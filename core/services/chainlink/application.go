@@ -27,6 +27,8 @@ import (
 	"github.com/smartcontractkit/chainlink/core/config"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services"
+	"github.com/smartcontractkit/chainlink/core/services/bulletprooftxmanager"
+	"github.com/smartcontractkit/chainlink/core/services/ccip"
 	"github.com/smartcontractkit/chainlink/core/services/blockhashstore"
 	"github.com/smartcontractkit/chainlink/core/services/cron"
 	"github.com/smartcontractkit/chainlink/core/services/directrequest"
@@ -363,6 +365,20 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 			globalLogger,
 			cfg,
 			relay,
+		)
+		delegates[job.CCIPRelay] = ccip.NewRelayDelegate(
+			db,
+			jobORM,
+			chainSet,
+			keyStore.OCR2(),
+			peerWrapper,
+		)
+		delegates[job.CCIPExecution] = ccip.NewExecutionDelegate(
+			db,
+			jobORM,
+			chainSet,
+			keyStore.OCR2(),
+			peerWrapper,
 		)
 	} else {
 		globalLogger.Debug("Off-chain reporting v2 disabled")

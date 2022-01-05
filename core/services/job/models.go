@@ -37,6 +37,9 @@ const (
 	BlockhashStore     Type = "blockhashstore"
 	Webhook            Type = "webhook"
 	Bootstrap          Type = "bootstrap"
+	CCIPExecution      Type = "ccip-execution"
+	CCIPRelay          Type = "ccip-relay"
+	CCIPBootstrap      Type = "ccip-bootstrap"
 )
 
 //revive:disable:redefines-builtin-id
@@ -70,6 +73,8 @@ var (
 		Webhook:            true,
 		BlockhashStore:     false,
 		Bootstrap:          false,
+		CCIPRelay:          false,
+		CCIPExecution:      false,
 	}
 	supportsAsync = map[Type]bool{
 		Cron:               true,
@@ -82,6 +87,8 @@ var (
 		Webhook:            true,
 		BlockhashStore:     false,
 		Bootstrap:          false,
+		CCIPRelay:          false,
+		CCIPExecution:      false,
 	}
 	schemaVersions = map[Type]uint32{
 		Cron:               1,
@@ -94,6 +101,8 @@ var (
 		Webhook:            1,
 		BlockhashStore:     1,
 		Bootstrap:          1,
+		CCIPRelay:          1,
+		CCIPExecution:      1,
 	}
 )
 
@@ -120,6 +129,10 @@ type Job struct {
 	BlockhashStoreSpec   *BlockhashStoreSpec
 	BootstrapSpec        *BootstrapSpec
 	BootstrapSpecID      *int32
+	CCIPRelaySpecID                *int32 `gorm:"column:ccip_relay_spec_id"`
+	CCIPRelaySpec                  *CCIPRelaySpec
+	CCIPExecutionSpecID            *int32 `gorm:"column:ccip_execution_spec_id"`
+	CCIPExecutionSpec              *CCIPExecutionSpec
 	PipelineSpecID       int32
 	PipelineSpec         *pipeline.Spec
 	JobSpecErrors        []SpecError
@@ -204,7 +217,7 @@ func (pr *PipelineRun) SetID(value string) error {
 type OCROracleSpec struct {
 	ID                                        int32               `toml:"-"`
 	ContractAddress                           ethkey.EIP55Address `toml:"contractAddress"`
-	P2PBootstrapPeers                         pq.StringArray      `toml:"p2pBootstrapPeers" db:"p2p_bootstrap_peers"`
+	P2PBootstrapPeers                         pq.StringArray      `toml:"p2pBootstrapPeers"                      db:"p2p_bootstrap_peers"`
 	IsBootstrapPeer                           bool                `toml:"isBootstrapPeer"`
 	EncryptedOCRKeyBundleID                   *models.Sha256Hash  `toml:"keyBundleID"`
 	EncryptedOCRKeyBundleIDEnv                bool
@@ -220,7 +233,7 @@ type OCROracleSpec struct {
 	ContractConfigTrackerPollIntervalEnv      bool
 	ContractConfigConfirmations               uint16 `toml:"contractConfigConfirmations"`
 	ContractConfigConfirmationsEnv            bool
-	EVMChainID                                *utils.Big       `toml:"evmChainID" db:"evm_chain_id"`
+	EVMChainID                                *utils.Big       `toml:"evmChainID"                             db:"evm_chain_id"`
 	DatabaseTimeout                           *models.Interval `toml:"databaseTimeout"`
 	DatabaseTimeoutEnv                        bool
 	ObservationGracePeriod                    *models.Interval `toml:"observationGracePeriod"`
@@ -323,8 +336,8 @@ type ExternalInitiatorWebhookSpec struct {
 type WebhookSpec struct {
 	ID                            int32 `toml:"-"`
 	ExternalInitiatorWebhookSpecs []ExternalInitiatorWebhookSpec
-	CreatedAt                     time.Time `json:"createdAt" toml:"-"`
-	UpdatedAt                     time.Time `json:"updatedAt" toml:"-"`
+	CreatedAt                     time.Time `toml:"-" json:"createdAt"`
+	UpdatedAt                     time.Time `toml:"-" json:"updatedAt"`
 }
 
 func (w WebhookSpec) GetID() string {
@@ -508,4 +521,50 @@ func (s BootstrapSpec) AsOCR2Spec() OCR2OracleSpec {
 		CreatedAt:                         s.CreatedAt,
 		UpdatedAt:                         s.UpdatedAt,
 	}
+}
+
+// TODO(kostis): remove gorms
+type CCIPRelaySpec struct {
+	ID                                     int32                `toml:"-" gorm:"primary_key"`
+	OnRampAddress                          ethkey.EIP55Address  `toml:"onRampAddress"`
+	OffRampAddress                         ethkey.EIP55Address  `toml:"offRampAddress"`
+	P2PPeerID                              *p2pkey.PeerID       `toml:"p2pPeerID" gorm:"column:p2p_peer_id;default:null"`
+	P2PBootstrapPeers                      pq.StringArray       `toml:"p2pBootstrapPeers" gorm:"column:p2p_bootstrap_peers;type:text[]"`
+	SourceEVMChainID                       *utils.Big           `toml:"sourceEvmChainID" gorm:"column:source_evm_chain_id"`
+	DestEVMChainID                         *utils.Big           `toml:"destEvmChainID" gorm:"column:dest_evm_chain_id"`
+	EncryptedOCRKeyBundleID                *models.Sha256Hash   `toml:"keyBundleID" gorm:"type:bytea"`
+	TransmitterAddress                     *ethkey.EIP55Address `toml:"transmitterAddress"`
+	BlockchainTimeout                      models.Interval      `toml:"blockchainTimeout" gorm:"type:bigint;default:null"`
+	ContractConfigTrackerSubscribeInterval models.Interval      `toml:"contractConfigTrackerSubscribeInterval" gorm:"default:null"`
+	ContractConfigTrackerPollInterval      models.Interval      `toml:"contractConfigTrackerPollInterval" gorm:"type:bigint;default:null"`
+	ContractConfigConfirmations            uint16               `toml:"contractConfigConfirmations"`
+	CreatedAt                              time.Time            `toml:"-"`
+	UpdatedAt                              time.Time            `toml:"-"`
+}
+
+func (CCIPRelaySpec) TableName() string {
+	return "ccip_relay_specs"
+}
+
+type CCIPExecutionSpec struct {
+	ID                                     int32                `toml:"-" gorm:"primary_key"`
+	OnRampAddress                          ethkey.EIP55Address  `toml:"onRampAddress"`
+	OffRampAddress                         ethkey.EIP55Address  `toml:"offRampAddress"`
+	ExecutorAddress                        ethkey.EIP55Address  `toml:"executorAddress"`
+	P2PPeerID                              *p2pkey.PeerID       `toml:"p2pPeerID" gorm:"column:p2p_peer_id;default:null"`
+	P2PBootstrapPeers                      pq.StringArray       `toml:"p2pBootstrapPeers" gorm:"column:p2p_bootstrap_peers;type:text[]"`
+	SourceEVMChainID                       *utils.Big           `toml:"sourceEvmChainID" gorm:"column:source_evm_chain_id"`
+	DestEVMChainID                         *utils.Big           `toml:"destEvmChainID" gorm:"column:dest_evm_chain_id"`
+	EncryptedOCRKeyBundleID                *models.Sha256Hash   `toml:"keyBundleID" gorm:"type:bytea"`
+	TransmitterAddress                     *ethkey.EIP55Address `toml:"transmitterAddress"`
+	BlockchainTimeout                      models.Interval      `toml:"blockchainTimeout" gorm:"type:bigint;default:null"`
+	ContractConfigTrackerSubscribeInterval models.Interval      `toml:"contractConfigTrackerSubscribeInterval" gorm:"default:null"`
+	ContractConfigTrackerPollInterval      models.Interval      `toml:"contractConfigTrackerPollInterval" gorm:"type:bigint;default:null"`
+	ContractConfigConfirmations            uint16               `toml:"contractConfigConfirmations"`
+	CreatedAt                              time.Time            `toml:"-"`
+	UpdatedAt                              time.Time            `toml:"-"`
+}
+
+func (CCIPExecutionSpec) TableName() string {
+	return "ccip_execution_specs"
 }
