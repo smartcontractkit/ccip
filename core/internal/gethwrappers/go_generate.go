@@ -50,6 +50,18 @@ package gethwrappers
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/AggregatorV3Interface.abi ../../../contracts/solc/v0.8/AggregatorV3Interface.bin AggregatorV3Interface aggregator_v3_interface
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/DerivedPriceFeed.abi ../../../contracts/solc/v0.8/DerivedPriceFeed.bin DerivedPriceFeed derived_price_feed_wrapper
 
+// CCIP
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/SingleTokenOnRamp.abi ../../../contracts/solc/v0.8/SingleTokenOnRamp.bin SingleTokenOnRamp single_token_onramp
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/SingleTokenOffRamp.abi ../../../contracts/solc/v0.8/SingleTokenOffRamp.bin SingleTokenOffRamp single_token_offramp
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/LockUnlockPool.abi ../../../contracts/solc/v0.8/LockUnlockPool.bin LockUnlockPool lock_unlock_pool
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/SingleTokenOffRampHelper.abi ../../../contracts/solc/v0.8/SingleTokenOffRampHelper.bin SingleTokenOffRampHelper single_token_offramp_helper
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/SimpleMessageReceiver.abi ../../../contracts/solc/v0.8/SimpleMessageReceiver.bin SimpleMessageReceiver simple_message_receiver
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/EOASingleTokenReceiver.abi ../../../contracts/solc/v0.8/EOASingleTokenReceiver.bin EOASingleTokenReceiver single_token_receiver
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/EOASingleTokenSender.abi ../../../contracts/solc/v0.8/EOASingleTokenSender.bin EOASingleTokenSender single_token_sender
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/MessageExecutor.abi ../../../contracts/solc/v0.8/MessageExecutor.bin MessageExecutor message_executor
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/MessageExecutorHelper.abi ../../../contracts/solc/v0.8/MessageExecutorHelper.bin MessageExecutorHelper message_executor_helper
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/AFN.abi ../../../contracts/solc/v0.8/AFN.bin AFNContract afn_contract
+
 // To run these commands, you must either install docker, or the correct version
 // of abigen. The latter can be installed with these commands, at least on linux:
 //
