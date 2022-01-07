@@ -7,19 +7,20 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	gethCommon "github.com/ethereum/go-ethereum/common"
+	"github.com/pkg/errors"
+	"github.com/smartcontractkit/chainlink/core/services/pg"
+
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/message_executor"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_offramp"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/bulletprooftxmanager"
 	"github.com/smartcontractkit/chainlink/core/services/eth"
-
-	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	gethCommon "github.com/ethereum/go-ethereum/common"
-	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/offchainreporting2/chains/evmutil"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2/types"
-	"gorm.io/gorm"
+	"github.com/smartcontractkit/sqlx"
 )
 
 var (
@@ -31,24 +32,27 @@ type ExecutionTransmitter struct {
 	contractABI abi.ABI
 	transmitter Transmitter
 	contract    *message_executor.MessageExecutor
+	lggr        logger.Logger
 }
 
 func NewExecutionTransmitter(
 	contract *message_executor.MessageExecutor,
 	contractABI abi.ABI,
 	transmitter Transmitter,
+	lggr logger.Logger,
 ) *ExecutionTransmitter {
 	return &ExecutionTransmitter{
 		contractABI: contractABI,
 		transmitter: transmitter,
 		contract:    contract,
+		lggr:        lggr,
 	}
 }
 
 func (oc *ExecutionTransmitter) Transmit(ctx context.Context, reportCtx ocrtypes.ReportContext, report ocrtypes.Report, signatures []ocrtypes.AttributedOnchainSignature) error {
 	rs, ss, vs := splitSigs(signatures)
 	rawReportCtx := evmutil.RawReportContext(reportCtx)
-	logger.Infow("executor transmitting report", "report", hex.EncodeToString(report), "rawReportCtx", rawReportCtx, "contractAddress", oc.contract.Address())
+	oc.lggr.Infow("executor transmitting report", "report", hex.EncodeToString(report), "rawReportCtx", rawReportCtx, "contractAddress", oc.contract.Address())
 
 	payload, err := oc.contractABI.Pack("transmit", rawReportCtx, []byte(report), rs, ss, vs)
 	if err != nil {
@@ -89,17 +93,20 @@ type OfframpTransmitter struct {
 	contractABI abi.ABI
 	transmitter Transmitter
 	contract    *single_token_offramp.SingleTokenOffRamp
+	lggr        logger.Logger
 }
 
 func NewOfframpTransmitter(
 	contract *single_token_offramp.SingleTokenOffRamp,
 	contractABI abi.ABI,
 	transmitter Transmitter,
+	lggr logger.Logger,
 ) *OfframpTransmitter {
 	return &OfframpTransmitter{
 		contractABI: contractABI,
 		transmitter: transmitter,
 		contract:    contract,
+		lggr:        lggr,
 	}
 }
 
@@ -119,7 +126,7 @@ func splitSigs(signatures []ocrtypes.AttributedOnchainSignature) (rs [][32]byte,
 func (oc *OfframpTransmitter) Transmit(ctx context.Context, reportCtx ocrtypes.ReportContext, report ocrtypes.Report, signatures []ocrtypes.AttributedOnchainSignature) error {
 	rs, ss, vs := splitSigs(signatures)
 	rawReportCtx := evmutil.RawReportContext(reportCtx)
-	logger.Debugw("Transmitting report", "report", hex.EncodeToString(report), "rawReportCtx", rawReportCtx, "contractAddress", oc.contract.Address())
+	oc.lggr.Debugw("Transmitting report", "report", hex.EncodeToString(report), "rawReportCtx", rawReportCtx, "contractAddress", oc.contract.Address())
 
 	payload, err := oc.contractABI.Pack("transmit", rawReportCtx, []byte(report), rs, ss, vs)
 	if err != nil {
@@ -158,7 +165,7 @@ func (oc *OfframpTransmitter) FromAccount() ocrtypes.Account {
 
 type relayTransmitter struct {
 	txm                        TxManager
-	db                         *gorm.DB
+	db                         *sqlx.DB
 	fromAddress                gethCommon.Address
 	gasLimit                   uint64
 	strategy                   bulletprooftxmanager.TxStrategy
@@ -167,7 +174,7 @@ type relayTransmitter struct {
 }
 
 type TxManager interface {
-	CreateEthTransaction(db *gorm.DB, newTx bulletprooftxmanager.NewTx) (etx bulletprooftxmanager.EthTx, err error)
+	CreateEthTransaction(newTx bulletprooftxmanager.NewTx, qs ...pg.QOpt) (etx bulletprooftxmanager.EthTx, err error)
 }
 
 type Transmitter interface {
@@ -176,7 +183,7 @@ type Transmitter interface {
 }
 
 // NewTransmitter creates a new eth relayTransmitter
-func NewRelayTransmitter(txm TxManager, db *gorm.DB, sourceChainID, destChainID *big.Int, fromAddress gethCommon.Address, gasLimit uint64, strategy bulletprooftxmanager.TxStrategy, ec eth.Client) Transmitter {
+func NewRelayTransmitter(txm TxManager, db *sqlx.DB, sourceChainID, destChainID *big.Int, fromAddress gethCommon.Address, gasLimit uint64, strategy bulletprooftxmanager.TxStrategy, ec eth.Client) Transmitter {
 	return &relayTransmitter{
 		txm:           txm,
 		db:            db,
@@ -207,7 +214,7 @@ func (t *relayTransmitter) CreateEthTransaction(ctx context.Context, toAddress g
 		return errors.Wrap(err, fmt.Sprintf("gas estimate of %d exceeds gas limit set by node %d", gasEstimate, t.gasLimit))
 	}
 	// TODO: As soon as gorm is removed, these can two db ops need to be in the same transaction
-	_, err = t.txm.CreateEthTransaction(t.db, bulletprooftxmanager.NewTx{
+	_, err = t.txm.CreateEthTransaction(bulletprooftxmanager.NewTx{
 		FromAddress:    t.fromAddress,
 		ToAddress:      toAddress,
 		EncodedPayload: payload,
@@ -224,7 +231,7 @@ func (t *relayTransmitter) FromAddress() gethCommon.Address {
 
 type executeTransmitter struct {
 	txm                        TxManager
-	db                         *gorm.DB
+	db                         *sqlx.DB
 	fromAddress                gethCommon.Address
 	gasLimit                   uint64
 	strategy                   bulletprooftxmanager.TxStrategy
@@ -233,7 +240,7 @@ type executeTransmitter struct {
 }
 
 // NewTransmitter creates a new eth relayTransmitter
-func NewExecuteTransmitter(txm TxManager, db *gorm.DB, sourceChainID, destChainID *big.Int, fromAddress gethCommon.Address, gasLimit uint64, strategy bulletprooftxmanager.TxStrategy, ec eth.Client) Transmitter {
+func NewExecuteTransmitter(txm TxManager, db *sqlx.DB, sourceChainID, destChainID *big.Int, fromAddress gethCommon.Address, gasLimit uint64, strategy bulletprooftxmanager.TxStrategy, ec eth.Client) Transmitter {
 	return &executeTransmitter{
 		txm:           txm,
 		db:            db,
@@ -264,7 +271,7 @@ func (t *executeTransmitter) CreateEthTransaction(ctx context.Context, toAddress
 		return errors.Wrap(err, fmt.Sprintf("gas estimate of %d exceeds gas limit set by node %d", gasEstimate, t.gasLimit))
 	}
 	// TODO: As soon as gorm is removed, these can two db ops need to be in the same transaction
-	_, err = t.txm.CreateEthTransaction(t.db, bulletprooftxmanager.NewTx{
+	_, err = t.txm.CreateEthTransaction(bulletprooftxmanager.NewTx{
 		FromAddress:    t.fromAddress,
 		ToAddress:      toAddress,
 		EncodedPayload: payload,

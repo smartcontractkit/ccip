@@ -1,53 +1,55 @@
 package ccip
 
 import (
-	"context"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/pkg/errors"
+
+	"github.com/smartcontractkit/chainlink/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/message_executor"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_offramp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_onramp"
+	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/bulletprooftxmanager"
+	"github.com/smartcontractkit/chainlink/core/services/job"
 	"github.com/smartcontractkit/chainlink/core/services/keystore"
 	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
-
-	"github.com/pkg/errors"
-	"github.com/smartcontractkit/chainlink/core/chains/evm"
-	"github.com/smartcontractkit/chainlink/core/logger"
-	"github.com/smartcontractkit/chainlink/core/services/job"
-	"github.com/smartcontractkit/chainlink/core/services/postgres"
 	ocr "github.com/smartcontractkit/libocr/offchainreporting2"
 	"github.com/smartcontractkit/libocr/offchainreporting2/chains/evmutil"
-	"gorm.io/gorm"
+	"github.com/smartcontractkit/sqlx"
 )
 
 var _ job.Delegate = (*ExecutionDelegate)(nil)
 
 type ExecutionDelegate struct {
-	db          *gorm.DB
+	db          *sqlx.DB
 	jobORM      job.ORM
 	orm         ORM
 	chainSet    evm.ChainSet
-	keyStore    keystore.OCR2
+	ks          keystore.OCR2
 	peerWrapper *ocrcommon.SingletonPeerWrapper
+	lggr        logger.Logger
 }
 
 // TODO: Register this delegate behind a FF
 func NewExecutionDelegate(
-	db *gorm.DB,
+	db *sqlx.DB,
 	jobORM job.ORM,
 	chainSet evm.ChainSet,
 	keyStore keystore.OCR2,
 	peerWrapper *ocrcommon.SingletonPeerWrapper,
+	lggr logger.Logger,
+
 ) *ExecutionDelegate {
 	return &ExecutionDelegate{
 		db:          db,
 		jobORM:      jobORM,
-		orm:         NewORM(postgres.UnwrapGormDB(db)),
+		orm:         NewORM(db),
 		chainSet:    chainSet,
-		keyStore:    keyStore,
+		ks:          keyStore,
 		peerWrapper: peerWrapper,
+		lggr:        lggr,
 	}
 }
 
@@ -73,13 +75,14 @@ func (d ExecutionDelegate) getOracleArgs(l logger.Logger, jb job.Job, executor *
 			jb.CCIPExecutionSpec.DestEVMChainID.ToInt(), ta.Address(),
 			chain.Config().EvmGasLimitDefault(),
 			bulletprooftxmanager.NewQueueingTxStrategy(jb.ExternalJobID,
-				chain.Config().OCR2DefaultTransactionQueueDepth(), false),
+				chain.Config().OCRDefaultTransactionQueueDepth(), false),
 			chain.Client()),
+		d.lggr,
 	)
 	ocrLogger := logger.NewOCRWrapper(l, true, func(msg string) {
-		d.jobORM.RecordError(context.Background(), jb.ID, msg)
+		d.jobORM.RecordError(jb.ID, msg)
 	})
-	key, err := getValidatedKeyBundle(jb.CCIPExecutionSpec.EncryptedOCRKeyBundleID, chain, d.keyStore)
+	key, err := getValidatedKeyBundle(jb.CCIPExecutionSpec.EncryptedOCRKeyBundleID, chain, d.ks)
 	if err != nil {
 		return nil, err
 	}
@@ -91,11 +94,7 @@ func (d ExecutionDelegate) getOracleArgs(l logger.Logger, jb job.Job, executor *
 		return nil, err
 	}
 
-	gormdb, errdb := d.db.DB()
-	if errdb != nil {
-		return nil, errors.Wrap(errdb, "unable to open sql db")
-	}
-	ocrdb := NewDB(gormdb, jb.CCIPExecutionSpec.ExecutorAddress.Address())
+	ocrdb := NewDB(d.db.DB, jb.CCIPExecutionSpec.ExecutorAddress.Address(), d.lggr)
 	return &ocr.OracleArgs{
 		BinaryNetworkEndpointFactory: d.peerWrapper.Peer2,
 		V2Bootstrappers:              bootstrapPeers,
@@ -108,8 +107,8 @@ func (d ExecutionDelegate) getOracleArgs(l logger.Logger, jb job.Job, executor *
 		Logger:                 ocrLogger,
 		MonitoringEndpoint:     nil, // TODO
 		OffchainConfigDigester: offchainConfigDigester,
-		OffchainKeyring:        &key.OffchainKeyring,
-		OnchainKeyring:         &key.OnchainKeyring,
+		OffchainKeyring:        key,
+		OnchainKeyring:         key,
 		ReportingPluginFactory: NewExecutionReportingPluginFactory(l, d.orm, jb.CCIPExecutionSpec.SourceEVMChainID.ToInt(), jb.CCIPExecutionSpec.DestEVMChainID.ToInt(), jb.CCIPExecutionSpec.ExecutorAddress.Address(), offRamp),
 	}, nil
 }
@@ -118,7 +117,7 @@ func (d ExecutionDelegate) ServicesForSpec(jb job.Job) ([]job.Service, error) {
 	if jb.CCIPExecutionSpec == nil {
 		return nil, errors.New("no ccip job specified")
 	}
-	l := logger.Default.With(
+	l := d.lggr.With(
 		"jobID", jb.ID,
 		"externalJobID", jb.ExternalJobID,
 		"offRampAddress", jb.CCIPExecutionSpec.OffRampAddress,
@@ -151,11 +150,12 @@ func (d ExecutionDelegate) ServicesForSpec(jb job.Job) ([]job.Service, error) {
 		destChain.Client(),
 		destChain.LogBroadcaster(),
 		jb.ID,
-		logger.Default,
+		d.lggr,
 		d.db,
 		destChain,
 		destChain.HeadBroadcaster(),
 	)
+
 	oracleArgs, err := d.getOracleArgs(l, jb, contract, destChain, contractTracker, offchainConfigDigester, singleTokenOffRamp)
 	if err != nil {
 		return nil, err

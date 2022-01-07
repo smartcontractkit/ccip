@@ -17,7 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/postgres"
 	"github.com/smartcontractkit/chainlink/core/utils"
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
-	"gorm.io/gorm"
+	"github.com/smartcontractkit/sqlx"
 )
 
 var (
@@ -42,7 +42,7 @@ type LogListener struct {
 	unsubscribeLogsOnRamp  func()
 	unsubscribeLogsOffRamp func()
 
-	db  *gorm.DB
+	db  *sqlx.DB
 	orm ORM
 
 	wgShutdown sync.WaitGroup
@@ -57,7 +57,7 @@ func NewLogListener(
 	singleTokenOnRamp *single_token_onramp.SingleTokenOnRamp,
 	singleTokenOffRamp *single_token_offramp.SingleTokenOffRamp,
 	offchainConfig OffchainConfig,
-	db *gorm.DB,
+	db *sqlx.DB,
 	jobID int32,
 ) *LogListener {
 	return &LogListener{
@@ -66,7 +66,7 @@ func NewLogListener(
 		destChainLogBroadcaster:   destChainLogBroadcaster,
 		jobID:                     jobID,
 		db:                        db,
-		orm:                       NewORM(postgres.UnwrapGormDB(db)),
+		orm:                       NewORM(db),
 		singleTokenOnRamp:         singleTokenOnRamp,
 		singleTokenOffRamp:        singleTokenOffRamp,
 		offchainConfig:            offchainConfig,

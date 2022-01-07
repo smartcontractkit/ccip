@@ -1,23 +1,22 @@
 package ccip
 
 import (
-	"github.com/smartcontractkit/sqlx"
 	"strings"
 
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_onramp"
-
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/pkg/errors"
+
+	"github.com/smartcontractkit/chainlink/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_offramp"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_onramp"
+	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/bulletprooftxmanager"
+	"github.com/smartcontractkit/chainlink/core/services/job"
 	"github.com/smartcontractkit/chainlink/core/services/keystore"
 	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
-
-	"github.com/pkg/errors"
-	"github.com/smartcontractkit/chainlink/core/chains/evm"
-	"github.com/smartcontractkit/chainlink/core/logger"
-	"github.com/smartcontractkit/chainlink/core/services/job"
 	ocr "github.com/smartcontractkit/libocr/offchainreporting2"
 	"github.com/smartcontractkit/libocr/offchainreporting2/chains/evmutil"
+	"github.com/smartcontractkit/sqlx"
 )
 
 var _ job.Delegate = (*RelayDelegate)(nil)
@@ -29,6 +28,7 @@ type RelayDelegate struct {
 	chainSet    evm.ChainSet
 	keyStore    keystore.OCR2
 	peerWrapper *ocrcommon.SingletonPeerWrapper
+	lggr        logger.Logger
 }
 
 // TODO: Register this delegate behind a FF
@@ -38,6 +38,7 @@ func NewRelayDelegate(
 	chainSet evm.ChainSet,
 	keyStore keystore.OCR2,
 	peerWrapper *ocrcommon.SingletonPeerWrapper,
+	lggr logger.Logger,
 ) *RelayDelegate {
 	return &RelayDelegate{
 		db:          db,
@@ -46,6 +47,7 @@ func NewRelayDelegate(
 		chainSet:    chainSet,
 		keyStore:    keyStore,
 		peerWrapper: peerWrapper,
+		lggr:        lggr,
 	}
 }
 
@@ -73,6 +75,7 @@ func (d RelayDelegate) getOracleArgs(l logger.Logger, jb job.Job, offRamp *singl
 			bulletprooftxmanager.NewQueueingTxStrategy(jb.ExternalJobID,
 				chain.Config().OCRDefaultTransactionQueueDepth(), false),
 			chain.Client()),
+		d.lggr,
 	)
 	ocrLogger := logger.NewOCRWrapper(l, true, func(msg string) {
 		d.jobORM.RecordError(jb.ID, msg)
@@ -102,8 +105,8 @@ func (d RelayDelegate) getOracleArgs(l logger.Logger, jb job.Job, offRamp *singl
 		Logger:                 ocrLogger,
 		MonitoringEndpoint:     nil, // TODO
 		OffchainConfigDigester: offchainConfigDigester,
-		OffchainKeyring:        &key.OffchainKeyring,
-		OnchainKeyring:         &key.OnchainKeyring,
+		OffchainKeyring:        key,
+		OnchainKeyring:         key,
 		ReportingPluginFactory: NewRelayReportingPluginFactory(l, d.orm, offRamp),
 	}, nil
 }
@@ -112,7 +115,7 @@ func (d RelayDelegate) ServicesForSpec(jb job.Job) ([]job.Service, error) {
 	if jb.CCIPRelaySpec == nil {
 		return nil, errors.New("no ccip job specified")
 	}
-	l := logger.Default.With(
+	l := d.lggr.With(
 		"jobID", jb.ID,
 		"externalJobID", jb.ExternalJobID,
 		"offRampContract", jb.CCIPRelaySpec.OffRampAddress,
@@ -136,7 +139,7 @@ func (d RelayDelegate) ServicesForSpec(jb job.Job) ([]job.Service, error) {
 		destChain.Client(),
 		destChain.LogBroadcaster(),
 		jb.ID,
-		logger.Default,
+		d.lggr,
 		d.db,
 		destChain,
 		destChain.HeadBroadcaster(),
