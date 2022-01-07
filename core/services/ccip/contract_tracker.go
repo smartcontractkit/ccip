@@ -187,7 +187,7 @@ func (t *CCIPContractTracker) Start() error {
 		var latestHead *eth.Head
 		latestHead, t.unsubscribeHeads = t.headBroadcaster.Subscribe(t)
 		if latestHead != nil {
-			t.setLatestBlockHeight(*latestHead)
+			t.setLatestBlockHeight(latestHead)
 		}
 
 		t.wg.Add(1)
@@ -212,11 +212,11 @@ func (t *CCIPContractTracker) Close() error {
 func (t *CCIPContractTracker) Connect(*eth.Head) error { return nil }
 
 // OnNewLongestChain conformed to HeadTrackable and updates latestBlockHeight
-func (t *CCIPContractTracker) OnNewLongestChain(_ context.Context, h eth.Head) {
+func (t *CCIPContractTracker) OnNewLongestChain(_ context.Context, h *eth.Head) {
 	t.setLatestBlockHeight(h)
 }
 
-func (t *CCIPContractTracker) setLatestBlockHeight(h eth.Head) {
+func (t *CCIPContractTracker) setLatestBlockHeight(h *eth.Head) {
 	var num int64
 	if h.L1BlockNumber.Valid {
 		num = h.L1BlockNumber.Int64
@@ -280,12 +280,12 @@ func (t *CCIPContractTracker) HandleLog(lb log.Broadcast) {
 	raw := lb.RawLog()
 	if raw.Address != t.contract.Address() {
 		t.logger.Errorf("log address of 0x%x does not match configured contract address of 0x%x", raw.Address, t.contract.Address())
-		t.logger.ErrorIfCalling(func() error { return t.logBroadcaster.MarkConsumed(lb) })
+		t.markConsumed(lb)
 		return
 	}
 	topics := raw.Topics
 	if len(topics) == 0 {
-		t.logger.ErrorIfCalling(func() error { return t.logBroadcaster.MarkConsumed(lb) })
+		t.markConsumed(lb)
 		return
 	}
 
@@ -295,7 +295,7 @@ func (t *CCIPContractTracker) HandleLog(lb log.Broadcast) {
 		configSet, err := t.contract.ParseConfigSet(raw)
 		if err != nil {
 			t.logger.Errorw("could not parse config set", "err", err)
-			t.logger.ErrorIfCalling(func() error { return t.logBroadcaster.MarkConsumed(lb) })
+			t.markConsumed(lb)
 			return
 		}
 		configSet.Raw = raw
@@ -309,9 +309,16 @@ func (t *CCIPContractTracker) HandleLog(lb log.Broadcast) {
 		t.logger.Debugw("CCIPContractTracker: got unrecognised log topic", "topic", topics[0])
 	}
 	if !consumed {
-		ctx, cancel := pg.DefaultQueryCtx()
-		defer cancel()
-		t.logger.ErrorIfCalling(func() error { return t.logBroadcaster.MarkConsumed(lb, pg.WithParentCtx(ctx)) })
+		t.markConsumed(lb)
+	}
+}
+
+func (t *CCIPContractTracker) markConsumed(lb log.Broadcast) {
+	ctx, cancel := pg.DefaultQueryCtx()
+	defer cancel()
+	err := t.logBroadcaster.MarkConsumed(lb, pg.WithParentCtx(ctx))
+	if err != nil {
+		t.logger.Error(err)
 	}
 }
 

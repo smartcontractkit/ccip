@@ -6,7 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
-	evmconfig "github.com/smartcontractkit/chainlink/core/chains/evm/config"
+	"github.com/smartcontractkit/chainlink/core/config"
 	"github.com/smartcontractkit/chainlink/core/services/keystore"
 	"github.com/smartcontractkit/chainlink/core/services/keystore/keys/ethkey"
 	"github.com/smartcontractkit/chainlink/core/services/keystore/keys/ocr2key"
@@ -19,7 +19,7 @@ import (
 )
 
 // Fallback to config if explicit spec parameters are not set
-func computeLocalConfig(config evmconfig.OCR2Config, dev bool, bt time.Duration, confs uint16, poll time.Duration) ocrtypes.LocalConfig {
+func computeLocalConfig(config config.OCR2Config, dev bool, bt time.Duration, confs uint16, poll time.Duration) ocrtypes.LocalConfig {
 	var blockchainTimeout time.Duration
 	if bt != 0 {
 		blockchainTimeout = bt
@@ -114,7 +114,7 @@ func getValidatedKeyBundle(specBundleID *models.Sha256Hash, chain evm.Chain, ks 
 func getTransmitterAddress(specAddress *ethkey.EIP55Address, chain evm.Chain) (ta ethkey.EIP55Address, err error) {
 	if specAddress != nil {
 		ta = *specAddress
-	} else if ta, err = chain.Config().OCR2TransmitterAddress(); err != nil {
+	} else if ta, err = chain.Config().OCRTransmitterAddress(); err != nil {
 		return ta, err
 	}
 	return ta, nil
