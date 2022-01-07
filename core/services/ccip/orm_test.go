@@ -18,7 +18,7 @@ import (
 
 func TestORM(t *testing.T) {
 	// Use a real db so we can do timestamp testing.
-	_, db, _ := heavyweight.FullTestDB(t, "orm_test", true, false)
+	_, db := heavyweight.FullTestDB(t, "orm_test", true, false)
 	orm := ccip.NewORM(db)
 	source := big.NewInt(1)
 	dest := big.NewInt(2)

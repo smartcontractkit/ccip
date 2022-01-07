@@ -113,25 +113,26 @@ func TestLogListener_SavesRequests(t *testing.T) {
 
 	// Start the log broadcaster/log listener
 	// and add a CCIP job.
-	db := pgtest.NewSqlDB(t)
+	db := pgtest.NewSqlxDB(t)
 	ethClient := eth.NewClientFromSim(backend, big.NewInt(1337))
 	lggr := logger.TestLogger(t)
-	lorm := log.NewORM(db, lggr, *big.NewInt(1337))
+	lorm := log.NewORM(db, lggr, nil, *big.NewInt(1337))
 	r, err := lorm.FindConsumedLogs(0, 100)
 	require.NoError(t, err)
 	t.Log(r)
 	lb := log.NewBroadcaster(lorm, ethClient, lc{}, lggr, nil)
 	require.NoError(t, lb.Start())
-	jobORM := job.NewORM(db, nil, pipeline.NewORM(db), nil, lggr)
+	jobORM := job.NewORM(db, nil, pipeline.NewORM(db, lggr, nil), nil, lggr, nil)
 	ccipSpec, err := ValidatedCCIPSpec(testspecs.GenerateCCIPSpec(testspecs.CCIPSpecParams{}).Toml())
 	require.NoError(t, err)
-	jb, err := jobORM.CreateJob(context.Background(), &ccipSpec, ccipSpec.Pipeline)
+	err = jobORM.CreateJob(&ccipSpec)
 	require.NoError(t, err)
+	jb := ccipSpec
 	ccipConfig := OffchainConfig{
 		SourceIncomingConfirmations: 0,
 		DestIncomingConfirmations:   0,
 	}
-	logListener := NewLogListener(logger.Default, lb, lb, onRamp, offRamp, ccipConfig, db, jb.ID)
+	logListener := NewLogListener(lggr, lb, lb, onRamp, offRamp, ccipConfig, db, jb.ID)
 	t.Log("Ramp address", onRampAddress, onRamp.Address())
 	require.NoError(t, logListener.Start())
 
@@ -212,7 +213,7 @@ func TestLogListener_SavesRequests(t *testing.T) {
 
 	require.NoError(t, lb.Close())
 	require.NoError(t, logListener.Close())
-	require.NoError(t, jobORM.DeleteJob(context.Background(), jb.ID))
+	require.NoError(t, jobORM.DeleteJob(jb.ID))
 }
 
 func updateOffchainConfig(t *testing.T, reportingPluginConfig OffchainConfig, offRamp *single_token_offramp.SingleTokenOffRamp, user *bind.TransactOpts) {
@@ -262,7 +263,7 @@ func updateOffchainConfig(t *testing.T, reportingPluginConfig OffchainConfig, of
 		},
 	}
 	// Change the offramp config
-	signers, transmitters, threshold, onchainConfig, offchainConfigVersion, offchainConfig, err := confighelper2.ContractSetConfigArgs(
+	signers, transmitters, threshold, onchainConfig, offchainConfigVersion, offchainConfig, err := confighelper2.ContractSetConfigArgsForTests(
 		2*time.Second,        // deltaProgress
 		1*time.Second,        // deltaResend
 		1*time.Second,        // deltaRound

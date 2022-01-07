@@ -568,3 +568,23 @@ type CCIPExecutionSpec struct {
 func (CCIPExecutionSpec) TableName() string {
 	return "ccip_execution_specs"
 }
+
+// TODO: make generic bootstrap job
+type CCIPBootstrapSpec struct {
+	ID                 int32               `toml:"-" gorm:"primary_key"`
+	ContractAddress    ethkey.EIP55Address `toml:"contractAddress"`
+	EVMChainID         *utils.Big          `toml:"evmChainID" gorm:"column:evm_chain_id"`
+	MonitoringEndpoint *string             `toml:"monitoringEndpoint" gorm:"column:monitoring_endpoint"`
+	P2PPeerID          *p2pkey.PeerID      `toml:"p2pPeerID" gorm:"column:p2p_peer_id;default:null"`
+	// TODO: Add fields as needed
+	BlockchainTimeout                      models.Interval `toml:"blockchainTimeout" gorm:"type:bigint;default:null"`
+	ContractConfigTrackerSubscribeInterval models.Interval `toml:"contractConfigTrackerSubscribeInterval" gorm:"default:null"`
+	ContractConfigTrackerPollInterval      models.Interval `toml:"contractConfigTrackerPollInterval" gorm:"type:bigint;default:null"`
+	ContractConfigConfirmations            uint16          `toml:"contractConfigConfirmations"`
+	CreatedAt                              time.Time       `toml:"-"`
+	UpdatedAt                              time.Time       `toml:"-"`
+}
+
+func (CCIPBootstrapSpec) TableName() string {
+	return "ccip_bootstrap_specs"
+}

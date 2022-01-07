@@ -169,7 +169,7 @@ func TestExecutionReportEncoding(t *testing.T) {
 func TestExecutionPlugin(t *testing.T) {
 	// Avoid using txdb: it has bugs and currently has savepoints disabled (to be able to use with gorm)
 	// and so any ctx cancellation poisons the tx.
-	_, db, _ := heavyweight.FullTestDB(t, "executor_plugin", true, false)
+	_, db := heavyweight.FullTestDB(t, "executor_plugin", true, false)
 	orm := ccip.NewORM(db)
 	lr := new(lastreportermocks.OffRampLastReporter)
 	executor := common.HexToAddress("0xf97f4df75117a78c1A5a0DBb814Af92458539FB5")
