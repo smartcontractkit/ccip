@@ -8,7 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	"github.com/smartcontractkit/chainlink/core/services/postgres"
+	"github.com/smartcontractkit/chainlink/core/services/pg"
 
 	"github.com/smartcontractkit/sqlx"
 )
@@ -65,7 +65,7 @@ func (o *orm) Requests(sourceChainId, destChainId *big.Int, minSeqNum, maxSeqNum
 		q += fmt.Sprintf(` AND options = '\x%v'`, hexutil.Encode(options)[2:])
 	}
 	q += ` ORDER BY seq_num ASC`
-	ctx, cancel := postgres.DefaultQueryCtx()
+	ctx, cancel := pg.DefaultQueryCtx()
 	defer cancel()
 	err = o.db.SelectContext(ctx, &reqs, q)
 	return
@@ -79,7 +79,7 @@ func (o *orm) UpdateRequestStatus(sourceChainId, destChainId, minSeqNum, maxSeqN
 		  AND source_chain_id = $4 
 		  AND dest_chain_id = $5 
 		RETURNING seq_num`
-	ctx, cancel := postgres.DefaultQueryCtx()
+	ctx, cancel := pg.DefaultQueryCtx()
 	defer cancel()
 	res, err := o.db.ExecContext(ctx, q, status, minSeqNum.String(), maxSeqNum.String(), sourceChainId.String(), destChainId.String())
 	if err != nil {
@@ -111,7 +111,7 @@ func (o *orm) UpdateRequestSetStatus(sourceChainId, destChainId *big.Int, seqNum
 		  AND source_chain_id = $2 
 		  AND dest_chain_id = $3 
 		RETURNING seq_num`, seqNumsSet)
-	ctx, cancel := postgres.DefaultQueryCtx()
+	ctx, cancel := pg.DefaultQueryCtx()
 	defer cancel()
 	res, err := o.db.ExecContext(ctx, q, status, sourceChainId.String(), destChainId.String())
 	if err != nil {
@@ -133,7 +133,7 @@ func (o *orm) ResetExpiredRequests(sourceChainId, destChainId *big.Int, expiryTi
 			AND source_chain_id = $2
 			AND dest_chain_id = $3
 			AND status = $4`, expiryTimeoutSeconds)
-	ctx, cancel := postgres.DefaultQueryCtx()
+	ctx, cancel := pg.DefaultQueryCtx()
 	defer cancel()
 	_, err := o.db.ExecContext(ctx, q, toStatus, sourceChainId.String(), destChainId.String(), fromStatus)
 	return err
@@ -149,7 +149,7 @@ func (o *orm) SaveRequest(request *Request) error {
 	if err != nil {
 		return err
 	}
-	ctx, cancel := postgres.DefaultQueryCtx()
+	ctx, cancel := pg.DefaultQueryCtx()
 	defer cancel()
 	_, err = stmt.ExecContext(ctx, request)
 	return err
@@ -157,7 +157,7 @@ func (o *orm) SaveRequest(request *Request) error {
 
 func (o *orm) RelayReport(seqNum *big.Int) (report RelayReport, err error) {
 	q := `SELECT * FROM ccip_relay_reports WHERE min_seq_num <= $1 and max_seq_num >= $1`
-	ctx, cancel := postgres.DefaultQueryCtx()
+	ctx, cancel := pg.DefaultQueryCtx()
 	defer cancel()
 	err = o.db.GetContext(ctx, &report, q, seqNum.String())
 	return
@@ -165,7 +165,7 @@ func (o *orm) RelayReport(seqNum *big.Int) (report RelayReport, err error) {
 
 func (o *orm) SaveRelayReport(report RelayReport) error {
 	q := `INSERT INTO ccip_relay_reports (root, min_seq_num, max_seq_num, created_at) VALUES ($1, $2, $3, now()) ON CONFLICT DO NOTHING`
-	ctx, cancel := postgres.DefaultQueryCtx()
+	ctx, cancel := pg.DefaultQueryCtx()
 	defer cancel()
 	_, err := o.db.ExecContext(ctx, q, report.Root[:], report.MinSeqNum.String(), report.MaxSeqNum.String())
 	return err

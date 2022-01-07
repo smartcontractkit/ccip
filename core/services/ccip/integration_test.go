@@ -16,7 +16,9 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/onsi/gomega"
+	uuid "github.com/satori/go.uuid"
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
+	"github.com/smartcontractkit/chainlink/core/gracefulpanic"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/afn_contract"
 	"github.com/smartcontractkit/chainlink/core/services/ccip/abihelpers"
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -28,7 +30,6 @@ import (
 	"gopkg.in/guregu/null.v4"
 
 	evmtypes "github.com/smartcontractkit/chainlink/core/chains/evm/types"
-	"github.com/smartcontractkit/chainlink/core/gracefulpanic"
 	"github.com/smartcontractkit/chainlink/core/internal/cltest"
 	"github.com/smartcontractkit/chainlink/core/internal/cltest/heavyweight"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/link_token_interface"
@@ -51,7 +52,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/keystore"
 	"github.com/smartcontractkit/chainlink/core/services/keystore/keys/ocr2key"
 	"github.com/smartcontractkit/chainlink/core/services/log"
-	"github.com/smartcontractkit/chainlink/core/services/postgres"
+	"github.com/smartcontractkit/chainlink/core/services/pg"
 	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
@@ -250,25 +251,24 @@ func (ks EthKeyStoreSim) SignTx(address common.Address, tx *types.Transaction, c
 
 var _ keystore.Eth = EthKeyStoreSim{}
 
-func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port uint16, dbName string, sourceChain *backends.SimulatedBackend, destChain *backends.SimulatedBackend) (chainlink.Application, string, common.Address, ocr2key.KeyBundle, *configtest.TestGeneralConfig, func()) {
+func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName string, sourceChain *backends.SimulatedBackend, destChain *backends.SimulatedBackend) (chainlink.Application, string, common.Address, ocr2key.KeyBundle, *configtest.TestGeneralConfig, func()) {
 	// Do not want to load fixtures as they contain a dummy chainID.
-	config, _, db := heavyweight.FullTestDB(t, fmt.Sprintf("%s%d", dbName, port), true, false)
+	config, db := heavyweight.FullTestDB(t, fmt.Sprintf("%s%d", dbName, port), true, false)
 	config.Overrides.FeatureOffchainReporting = null.BoolFrom(false)
 	config.Overrides.FeatureOffchainReporting2 = null.BoolFrom(true)
 	config.Overrides.GlobalGasEstimatorMode = null.NewString("FixedPrice", true)
 	config.Overrides.DefaultChainID = nil
-	config.Overrides.P2PListenPort = port
+	config.Overrides.P2PListenPort = null.NewInt(port, true)
 	config.Overrides.P2PNetworkingStack = ocrnetworking.NetworkingStackV2
 	// Disables ocr spec validation so we can have fast polling for the test.
 	config.Overrides.Dev = null.BoolFrom(true)
 
-	eventBroadcaster := postgres.NewEventBroadcaster(config.DatabaseURL(), 0, 0)
 	var lggr = logger.TestLogger(t)
+	eventBroadcaster := pg.NewEventBroadcaster(config.DatabaseURL(), 0, 0, lggr, uuid.NewV1())
 	shutdown := gracefulpanic.NewSignal()
-	sqlxDB := postgres.UnwrapGormDB(db)
 
 	// We fake different chainIDs using the wrapped sim cltest.SimulatedBackend
-	chainORM := evm.NewORM(sqlxDB)
+	chainORM := evm.NewORM(db)
 	_, err := chainORM.CreateChain(*utils.NewBig(sourceChainID), evmtypes.ChainCfg{})
 	require.NoError(t, err)
 	_, err = chainORM.CreateChain(*utils.NewBig(destChainID), evmtypes.ChainCfg{})
@@ -276,7 +276,7 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port uint16, dbName s
 	sourceClient := cltest.NewSimulatedBackendClient(t, sourceChain, sourceChainID)
 	destClient := cltest.NewSimulatedBackendClient(t, destChain, destChainID)
 
-	keyStore := keystore.New(db, utils.FastScryptParams, lggr)
+	keyStore := keystore.New(db, utils.FastScryptParams, lggr, config)
 	simEthKeyStore := EthKeyStoreSim{Eth: keyStore.Eth()}
 
 	// Create our chainset manually so we can have custom eth clients
@@ -285,8 +285,7 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port uint16, dbName s
 		ORM:              chainORM,
 		Config:           config,
 		Logger:           lggr,
-		GormDB:           db,
-		SQLxDB:           sqlxDB,
+		DB:               db,
 		KeyStore:         simEthKeyStore,
 		EventBroadcaster: eventBroadcaster,
 		GenEthClient: func(c evmtypes.Chain) eth.Client {
@@ -310,10 +309,10 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port uint16, dbName s
 		GenLogBroadcaster: func(c evmtypes.Chain) log.Broadcaster {
 			if c.ID.String() == sourceChainID.String() {
 				t.Log("Generating log broadcaster source")
-				return log.NewBroadcaster(log.NewORM(db, *sourceChainID), sourceClient,
+				return log.NewBroadcaster(log.NewORM(db, lggr, config, *sourceChainID), sourceClient,
 					evmtest.NewChainScopedConfig(t, config), lggr, nil)
 			} else if c.ID.String() == destChainID.String() {
-				return log.NewBroadcaster(log.NewORM(db, *destChainID), destClient,
+				return log.NewBroadcaster(log.NewORM(db, lggr, config, *destChainID), destClient,
 					evmtest.NewChainScopedConfig(t, config), lggr, nil)
 			}
 			t.Fatalf("invalid chain ID %v", c.ID.String())
@@ -330,14 +329,13 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port uint16, dbName s
 		},
 	})
 	if err != nil {
-		logger.Fatal(err)
+		lggr.Fatal(err)
 	}
 	app, err := chainlink.NewApplication(chainlink.ApplicationOpts{
 		Config:                   config,
 		EventBroadcaster:         eventBroadcaster,
 		ShutdownSignal:           shutdown,
-		GormDB:                   db,
-		SqlxDB:                   sqlxDB,
+		SqlxDB:                   db,
 		KeyStore:                 keyStore,
 		ChainSet:                 chainSet,
 		Logger:                   lggr,
@@ -354,7 +352,7 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port uint16, dbName s
 	peerID := p2pIDs[0].PeerID()
 
 	config.Overrides.P2PPeerID = peerID
-	config.Overrides.P2PListenPort = port
+	config.Overrides.P2PListenPort = null.NewInt(port, true)
 	p2paddresses := []string{
 		fmt.Sprintf("127.0.0.1:%d", port),
 	}
@@ -369,7 +367,7 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port uint16, dbName s
 	transmitter := sendingKeys[0].Address.Address()
 	s, err := app.GetKeyStore().Eth().GetState(sendingKeys[0].ID())
 	require.NoError(t, err)
-	logger.Debug(fmt.Sprintf("Transmitter address %s chainID %s", transmitter, s.EVMChainID.String()))
+	lggr.Debug(fmt.Sprintf("Transmitter address %s chainID %s", transmitter, s.EVMChainID.String()))
 
 	// Fund the relayTransmitter address with some ETH
 	n, err := destChain.NonceAt(context.Background(), owner.From, nil)
@@ -392,7 +390,7 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port uint16, dbName s
 func TestIntegration_CCIP(t *testing.T) {
 	ccipContracts := setupCCIPContracts(t)
 	// Oracles need ETH on the destination chain
-	bootstrapNodePort := uint16(19599)
+	bootstrapNodePort := int64(19599)
 	appBootstrap, bootstrapPeerID, _, _, _, _ := setupNodeCCIP(t, ccipContracts.destUser, bootstrapNodePort, "bootstrap_ccip", ccipContracts.sourceChain, ccipContracts.destChain)
 	var (
 		oracles      []confighelper2.OracleIdentityExtra
@@ -401,7 +399,7 @@ func TestIntegration_CCIP(t *testing.T) {
 		apps         []chainlink.Application
 	)
 	// Set up the minimum 4 oracles all funded with destination ETH
-	for i := uint16(0); i < 4; i++ {
+	for i := int64(0); i < 4; i++ {
 		app, peerID, transmitter, kb, cfg, _ := setupNodeCCIP(t, ccipContracts.destUser, bootstrapNodePort+1+i, fmt.Sprintf("oracle_ccip%d", i), ccipContracts.sourceChain, ccipContracts.destChain)
 		// Supply the bootstrap IP and port as a V2 peer address
 		cfg.Overrides.P2PV2Bootstrappers = []commontypes.BootstrapperLocator{
@@ -449,7 +447,7 @@ contractConfigConfirmations = 1
 contractConfigTrackerPollInterval = "1s"
 `, destChainID, ccipContracts.offRamp.Address()))
 	require.NoError(t, err)
-	_, err = appBootstrap.AddJobV2(context.Background(), ocrJob, null.NewString("boot", true))
+	err = appBootstrap.AddJobV2(context.Background(), &ocrJob)
 	require.NoError(t, err)
 
 	// For each oracle add a relayer and job
@@ -473,7 +471,7 @@ contractConfigConfirmations = 1
 contractConfigTrackerPollInterval = "1s"
 `, i, ccipContracts.onRamp.Address(), ccipContracts.offRamp.Address(), sourceChainID, destChainID, kbs[i].ID(), transmitters[i]))
 		require.NoError(t, err)
-		_, err = apps[i].AddJobV2(context.Background(), ccipJob, null.NewString("ccip", true))
+		err = apps[i].AddJobV2(context.Background(), &ccipJob)
 		require.NoError(t, err)
 		// Add executor job
 		ccipExecutionJob, err := ccip.ValidatedCCIPSpec(fmt.Sprintf(`
@@ -491,7 +489,7 @@ contractConfigConfirmations = 1
 contractConfigTrackerPollInterval = "1s"
 `, i, ccipContracts.onRamp.Address(), ccipContracts.offRamp.Address(), ccipContracts.executor.Address(), sourceChainID, destChainID, kbs[i].ID(), transmitters[i]))
 		require.NoError(t, err)
-		_, err = apps[i].AddJobV2(context.Background(), ccipExecutionJob, null.NewString("ccip-executor", true))
+		err = apps[i].AddJobV2(context.Background(), &ccipExecutionJob)
 		require.NoError(t, err)
 	}
 	// Send a request.
@@ -525,7 +523,7 @@ contractConfigTrackerPollInterval = "1s"
 	// Request should appear on all nodes eventually
 	for i := 0; i < 4; i++ {
 		var reqs []*ccip.Request
-		ccipReqORM := ccip.NewORM(postgres.UnwrapGormDB(apps[i].GetDB()))
+		ccipReqORM := ccip.NewORM(apps[i].GetSqlxDB())
 		gomega.NewGomegaWithT(t).Eventually(func() bool {
 			ccipContracts.sourceChain.Commit()
 			reqs, err = ccipReqORM.Requests(sourceChainID, destChainID, big.NewInt(0), nil, ccip.RequestStatusUnstarted, nil, nil)
@@ -550,7 +548,7 @@ contractConfigTrackerPollInterval = "1s"
 	// remaining valid requests.
 	for i := 0; i < 4; i++ {
 		gomega.NewGomegaWithT(t).Eventually(func() bool {
-			ccipReqORM := ccip.NewORM(postgres.UnwrapGormDB(apps[i].GetDB()))
+			ccipReqORM := ccip.NewORM(apps[i].GetSqlxDB())
 			ccipContracts.destChain.Commit()
 			reqs, err := ccipReqORM.Requests(sourceChainID, destChainID, report.MinSequenceNumber, report.MaxSequenceNumber, ccip.RequestStatusRelayConfirmed, nil, nil)
 			require.NoError(t, err)
@@ -563,7 +561,7 @@ contractConfigTrackerPollInterval = "1s"
 	// Now the merkle root is across.
 	// Let's try to execute a request as an external party.
 	// The raw log in the merkle root should be the abi-encoded version of the CCIPMessage
-	ccipReqORM := ccip.NewORM(postgres.UnwrapGormDB(apps[0].GetDB()))
+	ccipReqORM := ccip.NewORM(apps[0].GetSqlxDB())
 	reqs, err := ccipReqORM.Requests(sourceChainID, destChainID, report.MinSequenceNumber, report.MaxSequenceNumber, "", nil, nil)
 	require.NoError(t, err)
 	root, proof := ccip.GenerateMerkleProof(32, [][]byte{reqs[0].Raw}, 0)
@@ -698,7 +696,7 @@ contractConfigTrackerPollInterval = "1s"
 func setupOnchainConfig(t *testing.T, ccipContracts CCIPContracts, oracles []confighelper2.OracleIdentityExtra, reportingPluginConfig []byte) {
 	// Note We do NOT set the payees, payment is done in the OCR2Base implementation
 	// Set the offramp config.
-	signers, transmitters, threshold, onchainConfig, offchainConfigVersion, offchainConfig, err := confighelper2.ContractSetConfigArgs(
+	signers, transmitters, threshold, onchainConfig, offchainConfigVersion, offchainConfig, err := confighelper2.ContractSetConfigArgsForTests(
 		2*time.Second,        // deltaProgress
 		1*time.Second,        // deltaResend
 		1*time.Second,        // deltaRound
@@ -718,7 +716,8 @@ func setupOnchainConfig(t *testing.T, ccipContracts CCIPContracts, oracles []con
 	)
 
 	require.NoError(t, err)
-	logger.Debugw("Setting Config on Oracle Contract",
+	lggr := logger.TestLogger(t)
+	lggr.Debugw("Setting Config on Oracle Contract",
 		"signers", signers,
 		"transmitters", transmitters,
 		"threshold", threshold,

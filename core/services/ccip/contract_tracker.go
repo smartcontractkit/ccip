@@ -20,12 +20,11 @@ import (
 	httypes "github.com/smartcontractkit/chainlink/core/services/headtracker/types"
 	"github.com/smartcontractkit/chainlink/core/services/log"
 	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
-	"github.com/smartcontractkit/chainlink/core/services/postgres"
+	"github.com/smartcontractkit/chainlink/core/services/pg"
 	"github.com/smartcontractkit/chainlink/core/utils"
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2/types"
-
-	"gorm.io/gorm"
+	"github.com/smartcontractkit/sqlx"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -112,7 +111,7 @@ type CCIPContractTracker struct {
 	logBroadcaster  log.Broadcaster
 	jobID           int32
 	logger          logger.Logger
-	gdb             *gorm.DB
+	gdb             *sqlx.DB
 	blockTranslator ocrcommon.BlockTranslator
 	chain           evm.Chain
 
@@ -142,7 +141,7 @@ func NewCCIPContractTracker(
 	logBroadcaster log.Broadcaster,
 	jobID int32,
 	logger logger.Logger,
-	gdb *gorm.DB,
+	gdb *sqlx.DB,
 	chain evm.Chain,
 	headBroadcaster httypes.HeadBroadcaster,
 ) (o *CCIPContractTracker) {
@@ -182,7 +181,7 @@ func (t *CCIPContractTracker) Start() error {
 			LogsWithTopics: map[gethCommon.Hash][][]log.Topic{
 				single_token_offramp.SingleTokenOffRampConfigSet{}.Topic(): nil,
 			},
-			NumConfirmations: 1,
+			MinIncomingConfirmations: 1,
 		})
 
 		var latestHead *eth.Head
@@ -270,7 +269,7 @@ func (t *CCIPContractTracker) processLogs() {
 // It is not thread safe
 func (t *CCIPContractTracker) HandleLog(lb log.Broadcast) {
 	t.logger.Infow("CCIPContractTracker: config set log received", "log", lb.String())
-	was, err := t.logBroadcaster.WasAlreadyConsumed(t.gdb, lb)
+	was, err := t.logBroadcaster.WasAlreadyConsumed(lb)
 	if err != nil {
 		t.logger.Errorw("OCRContract: could not determine if log was already consumed", "error", err)
 		return
@@ -281,12 +280,12 @@ func (t *CCIPContractTracker) HandleLog(lb log.Broadcast) {
 	raw := lb.RawLog()
 	if raw.Address != t.contract.Address() {
 		t.logger.Errorf("log address of 0x%x does not match configured contract address of 0x%x", raw.Address, t.contract.Address())
-		t.logger.ErrorIfCalling(func() error { return t.logBroadcaster.MarkConsumed(t.gdb, lb) })
+		t.logger.ErrorIfCalling(func() error { return t.logBroadcaster.MarkConsumed(lb) })
 		return
 	}
 	topics := raw.Topics
 	if len(topics) == 0 {
-		t.logger.ErrorIfCalling(func() error { return t.logBroadcaster.MarkConsumed(t.gdb, lb) })
+		t.logger.ErrorIfCalling(func() error { return t.logBroadcaster.MarkConsumed(lb) })
 		return
 	}
 
@@ -296,7 +295,7 @@ func (t *CCIPContractTracker) HandleLog(lb log.Broadcast) {
 		configSet, err := t.contract.ParseConfigSet(raw)
 		if err != nil {
 			t.logger.Errorw("could not parse config set", "err", err)
-			t.logger.ErrorIfCalling(func() error { return t.logBroadcaster.MarkConsumed(t.gdb, lb) })
+			t.logger.ErrorIfCalling(func() error { return t.logBroadcaster.MarkConsumed(lb) })
 			return
 		}
 		configSet.Raw = raw
@@ -307,12 +306,12 @@ func (t *CCIPContractTracker) HandleLog(lb log.Broadcast) {
 			t.logger.Error("config mailbox is over capacity - dropped the oldest unprocessed item")
 		}
 	default:
-		logger.Debugw("CCIPContractTracker: got unrecognised log topic", "topic", topics[0])
+		t.logger.Debugw("CCIPContractTracker: got unrecognised log topic", "topic", topics[0])
 	}
 	if !consumed {
-		ctx, cancel := postgres.DefaultQueryCtx()
+		ctx, cancel := pg.DefaultQueryCtx()
 		defer cancel()
-		t.logger.ErrorIfCalling(func() error { return t.logBroadcaster.MarkConsumed(t.gdb.WithContext(ctx), lb) })
+		t.logger.ErrorIfCalling(func() error { return t.logBroadcaster.MarkConsumed(lb, pg.WithParentCtx(ctx)) })
 	}
 }
 

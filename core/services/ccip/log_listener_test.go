@@ -113,10 +113,10 @@ func TestLogListener_SavesRequests(t *testing.T) {
 
 	// Start the log broadcaster/log listener
 	// and add a CCIP job.
-	db := pgtest.NewGormDB(t)
+	db := pgtest.NewSqlDB(t)
 	ethClient := eth.NewClientFromSim(backend, big.NewInt(1337))
 	lggr := logger.TestLogger(t)
-	lorm := log.NewORM(db, *big.NewInt(1337))
+	lorm := log.NewORM(db, lggr, *big.NewInt(1337))
 	r, err := lorm.FindConsumedLogs(0, 100)
 	require.NoError(t, err)
 	t.Log(r)

@@ -14,7 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/job"
 	"github.com/smartcontractkit/chainlink/core/services/log"
-	"github.com/smartcontractkit/chainlink/core/services/postgres"
+	"github.com/smartcontractkit/chainlink/core/services/pg"
 	"github.com/smartcontractkit/chainlink/core/utils"
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	"github.com/smartcontractkit/sqlx"
@@ -105,8 +105,8 @@ func (l *LogListener) subscribeSourceChainLogBroadcaster() {
 			// Both relayer and executor save to db
 			single_token_onramp.SingleTokenOnRampCrossChainSendRequested{}.Topic(): {},
 		},
-		ParseLog:         l.singleTokenOnRamp.ParseLog,
-		NumConfirmations: uint64(l.offchainConfig.SourceIncomingConfirmations),
+		ParseLog:                 l.singleTokenOnRamp.ParseLog,
+		MinIncomingConfirmations: l.offchainConfig.SourceIncomingConfirmations,
 	})
 }
 
@@ -121,8 +121,8 @@ func (l *LogListener) subscribeDestChainLogBroadcaster() {
 			// The offramp listens to config changed
 			single_token_offramp.SingleTokenOffRampConfigSet{}.Topic(): {},
 		},
-		ParseLog:         l.singleTokenOffRamp.ParseLog,
-		NumConfirmations: uint64(l.offchainConfig.DestIncomingConfirmations),
+		ParseLog:                 l.singleTokenOffRamp.ParseLog,
+		MinIncomingConfirmations: l.offchainConfig.DestIncomingConfirmations,
 	})
 }
 
@@ -184,8 +184,8 @@ func (l *LogListener) handleReceivedLogs() {
 			l.logger.Warnf("CCIP_LogListener: unexpected log type %T", logObj)
 		}
 
-		ctx, cancel := postgres.DefaultQueryCtx()
-		wasConsumed, err := logBroadcaster.WasAlreadyConsumed(l.db.WithContext(ctx), lb)
+		ctx, cancel := pg.DefaultQueryCtx()
+		wasConsumed, err := logBroadcaster.WasAlreadyConsumed(lb, pg.WithParentCtx(ctx))
 		cancel()
 		if err != nil {
 			l.logger.Errorw("CCIP_LogListener: could not determine if log was already consumed", "error", err)
@@ -250,9 +250,9 @@ func (l *LogListener) handleCrossChainMessageExecuted(executed *single_token_off
 		l.logger.Errorw("failed to save CCIP request", "error", err)
 		return
 	}
-	ctx, cancel := postgres.DefaultQueryCtx()
+	ctx, cancel := pg.DefaultQueryCtx()
 	defer cancel()
-	if err := l.destChainLogBroadcaster.MarkConsumed(l.db.WithContext(ctx), lb); err != nil {
+	if err := l.destChainLogBroadcaster.MarkConsumed(lb, pg.WithParentCtx(ctx)); err != nil {
 		l.logger.Errorw("CCIP_LogListener: failed mark consumed", "err", err)
 	}
 }
@@ -281,9 +281,9 @@ func (l *LogListener) handleCrossChainReportRelayed(relayed *single_token_offram
 		l.logger.Errorw("failed to save CCIP report", "error", err)
 		return
 	}
-	ctx, cancel := postgres.DefaultQueryCtx()
+	ctx, cancel := pg.DefaultQueryCtx()
 	defer cancel()
-	if err := l.destChainLogBroadcaster.MarkConsumed(l.db.WithContext(ctx), lb); err != nil {
+	if err := l.destChainLogBroadcaster.MarkConsumed(lb, pg.WithParentCtx(ctx)); err != nil {
 		l.logger.Errorw("CCIP_LogListener: failed mark consumed", "err", err)
 	}
 }
@@ -331,9 +331,9 @@ func (l *LogListener) handleCrossChainSendRequested(request *single_token_onramp
 		return
 	}
 
-	ctx, cancel := postgres.DefaultQueryCtx()
+	ctx, cancel := pg.DefaultQueryCtx()
 	defer cancel()
-	if err := l.sourceChainLogBroadcaster.MarkConsumed(l.db.WithContext(ctx), lb); err != nil {
+	if err := l.sourceChainLogBroadcaster.MarkConsumed(lb, pg.WithParentCtx(ctx)); err != nil {
 		l.logger.Errorw("CCIP_LogListener: failed mark consumed", "err", err)
 	}
 }
