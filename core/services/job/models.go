@@ -131,7 +131,7 @@ type Job struct {
 	BootstrapSpecID      *int32
 	CCIPRelaySpecID                *int32 `gorm:"column:ccip_relay_spec_id"`
 	CCIPRelaySpec                  *CCIPRelaySpec
-	CCIPExecutionSpecID            *int32 `gorm:"column:ccip_execution_spec_id"`
+	CCIPExecutionSpecID            *int32
 	CCIPExecutionSpec              *CCIPExecutionSpec
 	PipelineSpecID       int32
 	PipelineSpec         *pipeline.Spec
