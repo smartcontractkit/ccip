@@ -12,13 +12,14 @@ import (
 
 	"github.com/smartcontractkit/chainlink/core/chains"
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
+	eth "github.com/smartcontractkit/chainlink/core/chains/evm/client"
+	httypes "github.com/smartcontractkit/chainlink/core/chains/evm/headtracker/types"
+	"github.com/smartcontractkit/chainlink/core/chains/evm/log"
+	"github.com/smartcontractkit/chainlink/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/message_executor"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_offramp"
 	"github.com/smartcontractkit/chainlink/core/logger"
-	"github.com/smartcontractkit/chainlink/core/services/eth"
-	httypes "github.com/smartcontractkit/chainlink/core/services/headtracker/types"
-	"github.com/smartcontractkit/chainlink/core/services/log"
 	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
 	"github.com/smartcontractkit/chainlink/core/services/pg"
 	"github.com/smartcontractkit/chainlink/core/utils"
@@ -184,7 +185,7 @@ func (t *CCIPContractTracker) Start() error {
 			MinIncomingConfirmations: 1,
 		})
 
-		var latestHead *eth.Head
+		var latestHead *types.Head
 		latestHead, t.unsubscribeHeads = t.headBroadcaster.Subscribe(t)
 		if latestHead != nil {
 			t.setLatestBlockHeight(latestHead)
@@ -209,14 +210,14 @@ func (t *CCIPContractTracker) Close() error {
 }
 
 // Connect conforms to HeadTrackable
-func (t *CCIPContractTracker) Connect(*eth.Head) error { return nil }
+func (t *CCIPContractTracker) Connect(*types.Head) error { return nil }
 
 // OnNewLongestChain conformed to HeadTrackable and updates latestBlockHeight
-func (t *CCIPContractTracker) OnNewLongestChain(_ context.Context, h *eth.Head) {
+func (t *CCIPContractTracker) OnNewLongestChain(_ context.Context, h *types.Head) {
 	t.setLatestBlockHeight(h)
 }
 
-func (t *CCIPContractTracker) setLatestBlockHeight(h *eth.Head) {
+func (t *CCIPContractTracker) setLatestBlockHeight(h *types.Head) {
 	var num int64
 	if h.L1BlockNumber.Valid {
 		num = h.L1BlockNumber.Int64

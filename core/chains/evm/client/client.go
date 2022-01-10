@@ -354,12 +354,12 @@ func (s *simClient) RoundRobinBatchCallContext(ctx context.Context, b []rpc.Batc
 	panic("implement me")
 }
 
-func (s *simClient) HeadByNumber(ctx context.Context, n *big.Int) (*Head, error) {
+func (s *simClient) HeadByNumber(ctx context.Context, n *big.Int) (*evmtypes.Head, error) {
 	head, err := s.HeaderByNumber(ctx, n)
 	if err != nil {
 		return nil, err
 	}
-	return &Head{
+	return &evmtypes.Head{
 		Hash:          head.Hash(),
 		Number:        head.Number.Int64(),
 		L1BlockNumber: null.NewInt64(head.Number.Int64(), true),
@@ -369,7 +369,7 @@ func (s *simClient) HeadByNumber(ctx context.Context, n *big.Int) (*Head, error)
 	}, nil
 }
 
-func (s *simClient) SubscribeNewHead(ctx context.Context, ch chan<- *Head) (ethereum.Subscription, error) {
+func (s *simClient) SubscribeNewHead(ctx context.Context, ch chan<- *evmtypes.Head) (ethereum.Subscription, error) {
 	panic("implement me")
 }
 
