@@ -212,9 +212,9 @@ func (o *orm) FindConsumedLogs(fromBlockNum int64, toBlockNum int64, qopts ...pg
 	var broadcasts []LogBroadcast
 	query := `
 		SELECT block_hash, log_index, job_id FROM log_broadcasts
-		WHERE block_number >= ?
-		AND block_number <= ?
-		AND evm_chain_id = ?
+		WHERE block_number >= $1
+		AND block_number <= $2
+		AND evm_chain_id = $3
 		AND consumed = true
 	`
 
@@ -224,7 +224,7 @@ func (o *orm) FindConsumedLogs(fromBlockNum int64, toBlockNum int64, qopts ...pg
 		o.evmChainID,
 	}
 	q := o.q.WithOpts(qopts...)
-	err := q.Get(&broadcasts, query, args...)
+	err := q.Select(&broadcasts, query, args...)
 	return broadcasts, err
 }
 
