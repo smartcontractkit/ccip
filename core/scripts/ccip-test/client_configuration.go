@@ -17,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
+	"github.com/smartcontractkit/chainlink/core/chains/evm/addressparser"
 
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/afn_contract"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/link_token_interface"
@@ -686,7 +687,7 @@ func (client CcipClient) SetConfig() {
 		DestIncomingConfirmations:   0,
 	}.Encode()
 	PanicErr(err)
-	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := confighelper2.ContractSetConfigArgs(
+	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := confighelper2.ContractSetConfigArgsForTests(
 		60*time.Second, // deltaProgress
 		1*time.Second,  // deltaResend
 		20*time.Second, // deltaRound
@@ -710,8 +711,8 @@ func (client CcipClient) SetConfig() {
 
 	tx, err := client.Dest.SingleTokenOfframp.SetConfig(
 		client.Dest.Owner,
-		signers,
-		transmitters,
+		addressparser.OnchainPublicKeyToAddress(signers),
+		addressparser.AccountToAddress(transmitters),
 		f,
 		onchainConfig,
 		offchainConfigVersion,
@@ -723,8 +724,8 @@ func (client CcipClient) SetConfig() {
 
 	tx, err = client.Dest.MessageExecutor.SetConfig(
 		client.Dest.Owner,
-		signers,
-		transmitters,
+		addressparser.OnchainPublicKeyToAddress(signers),
+		addressparser.AccountToAddress(transmitters),
 		f,
 		onchainConfig,
 		offchainConfigVersion,
