@@ -6,9 +6,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/smartcontractkit/chainlink/core/assets"
 	evmtypes "github.com/smartcontractkit/chainlink/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/core/logger"
+	"github.com/smartcontractkit/chainlink/core/null"
 	"github.com/smartcontractkit/chainlink/core/utils"
 
 	ethereum "github.com/ethereum/go-ethereum"
@@ -314,4 +316,76 @@ func (client *client) BatchCallContextAll(ctx context.Context, b []rpc.BatchElem
 // instead.
 func (client *client) SuggestGasTipCap(ctx context.Context) (tipCap *big.Int, err error) {
 	return client.pool.SuggestGasTipCap(ctx)
+}
+
+type simClient struct {
+	*backends.SimulatedBackend
+	chainID *big.Int
+}
+
+func (s *simClient) Close() {
+}
+
+func (s *simClient) GetERC20Balance(address common.Address, contractAddress common.Address) (*big.Int, error) {
+	panic("implement me")
+}
+
+func (s *simClient) GetLINKBalance(linkAddress common.Address, address common.Address) (*assets.Link, error) {
+	panic("implement me")
+}
+
+func (s *simClient) GetEthBalance(ctx context.Context, account common.Address, blockNumber *big.Int) (*assets.Eth, error) {
+	panic("implement me")
+}
+
+func (s *simClient) Call(result interface{}, method string, args ...interface{}) error {
+	panic("implement me")
+}
+
+func (s *simClient) CallContext(ctx context.Context, result interface{}, method string, args ...interface{}) error {
+	panic("implement me")
+}
+
+func (s *simClient) BatchCallContext(ctx context.Context, b []rpc.BatchElem) error {
+	panic("implement me")
+}
+
+func (s *simClient) RoundRobinBatchCallContext(ctx context.Context, b []rpc.BatchElem) error {
+	panic("implement me")
+}
+
+func (s *simClient) HeadByNumber(ctx context.Context, n *big.Int) (*Head, error) {
+	head, err := s.HeaderByNumber(ctx, n)
+	if err != nil {
+		return nil, err
+	}
+	return &Head{
+		Hash:          head.Hash(),
+		Number:        head.Number.Int64(),
+		L1BlockNumber: null.NewInt64(head.Number.Int64(), true),
+		ParentHash:    head.ParentHash,
+		Parent:        nil,
+		EVMChainID:    utils.NewBig(s.chainID),
+	}, nil
+}
+
+func (s *simClient) SubscribeNewHead(ctx context.Context, ch chan<- *Head) (ethereum.Subscription, error) {
+	panic("implement me")
+}
+
+func (s *simClient) Dial(ctx context.Context) error {
+	return nil
+}
+
+func (s *simClient) ChainID() *big.Int {
+	return s.chainID
+}
+
+var _ Client = &simClient{}
+
+func NewClientFromSim(sim *backends.SimulatedBackend, chainID *big.Int) *simClient {
+	return &simClient{
+		SimulatedBackend: sim,
+		chainID:          chainID,
+	}
 }

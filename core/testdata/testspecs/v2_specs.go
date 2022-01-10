@@ -577,3 +577,35 @@ fromAddress = "%s"
 
 	return BlockhashStoreSpec{BlockhashStoreSpecParams: params, toml: toml}
 }
+
+type CCIPSpecParams struct {
+	contract string
+}
+
+type CCIPSpec struct {
+	CCIPSpecParams
+	toml string
+}
+
+func (c CCIPSpec) Toml() string {
+	return c.toml
+}
+
+func GenerateCCIPSpec(params CCIPSpecParams) CCIPSpec {
+	var spec CCIPSpec
+	var contract = "0x613a38AC1659769640aaE063C651F48E0250454C"
+	if params.contract != "" {
+		contract = params.contract
+	}
+	template := `
+type            = "ccip-relay"
+schemaVersion   = 1
+onRampAddress = "%s"
+offRampAddress = "%s"
+sourceEvmChainID = 1337
+destEvmChainID = 1337
+`
+	spec.toml = fmt.Sprintf(template, contract, contract)
+	spec.CCIPSpecParams = params
+	return spec
+}

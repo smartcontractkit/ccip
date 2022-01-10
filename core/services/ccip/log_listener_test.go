@@ -151,7 +151,7 @@ func TestLogListener_SavesRequests(t *testing.T) {
 	startHead := head.Number.Int64()
 	var reqs []*Request
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
-		lb.OnNewLongestChain(context.Background(), eth.Head{Hash: head.Hash(), Number: startHead})
+		lb.OnNewLongestChain(context.Background(), &eth.Head{Hash: head.Hash(), Number: startHead})
 		startHead++
 		reqs, err = logListener.orm.Requests(big.NewInt(2), big.NewInt(1), big.NewInt(0), nil, RequestStatusUnstarted, nil, nil)
 		require.NoError(t, err)
@@ -180,7 +180,7 @@ func TestLogListener_SavesRequests(t *testing.T) {
 	startHead = head.Number.Int64()
 	reqs = []*Request{}
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
-		lb.OnNewLongestChain(context.Background(), eth.Head{Hash: head.Hash(), Number: startHead})
+		lb.OnNewLongestChain(context.Background(), &eth.Head{Hash: head.Hash(), Number: startHead})
 		startHead++
 		reqs, err = logListener.orm.Requests(big.NewInt(2), big.NewInt(1), big.NewInt(0), nil, RequestStatusUnstarted, nil, nil)
 		require.NoError(t, err)
