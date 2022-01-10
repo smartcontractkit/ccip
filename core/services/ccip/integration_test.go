@@ -34,6 +34,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_sender"
 	"github.com/smartcontractkit/chainlink/core/internal/testutils/configtest"
 	"github.com/smartcontractkit/chainlink/core/internal/testutils/evmtest"
+	"github.com/smartcontractkit/chainlink/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/bulletprooftxmanager"
 	"github.com/smartcontractkit/chainlink/core/services/ccip"
@@ -300,9 +301,20 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 		},
 		GenHeadTracker: func(c evmtypes.Chain) httypes.HeadTracker {
 			if c.ID.String() == sourceChainID.String() {
-				return headtracker.NewHeadTracker(lggr, sourceClient, evmtest.NewChainScopedConfig(t, config), headtracker.NewORM(db, *sourceChainID), ht)
+				return headtracker.NewHeadTracker(
+					lggr, sourceClient,
+					evmtest.NewChainScopedConfig(t, config),
+					headtracker.NewHeadBroadcaster(lggr),
+					headtracker.NewHeadSaver(lggr, headtracker.NewORM(db, lggr, pgtest.NewPGCfg(false), *sourceClient.ChainID()), nil),
+				)
 			} else if c.ID.String() == destChainID.String() {
-				return headtracker.NewHeadTracker(lggr, destClient, evmtest.NewChainScopedConfig(t, config), headtracker.NewORM(db, *destChainID), ht)
+				return headtracker.NewHeadTracker(
+					lggr,
+					destClient,
+					evmtest.NewChainScopedConfig(t, config),
+					headtracker.NewHeadBroadcaster(lggr),
+					headtracker.NewHeadSaver(lggr, headtracker.NewORM(db, lggr, pgtest.NewPGCfg(false), *destClient.ChainID()), nil),
+				)
 			}
 			t.Fatalf("invalid chain ID %v", c.ID.String())
 			return nil
