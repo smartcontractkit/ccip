@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/smartcontractkit/chainlink/core/chains/evm/addressparser"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/afn_contract"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_offramp"
 	"github.com/smartcontractkit/chainlink/core/services/ccip/abihelpers"
@@ -281,7 +282,7 @@ func updateOffchainConfig(t *testing.T, reportingPluginConfig OffchainConfig, of
 		1, // faults
 		nil,
 	)
-	_, err = offRamp.SetConfig(user, signers, transmitters, threshold, onchainConfig, offchainConfigVersion, offchainConfig)
+	_, err = offRamp.SetConfig(user, addressparser.OnchainPublicKeyToAddress(signers), addressparser.AccountToAddress(transmitters), threshold, onchainConfig, offchainConfigVersion, offchainConfig)
 	require.NoError(t, err)
 }
 

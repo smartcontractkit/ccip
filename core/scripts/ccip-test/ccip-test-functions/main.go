@@ -15,13 +15,13 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
-	"github.com/smartcontractkit/chainlink/core/services/ccip/abihelpers"
-	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
-
+	"github.com/smartcontractkit/chainlink/core/chains/evm/addressparser"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_offramp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_onramp"
 	ccipshared "github.com/smartcontractkit/chainlink/core/scripts/ccip-test/ccip-shared"
 	"github.com/smartcontractkit/chainlink/core/services/ccip"
+	"github.com/smartcontractkit/chainlink/core/services/ccip/abihelpers"
+	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 )
 
 type ccipClient ccipshared.CcipClient
@@ -63,7 +63,7 @@ func main() {
 	//client.externalExecutionSubmitOfframpTwiceShouldFail()
 
 	// Cross chain request with DON execution
-	//client.donExecutionHappyPath()
+	client.donExecutionHappyPath()
 
 	// Submit 10 txs. This should result in the txs being batched together
 	//client.scalingAndBatching()
@@ -73,7 +73,7 @@ func main() {
 
 	//client.tryGetTokensFromPausedPool()
 
-	client.crossChainSendPausedOfframpShouldFail()
+	//client.crossChainSendPausedOfframpShouldFail()
 
 	//client.crossChainSendPausedOnrampShouldFail()
 }
@@ -558,7 +558,7 @@ func (client ccipClient) setConfig() {
 		DestIncomingConfirmations:   0,
 	}.Encode()
 	ccipshared.PanicErr(err)
-	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := confighelper2.ContractSetConfigArgs(
+	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := confighelper2.ContractSetConfigArgsForTests(
 		60*time.Second, // deltaProgress
 		1*time.Second,  // deltaResend
 		20*time.Second, // deltaRound
@@ -582,8 +582,8 @@ func (client ccipClient) setConfig() {
 
 	tx, err := client.Dest.SingleTokenOfframp.SetConfig(
 		client.Dest.Owner,
-		signers,
-		transmitters,
+		addressparser.OnchainPublicKeyToAddress(signers),
+		addressparser.AccountToAddress(transmitters),
 		f,
 		onchainConfig,
 		offchainConfigVersion,
@@ -595,8 +595,8 @@ func (client ccipClient) setConfig() {
 
 	tx, err = client.Dest.MessageExecutor.SetConfig(
 		client.Dest.Owner,
-		signers,
-		transmitters,
+		addressparser.OnchainPublicKeyToAddress(signers),
+		addressparser.AccountToAddress(transmitters),
 		f,
 		onchainConfig,
 		offchainConfigVersion,

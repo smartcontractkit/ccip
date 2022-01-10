@@ -18,9 +18,11 @@ import (
 	"github.com/onsi/gomega"
 	uuid "github.com/satori/go.uuid"
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
-	"github.com/smartcontractkit/chainlink/core/gracefulpanic"
+	"github.com/smartcontractkit/chainlink/core/chains/evm/addressparser"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/afn_contract"
 	"github.com/smartcontractkit/chainlink/core/services/ccip/abihelpers"
+	"github.com/smartcontractkit/chainlink/core/services/keystore/chaintype"
+	"github.com/smartcontractkit/chainlink/core/shutdown"
 	"github.com/smartcontractkit/libocr/commontypes"
 	ocrnetworking "github.com/smartcontractkit/libocr/networking"
 	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
@@ -265,7 +267,6 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 
 	var lggr = logger.TestLogger(t)
 	eventBroadcaster := pg.NewEventBroadcaster(config.DatabaseURL(), 0, 0, lggr, uuid.NewV1())
-	shutdown := gracefulpanic.NewSignal()
 
 	// We fake different chainIDs using the wrapped sim cltest.SimulatedBackend
 	chainORM := evm.NewORM(db)
@@ -297,7 +298,7 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 			t.Fatalf("invalid chain ID %v", c.ID.String())
 			return nil
 		},
-		GenHeadTracker: func(c evmtypes.Chain, ht httypes.HeadBroadcaster) httypes.Tracker {
+		GenHeadTracker: func(c evmtypes.Chain) httypes.HeadTracker {
 			if c.ID.String() == sourceChainID.String() {
 				return headtracker.NewHeadTracker(lggr, sourceClient, evmtest.NewChainScopedConfig(t, config), headtracker.NewORM(db, *sourceChainID), ht)
 			} else if c.ID.String() == destChainID.String() {
@@ -331,10 +332,11 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 	if err != nil {
 		lggr.Fatal(err)
 	}
+	sig := shutdown.NewSignal()
 	app, err := chainlink.NewApplication(chainlink.ApplicationOpts{
 		Config:                   config,
 		EventBroadcaster:         eventBroadcaster,
-		ShutdownSignal:           shutdown,
+		ShutdownSignal:           sig,
 		SqlxDB:                   db,
 		KeyStore:                 keyStore,
 		ChainSet:                 chainSet,
@@ -380,7 +382,7 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 	require.NoError(t, err)
 	destChain.Commit()
 
-	kb, err := app.GetKeyStore().OCR2().Create()
+	kb, err := app.GetKeyStore().OCR2().Create(chaintype.EVM)
 	require.NoError(t, err)
 	return app, peerID.Raw(), transmitter, kb, config, func() {
 		app.Stop()
@@ -412,12 +414,12 @@ func TestIntegration_CCIP(t *testing.T) {
 		transmitters = append(transmitters, transmitter)
 		oracles = append(oracles, confighelper2.OracleIdentityExtra{
 			OracleIdentity: confighelper2.OracleIdentity{
-				OnchainPublicKey:  kb.OnchainKeyring.SigningAddress().Bytes(),
+				OnchainPublicKey:  []byte(kb.OnChainPublicKey()),
 				TransmitAccount:   ocrtypes2.Account(transmitter.String()),
-				OffchainPublicKey: kb.OffchainKeyring.OffchainPublicKey(),
+				OffchainPublicKey: kb.OffchainPublicKey(),
 				PeerID:            peerID,
 			},
-			ConfigEncryptionPublicKey: kb.OffchainKeyring.ConfigEncryptionPublicKey(),
+			ConfigEncryptionPublicKey: kb.ConfigEncryptionPublicKey(),
 		})
 	}
 
@@ -575,8 +577,10 @@ contractConfigTrackerPollInterval = "1s"
 	require.NoError(t, err)
 	require.True(t, exists.Int64() > 0)
 
-	h := utils.MustFixedKeccak256(append([]byte{0x00}, reqs[0].Raw...))
-	onchainRoot, err := ccipContracts.offRamp.GenerateMerkleRoot(nil, proof.PathForExecute(), h, proof.Index())
+	h, err := utils.Keccak256(append([]byte{0x00}, reqs[0].Raw...))
+	var leaf [32]byte
+	copy(leaf[:], h)
+	onchainRoot, err := ccipContracts.offRamp.GenerateMerkleRoot(nil, proof.PathForExecute(), leaf, proof.Index())
 	require.NoError(t, err)
 	require.Equal(t, genRoot, onchainRoot)
 
@@ -728,8 +732,8 @@ func setupOnchainConfig(t *testing.T, ccipContracts CCIPContracts, oracles []con
 	// Set the DON on the offramp
 	_, err = ccipContracts.offRamp.SetConfig(
 		ccipContracts.destUser,
-		signers,
-		transmitters,
+		addressparser.OnchainPublicKeyToAddress(signers),
+		addressparser.AccountToAddress(transmitters),
 		threshold,
 		onchainConfig,
 		offchainConfigVersion,
@@ -741,8 +745,8 @@ func setupOnchainConfig(t *testing.T, ccipContracts CCIPContracts, oracles []con
 	// Same DON on the message executor
 	_, err = ccipContracts.executor.SetConfig(
 		ccipContracts.destUser,
-		signers,
-		transmitters,
+		addressparser.OnchainPublicKeyToAddress(signers),
+		addressparser.AccountToAddress(transmitters),
 		threshold,
 		onchainConfig,
 		offchainConfigVersion,
