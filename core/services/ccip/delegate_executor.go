@@ -80,7 +80,7 @@ func (d ExecutionDelegate) getOracleArgs(l logger.Logger, jb job.Job, executor *
 		d.lggr,
 	)
 	ocrLogger := logger.NewOCRWrapper(l, true, func(msg string) {
-		d.jobORM.RecordError(jb.ID, msg)
+		_ = d.jobORM.RecordError(jb.ID, msg)
 	})
 	key, err := getValidatedKeyBundle(jb.CCIPExecutionSpec.EncryptedOCRKeyBundleID, chain, d.ks)
 	if err != nil {

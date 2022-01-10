@@ -78,7 +78,7 @@ func (d RelayDelegate) getOracleArgs(l logger.Logger, jb job.Job, offRamp *singl
 		d.lggr,
 	)
 	ocrLogger := logger.NewOCRWrapper(l, true, func(msg string) {
-		d.jobORM.RecordError(jb.ID, msg)
+		_ = d.jobORM.RecordError(jb.ID, msg)
 	})
 	key, err := getValidatedKeyBundle(jb.CCIPRelaySpec.EncryptedOCRKeyBundleID, chain, d.keyStore)
 	if err != nil {

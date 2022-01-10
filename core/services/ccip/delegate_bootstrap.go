@@ -78,7 +78,7 @@ func (d DelegateBootstrap) ServicesForSpec(jb job.Job) ([]job.Service, error) {
 		c.HeadBroadcaster(),
 	)
 	ocrLogger := logger.NewOCRWrapper(l, true, func(msg string) {
-		d.jobORM.RecordError(jb.ID, msg)
+		_ = d.jobORM.RecordError(jb.ID, msg)
 	})
 	offchainConfigDigester := evmutil.EVMOffchainConfigDigester{
 		ChainID:         maybeRemapChainID(c.Config().ChainID()).Uint64(),
