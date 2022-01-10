@@ -3,8 +3,10 @@ package ccip_test
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"fmt"
 	"math/big"
+	"strings"
 	"testing"
 	"time"
 
@@ -261,7 +263,12 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 	config.Overrides.FeatureOffchainReporting2 = null.BoolFrom(true)
 	config.Overrides.GlobalGasEstimatorMode = null.NewString("FixedPrice", true)
 	config.Overrides.DefaultChainID = nil
-	config.Overrides.P2PListenPort = null.NewInt(port, true)
+	config.Overrides.P2PListenPort = null.NewInt(0, true)
+	p2paddresses := []string{
+		fmt.Sprintf("127.0.0.1:%d", port),
+	}
+	config.Overrides.P2PV2ListenAddresses = p2paddresses
+	config.Overrides.P2PV2AnnounceAddresses = p2paddresses
 	config.Overrides.P2PNetworkingStack = ocrnetworking.NetworkingStackV2
 	// Disables ocr spec validation so we can have fast polling for the test.
 	config.Overrides.Dev = null.BoolFrom(true)
@@ -367,11 +374,6 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 
 	config.Overrides.P2PPeerID = peerID
 	config.Overrides.P2PListenPort = null.NewInt(port, true)
-	p2paddresses := []string{
-		fmt.Sprintf("127.0.0.1:%d", port),
-	}
-	config.Overrides.P2PV2ListenAddresses = p2paddresses
-	config.Overrides.P2PV2AnnounceAddresses = p2paddresses
 
 	_, err = app.GetKeyStore().Eth().Create(destChainID)
 	require.NoError(t, err)
@@ -424,9 +426,10 @@ func TestIntegration_CCIP(t *testing.T) {
 		kbs = append(kbs, kb)
 		apps = append(apps, app)
 		transmitters = append(transmitters, transmitter)
+		offchainPublicKey, _ := hex.DecodeString(strings.TrimPrefix(kb.OnChainPublicKey(), "0x"))
 		oracles = append(oracles, confighelper2.OracleIdentityExtra{
 			OracleIdentity: confighelper2.OracleIdentity{
-				OnchainPublicKey:  []byte(kb.OnChainPublicKey()),
+				OnchainPublicKey:  offchainPublicKey,
 				TransmitAccount:   ocrtypes2.Account(transmitter.String()),
 				OffchainPublicKey: kb.OffchainPublicKey(),
 				PeerID:            peerID,
