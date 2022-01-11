@@ -341,7 +341,7 @@ func (o *orm) CreateJob(jb *Job, qopts ...pg.QOpt) error {
 					p2p_bootstrap_peers, encrypted_ocr_key_bundle_id, transmitter_address, dest_evm_chain_id, source_evm_chain_id, 
 					blockchain_timeout, contract_config_tracker_subscribe_interval, contract_config_tracker_poll_interval, 
 					contract_config_confirmations, created_at, updated_at)
-			VALUES (:on_ramp_address, :off_ramp_address, :executor_address, :p2p_peer_id,p2p_bootstrap_peers, 
+			VALUES (:on_ramp_address, :off_ramp_address, :executor_address, :p2p_peer_id, :p2p_bootstrap_peers, 
 					:encrypted_ocr_key_bundle_id, :transmitter_address, :dest_evm_chain_id, :source_evm_chain_id, :blockchain_timeout,
 					:contract_config_tracker_subscribe_interval, :contract_config_tracker_poll_interval, :contract_config_confirmations, 
 					NOW(), NOW())
@@ -355,7 +355,7 @@ func (o *orm) CreateJob(jb *Job, qopts ...pg.QOpt) error {
 			sql := `INSERT INTO ccip_bootstrap_specs (contract_address, p2p_peer_id, evm_chain_id, monitoring_endpoint,
 					blockchain_timeout, contract_config_tracker_subscribe_interval, contract_config_tracker_poll_interval, 
 					contract_config_confirmations, created_at, updated_at)
-			VALUES (:contract_address, :p2p_peer_id, evm_chain_id, :monitoring_endpoint, :blockchain_timeout, 
+			VALUES (:contract_address, :p2p_peer_id, :evm_chain_id, :monitoring_endpoint, :blockchain_timeout, 
 					:contract_config_tracker_subscribe_interval, :contract_config_tracker_poll_interval, 
 					:contract_config_confirmations, NOW(), NOW())
 			RETURNING id;`

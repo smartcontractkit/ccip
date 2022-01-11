@@ -353,6 +353,8 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 	if err != nil {
 		lggr.Fatal(err)
 	}
+	_, err = chainORM.CreateChain(*utils.NewBig(big.NewInt(1337)), evmtypes.ChainCfg{})
+	require.NoError(t, err)
 	sig := shutdown.NewSignal()
 	app, err := chainlink.NewApplication(chainlink.ApplicationOpts{
 		Config:                   config,

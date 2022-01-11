@@ -365,6 +365,13 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 			cfg,
 			relay,
 		)
+		delegates[job.CCIPBootstrap] = ccip.NewDelegateBootstrap(
+			db,
+			jobORM,
+			chainSet,
+			peerWrapper,
+			globalLogger,
+		)
 		delegates[job.CCIPRelay] = ccip.NewRelayDelegate(
 			db,
 			jobORM,
