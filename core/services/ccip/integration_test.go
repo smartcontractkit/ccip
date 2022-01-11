@@ -287,6 +287,8 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 
 	keyStore := keystore.New(db, utils.FastScryptParams, lggr, config)
 	simEthKeyStore := EthKeyStoreSim{Eth: keyStore.Eth()}
+	cfg := cltest.NewTestGeneralConfig(t)
+	evmCfg := evmtest.NewChainScopedConfig(t, cfg)
 
 	// Create our chainset manually so we can have custom eth clients
 	// (the wrapped sims faking different chainIDs)
@@ -312,7 +314,7 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 					lggr, sourceClient,
 					evmtest.NewChainScopedConfig(t, config),
 					headtracker.NewHeadBroadcaster(lggr),
-					headtracker.NewHeadSaver(lggr, headtracker.NewORM(db, lggr, pgtest.NewPGCfg(false), *sourceClient.ChainID()), nil),
+					headtracker.NewHeadSaver(lggr, headtracker.NewORM(db, lggr, pgtest.NewPGCfg(false), *sourceClient.ChainID()), evmCfg),
 				)
 			} else if c.ID.String() == destChainID.String() {
 				return headtracker.NewHeadTracker(
@@ -320,7 +322,7 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 					destClient,
 					evmtest.NewChainScopedConfig(t, config),
 					headtracker.NewHeadBroadcaster(lggr),
-					headtracker.NewHeadSaver(lggr, headtracker.NewORM(db, lggr, pgtest.NewPGCfg(false), *destClient.ChainID()), nil),
+					headtracker.NewHeadSaver(lggr, headtracker.NewORM(db, lggr, pgtest.NewPGCfg(false), *destClient.ChainID()), evmCfg),
 				)
 			}
 			t.Fatalf("invalid chain ID %v", c.ID.String())
