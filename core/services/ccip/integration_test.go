@@ -308,12 +308,12 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 			t.Fatalf("invalid chain ID %v", c.ID.String())
 			return nil
 		},
-		GenHeadTracker: func(c evmtypes.Chain) httypes.HeadTracker {
+		GenHeadTracker: func(c evmtypes.Chain, hb httypes.HeadBroadcaster) httypes.HeadTracker {
 			if c.ID.String() == sourceChainID.String() {
 				return headtracker.NewHeadTracker(
 					lggr, sourceClient,
 					evmtest.NewChainScopedConfig(t, config),
-					headtracker.NewHeadBroadcaster(lggr),
+					hb,
 					headtracker.NewHeadSaver(lggr, headtracker.NewORM(db, lggr, pgtest.NewPGCfg(false), *sourceClient.ChainID()), evmCfg),
 				)
 			} else if c.ID.String() == destChainID.String() {
@@ -321,7 +321,7 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 					lggr,
 					destClient,
 					evmtest.NewChainScopedConfig(t, config),
-					headtracker.NewHeadBroadcaster(lggr),
+					hb,
 					headtracker.NewHeadSaver(lggr, headtracker.NewORM(db, lggr, pgtest.NewPGCfg(false), *destClient.ChainID()), evmCfg),
 				)
 			}
@@ -559,6 +559,7 @@ contractConfigTrackerPollInterval = "1s"
 		report, err = ccipContracts.offRamp.GetLastReport(nil)
 		require.NoError(t, err)
 		ccipContracts.destChain.Commit()
+		t.Log("last report", report.MinSequenceNumber.String(), report.MaxSequenceNumber.String())
 		return report.MinSequenceNumber.String() == "1" && report.MaxSequenceNumber.String() == "1"
 	}, 10*time.Second, 1*time.Second).Should(gomega.BeTrue())
 
