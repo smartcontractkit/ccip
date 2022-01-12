@@ -257,6 +257,9 @@ func (ks EthKeyStoreSim) SignTx(address common.Address, tx *types.Transaction, c
 var _ keystore.Eth = EthKeyStoreSim{}
 
 func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName string, sourceChain *backends.SimulatedBackend, destChain *backends.SimulatedBackend) (chainlink.Application, string, common.Address, ocr2key.KeyBundle, *configtest.TestGeneralConfig, func()) {
+	p2paddresses := []string{
+		fmt.Sprintf("127.0.0.1:%d", port),
+	}
 	// Do not want to load fixtures as they contain a dummy chainID.
 	config, db := heavyweight.FullTestDB(t, fmt.Sprintf("%s%d", dbName, port), true, false)
 	config.Overrides.FeatureOffchainReporting = null.BoolFrom(false)
@@ -264,9 +267,6 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 	config.Overrides.GlobalGasEstimatorMode = null.NewString("FixedPrice", true)
 	config.Overrides.DefaultChainID = nil
 	config.Overrides.P2PListenPort = null.NewInt(0, true)
-	p2paddresses := []string{
-		fmt.Sprintf("127.0.0.1:%d", port),
-	}
 	config.Overrides.P2PV2ListenAddresses = p2paddresses
 	config.Overrides.P2PV2AnnounceAddresses = p2paddresses
 	config.Overrides.P2PNetworkingStack = ocrnetworking.NetworkingStackV2
@@ -375,9 +375,7 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 	require.NoError(t, err)
 	require.Len(t, p2pIDs, 1)
 	peerID := p2pIDs[0].PeerID()
-
 	config.Overrides.P2PPeerID = peerID
-	config.Overrides.P2PListenPort = null.NewInt(port, true)
 
 	_, err = app.GetKeyStore().Eth().Create(destChainID)
 	require.NoError(t, err)
