@@ -265,6 +265,8 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 	config.Overrides.FeatureOffchainReporting = null.BoolFrom(false)
 	config.Overrides.FeatureOffchainReporting2 = null.BoolFrom(true)
 	config.Overrides.GlobalGasEstimatorMode = null.NewString("FixedPrice", true)
+	config.Overrides.SetP2PV2DeltaDial(500 * time.Millisecond)
+	config.Overrides.SetP2PV2DeltaReconcile(5 * time.Second)
 	config.Overrides.DefaultChainID = nil
 	config.Overrides.P2PListenPort = null.NewInt(0, true)
 	config.Overrides.P2PV2ListenAddresses = p2paddresses
@@ -739,7 +741,7 @@ func setupOnchainConfig(t *testing.T, ccipContracts CCIPContracts, oracles []con
 
 	require.NoError(t, err)
 	lggr := logger.TestLogger(t)
-	lggr.Debugw("Setting Config on Oracle Contract",
+	lggr.Infow("Setting Config on Oracle Contract",
 		"signers", signers,
 		"transmitters", transmitters,
 		"threshold", threshold,

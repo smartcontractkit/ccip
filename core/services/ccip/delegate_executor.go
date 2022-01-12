@@ -174,6 +174,7 @@ func (d ExecutionDelegate) ServicesForSpec(jb job.Job) ([]job.Service, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "could not get the latest encoded config")
 	}
+
 	// TODO: Its conceivable we may want pull out this log listener into its own job spec so to avoid repeating
 	// all the log subscriptions.
 	logListener := NewLogListener(l,
