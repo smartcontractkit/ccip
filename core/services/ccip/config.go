@@ -8,12 +8,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/core/config"
-	"github.com/smartcontractkit/chainlink/core/services/keystore"
-	"github.com/smartcontractkit/chainlink/core/services/keystore/keys/ethkey"
-	"github.com/smartcontractkit/chainlink/core/services/keystore/keys/ocr2key"
 	"github.com/smartcontractkit/chainlink/core/services/keystore/keys/p2pkey"
 	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
-	"github.com/smartcontractkit/chainlink/core/store/models"
 	ocrcommontypes "github.com/smartcontractkit/libocr/commontypes"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
@@ -95,29 +91,6 @@ func validatePeerWrapper(specID *p2pkey.PeerID, chain evm.Chain, pw *ocrcommon.S
 		return errors.Errorf("given peer with ID '%s' does not match OCR2 configured peer with ID: %s", pw.PeerID.String(), peerID.String())
 	}
 	return nil
-}
-
-func getValidatedKeyBundle(specBundleID *models.Sha256Hash, chain evm.Chain, ks keystore.OCR2) (kb ocr2key.KeyBundle, err error) {
-	var kbs string
-	if specBundleID != nil {
-		kbs = specBundleID.String()
-	} else if kbs, err = chain.Config().OCR2KeyBundleID(); err != nil {
-		return kb, err
-	}
-	key, err := ks.Get(kbs)
-	if err != nil {
-		return kb, err
-	}
-	return key, nil
-}
-
-func getTransmitterAddress(specAddress *ethkey.EIP55Address, chain evm.Chain) (ta ethkey.EIP55Address, err error) {
-	if specAddress != nil {
-		ta = *specAddress
-	} else if ta, err = chain.Config().OCRTransmitterAddress(); err != nil {
-		return ta, err
-	}
-	return ta, nil
 }
 
 // Multi-chain tests using the sim have to be remapped to the default

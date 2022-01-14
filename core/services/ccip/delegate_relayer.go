@@ -1,10 +1,14 @@
 package ccip
 
 import (
+	"encoding/hex"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
+	"github.com/smartcontractkit/chainlink/core/config"
+	"github.com/smartcontractkit/chainlink/core/services/offchainreporting2"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/bulletprooftxmanager"
@@ -21,12 +25,17 @@ import (
 
 var _ job.Delegate = (*RelayDelegate)(nil)
 
+type Config interface {
+	config.OCR2Config
+}
+
 type RelayDelegate struct {
 	db          *sqlx.DB
 	jobORM      job.ORM
 	orm         ORM
 	chainSet    evm.ChainSet
-	keyStore    keystore.OCR2
+	cfg         Config
+	ks          keystore.OCR2
 	peerWrapper *ocrcommon.SingletonPeerWrapper
 	lggr        logger.Logger
 }
@@ -36,6 +45,7 @@ func NewRelayDelegate(
 	db *sqlx.DB,
 	jobORM job.ORM,
 	chainSet evm.ChainSet,
+	cfg Config,
 	keyStore keystore.OCR2,
 	peerWrapper *ocrcommon.SingletonPeerWrapper,
 	lggr logger.Logger,
@@ -45,7 +55,8 @@ func NewRelayDelegate(
 		jobORM:      jobORM,
 		orm:         NewORM(db),
 		chainSet:    chainSet,
-		keyStore:    keyStore,
+		cfg:         cfg,
+		ks:          keyStore,
 		peerWrapper: peerWrapper,
 		lggr:        lggr,
 	}
@@ -55,10 +66,15 @@ func (d RelayDelegate) JobType() job.Type {
 	return job.CCIPRelay
 }
 
-func (d RelayDelegate) getOracleArgs(l logger.Logger, jb job.Job, offRamp *single_token_offramp.SingleTokenOffRamp, chain evm.Chain, contractTracker *CCIPContractTracker, offchainConfigDigester evmutil.EVMOffchainConfigDigester) (*ocr.OracleArgs, error) {
-	ta, err := getTransmitterAddress(jb.CCIPRelaySpec.TransmitterAddress, chain)
+func (d RelayDelegate) getOracleArgs(l logger.Logger, jobSpec job.Job, offRamp *single_token_offramp.SingleTokenOffRamp, chain evm.Chain, contractTracker *CCIPContractTracker, offchainConfigDigester evmutil.EVMOffchainConfigDigester) (*ocr.OracleArgs, error) {
+	spec := jobSpec.CCIPRelaySpec
+	if !spec.TransmitterID.Valid {
+		return nil, errors.New("spec.TransmitterID not valid")
+	}
+	bytes, err := hex.DecodeString(strings.TrimPrefix(spec.TransmitterID.String, "0x"))
+	transmitterAddress := common.BytesToAddress(bytes)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error parsing spec.TransmitterID ")
 	}
 	offRampABI, err := abi.JSON(strings.NewReader(single_token_offramp.SingleTokenOffRampABI))
 	if err != nil {
@@ -69,45 +85,68 @@ func (d RelayDelegate) getOracleArgs(l logger.Logger, jb job.Job, offRamp *singl
 		offRampABI,
 		NewRelayTransmitter(chain.TxManager(),
 			d.db,
-			jb.CCIPRelaySpec.SourceEVMChainID.ToInt(),
-			jb.CCIPRelaySpec.DestEVMChainID.ToInt(), ta.Address(),
+			jobSpec.CCIPRelaySpec.SourceEVMChainID.ToInt(),
+			jobSpec.CCIPRelaySpec.DestEVMChainID.ToInt(),
+			transmitterAddress,
 			chain.Config().EvmGasLimitDefault(),
-			bulletprooftxmanager.NewQueueingTxStrategy(jb.ExternalJobID,
+			bulletprooftxmanager.NewQueueingTxStrategy(jobSpec.ExternalJobID,
 				chain.Config().OCRDefaultTransactionQueueDepth(), false),
 			chain.Client()),
 		d.lggr,
 	)
-	ocrLogger := logger.NewOCRWrapper(l, true, func(msg string) {
-		_ = d.jobORM.RecordError(jb.ID, msg)
+	loggerWith := d.lggr.With(
+		"OCRLogger", "true",
+		"contractID", spec.ContractID,
+		"jobName", jobSpec.Name.ValueOrZero(),
+		"jobID", jobSpec.ID,
+	)
+	ocrLogger := logger.NewOCRWrapper(loggerWith, true, func(msg string) {
+		d.lggr.ErrorIf(d.jobORM.RecordError(jobSpec.ID, msg), "unable to record error")
 	})
-	key, err := getValidatedKeyBundle(jb.CCIPRelaySpec.EncryptedOCRKeyBundleID, chain, d.keyStore)
-	if err != nil {
+
+	// Fetch the specified OCR2 key bundle
+	var kbID string
+	if spec.OCRKeyBundleID.Valid {
+		kbID = spec.OCRKeyBundleID.String
+	} else if kbID, err = d.cfg.OCR2KeyBundleID(); err != nil {
 		return nil, err
 	}
-	if err = validatePeerWrapper(jb.CCIPRelaySpec.P2PPeerID, chain, d.peerWrapper); err != nil {
-		return nil, err
-	}
-	bootstrapPeers, err := getValidatedBootstrapPeers(jb.CCIPRelaySpec.P2PBootstrapPeers, chain)
+	key, err := d.ks.Get(kbID)
 	if err != nil {
 		return nil, err
 	}
 
-	ocrdb := NewDB(d.db.DB, jb.CCIPRelaySpec.OffRampAddress.Address(), l)
+	bootstrapPeers, err := getValidatedBootstrapPeers(jobSpec.CCIPRelaySpec.P2PBootstrapPeers, chain)
+	if err != nil {
+		return nil, err
+	}
+
+	lc := offchainreporting2.ToLocalConfig(chain.Config(), spec.AsOCR2Spec())
+	if err = ocr.SanityCheckLocalConfig(lc); err != nil {
+		return nil, err
+	}
+	d.lggr.Infow("OCR2 job using local config",
+		"BlockchainTimeout", lc.BlockchainTimeout,
+		"ContractConfigConfirmations", lc.ContractConfigConfirmations,
+		"ContractConfigTrackerPollInterval", lc.ContractConfigTrackerPollInterval,
+		"ContractTransmitterTransmitTimeout", lc.ContractTransmitterTransmitTimeout,
+		"DatabaseTimeout", lc.DatabaseTimeout,
+	)
+
+	ocrdb := NewDB(d.db.DB, jobSpec.CCIPRelaySpec.OffRampAddress.Address(), l)
 	return &ocr.OracleArgs{
 		BinaryNetworkEndpointFactory: d.peerWrapper.Peer2,
 		V2Bootstrappers:              bootstrapPeers,
 		ContractTransmitter:          contractTransmitter,
 		ContractConfigTracker:        contractTracker,
 		Database:                     ocrdb,
-		LocalConfig: computeLocalConfig(chain.Config(), chain.Config().Dev(),
-			jb.CCIPRelaySpec.BlockchainTimeout.Duration(),
-			jb.CCIPRelaySpec.ContractConfigConfirmations, jb.CCIPRelaySpec.ContractConfigTrackerPollInterval.Duration()),
-		Logger:                 ocrLogger,
-		MonitoringEndpoint:     nil, // TODO
-		OffchainConfigDigester: offchainConfigDigester,
-		OffchainKeyring:        key,
-		OnchainKeyring:         key,
-		ReportingPluginFactory: NewRelayReportingPluginFactory(l, d.orm, offRamp),
+		LocalConfig:                  lc,
+		Logger:                       ocrLogger,
+		MonitoringEndpoint:           nil, // TODO
+		OffchainConfigDigester:       offchainConfigDigester,
+		OffchainKeyring:              key,
+		OnchainKeyring:               key,
+		ReportingPluginFactory:       NewRelayReportingPluginFactory(l, d.orm, offRamp),
 	}, nil
 }
 

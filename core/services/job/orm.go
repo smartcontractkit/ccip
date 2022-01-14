@@ -324,12 +324,15 @@ func (o *orm) CreateJob(jb *Job, qopts ...pg.QOpt) error {
 			jb.BootstrapSpecID = &specID
 		case CCIPRelay:
 			var specID int32
-			sql := `INSERT INTO ccip_relay_specs (off_ramp_address, on_ramp_address, p2p_peer_id, p2p_bootstrap_peers,
-					encrypted_ocr_key_bundle_id, transmitter_address, dest_evm_chain_id, source_evm_chain_id, blockchain_timeout, 
-					contract_config_tracker_subscribe_interval,contract_config_tracker_poll_interval, contract_config_confirmations, created_at, updated_at)
-			VALUES (:off_ramp_address, :on_ramp_address, :p2p_peer_id, :p2p_bootstrap_peers, :encrypted_ocr_key_bundle_id, 
-					:transmitter_address, :dest_evm_chain_id, :source_evm_chain_id, :blockchain_timeout, :contract_config_tracker_subscribe_interval, 
-					:contract_config_tracker_poll_interval, :contract_config_confirmations, NOW(), NOW())
+			// The first part is generic OCR2, last line is relay specific
+			sql := `INSERT INTO ccip_relay_specs (contract_id, relay, relay_config, p2p_bootstrap_peers, is_bootstrap_peer, ocr_key_bundle_id, transmitter_id,
+					blockchain_timeout, contract_config_tracker_subscribe_interval, contract_config_tracker_poll_interval, contract_config_confirmations, juels_per_fee_coin_pipeline,
+					created_at, updated_at,
+					on_ramp_address, off_ramp_address, source_evm_chain_id, dest_evm_chain_id)
+			VALUES (:contract_id, :relay, :relay_config, :p2p_bootstrap_peers, :is_bootstrap_peer, :ocr_key_bundle_id, :transmitter_id,
+					 :blockchain_timeout, :contract_config_tracker_subscribe_interval, :contract_config_tracker_poll_interval, :contract_config_confirmations, :juels_per_fee_coin_pipeline,
+					NOW(), NOW(),
+					:on_ramp_address, :off_ramp_address, :source_evm_chain_id, :dest_evm_chain_id)
 			RETURNING id;`
 			if err := pg.PrepareQueryRowx(tx, sql, &specID, jb.CCIPRelaySpec); err != nil {
 				return errors.Wrap(err, "failed to create CCIPRelaySpec for jobSpec")
@@ -337,14 +340,14 @@ func (o *orm) CreateJob(jb *Job, qopts ...pg.QOpt) error {
 			jb.CCIPRelaySpecID = &specID
 		case CCIPExecution:
 			var specID int32
-			sql := `INSERT INTO ccip_execution_specs (on_ramp_address, off_ramp_address, executor_address, p2p_peer_id, 
-					p2p_bootstrap_peers, encrypted_ocr_key_bundle_id, transmitter_address, dest_evm_chain_id, source_evm_chain_id, 
-					blockchain_timeout, contract_config_tracker_subscribe_interval, contract_config_tracker_poll_interval, 
-					contract_config_confirmations, created_at, updated_at)
-			VALUES (:on_ramp_address, :off_ramp_address, :executor_address, :p2p_peer_id, :p2p_bootstrap_peers, 
-					:encrypted_ocr_key_bundle_id, :transmitter_address, :dest_evm_chain_id, :source_evm_chain_id, :blockchain_timeout,
-					:contract_config_tracker_subscribe_interval, :contract_config_tracker_poll_interval, :contract_config_confirmations, 
-					NOW(), NOW())
+			sql := `INSERT INTO ccip_execution_specs (contract_id, relay, relay_config, p2p_bootstrap_peers, is_bootstrap_peer, ocr_key_bundle_id, transmitter_id,
+					blockchain_timeout, contract_config_tracker_subscribe_interval, contract_config_tracker_poll_interval, contract_config_confirmations, juels_per_fee_coin_pipeline,
+					created_at, updated_at,
+					on_ramp_address, off_ramp_address, executor_address, source_evm_chain_id, dest_evm_chain_id)
+			VALUES (:contract_id, :relay, :relay_config, :p2p_bootstrap_peers, :is_bootstrap_peer, :ocr_key_bundle_id, :transmitter_id,
+					 :blockchain_timeout, :contract_config_tracker_subscribe_interval, :contract_config_tracker_poll_interval, :contract_config_confirmations, :juels_per_fee_coin_pipeline,
+					NOW(), NOW(),
+					:on_ramp_address, :off_ramp_address, :executor_address, :source_evm_chain_id, :dest_evm_chain_id)
 			RETURNING id;`
 			if err := pg.PrepareQueryRowx(tx, sql, &specID, jb.CCIPExecutionSpec); err != nil {
 				return errors.Wrap(err, "failed to create CCIPExecutionSpec for jobSpec")

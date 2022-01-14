@@ -31,20 +31,26 @@ CREATE TABLE ccip_relay_reports
 CREATE TABLE ccip_relay_specs
 (
     id                                         SERIAL PRIMARY KEY,
-    off_ramp_address                           bytea                    NOT NULL,
-    on_ramp_address                            bytea                    NOT NULL,
-    p2p_peer_id                                text,
+    contract_id                                text,
+    relay                                      text,
+    relay_config                               JSONB,
     p2p_bootstrap_peers                        text[],
-    encrypted_ocr_key_bundle_id                bytea,
-    transmitter_address                        bytea,
-    dest_evm_chain_id                          numeric(78, 0)           NOT NULL REFERENCES evm_chains (id),
-    source_evm_chain_id                        numeric(78, 0)           NOT NULL REFERENCES evm_chains (id),
+    is_bootstrap_peer                          boolean                  NOT NULL,
+    ocr_key_bundle_id                          bytea,
+    monitoring_endpoint                        text,
+    transmitter_id                             text,
     blockchain_timeout                         bigint,
     contract_config_tracker_subscribe_interval bigint,
     contract_config_tracker_poll_interval      bigint,
     contract_config_confirmations              integer                  NOT NULL,
+    juels_per_fee_coin_pipeline                text                     NOT NULL,
     created_at                                 timestamp with time zone NOT NULL,
     updated_at                                 timestamp with time zone NOT NULL,
+
+    on_ramp_address                            bytea                    NOT NULL,
+    off_ramp_address                           bytea                    NOT NULL,
+    source_evm_chain_id                        numeric(78, 0)           NOT NULL REFERENCES evm_chains (id),
+    dest_evm_chain_id                          numeric(78, 0)           NOT NULL REFERENCES evm_chains (id),
     CONSTRAINT chk_contract_addresses_length CHECK (
         (octet_length(off_ramp_address) = 20
             AND octet_length(off_ramp_address) = 20))
@@ -53,21 +59,27 @@ CREATE TABLE ccip_relay_specs
 CREATE TABLE ccip_execution_specs
 (
     id                                         SERIAL PRIMARY KEY,
-    on_ramp_address                            bytea                    NOT NULL,
-    off_ramp_address                           bytea                    NOT NULL,
-    executor_address                           bytea                    NOT NULL,
-    p2p_peer_id                                text,
+    contract_id                                text,
+    relay                                      text,
+    relay_config                               JSONB,
     p2p_bootstrap_peers                        text[],
-    encrypted_ocr_key_bundle_id                bytea,
-    transmitter_address                        bytea,
-    dest_evm_chain_id                          numeric(78, 0)           NOT NULL REFERENCES evm_chains (id),
-    source_evm_chain_id                        numeric(78, 0)           NOT NULL REFERENCES evm_chains (id),
+    is_bootstrap_peer                          boolean                  NOT NULL,
+    ocr_key_bundle_id                          bytea,
+    monitoring_endpoint                        text,
+    transmitter_id                             text,
     blockchain_timeout                         bigint,
     contract_config_tracker_subscribe_interval bigint,
     contract_config_tracker_poll_interval      bigint,
     contract_config_confirmations              integer                  NOT NULL,
+    juels_per_fee_coin_pipeline                text                     NOT NULL,
     created_at                                 timestamp with time zone NOT NULL,
     updated_at                                 timestamp with time zone NOT NULL,
+
+    on_ramp_address                            bytea                    NOT NULL,
+    off_ramp_address                           bytea                    NOT NULL,
+    executor_address                           bytea                    NOT NULL,
+    source_evm_chain_id                        numeric(78, 0)           NOT NULL REFERENCES evm_chains (id),
+    dest_evm_chain_id                          numeric(78, 0)           NOT NULL REFERENCES evm_chains (id),
     CONSTRAINT chk_contract_addresses_length CHECK (
             (octet_length(off_ramp_address) = 20
                 AND octet_length(on_ramp_address) = 20)

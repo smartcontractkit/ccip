@@ -479,15 +479,16 @@ contractConfigTrackerPollInterval = "1s"
 		// Wait for peer wrapper to start
 		time.Sleep(1 * time.Second)
 		ccipJob, err := ccip.ValidatedCCIPSpec(fmt.Sprintf(`
-type               = "ccip-relay"
-schemaVersion      = 1
-name               = "ccip-job-%d"
-onRampAddress = "%s"
-offRampAddress = "%s"
-sourceEvmChainID   = "%s"
-destEvmChainID     = "%s"
-keyBundleID        = "%s"
-transmitterAddress = "%s"
+type               	= "ccip-relay"
+relay 				= "evm"
+schemaVersion      	= 1
+name               	= "ccip-job-%d"
+onRampAddress 		= "%s"
+offRampAddress 		= "%s"
+sourceEvmChainID   	= "%s"
+destEvmChainID     	= "%s"
+ocrKeyBundleID      = "%s"
+transmitterID 		= "%s"
 contractConfigConfirmations = 1
 contractConfigTrackerPollInterval = "1s"
 `, i, ccipContracts.onRamp.Address(), ccipContracts.offRamp.Address(), sourceChainID, destChainID, kbs[i].ID(), transmitters[i]))
@@ -496,16 +497,17 @@ contractConfigTrackerPollInterval = "1s"
 		require.NoError(t, err)
 		// Add executor job
 		ccipExecutionJob, err := ccip.ValidatedCCIPSpec(fmt.Sprintf(`
-type               = "ccip-execution"
-schemaVersion      = 1
-name               = "ccip-executor-job-%d"
-onRampAddress = "%s"
-offRampAddress = "%s"
-executorAddress = "%s"
-sourceEvmChainID   = "%s"
-destEvmChainID     = "%s"
-keyBundleID        = "%s"
-transmitterAddress = "%s"
+type               	= "ccip-execution"
+relay 				= "evm"
+schemaVersion      	= 1
+name               	= "ccip-executor-job-%d"
+onRampAddress 		= "%s"
+offRampAddress 		= "%s"
+executorAddress 	= "%s"
+sourceEvmChainID   	= "%s"
+destEvmChainID     	= "%s"
+ocrKeyBundleID      = "%s"
+transmitterID 		= "%s"
 contractConfigConfirmations = 1
 contractConfigTrackerPollInterval = "1s"
 `, i, ccipContracts.onRamp.Address(), ccipContracts.offRamp.Address(), ccipContracts.executor.Address(), sourceChainID, destChainID, kbs[i].ID(), transmitters[i]))
