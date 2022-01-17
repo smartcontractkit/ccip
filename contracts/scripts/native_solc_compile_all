@@ -66,3 +66,15 @@ $SCRIPTPATH/native_solc8_compile dev/VRFCoordinatorV2.sol
 
 # Feeds
 $SCRIPTPATH/native_solc8_compile dev/DerivedPriceFeed.sol
+
+# CCIP
+$SCRIPTPATH/native_solc8_compile ccip/test/helpers/SingleTokenOffRampHelper.sol
+$SCRIPTPATH/native_solc8_compile ccip/test/helpers/SimpleMessageReceiver.sol
+$SCRIPTPATH/native_solc8_compile ccip/applications/EOASingleTokenSender.sol
+$SCRIPTPATH/native_solc8_compile ccip/applications/EOASingleTokenReceiver.sol
+$SCRIPTPATH/native_solc8_compile ccip/ramps/SingleTokenOffRamp.sol
+$SCRIPTPATH/native_solc8_compile ccip/pools/LockUnlockPool.sol
+$SCRIPTPATH/native_solc8_compile ccip/ramps/SingleTokenOnRamp.sol
+$SCRIPTPATH/native_solc8_compile ccip/ramps/MessageExecutor.sol
+$SCRIPTPATH/native_solc8_compile ccip/test/helpers/MessageExecutorHelper.sol
+$SCRIPTPATH/native_solc8_compile ccip/health/AFN.sol

@@ -90,7 +90,7 @@ func (d RelayDelegate) getOracleArgs(l logger.Logger, jobSpec job.Job, offRamp *
 			transmitterAddress,
 			chain.Config().EvmGasLimitDefault(),
 			bulletprooftxmanager.NewQueueingTxStrategy(jobSpec.ExternalJobID,
-				chain.Config().OCRDefaultTransactionQueueDepth(), false),
+				chain.Config().OCRDefaultTransactionQueueDepth()),
 			chain.Client()),
 		d.lggr,
 	)

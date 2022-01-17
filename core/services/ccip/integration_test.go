@@ -19,6 +19,9 @@ import (
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/onsi/gomega"
 	uuid "github.com/satori/go.uuid"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"gopkg.in/guregu/null.v4"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/addressparser"
@@ -56,9 +59,6 @@ import (
 	ocrnetworking "github.com/smartcontractkit/libocr/networking"
 	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	ocrtypes2 "github.com/smartcontractkit/libocr/offchainreporting2/types"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"gopkg.in/guregu/null.v4"
 )
 
 func setupChain(t *testing.T) (*backends.SimulatedBackend, *bind.TransactOpts) {
@@ -256,6 +256,27 @@ func (ks EthKeyStoreSim) SignTx(address common.Address, tx *types.Transaction, c
 
 var _ keystore.Eth = EthKeyStoreSim{}
 
+type testCheckerFactory struct {
+	err error
+}
+
+func (t *testCheckerFactory) BuildChecker(spec bulletprooftxmanager.TransmitCheckerSpec) (bulletprooftxmanager.TransmitChecker, error) {
+	return &testChecker{t.err}, nil
+}
+
+type testChecker struct {
+	err error
+}
+
+func (t *testChecker) Check(
+	_ context.Context,
+	_ logger.Logger,
+	_ bulletprooftxmanager.EthTx,
+	_ bulletprooftxmanager.EthTxAttempt,
+) error {
+	return t.err
+}
+
 func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName string, sourceChain *backends.SimulatedBackend, destChain *backends.SimulatedBackend) (chainlink.Application, string, common.Address, ocr2key.KeyBundle, *configtest.TestGeneralConfig, func()) {
 	p2paddresses := []string{
 		fmt.Sprintf("127.0.0.1:%d", port),
@@ -291,6 +312,7 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 	simEthKeyStore := EthKeyStoreSim{Eth: keyStore.Eth()}
 	cfg := cltest.NewTestGeneralConfig(t)
 	evmCfg := evmtest.NewChainScopedConfig(t, cfg)
+	checkerFactory := &testCheckerFactory{}
 
 	// Create our chainset manually so we can have custom eth clients
 	// (the wrapped sims faking different chainIDs)
@@ -344,9 +366,9 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 		},
 		GenTxManager: func(c evmtypes.Chain) bulletprooftxmanager.TxManager {
 			if c.ID.String() == sourceChainID.String() {
-				return bulletprooftxmanager.NewBulletproofTxManager(db, sourceClient, evmtest.NewChainScopedConfig(t, config), simEthKeyStore, eventBroadcaster, lggr)
+				return bulletprooftxmanager.NewBulletproofTxManager(db, sourceClient, evmtest.NewChainScopedConfig(t, config), simEthKeyStore, eventBroadcaster, lggr, checkerFactory)
 			} else if c.ID.String() == destChainID.String() {
-				return bulletprooftxmanager.NewBulletproofTxManager(db, destClient, evmtest.NewChainScopedConfig(t, config), simEthKeyStore, eventBroadcaster, lggr)
+				return bulletprooftxmanager.NewBulletproofTxManager(db, destClient, evmtest.NewChainScopedConfig(t, config), simEthKeyStore, eventBroadcaster, lggr, checkerFactory)
 			}
 			t.Fatalf("invalid chain ID %v", c.ID.String())
 			return nil

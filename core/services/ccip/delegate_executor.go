@@ -88,7 +88,7 @@ func (d ExecutionDelegate) getOracleArgs(l logger.Logger, jobSpec job.Job, execu
 			transmitterAddress,
 			chain.Config().EvmGasLimitDefault(),
 			bulletprooftxmanager.NewQueueingTxStrategy(jobSpec.ExternalJobID,
-				chain.Config().OCRDefaultTransactionQueueDepth(), false),
+				chain.Config().OCRDefaultTransactionQueueDepth()),
 			chain.Client()),
 		d.lggr,
 	)
