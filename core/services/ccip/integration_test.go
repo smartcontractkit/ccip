@@ -506,6 +506,7 @@ relay 				= "evm"
 schemaVersion      	= 1
 name               	= "ccip-job-%d"
 onRampAddress 		= "%s"
+contractID 			= "%s"
 offRampAddress 		= "%s"
 sourceEvmChainID   	= "%s"
 destEvmChainID     	= "%s"
@@ -513,7 +514,7 @@ ocrKeyBundleID      = "%s"
 transmitterID 		= "%s"
 contractConfigConfirmations = 1
 contractConfigTrackerPollInterval = "1s"
-`, i, ccipContracts.onRamp.Address(), ccipContracts.offRamp.Address(), sourceChainID, destChainID, kbs[i].ID(), transmitters[i]))
+`, i, ccipContracts.onRamp.Address(), ccipContracts.offRamp.Address(), ccipContracts.offRamp.Address(), sourceChainID, destChainID, kbs[i].ID(), transmitters[i]))
 		require.NoError(t, err)
 		err = apps[i].AddJobV2(context.Background(), &ccipJob)
 		require.NoError(t, err)
@@ -525,6 +526,7 @@ schemaVersion      	= 1
 name               	= "ccip-executor-job-%d"
 onRampAddress 		= "%s"
 offRampAddress 		= "%s"
+contractID 			= "%s"
 executorAddress 	= "%s"
 sourceEvmChainID   	= "%s"
 destEvmChainID     	= "%s"
@@ -532,7 +534,7 @@ ocrKeyBundleID      = "%s"
 transmitterID 		= "%s"
 contractConfigConfirmations = 1
 contractConfigTrackerPollInterval = "1s"
-`, i, ccipContracts.onRamp.Address(), ccipContracts.offRamp.Address(), ccipContracts.executor.Address(), sourceChainID, destChainID, kbs[i].ID(), transmitters[i]))
+`, i, ccipContracts.onRamp.Address(), ccipContracts.offRamp.Address(), ccipContracts.executor.Address(), ccipContracts.executor.Address(), sourceChainID, destChainID, kbs[i].ID(), transmitters[i]))
 		require.NoError(t, err)
 		err = apps[i].AddJobV2(context.Background(), &ccipExecutionJob)
 		require.NoError(t, err)

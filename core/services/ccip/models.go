@@ -16,8 +16,8 @@ import (
 
 type Request struct {
 	SeqNum        utils.Big
-	SourceChainID string // Note this will be some super set which includes evm_chain_id
-	DestChainID   string // Note this will be some super set which includes evm_chain_id
+	SourceChainID string // TODO Note this will be some super set which includes evm_chain_id
+	DestChainID   string // TODO Note this will be some super set which includes evm_chain_id
 	Sender        common.Address
 	Receiver      common.Address
 	Data          []byte

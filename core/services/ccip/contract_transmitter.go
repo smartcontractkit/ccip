@@ -51,7 +51,10 @@ func NewExecutionTransmitter(
 }
 
 func (oc *ExecutionTransmitter) Transmit(ctx context.Context, reportCtx ocrtypes.ReportContext, report ocrtypes.Report, signatures []ocrtypes.AttributedOnchainSignature) error {
-	rs, ss, vs := splitSigs(signatures)
+	rs, ss, vs, err := splitSigs(signatures)
+	if err != nil {
+		return err
+	}
 	rawReportCtx := evmutil.RawReportContext(reportCtx)
 	oc.lggr.Infow("executor transmitting report", "report", hex.EncodeToString(report), "rawReportCtx", rawReportCtx, "contractAddress", oc.contract.Address())
 
@@ -75,7 +78,6 @@ func (oc *ExecutionTransmitter) LatestConfigDigestAndEpoch(ctx context.Context) 
 	}
 	defer it.Close()
 	for it.Next() {
-		fmt.Println("LatestConfigDigestAndEpoch:", it.Event)
 		configDigest = it.Event.ConfigDigest
 		epoch = it.Event.Epoch
 	}
@@ -111,11 +113,11 @@ func NewOfframpTransmitter(
 	}
 }
 
-func splitSigs(signatures []ocrtypes.AttributedOnchainSignature) (rs [][32]byte, ss [][32]byte, vs [32]byte) {
+func splitSigs(signatures []ocrtypes.AttributedOnchainSignature) (rs [][32]byte, ss [][32]byte, vs [32]byte, err error) {
 	for i, as := range signatures {
 		r, s, v, err := evmutil.SplitSignature(as.Signature)
 		if err != nil {
-			panic("eventTransmit(ev): error in SplitSignature")
+			return nil, nil, [32]byte{}, errors.Wrap(err, "eventTransmit(ev): error in SplitSignature")
 		}
 		rs = append(rs, r)
 		ss = append(ss, s)
@@ -125,7 +127,10 @@ func splitSigs(signatures []ocrtypes.AttributedOnchainSignature) (rs [][32]byte,
 }
 
 func (oc *OfframpTransmitter) Transmit(ctx context.Context, reportCtx ocrtypes.ReportContext, report ocrtypes.Report, signatures []ocrtypes.AttributedOnchainSignature) error {
-	rs, ss, vs := splitSigs(signatures)
+	rs, ss, vs, err := splitSigs(signatures)
+	if err != nil {
+		return err
+	}
 	rawReportCtx := evmutil.RawReportContext(reportCtx)
 	oc.lggr.Debugw("Transmitting report", "report", hex.EncodeToString(report), "rawReportCtx", rawReportCtx, "contractAddress", oc.contract.Address())
 
@@ -198,7 +203,7 @@ func NewRelayTransmitter(txm TxManager, db *sqlx.DB, sourceChainID, destChainID 
 }
 
 func (t *relayTransmitter) CreateEthTransaction(ctx context.Context, toAddress gethCommon.Address, payload []byte, report []byte) error {
-	twoGwei := big.NewInt(2_000_000_000)
+	twoGwei := big.NewInt(2e9)
 	a := toAddress
 	gasEstimate, err := t.ec.EstimateGas(ctx, ethereum.CallMsg{
 		From:      t.fromAddress,
@@ -214,7 +219,6 @@ func (t *relayTransmitter) CreateEthTransaction(ctx context.Context, toAddress g
 	if gasEstimate > t.gasLimit {
 		return errors.Wrap(err, fmt.Sprintf("gas estimate of %d exceeds gas limit set by node %d", gasEstimate, t.gasLimit))
 	}
-	// TODO: As soon as gorm is removed, these can two db ops need to be in the same transaction
 	_, err = t.txm.CreateEthTransaction(bulletprooftxmanager.NewTx{
 		FromAddress:    t.fromAddress,
 		ToAddress:      toAddress,
@@ -255,7 +259,7 @@ func NewExecuteTransmitter(txm TxManager, db *sqlx.DB, sourceChainID, destChainI
 }
 
 func (t *executeTransmitter) CreateEthTransaction(ctx context.Context, toAddress gethCommon.Address, payload []byte, report []byte) error {
-	twoGwei := big.NewInt(2_000_000_000)
+	twoGwei := big.NewInt(2e9)
 	a := toAddress
 	gasEstimate, err := t.ec.EstimateGas(ctx, ethereum.CallMsg{
 		From:      t.fromAddress,
@@ -271,7 +275,6 @@ func (t *executeTransmitter) CreateEthTransaction(ctx context.Context, toAddress
 	if gasEstimate > t.gasLimit {
 		return errors.Wrap(err, fmt.Sprintf("gas estimate of %d exceeds gas limit set by node %d", gasEstimate, t.gasLimit))
 	}
-	// TODO: As soon as gorm is removed, these can two db ops need to be in the same transaction
 	_, err = t.txm.CreateEthTransaction(bulletprooftxmanager.NewTx{
 		FromAddress:    t.fromAddress,
 		ToAddress:      toAddress,

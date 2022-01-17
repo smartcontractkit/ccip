@@ -375,20 +375,22 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 		delegates[job.CCIPRelay] = ccip.NewRelayDelegate(
 			db,
 			jobORM,
+			peerWrapper,
+			monitoringEndpointGen,
 			chainSet,
+			globalLogger,
 			cfg,
 			keyStore.OCR2(),
-			peerWrapper,
-			globalLogger,
 		)
 		delegates[job.CCIPExecution] = ccip.NewExecutionDelegate(
 			db,
 			jobORM,
+			peerWrapper,
+			monitoringEndpointGen,
 			chainSet,
+			globalLogger,
 			cfg,
 			keyStore.OCR2(),
-			peerWrapper,
-			globalLogger,
 		)
 	} else {
 		globalLogger.Debug("Off-chain reporting v2 disabled")

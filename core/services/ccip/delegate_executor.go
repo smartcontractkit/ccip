@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/chainlink/core/services/offchainreporting2"
+	"github.com/smartcontractkit/chainlink/core/services/telemetry"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/bulletprooftxmanager"
@@ -26,36 +27,38 @@ import (
 var _ job.Delegate = (*ExecutionDelegate)(nil)
 
 type ExecutionDelegate struct {
-	db          *sqlx.DB
-	jobORM      job.ORM
-	orm         ORM
-	chainSet    evm.ChainSet
-	cfg         Config
-	ks          keystore.OCR2
-	peerWrapper *ocrcommon.SingletonPeerWrapper
-	lggr        logger.Logger
+	db                    *sqlx.DB
+	jobORM                job.ORM
+	peerWrapper           *ocrcommon.SingletonPeerWrapper
+	monitoringEndpointGen telemetry.MonitoringEndpointGenerator
+	chainSet              evm.ChainSet
+	cfg                   Config
+	lggr                  logger.Logger
+	ks                    keystore.OCR2
+	ccipORM               ORM
 }
 
 // TODO: Register this delegate behind a FF
 func NewExecutionDelegate(
 	db *sqlx.DB,
 	jobORM job.ORM,
-	chainSet evm.ChainSet,
-	cfg Config,
-	keyStore keystore.OCR2,
 	peerWrapper *ocrcommon.SingletonPeerWrapper,
+	monitoringEndpointGen telemetry.MonitoringEndpointGenerator,
+	chainSet evm.ChainSet,
 	lggr logger.Logger,
-
+	cfg Config,
+	ks keystore.OCR2,
 ) *ExecutionDelegate {
 	return &ExecutionDelegate{
-		db:          db,
-		jobORM:      jobORM,
-		orm:         NewORM(db),
-		chainSet:    chainSet,
-		cfg:         cfg,
-		ks:          keyStore,
-		peerWrapper: peerWrapper,
-		lggr:        lggr,
+		db:                    db,
+		jobORM:                jobORM,
+		peerWrapper:           peerWrapper,
+		monitoringEndpointGen: monitoringEndpointGen,
+		chainSet:              chainSet,
+		cfg:                   cfg,
+		lggr:                  lggr,
+		ks:                    ks,
+		ccipORM:               NewORM(db),
 	}
 }
 
@@ -63,41 +66,73 @@ func (d ExecutionDelegate) JobType() job.Type {
 	return job.CCIPExecution
 }
 
-func (d ExecutionDelegate) getOracleArgs(l logger.Logger, jobSpec job.Job, executor *message_executor.MessageExecutor, chain evm.Chain, contractTracker *CCIPContractTracker, offchainConfigDigester evmutil.EVMOffchainConfigDigester, offRamp *single_token_offramp.SingleTokenOffRamp) (*ocr.OracleArgs, error) {
+func (d ExecutionDelegate) ServicesForSpec(jobSpec job.Job) (services []job.Service, err error) {
 	spec := jobSpec.CCIPExecutionSpec
+	if spec == nil {
+		return nil, errors.Errorf("CCIPExecution expects a *job.CCIPExecutionSpec to be present, got %v", jobSpec)
+	}
 	if !spec.TransmitterID.Valid {
 		return nil, errors.New("spec.TransmitterID not valid")
 	}
-	bytes, err := hex.DecodeString(strings.TrimPrefix(spec.TransmitterID.String, "0x"))
-	if err != nil {
-		return nil, errors.Wrap(err, "error parsing spec.TransmitterID ")
-	}
-	transmitterAddress := common.BytesToAddress(bytes)
 
-	executorABI, err := abi.JSON(strings.NewReader(message_executor.MessageExecutorABI))
+	destChain, err := d.chainSet.Get(spec.DestEVMChainID.ToInt())
 	if err != nil {
-		return nil, errors.Wrap(err, "could not get contract ABI JSON")
+		return nil, errors.Wrap(err, "unable to open chain")
 	}
-	contractTransmitter := NewExecutionTransmitter(
-		executor,
-		executorABI,
-		NewExecuteTransmitter(chain.TxManager(),
-			d.db,
-			jobSpec.CCIPExecutionSpec.SourceEVMChainID.ToInt(),
-			jobSpec.CCIPExecutionSpec.DestEVMChainID.ToInt(),
-			transmitterAddress,
-			chain.Config().EvmGasLimitDefault(),
-			bulletprooftxmanager.NewQueueingTxStrategy(jobSpec.ExternalJobID,
-				chain.Config().OCRDefaultTransactionQueueDepth()),
-			chain.Client()),
+	contract, err := message_executor.NewMessageExecutor(spec.ExecutorAddress.Address(), destChain.Client())
+	if err != nil {
+		return nil, errors.Wrap(err, "could not instantiate NewOffchainAggregator")
+	}
+	contractTracker := NewCCIPContractTracker(
+		executorTracker{contract},
+		destChain.Client(),
+		destChain.LogBroadcaster(),
+		jobSpec.ID,
 		d.lggr,
+		d.db,
+		destChain,
+		destChain.HeadBroadcaster(),
 	)
+	services = append(services, contractTracker)
+
 	loggerWith := d.lggr.With(
 		"OCRLogger", "true",
 		"contractID", spec.ContractID,
 		"jobName", jobSpec.Name.ValueOrZero(),
 		"jobID", jobSpec.ID,
 	)
+	loggerWith.Infof("starting job with externalJobId %s, "+
+		"offrampContract %s, onrampContract %s",
+		jobSpec.ExternalJobID.String(),
+		spec.OffRampAddress.String(),
+		spec.OnRampAddress.String(),
+	)
+
+	bytes, err := hex.DecodeString(strings.TrimPrefix(spec.TransmitterID.String, "0x"))
+	if err != nil {
+		return nil, errors.Wrap(err, "error parsing spec.TransmitterID ")
+	}
+	transmitterAddress := common.BytesToAddress(bytes)
+	executorABI, err := abi.JSON(strings.NewReader(message_executor.MessageExecutorABI))
+	if err != nil {
+		return nil, errors.Wrap(err, "could not get contract ABI JSON")
+	}
+
+	contractTransmitter := NewExecutionTransmitter(
+		contract,
+		executorABI,
+		NewExecuteTransmitter(destChain.TxManager(),
+			d.db,
+			spec.SourceEVMChainID.ToInt(),
+			spec.DestEVMChainID.ToInt(),
+			transmitterAddress,
+			destChain.Config().EvmGasLimitDefault(),
+			bulletprooftxmanager.NewQueueingTxStrategy(jobSpec.ExternalJobID,
+				destChain.Config().OCRDefaultTransactionQueueDepth()),
+			destChain.Client()),
+		d.lggr,
+	)
+
 	ocrLogger := logger.NewOCRWrapper(loggerWith, true, func(msg string) {
 		d.lggr.ErrorIf(d.jobORM.RecordError(jobSpec.ID, msg), "unable to record error")
 	})
@@ -109,20 +144,23 @@ func (d ExecutionDelegate) getOracleArgs(l logger.Logger, jobSpec job.Job, execu
 	} else if kbID, err = d.cfg.OCR2KeyBundleID(); err != nil {
 		return nil, err
 	}
-	key, err := d.ks.Get(kbID)
+	kb, err := d.ks.Get(kbID)
 	if err != nil {
 		return nil, err
 	}
 
-	bootstrapPeers, err := getValidatedBootstrapPeers(jobSpec.CCIPExecutionSpec.P2PBootstrapPeers, chain)
+	bootstrapPeers, err := ocrcommon.GetValidatedBootstrapPeers(spec.P2PBootstrapPeers, d.peerWrapper.Config().P2PV2Bootstrappers())
 	if err != nil {
 		return nil, err
 	}
 
-	ocrdb := NewDB(d.db.DB, jobSpec.CCIPExecutionSpec.ExecutorAddress.Address(), d.lggr)
-
-	lc := offchainreporting2.ToLocalConfig(chain.Config(), spec.AsOCR2Spec())
+	ocrdb := NewDB(d.db.DB, spec.ExecutorAddress.Address(), d.lggr)
+	lc := offchainreporting2.ToLocalConfig(destChain.Config(), spec.AsOCR2Spec())
 	if err = ocr.SanityCheckLocalConfig(lc); err != nil {
+		return nil, err
+	}
+	singleTokenOffRamp, err := single_token_offramp.NewSingleTokenOffRamp(spec.OffRampAddress.Address(), destChain.Client())
+	if err != nil {
 		return nil, err
 	}
 	d.lggr.Infow("OCR2 job using local config",
@@ -133,7 +171,7 @@ func (d ExecutionDelegate) getOracleArgs(l logger.Logger, jobSpec job.Job, execu
 		"DatabaseTimeout", lc.DatabaseTimeout,
 	)
 
-	return &ocr.OracleArgs{
+	oracle, err := ocr.NewOracle(ocr.OracleArgs{
 		BinaryNetworkEndpointFactory: d.peerWrapper.Peer2,
 		V2Bootstrappers:              bootstrapPeers,
 		ContractTransmitter:          contractTransmitter,
@@ -141,71 +179,34 @@ func (d ExecutionDelegate) getOracleArgs(l logger.Logger, jobSpec job.Job, execu
 		Database:                     ocrdb,
 		LocalConfig:                  lc,
 		Logger:                       ocrLogger,
-		MonitoringEndpoint:           nil, // TODO
-		OffchainConfigDigester:       offchainConfigDigester,
-		OffchainKeyring:              key,
-		OnchainKeyring:               key,
-		ReportingPluginFactory:       NewExecutionReportingPluginFactory(l, d.orm, jobSpec.CCIPExecutionSpec.SourceEVMChainID.ToInt(), jobSpec.CCIPExecutionSpec.DestEVMChainID.ToInt(), jobSpec.CCIPExecutionSpec.ExecutorAddress.Address(), offRamp),
-	}, nil
-}
-
-func (d ExecutionDelegate) ServicesForSpec(jb job.Job) ([]job.Service, error) {
-	if jb.CCIPExecutionSpec == nil {
-		return nil, errors.New("no ccip job specified")
+		MonitoringEndpoint:           d.monitoringEndpointGen.GenMonitoringEndpoint(spec.ContractID),
+		OffchainConfigDigester: evmutil.EVMOffchainConfigDigester{
+			ChainID:         maybeRemapChainID(destChain.Config().ChainID()).Uint64(),
+			ContractAddress: spec.ExecutorAddress.Address(),
+		},
+		OffchainKeyring: kb,
+		OnchainKeyring:  kb,
+		ReportingPluginFactory: NewExecutionReportingPluginFactory(
+			loggerWith,
+			d.ccipORM,
+			spec.SourceEVMChainID.ToInt(),
+			spec.DestEVMChainID.ToInt(),
+			spec.ExecutorAddress.Address(),
+			singleTokenOffRamp),
+	})
+	if err != nil {
+		return nil, err
 	}
-	l := d.lggr.With(
-		"jobID", jb.ID,
-		"externalJobID", jb.ExternalJobID,
-		"offRampAddress", jb.CCIPExecutionSpec.OffRampAddress,
-		"onRampAddress", jb.CCIPExecutionSpec.OnRampAddress,
-		"executorAddress", jb.CCIPExecutionSpec.OnRampAddress,
-	)
+	services = append(services, oracle)
 
-	destChain, err := d.chainSet.Get(jb.CCIPExecutionSpec.DestEVMChainID.ToInt())
+	sourceChain, err := d.chainSet.Get(spec.SourceEVMChainID.ToInt())
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to open chain")
 	}
-	sourceChain, err := d.chainSet.Get(jb.CCIPExecutionSpec.SourceEVMChainID.ToInt())
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to open chain")
-	}
-	contract, err := message_executor.NewMessageExecutor(jb.CCIPExecutionSpec.ExecutorAddress.Address(), destChain.Client())
-	if err != nil {
-		return nil, errors.Wrap(err, "could not instantiate NewOffchainAggregator")
-	}
-	singleTokenOffRamp, err := single_token_offramp.NewSingleTokenOffRamp(jb.CCIPExecutionSpec.OffRampAddress.Address(), destChain.Client())
+	singleTokenOnRamp, err := single_token_onramp.NewSingleTokenOnRamp(spec.OnRampAddress.Address(), sourceChain.Client())
 	if err != nil {
 		return nil, err
 	}
-	offchainConfigDigester := evmutil.EVMOffchainConfigDigester{
-		ChainID:         maybeRemapChainID(destChain.Config().ChainID()).Uint64(),
-		ContractAddress: jb.CCIPExecutionSpec.ExecutorAddress.Address(),
-	}
-	contractTracker := NewCCIPContractTracker(
-		executorTracker{contract},
-		destChain.Client(),
-		destChain.LogBroadcaster(),
-		jb.ID,
-		d.lggr,
-		d.db,
-		destChain,
-		destChain.HeadBroadcaster(),
-	)
-
-	oracleArgs, err := d.getOracleArgs(l, jb, contract, destChain, contractTracker, offchainConfigDigester, singleTokenOffRamp)
-	if err != nil {
-		return nil, err
-	}
-	oracle, err := ocr.NewOracle(*oracleArgs)
-	if err != nil {
-		return nil, err
-	}
-
-	singleTokenOnRamp, err := single_token_onramp.NewSingleTokenOnRamp(jb.CCIPExecutionSpec.OnRampAddress.Address(), sourceChain.Client())
-	if err != nil {
-		return nil, err
-	}
-
 	encodedCCIPConfig, err := contractTracker.GetOffchainConfig()
 	if err != nil {
 		return nil, errors.Wrap(err, "could not get the latest encoded config")
@@ -213,15 +214,16 @@ func (d ExecutionDelegate) ServicesForSpec(jb job.Job) ([]job.Service, error) {
 
 	// TODO: Its conceivable we may want pull out this log listener into its own job spec so to avoid repeating
 	// all the log subscriptions.
-	logListener := NewLogListener(l,
+	logListener := NewLogListener(loggerWith,
 		sourceChain.LogBroadcaster(),
 		destChain.LogBroadcaster(),
 		singleTokenOnRamp,
 		singleTokenOffRamp,
 		encodedCCIPConfig,
 		d.db,
-		jb.ID)
-	return []job.Service{contractTracker, oracle, logListener}, nil
+		jobSpec.ID)
+	services = append(services, logListener)
+	return services, nil
 }
 
 func (d ExecutionDelegate) AfterJobCreated(spec job.Job) {

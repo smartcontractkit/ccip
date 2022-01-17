@@ -2,8 +2,11 @@
 package ccip
 
 import (
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
+	"github.com/smartcontractkit/chainlink/core/config"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_offramp"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/job"
@@ -11,6 +14,7 @@ import (
 	ocrcommontypes "github.com/smartcontractkit/libocr/commontypes"
 	ocr "github.com/smartcontractkit/libocr/offchainreporting2"
 	"github.com/smartcontractkit/libocr/offchainreporting2/chains/evmutil"
+	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"github.com/smartcontractkit/sqlx"
 )
 
@@ -84,6 +88,7 @@ func (d DelegateBootstrap) ServicesForSpec(jb job.Job) ([]job.Service, error) {
 		ChainID:         maybeRemapChainID(c.Config().ChainID()).Uint64(),
 		ContractAddress: jb.CCIPBootstrapSpec.ContractAddress.Address(),
 	}
+
 	bootstrapNode, err := ocr.NewBootstrapper(ocr.BootstrapperArgs{
 		BootstrapperFactory:   d.peerWrapper.Peer2,
 		ContractConfigTracker: contractTracker,
@@ -105,4 +110,42 @@ func (d DelegateBootstrap) AfterJobCreated(spec job.Job) {
 }
 
 func (d DelegateBootstrap) BeforeJobDeleted(spec job.Job) {
+}
+
+// Fallback to config if explicit spec parameters are not set
+func computeLocalConfig(config config.OCR2Config, dev bool, bt time.Duration, confs uint16, poll time.Duration) ocrtypes.LocalConfig {
+	var blockchainTimeout time.Duration
+	if bt != 0 {
+		blockchainTimeout = bt
+	} else {
+		blockchainTimeout = config.OCR2BlockchainTimeout()
+	}
+
+	var contractConfirmations uint16
+	if confs != 0 {
+		contractConfirmations = confs
+	} else {
+		contractConfirmations = config.OCR2ContractConfirmations()
+	}
+
+	var contractConfigTrackerPollInterval time.Duration
+	if poll != 0 {
+		contractConfigTrackerPollInterval = poll
+	} else {
+		contractConfigTrackerPollInterval = config.OCR2ContractPollInterval()
+	}
+
+	lc := ocrtypes.LocalConfig{
+		BlockchainTimeout:                  blockchainTimeout,
+		ContractConfigConfirmations:        contractConfirmations,
+		ContractConfigTrackerPollInterval:  contractConfigTrackerPollInterval,
+		ContractTransmitterTransmitTimeout: config.OCR2ContractTransmitterTransmitTimeout(),
+		DatabaseTimeout:                    config.OCR2DatabaseTimeout(),
+	}
+	if dev {
+		// Skips config validation so we can use any config parameters we want.
+		// For example to lower contractConfigTrackerPollInterval to speed up tests.
+		lc.DevelopmentMode = ocrtypes.EnableDangerousDevelopmentMode
+	}
+	return lc
 }

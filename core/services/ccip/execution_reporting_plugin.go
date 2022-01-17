@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	EXECUTION_MAX_INFLIGHT_TIME_SECONDS = 180
+	ExecutionMaxInflightTimeSeconds = 180
 )
 
 var _ types.ReportingPluginFactory = &ExecutionReportingPluginFactory{}
@@ -372,7 +372,7 @@ func (r ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Contex
 		return false, err
 	}
 	// Any timed out requests should be set back to RequestStatusExecutionPending so their execution can be retried in a subsequent report.
-	if err = r.orm.ResetExpiredRequests(r.sourceChainId, r.destChainId, EXECUTION_MAX_INFLIGHT_TIME_SECONDS, RequestStatusExecutionPending, RequestStatusRelayConfirmed); err != nil {
+	if err = r.orm.ResetExpiredRequests(r.sourceChainId, r.destChainId, ExecutionMaxInflightTimeSeconds, RequestStatusExecutionPending, RequestStatusRelayConfirmed); err != nil {
 		// Ok to continue here, we'll try to reset them again on the next round.
 		r.l.Errorw("unable to reset expired requests", "err", err)
 	}

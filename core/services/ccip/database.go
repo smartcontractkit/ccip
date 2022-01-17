@@ -19,14 +19,12 @@ import (
 
 type db struct {
 	*sql.DB
-	//oracleSpecID int32
 	contractAddr common.Address
 	logger       logger.Logger
 }
 
 var (
 	_ ocrtypes.Database = &db{}
-	//_ OCRContractTrackerDB = &db{}
 )
 
 // NewDB returns a new DB scoped to this oracleSpecID
@@ -321,59 +319,3 @@ WHERE contract_address = $1 AND time < $2
 
 	return
 }
-
-//func (d *db) SaveLatestRoundRequested(tx *sql.Tx, rr ocr2aggregator.OCR2AggregatorRoundRequested) error {
-//	rawLog, err := json.Marshal(rr.Raw)
-//	if err != nil {
-//		return errors.Wrap(err, "could not marshal log as JSON")
-//	}
-//	_, err = tx.Exec(`
-//INSERT INTO offchainreporting2_latest_round_requested (offchainreporting2_oracle_spec_id, requester, config_digest, epoch, round, raw)
-//VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (offchainreporting2_oracle_spec_id) DO UPDATE SET
-//	requester = EXCLUDED.requester,
-//	config_digest = EXCLUDED.config_digest,
-//	epoch = EXCLUDED.epoch,
-//	round = EXCLUDED.round,
-//	raw = EXCLUDED.raw
-//`, d.oracleSpecID, rr.Requester, rr.ConfigDigest[:], rr.Epoch, rr.Round, rawLog)
-//
-//	return errors.Wrap(err, "could not save latest round requested")
-//}
-//
-//func (d *db) LoadLatestRoundRequested() (ocr2aggregator.OCR2AggregatorRoundRequested, error) {
-//	rr := ocr2aggregator.OCR2AggregatorRoundRequested{}
-//	rows, err := d.Query(`
-//SELECT requester, config_digest, epoch, round, raw
-//FROM offchainreporting2_latest_round_requested
-//WHERE offchainreporting2_oracle_spec_id = $1
-//LIMIT 1
-//`, d.oracleSpecID)
-//	if err != nil {
-//		return rr, errors.Wrap(err, "LoadLatestRoundRequested failed to query rows")
-//	}
-//	if rows.Err() != nil {
-//		return rr, errors.Wrap(err, "LoadLatestRoundRequested row iteration error")
-//	}
-//
-//	for rows.Next() {
-//		var configDigest []byte
-//		var rawLog []byte
-//
-//		err = rows.Scan(&rr.Requester, &configDigest, &rr.Epoch, &rr.Round, &rawLog)
-//		if err != nil {
-//			return rr, errors.Wrap(err, "LoadLatestRoundRequested failed to scan row")
-//		}
-//
-//		rr.ConfigDigest, err = ocrtypes.BytesToConfigDigest(configDigest)
-//		if err != nil {
-//			return rr, errors.Wrap(err, "LoadLatestRoundRequested failed to decode config digest")
-//		}
-//
-//		err = json.Unmarshal(rawLog, &rr.Raw)
-//		if err != nil {
-//			return rr, errors.Wrap(err, "LoadLatestRoundRequested failed to unmarshal raw log")
-//		}
-//	}
-//
-//	return rr, nil
-//}

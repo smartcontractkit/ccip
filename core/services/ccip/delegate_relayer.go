@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/chainlink/core/config"
 	"github.com/smartcontractkit/chainlink/core/services/offchainreporting2"
+	"github.com/smartcontractkit/chainlink/core/services/telemetry"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/bulletprooftxmanager"
@@ -30,35 +31,38 @@ type Config interface {
 }
 
 type RelayDelegate struct {
-	db          *sqlx.DB
-	jobORM      job.ORM
-	orm         ORM
-	chainSet    evm.ChainSet
-	cfg         Config
-	ks          keystore.OCR2
-	peerWrapper *ocrcommon.SingletonPeerWrapper
-	lggr        logger.Logger
+	db                    *sqlx.DB
+	jobORM                job.ORM
+	peerWrapper           *ocrcommon.SingletonPeerWrapper
+	monitoringEndpointGen telemetry.MonitoringEndpointGenerator
+	chainSet              evm.ChainSet
+	cfg                   Config
+	lggr                  logger.Logger
+	ks                    keystore.OCR2
+	ccipORM               ORM
 }
 
 // TODO: Register this delegate behind a FF
 func NewRelayDelegate(
 	db *sqlx.DB,
 	jobORM job.ORM,
-	chainSet evm.ChainSet,
-	cfg Config,
-	keyStore keystore.OCR2,
 	peerWrapper *ocrcommon.SingletonPeerWrapper,
+	monitoringEndpointGen telemetry.MonitoringEndpointGenerator,
+	chainSet evm.ChainSet,
 	lggr logger.Logger,
+	cfg Config,
+	ks keystore.OCR2,
 ) *RelayDelegate {
 	return &RelayDelegate{
-		db:          db,
-		jobORM:      jobORM,
-		orm:         NewORM(db),
-		chainSet:    chainSet,
-		cfg:         cfg,
-		ks:          keyStore,
-		peerWrapper: peerWrapper,
-		lggr:        lggr,
+		db:                    db,
+		jobORM:                jobORM,
+		peerWrapper:           peerWrapper,
+		monitoringEndpointGen: monitoringEndpointGen,
+		chainSet:              chainSet,
+		cfg:                   cfg,
+		lggr:                  lggr,
+		ks:                    ks,
+		ccipORM:               NewORM(db),
 	}
 }
 
@@ -66,16 +70,62 @@ func (d RelayDelegate) JobType() job.Type {
 	return job.CCIPRelay
 }
 
-func (d RelayDelegate) getOracleArgs(l logger.Logger, jobSpec job.Job, offRamp *single_token_offramp.SingleTokenOffRamp, chain evm.Chain, contractTracker *CCIPContractTracker, offchainConfigDigester evmutil.EVMOffchainConfigDigester) (*ocr.OracleArgs, error) {
+func (d RelayDelegate) ServicesForSpec(jobSpec job.Job) (services []job.Service, err error) {
 	spec := jobSpec.CCIPRelaySpec
+	if spec == nil {
+		return nil, errors.Errorf("CCIPRelay expects a *job.CCIPRelaySpec to be present, got %v", jobSpec)
+	}
 	if !spec.TransmitterID.Valid {
 		return nil, errors.New("spec.TransmitterID not valid")
 	}
+
+	destChain, err := d.chainSet.Get(spec.DestEVMChainID.ToInt())
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to open chain")
+	}
+	sourceChain, err := d.chainSet.Get(spec.SourceEVMChainID.ToInt())
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to open chain")
+	}
+	offRamp, err := single_token_offramp.NewSingleTokenOffRamp(spec.OffRampAddress.Address(), destChain.Client())
+	if err != nil {
+		return nil, errors.Wrap(err, "could not instantiate NewOffchainAggregator")
+	}
+	contractTracker := NewCCIPContractTracker(
+		offrampTracker{offRamp},
+		destChain.Client(),
+		destChain.LogBroadcaster(),
+		jobSpec.ID,
+		d.lggr,
+		d.db,
+		destChain,
+		destChain.HeadBroadcaster(),
+	)
+	services = append(services, contractTracker)
+
+	loggerWith := d.lggr.With(
+		"OCRLogger", "true",
+		"contractID", spec.ContractID,
+		"jobName", jobSpec.Name.ValueOrZero(),
+		"jobID", jobSpec.ID,
+	)
+	loggerWith.Infof("starting job with externalJobId %s, "+
+		"offrampContract %s, onrampContract %s",
+		jobSpec.ExternalJobID.String(),
+		spec.OffRampAddress.String(),
+		spec.OnRampAddress.String(),
+	)
+
+	offchainConfigDigester := evmutil.EVMOffchainConfigDigester{
+		ChainID:         maybeRemapChainID(destChain.Config().ChainID()).Uint64(),
+		ContractAddress: spec.OffRampAddress.Address(),
+	}
+
 	bytes, err := hex.DecodeString(strings.TrimPrefix(spec.TransmitterID.String, "0x"))
-	transmitterAddress := common.BytesToAddress(bytes)
 	if err != nil {
 		return nil, errors.Wrap(err, "error parsing spec.TransmitterID ")
 	}
+	transmitterAddress := common.BytesToAddress(bytes)
 	offRampABI, err := abi.JSON(strings.NewReader(single_token_offramp.SingleTokenOffRampABI))
 	if err != nil {
 		return nil, errors.Wrap(err, "could not get contract ABI JSON")
@@ -83,23 +133,17 @@ func (d RelayDelegate) getOracleArgs(l logger.Logger, jobSpec job.Job, offRamp *
 	contractTransmitter := NewOfframpTransmitter(
 		offRamp,
 		offRampABI,
-		NewRelayTransmitter(chain.TxManager(),
+		NewRelayTransmitter(destChain.TxManager(),
 			d.db,
-			jobSpec.CCIPRelaySpec.SourceEVMChainID.ToInt(),
-			jobSpec.CCIPRelaySpec.DestEVMChainID.ToInt(),
+			spec.SourceEVMChainID.ToInt(),
+			spec.DestEVMChainID.ToInt(),
 			transmitterAddress,
-			chain.Config().EvmGasLimitDefault(),
-			bulletprooftxmanager.NewQueueingTxStrategy(jobSpec.ExternalJobID,
-				chain.Config().OCRDefaultTransactionQueueDepth()),
-			chain.Client()),
+			destChain.Config().EvmGasLimitDefault(),
+			bulletprooftxmanager.NewQueueingTxStrategy(jobSpec.ExternalJobID, destChain.Config().OCRDefaultTransactionQueueDepth()),
+			destChain.Client()),
 		d.lggr,
 	)
-	loggerWith := d.lggr.With(
-		"OCRLogger", "true",
-		"contractID", spec.ContractID,
-		"jobName", jobSpec.Name.ValueOrZero(),
-		"jobID", jobSpec.ID,
-	)
+
 	ocrLogger := logger.NewOCRWrapper(loggerWith, true, func(msg string) {
 		d.lggr.ErrorIf(d.jobORM.RecordError(jobSpec.ID, msg), "unable to record error")
 	})
@@ -111,17 +155,17 @@ func (d RelayDelegate) getOracleArgs(l logger.Logger, jobSpec job.Job, offRamp *
 	} else if kbID, err = d.cfg.OCR2KeyBundleID(); err != nil {
 		return nil, err
 	}
-	key, err := d.ks.Get(kbID)
+	kb, err := d.ks.Get(kbID)
 	if err != nil {
 		return nil, err
 	}
 
-	bootstrapPeers, err := getValidatedBootstrapPeers(jobSpec.CCIPRelaySpec.P2PBootstrapPeers, chain)
+	bootstrapPeers, err := ocrcommon.GetValidatedBootstrapPeers(spec.P2PBootstrapPeers, d.peerWrapper.Config().P2PV2Bootstrappers())
 	if err != nil {
 		return nil, err
 	}
 
-	lc := offchainreporting2.ToLocalConfig(chain.Config(), spec.AsOCR2Spec())
+	lc := offchainreporting2.ToLocalConfig(destChain.Config(), spec.AsOCR2Spec())
 	if err = ocr.SanityCheckLocalConfig(lc); err != nil {
 		return nil, err
 	}
@@ -133,8 +177,8 @@ func (d RelayDelegate) getOracleArgs(l logger.Logger, jobSpec job.Job, offRamp *
 		"DatabaseTimeout", lc.DatabaseTimeout,
 	)
 
-	ocrdb := NewDB(d.db.DB, jobSpec.CCIPRelaySpec.OffRampAddress.Address(), l)
-	return &ocr.OracleArgs{
+	ocrdb := NewDB(d.db.DB, spec.OffRampAddress.Address(), loggerWith)
+	oracle, err := ocr.NewOracle(ocr.OracleArgs{
 		BinaryNetworkEndpointFactory: d.peerWrapper.Peer2,
 		V2Bootstrappers:              bootstrapPeers,
 		ContractTransmitter:          contractTransmitter,
@@ -142,79 +186,37 @@ func (d RelayDelegate) getOracleArgs(l logger.Logger, jobSpec job.Job, offRamp *
 		Database:                     ocrdb,
 		LocalConfig:                  lc,
 		Logger:                       ocrLogger,
-		MonitoringEndpoint:           nil, // TODO
+		MonitoringEndpoint:           d.monitoringEndpointGen.GenMonitoringEndpoint(spec.ContractID),
 		OffchainConfigDigester:       offchainConfigDigester,
-		OffchainKeyring:              key,
-		OnchainKeyring:               key,
-		ReportingPluginFactory:       NewRelayReportingPluginFactory(l, d.orm, offRamp),
-	}, nil
-}
-
-func (d RelayDelegate) ServicesForSpec(jb job.Job) ([]job.Service, error) {
-	if jb.CCIPRelaySpec == nil {
-		return nil, errors.New("no ccip job specified")
-	}
-	l := d.lggr.With(
-		"jobID", jb.ID,
-		"externalJobID", jb.ExternalJobID,
-		"offRampContract", jb.CCIPRelaySpec.OffRampAddress,
-		"onRampContract", jb.CCIPRelaySpec.OnRampAddress,
-	)
-
-	destChain, err := d.chainSet.Get(jb.CCIPRelaySpec.DestEVMChainID.ToInt())
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to open chain")
-	}
-	sourceChain, err := d.chainSet.Get(jb.CCIPRelaySpec.SourceEVMChainID.ToInt())
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to open chain")
-	}
-	offRamp, err := single_token_offramp.NewSingleTokenOffRamp(jb.CCIPRelaySpec.OffRampAddress.Address(), destChain.Client())
-	if err != nil {
-		return nil, errors.Wrap(err, "could not instantiate NewOffchainAggregator")
-	}
-	contractTracker := NewCCIPContractTracker(
-		offrampTracker{offRamp},
-		destChain.Client(),
-		destChain.LogBroadcaster(),
-		jb.ID,
-		d.lggr,
-		d.db,
-		destChain,
-		destChain.HeadBroadcaster(),
-	)
-	offchainConfigDigester := evmutil.EVMOffchainConfigDigester{
-		ChainID:         maybeRemapChainID(destChain.Config().ChainID()).Uint64(),
-		ContractAddress: jb.CCIPRelaySpec.OffRampAddress.Address(),
-	}
-	oracleArgs, err := d.getOracleArgs(l, jb, offRamp, destChain, contractTracker, offchainConfigDigester)
+		OffchainKeyring:              kb,
+		OnchainKeyring:               kb,
+		ReportingPluginFactory:       NewRelayReportingPluginFactory(loggerWith, d.ccipORM, offRamp),
+	})
 	if err != nil {
 		return nil, err
 	}
-	oracle, err := ocr.NewOracle(*oracleArgs)
-	if err != nil {
-		return nil, err
-	}
-	singleTokenOnRamp, err := single_token_onramp.NewSingleTokenOnRamp(jb.CCIPRelaySpec.OnRampAddress.Address(), sourceChain.Client())
-	if err != nil {
-		return nil, err
-	}
+	services = append(services, oracle)
 
+	singleTokenOnRamp, err := single_token_onramp.NewSingleTokenOnRamp(spec.OnRampAddress.Address(), sourceChain.Client())
+	if err != nil {
+		return nil, err
+	}
 	encodedCCIPConfig, err := contractTracker.GetOffchainConfig()
 	if err != nil {
 		return nil, errors.Wrap(err, "could not get the latest encoded config")
 	}
 	// TODO: Its conceivable we may want pull out this log listener into its own job spec so to avoid repeating
 	// All the log subscriptions
-	logListener := NewLogListener(l,
+	logListener := NewLogListener(loggerWith,
 		sourceChain.LogBroadcaster(),
 		destChain.LogBroadcaster(),
 		singleTokenOnRamp,
 		offRamp,
 		encodedCCIPConfig,
 		d.db,
-		jb.ID)
-	return []job.Service{contractTracker, oracle, logListener}, nil
+		jobSpec.ID)
+	services = append(services, logListener)
+	return services, nil
 }
 
 func (d RelayDelegate) AfterJobCreated(spec job.Job) {
