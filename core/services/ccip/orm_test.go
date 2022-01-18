@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/smartcontractkit/chainlink/core/internal/cltest/heavyweight"
+	"github.com/smartcontractkit/chainlink/core/internal/testutils/pgtest"
+	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/ccip"
 	"github.com/smartcontractkit/chainlink/core/utils"
 
@@ -19,7 +21,8 @@ import (
 func TestORM(t *testing.T) {
 	// Use a real db so we can do timestamp testing.
 	_, db := heavyweight.FullTestDB(t, "orm_test", true, false)
-	orm := ccip.NewORM(db)
+	var lggr = logger.TestLogger(t)
+	orm := ccip.NewORM(db, lggr, pgtest.NewPGCfg(false))
 	source := big.NewInt(1)
 	dest := big.NewInt(2)
 

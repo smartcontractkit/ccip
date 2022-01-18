@@ -32,6 +32,7 @@ type DelegateBootstrap struct {
 func NewDelegateBootstrap(
 	db *sqlx.DB,
 	jobORM job.ORM,
+	ccipORM ORM,
 	chainSet evm.ChainSet,
 	peerWrapper *ocrcommon.SingletonPeerWrapper,
 	lggr logger.Logger,
@@ -39,7 +40,7 @@ func NewDelegateBootstrap(
 	return &DelegateBootstrap{
 		db:          db,
 		jobORM:      jobORM,
-		orm:         NewORM(db),
+		orm:         ccipORM,
 		chainSet:    chainSet,
 		peerWrapper: peerWrapper,
 		lggr:        lggr,
@@ -77,7 +78,6 @@ func (d DelegateBootstrap) ServicesForSpec(jb job.Job) ([]job.Service, error) {
 		c.LogBroadcaster(),
 		jb.ID,
 		d.lggr,
-		d.db,
 		c,
 		c.HeadBroadcaster(),
 	)

@@ -25,7 +25,6 @@ import (
 	"github.com/smartcontractkit/chainlink/core/utils"
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2/types"
-	"github.com/smartcontractkit/sqlx"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -112,7 +111,6 @@ type CCIPContractTracker struct {
 	logBroadcaster  log.Broadcaster
 	jobID           int32
 	logger          logger.Logger
-	gdb             *sqlx.DB
 	blockTranslator ocrcommon.BlockTranslator
 	chain           evm.Chain
 
@@ -142,7 +140,6 @@ func NewCCIPContractTracker(
 	logBroadcaster log.Broadcaster,
 	jobID int32,
 	logger logger.Logger,
-	gdb *sqlx.DB,
 	chain evm.Chain,
 	headBroadcaster httypes.HeadBroadcaster,
 ) (o *CCIPContractTracker) {
@@ -154,7 +151,6 @@ func NewCCIPContractTracker(
 		logBroadcaster,
 		jobID,
 		logger,
-		gdb,
 		ocrcommon.NewBlockTranslator(chain.Config(), ethClient, logger),
 		chain,
 		headBroadcaster,

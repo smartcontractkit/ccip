@@ -431,6 +431,7 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 
 func TestIntegration_CCIP(t *testing.T) {
 	ccipContracts := setupCCIPContracts(t)
+	lggr := logger.TestLogger(t)
 	// Oracles need ETH on the destination chain
 	bootstrapNodePort := int64(19599)
 	appBootstrap, bootstrapPeerID, _, _, _, _ := setupNodeCCIP(t, ccipContracts.destUser, bootstrapNodePort, "bootstrap_ccip", ccipContracts.sourceChain, ccipContracts.destChain)
@@ -570,7 +571,7 @@ contractConfigTrackerPollInterval = "1s"
 	// Request should appear on all nodes eventually
 	for i := 0; i < 4; i++ {
 		var reqs []*ccip.Request
-		ccipReqORM := ccip.NewORM(apps[i].GetSqlxDB())
+		ccipReqORM := ccip.NewORM(apps[i].GetSqlxDB(), lggr, pgtest.NewPGCfg(false))
 		gomega.NewGomegaWithT(t).Eventually(func() bool {
 			ccipContracts.sourceChain.Commit()
 			reqs, err = ccipReqORM.Requests(sourceChainID, destChainID, big.NewInt(0), nil, ccip.RequestStatusUnstarted, nil, nil)
@@ -596,7 +597,7 @@ contractConfigTrackerPollInterval = "1s"
 	// remaining valid requests.
 	for i := 0; i < 4; i++ {
 		gomega.NewGomegaWithT(t).Eventually(func() bool {
-			ccipReqORM := ccip.NewORM(apps[i].GetSqlxDB())
+			ccipReqORM := ccip.NewORM(apps[i].GetSqlxDB(), lggr, pgtest.NewPGCfg(false))
 			ccipContracts.destChain.Commit()
 			reqs, err := ccipReqORM.Requests(sourceChainID, destChainID, report.MinSequenceNumber, report.MaxSequenceNumber, ccip.RequestStatusRelayConfirmed, nil, nil)
 			require.NoError(t, err)
@@ -609,7 +610,7 @@ contractConfigTrackerPollInterval = "1s"
 	// Now the merkle root is across.
 	// Let's try to execute a request as an external party.
 	// The raw log in the merkle root should be the abi-encoded version of the CCIPMessage
-	ccipReqORM := ccip.NewORM(apps[0].GetSqlxDB())
+	ccipReqORM := ccip.NewORM(apps[0].GetSqlxDB(), lggr, pgtest.NewPGCfg(false))
 	reqs, err := ccipReqORM.Requests(sourceChainID, destChainID, report.MinSequenceNumber, report.MaxSequenceNumber, "", nil, nil)
 	require.NoError(t, err)
 	root, proof := ccip.GenerateMerkleProof(32, [][]byte{reqs[0].Raw}, 0)

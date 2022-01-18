@@ -29,19 +29,20 @@ var _ job.Delegate = (*ExecutionDelegate)(nil)
 type ExecutionDelegate struct {
 	db                    *sqlx.DB
 	jobORM                job.ORM
+	ccipORM               ORM
 	peerWrapper           *ocrcommon.SingletonPeerWrapper
 	monitoringEndpointGen telemetry.MonitoringEndpointGenerator
 	chainSet              evm.ChainSet
 	cfg                   Config
 	lggr                  logger.Logger
 	ks                    keystore.OCR2
-	ccipORM               ORM
 }
 
 // TODO: Register this delegate behind a FF
 func NewExecutionDelegate(
 	db *sqlx.DB,
 	jobORM job.ORM,
+	ccipORM ORM,
 	peerWrapper *ocrcommon.SingletonPeerWrapper,
 	monitoringEndpointGen telemetry.MonitoringEndpointGenerator,
 	chainSet evm.ChainSet,
@@ -52,13 +53,13 @@ func NewExecutionDelegate(
 	return &ExecutionDelegate{
 		db:                    db,
 		jobORM:                jobORM,
+		ccipORM:               ccipORM,
 		peerWrapper:           peerWrapper,
 		monitoringEndpointGen: monitoringEndpointGen,
 		chainSet:              chainSet,
 		cfg:                   cfg,
 		lggr:                  lggr,
 		ks:                    ks,
-		ccipORM:               NewORM(db),
 	}
 }
 
@@ -89,7 +90,6 @@ func (d ExecutionDelegate) ServicesForSpec(jobSpec job.Job) (services []job.Serv
 		destChain.LogBroadcaster(),
 		jobSpec.ID,
 		d.lggr,
-		d.db,
 		destChain,
 		destChain.HeadBroadcaster(),
 	)
@@ -220,7 +220,7 @@ func (d ExecutionDelegate) ServicesForSpec(jobSpec job.Job) (services []job.Serv
 		singleTokenOnRamp,
 		singleTokenOffRamp,
 		encodedCCIPConfig,
-		d.db,
+		d.ccipORM,
 		jobSpec.ID)
 	services = append(services, logListener)
 	return services, nil

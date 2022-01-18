@@ -46,6 +46,7 @@ type RelayDelegate struct {
 func NewRelayDelegate(
 	db *sqlx.DB,
 	jobORM job.ORM,
+	ccipORM ORM,
 	peerWrapper *ocrcommon.SingletonPeerWrapper,
 	monitoringEndpointGen telemetry.MonitoringEndpointGenerator,
 	chainSet evm.ChainSet,
@@ -56,13 +57,13 @@ func NewRelayDelegate(
 	return &RelayDelegate{
 		db:                    db,
 		jobORM:                jobORM,
+		ccipORM:               ccipORM,
 		peerWrapper:           peerWrapper,
 		monitoringEndpointGen: monitoringEndpointGen,
 		chainSet:              chainSet,
 		cfg:                   cfg,
 		lggr:                  lggr,
 		ks:                    ks,
-		ccipORM:               NewORM(db),
 	}
 }
 
@@ -97,7 +98,6 @@ func (d RelayDelegate) ServicesForSpec(jobSpec job.Job) (services []job.Service,
 		destChain.LogBroadcaster(),
 		jobSpec.ID,
 		d.lggr,
-		d.db,
 		destChain,
 		destChain.HeadBroadcaster(),
 	)
@@ -213,7 +213,7 @@ func (d RelayDelegate) ServicesForSpec(jobSpec job.Job) (services []job.Service,
 		singleTokenOnRamp,
 		offRamp,
 		encodedCCIPConfig,
-		d.db,
+		d.ccipORM,
 		jobSpec.ID)
 	services = append(services, logListener)
 	return services, nil

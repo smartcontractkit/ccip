@@ -3,13 +3,13 @@ package ccip
 import (
 	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
+	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/pg"
-
 	"github.com/smartcontractkit/sqlx"
 )
 
@@ -20,7 +20,7 @@ import (
 //go:generate mockery --name ORM --output ./mocks/ --case=underscore
 type ORM interface {
 	// Note always returns them sorted by seqNum
-	Requests(sourceChainId, destChainId, minSeqNum, maxSeqNum *big.Int, status RequestStatus, executor *common.Address, options []byte) ([]*Request, error)
+	Requests(sourceChainId, destChainId, minSeqNum, maxSeqNum *big.Int, status RequestStatus, executor *common.Address, options []byte, opt ...pg.QOpt) ([]*Request, error)
 	SaveRequest(request *Request) error
 	UpdateRequestStatus(sourceChainId, destChainId, minSeqNum, maxSeqNum *big.Int, status RequestStatus) error
 	UpdateRequestSetStatus(sourceChainId, destChainId *big.Int, seqNums []*big.Int, status RequestStatus) error
@@ -30,44 +30,53 @@ type ORM interface {
 }
 
 type orm struct {
-	db *sqlx.DB
+	db   *sqlx.DB
+	q    pg.Q
+	lggr logger.Logger
+	cfg  pg.LogConfig
 }
 
 var _ORM = (*orm)(nil)
 
-func NewORM(db *sqlx.DB) ORM {
-	return &orm{db}
+func NewORM(db *sqlx.DB, lggr logger.Logger, cfg pg.LogConfig) ORM {
+	namedLogger := lggr.Named("JobORM")
+	return &orm{
+		db:   db,
+		q:    pg.NewQ(db, namedLogger, cfg),
+		lggr: namedLogger,
+		cfg:  cfg,
+	}
 }
 
 // Note that executor can be left unset in the request, meaning anyone can execute.
 // A nil executor as an argument here however means "don't filter on executor" and so it will return requests with both unset and set executors.
-func (o *orm) Requests(sourceChainId, destChainId *big.Int, minSeqNum, maxSeqNum *big.Int, status RequestStatus, executor *common.Address, options []byte) (reqs []*Request, err error) {
-	q := `SELECT * FROM ccip_requests WHERE true`
+func (o *orm) Requests(sourceChainId, destChainId *big.Int, minSeqNum, maxSeqNum *big.Int, status RequestStatus, executor *common.Address, options []byte, qopts ...pg.QOpt) (reqs []*Request, err error) {
+	q := o.q.WithOpts(qopts...)
+	var b strings.Builder
+	b.WriteString(`SELECT * FROM ccip_requests WHERE true`)
 	if sourceChainId != nil {
-		q += fmt.Sprintf(" AND source_chain_id = '%s'", sourceChainId.String())
+		b.WriteString(fmt.Sprintf(" AND source_chain_id = '%s'", sourceChainId.String()))
 	}
 	if destChainId != nil {
-		q += fmt.Sprintf(" AND dest_chain_id = '%s'", destChainId.String())
+		b.WriteString(fmt.Sprintf(" AND dest_chain_id = '%s'", destChainId.String()))
 	}
 	if minSeqNum != nil {
-		q += fmt.Sprintf(" AND seq_num >= CAST(%s AS NUMERIC(78,0))", minSeqNum.String())
+		b.WriteString(fmt.Sprintf(" AND seq_num >= CAST(%s AS NUMERIC(78,0))", minSeqNum.String()))
 	}
 	if maxSeqNum != nil {
-		q += fmt.Sprintf(" AND seq_num <= CAST(%s AS NUMERIC(78,0))", maxSeqNum.String())
+		b.WriteString(fmt.Sprintf(" AND seq_num <= CAST(%s AS NUMERIC(78,0))", maxSeqNum.String()))
 	}
 	if status != "" {
-		q += fmt.Sprintf(" AND status = '%s'", status)
+		b.WriteString(fmt.Sprintf(" AND status = '%s'", status))
 	}
 	if executor != nil {
-		q += fmt.Sprintf(` AND executor = '\x%v'`, executor.String()[2:])
+		b.WriteString(fmt.Sprintf(` AND executor = '\x%v'`, executor.String()[2:]))
 	}
 	if options != nil {
-		q += fmt.Sprintf(` AND options = '\x%v'`, hexutil.Encode(options)[2:])
+		b.WriteString(fmt.Sprintf(` AND options = '\x%v'`, hexutil.Encode(options)[2:]))
 	}
-	q += ` ORDER BY seq_num ASC`
-	ctx, cancel := pg.DefaultQueryCtx()
-	defer cancel()
-	err = o.db.SelectContext(ctx, &reqs, q)
+	b.WriteString(` ORDER BY seq_num ASC`)
+	err = q.Select(&reqs, b.String())
 	return
 }
 
@@ -101,16 +110,17 @@ func (o *orm) UpdateRequestSetStatus(sourceChainId, destChainId *big.Int, seqNum
 	if len(seqNums) == 0 {
 		return nil
 	}
-	seqNumsSet := fmt.Sprintf(`(CAST('%s' AS NUMERIC(78,0))`, seqNums[0].String())
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf(`(CAST('%s' AS NUMERIC(78,0))`, seqNums[0].String()))
 	for _, n := range seqNums[1:] {
-		seqNumsSet += fmt.Sprintf(`,CAST('%s' AS NUMERIC(78,0))`, n.String())
+		b.WriteString(fmt.Sprintf(`,CAST('%s' AS NUMERIC(78,0))`, n.String()))
 	}
-	seqNumsSet += `)`
+	b.WriteString(`)`)
 	q := fmt.Sprintf(`UPDATE ccip_requests SET status = $1, updated_at = now()
 		WHERE seq_num IN %s 
 		  AND source_chain_id = $2 
 		  AND dest_chain_id = $3 
-		RETURNING seq_num`, seqNumsSet)
+		RETURNING seq_num`, b.String())
 	ctx, cancel := pg.DefaultQueryCtx()
 	defer cancel()
 	res, err := o.db.ExecContext(ctx, q, status, sourceChainId.String(), destChainId.String())

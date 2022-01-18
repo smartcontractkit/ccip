@@ -125,6 +125,7 @@ func TestLogListener_SavesRequests(t *testing.T) {
 	lb := log.NewBroadcaster(lorm, ethClient, lc{}, lggr, nil)
 	require.NoError(t, lb.Start())
 	jobORM := job.NewORM(db, nil, pipeline.NewORM(db, lggr, pgtest.NewPGCfg(false)), nil, lggr, pgtest.NewPGCfg(false))
+	ccipORM := NewORM(db, lggr, pgtest.NewPGCfg(false))
 	ccipSpec, err := ValidatedCCIPSpec(testspecs.GenerateCCIPSpec(testspecs.CCIPSpecParams{}).Toml())
 	require.NoError(t, err)
 	err = jobORM.CreateJob(&ccipSpec)
@@ -134,7 +135,7 @@ func TestLogListener_SavesRequests(t *testing.T) {
 		SourceIncomingConfirmations: 0,
 		DestIncomingConfirmations:   0,
 	}
-	logListener := NewLogListener(lggr, lb, lb, onRamp, offRamp, ccipConfig, db, jb.ID)
+	logListener := NewLogListener(lggr, lb, lb, onRamp, offRamp, ccipConfig, ccipORM, jb.ID)
 	t.Log("Ramp address", onRampAddress, onRamp.Address())
 	require.NoError(t, logListener.Start())
 

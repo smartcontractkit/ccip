@@ -243,6 +243,7 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 		pipelineRunner = pipeline.NewRunner(pipelineORM, cfg, chains.EVM, keyStore.Eth(), keyStore.VRF(), globalLogger)
 		jobORM         = job.NewORM(db, chains.EVM, pipelineORM, keyStore, globalLogger, cfg)
 		txmORM         = txmgr.NewORM(db, globalLogger, cfg)
+		ccipORM        = ccip.NewORM(db, globalLogger, cfg)
 	)
 
 	for _, chain := range chains.EVM.Chains() {
@@ -368,6 +369,7 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 		delegates[job.CCIPBootstrap] = ccip.NewDelegateBootstrap(
 			db,
 			jobORM,
+			ccipORM,
 			chainSet,
 			peerWrapper,
 			globalLogger,
@@ -375,6 +377,7 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 		delegates[job.CCIPRelay] = ccip.NewRelayDelegate(
 			db,
 			jobORM,
+			ccipORM,
 			peerWrapper,
 			monitoringEndpointGen,
 			chainSet,
@@ -385,6 +388,7 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 		delegates[job.CCIPExecution] = ccip.NewExecutionDelegate(
 			db,
 			jobORM,
+			ccipORM,
 			peerWrapper,
 			monitoringEndpointGen,
 			chainSet,

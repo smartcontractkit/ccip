@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/afn_contract"
+	"github.com/smartcontractkit/chainlink/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/ccip/abihelpers"
 
@@ -170,7 +171,8 @@ func TestExecutionPlugin(t *testing.T) {
 	// Avoid using txdb: it has bugs and currently has savepoints disabled (to be able to use with gorm)
 	// and so any ctx cancellation poisons the tx.
 	_, db := heavyweight.FullTestDB(t, "executor_plugin", true, false)
-	orm := ccip.NewORM(db)
+	lggr := logger.TestLogger(t)
+	orm := ccip.NewORM(db, lggr, pgtest.NewPGCfg(false))
 	lr := new(lastreportermocks.OffRampLastReporter)
 	executor := common.HexToAddress("0xf97f4df75117a78c1A5a0DBb814Af92458539FB5")
 	rf := ccip.NewExecutionReportingPluginFactory(logger.TestLogger(t), orm, big.NewInt(1), big.NewInt(2), executor, lr)
