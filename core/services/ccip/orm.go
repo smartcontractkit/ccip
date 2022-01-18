@@ -21,12 +21,12 @@ import (
 type ORM interface {
 	// Note always returns them sorted by seqNum
 	Requests(sourceChainId, destChainId, minSeqNum, maxSeqNum *big.Int, status RequestStatus, executor *common.Address, options []byte, opt ...pg.QOpt) ([]*Request, error)
-	SaveRequest(request *Request) error
-	UpdateRequestStatus(sourceChainId, destChainId, minSeqNum, maxSeqNum *big.Int, status RequestStatus) error
-	UpdateRequestSetStatus(sourceChainId, destChainId *big.Int, seqNums []*big.Int, status RequestStatus) error
-	ResetExpiredRequests(sourceChainId, destChainId *big.Int, expiryTimeoutSeconds int, fromStatus RequestStatus, toStatus RequestStatus) error
-	RelayReport(seqNum *big.Int) (RelayReport, error)
-	SaveRelayReport(report RelayReport) error
+	SaveRequest(request *Request, qopts ...pg.QOpt) error
+	UpdateRequestStatus(sourceChainId, destChainId, minSeqNum, maxSeqNum *big.Int, status RequestStatus, qopts ...pg.QOpt) error
+	UpdateRequestSetStatus(sourceChainId, destChainId *big.Int, seqNums []*big.Int, status RequestStatus, qopts ...pg.QOpt) error
+	ResetExpiredRequests(sourceChainId, destChainId *big.Int, expiryTimeoutSeconds int, fromStatus RequestStatus, toStatus RequestStatus, qopts ...pg.QOpt) error
+	RelayReport(seqNum *big.Int, qopts ...pg.QOpt) (RelayReport, error)
+	SaveRelayReport(report RelayReport, qopts ...pg.QOpt) error
 }
 
 type orm struct {
@@ -80,9 +80,10 @@ func (o *orm) Requests(sourceChainId, destChainId *big.Int, minSeqNum, maxSeqNum
 	return
 }
 
-func (o *orm) UpdateRequestStatus(sourceChainId, destChainId, minSeqNum, maxSeqNum *big.Int, status RequestStatus) error {
+func (o *orm) UpdateRequestStatus(sourceChainId, destChainId, minSeqNum, maxSeqNum *big.Int, status RequestStatus, qopts ...pg.QOpt) error {
+	q := o.q.WithOpts(qopts...)
 	// We return seqNum here to error if it doesn't exist
-	q := `UPDATE ccip_requests SET status = $1, updated_at = now()
+	sql := `UPDATE ccip_requests SET status = $1, updated_at = now()
 		WHERE seq_num >= CAST($2 AS NUMERIC(78,0))
 		  AND seq_num <= CAST($3 AS NUMERIC(78,0))
 		  AND source_chain_id = $4 
@@ -90,7 +91,7 @@ func (o *orm) UpdateRequestStatus(sourceChainId, destChainId, minSeqNum, maxSeqN
 		RETURNING seq_num`
 	ctx, cancel := pg.DefaultQueryCtx()
 	defer cancel()
-	res, err := o.db.ExecContext(ctx, q, status, minSeqNum.String(), maxSeqNum.String(), sourceChainId.String(), destChainId.String())
+	res, err := q.ExecContext(ctx, sql, status, minSeqNum.String(), maxSeqNum.String(), sourceChainId.String(), destChainId.String())
 	if err != nil {
 		return err
 	}
@@ -106,7 +107,8 @@ func (o *orm) UpdateRequestStatus(sourceChainId, destChainId, minSeqNum, maxSeqN
 	return nil
 }
 
-func (o *orm) UpdateRequestSetStatus(sourceChainId, destChainId *big.Int, seqNums []*big.Int, status RequestStatus) error {
+func (o *orm) UpdateRequestSetStatus(sourceChainId, destChainId *big.Int, seqNums []*big.Int, status RequestStatus, qopts ...pg.QOpt) error {
+	q := o.q.WithOpts(qopts...)
 	if len(seqNums) == 0 {
 		return nil
 	}
@@ -116,14 +118,15 @@ func (o *orm) UpdateRequestSetStatus(sourceChainId, destChainId *big.Int, seqNum
 		b.WriteString(fmt.Sprintf(`,CAST('%s' AS NUMERIC(78,0))`, n.String()))
 	}
 	b.WriteString(`)`)
-	q := fmt.Sprintf(`UPDATE ccip_requests SET status = $1, updated_at = now()
+	sql := fmt.Sprintf(`UPDATE ccip_requests SET status = $1, updated_at = now()
 		WHERE seq_num IN %s 
 		  AND source_chain_id = $2 
 		  AND dest_chain_id = $3 
 		RETURNING seq_num`, b.String())
+
 	ctx, cancel := pg.DefaultQueryCtx()
 	defer cancel()
-	res, err := o.db.ExecContext(ctx, q, status, sourceChainId.String(), destChainId.String())
+	res, err := q.ExecContext(ctx, sql, status, sourceChainId.String(), destChainId.String())
 	if err != nil {
 		return err
 	}
@@ -137,46 +140,40 @@ func (o *orm) UpdateRequestSetStatus(sourceChainId, destChainId *big.Int, seqNum
 	return err
 }
 
-func (o *orm) ResetExpiredRequests(sourceChainId, destChainId *big.Int, expiryTimeoutSeconds int, fromStatus RequestStatus, toStatus RequestStatus) error {
-	q := fmt.Sprintf(`UPDATE ccip_requests SET status = $1, updated_at = now()
+func (o *orm) ResetExpiredRequests(sourceChainId, destChainId *big.Int, expiryTimeoutSeconds int, fromStatus RequestStatus, toStatus RequestStatus, qopts ...pg.QOpt) error {
+	q := o.q.WithOpts(qopts...)
+	sql := fmt.Sprintf(`UPDATE ccip_requests SET status = $1, updated_at = now()
 		WHERE now() > (updated_at + interval '%d seconds') 
 			AND source_chain_id = $2
 			AND dest_chain_id = $3
 			AND status = $4`, expiryTimeoutSeconds)
-	ctx, cancel := pg.DefaultQueryCtx()
-	defer cancel()
-	_, err := o.db.ExecContext(ctx, q, toStatus, sourceChainId.String(), destChainId.String(), fromStatus)
-	return err
+	return q.ExecQ(sql, toStatus, sourceChainId.String(), destChainId.String(), fromStatus)
 }
 
 // Note requests will only be added in an unstarted status
-func (o *orm) SaveRequest(request *Request) error {
-	q := `INSERT INTO ccip_requests 
+func (o *orm) SaveRequest(request *Request, qopts ...pg.QOpt) error {
+	q := o.q.WithOpts(qopts...)
+	sql := `INSERT INTO ccip_requests 
     (seq_num, source_chain_id, dest_chain_id, sender, receiver, data, tokens, amounts, executor, options, raw, status, created_at, updated_at) 
     VALUES (:seq_num, :source_chain_id, :dest_chain_id, :sender, :receiver, :data, :tokens, :amounts, :executor, :options, :raw, 'unstarted', now(), now())
-   	ON CONFLICT DO NOTHING `
-	stmt, err := o.db.PrepareNamed(q)
-	if err != nil {
-		return err
-	}
-	ctx, cancel := pg.DefaultQueryCtx()
-	defer cancel()
-	_, err = stmt.ExecContext(ctx, request)
-	return err
+   	ON CONFLICT DO NOTHING`
+
+	return q.ExecQNamed(sql, request)
 }
 
-func (o *orm) RelayReport(seqNum *big.Int) (report RelayReport, err error) {
-	q := `SELECT * FROM ccip_relay_reports WHERE min_seq_num <= $1 and max_seq_num >= $1`
-	ctx, cancel := pg.DefaultQueryCtx()
-	defer cancel()
-	err = o.db.GetContext(ctx, &report, q, seqNum.String())
+func (o *orm) RelayReport(seqNum *big.Int, qopts ...pg.QOpt) (report RelayReport, err error) {
+	q := o.q.WithOpts(qopts...)
+	sql := `SELECT * FROM ccip_relay_reports WHERE min_seq_num <= $1 and max_seq_num >= $1`
+
+	if err = q.Get(&report, sql, seqNum.String()); err != nil {
+		return RelayReport{}, err
+	}
 	return
 }
 
-func (o *orm) SaveRelayReport(report RelayReport) error {
-	q := `INSERT INTO ccip_relay_reports (root, min_seq_num, max_seq_num, created_at) VALUES ($1, $2, $3, now()) ON CONFLICT DO NOTHING`
-	ctx, cancel := pg.DefaultQueryCtx()
-	defer cancel()
-	_, err := o.db.ExecContext(ctx, q, report.Root[:], report.MinSeqNum.String(), report.MaxSeqNum.String())
-	return err
+func (o *orm) SaveRelayReport(report RelayReport, qopts ...pg.QOpt) error {
+	q := o.q.WithOpts(qopts...)
+	sql := `INSERT INTO ccip_relay_reports (root, min_seq_num, max_seq_num, created_at) VALUES ($1, $2, $3, now()) ON CONFLICT DO NOTHING`
+
+	return q.ExecQ(sql, report.Root[:], report.MinSeqNum.String(), report.MaxSeqNum.String())
 }

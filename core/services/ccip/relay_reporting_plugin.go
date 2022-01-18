@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	RELAY_MAX_INFLIGHT_TIME_SECONDS = 180
+	RelayMaxInflightTimeSeconds = 180
 )
 
 var _ types.ReportingPluginFactory = &RelayReportingPluginFactory{}
@@ -103,11 +103,11 @@ func (rf *RelayReportingPluginFactory) NewReportingPlugin(config types.Reporting
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
-	sourcChainId, err := rf.offRamp.SOURCECHAINID(nil)
+	sourceChainId, err := rf.offRamp.SOURCECHAINID(nil)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
-	return RelayReportingPlugin{rf.l, config.F, rf.orm, sourcChainId, destChainId, rf.offRamp}, types.ReportingPluginInfo{
+	return RelayReportingPlugin{rf.l, config.F, rf.orm, sourceChainId, destChainId, rf.offRamp}, types.ReportingPluginInfo{
 		Name:              "CCIPRelay",
 		UniqueReports:     true,
 		MaxQueryLen:       0,      // We do not use the query phase.
@@ -162,7 +162,7 @@ func (r RelayReportingPlugin) Report(ctx context.Context, timestamp types.Report
 		var ob Observation
 		err := json.Unmarshal(ao.Observation, &ob)
 		if err != nil {
-			r.l.Errorw("received unmarshallable observation", "err", err)
+			r.l.Errorw("received unmarshallable observation", "err", err, "observation", string(ao.Observation))
 			continue
 		}
 		nonEmptyObservations = append(nonEmptyObservations, ob)
@@ -253,7 +253,7 @@ func (r RelayReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context, t
 		return false, nil
 	}
 	// Any timed out requests should be set back to RequestStatusExecutionPending so their execution can be retried in a subsequent report.
-	if err = r.orm.ResetExpiredRequests(r.sourceChainId, r.destChainId, RELAY_MAX_INFLIGHT_TIME_SECONDS, RequestStatusRelayPending, RequestStatusUnstarted); err != nil {
+	if err = r.orm.ResetExpiredRequests(r.sourceChainId, r.destChainId, RelayMaxInflightTimeSeconds, RequestStatusRelayPending, RequestStatusUnstarted); err != nil {
 		// Ok to continue here, we'll try to reset them again on the next round.
 		r.l.Errorw("unable to reset expired requests", "err", err)
 	}
