@@ -47,13 +47,10 @@ CREATE TABLE ccip_relay_specs
     created_at                                 timestamp with time zone NOT NULL,
     updated_at                                 timestamp with time zone NOT NULL,
 
-    on_ramp_address                            bytea                    NOT NULL,
-    off_ramp_address                           bytea                    NOT NULL,
+    on_ramp_id                                 text                     NOT NULL,
+    off_ramp_id                                text                     NOT NULL,
     source_evm_chain_id                        numeric(78, 0)           NOT NULL REFERENCES evm_chains (id),
-    dest_evm_chain_id                          numeric(78, 0)           NOT NULL REFERENCES evm_chains (id),
-    CONSTRAINT chk_contract_addresses_length CHECK (
-        (octet_length(off_ramp_address) = 20
-            AND octet_length(off_ramp_address) = 20))
+    dest_evm_chain_id                          numeric(78, 0)           NOT NULL REFERENCES evm_chains (id)
 );
 
 CREATE TABLE ccip_execution_specs
@@ -75,15 +72,11 @@ CREATE TABLE ccip_execution_specs
     created_at                                 timestamp with time zone NOT NULL,
     updated_at                                 timestamp with time zone NOT NULL,
 
-    on_ramp_address                            bytea                    NOT NULL,
-    off_ramp_address                           bytea                    NOT NULL,
-    executor_address                           bytea                    NOT NULL,
+    on_ramp_id                                 text                     NOT NULL,
+    off_ramp_id                                text                     NOT NULL,
+    executor_id                                text                     NOT NULL,
     source_evm_chain_id                        numeric(78, 0)           NOT NULL REFERENCES evm_chains (id),
-    dest_evm_chain_id                          numeric(78, 0)           NOT NULL REFERENCES evm_chains (id),
-    CONSTRAINT chk_contract_addresses_length CHECK (
-            (octet_length(off_ramp_address) = 20
-                AND octet_length(on_ramp_address) = 20)
-            AND octet_length(executor_address) = 20)
+    dest_evm_chain_id                          numeric(78, 0)           NOT NULL REFERENCES evm_chains (id)
 );
 
 CREATE TABLE ccip_contract_configs

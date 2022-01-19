@@ -19,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/blockhashstore"
+	"github.com/smartcontractkit/chainlink/core/services/ccip"
 	"github.com/smartcontractkit/chainlink/core/services/chainlink"
 	"github.com/smartcontractkit/chainlink/core/services/cron"
 	"github.com/smartcontractkit/chainlink/core/services/directrequest"
@@ -979,6 +980,12 @@ func (r *Resolver) CreateJob(ctx context.Context, args struct {
 		jb, err = blockhashstore.ValidatedSpec(args.Input.TOML)
 	case job.Bootstrap:
 		jb, err = ocrbootstrap.ValidatedBootstrapSpecToml(args.Input.TOML)
+	case job.CCIPBootstrap:
+		jb, err = ccip.ValidatedCCIPBootstrapSpec(args.Input.TOML)
+	case job.CCIPRelay:
+		jb, err = ccip.ValidatedCCIPSpec(args.Input.TOML)
+	case job.CCIPExecution:
+		jb, err = ccip.ValidatedCCIPSpec(args.Input.TOML)
 	default:
 		return NewCreateJobPayload(r.App, nil, map[string]string{
 			"Job Type": fmt.Sprintf("unknown job type: %s", jbt),

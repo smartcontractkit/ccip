@@ -135,6 +135,12 @@ func (jc *JobsController) Create(c *gin.Context) {
 		jb, err = blockhashstore.ValidatedSpec(request.TOML)
 	case job.Bootstrap:
 		jb, err = ocrbootstrap.ValidatedBootstrapSpecToml(request.TOML)
+	case job.CCIPBootstrap:
+		jb, err = ccip.ValidatedCCIPBootstrapSpec(request.TOML)
+	case job.CCIPRelay:
+		jb, err = ccip.ValidatedCCIPSpec(request.TOML)
+	case job.CCIPExecution:
+		jb, err = ccip.ValidatedCCIPSpec(request.TOML)
 	default:
 		jsonAPIError(c, http.StatusUnprocessableEntity, errors.Errorf("unknown job type: %s", jobType))
 		return

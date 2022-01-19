@@ -328,11 +328,11 @@ func (o *orm) CreateJob(jb *Job, qopts ...pg.QOpt) error {
 			sql := `INSERT INTO ccip_relay_specs (contract_id, relay, relay_config, p2p_bootstrap_peers, is_bootstrap_peer, ocr_key_bundle_id, transmitter_id,
 					blockchain_timeout, contract_config_tracker_subscribe_interval, contract_config_tracker_poll_interval, contract_config_confirmations, juels_per_fee_coin_pipeline,
 					created_at, updated_at,
-					on_ramp_address, off_ramp_address, source_evm_chain_id, dest_evm_chain_id)
+					on_ramp_id, off_ramp_id, source_evm_chain_id, dest_evm_chain_id)
 			VALUES (:contract_id, :relay, :relay_config, :p2p_bootstrap_peers, :is_bootstrap_peer, :ocr_key_bundle_id, :transmitter_id,
 					 :blockchain_timeout, :contract_config_tracker_subscribe_interval, :contract_config_tracker_poll_interval, :contract_config_confirmations, :juels_per_fee_coin_pipeline,
 					NOW(), NOW(),
-					:on_ramp_address, :off_ramp_address, :source_evm_chain_id, :dest_evm_chain_id)
+					:on_ramp_id, :off_ramp_id, :source_evm_chain_id, :dest_evm_chain_id)
 			RETURNING id;`
 			if err := pg.PrepareQueryRowx(tx, sql, &specID, jb.CCIPRelaySpec); err != nil {
 				return errors.Wrap(err, "failed to create CCIPRelaySpec for jobSpec")
@@ -343,11 +343,11 @@ func (o *orm) CreateJob(jb *Job, qopts ...pg.QOpt) error {
 			sql := `INSERT INTO ccip_execution_specs (contract_id, relay, relay_config, p2p_bootstrap_peers, is_bootstrap_peer, ocr_key_bundle_id, transmitter_id,
 					blockchain_timeout, contract_config_tracker_subscribe_interval, contract_config_tracker_poll_interval, contract_config_confirmations, juels_per_fee_coin_pipeline,
 					created_at, updated_at,
-					on_ramp_address, off_ramp_address, executor_address, source_evm_chain_id, dest_evm_chain_id)
+					on_ramp_id, off_ramp_id, executor_id, source_evm_chain_id, dest_evm_chain_id)
 			VALUES (:contract_id, :relay, :relay_config, :p2p_bootstrap_peers, :is_bootstrap_peer, :ocr_key_bundle_id, :transmitter_id,
 					 :blockchain_timeout, :contract_config_tracker_subscribe_interval, :contract_config_tracker_poll_interval, :contract_config_confirmations, :juels_per_fee_coin_pipeline,
 					NOW(), NOW(),
-					:on_ramp_address, :off_ramp_address, :executor_address, :source_evm_chain_id, :dest_evm_chain_id)
+					:on_ramp_id, :off_ramp_id, :executor_id, :source_evm_chain_id, :dest_evm_chain_id)
 			RETURNING id;`
 			if err := pg.PrepareQueryRowx(tx, sql, &specID, jb.CCIPExecutionSpec); err != nil {
 				return errors.Wrap(err, "failed to create CCIPExecutionSpec for jobSpec")
@@ -1040,6 +1040,9 @@ func LoadAllJobTypes(tx pg.Queryer, job *Job) error {
 		loadJobType(tx, job, "VRFSpec", "vrf_specs", job.VRFSpecID),
 		loadJobType(tx, job, "BlockhashStoreSpec", "blockhash_store_specs", job.BlockhashStoreSpecID),
 		loadJobType(tx, job, "BootstrapSpec", "bootstrap_specs", job.BootstrapSpecID),
+		loadJobType(tx, job, "CCIPRelaySpec", "ccip_relay_specs", job.CCIPRelaySpecID),
+		loadJobType(tx, job, "CCIPExecutionSpec", "ccip_execution_specs", job.CCIPExecutionSpecID),
+		loadJobType(tx, job, "CCIPBootstrapSpec", "ccip_bootstrap_specs", job.CCIPBootstrapSpecID),
 	)
 }
 

@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"gopkg.in/guregu/null.v4"
 
+	"github.com/smartcontractkit/chainlink/core/services/ccip"
 	"github.com/smartcontractkit/chainlink/core/services/directrequest"
 	"github.com/smartcontractkit/chainlink/core/services/job"
 	"github.com/smartcontractkit/chainlink/core/services/pipeline"
@@ -348,6 +349,64 @@ func TestResolver_CreateJob(t *testing.T) {
 					Message:       gError.Error(),
 				},
 			},
+		},
+	}
+
+	RunGQLTests(t, testCases)
+}
+
+func TestResolver_CreateJob_CCIP(t *testing.T) {
+	t.Parallel()
+
+	mutation := `
+		mutation CreateJob($input: CreateJobInput!) {
+			createJob(input: $input) {
+				... on CreateJobSuccess {
+					job {
+						id
+						createdAt
+						externalJobID
+						maxTaskDuration
+						schemaVersion
+					}
+				}
+			}
+		}`
+	spec := testspecs.GenerateCCIPSpec(testspecs.CCIPSpecParams{}).Toml()
+	variables := map[string]interface{}{
+		"input": map[string]interface{}{
+			"TOML": spec,
+		},
+	}
+	jb, err := ccip.ValidatedCCIPSpec(spec)
+	assert.NoError(t, err)
+
+	d, err := json.Marshal(map[string]interface{}{
+		"createJob": map[string]interface{}{
+			"job": map[string]interface{}{
+				"id":              "0",
+				"maxTaskDuration": "0s",
+				"schemaVersion":   1,
+				"createdAt":       "0001-01-01T00:00:00Z",
+				"externalJobID":   jb.ExternalJobID.String(),
+			},
+		},
+	})
+	assert.NoError(t, err)
+	expected := string(d)
+
+	testCases := []GQLTestCase{
+		unauthorizedTestCase(GQLTestCase{query: mutation, variables: variables}, "createJob"),
+		{
+			name:          "success",
+			authenticated: true,
+			before: func(f *gqlTestFramework) {
+				f.App.On("GetConfig").Return(f.Mocks.cfg)
+				f.App.On("AddJobV2", mock.Anything, &jb).Return(nil)
+			},
+			query:     mutation,
+			variables: variables,
+			result:    expected,
 		},
 	}
 

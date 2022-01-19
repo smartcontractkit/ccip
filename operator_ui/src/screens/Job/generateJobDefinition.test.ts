@@ -531,4 +531,176 @@ chainID = 1_337
     expect(output.definition).toEqual(expectedOutput)
     expect(output.envDefinition).toEqual('')
   })
+
+  it('generates a valid CCIPBootstrap definition', () => {
+    const job: JobPayload_Fields = {
+      id: '1',
+      type: 'ccip-bootstrap',
+      schemaVersion: 1,
+      name: 'ccip-bootstrap',
+      externalJobID: '00000000-0000-0000-0000-0000000000001',
+      maxTaskDuration: '10s',
+      spec: {
+        __typename: 'CCIPBootstrapSpec',
+        id: '',
+        contractAddress: '0x0000000000000000000000000000000000000000',
+        evmChainID: '4',
+        monitoringEndpoint: '',
+        p2pPeerID: '',
+        blockchainTimeout: '',
+        contractConfigTrackerSubscribeInterval: '',
+        contractConfigTrackerPollInterval: '60s',
+        contractConfigConfirmations: 1,
+        createdAt: '',
+      },
+      observationSource: '',
+      ...otherJobFields,
+    }
+
+    const expectedOutput = `type = "ccip-bootstrap"
+schemaVersion = 1
+name = "ccip-bootstrap"
+externalJobID = "00000000-0000-0000-0000-0000000000001"
+id = ""
+contractAddress = "0x0000000000000000000000000000000000000000"
+evmChainID = "4"
+monitoringEndpoint = ""
+p2pPeerID = ""
+blockchainTimeout = ""
+contractConfigTrackerSubscribeInterval = ""
+contractConfigTrackerPollInterval = "60s"
+contractConfigConfirmations = 1
+`
+    const output = generateJobDefinition(job)
+    expect(output.definition).toEqual(expectedOutput)
+    expect(output.envDefinition).toEqual('')
+  })
+
+  it('generates a valid CCIPRelay definition', () => {
+    const job: JobPayload_Fields = {
+      id: '1',
+      type: 'ccip-relay',
+      schemaVersion: 1,
+      name: 'ccip-relay',
+      externalJobID: '00000000-0000-0000-0000-0000000000001',
+      maxTaskDuration: '10s',
+      spec: {
+        __typename: 'CCIPRelaySpec',
+        id: '',
+        contractID: 'contract-id',
+        relay: 'evm',
+        relayConfig: {},
+        p2pBootstrapPeers: ['p2p-peer'],
+        isBootstrapPeer: true,
+        ocrKeyBundleID: 'ocr-key-bundle',
+        monitoringEndpoint: 'endpoint',
+        transmitterID: 'transmitter-id',
+        blockchainTimeout: '1m0s',
+        contractConfigTrackerSubscribeInterval: '1m0s',
+        contractConfigTrackerPollInterval: '1m0s',
+        contractConfigConfirmations: 1,
+        juelsPerFeeCoinSource: '20',
+        onRampID: 'on-ramp-id',
+        offRampID: 'off-ramp-id',
+        sourceEVMChainID: '42',
+        destEVMChainID: '4',
+        createdAt: '',
+      },
+      observationSource: '',
+      ...otherJobFields,
+    }
+
+    const expectedOutput = `type = "ccip-relay"
+schemaVersion = 1
+name = "ccip-relay"
+externalJobID = "00000000-0000-0000-0000-0000000000001"
+id = ""
+contractID = "contract-id"
+relay = "evm"
+relayConfig = { }
+p2pBootstrapPeers = [ "p2p-peer" ]
+isBootstrapPeer = true
+ocrKeyBundleID = "ocr-key-bundle"
+monitoringEndpoint = "endpoint"
+transmitterID = "transmitter-id"
+blockchainTimeout = "1m0s"
+contractConfigTrackerSubscribeInterval = "1m0s"
+contractConfigTrackerPollInterval = "1m0s"
+contractConfigConfirmations = 1
+juelsPerFeeCoinSource = "20"
+createdAt = ""
+onRampID = "on-ramp-id"
+offRampID = "off-ramp-id"
+sourceEVMChainID = "42"
+destEVMChainID = "4"
+`
+    const output = generateJobDefinition(job)
+    expect(output.definition).toEqual(expectedOutput)
+    expect(output.envDefinition).toEqual('')
+  })
+
+  it('generates a valid CCIPExecution definition', () => {
+    const job: JobPayload_Fields = {
+      id: '1',
+      type: 'ccip-execution',
+      schemaVersion: 1,
+      name: 'ccip-execution',
+      externalJobID: '00000000-0000-0000-0000-0000000000001',
+      maxTaskDuration: '10s',
+      spec: {
+        __typename: 'CCIPExecutionSpec',
+        id: '',
+        contractID: 'contract-id',
+        relay: 'evm',
+        relayConfig: {},
+        p2pBootstrapPeers: ['p2p-peer'],
+        isBootstrapPeer: true,
+        ocrKeyBundleID: 'ocr-key-bundle',
+        monitoringEndpoint: 'endpoint',
+        transmitterID: 'transmitter-id',
+        blockchainTimeout: '1m0s',
+        contractConfigTrackerSubscribeInterval: '1m0s',
+        contractConfigTrackerPollInterval: '1m0s',
+        contractConfigConfirmations: 1,
+        juelsPerFeeCoinSource: '20',
+        onRampID: 'on-ramp-id',
+        executorID: 'executor-id',
+        offRampID: 'off-ramp-id',
+        sourceEVMChainID: '42',
+        destEVMChainID: '4',
+        createdAt: '',
+      },
+      observationSource: '',
+      ...otherJobFields,
+    }
+
+    const expectedOutput = `type = "ccip-execution"
+schemaVersion = 1
+name = "ccip-execution"
+externalJobID = "00000000-0000-0000-0000-0000000000001"
+id = ""
+contractID = "contract-id"
+relay = "evm"
+relayConfig = { }
+p2pBootstrapPeers = [ "p2p-peer" ]
+isBootstrapPeer = true
+ocrKeyBundleID = "ocr-key-bundle"
+monitoringEndpoint = "endpoint"
+transmitterID = "transmitter-id"
+blockchainTimeout = "1m0s"
+contractConfigTrackerSubscribeInterval = "1m0s"
+contractConfigTrackerPollInterval = "1m0s"
+contractConfigConfirmations = 1
+juelsPerFeeCoinSource = "20"
+createdAt = ""
+onRampID = "on-ramp-id"
+offRampID = "off-ramp-id"
+executorID = "executor-id"
+sourceEVMChainID = "42"
+destEVMChainID = "4"
+`
+    const output = generateJobDefinition(job)
+    expect(output.definition).toEqual(expectedOutput)
+    expect(output.envDefinition).toEqual('')
+  })
 })

@@ -860,3 +860,288 @@ func TestResolver_BootstrapSpec(t *testing.T) {
 
 	RunGQLTests(t, testCases)
 }
+
+func TestResolver_CCIPBootstrapSpec(t *testing.T) {
+	var (
+		id = int32(1)
+	)
+
+	contractAddress, err := ethkey.NewEIP55Address("0x613a38AC1659769640aaE063C651F48E0250454C")
+	require.NoError(t, err)
+
+	testCases := []GQLTestCase{
+		{
+			name:          "CCIP Bootstrap spec",
+			authenticated: true,
+			before: func(f *gqlTestFramework) {
+				f.App.On("JobORM").Return(f.Mocks.jobORM)
+				f.Mocks.jobORM.On("FindJobTx", id).Return(job.Job{
+					Type: job.CCIPBootstrap,
+					CCIPBootstrapSpec: &job.CCIPBootstrapSpec{
+						ID:                                     id,
+						ContractAddress:                        contractAddress,
+						EVMChainID:                             utils.NewBigI(4),
+						MonitoringEndpoint:                     nil,
+						P2PPeerID:                              nil,
+						BlockchainTimeout:                      models.Interval(2 * time.Minute),
+						ContractConfigTrackerSubscribeInterval: models.Interval(2 * time.Minute),
+						ContractConfigTrackerPollInterval:      models.Interval(2 * time.Minute),
+						ContractConfigConfirmations:            100,
+						CreatedAt:                              f.Timestamp(),
+					},
+				}, nil)
+			},
+			query: `
+				query GetJob {
+					job(id: "1") {
+						... on Job {
+							spec {
+								__typename
+								... on CCIPBootstrapSpec {
+									id
+									contractAddress
+									evmChainID
+									monitoringEndpoint
+									p2pPeerID
+									blockchainTimeout
+									contractConfigTrackerSubscribeInterval
+									contractConfigTrackerPollInterval
+									contractConfigConfirmations
+									createdAt
+								}
+							}
+						}
+					}
+				}
+			`,
+			result: `
+				{
+					"job": {
+						"spec": {
+							"__typename": "CCIPBootstrapSpec",
+							"id": "1",
+							"contractAddress": "0x613a38AC1659769640aaE063C651F48E0250454C",
+							"evmChainID": "4",
+							"monitoringEndpoint": null,
+							"p2pPeerID": null,
+							"blockchainTimeout": "2m0s",
+							"contractConfigTrackerSubscribeInterval": "2m0s",
+							"contractConfigTrackerPollInterval": "2m0s",
+							"contractConfigConfirmations": 100,
+							"createdAt": "2021-01-01T00:00:00Z"
+						}
+					}
+				}
+			`,
+		},
+	}
+
+	RunGQLTests(t, testCases)
+}
+
+func TestResolver_CCIPExecutionSpec(t *testing.T) {
+	var (
+		id = int32(1)
+	)
+
+	testCases := []GQLTestCase{
+		{
+			name:          "CCIP Execution spec",
+			authenticated: true,
+			before: func(f *gqlTestFramework) {
+				f.App.On("JobORM").Return(f.Mocks.jobORM)
+				f.Mocks.jobORM.On("FindJobTx", id).Return(job.Job{
+					Type: job.CCIPExecution,
+					CCIPExecutionSpec: &job.CCIPExecutionSpec{
+						ID:                                     id,
+						ContractID:                             "contract-id",
+						Relay:                                  "evm",
+						RelayConfig:                            map[string]interface{}{},
+						P2PBootstrapPeers:                      []string{},
+						IsBootstrapPeer:                        false,
+						OCRKeyBundleID:                         null.StringFrom("ocr-key-id"),
+						MonitoringEndpoint:                     null.StringFrom("monitoring-endpoint"),
+						TransmitterID:                          null.StringFrom("transmitter-id"),
+						BlockchainTimeout:                      models.Interval(1 * time.Minute),
+						ContractConfigTrackerSubscribeInterval: models.Interval(1 * time.Minute),
+						ContractConfigTrackerPollInterval:      models.Interval(1 * time.Minute),
+						ContractConfigConfirmations:            12,
+						JuelsPerFeeCoinPipeline:                "20",
+						CreatedAt:                              f.Timestamp(),
+						OnRampID:                               "on-ramp-id",
+						OffRampID:                              "off-ramp-id",
+						ExecutorID:                             "executor-id",
+						SourceEVMChainID:                       utils.NewBigI(4),
+						DestEVMChainID:                         utils.NewBigI(42),
+					},
+				}, nil)
+			},
+			query: `
+				query GetJob {
+					job(id: "1") {
+						... on Job {
+							spec {
+								__typename
+								... on CCIPExecutionSpec {
+									id
+									contractID
+									relay
+									relayConfig
+									p2pBootstrapPeers
+									isBootstrapPeer
+									ocrKeyBundleID
+									monitoringEndpoint
+									transmitterID
+									blockchainTimeout
+									contractConfigTrackerSubscribeInterval
+									contractConfigTrackerPollInterval
+									contractConfigConfirmations
+									juelsPerFeeCoinSource
+									createdAt
+									onRampID
+									offRampID
+									executorID
+									sourceEVMChainID
+									destEVMChainID
+								}
+							}
+						}
+					}
+				}
+			`,
+			result: `
+				{
+					"job": {
+						"spec": {
+							"__typename": "CCIPExecutionSpec",
+							"id": "1",
+							"contractID": "contract-id",
+							"relay": "evm",
+							"relayConfig": {},
+							"p2pBootstrapPeers": null,
+							"isBootstrapPeer": false,
+							"ocrKeyBundleID": "ocr-key-id",
+							"monitoringEndpoint": "monitoring-endpoint",
+							"transmitterID": "transmitter-id",
+							"blockchainTimeout": "1m0s",
+							"contractConfigTrackerSubscribeInterval": "1m0s",
+							"contractConfigTrackerPollInterval": "1m0s",
+							"contractConfigConfirmations": 12,
+							"juelsPerFeeCoinSource": "20",
+							"onRampID": "on-ramp-id",
+							"offRampID": "off-ramp-id",
+							"executorID": "executor-id",
+							"sourceEVMChainID": "4",
+							"destEVMChainID": "42",
+							"createdAt": "2021-01-01T00:00:00Z"
+						}
+					}
+				}
+			`,
+		},
+	}
+
+	RunGQLTests(t, testCases)
+}
+
+func TestResolver_CCIPRelaySpec(t *testing.T) {
+	var (
+		id = int32(1)
+	)
+
+	testCases := []GQLTestCase{
+		{
+			name:          "CCIP Execution spec",
+			authenticated: true,
+			before: func(f *gqlTestFramework) {
+				f.App.On("JobORM").Return(f.Mocks.jobORM)
+				f.Mocks.jobORM.On("FindJobTx", id).Return(job.Job{
+					Type: job.CCIPRelay,
+					CCIPRelaySpec: &job.CCIPRelaySpec{
+						ID:                                     id,
+						ContractID:                             "contract-id",
+						Relay:                                  "evm",
+						RelayConfig:                            map[string]interface{}{},
+						P2PBootstrapPeers:                      []string{},
+						IsBootstrapPeer:                        false,
+						OCRKeyBundleID:                         null.StringFrom("ocr-key-id"),
+						MonitoringEndpoint:                     null.StringFrom("monitoring-endpoint"),
+						TransmitterID:                          null.StringFrom("transmitter-id"),
+						BlockchainTimeout:                      models.Interval(1 * time.Minute),
+						ContractConfigTrackerSubscribeInterval: models.Interval(1 * time.Minute),
+						ContractConfigTrackerPollInterval:      models.Interval(1 * time.Minute),
+						ContractConfigConfirmations:            12,
+						JuelsPerFeeCoinPipeline:                "20",
+						CreatedAt:                              f.Timestamp(),
+						OnRampID:                               "on-ramp-id",
+						OffRampID:                              "off-ramp-id",
+						SourceEVMChainID:                       utils.NewBigI(4),
+						DestEVMChainID:                         utils.NewBigI(42),
+					},
+				}, nil)
+			},
+			query: `
+				query GetJob {
+					job(id: "1") {
+						... on Job {
+							spec {
+								__typename
+								... on CCIPRelaySpec {
+									id
+									contractID
+									relay
+									relayConfig
+									p2pBootstrapPeers
+									isBootstrapPeer
+									ocrKeyBundleID
+									monitoringEndpoint
+									transmitterID
+									blockchainTimeout
+									contractConfigTrackerSubscribeInterval
+									contractConfigTrackerPollInterval
+									contractConfigConfirmations
+									juelsPerFeeCoinSource
+									createdAt
+									onRampID
+									offRampID
+									sourceEVMChainID
+									destEVMChainID
+								}
+							}
+						}
+					}
+				}
+			`,
+			result: `
+				{
+					"job": {
+						"spec": {
+							"__typename": "CCIPRelaySpec",
+							"id": "1",
+							"contractID": "contract-id",
+							"relay": "evm",
+							"relayConfig": {},
+							"p2pBootstrapPeers": null,
+							"isBootstrapPeer": false,
+							"ocrKeyBundleID": "ocr-key-id",
+							"monitoringEndpoint": "monitoring-endpoint",
+							"transmitterID": "transmitter-id",
+							"blockchainTimeout": "1m0s",
+							"contractConfigTrackerSubscribeInterval": "1m0s",
+							"contractConfigTrackerPollInterval": "1m0s",
+							"contractConfigConfirmations": 12,
+							"juelsPerFeeCoinSource": "20",
+							"onRampID": "on-ramp-id",
+							"offRampID": "off-ramp-id",
+							"sourceEVMChainID": "4",
+							"destEVMChainID": "42",
+							"createdAt": "2021-01-01T00:00:00Z"
+						}
+					}
+				}
+			`,
+		},
+	}
+
+	RunGQLTests(t, testCases)
+}

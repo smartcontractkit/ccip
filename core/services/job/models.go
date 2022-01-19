@@ -73,6 +73,7 @@ var (
 		Webhook:            true,
 		BlockhashStore:     false,
 		Bootstrap:          false,
+		CCIPBootstrap:      false,
 		CCIPRelay:          false,
 		CCIPExecution:      false,
 	}
@@ -87,6 +88,7 @@ var (
 		Webhook:            true,
 		BlockhashStore:     false,
 		Bootstrap:          false,
+		CCIPBootstrap:      false,
 		CCIPRelay:          false,
 		CCIPExecution:      false,
 	}
@@ -101,6 +103,7 @@ var (
 		Webhook:            1,
 		BlockhashStore:     1,
 		Bootstrap:          1,
+		CCIPBootstrap:      1,
 		CCIPRelay:          1,
 		CCIPExecution:      1,
 	}
@@ -541,10 +544,10 @@ type CCIPRelaySpec struct {
 	CreatedAt                              time.Time          `toml:"-"`
 	UpdatedAt                              time.Time          `toml:"-"`
 	// CCIP relay specific
-	OnRampAddress    ethkey.EIP55Address `toml:"onRampAddress"`
-	OffRampAddress   ethkey.EIP55Address `toml:"offRampAddress"`
-	SourceEVMChainID *utils.Big          `toml:"sourceEvmChainID"`
-	DestEVMChainID   *utils.Big          `toml:"destEvmChainID"`
+	OnRampID         string     `toml:"onRampID"`
+	OffRampID        string     `toml:"offRampID"`
+	SourceEVMChainID *utils.Big `toml:"sourceEvmChainID"`
+	DestEVMChainID   *utils.Big `toml:"destEvmChainID"`
 }
 
 func (s CCIPRelaySpec) AsOCR2Spec() OffchainReporting2OracleSpec {
@@ -603,11 +606,11 @@ type CCIPExecutionSpec struct {
 	CreatedAt                              time.Time          `toml:"-"`
 	UpdatedAt                              time.Time          `toml:"-"`
 	// CCIP execution specific
-	OnRampAddress    ethkey.EIP55Address `toml:"onRampAddress"`
-	OffRampAddress   ethkey.EIP55Address `toml:"offRampAddress"`
-	ExecutorAddress  ethkey.EIP55Address `toml:"executorAddress"`
-	SourceEVMChainID *utils.Big          `toml:"sourceEvmChainID"`
-	DestEVMChainID   *utils.Big          `toml:"destEvmChainID"`
+	OnRampID         string     `toml:"onRampID"`
+	OffRampID        string     `toml:"offRampID"`
+	ExecutorID       string     `toml:"executorID"`
+	SourceEVMChainID *utils.Big `toml:"sourceEvmChainID"`
+	DestEVMChainID   *utils.Big `toml:"destEvmChainID"`
 }
 
 func (s CCIPExecutionSpec) AsOCR2Spec() OffchainReporting2OracleSpec {

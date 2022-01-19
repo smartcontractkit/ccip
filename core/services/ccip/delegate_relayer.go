@@ -88,7 +88,7 @@ func (d RelayDelegate) ServicesForSpec(jobSpec job.Job) (services []job.Service,
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to open chain")
 	}
-	offRamp, err := single_token_offramp.NewSingleTokenOffRamp(spec.OffRampAddress.Address(), destChain.Client())
+	offRamp, err := single_token_offramp.NewSingleTokenOffRamp(common.HexToAddress(spec.OffRampID), destChain.Client())
 	if err != nil {
 		return nil, errors.Wrap(err, "could not instantiate NewOffchainAggregator")
 	}
@@ -112,13 +112,13 @@ func (d RelayDelegate) ServicesForSpec(jobSpec job.Job) (services []job.Service,
 	loggerWith.Infof("starting job with externalJobId %s, "+
 		"offrampContract %s, onrampContract %s",
 		jobSpec.ExternalJobID.String(),
-		spec.OffRampAddress.String(),
-		spec.OnRampAddress.String(),
+		spec.OffRampID,
+		spec.OnRampID,
 	)
 
 	offchainConfigDigester := evmutil.EVMOffchainConfigDigester{
 		ChainID:         maybeRemapChainID(destChain.Config().ChainID()).Uint64(),
-		ContractAddress: spec.OffRampAddress.Address(),
+		ContractAddress: common.HexToAddress(spec.OffRampID),
 	}
 
 	bytes, err := hex.DecodeString(strings.TrimPrefix(spec.TransmitterID.String, "0x"))
@@ -177,7 +177,7 @@ func (d RelayDelegate) ServicesForSpec(jobSpec job.Job) (services []job.Service,
 		"DatabaseTimeout", lc.DatabaseTimeout,
 	)
 
-	ocrdb := NewDB(d.db.DB, spec.OffRampAddress.Address(), loggerWith)
+	ocrdb := NewDB(d.db.DB, common.HexToAddress(spec.OffRampID), loggerWith)
 	oracle, err := ocr.NewOracle(ocr.OracleArgs{
 		BinaryNetworkEndpointFactory: d.peerWrapper.Peer2,
 		V2Bootstrappers:              bootstrapPeers,
@@ -197,7 +197,7 @@ func (d RelayDelegate) ServicesForSpec(jobSpec job.Job) (services []job.Service,
 	}
 	services = append(services, oracle)
 
-	singleTokenOnRamp, err := single_token_onramp.NewSingleTokenOnRamp(spec.OnRampAddress.Address(), sourceChain.Client())
+	singleTokenOnRamp, err := single_token_onramp.NewSingleTokenOnRamp(common.HexToAddress(spec.OnRampID), sourceChain.Client())
 	if err != nil {
 		return nil, err
 	}

@@ -35,29 +35,31 @@ contractConfigTrackerPollInterval   = "60s"
 const relayTemplate = `
 // Node %d
 # CCIPRelaySpec
-type                = "ccip-relay"
-name                = "ccip-relay"
-schemaVersion       = 1
-offRampAddress      = "%s"
-onRampAddress       = "%s"
-sourceEvmChainID    = "%d"
-destEvmChainID      = "%d"
-keyBundleID         = "<KEY-BUNDLE-ID>"
-transmitterAddress  = "%s"
-p2pBootstrapPeers   = ["%s@<BOOTSTRAP-HOST>:<PORT>"]
+type				= "ccip-relay"
+name				= "ccip-relay"
+schemaVersion		= 1
+offRampID			= "%s"
+onRampID			= "%s"
+sourceEvmChainID	= "%d"
+destEvmChainID		= "%d"
+ocrKeyBundleID		= "<KEY-BUNDLE-ID>"
+transmitterID		= "%s"
+p2pBootstrapPeers	= ["%s@<BOOTSTRAP-HOST>:<PORT>"]
+relay				= "evm"
 `
 
 const executionTemplate = `
 # CCIPExecutionSpec
-type                = "ccip-execution"
-name                = "ccip-execution"
-schemaVersion       = 1
-onRampAddress       = "%s"
-offRampAddress      = "%s"
-executorAddress     = "%s"
-sourceEvmChainID    = "%d"
-destEvmChainID      = "%d"
-keyBundleID         = "<KEY-BUNDLE-ID>"
-transmitterAddress  = "%s"
-p2pBootstrapPeers   = ["%s@<BOOTSTRAP-HOST>:<PORT>"]
+type				= "ccip-execution"
+name				= "ccip-execution"
+schemaVersion		= 1
+onRampID			= "%s"
+offRampID			= "%s"
+executorID			= "%s"
+sourceEvmChainID	= "%d"
+destEvmChainID		= "%d"
+ocrKeyBundleID		= "<KEY-BUNDLE-ID>"
+transmitterID		= "%s"
+p2pBootstrapPeers	= ["%s@<BOOTSTRAP-HOST>:<PORT>"]
+relay 				= "evm"
 `

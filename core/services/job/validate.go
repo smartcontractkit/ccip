@@ -22,6 +22,9 @@ var (
 		Webhook:            {},
 		BlockhashStore:     {},
 		Bootstrap:          {},
+		CCIPRelay:          {},
+		CCIPExecution:      {},
+		CCIPBootstrap:      {},
 	}
 )
 

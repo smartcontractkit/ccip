@@ -246,8 +246,6 @@ export const generateJobDefinition = (
       }
 
       break
-    default:
-      return { definition: '', envDefinition: '' }
     case 'WebhookSpec':
       values = {
         ...extractJobFields(job),
@@ -255,6 +253,85 @@ export const generateJobDefinition = (
       }
 
       break
+    case 'CCIPBootstrapSpec':
+      values = {
+        ...extractJobFields(job),
+        ...extractSpecFields(
+          job.spec,
+          'id',
+          'contractAddress',
+          'evmChainID',
+          'monitoringEndpoint',
+          'p2pPeerID',
+          'blockchainTimeout',
+          'contractConfigTrackerSubscribeInterval',
+          'contractConfigTrackerPollInterval',
+          'contractConfigConfirmations',
+        ),
+      }
+
+      break
+    case 'CCIPExecutionSpec':
+      values = {
+        ...extractJobFields(job),
+        ...extractSpecFields(
+          job.spec,
+          'id',
+          'contractID',
+          'relay',
+          'relayConfig',
+          'p2pBootstrapPeers',
+          'isBootstrapPeer',
+          'ocrKeyBundleID',
+          'monitoringEndpoint',
+          'transmitterID',
+          'blockchainTimeout',
+          'contractConfigTrackerSubscribeInterval',
+          'contractConfigTrackerPollInterval',
+          'contractConfigConfirmations',
+          'juelsPerFeeCoinSource',
+          'createdAt',
+          'onRampID',
+          'offRampID',
+          'executorID',
+          'sourceEVMChainID',
+          'destEVMChainID',
+        ),
+        ...extractObservationSourceField(job),
+      }
+
+      break
+    case 'CCIPRelaySpec':
+      values = {
+        ...extractJobFields(job),
+        ...extractSpecFields(
+          job.spec,
+          'id',
+          'contractID',
+          'relay',
+          'relayConfig',
+          'p2pBootstrapPeers',
+          'isBootstrapPeer',
+          'ocrKeyBundleID',
+          'monitoringEndpoint',
+          'transmitterID',
+          'blockchainTimeout',
+          'contractConfigTrackerSubscribeInterval',
+          'contractConfigTrackerPollInterval',
+          'contractConfigConfirmations',
+          'juelsPerFeeCoinSource',
+          'createdAt',
+          'onRampID',
+          'offRampID',
+          'sourceEVMChainID',
+          'destEVMChainID',
+        ),
+        ...extractObservationSourceField(job),
+      }
+
+      break
+    default:
+      return { definition: '', envDefinition: '' }
   }
 
   return {

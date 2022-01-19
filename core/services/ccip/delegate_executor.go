@@ -80,7 +80,7 @@ func (d ExecutionDelegate) ServicesForSpec(jobSpec job.Job) (services []job.Serv
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to open chain")
 	}
-	contract, err := message_executor.NewMessageExecutor(spec.ExecutorAddress.Address(), destChain.Client())
+	contract, err := message_executor.NewMessageExecutor(common.HexToAddress(spec.ExecutorID), destChain.Client())
 	if err != nil {
 		return nil, errors.Wrap(err, "could not instantiate NewOffchainAggregator")
 	}
@@ -104,8 +104,8 @@ func (d ExecutionDelegate) ServicesForSpec(jobSpec job.Job) (services []job.Serv
 	loggerWith.Infof("starting job with externalJobId %s, "+
 		"offrampContract %s, onrampContract %s",
 		jobSpec.ExternalJobID.String(),
-		spec.OffRampAddress.String(),
-		spec.OnRampAddress.String(),
+		spec.OffRampID,
+		spec.OnRampID,
 	)
 
 	bytes, err := hex.DecodeString(strings.TrimPrefix(spec.TransmitterID.String, "0x"))
@@ -154,12 +154,12 @@ func (d ExecutionDelegate) ServicesForSpec(jobSpec job.Job) (services []job.Serv
 		return nil, err
 	}
 
-	ocrdb := NewDB(d.db.DB, spec.ExecutorAddress.Address(), d.lggr)
+	ocrdb := NewDB(d.db.DB, common.HexToAddress(spec.ExecutorID), d.lggr)
 	lc := offchainreporting2.ToLocalConfig(destChain.Config(), spec.AsOCR2Spec())
 	if err = ocr.SanityCheckLocalConfig(lc); err != nil {
 		return nil, err
 	}
-	singleTokenOffRamp, err := single_token_offramp.NewSingleTokenOffRamp(spec.OffRampAddress.Address(), destChain.Client())
+	singleTokenOffRamp, err := single_token_offramp.NewSingleTokenOffRamp(common.HexToAddress(spec.OffRampID), destChain.Client())
 	if err != nil {
 		return nil, err
 	}
@@ -182,7 +182,7 @@ func (d ExecutionDelegate) ServicesForSpec(jobSpec job.Job) (services []job.Serv
 		MonitoringEndpoint:           d.monitoringEndpointGen.GenMonitoringEndpoint(spec.ContractID),
 		OffchainConfigDigester: evmutil.EVMOffchainConfigDigester{
 			ChainID:         maybeRemapChainID(destChain.Config().ChainID()).Uint64(),
-			ContractAddress: spec.ExecutorAddress.Address(),
+			ContractAddress: common.HexToAddress(spec.ExecutorID),
 		},
 		OffchainKeyring: kb,
 		OnchainKeyring:  kb,
@@ -191,7 +191,7 @@ func (d ExecutionDelegate) ServicesForSpec(jobSpec job.Job) (services []job.Serv
 			d.ccipORM,
 			spec.SourceEVMChainID.ToInt(),
 			spec.DestEVMChainID.ToInt(),
-			spec.ExecutorAddress.Address(),
+			common.HexToAddress(spec.ExecutorID),
 			singleTokenOffRamp),
 	})
 	if err != nil {
@@ -203,7 +203,7 @@ func (d ExecutionDelegate) ServicesForSpec(jobSpec job.Job) (services []job.Serv
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to open chain")
 	}
-	singleTokenOnRamp, err := single_token_onramp.NewSingleTokenOnRamp(spec.OnRampAddress.Address(), sourceChain.Client())
+	singleTokenOnRamp, err := single_token_onramp.NewSingleTokenOnRamp(common.HexToAddress(spec.OnRampID), sourceChain.Client())
 	if err != nil {
 		return nil, err
 	}
