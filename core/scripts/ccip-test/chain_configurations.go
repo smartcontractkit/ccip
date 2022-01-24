@@ -31,11 +31,11 @@ type EvmChainConfig struct {
 var Kovan = EvmChainConfig{
 	ChainId:            big.NewInt(42),
 	LinkToken:          common.HexToAddress("0xa36085F69e2889c224210F603D836748e7dC0088"),
-	SingleTokenOnramp:  common.HexToAddress("0x7590f49f088a7B74596712A1DB4C39D9FAB00347"),
+	SingleTokenOnramp:  common.HexToAddress("0x7514aB087CcD8f5803CD20034eD9955cA5f2B99B"),
 	SingleTokenOfframp: common.Address{},
-	LockUnlockPool:     common.HexToAddress("0x0C710E14226A43301028cEf2D0D492fDE7E3024A"),
-	SingleTokenSender:  common.HexToAddress("0xCfBc79f4042Be99a7292Ff33466cEE6652F40485"),
-	Afn:                common.HexToAddress("0xB86654A84CF21a913f39d9Da126C27f56Df07166"),
+	LockUnlockPool:     common.HexToAddress("0xc0299FBdAfdE8A91998989e6B36a78fE6b179112"),
+	SingleTokenSender:  common.HexToAddress("0x8958F24DF47CE7C518ee4bD55d92406c23d834a1"),
+	Afn:                common.HexToAddress("0xA6A3b37ACd10937D5857C7fac93E8BdBAc80424d"),
 	EthUrl:             "wss://parity-kovan.eth.devnet.tools/ws",
 }
 
@@ -43,57 +43,57 @@ var Rinkeby = EvmChainConfig{
 	ChainId:               big.NewInt(4),
 	LinkToken:             common.HexToAddress("0x01be23585060835e02b77ef475b0cc51aa1e0709"),
 	SingleTokenOnramp:     common.Address{},
-	SingleTokenOfframp:    common.HexToAddress("0xC3376eD981978E0C107a52f0488f1d131B9ECCAc"),
-	LockUnlockPool:        common.HexToAddress("0x33079B10A1417EF666040BF5aAF5623FCc90FAFe"),
-	SimpleMessageReceiver: common.HexToAddress("0x0389eF5B01822F673cFb87cdf3D8f97E0FaDBf77"),
-	SingleTokenReceiver:   common.HexToAddress("0xF47C5C5cEeE3F77954Fa2eA58690e44fD6658B9F"),
-	MessageExecutor:       common.HexToAddress("0x21d5C93B2A22Bdc315F1760E92960Cda23D93f3E"),
-	Afn:                   common.HexToAddress("0x1E275452a2bD9154EC0F46aE21881E47Aed03E3e"),
+	SingleTokenOfframp:    common.HexToAddress("0x5f76AE26CaC2400861a00620af1F7ba8234Fb86F"),
+	LockUnlockPool:        common.HexToAddress("0x759bB7c540900f489047adF66322D27E858A6281"),
+	SimpleMessageReceiver: common.HexToAddress("0x869f73B2BA20efDb7d38534461fF9cCe901C4AEF"),
+	SingleTokenReceiver:   common.HexToAddress("0x6A19BA4584230FC8c3D9Bcd8d54E48976af3f7DB"),
+	MessageExecutor:       common.HexToAddress("0x79333B2A23BF56952E65F8aC0019e1B2ec3c8B88"),
+	Afn:                   common.HexToAddress("0xb6067e139e90C17765116847D258578c6Db102dd"),
 	EthUrl:                "wss://geth-rinkeby.eth.devnet.tools/ws",
 }
 
-const BootstrapPeerID = "12D3KooWFHTQLnS1dzmRoqit8zyLx7ost7sm8pSjFQSByfjsoqyT"
+const BootstrapPeerID = "12D3KooWNEeby2qn8hHhNEmX8WzWTRSoP46KqyfPtjhq6duRB1Zy"
 
 var Oracles = []confighelper2.OracleIdentityExtra{
 	{
 		// Node 0
 		OracleIdentity: confighelper2.OracleIdentity{
-			OnchainPublicKey:  common.HexToAddress("0x69B8fADd511A2BE6d90A5dA5F617EB48cE3FA132").Bytes(),
-			TransmitAccount:   ocrtypes2.Account("0x1b9aC605d2b2E2E9Db4cac561181Ec10A938390c"),
-			OffchainPublicKey: hexutil.MustDecode("0x17992ca120fe8a3075e6c8b3e8c93f06fc3fc5dc5f989d54ec14def8cf080d06"),
-			PeerID:            "12D3KooWPRpNDEzJKJevcwhdjKvTWEBV4o9RFJ8FmzPf9ErsPtBM",
+			OnchainPublicKey:  common.HexToAddress("0x9546f9162e4dc7b4a03e55e988c5fda8dfe27cb1").Bytes(),
+			TransmitAccount:   ocrtypes2.Account("0x0021B2310DB6679998ac483d841Ea72F691c9B50"),
+			OffchainPublicKey: hexutil.MustDecode("0x3cdb3f0e649007f07bf0a72413304c06e686963399ec47b9bf836a6db3240765"),
+			PeerID:            "12D3KooWBTk3X89nfcpX7VWxRmi3gQBoJ8GHDnUDhWsMWz9JbZMt",
 		},
-		ConfigEncryptionPublicKey: stringTo32Bytes("0x69a21497b875787e4810d2d825aefca5f9ee6dc3e97f51b93b33de67300c402f"),
+		ConfigEncryptionPublicKey: stringTo32Bytes("0x3b82e5e7d4be5a65c4115754342a53aab85a4180b96da3463724d357d171ae0c"),
 	},
 	{
 		// Node 1
 		OracleIdentity: confighelper2.OracleIdentity{
-			OnchainPublicKey:  common.HexToAddress("0x51A4282729AFE2A7967ab24ff707AffCe1dcc678").Bytes(),
-			TransmitAccount:   ocrtypes2.Account("0x2FF79Fff751a157054629eECF2B32aE671d72Bf8"),
-			OffchainPublicKey: hexutil.MustDecode("0xd7f949bb2ff6242f2d5158b2f54eb0b629904dddfaa9d699736e7265eb87bb2f"),
-			PeerID:            "12D3KooWAPnKdfa3wPobf3FdErZu1VAKKMmuoEHwvmcjnSQhYSvD",
+			OnchainPublicKey:  common.HexToAddress("0x63349e339807a177d2caa7409e0bc87bc031724f").Bytes(),
+			TransmitAccount:   ocrtypes2.Account("0x256FF5d0406fE8a55B92135d3470707C23077F15"),
+			OffchainPublicKey: hexutil.MustDecode("0xe3b4c7afbd138ff69660055b439a8d2e4c11175eec1a1206a66dad6ddce60a38"),
+			PeerID:            "12D3KooWBMbX3cgV8QWBi92W9eMMjEpN1vB8wgdJ8jdtnZLPkvPd",
 		},
-		ConfigEncryptionPublicKey: stringTo32Bytes("0x4320cf6a9be0ffdd4e44787551bfda49950288c31d6854ba5f243e9ea23e5278"),
+		ConfigEncryptionPublicKey: stringTo32Bytes("0x2d631eb41938bc2e4589e8ab7d598dc8fa8e7c1e6f86c18b972699a5540e150e"),
 	},
 	{
 		// Node 2
 		OracleIdentity: confighelper2.OracleIdentity{
-			OnchainPublicKey:  common.HexToAddress("0x9d51eeF5292d2fFE9bEa7c263CF1fe18e9f35148").Bytes(),
-			TransmitAccount:   ocrtypes2.Account("0xC81C5cccfcA5B95526609575235D55077A25F105"),
-			OffchainPublicKey: hexutil.MustDecode("0x65b165e268405827411a79384bae8648f7725d701bc4d8373fdd55838802e4f6"),
-			PeerID:            "12D3KooWJnTuDhN1GCSbxWjNW51P7z1QRbC3VJbtY6wuL1VUXkQu",
+			OnchainPublicKey:  common.HexToAddress("0xd0da342c51f2790f9a21695e9efa45e3757b1337").Bytes(),
+			TransmitAccount:   ocrtypes2.Account("0x645e882A796893Ba829179937d775b3a784b35A7"),
+			OffchainPublicKey: hexutil.MustDecode("0x26d224b04e429a1f89b8d4d509aa6492c8d4985a78b869d6362d71cf7584423b"),
+			PeerID:            "12D3KooWCDqaBN9PQaLk7ZxEYGanXusw9fyDbsTYRRRe3jwHk8xZ",
 		},
-		ConfigEncryptionPublicKey: stringTo32Bytes("0xc4717af64f5e4235c07e893159c522b12dc0809982f09f519d873d6194129a43"),
+		ConfigEncryptionPublicKey: stringTo32Bytes("0x3381bde66e3368bd8d100218beb59eb8232c8a2110dd3e4cbda179be6409ac27"),
 	},
 	{
 		// Node 3
 		OracleIdentity: confighelper2.OracleIdentity{
-			OnchainPublicKey:  common.HexToAddress("0xaaeB8784265a6ee8181729dDD0Aea99c60814482").Bytes(),
-			TransmitAccount:   ocrtypes2.Account("0x1FD884B9088d2013B6c2EC2F9640F551578e2f1C"),
-			OffchainPublicKey: hexutil.MustDecode("0x61c4c6a6e9a2ac020e87e2e7e8c88e32373a503a1ae7d1a651b1ac08bb7c31f5"),
-			PeerID:            "12D3KooWSDzVm7Kv3xSHB17aUQ5UvBJay2cxC7XfTjGsqGn7MDK7",
+			OnchainPublicKey:  common.HexToAddress("0x89f8e7edd34432188220a736d3e64f6af2bf46a1").Bytes(),
+			TransmitAccount:   ocrtypes2.Account("0x714546e24F8F7Ea328076718E4534D5a37F0c86B"),
+			OffchainPublicKey: hexutil.MustDecode("0x2f7156e538da9f0fa259d63e0a0d587936342a98f469871bba0b546d3464d320"),
+			PeerID:            "12D3KooWGEX8ynS2PWLNSmY6wHNrjSMTJm7SN2rtsxcYcALcvH3L",
 		},
-		ConfigEncryptionPublicKey: stringTo32Bytes("0xe0b8876b62cb1c5c827be6f6dc271ce7702f06a8bf7d5c289486b2a6c8a21e19"),
+		ConfigEncryptionPublicKey: stringTo32Bytes("0x9c3de2854cd228f069660ae7d46dbf3b33550655d2ed1d6bbc3eeb11a0d73d25"),
 	},
 }
 
