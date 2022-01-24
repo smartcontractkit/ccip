@@ -355,10 +355,10 @@ func (o *orm) CreateJob(jb *Job, qopts ...pg.QOpt) error {
 			jb.CCIPExecutionSpecID = &specID
 		case CCIPBootstrap:
 			var specID int32
-			sql := `INSERT INTO ccip_bootstrap_specs (contract_address, p2p_peer_id, evm_chain_id, monitoring_endpoint,
+			sql := `INSERT INTO ccip_bootstrap_specs (contract_address, relay, relay_config, p2p_peer_id, evm_chain_id, monitoring_endpoint,
 					blockchain_timeout, contract_config_tracker_subscribe_interval, contract_config_tracker_poll_interval, 
 					contract_config_confirmations, created_at, updated_at)
-			VALUES (:contract_address, :p2p_peer_id, :evm_chain_id, :monitoring_endpoint, :blockchain_timeout, 
+			VALUES (:contract_address, :relay, :relay_config, :p2p_peer_id, :evm_chain_id, :monitoring_endpoint, :blockchain_timeout, 
 					:contract_config_tracker_subscribe_interval, :contract_config_tracker_poll_interval, 
 					:contract_config_confirmations, NOW(), NOW())
 			RETURNING id;`

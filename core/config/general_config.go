@@ -50,6 +50,7 @@ type FeatureFlags interface {
 	FeatureOffchainReporting() bool
 	FeatureOffchainReporting2() bool
 	FeatureUICSAKeys() bool
+	FeatureCCIP() bool
 
 	AutoPprofEnabled() bool
 	EVMEnabled() bool
@@ -610,6 +611,11 @@ func (c *generalConfig) Dev() bool {
 // If exceeded, it will try closing DB lock and connection and exit immediately to avoid SIGKILL.
 func (c *generalConfig) ShutdownGracePeriod() time.Duration {
 	return c.getWithFallback("ShutdownGracePeriod", parse.Duration).(time.Duration)
+}
+
+// FeatureCCIP enables the CCIP feature.
+func (c *generalConfig) FeatureCCIP() bool {
+	return c.viper.GetBool(envvar.Name("FeatureCCIP"))
 }
 
 // FeatureExternalInitiators enables the External Initiator feature.

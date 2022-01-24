@@ -8,10 +8,11 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/smartcontractkit/chainlink/core/chains/evm/addressparser"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/afn_contract"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_offramp"
 	"github.com/smartcontractkit/chainlink/core/services/ccip/abihelpers"
+	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
+	"github.com/smartcontractkit/chainlink/core/services/pg"
 	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	ocrtypes2 "github.com/smartcontractkit/libocr/offchainreporting2/types"
 
@@ -116,16 +117,17 @@ func TestLogListener_SavesRequests(t *testing.T) {
 	// Start the log broadcaster/log listener
 	// and add a CCIP job.
 	db := pgtest.NewSqlxDB(t)
+	cfg := pgtest.NewPGCfg(false)
 	ethClient := eth.NewClientFromSim(backend, big.NewInt(1337))
 	lggr := logger.TestLogger(t)
-	lorm := log.NewORM(db, lggr, pgtest.NewPGCfg(false), *big.NewInt(1337))
+	lorm := log.NewORM(db, lggr, cfg, *big.NewInt(1337))
 	r, err := lorm.FindConsumedLogs(0, 100)
 	require.NoError(t, err)
 	t.Log(r)
 	lb := log.NewBroadcaster(lorm, ethClient, lc{}, lggr, nil)
 	require.NoError(t, lb.Start())
-	jobORM := job.NewORM(db, nil, pipeline.NewORM(db, lggr, pgtest.NewPGCfg(false)), nil, lggr, pgtest.NewPGCfg(false))
-	ccipORM := NewORM(db, lggr, pgtest.NewPGCfg(false))
+	jobORM := job.NewORM(db, nil, pipeline.NewORM(db, lggr, cfg), nil, lggr, cfg)
+	ccipORM := NewORM(db, lggr, cfg)
 	ccipSpec, err := ValidatedCCIPSpec(testspecs.GenerateCCIPSpec(testspecs.CCIPSpecParams{}).Toml())
 	require.NoError(t, err)
 	err = jobORM.CreateJob(&ccipSpec)
@@ -135,7 +137,8 @@ func TestLogListener_SavesRequests(t *testing.T) {
 		SourceIncomingConfirmations: 0,
 		DestIncomingConfirmations:   0,
 	}
-	logListener := NewLogListener(lggr, lb, lb, onRamp, offRamp, ccipConfig, ccipORM, jb.ID)
+	q := pg.NewQ(db, lggr, cfg)
+	logListener := NewLogListener(lggr, lb, lb, onRamp, offRamp, ccipConfig, ccipORM, jb.ID, q)
 	t.Log("Ramp address", onRampAddress, onRamp.Address())
 	require.NoError(t, logListener.Start())
 
@@ -284,7 +287,13 @@ func updateOffchainConfig(t *testing.T, reportingPluginConfig OffchainConfig, of
 		1, // faults
 		nil,
 	)
-	_, err = offRamp.SetConfig(user, addressparser.OnchainPublicKeyToAddress(signers), addressparser.AccountToAddress(transmitters), threshold, onchainConfig, offchainConfigVersion, offchainConfig)
+
+	signerAddresses, err := ocrcommon.OnchainPublicKeyToAddress(signers)
+	require.NoError(t, err)
+	transmitterAddresses, err := ocrcommon.AccountToAddress(transmitters)
+	require.NoError(t, err)
+
+	_, err = offRamp.SetConfig(user, signerAddresses, transmitterAddresses, threshold, onchainConfig, offchainConfigVersion, offchainConfig)
 	require.NoError(t, err)
 }
 

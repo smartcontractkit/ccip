@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
+
 	"github.com/smartcontractkit/chainlink/core/chains/evm/log"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_offramp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_onramp"
@@ -17,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/pg"
 	"github.com/smartcontractkit/chainlink/core/utils"
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
+	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
 
 var (
@@ -29,6 +31,7 @@ type LogListener struct {
 
 	logger                     logger.Logger
 	orm                        ORM
+	q                          pg.Q
 	sourceChainLogBroadcaster  log.Broadcaster
 	destChainLogBroadcaster    log.Broadcaster
 	singleTokenOnRamp          *single_token_onramp.SingleTokenOnRamp
@@ -56,6 +59,7 @@ func NewLogListener(
 	offchainConfig OffchainConfig,
 	ccipORM ORM,
 	jobID int32,
+	q pg.Q,
 ) *LogListener {
 	return &LogListener{
 		logger:                    l,
@@ -68,7 +72,21 @@ func NewLogListener(
 		offchainConfig:            offchainConfig,
 		mbLogs:                    utils.NewMailbox(10000),
 		chStop:                    make(chan struct{}),
+		q:                         q,
 	}
+}
+
+type ConfigSet struct {
+	PreviousConfigBlockNumber uint32
+	ConfigDigest              [32]byte
+	ConfigCount               uint64
+	Signers                   []common.Address
+	Transmitters              []common.Address
+	F                         uint8
+	OnchainConfig             []byte
+	EncodedConfigVersion      uint64
+	Encoded                   []byte
+	Raw                       types.Log
 }
 
 // Start complies with job.Service
@@ -76,11 +94,11 @@ func (l *LogListener) Start() error {
 	return l.StartOnce("CCIP_LogListener", func() error {
 		sourceChainId, err := l.singleTokenOnRamp.CHAINID(nil)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "error getting source chain ID")
 		}
 		destChainId, err := l.singleTokenOffRamp.CHAINID(nil)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "error getting dest chain ID")
 		}
 		l.sourceChainId = sourceChainId
 		l.destChainId = destChainId
@@ -139,12 +157,12 @@ func (l *LogListener) HandleLog(lb log.Broadcast) {
 }
 
 func (l *LogListener) run() {
+	defer l.wgShutdown.Done()
 	for {
 		select {
 		case <-l.chStop:
 			l.unsubscribeLogsOffRamp()
 			l.unsubscribeLogsOnRamp()
-			l.wgShutdown.Done()
 			return
 		case <-l.mbLogs.Notify():
 			l.handleReceivedLogs()
@@ -180,11 +198,9 @@ func (l *LogListener) handleReceivedLogs() {
 			l.logger.Warnf("CCIP_LogListener: unexpected log type %T", logObj)
 		}
 
-		ctx, cancel := pg.DefaultQueryCtx()
-		wasConsumed, err := logBroadcaster.WasAlreadyConsumed(lb, pg.WithParentCtx(ctx))
-		cancel()
+		wasConsumed, err := logBroadcaster.WasAlreadyConsumed(lb)
 		if err != nil {
-			l.logger.Errorw("CCIP_LogListener: could not determine if log was already consumed", "error", err)
+			l.logger.Errorw("CCIP_LogListener: could not determine if log was already consumed", "err", err)
 			return
 		} else if wasConsumed {
 			return
@@ -243,12 +259,10 @@ func (l *LogListener) handleCrossChainMessageExecuted(executed *single_token_off
 	err := l.orm.UpdateRequestStatus(l.sourceChainId, l.destChainId, executed.SequenceNumber, executed.SequenceNumber, RequestStatusExecutionConfirmed)
 	if err != nil {
 		// We can replay the logs if needed
-		l.logger.Errorw("failed to save CCIP request", "error", err)
+		l.logger.Errorw("failed to save CCIP request", "err", err)
 		return
 	}
-	ctx, cancel := pg.DefaultQueryCtx()
-	defer cancel()
-	if err := l.destChainLogBroadcaster.MarkConsumed(lb, pg.WithParentCtx(ctx)); err != nil {
+	if err := l.destChainLogBroadcaster.MarkConsumed(lb); err != nil {
 		l.logger.Errorw("CCIP_LogListener: failed mark consumed", "err", err)
 	}
 }
@@ -260,28 +274,28 @@ func (l *LogListener) handleCrossChainReportRelayed(relayed *single_token_offram
 		"jobID", lb.JobID(),
 	)
 
-	// TODO: should be in the same tx
-	err := l.orm.UpdateRequestStatus(l.sourceChainId, l.destChainId, relayed.Report.MinSequenceNumber, relayed.Report.MaxSequenceNumber, RequestStatusRelayConfirmed)
-	if err != nil {
-		// We can replay the logs if needed
-		l.logger.Errorw("failed to save CCIP request", "error", err)
-		return
-	}
-	err = l.orm.SaveRelayReport(RelayReport{
-		Root:      relayed.Report.MerkleRoot[:],
-		MinSeqNum: *utils.NewBig(relayed.Report.MinSequenceNumber),
-		MaxSeqNum: *utils.NewBig(relayed.Report.MaxSequenceNumber),
+	_ = l.q.Transaction(func(tx pg.Queryer) error {
+		err := l.orm.UpdateRequestStatus(l.sourceChainId, l.destChainId, relayed.Report.MinSequenceNumber, relayed.Report.MaxSequenceNumber, RequestStatusRelayConfirmed)
+		if err != nil {
+			// We can replay the logs if needed
+			l.logger.Errorw("failed to save CCIP request", "err", err)
+			return err
+		}
+		err = l.orm.SaveRelayReport(RelayReport{
+			Root:      relayed.Report.MerkleRoot[:],
+			MinSeqNum: *utils.NewBig(relayed.Report.MinSequenceNumber),
+			MaxSeqNum: *utils.NewBig(relayed.Report.MaxSequenceNumber),
+		})
+		if err != nil {
+			// We can replay the logs if needed
+			l.logger.Errorw("failed to save CCIP report", "err", err)
+			return err
+		}
+		if err := l.destChainLogBroadcaster.MarkConsumed(lb); err != nil {
+			l.logger.Errorw("CCIP_LogListener: failed mark consumed", "err", err)
+		}
+		return nil
 	})
-	if err != nil {
-		// We can replay the logs if needed
-		l.logger.Errorw("failed to save CCIP report", "error", err)
-		return
-	}
-	ctx, cancel := pg.DefaultQueryCtx()
-	defer cancel()
-	if err := l.destChainLogBroadcaster.MarkConsumed(lb, pg.WithParentCtx(ctx)); err != nil {
-		l.logger.Errorw("CCIP_LogListener: failed mark consumed", "err", err)
-	}
 }
 
 // We assume a bounded Message size which is enforced on-chain,
@@ -323,13 +337,11 @@ func (l *LogListener) handleCrossChainSendRequested(request *single_token_onramp
 	})
 	if err != nil {
 		// We can replay the logs if needed
-		l.logger.Errorw("failed to save CCIP request", "error", err)
+		l.logger.Errorw("failed to save CCIP request", "err", err)
 		return
 	}
 
-	ctx, cancel := pg.DefaultQueryCtx()
-	defer cancel()
-	if err := l.sourceChainLogBroadcaster.MarkConsumed(lb, pg.WithParentCtx(ctx)); err != nil {
+	if err := l.sourceChainLogBroadcaster.MarkConsumed(lb); err != nil {
 		l.logger.Errorw("CCIP_LogListener: failed mark consumed", "err", err)
 	}
 }
@@ -337,4 +349,26 @@ func (l *LogListener) handleCrossChainSendRequested(request *single_token_onramp
 // JobID complies with log.Listener
 func (l *LogListener) JobID() int32 {
 	return l.jobID
+}
+
+func ContractConfigFromConfigSetEvent(changed ConfigSet) ocrtypes.ContractConfig {
+	var transmitAccounts []ocrtypes.Account
+	for _, addr := range changed.Transmitters {
+		transmitAccounts = append(transmitAccounts, ocrtypes.Account(addr.Hex()))
+	}
+	var signers []ocrtypes.OnchainPublicKey
+	for _, addr := range changed.Signers {
+		addr := addr
+		signers = append(signers, addr[:])
+	}
+	return ocrtypes.ContractConfig{
+		ConfigDigest:          changed.ConfigDigest,
+		ConfigCount:           changed.ConfigCount,
+		Signers:               signers,
+		Transmitters:          transmitAccounts,
+		F:                     changed.F,
+		OnchainConfig:         changed.OnchainConfig,
+		OffchainConfigVersion: changed.EncodedConfigVersion,
+		OffchainConfig:        changed.Encoded,
+	}
 }

@@ -743,6 +743,20 @@ func (_m *GeneralConfig) FMSimulateTransactions() bool {
 	return r0
 }
 
+// FeatureCCIP provides a mock function with given fields:
+func (_m *GeneralConfig) FeatureCCIP() bool {
+	ret := _m.Called()
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
 // FeatureExternalInitiators provides a mock function with given fields:
 func (_m *GeneralConfig) FeatureExternalInitiators() bool {
 	ret := _m.Called()

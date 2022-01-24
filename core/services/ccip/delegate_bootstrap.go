@@ -2,19 +2,15 @@
 package ccip
 
 import (
-	"time"
-
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
-	"github.com/smartcontractkit/chainlink/core/config"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_offramp"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/job"
 	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
+	"github.com/smartcontractkit/chainlink/core/services/offchainreporting2"
+	"github.com/smartcontractkit/chainlink/core/services/relay/types"
 	ocrcommontypes "github.com/smartcontractkit/libocr/commontypes"
 	ocr "github.com/smartcontractkit/libocr/offchainreporting2"
-	"github.com/smartcontractkit/libocr/offchainreporting2/chains/evmutil"
-	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"github.com/smartcontractkit/sqlx"
 )
 
@@ -22,28 +18,31 @@ type DelegateBootstrap struct {
 	bootstrappers []ocrcommontypes.BootstrapperLocator
 	db            *sqlx.DB
 	jobORM        job.ORM
-	orm           ORM
 	chainSet      evm.ChainSet
+	cfg           Config
 	peerWrapper   *ocrcommon.SingletonPeerWrapper
 	lggr          logger.Logger
+	relayer       types.Relayer
 }
 
 // TODO: Register this delegate behind a FF
 func NewDelegateBootstrap(
 	db *sqlx.DB,
 	jobORM job.ORM,
-	ccipORM ORM,
 	chainSet evm.ChainSet,
 	peerWrapper *ocrcommon.SingletonPeerWrapper,
 	lggr logger.Logger,
+	cfg Config,
+	relayer types.Relayer,
 ) *DelegateBootstrap {
 	return &DelegateBootstrap{
 		db:          db,
 		jobORM:      jobORM,
-		orm:         ccipORM,
 		chainSet:    chainSet,
 		peerWrapper: peerWrapper,
 		lggr:        lggr,
+		cfg:         cfg,
+		relayer:     relayer,
 	}
 }
 
@@ -51,101 +50,50 @@ func (d DelegateBootstrap) JobType() job.Type {
 	return job.CCIPBootstrap
 }
 
-func (d DelegateBootstrap) ServicesForSpec(jb job.Job) ([]job.Service, error) {
-	if jb.CCIPBootstrapSpec == nil {
-		return nil, errors.New("no bootstrap job specified")
+func (d DelegateBootstrap) ServicesForSpec(jobSpec job.Job) (services []job.Service, err error) {
+	spec := jobSpec.CCIPBootstrapSpec
+	if spec == nil {
+		return nil, errors.Errorf("CCIPBootstrap expects a *job.CCIPBootstrapSpec to be present, got %v", jobSpec)
 	}
 	l := d.lggr.With(
-		"jobID", jb.ID,
-		"externalJobID", jb.ExternalJobID,
-		"coordinatorAddress", jb.CCIPBootstrapSpec.ContractAddress,
+		"jobID", jobSpec.ID,
+		"externalJobID", jobSpec.ExternalJobID,
+		"coordinatorAddress", spec.ContractAddress,
 	)
-
-	c, err := d.chainSet.Get(jb.CCIPBootstrapSpec.EVMChainID.ToInt())
+	ocr2Spec := spec.AsOCR2Spec()
+	ocr2Provider, err := d.relayer.NewOCR2Provider(jobSpec.ExternalJobID, &ocr2Spec)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to open chain")
+		return nil, errors.Wrap(err, "error calling 'relayer.NewOCR2Provider'")
 	}
-	// Bootstrap could either be an offramp or an executor, should work in both cases
-	offRamp, err := single_token_offramp.NewSingleTokenOffRamp(jb.CCIPBootstrapSpec.ContractAddress.Address(), c.Client())
-	if err != nil {
-		return nil, errors.Wrap(err, "could not instantiate NewOffchainAggregator")
+	services = append(services, ocr2Provider)
+
+	lc := offchainreporting2.ToLocalConfig(d.cfg, ocr2Spec)
+	if err = ocr.SanityCheckLocalConfig(lc); err != nil {
+		return nil, err
 	}
 
-	ocrdb := NewDB(d.db.DB, jb.CCIPBootstrapSpec.ContractAddress.Address(), d.lggr)
-	contractTracker := NewCCIPContractTracker(
-		offrampTracker{offRamp},
-		c.Client(),
-		c.LogBroadcaster(),
-		jb.ID,
-		d.lggr,
-		c,
-		c.HeadBroadcaster(),
-	)
+	ocrdb := NewDB(d.db.DB, spec.ContractAddress.Address(), d.lggr)
 	ocrLogger := logger.NewOCRWrapper(l, true, func(msg string) {
-		_ = d.jobORM.RecordError(jb.ID, msg)
+		_ = d.jobORM.RecordError(jobSpec.ID, msg)
 	})
-	offchainConfigDigester := evmutil.EVMOffchainConfigDigester{
-		ChainID:         maybeRemapChainID(c.Config().ChainID()).Uint64(),
-		ContractAddress: jb.CCIPBootstrapSpec.ContractAddress.Address(),
-	}
 
 	bootstrapNode, err := ocr.NewBootstrapper(ocr.BootstrapperArgs{
-		BootstrapperFactory:   d.peerWrapper.Peer2,
-		ContractConfigTracker: contractTracker,
-		Database:              ocrdb,
-		LocalConfig: computeLocalConfig(c.Config(), c.Config().Dev(),
-			jb.CCIPBootstrapSpec.BlockchainTimeout.Duration(),
-			jb.CCIPBootstrapSpec.ContractConfigConfirmations, jb.CCIPBootstrapSpec.ContractConfigTrackerPollInterval.Duration()),
+		BootstrapperFactory:    d.peerWrapper.Peer2,
+		ContractConfigTracker:  ocr2Provider.ContractConfigTracker(),
+		Database:               ocrdb,
+		LocalConfig:            lc,
 		Logger:                 ocrLogger,
-		MonitoringEndpoint:     nil, // TODO
-		OffchainConfigDigester: offchainConfigDigester,
+		OffchainConfigDigester: ocr2Provider.OffchainConfigDigester(),
 	})
 	if err != nil {
 		return nil, err
 	}
-	return []job.Service{contractTracker, bootstrapNode}, nil
+	services = append(services, bootstrapNode)
+	return services, nil
 }
 
 func (d DelegateBootstrap) AfterJobCreated(spec job.Job) {
 }
 
 func (d DelegateBootstrap) BeforeJobDeleted(spec job.Job) {
-}
-
-// Fallback to config if explicit spec parameters are not set
-func computeLocalConfig(config config.OCR2Config, dev bool, bt time.Duration, confs uint16, poll time.Duration) ocrtypes.LocalConfig {
-	var blockchainTimeout time.Duration
-	if bt != 0 {
-		blockchainTimeout = bt
-	} else {
-		blockchainTimeout = config.OCR2BlockchainTimeout()
-	}
-
-	var contractConfirmations uint16
-	if confs != 0 {
-		contractConfirmations = confs
-	} else {
-		contractConfirmations = config.OCR2ContractConfirmations()
-	}
-
-	var contractConfigTrackerPollInterval time.Duration
-	if poll != 0 {
-		contractConfigTrackerPollInterval = poll
-	} else {
-		contractConfigTrackerPollInterval = config.OCR2ContractPollInterval()
-	}
-
-	lc := ocrtypes.LocalConfig{
-		BlockchainTimeout:                  blockchainTimeout,
-		ContractConfigConfirmations:        contractConfirmations,
-		ContractConfigTrackerPollInterval:  contractConfigTrackerPollInterval,
-		ContractTransmitterTransmitTimeout: config.OCR2ContractTransmitterTransmitTimeout(),
-		DatabaseTimeout:                    config.OCR2DatabaseTimeout(),
-	}
-	if dev {
-		// Skips config validation so we can use any config parameters we want.
-		// For example to lower contractConfigTrackerPollInterval to speed up tests.
-		lc.DevelopmentMode = ocrtypes.EnableDangerousDevelopmentMode
-	}
-	return lc
 }

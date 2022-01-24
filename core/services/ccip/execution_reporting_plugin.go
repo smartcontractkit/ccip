@@ -246,13 +246,13 @@ func (r ExecutionReportingPlugin) Observation(ctx context.Context, timestamp typ
 	if len(reqs) == 0 {
 		return nil, fmt.Errorf("no requests for oracle execution")
 	}
-	// Double check the latest sequence number onchain is >= our max relayed seq num
+	// Double-check the latest sequence number onchain is >= our max relayed seq num
 	lr, err := r.lastReporter.GetLastReport(nil)
 	if err != nil {
 		return nil, err
 	}
 	if reqs[len(reqs)-1].SeqNum.ToInt().Cmp(lr.MaxSequenceNumber) > 0 {
-		return nil, fmt.Errorf("invariant violated, mismatch between relay_confirmed requests and last report")
+		return nil, errors.Errorf("invariant violated, mismatch between relay_confirmed requests and last report")
 	}
 	b, err := json.Marshal(&ExecutionObservation{
 		MinSeqNum: reqs[0].SeqNum,

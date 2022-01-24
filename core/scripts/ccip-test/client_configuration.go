@@ -17,7 +17,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
-	"github.com/smartcontractkit/chainlink/core/chains/evm/addressparser"
 
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/afn_contract"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/link_token_interface"
@@ -30,6 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_sender"
 	"github.com/smartcontractkit/chainlink/core/services/ccip"
 	"github.com/smartcontractkit/chainlink/core/services/ccip/abihelpers"
+	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
 	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 )
 
@@ -280,7 +280,6 @@ func (client CcipClient) ExternalExecutionHappyPath() {
 	proof := client.ValidateMerkleRoot(onrampRequest, requests, report)
 
 	// Execute the transaction on the offramp
-	client.Dest.Owner.GasLimit = 2e9
 	fmt.Println("Executing offramp TX")
 	tx, err := client.ExecuteOfframpTransaction(proof, onrampRequest.Raw.Data)
 	PanicErr(err)
@@ -709,10 +708,15 @@ func (client CcipClient) SetConfig() {
 
 	ctx := context.Background()
 
+	signerAddresses, err := ocrcommon.OnchainPublicKeyToAddress(signers)
+	PanicErr(err)
+	transmitterAddresses, err := ocrcommon.AccountToAddress(transmitters)
+	PanicErr(err)
+
 	tx, err := client.Dest.SingleTokenOfframp.SetConfig(
 		client.Dest.Owner,
-		addressparser.OnchainPublicKeyToAddress(signers),
-		addressparser.AccountToAddress(transmitters),
+		signerAddresses,
+		transmitterAddresses,
 		f,
 		onchainConfig,
 		offchainConfigVersion,
@@ -724,8 +728,8 @@ func (client CcipClient) SetConfig() {
 
 	tx, err = client.Dest.MessageExecutor.SetConfig(
 		client.Dest.Owner,
-		addressparser.OnchainPublicKeyToAddress(signers),
-		addressparser.AccountToAddress(transmitters),
+		signerAddresses,
+		transmitterAddresses,
 		f,
 		onchainConfig,
 		offchainConfigVersion,

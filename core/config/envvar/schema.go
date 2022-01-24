@@ -192,6 +192,9 @@ type ConfigSchema struct {
 	FMDefaultTransactionQueueDepth uint32 `env:"FM_DEFAULT_TRANSACTION_QUEUE_DEPTH" default:"1"` //nodoc
 	FMSimulateTransactions         bool   `env:"FM_SIMULATE_TRANSACTIONS" default:"false"`
 
+	// CCIP
+	FeatureCCIP bool `env:"FEATURE_CCIP" default:"false"` //nodoc
+
 	// OCR V2
 	FeatureOffchainReporting2 bool `env:"FEATURE_OFFCHAIN_REPORTING2" default:"false"` //nodoc
 	// Global defaults

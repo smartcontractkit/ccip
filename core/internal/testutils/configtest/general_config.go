@@ -54,6 +54,7 @@ type GeneralConfigOverrides struct {
 	ShutdownGracePeriod                       *time.Duration
 	Dialect                                   dialects.DialectName
 	EthereumURL                               null.String
+	FeatureCCIP                               null.Bool
 	GlobalBalanceMonitorEnabled               null.Bool
 	GlobalBlockEmissionIdleWarningThreshold   *time.Duration
 	GlobalChainType                           null.String
@@ -334,6 +335,13 @@ func (c *TestGeneralConfig) DatabaseLockingMode() string {
 	}
 	// tests do not need DB locks, except for LockedDB tests
 	return "none"
+}
+
+func (c *TestGeneralConfig) FeatureCCIP() bool {
+	if c.Overrides.FeatureCCIP.Valid {
+		return c.Overrides.FeatureCCIP.Bool
+	}
+	return c.GeneralConfig.FeatureCCIP()
 }
 
 func (c *TestGeneralConfig) FeatureExternalInitiators() bool {

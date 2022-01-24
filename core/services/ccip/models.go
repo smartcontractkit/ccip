@@ -5,8 +5,6 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
-
 	"github.com/smartcontractkit/chainlink/core/utils"
 
 	"github.com/lib/pq"
@@ -29,23 +27,6 @@ type Request struct {
 	Status        RequestStatus
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
-}
-
-func (Request) TableName() string {
-	return "ccip_requests"
-}
-
-func MakeOptions() abi.Arguments {
-	mustType := func(ts string) abi.Type {
-		ty, _ := abi.NewType(ts, "", nil)
-		return ty
-	}
-	return []abi.Argument{
-		{
-			Type: mustType("bool"),
-			Name: "oracleExecute",
-		},
-	}
 }
 
 func mustStringToBigInt(s string) *big.Int {

@@ -93,6 +93,7 @@ func TestConfigSchema(t *testing.T) {
 		"ExplorerURL":                                    "EXPLORER_URL",
 		"FMDefaultTransactionQueueDepth":                 "FM_DEFAULT_TRANSACTION_QUEUE_DEPTH",
 		"FMSimulateTransactions":                         "FM_SIMULATE_TRANSACTIONS",
+		"FeatureCCIP":                                    "FEATURE_CCIP",
 		"FeatureExternalInitiators":                      "FEATURE_EXTERNAL_INITIATORS",
 		"FeatureFeedsManager":                            "FEATURE_FEEDS_MANAGER",
 		"FeatureOffchainReporting":                       "FEATURE_OFFCHAIN_REPORTING",

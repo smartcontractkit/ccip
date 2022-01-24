@@ -571,10 +571,6 @@ func (s CCIPRelaySpec) AsOCR2Spec() OffchainReporting2OracleSpec {
 	}
 }
 
-func (CCIPRelaySpec) TableName() string {
-	return "ccip_relay_specs"
-}
-
 func (s CCIPRelaySpec) GetID() string {
 	return fmt.Sprintf("%v", s.ID)
 }
@@ -634,10 +630,6 @@ func (s CCIPExecutionSpec) AsOCR2Spec() OffchainReporting2OracleSpec {
 	}
 }
 
-func (CCIPExecutionSpec) TableName() string {
-	return "ccip_execution_specs"
-}
-
 func (s CCIPExecutionSpec) GetID() string {
 	return fmt.Sprintf("%v", s.ID)
 }
@@ -651,22 +643,34 @@ func (s *CCIPExecutionSpec) SetID(value string) error {
 	return nil
 }
 
-// TODO: make generic bootstrap job
 type CCIPBootstrapSpec struct {
-	ID                 int32               `toml:"-"`
-	ContractAddress    ethkey.EIP55Address `toml:"contractAddress"`
-	EVMChainID         *utils.Big          `toml:"evmChainID"`
-	MonitoringEndpoint *string             `toml:"monitoringEndpoint"`
-	P2PPeerID          *p2pkey.PeerID      `toml:"p2pPeerID"`
-	// TODO: Add fields as needed
-	BlockchainTimeout                      models.Interval `toml:"blockchainTimeout"`
-	ContractConfigTrackerSubscribeInterval models.Interval `toml:"contractConfigTrackerSubscribeInterval"`
-	ContractConfigTrackerPollInterval      models.Interval `toml:"contractConfigTrackerPollInterval"`
-	ContractConfigConfirmations            uint16          `toml:"contractConfigConfirmations"`
-	CreatedAt                              time.Time       `toml:"-"`
-	UpdatedAt                              time.Time       `toml:"-"`
+	ID                                     int32               `toml:"-"`
+	ContractAddress                        ethkey.EIP55Address `toml:"contractAddress"`
+	Relay                                  relaytypes.Network  `toml:"relay"`
+	RelayConfig                            RelayConfig         `toml:"relayConfig"`
+	EVMChainID                             *utils.Big          `toml:"evmChainID"`
+	MonitoringEndpoint                     *string             `toml:"monitoringEndpoint"`
+	P2PPeerID                              *p2pkey.PeerID      `toml:"p2pPeerID"`
+	BlockchainTimeout                      models.Interval     `toml:"blockchainTimeout"`
+	ContractConfigTrackerSubscribeInterval models.Interval     `toml:"contractConfigTrackerSubscribeInterval"`
+	ContractConfigTrackerPollInterval      models.Interval     `toml:"contractConfigTrackerPollInterval"`
+	ContractConfigConfirmations            uint16              `toml:"contractConfigConfirmations"`
+	CreatedAt                              time.Time           `toml:"-"`
+	UpdatedAt                              time.Time           `toml:"-"`
 }
 
-func (CCIPBootstrapSpec) TableName() string {
-	return "ccip_bootstrap_specs"
+func (s CCIPBootstrapSpec) AsOCR2Spec() OffchainReporting2OracleSpec {
+	return OffchainReporting2OracleSpec{
+		ID:                                     s.ID,
+		ContractID:                             s.ContractAddress.Hex(),
+		Relay:                                  s.Relay,
+		RelayConfig:                            s.RelayConfig,
+		IsBootstrapPeer:                        true,
+		BlockchainTimeout:                      s.BlockchainTimeout,
+		ContractConfigTrackerSubscribeInterval: s.ContractConfigTrackerSubscribeInterval,
+		ContractConfigTrackerPollInterval:      s.ContractConfigTrackerPollInterval,
+		ContractConfigConfirmations:            s.ContractConfigConfirmations,
+		CreatedAt:                              s.CreatedAt,
+		UpdatedAt:                              s.UpdatedAt,
+	}
 }

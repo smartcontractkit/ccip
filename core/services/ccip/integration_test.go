@@ -24,13 +24,13 @@ import (
 	"gopkg.in/guregu/null.v4"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
-	"github.com/smartcontractkit/chainlink/core/chains/evm/addressparser"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/bulletprooftxmanager"
 	eth "github.com/smartcontractkit/chainlink/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/headtracker"
 	httypes "github.com/smartcontractkit/chainlink/core/chains/evm/headtracker/types"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/log"
 	evmtypes "github.com/smartcontractkit/chainlink/core/chains/evm/types"
+	"github.com/smartcontractkit/chainlink/core/chains/terra"
 	"github.com/smartcontractkit/chainlink/core/internal/cltest"
 	"github.com/smartcontractkit/chainlink/core/internal/cltest/heavyweight"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/afn_contract"
@@ -52,6 +52,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/keystore"
 	"github.com/smartcontractkit/chainlink/core/services/keystore/chaintype"
 	"github.com/smartcontractkit/chainlink/core/services/keystore/keys/ocr2key"
+	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
 	"github.com/smartcontractkit/chainlink/core/services/pg"
 	"github.com/smartcontractkit/chainlink/core/shutdown"
 	"github.com/smartcontractkit/chainlink/core/utils"
@@ -238,7 +239,7 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 
 var (
 	sourceChainID = big.NewInt(1000)
-	destChainID   = big.NewInt(2000)
+	destChainID   = big.NewInt(1337)
 )
 
 type EthKeyStoreSim struct {
@@ -246,9 +247,9 @@ type EthKeyStoreSim struct {
 }
 
 func (ks EthKeyStoreSim) SignTx(address common.Address, tx *types.Transaction, chainID *big.Int) (*types.Transaction, error) {
-	if chainID.String() == "1000" || chainID.String() == "2000" {
-		// A terrible hack, just for the multichain test
-		// Needs to actually use the sim
+	if chainID.String() == "1000" {
+		// A terrible hack, just for the multichain test. All simulation clients run on chainID 1337.
+		// We let the destChain actually use 1337 to make sure the config digests are properly generated.
 		return ks.Eth.SignTx(address, tx, big.NewInt(1337))
 	}
 	return ks.Eth.SignTx(address, tx, chainID)
@@ -285,6 +286,7 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 	config, db := heavyweight.FullTestDB(t, fmt.Sprintf("%s%d", dbName, port), true, false)
 	config.Overrides.FeatureOffchainReporting = null.BoolFrom(false)
 	config.Overrides.FeatureOffchainReporting2 = null.BoolFrom(true)
+	config.Overrides.FeatureCCIP = null.BoolFrom(true)
 	config.Overrides.GlobalGasEstimatorMode = null.NewString("FixedPrice", true)
 	config.Overrides.SetP2PV2DeltaDial(500 * time.Millisecond)
 	config.Overrides.SetP2PV2DeltaReconcile(5 * time.Second)
@@ -316,7 +318,7 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 
 	// Create our chainset manually so we can have custom eth clients
 	// (the wrapped sims faking different chainIDs)
-	chainSet, err := evm.LoadChainSet(evm.ChainSetOpts{
+	evmChain, err := evm.LoadChainSet(evm.ChainSetOpts{
 		ORM:              chainORM,
 		Config:           config,
 		Logger:           lggr,
@@ -377,16 +379,26 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 	if err != nil {
 		lggr.Fatal(err)
 	}
-	_, err = chainORM.CreateChain(*utils.NewBig(big.NewInt(1337)), evmtypes.ChainCfg{})
-	require.NoError(t, err)
 	sig := shutdown.NewSignal()
+	terraChain, err := terra.NewChainSet(terra.ChainSetOpts{
+		Config:           cfg,
+		Logger:           lggr,
+		DB:               db,
+		KeyStore:         keyStore.Terra(),
+		EventBroadcaster: eventBroadcaster,
+		ORM:              terra.NewORM(db, lggr, cfg),
+	})
+
 	app, err := chainlink.NewApplication(chainlink.ApplicationOpts{
-		Config:                   config,
-		EventBroadcaster:         eventBroadcaster,
-		ShutdownSignal:           sig,
-		SqlxDB:                   db,
-		KeyStore:                 keyStore,
-		ChainSet:                 chainSet,
+		Config:           config,
+		EventBroadcaster: eventBroadcaster,
+		ShutdownSignal:   sig,
+		SqlxDB:           db,
+		KeyStore:         keyStore,
+		Chains: chainlink.Chains{
+			EVM:   evmChain,
+			Terra: terraChain,
+		},
 		Logger:                   lggr,
 		ExternalInitiatorManager: nil,
 	})
@@ -478,18 +490,21 @@ func TestIntegration_CCIP(t *testing.T) {
 	defer appBootstrap.Stop()
 
 	// Add the bootstrap job
-	chainSet := appBootstrap.GetChainSet()
+	chainSet := appBootstrap.GetChains()
 	require.NotNil(t, chainSet)
 	ocrJob, err := ccip.ValidatedCCIPBootstrapSpec(fmt.Sprintf(`
-type               = "ccip-bootstrap"
-schemaVersion      = 1
-evmChainID         = "%s"
-name               = "boot"
-contractAddress    = "%s"
-isBootstrapPeer    = true
+type               	= "ccip-bootstrap"
+relay 				= "evm"
+schemaVersion      	= 1
+evmChainID         	= "%s"
+name               	= "boot"
+contractAddress    	= "%s"
+isBootstrapPeer    	= true
 contractConfigConfirmations = 1
 contractConfigTrackerPollInterval = "1s"
-`, destChainID, ccipContracts.offRamp.Address()))
+[relayConfig]
+chainID = %s
+`, destChainID, ccipContracts.offRamp.Address(), destChainID))
 	require.NoError(t, err)
 	err = appBootstrap.AddJobV2(context.Background(), &ocrJob)
 	require.NoError(t, err)
@@ -515,7 +530,9 @@ ocrKeyBundleID      = "%s"
 transmitterID 		= "%s"
 contractConfigConfirmations = 1
 contractConfigTrackerPollInterval = "1s"
-`, i, ccipContracts.onRamp.Address(), ccipContracts.offRamp.Address(), ccipContracts.offRamp.Address(), sourceChainID, destChainID, kbs[i].ID(), transmitters[i]))
+[relayConfig]
+chainID = "%s"
+`, i, ccipContracts.onRamp.Address(), ccipContracts.offRamp.Address(), ccipContracts.offRamp.Address(), sourceChainID, destChainID, kbs[i].ID(), transmitters[i], destChainID))
 		require.NoError(t, err)
 		err = apps[i].AddJobV2(context.Background(), &ccipJob)
 		require.NoError(t, err)
@@ -535,7 +552,9 @@ ocrKeyBundleID      = "%s"
 transmitterID 		= "%s"
 contractConfigConfirmations = 1
 contractConfigTrackerPollInterval = "1s"
-`, i, ccipContracts.onRamp.Address(), ccipContracts.offRamp.Address(), ccipContracts.executor.Address(), ccipContracts.executor.Address(), sourceChainID, destChainID, kbs[i].ID(), transmitters[i]))
+[relayConfig]
+chainID = "%s"
+`, i, ccipContracts.onRamp.Address(), ccipContracts.offRamp.Address(), ccipContracts.executor.Address(), ccipContracts.executor.Address(), sourceChainID, destChainID, kbs[i].ID(), transmitters[i], destChainID))
 		require.NoError(t, err)
 		err = apps[i].AddJobV2(context.Background(), &ccipExecutionJob)
 		require.NoError(t, err)
@@ -776,11 +795,16 @@ func setupOnchainConfig(t *testing.T, ccipContracts CCIPContracts, oracles []con
 		"encodedConfigVersion", offchainConfigVersion,
 	)
 
+	signerAddresses, err := ocrcommon.OnchainPublicKeyToAddress(signers)
+	require.NoError(t, err)
+	transmitterAddresses, err := ocrcommon.AccountToAddress(transmitters)
+	require.NoError(t, err)
+
 	// Set the DON on the offramp
 	_, err = ccipContracts.offRamp.SetConfig(
 		ccipContracts.destUser,
-		addressparser.OnchainPublicKeyToAddress(signers),
-		addressparser.AccountToAddress(transmitters),
+		signerAddresses,
+		transmitterAddresses,
 		threshold,
 		onchainConfig,
 		offchainConfigVersion,
@@ -792,8 +816,8 @@ func setupOnchainConfig(t *testing.T, ccipContracts CCIPContracts, oracles []con
 	// Same DON on the message executor
 	_, err = ccipContracts.executor.SetConfig(
 		ccipContracts.destUser,
-		addressparser.OnchainPublicKeyToAddress(signers),
-		addressparser.AccountToAddress(transmitters),
+		signerAddresses,
+		transmitterAddresses,
 		threshold,
 		onchainConfig,
 		offchainConfigVersion,

@@ -27,8 +27,8 @@ import (
 	"github.com/smartcontractkit/chainlink/core/config"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services"
-	"github.com/smartcontractkit/chainlink/core/services/ccip"
 	"github.com/smartcontractkit/chainlink/core/services/blockhashstore"
+	"github.com/smartcontractkit/chainlink/core/services/ccip"
 	"github.com/smartcontractkit/chainlink/core/services/cron"
 	"github.com/smartcontractkit/chainlink/core/services/directrequest"
 	"github.com/smartcontractkit/chainlink/core/services/feeds"
@@ -396,6 +396,44 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 			cfg,
 			keyStore.OCR2(),
 		)
+		if cfg.FeatureCCIP() {
+			globalLogger.Debug("CCIP enabled")
+			delegates[job.CCIPBootstrap] = ccip.NewDelegateBootstrap(
+				db,
+				jobORM,
+				chains.EVM,
+				peerWrapper,
+				globalLogger,
+				cfg,
+				relay,
+			)
+			delegates[job.CCIPRelay] = ccip.NewRelayDelegate(
+				db,
+				jobORM,
+				ccipORM,
+				peerWrapper,
+				monitoringEndpointGen,
+				chains.EVM,
+				globalLogger,
+				cfg,
+				keyStore.OCR2(),
+				relay,
+			)
+			delegates[job.CCIPExecution] = ccip.NewExecutionDelegate(
+				db,
+				jobORM,
+				ccipORM,
+				peerWrapper,
+				monitoringEndpointGen,
+				chains.EVM,
+				globalLogger,
+				cfg,
+				keyStore.OCR2(),
+				relay,
+			)
+		} else {
+			globalLogger.Debug("CCIP disabled")
+		}
 	} else {
 		globalLogger.Debug("Off-chain reporting v2 disabled")
 	}

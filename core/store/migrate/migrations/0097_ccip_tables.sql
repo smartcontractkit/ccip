@@ -136,6 +136,8 @@ CREATE TABLE ccip_bootstrap_specs
 (
     id                                         SERIAL PRIMARY KEY,
     contract_address                           bytea                    NOT NULL,
+    relay                                      text,
+    relay_config                               JSONB,
     p2p_peer_id                                text,
     evm_chain_id                               numeric(78, 0)           NOT NULL REFERENCES evm_chains (id),
     monitoring_endpoint                        text,
@@ -163,6 +165,7 @@ ALTER TABLE jobs
                     cron_spec_id,
                     webhook_spec_id,
                     vrf_spec_id,
+                    blockhash_store_spec_id,
                     ccip_relay_spec_id,
                     ccip_execution_spec_id,
                     ccip_bootstrap_spec_id) = 1
@@ -185,7 +188,8 @@ ALTER TABLE jobs
                     keeper_spec_id,
                     cron_spec_id,
                     webhook_spec_id,
-                    vrf_spec_id) = 1
+                    vrf_spec_id,
+                    blockhash_store_spec_id) = 1
         );
 ALTER TABLE jobs
     DROP COLUMN ccip_relay_spec_id;

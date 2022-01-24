@@ -8,6 +8,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/chainlink/core/services/offchainreporting2"
+	"github.com/smartcontractkit/chainlink/core/services/pg"
+	"github.com/smartcontractkit/chainlink/core/services/relay/types"
 	"github.com/smartcontractkit/chainlink/core/services/telemetry"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
@@ -20,7 +22,6 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/keystore"
 	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
 	ocr "github.com/smartcontractkit/libocr/offchainreporting2"
-	"github.com/smartcontractkit/libocr/offchainreporting2/chains/evmutil"
 	"github.com/smartcontractkit/sqlx"
 )
 
@@ -36,9 +37,9 @@ type ExecutionDelegate struct {
 	cfg                   Config
 	lggr                  logger.Logger
 	ks                    keystore.OCR2
+	relayer               types.Relayer
 }
 
-// TODO: Register this delegate behind a FF
 func NewExecutionDelegate(
 	db *sqlx.DB,
 	jobORM job.ORM,
@@ -49,6 +50,7 @@ func NewExecutionDelegate(
 	lggr logger.Logger,
 	cfg Config,
 	ks keystore.OCR2,
+	relayer types.Relayer,
 ) *ExecutionDelegate {
 	return &ExecutionDelegate{
 		db:                    db,
@@ -60,6 +62,7 @@ func NewExecutionDelegate(
 		cfg:                   cfg,
 		lggr:                  lggr,
 		ks:                    ks,
+		relayer:               relayer,
 	}
 }
 
@@ -76,6 +79,13 @@ func (d ExecutionDelegate) ServicesForSpec(jobSpec job.Job) (services []job.Serv
 		return nil, errors.New("spec.TransmitterID not valid")
 	}
 
+	ocr2Spec := spec.AsOCR2Spec()
+	ocr2Provider, err := d.relayer.NewOCR2Provider(jobSpec.ExternalJobID, &ocr2Spec)
+	if err != nil {
+		return nil, errors.Wrap(err, "error calling 'relayer.NewOCR2Provider'")
+	}
+	services = append(services, ocr2Provider)
+
 	destChain, err := d.chainSet.Get(spec.DestEVMChainID.ToInt())
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to open chain")
@@ -84,16 +94,6 @@ func (d ExecutionDelegate) ServicesForSpec(jobSpec job.Job) (services []job.Serv
 	if err != nil {
 		return nil, errors.Wrap(err, "could not instantiate NewOffchainAggregator")
 	}
-	contractTracker := NewCCIPContractTracker(
-		executorTracker{contract},
-		destChain.Client(),
-		destChain.LogBroadcaster(),
-		jobSpec.ID,
-		d.lggr,
-		destChain,
-		destChain.HeadBroadcaster(),
-	)
-	services = append(services, contractTracker)
 
 	loggerWith := d.lggr.With(
 		"OCRLogger", "true",
@@ -155,7 +155,7 @@ func (d ExecutionDelegate) ServicesForSpec(jobSpec job.Job) (services []job.Serv
 	}
 
 	ocrdb := NewDB(d.db.DB, common.HexToAddress(spec.ExecutorID), d.lggr)
-	lc := offchainreporting2.ToLocalConfig(destChain.Config(), spec.AsOCR2Spec())
+	lc := offchainreporting2.ToLocalConfig(d.cfg, ocr2Spec)
 	if err = ocr.SanityCheckLocalConfig(lc); err != nil {
 		return nil, err
 	}
@@ -171,21 +171,19 @@ func (d ExecutionDelegate) ServicesForSpec(jobSpec job.Job) (services []job.Serv
 		"DatabaseTimeout", lc.DatabaseTimeout,
 	)
 
+	tracker := ocr2Provider.ContractConfigTracker()
 	oracle, err := ocr.NewOracle(ocr.OracleArgs{
 		BinaryNetworkEndpointFactory: d.peerWrapper.Peer2,
 		V2Bootstrappers:              bootstrapPeers,
 		ContractTransmitter:          contractTransmitter,
-		ContractConfigTracker:        contractTracker,
+		ContractConfigTracker:        tracker,
 		Database:                     ocrdb,
 		LocalConfig:                  lc,
 		Logger:                       ocrLogger,
 		MonitoringEndpoint:           d.monitoringEndpointGen.GenMonitoringEndpoint(spec.ContractID),
-		OffchainConfigDigester: evmutil.EVMOffchainConfigDigester{
-			ChainID:         maybeRemapChainID(destChain.Config().ChainID()).Uint64(),
-			ContractAddress: common.HexToAddress(spec.ExecutorID),
-		},
-		OffchainKeyring: kb,
-		OnchainKeyring:  kb,
+		OffchainConfigDigester:       ocr2Provider.OffchainConfigDigester(),
+		OffchainKeyring:              kb,
+		OnchainKeyring:               kb,
 		ReportingPluginFactory: NewExecutionReportingPluginFactory(
 			loggerWith,
 			d.ccipORM,
@@ -207,7 +205,7 @@ func (d ExecutionDelegate) ServicesForSpec(jobSpec job.Job) (services []job.Serv
 	if err != nil {
 		return nil, err
 	}
-	encodedCCIPConfig, err := contractTracker.GetOffchainConfig()
+	ccipConfig, err := GetOffchainConfig(tracker)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not get the latest encoded config")
 	}
@@ -219,9 +217,10 @@ func (d ExecutionDelegate) ServicesForSpec(jobSpec job.Job) (services []job.Serv
 		destChain.LogBroadcaster(),
 		singleTokenOnRamp,
 		singleTokenOffRamp,
-		encodedCCIPConfig,
+		ccipConfig,
 		d.ccipORM,
-		jobSpec.ID)
+		jobSpec.ID,
+		pg.NewQ(d.db, d.lggr, d.cfg))
 	services = append(services, logListener)
 	return services, nil
 }
