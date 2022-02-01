@@ -37,26 +37,3 @@ func ValidatedCCIPSpec(tomlString string) (job.Job, error) {
 
 	return jb, nil
 }
-
-func ValidatedCCIPBootstrapSpec(tomlString string) (job.Job, error) {
-	var jb = job.Job{}
-	tree, err := toml.Load(tomlString)
-	if err != nil {
-		return jb, err
-	}
-	err = tree.Unmarshal(&jb)
-	if err != nil {
-		return jb, err
-	}
-	var spec job.CCIPBootstrapSpec
-	err = tree.Unmarshal(&spec)
-	if err != nil {
-		return jb, err
-	}
-	jb.CCIPBootstrapSpec = &spec
-
-	if jb.Type != job.CCIPBootstrap {
-		return jb, errors.Errorf("unsupported type %s", jb.Type)
-	}
-	return jb, nil
-}

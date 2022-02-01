@@ -52,33 +52,3 @@ answer1      [type=median Index=0];
 		})
 	}
 }
-
-func TestValidateCCIPBootstrapSpec(t *testing.T) {
-	var tt = []struct {
-		name         string
-		toml         string
-		setGlobalCfg func(t *testing.T, c *configtest.TestGeneralConfig)
-		assertion    func(t *testing.T, os job.Job, err error)
-	}{
-		{
-			name: "decodes valid ccip bootstrap spec toml",
-			toml: `
-type               = "ccip-bootstrap"
-schemaVersion      = 1
-contractAddress    = "0x613a38AC1659769640aaE063C651F48E0250454C"
-monitoringEndpoint = "chain.link:4321"
-`,
-			assertion: func(t *testing.T, os job.Job, err error) {
-				require.NoError(t, err)
-				assert.Equal(t, 1, int(os.SchemaVersion))
-			},
-		},
-	}
-
-	for _, tc := range tt {
-		t.Run(tc.name, func(t *testing.T) {
-			s, err := ValidatedCCIPBootstrapSpec(tc.toml)
-			tc.assertion(t, s, err)
-		})
-	}
-}

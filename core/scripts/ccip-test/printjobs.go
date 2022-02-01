@@ -21,15 +21,16 @@ func PrintJobSpecs(onramp, offramp, executor common.Address) {
 
 const bootstrapTemplate = `
 // Bootstrap Node
-# CCIPBootstrapSpec
-type                                = "ccip-bootstrap"
-name                                = "ccip-bootstrap"
+# BootstrapSpec
+type                                = "bootstrap"
+name                                = "bootstrap"
+relay                               = "evm"
 schemaVersion                       = 1
-contractAddress                     = "%s"
-evmChainID                          = 4
-isBootstrapPeer                     = true
+contractID                          = "%s"
 contractConfigConfirmations         = 1
 contractConfigTrackerPollInterval   = "60s"
+[relayConfig]
+chainID 							= 4
 `
 
 const relayTemplate = `

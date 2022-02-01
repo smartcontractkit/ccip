@@ -24,7 +24,6 @@ var (
 		Bootstrap:          {},
 		CCIPRelay:          {},
 		CCIPExecution:      {},
-		CCIPBootstrap:      {},
 	}
 )
 

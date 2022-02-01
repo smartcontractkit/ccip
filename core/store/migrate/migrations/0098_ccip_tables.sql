@@ -132,28 +132,9 @@ ALTER TABLE ONLY ccip_persistent_states
     ADD CONSTRAINT ccip_persistent_states_pkey
         PRIMARY KEY (contract_address, config_digest);
 
-CREATE TABLE ccip_bootstrap_specs
-(
-    id                                         SERIAL PRIMARY KEY,
-    contract_address                           bytea                    NOT NULL,
-    relay                                      text,
-    relay_config                               JSONB,
-    p2p_peer_id                                text,
-    evm_chain_id                               numeric(78, 0)           NOT NULL REFERENCES evm_chains (id),
-    monitoring_endpoint                        text,
-    blockchain_timeout                         bigint,
-    contract_config_tracker_subscribe_interval bigint,
-    contract_config_tracker_poll_interval      bigint,
-    contract_config_confirmations              integer                  NOT NULL,
-    created_at                                 timestamp with time zone NOT NULL,
-    updated_at                                 timestamp with time zone NOT NULL,
-    CONSTRAINT chk_contract_address_length CHECK ((octet_length(contract_address) = 20))
-);
-
 ALTER TABLE jobs
     ADD COLUMN ccip_relay_spec_id     INT REFERENCES ccip_relay_specs (id),
     ADD COLUMN ccip_execution_spec_id INT REFERENCES ccip_execution_specs (id),
-    ADD COLUMN ccip_bootstrap_spec_id INT REFERENCES ccip_bootstrap_specs (id),
     DROP CONSTRAINT chk_only_one_spec,
     ADD CONSTRAINT chk_only_one_spec CHECK (
             num_nonnulls(
@@ -168,8 +149,7 @@ ALTER TABLE jobs
                     blockhash_store_spec_id,
                     bootstrap_spec_id,
                     ccip_relay_spec_id,
-                    ccip_execution_spec_id,
-                    ccip_bootstrap_spec_id) = 1
+                    ccip_execution_spec_id) = 1
         );
 -- +goose StatementEnd
 
@@ -197,11 +177,8 @@ ALTER TABLE jobs
     DROP COLUMN ccip_relay_spec_id;
 ALTER TABLE jobs
     DROP COLUMN ccip_execution_spec_id;
-ALTER TABLE jobs
-    DROP COLUMN ccip_bootstrap_spec_id;
 DROP TABLE IF EXISTS ccip_relay_specs;
 DROP TABLE IF EXISTS ccip_execution_specs;
-DROP TABLE IF EXISTS ccip_bootstrap_specs;
 DROP TABLE IF EXISTS ccip_contract_configs;
 DROP TABLE ccip_pending_transmissions;
 DROP TABLE ccip_persistent_states;

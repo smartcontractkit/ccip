@@ -980,8 +980,6 @@ func (r *Resolver) CreateJob(ctx context.Context, args struct {
 		jb, err = blockhashstore.ValidatedSpec(args.Input.TOML)
 	case job.Bootstrap:
 		jb, err = ocrbootstrap.ValidatedBootstrapSpecToml(args.Input.TOML)
-	case job.CCIPBootstrap:
-		jb, err = ccip.ValidatedCCIPBootstrapSpec(args.Input.TOML)
 	case job.CCIPRelay:
 		jb, err = ccip.ValidatedCCIPSpec(args.Input.TOML)
 	case job.CCIPExecution:

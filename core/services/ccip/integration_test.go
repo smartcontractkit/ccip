@@ -19,6 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/onsi/gomega"
 	uuid "github.com/satori/go.uuid"
+	"github.com/smartcontractkit/chainlink/core/services/ocrbootstrap"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v4"
@@ -489,19 +490,17 @@ func TestIntegration_CCIP(t *testing.T) {
 	// Add the bootstrap job
 	chainSet := appBootstrap.GetChains()
 	require.NotNil(t, chainSet)
-	ocrJob, err := ccip.ValidatedCCIPBootstrapSpec(fmt.Sprintf(`
-type               	= "ccip-bootstrap"
+	ocrJob, err := ocrbootstrap.ValidatedBootstrapSpecToml(fmt.Sprintf(`
+type               	= "bootstrap"
 relay 				= "evm"
 schemaVersion      	= 1
-evmChainID         	= "%s"
 name               	= "boot"
-contractAddress    	= "%s"
-isBootstrapPeer    	= true
+contractID    	    = "%s"
 contractConfigConfirmations = 1
 contractConfigTrackerPollInterval = "1s"
 [relayConfig]
 chainID = %s
-`, destChainID, ccipContracts.offRamp.Address(), destChainID))
+`, ccipContracts.offRamp.Address(), destChainID))
 	require.NoError(t, err)
 	err = appBootstrap.AddJobV2(context.Background(), &ocrJob)
 	require.NoError(t, err)

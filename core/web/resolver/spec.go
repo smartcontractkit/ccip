@@ -99,15 +99,6 @@ func (r *SpecResolver) ToBootstrapSpec() (*BootstrapSpecResolver, bool) {
 	return &BootstrapSpecResolver{spec: *r.j.BootstrapSpec}, true
 }
 
-// ToCCIPBootstrapSpec resolves to the CCIP Booststrap Spec Resolver
-func (r *SpecResolver) ToCCIPBootstrapSpec() (*CCIPBootstrapSpecResolver, bool) {
-	if r.j.Type != job.CCIPBootstrap {
-		return nil, false
-	}
-
-	return &CCIPBootstrapSpecResolver{spec: *r.j.CCIPBootstrapSpec}, true
-}
-
 // ToCCIPRelaySpec resolves to the CCIP Relay Spec Resolver
 func (r *SpecResolver) ToCCIPRelaySpec() (*CCIPRelaySpecResolver, bool) {
 	if r.j.Type != job.CCIPRelay {
@@ -824,99 +815,6 @@ func (r *BootstrapSpecResolver) ContractConfigConfirmations() *int32 {
 
 // CreatedAt resolves the spec's created at timestamp.
 func (r *BootstrapSpecResolver) CreatedAt() graphql.Time {
-	return graphql.Time{Time: r.spec.CreatedAt}
-}
-
-// CCIPBootstrapSpecResolver defines the CCIP Booststrap Spec Resolver
-type CCIPBootstrapSpecResolver struct {
-	spec job.CCIPBootstrapSpec
-}
-
-// ID resolves the CCIP Bootstrap spec ID
-func (r *CCIPBootstrapSpecResolver) ID() graphql.ID {
-	return graphql.ID(stringutils.FromInt32(r.spec.ID))
-}
-
-// ContractAddress resolves the spec's contract address
-func (r *CCIPBootstrapSpecResolver) ContractAddress() string {
-	return r.spec.ContractAddress.String()
-}
-
-// EVMChainID resolves the spec's coordinator address.
-func (r *CCIPBootstrapSpecResolver) EVMChainID() *string {
-	if r.spec.EVMChainID == nil {
-		return nil
-	}
-
-	id := r.spec.EVMChainID.String()
-
-	return &id
-}
-
-// MonitoringEndpoint resolves the spec's monitoring endpoint
-func (r *CCIPBootstrapSpecResolver) MonitoringEndpoint() *string {
-	return r.spec.MonitoringEndpoint
-}
-
-// P2PPeerID resolves the spec's P2P Peer ID
-func (r *CCIPBootstrapSpecResolver) P2PPeerID() *string {
-	if r.spec.P2PPeerID == nil {
-		return nil
-	}
-
-	id := r.spec.P2PPeerID.String()
-
-	return &id
-}
-
-// BlockchainTimeout resolves the spec's blockchain timeout
-func (r *CCIPBootstrapSpecResolver) BlockchainTimeout() *string {
-	if r.spec.BlockchainTimeout.Duration() == 0 {
-		return nil
-	}
-
-	interval := r.spec.BlockchainTimeout.Duration().String()
-
-	return &interval
-}
-
-// ContractConfigTrackerSubscribeInterval resolves the spec's tracker subscribe
-// interval config.
-func (r *CCIPBootstrapSpecResolver) ContractConfigTrackerSubscribeInterval() *string {
-	if r.spec.ContractConfigTrackerSubscribeInterval.Duration() == 0 {
-		return nil
-	}
-
-	interval := r.spec.ContractConfigTrackerSubscribeInterval.Duration().String()
-
-	return &interval
-}
-
-// ContractConfigTrackerPollInterval resolves the spec's contract tracker poll
-// interval config.
-func (r *CCIPBootstrapSpecResolver) ContractConfigTrackerPollInterval() *string {
-	if r.spec.ContractConfigTrackerPollInterval.Duration() == 0 {
-		return nil
-	}
-
-	interval := r.spec.ContractConfigTrackerPollInterval.Duration().String()
-
-	return &interval
-}
-
-// ContractConfigConfirmations resolves the spec's confirmations config.
-func (r *CCIPBootstrapSpecResolver) ContractConfigConfirmations() *int32 {
-	if r.spec.ContractConfigConfirmations == 0 {
-		return nil
-	}
-
-	confirmations := int32(r.spec.ContractConfigConfirmations)
-
-	return &confirmations
-}
-
-// CreatedAt resolves the spec's created at timestamp.
-func (r *CCIPBootstrapSpecResolver) CreatedAt() graphql.Time {
 	return graphql.Time{Time: r.spec.CreatedAt}
 }
 

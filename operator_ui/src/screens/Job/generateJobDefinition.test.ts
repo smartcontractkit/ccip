@@ -532,50 +532,6 @@ chainID = 1_337
     expect(output.envDefinition).toEqual('')
   })
 
-  it('generates a valid CCIPBootstrap definition', () => {
-    const job: JobPayload_Fields = {
-      id: '1',
-      type: 'ccip-bootstrap',
-      schemaVersion: 1,
-      name: 'ccip-bootstrap',
-      externalJobID: '00000000-0000-0000-0000-0000000000001',
-      maxTaskDuration: '10s',
-      spec: {
-        __typename: 'CCIPBootstrapSpec',
-        id: '',
-        contractAddress: '0x0000000000000000000000000000000000000000',
-        evmChainID: '4',
-        monitoringEndpoint: '',
-        p2pPeerID: '',
-        blockchainTimeout: '',
-        contractConfigTrackerSubscribeInterval: '',
-        contractConfigTrackerPollInterval: '60s',
-        contractConfigConfirmations: 1,
-        createdAt: '',
-      },
-      observationSource: '',
-      ...otherJobFields,
-    }
-
-    const expectedOutput = `type = "ccip-bootstrap"
-schemaVersion = 1
-name = "ccip-bootstrap"
-externalJobID = "00000000-0000-0000-0000-0000000000001"
-id = ""
-contractAddress = "0x0000000000000000000000000000000000000000"
-evmChainID = "4"
-monitoringEndpoint = ""
-p2pPeerID = ""
-blockchainTimeout = ""
-contractConfigTrackerSubscribeInterval = ""
-contractConfigTrackerPollInterval = "60s"
-contractConfigConfirmations = 1
-`
-    const output = generateJobDefinition(job)
-    expect(output.definition).toEqual(expectedOutput)
-    expect(output.envDefinition).toEqual('')
-  })
-
   it('generates a valid CCIPRelay definition', () => {
     const job: JobPayload_Fields = {
       id: '1',

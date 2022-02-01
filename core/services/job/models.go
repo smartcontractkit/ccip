@@ -18,7 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink/core/bridges"
 	clnull "github.com/smartcontractkit/chainlink/core/null"
 	"github.com/smartcontractkit/chainlink/core/services/keystore/keys/ethkey"
-	"github.com/smartcontractkit/chainlink/core/services/keystore/keys/p2pkey"
 	"github.com/smartcontractkit/chainlink/core/services/pipeline"
 	relaytypes "github.com/smartcontractkit/chainlink/core/services/relay/types"
 	"github.com/smartcontractkit/chainlink/core/services/signatures/secp256k1"
@@ -40,7 +39,6 @@ const (
 	Bootstrap          Type = "bootstrap"
 	CCIPExecution      Type = "ccip-execution"
 	CCIPRelay          Type = "ccip-relay"
-	CCIPBootstrap      Type = "ccip-bootstrap"
 )
 
 //revive:disable:redefines-builtin-id
@@ -74,7 +72,6 @@ var (
 		Webhook:            true,
 		BlockhashStore:     false,
 		Bootstrap:          false,
-		CCIPBootstrap:      false,
 		CCIPRelay:          false,
 		CCIPExecution:      false,
 	}
@@ -89,7 +86,6 @@ var (
 		Webhook:            true,
 		BlockhashStore:     false,
 		Bootstrap:          false,
-		CCIPBootstrap:      false,
 		CCIPRelay:          false,
 		CCIPExecution:      false,
 	}
@@ -104,7 +100,6 @@ var (
 		Webhook:            1,
 		BlockhashStore:     1,
 		Bootstrap:          1,
-		CCIPBootstrap:      1,
 		CCIPRelay:          1,
 		CCIPExecution:      1,
 	}
@@ -640,35 +635,4 @@ func (s *CCIPExecutionSpec) SetID(value string) error {
 	}
 	s.ID = int32(ID)
 	return nil
-}
-
-type CCIPBootstrapSpec struct {
-	ID                                     int32               `toml:"-"`
-	ContractAddress                        ethkey.EIP55Address `toml:"contractAddress"`
-	Relay                                  relaytypes.Network  `toml:"relay"`
-	RelayConfig                            RelayConfig         `toml:"relayConfig"`
-	EVMChainID                             *utils.Big          `toml:"evmChainID"`
-	MonitoringEndpoint                     *string             `toml:"monitoringEndpoint"`
-	P2PPeerID                              *p2pkey.PeerID      `toml:"p2pPeerID"`
-	BlockchainTimeout                      models.Interval     `toml:"blockchainTimeout"`
-	ContractConfigTrackerSubscribeInterval models.Interval     `toml:"contractConfigTrackerSubscribeInterval"`
-	ContractConfigTrackerPollInterval      models.Interval     `toml:"contractConfigTrackerPollInterval"`
-	ContractConfigConfirmations            uint16              `toml:"contractConfigConfirmations"`
-	CreatedAt                              time.Time           `toml:"-"`
-	UpdatedAt                              time.Time           `toml:"-"`
-}
-
-func (s CCIPBootstrapSpec) AsOCR2Spec() OffchainReporting2OracleSpec {
-	return OffchainReporting2OracleSpec{
-		ID:                                s.ID,
-		ContractID:                        s.ContractAddress.Hex(),
-		Relay:                             s.Relay,
-		RelayConfig:                       s.RelayConfig,
-		IsBootstrapPeer:                   true,
-		BlockchainTimeout:                 s.BlockchainTimeout,
-		ContractConfigTrackerPollInterval: s.ContractConfigTrackerPollInterval,
-		ContractConfigConfirmations:       s.ContractConfigConfirmations,
-		CreatedAt:                         s.CreatedAt,
-		UpdatedAt:                         s.UpdatedAt,
-	}
 }

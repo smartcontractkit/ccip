@@ -253,24 +253,6 @@ export const generateJobDefinition = (
       }
 
       break
-    case 'CCIPBootstrapSpec':
-      values = {
-        ...extractJobFields(job),
-        ...extractSpecFields(
-          job.spec,
-          'id',
-          'contractAddress',
-          'evmChainID',
-          'monitoringEndpoint',
-          'p2pPeerID',
-          'blockchainTimeout',
-          'contractConfigTrackerSubscribeInterval',
-          'contractConfigTrackerPollInterval',
-          'contractConfigConfirmations',
-        ),
-      }
-
-      break
     case 'CCIPExecutionSpec':
       values = {
         ...extractJobFields(job),
