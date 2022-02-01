@@ -166,6 +166,7 @@ ALTER TABLE jobs
                     webhook_spec_id,
                     vrf_spec_id,
                     blockhash_store_spec_id,
+                    bootstrap_spec_id,
                     ccip_relay_spec_id,
                     ccip_execution_spec_id,
                     ccip_bootstrap_spec_id) = 1
@@ -189,7 +190,8 @@ ALTER TABLE jobs
                     cron_spec_id,
                     webhook_spec_id,
                     vrf_spec_id,
-                    blockhash_store_spec_id) = 1
+                    blockhash_store_spec_id,
+                    bootstrap_spec_id) = 1
         );
 ALTER TABLE jobs
     DROP COLUMN ccip_relay_spec_id;

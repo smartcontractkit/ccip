@@ -369,10 +369,11 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 		delegates[job.CCIPBootstrap] = ccip.NewDelegateBootstrap(
 			db,
 			jobORM,
-			ccipORM,
-			chainSet,
+			chains.EVM,
 			peerWrapper,
 			globalLogger,
+			cfg,
+			relay,
 		)
 		delegates[job.CCIPRelay] = ccip.NewRelayDelegate(
 			db,
@@ -380,10 +381,11 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 			ccipORM,
 			peerWrapper,
 			monitoringEndpointGen,
-			chainSet,
+			chains.EVM,
 			globalLogger,
 			cfg,
 			keyStore.OCR2(),
+			relay,
 		)
 		delegates[job.CCIPExecution] = ccip.NewExecutionDelegate(
 			db,
@@ -391,10 +393,11 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 			ccipORM,
 			peerWrapper,
 			monitoringEndpointGen,
-			chainSet,
+			chains.EVM,
 			globalLogger,
 			cfg,
 			keyStore.OCR2(),
+			relay,
 		)
 		if cfg.FeatureCCIP() {
 			globalLogger.Debug("CCIP enabled")

@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/bridges"
 	clnull "github.com/smartcontractkit/chainlink/core/null"
 	"github.com/smartcontractkit/chainlink/core/services/keystore/keys/ethkey"
+	"github.com/smartcontractkit/chainlink/core/services/keystore/keys/p2pkey"
 	"github.com/smartcontractkit/chainlink/core/services/pipeline"
 	relaytypes "github.com/smartcontractkit/chainlink/core/services/relay/types"
 	"github.com/smartcontractkit/chainlink/core/services/signatures/secp256k1"
@@ -552,22 +553,21 @@ type CCIPRelaySpec struct {
 
 func (s CCIPRelaySpec) AsOCR2Spec() OffchainReporting2OracleSpec {
 	return OffchainReporting2OracleSpec{
-		ID:                                     s.ID,
-		ContractID:                             s.ContractID,
-		Relay:                                  s.Relay,
-		RelayConfig:                            s.RelayConfig,
-		P2PBootstrapPeers:                      s.P2PBootstrapPeers,
-		IsBootstrapPeer:                        s.IsBootstrapPeer,
-		OCRKeyBundleID:                         s.OCRKeyBundleID,
-		MonitoringEndpoint:                     s.MonitoringEndpoint,
-		TransmitterID:                          s.TransmitterID,
-		BlockchainTimeout:                      s.BlockchainTimeout,
-		ContractConfigTrackerSubscribeInterval: s.ContractConfigTrackerSubscribeInterval,
-		ContractConfigTrackerPollInterval:      s.ContractConfigTrackerPollInterval,
-		ContractConfigConfirmations:            s.ContractConfigConfirmations,
-		JuelsPerFeeCoinPipeline:                s.JuelsPerFeeCoinPipeline,
-		CreatedAt:                              s.CreatedAt,
-		UpdatedAt:                              s.UpdatedAt,
+		ID:                                s.ID,
+		ContractID:                        s.ContractID,
+		Relay:                             s.Relay,
+		RelayConfig:                       s.RelayConfig,
+		P2PBootstrapPeers:                 s.P2PBootstrapPeers,
+		IsBootstrapPeer:                   s.IsBootstrapPeer,
+		OCRKeyBundleID:                    s.OCRKeyBundleID,
+		MonitoringEndpoint:                s.MonitoringEndpoint,
+		TransmitterID:                     s.TransmitterID,
+		BlockchainTimeout:                 s.BlockchainTimeout,
+		ContractConfigTrackerPollInterval: s.ContractConfigTrackerPollInterval,
+		ContractConfigConfirmations:       s.ContractConfigConfirmations,
+		JuelsPerFeeCoinPipeline:           s.JuelsPerFeeCoinPipeline,
+		CreatedAt:                         s.CreatedAt,
+		UpdatedAt:                         s.UpdatedAt,
 	}
 }
 
@@ -611,22 +611,21 @@ type CCIPExecutionSpec struct {
 
 func (s CCIPExecutionSpec) AsOCR2Spec() OffchainReporting2OracleSpec {
 	return OffchainReporting2OracleSpec{
-		ID:                                     s.ID,
-		ContractID:                             s.ContractID,
-		Relay:                                  s.Relay,
-		RelayConfig:                            s.RelayConfig,
-		P2PBootstrapPeers:                      s.P2PBootstrapPeers,
-		IsBootstrapPeer:                        s.IsBootstrapPeer,
-		OCRKeyBundleID:                         s.OCRKeyBundleID,
-		MonitoringEndpoint:                     s.MonitoringEndpoint,
-		TransmitterID:                          s.TransmitterID,
-		BlockchainTimeout:                      s.BlockchainTimeout,
-		ContractConfigTrackerSubscribeInterval: s.ContractConfigTrackerSubscribeInterval,
-		ContractConfigTrackerPollInterval:      s.ContractConfigTrackerPollInterval,
-		ContractConfigConfirmations:            s.ContractConfigConfirmations,
-		JuelsPerFeeCoinPipeline:                s.JuelsPerFeeCoinPipeline,
-		CreatedAt:                              s.CreatedAt,
-		UpdatedAt:                              s.UpdatedAt,
+		ID:                                s.ID,
+		ContractID:                        s.ContractID,
+		Relay:                             s.Relay,
+		RelayConfig:                       s.RelayConfig,
+		P2PBootstrapPeers:                 s.P2PBootstrapPeers,
+		IsBootstrapPeer:                   s.IsBootstrapPeer,
+		OCRKeyBundleID:                    s.OCRKeyBundleID,
+		MonitoringEndpoint:                s.MonitoringEndpoint,
+		TransmitterID:                     s.TransmitterID,
+		BlockchainTimeout:                 s.BlockchainTimeout,
+		ContractConfigTrackerPollInterval: s.ContractConfigTrackerPollInterval,
+		ContractConfigConfirmations:       s.ContractConfigConfirmations,
+		JuelsPerFeeCoinPipeline:           s.JuelsPerFeeCoinPipeline,
+		CreatedAt:                         s.CreatedAt,
+		UpdatedAt:                         s.UpdatedAt,
 	}
 }
 
@@ -661,16 +660,15 @@ type CCIPBootstrapSpec struct {
 
 func (s CCIPBootstrapSpec) AsOCR2Spec() OffchainReporting2OracleSpec {
 	return OffchainReporting2OracleSpec{
-		ID:                                     s.ID,
-		ContractID:                             s.ContractAddress.Hex(),
-		Relay:                                  s.Relay,
-		RelayConfig:                            s.RelayConfig,
-		IsBootstrapPeer:                        true,
-		BlockchainTimeout:                      s.BlockchainTimeout,
-		ContractConfigTrackerSubscribeInterval: s.ContractConfigTrackerSubscribeInterval,
-		ContractConfigTrackerPollInterval:      s.ContractConfigTrackerPollInterval,
-		ContractConfigConfirmations:            s.ContractConfigConfirmations,
-		CreatedAt:                              s.CreatedAt,
-		UpdatedAt:                              s.UpdatedAt,
+		ID:                                s.ID,
+		ContractID:                        s.ContractAddress.Hex(),
+		Relay:                             s.Relay,
+		RelayConfig:                       s.RelayConfig,
+		IsBootstrapPeer:                   true,
+		BlockchainTimeout:                 s.BlockchainTimeout,
+		ContractConfigTrackerPollInterval: s.ContractConfigTrackerPollInterval,
+		ContractConfigConfirmations:       s.ContractConfigConfirmations,
+		CreatedAt:                         s.CreatedAt,
+		UpdatedAt:                         s.UpdatedAt,
 	}
 }

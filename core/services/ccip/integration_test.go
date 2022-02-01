@@ -54,7 +54,6 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/keystore/keys/ocr2key"
 	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
 	"github.com/smartcontractkit/chainlink/core/services/pg"
-	"github.com/smartcontractkit/chainlink/core/shutdown"
 	"github.com/smartcontractkit/chainlink/core/utils"
 	"github.com/smartcontractkit/libocr/commontypes"
 	ocrnetworking "github.com/smartcontractkit/libocr/networking"
@@ -379,7 +378,6 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 	if err != nil {
 		lggr.Fatal(err)
 	}
-	sig := shutdown.NewSignal()
 	terraChain, err := terra.NewChainSet(terra.ChainSetOpts{
 		Config:           cfg,
 		Logger:           lggr,
@@ -392,7 +390,6 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 	app, err := chainlink.NewApplication(chainlink.ApplicationOpts{
 		Config:           config,
 		EventBroadcaster: eventBroadcaster,
-		ShutdownSignal:   sig,
 		SqlxDB:           db,
 		KeyStore:         keyStore,
 		Chains: chainlink.Chains{
