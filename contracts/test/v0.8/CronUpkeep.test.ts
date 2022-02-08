@@ -420,7 +420,7 @@ describe('CronUpkeep', () => {
 })
 
 // only run during yarn test:gas
-describe('Cron Gas Usage', () => {
+describe('Cron Gas Usage [ @skip-coverage ]', () => {
   before(async () => {
     const accounts = await ethers.getSigners()
     admin = accounts[0]
