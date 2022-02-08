@@ -53,30 +53,43 @@ func NewORM(db *sqlx.DB, lggr logger.Logger, cfg pg.LogConfig) ORM {
 func (o *orm) Requests(sourceChainId, destChainId *big.Int, minSeqNum, maxSeqNum *big.Int, status RequestStatus, executor *common.Address, options []byte, qopts ...pg.QOpt) (reqs []*Request, err error) {
 	q := o.q.WithOpts(qopts...)
 	var b strings.Builder
+	var params []interface{}
 	b.WriteString(`SELECT * FROM ccip_requests WHERE true`)
 	if sourceChainId != nil {
-		b.WriteString(fmt.Sprintf(" AND source_chain_id = '%s'", sourceChainId.String()))
+		b.WriteString(" AND source_chain_id = ?")
+		params = append(params, sourceChainId.String())
 	}
 	if destChainId != nil {
-		b.WriteString(fmt.Sprintf(" AND dest_chain_id = '%s'", destChainId.String()))
+		b.WriteString(" AND dest_chain_id = ?")
+		params = append(params, destChainId.String())
 	}
 	if minSeqNum != nil {
-		b.WriteString(fmt.Sprintf(" AND seq_num >= CAST(%s AS NUMERIC(78,0))", minSeqNum.String()))
+		b.WriteString(" AND seq_num >= CAST(? AS NUMERIC(78,0))")
+		params = append(params, minSeqNum.String())
 	}
 	if maxSeqNum != nil {
-		b.WriteString(fmt.Sprintf(" AND seq_num <= CAST(%s AS NUMERIC(78,0))", maxSeqNum.String()))
+		b.WriteString(" AND seq_num <= CAST(? AS NUMERIC(78,0))")
+		params = append(params, maxSeqNum.String())
 	}
 	if status != "" {
-		b.WriteString(fmt.Sprintf(" AND status = '%s'", status))
+		b.WriteString(" AND status = ?")
+		params = append(params, status)
 	}
 	if executor != nil {
-		b.WriteString(fmt.Sprintf(` AND executor = '\x%v'`, executor.String()[2:]))
+		b.WriteString(` AND executor = ?`)
+		params = append(params, fmt.Sprintf(`\x%v`, executor.String()[2:]))
 	}
 	if options != nil {
-		b.WriteString(fmt.Sprintf(` AND options = '\x%v'`, hexutil.Encode(options)[2:]))
+		b.WriteString(` AND options = ?`)
+		params = append(params, fmt.Sprintf(`\x%v`, hexutil.Encode(options)[2:]))
 	}
 	b.WriteString(` ORDER BY seq_num ASC`)
-	err = q.Select(&reqs, b.String())
+	stmt := sqlx.Rebind(sqlx.DOLLAR, b.String())
+	o.lggr.Warnf(stmt)
+	o.lggr.Warnf("%v", params)
+
+	err = q.Select(&reqs, stmt, params...)
+	o.lggr.Warnf("%v", reqs)
 	return
 }
 
@@ -113,20 +126,26 @@ func (o *orm) UpdateRequestSetStatus(sourceChainId, destChainId *big.Int, seqNum
 		return nil
 	}
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf(`(CAST('%s' AS NUMERIC(78,0))`, seqNums[0].String()))
-	for _, n := range seqNums[1:] {
-		b.WriteString(fmt.Sprintf(`,CAST('%s' AS NUMERIC(78,0))`, n.String()))
-	}
-	b.WriteString(`)`)
-	sql := fmt.Sprintf(`UPDATE ccip_requests SET status = $1, updated_at = now()
-		WHERE seq_num IN %s 
-		  AND source_chain_id = $2 
-		  AND dest_chain_id = $3 
-		RETURNING seq_num`, b.String())
+	var params []interface{}
 
+	b.WriteString(`UPDATE ccip_requests SET status = ?, updated_at = now() 
+						WHERE seq_num IN`)
+	params = append(params, status)
+	b.WriteString(`(CAST(? AS NUMERIC(78,0))`)
+	params = append(params, seqNums[0].String())
+
+	for _, n := range seqNums[1:] {
+		b.WriteString(`,CAST(? AS NUMERIC(78,0))`)
+		params = append(params, n.String())
+	}
+	b.WriteString(`) AND source_chain_id = ? AND dest_chain_id = ? RETURNING seq_num`)
+	params = append(params, sourceChainId.String())
+	params = append(params, destChainId.String())
+
+	stmt := sqlx.Rebind(sqlx.DOLLAR, b.String())
 	ctx, cancel := pg.DefaultQueryCtx()
 	defer cancel()
-	res, err := q.ExecContext(ctx, sql, status, sourceChainId.String(), destChainId.String())
+	res, err := q.ExecContext(ctx, stmt, params...)
 	if err != nil {
 		return err
 	}
@@ -142,12 +161,12 @@ func (o *orm) UpdateRequestSetStatus(sourceChainId, destChainId *big.Int, seqNum
 
 func (o *orm) ResetExpiredRequests(sourceChainId, destChainId *big.Int, expiryTimeoutSeconds int, fromStatus RequestStatus, toStatus RequestStatus, qopts ...pg.QOpt) error {
 	q := o.q.WithOpts(qopts...)
-	sql := fmt.Sprintf(`UPDATE ccip_requests SET status = $1, updated_at = now()
-		WHERE now() > (updated_at + interval '%d seconds') 
-			AND source_chain_id = $2
-			AND dest_chain_id = $3
-			AND status = $4`, expiryTimeoutSeconds)
-	return q.ExecQ(sql, toStatus, sourceChainId.String(), destChainId.String(), fromStatus)
+	sql := `UPDATE ccip_requests SET status = $1, updated_at = now()
+		WHERE now() > (updated_at + $2) 
+			AND source_chain_id = $3
+			AND dest_chain_id = $4
+			AND status = $5`
+	return q.ExecQ(sql, toStatus, fmt.Sprintf("%d seconds", expiryTimeoutSeconds), sourceChainId.String(), destChainId.String(), fromStatus)
 }
 
 // Note requests will only be added in an unstarted status
