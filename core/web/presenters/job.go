@@ -431,6 +431,7 @@ func NewJobResource(j job.Job) *JobResource {
 	case job.Bootstrap:
 		resource.BootstrapSpec = NewBootstrapSpec(j.BootstrapSpec)
 	case job.CCIPRelay, job.CCIPExecution:
+		panic("TODO implement for CCIP jobs")
 		// TODO handle ccip jobs
 	}
 

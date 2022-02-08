@@ -39,7 +39,7 @@ type orm struct {
 var _ORM = (*orm)(nil)
 
 func NewORM(db *sqlx.DB, lggr logger.Logger, cfg pg.LogConfig) ORM {
-	namedLogger := lggr.Named("JobORM")
+	namedLogger := lggr.Named("CCIPORM")
 	return &orm{
 		db:   db,
 		q:    pg.NewQ(db, namedLogger, cfg),
@@ -102,9 +102,7 @@ func (o *orm) UpdateRequestStatus(sourceChainId, destChainId, minSeqNum, maxSeqN
 		  AND source_chain_id = $4 
 		  AND dest_chain_id = $5 
 		RETURNING seq_num`
-	ctx, cancel := pg.DefaultQueryCtx()
-	defer cancel()
-	res, err := q.ExecContext(ctx, sql, status, minSeqNum.String(), maxSeqNum.String(), sourceChainId.String(), destChainId.String())
+	res, err := q.Exec(sql, status, minSeqNum.String(), maxSeqNum.String(), sourceChainId.String(), destChainId.String())
 	if err != nil {
 		return err
 	}
@@ -143,9 +141,7 @@ func (o *orm) UpdateRequestSetStatus(sourceChainId, destChainId *big.Int, seqNum
 	params = append(params, destChainId.String())
 
 	stmt := sqlx.Rebind(sqlx.DOLLAR, b.String())
-	ctx, cancel := pg.DefaultQueryCtx()
-	defer cancel()
-	res, err := q.ExecContext(ctx, stmt, params...)
+	res, err := q.Exec(stmt, params...)
 	if err != nil {
 		return err
 	}

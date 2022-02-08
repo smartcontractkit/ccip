@@ -76,7 +76,7 @@ func DecodeRelayReport(report types.Report) (*single_token_offramp.CCIPRelayRepo
 	if !ok {
 		return nil, errors.New("invalid min")
 	}
-	max, ok := unpacked[1].(*big.Int)
+	max, ok := unpacked[2].(*big.Int)
 	if !ok {
 		return nil, errors.New("invalid max")
 	}
@@ -175,6 +175,7 @@ func (r RelayReportingPlugin) Report(ctx context.Context, timestamp types.Report
 	sort.Slice(nonEmptyObservations, func(i, j int) bool {
 		return nonEmptyObservations[i].MinSeqNum.ToInt().Cmp(nonEmptyObservations[j].MinSeqNum.ToInt()) < 0
 	})
+	// r.F < len(nonEmptyObservations) because of the check above and therefore this is safe
 	min := nonEmptyObservations[r.F].MinSeqNum.ToInt()
 	sort.Slice(nonEmptyObservations, func(i, j int) bool {
 		return nonEmptyObservations[i].MaxSeqNum.ToInt().Cmp(nonEmptyObservations[j].MaxSeqNum.ToInt()) < 0

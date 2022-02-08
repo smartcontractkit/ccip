@@ -66,14 +66,16 @@ func TestRelayReportEncoding(t *testing.T) {
 	require.True(t, bytes.Equal(rootLocal[:], r[:]))
 	t.Log(proof.PathForExecute(), proof.path)
 
-	out, err := EncodeRelayReport(&single_token_offramp.CCIPRelayReport{
+	report := single_token_offramp.CCIPRelayReport{
 		MerkleRoot:        r,
 		MinSequenceNumber: big.NewInt(1),
 		MaxSequenceNumber: big.NewInt(10),
-	})
+	}
+	out, err := EncodeRelayReport(&report)
 	require.NoError(t, err)
-	_, err = DecodeRelayReport(out)
+	decodedReport, err := DecodeRelayReport(out)
 	require.NoError(t, err)
+	require.Equal(t, &report, decodedReport)
 
 	tx, err := offRamp.Report(destUser, out)
 	require.NoError(t, err)

@@ -566,19 +566,6 @@ func (s CCIPRelaySpec) AsOCR2Spec() OffchainReporting2OracleSpec {
 	}
 }
 
-func (s CCIPRelaySpec) GetID() string {
-	return fmt.Sprintf("%v", s.ID)
-}
-
-func (s *CCIPRelaySpec) SetID(value string) error {
-	ID, err := strconv.ParseInt(value, 10, 32)
-	if err != nil {
-		return err
-	}
-	s.ID = int32(ID)
-	return nil
-}
-
 type CCIPExecutionSpec struct {
 	ID                                     int32              `toml:"-"`
 	ContractID                             string             `toml:"contractID"`
@@ -622,17 +609,4 @@ func (s CCIPExecutionSpec) AsOCR2Spec() OffchainReporting2OracleSpec {
 		CreatedAt:                         s.CreatedAt,
 		UpdatedAt:                         s.UpdatedAt,
 	}
-}
-
-func (s CCIPExecutionSpec) GetID() string {
-	return fmt.Sprintf("%v", s.ID)
-}
-
-func (s *CCIPExecutionSpec) SetID(value string) error {
-	ID, err := strconv.ParseInt(value, 10, 32)
-	if err != nil {
-		return err
-	}
-	s.ID = int32(ID)
-	return nil
 }
