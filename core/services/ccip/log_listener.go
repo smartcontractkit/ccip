@@ -70,9 +70,10 @@ func NewLogListener(
 		singleTokenOnRamp:         singleTokenOnRamp,
 		singleTokenOffRamp:        singleTokenOffRamp,
 		offchainConfig:            offchainConfig,
-		mbLogs:                    utils.NewMailbox(10000),
-		chStop:                    make(chan struct{}),
-		q:                         q,
+		// TODO: https://app.shortcut.com/chainlinklabs/story/30169/source-chain-event-reliability
+		mbLogs: utils.NewMailbox(10000),
+		chStop: make(chan struct{}),
+		q:      q,
 	}
 }
 
@@ -187,7 +188,6 @@ func (l *LogListener) handleReceivedLogs() {
 			return
 		}
 
-		// TODO: think about a way to do a single switch
 		var logBroadcaster log.Broadcaster
 		switch logObj.(type) {
 		case *single_token_onramp.SingleTokenOnRampCrossChainSendRequested:

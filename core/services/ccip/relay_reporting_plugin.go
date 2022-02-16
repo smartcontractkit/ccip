@@ -108,9 +108,10 @@ func (rf *RelayReportingPluginFactory) NewReportingPlugin(config types.Reporting
 		return nil, types.ReportingPluginInfo{}, err
 	}
 	return RelayReportingPlugin{rf.l, config.F, rf.orm, sourceChainId, destChainId, rf.offRamp}, types.ReportingPluginInfo{
-		Name:              "CCIPRelay",
-		UniqueReports:     true,
-		MaxQueryLen:       0,      // We do not use the query phase.
+		Name:          "CCIPRelay",
+		UniqueReports: true,
+		MaxQueryLen:   0, // We do not use the query phase.
+		// TODO: https://app.shortcut.com/chainlinklabs/story/30171/define-report-plugin-limits
 		MaxObservationLen: 100000, // TODO
 		MaxReportLen:      100000, // TODO
 	}, nil

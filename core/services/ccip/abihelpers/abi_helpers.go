@@ -14,6 +14,9 @@ func DecodeCCIPMessage(b []byte) (*single_token_offramp.CCIPMessage, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(unpacked) == 0 {
+		return nil, fmt.Errorf("no message found when unpacking")
+	}
 	// Note must use unnamed type here
 	receivedCp, ok := unpacked[0].(struct {
 		SequenceNumber     *big.Int       `json:"sequenceNumber"`

@@ -209,9 +209,10 @@ func NewExecutionReportingPluginFactory(l logger.Logger, orm ORM, source, dest *
 
 func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.ReportingPluginConfig) (types.ReportingPlugin, types.ReportingPluginInfo, error) {
 	return ExecutionReportingPlugin{rf.l, config.F, rf.orm, rf.source, rf.dest, rf.executor, rf.lastReporter}, types.ReportingPluginInfo{
-		Name:              "CCIPExecution",
-		UniqueReports:     true,
-		MaxQueryLen:       0,      // We do not use the query phase.
+		Name:          "CCIPExecution",
+		UniqueReports: true,
+		MaxQueryLen:   0, // We do not use the query phase.
+		// TODO: https://app.shortcut.com/chainlinklabs/story/30171/define-report-plugin-limits
 		MaxObservationLen: 100000, // TODO
 		MaxReportLen:      100000, // TODO
 	}, nil
