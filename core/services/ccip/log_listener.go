@@ -9,6 +9,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
+	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
+	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2/types"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm/log"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_offramp"
@@ -17,8 +19,6 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/job"
 	"github.com/smartcontractkit/chainlink/core/services/pg"
 	"github.com/smartcontractkit/chainlink/core/utils"
-	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
-	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
 
 var (
@@ -62,7 +62,7 @@ func NewLogListener(
 	q pg.Q,
 ) *LogListener {
 	return &LogListener{
-		logger:                    l,
+		logger:                    l.Named("CCIP_LogListener"),
 		sourceChainLogBroadcaster: sourceChainLogBroadcaster,
 		destChainLogBroadcaster:   destChainLogBroadcaster,
 		jobID:                     jobID,
@@ -106,7 +106,7 @@ func (l *LogListener) Start() error {
 		l.subscribeSourceChainLogBroadcaster()
 		l.subscribeDestChainLogBroadcaster()
 		l.wgShutdown.Add(1)
-		l.logger.Infow("CCIP_LogListener: Starting", "onRamp", l.singleTokenOnRamp.Address(), "offRamp", l.singleTokenOffRamp.Address())
+		l.logger.Infow("Starting", "onRamp", l.singleTokenOnRamp.Address(), "offRamp", l.singleTokenOffRamp.Address())
 		go l.run()
 
 		return nil
@@ -153,7 +153,7 @@ func (l *LogListener) Close() error {
 func (l *LogListener) HandleLog(lb log.Broadcast) {
 	wasOverCapacity := l.mbLogs.Deliver(lb)
 	if wasOverCapacity {
-		l.logger.Error("CCIP_LogListener: log mailbox is over capacity - dropped the oldest log")
+		l.logger.Error("Log mailbox is over capacity - dropped the oldest log")
 	}
 }
 
@@ -184,7 +184,7 @@ func (l *LogListener) handleReceivedLogs() {
 
 		logObj := lb.DecodedLog()
 		if logObj == nil || reflect.ValueOf(logObj).IsNil() {
-			l.logger.Error("CCIP_LogListener: HandleLog: ignoring nil value")
+			l.logger.Error("HandleLog: ignoring nil value")
 			return
 		}
 
@@ -195,12 +195,12 @@ func (l *LogListener) handleReceivedLogs() {
 		case *single_token_offramp.SingleTokenOffRampCrossChainMessageExecuted, *single_token_offramp.SingleTokenOffRampReportAccepted, *single_token_offramp.SingleTokenOffRampConfigSet:
 			logBroadcaster = l.destChainLogBroadcaster
 		default:
-			l.logger.Warnf("CCIP_LogListener: unexpected log type %T", logObj)
+			l.logger.Warnf("Unexpected log type %T", logObj)
 		}
 
 		wasConsumed, err := logBroadcaster.WasAlreadyConsumed(lb)
 		if err != nil {
-			l.logger.Errorw("CCIP_LogListener: could not determine if log was already consumed", "err", err)
+			l.logger.Errorw("Could not determine if log was already consumed", "err", err)
 			return
 		} else if wasConsumed {
 			return
@@ -215,10 +215,10 @@ func (l *LogListener) handleReceivedLogs() {
 			l.handleCrossChainReportRelayed(log, lb)
 		case *single_token_offramp.SingleTokenOffRampConfigSet:
 			if err := l.updateIncomingConfirmationsConfig(lb.RawLog()); err != nil {
-				l.logger.Errorw("could not parse config set", "err", err)
+				l.logger.Errorw("Could not parse config set", "err", err)
 			}
 		default:
-			l.logger.Warnf("CCIP_LogListener: unexpected log type %T", logObj)
+			l.logger.Warnf("Unexpected log type %T", logObj)
 		}
 	}
 }
@@ -252,23 +252,23 @@ func (l *LogListener) updateIncomingConfirmationsConfig(log types.Log) error {
 }
 
 func (l *LogListener) handleCrossChainMessageExecuted(executed *single_token_offramp.SingleTokenOffRampCrossChainMessageExecuted, lb log.Broadcast) {
-	l.logger.Infow("CCIP_LogListener: cross chain request executed",
-		"seqNum", fmt.Sprintf("%0x", executed.SequenceNumber),
+	l.logger.Infow("Cross chain request executed",
+		"seqNum", fmt.Sprintf("%d", executed.SequenceNumber.Int64()),
 		"jobID", lb.JobID(),
 	)
 	err := l.orm.UpdateRequestStatus(l.sourceChainId, l.destChainId, executed.SequenceNumber, executed.SequenceNumber, RequestStatusExecutionConfirmed)
 	if err != nil {
 		// We can replay the logs if needed
-		l.logger.Errorw("failed to save CCIP request", "err", err)
+		l.logger.Errorw("Failed to save CCIP request", "err", err)
 		return
 	}
 	if err := l.destChainLogBroadcaster.MarkConsumed(lb); err != nil {
-		l.logger.Errorw("CCIP_LogListener: failed mark consumed", "err", err)
+		l.logger.Errorw("Failed mark consumed", "err", err)
 	}
 }
 
 func (l *LogListener) handleCrossChainReportRelayed(relayed *single_token_offramp.SingleTokenOffRampReportAccepted, lb log.Broadcast) {
-	l.logger.Infow("CCIP_LogListener: cross chain report relayed",
+	l.logger.Infow("Cross chain report relayed",
 		"minSeqNum", fmt.Sprintf("%0x", relayed.Report.MinSequenceNumber),
 		"maxSeqNum", fmt.Sprintf("%0x", relayed.Report.MaxSequenceNumber),
 		"jobID", lb.JobID(),
@@ -278,7 +278,7 @@ func (l *LogListener) handleCrossChainReportRelayed(relayed *single_token_offram
 		err := l.orm.UpdateRequestStatus(l.sourceChainId, l.destChainId, relayed.Report.MinSequenceNumber, relayed.Report.MaxSequenceNumber, RequestStatusRelayConfirmed)
 		if err != nil {
 			// We can replay the logs if needed
-			l.logger.Errorw("failed to save CCIP request", "err", err)
+			l.logger.Errorw("Failed to save CCIP request", "err", err)
 			return err
 		}
 		err = l.orm.SaveRelayReport(RelayReport{
@@ -288,11 +288,11 @@ func (l *LogListener) handleCrossChainReportRelayed(relayed *single_token_offram
 		})
 		if err != nil {
 			// We can replay the logs if needed
-			l.logger.Errorw("failed to save CCIP report", "err", err)
+			l.logger.Errorw("Failed to save CCIP report", "err", err)
 			return err
 		}
 		if err := l.destChainLogBroadcaster.MarkConsumed(lb); err != nil {
-			l.logger.Errorw("CCIP_LogListener: failed mark consumed", "err", err)
+			l.logger.Errorw("Failed mark consumed", "err", err)
 		}
 		return nil
 	})
@@ -301,8 +301,8 @@ func (l *LogListener) handleCrossChainReportRelayed(relayed *single_token_offram
 // We assume a bounded Message size which is enforced on-chain,
 // TODO: add Message bounds to onramp and include assertion offchain as well.
 func (l *LogListener) handleCrossChainSendRequested(request *single_token_onramp.SingleTokenOnRampCrossChainSendRequested, lb log.Broadcast) {
-	l.logger.Infow("CCIP_LogListener: cross chain send request received",
-		"requestId", fmt.Sprintf("%0x", request.Message.SequenceNumber),
+	l.logger.Infow("Cross chain send request received",
+		"requestId", fmt.Sprintf("%d", request.Message.SequenceNumber.Int64()),
 		"sender", request.Message.Sender,
 		"receiver", request.Message.Payload.Receiver,
 		"sourceChainId", request.Message.SourceChainId,
@@ -337,12 +337,12 @@ func (l *LogListener) handleCrossChainSendRequested(request *single_token_onramp
 	})
 	if err != nil {
 		// We can replay the logs if needed
-		l.logger.Errorw("failed to save CCIP request", "err", err)
+		l.logger.Errorw("Failed to save CCIP request", "err", err)
 		return
 	}
 
 	if err := l.sourceChainLogBroadcaster.MarkConsumed(lb); err != nil {
-		l.logger.Errorw("CCIP_LogListener: failed mark consumed", "err", err)
+		l.logger.Errorw("Failed mark consumed", "err", err)
 	}
 }
 

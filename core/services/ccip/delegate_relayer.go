@@ -7,6 +7,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
+	ocr "github.com/smartcontractkit/libocr/offchainreporting2"
+	"github.com/smartcontractkit/sqlx"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/bulletprooftxmanager"
@@ -16,13 +18,12 @@ import (
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/job"
 	"github.com/smartcontractkit/chainlink/core/services/keystore"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2"
 	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
-	"github.com/smartcontractkit/chainlink/core/services/offchainreporting2"
 	"github.com/smartcontractkit/chainlink/core/services/pg"
+	"github.com/smartcontractkit/chainlink/core/services/relay"
 	"github.com/smartcontractkit/chainlink/core/services/relay/types"
 	"github.com/smartcontractkit/chainlink/core/services/telemetry"
-	ocr "github.com/smartcontractkit/libocr/offchainreporting2"
-	"github.com/smartcontractkit/sqlx"
 )
 
 var _ job.Delegate = (*RelayDelegate)(nil)
@@ -77,17 +78,23 @@ func (d RelayDelegate) JobType() job.Type {
 	return job.CCIPRelay
 }
 
-func (d RelayDelegate) ServicesForSpec(jobSpec job.Job) (services []job.Service, err error) {
-	spec := jobSpec.CCIPRelaySpec
+func (d RelayDelegate) ServicesForSpec(jb job.Job) (services []job.Service, err error) {
+	spec := jb.CCIPRelaySpec
 	if spec == nil {
-		return nil, errors.Errorf("CCIPRelay expects a *job.CCIPRelaySpec to be present, got %v", jobSpec)
+		return nil, errors.Errorf("CCIPRelay expects a *job.CCIPRelaySpec to be present, got %v", jb)
 	}
 	if !spec.TransmitterID.Valid {
 		return nil, errors.New("spec.TransmitterID not valid")
 	}
 
-	ocr2Spec := spec.AsOCR2Spec()
-	ocr2Provider, err := d.relayer.NewOCR2Provider(jobSpec.ExternalJobID, &ocr2Spec)
+	ocr2Provider, err := d.relayer.NewOCR2Provider(jb.ExternalJobID, &relay.OCR2ProviderArgs{
+		ID:              spec.ID,
+		ContractID:      spec.ContractID,
+		TransmitterID:   spec.TransmitterID,
+		Relay:           spec.Relay,
+		RelayConfig:     spec.RelayConfig,
+		IsBootstrapPeer: false,
+	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error calling 'relayer.NewOCR2Provider'")
 	}
@@ -95,22 +102,25 @@ func (d RelayDelegate) ServicesForSpec(jobSpec job.Job) (services []job.Service,
 
 	destChain, err := d.chainSet.Get(spec.DestEVMChainID.ToInt())
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to open chain")
+		return nil, errors.Wrap(err, "unable to open destination chain")
+	}
+	if !common.IsHexAddress(spec.OffRampID) {
+		return nil, errors.Wrap(err, "spec.OffRampID is not a valid hex address")
 	}
 	offRamp, err := single_token_offramp.NewSingleTokenOffRamp(common.HexToAddress(spec.OffRampID), destChain.Client())
 	if err != nil {
-		return nil, errors.Wrap(err, "could not instantiate NewOffchainAggregator")
+		return nil, errors.Wrap(err, "failed creating a new onramp")
 	}
 
-	loggerWith := d.lggr.With(
+	lggr := d.lggr.With(
 		"OCRLogger", "true",
 		"contractID", spec.ContractID,
-		"jobName", jobSpec.Name.ValueOrZero(),
-		"jobID", jobSpec.ID,
+		"jobName", jb.Name.ValueOrZero(),
+		"jobID", jb.ID,
 	)
-	loggerWith.Infof("starting job with externalJobId %s, "+
+	lggr.Infof("starting job with externalJobId %s, "+
 		"offrampContract %s, onrampContract %s",
-		jobSpec.ExternalJobID.String(),
+		jb.ExternalJobID.String(),
 		spec.OffRampID,
 		spec.OnRampID,
 	)
@@ -133,13 +143,13 @@ func (d RelayDelegate) ServicesForSpec(jobSpec job.Job) (services []job.Service,
 			spec.DestEVMChainID.ToInt(),
 			transmitterAddress,
 			destChain.Config().EvmGasLimitDefault(),
-			bulletprooftxmanager.NewQueueingTxStrategy(jobSpec.ExternalJobID, destChain.Config().OCRDefaultTransactionQueueDepth()),
+			bulletprooftxmanager.NewQueueingTxStrategy(jb.ExternalJobID, destChain.Config().OCRDefaultTransactionQueueDepth()),
 			destChain.Client()),
-		loggerWith,
+		lggr,
 	)
 
-	ocrLogger := logger.NewOCRWrapper(loggerWith, true, func(msg string) {
-		d.lggr.ErrorIf(d.jobORM.RecordError(jobSpec.ID, msg), "unable to record error")
+	ocrLogger := logger.NewOCRWrapper(lggr, true, func(msg string) {
+		d.lggr.ErrorIf(d.jobORM.RecordError(jb.ID, msg), "unable to record error")
 	})
 
 	// Fetch the specified OCR2 key bundle
@@ -147,23 +157,23 @@ func (d RelayDelegate) ServicesForSpec(jobSpec job.Job) (services []job.Service,
 	if spec.OCRKeyBundleID.Valid {
 		kbID = spec.OCRKeyBundleID.String
 	} else if kbID, err = d.cfg.OCR2KeyBundleID(); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error getting OCR2 key bundle id")
 	}
 	kb, err := d.ks.Get(kbID)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get keys from key bundle")
 	}
 
 	bootstrapPeers, err := ocrcommon.GetValidatedBootstrapPeers(spec.P2PBootstrapPeers, d.peerWrapper.Config().P2PV2Bootstrappers())
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to validate bootstrap peers")
 	}
 
-	lc := offchainreporting2.ToLocalConfig(d.cfg, ocr2Spec)
+	lc := ocr2.ToLocalConfig(d.cfg, spec.AsOCR2Spec())
 	if err = ocr.SanityCheckLocalConfig(lc); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error while checking local config")
 	}
-	loggerWith.Infow("OCR2 job using local config",
+	lggr.Infow("OCR2 job using local config",
 		"BlockchainTimeout", lc.BlockchainTimeout,
 		"ContractConfigConfirmations", lc.ContractConfigConfirmations,
 		"ContractConfigTrackerPollInterval", lc.ContractConfigTrackerPollInterval,
@@ -171,7 +181,7 @@ func (d RelayDelegate) ServicesForSpec(jobSpec job.Job) (services []job.Service,
 		"DatabaseTimeout", lc.DatabaseTimeout,
 	)
 
-	ocrdb := NewDB(d.db.DB, common.HexToAddress(spec.OffRampID), loggerWith)
+	ocrdb := NewDB(d.db.DB, common.HexToAddress(spec.OffRampID), lggr)
 	tracker := ocr2Provider.ContractConfigTracker()
 	oracle, err := ocr.NewOracle(ocr.OracleArgs{
 		BinaryNetworkEndpointFactory: d.peerWrapper.Peer2,
@@ -185,36 +195,35 @@ func (d RelayDelegate) ServicesForSpec(jobSpec job.Job) (services []job.Service,
 		OffchainConfigDigester:       ocr2Provider.OffchainConfigDigester(),
 		OffchainKeyring:              kb,
 		OnchainKeyring:               kb,
-		ReportingPluginFactory:       NewRelayReportingPluginFactory(loggerWith, d.ccipORM, offRamp),
+		ReportingPluginFactory:       NewRelayReportingPluginFactory(lggr, d.ccipORM, offRamp),
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create new oracle")
 	}
 	services = append(services, oracle)
 
 	sourceChain, err := d.chainSet.Get(spec.SourceEVMChainID.ToInt())
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to open chain")
+		return nil, errors.Wrap(err, "unable to open source chain")
 	}
 	singleTokenOnRamp, err := single_token_onramp.NewSingleTokenOnRamp(common.HexToAddress(spec.OnRampID), sourceChain.Client())
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed creating a new onramp")
 	}
 	ccipConfig, err := GetOffchainConfig(tracker)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not get the latest encoded config")
 	}
 
-	// TODO: Its conceivable we may want pull out this log listener into its own job spec so to avoid repeating
 	// All the log subscriptions
-	logListener := NewLogListener(loggerWith,
+	logListener := NewLogListener(lggr,
 		sourceChain.LogBroadcaster(),
 		destChain.LogBroadcaster(),
 		singleTokenOnRamp,
 		offRamp,
 		ccipConfig,
 		d.ccipORM,
-		jobSpec.ID,
+		jb.ID,
 		pg.NewQ(d.db, d.lggr, d.cfg))
 	services = append(services, logListener)
 	return services, nil

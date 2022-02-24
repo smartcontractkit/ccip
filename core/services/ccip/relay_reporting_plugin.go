@@ -3,20 +3,16 @@ package ccip
 import (
 	"context"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"math/big"
 	"sort"
 
-	"github.com/smartcontractkit/chainlink/core/logger"
-
 	"github.com/ethereum/go-ethereum/accounts/abi"
-
-	"github.com/smartcontractkit/chainlink/core/utils"
+	"github.com/pkg/errors"
+	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_offramp"
-
-	"github.com/smartcontractkit/libocr/offchainreporting2/types"
+	"github.com/smartcontractkit/chainlink/core/logger"
+	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
 const (
@@ -127,6 +123,7 @@ type RelayReportingPlugin struct {
 }
 
 func (r RelayReportingPlugin) Query(ctx context.Context, timestamp types.ReportTimestamp) (types.Query, error) {
+	// We don't use a query for this reporting plugin, so we can just leave it empty here
 	return types.Query{}, nil
 }
 
@@ -143,7 +140,7 @@ func (r RelayReportingPlugin) Observation(ctx context.Context, timestamp types.R
 	// Return an empty observation
 	// which should not result in a report generated.
 	if len(unstartedReqs) == 0 {
-		return nil, fmt.Errorf("no requests with seq num greater than %v", lastReport.MaxSequenceNumber)
+		return nil, errors.Errorf("no requests with seq num greater than %v", lastReport.MaxSequenceNumber)
 	}
 
 	b, err := json.Marshal(&Observation{
@@ -163,12 +160,13 @@ func (r RelayReportingPlugin) Report(ctx context.Context, timestamp types.Report
 		var ob Observation
 		err := json.Unmarshal(ao.Observation, &ob)
 		if err != nil {
-			r.l.Errorw("received unmarshallable observation", "err", err, "observation", string(ao.Observation))
+			r.l.Errorw("Received unmarshallable observation", "err", err, "observation", string(ao.Observation))
 			continue
 		}
 		nonEmptyObservations = append(nonEmptyObservations, ob)
 	}
 	if len(nonEmptyObservations) <= r.F {
+		r.l.Tracew("Non-empty observations <= F, need at least F+1 to continue")
 		return false, nil, nil
 	}
 	// We have at least F+1 valid observations
@@ -191,10 +189,10 @@ func (r RelayReportingPlugin) Report(ctx context.Context, timestamp types.Report
 	}
 	// Cannot construct a report for which we haven't seen all the messages.
 	if len(reqs) == 0 {
-		return false, nil, fmt.Errorf("do not have all the messages in report, have zero messages, report has min %v max %v", min, max)
+		return false, nil, errors.Errorf("do not have all the messages in report, have zero messages, report has min %v max %v", min, max)
 	}
 	if reqs[len(reqs)-1].SeqNum.ToInt().Cmp(max) < 0 {
-		return false, nil, fmt.Errorf("do not have all the messages in report, our max %v reports max %v", reqs[len(reqs)-1].SeqNum, max)
+		return false, nil, errors.Errorf("do not have all the messages in report, our max %v reports max %v", reqs[len(reqs)-1].SeqNum, max)
 	}
 	if r.isStale(min) {
 		return false, nil, nil
@@ -249,7 +247,7 @@ func (r RelayReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context, t
 	if err != nil {
 		return false, nil
 	}
-	// Note its ok to leave the unstarted requests behind, since the
+	// Note it's ok to leave the unstarted requests behind, since the
 	// Observe is always based on the last reports onchain min seq num.
 	if r.isStale(parsedReport.MinSequenceNumber) {
 		return false, nil
@@ -257,7 +255,7 @@ func (r RelayReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context, t
 	// Any timed out requests should be set back to RequestStatusExecutionPending so their execution can be retried in a subsequent report.
 	if err = r.orm.ResetExpiredRequests(r.sourceChainId, r.destChainId, RelayMaxInflightTimeSeconds, RequestStatusRelayPending, RequestStatusUnstarted); err != nil {
 		// Ok to continue here, we'll try to reset them again on the next round.
-		r.l.Errorw("unable to reset expired requests", "err", err)
+		r.l.Errorw("Unable to reset expired requests", "err", err)
 	}
 	// Marking new requests as pending/in-flight
 	err = r.orm.UpdateRequestStatus(r.sourceChainId, r.destChainId, parsedReport.MinSequenceNumber, parsedReport.MaxSequenceNumber, RequestStatusRelayPending)

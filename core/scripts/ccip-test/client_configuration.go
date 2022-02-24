@@ -17,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
+	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/afn_contract"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/link_token_interface"
@@ -30,7 +31,6 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/ccip"
 	"github.com/smartcontractkit/chainlink/core/services/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
-	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 )
 
 type Client struct {
@@ -118,18 +118,18 @@ func NewDestinationClient(config EvmChainConfig) DestClient {
 	}
 }
 
-type CcipClient struct {
+type CCIPClient struct {
 	Source SourceClient
 	Dest   DestClient
 }
 
-func NewCcipClient(sourceConfig EvmChainConfig, destConfig EvmChainConfig, ownerKey string, seedKey string) CcipClient {
+func NewCcipClient(sourceConfig EvmChainConfig, destConfig EvmChainConfig, ownerKey string, seedKey string) CCIPClient {
 	source := NewSourceClient(sourceConfig)
 	source.SetOwnerAndUsers(ownerKey, seedKey)
 	dest := NewDestinationClient(destConfig)
 	dest.SetOwnerAndUsers(ownerKey, seedKey)
 
-	return CcipClient{
+	return CCIPClient{
 		Source: source,
 		Dest:   dest,
 	}
@@ -208,7 +208,7 @@ func (client *Client) ApproveLink(approvedFor common.Address, amount *big.Int) {
 	client.ApproveLinkFrom(client.Owner, approvedFor, amount)
 }
 
-func (client CcipClient) SendMessage() {
+func (client CCIPClient) SendMessage() {
 	// ABI encoded message
 	bytes, _ := hex.DecodeString("00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000005626c616e6b000000000000000000000000000000000000000000000000000000")
 
@@ -227,7 +227,7 @@ func (client CcipClient) SendMessage() {
 	WaitForMined(context.Background(), client.Source.Client.Client, tx.Hash(), true)
 }
 
-func (client CcipClient) DonExecutionHappyPath() {
+func (client CCIPClient) DonExecutionHappyPath() {
 	amount := big.NewInt(100)
 	client.Source.ApproveLink(client.Source.SingleTokenSender.Address(), amount)
 	DestBlockNum := GetCurrentBlockNumber(client.Dest.Client.Client)
@@ -255,7 +255,7 @@ func (client CcipClient) DonExecutionHappyPath() {
 	}
 }
 
-func (client CcipClient) ExternalExecutionHappyPath() {
+func (client CCIPClient) ExternalExecutionHappyPath() {
 	ctx := context.Background()
 	offrampBlockNumber := GetCurrentBlockNumber(client.Dest.Client.Client)
 	onrampBlockNumber := GetCurrentBlockNumber(client.Source.Client.Client)
@@ -286,7 +286,7 @@ func (client CcipClient) ExternalExecutionHappyPath() {
 	WaitForMined(ctx, client.Dest.Client.Client, tx.Hash(), true)
 }
 
-func (client CcipClient) CrossChainSendPausedOnrampShouldFail() {
+func (client CCIPClient) CrossChainSendPausedOnrampShouldFail() {
 	client.PauseOnramp()
 	amount := big.NewInt(100)
 	client.Source.ApproveLink(client.Source.SingleTokenSender.Address(), amount)
@@ -296,7 +296,7 @@ func (client CcipClient) CrossChainSendPausedOnrampShouldFail() {
 	WaitForMined(context.Background(), client.Source.Client.Client, tx.Hash(), false)
 }
 
-func (client CcipClient) CrossChainSendPausedOfframpShouldFail() {
+func (client CCIPClient) CrossChainSendPausedOfframpShouldFail() {
 	client.PauseOfframp()
 	ctx := context.Background()
 	offrampBlockNumber := GetCurrentBlockNumber(client.Dest.Client.Client)
@@ -316,7 +316,7 @@ func (client CcipClient) CrossChainSendPausedOfframpShouldFail() {
 	}
 }
 
-func (client CcipClient) NotEnoughFundsInBucketShouldFail() {
+func (client CCIPClient) NotEnoughFundsInBucketShouldFail() {
 	amount := big.NewInt(2e18) // 2 LINK, bucket size is 1 LINK
 	client.Source.ApproveLink(client.Source.SingleTokenSender.Address(), amount)
 	client.Source.Owner.GasLimit = 1e6
@@ -325,7 +325,7 @@ func (client CcipClient) NotEnoughFundsInBucketShouldFail() {
 	WaitForMined(context.Background(), client.Source.Client.Client, tx.Hash(), false)
 }
 
-func (client CcipClient) ExternalExecutionSubmitOfframpTwiceShouldFail() {
+func (client CCIPClient) ExternalExecutionSubmitOfframpTwiceShouldFail() {
 	ctx := context.Background()
 	offrampBlockNumber := GetCurrentBlockNumber(client.Dest.Client.Client)
 	onrampBlockNumber := GetCurrentBlockNumber(client.Source.Client.Client)
@@ -364,7 +364,7 @@ func (client CcipClient) ExternalExecutionSubmitOfframpTwiceShouldFail() {
 }
 
 // ScalingAndBatching should scale so that we see batching on the nodes
-func (client CcipClient) ScalingAndBatching() {
+func (client CCIPClient) ScalingAndBatching() {
 	amount := big.NewInt(10)
 	toAddress := common.HexToAddress("0x57359120D900fab8cE74edC2c9959b21660d3887")
 
@@ -382,7 +382,7 @@ func (client CcipClient) ScalingAndBatching() {
 	fmt.Println("Sent 10 txs to onramp.")
 }
 
-func (client CcipClient) ExecuteOfframpTransaction(proof ccip.MerkleProof, encodedMessage []byte) (*types.Transaction, error) {
+func (client CCIPClient) ExecuteOfframpTransaction(proof ccip.MerkleProof, encodedMessage []byte) (*types.Transaction, error) {
 	decodedMsg, err := abihelpers.DecodeCCIPMessage(encodedMessage)
 	PanicErr(err)
 	_, err = abihelpers.MakeCCIPMsgArgs().PackValues([]interface{}{*decodedMsg})
@@ -392,7 +392,7 @@ func (client CcipClient) ExecuteOfframpTransaction(proof ccip.MerkleProof, encod
 	return tx, errors.Wrap(err, "executing offramp tx")
 }
 
-func (client CcipClient) GetCrossChainSendRequestsForRange(
+func (client CCIPClient) GetCrossChainSendRequestsForRange(
 	ctx context.Context,
 	report single_token_offramp.CCIPRelayReport,
 	onrampBlockNumber uint64) []*single_token_onramp.SingleTokenOnRampCrossChainSendRequested {
@@ -427,7 +427,7 @@ func (client CcipClient) GetCrossChainSendRequestsForRange(
 	return requests
 }
 
-func (client CcipClient) GetReportForSequenceNumber(ctx context.Context, sequenceNumber int64, minBlockNumber uint64) (single_token_offramp.CCIPRelayReport, error) {
+func (client CCIPClient) GetReportForSequenceNumber(ctx context.Context, sequenceNumber int64, minBlockNumber uint64) (single_token_offramp.CCIPRelayReport, error) {
 	report, err := client.Dest.SingleTokenOfframp.GetLastReport(&bind.CallOpts{Context: ctx, Pending: false})
 	if err != nil {
 		return single_token_offramp.CCIPRelayReport{}, err
@@ -482,7 +482,7 @@ func GetCurrentBlockNumber(chain *ethclient.Client) uint64 {
 	return blockNumber
 }
 
-func (client CcipClient) ValidateMerkleRoot(
+func (client CCIPClient) ValidateMerkleRoot(
 	request *single_token_onramp.SingleTokenOnRampCrossChainSendRequested,
 	reportRequests []*single_token_onramp.SingleTokenOnRampCrossChainSendRequested,
 	report single_token_offramp.CCIPRelayReport,
@@ -512,7 +512,7 @@ func (client CcipClient) ValidateMerkleRoot(
 	return proof
 }
 
-func (client CcipClient) TryGetTokensFromPausedPool() {
+func (client CCIPClient) TryGetTokensFromPausedPool() {
 	client.PauseOnrampPool()
 
 	paused, err := client.Source.LockUnlockPool.Paused(nil)
@@ -527,7 +527,7 @@ func (client CcipClient) TryGetTokensFromPausedPool() {
 	WaitForMined(context.Background(), client.Source.Client.Client, tx.Hash(), false)
 }
 
-func (client CcipClient) SendToOnrampWithExecution(Source SourceClient, from *bind.TransactOpts, toAddress common.Address, amount *big.Int, executor common.Address) *single_token_onramp.SingleTokenOnRampCrossChainSendRequested {
+func (client CCIPClient) SendToOnrampWithExecution(Source SourceClient, from *bind.TransactOpts, toAddress common.Address, amount *big.Int, executor common.Address) *single_token_onramp.SingleTokenOnRampCrossChainSendRequested {
 	ctx := context.Background()
 	SourceBlockNumber := GetCurrentBlockNumber(Source.Client.Client)
 
@@ -554,7 +554,7 @@ func WaitForCrossChainSendRequest(Source SourceClient, fromBlockNum uint64, txha
 	}
 }
 
-func (client CcipClient) PauseOfframpPool() {
+func (client CCIPClient) PauseOfframpPool() {
 	paused, err := client.Dest.LockUnlockPool.Paused(nil)
 	PanicErr(err)
 	if paused {
@@ -567,7 +567,7 @@ func (client CcipClient) PauseOfframpPool() {
 	WaitForMined(context.Background(), client.Dest.Client.Client, tx.Hash(), true)
 }
 
-func (client CcipClient) PauseOnrampPool() {
+func (client CCIPClient) PauseOnrampPool() {
 	paused, err := client.Source.LockUnlockPool.Paused(nil)
 	PanicErr(err)
 	if paused {
@@ -580,7 +580,7 @@ func (client CcipClient) PauseOnrampPool() {
 	WaitForMined(context.Background(), client.Source.Client.Client, tx.Hash(), true)
 }
 
-func (client CcipClient) UnpauseOfframpPool() {
+func (client CCIPClient) UnpauseOfframpPool() {
 	paused, err := client.Dest.LockUnlockPool.Paused(nil)
 	PanicErr(err)
 	if !paused {
@@ -593,7 +593,7 @@ func (client CcipClient) UnpauseOfframpPool() {
 	WaitForMined(context.Background(), client.Dest.Client.Client, tx.Hash(), true)
 }
 
-func (client CcipClient) UnpauseOnrampPool() {
+func (client CCIPClient) UnpauseOnrampPool() {
 	paused, err := client.Source.LockUnlockPool.Paused(nil)
 	PanicErr(err)
 	if !paused {
@@ -606,7 +606,7 @@ func (client CcipClient) UnpauseOnrampPool() {
 	WaitForMined(context.Background(), client.Source.Client.Client, tx.Hash(), true)
 }
 
-func (client CcipClient) PauseOnramp() {
+func (client CCIPClient) PauseOnramp() {
 	paused, err := client.Source.SingleTokenOnramp.Paused(nil)
 	PanicErr(err)
 	if paused {
@@ -619,7 +619,7 @@ func (client CcipClient) PauseOnramp() {
 	WaitForMined(context.Background(), client.Source.Client.Client, tx.Hash(), true)
 }
 
-func (client CcipClient) PauseOfframp() {
+func (client CCIPClient) PauseOfframp() {
 	paused, err := client.Dest.SingleTokenOfframp.Paused(nil)
 	PanicErr(err)
 	if paused {
@@ -632,7 +632,7 @@ func (client CcipClient) PauseOfframp() {
 	WaitForMined(context.Background(), client.Dest.Client.Client, tx.Hash(), true)
 }
 
-func (client CcipClient) UnpauseOnramp() {
+func (client CCIPClient) UnpauseOnramp() {
 	paused, err := client.Source.SingleTokenOnramp.Paused(nil)
 	PanicErr(err)
 	if !paused {
@@ -645,7 +645,7 @@ func (client CcipClient) UnpauseOnramp() {
 	WaitForMined(context.Background(), client.Source.Client.Client, tx.Hash(), true)
 }
 
-func (client CcipClient) UnpauseOfframp() {
+func (client CCIPClient) UnpauseOfframp() {
 	paused, err := client.Dest.SingleTokenOfframp.Paused(nil)
 	PanicErr(err)
 	if !paused {
@@ -658,7 +658,7 @@ func (client CcipClient) UnpauseOfframp() {
 	WaitForMined(context.Background(), client.Dest.Client.Client, tx.Hash(), true)
 }
 
-func (client CcipClient) UnpauseAll() {
+func (client CCIPClient) UnpauseAll() {
 	wg := sync.WaitGroup{}
 	wg.Add(4)
 	go func() {
@@ -680,7 +680,7 @@ func (client CcipClient) UnpauseAll() {
 	wg.Wait()
 }
 
-func (client CcipClient) SetConfig() {
+func (client CCIPClient) SetConfig() {
 	ccipConfig, err := ccip.OffchainConfig{
 		SourceIncomingConfirmations: 0,
 		DestIncomingConfirmations:   0,

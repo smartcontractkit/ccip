@@ -128,10 +128,10 @@ type Job struct {
 	BlockhashStoreSpec   *BlockhashStoreSpec
 	BootstrapSpec        *BootstrapSpec
 	BootstrapSpecID      *int32
-	CCIPRelaySpecID                *int32 `gorm:"column:ccip_relay_spec_id"`
-	CCIPRelaySpec                  *CCIPRelaySpec
-	CCIPExecutionSpecID            *int32
-	CCIPExecutionSpec              *CCIPExecutionSpec
+	CCIPRelaySpecID      *int32 `gorm:"column:ccip_relay_spec_id"`
+	CCIPRelaySpec        *CCIPRelaySpec
+	CCIPExecutionSpecID  *int32
+	CCIPExecutionSpec    *CCIPExecutionSpec
 	PipelineSpecID       int32
 	PipelineSpec         *pipeline.Spec
 	JobSpecErrors        []SpecError
@@ -526,7 +526,7 @@ type CCIPRelaySpec struct {
 	ID                                     int32              `toml:"-"`
 	ContractID                             string             `toml:"contractID"`
 	Relay                                  relaytypes.Network `toml:"relay"`
-	RelayConfig                            RelayConfig        `toml:"relayConfig"`
+	RelayConfig                            JSONConfig         `toml:"relayConfig"`
 	P2PBootstrapPeers                      pq.StringArray     `toml:"p2pBootstrapPeers"`
 	IsBootstrapPeer                        bool               `toml:"isBootstrapPeer"`
 	OCRKeyBundleID                         null.String        `toml:"ocrKeyBundleID"`
@@ -546,21 +546,19 @@ type CCIPRelaySpec struct {
 	DestEVMChainID   *utils.Big `toml:"destEvmChainID"`
 }
 
-func (s CCIPRelaySpec) AsOCR2Spec() OffchainReporting2OracleSpec {
-	return OffchainReporting2OracleSpec{
+func (s CCIPRelaySpec) AsOCR2Spec() OCR2OracleSpec {
+	return OCR2OracleSpec{
 		ID:                                s.ID,
 		ContractID:                        s.ContractID,
 		Relay:                             s.Relay,
 		RelayConfig:                       s.RelayConfig,
 		P2PBootstrapPeers:                 s.P2PBootstrapPeers,
-		IsBootstrapPeer:                   s.IsBootstrapPeer,
 		OCRKeyBundleID:                    s.OCRKeyBundleID,
 		MonitoringEndpoint:                s.MonitoringEndpoint,
 		TransmitterID:                     s.TransmitterID,
 		BlockchainTimeout:                 s.BlockchainTimeout,
 		ContractConfigTrackerPollInterval: s.ContractConfigTrackerPollInterval,
 		ContractConfigConfirmations:       s.ContractConfigConfirmations,
-		JuelsPerFeeCoinPipeline:           s.JuelsPerFeeCoinPipeline,
 		CreatedAt:                         s.CreatedAt,
 		UpdatedAt:                         s.UpdatedAt,
 	}
@@ -570,7 +568,7 @@ type CCIPExecutionSpec struct {
 	ID                                     int32              `toml:"-"`
 	ContractID                             string             `toml:"contractID"`
 	Relay                                  relaytypes.Network `toml:"relay"`
-	RelayConfig                            RelayConfig        `toml:"relayConfig"`
+	RelayConfig                            JSONConfig         `toml:"relayConfig"`
 	P2PBootstrapPeers                      pq.StringArray     `toml:"p2pBootstrapPeers"`
 	IsBootstrapPeer                        bool               `toml:"isBootstrapPeer"`
 	OCRKeyBundleID                         null.String        `toml:"ocrKeyBundleID"`
@@ -591,21 +589,19 @@ type CCIPExecutionSpec struct {
 	DestEVMChainID   *utils.Big `toml:"destEvmChainID"`
 }
 
-func (s CCIPExecutionSpec) AsOCR2Spec() OffchainReporting2OracleSpec {
-	return OffchainReporting2OracleSpec{
+func (s CCIPExecutionSpec) AsOCR2Spec() OCR2OracleSpec {
+	return OCR2OracleSpec{
 		ID:                                s.ID,
 		ContractID:                        s.ContractID,
 		Relay:                             s.Relay,
 		RelayConfig:                       s.RelayConfig,
 		P2PBootstrapPeers:                 s.P2PBootstrapPeers,
-		IsBootstrapPeer:                   s.IsBootstrapPeer,
 		OCRKeyBundleID:                    s.OCRKeyBundleID,
 		MonitoringEndpoint:                s.MonitoringEndpoint,
 		TransmitterID:                     s.TransmitterID,
 		BlockchainTimeout:                 s.BlockchainTimeout,
 		ContractConfigTrackerPollInterval: s.ContractConfigTrackerPollInterval,
 		ContractConfigConfirmations:       s.ContractConfigConfirmations,
-		JuelsPerFeeCoinPipeline:           s.JuelsPerFeeCoinPipeline,
 		CreatedAt:                         s.CreatedAt,
 		UpdatedAt:                         s.UpdatedAt,
 	}

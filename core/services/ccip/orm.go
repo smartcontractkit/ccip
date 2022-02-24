@@ -7,10 +7,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/smartcontractkit/sqlx"
 
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/pg"
-	"github.com/smartcontractkit/sqlx"
 )
 
 // ORM We intend to use the same table for all xchain requests.
@@ -85,8 +85,6 @@ func (o *orm) Requests(sourceChainId, destChainId *big.Int, minSeqNum, maxSeqNum
 	}
 	b.WriteString(` ORDER BY seq_num ASC`)
 	stmt := sqlx.Rebind(sqlx.DOLLAR, b.String())
-	o.lggr.Warnf(stmt)
-	o.lggr.Warnf("%v", params)
 
 	err = q.Select(&reqs, stmt, params...)
 	o.lggr.Warnf("%v", reqs)

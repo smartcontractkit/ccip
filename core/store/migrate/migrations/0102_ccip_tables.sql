@@ -138,8 +138,8 @@ ALTER TABLE jobs
     DROP CONSTRAINT chk_only_one_spec,
     ADD CONSTRAINT chk_only_one_spec CHECK (
             num_nonnulls(
-                    offchainreporting_oracle_spec_id,
-                    offchainreporting2_oracle_spec_id,
+                    ocr_oracle_spec_id,
+                    ocr2_oracle_spec_id,
                     direct_request_spec_id,
                     flux_monitor_spec_id,
                     keeper_spec_id,
@@ -162,8 +162,8 @@ ALTER TABLE jobs
     DROP CONSTRAINT chk_only_one_spec,
     ADD CONSTRAINT chk_only_one_spec CHECK (
             num_nonnulls(
-                    offchainreporting_oracle_spec_id,
-                    offchainreporting2_oracle_spec_id,
+                    ocr_oracle_spec_id,
+                    ocr2_oracle_spec_id,
                     direct_request_spec_id,
                     flux_monitor_spec_id,
                     keeper_spec_id,

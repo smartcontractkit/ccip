@@ -7,36 +7,36 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/afn_contract"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_offramp"
-	"github.com/smartcontractkit/chainlink/core/services/ccip/abihelpers"
-	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
-	"github.com/smartcontractkit/chainlink/core/services/pg"
-	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
-	ocrtypes2 "github.com/smartcontractkit/libocr/offchainreporting2/types"
-
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/lib/pq"
 	"github.com/onsi/gomega"
+	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
+	ocrtypes2 "github.com/smartcontractkit/libocr/offchainreporting2/types"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	eth "github.com/smartcontractkit/chainlink/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/log"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/types"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/afn_contract"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/lock_unlock_pool"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_offramp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_onramp"
 	"github.com/smartcontractkit/chainlink/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/core/logger"
+	"github.com/smartcontractkit/chainlink/core/services/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/core/services/job"
+	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
+	"github.com/smartcontractkit/chainlink/core/services/pg"
 	"github.com/smartcontractkit/chainlink/core/services/pipeline"
 	"github.com/smartcontractkit/chainlink/core/testdata/testspecs"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 type lc struct {
@@ -222,6 +222,11 @@ func TestLogListener_SavesRequests(t *testing.T) {
 	require.NoError(t, jobORM.DeleteJob(jb.ID))
 }
 
+func toOffchainPublicKey(s string) (key ocrtypes2.OffchainPublicKey) {
+	copy(key[:], hexutil.MustDecode(s)[:])
+	return
+}
+
 func updateOffchainConfig(t *testing.T, reportingPluginConfig OffchainConfig, offRamp *single_token_offramp.SingleTokenOffRamp, user *bind.TransactOpts) {
 	encoded, err := reportingPluginConfig.Encode()
 	require.NoError(t, err)
@@ -232,7 +237,7 @@ func updateOffchainConfig(t *testing.T, reportingPluginConfig OffchainConfig, of
 			OracleIdentity: confighelper2.OracleIdentity{
 				OnchainPublicKey:  common.HexToAddress("0xf4e7b2426718b11d8df7008d688d48c8926768d3").Bytes(),
 				TransmitAccount:   ocrtypes2.Account("0x016D97857a21A501a0C10b526011516000cE4586"),
-				OffchainPublicKey: hexutil.MustDecode("0x510bdd47650e70f3006b24261944d5c3685bc1b8194e5e209beea02916189952"),
+				OffchainPublicKey: toOffchainPublicKey("0x510bdd47650e70f3006b24261944d5c3685bc1b8194e5e209beea02916189952"),
 				PeerID:            "12D3KooWENNxGhdSx7wXWRXcrZ2uKrY8FEagUCntS6Jw55gXqrTX",
 			},
 			ConfigEncryptionPublicKey: stringTo32Bytes("0xb2b25ce373a833e3fa7f23538a6ace837673e4ef890db7f7e02830e8d5b6d009"),
@@ -242,7 +247,7 @@ func updateOffchainConfig(t *testing.T, reportingPluginConfig OffchainConfig, of
 			OracleIdentity: confighelper2.OracleIdentity{
 				OnchainPublicKey:  common.HexToAddress("0x33a96c0976DD8c10Cc3e9709Ed25f2CF7d7d970E").Bytes(),
 				TransmitAccount:   ocrtypes2.Account("0xcca943C692b27b47a43cB532b2354591BD8a7E9b"),
-				OffchainPublicKey: hexutil.MustDecode("0x705cec8e7df7ca42fb8465a60e68ff4e02afd90e17dfef2b01e1166c8dd0cb96"),
+				OffchainPublicKey: toOffchainPublicKey("0x705cec8e7df7ca42fb8465a60e68ff4e02afd90e17dfef2b01e1166c8dd0cb96"),
 				PeerID:            "12D3KooWJtEHwtgkC96umAg2C3Gc8oWpqqT81z6RQXEhkFZK1P21",
 			},
 			ConfigEncryptionPublicKey: stringTo32Bytes("0x0661dc7f751df3c97b1303a78d310d09d7cf32c24df5404136c6275a0385d172"),
@@ -252,7 +257,7 @@ func updateOffchainConfig(t *testing.T, reportingPluginConfig OffchainConfig, of
 			OracleIdentity: confighelper2.OracleIdentity{
 				OnchainPublicKey:  common.HexToAddress("0x19dec24A8748c117b102Bb29418F36c45E8C94f1").Bytes(),
 				TransmitAccount:   ocrtypes2.Account("0x2fD8930F52bD73Eb01C78b375E8449D6c107170c"),
-				OffchainPublicKey: hexutil.MustDecode("0xccc929da9f3185f018c357a14d427cb9c982e981e3d4e20c391cbfb13d9fbb81"),
+				OffchainPublicKey: toOffchainPublicKey("0xccc929da9f3185f018c357a14d427cb9c982e981e3d4e20c391cbfb13d9fbb81"),
 				PeerID:            "12D3KooWEC7dxiVkSRTCbFV72R4MSn2EZhDtnH7sH5mtYZifzqCW",
 			},
 			ConfigEncryptionPublicKey: stringTo32Bytes("0x3c21f181098f39d854cc77a4189b3a56b37bee7fec2386abe04e1e36b9177d15"),
@@ -262,7 +267,7 @@ func updateOffchainConfig(t *testing.T, reportingPluginConfig OffchainConfig, of
 			OracleIdentity: confighelper2.OracleIdentity{
 				OnchainPublicKey:  common.HexToAddress("0x257ca0ff00204861bbeb626d70a733ece8dc71fa").Bytes(),
 				TransmitAccount:   ocrtypes2.Account("0x338820995b4772fAafCEd3bF56824D4b7a6996De"),
-				OffchainPublicKey: hexutil.MustDecode("0x2b6fe2d95b217e93da7192bc495828bd5a7c8fc5e7deee919a21c19bc4b951c7"),
+				OffchainPublicKey: toOffchainPublicKey("0x2b6fe2d95b217e93da7192bc495828bd5a7c8fc5e7deee919a21c19bc4b951c7"),
 				PeerID:            "12D3KooWAyafDntpPKSnGeT4ybu7onfDtUAe54LNzaJGKGnfBx6c",
 			},
 			ConfigEncryptionPublicKey: stringTo32Bytes("0xd14d160383b80e13dff1130fcdaed3afd54eabbb1f1c1136d3ea6b77e802744b"),

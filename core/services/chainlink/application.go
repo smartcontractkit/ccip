@@ -367,7 +367,7 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 			relay,
 		)
 		if cfg.FeatureCCIP() {
-			globalLogger.Debug("CCIP enabled")
+			globalLogger.Info("CCIP enabled")
 			delegates[job.CCIPRelay] = ccip.NewRelayDelegate(
 				db,
 				jobORM,

@@ -19,7 +19,10 @@ import (
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/onsi/gomega"
 	uuid "github.com/satori/go.uuid"
-	"github.com/smartcontractkit/chainlink/core/services/ocrbootstrap"
+	"github.com/smartcontractkit/libocr/commontypes"
+	ocrnetworking "github.com/smartcontractkit/libocr/networking"
+	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
+	ocrtypes2 "github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v4"
@@ -27,6 +30,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/bulletprooftxmanager"
 	eth "github.com/smartcontractkit/chainlink/core/chains/evm/client"
+	evmclient "github.com/smartcontractkit/chainlink/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/headtracker"
 	httypes "github.com/smartcontractkit/chainlink/core/chains/evm/headtracker/types"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/log"
@@ -53,13 +57,10 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/keystore"
 	"github.com/smartcontractkit/chainlink/core/services/keystore/chaintype"
 	"github.com/smartcontractkit/chainlink/core/services/keystore/keys/ocr2key"
+	"github.com/smartcontractkit/chainlink/core/services/ocrbootstrap"
 	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
 	"github.com/smartcontractkit/chainlink/core/services/pg"
 	"github.com/smartcontractkit/chainlink/core/utils"
-	"github.com/smartcontractkit/libocr/commontypes"
-	ocrnetworking "github.com/smartcontractkit/libocr/networking"
-	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
-	ocrtypes2 "github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
 
 func setupChain(t *testing.T) (*backends.SimulatedBackend, *bind.TransactOpts) {
@@ -307,8 +308,8 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 	require.NoError(t, err)
 	_, err = chainORM.CreateChain(*utils.NewBig(destChainID), evmtypes.ChainCfg{})
 	require.NoError(t, err)
-	sourceClient := cltest.NewSimulatedBackendClient(t, sourceChain, sourceChainID)
-	destClient := cltest.NewSimulatedBackendClient(t, destChain, destChainID)
+	sourceClient := evmclient.NewSimulatedBackendClient(t, sourceChain, sourceChainID)
+	destClient := evmclient.NewSimulatedBackendClient(t, destChain, destChainID)
 
 	keyStore := keystore.New(db, utils.FastScryptParams, lggr, config)
 	simEthKeyStore := EthKeyStoreSim{Eth: keyStore.Eth()}
@@ -482,8 +483,9 @@ func TestIntegration_CCIP(t *testing.T) {
 	require.NoError(t, err)
 
 	setupOnchainConfig(t, ccipContracts, oracles, reportingPluginConfig)
+	ctx := context.Background()
 
-	err = appBootstrap.Start()
+	err = appBootstrap.Start(ctx)
 	require.NoError(t, err)
 	defer appBootstrap.Stop()
 
@@ -507,7 +509,7 @@ chainID = %s
 
 	// For each oracle add a relayer and job
 	for i := 0; i < 4; i++ {
-		err = apps[i].Start()
+		err = apps[i].Start(ctx)
 		require.NoError(t, err)
 		defer apps[i].Stop()
 		// Wait for peer wrapper to start

@@ -4,22 +4,18 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"math/big"
 	"sort"
 
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_offramp"
-	"github.com/smartcontractkit/chainlink/core/utils"
-
-	"github.com/smartcontractkit/chainlink/core/logger"
-
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
+
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_offramp"
+	"github.com/smartcontractkit/chainlink/core/logger"
+	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
 const (
@@ -154,7 +150,7 @@ func DecodeExecutionReport(report types.Report) ([]ExecutableMessage, error) {
 		return nil, err
 	}
 	if len(unpacked) == 0 {
-		return nil, nil
+		return nil, errors.New("assumptionViolation: expected at least one element")
 	}
 
 	// Must be anonymous struct here
@@ -177,7 +173,7 @@ func DecodeExecutionReport(report types.Report) ([]ExecutableMessage, error) {
 		Index *big.Int `json:"Index"`
 	})
 	if !ok {
-		return nil, fmt.Errorf("got %T", unpacked[0])
+		return nil, errors.Errorf("got %T", unpacked[0])
 	}
 	var ems []ExecutableMessage
 	for _, emi := range msgs {
@@ -230,6 +226,7 @@ type ExecutionReportingPlugin struct {
 }
 
 func (r ExecutionReportingPlugin) Query(ctx context.Context, timestamp types.ReportTimestamp) (types.Query, error) {
+	// We don't use a query for this reporting plugin, so we can just leave it empty here
 	return types.Query{}, nil
 }
 
@@ -245,7 +242,7 @@ func (r ExecutionReportingPlugin) Observation(ctx context.Context, timestamp typ
 	// Return an empty observation
 	// which should not result in a report generated.
 	if len(reqs) == 0 {
-		return nil, fmt.Errorf("no requests for oracle execution")
+		return nil, errors.Errorf("no requests for oracle execution")
 	}
 	// Double-check the latest sequence number onchain is >= our max relayed seq num
 	lr, err := r.lastReporter.GetLastReport(nil)
@@ -271,13 +268,14 @@ func (r ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.Re
 		var ob ExecutionObservation
 		err := json.Unmarshal(ao.Observation, &ob)
 		if err != nil {
-			r.l.Errorw("unmarshallable observation", "ao", ao.Observation, "err", err)
+			r.l.Errorw("Unmarshallable observation", "ao", ao.Observation, "err", err)
 			continue
 		}
 		nonEmptyObservations = append(nonEmptyObservations, ob)
 	}
 	// Need at least F+1 observations
 	if len(nonEmptyObservations) <= r.F {
+		r.l.Tracew("Non-empty observations <= F, need at least F+1 to continue")
 		return false, nil, nil
 	}
 	// We have at least F+1 valid observations
@@ -285,6 +283,7 @@ func (r ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.Re
 	sort.Slice(nonEmptyObservations, func(i, j int) bool {
 		return nonEmptyObservations[i].MinSeqNum.ToInt().Cmp(nonEmptyObservations[j].MinSeqNum.ToInt()) < 0
 	})
+	// r.F < len(nonEmptyObservations) because of the check above and therefore this is safe
 	min := nonEmptyObservations[r.F].MinSeqNum.ToInt()
 	sort.Slice(nonEmptyObservations, func(i, j int) bool {
 		return nonEmptyObservations[i].MaxSeqNum.ToInt().Cmp(nonEmptyObservations[j].MaxSeqNum.ToInt()) < 0
@@ -299,14 +298,14 @@ func (r ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.Re
 	}
 	// Cannot construct a report for which we haven't seen all the messages.
 	if len(reqs) == 0 {
-		return false, nil, fmt.Errorf("do not have all the messages in report, have zero messages, report has min %v max %v", min, max)
+		return false, nil, errors.Errorf("do not have all the messages in report, have zero messages, report has min %v max %v", min, max)
 	}
 	lr, err := r.lastReporter.GetLastReport(nil)
 	if err != nil {
 		return false, nil, err
 	}
 	if reqs[len(reqs)-1].SeqNum.ToInt().Cmp(lr.MaxSequenceNumber) > 0 {
-		return false, nil, fmt.Errorf("invariant violated, mismatch between relay_confirmed requests (max %v) and last report (max %v)", reqs[len(reqs)-1].SeqNum, lr.MaxSequenceNumber)
+		return false, nil, errors.Errorf("invariant violated, mismatch between relay_confirmed requests (max %v) and last report (max %v)", reqs[len(reqs)-1].SeqNum, lr.MaxSequenceNumber)
 	}
 	report, err := r.buildReport(reqs)
 	if err != nil {
@@ -328,7 +327,7 @@ func (r ExecutionReportingPlugin) buildReport(reqs []*Request) ([]byte, error) {
 		// as this one (even externally executed ones), generate a Proof and double-check the root checks out.
 		rep, err2 := r.orm.RelayReport(req.SeqNum.ToInt())
 		if err2 != nil {
-			r.l.Errorw("could not find relay report for request", "err", err2, "seq num", req.SeqNum.String())
+			r.l.Errorw("Could not find relay report for request", "err", err2, "seq num", req.SeqNum.String())
 			continue
 		}
 		allReqsInReport, err3 := r.orm.Requests(r.sourceChainId, r.destChainId, rep.MinSeqNum.ToInt(), rep.MaxSeqNum.ToInt(), "", nil, nil)
@@ -375,7 +374,7 @@ func (r ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Contex
 	// Any timed out requests should be set back to RequestStatusExecutionPending so their execution can be retried in a subsequent report.
 	if err = r.orm.ResetExpiredRequests(r.sourceChainId, r.destChainId, ExecutionMaxInflightTimeSeconds, RequestStatusExecutionPending, RequestStatusRelayConfirmed); err != nil {
 		// Ok to continue here, we'll try to reset them again on the next round.
-		r.l.Errorw("unable to reset expired requests", "err", err)
+		r.l.Errorw("Unable to reset expired requests", "err", err)
 	}
 	if err := r.orm.UpdateRequestSetStatus(r.sourceChainId, r.destChainId, ExecutableMessages(ems).SeqNums(), RequestStatusExecutionPending); err != nil {
 		return false, err

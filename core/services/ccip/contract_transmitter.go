@@ -7,11 +7,13 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum"
-
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
+	"github.com/smartcontractkit/libocr/offchainreporting2/chains/evmutil"
+	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2/types"
+	"github.com/smartcontractkit/sqlx"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm/bulletprooftxmanager"
 	eth "github.com/smartcontractkit/chainlink/core/chains/evm/client"
@@ -19,9 +21,6 @@ import (
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_offramp"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/pg"
-	"github.com/smartcontractkit/libocr/offchainreporting2/chains/evmutil"
-	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2/types"
-	"github.com/smartcontractkit/sqlx"
 )
 
 var (
@@ -154,7 +153,7 @@ func (oc *OfframpTransmitter) LatestConfigDigestAndEpoch(ctx context.Context) (c
 	}
 	defer it.Close()
 	for it.Next() {
-		fmt.Println("LatestConfigDigestAndEpoch:", it.Event)
+		oc.lggr.Infow(fmt.Sprintf("LatestConfigDigestAndEpoch: %+v", it.Event))
 		configDigest = it.Event.ConfigDigest
 		epoch = it.Event.Epoch
 	}

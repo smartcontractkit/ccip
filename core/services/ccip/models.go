@@ -74,11 +74,11 @@ type RequestStatus string
 const (
 	RequestStatusUnstarted    RequestStatus = "unstarted"
 	RequestStatusRelayPending RequestStatus = "relay_pending"
-	// We only mark relay confirmed after we've seen the report accepted log with sufficient
+	// RequestStatusRelayConfirmed is used after we've seen the report accepted log with sufficient
 	// number of confirmations
 	RequestStatusRelayConfirmed   RequestStatus = "relay_confirmed"
 	RequestStatusExecutionPending RequestStatus = "execution_pending"
-	// We only mark execution confirmed after we've seen the Message executed log with sufficient
+	// RequestStatusExecutionConfirmed is used after we've seen the Message executed log with sufficient
 	// number of confirmations
 	RequestStatusExecutionConfirmed RequestStatus = "execution_confirmed"
 )
