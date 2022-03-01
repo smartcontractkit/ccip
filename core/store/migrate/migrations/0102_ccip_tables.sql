@@ -19,6 +19,12 @@ CREATE TABLE ccip_requests
     updated_at      timestamptz    NOT NULL
 );
 
+CREATE INDEX IF NOT EXISTS idx_ccip_requests_seq ON ccip_requests USING brin (seq_num);
+CREATE INDEX IF NOT EXISTS idx_ccip_requests_source ON ccip_requests USING brin (source_chain_id);
+CREATE INDEX IF NOT EXISTS idx_ccip_requests_dest ON ccip_requests USING brin (dest_chain_id);
+CREATE INDEX IF NOT EXISTS idx_ccip_requests_status ON ccip_requests USING brin (status);
+CREATE INDEX IF NOT EXISTS idx_ccip_requests_updated ON ccip_requests USING brin (updated_at);
+
 CREATE TABLE ccip_relay_reports
 (
     root        bytea PRIMARY KEY,
@@ -151,6 +157,10 @@ ALTER TABLE jobs
                     ccip_relay_spec_id,
                     ccip_execution_spec_id) = 1
         );
+
+CREATE INDEX IF NOT EXISTS idx_ccip_relay_min_seq ON ccip_relay_reports USING brin (min_seq_num);
+CREATE INDEX IF NOT EXISTS idx_ccip_relay_max_seq ON ccip_relay_reports USING brin (max_seq_num);
+
 -- +goose StatementEnd
 
 -- +goose Down
