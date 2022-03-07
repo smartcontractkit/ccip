@@ -213,7 +213,7 @@ func (t *relayTransmitter) CreateEthTransaction(ctx context.Context, toAddress g
 		Data:      payload,
 	})
 	if err != nil {
-		return errors.Wrap(err, "failed to estimating gas cost for ccip execute transaction")
+		return errors.Wrap(err, "failed to estimating gas cost for ccip relay transaction")
 	}
 	if gasEstimate > t.gasLimit {
 		return errors.Wrap(err, fmt.Sprintf("gas estimate of %d exceeds gas limit set by node %d", gasEstimate, t.gasLimit))

@@ -300,10 +300,11 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 	config.Overrides.Dev = null.BoolFrom(true)
 
 	var lggr = logger.TestLogger(t)
+	cfg := cltest.NewTestGeneralConfig(t)
 	eventBroadcaster := pg.NewEventBroadcaster(config.DatabaseURL(), 0, 0, lggr, uuid.NewV1())
 
 	// We fake different chainIDs using the wrapped sim cltest.SimulatedBackend
-	chainORM := evm.NewORM(db)
+	chainORM := evm.NewORM(db, lggr, cfg)
 	_, err := chainORM.CreateChain(*utils.NewBig(sourceChainID), evmtypes.ChainCfg{})
 	require.NoError(t, err)
 	_, err = chainORM.CreateChain(*utils.NewBig(destChainID), evmtypes.ChainCfg{})
@@ -313,7 +314,7 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 
 	keyStore := keystore.New(db, utils.FastScryptParams, lggr, config)
 	simEthKeyStore := EthKeyStoreSim{Eth: keyStore.Eth()}
-	cfg := cltest.NewTestGeneralConfig(t)
+
 	evmCfg := evmtest.NewChainScopedConfig(t, cfg)
 	checkerFactory := &testCheckerFactory{}
 

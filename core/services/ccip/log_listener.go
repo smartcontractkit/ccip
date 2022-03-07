@@ -1,6 +1,7 @@
 package ccip
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 	"reflect"
@@ -22,8 +23,8 @@ import (
 )
 
 var (
-	_ log.Listener = &LogListener{}
-	_ job.Service  = &LogListener{}
+	_ log.Listener   = &LogListener{}
+	_ job.ServiceCtx = &LogListener{}
 )
 
 type LogListener struct {
@@ -91,7 +92,7 @@ type ConfigSet struct {
 }
 
 // Start complies with job.Service
-func (l *LogListener) Start() error {
+func (l *LogListener) Start(ctx context.Context) error {
 	return l.StartOnce("CCIP_LogListener", func() error {
 		sourceChainId, err := l.singleTokenOnRamp.CHAINID(nil)
 		if err != nil {

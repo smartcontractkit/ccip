@@ -18,7 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/job"
 	"github.com/smartcontractkit/chainlink/core/services/keystore"
-	"github.com/smartcontractkit/chainlink/core/services/ocr2"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/validate"
 	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
 	"github.com/smartcontractkit/chainlink/core/services/pg"
 	"github.com/smartcontractkit/chainlink/core/services/relay"
@@ -45,7 +45,7 @@ type RelayDelegate struct {
 	lggr                  logger.Logger
 	ks                    keystore.OCR2
 	ccipORM               ORM
-	relayer               types.Relayer
+	relayer               types.RelayerCtx
 }
 
 func NewRelayDelegate(
@@ -58,7 +58,7 @@ func NewRelayDelegate(
 	lggr logger.Logger,
 	cfg Config,
 	ks keystore.OCR2,
-	relayer types.Relayer,
+	relayer types.RelayerCtx,
 ) *RelayDelegate {
 	return &RelayDelegate{
 		db:                    db,
@@ -78,7 +78,7 @@ func (d RelayDelegate) JobType() job.Type {
 	return job.CCIPRelay
 }
 
-func (d RelayDelegate) ServicesForSpec(jb job.Job) (services []job.Service, err error) {
+func (d RelayDelegate) ServicesForSpec(jb job.Job) (services []job.ServiceCtx, err error) {
 	spec := jb.CCIPRelaySpec
 	if spec == nil {
 		return nil, errors.Errorf("CCIPRelay expects a *job.CCIPRelaySpec to be present, got %v", jb)
@@ -169,7 +169,7 @@ func (d RelayDelegate) ServicesForSpec(jb job.Job) (services []job.Service, err 
 		return nil, errors.Wrap(err, "failed to validate bootstrap peers")
 	}
 
-	lc := ocr2.ToLocalConfig(d.cfg, spec.AsOCR2Spec())
+	lc := validate.ToLocalConfig(d.cfg, spec.AsOCR2Spec())
 	if err = ocr.SanityCheckLocalConfig(lc); err != nil {
 		return nil, errors.Wrap(err, "error while checking local config")
 	}
@@ -200,7 +200,7 @@ func (d RelayDelegate) ServicesForSpec(jb job.Job) (services []job.Service, err 
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create new oracle")
 	}
-	services = append(services, oracle)
+	services = append(services, job.NewServiceAdapter(oracle))
 
 	sourceChain, err := d.chainSet.Get(spec.SourceEVMChainID.ToInt())
 	if err != nil {

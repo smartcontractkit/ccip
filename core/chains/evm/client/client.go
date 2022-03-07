@@ -6,19 +6,19 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
-	"github.com/smartcontractkit/chainlink/core/assets"
-	evmtypes "github.com/smartcontractkit/chainlink/core/chains/evm/types"
-	"github.com/smartcontractkit/chainlink/core/logger"
-	"github.com/smartcontractkit/chainlink/core/null"
-	"github.com/smartcontractkit/chainlink/core/utils"
-
-	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
+
+	"github.com/smartcontractkit/chainlink/core/assets"
+	evmtypes "github.com/smartcontractkit/chainlink/core/chains/evm/types"
+	"github.com/smartcontractkit/chainlink/core/logger"
+	"github.com/smartcontractkit/chainlink/core/null"
+	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
 const queryTimeout = 10 * time.Second
@@ -321,6 +321,10 @@ func (client *client) SuggestGasTipCap(ctx context.Context) (tipCap *big.Int, er
 type simClient struct {
 	*backends.SimulatedBackend
 	chainID *big.Int
+}
+
+func (s *simClient) NodeStates() map[int32]string {
+	panic("implement me")
 }
 
 func (s *simClient) Close() {

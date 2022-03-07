@@ -125,7 +125,8 @@ func TestLogListener_SavesRequests(t *testing.T) {
 	require.NoError(t, err)
 	t.Log(r)
 	lb := log.NewBroadcaster(lorm, ethClient, lc{}, lggr, nil)
-	require.NoError(t, lb.Start())
+	ctx := context.Background()
+	require.NoError(t, lb.Start(ctx))
 	jobORM := job.NewORM(db, nil, pipeline.NewORM(db, lggr, cfg), nil, lggr, cfg)
 	ccipORM := NewORM(db, lggr, cfg)
 	ccipSpec, err := ValidatedCCIPSpec(testspecs.GenerateCCIPSpec(testspecs.CCIPSpecParams{}).Toml())
@@ -140,7 +141,7 @@ func TestLogListener_SavesRequests(t *testing.T) {
 	q := pg.NewQ(db, lggr, cfg)
 	logListener := NewLogListener(lggr, lb, lb, onRamp, offRamp, ccipConfig, ccipORM, jb.ID, q)
 	t.Log("Ramp address", onRampAddress, onRamp.Address())
-	require.NoError(t, logListener.Start())
+	require.NoError(t, logListener.Start(ctx))
 
 	// Update the ccip config on chain and assert that the log listener uses the new config values
 	newCcipConfig := OffchainConfig{
@@ -302,8 +303,8 @@ func updateOffchainConfig(t *testing.T, reportingPluginConfig OffchainConfig, of
 	require.NoError(t, err)
 }
 
-func stringTo32Bytes(s string) [32]byte {
-	var b [32]byte
+func stringTo32Bytes(s string) ocrtypes2.ConfigEncryptionPublicKey {
+	var b ocrtypes2.ConfigEncryptionPublicKey
 	copy(b[:], hexutil.MustDecode(s))
 	return b
 }

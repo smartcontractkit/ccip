@@ -62,7 +62,6 @@ require (
 	github.com/smartcontractkit/wsrpc v0.3.9
 	github.com/spf13/cobra v1.3.0
 	github.com/spf13/viper v1.10.1
-	github.com/status-im/keycard-go v0.0.0-20190424133014-d95853db0f48
 	github.com/stretchr/testify v1.7.0
 	github.com/tendermint/tendermint v0.34.15
 	github.com/terra-money/core v0.5.14
