@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.6;
+pragma solidity 0.8.12;
 
 import "../../vendor/Pausable.sol";
 import "../interfaces/AFNInterface.sol";

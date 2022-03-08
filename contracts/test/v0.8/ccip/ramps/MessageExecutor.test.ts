@@ -5,18 +5,18 @@ import { MockOffRamp, MessageExecutorHelper } from '../../../../typechain'
 import { Artifact } from 'hardhat/types'
 import { CCIPMessage, messageDeepEqual } from '../../../test-helpers/ccip'
 import { BigNumber } from '@ethersproject/bignumber'
-import { numToBytes32 } from '../../../test-helpers/helpers'
+import { numToBytes32, publicAbi } from '../../../test-helpers/helpers'
 
 interface ExecutableMessage {
-  proof: string[]
-  message: CCIPMessage
+  path: string[]
   index: BigNumber
+  message: CCIPMessage
 }
 
 function encodeExecutableMessages(messages: ExecutableMessage[]): string {
   return ethers.utils.defaultAbiCoder.encode(
     [
-      'tuple(bytes32[] proof, tuple(uint256 sequenceNumber, uint256 sourceChainId, uint256 destinationChainId, address sender, tuple(address receiver, bytes data, address[] tokens, uint256[] amounts, address executor, bytes options) payload) message, uint256 index)[] report',
+      'tuple(bytes32[] path, uint256 index, tuple(uint256 sequenceNumber, uint256 sourceChainId, address sender, tuple(address[] tokens, uint256[] amounts, uint256 destinationChainId, address receiver, address executor, bytes data, bytes options) payload) message)[] report',
     ],
     [messages],
   )
@@ -52,6 +52,27 @@ describe('MessageExecutor', () => {
     )
   })
 
+  it('has a limited public interface [ @skip-coverage ]', async () => {
+    publicAbi(executor, [
+      's_offRamp',
+      // MessageExecutorHelper
+      'report',
+      // OCR2Abstract
+      'setConfig',
+      'latestConfigDetails',
+      'latestConfigDigestAndEpoch',
+      'transmit',
+      // OCR2Base
+      'transmitters',
+      // Ownership
+      'owner',
+      'transferOwnership',
+      'acceptOwnership',
+      // TypeAndVersionInterface
+      'typeAndVersion',
+    ])
+  })
+
   it('deploys correctly', async () => {
     expect(await executor.s_offRamp()).to.equal(ramp.address)
   })
@@ -60,9 +81,9 @@ describe('MessageExecutor', () => {
     const message1: CCIPMessage = {
       sequenceNumber: BigNumber.from(1),
       sourceChainId: BigNumber.from(1),
-      destinationChainId: BigNumber.from(2),
       sender: await roles.oracleNode1.getAddress(),
       payload: {
+        destinationChainId: BigNumber.from(2),
         receiver: await roles.oracleNode2.getAddress(),
         data: numToBytes32(3),
         tokens: [],
@@ -74,9 +95,9 @@ describe('MessageExecutor', () => {
     const message2: CCIPMessage = {
       sequenceNumber: BigNumber.from(2),
       sourceChainId: BigNumber.from(1),
-      destinationChainId: BigNumber.from(2),
       sender: await roles.oracleNode3.getAddress(),
       payload: {
+        destinationChainId: BigNumber.from(2),
         receiver: await roles.oracleNode4.getAddress(),
         data: numToBytes32(7),
         tokens: [],
@@ -85,20 +106,20 @@ describe('MessageExecutor', () => {
         options: numToBytes32(8),
       },
     }
-    const proof1 = [numToBytes32(9)]
-    const proof2 = [numToBytes32(10)]
+    const path1 = [numToBytes32(9)]
+    const path2 = [numToBytes32(10)]
     const index1 = BigNumber.from(0)
     const index2 = BigNumber.from(1)
 
     const em1: ExecutableMessage = {
-      proof: proof1,
-      message: message1,
+      path: path1,
       index: index1,
+      message: message1,
     }
     const em2: ExecutableMessage = {
-      proof: proof2,
-      message: message2,
+      path: path2,
       index: index2,
+      message: message2,
     }
     const tx = await executor
       .connect(roles.defaultAccount)
@@ -107,11 +128,11 @@ describe('MessageExecutor', () => {
     const event1 = ramp.interface.parseLog(receipt.logs[0])
     const event2 = ramp.interface.parseLog(receipt.logs[1])
 
-    expect(event1.args.proof).to.deep.equal(proof1)
+    expect(event1.args.path).to.deep.equal(path1)
     expect(event1.args.index).to.equal(index1)
     messageDeepEqual(event1.args.message, message1)
 
-    expect(event2.args.proof).to.deep.equal(proof2)
+    expect(event2.args.path).to.deep.equal(path2)
     expect(event2.args.index).to.equal(index2)
     messageDeepEqual(event2.args.message, message2)
   })

@@ -46,41 +46,27 @@ func (r Request) ToMessage() Message {
 		amounts = append(amounts, mustStringToBigInt(a))
 	}
 	return Message{
-		SequenceNumber:     r.SeqNum.ToInt(),
-		SourceChainId:      mustStringToBigInt(r.SourceChainID),
-		DestinationChainId: mustStringToBigInt(r.DestChainID),
-		Sender:             r.Sender,
+		SequenceNumber: r.SeqNum.ToInt(),
+		SourceChainId:  mustStringToBigInt(r.SourceChainID),
+		Sender:         r.Sender,
 		Payload: struct {
-			Receiver common.Address   `json:"receiver"`
-			Data     []uint8          `json:"data"`
-			Tokens   []common.Address `json:"tokens"`
-			Amounts  []*big.Int       `json:"amounts"`
-			Executor common.Address   `json:"executor"`
-			Options  []uint8          `json:"options"`
+			Tokens             []common.Address `json:"tokens"`
+			Amounts            []*big.Int       `json:"amounts"`
+			DestinationChainId *big.Int         `json:"destinationChainId"`
+			Receiver           common.Address   `json:"receiver"`
+			Executor           common.Address   `json:"executor"`
+			Data               []uint8          `json:"data"`
+			Options            []uint8          `json:"options"`
 		}{
-			Receiver: r.Receiver,
-			Data:     r.Data,
-			Tokens:   tokens,
-			Amounts:  amounts,
-			Executor: r.Executor,
-			Options:  r.Options,
+			Tokens:             tokens,
+			Amounts:            amounts,
+			DestinationChainId: mustStringToBigInt(r.DestChainID),
+			Receiver:           r.Receiver,
+			Executor:           r.Executor,
+			Data:               r.Data,
+			Options:            r.Options,
 		},
 	}
-}
-
-type Message struct {
-	SequenceNumber     *big.Int       `json:"sequenceNumber"`
-	SourceChainId      *big.Int       `json:"sourceChainId"`
-	DestinationChainId *big.Int       `json:"destinationChainId"`
-	Sender             common.Address `json:"sender"`
-	Payload            struct {
-		Receiver common.Address   `json:"receiver"`
-		Data     []uint8          `json:"data"`
-		Tokens   []common.Address `json:"tokens"`
-		Amounts  []*big.Int       `json:"amounts"`
-		Executor common.Address   `json:"executor"`
-		Options  []uint8          `json:"options"`
-	} `json:"payload"`
 }
 
 type RequestStatus string

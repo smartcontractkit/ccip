@@ -84,16 +84,6 @@ describe('ArbitrumSequencerUptimeFeed', () => {
     )
   })
 
-  describe('constants', () => {
-    it('should have the correct value for FLAG_L2_SEQ_OFFLINE', async () => {
-      const flag: string =
-        await arbitrumSequencerUptimeFeed.FLAG_L2_SEQ_OFFLINE()
-      expect(flag.toLowerCase()).to.equal(
-        '0xa438451d6458044c3c8cd2f6f31c91ac882a6d91',
-      )
-    })
-  })
-
   describe('#updateStatus', () => {
     it(`should update status when status has changed and incoming timestamp is newer than the latest`, async () => {
       let timestamp = await arbitrumSequencerUptimeFeed.latestTimestamp()
@@ -300,7 +290,7 @@ describe('ArbitrumSequencerUptimeFeed', () => {
       const updateTx = await _updateTx.wait(1)
       // Assert update
       expect(await arbitrumSequencerUptimeFeed.latestAnswer()).to.equal(1)
-      expect(updateTx.cumulativeGasUsed).to.equal(93137)
+      expect(updateTx.cumulativeGasUsed).to.equal(93009)
     })
 
     describe('Aggregator interface', () => {

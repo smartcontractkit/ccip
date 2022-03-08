@@ -10,12 +10,16 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_offramp"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
 const RelayMaxInflightTimeSeconds = 180
+
+// NoRequestsToProcess indicates an empty observation. We use -1 as any value below zero would
+// indicate a failure and therefore this number range is safe to use.
+var NoRequestsToProcess = big.NewInt(-1)
 
 var _ types.ReportingPluginFactory = &RelayReportingPluginFactory{}
 var _ types.ReportingPlugin = &RelayReportingPlugin{}
@@ -46,7 +50,8 @@ func makeRelayReportArgs() abi.Arguments {
 	}
 }
 
-func EncodeRelayReport(relayReport *single_token_offramp.CCIPRelayReport) (types.Report, error) {
+// EncodeRelayReport abi encodes an offramp.CCIPRelayReport.
+func EncodeRelayReport(relayReport *offramp.CCIPRelayReport) (types.Report, error) {
 	report, err := makeRelayReportArgs().PackValues([]interface{}{relayReport.MerkleRoot, relayReport.MinSequenceNumber, relayReport.MaxSequenceNumber})
 	if err != nil {
 		return nil, err
@@ -54,7 +59,8 @@ func EncodeRelayReport(relayReport *single_token_offramp.CCIPRelayReport) (types
 	return report, nil
 }
 
-func DecodeRelayReport(report types.Report) (*single_token_offramp.CCIPRelayReport, error) {
+// DecodeRelayReport abi decodes a types.Report to an offramp.CCIPRelayReport
+func DecodeRelayReport(report types.Report) (*offramp.CCIPRelayReport, error) {
 	unpacked, err := makeRelayReportArgs().Unpack(report)
 	if err != nil {
 		return nil, err
@@ -74,7 +80,7 @@ func DecodeRelayReport(report types.Report) (*single_token_offramp.CCIPRelayRepo
 	if !ok {
 		return nil, errors.New("invalid max")
 	}
-	return &single_token_offramp.CCIPRelayReport{
+	return &offramp.CCIPRelayReport{
 		MerkleRoot:        root,
 		MinSequenceNumber: min,
 		MaxSequenceNumber: max,
@@ -84,21 +90,24 @@ func DecodeRelayReport(report types.Report) (*single_token_offramp.CCIPRelayRepo
 type RelayReportingPluginFactory struct {
 	l       logger.Logger
 	orm     ORM
-	offRamp *single_token_offramp.SingleTokenOffRamp
+	offRamp *offramp.OffRamp
 }
 
-func NewRelayReportingPluginFactory(l logger.Logger, orm ORM, offRamp *single_token_offramp.SingleTokenOffRamp) types.ReportingPluginFactory {
+// NewRelayReportingPluginFactory return a new RelayReportingPluginFactory.
+func NewRelayReportingPluginFactory(l logger.Logger, orm ORM, offRamp *offramp.OffRamp) types.ReportingPluginFactory {
 	return &RelayReportingPluginFactory{l: l, orm: orm, offRamp: offRamp}
 }
 
+// NewReportingPlugin returns the ccip RelayReportingPlugin and satisfies the ReportingPluginFactory interface.
+// This function can error if the onRamp or offRamp chainIDs are not properly set.
 func (rf *RelayReportingPluginFactory) NewReportingPlugin(config types.ReportingPluginConfig) (types.ReportingPlugin, types.ReportingPluginInfo, error) {
 	destChainId, err := rf.offRamp.CHAINID(nil)
 	if err != nil {
-		return nil, types.ReportingPluginInfo{}, err
+		return nil, types.ReportingPluginInfo{}, errors.WithStack(err)
 	}
 	sourceChainId, err := rf.offRamp.SOURCECHAINID(nil)
 	if err != nil {
-		return nil, types.ReportingPluginInfo{}, err
+		return nil, types.ReportingPluginInfo{}, errors.WithStack(err)
 	}
 	return RelayReportingPlugin{rf.l, config.F, rf.orm, sourceChainId, destChainId, rf.offRamp}, types.ReportingPluginInfo{
 		Name:          "CCIPRelay",
@@ -116,7 +125,7 @@ type RelayReportingPlugin struct {
 	orm           ORM
 	sourceChainId *big.Int
 	destChainId   *big.Int
-	offRamp       *single_token_offramp.SingleTokenOffRamp
+	offRamp       *offramp.OffRamp
 }
 
 func (r RelayReportingPlugin) Query(ctx context.Context, timestamp types.ReportTimestamp) (types.Query, error) {
@@ -133,10 +142,17 @@ func (r RelayReportingPlugin) Observation(ctx context.Context, timestamp types.R
 	if err != nil {
 		return nil, err
 	}
-	// No request to process
-	// Return an empty observation which should not result in a report generated.
+	// No request to process. Return an observation with MinSeqNum and MaxSeqNum equal to NoRequestsToProcess
+	// which should not result in a new report being generated during the Report step.
 	if len(unstartedReqs) == 0 {
-		return nil, errors.Errorf("no requests with seq num greater than %v", lastReport.MaxSequenceNumber)
+		b, jsonErr := json.Marshal(&ExecutionObservation{
+			MinSeqNum: utils.Big(*NoRequestsToProcess),
+			MaxSeqNum: utils.Big(*NoRequestsToProcess),
+		})
+		if jsonErr != nil {
+			return nil, jsonErr
+		}
+		return b, nil
 	}
 
 	b, err := json.Marshal(&Observation{
@@ -159,6 +175,15 @@ func (r RelayReportingPlugin) Report(ctx context.Context, timestamp types.Report
 			r.l.Errorw("Received unmarshallable observation", "err", err, "observation", string(ao.Observation))
 			continue
 		}
+		minSeqNum := ob.MinSeqNum.ToInt()
+		if minSeqNum.Sign() < 0 {
+			if minSeqNum.Cmp(NoRequestsToProcess) == 0 {
+				r.l.Tracew("Discarded empty observation %+v", ao)
+			} else {
+				r.l.Warnf("Discarded invalid observation %+v", ao)
+			}
+			continue
+		}
 		nonEmptyObservations = append(nonEmptyObservations, ob)
 	}
 	if len(nonEmptyObservations) <= r.F {
@@ -171,15 +196,17 @@ func (r RelayReportingPlugin) Report(ctx context.Context, timestamp types.Report
 		return nonEmptyObservations[i].MinSeqNum.ToInt().Cmp(nonEmptyObservations[j].MinSeqNum.ToInt()) < 0
 	})
 	// r.F < len(nonEmptyObservations) because of the check above and therefore this is safe
-	min := nonEmptyObservations[r.F].MinSeqNum.ToInt()
+	min := *nonEmptyObservations[r.F].MinSeqNum.ToInt()
 	sort.Slice(nonEmptyObservations, func(i, j int) bool {
 		return nonEmptyObservations[i].MaxSeqNum.ToInt().Cmp(nonEmptyObservations[j].MaxSeqNum.ToInt()) < 0
 	})
-	max := nonEmptyObservations[r.F].MaxSeqNum.ToInt()
-	if max.Cmp(min) < 0 {
+	// We use a conservative maximum. If we pick a value that some honest oracles might not
+	// have seen they’ll end up not agreeing on a report, stalling the protocol.
+	max := *nonEmptyObservations[r.F].MaxSeqNum.ToInt()
+	if max.Cmp(&min) < 0 {
 		return false, nil, errors.New("max seq num smaller than min")
 	}
-	reqs, err := r.orm.Requests(r.sourceChainId, r.destChainId, min, nil, RequestStatusUnstarted, nil, nil)
+	reqs, err := r.orm.Requests(r.sourceChainId, r.destChainId, &min, nil, RequestStatusUnstarted, nil, nil)
 	if err != nil {
 		return false, nil, err
 	}
@@ -187,14 +214,14 @@ func (r RelayReportingPlugin) Report(ctx context.Context, timestamp types.Report
 	if len(reqs) == 0 {
 		return false, nil, errors.Errorf("do not have all the messages in report, have zero messages, report has min %v max %v", min, max)
 	}
-	if reqs[len(reqs)-1].SeqNum.ToInt().Cmp(max) < 0 {
+	if reqs[len(reqs)-1].SeqNum.ToInt().Cmp(&max) < 0 {
 		return false, nil, errors.Errorf("do not have all the messages in report, our max %v reports max %v", reqs[len(reqs)-1].SeqNum, max)
 	}
-	if r.isStale(min) {
+	if r.isStale(&min) {
 		return false, nil, nil
 	}
 
-	report, err := r.buildReport(min, max)
+	report, err := r.buildReport(&min, &max)
 	if err != nil {
 		return false, nil, err
 	}
@@ -227,7 +254,7 @@ func (r RelayReportingPlugin) buildReport(min *big.Int, max *big.Int) ([]byte, e
 
 	// Note Index doesn't matter, we just want the root
 	root, _ := GenerateMerkleProof(32, leaves, 0)
-	report, err := EncodeRelayReport(&single_token_offramp.CCIPRelayReport{
+	report, err := EncodeRelayReport(&offramp.CCIPRelayReport{
 		MerkleRoot:        root,
 		MinSequenceNumber: min,
 		MaxSequenceNumber: max,

@@ -13,9 +13,10 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2/types"
 
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/onramp"
+
 	"github.com/smartcontractkit/chainlink/core/chains/evm/log"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_offramp"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_onramp"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/job"
 	"github.com/smartcontractkit/chainlink/core/services/pg"
@@ -35,8 +36,8 @@ type LogListener struct {
 	q                          pg.Q
 	sourceChainLogBroadcaster  log.Broadcaster
 	destChainLogBroadcaster    log.Broadcaster
-	singleTokenOnRamp          *single_token_onramp.SingleTokenOnRamp
-	singleTokenOffRamp         *single_token_offramp.SingleTokenOffRamp
+	onRamp                     *onramp.OnRamp
+	offRamp                    *offramp.OffRamp
 	sourceChainId, destChainId *big.Int
 	// this can get overwritten by on-chain changes but doesn't need mutexes
 	// because this is a single goroutine service.
@@ -55,8 +56,8 @@ func NewLogListener(
 	l logger.Logger,
 	sourceChainLogBroadcaster log.Broadcaster,
 	destChainLogBroadcaster log.Broadcaster,
-	singleTokenOnRamp *single_token_onramp.SingleTokenOnRamp,
-	singleTokenOffRamp *single_token_offramp.SingleTokenOffRamp,
+	onRamp *onramp.OnRamp,
+	offRamp *offramp.OffRamp,
 	offchainConfig OffchainConfig,
 	ccipORM ORM,
 	jobID int32,
@@ -68,8 +69,8 @@ func NewLogListener(
 		destChainLogBroadcaster:   destChainLogBroadcaster,
 		jobID:                     jobID,
 		orm:                       ccipORM,
-		singleTokenOnRamp:         singleTokenOnRamp,
-		singleTokenOffRamp:        singleTokenOffRamp,
+		onRamp:                    onRamp,
+		offRamp:                   offRamp,
 		offchainConfig:            offchainConfig,
 		// TODO: https://app.shortcut.com/chainlinklabs/story/30169/source-chain-event-reliability
 		mbLogs: utils.NewMailbox(10000),
@@ -94,11 +95,11 @@ type ConfigSet struct {
 // Start complies with job.Service
 func (l *LogListener) Start(ctx context.Context) error {
 	return l.StartOnce("CCIP_LogListener", func() error {
-		sourceChainId, err := l.singleTokenOnRamp.CHAINID(nil)
+		sourceChainId, err := l.onRamp.CHAINID(nil)
 		if err != nil {
 			return errors.Wrap(err, "error getting source chain ID")
 		}
-		destChainId, err := l.singleTokenOffRamp.CHAINID(nil)
+		destChainId, err := l.offRamp.CHAINID(nil)
 		if err != nil {
 			return errors.Wrap(err, "error getting dest chain ID")
 		}
@@ -107,7 +108,7 @@ func (l *LogListener) Start(ctx context.Context) error {
 		l.subscribeSourceChainLogBroadcaster()
 		l.subscribeDestChainLogBroadcaster()
 		l.wgShutdown.Add(1)
-		l.logger.Infow("Starting", "onRamp", l.singleTokenOnRamp.Address(), "offRamp", l.singleTokenOffRamp.Address())
+		l.logger.Infow("Starting", "onRamp", l.onRamp.Address(), "offRamp", l.offRamp.Address())
 		go l.run()
 
 		return nil
@@ -116,28 +117,28 @@ func (l *LogListener) Start(ctx context.Context) error {
 
 func (l *LogListener) subscribeSourceChainLogBroadcaster() {
 	l.unsubscribeLogsOnRamp = l.sourceChainLogBroadcaster.Register(l, log.ListenerOpts{
-		Contract: l.singleTokenOnRamp.Address(),
+		Contract: l.onRamp.Address(),
 		LogsWithTopics: map[common.Hash][][]log.Topic{
 			// Both relayer and executor save to db
-			single_token_onramp.SingleTokenOnRampCrossChainSendRequested{}.Topic(): {},
+			onramp.OnRampCrossChainSendRequested{}.Topic(): {},
 		},
-		ParseLog:                 l.singleTokenOnRamp.ParseLog,
+		ParseLog:                 l.onRamp.ParseLog,
 		MinIncomingConfirmations: l.offchainConfig.SourceIncomingConfirmations,
 	})
 }
 
 func (l *LogListener) subscribeDestChainLogBroadcaster() {
 	l.unsubscribeLogsOffRamp = l.destChainLogBroadcaster.Register(l, log.ListenerOpts{
-		Contract: l.singleTokenOffRamp.Address(),
+		Contract: l.offRamp.Address(),
 		LogsWithTopics: map[common.Hash][][]log.Topic{
 			// Both relayer and executor mark as report_confirmed state
-			single_token_offramp.SingleTokenOffRampReportAccepted{}.Topic(): {},
+			offramp.OffRampReportAccepted{}.Topic(): {},
 			// Both relayer and executor mark as execution_confirmed state
-			single_token_offramp.SingleTokenOffRampCrossChainMessageExecuted{}.Topic(): {},
+			offramp.OffRampCrossChainMessageExecuted{}.Topic(): {},
 			// The offramp listens to config changed
-			single_token_offramp.SingleTokenOffRampConfigSet{}.Topic(): {},
+			offramp.OffRampConfigSet{}.Topic(): {},
 		},
-		ParseLog:                 l.singleTokenOffRamp.ParseLog,
+		ParseLog:                 l.offRamp.ParseLog,
 		MinIncomingConfirmations: l.offchainConfig.DestIncomingConfirmations,
 	})
 }
@@ -191,9 +192,9 @@ func (l *LogListener) handleReceivedLogs() {
 
 		var logBroadcaster log.Broadcaster
 		switch logObj.(type) {
-		case *single_token_onramp.SingleTokenOnRampCrossChainSendRequested:
+		case *onramp.OnRampCrossChainSendRequested:
 			logBroadcaster = l.sourceChainLogBroadcaster
-		case *single_token_offramp.SingleTokenOffRampCrossChainMessageExecuted, *single_token_offramp.SingleTokenOffRampReportAccepted, *single_token_offramp.SingleTokenOffRampConfigSet:
+		case *offramp.OffRampCrossChainMessageExecuted, *offramp.OffRampReportAccepted, *offramp.OffRampConfigSet:
 			logBroadcaster = l.destChainLogBroadcaster
 		default:
 			l.logger.Warnf("Unexpected log type %T", logObj)
@@ -208,13 +209,13 @@ func (l *LogListener) handleReceivedLogs() {
 		}
 
 		switch log := logObj.(type) {
-		case *single_token_onramp.SingleTokenOnRampCrossChainSendRequested:
+		case *onramp.OnRampCrossChainSendRequested:
 			l.handleCrossChainSendRequested(log, lb)
-		case *single_token_offramp.SingleTokenOffRampCrossChainMessageExecuted:
+		case *offramp.OffRampCrossChainMessageExecuted:
 			l.handleCrossChainMessageExecuted(log, lb)
-		case *single_token_offramp.SingleTokenOffRampReportAccepted:
+		case *offramp.OffRampReportAccepted:
 			l.handleCrossChainReportRelayed(log, lb)
-		case *single_token_offramp.SingleTokenOffRampConfigSet:
+		case *offramp.OffRampConfigSet:
 			if err := l.updateIncomingConfirmationsConfig(lb.RawLog()); err != nil {
 				l.logger.Errorw("Could not parse config set", "err", err)
 			}
@@ -225,7 +226,7 @@ func (l *LogListener) handleReceivedLogs() {
 }
 
 func (l *LogListener) updateIncomingConfirmationsConfig(log types.Log) error {
-	offrampConfigSet, err := l.singleTokenOffRamp.ParseConfigSet(log)
+	offrampConfigSet, err := l.offRamp.ParseConfigSet(log)
 	if err != nil {
 		return err
 	}
@@ -252,7 +253,7 @@ func (l *LogListener) updateIncomingConfirmationsConfig(log types.Log) error {
 	return nil
 }
 
-func (l *LogListener) handleCrossChainMessageExecuted(executed *single_token_offramp.SingleTokenOffRampCrossChainMessageExecuted, lb log.Broadcast) {
+func (l *LogListener) handleCrossChainMessageExecuted(executed *offramp.OffRampCrossChainMessageExecuted, lb log.Broadcast) {
 	l.logger.Infow("Cross chain request executed",
 		"seqNum", fmt.Sprintf("%d", executed.SequenceNumber.Int64()),
 		"jobID", lb.JobID(),
@@ -268,7 +269,7 @@ func (l *LogListener) handleCrossChainMessageExecuted(executed *single_token_off
 	}
 }
 
-func (l *LogListener) handleCrossChainReportRelayed(relayed *single_token_offramp.SingleTokenOffRampReportAccepted, lb log.Broadcast) {
+func (l *LogListener) handleCrossChainReportRelayed(relayed *offramp.OffRampReportAccepted, lb log.Broadcast) {
 	l.logger.Infow("Cross chain report relayed",
 		"minSeqNum", fmt.Sprintf("%0x", relayed.Report.MinSequenceNumber),
 		"maxSeqNum", fmt.Sprintf("%0x", relayed.Report.MaxSequenceNumber),
@@ -301,13 +302,13 @@ func (l *LogListener) handleCrossChainReportRelayed(relayed *single_token_offram
 
 // We assume a bounded Message size which is enforced on-chain,
 // TODO: add Message bounds to onramp and include assertion offchain as well.
-func (l *LogListener) handleCrossChainSendRequested(request *single_token_onramp.SingleTokenOnRampCrossChainSendRequested, lb log.Broadcast) {
+func (l *LogListener) handleCrossChainSendRequested(request *onramp.OnRampCrossChainSendRequested, lb log.Broadcast) {
 	l.logger.Infow("Cross chain send request received",
 		"requestId", fmt.Sprintf("%d", request.Message.SequenceNumber.Int64()),
 		"sender", request.Message.Sender,
 		"receiver", request.Message.Payload.Receiver,
 		"sourceChainId", request.Message.SourceChainId,
-		"destChainId", request.Message.DestinationChainId,
+		"destChainId", request.Message.Payload.DestinationChainId,
 		"tokens", request.Message.Payload.Tokens,
 		"amounts", request.Message.Payload.Amounts,
 		"options", request.Message.Payload.Options,
@@ -325,7 +326,7 @@ func (l *LogListener) handleCrossChainSendRequested(request *single_token_onramp
 	err := l.orm.SaveRequest(&Request{
 		SeqNum:        *utils.NewBig(request.Message.SequenceNumber),
 		SourceChainID: request.Message.SourceChainId.String(),
-		DestChainID:   request.Message.DestinationChainId.String(),
+		DestChainID:   request.Message.Payload.DestinationChainId.String(),
 		Sender:        request.Message.Sender,
 		Receiver:      request.Message.Payload.Receiver,
 		Data:          request.Message.Payload.Data,

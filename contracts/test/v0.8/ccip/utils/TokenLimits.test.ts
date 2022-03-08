@@ -4,7 +4,7 @@ import { Roles, getUsers } from '../../../test-helpers/setup'
 import { TokenLimitsHelper } from '../../../../typechain'
 import { Artifact } from 'hardhat/types'
 import { BigNumber } from '@ethersproject/bignumber'
-import { increaseTime5Minutes } from '../../../test-helpers/helpers'
+import { increaseTime5Minutes, publicAbi } from '../../../test-helpers/helpers'
 import { evmRevert } from '../../../test-helpers/matchers'
 
 const { deployContract } = hre.waffle
@@ -26,6 +26,16 @@ describe('TokenLimits library', () => {
     helper = <TokenLimitsHelper>(
       await deployContract(roles.defaultAccount, TokenLimitsHelperArtifact)
     )
+  })
+
+  it('has a limited public interface [ @skip-coverage ]', async () => {
+    publicAbi(helper, [
+      'constructTokenBucket',
+      'remove',
+      'update',
+      'alterCapacity',
+      's_bucket',
+    ])
   })
 
   describe('#constructTokenBucket', () => {

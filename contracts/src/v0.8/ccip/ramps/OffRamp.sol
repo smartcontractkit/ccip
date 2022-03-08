@@ -1,0 +1,279 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.12;
+
+import "../interfaces/OffRampInterface.sol";
+import "../../interfaces/TypeAndVersionInterface.sol";
+import "../ocr/OCR2Base.sol";
+import "../utils/CCIP.sol";
+import "../health/HealthChecker.sol";
+import "../pools/TokenPoolRegistry.sol";
+import "../../vendor/Address.sol";
+import "./PriceFeedRegistry.sol";
+
+contract OffRamp is
+  OffRampInterface,
+  TypeAndVersionInterface,
+  HealthChecker,
+  TokenPoolRegistry,
+  PriceFeedRegistry,
+  OCR2Base
+{
+  using Address for address;
+
+  // Chain ID of the source chain
+  uint256 public immutable SOURCE_CHAIN_ID;
+  // Chain ID of this chain
+  uint256 public immutable CHAIN_ID;
+  // Offchain leaf domain separator
+  bytes1 private constant LEAF_DOMAIN_SEPARATOR = 0x00;
+  // Internal domain separator used in proofs
+  bytes1 private constant INTERNAL_DOMAIN_SEPARATOR = 0x01;
+  // merkleRoot => timestamp when received
+  mapping(bytes32 => uint256) private s_merkleRoots;
+  // sequenceNumber => executed
+  mapping(uint256 => bool) private s_executed;
+  // Execution fee in link
+  uint256 private s_executionFeeLink;
+  // execution delay in seconds
+  uint256 private s_executionDelaySeconds;
+  // maximum payload data size
+  uint256 private s_maxDataSize;
+  // Last relay report
+  CCIP.RelayReport private s_lastReport;
+  // Maximum number of distinct ERC20 tokens that can be sent in a message
+  uint256 private s_maxTokensLength;
+
+  /**
+   * @dev sourceTokens are mapped to pools, and therefore should be the same length arrays.
+   * @dev The AFN contract should be deployed already
+   * @param sourceChainId The ID of the source chain
+   * @param chainId The ID that this contract is deployed to
+   * @param sourceTokens Array of source chain tokens that this contract supports
+   * @param pools Array token token pools on this chain (Must map 1:1 with sourceTokens)
+   * @param afn AFN contract
+   * @param maxTimeWithoutAFNSignal Maximum number of seconds allows between AFN singals
+   * @param executionDelaySeconds Delay, in seconds, between the relay and execution of a message
+   * @param maxTokensLength The maximum number of different tokens allowed to be sent in a single message
+   * @param executionFeeLink The execution fee, denominated in JUELS
+   */
+  constructor(
+    uint256 sourceChainId,
+    uint256 chainId,
+    IERC20[] memory sourceTokens,
+    PoolInterface[] memory pools,
+    AggregatorV2V3Interface[] memory feeds,
+    AFNInterface afn,
+    uint256 maxTimeWithoutAFNSignal,
+    uint256 executionDelaySeconds,
+    uint256 maxTokensLength,
+    uint256 executionFeeLink,
+    uint256 maxDataSize
+  )
+    OCR2Base(true)
+    HealthChecker(afn, maxTimeWithoutAFNSignal)
+    TokenPoolRegistry(sourceTokens, pools)
+    PriceFeedRegistry(sourceTokens, feeds)
+  {
+    SOURCE_CHAIN_ID = sourceChainId;
+    CHAIN_ID = chainId;
+    s_executionDelaySeconds = executionDelaySeconds;
+    s_maxTokensLength = maxTokensLength;
+    s_executionFeeLink = executionFeeLink;
+    s_maxDataSize = maxDataSize;
+  }
+
+  /**
+   * @notice Extending OCR2Base._report
+   * @dev assumes the report is a bytes encoded bytes32 merkle root
+   * @dev will be called by Chainlink nodes on transmit()
+   */
+  function _report(
+    bytes32, /*configDigest*/
+    uint40, /*epochAndRound*/
+    bytes memory report
+  ) internal override whenNotPaused whenHealthy {
+    CCIP.RelayReport memory newRelayReport = abi.decode(report, (CCIP.RelayReport));
+    // check that the sequence numbers make sense
+    if (newRelayReport.minSequenceNumber > newRelayReport.maxSequenceNumber) revert RelayReportError();
+    CCIP.RelayReport memory lastRelayReport = s_lastReport;
+    // if this is not the first relay report, make sure the sequence numbers
+    // are greater than the previous report.
+    if (lastRelayReport.merkleRoot != bytes32(0)) {
+      if (newRelayReport.minSequenceNumber != lastRelayReport.maxSequenceNumber + 1) {
+        revert SequenceError(lastRelayReport.maxSequenceNumber, newRelayReport.minSequenceNumber);
+      }
+    }
+
+    s_merkleRoots[newRelayReport.merkleRoot] = block.timestamp;
+    s_lastReport = newRelayReport;
+    emit ReportAccepted(newRelayReport);
+  }
+
+  /**
+   * @notice Execute the delivery of a message by using its merkle proof
+   * @param proof Merkle proof
+   * @param message Original message object
+   * @param needFee Whether or not the executor requires a fee
+   * @dev Can be called by anyone
+   */
+  function executeTransaction(
+    CCIP.Message memory message,
+    CCIP.MerkleProof memory proof,
+    bool needFee
+  ) external override whenNotPaused whenHealthy {
+    // Get root from path
+    bytes32 root = merkleRoot(message, proof);
+
+    // Check that root has been relayed
+    uint256 reportTimestamp = s_merkleRoots[root];
+    if (reportTimestamp == 0) revert MerkleProofError(proof, message);
+
+    // Execution delay
+    if (reportTimestamp + s_executionDelaySeconds >= block.timestamp) revert ExecutionDelayError();
+
+    // Disallow double-execution.
+    if (s_executed[message.sequenceNumber]) revert AlreadyExecuted(message.sequenceNumber);
+
+    // The transaction can only be executed by the designated executor, if one exists.
+    if (message.payload.executor != address(0) && message.payload.executor != msg.sender)
+      revert InvalidExecutor(message.sequenceNumber);
+
+    // Validity checks for the message.
+    _isWellFormed(message);
+
+    // Avoid shooting ourselves in the foot by disallowing calls to some
+    // privileged OffRamp function as OffRamp.
+    // In the wild: https://rekt.news/polynetwork-rekt/
+    _validateReceiver(message);
+
+    // Mark as executed before external calls
+    s_executed[message.sequenceNumber] = true;
+
+    if (needFee) {
+      uint256 fee = 0;
+      IERC20 feeToken = message.payload.tokens[0];
+      AggregatorV2V3Interface feed = getFeed(feeToken);
+      if (address(feed) == address(0)) revert FeeError();
+      fee = s_executionFeeLink * uint256(feed.latestAnswer());
+      message.payload.amounts[0] -= fee;
+      getPool(feeToken).releaseOrMint(msg.sender, fee);
+    }
+
+    for (uint256 i = 0; i < message.payload.tokens.length; i++) {
+      PoolInterface pool = getPool(message.payload.tokens[i]);
+      if (address(pool) == address(0)) revert UnsupportedToken(message.payload.tokens[i]);
+      // Release tokens to receiver
+      pool.releaseOrMint(message.payload.receiver, message.payload.amounts[i]);
+    }
+
+    // Try send the message, revert if fails
+    if (message.payload.receiver.isContract()) {
+      try CrossChainMessageReceiverInterface(message.payload.receiver).receiveMessage(message) {
+        emit CrossChainMessageExecuted(message.sequenceNumber);
+      } catch (bytes memory reason) {
+        revert ExecutionError(message.sequenceNumber, reason);
+      }
+    }
+  }
+
+  /**
+   * @notice Generate a Merkle Root from Proof.
+   * @param message Original Message
+   * @param proof Merkle proof in the order bottom to top of the tree
+   * @return bytes32 root generated by proof
+   */
+  function merkleRoot(CCIP.Message memory message, CCIP.MerkleProof memory proof) public pure returns (bytes32) {
+    // The hash offchain is keccak256(LEAF_DOMAIN_SEPARATOR || CrossChainSendRequested event data),
+    // where the CrossChainSendRequested event data is abi.encode(CCIP.Message).
+    bytes32 hash = keccak256(abi.encodePacked(LEAF_DOMAIN_SEPARATOR, abi.encode(message)));
+
+    for (uint256 i = 0; i < proof.path.length; i++) {
+      bytes32 pathElement = proof.path[i];
+
+      if (proof.index % 2 == 0) {
+        hash = keccak256(abi.encodePacked(INTERNAL_DOMAIN_SEPARATOR, hash, pathElement));
+      } else {
+        hash = keccak256(abi.encodePacked(INTERNAL_DOMAIN_SEPARATOR, pathElement, hash));
+      }
+      proof.index = proof.index / 2;
+    }
+    return hash;
+  }
+
+  /**
+   * @notice Message receiver checks
+   */
+  function _validateReceiver(CCIP.Message memory message) private view {
+    if (address(message.payload.receiver) == address(this) || isPool(address(message.payload.receiver)))
+      revert InvalidReceiver(message.payload.receiver);
+  }
+
+  function _isWellFormed(CCIP.Message memory message) private view {
+    if (message.sourceChainId != SOURCE_CHAIN_ID) revert InvalidSourceChain(message.sourceChainId);
+    if (
+      message.payload.tokens.length > s_maxTokensLength ||
+      message.payload.tokens.length != message.payload.amounts.length
+    ) {
+      revert UnsupportedNumberOfTokens();
+    }
+    if (message.payload.data.length > s_maxDataSize) revert MessageTooLarge(s_maxDataSize, message.payload.data.length);
+  }
+
+  function _beforeSetConfig(uint8 _threshold, bytes memory _onchainConfig) internal override {
+    // TODO
+  }
+
+  function _afterSetConfig(
+    uint8, /* f */
+    bytes memory /* onchainConfig */
+  ) internal override {
+    // TODO
+  }
+
+  function _payTransmitter(uint32 initialGas, address transmitter) internal override {
+    // TODO
+  }
+
+  function setMaxDataSize(uint256 maxDataSize) external onlyOwner {
+    s_maxDataSize = maxDataSize;
+    emit MaxDataSizeSet(maxDataSize);
+  }
+
+  function getMaxDataSize() external view returns (uint256) {
+    return s_maxDataSize;
+  }
+
+  function setExecutionFeeLink(uint256 executionFeeLink) external onlyOwner {
+    s_executionFeeLink = executionFeeLink;
+    emit ExecutionFeeLinkSet(executionFeeLink);
+  }
+
+  function getExecutionFeeLink() external view returns (uint256) {
+    return s_executionFeeLink;
+  }
+
+  function setExecutionDelaySeconds(uint256 executionDelaySeconds) external onlyOwner {
+    s_executionDelaySeconds = executionDelaySeconds;
+    emit ExecutionDelaySecondsSet(executionDelaySeconds);
+  }
+
+  function getExecutionDelaySeconds() external view returns (uint256) {
+    return s_executionDelaySeconds;
+  }
+
+  function getMerkleRoot(bytes32 root) external view returns (uint256) {
+    return s_merkleRoots[root];
+  }
+
+  function getExecuted(uint256 sequenceNumber) external view returns (bool) {
+    return s_executed[sequenceNumber];
+  }
+
+  function getLastReport() external view returns (CCIP.RelayReport memory) {
+    return s_lastReport;
+  }
+
+  function typeAndVersion() external pure override returns (string memory) {
+    return "OffRamp 0.0.1";
+  }
+}

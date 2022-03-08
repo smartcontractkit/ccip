@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity 0.8.12;
 
 import "../../vendor/IERC20.sol";
 
@@ -8,18 +8,18 @@ contract CCIP {
   struct Message {
     uint256 sequenceNumber;
     uint256 sourceChainId;
-    uint256 destinationChainId;
     address sender;
     MessagePayload payload;
   }
 
   /// @notice Payload within the message
   struct MessagePayload {
-    address receiver;
-    bytes data;
     IERC20[] tokens;
     uint256[] amounts;
+    uint256 destinationChainId;
+    address receiver;
     address executor;
+    bytes data;
     bytes options;
   }
 
@@ -28,5 +28,10 @@ contract CCIP {
     bytes32 merkleRoot;
     uint256 minSequenceNumber;
     uint256 maxSequenceNumber;
+  }
+
+  struct MerkleProof {
+    bytes32[] path;
+    uint256 index;
   }
 }

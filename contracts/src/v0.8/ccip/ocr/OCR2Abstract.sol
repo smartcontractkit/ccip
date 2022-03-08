@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "../../interfaces/TypeAndVersionInterface.sol";
 
 abstract contract OCR2Abstract is TypeAndVersionInterface {
-  // Maximum number of oracles the offchain reporting protocol is designed for
+  // Maximum number of oracles the offchain reporting protocol is designed fo
   uint256 internal constant maxNumOracles = 31;
 
   /**
@@ -97,14 +97,14 @@ abstract contract OCR2Abstract is TypeAndVersionInterface {
   }
 
   /**
-  * @notice optionally emited to indicate the latest configDigest and epoch for
+    * @notice optionally emited to indicate the latest configDigest and epoch for
      which a report was successfully transmited. Alternatively, the contract may
      use latestConfigDigestAndEpoch with scanLogs set to false.
   */
   event Transmitted(bytes32 configDigest, uint32 epoch);
 
   /**
-   * @notice optionally returns the latest configDigest and epoch for which a
+     * @notice optionally returns the latest configDigest and epoch for which a
      report was successfully transmitted. Alternatively, the contract may return
      scanLogs set to true and use Transmitted events to provide this information
      to offchain watchers.

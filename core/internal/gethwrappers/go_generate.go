@@ -25,11 +25,11 @@ package gethwrappers
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.7/UpkeepCounter.abi ../../../contracts/solc/v0.7/UpkeepCounter.bin UpkeepCounter upkeep_counter_wrapper
 
 // v0.8 VRFConsumer
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/VRFConsumer.abi ../../../contracts/solc/v0.8/VRFConsumer.bin VRFConsumer solidity_vrf_consumer_interface_v08
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/VRFRequestIDBaseTestHelper.abi ../../../contracts/solc/v0.8/VRFRequestIDBaseTestHelper.bin VRFRequestIDBaseTestHelper solidity_vrf_request_id_v08
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/VRFOwnerlessConsumerExample.abi ../../../contracts/solc/v0.8/VRFOwnerlessConsumerExample.bin VRFOwnerlessConsumerExample vrf_ownerless_consumer_example
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/VRFLoadTestOwnerlessConsumer.abi ../../../contracts/solc/v0.8/VRFLoadTestOwnerlessConsumer.bin VRFLoadTestOwnerlessConsumer vrf_load_test_ownerless_consumer
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/VRFLoadTestExternalSubOwner.abi ../../../contracts/solc/v0.8/VRFLoadTestExternalSubOwner.bin VRFLoadTestExternalSubOwner vrf_load_test_external_sub_owner
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.6/VRFConsumer.abi ../../../contracts/solc/v0.8/VRFConsumer.bin VRFConsumer solidity_vrf_consumer_interface_v08
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.6/VRFRequestIDBaseTestHelper.abi ../../../contracts/solc/v0.8/VRFRequestIDBaseTestHelper.bin VRFRequestIDBaseTestHelper solidity_vrf_request_id_v08
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.6/VRFOwnerlessConsumerExample.abi ../../../contracts/solc/v0.8/VRFOwnerlessConsumerExample.bin VRFOwnerlessConsumerExample vrf_ownerless_consumer_example
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.6/VRFLoadTestOwnerlessConsumer.abi ../../../contracts/solc/v0.8/VRFLoadTestOwnerlessConsumer.bin VRFLoadTestOwnerlessConsumer vrf_load_test_ownerless_consumer
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.6/VRFLoadTestExternalSubOwner.abi ../../../contracts/solc/v0.8/VRFLoadTestExternalSubOwner.bin VRFLoadTestExternalSubOwner vrf_load_test_external_sub_owner
 
 //go:generate mockery --recursive --name FluxAggregatorInterface --output ../mocks/ --case=underscore --structname FluxAggregator --filename flux_aggregator.go
 //go:generate mockery --recursive --name FlagsInterface --output ../mocks/ --case=underscore --structname Flags --filename flags.go
@@ -37,30 +37,30 @@ package gethwrappers
 //go:generate go run ./generation/generate_link/wrap_link.go
 
 // VRF V2
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/VRFCoordinatorV2.abi ../../../contracts/solc/v0.8/VRFCoordinatorV2.bin VRFCoordinatorV2 vrf_coordinator_v2
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/VRFConsumerV2.abi ../../../contracts/solc/v0.8/VRFConsumerV2.bin VRFConsumerV2 vrf_consumer_v2
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/VRFMaliciousConsumerV2.abi ../../../contracts/solc/v0.8/VRFMaliciousConsumerV2.bin VRFMaliciousConsumerV2 vrf_malicious_consumer_v2
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/VRFTestHelper.abi ../../../contracts/solc/v0.8/VRFTestHelper.bin VRFV08TestHelper solidity_vrf_v08_verifier_wrapper
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/VRFSingleConsumerExample.abi ../../../contracts/solc/v0.8/VRFSingleConsumerExample.bin VRFSingleConsumerExample vrf_single_consumer_example
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/VRFExternalSubOwnerExample.abi ../../../contracts/solc/v0.8/VRFExternalSubOwnerExample.bin VRFExternalSubOwnerExample vrf_external_sub_owner_example
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/VRFV2RevertingExample.abi ../../../contracts/solc/v0.8/VRFV2RevertingExample.bin VRFV2RevertingExample vrfv2_reverting_example
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.6/VRFCoordinatorV2.abi ../../../contracts/solc/v0.8.6/VRFCoordinatorV2.bin VRFCoordinatorV2 vrf_coordinator_v2
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.6/VRFConsumerV2.abi ../../../contracts/solc/v0.8.6/VRFConsumerV2.bin VRFConsumerV2 vrf_consumer_v2
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.6/VRFMaliciousConsumerV2.abi ../../../contracts/solc/v0.8.6/VRFMaliciousConsumerV2.bin VRFMaliciousConsumerV2 vrf_malicious_consumer_v2
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.6/VRFTestHelper.abi ../../../contracts/solc/v0.8.6/VRFTestHelper.bin VRFV08TestHelper solidity_vrf_v08_verifier_wrapper
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.6/VRFSingleConsumerExample.abi ../../../contracts/solc/v0.8.6/VRFSingleConsumerExample.bin VRFSingleConsumerExample vrf_single_consumer_example
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.6/VRFExternalSubOwnerExample.abi ../../../contracts/solc/v0.8.6/VRFExternalSubOwnerExample.bin VRFExternalSubOwnerExample vrf_external_sub_owner_example
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.6/VRFV2RevertingExample.abi ../../../contracts/solc/v0.8.6/VRFV2RevertingExample.bin VRFV2RevertingExample vrfv2_reverting_example
 
 // Aggregators
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/AggregatorV2V3Interface.abi ../../../contracts/solc/v0.8/AggregatorV2V3Interface.bin AggregatorV2V3Interface aggregator_v2v3_interface
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/AggregatorV3Interface.abi ../../../contracts/solc/v0.8/AggregatorV3Interface.bin AggregatorV3Interface aggregator_v3_interface
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/DerivedPriceFeed.abi ../../../contracts/solc/v0.8/DerivedPriceFeed.bin DerivedPriceFeed derived_price_feed_wrapper
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.6/AggregatorV3Interface.abi ../../../contracts/solc/v0.8.6/AggregatorV3Interface.bin AggregatorV3Interface aggregator_v3_interface
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.6/DerivedPriceFeed.abi ../../../contracts/solc/v0.8.6/DerivedPriceFeed.bin DerivedPriceFeed derived_price_feed_wrapper
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.6/AggregatorV2V3Interface.abi ../../../contracts/solc/v0.8.6/AggregatorV2V3Interface.bin AggregatorV2V3Interface aggregator_v2v3_interface
 
 // CCIP
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/SingleTokenOnRamp.abi ../../../contracts/solc/v0.8/SingleTokenOnRamp.bin SingleTokenOnRamp single_token_onramp
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/SingleTokenOffRamp.abi ../../../contracts/solc/v0.8/SingleTokenOffRamp.bin SingleTokenOffRamp single_token_offramp
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/LockUnlockPool.abi ../../../contracts/solc/v0.8/LockUnlockPool.bin LockUnlockPool lock_unlock_pool
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/SingleTokenOffRampHelper.abi ../../../contracts/solc/v0.8/SingleTokenOffRampHelper.bin SingleTokenOffRampHelper single_token_offramp_helper
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/SimpleMessageReceiver.abi ../../../contracts/solc/v0.8/SimpleMessageReceiver.bin SimpleMessageReceiver simple_message_receiver
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/EOASingleTokenReceiver.abi ../../../contracts/solc/v0.8/EOASingleTokenReceiver.bin EOASingleTokenReceiver single_token_receiver
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/EOASingleTokenSender.abi ../../../contracts/solc/v0.8/EOASingleTokenSender.bin EOASingleTokenSender single_token_sender
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/MessageExecutor.abi ../../../contracts/solc/v0.8/MessageExecutor.bin MessageExecutor message_executor
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/MessageExecutorHelper.abi ../../../contracts/solc/v0.8/MessageExecutorHelper.bin MessageExecutorHelper message_executor_helper
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8/AFN.abi ../../../contracts/solc/v0.8/AFN.bin AFNContract afn_contract
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.12/OnRamp.abi ../../../contracts/solc/v0.8.12/OnRamp.bin OnRamp onramp
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.12/OffRamp.abi ../../../contracts/solc/v0.8.12/OffRamp.bin OffRamp offramp
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.12/NativeTokenPool.abi ../../../contracts/solc/v0.8.12/NativeTokenPool.bin NativeTokenPool native_token_pool
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.12/OffRampHelper.abi ../../../contracts/solc/v0.8.12/OffRampHelper.bin OffRampHelper offramp_helper
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.12/SimpleMessageReceiver.abi ../../../contracts/solc/v0.8.12/SimpleMessageReceiver.bin SimpleMessageReceiver simple_message_receiver
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.12/ReceiverDapp.abi ../../../contracts/solc/v0.8.12/ReceiverDapp.bin ReceiverDapp receiver_dapp
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.12/SenderDapp.abi ../../../contracts/solc/v0.8.12/SenderDapp.bin SenderDapp sender_dapp
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.12/MessageExecutor.abi ../../../contracts/solc/v0.8.12/MessageExecutor.bin MessageExecutor message_executor
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.12/MessageExecutorHelper.abi ../../../contracts/solc/v0.8.12/MessageExecutorHelper.bin MessageExecutorHelper message_executor_helper
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.12/AFN.abi ../../../contracts/solc/v0.8.12/AFN.bin AFNContract afn_contract
 
 // To run these commands, you must either install docker, or the correct version
 // of abigen. The latter can be installed with these commands, at least on linux:

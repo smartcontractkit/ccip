@@ -2,19 +2,23 @@ package main
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 )
 
-func PrintJobSpecs(onramp, offramp, executor common.Address) {
+// PrintJobSpecs prints the job spec for each node and CCIP spec type, as well as a bootstrap spec.
+func PrintJobSpecs(onramp, offramp, executor common.Address, sourceChainID, destChainID *big.Int) {
 	jobs := fmt.Sprintf(bootstrapTemplate, offramp)
 	for i, oracle := range Oracles {
-		jobs += "\n" + fmt.Sprintf(relayTemplate, i, offramp, onramp,
-			Kovan.ChainId.Int64(), Rinkeby.ChainId.Int64(),
-			oracle.OracleIdentity.TransmitAccount, BootstrapPeerID)
-		jobs += fmt.Sprintf(executionTemplate, onramp, offramp, executor,
-			Kovan.ChainId.Int64(), Rinkeby.ChainId.Int64(),
-			oracle.OracleIdentity.TransmitAccount, BootstrapPeerID)
+		jobs += "\n" + fmt.Sprintf(relayTemplate, i,
+			oracle.OracleIdentity.TransmitAccount, BootstrapPeerID,
+			offramp, onramp, sourceChainID, destChainID, destChainID,
+		)
+		jobs += fmt.Sprintf(executionTemplate,
+			oracle.OracleIdentity.TransmitAccount, BootstrapPeerID,
+			onramp, offramp, executor, sourceChainID, destChainID, destChainID,
+		)
 	}
 	fmt.Println(jobs)
 }
@@ -22,45 +26,57 @@ func PrintJobSpecs(onramp, offramp, executor common.Address) {
 const bootstrapTemplate = `
 // Bootstrap Node
 # BootstrapSpec
-type                                = "bootstrap"
-name                                = "bootstrap"
-relay                               = "evm"
-schemaVersion                       = 1
-contractID                          = "%s"
-contractConfigConfirmations         = 1
-contractConfigTrackerPollInterval   = "60s"
+type                               = "bootstrap"
+name                               = "bootstrap"
+relay                              = "evm"
+schemaVersion                      = 1
+contractID                         = "%s"
+contractConfigConfirmations        = 1
+contractConfigTrackerPollInterval  = "60s"
 [relayConfig]
-chainID 							= 4
+chainID                            = 4
 `
 
 const relayTemplate = `
 // Node %d
 # CCIPRelaySpec
-type				= "ccip-relay"
-name				= "ccip-relay"
-schemaVersion		= 1
-offRampID			= "%s"
-onRampID			= "%s"
-sourceEvmChainID	= "%d"
-destEvmChainID		= "%d"
-ocrKeyBundleID		= "<KEY-BUNDLE-ID>"
-transmitterID		= "%s"
-p2pBootstrapPeers	= ["%s@<BOOTSTRAP-HOST>:<PORT>"]
-relay				= "evm"
+type               = "offchainreporting2"
+name               = "ccip-relay"
+pluginType         = "ccip-relay"
+relay              = "evm"
+schemaVersion      = 1
+ocrKeyBundleID     = "<KEY-BUNDLE-ID>"
+transmitterID      = "%s"
+p2pBootstrapPeers  = ["%s@<BOOTSTRAP-HOST>:<PORT>"]
+
+[pluginConfig]
+offRampID          = "%s"
+onRampID           = "%s"
+sourceChainID      = "%d"
+destChainID        = "%d"
+
+[relayConfig]
+chainID            = "%d"
 `
 
 const executionTemplate = `
 # CCIPExecutionSpec
-type				= "ccip-execution"
-name				= "ccip-execution"
-schemaVersion		= 1
-onRampID			= "%s"
-offRampID			= "%s"
-executorID			= "%s"
-sourceEvmChainID	= "%d"
-destEvmChainID		= "%d"
-ocrKeyBundleID		= "<KEY-BUNDLE-ID>"
-transmitterID		= "%s"
-p2pBootstrapPeers	= ["%s@<BOOTSTRAP-HOST>:<PORT>"]
-relay 				= "evm"
+type              = "ccip-execution"
+name              = "ccip-execution"
+pluginType        = "ccip-execution"
+relay             = "evm"
+schemaVersion     = 1
+ocrKeyBundleID    = "<KEY-BUNDLE-ID>"
+transmitterID     = "%s"
+p2pBootstrapPeers = ["%s@<BOOTSTRAP-HOST>:<PORT>"]
+
+[pluginConfig]
+onRampID          = "%s"
+offRampID         = "%s"
+executorID        = "%s"
+sourceChainID     = "%d"
+destChainID       = "%d"
+
+[relayConfig]
+chainID           = "%d"
 `

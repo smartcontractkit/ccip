@@ -12,43 +12,103 @@ import (
 )
 
 type EvmChainConfig struct {
-	Owner                 *bind.TransactOpts
-	Client                *ethclient.Client
-	ChainId               *big.Int
-	LinkToken             common.Address
-	SingleTokenOnramp     common.Address
-	SingleTokenOfframp    common.Address
-	LockUnlockPool        common.Address
-	SingleTokenSender     common.Address
-	SimpleMessageReceiver common.Address
-	SingleTokenReceiver   common.Address
-	MessageExecutor       common.Address
-	Afn                   common.Address
-	EthUrl                string
+	Owner           *bind.TransactOpts
+	Client          *ethclient.Client
+	ChainId         *big.Int
+	LinkToken       common.Address
+	OnRamp          common.Address
+	OffRamp         common.Address
+	TokenPool       common.Address
+	TokenSender     common.Address
+	MessageReceiver common.Address
+	TokenReceiver   common.Address
+	MessageExecutor common.Address
+	Afn             common.Address
+	PriceFeed       common.Address
+	EthUrl          string
+	GasSettings     EVMGasSettings
 }
 
-var Kovan = EvmChainConfig{
-	ChainId:            big.NewInt(42),
-	LinkToken:          common.HexToAddress("0xa36085F69e2889c224210F603D836748e7dC0088"),
-	SingleTokenOnramp:  common.HexToAddress("0x7514aB087CcD8f5803CD20034eD9955cA5f2B99B"),
-	SingleTokenOfframp: common.Address{},
-	LockUnlockPool:     common.HexToAddress("0xc0299FBdAfdE8A91998989e6B36a78fE6b179112"),
-	SingleTokenSender:  common.HexToAddress("0x8958F24DF47CE7C518ee4bD55d92406c23d834a1"),
-	Afn:                common.HexToAddress("0xA6A3b37ACd10937D5857C7fac93E8BdBAc80424d"),
-	EthUrl:             "wss://parity-kovan.eth.devnet.tools/ws",
+// EVMGasSettings specifies the gas configuration for an EVM chain.
+type EVMGasSettings struct {
+	EIP1559   bool
+	GasPrice  *big.Int
+	GasTipCap *big.Int
 }
 
+// DefaultGasTipFee is the default gas tip fee of 2gwei.
+var DefaultGasTipFee = big.NewInt(2e9)
+
+// Rinkeby is configured to work as an onramp for Kovan
 var Rinkeby = EvmChainConfig{
-	ChainId:               big.NewInt(4),
-	LinkToken:             common.HexToAddress("0x01be23585060835e02b77ef475b0cc51aa1e0709"),
-	SingleTokenOnramp:     common.Address{},
-	SingleTokenOfframp:    common.HexToAddress("0x5f76AE26CaC2400861a00620af1F7ba8234Fb86F"),
-	LockUnlockPool:        common.HexToAddress("0x759bB7c540900f489047adF66322D27E858A6281"),
-	SimpleMessageReceiver: common.HexToAddress("0x869f73B2BA20efDb7d38534461fF9cCe901C4AEF"),
-	SingleTokenReceiver:   common.HexToAddress("0x6A19BA4584230FC8c3D9Bcd8d54E48976af3f7DB"),
-	MessageExecutor:       common.HexToAddress("0x79333B2A23BF56952E65F8aC0019e1B2ec3c8B88"),
-	Afn:                   common.HexToAddress("0xb6067e139e90C17765116847D258578c6Db102dd"),
-	EthUrl:                "wss://geth-rinkeby.eth.devnet.tools/ws",
+	ChainId:         big.NewInt(4),
+	LinkToken:       common.HexToAddress("0x01be23585060835e02b77ef475b0cc51aa1e0709"),
+	OnRamp:          common.Address{},
+	OffRamp:         common.HexToAddress("0x1F10C5d25A08B21b3DCf9af95caEd54cE71a970B"),
+	TokenPool:       common.HexToAddress("0xdA4318e7ec689f985E19F05d0351492244FFBa65"),
+	MessageReceiver: common.HexToAddress("0xEb53a2B96aA765b078DCD6AB291E18BBA856f6Df"),
+	TokenReceiver:   common.HexToAddress("0xaA8C18271dD9Dea20186b2Df8685156EA5eE43f5"),
+	MessageExecutor: common.HexToAddress("0x11aF9a660AA8DF43D575541312caAE5d929f43F7"),
+	Afn:             common.HexToAddress("0xb6067e139e90C17765116847D258578c6Db102dd"),
+	PriceFeed:       common.HexToAddress("0xA2E0614f90BD107BF72faE4AD9251b63E18bA6f2"),
+	EthUrl:          "wss://geth-rinkeby.eth.devnet.tools/ws",
+	GasSettings: EVMGasSettings{
+		EIP1559:   true,
+		GasTipCap: DefaultGasTipFee,
+	},
+}
+
+// Kovan is configured to work as an offramp for Rinkeby
+var Kovan = EvmChainConfig{
+	ChainId:     big.NewInt(42),
+	LinkToken:   common.HexToAddress("0xa36085F69e2889c224210F603D836748e7dC0088"),
+	OnRamp:      common.HexToAddress("0xB412Afaa0526979d85dcadf7Db0ADA40acCAaFa5"),
+	OffRamp:     common.Address{},
+	TokenPool:   common.HexToAddress("0x676f9261ecB2fd1B9d047BaC003bD30be61fDf24"),
+	TokenSender: common.HexToAddress("0x8016b65003284abEA8405fBec65BF86BC7e460E0"),
+	Afn:         common.HexToAddress("0xcB6f8a746db85f60a58Eba211E476601fd40A999"),
+	PriceFeed:   common.HexToAddress("0xE96B14ddd215F2203601f2C5dc574DBBf02c19d9"),
+	EthUrl:      "wss://parity-kovan.eth.devnet.tools/ws",
+	GasSettings: EVMGasSettings{
+		EIP1559:   true,
+		GasTipCap: DefaultGasTipFee,
+	},
+}
+
+// BSCTestnet is configured to be an offramp for PolygonMumbai
+var BSCTestnet = EvmChainConfig{
+	ChainId:         big.NewInt(97),
+	LinkToken:       common.HexToAddress("0x84b9b910527ad5c03a9ca831909e21e236ea7b06"),
+	OnRamp:          common.Address{},
+	OffRamp:         common.HexToAddress("0xD4495b27DF53A15E513c43045C52f12f0EBa1f5e"),
+	TokenPool:       common.HexToAddress("0x0924011a856483E47565d54BBC65cA9E21E8EE42"),
+	MessageReceiver: common.HexToAddress("0x9E8C0E213e5B781D82134b8030fBfdEE379D54E7"),
+	TokenReceiver:   common.HexToAddress("0x98Ed3e482a6133D8098A7D010808503F4224c6b3"),
+	MessageExecutor: common.HexToAddress("0x7054E6420d2041c84b845c2f60537C7974a059d8"),
+	Afn:             common.HexToAddress("0xCa3186CF799F07c68694737eC45026Bee3B4D9C2"),
+	PriceFeed:       common.HexToAddress("0xCe078EA05aEA5342f3b8856004F8959930d00b69"),
+	EthUrl:          "wss://binance-testnet.eth.devnet.tools/ws",
+	GasSettings: EVMGasSettings{
+		EIP1559:  false,
+		GasPrice: big.NewInt(2e10),
+	},
+}
+
+// PolygonMumbai is configured to be an onramp for BSCTestnet
+var PolygonMumbai = EvmChainConfig{
+	ChainId:     big.NewInt(80001),
+	LinkToken:   common.HexToAddress("0x326C977E6efc84E512bB9C30f76E30c160eD06FB"),
+	OnRamp:      common.HexToAddress("0xD4495b27DF53A15E513c43045C52f12f0EBa1f5e"),
+	OffRamp:     common.Address{},
+	TokenPool:   common.HexToAddress("0x0924011a856483E47565d54BBC65cA9E21E8EE42"),
+	TokenSender: common.HexToAddress("0x37816F4367064A17c000483c55c8a846Cab33051"),
+	Afn:         common.HexToAddress("0xCa3186CF799F07c68694737eC45026Bee3B4D9C2"),
+	PriceFeed:   common.HexToAddress("0xCe078EA05aEA5342f3b8856004F8959930d00b69"),
+	EthUrl:      "wss://link-matic.getblock.io/testnet/axej8woh-seej-6ash-4Yu7-eyib1495dhno/",
+	GasSettings: EVMGasSettings{
+		EIP1559:  false,
+		GasPrice: nil,
+	},
 }
 
 const BootstrapPeerID = "12D3KooWNEeby2qn8hHhNEmX8WzWTRSoP46KqyfPtjhq6duRB1Zy"

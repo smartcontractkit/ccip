@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.6;
+pragma solidity 0.8.12;
 
 import "../../interfaces/OffRampInterface.sol";
 
 contract MockOffRamp is OffRampInterface {
-  event MessageExecuted(bytes32[] proof, CCIP.Message message, uint256 index);
+  event MessageExecuted(bytes32[] path, uint256 index, CCIP.Message message, bool needFee);
 
   IERC20 public s_token;
 
@@ -17,11 +17,11 @@ contract MockOffRamp is OffRampInterface {
   function CHAIN_ID() external view returns (uint256) {}
 
   function executeTransaction(
-    bytes32[] memory proof,
     CCIP.Message memory message,
-    uint256 index
+    CCIP.MerkleProof memory proof,
+    bool needFee
   ) external override {
-    emit MessageExecuted(proof, message, index);
+    emit MessageExecuted(proof.path, proof.index, message, needFee);
   }
 
   function setToken(IERC20 token) external {

@@ -10,76 +10,75 @@ import (
 
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/afn_contract"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/link_token_interface"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/lock_unlock_pool"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/message_executor"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/mock_v3_aggregator_contract"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/native_token_pool"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/onramp"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/receiver_dapp"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/sender_dapp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/simple_message_receiver"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_offramp"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_onramp"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_receiver"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_sender"
 )
 
 // deployContracts will deploy all source and Destination chain contracts using the
 // owner key. Only run this of the currently deployed contracts are outdated or
 // when initializing a new chain.
 func deployContracts(ownerKey string) {
-	source := Kovan
-	source.Owner = GetOwner(ownerKey, source.ChainId)
+	source := Rinkeby
+	source.Owner = GetOwner(ownerKey, source.ChainId, source.GasSettings)
 	source.Client = GetClient(source.EthUrl)
-	dest := Rinkeby
-	dest.Owner = GetOwner(ownerKey, dest.ChainId)
+	dest := Kovan
+	dest.Owner = GetOwner(ownerKey, dest.ChainId, source.GasSettings)
 	dest.Client = GetClient(dest.EthUrl)
 
 	deploySourceAndDestContracts(source, dest)
 }
 
 func deploySourceAndDestContracts(source EvmChainConfig, dest EvmChainConfig) {
-	// to not use geth-only tip fee method
-	// https://github.com/ethereum/go-ethereum/pull/23484
-	source.Owner.GasTipCap = big.NewInt(2e9)
-	dest.Owner.GasTipCap = big.NewInt(2e9)
+	SetGasFees(source.Owner, source.GasSettings)
+	SetGasFees(dest.Owner, dest.GasSettings)
 
 	// After running this code please update the configuration to reflect the newly
 	// deployed contract addresses.
-	onramp := deployOnramp(source, dest.ChainId, dest.LinkToken)
-	fmt.Println("Onramp fully deployed:", onramp.Address().Hex())
-	offramp, executor, singleTokenReceiver := deployOfframp(dest, source.ChainId)
-	fmt.Println("Offramp fully deployed:", offramp.Address().Hex())
+	onRamp := deployOnramp(source, dest.ChainId)
+	fmt.Println("Onramp fully deployed:", onRamp.Address().Hex())
+	offRamp, executor, tokenReceiver := deployOfframp(dest, source.ChainId)
+	fmt.Println("Offramp fully deployed:", offRamp.Address().Hex())
 
-	// Deploy onramp EOA token sender
-	eoaTokenSenderAddress, tx, _, err := single_token_sender.DeployEOASingleTokenSender(source.Owner, source.Client, onramp.Address(), singleTokenReceiver)
+	// Deploy onramp sender dapp
+	tokenSenderAddress, tx, _, err := sender_dapp.DeploySenderDapp(source.Owner, source.Client, onRamp.Address(), dest.ChainId, tokenReceiver)
 	PanicErr(err)
 	WaitForMined(context.Background(), source.Client, tx.Hash(), true)
-	fmt.Println("Onramp EOA token sender deployed:", eoaTokenSenderAddress.Hex())
+	fmt.Println("Onramp token sender dapp deployed:", tokenSenderAddress.Hex())
 
-	PrintJobSpecs(onramp.Address(), offramp.Address(), executor.Address())
+	PrintJobSpecs(onRamp.Address(), offRamp.Address(), executor.Address(), source.ChainId, dest.ChainId)
 }
 
-func deployOnramp(source EvmChainConfig, offrampChainId *big.Int, offrampLinkTokenAddress common.Address) *single_token_onramp.SingleTokenOnRamp {
-	sourcePool := deployLockUnlockPool(source, true)
+func deployOnramp(source EvmChainConfig, offrampChainId *big.Int) *onramp.OnRamp {
+	sourcePool := deployNativeTokenPool(source, true)
 	afn := deployAFN(source, true)
+	feedAddress := deployPriceFeed(source, true)
 
 	// deploy onramp
-	onRampAddress, tx, _, err := single_token_onramp.DeploySingleTokenOnRamp(
-		source.Owner,                    // user
-		source.Client,                   // client
-		source.ChainId,                  // source chain id
-		source.LinkToken,                // source token
-		sourcePool.Address(),            // source pool
-		offrampChainId,                  // dest chain id
-		offrampLinkTokenAddress,         // remoteToken
-		[]common.Address{},              // allow list
-		false,                           // enableAllowList
-		big.NewInt(1),                   // token bucket rate
-		big.NewInt(1000000000000000000), // token bucket capacity, 1 LINK
-		afn.Address(),                   // AFN
-		// 86400 seconds = one day
-		big.NewInt(86400), //maxTimeWithoutAFNSignal
+	onRampAddress, tx, _, err := onramp.DeployOnRamp(
+		source.Owner,                           // user
+		source.Client,                          // client
+		source.ChainId,                         // source chain id
+		[]*big.Int{offrampChainId},             // destinationChainIds
+		[]common.Address{source.LinkToken},     // tokens
+		[]common.Address{sourcePool.Address()}, // pools
+		[]common.Address{feedAddress},          // Feeds
+		[]common.Address{},                     // allow list
+		afn.Address(),                          // AFN
+		big.NewInt(86400),                      //maxTimeWithoutAFNSignal 86400 seconds = one day
+		big.NewInt(5),                          // maxTokensLength
+		big.NewInt(1e6),                        // maxDataSize
+		big.NewInt(0),                          // relayingFeeLink
 	)
 	PanicErr(err)
 	WaitForMined(context.Background(), source.Client, tx.Hash(), true)
 
-	onRamp, err := single_token_onramp.NewSingleTokenOnRamp(onRampAddress, source.Client)
+	onRamp, err := onramp.NewOnRamp(onRampAddress, source.Client)
 	PanicErr(err)
 	fmt.Println("Onramp deployed on:", onRampAddress.String())
 
@@ -91,35 +90,38 @@ func deployOnramp(source EvmChainConfig, offrampChainId *big.Int, offrampLinkTok
 	return onRamp
 }
 
-func deployOfframp(dest EvmChainConfig, onrampChainId *big.Int) (*single_token_offramp.SingleTokenOffRamp, *message_executor.MessageExecutor, common.Address) {
-	pool := deployLockUnlockPool(dest, true)
-	fillPoolWithLink(dest, pool)
+func deployOfframp(dest EvmChainConfig, onrampChainId *big.Int) (*offramp.OffRamp, *message_executor.MessageExecutor, common.Address) {
+	pool := deployNativeTokenPool(dest, true)
 	afn := deployAFN(dest, true)
+	feedAddress := deployPriceFeed(dest, true)
 
 	// deploy offramp on Rinkeby
-	offrampAddress, tx, _, err := single_token_offramp.DeploySingleTokenOffRamp(
-		dest.Owner,                      // user
-		dest.Client,                     // client
-		onrampChainId,                   // source chain id
-		dest.ChainId,                    // dest chain id
-		dest.LinkToken,                  // link token address
-		pool.Address(),                  // dest pool address
-		big.NewInt(1),                   // token bucket rate
-		big.NewInt(1000000000000000000), // token bucket capacity
-		afn.Address(),                   // AFN address
-		// 86400 seconds = one day
-		big.NewInt(86400), // max timeout without AFN signal
-		big.NewInt(0),     // execution delay in seconds
+	offrampAddress, tx, _, err := offramp.DeployOffRamp(
+		dest.Owner,                       // user
+		dest.Client,                      // client
+		onrampChainId,                    // source chain id
+		dest.ChainId,                     // dest chain id
+		[]common.Address{dest.LinkToken}, // source tokens
+		[]common.Address{pool.Address()}, // dest pool addresses
+		[]common.Address{feedAddress},    // Feeds
+		afn.Address(),                    // AFN address
+		big.NewInt(86400),                // max timeout without AFN signal  86400 seconds = one day
+		big.NewInt(0),                    // executionDelaySeconds
+		big.NewInt(5),                    // maxTokensLength
+		big.NewInt(0),                    // executionFeeLink
+		big.NewInt(1e6),                  //maxDataSize
 	)
 	PanicErr(err)
 	WaitForMined(context.Background(), dest.Client, tx.Hash(), true)
 	fmt.Println("Offramp deployed on:", offrampAddress.Hex())
 
-	offramp, err := single_token_offramp.NewSingleTokenOffRamp(offrampAddress, dest.Client)
+	offRamp, err := offramp.NewOffRamp(offrampAddress, dest.Client)
 	PanicErr(err)
 
+	fillPoolWithLink(dest, pool)
+
 	// Configure offramp address on pool
-	tx, err = pool.SetOffRamp(dest.Owner, offramp.Address(), true)
+	tx, err = pool.SetOffRamp(dest.Owner, offRamp.Address(), true)
 	PanicErr(err)
 	fmt.Println("Offramp pool configured with offramp address, tx hash:", tx.Hash().Hex())
 
@@ -129,37 +131,38 @@ func deployOfframp(dest EvmChainConfig, onrampChainId *big.Int) (*single_token_o
 	WaitForMined(context.Background(), dest.Client, tx.Hash(), true)
 	fmt.Println("Offramp contract message receiver deployed on:", messageReceiverAddress.Hex())
 
-	// Deploy offramp EOA token receiver
-	tokenReceiverAddress, tx, _, err := single_token_receiver.DeployEOASingleTokenReceiver(dest.Owner, dest.Client, offramp.Address())
+	// Deploy offramp token receiver dapp
+	tokenReceiverAddress, tx, _, err := receiver_dapp.DeployReceiverDapp(dest.Owner, dest.Client, offRamp.Address(), dest.LinkToken)
 	PanicErr(err)
 	WaitForMined(context.Background(), dest.Client, tx.Hash(), true)
-	fmt.Println("Offramp EOA token receiver deployed on:", tokenReceiverAddress.Hex())
-	// Deploy the message executor ocr2 contract
-	executorAddress, tx, _, err := message_executor.DeployMessageExecutor(dest.Owner, dest.Client, offramp.Address())
+	fmt.Println("Offramp token receiver dapp deployed on:", tokenReceiverAddress.Hex())
+	// Deploy the message executor contract
+	executorAddress, tx, _, err := message_executor.DeployMessageExecutor(dest.Owner, dest.Client, offRamp.Address())
 	PanicErr(err)
 	WaitForMined(context.Background(), dest.Client, tx.Hash(), true)
-	fmt.Println("Message executor ocr2 contract deployed on:", executorAddress.Hex())
+	fmt.Println("Message executor contract deployed on:", executorAddress.Hex())
 
 	executor, err := message_executor.NewMessageExecutor(executorAddress, dest.Client)
 	PanicErr(err)
 
-	return offramp, executor, tokenReceiverAddress
+	return offRamp, executor, tokenReceiverAddress
 }
 
-func deployLockUnlockPool(client EvmChainConfig, deployNew bool) *lock_unlock_pool.LockUnlockPool {
+func deployNativeTokenPool(client EvmChainConfig, deployNew bool) *native_token_pool.NativeTokenPool {
 	if deployNew {
-		address, tx, _, err := lock_unlock_pool.DeployLockUnlockPool(client.Owner, client.Client, client.LinkToken)
+		tenLink := new(big.Int).Mul(big.NewInt(1e18), big.NewInt(10))
+		address, tx, _, err := native_token_pool.DeployNativeTokenPool(client.Owner, client.Client, client.LinkToken, big.NewInt(10), tenLink, big.NewInt(10), tenLink)
 		PanicErr(err)
 		WaitForMined(context.Background(), client.Client, tx.Hash(), true)
 		fmt.Println("Lock/unlock pool deployed on:", address.Hex())
-		pool, err := lock_unlock_pool.NewLockUnlockPool(address, client.Client)
+		pool, err := native_token_pool.NewNativeTokenPool(address, client.Client)
 		PanicErr(err)
 		return pool
 	}
-	if client.LockUnlockPool.Hex() == "0x0000000000000000000000000000000000000000" {
+	if client.TokenPool.Hex() == "0x0000000000000000000000000000000000000000" {
 		PanicErr(errors.New("deploy new lock unlock pool set to false but no lock unlock pool given in config"))
 	}
-	sourcePool, err := lock_unlock_pool.NewLockUnlockPool(client.LockUnlockPool, client.Client)
+	sourcePool, err := native_token_pool.NewNativeTokenPool(client.TokenPool, client.Client)
 	PanicErr(err)
 	fmt.Println("Lock unlock pool loaded from:", sourcePool.Address().Hex())
 	return sourcePool
@@ -191,14 +194,29 @@ func deployAFN(client EvmChainConfig, deployNew bool) *afn_contract.AFNContract 
 	return afn
 }
 
-func fillPoolWithLink(client EvmChainConfig, pool *lock_unlock_pool.LockUnlockPool) {
+func deployPriceFeed(client EvmChainConfig, deployNew bool) common.Address {
+	if deployNew {
+		address, tx, _, err := mock_v3_aggregator_contract.DeployMockV3AggregatorContract(client.Owner, client.Client, 18, big.NewInt(6e12))
+		PanicErr(err)
+		WaitForMined(context.Background(), client.Client, tx.Hash(), true)
+		fmt.Println("Mock feed deployed on:", address.Hex())
+		return address
+	}
+	if client.PriceFeed.Hex() == "0x0000000000000000000000000000000000000000" {
+		PanicErr(errors.New("deploy new price feed set to false but no price feed given in config"))
+	}
+	return client.PriceFeed
+}
+
+func fillPoolWithLink(client EvmChainConfig, pool *native_token_pool.NativeTokenPool) {
 	destLinkToken, err := link_token_interface.NewLinkToken(client.LinkToken, client.Client)
 	PanicErr(err)
 
-	// fill offramp token pool with 5 LINK
-	amount, _ := new(big.Int).SetString("5000000000000000000", 10)
+	// fill offramp token pool with 0.5 LINK
+	amount := big.NewInt(5e17)
 	tx, err := destLinkToken.Approve(client.Owner, pool.Address(), amount)
 	PanicErr(err)
+	fmt.Println("Approving LINK on token pool:", tx.Hash().Hex())
 	WaitForMined(context.Background(), client.Client, tx.Hash(), true)
 
 	tx, err = pool.LockOrBurn(client.Owner, client.Owner.From, amount)

@@ -19,14 +19,13 @@ import (
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/onsi/gomega"
 	uuid "github.com/satori/go.uuid"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"gopkg.in/guregu/null.v4"
-
 	"github.com/smartcontractkit/libocr/commontypes"
 	ocrnetworking "github.com/smartcontractkit/libocr/networking"
 	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	ocrtypes2 "github.com/smartcontractkit/libocr/offchainreporting2/types"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"gopkg.in/guregu/null.v4"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/bulletprooftxmanager"
@@ -41,13 +40,14 @@ import (
 	"github.com/smartcontractkit/chainlink/core/internal/cltest/heavyweight"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/afn_contract"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/link_token_interface"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/lock_unlock_pool"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/message_executor"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/mock_v3_aggregator_contract"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/native_token_pool"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/onramp"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/receiver_dapp"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/sender_dapp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/simple_message_receiver"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_offramp"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_onramp"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_receiver"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_sender"
 	"github.com/smartcontractkit/chainlink/core/internal/testutils/configtest"
 	"github.com/smartcontractkit/chainlink/core/internal/testutils/evmtest"
 	"github.com/smartcontractkit/chainlink/core/internal/testutils/pgtest"
@@ -77,13 +77,13 @@ func setupChain(t *testing.T) (*backends.SimulatedBackend, *bind.TransactOpts) {
 type CCIPContracts struct {
 	sourceUser, destUser           *bind.TransactOpts
 	sourceChain, destChain         *backends.SimulatedBackend
-	sourcePool, destPool           *lock_unlock_pool.LockUnlockPool
-	onRamp                         *single_token_onramp.SingleTokenOnRamp
+	sourcePool, destPool           *native_token_pool.NativeTokenPool
+	onRamp                         *onramp.OnRamp
 	sourceLinkToken, destLinkToken *link_token_interface.LinkToken
-	offRamp                        *single_token_offramp.SingleTokenOffRamp
+	offRamp                        *offramp.OffRamp
 	messageReceiver                *simple_message_receiver.SimpleMessageReceiver
-	eoaTokenSender                 *single_token_sender.EOASingleTokenSender
-	eoaTokenReceiver               *single_token_receiver.EOASingleTokenReceiver
+	senderDapp                     *sender_dapp.SenderDapp
+	receiverDapp                   *receiver_dapp.ReceiverDapp
 	executor                       *message_executor.MessageExecutor
 }
 
@@ -97,10 +97,10 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 	sourceChain.Commit()
 	sourceLinkToken, err := link_token_interface.NewLinkToken(sourceLinkTokenAddress, sourceChain)
 	require.NoError(t, err)
-	sourcePoolAddress, _, _, err := lock_unlock_pool.DeployLockUnlockPool(sourceUser, sourceChain, sourceLinkTokenAddress)
+	sourcePoolAddress, _, _, err := native_token_pool.DeployNativeTokenPool(sourceUser, sourceChain, sourceLinkTokenAddress, big.NewInt(1), big.NewInt(1e9), big.NewInt(1), big.NewInt(1e9))
 	require.NoError(t, err)
 	sourceChain.Commit()
-	sourcePool, err := lock_unlock_pool.NewLockUnlockPool(sourcePoolAddress, sourceChain)
+	sourcePool, err := native_token_pool.NewNativeTokenPool(sourcePoolAddress, sourceChain)
 	require.NoError(t, err)
 
 	// Deploy link token and pool on destination chain
@@ -109,10 +109,10 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 	destChain.Commit()
 	destLinkToken, err := link_token_interface.NewLinkToken(destLinkTokenAddress, destChain)
 	require.NoError(t, err)
-	destPoolAddress, _, _, err := lock_unlock_pool.DeployLockUnlockPool(destUser, destChain, destLinkTokenAddress)
+	destPoolAddress, _, _, err := native_token_pool.DeployNativeTokenPool(destUser, destChain, destLinkTokenAddress, big.NewInt(1), big.NewInt(1e9), big.NewInt(1), big.NewInt(1e9))
 	require.NoError(t, err)
 	destChain.Commit()
-	destPool, err := lock_unlock_pool.NewLockUnlockPool(destPoolAddress, destChain)
+	destPool, err := native_token_pool.NewNativeTokenPool(destPoolAddress, destChain)
 	require.NoError(t, err)
 	destChain.Commit()
 
@@ -141,25 +141,29 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 	require.NoError(t, err)
 	sourceChain.Commit()
 
+	// LINK/ETH price
+	feedAddress, _, _, err := mock_v3_aggregator_contract.DeployMockV3AggregatorContract(sourceUser, sourceChain, 18, big.NewInt(6000000000000000))
+	require.NoError(t, err)
+
 	// Deploy onramp source chain
-	onRampAddress, _, _, err := single_token_onramp.DeploySingleTokenOnRamp(
-		sourceUser,             // users
-		sourceChain,            // backend
-		sourceChainID,          // source chain id
-		sourceLinkTokenAddress, // token
-		sourcePoolAddress,      // pool
-		destChainID,            // remoteChainId
-		destLinkTokenAddress,   // remoteToken
-		[]common.Address{},     // allow list
-		false,                  // enableAllowList
-		big.NewInt(1),          // token bucket rate
-		big.NewInt(1000),       // token bucket capacity,
-		afnSourceAddress,       // AFN
-		big.NewInt(86400),      //maxTimeWithoutAFNSignal 86400 seconds = one day
+	onRampAddress, _, _, err := onramp.DeployOnRamp(
+		sourceUser,                               // user
+		sourceChain,                              // client
+		sourceChainID,                            // source chain id
+		[]*big.Int{destChainID},                  // destinationChainIds
+		[]common.Address{sourceLinkTokenAddress}, // tokens
+		[]common.Address{sourcePoolAddress},      // pools
+		[]common.Address{feedAddress},            // Feeds
+		[]common.Address{},                       // allow list
+		afnSourceAddress,                         // AFN
+		big.NewInt(86400),                        //maxTimeWithoutAFNSignal 86400 seconds = one day
+		big.NewInt(5),                            // maxTokensLength
+		big.NewInt(1e12),                         // maxDataSize
+		big.NewInt(0),                            // relayingFeeLink
 	)
 	require.NoError(t, err)
 	// We do this so onRamp.Address() works
-	onRamp, err := single_token_onramp.NewSingleTokenOnRamp(onRampAddress, sourceChain)
+	onRamp, err := onramp.NewOnRamp(onRampAddress, sourceChain)
 	require.NoError(t, err)
 	_, err = sourcePool.SetOnRamp(sourceUser, onRampAddress, true)
 	require.NoError(t, err)
@@ -175,42 +179,52 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 	require.NoError(t, err)
 	destChain.Commit()
 
+	feedDestAddress, _, _, err := mock_v3_aggregator_contract.DeployMockV3AggregatorContract(destUser, destChain, 18, big.NewInt(6000000000000000))
+	require.NoError(t, err)
+
 	// Deploy offramp dest chain
-	offRampAddress, _, _, err := single_token_offramp.DeploySingleTokenOffRamp(
-		destUser,
-		destChain,
-		sourceChainID,
-		destChainID,
-		destLinkTokenAddress,
-		destPoolAddress,
-		big.NewInt(1),     // token bucket rate
-		big.NewInt(1000),  // token bucket capacity,
-		afnDestAddress,    // AFN
-		big.NewInt(86400), //maxTimeWithoutAFNSignal 86400 seconds = one day
-		big.NewInt(0),     // execution delay in seconds
+	offRampAddress, _, _, err := offramp.DeployOffRamp(
+		destUser,                                 // user
+		destChain,                                // client
+		sourceChainID,                            // source chain id
+		destChainID,                              // dest chain id
+		[]common.Address{sourceLinkTokenAddress}, // source tokens
+		[]common.Address{destPoolAddress},        // dest pool addresses
+		[]common.Address{feedDestAddress},        // feeds
+		afnDestAddress,                           // AFN address
+		big.NewInt(86400),                        // max timeout without AFN signal  86400 seconds = one day
+		big.NewInt(0),                            // executionDelaySeconds
+		big.NewInt(5),                            // maxTokensLength
+		big.NewInt(0),                            // executionFeeLink
+		big.NewInt(1e12),                         // maxDataSize
 	)
 	require.NoError(t, err)
-	offRamp, err := single_token_offramp.NewSingleTokenOffRamp(offRampAddress, destChain)
+	offRamp, err := offramp.NewOffRamp(offRampAddress, destChain)
 	require.NoError(t, err)
 	// Set the pool to be the offramp
 	_, err = destPool.SetOffRamp(destUser, offRampAddress, true)
 	require.NoError(t, err)
+	destChain.Commit()
 
 	// Deploy offramp contract token receiver
 	messageReceiverAddress, _, _, err := simple_message_receiver.DeploySimpleMessageReceiver(destUser, destChain)
 	require.NoError(t, err)
 	messageReceiver, err := simple_message_receiver.NewSimpleMessageReceiver(messageReceiverAddress, destChain)
 	require.NoError(t, err)
-	// Deploy offramp EOA token receiver
-	eoaTokenReceiverAddress, _, _, err := single_token_receiver.DeployEOASingleTokenReceiver(destUser, destChain, offRampAddress)
+	// Deploy offramp token receiver dapp
+	receiverDappAddress, _, _, err := receiver_dapp.DeployReceiverDapp(destUser, destChain, offRampAddress, destLinkTokenAddress)
 	require.NoError(t, err)
-	eoaTokenReceiver, err := single_token_receiver.NewEOASingleTokenReceiver(eoaTokenReceiverAddress, destChain)
+	eoaTokenReceiver, err := receiver_dapp.NewReceiverDapp(receiverDappAddress, destChain)
 	require.NoError(t, err)
-	// Deploy onramp EOA token sender
-	eoaTokenSenderAddress, _, _, err := single_token_sender.DeployEOASingleTokenSender(sourceUser, sourceChain, onRampAddress, eoaTokenReceiverAddress)
+	// Deploy onramp token sender dapp
+	senderDappAddress, _, _, err := sender_dapp.DeploySenderDapp(sourceUser, sourceChain, onRampAddress, destChainID, receiverDappAddress)
 	require.NoError(t, err)
-	eoaTokenSender, err := single_token_sender.NewEOASingleTokenSender(eoaTokenSenderAddress, sourceChain)
+	eoaTokenSender, err := sender_dapp.NewSenderDapp(senderDappAddress, sourceChain)
 	require.NoError(t, err)
+
+	// Need to commit here, or we will hit the block gas limit when deploying the executor
+	sourceChain.Commit()
+	destChain.Commit()
 
 	// Deploy the message executor ocr2 contract
 	executorAddress, _, _, err := message_executor.DeployMessageExecutor(destUser, destChain, offRampAddress)
@@ -222,20 +236,20 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 	destChain.Commit()
 
 	return CCIPContracts{
-		sourceUser:       sourceUser,
-		destUser:         destUser,
-		sourceChain:      sourceChain,
-		destChain:        destChain,
-		sourcePool:       sourcePool,
-		destPool:         destPool,
-		onRamp:           onRamp,
-		sourceLinkToken:  sourceLinkToken,
-		destLinkToken:    destLinkToken,
-		offRamp:          offRamp,
-		messageReceiver:  messageReceiver,
-		eoaTokenReceiver: eoaTokenReceiver,
-		eoaTokenSender:   eoaTokenSender,
-		executor:         executor,
+		sourceUser:      sourceUser,
+		destUser:        destUser,
+		sourceChain:     sourceChain,
+		destChain:       destChain,
+		sourcePool:      sourcePool,
+		destPool:        destPool,
+		onRamp:          onRamp,
+		sourceLinkToken: sourceLinkToken,
+		destLinkToken:   destLinkToken,
+		offRamp:         offRamp,
+		messageReceiver: messageReceiver,
+		receiverDapp:    eoaTokenReceiver,
+		senderDapp:      eoaTokenSender,
+		executor:        executor,
 	}
 }
 
@@ -488,7 +502,6 @@ func TestIntegration_CCIP(t *testing.T) {
 
 	setupOnchainConfig(t, ccipContracts, oracles, reportingPluginConfig)
 	ctx := context.Background()
-
 	err = appBootstrap.Start(ctx)
 	require.NoError(t, err)
 	defer appBootstrap.Stop()
@@ -573,14 +586,15 @@ chainID             = "%s"
 	// Jobs are booting but that is ok, the log broadcaster
 	// will backfill this request log.
 	ccipContracts.sourceUser.GasLimit = 500000
-	_, err = ccipContracts.sourceLinkToken.Approve(ccipContracts.sourceUser, ccipContracts.sourcePool.Address(), big.NewInt(100))
+	_, err = ccipContracts.sourceLinkToken.Approve(ccipContracts.sourceUser, ccipContracts.onRamp.Address(), big.NewInt(100))
 	ccipContracts.sourceChain.Commit()
-	msg := single_token_onramp.CCIPMessagePayload{
-		Receiver: ccipContracts.messageReceiver.Address(),
-		Data:     []byte("hello xchain world"),
-		Tokens:   []common.Address{ccipContracts.sourceLinkToken.Address()},
-		Amounts:  []*big.Int{big.NewInt(100)},
-		Options:  nil,
+	msg := onramp.CCIPMessagePayload{
+		Receiver:           ccipContracts.messageReceiver.Address(),
+		DestinationChainId: destChainID,
+		Data:               []byte("hello xchain world"),
+		Tokens:             []common.Address{ccipContracts.sourceLinkToken.Address()},
+		Amounts:            []*big.Int{big.NewInt(100)},
+		Options:            nil,
 	}
 	tx, err := ccipContracts.onRamp.RequestCrossChainSend(ccipContracts.sourceUser, msg)
 	require.NoError(t, err)
@@ -612,7 +626,7 @@ chainID             = "%s"
 	// So we should eventually see a successful offramp submission.
 	// Note that since we only send blocks here, it's likely that all the nodes will enter the transmission
 	// phase before someone has submitted, so 1 report will succeed and 3 will revert.
-	var report single_token_offramp.CCIPRelayReport
+	var report offramp.CCIPRelayReport
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
 		report, err = ccipContracts.offRamp.GetLastReport(nil)
 		require.NoError(t, err)
@@ -646,7 +660,7 @@ chainID             = "%s"
 	// Root should match the report root
 	require.True(t, bytes.Equal(root[:], report.MerkleRoot[:]))
 
-	// Proof should verify.
+	// Path should verify.
 	genRoot := ccip.GenerateMerkleRoot(reqs[0].Raw, proof)
 	require.True(t, bytes.Equal(root[:], genRoot[:]))
 	exists, err := ccipContracts.offRamp.GetMerkleRoot(nil, report.MerkleRoot)
@@ -656,15 +670,18 @@ chainID             = "%s"
 	h, err := utils.Keccak256(append([]byte{0x00}, reqs[0].Raw...))
 	var leaf [32]byte
 	copy(leaf[:], h)
-	onchainRoot, err := ccipContracts.offRamp.GenerateMerkleRoot(nil, proof.PathForExecute(), leaf, proof.Index())
+	decodedMsg, err := ccip.DecodeCCIPMessage(reqs[0].Raw)
+	require.NoError(t, err)
+	offRampProof := offramp.CCIPMerkleProof{
+		Path:  proof.PathForExecute(),
+		Index: proof.Index(),
+	}
+	onchainRoot, err := ccipContracts.offRamp.MerkleRoot(nil, *decodedMsg, offRampProof)
 	require.NoError(t, err)
 	require.Equal(t, genRoot, onchainRoot)
 
 	// Execute the Message
-	decodedMsg, err := ccip.DecodeCCIPMessage(reqs[0].Raw)
-	require.NoError(t, err)
-	ccip.MakeCCIPMsgArgs().PackValues([]interface{}{*decodedMsg})
-	tx, err = ccipContracts.offRamp.ExecuteTransaction(ccipContracts.destUser, proof.PathForExecute(), *decodedMsg, proof.Index())
+	tx, err = ccipContracts.offRamp.ExecuteTransaction(ccipContracts.destUser, *decodedMsg, offRampProof, false)
 	require.NoError(t, err)
 	ccipContracts.destChain.Commit()
 
@@ -683,11 +700,11 @@ chainID             = "%s"
 
 	ccipContracts.sourceUser.GasLimit = 500000
 	// Approve the sender contract to take the tokens
-	_, err = ccipContracts.sourceLinkToken.Approve(ccipContracts.sourceUser, ccipContracts.eoaTokenSender.Address(), big.NewInt(100))
+	_, err = ccipContracts.sourceLinkToken.Approve(ccipContracts.sourceUser, ccipContracts.senderDapp.Address(), big.NewInt(100))
 	ccipContracts.sourceChain.Commit()
 	// Send the tokens. Should invoke the onramp.
 	// Only the destUser can execute.
-	tx, err = ccipContracts.eoaTokenSender.SendTokens(ccipContracts.sourceUser, ccipContracts.destUser.From, big.NewInt(100), ccipContracts.destUser.From)
+	tx, err = ccipContracts.senderDapp.SendTokens(ccipContracts.sourceUser, ccipContracts.destUser.From, []common.Address{ccipContracts.sourceLinkToken.Address()}, []*big.Int{big.NewInt(100)}, ccipContracts.destUser.From)
 	require.NoError(t, err)
 	ccipContracts.sourceChain.Commit()
 
@@ -709,7 +726,10 @@ chainID             = "%s"
 	decodedMsg, err = ccip.DecodeCCIPMessage(eoaReq[0].Raw)
 	require.NoError(t, err)
 	ccip.MakeCCIPMsgArgs().PackValues([]interface{}{*decodedMsg})
-	tx, err = ccipContracts.offRamp.ExecuteTransaction(ccipContracts.destUser, proof.PathForExecute(), *decodedMsg, proof.Index())
+	tx, err = ccipContracts.offRamp.ExecuteTransaction(ccipContracts.destUser, *decodedMsg, offramp.CCIPMerkleProof{
+		Path:  proof.PathForExecute(),
+		Index: proof.Index(),
+	}, false)
 	require.NoError(t, err)
 	ccipContracts.destChain.Commit()
 
@@ -724,17 +744,18 @@ chainID             = "%s"
 	assert.Equal(t, "100", big.NewInt(0).Sub(endBalanceDest, startBalanceDest).String())
 
 	// Now let's send a request flagged for oracle execution
-	_, err = ccipContracts.sourceLinkToken.Approve(ccipContracts.sourceUser, ccipContracts.sourcePool.Address(), big.NewInt(100))
+	_, err = ccipContracts.sourceLinkToken.Approve(ccipContracts.sourceUser, ccipContracts.onRamp.Address(), big.NewInt(100))
 	require.NoError(t, err)
 	ccipContracts.sourceChain.Commit()
 	require.NoError(t, err)
-	msg = single_token_onramp.CCIPMessagePayload{
-		Receiver: ccipContracts.messageReceiver.Address(),
-		Data:     []byte("hey DON, execute for me"),
-		Tokens:   []common.Address{ccipContracts.sourceLinkToken.Address()},
-		Amounts:  []*big.Int{big.NewInt(100)},
-		Executor: ccipContracts.executor.Address(),
-		Options:  []byte{},
+	msg = onramp.CCIPMessagePayload{
+		Receiver:           ccipContracts.messageReceiver.Address(),
+		Data:               []byte("hey DON, execute for me"),
+		Tokens:             []common.Address{ccipContracts.sourceLinkToken.Address()},
+		Amounts:            []*big.Int{big.NewInt(100)},
+		DestinationChainId: destChainID,
+		Executor:           ccipContracts.executor.Address(),
+		Options:            []byte{},
 	}
 	_, err = ccipContracts.onRamp.RequestCrossChainSend(ccipContracts.sourceUser, msg)
 	require.NoError(t, err)

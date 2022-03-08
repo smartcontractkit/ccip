@@ -9,10 +9,11 @@ import (
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"github.com/smartcontractkit/sqlx"
 
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/onramp"
+
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/core/config"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_offramp"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_onramp"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/job"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins"
@@ -42,7 +43,7 @@ type CCIPExecution struct {
 
 	sourceChain evm.Chain
 	destChain   evm.Chain
-	offRamp     *single_token_offramp.SingleTokenOffRamp
+	offRamp     *offramp.OffRamp
 }
 
 var _ plugins.OraclePlugin = &CCIPExecution{}
@@ -71,7 +72,7 @@ func NewCCIPExecution(jobID int32, spec *job.OCR2OracleSpec, chainSet evm.ChainS
 	if !common.IsHexAddress(spec.ContractID) {
 		return nil, errors.Wrap(err, "spec.OffRampID is not a valid hex address")
 	}
-	offRamp, err := single_token_offramp.NewSingleTokenOffRamp(common.HexToAddress(pluginConfig.OffRampId), destChain.Client())
+	offRamp, err := offramp.NewOffRamp(common.HexToAddress(pluginConfig.OffRampId), destChain.Client())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed creating a new onramp")
 	}
@@ -105,7 +106,7 @@ func (c *CCIPExecution) GetPluginFactory() (plugin ocrtypes.ReportingPluginFacto
 
 // GetServices returns the log listener service.
 func (c *CCIPExecution) GetServices() ([]job.ServiceCtx, error) {
-	singleTokenOnRamp, err := single_token_onramp.NewSingleTokenOnRamp(common.HexToAddress(string(c.config.OnRampID)), c.sourceChain.Client())
+	singleTokenOnRamp, err := onramp.NewOnRamp(common.HexToAddress(string(c.config.OnRampID)), c.sourceChain.Client())
 	if err != nil {
 		return nil, err
 	}

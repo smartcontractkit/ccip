@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.6;
+pragma solidity 0.8.12;
 
 import "../interfaces/OffRampInterface.sol";
 import "../../interfaces/TypeAndVersionInterface.sol";
@@ -11,10 +11,13 @@ import "../utils/CCIP.sol";
  * in an OffRamp in a single transaction.
  */
 contract MessageExecutor is TypeAndVersionInterface, OCR2Base {
+  /// @notice Message and its proof
   struct ExecutableMessage {
-    bytes32[] proof;
-    CCIP.Message message;
+    // We have to split to MerkleProof up here into its individual parts, and also order
+    // the items here to avoid a stack too deep error. This needs investigation.
+    bytes32[] path;
     uint256 index;
+    CCIP.Message message;
   }
 
   OffRampInterface public immutable s_offRamp;
@@ -35,7 +38,7 @@ contract MessageExecutor is TypeAndVersionInterface, OCR2Base {
     ExecutableMessage[] memory executableMessages = abi.decode(report, (ExecutableMessage[]));
     for (uint256 i = 0; i < executableMessages.length; i++) {
       ExecutableMessage memory em = executableMessages[i];
-      s_offRamp.executeTransaction(em.proof, em.message, em.index);
+      s_offRamp.executeTransaction(em.message, CCIP.MerkleProof({path: em.path, index: em.index}), false);
     }
   }
 

@@ -8,32 +8,34 @@ import "../utils/CCIP.sol";
 interface OffRampInterface {
   error RelayReportError();
   error SequenceError(uint256 lastMaxSequenceNumber, uint256 newMinSequenceNumber);
-  error MerkleProofError(bytes32[] proof, CCIP.Message message, uint256 index);
+  error MerkleProofError(CCIP.MerkleProof proof, CCIP.Message message);
   error TokenMismatch();
   error UnsupportedNumberOfTokens();
   error UnsupportedToken(IERC20 token);
-  error ExceedsTokenLimit(uint256 currentLimit, uint256 requested);
   error AlreadyExecuted(uint256 sequenceNumber);
   error InvalidExecutor(uint256 sequenceNumber);
   error ExecutionError(uint256 sequenceNumber, bytes reason);
+  error FeeError();
   error ExecutionDelayError();
   error InvalidReceiver(address receiver);
   error InvalidSourceChain(uint256 sourceChainId);
+  error MessageTooLarge(uint256 maxSize, uint256 actualSize);
 
   event ReportAccepted(CCIP.RelayReport report);
   event CrossChainMessageExecuted(uint256 indexed sequenceNumber);
   event ExecutionDelaySecondsSet(uint256 delay);
-  event NewTokenBucketConstructed(uint256 rate, uint256 capacity, bool full);
+  event ExecutionFeeLinkSet(uint256 executionFee);
+  event MaxDataSizeSet(uint256 size);
 
   /**
    * @notice Execute the delivery of a message by using its merkle proof
    * @param proof Merkle proof
    * @param message Original message object
-   * @param index Index of the message in the original tree
+   * @param needFee Whether or not the executor requires a fee
    */
   function executeTransaction(
-    bytes32[] memory proof,
     CCIP.Message memory message,
-    uint256 index
+    CCIP.MerkleProof memory proof,
+    bool needFee
   ) external;
 }

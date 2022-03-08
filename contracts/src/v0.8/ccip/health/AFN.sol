@@ -1,21 +1,22 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.6;
+pragma solidity 0.8.12;
 
 import "../interfaces/AFNInterface.sol";
 import "../access/OwnerIsCreator.sol";
+import "../../interfaces/TypeAndVersionInterface.sol";
 
-contract AFN is AFNInterface, OwnerIsCreator {
-  // AFN party addresses and weights
-  mapping(address => uint256) private s_parties;
-  // List of AFN party addresses
-  address[] private s_partyList;
-  // Quorum of good votes to reach
-  uint256 private s_goodQuorum;
-  // Quorum of bad votes to reach
-  uint256 private s_badQuorum;
+contract AFN is AFNInterface, OwnerIsCreator, TypeAndVersionInterface {
+  // AFN participant addresses and weights
+  mapping(address => uint256) private s_weightByParticipant;
+  // List of AFN participant addresses
+  address[] private s_participantList;
+  // Quorum of good votes to reach for a heartbeat
+  uint256 private s_weightThresholdForHeartbeat;
+  // Quorum of bad votes to reach for a bad signal
+  uint256 private s_weightThresholdForBadSignal;
   // The current round ID
   uint256 private s_round;
-  // Version of the set of parties
+  // Version of the set of participants
   uint256 private s_committeeVersion;
 
   // Last heartbeat
@@ -27,7 +28,7 @@ contract AFN is AFNInterface, OwnerIsCreator {
 
   // Has a party voted bad
   mapping(address => bool) private s_hasVotedBad;
-  // Parties that have voted bad
+  // participants that have voted bad
   address[] private s_badVoters;
   // Total bad votes
   uint256 private s_badVotes;
@@ -35,12 +36,12 @@ contract AFN is AFNInterface, OwnerIsCreator {
   bool private s_badSignal;
 
   constructor(
-    address[] memory parties,
+    address[] memory participants,
     uint256[] memory weights,
-    uint256 goodQuorum,
-    uint256 badQuorum
+    uint256 weightThresholdForHeartbeat,
+    uint256 weightThresholdForBadSignal
   ) {
-    _setConfig(parties, weights, goodQuorum, badQuorum, 1, 1);
+    _setConfig(participants, weights, weightThresholdForHeartbeat, weightThresholdForBadSignal, 1, 1);
   }
 
   ////////  VOTING  ////////
@@ -55,14 +56,14 @@ contract AFN is AFNInterface, OwnerIsCreator {
     if (round != currentRound) revert IncorrectRound(currentRound, round);
     if (s_badSignal) revert MustRecoverFromBadSignal();
     address sender = msg.sender;
-    if (s_parties[sender] == 0) revert InvalidVoter(sender);
+    if (s_weightByParticipant[sender] == 0) revert InvalidVoter(sender);
     if (s_lastGoodVote[sender] == currentRound) revert AlreadyVoted();
 
     s_lastGoodVote[sender] = currentRound;
-    s_goodVotes[currentRound] += s_parties[sender];
+    s_goodVotes[currentRound] += s_weightByParticipant[sender];
     emit GoodVote(sender, currentRound);
 
-    if (s_goodVotes[currentRound] >= s_goodQuorum) {
+    if (s_goodVotes[currentRound] >= s_weightThresholdForHeartbeat) {
       Heartbeat memory heartbeat = Heartbeat({
         round: currentRound,
         timestamp: uint64(block.timestamp),
@@ -81,7 +82,7 @@ contract AFN is AFNInterface, OwnerIsCreator {
   function voteBad() external override {
     if (s_badSignal) revert MustRecoverFromBadSignal();
     address sender = msg.sender;
-    uint256 senderWeight = s_parties[sender];
+    uint256 senderWeight = s_weightByParticipant[sender];
     if (senderWeight == 0) revert InvalidVoter(sender);
     if (s_hasVotedBad[sender]) revert AlreadyVoted();
 
@@ -89,7 +90,7 @@ contract AFN is AFNInterface, OwnerIsCreator {
     s_badVoters.push(sender);
     s_badVotes += senderWeight;
 
-    if (s_badVotes >= s_badQuorum) {
+    if (s_badVotes >= s_weightThresholdForBadSignal) {
       s_badSignal = true;
       emit AFNBadSignal(block.timestamp);
     }
@@ -116,18 +117,25 @@ contract AFN is AFNInterface, OwnerIsCreator {
   /**
    * @notice Set config storage vars
    * @dev only callable by the owner
-   * @param parties parties allowed to vote
+   * @param participants participants allowed to vote
    * @param weights weights of each party's vote
-   * @param goodQuorum threshold to emit a heartbeat
-   * @param badQuorum threashold to emit a bad signal
+   * @param weightThresholdForHeartbeat threshold to emit a heartbeat
+   * @param weightThresholdForBadSignal threashold to emit a bad signal
    */
   function setConfig(
-    address[] memory parties,
+    address[] memory participants,
     uint256[] memory weights,
-    uint256 goodQuorum,
-    uint256 badQuorum
+    uint256 weightThresholdForHeartbeat,
+    uint256 weightThresholdForBadSignal
   ) external override onlyOwner {
-    _setConfig(parties, weights, goodQuorum, badQuorum, s_round + 1, s_committeeVersion + 1);
+    _setConfig(
+      participants,
+      weights,
+      weightThresholdForHeartbeat,
+      weightThresholdForBadSignal,
+      s_round + 1,
+      s_committeeVersion + 1
+    );
   }
 
   ////////  Views ////////
@@ -140,16 +148,16 @@ contract AFN is AFNInterface, OwnerIsCreator {
     return s_lastHeartbeat;
   }
 
-  function getQuorums() external view returns (uint256 good, uint256 bad) {
-    return (s_goodQuorum, s_badQuorum);
+  function getWeightThresholds() external view returns (uint256 good, uint256 bad) {
+    return (s_weightThresholdForHeartbeat, s_weightThresholdForBadSignal);
   }
 
-  function getParties() external view returns (address[] memory) {
-    return s_partyList;
+  function getParticipants() external view returns (address[] memory) {
+    return s_participantList;
   }
 
-  function getWeight(address party) external view returns (uint256) {
-    return s_parties[party];
+  function getWeightByParticipant(address participant) external view returns (uint256) {
+    return s_weightByParticipant[participant];
   }
 
   function getRound() external view returns (uint256) {
@@ -160,8 +168,8 @@ contract AFN is AFNInterface, OwnerIsCreator {
     return s_committeeVersion;
   }
 
-  function getLastGoodVote(address party) external view returns (uint256) {
-    return s_lastGoodVote[party];
+  function getLastGoodVoteByParticipant(address participant) external view returns (uint256) {
+    return s_lastGoodVote[participant];
   }
 
   function getGoodVotes(uint256 round) external view returns (uint256) {
@@ -172,8 +180,8 @@ contract AFN is AFNInterface, OwnerIsCreator {
     return (s_badVoters, s_badVotes);
   }
 
-  function hasVotedBad(address party) external view returns (bool) {
-    return s_hasVotedBad[party];
+  function hasVotedBad(address participant) external view returns (bool) {
+    return s_hasVotedBad[participant];
   }
 
   ////////  Private ////////
@@ -182,41 +190,50 @@ contract AFN is AFNInterface, OwnerIsCreator {
    * @notice Set detailed config storage vars
    */
   function _setConfig(
-    address[] memory parties,
+    address[] memory participants,
     uint256[] memory weights,
-    uint256 goodQuorum,
-    uint256 badQuorum,
+    uint256 weightThresholdForHeartbeat,
+    uint256 weightThresholdForBadSignal,
     uint256 round,
     uint256 committeeVersion
   ) private {
     if (
-      parties.length != weights.length ||
-      parties.length == 0 ||
-      goodQuorum == 0 ||
-      badQuorum == 0 ||
+      participants.length != weights.length ||
+      participants.length == 0 ||
+      weightThresholdForHeartbeat == 0 ||
+      weightThresholdForBadSignal == 0 ||
       round == 0 ||
       committeeVersion == 0
     ) {
       revert InvalidConfig();
     }
-    // Unset existing parties
-    address[] memory existingParties = s_partyList;
-    for (uint256 i = 0; i < existingParties.length; i++) {
-      s_parties[existingParties[i]] = 0;
+    // Unset existing participants
+    address[] memory existingParticipants = s_participantList;
+    for (uint256 i = 0; i < existingParticipants.length; i++) {
+      s_weightByParticipant[existingParticipants[i]] = 0;
     }
 
     // Update round, committee and quorum details
-    s_goodQuorum = goodQuorum;
-    s_badQuorum = badQuorum;
+    s_weightThresholdForHeartbeat = weightThresholdForHeartbeat;
+    s_weightThresholdForBadSignal = weightThresholdForBadSignal;
     s_round = round;
     s_committeeVersion = committeeVersion;
 
-    // Set new parties
-    s_partyList = parties;
-    for (uint256 i = 0; i < parties.length; i++) {
+    uint256 weightTotal = 0;
+    // Set new participants
+    s_participantList = participants;
+    for (uint256 i = 0; i < participants.length; i++) {
       if (weights[i] == 0) revert InvalidWeight();
-      s_parties[parties[i]] = weights[i];
+      s_weightByParticipant[participants[i]] = weights[i];
+      weightTotal += weights[i];
     }
-    emit ConfigSet(parties, weights, goodQuorum, badQuorum);
+    if (weightTotal < weightThresholdForHeartbeat || weightTotal < weightThresholdForBadSignal) {
+      revert InvalidConfig();
+    }
+    emit ConfigSet(participants, weights, weightThresholdForHeartbeat, weightThresholdForBadSignal);
+  }
+
+  function typeAndVersion() external pure override returns (string memory) {
+    return "AFN 0.0.1";
   }
 }

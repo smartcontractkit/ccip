@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
@@ -40,4 +41,16 @@ func WaitForMined(ctx context.Context, client *ethclient.Client, hash common.Has
 		time.Sleep(RetryTiming)
 	}
 	panic("No tx found within the given timeout")
+}
+
+// SetGasFees configures the chain client with the given EVMGasSettings. This method is needed for EIP txs
+// to function because of the geth-only tip fee method.
+func SetGasFees(owner *bind.TransactOpts, config EVMGasSettings) {
+	if config.EIP1559 {
+		// to not use geth-only tip fee method when EIP1559 is enabled
+		// https://github.com/ethereum/go-ethereum/pull/23484
+		owner.GasTipCap = config.GasTipCap
+	} else {
+		owner.GasPrice = config.GasPrice
+	}
 }

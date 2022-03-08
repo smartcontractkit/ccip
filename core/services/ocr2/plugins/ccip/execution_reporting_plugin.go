@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"sort"
 
@@ -13,7 +14,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_offramp"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/utils"
 )
@@ -23,10 +24,26 @@ const ExecutionMaxInflightTimeSeconds = 180
 var _ types.ReportingPluginFactory = &ExecutionReportingPluginFactory{}
 var _ types.ReportingPlugin = &ExecutionReportingPlugin{}
 
+// Message contains the data from a cross chain message
+type Message struct {
+	SequenceNumber *big.Int       `json:"sequenceNumber"`
+	SourceChainId  *big.Int       `json:"sourceChainId"`
+	Sender         common.Address `json:"sender"`
+	Payload        struct {
+		Tokens             []common.Address `json:"tokens"`
+		Amounts            []*big.Int       `json:"amounts"`
+		DestinationChainId *big.Int         `json:"destinationChainId"`
+		Receiver           common.Address   `json:"receiver"`
+		Executor           common.Address   `json:"executor"`
+		Data               []uint8          `json:"data"`
+		Options            []uint8          `json:"options"`
+	} `json:"payload"`
+}
+
 type ExecutableMessage struct {
-	Proof   [][32]byte `json:"proof"`
-	Message Message    `json:"message"`
+	Path    [][32]byte `json:"path"`
 	Index   *big.Int   `json:"index"`
+	Message Message    `json:"message"`
 }
 
 type ExecutableMessages []ExecutableMessage
@@ -55,8 +72,12 @@ func makeExecutionReportArgs() abi.Arguments {
 			Name: "executableMessages",
 			Type: mustType("tuple[]", []abi.ArgumentMarshaling{
 				{
-					Name: "Proof",
+					Name: "Path",
 					Type: "bytes32[]",
+				},
+				{
+					Name: "Index",
+					Type: "uint256",
 				},
 				{
 					Name: "Message",
@@ -70,10 +91,7 @@ func makeExecutionReportArgs() abi.Arguments {
 							Name: "sourceChainId",
 							Type: "uint256",
 						},
-						{
-							Name: "destinationChainId",
-							Type: "uint256",
-						},
+
 						{
 							Name: "sender",
 							Type: "address",
@@ -83,14 +101,6 @@ func makeExecutionReportArgs() abi.Arguments {
 							Type: "tuple",
 							Components: []abi.ArgumentMarshaling{
 								{
-									Name: "receiver",
-									Type: "address",
-								},
-								{
-									Name: "data",
-									Type: "bytes",
-								},
-								{
 									Name: "tokens",
 									Type: "address[]",
 								},
@@ -99,8 +109,20 @@ func makeExecutionReportArgs() abi.Arguments {
 									Type: "uint256[]",
 								},
 								{
+									Name: "destinationChainId",
+									Type: "uint256",
+								},
+								{
+									Name: "receiver",
+									Type: "address",
+								},
+								{
 									Name: "executor",
 									Type: "address",
+								},
+								{
+									Name: "data",
+									Type: "bytes",
 								},
 								{
 									Name: "options",
@@ -109,10 +131,6 @@ func makeExecutionReportArgs() abi.Arguments {
 							},
 						},
 					},
-				},
-				{
-					Name: "Index",
-					Type: "uint256",
 				},
 			}),
 		},
@@ -138,32 +156,32 @@ func DecodeExecutionReport(report types.Report) ([]ExecutableMessage, error) {
 
 	// Must be anonymous struct here
 	msgs, ok := unpacked[0].([]struct {
-		Proof   [][32]uint8 `json:"Proof"`
+		Path    [][32]uint8 `json:"Path"`
+		Index   *big.Int    `json:"Index"`
 		Message struct {
-			SequenceNumber     *big.Int       `json:"sequenceNumber"`
-			SourceChainId      *big.Int       `json:"sourceChainId"`
-			DestinationChainId *big.Int       `json:"destinationChainId"`
-			Sender             common.Address `json:"sender"`
-			Payload            struct {
-				Receiver common.Address   `json:"receiver"`
-				Data     []uint8          `json:"data"`
-				Tokens   []common.Address `json:"tokens"`
-				Amounts  []*big.Int       `json:"amounts"`
-				Executor common.Address   `json:"executor"`
-				Options  []uint8          `json:"options"`
+			SequenceNumber *big.Int       `json:"sequenceNumber"`
+			SourceChainId  *big.Int       `json:"sourceChainId"`
+			Sender         common.Address `json:"sender"`
+			Payload        struct {
+				Tokens             []common.Address `json:"tokens"`
+				Amounts            []*big.Int       `json:"amounts"`
+				DestinationChainId *big.Int         `json:"destinationChainId"`
+				Receiver           common.Address   `json:"receiver"`
+				Executor           common.Address   `json:"executor"`
+				Data               []uint8          `json:"data"`
+				Options            []uint8          `json:"options"`
 			} `json:"payload"`
 		} `json:"Message"`
-		Index *big.Int `json:"Index"`
 	})
 	if !ok {
-		return nil, errors.Errorf("got %T", unpacked[0])
+		return nil, fmt.Errorf("got %T", unpacked[0])
 	}
 	var ems []ExecutableMessage
 	for _, emi := range msgs {
 		ems = append(ems, ExecutableMessage{
-			Proof:   emi.Proof,
-			Message: emi.Message,
+			Path:    emi.Path,
 			Index:   emi.Index,
+			Message: emi.Message,
 		})
 	}
 	return ems, nil
@@ -171,7 +189,7 @@ func DecodeExecutionReport(report types.Report) ([]ExecutableMessage, error) {
 
 //go:generate mockery --name OffRampLastReporter --output ./mocks/lastreporter --case=underscore
 type OffRampLastReporter interface {
-	GetLastReport(opts *bind.CallOpts) (single_token_offramp.CCIPRelayReport, error)
+	GetLastReport(opts *bind.CallOpts) (offramp.CCIPRelayReport, error)
 }
 
 type ExecutionReportingPluginFactory struct {
@@ -217,27 +235,33 @@ func (r ExecutionReportingPlugin) Observation(ctx context.Context, timestamp typ
 	// We want to execute any messages which satisfy the following:
 	// 1. Have the executor field set to the DONs message executor contract
 	// 2. There exists a confirmed relay report containing its sequence number, i.e. it's status is RequestStatusRelayConfirmed
-	reqs, err := r.orm.Requests(r.sourceChainId, r.destChainId, nil, nil, RequestStatusRelayConfirmed, &r.executor, nil)
+	relayedReqs, err := r.orm.Requests(r.sourceChainId, r.destChainId, nil, nil, RequestStatusRelayConfirmed, &r.executor, nil)
 	if err != nil {
 		return nil, err
 	}
-	// No request to process
-	// Return an empty observation
-	// which should not result in a report generated.
-	if len(reqs) == 0 {
-		return nil, errors.Errorf("no requests for oracle execution")
+	// No request to process. Return an observation with MinSeqNum and MaxSeqNum equal to NoRequestsToProcess
+	// which should not result in a new report being generated during the Report step.
+	if len(relayedReqs) == 0 {
+		b, jsonErr := json.Marshal(&ExecutionObservation{
+			MinSeqNum: utils.Big(*NoRequestsToProcess),
+			MaxSeqNum: utils.Big(*NoRequestsToProcess),
+		})
+		if jsonErr != nil {
+			return nil, jsonErr
+		}
+		return b, nil
 	}
 	// Double-check the latest sequence number onchain is >= our max relayed seq num
 	lr, err := r.lastReporter.GetLastReport(nil)
 	if err != nil {
 		return nil, err
 	}
-	if reqs[len(reqs)-1].SeqNum.ToInt().Cmp(lr.MaxSequenceNumber) > 0 {
+	if relayedReqs[len(relayedReqs)-1].SeqNum.ToInt().Cmp(lr.MaxSequenceNumber) > 0 {
 		return nil, errors.Errorf("invariant violated, mismatch between relay_confirmed requests and last report")
 	}
 	b, err := json.Marshal(&ExecutionObservation{
-		MinSeqNum: reqs[0].SeqNum,
-		MaxSeqNum: reqs[len(reqs)-1].SeqNum,
+		MinSeqNum: relayedReqs[0].SeqNum,
+		MaxSeqNum: relayedReqs[len(relayedReqs)-1].SeqNum,
 	})
 	if err != nil {
 		return nil, err
@@ -251,7 +275,16 @@ func (r ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.Re
 		var ob ExecutionObservation
 		err := json.Unmarshal(ao.Observation, &ob)
 		if err != nil {
-			r.l.Errorw("Unmarshallable observation", "ao", ao.Observation, "err", err)
+			r.l.Errorw("Received unmarshallable observation", "err", err, "observation", string(ao.Observation))
+			continue
+		}
+		minSeqNum := ob.MinSeqNum.ToInt()
+		if minSeqNum.Sign() < 0 {
+			if minSeqNum.Cmp(NoRequestsToProcess) == 0 {
+				r.l.Tracew("Discarded empty observation %+v", ao)
+			} else {
+				r.l.Warnf("Discarded invalid observation %+v", ao)
+			}
 			continue
 		}
 		nonEmptyObservations = append(nonEmptyObservations, ob)
@@ -267,15 +300,17 @@ func (r ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.Re
 		return nonEmptyObservations[i].MinSeqNum.ToInt().Cmp(nonEmptyObservations[j].MinSeqNum.ToInt()) < 0
 	})
 	// r.F < len(nonEmptyObservations) because of the check above and therefore this is safe
-	min := nonEmptyObservations[r.F].MinSeqNum.ToInt()
+	min := *nonEmptyObservations[r.F].MinSeqNum.ToInt()
 	sort.Slice(nonEmptyObservations, func(i, j int) bool {
 		return nonEmptyObservations[i].MaxSeqNum.ToInt().Cmp(nonEmptyObservations[j].MaxSeqNum.ToInt()) < 0
 	})
-	max := nonEmptyObservations[r.F].MaxSeqNum.ToInt()
-	if max.Cmp(min) < 0 {
+	// We use a conservative maximum. If we pick a value that some honest oracles might not
+	// have seen they’ll end up not agreeing on a report, stalling the protocol.
+	max := *nonEmptyObservations[r.F].MaxSeqNum.ToInt()
+	if max.Cmp(&min) < 0 {
 		return false, nil, errors.New("max seq num smaller than min")
 	}
-	reqs, err := r.orm.Requests(r.sourceChainId, r.destChainId, min, max, RequestStatusRelayConfirmed, &r.executor, nil)
+	reqs, err := r.orm.Requests(r.sourceChainId, r.destChainId, &min, &max, RequestStatusRelayConfirmed, &r.executor, nil)
 	if err != nil {
 		return false, nil, err
 	}
@@ -327,7 +362,7 @@ func (r ExecutionReportingPlugin) buildReport(reqs []*Request) ([]byte, error) {
 			continue
 		}
 		executable = append(executable, ExecutableMessage{
-			Proof:   proof.PathForExecute(),
+			Path:    proof.PathForExecute(),
 			Message: req.ToMessage(),
 			Index:   proof.Index(),
 		})

@@ -1,6 +1,12 @@
 import { BigNumber, BigNumberish, BytesLike } from 'ethers'
 import { ethers } from 'hardhat'
 import { expect } from 'chai'
+
+export interface MerkleProof {
+  path: string[]
+  index: BigNumberish
+}
+
 export interface RelayReport {
   merkleRoot: string
   minSequenceNumber: BigNumber
@@ -10,17 +16,17 @@ export interface RelayReport {
 export interface CCIPMessage {
   sequenceNumber: BigNumber
   sourceChainId: BigNumber
-  destinationChainId: BigNumber
   sender: string
   payload: CCIPMessagePayload
 }
 
 export interface CCIPMessagePayload {
-  receiver: string
-  data: BytesLike
   tokens: string[]
   amounts: BigNumberish[]
+  destinationChainId: BigNumber
+  receiver: string
   executor: string
+  data: BytesLike
   options: BytesLike
 }
 
@@ -56,10 +62,10 @@ export class MerkleTree {
     }
   }
 
-  public recursiveProof(proof: string[]): string[] {
+  public recursivePath(proof: string[]): string[] {
     if (this.parent != undefined) {
       proof.push(this.parent?.getSiblingHash(this.hash)!)
-      this.parent.recursiveProof(proof)
+      this.parent.recursivePath(proof)
     }
     return proof
   }
@@ -142,7 +148,7 @@ export function encodeReport(report: RelayReport) {
 export function hashMessage(message: CCIPMessage) {
   const bytesMessage = ethers.utils.defaultAbiCoder.encode(
     [
-      'tuple(uint256 sequenceNumber, uint256 sourceChainId, uint256 destinationChainId, address sender, tuple(address receiver, bytes data, address[] tokens, uint256[] amounts, address executor, bytes options) payload) message',
+      'tuple(uint256 sequenceNumber, uint256 sourceChainId, address sender, tuple(address[] tokens, uint256[] amounts, uint256 destinationChainId, address receiver, address executor, bytes data, bytes options) payload) message',
     ],
     [message],
   )
@@ -159,9 +165,6 @@ export function messageDeepEqual(
 ) {
   expect(actualMessage?.sequenceNumber).to.equal(expectedMessage.sequenceNumber)
   expect(actualMessage?.sourceChainId).to.equal(expectedMessage.sourceChainId)
-  expect(actualMessage?.destinationChainId).to.equal(
-    expectedMessage.destinationChainId,
-  )
   expect(actualMessage?.sender).to.equal(expectedMessage.sender)
   const actualMessagePayload = actualMessage?.payload
   expect(actualMessagePayload?.receiver).to.equal(
@@ -177,6 +180,9 @@ export function messageDeepEqual(
     const expectedAmount = expectedAmounts[i].toString()
     expect(actualMessagePayload.amounts[i].toString()).to.equal(expectedAmount)
   }
+  expect(actualMessagePayload.destinationChainId).to.equal(
+    expectedMessage.payload.destinationChainId,
+  )
   expect(actualMessagePayload?.options).to.equal(
     expectedMessage.payload.options,
   )
@@ -186,29 +192,35 @@ export function requestEventArgsEqual(
   actualRequestArgs: any,
   expectedRequestArgs: any,
 ) {
-  expect(actualRequestArgs?.sequenceNumber).to.equal(
+  expect(actualRequestArgs.message.sequenceNumber).to.equal(
     expectedRequestArgs.sequenceNumber,
   )
-
-  expect(actualRequestArgs?.chainId).to.equal(expectedRequestArgs.chainId)
-  expect(actualRequestArgs?.sender).to.equal(expectedRequestArgs.sender)
-  expect(actualRequestArgs?.payload.receiver).to.equal(
+  expect(actualRequestArgs.message.sourceChainId).to.equal(
+    expectedRequestArgs.sourceChainId,
+  )
+  expect(actualRequestArgs.message.sender).to.equal(expectedRequestArgs.sender)
+  expect(actualRequestArgs.message.payload.receiver).to.equal(
     expectedRequestArgs.receiver,
   )
-  expect(actualRequestArgs?.payload.data).to.equal(expectedRequestArgs.data)
-  expect(actualRequestArgs.payload.tokens).to.deep.equal(
+  expect(actualRequestArgs.message.payload.data).to.equal(
+    expectedRequestArgs.data,
+  )
+  expect(actualRequestArgs.message.payload.tokens).to.deep.equal(
     expectedRequestArgs.tokens,
   )
-  expect(actualRequestArgs.payload.amounts.length).to.equal(
+  expect(actualRequestArgs.message.payload.amounts.length).to.equal(
     expectedRequestArgs.amounts.length,
   )
   for (let i = 0; i < expectedRequestArgs.amounts.length; i++) {
-    const expectedAmount = expectedRequestArgs?.amounts[i].toString()
-    expect(actualRequestArgs?.payload.amounts[i].toString()).to.equal(
+    const expectedAmount = expectedRequestArgs.amounts[i].toString()
+    expect(actualRequestArgs.message.payload.amounts[i].toString()).to.equal(
       expectedAmount,
     )
   }
-  expect(actualRequestArgs?.payload.options).to.equal(
-    expectedRequestArgs?.options,
+  expect(actualRequestArgs.message.payload.destinationChainId).to.equal(
+    expectedRequestArgs.destinationChainId,
+  )
+  expect(actualRequestArgs.message.payload.options).to.equal(
+    expectedRequestArgs.options,
   )
 }
