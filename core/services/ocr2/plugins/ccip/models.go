@@ -5,11 +5,10 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/smartcontractkit/chainlink/core/utils"
-
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/lib/pq"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
 type Request struct {
@@ -67,6 +66,21 @@ func (r Request) ToMessage() Message {
 			Options:  r.Options,
 		},
 	}
+}
+
+type Message struct {
+	SequenceNumber     *big.Int       `json:"sequenceNumber"`
+	SourceChainId      *big.Int       `json:"sourceChainId"`
+	DestinationChainId *big.Int       `json:"destinationChainId"`
+	Sender             common.Address `json:"sender"`
+	Payload            struct {
+		Receiver common.Address   `json:"receiver"`
+		Data     []uint8          `json:"data"`
+		Tokens   []common.Address `json:"tokens"`
+		Amounts  []*big.Int       `json:"amounts"`
+		Executor common.Address   `json:"executor"`
+		Options  []uint8          `json:"options"`
+	} `json:"payload"`
 }
 
 type RequestStatus string

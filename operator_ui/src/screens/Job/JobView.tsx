@@ -112,49 +112,6 @@ const JOB_PAYLOAD__SPEC = gql`
       contractConfigConfirmations
       createdAt
     }
-    ... on CCIPExecutionSpec {
-      id
-      contractID
-      relay
-      relayConfig
-      p2pBootstrapPeers
-      isBootstrapPeer
-      ocrKeyBundleID
-      monitoringEndpoint
-      transmitterID
-      blockchainTimeout
-      contractConfigTrackerSubscribeInterval
-      contractConfigTrackerPollInterval
-      contractConfigConfirmations
-      juelsPerFeeCoinSource
-      createdAt
-      onRampID
-      offRampID
-      executorID
-      sourceEVMChainID
-      destEVMChainID
-    }
-    ... on CCIPRelaySpec {
-      id
-      contractID
-      relay
-      relayConfig
-      p2pBootstrapPeers
-      isBootstrapPeer
-      ocrKeyBundleID
-      monitoringEndpoint
-      transmitterID
-      blockchainTimeout
-      contractConfigTrackerSubscribeInterval
-      contractConfigTrackerPollInterval
-      contractConfigConfirmations
-      juelsPerFeeCoinSource
-      createdAt
-      onRampID
-      offRampID
-      sourceEVMChainID
-      destEVMChainID
-    }
   }
 `
 

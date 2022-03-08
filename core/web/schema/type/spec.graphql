@@ -8,9 +8,7 @@ union JobSpec =
     VRFSpec |
     WebhookSpec |
     BlockhashStoreSpec |
-    BootstrapSpec |
-    CCIPRelaySpec |
-    CCIPExecutionSpec
+    BootstrapSpec
 
 type CronSpec {
     schedule: String!
@@ -132,49 +130,4 @@ type BootstrapSpec {
     contractConfigTrackerPollInterval: String
     contractConfigConfirmations: Int
     createdAt: Time!
-}
-
-type CCIPExecutionSpec {
-    id: ID!
-    contractID: String!
-    relay: String!
-    relayConfig: Map!
-    p2pBootstrapPeers: [String!]
-    isBootstrapPeer: Boolean!
-    ocrKeyBundleID: String
-    monitoringEndpoint: String
-    transmitterID: String
-    blockchainTimeout: String
-    contractConfigTrackerSubscribeInterval: String
-    contractConfigTrackerPollInterval: String
-    contractConfigConfirmations: Int
-    juelsPerFeeCoinSource: String
-    createdAt: Time!
-    onRampID: String!
-    offRampID: String!
-    executorID: String!
-    sourceEVMChainID: ID
-    destEVMChainID: ID
-}
-
-type CCIPRelaySpec {
-    id: ID!
-    contractID: String!
-    relay: String!
-    relayConfig: Map!
-    p2pBootstrapPeers: [String!]
-    isBootstrapPeer: Boolean!
-    ocrKeyBundleID: String
-    monitoringEndpoint: String
-    transmitterID: String
-    blockchainTimeout: String
-    contractConfigTrackerSubscribeInterval: String
-    contractConfigTrackerPollInterval: String
-    contractConfigConfirmations: Int
-    juelsPerFeeCoinSource: String
-    createdAt: Time!
-    onRampID: String!
-    offRampID: String!
-    sourceEVMChainID: ID
-    destEVMChainID: ID
 }

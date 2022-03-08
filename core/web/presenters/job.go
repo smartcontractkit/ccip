@@ -430,9 +430,6 @@ func NewJobResource(j job.Job) *JobResource {
 		resource.BlockhashStoreSpec = NewBlockhashStoreSpec(j.BlockhashStoreSpec)
 	case job.Bootstrap:
 		resource.BootstrapSpec = NewBootstrapSpec(j.BootstrapSpec)
-	case job.CCIPRelay, job.CCIPExecution:
-		panic("TODO implement for CCIP jobs")
-		// TODO handle ccip jobs
 	}
 
 	jes := []JobError{}

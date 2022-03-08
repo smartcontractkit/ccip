@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/pkg/errors"
 	"github.com/smartcontractkit/sqlx"
 
 	"github.com/smartcontractkit/chainlink/core/logger"
@@ -14,8 +15,6 @@ import (
 )
 
 // ORM We intend to use the same table for all xchain requests.
-// TODO: I think we may need to pass in string based chainIDs
-// in the future when we support non-evm chains, for now keep the interface EVM
 // The triplet (seqNum, source, dest) defined the Message.
 //go:generate mockery --name ORM --output ./mocks/ --case=underscore
 type ORM interface {
@@ -77,7 +76,7 @@ func (o *orm) Requests(sourceChainId, destChainId *big.Int, minSeqNum, maxSeqNum
 	}
 	if executor != nil {
 		b.WriteString(` AND executor = ?`)
-		params = append(params, fmt.Sprintf(`\x%v`, executor.String()[2:]))
+		params = append(params, fmt.Sprintf(`\x%v`, executor.Hex()[2:]))
 	}
 	if options != nil {
 		b.WriteString(` AND options = ?`)
@@ -87,6 +86,7 @@ func (o *orm) Requests(sourceChainId, destChainId *big.Int, minSeqNum, maxSeqNum
 	stmt := sqlx.Rebind(sqlx.DOLLAR, b.String())
 
 	err = q.Select(&reqs, stmt, params...)
+	o.lggr.Warnf("%v", reqs)
 	return
 }
 
@@ -101,13 +101,13 @@ func (o *orm) UpdateRequestStatus(sourceChainId, destChainId, minSeqNum, maxSeqN
 		RETURNING seq_num`
 	res, err := q.Exec(sql, status, minSeqNum.String(), maxSeqNum.String(), sourceChainId.String(), destChainId.String())
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	seqRange := big.NewInt(0).Sub(maxSeqNum, minSeqNum)
 	expectedUpdates := seqRange.Add(seqRange, big.NewInt(1)).Int64()
 	n, err := res.RowsAffected()
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	if n != expectedUpdates {
 		return fmt.Errorf("did not update expected num rows, got %v want %v", n, expectedUpdates)
@@ -140,7 +140,7 @@ func (o *orm) UpdateRequestSetStatus(sourceChainId, destChainId *big.Int, seqNum
 	stmt := sqlx.Rebind(sqlx.DOLLAR, b.String())
 	res, err := q.Exec(stmt, params...)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	n, err := res.RowsAffected()
 	if err != nil {
@@ -149,7 +149,7 @@ func (o *orm) UpdateRequestSetStatus(sourceChainId, destChainId *big.Int, seqNum
 	if int(n) != len(seqNums) {
 		return fmt.Errorf("did not update expected num rows, got %v want %v", n, len(seqNums))
 	}
-	return err
+	return errors.WithStack(err)
 }
 
 func (o *orm) ResetExpiredRequests(sourceChainId, destChainId *big.Int, expiryTimeoutSeconds int, fromStatus RequestStatus, toStatus RequestStatus, qopts ...pg.QOpt) error {

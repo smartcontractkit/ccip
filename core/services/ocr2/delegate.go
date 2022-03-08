@@ -10,6 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/job"
 	"github.com/smartcontractkit/chainlink/core/services/keystore"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/median"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/validate"
 	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
@@ -151,6 +152,11 @@ func (d Delegate) ServicesForSpec(jobSpec job.Job) ([]job.ServiceCtx, error) {
 	switch spec.PluginType {
 	case job.Median:
 		pluginOracle, err = median.NewMedian(jobSpec, ocr2Provider, d.pipelineRunner, runResults, lggr, ocrLogger)
+	case job.CCIPRelay:
+		pluginOracle, err = ccip.NewCCIPRelay(jobSpec.ID, spec, d.chainSet, d.db, ocr2Provider, d.cfg, lggr)
+	case job.CCIPExecution:
+		pluginOracle, err = ccip.NewCCIPExecution(jobSpec.ID, spec, d.chainSet, d.db, ocr2Provider, d.cfg, lggr)
+
 	default:
 		return nil, errors.Errorf("plugin type %s not supported", spec.PluginType)
 	}

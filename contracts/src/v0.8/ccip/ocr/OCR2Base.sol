@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "../access/OwnerIsCreator.sol";
-import "../../interfaces/TypeAndVersionInterface.sol";
+import "./OCR2Abstract.sol";
 
 /**
   * @notice Onchain verification of reports from the offchain reporting protocol
@@ -17,7 +17,7 @@ import "../../interfaces/TypeAndVersionInterface.sol";
 
   * @dev THIS CONTRACT HAS NOT GONE THROUGH ANY SECURITY REVIEW. DO NOT USE IN PROD
 */
-abstract contract OCR2Base is OwnerIsCreator, TypeAndVersionInterface {
+abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
   bool internal immutable UNIQUE_REPORTS;
 
   constructor(bool uniqueReports) {
@@ -25,9 +25,6 @@ abstract contract OCR2Base is OwnerIsCreator, TypeAndVersionInterface {
   }
 
   uint256 private constant maxUint32 = (1 << 32) - 1;
-
-  // Maximum number of oracles the offchain reporting protocol is designed for
-  uint256 internal constant maxNumOracles = 31;
 
   // Storing these fields used on the hot path in a ConfigInfo variable reduces the
   // retrieval of all of them to a single SLOAD. If any further fields are
@@ -78,28 +75,6 @@ abstract contract OCR2Base is OwnerIsCreator, TypeAndVersionInterface {
    * Config logic
    */
 
-  /**
-   * @notice triggers a new run of the offchain reporting protocol
-   * @param previousConfigBlockNumber block in which the previous config was set, to simplify historic analysis
-   * @param configCount ordinal number of this config setting among all config settings over the life of this contract
-   * @param signers ith element is address ith oracle uses to sign a report
-   * @param transmitters ith element is address ith oracle uses to transmit a report via the transmit method
-   * @param f maximum number of faulty/dishonest oracles the protocol can tolerate while still working correctly
-   * @param encodedConfigVersion version of the serialization format used for "encoded" parameter
-   * @param encoded serialized data used by oracles to configure their offchain operation
-   */
-  event ConfigSet(
-    uint32 previousConfigBlockNumber,
-    bytes32 configDigest,
-    uint64 configCount,
-    address[] signers,
-    address[] transmitters,
-    uint8 f,
-    bytes onchainConfig,
-    uint64 encodedConfigVersion,
-    bytes encoded
-  );
-
   // Reverts transaction if config args are invalid
   modifier checkConfigValid(
     uint256 _numSigners,
@@ -122,6 +97,21 @@ abstract contract OCR2Base is OwnerIsCreator, TypeAndVersionInterface {
     bytes offchainConfig;
   }
 
+  /// @inheritdoc OCR2Abstract
+  function latestConfigDigestAndEpoch()
+    external
+    view
+    virtual
+    override
+    returns (
+      bool scanLogs,
+      bytes32 configDigest,
+      uint32 epoch
+    )
+  {
+    return (true, bytes32(0), uint32(0));
+  }
+
   /**
    * @notice sets offchain reporting protocol configuration incl. participating oracles
    * @param _signers addresses with which oracles sign the reports
@@ -138,7 +128,7 @@ abstract contract OCR2Base is OwnerIsCreator, TypeAndVersionInterface {
     bytes memory _onchainConfig,
     uint64 _offchainConfigVersion,
     bytes memory _offchainConfig
-  ) external checkConfigValid(_signers.length, _transmitters.length, _f) onlyOwner {
+  ) external override checkConfigValid(_signers.length, _transmitters.length, _f) onlyOwner {
     SetConfigArgs memory args = SetConfigArgs({
       signers: _signers,
       transmitters: _transmitters,
@@ -245,6 +235,7 @@ abstract contract OCR2Base is OwnerIsCreator, TypeAndVersionInterface {
   function latestConfigDetails()
     external
     view
+    override
     returns (
       uint32 configCount,
       uint32 blockNumber,
@@ -307,8 +298,6 @@ abstract contract OCR2Base is OwnerIsCreator, TypeAndVersionInterface {
     require(msg.data.length == expected, "calldata length mismatch");
   }
 
-  event Transmited(bytes32 configDigest, uint32 epoch);
-
   /**
    * @notice transmit is called to post a new report to the contract
    * @param report serialized report, which the signatures are signing.
@@ -324,7 +313,7 @@ abstract contract OCR2Base is OwnerIsCreator, TypeAndVersionInterface {
     bytes32[] calldata rs,
     bytes32[] calldata ss,
     bytes32 rawVs // signatures
-  ) external {
+  ) external override {
     uint256 initialGas = gasleft(); // This line must come first
 
     {
@@ -333,11 +322,11 @@ abstract contract OCR2Base is OwnerIsCreator, TypeAndVersionInterface {
       // reportContext[1]: 27 byte padding, 4-byte epoch and 1-byte round
       // reportContext[2]: ExtraHash
       bytes32 configDigest = reportContext[0];
-      uint40 epochAndRound = uint40(uint256(reportContext[1]));
+      uint32 epochAndRound = uint32(uint256(reportContext[1]));
 
       _report(configDigest, epochAndRound, report);
 
-      emit Transmited(configDigest, uint32(epochAndRound >> 8));
+      emit Transmitted(configDigest, uint32(epochAndRound >> 8));
 
       ConfigInfo memory configInfo = s_configInfo;
       require(configInfo.latestConfigDigest == configDigest, "configDigest mismatch");

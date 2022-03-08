@@ -54,7 +54,6 @@ type GeneralConfigOverrides struct {
 	ShutdownGracePeriod                       *time.Duration
 	Dialect                                   dialects.DialectName
 	EthereumURL                               null.String
-	FeatureCCIP                               null.Bool
 	GlobalBalanceMonitorEnabled               null.Bool
 	GlobalBlockEmissionIdleWarningThreshold   *time.Duration
 	GlobalChainType                           null.String
@@ -108,6 +107,7 @@ type GeneralConfigOverrides struct {
 	FeatureFeedsManager       null.Bool
 	FeatureOffchainReporting  null.Bool
 	FeatureOffchainReporting2 null.Bool
+	FeatureCCIP               null.Bool
 	EVMEnabled                null.Bool
 	EVMRPCEnabled             null.Bool
 	TerraEnabled              null.Bool

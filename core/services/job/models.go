@@ -37,8 +37,6 @@ const (
 	BlockhashStore     Type = "blockhashstore"
 	Webhook            Type = "webhook"
 	Bootstrap          Type = "bootstrap"
-	CCIPExecution      Type = "ccip-execution"
-	CCIPRelay          Type = "ccip-relay"
 )
 
 //revive:disable:redefines-builtin-id
@@ -72,8 +70,6 @@ var (
 		Webhook:            true,
 		BlockhashStore:     false,
 		Bootstrap:          false,
-		CCIPRelay:          false,
-		CCIPExecution:      false,
 	}
 	supportsAsync = map[Type]bool{
 		Cron:               true,
@@ -86,8 +82,6 @@ var (
 		Webhook:            true,
 		BlockhashStore:     false,
 		Bootstrap:          false,
-		CCIPRelay:          false,
-		CCIPExecution:      false,
 	}
 	schemaVersions = map[Type]uint32{
 		Cron:               1,
@@ -100,8 +94,6 @@ var (
 		Webhook:            1,
 		BlockhashStore:     1,
 		Bootstrap:          1,
-		CCIPRelay:          1,
-		CCIPExecution:      1,
 	}
 )
 
@@ -128,10 +120,6 @@ type Job struct {
 	BlockhashStoreSpec   *BlockhashStoreSpec
 	BootstrapSpec        *BootstrapSpec
 	BootstrapSpecID      *int32
-	CCIPRelaySpecID      *int32 `gorm:"column:ccip_relay_spec_id"`
-	CCIPRelaySpec        *CCIPRelaySpec
-	CCIPExecutionSpecID  *int32
-	CCIPExecutionSpec    *CCIPExecutionSpec
 	PipelineSpecID       int32
 	PipelineSpec         *pipeline.Spec
 	JobSpecErrors        []SpecError
@@ -285,8 +273,12 @@ func (r *JSONConfig) Scan(value interface{}) error {
 type OCR2PluginType string
 
 const (
-	// Median refers to the median.Median type
+	// Median refers to the median.Median plugin
 	Median OCR2PluginType = "median"
+	// CCIPRelay refers to the ccip.CCIPRelay plugin
+	CCIPRelay OCR2PluginType = "ccip-relay"
+	// CCIPExecution refers to the ccip.CCIPExecution plugin
+	CCIPExecution OCR2PluginType = "ccip-execution"
 )
 
 // OCR2OracleSpec defines the job spec for OCR2 jobs.
@@ -514,91 +506,6 @@ func (s BootstrapSpec) AsOCR2Spec() OCR2OracleSpec {
 		Relay:                             s.Relay,
 		RelayConfig:                       s.RelayConfig,
 		MonitoringEndpoint:                s.MonitoringEndpoint,
-		BlockchainTimeout:                 s.BlockchainTimeout,
-		ContractConfigTrackerPollInterval: s.ContractConfigTrackerPollInterval,
-		ContractConfigConfirmations:       s.ContractConfigConfirmations,
-		CreatedAt:                         s.CreatedAt,
-		UpdatedAt:                         s.UpdatedAt,
-	}
-}
-
-type CCIPRelaySpec struct {
-	ID                                     int32              `toml:"-"`
-	ContractID                             string             `toml:"contractID"`
-	Relay                                  relaytypes.Network `toml:"relay"`
-	RelayConfig                            JSONConfig         `toml:"relayConfig"`
-	P2PBootstrapPeers                      pq.StringArray     `toml:"p2pBootstrapPeers"`
-	IsBootstrapPeer                        bool               `toml:"isBootstrapPeer"`
-	OCRKeyBundleID                         null.String        `toml:"ocrKeyBundleID"`
-	MonitoringEndpoint                     null.String        `toml:"monitoringEndpoint"`
-	TransmitterID                          null.String        `toml:"transmitterID"`
-	BlockchainTimeout                      models.Interval    `toml:"blockchainTimeout"`
-	ContractConfigTrackerSubscribeInterval models.Interval    `toml:"contractConfigTrackerSubscribeInterval"`
-	ContractConfigTrackerPollInterval      models.Interval    `toml:"contractConfigTrackerPollInterval"`
-	ContractConfigConfirmations            uint16             `toml:"contractConfigConfirmations"`
-	JuelsPerFeeCoinPipeline                string             `toml:"juelsPerFeeCoinSource"`
-	CreatedAt                              time.Time          `toml:"-"`
-	UpdatedAt                              time.Time          `toml:"-"`
-	// CCIP relay specific
-	OnRampID         string     `toml:"onRampID"`
-	OffRampID        string     `toml:"offRampID"`
-	SourceEVMChainID *utils.Big `toml:"sourceEvmChainID"`
-	DestEVMChainID   *utils.Big `toml:"destEvmChainID"`
-}
-
-func (s CCIPRelaySpec) AsOCR2Spec() OCR2OracleSpec {
-	return OCR2OracleSpec{
-		ID:                                s.ID,
-		ContractID:                        s.ContractID,
-		Relay:                             s.Relay,
-		RelayConfig:                       s.RelayConfig,
-		P2PBootstrapPeers:                 s.P2PBootstrapPeers,
-		OCRKeyBundleID:                    s.OCRKeyBundleID,
-		MonitoringEndpoint:                s.MonitoringEndpoint,
-		TransmitterID:                     s.TransmitterID,
-		BlockchainTimeout:                 s.BlockchainTimeout,
-		ContractConfigTrackerPollInterval: s.ContractConfigTrackerPollInterval,
-		ContractConfigConfirmations:       s.ContractConfigConfirmations,
-		CreatedAt:                         s.CreatedAt,
-		UpdatedAt:                         s.UpdatedAt,
-	}
-}
-
-type CCIPExecutionSpec struct {
-	ID                                     int32              `toml:"-"`
-	ContractID                             string             `toml:"contractID"`
-	Relay                                  relaytypes.Network `toml:"relay"`
-	RelayConfig                            JSONConfig         `toml:"relayConfig"`
-	P2PBootstrapPeers                      pq.StringArray     `toml:"p2pBootstrapPeers"`
-	IsBootstrapPeer                        bool               `toml:"isBootstrapPeer"`
-	OCRKeyBundleID                         null.String        `toml:"ocrKeyBundleID"`
-	MonitoringEndpoint                     null.String        `toml:"monitoringEndpoint"`
-	TransmitterID                          null.String        `toml:"transmitterID"`
-	BlockchainTimeout                      models.Interval    `toml:"blockchainTimeout"`
-	ContractConfigTrackerSubscribeInterval models.Interval    `toml:"contractConfigTrackerSubscribeInterval"`
-	ContractConfigTrackerPollInterval      models.Interval    `toml:"contractConfigTrackerPollInterval"`
-	ContractConfigConfirmations            uint16             `toml:"contractConfigConfirmations"`
-	JuelsPerFeeCoinPipeline                string             `toml:"juelsPerFeeCoinSource"`
-	CreatedAt                              time.Time          `toml:"-"`
-	UpdatedAt                              time.Time          `toml:"-"`
-	// CCIP execution specific
-	OnRampID         string     `toml:"onRampID"`
-	OffRampID        string     `toml:"offRampID"`
-	ExecutorID       string     `toml:"executorID"`
-	SourceEVMChainID *utils.Big `toml:"sourceEvmChainID"`
-	DestEVMChainID   *utils.Big `toml:"destEvmChainID"`
-}
-
-func (s CCIPExecutionSpec) AsOCR2Spec() OCR2OracleSpec {
-	return OCR2OracleSpec{
-		ID:                                s.ID,
-		ContractID:                        s.ContractID,
-		Relay:                             s.Relay,
-		RelayConfig:                       s.RelayConfig,
-		P2PBootstrapPeers:                 s.P2PBootstrapPeers,
-		OCRKeyBundleID:                    s.OCRKeyBundleID,
-		MonitoringEndpoint:                s.MonitoringEndpoint,
-		TransmitterID:                     s.TransmitterID,
 		BlockchainTimeout:                 s.BlockchainTimeout,
 		ContractConfigTrackerPollInterval: s.ContractConfigTrackerPollInterval,
 		ContractConfigConfirmations:       s.ContractConfigConfirmations,

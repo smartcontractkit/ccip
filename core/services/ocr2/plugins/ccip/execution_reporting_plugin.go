@@ -18,27 +18,10 @@ import (
 	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
-const (
-	ExecutionMaxInflightTimeSeconds = 180
-)
+const ExecutionMaxInflightTimeSeconds = 180
 
 var _ types.ReportingPluginFactory = &ExecutionReportingPluginFactory{}
 var _ types.ReportingPlugin = &ExecutionReportingPlugin{}
-
-type Message struct {
-	SequenceNumber     *big.Int       `json:"sequenceNumber"`
-	SourceChainId      *big.Int       `json:"sourceChainId"`
-	DestinationChainId *big.Int       `json:"destinationChainId"`
-	Sender             common.Address `json:"sender"`
-	Payload            struct {
-		Receiver common.Address   `json:"receiver"`
-		Data     []uint8          `json:"data"`
-		Tokens   []common.Address `json:"tokens"`
-		Amounts  []*big.Int       `json:"amounts"`
-		Executor common.Address   `json:"executor"`
-		Options  []uint8          `json:"options"`
-	} `json:"payload"`
-}
 
 type ExecutableMessage struct {
 	Proof   [][32]byte `json:"proof"`

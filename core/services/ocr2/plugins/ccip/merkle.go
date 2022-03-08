@@ -27,7 +27,7 @@ func (mp MerkleProof) Index() *big.Int {
 }
 
 func GenerateMerkleProof(treeHeight int, leaves [][]byte, index int) ([32]byte, MerkleProof) {
-	zhs := computeZeroHashes(treeHeight)
+	zhs := ComputeZeroHashes(treeHeight)
 	var level [][32]byte
 	for _, leaf := range leaves {
 		level = append(level, HashLeaf(leaf))
@@ -56,7 +56,7 @@ func GenerateMerkleProof(treeHeight int, leaves [][]byte, index int) ([32]byte, 
 		// (we know there is an even number of them)
 		var newLevel [][32]byte
 		for i := 0; i < len(level)-1; i += 2 {
-			newLevel = append(newLevel, hashInternal(level[i], level[i+1]))
+			newLevel = append(newLevel, HashInternal(level[i], level[i+1]))
 		}
 		level = newLevel
 	}
@@ -93,13 +93,13 @@ func GenerateMerkleRoot(leaf []byte, proof MerkleProof) [32]byte {
 			r = h
 		}
 		path = path[1:] // done with that Proof element
-		h = hashInternal(l, r)
+		h = HashInternal(l, r)
 		index >>= 1
 	}
 	return h
 }
 
-func hashInternal(l, r [32]byte) [32]byte {
+func HashInternal(l, r [32]byte) [32]byte {
 	hash := sha3.NewLegacyKeccak256()
 	// Ignore errors
 	hash.Write([]byte{0x01})
@@ -120,7 +120,7 @@ func HashLeaf(b []byte) [32]byte {
 	return r
 }
 
-func computeZeroHashes(height int) [][32]byte {
+func ComputeZeroHashes(height int) [][32]byte {
 	// Pre-compute all-zero trees for each depth
 	// i.e. [0x00, H(0x00), H(H(0x00)||H(0x00)), ...]
 	var zeroHashes = make([][32]byte, height)
@@ -129,7 +129,7 @@ func computeZeroHashes(height int) [][32]byte {
 			var zh [32]byte
 			zeroHashes[i] = zh
 		}
-		zeroHashes[i+1] = hashInternal(zeroHashes[i], zeroHashes[i])
+		zeroHashes[i+1] = HashInternal(zeroHashes[i], zeroHashes[i])
 	}
 	return zeroHashes
 }

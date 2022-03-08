@@ -86,8 +86,8 @@ type ConfigSet struct {
 	Transmitters              []common.Address
 	F                         uint8
 	OnchainConfig             []byte
-	EncodedConfigVersion      uint64
-	Encoded                   []byte
+	OffchainConfigVersion     uint64
+	OffchainConfig            []byte
 	Raw                       types.Log
 }
 
@@ -369,7 +369,7 @@ func ContractConfigFromConfigSetEvent(changed ConfigSet) ocrtypes.ContractConfig
 		Transmitters:          transmitAccounts,
 		F:                     changed.F,
 		OnchainConfig:         changed.OnchainConfig,
-		OffchainConfigVersion: changed.EncodedConfigVersion,
-		OffchainConfig:        changed.Encoded,
+		OffchainConfigVersion: changed.OffchainConfigVersion,
+		OffchainConfig:        changed.OffchainConfig,
 	}
 }

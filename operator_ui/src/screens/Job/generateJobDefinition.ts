@@ -253,65 +253,6 @@ export const generateJobDefinition = (
       }
 
       break
-    case 'CCIPExecutionSpec':
-      values = {
-        ...extractJobFields(job),
-        ...extractSpecFields(
-          job.spec,
-          'id',
-          'contractID',
-          'relay',
-          'relayConfig',
-          'p2pBootstrapPeers',
-          'isBootstrapPeer',
-          'ocrKeyBundleID',
-          'monitoringEndpoint',
-          'transmitterID',
-          'blockchainTimeout',
-          'contractConfigTrackerSubscribeInterval',
-          'contractConfigTrackerPollInterval',
-          'contractConfigConfirmations',
-          'juelsPerFeeCoinSource',
-          'createdAt',
-          'onRampID',
-          'offRampID',
-          'executorID',
-          'sourceEVMChainID',
-          'destEVMChainID',
-        ),
-        ...extractObservationSourceField(job),
-      }
-
-      break
-    case 'CCIPRelaySpec':
-      values = {
-        ...extractJobFields(job),
-        ...extractSpecFields(
-          job.spec,
-          'id',
-          'contractID',
-          'relay',
-          'relayConfig',
-          'p2pBootstrapPeers',
-          'isBootstrapPeer',
-          'ocrKeyBundleID',
-          'monitoringEndpoint',
-          'transmitterID',
-          'blockchainTimeout',
-          'contractConfigTrackerSubscribeInterval',
-          'contractConfigTrackerPollInterval',
-          'contractConfigConfirmations',
-          'juelsPerFeeCoinSource',
-          'createdAt',
-          'onRampID',
-          'offRampID',
-          'sourceEVMChainID',
-          'destEVMChainID',
-        ),
-        ...extractObservationSourceField(job),
-      }
-
-      break
     default:
       return { definition: '', envDefinition: '' }
   }

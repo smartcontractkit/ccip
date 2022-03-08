@@ -22,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/keystore"
 	"github.com/smartcontractkit/chainlink/core/services/keystore/keys/ethkey"
 	"github.com/smartcontractkit/chainlink/core/services/keystore/keys/p2pkey"
+	ccipconfig "github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/config"
 	medianconfig "github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/median/config"
 	"github.com/smartcontractkit/chainlink/core/services/pg"
 	"github.com/smartcontractkit/chainlink/core/services/pipeline"
@@ -230,6 +231,18 @@ func (o *orm) CreateJob(jb *Job, qopts ...pg.QOpt) error {
 				if err2 := o.assertBridgesExist(*feePipeline); err2 != nil {
 					return err2
 				}
+			case CCIPRelay:
+				var cfg ccipconfig.RelayPluginConfig
+				err := json.Unmarshal(jb.OCR2OracleSpec.PluginConfig.Bytes(), &cfg)
+				if err != nil {
+					return errors.Wrap(err, "failed to parse plugin config")
+				}
+			case CCIPExecution:
+				var cfg ccipconfig.ExecutionPluginConfig
+				err := json.Unmarshal(jb.OCR2OracleSpec.PluginConfig.Bytes(), &cfg)
+				if err != nil {
+					return errors.Wrap(err, "failed to parse plugin config")
+				}
 			}
 
 			sql := `INSERT INTO ocr2_oracle_specs (contract_id, relay, relay_config, plugin_type, plugin_config, p2p_bootstrap_peers, ocr_key_bundle_id, transmitter_id,
@@ -322,37 +335,6 @@ func (o *orm) CreateJob(jb *Job, qopts ...pg.QOpt) error {
 				return errors.Wrap(err, "failed to create BootstrapSpec for jobSpec")
 			}
 			jb.BootstrapSpecID = &specID
-		case CCIPRelay:
-			var specID int32
-			// The first part is generic OCR2, last line is relay specific
-			sql := `INSERT INTO ccip_relay_specs (contract_id, relay, relay_config, p2p_bootstrap_peers, is_bootstrap_peer, ocr_key_bundle_id, transmitter_id,
-					blockchain_timeout, contract_config_tracker_subscribe_interval, contract_config_tracker_poll_interval, contract_config_confirmations, juels_per_fee_coin_pipeline,
-					created_at, updated_at,
-					on_ramp_id, off_ramp_id, source_evm_chain_id, dest_evm_chain_id)
-			VALUES (:contract_id, :relay, :relay_config, :p2p_bootstrap_peers, :is_bootstrap_peer, :ocr_key_bundle_id, :transmitter_id,
-					 :blockchain_timeout, :contract_config_tracker_subscribe_interval, :contract_config_tracker_poll_interval, :contract_config_confirmations, :juels_per_fee_coin_pipeline,
-					NOW(), NOW(),
-					:on_ramp_id, :off_ramp_id, :source_evm_chain_id, :dest_evm_chain_id)
-			RETURNING id;`
-			if err := pg.PrepareQueryRowx(tx, sql, &specID, jb.CCIPRelaySpec); err != nil {
-				return errors.Wrap(err, "failed to create CCIPRelaySpec for jobSpec")
-			}
-			jb.CCIPRelaySpecID = &specID
-		case CCIPExecution:
-			var specID int32
-			sql := `INSERT INTO ccip_execution_specs (contract_id, relay, relay_config, p2p_bootstrap_peers, is_bootstrap_peer, ocr_key_bundle_id, transmitter_id,
-					blockchain_timeout, contract_config_tracker_subscribe_interval, contract_config_tracker_poll_interval, contract_config_confirmations, juels_per_fee_coin_pipeline,
-					created_at, updated_at,
-					on_ramp_id, off_ramp_id, executor_id, source_evm_chain_id, dest_evm_chain_id)
-			VALUES (:contract_id, :relay, :relay_config, :p2p_bootstrap_peers, :is_bootstrap_peer, :ocr_key_bundle_id, :transmitter_id,
-					 :blockchain_timeout, :contract_config_tracker_subscribe_interval, :contract_config_tracker_poll_interval, :contract_config_confirmations, :juels_per_fee_coin_pipeline,
-					NOW(), NOW(),
-					:on_ramp_id, :off_ramp_id, :executor_id, :source_evm_chain_id, :dest_evm_chain_id)
-			RETURNING id;`
-			if err := pg.PrepareQueryRowx(tx, sql, &specID, jb.CCIPExecutionSpec); err != nil {
-				return errors.Wrap(err, "failed to create CCIPExecutionSpec for jobSpec")
-			}
-			jb.CCIPExecutionSpecID = &specID
 		default:
 			o.lggr.Panicf("Unsupported jb.Type: %v", jb.Type)
 		}
@@ -385,9 +367,9 @@ func (o *orm) InsertWebhookSpec(webhookSpec *WebhookSpec, qopts ...pg.QOpt) erro
 func (o *orm) InsertJob(job *Job, qopts ...pg.QOpt) error {
 	q := o.q.WithOpts(qopts...)
 	query := `INSERT INTO jobs (pipeline_spec_id, name, schema_version, type, max_task_duration, ocr_oracle_spec_id, ocr2_oracle_spec_id, direct_request_spec_id, flux_monitor_spec_id,
-				keeper_spec_id, cron_spec_id, vrf_spec_id, webhook_spec_id, blockhash_store_spec_id, bootstrap_spec_id, external_job_id, created_at, ccip_relay_spec_id, ccip_execution_spec_id)
+				keeper_spec_id, cron_spec_id, vrf_spec_id, webhook_spec_id, blockhash_store_spec_id, bootstrap_spec_id, external_job_id, created_at)
 		VALUES (:pipeline_spec_id, :name, :schema_version, :type, :max_task_duration, :ocr_oracle_spec_id, :ocr2_oracle_spec_id, :direct_request_spec_id, :flux_monitor_spec_id,
-				:keeper_spec_id, :cron_spec_id, :vrf_spec_id, :webhook_spec_id, :blockhash_store_spec_id, :bootstrap_spec_id, :external_job_id, NOW(),  :ccip_relay_spec_id, :ccip_execution_spec_id)
+				:keeper_spec_id, :cron_spec_id, :vrf_spec_id, :webhook_spec_id, :blockhash_store_spec_id, :bootstrap_spec_id, :external_job_id, NOW())
 		RETURNING *;`
 	return q.GetNamed(query, job, job)
 }
@@ -413,9 +395,7 @@ func (o *orm) DeleteJob(id int32, qopts ...pg.QOpt) error {
 				webhook_spec_id,
 				direct_request_spec_id,
 				blockhash_store_spec_id,
-				bootstrap_spec_id,
-                ccip_relay_spec_id,
-                ccip_execution_spec_id
+				bootstrap_spec_id
 		),
 		deleted_oracle_specs AS (
 			DELETE FROM ocr_oracle_specs WHERE id IN (SELECT ocr_oracle_spec_id FROM deleted_jobs)
@@ -446,12 +426,6 @@ func (o *orm) DeleteJob(id int32, qopts ...pg.QOpt) error {
 		),
 		deleted_bootstrap_specs AS (
 			DELETE FROM bootstrap_specs WHERE id IN (SELECT bootstrap_spec_id FROM deleted_jobs)
-		),
-		deleted_ccip_execution_specs AS (
-			DELETE FROM ccip_execution_specs WHERE id IN (SELECT ccip_execution_spec_id FROM deleted_jobs)
-		),
-		deleted_ccip_relay_specs AS (
-			DELETE FROM ccip_relay_specs WHERE id IN (SELECT ccip_relay_spec_id FROM deleted_jobs)
 		)
 		DELETE FROM pipeline_specs WHERE id IN (SELECT pipeline_spec_id FROM deleted_jobs)`
 	res, cancel, err := q.ExecQIter(query, id)
@@ -1023,8 +997,6 @@ func LoadAllJobTypes(tx pg.Queryer, job *Job) error {
 		loadJobType(tx, job, "VRFSpec", "vrf_specs", job.VRFSpecID),
 		loadJobType(tx, job, "BlockhashStoreSpec", "blockhash_store_specs", job.BlockhashStoreSpecID),
 		loadJobType(tx, job, "BootstrapSpec", "bootstrap_specs", job.BootstrapSpecID),
-		loadJobType(tx, job, "CCIPRelaySpec", "ccip_relay_specs", job.CCIPRelaySpecID),
-		loadJobType(tx, job, "CCIPExecutionSpec", "ccip_execution_specs", job.CCIPExecutionSpecID),
 	)
 }
 

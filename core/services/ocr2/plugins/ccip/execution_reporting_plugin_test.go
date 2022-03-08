@@ -29,9 +29,8 @@ import (
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_offramp_helper"
 	"github.com/smartcontractkit/chainlink/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/core/logger"
-	"github.com/smartcontractkit/chainlink/core/services/ccip"
-	"github.com/smartcontractkit/chainlink/core/services/ccip/abihelpers"
-	lastreportermocks "github.com/smartcontractkit/chainlink/core/services/ccip/mocks/lastreporter"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
+	mocks "github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/mocks/lastreporter"
 	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
@@ -110,7 +109,7 @@ func TestExecutionReportEncoding(t *testing.T) {
 		Amounts:       []string{"100"},
 		Options:       []byte{},
 	}
-	msgBytes, err := abihelpers.MakeCCIPMsgArgs().PackValues([]interface{}{m.ToMessage()})
+	msgBytes, err := ccip.MakeCCIPMsgArgs().PackValues([]interface{}{m.ToMessage()})
 	require.NoError(t, err)
 	r, proof := ccip.GenerateMerkleProof(2, [][]byte{msgBytes}, 0)
 	var root [32]byte
@@ -172,7 +171,7 @@ func TestExecutionPlugin(t *testing.T) {
 	_, db := heavyweight.FullTestDB(t, "executor_plugin", true, false)
 	lggr := logger.TestLogger(t)
 	orm := ccip.NewORM(db, lggr, pgtest.NewPGCfg(false))
-	lr := new(lastreportermocks.OffRampLastReporter)
+	lr := new(mocks.OffRampLastReporter)
 	executor := common.HexToAddress("0xf97f4df75117a78c1A5a0DBb814Af92458539FB5")
 	rf := ccip.NewExecutionReportingPluginFactory(logger.TestLogger(t), orm, big.NewInt(1), big.NewInt(2), executor, lr)
 	rp, _, err := rf.NewReportingPlugin(types.ReportingPluginConfig{F: 1})
@@ -195,7 +194,7 @@ func TestExecutionPlugin(t *testing.T) {
 		Executor:      executor,
 		Options:       []byte{},
 	}
-	b, err := abihelpers.MakeCCIPMsgArgs().PackValues([]interface{}{req.ToMessage()})
+	b, err := ccip.MakeCCIPMsgArgs().PackValues([]interface{}{req.ToMessage()})
 	require.NoError(t, err)
 	req.Raw = b
 	require.NoError(t, orm.SaveRequest(&req))
@@ -281,7 +280,7 @@ func TestExecutionPlugin(t *testing.T) {
 			Executor:      executor,
 			Options:       []byte{},
 		}
-		b, err := abihelpers.MakeCCIPMsgArgs().PackValues([]interface{}{req.ToMessage()})
+		b, err := ccip.MakeCCIPMsgArgs().PackValues([]interface{}{req.ToMessage()})
 		require.NoError(t, err)
 		req.Raw = b
 		require.NoError(t, orm.SaveRequest(&req))

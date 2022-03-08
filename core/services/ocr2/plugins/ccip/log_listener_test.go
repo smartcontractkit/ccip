@@ -29,10 +29,11 @@ import (
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/lock_unlock_pool"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_offramp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_onramp"
+	"github.com/smartcontractkit/chainlink/core/internal/testutils/configtest"
 	"github.com/smartcontractkit/chainlink/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/core/logger"
-	"github.com/smartcontractkit/chainlink/core/services/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/core/services/job"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/validate"
 	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
 	"github.com/smartcontractkit/chainlink/core/services/pg"
 	"github.com/smartcontractkit/chainlink/core/services/pipeline"
@@ -70,7 +71,7 @@ func TestLogListener_SavesRequests(t *testing.T) {
 	require.NoError(t, err)
 	poolAddress, _, pool, err := lock_unlock_pool.DeployLockUnlockPool(user, backend, linkTokenAddress)
 	require.NoError(t, err)
-	afn := deployAfn(t, user, backend)
+	afn := DeployAfn(t, user, backend)
 
 	onRampAddress, _, _, err := single_token_onramp.DeploySingleTokenOnRamp(
 		user,               // user
@@ -129,7 +130,9 @@ func TestLogListener_SavesRequests(t *testing.T) {
 	require.NoError(t, lb.Start(ctx))
 	jobORM := job.NewORM(db, nil, pipeline.NewORM(db, lggr, cfg), nil, lggr, cfg)
 	ccipORM := NewORM(db, lggr, cfg)
-	ccipSpec, err := ValidatedCCIPSpec(testspecs.GenerateCCIPSpec(testspecs.CCIPSpecParams{}).Toml())
+	ccipSpec, err := validate.ValidatedOracleSpecToml(
+		configtest.NewTestGeneralConfig(t),
+		testspecs.GenerateCCIPSpec(testspecs.CCIPSpecParams{}).Toml())
 	require.NoError(t, err)
 	err = jobORM.CreateJob(&ccipSpec)
 	require.NoError(t, err)
@@ -141,7 +144,7 @@ func TestLogListener_SavesRequests(t *testing.T) {
 	q := pg.NewQ(db, lggr, cfg)
 	logListener := NewLogListener(lggr, lb, lb, onRamp, offRamp, ccipConfig, ccipORM, jb.ID, q)
 	t.Log("Ramp address", onRampAddress, onRamp.Address())
-	require.NoError(t, logListener.Start(ctx))
+	require.NoError(t, logListener.Start(context.Background()))
 
 	// Update the ccip config on chain and assert that the log listener uses the new config values
 	newCcipConfig := OffchainConfig{
@@ -202,7 +205,7 @@ func TestLogListener_SavesRequests(t *testing.T) {
 	assert.Equal(t, msg.Executor.String(), reqs[0].Executor.String())
 	assert.Equal(t, []byte{}, reqs[0].Options)
 	// We expect the raw request bytes to be the abi.encoded CCIP Message
-	b, err := abihelpers.MakeCCIPMsgArgs().PackValues([]interface{}{single_token_onramp.CCIPMessage{
+	b, err := MakeCCIPMsgArgs().PackValues([]interface{}{single_token_onramp.CCIPMessage{
 		SequenceNumber:     big.NewInt(1),
 		SourceChainId:      big.NewInt(2),
 		DestinationChainId: big.NewInt(1),
@@ -212,9 +215,9 @@ func TestLogListener_SavesRequests(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, bytes.Equal(reqs[0].Raw, b))
 	// Round trip should be the same bytes
-	cmsg, err := abihelpers.DecodeCCIPMessage(b)
+	cmsg, err := DecodeCCIPMessage(b)
 	require.NoError(t, err)
-	b2, err := abihelpers.MakeCCIPMsgArgs().PackValues([]interface{}{cmsg})
+	b2, err := MakeCCIPMsgArgs().PackValues([]interface{}{cmsg})
 	require.NoError(t, err)
 	require.True(t, bytes.Equal(b2, b))
 
@@ -303,13 +306,13 @@ func updateOffchainConfig(t *testing.T, reportingPluginConfig OffchainConfig, of
 	require.NoError(t, err)
 }
 
-func stringTo32Bytes(s string) ocrtypes2.ConfigEncryptionPublicKey {
-	var b ocrtypes2.ConfigEncryptionPublicKey
+func stringTo32Bytes(s string) [32]byte {
+	var b [32]byte
 	copy(b[:], hexutil.MustDecode(s))
 	return b
 }
 
-func deployAfn(t *testing.T, user *bind.TransactOpts, chain *backends.SimulatedBackend) common.Address {
+func DeployAfn(t *testing.T, user *bind.TransactOpts, chain *backends.SimulatedBackend) common.Address {
 	afnSourceAddress, _, _, err := afn_contract.DeployAFNContract(
 		user,
 		chain,

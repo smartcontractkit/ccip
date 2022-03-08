@@ -6,7 +6,7 @@ import (
 	big "math/big"
 
 	common "github.com/ethereum/go-ethereum/common"
-	ccip "github.com/smartcontractkit/chainlink/core/services/ccip"
+	ccip "github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 
 	mock "github.com/stretchr/testify/mock"
 

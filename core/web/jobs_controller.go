@@ -11,7 +11,6 @@ import (
 	uuid "github.com/satori/go.uuid"
 
 	"github.com/smartcontractkit/chainlink/core/services/blockhashstore"
-	"github.com/smartcontractkit/chainlink/core/services/ccip"
 	"github.com/smartcontractkit/chainlink/core/services/chainlink"
 	"github.com/smartcontractkit/chainlink/core/services/cron"
 	"github.com/smartcontractkit/chainlink/core/services/directrequest"
@@ -136,10 +135,6 @@ func (jc *JobsController) Create(c *gin.Context) {
 		jb, err = blockhashstore.ValidatedSpec(request.TOML)
 	case job.Bootstrap:
 		jb, err = ocrbootstrap.ValidatedBootstrapSpecToml(request.TOML)
-	case job.CCIPRelay:
-		jb, err = ccip.ValidatedCCIPSpec(request.TOML)
-	case job.CCIPExecution:
-		jb, err = ccip.ValidatedCCIPSpec(request.TOML)
 	default:
 		jsonAPIError(c, http.StatusUnprocessableEntity, errors.Errorf("unknown job type: %s", jobType))
 		return

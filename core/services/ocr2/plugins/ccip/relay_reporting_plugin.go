@@ -15,9 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
-const (
-	RelayMaxInflightTimeSeconds = 180
-)
+const RelayMaxInflightTimeSeconds = 180
 
 var _ types.ReportingPluginFactory = &RelayReportingPluginFactory{}
 var _ types.ReportingPlugin = &RelayReportingPlugin{}
@@ -86,7 +84,6 @@ func DecodeRelayReport(report types.Report) (*single_token_offramp.CCIPRelayRepo
 type RelayReportingPluginFactory struct {
 	l       logger.Logger
 	orm     ORM
-	jobID   int32
 	offRamp *single_token_offramp.SingleTokenOffRamp
 }
 
@@ -137,8 +134,7 @@ func (r RelayReportingPlugin) Observation(ctx context.Context, timestamp types.R
 		return nil, err
 	}
 	// No request to process
-	// Return an empty observation
-	// which should not result in a report generated.
+	// Return an empty observation which should not result in a report generated.
 	if len(unstartedReqs) == 0 {
 		return nil, errors.Errorf("no requests with seq num greater than %v", lastReport.MaxSequenceNumber)
 	}

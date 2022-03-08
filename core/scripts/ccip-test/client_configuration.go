@@ -28,8 +28,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_onramp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_receiver"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_sender"
-	"github.com/smartcontractkit/chainlink/core/services/ccip"
-	"github.com/smartcontractkit/chainlink/core/services/ccip/abihelpers"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
 )
 
@@ -383,9 +382,9 @@ func (client CCIPClient) ScalingAndBatching() {
 }
 
 func (client CCIPClient) ExecuteOfframpTransaction(proof ccip.MerkleProof, encodedMessage []byte) (*types.Transaction, error) {
-	decodedMsg, err := abihelpers.DecodeCCIPMessage(encodedMessage)
+	decodedMsg, err := ccip.DecodeCCIPMessage(encodedMessage)
 	PanicErr(err)
-	_, err = abihelpers.MakeCCIPMsgArgs().PackValues([]interface{}{*decodedMsg})
+	_, err = ccip.MakeCCIPMsgArgs().PackValues([]interface{}{*decodedMsg})
 	PanicErr(err)
 
 	tx, err := client.Dest.SingleTokenOfframp.ExecuteTransaction(client.Dest.Owner, proof.PathForExecute(), *decodedMsg, proof.Index())

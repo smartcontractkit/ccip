@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	types2 "github.com/smartcontractkit/libocr/offchainreporting2/types"
 )

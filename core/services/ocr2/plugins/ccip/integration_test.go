@@ -19,13 +19,14 @@ import (
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/onsi/gomega"
 	uuid "github.com/satori/go.uuid"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"gopkg.in/guregu/null.v4"
+
 	"github.com/smartcontractkit/libocr/commontypes"
 	ocrnetworking "github.com/smartcontractkit/libocr/networking"
 	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	ocrtypes2 "github.com/smartcontractkit/libocr/offchainreporting2/types"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"gopkg.in/guregu/null.v4"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/bulletprooftxmanager"
@@ -51,12 +52,12 @@ import (
 	"github.com/smartcontractkit/chainlink/core/internal/testutils/evmtest"
 	"github.com/smartcontractkit/chainlink/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/core/logger"
-	"github.com/smartcontractkit/chainlink/core/services/ccip"
-	"github.com/smartcontractkit/chainlink/core/services/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/core/services/chainlink"
 	"github.com/smartcontractkit/chainlink/core/services/keystore"
 	"github.com/smartcontractkit/chainlink/core/services/keystore/chaintype"
 	"github.com/smartcontractkit/chainlink/core/services/keystore/keys/ocr2key"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/validate"
 	"github.com/smartcontractkit/chainlink/core/services/ocrbootstrap"
 	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
 	"github.com/smartcontractkit/chainlink/core/services/pg"
@@ -300,11 +301,10 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 	config.Overrides.Dev = null.BoolFrom(true)
 
 	var lggr = logger.TestLogger(t)
-	cfg := cltest.NewTestGeneralConfig(t)
 	eventBroadcaster := pg.NewEventBroadcaster(config.DatabaseURL(), 0, 0, lggr, uuid.NewV1())
 
 	// We fake different chainIDs using the wrapped sim cltest.SimulatedBackend
-	chainORM := evm.NewORM(db, lggr, cfg)
+	chainORM := evm.NewORM(db, lggr, config)
 	_, err := chainORM.CreateChain(*utils.NewBig(sourceChainID), evmtypes.ChainCfg{})
 	require.NoError(t, err)
 	_, err = chainORM.CreateChain(*utils.NewBig(destChainID), evmtypes.ChainCfg{})
@@ -314,7 +314,7 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 
 	keyStore := keystore.New(db, utils.FastScryptParams, lggr, config)
 	simEthKeyStore := EthKeyStoreSim{Eth: keyStore.Eth()}
-
+	cfg := cltest.NewTestGeneralConfig(t)
 	evmCfg := evmtest.NewChainScopedConfig(t, cfg)
 	checkerFactory := &testCheckerFactory{}
 
@@ -401,6 +401,9 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 		},
 		Logger:                   lggr,
 		ExternalInitiatorManager: nil,
+		CloseLogger: func() error {
+			return nil
+		},
 	})
 	require.NoError(t, err)
 	require.NoError(t, app.GetKeyStore().Unlock("password"))
@@ -515,45 +518,53 @@ chainID = %s
 		defer apps[i].Stop()
 		// Wait for peer wrapper to start
 		time.Sleep(1 * time.Second)
-		ccipJob, err := ccip.ValidatedCCIPSpec(fmt.Sprintf(`
-type               	= "ccip-relay"
+		ccipJob, err := validate.ValidatedOracleSpecToml(apps[0].GetConfig(), fmt.Sprintf(`
+type                = "offchainreporting2"
+pluginType          = "ccip-relay"
 relay 				= "evm"
 schemaVersion      	= 1
 name               	= "ccip-job-%d"
-onRampID 			= "%s"
 contractID 			= "%s"
-offRampID 			= "%s"
-sourceEvmChainID   	= "%s"
-destEvmChainID     	= "%s"
 ocrKeyBundleID      = "%s"
 transmitterID 		= "%s"
 contractConfigConfirmations = 1
 contractConfigTrackerPollInterval = "1s"
+
+[pluginConfig]
+onRampID            = "%s"
+sourceChainID       = %s
+destChainID         = %s
+
 [relayConfig]
-chainID = "%s"
-`, i, ccipContracts.onRamp.Address(), ccipContracts.offRamp.Address(), ccipContracts.offRamp.Address(), sourceChainID, destChainID, kbs[i].ID(), transmitters[i], destChainID))
+chainID             = "%s"
+
+`, i, ccipContracts.offRamp.Address(), kbs[i].ID(), transmitters[i], ccipContracts.onRamp.Address(), sourceChainID, destChainID, destChainID))
 		require.NoError(t, err)
 		err = apps[i].AddJobV2(context.Background(), &ccipJob)
 		require.NoError(t, err)
 		// Add executor job
-		ccipExecutionJob, err := ccip.ValidatedCCIPSpec(fmt.Sprintf(`
-type               	= "ccip-execution"
+		ccipExecutionJob, err := validate.ValidatedOracleSpecToml(apps[0].GetConfig(), fmt.Sprintf(`
+type                = "offchainreporting2"
+pluginType          = "ccip-execution"
 relay 				= "evm"
 schemaVersion      	= 1
 name               	= "ccip-executor-job-%d"
-onRampID 			= "%s"
-offRampID 			= "%s"
 contractID 			= "%s"
-executorID 			= "%s"
-sourceEvmChainID   	= "%s"
-destEvmChainID     	= "%s"
 ocrKeyBundleID      = "%s"
 transmitterID 		= "%s"
 contractConfigConfirmations = 1
 contractConfigTrackerPollInterval = "1s"
+
+[pluginConfig]
+onRampID            = "%s"
+offRampID           = "%s"
+sourceChainID       = %s
+destChainID         = %s
+
 [relayConfig]
-chainID = "%s"
-`, i, ccipContracts.onRamp.Address(), ccipContracts.offRamp.Address(), ccipContracts.executor.Address(), ccipContracts.executor.Address(), sourceChainID, destChainID, kbs[i].ID(), transmitters[i], destChainID))
+chainID             = "%s"
+
+`, i, ccipContracts.executor.Address(), kbs[i].ID(), transmitters[i], ccipContracts.onRamp.Address(), ccipContracts.offRamp.Address(), sourceChainID, destChainID, destChainID))
 		require.NoError(t, err)
 		err = apps[i].AddJobV2(context.Background(), &ccipExecutionJob)
 		require.NoError(t, err)
@@ -650,9 +661,9 @@ chainID = "%s"
 	require.Equal(t, genRoot, onchainRoot)
 
 	// Execute the Message
-	decodedMsg, err := abihelpers.DecodeCCIPMessage(reqs[0].Raw)
+	decodedMsg, err := ccip.DecodeCCIPMessage(reqs[0].Raw)
 	require.NoError(t, err)
-	abihelpers.MakeCCIPMsgArgs().PackValues([]interface{}{*decodedMsg})
+	ccip.MakeCCIPMsgArgs().PackValues([]interface{}{*decodedMsg})
 	tx, err = ccipContracts.offRamp.ExecuteTransaction(ccipContracts.destUser, proof.PathForExecute(), *decodedMsg, proof.Index())
 	require.NoError(t, err)
 	ccipContracts.destChain.Commit()
@@ -695,9 +706,9 @@ chainID = "%s"
 	require.True(t, bytes.Equal(root[:], report.MerkleRoot[:]))
 
 	// Execute the Message
-	decodedMsg, err = abihelpers.DecodeCCIPMessage(eoaReq[0].Raw)
+	decodedMsg, err = ccip.DecodeCCIPMessage(eoaReq[0].Raw)
 	require.NoError(t, err)
-	abihelpers.MakeCCIPMsgArgs().PackValues([]interface{}{*decodedMsg})
+	ccip.MakeCCIPMsgArgs().PackValues([]interface{}{*decodedMsg})
 	tx, err = ccipContracts.offRamp.ExecuteTransaction(ccipContracts.destUser, proof.PathForExecute(), *decodedMsg, proof.Index())
 	require.NoError(t, err)
 	ccipContracts.destChain.Commit()

@@ -579,7 +579,7 @@ fromAddress = "%s"
 }
 
 type CCIPSpecParams struct {
-	contract string
+	contractID string
 }
 
 type CCIPSpec struct {
@@ -594,16 +594,23 @@ func (c CCIPSpec) Toml() string {
 func GenerateCCIPSpec(params CCIPSpecParams) CCIPSpec {
 	var spec CCIPSpec
 	var contract = "0x613a38AC1659769640aaE063C651F48E0250454C"
-	if params.contract != "" {
-		contract = params.contract
+	if params.contractID != "" {
+		contract = params.contractID
 	}
 	template := `
-type            = "ccip-relay"
-schemaVersion   = 1
-onRampAddress = "%s"
-offRampAddress = "%s"
+type             = "offchainreporting2"
+pluginType       = "ccip-relay"
+relay            = "evm"
+schemaVersion    = 1
+contractID       = "%s"
+
+[pluginConfig]
+onRampAddress    = "%s"
 sourceEvmChainID = 1337
-destEvmChainID = 1337
+destEvmChainID   = 1337
+
+[relayConfig]
+chainID          = 1337
 `
 	spec.toml = fmt.Sprintf(template, contract, contract)
 	spec.CCIPSpecParams = params

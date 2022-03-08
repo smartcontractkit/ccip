@@ -1,4 +1,4 @@
-package ccip
+package ccip_test
 
 import (
 	"bytes"
@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"math/big"
 	"testing"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/afn_contract"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
@@ -20,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/lock_unlock_pool"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_offramp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/single_token_offramp_helper"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 )
 
 func TestRelayReportEncoding(t *testing.T) {
@@ -39,7 +43,14 @@ func TestRelayReportEncoding(t *testing.T) {
 	destChain.Commit()
 	_, err = lock_unlock_pool.NewLockUnlockPool(destPoolAddress, destChain)
 	require.NoError(t, err)
-	destAfn := deployAfn(t, destUser, destChain)
+	afnAddress, _, _, err := afn_contract.DeployAFNContract(
+		destUser,
+		destChain,
+		[]common.Address{destUser.From},
+		[]*big.Int{big.NewInt(1)},
+		big.NewInt(1),
+		big.NewInt(1),
+	)
 
 	offRampAddress, _, _, err := single_token_offramp_helper.DeploySingleTokenOffRampHelper(
 		destUser,             // user
@@ -50,7 +61,7 @@ func TestRelayReportEncoding(t *testing.T) {
 		destPoolAddress,      // dest pool address
 		big.NewInt(1),        // token bucket rate
 		big.NewInt(1000),     // token bucket capacity
-		destAfn,              // AFN address
+		afnAddress,           // AFN address
 		// 86400 seconds = one day
 		big.NewInt(86400), // max timeout without AFN signal
 		big.NewInt(0),     // execution delay in seconds
@@ -60,19 +71,19 @@ func TestRelayReportEncoding(t *testing.T) {
 	require.NoError(t, err)
 	destChain.Commit()
 
-	r, proof := GenerateMerkleProof(2, [][]byte{{0xaa}}, 0)
-	rootLocal := GenerateMerkleRoot([]byte{0xaa}, proof)
+	r, proof := ccip.GenerateMerkleProof(2, [][]byte{{0xaa}}, 0)
+	rootLocal := ccip.GenerateMerkleRoot([]byte{0xaa}, proof)
 	require.True(t, bytes.Equal(rootLocal[:], r[:]))
-	t.Log(proof.PathForExecute(), proof.path)
+	t.Log(proof.PathForExecute(), proof.PathForExecute())
 
 	report := single_token_offramp.CCIPRelayReport{
 		MerkleRoot:        r,
 		MinSequenceNumber: big.NewInt(1),
 		MaxSequenceNumber: big.NewInt(10),
 	}
-	out, err := EncodeRelayReport(&report)
+	out, err := ccip.EncodeRelayReport(&report)
 	require.NoError(t, err)
-	decodedReport, err := DecodeRelayReport(out)
+	decodedReport, err := ccip.DecodeRelayReport(out)
 	require.NoError(t, err)
 	require.Equal(t, &report, decodedReport)
 
@@ -92,11 +103,11 @@ func TestRelayReportEncoding(t *testing.T) {
 	require.True(t, exists.Int64() > 0)
 
 	// Verify it onchain
-	lh := HashLeaf([]byte{0xaa})
+	lh := ccip.HashLeaf([]byte{0xaa})
 	// Should merely be doing H(lhash, 32 zero bytes) and obtaining the same hash
 	root, err := offRamp.GenerateMerkleRoot(nil, proof.PathForExecute(), lh, proof.Index())
 	require.NoError(t, err)
 
-	t.Log("verifies", root, "path", proof.PathForExecute(), "Index", proof.Index(), "root", rep.MerkleRoot, "rootlocal", hashInternal(lh, proof.PathForExecute()[0]))
+	t.Log("verifies", root, "path", proof.PathForExecute(), "Index", proof.Index(), "root", rep.MerkleRoot, "rootlocal", ccip.HashInternal(lh, proof.PathForExecute()[0]))
 	require.Equal(t, rootLocal, root)
 }

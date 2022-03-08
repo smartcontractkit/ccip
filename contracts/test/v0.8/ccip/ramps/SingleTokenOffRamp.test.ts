@@ -150,6 +150,7 @@ describe('SingleTokenOffRamp', () => {
       'latestConfigDetails',
       'transmitters',
       'transmit',
+      'latestConfigDigestAndEpoch',
       // TypeAndVersionInterface
       'typeAndVersion',
       // Ownership
