@@ -28,6 +28,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/receiver_dapp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/sender_dapp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/simple_message_receiver"
+	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
 )
@@ -52,15 +53,15 @@ type SourceClient struct {
 func NewSourceClient(config EvmChainConfig) SourceClient {
 	client := GetClient(config.EthUrl)
 	LinkToken, err := link_token_interface.NewLinkToken(config.LinkToken, client)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	tokenPool, err := native_token_pool.NewNativeTokenPool(config.TokenPool, client)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	afn, err := afn_contract.NewAFNContract(config.Afn, client)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	onRamp, err := onramp.NewOnRamp(config.OnRamp, client)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	tokenSender, err := sender_dapp.NewSenderDapp(config.TokenSender, client)
-	PanicErr(err)
+	helpers.PanicErr(err)
 
 	return SourceClient{
 		Client: Client{
@@ -87,19 +88,19 @@ type DestClient struct {
 func NewDestinationClient(config EvmChainConfig) DestClient {
 	client := GetClient(config.EthUrl)
 	LinkToken, err := link_token_interface.NewLinkToken(config.LinkToken, client)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	tokenPool, err := native_token_pool.NewNativeTokenPool(config.TokenPool, client)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	afn, err := afn_contract.NewAFNContract(config.Afn, client)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	offRamp, err := offramp.NewOffRamp(config.OffRamp, client)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	messageExecutor, err := message_executor.NewMessageExecutor(config.MessageExecutor, client)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	messageReceiver, err := simple_message_receiver.NewSimpleMessageReceiver(config.MessageReceiver, client)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	receiverDapp, err := receiver_dapp.NewReceiverDapp(config.TokenReceiver, client)
-	PanicErr(err)
+	helpers.PanicErr(err)
 
 	return DestClient{
 		Client: Client{
@@ -140,9 +141,9 @@ func NewCcipClient(sourceConfig EvmChainConfig, destConfig EvmChainConfig, owner
 // GetOwner sets the owner user credentials and ensures a GasTipCap is set for the resulting user.
 func GetOwner(ownerPrivateKey string, chainId *big.Int, gasSettings EVMGasSettings) *bind.TransactOpts {
 	ownerKey, err := crypto.HexToECDSA(ownerPrivateKey)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	user, err := bind.NewKeyedTransactorWithChainID(ownerKey, chainId)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	fmt.Println("--- Owner address ")
 	fmt.Println(user.From.Hex())
 	SetGasFees(user, gasSettings)
@@ -153,7 +154,7 @@ func GetOwner(ownerPrivateKey string, chainId *big.Int, gasSettings EVMGasSettin
 // GetClient dials a given EVM client url and returns the resulting client.
 func GetClient(ethUrl string) *ethclient.Client {
 	client, err := ethclient.Dial(ethUrl)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	return client
 }
 
@@ -167,9 +168,9 @@ func (client *Client) SetOwnerAndUsers(ownerPrivateKey string, seedKey string, g
 	fmt.Println("--- Addresses of the seed key")
 	for i := 0; i <= 9; i++ {
 		key, err := crypto.HexToECDSA(strconv.Itoa(i) + seedKeyWithoutFirstChar)
-		PanicErr(err)
+		helpers.PanicErr(err)
 		user, err := bind.NewKeyedTransactorWithChainID(key, client.ChainId)
-		PanicErr(err)
+		helpers.PanicErr(err)
 		SetGasFees(user, gasSettings)
 		users = append(users, user)
 		fmt.Println(user.From.Hex())
@@ -185,12 +186,12 @@ func (client *Client) AssureHealth() {
 		Pending: false,
 		Context: nil,
 	})
-	PanicErr(err)
+	helpers.PanicErr(err)
 	timeNow := time.Now().Unix()
 
 	if timeNow > status.Timestamp.Int64()+standardAfnTimeout {
 		tx, err := client.Afn.VoteGood(client.Owner, big.NewInt(status.Round.Int64()+1))
-		PanicErr(err)
+		helpers.PanicErr(err)
 		WaitForMined(context.Background(), client.Client, tx.Hash(), true)
 		fmt.Printf("[HEALTH] client with chainId %d set healthy for %d hours\n", client.ChainId.Int64(), standardAfnTimeout/60/60)
 	} else {
@@ -201,7 +202,7 @@ func (client *Client) AssureHealth() {
 func (client *Client) ApproveLinkFrom(user *bind.TransactOpts, approvedFor common.Address, amount *big.Int) {
 	ctx := context.Background()
 	tx, err := client.LinkToken.Approve(user, approvedFor, amount)
-	PanicErr(err)
+	helpers.PanicErr(err)
 
 	WaitForMined(ctx, client.Client, tx.Hash(), true)
 	fmt.Println("approve tx hash", tx.Hash().Hex())
@@ -226,7 +227,7 @@ func (client CCIPClient) SendMessage() {
 
 	client.Source.ApproveLink(client.Source.TokenPool.Address(), big.NewInt(1))
 	tx, err := client.Source.OnRamp.RequestCrossChainSend(client.Source.Owner, msg)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	WaitForMined(context.Background(), client.Source.Client.Client, tx.Hash(), true)
 }
 
@@ -246,7 +247,7 @@ func (client CCIPClient) DonExecutionHappyPath() {
 		},
 		events,
 		[]*big.Int{crossChainRequest.Message.SequenceNumber})
-	PanicErr(err)
+	helpers.PanicErr(err)
 	defer sub.Unsubscribe()
 
 	select {
@@ -272,7 +273,7 @@ func (client CCIPClient) ExternalExecutionHappyPath() {
 	// Gets the report that our transaction is included in
 	fmt.Println("Getting report")
 	report, err := client.GetReportForSequenceNumber(ctx, sequenceNumber, offrampBlockNumber)
-	PanicErr(err)
+	helpers.PanicErr(err)
 
 	// Get all requests included in the given report
 	fmt.Println("Getting recent cross chain requests")
@@ -285,7 +286,7 @@ func (client CCIPClient) ExternalExecutionHappyPath() {
 	// Execute the transaction on the offramp
 	fmt.Println("Executing offramp TX")
 	tx, err := client.ExecuteOfframpTransaction(proof, onrampRequest.Raw.Data)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	WaitForMined(ctx, client.Dest.Client.Client, tx.Hash(), true)
 }
 
@@ -295,7 +296,7 @@ func (client CCIPClient) CrossChainSendPausedOnrampShouldFail() {
 	client.Source.ApproveLink(client.Source.SenderDapp.Address(), amount)
 	client.Source.Owner.GasLimit = 1e6
 	tx, err := client.Source.SenderDapp.SendTokens(client.Source.Owner, client.Dest.Owner.From, []common.Address{client.Source.LinkTokenAddress}, []*big.Int{amount}, client.Dest.MessageExecutor.Address())
-	PanicErr(err)
+	helpers.PanicErr(err)
 	WaitForMined(context.Background(), client.Source.Client.Client, tx.Hash(), false)
 }
 
@@ -324,7 +325,7 @@ func (client CCIPClient) NotEnoughFundsInBucketShouldFail() {
 	client.Source.ApproveLink(client.Source.SenderDapp.Address(), amount)
 	client.Source.Owner.GasLimit = 1e6
 	tx, err := client.Source.SenderDapp.SendTokens(client.Source.Owner, client.Dest.Owner.From, []common.Address{client.Source.LinkTokenAddress}, []*big.Int{amount}, client.Dest.MessageExecutor.Address())
-	PanicErr(err)
+	helpers.PanicErr(err)
 	WaitForMined(context.Background(), client.Source.Client.Client, tx.Hash(), false)
 }
 
@@ -342,7 +343,7 @@ func (client CCIPClient) ExternalExecutionSubmitOfframpTwiceShouldFail() {
 	// Gets the report that our transaction is included in
 	fmt.Println("Getting report")
 	report, err := client.GetReportForSequenceNumber(ctx, sequenceNumber, offrampBlockNumber)
-	PanicErr(err)
+	helpers.PanicErr(err)
 
 	// Get all requests included in the given report
 	fmt.Println("Getting recent cross chain requests")
@@ -355,14 +356,14 @@ func (client CCIPClient) ExternalExecutionSubmitOfframpTwiceShouldFail() {
 	// Execute the transaction on the offramp
 	fmt.Println("Executing first offramp TX - should succeed")
 	tx, err := client.ExecuteOfframpTransaction(proof, onrampRequest.Raw.Data)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	WaitForMined(ctx, client.Dest.Client.Client, tx.Hash(), true)
 
 	// Execute the transaction on the offramp
 	fmt.Println("Executing second offramp TX - should fail")
 	client.Dest.Owner.GasLimit = 1e6
 	tx, err = client.ExecuteOfframpTransaction(proof, onrampRequest.Raw.Data)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	WaitForMined(ctx, client.Dest.Client.Client, tx.Hash(), false)
 }
 
@@ -387,9 +388,9 @@ func (client CCIPClient) ScalingAndBatching() {
 
 func (client CCIPClient) ExecuteOfframpTransaction(proof ccip.MerkleProof, encodedMessage []byte) (*types.Transaction, error) {
 	decodedMsg, err := ccip.DecodeCCIPMessage(encodedMessage)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	_, err = ccip.MakeCCIPMsgArgs().PackValues([]interface{}{*decodedMsg})
-	PanicErr(err)
+	helpers.PanicErr(err)
 
 	tx, err := client.Dest.OffRamp.ExecuteTransaction(client.Dest.Owner, *decodedMsg, offramp.CCIPMerkleProof{
 		Path:  proof.PathForExecute(),
@@ -409,7 +410,7 @@ func (client CCIPClient) GetCrossChainSendRequestsForRange(
 		Context: ctx,
 		Start:   onrampBlockNumber - 1000,
 	})
-	PanicErr(err)
+	helpers.PanicErr(err)
 
 	var requests []*onramp.OnRampCrossChainSendRequested
 
@@ -427,7 +428,7 @@ func (client CCIPClient) GetCrossChainSendRequestsForRange(
 	// TODO: Even if this check passes, we may not have fetched all necessary requests if
 	// minFound == report.MinSequenceNumber
 	if minFound > report.MinSequenceNumber.Int64() {
-		PanicErr(errors.New("Not all cross chain requests found in the last 1000 blocks"))
+		helpers.PanicErr(errors.New("Not all cross chain requests found in the last 1000 blocks"))
 	}
 
 	return requests
@@ -485,7 +486,7 @@ func (client CCIPClient) GetReportForSequenceNumber(ctx context.Context, sequenc
 
 func GetCurrentBlockNumber(chain *ethclient.Client) uint64 {
 	blockNumber, err := chain.BlockNumber(context.Background())
-	PanicErr(err)
+	helpers.PanicErr(err)
 	return blockNumber
 }
 
@@ -503,18 +504,18 @@ func (client CCIPClient) ValidateMerkleRoot(
 	fmt.Println("index is", index)
 	root, proof := ccip.GenerateMerkleProof(32, leaves, int(index.Int64()))
 	if !bytes.Equal(root[:], report.MerkleRoot[:]) {
-		PanicErr(errors.New("Merkle root does not match the report"))
+		helpers.PanicErr(errors.New("Merkle root does not match the report"))
 	}
 
 	genRoot := ccip.GenerateMerkleRoot(leaves[int(index.Int64())], proof)
 	if !reflect.DeepEqual(root[:], genRoot[:]) {
-		PanicErr(errors.New("Root does not verify"))
+		helpers.PanicErr(errors.New("Root does not verify"))
 	}
 
 	exists, err := client.Dest.OffRamp.GetMerkleRoot(nil, root)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	if exists.Uint64() < 1 {
-		PanicErr(errors.New("Path is not present in the offramp"))
+		helpers.PanicErr(errors.New("Path is not present in the offramp"))
 	}
 	return proof
 }
@@ -523,14 +524,14 @@ func (client CCIPClient) TryGetTokensFromPausedPool() {
 	client.PauseOnrampPool()
 
 	paused, err := client.Source.TokenPool.Paused(nil)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	if !paused {
-		PanicErr(errors.New("Should be paused"))
+		helpers.PanicErr(errors.New("Should be paused"))
 	}
 
 	client.Source.Owner.GasLimit = 2e6
 	tx, err := client.Source.TokenPool.LockOrBurn(client.Source.Owner, client.Source.Owner.From, big.NewInt(1000))
-	PanicErr(err)
+	helpers.PanicErr(err)
 	WaitForMined(context.Background(), client.Source.Client.Client, tx.Hash(), false)
 }
 
@@ -540,7 +541,7 @@ func (client CCIPClient) SendToOnrampWithExecution(Source SourceClient, from *bi
 	SourceBlockNumber := GetCurrentBlockNumber(Source.Client.Client)
 
 	tx, err := Source.SenderDapp.SendTokens(from, toAddress, []common.Address{client.Source.LinkTokenAddress}, []*big.Int{amount}, executor)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	fmt.Println("send tokens hash ", tx.Hash())
 	WaitForMined(ctx, Source.Client.Client, tx.Hash(), true)
 
@@ -553,7 +554,7 @@ func WaitForCrossChainSendRequest(Source SourceClient, fromBlockNum uint64, txha
 	filter := bind.FilterOpts{Start: fromBlockNum}
 	for {
 		iterator, err := Source.OnRamp.FilterCrossChainSendRequested(&filter)
-		PanicErr(err)
+		helpers.PanicErr(err)
 		for iterator.Next() {
 			if iterator.Event.Raw.TxHash.Hex() == txhash.Hex() {
 				fmt.Println("cross chain send event found in tx: ", txhash.Hex())
@@ -566,104 +567,104 @@ func WaitForCrossChainSendRequest(Source SourceClient, fromBlockNum uint64, txha
 
 func (client CCIPClient) PauseOfframpPool() {
 	paused, err := client.Dest.TokenPool.Paused(nil)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	if paused {
 		return
 	}
 	fmt.Println("pausing offramp pool...")
 	tx, err := client.Dest.TokenPool.Pause(client.Dest.Owner)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	fmt.Println("Offramp pool paused, tx hash:", tx.Hash())
 	WaitForMined(context.Background(), client.Dest.Client.Client, tx.Hash(), true)
 }
 
 func (client CCIPClient) PauseOnrampPool() {
 	paused, err := client.Source.TokenPool.Paused(nil)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	if paused {
 		return
 	}
 	fmt.Println("pausing onramp pool...")
 	tx, err := client.Source.TokenPool.Pause(client.Source.Owner)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	fmt.Println("Onramp pool paused, tx hash:", tx.Hash())
 	WaitForMined(context.Background(), client.Source.Client.Client, tx.Hash(), true)
 }
 
 func (client CCIPClient) UnpauseOfframpPool() {
 	paused, err := client.Dest.TokenPool.Paused(nil)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	if !paused {
 		return
 	}
 	fmt.Println("unpausing offramp pool...")
 	tx, err := client.Dest.TokenPool.Unpause(client.Dest.Owner)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	fmt.Println("Offramp pool unpaused, tx hash:", tx.Hash())
 	WaitForMined(context.Background(), client.Dest.Client.Client, tx.Hash(), true)
 }
 
 func (client CCIPClient) UnpauseOnrampPool() {
 	paused, err := client.Source.TokenPool.Paused(nil)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	if !paused {
 		return
 	}
 	fmt.Println("unpausing onramp pool...")
 	tx, err := client.Source.TokenPool.Unpause(client.Source.Owner)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	fmt.Println("Onramp pool unpaused, tx hash:", tx.Hash())
 	WaitForMined(context.Background(), client.Source.Client.Client, tx.Hash(), true)
 }
 
 func (client CCIPClient) PauseOnramp() {
 	paused, err := client.Source.OnRamp.Paused(nil)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	if paused {
 		return
 	}
 	fmt.Println("pausing onramp...")
 	tx, err := client.Source.OnRamp.Pause(client.Source.Owner)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	fmt.Println("Onramp paused, tx hash:", tx.Hash())
 	WaitForMined(context.Background(), client.Source.Client.Client, tx.Hash(), true)
 }
 
 func (client CCIPClient) PauseOfframp() {
 	paused, err := client.Dest.OffRamp.Paused(nil)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	if paused {
 		return
 	}
 	fmt.Println("pausing offramp...")
 	tx, err := client.Dest.OffRamp.Pause(client.Dest.Owner)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	fmt.Println("Offramp paused, tx hash:", tx.Hash())
 	WaitForMined(context.Background(), client.Dest.Client.Client, tx.Hash(), true)
 }
 
 func (client CCIPClient) UnpauseOnramp() {
 	paused, err := client.Source.OnRamp.Paused(nil)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	if !paused {
 		return
 	}
 	fmt.Println("unpausing onramp...")
 	tx, err := client.Source.OnRamp.Unpause(client.Source.Owner)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	fmt.Println("Onramp unpaused, tx hash:", tx.Hash())
 	WaitForMined(context.Background(), client.Source.Client.Client, tx.Hash(), true)
 }
 
 func (client CCIPClient) UnpauseOfframp() {
 	paused, err := client.Dest.OffRamp.Paused(nil)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	if !paused {
 		return
 	}
 	fmt.Println("unpausing offramp...")
 	tx, err := client.Dest.OffRamp.Unpause(client.Dest.Owner)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	fmt.Println("Offramp unpaused, tx hash:", tx.Hash())
 	WaitForMined(context.Background(), client.Dest.Client.Client, tx.Hash(), true)
 }
@@ -695,7 +696,7 @@ func (client CCIPClient) SetConfig() {
 		SourceIncomingConfirmations: 0,
 		DestIncomingConfirmations:   0,
 	}.Encode()
-	PanicErr(err)
+	helpers.PanicErr(err)
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := confighelper2.ContractSetConfigArgsForTests(
 		60*time.Second, // deltaProgress
 		1*time.Second,  // deltaResend
@@ -714,14 +715,14 @@ func (client CCIPClient) SetConfig() {
 		1, // faults
 		nil,
 	)
-	PanicErr(err)
+	helpers.PanicErr(err)
 
 	ctx := context.Background()
 
 	signerAddresses, err := ocrcommon.OnchainPublicKeyToAddress(signers)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	transmitterAddresses, err := ocrcommon.AccountToAddress(transmitters)
-	PanicErr(err)
+	helpers.PanicErr(err)
 
 	tx, err := client.Dest.OffRamp.SetConfig(
 		client.Dest.Owner,
@@ -732,7 +733,7 @@ func (client CCIPClient) SetConfig() {
 		offchainConfigVersion,
 		offchainConfig,
 	)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	WaitForMined(ctx, client.Dest.Client.Client, tx.Hash(), true)
 	fmt.Println("Config set on offramp. Tx hash:", tx.Hash().Hex())
 
@@ -745,7 +746,7 @@ func (client CCIPClient) SetConfig() {
 		offchainConfigVersion,
 		offchainConfig,
 	)
-	PanicErr(err)
+	helpers.PanicErr(err)
 	WaitForMined(ctx, client.Dest.Client.Client, tx.Hash(), true)
 	fmt.Println("Config set on message executor. Tx hash:", tx.Hash().Hex())
 }

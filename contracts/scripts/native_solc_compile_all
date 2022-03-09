@@ -52,6 +52,8 @@ $SCRIPTPATH/native_solc8_6_compile tests/VRFConsumerV2.sol
 $SCRIPTPATH/native_solc8_6_compile tests/VRFMaliciousConsumerV2.sol
 $SCRIPTPATH/native_solc8_6_compile tests/VRFTestHelper.sol
 $SCRIPTPATH/native_solc8_6_compile tests/VRFV2RevertingExample.sol
+$SCRIPTPATH/native_solc8_6_compile tests/VRFCoordinatorV2TestHelper.sol
+$SCRIPTPATH/native_solc8_6_compile dev/VRFCoordinatorV2.sol
 
 $SCRIPTPATH/native_solc8_compile dev/BatchBlockhashStore.sol
 
@@ -67,9 +69,6 @@ $SCRIPTPATH/native_solc8_6_compile dev/VRFCoordinatorV2.sol
 
 # Feeds
 $SCRIPTPATH/native_solc8_6_compile dev/DerivedPriceFeed.sol
-
-$SCRIPTPATH/native_solc8_6_compile tests/VRFCoordinatorV2TestHelper.sol
-$SCRIPTPATH/native_solc8_6_compile dev/VRFCoordinatorV2.sol
 
 # CCIP
 $SCRIPTPATH/native_solc8_12_compile ccip/test/helpers/OffRampHelper.sol

@@ -7,12 +7,9 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
-
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/afn_contract"
-
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -20,9 +17,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/native_token_pool"
-
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/afn_contract"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/link_token_interface"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/native_token_pool"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp_helper"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
@@ -33,7 +30,7 @@ func TestRelayReportEncoding(t *testing.T) {
 	require.NoError(t, err)
 	destUser, err := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
 	destChain := backends.NewSimulatedBackend(core.GenesisAlloc{
-		destUser.From: {Balance: big.NewInt(0).Mul(big.NewInt(100), big.NewInt(1000000000000000000))}},
+		destUser.From: {Balance: big.NewInt(0).Mul(big.NewInt(100), big.NewInt(1e18))}},
 		ethconfig.Defaults.Miner.GasCeil)
 	destLinkTokenAddress, _, _, err := link_token_interface.DeployLinkToken(destUser, destChain)
 	require.NoError(t, err)

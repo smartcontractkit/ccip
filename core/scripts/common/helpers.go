@@ -7,12 +7,14 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
+// PanicErr panics if an error is detected
 func PanicErr(err error) {
 	if err != nil {
 		panic(err)
 	}
 }
 
+// ParseArgs parses arguments and ensures the required args are set.
 func ParseArgs(flagSet *flag.FlagSet, args []string, requiredArgs ...string) {
 	PanicErr(flagSet.Parse(args))
 	seen := map[string]bool{}

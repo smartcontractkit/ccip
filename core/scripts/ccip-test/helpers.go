@@ -14,12 +14,8 @@ const RetryTiming = 5 * time.Second
 const CrossChainTimout = 5 * time.Minute
 const TxInclusionTimout = 3 * time.Minute
 
-func PanicErr(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-
+// WaitForMined wait for a tx to be included on chain. It will panic when
+// the tx is reverted/successful based on the shouldSucceed parameter.
 func WaitForMined(ctx context.Context, client *ethclient.Client, hash common.Hash, shouldSucceed bool) {
 	maxIterations := TxInclusionTimout / RetryTiming
 	for i := 0; i < int(maxIterations); i++ {
