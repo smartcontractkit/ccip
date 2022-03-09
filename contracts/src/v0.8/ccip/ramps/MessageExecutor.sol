@@ -13,7 +13,7 @@ import "../utils/CCIP.sol";
 contract MessageExecutor is TypeAndVersionInterface, OCR2Base {
   /// @notice Message and its proof
   struct ExecutableMessage {
-    // We have to split to MerkleProof up here into its individual parts, and also order
+    // TODO: We have to split to MerkleProof up here into its individual parts, and also order
     // the items here to avoid a stack too deep error. This needs investigation.
     bytes32[] path;
     uint256 index;
