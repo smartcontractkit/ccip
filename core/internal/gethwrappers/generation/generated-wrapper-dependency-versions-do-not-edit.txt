@@ -10,7 +10,6 @@ flags_wrapper: ../../../contracts/solc/v0.6/Flags.abi ../../../contracts/solc/v0
 flux_aggregator_wrapper: ../../../contracts/solc/v0.6/FluxAggregator.abi ../../../contracts/solc/v0.6/FluxAggregator.bin a3b0a6396c4aa3b5ee39b3c4bd45efc89789d4859379a8a92caca3a0496c5794
 keeper_registry_vb_wrapper: ../../../contracts/solc/v0.7/KeeperRegistryVB.abi ../../../contracts/solc/v0.7/KeeperRegistryVB.bin af13a53e7350624fab49e259ca484098361d7b72eb8f4e4338b659d766e5bee5
 keeper_registry_wrapper: ../../../contracts/solc/v0.7/KeeperRegistry.abi ../../../contracts/solc/v0.7/KeeperRegistry.bin f5c76c6fc35e775da0a4737beea8ebcb6f37ca78db3c21811f17b6f3d5623379
-lock_unlock_pool: ../../../contracts/solc/v0.8/LockUnlockPool.abi ../../../contracts/solc/v0.8/LockUnlockPool.bin 8e9dc729af0a457d10d7afa7d2ffb653b58d621c97cf6473f077877ef5d231de
 message_executor: ../../../contracts/solc/v0.8.12/MessageExecutor.abi ../../../contracts/solc/v0.8.12/MessageExecutor.bin c0e4826663b851f1ee50d1421b4ad8c2c40dfa5a6ee06cf347ff01c339cf6848
 message_executor_helper: ../../../contracts/solc/v0.8.12/MessageExecutorHelper.abi ../../../contracts/solc/v0.8.12/MessageExecutorHelper.bin d19943216ffd0e65b15885f08a5fa9b0ea1041c6a8b036f3b153b9a482f155c6
 multiwordconsumer_wrapper: ../../../contracts/solc/v0.7/MultiWordConsumer.abi ../../../contracts/solc/v0.7/MultiWordConsumer.bin 6e68abdf614e3ed0f5066c1b5f9d7c1199f1e7c5c5251fe8a471344a59afc6ba
@@ -24,11 +23,6 @@ oracle_wrapper: ../../../contracts/solc/v0.6/Oracle.abi ../../../contracts/solc/
 receiver_dapp: ../../../contracts/solc/v0.8.12/ReceiverDapp.abi ../../../contracts/solc/v0.8.12/ReceiverDapp.bin e65d1df1f6e44741c221726f5b56d731493b0098520e584bb2183610ee8ae0c6
 sender_dapp: ../../../contracts/solc/v0.8.12/SenderDapp.abi ../../../contracts/solc/v0.8.12/SenderDapp.bin 5e35279fd1b261288c72107043562811b1edda5bfc473d7e1ebef12157476945
 simple_message_receiver: ../../../contracts/solc/v0.8.12/SimpleMessageReceiver.abi ../../../contracts/solc/v0.8.12/SimpleMessageReceiver.bin 3d65ff2ee69dafc0c2fd9f5d0b1ee0e6f4e3d5464169ed8780b09a132c177308
-single_token_offramp: ../../../contracts/solc/v0.8/SingleTokenOffRamp.abi ../../../contracts/solc/v0.8/SingleTokenOffRamp.bin 840025d6178f924fdf5d6461f769ff846f9708f6fcb988b48f8a45cd6b37fbd0
-single_token_offramp_helper: ../../../contracts/solc/v0.8/SingleTokenOffRampHelper.abi ../../../contracts/solc/v0.8/SingleTokenOffRampHelper.bin 192be5e68c976046defb69be8d3585c3afec2dfb6ea2d0b5543b94bd28760057
-single_token_onramp: ../../../contracts/solc/v0.8/SingleTokenOnRamp.abi ../../../contracts/solc/v0.8/SingleTokenOnRamp.bin c493c4a32482678b27a2f75b5da114a545b1e09bc9971b592c25dcb7b8c418c8
-single_token_receiver: ../../../contracts/solc/v0.8/EOASingleTokenReceiver.abi ../../../contracts/solc/v0.8/EOASingleTokenReceiver.bin 2ccadd9cccc0b5f8cf5f0b178d5d04f0bb1c2e2abcf104000417fa16652fbfd9
-single_token_sender: ../../../contracts/solc/v0.8/EOASingleTokenSender.abi ../../../contracts/solc/v0.8/EOASingleTokenSender.bin e97c74d63db2f7ed046d153df042fb75a4575b8320dc23cb15b40ca1e403d8f0
 solidity_vrf_consumer_interface: ../../../contracts/solc/v0.6/VRFConsumer.abi ../../../contracts/solc/v0.6/VRFConsumer.bin a79da241ca9525f6a96adc5f55651b1f91e1579b85fec7b02a51d06bd6018ee3
 solidity_vrf_consumer_interface_v08: ../../../contracts/solc/v0.8.6/VRFConsumer.abi ../../../contracts/solc/v0.8.6/VRFConsumer.bin 38ed0884fe7023cae96077a7881efd7fe236cc471db6ee1fe3934c68a9b7ab9a
 solidity_vrf_coordinator_interface: ../../../contracts/solc/v0.6/VRFCoordinator.abi ../../../contracts/solc/v0.6/VRFCoordinator.bin a23d3c395156804788c7f6fbda2994e8f7184304c0f0c9f2c4ddeaf073d346d2
