@@ -88,7 +88,9 @@ contract OnRamp is OnRampInterface, TypeAndVersionInterface, HealthChecker, Toke
     // Assumes that any configured destination chains sequence number are initialized with 1
     if (sequenceNumber == 0) revert UnsupportedDestinationChain(payload.destinationChainId);
     // Check that payload is formed corretly
-    _isWellFormed(payload);
+    if (payload.data.length > s_maxDataSize) revert MessageTooLarge(s_maxDataSize, payload.data.length);
+    if (payload.tokens.length > s_maxTokensLength || payload.tokens.length != payload.amounts.length)
+      revert UnsupportedNumberOfTokens();
 
     // Calculate fee
     IERC20 feeToken = payload.tokens[0];
@@ -125,12 +127,6 @@ contract OnRamp is OnRampInterface, TypeAndVersionInterface, HealthChecker, Toke
     AggregatorV2V3Interface priceFeed = getFeed(feeToken);
     if (address(priceFeed) == address(0)) revert UnsupportedFeeToken(feeToken);
     return s_relayingFeeLink * uint256(priceFeed.latestAnswer());
-  }
-
-  function _isWellFormed(CCIP.MessagePayload memory payload) private view {
-    if (payload.data.length > s_maxDataSize) revert MessageTooLarge(s_maxDataSize, payload.data.length);
-    if (payload.tokens.length > s_maxTokensLength || payload.tokens.length != payload.amounts.length)
-      revert UnsupportedNumberOfTokens();
   }
 
   function withdrawAccumulatedFees(
