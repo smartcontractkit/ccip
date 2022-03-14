@@ -9,7 +9,8 @@ import {
 import { publicAbi } from '../../../test-helpers/helpers'
 import { expect } from 'chai'
 import { evmRevert } from '../../../test-helpers/matchers'
-import { constants, ContractTransaction } from 'ethers'
+import { constants } from 'ethers'
+import { ContractTransaction } from 'ethers'
 
 const { deployContract } = hre.waffle
 
@@ -70,7 +71,8 @@ describe('PriceFeedRegistry', () => {
 
   it('has a limited public interface [ @skip-coverage ]', async () => {
     publicAbi(registry, [
-      'setFeeds',
+      'addFeed',
+      'removeFeed',
       'getFeed',
       'getFeedTokens',
       // Ownership
@@ -98,114 +100,158 @@ describe('PriceFeedRegistry', () => {
     })
   })
 
-  describe('#setFeeds', () => {
-    let newTokens: Array<MockERC20>
-    let newFeeds: Array<MockAggregator>
+  describe('#removeFeed', () => {
+    let newToken: MockERC20
+    let newFeed: MockAggregator
+    beforeEach(async () => {
+      newToken = <MockERC20>(
+        await deployContract(roles.defaultAccount, MockERC20Artifact, [
+          '6',
+          '6',
+          await roles.defaultAccount.getAddress(),
+          100,
+        ])
+      )
+      newFeed = <MockAggregator>(
+        await deployContract(roles.defaultAccount, MockFeedArtifact, [])
+      )
+    })
     describe('failure', () => {
-      beforeEach(async () => {
-        newTokens = new Array<MockERC20>()
-        newFeeds = new Array<MockAggregator>()
-
-        newTokens.push(
-          <MockERC20>(
-            await deployContract(roles.defaultAccount, MockERC20Artifact, [
-              '6',
-              '6',
-              await roles.defaultAccount.getAddress(),
-              100,
-            ])
-          ),
-        )
-
-        newFeeds.push(
-          <MockAggregator>(
-            await deployContract(roles.defaultAccount, MockFeedArtifact, [])
-          ),
-        )
-      })
       it('fails when called by a non-owner', async () => {
         await evmRevert(
-          registry.connect(roles.stranger).setFeeds(
-            newTokens.map((nt) => nt.address),
-            newFeeds.map((nf) => nf.address),
-          ),
+          registry
+            .connect(roles.stranger)
+            .removeFeed(tokens[2].address, feeds[2].address),
           'Only callable by owner',
         )
       })
-      it('fails when lengths of params are not equal', async () => {
-        await evmRevert(
-          registry.connect(roles.defaultAccount).setFeeds(
-            newTokens.map((nt) => nt.address),
-            [],
-          ),
-          'InvalidPriceFeedConfig()',
+      it('fails when there are no feeds', async () => {
+        let newRegistry: PriceFeedRegistry = <PriceFeedRegistry>(
+          await deployContract(roles.defaultAccount, RegistryArtifact, [[], []])
         )
         await evmRevert(
-          registry.connect(roles.defaultAccount).setFeeds(
-            [],
-            newFeeds.map((nf) => nf.address),
-          ),
-          'InvalidPriceFeedConfig()',
+          newRegistry
+            .connect(roles.defaultAccount)
+            .removeFeed(newFeed.address, newToken.address),
+          'NoFeeds()',
         )
       })
-      it('fails when length of params is zero', async () => {
+      it('fails when the feed does not exist', async () => {
         await evmRevert(
-          registry.connect(roles.defaultAccount).setFeeds([], []),
-          'InvalidPriceFeedConfig()',
+          registry
+            .connect(roles.defaultAccount)
+            .removeFeed(newToken.address, newFeed.address),
+          'FeedDoesNotExist()',
+        )
+      })
+      it('fails when the token doesnt match the configuration', async () => {
+        await evmRevert(
+          registry
+            .connect(roles.defaultAccount)
+            .removeFeed(tokens[2].address, feeds[3].address),
+          'TokenFeedMistmatch()',
         )
       })
     })
     describe('success', () => {
       let tx: ContractTransaction
+      let theToken: string
+      let theFeed: string
+
       beforeEach(async () => {
-        newTokens = new Array<MockERC20>()
-        newFeeds = new Array<MockAggregator>()
-
-        newTokens.push(
-          <MockERC20>(
-            await deployContract(roles.defaultAccount, MockERC20Artifact, [
-              '6',
-              '6',
-              await roles.defaultAccount.getAddress(),
-              100,
-            ])
-          ),
-        )
-
-        newFeeds.push(
-          <MockAggregator>(
-            await deployContract(roles.defaultAccount, MockFeedArtifact, [])
-          ),
-        )
-
-        tx = await registry.connect(roles.defaultAccount).setFeeds(
-          newTokens.map((nt) => nt.address),
-          newFeeds.map((nf) => nf.address),
-        )
+        theToken = tokens[2].address
+        theFeed = feeds[2].address
+        tx = await registry
+          .connect(roles.defaultAccount)
+          .removeFeed(theToken, theFeed)
       })
-      it('removes the old source tokens and feeds', async () => {
-        for (let i = 0; i < numberOfFeeds; i++) {
-          expect(await registry.getFeed(tokensAddresses[i])).to.equal(
-            constants.AddressZero,
-          )
-        }
-        expect((await registry.getFeedTokens()).length).to.equal(1)
+      it('removes the token from the mapping', async () => {
+        const response = await registry.getFeed(theToken)
+        expect(response).to.equal(constants.AddressZero)
       })
-      it('sets the new tokens and feeds', async () => {
-        expect(await registry.getFeedTokens()).to.deep.equal(
-          newTokens.map((nt) => nt.address),
-        )
-        expect(await registry.getFeed(newTokens[0].address)).to.equal(
-          newFeeds[0].address,
-        )
+      it('removes the token from the list', async () => {
+        const response = await registry.getFeedTokens()
+        expect(response).to.not.contain(theToken)
       })
-      it('emits a FeedsSet event', async () => {
+      it('emits an event', async () => {
         await expect(tx)
-          .to.emit(registry, 'FeedsSet')
-          .withArgs(
-            newTokens.map((nt) => nt.address),
-            newFeeds.map((nf) => nf.address),
-          )
+          .to.emit(registry, 'FeedRemoved')
+          .withArgs(theToken, theFeed)
+      })
+    })
+  })
+
+  describe('#addFeed', () => {
+    let newToken: MockERC20
+    let newFeed: MockAggregator
+    beforeEach(async () => {
+      newToken = <MockERC20>(
+        await deployContract(roles.defaultAccount, MockERC20Artifact, [
+          '6',
+          '6',
+          await roles.defaultAccount.getAddress(),
+          100,
+        ])
+      )
+      newFeed = <MockAggregator>(
+        await deployContract(roles.defaultAccount, MockFeedArtifact, [])
+      )
+    })
+
+    describe('failure', () => {
+      it('fails when called by a non-owner', async () => {
+        await evmRevert(
+          registry
+            .connect(roles.stranger)
+            .addFeed(newToken.address, newFeed.address),
+          'Only callable by owner',
+        )
+      })
+      it('fails when the feed already exists', async () => {
+        await evmRevert(
+          registry
+            .connect(roles.defaultAccount)
+            .addFeed(tokens[1].address, feeds[1].address),
+          `FeedAlreadyAdded()`,
+        )
+      })
+      it('fails when the token is zero address', async () => {
+        await evmRevert(
+          registry
+            .connect(roles.defaultAccount)
+            .addFeed(constants.AddressZero, newFeed.address),
+          `InvalidPriceFeedConfig()`,
+        )
+      })
+      it('fails when the token is a zer address', async () => {
+        await evmRevert(
+          registry
+            .connect(roles.defaultAccount)
+            .addFeed(newToken.address, constants.AddressZero),
+          `InvalidPriceFeedConfig()`,
+        )
+      })
+    })
+
+    describe('success', () => {
+      let tx: ContractTransaction
+      beforeEach(async () => {
+        tx = await registry
+          .connect(roles.defaultAccount)
+          .addFeed(newToken.address, newFeed.address)
+      })
+      it('adds a new feed to the mapping', async () => {
+        const configuredFeed = await registry.getFeed(newToken.address)
+        expect(configuredFeed).to.equal(newFeed.address)
+      })
+      it('adds the token to the s_tokenList', async () => {
+        const tokenList = await registry.getFeedTokens()
+        expect(tokenList).to.contain(newToken.address)
+      })
+      it('emits an event', async () => {
+        await expect(tx)
+          .to.emit(registry, 'FeedAdded')
+          .withArgs(newToken.address, newFeed.address)
       })
     })
   })
