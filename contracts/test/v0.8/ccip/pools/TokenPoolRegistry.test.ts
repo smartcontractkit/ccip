@@ -66,7 +66,8 @@ describe('TokenPoolRegistry', () => {
 
   it('has a limited public interface [ @skip-coverage ]', async () => {
     publicAbi(registry, [
-      'setPools',
+      'addPool',
+      'removePool',
       'getPool',
       'isPool',
       'getPoolTokens',
@@ -100,61 +101,139 @@ describe('TokenPoolRegistry', () => {
     })
   })
 
-  describe('#setPools', async () => {
-    let newTokens: Array<MockERC20>
-    let newPools: Array<MockPool>
+  describe('#removePool', () => {
+    let newToken: MockERC20
+    let newPool: MockPool
+    beforeEach(async () => {
+      newToken = <MockERC20>(
+        await deployContract(roles.defaultAccount, MockERC20Artifact, [
+          '6',
+          '6',
+          await roles.defaultAccount.getAddress(),
+          100,
+        ])
+      )
+      newPool = <MockPool>(
+        await deployContract(roles.defaultAccount, MockPoolArtifact, [6])
+      )
+    })
     describe('failure', () => {
-      beforeEach(async () => {
-        newTokens = new Array<MockERC20>()
-        newPools = new Array<MockPool>()
-
-        newTokens.push(
-          <MockERC20>(
-            await deployContract(roles.defaultAccount, MockERC20Artifact, [
-              '6',
-              '6',
-              await roles.defaultAccount.getAddress(),
-              100,
-            ])
-          ),
-        )
-
-        newPools.push(
-          <MockPool>(
-            await deployContract(roles.defaultAccount, MockPoolArtifact, [6])
-          ),
-        )
-      })
-
-      it('fails when called by the non-owner', async () => {
+      it('fails when called by a non-owner', async () => {
         await evmRevert(
-          registry.connect(roles.stranger).setPools(
-            newTokens.map((nt) => nt.address),
-            newPools.map((np) => np.address),
-          ),
+          registry
+            .connect(roles.stranger)
+            .removePool(tokens[2].address, pools[2].address),
           'Only callable by owner',
         )
       })
-      it('fails when the source tokens length and pools length is 0', async () => {
+      it('fails when there are no pools', async () => {
+        let newRegistry: TokenPoolRegistry = <TokenPoolRegistry>(
+          await deployContract(roles.defaultAccount, RegistryArtifact, [[], []])
+        )
         await evmRevert(
-          registry.connect(roles.defaultAccount).setPools([], []),
-          'InvalidTokenPoolConfig()',
+          newRegistry
+            .connect(roles.defaultAccount)
+            .removePool(newPool.address, newToken.address),
+          'NoPools()',
         )
       })
-      it('fails if the length of source tokens is different to the length of pools', async () => {
+      it('fails when the pool does not exist', async () => {
         await evmRevert(
-          registry.connect(roles.defaultAccount).setPools(
-            newTokens.map((nt) => nt.address),
-            [],
-          ),
-          'InvalidTokenPoolConfig()',
+          registry
+            .connect(roles.defaultAccount)
+            .removePool(newToken.address, newPool.address),
+          'PoolDoesNotExist()',
         )
+      })
+      it('fails when the token doesnt match the configuration', async () => {
         await evmRevert(
-          registry.connect(roles.defaultAccount).setPools(
-            [],
-            newPools.map((np) => np.address),
-          ),
-          'InvalidTokenPoolConfig()',
+          registry
+            .connect(roles.defaultAccount)
+            .removePool(tokens[2].address, pools[3].address),
+          'TokenPoolMistmatch()',
+        )
+      })
+    })
+    describe('success', () => {
+      let tx: ContractTransaction
+      let theToken: string
+      let thePool: string
+
+      beforeEach(async () => {
+        theToken = tokens[2].address
+        thePool = pools[2].address
+        tx = await registry
+          .connect(roles.defaultAccount)
+          .removePool(theToken, thePool)
+      })
+      it('removes the token from the mapping', async () => {
+        const response = await registry.getPool(theToken)
+        expect(response).to.equal(constants.AddressZero)
+      })
+      it('removes the token from the list', async () => {
+        const response = await registry.getPoolTokens()
+        expect(response).to.not.contain(theToken)
+      })
+      it('emits an event', async () => {
+        await expect(tx)
+          .to.emit(registry, 'PoolRemoved')
+          .withArgs(theToken, thePool)
+      })
+      it('sets the isPool flag to false', async () => {
+        const response = await registry.isPool(thePool)
+        expect(response).to.be.false
+      })
+    })
+  })
+
+  describe('#addPool', () => {
+    let newToken: MockERC20
+    let newPool: MockPool
+    beforeEach(async () => {
+      newToken = <MockERC20>(
+        await deployContract(roles.defaultAccount, MockERC20Artifact, [
+          '6',
+          '6',
+          await roles.defaultAccount.getAddress(),
+          100,
+        ])
+      )
+      newPool = <MockPool>(
+        await deployContract(roles.defaultAccount, MockPoolArtifact, [6])
+      )
+    })
+
+    describe('failure', () => {
+      it('fails when called by a non-owner', async () => {
+        await evmRevert(
+          registry
+            .connect(roles.stranger)
+            .addPool(newToken.address, newPool.address),
+          'Only callable by owner',
+        )
+      })
+      it('fails when the pool already exists', async () => {
+        await evmRevert(
+          registry
+            .connect(roles.defaultAccount)
+            .addPool(tokens[1].address, pools[1].address),
+          `PoolAlreadyAdded()`,
+        )
+      })
+      it('fails when the token is zero address', async () => {
+        await evmRevert(
+          registry
+            .connect(roles.defaultAccount)
+            .addPool(constants.AddressZero, newPool.address),
+          `InvalidTokenPoolConfig()`,
+        )
+      })
+      it('fails when the token is a zer address', async () => {
+        await evmRevert(
+          registry
+            .connect(roles.defaultAccount)
+            .addPool(newToken.address, constants.AddressZero),
+          `InvalidTokenPoolConfig()`,
         )
       })
     })
@@ -162,59 +241,26 @@ describe('TokenPoolRegistry', () => {
     describe('success', () => {
       let tx: ContractTransaction
       beforeEach(async () => {
-        newTokens = new Array<MockERC20>()
-        newPools = new Array<MockPool>()
-
-        newTokens.push(
-          <MockERC20>(
-            await deployContract(roles.defaultAccount, MockERC20Artifact, [
-              '6',
-              '6',
-              await roles.defaultAccount.getAddress(),
-              100,
-            ])
-          ),
-        )
-
-        newPools.push(
-          <MockPool>(
-            await deployContract(roles.defaultAccount, MockPoolArtifact, [6])
-          ),
-        )
-
-        tx = await registry.connect(roles.defaultAccount).setPools(
-          newTokens.map((nt) => nt.address),
-          newPools.map((np) => np.address),
-        )
+        tx = await registry
+          .connect(roles.defaultAccount)
+          .addPool(newToken.address, newPool.address)
       })
-
-      it('removes the old source tokens and pools from all fields', async () => {
-        for (let i = 0; i < numberOfPools; i++) {
-          expect(await registry.getPool(tokensAddresses[i])).to.equal(
-            constants.AddressZero,
-          )
-          expect(await registry.isPool(poolsAddresses[i])).to.be.false
-        }
-        expect((await registry.getPoolTokens()).length).to.equal(1)
+      it('adds a new pool to the mapping', async () => {
+        const configuredPool = await registry.getPool(newToken.address)
+        expect(configuredPool).to.equal(newPool.address)
       })
-
-      it('sets the new tokens and pools in all fields', async () => {
-        expect(await registry.getPoolTokens()).to.deep.equal(
-          newTokens.map((nt) => nt.address),
-        )
-        expect(await registry.getPool(newTokens[0].address)).to.equal(
-          newPools[0].address,
-        )
-        expect(await registry.isPool(newPools[0].address)).to.be.true
+      it('adds the token to the s_tokenList', async () => {
+        const tokenList = await registry.getPoolTokens()
+        expect(tokenList).to.contain(newToken.address)
       })
-
-      it('emits a PoolsSet event', async () => {
+      it('emits an event', async () => {
         await expect(tx)
-          .to.emit(registry, 'PoolsSet')
-          .withArgs(
-            newTokens.map((nt) => nt.address),
-            newPools.map((np) => np.address),
-          )
+          .to.emit(registry, 'PoolAdded')
+          .withArgs(newToken.address, newPool.address)
+      })
+      it('sets the configured flag to true', async () => {
+        const response = await registry.isPool(newPool.address)
+        expect(response).to.be.true
       })
     })
   })

@@ -6,11 +6,21 @@ import "../access/OwnerIsCreator.sol";
 
 contract TokenPoolRegistry is OwnerIsCreator {
   error InvalidTokenPoolConfig();
+  error PoolAlreadyAdded();
+  error NoPools();
+  error PoolDoesNotExist();
+  error TokenPoolMistmatch();
 
-  event PoolsSet(IERC20[] tokens, PoolInterface[] pools);
+  event PoolAdded(IERC20 token, PoolInterface pool);
+  event PoolRemoved(IERC20 token, PoolInterface pool);
+
+  struct PoolConfig {
+    PoolInterface pool;
+    uint96 listIndex;
+  }
 
   // token => token pool
-  mapping(IERC20 => PoolInterface) private s_pools;
+  mapping(IERC20 => PoolConfig) private s_pools;
   // List of tokens
   IERC20[] private s_tokenList;
   // Mapping of whether token pools have been configured here
@@ -25,36 +35,65 @@ contract TokenPoolRegistry is OwnerIsCreator {
    * should both be source chain.
    */
   constructor(IERC20[] memory tokens, PoolInterface[] memory pools) {
-    setPools(tokens, pools);
-  }
-
-  /**
-   * @notice Removes the existing tokens and pool and sets using the parameters
-   * @param tokens token array
-   * @param pools Token Pool array
-   */
-  function setPools(IERC20[] memory tokens, PoolInterface[] memory pools) public onlyOwner {
-    if (tokens.length != pools.length || tokens.length == 0) revert InvalidTokenPoolConfig();
-
-    // Unset existing tokens and pools
-    IERC20[] memory existingTokens = s_tokenList;
-    for (uint256 i = 0; i < existingTokens.length; i++) {
-      IERC20 existingToken = existingTokens[i];
-      // Unset s_tokenPoolConfigured
-      PoolInterface existingPool = s_pools[existingToken];
-      s_tokenPoolConfigured[existingPool] = false;
-      // Unset s_pools
-      delete s_pools[existingToken];
-    }
+    if (tokens.length != pools.length) revert InvalidTokenPoolConfig();
 
     // Set new tokens and pools
     s_tokenList = tokens;
     for (uint256 i = 0; i < tokens.length; i++) {
       PoolInterface pool = pools[i];
-      s_pools[tokens[i]] = pool;
+      s_pools[tokens[i]] = PoolConfig({pool: pool, listIndex: uint96(i)});
       s_tokenPoolConfigured[pool] = true;
     }
-    emit PoolsSet(tokens, pools);
+  }
+
+  function addPool(IERC20 token, PoolInterface pool) public onlyOwner {
+    if (address(token) == address(0) || address(pool) == address(0)) revert InvalidTokenPoolConfig();
+    PoolConfig memory config = s_pools[token];
+    // Check if the pool is already set
+    if (address(config.pool) != address(0)) revert PoolAlreadyAdded();
+
+    // Set the s_pools with new config values
+    config.pool = pool;
+    config.listIndex = uint96(s_tokenList.length);
+    s_pools[token] = config;
+
+    // Add to the s_tokenList
+    s_tokenList.push(token);
+
+    // Set configured to true
+    s_tokenPoolConfigured[pool] = true;
+
+    emit PoolAdded(token, pool);
+  }
+
+  function removePool(IERC20 token, PoolInterface pool) public onlyOwner {
+    // Check that there are any pools to remove
+    uint256 listLength = s_tokenList.length;
+    if (listLength == 0) revert NoPools();
+
+    PoolConfig memory oldConfig = s_pools[token];
+    // Check if the pool exists
+    if (address(oldConfig.pool) == address(0)) revert PoolDoesNotExist();
+    // Sanity check
+    if (address(oldConfig.pool) != address(pool)) revert TokenPoolMistmatch();
+
+    // In the list, swap the pool token in question with the last item,
+    // Update the index of the item swapped, then pop from the list to remove.
+
+    IERC20 lastItem = s_tokenList[listLength - 1];
+    // Perform swap
+    s_tokenList[listLength - 1] = s_tokenList[oldConfig.listIndex];
+    s_tokenList[oldConfig.listIndex] = lastItem;
+    // Update listIndex on moved item
+    s_pools[lastItem].listIndex = oldConfig.listIndex;
+    // Pop, and delete from mapping
+    s_tokenList.pop();
+    delete s_pools[token];
+
+    // Set configured to false
+    s_tokenPoolConfigured[pool] = false;
+
+    emit PoolRemoved(token, pool);
   }
 
   /**
@@ -63,7 +102,7 @@ contract TokenPoolRegistry is OwnerIsCreator {
    * @return Token Pool
    */
   function getPool(IERC20 sourceToken) public view returns (PoolInterface) {
-    return s_pools[sourceToken];
+    return s_pools[sourceToken].pool;
   }
 
   /**
