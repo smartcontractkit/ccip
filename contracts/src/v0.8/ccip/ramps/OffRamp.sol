@@ -9,6 +9,7 @@ import "../health/HealthChecker.sol";
 import "../pools/TokenPoolRegistry.sol";
 import "../../vendor/Address.sol";
 import "./PriceFeedRegistry.sol";
+import "../../vendor/SafeERC20.sol";
 
 contract OffRamp is
   OffRampInterface,
@@ -19,6 +20,7 @@ contract OffRamp is
   OCR2Base
 {
   using Address for address;
+  using SafeERC20 for IERC20;
 
   // Chain ID of the source chain
   uint256 public immutable SOURCE_CHAIN_ID;
@@ -218,6 +220,18 @@ contract OffRamp is
       revert UnsupportedNumberOfTokens();
     }
     if (message.payload.data.length > s_maxDataSize) revert MessageTooLarge(s_maxDataSize, message.payload.data.length);
+  }
+
+  /**
+   * @notice TODO Withraw function that will be removed once transmitter renumeration is implemented
+   */
+  function withdrawAccumulatedFees(
+    IERC20 feeToken,
+    address recipient,
+    uint256 amount
+  ) external onlyOwner {
+    feeToken.safeTransfer(recipient, amount);
+    emit FeesWithdrawn(feeToken, recipient, amount);
   }
 
   function _beforeSetConfig(uint8 _threshold, bytes memory _onchainConfig) internal override {

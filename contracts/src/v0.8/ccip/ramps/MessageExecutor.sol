@@ -5,12 +5,17 @@ import "../interfaces/OffRampInterface.sol";
 import "../../interfaces/TypeAndVersionInterface.sol";
 import "../ocr/OCR2Base.sol";
 import "../utils/CCIP.sol";
+import "../../vendor/SafeERC20.sol";
 
 /**
  * @notice MessageExecutor enables OCR networks to execute multiple messages
  * in an OffRamp in a single transaction.
  */
 contract MessageExecutor is TypeAndVersionInterface, OCR2Base {
+  using SafeERC20 for IERC20;
+
+  event FeesWithdrawn(IERC20 feeToken, address recipient, uint256 amount);
+
   /// @notice Message and its proof
   struct ExecutableMessage {
     // TODO: We have to split to MerkleProof up here into its individual parts, and also order
@@ -38,8 +43,20 @@ contract MessageExecutor is TypeAndVersionInterface, OCR2Base {
     ExecutableMessage[] memory executableMessages = abi.decode(report, (ExecutableMessage[]));
     for (uint256 i = 0; i < executableMessages.length; i++) {
       ExecutableMessage memory em = executableMessages[i];
-      s_offRamp.executeTransaction(em.message, CCIP.MerkleProof({path: em.path, index: em.index}), false);
+      s_offRamp.executeTransaction(em.message, CCIP.MerkleProof({path: em.path, index: em.index}), true);
     }
+  }
+
+  /**
+   * @notice TODO Withraw function that will be removed once transmitter renumeration is implemented
+   */
+  function withdrawAccumulatedFees(
+    IERC20 feeToken,
+    address recipient,
+    uint256 amount
+  ) external onlyOwner {
+    feeToken.safeTransfer(recipient, amount);
+    emit FeesWithdrawn(feeToken, recipient, amount);
   }
 
   function _beforeSetConfig(uint8 _threshold, bytes memory _onchainConfig) internal override {

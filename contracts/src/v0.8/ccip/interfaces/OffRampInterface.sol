@@ -26,6 +26,7 @@ interface OffRampInterface {
   event ExecutionDelaySecondsSet(uint256 delay);
   event ExecutionFeeLinkSet(uint256 executionFee);
   event MaxDataSizeSet(uint256 size);
+  event FeesWithdrawn(IERC20 feeToken, address recipient, uint256 amount);
 
   /**
    * @notice Execute the delivery of a message by using its merkle proof

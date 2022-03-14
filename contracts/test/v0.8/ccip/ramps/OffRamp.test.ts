@@ -189,6 +189,7 @@ describe('OffRamp', () => {
       'SOURCE_CHAIN_ID',
       'CHAIN_ID',
       'executeTransaction',
+      'withdrawAccumulatedFees',
       'merkleRoot',
       'getMerkleRoot',
       'getExecuted',
@@ -205,12 +206,14 @@ describe('OffRamp', () => {
       'setMaxSecondsWithoutAFNHeartbeat',
       'getMaxSecondsWithoutAFNHeartbeat',
       // TokenPoolRegistry
-      'setPools',
+      'addPool',
+      'removePool',
       'getPool',
       'isPool',
       'getPoolTokens',
       // PriceFeedRegistry
-      'setFeeds',
+      'addFeed',
+      'removeFeed',
       'getFeed',
       'getFeedTokens',
       // OffRampHelper
@@ -775,7 +778,7 @@ describe('OffRamp', () => {
           await ramp.connect(roles.defaultAccount).report(encodeReport(report))
           await ramp
             .connect(roles.defaultAccount)
-            .setFeeds([sourceToken1.address], [constants.AddressZero])
+            .removeFeed(sourceToken1.address, priceFeed1.address)
           await evmRevert(
             ramp
               .connect(roles.defaultAccount)

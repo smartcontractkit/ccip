@@ -147,11 +147,13 @@ describe('OnRamp', () => {
       'setRelayingFeeLink',
       'getRelayingFeeLink',
       // PriceFeedRegistry
-      'setFeeds',
+      'addFeed',
+      'removeFeed',
       'getFeed',
       'getFeedTokens',
       // TokenPoolRegistry
-      'setPools',
+      'addPool',
+      'removePool',
       'getPool',
       'isPool',
       'getPoolTokens',
@@ -385,7 +387,7 @@ describe('OnRamp', () => {
           .connect(roles.defaultAccount)
           .requestCrossChainSend(payload)
         gasUsed = gasUsed.add((await tx.wait()).gasUsed)
-        expectGasWithinDeviation(gasUsed, 191_846)
+        expectGasWithinDeviation(gasUsed, 191_868)
       })
 
       it('GASTEST - Send 1 token [ @skip-coverage ]', async () => {
@@ -399,7 +401,7 @@ describe('OnRamp', () => {
           .connect(roles.defaultAccount)
           .requestCrossChainSend(payload)
         gasUsed = gasUsed.add((await tx.wait()).gasUsed)
-        expectGasWithinDeviation(gasUsed, 214_527)
+        expectGasWithinDeviation(gasUsed, 214_549)
       })
 
       it('GASTEST - Send 2 tokens [ @skip-coverage ]', async () => {
@@ -415,7 +417,7 @@ describe('OnRamp', () => {
           .connect(roles.defaultAccount)
           .requestCrossChainSend(payload)
         gasUsed = gasUsed.add((await tx.wait()).gasUsed)
-        expectGasWithinDeviation(gasUsed, 324_842)
+        expectGasWithinDeviation(gasUsed, 324_852)
       })
 
       it('GASTEST - Send 3 tokens [ @skip-coverage ]', async () => {
@@ -429,7 +431,7 @@ describe('OnRamp', () => {
           .connect(roles.defaultAccount)
           .requestCrossChainSend(payload)
         gasUsed = gasUsed.add((await tx.wait()).gasUsed)
-        expectGasWithinDeviation(gasUsed, 435_121)
+        expectGasWithinDeviation(gasUsed, 435_179)
       })
     })
 
@@ -582,12 +584,9 @@ describe('OnRamp', () => {
       })
       it('fails if a token does not have a configured pool in the ramp', async () => {
         // Remove one of the 3 pools from the ramp
-        const newlyConfiguredTokens = [tokens[1], tokens[2]]
-        const newlyConfiguredPools = [pools[1], pools[2]]
-        await ramp.connect(roles.defaultAccount).setPools(
-          newlyConfiguredTokens.map((t) => t.address),
-          newlyConfiguredPools.map((p) => p.address),
-        )
+        await ramp
+          .connect(roles.defaultAccount)
+          .removePool(tokens[0].address, pools[0].address)
 
         // Approve so it gets past the fee taking
         await tokens[0]

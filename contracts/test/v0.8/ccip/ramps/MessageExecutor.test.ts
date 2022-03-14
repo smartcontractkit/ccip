@@ -57,6 +57,7 @@ describe('MessageExecutor', () => {
       's_offRamp',
       // MessageExecutorHelper
       'report',
+      'withdrawAccumulatedFees',
       // OCR2Abstract
       'setConfig',
       'latestConfigDetails',
