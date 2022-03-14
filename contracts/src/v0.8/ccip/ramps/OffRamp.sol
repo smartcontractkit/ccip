@@ -173,10 +173,15 @@ contract OffRamp is
       try CrossChainMessageReceiverInterface(message.payload.receiver).receiveMessage(message) {
         emit CrossChainMessageExecuted(message.sequenceNumber);
       } catch (bytes memory reason) {
+        // TODO: Figure out a better way to handle failed executions
         revert ExecutionError(message.sequenceNumber, reason);
       }
+    } else {
+      if (message.payload.data.length > 0) {
+        revert UnexpectedPayloadData(message.sequenceNumber);
+      }
     }
-    //TODO: gas based fee calculation
+    // TODO: gas based fee calculation
   }
 
   /**

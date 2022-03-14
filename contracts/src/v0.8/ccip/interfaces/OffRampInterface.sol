@@ -20,6 +20,7 @@ interface OffRampInterface {
   error InvalidReceiver(address receiver);
   error InvalidSourceChain(uint256 sourceChainId);
   error MessageTooLarge(uint256 maxSize, uint256 actualSize);
+  error UnexpectedPayloadData(uint256 sequenceNumber);
 
   event ReportAccepted(CCIP.RelayReport report);
   event CrossChainMessageExecuted(uint256 indexed sequenceNumber);

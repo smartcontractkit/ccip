@@ -830,6 +830,7 @@ describe('OffRamp', () => {
             const nextSequenceNumber = sequenceNumber.add(1)
             message.payload.receiver = await roles.consumer.getAddress()
             message.sequenceNumber = nextSequenceNumber
+            message.payload.data = []
             const report = constructReport(
               message,
               nextSequenceNumber,
@@ -845,7 +846,7 @@ describe('OffRamp', () => {
             tx = await ramp
               .connect(roles.oracleNode)
               .executeTransaction(message, proof, true)
-            expectGasWithinDeviation((await tx.wait()).gasUsed, 238_438)
+            expectGasWithinDeviation((await tx.wait()).gasUsed, 238_099)
           })
         })
 
@@ -918,6 +919,7 @@ describe('OffRamp', () => {
             const nextSequenceNumber = sequenceNumber.add(1)
             message.payload.receiver = await roles.consumer.getAddress()
             message.sequenceNumber = nextSequenceNumber
+            message.payload.data = []
             const report = constructReport(
               message,
               nextSequenceNumber,
@@ -933,7 +935,7 @@ describe('OffRamp', () => {
             tx = await ramp
               .connect(roles.oracleNode)
               .executeTransaction(message, proof, true)
-            expectGasWithinDeviation((await tx.wait()).gasUsed, 252_738)
+            expectGasWithinDeviation((await tx.wait()).gasUsed, 252_387)
           })
         })
 
