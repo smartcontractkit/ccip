@@ -160,7 +160,7 @@ describe('Single Token EOA End to End', () => {
         {
           maxTokensLength: 2,
           maxDataSize: 10 ** 3,
-          relayingFeeLink: 0,
+          relayingFeeJuels: 0,
         },
       ])
     )

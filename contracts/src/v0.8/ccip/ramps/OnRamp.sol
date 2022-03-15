@@ -119,7 +119,7 @@ contract OnRamp is OnRampInterface, TypeAndVersionInterface, HealthChecker, Toke
   function _calculateFee(IERC20 feeToken) internal view returns (uint256) {
     AggregatorV2V3Interface priceFeed = getFeed(feeToken);
     if (address(priceFeed) == address(0)) revert UnsupportedFeeToken(feeToken);
-    return uint256(s_config.relayingFeeLink) * uint256(priceFeed.latestAnswer());
+    return uint256(s_config.relayingFeeJuels) * uint256(priceFeed.latestAnswer());
   }
 
   function withdrawAccumulatedFees(

@@ -17,7 +17,7 @@ native_token_pool: ../../../contracts/solc/v0.8.12/NativeTokenPool.abi ../../../
 offchain_aggregator_wrapper: OffchainAggregator/OffchainAggregator.abi - 5f97dc197fd4e2b999856b9b3fa7c2aaf0c700c71d7009d7d017d233bc855877
 offramp: ../../../contracts/solc/v0.8.12/OffRamp.abi ../../../contracts/solc/v0.8.12/OffRamp.bin a38126b7b364ed65a444aabbf8f8ccd71587024d4519af6f1f705617fd5471f3
 offramp_helper: ../../../contracts/solc/v0.8.12/OffRampHelper.abi ../../../contracts/solc/v0.8.12/OffRampHelper.bin 5b4af46caef5c239751a8c07bdd509a3ebd7fd739c4b8dff02da3593f16fdd92
-onramp: ../../../contracts/solc/v0.8.12/OnRamp.abi ../../../contracts/solc/v0.8.12/OnRamp.bin c1963b157e64ba9a5eb8f259e87dd9d98b174ffbf740034c82a1195e5ab052da
+onramp: ../../../contracts/solc/v0.8.12/OnRamp.abi ../../../contracts/solc/v0.8.12/OnRamp.bin fe1e9970eb8c52a47e98f17c15bc2f42f8f3f6c81ebf396a11d7c5213f9fa4ee
 operator_wrapper: ../../../contracts/solc/v0.7/Operator.abi ../../../contracts/solc/v0.7/Operator.bin 08965dbb26f62739c1ce4d0941f30c0dd08003648823e7d722900b48270ffc2b
 oracle_wrapper: ../../../contracts/solc/v0.6/Oracle.abi ../../../contracts/solc/v0.6/Oracle.bin 7af2fbac22a6e8c2847e8e685a5400cac5101d72ddf5365213beb79e4dede43a
 receiver_dapp: ../../../contracts/solc/v0.8.12/ReceiverDapp.abi ../../../contracts/solc/v0.8.12/ReceiverDapp.bin ee93b07a1c7ba3d23883c2a596f95a6e2b188c15e894e303f77fb0ad17726aea

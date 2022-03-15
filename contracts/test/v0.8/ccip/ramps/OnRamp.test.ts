@@ -47,7 +47,7 @@ const destinationChainIds: Array<BigNumber> = [
 ]
 const maxTokensLength: number = 10
 const maxDataSize: number = 10 ** 3 // 1kb
-const relayingFeeLink: number = 1
+const relayingFeeJuels: number = 1
 let bucketRate: BigNumber
 let bucketCapactiy: BigNumber
 let maxTimeWithoutAFNSignal: BigNumber
@@ -121,7 +121,7 @@ describe('OnRamp', () => {
         maxTimeWithoutAFNSignal,
         maxTokensLength,
         maxDataSize,
-        relayingFeeLink,
+        relayingFeeJuels,
       ])
     )
 
@@ -192,7 +192,7 @@ describe('OnRamp', () => {
       const config = await ramp.getConfig()
       expect(config.maxDataSize).to.equal(maxDataSize)
       expect(config.maxTokensLength).to.equal(maxTokensLength)
-      expect(config.relayingFeeLink).to.equal(relayingFeeLink)
+      expect(config.relayingFeeJuels).to.equal(relayingFeeJuels)
 
       // Tokens, Pools and Price Feeds
       for (let i = 0; i < numberOfTokensPoolsAndFeeds; i++) {
@@ -223,7 +223,7 @@ describe('OnRamp', () => {
 
     beforeEach(async () => {
       // Ensure that the contracts are setup correctly
-      expect((await ramp.getConfig()).relayingFeeLink).to.equal(1)
+      expect((await ramp.getConfig()).relayingFeeJuels).to.equal(1)
       expect(await ramp.getFeed(tokens[0].address)).to.equal(priceFeed.address)
 
       // Generate latest price
@@ -252,7 +252,7 @@ describe('OnRamp', () => {
       it('calculates the correct fee', async () => {
         const fee = Math.ceil(Math.random() * 1000)
         await ramp.connect(roles.defaultAccount).setConfig({
-          relayingFeeLink: fee,
+          relayingFeeJuels: fee,
           maxDataSize: maxDataSize,
           maxTokensLength: maxTokensLength,
         })
@@ -296,7 +296,7 @@ describe('OnRamp', () => {
       recipient = roles.stranger
       recipientAddress = await recipient.getAddress()
       feeToken = tokens[0]
-      feesTaken = (await priceFeed.latestAnswer()).mul(relayingFeeLink)
+      feesTaken = (await priceFeed.latestAnswer()).mul(relayingFeeJuels)
     })
 
     it('success', async () => {
@@ -451,7 +451,7 @@ describe('OnRamp', () => {
         tx = await ramp
           .connect(roles.defaultAccount)
           .requestCrossChainSend(payload)
-        feeTaken = (await priceFeed.latestAnswer()).mul(relayingFeeLink)
+        feeTaken = (await priceFeed.latestAnswer()).mul(relayingFeeJuels)
       })
 
       it('stores the fee in the OnRamp', async () => {
@@ -550,7 +550,7 @@ describe('OnRamp', () => {
         await ramp.connect(roles.defaultAccount).setConfig({
           maxDataSize: newDataSize,
           maxTokensLength: maxTokensLength,
-          relayingFeeLink: relayingFeeLink,
+          relayingFeeJuels: relayingFeeJuels,
         })
         await evmRevert(
           ramp.connect(roles.defaultAccount).requestCrossChainSend(payload),
@@ -561,7 +561,7 @@ describe('OnRamp', () => {
         await ramp.connect(roles.defaultAccount).setConfig({
           maxDataSize: maxDataSize,
           maxTokensLength: 1,
-          relayingFeeLink: relayingFeeLink,
+          relayingFeeJuels: relayingFeeJuels,
         })
         await evmRevert(
           ramp.connect(roles.defaultAccount).requestCrossChainSend(payload),
@@ -570,7 +570,7 @@ describe('OnRamp', () => {
         await ramp.connect(roles.defaultAccount).setConfig({
           maxDataSize: maxDataSize,
           maxTokensLength: maxTokensLength,
-          relayingFeeLink: relayingFeeLink,
+          relayingFeeJuels: relayingFeeJuels,
         })
         payload.amounts = [100]
         await evmRevert(
@@ -616,7 +616,7 @@ describe('OnRamp', () => {
           .connect(roles.defaultAccount)
           .approve(ramp.address, amounts[0])
         const amountToLock = amounts[0].sub(
-          relayingFeeLink * priceFeedLatestAnswer,
+          relayingFeeJuels * priceFeedLatestAnswer,
         )
         await evmRevert(
           ramp.connect(roles.defaultAccount).requestCrossChainSend(payload),
@@ -630,7 +630,7 @@ describe('OnRamp', () => {
     it('only allows owner to set', async () => {
       await evmRevert(
         ramp.connect(roles.stranger).setConfig({
-          relayingFeeLink: 1,
+          relayingFeeJuels: 1,
           maxDataSize: 2,
           maxTokensLength: 3,
         }),
@@ -645,12 +645,12 @@ describe('OnRamp', () => {
       let tx = await ramp.connect(roles.defaultAccount).setConfig({
         maxDataSize: newDataSize,
         maxTokensLength: newTokensLength,
-        relayingFeeLink: newRelayFee,
+        relayingFeeJuels: newRelayFee,
       })
       const config = await await ramp.getConfig()
       expect(config.maxDataSize).to.equal(newDataSize)
       expect(config.maxTokensLength).to.equal(newTokensLength)
-      expect(config.relayingFeeLink).to.equal(newRelayFee)
+      expect(config.relayingFeeJuels).to.equal(newRelayFee)
       await expect(tx)
         .to.emit(ramp, 'OnRampConfigSet')
         .withArgs([newRelayFee, newDataSize, newTokensLength])

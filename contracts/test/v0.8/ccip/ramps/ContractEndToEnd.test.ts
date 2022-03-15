@@ -165,7 +165,7 @@ describe('Contract End to End', () => {
         {
           maxTokensLength: maxTokensLength,
           maxDataSize: maxDataSize,
-          relayingFeeLink: 0,
+          relayingFeeJuels: 0,
         },
       ])
     )
