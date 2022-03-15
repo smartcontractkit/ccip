@@ -99,9 +99,9 @@ func TestLogListener_SavesRequests(t *testing.T) {
 		afn,                                // AFN
 		big.NewInt(86400),                  //maxTimeWithoutAFNSignal 86400 seconds = one day
 		onramp.OnRampInterfaceOnRampConfig{
-			RelayingFeeLink: 0,
-			MaxDataSize:     1e5,
-			MaxTokensLength: 5,
+			RelayingFeeJuels: 0,
+			MaxDataSize:      1e5,
+			MaxTokensLength:  5,
 		},
 	)
 	require.NoError(t, err)

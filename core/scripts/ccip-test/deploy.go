@@ -73,9 +73,9 @@ func deployOnramp(source EvmChainConfig, offrampChainId *big.Int) *onramp.OnRamp
 		afn.Address(),                          // AFN
 		big.NewInt(86400),                      //maxTimeWithoutAFNSignal 86400 seconds = one day
 		onramp.OnRampInterfaceOnRampConfig{
-			RelayingFeeLink: 0,
-			MaxDataSize:     1e6,
-			MaxTokensLength: 5,
+			RelayingFeeJuels: 0,
+			MaxDataSize:      1e6,
+			MaxTokensLength:  5,
 		},
 	)
 	helpers.PanicErr(err)
