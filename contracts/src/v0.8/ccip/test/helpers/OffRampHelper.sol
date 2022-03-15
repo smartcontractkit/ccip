@@ -15,7 +15,6 @@ contract OffRampHelper is OffRamp {
     uint64 executionDelaySeconds,
     uint64 maxTokensLength
   )
-
     OffRamp(
       sourceChainId,
       chainId,

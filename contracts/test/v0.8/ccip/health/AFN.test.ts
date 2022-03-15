@@ -144,7 +144,7 @@ describe('AFN', () => {
           expect(lastGoodVote).to.equal(1)
         })
         it('adds the votes to this round', async () => {
-          const votes = await afn.getGoodVotes(1)
+          const votes = await afn.getGoodVotes()
           expect(votes).to.equal(weights[index])
         })
         it('emits a good vote event', async () => {

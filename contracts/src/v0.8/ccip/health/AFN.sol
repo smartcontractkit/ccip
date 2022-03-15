@@ -23,8 +23,8 @@ contract AFN is AFNInterface, OwnerIsCreator, TypeAndVersionInterface {
   Heartbeat private s_lastHeartbeat;
   // The last round that a participant voted good
   mapping(address => uint256) private s_lastGoodVote;
-  // round => total good votes
-  mapping(uint256 => uint256) private s_goodVotes;
+  // Total good votes for this round
+  uint256 private s_goodVotes;
 
   // Has a participant voted bad
   mapping(address => bool) private s_hasVotedBad;
@@ -60,10 +60,10 @@ contract AFN is AFNInterface, OwnerIsCreator, TypeAndVersionInterface {
     if (s_lastGoodVote[sender] == currentRound) revert AlreadyVoted();
 
     s_lastGoodVote[sender] = currentRound;
-    s_goodVotes[currentRound] += s_weightByParticipant[sender];
+    s_goodVotes += s_weightByParticipant[sender];
     emit GoodVote(sender, currentRound);
 
-    if (s_goodVotes[currentRound] >= s_weightThresholdForHeartbeat) {
+    if (s_goodVotes >= s_weightThresholdForHeartbeat) {
       Heartbeat memory heartbeat = Heartbeat({
         round: currentRound,
         timestamp: uint64(block.timestamp),
@@ -71,6 +71,7 @@ contract AFN is AFNInterface, OwnerIsCreator, TypeAndVersionInterface {
       });
       s_lastHeartbeat = heartbeat;
       s_round++;
+      s_goodVotes = 0;
       emit AFNHeartbeat(heartbeat);
     }
   }
@@ -172,8 +173,8 @@ contract AFN is AFNInterface, OwnerIsCreator, TypeAndVersionInterface {
     return s_lastGoodVote[participant];
   }
 
-  function getGoodVotes(uint256 round) external view returns (uint256) {
-    return s_goodVotes[round];
+  function getGoodVotes() external view returns (uint256) {
+    return s_goodVotes;
   }
 
   function getBadVotersAndVotes() external view returns (address[] memory voters, uint256 votes) {

@@ -36,7 +36,7 @@ contract OffRamp is
   mapping(uint256 => bool) private s_executed;
   // Last relay report
   CCIP.RelayReport private s_lastReport;
-  
+
   // Configuration values
   OffRampConfig private s_config;
 
@@ -216,7 +216,8 @@ contract OffRamp is
     ) {
       revert UnsupportedNumberOfTokens();
     }
-    if (message.payload.data.length > uint256(s_config.maxDataSize)) revert MessageTooLarge(uint256(s_config.maxDataSize), message.payload.data.length);
+    if (message.payload.data.length > uint256(s_config.maxDataSize))
+      revert MessageTooLarge(uint256(s_config.maxDataSize), message.payload.data.length);
   }
 
   /**

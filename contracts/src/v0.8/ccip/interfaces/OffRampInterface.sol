@@ -30,7 +30,7 @@ interface OffRampInterface {
   event MaxTokensLengthSet(uint64 length);
   event FeesWithdrawn(IERC20 feeToken, address recipient, uint256 amount);
 
-  struct OffRampConfig{
+  struct OffRampConfig {
     // Execution fee in Juels (smallest denomination of LINK)
     uint64 executionFeeJuels;
     // execution delay in seconds
