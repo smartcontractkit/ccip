@@ -67,7 +67,7 @@ func TestLogListener_SavesRequests(t *testing.T) {
 	user, err := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
 	backend := backends.NewSimulatedBackend(core.GenesisAlloc{
 		user.From: {Balance: big.NewInt(1000000000000000000)}},
-		ethconfig.Defaults.Miner.GasCeil)
+		5*ethconfig.Defaults.Miner.GasCeil)
 	linkTokenAddress, _, linkToken, err := link_token_interface.DeployLinkToken(user, backend)
 	require.NoError(t, err)
 	poolAddress, _, pool, err := native_token_pool.DeployNativeTokenPool(user, backend, linkTokenAddress,
