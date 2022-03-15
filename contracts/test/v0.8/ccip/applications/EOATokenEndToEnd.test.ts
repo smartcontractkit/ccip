@@ -85,13 +85,15 @@ describe('Single Token EOA End to End', () => {
         BigNumber.from('100000000000000000000'),
       ])
     )
+    let bucketConfig = {
+      rate: sendAmount,
+      capacity: sendAmount,
+    }
     chain2Pool = <NativeTokenPool>(
       await deployContract(roles.defaultAccount, PoolArtifact, [
         chain2Token.address,
-        sendAmount, //bucketRate
-        sendAmount, //bucketCapacity
-        sendAmount, //bucketRate
-        sendAmount, //bucketCapacity
+        bucketConfig,
+        bucketConfig,
       ])
     )
     chain2AFN = <MockAFN>(
@@ -138,10 +140,8 @@ describe('Single Token EOA End to End', () => {
     chain1Pool = <NativeTokenPool>(
       await deployContract(roles.defaultAccount, PoolArtifact, [
         chain1Token.address,
-        sendAmount, //bucketRate
-        sendAmount, //bucketCapacity
-        sendAmount, //bucketRate
-        sendAmount, //bucketCapacity
+        bucketConfig,
+        bucketConfig,
       ])
     )
     chain1AFN = <MockAFN>(

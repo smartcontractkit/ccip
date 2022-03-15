@@ -13,11 +13,9 @@ contract NativeTokenPool is TokenPool {
 
   constructor(
     IERC20 token,
-    uint256 lockBucketRate,
-    uint256 lockBucketCapacity,
-    uint256 releaseBucketRate,
-    uint256 releaseBucketCapacity
-  ) TokenPool(token, lockBucketRate, lockBucketCapacity, releaseBucketRate, releaseBucketCapacity) {}
+    BucketConfig memory lockConfig,
+    BucketConfig memory releaseConfig
+  ) TokenPool(token, lockConfig, releaseConfig) {}
 
   /**
    * @notice Locks the token in the pool

@@ -15,7 +15,13 @@ contract TokenPoolHelper is TokenPool {
     uint256 lockBucketCapacity,
     uint256 releaseBucketRate,
     uint256 releaseBucketCapacity
-  ) TokenPool(token, lockBucketRate, lockBucketCapacity, releaseBucketRate, releaseBucketCapacity) {}
+  )
+    TokenPool(
+      token,
+      BucketConfig({rate: lockBucketRate, capacity: lockBucketCapacity}),
+      BucketConfig({rate: releaseBucketRate, capacity: releaseBucketCapacity})
+    )
+  {}
 
   function lockOrBurn(address depositor, uint256 amount) external override {
     emit LockOrBurn(depositor, amount);

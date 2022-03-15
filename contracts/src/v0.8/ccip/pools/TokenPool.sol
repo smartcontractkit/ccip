@@ -25,16 +25,14 @@ abstract contract TokenPool is PoolInterface, OwnerIsCreator, Pausable {
 
   constructor(
     IERC20 token,
-    uint256 lockOrBurnBucketRate,
-    uint256 lockOrBurnBucketCapacity,
-    uint256 releaseOrMintBucketRate,
-    uint256 releaseOrMintBucketCapacity
+    BucketConfig memory lockOrBurnConfig,
+    BucketConfig memory releaseOrMintConfig
   ) {
     s_token = token;
-    s_lockOrBurnBucket = TokenLimits.constructTokenBucket(lockOrBurnBucketRate, lockOrBurnBucketCapacity, true);
+    s_lockOrBurnBucket = TokenLimits.constructTokenBucket(lockOrBurnConfig.rate, lockOrBurnConfig.capacity, true);
     s_releaseOrMintBucket = TokenLimits.constructTokenBucket(
-      releaseOrMintBucketRate,
-      releaseOrMintBucketCapacity,
+      releaseOrMintConfig.rate,
+      releaseOrMintConfig.capacity,
       true
     );
   }

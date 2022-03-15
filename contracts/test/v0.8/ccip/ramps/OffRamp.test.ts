@@ -138,22 +138,22 @@ describe('OffRamp', () => {
         mintAmount,
       ])
     )
+    let bucketConfig = {
+      rate: bucketRate,
+      capacity: bucketCapactiy,
+    }
     pool1 = <NativeTokenPool>(
       await deployContract(roles.defaultAccount, PoolArtifact, [
         destinationToken1.address,
-        bucketRate,
-        bucketCapactiy,
-        bucketRate,
-        bucketCapactiy,
+        bucketConfig,
+        bucketConfig,
       ])
     )
     pool2 = <NativeTokenPool>(
       await deployContract(roles.defaultAccount, PoolArtifact, [
         destinationToken2.address,
-        bucketRate,
-        bucketCapactiy,
-        bucketRate,
-        bucketCapactiy,
+        bucketConfig,
+        bucketConfig,
       ])
     )
     await destinationToken1

@@ -75,6 +75,10 @@ describe('OnRamp', () => {
 
     tokens = new Array<MockERC20>()
     pools = new Array<NativeTokenPool>()
+    let bucketConfig = {
+      rate: bucketRate,
+      capacity: bucketCapactiy,
+    }
     for (let i = 0; i < numberOfTokensPoolsAndFeeds; i++) {
       tokens.push(
         <MockERC20>(
@@ -91,10 +95,8 @@ describe('OnRamp', () => {
         <NativeTokenPool>(
           await deployContract(roles.defaultAccount, PoolArtifact, [
             tokens[i].address,
-            bucketRate,
-            bucketCapactiy,
-            bucketRate,
-            bucketCapactiy,
+            bucketConfig,
+            bucketConfig,
           ])
         ),
       )

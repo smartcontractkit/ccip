@@ -56,10 +56,14 @@ describe('NativeTokenPool', () => {
     pool = <NativeTokenPool>(
       await deployContract(roles.defaultAccount, NativeTokenPoolArtifact, [
         token.address,
-        bucketRate,
-        bucketCapactiy,
-        bucketRate,
-        bucketCapactiy,
+        {
+          rate: bucketRate,
+          capacity: bucketCapactiy,
+        },
+        {
+          rate: bucketRate,
+          capacity: bucketCapactiy,
+        },
       ])
     )
   })

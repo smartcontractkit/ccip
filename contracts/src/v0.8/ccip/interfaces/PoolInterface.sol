@@ -17,6 +17,11 @@ interface PoolInterface {
   event NewLockBurnBucketConstructed(uint256 rate, uint256 capacity, bool full);
   event NewReleaseMintBucketConstructed(uint256 rate, uint256 capacity, bool full);
 
+  struct BucketConfig {
+    uint256 rate;
+    uint256 capacity;
+  }
+
   /**
    * @notice Lock or burn the token in the pool
    * @param depositor Token holder address

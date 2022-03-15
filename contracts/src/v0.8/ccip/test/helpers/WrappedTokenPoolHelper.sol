@@ -12,7 +12,14 @@ contract WrappedTokenPoolHelper is WrappedTokenPool {
     uint256 burnBucketCapacity,
     uint256 mintBucketRate,
     uint256 mintBucketCapacity
-  ) WrappedTokenPool(name, symbol, burnBucketRate, burnBucketCapacity, mintBucketRate, mintBucketCapacity) {}
+  )
+    WrappedTokenPool(
+      name,
+      symbol,
+      BucketConfig({rate: burnBucketRate, capacity: burnBucketCapacity}),
+      BucketConfig({rate: mintBucketRate, capacity: mintBucketCapacity})
+    )
+  {}
 
   function mint(address account, uint256 amount) public onlyOwner {
     _mint(account, amount);

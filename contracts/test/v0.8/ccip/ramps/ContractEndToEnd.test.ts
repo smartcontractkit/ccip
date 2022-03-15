@@ -87,13 +87,15 @@ describe('Contract End to End', () => {
         BigNumber.from('100000000000000000000'),
       ])
     )
+    let bucketConfig = {
+      rate: bucketRate,
+      capacity: bucketCapactiy,
+    }
     chain2Pool = <NativeTokenPool>(
       await deployContract(roles.defaultAccount, PoolArtifact, [
         chain2Token.address,
-        bucketRate,
-        bucketCapactiy,
-        bucketRate,
-        bucketCapactiy,
+        bucketConfig,
+        bucketConfig,
       ])
     )
     chain2AFN = <MockAFN>(
@@ -143,10 +145,8 @@ describe('Contract End to End', () => {
     chain1Pool = <NativeTokenPool>(
       await deployContract(roles.defaultAccount, PoolArtifact, [
         chain1Token.address,
-        bucketRate,
-        bucketCapactiy,
-        bucketRate,
-        bucketCapactiy,
+        bucketConfig,
+        bucketConfig,
       ])
     )
     chain1AFN = <MockAFN>(

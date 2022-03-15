@@ -14,14 +14,9 @@ contract WrappedTokenPool is TokenPool, ERC20 {
   constructor(
     string memory name,
     string memory symbol,
-    uint256 burnBucketRate,
-    uint256 burnBucketCapacity,
-    uint256 mintBucketRate,
-    uint256 mintBucketCapacity
-  )
-    TokenPool(IERC20(address(this)), burnBucketRate, burnBucketCapacity, mintBucketRate, mintBucketCapacity)
-    ERC20(name, symbol)
-  {}
+    BucketConfig memory burnConfig,
+    BucketConfig memory mintConfig
+  ) TokenPool(IERC20(address(this)), burnConfig, mintConfig) ERC20(name, symbol) {}
 
   /**
    * @notice Burn the token in the pool
