@@ -52,7 +52,14 @@ func TestExecutionReportEncoding(t *testing.T) {
 	require.NoError(t, err)
 
 	// Deploy destination pool
-	destPoolAddress, _, _, err := native_token_pool.DeployNativeTokenPool(destUser, destChain, destLinkTokenAddress, big.NewInt(1), big.NewInt(1e9), big.NewInt(1), big.NewInt(1e9))
+	destPoolAddress, _, _, err := native_token_pool.DeployNativeTokenPool(destUser, destChain, destLinkTokenAddress,
+		native_token_pool.PoolInterfaceBucketConfig{
+			Rate:     big.NewInt(1),
+			Capacity: big.NewInt(1e9),
+		}, native_token_pool.PoolInterfaceBucketConfig{
+			Rate:     big.NewInt(1),
+			Capacity: big.NewInt(1e9),
+		})
 	require.NoError(t, err)
 	destChain.Commit()
 	destPool, err := native_token_pool.NewNativeTokenPool(destPoolAddress, destChain)
@@ -91,8 +98,8 @@ func TestExecutionReportEncoding(t *testing.T) {
 		[]common.Address{feedAddress},          // feeds
 		afnAddress,                             // AFN address
 		big.NewInt(86400),                      // max timeout without AFN signal  86400 seconds = one day
-		big.NewInt(0),                          // executionDelaySeconds
-		big.NewInt(5),                          // maxTokensLength
+		0,                                      // executionDelaySeconds
+		5,                                      // maxTokensLength
 	)
 	require.NoError(t, err)
 	offRamp, err := offramp_helper.NewOffRampHelper(offRampAddress, destChain)

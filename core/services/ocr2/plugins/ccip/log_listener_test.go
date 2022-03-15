@@ -70,7 +70,14 @@ func TestLogListener_SavesRequests(t *testing.T) {
 		ethconfig.Defaults.Miner.GasCeil)
 	linkTokenAddress, _, linkToken, err := link_token_interface.DeployLinkToken(user, backend)
 	require.NoError(t, err)
-	poolAddress, _, pool, err := native_token_pool.DeployNativeTokenPool(user, backend, linkTokenAddress, big.NewInt(1), big.NewInt(1e9), big.NewInt(1), big.NewInt(1e9))
+	poolAddress, _, pool, err := native_token_pool.DeployNativeTokenPool(user, backend, linkTokenAddress,
+		native_token_pool.PoolInterfaceBucketConfig{
+			Rate:     big.NewInt(1),
+			Capacity: big.NewInt(1e9),
+		}, native_token_pool.PoolInterfaceBucketConfig{
+			Rate:     big.NewInt(1),
+			Capacity: big.NewInt(1e9),
+		})
 	require.NoError(t, err)
 	afn := DeployAfn(t, user, backend)
 	sourceChainId := big.NewInt(1)
@@ -91,9 +98,11 @@ func TestLogListener_SavesRequests(t *testing.T) {
 		[]common.Address{user.From},        // allow list
 		afn,                                // AFN
 		big.NewInt(86400),                  //maxTimeWithoutAFNSignal 86400 seconds = one day
-		big.NewInt(5),                      // maxTokensLength
-		big.NewInt(1e5),                    // maxDataSize
-		big.NewInt(0),                      // relayingFeeLink
+		onramp.OnRampInterfaceOnRampConfig{
+			RelayingFeeLink: 0,
+			MaxDataSize:     1e5,
+			MaxTokensLength: 5,
+		},
 	)
 	require.NoError(t, err)
 	onRamp, err := onramp.NewOnRamp(onRampAddress, backend)
@@ -112,10 +121,12 @@ func TestLogListener_SavesRequests(t *testing.T) {
 		[]common.Address{feedAddress},      // feeds
 		afn,                                // AFN address
 		big.NewInt(86400),                  // max timeout without AFN signal  86400 seconds = one day
-		big.NewInt(0),                      // executionDelaySeconds
-		big.NewInt(5),                      // maxTokensLength
-		big.NewInt(0),                      // executionFeeLink
-		big.NewInt(1e9),                    // maxDataSize
+		offramp.OffRampInterfaceOffRampConfig{
+			ExecutionFeeJuels:     0,
+			ExecutionDelaySeconds: 0,
+			MaxDataSize:           1e9,
+			MaxTokensLength:       5,
+		},
 	)
 	require.NoError(t, err)
 	offRamp, err := offramp.NewOffRamp(offRampAddress, backend)

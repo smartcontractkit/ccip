@@ -37,7 +37,14 @@ func TestRelayReportEncoding(t *testing.T) {
 	destChain.Commit()
 	_, err = link_token_interface.NewLinkToken(destLinkTokenAddress, destChain)
 	require.NoError(t, err)
-	destPoolAddress, _, _, err := native_token_pool.DeployNativeTokenPool(destUser, destChain, destLinkTokenAddress, big.NewInt(1), big.NewInt(1e9), big.NewInt(1), big.NewInt(1e9))
+	destPoolAddress, _, _, err := native_token_pool.DeployNativeTokenPool(destUser, destChain, destLinkTokenAddress,
+		native_token_pool.PoolInterfaceBucketConfig{
+			Rate:     big.NewInt(1),
+			Capacity: big.NewInt(1e9),
+		}, native_token_pool.PoolInterfaceBucketConfig{
+			Rate:     big.NewInt(1),
+			Capacity: big.NewInt(1e9),
+		})
 	require.NoError(t, err)
 	destChain.Commit()
 	_, err = native_token_pool.NewNativeTokenPool(destPoolAddress, destChain)
@@ -61,8 +68,8 @@ func TestRelayReportEncoding(t *testing.T) {
 		[]common.Address{destPoolAddress},      // Feeds
 		afnAddress,                             // AFN address
 		big.NewInt(86400),                      // max timeout without AFN signal  86400 seconds = one day
-		big.NewInt(0),                          // executionDelaySeconds
-		big.NewInt(1000),                       // maxTokensLength
+		0,                                      // executionDelaySeconds
+		1000,                                   // maxTokensLength
 	)
 	require.NoError(t, err)
 	offRamp, err := offramp_helper.NewOffRampHelper(offRampAddress, destChain)

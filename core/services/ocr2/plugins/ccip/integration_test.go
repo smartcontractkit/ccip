@@ -97,7 +97,16 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 	sourceChain.Commit()
 	sourceLinkToken, err := link_token_interface.NewLinkToken(sourceLinkTokenAddress, sourceChain)
 	require.NoError(t, err)
-	sourcePoolAddress, _, _, err := native_token_pool.DeployNativeTokenPool(sourceUser, sourceChain, sourceLinkTokenAddress, big.NewInt(1), big.NewInt(1e9), big.NewInt(1), big.NewInt(1e9))
+	sourcePoolAddress, _, _, err := native_token_pool.DeployNativeTokenPool(sourceUser,
+		sourceChain,
+		sourceLinkTokenAddress,
+		native_token_pool.PoolInterfaceBucketConfig{
+			Rate:     big.NewInt(1),
+			Capacity: big.NewInt(1e9),
+		}, native_token_pool.PoolInterfaceBucketConfig{
+			Rate:     big.NewInt(1),
+			Capacity: big.NewInt(1e9),
+		})
 	require.NoError(t, err)
 	sourceChain.Commit()
 	sourcePool, err := native_token_pool.NewNativeTokenPool(sourcePoolAddress, sourceChain)
@@ -109,7 +118,14 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 	destChain.Commit()
 	destLinkToken, err := link_token_interface.NewLinkToken(destLinkTokenAddress, destChain)
 	require.NoError(t, err)
-	destPoolAddress, _, _, err := native_token_pool.DeployNativeTokenPool(destUser, destChain, destLinkTokenAddress, big.NewInt(1), big.NewInt(1e9), big.NewInt(1), big.NewInt(1e9))
+	destPoolAddress, _, _, err := native_token_pool.DeployNativeTokenPool(destUser, destChain, destLinkTokenAddress,
+		native_token_pool.PoolInterfaceBucketConfig{
+			Rate:     big.NewInt(1),
+			Capacity: big.NewInt(1e9),
+		}, native_token_pool.PoolInterfaceBucketConfig{
+			Rate:     big.NewInt(1),
+			Capacity: big.NewInt(1e9),
+		})
 	require.NoError(t, err)
 	destChain.Commit()
 	destPool, err := native_token_pool.NewNativeTokenPool(destPoolAddress, destChain)
@@ -157,9 +173,11 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 		[]common.Address{},                       // allow list
 		afnSourceAddress,                         // AFN
 		big.NewInt(86400),                        //maxTimeWithoutAFNSignal 86400 seconds = one day
-		big.NewInt(5),                            // maxTokensLength
-		big.NewInt(1e12),                         // maxDataSize
-		big.NewInt(0),                            // relayingFeeLink
+		onramp.OnRampInterfaceOnRampConfig{
+			RelayingFeeLink: 0,
+			MaxDataSize:     1e12,
+			MaxTokensLength: 5,
+		},
 	)
 	require.NoError(t, err)
 	// We do this so onRamp.Address() works
@@ -193,10 +211,12 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 		[]common.Address{feedDestAddress},        // feeds
 		afnDestAddress,                           // AFN address
 		big.NewInt(86400),                        // max timeout without AFN signal  86400 seconds = one day
-		big.NewInt(0),                            // executionDelaySeconds
-		big.NewInt(5),                            // maxTokensLength
-		big.NewInt(0),                            // executionFeeLink
-		big.NewInt(1e12),                         // maxDataSize
+		offramp.OffRampInterfaceOffRampConfig{
+			ExecutionFeeJuels:     0,
+			ExecutionDelaySeconds: 0,
+			MaxDataSize:           1e12,
+			MaxTokensLength:       5,
+		},
 	)
 	require.NoError(t, err)
 	offRamp, err := offramp.NewOffRamp(offRampAddress, destChain)
