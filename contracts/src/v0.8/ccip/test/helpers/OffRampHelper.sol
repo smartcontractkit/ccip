@@ -12,9 +12,10 @@ contract OffRampHelper is OffRamp {
     AggregatorV2V3Interface[] memory feeds,
     AFNInterface afn,
     uint256 maxTimeWithoutAFNSignal,
-    uint256 executionDelaySeconds,
-    uint256 maxTokensLength
+    uint64 executionDelaySeconds,
+    uint64 maxTokensLength
   )
+
     OffRamp(
       sourceChainId,
       chainId,
@@ -23,10 +24,12 @@ contract OffRampHelper is OffRamp {
       feeds,
       afn,
       maxTimeWithoutAFNSignal,
-      executionDelaySeconds,
-      maxTokensLength,
-      1,
-      1000
+      OffRampConfig({
+        executionFeeJuels: 1,
+        executionDelaySeconds: executionDelaySeconds,
+        maxDataSize: 1000,
+        maxTokensLength: maxTokensLength
+      })
     )
   {}
 

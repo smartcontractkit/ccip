@@ -34,16 +34,11 @@ contract OffRamp is
   mapping(bytes32 => uint256) private s_merkleRoots;
   // sequenceNumber => executed
   mapping(uint256 => bool) private s_executed;
-  // Execution fee in link
-  uint256 private s_executionFeeLink;
-  // execution delay in seconds
-  uint256 private s_executionDelaySeconds;
-  // maximum payload data size
-  uint256 private s_maxDataSize;
   // Last relay report
   CCIP.RelayReport private s_lastReport;
-  // Maximum number of distinct ERC20 tokens that can be sent in a message
-  uint256 private s_maxTokensLength;
+  
+  // Configuration values
+  OffRampConfig private s_config;
 
   /**
    * @dev sourceTokens are mapped to pools, and therefore should be the same length arrays.
@@ -53,10 +48,11 @@ contract OffRamp is
    * @param sourceTokens Array of source chain tokens that this contract supports
    * @param pools Array token token pools on this chain (Must map 1:1 with sourceTokens)
    * @param afn AFN contract
-   * @param maxTimeWithoutAFNSignal Maximum number of seconds allows between AFN singals
-   * @param executionDelaySeconds Delay, in seconds, between the relay and execution of a message
-   * @param maxTokensLength The maximum number of different tokens allowed to be sent in a single message
-   * @param executionFeeLink The execution fee, denominated in JUELS
+   * @param config containing:
+   * - maxTimeWithoutAFNSignal Maximum number of seconds allows between AFN singals
+   * - executionDelaySeconds Delay, in seconds, between the relay and execution of a message
+   * - maxTokensLength The maximum number of different tokens allowed to be sent in a single message
+   * - executionFeeJuels The execution fee, denominated in JUELS
    */
   constructor(
     uint256 sourceChainId,
@@ -66,10 +62,7 @@ contract OffRamp is
     AggregatorV2V3Interface[] memory feeds,
     AFNInterface afn,
     uint256 maxTimeWithoutAFNSignal,
-    uint256 executionDelaySeconds,
-    uint256 maxTokensLength,
-    uint256 executionFeeLink,
-    uint256 maxDataSize
+    OffRampConfig memory config
   )
     OCR2Base(true)
     HealthChecker(afn, maxTimeWithoutAFNSignal)
@@ -78,10 +71,7 @@ contract OffRamp is
   {
     SOURCE_CHAIN_ID = sourceChainId;
     CHAIN_ID = chainId;
-    s_executionDelaySeconds = executionDelaySeconds;
-    s_maxTokensLength = maxTokensLength;
-    s_executionFeeLink = executionFeeLink;
-    s_maxDataSize = maxDataSize;
+    s_config = config;
   }
 
   /**
@@ -117,6 +107,8 @@ contract OffRamp is
    * @param message Original message object
    * @param needFee Whether or not the executor requires a fee
    * @dev Can be called by anyone
+   * @dev If the caller wishes to collect fees from the execution, needFee should be true.
+   * This will send fee tokens directly to the executor address (msg.sender)
    */
   function executeTransaction(
     CCIP.Message memory message,
@@ -131,7 +123,7 @@ contract OffRamp is
     if (reportTimestamp == 0) revert MerkleProofError(proof, message);
 
     // Execution delay
-    if (reportTimestamp + s_executionDelaySeconds >= block.timestamp) revert ExecutionDelayError();
+    if (reportTimestamp + uint256(s_config.executionDelaySeconds) >= block.timestamp) revert ExecutionDelayError();
 
     // Disallow double-execution.
     if (s_executed[message.sequenceNumber]) revert AlreadyExecuted(message.sequenceNumber);
@@ -156,7 +148,7 @@ contract OffRamp is
       IERC20 feeToken = message.payload.tokens[0];
       AggregatorV2V3Interface feed = getFeed(feeToken);
       if (address(feed) == address(0)) revert FeeError();
-      fee = s_executionFeeLink * uint256(feed.latestAnswer());
+      fee = uint256(s_config.executionFeeJuels) * uint256(feed.latestAnswer());
       message.payload.amounts[0] -= fee;
       getPool(feeToken).releaseOrMint(msg.sender, fee);
     }
@@ -219,12 +211,12 @@ contract OffRamp is
   function _isWellFormed(CCIP.Message memory message) private view {
     if (message.sourceChainId != SOURCE_CHAIN_ID) revert InvalidSourceChain(message.sourceChainId);
     if (
-      message.payload.tokens.length > s_maxTokensLength ||
+      message.payload.tokens.length > uint256(s_config.maxTokensLength) ||
       message.payload.tokens.length != message.payload.amounts.length
     ) {
       revert UnsupportedNumberOfTokens();
     }
-    if (message.payload.data.length > s_maxDataSize) revert MessageTooLarge(s_maxDataSize, message.payload.data.length);
+    if (message.payload.data.length > uint256(s_config.maxDataSize)) revert MessageTooLarge(uint256(s_config.maxDataSize), message.payload.data.length);
   }
 
   /**
@@ -254,31 +246,40 @@ contract OffRamp is
     // TODO
   }
 
-  function setMaxDataSize(uint256 maxDataSize) external onlyOwner {
-    s_maxDataSize = maxDataSize;
+  function setMaxDataSize(uint64 maxDataSize) external onlyOwner {
+    s_config.maxDataSize = maxDataSize;
     emit MaxDataSizeSet(maxDataSize);
   }
 
-  function getMaxDataSize() external view returns (uint256) {
-    return s_maxDataSize;
+  function getMaxDataSize() external view returns (uint64) {
+    return s_config.maxDataSize;
   }
 
-  function setExecutionFeeLink(uint256 executionFeeLink) external onlyOwner {
-    s_executionFeeLink = executionFeeLink;
-    emit ExecutionFeeLinkSet(executionFeeLink);
+  function setExecutionFeeLink(uint64 executionFeeJuels) external onlyOwner {
+    s_config.executionFeeJuels = executionFeeJuels;
+    emit ExecutionFeeLinkSet(executionFeeJuels);
   }
 
-  function getExecutionFeeLink() external view returns (uint256) {
-    return s_executionFeeLink;
+  function getExecutionFeeLink() external view returns (uint64) {
+    return s_config.executionFeeJuels;
   }
 
-  function setExecutionDelaySeconds(uint256 executionDelaySeconds) external onlyOwner {
-    s_executionDelaySeconds = executionDelaySeconds;
+  function setExecutionDelaySeconds(uint64 executionDelaySeconds) external onlyOwner {
+    s_config.executionDelaySeconds = executionDelaySeconds;
     emit ExecutionDelaySecondsSet(executionDelaySeconds);
   }
 
   function getExecutionDelaySeconds() external view returns (uint256) {
-    return s_executionDelaySeconds;
+    return s_config.executionDelaySeconds;
+  }
+
+  function setMaxTokensLength(uint64 maxTokensLength) external onlyOwner {
+    s_config.maxTokensLength = maxTokensLength;
+    emit MaxTokensLengthSet(maxTokensLength);
+  }
+
+  function getMaxTokensLength() external view returns (uint256) {
+    return s_config.maxTokensLength;
   }
 
   function getMerkleRoot(bytes32 root) external view returns (uint256) {

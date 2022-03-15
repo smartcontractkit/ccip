@@ -200,6 +200,8 @@ describe('OffRamp', () => {
       'setExecutionFeeLink',
       'getExecutionDelaySeconds',
       'setExecutionDelaySeconds',
+      'getMaxTokensLength',
+      'setMaxTokensLength',
       // HealthChecker
       'setAFN',
       'getAFN',
@@ -823,7 +825,7 @@ describe('OffRamp', () => {
 
         describe('GASTEST', () => {
           it('GASTEST - contract receiver execution [ @skip-coverage ]', async () => {
-            expectGasWithinDeviation((await tx.wait()).gasUsed, 553_976)
+            expectGasWithinDeviation((await tx.wait()).gasUsed, 548_072)
           })
 
           it('GASTEST - EOA receiver [ @skip-coverage ]', async () => {
@@ -846,7 +848,7 @@ describe('OffRamp', () => {
             tx = await ramp
               .connect(roles.oracleNode)
               .executeTransaction(message, proof, true)
-            expectGasWithinDeviation((await tx.wait()).gasUsed, 238_099)
+            expectGasWithinDeviation((await tx.wait()).gasUsed, 232_184)
           })
         })
 
@@ -912,7 +914,7 @@ describe('OffRamp', () => {
 
         describe('GASTEST', () => {
           it('GASTEST - contract receiver execution [ @skip-coverage ]', async () => {
-            expectGasWithinDeviation((await tx.wait()).gasUsed, 505_405)
+            expectGasWithinDeviation((await tx.wait()).gasUsed, 501_495)
           })
 
           it('GASTEST - EOA receiver [ @skip-coverage ]', async () => {
@@ -935,7 +937,7 @@ describe('OffRamp', () => {
             tx = await ramp
               .connect(roles.oracleNode)
               .executeTransaction(message, proof, true)
-            expectGasWithinDeviation((await tx.wait()).gasUsed, 252_387)
+            expectGasWithinDeviation((await tx.wait()).gasUsed, 246_484)
           })
         })
 

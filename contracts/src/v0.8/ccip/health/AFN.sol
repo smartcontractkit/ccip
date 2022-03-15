@@ -21,12 +21,12 @@ contract AFN is AFNInterface, OwnerIsCreator, TypeAndVersionInterface {
 
   // Last heartbeat
   Heartbeat private s_lastHeartbeat;
-  // The last round that a party voted good
+  // The last round that a participant voted good
   mapping(address => uint256) private s_lastGoodVote;
   // round => total good votes
   mapping(uint256 => uint256) private s_goodVotes;
 
-  // Has a party voted bad
+  // Has a participant voted bad
   mapping(address => bool) private s_hasVotedBad;
   // participants that have voted bad
   address[] private s_badVoters;
@@ -48,7 +48,7 @@ contract AFN is AFNInterface, OwnerIsCreator, TypeAndVersionInterface {
 
   /**
    * @notice Submit a good vote
-   * @dev msg.sender must be a registered party
+   * @dev msg.sender must be a registered participant
    * @param round the current round
    */
   function voteGood(uint256 round) external override {
@@ -77,7 +77,7 @@ contract AFN is AFNInterface, OwnerIsCreator, TypeAndVersionInterface {
 
   /**
    * @notice Submit a bad vote
-   * @dev msg.sender must be a registered party
+   * @dev msg.sender must be a registered participant
    */
   function voteBad() external override {
     if (s_badSignal) revert MustRecoverFromBadSignal();
@@ -118,7 +118,7 @@ contract AFN is AFNInterface, OwnerIsCreator, TypeAndVersionInterface {
    * @notice Set config storage vars
    * @dev only callable by the owner
    * @param participants participants allowed to vote
-   * @param weights weights of each party's vote
+   * @param weights weights of each participant's vote
    * @param weightThresholdForHeartbeat threshold to emit a heartbeat
    * @param weightThresholdForBadSignal threashold to emit a bad signal
    */
@@ -223,6 +223,7 @@ contract AFN is AFNInterface, OwnerIsCreator, TypeAndVersionInterface {
     // Set new participants
     s_participantList = participants;
     for (uint256 i = 0; i < participants.length; i++) {
+      if (participants[i] == address(0)) revert InvalidConfig();
       if (weights[i] == 0) revert InvalidWeight();
       s_weightByParticipant[participants[i]] = weights[i];
       weightTotal += weights[i];

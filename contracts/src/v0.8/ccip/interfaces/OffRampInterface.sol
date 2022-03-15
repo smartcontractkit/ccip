@@ -24,10 +24,22 @@ interface OffRampInterface {
 
   event ReportAccepted(CCIP.RelayReport report);
   event CrossChainMessageExecuted(uint256 indexed sequenceNumber);
-  event ExecutionDelaySecondsSet(uint256 delay);
-  event ExecutionFeeLinkSet(uint256 executionFee);
-  event MaxDataSizeSet(uint256 size);
+  event ExecutionDelaySecondsSet(uint64 delay);
+  event ExecutionFeeLinkSet(uint64 executionFee);
+  event MaxDataSizeSet(uint64 size);
+  event MaxTokensLengthSet(uint64 length);
   event FeesWithdrawn(IERC20 feeToken, address recipient, uint256 amount);
+
+  struct OffRampConfig{
+    // Execution fee in Juels (smallest denomination of LINK)
+    uint64 executionFeeJuels;
+    // execution delay in seconds
+    uint64 executionDelaySeconds;
+    // maximum payload data size
+    uint64 maxDataSize;
+    // Maximum number of distinct ERC20 tokens that can be sent in a message
+    uint64 maxTokensLength;
+  }
 
   /**
    * @notice Execute the delivery of a message by using its merkle proof

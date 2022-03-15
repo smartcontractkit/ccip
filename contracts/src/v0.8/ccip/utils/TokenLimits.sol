@@ -55,7 +55,8 @@ library TokenLimits {
 
   /**
    * @notice Update the tokens in the bucket
-   * @dev Uses the `rate` and block timestamp to refill the bucket.
+   * @dev Uses the `rate` and block timestamp to refill the bucket. The bucket will not start
+   * refilling within the same block that it was removed from.
    * @dev This acts upon a storage variable in the calling contract.
    * @param bucket token bucket (MUST BE STORAGE)
    */

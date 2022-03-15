@@ -165,17 +165,21 @@ abstract contract TokenPool is PoolInterface, OwnerIsCreator, Pausable {
 
   /**
    * @notice Checks whether the amount requested to lock or burn is within the lock or burn token bucket limit
+   * @dev NOTE: this mutates s_lockOrBurnBucket in storage
    * @dev Reverts with a ExceedsTokenLimit is check fails
    */
   function _verifyLockOrBurnWithinLimits(uint256 amount) internal {
+    // Alters the s_lockOrBurnBucket in storage
     if (!s_lockOrBurnBucket.remove(amount)) revert ExceedsTokenLimit(s_lockOrBurnBucket.tokens, amount);
   }
 
   /**
    * @notice Checks whether the amount requested to mint or release is within the mint or release token bucket limit
+   * @dev NOTE: this mutates s_releaseOrMintBucket in storage
    * @dev Reverts with a ExceedsTokenLimit is check fails
    */
   function _verifyMintOrReleaseWithinLimits(uint256 amount) internal {
+    // Alters the s_releaseOrMintBucket in storage
     if (!s_releaseOrMintBucket.remove(amount)) revert ExceedsTokenLimit(s_releaseOrMintBucket.tokens, amount);
   }
 
