@@ -72,9 +72,11 @@ func deployOnramp(source EvmChainConfig, offrampChainId *big.Int) *onramp.OnRamp
 		[]common.Address{},                     // allow list
 		afn.Address(),                          // AFN
 		big.NewInt(86400),                      //maxTimeWithoutAFNSignal 86400 seconds = one day
-		big.NewInt(5),                          // maxTokensLength
-		big.NewInt(1e6),                        // maxDataSize
-		big.NewInt(0),                          // relayingFeeLink
+		onramp.OnRampInterfaceOnRampConfig{
+			RelayingFeeLink: 0,
+			MaxDataSize:     1e6,
+			MaxTokensLength: 5,
+		},
 	)
 	helpers.PanicErr(err)
 	WaitForMined(context.Background(), source.Client, tx.Hash(), true)
@@ -107,10 +109,12 @@ func deployOfframp(dest EvmChainConfig, onrampChainId *big.Int) (*offramp.OffRam
 		[]common.Address{feedAddress},    // Feeds
 		afn.Address(),                    // AFN address
 		big.NewInt(86400),                // max timeout without AFN signal  86400 seconds = one day
-		big.NewInt(0),                    // executionDelaySeconds
-		big.NewInt(5),                    // maxTokensLength
-		big.NewInt(0),                    // executionFeeLink
-		big.NewInt(1e6),                  //maxDataSize
+		offramp.OffRampInterfaceOffRampConfig{
+			ExecutionFeeJuels:     0,
+			ExecutionDelaySeconds: 0,
+			MaxDataSize:           1e6,
+			MaxTokensLength:       5,
+		},
 	)
 	helpers.PanicErr(err)
 	WaitForMined(context.Background(), dest.Client, tx.Hash(), true)
@@ -152,7 +156,15 @@ func deployOfframp(dest EvmChainConfig, onrampChainId *big.Int) (*offramp.OffRam
 func deployNativeTokenPool(client EvmChainConfig, deployNew bool) *native_token_pool.NativeTokenPool {
 	if deployNew {
 		tenLink := new(big.Int).Mul(big.NewInt(1e18), big.NewInt(10))
-		address, tx, _, err := native_token_pool.DeployNativeTokenPool(client.Owner, client.Client, client.LinkToken, big.NewInt(10), tenLink, big.NewInt(10), tenLink)
+		address, tx, _, err := native_token_pool.DeployNativeTokenPool(client.Owner, client.Client, client.LinkToken,
+			native_token_pool.PoolInterfaceBucketConfig{
+				Rate:     big.NewInt(10),
+				Capacity: tenLink,
+			},
+			native_token_pool.PoolInterfaceBucketConfig{
+				Rate:     big.NewInt(10),
+				Capacity: tenLink,
+			})
 		helpers.PanicErr(err)
 		WaitForMined(context.Background(), client.Client, tx.Hash(), true)
 		fmt.Println("Native token pool deployed on:", address.Hex())
