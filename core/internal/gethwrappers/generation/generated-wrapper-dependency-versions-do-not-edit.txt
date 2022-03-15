@@ -1,5 +1,5 @@
 GETH_VERSION: 1.10.16
-afn_contract: ../../../contracts/solc/v0.8.12/AFN.abi ../../../contracts/solc/v0.8.12/AFN.bin 452f32b3cc2cf3997ae9bac3e133ef2624e61474dca2ad35d8d3629e2fb401c5
+afn_contract: ../../../contracts/solc/v0.8.12/AFN.abi ../../../contracts/solc/v0.8.12/AFN.bin 74c3c9aec52af49b87f99d3121597be5dcd4c9ff55544ee3fff93eb95d9948a2
 aggregator_v2v3_interface: ../../../contracts/solc/v0.8.6/AggregatorV2V3Interface.abi ../../../contracts/solc/v0.8.6/AggregatorV2V3Interface.bin 95e8814b408bb05bf21742ef580d98698b7db6a9bac6a35c3de12b23aec4ee28
 aggregator_v3_interface: ../../../contracts/solc/v0.8.6/AggregatorV3Interface.abi ../../../contracts/solc/v0.8.6/AggregatorV3Interface.bin 351b55d3b0f04af67db6dfb5c92f1c64479400ca1fec77afc20bc0ce65cb49ab
 batch_blockhash_store: ../../../contracts/solc/v0.8.6/BatchBlockhashStore.abi ../../../contracts/solc/v0.8/BatchBlockhashStore.bin 9220f1ed6c576863a2f5b34263846660e742f3513c19eb9e2562a374cb70c252
@@ -13,11 +13,11 @@ keeper_registry_wrapper: ../../../contracts/solc/v0.7/KeeperRegistry.abi ../../.
 message_executor: ../../../contracts/solc/v0.8.12/MessageExecutor.abi ../../../contracts/solc/v0.8.12/MessageExecutor.bin fa89e2ec64a48c3b74da7f0c452edc0a71ee8bcc2a23d099df0b8c9798235c8e
 message_executor_helper: ../../../contracts/solc/v0.8.12/MessageExecutorHelper.abi ../../../contracts/solc/v0.8.12/MessageExecutorHelper.bin 1cacf93a95bfe1e1d2f14a30e6d4d51f440d789c4eba2e96601458bf9de152b8
 multiwordconsumer_wrapper: ../../../contracts/solc/v0.7/MultiWordConsumer.abi ../../../contracts/solc/v0.7/MultiWordConsumer.bin 6e68abdf614e3ed0f5066c1b5f9d7c1199f1e7c5c5251fe8a471344a59afc6ba
-native_token_pool: ../../../contracts/solc/v0.8.12/NativeTokenPool.abi ../../../contracts/solc/v0.8.12/NativeTokenPool.bin bcd14304fbfb7dd0cc6738fc84708ec19577b9ee21302fa3242bd45c0b6e5269
+native_token_pool: ../../../contracts/solc/v0.8.12/NativeTokenPool.abi ../../../contracts/solc/v0.8.12/NativeTokenPool.bin 0ddd6851769509ad0dadbc3902748b6bf56e93e16523b48b83724cc2a387b054
 offchain_aggregator_wrapper: OffchainAggregator/OffchainAggregator.abi - 5f97dc197fd4e2b999856b9b3fa7c2aaf0c700c71d7009d7d017d233bc855877
-offramp: ../../../contracts/solc/v0.8.12/OffRamp.abi ../../../contracts/solc/v0.8.12/OffRamp.bin 87e71521ab9705b67ba87f2870eaaaaa092ddce6b12a8d8e714012b3e10cf6eb
-offramp_helper: ../../../contracts/solc/v0.8.12/OffRampHelper.abi ../../../contracts/solc/v0.8.12/OffRampHelper.bin 72f3810a7507d39d3e0ec6a6fe41f6da7c5c88b70e0c9e9dac56327ce1511188
-onramp: ../../../contracts/solc/v0.8.12/OnRamp.abi ../../../contracts/solc/v0.8.12/OnRamp.bin fb096c1f8f9ae8ae215c2d4339aab3cb6853f35a5f09c6050b48cb36f16d3ab2
+offramp: ../../../contracts/solc/v0.8.12/OffRamp.abi ../../../contracts/solc/v0.8.12/OffRamp.bin a38126b7b364ed65a444aabbf8f8ccd71587024d4519af6f1f705617fd5471f3
+offramp_helper: ../../../contracts/solc/v0.8.12/OffRampHelper.abi ../../../contracts/solc/v0.8.12/OffRampHelper.bin 5b4af46caef5c239751a8c07bdd509a3ebd7fd739c4b8dff02da3593f16fdd92
+onramp: ../../../contracts/solc/v0.8.12/OnRamp.abi ../../../contracts/solc/v0.8.12/OnRamp.bin c1963b157e64ba9a5eb8f259e87dd9d98b174ffbf740034c82a1195e5ab052da
 operator_wrapper: ../../../contracts/solc/v0.7/Operator.abi ../../../contracts/solc/v0.7/Operator.bin 08965dbb26f62739c1ce4d0941f30c0dd08003648823e7d722900b48270ffc2b
 oracle_wrapper: ../../../contracts/solc/v0.6/Oracle.abi ../../../contracts/solc/v0.6/Oracle.bin 7af2fbac22a6e8c2847e8e685a5400cac5101d72ddf5365213beb79e4dede43a
 receiver_dapp: ../../../contracts/solc/v0.8.12/ReceiverDapp.abi ../../../contracts/solc/v0.8.12/ReceiverDapp.bin ee93b07a1c7ba3d23883c2a596f95a6e2b188c15e894e303f77fb0ad17726aea
