@@ -24,10 +24,7 @@ interface OffRampInterface {
 
   event ReportAccepted(CCIP.RelayReport report);
   event CrossChainMessageExecuted(uint256 indexed sequenceNumber);
-  event ExecutionDelaySecondsSet(uint64 delay);
-  event ExecutionFeeLinkSet(uint64 executionFee);
-  event MaxDataSizeSet(uint64 size);
-  event MaxTokensLengthSet(uint64 length);
+  event OffRampConfigSet(OffRampConfig config);
   event FeesWithdrawn(IERC20 feeToken, address recipient, uint256 amount);
 
   struct OffRampConfig {

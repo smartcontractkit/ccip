@@ -157,9 +157,11 @@ describe('Single Token EOA End to End', () => {
         [],
         chain1AFN.address,
         maxTimeBetweenAFNSignals,
-        2,
-        10 ** 3,
-        0,
+        {
+          maxTokensLength: 2,
+          maxDataSize: 10 ** 3,
+          relayingFeeLink: 0,
+        },
       ])
     )
     await chain1Pool

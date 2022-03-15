@@ -142,10 +142,8 @@ describe('OnRamp', () => {
       'getAllowlist',
       'getSequenceNumberOfDestinationChain',
       'getDestinationChains',
-      'getPayloadConfig',
-      'setPayloadConfig',
-      'setRelayingFeeLink',
-      'getRelayingFeeLink',
+      'getConfig',
+      'setConfig',
       // PriceFeedRegistry
       'addFeed',
       'removeFeed',
@@ -189,10 +187,10 @@ describe('OnRamp', () => {
       expect(await ramp.getMaxSecondsWithoutAFNHeartbeat()).to.equal(
         maxTimeWithoutAFNSignal,
       )
-      const payloadConfig = await ramp.getPayloadConfig()
-      expect(payloadConfig.maxDataSize).to.equal(maxDataSize)
-      expect(payloadConfig.maxTokensLength).to.equal(maxTokensLength)
-      expect(await ramp.getRelayingFeeLink()).to.equal(relayingFeeLink)
+      const config = await ramp.getConfig()
+      expect(config.maxDataSize).to.equal(maxDataSize)
+      expect(config.maxTokensLength).to.equal(maxTokensLength)
+      expect(config.relayingFeeLink).to.equal(relayingFeeLink)
 
       // Tokens, Pools and Price Feeds
       for (let i = 0; i < numberOfTokensPoolsAndFeeds; i++) {
@@ -223,7 +221,7 @@ describe('OnRamp', () => {
 
     beforeEach(async () => {
       // Ensure that the contracts are setup correctly
-      expect(await ramp.getRelayingFeeLink()).to.equal(1)
+      expect((await ramp.getConfig()).relayingFeeLink).to.equal(1)
       expect(await ramp.getFeed(tokens[0].address)).to.equal(priceFeed.address)
 
       // Generate latest price
@@ -251,7 +249,11 @@ describe('OnRamp', () => {
     describe('when relaying fee is different', () => {
       it('calculates the correct fee', async () => {
         const fee = Math.ceil(Math.random() * 1000)
-        await ramp.connect(roles.defaultAccount).setRelayingFeeLink(fee)
+        await ramp.connect(roles.defaultAccount).setConfig({
+          relayingFeeLink: fee,
+          maxDataSize: maxDataSize,
+          maxTokensLength: maxTokensLength,
+        })
         const result = await ramp
           .connect(roles.defaultAccount)
           .publicCalculateFee(tokens[0].address)
@@ -387,7 +389,7 @@ describe('OnRamp', () => {
           .connect(roles.defaultAccount)
           .requestCrossChainSend(payload)
         gasUsed = gasUsed.add((await tx.wait()).gasUsed)
-        expectGasWithinDeviation(gasUsed, 191_868)
+        expectGasWithinDeviation(gasUsed, 187_929)
       })
 
       it('GASTEST - Send 1 token [ @skip-coverage ]', async () => {
@@ -401,7 +403,7 @@ describe('OnRamp', () => {
           .connect(roles.defaultAccount)
           .requestCrossChainSend(payload)
         gasUsed = gasUsed.add((await tx.wait()).gasUsed)
-        expectGasWithinDeviation(gasUsed, 214_549)
+        expectGasWithinDeviation(gasUsed, 210_610)
       })
 
       it('GASTEST - Send 2 tokens [ @skip-coverage ]', async () => {
@@ -417,7 +419,7 @@ describe('OnRamp', () => {
           .connect(roles.defaultAccount)
           .requestCrossChainSend(payload)
         gasUsed = gasUsed.add((await tx.wait()).gasUsed)
-        expectGasWithinDeviation(gasUsed, 324_852)
+        expectGasWithinDeviation(gasUsed, 320_925)
       })
 
       it('GASTEST - Send 3 tokens [ @skip-coverage ]', async () => {
@@ -431,7 +433,7 @@ describe('OnRamp', () => {
           .connect(roles.defaultAccount)
           .requestCrossChainSend(payload)
         gasUsed = gasUsed.add((await tx.wait()).gasUsed)
-        expectGasWithinDeviation(gasUsed, 435_179)
+        expectGasWithinDeviation(gasUsed, 431_240)
       })
     })
 
@@ -543,25 +545,31 @@ describe('OnRamp', () => {
       })
       it('fails if the data is larger than the max data size', async () => {
         const newDataSize = 1
-        await ramp
-          .connect(roles.defaultAccount)
-          .setPayloadConfig(newDataSize, maxTokensLength)
+        await ramp.connect(roles.defaultAccount).setConfig({
+          maxDataSize: newDataSize,
+          maxTokensLength: maxTokensLength,
+          relayingFeeLink: relayingFeeLink,
+        })
         await evmRevert(
           ramp.connect(roles.defaultAccount).requestCrossChainSend(payload),
           `MessageTooLarge(${newDataSize}, 32)`,
         )
       })
       it('fails if there are too many tokens, or the amounts are a different length to the tokens', async () => {
-        await ramp
-          .connect(roles.defaultAccount)
-          .setPayloadConfig(maxDataSize, 1)
+        await ramp.connect(roles.defaultAccount).setConfig({
+          maxDataSize: maxDataSize,
+          maxTokensLength: 1,
+          relayingFeeLink: relayingFeeLink,
+        })
         await evmRevert(
           ramp.connect(roles.defaultAccount).requestCrossChainSend(payload),
           `UnsupportedNumberOfTokens()`,
         )
-        await ramp
-          .connect(roles.defaultAccount)
-          .setPayloadConfig(maxDataSize, maxTokensLength)
+        await ramp.connect(roles.defaultAccount).setConfig({
+          maxDataSize: maxDataSize,
+          maxTokensLength: maxTokensLength,
+          relayingFeeLink: relayingFeeLink,
+        })
         payload.amounts = [100]
         await evmRevert(
           ramp.connect(roles.defaultAccount).requestCrossChainSend(payload),
@@ -616,28 +624,14 @@ describe('OnRamp', () => {
     })
   })
 
-  describe('#setRelayingFeeLink', () => {
-    it('only allows the owner to set', async () => {
-      await evmRevert(
-        ramp.connect(roles.stranger).setRelayingFeeLink(5),
-        'Only callable by owner',
-      )
-    })
-
-    it('sets the relaying fee correctly', async () => {
-      const newRelayFee = 5
-      let tx = await ramp
-        .connect(roles.defaultAccount)
-        .setRelayingFeeLink(newRelayFee)
-      expect(await ramp.getRelayingFeeLink()).to.equal(newRelayFee)
-      await expect(tx).to.emit(ramp, 'RelayingFeeLinkSet').withArgs(newRelayFee)
-    })
-  })
-
-  describe('#setPayloadConfig', () => {
+  describe('#setConfig', () => {
     it('only allows owner to set', async () => {
       await evmRevert(
-        ramp.connect(roles.stranger).setPayloadConfig(1, 1),
+        ramp.connect(roles.stranger).setConfig({
+          relayingFeeLink: 1,
+          maxDataSize: 2,
+          maxTokensLength: 3,
+        }),
         'Only callable by owner',
       )
     })
@@ -645,15 +639,19 @@ describe('OnRamp', () => {
     it('sets the max data size correctly', async () => {
       const newDataSize = 1
       const newTokensLength = 1
-      let tx = await ramp
-        .connect(roles.defaultAccount)
-        .setPayloadConfig(newDataSize, newTokensLength)
-      const payloadConfig = await await ramp.getPayloadConfig()
-      expect(payloadConfig.maxDataSize).to.equal(newDataSize)
-      expect(payloadConfig.maxTokensLength).to.equal(newTokensLength)
+      const newRelayFee = 1
+      let tx = await ramp.connect(roles.defaultAccount).setConfig({
+        maxDataSize: newDataSize,
+        maxTokensLength: newTokensLength,
+        relayingFeeLink: newRelayFee,
+      })
+      const config = await await ramp.getConfig()
+      expect(config.maxDataSize).to.equal(newDataSize)
+      expect(config.maxTokensLength).to.equal(newTokensLength)
+      expect(config.relayingFeeLink).to.equal(newRelayFee)
       await expect(tx)
-        .to.emit(ramp, 'PayloadConfigSet')
-        .withArgs(newDataSize, newTokensLength)
+        .to.emit(ramp, 'OnRampConfigSet')
+        .withArgs([newRelayFee, newDataSize, newTokensLength])
     })
   })
 

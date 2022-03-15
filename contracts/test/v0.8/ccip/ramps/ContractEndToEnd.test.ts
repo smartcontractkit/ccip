@@ -162,9 +162,11 @@ describe('Contract End to End', () => {
         [],
         chain1AFN.address,
         maxTimeBetweenAFNSignals,
-        maxTokensLength,
-        maxDataSize,
-        0,
+        {
+          maxTokensLength: maxTokensLength,
+          maxDataSize: maxDataSize,
+          relayingFeeLink: 0,
+        },
       ])
     )
     await chain1Pool

@@ -18,10 +18,18 @@ interface OnRampInterface {
   event AllowlistEnabledSet(bool enabled);
   event AllowlistSet(address[] allowlist);
   event NewTokenBucketConstructed(uint256 rate, uint256 capacity, bool full);
-  event PayloadConfigSet(uint256 maxDataSize, uint256 maxTokensLength);
-  event RelayingFeeLinkSet(uint256 fee);
+  event OnRampConfigSet(OnRampConfig config);
   event FeeCharged(address from, address to, uint256 fee);
   event FeesWithdrawn(IERC20 feeToken, address recipient, uint256 amount);
+
+  struct OnRampConfig {
+    // Fee for sending message taken in this contract
+    uint64 relayingFeeLink;
+    // maximum payload data size
+    uint64 maxDataSize;
+    // Maximum number of distinct ERC20 tokens that can be sent in a message
+    uint64 maxTokensLength;
+  }
 
   /**
    * @notice Request a message to be sent to the destination chain

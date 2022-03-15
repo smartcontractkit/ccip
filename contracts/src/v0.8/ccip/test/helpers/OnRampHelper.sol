@@ -13,9 +13,9 @@ contract OnRampHelper is OnRamp {
     address[] memory allowlist,
     AFNInterface afn,
     uint256 maxTimeWithoutAFNSignal,
-    uint256 maxTokensLength,
-    uint256 maxDataSize,
-    uint256 relayingFeeLink
+    uint64 maxTokensLength,
+    uint64 maxDataSize,
+    uint64 relayingFeeLink
   )
     OnRamp(
       chainId,
@@ -26,9 +26,7 @@ contract OnRampHelper is OnRamp {
       allowlist,
       afn,
       maxTimeWithoutAFNSignal,
-      maxTokensLength,
-      maxDataSize,
-      relayingFeeLink
+      OnRampConfig({maxTokensLength: maxTokensLength, maxDataSize: maxDataSize, relayingFeeLink: relayingFeeLink})
     )
   {}
 

@@ -247,40 +247,13 @@ contract OffRamp is
     // TODO
   }
 
-  function setMaxDataSize(uint64 maxDataSize) external onlyOwner {
-    s_config.maxDataSize = maxDataSize;
-    emit MaxDataSizeSet(maxDataSize);
+  function setOffRampConfig(OffRampConfig calldata config) external onlyOwner {
+    s_config = config;
+    emit OffRampConfigSet(config);
   }
 
-  function getMaxDataSize() external view returns (uint64) {
-    return s_config.maxDataSize;
-  }
-
-  function setExecutionFeeLink(uint64 executionFeeJuels) external onlyOwner {
-    s_config.executionFeeJuels = executionFeeJuels;
-    emit ExecutionFeeLinkSet(executionFeeJuels);
-  }
-
-  function getExecutionFeeLink() external view returns (uint64) {
-    return s_config.executionFeeJuels;
-  }
-
-  function setExecutionDelaySeconds(uint64 executionDelaySeconds) external onlyOwner {
-    s_config.executionDelaySeconds = executionDelaySeconds;
-    emit ExecutionDelaySecondsSet(executionDelaySeconds);
-  }
-
-  function getExecutionDelaySeconds() external view returns (uint256) {
-    return s_config.executionDelaySeconds;
-  }
-
-  function setMaxTokensLength(uint64 maxTokensLength) external onlyOwner {
-    s_config.maxTokensLength = maxTokensLength;
-    emit MaxTokensLengthSet(maxTokensLength);
-  }
-
-  function getMaxTokensLength() external view returns (uint256) {
-    return s_config.maxTokensLength;
+  function getOffRampConfig() external view returns (OffRampConfig memory) {
+    return s_config;
   }
 
   function getMerkleRoot(bytes32 root) external view returns (uint256) {

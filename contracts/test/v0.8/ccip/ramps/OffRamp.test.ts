@@ -77,6 +77,12 @@ const sourceChainId: number = 123
 const destinationChainId: number = 234
 const initialExecutionDelay: number = 0
 const maxTokenLength: number = 10
+const initialConfig = {
+  executionFeeJuels: 1,
+  executionDelaySeconds: initialExecutionDelay,
+  maxDataSize: 1000,
+  maxTokensLength: maxTokenLength,
+}
 let bucketRate: BigNumber
 let bucketCapactiy: BigNumber
 let maxTimeBetweenAFNSignals: BigNumber
@@ -194,14 +200,8 @@ describe('OffRamp', () => {
       'getMerkleRoot',
       'getExecuted',
       'getLastReport',
-      'getMaxDataSize',
-      'setMaxDataSize',
-      'getExecutionFeeLink',
-      'setExecutionFeeLink',
-      'getExecutionDelaySeconds',
-      'setExecutionDelaySeconds',
-      'getMaxTokensLength',
-      'setMaxTokensLength',
+      'getOffRampConfig',
+      'setOffRampConfig',
       // HealthChecker
       'setAFN',
       'getAFN',
@@ -245,8 +245,12 @@ describe('OffRamp', () => {
       const owner = await roles.defaultAccount.getAddress()
       await expect(await ramp.SOURCE_CHAIN_ID()).to.equal(sourceChainId)
       await expect(await ramp.owner()).to.equal(owner)
-      await expect(await ramp.getExecutionDelaySeconds()).to.equal(0)
-
+      await expect(await ramp.getOffRampConfig()).to.deep.equal([
+        BigNumber.from(initialConfig.executionFeeJuels),
+        BigNumber.from(initialConfig.executionDelaySeconds),
+        BigNumber.from(initialConfig.maxDataSize),
+        BigNumber.from(initialConfig.maxTokensLength),
+      ])
       await expect(await pool1.owner()).to.equal(owner)
       await expect(await pool1.isOffRamp(ramp.address)).to.equal(true)
       await expect(await pool1.getToken()).to.equal(destinationToken1.address)
@@ -553,9 +557,9 @@ describe('OffRamp', () => {
             path: path,
             index: 0,
           }
-          await ramp
-            .connect(roles.defaultAccount)
-            .setExecutionDelaySeconds(60 * 60)
+          let newConfig = initialConfig
+          newConfig.executionDelaySeconds = 60 * 60
+          await ramp.connect(roles.defaultAccount).setOffRampConfig(newConfig)
           await evmRevert(
             ramp
               .connect(roles.defaultAccount)
@@ -848,7 +852,7 @@ describe('OffRamp', () => {
             tx = await ramp
               .connect(roles.oracleNode)
               .executeTransaction(message, proof, true)
-            expectGasWithinDeviation((await tx.wait()).gasUsed, 232_184)
+            expectGasWithinDeviation((await tx.wait()).gasUsed, 232_128)
           })
         })
 
@@ -914,7 +918,7 @@ describe('OffRamp', () => {
 
         describe('GASTEST', () => {
           it('GASTEST - contract receiver execution [ @skip-coverage ]', async () => {
-            expectGasWithinDeviation((await tx.wait()).gasUsed, 501_495)
+            expectGasWithinDeviation((await tx.wait()).gasUsed, 501_439)
           })
 
           it('GASTEST - EOA receiver [ @skip-coverage ]', async () => {
@@ -937,7 +941,7 @@ describe('OffRamp', () => {
             tx = await ramp
               .connect(roles.oracleNode)
               .executeTransaction(message, proof, true)
-            expectGasWithinDeviation((await tx.wait()).gasUsed, 246_484)
+            expectGasWithinDeviation((await tx.wait()).gasUsed, 246_428)
           })
         })
 
@@ -1023,24 +1027,38 @@ describe('OffRamp', () => {
     })
   })
 
-  describe('#setExecutionDelaySeconds', () => {
+  describe('#setOffRampConfig', () => {
     it('can only be called by the owner', async () => {
       await evmRevert(
-        ramp.connect(roles.stranger).setExecutionDelaySeconds(60),
+        ramp.connect(roles.stranger).setOffRampConfig(initialConfig),
         'Only callable by owner',
       )
     })
 
-    it('sets the execution delay', async () => {
-      const delaySeconds = 60
+    it('sets the config', async () => {
+      let newConfig = initialConfig
+      newConfig.executionDelaySeconds = newConfig.executionDelaySeconds * 2
+      newConfig.executionFeeJuels = newConfig.executionFeeJuels * 2
+      newConfig.maxDataSize = newConfig.maxDataSize * 2
+      newConfig.maxTokensLength = newConfig.maxTokensLength * 2
       const tx = await ramp
         .connect(roles.defaultAccount)
-        .setExecutionDelaySeconds(delaySeconds)
+        .setOffRampConfig(newConfig)
       await expect(tx)
-        .to.emit(ramp, 'ExecutionDelaySecondsSet')
-        .withArgs(delaySeconds)
-      const actualDelaySeconds = await ramp.getExecutionDelaySeconds()
-      expect(actualDelaySeconds).to.equal(delaySeconds)
+        .to.emit(ramp, 'OffRampConfigSet')
+        .withArgs([
+          newConfig.executionFeeJuels,
+          newConfig.executionDelaySeconds,
+          newConfig.maxDataSize,
+          newConfig.maxTokensLength,
+        ])
+      const actualConfig = await ramp.getOffRampConfig()
+      expect(actualConfig).to.deep.equal([
+        BigNumber.from(newConfig.executionFeeJuels),
+        BigNumber.from(newConfig.executionDelaySeconds),
+        BigNumber.from(newConfig.maxDataSize),
+        BigNumber.from(newConfig.maxTokensLength),
+      ])
     })
   })
 

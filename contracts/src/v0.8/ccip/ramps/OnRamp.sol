@@ -23,12 +23,8 @@ contract OnRamp is OnRampInterface, TypeAndVersionInterface, HealthChecker, Toke
   mapping(uint256 => uint256) private s_sequenceNumberPerDestinationChain;
   // List of destination chains
   uint256[] private s_destinationChains;
-  // Maximum number of distinct ERC20 tokens that can be sent in a message
-  uint256 private s_maxTokensLength;
-  // Maximum data size that can be sent in a message
-  uint256 private s_maxDataSize;
-  // Fee for sending message taken in this contract
-  uint256 private s_relayingFeeLink;
+  // OnRamp config
+  OnRampConfig private s_config;
 
   // Whether the allowlist is enabled
   bool private s_allowlistEnabled;
@@ -46,9 +42,7 @@ contract OnRamp is OnRampInterface, TypeAndVersionInterface, HealthChecker, Toke
     address[] memory allowlist,
     AFNInterface afn,
     uint256 maxTimeWithoutAFNSignal,
-    uint256 maxTokensLength,
-    uint256 maxDataSize,
-    uint256 relayingFeeLink
+    OnRampConfig memory config
   ) HealthChecker(afn, maxTimeWithoutAFNSignal) TokenPoolRegistry(tokens, pools) PriceFeedRegistry(tokens, feeds) {
     CHAIN_ID = chainId;
     s_destinationChains = destinationChainIds;
@@ -62,9 +56,7 @@ contract OnRamp is OnRampInterface, TypeAndVersionInterface, HealthChecker, Toke
     for (uint256 i = 0; i < allowlist.length; i++) {
       s_allowed[allowlist[i]] = true;
     }
-    s_maxTokensLength = maxTokensLength;
-    s_maxDataSize = maxDataSize;
-    s_relayingFeeLink = relayingFeeLink;
+    s_config = config;
   }
 
   /**
@@ -88,8 +80,9 @@ contract OnRamp is OnRampInterface, TypeAndVersionInterface, HealthChecker, Toke
     // Assumes that any configured destination chains sequence number are initialized with 1
     if (sequenceNumber == 0) revert UnsupportedDestinationChain(payload.destinationChainId);
     // Check that payload is formed corretly
-    if (payload.data.length > s_maxDataSize) revert MessageTooLarge(s_maxDataSize, payload.data.length);
-    if (payload.tokens.length > s_maxTokensLength || payload.tokens.length != payload.amounts.length)
+    if (payload.data.length > uint256(s_config.maxDataSize))
+      revert MessageTooLarge(uint256(s_config.maxDataSize), payload.data.length);
+    if (payload.tokens.length > uint256(s_config.maxTokensLength) || payload.tokens.length != payload.amounts.length)
       revert UnsupportedNumberOfTokens();
 
     // Calculate fee
@@ -126,7 +119,7 @@ contract OnRamp is OnRampInterface, TypeAndVersionInterface, HealthChecker, Toke
   function _calculateFee(IERC20 feeToken) internal view returns (uint256) {
     AggregatorV2V3Interface priceFeed = getFeed(feeToken);
     if (address(priceFeed) == address(0)) revert UnsupportedFeeToken(feeToken);
-    return s_relayingFeeLink * uint256(priceFeed.latestAnswer());
+    return uint256(s_config.relayingFeeLink) * uint256(priceFeed.latestAnswer());
   }
 
   function withdrawAccumulatedFees(
@@ -166,24 +159,13 @@ contract OnRamp is OnRampInterface, TypeAndVersionInterface, HealthChecker, Toke
     return s_allowList;
   }
 
-  function setPayloadConfig(uint256 maxDataSize, uint256 maxTokensLength) external onlyOwner {
-    s_maxDataSize = maxDataSize;
-    s_maxTokensLength = maxTokensLength;
-    emit PayloadConfigSet(maxDataSize, maxTokensLength);
+  function setConfig(OnRampConfig calldata config) external onlyOwner {
+    s_config = config;
+    emit OnRampConfigSet(config);
   }
 
-  function getPayloadConfig() external view returns (uint256 maxDataSize, uint256 maxTokensLength) {
-    maxDataSize = s_maxDataSize;
-    maxTokensLength = s_maxTokensLength;
-  }
-
-  function setRelayingFeeLink(uint256 relayingFeeLink) external onlyOwner {
-    s_relayingFeeLink = relayingFeeLink;
-    emit RelayingFeeLinkSet(relayingFeeLink);
-  }
-
-  function getRelayingFeeLink() external view returns (uint256) {
-    return s_relayingFeeLink;
+  function getConfig() external view returns (OnRampConfig memory config) {
+    return s_config;
   }
 
   function getDestinationChains() external view returns (uint256[] memory) {
