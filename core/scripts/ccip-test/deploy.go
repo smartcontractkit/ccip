@@ -142,7 +142,7 @@ func deployOfframp(dest EvmChainConfig, onrampChainId *big.Int) (*offramp.OffRam
 	WaitForMined(context.Background(), dest.Client, tx.Hash(), true)
 	fmt.Println("Offramp token receiver dapp deployed on:", tokenReceiverAddress.Hex())
 	// Deploy the message executor contract
-	executorAddress, tx, _, err := message_executor.DeployMessageExecutor(dest.Owner, dest.Client, offRamp.Address())
+	executorAddress, tx, _, err := message_executor.DeployMessageExecutor(dest.Owner, dest.Client, offRamp.Address(), false)
 	helpers.PanicErr(err)
 	WaitForMined(context.Background(), dest.Client, tx.Hash(), true)
 	fmt.Println("Message executor contract deployed on:", executorAddress.Hex())

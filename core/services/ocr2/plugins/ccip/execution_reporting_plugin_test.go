@@ -151,7 +151,8 @@ func TestExecutionReportEncoding(t *testing.T) {
 	executorAddress, _, _, err := message_executor_helper.DeployMessageExecutorHelper(
 		destUser,
 		destChain,
-		offRampAddress)
+		offRampAddress,
+		false)
 	require.NoError(t, err)
 	executor, err := message_executor_helper.NewMessageExecutorHelper(executorAddress, destChain)
 	require.NoError(t, err)

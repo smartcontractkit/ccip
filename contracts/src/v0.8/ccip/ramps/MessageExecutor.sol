@@ -25,10 +25,12 @@ contract MessageExecutor is TypeAndVersionInterface, OCR2Base {
     CCIP.Message message;
   }
 
-  OffRampInterface public immutable s_offRamp;
+  OffRampInterface private immutable s_offRamp;
+  bool private s_needFee;
 
-  constructor(OffRampInterface offRamp) OCR2Base(true) {
+  constructor(OffRampInterface offRamp, bool needFee) OCR2Base(true) {
     s_offRamp = offRamp;
+    s_needFee = needFee;
   }
 
   /**
@@ -43,7 +45,7 @@ contract MessageExecutor is TypeAndVersionInterface, OCR2Base {
     ExecutableMessage[] memory executableMessages = abi.decode(report, (ExecutableMessage[]));
     for (uint256 i = 0; i < executableMessages.length; i++) {
       ExecutableMessage memory em = executableMessages[i];
-      s_offRamp.executeTransaction(em.message, CCIP.MerkleProof({path: em.path, index: em.index}), true);
+      s_offRamp.executeTransaction(em.message, CCIP.MerkleProof({path: em.path, index: em.index}), s_needFee);
     }
   }
 
@@ -72,6 +74,18 @@ contract MessageExecutor is TypeAndVersionInterface, OCR2Base {
 
   function _payTransmitter(uint32 initialGas, address transmitter) internal override {
     // TODO
+  }
+
+  function setNeedFee(bool flag) external onlyOwner {
+    s_needFee = flag;
+  }
+
+  function getNeedFee() external view returns (bool) {
+    return s_needFee;
+  }
+
+  function getOffRamp() external view returns (OffRampInterface) {
+    return s_offRamp;
   }
 
   function typeAndVersion() external pure override returns (string memory) {

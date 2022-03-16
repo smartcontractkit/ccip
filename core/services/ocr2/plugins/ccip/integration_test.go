@@ -247,7 +247,7 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 	destChain.Commit()
 
 	// Deploy the message executor ocr2 contract
-	executorAddress, _, _, err := message_executor.DeployMessageExecutor(destUser, destChain, offRampAddress)
+	executorAddress, _, _, err := message_executor.DeployMessageExecutor(destUser, destChain, offRampAddress, false)
 	require.NoError(t, err)
 	executor, err := message_executor.NewMessageExecutor(executorAddress, destChain)
 	require.NoError(t, err)

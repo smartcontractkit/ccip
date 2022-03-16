@@ -48,13 +48,16 @@ describe('MessageExecutor', () => {
     executor = <MessageExecutorHelper>(
       await deployContract(roles.defaultAccount, ExecutorArtifact, [
         ramp.address,
+        false,
       ])
     )
   })
 
   it('has a limited public interface [ @skip-coverage ]', async () => {
     publicAbi(executor, [
-      's_offRamp',
+      'getOffRamp',
+      'setNeedFee',
+      'getNeedFee',
       // MessageExecutorHelper
       'report',
       'withdrawAccumulatedFees',
@@ -75,7 +78,7 @@ describe('MessageExecutor', () => {
   })
 
   it('deploys correctly', async () => {
-    expect(await executor.s_offRamp()).to.equal(ramp.address)
+    expect(await executor.getOffRamp()).to.equal(ramp.address)
   })
 
   it('executes 2 messages in the same tx', async () => {

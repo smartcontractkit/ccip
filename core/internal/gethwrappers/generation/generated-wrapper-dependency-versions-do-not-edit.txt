@@ -10,8 +10,8 @@ flags_wrapper: ../../../contracts/solc/v0.6/Flags.abi ../../../contracts/solc/v0
 flux_aggregator_wrapper: ../../../contracts/solc/v0.6/FluxAggregator.abi ../../../contracts/solc/v0.6/FluxAggregator.bin a3b0a6396c4aa3b5ee39b3c4bd45efc89789d4859379a8a92caca3a0496c5794
 keeper_registry_vb_wrapper: ../../../contracts/solc/v0.7/KeeperRegistryVB.abi ../../../contracts/solc/v0.7/KeeperRegistryVB.bin af13a53e7350624fab49e259ca484098361d7b72eb8f4e4338b659d766e5bee5
 keeper_registry_wrapper: ../../../contracts/solc/v0.7/KeeperRegistry.abi ../../../contracts/solc/v0.7/KeeperRegistry.bin f5c76c6fc35e775da0a4737beea8ebcb6f37ca78db3c21811f17b6f3d5623379
-message_executor: ../../../contracts/solc/v0.8.12/MessageExecutor.abi ../../../contracts/solc/v0.8.12/MessageExecutor.bin fa89e2ec64a48c3b74da7f0c452edc0a71ee8bcc2a23d099df0b8c9798235c8e
-message_executor_helper: ../../../contracts/solc/v0.8.12/MessageExecutorHelper.abi ../../../contracts/solc/v0.8.12/MessageExecutorHelper.bin 1cacf93a95bfe1e1d2f14a30e6d4d51f440d789c4eba2e96601458bf9de152b8
+message_executor: ../../../contracts/solc/v0.8.12/MessageExecutor.abi ../../../contracts/solc/v0.8.12/MessageExecutor.bin 36f65dd6bddd76ac10f6e477367b61c2247b5c06df60420225df5d1ed830b44c
+message_executor_helper: ../../../contracts/solc/v0.8.12/MessageExecutorHelper.abi ../../../contracts/solc/v0.8.12/MessageExecutorHelper.bin fbc6965b820f0791355e39bae575ee62ff45e1ed729c33bea0abbeb7b77947e0
 multiwordconsumer_wrapper: ../../../contracts/solc/v0.7/MultiWordConsumer.abi ../../../contracts/solc/v0.7/MultiWordConsumer.bin 6e68abdf614e3ed0f5066c1b5f9d7c1199f1e7c5c5251fe8a471344a59afc6ba
 native_token_pool: ../../../contracts/solc/v0.8.12/NativeTokenPool.abi ../../../contracts/solc/v0.8.12/NativeTokenPool.bin 0ddd6851769509ad0dadbc3902748b6bf56e93e16523b48b83724cc2a387b054
 offchain_aggregator_wrapper: OffchainAggregator/OffchainAggregator.abi - 5f97dc197fd4e2b999856b9b3fa7c2aaf0c700c71d7009d7d017d233bc855877
