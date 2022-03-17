@@ -28,12 +28,12 @@ import (
 	"gopkg.in/guregu/null.v4"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
-	"github.com/smartcontractkit/chainlink/core/chains/evm/bulletprooftxmanager"
 	eth "github.com/smartcontractkit/chainlink/core/chains/evm/client"
 	evmclient "github.com/smartcontractkit/chainlink/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/headtracker"
 	httypes "github.com/smartcontractkit/chainlink/core/chains/evm/headtracker/types"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/log"
+	"github.com/smartcontractkit/chainlink/core/chains/evm/txmgr"
 	evmtypes "github.com/smartcontractkit/chainlink/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/core/chains/terra"
 	"github.com/smartcontractkit/chainlink/core/internal/cltest"
@@ -297,7 +297,7 @@ type testCheckerFactory struct {
 	err error
 }
 
-func (t *testCheckerFactory) BuildChecker(spec bulletprooftxmanager.TransmitCheckerSpec) (bulletprooftxmanager.TransmitChecker, error) {
+func (t *testCheckerFactory) BuildChecker(spec txmgr.TransmitCheckerSpec) (txmgr.TransmitChecker, error) {
 	return &testChecker{t.err}, nil
 }
 
@@ -308,8 +308,8 @@ type testChecker struct {
 func (t *testChecker) Check(
 	_ context.Context,
 	_ logger.Logger,
-	_ bulletprooftxmanager.EthTx,
-	_ bulletprooftxmanager.EthTxAttempt,
+	_ txmgr.EthTx,
+	_ txmgr.EthTxAttempt,
 ) error {
 	return t.err
 }
@@ -402,11 +402,11 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 			t.Fatalf("invalid chain ID %v", c.ID.String())
 			return nil
 		},
-		GenTxManager: func(c evmtypes.Chain) bulletprooftxmanager.TxManager {
+		GenTxManager: func(c evmtypes.Chain) txmgr.TxManager {
 			if c.ID.String() == sourceChainID.String() {
-				return bulletprooftxmanager.NewBulletproofTxManager(db, sourceClient, evmtest.NewChainScopedConfig(t, config), simEthKeyStore, eventBroadcaster, lggr, checkerFactory)
+				return txmgr.NewTxm(db, sourceClient, evmtest.NewChainScopedConfig(t, config), simEthKeyStore, eventBroadcaster, lggr, checkerFactory)
 			} else if c.ID.String() == destChainID.String() {
-				return bulletprooftxmanager.NewBulletproofTxManager(db, destClient, evmtest.NewChainScopedConfig(t, config), simEthKeyStore, eventBroadcaster, lggr, checkerFactory)
+				return txmgr.NewTxm(db, destClient, evmtest.NewChainScopedConfig(t, config), simEthKeyStore, eventBroadcaster, lggr, checkerFactory)
 			}
 			t.Fatalf("invalid chain ID %v", c.ID.String())
 			return nil

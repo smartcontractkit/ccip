@@ -323,6 +323,10 @@ type simClient struct {
 	chainID *big.Int
 }
 
+func (s *simClient) BatchCallContextAll(ctx context.Context, b []rpc.BatchElem) error {
+	panic("implement me")
+}
+
 func (s *simClient) NodeStates() map[int32]string {
 	panic("implement me")
 }
