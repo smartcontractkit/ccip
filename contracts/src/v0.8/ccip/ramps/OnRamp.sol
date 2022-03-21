@@ -88,11 +88,13 @@ contract OnRamp is OnRampInterface, TypeAndVersionInterface, HealthChecker, Toke
     // Calculate fee
     IERC20 feeToken = payload.tokens[0];
     uint256 fee = _calculateFee(feeToken);
-    // Will revert on underflow
-    payload.amounts[0] -= fee;
-    // Charge fee
-    feeToken.safeTransferFrom(sender, address(this), fee);
-    emit FeeCharged(sender, address(this), fee);
+    if (fee > 0) {
+      // Will revert on underflow
+      payload.amounts[0] -= fee;
+      // Charge fee
+      feeToken.safeTransferFrom(sender, address(this), fee);
+      emit FeeCharged(sender, address(this), fee);
+    }
 
     for (uint256 i = 0; i < payload.tokens.length; i++) {
       IERC20 token = payload.tokens[i];

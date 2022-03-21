@@ -149,8 +149,10 @@ contract OffRamp is
       AggregatorV2V3Interface feed = getFeed(feeToken);
       if (address(feed) == address(0)) revert FeeError();
       fee = uint256(s_config.executionFeeJuels) * uint256(feed.latestAnswer());
-      message.payload.amounts[0] -= fee;
-      getPool(feeToken).releaseOrMint(msg.sender, fee);
+      if (fee > 0) {
+        message.payload.amounts[0] -= fee;
+        getPool(feeToken).releaseOrMint(msg.sender, fee);
+      }
     }
 
     for (uint256 i = 0; i < message.payload.tokens.length; i++) {
