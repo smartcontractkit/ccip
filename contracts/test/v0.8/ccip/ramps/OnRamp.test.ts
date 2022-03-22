@@ -439,6 +439,67 @@ describe('OnRamp', () => {
       })
     })
 
+    describe('success (3 tokens - without fees)', () => {
+      let tx: ContractTransaction
+      beforeEach(async () => {
+        await ramp.connect(roles.defaultAccount).setConfig({
+          relayingFeeJuels: 0,
+          maxDataSize: maxDataSize,
+          maxTokensLength: maxTokensLength,
+        })
+        for (let i = 0; i < tokens.length; i++) {
+          tx = await tokens[i]
+            .connect(roles.defaultAccount)
+            .approve(ramp.address, amounts[i])
+        }
+        tx = await ramp
+          .connect(roles.defaultAccount)
+          .requestCrossChainSend(payload)
+      })
+
+      it('does not store any fees', async () => {
+        expect(await tokens[0].balanceOf(ramp.address)).to.equal(0)
+      })
+
+      it('does not emit a fee taken event', async () => {
+        await expect(tx).to.not.emit(ramp, 'FeeCharged')
+      })
+
+      it('locks each token into the pools', async () => {
+        for (let i = 0; i < pools.length; i++) {
+          const poolBalance = await tokens[i].balanceOf(pools[i].address)
+          expect(poolBalance).to.equal(amounts[i])
+        }
+      })
+
+      it('emits a CrossChainSendRequested event', async () => {
+        const receipt = await tx.wait()
+        const eventArgs = ramp.interface.parseLog(
+          receipt.logs[receipt.logs.length - 1],
+        ).args
+        const expectedAmounts = amounts
+        requestEventArgsEqual(eventArgs, {
+          sequenceNumber: eventArgs?.message?.sequenceNumber,
+          sourceChainId: BigNumber.from(sourceChainId),
+          destinationChainId: BigNumber.from(payload.destinationChainId),
+          sender: await roles.defaultAccount.getAddress(),
+          receiver: receiver,
+          data: messagedata,
+          tokens: tokens.map((t) => t.address),
+          amounts: expectedAmounts,
+          options: options,
+        })
+      })
+
+      it('increments the sequence number per destination chain', async () => {
+        expect(
+          await ramp.getSequenceNumberOfDestinationChain(
+            payload.destinationChainId,
+          ),
+        ).to.equal(2)
+      })
+    })
+
     describe('success (3 tokens)', () => {
       let tx: ContractTransaction
       let feeTaken: BigNumber

@@ -34,7 +34,7 @@ import {
   RelayReport,
 } from '../../../test-helpers/ccip'
 import { constants } from 'ethers'
-
+import { ContractReceipt } from 'ethers'
 const { deployContract } = hre.waffle
 
 function constructReport(
@@ -868,6 +868,45 @@ describe('OffRamp', () => {
               await roles.oracleNode.getAddress(),
             ),
           ).to.equal(priceFeed1LatestAnswer)
+          await expect(tx)
+            .to.emit(pool1, 'Released')
+            .withArgs(
+              ramp.address,
+              await roles.oracleNode.getAddress(),
+              priceFeed1LatestAnswer,
+            )
+        })
+        it('should not extract a fee if fee is zero', async () => {
+          let newConfig = initialConfig
+          newConfig.executionFeeJuels = 0
+          newConfig.executionDelaySeconds = 0
+          await ramp.connect(roles.defaultAccount).setOffRampConfig(newConfig)
+          const newSequenceNumber = message.sequenceNumber.add(1)
+          message.sequenceNumber = newSequenceNumber
+          const report = constructReport(
+            message,
+            newSequenceNumber,
+            newSequenceNumber,
+          )
+          await ramp.connect(roles.defaultAccount).report(encodeReport(report))
+          proof = {
+            path: [],
+            index: 0,
+          }
+          tx = await ramp
+            .connect(roles.oracleNode)
+            .executeTransaction(message, proof, true)
+          const receipt: ContractReceipt = await tx.wait()
+          for (let i = 0; i < receipt.logs.length; i++) {
+            const log = receipt.logs[i]
+            if (log.address == pool1.address) {
+              const parsedLog = pool1.interface.parseLog(log)
+              // ensure that no Released events are emitted with the executor as recipient
+              expect(parsedLog.args.recipient).to.not.equal(
+                await roles.oracleNode.getAddress(),
+              )
+            }
+          }
         })
         it('should send the funds to the receiver contract', async () => {
           const amountAfterFee = BigNumber.from(message.payload.amounts[0]).sub(
