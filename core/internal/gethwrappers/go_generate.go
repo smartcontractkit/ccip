@@ -51,16 +51,16 @@ package gethwrappers
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.6/AggregatorV2V3Interface.abi ../../../contracts/solc/v0.8.6/AggregatorV2V3Interface.bin AggregatorV2V3Interface aggregator_v2v3_interface
 
 // CCIP
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.12/OnRamp.abi ../../../contracts/solc/v0.8.12/OnRamp.bin OnRamp onramp
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.12/OffRamp.abi ../../../contracts/solc/v0.8.12/OffRamp.bin OffRamp offramp
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.12/NativeTokenPool.abi ../../../contracts/solc/v0.8.12/NativeTokenPool.bin NativeTokenPool native_token_pool
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.12/OffRampHelper.abi ../../../contracts/solc/v0.8.12/OffRampHelper.bin OffRampHelper offramp_helper
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.12/SimpleMessageReceiver.abi ../../../contracts/solc/v0.8.12/SimpleMessageReceiver.bin SimpleMessageReceiver simple_message_receiver
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.12/ReceiverDapp.abi ../../../contracts/solc/v0.8.12/ReceiverDapp.bin ReceiverDapp receiver_dapp
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.12/SenderDapp.abi ../../../contracts/solc/v0.8.12/SenderDapp.bin SenderDapp sender_dapp
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.12/MessageExecutor.abi ../../../contracts/solc/v0.8.12/MessageExecutor.bin MessageExecutor message_executor
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.12/MessageExecutorHelper.abi ../../../contracts/solc/v0.8.12/MessageExecutorHelper.bin MessageExecutorHelper message_executor_helper
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.12/AFN.abi ../../../contracts/solc/v0.8.12/AFN.bin AFNContract afn_contract
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.13/OnRamp.abi ../../../contracts/solc/v0.8.13/OnRamp.bin OnRamp onramp
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.13/OffRamp.abi ../../../contracts/solc/v0.8.13/OffRamp.bin OffRamp offramp
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.13/NativeTokenPool.abi ../../../contracts/solc/v0.8.13/NativeTokenPool.bin NativeTokenPool native_token_pool
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.13/OffRampHelper.abi ../../../contracts/solc/v0.8.13/OffRampHelper.bin OffRampHelper offramp_helper
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.13/SimpleMessageReceiver.abi ../../../contracts/solc/v0.8.13/SimpleMessageReceiver.bin SimpleMessageReceiver simple_message_receiver
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.13/ReceiverDapp.abi ../../../contracts/solc/v0.8.13/ReceiverDapp.bin ReceiverDapp receiver_dapp
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.13/SenderDapp.abi ../../../contracts/solc/v0.8.13/SenderDapp.bin SenderDapp sender_dapp
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.13/MessageExecutor.abi ../../../contracts/solc/v0.8.13/MessageExecutor.bin MessageExecutor message_executor
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.13/MessageExecutorHelper.abi ../../../contracts/solc/v0.8.13/MessageExecutorHelper.bin MessageExecutorHelper message_executor_helper
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.13/AFN.abi ../../../contracts/solc/v0.8.13/AFN.bin AFNContract afn_contract
 
 // To run these commands, you must either install docker, or the correct version
 // of abigen. The latter can be installed with these commands, at least on linux:
