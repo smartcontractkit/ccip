@@ -151,22 +151,20 @@ contract OffRamp is
       fee = uint256(s_config.executionFeeJuels) * uint256(feed.latestAnswer());
       if (fee > 0) {
         message.payload.amounts[0] -= fee;
-        getPool(feeToken).releaseOrMint(msg.sender, fee);
+        _getPool(feeToken).releaseOrMint(msg.sender, fee);
       }
     }
 
     for (uint256 i = 0; i < message.payload.tokens.length; i++) {
-      PoolInterface pool = getPool(message.payload.tokens[i]);
-      if (address(pool) == address(0)) revert UnsupportedToken(message.payload.tokens[i]);
       // Release tokens to receiver
-      pool.releaseOrMint(message.payload.receiver, message.payload.amounts[i]);
+      _getPool(message.payload.tokens[i]).releaseOrMint(message.payload.receiver, message.payload.amounts[i]);
     }
 
     // Try send the message, revert if fails
     if (message.payload.receiver.isContract()) {
-      try CrossChainMessageReceiverInterface(message.payload.receiver).receiveMessage(message) {
-        emit CrossChainMessageExecuted(message.sequenceNumber);
-      } catch (bytes memory reason) {
+      try CrossChainMessageReceiverInterface(message.payload.receiver).receiveMessage(message) {} catch (
+        bytes memory reason
+      ) {
         // TODO: Figure out a better way to handle failed executions
         revert ExecutionError(message.sequenceNumber, reason);
       }
@@ -175,6 +173,7 @@ contract OffRamp is
         revert UnexpectedPayloadData(message.sequenceNumber);
       }
     }
+    emit CrossChainMessageExecuted(message.sequenceNumber);
     // TODO: gas based fee calculation
   }
 
@@ -200,6 +199,11 @@ contract OffRamp is
       proof.index = proof.index / 2;
     }
     return hash;
+  }
+
+  function _getPool(IERC20 token) private view returns (PoolInterface pool) {
+    pool = getPool(token);
+    if (address(pool) == address(0)) revert UnsupportedToken(token);
   }
 
   /**

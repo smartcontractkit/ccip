@@ -852,7 +852,11 @@ describe('OffRamp', () => {
             tx = await ramp
               .connect(roles.oracleNode)
               .executeTransaction(message, proof, true)
-            expectGasWithinDeviation((await tx.wait()).gasUsed, 232_128)
+            expectGasWithinDeviation((await tx.wait()).gasUsed, 233_336)
+
+            expect(tx)
+              .to.emit(ramp, 'CrossChainMessageExecuted')
+              .withArgs(message.sequenceNumber)
           })
         })
 
@@ -980,7 +984,7 @@ describe('OffRamp', () => {
             tx = await ramp
               .connect(roles.oracleNode)
               .executeTransaction(message, proof, true)
-            expectGasWithinDeviation((await tx.wait()).gasUsed, 246_428)
+            expectGasWithinDeviation((await tx.wait()).gasUsed, 247_648)
           })
         })
 
