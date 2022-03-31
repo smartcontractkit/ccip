@@ -206,7 +206,7 @@ func (r RelayReportingPlugin) Report(ctx context.Context, timestamp types.Report
 	if max.Cmp(&min) < 0 {
 		return false, nil, errors.New("max seq num smaller than min")
 	}
-	reqs, err := r.orm.Requests(r.sourceChainId, r.destChainId, &min, nil, RequestStatusUnstarted, nil, nil)
+	reqs, err := r.orm.Requests(r.sourceChainId, r.destChainId, &min, &max, RequestStatusUnstarted, nil, nil)
 	if err != nil {
 		return false, nil, err
 	}
@@ -271,7 +271,7 @@ func (r RelayReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context, t
 		return false, nil
 	}
 	// Note it's ok to leave the unstarted requests behind, since the
-	// Observe is always based on the last reports onchain min seq num.
+	// 'Observe' is always based on the last reports onchain min seq num.
 	if r.isStale(parsedReport.MinSequenceNumber) {
 		return false, nil
 	}

@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
+
+	"github.com/smartcontractkit/chainlink/core/logger"
 )
 
 const RetryTiming = 5 * time.Second
@@ -16,27 +18,27 @@ const TxInclusionTimout = 3 * time.Minute
 
 // WaitForMined wait for a tx to be included on chain. It will panic when
 // the tx is reverted/successful based on the shouldSucceed parameter.
-func WaitForMined(ctx context.Context, client *ethclient.Client, hash common.Hash, shouldSucceed bool) {
+func WaitForMined(t *testing.T, lggr logger.Logger, client ethereum.TransactionReader, hash common.Hash, shouldSucceed bool) {
 	maxIterations := TxInclusionTimout / RetryTiming
 	for i := 0; i < int(maxIterations); i++ {
-		fmt.Println("[MINING] waiting for tx to be mined...")
-		receipt, _ := client.TransactionReceipt(ctx, hash)
+		lggr.Info("[MINING] waiting for tx to be mined...")
+		receipt, _ := client.TransactionReceipt(context.Background(), hash)
 
 		if receipt != nil {
 			if shouldSucceed && receipt.Status == 0 {
-				fmt.Println("[MINING] ERROR tx reverted!", hash.Hex())
+				lggr.Infof("[MINING] ERROR tx reverted %s", hash.Hex())
 				panic(receipt)
 			} else if !shouldSucceed && receipt.Status != 0 {
-				fmt.Println("[MINING] ERROR expected tx to revert!", hash.Hex())
+				lggr.Infof("[MINING] ERROR expected tx to revert %s", hash.Hex())
 				panic(receipt)
 			}
-			fmt.Println("[MINING] tx mined", hash.Hex(), "successful", shouldSucceed)
+			lggr.Infof("[MINING] tx mined %s successful %t", hash.Hex(), shouldSucceed)
 			return
 		}
 
 		time.Sleep(RetryTiming)
 	}
-	panic("No tx found within the given timeout")
+	t.Error("No tx found within the given timeout")
 }
 
 // SetGasFees configures the chain client with the given EVMGasSettings. This method is needed for EIP txs

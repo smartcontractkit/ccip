@@ -86,7 +86,6 @@ func (o *orm) Requests(sourceChainId, destChainId *big.Int, minSeqNum, maxSeqNum
 	stmt := sqlx.Rebind(sqlx.DOLLAR, b.String())
 
 	err = q.Select(&reqs, stmt, params...)
-	o.lggr.Warnf("%v", reqs)
 	return
 }
 

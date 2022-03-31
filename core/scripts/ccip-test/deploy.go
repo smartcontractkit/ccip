@@ -1,12 +1,12 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"math/big"
+	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/pkg/errors"
+	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/afn_contract"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/link_token_interface"
@@ -21,94 +21,155 @@ import (
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
 )
 
-// deployContracts will deploy all source and Destination chain contracts using the
+// deployCCIPContracts will deploy all source and Destination chain contracts using the
 // owner key. Only run this of the currently deployed contracts are outdated or
 // when initializing a new chain.
-func deployContracts(ownerKey string) {
-	source := Rinkeby
-	source.Owner = GetOwner(ownerKey, source.ChainId, source.GasSettings)
-	source.Client = GetClient(source.EthUrl)
-	dest := Kovan
-	dest.Owner = GetOwner(ownerKey, dest.ChainId, dest.GasSettings)
-	dest.Client = GetClient(dest.EthUrl)
+func deployCCIPContracts(t *testing.T, ownerKey string, sourceChain *EvmChainConfig, destChains []*EvmChainConfig) {
+	sourceChain.SetupChain(t, ownerKey)
 
-	deploySourceAndDestContracts(source, dest)
+	for _, dest := range destChains {
+		dest.SetupChain(t, ownerKey)
+	}
+
+	deploySourceAndDestContracts(t, sourceChain, destChains)
 }
 
-func deploySourceAndDestContracts(source EvmChainConfig, dest EvmChainConfig) {
-	SetGasFees(source.Owner, source.GasSettings)
-	SetGasFees(dest.Owner, dest.GasSettings)
-
+func deploySourceAndDestContracts(t *testing.T, source *EvmChainConfig, destinations []*EvmChainConfig) {
 	// After running this code please update the configuration to reflect the newly
 	// deployed contract addresses.
-	onRamp := deployOnramp(source, dest.ChainId)
-	fmt.Println("Onramp fully deployed:", onRamp.Address().Hex())
-	offRamp, executor, tokenReceiver := deployOfframp(dest, source.ChainId)
-	fmt.Println("Offramp fully deployed:", offRamp.Address().Hex())
+	var destChainIds []*big.Int
+	for _, dest := range destinations {
+		destChainIds = append(destChainIds, dest.ChainId)
+	}
 
-	// Deploy onramp sender dapp
-	tokenSenderAddress, tx, _, err := sender_dapp.DeploySenderDapp(source.Owner, source.Client, onRamp.Address(), dest.ChainId, tokenReceiver)
-	helpers.PanicErr(err)
-	WaitForMined(context.Background(), source.Client, tx.Hash(), true)
-	fmt.Println("Onramp token sender dapp deployed:", tokenSenderAddress.Hex())
+	onRamp := deploySourceContracts(t, source, destChainIds)
+	source.Logger.Infof("%s contracts fully deployed as source chain", helpers.ChainName(source.ChainId.Int64()))
 
-	PrintJobSpecs(onRamp.Address(), offRamp.Address(), executor.Address(), source.ChainId, dest.ChainId)
+	var tokenSenders []common.Address
+	for i, chain := range destinations {
+		tokenReceiver := deployDestinationContracts(t, chain, source.ChainId, source.BridgeTokens)
+		chain.Logger.Infof("%s contracts fully deployed as destination chain %d/%d", helpers.ChainName(chain.ChainId.Int64()), i+1, len(destinations))
+
+		// Deploy onramp sender dapp
+		tokenSenderAddress, tx, _, err := sender_dapp.DeploySenderDapp(source.Owner, source.Client, onRamp.Address(), chain.ChainId, tokenReceiver)
+		require.NoError(t, err)
+		WaitForMined(t, chain.Logger, source.Client, tx.Hash(), true)
+		source.Logger.Infof("Token sender dapp deployed on %s in tx: %s", tokenSenderAddress.Hex(), helpers.ExplorerLink(source.ChainId.Int64(), tx.Hash()))
+		tokenSenders = append(tokenSenders, tokenSenderAddress)
+	}
+	source.TokenSenders = tokenSenders
+
+	printContractConfig(source, destinations)
 }
 
-func deployOnramp(source EvmChainConfig, offrampChainId *big.Int) *onramp.OnRamp {
-	sourcePool := deployNativeTokenPool(source, true)
-	afn := deployAFN(source, true)
-	feedAddress := deployPriceFeed(source, true)
+func deploySourceContracts(t *testing.T, source *EvmChainConfig, offrampChainIDs []*big.Int) *onramp.OnRamp {
+	tokenPools := deployNativeTokenPool(t, source)
+	afn := deployAFN(t, source)
+	feedAddresses := deployPriceFeed(t, source)
 
-	// deploy onramp
+	var tokenPoolAddresses []common.Address
+	for _, tokenPool := range tokenPools {
+		tokenPoolAddresses = append(tokenPoolAddresses, tokenPool.Address())
+	}
+
+	onRamp := deployOnRamp(t, source, offrampChainIDs, tokenPoolAddresses, feedAddresses, afn.Address())
+
+	for _, tokenPool := range tokenPools {
+		// Configure onramp address on pool
+		tx, err := tokenPool.SetOnRamp(source.Owner, onRamp.Address(), true)
+		require.NoError(t, err)
+		source.Logger.Infof("Onramp pool configured with onramp: %s", helpers.ExplorerLink(source.ChainId.Int64(), tx.Hash()))
+	}
+
+	return onRamp
+}
+
+func deployDestinationContracts(t *testing.T, client *EvmChainConfig, onrampChainId *big.Int, sourceBridgeTokens []common.Address) common.Address {
+	tokenPools := deployNativeTokenPool(t, client)
+	afn := deployAFN(t, client)
+	feedAddresses := deployPriceFeed(t, client)
+
+	var tokenPoolAddresses []common.Address
+	for _, tokenPool := range tokenPools {
+		tokenPoolAddresses = append(tokenPoolAddresses, tokenPool.Address())
+	}
+
+	offRamp := deployOffRamp(t, client, onrampChainId, tokenPoolAddresses, feedAddresses, afn.Address(), sourceBridgeTokens)
+
+	for _, tokenPool := range tokenPools {
+		// Configure offramp address on pool
+		tx, err := tokenPool.SetOffRamp(client.Owner, offRamp.Address(), true)
+		require.NoError(t, err)
+		WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
+		client.Logger.Infof("Offramp pool configured with offramp address: %s", helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash()))
+	}
+
+	// Deploy offramp contract token receiver
+	messageReceiverAddress, tx, _, err := simple_message_receiver.DeploySimpleMessageReceiver(client.Owner, client.Client)
+	require.NoError(t, err)
+	WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
+	client.Logger.Infof("Offramp contract message receiver deployed on %s in tx: %s", messageReceiverAddress.Hex(), helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash()))
+	client.MessageReceiver = messageReceiverAddress
+
+	// Deploy offramp token receiver dapp
+	tokenReceiverAddress, tx, _, err := receiver_dapp.DeployReceiverDapp(client.Owner, client.Client, offRamp.Address(), client.LinkToken)
+	require.NoError(t, err)
+	WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
+	client.Logger.Infof("Offramp token receiver dapp deployed on %s in tx: %s", tokenReceiverAddress.Hex(), helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash()))
+	client.TokenReceiver = tokenReceiverAddress
+
+	// Deploy the message executor contract
+	executorAddress, tx, _, err := message_executor.DeployMessageExecutor(client.Owner, client.Client, offRamp.Address(), false)
+	require.NoError(t, err)
+	WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
+	client.Logger.Infof("Message executor contract deployed on %s in tx: %s", executorAddress.Hex(), helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash()))
+	client.MessageExecutor = executorAddress
+
+	return tokenReceiverAddress
+}
+
+func deployOnRamp(t *testing.T, client *EvmChainConfig, destinationChains []*big.Int, poolAddresses []common.Address, feedAddresses []common.Address, afn common.Address) *onramp.OnRamp {
+	client.Logger.Infof("Deploying onramp: destinationChains %+v, bridgeTokens %+v, poolAddresses %+v, priceFeeds %+v", destinationChains, client.BridgeTokens, poolAddresses, feedAddresses)
 	onRampAddress, tx, _, err := onramp.DeployOnRamp(
-		source.Owner,                           // user
-		source.Client,                          // client
-		source.ChainId,                         // source chain id
-		[]*big.Int{offrampChainId},             // destinationChainIds
-		[]common.Address{source.LinkToken},     // tokens
-		[]common.Address{sourcePool.Address()}, // pools
-		[]common.Address{feedAddress},          // Feeds
-		[]common.Address{},                     // allow list
-		afn.Address(),                          // AFN
-		big.NewInt(86400),                      //maxTimeWithoutAFNSignal 86400 seconds = one day
+		client.Owner,        // user
+		client.Client,       // client
+		client.ChainId,      // source chain id
+		destinationChains,   // destinationChainIds
+		client.BridgeTokens, // tokens
+		poolAddresses,       // pools
+		feedAddresses,       // Feeds
+		[]common.Address{},  // allow list
+		afn,                 // AFN
+		big.NewInt(86400),   // maxTimeWithoutAFNSignal 86400 seconds = one day
 		onramp.OnRampInterfaceOnRampConfig{
 			RelayingFeeJuels: 0,
 			MaxDataSize:      1e6,
 			MaxTokensLength:  5,
 		},
 	)
-	helpers.PanicErr(err)
-	WaitForMined(context.Background(), source.Client, tx.Hash(), true)
+	require.NoError(t, err)
+	WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 
-	onRamp, err := onramp.NewOnRamp(onRampAddress, source.Client)
-	helpers.PanicErr(err)
-	fmt.Println("Onramp deployed on:", onRampAddress.String())
+	onRamp, err := onramp.NewOnRamp(onRampAddress, client.Client)
+	require.NoError(t, err)
+	client.Logger.Infof(fmt.Sprintf("Onramp deployed on %s in tx %s", onRampAddress.String(), helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash())))
+	client.OnRamp = onRampAddress
 
-	// Configure onramp address on pool
-	tx, err = sourcePool.SetOnRamp(source.Owner, onRampAddress, true)
-	helpers.PanicErr(err)
-
-	fmt.Println("Onramp pool configured with onramp on:", tx.Hash().Hex())
 	return onRamp
 }
 
-func deployOfframp(dest EvmChainConfig, onrampChainId *big.Int) (*offramp.OffRamp, *message_executor.MessageExecutor, common.Address) {
-	pool := deployNativeTokenPool(dest, true)
-	afn := deployAFN(dest, true)
-	feedAddress := deployPriceFeed(dest, true)
-
-	// deploy offramp on Rinkeby
+func deployOffRamp(t *testing.T, client *EvmChainConfig, sourceChain *big.Int, poolAddresses []common.Address, feedAddresses []common.Address, afn common.Address, sourceBridgeTokens []common.Address) *offramp.OffRamp {
+	client.Logger.Infof("Deploying offramp: bridgeTokens %+v, poolAddresses %+v, priceFeeds %+v", client.BridgeTokens, client.TokenPools, client.PriceFeeds)
 	offrampAddress, tx, _, err := offramp.DeployOffRamp(
-		dest.Owner,                       // user
-		dest.Client,                      // client
-		onrampChainId,                    // source chain id
-		dest.ChainId,                     // dest chain id
-		[]common.Address{dest.LinkToken}, // source tokens
-		[]common.Address{pool.Address()}, // dest pool addresses
-		[]common.Address{feedAddress},    // Feeds
-		afn.Address(),                    // AFN address
-		big.NewInt(86400),                // max timeout without AFN signal  86400 seconds = one day
+		client.Owner,       // user
+		client.Client,      // client
+		sourceChain,        // source chain id
+		client.ChainId,     // dest chain id
+		sourceBridgeTokens, // source tokens
+		poolAddresses,      // dest pool addresses
+		feedAddresses,      // Feeds
+		afn,                // AFN address
+		big.NewInt(86400),  // max timeout without AFN signal  86400 seconds = one day
 		offramp.OffRampInterfaceOffRampConfig{
 			ExecutionFeeJuels:     0,
 			ExecutionDelaySeconds: 0,
@@ -116,73 +177,59 @@ func deployOfframp(dest EvmChainConfig, onrampChainId *big.Int) (*offramp.OffRam
 			MaxTokensLength:       5,
 		},
 	)
-	helpers.PanicErr(err)
-	WaitForMined(context.Background(), dest.Client, tx.Hash(), true)
-	fmt.Println("Offramp deployed on:", offrampAddress.Hex())
+	require.NoError(t, err)
+	WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
+	client.Logger.Infof("Offramp deployed on %s in tx: %s", offrampAddress.Hex(), helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash()))
+	client.OffRamp = offrampAddress
 
-	offRamp, err := offramp.NewOffRamp(offrampAddress, dest.Client)
-	helpers.PanicErr(err)
-
-	fillPoolWithLink(dest, pool)
-
-	// Configure offramp address on pool
-	tx, err = pool.SetOffRamp(dest.Owner, offRamp.Address(), true)
-	helpers.PanicErr(err)
-	fmt.Println("Offramp pool configured with offramp address, tx hash:", tx.Hash().Hex())
-
-	// Deploy offramp contract token receiver
-	messageReceiverAddress, tx, _, err := simple_message_receiver.DeploySimpleMessageReceiver(dest.Owner, dest.Client)
-	helpers.PanicErr(err)
-	WaitForMined(context.Background(), dest.Client, tx.Hash(), true)
-	fmt.Println("Offramp contract message receiver deployed on:", messageReceiverAddress.Hex())
-
-	// Deploy offramp token receiver dapp
-	tokenReceiverAddress, tx, _, err := receiver_dapp.DeployReceiverDapp(dest.Owner, dest.Client, offRamp.Address(), dest.LinkToken)
-	helpers.PanicErr(err)
-	WaitForMined(context.Background(), dest.Client, tx.Hash(), true)
-	fmt.Println("Offramp token receiver dapp deployed on:", tokenReceiverAddress.Hex())
-	// Deploy the message executor contract
-	executorAddress, tx, _, err := message_executor.DeployMessageExecutor(dest.Owner, dest.Client, offRamp.Address(), false)
-	helpers.PanicErr(err)
-	WaitForMined(context.Background(), dest.Client, tx.Hash(), true)
-	fmt.Println("Message executor contract deployed on:", executorAddress.Hex())
-
-	executor, err := message_executor.NewMessageExecutor(executorAddress, dest.Client)
-	helpers.PanicErr(err)
-
-	return offRamp, executor, tokenReceiverAddress
+	offRamp, err := offramp.NewOffRamp(offrampAddress, client.Client)
+	require.NoError(t, err)
+	return offRamp
 }
 
-func deployNativeTokenPool(client EvmChainConfig, deployNew bool) *native_token_pool.NativeTokenPool {
-	if deployNew {
-		tenLink := new(big.Int).Mul(big.NewInt(1e18), big.NewInt(10))
-		address, tx, _, err := native_token_pool.DeployNativeTokenPool(client.Owner, client.Client, client.LinkToken,
-			native_token_pool.PoolInterfaceBucketConfig{
-				Rate:     big.NewInt(10),
-				Capacity: tenLink,
-			},
-			native_token_pool.PoolInterfaceBucketConfig{
-				Rate:     big.NewInt(10),
-				Capacity: tenLink,
-			})
-		helpers.PanicErr(err)
-		WaitForMined(context.Background(), client.Client, tx.Hash(), true)
-		fmt.Println("Native token pool deployed on:", address.Hex())
-		pool, err := native_token_pool.NewNativeTokenPool(address, client.Client)
-		helpers.PanicErr(err)
-		return pool
+func deployNativeTokenPool(t *testing.T, client *EvmChainConfig) []*native_token_pool.NativeTokenPool {
+	var pools []*native_token_pool.NativeTokenPool
+	var poolAddresses []common.Address
+
+	for i, bridgeToken := range client.BridgeTokens {
+		if client.DeploySettings.DeployTokenPools {
+			tenCoins := new(big.Int).Mul(big.NewInt(1e18), big.NewInt(10))
+			client.Logger.Infof("Deploying token pool for token %s", bridgeToken.Hex())
+			lockConfig := native_token_pool.PoolInterfaceBucketConfig{
+				Rate:     tenCoins,
+				Capacity: tenCoins,
+			}
+			releaseConfig := native_token_pool.PoolInterfaceBucketConfig{
+				Rate:     tenCoins,
+				Capacity: tenCoins,
+			}
+			tokenPoolAddress, tx, _, err := native_token_pool.DeployNativeTokenPool(client.Owner, client.Client, bridgeToken, lockConfig, releaseConfig)
+			require.NoError(t, err)
+			WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
+			client.Logger.Infof("Native token pool deployed on %s in tx %s", tokenPoolAddress, helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash()))
+			pool, err := native_token_pool.NewNativeTokenPool(tokenPoolAddress, client.Client)
+			require.NoError(t, err)
+			fillPoolWithTokens(t, client, pool)
+			pools = append(pools, pool)
+			poolAddresses = append(poolAddresses, tokenPoolAddress)
+		} else {
+			if client.TokenPools[i].Hex() == "0x0000000000000000000000000000000000000000" {
+				t.Error("deploy new lock unlock pool set to false but no lock unlock pool given in config")
+			}
+			pool, err := native_token_pool.NewNativeTokenPool(client.TokenPools[i], client.Client)
+			require.NoError(t, err)
+			client.Logger.Infof("Lock unlock pool loaded from: %s", pool.Address().Hex())
+			pools = append(pools, pool)
+			poolAddresses = append(poolAddresses, client.TokenPools[i])
+		}
 	}
-	if client.TokenPool.Hex() == "0x0000000000000000000000000000000000000000" {
-		helpers.PanicErr(errors.New("deploy new lock unlock pool set to false but no lock unlock pool given in config"))
-	}
-	sourcePool, err := native_token_pool.NewNativeTokenPool(client.TokenPool, client.Client)
-	helpers.PanicErr(err)
-	fmt.Println("Lock unlock pool loaded from:", sourcePool.Address().Hex())
-	return sourcePool
+
+	client.TokenPools = poolAddresses
+	return pools
 }
 
-func deployAFN(client EvmChainConfig, deployNew bool) *afn_contract.AFNContract {
-	if deployNew {
+func deployAFN(t *testing.T, client *EvmChainConfig) *afn_contract.AFNContract {
+	if client.DeploySettings.DeployAFN {
 		address, tx, _, err := afn_contract.DeployAFNContract(
 			client.Owner,
 			client.Client,
@@ -191,49 +238,95 @@ func deployAFN(client EvmChainConfig, deployNew bool) *afn_contract.AFNContract 
 			big.NewInt(1),
 			big.NewInt(1),
 		)
-		helpers.PanicErr(err)
-		WaitForMined(context.Background(), client.Client, tx.Hash(), true)
-		fmt.Println("AFN deployed on:", address.Hex())
+		require.NoError(t, err)
+		WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
+		client.Logger.Infof("AFN deployed on %s in tx: %s", address.Hex(), helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash()))
+		client.Afn = address
+
 		afn, err := afn_contract.NewAFNContract(address, client.Client)
-		helpers.PanicErr(err)
+		require.NoError(t, err)
 		return afn
 	}
 	if client.Afn.Hex() == "0x0000000000000000000000000000000000000000" {
-		helpers.PanicErr(errors.New("deploy new afn set to false but no afn given in config"))
+		t.Error("deploy new afn set to false but no afn given in config")
 	}
 	afn, err := afn_contract.NewAFNContract(client.Afn, client.Client)
-	helpers.PanicErr(err)
-	fmt.Println("AFN loaded from:", afn.Address().Hex())
+	require.NoError(t, err)
+	client.Logger.Infof("AFN loaded from: %s", afn.Address().Hex())
 	return afn
 }
 
-func deployPriceFeed(client EvmChainConfig, deployNew bool) common.Address {
-	if deployNew {
-		address, tx, _, err := mock_v3_aggregator_contract.DeployMockV3AggregatorContract(client.Owner, client.Client, 18, big.NewInt(6e12))
-		helpers.PanicErr(err)
-		WaitForMined(context.Background(), client.Client, tx.Hash(), true)
-		fmt.Println("Mock feed deployed on:", address.Hex())
-		return address
+func deployPriceFeed(t *testing.T, client *EvmChainConfig) []common.Address {
+	var priceFeeds []common.Address
+
+	for _, feed := range client.PriceFeeds {
+		if client.DeploySettings.DeployPriceFeeds {
+			address, tx, _, err := mock_v3_aggregator_contract.DeployMockV3AggregatorContract(client.Owner, client.Client, 18, big.NewInt(6e12))
+			require.NoError(t, err)
+			WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
+			client.Logger.Infof("Mock feed deployed on %s in tx: %s", address, helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash()))
+			priceFeeds = append(priceFeeds, address)
+		} else {
+			if feed.Hex() == "0x0000000000000000000000000000000000000000" {
+				t.Error("deploy new price feed set to false but no price feed given in config")
+			}
+			priceFeeds = append(priceFeeds, feed)
+		}
 	}
-	if client.PriceFeed.Hex() == "0x0000000000000000000000000000000000000000" {
-		helpers.PanicErr(errors.New("deploy new price feed set to false but no price feed given in config"))
-	}
-	return client.PriceFeed
+
+	client.PriceFeeds = priceFeeds
+	return priceFeeds
 }
 
-func fillPoolWithLink(client EvmChainConfig, pool *native_token_pool.NativeTokenPool) {
+func fillPoolWithTokens(t *testing.T, client *EvmChainConfig, pool *native_token_pool.NativeTokenPool) {
 	destLinkToken, err := link_token_interface.NewLinkToken(client.LinkToken, client.Client)
-	helpers.PanicErr(err)
+	require.NoError(t, err)
 
-	// fill offramp token pool with 0.5 LINK
-	amount := big.NewInt(5e17)
+	// fill offramp token pool with 0.05 LINK
+	amount := big.NewInt(5e16)
 	tx, err := destLinkToken.Approve(client.Owner, pool.Address(), amount)
-	helpers.PanicErr(err)
-	fmt.Println("Approving LINK on token pool:", tx.Hash().Hex())
-	WaitForMined(context.Background(), client.Client, tx.Hash(), true)
+	require.NoError(t, err)
+	client.Logger.Infof("Approving token on token pool: %s", helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash()))
+	WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 
+	client.Logger.Infof("Locking tokens in pool")
 	tx, err = pool.LockOrBurn(client.Owner, client.Owner.From, amount)
-	helpers.PanicErr(err)
-	WaitForMined(context.Background(), client.Client, tx.Hash(), true)
-	fmt.Println("Dest pool filled with funds, tx hash:", tx.Hash().Hex())
+	require.NoError(t, err)
+	WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
+	client.Logger.Infof("Pool filled with tokens: %s", helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash()))
+}
+
+func printContractConfig(source *EvmChainConfig, destinations []*EvmChainConfig) {
+	source.Logger.Infof("Source chain config")
+	source.Logger.Infof(`
+Source chain config	
+	
+LinkToken:    common.HexToAddress("%s"),
+BridgeTokens: %s,
+TokenPools:   %s,
+PriceFeeds:   %s,
+TokenSenders: %s,
+OnRamp:       common.HexToAddress("%s"),
+OffRamp:      common.Address{},
+Afn:          common.HexToAddress("%s"),
+`, source.LinkToken, source.BridgeTokens, source.TokenPools, source.PriceFeeds, source.TokenSenders, source.OnRamp, source.Afn)
+
+	for _, dest := range destinations {
+		dest.Logger.Infof(`
+Destination chain config	
+	
+LinkToken:       common.HexToAddress("%s"),
+BridgeTokens:    %s,
+TokenPools:      %s,
+PriceFeeds:      %s,
+OnRamp:          common.Address{},
+OffRamp:         common.HexToAddress("%s"),
+MessageReceiver: common.HexToAddress("%s"),
+TokenReceiver:   common.HexToAddress("%s"),
+MessageExecutor: common.HexToAddress("%s"),
+Afn:             common.HexToAddress("%s"),
+`, dest.LinkToken, dest.BridgeTokens, dest.TokenPools, dest.PriceFeeds, dest.OffRamp, dest.MessageReceiver, dest.TokenReceiver, dest.MessageExecutor, dest.Afn)
+
+		PrintJobSpecs(source.OnRamp, dest.OffRamp, dest.MessageExecutor, source.ChainId, dest.ChainId)
+	}
 }

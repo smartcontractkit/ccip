@@ -46,15 +46,6 @@ type ExecutableMessage struct {
 	Message Message    `json:"message"`
 }
 
-type ExecutableMessages []ExecutableMessage
-
-func (ems ExecutableMessages) SeqNums() (nums []*big.Int) {
-	for i := range ems {
-		nums = append(nums, ems[i].Message.SequenceNumber)
-	}
-	return
-}
-
 // ExecutionObservation Note there can be gaps in this range of sequence numbers,
 // indicative of some messages being non-DON executed.
 type ExecutionObservation struct {
@@ -175,6 +166,9 @@ func DecodeExecutionReport(report types.Report) ([]ExecutableMessage, error) {
 	})
 	if !ok {
 		return nil, fmt.Errorf("got %T", unpacked[0])
+	}
+	if len(msgs) == 0 {
+		return nil, errors.New("assumptionViolation: expected at least one element")
 	}
 	var ems []ExecutableMessage
 	for _, emi := range msgs {
@@ -381,8 +375,14 @@ func (r ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Contex
 	if err != nil {
 		return false, nil
 	}
-	// If the report is stale, we do not accept it.
-	stale, err := r.isStale(ems[0].Message.SequenceNumber)
+
+	var seqNums []*big.Int
+	for i := range ems {
+		seqNums = append(seqNums, ems[i].Message.SequenceNumber)
+	}
+
+	// If the first message is executed already, this execution report is stale, and we do not accept it.
+	stale, err := r.isStale(seqNums[0])
 	if err != nil {
 		return !stale, err
 	}
@@ -394,7 +394,8 @@ func (r ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Contex
 		// Ok to continue here, we'll try to reset them again on the next round.
 		r.l.Errorw("Unable to reset expired requests", "err", err)
 	}
-	if err := r.orm.UpdateRequestSetStatus(r.sourceChainId, r.destChainId, ExecutableMessages(ems).SeqNums(), RequestStatusExecutionPending); err != nil {
+
+	if err := r.orm.UpdateRequestSetStatus(r.sourceChainId, r.destChainId, seqNums, RequestStatusExecutionPending); err != nil {
 		return false, err
 	}
 	return true, nil

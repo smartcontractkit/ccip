@@ -394,3 +394,11 @@ func getLastReportMock(maxSequenceNumber int64) (offramp.CCIPRelayReport, error)
 		MaxSequenceNumber: maxSequenceNumberBig,
 	}, nil
 }
+
+func TestDecodeEmptyExecutionReport(t *testing.T) {
+	executorReport, err := ccip.EncodeExecutionReport([]ccip.ExecutableMessage{})
+	require.NoError(t, err)
+	_, err = ccip.DecodeExecutionReport(executorReport)
+	require.Error(t, err)
+	require.Equal(t, "assumptionViolation: expected at least one element", err.Error())
+}

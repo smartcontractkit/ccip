@@ -3,6 +3,7 @@ package common
 import (
 	"flag"
 	"fmt"
+	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -56,4 +57,28 @@ func ExplorerLink(chainID int64, txHash common.Hash) string {
 	}
 
 	return fmt.Sprintf(fmtURL, txHash.String())
+}
+
+// ChainName returns the name of the EVM network based on its chainID
+func ChainName(chainID int64) string {
+	switch chainID {
+	case 1:
+		return "Ethereum"
+	case 4:
+		return "Rinkeby"
+	case 42:
+		return "Kovan"
+	case 56:
+		return "BSC"
+	case 97:
+		return "BSC Testnet"
+	case 137:
+		return "Polygon"
+	case 4002:
+		return "Fantom testnet"
+	case 80001:
+		return "Polygon Mumbai"
+	default: // Unknown chain, return chainID as string
+		return strconv.FormatInt(chainID, 10)
+	}
 }
