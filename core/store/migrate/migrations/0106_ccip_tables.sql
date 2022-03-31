@@ -2,9 +2,11 @@
 -- +goose StatementBegin
 CREATE TABLE ccip_requests
 (
-    PRIMARY KEY (source_chain_id, dest_chain_id, seq_num),
+    PRIMARY KEY (source_chain_id, dest_chain_id, on_ramp, off_ramp, seq_num),
     source_chain_id text           NOT NULL,
     dest_chain_id   text           NOT NULL,
+    on_ramp         bytea          NOT NULL,
+    off_ramp        bytea          NOT NULL,
     seq_num         numeric(78, 0) NOT NULL,
     sender          bytea          NOT NULL,
     receiver        bytea          NOT NULL,

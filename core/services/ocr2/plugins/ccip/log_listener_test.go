@@ -180,7 +180,7 @@ func TestLogListener_SavesRequests(t *testing.T) {
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
 		lb.OnNewLongestChain(context.Background(), &types.Head{Hash: head.Hash(), Number: startHead})
 		startHead++
-		reqs, err = logListener.orm.Requests(big.NewInt(2), big.NewInt(1), big.NewInt(0), nil, RequestStatusUnstarted, nil, nil)
+		reqs, err = logListener.orm.Requests(big.NewInt(2), big.NewInt(1), onRampAddress, offRampAddress, big.NewInt(0), nil, RequestStatusUnstarted, nil, nil)
 		require.NoError(t, err)
 		t.Logf("log %+v\n", reqs)
 		return logListener.offchainConfig.DestIncomingConfirmations == newCcipConfig.DestIncomingConfirmations &&
@@ -210,7 +210,7 @@ func TestLogListener_SavesRequests(t *testing.T) {
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
 		lb.OnNewLongestChain(context.Background(), &types.Head{Hash: head.Hash(), Number: startHead})
 		startHead++
-		reqs, err = logListener.orm.Requests(sourceChainId, destChainId, big.NewInt(0), nil, RequestStatusUnstarted, nil, nil)
+		reqs, err = logListener.orm.Requests(sourceChainId, destChainId, onRampAddress, offRampAddress, big.NewInt(0), nil, RequestStatusUnstarted, nil, nil)
 		require.NoError(t, err)
 		t.Logf("log %+v\n", reqs)
 		return len(reqs) == 1

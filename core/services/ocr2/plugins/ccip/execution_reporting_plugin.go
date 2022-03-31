@@ -192,14 +192,16 @@ type ExecutionReportingPluginFactory struct {
 	source, dest *big.Int
 	lastReporter OffRampLastReporter
 	executor     common.Address
+	onRamp       common.Address
+	offRamp      common.Address
 }
 
-func NewExecutionReportingPluginFactory(l logger.Logger, orm ORM, source, dest *big.Int, executor common.Address, lastReporter OffRampLastReporter) types.ReportingPluginFactory {
-	return &ExecutionReportingPluginFactory{l: l, orm: orm, source: source, dest: dest, executor: executor, lastReporter: lastReporter}
+func NewExecutionReportingPluginFactory(l logger.Logger, orm ORM, source, dest *big.Int, onRamp, offRamp common.Address, executor common.Address, lastReporter OffRampLastReporter) types.ReportingPluginFactory {
+	return &ExecutionReportingPluginFactory{l: l, orm: orm, source: source, dest: dest, onRamp: onRamp, offRamp: offRamp, executor: executor, lastReporter: lastReporter}
 }
 
 func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.ReportingPluginConfig) (types.ReportingPlugin, types.ReportingPluginInfo, error) {
-	return ExecutionReportingPlugin{rf.l, config.F, rf.orm, rf.source, rf.dest, rf.executor, rf.lastReporter}, types.ReportingPluginInfo{
+	return ExecutionReportingPlugin{rf.l, config.F, rf.orm, rf.source, rf.dest, rf.executor, rf.onRamp, rf.offRamp, rf.lastReporter}, types.ReportingPluginInfo{
 		Name:          "CCIPExecution",
 		UniqueReports: true,
 		MaxQueryLen:   0, // We do not use the query phase.
@@ -216,6 +218,8 @@ type ExecutionReportingPlugin struct {
 	sourceChainId *big.Int
 	destChainId   *big.Int
 	executor      common.Address
+	onRamp        common.Address
+	offRamp       common.Address
 	// We also use the offramp for defensive checks
 	lastReporter OffRampLastReporter
 }
@@ -229,7 +233,7 @@ func (r ExecutionReportingPlugin) Observation(ctx context.Context, timestamp typ
 	// We want to execute any messages which satisfy the following:
 	// 1. Have the executor field set to the DONs message executor contract
 	// 2. There exists a confirmed relay report containing its sequence number, i.e. it's status is RequestStatusRelayConfirmed
-	relayedReqs, err := r.orm.Requests(r.sourceChainId, r.destChainId, nil, nil, RequestStatusRelayConfirmed, &r.executor, nil)
+	relayedReqs, err := r.orm.Requests(r.sourceChainId, r.destChainId, r.onRamp, r.offRamp, nil, nil, RequestStatusRelayConfirmed, &r.executor, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -304,7 +308,7 @@ func (r ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.Re
 	if max.Cmp(&min) < 0 {
 		return false, nil, errors.New("max seq num smaller than min")
 	}
-	reqs, err := r.orm.Requests(r.sourceChainId, r.destChainId, &min, &max, RequestStatusRelayConfirmed, &r.executor, nil)
+	reqs, err := r.orm.Requests(r.sourceChainId, r.destChainId, r.onRamp, r.offRamp, &min, &max, RequestStatusRelayConfirmed, &r.executor, nil)
 	if err != nil {
 		return false, nil, err
 	}
@@ -342,7 +346,7 @@ func (r ExecutionReportingPlugin) buildReport(reqs []*Request) ([]byte, error) {
 			r.l.Errorw("Could not find relay report for request", "err", err2, "seq num", req.SeqNum.String())
 			continue
 		}
-		allReqsInReport, err3 := r.orm.Requests(r.sourceChainId, r.destChainId, rep.MinSeqNum.ToInt(), rep.MaxSeqNum.ToInt(), "", nil, nil)
+		allReqsInReport, err3 := r.orm.Requests(r.sourceChainId, r.destChainId, req.OnRamp, req.OffRamp, rep.MinSeqNum.ToInt(), rep.MaxSeqNum.ToInt(), "", nil, nil)
 		if err3 != nil {
 			continue
 		}
@@ -390,12 +394,12 @@ func (r ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Contex
 		return false, err
 	}
 	// Any timed out requests should be set back to RequestStatusExecutionPending so their execution can be retried in a subsequent report.
-	if err = r.orm.ResetExpiredRequests(r.sourceChainId, r.destChainId, ExecutionMaxInflightTimeSeconds, RequestStatusExecutionPending, RequestStatusRelayConfirmed); err != nil {
+	if err = r.orm.ResetExpiredRequests(r.sourceChainId, r.destChainId, r.onRamp, r.offRamp, ExecutionMaxInflightTimeSeconds, RequestStatusExecutionPending, RequestStatusRelayConfirmed); err != nil {
 		// Ok to continue here, we'll try to reset them again on the next round.
 		r.l.Errorw("Unable to reset expired requests", "err", err)
 	}
 
-	if err := r.orm.UpdateRequestSetStatus(r.sourceChainId, r.destChainId, seqNums, RequestStatusExecutionPending); err != nil {
+	if err := r.orm.UpdateRequestSetStatus(r.sourceChainId, r.destChainId, r.onRamp, r.offRamp, seqNums, RequestStatusExecutionPending); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -415,7 +419,7 @@ func (r ExecutionReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Conte
 
 func (r ExecutionReportingPlugin) isStale(min *big.Int) (bool, error) {
 	// If the first message is executed already, this execution report is stale.
-	req, err := r.orm.Requests(r.sourceChainId, r.destChainId, min, min, "", nil, nil)
+	req, err := r.orm.Requests(r.sourceChainId, r.destChainId, r.onRamp, r.offRamp, min, min, "", nil, nil)
 	if err != nil {
 		// if we can't find the request, assume transient db issue
 		// and wait until the next OCR2 round (don't submit)

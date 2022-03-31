@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
@@ -90,12 +91,13 @@ func DecodeRelayReport(report types.Report) (*offramp.CCIPRelayReport, error) {
 type RelayReportingPluginFactory struct {
 	l       logger.Logger
 	orm     ORM
+	onRamp  common.Address
 	offRamp *offramp.OffRamp
 }
 
 // NewRelayReportingPluginFactory return a new RelayReportingPluginFactory.
-func NewRelayReportingPluginFactory(l logger.Logger, orm ORM, offRamp *offramp.OffRamp) types.ReportingPluginFactory {
-	return &RelayReportingPluginFactory{l: l, orm: orm, offRamp: offRamp}
+func NewRelayReportingPluginFactory(l logger.Logger, orm ORM, offRamp *offramp.OffRamp, onRamp common.Address) types.ReportingPluginFactory {
+	return &RelayReportingPluginFactory{l: l, orm: orm, offRamp: offRamp, onRamp: onRamp}
 }
 
 // NewReportingPlugin returns the ccip RelayReportingPlugin and satisfies the ReportingPluginFactory interface.
@@ -109,7 +111,7 @@ func (rf *RelayReportingPluginFactory) NewReportingPlugin(config types.Reporting
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, errors.WithStack(err)
 	}
-	return RelayReportingPlugin{rf.l, config.F, rf.orm, sourceChainId, destChainId, rf.offRamp}, types.ReportingPluginInfo{
+	return RelayReportingPlugin{rf.l, config.F, rf.orm, sourceChainId, destChainId, rf.onRamp, rf.offRamp}, types.ReportingPluginInfo{
 		Name:          "CCIPRelay",
 		UniqueReports: true,
 		MaxQueryLen:   0, // We do not use the query phase.
@@ -125,6 +127,7 @@ type RelayReportingPlugin struct {
 	orm           ORM
 	sourceChainId *big.Int
 	destChainId   *big.Int
+	onRamp        common.Address
 	offRamp       *offramp.OffRamp
 }
 
@@ -138,7 +141,7 @@ func (r RelayReportingPlugin) Observation(ctx context.Context, timestamp types.R
 	if err != nil {
 		return nil, err
 	}
-	unstartedReqs, err := r.orm.Requests(r.sourceChainId, r.destChainId, big.NewInt(0).Add(lastReport.MaxSequenceNumber, big.NewInt(1)), nil, RequestStatusUnstarted, nil, nil)
+	unstartedReqs, err := r.orm.Requests(r.sourceChainId, r.destChainId, r.onRamp, r.offRamp.Address(), big.NewInt(0).Add(lastReport.MaxSequenceNumber, big.NewInt(1)), nil, RequestStatusUnstarted, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +209,7 @@ func (r RelayReportingPlugin) Report(ctx context.Context, timestamp types.Report
 	if max.Cmp(&min) < 0 {
 		return false, nil, errors.New("max seq num smaller than min")
 	}
-	reqs, err := r.orm.Requests(r.sourceChainId, r.destChainId, &min, &max, RequestStatusUnstarted, nil, nil)
+	reqs, err := r.orm.Requests(r.sourceChainId, r.destChainId, r.onRamp, r.offRamp.Address(), &min, &max, RequestStatusUnstarted, nil, nil)
 	if err != nil {
 		return false, nil, err
 	}
@@ -242,7 +245,7 @@ func (r RelayReportingPlugin) isStale(minSeqNum *big.Int) bool {
 }
 
 func (r RelayReportingPlugin) buildReport(min *big.Int, max *big.Int) ([]byte, error) {
-	reqs, err := r.orm.Requests(r.sourceChainId, r.destChainId, min, max, "", nil, nil)
+	reqs, err := r.orm.Requests(r.sourceChainId, r.destChainId, r.onRamp, r.offRamp.Address(), min, max, "", nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -276,12 +279,12 @@ func (r RelayReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context, t
 		return false, nil
 	}
 	// Any timed out requests should be set back to RequestStatusExecutionPending so their execution can be retried in a subsequent report.
-	if err = r.orm.ResetExpiredRequests(r.sourceChainId, r.destChainId, RelayMaxInflightTimeSeconds, RequestStatusRelayPending, RequestStatusUnstarted); err != nil {
+	if err = r.orm.ResetExpiredRequests(r.sourceChainId, r.destChainId, r.onRamp, r.offRamp.Address(), RelayMaxInflightTimeSeconds, RequestStatusRelayPending, RequestStatusUnstarted); err != nil {
 		// Ok to continue here, we'll try to reset them again on the next round.
 		r.l.Errorw("Unable to reset expired requests", "err", err)
 	}
 	// Marking new requests as pending/in-flight
-	err = r.orm.UpdateRequestStatus(r.sourceChainId, r.destChainId, parsedReport.MinSequenceNumber, parsedReport.MaxSequenceNumber, RequestStatusRelayPending)
+	err = r.orm.UpdateRequestStatus(r.sourceChainId, r.destChainId, r.onRamp, r.offRamp.Address(), parsedReport.MinSequenceNumber, parsedReport.MaxSequenceNumber, RequestStatusRelayPending)
 	if err != nil {
 		return false, nil
 	}

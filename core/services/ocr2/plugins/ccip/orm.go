@@ -19,11 +19,11 @@ import (
 //go:generate mockery --name ORM --output ./mocks/ --case=underscore
 type ORM interface {
 	// Note always returns them sorted by seqNum
-	Requests(sourceChainId, destChainId, minSeqNum, maxSeqNum *big.Int, status RequestStatus, executor *common.Address, options []byte, opt ...pg.QOpt) ([]*Request, error)
+	Requests(sourceChainId, destChainId *big.Int, onRamp, offRamp common.Address, minSeqNum, maxSeqNum *big.Int, status RequestStatus, executor *common.Address, options []byte, opt ...pg.QOpt) ([]*Request, error)
 	SaveRequest(request *Request, qopts ...pg.QOpt) error
-	UpdateRequestStatus(sourceChainId, destChainId, minSeqNum, maxSeqNum *big.Int, status RequestStatus, qopts ...pg.QOpt) error
-	UpdateRequestSetStatus(sourceChainId, destChainId *big.Int, seqNums []*big.Int, status RequestStatus, qopts ...pg.QOpt) error
-	ResetExpiredRequests(sourceChainId, destChainId *big.Int, expiryTimeoutSeconds int, fromStatus RequestStatus, toStatus RequestStatus, qopts ...pg.QOpt) error
+	UpdateRequestStatus(sourceChainId, destChainId *big.Int, onRamp, offRamp common.Address, minSeqNum, maxSeqNum *big.Int, status RequestStatus, qopts ...pg.QOpt) error
+	UpdateRequestSetStatus(sourceChainId, destChainId *big.Int, onRamp, offRamp common.Address, seqNums []*big.Int, status RequestStatus, qopts ...pg.QOpt) error
+	ResetExpiredRequests(sourceChainId, destChainId *big.Int, onRamp, offRamp common.Address, expiryTimeoutSeconds int, fromStatus RequestStatus, toStatus RequestStatus, qopts ...pg.QOpt) error
 	RelayReport(seqNum *big.Int, qopts ...pg.QOpt) (RelayReport, error)
 	SaveRelayReport(report RelayReport, qopts ...pg.QOpt) error
 }
@@ -38,7 +38,7 @@ type orm struct {
 var _ORM = (*orm)(nil)
 
 func NewORM(db *sqlx.DB, lggr logger.Logger, cfg pg.LogConfig) ORM {
-	namedLogger := lggr.Named("CCIPORM")
+	namedLogger := lggr.Named("CCIP.ORM")
 	return &orm{
 		db:   db,
 		q:    pg.NewQ(db, namedLogger, cfg),
@@ -49,7 +49,14 @@ func NewORM(db *sqlx.DB, lggr logger.Logger, cfg pg.LogConfig) ORM {
 
 // Note that executor can be left unset in the request, meaning anyone can execute.
 // A nil executor as an argument here however means "don't filter on executor" and so it will return requests with both unset and set executors.
-func (o *orm) Requests(sourceChainId, destChainId *big.Int, minSeqNum, maxSeqNum *big.Int, status RequestStatus, executor *common.Address, options []byte, qopts ...pg.QOpt) (reqs []*Request, err error) {
+func (o *orm) Requests(
+	sourceChainId, destChainId *big.Int,
+	onRamp, offRamp common.Address,
+	minSeqNum, maxSeqNum *big.Int,
+	status RequestStatus,
+	executor *common.Address,
+	options []byte,
+	qopts ...pg.QOpt) (reqs []*Request, err error) {
 	q := o.q.WithOpts(qopts...)
 	var b strings.Builder
 	var params []interface{}
@@ -61,6 +68,14 @@ func (o *orm) Requests(sourceChainId, destChainId *big.Int, minSeqNum, maxSeqNum
 	if destChainId != nil {
 		b.WriteString(" AND dest_chain_id = ?")
 		params = append(params, destChainId.String())
+	}
+	if onRamp != common.HexToAddress("") {
+		b.WriteString(" AND on_ramp = ?")
+		params = append(params, onRamp)
+	}
+	if offRamp != common.HexToAddress("") {
+		b.WriteString(" AND off_ramp = ?")
+		params = append(params, offRamp)
 	}
 	if minSeqNum != nil {
 		b.WriteString(" AND seq_num >= CAST(? AS NUMERIC(78,0))")
@@ -89,7 +104,7 @@ func (o *orm) Requests(sourceChainId, destChainId *big.Int, minSeqNum, maxSeqNum
 	return
 }
 
-func (o *orm) UpdateRequestStatus(sourceChainId, destChainId, minSeqNum, maxSeqNum *big.Int, status RequestStatus, qopts ...pg.QOpt) error {
+func (o *orm) UpdateRequestStatus(sourceChainId, destChainId *big.Int, onRamp, offRamp common.Address, minSeqNum, maxSeqNum *big.Int, status RequestStatus, qopts ...pg.QOpt) error {
 	q := o.q.WithOpts(qopts...)
 	// We return seqNum here to error if it doesn't exist
 	sql := `UPDATE ccip_requests SET status = $1, updated_at = now()
@@ -97,8 +112,10 @@ func (o *orm) UpdateRequestStatus(sourceChainId, destChainId, minSeqNum, maxSeqN
 		  AND seq_num <= CAST($3 AS NUMERIC(78,0))
 		  AND source_chain_id = $4 
 		  AND dest_chain_id = $5 
+	      AND on_ramp = $6
+	      AND off_ramp = $7
 		RETURNING seq_num`
-	res, err := q.Exec(sql, status, minSeqNum.String(), maxSeqNum.String(), sourceChainId.String(), destChainId.String())
+	res, err := q.Exec(sql, status, minSeqNum.String(), maxSeqNum.String(), sourceChainId.String(), destChainId.String(), onRamp, offRamp)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -114,7 +131,7 @@ func (o *orm) UpdateRequestStatus(sourceChainId, destChainId, minSeqNum, maxSeqN
 	return nil
 }
 
-func (o *orm) UpdateRequestSetStatus(sourceChainId, destChainId *big.Int, seqNums []*big.Int, status RequestStatus, qopts ...pg.QOpt) error {
+func (o *orm) UpdateRequestSetStatus(sourceChainId, destChainId *big.Int, onRamp, offRamp common.Address, seqNums []*big.Int, status RequestStatus, qopts ...pg.QOpt) error {
 	q := o.q.WithOpts(qopts...)
 	if len(seqNums) == 0 {
 		return nil
@@ -132,9 +149,8 @@ func (o *orm) UpdateRequestSetStatus(sourceChainId, destChainId *big.Int, seqNum
 		b.WriteString(`,CAST(? AS NUMERIC(78,0))`)
 		params = append(params, n.String())
 	}
-	b.WriteString(`) AND source_chain_id = ? AND dest_chain_id = ? RETURNING seq_num`)
-	params = append(params, sourceChainId.String())
-	params = append(params, destChainId.String())
+	b.WriteString(`) AND source_chain_id = ? AND dest_chain_id = ? AND on_ramp = ? AND off_ramp = ? RETURNING seq_num`)
+	params = append(params, sourceChainId.String(), destChainId.String(), onRamp, offRamp)
 
 	stmt := sqlx.Rebind(sqlx.DOLLAR, b.String())
 	res, err := q.Exec(stmt, params...)
@@ -151,22 +167,24 @@ func (o *orm) UpdateRequestSetStatus(sourceChainId, destChainId *big.Int, seqNum
 	return errors.WithStack(err)
 }
 
-func (o *orm) ResetExpiredRequests(sourceChainId, destChainId *big.Int, expiryTimeoutSeconds int, fromStatus RequestStatus, toStatus RequestStatus, qopts ...pg.QOpt) error {
+func (o *orm) ResetExpiredRequests(sourceChainId, destChainId *big.Int, onRamp, offRamp common.Address, expiryTimeoutSeconds int, fromStatus RequestStatus, toStatus RequestStatus, qopts ...pg.QOpt) error {
 	q := o.q.WithOpts(qopts...)
 	sql := `UPDATE ccip_requests SET status = $1, updated_at = now()
 		WHERE now() > (updated_at + $2) 
 			AND source_chain_id = $3
 			AND dest_chain_id = $4
-			AND status = $5`
-	return q.ExecQ(sql, toStatus, fmt.Sprintf("%d seconds", expiryTimeoutSeconds), sourceChainId.String(), destChainId.String(), fromStatus)
+	        AND on_ramp = $5
+	        AND off_ramp = $6
+			AND status = $7`
+	return q.ExecQ(sql, toStatus, fmt.Sprintf("%d seconds", expiryTimeoutSeconds), sourceChainId.String(), destChainId.String(), onRamp, offRamp, fromStatus)
 }
 
 // Note requests will only be added in an unstarted status
 func (o *orm) SaveRequest(request *Request, qopts ...pg.QOpt) error {
 	q := o.q.WithOpts(qopts...)
 	sql := `INSERT INTO ccip_requests 
-    (seq_num, source_chain_id, dest_chain_id, sender, receiver, data, tokens, amounts, executor, options, raw, status, created_at, updated_at) 
-    VALUES (:seq_num, :source_chain_id, :dest_chain_id, :sender, :receiver, :data, :tokens, :amounts, :executor, :options, :raw, 'unstarted', now(), now())
+    (seq_num, source_chain_id, dest_chain_id, on_ramp, off_ramp, sender, receiver, data, tokens, amounts, executor, options, raw, status, created_at, updated_at) 
+    VALUES (:seq_num, :source_chain_id, :dest_chain_id, :on_ramp, :off_ramp, :sender, :receiver, :data, :tokens, :amounts, :executor, :options, :raw, 'unstarted', now(), now())
    	ON CONFLICT DO NOTHING`
 
 	return q.ExecQNamed(sql, request)

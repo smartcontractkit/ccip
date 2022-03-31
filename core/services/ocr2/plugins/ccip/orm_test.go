@@ -25,11 +25,15 @@ func TestORM(t *testing.T) {
 	orm := ccip.NewORM(db, lggr, pgtest.NewPGCfg(false))
 	source := big.NewInt(1)
 	dest := big.NewInt(2)
+	onRamp := common.HexToAddress("0xf97f4df75117a78c1A5a0DBb814Af92458539FB5")
+	offRamp := common.HexToAddress("0xf97f4df75117a78c1A5a0DBb814Af92458539FB7")
 
 	// Check we can read/write requests.
 	req := ccip.Request{
 		SourceChainID: source.String(),
 		DestChainID:   dest.String(),
+		OnRamp:        onRamp,
+		OffRamp:       offRamp,
 		SeqNum:        *utils.NewBigI(10),
 		Sender:        common.HexToAddress("0xf97f4df75117a78c1A5a0DBb814Af92458539FB4"),
 		Receiver:      common.HexToAddress("0xf97f4df75117a78c1A5a0DBb814Af92458539FB4"),
@@ -40,20 +44,20 @@ func TestORM(t *testing.T) {
 	}
 	err := orm.SaveRequest(&req)
 	require.NoError(t, err)
-	reqRead, err := orm.Requests(source, dest, req.SeqNum.ToInt(), req.SeqNum.ToInt(), "", nil, nil)
+	reqRead, err := orm.Requests(source, dest, onRamp, offRamp, req.SeqNum.ToInt(), req.SeqNum.ToInt(), "", nil, nil)
 	require.NoError(t, err)
-	require.Equal(t, 1, len(reqRead))
+	require.Len(t, reqRead, 1)
 	assert.True(t, reqRead[0].UpdatedAt != time.Time{})
 	assert.True(t, reqRead[0].CreatedAt != time.Time{})
 	assert.Equal(t, req.Data, reqRead[0].Data)
 
 	// Check we can update the request status.
-	err = orm.UpdateRequestStatus(source, dest, req.SeqNum.ToInt(), req.SeqNum.ToInt(), ccip.RequestStatusRelayPending)
+	err = orm.UpdateRequestStatus(source, dest, onRamp, offRamp, req.SeqNum.ToInt(), req.SeqNum.ToInt(), ccip.RequestStatusRelayPending)
 	require.NoError(t, err)
 	// Updating an non-existent reqID should error
-	err = orm.UpdateRequestStatus(source, dest, big.NewInt(1337), big.NewInt(1337), ccip.RequestStatusUnstarted)
+	err = orm.UpdateRequestStatus(source, dest, onRamp, offRamp, big.NewInt(1337), big.NewInt(1337), ccip.RequestStatusUnstarted)
 	require.Error(t, err)
-	reqReadAfterUpdate, err := orm.Requests(source, dest, req.SeqNum.ToInt(), req.SeqNum.ToInt(), "", nil, nil)
+	reqReadAfterUpdate, err := orm.Requests(source, dest, onRamp, offRamp, req.SeqNum.ToInt(), req.SeqNum.ToInt(), "", nil, nil)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(reqReadAfterUpdate))
 	assert.Equal(t, ccip.RequestStatusRelayPending, reqReadAfterUpdate[0].Status)
@@ -77,6 +81,8 @@ func TestORM(t *testing.T) {
 	reqForOracleExecution := ccip.Request{
 		SourceChainID: source.String(),
 		DestChainID:   dest.String(),
+		OnRamp:        onRamp,
+		OffRamp:       offRamp,
 		SeqNum:        *utils.NewBigI(11),
 		Sender:        common.HexToAddress("0xf97f4df75117a78c1A5a0DBb814Af92458539FB4"),
 		Receiver:      common.HexToAddress("0xf97f4df75117a78c1A5a0DBb814Af92458539FB4"),
@@ -87,19 +93,19 @@ func TestORM(t *testing.T) {
 		Options:       []byte{},
 	}
 	require.NoError(t, orm.SaveRequest(&reqForOracleExecution))
-	require.NoError(t, orm.UpdateRequestStatus(source, dest, big.NewInt(11), big.NewInt(11), ccip.RequestStatusRelayConfirmed))
-	reqsForOracle, err := orm.Requests(source, dest, nil, nil, ccip.RequestStatusRelayConfirmed, nil, nil)
+	require.NoError(t, orm.UpdateRequestStatus(source, dest, onRamp, offRamp, big.NewInt(11), big.NewInt(11), ccip.RequestStatusRelayConfirmed))
+	reqsForOracle, err := orm.Requests(source, dest, onRamp, offRamp, nil, nil, ccip.RequestStatusRelayConfirmed, nil, nil)
 	require.NoError(t, err)
 	require.Len(t, reqsForOracle, 1)
-	reqsForOracle, err = orm.Requests(source, dest, nil, nil, ccip.RequestStatusRelayConfirmed, &executor, nil)
+	reqsForOracle, err = orm.Requests(source, dest, onRamp, offRamp, nil, nil, ccip.RequestStatusRelayConfirmed, &executor, nil)
 	require.NoError(t, err)
 	require.Len(t, reqsForOracle, 1)
 
 	// Check we can update the status with specific seq nums, as opposed to a range.
-	reqsBefore, err := orm.Requests(source, dest, big.NewInt(10), big.NewInt(11), ccip.RequestStatusRelayConfirmed, nil, nil)
+	reqsBefore, err := orm.Requests(source, dest, onRamp, offRamp, big.NewInt(10), big.NewInt(11), ccip.RequestStatusRelayConfirmed, nil, nil)
 	require.NoError(t, err)
-	require.NoError(t, orm.UpdateRequestSetStatus(source, dest, []*big.Int{big.NewInt(10), big.NewInt(11)}, ccip.RequestStatusExecutionConfirmed))
-	reqs, err := orm.Requests(source, dest, nil, nil, ccip.RequestStatusExecutionConfirmed, nil, nil)
+	require.NoError(t, orm.UpdateRequestSetStatus(source, dest, onRamp, offRamp, []*big.Int{big.NewInt(10), big.NewInt(11)}, ccip.RequestStatusExecutionConfirmed))
+	reqs, err := orm.Requests(source, dest, onRamp, offRamp, nil, nil, ccip.RequestStatusExecutionConfirmed, nil, nil)
 	require.NoError(t, err)
 	require.Len(t, reqs, 2)
 	assert.True(t, reqs[0].UpdatedAt.After(reqsBefore[0].UpdatedAt), fmt.Sprintf("before %v after %v", reqRead[0].UpdatedAt, reqReadAfterUpdate[0].UpdatedAt))
@@ -111,9 +117,42 @@ func TestORM(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(2), n)
 	// Now they should be recognized as being 1s old, so we can reset them with a timeout of 1s.
-	require.NoError(t, orm.ResetExpiredRequests(source, dest, 1, ccip.RequestStatusExecutionConfirmed, ccip.RequestStatusRelayConfirmed))
+	require.NoError(t, orm.ResetExpiredRequests(source, dest, onRamp, offRamp, 1, ccip.RequestStatusExecutionConfirmed, ccip.RequestStatusRelayConfirmed))
 	// Should all be relay confirmed now.
-	reqs, err = orm.Requests(source, dest, nil, nil, ccip.RequestStatusRelayConfirmed, nil, nil)
+	reqs, err = orm.Requests(source, dest, onRamp, offRamp, nil, nil, ccip.RequestStatusRelayConfirmed, nil, nil)
 	require.NoError(t, err)
 	require.Len(t, reqs, 2)
+
+	newOfframp := common.HexToAddress("0xf97f4df75117a78c1A5a0DBb814Af92458539F823")
+	// No requests should be returned when we query for a different ramp
+	reqs, err = orm.Requests(source, dest, onRamp, newOfframp, nil, nil, ccip.RequestStatusRelayConfirmed, nil, nil)
+	require.NoError(t, err)
+	require.Empty(t, reqs)
+
+	// Insert new request for a different offRamp
+	req = ccip.Request{
+		SourceChainID: source.String(),
+		DestChainID:   dest.String(),
+		OnRamp:        onRamp,
+		OffRamp:       newOfframp,
+		SeqNum:        *utils.NewBigI(100),
+		Sender:        common.HexToAddress("0xf97f4df75117a78c1A5a0DBb814Af92458539FB4"),
+		Receiver:      common.HexToAddress("0xf97f4df75117a78c1A5a0DBb814Af92458539FB4"),
+		Data:          []byte("goodbye"),
+		Tokens:        pq.StringArray{},
+		Amounts:       pq.StringArray{},
+		Options:       []byte{},
+	}
+	err = orm.SaveRequest(&req)
+	require.NoError(t, err)
+
+	// Only the request with the same ramp should be returned on query
+	reqs, err = orm.Requests(source, dest, onRamp, newOfframp, nil, nil, "", nil, nil)
+	require.NoError(t, err)
+	require.Len(t, reqs, 1)
+
+	// All requests should be returned when no offramp is given
+	reqs, err = orm.Requests(source, dest, onRamp, common.HexToAddress(""), nil, nil, "", nil, nil)
+	require.NoError(t, err)
+	require.Len(t, reqs, 3)
 }

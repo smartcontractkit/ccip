@@ -88,6 +88,7 @@ func TestExecutionReportEncoding(t *testing.T) {
 	feedAddress, _, _, err := mock_v3_aggregator_contract.DeployMockV3AggregatorContract(destUser, destChain, 18, big.NewInt(6000000000000000))
 	require.NoError(t, err)
 
+	onRamp := common.HexToAddress("0xf97f4df75117a78c1A5a0DBb814Af92458539FB4")
 	offRampAddress, _, _, err := offramp_helper.DeployOffRampHelper(
 		destUser,
 		destChain,
@@ -115,6 +116,8 @@ func TestExecutionReportEncoding(t *testing.T) {
 		SeqNum:        *utils.NewBigI(10),
 		SourceChainID: sourceChainID.String(),
 		DestChainID:   destChainID.String(),
+		OnRamp:        onRamp,
+		OffRamp:       offRampAddress,
 		Sender:        destUser.From,
 		Receiver:      receiverAddress,
 		Data:          []byte("hello"),
@@ -242,7 +245,9 @@ func TestExecutionPlugin(t *testing.T) {
 	orm := ccip.NewORM(db, lggr, pgtest.NewPGCfg(false))
 	lr := new(mocks.OffRampLastReporter)
 	executor := common.HexToAddress("0xf97f4df75117a78c1A5a0DBb814Af92458539FB5")
-	rf := ccip.NewExecutionReportingPluginFactory(logger.TestLogger(t), orm, big.NewInt(1), big.NewInt(2), executor, lr)
+	onRamp := common.HexToAddress("0x999f4df75117a78c1A5a0DBb814Af92458539999")
+	offRamp := common.HexToAddress("0x111f4df75117a78c1A5a0DBb814Af92458539111")
+	rf := ccip.NewExecutionReportingPluginFactory(logger.TestLogger(t), orm, big.NewInt(1), big.NewInt(2), onRamp, offRamp, executor, lr)
 	rp, _, err := rf.NewReportingPlugin(types.ReportingPluginConfig{F: 1})
 	require.NoError(t, err)
 	sid, did := big.NewInt(1), big.NewInt(2)
@@ -259,6 +264,8 @@ func TestExecutionPlugin(t *testing.T) {
 		SeqNum:        *utils.NewBigI(2),
 		SourceChainID: sid.String(),
 		DestChainID:   did.String(),
+		OnRamp:        onRamp,
+		OffRamp:       offRamp,
 		Sender:        common.HexToAddress("0xf97f4df75117a78c1A5a0DBb814Af92458539FB4"),
 		Data:          []byte("hello"),
 		Tokens:        pq.StringArray{},
@@ -278,7 +285,7 @@ func TestExecutionPlugin(t *testing.T) {
 
 	// We should see an error if the latest report doesn't have a higher seq num
 	lr.On("GetLastReport", mock.Anything).Return(getLastReportMock(1)).Once()
-	require.NoError(t, orm.UpdateRequestSetStatus(sid, did, []*big.Int{big.NewInt(2)}, ccip.RequestStatusRelayConfirmed))
+	require.NoError(t, orm.UpdateRequestSetStatus(sid, did, onRamp, offRamp, []*big.Int{big.NewInt(2)}, ccip.RequestStatusRelayConfirmed))
 	obs, err = rp.Observation(context.Background(), types.ReportTimestamp{}, types.Query{})
 	require.Error(t, err)
 	// Should succeed if we do have a higher seq num
@@ -330,7 +337,7 @@ func TestExecutionPlugin(t *testing.T) {
 	require.Equal(t, "2", executableMessages[0].Message.SequenceNumber.String())
 
 	// Should not accept or transmit if the report is stale
-	orm.UpdateRequestSetStatus(sid, did, []*big.Int{big.NewInt(2)}, ccip.RequestStatusExecutionConfirmed)
+	orm.UpdateRequestSetStatus(sid, did, onRamp, offRamp, []*big.Int{big.NewInt(2)}, ccip.RequestStatusExecutionConfirmed)
 	accept, err := rp.ShouldAcceptFinalizedReport(context.Background(), types.ReportTimestamp{}, rep)
 	require.NoError(t, err)
 	require.False(t, accept)
@@ -346,6 +353,8 @@ func TestExecutionPlugin(t *testing.T) {
 			SeqNum:        *utils.NewBigI(int64(i)),
 			SourceChainID: sid.String(),
 			DestChainID:   did.String(),
+			OnRamp:        onRamp,
+			OffRamp:       offRamp,
 			Sender:        common.HexToAddress("0xf97f4df75117a78c1A5a0DBb814Af92458539FB4"),
 			Data:          []byte("hello"),
 			Tokens:        pq.StringArray{},
@@ -359,7 +368,7 @@ func TestExecutionPlugin(t *testing.T) {
 		require.NoError(t, orm.SaveRequest(&req))
 		leaves = append(leaves, b)
 	}
-	require.NoError(t, orm.UpdateRequestStatus(sid, did, big.NewInt(3), big.NewInt(5), ccip.RequestStatusRelayConfirmed))
+	require.NoError(t, orm.UpdateRequestStatus(sid, did, onRamp, offRamp, big.NewInt(3), big.NewInt(5), ccip.RequestStatusRelayConfirmed))
 	lr.On("GetLastReport", mock.Anything).Return(getLastReportMock(5)).Once()
 	obs, err = rp.Observation(context.Background(), types.ReportTimestamp{}, types.Query{})
 	require.NoError(t, err)

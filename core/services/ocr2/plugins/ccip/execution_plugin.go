@@ -99,6 +99,8 @@ func (c *CCIPExecution) GetPluginFactory() (plugin ocrtypes.ReportingPluginFacto
 		c.ccipORM,
 		big.NewInt(c.config.SourceChainID),
 		big.NewInt(c.config.DestChainID),
+		common.HexToAddress(string(c.config.OnRampID)),
+		common.HexToAddress(c.config.OffRampId),
 		common.HexToAddress(c.spec.ContractID),
 		c.offRamp,
 	), nil

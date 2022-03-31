@@ -637,7 +637,7 @@ chainID             = "%s"
 		ccipReqORM := ccip.NewORM(apps[i].GetSqlxDB(), lggr, pgtest.NewPGCfg(false))
 		gomega.NewGomegaWithT(t).Eventually(func() bool {
 			ccipContracts.sourceChain.Commit()
-			reqs, err = ccipReqORM.Requests(sourceChainID, destChainID, big.NewInt(0), nil, ccip.RequestStatusUnstarted, nil, nil)
+			reqs, err = ccipReqORM.Requests(sourceChainID, destChainID, ccipContracts.onRamp.Address(), ccipContracts.offRamp.Address(), big.NewInt(0), nil, ccip.RequestStatusUnstarted, nil, nil)
 			return len(reqs) == 1
 		}, 5*time.Second, 1*time.Second).Should(gomega.BeTrue())
 	}
@@ -662,9 +662,9 @@ chainID             = "%s"
 		gomega.NewGomegaWithT(t).Eventually(func() bool {
 			ccipReqORM := ccip.NewORM(apps[i].GetSqlxDB(), lggr, pgtest.NewPGCfg(false))
 			ccipContracts.destChain.Commit()
-			reqs, err := ccipReqORM.Requests(sourceChainID, destChainID, report.MinSequenceNumber, report.MaxSequenceNumber, ccip.RequestStatusRelayConfirmed, nil, nil)
+			reqs, err := ccipReqORM.Requests(sourceChainID, destChainID, ccipContracts.onRamp.Address(), ccipContracts.offRamp.Address(), report.MinSequenceNumber, report.MaxSequenceNumber, ccip.RequestStatusRelayConfirmed, nil, nil)
 			require.NoError(t, err)
-			valid, err := ccipReqORM.Requests(sourceChainID, destChainID, report.MinSequenceNumber, nil, ccip.RequestStatusUnstarted, nil, nil)
+			valid, err := ccipReqORM.Requests(sourceChainID, destChainID, ccipContracts.onRamp.Address(), ccipContracts.offRamp.Address(), report.MinSequenceNumber, nil, ccip.RequestStatusUnstarted, nil, nil)
 			require.NoError(t, err)
 			return len(reqs) == 1 && len(valid) == 0
 		}, 10*time.Second, 1*time.Second).Should(gomega.BeTrue())
@@ -674,7 +674,7 @@ chainID             = "%s"
 	// Let's try to execute a request as an external party.
 	// The raw log in the merkle root should be the abi-encoded version of the CCIPMessage
 	ccipReqORM := ccip.NewORM(apps[0].GetSqlxDB(), lggr, pgtest.NewPGCfg(false))
-	reqs, err := ccipReqORM.Requests(sourceChainID, destChainID, report.MinSequenceNumber, report.MaxSequenceNumber, "", nil, nil)
+	reqs, err := ccipReqORM.Requests(sourceChainID, destChainID, ccipContracts.onRamp.Address(), ccipContracts.offRamp.Address(), report.MinSequenceNumber, report.MaxSequenceNumber, "", nil, nil)
 	require.NoError(t, err)
 	root, proof := ccip.GenerateMerkleProof(32, [][]byte{reqs[0].Raw}, 0)
 	// Root should match the report root
@@ -736,7 +736,7 @@ chainID             = "%s"
 		return report.MinSequenceNumber.String() == "2" && report.MaxSequenceNumber.String() == "2"
 	}, 10*time.Second, 1*time.Second).Should(gomega.BeTrue())
 
-	eoaReq, err := ccipReqORM.Requests(sourceChainID, destChainID, report.MinSequenceNumber, report.MaxSequenceNumber, "", nil, nil)
+	eoaReq, err := ccipReqORM.Requests(sourceChainID, destChainID, ccipContracts.onRamp.Address(), ccipContracts.offRamp.Address(), report.MinSequenceNumber, report.MaxSequenceNumber, "", nil, nil)
 	require.NoError(t, err)
 	root, proof = ccip.GenerateMerkleProof(32, [][]byte{eoaReq[0].Raw}, 0)
 	// Root should match the report root
@@ -803,7 +803,7 @@ chainID             = "%s"
 	}, 20*time.Second, 1*time.Second).Should(gomega.BeTrue())
 	// In total, we should see 3 relay reports containing seq 1,2,3
 	// and 3 execution_confirmed messages
-	reqs, err = ccipReqORM.Requests(sourceChainID, destChainID, big.NewInt(1), big.NewInt(3), ccip.RequestStatusExecutionConfirmed, nil, nil)
+	reqs, err = ccipReqORM.Requests(sourceChainID, destChainID, ccipContracts.onRamp.Address(), ccipContracts.offRamp.Address(), big.NewInt(1), big.NewInt(3), ccip.RequestStatusExecutionConfirmed, nil, nil)
 	require.NoError(t, err)
 	require.Len(t, reqs, 3)
 	_, err = ccipReqORM.RelayReport(big.NewInt(1))

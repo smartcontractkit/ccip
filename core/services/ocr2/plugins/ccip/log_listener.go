@@ -258,7 +258,7 @@ func (l *LogListener) handleCrossChainMessageExecuted(executed *offramp.OffRampC
 		"seqNum", fmt.Sprintf("%d", executed.SequenceNumber.Int64()),
 		"jobID", lb.JobID(),
 	)
-	err := l.orm.UpdateRequestStatus(l.sourceChainId, l.destChainId, executed.SequenceNumber, executed.SequenceNumber, RequestStatusExecutionConfirmed)
+	err := l.orm.UpdateRequestStatus(l.sourceChainId, l.destChainId, l.onRamp.Address(), l.offRamp.Address(), executed.SequenceNumber, executed.SequenceNumber, RequestStatusExecutionConfirmed)
 	if err != nil {
 		// We can replay the logs if needed
 		l.logger.Errorw("Failed to save CCIP request", "err", err)
@@ -277,7 +277,7 @@ func (l *LogListener) handleCrossChainReportRelayed(relayed *offramp.OffRampRepo
 	)
 
 	_ = l.q.Transaction(func(tx pg.Queryer) error {
-		err := l.orm.UpdateRequestStatus(l.sourceChainId, l.destChainId, relayed.Report.MinSequenceNumber, relayed.Report.MaxSequenceNumber, RequestStatusRelayConfirmed)
+		err := l.orm.UpdateRequestStatus(l.sourceChainId, l.destChainId, l.onRamp.Address(), l.offRamp.Address(), relayed.Report.MinSequenceNumber, relayed.Report.MaxSequenceNumber, RequestStatusRelayConfirmed)
 		if err != nil {
 			// We can replay the logs if needed
 			l.logger.Errorw("Failed to save CCIP request", "err", err)
@@ -327,6 +327,8 @@ func (l *LogListener) handleCrossChainSendRequested(request *onramp.OnRampCrossC
 		SeqNum:        *utils.NewBig(request.Message.SequenceNumber),
 		SourceChainID: request.Message.SourceChainId.String(),
 		DestChainID:   request.Message.Payload.DestinationChainId.String(),
+		OnRamp:        l.onRamp.Address(),
+		OffRamp:       l.offRamp.Address(),
 		Sender:        request.Message.Sender,
 		Receiver:      request.Message.Payload.Receiver,
 		Data:          request.Message.Payload.Data,

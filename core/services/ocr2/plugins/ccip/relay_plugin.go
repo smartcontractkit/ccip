@@ -85,7 +85,7 @@ func NewCCIPRelay(jobID int32, spec *job.OCR2OracleSpec, chainSet evm.ChainSet, 
 }
 
 func (c *CCIPRelay) GetPluginFactory() (plugin ocrtypes.ReportingPluginFactory, err error) {
-	return NewRelayReportingPluginFactory(c.lggr, c.ccipORM, c.offRamp), nil
+	return NewRelayReportingPluginFactory(c.lggr, c.ccipORM, c.offRamp, common.HexToAddress(string(c.config.OnRampID))), nil
 }
 
 // GetServices returns the log listener service.
