@@ -1,0 +1,45 @@
+name: publish
+
+on:
+  push:
+    branches:
+      - ccip-develop
+      - prototype-mo
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # v2.4.0
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@94ab11c41e45d028884a99163086648e898eed25 # v1.6.0
+        with:
+          version: latest
+      - name: Login to ECR
+        uses: docker/login-action@42d299face0c5c43a0487c477f595ac9cf22f1a7 #v1.12.0
+        with:
+          username: "${{ secrets.AWS_ACCESS_KEY }}"
+          password: "${{ secrets.AWS_SECRET_KEY }}"
+          registry: ${{ secrets.AWS_ECR_REPO_URL }}
+      - name: Docker meta
+        id: docker_meta
+        uses: docker/metadata-action@e5622373a38e60fb6d795a4421e56882f2d7a681 # v3.6.2
+        with:
+          images: ${{ secrets.AWS_ECR_REPO_URL }} # list of Docker images to use as base name for tags
+          flavor: |
+            latest=true
+          tags: |
+            type=sha
+            type=sha,format=long
+            type=semver,pattern={{version}},value=v0.0.1
+      - name: Build and push
+        id: docker_build
+        uses: docker/build-push-action@1814d3dfb36d6f84174e61f4a4b05bd84089a4b9 # v2.8.0
+        with:
+          context: ./core
+          push: true
+          file: ./core/chainlink.Dockerfile
+          tags: ${{ steps.docker_meta.outputs.tags }}
+          labels: ${{ steps.docker_meta.outputs.labels }}
