@@ -452,7 +452,7 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 
 	_, err = app.GetKeyStore().Eth().Create(destChainID)
 	require.NoError(t, err)
-	sendingKeys, err := app.GetKeyStore().Eth().SendingKeys()
+	sendingKeys, err := app.GetKeyStore().Eth().SendingKeys(destChainID)
 	require.NoError(t, err)
 	require.Len(t, sendingKeys, 1)
 	transmitter := sendingKeys[0].Address.Address()

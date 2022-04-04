@@ -20,11 +20,12 @@ package gethwrappers
 //go:generate go run ./generation/generate/wrap.go OffchainAggregator/OffchainAggregator.abi - OffchainAggregator offchain_aggregator_wrapper
 
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.7/KeeperRegistry.abi ../../../contracts/solc/v0.7/KeeperRegistry.bin KeeperRegistry keeper_registry_wrapper
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.7/KeeperRegistryVB.abi ../../../contracts/solc/v0.7/KeeperRegistryVB.bin KeeperRegistryVB keeper_registry_vb_wrapper
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.7/UpkeepPerformCounterRestrictive.abi ../../../contracts/solc/v0.7/UpkeepPerformCounterRestrictive.bin UpkeepPerformCounterRestrictive upkeep_perform_counter_restrictive_wrapper
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.7/UpkeepCounter.abi ../../../contracts/solc/v0.7/UpkeepCounter.bin UpkeepCounter upkeep_counter_wrapper
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.6/CronUpkeepFactory.abi - CronUpkeepFactory cron_upkeep_factory_wrapper
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.6/CronUpkeep.abi - CronUpkeep cron_upkeep_wrapper
 
-// v0.8 VRFConsumer
+// v0.8.6 VRFConsumer
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.6/VRFConsumer.abi ../../../contracts/solc/v0.8.6/VRFConsumer.bin VRFConsumer solidity_vrf_consumer_interface_v08
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.6/VRFRequestIDBaseTestHelper.abi ../../../contracts/solc/v0.8.6/VRFRequestIDBaseTestHelper.bin VRFRequestIDBaseTestHelper solidity_vrf_request_id_v08
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.6/VRFOwnerlessConsumerExample.abi ../../../contracts/solc/v0.8.6/VRFOwnerlessConsumerExample.bin VRFOwnerlessConsumerExample vrf_ownerless_consumer_example
@@ -46,9 +47,9 @@ package gethwrappers
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.6/VRFV2RevertingExample.abi ../../../contracts/solc/v0.8.6/VRFV2RevertingExample.bin VRFV2RevertingExample vrfv2_reverting_example
 
 // Aggregators
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.6/AggregatorV2V3Interface.abi ../../../contracts/solc/v0.8.6/AggregatorV2V3Interface.bin AggregatorV2V3Interface aggregator_v2v3_interface
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.6/AggregatorV3Interface.abi ../../../contracts/solc/v0.8.6/AggregatorV3Interface.bin AggregatorV3Interface aggregator_v3_interface
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.6/DerivedPriceFeed.abi ../../../contracts/solc/v0.8.6/DerivedPriceFeed.bin DerivedPriceFeed derived_price_feed_wrapper
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.6/AggregatorV2V3Interface.abi ../../../contracts/solc/v0.8.6/AggregatorV2V3Interface.bin AggregatorV2V3Interface aggregator_v2v3_interface
 
 // CCIP
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.13/OnRamp.abi ../../../contracts/solc/v0.8.13/OnRamp.bin OnRamp onramp

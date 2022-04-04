@@ -112,6 +112,7 @@ type GeneralConfigOverrides struct {
 	EVMRPCEnabled             null.Bool
 	TerraEnabled              null.Bool
 	P2PEnabled                null.Bool
+	SolanaEnabled             null.Bool
 
 	// OCR v2
 	OCR2DatabaseTimeout *time.Duration
@@ -288,6 +289,14 @@ func (c *TestGeneralConfig) TerraEnabled() bool {
 		return c.Overrides.TerraEnabled.Bool
 	}
 	return c.GeneralConfig.TerraEnabled()
+}
+
+// SolanaEnabled allows Solana to be used
+func (c *TestGeneralConfig) SolanaEnabled() bool {
+	if c.Overrides.SolanaEnabled.Valid {
+		return c.Overrides.SolanaEnabled.Bool
+	}
+	return c.GeneralConfig.SolanaEnabled()
 }
 
 func (c *TestGeneralConfig) EthereumURL() string {
