@@ -30,6 +30,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/native_token_pool"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/onramp"
+	"github.com/smartcontractkit/chainlink/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/core/internal/testutils/configtest"
 	"github.com/smartcontractkit/chainlink/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/core/logger"
@@ -185,7 +186,7 @@ func TestLogListener_SavesRequests(t *testing.T) {
 		t.Logf("log %+v\n", reqs)
 		return logListener.offchainConfig.DestIncomingConfirmations == newCcipConfig.DestIncomingConfirmations &&
 			logListener.offchainConfig.SourceIncomingConfirmations == newCcipConfig.SourceIncomingConfirmations
-	}, 3*time.Second, 100*time.Millisecond).Should(gomega.BeTrue())
+	}, testutils.WaitTimeout(t), 100*time.Millisecond).Should(gomega.BeTrue())
 
 	//Send a request.
 	executor := common.HexToAddress("0xf97f4df75117a78c1A5a0DBb814Af92458539FB4")
@@ -214,7 +215,7 @@ func TestLogListener_SavesRequests(t *testing.T) {
 		require.NoError(t, err)
 		t.Logf("log %+v\n", reqs)
 		return len(reqs) == 1
-	}, 3*time.Second, 100*time.Millisecond).Should(gomega.BeTrue())
+	}, testutils.WaitTimeout(t), 100*time.Millisecond).Should(gomega.BeTrue())
 
 	// Assert the xchain request was saved correctly.
 	assert.Equal(t, "100", reqs[0].Amounts[0])
