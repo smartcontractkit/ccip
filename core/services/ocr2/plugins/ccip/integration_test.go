@@ -48,6 +48,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/receiver_dapp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/sender_dapp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/simple_message_receiver"
+	"github.com/smartcontractkit/chainlink/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/core/internal/testutils/configtest"
 	"github.com/smartcontractkit/chainlink/core/internal/testutils/evmtest"
 	"github.com/smartcontractkit/chainlink/core/internal/testutils/pgtest"
@@ -639,7 +640,7 @@ chainID             = "%s"
 			ccipContracts.sourceChain.Commit()
 			reqs, err = ccipReqORM.Requests(sourceChainID, destChainID, ccipContracts.onRamp.Address(), ccipContracts.offRamp.Address(), big.NewInt(0), nil, ccip.RequestStatusUnstarted, nil, nil)
 			return len(reqs) == 1
-		}, 5*time.Second, 1*time.Second).Should(gomega.BeTrue())
+		}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue())
 	}
 
 	// Once all nodes have the request, the reporting plugin should run to generate and submit a report onchain.
@@ -653,7 +654,7 @@ chainID             = "%s"
 		ccipContracts.destChain.Commit()
 		t.Log("last report", report.MinSequenceNumber.String(), report.MaxSequenceNumber.String())
 		return report.MinSequenceNumber.String() == "1" && report.MaxSequenceNumber.String() == "1"
-	}, 10*time.Second, 1*time.Second).Should(gomega.BeTrue())
+	}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue())
 
 	// We should see the request in a fulfilled state on all nodes
 	// after the offramp submission. There should be no
@@ -667,7 +668,7 @@ chainID             = "%s"
 			valid, err := ccipReqORM.Requests(sourceChainID, destChainID, ccipContracts.onRamp.Address(), ccipContracts.offRamp.Address(), report.MinSequenceNumber, nil, ccip.RequestStatusUnstarted, nil, nil)
 			require.NoError(t, err)
 			return len(reqs) == 1 && len(valid) == 0
-		}, 10*time.Second, 1*time.Second).Should(gomega.BeTrue())
+		}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue())
 	}
 
 	// Now the merkle root is across.
@@ -734,7 +735,7 @@ chainID             = "%s"
 		require.NoError(t, err)
 		ccipContracts.destChain.Commit()
 		return report.MinSequenceNumber.String() == "2" && report.MaxSequenceNumber.String() == "2"
-	}, 10*time.Second, 1*time.Second).Should(gomega.BeTrue())
+	}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue())
 
 	eoaReq, err := ccipReqORM.Requests(sourceChainID, destChainID, ccipContracts.onRamp.Address(), ccipContracts.offRamp.Address(), report.MinSequenceNumber, report.MaxSequenceNumber, "", nil, nil)
 	require.NoError(t, err)
@@ -787,7 +788,7 @@ chainID             = "%s"
 		require.NoError(t, err)
 		ccipContracts.destChain.Commit()
 		return report.MinSequenceNumber.String() == "3" && report.MaxSequenceNumber.String() == "3"
-	}, 10*time.Second, 1*time.Second).Should(gomega.BeTrue())
+	}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue())
 
 	// Should see the 3rd message be executed
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
@@ -800,7 +801,7 @@ chainID             = "%s"
 		}
 		ccipContracts.destChain.Commit()
 		return ecount == 3
-	}, 20*time.Second, 1*time.Second).Should(gomega.BeTrue())
+	}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue())
 	// In total, we should see 3 relay reports containing seq 1,2,3
 	// and 3 execution_confirmed messages
 	reqs, err = ccipReqORM.Requests(sourceChainID, destChainID, ccipContracts.onRamp.Address(), ccipContracts.offRamp.Address(), big.NewInt(1), big.NewInt(3), ccip.RequestStatusExecutionConfirmed, nil, nil)
