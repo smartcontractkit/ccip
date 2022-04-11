@@ -11,7 +11,6 @@ cron_upkeep_wrapper: ../../../contracts/solc/v0.8.6/CronUpkeep.abi - b1257293e00
 derived_price_feed_wrapper: ../../../contracts/solc/v0.8.6/DerivedPriceFeed.abi ../../../contracts/solc/v0.8.6/DerivedPriceFeed.bin c8542e6c850c2d0fffb79a7f7213dc927ec64e6ddd54e1224cb2fb4a13aabdd0
 flags_wrapper: ../../../contracts/solc/v0.6/Flags.abi ../../../contracts/solc/v0.6/Flags.bin 2034d1b562ca37a63068851915e3703980276e8d5f7db6db8a3351a49d69fc4a
 flux_aggregator_wrapper: ../../../contracts/solc/v0.6/FluxAggregator.abi ../../../contracts/solc/v0.6/FluxAggregator.bin a3b0a6396c4aa3b5ee39b3c4bd45efc89789d4859379a8a92caca3a0496c5794
-keeper_registry_vb_wrapper: ../../../contracts/solc/v0.7/KeeperRegistryVB.abi ../../../contracts/solc/v0.7/KeeperRegistryVB.bin af13a53e7350624fab49e259ca484098361d7b72eb8f4e4338b659d766e5bee5
 keeper_registry_wrapper: ../../../contracts/solc/v0.7/KeeperRegistry.abi ../../../contracts/solc/v0.7/KeeperRegistry.bin fd5171038649a53203e3e8315f311320a43983858c8eaa709927cb00030b7f12
 message_executor: ../../../contracts/solc/v0.8.13/MessageExecutor.abi ../../../contracts/solc/v0.8.13/MessageExecutor.bin 64521c9ebf1f07c6e3cd5300cdbfb775db02d0fd7cb47f0d65bc38cdb0279461
 message_executor_helper: ../../../contracts/solc/v0.8.13/MessageExecutorHelper.abi ../../../contracts/solc/v0.8.13/MessageExecutorHelper.bin c1c5c69dc13b5ec8471eebb973066c31e77739af6861b414ac51b8e237f7422f
