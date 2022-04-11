@@ -48,7 +48,7 @@ type LogListener struct {
 	unsubscribeLogsOffRamp func()
 
 	wgShutdown sync.WaitGroup
-	mbLogs     *utils.Mailbox
+	mbLogs     *utils.Mailbox[log.Broadcast]
 	chStop     chan struct{}
 }
 
@@ -73,7 +73,7 @@ func NewLogListener(
 		offRamp:                   offRamp,
 		offchainConfig:            offchainConfig,
 		// TODO: https://app.shortcut.com/chainlinklabs/story/30169/source-chain-event-reliability
-		mbLogs: utils.NewMailbox(10000),
+		mbLogs: utils.NewMailbox[log.Broadcast](10000),
 		chStop: make(chan struct{}),
 		q:      q,
 	}
