@@ -70,8 +70,7 @@ contract AFN is AFNInterface, OwnerIsCreator, TypeAndVersionInterface {
         committeeVersion: s_committeeVersion
       });
       s_lastHeartbeat = heartbeat;
-      s_round++;
-      s_goodVotes = 0;
+      _newRound();
       emit AFNHeartbeat(heartbeat);
     }
   }
@@ -105,12 +104,7 @@ contract AFN is AFNInterface, OwnerIsCreator, TypeAndVersionInterface {
    */
   function recover() external override onlyOwner {
     if (!s_badSignal) revert RecoveryNotNecessary();
-    address[] memory badVoters = s_badVoters;
-    for (uint256 i = 0; i < badVoters.length; i++) {
-      s_hasVotedBad[badVoters[i]] = false;
-    }
-    s_badVotes = 0;
-    delete s_badVoters;
+    _clearBadVotes();
     s_badSignal = false;
     emit RecoveredFromBadSignal();
   }
@@ -188,6 +182,26 @@ contract AFN is AFNInterface, OwnerIsCreator, TypeAndVersionInterface {
   ////////  Private ////////
 
   /**
+   * @notice Increment the round and reset good votes
+   */
+  function _newRound() private {
+    s_round++;
+    s_goodVotes = 0;
+  }
+
+  /**
+   * @notice Clear all bad votes and voters
+   */
+  function _clearBadVotes() private {
+    address[] memory badVoters = s_badVoters;
+    for (uint256 i = 0; i < badVoters.length; i++) {
+      s_hasVotedBad[badVoters[i]] = false;
+    }
+    s_badVotes = 0;
+    delete s_badVoters;
+  }
+
+  /**
    * @notice Set detailed config storage vars
    */
   function _setConfig(
@@ -217,8 +231,9 @@ contract AFN is AFNInterface, OwnerIsCreator, TypeAndVersionInterface {
     // Update round, committee and quorum details
     s_weightThresholdForHeartbeat = weightThresholdForHeartbeat;
     s_weightThresholdForBadSignal = weightThresholdForBadSignal;
-    s_round = round;
     s_committeeVersion = committeeVersion;
+    _newRound();
+    _clearBadVotes();
 
     uint256 weightTotal = 0;
     // Set new participants

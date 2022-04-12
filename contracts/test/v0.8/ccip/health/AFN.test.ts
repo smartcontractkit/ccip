@@ -349,6 +349,9 @@ describe('AFN', () => {
         initialRound = await afn.getRound()
         initialCommitteeVersion = await afn.getCommitteeVersion()
 
+        await afn.connect(partyAccounts[0]).voteBad()
+        await afn.connect(partyAccounts[1]).voteGood(initialRound)
+
         newParties = [
           await roles.consumer.getAddress(),
           await roles.stranger.getAddress(),
@@ -393,6 +396,14 @@ describe('AFN', () => {
         const setCommitteeVersion = await afn.getCommitteeVersion()
         expect(setRound).to.equal(initialRound.add(1))
         expect(setCommitteeVersion).to.equal(initialCommitteeVersion.add(1))
+      })
+
+      it('resets all votes', async () => {
+        const goodVotes = await afn.getGoodVotes()
+        const badVotes = await afn.getBadVotersAndVotes()
+        expect(goodVotes).to.equal(0)
+        expect(badVotes.votes).to.equal(0)
+        expect(badVotes.voters).to.deep.equal([])
       })
 
       it('emits an event', async () => {
