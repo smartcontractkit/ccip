@@ -137,11 +137,12 @@ func (r RelayReportingPlugin) Query(ctx context.Context, timestamp types.ReportT
 }
 
 func (r RelayReportingPlugin) Observation(ctx context.Context, timestamp types.ReportTimestamp, query types.Query) (types.Observation, error) {
-	lastReport, err := r.offRamp.GetLastReport(nil)
+	nextMin, err := r.nextMinSeqNumForOffRamp()
 	if err != nil {
 		return nil, err
 	}
-	unstartedReqs, err := r.orm.Requests(r.sourceChainId, r.destChainId, r.onRamp, r.offRamp.Address(), big.NewInt(0).Add(lastReport.MaxSequenceNumber, big.NewInt(1)), nil, RequestStatusUnstarted, nil, nil)
+
+	unstartedReqs, err := r.orm.Requests(r.sourceChainId, r.destChainId, r.onRamp, r.offRamp.Address(), nextMin, nil, RequestStatusUnstarted, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -231,17 +232,28 @@ func (r RelayReportingPlugin) Report(ctx context.Context, timestamp types.Report
 	return true, report, nil
 }
 
-func (r RelayReportingPlugin) isStale(minSeqNum *big.Int) bool {
+func (r RelayReportingPlugin) nextMinSeqNumForOffRamp() (*big.Int, error) {
 	lastReport, err := r.offRamp.GetLastReport(nil)
 	if err != nil {
-		// Assume its a transient issue getting the last report
+		return nil, err
+	}
+	if lastReport.MerkleRoot == utils.Bytes32FromString("0x0000000000000000000000000000000000000000000000000000000000000000") {
+		return big.NewInt(0), nil
+	}
+	return big.NewInt(0).Add(lastReport.MaxSequenceNumber, big.NewInt(1)), nil
+}
+
+func (r RelayReportingPlugin) isStale(minSeqNum *big.Int) bool {
+	nextMin, err := r.nextMinSeqNumForOffRamp()
+	if err != nil {
+		// Assume it's a transient issue getting the last report
 		// Will try again on the next round
 		return true
 	}
-	// If the last report onchain has a lower bound
-	// strictly greater than this minSeqNum, then this minSeqNum
-	// is stale.
-	return lastReport.MinSequenceNumber.Cmp(minSeqNum) > 0
+	// TODO(36248): Add is offramp healthy check
+	// If the next min is already greater than this reports min,
+	// this report is stale.
+	return nextMin.Cmp(minSeqNum) > 0
 }
 
 func (r RelayReportingPlugin) buildReport(min *big.Int, max *big.Int) ([]byte, error) {
