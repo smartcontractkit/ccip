@@ -13,22 +13,8 @@ contract OnRampHelper is OnRamp {
     address[] memory allowlist,
     AFNInterface afn,
     uint256 maxTimeWithoutAFNSignal,
-    uint64 maxTokensLength,
-    uint64 maxDataSize,
-    uint64 relayingFeeJuels
-  )
-    OnRamp(
-      chainId,
-      destinationChainIds,
-      tokens,
-      pools,
-      feeds,
-      allowlist,
-      afn,
-      maxTimeWithoutAFNSignal,
-      OnRampConfig({maxTokensLength: maxTokensLength, maxDataSize: maxDataSize, relayingFeeJuels: relayingFeeJuels})
-    )
-  {}
+    OnRampConfig memory config
+  ) OnRamp(chainId, destinationChainIds, tokens, pools, feeds, allowlist, afn, maxTimeWithoutAFNSignal, config) {}
 
   function publicCalculateFee(IERC20 feeToken) external view returns (uint256) {
     return _calculateFee(feeToken);

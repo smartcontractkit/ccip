@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.13;
 
-import "../ramps/OnRamp.sol";
+import "../ramps/OnRampRouter.sol";
 import "../../interfaces/TypeAndVersionInterface.sol";
 import "../utils/CCIP.sol";
 import "../../vendor/SafeERC20.sol";
@@ -15,7 +15,7 @@ contract SenderDapp is TypeAndVersionInterface {
   using SafeERC20 for IERC20;
 
   // On ramp contract responsible for interacting with the DON.
-  OnRamp public immutable ON_RAMP;
+  OnRampRouter public immutable ON_RAMP_ROUTER;
   uint256 public immutable DESTINATION_CHAIN_ID;
   // Corresponding contract on the destination chain responsible for receiving the message
   // and enabling the EOA on the destination chain to access the tokens that are sent.
@@ -25,11 +25,11 @@ contract SenderDapp is TypeAndVersionInterface {
   error InvalidDestinationAddress(address invalidAddress);
 
   constructor(
-    OnRamp onRamp,
+    OnRampRouter onRampRouter,
     uint256 destinationChainId,
     address destinationContract
   ) {
-    ON_RAMP = onRamp;
+    ON_RAMP_ROUTER = onRampRouter;
     DESTINATION_CHAIN_ID = destinationChainId;
     DESTINATION_CONTRACT = destinationContract;
   }
@@ -62,9 +62,9 @@ contract SenderDapp is TypeAndVersionInterface {
     });
     for (uint256 i = 0; i < tokens.length; i++) {
       tokens[i].safeTransferFrom(originalSender, address(this), amounts[i]);
-      tokens[i].approve(address(ON_RAMP), amounts[i]);
+      tokens[i].approve(address(ON_RAMP_ROUTER), amounts[i]);
     }
-    sequenceNumber = ON_RAMP.requestCrossChainSend(payload);
+    sequenceNumber = ON_RAMP_ROUTER.requestCrossChainSend(payload);
   }
 
   function typeAndVersion() external pure override returns (string memory) {

@@ -56,6 +56,7 @@ let roles: Roles
 // This has to be ethers.Contract because of an issue with
 // `address.call(abi.encodeWithSelector(...))` using typechain artifacts.
 let ramp: Contract
+let router: Contract
 let afn: MockAFN
 let sourceToken1: MockERC20
 let destinationToken1: MockERC20
@@ -71,6 +72,7 @@ let TokenArtifact: Artifact
 let PoolArtifact: Artifact
 let PriceFeedArtifact: Artifact
 let rampFactory: ContractFactory
+let routerFactory: ContractFactory
 
 const priceFeed1LatestAnswer: number = 100
 const sourceChainId: number = 123
@@ -97,8 +99,9 @@ describe('OffRamp', () => {
     MockAFNArtifact = await hre.artifacts.readArtifact('MockAFN')
     TokenArtifact = await hre.artifacts.readArtifact('MockERC20')
     PoolArtifact = await hre.artifacts.readArtifact('NativeTokenPool')
-    rampFactory = await hre.ethers.getContractFactory('OffRampHelper')
     PriceFeedArtifact = await hre.artifacts.readArtifact('MockAggregator')
+    rampFactory = await hre.ethers.getContractFactory('OffRampHelper')
+    routerFactory = await hre.ethers.getContractFactory('OffRampRouter')
 
     const SimpleMessageReceiverArtifact: Artifact =
       await hre.artifacts.readArtifact('SimpleMessageReceiver')
@@ -182,6 +185,10 @@ describe('OffRamp', () => {
         initialExecutionDelay,
         maxTokenLength,
       )
+    router = await routerFactory
+      .connect(roles.defaultAccount)
+      .deploy([ramp.address])
+    await ramp.connect(roles.defaultAccount).setRouter(router.address)
     await pool1.connect(roles.defaultAccount).setOffRamp(ramp.address, true)
     await pool2.connect(roles.defaultAccount).setOffRamp(ramp.address, true)
     receiver = <SimpleMessageReceiver>(
@@ -202,6 +209,8 @@ describe('OffRamp', () => {
       'getLastReport',
       'getOffRampConfig',
       'setOffRampConfig',
+      'getRouter',
+      'setRouter',
       // HealthChecker
       'setAFN',
       'getAFN',
@@ -704,29 +713,6 @@ describe('OffRamp', () => {
             `ExceedsTokenLimit(${bucketCapactiy}, ${message.payload.amounts[0]})`,
           )
         })
-        it('should fail if the receiver does not support CrossChainMessageReceiverInterface', async () => {
-          const nonReceiver = <MockERC20>(
-            await deployContract(roles.defaultAccount, TokenArtifact, [
-              'FAKE destinationToken1',
-              'FAKE',
-              await roles.defaultAccount.getAddress(),
-              100,
-            ])
-          )
-          message.payload.receiver = nonReceiver.address
-          report = constructReport(message, sequenceNumber, sequenceNumber)
-          proof = {
-            path: [],
-            index: 0,
-          }
-          await ramp.connect(roles.defaultAccount).report(encodeReport(report))
-          await evmRevert(
-            ramp
-              .connect(roles.defaultAccount)
-              .executeTransaction(message, proof, false),
-            `ExecutionError(${message.sequenceNumber}, "0x")`,
-          )
-        })
         it('should fail if the contract is paused', async () => {
           report = constructReport(message, sequenceNumber, sequenceNumber)
           proof = {
@@ -829,7 +815,7 @@ describe('OffRamp', () => {
 
         describe('GASTEST', () => {
           it('GASTEST - contract receiver execution [ @skip-coverage ]', async () => {
-            expectGasWithinDeviation((await tx.wait()).gasUsed, 548_072)
+            expectGasWithinDeviation((await tx.wait()).gasUsed, 558_086)
           })
 
           it('GASTEST - EOA receiver [ @skip-coverage ]', async () => {
@@ -852,7 +838,7 @@ describe('OffRamp', () => {
             tx = await ramp
               .connect(roles.oracleNode)
               .executeTransaction(message, proof, true)
-            expectGasWithinDeviation((await tx.wait()).gasUsed, 233_336)
+            expectGasWithinDeviation((await tx.wait()).gasUsed, 235_471)
 
             expect(tx)
               .to.emit(ramp, 'CrossChainMessageExecuted')
@@ -961,7 +947,7 @@ describe('OffRamp', () => {
 
         describe('GASTEST', () => {
           it('GASTEST - contract receiver execution [ @skip-coverage ]', async () => {
-            expectGasWithinDeviation((await tx.wait()).gasUsed, 501_439)
+            expectGasWithinDeviation((await tx.wait()).gasUsed, 511_416)
           })
 
           it('GASTEST - EOA receiver [ @skip-coverage ]', async () => {
@@ -984,7 +970,7 @@ describe('OffRamp', () => {
             tx = await ramp
               .connect(roles.oracleNode)
               .executeTransaction(message, proof, true)
-            expectGasWithinDeviation((await tx.wait()).gasUsed, 247_648)
+            expectGasWithinDeviation((await tx.wait()).gasUsed, 249_759)
           })
         })
 

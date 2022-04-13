@@ -10,6 +10,7 @@ import {
   SenderDapp,
   MockAFN,
   MockAggregator,
+  OnRampRouter,
 } from '../../../../typechain'
 import { Artifact } from 'hardhat/types'
 import {
@@ -27,6 +28,7 @@ let priceFeed1: MockAggregator
 
 let chain1OnApp: SenderDapp
 let chain1AFN: MockAFN
+let chain1OnRampRouter: OnRampRouter
 let chain1OnRamp: OnRamp
 let chain1Token: MockERC20
 let chain1Pool: NativeTokenPool
@@ -35,6 +37,7 @@ const chain1ID: number = 1
 // This has to be ethers.Contract because of an issue with
 // `address.call(abi.encodeWithSelector(...))` and try-catch using typechain artifacts.
 let chain2OffRamp: Contract
+let chain2Router: Contract
 let chain2AFN: MockAFN
 let chain2OffApp: ReceiverDapp
 let chain2Token: MockERC20
@@ -64,8 +67,12 @@ describe('Single Token EOA End to End', () => {
       'NativeTokenPool',
     )
     const offRampFactory = await ethers.getContractFactory('OffRampHelper')
+    const routerFactory = await hre.ethers.getContractFactory('OffRampRouter')
     const OnRampSenderArtifact: Artifact = await hre.artifacts.readArtifact(
       'SenderDapp',
+    )
+    const OnRampRouterArtifact: Artifact = await hre.artifacts.readArtifact(
+      'OnRampRouter',
     )
     const OnRampArtifact: Artifact = await hre.artifacts.readArtifact('OnRamp')
     const OffRampReceiverArtifact: Artifact = await hre.artifacts.readArtifact(
@@ -120,6 +127,10 @@ describe('Single Token EOA End to End', () => {
         executionDelay,
         2,
       )
+    chain2Router = await routerFactory
+      .connect(roles.defaultAccount)
+      .deploy([chain2OffRamp.address])
+    await chain2OffRamp.setRouter(chain2Router.address)
     await chain2Pool
       .connect(roles.defaultAccount)
       .setOffRamp(chain2OffRamp.address, true)
@@ -131,7 +142,7 @@ describe('Single Token EOA End to End', () => {
       .lockOrBurn(adminAddress, sendAmount)
     chain2OffApp = <ReceiverDapp>(
       await deployContract(roles.defaultAccount, OffRampReceiverArtifact, [
-        chain2OffRamp.address,
+        chain2Router.address,
         chain2Token.address,
       ])
     )
@@ -147,6 +158,9 @@ describe('Single Token EOA End to End', () => {
     chain1AFN = <MockAFN>(
       await deployContract(roles.defaultAccount, MockAFNArtifact)
     )
+    chain1OnRampRouter = <OnRampRouter>(
+      await deployContract(roles.defaultAccount, OnRampRouterArtifact)
+    )
     chain1OnRamp = <OnRamp>(
       await deployContract(roles.defaultAccount, OnRampArtifact, [
         chain1ID,
@@ -158,18 +172,22 @@ describe('Single Token EOA End to End', () => {
         chain1AFN.address,
         maxTimeBetweenAFNSignals,
         {
+          router: chain1OnRampRouter.address,
           maxTokensLength: 2,
           maxDataSize: 10 ** 3,
           relayingFeeJuels: 0,
         },
       ])
     )
+    await chain1OnRampRouter
+      .connect(roles.defaultAccount)
+      .setOnRamp(chain2ID, chain1OnRamp.address)
     await chain1Pool
       .connect(roles.defaultAccount)
       .setOnRamp(chain1OnRamp.address, true)
     chain1OnApp = <SenderDapp>(
       await deployContract(roles.defaultAccount, OnRampSenderArtifact, [
-        chain1OnRamp.address,
+        chain1OnRampRouter.address,
         chain2ID,
         chain2OffApp.address,
       ])

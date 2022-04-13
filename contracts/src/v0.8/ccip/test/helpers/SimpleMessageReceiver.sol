@@ -2,7 +2,6 @@
 pragma solidity 0.8.13;
 
 import "../../interfaces/CrossChainMessageReceiverInterface.sol";
-import "../../interfaces/OffRampInterface.sol";
 
 contract SimpleMessageReceiver is CrossChainMessageReceiverInterface {
   CCIP.Message public s_message;

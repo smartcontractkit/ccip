@@ -119,9 +119,12 @@ describe('OnRamp', () => {
         [await roles.defaultAccount.getAddress()],
         afn.address,
         maxTimeWithoutAFNSignal,
-        maxTokensLength,
-        maxDataSize,
-        relayingFeeJuels,
+        {
+          router: hre.ethers.constants.AddressZero,
+          maxTokensLength: maxTokensLength,
+          maxDataSize: maxDataSize,
+          relayingFeeJuels: relayingFeeJuels,
+        },
       ])
     )
 
@@ -252,6 +255,7 @@ describe('OnRamp', () => {
       it('calculates the correct fee', async () => {
         const fee = Math.ceil(Math.random() * 1000)
         await ramp.connect(roles.defaultAccount).setConfig({
+          router: hre.ethers.constants.AddressZero,
           relayingFeeJuels: fee,
           maxDataSize: maxDataSize,
           maxTokensLength: maxTokensLength,
@@ -292,7 +296,9 @@ describe('OnRamp', () => {
       await tokens[0]
         .connect(roles.defaultAccount)
         .approve(ramp.address, amounts[0])
-      await ramp.connect(roles.defaultAccount).requestCrossChainSend(payload)
+      await ramp
+        .connect(roles.defaultAccount)
+        .requestCrossChainSend(payload, hre.ethers.constants.AddressZero)
       recipient = roles.stranger
       recipientAddress = await recipient.getAddress()
       feeToken = tokens[0]
@@ -389,9 +395,9 @@ describe('OnRamp', () => {
         gasUsed = gasUsed.add((await tx.wait()).gasUsed)
         tx = await ramp
           .connect(roles.defaultAccount)
-          .requestCrossChainSend(payload)
+          .requestCrossChainSend(payload, hre.ethers.constants.AddressZero)
         gasUsed = gasUsed.add((await tx.wait()).gasUsed)
-        expectGasWithinDeviation(gasUsed, 187_929)
+        expectGasWithinDeviation(gasUsed, 190_196)
       })
 
       it('GASTEST - Send 1 token [ @skip-coverage ]', async () => {
@@ -403,9 +409,9 @@ describe('OnRamp', () => {
         gasUsed = gasUsed.add((await tx.wait()).gasUsed)
         tx = await ramp
           .connect(roles.defaultAccount)
-          .requestCrossChainSend(payload)
+          .requestCrossChainSend(payload, hre.ethers.constants.AddressZero)
         gasUsed = gasUsed.add((await tx.wait()).gasUsed)
-        expectGasWithinDeviation(gasUsed, 210_610)
+        expectGasWithinDeviation(gasUsed, 212_877)
       })
 
       it('GASTEST - Send 2 tokens [ @skip-coverage ]', async () => {
@@ -419,9 +425,9 @@ describe('OnRamp', () => {
         }
         tx = await ramp
           .connect(roles.defaultAccount)
-          .requestCrossChainSend(payload)
+          .requestCrossChainSend(payload, hre.ethers.constants.AddressZero)
         gasUsed = gasUsed.add((await tx.wait()).gasUsed)
-        expectGasWithinDeviation(gasUsed, 320_925)
+        expectGasWithinDeviation(gasUsed, 323_186)
       })
 
       it('GASTEST - Send 3 tokens [ @skip-coverage ]', async () => {
@@ -433,9 +439,9 @@ describe('OnRamp', () => {
         }
         tx = await ramp
           .connect(roles.defaultAccount)
-          .requestCrossChainSend(payload)
+          .requestCrossChainSend(payload, hre.ethers.constants.AddressZero)
         gasUsed = gasUsed.add((await tx.wait()).gasUsed)
-        expectGasWithinDeviation(gasUsed, 431_240)
+        expectGasWithinDeviation(gasUsed, 433_495)
       })
     })
 
@@ -443,6 +449,7 @@ describe('OnRamp', () => {
       let tx: ContractTransaction
       beforeEach(async () => {
         await ramp.connect(roles.defaultAccount).setConfig({
+          router: hre.ethers.constants.AddressZero,
           relayingFeeJuels: 0,
           maxDataSize: maxDataSize,
           maxTokensLength: maxTokensLength,
@@ -454,7 +461,7 @@ describe('OnRamp', () => {
         }
         tx = await ramp
           .connect(roles.defaultAccount)
-          .requestCrossChainSend(payload)
+          .requestCrossChainSend(payload, hre.ethers.constants.AddressZero)
       })
 
       it('does not store any fees', async () => {
@@ -511,7 +518,7 @@ describe('OnRamp', () => {
         }
         tx = await ramp
           .connect(roles.defaultAccount)
-          .requestCrossChainSend(payload)
+          .requestCrossChainSend(payload, hre.ethers.constants.AddressZero)
         feeTaken = (await priceFeed.latestAnswer()).mul(relayingFeeJuels)
       })
 
@@ -574,68 +581,104 @@ describe('OnRamp', () => {
       it('fails when the ramp is paused', async () => {
         await ramp.pause()
         await evmRevert(
-          ramp.connect(roles.defaultAccount).requestCrossChainSend(payload),
+          ramp
+            .connect(roles.defaultAccount)
+            .requestCrossChainSend(payload, hre.ethers.constants.AddressZero),
           'Pausable: paused',
         )
       })
       it('fails when the AFN signal is bad', async () => {
         await afn.voteBad()
         await evmRevert(
-          ramp.connect(roles.defaultAccount).requestCrossChainSend(payload),
+          ramp
+            .connect(roles.defaultAccount)
+            .requestCrossChainSend(payload, hre.ethers.constants.AddressZero),
           'BadAFNSignal()',
         )
       })
       it('fails when the AFN signal is stale', async () => {
         await afn.setTimestamp(BigNumber.from(1))
         await evmRevert(
-          ramp.connect(roles.defaultAccount).requestCrossChainSend(payload),
+          ramp
+            .connect(roles.defaultAccount)
+            .requestCrossChainSend(payload, hre.ethers.constants.AddressZero),
           'StaleAFNHeartbeat()',
+        )
+      })
+      it('fails if the originalSender is set, but its not called by the router', async () => {
+        await ramp.connect(roles.defaultAccount).setConfig({
+          router: await roles.oracleNode.getAddress(),
+          relayingFeeJuels: relayingFeeJuels,
+          maxDataSize: maxDataSize,
+          maxTokensLength: maxTokensLength,
+        })
+        await evmRevert(
+          ramp
+            .connect(roles.defaultAccount)
+            .requestCrossChainSend(
+              payload,
+              await roles.oracleNode1.getAddress(),
+            ),
+          `MustBeCalledByRouter()`,
         )
       })
       it('fails when the allowlist is set and the sender is not part of it', async () => {
         await ramp.connect(roles.defaultAccount).setAllowlist([])
         await evmRevert(
-          ramp.connect(roles.defaultAccount).requestCrossChainSend(payload),
+          ramp
+            .connect(roles.defaultAccount)
+            .requestCrossChainSend(payload, hre.ethers.constants.AddressZero),
           `SenderNotAllowed("${await roles.defaultAccount.getAddress()}")`,
         )
       })
       it('fails if the destination chain ID is not supported by the OnRamp', async () => {
         payload.destinationChainId = BigNumber.from(999)
         await evmRevert(
-          ramp.connect(roles.defaultAccount).requestCrossChainSend(payload),
+          ramp
+            .connect(roles.defaultAccount)
+            .requestCrossChainSend(payload, hre.ethers.constants.AddressZero),
           `UnsupportedDestinationChain(${payload.destinationChainId})`,
         )
       })
       it('fails if the data is larger than the max data size', async () => {
         const newDataSize = 1
         await ramp.connect(roles.defaultAccount).setConfig({
+          router: hre.ethers.constants.AddressZero,
           maxDataSize: newDataSize,
           maxTokensLength: maxTokensLength,
           relayingFeeJuels: relayingFeeJuels,
         })
         await evmRevert(
-          ramp.connect(roles.defaultAccount).requestCrossChainSend(payload),
+          ramp
+            .connect(roles.defaultAccount)
+            .requestCrossChainSend(payload, hre.ethers.constants.AddressZero),
           `MessageTooLarge(${newDataSize}, 32)`,
         )
       })
       it('fails if there are too many tokens, or the amounts are a different length to the tokens', async () => {
         await ramp.connect(roles.defaultAccount).setConfig({
+          router: hre.ethers.constants.AddressZero,
           maxDataSize: maxDataSize,
           maxTokensLength: 1,
           relayingFeeJuels: relayingFeeJuels,
         })
         await evmRevert(
-          ramp.connect(roles.defaultAccount).requestCrossChainSend(payload),
+          ramp
+            .connect(roles.defaultAccount)
+            .requestCrossChainSend(payload, hre.ethers.constants.AddressZero),
           `UnsupportedNumberOfTokens()`,
         )
         await ramp.connect(roles.defaultAccount).setConfig({
+          router: hre.ethers.constants.AddressZero,
           maxDataSize: maxDataSize,
           maxTokensLength: maxTokensLength,
           relayingFeeJuels: relayingFeeJuels,
         })
         payload.amounts = [100]
         await evmRevert(
-          ramp.connect(roles.defaultAccount).requestCrossChainSend(payload),
+          ramp
+            .connect(roles.defaultAccount)
+            .requestCrossChainSend(payload, hre.ethers.constants.AddressZero),
           `UnsupportedNumberOfTokens()`,
         )
       })
@@ -643,13 +686,17 @@ describe('OnRamp', () => {
         const wrongToken = await roles.stranger.getAddress()
         payload.tokens[0] = wrongToken
         await evmRevert(
-          ramp.connect(roles.defaultAccount).requestCrossChainSend(payload),
+          ramp
+            .connect(roles.defaultAccount)
+            .requestCrossChainSend(payload, hre.ethers.constants.AddressZero),
           `UnsupportedFeeToken("${wrongToken}")`,
         )
       })
       it('fails if the sender does not approve the ramp for a token', async () => {
         await evmRevert(
-          ramp.connect(roles.defaultAccount).requestCrossChainSend(payload),
+          ramp
+            .connect(roles.defaultAccount)
+            .requestCrossChainSend(payload, hre.ethers.constants.AddressZero),
           `ERC20: transfer amount exceeds allowance`,
         )
       })
@@ -664,7 +711,9 @@ describe('OnRamp', () => {
           .connect(roles.defaultAccount)
           .approve(ramp.address, amounts[0])
         await evmRevert(
-          ramp.connect(roles.defaultAccount).requestCrossChainSend(payload),
+          ramp
+            .connect(roles.defaultAccount)
+            .requestCrossChainSend(payload, hre.ethers.constants.AddressZero),
           `UnsupportedToken("${tokens[0].address}")`,
         )
       })
@@ -680,7 +729,9 @@ describe('OnRamp', () => {
           relayingFeeJuels * priceFeedLatestAnswer,
         )
         await evmRevert(
-          ramp.connect(roles.defaultAccount).requestCrossChainSend(payload),
+          ramp
+            .connect(roles.defaultAccount)
+            .requestCrossChainSend(payload, hre.ethers.constants.AddressZero),
           `ExceedsTokenLimit(1, ${amountToLock})`,
         )
       })
@@ -691,6 +742,7 @@ describe('OnRamp', () => {
     it('only allows owner to set', async () => {
       await evmRevert(
         ramp.connect(roles.stranger).setConfig({
+          router: hre.ethers.constants.AddressZero,
           relayingFeeJuels: 1,
           maxDataSize: 2,
           maxTokensLength: 3,
@@ -700,10 +752,12 @@ describe('OnRamp', () => {
     })
 
     it('sets the max data size correctly', async () => {
+      const router = hre.ethers.constants.AddressZero
       const newDataSize = 1
       const newTokensLength = 1
       const newRelayFee = 1
       let tx = await ramp.connect(roles.defaultAccount).setConfig({
+        router: hre.ethers.constants.AddressZero,
         maxDataSize: newDataSize,
         maxTokensLength: newTokensLength,
         relayingFeeJuels: newRelayFee,
@@ -714,7 +768,7 @@ describe('OnRamp', () => {
       expect(config.relayingFeeJuels).to.equal(newRelayFee)
       await expect(tx)
         .to.emit(ramp, 'OnRampConfigSet')
-        .withArgs([newRelayFee, newDataSize, newTokensLength])
+        .withArgs([router, newRelayFee, newDataSize, newTokensLength])
     })
   })
 

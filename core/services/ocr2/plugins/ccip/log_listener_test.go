@@ -30,6 +30,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/native_token_pool"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/onramp"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/onramp_router"
 	"github.com/smartcontractkit/chainlink/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/core/internal/testutils/configtest"
 	"github.com/smartcontractkit/chainlink/core/internal/testutils/pgtest"
@@ -81,18 +82,22 @@ func TestLogListener_SavesRequests(t *testing.T) {
 		})
 	require.NoError(t, err)
 	afn := DeployAfn(t, user, backend)
-	sourceChainId := big.NewInt(1)
-	destChainId := big.NewInt(2)
+	sourceChainID := big.NewInt(1)
+	destChainID := big.NewInt(2)
 
 	// LINK/ETH price
 	feedAddress, _, _, err := mock_v3_aggregator_contract.DeployMockV3AggregatorContract(user, backend, 18, big.NewInt(6000000000000000))
 	require.NoError(t, err)
+	// Create onramp router
+	onRampRouterAddress, _, _, err := onramp_router.DeployOnRampRouter(user, backend)
+	require.NoError(t, err)
+	backend.Commit()
 
 	onRampAddress, _, _, err := onramp.DeployOnRamp(
 		user,                               // user
 		backend,                            // client
-		sourceChainId,                      // source chain id
-		[]*big.Int{destChainId},            // destinationChainIds
+		sourceChainID,                      // source chain id
+		[]*big.Int{destChainID},            // destinationChainIds
 		[]common.Address{linkTokenAddress}, // tokens
 		[]common.Address{poolAddress},      // pools
 		[]common.Address{feedAddress},      // feeds
@@ -100,6 +105,7 @@ func TestLogListener_SavesRequests(t *testing.T) {
 		afn,                                // AFN
 		big.NewInt(86400),                  //maxTimeWithoutAFNSignal 86400 seconds = one day
 		onramp.OnRampInterfaceOnRampConfig{
+			Router:           onRampRouterAddress,
 			RelayingFeeJuels: 0,
 			MaxDataSize:      1e5,
 			MaxTokensLength:  5,
@@ -110,13 +116,18 @@ func TestLogListener_SavesRequests(t *testing.T) {
 	require.NoError(t, err)
 	_, err = pool.SetOnRamp(user, onRampAddress, true)
 	require.NoError(t, err)
-	_, err = linkToken.Approve(user, onRampAddress, big.NewInt(100))
+	onRampRouter, err := onramp_router.NewOnRampRouter(onRampRouterAddress, backend)
 	require.NoError(t, err)
+	_, err = onRampRouter.SetOnRamp(user, destChainID, onRampAddress)
+	require.NoError(t, err)
+	_, err = linkToken.Approve(user, onRampRouterAddress, big.NewInt(100))
+	require.NoError(t, err)
+
 	offRampAddress, _, _, err := offramp.DeployOffRamp(
 		user,                               // user
 		backend,                            // client
-		sourceChainId,                      // source chain id
-		destChainId,                        // dest chain id
+		sourceChainID,                      // source chain id
+		destChainID,                        // dest chain id
 		[]common.Address{linkTokenAddress}, // source tokens
 		[]common.Address{poolAddress},      // dest pool addresses
 		[]common.Address{feedAddress},      // feeds
@@ -190,16 +201,17 @@ func TestLogListener_SavesRequests(t *testing.T) {
 
 	//Send a request.
 	executor := common.HexToAddress("0xf97f4df75117a78c1A5a0DBb814Af92458539FB4")
-	msg := onramp.CCIPMessagePayload{
+	msg := onramp_router.CCIPMessagePayload{
 		Receiver:           linkTokenAddress,
 		Data:               []byte("hello xchain world"),
-		DestinationChainId: destChainId,
+		DestinationChainId: destChainID,
 		Tokens:             []common.Address{linkTokenAddress},
 		Amounts:            []*big.Int{big.NewInt(100)},
 		Executor:           executor,
 		Options:            nil,
 	}
-	_, err = onRamp.RequestCrossChainSend(user, msg)
+
+	_, err = onRampRouter.RequestCrossChainSend(user, msg)
 	require.NoError(t, err)
 	backend.Commit()
 
@@ -211,7 +223,7 @@ func TestLogListener_SavesRequests(t *testing.T) {
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
 		lb.OnNewLongestChain(context.Background(), &types.Head{Hash: head.Hash(), Number: startHead})
 		startHead++
-		reqs, err = logListener.orm.Requests(sourceChainId, destChainId, onRampAddress, offRampAddress, big.NewInt(0), nil, RequestStatusUnstarted, nil, nil)
+		reqs, err = logListener.orm.Requests(sourceChainID, destChainID, onRampAddress, offRampAddress, big.NewInt(0), nil, RequestStatusUnstarted, nil, nil)
 		require.NoError(t, err)
 		t.Logf("log %+v\n", reqs)
 		return len(reqs) == 1
@@ -224,13 +236,21 @@ func TestLogListener_SavesRequests(t *testing.T) {
 	assert.Equal(t, msg.Receiver, reqs[0].Receiver)
 	assert.Equal(t, msg.Executor.String(), reqs[0].Executor.String())
 	assert.Equal(t, []byte{}, reqs[0].Options)
-	assert.Equal(t, destChainId.String(), reqs[0].DestChainID)
+	assert.Equal(t, destChainID.String(), reqs[0].DestChainID)
 	// We expect the raw request bytes to be the abi.encoded CCIP Message
 	b, err := MakeCCIPMsgArgs().PackValues([]interface{}{onramp.CCIPMessage{
 		SequenceNumber: big.NewInt(1),
-		SourceChainId:  sourceChainId,
+		SourceChainId:  sourceChainID,
 		Sender:         user.From,
-		Payload:        msg,
+		Payload: onramp.CCIPMessagePayload{
+			Tokens:             msg.Tokens,
+			Amounts:            msg.Amounts,
+			DestinationChainId: msg.DestinationChainId,
+			Receiver:           msg.Receiver,
+			Executor:           msg.Executor,
+			Data:               msg.Data,
+			Options:            msg.Options,
+		},
 	}})
 	require.NoError(t, err)
 	require.True(t, bytes.Equal(reqs[0].Raw, b), "have %s (%d) want %s (%d)", hexutil.Encode(reqs[0].Raw), len(reqs[0].Raw), hexutil.Encode(b), len(b))

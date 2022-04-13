@@ -27,7 +27,9 @@ import (
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/message_executor"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/native_token_pool"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp_router"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/onramp"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/onramp_router"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/receiver_dapp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/sender_dapp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/simple_message_receiver"
@@ -52,8 +54,9 @@ type Client struct {
 
 type SourceClient struct {
 	Client
-	OnRamp     *onramp.OnRamp
-	SenderDapp *sender_dapp.SenderDapp
+	OnRamp       *onramp.OnRamp
+	OnRampRouter *onramp_router.OnRampRouter
+	SenderDapp   *sender_dapp.SenderDapp
 }
 
 func NewSourceClient(t *testing.T, config EvmChainConfig) SourceClient {
@@ -73,6 +76,8 @@ func NewSourceClient(t *testing.T, config EvmChainConfig) SourceClient {
 	require.NoError(t, err)
 	tokenSender, err := sender_dapp.NewSenderDapp(config.TokenSenders[0], client)
 	require.NoError(t, err)
+	onRampRouter, err := onramp_router.NewOnRampRouter(config.OnRampRouter, client)
+	require.NoError(t, err)
 
 	return SourceClient{
 		Client: Client{
@@ -85,8 +90,9 @@ func NewSourceClient(t *testing.T, config EvmChainConfig) SourceClient {
 			logger:           logger.TestLogger(t).Named(helpers.ChainName(config.ChainId.Int64())),
 			t:                t,
 		},
-		OnRamp:     onRamp,
-		SenderDapp: tokenSender,
+		OnRamp:       onRamp,
+		OnRampRouter: onRampRouter,
+		SenderDapp:   tokenSender,
 	}
 }
 
@@ -95,6 +101,7 @@ type DestClient struct {
 	OffRamp         *offramp.OffRamp
 	MessageReceiver *simple_message_receiver.SimpleMessageReceiver
 	ReceiverDapp    *receiver_dapp.ReceiverDapp
+	OffRampRouter   *offramp_router.OffRampRouter
 	MessageExecutor *message_executor.MessageExecutor
 }
 
@@ -120,6 +127,8 @@ func NewDestinationClient(t *testing.T, config EvmChainConfig) DestClient {
 	require.NoError(t, err)
 	receiverDapp, err := receiver_dapp.NewReceiverDapp(config.TokenReceiver, client)
 	require.NoError(t, err)
+	offRampRouter, err := offramp_router.NewOffRampRouter(config.OffRampRouter, client)
+	require.NoError(t, err)
 
 	return DestClient{
 		Client: Client{
@@ -133,6 +142,7 @@ func NewDestinationClient(t *testing.T, config EvmChainConfig) DestClient {
 			t:                t,
 		},
 		OffRamp:         offRamp,
+		OffRampRouter:   offRampRouter,
 		MessageReceiver: messageReceiver,
 		ReceiverDapp:    receiverDapp,
 		MessageExecutor: messageExecutor,
@@ -257,7 +267,7 @@ func (client CCIPClient) SendMessage(t *testing.T) {
 	bytes, err := hex.DecodeString("00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000005626c616e6b000000000000000000000000000000000000000000000000000000")
 	require.NoError(t, err)
 
-	msg := onramp.CCIPMessagePayload{
+	msg := onramp_router.CCIPMessagePayload{
 		Receiver:           client.Dest.MessageReceiver.Address(),
 		Data:               bytes,
 		DestinationChainId: client.Dest.ChainId,
@@ -267,7 +277,7 @@ func (client CCIPClient) SendMessage(t *testing.T) {
 		Executor:           common.Address{},
 	}
 
-	tx, err := client.Source.OnRamp.RequestCrossChainSend(client.Source.Owner, msg)
+	tx, err := client.Source.OnRampRouter.RequestCrossChainSend(client.Source.Owner, msg)
 	require.NoError(t, err)
 	WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 }
@@ -610,7 +620,7 @@ func (client CCIPClient) SendToDappWithExecution(source SourceClient, from *bind
 // SendToOnrampWithExecution executes a cross chain transactions using the onramp interface.
 func (client CCIPClient) SendToOnrampWithExecution(source SourceClient, from *bind.TransactOpts, toAddress common.Address, amount *big.Int, executor common.Address) *onramp.OnRampCrossChainSendRequested {
 	SourceBlockNumber := GetCurrentBlockNumber(source.Client.Client)
-	payload := onramp.CCIPMessagePayload{
+	payload := onramp_router.CCIPMessagePayload{
 		Tokens:             []common.Address{source.LinkTokenAddress},
 		Amounts:            []*big.Int{amount},
 		DestinationChainId: client.Dest.ChainId,
@@ -619,7 +629,7 @@ func (client CCIPClient) SendToOnrampWithExecution(source SourceClient, from *bi
 		Data:               []byte{},
 		Options:            []byte{},
 	}
-	tx, err := source.OnRamp.RequestCrossChainSend(from, payload)
+	tx, err := source.OnRampRouter.RequestCrossChainSend(from, payload)
 	helpers.PanicErr(err)
 	source.logger.Infof("Send tokens tx %s", helpers.ExplorerLink(source.ChainId.Int64(), tx.Hash()))
 	return WaitForCrossChainSendRequest(source, SourceBlockNumber, tx.Hash())

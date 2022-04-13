@@ -27,7 +27,9 @@ type EvmChainConfig struct {
 	TokenPools      []common.Address
 	PriceFeeds      []common.Address
 	OnRamp          common.Address
+	OnRampRouter    common.Address
 	OffRamp         common.Address
+	OffRampRouter   common.Address
 	TokenSenders    []common.Address
 	MessageReceiver common.Address
 	TokenReceiver   common.Address
@@ -59,14 +61,16 @@ var Rinkeby = EvmChainConfig{
 		EIP1559:   true,
 		GasTipCap: DefaultGasTipFee,
 	},
-	LinkToken:    common.HexToAddress("0x01be23585060835e02b77ef475b0cc51aa1e0709"),
-	BridgeTokens: []common.Address{common.HexToAddress("0x01be23585060835e02b77ef475b0cc51aa1e0709")},
-	TokenPools:   []common.Address{common.HexToAddress("0x232bc33b22501fC010835e872EA47969F0afb97A")},
-	PriceFeeds:   []common.Address{common.HexToAddress("0x8eDcf07BfF3ee235B6b8Ba7FAe907E385c24e175")},
-	OnRamp:       common.HexToAddress("0xda92A4766e1cFF0Aa77470fEccd095e471D8295F"),
-	OffRamp:      common.Address{},
-	TokenSenders: []common.Address{common.HexToAddress("0xC2F8a293ca968c449795d47337497F26b2813434"), common.HexToAddress("0x621686CC559AaC74af08C3cc829c696751c33000"), common.HexToAddress("0x496bBBD6840b31d3C54517ab81D3688eb962EBcD")},
-	Afn:          common.HexToAddress("0xA4E4fd20121f268674d2C5c771e4cd27eAD0C543"),
+	LinkToken:     common.HexToAddress("0x01be23585060835e02b77ef475b0cc51aa1e0709"),
+	BridgeTokens:  []common.Address{common.HexToAddress("0x01be23585060835e02b77ef475b0cc51aa1e0709")},
+	TokenPools:    []common.Address{common.HexToAddress("0x232bc33b22501fC010835e872EA47969F0afb97A")},
+	PriceFeeds:    []common.Address{common.HexToAddress("0x8eDcf07BfF3ee235B6b8Ba7FAe907E385c24e175")},
+	OnRamp:        common.HexToAddress("0xda92A4766e1cFF0Aa77470fEccd095e471D8295F"),
+	OnRampRouter:  common.HexToAddress(""),
+	OffRamp:       common.Address{},
+	OffRampRouter: common.HexToAddress(""),
+	TokenSenders:  []common.Address{common.HexToAddress("0xC2F8a293ca968c449795d47337497F26b2813434"), common.HexToAddress("0x621686CC559AaC74af08C3cc829c696751c33000"), common.HexToAddress("0x496bBBD6840b31d3C54517ab81D3688eb962EBcD")},
+	Afn:           common.HexToAddress("0xA4E4fd20121f268674d2C5c771e4cd27eAD0C543"),
 	DeploySettings: DeploySettings{
 		DeployAFN:        false,
 		DeployTokenPools: false,
@@ -87,7 +91,9 @@ var Kovan = EvmChainConfig{
 	TokenPools:      []common.Address{common.HexToAddress("0x8E63731A427d2D3E4b9358cDc7d75ff2650A6989")},
 	PriceFeeds:      []common.Address{common.HexToAddress("0x7c132A947feC9C1aA17Db2d11eBc562243d4f331")},
 	OnRamp:          common.Address{},
+	OnRampRouter:    common.HexToAddress(""),
 	OffRamp:         common.HexToAddress("0x5B48C82ED450e20E04E6133D26ddcA1eFF33D062"),
+	OffRampRouter:   common.HexToAddress(""),
 	MessageReceiver: common.HexToAddress("0x1a224Ab562D640aDE0FBc203bE619D5Cd3CEf935"),
 	TokenReceiver:   common.HexToAddress("0xC4ED6c4F56ef4bD105e398BA320cF08e99C36E06"),
 	MessageExecutor: common.HexToAddress("0x97403d2377e02eFc2D6e60D129435c0BA0917c9A"),

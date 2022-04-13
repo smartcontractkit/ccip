@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "../interfaces/PoolInterface.sol";
+import "../interfaces/OffRampRouterInterface.sol";
 import "../interfaces/CrossChainMessageReceiverInterface.sol";
 import "../utils/CCIP.sol";
 
@@ -21,11 +22,13 @@ interface OffRampInterface {
   error InvalidSourceChain(uint256 sourceChainId);
   error MessageTooLarge(uint256 maxSize, uint256 actualSize);
   error UnexpectedPayloadData(uint256 sequenceNumber);
+  error RouterNotSet();
 
   event ReportAccepted(CCIP.RelayReport report);
   event CrossChainMessageExecuted(uint256 indexed sequenceNumber);
   event OffRampConfigSet(OffRampConfig config);
   event FeesWithdrawn(IERC20 feeToken, address recipient, uint256 amount);
+  event OffRampRouterSet(OffRampRouterInterface router);
 
   struct OffRampConfig {
     // Execution fee in Juels (smallest denomination of LINK)

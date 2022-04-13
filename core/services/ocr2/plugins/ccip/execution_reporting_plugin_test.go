@@ -27,6 +27,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/native_token_pool"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp_helper"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp_router"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/simple_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/core/logger"
@@ -109,6 +110,12 @@ func TestExecutionReportEncoding(t *testing.T) {
 	_, err = destPool.SetOffRamp(destUser, offRampAddress, true)
 	require.NoError(t, err)
 	receiverAddress, _, _, err := simple_message_receiver.DeploySimpleMessageReceiver(destUser, destChain)
+	require.NoError(t, err)
+	destChain.Commit()
+	routerAddress, _, _, err := offramp_router.DeployOffRampRouter(destUser, destChain, []common.Address{offRampAddress})
+	require.NoError(t, err)
+	destChain.Commit()
+	_, err = offRamp.SetRouter(destUser, routerAddress)
 	require.NoError(t, err)
 	destChain.Commit()
 

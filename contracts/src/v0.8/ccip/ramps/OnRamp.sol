@@ -66,7 +66,7 @@ contract OnRamp is OnRampInterface, TypeAndVersionInterface, HealthChecker, Toke
    * @dev if the contract is paused, this function will revert.
    * @param payload Message struct to send
    */
-  function requestCrossChainSend(CCIP.MessagePayload memory payload)
+  function requestCrossChainSend(CCIP.MessagePayload memory payload, address originalSender)
     external
     override
     whenNotPaused
@@ -74,7 +74,12 @@ contract OnRamp is OnRampInterface, TypeAndVersionInterface, HealthChecker, Toke
     returns (uint256)
   {
     address sender = msg.sender;
-    if (s_allowlistEnabled && !s_allowed[sender]) revert SenderNotAllowed(sender);
+    if (originalSender != address(0)) {
+      if (sender != s_config.router) revert MustBeCalledByRouter();
+    } else {
+      originalSender = sender;
+    }
+    if (s_allowlistEnabled && !s_allowed[originalSender]) revert SenderNotAllowed(originalSender);
     uint256 sequenceNumber = s_sequenceNumberPerDestinationChain[payload.destinationChainId];
     // Check that the destination chain has been configured
     // Assumes that any configured destination chains sequence number are initialized with 1
@@ -110,7 +115,7 @@ contract OnRamp is OnRampInterface, TypeAndVersionInterface, HealthChecker, Toke
     CCIP.Message memory message = CCIP.Message({
       sequenceNumber: sequenceNumber,
       sourceChainId: CHAIN_ID,
-      sender: sender,
+      sender: originalSender,
       payload: payload
     });
     s_sequenceNumberPerDestinationChain[payload.destinationChainId] = sequenceNumber + 1;

@@ -8,6 +8,7 @@ import {
   NativeTokenPool,
   SimpleMessageReceiver,
   OnRamp,
+  OnRampRouter,
   MockAFN,
   MockAggregator,
 } from '../../../../typechain'
@@ -27,6 +28,7 @@ const { deployContract } = hre.waffle
 let roles: Roles
 
 let chain1AFN: MockAFN
+let chain1OnRampRouter: OnRampRouter
 let chain1OnRamp: OnRamp
 let chain1Token: MockERC20
 let chain1Pool: NativeTokenPool
@@ -35,6 +37,7 @@ const chain1ID: number = 1
 // This has to be ethers.Contract because of an issue with
 // `address.call(abi.encodeWithSelector(...))` using typechain artifacts.
 let chain2OffRamp: Contract
+let chain2Router: Contract
 let chain2AFN: MockAFN
 let chain2Token: MockERC20
 let chain2Receiver: SimpleMessageReceiver
@@ -71,8 +74,12 @@ describe('Contract End to End', () => {
       'NativeTokenPool',
     )
     const offRampFactory = await ethers.getContractFactory('OffRampHelper')
+    const routerFactory = await hre.ethers.getContractFactory('OffRampRouter')
     const PriceFeedFactory: Artifact = await hre.artifacts.readArtifact(
       'MockAggregator',
+    )
+    const OnRampRouterArtifact: Artifact = await hre.artifacts.readArtifact(
+      'OnRampRouter',
     )
     const OnRampArtifact: Artifact = await hre.artifacts.readArtifact('OnRamp')
     const SimpleMessageReceiverArtifact: Artifact =
@@ -128,6 +135,10 @@ describe('Contract End to End', () => {
         executionDelay,
         maxTokensLength,
       )
+    chain2Router = await routerFactory
+      .connect(roles.defaultAccount)
+      .deploy([chain2OffRamp.address])
+    await chain2OffRamp.setRouter(chain2Router.address)
     await chain2Pool
       .connect(roles.defaultAccount)
       .setOffRamp(chain2OffRamp.address, true)
@@ -152,6 +163,9 @@ describe('Contract End to End', () => {
     chain1AFN = <MockAFN>(
       await deployContract(roles.defaultAccount, MockAFNArtifact)
     )
+    chain1OnRampRouter = <OnRampRouter>(
+      await deployContract(roles.defaultAccount, OnRampRouterArtifact)
+    )
     chain1OnRamp = <OnRamp>(
       await deployContract(roles.defaultAccount, OnRampArtifact, [
         chain1ID,
@@ -163,12 +177,14 @@ describe('Contract End to End', () => {
         chain1AFN.address,
         maxTimeBetweenAFNSignals,
         {
+          router: chain1OnRampRouter.address,
           maxTokensLength: maxTokensLength,
           maxDataSize: maxDataSize,
           relayingFeeJuels: 0,
         },
       ])
     )
+    await chain1OnRampRouter.setOnRamp(chain2ID, chain1OnRamp.address)
     await chain1Pool
       .connect(roles.defaultAccount)
       .setOnRamp(chain1OnRamp.address, true)
@@ -196,8 +212,8 @@ describe('Contract End to End', () => {
     // approve tokens and send message
     await chain1Token
       .connect(roles.defaultAccount)
-      .approve(chain1OnRamp.address, sendAmount)
-    let tx = await chain1OnRamp
+      .approve(chain1OnRampRouter.address, sendAmount)
+    let tx = await chain1OnRampRouter
       .connect(roles.defaultAccount)
       .requestCrossChainSend(payload)
 

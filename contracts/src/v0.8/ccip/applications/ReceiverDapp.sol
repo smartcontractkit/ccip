@@ -3,8 +3,8 @@ pragma solidity 0.8.13;
 
 import "../interfaces/CrossChainMessageReceiverInterface.sol";
 import "../../vendor/SafeERC20.sol";
-import "../ramps/OffRamp.sol";
 import "../../interfaces/TypeAndVersionInterface.sol";
+import "../interfaces/OffRampRouterInterface.sol";
 
 /**
  * @notice Appliation contract for receiving messages from the OffRamp on behalf of an EOA
@@ -12,13 +12,13 @@ import "../../interfaces/TypeAndVersionInterface.sol";
 contract ReceiverDapp is CrossChainMessageReceiverInterface, TypeAndVersionInterface {
   using SafeERC20 for IERC20;
 
-  OffRamp public immutable OFF_RAMP;
+  OffRampRouterInterface public immutable ROUTER;
   IERC20 public immutable TOKEN;
 
   error InvalidDeliverer(address deliverer);
 
-  constructor(OffRamp offRamp, IERC20 token) {
-    OFF_RAMP = offRamp;
+  constructor(OffRampRouterInterface router, IERC20 token) {
+    ROUTER = router;
     TOKEN = token;
   }
 
@@ -28,7 +28,7 @@ contract ReceiverDapp is CrossChainMessageReceiverInterface, TypeAndVersionInter
    * @param message CCIP Message
    */
   function receiveMessage(CCIP.Message calldata message) external override {
-    if (msg.sender != address(OFF_RAMP)) revert InvalidDeliverer(msg.sender);
+    if (msg.sender != address(ROUTER)) revert InvalidDeliverer(msg.sender);
     (
       ,
       /* address originalSender */

@@ -26,7 +26,11 @@ contract MockOnRamp is OnRampInterface {
     DESTINATION_CHAIN_ID = destinationChainId;
   }
 
-  function requestCrossChainSend(CCIP.MessagePayload calldata payload) external override returns (uint256) {
+  function requestCrossChainSend(CCIP.MessagePayload calldata payload, address originalSender)
+    external
+    override
+    returns (uint256)
+  {
     mp = payload;
     return 0;
   }
@@ -35,13 +39,17 @@ contract MockOnRamp is OnRampInterface {
     external
     view
     returns (
-      address,
-      bytes memory,
-      IERC20[] memory,
-      uint256[] memory,
-      bytes memory
+      address receiver,
+      bytes memory data,
+      IERC20[] memory tokens,
+      uint256[] memory amounts,
+      bytes memory options
     )
   {
-    return (mp.receiver, mp.data, mp.tokens, mp.amounts, mp.options);
+    receiver = mp.receiver;
+    data = mp.data;
+    tokens = mp.tokens;
+    amounts = mp.amounts;
+    options = mp.options;
   }
 }

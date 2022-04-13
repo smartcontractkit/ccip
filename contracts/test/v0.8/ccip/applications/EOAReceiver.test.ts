@@ -60,7 +60,7 @@ describe('ReceiverDapp', () => {
 
   describe('#constructor', () => {
     it('sets the off ramp', async () => {
-      const response = await receiverContract.OFF_RAMP()
+      const response = await receiverContract.ROUTER()
       expect(response).to.equal(ramp.address)
     })
   })

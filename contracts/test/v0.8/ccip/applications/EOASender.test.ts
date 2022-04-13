@@ -1,7 +1,7 @@
 import hre, { ethers } from 'hardhat'
 import { expect } from 'chai'
 import { Roles, getUsers } from '../../../test-helpers/setup'
-import { MockOnRamp, SenderDapp, MockERC20 } from '../../../../typechain'
+import { MockOnRampRouter, SenderDapp, MockERC20 } from '../../../../typechain'
 import { Artifact } from 'hardhat/types'
 import { BigNumber } from '@ethersproject/bignumber'
 import { evmRevert } from '../../../test-helpers/matchers'
@@ -11,15 +11,13 @@ const { deployContract } = hre.waffle
 let roles: Roles
 
 let SenderArtifact: Artifact
-let RampArtifact: Artifact
+let RampRouterArtifact: Artifact
 let TokenArtifact: Artifact
 
-let sourceChainId: BigNumber
 let token: MockERC20
-let destinationToken: string
 let destinationChainId: BigNumber
 
-let ramp: MockOnRamp
+let router: MockOnRampRouter
 let senderContract: SenderDapp
 let destinationContract: string
 
@@ -31,12 +29,10 @@ beforeEach(async () => {
 
 describe('SenderDapp', () => {
   beforeEach(async () => {
-    sourceChainId = BigNumber.from(1)
-    destinationToken = await roles.oracleNode2.getAddress()
     destinationChainId = BigNumber.from(2)
 
     SenderArtifact = await hre.artifacts.readArtifact('SenderDapp')
-    RampArtifact = await hre.artifacts.readArtifact('MockOnRamp')
+    RampRouterArtifact = await hre.artifacts.readArtifact('MockOnRampRouter')
     TokenArtifact = await hre.artifacts.readArtifact('MockERC20')
 
     token = <MockERC20>(
@@ -48,19 +44,13 @@ describe('SenderDapp', () => {
       ])
     )
 
-    ramp = <MockOnRamp>(
-      await deployContract(roles.defaultAccount, RampArtifact, [
-        sourceChainId,
-        token.address,
-        destinationToken,
-        await roles.oracleNode3.getAddress(),
-        destinationChainId,
-      ])
+    router = <MockOnRampRouter>(
+      await deployContract(roles.defaultAccount, RampRouterArtifact)
     )
 
     senderContract = <SenderDapp>(
       await deployContract(roles.defaultAccount, SenderArtifact, [
-        ramp.address,
+        router.address,
         destinationChainId,
         destinationContract,
       ])
@@ -69,8 +59,8 @@ describe('SenderDapp', () => {
 
   describe('#constructor', () => {
     it('should set the onRamp', async () => {
-      const onRamp = await senderContract.ON_RAMP()
-      expect(onRamp).to.equal(ramp.address)
+      const onRamp = await senderContract.ON_RAMP_ROUTER()
+      expect(onRamp).to.equal(router.address)
     })
 
     it('#should set the destination contract', async () => {
@@ -113,7 +103,7 @@ describe('SenderDapp', () => {
         [amount],
         ethers.constants.AddressZero,
       )
-      const response = await ramp.getMessagePayload()
+      const response = await router.getMessagePayload()
       for (let i = 0; i < response.length; i++) {
         const actual = response[i].toString()
         const expected = expectedResponse[i].toString()

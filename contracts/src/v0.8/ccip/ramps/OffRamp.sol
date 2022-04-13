@@ -39,6 +39,8 @@ contract OffRamp is
 
   // Configuration values
   OffRampConfig private s_config;
+  // Router
+  OffRampRouterInterface private s_router;
 
   /**
    * @dev sourceTokens are mapped to pools, and therefore should be the same length arrays.
@@ -115,6 +117,7 @@ contract OffRamp is
     CCIP.MerkleProof memory proof,
     bool needFee
   ) external override whenNotPaused whenHealthy {
+    if (address(s_router) == address(0)) revert RouterNotSet();
     // Get root from path
     bytes32 root = merkleRoot(message, proof);
 
@@ -162,7 +165,7 @@ contract OffRamp is
 
     // Try send the message, revert if fails
     if (message.payload.receiver.isContract()) {
-      try CrossChainMessageReceiverInterface(message.payload.receiver).receiveMessage(message) {} catch (
+      try s_router.routeMessage(CrossChainMessageReceiverInterface(message.payload.receiver), message) {} catch (
         bytes memory reason
       ) {
         // TODO: Figure out a better way to handle failed executions
@@ -251,6 +254,15 @@ contract OffRamp is
 
   function _payTransmitter(uint32 initialGas, address transmitter) internal override {
     // TODO
+  }
+
+  function setRouter(OffRampRouterInterface router) external onlyOwner {
+    s_router = router;
+    emit OffRampRouterSet(router);
+  }
+
+  function getRouter() external view returns (OffRampRouterInterface) {
+    return s_router;
   }
 
   function setOffRampConfig(OffRampConfig calldata config) external onlyOwner {
