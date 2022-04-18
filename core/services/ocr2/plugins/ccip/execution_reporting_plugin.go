@@ -46,13 +46,6 @@ type ExecutableMessage struct {
 	Message Message    `json:"message"`
 }
 
-// ExecutionObservation Note there can be gaps in this range of sequence numbers,
-// indicative of some messages being non-DON executed.
-type ExecutionObservation struct {
-	MinSeqNum utils.Big `json:"minSeqNum"`
-	MaxSeqNum utils.Big `json:"maxSeqNum"`
-}
-
 func makeExecutionReportArgs() abi.Arguments {
 	mustType := func(ts string, components []abi.ArgumentMarshaling) abi.Type {
 		ty, _ := abi.NewType(ts, "", components)
@@ -240,7 +233,7 @@ func (r ExecutionReportingPlugin) Observation(ctx context.Context, timestamp typ
 	// No request to process. Return an observation with MinSeqNum and MaxSeqNum equal to NoRequestsToProcess
 	// which should not result in a new report being generated during the Report step.
 	if len(relayedReqs) == 0 {
-		b, jsonErr := json.Marshal(&ExecutionObservation{
+		b, jsonErr := json.Marshal(&Observation{
 			MinSeqNum: utils.Big(*NoRequestsToProcess),
 			MaxSeqNum: utils.Big(*NoRequestsToProcess),
 		})
@@ -257,7 +250,7 @@ func (r ExecutionReportingPlugin) Observation(ctx context.Context, timestamp typ
 	if relayedReqs[len(relayedReqs)-1].SeqNum.ToInt().Cmp(lr.MaxSequenceNumber) > 0 {
 		return nil, errors.Errorf("invariant violated, mismatch between relay_confirmed requests and last report")
 	}
-	b, err := json.Marshal(&ExecutionObservation{
+	b, err := json.Marshal(&Observation{
 		MinSeqNum: relayedReqs[0].SeqNum,
 		MaxSeqNum: relayedReqs[len(relayedReqs)-1].SeqNum,
 	})
@@ -268,9 +261,53 @@ func (r ExecutionReportingPlugin) Observation(ctx context.Context, timestamp typ
 }
 
 func (r ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.ReportTimestamp, query types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
-	var nonEmptyObservations []ExecutionObservation
+	var nonEmptyObservations = r.getNonEmptyObservation(observations)
+	// Need at least F+1 observations
+	if len(nonEmptyObservations) <= r.F {
+		r.l.Tracew("Non-empty observations <= F, need at least F+1 to continue")
+		return false, nil, nil
+	}
+	// We have at least F+1 valid observations
+	// Extract the min and max
+	sort.Slice(nonEmptyObservations, func(i, j int) bool {
+		return nonEmptyObservations[i].MinSeqNum.ToInt().Cmp(nonEmptyObservations[j].MinSeqNum.ToInt()) < 0
+	})
+	// r.F < len(nonEmptyObservations) because of the check above and therefore this is safe
+	minSeqNum := *nonEmptyObservations[r.F].MinSeqNum.ToInt()
+	sort.Slice(nonEmptyObservations, func(i, j int) bool {
+		return nonEmptyObservations[i].MaxSeqNum.ToInt().Cmp(nonEmptyObservations[j].MaxSeqNum.ToInt()) < 0
+	})
+	// We use a conservative maximum. If we pick a value that some honest oracles might not
+	// have seen they’ll end up not agreeing on a report, stalling the protocol.
+	maxSeqNum := *nonEmptyObservations[r.F].MaxSeqNum.ToInt()
+	if maxSeqNum.Cmp(&minSeqNum) < 0 {
+		return false, nil, errors.New("max seq num smaller than min")
+	}
+	reqs, err := r.orm.Requests(r.sourceChainId, r.destChainId, r.onRamp, r.offRamp, &minSeqNum, &maxSeqNum, RequestStatusRelayConfirmed, &r.executor, nil)
+	if err != nil {
+		return false, nil, err
+	}
+	// Cannot construct a report for which we haven't seen all the messages.
+	if len(reqs) == 0 {
+		return false, nil, errors.Errorf("do not have all the messages in report, have zero messages, report has min %v max %v", minSeqNum, maxSeqNum)
+	}
+	lr, err := r.lastReporter.GetLastReport(nil)
+	if err != nil {
+		return false, nil, err
+	}
+	if reqs[len(reqs)-1].SeqNum.ToInt().Cmp(lr.MaxSequenceNumber) > 0 {
+		return false, nil, errors.Errorf("invariant violated, mismatch between relay_confirmed requests (max %v) and last report (max %v)", reqs[len(reqs)-1].SeqNum, lr.MaxSequenceNumber)
+	}
+	report, err := r.buildReport(reqs)
+	if err != nil {
+		return false, nil, err
+	}
+	return true, report, nil
+}
+
+func (r ExecutionReportingPlugin) getNonEmptyObservation(observations []types.AttributedObservation) (nonEmptyObservations []Observation) {
 	for _, ao := range observations {
-		var ob ExecutionObservation
+		var ob Observation
 		err := json.Unmarshal(ao.Observation, &ob)
 		if err != nil {
 			r.l.Errorw("Received unmarshallable observation", "err", err, "observation", string(ao.Observation))
@@ -287,47 +324,7 @@ func (r ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.Re
 		}
 		nonEmptyObservations = append(nonEmptyObservations, ob)
 	}
-	// Need at least F+1 observations
-	if len(nonEmptyObservations) <= r.F {
-		r.l.Tracew("Non-empty observations <= F, need at least F+1 to continue")
-		return false, nil, nil
-	}
-	// We have at least F+1 valid observations
-	// Extract the min and max
-	sort.Slice(nonEmptyObservations, func(i, j int) bool {
-		return nonEmptyObservations[i].MinSeqNum.ToInt().Cmp(nonEmptyObservations[j].MinSeqNum.ToInt()) < 0
-	})
-	// r.F < len(nonEmptyObservations) because of the check above and therefore this is safe
-	min := *nonEmptyObservations[r.F].MinSeqNum.ToInt()
-	sort.Slice(nonEmptyObservations, func(i, j int) bool {
-		return nonEmptyObservations[i].MaxSeqNum.ToInt().Cmp(nonEmptyObservations[j].MaxSeqNum.ToInt()) < 0
-	})
-	// We use a conservative maximum. If we pick a value that some honest oracles might not
-	// have seen they’ll end up not agreeing on a report, stalling the protocol.
-	max := *nonEmptyObservations[r.F].MaxSeqNum.ToInt()
-	if max.Cmp(&min) < 0 {
-		return false, nil, errors.New("max seq num smaller than min")
-	}
-	reqs, err := r.orm.Requests(r.sourceChainId, r.destChainId, r.onRamp, r.offRamp, &min, &max, RequestStatusRelayConfirmed, &r.executor, nil)
-	if err != nil {
-		return false, nil, err
-	}
-	// Cannot construct a report for which we haven't seen all the messages.
-	if len(reqs) == 0 {
-		return false, nil, errors.Errorf("do not have all the messages in report, have zero messages, report has min %v max %v", min, max)
-	}
-	lr, err := r.lastReporter.GetLastReport(nil)
-	if err != nil {
-		return false, nil, err
-	}
-	if reqs[len(reqs)-1].SeqNum.ToInt().Cmp(lr.MaxSequenceNumber) > 0 {
-		return false, nil, errors.Errorf("invariant violated, mismatch between relay_confirmed requests (max %v) and last report (max %v)", reqs[len(reqs)-1].SeqNum, lr.MaxSequenceNumber)
-	}
-	report, err := r.buildReport(reqs)
-	if err != nil {
-		return false, nil, err
-	}
-	return true, report, nil
+	return nonEmptyObservations
 }
 
 // For each message in the given range of sequence numbers (with potential holes):

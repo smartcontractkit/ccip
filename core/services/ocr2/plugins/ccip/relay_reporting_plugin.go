@@ -142,36 +142,79 @@ func (r RelayReportingPlugin) Observation(ctx context.Context, timestamp types.R
 		return nil, err
 	}
 
+	// Because we explicitly look for requests with status RequestStatusUnstarted, inflight requests
+	// are ignored.
 	unstartedReqs, err := r.orm.Requests(r.sourceChainId, r.destChainId, r.onRamp, r.offRamp.Address(), nextMin, nil, RequestStatusUnstarted, nil, nil)
 	if err != nil {
 		return nil, err
 	}
-	// No request to process. Return an observation with MinSeqNum and MaxSeqNum equal to NoRequestsToProcess
-	// which should not result in a new report being generated during the Report step.
-	if len(unstartedReqs) == 0 {
-		b, jsonErr := json.Marshal(&ExecutionObservation{
-			MinSeqNum: utils.Big(*NoRequestsToProcess),
-			MaxSeqNum: utils.Big(*NoRequestsToProcess),
-		})
-		if jsonErr != nil {
-			return nil, jsonErr
-		}
-		return b, nil
-	}
 
-	b, err := json.Marshal(&Observation{
-		MinSeqNum: unstartedReqs[0].SeqNum,
-		MaxSeqNum: unstartedReqs[len(unstartedReqs)-1].SeqNum,
-	})
-	if err != nil {
-		return nil, err
+	// If there are no request to process, return an observation with MinSeqNum and MaxSeqNum equal to NoRequestsToProcess
+	// which should not result in a new report being generated during the Report step.
+	var (
+		minSeqNum = utils.Big(*NoRequestsToProcess)
+		maxSeqNum = utils.Big(*NoRequestsToProcess)
+	)
+	if len(unstartedReqs) != 0 {
+		minSeqNum = unstartedReqs[0].SeqNum
+		maxSeqNum = unstartedReqs[len(unstartedReqs)-1].SeqNum
 	}
-	return b, nil
+	return json.Marshal(&Observation{
+		MinSeqNum: minSeqNum,
+		MaxSeqNum: maxSeqNum,
+	})
 }
 
 func (r RelayReportingPlugin) Report(ctx context.Context, timestamp types.ReportTimestamp, query types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
+	var nonEmptyObservations = r.getNonEmptyObservations(observations)
 	// Need at least F+1 valid observations
-	var nonEmptyObservations []Observation
+	if len(nonEmptyObservations) <= r.F {
+		r.l.Tracew("Non-empty observations <= F, need at least F+1 to continue")
+		return false, nil, nil
+	}
+	// We have at least F+1 valid observations
+	// Extract the min and max
+	sort.Slice(nonEmptyObservations, func(i, j int) bool {
+		return nonEmptyObservations[i].MinSeqNum.ToInt().Cmp(nonEmptyObservations[j].MinSeqNum.ToInt()) < 0
+	})
+	// r.F < len(nonEmptyObservations) because of the check above and therefore this is safe
+	minSeqNum := *nonEmptyObservations[r.F].MinSeqNum.ToInt()
+	sort.Slice(nonEmptyObservations, func(i, j int) bool {
+		return nonEmptyObservations[i].MaxSeqNum.ToInt().Cmp(nonEmptyObservations[j].MaxSeqNum.ToInt()) < 0
+	})
+	// We use a conservative maximum. If we pick a value that some honest oracles might not
+	// have seen they’ll end up not agreeing on a report, stalling the protocol.
+	maxSeqNum := *nonEmptyObservations[r.F].MaxSeqNum.ToInt()
+	if maxSeqNum.Cmp(&minSeqNum) < 0 {
+		return false, nil, errors.New("max seq num smaller than min")
+	}
+	reqs, err := r.orm.Requests(r.sourceChainId, r.destChainId, r.onRamp, r.offRamp.Address(), &minSeqNum, &maxSeqNum, RequestStatusUnstarted, nil, nil)
+	if err != nil {
+		return false, nil, err
+	}
+	// Cannot construct a report for which we haven't seen all the messages.
+	if len(reqs) == 0 {
+		return false, nil, errors.Errorf("do not have all the messages in report, have zero messages, report has min %v max %v", minSeqNum, maxSeqNum)
+	}
+	if reqs[len(reqs)-1].SeqNum.ToInt().Cmp(&maxSeqNum) < 0 {
+		return false, nil, errors.Errorf("do not have all the messages in report, our max %v reports max %v", reqs[len(reqs)-1].SeqNum, maxSeqNum)
+	}
+
+	nextMin, err := r.nextMinSeqNumForOffRamp()
+	if err != nil {
+		return false, nil, err
+	}
+	if nextMin.Cmp(&minSeqNum) > 0 {
+		return false, nil, errors.Errorf("invalid min seq number got %v want %v", minSeqNum, nextMin)
+	}
+	encodedReport, err := EncodeRelayReport(r.buildReport(reqs, &minSeqNum, &maxSeqNum))
+	if err != nil {
+		return false, nil, err
+	}
+	return true, encodedReport, nil
+}
+
+func (r RelayReportingPlugin) getNonEmptyObservations(observations []types.AttributedObservation) (nonEmptyObservations []Observation) {
 	for _, ao := range observations {
 		var ob Observation
 		err := json.Unmarshal(ao.Observation, &ob)
@@ -190,46 +233,7 @@ func (r RelayReportingPlugin) Report(ctx context.Context, timestamp types.Report
 		}
 		nonEmptyObservations = append(nonEmptyObservations, ob)
 	}
-	if len(nonEmptyObservations) <= r.F {
-		r.l.Tracew("Non-empty observations <= F, need at least F+1 to continue")
-		return false, nil, nil
-	}
-	// We have at least F+1 valid observations
-	// Extract the min and max
-	sort.Slice(nonEmptyObservations, func(i, j int) bool {
-		return nonEmptyObservations[i].MinSeqNum.ToInt().Cmp(nonEmptyObservations[j].MinSeqNum.ToInt()) < 0
-	})
-	// r.F < len(nonEmptyObservations) because of the check above and therefore this is safe
-	min := *nonEmptyObservations[r.F].MinSeqNum.ToInt()
-	sort.Slice(nonEmptyObservations, func(i, j int) bool {
-		return nonEmptyObservations[i].MaxSeqNum.ToInt().Cmp(nonEmptyObservations[j].MaxSeqNum.ToInt()) < 0
-	})
-	// We use a conservative maximum. If we pick a value that some honest oracles might not
-	// have seen they’ll end up not agreeing on a report, stalling the protocol.
-	max := *nonEmptyObservations[r.F].MaxSeqNum.ToInt()
-	if max.Cmp(&min) < 0 {
-		return false, nil, errors.New("max seq num smaller than min")
-	}
-	reqs, err := r.orm.Requests(r.sourceChainId, r.destChainId, r.onRamp, r.offRamp.Address(), &min, &max, RequestStatusUnstarted, nil, nil)
-	if err != nil {
-		return false, nil, err
-	}
-	// Cannot construct a report for which we haven't seen all the messages.
-	if len(reqs) == 0 {
-		return false, nil, errors.Errorf("do not have all the messages in report, have zero messages, report has min %v max %v", min, max)
-	}
-	if reqs[len(reqs)-1].SeqNum.ToInt().Cmp(&max) < 0 {
-		return false, nil, errors.Errorf("do not have all the messages in report, our max %v reports max %v", reqs[len(reqs)-1].SeqNum, max)
-	}
-	if r.isStale(&min) {
-		return false, nil, nil
-	}
-
-	report, err := r.buildReport(&min, &max)
-	if err != nil {
-		return false, nil, err
-	}
-	return true, report, nil
+	return nonEmptyObservations
 }
 
 func (r RelayReportingPlugin) nextMinSeqNumForOffRamp() (*big.Int, error) {
@@ -237,13 +241,13 @@ func (r RelayReportingPlugin) nextMinSeqNumForOffRamp() (*big.Int, error) {
 	if err != nil {
 		return nil, err
 	}
-	if lastReport.MerkleRoot == utils.Bytes32FromString("0x0000000000000000000000000000000000000000000000000000000000000000") {
+	if lastReport.MerkleRoot == [32]byte{} {
 		return big.NewInt(0), nil
 	}
 	return big.NewInt(0).Add(lastReport.MaxSequenceNumber, big.NewInt(1)), nil
 }
 
-func (r RelayReportingPlugin) isStale(minSeqNum *big.Int) bool {
+func (r RelayReportingPlugin) isStaleReport(report *offramp.CCIPRelayReport) bool {
 	nextMin, err := r.nextMinSeqNumForOffRamp()
 	if err != nil {
 		// Assume it's a transient issue getting the last report
@@ -253,14 +257,10 @@ func (r RelayReportingPlugin) isStale(minSeqNum *big.Int) bool {
 	// TODO(36248): Add is offramp healthy check
 	// If the next min is already greater than this reports min,
 	// this report is stale.
-	return nextMin.Cmp(minSeqNum) > 0
+	return nextMin.Cmp(report.MinSequenceNumber) > 0
 }
 
-func (r RelayReportingPlugin) buildReport(min *big.Int, max *big.Int) ([]byte, error) {
-	reqs, err := r.orm.Requests(r.sourceChainId, r.destChainId, r.onRamp, r.offRamp.Address(), min, max, "", nil, nil)
-	if err != nil {
-		return nil, err
-	}
+func (r RelayReportingPlugin) buildReport(reqs []*Request, min *big.Int, max *big.Int) *offramp.CCIPRelayReport {
 	// Take all these request and produce a merkle root of them
 	var leaves [][]byte
 	for _, req := range reqs {
@@ -269,15 +269,11 @@ func (r RelayReportingPlugin) buildReport(min *big.Int, max *big.Int) ([]byte, e
 
 	// Note Index doesn't matter, we just want the root
 	root, _ := GenerateMerkleProof(32, leaves, 0)
-	report, err := EncodeRelayReport(&offramp.CCIPRelayReport{
+	return &offramp.CCIPRelayReport{
 		MerkleRoot:        root,
 		MinSequenceNumber: min,
 		MaxSequenceNumber: max,
-	})
-	if err != nil {
-		return nil, err
 	}
-	return report, nil
 }
 
 func (r RelayReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context, timestamp types.ReportTimestamp, report types.Report) (bool, error) {
@@ -287,7 +283,7 @@ func (r RelayReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context, t
 	}
 	// Note it's ok to leave the unstarted requests behind, since the
 	// 'Observe' is always based on the last reports onchain min seq num.
-	if r.isStale(parsedReport.MinSequenceNumber) {
+	if r.isStaleReport(parsedReport) {
 		return false, nil
 	}
 	// Any timed out requests should be set back to RequestStatusExecutionPending so their execution can be retried in a subsequent report.
@@ -311,7 +307,7 @@ func (r RelayReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context, 
 	// If report is not stale we transmit.
 	// When the relayTransmitter enqueues the tx for bptxm,
 	// we mark it as fulfilled, effectively removing it from the set of inflight messages.
-	return !r.isStale(parsedReport.MinSequenceNumber), nil
+	return !r.isStaleReport(parsedReport), nil
 }
 
 func (r RelayReportingPlugin) Start() error {
