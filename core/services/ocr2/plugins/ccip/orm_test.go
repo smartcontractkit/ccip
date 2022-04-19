@@ -20,7 +20,7 @@ import (
 
 func TestORM(t *testing.T) {
 	// Use a real db so we can do timestamp testing.
-	_, db := heavyweight.FullTestDB(t, "orm_test", true, false)
+	_, db := heavyweight.FullTestDBNoFixtures(t, "orm_test")
 	var lggr = logger.TestLogger(t)
 	orm := ccip.NewORM(db, lggr, pgtest.NewPGCfg(false))
 	source := big.NewInt(1)

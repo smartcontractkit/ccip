@@ -345,7 +345,7 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 		fmt.Sprintf("127.0.0.1:%d", port),
 	}
 	// Do not want to load fixtures as they contain a dummy chainID.
-	config, db := heavyweight.FullTestDB(t, fmt.Sprintf("%s%d", dbName, port), true, false)
+	config, db := heavyweight.FullTestDBNoFixtures(t, fmt.Sprintf("%s%d", dbName, port))
 	config.Overrides.FeatureOffchainReporting = null.BoolFrom(false)
 	config.Overrides.FeatureOffchainReporting2 = null.BoolFrom(true)
 	config.Overrides.FeatureCCIP = null.BoolFrom(true)

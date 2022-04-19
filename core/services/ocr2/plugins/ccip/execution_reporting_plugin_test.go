@@ -247,7 +247,7 @@ func TestExecutionReportInvariance(t *testing.T) {
 }
 
 func TestExecutionPlugin(t *testing.T) {
-	_, db := heavyweight.FullTestDB(t, "executor_plugin", true, false)
+	_, db := heavyweight.FullTestDBNoFixtures(t, "executor_plugin")
 	lggr := logger.TestLogger(t)
 	orm := ccip.NewORM(db, lggr, pgtest.NewPGCfg(false))
 	lr := new(mocks.OffRampLastReporter)
@@ -344,7 +344,8 @@ func TestExecutionPlugin(t *testing.T) {
 	require.Equal(t, "2", executableMessages[0].Message.SequenceNumber.String())
 
 	// Should not accept or transmit if the report is stale
-	orm.UpdateRequestSetStatus(sid, did, onRamp, offRamp, []*big.Int{big.NewInt(2)}, ccip.RequestStatusExecutionConfirmed)
+	err = orm.UpdateRequestSetStatus(sid, did, onRamp, offRamp, []*big.Int{big.NewInt(2)}, ccip.RequestStatusExecutionConfirmed)
+	require.NoError(t, err)
 	accept, err := rp.ShouldAcceptFinalizedReport(context.Background(), types.ReportTimestamp{}, rep)
 	require.NoError(t, err)
 	require.False(t, accept)
