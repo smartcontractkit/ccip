@@ -207,7 +207,7 @@ func (r RelayReportingPlugin) Report(ctx context.Context, timestamp types.Report
 	if nextMin.Cmp(&minSeqNum) > 0 {
 		return false, nil, errors.Errorf("invalid min seq number got %v want %v", minSeqNum, nextMin)
 	}
-	encodedReport, err := EncodeRelayReport(r.buildReport(reqs, &minSeqNum, &maxSeqNum))
+	encodedReport, err := EncodeRelayReport(r.buildReport(reqs))
 	if err != nil {
 		return false, nil, err
 	}
@@ -260,7 +260,8 @@ func (r RelayReportingPlugin) isStaleReport(report *offramp.CCIPRelayReport) boo
 	return nextMin.Cmp(report.MinSequenceNumber) > 0
 }
 
-func (r RelayReportingPlugin) buildReport(reqs []*Request, min *big.Int, max *big.Int) *offramp.CCIPRelayReport {
+// buildReport assumes there is at least one message in reqs.
+func (r RelayReportingPlugin) buildReport(reqs []*Request) *offramp.CCIPRelayReport {
 	// Take all these request and produce a merkle root of them
 	var leaves [][]byte
 	for _, req := range reqs {
@@ -271,8 +272,8 @@ func (r RelayReportingPlugin) buildReport(reqs []*Request, min *big.Int, max *bi
 	root, _ := GenerateMerkleProof(32, leaves, 0)
 	return &offramp.CCIPRelayReport{
 		MerkleRoot:        root,
-		MinSequenceNumber: min,
-		MaxSequenceNumber: max,
+		MinSequenceNumber: reqs[0].SeqNum.ToInt(),
+		MaxSequenceNumber: reqs[len(reqs)-1].SeqNum.ToInt(),
 	}
 }
 
