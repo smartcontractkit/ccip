@@ -53,6 +53,9 @@ package gethwrappers
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.6/AggregatorV3Interface.abi ../../../contracts/solc/v0.8.6/AggregatorV3Interface.bin AggregatorV3Interface aggregator_v3_interface
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.6/DerivedPriceFeed.abi ../../../contracts/solc/v0.8.6/DerivedPriceFeed.bin DerivedPriceFeed derived_price_feed_wrapper
 
+// Log tester
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.6/LogEmitter.abi ../../../contracts/solc/v0.8.6/LogEmitter.bin LogEmitter log_emitter
+
 // CCIP
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.13/OnRamp.abi ../../../contracts/solc/v0.8.13/OnRamp.bin OnRamp onramp
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.13/OffRamp.abi ../../../contracts/solc/v0.8.13/OffRamp.bin OffRamp offramp

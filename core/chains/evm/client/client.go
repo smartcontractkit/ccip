@@ -6,6 +6,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/smartcontractkit/chainlink/core/assets"
+	evmtypes "github.com/smartcontractkit/chainlink/core/chains/evm/types"
+	"github.com/smartcontractkit/chainlink/core/logger"
+	"github.com/smartcontractkit/chainlink/core/null"
+	"github.com/smartcontractkit/chainlink/core/utils"
+
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
@@ -13,12 +19,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
-
-	"github.com/smartcontractkit/chainlink/core/assets"
-	evmtypes "github.com/smartcontractkit/chainlink/core/chains/evm/types"
-	"github.com/smartcontractkit/chainlink/core/logger"
-	"github.com/smartcontractkit/chainlink/core/null"
-	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
 const queryTimeout = 10 * time.Second
@@ -63,6 +63,7 @@ type Client interface {
 	NonceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (uint64, error)
 	TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error)
 	BlockByNumber(ctx context.Context, number *big.Int) (*types.Block, error)
+	BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error)
 	BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error)
 	FilterLogs(ctx context.Context, q ethereum.FilterQuery) ([]types.Log, error)
 	SubscribeFilterLogs(ctx context.Context, q ethereum.FilterQuery, ch chan<- types.Log) (ethereum.Subscription, error)
@@ -239,6 +240,10 @@ func (client *client) CodeAt(ctx context.Context, account common.Address, blockN
 
 func (client *client) BlockByNumber(ctx context.Context, number *big.Int) (*types.Block, error) {
 	return client.pool.BlockByNumber(ctx, number)
+}
+
+func (client *client) BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error) {
+	return client.pool.BlockByHash(ctx, hash)
 }
 
 func (client *client) HeadByNumber(ctx context.Context, number *big.Int) (head *evmtypes.Head, err error) {

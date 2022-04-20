@@ -71,6 +71,9 @@ $SCRIPTPATH/native_solc8_6_compile dev/VRFCoordinatorV2.sol
 # Feeds
 $SCRIPTPATH/native_solc8_6_compile dev/DerivedPriceFeed.sol
 
+# Log tester
+$SCRIPTPATH/native_solc8_6_compile tests/LogEmitter.sol
+
 # CCIP
 $SCRIPTPATH/native_solc8_13_compile ccip/test/helpers/OffRampHelper.sol
 $SCRIPTPATH/native_solc8_13_compile ccip/test/helpers/SimpleMessageReceiver.sol
