@@ -197,10 +197,12 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 	return ExecutionReportingPlugin{rf.l, config.F, rf.orm, rf.source, rf.dest, rf.executor, rf.onRamp, rf.offRamp, rf.lastReporter}, types.ReportingPluginInfo{
 		Name:          "CCIPExecution",
 		UniqueReports: true,
-		MaxQueryLen:   0, // We do not use the query phase.
-		// TODO: https://app.shortcut.com/chainlinklabs/story/30171/define-report-plugin-limits
-		MaxObservationLen: 100000, // TODO
-		MaxReportLen:      100000, // TODO
+		Limits: types.ReportingPluginLimits{
+			MaxQueryLength: 0, // We do not use the query phase.
+			// TODO: https://app.shortcut.com/chainlinklabs/story/30171/define-report-plugin-limits
+			MaxObservationLength: 100000, // TODO
+			MaxReportLength:      100000, // TODO
+		},
 	}, nil
 }
 
