@@ -137,6 +137,7 @@ type GeneralOnlyConfig interface {
 	KeeperRegistrySyncInterval() time.Duration
 	KeeperRegistrySyncUpkeepQueueSize() uint32
 	KeeperTurnLookBack() int64
+	KeeperTurnFlagEnabled() bool
 	KeyFile() string
 	LeaseLockDuration() time.Duration
 	LeaseLockRefreshInterval() time.Duration
@@ -159,6 +160,8 @@ type GeneralOnlyConfig interface {
 	SessionOptions() sessions.Options
 	SessionSecret() ([]byte, error)
 	SessionTimeout() models.Duration
+	SolanaNodes() string
+	TerraNodes() string
 	TLSCertPath() string
 	TLSDir() string
 	TLSHost() string
@@ -856,6 +859,11 @@ func (c *generalConfig) KeeperTurnLookBack() int64 {
 	return c.viper.GetInt64(envvar.Name("KeeperTurnLookBack"))
 }
 
+// KeeperTurnFlagEnabled enables new turn taking algo for keepers
+func (c *generalConfig) KeeperTurnFlagEnabled() bool {
+	return getEnvWithFallback(c, envvar.NewBool("KeeperTurnFlagEnabled"))
+}
+
 // JSONConsole when set to true causes logging to be made in JSON format
 // If set to false, logs in console format
 func (c *generalConfig) JSONConsole() bool {
@@ -875,6 +883,18 @@ func (c *generalConfig) ExplorerAccessKey() string {
 // ExplorerSecret returns the secret for authenticating with explorer
 func (c *generalConfig) ExplorerSecret() string {
 	return c.viper.GetString(envvar.Name("ExplorerSecret"))
+}
+
+// SolanaNodes is a hack to allow node operators to give a JSON string that
+// sets up multiple nodes
+func (c *generalConfig) SolanaNodes() string {
+	return c.viper.GetString(envvar.Name("SolanaNodes"))
+}
+
+// TerraNodes is a hack to allow node operators to give a JSON string that
+// sets up multiple nodes
+func (c *generalConfig) TerraNodes() string {
+	return c.viper.GetString(envvar.Name("TerraNodes"))
 }
 
 // TelemetryIngressURL returns the WSRPC URL for this node to push telemetry to, or nil.

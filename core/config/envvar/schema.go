@@ -120,10 +120,12 @@ type ConfigSchema struct {
 	FeatureLogPoller bool `env:"FEATURE_LOG_POLLER" default:"false"` //nodoc
 
 	// General chains/RPC
-	EVMEnabled    bool `env:"EVM_ENABLED" default:"true"`
-	EVMRPCEnabled bool `env:"EVM_RPC_ENABLED" default:"true"`
-	SolanaEnabled bool `env:"SOLANA_ENABLED" default:"false"`
-	TerraEnabled  bool `env:"TERRA_ENABLED" default:"false"`
+	EVMEnabled    bool   `env:"EVM_ENABLED" default:"true"`
+	EVMRPCEnabled bool   `env:"EVM_RPC_ENABLED" default:"true"`
+	SolanaEnabled bool   `env:"SOLANA_ENABLED" default:"false"`
+	SolanaNodes   string `env:"SOLANA_NODES"`
+	TerraEnabled  bool   `env:"TERRA_ENABLED" default:"false"`
+	TerraNodes    string `env:"TERRA_NODES"`
 
 	// EVM/Ethereum
 	// Legacy Eth ENV vars
@@ -277,6 +279,7 @@ type ConfigSchema struct {
 	KeeperRegistrySyncInterval              time.Duration `env:"KEEPER_REGISTRY_SYNC_INTERVAL" default:"30m"`
 	KeeperRegistrySyncUpkeepQueueSize       uint32        `env:"KEEPER_REGISTRY_SYNC_UPKEEP_QUEUE_SIZE" default:"10"`
 	KeeperTurnLookBack                      int64         `env:"KEEPER_TURN_LOOK_BACK" default:"1000"`
+	KeeperTurnFlagEnabled                   bool          `env:"KEEPER_TURN_FLAG_ENABLED" default:"false"`
 
 	// CLI client
 	AdminCredentialsFile string `env:"ADMIN_CREDENTIALS_FILE" default:"$ROOT/apicredentials"`
