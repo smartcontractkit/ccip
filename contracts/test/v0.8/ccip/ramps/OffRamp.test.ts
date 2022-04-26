@@ -274,8 +274,8 @@ describe('OffRamp', () => {
       const receiver = await roles.oracleNode1.getAddress()
       messages = [
         {
+          sourceChainId: BigNumber.from(1),
           sequenceNumber: BigNumber.from(1),
-          sourceChainId: BigNumber.from(1),
           sender: receiver,
           payload: {
             destinationChainId: BigNumber.from(2),
@@ -288,8 +288,8 @@ describe('OffRamp', () => {
           },
         },
         {
+          sourceChainId: BigNumber.from(1),
           sequenceNumber: BigNumber.from(2),
-          sourceChainId: BigNumber.from(1),
           sender: receiver,
           payload: {
             destinationChainId: BigNumber.from(2),
@@ -302,8 +302,8 @@ describe('OffRamp', () => {
           },
         },
         {
+          sourceChainId: BigNumber.from(1),
           sequenceNumber: BigNumber.from(3),
-          sourceChainId: BigNumber.from(1),
           sender: receiver,
           payload: {
             destinationChainId: BigNumber.from(2),
@@ -316,8 +316,8 @@ describe('OffRamp', () => {
           },
         },
         {
-          sequenceNumber: BigNumber.from(4),
           sourceChainId: BigNumber.from(1),
+          sequenceNumber: BigNumber.from(4),
           sender: receiver,
           payload: {
             destinationChainId: BigNumber.from(2),
@@ -422,7 +422,7 @@ describe('OffRamp', () => {
         gasUsed = gasUsed.add((await response.wait()).gasUsed)
       })
       it('GASTEST [ @skip-coverage ]', async () => {
-        expectGasWithinDeviation(gasUsed, 132_195)
+        expectGasWithinDeviation(gasUsed, 110_456)
       })
       it('stores the root', async () => {
         const stored = await ramp.getMerkleRoot(root)
@@ -472,8 +472,8 @@ describe('OffRamp', () => {
         destinationChainId: destinationId,
       }
       message = {
-        sequenceNumber: sequenceNumber,
         sourceChainId: sourceId,
+        sequenceNumber: sequenceNumber,
         sender: sender,
         payload: payload,
       }
@@ -498,8 +498,8 @@ describe('OffRamp', () => {
             destinationChainId: destinationId,
           }
           const message2 = {
-            sequenceNumber: sequenceNumber2,
             sourceChainId: sourceId,
+            sequenceNumber: sequenceNumber2,
             sender: sender,
             payload: payload2,
           }
@@ -527,7 +527,7 @@ describe('OffRamp', () => {
             ramp
               .connect(roles.defaultAccount)
               .executeTransaction(message, proof, false),
-            `MerkleProofError([["${path[0]}"], 0], [${message.sequenceNumber}, ${message.sourceChainId}, "${message.sender}", [["${message.payload.tokens[0]}", "${message.payload.tokens[1]}"], [${message.payload.amounts[0]}, ${message.payload.amounts[1]}], ${message.payload.destinationChainId}, "${message.payload.receiver}", "${message.payload.executor}", "${message.payload.data}", "${message.payload.options}"]])`,
+            `MerkleProofError([["${path[0]}"], 0], [${message.sourceChainId}, ${message.sequenceNumber}, "${message.sender}", [["${message.payload.tokens[0]}", "${message.payload.tokens[1]}"], [${message.payload.amounts[0]}, ${message.payload.amounts[1]}], ${message.payload.destinationChainId}, "${message.payload.receiver}", "${message.payload.executor}", "${message.payload.data}", "${message.payload.options}"]])`,
           )
         })
 
@@ -541,7 +541,7 @@ describe('OffRamp', () => {
             ramp
               .connect(roles.defaultAccount)
               .executeTransaction(message, proof, false),
-            `MerkleProofError([["${path[0]}"], 0], [${message.sequenceNumber}, ${message.sourceChainId}, "${message.sender}", [["${message.payload.tokens[0]}", "${message.payload.tokens[1]}"], [${message.payload.amounts[0]}, ${message.payload.amounts[1]}], ${message.payload.destinationChainId}, "${message.payload.receiver}", "${message.payload.executor}", "${message.payload.data}", "${message.payload.options}"]])`,
+            `MerkleProofError([["${path[0]}"], 0], [${message.sourceChainId}, ${message.sequenceNumber}, "${message.sender}", [["${message.payload.tokens[0]}", "${message.payload.tokens[1]}"], [${message.payload.amounts[0]}, ${message.payload.amounts[1]}], ${message.payload.destinationChainId}, "${message.payload.receiver}", "${message.payload.executor}", "${message.payload.data}", "${message.payload.options}"]])`,
           )
         })
 
@@ -556,7 +556,7 @@ describe('OffRamp', () => {
             ramp
               .connect(roles.defaultAccount)
               .executeTransaction(message, proof, false),
-            `MerkleProofError([["${path[0]}"], 0], [${message.sequenceNumber}, ${message.sourceChainId}, "${message.sender}", [["${message.payload.tokens[0]}", "${message.payload.tokens[1]}"], [${message.payload.amounts[0]}, ${message.payload.amounts[1]}], ${message.payload.destinationChainId}, "${message.payload.receiver}", "${message.payload.executor}", "${message.payload.data}", "${message.payload.options}"]])`,
+            `MerkleProofError([["${path[0]}"], 0], [${message.sourceChainId}, ${message.sequenceNumber}, "${message.sender}", [["${message.payload.tokens[0]}", "${message.payload.tokens[1]}"], [${message.payload.amounts[0]}, ${message.payload.amounts[1]}], ${message.payload.destinationChainId}, "${message.payload.receiver}", "${message.payload.executor}", "${message.payload.data}", "${message.payload.options}"]])`,
           )
         })
 
@@ -728,7 +728,7 @@ describe('OffRamp', () => {
             `Pausable: paused`,
           )
         })
-        it('fails whenn the AFN signal is bad', async () => {
+        it('fails when the AFN signal is bad', async () => {
           report = constructReport(message, sequenceNumber, sequenceNumber)
           proof = {
             path: [],
@@ -815,7 +815,7 @@ describe('OffRamp', () => {
 
         describe('GASTEST', () => {
           it('GASTEST - contract receiver execution [ @skip-coverage ]', async () => {
-            expectGasWithinDeviation((await tx.wait()).gasUsed, 558_086)
+            expectGasWithinDeviation((await tx.wait()).gasUsed, 536_304)
           })
 
           it('GASTEST - EOA receiver [ @skip-coverage ]', async () => {
@@ -838,7 +838,7 @@ describe('OffRamp', () => {
             tx = await ramp
               .connect(roles.oracleNode)
               .executeTransaction(message, proof, true)
-            expectGasWithinDeviation((await tx.wait()).gasUsed, 235_471)
+            expectGasWithinDeviation((await tx.wait()).gasUsed, 235_608)
 
             expect(tx)
               .to.emit(ramp, 'CrossChainMessageExecuted')
@@ -947,7 +947,7 @@ describe('OffRamp', () => {
 
         describe('GASTEST', () => {
           it('GASTEST - contract receiver execution [ @skip-coverage ]', async () => {
-            expectGasWithinDeviation((await tx.wait()).gasUsed, 511_416)
+            expectGasWithinDeviation((await tx.wait()).gasUsed, 489_646)
           })
 
           it('GASTEST - EOA receiver [ @skip-coverage ]', async () => {
@@ -970,7 +970,7 @@ describe('OffRamp', () => {
             tx = await ramp
               .connect(roles.oracleNode)
               .executeTransaction(message, proof, true)
-            expectGasWithinDeviation((await tx.wait()).gasUsed, 249_759)
+            expectGasWithinDeviation((await tx.wait()).gasUsed, 249_896)
           })
         })
 

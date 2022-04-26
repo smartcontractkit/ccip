@@ -7,12 +7,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/lib/pq"
-
-	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
 type Request struct {
-	SeqNum        utils.Big
+	SeqNum        int64
 	SourceChainID string // TODO Note this will be some super set which includes evm_chain_id
 	DestChainID   string // TODO Note this will be some super set which includes evm_chain_id
 	OnRamp        common.Address
@@ -48,7 +46,7 @@ func (r Request) ToMessage() Message {
 		amounts = append(amounts, mustStringToBigInt(a))
 	}
 	return Message{
-		SequenceNumber: r.SeqNum.ToInt(),
+		SequenceNumber: uint64(r.SeqNum),
 		SourceChainId:  mustStringToBigInt(r.SourceChainID),
 		Sender:         r.Sender,
 		Payload: struct {
@@ -87,7 +85,7 @@ const (
 
 type RelayReport struct {
 	Root      []byte
-	MinSeqNum utils.Big
-	MaxSeqNum utils.Big
+	MinSeqNum int64
+	MaxSeqNum int64
 	CreatedAt time.Time
 }

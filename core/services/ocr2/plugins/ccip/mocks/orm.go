@@ -19,7 +19,7 @@ type ORM struct {
 }
 
 // RelayReport provides a mock function with given fields: seqNum, qopts
-func (_m *ORM) RelayReport(seqNum *big.Int, qopts ...pg.QOpt) (ccip.RelayReport, error) {
+func (_m *ORM) RelayReport(seqNum int64, qopts ...pg.QOpt) (ccip.RelayReport, error) {
 	_va := make([]interface{}, len(qopts))
 	for _i := range qopts {
 		_va[_i] = qopts[_i]
@@ -30,14 +30,14 @@ func (_m *ORM) RelayReport(seqNum *big.Int, qopts ...pg.QOpt) (ccip.RelayReport,
 	ret := _m.Called(_ca...)
 
 	var r0 ccip.RelayReport
-	if rf, ok := ret.Get(0).(func(*big.Int, ...pg.QOpt) ccip.RelayReport); ok {
+	if rf, ok := ret.Get(0).(func(int64, ...pg.QOpt) ccip.RelayReport); ok {
 		r0 = rf(seqNum, qopts...)
 	} else {
 		r0 = ret.Get(0).(ccip.RelayReport)
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(*big.Int, ...pg.QOpt) error); ok {
+	if rf, ok := ret.Get(1).(func(int64, ...pg.QOpt) error); ok {
 		r1 = rf(seqNum, qopts...)
 	} else {
 		r1 = ret.Error(1)
@@ -47,7 +47,7 @@ func (_m *ORM) RelayReport(seqNum *big.Int, qopts ...pg.QOpt) (ccip.RelayReport,
 }
 
 // Requests provides a mock function with given fields: sourceChainId, destChainId, onRamp, offRamp, minSeqNum, maxSeqNum, status, executor, options, opt
-func (_m *ORM) Requests(sourceChainId *big.Int, destChainId *big.Int, onRamp common.Address, offRamp common.Address, minSeqNum *big.Int, maxSeqNum *big.Int, status ccip.RequestStatus, executor *common.Address, options []byte, opt ...pg.QOpt) ([]*ccip.Request, error) {
+func (_m *ORM) Requests(sourceChainId *big.Int, destChainId *big.Int, onRamp common.Address, offRamp common.Address, minSeqNum int64, maxSeqNum int64, status ccip.RequestStatus, executor *common.Address, options []byte, opt ...pg.QOpt) ([]*ccip.Request, error) {
 	_va := make([]interface{}, len(opt))
 	for _i := range opt {
 		_va[_i] = opt[_i]
@@ -58,7 +58,7 @@ func (_m *ORM) Requests(sourceChainId *big.Int, destChainId *big.Int, onRamp com
 	ret := _m.Called(_ca...)
 
 	var r0 []*ccip.Request
-	if rf, ok := ret.Get(0).(func(*big.Int, *big.Int, common.Address, common.Address, *big.Int, *big.Int, ccip.RequestStatus, *common.Address, []byte, ...pg.QOpt) []*ccip.Request); ok {
+	if rf, ok := ret.Get(0).(func(*big.Int, *big.Int, common.Address, common.Address, int64, int64, ccip.RequestStatus, *common.Address, []byte, ...pg.QOpt) []*ccip.Request); ok {
 		r0 = rf(sourceChainId, destChainId, onRamp, offRamp, minSeqNum, maxSeqNum, status, executor, options, opt...)
 	} else {
 		if ret.Get(0) != nil {
@@ -67,7 +67,7 @@ func (_m *ORM) Requests(sourceChainId *big.Int, destChainId *big.Int, onRamp com
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(*big.Int, *big.Int, common.Address, common.Address, *big.Int, *big.Int, ccip.RequestStatus, *common.Address, []byte, ...pg.QOpt) error); ok {
+	if rf, ok := ret.Get(1).(func(*big.Int, *big.Int, common.Address, common.Address, int64, int64, ccip.RequestStatus, *common.Address, []byte, ...pg.QOpt) error); ok {
 		r1 = rf(sourceChainId, destChainId, onRamp, offRamp, minSeqNum, maxSeqNum, status, executor, options, opt...)
 	} else {
 		r1 = ret.Error(1)
@@ -140,7 +140,7 @@ func (_m *ORM) SaveRequest(request *ccip.Request, qopts ...pg.QOpt) error {
 }
 
 // UpdateRequestSetStatus provides a mock function with given fields: sourceChainId, destChainId, onRamp, offRamp, seqNums, status, qopts
-func (_m *ORM) UpdateRequestSetStatus(sourceChainId *big.Int, destChainId *big.Int, onRamp common.Address, offRamp common.Address, seqNums []*big.Int, status ccip.RequestStatus, qopts ...pg.QOpt) error {
+func (_m *ORM) UpdateRequestSetStatus(sourceChainId *big.Int, destChainId *big.Int, onRamp common.Address, offRamp common.Address, seqNums []int64, status ccip.RequestStatus, qopts ...pg.QOpt) error {
 	_va := make([]interface{}, len(qopts))
 	for _i := range qopts {
 		_va[_i] = qopts[_i]
@@ -151,7 +151,7 @@ func (_m *ORM) UpdateRequestSetStatus(sourceChainId *big.Int, destChainId *big.I
 	ret := _m.Called(_ca...)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*big.Int, *big.Int, common.Address, common.Address, []*big.Int, ccip.RequestStatus, ...pg.QOpt) error); ok {
+	if rf, ok := ret.Get(0).(func(*big.Int, *big.Int, common.Address, common.Address, []int64, ccip.RequestStatus, ...pg.QOpt) error); ok {
 		r0 = rf(sourceChainId, destChainId, onRamp, offRamp, seqNums, status, qopts...)
 	} else {
 		r0 = ret.Error(0)
@@ -161,7 +161,7 @@ func (_m *ORM) UpdateRequestSetStatus(sourceChainId *big.Int, destChainId *big.I
 }
 
 // UpdateRequestStatus provides a mock function with given fields: sourceChainId, destChainId, onRamp, offRamp, minSeqNum, maxSeqNum, status, qopts
-func (_m *ORM) UpdateRequestStatus(sourceChainId *big.Int, destChainId *big.Int, onRamp common.Address, offRamp common.Address, minSeqNum *big.Int, maxSeqNum *big.Int, status ccip.RequestStatus, qopts ...pg.QOpt) error {
+func (_m *ORM) UpdateRequestStatus(sourceChainId *big.Int, destChainId *big.Int, onRamp common.Address, offRamp common.Address, minSeqNum int64, maxSeqNum int64, status ccip.RequestStatus, qopts ...pg.QOpt) error {
 	_va := make([]interface{}, len(qopts))
 	for _i := range qopts {
 		_va[_i] = qopts[_i]
@@ -172,7 +172,7 @@ func (_m *ORM) UpdateRequestStatus(sourceChainId *big.Int, destChainId *big.Int,
 	ret := _m.Called(_ca...)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*big.Int, *big.Int, common.Address, common.Address, *big.Int, *big.Int, ccip.RequestStatus, ...pg.QOpt) error); ok {
+	if rf, ok := ret.Get(0).(func(*big.Int, *big.Int, common.Address, common.Address, int64, int64, ccip.RequestStatus, ...pg.QOpt) error); ok {
 		r0 = rf(sourceChainId, destChainId, onRamp, offRamp, minSeqNum, maxSeqNum, status, qopts...)
 	} else {
 		r0 = ret.Error(0)

@@ -3,6 +3,7 @@ package ccip
 import (
 	"bytes"
 	"context"
+	"math"
 	"math/big"
 	"testing"
 	"time"
@@ -192,7 +193,7 @@ func TestLogListener_SavesRequests(t *testing.T) {
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
 		lb.OnNewLongestChain(context.Background(), &types.Head{Hash: head.Hash(), Number: startHead})
 		startHead++
-		reqs, err = logListener.orm.Requests(big.NewInt(2), big.NewInt(1), onRampAddress, offRampAddress, big.NewInt(0), nil, RequestStatusUnstarted, nil, nil)
+		reqs, err = logListener.orm.Requests(big.NewInt(2), big.NewInt(1), onRampAddress, offRampAddress, 0, math.MaxInt64, RequestStatusUnstarted, nil, nil)
 		require.NoError(t, err)
 		t.Logf("log %+v\n", reqs)
 		return logListener.offchainConfig.DestIncomingConfirmations == newCcipConfig.DestIncomingConfirmations &&
@@ -223,7 +224,7 @@ func TestLogListener_SavesRequests(t *testing.T) {
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
 		lb.OnNewLongestChain(context.Background(), &types.Head{Hash: head.Hash(), Number: startHead})
 		startHead++
-		reqs, err = logListener.orm.Requests(sourceChainID, destChainID, onRampAddress, offRampAddress, big.NewInt(0), nil, RequestStatusUnstarted, nil, nil)
+		reqs, err = logListener.orm.Requests(sourceChainID, destChainID, onRampAddress, offRampAddress, 0, math.MaxInt64, RequestStatusUnstarted, nil, nil)
 		require.NoError(t, err)
 		t.Logf("log %+v\n", reqs)
 		return len(reqs) == 1
@@ -239,7 +240,7 @@ func TestLogListener_SavesRequests(t *testing.T) {
 	assert.Equal(t, destChainID.String(), reqs[0].DestChainID)
 	// We expect the raw request bytes to be the abi.encoded CCIP Message
 	b, err := MakeCCIPMsgArgs().PackValues([]interface{}{onramp.CCIPMessage{
-		SequenceNumber: big.NewInt(1),
+		SequenceNumber: 1,
 		SourceChainId:  sourceChainID,
 		Sender:         user.From,
 		Payload: onramp.CCIPMessagePayload{

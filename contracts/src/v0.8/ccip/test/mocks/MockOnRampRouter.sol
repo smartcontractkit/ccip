@@ -6,7 +6,7 @@ import "../../utils/CCIP.sol";
 contract MockOnRampRouter {
   CCIP.MessagePayload public mp;
 
-  function requestCrossChainSend(CCIP.MessagePayload calldata payload) external returns (uint256) {
+  function requestCrossChainSend(CCIP.MessagePayload calldata payload) external returns (uint64) {
     mp = payload;
     return 0;
   }

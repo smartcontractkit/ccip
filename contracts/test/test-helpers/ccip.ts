@@ -14,8 +14,8 @@ export interface RelayReport {
 }
 
 export interface CCIPMessage {
-  sequenceNumber: BigNumber
   sourceChainId: BigNumber
+  sequenceNumber: BigNumber
   sender: string
   payload: CCIPMessagePayload
 }
@@ -139,7 +139,7 @@ export function generateMerkleTreeFromHashes(hashes: string[]): any {
 export function encodeReport(report: RelayReport) {
   return ethers.utils.defaultAbiCoder.encode(
     [
-      'tuple(bytes32 merkleRoot, uint256 minSequenceNumber, uint256 maxSequenceNumber) report',
+      'tuple(bytes32 merkleRoot, uint64 minSequenceNumber, uint64 maxSequenceNumber) report',
     ],
     [report],
   )
@@ -148,7 +148,7 @@ export function encodeReport(report: RelayReport) {
 export function hashMessage(message: CCIPMessage) {
   const bytesMessage = ethers.utils.defaultAbiCoder.encode(
     [
-      'tuple(uint256 sequenceNumber, uint256 sourceChainId, address sender, tuple(address[] tokens, uint256[] amounts, uint256 destinationChainId, address receiver, address executor, bytes data, bytes options) payload) message',
+      'tuple(uint256 sourceChainId, uint64 sequenceNumber, address sender, tuple(address[] tokens, uint256[] amounts, uint256 destinationChainId, address receiver, address executor, bytes data, bytes options) payload) message',
     ],
     [message],
   )

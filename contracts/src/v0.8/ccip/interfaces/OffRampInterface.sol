@@ -8,24 +8,24 @@ import "../utils/CCIP.sol";
 
 interface OffRampInterface {
   error RelayReportError();
-  error SequenceError(uint256 lastMaxSequenceNumber, uint256 newMinSequenceNumber);
+  error SequenceError(uint64 lastMaxSequenceNumber, uint64 newMinSequenceNumber);
   error MerkleProofError(CCIP.MerkleProof proof, CCIP.Message message);
   error TokenMismatch();
   error UnsupportedNumberOfTokens();
   error UnsupportedToken(IERC20 token);
-  error AlreadyExecuted(uint256 sequenceNumber);
-  error InvalidExecutor(uint256 sequenceNumber);
-  error ExecutionError(uint256 sequenceNumber, bytes reason);
+  error AlreadyExecuted(uint64 sequenceNumber);
+  error InvalidExecutor(uint64 sequenceNumber);
+  error ExecutionError(uint64 sequenceNumber, bytes reason);
   error FeeError();
   error ExecutionDelayError();
   error InvalidReceiver(address receiver);
   error InvalidSourceChain(uint256 sourceChainId);
   error MessageTooLarge(uint256 maxSize, uint256 actualSize);
-  error UnexpectedPayloadData(uint256 sequenceNumber);
+  error UnexpectedPayloadData(uint64 sequenceNumber);
   error RouterNotSet();
 
   event ReportAccepted(CCIP.RelayReport report);
-  event CrossChainMessageExecuted(uint256 indexed sequenceNumber);
+  event CrossChainMessageExecuted(uint64 indexed sequenceNumber);
   event OffRampConfigSet(OffRampConfig config);
   event FeesWithdrawn(IERC20 feeToken, address recipient, uint256 amount);
   event OffRampRouterSet(OffRampRouterInterface router);

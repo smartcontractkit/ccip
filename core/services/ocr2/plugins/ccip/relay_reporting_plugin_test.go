@@ -83,8 +83,8 @@ func TestRelayReportEncoding(t *testing.T) {
 
 	report := offramp.CCIPRelayReport{
 		MerkleRoot:        r,
-		MinSequenceNumber: big.NewInt(1),
-		MaxSequenceNumber: big.NewInt(10),
+		MinSequenceNumber: 1,
+		MaxSequenceNumber: 10,
 	}
 	out, err := ccip.EncodeRelayReport(&report)
 	require.NoError(t, err)

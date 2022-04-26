@@ -42,5 +42,5 @@ interface OnRampInterface {
    */
   function requestCrossChainSend(CCIP.MessagePayload calldata payload, address originalSender)
     external
-    returns (uint256);
+    returns (uint64);
 }

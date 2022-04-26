@@ -13,7 +13,7 @@ contract OffRampRouter is OffRampRouterInterface, OwnerIsCreator {
   error OffRampNotConfigured(OffRampInterface offRamp);
   error AlreadyConfigured(OffRampInterface offRamp);
   error NoOffRampsConfigured();
-  error MessageFailure(uint256 sequenceNumber, bytes reason);
+  error MessageFailure(uint64 sequenceNumber, bytes reason);
 
   event OffRampAdded(OffRampInterface indexed offRamp);
   event OffRampRemoved(OffRampInterface indexed offRamp);

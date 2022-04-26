@@ -5,8 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"math/big"
-	"sort"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -16,7 +16,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp"
 	"github.com/smartcontractkit/chainlink/core/logger"
-	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
 const ExecutionMaxInflightTimeSeconds = 180
@@ -26,8 +25,8 @@ var _ types.ReportingPlugin = &ExecutionReportingPlugin{}
 
 // Message contains the data from a cross chain message
 type Message struct {
-	SequenceNumber *big.Int       `json:"sequenceNumber"`
 	SourceChainId  *big.Int       `json:"sourceChainId"`
+	SequenceNumber uint64         `json:"sequenceNumber"`
 	Sender         common.Address `json:"sender"`
 	Payload        struct {
 		Tokens             []common.Address `json:"tokens"`
@@ -68,14 +67,13 @@ func makeExecutionReportArgs() abi.Arguments {
 					Type: "tuple",
 					Components: []abi.ArgumentMarshaling{
 						{
-							Name: "sequenceNumber",
-							Type: "uint256",
-						},
-						{
 							Name: "sourceChainId",
 							Type: "uint256",
 						},
-
+						{
+							Name: "sequenceNumber",
+							Type: "uint64",
+						},
 						{
 							Name: "sender",
 							Type: "address",
@@ -143,8 +141,8 @@ func DecodeExecutionReport(report types.Report) ([]ExecutableMessage, error) {
 		Path    [][32]uint8 `json:"Path"`
 		Index   *big.Int    `json:"Index"`
 		Message struct {
-			SequenceNumber *big.Int       `json:"sequenceNumber"`
 			SourceChainId  *big.Int       `json:"sourceChainId"`
+			SequenceNumber uint64         `json:"sequenceNumber"`
 			Sender         common.Address `json:"sender"`
 			Payload        struct {
 				Tokens             []common.Address `json:"tokens"`
@@ -165,6 +163,10 @@ func DecodeExecutionReport(report types.Report) ([]ExecutableMessage, error) {
 	}
 	var ems []ExecutableMessage
 	for _, emi := range msgs {
+		// This should never be possible as this is checked before this step
+		if emi.Message.SequenceNumber > math.MaxInt64 {
+			return nil, errors.Errorf("sequenceNumber is larger than max int64, %v", emi)
+		}
 		ems = append(ems, ExecutableMessage{
 			Path:    emi.Path,
 			Index:   emi.Index,
@@ -228,7 +230,7 @@ func (r ExecutionReportingPlugin) Observation(ctx context.Context, timestamp typ
 	// We want to execute any messages which satisfy the following:
 	// 1. Have the executor field set to the DONs message executor contract
 	// 2. There exists a confirmed relay report containing its sequence number, i.e. it's status is RequestStatusRelayConfirmed
-	relayedReqs, err := r.orm.Requests(r.sourceChainId, r.destChainId, r.onRamp, r.offRamp, nil, nil, RequestStatusRelayConfirmed, &r.executor, nil)
+	relayedReqs, err := r.orm.Requests(r.sourceChainId, r.destChainId, r.onRamp, r.offRamp, 0, math.MaxInt64, RequestStatusRelayConfirmed, &r.executor, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -236,8 +238,8 @@ func (r ExecutionReportingPlugin) Observation(ctx context.Context, timestamp typ
 	// which should not result in a new report being generated during the Report step.
 	if len(relayedReqs) == 0 {
 		b, jsonErr := json.Marshal(&Observation{
-			MinSeqNum: utils.Big(*NoRequestsToProcess),
-			MaxSeqNum: utils.Big(*NoRequestsToProcess),
+			MinSeqNum: NoRequestsToProcess,
+			MaxSeqNum: NoRequestsToProcess,
 		})
 		if jsonErr != nil {
 			return nil, jsonErr
@@ -249,7 +251,7 @@ func (r ExecutionReportingPlugin) Observation(ctx context.Context, timestamp typ
 	if err != nil {
 		return nil, err
 	}
-	if relayedReqs[len(relayedReqs)-1].SeqNum.ToInt().Cmp(lr.MaxSequenceNumber) > 0 {
+	if uint64(relayedReqs[len(relayedReqs)-1].SeqNum) > lr.MaxSequenceNumber {
 		return nil, errors.Errorf("invariant violated, mismatch between relay_confirmed requests and last report")
 	}
 	b, err := json.Marshal(&Observation{
@@ -263,29 +265,17 @@ func (r ExecutionReportingPlugin) Observation(ctx context.Context, timestamp typ
 }
 
 func (r ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.ReportTimestamp, query types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
-	var nonEmptyObservations = r.getNonEmptyObservation(observations)
+	nonEmptyObservations := getNonEmptyObservations(r.l, observations)
 	// Need at least F+1 observations
 	if len(nonEmptyObservations) <= r.F {
 		r.l.Tracew("Non-empty observations <= F, need at least F+1 to continue")
 		return false, nil, nil
 	}
-	// We have at least F+1 valid observations
-	// Extract the min and max
-	sort.Slice(nonEmptyObservations, func(i, j int) bool {
-		return nonEmptyObservations[i].MinSeqNum.ToInt().Cmp(nonEmptyObservations[j].MinSeqNum.ToInt()) < 0
-	})
-	// r.F < len(nonEmptyObservations) because of the check above and therefore this is safe
-	minSeqNum := *nonEmptyObservations[r.F].MinSeqNum.ToInt()
-	sort.Slice(nonEmptyObservations, func(i, j int) bool {
-		return nonEmptyObservations[i].MaxSeqNum.ToInt().Cmp(nonEmptyObservations[j].MaxSeqNum.ToInt()) < 0
-	})
-	// We use a conservative maximum. If we pick a value that some honest oracles might not
-	// have seen they’ll end up not agreeing on a report, stalling the protocol.
-	maxSeqNum := *nonEmptyObservations[r.F].MaxSeqNum.ToInt()
-	if maxSeqNum.Cmp(&minSeqNum) < 0 {
-		return false, nil, errors.New("max seq num smaller than min")
+	minSeqNum, maxSeqNum, err := getMinMaxSequenceNumbers(nonEmptyObservations, r.F)
+	if err != nil {
+		return false, nil, errors.Wrap(err, "failed getting valid sequence numbers from observations")
 	}
-	reqs, err := r.orm.Requests(r.sourceChainId, r.destChainId, r.onRamp, r.offRamp, &minSeqNum, &maxSeqNum, RequestStatusRelayConfirmed, &r.executor, nil)
+	reqs, err := r.orm.Requests(r.sourceChainId, r.destChainId, r.onRamp, r.offRamp, minSeqNum, maxSeqNum, RequestStatusRelayConfirmed, &r.executor, nil)
 	if err != nil {
 		return false, nil, err
 	}
@@ -297,7 +287,7 @@ func (r ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.Re
 	if err != nil {
 		return false, nil, err
 	}
-	if reqs[len(reqs)-1].SeqNum.ToInt().Cmp(lr.MaxSequenceNumber) > 0 {
+	if uint64(reqs[len(reqs)-1].SeqNum) > lr.MaxSequenceNumber {
 		return false, nil, errors.Errorf("invariant violated, mismatch between relay_confirmed requests (max %v) and last report (max %v)", reqs[len(reqs)-1].SeqNum, lr.MaxSequenceNumber)
 	}
 	report, err := r.buildReport(reqs)
@@ -305,28 +295,6 @@ func (r ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.Re
 		return false, nil, err
 	}
 	return true, report, nil
-}
-
-func (r ExecutionReportingPlugin) getNonEmptyObservation(observations []types.AttributedObservation) (nonEmptyObservations []Observation) {
-	for _, ao := range observations {
-		var ob Observation
-		err := json.Unmarshal(ao.Observation, &ob)
-		if err != nil {
-			r.l.Errorw("Received unmarshallable observation", "err", err, "observation", string(ao.Observation))
-			continue
-		}
-		minSeqNum := ob.MinSeqNum.ToInt()
-		if minSeqNum.Sign() < 0 {
-			if minSeqNum.Cmp(NoRequestsToProcess) == 0 {
-				r.l.Tracew("Discarded empty observation %+v", ao)
-			} else {
-				r.l.Warnf("Discarded invalid observation %+v", ao)
-			}
-			continue
-		}
-		nonEmptyObservations = append(nonEmptyObservations, ob)
-	}
-	return nonEmptyObservations
 }
 
 // For each message in the given range of sequence numbers (with potential holes):
@@ -340,12 +308,12 @@ func (r ExecutionReportingPlugin) buildReport(reqs []*Request) ([]byte, error) {
 	for _, req := range reqs {
 		// Look up all the messages that are in the same report
 		// as this one (even externally executed ones), generate a Proof and double-check the root checks out.
-		rep, err2 := r.orm.RelayReport(req.SeqNum.ToInt())
+		rep, err2 := r.orm.RelayReport(req.SeqNum)
 		if err2 != nil {
-			r.l.Errorw("Could not find relay report for request", "err", err2, "seq num", req.SeqNum.String())
+			r.l.Errorw("Could not find relay report for request", "err", err2, "seq num", req.SeqNum)
 			continue
 		}
-		allReqsInReport, err3 := r.orm.Requests(r.sourceChainId, r.destChainId, req.OnRamp, req.OffRamp, rep.MinSeqNum.ToInt(), rep.MaxSeqNum.ToInt(), "", nil, nil)
+		allReqsInReport, err3 := r.orm.Requests(r.sourceChainId, r.destChainId, req.OnRamp, req.OffRamp, rep.MinSeqNum, rep.MaxSeqNum, "", nil, nil)
 		if err3 != nil {
 			continue
 		}
@@ -353,8 +321,8 @@ func (r ExecutionReportingPlugin) buildReport(reqs []*Request) ([]byte, error) {
 		for _, reqInReport := range allReqsInReport {
 			leaves = append(leaves, reqInReport.Raw)
 		}
-		index := big.NewInt(0).Sub(req.SeqNum.ToInt(), rep.MinSeqNum.ToInt())
-		root, proof := GenerateMerkleProof(32, leaves, int(index.Int64()))
+		index := req.SeqNum - rep.MinSeqNum
+		root, proof := GenerateMerkleProof(32, leaves, int(index))
 		if !bytes.Equal(root[:], rep.Root[:]) {
 			continue
 		}
@@ -379,9 +347,9 @@ func (r ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Contex
 		return false, nil
 	}
 
-	var seqNums []*big.Int
+	var seqNums []int64
 	for i := range ems {
-		seqNums = append(seqNums, ems[i].Message.SequenceNumber)
+		seqNums = append(seqNums, int64(ems[i].Message.SequenceNumber))
 	}
 
 	// If the first message is executed already, this execution report is stale, and we do not accept it.
@@ -409,14 +377,17 @@ func (r ExecutionReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Conte
 	if err != nil {
 		return false, nil
 	}
+	if parsedReport[0].Message.SequenceNumber > math.MaxInt64 {
+		return false, errors.New("sequenceNumber is larger than max int64")
+	}
 	// If report is not stale we transmit.
 	// When the executeTransmitter enqueues the tx for bptxm,
 	// we mark it as execution_sent, removing it from the set of inflight messages.
-	stale, err := r.isStale(parsedReport[0].Message.SequenceNumber)
+	stale, err := r.isStale(int64(parsedReport[0].Message.SequenceNumber))
 	return !stale, err
 }
 
-func (r ExecutionReportingPlugin) isStale(min *big.Int) (bool, error) {
+func (r ExecutionReportingPlugin) isStale(min int64) (bool, error) {
 	// If the first message is executed already, this execution report is stale.
 	req, err := r.orm.Requests(r.sourceChainId, r.destChainId, r.onRamp, r.offRamp, min, min, "", nil, nil)
 	if err != nil {

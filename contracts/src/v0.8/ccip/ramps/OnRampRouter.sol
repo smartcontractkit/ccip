@@ -21,7 +21,7 @@ contract OnRampRouter is TypeAndVersionInterface, OwnerIsCreator {
    * @param payload The message payload
    * @return The sequence number of the message
    */
-  function requestCrossChainSend(CCIP.MessagePayload calldata payload) external returns (uint256) {
+  function requestCrossChainSend(CCIP.MessagePayload calldata payload) external returns (uint64) {
     address sender = msg.sender;
     OnRampInterface onRamp = s_onRamps[payload.destinationChainId];
     if (address(onRamp) == address(0)) revert OnRampInterface.UnsupportedDestinationChain(payload.destinationChainId);

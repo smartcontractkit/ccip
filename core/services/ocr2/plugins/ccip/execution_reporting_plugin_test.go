@@ -33,7 +33,6 @@ import (
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 	mocks "github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/mocks/lastreporter"
-	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
 func TestExecutionReportEncoding(t *testing.T) {
@@ -120,7 +119,7 @@ func TestExecutionReportEncoding(t *testing.T) {
 	destChain.Commit()
 
 	message := ccip.Request{
-		SeqNum:        *utils.NewBigI(10),
+		SeqNum:        10,
 		SourceChainID: sourceChainID.String(),
 		DestChainID:   destChainID.String(),
 		OnRamp:        onRamp,
@@ -142,8 +141,8 @@ func TestExecutionReportEncoding(t *testing.T) {
 
 	report := offramp.CCIPRelayReport{
 		MerkleRoot:        root,
-		MinSequenceNumber: big.NewInt(10),
-		MaxSequenceNumber: big.NewInt(10),
+		MinSequenceNumber: 10,
+		MaxSequenceNumber: 10,
 	}
 	encodeRelayReport, err := ccip.EncodeRelayReport(&report)
 	require.NoError(t, err)
@@ -180,7 +179,7 @@ func TestExecutionReportEncoding(t *testing.T) {
 	t.Log(ems)
 
 	helperMessage := offramp_helper.CCIPMessage{
-		SequenceNumber: message.SequenceNumber,
+		SequenceNumber: uint64(message.SequenceNumber),
 		SourceChainId:  message.SourceChainId,
 		Sender:         message.Sender,
 		Payload: offramp_helper.CCIPMessagePayload{
@@ -212,7 +211,7 @@ func TestExecutionReportInvariance(t *testing.T) {
 	message := ccip.ExecutableMessage{
 		Path: [][32]byte{{}},
 		Message: ccip.Message{
-			SequenceNumber: big.NewInt(2e18),
+			SequenceNumber: 2e18,
 			SourceChainId:  big.NewInt(9999999999999999),
 			Sender:         common.HexToAddress("0xf97f4df75117a78c1A5a0DBb814Af92458539FB2"),
 			Payload: struct {
@@ -263,12 +262,12 @@ func TestExecutionPlugin(t *testing.T) {
 	require.NoError(t, err)
 	var observation ccip.Observation
 	require.NoError(t, json.Unmarshal(obs, &observation))
-	require.Equal(t, observation.MinSeqNum.String(), "-1")
-	require.Equal(t, observation.MaxSeqNum.String(), "-1")
+	require.Equal(t, observation.MinSeqNum, ccip.NoRequestsToProcess)
+	require.Equal(t, observation.MaxSeqNum, ccip.NoRequestsToProcess)
 
 	// Observe with a non-relay-confirmed request should still return no requests
 	req := ccip.Request{
-		SeqNum:        *utils.NewBigI(2),
+		SeqNum:        2,
 		SourceChainID: sid.String(),
 		DestChainID:   did.String(),
 		OnRamp:        onRamp,
@@ -287,12 +286,12 @@ func TestExecutionPlugin(t *testing.T) {
 	obs, err = rp.Observation(context.Background(), types.ReportTimestamp{}, types.Query{})
 	require.NoError(t, err)
 	require.NoError(t, json.Unmarshal(obs, &observation))
-	require.Equal(t, observation.MinSeqNum.String(), "-1")
-	require.Equal(t, observation.MaxSeqNum.String(), "-1")
+	require.Equal(t, observation.MinSeqNum, ccip.NoRequestsToProcess)
+	require.Equal(t, observation.MaxSeqNum, ccip.NoRequestsToProcess)
 
 	// We should see an error if the latest report doesn't have a higher seq num
 	lr.On("GetLastReport", mock.Anything).Return(getLastReportMock(1)).Once()
-	require.NoError(t, orm.UpdateRequestSetStatus(sid, did, onRamp, offRamp, []*big.Int{big.NewInt(2)}, ccip.RequestStatusRelayConfirmed))
+	require.NoError(t, orm.UpdateRequestSetStatus(sid, did, onRamp, offRamp, []int64{2}, ccip.RequestStatusRelayConfirmed))
 	obs, err = rp.Observation(context.Background(), types.ReportTimestamp{}, types.Query{})
 	require.Error(t, err)
 	// Should succeed if we do have a higher seq num
@@ -301,13 +300,13 @@ func TestExecutionPlugin(t *testing.T) {
 	require.NoError(t, err)
 	var o ccip.Observation
 	require.NoError(t, json.Unmarshal(obs, &o))
-	require.Equal(t, "2", o.MinSeqNum.String())
-	require.Equal(t, "2", o.MaxSeqNum.String())
+	require.Equal(t, int64(2), o.MinSeqNum)
+	require.Equal(t, int64(2), o.MaxSeqNum)
 
 	// If all the nodes report the same, this should succeed
 	// First add the relay report
 	root, _ := ccip.GenerateMerkleProof(32, [][]byte{b}, 0)
-	require.NoError(t, orm.SaveRelayReport(ccip.RelayReport{Root: root[:], MinSeqNum: *utils.NewBigI(2), MaxSeqNum: *utils.NewBigI(2)}))
+	require.NoError(t, orm.SaveRelayReport(ccip.RelayReport{Root: root[:], MinSeqNum: 2, MaxSeqNum: 2}))
 	lr.On("GetLastReport", mock.Anything).Return(getLastReportMock(2)).Once()
 	finalizeReport, rep, err := rp.Report(context.Background(), types.ReportTimestamp{}, types.Query{}, []types.AttributedObservation{
 		{Observation: obs}, {Observation: obs}, {Observation: obs}, {Observation: obs},
@@ -318,7 +317,7 @@ func TestExecutionPlugin(t *testing.T) {
 	require.NoError(t, err)
 	// Should see our one message there
 	require.Len(t, executableMessages, 1)
-	require.Equal(t, "2", executableMessages[0].Message.SequenceNumber.String())
+	require.Equal(t, uint64(2), executableMessages[0].Message.SequenceNumber)
 
 	// If we have < F observations, we should not get a report
 	finalizeReport, rep, err = rp.Report(context.Background(), types.ReportTimestamp{}, types.Query{}, []types.AttributedObservation{
@@ -327,8 +326,8 @@ func TestExecutionPlugin(t *testing.T) {
 	require.False(t, finalizeReport)
 	// With F=1, that means a single value cannot corrupt our report
 	var fakeObs = ccip.Observation{
-		MinSeqNum: *utils.NewBigI(10000),
-		MaxSeqNum: *utils.NewBigI(10000),
+		MinSeqNum: 10000,
+		MaxSeqNum: 10000,
 	}
 	b, err = json.Marshal(fakeObs)
 	require.NoError(t, err)
@@ -341,10 +340,10 @@ func TestExecutionPlugin(t *testing.T) {
 	executableMessages, err = ccip.DecodeExecutionReport(rep)
 	require.NoError(t, err)
 	require.Len(t, executableMessages, 1)
-	require.Equal(t, "2", executableMessages[0].Message.SequenceNumber.String())
+	require.Equal(t, uint64(2), executableMessages[0].Message.SequenceNumber)
 
 	// Should not accept or transmit if the report is stale
-	err = orm.UpdateRequestSetStatus(sid, did, onRamp, offRamp, []*big.Int{big.NewInt(2)}, ccip.RequestStatusExecutionConfirmed)
+	err = orm.UpdateRequestSetStatus(sid, did, onRamp, offRamp, []int64{2}, ccip.RequestStatusExecutionConfirmed)
 	require.NoError(t, err)
 	accept, err := rp.ShouldAcceptFinalizedReport(context.Background(), types.ReportTimestamp{}, rep)
 	require.NoError(t, err)
@@ -358,7 +357,7 @@ func TestExecutionPlugin(t *testing.T) {
 	var leaves [][]byte
 	for i := 3; i < 6; i++ {
 		req := ccip.Request{
-			SeqNum:        *utils.NewBigI(int64(i)),
+			SeqNum:        int64(i),
 			SourceChainID: sid.String(),
 			DestChainID:   did.String(),
 			OnRamp:        onRamp,
@@ -376,19 +375,19 @@ func TestExecutionPlugin(t *testing.T) {
 		require.NoError(t, orm.SaveRequest(&req))
 		leaves = append(leaves, b)
 	}
-	require.NoError(t, orm.UpdateRequestStatus(sid, did, onRamp, offRamp, big.NewInt(3), big.NewInt(5), ccip.RequestStatusRelayConfirmed))
+	require.NoError(t, orm.UpdateRequestStatus(sid, did, onRamp, offRamp, 3, 5, ccip.RequestStatusRelayConfirmed))
 	lr.On("GetLastReport", mock.Anything).Return(getLastReportMock(5)).Once()
 	obs, err = rp.Observation(context.Background(), types.ReportTimestamp{}, types.Query{})
 	require.NoError(t, err)
 	require.NoError(t, json.Unmarshal(obs, &o))
-	require.Equal(t, "3", o.MinSeqNum.String())
-	require.Equal(t, "5", o.MaxSeqNum.String())
+	require.Equal(t, int64(3), o.MinSeqNum)
+	require.Equal(t, int64(5), o.MaxSeqNum)
 
 	// Let's put 2 in one report and 1 in a different report then assert the execution report makes sense
 	root1, _ := ccip.GenerateMerkleProof(32, [][]byte{leaves[0]}, 0)
-	require.NoError(t, orm.SaveRelayReport(ccip.RelayReport{Root: root1[:], MinSeqNum: *utils.NewBigI(3), MaxSeqNum: *utils.NewBigI(3)}))
+	require.NoError(t, orm.SaveRelayReport(ccip.RelayReport{Root: root1[:], MinSeqNum: 3, MaxSeqNum: 3}))
 	root2, _ := ccip.GenerateMerkleProof(32, [][]byte{leaves[1], leaves[2]}, 0)
-	require.NoError(t, orm.SaveRelayReport(ccip.RelayReport{Root: root2[:], MinSeqNum: *utils.NewBigI(4), MaxSeqNum: *utils.NewBigI(5)}))
+	require.NoError(t, orm.SaveRelayReport(ccip.RelayReport{Root: root2[:], MinSeqNum: 4, MaxSeqNum: 5}))
 	lr.On("GetLastReport", mock.Anything).Return(getLastReportMock(5)).Once()
 	finalizeReport, rep, err = rp.Report(context.Background(), types.ReportTimestamp{}, types.Query{}, []types.AttributedObservation{
 		{Observation: obs}, {Observation: obs}, {Observation: obs}, {Observation: obs},
@@ -406,9 +405,8 @@ func TestExecutionPlugin(t *testing.T) {
 }
 
 func getLastReportMock(maxSequenceNumber int64) (offramp.CCIPRelayReport, error) {
-	maxSequenceNumberBig := big.NewInt(maxSequenceNumber)
 	return offramp.CCIPRelayReport{
-		MaxSequenceNumber: maxSequenceNumberBig,
+		MaxSequenceNumber: uint64(maxSequenceNumber),
 	}, nil
 }
 

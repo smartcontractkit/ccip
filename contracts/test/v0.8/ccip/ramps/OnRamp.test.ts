@@ -270,7 +270,7 @@ describe('OnRamp', () => {
 
   describe('#withdrawAccumulatedFees', () => {
     let receiver: string
-    let messagedata: string
+    let messageData: string
     let options: string
     let amounts: Array<BigNumber>
     let payload: CCIPMessagePayload
@@ -281,12 +281,12 @@ describe('OnRamp', () => {
 
     beforeEach(async () => {
       receiver = await roles.stranger.getAddress()
-      messagedata = hre.ethers.constants.HashZero
+      messageData = hre.ethers.constants.HashZero
       options = hre.ethers.constants.HashZero
       amounts = [bucketRate.div(8)]
       payload = {
         receiver: receiver,
-        data: messagedata,
+        data: messageData,
         tokens: [tokens.map((t) => t.address)[0]],
         amounts: amounts,
         destinationChainId: destinationChainIds[0],
@@ -356,19 +356,19 @@ describe('OnRamp', () => {
 
   describe('#requestCrossChainSend', async () => {
     let receiver: string
-    let messagedata: string
+    let messageData: string
     let options: string
     let amounts: Array<BigNumber>
     let payload: CCIPMessagePayload
 
     beforeEach(async () => {
       receiver = await roles.stranger.getAddress()
-      messagedata = hre.ethers.constants.HashZero
+      messageData = hre.ethers.constants.HashZero
       options = hre.ethers.constants.HashZero
       amounts = [bucketRate.div(8), bucketRate.div(4), bucketRate.div(2)]
       payload = {
         receiver: receiver,
-        data: messagedata,
+        data: messageData,
         tokens: tokens.map((t) => t.address),
         amounts: amounts,
         destinationChainId: destinationChainIds[0],
@@ -397,7 +397,7 @@ describe('OnRamp', () => {
           .connect(roles.defaultAccount)
           .requestCrossChainSend(payload, hre.ethers.constants.AddressZero)
         gasUsed = gasUsed.add((await tx.wait()).gasUsed)
-        expectGasWithinDeviation(gasUsed, 190_196)
+        expectGasWithinDeviation(gasUsed, 190_394)
       })
 
       it('GASTEST - Send 1 token [ @skip-coverage ]', async () => {
@@ -411,7 +411,7 @@ describe('OnRamp', () => {
           .connect(roles.defaultAccount)
           .requestCrossChainSend(payload, hre.ethers.constants.AddressZero)
         gasUsed = gasUsed.add((await tx.wait()).gasUsed)
-        expectGasWithinDeviation(gasUsed, 212_877)
+        expectGasWithinDeviation(gasUsed, 213_081)
       })
 
       it('GASTEST - Send 2 tokens [ @skip-coverage ]', async () => {
@@ -427,7 +427,7 @@ describe('OnRamp', () => {
           .connect(roles.defaultAccount)
           .requestCrossChainSend(payload, hre.ethers.constants.AddressZero)
         gasUsed = gasUsed.add((await tx.wait()).gasUsed)
-        expectGasWithinDeviation(gasUsed, 323_186)
+        expectGasWithinDeviation(gasUsed, 323_390)
       })
 
       it('GASTEST - Send 3 tokens [ @skip-coverage ]', async () => {
@@ -441,7 +441,7 @@ describe('OnRamp', () => {
           .connect(roles.defaultAccount)
           .requestCrossChainSend(payload, hre.ethers.constants.AddressZero)
         gasUsed = gasUsed.add((await tx.wait()).gasUsed)
-        expectGasWithinDeviation(gasUsed, 433_495)
+        expectGasWithinDeviation(gasUsed, 433_687)
       })
     })
 
@@ -491,7 +491,7 @@ describe('OnRamp', () => {
           destinationChainId: BigNumber.from(payload.destinationChainId),
           sender: await roles.defaultAccount.getAddress(),
           receiver: receiver,
-          data: messagedata,
+          data: messageData,
           tokens: tokens.map((t) => t.address),
           amounts: expectedAmounts,
           options: options,
@@ -561,7 +561,7 @@ describe('OnRamp', () => {
           destinationChainId: BigNumber.from(payload.destinationChainId),
           sender: await roles.defaultAccount.getAddress(),
           receiver: receiver,
-          data: messagedata,
+          data: messageData,
           tokens: tokens.map((t) => t.address),
           amounts: expectedAmounts,
           options: options,

@@ -6,8 +6,8 @@ import "../../vendor/IERC20.sol";
 contract CCIP {
   /// @notice High level message
   struct Message {
-    uint256 sequenceNumber;
     uint256 sourceChainId;
+    uint64 sequenceNumber;
     address sender;
     MessagePayload payload;
   }
@@ -26,8 +26,8 @@ contract CCIP {
   /// @notice Report that is relayed by the observing DON at the relay phase
   struct RelayReport {
     bytes32 merkleRoot;
-    uint256 minSequenceNumber;
-    uint256 maxSequenceNumber;
+    uint64 minSequenceNumber;
+    uint64 maxSequenceNumber;
   }
 
   struct MerkleProof {

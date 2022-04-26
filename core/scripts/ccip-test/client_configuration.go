@@ -288,7 +288,7 @@ func (client CCIPClient) DonExecutionHappyPath(t *testing.T) {
 	client.Source.ApproveLink(t, client.Source.OnRamp.Address(), amount)
 	DestBlockNum := GetCurrentBlockNumber(client.Dest.Client.Client)
 	crossChainRequest := client.SendToOnrampWithExecution(client.Source, client.Source.Owner, client.Dest.Owner.From, amount, client.Dest.MessageExecutor.Address())
-	client.Source.logger.Infof("Don executed tx submitted with sequence number: %d", crossChainRequest.Message.SequenceNumber.Int64())
+	client.Source.logger.Infof("Don executed tx submitted with sequence number: %d", crossChainRequest.Message.SequenceNumber)
 	client.Source.logger.Infof("Waiting for Destination funds transfer...")
 
 	events := make(chan *offramp.OffRampCrossChainMessageExecuted)
@@ -298,7 +298,7 @@ func (client CCIPClient) DonExecutionHappyPath(t *testing.T) {
 			Start:   &DestBlockNum,
 		},
 		events,
-		[]*big.Int{crossChainRequest.Message.SequenceNumber})
+		[]uint64{crossChainRequest.Message.SequenceNumber})
 	require.NoError(t, err)
 	defer sub.Unsubscribe()
 
@@ -320,7 +320,7 @@ func (client CCIPClient) ExternalExecutionHappyPath(t *testing.T) {
 	client.Source.ApproveLink(t, client.Source.OnRamp.Address(), amount)
 
 	onrampRequest := client.SendToOnrampWithExecution(client.Source, client.Source.Owner, client.Dest.Owner.From, amount, common.HexToAddress("0x0000000000000000000000000000000000000000"))
-	sequenceNumber := onrampRequest.Message.SequenceNumber.Int64()
+	sequenceNumber := onrampRequest.Message.SequenceNumber
 
 	// Gets the report that our transaction is included in
 	client.Dest.logger.Info("Getting report")
@@ -361,12 +361,10 @@ func (client CCIPClient) CrossChainSendPausedOfframpShouldFail(t *testing.T) {
 
 	amount, _ := new(big.Int).SetString("10", 10)
 	client.Source.ApproveLink(t, client.Source.SenderDapp.Address(), amount)
-
 	onrampRequest := client.SendToDappWithExecution(client.Source, client.Source.Owner, client.Dest.Owner.From, amount, common.HexToAddress("0x0000000000000000000000000000000000000000"))
-	sequenceNumber := onrampRequest.Message.SequenceNumber.Int64()
 
 	client.Dest.logger.Info("Waiting for report...")
-	_, err := client.GetReportForSequenceNumber(ctx, sequenceNumber, offrampBlockNumber)
+	_, err := client.GetReportForSequenceNumber(ctx, onrampRequest.Message.SequenceNumber, offrampBlockNumber)
 	if err.Error() == "No report found within the given time" {
 		client.Dest.logger.Info("Success, no oracle report sent to paused offramp.")
 	} else {
@@ -392,11 +390,10 @@ func (client CCIPClient) ExternalExecutionSubmitOfframpTwiceShouldFail(t *testin
 	client.Source.ApproveLink(t, client.Source.SenderDapp.Address(), amount)
 
 	onrampRequest := client.SendToDappWithExecution(client.Source, client.Source.Owner, client.Dest.Owner.From, amount, common.HexToAddress("0x0000000000000000000000000000000000000000"))
-	sequenceNumber := onrampRequest.Message.SequenceNumber.Int64()
 
 	// Gets the report that our transaction is included in
 	client.Dest.logger.Info("Getting report")
-	report, err := client.GetReportForSequenceNumber(ctx, sequenceNumber, offrampBlockNumber)
+	report, err := client.GetReportForSequenceNumber(ctx, onrampRequest.Message.SequenceNumber, offrampBlockNumber)
 	require.NoError(t, err)
 
 	// Get all requests included in the given report
@@ -433,7 +430,7 @@ func (client CCIPClient) ScalingAndBatching(t *testing.T) {
 			defer wg.Done()
 			client.Source.ApproveLinkFrom(t, user, client.Source.SenderDapp.Address(), amount)
 			crossChainRequest := client.SendToDappWithExecution(client.Source, user, toAddress, amount, client.Dest.MessageExecutor.Address())
-			client.Source.logger.Info("Don executed tx submitted with sequence number: ", crossChainRequest.Message.SequenceNumber.Int64())
+			client.Source.logger.Info("Don executed tx submitted with sequence number: ", crossChainRequest.Message.SequenceNumber)
 		}(user)
 	}
 	wg.Wait()
@@ -476,21 +473,21 @@ func (client CCIPClient) GetCrossChainSendRequestsForRange(
 	require.NoError(t, err)
 
 	var requests []*onramp.OnRampCrossChainSendRequested
-	var minFound = report.MaxSequenceNumber.Int64()
+	var minFound = report.MaxSequenceNumber
 
 	for reqsIterator.Next() {
-		num := reqsIterator.Event.Message.SequenceNumber.Int64()
+		num := reqsIterator.Event.Message.SequenceNumber
 		if num < minFound {
 			minFound = num
 		}
-		if num >= report.MinSequenceNumber.Int64() && num <= report.MaxSequenceNumber.Int64() {
+		if num >= report.MinSequenceNumber && num <= report.MaxSequenceNumber {
 			requests = append(requests, reqsIterator.Event)
 		}
 	}
 
 	// TODO: Even if this check passes, we may not have fetched all necessary requests if
 	// minFound == report.MinSequenceNumber
-	if minFound > report.MinSequenceNumber.Int64() {
+	if minFound > report.MinSequenceNumber {
 		t.Log("Not all cross chain requests found in the last 1000 blocks")
 		t.FailNow()
 	}
@@ -499,28 +496,28 @@ func (client CCIPClient) GetCrossChainSendRequestsForRange(
 }
 
 // GetReportForSequenceNumber return the offramp.CCIPRelayReport for a given ccip requests sequence number.
-func (client CCIPClient) GetReportForSequenceNumber(ctx context.Context, sequenceNumber int64, minBlockNumber uint64) (offramp.CCIPRelayReport, error) {
+func (client CCIPClient) GetReportForSequenceNumber(ctx context.Context, sequenceNumber uint64, minBlockNumber uint64) (offramp.CCIPRelayReport, error) {
 	client.Dest.logger.Infof("Looking for sequenceNumber %d", sequenceNumber)
 	report, err := client.Dest.OffRamp.GetLastReport(&bind.CallOpts{Context: ctx, Pending: false})
 	if err != nil {
 		return offramp.CCIPRelayReport{}, err
 	}
 
-	client.Dest.logger.Infof("Last report found for range %d-%d", report.MinSequenceNumber.Int64(), report.MaxSequenceNumber.Uint64())
+	client.Dest.logger.Infof("Last report found for range %d-%d", report.MinSequenceNumber, report.MaxSequenceNumber)
 	// our tx is in the latest report
-	if sequenceNumber >= report.MinSequenceNumber.Int64() && sequenceNumber <= report.MaxSequenceNumber.Int64() {
+	if sequenceNumber >= report.MinSequenceNumber && sequenceNumber <= report.MaxSequenceNumber {
 		return report, nil
 	}
 	// report isn't out yet, it will be in a future report
-	if sequenceNumber > report.MaxSequenceNumber.Int64() {
+	if sequenceNumber > report.MaxSequenceNumber {
 		maxIterations := CrossChainTimout / RetryTiming
 		for i := 0; i < int(maxIterations); i++ {
 			report, err = client.Dest.OffRamp.GetLastReport(&bind.CallOpts{Context: ctx, Pending: false})
 			if err != nil {
 				return offramp.CCIPRelayReport{}, err
 			}
-			client.Dest.logger.Infof("Last report found for range %d-%d", report.MinSequenceNumber.Int64(), report.MaxSequenceNumber.Uint64())
-			if sequenceNumber >= report.MinSequenceNumber.Int64() && sequenceNumber <= report.MaxSequenceNumber.Int64() {
+			client.Dest.logger.Infof("Last report found for range %d-%d", report.MinSequenceNumber, report.MaxSequenceNumber)
+			if sequenceNumber >= report.MinSequenceNumber && sequenceNumber <= report.MaxSequenceNumber {
 				return report, nil
 			}
 			time.Sleep(RetryTiming)
@@ -541,7 +538,7 @@ func (client CCIPClient) GetReportForSequenceNumber(ctx context.Context, sequenc
 
 	for reports.Next() {
 		report = reports.Event.Report
-		if sequenceNumber >= report.MinSequenceNumber.Int64() && sequenceNumber <= report.MaxSequenceNumber.Int64() {
+		if sequenceNumber >= report.MinSequenceNumber && sequenceNumber <= report.MaxSequenceNumber {
 			return report, nil
 		}
 	}
@@ -568,16 +565,16 @@ func (client CCIPClient) ValidateMerkleRoot(
 		leaves = append(leaves, req.Raw.Data)
 	}
 
-	index := big.NewInt(0).Sub(request.Message.SequenceNumber, report.MinSequenceNumber)
+	index := request.Message.SequenceNumber - report.MinSequenceNumber
 	client.Dest.logger.Info("index is ", index)
-	root, proof := ccip.GenerateMerkleProof(32, leaves, int(index.Int64()))
+	root, proof := ccip.GenerateMerkleProof(32, leaves, int(index))
 	if !bytes.Equal(root[:], report.MerkleRoot[:]) {
 		t.Log("Merkle root does not match the root in the report")
 		t.Logf("Computed %+v, reported %+v", root[:], report.MerkleRoot[:])
 		t.FailNow()
 	}
 
-	genRoot := ccip.GenerateMerkleRoot(leaves[int(index.Int64())], proof)
+	genRoot := ccip.GenerateMerkleRoot(leaves[index], proof)
 	if !reflect.DeepEqual(root[:], genRoot[:]) {
 		panic("Root does not verify")
 	}

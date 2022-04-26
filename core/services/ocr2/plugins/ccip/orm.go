@@ -19,13 +19,22 @@ import (
 //go:generate mockery --name ORM --output ./mocks/ --case=underscore
 type ORM interface {
 	// Note always returns them sorted by seqNum
-	Requests(sourceChainId, destChainId *big.Int, onRamp, offRamp common.Address, minSeqNum, maxSeqNum *big.Int, status RequestStatus, executor *common.Address, options []byte, opt ...pg.QOpt) ([]*Request, error)
+	Requests(sourceChainId, destChainId *big.Int, onRamp, offRamp common.Address, minSeqNum, maxSeqNum int64, status RequestStatus, executor *common.Address, options []byte, opt ...pg.QOpt) ([]*Request, error)
 	SaveRequest(request *Request, qopts ...pg.QOpt) error
-	UpdateRequestStatus(sourceChainId, destChainId *big.Int, onRamp, offRamp common.Address, minSeqNum, maxSeqNum *big.Int, status RequestStatus, qopts ...pg.QOpt) error
-	UpdateRequestSetStatus(sourceChainId, destChainId *big.Int, onRamp, offRamp common.Address, seqNums []*big.Int, status RequestStatus, qopts ...pg.QOpt) error
+	UpdateRequestStatus(sourceChainId, destChainId *big.Int, onRamp, offRamp common.Address, minSeqNum, maxSeqNum int64, status RequestStatus, qopts ...pg.QOpt) error
+	UpdateRequestSetStatus(sourceChainId, destChainId *big.Int, onRamp, offRamp common.Address, seqNums []int64, status RequestStatus, qopts ...pg.QOpt) error
 	ResetExpiredRequests(sourceChainId, destChainId *big.Int, onRamp, offRamp common.Address, expiryTimeoutSeconds int, fromStatus RequestStatus, toStatus RequestStatus, qopts ...pg.QOpt) error
-	RelayReport(seqNum *big.Int, qopts ...pg.QOpt) (RelayReport, error)
+	RelayReport(seqNum int64, qopts ...pg.QOpt) (RelayReport, error)
 	SaveRelayReport(report RelayReport, qopts ...pg.QOpt) error
+}
+
+func validSeqNums(seqNums []int64) error {
+	for _, seqNum := range seqNums {
+		if seqNum <= 0 {
+			return errors.Errorf("invalid seq num found %d", seqNum)
+		}
+	}
+	return nil
 }
 
 type orm struct {
@@ -52,7 +61,7 @@ func NewORM(db *sqlx.DB, lggr logger.Logger, cfg pg.LogConfig) ORM {
 func (o *orm) Requests(
 	sourceChainId, destChainId *big.Int,
 	onRamp, offRamp common.Address,
-	minSeqNum, maxSeqNum *big.Int,
+	minSeqNum, maxSeqNum int64,
 	status RequestStatus,
 	executor *common.Address,
 	options []byte,
@@ -60,7 +69,10 @@ func (o *orm) Requests(
 	q := o.q.WithOpts(qopts...)
 	var b strings.Builder
 	var params []interface{}
-	b.WriteString(`SELECT * FROM ccip_requests WHERE true`)
+
+	b.WriteString(`SELECT * FROM ccip_requests WHERE seq_num >= ? AND seq_num <= ?`)
+	params = append(params, minSeqNum, maxSeqNum)
+
 	if sourceChainId != nil {
 		b.WriteString(" AND source_chain_id = ?")
 		params = append(params, sourceChainId.String())
@@ -76,14 +88,6 @@ func (o *orm) Requests(
 	if offRamp != common.HexToAddress("") {
 		b.WriteString(" AND off_ramp = ?")
 		params = append(params, offRamp)
-	}
-	if minSeqNum != nil {
-		b.WriteString(" AND seq_num >= CAST(? AS NUMERIC(78,0))")
-		params = append(params, minSeqNum.String())
-	}
-	if maxSeqNum != nil {
-		b.WriteString(" AND seq_num <= CAST(? AS NUMERIC(78,0))")
-		params = append(params, maxSeqNum.String())
 	}
 	if status != "" {
 		b.WriteString(" AND status = ?")
@@ -104,23 +108,25 @@ func (o *orm) Requests(
 	return
 }
 
-func (o *orm) UpdateRequestStatus(sourceChainId, destChainId *big.Int, onRamp, offRamp common.Address, minSeqNum, maxSeqNum *big.Int, status RequestStatus, qopts ...pg.QOpt) error {
+func (o *orm) UpdateRequestStatus(sourceChainId, destChainId *big.Int, onRamp, offRamp common.Address, minSeqNum, maxSeqNum int64, status RequestStatus, qopts ...pg.QOpt) error {
+	if err := validSeqNums([]int64{minSeqNum, maxSeqNum}); err != nil {
+		return err
+	}
 	q := o.q.WithOpts(qopts...)
 	// We return seqNum here to error if it doesn't exist
 	sql := `UPDATE ccip_requests SET status = $1, updated_at = now()
-		WHERE seq_num >= CAST($2 AS NUMERIC(78,0))
-		  AND seq_num <= CAST($3 AS NUMERIC(78,0))
+		WHERE seq_num >= $2
+		  AND seq_num <= $3
 		  AND source_chain_id = $4 
 		  AND dest_chain_id = $5 
 	      AND on_ramp = $6
 	      AND off_ramp = $7
 		RETURNING seq_num`
-	res, err := q.Exec(sql, status, minSeqNum.String(), maxSeqNum.String(), sourceChainId.String(), destChainId.String(), onRamp, offRamp)
+	res, err := q.Exec(sql, status, minSeqNum, maxSeqNum, sourceChainId.String(), destChainId.String(), onRamp, offRamp)
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	seqRange := big.NewInt(0).Sub(maxSeqNum, minSeqNum)
-	expectedUpdates := seqRange.Add(seqRange, big.NewInt(1)).Int64()
+	expectedUpdates := maxSeqNum - minSeqNum + 1
 	n, err := res.RowsAffected()
 	if err != nil {
 		return errors.WithStack(err)
@@ -131,7 +137,10 @@ func (o *orm) UpdateRequestStatus(sourceChainId, destChainId *big.Int, onRamp, o
 	return nil
 }
 
-func (o *orm) UpdateRequestSetStatus(sourceChainId, destChainId *big.Int, onRamp, offRamp common.Address, seqNums []*big.Int, status RequestStatus, qopts ...pg.QOpt) error {
+func (o *orm) UpdateRequestSetStatus(sourceChainId, destChainId *big.Int, onRamp, offRamp common.Address, seqNums []int64, status RequestStatus, qopts ...pg.QOpt) error {
+	if err := validSeqNums(seqNums); err != nil {
+		return err
+	}
 	q := o.q.WithOpts(qopts...)
 	if len(seqNums) == 0 {
 		return nil
@@ -142,12 +151,12 @@ func (o *orm) UpdateRequestSetStatus(sourceChainId, destChainId *big.Int, onRamp
 	b.WriteString(`UPDATE ccip_requests SET status = ?, updated_at = now() 
 						WHERE seq_num IN`)
 	params = append(params, status)
-	b.WriteString(`(CAST(? AS NUMERIC(78,0))`)
-	params = append(params, seqNums[0].String())
+	b.WriteString(`(?`)
+	params = append(params, seqNums[0])
 
 	for _, n := range seqNums[1:] {
-		b.WriteString(`,CAST(? AS NUMERIC(78,0))`)
-		params = append(params, n.String())
+		b.WriteString(`,?`)
+		params = append(params, n)
 	}
 	b.WriteString(`) AND source_chain_id = ? AND dest_chain_id = ? AND on_ramp = ? AND off_ramp = ? RETURNING seq_num`)
 	params = append(params, sourceChainId.String(), destChainId.String(), onRamp, offRamp)
@@ -190,11 +199,14 @@ func (o *orm) SaveRequest(request *Request, qopts ...pg.QOpt) error {
 	return q.ExecQNamed(sql, request)
 }
 
-func (o *orm) RelayReport(seqNum *big.Int, qopts ...pg.QOpt) (report RelayReport, err error) {
+func (o *orm) RelayReport(seqNum int64, qopts ...pg.QOpt) (report RelayReport, err error) {
+	if err = validSeqNums([]int64{seqNum}); err != nil {
+		return RelayReport{}, err
+	}
 	q := o.q.WithOpts(qopts...)
 	sql := `SELECT * FROM ccip_relay_reports WHERE min_seq_num <= $1 and max_seq_num >= $1`
 
-	if err = q.Get(&report, sql, seqNum.String()); err != nil {
+	if err = q.Get(&report, sql, seqNum); err != nil {
 		return RelayReport{}, err
 	}
 	return
@@ -204,5 +216,5 @@ func (o *orm) SaveRelayReport(report RelayReport, qopts ...pg.QOpt) error {
 	q := o.q.WithOpts(qopts...)
 	sql := `INSERT INTO ccip_relay_reports (root, min_seq_num, max_seq_num, created_at) VALUES ($1, $2, $3, now()) ON CONFLICT DO NOTHING`
 
-	return q.ExecQ(sql, report.Root[:], report.MinSeqNum.String(), report.MaxSeqNum.String())
+	return q.ExecQ(sql, report.Root[:], report.MinSeqNum, report.MaxSeqNum)
 }

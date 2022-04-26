@@ -7,7 +7,7 @@ CREATE TABLE ccip_requests
     dest_chain_id   text           NOT NULL,
     on_ramp         bytea          NOT NULL,
     off_ramp        bytea          NOT NULL,
-    seq_num         numeric(78, 0) NOT NULL,
+    seq_num         bigint         NOT NULL CHECK (seq_num >= 1),
     sender          bytea          NOT NULL,
     receiver        bytea          NOT NULL,
     data            bytea          NOT NULL,
@@ -29,9 +29,9 @@ CREATE INDEX IF NOT EXISTS idx_ccip_requests_updated ON ccip_requests USING brin
 
 CREATE TABLE ccip_relay_reports
 (
-    root        bytea PRIMARY KEY,
-    min_seq_num numeric(78, 0) NOT NULL,
-    max_seq_num numeric(78, 0) NOT NULL,
+    root        bytea     PRIMARY KEY,
+    min_seq_num bigint    NOT NULL CHECK (min_seq_num >= 1),
+    max_seq_num bigint    NOT NULL CHECK (min_seq_num >= 1),
     created_at  timestamptz    NOT NULL DEFAULT now()
         CONSTRAINT chk_root CHECK (octet_length(root) = 32)
 );

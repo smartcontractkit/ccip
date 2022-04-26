@@ -43,7 +43,7 @@ contract SenderDapp is TypeAndVersionInterface {
     IERC20[] memory tokens,
     uint256[] memory amounts,
     address executor
-  ) external returns (uint256 sequenceNumber) {
+  ) external returns (uint64 sequenceNumber) {
     if (destinationAddress == address(0)) revert InvalidDestinationAddress(destinationAddress);
     bytes memory options;
     address originalSender = msg.sender;

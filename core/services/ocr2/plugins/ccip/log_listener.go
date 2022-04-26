@@ -3,6 +3,7 @@ package ccip
 import (
 	"context"
 	"fmt"
+	"math"
 	"math/big"
 	"reflect"
 	"sync"
@@ -255,10 +256,14 @@ func (l *LogListener) updateIncomingConfirmationsConfig(log types.Log) error {
 
 func (l *LogListener) handleCrossChainMessageExecuted(executed *offramp.OffRampCrossChainMessageExecuted, lb log.Broadcast) {
 	l.logger.Infow("Cross chain request executed",
-		"seqNum", fmt.Sprintf("%d", executed.SequenceNumber.Int64()),
+		"seqNum", fmt.Sprintf("%d", executed.SequenceNumber),
 		"jobID", lb.JobID(),
 	)
-	err := l.orm.UpdateRequestStatus(l.sourceChainId, l.destChainId, l.onRamp.Address(), l.offRamp.Address(), executed.SequenceNumber, executed.SequenceNumber, RequestStatusExecutionConfirmed)
+	if executed.SequenceNumber > math.MaxInt64 {
+		l.logger.Errorw("Failed to save CCIP request: SequenceNumber is larger than max int64")
+		return
+	}
+	err := l.orm.UpdateRequestStatus(l.sourceChainId, l.destChainId, l.onRamp.Address(), l.offRamp.Address(), int64(executed.SequenceNumber), int64(executed.SequenceNumber), RequestStatusExecutionConfirmed)
 	if err != nil {
 		// We can replay the logs if needed
 		l.logger.Errorw("Failed to save CCIP request", "err", err)
@@ -275,9 +280,13 @@ func (l *LogListener) handleCrossChainReportRelayed(relayed *offramp.OffRampRepo
 		"maxSeqNum", fmt.Sprintf("%0x", relayed.Report.MaxSequenceNumber),
 		"jobID", lb.JobID(),
 	)
+	if relayed.Report.MinSequenceNumber > math.MaxInt64 || relayed.Report.MaxSequenceNumber > math.MaxInt64 {
+		l.logger.Errorw("Failed to save CCIP request: SequenceNumber is larger than max int64")
+		return
+	}
 
 	_ = l.q.Transaction(func(tx pg.Queryer) error {
-		err := l.orm.UpdateRequestStatus(l.sourceChainId, l.destChainId, l.onRamp.Address(), l.offRamp.Address(), relayed.Report.MinSequenceNumber, relayed.Report.MaxSequenceNumber, RequestStatusRelayConfirmed)
+		err := l.orm.UpdateRequestStatus(l.sourceChainId, l.destChainId, l.onRamp.Address(), l.offRamp.Address(), int64(relayed.Report.MinSequenceNumber), int64(relayed.Report.MaxSequenceNumber), RequestStatusRelayConfirmed)
 		if err != nil {
 			// We can replay the logs if needed
 			l.logger.Errorw("Failed to save CCIP request", "err", err)
@@ -285,8 +294,8 @@ func (l *LogListener) handleCrossChainReportRelayed(relayed *offramp.OffRampRepo
 		}
 		err = l.orm.SaveRelayReport(RelayReport{
 			Root:      relayed.Report.MerkleRoot[:],
-			MinSeqNum: *utils.NewBig(relayed.Report.MinSequenceNumber),
-			MaxSeqNum: *utils.NewBig(relayed.Report.MaxSequenceNumber),
+			MinSeqNum: int64(relayed.Report.MinSequenceNumber),
+			MaxSeqNum: int64(relayed.Report.MaxSequenceNumber),
 		})
 		if err != nil {
 			// We can replay the logs if needed
@@ -304,7 +313,7 @@ func (l *LogListener) handleCrossChainReportRelayed(relayed *offramp.OffRampRepo
 // TODO: add Message bounds to onramp and include assertion offchain as well.
 func (l *LogListener) handleCrossChainSendRequested(request *onramp.OnRampCrossChainSendRequested, lb log.Broadcast) {
 	l.logger.Infow("Cross chain send request received",
-		"requestId", fmt.Sprintf("%d", request.Message.SequenceNumber.Int64()),
+		"requestId", fmt.Sprintf("%d", request.Message.SequenceNumber),
 		"sender", request.Message.Sender,
 		"receiver", request.Message.Payload.Receiver,
 		"sourceChainId", request.Message.SourceChainId,
@@ -314,6 +323,10 @@ func (l *LogListener) handleCrossChainSendRequested(request *onramp.OnRampCrossC
 		"options", request.Message.Payload.Options,
 		"jobID", lb.JobID(),
 	)
+	if request.Message.SequenceNumber > math.MaxInt64 {
+		l.logger.Errorw("Failed to save CCIP request: SequenceNumber is larger than max int64")
+		return
+	}
 
 	var tokens []string
 	for _, token := range request.Message.Payload.Tokens {
@@ -324,7 +337,7 @@ func (l *LogListener) handleCrossChainSendRequested(request *onramp.OnRampCrossC
 		amounts = append(amounts, amount.String())
 	}
 	err := l.orm.SaveRequest(&Request{
-		SeqNum:        *utils.NewBig(request.Message.SequenceNumber),
+		SeqNum:        int64(request.Message.SequenceNumber),
 		SourceChainID: request.Message.SourceChainId.String(),
 		DestChainID:   request.Message.Payload.DestinationChainId.String(),
 		OnRamp:        l.onRamp.Address(),

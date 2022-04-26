@@ -33,7 +33,7 @@ contract OffRamp is
   // merkleRoot => timestamp when received
   mapping(bytes32 => uint256) private s_merkleRoots;
   // sequenceNumber => executed
-  mapping(uint256 => bool) private s_executed;
+  mapping(uint64 => bool) private s_executed;
   // Last relay report
   CCIP.RelayReport private s_lastReport;
 
@@ -278,7 +278,7 @@ contract OffRamp is
     return s_merkleRoots[root];
   }
 
-  function getExecuted(uint256 sequenceNumber) external view returns (bool) {
+  function getExecuted(uint64 sequenceNumber) external view returns (bool) {
     return s_executed[sequenceNumber];
   }
 

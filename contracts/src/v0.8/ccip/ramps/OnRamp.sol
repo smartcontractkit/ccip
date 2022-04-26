@@ -20,7 +20,7 @@ contract OnRamp is OnRampInterface, TypeAndVersionInterface, HealthChecker, Toke
   uint256 public immutable CHAIN_ID;
 
   // Destination chain => sequence number
-  mapping(uint256 => uint256) private s_sequenceNumberPerDestinationChain;
+  mapping(uint256 => uint64) private s_sequenceNumberPerDestinationChain;
   // List of destination chains
   uint256[] private s_destinationChains;
   // OnRamp config
@@ -71,7 +71,7 @@ contract OnRamp is OnRampInterface, TypeAndVersionInterface, HealthChecker, Toke
     override
     whenNotPaused
     whenHealthy
-    returns (uint256)
+    returns (uint64)
   {
     address sender = msg.sender;
     if (originalSender != address(0)) {
@@ -80,11 +80,11 @@ contract OnRamp is OnRampInterface, TypeAndVersionInterface, HealthChecker, Toke
       originalSender = sender;
     }
     if (s_allowlistEnabled && !s_allowed[originalSender]) revert SenderNotAllowed(originalSender);
-    uint256 sequenceNumber = s_sequenceNumberPerDestinationChain[payload.destinationChainId];
+    uint64 sequenceNumber = s_sequenceNumberPerDestinationChain[payload.destinationChainId];
     // Check that the destination chain has been configured
     // Assumes that any configured destination chains sequence number are initialized with 1
     if (sequenceNumber == 0) revert UnsupportedDestinationChain(payload.destinationChainId);
-    // Check that payload is formed corretly
+    // Check that payload is formed correctly
     if (payload.data.length > uint256(s_config.maxDataSize))
       revert MessageTooLarge(uint256(s_config.maxDataSize), payload.data.length);
     if (payload.tokens.length > uint256(s_config.maxTokensLength) || payload.tokens.length != payload.amounts.length)
@@ -179,7 +179,7 @@ contract OnRamp is OnRampInterface, TypeAndVersionInterface, HealthChecker, Toke
     return s_destinationChains;
   }
 
-  function getSequenceNumberOfDestinationChain(uint256 destinationChainId) external view returns (uint256) {
+  function getSequenceNumberOfDestinationChain(uint256 destinationChainId) external view returns (uint64) {
     return s_sequenceNumberPerDestinationChain[destinationChainId];
   }
 

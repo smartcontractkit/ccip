@@ -29,7 +29,7 @@ contract MockOnRamp is OnRampInterface {
   function requestCrossChainSend(CCIP.MessagePayload calldata payload, address originalSender)
     external
     override
-    returns (uint256)
+    returns (uint64)
   {
     mp = payload;
     return 0;

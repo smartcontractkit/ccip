@@ -23,8 +23,8 @@ func DecodeCCIPMessage(b []byte) (*offramp.CCIPMessage, error) {
 	}
 	// Note must use unnamed type here
 	receivedCp, ok := unpacked[0].(struct {
-		SequenceNumber *big.Int       `json:"sequenceNumber"`
 		SourceChainId  *big.Int       `json:"sourceChainId"`
+		SequenceNumber uint64         `json:"sequenceNumber"`
 		Sender         common.Address `json:"sender"`
 		Payload        struct {
 			Tokens             []common.Address `json:"tokens"`
@@ -40,8 +40,8 @@ func DecodeCCIPMessage(b []byte) (*offramp.CCIPMessage, error) {
 		return nil, fmt.Errorf("invalid format have %T want %T", unpacked[0], receivedCp)
 	}
 	return &offramp.CCIPMessage{
-		SequenceNumber: receivedCp.SequenceNumber,
 		SourceChainId:  receivedCp.SourceChainId,
+		SequenceNumber: receivedCp.SequenceNumber,
 		Sender:         receivedCp.Sender,
 		Payload: offramp.CCIPMessagePayload{
 			DestinationChainId: receivedCp.Payload.DestinationChainId,
@@ -60,12 +60,12 @@ func DecodeCCIPMessage(b []byte) (*offramp.CCIPMessage, error) {
 func MakeCCIPMsgArgs() abi.Arguments {
 	var tuples = []abi.ArgumentMarshaling{
 		{
-			Name: "sequenceNumber",
+			Name: "sourceChainId",
 			Type: "uint256",
 		},
 		{
-			Name: "sourceChainId",
-			Type: "uint256",
+			Name: "sequenceNumber",
+			Type: "uint64",
 		},
 		{
 			Name: "sender",

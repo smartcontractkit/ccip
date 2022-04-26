@@ -16,7 +16,7 @@ interface ExecutableMessage {
 function encodeExecutableMessages(messages: ExecutableMessage[]): string {
   return ethers.utils.defaultAbiCoder.encode(
     [
-      'tuple(bytes32[] path, uint256 index, tuple(uint256 sequenceNumber, uint256 sourceChainId, address sender, tuple(address[] tokens, uint256[] amounts, uint256 destinationChainId, address receiver, address executor, bytes data, bytes options) payload) message)[] report',
+      'tuple(bytes32[] path, uint256 index, tuple(uint256 sourceChainId, uint64 sequenceNumber, address sender, tuple(address[] tokens, uint256[] amounts, uint256 destinationChainId, address receiver, address executor, bytes data, bytes options) payload) message)[] report',
     ],
     [messages],
   )
@@ -83,8 +83,8 @@ describe('MessageExecutor', () => {
 
   it('executes 2 messages in the same tx', async () => {
     const message1: CCIPMessage = {
-      sequenceNumber: BigNumber.from(1),
       sourceChainId: BigNumber.from(1),
+      sequenceNumber: BigNumber.from(1),
       sender: await roles.oracleNode1.getAddress(),
       payload: {
         destinationChainId: BigNumber.from(2),
@@ -97,8 +97,8 @@ describe('MessageExecutor', () => {
       },
     }
     const message2: CCIPMessage = {
-      sequenceNumber: BigNumber.from(2),
       sourceChainId: BigNumber.from(1),
+      sequenceNumber: BigNumber.from(2),
       sender: await roles.oracleNode3.getAddress(),
       payload: {
         destinationChainId: BigNumber.from(2),
