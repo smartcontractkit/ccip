@@ -4,13 +4,16 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
+
+	"github.com/smartcontractkit/chainlink/core/store/models"
 )
 
 // RelayPluginConfig contains the plugin specific variables for the ccip.CCIPRelay plugin.
 type RelayPluginConfig struct {
-	SourceChainID int64         `json:"sourceChainID"`
-	DestChainID   int64         `json:"destChainID"`
-	OnRampID      types.Account `json:"onRampID"`
+	SourceChainID int64           `json:"sourceChainID"`
+	DestChainID   int64           `json:"destChainID"`
+	OnRampID      types.Account   `json:"onRampID"`
+	PollPeriod    models.Duration `json:"pollPeriod"`
 }
 
 // ValidateRelayPluginConfig validates the arguments for the CCIP Relay plugin.

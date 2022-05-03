@@ -3,7 +3,6 @@ package ccip_test
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"math/big"
 	"testing"
 
@@ -13,14 +12,10 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
-	"github.com/lib/pq"
 	"github.com/smartcontractkit/libocr/gethwrappers/link_token_interface"
-	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink/core/internal/cltest/heavyweight"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/afn_contract"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/message_executor_helper"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/mock_v3_aggregator_contract"
@@ -29,10 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp_helper"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp_router"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/simple_message_receiver"
-	"github.com/smartcontractkit/chainlink/core/internal/testutils/pgtest"
-	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
-	mocks "github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/mocks/lastreporter"
 )
 
 func TestExecutionReportEncoding(t *testing.T) {
@@ -88,7 +80,6 @@ func TestExecutionReportEncoding(t *testing.T) {
 	feedAddress, _, _, err := mock_v3_aggregator_contract.DeployMockV3AggregatorContract(destUser, destChain, 18, big.NewInt(6000000000000000))
 	require.NoError(t, err)
 
-	onRamp := common.HexToAddress("0xf97f4df75117a78c1A5a0DBb814Af92458539FB4")
 	offRampAddress, _, _, err := offramp_helper.DeployOffRampHelper(
 		destUser,
 		destChain,
@@ -118,19 +109,27 @@ func TestExecutionReportEncoding(t *testing.T) {
 	require.NoError(t, err)
 	destChain.Commit()
 
-	message := ccip.Request{
-		SeqNum:        10,
-		SourceChainID: sourceChainID.String(),
-		DestChainID:   destChainID.String(),
-		OnRamp:        onRamp,
-		OffRamp:       offRampAddress,
-		Sender:        destUser.From,
-		Receiver:      receiverAddress,
-		Data:          []byte("hello"),
-		Tokens:        []string{destLinkTokenAddress.String()},
-		Amounts:       []string{"100"},
-		Options:       []byte{},
-	}.ToMessage()
+	message := ccip.Message{
+		SequenceNumber: 10,
+		SourceChainId:  sourceChainID,
+		Sender:         destUser.From,
+		Payload: struct {
+			Tokens             []common.Address `json:"tokens"`
+			Amounts            []*big.Int       `json:"amounts"`
+			DestinationChainId *big.Int         `json:"destinationChainId"`
+			Receiver           common.Address   `json:"receiver"`
+			Executor           common.Address   `json:"executor"`
+			Data               []uint8          `json:"data"`
+			Options            []uint8          `json:"options"`
+		}{
+			Tokens:             []common.Address{destLinkTokenAddress},
+			Amounts:            []*big.Int{big.NewInt(100)},
+			DestinationChainId: destChainID,
+			Receiver:           receiverAddress,
+			Data:               []byte("hello"),
+			Options:            []byte{},
+		},
+	}
 	msgBytes, err := ccip.MakeCCIPMsgArgs().PackValues([]interface{}{message})
 	require.NoError(t, err)
 	r, proof := ccip.GenerateMerkleProof(2, [][]byte{msgBytes}, 0)
@@ -179,7 +178,7 @@ func TestExecutionReportEncoding(t *testing.T) {
 	t.Log(ems)
 
 	helperMessage := offramp_helper.CCIPMessage{
-		SequenceNumber: uint64(message.SequenceNumber),
+		SequenceNumber: message.SequenceNumber,
 		SourceChainId:  message.SourceChainId,
 		Sender:         message.Sender,
 		Payload: offramp_helper.CCIPMessagePayload{
@@ -243,171 +242,6 @@ func TestExecutionReportInvariance(t *testing.T) {
 	require.Len(t, executableMessages, 3)
 	require.Equal(t, message, executableMessages[0])
 	require.Equal(t, message, executableMessages[2])
-}
-
-func TestExecutionPlugin(t *testing.T) {
-	_, db := heavyweight.FullTestDBNoFixtures(t, "executor_plugin")
-	lggr := logger.TestLogger(t)
-	orm := ccip.NewORM(db, lggr, pgtest.NewPGCfg(false))
-	lr := new(mocks.OffRampLastReporter)
-	executor := common.HexToAddress("0xf97f4df75117a78c1A5a0DBb814Af92458539FB5")
-	onRamp := common.HexToAddress("0x999f4df75117a78c1A5a0DBb814Af92458539999")
-	offRamp := common.HexToAddress("0x111f4df75117a78c1A5a0DBb814Af92458539111")
-	rf := ccip.NewExecutionReportingPluginFactory(logger.TestLogger(t), orm, big.NewInt(1), big.NewInt(2), onRamp, offRamp, executor, lr)
-	rp, _, err := rf.NewReportingPlugin(types.ReportingPluginConfig{F: 1})
-	require.NoError(t, err)
-	sid, did := big.NewInt(1), big.NewInt(2)
-	// Observe with nothing in the db should error with no observations
-	obs, err := rp.Observation(context.Background(), types.ReportTimestamp{}, types.Query{})
-	require.NoError(t, err)
-	var observation ccip.Observation
-	require.NoError(t, json.Unmarshal(obs, &observation))
-	require.Equal(t, observation.MinSeqNum, ccip.NoRequestsToProcess)
-	require.Equal(t, observation.MaxSeqNum, ccip.NoRequestsToProcess)
-
-	// Observe with a non-relay-confirmed request should still return no requests
-	req := ccip.Request{
-		SeqNum:        2,
-		SourceChainID: sid.String(),
-		DestChainID:   did.String(),
-		OnRamp:        onRamp,
-		OffRamp:       offRamp,
-		Sender:        common.HexToAddress("0xf97f4df75117a78c1A5a0DBb814Af92458539FB4"),
-		Data:          []byte("hello"),
-		Tokens:        pq.StringArray{},
-		Amounts:       pq.StringArray{},
-		Executor:      executor,
-		Options:       []byte{},
-	}
-	b, err := ccip.MakeCCIPMsgArgs().PackValues([]interface{}{req.ToMessage()})
-	require.NoError(t, err)
-	req.Raw = b
-	require.NoError(t, orm.SaveRequest(&req))
-	obs, err = rp.Observation(context.Background(), types.ReportTimestamp{}, types.Query{})
-	require.NoError(t, err)
-	require.NoError(t, json.Unmarshal(obs, &observation))
-	require.Equal(t, observation.MinSeqNum, ccip.NoRequestsToProcess)
-	require.Equal(t, observation.MaxSeqNum, ccip.NoRequestsToProcess)
-
-	// We should see an error if the latest report doesn't have a higher seq num
-	lr.On("GetLastReport", mock.Anything).Return(getLastReportMock(1)).Once()
-	require.NoError(t, orm.UpdateRequestSetStatus(sid, did, onRamp, offRamp, []int64{2}, ccip.RequestStatusRelayConfirmed))
-	obs, err = rp.Observation(context.Background(), types.ReportTimestamp{}, types.Query{})
-	require.Error(t, err)
-	// Should succeed if we do have a higher seq num
-	lr.On("GetLastReport", mock.Anything).Return(getLastReportMock(2)).Once()
-	obs, err = rp.Observation(context.Background(), types.ReportTimestamp{}, types.Query{})
-	require.NoError(t, err)
-	var o ccip.Observation
-	require.NoError(t, json.Unmarshal(obs, &o))
-	require.Equal(t, int64(2), o.MinSeqNum)
-	require.Equal(t, int64(2), o.MaxSeqNum)
-
-	// If all the nodes report the same, this should succeed
-	// First add the relay report
-	root, _ := ccip.GenerateMerkleProof(32, [][]byte{b}, 0)
-	require.NoError(t, orm.SaveRelayReport(ccip.RelayReport{Root: root[:], MinSeqNum: 2, MaxSeqNum: 2}))
-	lr.On("GetLastReport", mock.Anything).Return(getLastReportMock(2)).Once()
-	finalizeReport, rep, err := rp.Report(context.Background(), types.ReportTimestamp{}, types.Query{}, []types.AttributedObservation{
-		{Observation: obs}, {Observation: obs}, {Observation: obs}, {Observation: obs},
-	})
-	require.NoError(t, err)
-	require.True(t, finalizeReport)
-	executableMessages, err := ccip.DecodeExecutionReport(rep)
-	require.NoError(t, err)
-	// Should see our one message there
-	require.Len(t, executableMessages, 1)
-	require.Equal(t, uint64(2), executableMessages[0].Message.SequenceNumber)
-
-	// If we have < F observations, we should not get a report
-	finalizeReport, rep, err = rp.Report(context.Background(), types.ReportTimestamp{}, types.Query{}, []types.AttributedObservation{
-		{Observation: nil}, {Observation: nil}, {Observation: nil}, {Observation: obs},
-	})
-	require.False(t, finalizeReport)
-	// With F=1, that means a single value cannot corrupt our report
-	var fakeObs = ccip.Observation{
-		MinSeqNum: 10000,
-		MaxSeqNum: 10000,
-	}
-	b, err = json.Marshal(fakeObs)
-	require.NoError(t, err)
-	lr.On("GetLastReport", mock.Anything).Return(getLastReportMock(2)).Once()
-	finalizeReport, rep, err = rp.Report(context.Background(), types.ReportTimestamp{}, types.Query{}, []types.AttributedObservation{
-		{Observation: obs}, {Observation: obs}, {Observation: obs}, {Observation: b},
-	})
-	require.NoError(t, err)
-	// Still our message 2 despite the fakeObs
-	executableMessages, err = ccip.DecodeExecutionReport(rep)
-	require.NoError(t, err)
-	require.Len(t, executableMessages, 1)
-	require.Equal(t, uint64(2), executableMessages[0].Message.SequenceNumber)
-
-	// Should not accept or transmit if the report is stale
-	err = orm.UpdateRequestSetStatus(sid, did, onRamp, offRamp, []int64{2}, ccip.RequestStatusExecutionConfirmed)
-	require.NoError(t, err)
-	accept, err := rp.ShouldAcceptFinalizedReport(context.Background(), types.ReportTimestamp{}, rep)
-	require.NoError(t, err)
-	require.False(t, accept)
-	accept, err = rp.ShouldTransmitAcceptedReport(context.Background(), types.ReportTimestamp{}, rep)
-	require.NoError(t, err)
-	require.False(t, accept)
-
-	// Ensure observing and reporting works with batches.
-	// Let's save a batch of seqnums {3,4,5}
-	var leaves [][]byte
-	for i := 3; i < 6; i++ {
-		req := ccip.Request{
-			SeqNum:        int64(i),
-			SourceChainID: sid.String(),
-			DestChainID:   did.String(),
-			OnRamp:        onRamp,
-			OffRamp:       offRamp,
-			Sender:        common.HexToAddress("0xf97f4df75117a78c1A5a0DBb814Af92458539FB4"),
-			Data:          []byte("hello"),
-			Tokens:        pq.StringArray{},
-			Amounts:       pq.StringArray{},
-			Executor:      executor,
-			Options:       []byte{},
-		}
-		b, err := ccip.MakeCCIPMsgArgs().PackValues([]interface{}{req.ToMessage()})
-		require.NoError(t, err)
-		req.Raw = b
-		require.NoError(t, orm.SaveRequest(&req))
-		leaves = append(leaves, b)
-	}
-	require.NoError(t, orm.UpdateRequestStatus(sid, did, onRamp, offRamp, 3, 5, ccip.RequestStatusRelayConfirmed))
-	lr.On("GetLastReport", mock.Anything).Return(getLastReportMock(5)).Once()
-	obs, err = rp.Observation(context.Background(), types.ReportTimestamp{}, types.Query{})
-	require.NoError(t, err)
-	require.NoError(t, json.Unmarshal(obs, &o))
-	require.Equal(t, int64(3), o.MinSeqNum)
-	require.Equal(t, int64(5), o.MaxSeqNum)
-
-	// Let's put 2 in one report and 1 in a different report then assert the execution report makes sense
-	root1, _ := ccip.GenerateMerkleProof(32, [][]byte{leaves[0]}, 0)
-	require.NoError(t, orm.SaveRelayReport(ccip.RelayReport{Root: root1[:], MinSeqNum: 3, MaxSeqNum: 3}))
-	root2, _ := ccip.GenerateMerkleProof(32, [][]byte{leaves[1], leaves[2]}, 0)
-	require.NoError(t, orm.SaveRelayReport(ccip.RelayReport{Root: root2[:], MinSeqNum: 4, MaxSeqNum: 5}))
-	lr.On("GetLastReport", mock.Anything).Return(getLastReportMock(5)).Once()
-	finalizeReport, rep, err = rp.Report(context.Background(), types.ReportTimestamp{}, types.Query{}, []types.AttributedObservation{
-		{Observation: obs}, {Observation: obs}, {Observation: obs}, {Observation: obs},
-	})
-	require.NoError(t, err)
-	msgs, err := ccip.DecodeExecutionReport(rep)
-	require.NoError(t, err)
-	require.Len(t, msgs, 3)
-	rootLeaf1 := ccip.GenerateMerkleRoot(leaves[0], ccip.NewMerkleProof(int(msgs[0].Index.Int64()), msgs[0].Path))
-	rootLeaf2 := ccip.GenerateMerkleRoot(leaves[1], ccip.NewMerkleProof(int(msgs[1].Index.Int64()), msgs[1].Path))
-	rootLeaf3 := ccip.GenerateMerkleRoot(leaves[1], ccip.NewMerkleProof(int(msgs[1].Index.Int64()), msgs[1].Path))
-	require.True(t, bytes.Equal(rootLeaf1[:], root1[:]))
-	require.True(t, bytes.Equal(rootLeaf2[:], root2[:]))
-	require.True(t, bytes.Equal(rootLeaf3[:], root2[:]))
-}
-
-func getLastReportMock(maxSequenceNumber int64) (offramp.CCIPRelayReport, error) {
-	return offramp.CCIPRelayReport{
-		MaxSequenceNumber: uint64(maxSequenceNumber),
-	}, nil
 }
 
 func TestDecodeEmptyExecutionReport(t *testing.T) {

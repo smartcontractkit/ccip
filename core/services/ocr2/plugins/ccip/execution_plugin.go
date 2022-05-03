@@ -18,7 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/job"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins"
 	ccipconfig "github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/config"
-	"github.com/smartcontractkit/chainlink/core/services/pg"
 	"github.com/smartcontractkit/chainlink/core/services/relay/types"
 )
 
@@ -33,7 +32,6 @@ type Config interface {
 type CCIPExecution struct {
 	db           *sqlx.DB
 	lggr         logger.Logger
-	ccipORM      ORM
 	ocr2Provider types.OCR2ProviderCtx
 	cfg          Config
 
@@ -41,9 +39,11 @@ type CCIPExecution struct {
 	spec   *job.OCR2OracleSpec
 	config ccipconfig.ExecutionPluginConfig
 
-	sourceChain evm.Chain
-	destChain   evm.Chain
-	offRamp     *offramp.OffRamp
+	sourceChain  evm.Chain
+	destChain    evm.Chain
+	offRamp      *offramp.OffRamp
+	onRamp       *onramp.OnRamp
+	configPoller *ConfigPoller
 }
 
 var _ plugins.OraclePlugin = &CCIPExecution{}
@@ -76,7 +76,21 @@ func NewCCIPExecution(jobID int32, spec *job.OCR2OracleSpec, chainSet evm.ChainS
 	if err != nil {
 		return nil, errors.Wrap(err, "failed creating a new onramp")
 	}
+	onRamp, err := onramp.NewOnRamp(common.HexToAddress(string(pluginConfig.OnRampID)), sourceChain.Client())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed creating a new onramp")
+	}
 
+	// Subscribe to all relevant execution logs.
+	sourceChain.LogPoller().MergeFilter([]common.Hash{CrossChainSendRequested}, onRamp.Address())
+	destChain.LogPoller().MergeFilter([]common.Hash{ReportAccepted}, offRamp.Address())
+	destChain.LogPoller().MergeFilter([]common.Hash{CrossChainMessageExecuted}, offRamp.Address())
+
+	configPoller := NewConfigPoller(
+		lggr.Named("CCIP_LogListener").With("jobID", jobID),
+		destChain.LogPoller(),
+		offRamp,
+		pluginConfig.PollPeriod.Duration())
 	return &CCIPExecution{
 		db:           db,
 		lggr:         lggr,
@@ -84,49 +98,29 @@ func NewCCIPExecution(jobID int32, spec *job.OCR2OracleSpec, chainSet evm.ChainS
 		cfg:          cfg,
 		jobID:        jobID,
 		spec:         spec,
-		ccipORM:      NewORM(db, lggr, cfg),
 		config:       pluginConfig,
-
-		offRamp:     offRamp,
-		sourceChain: sourceChain,
-		destChain:   destChain,
+		offRamp:      offRamp,
+		onRamp:       onRamp,
+		sourceChain:  sourceChain,
+		destChain:    destChain,
+		configPoller: configPoller,
 	}, nil
 }
 
 func (c *CCIPExecution) GetPluginFactory() (plugin ocrtypes.ReportingPluginFactory, err error) {
 	return NewExecutionReportingPluginFactory(
 		c.lggr,
-		c.ccipORM,
-		big.NewInt(c.config.SourceChainID),
-		big.NewInt(c.config.DestChainID),
-		common.HexToAddress(string(c.config.OnRampID)),
-		common.HexToAddress(c.config.OffRampId),
+		c.onRamp,
+		c.offRamp,
+		c.sourceChain.LogPoller(),
+		c.destChain.LogPoller(),
 		common.HexToAddress(c.spec.ContractID),
 		c.offRamp,
+		c.configPoller,
 	), nil
 }
 
 // GetServices returns the log listener service.
 func (c *CCIPExecution) GetServices() ([]job.ServiceCtx, error) {
-	singleTokenOnRamp, err := onramp.NewOnRamp(common.HexToAddress(string(c.config.OnRampID)), c.sourceChain.Client())
-	if err != nil {
-		return nil, err
-	}
-
-	ccipConfig, err := GetOffchainConfig(c.ocr2Provider.ContractConfigTracker())
-	if err != nil {
-		return nil, errors.Wrap(err, "could not get the latest encoded config")
-	}
-
-	logListener := NewLogListener(c.lggr,
-		c.sourceChain.LogBroadcaster(),
-		c.destChain.LogBroadcaster(),
-		singleTokenOnRamp,
-		c.offRamp,
-		ccipConfig,
-		c.ccipORM,
-		c.jobID,
-		pg.NewQ(c.db, c.lggr, c.cfg))
-
-	return []job.ServiceCtx{logListener}, nil
+	return []job.ServiceCtx{c.configPoller}, nil
 }

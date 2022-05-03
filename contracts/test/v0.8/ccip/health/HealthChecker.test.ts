@@ -46,6 +46,7 @@ describe('HealthChecker', () => {
       'setMaxSecondsWithoutAFNHeartbeat',
       'getMaxSecondsWithoutAFNHeartbeat',
       'whenHealthyFunction',
+      'isHealthy',
       // Ownership
       'owner',
       'transferOwnership',

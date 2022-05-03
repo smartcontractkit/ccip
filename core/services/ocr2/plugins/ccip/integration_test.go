@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"math"
 	"math/big"
 	"strings"
 	"testing"
@@ -34,6 +33,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/chains/evm/headtracker"
 	httypes "github.com/smartcontractkit/chainlink/core/chains/evm/headtracker/types"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/log"
+	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/txmgr"
 	evmtypes "github.com/smartcontractkit/chainlink/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/core/chains/terra"
@@ -227,7 +227,9 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 		[]common.Address{destPoolAddress},        // dest pool addresses
 		[]common.Address{feedDestAddress},        // feeds
 		afnDestAddress,                           // AFN address
-		big.NewInt(86400),                        // max timeout without AFN signal  86400 seconds = one day
+		// We set this above the current unix timestamp
+		// so we do not even have to send a heartbeat for it to be healthy.
+		big.NewInt(time.Now().Unix()*2),
 		offramp.OffRampInterfaceOffRampConfig{
 			ExecutionFeeJuels:     0,
 			ExecutionDelaySeconds: 0,
@@ -279,6 +281,12 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 
 	sourceChain.Commit()
 	destChain.Commit()
+
+	// Ensure we have at least finality blocks.
+	for i := 0; i < 50; i++ {
+		sourceChain.Commit()
+		destChain.Commit()
+	}
 
 	return CCIPContracts{
 		sourceUser:      sourceUser,
@@ -350,6 +358,7 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 	config.Overrides.FeatureOffchainReporting = null.BoolFrom(false)
 	config.Overrides.FeatureOffchainReporting2 = null.BoolFrom(true)
 	config.Overrides.FeatureCCIP = null.BoolFrom(true)
+	config.Overrides.FeatureLogPoller = null.BoolFrom(true)
 	config.Overrides.GlobalGasEstimatorMode = null.NewString("FixedPrice", true)
 	config.Overrides.SetP2PV2DeltaDial(500 * time.Millisecond)
 	config.Overrides.SetP2PV2DeltaReconcile(5 * time.Second)
@@ -413,6 +422,18 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 					hb,
 					headtracker.NewHeadSaver(lggr, headtracker.NewORM(db, lggr, pgtest.NewPGCfg(false), *destClient.ChainID()), evmCfg),
 				)
+			}
+			t.Fatalf("invalid chain ID %v", c.ID.String())
+			return nil
+		},
+		GenLogPoller: func(c evmtypes.Chain) *logpoller.LogPoller {
+			if c.ID.String() == sourceChainID.String() {
+				t.Log("Generating log broadcaster source")
+				return logpoller.NewLogPoller(logpoller.NewORM(sourceChainID, db, lggr, config), sourceClient,
+					lggr, 500*time.Millisecond, 10, 2)
+			} else if c.ID.String() == destChainID.String() {
+				return logpoller.NewLogPoller(logpoller.NewORM(destChainID, db, lggr, config), destClient,
+					lggr, 500*time.Millisecond, 10, 2)
 			}
 			t.Fatalf("invalid chain ID %v", c.ID.String())
 			return nil
@@ -507,7 +528,6 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 
 func TestIntegration_CCIP(t *testing.T) {
 	ccipContracts := setupCCIPContracts(t)
-	lggr := logger.TestLogger(t)
 	// Oracles need ETH on the destination chain
 	bootstrapNodePort := int64(19599)
 	appBootstrap, bootstrapPeerID, _, _, _, _ := setupNodeCCIP(t, ccipContracts.destUser, bootstrapNodePort, "bootstrap_ccip", ccipContracts.sourceChain, ccipContracts.destChain)
@@ -594,6 +614,7 @@ contractConfigTrackerPollInterval = "1s"
 onRampID            = "%s"
 sourceChainID       = %s
 destChainID         = %s
+pollPeriod          = "1s"
 
 [relayConfig]
 chainID             = "%s"
@@ -620,6 +641,7 @@ onRampID            = "%s"
 offRampID           = "%s"
 sourceChainID       = %s
 destChainID         = %s
+pollPeriod          = "1s"
 
 [relayConfig]
 chainID             = "%s"
@@ -659,65 +681,68 @@ chainID             = "%s"
 	setupOnchainConfig(t, ccipContracts, oracles, reportingPluginConfig)
 
 	// Request should appear on all nodes eventually
+	var req logpoller.Log
 	for i := 0; i < 4; i++ {
-		var reqs []*ccip.Request
-		ccipReqORM := ccip.NewORM(apps[i].GetSqlxDB(), lggr, pgtest.NewPGCfg(false))
+		c, err := apps[i].GetChains().EVM.Get(sourceChainID)
+		require.NoError(t, err)
 		gomega.NewGomegaWithT(t).Eventually(func() bool {
 			ccipContracts.sourceChain.Commit()
-			reqs, err = ccipReqORM.Requests(sourceChainID, destChainID, ccipContracts.onRamp.Address(), ccipContracts.offRamp.Address(), 0, math.MaxInt64, ccip.RequestStatusUnstarted, nil, nil)
-			return len(reqs) == 1
+			ccipContracts.destChain.Commit()
+			lgs, err := c.LogPoller().Logs(0, 1000, ccip.CrossChainSendRequested, ccipContracts.onRamp.Address())
+			require.NoError(t, err)
+			if len(lgs) == 1 {
+				req = lgs[0]
+				return true
+			}
+			return false
 		}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue())
 	}
 
-	// Once all nodes have the request, the reporting plugin should run to generate and submit a report onchain.
+	// Once all nodes have the request, the reporting plugin should run to generate and submit a msg onchain.
 	// So we should eventually see a successful offramp submission.
 	// Note that since we only send blocks here, it's likely that all the nodes will enter the transmission
-	// phase before someone has submitted, so 1 report will succeed and 3 will revert.
+	// phase before someone has submitted, so 1 msgs will succeed and 3 will revert.
 	var report offramp.CCIPRelayReport
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
 		report, err = ccipContracts.offRamp.GetLastReport(nil)
 		require.NoError(t, err)
+		ccipContracts.sourceChain.Commit()
 		ccipContracts.destChain.Commit()
-		t.Log("last report", report.MinSequenceNumber, report.MaxSequenceNumber)
+		t.Log("last msgs", report.MinSequenceNumber, report.MaxSequenceNumber)
 		return report.MinSequenceNumber == 1 && report.MaxSequenceNumber == 1
 	}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue())
 
-	// We should see the request in a fulfilled state on all nodes
-	// after the offramp submission. There should be no
-	// remaining valid requests.
+	// No logs after the msgs
 	for i := 0; i < 4; i++ {
+		c, err := apps[i].GetChains().EVM.Get(sourceChainID)
+		require.NoError(t, err)
 		gomega.NewGomegaWithT(t).Eventually(func() bool {
-			ccipReqORM := ccip.NewORM(apps[i].GetSqlxDB(), lggr, pgtest.NewPGCfg(false))
+			ccipContracts.sourceChain.Commit()
 			ccipContracts.destChain.Commit()
-			reqs, err := ccipReqORM.Requests(sourceChainID, destChainID, ccipContracts.onRamp.Address(), ccipContracts.offRamp.Address(), int64(report.MinSequenceNumber), int64(report.MaxSequenceNumber), ccip.RequestStatusRelayConfirmed, nil, nil)
+			lgs, err := c.LogPoller().LogsDataWordGreaterThan(ccip.CrossChainSendRequested, ccipContracts.onRamp.Address(), 2, common.BigToHash(big.NewInt(int64(report.MaxSequenceNumber)+1)), 1)
 			require.NoError(t, err)
-			valid, err := ccipReqORM.Requests(sourceChainID, destChainID, ccipContracts.onRamp.Address(), ccipContracts.offRamp.Address(), int64(report.MinSequenceNumber), math.MaxInt64, ccip.RequestStatusUnstarted, nil, nil)
-			require.NoError(t, err)
-			return len(reqs) == 1 && len(valid) == 0
+			return len(lgs) == 0
 		}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue())
 	}
 
 	// Now the merkle root is across.
 	// Let's try to execute a request as an external party.
 	// The raw log in the merkle root should be the abi-encoded version of the CCIPMessage
-	ccipReqORM := ccip.NewORM(apps[0].GetSqlxDB(), lggr, pgtest.NewPGCfg(false))
-	reqs, err := ccipReqORM.Requests(sourceChainID, destChainID, ccipContracts.onRamp.Address(), ccipContracts.offRamp.Address(), int64(report.MinSequenceNumber), int64(report.MaxSequenceNumber), "", nil, nil)
-	require.NoError(t, err)
-	root, proof := ccip.GenerateMerkleProof(32, [][]byte{reqs[0].Raw}, 0)
-	// Root should match the report root
+	root, proof := ccip.GenerateMerkleProof(32, [][]byte{req.Data}, 0)
+	// Root should match the msgs root
 	require.True(t, bytes.Equal(root[:], report.MerkleRoot[:]))
 
 	// Path should verify.
-	genRoot := ccip.GenerateMerkleRoot(reqs[0].Raw, proof)
+	genRoot := ccip.GenerateMerkleRoot(req.Data, proof)
 	require.True(t, bytes.Equal(root[:], genRoot[:]))
 	exists, err := ccipContracts.offRamp.GetMerkleRoot(nil, report.MerkleRoot)
 	require.NoError(t, err)
 	require.True(t, exists.Int64() > 0)
 
-	h, err := utils.Keccak256(append([]byte{0x00}, reqs[0].Raw...))
+	h, err := utils.Keccak256(append([]byte{0x00}, req.Data...))
 	var leaf [32]byte
 	copy(leaf[:], h)
-	decodedMsg, err := ccip.DecodeCCIPMessage(reqs[0].Raw)
+	decodedMsg, err := ccip.DecodeCCIPMessage(req.Data)
 	require.NoError(t, err)
 	offRampProof := offramp.CCIPMerkleProof{
 		Path:  proof.PathForExecute(),
@@ -725,7 +750,6 @@ chainID             = "%s"
 	}
 	onchainRoot, err := ccipContracts.offRamp.MerkleRoot(nil, *decodedMsg, offRampProof)
 	require.NoError(t, err)
-	t.Logf("on chain root: %+v", onchainRoot)
 	require.Equal(t, genRoot, onchainRoot)
 
 	// Execute the Message
@@ -757,22 +781,36 @@ chainID             = "%s"
 	require.NoError(t, err)
 	ccipContracts.sourceChain.Commit()
 
-	// DON should eventually send another report
+	var req2 logpoller.Log
+	for i := 0; i < 4; i++ {
+		c, err := apps[i].GetChains().EVM.Get(sourceChainID)
+		require.NoError(t, err)
+		gomega.NewGomegaWithT(t).Eventually(func() bool {
+			ccipContracts.sourceChain.Commit()
+			lgs, err := c.LogPoller().LogsDataWordRange(ccip.CrossChainSendRequested, ccipContracts.onRamp.Address(), 2, common.BigToHash(big.NewInt(2)), common.BigToHash(big.NewInt(2)), 1)
+			require.NoError(t, err)
+			if len(lgs) == 1 {
+				req2 = lgs[0]
+				return true
+			}
+			return false
+		}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue())
+	}
+	// DON should eventually send another msgs
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
 		report, err = ccipContracts.offRamp.GetLastReport(nil)
 		require.NoError(t, err)
 		ccipContracts.destChain.Commit()
+		ccipContracts.sourceChain.Commit()
 		return report.MinSequenceNumber == 2 && report.MaxSequenceNumber == 2
 	}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue())
 
-	eoaReq, err := ccipReqORM.Requests(sourceChainID, destChainID, ccipContracts.onRamp.Address(), ccipContracts.offRamp.Address(), int64(report.MinSequenceNumber), int64(report.MaxSequenceNumber), "", nil, nil)
-	require.NoError(t, err)
-	root, proof = ccip.GenerateMerkleProof(32, [][]byte{eoaReq[0].Raw}, 0)
-	// Root should match the report root
+	root, proof = ccip.GenerateMerkleProof(32, [][]byte{req2.Data}, 0)
+	// Root should match the msgs root
 	require.True(t, bytes.Equal(root[:], report.MerkleRoot[:]))
 
 	// Execute the Message
-	decodedMsg, err = ccip.DecodeCCIPMessage(eoaReq[0].Raw)
+	decodedMsg, err = ccip.DecodeCCIPMessage(req2.Data)
 	require.NoError(t, err)
 	ccip.MakeCCIPMsgArgs().PackValues([]interface{}{*decodedMsg})
 	t.Logf("Message post: %+v", decodedMsg)
@@ -817,32 +855,29 @@ chainID             = "%s"
 		report, err = ccipContracts.offRamp.GetLastReport(nil)
 		require.NoError(t, err)
 		ccipContracts.destChain.Commit()
+		ccipContracts.sourceChain.Commit()
 		return report.MinSequenceNumber == 3 && report.MaxSequenceNumber == 3
 	}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue())
 
-	// Should see the 3rd message be executed
+	// Then it should be executed
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
-		it, err := ccipContracts.offRamp.FilterCrossChainMessageExecuted(nil, nil)
+		report, err = ccipContracts.offRamp.GetLastReport(nil)
 		require.NoError(t, err)
-		ecount := 0
-		for it.Next() {
-			t.Log("executed", it.Event.SequenceNumber)
-			ecount++
-		}
 		ccipContracts.destChain.Commit()
-		return ecount == 3
+		ccipContracts.sourceChain.Commit()
+		return report.MinSequenceNumber == 3 && report.MaxSequenceNumber == 3
 	}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue())
-	// In total, we should see 3 relay reports containing seq 1,2,3
-	// and 3 execution_confirmed messages
-	reqs, err = ccipReqORM.Requests(sourceChainID, destChainID, ccipContracts.onRamp.Address(), ccipContracts.offRamp.Address(), 1, 3, ccip.RequestStatusExecutionConfirmed, nil, nil)
+
+	destChain, err := apps[0].GetChains().EVM.Get(destChainID)
 	require.NoError(t, err)
-	require.Len(t, reqs, 3)
-	_, err = ccipReqORM.RelayReport(1)
-	require.NoError(t, err)
-	_, err = ccipReqORM.RelayReport(2)
-	require.NoError(t, err)
-	_, err = ccipReqORM.RelayReport(3)
-	require.NoError(t, err)
+	gomega.NewGomegaWithT(t).Eventually(func() bool {
+		ccipContracts.sourceChain.Commit()
+		ccipContracts.destChain.Commit()
+		lgs, err := destChain.LogPoller().Logs(1, 1000, ccip.CrossChainMessageExecuted, ccipContracts.offRamp.Address())
+		require.NoError(t, err)
+		t.Log("executed", len(lgs))
+		return len(lgs) == 3
+	}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue())
 }
 
 func setupOnchainConfig(t *testing.T, ccipContracts CCIPContracts, oracles []confighelper2.OracleIdentityExtra, reportingPluginConfig []byte) {

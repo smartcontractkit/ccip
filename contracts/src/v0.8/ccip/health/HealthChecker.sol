@@ -86,6 +86,13 @@ contract HealthChecker is Pausable, OwnerIsCreator {
   }
 
   /**
+   * @notice Support querying whether health checker is healthy.
+   */
+  function isHealthy(uint256 now) external view returns (bool) {
+    return !s_afn.hasBadSignal() && ((now - s_afn.getLastHeartbeat().timestamp) <= s_maxSecondsWithoutAFNHeartbeat);
+  }
+
+  /**
    * @notice Ensure that the AFN has not emitted a bad signal, and that the latest heartbeat is not stale.
    */
   modifier whenHealthy() {

@@ -144,6 +144,9 @@ func newChain(dbchain types.Chain, nodes []types.Node, opts ChainSetOpts) (*chai
 		logBroadcaster = opts.GenLogBroadcaster(dbchain)
 	}
 	logPoller := logpoller.NewLogPoller(logpoller.NewORM(chainID, db, l, cfg), client, l, cfg.EvmLogPollInterval(), int64(cfg.EvmFinalityDepth()), int64(cfg.EvmLogBackfillBatchSize()))
+	if opts.GenLogPoller != nil {
+		logPoller = opts.GenLogPoller(dbchain)
+	}
 
 	// AddDependent for this chain
 	// log broadcaster will not start until dependent ready is called by a

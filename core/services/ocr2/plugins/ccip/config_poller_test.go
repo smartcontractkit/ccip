@@ -1,9 +1,7 @@
 package ccip
 
 import (
-	"bytes"
 	"context"
-	"math"
 	"math/big"
 	"testing"
 	"time"
@@ -15,16 +13,13 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
-	"github.com/lib/pq"
 	"github.com/onsi/gomega"
 	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	ocrtypes2 "github.com/smartcontractkit/libocr/offchainreporting2/types"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	eth "github.com/smartcontractkit/chainlink/core/chains/evm/client"
-	"github.com/smartcontractkit/chainlink/core/chains/evm/log"
-	"github.com/smartcontractkit/chainlink/core/chains/evm/types"
+	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/afn_contract"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/mock_v3_aggregator_contract"
@@ -39,31 +34,11 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/job"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/validate"
 	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
-	"github.com/smartcontractkit/chainlink/core/services/pg"
 	"github.com/smartcontractkit/chainlink/core/services/pipeline"
 	"github.com/smartcontractkit/chainlink/core/testdata/testspecs"
 )
 
-type lc struct {
-}
-
-func (l lc) BlockBackfillDepth() uint64 {
-	return 1
-}
-
-func (l lc) BlockBackfillSkip() bool {
-	return false
-}
-
-func (l lc) EvmFinalityDepth() uint32 {
-	return 50
-}
-
-func (l lc) EvmLogBackfillBatchSize() uint32 {
-	return 1
-}
-
-func TestLogListener_SavesRequests(t *testing.T) {
+func TestConfigPoller(t *testing.T) {
 	// Deploy contract
 	key, err := crypto.GenerateKey()
 	require.NoError(t, err)
@@ -104,7 +79,7 @@ func TestLogListener_SavesRequests(t *testing.T) {
 		[]common.Address{feedAddress},      // feeds
 		[]common.Address{user.From},        // allow list
 		afn,                                // AFN
-		big.NewInt(86400),                  //maxTimeWithoutAFNSignal 86400 seconds = one day
+		big.NewInt(2*time.Now().Unix()),    //maxTimeWithoutAFNSignal 86400 seconds = one day
 		onramp.OnRampInterfaceOnRampConfig{
 			Router:           onRampRouterAddress,
 			RelayingFeeJuels: 0,
@@ -152,30 +127,21 @@ func TestLogListener_SavesRequests(t *testing.T) {
 	cfg := pgtest.NewPGCfg(false)
 	ethClient := eth.NewClientFromSim(backend, big.NewInt(1337))
 	lggr := logger.TestLogger(t)
-	lorm := log.NewORM(db, lggr, cfg, *big.NewInt(1337))
-	r, err := lorm.FindConsumedLogs(0, 100)
-	require.NoError(t, err)
-	t.Log(r)
-	lb := log.NewBroadcaster(lorm, ethClient, lc{}, lggr, nil)
+	lorm := logpoller.NewORM(big.NewInt(1337), db, lggr, cfg)
+	lp := logpoller.NewLogPoller(lorm, ethClient, lggr, 100*time.Millisecond, 1, 2)
+	lp.MergeFilter([]common.Hash{CrossChainSendRequested}, onRampAddress)
 	ctx := context.Background()
-	require.NoError(t, lb.Start(ctx))
 	jobORM := job.NewORM(db, nil, pipeline.NewORM(db, lggr, cfg), nil, lggr, cfg)
-	ccipORM := NewORM(db, lggr, cfg)
 	ccipSpec, err := validate.ValidatedOracleSpecToml(
 		configtest.NewTestGeneralConfig(t),
 		testspecs.GenerateCCIPSpec(testspecs.CCIPSpecParams{}).Toml())
 	require.NoError(t, err)
 	err = jobORM.CreateJob(&ccipSpec)
 	require.NoError(t, err)
-	jb := ccipSpec
-	ccipConfig := OffchainConfig{
-		SourceIncomingConfirmations: 0,
-		DestIncomingConfirmations:   0,
-	}
-	q := pg.NewQ(db, lggr, cfg)
-	logListener := NewLogListener(lggr, lb, lb, onRamp, offRamp, ccipConfig, ccipORM, jb.ID, q)
+	logListener := NewConfigPoller(lggr, lp, offRamp, 100*time.Millisecond)
 	t.Log("Ramp address", onRampAddress, onRamp.Address())
 	require.NoError(t, logListener.Start(ctx))
+	require.NoError(t, lp.Start(ctx))
 
 	// Update the ccip config on chain and assert that the log listener uses the new config values
 	newCcipConfig := OffchainConfig{
@@ -185,22 +151,19 @@ func TestLogListener_SavesRequests(t *testing.T) {
 	updateOffchainConfig(t, newCcipConfig, offRamp, user)
 	backend.Commit()
 
-	// Send blocks until that request is saved.
-	head, err := backend.HeaderByNumber(context.Background(), nil)
-	require.NoError(t, err)
-	startHead := head.Number.Int64()
-	var reqs []*Request
+	// Send blocks until we see the config updated.
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
-		lb.OnNewLongestChain(context.Background(), &types.Head{Hash: head.Hash(), Number: startHead})
-		startHead++
-		reqs, err = logListener.orm.Requests(big.NewInt(2), big.NewInt(1), onRampAddress, offRampAddress, 0, math.MaxInt64, RequestStatusUnstarted, nil, nil)
-		require.NoError(t, err)
-		t.Logf("log %+v\n", reqs)
-		return logListener.offchainConfig.DestIncomingConfirmations == newCcipConfig.DestIncomingConfirmations &&
-			logListener.offchainConfig.SourceIncomingConfirmations == newCcipConfig.SourceIncomingConfirmations
+		backend.Commit()
+		var cfg OffchainConfig
+		logListener.offchainConfigMu.RLock()
+		cfg = logListener.offchainConfig
+		logListener.offchainConfigMu.RUnlock()
+		t.Logf("have %v want %v", cfg, newCcipConfig)
+		return cfg.DestIncomingConfirmations == newCcipConfig.DestIncomingConfirmations &&
+			cfg.SourceIncomingConfirmations == newCcipConfig.SourceIncomingConfirmations
 	}, testutils.WaitTimeout(t), 100*time.Millisecond).Should(gomega.BeTrue())
 
-	//Send a request.
+	// Send a request.
 	executor := common.HexToAddress("0xf97f4df75117a78c1A5a0DBb814Af92458539FB4")
 	msg := onramp_router.CCIPMessagePayload{
 		Receiver:           linkTokenAddress,
@@ -211,60 +174,27 @@ func TestLogListener_SavesRequests(t *testing.T) {
 		Executor:           executor,
 		Options:            nil,
 	}
-
 	_, err = onRampRouter.RequestCrossChainSend(user, msg)
 	require.NoError(t, err)
 	backend.Commit()
 
 	// Send blocks until that request is saved.
-	head, err = backend.HeaderByNumber(context.Background(), nil)
-	require.NoError(t, err)
-	startHead = head.Number.Int64()
-	reqs = []*Request{}
+	var lg logpoller.Log
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
-		lb.OnNewLongestChain(context.Background(), &types.Head{Hash: head.Hash(), Number: startHead})
-		startHead++
-		reqs, err = logListener.orm.Requests(sourceChainID, destChainID, onRampAddress, offRampAddress, 0, math.MaxInt64, RequestStatusUnstarted, nil, nil)
+		backend.Commit()
+		lgs, err := lp.Logs(1, 1000, CrossChainSendRequested, onRampAddress)
 		require.NoError(t, err)
-		t.Logf("log %+v\n", reqs)
-		return len(reqs) == 1
+		t.Logf("logs %+v\n", len(lgs))
+		if len(lgs) == 1 {
+			lg = lgs[0]
+			return true
+		}
+		return false
 	}, testutils.WaitTimeout(t), 100*time.Millisecond).Should(gomega.BeTrue())
-
-	// Assert the xchain request was saved correctly.
-	assert.Equal(t, "100", reqs[0].Amounts[0])
-	assert.Equal(t, msg.Data, reqs[0].Data)
-	assert.Equal(t, pq.StringArray{linkTokenAddress.String()}, reqs[0].Tokens)
-	assert.Equal(t, msg.Receiver, reqs[0].Receiver)
-	assert.Equal(t, msg.Executor.String(), reqs[0].Executor.String())
-	assert.Equal(t, []byte{}, reqs[0].Options)
-	assert.Equal(t, destChainID.String(), reqs[0].DestChainID)
-	// We expect the raw request bytes to be the abi.encoded CCIP Message
-	b, err := MakeCCIPMsgArgs().PackValues([]interface{}{onramp.CCIPMessage{
-		SequenceNumber: 1,
-		SourceChainId:  sourceChainID,
-		Sender:         user.From,
-		Payload: onramp.CCIPMessagePayload{
-			Tokens:             msg.Tokens,
-			Amounts:            msg.Amounts,
-			DestinationChainId: msg.DestinationChainId,
-			Receiver:           msg.Receiver,
-			Executor:           msg.Executor,
-			Data:               msg.Data,
-			Options:            msg.Options,
-		},
-	}})
-	require.NoError(t, err)
-	require.True(t, bytes.Equal(reqs[0].Raw, b), "have %s (%d) want %s (%d)", hexutil.Encode(reqs[0].Raw), len(reqs[0].Raw), hexutil.Encode(b), len(b))
-	// Round trip should be the same bytes
-	cmsg, err := DecodeCCIPMessage(b)
-	require.NoError(t, err)
-	b2, err := MakeCCIPMsgArgs().PackValues([]interface{}{cmsg})
-	require.NoError(t, err)
-	require.True(t, bytes.Equal(b2, b))
-
-	require.NoError(t, lb.Close())
+	t.Log(lg)
+	require.NoError(t, lp.Close())
 	require.NoError(t, logListener.Close())
-	require.NoError(t, jobORM.DeleteJob(jb.ID))
+	require.NoError(t, jobORM.DeleteJob(ccipSpec.ID))
 }
 
 func toOffchainPublicKey(s string) (key ocrtypes2.OffchainPublicKey) {

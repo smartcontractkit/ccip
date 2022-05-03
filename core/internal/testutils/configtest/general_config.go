@@ -110,6 +110,7 @@ type GeneralConfigOverrides struct {
 	FeatureOffchainReporting  null.Bool
 	FeatureOffchainReporting2 null.Bool
 	FeatureCCIP               null.Bool
+	FeatureLogPoller          null.Bool
 	EVMEnabled                null.Bool
 	EVMRPCEnabled             null.Bool
 	TerraEnabled              null.Bool
@@ -354,6 +355,13 @@ func (c *TestGeneralConfig) FeatureCCIP() bool {
 		return c.Overrides.FeatureCCIP.Bool
 	}
 	return c.GeneralConfig.FeatureCCIP()
+}
+
+func (c *TestGeneralConfig) FeatureLogPoller() bool {
+	if c.Overrides.FeatureLogPoller.Valid {
+		return c.Overrides.FeatureLogPoller.Bool
+	}
+	return c.GeneralConfig.FeatureLogPoller()
 }
 
 func (c *TestGeneralConfig) FeatureExternalInitiators() bool {

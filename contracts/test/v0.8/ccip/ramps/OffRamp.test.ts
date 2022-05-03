@@ -216,6 +216,7 @@ describe('OffRamp', () => {
       'getAFN',
       'setMaxSecondsWithoutAFNHeartbeat',
       'getMaxSecondsWithoutAFNHeartbeat',
+      'isHealthy',
       // TokenPoolRegistry
       'addPool',
       'removePool',

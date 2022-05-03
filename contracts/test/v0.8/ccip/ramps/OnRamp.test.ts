@@ -165,6 +165,7 @@ describe('OnRamp', () => {
       'getAFN',
       'setMaxSecondsWithoutAFNHeartbeat',
       'getMaxSecondsWithoutAFNHeartbeat',
+      'isHealthy',
       // TypeAndVersionInterface
       'typeAndVersion',
       // Ownership

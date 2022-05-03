@@ -15,6 +15,7 @@ import (
 	evmclient "github.com/smartcontractkit/chainlink/core/chains/evm/client"
 	httypes "github.com/smartcontractkit/chainlink/core/chains/evm/headtracker/types"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/log"
+	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/types"
 	evmtypes "github.com/smartcontractkit/chainlink/core/chains/evm/types"
@@ -361,6 +362,7 @@ type ChainSetOpts struct {
 	// Gen-functions are useful for dependency injection by tests
 	GenEthClient      func(types.Chain) evmclient.Client
 	GenLogBroadcaster func(types.Chain) log.Broadcaster
+	GenLogPoller      func(types.Chain) *logpoller.LogPoller
 	GenHeadTracker    func(types.Chain, httypes.HeadBroadcaster) httypes.HeadTracker
 	GenTxManager      func(types.Chain) txmgr.TxManager
 }

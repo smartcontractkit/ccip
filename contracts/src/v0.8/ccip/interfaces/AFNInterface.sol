@@ -23,9 +23,9 @@ interface AFNInterface {
   error MustRecoverFromBadSignal();
   error RecoveryNotNecessary();
 
-  function hasBadSignal() external returns (bool);
+  function hasBadSignal() external view returns (bool);
 
-  function getLastHeartbeat() external returns (Heartbeat memory);
+  function getLastHeartbeat() external view returns (Heartbeat memory);
 
   function voteGood(uint256 round) external;
 

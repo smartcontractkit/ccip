@@ -11,8 +11,8 @@ func TestGetMinMaxSequenceNumbers(t *testing.T) {
 	tests := []struct {
 		input     []Observation
 		f         int
-		minSeqNum int64
-		maxSeqNum int64
+		minSeqNum uint64
+		maxSeqNum uint64
 		err       error
 	}{
 		{[]Observation{{MinSeqNum: 1, MaxSeqNum: 1}}, 0, 1, 1, nil},
