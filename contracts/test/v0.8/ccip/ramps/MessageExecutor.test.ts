@@ -3,7 +3,7 @@ import { expect } from 'chai'
 import { Roles, getUsers } from '../../../test-helpers/setup'
 import { MockOffRamp, MessageExecutorHelper } from '../../../../typechain'
 import { Artifact } from 'hardhat/types'
-import { CCIPMessage, messageDeepEqual } from '../../../test-helpers/ccip'
+import { CCIPMessage, messageDeepEqual } from '../../../test-helpers/ccip/ccip'
 import { BigNumber } from '@ethersproject/bignumber'
 import { numToBytes32, publicAbi } from '../../../test-helpers/helpers'
 

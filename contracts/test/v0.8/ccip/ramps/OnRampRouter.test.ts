@@ -5,7 +5,7 @@ import { constants } from 'ethers'
 import hre from 'hardhat'
 import { Artifact } from 'hardhat/types'
 import { MockERC20, MockOnRamp, OnRampRouter } from '../../../../typechain'
-import { CCIPMessagePayload } from '../../../test-helpers/ccip'
+import { CCIPMessagePayload } from '../../../test-helpers/ccip/ccip'
 import { evmRevert } from '../../../test-helpers/matchers'
 import { getUsers, Roles } from '../../../test-helpers/setup'
 

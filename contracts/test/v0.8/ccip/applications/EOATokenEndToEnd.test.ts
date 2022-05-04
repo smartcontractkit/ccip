@@ -19,7 +19,7 @@ import {
   hashMessage,
   MerkleProof,
   RelayReport,
-} from '../../../test-helpers/ccip'
+} from '../../../test-helpers/ccip/ccip'
 
 const { deployContract } = hre.waffle
 

@@ -4,7 +4,7 @@ import { Roles, getUsers } from '../../../test-helpers/setup'
 import { MockERC20, MockOffRamp, ReceiverDapp } from '../../../../typechain'
 import { Artifact } from 'hardhat/types'
 import { evmRevert } from '../../../test-helpers/matchers'
-import { CCIPMessage } from '../../../test-helpers/ccip'
+import { CCIPMessage } from '../../../test-helpers/ccip/ccip'
 import { BigNumber } from '@ethersproject/bignumber'
 
 const { deployContract } = hre.waffle

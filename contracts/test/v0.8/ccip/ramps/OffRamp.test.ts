@@ -32,9 +32,10 @@ import {
   MerkleTree,
   messageDeepEqual,
   RelayReport,
-} from '../../../test-helpers/ccip'
+} from '../../../test-helpers/ccip/ccip'
 import { constants } from 'ethers'
 import { ContractReceipt } from 'ethers'
+import { GAS } from '../../../test-helpers/ccip/gas-measurements'
 const { deployContract } = hre.waffle
 
 function constructReport(
@@ -423,7 +424,7 @@ describe('OffRamp', () => {
         gasUsed = gasUsed.add((await response.wait()).gasUsed)
       })
       it('GASTEST [ @skip-coverage ]', async () => {
-        expectGasWithinDeviation(gasUsed, 110_456)
+        expectGasWithinDeviation(gasUsed, GAS.OffRamp.report)
       })
       it('stores the root', async () => {
         const stored = await ramp.getMerkleRoot(root)
@@ -816,7 +817,10 @@ describe('OffRamp', () => {
 
         describe('GASTEST', () => {
           it('GASTEST - contract receiver execution [ @skip-coverage ]', async () => {
-            expectGasWithinDeviation((await tx.wait()).gasUsed, 536_304)
+            expectGasWithinDeviation(
+              (await tx.wait()).gasUsed,
+              GAS.OffRamp.executeTransaction.TWO_TOKENS.FEES.CONTRACT_RECEIVER,
+            )
           })
 
           it('GASTEST - EOA receiver [ @skip-coverage ]', async () => {
@@ -839,7 +843,10 @@ describe('OffRamp', () => {
             tx = await ramp
               .connect(roles.oracleNode)
               .executeTransaction(message, proof, true)
-            expectGasWithinDeviation((await tx.wait()).gasUsed, 235_608)
+            expectGasWithinDeviation(
+              (await tx.wait()).gasUsed,
+              GAS.OffRamp.executeTransaction.TWO_TOKENS.FEES.EOA_RECEIVER,
+            )
 
             expect(tx)
               .to.emit(ramp, 'CrossChainMessageExecuted')
@@ -948,7 +955,11 @@ describe('OffRamp', () => {
 
         describe('GASTEST', () => {
           it('GASTEST - contract receiver execution [ @skip-coverage ]', async () => {
-            expectGasWithinDeviation((await tx.wait()).gasUsed, 489_646)
+            expectGasWithinDeviation(
+              (await tx.wait()).gasUsed,
+              GAS.OffRamp.executeTransaction.TWO_TOKENS.NO_FEES
+                .CONTRACT_RECEIVER,
+            )
           })
 
           it('GASTEST - EOA receiver [ @skip-coverage ]', async () => {
@@ -971,7 +982,10 @@ describe('OffRamp', () => {
             tx = await ramp
               .connect(roles.oracleNode)
               .executeTransaction(message, proof, true)
-            expectGasWithinDeviation((await tx.wait()).gasUsed, 249_896)
+            expectGasWithinDeviation(
+              (await tx.wait()).gasUsed,
+              GAS.OffRamp.executeTransaction.TWO_TOKENS.NO_FEES.EOA_RECEIVER,
+            )
           })
         })
 

@@ -19,8 +19,9 @@ import { evmRevert } from '../../../test-helpers/matchers'
 import {
   CCIPMessagePayload,
   requestEventArgsEqual,
-} from '../../../test-helpers/ccip'
+} from '../../../test-helpers/ccip/ccip'
 import { Signer } from 'ethers'
+import { GAS } from '../../../test-helpers/ccip/gas-measurements'
 
 const { deployContract } = hre.waffle
 
@@ -398,7 +399,10 @@ describe('OnRamp', () => {
           .connect(roles.defaultAccount)
           .requestCrossChainSend(payload, hre.ethers.constants.AddressZero)
         gasUsed = gasUsed.add((await tx.wait()).gasUsed)
-        expectGasWithinDeviation(gasUsed, 190_394)
+        expectGasWithinDeviation(
+          gasUsed,
+          GAS.OnRamp.requestCrossChainSend.MESSAGE_ONLY,
+        )
       })
 
       it('GASTEST - Send 1 token [ @skip-coverage ]', async () => {
@@ -412,7 +416,10 @@ describe('OnRamp', () => {
           .connect(roles.defaultAccount)
           .requestCrossChainSend(payload, hre.ethers.constants.AddressZero)
         gasUsed = gasUsed.add((await tx.wait()).gasUsed)
-        expectGasWithinDeviation(gasUsed, 213_081)
+        expectGasWithinDeviation(
+          gasUsed,
+          GAS.OnRamp.requestCrossChainSend.ONE_TOKEN,
+        )
       })
 
       it('GASTEST - Send 2 tokens [ @skip-coverage ]', async () => {
@@ -428,7 +435,10 @@ describe('OnRamp', () => {
           .connect(roles.defaultAccount)
           .requestCrossChainSend(payload, hre.ethers.constants.AddressZero)
         gasUsed = gasUsed.add((await tx.wait()).gasUsed)
-        expectGasWithinDeviation(gasUsed, 323_390)
+        expectGasWithinDeviation(
+          gasUsed,
+          GAS.OnRamp.requestCrossChainSend.TWO_TOKENS,
+        )
       })
 
       it('GASTEST - Send 3 tokens [ @skip-coverage ]', async () => {
@@ -442,7 +452,10 @@ describe('OnRamp', () => {
           .connect(roles.defaultAccount)
           .requestCrossChainSend(payload, hre.ethers.constants.AddressZero)
         gasUsed = gasUsed.add((await tx.wait()).gasUsed)
-        expectGasWithinDeviation(gasUsed, 433_687)
+        expectGasWithinDeviation(
+          gasUsed,
+          GAS.OnRamp.requestCrossChainSend.THREE_TOKENS,
+        )
       })
     })
 

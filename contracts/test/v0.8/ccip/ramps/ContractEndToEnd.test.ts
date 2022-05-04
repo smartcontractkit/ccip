@@ -21,7 +21,7 @@ import {
   MerkleProof,
   messageDeepEqual,
   RelayReport,
-} from '../../../test-helpers/ccip'
+} from '../../../test-helpers/ccip/ccip'
 
 const { deployContract } = hre.waffle
 
