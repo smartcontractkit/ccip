@@ -150,6 +150,10 @@ func TestConfigPoller(t *testing.T) {
 	}
 	updateOffchainConfig(t, newCcipConfig, offRamp, user)
 	backend.Commit()
+	latest, err := backend.BlockByNumber(context.Background(), nil)
+	require.NoError(t, err)
+	// Ensure we capture this config set log.
+	require.NoError(t, lp.Replay(context.Background(), latest.Number().Int64()-1))
 
 	// Send blocks until we see the config updated.
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
