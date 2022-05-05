@@ -10,55 +10,55 @@ import (
 	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
-type Hash []byte
+// Add additional hash types e.g. [20]byte as needed here.
+type Hash interface {
+	[32]byte
+}
 
-type Ctx interface {
-	HashLeaf(l []byte) Hash
-	HashInternal(a, b Hash) Hash
-	ZeroHash() Hash
+type Ctx[H Hash] interface {
+	HashLeaf(l []byte) H
+	HashInternal(a, b H) H
+	ZeroHash() H
 }
 
 type keccakCtx struct{}
 
-func NewKeccakCtx() Ctx {
+func NewKeccakCtx() Ctx[[32]byte] {
 	return keccakCtx{}
 }
 
-func (k keccakCtx) HashLeaf(l []byte) Hash {
+func (k keccakCtx) HashLeaf(l []byte) [32]byte {
 	// Note this Keccak256 cannot error https://github.com/golang/crypto/blob/master/sha3/sha3.go#L126
 	// if we start supporting hashing algos which do, we can change this API to include an error.
-	h, _ := utils.Keccak256(append([]byte{0x00}, l...))
-	return h
+	return utils.Keccak256Fixed(append([]byte{0x00}, l...))
 }
 
-func (k keccakCtx) HashInternal(a, b Hash) Hash {
-	if bytes.Compare(a, b) < 0 {
-		h, _ := utils.Keccak256(append([]byte{0x01}, append(a, b...)...))
-		return h
+func (k keccakCtx) HashInternal(a, b [32]byte) [32]byte {
+	if bytes.Compare(a[:], b[:]) < 0 {
+		return utils.Keccak256Fixed(append([]byte{0x01}, append(a[:], b[:]...)...))
 	}
-	h, _ := utils.Keccak256(append([]byte{0x01}, append(b, a...)...))
-	return h
+	return utils.Keccak256Fixed(append([]byte{0x01}, append(b[:], a[:]...)...))
 }
 
 // We use empty bytes32 for zeroHash
 // on the solidity side, this needs to match.
-func (k keccakCtx) ZeroHash() Hash {
+func (k keccakCtx) ZeroHash() [32]byte {
 	var zeroes [32]byte
-	return zeroes[:]
+	return zeroes
 }
 
-type singleLayerProof struct {
+type singleLayerProof[H Hash] struct {
 	nextIndices []int
-	subProof    []Hash
+	subProof    []H
 	sourceFlags []bool
 }
 
-type Proof struct {
-	Hashes      []Hash `json:"hashes"`
+type Proof[H Hash] struct {
+	Hashes      []H    `json:"hashes"`
 	SourceFlags []bool `json:"source_flags"`
 }
 
-func (p Proof) countSourceFlags(b bool) (count int) {
+func (p Proof[H]) countSourceFlags(b bool) (count int) {
 	for _, flag := range p.SourceFlags {
 		if flag == b {
 			count++
@@ -80,7 +80,7 @@ func siblingIndex(idx int) int {
 	return idx ^ 1
 }
 
-func proveSingleLayer(layer []Hash, indices []int) singleLayerProof {
+func proveSingleLayer[H Hash](layer []H, indices []int) singleLayerProof[H] {
 	var (
 		authIndices []int
 		nextIndices []int
@@ -99,27 +99,27 @@ func proveSingleLayer(layer []Hash, indices []int) singleLayerProof {
 		}
 		j++
 	}
-	var subProof []Hash
+	var subProof []H
 	for _, i := range authIndices {
 		subProof = append(subProof, layer[i])
 	}
-	return singleLayerProof{
+	return singleLayerProof[H]{
 		nextIndices: nextIndices,
 		subProof:    subProof,
 		sourceFlags: sourceFlags,
 	}
 }
 
-type Tree struct {
-	layers [][]Hash
-	ctx    Ctx
+type Tree[H Hash] struct {
+	layers [][]H
+	ctx    Ctx[H]
 }
 
-func NewTree(ctx Ctx, leafHashes []Hash) *Tree {
-	var layer = make([]Hash, len(leafHashes))
+func NewTree[H Hash](ctx Ctx[H], leafHashes []H) *Tree[H] {
+	var layer = make([]H, len(leafHashes))
 	copy(layer, leafHashes)
 
-	var layers = [][]Hash{layer}
+	var layers = [][]H{layer}
 	var curr int
 	for len(layer) > 1 {
 		paddedLayer, nextLayer := computeNextLayer(ctx, layer)
@@ -128,12 +128,14 @@ func NewTree(ctx Ctx, leafHashes []Hash) *Tree {
 		layers = append(layers, nextLayer)
 		layer = nextLayer
 	}
-	return &Tree{
+	return &Tree[H]{
 		layers: layers,
 	}
 }
 
-func (t *Tree) String() string {
+// Revive appears confused with the generics "receiver name t should be consistent with previous receiver name p for invalid-type"
+//revive:disable:receiver-naming
+func (t *Tree[H]) String() string {
 	b := strings.Builder{}
 	for _, layer := range t.layers {
 		b.WriteString(fmt.Sprintf("%v", layer))
@@ -141,12 +143,12 @@ func (t *Tree) String() string {
 	return b.String()
 }
 
-func (t *Tree) Root() Hash {
+func (t *Tree[H]) Root() H {
 	return t.layers[len(t.layers)-1][0]
 }
 
-func (t *Tree) Prove(indices []int) Proof {
-	var proof Proof
+func (t *Tree[H]) Prove(indices []int) Proof[H] {
+	var proof Proof[H]
 	for _, layer := range t.layers[:len(t.layers)-1] {
 		res := proveSingleLayer(layer, indices)
 		indices = res.nextIndices
@@ -156,32 +158,32 @@ func (t *Tree) Prove(indices []int) Proof {
 	return proof
 }
 
-func computeNextLayer(ctx Ctx, layer []Hash) ([]Hash, []Hash) {
+func computeNextLayer[H Hash](ctx Ctx[H], layer []H) ([]H, []H) {
 	if len(layer) == 1 {
 		return layer, layer
 	}
 	if len(layer)%2 != 0 {
 		layer = append(layer, ctx.ZeroHash())
 	}
-	var nextLayer []Hash
+	var nextLayer []H
 	for i := 0; i < len(layer); i += 2 {
 		nextLayer = append(nextLayer, ctx.HashInternal(layer[i], layer[i+1]))
 	}
 	return layer, nextLayer
 }
 
-func VerifyComputeRoot(ctx Ctx, leaves []Hash, proof Proof) (Hash, error) {
-	totalHashes := len(leaves) + len(proof.Hashes) - 1
+func VerifyComputeRoot[H Hash](ctx Ctx[H], leafHashes []H, proof Proof[H]) (H, error) {
+	totalHashes := len(leafHashes) + len(proof.Hashes) - 1
 	if totalHashes != len(proof.SourceFlags) {
-		return nil, errors.Errorf("hashes %d != sourceFlags %d", totalHashes, len(proof.SourceFlags))
+		return ctx.ZeroHash(), errors.Errorf("hashes %d != sourceFlags %d", totalHashes, len(proof.SourceFlags))
 	}
 	sourceProofCount := proof.countSourceFlags(SourceFromProof)
 	if sourceProofCount != len(proof.Hashes) {
-		return nil, errors.Errorf("proof source flags %d != proof hashes%d", sourceProofCount, len(proof.Hashes))
+		return ctx.ZeroHash(), errors.Errorf("proof source flags %d != proof hashes%d", sourceProofCount, len(proof.Hashes))
 	}
-	var hashes []Hash
+	var hashes []H
 	for i := 0; i < totalHashes; i++ {
-		hashes = append(hashes, leaves[0])
+		hashes = append(hashes, leafHashes[0])
 	}
 	var (
 		leafPos  int
@@ -189,10 +191,10 @@ func VerifyComputeRoot(ctx Ctx, leaves []Hash, proof Proof) (Hash, error) {
 		proofPos int
 	)
 	for i := 0; i < totalHashes; i++ {
-		var a, b Hash
+		var a, b H
 		if proof.SourceFlags[i] == SourceFromHashes {
-			if leafPos < len(leaves) {
-				a = leaves[leafPos]
+			if leafPos < len(leafHashes) {
+				a = leafHashes[leafPos]
 				leafPos++
 			} else {
 				a = hashes[hashPos]
@@ -202,8 +204,8 @@ func VerifyComputeRoot(ctx Ctx, leaves []Hash, proof Proof) (Hash, error) {
 			a = proof.Hashes[proofPos]
 			proofPos++
 		}
-		if leafPos < len(leaves) {
-			b = leaves[leafPos]
+		if leafPos < len(leafHashes) {
+			b = leafHashes[leafPos]
 			leafPos++
 		} else {
 			b = hashes[hashPos]
@@ -212,7 +214,7 @@ func VerifyComputeRoot(ctx Ctx, leaves []Hash, proof Proof) (Hash, error) {
 		hashes[i] = ctx.HashInternal(a, b)
 	}
 	if totalHashes == 0 {
-		return leaves[0], nil
+		return leafHashes[0], nil
 	}
 	return hashes[totalHashes-1], nil
 }

@@ -627,7 +627,7 @@ func executeMessage(t *testing.T, ccipContracts CCIPContracts, req logpoller.Log
 
 	// Build full tree for report
 	mctx := merklemulti.NewKeccakCtx()
-	var leafHashes []merklemulti.Hash
+	var leafHashes [][32]byte
 	for _, otherReq := range allReqs {
 		leafHashes = append(leafHashes, mctx.HashLeaf(otherReq.Data))
 	}
@@ -638,17 +638,16 @@ func executeMessage(t *testing.T, ccipContracts CCIPContracts, req logpoller.Log
 	require.NoError(t, err)
 	index := decodedMsg.SequenceNumber - report.MinSequenceNumber
 	proof := tree.Prove([]int{int(index)})
-	require.Equal(t, []byte(tree.Root()), report.MerkleRoot[:])
-	solidityProofs, err := ccip.ProofsToSolidity(proof.Hashes)
+	require.Equal(t, tree.Root(), report.MerkleRoot)
 	require.NoError(t, err, "hashes %v index %d", proof.Hashes, index)
 	offRampProof := offramp.CCIPExecutionReport{
 		Messages:       []offramp.CCIPMessage{*decodedMsg},
-		Proofs:         solidityProofs,
+		Proofs:         proof.Hashes,
 		ProofFlagsBits: ccip.ProofFlagsToBits(proof.SourceFlags),
 	}
 	onchainRoot, err := ccipContracts.offRamp.MerkleRoot(nil, offRampProof)
 	require.NoError(t, err)
-	require.Equal(t, []byte(tree.Root()), onchainRoot[:])
+	require.Equal(t, tree.Root(), onchainRoot)
 
 	// Execute.
 	tx, err := ccipContracts.offRamp.ExecuteTransaction(ccipContracts.destUser, offRampProof, false)

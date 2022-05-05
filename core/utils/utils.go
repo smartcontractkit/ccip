@@ -280,6 +280,16 @@ func Keccak256(in []byte) ([]byte, error) {
 	return hash.Sum(nil), err
 }
 
+func Keccak256Fixed(in []byte) [32]byte {
+	hash := sha3.NewLegacyKeccak256()
+	// Note this Keccak256 cannot error https://github.com/golang/crypto/blob/master/sha3/sha3.go#L126
+	// if we start supporting hashing algos which do, we can change this API to include an error.
+	hash.Write(in)
+	var h [32]byte
+	copy(h[:], hash.Sum(nil))
+	return h
+}
+
 // Sha256 returns a hexadecimal encoded string of a hashed input
 func Sha256(in string) (string, error) {
 	hasher := sha3.New256()

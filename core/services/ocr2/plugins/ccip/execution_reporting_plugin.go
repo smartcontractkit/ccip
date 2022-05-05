@@ -33,27 +33,10 @@ var (
 	ErrOffRampIsDown                              = errors.New("offramp is down")
 )
 
-func ProofsToSolidity(proofs []merklemulti.Hash) ([][32]byte, error) {
-	var solidityProofs [][32]byte
-	for _, proof := range proofs {
-		if len(proof) != 32 {
-			return nil, errors.New("invalid solidity proof")
-		}
-		var solProof [32]byte
-		copy(solProof[:], proof)
-		solidityProofs = append(solidityProofs, solProof)
-	}
-	return solidityProofs, nil
-}
-
-func EncodeExecutionReport(msgs []Message, proofs []merklemulti.Hash, proofSourceFlags []bool) (types.Report, error) {
-	solidityProofs, err := ProofsToSolidity(proofs)
-	if err != nil {
-		return nil, err
-	}
+func EncodeExecutionReport(msgs []Message, proofs [][32]byte, proofSourceFlags []bool) (types.Report, error) {
 	report, err := makeExecutionReportArgs().PackValues([]interface{}{ExecutionReport{
 		Messages:      msgs,
-		Proofs:        solidityProofs,
+		Proofs:        proofs,
 		ProofFlagBits: ProofFlagsToBits(proofSourceFlags),
 	}})
 	if err != nil {
@@ -308,7 +291,7 @@ func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, report offram
 		return nil, errors.Errorf("do not have all messages, have %d want %d", len(allMsgs), int(report.Report.MaxSequenceNumber-report.Report.MinSequenceNumber+1))
 	}
 	mctx := merklemulti.NewKeccakCtx()
-	var leaves []merklemulti.Hash
+	var leaves [][32]byte
 	for _, msg := range allMsgs {
 		leaves = append(leaves, mctx.HashLeaf(msg.Raw.Data))
 	}

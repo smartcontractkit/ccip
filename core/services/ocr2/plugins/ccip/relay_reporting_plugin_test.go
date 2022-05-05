@@ -1,7 +1,6 @@
 package ccip_test
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"math/big"
@@ -78,10 +77,8 @@ func TestRelayReportEncoding(t *testing.T) {
 	destChain.Commit()
 
 	mctx := merklemulti.NewKeccakCtx()
-	tree := merklemulti.NewTree(mctx, []merklemulti.Hash{mctx.HashLeaf([]byte{0xaa})})
-	var root [32]byte
-	copy(root[:], tree.Root())
-
+	tree := merklemulti.NewTree(mctx, [][32]byte{mctx.HashLeaf([]byte{0xaa})})
+	root := tree.Root()
 	report := offramp.CCIPRelayReport{
 		MerkleRoot:        root,
 		MinSequenceNumber: 1,
@@ -103,7 +100,7 @@ func TestRelayReportEncoding(t *testing.T) {
 	rep, err := offRamp.GetLastReport(nil)
 	require.NoError(t, err)
 	// Verify it locally
-	require.True(t, bytes.Equal(rep.MerkleRoot[:], root[:]), fmt.Sprintf("Got %v want %v", hexutil.Encode(root[:]), hexutil.Encode(rep.MerkleRoot[:])))
+	require.Equal(t, rep.MerkleRoot, root, fmt.Sprintf("Got %v want %v", hexutil.Encode(root[:]), hexutil.Encode(rep.MerkleRoot[:])))
 	exists, err := offRamp.GetMerkleRoot(nil, rep.MerkleRoot)
 	require.NoError(t, err)
 	require.True(t, exists.Int64() > 0)

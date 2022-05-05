@@ -254,15 +254,13 @@ func (r *RelayReportingPlugin) buildReport(minSeqNum, maxSeqNum uint64) (*offram
 	}
 	// Take all these request and produce a merkle root of them
 	mctx := merklemulti.NewKeccakCtx()
-	var leaves []merklemulti.Hash
+	var leaves [][32]byte
 	for _, req := range reqs {
 		leaves = append(leaves, mctx.HashLeaf(req.Raw.Data))
 	}
 	tree := merklemulti.NewTree(mctx, leaves)
-	var root [32]byte
-	copy(root[:], tree.Root())
 	return &offramp.CCIPRelayReport{
-		MerkleRoot:        root,
+		MerkleRoot:        tree.Root(),
 		MinSequenceNumber: reqs[0].Message.SequenceNumber,
 		MaxSequenceNumber: reqs[len(reqs)-1].Message.SequenceNumber,
 	}, nil

@@ -12,65 +12,68 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti/fixtures"
 )
 
+var (
+	ctx              = NewKeccakCtx()
+	a, b, c, d, e, f = ctx.HashLeaf([]byte{0xa}), ctx.HashLeaf([]byte{0xb}), ctx.HashLeaf([]byte{0xc}), ctx.HashLeaf([]byte{0xd}), ctx.HashLeaf([]byte{0xe}), ctx.HashLeaf([]byte{0xf})
+)
+
 func TestSpecFixture(t *testing.T) {
-	var proofLeaves []Hash
+	var leafHashes [][32]byte
 	for _, leaf := range fixtures.TestVectorLeaves {
-		proofLeaves = append(proofLeaves, hexutil.MustDecode(fmt.Sprintf("0x%s", leaf)))
+		var leaf32 [32]byte
+		copy(leaf32[:], hexutil.MustDecode(fmt.Sprintf("0x%s", leaf)))
+		leafHashes = append(leafHashes, leaf32)
 	}
-	var proofHashes []Hash
+	var proofHashes [][32]byte
 	for _, proofHash := range fixtures.TestVectorProof {
-		proofHashes = append(proofHashes, hexutil.MustDecode(fmt.Sprintf("0x%s", proofHash)))
+		var proofHash32 [32]byte
+		copy(proofHash32[:], hexutil.MustDecode(fmt.Sprintf("0x%s", proofHash)))
+		proofHashes = append(proofHashes, proofHash32)
 	}
-	computedRoot, err := VerifyComputeRoot(NewKeccakCtx(), proofLeaves, Proof{
+	computedRoot, err := VerifyComputeRoot(NewKeccakCtx(), leafHashes, Proof[[32]byte]{
 		Hashes: proofHashes, SourceFlags: fixtures.TestVectorSourceFlags,
 	})
 	require.NoError(t, err)
-	assert.Equal(t, hexutil.MustDecode(fmt.Sprintf("0x%s", fixtures.TestVectorExpectedRoot)), []byte(computedRoot))
+	assert.Equal(t, hexutil.MustDecode(fmt.Sprintf("0x%s", fixtures.TestVectorExpectedRoot)), computedRoot[:])
 }
 
 func TestPadding(t *testing.T) {
-	ctx := NewKeccakCtx()
-	tr4 := NewTree(ctx, []Hash{[]byte{0xa}, []byte{0xb}, []byte{0xc}})
+	tr4 := NewTree(ctx, [][32]byte{a, b, c})
 	assert.Equal(t, 4, len(tr4.layers[0]))
-	tr8 := NewTree(ctx, []Hash{[]byte{0xa}, []byte{0xb}, []byte{0xc}, []byte{0xd}, []byte{0xe}})
+	tr8 := NewTree(ctx, [][32]byte{a, b, c, d, e})
 	assert.Equal(t, 6, len(tr8.layers[0]))
 	assert.Equal(t, 4, len(tr8.layers[1]))
 	p := tr8.Prove([]int{0})
-	h, err := VerifyComputeRoot(ctx, []Hash{[]byte{0xa}}, p)
+	h, err := VerifyComputeRoot(ctx, [][32]byte{a}, p)
 	require.NoError(t, err)
 	assert.Equal(t, tr8.Root(), h)
-	expected := ctx.HashInternal(ctx.HashInternal(ctx.HashInternal([]byte{0xa}, []byte{0xb}), ctx.HashInternal([]byte{0xc}, []byte{0xd})), ctx.HashInternal(ctx.HashInternal([]byte{0xe}, ctx.ZeroHash()), ctx.ZeroHash()))
+	expected := ctx.HashInternal(ctx.HashInternal(ctx.HashInternal(a, b), ctx.HashInternal(c, d)), ctx.HashInternal(ctx.HashInternal(e, ctx.ZeroHash()), ctx.ZeroHash()))
 	assert.Equal(t, expected, tr8.Root())
 }
 
 func TestMerkleMultiProofSecondPreimage(t *testing.T) {
-	ctx := NewKeccakCtx()
-	leaves := []Hash{ctx.HashLeaf([]byte{0xa}), ctx.HashLeaf([]byte{0xb})}
-	tr := NewTree(ctx, leaves)
-	root, err := VerifyComputeRoot(ctx, []Hash{ctx.HashLeaf([]byte{0xa})}, tr.Prove([]int{0}))
+	tr := NewTree(ctx, [][32]byte{a, b})
+	root, err := VerifyComputeRoot(ctx, [][32]byte{a}, tr.Prove([]int{0}))
 	require.NoError(t, err)
 	assert.Equal(t, root, tr.Root())
-
-	secondPreimage := append(ctx.HashLeaf([]byte{0xa}), ctx.HashLeaf([]byte{0xb})...)
-	leaves2 := []Hash{ctx.HashLeaf(secondPreimage)}
-	tr2 := NewTree(ctx, leaves2)
+	tr2 := NewTree(ctx, [][32]byte{ctx.HashLeaf(append(a[:], b[:]...))})
 	assert.NotEqual(t, tr2.Root(), tr.Root())
 }
 
 func TestMerkleMultiProof(t *testing.T) {
 	ctx := NewKeccakCtx()
-	leaves := []Hash{[]byte{0xa}, []byte{0xb}, []byte{0xc}, []byte{0xd}, []byte{0xe}, []byte{0xf}}
-	expectedRoots := []Hash{
-		[]byte{0xa},
-		ctx.HashInternal([]byte{0xa}, []byte{0xb}),
-		ctx.HashInternal(ctx.HashInternal([]byte{0xa}, []byte{0xb}), ctx.HashInternal([]byte{0xc}, ctx.ZeroHash())),
-		ctx.HashInternal(ctx.HashInternal([]byte{0xa}, []byte{0xb}), ctx.HashInternal([]byte{0xc}, []byte{0xd})),
-		ctx.HashInternal(ctx.HashInternal(ctx.HashInternal([]byte{0xa}, []byte{0xb}), ctx.HashInternal([]byte{0xc}, []byte{0xd})), ctx.HashInternal(ctx.HashInternal([]byte{0xe}, ctx.ZeroHash()), ctx.ZeroHash())),
-		ctx.HashInternal(ctx.HashInternal(ctx.HashInternal([]byte{0xa}, []byte{0xb}), ctx.HashInternal([]byte{0xc}, []byte{0xd})), ctx.HashInternal(ctx.HashInternal([]byte{0xe}, []byte{0xf}), ctx.ZeroHash())),
+	leafHashes := [][32]byte{a, b, c, d, e, f}
+	expectedRoots := [][32]byte{
+		a,
+		ctx.HashInternal(a, b),
+		ctx.HashInternal(ctx.HashInternal(a, b), ctx.HashInternal(c, ctx.ZeroHash())),
+		ctx.HashInternal(ctx.HashInternal(a, b), ctx.HashInternal(c, d)),
+		ctx.HashInternal(ctx.HashInternal(ctx.HashInternal(a, b), ctx.HashInternal(c, d)), ctx.HashInternal(ctx.HashInternal(e, ctx.ZeroHash()), ctx.ZeroHash())),
+		ctx.HashInternal(ctx.HashInternal(ctx.HashInternal(a, b), ctx.HashInternal(c, d)), ctx.HashInternal(ctx.HashInternal(e, f), ctx.ZeroHash())),
 	}
 	// For every size tree from 0..len(leaves)
-	for len_ := 1; len_ <= len(leaves); len_++ {
-		tr := NewTree(NewKeccakCtx(), leaves[:len_])
+	for len_ := 1; len_ <= len(leafHashes); len_++ {
+		tr := NewTree(NewKeccakCtx(), leafHashes[:len_])
 		t.Log(tr)
 		expectedRoot := expectedRoots[len_-1]
 		require.Equal(t, tr.Root(), expectedRoot)
@@ -81,9 +84,9 @@ func TestMerkleMultiProof(t *testing.T) {
 				leaveIndices := gen.Combination(nil)
 				t.Log("indices", leaveIndices)
 				proof := tr.Prove(leaveIndices)
-				var leavesToProve []Hash
+				var leavesToProve [][32]byte
 				for _, idx := range leaveIndices {
-					leavesToProve = append(leavesToProve, leaves[idx])
+					leavesToProve = append(leavesToProve, leafHashes[idx])
 				}
 				root, err := VerifyComputeRoot(ctx, leavesToProve, proof)
 				require.NoError(t, err)

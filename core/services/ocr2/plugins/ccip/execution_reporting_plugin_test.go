@@ -110,7 +110,7 @@ func TestExecutionReportEncoding(t *testing.T) {
 	destChain.Commit()
 
 	mctx := merklemulti.NewKeccakCtx()
-	var leafHashes []merklemulti.Hash
+	var leafHashes [][32]byte
 	var msgs []ccip.Message
 	for i := 0; i < 3; i++ {
 		message := ccip.Message{
@@ -143,12 +143,8 @@ func TestExecutionReportEncoding(t *testing.T) {
 
 	rootLocal, err := merklemulti.VerifyComputeRoot(mctx, leafHashes, proof)
 	require.NoError(t, err)
-	var root [32]byte
-	copy(root[:], tree.Root()[:])
-	require.Equal(t, []byte(rootLocal[:]), root[:])
-
 	report := offramp.CCIPRelayReport{
-		MerkleRoot:        root,
+		MerkleRoot:        rootLocal,
 		MinSequenceNumber: 10,
 		MaxSequenceNumber: 12,
 	}
@@ -209,7 +205,7 @@ func TestExecutionReportEncoding(t *testing.T) {
 
 	generatedRoot, err := offRamp.MerkleRoot(nil, executionReport)
 	require.NoError(t, err)
-	require.Equal(t, root, generatedRoot)
+	require.Equal(t, rootLocal, generatedRoot)
 	tx, err := executor.Report(destUser, executorReport)
 	require.NoError(t, err)
 	destChain.Commit()
@@ -241,7 +237,7 @@ func TestExecutionReportInvariance(t *testing.T) {
 		},
 	}
 	var h [32]byte
-	report, err := ccip.EncodeExecutionReport([]ccip.Message{message, message, message}, []merklemulti.Hash{h[:]}, []bool{true})
+	report, err := ccip.EncodeExecutionReport([]ccip.Message{message, message, message}, [][32]byte{h}, []bool{true})
 	require.NoError(t, err)
 	er, err := ccip.DecodeExecutionReport(report)
 	require.NoError(t, err)
@@ -251,7 +247,7 @@ func TestExecutionReportInvariance(t *testing.T) {
 }
 
 func TestDecodeEmptyExecutionReport(t *testing.T) {
-	executorReport, err := ccip.EncodeExecutionReport([]ccip.Message{}, []merklemulti.Hash{}, []bool{})
+	executorReport, err := ccip.EncodeExecutionReport([]ccip.Message{}, [][32]byte{}, []bool{})
 	require.NoError(t, err)
 	_, err = ccip.DecodeExecutionReport(executorReport)
 	require.Error(t, err)

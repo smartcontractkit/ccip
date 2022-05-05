@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/hex"
 	"fmt"
@@ -436,7 +435,7 @@ func (client CCIPClient) ScalingAndBatching(t *testing.T) {
 	client.Source.logger.Info("Sent 10 txs to onramp.")
 }
 
-func (client CCIPClient) ExecuteOfframpTransaction(t *testing.T, proof merklemulti.Proof, encodedMessage []byte) (*types.Transaction, error) {
+func (client CCIPClient) ExecuteOfframpTransaction(t *testing.T, proof merklemulti.Proof[[32]byte], encodedMessage []byte) (*types.Transaction, error) {
 	decodedMsg, err := ccip.DecodeCCIPMessage(encodedMessage)
 	require.NoError(t, err)
 	_, err = ccip.MakeCCIPMsgArgs().PackValues([]interface{}{*decodedMsg})
@@ -444,11 +443,9 @@ func (client CCIPClient) ExecuteOfframpTransaction(t *testing.T, proof merklemul
 
 	client.Dest.logger.Infof("Cross chain message %+v", decodedMsg)
 
-	solidityProofs, err := ccip.ProofsToSolidity(proof.Hashes)
-	require.NoError(t, err)
 	report := offramp.CCIPExecutionReport{
 		Messages:       []offramp.CCIPMessage{*decodedMsg},
-		Proofs:         solidityProofs,
+		Proofs:         proof.Hashes,
 		ProofFlagsBits: ccip.ProofFlagsToBits(proof.SourceFlags),
 	}
 
@@ -563,23 +560,21 @@ func (client CCIPClient) ValidateMerkleRoot(
 	request *onramp.OnRampCrossChainSendRequested,
 	reportRequests []*onramp.OnRampCrossChainSendRequested,
 	report offramp.CCIPRelayReport,
-) merklemulti.Proof {
+) merklemulti.Proof[[32]byte] {
 	mctx := merklemulti.NewKeccakCtx()
-	var leafHashes []merklemulti.Hash
+	var leafHashes [][32]byte
 	for _, req := range reportRequests {
 		leafHashes = append(leafHashes, mctx.HashLeaf(req.Raw.Data))
 	}
 
 	tree := merklemulti.NewTree(mctx, leafHashes)
-	if !bytes.Equal(tree.Root()[:], report.MerkleRoot[:]) {
+	if tree.Root() != report.MerkleRoot {
 		t.Log("Merkle root does not match the root in the report")
-		t.Logf("Computed %+v, reported %+v", tree.Root()[:], report.MerkleRoot[:])
+		t.Logf("Computed %+v, reported %+v", tree.Root(), report.MerkleRoot)
 		t.FailNow()
 	}
 
-	var root [32]byte
-	copy(root[:], tree.Root())
-	exists, err := client.Dest.OffRamp.GetMerkleRoot(nil, root)
+	exists, err := client.Dest.OffRamp.GetMerkleRoot(nil, tree.Root())
 	require.NoError(t, err)
 	if exists.Uint64() < 1 {
 		panic("Path is not present in the offramp")
