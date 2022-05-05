@@ -33,7 +33,7 @@ type EvmChainConfig struct {
 	TokenSenders    []common.Address
 	MessageReceiver common.Address
 	TokenReceiver   common.Address
-	MessageExecutor common.Address
+	OffRampExecutor common.Address
 	Afn             common.Address
 }
 
@@ -96,7 +96,7 @@ var Kovan = EvmChainConfig{
 	OffRampRouter:   common.HexToAddress(""),
 	MessageReceiver: common.HexToAddress("0x1a224Ab562D640aDE0FBc203bE619D5Cd3CEf935"),
 	TokenReceiver:   common.HexToAddress("0xC4ED6c4F56ef4bD105e398BA320cF08e99C36E06"),
-	MessageExecutor: common.HexToAddress("0x97403d2377e02eFc2D6e60D129435c0BA0917c9A"),
+	OffRampExecutor: common.HexToAddress("0x97403d2377e02eFc2D6e60D129435c0BA0917c9A"),
 	Afn:             common.HexToAddress("0xE0271CC39005530A228E91bdF9454deEfdE47DCd"),
 	DeploySettings: DeploySettings{
 		DeployAFN:        false,
@@ -121,7 +121,7 @@ var BSCTestnet = EvmChainConfig{
 	OffRamp:         common.HexToAddress("0x57c9639Fd47Ba84F0ac5DCe3d6c368D8eDDEEf94"),
 	MessageReceiver: common.HexToAddress("0xE2e54DF7E28e1Fa2ebAebBc9A0796A884Eb7B9BB"),
 	TokenReceiver:   common.HexToAddress("0xD9B7CD57A2ADB88A28D48D61c3552DA748247a22"),
-	MessageExecutor: common.HexToAddress("0x1e936E6e617E20ba3E73D7BF02b5A8b0bBb2673A"),
+	OffRampExecutor: common.HexToAddress("0x1e936E6e617E20ba3E73D7BF02b5A8b0bBb2673A"),
 	Afn:             common.HexToAddress("0xaa9DFC20A535886974acdD23192D85f6A4c9a8D1"),
 	DeploySettings: DeploySettings{
 		DeployAFN:        false,
@@ -146,7 +146,7 @@ var PolygonMumbai = EvmChainConfig{
 	OffRamp:         common.HexToAddress("0xB16eaA4596a2CedD765B85334448DB6C6Cb5c2FE"),
 	MessageReceiver: common.HexToAddress("0x887F2081E5d3A3780098E3110E8b027848efF01c"),
 	TokenReceiver:   common.HexToAddress("0x82a91b70A1470976979BE3862615A1A569fBb701"),
-	MessageExecutor: common.HexToAddress("0xe3B3001a415072AF66A533376eb3182b1f47f646"),
+	OffRampExecutor: common.HexToAddress("0xe3B3001a415072AF66A533376eb3182b1f47f646"),
 	Afn:             common.HexToAddress("0x1c5cE558D50FaaFee9a9da89F5Db20aC7037E3Fb"),
 	DeploySettings: DeploySettings{
 		DeployAFN:        false,

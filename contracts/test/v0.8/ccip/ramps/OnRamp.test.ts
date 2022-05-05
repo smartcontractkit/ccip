@@ -273,7 +273,6 @@ describe('OnRamp', () => {
   describe('#withdrawAccumulatedFees', () => {
     let receiver: string
     let messageData: string
-    let options: string
     let amounts: Array<BigNumber>
     let payload: CCIPMessagePayload
     let recipient: Signer
@@ -284,7 +283,6 @@ describe('OnRamp', () => {
     beforeEach(async () => {
       receiver = await roles.stranger.getAddress()
       messageData = hre.ethers.constants.HashZero
-      options = hre.ethers.constants.HashZero
       amounts = [bucketRate.div(8)]
       payload = {
         receiver: receiver,
@@ -293,7 +291,6 @@ describe('OnRamp', () => {
         amounts: amounts,
         destinationChainId: destinationChainIds[0],
         executor: hre.ethers.constants.AddressZero,
-        options: options,
       }
       await tokens[0]
         .connect(roles.defaultAccount)
@@ -359,14 +356,12 @@ describe('OnRamp', () => {
   describe('#requestCrossChainSend', async () => {
     let receiver: string
     let messageData: string
-    let options: string
     let amounts: Array<BigNumber>
     let payload: CCIPMessagePayload
 
     beforeEach(async () => {
       receiver = await roles.stranger.getAddress()
       messageData = hre.ethers.constants.HashZero
-      options = hre.ethers.constants.HashZero
       amounts = [bucketRate.div(8), bucketRate.div(4), bucketRate.div(2)]
       payload = {
         receiver: receiver,
@@ -375,7 +370,6 @@ describe('OnRamp', () => {
         amounts: amounts,
         destinationChainId: destinationChainIds[0],
         executor: hre.ethers.constants.AddressZero,
-        options: options,
       }
     })
 
@@ -508,7 +502,6 @@ describe('OnRamp', () => {
           data: messageData,
           tokens: tokens.map((t) => t.address),
           amounts: expectedAmounts,
-          options: options,
         })
       })
 
@@ -578,7 +571,6 @@ describe('OnRamp', () => {
           data: messageData,
           tokens: tokens.map((t) => t.address),
           amounts: expectedAmounts,
-          options: options,
         })
       })
 

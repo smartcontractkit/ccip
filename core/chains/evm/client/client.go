@@ -141,6 +141,7 @@ func (client *client) NodeStates() (states map[int32]string) {
 // "To" is the address of the ERC contract. "Data" is the message sent
 // to the contract.
 type CallArgs struct {
+	From common.Address `json:"from"`
 	To   common.Address `json:"to"`
 	Data hexutil.Bytes  `json:"data"`
 }

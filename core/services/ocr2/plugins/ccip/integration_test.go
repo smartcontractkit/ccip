@@ -1,7 +1,6 @@
 package ccip_test
 
 import (
-	"bytes"
 	"context"
 	"encoding/hex"
 	"fmt"
@@ -10,9 +9,12 @@ import (
 	"testing"
 	"time"
 
+	gethtypes "github.com/ethereum/go-ethereum/core/types"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -36,15 +38,14 @@ import (
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/txmgr"
 	evmtypes "github.com/smartcontractkit/chainlink/core/chains/evm/types"
-	"github.com/smartcontractkit/chainlink/core/chains/terra"
 	"github.com/smartcontractkit/chainlink/core/internal/cltest"
 	"github.com/smartcontractkit/chainlink/core/internal/cltest/heavyweight"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/afn_contract"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/link_token_interface"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/message_executor"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/mock_v3_aggregator_contract"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/native_token_pool"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp_executor"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp_router"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/onramp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/onramp_router"
@@ -61,6 +62,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/keystore/chaintype"
 	"github.com/smartcontractkit/chainlink/core/services/keystore/keys/ocr2key"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/validate"
 	"github.com/smartcontractkit/chainlink/core/services/ocrbootstrap"
 	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
@@ -90,7 +92,7 @@ type CCIPContracts struct {
 	messageReceiver                *simple_message_receiver.SimpleMessageReceiver
 	senderDapp                     *sender_dapp.SenderDapp
 	receiverDapp                   *receiver_dapp.ReceiverDapp
-	executor                       *message_executor.MessageExecutor
+	executor                       *offramp_executor.OffRampExecutor
 }
 
 func setupCCIPContracts(t *testing.T) CCIPContracts {
@@ -107,11 +109,11 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 		sourceChain,
 		sourceLinkTokenAddress,
 		native_token_pool.PoolInterfaceBucketConfig{
-			Rate:     big.NewInt(1),
-			Capacity: big.NewInt(1e9),
+			Rate:     big.NewInt(1e9),
+			Capacity: big.NewInt(1e18),
 		}, native_token_pool.PoolInterfaceBucketConfig{
-			Rate:     big.NewInt(1),
-			Capacity: big.NewInt(1e9),
+			Rate:     big.NewInt(1e9),
+			Capacity: big.NewInt(1e18),
 		})
 	require.NoError(t, err)
 	sourceChain.Commit()
@@ -127,16 +129,19 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 	destPoolAddress, _, _, err := native_token_pool.DeployNativeTokenPool(destUser, destChain, destLinkTokenAddress,
 		native_token_pool.PoolInterfaceBucketConfig{
 			Rate:     big.NewInt(1),
-			Capacity: big.NewInt(1e9),
+			Capacity: big.NewInt(1e18),
 		}, native_token_pool.PoolInterfaceBucketConfig{
 			Rate:     big.NewInt(1),
-			Capacity: big.NewInt(1e9),
+			Capacity: big.NewInt(1e18),
 		})
 	require.NoError(t, err)
 	destChain.Commit()
 	destPool, err := native_token_pool.NewNativeTokenPool(destPoolAddress, destChain)
 	require.NoError(t, err)
 	destChain.Commit()
+	releaseBucket, err := destPool.GetReleaseOrMintBucket(nil)
+	require.NoError(t, err)
+	t.Logf("release bucket %v %v\n", releaseBucket.Tokens, releaseBucket.Capacity)
 
 	// Float the offramp pool with 1M juels
 	// Dest user is the owner of the dest pool, so he can store
@@ -274,9 +279,9 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 	destChain.Commit()
 
 	// Deploy the message executor ocr2 contract
-	executorAddress, _, _, err := message_executor.DeployMessageExecutor(destUser, destChain, offRampAddress, false)
+	executorAddress, _, _, err := offramp_executor.DeployOffRampExecutor(destUser, destChain, offRampAddress, false)
 	require.NoError(t, err)
-	executor, err := message_executor.NewMessageExecutor(executorAddress, destChain)
+	executor, err := offramp_executor.NewOffRampExecutor(executorAddress, destChain)
 	require.NoError(t, err)
 
 	sourceChain.Commit()
@@ -287,6 +292,10 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 		sourceChain.Commit()
 		destChain.Commit()
 	}
+	// (practically) Infinite approval source user (owner of all the link) to onramp router.
+	sourceUser.GasLimit = 500000
+	_, err = sourceLinkToken.Approve(sourceUser, onRampRouter.Address(), big.NewInt(math.MaxInt64))
+	sourceChain.Commit()
 
 	return CCIPContracts{
 		sourceUser:      sourceUser,
@@ -328,27 +337,6 @@ func (ks EthKeyStoreSim) SignTx(address common.Address, tx *types.Transaction, c
 
 var _ keystore.Eth = EthKeyStoreSim{}
 
-type testCheckerFactory struct {
-	err error
-}
-
-func (t *testCheckerFactory) BuildChecker(spec txmgr.TransmitCheckerSpec) (txmgr.TransmitChecker, error) {
-	return &testChecker{t.err}, nil
-}
-
-type testChecker struct {
-	err error
-}
-
-func (t *testChecker) Check(
-	_ context.Context,
-	_ logger.Logger,
-	_ txmgr.EthTx,
-	_ txmgr.EthTxAttempt,
-) error {
-	return t.err
-}
-
 func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName string, sourceChain *backends.SimulatedBackend, destChain *backends.SimulatedBackend) (chainlink.Application, string, common.Address, ocr2key.KeyBundle, *configtest.TestGeneralConfig, func()) {
 	p2paddresses := []string{
 		fmt.Sprintf("127.0.0.1:%d", port),
@@ -367,6 +355,8 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 	config.Overrides.P2PV2ListenAddresses = p2paddresses
 	config.Overrides.P2PV2AnnounceAddresses = p2paddresses
 	config.Overrides.P2PNetworkingStack = ocrnetworking.NetworkingStackV2
+	// NOTE: For the executor jobs, the default of 500k is insufficient for a 3 message batch
+	config.Overrides.GlobalEvmGasLimitDefault = null.NewInt(600000, true)
 	// Disables ocr spec validation so we can have fast polling for the test.
 	config.Overrides.Dev = null.BoolFrom(true)
 
@@ -386,7 +376,6 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 	simEthKeyStore := EthKeyStoreSim{Eth: keyStore.Eth()}
 	cfg := cltest.NewTestGeneralConfig(t)
 	evmCfg := evmtest.NewChainScopedConfig(t, cfg)
-	checkerFactory := &testCheckerFactory{}
 
 	// Create our chainset manually so we can have custom eth clients
 	// (the wrapped sims faking different chainIDs)
@@ -452,9 +441,9 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 		},
 		GenTxManager: func(c evmtypes.Chain) txmgr.TxManager {
 			if c.ID.String() == sourceChainID.String() {
-				return txmgr.NewTxm(db, sourceClient, evmtest.NewChainScopedConfig(t, config), simEthKeyStore, eventBroadcaster, lggr, checkerFactory)
+				return txmgr.NewTxm(db, sourceClient, evmtest.NewChainScopedConfig(t, config), simEthKeyStore, eventBroadcaster, lggr, &txmgr.CheckerFactory{sourceClient})
 			} else if c.ID.String() == destChainID.String() {
-				return txmgr.NewTxm(db, destClient, evmtest.NewChainScopedConfig(t, config), simEthKeyStore, eventBroadcaster, lggr, checkerFactory)
+				return txmgr.NewTxm(db, destClient, evmtest.NewChainScopedConfig(t, config), simEthKeyStore, eventBroadcaster, lggr, &txmgr.CheckerFactory{destClient})
 			}
 			t.Fatalf("invalid chain ID %v", c.ID.String())
 			return nil
@@ -463,23 +452,13 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 	if err != nil {
 		lggr.Fatal(err)
 	}
-	terraChain, err := terra.NewChainSet(terra.ChainSetOpts{
-		Config:           cfg,
-		Logger:           lggr,
-		DB:               db,
-		KeyStore:         keyStore.Terra(),
-		EventBroadcaster: eventBroadcaster,
-		ORM:              terra.NewORM(db, lggr, cfg),
-	})
-
 	app, err := chainlink.NewApplication(chainlink.ApplicationOpts{
 		Config:           config,
 		EventBroadcaster: eventBroadcaster,
 		SqlxDB:           db,
 		KeyStore:         keyStore,
 		Chains: chainlink.Chains{
-			EVM:   evmChain,
-			Terra: terraChain,
+			EVM: evmChain,
 		},
 		Logger:                   lggr,
 		ExternalInitiatorManager: nil,
@@ -526,17 +505,174 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 	}
 }
 
-func TestIntegration_CCIP(t *testing.T) {
-	ccipContracts := setupCCIPContracts(t)
-	// Oracles need ETH on the destination chain
-	bootstrapNodePort := int64(19599)
-	appBootstrap, bootstrapPeerID, _, _, _, _ := setupNodeCCIP(t, ccipContracts.destUser, bootstrapNodePort, "bootstrap_ccip", ccipContracts.sourceChain, ccipContracts.destChain)
+type Node struct {
+	app         chainlink.Application
+	transmitter common.Address
+	kb          ocr2key.KeyBundle
+}
+
+func (node *Node) eventuallyHasReqSeqNum(t *testing.T, ccipContracts CCIPContracts, seqNum int) logpoller.Log {
+	c, err := node.app.GetChains().EVM.Get(sourceChainID)
+	require.NoError(t, err)
+	var log logpoller.Log
+	gomega.NewGomegaWithT(t).Eventually(func() bool {
+		ccipContracts.sourceChain.Commit()
+		ccipContracts.destChain.Commit()
+		lgs, err := c.LogPoller().LogsDataWordRange(ccip.CrossChainSendRequested, ccipContracts.onRamp.Address(), 2, ccip.EvmWord(uint64(seqNum)), ccip.EvmWord(uint64(seqNum)), 1)
+		require.NoError(t, err)
+		if len(lgs) == 1 {
+			log = lgs[0]
+			return true
+		}
+		return false
+	}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue())
+	return log
+}
+
+func (node *Node) eventuallyHasExecutedSeqNum(t *testing.T, ccipContracts CCIPContracts, seqNum int) logpoller.Log {
+	c, err := node.app.GetChains().EVM.Get(destChainID)
+	require.NoError(t, err)
+	var log logpoller.Log
+	gomega.NewGomegaWithT(t).Eventually(func() bool {
+		ccipContracts.sourceChain.Commit()
+		ccipContracts.destChain.Commit()
+		lgs, err := c.LogPoller().IndexedLogsTopicRange(ccip.CrossChainMessageExecuted, ccipContracts.offRamp.Address(), 1, ccip.EvmWord(uint64(seqNum)), ccip.EvmWord(uint64(seqNum)), 1)
+		require.NoError(t, err)
+		if len(lgs) == 1 {
+			log = lgs[0]
+			return true
+		}
+		return false
+	}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue())
+	return log
+}
+
+func (node *Node) addJob(t *testing.T, spec string) {
+	ccipJob, err := validate.ValidatedOracleSpecToml(node.app.GetConfig(), spec)
+	require.NoError(t, err)
+	err = node.app.AddJobV2(context.Background(), &ccipJob)
+	require.NoError(t, err)
+}
+
+func (node *Node) addBootstrapJob(t *testing.T, spec string) {
+	ccipJob, err := ocrbootstrap.ValidatedBootstrapSpecToml(spec)
+	require.NoError(t, err)
+	err = node.app.AddJobV2(context.Background(), &ccipJob)
+	require.NoError(t, err)
+}
+
+func allNodesHaveReqSeqNum(t *testing.T, ccipContracts CCIPContracts, nodes []Node, seqNum int) logpoller.Log {
+	var log logpoller.Log
+	for _, node := range nodes {
+		log = node.eventuallyHasReqSeqNum(t, ccipContracts, seqNum)
+	}
+	return log
+}
+
+func allNodesHaveExecutedSeqNum(t *testing.T, ccipContracts CCIPContracts, nodes []Node, seqNum int) logpoller.Log {
+	var log logpoller.Log
+	for _, node := range nodes {
+		log = node.eventuallyHasExecutedSeqNum(t, ccipContracts, seqNum)
+	}
+	return log
+}
+
+func queueRequest(t *testing.T, ccipContracts CCIPContracts, msgPayload string, tokens []common.Address, amounts []*big.Int, executor common.Address) *gethtypes.Transaction {
+	msg := onramp_router.CCIPMessagePayload{
+		Receiver:           ccipContracts.messageReceiver.Address(),
+		DestinationChainId: destChainID,
+		Data:               []byte(msgPayload),
+		Tokens:             tokens,
+		Amounts:            amounts,
+		Executor:           executor,
+	}
+	tx, err := ccipContracts.onRampRouter.RequestCrossChainSend(ccipContracts.sourceUser, msg)
+	require.NoError(t, err)
+	return tx
+}
+
+func confirmTxs(t *testing.T, txs []*gethtypes.Transaction, chain *backends.SimulatedBackend) {
+	chain.Commit()
+	for _, tx := range txs {
+		rec, err := chain.TransactionReceipt(context.Background(), tx.Hash())
+		require.NoError(t, err)
+		require.Equal(t, uint64(1), rec.Status)
+	}
+}
+
+func sendRequest(t *testing.T, ccipContracts CCIPContracts, msgPayload string, tokens []common.Address, amounts []*big.Int, executor common.Address) {
+	tx := queueRequest(t, ccipContracts, msgPayload, tokens, amounts, executor)
+	confirmTxs(t, []*gethtypes.Transaction{tx}, ccipContracts.sourceChain)
+}
+
+func eventuallyReportRelayed(t *testing.T, ccipContracts CCIPContracts, min, max int) offramp.CCIPRelayReport {
+	var report offramp.CCIPRelayReport
+	var err error
+	gomega.NewGomegaWithT(t).Eventually(func() bool {
+		report, err = ccipContracts.offRamp.GetLastReport(nil)
+		require.NoError(t, err)
+		ccipContracts.sourceChain.Commit()
+		ccipContracts.destChain.Commit()
+		t.Log("last report", report.MinSequenceNumber, report.MaxSequenceNumber)
+		return report.MinSequenceNumber == uint64(min) && report.MaxSequenceNumber == uint64(max)
+	}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue())
+	return report
+}
+
+func executeMessage(t *testing.T, ccipContracts CCIPContracts, req logpoller.Log, allReqs []logpoller.Log, report offramp.CCIPRelayReport) {
+	// Double check root exists onchain.
+	exists, err := ccipContracts.offRamp.GetMerkleRoot(nil, report.MerkleRoot)
+	require.NoError(t, err)
+	require.True(t, exists.Int64() > 0)
+
+	// Build full tree for report
+	mctx := merklemulti.NewKeccakCtx()
+	var leafHashes []merklemulti.Hash
+	for _, otherReq := range allReqs {
+		leafHashes = append(leafHashes, mctx.HashLeaf(otherReq.Data))
+	}
+	tree := merklemulti.NewTree(mctx, leafHashes)
+
+	// Generate our proof in the execution ramp report format.
+	decodedMsg, err := ccip.DecodeCCIPMessage(req.Data)
+	require.NoError(t, err)
+	index := decodedMsg.SequenceNumber - report.MinSequenceNumber
+	proof := tree.Prove([]int{int(index)})
+	require.Equal(t, []byte(tree.Root()), report.MerkleRoot[:])
+	solidityProofs, err := ccip.ProofsToSolidity(proof.Hashes)
+	require.NoError(t, err, "hashes %v index %d", proof.Hashes, index)
+	offRampProof := offramp.CCIPExecutionReport{
+		Messages:       []offramp.CCIPMessage{*decodedMsg},
+		Proofs:         solidityProofs,
+		ProofFlagsBits: ccip.ProofFlagsToBits(proof.SourceFlags),
+	}
+	onchainRoot, err := ccipContracts.offRamp.MerkleRoot(nil, offRampProof)
+	require.NoError(t, err)
+	require.Equal(t, []byte(tree.Root()), onchainRoot[:])
+
+	// Execute.
+	tx, err := ccipContracts.offRamp.ExecuteTransaction(ccipContracts.destUser, offRampProof, false)
+	require.NoError(t, err)
+	ccipContracts.destChain.Commit()
+	rec, err := ccipContracts.destChain.TransactionReceipt(context.Background(), tx.Hash())
+	require.NoError(t, err)
+	require.Equal(t, uint64(1), rec.Status)
+}
+
+func setupAndStartNodes(t *testing.T, ctx context.Context, ccipContracts CCIPContracts, bootstrapNodePort int64) (Node, []Node) {
+	appBootstrap, bootstrapPeerID, bootstrapTransmitter, bootstrapKb, _, _ := setupNodeCCIP(t, ccipContracts.destUser, bootstrapNodePort, "bootstrap_ccip", ccipContracts.sourceChain, ccipContracts.destChain)
 	var (
-		oracles      []confighelper2.OracleIdentityExtra
-		transmitters []common.Address
-		kbs          []ocr2key.KeyBundle
-		apps         []chainlink.Application
+		oracles []confighelper2.OracleIdentityExtra
+		nodes   []Node
 	)
+	err := appBootstrap.Start(ctx)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		appBootstrap.Stop()
+	})
+	bootstrapNode := Node{
+		appBootstrap, bootstrapTransmitter, bootstrapKb,
+	}
 	// Set up the minimum 4 oracles all funded with destination ETH
 	for i := int64(0); i < 4; i++ {
 		app, peerID, transmitter, kb, cfg, _ := setupNodeCCIP(t, ccipContracts.destUser, bootstrapNodePort+1+i, fmt.Sprintf("oracle_ccip%d", i), ccipContracts.sourceChain, ccipContracts.destChain)
@@ -546,9 +682,9 @@ func TestIntegration_CCIP(t *testing.T) {
 				fmt.Sprintf("127.0.0.1:%d", bootstrapNodePort),
 			}},
 		}
-		kbs = append(kbs, kb)
-		apps = append(apps, app)
-		transmitters = append(transmitters, transmitter)
+		nodes = append(nodes, Node{
+			app, transmitter, kb,
+		})
 		offchainPublicKey, _ := hex.DecodeString(strings.TrimPrefix(kb.OnChainPublicKey(), "0x"))
 		oracles = append(oracles, confighelper2.OracleIdentityExtra{
 			OracleIdentity: confighelper2.OracleIdentity{
@@ -559,6 +695,11 @@ func TestIntegration_CCIP(t *testing.T) {
 			},
 			ConfigEncryptionPublicKey: kb.ConfigEncryptionPublicKey(),
 		})
+		err := app.Start(ctx)
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			app.Stop()
+		})
 	}
 
 	reportingPluginConfig, err := ccip.OffchainConfig{
@@ -566,17 +707,19 @@ func TestIntegration_CCIP(t *testing.T) {
 		DestIncomingConfirmations:   1,
 	}.Encode()
 	require.NoError(t, err)
-
 	setupOnchainConfig(t, ccipContracts, oracles, reportingPluginConfig)
+	return bootstrapNode, nodes
+}
+
+func TestIntegration_CCIP(t *testing.T) {
+	ccipContracts := setupCCIPContracts(t)
+	bootstrapNodePort := int64(19599)
 	ctx := context.Background()
-	err = appBootstrap.Start(ctx)
-	require.NoError(t, err)
-	defer appBootstrap.Stop()
+	// Starts nodes and configures them in the OCR contracts.
+	bootstrapNode, nodes := setupAndStartNodes(t, ctx, ccipContracts, bootstrapNodePort)
 
 	// Add the bootstrap job
-	chainSet := appBootstrap.GetChains()
-	require.NotNil(t, chainSet)
-	ocrJob, err := ocrbootstrap.ValidatedBootstrapSpecToml(fmt.Sprintf(`
+	bootstrapNode.addBootstrapJob(t, fmt.Sprintf(`
 type               	= "bootstrap"
 relay 				= "evm"
 schemaVersion      	= 1
@@ -587,18 +730,10 @@ contractConfigTrackerPollInterval = "1s"
 [relayConfig]
 chainID = %s
 `, ccipContracts.offRamp.Address(), destChainID))
-	require.NoError(t, err)
-	err = appBootstrap.AddJobV2(context.Background(), &ocrJob)
-	require.NoError(t, err)
 
-	// For each oracle add a relayer and job
-	for i := 0; i < 4; i++ {
-		err = apps[i].Start(ctx)
-		require.NoError(t, err)
-		defer apps[i].Stop()
-		// Wait for peer wrapper to start
-		time.Sleep(1 * time.Second)
-		ccipJob, err := validate.ValidatedOracleSpecToml(apps[0].GetConfig(), fmt.Sprintf(`
+	// For each node add a relayer and executor job.
+	for i, node := range nodes {
+		node.addJob(t, fmt.Sprintf(`
 type                = "offchainreporting2"
 pluginType          = "ccip-relay"
 relay 				= "evm"
@@ -619,12 +754,8 @@ pollPeriod          = "1s"
 [relayConfig]
 chainID             = "%s"
 
-`, i, ccipContracts.offRamp.Address(), kbs[i].ID(), transmitters[i], ccipContracts.onRamp.Address(), sourceChainID, destChainID, destChainID))
-		require.NoError(t, err)
-		err = apps[i].AddJobV2(context.Background(), &ccipJob)
-		require.NoError(t, err)
-		// Add executor job
-		ccipExecutionJob, err := validate.ValidatedOracleSpecToml(apps[0].GetConfig(), fmt.Sprintf(`
+`, i, ccipContracts.offRamp.Address(), node.kb.ID(), node.transmitter, ccipContracts.onRamp.Address(), sourceChainID, destChainID, destChainID))
+		node.addJob(t, fmt.Sprintf(`
 type                = "offchainreporting2"
 pluginType          = "ccip-execution"
 relay 				= "evm"
@@ -646,238 +777,112 @@ pollPeriod          = "1s"
 [relayConfig]
 chainID             = "%s"
 
-`, i, ccipContracts.executor.Address(), kbs[i].ID(), transmitters[i], ccipContracts.onRamp.Address(), ccipContracts.offRamp.Address(), sourceChainID, destChainID, destChainID))
-		require.NoError(t, err)
-		err = apps[i].AddJobV2(context.Background(), &ccipExecutionJob)
-		require.NoError(t, err)
-	}
-	// Send a request.
-	// Jobs are booting but that is ok, the log broadcaster
-	// will backfill this request log.
-	ccipContracts.sourceUser.GasLimit = 500000
-	_, err = ccipContracts.sourceLinkToken.Approve(ccipContracts.sourceUser, ccipContracts.onRampRouter.Address(), big.NewInt(100))
-	ccipContracts.sourceChain.Commit()
-	msg := onramp_router.CCIPMessagePayload{
-		Receiver:           ccipContracts.messageReceiver.Address(),
-		DestinationChainId: destChainID,
-		Data:               []byte("hello xchain world"),
-		Tokens:             []common.Address{ccipContracts.sourceLinkToken.Address()},
-		Amounts:            []*big.Int{big.NewInt(100)},
-		Options:            nil,
-	}
-	tx, err := ccipContracts.onRampRouter.RequestCrossChainSend(ccipContracts.sourceUser, msg)
-	require.NoError(t, err)
-	ccipContracts.sourceChain.Commit()
-	rec, err := ccipContracts.sourceChain.TransactionReceipt(context.Background(), tx.Hash())
-	require.NoError(t, err)
-	require.Equal(t, uint64(1), rec.Status)
-
-	reportingPluginConfig, err = ccip.OffchainConfig{
-		SourceIncomingConfirmations: 1,
-		DestIncomingConfirmations:   0,
-	}.Encode()
-	require.NoError(t, err)
-
-	setupOnchainConfig(t, ccipContracts, oracles, reportingPluginConfig)
-
-	// Request should appear on all nodes eventually
-	var req logpoller.Log
-	for i := 0; i < 4; i++ {
-		c, err := apps[i].GetChains().EVM.Get(sourceChainID)
-		require.NoError(t, err)
-		gomega.NewGomegaWithT(t).Eventually(func() bool {
-			ccipContracts.sourceChain.Commit()
-			ccipContracts.destChain.Commit()
-			lgs, err := c.LogPoller().Logs(0, 1000, ccip.CrossChainSendRequested, ccipContracts.onRamp.Address())
-			require.NoError(t, err)
-			if len(lgs) == 1 {
-				req = lgs[0]
-				return true
-			}
-			return false
-		}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue())
+`, i, ccipContracts.executor.Address(), node.kb.ID(), node.transmitter, ccipContracts.onRamp.Address(), ccipContracts.offRamp.Address(), sourceChainID, destChainID, destChainID))
 	}
 
-	// Once all nodes have the request, the reporting plugin should run to generate and submit a msg onchain.
-	// So we should eventually see a successful offramp submission.
-	// Note that since we only send blocks here, it's likely that all the nodes will enter the transmission
-	// phase before someone has submitted, so 1 msgs will succeed and 3 will revert.
-	var report offramp.CCIPRelayReport
-	gomega.NewGomegaWithT(t).Eventually(func() bool {
-		report, err = ccipContracts.offRamp.GetLastReport(nil)
+	currentSeqNum := 1
+	t.Run("single self-execute", func(t *testing.T) {
+		sendRequest(t, ccipContracts, "single req", []common.Address{ccipContracts.sourceLinkToken.Address()}, []*big.Int{big.NewInt(100)}, common.Address{})
+		req := allNodesHaveReqSeqNum(t, ccipContracts, nodes, currentSeqNum)
+		report := eventuallyReportRelayed(t, ccipContracts, currentSeqNum, currentSeqNum)
+		executeMessage(t, ccipContracts, req, []logpoller.Log{req}, report)
+		allNodesHaveExecutedSeqNum(t, ccipContracts, nodes, currentSeqNum)
+		receivedMsg, err := ccipContracts.messageReceiver.SMessage(nil)
+		require.NoError(t, err)
+		assert.Equal(t, "single req", string(receivedMsg.Payload.Data))
+		currentSeqNum++
+	})
+
+	t.Run("batch self-execute", func(t *testing.T) {
+		var txs []*gethtypes.Transaction
+		n := 3
+		for i := 0; i < n; i++ {
+			txs = append(txs, queueRequest(t, ccipContracts, fmt.Sprintf("batch request %d", currentSeqNum+i), []common.Address{ccipContracts.sourceLinkToken.Address()}, []*big.Int{big.NewInt(100)}, common.Address{}))
+		}
+		// Send a batch of requests in a single block
+		confirmTxs(t, txs, ccipContracts.sourceChain)
+		// All nodes should have all 3.
+		var reqs []logpoller.Log
+		for i := 0; i < n; i++ {
+			reqs = append(reqs, allNodesHaveReqSeqNum(t, ccipContracts, nodes, currentSeqNum+i))
+		}
+		// Should see a report with the full range
+		report := eventuallyReportRelayed(t, ccipContracts, currentSeqNum, currentSeqNum+n-1)
+		// Execute them all
+		for _, req := range reqs {
+			executeMessage(t, ccipContracts, req, reqs, report)
+		}
+		for i := range reqs {
+			allNodesHaveExecutedSeqNum(t, ccipContracts, nodes, currentSeqNum+i)
+		}
+		receivedMsg, err := ccipContracts.messageReceiver.SMessage(nil)
+		require.NoError(t, err)
+		assert.Equal(t, fmt.Sprintf("batch request %d", currentSeqNum+n-1), string(receivedMsg.Payload.Data))
+		currentSeqNum += n
+	})
+
+	t.Run("single auto-execute", func(t *testing.T) {
+		sendRequest(t, ccipContracts, "hey DON, execute for me", []common.Address{ccipContracts.sourceLinkToken.Address()}, []*big.Int{big.NewInt(100)}, ccipContracts.executor.Address())
+		allNodesHaveReqSeqNum(t, ccipContracts, nodes, currentSeqNum)
+		eventuallyReportRelayed(t, ccipContracts, currentSeqNum, currentSeqNum)
+		allNodesHaveExecutedSeqNum(t, ccipContracts, nodes, currentSeqNum)
+		currentSeqNum++
+	})
+
+	t.Run("batch auto-execute", func(t *testing.T) {
+		var txs []*gethtypes.Transaction
+		n := 3
+		for i := 0; i < n; i++ {
+			txs = append(txs, queueRequest(t, ccipContracts, fmt.Sprintf("batch request %d", currentSeqNum+i), []common.Address{ccipContracts.sourceLinkToken.Address()}, []*big.Int{big.NewInt(100)}, ccipContracts.executor.Address()))
+		}
+		// Send a batch of requests in a single block
+		confirmTxs(t, txs, ccipContracts.sourceChain)
+		// All nodes should have all 3.
+		var reqs []logpoller.Log
+		for i := 0; i < n; i++ {
+			reqs = append(reqs, allNodesHaveReqSeqNum(t, ccipContracts, nodes, currentSeqNum+i))
+		}
+		// Should see a report with the full range
+		eventuallyReportRelayed(t, ccipContracts, currentSeqNum, currentSeqNum+n-1)
+		// Should all be executed
+		for i := range reqs {
+			allNodesHaveExecutedSeqNum(t, ccipContracts, nodes, currentSeqNum+i)
+		}
+		currentSeqNum += n
+	})
+
+	t.Run("eoa2eoa", func(t *testing.T) {
+		// Now let's send an EOA to EOA request
+		// We can just use the sourceUser and destUser
+		startBalanceSource, err := ccipContracts.sourceLinkToken.BalanceOf(nil, ccipContracts.sourceUser.From)
+		require.NoError(t, err)
+		startBalanceDest, err := ccipContracts.destLinkToken.BalanceOf(nil, ccipContracts.destUser.From)
+		require.NoError(t, err)
+		t.Log(startBalanceSource, startBalanceDest)
+
+		ccipContracts.sourceUser.GasLimit = 500000
+		// Approve the sender contract to take the tokens
+		_, err = ccipContracts.sourceLinkToken.Approve(ccipContracts.sourceUser, ccipContracts.senderDapp.Address(), big.NewInt(100))
+		ccipContracts.sourceChain.Commit()
+		// Send the tokens. Should invoke the onramp.
+		// Only the destUser can execute.
+		_, err = ccipContracts.senderDapp.SendTokens(ccipContracts.sourceUser, ccipContracts.destUser.From, []common.Address{ccipContracts.sourceLinkToken.Address()}, []*big.Int{big.NewInt(100)}, ccipContracts.destUser.From)
 		require.NoError(t, err)
 		ccipContracts.sourceChain.Commit()
-		ccipContracts.destChain.Commit()
-		t.Log("last msgs", report.MinSequenceNumber, report.MaxSequenceNumber)
-		return report.MinSequenceNumber == 1 && report.MaxSequenceNumber == 1
-	}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue())
 
-	// No logs after the msgs
-	for i := 0; i < 4; i++ {
-		c, err := apps[i].GetChains().EVM.Get(sourceChainID)
+		req2 := allNodesHaveReqSeqNum(t, ccipContracts, nodes, currentSeqNum)
+		report2 := eventuallyReportRelayed(t, ccipContracts, currentSeqNum, currentSeqNum)
+		executeMessage(t, ccipContracts, req2, []logpoller.Log{req2}, report2)
+		allNodesHaveExecutedSeqNum(t, ccipContracts, nodes, currentSeqNum)
+
+		// The destination user's balance should increase
+		endBalanceSource, err := ccipContracts.sourceLinkToken.BalanceOf(nil, ccipContracts.sourceUser.From)
 		require.NoError(t, err)
-		gomega.NewGomegaWithT(t).Eventually(func() bool {
-			ccipContracts.sourceChain.Commit()
-			ccipContracts.destChain.Commit()
-			lgs, err := c.LogPoller().LogsDataWordGreaterThan(ccip.CrossChainSendRequested, ccipContracts.onRamp.Address(), 2, common.BigToHash(big.NewInt(int64(report.MaxSequenceNumber)+1)), 1)
-			require.NoError(t, err)
-			return len(lgs) == 0
-		}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue())
-	}
-
-	// Now the merkle root is across.
-	// Let's try to execute a request as an external party.
-	// The raw log in the merkle root should be the abi-encoded version of the CCIPMessage
-	root, proof := ccip.GenerateMerkleProof(32, [][]byte{req.Data}, 0)
-	// Root should match the msgs root
-	require.True(t, bytes.Equal(root[:], report.MerkleRoot[:]))
-
-	// Path should verify.
-	genRoot := ccip.GenerateMerkleRoot(req.Data, proof)
-	require.True(t, bytes.Equal(root[:], genRoot[:]))
-	exists, err := ccipContracts.offRamp.GetMerkleRoot(nil, report.MerkleRoot)
-	require.NoError(t, err)
-	require.True(t, exists.Int64() > 0)
-
-	h, err := utils.Keccak256(append([]byte{0x00}, req.Data...))
-	var leaf [32]byte
-	copy(leaf[:], h)
-	decodedMsg, err := ccip.DecodeCCIPMessage(req.Data)
-	require.NoError(t, err)
-	offRampProof := offramp.CCIPMerkleProof{
-		Path:  proof.PathForExecute(),
-		Index: proof.Index(),
-	}
-	onchainRoot, err := ccipContracts.offRamp.MerkleRoot(nil, *decodedMsg, offRampProof)
-	require.NoError(t, err)
-	require.Equal(t, genRoot, onchainRoot)
-
-	// Execute the Message
-	tx, err = ccipContracts.offRamp.ExecuteTransaction(ccipContracts.destUser, *decodedMsg, offRampProof, false)
-	require.NoError(t, err)
-	ccipContracts.destChain.Commit()
-
-	// We should now have the Message in the offchain receiver
-	receivedMsg, err := ccipContracts.messageReceiver.SMessage(nil)
-	require.NoError(t, err)
-	t.Logf("%+v", receivedMsg)
-	assert.Equal(t, "hello xchain world", string(receivedMsg.Payload.Data))
-
-	// Now let's send an EOA to EOA request
-	// We can just use the sourceUser and destUser
-	startBalanceSource, err := ccipContracts.sourceLinkToken.BalanceOf(nil, ccipContracts.sourceUser.From)
-	require.NoError(t, err)
-	startBalanceDest, err := ccipContracts.destLinkToken.BalanceOf(nil, ccipContracts.destUser.From)
-	require.NoError(t, err)
-	t.Log(startBalanceSource, startBalanceDest)
-
-	ccipContracts.sourceUser.GasLimit = 500000
-	// Approve the sender contract to take the tokens
-	_, err = ccipContracts.sourceLinkToken.Approve(ccipContracts.sourceUser, ccipContracts.senderDapp.Address(), big.NewInt(100))
-	ccipContracts.sourceChain.Commit()
-	// Send the tokens. Should invoke the onramp.
-	// Only the destUser can execute.
-	tx, err = ccipContracts.senderDapp.SendTokens(ccipContracts.sourceUser, ccipContracts.destUser.From, []common.Address{ccipContracts.sourceLinkToken.Address()}, []*big.Int{big.NewInt(100)}, ccipContracts.destUser.From)
-	require.NoError(t, err)
-	ccipContracts.sourceChain.Commit()
-
-	var req2 logpoller.Log
-	for i := 0; i < 4; i++ {
-		c, err := apps[i].GetChains().EVM.Get(sourceChainID)
+		endBalanceDest, err := ccipContracts.destLinkToken.BalanceOf(nil, ccipContracts.destUser.From)
 		require.NoError(t, err)
-		gomega.NewGomegaWithT(t).Eventually(func() bool {
-			ccipContracts.sourceChain.Commit()
-			lgs, err := c.LogPoller().LogsDataWordRange(ccip.CrossChainSendRequested, ccipContracts.onRamp.Address(), 2, common.BigToHash(big.NewInt(2)), common.BigToHash(big.NewInt(2)), 1)
-			require.NoError(t, err)
-			if len(lgs) == 1 {
-				req2 = lgs[0]
-				return true
-			}
-			return false
-		}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue())
-	}
-	// DON should eventually send another msgs
-	gomega.NewGomegaWithT(t).Eventually(func() bool {
-		report, err = ccipContracts.offRamp.GetLastReport(nil)
-		require.NoError(t, err)
-		ccipContracts.destChain.Commit()
-		ccipContracts.sourceChain.Commit()
-		return report.MinSequenceNumber == 2 && report.MaxSequenceNumber == 2
-	}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue())
-
-	root, proof = ccip.GenerateMerkleProof(32, [][]byte{req2.Data}, 0)
-	// Root should match the msgs root
-	require.True(t, bytes.Equal(root[:], report.MerkleRoot[:]))
-
-	// Execute the Message
-	decodedMsg, err = ccip.DecodeCCIPMessage(req2.Data)
-	require.NoError(t, err)
-	ccip.MakeCCIPMsgArgs().PackValues([]interface{}{*decodedMsg})
-	t.Logf("Message post: %+v", decodedMsg)
-	tx, err = ccipContracts.offRamp.ExecuteTransaction(ccipContracts.destUser, *decodedMsg, offramp.CCIPMerkleProof{
-		Path:  proof.PathForExecute(),
-		Index: proof.Index(),
-	}, false)
-
-	require.NoError(t, err)
-	ccipContracts.destChain.Commit()
-
-	// The destination user's balance should increase
-	endBalanceSource, err := ccipContracts.sourceLinkToken.BalanceOf(nil, ccipContracts.sourceUser.From)
-	require.NoError(t, err)
-	endBalanceDest, err := ccipContracts.destLinkToken.BalanceOf(nil, ccipContracts.destUser.From)
-	require.NoError(t, err)
-	t.Log("Start balances", startBalanceSource, startBalanceDest)
-	t.Log("End balances", endBalanceSource, endBalanceDest)
-	assert.Equal(t, "100", big.NewInt(0).Sub(startBalanceSource, endBalanceSource).String())
-	assert.Equal(t, "100", big.NewInt(0).Sub(endBalanceDest, startBalanceDest).String())
-
-	// Now let's send a request flagged for oracle execution
-	_, err = ccipContracts.sourceLinkToken.Approve(ccipContracts.sourceUser, ccipContracts.onRampRouter.Address(), big.NewInt(100))
-	require.NoError(t, err)
-	ccipContracts.sourceChain.Commit()
-	require.NoError(t, err)
-	msg = onramp_router.CCIPMessagePayload{
-		Receiver:           ccipContracts.messageReceiver.Address(),
-		Data:               []byte("hey DON, execute for me"),
-		Tokens:             []common.Address{ccipContracts.sourceLinkToken.Address()},
-		Amounts:            []*big.Int{big.NewInt(100)},
-		DestinationChainId: destChainID,
-		Executor:           ccipContracts.executor.Address(),
-		Options:            []byte{},
-	}
-	_, err = ccipContracts.onRampRouter.RequestCrossChainSend(ccipContracts.sourceUser, msg)
-	require.NoError(t, err)
-	ccipContracts.sourceChain.Commit()
-
-	// Should first be relayed, seq number 3
-	gomega.NewGomegaWithT(t).Eventually(func() bool {
-		report, err = ccipContracts.offRamp.GetLastReport(nil)
-		require.NoError(t, err)
-		ccipContracts.destChain.Commit()
-		ccipContracts.sourceChain.Commit()
-		return report.MinSequenceNumber == 3 && report.MaxSequenceNumber == 3
-	}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue())
-
-	// Then it should be executed
-	gomega.NewGomegaWithT(t).Eventually(func() bool {
-		report, err = ccipContracts.offRamp.GetLastReport(nil)
-		require.NoError(t, err)
-		ccipContracts.destChain.Commit()
-		ccipContracts.sourceChain.Commit()
-		return report.MinSequenceNumber == 3 && report.MaxSequenceNumber == 3
-	}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue())
-
-	destChain, err := apps[0].GetChains().EVM.Get(destChainID)
-	require.NoError(t, err)
-	gomega.NewGomegaWithT(t).Eventually(func() bool {
-		ccipContracts.sourceChain.Commit()
-		ccipContracts.destChain.Commit()
-		lgs, err := destChain.LogPoller().Logs(1, 1000, ccip.CrossChainMessageExecuted, ccipContracts.offRamp.Address())
-		require.NoError(t, err)
-		t.Log("executed", len(lgs))
-		return len(lgs) == 3
-	}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue())
+		assert.Equal(t, "100", big.NewInt(0).Sub(startBalanceSource, endBalanceSource).String())
+		assert.Equal(t, "100", big.NewInt(0).Sub(endBalanceDest, startBalanceDest).String())
+	})
 }
 
 func setupOnchainConfig(t *testing.T, ccipContracts CCIPContracts, oracles []confighelper2.OracleIdentityExtra, reportingPluginConfig []byte) {

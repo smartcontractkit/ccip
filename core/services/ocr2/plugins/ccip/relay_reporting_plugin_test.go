@@ -23,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp_helper"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
 )
 
 func TestRelayReportEncoding(t *testing.T) {
@@ -76,13 +77,13 @@ func TestRelayReportEncoding(t *testing.T) {
 	require.NoError(t, err)
 	destChain.Commit()
 
-	r, proof := ccip.GenerateMerkleProof(2, [][]byte{{0xaa}}, 0)
-	rootLocal := ccip.GenerateMerkleRoot([]byte{0xaa}, proof)
-	require.True(t, bytes.Equal(rootLocal[:], r[:]))
-	t.Log(proof.PathForExecute(), proof.PathForExecute())
+	mctx := merklemulti.NewKeccakCtx()
+	tree := merklemulti.NewTree(mctx, []merklemulti.Hash{mctx.HashLeaf([]byte{0xaa})})
+	var root [32]byte
+	copy(root[:], tree.Root())
 
 	report := offramp.CCIPRelayReport{
-		MerkleRoot:        r,
+		MerkleRoot:        root,
 		MinSequenceNumber: 1,
 		MaxSequenceNumber: 10,
 	}
@@ -102,7 +103,7 @@ func TestRelayReportEncoding(t *testing.T) {
 	rep, err := offRamp.GetLastReport(nil)
 	require.NoError(t, err)
 	// Verify it locally
-	require.True(t, bytes.Equal(rep.MerkleRoot[:], rootLocal[:]), fmt.Sprintf("Got %v want %v", hexutil.Encode(rootLocal[:]), hexutil.Encode(rep.MerkleRoot[:])))
+	require.True(t, bytes.Equal(rep.MerkleRoot[:], root[:]), fmt.Sprintf("Got %v want %v", hexutil.Encode(root[:]), hexutil.Encode(rep.MerkleRoot[:])))
 	exists, err := offRamp.GetMerkleRoot(nil, rep.MerkleRoot)
 	require.NoError(t, err)
 	require.True(t, exists.Int64() > 0)

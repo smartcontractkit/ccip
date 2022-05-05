@@ -141,7 +141,6 @@ describe('OffRampRouter', () => {
           receiver: receiver.address,
           executor: hre.ethers.constants.AddressZero,
           data: hre.ethers.constants.HashZero,
-          options: hre.ethers.constants.HashZero,
         },
       }
     })

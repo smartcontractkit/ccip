@@ -8,22 +8,13 @@ import "../utils/CCIP.sol";
 import "../../vendor/SafeERC20.sol";
 
 /**
- * @notice MessageExecutor enables OCR networks to execute multiple messages
+ * @notice OffRampExecutor enables OCR networks to execute multiple messages
  * in an OffRamp in a single transaction.
  */
-contract MessageExecutor is TypeAndVersionInterface, OCR2Base {
+contract OffRampExecutor is TypeAndVersionInterface, OCR2Base {
   using SafeERC20 for IERC20;
 
   event FeesWithdrawn(IERC20 feeToken, address recipient, uint256 amount);
-
-  /// @notice Message and its proof
-  struct ExecutableMessage {
-    // TODO: We have to split to MerkleProof up here into its individual parts, and also order
-    // the items here to avoid a stack too deep error. This needs investigation.
-    bytes32[] path;
-    uint256 index;
-    CCIP.Message message;
-  }
 
   OffRampInterface private immutable s_offRamp;
   bool private s_needFee;
@@ -42,11 +33,8 @@ contract MessageExecutor is TypeAndVersionInterface, OCR2Base {
     uint40, /*epochAndRound*/
     bytes memory report
   ) internal override {
-    ExecutableMessage[] memory executableMessages = abi.decode(report, (ExecutableMessage[]));
-    for (uint256 i = 0; i < executableMessages.length; i++) {
-      ExecutableMessage memory em = executableMessages[i];
-      s_offRamp.executeTransaction(em.message, CCIP.MerkleProof({path: em.path, index: em.index}), s_needFee);
-    }
+    CCIP.ExecutionReport memory executionReport = abi.decode(report, (CCIP.ExecutionReport));
+    s_offRamp.executeTransaction(executionReport, s_needFee);
   }
 
   /**
@@ -89,6 +77,6 @@ contract MessageExecutor is TypeAndVersionInterface, OCR2Base {
   }
 
   function typeAndVersion() external pure override returns (string memory) {
-    return "MessageExecutor 1.0.0";
+    return "OffRampExecutor 1.0.0";
   }
 }

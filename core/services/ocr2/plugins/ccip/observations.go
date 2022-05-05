@@ -14,7 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/logger"
 )
 
-func evmWord(i uint64) common.Hash {
+func EvmWord(i uint64) common.Hash {
 	var b = make([]byte, 8)
 	binary.BigEndian.PutUint64(b, i)
 	return common.BigToHash(big.NewInt(0).SetBytes(b))

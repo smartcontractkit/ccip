@@ -1,17 +1,16 @@
 package ccip
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"math/big"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
@@ -20,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/onramp"
 	"github.com/smartcontractkit/chainlink/core/logger"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
 )
 
 const (
@@ -33,15 +33,36 @@ var (
 	ErrOffRampIsDown                              = errors.New("offramp is down")
 )
 
-func EncodeExecutionReport(ems []ExecutableMessage) (types.Report, error) {
-	report, err := makeExecutionReportArgs().PackValues([]interface{}{ems})
+func ProofsToSolidity(proofs []merklemulti.Hash) ([][32]byte, error) {
+	var solidityProofs [][32]byte
+	for _, proof := range proofs {
+		if len(proof) != 32 {
+			return nil, errors.New("invalid solidity proof")
+		}
+		var solProof [32]byte
+		copy(solProof[:], proof)
+		solidityProofs = append(solidityProofs, solProof)
+	}
+	return solidityProofs, nil
+}
+
+func EncodeExecutionReport(msgs []Message, proofs []merklemulti.Hash, proofSourceFlags []bool) (types.Report, error) {
+	solidityProofs, err := ProofsToSolidity(proofs)
+	if err != nil {
+		return nil, err
+	}
+	report, err := makeExecutionReportArgs().PackValues([]interface{}{ExecutionReport{
+		Messages:      msgs,
+		Proofs:        solidityProofs,
+		ProofFlagBits: ProofFlagsToBits(proofSourceFlags),
+	}})
 	if err != nil {
 		return nil, err
 	}
 	return report, nil
 }
 
-func DecodeExecutionReport(report types.Report) ([]ExecutableMessage, error) {
+func DecodeExecutionReport(report types.Report) (*ExecutionReport, error) {
 	unpacked, err := makeExecutionReportArgs().Unpack(report)
 	if err != nil {
 		return nil, err
@@ -51,10 +72,8 @@ func DecodeExecutionReport(report types.Report) ([]ExecutableMessage, error) {
 	}
 
 	// Must be anonymous struct here
-	msgs, ok := unpacked[0].([]struct {
-		Path    [][32]uint8 `json:"Path"`
-		Index   *big.Int    `json:"Index"`
-		Message struct {
+	erStruct, ok := unpacked[0].(struct {
+		Messages []struct {
 			SourceChainId  *big.Int       `json:"sourceChainId"`
 			SequenceNumber uint64         `json:"sequenceNumber"`
 			Sender         common.Address `json:"sender"`
@@ -65,25 +84,26 @@ func DecodeExecutionReport(report types.Report) ([]ExecutableMessage, error) {
 				Receiver           common.Address   `json:"receiver"`
 				Executor           common.Address   `json:"executor"`
 				Data               []uint8          `json:"data"`
-				Options            []uint8          `json:"options"`
 			} `json:"payload"`
-		} `json:"Message"`
+		} `json:"Messages"`
+		Proofs        [][32]uint8 `json:"Proofs"`
+		ProofFlagBits *big.Int    `json:"ProofFlagBits"`
 	})
 	if !ok {
 		return nil, fmt.Errorf("got %T", unpacked[0])
 	}
-	if len(msgs) == 0 {
+	if len(erStruct.Messages) == 0 {
 		return nil, errors.New("assumptionViolation: expected at least one element")
 	}
-	var ems []ExecutableMessage
-	for _, emi := range msgs {
-		ems = append(ems, ExecutableMessage{
-			Path:    emi.Path,
-			Index:   emi.Index,
-			Message: emi.Message,
-		})
+	var er ExecutionReport
+	for _, msg := range erStruct.Messages {
+		er.Messages = append(er.Messages, msg)
 	}
-	return ems, nil
+	for _, proof := range erStruct.Proofs {
+		er.Proofs = append(er.Proofs, proof)
+	}
+	er.ProofFlagBits = erStruct.ProofFlagBits
+	return &er, nil
 }
 
 //go:generate mockery --name OffRampLastReporter --output ./mocks/lastreporter --case=underscore
@@ -145,13 +165,17 @@ type ExecutionReportingPlugin struct {
 	source, dest *logpoller.LogPoller
 	// We also use the offramp for defensive checks
 	lastReporter OffRampLastReporter
+	// We need to synchronize access to the inflight structure
+	// as reporting plugin methods may be called from separate goroutines,
+	// e.g. reporting vs transmission protocol.
+	inFlightMu   sync.RWMutex
 	inFlight     []InflightExecutionReport
 	configPoller *ConfigPoller
 }
 
 type InflightExecutionReport struct {
 	createdAt time.Time
-	msgs      []ExecutableMessage
+	report    ExecutionReport
 }
 
 func (r *ExecutionReportingPlugin) Query(ctx context.Context, timestamp types.ReportTimestamp) (types.Query, error) {
@@ -162,7 +186,7 @@ func (r *ExecutionReportingPlugin) Query(ctx context.Context, timestamp types.Re
 // getRelayedReports returns them in sorted order.
 func (r *ExecutionReportingPlugin) getRelayedReports(min, max uint64) ([]offramp.OffRampReportAccepted, error) {
 	// Get all reports where minSeqNum is >= min as a lower bound.
-	reportLogs, err := r.dest.LogsDataWordGreaterThan(ReportAccepted, r.offRamp.Address(), 1, evmWord(min), 1)
+	reportLogs, err := r.dest.LogsDataWordGreaterThan(ReportAccepted, r.offRamp.Address(), 1, EvmWord(min), 1)
 	if err != nil {
 		return nil, err
 	}
@@ -180,10 +204,12 @@ func (r *ExecutionReportingPlugin) getRelayedReports(min, max uint64) ([]offramp
 }
 
 func (r *ExecutionReportingPlugin) inflightSeqNums() map[uint64]struct{} {
+	r.inFlightMu.RLock()
+	defer r.inFlightMu.RUnlock()
 	inFlightSeqNums := make(map[uint64]struct{})
 	for _, report := range r.inFlight {
-		for _, msg := range report.msgs {
-			inFlightSeqNums[msg.Message.SequenceNumber] = struct{}{}
+		for _, msg := range report.report.Messages {
+			inFlightSeqNums[msg.SequenceNumber] = struct{}{}
 		}
 	}
 	return inFlightSeqNums
@@ -247,7 +273,7 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 }
 
 func (r *ExecutionReportingPlugin) getMessagesInRangeWithExecutor(min, max uint64, executor common.Address) ([]onramp.OnRampCrossChainSendRequested, error) {
-	msgs, err := r.source.LogsDataWordRange(CrossChainSendRequested, r.onRamp.Address(), 2, evmWord(min), evmWord(max), r.configPoller.sourceConfs())
+	msgs, err := r.source.LogsDataWordRange(CrossChainSendRequested, r.onRamp.Address(), 2, EvmWord(min), EvmWord(max), r.configPoller.sourceConfs())
 	if err != nil {
 		return nil, err
 	}
@@ -271,81 +297,64 @@ func min(a, b uint64) uint64 {
 	return b
 }
 
-// Assumes non-empty msgs
-func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, msgs []onramp.OnRampCrossChainSendRequested) ([]byte, error) {
-	// Bound the execution report size.
-	msgs = msgs[:min(uint64(len(msgs)), MaxNumMessagesInExecutionReport)]
-	minActualSeqNum, maxActualSeqNum := msgs[0].Message.SequenceNumber, msgs[len(msgs)-1].Message.SequenceNumber
-	// Find the root for each message by looking at all the relayed reports
-	// Assumes the return relayed reports are sorted.
-	reports, err := r.getRelayedReports(minActualSeqNum, maxActualSeqNum)
-	if err != nil {
-		return nil, err
+// Assumes non-empty report. Messages to execute can be span more than one report, but are assumed to be in order of increasing
+// sequence number.
+func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, report offramp.OffRampReportAccepted, msgsToExecute []onramp.OnRampCrossChainSendRequested) ([]byte, error) {
+	allMsgs, err2 := r.getMessagesInRangeWithExecutor(report.Report.MinSequenceNumber, report.Report.MaxSequenceNumber, [20]byte{})
+	if err2 != nil {
+		return nil, err2
 	}
-	var ems []ExecutableMessage
-	i := int64(0)
-	for _, report := range reports {
-		for ; i < int64(len(msgs)); i++ {
-			if msgs[i].Message.SequenceNumber > report.Report.MaxSequenceNumber {
-				break
-			}
-			// its in the range of the msgs, get all messages in the msgs
-			allMsgs, err2 := r.getMessagesInRangeWithExecutor(report.Report.MinSequenceNumber, report.Report.MaxSequenceNumber, [20]byte{})
-			if err2 != nil {
-				return nil, err2
-			}
-			if len(allMsgs) != int(report.Report.MaxSequenceNumber-report.Report.MinSequenceNumber+1) {
-				return nil, errors.Errorf("do not have all messages, have %d want %d", len(allMsgs), int(report.Report.MaxSequenceNumber-report.Report.MinSequenceNumber+1))
-			}
-			var leaves [][]byte
-			for _, msg := range allMsgs {
-				leaves = append(leaves, msg.Raw.Data)
-			}
-			index := msgs[i].Message.SequenceNumber - report.Report.MinSequenceNumber
-			if index < 0 {
-				return nil, errors.New("unexpected invalid index")
-			}
-			root, proof := GenerateMerkleProof(32, leaves, int(index))
-			if !bytes.Equal(root[:], report.Report.MerkleRoot[:]) {
-				lggr.Errorw("Invalid merkle root generated", "have", hexutil.Encode(root[:]), "want", hexutil.Encode(report.Report.MerkleRoot[:]), "proving", msgs[i])
-				continue
-			}
-			ems = append(ems, ExecutableMessage{
-				Path: proof.PathForExecute(),
-				Message: Message{
-					SequenceNumber: msgs[i].Message.SequenceNumber,
-					SourceChainId:  msgs[i].Message.SourceChainId,
-					Sender:         msgs[i].Message.Sender,
-					Payload: struct {
-						Tokens             []common.Address `json:"tokens"`
-						Amounts            []*big.Int       `json:"amounts"`
-						DestinationChainId *big.Int         `json:"destinationChainId"`
-						Receiver           common.Address   `json:"receiver"`
-						Executor           common.Address   `json:"executor"`
-						Data               []uint8          `json:"data"`
-						Options            []uint8          `json:"options"`
-					}{
-						Tokens:             msgs[i].Message.Payload.Tokens,
-						Amounts:            msgs[i].Message.Payload.Amounts,
-						DestinationChainId: msgs[i].Message.Payload.DestinationChainId,
-						Receiver:           msgs[i].Message.Payload.Receiver,
-						Executor:           msgs[i].Message.Payload.Executor,
-						Data:               msgs[i].Message.Payload.Data,
-						Options:            msgs[i].Message.Payload.Options,
-					},
-				},
-				Index: proof.Index(),
-			})
+	if len(allMsgs) != int(report.Report.MaxSequenceNumber-report.Report.MinSequenceNumber+1) {
+		return nil, errors.Errorf("do not have all messages, have %d want %d", len(allMsgs), int(report.Report.MaxSequenceNumber-report.Report.MinSequenceNumber+1))
+	}
+	mctx := merklemulti.NewKeccakCtx()
+	var leaves []merklemulti.Hash
+	for _, msg := range allMsgs {
+		leaves = append(leaves, mctx.HashLeaf(msg.Raw.Data))
+	}
+	var messages []Message
+	var indices []int
+	tree := merklemulti.NewTree(mctx, leaves)
+	for i := int64(0); i < int64(len(msgsToExecute)); i++ {
+		if msgsToExecute[i].Message.SequenceNumber > report.Report.MaxSequenceNumber {
+			// Again we only execute one report at a time.
+			break
 		}
+		index := msgsToExecute[i].Message.SequenceNumber - report.Report.MinSequenceNumber
+		if index < 0 {
+			return nil, errors.New("unexpected invalid index")
+		}
+		indices = append(indices, int(index))
+		messages = append(messages, Message{
+			SequenceNumber: msgsToExecute[i].Message.SequenceNumber,
+			SourceChainId:  msgsToExecute[i].Message.SourceChainId,
+			Sender:         msgsToExecute[i].Message.Sender,
+			Payload: struct {
+				Tokens             []common.Address `json:"tokens"`
+				Amounts            []*big.Int       `json:"amounts"`
+				DestinationChainId *big.Int         `json:"destinationChainId"`
+				Receiver           common.Address   `json:"receiver"`
+				Executor           common.Address   `json:"executor"`
+				Data               []uint8          `json:"data"`
+			}{
+				Tokens:             msgsToExecute[i].Message.Payload.Tokens,
+				Amounts:            msgsToExecute[i].Message.Payload.Amounts,
+				DestinationChainId: msgsToExecute[i].Message.Payload.DestinationChainId,
+				Receiver:           msgsToExecute[i].Message.Payload.Receiver,
+				Executor:           msgsToExecute[i].Message.Payload.Executor,
+				Data:               msgsToExecute[i].Message.Payload.Data,
+			},
+		})
 	}
-	if len(ems) == 0 {
+	if len(messages) == 0 {
 		return nil, errors.New("no executed messages created")
 	}
-	report, err := EncodeExecutionReport(ems)
+	proof := tree.Prove(indices)
+	er, err := EncodeExecutionReport(messages, proof.Hashes, proof.SourceFlags)
 	if err != nil {
 		return nil, err
 	}
-	return report, nil
+	return er, nil
 }
 
 func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.ReportTimestamp, query types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
@@ -370,7 +379,7 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 		return nonEmptyObservations[i].MaxSeqNum < nonEmptyObservations[j].MaxSeqNum
 	})
 	// We use a conservative maximum. If we pick a value that some honest oracles might not
-	// have seen they’ll end up not agreeing on a msgs, stalling the protocol.
+	// have seen they’ll end up not agreeing on a report, stalling the protocol.
 	maxSeqNum := nonEmptyObservations[r.F].MaxSeqNum
 	if maxSeqNum < minSeqNum {
 		return false, nil, errors.New("max seq num smaller than min")
@@ -393,29 +402,67 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 		lggr.Infow("No messages to execute")
 		return false, nil, nil
 	}
-	report, err := r.buildReport(lggr, msgs)
+	msgs = msgs[:min(uint64(len(msgs)), MaxNumMessagesInExecutionReport)]
+	minActualSeqNum, maxActualSeqNum := msgs[0].Message.SequenceNumber, msgs[len(msgs)-1].Message.SequenceNumber
+	// Find the root for each message by looking at all the relayed reports
+	// Assumes the return relayed reports are sorted.
+	reports, err := r.getRelayedReports(minActualSeqNum, maxActualSeqNum)
+	if err != nil {
+		return false, nil, err
+	}
+	if len(reports) == 0 {
+		lggr.Infow("Executable message present, but reports not relayed yet", "numExecutable", len(msgs))
+		return false, nil, nil
+	}
+	// We only operate on one report at a time
+	report, err := r.buildReport(lggr, reports[0], msgs)
 	if err != nil {
 		return false, nil, err
 	}
 	return true, report, nil
 }
 
+func (r *ExecutionReportingPlugin) updateInFlight(lggr logger.Logger, er ExecutionReport) error {
+	r.inFlightMu.Lock()
+	defer r.inFlightMu.Unlock()
+	// Reap old inflights and check if any messages in the report are inflight.
+	var stillInFlight []InflightExecutionReport
+	for _, report := range r.inFlight {
+		// TODO: Think about if this fails in reorgs
+		if report.report.Messages[0].SequenceNumber == er.Messages[0].SequenceNumber {
+			return errors.Errorf("report is already in flight")
+		}
+		if time.Since(report.createdAt) < ExecutionMaxInflightTimeSeconds {
+			stillInFlight = append(stillInFlight, report)
+		} else {
+			lggr.Warnw("Inflight report expired, retrying", "min", report.report.Messages[0].SequenceNumber, "max", report.report.Messages[len(report.report.Messages)-1].SequenceNumber)
+		}
+	}
+	// Add new inflight
+	r.inFlight = append(stillInFlight, InflightExecutionReport{
+		createdAt: time.Now(),
+		report:    er,
+	})
+	return nil
+}
+
 func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context, timestamp types.ReportTimestamp, report types.Report) (bool, error) {
 	lggr := r.lggr.Named("ShouldAcceptFinalizedReport")
-	ems, err := DecodeExecutionReport(report)
+	er, err := DecodeExecutionReport(report)
 	if err != nil {
 		return false, nil
 	}
-	if len(ems) == 0 {
+	if len(er.Messages) == 0 {
 		r.lggr.Warnw("Received empty report")
 		return false, nil
 	}
 	var seqNums []uint64
-	for i := range ems {
-		seqNums = append(seqNums, ems[i].Message.SequenceNumber)
+	for i := range er.Messages {
+		seqNums = append(seqNums, er.Messages[i].SequenceNumber)
+		lggr.Infof("msg amounts %s", er.Messages[i].Payload.Amounts[0].String())
 	}
-	lggr.Infof("Seq nums %v", seqNums)
-	// If the first message is executed already, this execution msgs is stale, and we do not accept it.
+	lggr.Infof("Seq nums %v proofs %+v proof bits %s", seqNums, er.Proofs, er.ProofFlagBits.String())
+	// If the first message is executed already, this execution report is stale, and we do not accept it.
 	stale, err := r.isStaleReport(seqNums[0])
 	if err != nil {
 		return !stale, err
@@ -423,24 +470,9 @@ func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Conte
 	if stale {
 		return false, err
 	}
-	// Reap old inflights and check if any messages in the report are inflight.
-	var stillInFlight []InflightExecutionReport
-	for _, report := range r.inFlight {
-		// TODO: Think about if this fails in reorgs
-		if report.msgs[0].Message.SequenceNumber == ems[0].Message.SequenceNumber {
-			return false, errors.Errorf("report is already in flight")
-		}
-		if time.Since(report.createdAt) < ExecutionMaxInflightTimeSeconds {
-			stillInFlight = append(stillInFlight, report)
-		} else {
-			lggr.Warnw("Inflight report expired, retrying", "min", report.msgs[0].Message.SequenceNumber, "max", report.msgs[len(report.msgs)-1].Message.SequenceNumber)
-		}
+	if err := r.updateInFlight(lggr, *er); err != nil {
+		return false, err
 	}
-	// Add new inflight
-	r.inFlight = append(stillInFlight, InflightExecutionReport{
-		createdAt: time.Now(),
-		msgs:      ems,
-	})
 	return true, nil
 }
 
@@ -449,15 +481,15 @@ func (r *ExecutionReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Cont
 	if err != nil {
 		return false, nil
 	}
-	// If msgs is not stale we transmit.
+	// If report is not stale we transmit.
 	// When the executeTransmitter enqueues the tx for bptxm,
 	// we mark it as execution_sent, removing it from the set of inflight messages.
-	stale, err := r.isStaleReport(parsedReport[0].Message.SequenceNumber)
+	stale, err := r.isStaleReport(parsedReport.Messages[0].SequenceNumber)
 	return !stale, err
 }
 
 func (r *ExecutionReportingPlugin) isStaleReport(min uint64) (bool, error) {
-	// If the first message is executed already, this execution msgs is stale.
+	// If the first message is executed already, this execution report is stale.
 	executedMap, err := r.getExecutedMessages()
 	if err != nil {
 		return true, err

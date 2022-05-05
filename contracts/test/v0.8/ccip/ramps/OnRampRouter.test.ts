@@ -79,7 +79,6 @@ describe('OnRampRouter', () => {
   describe('#requestCrossChainSend', () => {
     let receiver: string
     let messagedata: string
-    let options: string
     let amounts: Array<BigNumber>
     let payload: CCIPMessagePayload
 
@@ -87,7 +86,6 @@ describe('OnRampRouter', () => {
       const amount = BigNumber.from('10000000000000000')
       receiver = await roles.stranger.getAddress()
       messagedata = hre.ethers.constants.HashZero
-      options = hre.ethers.constants.HashZero
       amounts = [amount, amount]
       payload = {
         receiver: receiver,
@@ -96,7 +94,6 @@ describe('OnRampRouter', () => {
         amounts: amounts,
         destinationChainId: BigNumber.from(destinationChainIds[0]),
         executor: hre.ethers.constants.AddressZero,
-        options: options,
       }
     })
 

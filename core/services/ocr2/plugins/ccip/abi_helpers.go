@@ -67,7 +67,6 @@ func DecodeCCIPMessage(b []byte) (*offramp.CCIPMessage, error) {
 			Receiver           common.Address   `json:"receiver"`
 			Executor           common.Address   `json:"executor"`
 			Data               []uint8          `json:"data"`
-			Options            []uint8          `json:"options"`
 		} `json:"payload"`
 	})
 	if !ok {
@@ -84,7 +83,6 @@ func DecodeCCIPMessage(b []byte) (*offramp.CCIPMessage, error) {
 			Tokens:             receivedCp.Payload.Tokens,
 			Amounts:            receivedCp.Payload.Amounts,
 			Executor:           receivedCp.Payload.Executor,
-			Options:            receivedCp.Payload.Options,
 		},
 	}, nil
 }
@@ -133,10 +131,6 @@ func MakeCCIPMsgArgs() abi.Arguments {
 					Name: "data",
 					Type: "bytes",
 				},
-				{
-					Name: "options",
-					Type: "bytes",
-				},
 			},
 		},
 	}
@@ -160,14 +154,24 @@ type Message struct {
 		Receiver           common.Address   `json:"receiver"`
 		Executor           common.Address   `json:"executor"`
 		Data               []uint8          `json:"data"`
-		Options            []uint8          `json:"options"`
 	} `json:"payload"`
 }
 
-type ExecutableMessage struct {
-	Path    [][32]byte `json:"path"`
-	Index   *big.Int   `json:"index"`
-	Message Message    `json:"message"`
+type ExecutionReport struct {
+	Messages      []Message  `json:"messages"`
+	Proofs        [][32]byte `json:"proofs"`
+	ProofFlagBits *big.Int   `json:"proofFlagBits"`
+}
+
+func ProofFlagsToBits(proofFlags []bool) *big.Int {
+	// TODO: Support larger than int64?
+	var a int64
+	for i := 0; i < len(proofFlags); i++ {
+		if proofFlags[i] {
+			a |= 1 << i
+		}
+	}
+	return big.NewInt(a)
 }
 
 func makeExecutionReportArgs() abi.Arguments {
@@ -177,19 +181,11 @@ func makeExecutionReportArgs() abi.Arguments {
 	}
 	return []abi.Argument{
 		{
-			Name: "executableMessages",
-			Type: mustType("tuple[]", []abi.ArgumentMarshaling{
+			Name: "ExecutionReport",
+			Type: mustType("tuple", []abi.ArgumentMarshaling{
 				{
-					Name: "Path",
-					Type: "bytes32[]",
-				},
-				{
-					Name: "Index",
-					Type: "uint256",
-				},
-				{
-					Name: "Message",
-					Type: "tuple",
+					Name: "Messages",
+					Type: "tuple[]",
 					Components: []abi.ArgumentMarshaling{
 						{
 							Name: "sourceChainId",
@@ -231,13 +227,17 @@ func makeExecutionReportArgs() abi.Arguments {
 									Name: "data",
 									Type: "bytes",
 								},
-								{
-									Name: "options",
-									Type: "bytes",
-								},
 							},
 						},
 					},
+				},
+				{
+					Name: "Proofs",
+					Type: "bytes32[]",
+				},
+				{
+					Name: "ProofFlagBits",
+					Type: "uint256",
 				},
 			}),
 		},

@@ -176,26 +176,19 @@ func TestConfigPoller(t *testing.T) {
 		Tokens:             []common.Address{linkTokenAddress},
 		Amounts:            []*big.Int{big.NewInt(100)},
 		Executor:           executor,
-		Options:            nil,
 	}
 	_, err = onRampRouter.RequestCrossChainSend(user, msg)
 	require.NoError(t, err)
 	backend.Commit()
 
 	// Send blocks until that request is saved.
-	var lg logpoller.Log
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
 		backend.Commit()
 		lgs, err := lp.Logs(1, 1000, CrossChainSendRequested, onRampAddress)
 		require.NoError(t, err)
 		t.Logf("logs %+v\n", len(lgs))
-		if len(lgs) == 1 {
-			lg = lgs[0]
-			return true
-		}
-		return false
+		return len(lgs) == 1
 	}, testutils.WaitTimeout(t), 100*time.Millisecond).Should(gomega.BeTrue())
-	t.Log(lg)
 	require.NoError(t, lp.Close())
 	require.NoError(t, logListener.Close())
 	require.NoError(t, jobORM.DeleteJob(ccipSpec.ID))

@@ -15,10 +15,8 @@ import {
 import { Artifact } from 'hardhat/types'
 import {
   CCIPMessage,
-  encodeReport,
-  hashMessage,
-  MerkleProof,
-  RelayReport,
+  encodeRelayReport,
+  MerkleMultiTree,
 } from '../../../test-helpers/ccip/ccip'
 
 const { deployContract } = hre.waffle
@@ -236,25 +234,16 @@ describe('Single Token EOA End to End', () => {
         tokens: log.args.message.payload.tokens,
         amounts: log.args.message.payload.amounts,
         executor: log.args.message.payload.executor,
-        options: log.args.message.payload.options,
       },
     }
     // DON encodes, reports and executes the message
-    let report: RelayReport = {
-      merkleRoot: hashMessage(message),
-      minSequenceNumber: log.args.message.sequenceNumber,
-      maxSequenceNumber: log.args.message.sequenceNumber,
-    }
+    const tree = new MerkleMultiTree([message])
     await chain2OffRamp
       .connect(roles.defaultAccount)
-      .report(encodeReport(report))
-    let proof: MerkleProof = {
-      path: [],
-      index: 0,
-    }
+      .report(encodeRelayReport(tree.generateRelayReport()))
     tx = await chain2OffRamp
       .connect(roles.defaultAccount)
-      .executeTransaction(message, proof, false)
+      .executeTransaction(tree.generateExecutionReport([0]), false)
     receipt = await tx.wait()
     const chain1StrangerBalanceAfter = await chain1Token.balanceOf(
       await roles.stranger.getAddress(),

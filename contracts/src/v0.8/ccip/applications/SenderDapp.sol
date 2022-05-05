@@ -45,7 +45,6 @@ contract SenderDapp is TypeAndVersionInterface {
     address executor
   ) external returns (uint64 sequenceNumber) {
     if (destinationAddress == address(0)) revert InvalidDestinationAddress(destinationAddress);
-    bytes memory options;
     address originalSender = msg.sender;
     // Init the MessagePayload struct
     // `payload.data` format:
@@ -57,8 +56,7 @@ contract SenderDapp is TypeAndVersionInterface {
       destinationChainId: DESTINATION_CHAIN_ID,
       receiver: DESTINATION_CONTRACT,
       executor: executor,
-      data: abi.encode(originalSender, destinationAddress),
-      options: options
+      data: abi.encode(originalSender, destinationAddress)
     });
     for (uint256 i = 0; i < tokens.length; i++) {
       tokens[i].safeTransferFrom(originalSender, address(this), amounts[i]);

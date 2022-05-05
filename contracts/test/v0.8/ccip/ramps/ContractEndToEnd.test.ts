@@ -16,11 +16,9 @@ import { Artifact } from 'hardhat/types'
 import {
   CCIPMessage,
   CCIPMessagePayload,
-  encodeReport,
-  hashMessage,
-  MerkleProof,
+  encodeRelayReport,
+  MerkleMultiTree,
   messageDeepEqual,
-  RelayReport,
 } from '../../../test-helpers/ccip/ccip'
 
 const { deployContract } = hre.waffle
@@ -192,7 +190,6 @@ describe('Contract End to End', () => {
 
   it('should send a message and tokens from chain1 to chain2', async () => {
     const messagedata = stringToBytes('Message')
-    const options = hre.ethers.constants.HashZero
     const payload: CCIPMessagePayload = {
       destinationChainId: BigNumber.from(chain2ID),
       receiver: chain2Receiver.address,
@@ -200,7 +197,6 @@ describe('Contract End to End', () => {
       tokens: [chain1Token.address],
       amounts: [sendAmount],
       executor: hre.ethers.constants.AddressZero,
-      options: options,
     }
 
     const initialChain1PoolBalance = await chain1Token.balanceOf(
@@ -234,7 +230,6 @@ describe('Contract End to End', () => {
       tokens: log.args.message.payload.tokens,
       amounts: log.args.message.payload.amounts,
       executor: log.args.message.payload.executor,
-      options: log.args.message.payload.options,
       destinationChainId: BigNumber.from(chain2ID),
     }
     const donMessage: CCIPMessage = {
@@ -245,21 +240,13 @@ describe('Contract End to End', () => {
     }
 
     // DON encodes, reports and executes the message
-    let report: RelayReport = {
-      merkleRoot: hashMessage(donMessage),
-      minSequenceNumber: sequenceNumber,
-      maxSequenceNumber: sequenceNumber,
-    }
+    const tree = new MerkleMultiTree([donMessage])
     await chain2OffRamp
       .connect(roles.defaultAccount)
-      .report(encodeReport(report))
-    let proof: MerkleProof = {
-      path: [],
-      index: 0,
-    }
+      .report(encodeRelayReport(tree.generateRelayReport()))
     tx = await chain2OffRamp
       .connect(roles.defaultAccount)
-      .executeTransaction(donMessage, proof, false)
+      .executeTransaction(tree.generateExecutionReport([0]), false)
     receipt = await tx.wait()
 
     // Check that events are emitted and receiver receives the message

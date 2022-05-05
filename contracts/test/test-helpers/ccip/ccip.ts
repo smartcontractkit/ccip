@@ -1,24 +1,8 @@
 import { BigNumber, BigNumberish, BytesLike } from 'ethers'
+import MerkleTree from 'merkletreejs'
 import { ethers } from 'hardhat'
 import { expect } from 'chai'
-
-export interface MerkleProof {
-  path: string[]
-  index: BigNumberish
-}
-
-export interface RelayReport {
-  merkleRoot: string
-  minSequenceNumber: BigNumber
-  maxSequenceNumber: BigNumber
-}
-
-export interface CCIPMessage {
-  sourceChainId: BigNumber
-  sequenceNumber: BigNumber
-  sender: string
-  payload: CCIPMessagePayload
-}
+import { stripHexPrefix } from '../helpers'
 
 export interface CCIPMessagePayload {
   tokens: string[]
@@ -27,136 +11,195 @@ export interface CCIPMessagePayload {
   receiver: string
   executor: string
   data: BytesLike
-  options: BytesLike
 }
+export const CCIPMessagePayloadTuple =
+  'tuple(address[] tokens, uint256[] amounts, uint256 destinationChainId, address receiver, address executor, bytes data)'
 
-export class MerkleTree {
-  public parent?: MerkleTree
-
-  /**
-   * Left subtree
-   */
-  public left?: MerkleTree
-
-  /**
-   * Right subtree
-   */
-  public right?: MerkleTree
-
-  /**
-   * Hash that is either provide or populated
-   */
-  public hash?: string
-
-  constructor(hash?: string) {
-    this.hash = hash
-  }
-
-  public getSiblingHash(hash?: string): string {
-    if (hash == this.left?.hash) {
-      return this.right?.hash!
-    } else if (hash == this.right?.hash) {
-      return this.left?.hash!
-    } else {
-      throw new Error('Hash not found')
-    }
-  }
-
-  public recursivePath(proof: string[]): string[] {
-    if (this.parent != undefined) {
-      proof.push(this.parent?.getSiblingHash(this.hash)!)
-      this.parent.recursivePath(proof)
-    }
-    return proof
-  }
-
-  /**
-   * Computes the hash based on the children. If no right child
-   * exists, reuse the left child's value
-   */
-  public computeHash(): string {
-    const leftHash = this.left!.hash
-    const rightHash = this.right ? this.right.hash : leftHash
-    // Add the internal node domain separator.
-    return ethers.utils.solidityKeccak256(
-      ['bytes', 'bytes32', 'bytes32'],
-      ['0x01', leftHash, rightHash],
-    )
-  }
+export interface CCIPMessage {
+  sourceChainId: BigNumber
+  sequenceNumber: BigNumber
+  sender: string
+  payload: CCIPMessagePayload
 }
+export const CCIPMessageTuple = `tuple(uint256 sourceChainId, uint64 sequenceNumber, address sender, ${CCIPMessagePayloadTuple} payload)`
 
-export function generateMerkleTreeFromHashes(hashes: string[]): any {
-  // Convert the initial hashes into leaf nodes. We will use these
-  // leaf nodes to construuct the Merkle tree from the bottom up by
-  // successively combining pairing nodes at each level to construct
-  // the parent
-  let nodes = hashes.map((p) => new MerkleTree(p))
-  let leaves: MerkleTree[] = []
+export interface ExecutionReport {
+  messages: CCIPMessage[]
+  proofs: string[]
+  proofFlagsBits: BigNumberish
+}
+export const ExecutionReportTuple = `tuple(${CCIPMessageTuple}[] messages, bytes32[] proofs, uint256 proofFlagsBits)`
 
-  // Loop until we reach a single node, which will be our Merkle root
-  while (nodes.length > 1) {
-    const parents = []
+export interface RelayReport {
+  merkleRoot: string
+  minSequenceNumber: BigNumber
+  maxSequenceNumber: BigNumber
+}
+export const RelayReportTuple = `tuple(bytes32 merkleRoot, uint64 minSequenceNumber, uint64 maxSequenceNumber)`
 
-    // Successively pair up nodes at each level
-    for (let i = 0; i < nodes.length; i += 2) {
-      // Create the parent node, which we will add a left, try add
-      // a right, then calculate the hash for the node
-      const parent = new MerkleTree()
-      parents.push(parent)
+/**
+ * @notice MerkleMultiTree generates a merkle tree using an array CCIPMessage leaves
+ * Use this to generate relay and execution reports for specific messages in tests.
+ */
+export class MerkleMultiTree {
+  public tree?: MerkleTree
+  public messages: { [hash: string]: CCIPMessage } = {}
+  public minSequenceNumber?: BigNumber
+  public maxSequenceNumber?: BigNumber
 
-      // Assign the left, which will always be there
-      parent.left = nodes[i]
-      nodes[i].parent = parent
-
-      // Assign the right, which won't always be there. However,
-      // in JavaScript, an array overflow simply returns undefined
-      // which in this context, is the same as a null pointer.
-      parent.right = nodes[i + 1]
-      nodes[i + 1].parent = parent
-
-      // Finally compute the hash, which will be based on the
-      // number of children.
-      parent.hash = parent.computeHash()
-
-      // Add to the leaves if we're still on the bottom level
-      if (leaves.length < hashes.length) {
-        leaves.push(nodes[i], nodes[i + 1])
+  /**
+   * @notice Create a new MerkleMultiTree
+   * @param rawMessages CCIPMessage[] array of messages
+   */
+  constructor(rawMessages: CCIPMessage[]) {
+    rawMessages.map((rm) => {
+      this.messages[this.hashMessage(rm)] = rm
+      if (
+        !this.minSequenceNumber ||
+        rm.sequenceNumber.lt(this.minSequenceNumber)
+      ) {
+        this.minSequenceNumber = rm.sequenceNumber
       }
+      if (
+        !this.maxSequenceNumber ||
+        rm.sequenceNumber.gt(this.maxSequenceNumber)
+      ) {
+        this.maxSequenceNumber = rm.sequenceNumber
+      }
+    })
+    this.tree = new MerkleTree(Object.keys(this.messages), this.hashInternal, {
+      sort: true,
+    })
+  }
+
+  /**
+   * Generate a relay report for this merkle tree
+   * @returns RelayReport
+   */
+  public generateRelayReport(): RelayReport {
+    const relayReport: RelayReport = {
+      merkleRoot: this.bufferToStringAddress(this.tree?.getRoot()!),
+      minSequenceNumber: this.minSequenceNumber!,
+      maxSequenceNumber: this.maxSequenceNumber!,
+    }
+    return relayReport
+  }
+
+  /**
+   * @notice Generate an execution report for specific messages in this merkle tree
+   * @param messageIndices indices of the messages to include in the execution report
+   * @returns ExecutionReport
+   */
+  public generateExecutionReport(messageIndices: number[]): ExecutionReport {
+    const messageHashes: string[] = messageIndices.map((i) =>
+      this.bufferToStringAddress(this.tree?.getLeaf(i)!),
+    )
+    return this.generateExecutionReportFromHashes(messageHashes)
+  }
+
+  /**
+   * @notice Generate an execution report for specific messages in this merkle tree
+   * @param messageHashes hashes of the messages to include in the execution report
+   * @returns ExecutionReport
+   */
+  public generateExecutionReportFromHashes(
+    messageHashes: string[],
+  ): ExecutionReport {
+    const [proofsBuffer, boolFlags] = this.generateProofs(messageHashes)
+
+    const execReport: ExecutionReport = {
+      messages: messageHashes.map((mh) => this.messages[mh]),
+      proofs: proofsBuffer.map((p) => this.bufferToStringAddress(p)),
+      proofFlagsBits: this.generateBigNumberBitmap(boolFlags),
     }
 
-    // Once all pairs have been made, the parents now become the
-    // children and we start all over again
-    nodes = parents
+    return execReport
   }
 
-  // Return the single node as our root
-  return {
-    root: nodes[0],
-    leaves: leaves,
+  /**
+   * @notice Get the root hash for this merkle tree
+   * @returns Root hash
+   */
+  public getRoot(): string {
+    return this.bufferToStringAddress(this.tree?.getRoot()!)
+  }
+
+  private generateProofs(messageHashes: string[]): [Buffer[], boolean[]] {
+    const bufferMessageHashes: Buffer[] = messageHashes.map((mh) =>
+      this.stringAddressToBuffer(mh),
+    )
+    const proofs = this.tree?.getMultiProof(bufferMessageHashes)
+    const proofFlags = this.tree?.getProofFlags(bufferMessageHashes, proofs!)
+    expect(proofFlags!.length).to.be.lte(256)
+    return [proofs!, proofFlags!]
+  }
+
+  private generateBigNumberBitmap(boolArray: Array<boolean>): BigNumber {
+    let bitmap = BigNumber.from(0)
+    for (let i = 0; i < boolArray.length; i++) {
+      const zeroOrOne: BigNumber = boolArray[i]
+        ? BigNumber.from(1)
+        : BigNumber.from(0)
+      bitmap = bitmap.or(zeroOrOne.shl(i))
+    }
+    return bitmap
+  }
+
+  private hashMessage(message: CCIPMessage): string {
+    const bytesMessage = ethers.utils.defaultAbiCoder.encode(
+      [CCIPMessageTuple],
+      [message],
+    )
+    return this.hashLeaf(bytesMessage)
+  }
+
+  private hashLeaf(value: string): string {
+    // Add the leaf domain separator 0x00.
+    return ethers.utils.solidityKeccak256(['bytes', 'bytes'], ['0x00', value])
+  }
+
+  private hashInternal(value: string): string {
+    // Add the internal domain separator 0x01.
+    return ethers.utils.solidityKeccak256(['bytes', 'bytes'], ['0x01', value])
+  }
+
+  private bufferToStringAddress(buf: Buffer): string {
+    return '0x' + buf.toString('hex')
+  }
+
+  private stringAddressToBuffer(addr: string): Buffer {
+    return Buffer.from(stripHexPrefix(addr), 'hex')
   }
 }
 
-export function encodeReport(report: RelayReport) {
-  return ethers.utils.defaultAbiCoder.encode(
-    [
-      'tuple(bytes32 merkleRoot, uint64 minSequenceNumber, uint64 maxSequenceNumber) report',
-    ],
-    [report],
-  )
+/**
+ * @notice Encode a RelayReport
+ * @param report RelayReport
+ * @returns encoded bytes string
+ */
+export function encodeRelayReport(report: RelayReport): string {
+  return ethers.utils.defaultAbiCoder.encode([RelayReportTuple], [report])
 }
 
-export function hashMessage(message: CCIPMessage) {
-  const bytesMessage = ethers.utils.defaultAbiCoder.encode(
-    [
-      'tuple(uint256 sourceChainId, uint64 sequenceNumber, address sender, tuple(address[] tokens, uint256[] amounts, uint256 destinationChainId, address receiver, address executor, bytes data, bytes options) payload) message',
-    ],
-    [message],
-  )
-  // Add the leaf domain separator 0x00.
-  return ethers.utils.solidityKeccak256(
-    ['bytes', 'bytes'],
-    ['0x00', bytesMessage],
-  )
+/**
+ * @notice Encode an ExecutionReport
+ * @param report ExecutionReport
+ * @returns encoded bytes string
+ */
+export function encodeExecutionReport(report: ExecutionReport): string {
+  return ethers.utils.defaultAbiCoder.encode([ExecutionReportTuple], [report])
+}
+
+export function executionReportDeepEqual(
+  actualReport: any,
+  expectedReport: ExecutionReport,
+) {
+  expect(actualReport?.proofs).to.deep.equal(expectedReport.proofs)
+  expect(actualReport?.proofFlagsBits).to.equal(expectedReport.proofFlagsBits)
+  for (let i = 0; i < expectedReport.messages.length; i++) {
+    const expectedMsg = expectedReport.messages[i]
+    messageDeepEqual(actualReport?.messages?.[i], expectedMsg)
+  }
 }
 
 export function messageDeepEqual(
@@ -182,9 +225,6 @@ export function messageDeepEqual(
   }
   expect(actualMessagePayload.destinationChainId).to.equal(
     expectedMessage.payload.destinationChainId,
-  )
-  expect(actualMessagePayload?.options).to.equal(
-    expectedMessage.payload.options,
   )
 }
 
@@ -219,8 +259,5 @@ export function requestEventArgsEqual(
   }
   expect(actualRequestArgs.message.payload.destinationChainId).to.equal(
     expectedRequestArgs.destinationChainId,
-  )
-  expect(actualRequestArgs.message.payload.options).to.equal(
-    expectedRequestArgs.options,
   )
 }

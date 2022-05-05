@@ -80,7 +80,6 @@ describe('ReceiverDapp', () => {
           tokens: [],
           amounts: [],
           executor: ethers.constants.AddressZero,
-          options: ethers.constants.HashZero,
         },
       }
       accountAddr = await roles.defaultAccount.getAddress()
@@ -113,7 +112,6 @@ describe('ReceiverDapp', () => {
             tokens: [token.address],
             amounts: [amount],
             executor: ethers.constants.AddressZero,
-            options: ethers.constants.HashZero,
           },
         }
         await ramp.deliverMessageTo(receiverContract.address, message)

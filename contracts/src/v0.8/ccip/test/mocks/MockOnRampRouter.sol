@@ -18,14 +18,12 @@ contract MockOnRampRouter {
       address receiver,
       bytes memory data,
       IERC20[] memory tokens,
-      uint256[] memory amounts,
-      bytes memory options
+      uint256[] memory amounts
     )
   {
     receiver = mp.receiver;
     data = mp.data;
     tokens = mp.tokens;
     amounts = mp.amounts;
-    options = mp.options;
   }
 }

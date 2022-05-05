@@ -10,6 +10,7 @@ import {
   BigNumber,
   Contract,
   ContractFactory,
+  ContractReceipt,
   ContractTransaction,
 } from 'ethers'
 import { Roles, getUsers } from '../../../test-helpers/setup'
@@ -25,32 +26,15 @@ import { evmRevert } from '../../../test-helpers/matchers'
 import {
   CCIPMessage,
   CCIPMessagePayload,
-  encodeReport,
-  generateMerkleTreeFromHashes,
-  hashMessage,
-  MerkleProof,
-  MerkleTree,
+  encodeRelayReport,
+  ExecutionReport,
+  MerkleMultiTree,
   messageDeepEqual,
   RelayReport,
 } from '../../../test-helpers/ccip/ccip'
 import { constants } from 'ethers'
-import { ContractReceipt } from 'ethers'
 import { GAS } from '../../../test-helpers/ccip/gas-measurements'
 const { deployContract } = hre.waffle
-
-function constructReport(
-  message: CCIPMessage,
-  minSequenceNumber: BigNumber,
-  maxSequenceNumber: BigNumber,
-): RelayReport {
-  const rootHash = hashMessage(message)
-  let report: RelayReport = {
-    merkleRoot: rootHash,
-    minSequenceNumber: minSequenceNumber,
-    maxSequenceNumber: maxSequenceNumber,
-  }
-  return report
-}
 
 let roles: Roles
 
@@ -72,6 +56,7 @@ let MockAFNArtifact: Artifact
 let TokenArtifact: Artifact
 let PoolArtifact: Artifact
 let PriceFeedArtifact: Artifact
+let SimpleMessageReceiverArtifact: Artifact
 let rampFactory: ContractFactory
 let routerFactory: ContractFactory
 
@@ -90,6 +75,24 @@ let bucketRate: BigNumber
 let bucketCapactiy: BigNumber
 let maxTimeBetweenAFNSignals: BigNumber
 
+async function executionValidationFail(
+  ramp: Contract,
+  messages: CCIPMessage[],
+  revertReason: string,
+  takeFees: boolean = false,
+) {
+  const tree = new MerkleMultiTree(messages)
+  await ramp
+    .connect(roles.defaultAccount)
+    .report(encodeRelayReport(tree.generateRelayReport()))
+  await evmRevert(
+    ramp
+      .connect(roles.defaultAccount)
+      .executeTransaction(tree.generateExecutionReport([0]), takeFees),
+    revertReason,
+  )
+}
+
 beforeEach(async () => {
   const users = await getUsers()
   roles = users.roles
@@ -104,8 +107,9 @@ describe('OffRamp', () => {
     rampFactory = await hre.ethers.getContractFactory('OffRampHelper')
     routerFactory = await hre.ethers.getContractFactory('OffRampRouter')
 
-    const SimpleMessageReceiverArtifact: Artifact =
-      await hre.artifacts.readArtifact('SimpleMessageReceiver')
+    SimpleMessageReceiverArtifact = await hre.artifacts.readArtifact(
+      'SimpleMessageReceiver',
+    )
     bucketRate = BigNumber.from('10000000000000000')
     bucketCapactiy = BigNumber.from('100000000000000000')
     const mintAmount = BigNumber.from('100000000000000000000')
@@ -270,9 +274,9 @@ describe('OffRamp', () => {
 
   describe('#merkleRoot', () => {
     let messages: Array<CCIPMessage>
-    let merkle: any
+    let tree: MerkleMultiTree
 
-    it('generates', async () => {
+    beforeEach(async () => {
       const receiver = await roles.oracleNode1.getAddress()
       messages = [
         {
@@ -286,7 +290,6 @@ describe('OffRamp', () => {
             receiver: receiver,
             executor: ethers.constants.AddressZero,
             data: ethers.constants.HashZero,
-            options: ethers.constants.HashZero,
           },
         },
         {
@@ -300,7 +303,6 @@ describe('OffRamp', () => {
             receiver: receiver,
             executor: ethers.constants.AddressZero,
             data: ethers.constants.HashZero,
-            options: ethers.constants.HashZero,
           },
         },
         {
@@ -314,7 +316,6 @@ describe('OffRamp', () => {
             receiver: receiver,
             executor: ethers.constants.AddressZero,
             data: ethers.constants.HashZero,
-            options: ethers.constants.HashZero,
           },
         },
         {
@@ -328,23 +329,42 @@ describe('OffRamp', () => {
             receiver: receiver,
             executor: ethers.constants.AddressZero,
             data: ethers.constants.HashZero,
-            options: ethers.constants.HashZero,
           },
         },
       ]
-      let messageHashes = messages.map((m) => hashMessage(m))
-      merkle = generateMerkleTreeFromHashes(messageHashes)
-      for (let i = 0; i < merkle.leaves.length; i++) {
-        const leaf = merkle.leaves[i]
-        const path = leaf.recursivePath([])
-        const proof: MerkleProof = {
-          path: path,
-          index: i,
-        }
-        expect(await ramp.merkleRoot(messages[i], proof)).to.equal(
-          merkle.root.hash,
-        )
-      }
+      tree = new MerkleMultiTree(messages)
+    })
+
+    describe('contract root verification', async () => {
+      it('leaf 1', async () => {
+        const execReport: ExecutionReport = tree.generateExecutionReport([0])
+        const response = await ramp.merkleRoot(execReport)
+        expect(response).to.equal(tree.getRoot())
+      })
+
+      it('2 leaves', async () => {
+        const indices = [0, 3]
+        const execReport: ExecutionReport =
+          tree.generateExecutionReport(indices)
+        const response = await ramp.merkleRoot(execReport)
+        expect(response).to.equal(tree.getRoot())
+      })
+
+      it('3 leaves', async () => {
+        const indices = [0, 1, 3]
+        const execReport: ExecutionReport =
+          tree.generateExecutionReport(indices)
+        const response = await ramp.merkleRoot(execReport)
+        expect(response).to.equal(tree.getRoot())
+      })
+
+      it('4 leaves', async () => {
+        const indices = [0, 1, 2, 3]
+        const execReport: ExecutionReport =
+          tree.generateExecutionReport(indices)
+        const response = await ramp.merkleRoot(execReport)
+        expect(response).to.equal(tree.getRoot())
+      })
     })
   })
 
@@ -386,20 +406,22 @@ describe('OffRamp', () => {
       it('reverts when the minSequenceNumber is greater than the maxSequenceNumber', async () => {
         report.maxSequenceNumber = BigNumber.from(1)
         await evmRevert(
-          ramp.connect(roles.defaultAccount).report(encodeReport(report)),
+          ramp.connect(roles.defaultAccount).report(encodeRelayReport(report)),
           'RelayReportError()',
         )
       })
 
       it('reverts when the minSequenceNumber is not 1 greater than the previous report maxSequenceNumber', async () => {
-        await ramp.connect(roles.defaultAccount).report(encodeReport(report))
+        await ramp
+          .connect(roles.defaultAccount)
+          .report(encodeRelayReport(report))
         report = {
           merkleRoot: numToBytes32(2),
           minSequenceNumber: BigNumber.from(3),
           maxSequenceNumber: BigNumber.from(4),
         }
         await evmRevert(
-          ramp.connect(roles.defaultAccount).report(encodeReport(report)),
+          ramp.connect(roles.defaultAccount).report(encodeRelayReport(report)),
           `SequenceError(3, 3)`,
         )
       })
@@ -420,7 +442,7 @@ describe('OffRamp', () => {
         }
         response = await ramp
           .connect(roles.defaultAccount)
-          .report(encodeReport(report))
+          .report(encodeRelayReport(report))
         gasUsed = gasUsed.add((await response.wait()).gasUsed)
       })
       it('GASTEST [ @skip-coverage ]', async () => {
@@ -451,11 +473,8 @@ describe('OffRamp', () => {
     let sender: string
     let messagedata: string
     let amount: BigNumber
-    let options: string
     let message: CCIPMessage
     let payload: CCIPMessagePayload
-    let report: RelayReport
-    let proof: MerkleProof
     beforeEach(async () => {
       sequenceNumber = BigNumber.from(1)
       sourceId = BigNumber.from(sourceChainId)
@@ -463,14 +482,12 @@ describe('OffRamp', () => {
       sender = await roles.oracleNode.getAddress()
       messagedata = stringToBytes('Message')
       amount = BigNumber.from('10000000000')
-      options = stringToBytes('options')
       payload = {
         receiver: receiver.address,
         data: messagedata,
         tokens: [sourceToken1.address, sourceToken2.address],
         amounts: [amount, amount],
         executor: hre.ethers.constants.AddressZero,
-        options: options,
         destinationChainId: destinationId,
       }
       message = {
@@ -483,12 +500,11 @@ describe('OffRamp', () => {
 
     describe('failure', () => {
       describe('verifyMerkleProof failures', () => {
-        let hashes: string[]
-        let root: MerkleTree
-        let leaves: MerkleTree[]
+        let tree: MerkleMultiTree
+        let relayReport: RelayReport
+        let executionReport: ExecutionReport
 
         beforeEach(async () => {
-          const hash1 = hashMessage(message)
           const sequenceNumber2 = BigNumber.from(2)
           const payload2 = {
             receiver: receiver.address,
@@ -496,7 +512,6 @@ describe('OffRamp', () => {
             tokens: [sourceToken1.address],
             amounts: [BigNumber.from('9999999')],
             executor: hre.ethers.constants.AddressZero,
-            options: options,
             destinationChainId: destinationId,
           }
           const message2 = {
@@ -505,76 +520,41 @@ describe('OffRamp', () => {
             sender: sender,
             payload: payload2,
           }
-          const hash2 = hashMessage(message2)
-          hashes = [hash1, hash2]
-          const merkle = generateMerkleTreeFromHashes(hashes)
-          root = merkle.root
-          leaves = merkle.leaves
-          report = {
-            merkleRoot: root.hash!,
-            minSequenceNumber: sequenceNumber,
-            maxSequenceNumber: sequenceNumber2,
-          }
-          await ramp.connect(roles.defaultAccount).report(encodeReport(report))
+          tree = new MerkleMultiTree([message, message2])
+          relayReport = tree.generateRelayReport()
+          await ramp
+            .connect(roles.defaultAccount)
+            .report(encodeRelayReport(relayReport))
+          executionReport = tree.generateExecutionReport([0])
         })
 
         it('fails when the payload is wrong', async () => {
-          const path = leaves[0].recursivePath([])
-          proof = {
-            path: path,
-            index: 0,
-          }
-          message.payload.options = stringToBytes('loremipsum')
+          executionReport.messages[0].payload.data = stringToBytes('loremipsum')
+
           await evmRevert(
             ramp
               .connect(roles.defaultAccount)
-              .executeTransaction(message, proof, false),
-            `MerkleProofError([["${path[0]}"], 0], [${message.sourceChainId}, ${message.sequenceNumber}, "${message.sender}", [["${message.payload.tokens[0]}", "${message.payload.tokens[1]}"], [${message.payload.amounts[0]}, ${message.payload.amounts[1]}], ${message.payload.destinationChainId}, "${message.payload.receiver}", "${message.payload.executor}", "${message.payload.data}", "${message.payload.options}"]])`,
+              .executeTransaction(executionReport, false),
           )
         })
 
-        it('fails when the path is wrong', async () => {
-          const path = [numToBytes32(1)]
-          proof = {
-            path: path,
-            index: 0,
-          }
+        it('fails when the proofs is wrong', async () => {
+          executionReport.proofs = []
           await evmRevert(
             ramp
               .connect(roles.defaultAccount)
-              .executeTransaction(message, proof, false),
-            `MerkleProofError([["${path[0]}"], 0], [${message.sourceChainId}, ${message.sequenceNumber}, "${message.sender}", [["${message.payload.tokens[0]}", "${message.payload.tokens[1]}"], [${message.payload.amounts[0]}, ${message.payload.amounts[1]}], ${message.payload.destinationChainId}, "${message.payload.receiver}", "${message.payload.executor}", "${message.payload.data}", "${message.payload.options}"]])`,
-          )
-        })
-
-        it('fails when the index is wrong', async () => {
-          const path = leaves[0].recursivePath([])
-          const wrongIndex = 1
-          proof = {
-            path: path,
-            index: wrongIndex,
-          }
-          await evmRevert(
-            ramp
-              .connect(roles.defaultAccount)
-              .executeTransaction(message, proof, false),
-            `MerkleProofError([["${path[0]}"], 0], [${message.sourceChainId}, ${message.sequenceNumber}, "${message.sender}", [["${message.payload.tokens[0]}", "${message.payload.tokens[1]}"], [${message.payload.amounts[0]}, ${message.payload.amounts[1]}], ${message.payload.destinationChainId}, "${message.payload.receiver}", "${message.payload.executor}", "${message.payload.data}", "${message.payload.options}"]])`,
+              .executeTransaction(executionReport, false),
           )
         })
 
         it('fails when the execution delay has not yet passed', async () => {
-          const path = leaves[0].recursivePath([])
-          proof = {
-            path: path,
-            index: 0,
-          }
           let newConfig = initialConfig
           newConfig.executionDelaySeconds = 60 * 60
           await ramp.connect(roles.defaultAccount).setOffRampConfig(newConfig)
           await evmRevert(
             ramp
               .connect(roles.defaultAccount)
-              .executeTransaction(message, proof, false),
+              .executeTransaction(executionReport, false),
             `ExecutionDelayError()`,
           )
         })
@@ -582,31 +562,17 @@ describe('OffRamp', () => {
       describe('validation fails', () => {
         it('fails if the receiver is the ramp', async () => {
           message.payload.receiver = ramp.address
-          report = constructReport(message, sequenceNumber, sequenceNumber)
-          proof = {
-            path: [],
-            index: 0,
-          }
-          await ramp.connect(roles.defaultAccount).report(encodeReport(report))
-          await evmRevert(
-            ramp
-              .connect(roles.defaultAccount)
-              .executeTransaction(message, proof, false),
+          await executionValidationFail(
+            ramp,
+            [message],
             `InvalidReceiver("${message.payload.receiver}")`,
           )
         })
         it('fails if the receiver is the pool1', async () => {
           message.payload.receiver = pool1.address
-          report = constructReport(message, sequenceNumber, sequenceNumber)
-          proof = {
-            path: [],
-            index: 0,
-          }
-          await ramp.connect(roles.defaultAccount).report(encodeReport(report))
-          await evmRevert(
-            ramp
-              .connect(roles.defaultAccount)
-              .executeTransaction(message, proof, false),
+          await executionValidationFail(
+            ramp,
+            [message],
             `InvalidReceiver("${message.payload.receiver}")`,
           )
         })
@@ -614,185 +580,131 @@ describe('OffRamp', () => {
           // Set the executor to a specific address, then executing with a different
           // one should revert.
           message.payload.executor = await roles.oracleNode1.getAddress()
-          report = constructReport(message, sequenceNumber, sequenceNumber)
-          proof = {
-            path: [],
-            index: 0,
-          }
-          await ramp.connect(roles.defaultAccount).report(encodeReport(report))
-          await evmRevert(
-            ramp
-              .connect(roles.defaultAccount)
-              .executeTransaction(message, proof, false),
+          await executionValidationFail(
+            ramp,
+            [message],
             `InvalidExecutor(${message.sequenceNumber})`,
           )
         })
         it('fails when the message is already executed', async () => {
-          report = constructReport(message, sequenceNumber, sequenceNumber)
-          proof = {
-            path: [],
-            index: 0,
-          }
-          await ramp.connect(roles.defaultAccount).report(encodeReport(report))
+          const tree = new MerkleMultiTree([message])
           await ramp
             .connect(roles.defaultAccount)
-            .executeTransaction(message, proof, false)
+            .report(encodeRelayReport(tree.generateRelayReport()))
+          const execReport = tree.generateExecutionReport([0])
+          await ramp
+            .connect(roles.defaultAccount)
+            .executeTransaction(execReport, false)
           await evmRevert(
             ramp
               .connect(roles.defaultAccount)
-              .executeTransaction(message, proof, false),
+              .executeTransaction(execReport, false),
             `AlreadyExecuted(${message.sequenceNumber})`,
           )
         })
         it('should fail if sent from an unsupported source chain', async () => {
           message.sourceChainId = BigNumber.from(999)
-          report = constructReport(message, sequenceNumber, sequenceNumber)
-          proof = {
-            path: [],
-            index: 0,
-          }
-          await ramp.connect(roles.defaultAccount).report(encodeReport(report))
-          await evmRevert(
-            ramp
-              .connect(roles.defaultAccount)
-              .executeTransaction(message, proof, false),
+          await executionValidationFail(
+            ramp,
+            [message],
             `InvalidSourceChain(${message.sourceChainId})`,
           )
         })
         it('should fail if the number of tokens sent is not 1', async () => {
           message.payload.tokens.push(await roles.oracleNode.getAddress())
-          report = constructReport(message, sequenceNumber, sequenceNumber)
-          proof = {
-            path: [],
-            index: 0,
-          }
-          await ramp.connect(roles.defaultAccount).report(encodeReport(report))
-          await evmRevert(
-            ramp
-              .connect(roles.defaultAccount)
-              .executeTransaction(message, proof, false),
+          await executionValidationFail(
+            ramp,
+            [message],
             `UnsupportedNumberOfTokens()`,
           )
         })
         it('should fail if the number of amounts of tokens to send is not 1', async () => {
           message.payload.amounts.push(BigNumber.from(50000))
-          report = constructReport(message, sequenceNumber, sequenceNumber)
-          proof = {
-            path: [],
-            index: 0,
-          }
-          await ramp.connect(roles.defaultAccount).report(encodeReport(report))
-          await evmRevert(
-            ramp
-              .connect(roles.defaultAccount)
-              .executeTransaction(message, proof, false),
+          await executionValidationFail(
+            ramp,
+            [message],
             `UnsupportedNumberOfTokens()`,
           )
         })
         it('should fail if sent using an unsupported source token', async () => {
           message.payload.tokens[0] = await roles.oracleNode2.getAddress()
-          report = constructReport(message, sequenceNumber, sequenceNumber)
-          proof = {
-            path: [],
-            index: 0,
-          }
-          await ramp.connect(roles.defaultAccount).report(encodeReport(report))
-          await evmRevert(
-            ramp
-              .connect(roles.defaultAccount)
-              .executeTransaction(message, proof, false),
+          await executionValidationFail(
+            ramp,
+            [message],
             `UnsupportedToken("${message.payload.tokens[0]}")`,
           )
         })
         it('should fail if sending more tokens than the tokenBucket allows', async () => {
           message.payload.amounts[0] = bucketCapactiy.add(1)
-          report = constructReport(message, sequenceNumber, sequenceNumber)
-          await ramp.connect(roles.defaultAccount).report(encodeReport(report))
-          await evmRevert(
-            ramp
-              .connect(roles.defaultAccount)
-              .executeTransaction(message, proof, false),
+          await executionValidationFail(
+            ramp,
+            [message],
             `ExceedsTokenLimit(${bucketCapactiy}, ${message.payload.amounts[0]})`,
           )
         })
         it('should fail if the contract is paused', async () => {
-          report = constructReport(message, sequenceNumber, sequenceNumber)
-          proof = {
-            path: [],
-            index: 0,
-          }
-          await ramp.connect(roles.defaultAccount).report(encodeReport(report))
+          const tree = new MerkleMultiTree([message])
+          await ramp
+            .connect(roles.defaultAccount)
+            .report(encodeRelayReport(tree.generateRelayReport()))
           await ramp.connect(roles.defaultAccount).pause()
           await evmRevert(
             ramp
               .connect(roles.defaultAccount)
-              .executeTransaction(message, proof, false),
+              .executeTransaction(tree.generateExecutionReport([0]), false),
             `Pausable: paused`,
           )
         })
         it('fails when the AFN signal is bad', async () => {
-          report = constructReport(message, sequenceNumber, sequenceNumber)
-          proof = {
-            path: [],
-            index: 0,
-          }
-          await ramp.connect(roles.defaultAccount).report(encodeReport(report))
+          const tree = new MerkleMultiTree([message])
+          await ramp
+            .connect(roles.defaultAccount)
+            .report(encodeRelayReport(tree.generateRelayReport()))
           await afn.voteBad()
           await evmRevert(
             ramp
               .connect(roles.defaultAccount)
-              .executeTransaction(message, proof, false),
+              .executeTransaction(tree.generateExecutionReport([0]), false),
             `BadAFNSignal()`,
           )
         })
-
         it('fails when the AFN signal is stale', async () => {
-          report = constructReport(message, sequenceNumber, sequenceNumber)
-          proof = {
-            path: [],
-            index: 0,
-          }
-          await ramp.connect(roles.defaultAccount).report(encodeReport(report))
+          const tree = new MerkleMultiTree([message])
+          await ramp
+            .connect(roles.defaultAccount)
+            .report(encodeRelayReport(tree.generateRelayReport()))
           await afn.setTimestamp(BigNumber.from(1))
           await evmRevert(
             ramp
               .connect(roles.defaultAccount)
-              .executeTransaction(message, proof, false),
+              .executeTransaction(tree.generateExecutionReport([0]), false),
             `StaleAFNHeartbeat()`,
           )
         })
       })
       describe('fee taking fails', () => {
         it('fails if the price feed does not exist', async () => {
-          report = constructReport(message, sequenceNumber, sequenceNumber)
-          proof = {
-            path: [],
-            index: 0,
-          }
-          await ramp.connect(roles.defaultAccount).report(encodeReport(report))
+          const tree = new MerkleMultiTree([message])
+          await ramp
+            .connect(roles.defaultAccount)
+            .report(encodeRelayReport(tree.generateRelayReport()))
           await ramp
             .connect(roles.defaultAccount)
             .removeFeed(sourceToken1.address, priceFeed1.address)
           await evmRevert(
             ramp
               .connect(roles.defaultAccount)
-              .executeTransaction(message, proof, true),
+              .executeTransaction(tree.generateExecutionReport([0]), true),
             `FeeError()`,
           )
         })
         it('fails if the fee exceeds the amount sent', async () => {
           message.payload.amounts[0] = 1
-          report = constructReport(message, sequenceNumber, sequenceNumber)
-          proof = {
-            path: [],
-            index: 0,
-          }
-          await ramp.connect(roles.defaultAccount).report(encodeReport(report))
-          await evmRevert(
-            ramp
-              .connect(roles.defaultAccount)
-              .executeTransaction(message, proof, true),
+          await executionValidationFail(
+            ramp,
+            [message],
             `panic code 0x11 (Arithmetic operation underflowed or overflowed outside of an unchecked block)`,
+            true,
           )
         })
       })
@@ -800,26 +712,26 @@ describe('OffRamp', () => {
 
     describe('success - 2 tokens', () => {
       let tx: ContractTransaction
+      let tree: MerkleMultiTree
       beforeEach(async () => {
-        const report = constructReport(message, sequenceNumber, sequenceNumber)
-        await ramp.connect(roles.defaultAccount).report(encodeReport(report))
-        proof = {
-          path: [],
-          index: 0,
-        }
+        tree = new MerkleMultiTree([message])
+        await ramp
+          .connect(roles.defaultAccount)
+          .report(encodeRelayReport(tree.generateRelayReport()))
       })
-      describe('with fees', () => {
+      describe('without fees', () => {
         beforeEach(async () => {
           tx = await ramp
-            .connect(roles.oracleNode)
-            .executeTransaction(message, proof, true)
+            .connect(roles.defaultAccount)
+            .executeTransaction(tree.generateExecutionReport([0]), false)
         })
 
         describe('GASTEST', () => {
           it('GASTEST - contract receiver execution [ @skip-coverage ]', async () => {
             expectGasWithinDeviation(
               (await tx.wait()).gasUsed,
-              GAS.OffRamp.executeTransaction.TWO_TOKENS.FEES.CONTRACT_RECEIVER,
+              GAS.OffRamp.executeTransaction.ONE_MESSAGE.TWO_TOKENS.NO_FEES
+                .CONTRACT_RECEIVER,
             )
           })
 
@@ -828,24 +740,89 @@ describe('OffRamp', () => {
             message.payload.receiver = await roles.consumer.getAddress()
             message.sequenceNumber = nextSequenceNumber
             message.payload.data = []
-            const report = constructReport(
-              message,
-              nextSequenceNumber,
-              nextSequenceNumber,
-            )
+            const newTree: MerkleMultiTree = new MerkleMultiTree([message])
             await ramp
               .connect(roles.defaultAccount)
-              .report(encodeReport(report))
-            proof = {
-              path: [],
-              index: 0,
-            }
+              .report(encodeRelayReport(newTree.generateRelayReport()))
             tx = await ramp
               .connect(roles.oracleNode)
-              .executeTransaction(message, proof, true)
+              .executeTransaction(newTree.generateExecutionReport([0]), true)
             expectGasWithinDeviation(
               (await tx.wait()).gasUsed,
-              GAS.OffRamp.executeTransaction.TWO_TOKENS.FEES.EOA_RECEIVER,
+              GAS.OffRamp.executeTransaction.ONE_MESSAGE.TWO_TOKENS.NO_FEES
+                .EOA_RECEIVER,
+            )
+          })
+        })
+
+        it('should set s_executed to true', async () => {
+          expect(await ramp.getExecuted(message.sequenceNumber)).to.be.true
+        })
+        it('should deliver the message to the receiver', async () => {
+          messageDeepEqual(await receiver.s_message(), message)
+        })
+        it('should send the funds to the receiver contract', async () => {
+          expect(await destinationToken1.balanceOf(receiver.address)).to.equal(
+            message.payload.amounts[0],
+          )
+          expect(await destinationToken2.balanceOf(receiver.address)).to.equal(
+            message.payload.amounts[1],
+          )
+        })
+        it('should emit a CrossChainMessageExecuted event', async () => {
+          expect(tx)
+            .to.emit(ramp, 'CrossChainMessageExecuted')
+            .withArgs(message.sequenceNumber)
+        })
+        it('should execute a message specifying an executor', async () => {
+          message.payload.executor = await roles.oracleNode1.getAddress()
+          message.sequenceNumber = message.sequenceNumber.add(1)
+          const newTree: MerkleMultiTree = new MerkleMultiTree([message])
+          await ramp
+            .connect(roles.defaultAccount)
+            .report(encodeRelayReport(newTree.generateRelayReport()))
+          // Should not revert
+          await expect(
+            ramp
+              .connect(roles.oracleNode1)
+              .executeTransaction(newTree.generateExecutionReport([0]), false),
+          )
+            .to.emit(ramp, 'CrossChainMessageExecuted')
+            .withArgs(message.sequenceNumber)
+        })
+      })
+      describe('with fees', () => {
+        beforeEach(async () => {
+          tx = await ramp
+            .connect(roles.oracleNode)
+            .executeTransaction(tree.generateExecutionReport([0]), true)
+        })
+
+        describe('GASTEST', () => {
+          it('GASTEST - contract receiver execution [ @skip-coverage ]', async () => {
+            expectGasWithinDeviation(
+              (await tx.wait()).gasUsed,
+              GAS.OffRamp.executeTransaction.ONE_MESSAGE.TWO_TOKENS.FEES
+                .CONTRACT_RECEIVER,
+            )
+          })
+
+          it('GASTEST - EOA receiver [ @skip-coverage ]', async () => {
+            const nextSequenceNumber = sequenceNumber.add(1)
+            message.payload.receiver = await roles.consumer.getAddress()
+            message.sequenceNumber = nextSequenceNumber
+            message.payload.data = []
+            const newTree: MerkleMultiTree = new MerkleMultiTree([message])
+            await ramp
+              .connect(roles.defaultAccount)
+              .report(encodeRelayReport(newTree.generateRelayReport()))
+            tx = await ramp
+              .connect(roles.oracleNode)
+              .executeTransaction(newTree.generateExecutionReport([0]), true)
+            expectGasWithinDeviation(
+              (await tx.wait()).gasUsed,
+              GAS.OffRamp.executeTransaction.ONE_MESSAGE.TWO_TOKENS.FEES
+                .EOA_RECEIVER,
             )
 
             expect(tx)
@@ -881,19 +858,14 @@ describe('OffRamp', () => {
           await ramp.connect(roles.defaultAccount).setOffRampConfig(newConfig)
           const newSequenceNumber = message.sequenceNumber.add(1)
           message.sequenceNumber = newSequenceNumber
-          const report = constructReport(
-            message,
-            newSequenceNumber,
-            newSequenceNumber,
-          )
-          await ramp.connect(roles.defaultAccount).report(encodeReport(report))
-          proof = {
-            path: [],
-            index: 0,
-          }
+          const newTree: MerkleMultiTree = new MerkleMultiTree([message])
+          await ramp
+            .connect(roles.defaultAccount)
+            .report(encodeRelayReport(newTree.generateRelayReport()))
           tx = await ramp
             .connect(roles.oracleNode)
-            .executeTransaction(message, proof, true)
+            .executeTransaction(newTree.generateExecutionReport([0]), true)
+
           const receipt: ContractReceipt = await tx.wait()
           for (let i = 0; i < receipt.logs.length; i++) {
             const log = receipt.logs[i]
@@ -925,111 +897,132 @@ describe('OffRamp', () => {
         it('should execute a message specifying an executor', async () => {
           message.payload.executor = await roles.oracleNode1.getAddress()
           message.sequenceNumber = message.sequenceNumber.add(1)
+          const newTree: MerkleMultiTree = new MerkleMultiTree([message])
           await ramp
             .connect(roles.defaultAccount)
-            .report(
-              encodeReport(
-                constructReport(
-                  message,
-                  sequenceNumber.add(1),
-                  sequenceNumber.add(1),
-                ),
-              ),
-            )
+            .report(encodeRelayReport(newTree.generateRelayReport()))
           // Should not revert
           await expect(
             ramp
               .connect(roles.oracleNode1)
-              .executeTransaction(message, proof, false),
+              .executeTransaction(newTree.generateExecutionReport([0]), true),
           )
             .to.emit(ramp, 'CrossChainMessageExecuted')
             .withArgs(message.sequenceNumber)
         })
       })
-      describe('without fees', () => {
+    })
+
+    describe('GASTEST - Tree of 20 [ @skip-coverage ]', () => {
+      describe('with no tokens', () => {
+        let messages: CCIPMessage[] = []
+        let tree: MerkleMultiTree
+        let relayReport: RelayReport
+        let executionReport: ExecutionReport
         beforeEach(async () => {
-          tx = await ramp
-            .connect(roles.defaultAccount)
-            .executeTransaction(message, proof, false)
-        })
-
-        describe('GASTEST', () => {
-          it('GASTEST - contract receiver execution [ @skip-coverage ]', async () => {
-            expectGasWithinDeviation(
-              (await tx.wait()).gasUsed,
-              GAS.OffRamp.executeTransaction.TWO_TOKENS.NO_FEES
-                .CONTRACT_RECEIVER,
+          const lastReport: RelayReport = await ramp.getLastReport()
+          for (let i = 0; i < 20; i++) {
+            const tempReceiver = <SimpleMessageReceiver>(
+              await deployContract(
+                roles.defaultAccount,
+                SimpleMessageReceiverArtifact,
+              )
             )
-          })
+            messages.push({
+              sourceChainId: BigNumber.from(sourceChainId),
+              sequenceNumber: lastReport.maxSequenceNumber.add(
+                BigNumber.from(i + 1),
+              ),
+              sender: await roles.defaultAccount.getAddress(),
+              payload: {
+                tokens: [],
+                amounts: [],
+                destinationChainId: BigNumber.from(destinationChainId),
+                receiver: tempReceiver.address,
+                executor: ethers.constants.AddressZero,
+                data: ethers.utils.defaultAbiCoder.encode(
+                  ['string'],
+                  [`no tokens message ${i + 1}`],
+                ),
+              },
+            })
+          }
 
-          it('GASTEST - EOA receiver [ @skip-coverage ]', async () => {
-            const nextSequenceNumber = sequenceNumber.add(1)
-            message.payload.receiver = await roles.consumer.getAddress()
-            message.sequenceNumber = nextSequenceNumber
-            message.payload.data = []
-            const report = constructReport(
-              message,
-              nextSequenceNumber,
-              nextSequenceNumber,
-            )
-            await ramp
-              .connect(roles.defaultAccount)
-              .report(encodeReport(report))
-            proof = {
-              path: [],
-              index: 0,
-            }
-            tx = await ramp
-              .connect(roles.oracleNode)
-              .executeTransaction(message, proof, true)
-            expectGasWithinDeviation(
-              (await tx.wait()).gasUsed,
-              GAS.OffRamp.executeTransaction.TWO_TOKENS.NO_FEES.EOA_RECEIVER,
-            )
-          })
-        })
-
-        it('should set s_executed to true', async () => {
-          expect(await ramp.getExecuted(message.sequenceNumber)).to.be.true
-        })
-        it('should deliver the message to the receiver', async () => {
-          messageDeepEqual(await receiver.s_message(), message)
-        })
-        it('should send the funds to the receiver contract', async () => {
-          expect(await destinationToken1.balanceOf(receiver.address)).to.equal(
-            message.payload.amounts[0],
-          )
-          expect(await destinationToken2.balanceOf(receiver.address)).to.equal(
-            message.payload.amounts[1],
-          )
-        })
-        it('should emit a CrossChainMessageExecuted event', async () => {
-          expect(tx)
-            .to.emit(ramp, 'CrossChainMessageExecuted')
-            .withArgs(message.sequenceNumber)
-        })
-        it('should execute a message specifying an executor', async () => {
-          message.payload.executor = await roles.oracleNode1.getAddress()
-          message.sequenceNumber = message.sequenceNumber.add(1)
+          tree = new MerkleMultiTree(messages)
+          relayReport = tree.generateRelayReport()
           await ramp
             .connect(roles.defaultAccount)
-            .report(
-              encodeReport(
-                constructReport(
-                  message,
-                  sequenceNumber.add(1),
-                  sequenceNumber.add(1),
-                ),
-              ),
-            )
-          // Should not revert
-          await expect(
-            ramp
-              .connect(roles.oracleNode1)
-              .executeTransaction(message, proof, false),
+            .report(encodeRelayReport(relayReport))
+        })
+
+        it('GASTEST - executing 10 messages', async () => {
+          const messageIndices = [...Array(10).keys()]
+          executionReport = tree.generateExecutionReport(messageIndices)
+
+          const tx = await ramp
+            .connect(roles.defaultAccount)
+            .executeTransaction(executionReport, false)
+          const receipt: ContractReceipt = await tx.wait()
+          expectGasWithinDeviation(
+            receipt.gasUsed,
+            GAS.OffRamp.executeTransaction.TEN_MESSAGES.NO_FEES.NO_TOKENS,
           )
-            .to.emit(ramp, 'CrossChainMessageExecuted')
-            .withArgs(message.sequenceNumber)
+        })
+      })
+
+      describe('with 1 token', () => {
+        let messages: CCIPMessage[] = []
+        let tree: MerkleMultiTree
+        let relayReport: RelayReport
+        let executionReport: ExecutionReport
+        beforeEach(async () => {
+          const lastReport: RelayReport = await ramp.getLastReport()
+          for (let i = 0; i < 20; i++) {
+            const tempReceiver = <SimpleMessageReceiver>(
+              await deployContract(
+                roles.defaultAccount,
+                SimpleMessageReceiverArtifact,
+              )
+            )
+            messages.push({
+              sourceChainId: BigNumber.from(sourceChainId),
+              sequenceNumber: lastReport.maxSequenceNumber.add(
+                BigNumber.from(i + 1),
+              ),
+              sender: await roles.defaultAccount.getAddress(),
+              payload: {
+                tokens: [sourceToken1.address],
+                amounts: [1],
+                destinationChainId: BigNumber.from(destinationChainId),
+                receiver: tempReceiver.address,
+                executor: ethers.constants.AddressZero,
+                data: ethers.utils.defaultAbiCoder.encode(
+                  ['string'],
+                  [`with 1 token message ${i + 1}`],
+                ),
+              },
+            })
+          }
+
+          tree = new MerkleMultiTree(messages)
+          relayReport = tree.generateRelayReport()
+          await ramp
+            .connect(roles.defaultAccount)
+            .report(encodeRelayReport(relayReport))
+        })
+
+        it('GASTEST - executing 10 messages', async () => {
+          const messageIndices = [...Array(10).keys()]
+          executionReport = tree.generateExecutionReport(messageIndices)
+
+          const tx = await ramp
+            .connect(roles.defaultAccount)
+            .executeTransaction(executionReport, false)
+          const receipt: ContractReceipt = await tx.wait()
+          expectGasWithinDeviation(
+            receipt.gasUsed,
+            GAS.OffRamp.executeTransaction.TEN_MESSAGES.NO_FEES.ONE_TOKEN,
+          )
         })
       })
     })

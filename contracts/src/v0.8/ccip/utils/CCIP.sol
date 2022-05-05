@@ -20,7 +20,6 @@ contract CCIP {
     address receiver;
     address executor;
     bytes data;
-    bytes options;
   }
 
   /// @notice Report that is relayed by the observing DON at the relay phase
@@ -30,8 +29,10 @@ contract CCIP {
     uint64 maxSequenceNumber;
   }
 
-  struct MerkleProof {
-    bytes32[] path;
-    uint256 index;
+  // TODO: This is a single root for now, enable many roots in one report.
+  struct ExecutionReport {
+    Message[] messages;
+    bytes32[] proofs;
+    uint256 proofFlagsBits;
   }
 }

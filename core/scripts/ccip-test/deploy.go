@@ -10,10 +10,10 @@ import (
 
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/afn_contract"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/link_token_interface"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/message_executor"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/mock_v3_aggregator_contract"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/native_token_pool"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp_executor"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/onramp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/receiver_dapp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/sender_dapp"
@@ -119,11 +119,11 @@ func deployDestinationContracts(t *testing.T, client *EvmChainConfig, onrampChai
 	client.TokenReceiver = tokenReceiverAddress
 
 	// Deploy the message executor contract
-	executorAddress, tx, _, err := message_executor.DeployMessageExecutor(client.Owner, client.Client, offRamp.Address(), false)
+	executorAddress, tx, _, err := offramp_executor.DeployOffRampExecutor(client.Owner, client.Client, offRamp.Address(), false)
 	require.NoError(t, err)
 	WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
-	client.Logger.Infof("Message executor contract deployed on %s in tx: %s", executorAddress.Hex(), helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash()))
-	client.MessageExecutor = executorAddress
+	client.Logger.Infof("OffRamp executor contract deployed on %s in tx: %s", executorAddress.Hex(), helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash()))
+	client.OffRampExecutor = executorAddress
 
 	return tokenReceiverAddress
 }
@@ -325,8 +325,8 @@ MessageReceiver: common.HexToAddress("%s"),
 TokenReceiver:   common.HexToAddress("%s"),
 MessageExecutor: common.HexToAddress("%s"),
 Afn:             common.HexToAddress("%s"),
-`, dest.LinkToken, dest.BridgeTokens, dest.TokenPools, dest.PriceFeeds, dest.OffRamp, dest.MessageReceiver, dest.TokenReceiver, dest.MessageExecutor, dest.Afn)
+`, dest.LinkToken, dest.BridgeTokens, dest.TokenPools, dest.PriceFeeds, dest.OffRamp, dest.MessageReceiver, dest.TokenReceiver, dest.OffRampExecutor, dest.Afn)
 
-		PrintJobSpecs(source.OnRamp, dest.OffRamp, dest.MessageExecutor, source.ChainId, dest.ChainId)
+		PrintJobSpecs(source.OnRamp, dest.OffRamp, dest.OffRampExecutor, source.ChainId, dest.ChainId)
 	}
 }

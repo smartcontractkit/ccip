@@ -1,26 +1,16 @@
-import hre, { ethers } from 'hardhat'
+import hre from 'hardhat'
 import { expect } from 'chai'
 import { Roles, getUsers } from '../../../test-helpers/setup'
-import { MockOffRamp, MessageExecutorHelper } from '../../../../typechain'
+import { MockOffRamp, OffRampExecutorHelper } from '../../../../typechain'
 import { Artifact } from 'hardhat/types'
-import { CCIPMessage, messageDeepEqual } from '../../../test-helpers/ccip/ccip'
+import {
+  CCIPMessage,
+  encodeExecutionReport,
+  executionReportDeepEqual,
+  MerkleMultiTree,
+} from '../../../test-helpers/ccip/ccip'
 import { BigNumber } from '@ethersproject/bignumber'
 import { numToBytes32, publicAbi } from '../../../test-helpers/helpers'
-
-interface ExecutableMessage {
-  path: string[]
-  index: BigNumber
-  message: CCIPMessage
-}
-
-function encodeExecutableMessages(messages: ExecutableMessage[]): string {
-  return ethers.utils.defaultAbiCoder.encode(
-    [
-      'tuple(bytes32[] path, uint256 index, tuple(uint256 sourceChainId, uint64 sequenceNumber, address sender, tuple(address[] tokens, uint256[] amounts, uint256 destinationChainId, address receiver, address executor, bytes data, bytes options) payload) message)[] report',
-    ],
-    [messages],
-  )
-}
 
 const { deployContract } = hre.waffle
 
@@ -30,22 +20,22 @@ let RampArtifact: Artifact
 let ExecutorArtifact: Artifact
 
 let ramp: MockOffRamp
-let executor: MessageExecutorHelper
+let executor: OffRampExecutorHelper
 
 beforeEach(async () => {
   const users = await getUsers()
   roles = users.roles
 })
 
-describe('MessageExecutor', () => {
+describe('OffRampExecutor', () => {
   beforeEach(async () => {
     RampArtifact = await hre.artifacts.readArtifact('MockOffRamp')
-    ExecutorArtifact = await hre.artifacts.readArtifact('MessageExecutorHelper')
+    ExecutorArtifact = await hre.artifacts.readArtifact('OffRampExecutorHelper')
 
     ramp = <MockOffRamp>(
       await deployContract(roles.defaultAccount, RampArtifact, [])
     )
-    executor = <MessageExecutorHelper>(
+    executor = <OffRampExecutorHelper>(
       await deployContract(roles.defaultAccount, ExecutorArtifact, [
         ramp.address,
         false,
@@ -58,7 +48,7 @@ describe('MessageExecutor', () => {
       'getOffRamp',
       'setNeedFee',
       'getNeedFee',
-      // MessageExecutorHelper
+      // OffRampExecutorHelper
       'report',
       'withdrawAccumulatedFees',
       // OCR2Abstract
@@ -81,7 +71,7 @@ describe('MessageExecutor', () => {
     expect(await executor.getOffRamp()).to.equal(ramp.address)
   })
 
-  it('executes 2 messages in the same tx', async () => {
+  it('executes a payload of 2 messages', async () => {
     const message1: CCIPMessage = {
       sourceChainId: BigNumber.from(1),
       sequenceNumber: BigNumber.from(1),
@@ -93,7 +83,6 @@ describe('MessageExecutor', () => {
         tokens: [],
         amounts: [],
         executor: hre.ethers.constants.AddressZero,
-        options: numToBytes32(4),
       },
     }
     const message2: CCIPMessage = {
@@ -107,37 +96,16 @@ describe('MessageExecutor', () => {
         tokens: [],
         amounts: [],
         executor: hre.ethers.constants.AddressZero,
-        options: numToBytes32(8),
       },
     }
-    const path1 = [numToBytes32(9)]
-    const path2 = [numToBytes32(10)]
-    const index1 = BigNumber.from(0)
-    const index2 = BigNumber.from(1)
-
-    const em1: ExecutableMessage = {
-      path: path1,
-      index: index1,
-      message: message1,
-    }
-    const em2: ExecutableMessage = {
-      path: path2,
-      index: index2,
-      message: message2,
-    }
+    const tree = new MerkleMultiTree([message1, message2])
+    const execReport = tree.generateExecutionReport([0, 1])
     const tx = await executor
       .connect(roles.defaultAccount)
-      .report(encodeExecutableMessages([em1, em2]))
+      .report(encodeExecutionReport(execReport))
     const receipt = await tx.wait()
     const event1 = ramp.interface.parseLog(receipt.logs[0])
-    const event2 = ramp.interface.parseLog(receipt.logs[1])
 
-    expect(event1.args.path).to.deep.equal(path1)
-    expect(event1.args.index).to.equal(index1)
-    messageDeepEqual(event1.args.message, message1)
-
-    expect(event2.args.path).to.deep.equal(path2)
-    expect(event2.args.index).to.equal(index2)
-    messageDeepEqual(event2.args.message, message2)
+    executionReportDeepEqual(event1.args.report, execReport)
   })
 })

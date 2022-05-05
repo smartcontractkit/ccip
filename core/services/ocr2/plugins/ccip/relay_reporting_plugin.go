@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"math/big"
 	"sort"
+	"sync"
 	"time"
 
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
@@ -15,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/onramp"
 	"github.com/smartcontractkit/chainlink/core/logger"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
 )
 
 const RelayMaxInflightTimeSeconds = 180
@@ -22,8 +24,6 @@ const RelayMaxInflightTimeSeconds = 180
 var (
 	_ types.ReportingPluginFactory = &RelayReportingPluginFactory{}
 	_ types.ReportingPlugin        = &RelayReportingPlugin{}
-	// Set to false for tests using sim. Sim does not have real unix timestamps
-	AFNCheck = true
 )
 
 // EncodeRelayReport abi encodes an offramp.CCIPRelayReport.
@@ -42,7 +42,7 @@ func DecodeRelayReport(report types.Report) (*offramp.CCIPRelayReport, error) {
 		return nil, err
 	}
 	if len(unpacked) != 3 {
-		return nil, errors.New("invalid num fields in msgs")
+		return nil, errors.New("invalid num fields in report")
 	}
 	root, ok := unpacked[0].([32]byte)
 	if !ok {
@@ -142,11 +142,15 @@ func (rf *RelayReportingPluginFactory) NewReportingPlugin(config types.Reporting
 }
 
 type RelayReportingPlugin struct {
-	lggr         logger.Logger
-	F            int
-	source       *logpoller.LogPoller
-	onRamp       *onramp.OnRamp
-	offRamp      *offramp.OffRamp
+	lggr    logger.Logger
+	F       int
+	source  *logpoller.LogPoller
+	onRamp  *onramp.OnRamp
+	offRamp *offramp.OffRamp
+	// We need to synchronize access to the inflight structure
+	// as reporting plugin methods may be called from separate goroutines,
+	// e.g. reporting vs transmission protocol.
+	inFlightMu   sync.RWMutex
 	inFlight     map[[32]byte]InflightReport
 	configPoller *ConfigPoller
 }
@@ -163,6 +167,8 @@ func (r *RelayReportingPlugin) nextMinSeqNumForOffRamp() (uint64, error) {
 }
 
 func (r *RelayReportingPlugin) nextMinSeqNumForInFlight() uint64 {
+	r.inFlightMu.RLock()
+	defer r.inFlightMu.RUnlock()
 	max := uint64(0)
 	for _, report := range r.inFlight {
 		if report.report.MaxSequenceNumber > max {
@@ -208,7 +214,7 @@ func (r *RelayReportingPlugin) Observation(ctx context.Context, timestamp types.
 		return nil, err
 	}
 	// All available messages that have not been relayed yet and have sufficient confirmations.
-	reqs, err := r.source.LogsDataWordGreaterThan(CrossChainSendRequested, r.onRamp.Address(), 2, evmWord(minSeqNum), r.configPoller.sourceConfs())
+	reqs, err := r.source.LogsDataWordGreaterThan(CrossChainSendRequested, r.onRamp.Address(), 2, EvmWord(minSeqNum), r.configPoller.sourceConfs())
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +241,7 @@ func (r *RelayReportingPlugin) Observation(ctx context.Context, timestamp types.
 func (r *RelayReportingPlugin) buildReport(minSeqNum, maxSeqNum uint64) (*offramp.CCIPRelayReport, error) {
 	// Logs are guaranteed to be in order of seq num, since these are finalized logs only
 	// and the contract's seq num is auto-incrementing.
-	logs, err := r.source.LogsDataWordRange(CrossChainSendRequested, r.onRamp.Address(), 2, evmWord(minSeqNum), evmWord(maxSeqNum), r.configPoller.sourceConfs())
+	logs, err := r.source.LogsDataWordRange(CrossChainSendRequested, r.onRamp.Address(), 2, EvmWord(minSeqNum), EvmWord(maxSeqNum), r.configPoller.sourceConfs())
 	if err != nil {
 		return nil, err
 	}
@@ -247,12 +253,14 @@ func (r *RelayReportingPlugin) buildReport(minSeqNum, maxSeqNum uint64) (*offram
 		return nil, errors.New("unexpected gap in seq nums")
 	}
 	// Take all these request and produce a merkle root of them
-	var leaves [][]byte
+	mctx := merklemulti.NewKeccakCtx()
+	var leaves []merklemulti.Hash
 	for _, req := range reqs {
-		leaves = append(leaves, req.Raw.Data)
+		leaves = append(leaves, mctx.HashLeaf(req.Raw.Data))
 	}
-	// Note Index doesn't matter, we just want the root
-	root, _ := GenerateMerkleProof(32, leaves, 0)
+	tree := merklemulti.NewTree(mctx, leaves)
+	var root [32]byte
+	copy(root[:], tree.Root())
 	return &offramp.CCIPRelayReport{
 		MerkleRoot:        root,
 		MinSequenceNumber: reqs[0].Message.SequenceNumber,
@@ -307,6 +315,23 @@ func (r *RelayReportingPlugin) Report(ctx context.Context, timestamp types.Repor
 	return true, encodedReport, nil
 }
 
+func (r *RelayReportingPlugin) updateInflight(lggr logger.Logger, report *offramp.CCIPRelayReport) {
+	r.inFlightMu.Lock()
+	defer r.inFlightMu.Unlock()
+	// Reap any expired entries from inflight.
+	for root, inFlightReport := range r.inFlight {
+		if time.Since(inFlightReport.createdAt) > RelayMaxInflightTimeSeconds {
+			lggr.Warnw("Inflight report expired, retrying", "min", inFlightReport.report.MinSequenceNumber, "max", inFlightReport.report.MaxSequenceNumber)
+			delete(r.inFlight, root)
+		}
+	}
+	// Set new inflight ones as pending
+	r.inFlight[report.MerkleRoot] = InflightReport{
+		report:    report,
+		createdAt: time.Now(),
+	}
+}
+
 func (r *RelayReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context, timestamp types.ReportTimestamp, report types.Report) (bool, error) {
 	lggr := r.lggr.Named("ShouldAcceptFinalizedReport")
 	parsedReport, err := DecodeRelayReport(report)
@@ -318,18 +343,7 @@ func (r *RelayReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context, 
 	if r.isStaleReport(parsedReport) {
 		return false, nil
 	}
-	// Reap any expired entries from inflight.
-	for root, inFlightReport := range r.inFlight {
-		if time.Since(inFlightReport.createdAt) > RelayMaxInflightTimeSeconds {
-			lggr.Warnw("Inflight report expired, retrying", "min", inFlightReport.report.MinSequenceNumber, "max", inFlightReport.report.MaxSequenceNumber)
-			delete(r.inFlight, root)
-		}
-	}
-	// Set new inflight ones as pending
-	r.inFlight[parsedReport.MerkleRoot] = InflightReport{
-		report:    parsedReport,
-		createdAt: time.Now(),
-	}
+	r.updateInflight(lggr, parsedReport)
 	lggr.Infow("Accepting finalized report", "min", parsedReport.MinSequenceNumber, "max", parsedReport.MaxSequenceNumber)
 	return true, nil
 }
@@ -339,7 +353,7 @@ func (r *RelayReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context,
 	if err != nil {
 		return false, nil
 	}
-	// If msgs is not stale we transmit.
+	// If report is not stale we transmit.
 	// When the relayTransmitter enqueues the tx for bptxm,
 	// we mark it as fulfilled, effectively removing it from the set of inflight messages.
 	return !r.isStaleReport(parsedReport), nil
@@ -351,14 +365,14 @@ func (r *RelayReportingPlugin) isStaleReport(report *offramp.CCIPRelayReport) bo
 	}
 	nextMin, err := r.nextMinSeqNumForOffRamp()
 	if err != nil {
-		// Assume it's a transient issue getting the last msgs
+		// Assume it's a transient issue getting the last report
 		// Will try again on the next round
 		return true
 	}
 	// If the next min is already greater than this reports min,
-	// this msgs is stale.
+	// this report is stale.
 	if nextMin > report.MinSequenceNumber {
-		r.lggr.Warnw("msgs is stale", "onchain min", nextMin, "msgs min", report.MinSequenceNumber)
+		r.lggr.Warnw("report is stale", "onchain min", nextMin, "report min", report.MinSequenceNumber)
 		return true
 	}
 	return false

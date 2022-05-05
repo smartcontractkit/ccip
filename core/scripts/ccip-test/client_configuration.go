@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
-	"reflect"
 	"strconv"
 	"sync"
 	"testing"
@@ -24,9 +23,9 @@ import (
 	evmclient "github.com/smartcontractkit/chainlink/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/afn_contract"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/link_token_interface"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/message_executor"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/native_token_pool"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp_executor"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp_router"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/onramp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/onramp_router"
@@ -36,6 +35,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/logger"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
 	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
 )
 
@@ -102,7 +102,7 @@ type DestClient struct {
 	MessageReceiver *simple_message_receiver.SimpleMessageReceiver
 	ReceiverDapp    *receiver_dapp.ReceiverDapp
 	OffRampRouter   *offramp_router.OffRampRouter
-	MessageExecutor *message_executor.MessageExecutor
+	OffRampExecutor *offramp_executor.OffRampExecutor
 }
 
 func NewDestinationClient(t *testing.T, config EvmChainConfig) DestClient {
@@ -121,7 +121,7 @@ func NewDestinationClient(t *testing.T, config EvmChainConfig) DestClient {
 	require.NoError(t, err)
 	offRamp, err := offramp.NewOffRamp(config.OffRamp, client)
 	require.NoError(t, err)
-	messageExecutor, err := message_executor.NewMessageExecutor(config.MessageExecutor, client)
+	offRampExecutor, err := offramp_executor.NewOffRampExecutor(config.OffRampExecutor, client)
 	require.NoError(t, err)
 	messageReceiver, err := simple_message_receiver.NewSimpleMessageReceiver(config.MessageReceiver, client)
 	require.NoError(t, err)
@@ -145,7 +145,7 @@ func NewDestinationClient(t *testing.T, config EvmChainConfig) DestClient {
 		OffRampRouter:   offRampRouter,
 		MessageReceiver: messageReceiver,
 		ReceiverDapp:    receiverDapp,
-		MessageExecutor: messageExecutor,
+		OffRampExecutor: offRampExecutor,
 	}
 }
 
@@ -273,7 +273,6 @@ func (client CCIPClient) SendMessage(t *testing.T) {
 		DestinationChainId: client.Dest.ChainId,
 		Tokens:             []common.Address{client.Source.LinkTokenAddress},
 		Amounts:            []*big.Int{big.NewInt(1)},
-		Options:            []byte{},
 		Executor:           common.Address{},
 	}
 
@@ -287,7 +286,7 @@ func (client CCIPClient) DonExecutionHappyPath(t *testing.T) {
 	amount := big.NewInt(100)
 	client.Source.ApproveLink(t, client.Source.OnRamp.Address(), amount)
 	DestBlockNum := GetCurrentBlockNumber(client.Dest.Client.Client)
-	crossChainRequest := client.SendToOnrampWithExecution(client.Source, client.Source.Owner, client.Dest.Owner.From, amount, client.Dest.MessageExecutor.Address())
+	crossChainRequest := client.SendToOnrampWithExecution(client.Source, client.Source.Owner, client.Dest.Owner.From, amount, client.Dest.OffRampExecutor.Address())
 	client.Source.logger.Infof("Don executed tx submitted with sequence number: %d", crossChainRequest.Message.SequenceNumber)
 	client.Source.logger.Infof("Waiting for Destination funds transfer...")
 
@@ -349,7 +348,7 @@ func (client CCIPClient) CrossChainSendPausedOnrampShouldFail(t *testing.T) {
 	amount := big.NewInt(100)
 	client.Source.ApproveLink(t, client.Source.SenderDapp.Address(), amount)
 	client.Source.Owner.GasLimit = 1e6
-	tx, err := client.Source.SenderDapp.SendTokens(client.Source.Owner, client.Dest.Owner.From, []common.Address{client.Source.LinkTokenAddress}, []*big.Int{amount}, client.Dest.MessageExecutor.Address())
+	tx, err := client.Source.SenderDapp.SendTokens(client.Source.Owner, client.Dest.Owner.From, []common.Address{client.Source.LinkTokenAddress}, []*big.Int{amount}, client.Dest.OffRampExecutor.Address())
 	require.NoError(t, err)
 	WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), false)
 }
@@ -376,7 +375,7 @@ func (client CCIPClient) NotEnoughFundsInBucketShouldFail(t *testing.T) {
 	amount := big.NewInt(2e18) // 2 LINK, bucket size is 1 LINK
 	client.Source.ApproveLink(t, client.Source.SenderDapp.Address(), amount)
 	client.Source.Owner.GasLimit = 1e6
-	tx, err := client.Source.SenderDapp.SendTokens(client.Source.Owner, client.Dest.Owner.From, []common.Address{client.Source.LinkTokenAddress}, []*big.Int{amount}, client.Dest.MessageExecutor.Address())
+	tx, err := client.Source.SenderDapp.SendTokens(client.Source.Owner, client.Dest.Owner.From, []common.Address{client.Source.LinkTokenAddress}, []*big.Int{amount}, client.Dest.OffRampExecutor.Address())
 	require.NoError(t, err)
 	WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), false)
 }
@@ -429,7 +428,7 @@ func (client CCIPClient) ScalingAndBatching(t *testing.T) {
 		go func(user *bind.TransactOpts) {
 			defer wg.Done()
 			client.Source.ApproveLinkFrom(t, user, client.Source.SenderDapp.Address(), amount)
-			crossChainRequest := client.SendToDappWithExecution(client.Source, user, toAddress, amount, client.Dest.MessageExecutor.Address())
+			crossChainRequest := client.SendToDappWithExecution(client.Source, user, toAddress, amount, client.Dest.OffRampExecutor.Address())
 			client.Source.logger.Info("Don executed tx submitted with sequence number: ", crossChainRequest.Message.SequenceNumber)
 		}(user)
 	}
@@ -437,7 +436,7 @@ func (client CCIPClient) ScalingAndBatching(t *testing.T) {
 	client.Source.logger.Info("Sent 10 txs to onramp.")
 }
 
-func (client CCIPClient) ExecuteOfframpTransaction(t *testing.T, proof ccip.MerkleProof, encodedMessage []byte) (*types.Transaction, error) {
+func (client CCIPClient) ExecuteOfframpTransaction(t *testing.T, proof merklemulti.Proof, encodedMessage []byte) (*types.Transaction, error) {
 	decodedMsg, err := ccip.DecodeCCIPMessage(encodedMessage)
 	require.NoError(t, err)
 	_, err = ccip.MakeCCIPMsgArgs().PackValues([]interface{}{*decodedMsg})
@@ -445,10 +444,15 @@ func (client CCIPClient) ExecuteOfframpTransaction(t *testing.T, proof ccip.Merk
 
 	client.Dest.logger.Infof("Cross chain message %+v", decodedMsg)
 
-	tx, err := client.Dest.OffRamp.ExecuteTransaction(client.Dest.Owner, *decodedMsg, offramp.CCIPMerkleProof{
-		Path:  proof.PathForExecute(),
-		Index: proof.Index(),
-	}, false)
+	solidityProofs, err := ccip.ProofsToSolidity(proof.Hashes)
+	require.NoError(t, err)
+	report := offramp.CCIPExecutionReport{
+		Messages:       []offramp.CCIPMessage{*decodedMsg},
+		Proofs:         solidityProofs,
+		ProofFlagsBits: ccip.ProofFlagsToBits(proof.SourceFlags),
+	}
+
+	tx, err := client.Dest.OffRamp.ExecuteTransaction(client.Dest.Owner, report, false)
 	if err != nil {
 		reason, err2 := evmclient.ExtractRevertReasonFromRPCError(err)
 		require.NoError(t, err2)
@@ -559,32 +563,30 @@ func (client CCIPClient) ValidateMerkleRoot(
 	request *onramp.OnRampCrossChainSendRequested,
 	reportRequests []*onramp.OnRampCrossChainSendRequested,
 	report offramp.CCIPRelayReport,
-) ccip.MerkleProof {
-	var leaves [][]byte
+) merklemulti.Proof {
+	mctx := merklemulti.NewKeccakCtx()
+	var leafHashes []merklemulti.Hash
 	for _, req := range reportRequests {
-		leaves = append(leaves, req.Raw.Data)
+		leafHashes = append(leafHashes, mctx.HashLeaf(req.Raw.Data))
 	}
 
-	index := request.Message.SequenceNumber - report.MinSequenceNumber
-	client.Dest.logger.Info("index is ", index)
-	root, proof := ccip.GenerateMerkleProof(32, leaves, int(index))
-	if !bytes.Equal(root[:], report.MerkleRoot[:]) {
+	tree := merklemulti.NewTree(mctx, leafHashes)
+	if !bytes.Equal(tree.Root()[:], report.MerkleRoot[:]) {
 		t.Log("Merkle root does not match the root in the report")
-		t.Logf("Computed %+v, reported %+v", root[:], report.MerkleRoot[:])
+		t.Logf("Computed %+v, reported %+v", tree.Root()[:], report.MerkleRoot[:])
 		t.FailNow()
 	}
 
-	genRoot := ccip.GenerateMerkleRoot(leaves[index], proof)
-	if !reflect.DeepEqual(root[:], genRoot[:]) {
-		panic("Root does not verify")
-	}
-
+	var root [32]byte
+	copy(root[:], tree.Root())
 	exists, err := client.Dest.OffRamp.GetMerkleRoot(nil, root)
 	require.NoError(t, err)
 	if exists.Uint64() < 1 {
 		panic("Path is not present in the offramp")
 	}
-	return proof
+	index := request.Message.SequenceNumber - report.MinSequenceNumber
+	client.Dest.logger.Info("index is ", index)
+	return tree.Prove([]int{int(index)})
 }
 
 func (client CCIPClient) TryGetTokensFromPausedPool() {
@@ -624,7 +626,6 @@ func (client CCIPClient) SendToOnrampWithExecution(source SourceClient, from *bi
 		Receiver:           toAddress,
 		Executor:           executor,
 		Data:               []byte{},
-		Options:            []byte{},
 	}
 	tx, err := source.OnRampRouter.RequestCrossChainSend(from, payload)
 	helpers.PanicErr(err)
@@ -820,7 +821,7 @@ func (client CCIPClient) SetConfig() {
 	WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 	client.Dest.logger.Infof("Config set on offramp %s", helpers.ExplorerLink(client.Dest.ChainId.Int64(), tx.Hash()))
 
-	tx, err = client.Dest.MessageExecutor.SetConfig(
+	tx, err = client.Dest.OffRampExecutor.SetConfig(
 		client.Dest.Owner,
 		signerAddresses,
 		transmitterAddresses,

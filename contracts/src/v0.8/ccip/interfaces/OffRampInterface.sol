@@ -9,7 +9,7 @@ import "../utils/CCIP.sol";
 interface OffRampInterface {
   error RelayReportError();
   error SequenceError(uint64 lastMaxSequenceNumber, uint64 newMinSequenceNumber);
-  error MerkleProofError(CCIP.MerkleProof proof, CCIP.Message message);
+  error MerkleProofError(bytes32 root);
   error TokenMismatch();
   error UnsupportedNumberOfTokens();
   error UnsupportedToken(IERC20 token);
@@ -43,13 +43,8 @@ interface OffRampInterface {
 
   /**
    * @notice Execute the delivery of a message by using its merkle proof
-   * @param proof Merkle proof
-   * @param message Original message object
+   * @param report ExecutionReport
    * @param needFee Whether or not the executor requires a fee
    */
-  function executeTransaction(
-    CCIP.Message memory message,
-    CCIP.MerkleProof memory proof,
-    bool needFee
-  ) external;
+  function executeTransaction(CCIP.ExecutionReport memory report, bool needFee) external;
 }

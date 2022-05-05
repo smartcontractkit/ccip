@@ -313,7 +313,7 @@ export async function reset() {
 export function expectGasWithinDeviation(
   gasUsed: BigNumber,
   expectedGas: BigNumberish,
-  deviation: BigNumberish = 50,
+  deviation: BigNumberish = 100,
 ) {
   const expected: BigNumber = BigNumber.from(expectedGas)
   expect(gasUsed).is.gt(expected.sub(deviation)).and.lt(expected.add(deviation))

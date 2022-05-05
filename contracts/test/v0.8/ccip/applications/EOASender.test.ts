@@ -74,7 +74,6 @@ describe('SenderDapp', () => {
     let destinationAddress: string
     let data: string
     let amount: BigNumber
-    let options: string
 
     beforeEach(async () => {
       senderAddress = await roles.defaultAccount.getAddress()
@@ -84,7 +83,6 @@ describe('SenderDapp', () => {
         [senderAddress, destinationAddress],
       )
       amount = BigNumber.from('1000000000000000000')
-      options = '0x'
     })
 
     it('should send a request to the onRamp', async () => {
@@ -93,7 +91,6 @@ describe('SenderDapp', () => {
         data,
         [token.address],
         [amount],
-        options,
       ]
 
       await token.approve(senderContract.address, amount)

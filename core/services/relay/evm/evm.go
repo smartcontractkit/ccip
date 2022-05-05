@@ -104,12 +104,16 @@ func (r *Relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}) (types
 	}
 	transmitterAddress := common.HexToAddress(spec.TransmitterID.String)
 	strategy := txm.NewQueueingTxStrategy(externalJobID, chain.Config().OCRDefaultTransactionQueueDepth())
+	var checker txm.TransmitCheckerSpec
+	if chain.Config().OCRSimulateTransactions() {
+		checker.CheckerType = txm.TransmitCheckerTypeSimulate
+	}
 
 	contractTransmitter := NewOCRContractTransmitter(
 		contractAddress,
 		chain.Client(),
 		contractABI,
-		ocrcommon.NewTransmitter(chain.TxManager(), transmitterAddress, chain.Config().EvmGasLimitDefault(), strategy, txm.TransmitCheckerSpec{}),
+		ocrcommon.NewTransmitter(chain.TxManager(), transmitterAddress, chain.Config().EvmGasLimitDefault(), strategy, checker),
 		r.lggr,
 	)
 

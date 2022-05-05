@@ -1,4 +1,4 @@
-package ccip
+package merkle
 
 import (
 	"math/big"
@@ -6,27 +6,27 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-type MerkleProof struct {
+type Proof struct {
 	index int
 	path  [][32]byte
 }
 
-func NewMerkleProof(index int, path [][32]byte) MerkleProof {
-	return MerkleProof{
+func NewProof(index int, path [][32]byte) Proof {
+	return Proof{
 		index: index,
 		path:  path,
 	}
 }
 
-func (mp MerkleProof) PathForExecute() [][32]byte {
+func (mp Proof) PathForExecute() [][32]byte {
 	return mp.path
 }
 
-func (mp MerkleProof) Index() *big.Int {
+func (mp Proof) Index() *big.Int {
 	return big.NewInt(int64(mp.index))
 }
 
-func GenerateMerkleProof(treeHeight int, leaves [][]byte, index int) ([32]byte, MerkleProof) {
+func GenerateProof(treeHeight int, leaves [][]byte, index int) ([32]byte, Proof) {
 	zhs := ComputeZeroHashes(treeHeight)
 	var level [][32]byte
 	for _, leaf := range leaves {
@@ -63,10 +63,10 @@ func GenerateMerkleProof(treeHeight int, leaves [][]byte, index int) ([32]byte, 
 	if len(level) != 1 {
 		panic("invalid")
 	}
-	return level[0], MerkleProof{path: path, index: index}
+	return level[0], Proof{path: path, index: index}
 }
 
-func GenerateMerkleRoot(leaf []byte, proof MerkleProof) [32]byte {
+func GenerateRoot(leaf []byte, proof Proof) [32]byte {
 	// Make a deep copy of the path
 	var path [][32]byte
 	for _, p := range proof.path {

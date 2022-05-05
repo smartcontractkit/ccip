@@ -1,7 +1,6 @@
 package ccip_test
 
 import (
-	"bytes"
 	"context"
 	"math/big"
 	"testing"
@@ -17,14 +16,15 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/afn_contract"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/message_executor_helper"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/mock_v3_aggregator_contract"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/native_token_pool"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp_executor_helper"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp_helper"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp_router"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/simple_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
 )
 
 func TestExecutionReportEncoding(t *testing.T) {
@@ -109,39 +109,48 @@ func TestExecutionReportEncoding(t *testing.T) {
 	require.NoError(t, err)
 	destChain.Commit()
 
-	message := ccip.Message{
-		SequenceNumber: 10,
-		SourceChainId:  sourceChainID,
-		Sender:         destUser.From,
-		Payload: struct {
-			Tokens             []common.Address `json:"tokens"`
-			Amounts            []*big.Int       `json:"amounts"`
-			DestinationChainId *big.Int         `json:"destinationChainId"`
-			Receiver           common.Address   `json:"receiver"`
-			Executor           common.Address   `json:"executor"`
-			Data               []uint8          `json:"data"`
-			Options            []uint8          `json:"options"`
-		}{
-			Tokens:             []common.Address{destLinkTokenAddress},
-			Amounts:            []*big.Int{big.NewInt(100)},
-			DestinationChainId: destChainID,
-			Receiver:           receiverAddress,
-			Data:               []byte("hello"),
-			Options:            []byte{},
-		},
+	mctx := merklemulti.NewKeccakCtx()
+	var leafHashes []merklemulti.Hash
+	var msgs []ccip.Message
+	for i := 0; i < 3; i++ {
+		message := ccip.Message{
+			SequenceNumber: 10 + uint64(i),
+			SourceChainId:  sourceChainID,
+			Sender:         destUser.From,
+			Payload: struct {
+				Tokens             []common.Address `json:"tokens"`
+				Amounts            []*big.Int       `json:"amounts"`
+				DestinationChainId *big.Int         `json:"destinationChainId"`
+				Receiver           common.Address   `json:"receiver"`
+				Executor           common.Address   `json:"executor"`
+				Data               []uint8          `json:"data"`
+			}{
+				Tokens:             []common.Address{destLinkTokenAddress},
+				Amounts:            []*big.Int{big.NewInt(100)},
+				DestinationChainId: destChainID,
+				Receiver:           receiverAddress,
+				Data:               []byte("hello"),
+			},
+		}
+		msgs = append(msgs, message)
+		msgBytes, err := ccip.MakeCCIPMsgArgs().PackValues([]interface{}{message})
+		require.NoError(t, err)
+		leafHashes = append(leafHashes, mctx.HashLeaf(msgBytes))
 	}
-	msgBytes, err := ccip.MakeCCIPMsgArgs().PackValues([]interface{}{message})
+	tree := merklemulti.NewTree(mctx, leafHashes)
 	require.NoError(t, err)
-	r, proof := ccip.GenerateMerkleProof(2, [][]byte{msgBytes}, 0)
+	proof := tree.Prove([]int{0, 1, 2})
+
+	rootLocal, err := merklemulti.VerifyComputeRoot(mctx, leafHashes, proof)
+	require.NoError(t, err)
 	var root [32]byte
-	copy(root[:], r[:])
-	rootLocal := ccip.GenerateMerkleRoot(msgBytes, proof)
-	require.True(t, bytes.Equal(rootLocal[:], r[:]))
+	copy(root[:], tree.Root()[:])
+	require.Equal(t, []byte(rootLocal[:]), root[:])
 
 	report := offramp.CCIPRelayReport{
 		MerkleRoot:        root,
 		MinSequenceNumber: 10,
-		MaxSequenceNumber: 10,
+		MaxSequenceNumber: 12,
 	}
 	encodeRelayReport, err := ccip.EncodeRelayReport(&report)
 	require.NoError(t, err)
@@ -150,55 +159,58 @@ func TestExecutionReportEncoding(t *testing.T) {
 	require.Equal(t, &report, decodeRelayReport)
 
 	// RelayReport that Message
-	tx, err := offRamp.Report(destUser, encodeRelayReport)
+	_, err = offRamp.Report(destUser, encodeRelayReport)
 	require.NoError(t, err)
 	destChain.Commit()
 
 	// Now execute that Message via the executor
 	t.Log(offRampAddress)
-	executorAddress, _, _, err := message_executor_helper.DeployMessageExecutorHelper(
+	executorAddress, _, _, err := offramp_executor_helper.DeployOffRampExecutorHelper(
 		destUser,
 		destChain,
 		offRampAddress,
 		false)
 	require.NoError(t, err)
-	executor, err := message_executor_helper.NewMessageExecutorHelper(executorAddress, destChain)
+	executor, err := offramp_executor_helper.NewOffRampExecutorHelper(executorAddress, destChain)
 	require.NoError(t, err)
 	destChain.Commit()
 
-	executorReport, err := ccip.EncodeExecutionReport([]ccip.ExecutableMessage{{
-		Path:    proof.PathForExecute(),
-		Index:   proof.Index(),
-		Message: message,
-	},
-	})
+	executorReport, err := ccip.EncodeExecutionReport(
+		msgs,
+		proof.Hashes,
+		proof.SourceFlags,
+	)
 	require.NoError(t, err)
-	ems, err := ccip.DecodeExecutionReport(executorReport)
+	er, err := ccip.DecodeExecutionReport(executorReport)
 	require.NoError(t, err)
-	t.Log(ems)
 
-	helperMessage := offramp_helper.CCIPMessage{
-		SequenceNumber: message.SequenceNumber,
-		SourceChainId:  message.SourceChainId,
-		Sender:         message.Sender,
-		Payload: offramp_helper.CCIPMessagePayload{
-			Tokens:             message.Payload.Tokens,
-			Amounts:            message.Payload.Amounts,
-			DestinationChainId: message.Payload.DestinationChainId,
-			Receiver:           message.Payload.Receiver,
-			Executor:           message.Payload.Executor,
-			Data:               message.Payload.Data,
-			Options:            message.Payload.Options,
-		},
+	var helperMsgs []offramp_helper.CCIPMessage
+	for _, message := range msgs {
+		helperMsgs = append(helperMsgs, offramp_helper.CCIPMessage{
+			SequenceNumber: message.SequenceNumber,
+			SourceChainId:  message.SourceChainId,
+			Sender:         message.Sender,
+			Payload: offramp_helper.CCIPMessagePayload{
+				Tokens:             message.Payload.Tokens,
+				Amounts:            message.Payload.Amounts,
+				DestinationChainId: message.Payload.DestinationChainId,
+				Receiver:           message.Payload.Receiver,
+				Executor:           message.Payload.Executor,
+				Data:               message.Payload.Data,
+			},
+		})
 	}
 
-	generatedRoot, err := offRamp.MerkleRoot(nil, helperMessage, offramp_helper.CCIPMerkleProof{
-		Path:  proof.PathForExecute(),
-		Index: proof.Index(),
-	})
+	executionReport := offramp_helper.CCIPExecutionReport{
+		Messages:       helperMsgs,
+		Proofs:         er.Proofs,
+		ProofFlagsBits: er.ProofFlagBits,
+	}
+
+	generatedRoot, err := offRamp.MerkleRoot(nil, executionReport)
 	require.NoError(t, err)
 	require.Equal(t, root, generatedRoot)
-	tx, err = executor.Report(destUser, executorReport)
+	tx, err := executor.Report(destUser, executorReport)
 	require.NoError(t, err)
 	destChain.Commit()
 	res, err := destChain.TransactionReceipt(context.Background(), tx.Hash())
@@ -207,45 +219,39 @@ func TestExecutionReportEncoding(t *testing.T) {
 }
 
 func TestExecutionReportInvariance(t *testing.T) {
-	message := ccip.ExecutableMessage{
-		Path: [][32]byte{{}},
-		Message: ccip.Message{
-			SequenceNumber: 2e18,
-			SourceChainId:  big.NewInt(9999999999999999),
-			Sender:         common.HexToAddress("0xf97f4df75117a78c1A5a0DBb814Af92458539FB2"),
-			Payload: struct {
-				Tokens             []common.Address `json:"tokens"`
-				Amounts            []*big.Int       `json:"amounts"`
-				DestinationChainId *big.Int         `json:"destinationChainId"`
-				Receiver           common.Address   `json:"receiver"`
-				Executor           common.Address   `json:"executor"`
-				Data               []uint8          `json:"data"`
-				Options            []uint8          `json:"options"`
-			}{
-				[]common.Address{common.HexToAddress("0xf97f4df75117a78c1A5a0DBb814Af92458539FB3")},
-				// 1e18 * 2e9 to test values larger than int64
-				[]*big.Int{big.NewInt(1e18), new(big.Int).Mul(big.NewInt(1e18), big.NewInt(2e9))},
-				big.NewInt(11110),
-				common.HexToAddress("0xf97f4df75117a78c1A5a0DBb814Af92458539FB4"),
-				common.HexToAddress("0xf97f4df75117a78c1A5a0DBb814Af92458539FB5"),
-				[]uint8{23, 255, 0, 1},
-				[]uint8{1, 18, 255, 0},
-			},
+	message := ccip.Message{
+		SequenceNumber: 2e18,
+		SourceChainId:  big.NewInt(9999999999999999),
+		Sender:         common.HexToAddress("0xf97f4df75117a78c1A5a0DBb814Af92458539FB2"),
+		Payload: struct {
+			Tokens             []common.Address `json:"tokens"`
+			Amounts            []*big.Int       `json:"amounts"`
+			DestinationChainId *big.Int         `json:"destinationChainId"`
+			Receiver           common.Address   `json:"receiver"`
+			Executor           common.Address   `json:"executor"`
+			Data               []uint8          `json:"data"`
+		}{
+			[]common.Address{common.HexToAddress("0xf97f4df75117a78c1A5a0DBb814Af92458539FB3")},
+			// 1e18 * 2e9 to test values larger than int64
+			[]*big.Int{big.NewInt(1e18), new(big.Int).Mul(big.NewInt(1e18), big.NewInt(2e9))},
+			big.NewInt(11110),
+			common.HexToAddress("0xf97f4df75117a78c1A5a0DBb814Af92458539FB4"),
+			common.HexToAddress("0xf97f4df75117a78c1A5a0DBb814Af92458539FB5"),
+			[]uint8{23, 255, 0, 1},
 		},
-		Index: big.NewInt(200),
 	}
-
-	report, err := ccip.EncodeExecutionReport([]ccip.ExecutableMessage{message, message, message})
+	var h [32]byte
+	report, err := ccip.EncodeExecutionReport([]ccip.Message{message, message, message}, []merklemulti.Hash{h[:]}, []bool{true})
 	require.NoError(t, err)
-	executableMessages, err := ccip.DecodeExecutionReport(report)
+	er, err := ccip.DecodeExecutionReport(report)
 	require.NoError(t, err)
-	require.Len(t, executableMessages, 3)
-	require.Equal(t, message, executableMessages[0])
-	require.Equal(t, message, executableMessages[2])
+	require.Len(t, er.Messages, 3)
+	require.Equal(t, message, er.Messages[0])
+	require.Equal(t, message, er.Messages[2])
 }
 
 func TestDecodeEmptyExecutionReport(t *testing.T) {
-	executorReport, err := ccip.EncodeExecutionReport([]ccip.ExecutableMessage{})
+	executorReport, err := ccip.EncodeExecutionReport([]ccip.Message{}, []merklemulti.Hash{}, []bool{})
 	require.NoError(t, err)
 	_, err = ccip.DecodeExecutionReport(executorReport)
 	require.Error(t, err)

@@ -70,8 +70,8 @@ package gethwrappers
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.13/SimpleMessageReceiver.abi ../../../contracts/solc/v0.8.13/SimpleMessageReceiver.bin SimpleMessageReceiver simple_message_receiver
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.13/ReceiverDapp.abi ../../../contracts/solc/v0.8.13/ReceiverDapp.bin ReceiverDapp receiver_dapp
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.13/SenderDapp.abi ../../../contracts/solc/v0.8.13/SenderDapp.bin SenderDapp sender_dapp
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.13/MessageExecutor.abi ../../../contracts/solc/v0.8.13/MessageExecutor.bin MessageExecutor message_executor
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.13/MessageExecutorHelper.abi ../../../contracts/solc/v0.8.13/MessageExecutorHelper.bin MessageExecutorHelper message_executor_helper
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.13/OffRampExecutor.abi ../../../contracts/solc/v0.8.13/OffRampExecutor.bin OffRampExecutor offramp_executor
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.13/OffRampExecutorHelper.abi ../../../contracts/solc/v0.8.13/OffRampExecutorHelper.bin OffRampExecutorHelper offramp_executor_helper
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.13/AFN.abi ../../../contracts/solc/v0.8.13/AFN.bin AFNContract afn_contract
 
 // To run these commands, you must either install docker, or the correct version

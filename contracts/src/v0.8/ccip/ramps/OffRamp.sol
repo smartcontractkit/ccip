@@ -105,103 +105,127 @@ contract OffRamp is
 
   /**
    * @notice Execute the delivery of a message by using its merkle proof
-   * @param proof Merkle proof
-   * @param message Original message object
+   * @param report Execution report containing multi proofs
    * @param needFee Whether or not the executor requires a fee
    * @dev Can be called by anyone
    * @dev If the caller wishes to collect fees from the execution, needFee should be true.
    * This will send fee tokens directly to the executor address (msg.sender)
    */
-  function executeTransaction(
-    CCIP.Message memory message,
-    CCIP.MerkleProof memory proof,
-    bool needFee
-  ) external override whenNotPaused whenHealthy {
+  function executeTransaction(CCIP.ExecutionReport memory report, bool needFee)
+    external
+    override
+    whenNotPaused
+    whenHealthy
+  {
     if (address(s_router) == address(0)) revert RouterNotSet();
     // Get root from path
-    bytes32 root = merkleRoot(message, proof);
+    bytes32 root = merkleRoot(report);
 
     // Check that root has been relayed
     uint256 reportTimestamp = s_merkleRoots[root];
-    if (reportTimestamp == 0) revert MerkleProofError(proof, message);
+    if (reportTimestamp == 0) revert MerkleProofError(root);
 
     // Execution delay
     if (reportTimestamp + uint256(s_config.executionDelaySeconds) >= block.timestamp) revert ExecutionDelayError();
 
-    // Disallow double-execution.
-    if (s_executed[message.sequenceNumber]) revert AlreadyExecuted(message.sequenceNumber);
+    for (uint256 i = 0; i < report.messages.length; i++) {
+      CCIP.Message memory message = report.messages[i];
 
-    // The transaction can only be executed by the designated executor, if one exists.
-    if (message.payload.executor != address(0) && message.payload.executor != msg.sender)
-      revert InvalidExecutor(message.sequenceNumber);
+      // Disallow double-execution.
+      if (s_executed[message.sequenceNumber]) revert AlreadyExecuted(message.sequenceNumber);
 
-    // Validity checks for the message.
-    _isWellFormed(message);
+      // The transaction can only be executed by the designated executor, if one exists.
+      if (message.payload.executor != address(0) && message.payload.executor != msg.sender)
+        revert InvalidExecutor(message.sequenceNumber);
 
-    // Avoid shooting ourselves in the foot by disallowing calls to some
-    // privileged OffRamp function as OffRamp.
-    // In the wild: https://rekt.news/polynetwork-rekt/
-    _validateReceiver(message);
+      // Validity checks for the message.
+      _isWellFormed(message);
 
-    // Mark as executed before external calls
-    s_executed[message.sequenceNumber] = true;
+      // Avoid shooting ourselves in the foot by disallowing calls to some
+      // privileged OffRamp function as OffRamp.
+      // In the wild: https://rekt.news/polynetwork-rekt/
+      _validateReceiver(message);
 
-    if (needFee) {
-      uint256 fee = 0;
-      IERC20 feeToken = message.payload.tokens[0];
-      AggregatorV2V3Interface feed = getFeed(feeToken);
-      if (address(feed) == address(0)) revert FeeError();
-      fee = uint256(s_config.executionFeeJuels) * uint256(feed.latestAnswer());
-      if (fee > 0) {
-        message.payload.amounts[0] -= fee;
-        _getPool(feeToken).releaseOrMint(msg.sender, fee);
+      // Mark as executed before external calls
+      s_executed[message.sequenceNumber] = true;
+
+      if (needFee) {
+        uint256 fee = 0;
+        IERC20 feeToken = message.payload.tokens[0];
+        AggregatorV2V3Interface feed = getFeed(feeToken);
+        if (address(feed) == address(0)) revert FeeError();
+        fee = uint256(s_config.executionFeeJuels) * uint256(feed.latestAnswer());
+        if (fee > 0) {
+          message.payload.amounts[0] -= fee;
+          _getPool(feeToken).releaseOrMint(msg.sender, fee);
+        }
       }
-    }
 
-    for (uint256 i = 0; i < message.payload.tokens.length; i++) {
-      // Release tokens to receiver
-      _getPool(message.payload.tokens[i]).releaseOrMint(message.payload.receiver, message.payload.amounts[i]);
-    }
+      for (uint256 j = 0; j < message.payload.tokens.length; j++) {
+        // Release tokens to receiver
+        _getPool(message.payload.tokens[j]).releaseOrMint(message.payload.receiver, message.payload.amounts[j]);
+      }
 
-    // Try send the message, revert if fails
-    if (message.payload.receiver.isContract()) {
-      try s_router.routeMessage(CrossChainMessageReceiverInterface(message.payload.receiver), message) {} catch (
-        bytes memory reason
-      ) {
-        // TODO: Figure out a better way to handle failed executions
-        revert ExecutionError(message.sequenceNumber, reason);
+      // Try send the message, revert if fails
+      if (message.payload.receiver.isContract()) {
+        try s_router.routeMessage(CrossChainMessageReceiverInterface(message.payload.receiver), message) {} catch (
+          bytes memory reason
+        ) {
+          // TODO: Figure out a better way to handle failed executions
+          revert ExecutionError(message.sequenceNumber, reason);
+        }
+      } else {
+        if (message.payload.data.length > 0) {
+          revert UnexpectedPayloadData(message.sequenceNumber);
+        }
       }
-    } else {
-      if (message.payload.data.length > 0) {
-        revert UnexpectedPayloadData(message.sequenceNumber);
-      }
+      emit CrossChainMessageExecuted(message.sequenceNumber);
+      // TODO: gas based fee calculation
     }
-    emit CrossChainMessageExecuted(message.sequenceNumber);
-    // TODO: gas based fee calculation
   }
 
   /**
-   * @notice Generate a Merkle Root from Proof.
-   * @param message Original Message
-   * @param proof Merkle proof in the order bottom to top of the tree
-   * @return bytes32 root generated by proof
+   * @notice Generate a Merkle Root from an ExecutionReport
+   * @param report ExecutionReport
    */
-  function merkleRoot(CCIP.Message memory message, CCIP.MerkleProof memory proof) public pure returns (bytes32) {
+  function merkleRoot(CCIP.ExecutionReport memory report) public pure returns (bytes32) {
+    uint256 leavesLen = report.messages.length;
+    uint256 totalHashes = leavesLen + report.proofs.length - 1;
+    require(totalHashes <= 256);
+    unchecked {
+      bytes32[] memory hashes = new bytes32[](totalHashes);
+      uint256 leafPos = 0;
+      uint256 hashPos = 0;
+      uint256 proofPos = 0;
+      for (uint256 i = 0; i < totalHashes; ++i) {
+        bool proofFlag = ((report.proofFlagsBits >> i) & uint256(1)) == 1;
+        hashes[i] = hashPair(
+          proofFlag
+            ? (leafPos < leavesLen ? _hashLeafNode(report.messages[leafPos++]) : hashes[hashPos++])
+            : report.proofs[proofPos++],
+          leafPos < leavesLen ? _hashLeafNode(report.messages[leafPos++]) : hashes[hashPos++]
+        );
+      }
+
+      if (totalHashes > 0) {
+        return hashes[totalHashes - 1];
+      }
+      return _hashLeafNode(report.messages[0]);
+    }
+  }
+
+  function hashPair(bytes32 a, bytes32 b) private pure returns (bytes32) {
+    return a < b ? _hashInternalNode(a, b) : _hashInternalNode(b, a);
+  }
+
+  function _hashLeafNode(CCIP.Message memory message) private pure returns (bytes32) {
     // The hash offchain is keccak256(LEAF_DOMAIN_SEPARATOR || CrossChainSendRequested event data),
     // where the CrossChainSendRequested event data is abi.encode(CCIP.Message).
-    bytes32 hash = keccak256(abi.encodePacked(LEAF_DOMAIN_SEPARATOR, abi.encode(message)));
+    return keccak256(abi.encodePacked(LEAF_DOMAIN_SEPARATOR, abi.encode(message)));
+  }
 
-    for (uint256 i = 0; i < proof.path.length; i++) {
-      bytes32 pathElement = proof.path[i];
-
-      if (proof.index % 2 == 0) {
-        hash = keccak256(abi.encodePacked(INTERNAL_DOMAIN_SEPARATOR, hash, pathElement));
-      } else {
-        hash = keccak256(abi.encodePacked(INTERNAL_DOMAIN_SEPARATOR, pathElement, hash));
-      }
-      proof.index = proof.index / 2;
-    }
-    return hash;
+  function _hashInternalNode(bytes32 left, bytes32 right) private pure returns (bytes32 hash) {
+    return keccak256(abi.encodePacked(INTERNAL_DOMAIN_SEPARATOR, left, right));
   }
 
   function _getPool(IERC20 token) private view returns (PoolInterface pool) {
