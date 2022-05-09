@@ -2,7 +2,6 @@ package ccip
 
 import (
 	"context"
-	"encoding/json"
 	"math/big"
 	"sort"
 	"sync"
@@ -19,7 +18,10 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
 )
 
-const RelayMaxInflightTimeSeconds = 180
+const (
+	RelayMaxInflightTimeSeconds = 180
+	MaxRelayReportLength        = 96
+)
 
 var (
 	_ types.ReportingPluginFactory = &RelayReportingPluginFactory{}
@@ -133,10 +135,9 @@ func (rf *RelayReportingPluginFactory) NewReportingPlugin(config types.Reporting
 			Name:          "CCIPRelay",
 			UniqueReports: true,
 			Limits: types.ReportingPluginLimits{
-				MaxQueryLength: 0,
-				// TODO: https://app.shortcut.com/chainlinklabs/story/30171/define-report-plugin-limits
-				MaxObservationLength: 100000, // TODO
-				MaxReportLength:      100000, // TODO
+				MaxQueryLength:       0,
+				MaxObservationLength: MaxObservationLength,
+				MaxReportLength:      MaxRelayReportLength,
 			},
 		}, nil
 }
@@ -231,10 +232,10 @@ func (r *RelayReportingPlugin) Observation(ctx context.Context, timestamp types.
 		return nil, errors.New("unexpected gap in seq nums")
 	}
 	lggr.Infof("Messages %v", unstartedReqs)
-	return json.Marshal(&Observation{
+	return Observation{
 		MinSeqNum: min,
 		MaxSeqNum: max,
-	})
+	}.Marshal()
 }
 
 // buildReport assumes there is at least one message in reqs.

@@ -1,4 +1,4 @@
-package ccip_test
+package ccip
 
 import (
 	"context"
@@ -13,6 +13,9 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
+	"github.com/leanovate/gopter"
+	"github.com/leanovate/gopter/gen"
+	"github.com/leanovate/gopter/prop"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -21,9 +24,22 @@ import (
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/native_token_pool"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp_helper"
-	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
 )
+
+func TestRelayReportSize(t *testing.T) {
+	testParams := gopter.DefaultTestParameters()
+	testParams.MinSuccessfulTests = 100
+	p := gopter.NewProperties(testParams)
+	p.Property("bounded relay report size", prop.ForAll(func(root []byte, min, max uint64) bool {
+		var root32 [32]byte
+		copy(root32[:], root)
+		rep, err := EncodeRelayReport(&offramp.CCIPRelayReport{MerkleRoot: root32, MinSequenceNumber: min, MaxSequenceNumber: max})
+		require.NoError(t, err)
+		return len(rep) <= MaxRelayReportLength
+	}, gen.SliceOfN(32, gen.UInt8()), gen.UInt64(), gen.UInt64()))
+	p.TestingRun(t)
+}
 
 func TestRelayReportEncoding(t *testing.T) {
 	key, err := crypto.GenerateKey()
@@ -84,9 +100,9 @@ func TestRelayReportEncoding(t *testing.T) {
 		MinSequenceNumber: 1,
 		MaxSequenceNumber: 10,
 	}
-	out, err := ccip.EncodeRelayReport(&report)
+	out, err := EncodeRelayReport(&report)
 	require.NoError(t, err)
-	decodedReport, err := ccip.DecodeRelayReport(out)
+	decodedReport, err := DecodeRelayReport(out)
 	require.NoError(t, err)
 	require.Equal(t, &report, decodedReport)
 

@@ -3,31 +3,44 @@ package ccip_test
 import (
 	"context"
 	"math/big"
+	"strings"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/smartcontractkit/libocr/gethwrappers/link_token_interface"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/afn_contract"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/mock_v3_aggregator_contract"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/native_token_pool"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/no_storage_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp_executor_helper"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp_helper"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp_router"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/simple_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
 )
 
-func TestExecutionReportEncoding(t *testing.T) {
+type ExecutionContracts struct {
+	// Has all the link and 100ETH
+	user                       *bind.TransactOpts
+	executorHelper             *offramp_executor_helper.OffRampExecutorHelper
+	offRampHelper              *offramp_helper.OffRampHelper
+	receiver                   *no_storage_message_receiver.NoStorageMessageReceiver
+	linkTokenAddress           common.Address
+	destChainID, sourceChainID *big.Int
+	destChain                  *backends.SimulatedBackend
+}
+
+func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	key, err := crypto.GenerateKey()
 	require.NoError(t, err)
 	destChainID := big.NewInt(1337)
@@ -35,7 +48,7 @@ func TestExecutionReportEncoding(t *testing.T) {
 	destUser, err := bind.NewKeyedTransactorWithChainID(key, destChainID)
 	destChain := backends.NewSimulatedBackend(core.GenesisAlloc{
 		destUser.From: {Balance: big.NewInt(0).Mul(big.NewInt(100), big.NewInt(1000000000000000000))}},
-		ethconfig.Defaults.Miner.GasCeil)
+		10*ethconfig.Defaults.Miner.GasCeil) // 80M gas
 	// Deploy link token
 	destLinkTokenAddress, _, destLinkToken, err := link_token_interface.DeployLinkToken(destUser, destChain)
 	require.NoError(t, err)
@@ -99,7 +112,9 @@ func TestExecutionReportEncoding(t *testing.T) {
 	destChain.Commit()
 	_, err = destPool.SetOffRamp(destUser, offRampAddress, true)
 	require.NoError(t, err)
-	receiverAddress, _, _, err := simple_message_receiver.DeploySimpleMessageReceiver(destUser, destChain)
+	receiverAddress, _, _, err := no_storage_message_receiver.DeployNoStorageMessageReceiver(destUser, destChain)
+	require.NoError(t, err)
+	receiver, err := no_storage_message_receiver.NewNoStorageMessageReceiver(receiverAddress, destChain)
 	require.NoError(t, err)
 	destChain.Commit()
 	routerAddress, _, _, err := offramp_router.DeployOffRampRouter(destUser, destChain, []common.Address{offRampAddress})
@@ -109,58 +124,6 @@ func TestExecutionReportEncoding(t *testing.T) {
 	require.NoError(t, err)
 	destChain.Commit()
 
-	mctx := merklemulti.NewKeccakCtx()
-	var leafHashes [][32]byte
-	var msgs []ccip.Message
-	for i := 0; i < 3; i++ {
-		message := ccip.Message{
-			SequenceNumber: 10 + uint64(i),
-			SourceChainId:  sourceChainID,
-			Sender:         destUser.From,
-			Payload: struct {
-				Tokens             []common.Address `json:"tokens"`
-				Amounts            []*big.Int       `json:"amounts"`
-				DestinationChainId *big.Int         `json:"destinationChainId"`
-				Receiver           common.Address   `json:"receiver"`
-				Executor           common.Address   `json:"executor"`
-				Data               []uint8          `json:"data"`
-			}{
-				Tokens:             []common.Address{destLinkTokenAddress},
-				Amounts:            []*big.Int{big.NewInt(100)},
-				DestinationChainId: destChainID,
-				Receiver:           receiverAddress,
-				Data:               []byte("hello"),
-			},
-		}
-		msgs = append(msgs, message)
-		msgBytes, err := ccip.MakeCCIPMsgArgs().PackValues([]interface{}{message})
-		require.NoError(t, err)
-		leafHashes = append(leafHashes, mctx.HashLeaf(msgBytes))
-	}
-	tree := merklemulti.NewTree(mctx, leafHashes)
-	require.NoError(t, err)
-	proof := tree.Prove([]int{0, 1, 2})
-
-	rootLocal, err := merklemulti.VerifyComputeRoot(mctx, leafHashes, proof)
-	require.NoError(t, err)
-	report := offramp.CCIPRelayReport{
-		MerkleRoot:        rootLocal,
-		MinSequenceNumber: 10,
-		MaxSequenceNumber: 12,
-	}
-	encodeRelayReport, err := ccip.EncodeRelayReport(&report)
-	require.NoError(t, err)
-	decodeRelayReport, err := ccip.DecodeRelayReport(encodeRelayReport)
-	require.NoError(t, err)
-	require.Equal(t, &report, decodeRelayReport)
-
-	// RelayReport that Message
-	_, err = offRamp.Report(destUser, encodeRelayReport)
-	require.NoError(t, err)
-	destChain.Commit()
-
-	// Now execute that Message via the executor
-	t.Log(offRampAddress)
 	executorAddress, _, _, err := offramp_executor_helper.DeployOffRampExecutorHelper(
 		destUser,
 		destChain,
@@ -170,18 +133,63 @@ func TestExecutionReportEncoding(t *testing.T) {
 	executor, err := offramp_executor_helper.NewOffRampExecutorHelper(executorAddress, destChain)
 	require.NoError(t, err)
 	destChain.Commit()
+	return ExecutionContracts{user: destUser,
+		executorHelper:   executor,
+		offRampHelper:    offRamp,
+		receiver:         receiver,
+		linkTokenAddress: destLinkTokenAddress,
+		destChainID:      destChainID,
+		sourceChainID:    sourceChainID, destChain: destChain}
+}
 
-	executorReport, err := ccip.EncodeExecutionReport(
-		msgs,
-		proof.Hashes,
-		proof.SourceFlags,
-	)
-	require.NoError(t, err)
-	er, err := ccip.DecodeExecutionReport(executorReport)
-	require.NoError(t, err)
+type messageBatch struct {
+	msgs       []ccip.Message
+	helperMsgs []offramp_helper.CCIPMessage
+	proof      merklemulti.Proof[[32]byte]
+	root       [32]byte
+}
 
+func (e ExecutionContracts) generateMessageBatch(t *testing.T, payloadSize int, nMessages int, nTokensPerMessage int) messageBatch {
+	mctx := merklemulti.NewKeccakCtx()
+	maxData := func() []byte {
+		var b []byte
+		for i := 0; i < payloadSize; i++ {
+			b = append(b, 0xa)
+		}
+		return b
+	}
+	maxPayload := maxData()
+	var leafHashes [][32]byte
+	var msgs []ccip.Message
+	var indices []int
+	var tokens []common.Address
+	var amounts []*big.Int
 	var helperMsgs []offramp_helper.CCIPMessage
-	for _, message := range msgs {
+	for i := 0; i < nTokensPerMessage; i++ {
+		tokens = append(tokens, e.linkTokenAddress)
+		amounts = append(amounts, big.NewInt(1))
+	}
+	for i := 0; i < nMessages; i++ {
+		message := ccip.Message{
+			SequenceNumber: 1 + uint64(i),
+			SourceChainId:  e.sourceChainID,
+			Sender:         e.user.From,
+			Payload: struct {
+				Tokens             []common.Address `json:"tokens"`
+				Amounts            []*big.Int       `json:"amounts"`
+				DestinationChainId *big.Int         `json:"destinationChainId"`
+				Receiver           common.Address   `json:"receiver"`
+				Executor           common.Address   `json:"executor"`
+				Data               []uint8          `json:"data"`
+			}{
+				Tokens:             tokens,
+				Amounts:            amounts,
+				DestinationChainId: e.destChainID,
+				Receiver:           e.receiver.Address(),
+				Data:               maxPayload,
+			},
+		}
+		// Unfortunately have to do this to use the helper's gethwrappers.
 		helperMsgs = append(helperMsgs, offramp_helper.CCIPMessage{
 			SequenceNumber: message.SequenceNumber,
 			SourceChainId:  message.SourceChainId,
@@ -195,58 +203,71 @@ func TestExecutionReportEncoding(t *testing.T) {
 				Data:               message.Payload.Data,
 			},
 		})
+		msgs = append(msgs, message)
+		indices = append(indices, i)
+		msgBytes, err := ccip.MakeCCIPMsgArgs().PackValues([]interface{}{message})
+		require.NoError(t, err)
+		leafHashes = append(leafHashes, mctx.HashLeaf(msgBytes))
 	}
-
-	executionReport := offramp_helper.CCIPExecutionReport{
-		Messages:       helperMsgs,
-		Proofs:         er.Proofs,
-		ProofFlagsBits: er.ProofFlagBits,
-	}
-
-	generatedRoot, err := offRamp.MerkleRoot(nil, executionReport)
+	tree := merklemulti.NewTree(mctx, leafHashes)
+	proof := tree.Prove(indices)
+	rootLocal, err := merklemulti.VerifyComputeRoot(mctx, leafHashes, proof)
 	require.NoError(t, err)
-	require.Equal(t, rootLocal, generatedRoot)
-	tx, err := executor.Report(destUser, executorReport)
-	require.NoError(t, err)
-	destChain.Commit()
-	res, err := destChain.TransactionReceipt(context.Background(), tx.Hash())
-	require.NoError(t, err)
-	assert.Equal(t, uint64(1), res.Status)
+	return messageBatch{msgs: msgs, proof: proof, root: rootLocal, helperMsgs: helperMsgs}
 }
 
-func TestExecutionReportInvariance(t *testing.T) {
-	message := ccip.Message{
-		SequenceNumber: 2e18,
-		SourceChainId:  big.NewInt(9999999999999999),
-		Sender:         common.HexToAddress("0xf97f4df75117a78c1A5a0DBb814Af92458539FB2"),
-		Payload: struct {
-			Tokens             []common.Address `json:"tokens"`
-			Amounts            []*big.Int       `json:"amounts"`
-			DestinationChainId *big.Int         `json:"destinationChainId"`
-			Receiver           common.Address   `json:"receiver"`
-			Executor           common.Address   `json:"executor"`
-			Data               []uint8          `json:"data"`
-		}{
-			[]common.Address{common.HexToAddress("0xf97f4df75117a78c1A5a0DBb814Af92458539FB3")},
-			// 1e18 * 2e9 to test values larger than int64
-			[]*big.Int{big.NewInt(1e18), new(big.Int).Mul(big.NewInt(1e18), big.NewInt(2e9))},
-			big.NewInt(11110),
-			common.HexToAddress("0xf97f4df75117a78c1A5a0DBb814Af92458539FB4"),
-			common.HexToAddress("0xf97f4df75117a78c1A5a0DBb814Af92458539FB5"),
-			[]uint8{23, 255, 0, 1},
-		},
-	}
-	var h [32]byte
-	report, err := ccip.EncodeExecutionReport([]ccip.Message{message, message, message}, [][32]byte{h}, []bool{true})
+func TestMaxExecutionReportSize(t *testing.T) {
+	// Ensure that given max payload size and max num tokens,
+	// Our report size is under the tx size limit.
+	c := setupContractsForExecution(t)
+	mb := c.generateMessageBatch(t, ccip.MaxPayloadLength, ccip.MaxNumMessagesInExecutionReport, ccip.MaxTokensPerMessage)
+	// Ensure execution report size is valid
+	executorReport, err := ccip.EncodeExecutionReport(
+		mb.msgs,
+		mb.proof.Hashes,
+		mb.proof.SourceFlags,
+	)
 	require.NoError(t, err)
-	er, err := ccip.DecodeExecutionReport(report)
+	t.Log("execution report length", len(executorReport), ccip.MaxExecutionReportLength)
+	require.True(t, len(executorReport) <= ccip.MaxExecutionReportLength)
+
+	// Check can get into mempool i.e. tx size limit is respected.
+	a := c.executorHelper.Address()
+	bi, _ := abi.JSON(strings.NewReader(offramp_executor_helper.OffRampExecutorHelperABI))
+	b, err := bi.Pack("report", []byte(executorReport))
 	require.NoError(t, err)
-	require.Len(t, er.Messages, 3)
-	require.Equal(t, message, er.Messages[0])
-	require.Equal(t, message, er.Messages[2])
+	n, err := c.destChain.NonceAt(context.Background(), c.user.From, nil)
+	require.NoError(t, err)
+	signedTx, err := c.user.Signer(c.user.From, types.NewTx(&types.LegacyTx{
+		To:       &a,
+		Nonce:    n,
+		GasPrice: big.NewInt(1e9),
+		Gas:      10 * ethconfig.Defaults.Miner.GasCeil, // Massive gas limit, 10x normal block size
+		Value:    big.NewInt(0),
+		Data:     b,
+	}))
+	require.NoError(t, err)
+	pool := core.NewTxPool(core.DefaultTxPoolConfig, params.AllEthashProtocolChanges, c.destChain.Blockchain())
+	require.NoError(t, pool.AddLocal(signedTx))
 }
 
-func TestDecodeEmptyExecutionReport(t *testing.T) {
+func TestExecutionReportEncoding(t *testing.T) {
+	// Note could consider some fancier testing here (fuzz/property)
+	// but I think that would essentially be testing geth's abi library
+	// as our encode/decode is a thin wrapper around that.
+	c := setupContractsForExecution(t)
+	mb := c.generateMessageBatch(t, ccip.MaxPayloadLength, 3, ccip.MaxTokensPerMessage)
+	report := ccip.ExecutionReport{
+		Messages:      mb.msgs,
+		Proofs:        mb.proof.Hashes,
+		ProofFlagBits: ccip.ProofFlagsToBits(mb.proof.SourceFlags),
+	}
+	encodeRelayReport, err := ccip.EncodeExecutionReport(mb.msgs, mb.proof.Hashes, mb.proof.SourceFlags)
+	require.NoError(t, err)
+	decodeRelayReport, err := ccip.DecodeExecutionReport(encodeRelayReport)
+	require.NoError(t, err)
+	require.Equal(t, &report, decodeRelayReport)
+
 	executorReport, err := ccip.EncodeExecutionReport([]ccip.Message{}, [][32]byte{}, []bool{})
 	require.NoError(t, err)
 	_, err = ccip.DecodeExecutionReport(executorReport)

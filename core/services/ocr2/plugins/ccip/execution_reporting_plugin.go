@@ -2,7 +2,6 @@ package ccip
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math/big"
 	"sort"
@@ -24,7 +23,30 @@ import (
 
 const (
 	ExecutionMaxInflightTimeSeconds = 180
-	MaxNumMessagesInExecutionReport = 100
+	// Note user research is required for setting (MaxPayloadLength, MaxTokensPerMessage).
+	// TODO: If we really want this to be constant and not dynamic, then we need to wait
+	// until we have gas limits per message and ensure the block gas limit constraint is respected
+	// as well as the tx size limit.
+	MaxNumMessagesInExecutionReport = 70
+	MaxPayloadLength                = 1000
+	MaxTokensPerMessage             = 5
+	// NOTE: If execution report format changes, this has to change.
+	// See makeExecutionReportArgs. Note for each dynamic type, there's a offset + length word.
+	// We explicitly do not include struct packing here as its an upper bound.
+	MaxMessageLength = 32 + // len of message struct
+		32*6 + // sourceChainId, seqNum, sender, destChainId, executor, receiver
+		32*2 + // length of payload struct
+		32*2 + // len, offset for data
+		MaxPayloadLength +
+		32*2 + // len, offset for tokens
+		32*2 + // len, offset for amounts
+		MaxTokensPerMessage*(2*32) // per token, token and amount
+	MaxExecutionReportLength = 32 + // len of report struct
+		32*2 + // len, offset for messages
+		MaxMessageLength*MaxNumMessagesInExecutionReport + // messages
+		32*2 + // len, offset proofs
+		32 + // proof, only one in the case of all messages included
+		32 // proofFlagBits
 )
 
 var (
@@ -131,10 +153,9 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			Name:          "CCIPExecution",
 			UniqueReports: true,
 			Limits: types.ReportingPluginLimits{
-				MaxQueryLength: 0,
-				// TODO: https://app.shortcut.com/chainlinklabs/story/30171/define-report-plugin-limits
-				MaxObservationLength: 100000, // TODO
-				MaxReportLength:      100000, // TODO
+				MaxQueryLength:       0,
+				MaxObservationLength: MaxObservationLength,
+				MaxReportLength:      MaxExecutionReportLength,
 			},
 		}, nil
 }
@@ -249,10 +270,10 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 	if len(executable) == 0 {
 		return []byte{}, nil
 	}
-	return json.Marshal(&Observation{
+	return Observation{
 		MinSeqNum: executable[0],
 		MaxSeqNum: executable[len(executable)-1],
-	})
+	}.Marshal()
 }
 
 func (r *ExecutionReportingPlugin) getMessagesInRangeWithExecutor(min, max uint64, executor common.Address) ([]onramp.OnRampCrossChainSendRequested, error) {

@@ -4,8 +4,25 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/leanovate/gopter"
+	"github.com/leanovate/gopter/gen"
+	"github.com/leanovate/gopter/prop"
 	"github.com/pkg/errors"
+	"github.com/stretchr/testify/require"
 )
+
+func TestObservationSize(t *testing.T) {
+	testParams := gopter.DefaultTestParameters()
+	testParams.MinSuccessfulTests = 100
+	p := gopter.NewProperties(testParams)
+	p.Property("bounded observation size", prop.ForAll(func(min, max uint64) bool {
+		o := Observation{MinSeqNum: min, MaxSeqNum: max}
+		b, err := o.Marshal()
+		require.NoError(t, err)
+		return len(b) <= MaxObservationLength
+	}, gen.UInt64(), gen.UInt64()))
+	p.TestingRun(t)
+}
 
 func TestGetMinMaxSequenceNumbers(t *testing.T) {
 	tests := []struct {

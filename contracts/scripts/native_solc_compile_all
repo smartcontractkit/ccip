@@ -79,6 +79,7 @@ $SCRIPTPATH/native_solc8_6_compile tests/LogEmitter.sol
 $SCRIPTPATH/native_solc8_13_compile ccip/test/helpers/OffRampExecutorHelper.sol
 $SCRIPTPATH/native_solc8_13_compile ccip/test/helpers/OffRampHelper.sol
 $SCRIPTPATH/native_solc8_13_compile ccip/test/helpers/SimpleMessageReceiver.sol
+$SCRIPTPATH/native_solc8_13_compile ccip/test/helpers/NoStorageMessageReceiver.sol
 $SCRIPTPATH/native_solc8_13_compile ccip/applications/SenderDapp.sol
 $SCRIPTPATH/native_solc8_13_compile ccip/applications/ReceiverDapp.sol
 $SCRIPTPATH/native_solc8_13_compile ccip/pools/NativeTokenPool.sol

@@ -18,6 +18,7 @@ keeper_registry_wrapper1_2: ../../../contracts/solc/v0.8.13/KeeperRegistry.abi .
 log_emitter: ../../../contracts/solc/v0.8.6/LogEmitter.abi ../../../contracts/solc/v0.8.6/LogEmitter.bin 375488d19b6ee1c180d42048be10abea9146e2a58347fd180358850d435cb854
 multiwordconsumer_wrapper: ../../../contracts/solc/v0.7/MultiWordConsumer.abi ../../../contracts/solc/v0.7/MultiWordConsumer.bin 6e68abdf614e3ed0f5066c1b5f9d7c1199f1e7c5c5251fe8a471344a59afc6ba
 native_token_pool: ../../../contracts/solc/v0.8.13/NativeTokenPool.abi ../../../contracts/solc/v0.8.13/NativeTokenPool.bin 53785895e3cf34a5cc2fa7527f29617730cd5ea563ef4246756f6ec46860a208
+no_storage_message_receiver: ../../../contracts/solc/v0.8.13/NoStorageMessageReceiver.abi ../../../contracts/solc/v0.8.13/NoStorageMessageReceiver.bin b5d55c1af1186d72c4f7f0682f4c09689ebe9fbd87b8bbb559ae0f696df5aa98
 offchain_aggregator_wrapper: OffchainAggregator/OffchainAggregator.abi - 5f97dc197fd4e2b999856b9b3fa7c2aaf0c700c71d7009d7d017d233bc855877
 offramp: ../../../contracts/solc/v0.8.13/OffRamp.abi ../../../contracts/solc/v0.8.13/OffRamp.bin 7b7d9fcffa7585645a74c3ff1a7d0c5b02d556bdab4736a2b54d6c1c053fab9e
 offramp_executor: ../../../contracts/solc/v0.8.13/OffRampExecutor.abi ../../../contracts/solc/v0.8.13/OffRampExecutor.bin bb0e74b3fda9c2c633020074bbbe1d6d30c84769fce2ebf58459e984ecadab03

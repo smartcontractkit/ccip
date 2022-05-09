@@ -68,6 +68,7 @@ package gethwrappers
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.13/OffRampRouter.abi ../../../contracts/solc/v0.8.13/OffRampRouter.bin OffRampRouter offramp_router
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.13/OnRampRouter.abi ../../../contracts/solc/v0.8.13/OnRampRouter.bin OnRampRouter onramp_router
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.13/SimpleMessageReceiver.abi ../../../contracts/solc/v0.8.13/SimpleMessageReceiver.bin SimpleMessageReceiver simple_message_receiver
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.13/NoStorageMessageReceiver.abi ../../../contracts/solc/v0.8.13/NoStorageMessageReceiver.bin NoStorageMessageReceiver no_storage_message_receiver
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.13/ReceiverDapp.abi ../../../contracts/solc/v0.8.13/ReceiverDapp.bin ReceiverDapp receiver_dapp
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.13/SenderDapp.abi ../../../contracts/solc/v0.8.13/SenderDapp.bin SenderDapp sender_dapp
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.13/OffRampExecutor.abi ../../../contracts/solc/v0.8.13/OffRampExecutor.bin OffRampExecutor offramp_executor

@@ -14,6 +14,10 @@ import (
 	"github.com/smartcontractkit/chainlink/core/logger"
 )
 
+const (
+	MaxObservationLength = 67
+)
+
 func EvmWord(i uint64) common.Hash {
 	var b = make([]byte, 8)
 	binary.BigEndian.PutUint64(b, i)
@@ -23,6 +27,10 @@ func EvmWord(i uint64) common.Hash {
 type Observation struct {
 	MinSeqNum uint64 `json:"minSeqNum"`
 	MaxSeqNum uint64 `json:"maxSeqNum"`
+}
+
+func (o Observation) Marshal() ([]byte, error) {
+	return json.Marshal(&o)
 }
 
 // getNonEmptyObservations checks the given observations for formatting and value errors.
