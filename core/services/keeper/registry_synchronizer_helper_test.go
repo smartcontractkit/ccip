@@ -42,13 +42,13 @@ func setupRegistrySync(t *testing.T, version keeper.RegistryVersion) (
 	cc := evmtest.NewChainSet(t, evmtest.TestChainOpts{DB: db, Client: ethClient, LogBroadcaster: lbMock, GeneralConfig: cfg})
 	ch := evmtest.MustGetDefaultChain(t, cc)
 	keyStore := cltest.NewKeyStore(t, db, cfg)
-	jpv2 := cltest.NewJobPipelineV2(t, cfg, cc, db, keyStore)
+	jpv2 := cltest.NewJobPipelineV2(t, cfg, cc, db, keyStore, nil, nil)
 	contractAddress := j.KeeperSpec.ContractAddress.Address()
 
 	registryMock := cltest.NewContractMockReceiver(t, ethClient, keeper.Registry1_1ABI, contractAddress)
 	switch version {
 	case keeper.RegistryVersion_1_0, keeper.RegistryVersion_1_1:
-		registryMock.MockResponse("typeAndVersion", "KeeperRegistry 1.1.0").Once()
+		registryMock.MockResponse("typeAndVersion", "KeeperRegistry 1.1.1").Once()
 	case keeper.RegistryVersion_1_2:
 		registryMock.MockResponse("typeAndVersion", "KeeperRegistry 1.2.0").Once()
 	}

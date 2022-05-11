@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -69,7 +70,6 @@ type GeneralOnlyConfig interface {
 
 	FeatureFlags
 
-	AdminCredentialsFile() string
 	AdvisoryLockCheckInterval() time.Duration
 	AdvisoryLockID() int64
 	AllowOrigins() string
@@ -91,7 +91,6 @@ type GeneralOnlyConfig interface {
 	BlockBackfillSkip() bool
 	BridgeResponseURL() *url.URL
 	CertFile() string
-	ClientNodeURL() string
 	DatabaseBackupDir() string
 	DatabaseBackupFrequency() time.Duration
 	DatabaseBackupMode() DatabaseBackupMode
@@ -102,7 +101,6 @@ type GeneralOnlyConfig interface {
 	DatabaseLockingMode() string
 	DatabaseURL() url.URL
 	DefaultChainID() *big.Int
-	DefaultHTTPAllowUnrestrictedNetworkAccess() bool
 	DefaultHTTPLimit() int64
 	DefaultHTTPTimeout() models.Duration
 	DefaultLogLevel() zapcore.Level
@@ -121,7 +119,6 @@ type GeneralOnlyConfig interface {
 	GetDatabaseDialectConfiguredOrDefault() dialects.DialectName
 	HTTPServerWriteTimeout() time.Duration
 	InsecureFastScrypt() bool
-	InsecureSkipVerify() bool
 	JSONConsole() bool
 	JobPipelineMaxRunDuration() time.Duration
 	JobPipelineReaperInterval() time.Duration
@@ -407,7 +404,29 @@ EVM_ENABLED=false
 		c.lggr.Warn("LOG_FILE_DIR is ignored and has no effect when LOG_FILE_MAX_SIZE is not set to a value greater than zero")
 	}
 
+	if !c.Dev() {
+		if err := validateDBURL(c.DatabaseURL()); err != nil {
+			// TODO: Make this a hard error in some future version of Chainlink > 1.4.x
+			c.lggr.Errorf("DEPRECATION WARNING: Database has missing or insufficiently complex password: %s. Database should be secured by a password matching the following complexity requirements:\n%s\nThis error will PREVENT BOOT in a future version of Chainlink.\n\n", err, utils.PasswordComplexityRequirements)
+		}
+	}
+
 	return nil
+}
+
+func validateDBURL(dbURI url.URL) error {
+	if strings.Contains(dbURI.Redacted(), "_test") {
+		return nil
+	}
+	userInfo := dbURI.User
+	if userInfo == nil {
+		return errors.Errorf("DB URL must be authenticated; plaintext URLs are not allowed (got: %s)", dbURI.Redacted())
+	}
+	pw, pwSet := userInfo.Password()
+	if !pwSet {
+		return errors.Errorf("DB URL must be authenticated; password is required (got: %s)", dbURI.Redacted())
+	}
+	return utils.VerifyPasswordComplexity(pw)
 }
 
 func (c *generalConfig) GetAdvisoryLockIDConfiguredOrDefault() int64 {
@@ -428,17 +447,6 @@ func (c *generalConfig) AppID() uuid.UUID {
 		c.appID = uuid.NewV4()
 	})
 	return c.appID
-}
-
-// AdminCredentialsFile points to text file containing admin credentials for logging in
-func (c *generalConfig) AdminCredentialsFile() string {
-	fieldName := "AdminCredentialsFile"
-	file := c.viper.GetString(envvar.Name(fieldName))
-	defaultValue, _ := envvar.DefaultValue(fieldName)
-	if file == defaultValue {
-		return filepath.Join(c.RootDir(), "apicredentials")
-	}
-	return file
 }
 
 // AuthenticatedRateLimit defines the threshold to which authenticated requests
@@ -520,11 +528,6 @@ func (c *generalConfig) BridgeResponseURL() *url.URL {
 	return getEnvWithFallback(c, envvar.New("BridgeResponseURL", url.Parse))
 }
 
-// ClientNodeURL is the URL of the Ethereum node this Chainlink node should connect to.
-func (c *generalConfig) ClientNodeURL() string {
-	return c.viper.GetString(envvar.Name("ClientNodeURL"))
-}
-
 // FeatureUICSAKeys enables the CSA Keys UI Feature.
 func (c *generalConfig) FeatureUICSAKeys() bool {
 	return getEnvWithFallback(c, envvar.NewBool("FeatureUICSAKeys"))
@@ -604,12 +607,6 @@ func (c *generalConfig) DefaultHTTPLimit() int64 {
 // DefaultHTTPTimeout defines the default timeout for http requests
 func (c *generalConfig) DefaultHTTPTimeout() models.Duration {
 	return models.MustMakeDuration(getEnvWithFallback(c, envvar.NewDuration("DefaultHTTPTimeout")))
-}
-
-// DefaultHTTPAllowUnrestrictedNetworkAccess controls whether http requests are unrestricted by default
-// It is recommended that this be left disabled
-func (c *generalConfig) DefaultHTTPAllowUnrestrictedNetworkAccess() bool {
-	return c.viper.GetBool(envvar.Name("DefaultHTTPAllowUnrestrictedNetworkAccess"))
 }
 
 // Dev configures "development" mode for chainlink.
@@ -764,15 +761,6 @@ func (c *generalConfig) P2PEnabled() bool {
 // This is insecure and only useful for local testing. DO NOT SET THIS IN PRODUCTION
 func (c *generalConfig) InsecureFastScrypt() bool {
 	return c.viper.GetBool(envvar.Name("InsecureFastScrypt"))
-}
-
-// InsecureSkipVerify disables SSL certificate verification when connection to
-// a chainlink client using the remote client, i.e. when executing most remote
-// commands in the CLI.
-//
-// This is mostly useful for people who want to use TLS on localhost.
-func (c *generalConfig) InsecureSkipVerify() bool {
-	return c.viper.GetBool(envvar.Name("InsecureSkipVerify"))
 }
 
 func (c *generalConfig) TriggerFallbackDBPollInterval() time.Duration {

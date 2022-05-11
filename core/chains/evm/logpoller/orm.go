@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/sqlx"
 
@@ -130,6 +131,37 @@ func (o *ORM) SelectLogsByBlockRangeFilter(start, end int64, address common.Addr
 	return logs, nil
 }
 
+// LatestLogEventSigsAddrs finds the latest log by (address, event) combination that matches a list of addresses and list of events
+func (o *ORM) LatestLogEventSigsAddrs(fromBlock int64, addresses []common.Address, eventSigs []common.Hash, qopts ...pg.QOpt) ([]Log, error) {
+	var logs []Log
+
+	sigs := [][]byte{}
+	for _, sig := range eventSigs {
+		sigs = append(sigs, sig.Bytes())
+	}
+	addrs := [][]byte{}
+	for _, addr := range addresses {
+		addrs = append(addrs, addr.Bytes())
+	}
+
+	q := o.q.WithOpts(qopts...)
+	err := q.Select(&logs, `
+		SELECT * FROM logs WHERE (block_number, address, event_sig) IN (
+			SELECT MAX(block_number), address, event_sig FROM logs 
+				WHERE evm_chain_id = $1 AND
+				    event_sig = ANY($2) AND
+					address = ANY($3) AND
+		   			block_number > $4
+			GROUP BY event_sig, address
+		)
+		ORDER BY block_number ASC
+	`, o.chainID.Int64(), pq.Array(sigs), pq.Array(addrs), fromBlock)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to execute query")
+	}
+	return logs, nil
+}
+
 func (o *ORM) SelectDataWordRange(address common.Address, eventSig []byte, wordIndex int, wordValueMin, wordValueMax common.Hash, confs int, qopts ...pg.QOpt) ([]Log, error) {
 	var logs []Log
 	q := o.q.WithOpts(qopts...)
@@ -199,16 +231,16 @@ func (o *ORM) SelectIndexLogsTopicRange(address common.Address, eventSig []byte,
 func (o *ORM) SelectIndexedLogs(address common.Address, eventSig []byte, topicIndex int, topicValues []common.Hash, confs int, qopts ...pg.QOpt) ([]Log, error) {
 	var logs []Log
 	q := o.q.WithOpts(qopts...)
-	topicValuesList := fmt.Sprintf("'\\x%s'", topicValues[0].String()[2:])
+	topicValuesList := fmt.Sprintf("'%s'", topicValues[0].String()[2:])
 	for _, topicValue := range topicValues[1:] {
-		topicValuesList += fmt.Sprintf(",'\\x%s'", topicValue.String()[2:])
+		topicValuesList += fmt.Sprintf(",'%s'", topicValue.String()[2:])
 	}
 	// Add 1 since arrays are 1-indexed.
 	err := q.Select(&logs, fmt.Sprintf(`
 		SELECT * FROM logs 
 			WHERE logs.evm_chain_id = $1
 			AND address = $2 AND event_sig = $3
-			AND topics[$4] IN (%s) 
+			AND encode(topics[$4], 'hex') IN (%s) 
 			AND (block_number + $5) <= (SELECT COALESCE(block_number, 0) FROM log_poller_blocks WHERE evm_chain_id = $1 ORDER BY block_number DESC LIMIT 1)
 			ORDER BY (logs.block_number, logs.log_index)`, topicValuesList), utils.NewBig(o.chainID), address, eventSig, topicIndex+1, confs)
 	if err != nil {

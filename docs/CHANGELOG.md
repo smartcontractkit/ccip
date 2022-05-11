@@ -7,10 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Chainlink will now log a warning if the postgres database password is missing or too insecure. Passwords should conform to the following rules:
+```
+Must be longer than 12 characters
+Must comprise at least 3 of:
+	lowercase characters
+	uppercase characters
+	numbers
+	symbols
+Must not comprise:
+	A user's API email
+	More than three identical consecutive characters
+```
+This will prevent application boot in a future version of Chainlink.
+- The following ENV variables have been removed: `INSECURE_SKIP_VERIFY`, `CLIENT_NODE_URL`, `ADMIN_CREDENTIALS_FILE`. These vars only applied to Chainlink when running in client mode and have been replaced by command line args, notably: `--insecure-skip-verify`, `--remote-node-url URL` and `--admin-credentials-file FILE` respectively. More information can be found by running `./chainlink --help`.
+
+### Added 
+- Added `ETH_USE_FORWARDERS` config option to enable transactions forwarding contracts.
+
+### Fixed
+- Fixed `max_unconfirmed_age` metric. Previously this would incorrectly report the max time since the last rebroadcast, capping the upper limit to the EthResender interval. This now reports the correct value of total time elapsed since the _first_ broadcast.
+
+## [1.4.0] - 2022-05-02
+
 ### Added
 
 - JSON parse tasks (v2) now support a custom `separator` parameter to substitute for the default `,`.
-- Added `ETH_USE_FORWARDERS` config option to enable transactions forwarding contracts.
+- Log slow SQL queries
+- Fantom and avalanche block explorer urls
+- Display `requestTimeout` in job UI
+- Keeper upkeep order is shuffled
+
+### Fixed
+
+- `LOG_FILE_MAX_SIZE` handling
+- Improved websocket subscription management (fixes issues with multiple-primary-node failover from 1.3.x)
+- VRFv2 fixes and enhancements
+- UI support for `minContractPaymentLinkJuels`
 
 ## [1.3.0] - 2022-04-18
 
