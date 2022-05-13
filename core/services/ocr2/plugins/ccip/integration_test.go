@@ -329,7 +329,7 @@ type EthKeyStoreSim struct {
 func (ks EthKeyStoreSim) SignTx(address common.Address, tx *types.Transaction, chainID *big.Int) (*types.Transaction, error) {
 	if chainID.String() == "1000" {
 		// A terrible hack, just for the multichain test. All simulation clients run on chainID 1337.
-		// We let the destChain actually use 1337 to make sure the config digests are properly generated.
+		// We let the destChain actually use 1337 to make sure the offchainConfig digests are properly generated.
 		return ks.Eth.SignTx(address, tx, big.NewInt(1337))
 	}
 	return ks.Eth.SignTx(address, tx, chainID)
@@ -379,6 +379,12 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 
 	// Create our chainset manually so we can have custom eth clients
 	// (the wrapped sims faking different chainIDs)
+	var (
+		sourceLp logpoller.LogPoller = logpoller.NewLogPoller(logpoller.NewORM(sourceChainID, db, lggr, config), sourceClient,
+			lggr, 500*time.Millisecond, 10, 2)
+		destLp logpoller.LogPoller = logpoller.NewLogPoller(logpoller.NewORM(destChainID, db, lggr, config), destClient,
+			lggr, 500*time.Millisecond, 10, 2)
+	)
 	evmChain, err := evm.LoadChainSet(evm.ChainSetOpts{
 		ORM:              chainORM,
 		Config:           config,
@@ -386,7 +392,7 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 		DB:               db,
 		KeyStore:         simEthKeyStore,
 		EventBroadcaster: eventBroadcaster,
-		GenEthClient: func(c evmtypes.Chain) eth.Client {
+		GenEthClient: func(c evmtypes.DBChain) eth.Client {
 			if c.ID.String() == sourceChainID.String() {
 				return sourceClient
 			} else if c.ID.String() == destChainID.String() {
@@ -395,7 +401,7 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 			t.Fatalf("invalid chain ID %v", c.ID.String())
 			return nil
 		},
-		GenHeadTracker: func(c evmtypes.Chain, hb httypes.HeadBroadcaster) httypes.HeadTracker {
+		GenHeadTracker: func(c evmtypes.DBChain, hb httypes.HeadBroadcaster) httypes.HeadTracker {
 			if c.ID.String() == sourceChainID.String() {
 				return headtracker.NewHeadTracker(
 					lggr, sourceClient,
@@ -415,19 +421,17 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 			t.Fatalf("invalid chain ID %v", c.ID.String())
 			return nil
 		},
-		GenLogPoller: func(c evmtypes.Chain) *logpoller.LogPoller {
+		GenLogPoller: func(c evmtypes.DBChain) logpoller.LogPoller {
 			if c.ID.String() == sourceChainID.String() {
 				t.Log("Generating log broadcaster source")
-				return logpoller.NewLogPoller(logpoller.NewORM(sourceChainID, db, lggr, config), sourceClient,
-					lggr, 500*time.Millisecond, 10, 2)
+				return sourceLp
 			} else if c.ID.String() == destChainID.String() {
-				return logpoller.NewLogPoller(logpoller.NewORM(destChainID, db, lggr, config), destClient,
-					lggr, 500*time.Millisecond, 10, 2)
+				return destLp
 			}
 			t.Fatalf("invalid chain ID %v", c.ID.String())
 			return nil
 		},
-		GenLogBroadcaster: func(c evmtypes.Chain) log.Broadcaster {
+		GenLogBroadcaster: func(c evmtypes.DBChain) log.Broadcaster {
 			if c.ID.String() == sourceChainID.String() {
 				t.Log("Generating log broadcaster source")
 				return log.NewBroadcaster(log.NewORM(db, lggr, config, *sourceChainID), sourceClient,
@@ -439,11 +443,11 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 			t.Fatalf("invalid chain ID %v", c.ID.String())
 			return nil
 		},
-		GenTxManager: func(c evmtypes.Chain) txmgr.TxManager {
+		GenTxManager: func(c evmtypes.DBChain) txmgr.TxManager {
 			if c.ID.String() == sourceChainID.String() {
-				return txmgr.NewTxm(db, sourceClient, evmtest.NewChainScopedConfig(t, config), simEthKeyStore, eventBroadcaster, lggr, &txmgr.CheckerFactory{sourceClient})
+				return txmgr.NewTxm(db, sourceClient, evmtest.NewChainScopedConfig(t, config), simEthKeyStore, eventBroadcaster, lggr, &txmgr.CheckerFactory{sourceClient}, sourceLp)
 			} else if c.ID.String() == destChainID.String() {
-				return txmgr.NewTxm(db, destClient, evmtest.NewChainScopedConfig(t, config), simEthKeyStore, eventBroadcaster, lggr, &txmgr.CheckerFactory{destClient})
+				return txmgr.NewTxm(db, destClient, evmtest.NewChainScopedConfig(t, config), simEthKeyStore, eventBroadcaster, lggr, &txmgr.CheckerFactory{destClient}, destLp)
 			}
 			t.Fatalf("invalid chain ID %v", c.ID.String())
 			return nil
@@ -778,6 +782,14 @@ chainID             = "%s"
 
 `, i, ccipContracts.executor.Address(), node.kb.ID(), node.transmitter, ccipContracts.onRamp.Address(), ccipContracts.offRamp.Address(), sourceChainID, destChainID, destChainID))
 	}
+	// With jobs present, replay the config log.
+	b, err := ccipContracts.destChain.BlockByNumber(context.Background(), nil)
+	require.NoError(t, err)
+	for _, node := range nodes {
+		c, err := node.app.GetChains().EVM.Get(destChainID)
+		require.NoError(t, err)
+		require.NoError(t, c.LogPoller().Replay(context.Background(), int64(b.NumberU64()-1)))
+	}
 
 	currentSeqNum := 1
 	t.Run("single self-execute", func(t *testing.T) {
@@ -886,7 +898,7 @@ chainID             = "%s"
 
 func setupOnchainConfig(t *testing.T, ccipContracts CCIPContracts, oracles []confighelper2.OracleIdentityExtra, reportingPluginConfig []byte) {
 	// Note We do NOT set the payees, payment is done in the OCR2Base implementation
-	// Set the offramp config.
+	// Set the offramp offchainConfig.
 	signers, transmitters, threshold, onchainConfig, offchainConfigVersion, offchainConfig, err := confighelper2.ContractSetConfigArgsForTests(
 		2*time.Second,        // deltaProgress
 		1*time.Second,        // deltaResend

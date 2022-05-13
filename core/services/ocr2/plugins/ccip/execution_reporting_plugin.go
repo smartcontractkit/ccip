@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
@@ -111,44 +110,38 @@ func DecodeExecutionReport(report types.Report) (*ExecutionReport, error) {
 	return &er, nil
 }
 
-//go:generate mockery --name OffRampLastReporter --output ./mocks/lastreporter --case=underscore
-type OffRampLastReporter interface {
-	GetLastReport(opts *bind.CallOpts) (offramp.CCIPRelayReport, error)
-}
-
 type ExecutionReportingPluginFactory struct {
 	lggr         logger.Logger
-	lastReporter OffRampLastReporter
-	source, dest *logpoller.LogPoller
+	source, dest logpoller.LogPoller
 	executor     common.Address
 	onRamp       *onramp.OnRamp
 	offRamp      *offramp.OffRamp
-	configPoller *ConfigPoller
 }
 
 func NewExecutionReportingPluginFactory(
 	lggr logger.Logger,
 	onRamp *onramp.OnRamp,
 	offRamp *offramp.OffRamp,
-	source, dest *logpoller.LogPoller,
+	source, dest logpoller.LogPoller,
 	executor common.Address,
-	lastReporter OffRampLastReporter,
-	configPoller *ConfigPoller,
 ) types.ReportingPluginFactory {
-	return &ExecutionReportingPluginFactory{lggr: lggr, onRamp: onRamp, offRamp: offRamp, executor: executor, source: source, dest: dest, lastReporter: lastReporter, configPoller: configPoller}
+	return &ExecutionReportingPluginFactory{lggr: lggr, onRamp: onRamp, offRamp: offRamp, executor: executor, source: source, dest: dest}
 }
 
 func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.ReportingPluginConfig) (types.ReportingPlugin, types.ReportingPluginInfo, error) {
+	offchainConfig, err := Decode(config.OffchainConfig)
+	if err != nil {
+		return nil, types.ReportingPluginInfo{}, err
+	}
 	return &ExecutionReportingPlugin{
-			lggr:         rf.lggr.Named("ExecutionReportingPlugin"),
-			F:            config.F,
-			executor:     rf.executor,
-			onRamp:       rf.onRamp,
-			offRamp:      rf.offRamp,
-			source:       rf.source,
-			dest:         rf.dest,
-			lastReporter: rf.lastReporter,
-			configPoller: rf.configPoller,
+			lggr:           rf.lggr.Named("ExecutionReportingPlugin"),
+			F:              config.F,
+			executor:       rf.executor,
+			onRamp:         rf.onRamp,
+			offRamp:        rf.offRamp,
+			source:         rf.source,
+			dest:           rf.dest,
+			offchainConfig: offchainConfig,
 		}, types.ReportingPluginInfo{
 			Name:          "CCIPExecution",
 			UniqueReports: true,
@@ -166,15 +159,13 @@ type ExecutionReportingPlugin struct {
 	executor     common.Address
 	onRamp       *onramp.OnRamp
 	offRamp      *offramp.OffRamp
-	source, dest *logpoller.LogPoller
-	// We also use the offramp for defensive checks
-	lastReporter OffRampLastReporter
+	source, dest logpoller.LogPoller
 	// We need to synchronize access to the inflight structure
 	// as reporting plugin methods may be called from separate goroutines,
 	// e.g. reporting vs transmission protocol.
-	inFlightMu   sync.RWMutex
-	inFlight     []InflightExecutionReport
-	configPoller *ConfigPoller
+	inFlightMu     sync.RWMutex
+	inFlight       []InflightExecutionReport
+	offchainConfig OffchainConfig
 }
 
 type InflightExecutionReport struct {
@@ -246,7 +237,7 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 	if isOffRampDownNow(r.lggr, r.offRamp) {
 		return nil, ErrOffRampIsDown
 	}
-	rep, err := r.lastReporter.GetLastReport(nil)
+	rep, err := r.offRamp.GetLastReport(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -277,7 +268,7 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 }
 
 func (r *ExecutionReportingPlugin) getMessagesInRangeWithExecutor(min, max uint64, executor common.Address) ([]onramp.OnRampCrossChainSendRequested, error) {
-	msgs, err := r.source.LogsDataWordRange(CrossChainSendRequested, r.onRamp.Address(), 2, EvmWord(min), EvmWord(max), r.configPoller.sourceConfs())
+	msgs, err := r.source.LogsDataWordRange(CrossChainSendRequested, r.onRamp.Address(), 2, EvmWord(min), EvmWord(max), int(r.offchainConfig.SourceIncomingConfirmations))
 	if err != nil {
 		return nil, err
 	}
@@ -388,7 +379,7 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 	if maxSeqNum < minSeqNum {
 		return false, nil, errors.New("max seq num smaller than min")
 	}
-	lastRep, err := r.lastReporter.GetLastReport(nil)
+	lastRep, err := r.offRamp.GetLastReport(nil)
 	if err != nil {
 		return false, nil, err
 	}

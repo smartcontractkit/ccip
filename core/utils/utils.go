@@ -15,9 +15,12 @@ import (
 	"sync"
 	"time"
 
+	cryptop2p "github.com/libp2p/go-libp2p-core/crypto"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/jpillora/backoff"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/pkg/errors"
 	"github.com/robfig/cron/v3"
 	uuid "github.com/satori/go.uuid"
@@ -36,6 +39,36 @@ const (
 // ZeroAddress is an address of all zeroes, otherwise in Ethereum as
 // 0x0000000000000000000000000000000000000000
 var ZeroAddress = common.Address{}
+
+func RandomAddress() common.Address {
+	b := make([]byte, 20)
+	_, _ = rand.Read(b) // Assignment for errcheck. Only used in tests so we can ignore.
+	return common.BytesToAddress(b)
+}
+
+func RandomBytes32() (r [32]byte) {
+	b := make([]byte, 32)
+	_, _ = rand.Read(b[:]) // Assignment for errcheck. Only used in tests so we can ignore.
+	copy(r[:], b)
+	return
+}
+
+func Bytes32ToSlice(a [32]byte) (r []byte) {
+	r = append(r, a[:]...)
+	return
+}
+
+func MustNewPeerID() string {
+	_, pubKey, err := cryptop2p.GenerateEd25519Key(rand.Reader)
+	if err != nil {
+		panic(err)
+	}
+	peerID, err := peer.IDFromPublicKey(pubKey)
+	if err != nil {
+		panic(err)
+	}
+	return peerID.String()
+}
 
 // EmptyHash is a hash of all zeroes, otherwise in Ethereum as
 // 0x0000000000000000000000000000000000000000000000000000000000000000

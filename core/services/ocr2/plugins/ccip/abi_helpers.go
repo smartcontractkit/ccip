@@ -10,6 +10,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/onramp"
+	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
 var (
@@ -175,14 +176,10 @@ func ProofFlagsToBits(proofFlags []bool) *big.Int {
 }
 
 func makeExecutionReportArgs() abi.Arguments {
-	mustType := func(ts string, components []abi.ArgumentMarshaling) abi.Type {
-		ty, _ := abi.NewType(ts, "", components)
-		return ty
-	}
 	return []abi.Argument{
 		{
 			Name: "ExecutionReport",
-			Type: mustType("tuple", []abi.ArgumentMarshaling{
+			Type: utils.MustAbiType("tuple", []abi.ArgumentMarshaling{
 				{
 					Name: "Messages",
 					Type: "tuple[]",
@@ -245,22 +242,18 @@ func makeExecutionReportArgs() abi.Arguments {
 }
 
 func makeRelayReportArgs() abi.Arguments {
-	mustType := func(ts string) abi.Type {
-		ty, _ := abi.NewType(ts, "", nil)
-		return ty
-	}
 	return []abi.Argument{
 		{
 			Name: "merkleRoot",
-			Type: mustType("bytes32"),
+			Type: utils.MustAbiType("bytes32", nil),
 		},
 		{
 			Name: "minSequenceNumber",
-			Type: mustType("uint64"),
+			Type: utils.MustAbiType("uint64", nil),
 		},
 		{
 			Name: "maxSequenceNumber",
-			Type: mustType("uint64"),
+			Type: utils.MustAbiType("uint64", nil),
 		},
 	}
 }

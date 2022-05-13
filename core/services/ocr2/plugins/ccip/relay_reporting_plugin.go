@@ -102,34 +102,36 @@ type InflightReport struct {
 }
 
 type RelayReportingPluginFactory struct {
-	lggr         logger.Logger
-	source       *logpoller.LogPoller
-	onRamp       *onramp.OnRamp
-	offRamp      *offramp.OffRamp
-	configPoller *ConfigPoller
+	lggr    logger.Logger
+	source  logpoller.LogPoller
+	onRamp  *onramp.OnRamp
+	offRamp *offramp.OffRamp
 }
 
 // NewRelayReportingPluginFactory return a new RelayReportingPluginFactory.
 func NewRelayReportingPluginFactory(
 	lggr logger.Logger,
-	source *logpoller.LogPoller,
+	source logpoller.LogPoller,
 	offRamp *offramp.OffRamp,
 	onRamp *onramp.OnRamp,
-	configPoller *ConfigPoller,
 ) types.ReportingPluginFactory {
-	return &RelayReportingPluginFactory{lggr: lggr, offRamp: offRamp, onRamp: onRamp, source: source, configPoller: configPoller}
+	return &RelayReportingPluginFactory{lggr: lggr, offRamp: offRamp, onRamp: onRamp, source: source}
 }
 
 // NewReportingPlugin returns the ccip RelayReportingPlugin and satisfies the ReportingPluginFactory interface.
 func (rf *RelayReportingPluginFactory) NewReportingPlugin(config types.ReportingPluginConfig) (types.ReportingPlugin, types.ReportingPluginInfo, error) {
+	offchainConfig, err := Decode(config.OffchainConfig)
+	if err != nil {
+		return nil, types.ReportingPluginInfo{}, err
+	}
 	return &RelayReportingPlugin{
-			lggr:         rf.lggr.Named("RelayReportingPlugin"),
-			F:            config.F,
-			source:       rf.source,
-			onRamp:       rf.onRamp,
-			offRamp:      rf.offRamp,
-			inFlight:     make(map[[32]byte]InflightReport),
-			configPoller: rf.configPoller,
+			lggr:           rf.lggr.Named("RelayReportingPlugin"),
+			F:              config.F,
+			source:         rf.source,
+			onRamp:         rf.onRamp,
+			offRamp:        rf.offRamp,
+			inFlight:       make(map[[32]byte]InflightReport),
+			offchainConfig: offchainConfig,
 		},
 		types.ReportingPluginInfo{
 			Name:          "CCIPRelay",
@@ -145,15 +147,15 @@ func (rf *RelayReportingPluginFactory) NewReportingPlugin(config types.Reporting
 type RelayReportingPlugin struct {
 	lggr    logger.Logger
 	F       int
-	source  *logpoller.LogPoller
+	source  logpoller.LogPoller
 	onRamp  *onramp.OnRamp
 	offRamp *offramp.OffRamp
 	// We need to synchronize access to the inflight structure
 	// as reporting plugin methods may be called from separate goroutines,
 	// e.g. reporting vs transmission protocol.
-	inFlightMu   sync.RWMutex
-	inFlight     map[[32]byte]InflightReport
-	configPoller *ConfigPoller
+	inFlightMu     sync.RWMutex
+	inFlight       map[[32]byte]InflightReport
+	offchainConfig OffchainConfig
 }
 
 func (r *RelayReportingPlugin) nextMinSeqNumForOffRamp() (uint64, error) {
@@ -215,7 +217,7 @@ func (r *RelayReportingPlugin) Observation(ctx context.Context, timestamp types.
 		return nil, err
 	}
 	// All available messages that have not been relayed yet and have sufficient confirmations.
-	reqs, err := r.source.LogsDataWordGreaterThan(CrossChainSendRequested, r.onRamp.Address(), 2, EvmWord(minSeqNum), r.configPoller.sourceConfs())
+	reqs, err := r.source.LogsDataWordGreaterThan(CrossChainSendRequested, r.onRamp.Address(), 2, EvmWord(minSeqNum), int(r.offchainConfig.SourceIncomingConfirmations))
 	if err != nil {
 		return nil, err
 	}
@@ -242,7 +244,7 @@ func (r *RelayReportingPlugin) Observation(ctx context.Context, timestamp types.
 func (r *RelayReportingPlugin) buildReport(minSeqNum, maxSeqNum uint64) (*offramp.CCIPRelayReport, error) {
 	// Logs are guaranteed to be in order of seq num, since these are finalized logs only
 	// and the contract's seq num is auto-incrementing.
-	logs, err := r.source.LogsDataWordRange(CrossChainSendRequested, r.onRamp.Address(), 2, EvmWord(minSeqNum), EvmWord(maxSeqNum), r.configPoller.sourceConfs())
+	logs, err := r.source.LogsDataWordRange(CrossChainSendRequested, r.onRamp.Address(), 2, EvmWord(minSeqNum), EvmWord(maxSeqNum), int(r.offchainConfig.SourceIncomingConfirmations))
 	if err != nil {
 		return nil, err
 	}

@@ -71,6 +71,7 @@ type GeneralConfigOverrides struct {
 	GlobalEvmHeadTrackerMaxBufferSize       null.Int
 	GlobalEvmHeadTrackerSamplingInterval    *time.Duration
 	GlobalEvmLogBackfillBatchSize           null.Int
+	GlobalEvmLogPollInterval                *time.Duration
 	GlobalEvmMaxGasPriceWei                 *big.Int
 	GlobalEvmMinGasPriceWei                 *big.Int
 	GlobalEvmNonceAutoSync                  null.Bool
@@ -616,6 +617,13 @@ func (c *TestGeneralConfig) GlobalEvmLogBackfillBatchSize() (uint32, bool) {
 		return uint32(c.Overrides.GlobalEvmLogBackfillBatchSize.Int64), true
 	}
 	return c.GeneralConfig.GlobalEvmLogBackfillBatchSize()
+}
+
+func (c *TestGeneralConfig) GlobalEvmLogPollInterval() (time.Duration, bool) {
+	if c.Overrides.GlobalEvmLogPollInterval != nil {
+		return *c.Overrides.GlobalEvmLogPollInterval, true
+	}
+	return c.GeneralConfig.GlobalEvmLogPollInterval()
 }
 
 func (c *TestGeneralConfig) GlobalEvmMaxGasPriceWei() (*big.Int, bool) {

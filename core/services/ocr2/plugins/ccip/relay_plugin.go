@@ -7,9 +7,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2/types"
-	"github.com/smartcontractkit/sqlx"
 
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/afn_contract"
+	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/onramp"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
@@ -18,30 +17,19 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/job"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins"
 	ccipconfig "github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/config"
-	"github.com/smartcontractkit/chainlink/core/services/relay/types"
 )
 
 type CCIPRelay struct {
-	db           *sqlx.DB
-	lggr         logger.Logger
-	ocr2Provider types.OCR2ProviderCtx
-	cfg          Config
-	configPoller *ConfigPoller
-
-	jobID  int32
-	spec   *job.OCR2OracleSpec
-	config ccipconfig.RelayPluginConfig
-
-	sourceChain evm.Chain
-	destChain   evm.Chain
-	offRamp     *offramp.OffRamp
-	onRamp      *onramp.OnRamp
-	afn         *afn_contract.AFNContract
+	lggr              logger.Logger
+	spec              *job.OCR2OracleSpec
+	sourceChainPoller logpoller.LogPoller
+	offRamp           *offramp.OffRamp
+	onRamp            *onramp.OnRamp
 }
 
 var _ plugins.OraclePlugin = &CCIPRelay{}
 
-func NewCCIPRelay(jobID int32, spec *job.OCR2OracleSpec, chainSet evm.ChainSet, db *sqlx.DB, ocr2Provider types.OCR2ProviderCtx, cfg Config, lggr logger.Logger) (*CCIPRelay, error) {
+func NewCCIPRelay(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm.ChainSet) (*CCIPRelay, error) {
 	var pluginConfig ccipconfig.RelayPluginConfig
 	err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
 	if err != nil {
@@ -51,7 +39,7 @@ func NewCCIPRelay(jobID int32, spec *job.OCR2OracleSpec, chainSet evm.ChainSet, 
 	if err != nil {
 		return &CCIPRelay{}, err
 	}
-	lggr.Infof("CCIP relay plugin initialized with config: %+v", pluginConfig)
+	lggr.Infof("CCIP relay plugin initialized with offchainConfig: %+v", pluginConfig)
 
 	sourceChain, err := chainSet.Get(big.NewInt(pluginConfig.SourceChainID))
 	if err != nil {
@@ -69,40 +57,27 @@ func NewCCIPRelay(jobID int32, spec *job.OCR2OracleSpec, chainSet evm.ChainSet, 
 	if err != nil {
 		return nil, errors.Wrap(err, "failed creating a new offramp")
 	}
+	if !common.IsHexAddress(string(pluginConfig.OnRampID)) {
+		return nil, errors.Wrap(err, "OnRampID is not a valid hex address")
+	}
 	onRamp, err := onramp.NewOnRamp(common.HexToAddress(string(pluginConfig.OnRampID)), sourceChain.Client())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed creating a new onramp")
 	}
-
 	// Subscribe to all relevant relay logs.
 	sourceChain.LogPoller().MergeFilter([]common.Hash{CrossChainSendRequested}, onRamp.Address())
-
-	configPoller := NewConfigPoller(
-		lggr.Named("CCIP_LogListener").With("jobID", jobID),
-		destChain.LogPoller(),
-		offRamp,
-		pluginConfig.PollPeriod.Duration())
 	return &CCIPRelay{
-		db:           db,
-		lggr:         lggr,
-		ocr2Provider: ocr2Provider,
-		cfg:          cfg,
-		jobID:        jobID,
-		spec:         spec,
-		config:       pluginConfig,
-		offRamp:      offRamp,
-		onRamp:       onRamp,
-		sourceChain:  sourceChain,
-		destChain:    destChain,
-		configPoller: configPoller,
+		lggr:              lggr,
+		offRamp:           offRamp,
+		onRamp:            onRamp,
+		sourceChainPoller: sourceChain.LogPoller(),
 	}, nil
 }
 
 func (c *CCIPRelay) GetPluginFactory() (plugin ocrtypes.ReportingPluginFactory, err error) {
-	return NewRelayReportingPluginFactory(c.lggr, c.sourceChain.LogPoller(), c.offRamp, c.onRamp, c.configPoller), nil
+	return NewRelayReportingPluginFactory(c.lggr, c.sourceChainPoller, c.offRamp, c.onRamp), nil
 }
 
-// GetServices returns the log listener service.
 func (c *CCIPRelay) GetServices() ([]job.ServiceCtx, error) {
-	return []job.ServiceCtx{c.configPoller}, nil
+	return []job.ServiceCtx{}, nil
 }

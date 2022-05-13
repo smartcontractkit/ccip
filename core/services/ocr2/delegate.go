@@ -152,10 +152,9 @@ func (d Delegate) ServicesForSpec(jobSpec job.Job) ([]job.ServiceCtx, error) {
 	case job.Median:
 		pluginOracle, err = median.NewMedian(jobSpec, ocr2Provider, d.pipelineRunner, runResults, lggr, ocrLogger)
 	case job.CCIPRelay:
-		pluginOracle, err = ccip.NewCCIPRelay(jobSpec.ID, spec, d.chainSet, d.db, ocr2Provider, d.cfg, lggr)
+		pluginOracle, err = ccip.NewCCIPRelay(lggr, spec, d.chainSet)
 	case job.CCIPExecution:
-		pluginOracle, err = ccip.NewCCIPExecution(jobSpec.ID, spec, d.chainSet, d.db, ocr2Provider, d.cfg, lggr)
-
+		pluginOracle, err = ccip.NewCCIPExecution(lggr, spec, d.chainSet)
 	default:
 		return nil, errors.Errorf("plugin type %s not supported", spec.PluginType)
 	}
