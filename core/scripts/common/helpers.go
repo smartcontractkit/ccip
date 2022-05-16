@@ -40,6 +40,8 @@ func ExplorerLink(chainID int64, txHash common.Hash) string {
 		fmtURL = "https://etherscan.io/tx/%s"
 	case 4: // Rinkeby
 		fmtURL = "https://rinkeby.etherscan.io/tx/%s"
+	case 5: // Goerli
+		fmtURL = "https://goerli.etherscan.io/tx/%s"
 	case 42: // Kovan
 		fmtURL = "https://kovan.etherscan.io/tx/%s"
 
@@ -77,6 +79,8 @@ func ChainName(chainID int64) string {
 		return "Ethereum"
 	case 4:
 		return "Rinkeby"
+	case 5:
+		return "Goerli"
 	case 42:
 		return "Kovan"
 	case 56:

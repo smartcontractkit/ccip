@@ -131,16 +131,16 @@ func deployDestinationContracts(t *testing.T, client *EvmChainConfig, onrampChai
 func deployOnRamp(t *testing.T, client *EvmChainConfig, destinationChains []*big.Int, poolAddresses []common.Address, feedAddresses []common.Address, afn common.Address) *onramp.OnRamp {
 	client.Logger.Infof("Deploying onramp: destinationChains %+v, bridgeTokens %+v, poolAddresses %+v, priceFeeds %+v", destinationChains, client.BridgeTokens, poolAddresses, feedAddresses)
 	onRampAddress, tx, _, err := onramp.DeployOnRamp(
-		client.Owner,        // user
-		client.Client,       // client
-		client.ChainId,      // source chain id
-		destinationChains,   // destinationChainIds
-		client.BridgeTokens, // tokens
-		poolAddresses,       // pools
-		feedAddresses,       // Feeds
-		[]common.Address{},  // allow list
-		afn,                 // AFN
-		big.NewInt(86400),   // maxTimeWithoutAFNSignal 86400 seconds = one day
+		client.Owner,                  // user
+		client.Client,                 // client
+		client.ChainId,                // source chain id
+		destinationChains,             // destinationChainIds
+		client.BridgeTokens,           // tokens
+		poolAddresses,                 // pools
+		feedAddresses,                 // Feeds
+		[]common.Address{},            // allow list
+		afn,                           // AFN
+		big.NewInt(defaultAFNTimeout), // max timeout without AFN signal
 		onramp.OnRampInterfaceOnRampConfig{
 			RelayingFeeJuels: 0,
 			MaxDataSize:      1e6,
@@ -161,15 +161,15 @@ func deployOnRamp(t *testing.T, client *EvmChainConfig, destinationChains []*big
 func deployOffRamp(t *testing.T, client *EvmChainConfig, sourceChain *big.Int, poolAddresses []common.Address, feedAddresses []common.Address, afn common.Address, sourceBridgeTokens []common.Address) *offramp.OffRamp {
 	client.Logger.Infof("Deploying offramp: bridgeTokens %+v, poolAddresses %+v, priceFeeds %+v", client.BridgeTokens, client.TokenPools, client.PriceFeeds)
 	offrampAddress, tx, _, err := offramp.DeployOffRamp(
-		client.Owner,       // user
-		client.Client,      // client
-		sourceChain,        // source chain id
-		client.ChainId,     // dest chain id
-		sourceBridgeTokens, // source tokens
-		poolAddresses,      // dest pool addresses
-		feedAddresses,      // Feeds
-		afn,                // AFN address
-		big.NewInt(86400),  // max timeout without AFN signal  86400 seconds = one day
+		client.Owner,                  // user
+		client.Client,                 // client
+		sourceChain,                   // source chain id
+		client.ChainId,                // dest chain id
+		sourceBridgeTokens,            // source tokens
+		poolAddresses,                 // dest pool addresses
+		feedAddresses,                 // Feeds
+		afn,                           // AFN address
+		big.NewInt(defaultAFNTimeout), // max timeout without AFN signal
 		offramp.OffRampInterfaceOffRampConfig{
 			ExecutionFeeJuels:     0,
 			ExecutionDelaySeconds: 0,

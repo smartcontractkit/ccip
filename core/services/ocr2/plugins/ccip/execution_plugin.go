@@ -54,7 +54,7 @@ func NewCCIPExecution(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm
 	if !common.IsHexAddress(spec.ContractID) {
 		return nil, errors.Wrap(err, "spec.OffRampID is not a valid hex address")
 	}
-	offRamp, err := offramp.NewOffRamp(common.HexToAddress(pluginConfig.OffRampId), destChain.Client())
+	offRamp, err := offramp.NewOffRamp(common.HexToAddress(string(pluginConfig.OffRampID)), destChain.Client())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed creating a new onramp")
 	}

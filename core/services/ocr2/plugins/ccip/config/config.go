@@ -36,7 +36,7 @@ func (rp *RelayPluginConfig) ValidateRelayPluginConfig() error {
 // ExecutionPluginConfig contains the plugin specific variables for the ccip.CCIPExecution plugin.
 type ExecutionPluginConfig struct {
 	RelayPluginConfig
-	OffRampId string `json:"offRampId"`
+	OffRampID types.Account `json:"offRampID"`
 }
 
 // ValidateExecutionPluginConfig validates the arguments for the CCIP Execution plugin.
@@ -46,7 +46,7 @@ func (ep *ExecutionPluginConfig) ValidateExecutionPluginConfig() error {
 		return err
 	}
 
-	if _, err := hexutil.Decode(ep.OffRampId); err != nil {
+	if _, err := hexutil.Decode(string(ep.OffRampID)); err != nil {
 		return err
 	}
 

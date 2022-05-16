@@ -95,6 +95,12 @@ func runCommand(t *testing.T, ownerKey string, command string) {
 	case "tryPausedOnramp":
 		// Should not succeed because the onramp is paused
 		client.CrossChainSendPausedOnrampShouldFail(t)
+	case "acceptOwnership":
+		// Should accept ownership on the destination chain OffRamp & Executor
+		client.AcceptOwnership(t)
+	case "setTimeout":
+		// Should set the AFN timeout on the on- and offramp to the defaultAFNTimeout
+		client.SetAFNTimeout(t)
 	default:
 		t.Errorf("Unknown command \"%s\"", command)
 	}

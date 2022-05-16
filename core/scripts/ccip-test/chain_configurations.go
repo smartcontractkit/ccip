@@ -2,6 +2,7 @@ package main
 
 import (
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -37,6 +38,8 @@ type EvmChainConfig struct {
 	Afn             common.Address
 }
 
+var defaultAFNTimeout = int64((14 * 24 * time.Hour).Seconds())
+
 // EVMGasSettings specifies the gas configuration for an EVM chain.
 type EVMGasSettings struct {
 	EIP1559   bool
@@ -44,8 +47,8 @@ type EVMGasSettings struct {
 	GasTipCap *big.Int
 }
 
-// DefaultGasTipFee is the default gas tip fee of 2gwei.
-var DefaultGasTipFee = big.NewInt(2e9)
+// DefaultGasTipFee is the default gas tip fee of 1 gwei.
+var DefaultGasTipFee = big.NewInt(1e9)
 
 type DeploySettings struct {
 	DeployAFN        bool
@@ -175,6 +178,12 @@ var transmitterAccounts = map[int64]map[int]string{
 		1: "0x350c6b57923EBd32d4C928FE4e8A3D4b8b07ac33",
 		2: "0x26A8bDD396acA21578d2A12b11477B4E5071fC4b",
 		3: "0x19fA8Bd8fB7aB1Cb63615145FD81A4acb14dE09d",
+	},
+	5: {
+		0: "0xdc4FB792d2aa782FF4E0689e9E4030C5f8171807",
+		1: "0xea4E47518D611Bb467e0FFa345768C6d352588f7",
+		2: "0xfc0bD918A1dCb0d3ca17AE261aD057527A086fE2",
+		3: "0xe88ff73814fB891bb0e149F5578796fa41F20242",
 	},
 	42: {
 		0: "0x93A022332C95128Fd48fE44853836E038062509A",
