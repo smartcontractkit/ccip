@@ -365,9 +365,9 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 
 	// We fake different chainIDs using the wrapped sim cltest.SimulatedBackend
 	chainORM := evm.NewORM(db, lggr, config)
-	_, err := chainORM.CreateChain(*utils.NewBig(sourceChainID), evmtypes.ChainCfg{})
+	_, err := chainORM.CreateChain(*utils.NewBig(sourceChainID), &evmtypes.ChainCfg{})
 	require.NoError(t, err)
-	_, err = chainORM.CreateChain(*utils.NewBig(destChainID), evmtypes.ChainCfg{})
+	_, err = chainORM.CreateChain(*utils.NewBig(destChainID), &evmtypes.ChainCfg{})
 	require.NoError(t, err)
 	sourceClient := evmclient.NewSimulatedBackendClient(t, sourceChain, sourceChainID)
 	destClient := evmclient.NewSimulatedBackendClient(t, destChain, destChainID)
