@@ -61,4 +61,5 @@ core/web/assets
 integration-tests/logs/
 tests-*.xml
 *.test
+cache
 core/services/ocr2/plugins/ccip/transactions.rlp

@@ -1,0 +1,24 @@
+name: Foundry Tests
+on: [pull_request]
+
+jobs:
+  check:
+    name: Foundry Gas Test
+    runs-on: ubuntu-20.04
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Install dependencies
+        run: forge install
+
+      - name: Run tests
+        run: forge test -vv
+
+      - name: Check gas snapshots
+        run: forge snapshot --check

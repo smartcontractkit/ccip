@@ -23,6 +23,7 @@ contracts/src/v0.4
 contracts/src/v0.5
 contracts/src/v0.6
 contracts/**/vendor
+contracts/foundry-artifacts
 
 # Ignore TS definition and map files
 **/**.d.ts
@@ -30,6 +31,7 @@ contracts/**/vendor
 
 docs/
 venv/
+lib/
 
 *.md
 .github/**/*.yml
