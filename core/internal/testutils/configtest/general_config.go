@@ -79,7 +79,6 @@ type GeneralConfigOverrides struct {
 	GlobalFlagsContractAddress              null.String
 	GlobalGasEstimatorMode                  null.String
 	GlobalMinIncomingConfirmations          null.Int
-	GlobalMinRequiredOutgoingConfirmations  null.Int
 	GlobalMinimumContractPayment            *assets.Link
 	GlobalOCRObservationGracePeriod         time.Duration
 	KeeperCheckUpkeepGasPriceFeatureEnabled null.Bool
@@ -348,13 +347,6 @@ func (c *TestGeneralConfig) FeatureCCIP() bool {
 	return c.GeneralConfig.FeatureCCIP()
 }
 
-func (c *TestGeneralConfig) FeatureLogPoller() bool {
-	if c.Overrides.FeatureLogPoller.Valid {
-		return c.Overrides.FeatureLogPoller.Bool
-	}
-	return c.GeneralConfig.FeatureLogPoller()
-}
-
 func (c *TestGeneralConfig) FeatureExternalInitiators() bool {
 	if c.Overrides.FeatureExternalInitiators.Valid {
 		return c.Overrides.FeatureExternalInitiators.Bool
@@ -381,6 +373,13 @@ func (c *TestGeneralConfig) FeatureOffchainReporting2() bool {
 		return c.Overrides.FeatureOffchainReporting2.Bool
 	}
 	return c.GeneralConfig.FeatureOffchainReporting2()
+}
+
+func (c *TestGeneralConfig) FeatureLogPoller() bool {
+	if c.Overrides.FeatureLogPoller.Valid {
+		return c.Overrides.FeatureLogPoller.Bool
+	}
+	return c.GeneralConfig.FeatureLogPoller()
 }
 
 // TriggerFallbackDBPollInterval returns the test configured value for TriggerFallbackDBPollInterval
@@ -673,13 +672,6 @@ func (c *TestGeneralConfig) GlobalFlagsContractAddress() (string, bool) {
 		return c.Overrides.GlobalFlagsContractAddress.String, true
 	}
 	return c.GeneralConfig.GlobalFlagsContractAddress()
-}
-
-func (c *TestGeneralConfig) GlobalMinRequiredOutgoingConfirmations() (uint64, bool) {
-	if c.Overrides.GlobalMinRequiredOutgoingConfirmations.Valid {
-		return uint64(c.Overrides.GlobalMinRequiredOutgoingConfirmations.Int64), true
-	}
-	return c.GeneralConfig.GlobalMinRequiredOutgoingConfirmations()
 }
 
 func (c *TestGeneralConfig) GlobalEvmHeadTrackerMaxBufferSize() (uint32, bool) {

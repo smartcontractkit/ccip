@@ -79,12 +79,10 @@ func setupOCR2Contracts(t *testing.T) (*bind.TransactOpts, *backends.SimulatedBa
 		9,
 		"TEST",
 	)
-
 	// Ensure we have finality depth worth of blocks to start.
 	for i := 0; i < 20; i++ {
 		b.Commit()
 	}
-
 	require.NoError(t, err)
 	_, err = linkContract.Transfer(owner, ocrContractAddress, big.NewInt(1000))
 	require.NoError(t, err)
