@@ -593,7 +593,7 @@ func (client CCIPClient) TryGetTokensFromPausedPool() {
 	}
 
 	client.Source.Owner.GasLimit = 2e6
-	tx, err := client.Source.TokenPools[0].LockOrBurn(client.Source.Owner, client.Source.Owner.From, big.NewInt(1000))
+	tx, err := client.Source.TokenPools[0].LockOrBurn(client.Source.Owner, big.NewInt(1000))
 	helpers.PanicErr(err)
 	WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), false)
 }

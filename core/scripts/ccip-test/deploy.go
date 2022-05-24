@@ -284,13 +284,13 @@ func fillPoolWithTokens(t *testing.T, client *EvmChainConfig, pool *native_token
 
 	// fill offramp token pool with 0.05 LINK
 	amount := big.NewInt(5e16)
-	tx, err := destLinkToken.Approve(client.Owner, pool.Address(), amount)
+	tx, err := destLinkToken.Transfer(client.Owner, pool.Address(), amount)
 	require.NoError(t, err)
-	client.Logger.Infof("Approving token on token pool: %s", helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash()))
+	client.Logger.Infof("Transferring token to token pool: %s", helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash()))
 	WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 
 	client.Logger.Infof("Locking tokens in pool")
-	tx, err = pool.LockOrBurn(client.Owner, client.Owner.From, amount)
+	tx, err = pool.LockOrBurn(client.Owner, amount)
 	require.NoError(t, err)
 	WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 	client.Logger.Infof("Pool filled with tokens: %s", helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash()))

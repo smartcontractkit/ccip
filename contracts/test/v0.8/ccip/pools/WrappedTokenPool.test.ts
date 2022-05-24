@@ -163,27 +163,28 @@ describe('WrappedTokenPool', () => {
 
     it('fails when called by an unknown account', async () => {
       await evmRevert(
-        pool.connect(roles.stranger).lockOrBurn(sender, DEPOSIT),
+        pool.connect(roles.stranger).lockOrBurn(DEPOSIT),
         `PermissionsError()`,
       )
     })
 
     describe('called by the owner', () => {
       it('can burn tokens', async () => {
-        const startingBalance = await pool.balanceOf(sender)
-        await expect(pool.connect(account).lockOrBurn(sender, DEPOSIT))
+        const startingSupply = await pool.totalSupply()
+        await pool.connect(account).transfer(pool.address, DEPOSIT)
+        await expect(pool.connect(account).lockOrBurn(DEPOSIT))
           .to.emit(pool, 'Burned')
-          .withArgs(sender, sender, DEPOSIT)
+          .withArgs(sender, DEPOSIT)
 
-        const endingBalance = await pool.balanceOf(sender)
-        await expect(startingBalance.sub(endingBalance)).to.equal(DEPOSIT)
+        const endingSupply = await pool.totalSupply()
+        await expect(startingSupply.sub(endingSupply)).to.equal(DEPOSIT)
       })
 
       it("can't burn when paused", async () => {
         await pool.connect(account).pause()
 
         await evmRevert(
-          pool.connect(account).lockOrBurn(sender, DEPOSIT),
+          pool.connect(account).lockOrBurn(DEPOSIT),
           'Pausable: paused',
         )
       })
@@ -192,7 +193,7 @@ describe('WrappedTokenPool', () => {
         await pool.connect(account).setLockOrBurnBucket(1, 1, true)
 
         await evmRevert(
-          pool.connect(account).lockOrBurn(sender, DEPOSIT),
+          pool.connect(account).lockOrBurn(DEPOSIT),
           `ExceedsTokenLimit(1, ${DEPOSIT})`,
         )
       })
@@ -202,7 +203,7 @@ describe('WrappedTokenPool', () => {
       describe('when the onRamp is not set yet', () => {
         it('Fails with a permissions error', async () => {
           await evmRevert(
-            pool.connect(onRamp).lockOrBurn(sender, DEPOSIT),
+            pool.connect(onRamp).lockOrBurn(DEPOSIT),
             'PermissionsError()',
           )
         })
@@ -220,24 +221,22 @@ describe('WrappedTokenPool', () => {
         })
 
         it('tokens can be burned', async () => {
-          await pool
-            .connect(roles.defaultAccount)
-            .transfer(onRampAddress, DEPOSIT)
-          const balanceBefore = await pool.balanceOf(onRampAddress)
+          const startingSupply = await pool.totalSupply()
+          await pool.connect(account).transfer(pool.address, DEPOSIT)
 
-          await expect(pool.connect(onRamp).lockOrBurn(onRampAddress, DEPOSIT))
+          await expect(pool.connect(onRamp).lockOrBurn(DEPOSIT))
             .to.emit(pool, 'Burned')
-            .withArgs(onRampAddress, onRampAddress, DEPOSIT)
+            .withArgs(onRampAddress, DEPOSIT)
 
-          const balanceAfter = await pool.balanceOf(onRampAddress)
-          expect(balanceBefore.sub(balanceAfter)).to.equal(DEPOSIT)
+          const endingSupply = await pool.totalSupply()
+          await expect(startingSupply.sub(endingSupply)).to.equal(DEPOSIT)
         })
 
         it("can't burn when paused", async () => {
           await pool.connect(roles.defaultAccount).pause()
 
           await evmRevert(
-            pool.connect(onRamp).lockOrBurn(onRampAddress, DEPOSIT),
+            pool.connect(onRamp).lockOrBurn(DEPOSIT),
             'Pausable: paused',
           )
         })
@@ -248,7 +247,7 @@ describe('WrappedTokenPool', () => {
             .setLockOrBurnBucket(1, 1, true)
 
           await evmRevert(
-            pool.connect(onRamp).lockOrBurn(onRampAddress, DEPOSIT),
+            pool.connect(onRamp).lockOrBurn(DEPOSIT),
             `ExceedsTokenLimit(1, ${DEPOSIT})`,
           )
         })

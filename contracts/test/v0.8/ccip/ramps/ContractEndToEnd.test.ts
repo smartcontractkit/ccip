@@ -142,10 +142,7 @@ describe('Contract End to End', () => {
       .setOffRamp(chain2OffRamp.address, true)
     await chain2Token
       .connect(roles.defaultAccount)
-      .approve(chain2Pool.address, sendAmount)
-    await chain2Pool
-      .connect(roles.defaultAccount)
-      .lockOrBurn(adminAddress, sendAmount)
+      .transfer(chain2Pool.address, sendAmount)
     chain2Receiver = <SimpleMessageReceiver>(
       await deployContract(roles.defaultAccount, SimpleMessageReceiverArtifact)
     )

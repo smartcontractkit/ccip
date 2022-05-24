@@ -157,33 +157,24 @@ describe('NativeTokenPool', () => {
   describe('#lockOrBurn', () => {
     let account: Signer
     let sender: string
-    let depositor: string
 
     describe('called by the owner', () => {
       beforeEach(async () => {
         account = roles.defaultAccount
         sender = await account.getAddress()
-        depositor = await account.getAddress()
-
-        await token.connect(account).approve(pool.address, DEPOSIT)
-        const allowance = await token.allowance(depositor, pool.address)
-        await expect(allowance).to.equal(DEPOSIT)
       })
 
       it('can lock tokens', async () => {
-        await expect(pool.connect(account).lockOrBurn(depositor, DEPOSIT))
+        await expect(pool.connect(account).lockOrBurn(DEPOSIT))
           .to.emit(pool, 'Locked')
-          .withArgs(sender, depositor, DEPOSIT)
-
-        const poolBalance = await token.balanceOf(pool.address)
-        await expect(poolBalance).to.equal(DEPOSIT)
+          .withArgs(sender, DEPOSIT)
       })
 
       it("can't store when paused", async () => {
         await pool.connect(account).pause()
 
         await evmRevert(
-          pool.connect(account).lockOrBurn(depositor, DEPOSIT),
+          pool.connect(account).lockOrBurn(DEPOSIT),
           'Pausable: paused',
         )
       })
@@ -192,7 +183,7 @@ describe('NativeTokenPool', () => {
         await pool.connect(account).setLockOrBurnBucket(1, 1, true)
 
         await evmRevert(
-          pool.connect(account).lockOrBurn(depositor, DEPOSIT),
+          pool.connect(account).lockOrBurn(DEPOSIT),
           `ExceedsTokenLimit(1, ${DEPOSIT})`,
         )
       })
@@ -202,17 +193,12 @@ describe('NativeTokenPool', () => {
       beforeEach(async () => {
         account = onRamp
         sender = await account.getAddress()
-        depositor = await account.getAddress()
-
-        await token.connect(account).approve(pool.address, DEPOSIT)
-        const allowance = await token.allowance(depositor, pool.address)
-        await expect(allowance).to.equal(DEPOSIT)
       })
 
       describe('when the onRamp is not set yet', () => {
         it('Fails with a permissions error', async () => {
           await evmRevert(
-            pool.connect(account).lockOrBurn(depositor, DEPOSIT),
+            pool.connect(account).lockOrBurn(DEPOSIT),
             'PermissionsError()',
           )
         })
@@ -227,19 +213,16 @@ describe('NativeTokenPool', () => {
         })
 
         it('tokens can be locked', async () => {
-          await expect(pool.connect(account).lockOrBurn(depositor, DEPOSIT))
+          await expect(pool.connect(account).lockOrBurn(DEPOSIT))
             .to.emit(pool, 'Locked')
-            .withArgs(sender, depositor, DEPOSIT)
-
-          const poolBalance = await token.balanceOf(pool.address)
-          await expect(poolBalance).to.equal(DEPOSIT)
+            .withArgs(sender, DEPOSIT)
         })
 
         it("can't store when paused", async () => {
           await pool.connect(roles.defaultAccount).pause()
 
           await evmRevert(
-            pool.connect(account).lockOrBurn(depositor, DEPOSIT),
+            pool.connect(account).lockOrBurn(DEPOSIT),
             'Pausable: paused',
           )
         })
@@ -250,7 +233,7 @@ describe('NativeTokenPool', () => {
             .setLockOrBurnBucket(1, 1, true)
 
           await evmRevert(
-            pool.connect(account).lockOrBurn(depositor, DEPOSIT),
+            pool.connect(account).lockOrBurn(DEPOSIT),
             `ExceedsTokenLimit(1, ${DEPOSIT})`,
           )
         })
@@ -259,10 +242,9 @@ describe('NativeTokenPool', () => {
 
     it('fails when called by an unknown account', async () => {
       const account = roles.stranger
-      const depositor = await account.getAddress()
       await token.connect(account).approve(pool.address, DEPOSIT)
       await evmRevert(
-        pool.connect(account).lockOrBurn(depositor, DEPOSIT),
+        pool.connect(account).lockOrBurn(DEPOSIT),
         `PermissionsError()`,
       )
     })
@@ -287,10 +269,8 @@ describe('NativeTokenPool', () => {
           .setOnRamp(await onRamp.getAddress(), true)
         expect(await pool.isOnRamp(await onRamp.getAddress())).to.equal(true)
 
-        await token.connect(onRamp).approve(pool.address, DEPOSIT)
-        await pool
-          .connect(onRamp)
-          .lockOrBurn(await onRamp.getAddress(), DEPOSIT)
+        await token.connect(onRamp).transfer(pool.address, DEPOSIT)
+        await pool.connect(onRamp).lockOrBurn(DEPOSIT)
         // // Check pool balance
         const poolBalance = await token.balanceOf(pool.address)
         await expect(poolBalance).to.equal(DEPOSIT)
@@ -352,8 +332,8 @@ describe('NativeTokenPool', () => {
         depositor = await account.getAddress()
         recipient = await roles.stranger.getAddress()
 
-        await token.connect(account).approve(pool.address, DEPOSIT)
-        await pool.connect(account).lockOrBurn(depositor, DEPOSIT)
+        await token.connect(onRamp).transfer(pool.address, DEPOSIT)
+        await pool.connect(account).lockOrBurn(DEPOSIT)
         const poolBalance = await token.balanceOf(pool.address)
         await expect(poolBalance).to.equal(DEPOSIT)
       })

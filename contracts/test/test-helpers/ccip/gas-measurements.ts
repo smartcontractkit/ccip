@@ -16,18 +16,18 @@ export const GAS = {
       },
       TEN_MESSAGES: {
         NO_FEES: {
-          NO_TOKENS: 2_408_105,
-          ONE_TOKEN: 3_625_481,
+          NO_TOKENS: 2_408_163,
+          ONE_TOKEN: 3_625_293,
         },
       },
     },
   },
   OnRamp: {
     requestCrossChainSend: {
-      MESSAGE_ONLY: 188_431,
-      ONE_TOKEN: 211_112,
-      TWO_TOKENS: 321_445,
-      THREE_TOKENS: 431_754,
+      MESSAGE_ONLY: 133_548,
+      ONE_TOKEN: 133_512,
+      TWO_TOKENS: 202_574,
+      THREE_TOKENS: 271_600,
     },
   },
 }

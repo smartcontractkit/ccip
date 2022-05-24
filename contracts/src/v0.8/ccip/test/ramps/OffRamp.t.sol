@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
 import "../mocks/MockERC20.sol";
@@ -41,7 +42,7 @@ contract OffRampTest is Test {
     _offRamp.setRouter(_router);
   }
 
-  function loadReports(uint64 sequenceNumber) private returns (CCIP.Message memory) {
+  function loadReports(uint64 sequenceNumber) private pure returns (CCIP.Message memory) {
     IERC20[] memory tokens;
     uint256[] memory amounts;
     bytes memory data = abi.encode(0);

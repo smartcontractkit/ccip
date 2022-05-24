@@ -151,11 +151,9 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 	b, err := destLinkToken.BalanceOf(nil, destUser.From)
 	require.NoError(t, err)
 	t.Log("balance", b)
-	_, err = destLinkToken.Approve(destUser, destPoolAddress, big.NewInt(1000000))
+	_, err = destLinkToken.Transfer(destUser, destPoolAddress, big.NewInt(1000000))
 	require.NoError(t, err)
 	destChain.Commit()
-	_, err = destPool.LockOrBurn(destUser, destUser.From, big.NewInt(1000000))
-	require.NoError(t, err)
 
 	afnSourceAddress, _, _, err := afn_contract.DeployAFNContract(
 		sourceUser,

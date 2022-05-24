@@ -19,12 +19,10 @@ contract NativeTokenPool is TokenPool {
 
   /**
    * @notice Locks the token in the pool
-   * @param depositor Token holder address
    * @param amount Amount to lock
    */
-  function lockOrBurn(address depositor, uint256 amount) external override whenNotPaused assertLockOrBurn(amount) {
-    getToken().safeTransferFrom(depositor, address(this), amount);
-    emit Locked(msg.sender, depositor, amount);
+  function lockOrBurn(uint256 amount) external override whenNotPaused assertLockOrBurn(amount) {
+    emit Locked(msg.sender, amount);
   }
 
   /**

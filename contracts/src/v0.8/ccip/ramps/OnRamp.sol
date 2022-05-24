@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.13;
 
+import "../pools/PoolCollector.sol";
 import "../interfaces/OnRampInterface.sol";
 import "../../interfaces/TypeAndVersionInterface.sol";
 import "../utils/CCIP.sol";
@@ -13,7 +14,14 @@ import "../../vendor/SafeERC20.sol";
  * @notice An implementation of an On Ramp, which enables just a single token to be
  * used in the protocol.
  */
-contract OnRamp is OnRampInterface, TypeAndVersionInterface, HealthChecker, TokenPoolRegistry, PriceFeedRegistry {
+contract OnRamp is
+  OnRampInterface,
+  TypeAndVersionInterface,
+  HealthChecker,
+  TokenPoolRegistry,
+  PriceFeedRegistry,
+  PoolCollector
+{
   using SafeERC20 for IERC20;
 
   // Chain ID of the source chain (where this contract is deployed)
@@ -74,12 +82,8 @@ contract OnRamp is OnRampInterface, TypeAndVersionInterface, HealthChecker, Toke
     returns (uint64)
   {
     address sender = msg.sender;
-    if (originalSender != address(0)) {
-      if (sender != s_config.router) revert MustBeCalledByRouter();
-    } else {
-      originalSender = sender;
-    }
-    if (s_allowlistEnabled && !s_allowed[originalSender]) revert SenderNotAllowed(originalSender);
+    if (sender != s_config.router) revert MustBeCalledByRouter();
+    if (originalSender == address(0)) revert RouterMustSetOriginalSender();
     uint64 sequenceNumber = s_sequenceNumberPerDestinationChain[payload.destinationChainId];
     // Check that the destination chain has been configured
     // Assumes that any configured destination chains sequence number are initialized with 1
@@ -90,25 +94,14 @@ contract OnRamp is OnRampInterface, TypeAndVersionInterface, HealthChecker, Toke
     if (payload.tokens.length > uint256(s_config.maxTokensLength) || payload.tokens.length != payload.amounts.length)
       revert UnsupportedNumberOfTokens();
 
-    // Calculate fee
-    IERC20 feeToken = payload.tokens[0];
-    uint256 fee = _calculateFee(feeToken);
-    if (fee > 0) {
-      // Will revert on underflow
-      payload.amounts[0] -= fee;
-      // Charge fee
-      feeToken.safeTransferFrom(sender, address(this), fee);
-      emit FeeCharged(sender, address(this), fee);
-    }
+    if (s_allowlistEnabled && !s_allowed[originalSender]) revert SenderNotAllowed(originalSender);
 
     for (uint256 i = 0; i < payload.tokens.length; i++) {
       IERC20 token = payload.tokens[i];
       PoolInterface pool = getPool(token);
       if (address(pool) == address(0)) revert UnsupportedToken(token);
       uint256 amount = payload.amounts[i];
-      token.safeTransferFrom(sender, address(this), amount);
-      token.approve(address(pool), amount);
-      pool.lockOrBurn(address(this), amount);
+      pool.lockOrBurn(amount);
     }
 
     // Emit message request
@@ -123,19 +116,24 @@ contract OnRamp is OnRampInterface, TypeAndVersionInterface, HealthChecker, Toke
     return message.sequenceNumber;
   }
 
-  function _calculateFee(IERC20 feeToken) internal view returns (uint256) {
-    AggregatorV2V3Interface priceFeed = getFeed(feeToken);
-    if (address(priceFeed) == address(0)) revert UnsupportedFeeToken(feeToken);
-    return uint256(s_config.relayingFeeJuels) * uint256(priceFeed.latestAnswer());
+  /**
+   * @notice Get the required fee for a specific fee token
+   * @param feeToken token to get the fee for
+   * @return fee uint256
+   */
+  function getRequiredFee(IERC20 feeToken) public view override returns (uint256) {
+    AggregatorV2V3Interface feed = getFeed(feeToken);
+    if (address(feed) == address(0)) revert UnsupportedFeeToken(feeToken);
+    return s_config.relayingFeeJuels * uint256(feed.latestAnswer());
   }
 
-  function withdrawAccumulatedFees(
-    IERC20 feeToken,
-    address recipient,
-    uint256 amount
-  ) external onlyOwner {
-    feeToken.safeTransfer(recipient, amount);
-    emit FeesWithdrawn(feeToken, recipient, amount);
+  /**
+   * @notice Get the pool for a specific token
+   * @param token token to get the pool for
+   * @return pool PoolInterface
+   */
+  function getTokenPool(IERC20 token) external view override returns (PoolInterface) {
+    return getPool(token);
   }
 
   function setAllowlistEnabled(bool enabled) external onlyOwner {

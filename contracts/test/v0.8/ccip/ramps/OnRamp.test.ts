@@ -9,9 +9,9 @@ import { Roles, getUsers } from '../../../test-helpers/setup'
 import {
   MockERC20,
   NativeTokenPool,
-  OnRampHelper,
   MockAFN,
   MockAggregator,
+  OnRamp,
 } from '../../../../typechain'
 import { Artifact } from 'hardhat/types'
 import { expect } from 'chai'
@@ -20,7 +20,6 @@ import {
   CCIPMessagePayload,
   requestEventArgsEqual,
 } from '../../../test-helpers/ccip/ccip'
-import { Signer } from 'ethers'
 import { GAS } from '../../../test-helpers/ccip/gas-measurements'
 
 const { deployContract } = hre.waffle
@@ -34,7 +33,7 @@ let RampArtifact: Artifact
 let roles: Roles
 
 let afn: MockAFN
-let ramp: OnRampHelper
+let ramp: OnRamp
 const numberOfTokensPoolsAndFeeds = 3
 let tokens: Array<MockERC20>
 let pools: Array<NativeTokenPool>
@@ -69,7 +68,7 @@ describe('OnRamp', () => {
     TokenArtifact = await hre.artifacts.readArtifact('MockERC20')
     PoolArtifact = await hre.artifacts.readArtifact('NativeTokenPool')
     PriceFeedArtifact = await hre.artifacts.readArtifact('MockAggregator')
-    RampArtifact = await hre.artifacts.readArtifact('OnRampHelper')
+    RampArtifact = await hre.artifacts.readArtifact('OnRamp')
 
     afn = <MockAFN>await deployContract(roles.defaultAccount, MockAFNArtifact)
     maxTimeWithoutAFNSignal = BigNumber.from(60).mul(60) // 1 hour
@@ -110,24 +109,22 @@ describe('OnRamp', () => {
       .connect(roles.defaultAccount)
       .setLatestAnswer(priceFeedLatestAnswer)
 
-    ramp = <OnRampHelper>(
-      await deployContract(roles.defaultAccount, RampArtifact, [
-        sourceChainId,
-        destinationChainIds,
-        tokens.map((t) => t.address),
-        pools.map((p) => p.address),
-        [priceFeed.address, constants.AddressZero, constants.AddressZero],
-        [await roles.defaultAccount.getAddress()],
-        afn.address,
-        maxTimeWithoutAFNSignal,
-        {
-          router: hre.ethers.constants.AddressZero,
-          maxTokensLength: maxTokensLength,
-          maxDataSize: maxDataSize,
-          relayingFeeJuels: relayingFeeJuels,
-        },
-      ])
-    )
+    ramp = <OnRamp>await deployContract(roles.defaultAccount, RampArtifact, [
+      sourceChainId,
+      destinationChainIds,
+      tokens.map((t) => t.address),
+      pools.map((p) => p.address),
+      [priceFeed.address, constants.AddressZero, constants.AddressZero],
+      [await roles.defaultAccount.getAddress()],
+      afn.address,
+      maxTimeWithoutAFNSignal,
+      {
+        router: await roles.oracleNode.getAddress(),
+        maxTokensLength: maxTokensLength,
+        maxDataSize: maxDataSize,
+        relayingFeeJuels: relayingFeeJuels,
+      },
+    ])
 
     for (let i = 0; i < numberOfTokensPoolsAndFeeds; i++) {
       pools[i].connect(roles.defaultAccount).setOnRamp(ramp.address, true)
@@ -136,12 +133,11 @@ describe('OnRamp', () => {
 
   it('has a limited public interface [ @skip-coverage ]', async () => {
     publicAbi(ramp, [
-      // OnRampHelper
-      'publicCalculateFee',
       // OnRamp
       'requestCrossChainSend',
-      'withdrawAccumulatedFees',
       'CHAIN_ID',
+      'getRequiredFee',
+      'getTokenPool',
       'setAllowlistEnabled',
       'getAllowlistEnabled',
       'setAllowlist',
@@ -223,7 +219,7 @@ describe('OnRamp', () => {
     })
   })
 
-  describe('#_calculateFee', () => {
+  describe('#getRequiredFee', () => {
     let latestPrice: number
 
     beforeEach(async () => {
@@ -239,7 +235,7 @@ describe('OnRamp', () => {
     it('fails if the feeToken is not a configured fee token', async () => {
       const wrongToken = pools[0].address
       await evmRevert(
-        ramp.connect(roles.defaultAccount).publicCalculateFee(wrongToken),
+        ramp.connect(roles.defaultAccount).getRequiredFee(wrongToken),
         `UnsupportedFeeToken("${wrongToken}")`,
       )
     })
@@ -248,7 +244,7 @@ describe('OnRamp', () => {
       it('calculates the correct fee', async () => {
         const result = await ramp
           .connect(roles.defaultAccount)
-          .publicCalculateFee(tokens[0].address)
+          .getRequiredFee(tokens[0].address)
         expect(result).to.equal(latestPrice)
       })
     })
@@ -264,91 +260,8 @@ describe('OnRamp', () => {
         })
         const result = await ramp
           .connect(roles.defaultAccount)
-          .publicCalculateFee(tokens[0].address)
+          .getRequiredFee(tokens[0].address)
         expect(result).to.equal(fee * latestPrice)
-      })
-    })
-  })
-
-  describe('#withdrawAccumulatedFees', () => {
-    let receiver: string
-    let messageData: string
-    let amounts: Array<BigNumber>
-    let payload: CCIPMessagePayload
-    let recipient: Signer
-    let recipientAddress: string
-    let feeToken: MockERC20
-    let feesTaken: BigNumber
-
-    beforeEach(async () => {
-      receiver = await roles.stranger.getAddress()
-      messageData = hre.ethers.constants.HashZero
-      amounts = [bucketRate.div(8)]
-      payload = {
-        receiver: receiver,
-        data: messageData,
-        tokens: [tokens.map((t) => t.address)[0]],
-        amounts: amounts,
-        destinationChainId: destinationChainIds[0],
-        executor: hre.ethers.constants.AddressZero,
-      }
-      await tokens[0]
-        .connect(roles.defaultAccount)
-        .approve(ramp.address, amounts[0])
-      await ramp
-        .connect(roles.defaultAccount)
-        .requestCrossChainSend(payload, hre.ethers.constants.AddressZero)
-      recipient = roles.stranger
-      recipientAddress = await recipient.getAddress()
-      feeToken = tokens[0]
-      feesTaken = (await priceFeed.latestAnswer()).mul(relayingFeeJuels)
-    })
-
-    it('success', async () => {
-      const recipientBalanceBefore = await feeToken.balanceOf(recipientAddress)
-      const rampBalanceBefore = await feeToken.balanceOf(ramp.address)
-
-      const tx = await ramp
-        .connect(roles.defaultAccount)
-        .withdrawAccumulatedFees(feeToken.address, recipientAddress, feesTaken)
-
-      const recipientBalanceAfter = await feeToken.balanceOf(recipientAddress)
-      const rampBalanceAfter = await feeToken.balanceOf(ramp.address)
-
-      expect(recipientBalanceAfter).to.equal(
-        recipientBalanceBefore.add(feesTaken),
-      )
-      expect(rampBalanceAfter).to.equal(rampBalanceBefore.sub(feesTaken))
-
-      await expect(tx)
-        .to.emit(ramp, 'FeesWithdrawn')
-        .withArgs(feeToken.address, recipientAddress, feesTaken)
-    })
-
-    describe('failure', () => {
-      it('fails if called by a non-owner', async () => {
-        await evmRevert(
-          ramp
-            .connect(roles.stranger)
-            .withdrawAccumulatedFees(
-              feeToken.address,
-              recipientAddress,
-              feesTaken,
-            ),
-          'Only callable by owner',
-        )
-      })
-      it('fails if amount is greater than OnRamp balance', async () => {
-        await evmRevert(
-          ramp
-            .connect(roles.defaultAccount)
-            .withdrawAccumulatedFees(
-              feeToken.address,
-              recipientAddress,
-              feesTaken.mul(2),
-            ),
-          'ERC20: transfer amount exceeds balance',
-        )
       })
     })
   })
@@ -390,8 +303,11 @@ describe('OnRamp', () => {
           .approve(ramp.address, priceFeedLatestAnswer)
         gasUsed = gasUsed.add((await tx.wait()).gasUsed)
         tx = await ramp
-          .connect(roles.defaultAccount)
-          .requestCrossChainSend(payload, hre.ethers.constants.AddressZero)
+          .connect(roles.oracleNode)
+          .requestCrossChainSend(
+            payload,
+            await roles.defaultAccount.getAddress(),
+          )
         gasUsed = gasUsed.add((await tx.wait()).gasUsed)
         expectGasWithinDeviation(
           gasUsed,
@@ -407,8 +323,11 @@ describe('OnRamp', () => {
           .approve(ramp.address, amounts[0])
         gasUsed = gasUsed.add((await tx.wait()).gasUsed)
         tx = await ramp
-          .connect(roles.defaultAccount)
-          .requestCrossChainSend(payload, hre.ethers.constants.AddressZero)
+          .connect(roles.oracleNode)
+          .requestCrossChainSend(
+            payload,
+            await roles.defaultAccount.getAddress(),
+          )
         gasUsed = gasUsed.add((await tx.wait()).gasUsed)
         expectGasWithinDeviation(
           gasUsed,
@@ -426,8 +345,11 @@ describe('OnRamp', () => {
           gasUsed = gasUsed.add((await tx.wait()).gasUsed)
         }
         tx = await ramp
-          .connect(roles.defaultAccount)
-          .requestCrossChainSend(payload, hre.ethers.constants.AddressZero)
+          .connect(roles.oracleNode)
+          .requestCrossChainSend(
+            payload,
+            await roles.defaultAccount.getAddress(),
+          )
         gasUsed = gasUsed.add((await tx.wait()).gasUsed)
         expectGasWithinDeviation(
           gasUsed,
@@ -443,8 +365,11 @@ describe('OnRamp', () => {
           gasUsed = gasUsed.add((await tx.wait()).gasUsed)
         }
         tx = await ramp
-          .connect(roles.defaultAccount)
-          .requestCrossChainSend(payload, hre.ethers.constants.AddressZero)
+          .connect(roles.oracleNode)
+          .requestCrossChainSend(
+            payload,
+            await roles.defaultAccount.getAddress(),
+          )
         gasUsed = gasUsed.add((await tx.wait()).gasUsed)
         expectGasWithinDeviation(
           gasUsed,
@@ -453,70 +378,8 @@ describe('OnRamp', () => {
       })
     })
 
-    describe('success (3 tokens - without fees)', () => {
-      let tx: ContractTransaction
-      beforeEach(async () => {
-        await ramp.connect(roles.defaultAccount).setConfig({
-          router: hre.ethers.constants.AddressZero,
-          relayingFeeJuels: 0,
-          maxDataSize: maxDataSize,
-          maxTokensLength: maxTokensLength,
-        })
-        for (let i = 0; i < tokens.length; i++) {
-          tx = await tokens[i]
-            .connect(roles.defaultAccount)
-            .approve(ramp.address, amounts[i])
-        }
-        tx = await ramp
-          .connect(roles.defaultAccount)
-          .requestCrossChainSend(payload, hre.ethers.constants.AddressZero)
-      })
-
-      it('does not store any fees', async () => {
-        expect(await tokens[0].balanceOf(ramp.address)).to.equal(0)
-      })
-
-      it('does not emit a fee taken event', async () => {
-        await expect(tx).to.not.emit(ramp, 'FeeCharged')
-      })
-
-      it('locks each token into the pools', async () => {
-        for (let i = 0; i < pools.length; i++) {
-          const poolBalance = await tokens[i].balanceOf(pools[i].address)
-          expect(poolBalance).to.equal(amounts[i])
-        }
-      })
-
-      it('emits a CrossChainSendRequested event', async () => {
-        const receipt = await tx.wait()
-        const eventArgs = ramp.interface.parseLog(
-          receipt.logs[receipt.logs.length - 1],
-        ).args
-        const expectedAmounts = amounts
-        requestEventArgsEqual(eventArgs, {
-          sequenceNumber: eventArgs?.message?.sequenceNumber,
-          sourceChainId: BigNumber.from(sourceChainId),
-          destinationChainId: BigNumber.from(payload.destinationChainId),
-          sender: await roles.defaultAccount.getAddress(),
-          receiver: receiver,
-          data: messageData,
-          tokens: tokens.map((t) => t.address),
-          amounts: expectedAmounts,
-        })
-      })
-
-      it('increments the sequence number per destination chain', async () => {
-        expect(
-          await ramp.getSequenceNumberOfDestinationChain(
-            payload.destinationChainId,
-          ),
-        ).to.equal(2)
-      })
-    })
-
     describe('success (3 tokens)', () => {
       let tx: ContractTransaction
-      let feeTaken: BigNumber
       beforeEach(async () => {
         for (let i = 0; i < tokens.length; i++) {
           tx = await tokens[i]
@@ -524,44 +387,18 @@ describe('OnRamp', () => {
             .approve(ramp.address, amounts[i])
         }
         tx = await ramp
-          .connect(roles.defaultAccount)
-          .requestCrossChainSend(payload, hre.ethers.constants.AddressZero)
-        feeTaken = (await priceFeed.latestAnswer()).mul(relayingFeeJuels)
-      })
-
-      it('stores the fee in the OnRamp', async () => {
-        expect(await tokens[0].balanceOf(ramp.address)).to.equal(feeTaken)
-      })
-
-      it('emits a fee taken event', async () => {
-        await expect(tx)
-          .to.emit(ramp, 'FeeCharged')
-          .withArgs(
+          .connect(roles.oracleNode)
+          .requestCrossChainSend(
+            payload,
             await roles.defaultAccount.getAddress(),
-            ramp.address,
-            feeTaken,
           )
       })
 
-      it('locks each token into the pools', async () => {
-        for (let i = 0; i < pools.length; i++) {
-          const poolBalance = await tokens[i].balanceOf(pools[i].address)
-          if (i == 0) {
-            // Calculate amount minus fee
-            expect(poolBalance).to.equal(amounts[i].sub(feeTaken))
-          } else {
-            expect(poolBalance).to.equal(amounts[i])
-          }
-        }
-      })
-
       it('emits a CrossChainSendRequested event', async () => {
         const receipt = await tx.wait()
         const eventArgs = ramp.interface.parseLog(
           receipt.logs[receipt.logs.length - 1],
         ).args
-        const expectedAmounts = amounts
-        expectedAmounts[0] = expectedAmounts[0].sub(feeTaken)
         requestEventArgsEqual(eventArgs, {
           sequenceNumber: eventArgs?.message?.sequenceNumber,
           sourceChainId: BigNumber.from(sourceChainId),
@@ -570,7 +407,7 @@ describe('OnRamp', () => {
           receiver: receiver,
           data: messageData,
           tokens: tokens.map((t) => t.address),
-          amounts: expectedAmounts,
+          amounts: amounts,
         })
       })
 
@@ -588,8 +425,11 @@ describe('OnRamp', () => {
         await ramp.pause()
         await evmRevert(
           ramp
-            .connect(roles.defaultAccount)
-            .requestCrossChainSend(payload, hre.ethers.constants.AddressZero),
+            .connect(roles.oracleNode)
+            .requestCrossChainSend(
+              payload,
+              await roles.defaultAccount.getAddress(),
+            ),
           'Pausable: paused',
         )
       })
@@ -597,8 +437,11 @@ describe('OnRamp', () => {
         await afn.voteBad()
         await evmRevert(
           ramp
-            .connect(roles.defaultAccount)
-            .requestCrossChainSend(payload, hre.ethers.constants.AddressZero),
+            .connect(roles.oracleNode)
+            .requestCrossChainSend(
+              payload,
+              await roles.defaultAccount.getAddress(),
+            ),
           'BadAFNSignal()',
         )
       })
@@ -606,12 +449,20 @@ describe('OnRamp', () => {
         await afn.setTimestamp(BigNumber.from(1))
         await evmRevert(
           ramp
-            .connect(roles.defaultAccount)
-            .requestCrossChainSend(payload, hre.ethers.constants.AddressZero),
+            .connect(roles.oracleNode)
+            .requestCrossChainSend(
+              payload,
+              await roles.defaultAccount.getAddress(),
+            ),
           'StaleAFNHeartbeat()',
         )
       })
-      it('fails if the originalSender is set, but its not called by the router', async () => {
+      it('fails if the sender is the router but the originalSender is not set', async () => {
+        for (let i = 0; i < tokens.length; i++) {
+          await tokens[i]
+            .connect(roles.defaultAccount)
+            .approve(ramp.address, amounts[i])
+        }
         await ramp.connect(roles.defaultAccount).setConfig({
           router: await roles.oracleNode.getAddress(),
           relayingFeeJuels: relayingFeeJuels,
@@ -620,20 +471,25 @@ describe('OnRamp', () => {
         })
         await evmRevert(
           ramp
-            .connect(roles.defaultAccount)
-            .requestCrossChainSend(
-              payload,
-              await roles.oracleNode1.getAddress(),
-            ),
-          `MustBeCalledByRouter()`,
+            .connect(roles.oracleNode)
+            .requestCrossChainSend(payload, hre.ethers.constants.AddressZero),
+          `RouterMustSetOriginalSender()`,
         )
       })
       it('fails when the allowlist is set and the sender is not part of it', async () => {
+        for (let i = 0; i < tokens.length; i++) {
+          await tokens[i]
+            .connect(roles.defaultAccount)
+            .approve(ramp.address, amounts[i])
+        }
         await ramp.connect(roles.defaultAccount).setAllowlist([])
         await evmRevert(
           ramp
-            .connect(roles.defaultAccount)
-            .requestCrossChainSend(payload, hre.ethers.constants.AddressZero),
+            .connect(roles.oracleNode)
+            .requestCrossChainSend(
+              payload,
+              await roles.defaultAccount.getAddress(),
+            ),
           `SenderNotAllowed("${await roles.defaultAccount.getAddress()}")`,
         )
       })
@@ -641,41 +497,50 @@ describe('OnRamp', () => {
         payload.destinationChainId = BigNumber.from(999)
         await evmRevert(
           ramp
-            .connect(roles.defaultAccount)
-            .requestCrossChainSend(payload, hre.ethers.constants.AddressZero),
+            .connect(roles.oracleNode)
+            .requestCrossChainSend(
+              payload,
+              await roles.defaultAccount.getAddress(),
+            ),
           `UnsupportedDestinationChain(${payload.destinationChainId})`,
         )
       })
       it('fails if the data is larger than the max data size', async () => {
         const newDataSize = 1
         await ramp.connect(roles.defaultAccount).setConfig({
-          router: hre.ethers.constants.AddressZero,
+          router: await roles.oracleNode.getAddress(),
           maxDataSize: newDataSize,
           maxTokensLength: maxTokensLength,
           relayingFeeJuels: relayingFeeJuels,
         })
         await evmRevert(
           ramp
-            .connect(roles.defaultAccount)
-            .requestCrossChainSend(payload, hre.ethers.constants.AddressZero),
+            .connect(roles.oracleNode)
+            .requestCrossChainSend(
+              payload,
+              await roles.defaultAccount.getAddress(),
+            ),
           `MessageTooLarge(${newDataSize}, 32)`,
         )
       })
       it('fails if there are too many tokens, or the amounts are a different length to the tokens', async () => {
         await ramp.connect(roles.defaultAccount).setConfig({
-          router: hre.ethers.constants.AddressZero,
+          router: await roles.oracleNode.getAddress(),
           maxDataSize: maxDataSize,
           maxTokensLength: 1,
           relayingFeeJuels: relayingFeeJuels,
         })
         await evmRevert(
           ramp
-            .connect(roles.defaultAccount)
-            .requestCrossChainSend(payload, hre.ethers.constants.AddressZero),
+            .connect(roles.oracleNode)
+            .requestCrossChainSend(
+              payload,
+              await roles.defaultAccount.getAddress(),
+            ),
           `UnsupportedNumberOfTokens()`,
         )
         await ramp.connect(roles.defaultAccount).setConfig({
-          router: hre.ethers.constants.AddressZero,
+          router: await roles.oracleNode.getAddress(),
           maxDataSize: maxDataSize,
           maxTokensLength: maxTokensLength,
           relayingFeeJuels: relayingFeeJuels,
@@ -683,27 +548,12 @@ describe('OnRamp', () => {
         payload.amounts = [100]
         await evmRevert(
           ramp
-            .connect(roles.defaultAccount)
-            .requestCrossChainSend(payload, hre.ethers.constants.AddressZero),
+            .connect(roles.oracleNode)
+            .requestCrossChainSend(
+              payload,
+              await roles.defaultAccount.getAddress(),
+            ),
           `UnsupportedNumberOfTokens()`,
-        )
-      })
-      it('fails if the fee token is not supported', async () => {
-        const wrongToken = await roles.stranger.getAddress()
-        payload.tokens[0] = wrongToken
-        await evmRevert(
-          ramp
-            .connect(roles.defaultAccount)
-            .requestCrossChainSend(payload, hre.ethers.constants.AddressZero),
-          `UnsupportedFeeToken("${wrongToken}")`,
-        )
-      })
-      it('fails if the sender does not approve the ramp for a token', async () => {
-        await evmRevert(
-          ramp
-            .connect(roles.defaultAccount)
-            .requestCrossChainSend(payload, hre.ethers.constants.AddressZero),
-          `ERC20: transfer amount exceeds allowance`,
         )
       })
       it('fails if a token does not have a configured pool in the ramp', async () => {
@@ -718,12 +568,20 @@ describe('OnRamp', () => {
           .approve(ramp.address, amounts[0])
         await evmRevert(
           ramp
-            .connect(roles.defaultAccount)
-            .requestCrossChainSend(payload, hre.ethers.constants.AddressZero),
+            .connect(roles.oracleNode)
+            .requestCrossChainSend(
+              payload,
+              await roles.defaultAccount.getAddress(),
+            ),
           `UnsupportedToken("${tokens[0].address}")`,
         )
       })
       it('fails if a lock exceeds the token limit', async () => {
+        for (let i = 0; i < tokens.length; i++) {
+          await tokens[i]
+            .connect(roles.defaultAccount)
+            .approve(ramp.address, amounts[i])
+        }
         await pools[0]
           .connect(roles.defaultAccount)
           .setLockOrBurnBucket(1, 1, true)
@@ -731,14 +589,15 @@ describe('OnRamp', () => {
         await tokens[0]
           .connect(roles.defaultAccount)
           .approve(ramp.address, amounts[0])
-        const amountToLock = amounts[0].sub(
-          relayingFeeJuels * priceFeedLatestAnswer,
-        )
+
         await evmRevert(
           ramp
-            .connect(roles.defaultAccount)
-            .requestCrossChainSend(payload, hre.ethers.constants.AddressZero),
-          `ExceedsTokenLimit(1, ${amountToLock})`,
+            .connect(roles.oracleNode)
+            .requestCrossChainSend(
+              payload,
+              await roles.defaultAccount.getAddress(),
+            ),
+          `ExceedsTokenLimit(1, ${amounts[0]})`,
         )
       })
     })

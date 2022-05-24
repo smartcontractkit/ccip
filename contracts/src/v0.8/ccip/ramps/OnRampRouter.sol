@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.13;
 
-import "../interfaces/OnRampInterface.sol";
+import "../pools/PoolCollector.sol";
 import "../../interfaces/TypeAndVersionInterface.sol";
 import "../access/OwnerIsCreator.sol";
-import "../../vendor/SafeERC20.sol";
 
-contract OnRampRouter is TypeAndVersionInterface, OwnerIsCreator {
+contract OnRampRouter is TypeAndVersionInterface, OwnerIsCreator, PoolCollector {
   using SafeERC20 for IERC20;
 
   error OnRampAlreadySet(uint256 chainId, OnRampInterface onRamp);
 
   event OnRampSet(uint256 indexed chainId, OnRampInterface indexed onRamp);
+  event FeesWithdrawn(IERC20 feeToken, address recipient, uint256 amount);
 
   // destination chain id => OnRampInterface
   mapping(uint256 => OnRampInterface) private s_onRamps;
@@ -26,15 +26,17 @@ contract OnRampRouter is TypeAndVersionInterface, OwnerIsCreator {
     OnRampInterface onRamp = s_onRamps[payload.destinationChainId];
     if (address(onRamp) == address(0)) revert OnRampInterface.UnsupportedDestinationChain(payload.destinationChainId);
     if (payload.tokens.length != payload.amounts.length) revert OnRampInterface.UnsupportedNumberOfTokens();
-
-    for (uint256 i = 0; i < payload.tokens.length; i++) {
-      IERC20 token = payload.tokens[i];
-      uint256 amount = payload.amounts[i];
-      token.safeTransferFrom(sender, address(this), amount);
-      token.approve(address(onRamp), amount);
-    }
-
+    _collectTokens(onRamp, payload);
     return onRamp.requestCrossChainSend(payload, sender);
+  }
+
+  function withdrawAccumulatedFees(
+    IERC20 feeToken,
+    address recipient,
+    uint256 amount
+  ) external onlyOwner {
+    feeToken.safeTransfer(recipient, amount);
+    emit FeesWithdrawn(feeToken, recipient, amount);
   }
 
   /**

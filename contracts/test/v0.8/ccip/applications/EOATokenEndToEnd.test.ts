@@ -51,7 +51,7 @@ before(async () => {
   roles = users.roles
 })
 
-describe('Single Token EOA End to End', () => {
+describe('Single Token EOA End to End (through dapp contract)', () => {
   beforeEach(async () => {
     const adminAddress = await roles.defaultAccount.getAddress()
 
@@ -134,10 +134,7 @@ describe('Single Token EOA End to End', () => {
       .setOffRamp(chain2OffRamp.address, true)
     await chain2Token
       .connect(roles.defaultAccount)
-      .approve(chain2Pool.address, sendAmount)
-    await chain2Pool
-      .connect(roles.defaultAccount)
-      .lockOrBurn(adminAddress, sendAmount)
+      .transfer(chain2Pool.address, sendAmount)
     chain2OffApp = <ReceiverDapp>(
       await deployContract(roles.defaultAccount, OffRampReceiverArtifact, [
         chain2Router.address,

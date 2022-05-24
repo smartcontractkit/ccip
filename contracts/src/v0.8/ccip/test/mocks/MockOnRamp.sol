@@ -5,25 +5,25 @@ import "../../interfaces/OnRampInterface.sol";
 
 contract MockOnRamp is OnRampInterface {
   uint256 public immutable CHAIN_ID;
-  IERC20 public immutable TOKEN;
-  IERC20 public immutable DESTINATION_TOKEN;
   PoolInterface public immutable POOL;
   uint256 public immutable DESTINATION_CHAIN_ID;
+  uint256 public immutable FEE;
 
   CCIP.MessagePayload public mp;
 
+  event GetRequiredFee(IERC20 token);
+  event GetTokenPool(IERC20 token);
+
   constructor(
     uint256 chainId,
-    IERC20 token,
-    IERC20 destinationToken,
     PoolInterface pool,
-    uint256 destinationChainId
+    uint256 destinationChainId,
+    uint256 fee
   ) {
     CHAIN_ID = chainId;
-    TOKEN = token;
-    DESTINATION_TOKEN = destinationToken;
     POOL = pool;
     DESTINATION_CHAIN_ID = destinationChainId;
+    FEE = fee;
   }
 
   function requestCrossChainSend(CCIP.MessagePayload calldata payload, address originalSender)
@@ -49,5 +49,15 @@ contract MockOnRamp is OnRampInterface {
     data = mp.data;
     tokens = mp.tokens;
     amounts = mp.amounts;
+  }
+
+  function getRequiredFee(IERC20 token) external override returns (uint256) {
+    emit GetRequiredFee(token);
+    return FEE;
+  }
+
+  function getTokenPool(IERC20 token) external override returns (PoolInterface) {
+    emit GetTokenPool(token);
+    return POOL;
   }
 }

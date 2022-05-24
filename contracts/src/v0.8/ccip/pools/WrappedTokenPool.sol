@@ -20,12 +20,11 @@ contract WrappedTokenPool is TokenPool, ERC20 {
 
   /**
    * @notice Burn the token in the pool
-   * @param depositor Token holder address
    * @param amount Amount to burn
    */
-  function lockOrBurn(address depositor, uint256 amount) external override whenNotPaused assertLockOrBurn(amount) {
-    _burn(depositor, amount);
-    emit Burned(msg.sender, depositor, amount);
+  function lockOrBurn(uint256 amount) external override whenNotPaused assertLockOrBurn(amount) {
+    _burn(address(this), amount);
+    emit Burned(msg.sender, amount);
   }
 
   /**

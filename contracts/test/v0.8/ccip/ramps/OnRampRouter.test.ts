@@ -1,10 +1,14 @@
 import { expect } from 'chai'
-import { BigNumber } from 'ethers'
+import { BigNumber, Signer } from 'ethers'
 import { ContractTransaction } from 'ethers'
-import { constants } from 'ethers'
 import hre from 'hardhat'
 import { Artifact } from 'hardhat/types'
-import { MockERC20, MockOnRamp, OnRampRouter } from '../../../../typechain'
+import {
+  MockERC20,
+  MockOnRamp,
+  MockPool,
+  OnRampRouter,
+} from '../../../../typechain'
 import { CCIPMessagePayload } from '../../../test-helpers/ccip/ccip'
 import { evmRevert } from '../../../test-helpers/matchers'
 import { getUsers, Roles } from '../../../test-helpers/setup'
@@ -16,15 +20,17 @@ let roles: Roles
 let TokenArtifact: Artifact
 let OnRampArtifact: Artifact
 let RouterArtifact: Artifact
+let MockPoolArtifact: Artifact
 
 const chainId: number = 1
 const destinationChainIds: Array<number> = [2, 3]
-const pool: string = constants.AddressZero
 
 let tokens: Array<MockERC20>
 let onRamps: Array<MockOnRamp>
+let pool: MockPool
 let router: OnRampRouter
 let mintAmount: BigNumber
+let fee = BigNumber.from(1)
 
 before(async () => {
   const users = await getUsers()
@@ -38,7 +44,11 @@ describe('OnRampRouter', () => {
     TokenArtifact = await hre.artifacts.readArtifact('MockERC20')
     OnRampArtifact = await hre.artifacts.readArtifact('MockOnRamp')
     RouterArtifact = await hre.artifacts.readArtifact('OnRampRouter')
+    MockPoolArtifact = await hre.artifacts.readArtifact('MockPool')
 
+    pool = <MockPool>(
+      await deployContract(roles.defaultAccount, MockPoolArtifact, [1])
+    )
     tokens = new Array<MockERC20>()
     onRamps = new Array<MockOnRamp>()
     router = <OnRampRouter>(
@@ -62,10 +72,9 @@ describe('OnRampRouter', () => {
         <MockOnRamp>(
           await deployContract(roles.defaultAccount, OnRampArtifact, [
             chainId,
-            tokens[i].address,
-            tokens[i].address,
-            pool,
+            pool.address,
             destinationChainId,
+            fee,
           ])
         ),
       )
@@ -153,20 +162,14 @@ describe('OnRampRouter', () => {
           token2SenderBalanceBefore.sub(amounts[1]),
         )
       })
-      it('approves the onRamp to spend the tokens', async () => {
+      it('sends the tokens to the pool', async () => {
         await router
           .connect(roles.defaultAccount)
           .requestCrossChainSend(payload)
-        const allowance1 = await tokens[0].allowance(
-          router.address,
-          onRamps[0].address,
-        )
-        const allowance2 = await tokens[1].allowance(
-          router.address,
-          onRamps[0].address,
-        )
-        expect(allowance1).to.equal(payload.amounts[0])
-        expect(allowance2).to.equal(payload.amounts[1])
+        const balance1 = await tokens[0].balanceOf(pool.address)
+        const balance2 = await tokens[1].balanceOf(pool.address)
+        expect(balance1).to.equal(BigNumber.from(payload.amounts[0]).sub(fee))
+        expect(balance2).to.equal(payload.amounts[1])
       })
       it('calls requestCrossChainSend on the onRamp with the payload', async () => {
         await router
@@ -182,6 +185,77 @@ describe('OnRampRouter', () => {
     })
   })
 
+  describe('#withdrawAccumulatedFees', () => {
+    let recipient: Signer
+    let recipientAddress: string
+    let feeToken: MockERC20
+    let withdrawAmount: BigNumber
+
+    beforeEach(async () => {
+      withdrawAmount = BigNumber.from(123)
+      recipient = roles.defaultAccount
+      recipientAddress = await recipient.getAddress()
+      feeToken = tokens[0]
+      await feeToken
+        .connect(roles.defaultAccount)
+        .transfer(router.address, withdrawAmount)
+    })
+
+    it('success', async () => {
+      const recipientBalanceBefore = await feeToken.balanceOf(recipientAddress)
+      const routerBalanceBefore = await feeToken.balanceOf(router.address)
+
+      const tx = await router
+        .connect(roles.defaultAccount)
+        .withdrawAccumulatedFees(
+          feeToken.address,
+          recipientAddress,
+          withdrawAmount,
+        )
+
+      const recipientBalanceAfter = await feeToken.balanceOf(recipientAddress)
+      const routerBalanceAfter = await feeToken.balanceOf(router.address)
+
+      expect(recipientBalanceAfter).to.equal(
+        recipientBalanceBefore.add(withdrawAmount),
+      )
+      expect(routerBalanceAfter).to.equal(
+        routerBalanceBefore.sub(withdrawAmount),
+      )
+
+      await expect(tx)
+        .to.emit(router, 'FeesWithdrawn')
+        .withArgs(feeToken.address, recipientAddress, withdrawAmount)
+    })
+
+    describe('failure', () => {
+      it('fails if called by a non-owner', async () => {
+        await evmRevert(
+          router
+            .connect(roles.stranger)
+            .withdrawAccumulatedFees(
+              feeToken.address,
+              recipientAddress,
+              withdrawAmount,
+            ),
+          'Only callable by owner',
+        )
+      })
+      it('fails if amount is greater than OnRamp balance', async () => {
+        await evmRevert(
+          router
+            .connect(roles.defaultAccount)
+            .withdrawAccumulatedFees(
+              feeToken.address,
+              recipientAddress,
+              withdrawAmount.mul(2),
+            ),
+          'ERC20: transfer amount exceeds balance',
+        )
+      })
+    })
+  })
+
   describe('#setOnRamp', () => {
     let newOnRamp: MockOnRamp
 
@@ -189,10 +263,9 @@ describe('OnRampRouter', () => {
       newOnRamp = <MockOnRamp>(
         await deployContract(roles.defaultAccount, OnRampArtifact, [
           chainId,
-          tokens[0].address,
-          tokens[0].address,
-          pool,
+          pool.address,
           destinationChainIds[0],
+          fee,
         ])
       )
     })

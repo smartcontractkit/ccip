@@ -12,7 +12,7 @@ contract MockPool is PoolInterface {
     s_uid = uid;
   }
 
-  function lockOrBurn(address depositor, uint256 amount) external override {}
+  function lockOrBurn(uint256 amount) external override {}
 
   function releaseOrMint(address recipient, uint256 amount) external override {}
 

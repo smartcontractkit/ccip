@@ -71,10 +71,10 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	require.NoError(t, err)
 
 	// Fund dest pool
-	_, err = destLinkToken.Approve(destUser, destPoolAddress, big.NewInt(1000000))
+	_, err = destLinkToken.Transfer(destUser, destPoolAddress, big.NewInt(1000000))
 	require.NoError(t, err)
 	destChain.Commit()
-	_, err = destPool.LockOrBurn(destUser, destUser.From, big.NewInt(1000000))
+	_, err = destPool.LockOrBurn(destUser, big.NewInt(1000000))
 	require.NoError(t, err)
 	destChain.Commit()
 

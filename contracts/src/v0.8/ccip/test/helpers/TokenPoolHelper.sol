@@ -5,7 +5,7 @@ pragma solidity 0.8.13;
 import "../../pools/TokenPool.sol";
 
 contract TokenPoolHelper is TokenPool {
-  event LockOrBurn(address indexed depository, uint256 amount);
+  event LockOrBurn(uint256 amount);
   event ReleaseOrMint(address indexed recipient, uint256 amount);
   event AssertionPassed();
 
@@ -23,8 +23,8 @@ contract TokenPoolHelper is TokenPool {
     )
   {}
 
-  function lockOrBurn(address depositor, uint256 amount) external override {
-    emit LockOrBurn(depositor, amount);
+  function lockOrBurn(uint256 amount) external override {
+    emit LockOrBurn(amount);
   }
 
   function releaseOrMint(address recipient, uint256 amount) external override {

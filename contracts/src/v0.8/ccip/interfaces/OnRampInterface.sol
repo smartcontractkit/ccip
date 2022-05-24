@@ -14,6 +14,7 @@ interface OnRampInterface {
   error SenderNotAllowed(address sender);
   error UnsupportedDestinationChain(uint256 destinationChainId);
   error MustBeCalledByRouter();
+  error RouterMustSetOriginalSender();
 
   event CrossChainSendRequested(CCIP.Message message);
   event AllowlistEnabledSet(bool enabled);
@@ -21,8 +22,6 @@ interface OnRampInterface {
   event NewTokenBucketConstructed(uint256 rate, uint256 capacity, bool full);
   event OnRampConfigSet(OnRampConfig config);
   event RouterSet(address router);
-  event FeeCharged(address from, address to, uint256 fee);
-  event FeesWithdrawn(IERC20 feeToken, address recipient, uint256 amount);
 
   struct OnRampConfig {
     address router;
@@ -43,4 +42,8 @@ interface OnRampInterface {
   function requestCrossChainSend(CCIP.MessagePayload calldata payload, address originalSender)
     external
     returns (uint64);
+
+  function getRequiredFee(IERC20 feeToken) external returns (uint256);
+
+  function getTokenPool(IERC20 token) external returns (PoolInterface);
 }

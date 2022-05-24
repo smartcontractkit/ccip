@@ -10,8 +10,8 @@ import "../utils/TokenLimits.sol";
 interface PoolInterface {
   error ExceedsTokenLimit(uint256 currentLimit, uint256 requested);
 
-  event Locked(address indexed sender, address indexed depositor, uint256 amount);
-  event Burned(address indexed sender, address indexed depositor, uint256 amount);
+  event Locked(address indexed sender, uint256 amount);
+  event Burned(address indexed sender, uint256 amount);
   event Released(address indexed sender, address indexed recipient, uint256 amount);
   event Minted(address indexed sender, address indexed recipient, uint256 amount);
   event NewLockBurnBucketConstructed(uint256 rate, uint256 capacity, bool full);
@@ -24,10 +24,9 @@ interface PoolInterface {
 
   /**
    * @notice Lock or burn the token in the pool
-   * @param depositor Token holder address
    * @param amount Amount to lock or burn
    */
-  function lockOrBurn(address depositor, uint256 amount) external;
+  function lockOrBurn(uint256 amount) external;
 
   /**
    * @notice Release or mint tokens fromm the pool to the recipient
