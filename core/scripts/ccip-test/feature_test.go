@@ -31,13 +31,11 @@ func TestFullFeatureCCIP(t *testing.T) {
 	case "deploy":
 		deployCCIPContracts(t, ownerKey,
 			&Rinkeby,
-			[]*EvmChainConfig{&Kovan, &BSCTestnet, &PolygonMumbai})
+			&Kovan)
 	case "printJobs":
-		printContractConfig(GetSetupChain(t, ownerKey, Rinkeby),
-			[]*EvmChainConfig{
-				GetSetupChain(t, ownerKey, Kovan),
-				GetSetupChain(t, ownerKey, BSCTestnet),
-				GetSetupChain(t, ownerKey, PolygonMumbai)})
+		printContractConfig(
+			GetSetupChain(t, ownerKey, Rinkeby),
+			GetSetupChain(t, ownerKey, Kovan))
 	default:
 		runCommand(t, ownerKey, command)
 	}

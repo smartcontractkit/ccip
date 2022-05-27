@@ -159,7 +159,7 @@ describe('Single Token EOA End to End (through dapp contract)', () => {
     chain1OnRamp = <OnRamp>(
       await deployContract(roles.defaultAccount, OnRampArtifact, [
         chain1ID,
-        [chain2ID],
+        chain2ID,
         [chain1Token.address],
         [chain1Pool.address],
         [priceFeed1.address],

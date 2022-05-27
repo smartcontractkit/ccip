@@ -13,50 +13,60 @@ import "../../ramps/OnRampRouter.sol";
 import "forge-std/Test.sol";
 
 contract OnRampTest is Test {
-  uint256 _chainID = 1;
-  uint256[] _destinationChainIds = [2];
-  address public _owner;
-  address[] _allowList;
+  uint256 public s_chainID = 1;
+  uint256 public s_destinationChainId = 2;
+  address public s_owner;
+  address[] public s_allowList;
 
-  IERC20[] _tokens;
-  MockAFN _afn;
-  PoolInterface[] _pools;
-  AggregatorV2V3Interface[] _feeds;
-  OnRampRouter _router;
-  OnRamp _onRampObject;
+  IERC20[] public s_tokens;
+  MockAFN public s_afn;
+  PoolInterface[] public s_pools;
+  AggregatorV2V3Interface[] public s_feeds;
+  OnRampRouter public s_router;
+  OnRamp public s_onRamp;
 
   function setUp() public {
-    _owner = 0x00007e64E1fB0C487F25dd6D3601ff6aF8d32e4e;
-    // Set the sender to _owner
-    vm.startPrank(_owner);
+    s_owner = 0x00007e64E1fB0C487F25dd6D3601ff6aF8d32e4e;
+    // Set the sender to s_owner
+    vm.startPrank(s_owner);
 
-    _router = new OnRampRouter();
-    _tokens.push(new MockERC20("LINK", "LNK", _owner, 2**256 - 1));
-    _afn = new MockAFN();
-    _pools.push(new MockPool(5));
-    _feeds.push(new MockV3Aggregator(0, 1));
-    OnRampInterface.OnRampConfig memory Config = OnRampInterface.OnRampConfig(address(_router), 0, 2e6, 5);
+    s_router = new OnRampRouter();
+    s_tokens.push(new MockERC20("LINK", "LNK", s_owner, 2**256 - 1));
+    s_afn = new MockAFN();
+    s_pools.push(new MockPool(5));
+    s_feeds.push(new MockV3Aggregator(0, 1));
+    OnRampInterface.OnRampConfig memory Config = OnRampInterface.OnRampConfig(address(s_router), 0, 2e6, 5);
 
-    _onRampObject = new OnRamp(_chainID, _destinationChainIds, _tokens, _pools, _feeds, _allowList, _afn, 1e18, Config);
+    s_onRamp = new OnRamp(
+      s_chainID,
+      s_destinationChainId,
+      s_tokens,
+      s_pools,
+      s_feeds,
+      s_allowList,
+      s_afn,
+      1e18,
+      Config
+    );
 
-    _router.setOnRamp(_destinationChainIds[0], _onRampObject);
-    _tokens[0].approve(address(_router), 2**128);
+    s_router.setOnRamp(s_destinationChainId, s_onRamp);
+    s_tokens[0].approve(address(s_router), 2**128);
   }
 
   function testGetRequiredFee() public view {
-    _onRampObject.getRequiredFee(_tokens[0]);
+    s_onRamp.getRequiredFee(s_tokens[0]);
   }
 
   function testRequestXChainSendsExactApprove() public {
     uint256[] memory amounts = new uint256[](1);
     amounts[0] = 2**128;
-    requestCrossChainSend(_tokens, amounts, "");
+    requestCrossChainSend(s_tokens, amounts, "");
   }
 
   function testRequestXChainSends() public {
     uint256[] memory amounts = new uint256[](1);
     amounts[0] = 2**64;
-    requestCrossChainSend(_tokens, amounts, "");
+    requestCrossChainSend(s_tokens, amounts, "");
   }
 
   function requestCrossChainSend(
@@ -64,6 +74,6 @@ contract OnRampTest is Test {
     uint256[] memory amounts,
     bytes memory data
   ) public {
-    _router.requestCrossChainSend(CCIP.MessagePayload(tokens, amounts, _destinationChainIds[0], _owner, _owner, data));
+    s_router.requestCrossChainSend(CCIP.MessagePayload(tokens, amounts, s_destinationChainId, s_owner, s_owner, data));
   }
 }

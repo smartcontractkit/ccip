@@ -1,9 +1,5 @@
 import hre from 'hardhat'
-import {
-  expectGasWithinDeviation,
-  publicAbi,
-  stringToBytes,
-} from '../../../test-helpers/helpers'
+import { publicAbi } from '../../../test-helpers/helpers'
 import { BigNumber, constants, ContractTransaction } from 'ethers'
 import { Roles, getUsers } from '../../../test-helpers/setup'
 import {
@@ -20,7 +16,6 @@ import {
   CCIPMessagePayload,
   requestEventArgsEqual,
 } from '../../../test-helpers/ccip/ccip'
-import { GAS } from '../../../test-helpers/ccip/gas-measurements'
 
 const { deployContract } = hre.waffle
 
@@ -40,11 +35,7 @@ let pools: Array<NativeTokenPool>
 let priceFeed: MockAggregator
 let priceFeedLatestAnswer: number = 100
 const sourceChainId: number = 123
-const destinationChainIds: Array<BigNumber> = [
-  BigNumber.from(9),
-  BigNumber.from(8),
-  BigNumber.from(7),
-]
+const destinationChainId: BigNumber = BigNumber.from(9)
 const maxTokensLength: number = 10
 const maxDataSize: number = 10 ** 3 // 1kb
 const relayingFeeJuels: number = 1
@@ -111,7 +102,7 @@ describe('OnRamp', () => {
 
     ramp = <OnRamp>await deployContract(roles.defaultAccount, RampArtifact, [
       sourceChainId,
-      destinationChainIds,
+      destinationChainId,
       tokens.map((t) => t.address),
       pools.map((p) => p.address),
       [priceFeed.address, constants.AddressZero, constants.AddressZero],
@@ -136,14 +127,14 @@ describe('OnRamp', () => {
       // OnRamp
       'requestCrossChainSend',
       'CHAIN_ID',
+      'DESTINATION_CHAIN_ID',
       'getRequiredFee',
       'getTokenPool',
       'setAllowlistEnabled',
       'getAllowlistEnabled',
       'setAllowlist',
       'getAllowlist',
-      'getSequenceNumberOfDestinationChain',
-      'getDestinationChains',
+      'getSequenceNumber',
       'getConfig',
       'setConfig',
       // PriceFeedRegistry
@@ -208,14 +199,8 @@ describe('OnRamp', () => {
         }
       }
 
-      // Sequence numbers per destination chain
-      for (let i = 0; i < destinationChainIds.length; i++) {
-        expect(
-          await ramp.getSequenceNumberOfDestinationChain(
-            destinationChainIds[i],
-          ),
-        ).to.equal(1)
-      }
+      // Sequence number
+      expect(await ramp.getSequenceNumber()).to.equal(1)
     })
   })
 
@@ -281,101 +266,9 @@ describe('OnRamp', () => {
         data: messageData,
         tokens: tokens.map((t) => t.address),
         amounts: amounts,
-        destinationChainId: destinationChainIds[0],
+        destinationChainId: destinationChainId,
         executor: hre.ethers.constants.AddressZero,
       }
-    })
-
-    describe('GASTEST', () => {
-      let tx: ContractTransaction
-      let gasUsed: BigNumber
-
-      beforeEach(async () => {
-        gasUsed = BigNumber.from(0)
-      })
-
-      it('GASTEST - Message only (with payment) [ @skip-coverage ]', async () => {
-        payload.tokens = [tokens[0].address]
-        payload.amounts = [priceFeedLatestAnswer]
-        payload.data = stringToBytes('Hello World')
-        tx = await tokens[0]
-          .connect(roles.defaultAccount)
-          .approve(ramp.address, priceFeedLatestAnswer)
-        gasUsed = gasUsed.add((await tx.wait()).gasUsed)
-        tx = await ramp
-          .connect(roles.oracleNode)
-          .requestCrossChainSend(
-            payload,
-            await roles.defaultAccount.getAddress(),
-          )
-        gasUsed = gasUsed.add((await tx.wait()).gasUsed)
-        expectGasWithinDeviation(
-          gasUsed,
-          GAS.OnRamp.requestCrossChainSend.MESSAGE_ONLY,
-        )
-      })
-
-      it('GASTEST - Send 1 token [ @skip-coverage ]', async () => {
-        payload.tokens = [tokens[0].address]
-        payload.amounts = [amounts[0]]
-        tx = await tokens[0]
-          .connect(roles.defaultAccount)
-          .approve(ramp.address, amounts[0])
-        gasUsed = gasUsed.add((await tx.wait()).gasUsed)
-        tx = await ramp
-          .connect(roles.oracleNode)
-          .requestCrossChainSend(
-            payload,
-            await roles.defaultAccount.getAddress(),
-          )
-        gasUsed = gasUsed.add((await tx.wait()).gasUsed)
-        expectGasWithinDeviation(
-          gasUsed,
-          GAS.OnRamp.requestCrossChainSend.ONE_TOKEN,
-        )
-      })
-
-      it('GASTEST - Send 2 tokens [ @skip-coverage ]', async () => {
-        payload.tokens = [tokens[0].address, tokens[1].address]
-        payload.amounts = [amounts[0], amounts[1]]
-        for (let i = 0; i < 2; i++) {
-          tx = await tokens[i]
-            .connect(roles.defaultAccount)
-            .approve(ramp.address, amounts[i])
-          gasUsed = gasUsed.add((await tx.wait()).gasUsed)
-        }
-        tx = await ramp
-          .connect(roles.oracleNode)
-          .requestCrossChainSend(
-            payload,
-            await roles.defaultAccount.getAddress(),
-          )
-        gasUsed = gasUsed.add((await tx.wait()).gasUsed)
-        expectGasWithinDeviation(
-          gasUsed,
-          GAS.OnRamp.requestCrossChainSend.TWO_TOKENS,
-        )
-      })
-
-      it('GASTEST - Send 3 tokens [ @skip-coverage ]', async () => {
-        for (let i = 0; i < tokens.length; i++) {
-          tx = await tokens[i]
-            .connect(roles.defaultAccount)
-            .approve(ramp.address, amounts[i])
-          gasUsed = gasUsed.add((await tx.wait()).gasUsed)
-        }
-        tx = await ramp
-          .connect(roles.oracleNode)
-          .requestCrossChainSend(
-            payload,
-            await roles.defaultAccount.getAddress(),
-          )
-        gasUsed = gasUsed.add((await tx.wait()).gasUsed)
-        expectGasWithinDeviation(
-          gasUsed,
-          GAS.OnRamp.requestCrossChainSend.THREE_TOKENS,
-        )
-      })
     })
 
     describe('success (3 tokens)', () => {
@@ -412,11 +305,7 @@ describe('OnRamp', () => {
       })
 
       it('increments the sequence number per destination chain', async () => {
-        expect(
-          await ramp.getSequenceNumberOfDestinationChain(
-            payload.destinationChainId,
-          ),
-        ).to.equal(2)
+        expect(await ramp.getSequenceNumber()).to.equal(2)
       })
     })
 

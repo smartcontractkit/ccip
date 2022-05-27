@@ -24,45 +24,32 @@ import (
 // deployCCIPContracts will deploy all source and Destination chain contracts using the
 // owner key. Only run this of the currently deployed contracts are outdated or
 // when initializing a new chain.
-func deployCCIPContracts(t *testing.T, ownerKey string, sourceChain *EvmChainConfig, destChains []*EvmChainConfig) {
+func deployCCIPContracts(t *testing.T, ownerKey string, sourceChain *EvmChainConfig, destChain *EvmChainConfig) {
 	sourceChain.SetupChain(t, ownerKey)
-
-	for _, dest := range destChains {
-		dest.SetupChain(t, ownerKey)
-	}
-
-	deploySourceAndDestContracts(t, sourceChain, destChains)
+	destChain.SetupChain(t, ownerKey)
+	deploySourceAndDestContracts(t, sourceChain, destChain)
 }
 
-func deploySourceAndDestContracts(t *testing.T, source *EvmChainConfig, destinations []*EvmChainConfig) {
+func deploySourceAndDestContracts(t *testing.T, source *EvmChainConfig, destination *EvmChainConfig) {
 	// After running this code please update the configuration to reflect the newly
 	// deployed contract addresses.
-	var destChainIds []*big.Int
-	for _, dest := range destinations {
-		destChainIds = append(destChainIds, dest.ChainId)
-	}
-
-	onRamp := deploySourceContracts(t, source, destChainIds)
+	onRamp := deploySourceContracts(t, source, destination.ChainId)
 	source.Logger.Infof("%s contracts fully deployed as source chain", helpers.ChainName(source.ChainId.Int64()))
 
-	var tokenSenders []common.Address
-	for i, chain := range destinations {
-		tokenReceiver := deployDestinationContracts(t, chain, source.ChainId, source.BridgeTokens)
-		chain.Logger.Infof("%s contracts fully deployed as destination chain %d/%d", helpers.ChainName(chain.ChainId.Int64()), i+1, len(destinations))
+	tokenReceiver := deployDestinationContracts(t, destination, source.ChainId, source.BridgeTokens)
+	destination.Logger.Infof("%s contracts fully deployed as destination chain", helpers.ChainName(destination.ChainId.Int64()))
 
-		// Deploy onramp sender dapp
-		tokenSenderAddress, tx, _, err := sender_dapp.DeploySenderDapp(source.Owner, source.Client, onRamp.Address(), chain.ChainId, tokenReceiver)
-		require.NoError(t, err)
-		WaitForMined(t, chain.Logger, source.Client, tx.Hash(), true)
-		source.Logger.Infof("Token sender dapp deployed on %s in tx: %s", tokenSenderAddress.Hex(), helpers.ExplorerLink(source.ChainId.Int64(), tx.Hash()))
-		tokenSenders = append(tokenSenders, tokenSenderAddress)
-	}
-	source.TokenSenders = tokenSenders
+	// Deploy onramp sender dapp
+	tokenSenderAddress, tx, _, err := sender_dapp.DeploySenderDapp(source.Owner, source.Client, onRamp.Address(), destination.ChainId, tokenReceiver)
+	require.NoError(t, err)
+	WaitForMined(t, destination.Logger, source.Client, tx.Hash(), true)
+	source.Logger.Infof("Token sender dapp deployed on %s in tx: %s", tokenSenderAddress.Hex(), helpers.ExplorerLink(source.ChainId.Int64(), tx.Hash()))
+	source.TokenSender = tokenSenderAddress
 
-	printContractConfig(source, destinations)
+	printContractConfig(source, destination)
 }
 
-func deploySourceContracts(t *testing.T, source *EvmChainConfig, offrampChainIDs []*big.Int) *onramp.OnRamp {
+func deploySourceContracts(t *testing.T, source *EvmChainConfig, offRampChainID *big.Int) *onramp.OnRamp {
 	tokenPools := deployNativeTokenPool(t, source)
 	afn := deployAFN(t, source)
 	feedAddresses := deployPriceFeed(t, source)
@@ -72,7 +59,7 @@ func deploySourceContracts(t *testing.T, source *EvmChainConfig, offrampChainIDs
 		tokenPoolAddresses = append(tokenPoolAddresses, tokenPool.Address())
 	}
 
-	onRamp := deployOnRamp(t, source, offrampChainIDs, tokenPoolAddresses, feedAddresses, afn.Address())
+	onRamp := deployOnRamp(t, source, offRampChainID, tokenPoolAddresses, feedAddresses, afn.Address())
 
 	for _, tokenPool := range tokenPools {
 		// Configure onramp address on pool
@@ -84,7 +71,7 @@ func deploySourceContracts(t *testing.T, source *EvmChainConfig, offrampChainIDs
 	return onRamp
 }
 
-func deployDestinationContracts(t *testing.T, client *EvmChainConfig, onrampChainId *big.Int, sourceBridgeTokens []common.Address) common.Address {
+func deployDestinationContracts(t *testing.T, client *EvmChainConfig, onRampChainId *big.Int, sourceBridgeTokens []common.Address) common.Address {
 	tokenPools := deployNativeTokenPool(t, client)
 	afn := deployAFN(t, client)
 	feedAddresses := deployPriceFeed(t, client)
@@ -94,7 +81,7 @@ func deployDestinationContracts(t *testing.T, client *EvmChainConfig, onrampChai
 		tokenPoolAddresses = append(tokenPoolAddresses, tokenPool.Address())
 	}
 
-	offRamp := deployOffRamp(t, client, onrampChainId, tokenPoolAddresses, feedAddresses, afn.Address(), sourceBridgeTokens)
+	offRamp := deployOffRamp(t, client, onRampChainId, tokenPoolAddresses, feedAddresses, afn.Address(), sourceBridgeTokens)
 
 	for _, tokenPool := range tokenPools {
 		// Configure offramp address on pool
@@ -128,13 +115,13 @@ func deployDestinationContracts(t *testing.T, client *EvmChainConfig, onrampChai
 	return tokenReceiverAddress
 }
 
-func deployOnRamp(t *testing.T, client *EvmChainConfig, destinationChains []*big.Int, poolAddresses []common.Address, feedAddresses []common.Address, afn common.Address) *onramp.OnRamp {
-	client.Logger.Infof("Deploying onramp: destinationChains %+v, bridgeTokens %+v, poolAddresses %+v, priceFeeds %+v", destinationChains, client.BridgeTokens, poolAddresses, feedAddresses)
+func deployOnRamp(t *testing.T, client *EvmChainConfig, destinationChain *big.Int, poolAddresses []common.Address, feedAddresses []common.Address, afn common.Address) *onramp.OnRamp {
+	client.Logger.Infof("Deploying onramp: destinationChains %+v, bridgeTokens %+v, poolAddresses %+v, priceFeeds %+v", destinationChain, client.BridgeTokens, poolAddresses, feedAddresses)
 	onRampAddress, tx, _, err := onramp.DeployOnRamp(
 		client.Owner,                  // user
 		client.Client,                 // client
 		client.ChainId,                // source chain id
-		destinationChains,             // destinationChainIds
+		destinationChain,              // destinationChainId
 		client.BridgeTokens,           // tokens
 		poolAddresses,                 // pools
 		feedAddresses,                 // Feeds
@@ -296,7 +283,7 @@ func fillPoolWithTokens(t *testing.T, client *EvmChainConfig, pool *native_token
 	client.Logger.Infof("Pool filled with tokens: %s", helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash()))
 }
 
-func printContractConfig(source *EvmChainConfig, destinations []*EvmChainConfig) {
+func printContractConfig(source *EvmChainConfig, destination *EvmChainConfig) {
 	source.Logger.Infof("Source chain config")
 	source.Logger.Infof(`
 Source chain config	
@@ -309,10 +296,9 @@ TokenSenders: %s,
 OnRamp:       common.HexToAddress("%s"),
 OffRamp:      common.Address{},
 Afn:          common.HexToAddress("%s"),
-`, source.LinkToken, source.BridgeTokens, source.TokenPools, source.PriceFeeds, source.TokenSenders, source.OnRamp, source.Afn)
+`, source.LinkToken, source.BridgeTokens, source.TokenPools, source.PriceFeeds, source.TokenSender, source.OnRamp, source.Afn)
 
-	for _, dest := range destinations {
-		dest.Logger.Infof(`
+	destination.Logger.Infof(`
 Destination chain config	
 	
 LinkToken:       common.HexToAddress("%s"),
@@ -325,8 +311,8 @@ MessageReceiver: common.HexToAddress("%s"),
 TokenReceiver:   common.HexToAddress("%s"),
 MessageExecutor: common.HexToAddress("%s"),
 Afn:             common.HexToAddress("%s"),
-`, dest.LinkToken, dest.BridgeTokens, dest.TokenPools, dest.PriceFeeds, dest.OffRamp, dest.MessageReceiver, dest.TokenReceiver, dest.OffRampExecutor, dest.Afn)
+`, destination.LinkToken, destination.BridgeTokens, destination.TokenPools, destination.PriceFeeds, destination.OffRamp, destination.MessageReceiver, destination.TokenReceiver, destination.OffRampExecutor, destination.Afn)
 
-		PrintJobSpecs(source.OnRamp, dest.OffRamp, dest.OffRampExecutor, source.ChainId, dest.ChainId)
-	}
+	PrintJobSpecs(source.OnRamp, destination.OffRamp, destination.OffRampExecutor, source.ChainId, destination.ChainId)
+
 }

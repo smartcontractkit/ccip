@@ -26,11 +26,11 @@ contract OnRamp is
 
   // Chain ID of the source chain (where this contract is deployed)
   uint256 public immutable CHAIN_ID;
+  // Chain ID of the destination chain (where this contract sends messages)
+  uint256 public immutable DESTINATION_CHAIN_ID;
 
   // Destination chain => sequence number
-  mapping(uint256 => uint64) private s_sequenceNumberPerDestinationChain;
-  // List of destination chains
-  uint256[] private s_destinationChains;
+  uint64 private s_sequenceNumber;
   // OnRamp config
   OnRampConfig private s_config;
 
@@ -43,7 +43,7 @@ contract OnRamp is
 
   constructor(
     uint256 chainId,
-    uint256[] memory destinationChainIds,
+    uint256 destinationChainId,
     IERC20[] memory tokens,
     PoolInterface[] memory pools,
     AggregatorV2V3Interface[] memory feeds,
@@ -53,10 +53,8 @@ contract OnRamp is
     OnRampConfig memory config
   ) HealthChecker(afn, maxTimeWithoutAFNSignal) TokenPoolRegistry(tokens, pools) PriceFeedRegistry(tokens, feeds) {
     CHAIN_ID = chainId;
-    s_destinationChains = destinationChainIds;
-    for (uint256 i = 0; i < destinationChainIds.length; i++) {
-      s_sequenceNumberPerDestinationChain[destinationChainIds[i]] = 1;
-    }
+    DESTINATION_CHAIN_ID = destinationChainId;
+    s_sequenceNumber = 1;
     if (allowlist.length > 0) {
       s_allowlistEnabled = true;
       s_allowList = allowlist;
@@ -84,10 +82,8 @@ contract OnRamp is
     address sender = msg.sender;
     if (sender != s_config.router) revert MustBeCalledByRouter();
     if (originalSender == address(0)) revert RouterMustSetOriginalSender();
-    uint64 sequenceNumber = s_sequenceNumberPerDestinationChain[payload.destinationChainId];
-    // Check that the destination chain has been configured
-    // Assumes that any configured destination chains sequence number are initialized with 1
-    if (sequenceNumber == 0) revert UnsupportedDestinationChain(payload.destinationChainId);
+    if (payload.destinationChainId != DESTINATION_CHAIN_ID)
+      revert UnsupportedDestinationChain(payload.destinationChainId);
     // Check that payload is formed correctly
     if (payload.data.length > uint256(s_config.maxDataSize))
       revert MessageTooLarge(uint256(s_config.maxDataSize), payload.data.length);
@@ -104,6 +100,7 @@ contract OnRamp is
       pool.lockOrBurn(amount);
     }
 
+    uint64 sequenceNumber = s_sequenceNumber;
     // Emit message request
     CCIP.Message memory message = CCIP.Message({
       sequenceNumber: sequenceNumber,
@@ -111,7 +108,7 @@ contract OnRamp is
       sender: originalSender,
       payload: payload
     });
-    s_sequenceNumberPerDestinationChain[payload.destinationChainId] = sequenceNumber + 1;
+    s_sequenceNumber = sequenceNumber + 1;
     emit CrossChainSendRequested(message);
     return message.sequenceNumber;
   }
@@ -173,12 +170,8 @@ contract OnRamp is
     return s_config;
   }
 
-  function getDestinationChains() external view returns (uint256[] memory) {
-    return s_destinationChains;
-  }
-
-  function getSequenceNumberOfDestinationChain(uint256 destinationChainId) external view returns (uint64) {
-    return s_sequenceNumberPerDestinationChain[destinationChainId];
+  function getSequenceNumber() external view returns (uint64) {
+    return s_sequenceNumber;
   }
 
   function typeAndVersion() external pure override returns (string memory) {

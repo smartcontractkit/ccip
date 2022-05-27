@@ -31,7 +31,7 @@ type EvmChainConfig struct {
 	OnRampRouter    common.Address
 	OffRamp         common.Address
 	OffRampRouter   common.Address
-	TokenSenders    []common.Address
+	TokenSender     common.Address
 	MessageReceiver common.Address
 	TokenReceiver   common.Address
 	OffRampExecutor common.Address
@@ -72,7 +72,7 @@ var Rinkeby = EvmChainConfig{
 	OnRampRouter:  common.HexToAddress(""),
 	OffRamp:       common.Address{},
 	OffRampRouter: common.HexToAddress(""),
-	TokenSenders:  []common.Address{common.HexToAddress("0xC2F8a293ca968c449795d47337497F26b2813434"), common.HexToAddress("0x621686CC559AaC74af08C3cc829c696751c33000"), common.HexToAddress("0x496bBBD6840b31d3C54517ab81D3688eb962EBcD")},
+	TokenSender:   common.HexToAddress("0xC2F8a293ca968c449795d47337497F26b2813434"),
 	Afn:           common.HexToAddress("0xA4E4fd20121f268674d2C5c771e4cd27eAD0C543"),
 	DeploySettings: DeploySettings{
 		DeployAFN:        false,

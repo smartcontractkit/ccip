@@ -22,12 +22,4 @@ export const GAS = {
       },
     },
   },
-  OnRamp: {
-    requestCrossChainSend: {
-      MESSAGE_ONLY: 133_548,
-      ONE_TOKEN: 133_512,
-      TWO_TOKENS: 202_574,
-      THREE_TOKENS: 271_600,
-    },
-  },
 }

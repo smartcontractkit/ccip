@@ -179,7 +179,7 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 		sourceUser,                               // user
 		sourceChain,                              // client
 		sourceChainID,                            // source chain id
-		[]*big.Int{destChainID},                  // destinationChainIds
+		destChainID,                              // destinationChainIds
 		[]common.Address{sourceLinkTokenAddress}, // tokens
 		[]common.Address{sourcePoolAddress},      // pools
 		[]common.Address{feedAddress},            // Feeds

@@ -73,7 +73,7 @@ func NewSourceClient(t *testing.T, config EvmChainConfig) SourceClient {
 	require.NoError(t, err)
 	onRamp, err := onramp.NewOnRamp(config.OnRamp, client)
 	require.NoError(t, err)
-	tokenSender, err := sender_dapp.NewSenderDapp(config.TokenSenders[0], client)
+	tokenSender, err := sender_dapp.NewSenderDapp(config.TokenSender, client)
 	require.NoError(t, err)
 	onRampRouter, err := onramp_router.NewOnRampRouter(config.OnRampRouter, client)
 	require.NoError(t, err)
