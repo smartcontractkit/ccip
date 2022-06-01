@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
+	relaytypes "github.com/smartcontractkit/chainlink-relay/pkg/types"
 	"github.com/smartcontractkit/libocr/gethwrappers2/ocr2aggregator"
 	"github.com/smartcontractkit/libocr/offchainreporting2/chains/evmutil"
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
@@ -15,12 +16,11 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"github.com/smartcontractkit/sqlx"
 
-	relaytypes "github.com/smartcontractkit/chainlink-relay/pkg/types"
-
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
 	txm "github.com/smartcontractkit/chainlink/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
+	"github.com/smartcontractkit/chainlink/core/services/relay"
 	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
@@ -130,25 +130,29 @@ func newConfigProvider(lggr logger.Logger, chainSet evm.ChainSet, args relaytype
 	}, nil
 }
 
-func (r *Relayer) NewMedianProvider(rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.MedianProvider, error) {
-	configWatcher, err := newConfigProvider(r.lggr, r.chainSet, rargs)
-	if err != nil {
-		return nil, err
-	}
-	transmitterAddress := common.HexToAddress(pargs.TransmitterID)
+func getContractTransmitter(lggr logger.Logger, rargs relaytypes.RelayArgs, transmitterID string, configWatcher *configWatcher) (*ContractTransmitter, error) {
+	transmitterAddress := common.HexToAddress(transmitterID)
 	strategy := txm.NewQueueingTxStrategy(rargs.ExternalJobID, configWatcher.chain.Config().OCRDefaultTransactionQueueDepth())
 	var checker txm.TransmitCheckerSpec
 	if configWatcher.chain.Config().OCRSimulateTransactions() {
 		checker.CheckerType = txm.TransmitCheckerTypeSimulate
 	}
-	contractTransmitter, err := NewOCRContractTransmitter(
+	return NewOCRContractTransmitter(
 		configWatcher.contractAddress,
 		configWatcher.chain.Client(),
 		configWatcher.contractABI,
 		ocrcommon.NewTransmitter(configWatcher.chain.TxManager(), transmitterAddress, configWatcher.chain.Config().EvmGasLimitDefault(), strategy, txm.TransmitCheckerSpec{}),
 		configWatcher.chain.LogPoller(),
-		r.lggr,
+		lggr,
 	)
+}
+
+func (r *Relayer) NewMedianProvider(rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.MedianProvider, error) {
+	configWatcher, err := newConfigProvider(r.lggr, r.chainSet, rargs)
+	if err != nil {
+		return nil, err
+	}
+	contractTransmitter, err := getContractTransmitter(r.lggr, rargs, pargs.TransmitterID, configWatcher)
 	if err != nil {
 		return nil, err
 	}
@@ -187,4 +191,67 @@ func (p *medianProvider) ReportCodec() median.ReportCodec {
 
 func (p *medianProvider) MedianContract() median.MedianContract {
 	return p.medianContract
+}
+
+// CCIPRelayer is a relayer wrapper with added CCIP provider methods.
+type ccipRelayer struct {
+	*Relayer
+}
+
+var _ relay.CCIPRelayer = (*ccipRelayer)(nil)
+
+func NewCCIPRelayer(relayer interface{}) relay.CCIPRelayer {
+	return &ccipRelayer{relayer.(*Relayer)}
+}
+
+type ccipRelayProvider struct {
+	*configWatcher
+	contractTransmitter *ContractTransmitter
+}
+
+var _ relay.CCIPRelayProvider = (*ccipRelayProvider)(nil)
+
+func (c *ccipRelayer) NewCCIPRelayProvider(rargs relaytypes.RelayArgs, transmitterID string) (relay.CCIPRelayProvider, error) {
+	configWatcher, err := newConfigProvider(c.lggr, c.chainSet, rargs)
+	if err != nil {
+		return nil, err
+	}
+	contractTransmitter, err := getContractTransmitter(c.lggr, rargs, transmitterID, configWatcher)
+	if err != nil {
+		return nil, err
+	}
+	return &ccipRelayProvider{
+		configWatcher:       configWatcher,
+		contractTransmitter: contractTransmitter,
+	}, nil
+}
+
+func (c *ccipRelayProvider) ContractTransmitter() types.ContractTransmitter {
+	return c.contractTransmitter
+}
+
+type ccipExecutionProvider struct {
+	*configWatcher
+	contractTransmitter *ContractTransmitter
+}
+
+var _ relay.CCIPExecutionProvider = (*ccipExecutionProvider)(nil)
+
+func (c *ccipRelayer) NewCCIPExecutionProvider(rargs relaytypes.RelayArgs, transmitterID string) (relay.CCIPExecutionProvider, error) {
+	configWatcher, err := newConfigProvider(c.lggr, c.chainSet, rargs)
+	if err != nil {
+		return nil, err
+	}
+	contractTransmitter, err := getContractTransmitter(c.lggr, rargs, transmitterID, configWatcher)
+	if err != nil {
+		return nil, err
+	}
+	return &ccipExecutionProvider{
+		configWatcher:       configWatcher,
+		contractTransmitter: contractTransmitter,
+	}, nil
+}
+
+func (c *ccipExecutionProvider) ContractTransmitter() types.ContractTransmitter {
+	return c.contractTransmitter
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
 	"github.com/smartcontractkit/chainlink/core/services/pipeline"
 	"github.com/smartcontractkit/chainlink/core/services/relay"
+	evmrelay "github.com/smartcontractkit/chainlink/core/services/relay/evm"
 	"github.com/smartcontractkit/chainlink/core/services/telemetry"
 )
 
@@ -158,36 +159,36 @@ func (d Delegate) ServicesForSpec(jobSpec job.Job) ([]job.ServiceCtx, error) {
 		ocr2Provider = medianProvider
 		pluginOracle, err = median.NewMedian(jobSpec, medianProvider, d.pipelineRunner, runResults, lggr, ocrLogger)
 	case job.CCIPRelay:
-		medianProvider, err2 := relayer.NewMedianProvider(
+		if spec.Relay != relay.EVM {
+			return nil, errors.New("Non evm chains are not supported for CCIP relay")
+		}
+		ccipProvider, err2 := evmrelay.NewCCIPRelayer(relayer).NewCCIPRelayProvider(
 			types.RelayArgs{
 				ExternalJobID: jobSpec.ExternalJobID,
 				JobID:         spec.ID,
 				ContractID:    spec.ContractID,
 				RelayConfig:   spec.RelayConfig.Bytes(),
-			}, types.PluginArgs{
-				TransmitterID: spec.TransmitterID.String,
-				PluginConfig:  spec.PluginConfig.Bytes(),
-			})
+			}, spec.TransmitterID.String)
 		if err2 != nil {
 			return nil, err2
 		}
-		ocr2Provider = medianProvider
+		ocr2Provider = ccipProvider
 		pluginOracle, err = ccip.NewCCIPRelay(lggr, spec, d.chainSet)
 	case job.CCIPExecution:
-		medianProvider, err2 := relayer.NewMedianProvider(
+		if spec.Relay != relay.EVM {
+			return nil, errors.New("Non evm chains are not supported for CCIP execution")
+		}
+		ccipProvider, err2 := evmrelay.NewCCIPRelayer(relayer).NewCCIPExecutionProvider(
 			types.RelayArgs{
 				ExternalJobID: jobSpec.ExternalJobID,
 				JobID:         spec.ID,
 				ContractID:    spec.ContractID,
 				RelayConfig:   spec.RelayConfig.Bytes(),
-			}, types.PluginArgs{
-				TransmitterID: spec.TransmitterID.String,
-				PluginConfig:  spec.PluginConfig.Bytes(),
-			})
+			}, spec.TransmitterID.String)
 		if err2 != nil {
 			return nil, err2
 		}
-		ocr2Provider = medianProvider
+		ocr2Provider = ccipProvider
 		pluginOracle, err = ccip.NewCCIPExecution(lggr, spec, d.chainSet)
 	default:
 		return nil, errors.Errorf("plugin type %s not supported", spec.PluginType)
