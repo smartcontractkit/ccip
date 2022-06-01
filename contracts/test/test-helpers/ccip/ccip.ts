@@ -4,31 +4,50 @@ import { ethers } from 'hardhat'
 import { expect } from 'chai'
 import { stripHexPrefix } from '../helpers'
 
-export interface CCIPMessagePayload {
+export interface EVMToAnyTollMessage {
+  receiver: string
+  data: BytesLike
   tokens: string[]
   amounts: BigNumberish[]
-  destinationChainId: BigNumber
-  receiver: string
-  executor: string
-  data: BytesLike
+  feeToken: string
+  feeTokenAmount: BigNumberish
+  gasLimit: BigNumberish
 }
-export const CCIPMessagePayloadTuple =
-  'tuple(address[] tokens, uint256[] amounts, uint256 destinationChainId, address receiver, address executor, bytes data)'
 
-export interface CCIPMessage {
+export interface EVMToAnyTollEvent {
   sourceChainId: BigNumber
   sequenceNumber: BigNumber
   sender: string
-  payload: CCIPMessagePayload
+  receiver: string
+  data: BytesLike
+  tokens: string[]
+  amounts: BigNumberish[]
+  feeToken: string
+  feeTokenAmount: BigNumberish
+  gasLimit: BigNumberish
 }
-export const CCIPMessageTuple = `tuple(uint256 sourceChainId, uint64 sequenceNumber, address sender, ${CCIPMessagePayloadTuple} payload)`
+
+export interface AnyToEVMTollMessage {
+  sourceChainId: BigNumber
+  sequenceNumber: BigNumber
+  sender: string
+  receiver: string
+  data: BytesLike
+  tokens: string[]
+  amounts: BigNumberish[]
+  feeToken: string
+  feeTokenAmount: BigNumberish
+  gasLimit: BigNumberish
+}
+
+export const AnyToEVMTollMessageTuple = `tuple(uint256 sourceChainId, uint64 sequenceNumber, address sender, address receiver, bytes data, address[] tokens, uint256[] amounts, address feeToken, uint256 feeTokenAmount, uint256 gasLimit)`
 
 export interface ExecutionReport {
-  messages: CCIPMessage[]
+  messages: AnyToEVMTollMessage[]
   proofs: string[]
   proofFlagsBits: BigNumberish
 }
-export const ExecutionReportTuple = `tuple(${CCIPMessageTuple}[] messages, bytes32[] proofs, uint256 proofFlagsBits)`
+export const ExecutionReportTuple = `tuple(${AnyToEVMTollMessageTuple}[] messages, bytes32[] proofs, uint256 proofFlagsBits)`
 
 export interface RelayReport {
   merkleRoot: string
@@ -43,15 +62,15 @@ export const RelayReportTuple = `tuple(bytes32 merkleRoot, uint64 minSequenceNum
  */
 export class MerkleMultiTree {
   public tree?: MerkleTree
-  public messages: { [hash: string]: CCIPMessage } = {}
+  public messages: { [hash: string]: AnyToEVMTollMessage } = {}
   public minSequenceNumber?: BigNumber
   public maxSequenceNumber?: BigNumber
 
   /**
    * @notice Create a new MerkleMultiTree
-   * @param rawMessages CCIPMessage[] array of messages
+   * @param rawMessages AnyToEVMTollMessage[] array of messages
    */
-  constructor(rawMessages: CCIPMessage[]) {
+  constructor(rawMessages: AnyToEVMTollMessage[]) {
     rawMessages.map((rm) => {
       this.messages[this.hashMessage(rm)] = rm
       if (
@@ -145,9 +164,9 @@ export class MerkleMultiTree {
     return bitmap
   }
 
-  private hashMessage(message: CCIPMessage): string {
+  private hashMessage(message: AnyToEVMTollMessage): string {
     const bytesMessage = ethers.utils.defaultAbiCoder.encode(
-      [CCIPMessageTuple],
+      [AnyToEVMTollMessageTuple],
       [message],
     )
     return this.hashLeaf(bytesMessage)
@@ -204,28 +223,26 @@ export function executionReportDeepEqual(
 
 export function messageDeepEqual(
   actualMessage: any,
-  expectedMessage: CCIPMessage,
+  expectedMessage: AnyToEVMTollMessage,
 ) {
   expect(actualMessage?.sequenceNumber).to.equal(expectedMessage.sequenceNumber)
   expect(actualMessage?.sourceChainId).to.equal(expectedMessage.sourceChainId)
   expect(actualMessage?.sender).to.equal(expectedMessage.sender)
-  const actualMessagePayload = actualMessage?.payload
-  expect(actualMessagePayload?.receiver).to.equal(
-    expectedMessage.payload.receiver,
-  )
-  expect(actualMessagePayload?.data).to.equal(expectedMessage.payload.data)
-  expect(actualMessagePayload.tokens).to.deep.equal(
-    expectedMessage.payload.tokens,
-  )
-  const expectedAmounts = actualMessagePayload.amounts
-  expect(actualMessagePayload.amounts.length).to.equal(expectedAmounts.length)
-  for (let i = 0; i < expectedAmounts.length; i++) {
-    const expectedAmount = expectedAmounts[i].toString()
-    expect(actualMessagePayload.amounts[i].toString()).to.equal(expectedAmount)
+  expect(actualMessage?.receiver).to.equal(expectedMessage.receiver)
+  expect(actualMessage?.data).to.equal(expectedMessage.data)
+  expect(actualMessage?.tokens.length).to.equal(expectedMessage.tokens.length)
+  for (let i = 0; i < expectedMessage.tokens.length; i++) {
+    const expectedAmount = expectedMessage.tokens[i].toString()
+    expect(actualMessage.tokens[i].toString()).to.equal(expectedAmount)
   }
-  expect(actualMessagePayload.destinationChainId).to.equal(
-    expectedMessage.payload.destinationChainId,
-  )
+  expect(actualMessage?.amounts.length).to.equal(expectedMessage.amounts.length)
+  for (let i = 0; i < expectedMessage.amounts.length; i++) {
+    const expectedAmount = expectedMessage.amounts[i].toString()
+    expect(actualMessage.amounts[i].toString()).to.equal(expectedAmount)
+  }
+  expect(actualMessage?.feeToken).to.equal(expectedMessage.feeToken)
+  expect(actualMessage?.feeTokenAmount).to.equal(expectedMessage.feeTokenAmount)
+  expect(actualMessage?.gasLimit).to.equal(expectedMessage.gasLimit)
 }
 
 export function requestEventArgsEqual(
@@ -239,25 +256,29 @@ export function requestEventArgsEqual(
     expectedRequestArgs.sourceChainId,
   )
   expect(actualRequestArgs.message.sender).to.equal(expectedRequestArgs.sender)
-  expect(actualRequestArgs.message.payload.receiver).to.equal(
+  expect(actualRequestArgs.message.receiver).to.equal(
     expectedRequestArgs.receiver,
   )
-  expect(actualRequestArgs.message.payload.data).to.equal(
-    expectedRequestArgs.data,
-  )
-  expect(actualRequestArgs.message.payload.tokens).to.deep.equal(
+  expect(actualRequestArgs.message.data).to.equal(expectedRequestArgs.data)
+  expect(actualRequestArgs.message.tokens).to.deep.equal(
     expectedRequestArgs.tokens,
   )
-  expect(actualRequestArgs.message.payload.amounts.length).to.equal(
+  expect(actualRequestArgs.message.amounts.length).to.equal(
     expectedRequestArgs.amounts.length,
   )
   for (let i = 0; i < expectedRequestArgs.amounts.length; i++) {
     const expectedAmount = expectedRequestArgs.amounts[i].toString()
-    expect(actualRequestArgs.message.payload.amounts[i].toString()).to.equal(
+    expect(actualRequestArgs.message.amounts[i].toString()).to.equal(
       expectedAmount,
     )
   }
-  expect(actualRequestArgs.message.payload.destinationChainId).to.equal(
-    expectedRequestArgs.destinationChainId,
+  expect(actualRequestArgs.message.feeToken).to.equal(
+    expectedRequestArgs.feeToken,
+  )
+  expect(actualRequestArgs.message.feeTokenAmount).to.equal(
+    expectedRequestArgs.feeTokenAmount,
+  )
+  expect(actualRequestArgs.message.gasLimit).to.equal(
+    expectedRequestArgs.gasLimit,
   )
 }

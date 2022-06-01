@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.13;
 
-import "../ramps/OnRampRouter.sol";
+import "../ramps/EVMTollOnRampRouter.sol";
 import "../../interfaces/TypeAndVersionInterface.sol";
 import "../utils/CCIP.sol";
 import "../../vendor/SafeERC20.sol";
@@ -46,23 +46,25 @@ contract SenderDapp is TypeAndVersionInterface {
   ) external returns (uint64 sequenceNumber) {
     if (destinationAddress == address(0)) revert InvalidDestinationAddress(destinationAddress);
     address originalSender = msg.sender;
-    // Init the MessagePayload struct
-    // `payload.data` format:
-    //  - EOA sender address
-    //  - EOA destination address
-    CCIP.MessagePayload memory payload = CCIP.MessagePayload({
-      tokens: tokens,
-      amounts: amounts,
-      destinationChainId: DESTINATION_CHAIN_ID,
-      receiver: DESTINATION_CONTRACT,
-      executor: executor,
-      data: abi.encode(originalSender, destinationAddress)
-    });
     for (uint256 i = 0; i < tokens.length; i++) {
       tokens[i].safeTransferFrom(originalSender, address(this), amounts[i]);
       tokens[i].approve(address(ON_RAMP_ROUTER), amounts[i]);
     }
-    sequenceNumber = ON_RAMP_ROUTER.requestCrossChainSend(payload);
+    // `data` format:
+    //  - EOA sender address
+    //  - EOA destination address
+    sequenceNumber = ON_RAMP_ROUTER.ccipSend(
+      DESTINATION_CHAIN_ID,
+      CCIP.EVMToAnyTollMessage({
+        receiver: destinationAddress,
+        data: abi.encode(originalSender, destinationAddress),
+        tokens: tokens,
+        amounts: amounts,
+        feeToken: tokens[0],
+        feeTokenAmount: 0,
+        gasLimit: 0
+      })
+    );
   }
 
   function typeAndVersion() external pure override returns (string memory) {

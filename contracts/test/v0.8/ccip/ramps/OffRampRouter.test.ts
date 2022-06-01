@@ -7,8 +7,11 @@ import {
 } from 'ethers'
 import hre from 'hardhat'
 import { Artifact } from 'hardhat/types'
-import { SimpleMessageReceiver } from '../../../../typechain'
-import { CCIPMessage, messageDeepEqual } from '../../../test-helpers/ccip/ccip'
+import { MockERC20, SimpleMessageReceiver } from '../../../../typechain'
+import {
+  AnyToEVMTollMessage,
+  messageDeepEqual,
+} from '../../../test-helpers/ccip/ccip'
 import { evmRevert } from '../../../test-helpers/matchers'
 
 import { getUsers, Roles } from '../../../test-helpers/setup'
@@ -16,6 +19,7 @@ import { getUsers, Roles } from '../../../test-helpers/setup'
 const { deployContract } = hre.waffle
 
 let roles: Roles
+let token: MockERC20
 
 let OffRampRouterFactory: ContractFactory
 let SimpleMessageReceiverArtifact: Artifact
@@ -33,6 +37,20 @@ describe('OffRampRouter', () => {
     OffRampRouterFactory = await hre.ethers.getContractFactory('OffRampRouter')
     SimpleMessageReceiverArtifact = await hre.artifacts.readArtifact(
       'SimpleMessageReceiver',
+    )
+
+    const adminAddress = await roles.defaultAccount.getAddress()
+    const TokenArtifact: Artifact = await hre.artifacts.readArtifact(
+      'MockERC20',
+    )
+
+    token = <MockERC20>(
+      await deployContract(roles.defaultAccount, TokenArtifact, [
+        'Chain 1 LINK Token',
+        'LINK',
+        adminAddress,
+        BigNumber.from('100000000000000000000'),
+      ])
     )
 
     router = await OffRampRouterFactory.connect(roles.defaultAccount).deploy([
@@ -128,20 +146,19 @@ describe('OffRampRouter', () => {
   })
 
   describe('#routeMessage', () => {
-    let message: CCIPMessage
+    let message: AnyToEVMTollMessage
     beforeEach(async () => {
       message = {
         sequenceNumber: BigNumber.from(1),
         sourceChainId: BigNumber.from(1),
         sender: await roles.consumer.getAddress(),
-        payload: {
-          tokens: [],
-          amounts: [],
-          destinationChainId: BigNumber.from(2),
-          receiver: receiver.address,
-          executor: hre.ethers.constants.AddressZero,
-          data: hre.ethers.constants.HashZero,
-        },
+        tokens: [],
+        amounts: [],
+        receiver: receiver.address,
+        data: hre.ethers.constants.HashZero,
+        feeToken: token.address,
+        feeTokenAmount: 0,
+        gasLimit: 0,
       }
     })
     describe('failure', () => {
@@ -168,7 +185,7 @@ describe('OffRampRouter', () => {
           .connect(roles.defaultAccount)
           .routeMessage(receiver.address, message)
         await expect(tx).to.emit(receiver, 'MessageReceived')
-        const response = await receiver.s_message()
+        const response = await receiver.getMessage()
         messageDeepEqual(response, message)
       })
     })

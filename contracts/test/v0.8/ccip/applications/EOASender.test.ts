@@ -87,7 +87,7 @@ describe('SenderDapp', () => {
 
     it('should send a request to the onRamp', async () => {
       const expectedResponse = [
-        destinationContract,
+        destinationAddress,
         data,
         [token.address],
         [amount],
@@ -101,6 +101,8 @@ describe('SenderDapp', () => {
         ethers.constants.AddressZero,
       )
       const response = await router.getMessagePayload()
+      console.log(expectedResponse)
+      console.log(response)
       for (let i = 0; i < response.length; i++) {
         const actual = response[i].toString()
         const expected = expectedResponse[i].toString()

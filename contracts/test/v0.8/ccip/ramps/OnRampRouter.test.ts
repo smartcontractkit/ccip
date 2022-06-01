@@ -9,9 +9,9 @@ import {
   MockPool,
   OnRampRouter,
 } from '../../../../typechain'
-import { CCIPMessagePayload } from '../../../test-helpers/ccip/ccip'
 import { evmRevert } from '../../../test-helpers/matchers'
 import { getUsers, Roles } from '../../../test-helpers/setup'
+import { EVMToAnyTollMessage } from '../../../test-helpers/ccip/ccip'
 
 const { deployContract } = hre.waffle
 
@@ -23,10 +23,10 @@ let RouterArtifact: Artifact
 let MockPoolArtifact: Artifact
 
 const chainId: number = 1
-const destinationChainIds: Array<number> = [2, 3]
+const destinationChainId = 2
 
 let tokens: Array<MockERC20>
-let onRamps: Array<MockOnRamp>
+let onRamp: MockOnRamp
 let pool: MockPool
 let router: OnRampRouter
 let mintAmount: BigNumber
@@ -50,46 +50,50 @@ describe('OnRampRouter', () => {
       await deployContract(roles.defaultAccount, MockPoolArtifact, [1])
     )
     tokens = new Array<MockERC20>()
-    onRamps = new Array<MockOnRamp>()
     router = <OnRampRouter>(
       await deployContract(roles.defaultAccount, RouterArtifact)
     )
-    for (let i = 0; i < destinationChainIds.length; i++) {
-      const destinationChainId = destinationChainIds[i]
 
-      tokens.push(
-        <MockERC20>(
-          await deployContract(roles.defaultAccount, TokenArtifact, [
-            'TOKEN',
-            'TOKEN',
-            await roles.defaultAccount.getAddress(),
-            mintAmount,
-          ])
-        ),
-      )
+    tokens.push(
+      <MockERC20>(
+        await deployContract(roles.defaultAccount, TokenArtifact, [
+          'TOKEN',
+          'TOKEN',
+          await roles.defaultAccount.getAddress(),
+          mintAmount,
+        ])
+      ),
+    )
+    tokens.push(
+      <MockERC20>(
+        await deployContract(roles.defaultAccount, TokenArtifact, [
+          'TOKEN',
+          'TOKEN',
+          await roles.defaultAccount.getAddress(),
+          mintAmount,
+        ])
+      ),
+    )
 
-      onRamps.push(
-        <MockOnRamp>(
-          await deployContract(roles.defaultAccount, OnRampArtifact, [
-            chainId,
-            pool.address,
-            destinationChainId,
-            fee,
-          ])
-        ),
-      )
+    onRamp = <MockOnRamp>(
+      await deployContract(roles.defaultAccount, OnRampArtifact, [
+        chainId,
+        pool.address,
+        destinationChainId,
+        fee,
+      ])
+    )
 
-      await router
-        .connect(roles.defaultAccount)
-        .setOnRamp(destinationChainId, onRamps[i].address)
-    }
+    await router
+      .connect(roles.defaultAccount)
+      .setOnRamp(destinationChainId, onRamp.address)
   })
 
-  describe('#requestCrossChainSend', () => {
+  describe('#ccipSend', () => {
     let receiver: string
     let messagedata: string
     let amounts: Array<BigNumber>
-    let payload: CCIPMessagePayload
+    let payload: EVMToAnyTollMessage
 
     beforeEach(async () => {
       const amount = BigNumber.from('10000000000000000')
@@ -101,29 +105,27 @@ describe('OnRampRouter', () => {
         data: messagedata,
         tokens: tokens.map((t) => t.address),
         amounts: amounts,
-        destinationChainId: BigNumber.from(destinationChainIds[0]),
-        executor: hre.ethers.constants.AddressZero,
+        feeToken: tokens.map((t) => t.address)[0],
+        feeTokenAmount: fee,
+        gasLimit: 0,
       }
     })
 
     describe('failure', () => {
-      it('fails if the onRamp is not supported', async () => {
-        payload.destinationChainId = BigNumber.from(55)
-        await evmRevert(
-          router.connect(roles.defaultAccount).requestCrossChainSend(payload),
-          `UnsupportedDestinationChain(${payload.destinationChainId})`,
-        )
-      })
       it('fails if the number of tokens does not equal the amounts', async () => {
         payload.tokens = [tokens[0].address]
         await evmRevert(
-          router.connect(roles.defaultAccount).requestCrossChainSend(payload),
+          router
+            .connect(roles.defaultAccount)
+            .ccipSend(destinationChainId, payload),
           `UnsupportedNumberOfTokens()`,
         )
       })
       it('fails if the onRamp does not have approval on the token', async () => {
         await evmRevert(
-          router.connect(roles.defaultAccount).requestCrossChainSend(payload),
+          router
+            .connect(roles.defaultAccount)
+            .ccipSend(destinationChainId, payload),
           `ERC20: transfer amount exceeds allowance`,
         )
       })
@@ -136,7 +138,7 @@ describe('OnRampRouter', () => {
           const token = tokens[i]
           await token
             .connect(roles.defaultAccount)
-            .approve(router.address, amounts[i])
+            .approve(router.address, amounts[i].add(fee))
         }
       })
       it('transfers the tokens from the sender to the router', async () => {
@@ -148,7 +150,7 @@ describe('OnRampRouter', () => {
         )
         await router
           .connect(roles.defaultAccount)
-          .requestCrossChainSend(payload)
+          .ccipSend(destinationChainId, payload)
         const token1SenderBalanceAfter = await tokens[0].balanceOf(
           senderAddress,
         )
@@ -156,7 +158,7 @@ describe('OnRampRouter', () => {
           senderAddress,
         )
         expect(token1SenderBalanceAfter).to.equal(
-          token1SenderBalanceBefore.sub(amounts[0]),
+          token1SenderBalanceBefore.sub(amounts[0]).sub(fee),
         )
         expect(token2SenderBalanceAfter).to.equal(
           token2SenderBalanceBefore.sub(amounts[1]),
@@ -165,17 +167,17 @@ describe('OnRampRouter', () => {
       it('sends the tokens to the pool', async () => {
         await router
           .connect(roles.defaultAccount)
-          .requestCrossChainSend(payload)
+          .ccipSend(destinationChainId, payload)
         const balance1 = await tokens[0].balanceOf(pool.address)
         const balance2 = await tokens[1].balanceOf(pool.address)
-        expect(balance1).to.equal(BigNumber.from(payload.amounts[0]).sub(fee))
+        expect(balance1).to.equal(BigNumber.from(payload.amounts[0]))
         expect(balance2).to.equal(payload.amounts[1])
       })
-      it('calls requestCrossChainSend on the onRamp with the payload', async () => {
+      it('calls ccipSend on the onRamp with the payload', async () => {
         await router
           .connect(roles.defaultAccount)
-          .requestCrossChainSend(payload)
-        const rampPayload = await onRamps[0].getMessagePayload()
+          .ccipSend(destinationChainId, payload)
+        const rampPayload = await onRamp.getMessagePayload()
         expect(rampPayload.receiver).to.equal(payload.receiver)
         expect(rampPayload.tokens).to.deep.equal(payload.tokens)
         expect(rampPayload.amounts.map((a) => a.toString())).to.deep.equal(
@@ -264,7 +266,7 @@ describe('OnRampRouter', () => {
         await deployContract(roles.defaultAccount, OnRampArtifact, [
           chainId,
           pool.address,
-          destinationChainIds[0],
+          destinationChainId,
           fee,
         ])
       )
@@ -275,7 +277,7 @@ describe('OnRampRouter', () => {
         await evmRevert(
           router
             .connect(roles.stranger)
-            .setOnRamp(destinationChainIds[0], newOnRamp.address),
+            .setOnRamp(destinationChainId, newOnRamp.address),
           'Only callable by owner',
         )
       })
@@ -284,31 +286,29 @@ describe('OnRampRouter', () => {
         await evmRevert(
           router
             .connect(roles.defaultAccount)
-            .setOnRamp(destinationChainIds[0], onRamps[0].address),
-          `OnRampAlreadySet(${destinationChainIds[0]}, "${onRamps[0].address}")`,
+            .setOnRamp(destinationChainId, onRamp.address),
+          `OnRampAlreadySet(${destinationChainId}, "${onRamp.address}")`,
         )
       })
     })
 
     describe('success', () => {
       let tx: ContractTransaction
-      let destChainId: number
 
       beforeEach(async () => {
-        destChainId = destinationChainIds[0]
         tx = await router
           .connect(roles.defaultAccount)
-          .setOnRamp(destChainId, newOnRamp.address)
+          .setOnRamp(destinationChainId, newOnRamp.address)
       })
 
       it('should emit an event', async () => {
         await expect(tx)
           .to.emit(router, 'OnRampSet')
-          .withArgs(destChainId, newOnRamp.address)
+          .withArgs(destinationChainId, newOnRamp.address)
       })
 
       it('should set the correct value', async () => {
-        const response = await router.getOnRamp(destChainId)
+        const response = await router.getOnRamp(destinationChainId)
         expect(response).to.equal(newOnRamp.address)
       })
     })
@@ -316,7 +316,7 @@ describe('OnRampRouter', () => {
 
   describe('#isChainSupported', () => {
     it('returns true when the chain is supported', async () => {
-      expect(await router.isChainSupported(destinationChainIds[0])).to.be.true
+      expect(await router.isChainSupported(destinationChainId)).to.be.true
     })
     it('returns false when the chain is not supported', async () => {
       expect(await router.isChainSupported(55)).to.be.false

@@ -65,7 +65,7 @@ func NewCCIPRelay(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm.Cha
 		return nil, errors.Wrap(err, "failed creating a new onramp")
 	}
 	// Subscribe to all relevant relay logs.
-	sourceChain.LogPoller().MergeFilter([]common.Hash{CrossChainSendRequested}, onRamp.Address())
+	sourceChain.LogPoller().MergeFilter([]common.Hash{CCIPSendRequested}, onRamp.Address())
 	return &CCIPRelay{
 		lggr:              lggr,
 		offRamp:           offRamp,

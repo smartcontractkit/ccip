@@ -8,7 +8,9 @@ contract MockOffRamp is OffRampInterface {
 
   IERC20 public s_token;
 
-  function deliverMessageTo(CrossChainMessageReceiverInterface recipient, CCIP.Message calldata message) external {
+  function deliverMessageTo(CrossChainMessageReceiverInterface recipient, CCIP.AnyToEVMTollMessage calldata message)
+    external
+  {
     recipient.receiveMessage(message);
   }
 

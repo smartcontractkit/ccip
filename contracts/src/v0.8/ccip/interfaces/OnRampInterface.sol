@@ -16,7 +16,7 @@ interface OnRampInterface {
   error MustBeCalledByRouter();
   error RouterMustSetOriginalSender();
 
-  event CrossChainSendRequested(CCIP.Message message);
+  event CCIPSendRequested(CCIP.EVMToEVMTollEvent message);
   event AllowlistEnabledSet(bool enabled);
   event AllowlistSet(address[] allowlist);
   event NewTokenBucketConstructed(uint256 rate, uint256 capacity, bool full);
@@ -35,13 +35,11 @@ interface OnRampInterface {
 
   /**
    * @notice Request a message to be sent to the destination chain
-   * @param payload The message payload
+   * @param message the EVMToAnyTollMessage containing all message information
    * @param originalSender Original sender of the message if sent by a Router
    * @return The sequence number of the message
    */
-  function requestCrossChainSend(CCIP.MessagePayload calldata payload, address originalSender)
-    external
-    returns (uint64);
+  function forwardFromRouter(CCIP.EVMToAnyTollMessage memory message, address originalSender) external returns (uint64);
 
   function getRequiredFee(IERC20 feeToken) external returns (uint256);
 

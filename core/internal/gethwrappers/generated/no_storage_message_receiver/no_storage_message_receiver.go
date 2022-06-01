@@ -27,25 +27,22 @@ var (
 	_ = event.NewSubscription
 )
 
-type CCIPMessage struct {
+type CCIPAnyToEVMTollMessage struct {
 	SourceChainId  *big.Int
 	SequenceNumber uint64
 	Sender         common.Address
-	Payload        CCIPMessagePayload
-}
-
-type CCIPMessagePayload struct {
-	Tokens             []common.Address
-	Amounts            []*big.Int
-	DestinationChainId *big.Int
-	Receiver           common.Address
-	Executor           common.Address
-	Data               []byte
+	Receiver       common.Address
+	Data           []byte
+	Tokens         []common.Address
+	Amounts        []*big.Int
+	FeeToken       common.Address
+	FeeTokenAmount *big.Int
+	GasLimit       *big.Int
 }
 
 var NoStorageMessageReceiverMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"sourceChainId\",\"type\":\"uint256\"},{\"internalType\":\"uint64\",\"name\":\"sequenceNumber\",\"type\":\"uint64\"},{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"components\":[{\"internalType\":\"contractIERC20[]\",\"name\":\"tokens\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"amounts\",\"type\":\"uint256[]\"},{\"internalType\":\"uint256\",\"name\":\"destinationChainId\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"receiver\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"executor\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"internalType\":\"structCCIP.MessagePayload\",\"name\":\"payload\",\"type\":\"tuple\"}],\"internalType\":\"structCCIP.Message\",\"name\":\"message\",\"type\":\"tuple\"}],\"name\":\"receiveMessage\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
-	Bin: "0x608060405234801561001057600080fd5b5060898061001f6000396000f3fe6080604052348015600f57600080fd5b506004361060285760003560e01c806302b5e9fa14602d575b600080fd5b603b6038366004603d565b50565b005b600060208284031215604e57600080fd5b813567ffffffffffffffff811115606457600080fd5b820160808185031215607557600080fd5b939250505056fea164736f6c634300080d000a",
+	ABI: "[{\"inputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"sourceChainId\",\"type\":\"uint256\"},{\"internalType\":\"uint64\",\"name\":\"sequenceNumber\",\"type\":\"uint64\"},{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"receiver\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"},{\"internalType\":\"contractIERC20[]\",\"name\":\"tokens\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"amounts\",\"type\":\"uint256[]\"},{\"internalType\":\"contractIERC20\",\"name\":\"feeToken\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"feeTokenAmount\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"gasLimit\",\"type\":\"uint256\"}],\"internalType\":\"structCCIP.AnyToEVMTollMessage\",\"name\":\"message\",\"type\":\"tuple\"}],\"name\":\"receiveMessage\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+	Bin: "0x608060405234801561001057600080fd5b50608a8061001f6000396000f3fe6080604052348015600f57600080fd5b506004361060285760003560e01c806313d3e05e14602d575b600080fd5b603b6038366004603d565b50565b005b600060208284031215604e57600080fd5b813567ffffffffffffffff811115606457600080fd5b82016101408185031215607657600080fd5b939250505056fea164736f6c634300080d000a",
 }
 
 var NoStorageMessageReceiverABI = NoStorageMessageReceiverMetaData.ABI
@@ -184,15 +181,15 @@ func (_NoStorageMessageReceiver *NoStorageMessageReceiverTransactorRaw) Transact
 	return _NoStorageMessageReceiver.Contract.contract.Transact(opts, method, params...)
 }
 
-func (_NoStorageMessageReceiver *NoStorageMessageReceiverTransactor) ReceiveMessage(opts *bind.TransactOpts, message CCIPMessage) (*types.Transaction, error) {
+func (_NoStorageMessageReceiver *NoStorageMessageReceiverTransactor) ReceiveMessage(opts *bind.TransactOpts, message CCIPAnyToEVMTollMessage) (*types.Transaction, error) {
 	return _NoStorageMessageReceiver.contract.Transact(opts, "receiveMessage", message)
 }
 
-func (_NoStorageMessageReceiver *NoStorageMessageReceiverSession) ReceiveMessage(message CCIPMessage) (*types.Transaction, error) {
+func (_NoStorageMessageReceiver *NoStorageMessageReceiverSession) ReceiveMessage(message CCIPAnyToEVMTollMessage) (*types.Transaction, error) {
 	return _NoStorageMessageReceiver.Contract.ReceiveMessage(&_NoStorageMessageReceiver.TransactOpts, message)
 }
 
-func (_NoStorageMessageReceiver *NoStorageMessageReceiverTransactorSession) ReceiveMessage(message CCIPMessage) (*types.Transaction, error) {
+func (_NoStorageMessageReceiver *NoStorageMessageReceiverTransactorSession) ReceiveMessage(message CCIPAnyToEVMTollMessage) (*types.Transaction, error) {
 	return _NoStorageMessageReceiver.Contract.ReceiveMessage(&_NoStorageMessageReceiver.TransactOpts, message)
 }
 
@@ -201,7 +198,7 @@ func (_NoStorageMessageReceiver *NoStorageMessageReceiver) Address() common.Addr
 }
 
 type NoStorageMessageReceiverInterface interface {
-	ReceiveMessage(opts *bind.TransactOpts, message CCIPMessage) (*types.Transaction, error)
+	ReceiveMessage(opts *bind.TransactOpts, message CCIPAnyToEVMTollMessage) (*types.Transaction, error)
 
 	Address() common.Address
 }

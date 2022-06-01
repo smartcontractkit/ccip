@@ -265,16 +265,17 @@ func (client CCIPClient) SendMessage(t *testing.T) {
 	bytes, err := hex.DecodeString("00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000005626c616e6b000000000000000000000000000000000000000000000000000000")
 	require.NoError(t, err)
 
-	msg := onramp_router.CCIPMessagePayload{
-		Receiver:           client.Dest.MessageReceiver.Address(),
-		Data:               bytes,
-		DestinationChainId: client.Dest.ChainId,
-		Tokens:             []common.Address{client.Source.LinkTokenAddress},
-		Amounts:            []*big.Int{big.NewInt(1)},
-		Executor:           common.Address{},
+	msg := onramp_router.CCIPEVMToAnyTollMessage{
+		Receiver:       client.Dest.MessageReceiver.Address(),
+		Data:           bytes,
+		Tokens:         []common.Address{client.Source.LinkTokenAddress},
+		Amounts:        []*big.Int{big.NewInt(1)},
+		FeeToken:       client.Source.LinkTokenAddress,
+		FeeTokenAmount: DefaultGasTipFee,
+		GasLimit:       big.NewInt(0),
 	}
 
-	tx, err := client.Source.OnRampRouter.RequestCrossChainSend(client.Source.Owner, msg)
+	tx, err := client.Source.OnRampRouter.CcipSend(client.Source.Owner, client.Dest.ChainId, msg)
 	require.NoError(t, err)
 	WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 }
@@ -443,7 +444,7 @@ func (client CCIPClient) ExecuteOffRampTransaction(t *testing.T, proof merklemul
 	client.Dest.logger.Infof("Cross chain message %+v", decodedMsg)
 
 	report := offramp.CCIPExecutionReport{
-		Messages:       []offramp.CCIPMessage{*decodedMsg},
+		Messages:       []offramp.CCIPAnyToEVMTollMessage{*decodedMsg},
 		Proofs:         proof.Hashes,
 		ProofFlagsBits: ccip.ProofFlagsToBits(proof.SourceFlags),
 	}
@@ -462,17 +463,17 @@ func (client CCIPClient) GetCrossChainSendRequestsForRange(
 	ctx context.Context,
 	t *testing.T,
 	report offramp.CCIPRelayReport,
-	onrampBlockNumber uint64) []*onramp.OnRampCrossChainSendRequested {
+	onrampBlockNumber uint64) []*onramp.OnRampCCIPSendRequested {
 	// Get the other transactions in the proof, we look 1000 blocks back for transaction
 	// should be fine? Needs fine-tuning after improved batching strategies are developed
 	// in milestone 4
-	reqsIterator, err := client.Source.OnRamp.FilterCrossChainSendRequested(&bind.FilterOpts{
+	reqsIterator, err := client.Source.OnRamp.FilterCCIPSendRequested(&bind.FilterOpts{
 		Context: ctx,
 		Start:   onrampBlockNumber - 1000,
 	})
 	require.NoError(t, err)
 
-	var requests []*onramp.OnRampCrossChainSendRequested
+	var requests []*onramp.OnRampCCIPSendRequested
 	var minFound = report.MaxSequenceNumber
 
 	for reqsIterator.Next() {
@@ -556,8 +557,8 @@ func GetCurrentBlockNumber(chain *ethclient.Client) uint64 {
 
 func (client CCIPClient) ValidateMerkleRoot(
 	t *testing.T,
-	request *onramp.OnRampCrossChainSendRequested,
-	reportRequests []*onramp.OnRampCrossChainSendRequested,
+	request *onramp.OnRampCCIPSendRequested,
+	reportRequests []*onramp.OnRampCCIPSendRequested,
 	report offramp.CCIPRelayReport,
 ) merklemulti.Proof[[32]byte] {
 	mctx := merklemulti.NewKeccakCtx()
@@ -599,7 +600,7 @@ func (client CCIPClient) TryGetTokensFromPausedPool() {
 }
 
 // SendToDappWithExecution executes a cross chain transactions using the sender dapp interface.
-func (client CCIPClient) SendToDappWithExecution(source SourceClient, from *bind.TransactOpts, toAddress common.Address, amount *big.Int, executor common.Address) *onramp.OnRampCrossChainSendRequested {
+func (client CCIPClient) SendToDappWithExecution(source SourceClient, from *bind.TransactOpts, toAddress common.Address, amount *big.Int, executor common.Address) *onramp.OnRampCCIPSendRequested {
 	SourceBlockNumber := GetCurrentBlockNumber(source.Client.Client)
 
 	tx, err := source.SenderDapp.SendTokens(from, toAddress, []common.Address{client.Source.LinkTokenAddress}, []*big.Int{amount}, executor)
@@ -611,17 +612,18 @@ func (client CCIPClient) SendToDappWithExecution(source SourceClient, from *bind
 }
 
 // SendToOnrampWithExecution executes a cross chain transactions using the onramp interface.
-func (client CCIPClient) SendToOnrampWithExecution(source SourceClient, from *bind.TransactOpts, toAddress common.Address, amount *big.Int, executor common.Address) *onramp.OnRampCrossChainSendRequested {
+func (client CCIPClient) SendToOnrampWithExecution(source SourceClient, from *bind.TransactOpts, toAddress common.Address, amount *big.Int, executor common.Address) *onramp.OnRampCCIPSendRequested {
 	SourceBlockNumber := GetCurrentBlockNumber(source.Client.Client)
-	payload := onramp_router.CCIPMessagePayload{
-		Tokens:             []common.Address{source.LinkTokenAddress},
-		Amounts:            []*big.Int{amount},
-		DestinationChainId: client.Dest.ChainId,
-		Receiver:           toAddress,
-		Executor:           executor,
-		Data:               []byte{},
+	payload := onramp_router.CCIPEVMToAnyTollMessage{
+		Tokens:         []common.Address{source.LinkTokenAddress},
+		Amounts:        []*big.Int{amount},
+		Receiver:       toAddress,
+		Data:           []byte{},
+		FeeToken:       source.LinkTokenAddress,
+		FeeTokenAmount: DefaultGasTipFee,
+		GasLimit:       big.NewInt(0),
 	}
-	tx, err := source.OnRampRouter.RequestCrossChainSend(from, payload)
+	tx, err := source.OnRampRouter.CcipSend(from, client.Dest.ChainId, payload)
 	helpers.PanicErr(err)
 	source.logger.Infof("Send tokens tx %s", helpers.ExplorerLink(source.ChainId.Int64(), tx.Hash()))
 	return WaitForCrossChainSendRequest(source, SourceBlockNumber, tx.Hash())
@@ -629,10 +631,10 @@ func (client CCIPClient) SendToOnrampWithExecution(source SourceClient, from *bi
 
 // WaitForCrossChainSendRequest checks on chain for a successful onramp send event with the given tx hash.
 // If not immediately found it will keep retrying in intervals of the globally specified RetryTiming.
-func WaitForCrossChainSendRequest(source SourceClient, fromBlockNum uint64, txhash common.Hash) *onramp.OnRampCrossChainSendRequested {
+func WaitForCrossChainSendRequest(source SourceClient, fromBlockNum uint64, txhash common.Hash) *onramp.OnRampCCIPSendRequested {
 	filter := bind.FilterOpts{Start: fromBlockNum}
 	for {
-		iterator, err := source.OnRamp.FilterCrossChainSendRequested(&filter)
+		iterator, err := source.OnRamp.FilterCCIPSendRequested(&filter)
 		helpers.PanicErr(err)
 		for iterator.Next() {
 			if iterator.Event.Raw.TxHash.Hex() == txhash.Hex() {

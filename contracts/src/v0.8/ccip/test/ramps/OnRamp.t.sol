@@ -9,7 +9,7 @@ import "../../../tests/MockV3Aggregator.sol";
 import "../mocks/MockOnRampRouter.sol";
 import "../../interfaces/OnRampInterface.sol";
 import "../../utils/CCIP.sol";
-import "../../ramps/OnRampRouter.sol";
+import "../../ramps/EVMTollOnRampRouter.sol";
 import "forge-std/Test.sol";
 
 contract OnRampTest is Test {
@@ -60,20 +60,31 @@ contract OnRampTest is Test {
   function testRequestXChainSendsExactApprove() public {
     uint256[] memory amounts = new uint256[](1);
     amounts[0] = 2**128;
-    requestCrossChainSend(s_tokens, amounts, "");
+    ccipSend(s_tokens, amounts, "");
   }
 
   function testRequestXChainSends() public {
     uint256[] memory amounts = new uint256[](1);
     amounts[0] = 2**64;
-    requestCrossChainSend(s_tokens, amounts, "");
+    ccipSend(s_tokens, amounts, "");
   }
 
-  function requestCrossChainSend(
+  function ccipSend(
     IERC20[] memory tokens,
     uint256[] memory amounts,
     bytes memory data
   ) public {
-    s_router.requestCrossChainSend(CCIP.MessagePayload(tokens, amounts, s_destinationChainId, s_owner, s_owner, data));
+    s_router.ccipSend(
+      s_destinationChainId,
+      CCIP.EVMToAnyTollMessage({
+        receiver: s_owner,
+        data: data,
+        tokens: tokens,
+        amounts: amounts,
+        feeToken: tokens[0],
+        feeTokenAmount: 0,
+        gasLimit: 0
+      })
+    );
   }
 }

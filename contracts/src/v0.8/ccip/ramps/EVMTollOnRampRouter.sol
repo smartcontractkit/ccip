@@ -11,32 +11,32 @@ contract OnRampRouter is TypeAndVersionInterface, OwnerIsCreator, PoolCollector 
   error OnRampAlreadySet(uint256 chainId, OnRampInterface onRamp);
 
   event OnRampSet(uint256 indexed chainId, OnRampInterface indexed onRamp);
-  event FeesWithdrawn(IERC20 feeToken, address recipient, uint256 amount);
 
   // destination chain id => OnRampInterface
   mapping(uint256 => OnRampInterface) private s_onRamps;
 
   /**
    * @notice Request a message to be sent to the destination chain
-   * @param payload The message payload
+   * @param destinationChainId The destination chain ID
+   * @param message The message payload
    * @return The sequence number of the message
    */
-  function requestCrossChainSend(CCIP.MessagePayload calldata payload) external returns (uint64) {
+  function ccipSend(uint256 destinationChainId, CCIP.EVMToAnyTollMessage memory message) external returns (uint64) {
     address sender = msg.sender;
-    OnRampInterface onRamp = s_onRamps[payload.destinationChainId];
-    if (address(onRamp) == address(0)) revert OnRampInterface.UnsupportedDestinationChain(payload.destinationChainId);
-    if (payload.tokens.length != payload.amounts.length) revert OnRampInterface.UnsupportedNumberOfTokens();
-    _collectTokens(onRamp, payload);
-    return onRamp.requestCrossChainSend(payload, sender);
-  }
+    OnRampInterface onRamp = s_onRamps[destinationChainId];
+    if (address(onRamp) == address(0)) revert OnRampInterface.UnsupportedDestinationChain(destinationChainId);
+    if (message.tokens.length != message.amounts.length) revert OnRampInterface.UnsupportedNumberOfTokens();
 
-  function withdrawAccumulatedFees(
-    IERC20 feeToken,
-    address recipient,
-    uint256 amount
-  ) external onlyOwner {
-    feeToken.safeTransfer(recipient, amount);
-    emit FeesWithdrawn(feeToken, recipient, amount);
+    uint256 feeTaken = _collectTokens(
+      onRamp,
+      message.tokens,
+      message.amounts,
+      message.feeToken,
+      message.feeTokenAmount
+    );
+    message.feeTokenAmount -= feeTaken;
+
+    return onRamp.forwardFromRouter(message, sender);
   }
 
   /**

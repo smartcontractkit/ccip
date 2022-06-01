@@ -38,9 +38,9 @@ contract OffRampRouter is OffRampRouterInterface, OwnerIsCreator {
   /**
    * @notice Route the message to its intended receiver contract
    * @param receiver Receiver contract implementing CrossChainMessageReceiverInterface
-   * @param message CCIP.Message struct
+   * @param message CCIP.AnyToEVMTollMessage struct
    */
-  function routeMessage(CrossChainMessageReceiverInterface receiver, CCIP.Message calldata message)
+  function routeMessage(CrossChainMessageReceiverInterface receiver, CCIP.AnyToEVMTollMessage calldata message)
     external
     override
     onlyOffRamp

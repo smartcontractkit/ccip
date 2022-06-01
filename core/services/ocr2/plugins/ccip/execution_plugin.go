@@ -67,7 +67,7 @@ func NewCCIPExecution(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm
 	}
 
 	// Subscribe to all relevant execution logs.
-	sourceChain.LogPoller().MergeFilter([]common.Hash{CrossChainSendRequested}, onRamp.Address())
+	sourceChain.LogPoller().MergeFilter([]common.Hash{CCIPSendRequested}, onRamp.Address())
 	destChain.LogPoller().MergeFilter([]common.Hash{ReportAccepted}, offRamp.Address())
 	destChain.LogPoller().MergeFilter([]common.Hash{CrossChainMessageExecuted}, offRamp.Address())
 	return &CCIPExecution{

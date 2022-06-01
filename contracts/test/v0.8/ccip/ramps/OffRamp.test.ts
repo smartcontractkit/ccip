@@ -24,8 +24,7 @@ import {
 import { Artifact } from 'hardhat/types'
 import { evmRevert } from '../../../test-helpers/matchers'
 import {
-  CCIPMessage,
-  CCIPMessagePayload,
+  AnyToEVMTollMessage,
   encodeRelayReport,
   ExecutionReport,
   MerkleMultiTree,
@@ -77,7 +76,7 @@ let maxTimeBetweenAFNSignals: BigNumber
 
 async function executionValidationFail(
   ramp: Contract,
-  messages: CCIPMessage[],
+  messages: AnyToEVMTollMessage[],
   revertReason: string,
   takeFees: boolean = false,
 ) {
@@ -273,7 +272,7 @@ describe('OffRamp', () => {
   })
 
   describe('#merkleRoot', () => {
-    let messages: Array<CCIPMessage>
+    let messages: Array<AnyToEVMTollMessage>
     let tree: MerkleMultiTree
 
     beforeEach(async () => {
@@ -283,53 +282,49 @@ describe('OffRamp', () => {
           sourceChainId: BigNumber.from(1),
           sequenceNumber: BigNumber.from(1),
           sender: receiver,
-          payload: {
-            destinationChainId: BigNumber.from(2),
-            tokens: [],
-            amounts: [],
-            receiver: receiver,
-            executor: ethers.constants.AddressZero,
-            data: ethers.constants.HashZero,
-          },
+          tokens: [],
+          amounts: [],
+          receiver: receiver,
+          data: ethers.constants.HashZero,
+          feeToken: sourceToken1.address,
+          feeTokenAmount: 0,
+          gasLimit: 0,
         },
         {
           sourceChainId: BigNumber.from(1),
           sequenceNumber: BigNumber.from(2),
           sender: receiver,
-          payload: {
-            destinationChainId: BigNumber.from(2),
-            tokens: [],
-            amounts: [],
-            receiver: receiver,
-            executor: ethers.constants.AddressZero,
-            data: ethers.constants.HashZero,
-          },
+          tokens: [],
+          amounts: [],
+          receiver: receiver,
+          data: ethers.constants.HashZero,
+          feeToken: sourceToken1.address,
+          feeTokenAmount: 0,
+          gasLimit: 0,
         },
         {
           sourceChainId: BigNumber.from(1),
           sequenceNumber: BigNumber.from(3),
           sender: receiver,
-          payload: {
-            destinationChainId: BigNumber.from(2),
-            tokens: [],
-            amounts: [],
-            receiver: receiver,
-            executor: ethers.constants.AddressZero,
-            data: ethers.constants.HashZero,
-          },
+          tokens: [],
+          amounts: [],
+          receiver: receiver,
+          data: ethers.constants.HashZero,
+          feeToken: sourceToken1.address,
+          feeTokenAmount: 0,
+          gasLimit: 0,
         },
         {
           sourceChainId: BigNumber.from(1),
           sequenceNumber: BigNumber.from(4),
           sender: receiver,
-          payload: {
-            destinationChainId: BigNumber.from(2),
-            tokens: [],
-            amounts: [],
-            receiver: receiver,
-            executor: ethers.constants.AddressZero,
-            data: ethers.constants.HashZero,
-          },
+          tokens: [],
+          amounts: [],
+          receiver: receiver,
+          data: ethers.constants.HashZero,
+          feeToken: sourceToken1.address,
+          feeTokenAmount: 0,
+          gasLimit: 0,
         },
       ]
       tree = new MerkleMultiTree(messages)
@@ -469,32 +464,28 @@ describe('OffRamp', () => {
   describe('#executeTransaction', () => {
     let sequenceNumber: BigNumber
     let sourceId: BigNumber
-    let destinationId: BigNumber
     let sender: string
     let messagedata: string
     let amount: BigNumber
-    let message: CCIPMessage
-    let payload: CCIPMessagePayload
+    let message: AnyToEVMTollMessage
+
     beforeEach(async () => {
       sequenceNumber = BigNumber.from(1)
       sourceId = BigNumber.from(sourceChainId)
-      destinationId = BigNumber.from(destinationChainId)
       sender = await roles.oracleNode.getAddress()
       messagedata = stringToBytes('Message')
       amount = BigNumber.from('10000000000')
-      payload = {
+      message = {
+        sequenceNumber: sequenceNumber,
+        sourceChainId: sourceId,
+        sender: sender,
         receiver: receiver.address,
         data: messagedata,
         tokens: [sourceToken1.address, sourceToken2.address],
         amounts: [amount, amount],
-        executor: hre.ethers.constants.AddressZero,
-        destinationChainId: destinationId,
-      }
-      message = {
-        sourceChainId: sourceId,
-        sequenceNumber: sequenceNumber,
-        sender: sender,
-        payload: payload,
+        feeToken: sourceToken1.address,
+        feeTokenAmount: 0,
+        gasLimit: 0,
       }
     })
 
@@ -506,19 +497,17 @@ describe('OffRamp', () => {
 
         beforeEach(async () => {
           const sequenceNumber2 = BigNumber.from(2)
-          const payload2 = {
+          const message2: AnyToEVMTollMessage = {
+            sourceChainId: sourceId,
+            sequenceNumber: sequenceNumber2,
+            sender: sender,
             receiver: receiver.address,
             data: messagedata,
             tokens: [sourceToken1.address],
             amounts: [BigNumber.from('9999999')],
-            executor: hre.ethers.constants.AddressZero,
-            destinationChainId: destinationId,
-          }
-          const message2 = {
-            sourceChainId: sourceId,
-            sequenceNumber: sequenceNumber2,
-            sender: sender,
-            payload: payload2,
+            feeToken: sourceToken1.address,
+            feeTokenAmount: 0,
+            gasLimit: 0,
           }
           tree = new MerkleMultiTree([message, message2])
           relayReport = tree.generateRelayReport()
@@ -529,7 +518,7 @@ describe('OffRamp', () => {
         })
 
         it('fails when the payload is wrong', async () => {
-          executionReport.messages[0].payload.data = stringToBytes('loremipsum')
+          executionReport.messages[0].data = stringToBytes('loremipsum')
 
           await evmRevert(
             ramp
@@ -561,29 +550,19 @@ describe('OffRamp', () => {
       })
       describe('validation fails', () => {
         it('fails if the receiver is the ramp', async () => {
-          message.payload.receiver = ramp.address
+          message.receiver = ramp.address
           await executionValidationFail(
             ramp,
             [message],
-            `InvalidReceiver("${message.payload.receiver}")`,
+            `InvalidReceiver("${message.receiver}")`,
           )
         })
         it('fails if the receiver is the pool1', async () => {
-          message.payload.receiver = pool1.address
+          message.receiver = pool1.address
           await executionValidationFail(
             ramp,
             [message],
-            `InvalidReceiver("${message.payload.receiver}")`,
-          )
-        })
-        it('fails when the message executor is invalid', async () => {
-          // Set the executor to a specific address, then executing with a different
-          // one should revert.
-          message.payload.executor = await roles.oracleNode1.getAddress()
-          await executionValidationFail(
-            ramp,
-            [message],
-            `InvalidExecutor(${message.sequenceNumber})`,
+            `InvalidReceiver("${message.receiver}")`,
           )
         })
         it('fails when the message is already executed', async () => {
@@ -611,7 +590,7 @@ describe('OffRamp', () => {
           )
         })
         it('should fail if the number of tokens sent is not 1', async () => {
-          message.payload.tokens.push(await roles.oracleNode.getAddress())
+          message.tokens.push(await roles.oracleNode.getAddress())
           await executionValidationFail(
             ramp,
             [message],
@@ -619,7 +598,7 @@ describe('OffRamp', () => {
           )
         })
         it('should fail if the number of amounts of tokens to send is not 1', async () => {
-          message.payload.amounts.push(BigNumber.from(50000))
+          message.amounts.push(BigNumber.from(50000))
           await executionValidationFail(
             ramp,
             [message],
@@ -627,19 +606,19 @@ describe('OffRamp', () => {
           )
         })
         it('should fail if sent using an unsupported source token', async () => {
-          message.payload.tokens[0] = await roles.oracleNode2.getAddress()
+          message.tokens[0] = await roles.oracleNode2.getAddress()
           await executionValidationFail(
             ramp,
             [message],
-            `UnsupportedToken("${message.payload.tokens[0]}")`,
+            `UnsupportedToken("${message.tokens[0]}")`,
           )
         })
         it('should fail if sending more tokens than the tokenBucket allows', async () => {
-          message.payload.amounts[0] = bucketCapactiy.add(1)
+          message.amounts[0] = bucketCapactiy.add(1)
           await executionValidationFail(
             ramp,
             [message],
-            `ExceedsTokenLimit(${bucketCapactiy}, ${message.payload.amounts[0]})`,
+            `ExceedsTokenLimit(${bucketCapactiy}, ${message.amounts[0]})`,
           )
         })
         it('should fail if the contract is paused', async () => {
@@ -699,7 +678,7 @@ describe('OffRamp', () => {
           )
         })
         it('fails if the fee exceeds the amount sent', async () => {
-          message.payload.amounts[0] = 1
+          message.amounts[0] = 1
           await executionValidationFail(
             ramp,
             [message],
@@ -737,9 +716,9 @@ describe('OffRamp', () => {
 
           it('GASTEST - EOA receiver [ @skip-coverage ]', async () => {
             const nextSequenceNumber = sequenceNumber.add(1)
-            message.payload.receiver = await roles.consumer.getAddress()
+            message.receiver = await roles.consumer.getAddress()
             message.sequenceNumber = nextSequenceNumber
-            message.payload.data = []
+            message.data = []
             const newTree: MerkleMultiTree = new MerkleMultiTree([message])
             await ramp
               .connect(roles.defaultAccount)
@@ -759,34 +738,18 @@ describe('OffRamp', () => {
           expect(await ramp.getExecuted(message.sequenceNumber)).to.be.true
         })
         it('should deliver the message to the receiver', async () => {
-          messageDeepEqual(await receiver.s_message(), message)
+          messageDeepEqual(await receiver.getMessage(), message)
         })
         it('should send the funds to the receiver contract', async () => {
           expect(await destinationToken1.balanceOf(receiver.address)).to.equal(
-            message.payload.amounts[0],
+            message.amounts[0],
           )
           expect(await destinationToken2.balanceOf(receiver.address)).to.equal(
-            message.payload.amounts[1],
+            message.amounts[1],
           )
         })
         it('should emit a CrossChainMessageExecuted event', async () => {
           expect(tx)
-            .to.emit(ramp, 'CrossChainMessageExecuted')
-            .withArgs(message.sequenceNumber)
-        })
-        it('should execute a message specifying an executor', async () => {
-          message.payload.executor = await roles.oracleNode1.getAddress()
-          message.sequenceNumber = message.sequenceNumber.add(1)
-          const newTree: MerkleMultiTree = new MerkleMultiTree([message])
-          await ramp
-            .connect(roles.defaultAccount)
-            .report(encodeRelayReport(newTree.generateRelayReport()))
-          // Should not revert
-          await expect(
-            ramp
-              .connect(roles.oracleNode1)
-              .executeTransaction(newTree.generateExecutionReport([0]), false),
-          )
             .to.emit(ramp, 'CrossChainMessageExecuted')
             .withArgs(message.sequenceNumber)
         })
@@ -809,9 +772,9 @@ describe('OffRamp', () => {
 
           it('GASTEST - EOA receiver [ @skip-coverage ]', async () => {
             const nextSequenceNumber = sequenceNumber.add(1)
-            message.payload.receiver = await roles.consumer.getAddress()
+            message.receiver = await roles.consumer.getAddress()
             message.sequenceNumber = nextSequenceNumber
-            message.payload.data = []
+            message.data = []
             const newTree: MerkleMultiTree = new MerkleMultiTree([message])
             await ramp
               .connect(roles.defaultAccount)
@@ -835,7 +798,8 @@ describe('OffRamp', () => {
           expect(await ramp.getExecuted(message.sequenceNumber)).to.be.true
         })
         it('should deliver the message to the receiver', async () => {
-          messageDeepEqual(await receiver.s_message(), message)
+          message.amounts[0] = amount.sub(priceFeed1LatestAnswer)
+          messageDeepEqual(await receiver.getMessage(), message)
         })
         it('should mint fee funds to the executor', async () => {
           expect(
@@ -879,34 +843,18 @@ describe('OffRamp', () => {
           }
         })
         it('should send the funds to the receiver contract', async () => {
-          const amountAfterFee = BigNumber.from(message.payload.amounts[0]).sub(
+          const amountAfterFee = BigNumber.from(message.amounts[0]).sub(
             priceFeed1LatestAnswer,
           )
           expect(await destinationToken1.balanceOf(receiver.address)).to.equal(
             amountAfterFee,
           )
           expect(await destinationToken2.balanceOf(receiver.address)).to.equal(
-            message.payload.amounts[1],
+            message.amounts[1],
           )
         })
         it('should emit a CrossChainMessageExecuted event', async () => {
           expect(tx)
-            .to.emit(ramp, 'CrossChainMessageExecuted')
-            .withArgs(message.sequenceNumber)
-        })
-        it('should execute a message specifying an executor', async () => {
-          message.payload.executor = await roles.oracleNode1.getAddress()
-          message.sequenceNumber = message.sequenceNumber.add(1)
-          const newTree: MerkleMultiTree = new MerkleMultiTree([message])
-          await ramp
-            .connect(roles.defaultAccount)
-            .report(encodeRelayReport(newTree.generateRelayReport()))
-          // Should not revert
-          await expect(
-            ramp
-              .connect(roles.oracleNode1)
-              .executeTransaction(newTree.generateExecutionReport([0]), true),
-          )
             .to.emit(ramp, 'CrossChainMessageExecuted')
             .withArgs(message.sequenceNumber)
         })
@@ -915,7 +863,7 @@ describe('OffRamp', () => {
 
     describe('GASTEST - Tree of 20 [ @skip-coverage ]', () => {
       describe('with no tokens', () => {
-        let messages: CCIPMessage[] = []
+        let messages: AnyToEVMTollMessage[] = []
         let tree: MerkleMultiTree
         let relayReport: RelayReport
         let executionReport: ExecutionReport
@@ -929,22 +877,21 @@ describe('OffRamp', () => {
               )
             )
             messages.push({
-              sourceChainId: BigNumber.from(sourceChainId),
               sequenceNumber: lastReport.maxSequenceNumber.add(
                 BigNumber.from(i + 1),
               ),
+              sourceChainId: BigNumber.from(sourceChainId),
               sender: await roles.defaultAccount.getAddress(),
-              payload: {
-                tokens: [],
-                amounts: [],
-                destinationChainId: BigNumber.from(destinationChainId),
-                receiver: tempReceiver.address,
-                executor: ethers.constants.AddressZero,
-                data: ethers.utils.defaultAbiCoder.encode(
-                  ['string'],
-                  [`no tokens message ${i + 1}`],
-                ),
-              },
+              tokens: [],
+              amounts: [],
+              receiver: tempReceiver.address,
+              data: ethers.utils.defaultAbiCoder.encode(
+                ['string'],
+                [`no tokens message ${i + 1}`],
+              ),
+              feeToken: sourceToken1.address,
+              feeTokenAmount: 0,
+              gasLimit: 0,
             })
           }
 
@@ -971,7 +918,7 @@ describe('OffRamp', () => {
       })
 
       describe('with 1 token', () => {
-        let messages: CCIPMessage[] = []
+        let messages: AnyToEVMTollMessage[] = []
         let tree: MerkleMultiTree
         let relayReport: RelayReport
         let executionReport: ExecutionReport
@@ -985,22 +932,21 @@ describe('OffRamp', () => {
               )
             )
             messages.push({
-              sourceChainId: BigNumber.from(sourceChainId),
               sequenceNumber: lastReport.maxSequenceNumber.add(
                 BigNumber.from(i + 1),
               ),
+              sourceChainId: BigNumber.from(sourceChainId),
               sender: await roles.defaultAccount.getAddress(),
-              payload: {
-                tokens: [sourceToken1.address],
-                amounts: [1],
-                destinationChainId: BigNumber.from(destinationChainId),
-                receiver: tempReceiver.address,
-                executor: ethers.constants.AddressZero,
-                data: ethers.utils.defaultAbiCoder.encode(
-                  ['string'],
-                  [`with 1 token message ${i + 1}`],
-                ),
-              },
+              tokens: [sourceToken1.address],
+              amounts: [1],
+              receiver: tempReceiver.address,
+              data: ethers.utils.defaultAbiCoder.encode(
+                ['string'],
+                [`with 1 token message ${i + 1}`],
+              ),
+              feeToken: sourceToken1.address,
+              feeTokenAmount: 0,
+              gasLimit: 0,
             })
           }
 

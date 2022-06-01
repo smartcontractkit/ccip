@@ -9,7 +9,7 @@ contract MockOnRamp is OnRampInterface {
   uint256 public immutable DESTINATION_CHAIN_ID;
   uint256 public immutable FEE;
 
-  CCIP.MessagePayload public mp;
+  CCIP.EVMToAnyTollMessage public mp;
 
   event GetRequiredFee(IERC20 token);
   event GetTokenPool(IERC20 token);
@@ -26,12 +26,12 @@ contract MockOnRamp is OnRampInterface {
     FEE = fee;
   }
 
-  function requestCrossChainSend(CCIP.MessagePayload calldata payload, address originalSender)
+  function forwardFromRouter(CCIP.EVMToAnyTollMessage memory message, address originalSender)
     external
     override
     returns (uint64)
   {
-    mp = payload;
+    mp = message;
     return 0;
   }
 

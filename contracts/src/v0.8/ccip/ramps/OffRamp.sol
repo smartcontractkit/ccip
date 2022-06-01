@@ -129,14 +129,10 @@ contract OffRamp is
     if (reportTimestamp + uint256(s_config.executionDelaySeconds) >= block.timestamp) revert ExecutionDelayError();
 
     for (uint256 i = 0; i < report.messages.length; i++) {
-      CCIP.Message memory message = report.messages[i];
+      CCIP.AnyToEVMTollMessage memory message = report.messages[i];
 
       // Disallow double-execution.
       if (s_executed[message.sequenceNumber]) revert AlreadyExecuted(message.sequenceNumber);
-
-      // The transaction can only be executed by the designated executor, if one exists.
-      if (message.payload.executor != address(0) && message.payload.executor != msg.sender)
-        revert InvalidExecutor(message.sequenceNumber);
 
       // Validity checks for the message.
       _isWellFormed(message);
@@ -151,31 +147,31 @@ contract OffRamp is
 
       if (needFee) {
         uint256 fee = 0;
-        IERC20 feeToken = message.payload.tokens[0];
+        IERC20 feeToken = message.tokens[0];
         AggregatorV2V3Interface feed = getFeed(feeToken);
         if (address(feed) == address(0)) revert FeeError();
         fee = uint256(s_config.executionFeeJuels) * uint256(feed.latestAnswer());
         if (fee > 0) {
-          message.payload.amounts[0] -= fee;
+          message.amounts[0] -= fee;
           _getPool(feeToken).releaseOrMint(msg.sender, fee);
         }
       }
 
-      for (uint256 j = 0; j < message.payload.tokens.length; j++) {
+      for (uint256 j = 0; j < message.tokens.length; j++) {
         // Release tokens to receiver
-        _getPool(message.payload.tokens[j]).releaseOrMint(message.payload.receiver, message.payload.amounts[j]);
+        _getPool(message.tokens[j]).releaseOrMint(message.receiver, message.amounts[j]);
       }
 
       // Try send the message, revert if fails
-      if (message.payload.receiver.isContract()) {
-        try s_router.routeMessage(CrossChainMessageReceiverInterface(message.payload.receiver), message) {} catch (
+      if (message.receiver.isContract()) {
+        try s_router.routeMessage(CrossChainMessageReceiverInterface(message.receiver), message) {} catch (
           bytes memory reason
         ) {
           // TODO: Figure out a better way to handle failed executions
           revert ExecutionError(message.sequenceNumber, reason);
         }
       } else {
-        if (message.payload.data.length > 0) {
+        if (message.data.length > 0) {
           revert UnexpectedPayloadData(message.sequenceNumber);
         }
       }
@@ -218,9 +214,9 @@ contract OffRamp is
     return a < b ? _hashInternalNode(a, b) : _hashInternalNode(b, a);
   }
 
-  function _hashLeafNode(CCIP.Message memory message) private pure returns (bytes32) {
+  function _hashLeafNode(CCIP.AnyToEVMTollMessage memory message) private pure returns (bytes32) {
     // The hash offchain is keccak256(LEAF_DOMAIN_SEPARATOR || CrossChainSendRequested event data),
-    // where the CrossChainSendRequested event data is abi.encode(CCIP.Message).
+    // where the CrossChainSendRequested event data is abi.encode(CCIP.AnyToEVMTollMessage).
     return keccak256(abi.encodePacked(LEAF_DOMAIN_SEPARATOR, abi.encode(message)));
   }
 
@@ -236,21 +232,18 @@ contract OffRamp is
   /**
    * @notice Message receiver checks
    */
-  function _validateReceiver(CCIP.Message memory message) private view {
-    if (address(message.payload.receiver) == address(this) || isPool(address(message.payload.receiver)))
-      revert InvalidReceiver(message.payload.receiver);
+  function _validateReceiver(CCIP.AnyToEVMTollMessage memory message) private view {
+    if (address(message.receiver) == address(this) || isPool(address(message.receiver)))
+      revert InvalidReceiver(message.receiver);
   }
 
-  function _isWellFormed(CCIP.Message memory message) private view {
+  function _isWellFormed(CCIP.AnyToEVMTollMessage memory message) private view {
     if (message.sourceChainId != SOURCE_CHAIN_ID) revert InvalidSourceChain(message.sourceChainId);
-    if (
-      message.payload.tokens.length > uint256(s_config.maxTokensLength) ||
-      message.payload.tokens.length != message.payload.amounts.length
-    ) {
+    if (message.tokens.length > uint256(s_config.maxTokensLength) || message.tokens.length != message.amounts.length) {
       revert UnsupportedNumberOfTokens();
     }
-    if (message.payload.data.length > uint256(s_config.maxDataSize))
-      revert MessageTooLarge(uint256(s_config.maxDataSize), message.payload.data.length);
+    if (message.data.length > uint256(s_config.maxDataSize))
+      revert MessageTooLarge(uint256(s_config.maxDataSize), message.data.length);
   }
 
   /**

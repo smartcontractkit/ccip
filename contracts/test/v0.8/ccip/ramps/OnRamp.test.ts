@@ -13,7 +13,7 @@ import { Artifact } from 'hardhat/types'
 import { expect } from 'chai'
 import { evmRevert } from '../../../test-helpers/matchers'
 import {
-  CCIPMessagePayload,
+  EVMToAnyTollMessage,
   requestEventArgsEqual,
 } from '../../../test-helpers/ccip/ccip'
 
@@ -125,7 +125,7 @@ describe('OnRamp', () => {
   it('has a limited public interface [ @skip-coverage ]', async () => {
     publicAbi(ramp, [
       // OnRamp
-      'requestCrossChainSend',
+      'forwardFromRouter',
       'CHAIN_ID',
       'DESTINATION_CHAIN_ID',
       'getRequiredFee',
@@ -164,6 +164,8 @@ describe('OnRamp', () => {
       'paused',
       'pause',
       'unpause',
+      // PoolCollector
+      'withdrawAccumulatedFees',
     ])
   })
 
@@ -251,23 +253,24 @@ describe('OnRamp', () => {
     })
   })
 
-  describe('#requestCrossChainSend', async () => {
+  describe('#forwardFromRouter', async () => {
     let receiver: string
     let messageData: string
     let amounts: Array<BigNumber>
-    let payload: CCIPMessagePayload
+    let evmToAnyTollMessage: EVMToAnyTollMessage
 
     beforeEach(async () => {
       receiver = await roles.stranger.getAddress()
       messageData = hre.ethers.constants.HashZero
       amounts = [bucketRate.div(8), bucketRate.div(4), bucketRate.div(2)]
-      payload = {
+      evmToAnyTollMessage = {
         receiver: receiver,
         data: messageData,
         tokens: tokens.map((t) => t.address),
         amounts: amounts,
-        destinationChainId: destinationChainId,
-        executor: hre.ethers.constants.AddressZero,
+        feeToken: tokens.map((t) => t.address)[0],
+        feeTokenAmount: 0,
+        gasLimit: 0,
       }
     })
 
@@ -281,8 +284,8 @@ describe('OnRamp', () => {
         }
         tx = await ramp
           .connect(roles.oracleNode)
-          .requestCrossChainSend(
-            payload,
+          .forwardFromRouter(
+            evmToAnyTollMessage,
             await roles.defaultAccount.getAddress(),
           )
       })
@@ -292,15 +295,18 @@ describe('OnRamp', () => {
         const eventArgs = ramp.interface.parseLog(
           receipt.logs[receipt.logs.length - 1],
         ).args
+        console.log(eventArgs)
         requestEventArgsEqual(eventArgs, {
-          sequenceNumber: eventArgs?.message?.sequenceNumber,
+          sequenceNumber: eventArgs?.message.sequenceNumber,
           sourceChainId: BigNumber.from(sourceChainId),
-          destinationChainId: BigNumber.from(payload.destinationChainId),
           sender: await roles.defaultAccount.getAddress(),
           receiver: receiver,
           data: messageData,
           tokens: tokens.map((t) => t.address),
           amounts: amounts,
+          feeToken: tokens.map((t) => t.address)[0],
+          feeTokenAmount: 0,
+          gasLimit: 0,
         })
       })
 
@@ -315,8 +321,8 @@ describe('OnRamp', () => {
         await evmRevert(
           ramp
             .connect(roles.oracleNode)
-            .requestCrossChainSend(
-              payload,
+            .forwardFromRouter(
+              evmToAnyTollMessage,
               await roles.defaultAccount.getAddress(),
             ),
           'Pausable: paused',
@@ -327,8 +333,8 @@ describe('OnRamp', () => {
         await evmRevert(
           ramp
             .connect(roles.oracleNode)
-            .requestCrossChainSend(
-              payload,
+            .forwardFromRouter(
+              evmToAnyTollMessage,
               await roles.defaultAccount.getAddress(),
             ),
           'BadAFNSignal()',
@@ -339,8 +345,8 @@ describe('OnRamp', () => {
         await evmRevert(
           ramp
             .connect(roles.oracleNode)
-            .requestCrossChainSend(
-              payload,
+            .forwardFromRouter(
+              evmToAnyTollMessage,
               await roles.defaultAccount.getAddress(),
             ),
           'StaleAFNHeartbeat()',
@@ -361,7 +367,10 @@ describe('OnRamp', () => {
         await evmRevert(
           ramp
             .connect(roles.oracleNode)
-            .requestCrossChainSend(payload, hre.ethers.constants.AddressZero),
+            .forwardFromRouter(
+              evmToAnyTollMessage,
+              hre.ethers.constants.AddressZero,
+            ),
           `RouterMustSetOriginalSender()`,
         )
       })
@@ -375,23 +384,11 @@ describe('OnRamp', () => {
         await evmRevert(
           ramp
             .connect(roles.oracleNode)
-            .requestCrossChainSend(
-              payload,
+            .forwardFromRouter(
+              evmToAnyTollMessage,
               await roles.defaultAccount.getAddress(),
             ),
           `SenderNotAllowed("${await roles.defaultAccount.getAddress()}")`,
-        )
-      })
-      it('fails if the destination chain ID is not supported by the OnRamp', async () => {
-        payload.destinationChainId = BigNumber.from(999)
-        await evmRevert(
-          ramp
-            .connect(roles.oracleNode)
-            .requestCrossChainSend(
-              payload,
-              await roles.defaultAccount.getAddress(),
-            ),
-          `UnsupportedDestinationChain(${payload.destinationChainId})`,
         )
       })
       it('fails if the data is larger than the max data size', async () => {
@@ -405,8 +402,8 @@ describe('OnRamp', () => {
         await evmRevert(
           ramp
             .connect(roles.oracleNode)
-            .requestCrossChainSend(
-              payload,
+            .forwardFromRouter(
+              evmToAnyTollMessage,
               await roles.defaultAccount.getAddress(),
             ),
           `MessageTooLarge(${newDataSize}, 32)`,
@@ -422,8 +419,8 @@ describe('OnRamp', () => {
         await evmRevert(
           ramp
             .connect(roles.oracleNode)
-            .requestCrossChainSend(
-              payload,
+            .forwardFromRouter(
+              evmToAnyTollMessage,
               await roles.defaultAccount.getAddress(),
             ),
           `UnsupportedNumberOfTokens()`,
@@ -434,12 +431,12 @@ describe('OnRamp', () => {
           maxTokensLength: maxTokensLength,
           relayingFeeJuels: relayingFeeJuels,
         })
-        payload.amounts = [100]
+        evmToAnyTollMessage.amounts = [100]
         await evmRevert(
           ramp
             .connect(roles.oracleNode)
-            .requestCrossChainSend(
-              payload,
+            .forwardFromRouter(
+              evmToAnyTollMessage,
               await roles.defaultAccount.getAddress(),
             ),
           `UnsupportedNumberOfTokens()`,
@@ -458,8 +455,8 @@ describe('OnRamp', () => {
         await evmRevert(
           ramp
             .connect(roles.oracleNode)
-            .requestCrossChainSend(
-              payload,
+            .forwardFromRouter(
+              evmToAnyTollMessage,
               await roles.defaultAccount.getAddress(),
             ),
           `UnsupportedToken("${tokens[0].address}")`,
@@ -482,8 +479,8 @@ describe('OnRamp', () => {
         await evmRevert(
           ramp
             .connect(roles.oracleNode)
-            .requestCrossChainSend(
-              payload,
+            .forwardFromRouter(
+              evmToAnyTollMessage,
               await roles.defaultAccount.getAddress(),
             ),
           `ExceedsTokenLimit(1, ${amounts[0]})`,

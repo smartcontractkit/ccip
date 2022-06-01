@@ -4,7 +4,7 @@ import { Roles, getUsers } from '../../../test-helpers/setup'
 import { MockERC20, MockOffRamp, ReceiverDapp } from '../../../../typechain'
 import { Artifact } from 'hardhat/types'
 import { evmRevert } from '../../../test-helpers/matchers'
-import { CCIPMessage } from '../../../test-helpers/ccip/ccip'
+import { AnyToEVMTollMessage } from '../../../test-helpers/ccip/ccip'
 import { BigNumber } from '@ethersproject/bignumber'
 
 const { deployContract } = hre.waffle
@@ -69,18 +69,17 @@ describe('ReceiverDapp', () => {
     let accountAddr: string
 
     it('fails if the sender is not the off ramp', async () => {
-      const message: CCIPMessage = {
+      const message: AnyToEVMTollMessage = {
         sequenceNumber: BigNumber.from(1),
         sourceChainId: BigNumber.from(1),
         sender: ethers.constants.AddressZero,
-        payload: {
-          destinationChainId: BigNumber.from(2),
-          receiver: ethers.constants.AddressZero,
-          data: ethers.constants.HashZero,
-          tokens: [],
-          amounts: [],
-          executor: ethers.constants.AddressZero,
-        },
+        receiver: ethers.constants.AddressZero,
+        data: ethers.constants.HashZero,
+        tokens: [],
+        amounts: [],
+        feeToken: ethers.constants.AddressZero,
+        feeTokenAmount: 0,
+        gasLimit: 0,
       }
       accountAddr = await roles.defaultAccount.getAddress()
       await evmRevert(
@@ -101,18 +100,17 @@ describe('ReceiverDapp', () => {
         )
         sequenceNumber = BigNumber.from(1)
         amount = balance
-        const message: CCIPMessage = {
+        const message: AnyToEVMTollMessage = {
           sequenceNumber,
           sourceChainId: BigNumber.from(5),
           sender: receiverContract.address,
-          payload: {
-            destinationChainId: BigNumber.from(2),
-            receiver: receiverContract.address,
-            data,
-            tokens: [token.address],
-            amounts: [amount],
-            executor: ethers.constants.AddressZero,
-          },
+          receiver: receiverContract.address,
+          data,
+          tokens: [token.address],
+          amounts: [amount],
+          feeToken: token.address,
+          feeTokenAmount: 0,
+          gasLimit: 0,
         }
         await ramp.deliverMessageTo(receiverContract.address, message)
       })

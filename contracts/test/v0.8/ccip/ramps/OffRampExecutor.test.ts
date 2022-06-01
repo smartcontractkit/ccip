@@ -1,10 +1,14 @@
 import hre from 'hardhat'
 import { expect } from 'chai'
 import { Roles, getUsers } from '../../../test-helpers/setup'
-import { MockOffRamp, OffRampExecutorHelper } from '../../../../typechain'
+import {
+  MockERC20,
+  MockOffRamp,
+  OffRampExecutorHelper,
+} from '../../../../typechain'
 import { Artifact } from 'hardhat/types'
 import {
-  CCIPMessage,
+  AnyToEVMTollMessage,
   encodeExecutionReport,
   executionReportDeepEqual,
   MerkleMultiTree,
@@ -21,6 +25,7 @@ let ExecutorArtifact: Artifact
 
 let ramp: MockOffRamp
 let executor: OffRampExecutorHelper
+let token: MockERC20
 
 beforeEach(async () => {
   const users = await getUsers()
@@ -31,6 +36,20 @@ describe('OffRampExecutor', () => {
   beforeEach(async () => {
     RampArtifact = await hre.artifacts.readArtifact('MockOffRamp')
     ExecutorArtifact = await hre.artifacts.readArtifact('OffRampExecutorHelper')
+
+    const adminAddress = await roles.defaultAccount.getAddress()
+    const TokenArtifact: Artifact = await hre.artifacts.readArtifact(
+      'MockERC20',
+    )
+
+    token = <MockERC20>(
+      await deployContract(roles.defaultAccount, TokenArtifact, [
+        'Chain 1 LINK Token',
+        'LINK',
+        adminAddress,
+        BigNumber.from('100000000000000000000'),
+      ])
+    )
 
     ramp = <MockOffRamp>(
       await deployContract(roles.defaultAccount, RampArtifact, [])
@@ -72,31 +91,29 @@ describe('OffRampExecutor', () => {
   })
 
   it('executes a payload of 2 messages', async () => {
-    const message1: CCIPMessage = {
+    const message1: AnyToEVMTollMessage = {
       sourceChainId: BigNumber.from(1),
       sequenceNumber: BigNumber.from(1),
       sender: await roles.oracleNode1.getAddress(),
-      payload: {
-        destinationChainId: BigNumber.from(2),
-        receiver: await roles.oracleNode2.getAddress(),
-        data: numToBytes32(3),
-        tokens: [],
-        amounts: [],
-        executor: hre.ethers.constants.AddressZero,
-      },
+      receiver: await roles.oracleNode2.getAddress(),
+      data: numToBytes32(3),
+      tokens: [],
+      amounts: [],
+      feeToken: token.address,
+      feeTokenAmount: 0,
+      gasLimit: 0,
     }
-    const message2: CCIPMessage = {
+    const message2: AnyToEVMTollMessage = {
       sourceChainId: BigNumber.from(1),
       sequenceNumber: BigNumber.from(2),
       sender: await roles.oracleNode3.getAddress(),
-      payload: {
-        destinationChainId: BigNumber.from(2),
-        receiver: await roles.oracleNode4.getAddress(),
-        data: numToBytes32(7),
-        tokens: [],
-        amounts: [],
-        executor: hre.ethers.constants.AddressZero,
-      },
+      receiver: await roles.oracleNode4.getAddress(),
+      data: numToBytes32(7),
+      tokens: [],
+      amounts: [],
+      feeToken: token.address,
+      feeTokenAmount: 0,
+      gasLimit: 0,
     }
     const tree = new MerkleMultiTree([message1, message2])
     const execReport = tree.generateExecutionReport([0, 1])

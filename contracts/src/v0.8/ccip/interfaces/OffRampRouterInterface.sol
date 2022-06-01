@@ -10,5 +10,6 @@ interface OffRampRouterInterface {
    * @param receiver Receiver contract implementing CrossChainMessageReceiverInterface
    * @param message CCIP.Message struct
    */
-  function routeMessage(CrossChainMessageReceiverInterface receiver, CCIP.Message calldata message) external;
+  function routeMessage(CrossChainMessageReceiverInterface receiver, CCIP.AnyToEVMTollMessage calldata message)
+    external;
 }

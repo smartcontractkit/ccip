@@ -4,22 +4,29 @@ pragma solidity 0.8.13;
 import "../../vendor/IERC20.sol";
 
 contract CCIP {
-  /// @notice High level message
-  struct Message {
+  /// @notice The Toll message type for EVM chains.
+  struct EVMToAnyTollMessage {
+    address receiver;
+    bytes data;
+    IERC20[] tokens;
+    uint256[] amounts;
+    IERC20 feeToken;
+    uint256 feeTokenAmount;
+    uint256 gasLimit;
+  }
+
+  /// @notice The event that gets emitted when an EVM to EVM cross chain request is made.
+  struct EVMToEVMTollEvent {
     uint256 sourceChainId;
     uint64 sequenceNumber;
     address sender;
-    MessagePayload payload;
-  }
-
-  /// @notice Payload within the message
-  struct MessagePayload {
+    address receiver;
+    bytes data;
     IERC20[] tokens;
     uint256[] amounts;
-    uint256 destinationChainId;
-    address receiver;
-    address executor;
-    bytes data;
+    IERC20 feeToken;
+    uint256 feeTokenAmount;
+    uint256 gasLimit;
   }
 
   /// @notice Report that is relayed by the observing DON at the relay phase
@@ -29,9 +36,23 @@ contract CCIP {
     uint64 maxSequenceNumber;
   }
 
+  // @notice The cross chain message that gets relayed to EVM chains
+  struct AnyToEVMTollMessage {
+    uint256 sourceChainId;
+    uint64 sequenceNumber;
+    address sender;
+    address receiver;
+    bytes data;
+    IERC20[] tokens;
+    uint256[] amounts;
+    IERC20 feeToken;
+    uint256 feeTokenAmount;
+    uint256 gasLimit;
+  }
+
   // TODO: This is a single root for now, enable many roots in one report.
   struct ExecutionReport {
-    Message[] messages;
+    AnyToEVMTollMessage[] messages;
     bytes32[] proofs;
     uint256 proofFlagsBits;
   }

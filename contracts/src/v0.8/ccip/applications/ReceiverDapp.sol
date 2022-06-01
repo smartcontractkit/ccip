@@ -7,7 +7,7 @@ import "../../interfaces/TypeAndVersionInterface.sol";
 import "../interfaces/OffRampRouterInterface.sol";
 
 /**
- * @notice Appliation contract for receiving messages from the OffRamp on behalf of an EOA
+ * @notice Application contract for receiving messages from the OffRamp on behalf of an EOA
  */
 contract ReceiverDapp is CrossChainMessageReceiverInterface, TypeAndVersionInterface {
   using SafeERC20 for IERC20;
@@ -27,15 +27,15 @@ contract ReceiverDapp is CrossChainMessageReceiverInterface, TypeAndVersionInter
    * the tokens sent with it to the designated EOA
    * @param message CCIP Message
    */
-  function receiveMessage(CCIP.Message calldata message) external override {
+  function receiveMessage(CCIP.AnyToEVMTollMessage calldata message) external override {
     if (msg.sender != address(ROUTER)) revert InvalidDeliverer(msg.sender);
     (
       ,
       /* address originalSender */
       address destinationAddress
-    ) = abi.decode(message.payload.data, (address, address));
-    for (uint256 i = 0; i < message.payload.tokens.length; i++) {
-      uint256 amount = message.payload.amounts[i];
+    ) = abi.decode(message.data, (address, address));
+    for (uint256 i = 0; i < message.tokens.length; i++) {
+      uint256 amount = message.amounts[i];
       if (destinationAddress != address(0) && amount != 0) {
         TOKEN.transfer(destinationAddress, amount);
       }

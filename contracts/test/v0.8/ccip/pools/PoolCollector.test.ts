@@ -4,7 +4,6 @@ import hre, { ethers } from 'hardhat'
 import { Artifact } from 'hardhat/types'
 import { MockERC20, MockOnRamp, TokenPoolHelper } from '../../../../typechain'
 import { PoolCollectorHelper } from '../../../../typechain/PoolCollectorHelper'
-import { CCIPMessagePayload } from '../../../test-helpers/ccip/ccip'
 import { evmRevert } from '../../../test-helpers/matchers'
 import { getUsers, Roles } from '../../../test-helpers/setup'
 
@@ -22,7 +21,10 @@ let MockOnRampArtifact: Artifact
 let MockERC20Artifact: Artifact
 let TokenPoolArtifact: Artifact
 
-let payload: CCIPMessagePayload
+let payload: {
+  tokens: string[]
+  amounts: BigNumber[]
+}
 
 const destinationChainId = 99
 const amounts = [10, 11, 12]
@@ -85,10 +87,6 @@ describe('PoolCollector', () => {
         payload = {
           tokens: tokens.map((t) => t.address),
           amounts: amounts.map((a) => BigNumber.from(a)),
-          destinationChainId: BigNumber.from(destinationChainId),
-          receiver: await roles.consumer.getAddress(),
-          executor: ethers.constants.AddressZero,
-          data: ethers.constants.HashZero,
         }
         for (let i = 0; i < amounts.length; i++) {
           await tokens[i]
@@ -106,7 +104,13 @@ describe('PoolCollector', () => {
           ])
         )
         await evmRevert(
-          poolCollector.collectTokens(newOnRamp.address, payload),
+          poolCollector.collectTokens(
+            newOnRamp.address,
+            payload.tokens,
+            payload.amounts,
+            payload.tokens[0],
+            feeAmount,
+          ),
           `UnsupportedToken("${tokens[0].address}")`,
         )
       })
@@ -116,39 +120,71 @@ describe('PoolCollector', () => {
         payload = {
           tokens: tokens.map((t) => t.address),
           amounts: amounts.map((a) => BigNumber.from(a)),
-          destinationChainId: BigNumber.from(destinationChainId),
-          receiver: await roles.consumer.getAddress(),
-          executor: ethers.constants.AddressZero,
-          data: ethers.constants.HashZero,
         }
         for (let i = 0; i < amounts.length; i++) {
           await tokens[i]
             .connect(roles.defaultAccount)
-            .approve(poolCollector.address, BigNumber.from(amounts[i]))
+            .approve(
+              poolCollector.address,
+              BigNumber.from(amounts[i] + feeAmount),
+            )
+          await tokens[i]
+            .connect(roles.defaultAccount)
+            .approve(pool.address, BigNumber.from(amounts[i]))
         }
       })
 
       it('calls getRequiredFee on the onRamp', async () => {
-        const tx = await poolCollector.collectTokens(onRamp.address, payload)
+        const tx = await poolCollector.collectTokens(
+          onRamp.address,
+          payload.tokens,
+          payload.amounts,
+          payload.tokens[0],
+          feeAmount,
+        )
         await expect(tx)
           .to.emit(onRamp, 'GetRequiredFee')
           .withArgs(tokens[0].address)
       })
       it('transfers the feeToken fee amount to this contract', async () => {
-        await poolCollector.collectTokens(onRamp.address, payload)
+        await poolCollector.collectTokens(
+          onRamp.address,
+          payload.tokens,
+          payload.amounts,
+          payload.tokens[0],
+          feeAmount,
+        )
         const collectorBalance = await tokens[0].balanceOf(
           poolCollector.address,
         )
         expect(collectorBalance).to.equal(feeAmount)
       })
-      it('alters the payload amount of fee token correctly', async () => {
-        await poolCollector.collectTokens(onRamp.address, payload)
-        const amountAfterFee = BigNumber.from(payload.amounts[0]).sub(feeAmount)
+      it('collects the fee token amount above the actual fee in the token pool', async () => {
+        await tokens[0]
+          .connect(roles.defaultAccount)
+          .approve(
+            poolCollector.address,
+            BigNumber.from(amounts[0] + feeAmount * 2),
+          )
+        await poolCollector.collectTokens(
+          onRamp.address,
+          payload.tokens,
+          payload.amounts,
+          payload.tokens[0],
+          feeAmount * 2,
+        )
+        const amountAfterFee = BigNumber.from(payload.amounts[0]).add(feeAmount)
         const balance = await tokens[0].balanceOf(pool.address)
         expect(balance).to.equal(amountAfterFee)
       })
       it('calls getTokenPool on the onRamp for each token', async () => {
-        const tx = await poolCollector.collectTokens(onRamp.address, payload)
+        const tx = await poolCollector.collectTokens(
+          onRamp.address,
+          payload.tokens,
+          payload.amounts,
+          payload.tokens[0],
+          feeAmount,
+        )
         for (let i = 0; i < tokens.length; i++) {
           await expect(tx)
             .to.emit(onRamp, 'GetTokenPool')
@@ -156,13 +192,16 @@ describe('PoolCollector', () => {
         }
       })
       it('transfers each of the payload tokens to a token pool', async () => {
-        await poolCollector.collectTokens(onRamp.address, payload)
+        await poolCollector.collectTokens(
+          onRamp.address,
+          payload.tokens,
+          payload.amounts,
+          payload.tokens[0],
+          feeAmount,
+        )
         for (let i = 0; i < tokens.length; i++) {
           const balance = await tokens[i].balanceOf(pool.address)
           let amount = BigNumber.from(amounts[i])
-          if (i === 0) {
-            amount = amount.sub(feeAmount)
-          }
           expect(balance).to.equal(amount)
         }
       })

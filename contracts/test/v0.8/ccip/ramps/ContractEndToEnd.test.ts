@@ -14,9 +14,9 @@ import {
 } from '../../../../typechain'
 import { Artifact } from 'hardhat/types'
 import {
-  CCIPMessage,
-  CCIPMessagePayload,
+  AnyToEVMTollMessage,
   encodeRelayReport,
+  EVMToAnyTollMessage,
   MerkleMultiTree,
   messageDeepEqual,
 } from '../../../test-helpers/ccip/ccip'
@@ -187,13 +187,14 @@ describe('Contract End to End', () => {
 
   it('should send a message and tokens from chain1 to chain2', async () => {
     const messagedata = stringToBytes('Message')
-    const payload: CCIPMessagePayload = {
-      destinationChainId: BigNumber.from(chain2ID),
+    const evmToAnyTollMessage: EVMToAnyTollMessage = {
       receiver: chain2Receiver.address,
       data: messagedata,
       tokens: [chain1Token.address],
       amounts: [sendAmount],
-      executor: hre.ethers.constants.AddressZero,
+      feeToken: chain1Token.address,
+      feeTokenAmount: 0,
+      gasLimit: 0,
     }
 
     const initialChain1PoolBalance = await chain1Token.balanceOf(
@@ -208,7 +209,7 @@ describe('Contract End to End', () => {
       .approve(chain1OnRampRouter.address, sendAmount)
     let tx = await chain1OnRampRouter
       .connect(roles.defaultAccount)
-      .requestCrossChainSend(payload)
+      .ccipSend(BigNumber.from(chain2ID), evmToAnyTollMessage)
 
     // Check tokens are locked
     await expect(await chain1Token.balanceOf(chain1Pool.address)).to.equal(
@@ -220,20 +221,17 @@ describe('Contract End to End', () => {
     const log = chain1OnRamp.interface.parseLog(
       receipt.logs[receipt.logs.length - 1],
     )
-    const sequenceNumber = log.args.message.sequenceNumber
-    const donPayload: CCIPMessagePayload = {
-      receiver: log.args.message.payload.receiver,
-      data: log.args.message.payload.data,
-      tokens: log.args.message.payload.tokens,
-      amounts: log.args.message.payload.amounts,
-      executor: log.args.message.payload.executor,
-      destinationChainId: BigNumber.from(chain2ID),
-    }
-    const donMessage: CCIPMessage = {
-      sequenceNumber: sequenceNumber,
+    const donMessage: AnyToEVMTollMessage = {
+      sequenceNumber: log.args.message.sequenceNumber,
       sourceChainId: BigNumber.from(chain1ID),
       sender: log.args.message.sender,
-      payload: donPayload,
+      receiver: log.args.message.receiver,
+      data: log.args.message.data,
+      tokens: log.args.message.tokens,
+      amounts: log.args.message.amounts,
+      feeToken: log.args.message.feeToken,
+      feeTokenAmount: log.args.message.feeTokenAmount,
+      gasLimit: log.args.message.gasLimit,
     }
 
     // DON encodes, reports and executes the message
@@ -252,7 +250,7 @@ describe('Contract End to End', () => {
       .withArgs(donMessage.sequenceNumber)
 
     await expect(tx).to.emit(chain2Receiver, 'MessageReceived')
-    const receivedPayload = await chain2Receiver.s_message()
+    const receivedPayload = await chain2Receiver.getMessage()
     messageDeepEqual(receivedPayload, donMessage)
 
     // Check balance of contract

@@ -4,9 +4,9 @@ pragma solidity 0.8.13;
 import "../../utils/CCIP.sol";
 
 contract MockOnRampRouter {
-  CCIP.MessagePayload public mp;
+  CCIP.EVMToAnyTollMessage public mp;
 
-  function requestCrossChainSend(CCIP.MessagePayload calldata payload) external returns (uint64) {
+  function ccipSend(uint256 destinationChainId, CCIP.EVMToAnyTollMessage calldata payload) external returns (uint64) {
     mp = payload;
     return 0;
   }

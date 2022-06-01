@@ -78,17 +78,16 @@ func DecodeExecutionReport(report types.Report) (*ExecutionReport, error) {
 	// Must be anonymous struct here
 	erStruct, ok := unpacked[0].(struct {
 		Messages []struct {
-			SourceChainId  *big.Int       `json:"sourceChainId"`
-			SequenceNumber uint64         `json:"sequenceNumber"`
-			Sender         common.Address `json:"sender"`
-			Payload        struct {
-				Tokens             []common.Address `json:"tokens"`
-				Amounts            []*big.Int       `json:"amounts"`
-				DestinationChainId *big.Int         `json:"destinationChainId"`
-				Receiver           common.Address   `json:"receiver"`
-				Executor           common.Address   `json:"executor"`
-				Data               []uint8          `json:"data"`
-			} `json:"payload"`
+			SourceChainId  *big.Int         `json:"sourceChainId"`
+			SequenceNumber uint64           `json:"sequenceNumber"`
+			Sender         common.Address   `json:"sender"`
+			Receiver       common.Address   `json:"receiver"`
+			Data           []uint8          `json:"data"`
+			Tokens         []common.Address `json:"tokens"`
+			Amounts        []*big.Int       `json:"amounts"`
+			FeeToken       common.Address   `json:"feeToken"`
+			FeeTokenAmount *big.Int         `json:"feeTokenAmount"`
+			GasLimit       *big.Int         `json:"gasLimit"`
 		} `json:"Messages"`
 		Proofs        [][32]uint8 `json:"Proofs"`
 		ProofFlagBits *big.Int    `json:"ProofFlagBits"`
@@ -181,7 +180,7 @@ func (r *ExecutionReportingPlugin) Query(ctx context.Context, timestamp types.Re
 // getRelayedReports returns them in sorted order.
 func (r *ExecutionReportingPlugin) getRelayedReports(min, max uint64) ([]offramp.OffRampReportAccepted, error) {
 	// Get all reports where minSeqNum is >= min as a lower bound.
-	reportLogs, err := r.dest.LogsDataWordGreaterThan(ReportAccepted, r.offRamp.Address(), 1, EvmWord(min), 1)
+	reportLogs, err := r.dest.LogsDataWordGreaterThan(ReportAccepted, r.offRamp.Address(), ReportAcceptedMinSequenceNumberIndex, EvmWord(min), 1)
 	if err != nil {
 		return nil, err
 	}
@@ -267,20 +266,18 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 	}.Marshal()
 }
 
-func (r *ExecutionReportingPlugin) getMessagesInRangeWithExecutor(min, max uint64, executor common.Address) ([]onramp.OnRampCrossChainSendRequested, error) {
-	msgs, err := r.source.LogsDataWordRange(CrossChainSendRequested, r.onRamp.Address(), 2, EvmWord(min), EvmWord(max), int(r.offchainConfig.SourceIncomingConfirmations))
+func (r *ExecutionReportingPlugin) getMessagesInRangeWithExecutor(min, max uint64) ([]onramp.OnRampCCIPSendRequested, error) {
+	msgs, err := r.source.LogsDataWordRange(CCIPSendRequested, r.onRamp.Address(), SendRequestedSequenceNumberIndex, EvmWord(min), EvmWord(max), int(r.offchainConfig.SourceIncomingConfirmations))
 	if err != nil {
 		return nil, err
 	}
-	var reqs []onramp.OnRampCrossChainSendRequested
+	var reqs []onramp.OnRampCCIPSendRequested
 	for _, msg := range msgs {
-		req, err := r.onRamp.ParseCrossChainSendRequested(gethtypes.Log{Data: msg.Data, Topics: msg.GetTopics()})
+		req, err := r.onRamp.ParseCCIPSendRequested(gethtypes.Log{Data: msg.Data, Topics: msg.GetTopics()})
 		if err != nil {
 			return nil, err
 		}
-		if executor == [20]byte{} || req.Message.Payload.Executor == executor {
-			reqs = append(reqs, *req)
-		}
+		reqs = append(reqs, *req)
 	}
 	return reqs, nil
 }
@@ -294,8 +291,8 @@ func min(a, b uint64) uint64 {
 
 // Assumes non-empty report. Messages to execute can be span more than one report, but are assumed to be in order of increasing
 // sequence number.
-func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, report offramp.OffRampReportAccepted, msgsToExecute []onramp.OnRampCrossChainSendRequested) ([]byte, error) {
-	allMsgs, err2 := r.getMessagesInRangeWithExecutor(report.Report.MinSequenceNumber, report.Report.MaxSequenceNumber, [20]byte{})
+func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, report offramp.OffRampReportAccepted, msgsToExecute []Message) ([]byte, error) {
+	allMsgs, err2 := r.getMessagesInRangeWithExecutor(report.Report.MinSequenceNumber, report.Report.MaxSequenceNumber)
 	if err2 != nil {
 		return nil, err2
 	}
@@ -311,35 +308,16 @@ func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, report offram
 	var indices []int
 	tree := merklemulti.NewTree(mctx, leaves)
 	for i := int64(0); i < int64(len(msgsToExecute)); i++ {
-		if msgsToExecute[i].Message.SequenceNumber > report.Report.MaxSequenceNumber {
+		if msgsToExecute[i].SequenceNumber > report.Report.MaxSequenceNumber {
 			// Again we only execute one report at a time.
 			break
 		}
-		index := msgsToExecute[i].Message.SequenceNumber - report.Report.MinSequenceNumber
+		index := msgsToExecute[i].SequenceNumber - report.Report.MinSequenceNumber
 		if index < 0 {
 			return nil, errors.New("unexpected invalid index")
 		}
 		indices = append(indices, int(index))
-		messages = append(messages, Message{
-			SequenceNumber: msgsToExecute[i].Message.SequenceNumber,
-			SourceChainId:  msgsToExecute[i].Message.SourceChainId,
-			Sender:         msgsToExecute[i].Message.Sender,
-			Payload: struct {
-				Tokens             []common.Address `json:"tokens"`
-				Amounts            []*big.Int       `json:"amounts"`
-				DestinationChainId *big.Int         `json:"destinationChainId"`
-				Receiver           common.Address   `json:"receiver"`
-				Executor           common.Address   `json:"executor"`
-				Data               []uint8          `json:"data"`
-			}{
-				Tokens:             msgsToExecute[i].Message.Payload.Tokens,
-				Amounts:            msgsToExecute[i].Message.Payload.Amounts,
-				DestinationChainId: msgsToExecute[i].Message.Payload.DestinationChainId,
-				Receiver:           msgsToExecute[i].Message.Payload.Receiver,
-				Executor:           msgsToExecute[i].Message.Payload.Executor,
-				Data:               msgsToExecute[i].Message.Payload.Data,
-			},
-		})
+		messages = append(messages, msgsToExecute[i])
 	}
 	if len(messages) == 0 {
 		return nil, errors.New("no executed messages created")
@@ -389,7 +367,7 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 	if minSeqNum > lastRep.MaxSequenceNumber {
 		return false, nil, errors.New("min seq num greater than max relayed seq num")
 	}
-	msgs, err := r.getMessagesInRangeWithExecutor(minSeqNum, maxSeqNum, r.executor)
+	msgs, err := r.getMessagesInRangeWithExecutor(minSeqNum, maxSeqNum)
 	if err != nil {
 		return false, nil, err
 	}
@@ -409,8 +387,12 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 		lggr.Infow("Executable message present, but reports not relayed yet", "numExecutable", len(msgs))
 		return false, nil, nil
 	}
+	var events []Message
+	for _, m := range msgs {
+		events = append(events, EVMToEVMTollEventToMessage(m.Message))
+	}
 	// We only operate on one report at a time
-	report, err := r.buildReport(lggr, reports[0], msgs)
+	report, err := r.buildReport(lggr, reports[0], events)
 	if err != nil {
 		return false, nil, err
 	}
@@ -454,7 +436,7 @@ func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Conte
 	var seqNums []uint64
 	for i := range er.Messages {
 		seqNums = append(seqNums, er.Messages[i].SequenceNumber)
-		lggr.Infof("msg amounts %s", er.Messages[i].Payload.Amounts[0].String())
+		lggr.Infof("msg amounts %s", er.Messages[i].Amounts[0].String())
 	}
 	lggr.Infof("Seq nums %v proofs %+v proof bits %s", seqNums, er.Proofs, er.ProofFlagBits.String())
 	// If the first message is executed already, this execution report is stale, and we do not accept it.

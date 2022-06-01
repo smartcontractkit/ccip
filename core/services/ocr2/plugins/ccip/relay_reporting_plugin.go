@@ -66,10 +66,10 @@ func DecodeRelayReport(report types.Report) (*offramp.CCIPRelayReport, error) {
 }
 
 // parseLogs preserves the log order.
-func parseLogs(onRamp *onramp.OnRamp, logs []logpoller.Log) ([]onramp.OnRampCrossChainSendRequested, error) {
-	var unstartedReqs []onramp.OnRampCrossChainSendRequested
+func parseLogs(onRamp *onramp.OnRamp, logs []logpoller.Log) ([]onramp.OnRampCCIPSendRequested, error) {
+	var unstartedReqs []onramp.OnRampCCIPSendRequested
 	for _, log := range logs {
-		reqParsed, err := onRamp.ParseCrossChainSendRequested(gethtypes.Log{
+		reqParsed, err := onRamp.ParseCCIPSendRequested(gethtypes.Log{
 			Data:   log.Data,
 			Topics: log.GetTopics(),
 		})
@@ -193,7 +193,7 @@ func (r *RelayReportingPlugin) nextMinSeqNum() (uint64, error) {
 	return nextMin, nil
 }
 
-func (r *RelayReportingPlugin) contiguousReqs(min, max uint64, reqs []onramp.OnRampCrossChainSendRequested) bool {
+func (r *RelayReportingPlugin) contiguousReqs(min, max uint64, reqs []onramp.OnRampCCIPSendRequested) bool {
 	for i, j := min, 0; i < max && j < len(reqs); i, j = i+1, j+1 {
 		if reqs[j].Message.SequenceNumber != i {
 			r.lggr.Errorw("unexpected gap in seq nums", "seq", i)
@@ -217,7 +217,7 @@ func (r *RelayReportingPlugin) Observation(ctx context.Context, timestamp types.
 		return nil, err
 	}
 	// All available messages that have not been relayed yet and have sufficient confirmations.
-	reqs, err := r.source.LogsDataWordGreaterThan(CrossChainSendRequested, r.onRamp.Address(), 2, EvmWord(minSeqNum), int(r.offchainConfig.SourceIncomingConfirmations))
+	reqs, err := r.source.LogsDataWordGreaterThan(CCIPSendRequested, r.onRamp.Address(), SendRequestedSequenceNumberIndex, EvmWord(minSeqNum), int(r.offchainConfig.SourceIncomingConfirmations))
 	if err != nil {
 		return nil, err
 	}
@@ -244,7 +244,7 @@ func (r *RelayReportingPlugin) Observation(ctx context.Context, timestamp types.
 func (r *RelayReportingPlugin) buildReport(minSeqNum, maxSeqNum uint64) (*offramp.CCIPRelayReport, error) {
 	// Logs are guaranteed to be in order of seq num, since these are finalized logs only
 	// and the contract's seq num is auto-incrementing.
-	logs, err := r.source.LogsDataWordRange(CrossChainSendRequested, r.onRamp.Address(), 2, EvmWord(minSeqNum), EvmWord(maxSeqNum), int(r.offchainConfig.SourceIncomingConfirmations))
+	logs, err := r.source.LogsDataWordRange(CCIPSendRequested, r.onRamp.Address(), SendRequestedSequenceNumberIndex, EvmWord(minSeqNum), EvmWord(maxSeqNum), int(r.offchainConfig.SourceIncomingConfirmations))
 	if err != nil {
 		return nil, err
 	}

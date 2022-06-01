@@ -67,12 +67,12 @@ contract OnRamp is
 
   /**
    * @notice Send a message to the remote chain
-   * @dev the first token in the payload is used as the fee token
    * @dev approve() must have already been called on the token using the this ramp address as the spender.
    * @dev if the contract is paused, this function will revert.
-   * @param payload Message struct to send
+   * @param message Message struct to send
+   * @param originalSender The original initiator of the CCIP request
    */
-  function requestCrossChainSend(CCIP.MessagePayload memory payload, address originalSender)
+  function forwardFromRouter(CCIP.EVMToAnyTollMessage memory message, address originalSender)
     external
     override
     whenNotPaused
@@ -82,35 +82,39 @@ contract OnRamp is
     address sender = msg.sender;
     if (sender != s_config.router) revert MustBeCalledByRouter();
     if (originalSender == address(0)) revert RouterMustSetOriginalSender();
-    if (payload.destinationChainId != DESTINATION_CHAIN_ID)
-      revert UnsupportedDestinationChain(payload.destinationChainId);
     // Check that payload is formed correctly
-    if (payload.data.length > uint256(s_config.maxDataSize))
-      revert MessageTooLarge(uint256(s_config.maxDataSize), payload.data.length);
-    if (payload.tokens.length > uint256(s_config.maxTokensLength) || payload.tokens.length != payload.amounts.length)
+    if (message.data.length > uint256(s_config.maxDataSize))
+      revert MessageTooLarge(uint256(s_config.maxDataSize), message.data.length);
+    if (message.tokens.length > uint256(s_config.maxTokensLength) || message.tokens.length != message.amounts.length)
       revert UnsupportedNumberOfTokens();
 
     if (s_allowlistEnabled && !s_allowed[originalSender]) revert SenderNotAllowed(originalSender);
 
-    for (uint256 i = 0; i < payload.tokens.length; i++) {
-      IERC20 token = payload.tokens[i];
+    for (uint256 i = 0; i < message.tokens.length; i++) {
+      IERC20 token = message.tokens[i];
       PoolInterface pool = getPool(token);
       if (address(pool) == address(0)) revert UnsupportedToken(token);
-      uint256 amount = payload.amounts[i];
+      uint256 amount = message.amounts[i];
       pool.lockOrBurn(amount);
     }
 
     uint64 sequenceNumber = s_sequenceNumber;
     // Emit message request
-    CCIP.Message memory message = CCIP.Message({
+    CCIP.EVMToEVMTollEvent memory tollEvent = CCIP.EVMToEVMTollEvent({
       sequenceNumber: sequenceNumber,
       sourceChainId: CHAIN_ID,
       sender: originalSender,
-      payload: payload
+      receiver: message.receiver,
+      data: message.data,
+      tokens: message.tokens,
+      amounts: message.amounts,
+      feeToken: message.feeToken,
+      feeTokenAmount: message.feeTokenAmount,
+      gasLimit: message.gasLimit
     });
     s_sequenceNumber = sequenceNumber + 1;
-    emit CrossChainSendRequested(message);
-    return message.sequenceNumber;
+    emit CCIPSendRequested(tollEvent);
+    return tollEvent.sequenceNumber;
   }
 
   /**

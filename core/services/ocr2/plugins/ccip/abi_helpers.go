@@ -15,12 +15,19 @@ import (
 
 var (
 	// offset || sourceChainID || seqNum || ...
-	CrossChainSendRequested common.Hash
+	CCIPSendRequested common.Hash
 	// merkleRoot || minSeqNum || maxSeqNum
 	ReportAccepted common.Hash
 	// SeqNum
 	CrossChainMessageExecuted common.Hash
 	ConfigSet                 common.Hash
+)
+
+// Zero indexed
+const (
+	SendRequestedSequenceNumberIndex             = 2
+	ReportAcceptedMinSequenceNumberIndex         = 1
+	CrossChainMessageExecutedSequenceNumberIndex = 1
 )
 
 func init() {
@@ -39,16 +46,16 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	CrossChainSendRequested = getIDOrPanic("CrossChainSendRequested", onRampABI)
+	CCIPSendRequested = getIDOrPanic("CCIPSendRequested", onRampABI)
 	ReportAccepted = getIDOrPanic("ReportAccepted", offRampABI)
 	CrossChainMessageExecuted = getIDOrPanic("CrossChainMessageExecuted", offRampABI)
 	ConfigSet = getIDOrPanic("ConfigSet", offRampABI)
 }
 
-// DecodeCCIPMessage decodes the bytecode message into an offramp.CCIPMessage
+// DecodeCCIPMessage decodes the bytecode message into an offramp.CCIPAnyToEVMTollMessage
 // This function returns an error if there is no message in the bytecode or
 // when the payload is malformed.
-func DecodeCCIPMessage(b []byte) (*offramp.CCIPMessage, error) {
+func DecodeCCIPMessage(b []byte) (*offramp.CCIPAnyToEVMTollMessage, error) {
 	unpacked, err := MakeCCIPMsgArgs().Unpack(b)
 	if err != nil {
 		return nil, err
@@ -58,34 +65,47 @@ func DecodeCCIPMessage(b []byte) (*offramp.CCIPMessage, error) {
 	}
 	// Note must use unnamed type here
 	receivedCp, ok := unpacked[0].(struct {
-		SourceChainId  *big.Int       `json:"sourceChainId"`
-		SequenceNumber uint64         `json:"sequenceNumber"`
-		Sender         common.Address `json:"sender"`
-		Payload        struct {
-			Tokens             []common.Address `json:"tokens"`
-			Amounts            []*big.Int       `json:"amounts"`
-			DestinationChainId *big.Int         `json:"destinationChainId"`
-			Receiver           common.Address   `json:"receiver"`
-			Executor           common.Address   `json:"executor"`
-			Data               []uint8          `json:"data"`
-		} `json:"payload"`
+		SourceChainId  *big.Int         `json:"sourceChainId"`
+		SequenceNumber uint64           `json:"sequenceNumber"`
+		Sender         common.Address   `json:"sender"`
+		Receiver       common.Address   `json:"receiver"`
+		Data           []uint8          `json:"data"`
+		Tokens         []common.Address `json:"tokens"`
+		Amounts        []*big.Int       `json:"amounts"`
+		FeeToken       common.Address   `json:"feeToken"`
+		FeeTokenAmount *big.Int         `json:"feeTokenAmount"`
+		GasLimit       *big.Int         `json:"gasLimit"`
 	})
 	if !ok {
 		return nil, fmt.Errorf("invalid format have %T want %T", unpacked[0], receivedCp)
 	}
-	return &offramp.CCIPMessage{
+	return &offramp.CCIPAnyToEVMTollMessage{
 		SourceChainId:  receivedCp.SourceChainId,
 		SequenceNumber: receivedCp.SequenceNumber,
 		Sender:         receivedCp.Sender,
-		Payload: offramp.CCIPMessagePayload{
-			DestinationChainId: receivedCp.Payload.DestinationChainId,
-			Receiver:           receivedCp.Payload.Receiver,
-			Data:               receivedCp.Payload.Data,
-			Tokens:             receivedCp.Payload.Tokens,
-			Amounts:            receivedCp.Payload.Amounts,
-			Executor:           receivedCp.Payload.Executor,
-		},
+		Receiver:       receivedCp.Receiver,
+		Data:           receivedCp.Data,
+		Tokens:         receivedCp.Tokens,
+		Amounts:        receivedCp.Amounts,
+		FeeToken:       receivedCp.FeeToken,
+		FeeTokenAmount: receivedCp.FeeTokenAmount,
+		GasLimit:       receivedCp.GasLimit,
 	}, nil
+}
+
+func EVMToEVMTollEventToMessage(event onramp.CCIPEVMToEVMTollEvent) Message {
+	return Message{
+		SourceChainId:  event.SourceChainId,
+		SequenceNumber: event.SequenceNumber,
+		Sender:         event.Sender,
+		Receiver:       event.Receiver,
+		Data:           event.Data,
+		Tokens:         event.Tokens,
+		Amounts:        event.Amounts,
+		FeeToken:       event.FeeToken,
+		FeeTokenAmount: event.FeeTokenAmount,
+		GasLimit:       event.GasLimit,
+	}
 }
 
 // MakeCCIPMsgArgs is a static function that always returns the abi.Arguments
@@ -105,34 +125,32 @@ func MakeCCIPMsgArgs() abi.Arguments {
 			Type: "address",
 		},
 		{
-			Name: "payload",
-			Type: "tuple",
-			Components: []abi.ArgumentMarshaling{
-				{
-					Name: "tokens",
-					Type: "address[]",
-				},
-				{
-					Name: "amounts",
-					Type: "uint256[]",
-				},
-				{
-					Name: "destinationChainId",
-					Type: "uint256",
-				},
-				{
-					Name: "receiver",
-					Type: "address",
-				},
-				{
-					Name: "executor",
-					Type: "address",
-				},
-				{
-					Name: "data",
-					Type: "bytes",
-				},
-			},
+			Name: "receiver",
+			Type: "address",
+		},
+		{
+			Name: "data",
+			Type: "bytes",
+		},
+		{
+			Name: "tokens",
+			Type: "address[]",
+		},
+		{
+			Name: "amounts",
+			Type: "uint256[]",
+		},
+		{
+			Name: "feeToken",
+			Type: "address",
+		},
+		{
+			Name: "feeTokenAmount",
+			Type: "uint256",
+		},
+		{
+			Name: "gasLimit",
+			Type: "uint256",
 		},
 	}
 	ty, _ := abi.NewType("tuple", "", tuples)
@@ -145,17 +163,16 @@ func MakeCCIPMsgArgs() abi.Arguments {
 
 // Message contains the data from a cross chain message
 type Message struct {
-	SourceChainId  *big.Int       `json:"sourceChainId"`
-	SequenceNumber uint64         `json:"sequenceNumber"`
-	Sender         common.Address `json:"sender"`
-	Payload        struct {
-		Tokens             []common.Address `json:"tokens"`
-		Amounts            []*big.Int       `json:"amounts"`
-		DestinationChainId *big.Int         `json:"destinationChainId"`
-		Receiver           common.Address   `json:"receiver"`
-		Executor           common.Address   `json:"executor"`
-		Data               []uint8          `json:"data"`
-	} `json:"payload"`
+	SourceChainId  *big.Int         `json:"sourceChainId"`
+	SequenceNumber uint64           `json:"sequenceNumber"`
+	Sender         common.Address   `json:"sender"`
+	Receiver       common.Address   `json:"receiver"`
+	Data           []uint8          `json:"data"`
+	Tokens         []common.Address `json:"tokens"`
+	Amounts        []*big.Int       `json:"amounts"`
+	FeeToken       common.Address   `json:"feeToken"`
+	FeeTokenAmount *big.Int         `json:"feeTokenAmount"`
+	GasLimit       *big.Int         `json:"gasLimit"`
 }
 
 type ExecutionReport struct {
@@ -197,34 +214,32 @@ func makeExecutionReportArgs() abi.Arguments {
 							Type: "address",
 						},
 						{
-							Name: "payload",
-							Type: "tuple",
-							Components: []abi.ArgumentMarshaling{
-								{
-									Name: "tokens",
-									Type: "address[]",
-								},
-								{
-									Name: "amounts",
-									Type: "uint256[]",
-								},
-								{
-									Name: "destinationChainId",
-									Type: "uint256",
-								},
-								{
-									Name: "receiver",
-									Type: "address",
-								},
-								{
-									Name: "executor",
-									Type: "address",
-								},
-								{
-									Name: "data",
-									Type: "bytes",
-								},
-							},
+							Name: "receiver",
+							Type: "address",
+						},
+						{
+							Name: "data",
+							Type: "bytes",
+						},
+						{
+							Name: "tokens",
+							Type: "address[]",
+						},
+						{
+							Name: "amounts",
+							Type: "uint256[]",
+						},
+						{
+							Name: "feeToken",
+							Type: "address",
+						},
+						{
+							Name: "feeTokenAmount",
+							Type: "uint256",
+						},
+						{
+							Name: "gasLimit",
+							Type: "uint256",
 						},
 					},
 				},

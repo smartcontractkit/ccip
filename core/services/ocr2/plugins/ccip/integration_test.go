@@ -520,7 +520,7 @@ func (node *Node) eventuallyHasReqSeqNum(t *testing.T, ccipContracts CCIPContrac
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
 		ccipContracts.sourceChain.Commit()
 		ccipContracts.destChain.Commit()
-		lgs, err := c.LogPoller().LogsDataWordRange(ccip.CrossChainSendRequested, ccipContracts.onRamp.Address(), 2, ccip.EvmWord(uint64(seqNum)), ccip.EvmWord(uint64(seqNum)), 1)
+		lgs, err := c.LogPoller().LogsDataWordRange(ccip.CCIPSendRequested, ccipContracts.onRamp.Address(), ccip.SendRequestedSequenceNumberIndex, ccip.EvmWord(uint64(seqNum)), ccip.EvmWord(uint64(seqNum)), 1)
 		require.NoError(t, err)
 		if len(lgs) == 1 {
 			log = lgs[0]
@@ -538,7 +538,7 @@ func (node *Node) eventuallyHasExecutedSeqNum(t *testing.T, ccipContracts CCIPCo
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
 		ccipContracts.sourceChain.Commit()
 		ccipContracts.destChain.Commit()
-		lgs, err := c.LogPoller().IndexedLogsTopicRange(ccip.CrossChainMessageExecuted, ccipContracts.offRamp.Address(), 1, ccip.EvmWord(uint64(seqNum)), ccip.EvmWord(uint64(seqNum)), 1)
+		lgs, err := c.LogPoller().IndexedLogsTopicRange(ccip.CrossChainMessageExecuted, ccipContracts.offRamp.Address(), ccip.CrossChainMessageExecutedSequenceNumberIndex, ccip.EvmWord(uint64(seqNum)), ccip.EvmWord(uint64(seqNum)), 1)
 		require.NoError(t, err)
 		if len(lgs) == 1 {
 			log = lgs[0]
@@ -579,16 +579,17 @@ func allNodesHaveExecutedSeqNum(t *testing.T, ccipContracts CCIPContracts, nodes
 	return log
 }
 
-func queueRequest(t *testing.T, ccipContracts CCIPContracts, msgPayload string, tokens []common.Address, amounts []*big.Int, executor common.Address) *gethtypes.Transaction {
-	msg := onramp_router.CCIPMessagePayload{
-		Receiver:           ccipContracts.messageReceiver.Address(),
-		DestinationChainId: destChainID,
-		Data:               []byte(msgPayload),
-		Tokens:             tokens,
-		Amounts:            amounts,
-		Executor:           executor,
+func queueRequest(t *testing.T, ccipContracts CCIPContracts, msgPayload string, tokens []common.Address, amounts []*big.Int, feeTokenAmount *big.Int, gasLimit *big.Int) *gethtypes.Transaction {
+	msg := onramp_router.CCIPEVMToAnyTollMessage{
+		Receiver:       ccipContracts.messageReceiver.Address(),
+		Data:           []byte(msgPayload),
+		Tokens:         tokens,
+		Amounts:        amounts,
+		FeeToken:       tokens[0],
+		FeeTokenAmount: feeTokenAmount,
+		GasLimit:       gasLimit,
 	}
-	tx, err := ccipContracts.onRampRouter.RequestCrossChainSend(ccipContracts.sourceUser, msg)
+	tx, err := ccipContracts.onRampRouter.CcipSend(ccipContracts.sourceUser, destChainID, msg)
 	require.NoError(t, err)
 	return tx
 }
@@ -602,8 +603,8 @@ func confirmTxs(t *testing.T, txs []*gethtypes.Transaction, chain *backends.Simu
 	}
 }
 
-func sendRequest(t *testing.T, ccipContracts CCIPContracts, msgPayload string, tokens []common.Address, amounts []*big.Int, executor common.Address) {
-	tx := queueRequest(t, ccipContracts, msgPayload, tokens, amounts, executor)
+func sendRequest(t *testing.T, ccipContracts CCIPContracts, msgPayload string, tokens []common.Address, amounts []*big.Int, feeTokenAmount *big.Int, gasLimit *big.Int) {
+	tx := queueRequest(t, ccipContracts, msgPayload, tokens, amounts, feeTokenAmount, gasLimit)
 	confirmTxs(t, []*gethtypes.Transaction{tx}, ccipContracts.sourceChain)
 }
 
@@ -643,7 +644,7 @@ func executeMessage(t *testing.T, ccipContracts CCIPContracts, req logpoller.Log
 	require.Equal(t, tree.Root(), report.MerkleRoot)
 	require.NoError(t, err, "hashes %v index %d", proof.Hashes, index)
 	offRampProof := offramp.CCIPExecutionReport{
-		Messages:       []offramp.CCIPMessage{*decodedMsg},
+		Messages:       []offramp.CCIPAnyToEVMTollMessage{*decodedMsg},
 		Proofs:         proof.Hashes,
 		ProofFlagsBits: ccip.ProofFlagsToBits(proof.SourceFlags),
 	}
@@ -791,14 +792,14 @@ chainID             = "%s"
 
 	currentSeqNum := 1
 	t.Run("single self-execute", func(t *testing.T) {
-		sendRequest(t, ccipContracts, "single req", []common.Address{ccipContracts.sourceLinkToken.Address()}, []*big.Int{big.NewInt(100)}, common.Address{})
+		sendRequest(t, ccipContracts, "single req", []common.Address{ccipContracts.sourceLinkToken.Address()}, []*big.Int{big.NewInt(100)}, big.NewInt(0), big.NewInt(0))
 		req := allNodesHaveReqSeqNum(t, ccipContracts, nodes, currentSeqNum)
 		report := eventuallyReportRelayed(t, ccipContracts, currentSeqNum, currentSeqNum)
 		executeMessage(t, ccipContracts, req, []logpoller.Log{req}, report)
 		allNodesHaveExecutedSeqNum(t, ccipContracts, nodes, currentSeqNum)
 		receivedMsg, err := ccipContracts.messageReceiver.SMessage(nil)
 		require.NoError(t, err)
-		assert.Equal(t, "single req", string(receivedMsg.Payload.Data))
+		assert.Equal(t, "single req", string(receivedMsg.Data))
 		currentSeqNum++
 	})
 
@@ -806,7 +807,7 @@ chainID             = "%s"
 		var txs []*gethtypes.Transaction
 		n := 3
 		for i := 0; i < n; i++ {
-			txs = append(txs, queueRequest(t, ccipContracts, fmt.Sprintf("batch request %d", currentSeqNum+i), []common.Address{ccipContracts.sourceLinkToken.Address()}, []*big.Int{big.NewInt(100)}, common.Address{}))
+			txs = append(txs, queueRequest(t, ccipContracts, fmt.Sprintf("batch request %d", currentSeqNum+i), []common.Address{ccipContracts.sourceLinkToken.Address()}, []*big.Int{big.NewInt(100)}, big.NewInt(0), big.NewInt(0)))
 		}
 		// Send a batch of requests in a single block
 		confirmTxs(t, txs, ccipContracts.sourceChain)
@@ -826,12 +827,12 @@ chainID             = "%s"
 		}
 		receivedMsg, err := ccipContracts.messageReceiver.SMessage(nil)
 		require.NoError(t, err)
-		assert.Equal(t, fmt.Sprintf("batch request %d", currentSeqNum+n-1), string(receivedMsg.Payload.Data))
+		assert.Equal(t, fmt.Sprintf("batch request %d", currentSeqNum+n-1), string(receivedMsg.Data))
 		currentSeqNum += n
 	})
 
 	t.Run("single auto-execute", func(t *testing.T) {
-		sendRequest(t, ccipContracts, "hey DON, execute for me", []common.Address{ccipContracts.sourceLinkToken.Address()}, []*big.Int{big.NewInt(100)}, ccipContracts.executor.Address())
+		sendRequest(t, ccipContracts, "hey DON, execute for me", []common.Address{ccipContracts.sourceLinkToken.Address()}, []*big.Int{big.NewInt(100)}, big.NewInt(0), big.NewInt(0))
 		allNodesHaveReqSeqNum(t, ccipContracts, nodes, currentSeqNum)
 		eventuallyReportRelayed(t, ccipContracts, currentSeqNum, currentSeqNum)
 		allNodesHaveExecutedSeqNum(t, ccipContracts, nodes, currentSeqNum)
@@ -842,7 +843,7 @@ chainID             = "%s"
 		var txs []*gethtypes.Transaction
 		n := 3
 		for i := 0; i < n; i++ {
-			txs = append(txs, queueRequest(t, ccipContracts, fmt.Sprintf("batch request %d", currentSeqNum+i), []common.Address{ccipContracts.sourceLinkToken.Address()}, []*big.Int{big.NewInt(100)}, ccipContracts.executor.Address()))
+			txs = append(txs, queueRequest(t, ccipContracts, fmt.Sprintf("batch request %d", currentSeqNum+i), []common.Address{ccipContracts.sourceLinkToken.Address()}, []*big.Int{big.NewInt(100)}, big.NewInt(0), big.NewInt(0)))
 		}
 		// Send a batch of requests in a single block
 		confirmTxs(t, txs, ccipContracts.sourceChain)
@@ -875,7 +876,16 @@ chainID             = "%s"
 		ccipContracts.sourceChain.Commit()
 		// Send the tokens. Should invoke the onramp.
 		// Only the destUser can execute.
-		_, err = ccipContracts.senderDapp.SendTokens(ccipContracts.sourceUser, ccipContracts.destUser.From, []common.Address{ccipContracts.sourceLinkToken.Address()}, []*big.Int{big.NewInt(100)}, ccipContracts.destUser.From)
+		msg := onramp_router.CCIPEVMToAnyTollMessage{
+			Receiver:       ccipContracts.destUser.From,
+			Data:           nil,
+			Tokens:         []common.Address{ccipContracts.sourceLinkToken.Address()},
+			Amounts:        []*big.Int{big.NewInt(100)},
+			FeeToken:       ccipContracts.sourceLinkToken.Address(),
+			FeeTokenAmount: big.NewInt(0),
+			GasLimit:       big.NewInt(0),
+		}
+		_, err = ccipContracts.onRampRouter.CcipSend(ccipContracts.sourceUser, destChainID, msg)
 		require.NoError(t, err)
 		ccipContracts.sourceChain.Commit()
 

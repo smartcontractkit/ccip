@@ -5,19 +5,19 @@ export const GAS = {
       ONE_MESSAGE: {
         TWO_TOKENS: {
           FEES: {
-            CONTRACT_RECEIVER: 511_884,
+            CONTRACT_RECEIVER: 514_627,
             EOA_RECEIVER: 235_591,
           },
           NO_FEES: {
-            CONTRACT_RECEIVER: 465_214,
+            CONTRACT_RECEIVER: 468_008,
             EOA_RECEIVER: 249_891,
           },
         },
       },
       TEN_MESSAGES: {
         NO_FEES: {
-          NO_TOKENS: 2_408_163,
-          ONE_TOKEN: 3_625_293,
+          NO_TOKENS: 2_438_084,
+          ONE_TOKEN: 3_654_364,
         },
       },
     },

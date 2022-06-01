@@ -14,7 +14,7 @@ import {
 } from '../../../../typechain'
 import { Artifact } from 'hardhat/types'
 import {
-  CCIPMessage,
+  AnyToEVMTollMessage,
   encodeRelayReport,
   MerkleMultiTree,
 } from '../../../test-helpers/ccip/ccip'
@@ -219,19 +219,18 @@ describe('Single Token EOA End to End (through dapp contract)', () => {
       receipt.logs[receipt.logs.length - 1],
     )
 
-    // Send messge to chain2
-    const message: CCIPMessage = {
+    // Send message to chain2
+    const message: AnyToEVMTollMessage = {
       sequenceNumber: log.args.message.sequenceNumber,
       sourceChainId: BigNumber.from(chain1ID),
       sender: log.args.message.sender,
-      payload: {
-        destinationChainId: BigNumber.from(chain2ID),
-        receiver: chain2OffApp.address,
-        data: log.args.message.payload.data,
-        tokens: log.args.message.payload.tokens,
-        amounts: log.args.message.payload.amounts,
-        executor: log.args.message.payload.executor,
-      },
+      receiver: chain2OffApp.address,
+      data: log.args.message.data,
+      tokens: log.args.message.tokens,
+      amounts: log.args.message.amounts,
+      feeToken: log.args.message.tokens[0],
+      feeTokenAmount: 0,
+      gasLimit: 0,
     }
     // DON encodes, reports and executes the message
     const tree = new MerkleMultiTree([message])

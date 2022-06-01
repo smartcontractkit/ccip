@@ -144,7 +144,7 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 
 type messageBatch struct {
 	msgs       []ccip.Message
-	helperMsgs []offramp_helper.CCIPMessage
+	helperMsgs []offramp_helper.CCIPAnyToEVMTollMessage
 	proof      merklemulti.Proof[[32]byte]
 	root       [32]byte
 }
@@ -164,7 +164,7 @@ func (e ExecutionContracts) generateMessageBatch(t *testing.T, payloadSize int, 
 	var indices []int
 	var tokens []common.Address
 	var amounts []*big.Int
-	var helperMsgs []offramp_helper.CCIPMessage
+	var helperMsgs []offramp_helper.CCIPAnyToEVMTollMessage
 	for i := 0; i < nTokensPerMessage; i++ {
 		tokens = append(tokens, e.linkTokenAddress)
 		amounts = append(amounts, big.NewInt(1))
@@ -174,34 +174,26 @@ func (e ExecutionContracts) generateMessageBatch(t *testing.T, payloadSize int, 
 			SequenceNumber: 1 + uint64(i),
 			SourceChainId:  e.sourceChainID,
 			Sender:         e.user.From,
-			Payload: struct {
-				Tokens             []common.Address `json:"tokens"`
-				Amounts            []*big.Int       `json:"amounts"`
-				DestinationChainId *big.Int         `json:"destinationChainId"`
-				Receiver           common.Address   `json:"receiver"`
-				Executor           common.Address   `json:"executor"`
-				Data               []uint8          `json:"data"`
-			}{
-				Tokens:             tokens,
-				Amounts:            amounts,
-				DestinationChainId: e.destChainID,
-				Receiver:           e.receiver.Address(),
-				Data:               maxPayload,
-			},
+			Tokens:         tokens,
+			Amounts:        amounts,
+			Receiver:       e.receiver.Address(),
+			Data:           maxPayload,
+			FeeToken:       tokens[0],
+			FeeTokenAmount: big.NewInt(4),
+			GasLimit:       big.NewInt(100_000),
 		}
 		// Unfortunately have to do this to use the helper's gethwrappers.
-		helperMsgs = append(helperMsgs, offramp_helper.CCIPMessage{
+		helperMsgs = append(helperMsgs, offramp_helper.CCIPAnyToEVMTollMessage{
 			SequenceNumber: message.SequenceNumber,
 			SourceChainId:  message.SourceChainId,
 			Sender:         message.Sender,
-			Payload: offramp_helper.CCIPMessagePayload{
-				Tokens:             message.Payload.Tokens,
-				Amounts:            message.Payload.Amounts,
-				DestinationChainId: message.Payload.DestinationChainId,
-				Receiver:           message.Payload.Receiver,
-				Executor:           message.Payload.Executor,
-				Data:               message.Payload.Data,
-			},
+			Tokens:         message.Tokens,
+			Amounts:        message.Amounts,
+			Receiver:       message.Receiver,
+			Data:           message.Data,
+			FeeToken:       message.FeeToken,
+			FeeTokenAmount: message.FeeTokenAmount,
+			GasLimit:       message.GasLimit,
 		})
 		msgs = append(msgs, message)
 		indices = append(indices, i)
