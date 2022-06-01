@@ -1,4 +1,4 @@
-GETH_VERSION: 1.10.16
+GETH_VERSION: 1.10.18
 afn_contract: ../../../contracts/solc/v0.8.13/AFN.abi ../../../contracts/solc/v0.8.13/AFN.bin 8f6b198e4ac1daaf456427df41f93461e431519a468dcd4632d7c43e6a8ebb1d
 aggregator_v2v3_interface: ../../../contracts/solc/v0.8.6/AggregatorV2V3Interface.abi ../../../contracts/solc/v0.8.6/AggregatorV2V3Interface.bin 95e8814b408bb05bf21742ef580d98698b7db6a9bac6a35c3de12b23aec4ee28
 aggregator_v3_interface: ../../../contracts/solc/v0.8.6/AggregatorV3Interface.abi ../../../contracts/solc/v0.8.6/AggregatorV3Interface.bin 351b55d3b0f04af67db6dfb5c92f1c64479400ca1fec77afc20bc0ce65cb49ab
@@ -28,6 +28,7 @@ offramp_helper: ../../../contracts/solc/v0.8.13/OffRampHelper.abi ../../../contr
 offramp_router: ../../../contracts/solc/v0.8.13/OffRampRouter.abi ../../../contracts/solc/v0.8.13/OffRampRouter.bin 21ce7cc4151f00fb506844b9f6a3e69266bca8770ada13745573cd57d021998d
 onramp: ../../../contracts/solc/v0.8.13/OnRamp.abi ../../../contracts/solc/v0.8.13/OnRamp.bin 1237322eb10c49c14b0096ef2d3fb2b56785ea113ddaece4a20a4e43efbac575
 onramp_router: ../../../contracts/solc/v0.8.13/OnRampRouter.abi ../../../contracts/solc/v0.8.13/OnRampRouter.bin ca7086597b8e9609c60c18678bc5975ac4f175517fabeea3b5736649fb207644
+operator_factory: ../../../contracts/solc/v0.7/OperatorFactory.abi ../../../contracts/solc/v0.7/OperatorFactory.bin 065cff92e71cf0dc384bfdd6598c2c13c2290f64c26e0d18a1a326d08552e717
 operator_wrapper: ../../../contracts/solc/v0.7/Operator.abi ../../../contracts/solc/v0.7/Operator.bin 08965dbb26f62739c1ce4d0941f30c0dd08003648823e7d722900b48270ffc2b
 oracle_wrapper: ../../../contracts/solc/v0.6/Oracle.abi ../../../contracts/solc/v0.6/Oracle.bin 7af2fbac22a6e8c2847e8e685a5400cac5101d72ddf5365213beb79e4dede43a
 receiver_dapp: ../../../contracts/solc/v0.8.13/ReceiverDapp.abi ../../../contracts/solc/v0.8.13/ReceiverDapp.bin c9ccc4dd6a73ba941afdeed10bbfbcfa7c622c9465eb1b47475b5776dad12eaf

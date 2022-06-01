@@ -222,6 +222,7 @@ type GlobalConfig interface {
 	GlobalFlagsContractAddress() (string, bool)
 	GlobalGasEstimatorMode() (string, bool)
 	GlobalLinkContractAddress() (string, bool)
+	GlobalOperatorFactoryAddress() (string, bool)
 	GlobalMinIncomingConfirmations() (uint32, bool)
 	GlobalMinimumContractPayment() (*assets.Link, bool)
 	GlobalNodeNoNewHeadsThreshold() (time.Duration, bool)
@@ -1291,6 +1292,9 @@ func (c *generalConfig) GlobalChainType() (string, bool) {
 }
 func (c *generalConfig) GlobalLinkContractAddress() (string, bool) {
 	return lookupEnv(c, envvar.Name("LinkContractAddress"), parse.String)
+}
+func (c *generalConfig) GlobalOperatorFactoryAddress() (string, bool) {
+	return lookupEnv(c, envvar.Name("OperatorFactoryAddress"), parse.String)
 }
 func (c *generalConfig) GlobalMinIncomingConfirmations() (uint32, bool) {
 	return lookupEnv(c, envvar.Name("MinIncomingConfirmations"), parse.Uint32)

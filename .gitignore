@@ -58,7 +58,7 @@ core/cmd/vrfkey1
 core/web/assets
 
 # Integration Tests
-integration-tests/logs/
+integration-tests/**/logs/
 tests-*.xml
 *.test
 cache
