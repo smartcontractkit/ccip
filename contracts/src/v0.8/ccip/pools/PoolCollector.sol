@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.13;
 
-import "../interfaces/OnRampInterface.sol";
+import "../interfaces/TollOnRampInterface.sol";
 import "../../vendor/SafeERC20.sol";
 import "../access/OwnerIsCreator.sol";
 
@@ -20,7 +20,7 @@ contract PoolCollector is OwnerIsCreator {
    * @param feeTokenAmount the amount of feeToken that is available
    */
   function _collectTokens(
-    OnRampInterface onRamp,
+    TollOnRampInterface onRamp,
     IERC20[] memory tokens,
     uint256[] memory amounts,
     IERC20 feeToken,
@@ -35,7 +35,7 @@ contract PoolCollector is OwnerIsCreator {
       emit FeeCharged(sender, address(this), fee);
       // Send the fee token to the pool
       PoolInterface feeTokenPool = onRamp.getTokenPool(feeToken);
-      if (address(feeTokenPool) == address(0)) revert OnRampInterface.UnsupportedToken(feeToken);
+      if (address(feeTokenPool) == address(0)) revert TollOnRampInterface.UnsupportedToken(feeToken);
       feeToken.safeTransferFrom(sender, address(feeTokenPool), feeTokenAmount);
     }
 
@@ -43,7 +43,7 @@ contract PoolCollector is OwnerIsCreator {
     for (uint256 i = 0; i < tokens.length; i++) {
       IERC20 token = tokens[i];
       PoolInterface pool = onRamp.getTokenPool(token);
-      if (address(pool) == address(0)) revert OnRampInterface.UnsupportedToken(token);
+      if (address(pool) == address(0)) revert TollOnRampInterface.UnsupportedToken(token);
       token.safeTransferFrom(sender, address(pool), amounts[i]);
     }
   }

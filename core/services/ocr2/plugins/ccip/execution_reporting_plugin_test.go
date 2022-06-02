@@ -19,12 +19,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/afn_contract"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/any_2_evm_toll_offramp_router"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/blob_verifier"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/blob_verifier_helper"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/mock_v3_aggregator_contract"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/native_token_pool"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/no_storage_message_receiver"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp_executor_helper"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp_helper"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp_router"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
 )
@@ -32,8 +33,8 @@ import (
 type ExecutionContracts struct {
 	// Has all the link and 100ETH
 	user                       *bind.TransactOpts
-	executorHelper             *offramp_executor_helper.OffRampExecutorHelper
-	offRampHelper              *offramp_helper.OffRampHelper
+	executorHelper             *offramp_helper.OffRampHelper
+	offRampHelper              *blob_verifier_helper.BlobVerifierHelper
 	receiver                   *no_storage_message_receiver.NoStorageMessageReceiver
 	linkTokenAddress           common.Address
 	destChainID, sourceChainID *big.Int
@@ -93,7 +94,7 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	feedAddress, _, _, err := mock_v3_aggregator_contract.DeployMockV3AggregatorContract(destUser, destChain, 18, big.NewInt(6000000000000000))
 	require.NoError(t, err)
 
-	offRampAddress, _, _, err := offramp_helper.DeployOffRampHelper(
+	offRampAddress, _, _, err := blob_verifier_helper.DeployBlobVerifierHelper(
 		destUser,
 		destChain,
 		sourceChainID,
@@ -107,7 +108,7 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 		5,                                      // maxTokensLength
 	)
 	require.NoError(t, err)
-	offRamp, err := offramp_helper.NewOffRampHelper(offRampAddress, destChain)
+	offRamp, err := blob_verifier_helper.NewBlobVerifierHelper(offRampAddress, destChain)
 	require.NoError(t, err)
 	destChain.Commit()
 	_, err = destPool.SetOffRamp(destUser, offRampAddress, true)
@@ -117,20 +118,20 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	receiver, err := no_storage_message_receiver.NewNoStorageMessageReceiver(receiverAddress, destChain)
 	require.NoError(t, err)
 	destChain.Commit()
-	routerAddress, _, _, err := offramp_router.DeployOffRampRouter(destUser, destChain, []common.Address{offRampAddress})
+	routerAddress, _, _, err := any_2_evm_toll_offramp_router.DeployAny2EVMTollOffRampRouter(destUser, destChain, []common.Address{offRampAddress})
 	require.NoError(t, err)
 	destChain.Commit()
 	_, err = offRamp.SetRouter(destUser, routerAddress)
 	require.NoError(t, err)
 	destChain.Commit()
 
-	executorAddress, _, _, err := offramp_executor_helper.DeployOffRampExecutorHelper(
+	executorAddress, _, _, err := offramp_helper.DeployOffRampHelper(
 		destUser,
 		destChain,
 		offRampAddress,
 		false)
 	require.NoError(t, err)
-	executor, err := offramp_executor_helper.NewOffRampExecutorHelper(executorAddress, destChain)
+	executor, err := offramp_helper.NewOffRampHelper(executorAddress, destChain)
 	require.NoError(t, err)
 	destChain.Commit()
 	return ExecutionContracts{user: destUser,
@@ -144,7 +145,7 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 
 type messageBatch struct {
 	msgs       []ccip.Message
-	helperMsgs []offramp_helper.CCIPAnyToEVMTollMessage
+	helperMsgs []blob_verifier.CCIPAny2EVMTollMessage
 	proof      merklemulti.Proof[[32]byte]
 	root       [32]byte
 }
@@ -164,7 +165,7 @@ func (e ExecutionContracts) generateMessageBatch(t *testing.T, payloadSize int, 
 	var indices []int
 	var tokens []common.Address
 	var amounts []*big.Int
-	var helperMsgs []offramp_helper.CCIPAnyToEVMTollMessage
+	var helperMsgs []blob_verifier.CCIPAny2EVMTollMessage
 	for i := 0; i < nTokensPerMessage; i++ {
 		tokens = append(tokens, e.linkTokenAddress)
 		amounts = append(amounts, big.NewInt(1))
@@ -183,7 +184,7 @@ func (e ExecutionContracts) generateMessageBatch(t *testing.T, payloadSize int, 
 			GasLimit:       big.NewInt(100_000),
 		}
 		// Unfortunately have to do this to use the helper's gethwrappers.
-		helperMsgs = append(helperMsgs, offramp_helper.CCIPAnyToEVMTollMessage{
+		helperMsgs = append(helperMsgs, blob_verifier.CCIPAny2EVMTollMessage{
 			SequenceNumber: message.SequenceNumber,
 			SourceChainId:  message.SourceChainId,
 			Sender:         message.Sender,
@@ -225,7 +226,7 @@ func TestMaxExecutionReportSize(t *testing.T) {
 
 	// Check can get into mempool i.e. tx size limit is respected.
 	a := c.executorHelper.Address()
-	bi, _ := abi.JSON(strings.NewReader(offramp_executor_helper.OffRampExecutorHelperABI))
+	bi, _ := abi.JSON(strings.NewReader(offramp_helper.OffRampHelperABI))
 	b, err := bi.Pack("report", []byte(executorReport))
 	require.NoError(t, err)
 	n, err := c.destChain.NonceAt(context.Background(), c.user.From, nil)

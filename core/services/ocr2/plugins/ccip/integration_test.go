@@ -41,14 +41,14 @@ import (
 	"github.com/smartcontractkit/chainlink/core/internal/cltest"
 	"github.com/smartcontractkit/chainlink/core/internal/cltest/heavyweight"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/afn_contract"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/any_2_evm_toll_offramp"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/any_2_evm_toll_offramp_router"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/blob_verifier"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/evm_2_evm_toll_onramp"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/evm_2_evm_toll_onramp_router"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/mock_v3_aggregator_contract"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/native_token_pool"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp_executor"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp_router"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/onramp"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/onramp_router"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/receiver_dapp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/sender_dapp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/simple_message_receiver"
@@ -84,15 +84,15 @@ type CCIPContracts struct {
 	sourceUser, destUser           *bind.TransactOpts
 	sourceChain, destChain         *backends.SimulatedBackend
 	sourcePool, destPool           *native_token_pool.NativeTokenPool
-	onRamp                         *onramp.OnRamp
-	onRampRouter                   *onramp_router.OnRampRouter
+	onRamp                         *evm_2_evm_toll_onramp.EVM2EVMTollOnRamp
+	onRampRouter                   *evm_2_evm_toll_onramp_router.EVM2AnyTollOnRampRouter
 	sourceLinkToken, destLinkToken *link_token_interface.LinkToken
-	offRamp                        *offramp.OffRamp
-	offRampRouter                  *offramp_router.OffRampRouter
+	blobVerifier                   *blob_verifier.BlobVerifier
+	offRampRouter                  *any_2_evm_toll_offramp_router.Any2EVMTollOffRampRouter
 	messageReceiver                *simple_message_receiver.SimpleMessageReceiver
 	senderDapp                     *sender_dapp.SenderDapp
 	receiverDapp                   *receiver_dapp.ReceiverDapp
-	executor                       *offramp_executor.OffRampExecutor
+	offRamp                        *any_2_evm_toll_offramp.Any2EVMTollOffRamp
 }
 
 func setupCCIPContracts(t *testing.T) CCIPContracts {
@@ -170,12 +170,12 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 	feedAddress, _, _, err := mock_v3_aggregator_contract.DeployMockV3AggregatorContract(sourceUser, sourceChain, 18, big.NewInt(6000000000000000))
 	require.NoError(t, err)
 	// Create onramp router
-	onRampRouterAddress, _, _, err := onramp_router.DeployOnRampRouter(sourceUser, sourceChain)
+	onRampRouterAddress, _, _, err := evm_2_evm_toll_onramp_router.DeployEVM2AnyTollOnRampRouter(sourceUser, sourceChain)
 	require.NoError(t, err)
 	sourceChain.Commit()
 
 	// Deploy onramp source chain
-	onRampAddress, _, _, err := onramp.DeployOnRamp(
+	onRampAddress, _, _, err := evm_2_evm_toll_onramp.DeployEVM2EVMTollOnRamp(
 		sourceUser,                               // user
 		sourceChain,                              // client
 		sourceChainID,                            // source chain id
@@ -186,7 +186,7 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 		[]common.Address{},                       // allow list
 		afnSourceAddress,                         // AFN
 		big.NewInt(86400),                        //maxTimeWithoutAFNSignal 86400 seconds = one day
-		onramp.OnRampInterfaceOnRampConfig{
+		evm_2_evm_toll_onramp.TollOnRampInterfaceOnRampConfig{
 			Router:           onRampRouterAddress,
 			RelayingFeeJuels: 0,
 			MaxDataSize:      1e12,
@@ -195,12 +195,12 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 	)
 	require.NoError(t, err)
 	// We do this so onRamp.Address() works
-	onRamp, err := onramp.NewOnRamp(onRampAddress, sourceChain)
+	onRamp, err := evm_2_evm_toll_onramp.NewEVM2EVMTollOnRamp(onRampAddress, sourceChain)
 	require.NoError(t, err)
 	_, err = sourcePool.SetOnRamp(sourceUser, onRampAddress, true)
 	require.NoError(t, err)
 	sourceChain.Commit()
-	onRampRouter, err := onramp_router.NewOnRampRouter(onRampRouterAddress, sourceChain)
+	onRampRouter, err := evm_2_evm_toll_onramp_router.NewEVM2AnyTollOnRampRouter(onRampRouterAddress, sourceChain)
 	require.NoError(t, err)
 	_, err = onRampRouter.SetOnRamp(sourceUser, destChainID, onRampAddress)
 	require.NoError(t, err)
@@ -221,7 +221,7 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 	require.NoError(t, err)
 
 	// Deploy offramp dest chain
-	offRampAddress, _, _, err := offramp.DeployOffRamp(
+	offRampAddress, _, _, err := blob_verifier.DeployBlobVerifier(
 		destUser,                                 // user
 		destChain,                                // client
 		sourceChainID,                            // source chain id
@@ -233,7 +233,7 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 		// We set this above the current unix timestamp
 		// so we do not even have to send a heartbeat for it to be healthy.
 		big.NewInt(time.Now().Unix()*2),
-		offramp.OffRampInterfaceOffRampConfig{
+		blob_verifier.TollOffRampInterfaceOffRampConfig{
 			ExecutionFeeJuels:     0,
 			ExecutionDelaySeconds: 0,
 			MaxDataSize:           1e12,
@@ -241,19 +241,19 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 		},
 	)
 	require.NoError(t, err)
-	offRamp, err := offramp.NewOffRamp(offRampAddress, destChain)
+	offRamp, err := blob_verifier.NewBlobVerifier(offRampAddress, destChain)
 	require.NoError(t, err)
 	// Set the pool to be the offramp
 	_, err = destPool.SetOffRamp(destUser, offRampAddress, true)
 	require.NoError(t, err)
 	destChain.Commit()
 	// Create offRamp router
-	offRampRouterAddress, _, offRampRouter, err := offramp_router.DeployOffRampRouter(destUser, destChain, []common.Address{offRampAddress})
+	offRampRouterAddress, _, offRampRouter, err := any_2_evm_toll_offramp_router.DeployAny2EVMTollOffRampRouter(destUser, destChain, []common.Address{offRampAddress})
 	require.NoError(t, err)
 	destChain.Commit()
 	_, err = offRamp.SetRouter(destUser, offRampRouterAddress)
 	require.NoError(t, err)
-	offRampRouter, err = offramp_router.NewOffRampRouter(offRampRouterAddress, destChain)
+	offRampRouter, err = any_2_evm_toll_offramp_router.NewAny2EVMTollOffRampRouter(offRampRouterAddress, destChain)
 	require.NoError(t, err)
 
 	// Deploy offramp contract token receiver
@@ -277,9 +277,9 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 	destChain.Commit()
 
 	// Deploy the message executor ocr2 contract
-	executorAddress, _, _, err := offramp_executor.DeployOffRampExecutor(destUser, destChain, offRampAddress, false)
+	executorAddress, _, _, err := any_2_evm_toll_offramp.DeployAny2EVMTollOffRamp(destUser, destChain, offRampAddress, false)
 	require.NoError(t, err)
-	executor, err := offramp_executor.NewOffRampExecutor(executorAddress, destChain)
+	executor, err := any_2_evm_toll_offramp.NewAny2EVMTollOffRamp(executorAddress, destChain)
 	require.NoError(t, err)
 
 	sourceChain.Commit()
@@ -306,12 +306,12 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 		onRampRouter:    onRampRouter,
 		sourceLinkToken: sourceLinkToken,
 		destLinkToken:   destLinkToken,
-		offRamp:         offRamp,
+		blobVerifier:    offRamp,
 		offRampRouter:   offRampRouter,
 		messageReceiver: messageReceiver,
 		receiverDapp:    eoaTokenReceiver,
 		senderDapp:      eoaTokenSender,
-		executor:        executor,
+		offRamp:         executor,
 	}
 }
 
@@ -538,7 +538,7 @@ func (node *Node) eventuallyHasExecutedSeqNum(t *testing.T, ccipContracts CCIPCo
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
 		ccipContracts.sourceChain.Commit()
 		ccipContracts.destChain.Commit()
-		lgs, err := c.LogPoller().IndexedLogsTopicRange(ccip.CrossChainMessageExecuted, ccipContracts.offRamp.Address(), ccip.CrossChainMessageExecutedSequenceNumberIndex, ccip.EvmWord(uint64(seqNum)), ccip.EvmWord(uint64(seqNum)), 1)
+		lgs, err := c.LogPoller().IndexedLogsTopicRange(ccip.CrossChainMessageExecuted, ccipContracts.blobVerifier.Address(), ccip.CrossChainMessageExecutedSequenceNumberIndex, ccip.EvmWord(uint64(seqNum)), ccip.EvmWord(uint64(seqNum)), 1)
 		require.NoError(t, err)
 		if len(lgs) == 1 {
 			log = lgs[0]
@@ -580,7 +580,7 @@ func allNodesHaveExecutedSeqNum(t *testing.T, ccipContracts CCIPContracts, nodes
 }
 
 func queueRequest(t *testing.T, ccipContracts CCIPContracts, msgPayload string, tokens []common.Address, amounts []*big.Int, feeTokenAmount *big.Int, gasLimit *big.Int) *gethtypes.Transaction {
-	msg := onramp_router.CCIPEVMToAnyTollMessage{
+	msg := evm_2_evm_toll_onramp_router.CCIPEVM2AnyTollMessage{
 		Receiver:       ccipContracts.messageReceiver.Address(),
 		Data:           []byte(msgPayload),
 		Tokens:         tokens,
@@ -608,11 +608,11 @@ func sendRequest(t *testing.T, ccipContracts CCIPContracts, msgPayload string, t
 	confirmTxs(t, []*gethtypes.Transaction{tx}, ccipContracts.sourceChain)
 }
 
-func eventuallyReportRelayed(t *testing.T, ccipContracts CCIPContracts, min, max int) offramp.CCIPRelayReport {
-	var report offramp.CCIPRelayReport
+func eventuallyReportRelayed(t *testing.T, ccipContracts CCIPContracts, min, max int) blob_verifier.CCIPRelayReport {
+	var report blob_verifier.CCIPRelayReport
 	var err error
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
-		report, err = ccipContracts.offRamp.GetLastReport(nil)
+		report, err = ccipContracts.blobVerifier.GetLastReport(nil)
 		require.NoError(t, err)
 		ccipContracts.sourceChain.Commit()
 		ccipContracts.destChain.Commit()
@@ -622,9 +622,9 @@ func eventuallyReportRelayed(t *testing.T, ccipContracts CCIPContracts, min, max
 	return report
 }
 
-func executeMessage(t *testing.T, ccipContracts CCIPContracts, req logpoller.Log, allReqs []logpoller.Log, report offramp.CCIPRelayReport) {
+func executeMessage(t *testing.T, ccipContracts CCIPContracts, req logpoller.Log, allReqs []logpoller.Log, report blob_verifier.CCIPRelayReport) {
 	// Double check root exists onchain.
-	exists, err := ccipContracts.offRamp.GetMerkleRoot(nil, report.MerkleRoot)
+	exists, err := ccipContracts.blobVerifier.GetMerkleRoot(nil, report.MerkleRoot)
 	require.NoError(t, err)
 	require.True(t, exists.Int64() > 0)
 
@@ -643,17 +643,17 @@ func executeMessage(t *testing.T, ccipContracts CCIPContracts, req logpoller.Log
 	proof := tree.Prove([]int{int(index)})
 	require.Equal(t, tree.Root(), report.MerkleRoot)
 	require.NoError(t, err, "hashes %v index %d", proof.Hashes, index)
-	offRampProof := offramp.CCIPExecutionReport{
-		Messages:       []offramp.CCIPAnyToEVMTollMessage{*decodedMsg},
+	offRampProof := blob_verifier.CCIPExecutionReport{
+		Messages:       []blob_verifier.CCIPAny2EVMTollMessage{*decodedMsg},
 		Proofs:         proof.Hashes,
 		ProofFlagsBits: ccip.ProofFlagsToBits(proof.SourceFlags),
 	}
-	onchainRoot, err := ccipContracts.offRamp.MerkleRoot(nil, offRampProof)
+	onchainRoot, err := ccipContracts.blobVerifier.MerkleRoot(nil, offRampProof)
 	require.NoError(t, err)
 	require.Equal(t, tree.Root(), onchainRoot)
 
 	// Execute.
-	tx, err := ccipContracts.offRamp.ExecuteTransaction(ccipContracts.destUser, offRampProof, false)
+	tx, err := ccipContracts.blobVerifier.ExecuteTransaction(ccipContracts.destUser, offRampProof, false)
 	require.NoError(t, err)
 	ccipContracts.destChain.Commit()
 	rec, err := ccipContracts.destChain.TransactionReceipt(context.Background(), tx.Hash())
@@ -731,7 +731,7 @@ contractConfigConfirmations = 1
 contractConfigTrackerPollInterval = "1s"
 [relayConfig]
 chainID = %s
-`, ccipContracts.offRamp.Address(), destChainID))
+`, ccipContracts.blobVerifier.Address(), destChainID))
 
 	// For each node add a relayer and executor job.
 	for i, node := range nodes {
@@ -756,7 +756,7 @@ pollPeriod          = "1s"
 [relayConfig]
 chainID             = "%s"
 
-`, i, ccipContracts.offRamp.Address(), node.kb.ID(), node.transmitter, ccipContracts.onRamp.Address(), sourceChainID, destChainID, destChainID))
+`, i, ccipContracts.blobVerifier.Address(), node.kb.ID(), node.transmitter, ccipContracts.onRamp.Address(), sourceChainID, destChainID, destChainID))
 		node.addJob(t, fmt.Sprintf(`
 type                = "offchainreporting2"
 pluginType          = "ccip-execution"
@@ -779,7 +779,7 @@ pollPeriod          = "1s"
 [relayConfig]
 chainID             = "%s"
 
-`, i, ccipContracts.executor.Address(), node.kb.ID(), node.transmitter, ccipContracts.onRamp.Address(), ccipContracts.offRamp.Address(), sourceChainID, destChainID, destChainID))
+`, i, ccipContracts.offRamp.Address(), node.kb.ID(), node.transmitter, ccipContracts.onRamp.Address(), ccipContracts.blobVerifier.Address(), sourceChainID, destChainID, destChainID))
 	}
 	// With jobs present, replay the config log.
 	b, err := ccipContracts.destChain.BlockByNumber(context.Background(), nil)
@@ -876,7 +876,7 @@ chainID             = "%s"
 		ccipContracts.sourceChain.Commit()
 		// Send the tokens. Should invoke the onramp.
 		// Only the destUser can execute.
-		msg := onramp_router.CCIPEVMToAnyTollMessage{
+		msg := evm_2_evm_toll_onramp_router.CCIPEVM2AnyTollMessage{
 			Receiver:       ccipContracts.destUser.From,
 			Data:           nil,
 			Tokens:         []common.Address{ccipContracts.sourceLinkToken.Address()},
@@ -942,7 +942,7 @@ func setupOnchainConfig(t *testing.T, ccipContracts CCIPContracts, oracles []con
 	require.NoError(t, err)
 
 	// Set the DON on the offramp
-	_, err = ccipContracts.offRamp.SetConfig(
+	_, err = ccipContracts.blobVerifier.SetConfig(
 		ccipContracts.destUser,
 		signerAddresses,
 		transmitterAddresses,
@@ -955,7 +955,7 @@ func setupOnchainConfig(t *testing.T, ccipContracts CCIPContracts, oracles []con
 	ccipContracts.destChain.Commit()
 
 	// Same DON on the message executor
-	_, err = ccipContracts.executor.SetConfig(
+	_, err = ccipContracts.offRamp.SetConfig(
 		ccipContracts.destUser,
 		signerAddresses,
 		transmitterAddresses,

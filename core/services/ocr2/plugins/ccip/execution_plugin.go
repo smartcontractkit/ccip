@@ -8,11 +8,10 @@ import (
 	"github.com/pkg/errors"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2/types"
 
-	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/onramp"
-
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp"
+	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/blob_verifier"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/evm_2_evm_toll_onramp"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/job"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins"
@@ -24,8 +23,8 @@ type CCIPExecution struct {
 	spec                               *job.OCR2OracleSpec
 	sourceChainPoller, destChainPoller logpoller.LogPoller
 	destChain                          evm.Chain
-	offRamp                            *offramp.OffRamp
-	onRamp                             *onramp.OnRamp
+	blobVerifier                       *blob_verifier.BlobVerifier
+	onRamp                             *evm_2_evm_toll_onramp.EVM2EVMTollOnRamp
 }
 
 var _ plugins.OraclePlugin = &CCIPExecution{}
@@ -54,14 +53,14 @@ func NewCCIPExecution(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm
 	if !common.IsHexAddress(spec.ContractID) {
 		return nil, errors.Wrap(err, "spec.OffRampID is not a valid hex address")
 	}
-	offRamp, err := offramp.NewOffRamp(common.HexToAddress(string(pluginConfig.OffRampID)), destChain.Client())
+	offRamp, err := blob_verifier.NewBlobVerifier(common.HexToAddress(string(pluginConfig.OffRampID)), destChain.Client())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed creating a new onramp")
 	}
 	if !common.IsHexAddress(string(pluginConfig.OnRampID)) {
 		return nil, errors.Wrap(err, "spec.OffRampID is not a valid hex address")
 	}
-	onRamp, err := onramp.NewOnRamp(common.HexToAddress(string(pluginConfig.OnRampID)), sourceChain.Client())
+	onRamp, err := evm_2_evm_toll_onramp.NewEVM2EVMTollOnRamp(common.HexToAddress(string(pluginConfig.OnRampID)), sourceChain.Client())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed creating a new onramp")
 	}
@@ -73,7 +72,7 @@ func NewCCIPExecution(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm
 	return &CCIPExecution{
 		lggr:              lggr,
 		spec:              spec,
-		offRamp:           offRamp,
+		blobVerifier:      offRamp,
 		onRamp:            onRamp,
 		sourceChainPoller: sourceChain.LogPoller(),
 		destChainPoller:   destChain.LogPoller(),
@@ -84,7 +83,7 @@ func (c *CCIPExecution) GetPluginFactory() (plugin ocrtypes.ReportingPluginFacto
 	return NewExecutionReportingPluginFactory(
 		c.lggr,
 		c.onRamp,
-		c.offRamp,
+		c.blobVerifier,
 		c.sourceChainPoller,
 		c.destChainPoller,
 		common.HexToAddress(c.spec.ContractID),

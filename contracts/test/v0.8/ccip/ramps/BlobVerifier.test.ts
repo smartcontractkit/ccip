@@ -24,7 +24,7 @@ import {
 import { Artifact } from 'hardhat/types'
 import { evmRevert } from '../../../test-helpers/matchers'
 import {
-  AnyToEVMTollMessage,
+  Any2EVMTollMessage,
   encodeRelayReport,
   ExecutionReport,
   MerkleMultiTree,
@@ -39,7 +39,7 @@ let roles: Roles
 
 // This has to be ethers.Contract because of an issue with
 // `address.call(abi.encodeWithSelector(...))` using typechain artifacts.
-let ramp: Contract
+let blobVerifier: Contract
 let router: Contract
 let afn: MockAFN
 let sourceToken1: MockERC20
@@ -56,7 +56,7 @@ let TokenArtifact: Artifact
 let PoolArtifact: Artifact
 let PriceFeedArtifact: Artifact
 let SimpleMessageReceiverArtifact: Artifact
-let rampFactory: ContractFactory
+let blobVerifierHelperFactory: ContractFactory
 let routerFactory: ContractFactory
 
 const priceFeed1LatestAnswer: number = 100
@@ -76,7 +76,7 @@ let maxTimeBetweenAFNSignals: BigNumber
 
 async function executionValidationFail(
   ramp: Contract,
-  messages: AnyToEVMTollMessage[],
+  messages: Any2EVMTollMessage[],
   revertReason: string,
   takeFees: boolean = false,
 ) {
@@ -97,14 +97,18 @@ beforeEach(async () => {
   roles = users.roles
 })
 
-describe('OffRamp', () => {
+describe('BlobVerifier', () => {
   beforeEach(async () => {
     MockAFNArtifact = await hre.artifacts.readArtifact('MockAFN')
     TokenArtifact = await hre.artifacts.readArtifact('MockERC20')
     PoolArtifact = await hre.artifacts.readArtifact('NativeTokenPool')
     PriceFeedArtifact = await hre.artifacts.readArtifact('MockAggregator')
-    rampFactory = await hre.ethers.getContractFactory('OffRampHelper')
-    routerFactory = await hre.ethers.getContractFactory('OffRampRouter')
+    blobVerifierHelperFactory = await hre.ethers.getContractFactory(
+      'BlobVerifierHelper',
+    )
+    routerFactory = await hre.ethers.getContractFactory(
+      'Any2EVMTollOffRampRouter',
+    )
 
     SimpleMessageReceiverArtifact = await hre.artifacts.readArtifact(
       'SimpleMessageReceiver',
@@ -176,7 +180,7 @@ describe('OffRamp', () => {
       .connect(roles.defaultAccount)
       .setLatestAnswer(priceFeed1LatestAnswer)
     afn = <MockAFN>await deployContract(roles.defaultAccount, MockAFNArtifact)
-    ramp = await rampFactory
+    blobVerifier = await blobVerifierHelperFactory
       .connect(roles.defaultAccount)
       .deploy(
         sourceChainId,
@@ -191,17 +195,21 @@ describe('OffRamp', () => {
       )
     router = await routerFactory
       .connect(roles.defaultAccount)
-      .deploy([ramp.address])
-    await ramp.connect(roles.defaultAccount).setRouter(router.address)
-    await pool1.connect(roles.defaultAccount).setOffRamp(ramp.address, true)
-    await pool2.connect(roles.defaultAccount).setOffRamp(ramp.address, true)
+      .deploy([blobVerifier.address])
+    await blobVerifier.connect(roles.defaultAccount).setRouter(router.address)
+    await pool1
+      .connect(roles.defaultAccount)
+      .setOffRamp(blobVerifier.address, true)
+    await pool2
+      .connect(roles.defaultAccount)
+      .setOffRamp(blobVerifier.address, true)
     receiver = <SimpleMessageReceiver>(
       await deployContract(roles.defaultAccount, SimpleMessageReceiverArtifact)
     )
   })
 
   it('has a limited public interface [ @skip-coverage ]', async () => {
-    publicAbi(ramp, [
+    publicAbi(blobVerifier, [
       // Ramp
       'SOURCE_CHAIN_ID',
       'CHAIN_ID',
@@ -257,22 +265,22 @@ describe('OffRamp', () => {
   describe('#constructor', () => {
     it('should deploy correctly', async () => {
       const owner = await roles.defaultAccount.getAddress()
-      await expect(await ramp.SOURCE_CHAIN_ID()).to.equal(sourceChainId)
-      await expect(await ramp.owner()).to.equal(owner)
-      await expect(await ramp.getOffRampConfig()).to.deep.equal([
+      await expect(await blobVerifier.SOURCE_CHAIN_ID()).to.equal(sourceChainId)
+      await expect(await blobVerifier.owner()).to.equal(owner)
+      await expect(await blobVerifier.getOffRampConfig()).to.deep.equal([
         BigNumber.from(initialConfig.executionFeeJuels),
         BigNumber.from(initialConfig.executionDelaySeconds),
         BigNumber.from(initialConfig.maxDataSize),
         BigNumber.from(initialConfig.maxTokensLength),
       ])
       await expect(await pool1.owner()).to.equal(owner)
-      await expect(await pool1.isOffRamp(ramp.address)).to.equal(true)
+      await expect(await pool1.isOffRamp(blobVerifier.address)).to.equal(true)
       await expect(await pool1.getToken()).to.equal(destinationToken1.address)
     })
   })
 
   describe('#merkleRoot', () => {
-    let messages: Array<AnyToEVMTollMessage>
+    let messages: Array<Any2EVMTollMessage>
     let tree: MerkleMultiTree
 
     beforeEach(async () => {
@@ -333,7 +341,7 @@ describe('OffRamp', () => {
     describe('contract root verification', async () => {
       it('leaf 1', async () => {
         const execReport: ExecutionReport = tree.generateExecutionReport([0])
-        const response = await ramp.merkleRoot(execReport)
+        const response = await blobVerifier.merkleRoot(execReport)
         expect(response).to.equal(tree.getRoot())
       })
 
@@ -341,7 +349,7 @@ describe('OffRamp', () => {
         const indices = [0, 3]
         const execReport: ExecutionReport =
           tree.generateExecutionReport(indices)
-        const response = await ramp.merkleRoot(execReport)
+        const response = await blobVerifier.merkleRoot(execReport)
         expect(response).to.equal(tree.getRoot())
       })
 
@@ -349,7 +357,7 @@ describe('OffRamp', () => {
         const indices = [0, 1, 3]
         const execReport: ExecutionReport =
           tree.generateExecutionReport(indices)
-        const response = await ramp.merkleRoot(execReport)
+        const response = await blobVerifier.merkleRoot(execReport)
         expect(response).to.equal(tree.getRoot())
       })
 
@@ -357,7 +365,7 @@ describe('OffRamp', () => {
         const indices = [0, 1, 2, 3]
         const execReport: ExecutionReport =
           tree.generateExecutionReport(indices)
-        const response = await ramp.merkleRoot(execReport)
+        const response = await blobVerifier.merkleRoot(execReport)
         expect(response).to.equal(tree.getRoot())
       })
     })
@@ -375,9 +383,9 @@ describe('OffRamp', () => {
       })
 
       it('reverts when paused', async () => {
-        await ramp.connect(roles.defaultAccount).pause()
+        await blobVerifier.connect(roles.defaultAccount).pause()
         await evmRevert(
-          ramp.connect(roles.defaultAccount).report(stringToBytes('')),
+          blobVerifier.connect(roles.defaultAccount).report(stringToBytes('')),
           'Pausable: paused',
         )
       })
@@ -385,7 +393,7 @@ describe('OffRamp', () => {
       it('fails whenn the AFN signal is bad', async () => {
         await afn.voteBad()
         await evmRevert(
-          ramp.connect(roles.defaultAccount).report(stringToBytes('')),
+          blobVerifier.connect(roles.defaultAccount).report(stringToBytes('')),
           'BadAFNSignal()',
         )
       })
@@ -393,7 +401,7 @@ describe('OffRamp', () => {
       it('fails when the AFN signal is stale', async () => {
         await afn.setTimestamp(BigNumber.from(1))
         await evmRevert(
-          ramp.connect(roles.defaultAccount).report(stringToBytes('')),
+          blobVerifier.connect(roles.defaultAccount).report(stringToBytes('')),
           'StaleAFNHeartbeat()',
         )
       })
@@ -401,13 +409,15 @@ describe('OffRamp', () => {
       it('reverts when the minSequenceNumber is greater than the maxSequenceNumber', async () => {
         report.maxSequenceNumber = BigNumber.from(1)
         await evmRevert(
-          ramp.connect(roles.defaultAccount).report(encodeRelayReport(report)),
+          blobVerifier
+            .connect(roles.defaultAccount)
+            .report(encodeRelayReport(report)),
           'RelayReportError()',
         )
       })
 
       it('reverts when the minSequenceNumber is not 1 greater than the previous report maxSequenceNumber', async () => {
-        await ramp
+        await blobVerifier
           .connect(roles.defaultAccount)
           .report(encodeRelayReport(report))
         report = {
@@ -416,7 +426,9 @@ describe('OffRamp', () => {
           maxSequenceNumber: BigNumber.from(4),
         }
         await evmRevert(
-          ramp.connect(roles.defaultAccount).report(encodeRelayReport(report)),
+          blobVerifier
+            .connect(roles.defaultAccount)
+            .report(encodeRelayReport(report)),
           `SequenceError(3, 3)`,
         )
       })
@@ -435,7 +447,7 @@ describe('OffRamp', () => {
           minSequenceNumber: BigNumber.from(1),
           maxSequenceNumber: BigNumber.from(2),
         }
-        response = await ramp
+        response = await blobVerifier
           .connect(roles.defaultAccount)
           .report(encodeRelayReport(report))
         gasUsed = gasUsed.add((await response.wait()).gasUsed)
@@ -444,18 +456,18 @@ describe('OffRamp', () => {
         expectGasWithinDeviation(gasUsed, GAS.OffRamp.report)
       })
       it('stores the root', async () => {
-        const stored = await ramp.getMerkleRoot(root)
+        const stored = await blobVerifier.getMerkleRoot(root)
         expect(stored).to.not.equal(0)
       })
       it('stores the report in s_lastReport', async () => {
-        const response = await ramp.getLastReport()
+        const response = await blobVerifier.getLastReport()
         expect(response.merkleRoot).to.equal(root)
         expect(response.minSequenceNumber).to.equal(report.minSequenceNumber)
         expect(response.maxSequenceNumber).to.equal(report.maxSequenceNumber)
       })
       it('emits a ReportAccepted event', async () => {
         expect(response)
-          .to.emit(ramp, 'ReportAccepted')
+          .to.emit(blobVerifier, 'ReportAccepted')
           .withArgs([root, report.minSequenceNumber, report.maxSequenceNumber])
       })
     })
@@ -467,7 +479,7 @@ describe('OffRamp', () => {
     let sender: string
     let messagedata: string
     let amount: BigNumber
-    let message: AnyToEVMTollMessage
+    let message: Any2EVMTollMessage
 
     beforeEach(async () => {
       sequenceNumber = BigNumber.from(1)
@@ -497,7 +509,7 @@ describe('OffRamp', () => {
 
         beforeEach(async () => {
           const sequenceNumber2 = BigNumber.from(2)
-          const message2: AnyToEVMTollMessage = {
+          const message2: Any2EVMTollMessage = {
             sourceChainId: sourceId,
             sequenceNumber: sequenceNumber2,
             sender: sender,
@@ -511,7 +523,7 @@ describe('OffRamp', () => {
           }
           tree = new MerkleMultiTree([message, message2])
           relayReport = tree.generateRelayReport()
-          await ramp
+          await blobVerifier
             .connect(roles.defaultAccount)
             .report(encodeRelayReport(relayReport))
           executionReport = tree.generateExecutionReport([0])
@@ -521,7 +533,7 @@ describe('OffRamp', () => {
           executionReport.messages[0].data = stringToBytes('loremipsum')
 
           await evmRevert(
-            ramp
+            blobVerifier
               .connect(roles.defaultAccount)
               .executeTransaction(executionReport, false),
           )
@@ -530,7 +542,7 @@ describe('OffRamp', () => {
         it('fails when the proofs is wrong', async () => {
           executionReport.proofs = []
           await evmRevert(
-            ramp
+            blobVerifier
               .connect(roles.defaultAccount)
               .executeTransaction(executionReport, false),
           )
@@ -539,9 +551,11 @@ describe('OffRamp', () => {
         it('fails when the execution delay has not yet passed', async () => {
           let newConfig = initialConfig
           newConfig.executionDelaySeconds = 60 * 60
-          await ramp.connect(roles.defaultAccount).setOffRampConfig(newConfig)
+          await blobVerifier
+            .connect(roles.defaultAccount)
+            .setOffRampConfig(newConfig)
           await evmRevert(
-            ramp
+            blobVerifier
               .connect(roles.defaultAccount)
               .executeTransaction(executionReport, false),
             `ExecutionDelayError()`,
@@ -550,9 +564,9 @@ describe('OffRamp', () => {
       })
       describe('validation fails', () => {
         it('fails if the receiver is the ramp', async () => {
-          message.receiver = ramp.address
+          message.receiver = blobVerifier.address
           await executionValidationFail(
-            ramp,
+            blobVerifier,
             [message],
             `InvalidReceiver("${message.receiver}")`,
           )
@@ -560,22 +574,22 @@ describe('OffRamp', () => {
         it('fails if the receiver is the pool1', async () => {
           message.receiver = pool1.address
           await executionValidationFail(
-            ramp,
+            blobVerifier,
             [message],
             `InvalidReceiver("${message.receiver}")`,
           )
         })
         it('fails when the message is already executed', async () => {
           const tree = new MerkleMultiTree([message])
-          await ramp
+          await blobVerifier
             .connect(roles.defaultAccount)
             .report(encodeRelayReport(tree.generateRelayReport()))
           const execReport = tree.generateExecutionReport([0])
-          await ramp
+          await blobVerifier
             .connect(roles.defaultAccount)
             .executeTransaction(execReport, false)
           await evmRevert(
-            ramp
+            blobVerifier
               .connect(roles.defaultAccount)
               .executeTransaction(execReport, false),
             `AlreadyExecuted(${message.sequenceNumber})`,
@@ -584,7 +598,7 @@ describe('OffRamp', () => {
         it('should fail if sent from an unsupported source chain', async () => {
           message.sourceChainId = BigNumber.from(999)
           await executionValidationFail(
-            ramp,
+            blobVerifier,
             [message],
             `InvalidSourceChain(${message.sourceChainId})`,
           )
@@ -592,7 +606,7 @@ describe('OffRamp', () => {
         it('should fail if the number of tokens sent is not 1', async () => {
           message.tokens.push(await roles.oracleNode.getAddress())
           await executionValidationFail(
-            ramp,
+            blobVerifier,
             [message],
             `UnsupportedNumberOfTokens()`,
           )
@@ -600,7 +614,7 @@ describe('OffRamp', () => {
         it('should fail if the number of amounts of tokens to send is not 1', async () => {
           message.amounts.push(BigNumber.from(50000))
           await executionValidationFail(
-            ramp,
+            blobVerifier,
             [message],
             `UnsupportedNumberOfTokens()`,
           )
@@ -608,7 +622,7 @@ describe('OffRamp', () => {
         it('should fail if sent using an unsupported source token', async () => {
           message.tokens[0] = await roles.oracleNode2.getAddress()
           await executionValidationFail(
-            ramp,
+            blobVerifier,
             [message],
             `UnsupportedToken("${message.tokens[0]}")`,
           )
@@ -616,19 +630,19 @@ describe('OffRamp', () => {
         it('should fail if sending more tokens than the tokenBucket allows', async () => {
           message.amounts[0] = bucketCapactiy.add(1)
           await executionValidationFail(
-            ramp,
+            blobVerifier,
             [message],
             `ExceedsTokenLimit(${bucketCapactiy}, ${message.amounts[0]})`,
           )
         })
         it('should fail if the contract is paused', async () => {
           const tree = new MerkleMultiTree([message])
-          await ramp
+          await blobVerifier
             .connect(roles.defaultAccount)
             .report(encodeRelayReport(tree.generateRelayReport()))
-          await ramp.connect(roles.defaultAccount).pause()
+          await blobVerifier.connect(roles.defaultAccount).pause()
           await evmRevert(
-            ramp
+            blobVerifier
               .connect(roles.defaultAccount)
               .executeTransaction(tree.generateExecutionReport([0]), false),
             `Pausable: paused`,
@@ -636,12 +650,12 @@ describe('OffRamp', () => {
         })
         it('fails when the AFN signal is bad', async () => {
           const tree = new MerkleMultiTree([message])
-          await ramp
+          await blobVerifier
             .connect(roles.defaultAccount)
             .report(encodeRelayReport(tree.generateRelayReport()))
           await afn.voteBad()
           await evmRevert(
-            ramp
+            blobVerifier
               .connect(roles.defaultAccount)
               .executeTransaction(tree.generateExecutionReport([0]), false),
             `BadAFNSignal()`,
@@ -649,12 +663,12 @@ describe('OffRamp', () => {
         })
         it('fails when the AFN signal is stale', async () => {
           const tree = new MerkleMultiTree([message])
-          await ramp
+          await blobVerifier
             .connect(roles.defaultAccount)
             .report(encodeRelayReport(tree.generateRelayReport()))
           await afn.setTimestamp(BigNumber.from(1))
           await evmRevert(
-            ramp
+            blobVerifier
               .connect(roles.defaultAccount)
               .executeTransaction(tree.generateExecutionReport([0]), false),
             `StaleAFNHeartbeat()`,
@@ -664,14 +678,14 @@ describe('OffRamp', () => {
       describe('fee taking fails', () => {
         it('fails if the price feed does not exist', async () => {
           const tree = new MerkleMultiTree([message])
-          await ramp
+          await blobVerifier
             .connect(roles.defaultAccount)
             .report(encodeRelayReport(tree.generateRelayReport()))
-          await ramp
+          await blobVerifier
             .connect(roles.defaultAccount)
             .removeFeed(sourceToken1.address, priceFeed1.address)
           await evmRevert(
-            ramp
+            blobVerifier
               .connect(roles.defaultAccount)
               .executeTransaction(tree.generateExecutionReport([0]), true),
             `FeeError()`,
@@ -680,7 +694,7 @@ describe('OffRamp', () => {
         it('fails if the fee exceeds the amount sent', async () => {
           message.amounts[0] = 1
           await executionValidationFail(
-            ramp,
+            blobVerifier,
             [message],
             `panic code 0x11 (Arithmetic operation underflowed or overflowed outside of an unchecked block)`,
             true,
@@ -694,13 +708,13 @@ describe('OffRamp', () => {
       let tree: MerkleMultiTree
       beforeEach(async () => {
         tree = new MerkleMultiTree([message])
-        await ramp
+        await blobVerifier
           .connect(roles.defaultAccount)
           .report(encodeRelayReport(tree.generateRelayReport()))
       })
       describe('without fees', () => {
         beforeEach(async () => {
-          tx = await ramp
+          tx = await blobVerifier
             .connect(roles.defaultAccount)
             .executeTransaction(tree.generateExecutionReport([0]), false)
         })
@@ -720,10 +734,10 @@ describe('OffRamp', () => {
             message.sequenceNumber = nextSequenceNumber
             message.data = []
             const newTree: MerkleMultiTree = new MerkleMultiTree([message])
-            await ramp
+            await blobVerifier
               .connect(roles.defaultAccount)
               .report(encodeRelayReport(newTree.generateRelayReport()))
-            tx = await ramp
+            tx = await blobVerifier
               .connect(roles.oracleNode)
               .executeTransaction(newTree.generateExecutionReport([0]), true)
             expectGasWithinDeviation(
@@ -735,7 +749,8 @@ describe('OffRamp', () => {
         })
 
         it('should set s_executed to true', async () => {
-          expect(await ramp.getExecuted(message.sequenceNumber)).to.be.true
+          expect(await blobVerifier.getExecuted(message.sequenceNumber)).to.be
+            .true
         })
         it('should deliver the message to the receiver', async () => {
           messageDeepEqual(await receiver.getMessage(), message)
@@ -750,13 +765,13 @@ describe('OffRamp', () => {
         })
         it('should emit a CrossChainMessageExecuted event', async () => {
           expect(tx)
-            .to.emit(ramp, 'CrossChainMessageExecuted')
+            .to.emit(blobVerifier, 'CrossChainMessageExecuted')
             .withArgs(message.sequenceNumber)
         })
       })
       describe('with fees', () => {
         beforeEach(async () => {
-          tx = await ramp
+          tx = await blobVerifier
             .connect(roles.oracleNode)
             .executeTransaction(tree.generateExecutionReport([0]), true)
         })
@@ -776,10 +791,10 @@ describe('OffRamp', () => {
             message.sequenceNumber = nextSequenceNumber
             message.data = []
             const newTree: MerkleMultiTree = new MerkleMultiTree([message])
-            await ramp
+            await blobVerifier
               .connect(roles.defaultAccount)
               .report(encodeRelayReport(newTree.generateRelayReport()))
-            tx = await ramp
+            tx = await blobVerifier
               .connect(roles.oracleNode)
               .executeTransaction(newTree.generateExecutionReport([0]), true)
             expectGasWithinDeviation(
@@ -789,13 +804,14 @@ describe('OffRamp', () => {
             )
 
             expect(tx)
-              .to.emit(ramp, 'CrossChainMessageExecuted')
+              .to.emit(blobVerifier, 'CrossChainMessageExecuted')
               .withArgs(message.sequenceNumber)
           })
         })
 
         it('should set s_executed to true', async () => {
-          expect(await ramp.getExecuted(message.sequenceNumber)).to.be.true
+          expect(await blobVerifier.getExecuted(message.sequenceNumber)).to.be
+            .true
         })
         it('should deliver the message to the receiver', async () => {
           message.amounts[0] = amount.sub(priceFeed1LatestAnswer)
@@ -810,7 +826,7 @@ describe('OffRamp', () => {
           await expect(tx)
             .to.emit(pool1, 'Released')
             .withArgs(
-              ramp.address,
+              blobVerifier.address,
               await roles.oracleNode.getAddress(),
               priceFeed1LatestAnswer,
             )
@@ -819,14 +835,16 @@ describe('OffRamp', () => {
           let newConfig = initialConfig
           newConfig.executionFeeJuels = 0
           newConfig.executionDelaySeconds = 0
-          await ramp.connect(roles.defaultAccount).setOffRampConfig(newConfig)
+          await blobVerifier
+            .connect(roles.defaultAccount)
+            .setOffRampConfig(newConfig)
           const newSequenceNumber = message.sequenceNumber.add(1)
           message.sequenceNumber = newSequenceNumber
           const newTree: MerkleMultiTree = new MerkleMultiTree([message])
-          await ramp
+          await blobVerifier
             .connect(roles.defaultAccount)
             .report(encodeRelayReport(newTree.generateRelayReport()))
-          tx = await ramp
+          tx = await blobVerifier
             .connect(roles.oracleNode)
             .executeTransaction(newTree.generateExecutionReport([0]), true)
 
@@ -855,7 +873,7 @@ describe('OffRamp', () => {
         })
         it('should emit a CrossChainMessageExecuted event', async () => {
           expect(tx)
-            .to.emit(ramp, 'CrossChainMessageExecuted')
+            .to.emit(blobVerifier, 'CrossChainMessageExecuted')
             .withArgs(message.sequenceNumber)
         })
       })
@@ -863,12 +881,12 @@ describe('OffRamp', () => {
 
     describe('GASTEST - Tree of 20 [ @skip-coverage ]', () => {
       describe('with no tokens', () => {
-        let messages: AnyToEVMTollMessage[] = []
+        let messages: Any2EVMTollMessage[] = []
         let tree: MerkleMultiTree
         let relayReport: RelayReport
         let executionReport: ExecutionReport
         beforeEach(async () => {
-          const lastReport: RelayReport = await ramp.getLastReport()
+          const lastReport: RelayReport = await blobVerifier.getLastReport()
           for (let i = 0; i < 20; i++) {
             const tempReceiver = <SimpleMessageReceiver>(
               await deployContract(
@@ -897,7 +915,7 @@ describe('OffRamp', () => {
 
           tree = new MerkleMultiTree(messages)
           relayReport = tree.generateRelayReport()
-          await ramp
+          await blobVerifier
             .connect(roles.defaultAccount)
             .report(encodeRelayReport(relayReport))
         })
@@ -906,7 +924,7 @@ describe('OffRamp', () => {
           const messageIndices = [...Array(10).keys()]
           executionReport = tree.generateExecutionReport(messageIndices)
 
-          const tx = await ramp
+          const tx = await blobVerifier
             .connect(roles.defaultAccount)
             .executeTransaction(executionReport, false)
           const receipt: ContractReceipt = await tx.wait()
@@ -918,12 +936,12 @@ describe('OffRamp', () => {
       })
 
       describe('with 1 token', () => {
-        let messages: AnyToEVMTollMessage[] = []
+        let messages: Any2EVMTollMessage[] = []
         let tree: MerkleMultiTree
         let relayReport: RelayReport
         let executionReport: ExecutionReport
         beforeEach(async () => {
-          const lastReport: RelayReport = await ramp.getLastReport()
+          const lastReport: RelayReport = await blobVerifier.getLastReport()
           for (let i = 0; i < 20; i++) {
             const tempReceiver = <SimpleMessageReceiver>(
               await deployContract(
@@ -952,7 +970,7 @@ describe('OffRamp', () => {
 
           tree = new MerkleMultiTree(messages)
           relayReport = tree.generateRelayReport()
-          await ramp
+          await blobVerifier
             .connect(roles.defaultAccount)
             .report(encodeRelayReport(relayReport))
         })
@@ -961,7 +979,7 @@ describe('OffRamp', () => {
           const messageIndices = [...Array(10).keys()]
           executionReport = tree.generateExecutionReport(messageIndices)
 
-          const tx = await ramp
+          const tx = await blobVerifier
             .connect(roles.defaultAccount)
             .executeTransaction(executionReport, false)
           const receipt: ContractReceipt = await tx.wait()
@@ -977,14 +995,14 @@ describe('OffRamp', () => {
   describe('#pause', () => {
     it('owner can pause ramp', async () => {
       const account = roles.defaultAccount
-      await expect(ramp.connect(account).pause())
-        .to.emit(ramp, 'Paused')
+      await expect(blobVerifier.connect(account).pause())
+        .to.emit(blobVerifier, 'Paused')
         .withArgs(await account.getAddress())
     })
 
     it('unknown account cannot pause pool1', async function () {
       const account = roles.stranger
-      await expect(ramp.connect(account).pause()).to.be.revertedWith(
+      await expect(blobVerifier.connect(account).pause()).to.be.revertedWith(
         'Only callable by owner',
       )
     })
@@ -992,19 +1010,19 @@ describe('OffRamp', () => {
 
   describe('#unpause', () => {
     beforeEach(async () => {
-      await ramp.connect(roles.defaultAccount).pause()
+      await blobVerifier.connect(roles.defaultAccount).pause()
     })
 
     it('owner can unpause ramp', async () => {
       const account = roles.defaultAccount
-      await expect(ramp.connect(account).unpause())
-        .to.emit(ramp, 'Unpaused')
+      await expect(blobVerifier.connect(account).unpause())
+        .to.emit(blobVerifier, 'Unpaused')
         .withArgs(await account.getAddress())
     })
 
     it('unknown account cannot unpause pool1', async function () {
       const account = roles.stranger
-      await expect(ramp.connect(account).unpause()).to.be.revertedWith(
+      await expect(blobVerifier.connect(account).unpause()).to.be.revertedWith(
         'Only callable by owner',
       )
     })
@@ -1013,7 +1031,7 @@ describe('OffRamp', () => {
   describe('#setOffRampConfig', () => {
     it('can only be called by the owner', async () => {
       await evmRevert(
-        ramp.connect(roles.stranger).setOffRampConfig(initialConfig),
+        blobVerifier.connect(roles.stranger).setOffRampConfig(initialConfig),
         'Only callable by owner',
       )
     })
@@ -1024,18 +1042,18 @@ describe('OffRamp', () => {
       newConfig.executionFeeJuels = newConfig.executionFeeJuels * 2
       newConfig.maxDataSize = newConfig.maxDataSize * 2
       newConfig.maxTokensLength = newConfig.maxTokensLength * 2
-      const tx = await ramp
+      const tx = await blobVerifier
         .connect(roles.defaultAccount)
         .setOffRampConfig(newConfig)
       await expect(tx)
-        .to.emit(ramp, 'OffRampConfigSet')
+        .to.emit(blobVerifier, 'OffRampConfigSet')
         .withArgs([
           newConfig.executionFeeJuels,
           newConfig.executionDelaySeconds,
           newConfig.maxDataSize,
           newConfig.maxTokensLength,
         ])
-      const actualConfig = await ramp.getOffRampConfig()
+      const actualConfig = await blobVerifier.getOffRampConfig()
       expect(actualConfig).to.deep.equal([
         BigNumber.from(newConfig.executionFeeJuels),
         BigNumber.from(newConfig.executionDelaySeconds),
@@ -1056,15 +1074,17 @@ describe('OffRamp', () => {
 
     it('only callable by owner', async () => {
       await expect(
-        ramp.connect(roles.stranger).setAFN(newAFN.address),
+        blobVerifier.connect(roles.stranger).setAFN(newAFN.address),
       ).to.be.revertedWith('Only callable by owner')
     })
 
     it('sets the new AFN', async () => {
-      const tx = await ramp.connect(roles.defaultAccount).setAFN(newAFN.address)
-      expect(await ramp.getAFN()).to.equal(newAFN.address)
+      const tx = await blobVerifier
+        .connect(roles.defaultAccount)
+        .setAFN(newAFN.address)
+      expect(await blobVerifier.getAFN()).to.equal(newAFN.address)
       await expect(tx)
-        .to.emit(ramp, 'AFNSet')
+        .to.emit(blobVerifier, 'AFNSet')
         .withArgs(afn.address, newAFN.address)
     })
   })
@@ -1078,24 +1098,28 @@ describe('OffRamp', () => {
 
     it('only callable by owner', async () => {
       await expect(
-        ramp.connect(roles.stranger).setMaxSecondsWithoutAFNHeartbeat(newTime),
+        blobVerifier
+          .connect(roles.stranger)
+          .setMaxSecondsWithoutAFNHeartbeat(newTime),
       ).to.be.revertedWith('Only callable by owner')
     })
 
     it('sets the new max time without afn signal', async () => {
-      const tx = await ramp
+      const tx = await blobVerifier
         .connect(roles.defaultAccount)
         .setMaxSecondsWithoutAFNHeartbeat(newTime)
-      expect(await ramp.getMaxSecondsWithoutAFNHeartbeat()).to.equal(newTime)
+      expect(await blobVerifier.getMaxSecondsWithoutAFNHeartbeat()).to.equal(
+        newTime,
+      )
       await expect(tx)
-        .to.emit(ramp, 'AFNMaxHeartbeatTimeSet')
+        .to.emit(blobVerifier, 'AFNMaxHeartbeatTimeSet')
         .withArgs(maxTimeBetweenAFNSignals, newTime)
     })
   })
 
   describe('#typeAndVersion', () => {
     it('should return the correct type and version', async () => {
-      const response = await ramp.typeAndVersion()
+      const response = await blobVerifier.typeAndVersion()
       await expect(response).to.equal('OffRamp 0.0.1')
     })
   })

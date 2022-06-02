@@ -5,7 +5,7 @@ import "../../vendor/IERC20.sol";
 
 contract CCIP {
   /// @notice The Toll message type for EVM chains.
-  struct EVMToAnyTollMessage {
+  struct EVM2AnyTollMessage {
     address receiver;
     bytes data;
     IERC20[] tokens;
@@ -16,7 +16,7 @@ contract CCIP {
   }
 
   /// @notice The event that gets emitted when an EVM to EVM cross chain request is made.
-  struct EVMToEVMTollEvent {
+  struct EVM2EVMTollEvent {
     uint256 sourceChainId;
     uint64 sequenceNumber;
     address sender;
@@ -37,7 +37,7 @@ contract CCIP {
   }
 
   // @notice The cross chain message that gets relayed to EVM chains
-  struct AnyToEVMTollMessage {
+  struct Any2EVMTollMessage {
     uint256 sourceChainId;
     uint64 sequenceNumber;
     address sender;
@@ -52,7 +52,7 @@ contract CCIP {
 
   // TODO: This is a single root for now, enable many roots in one report.
   struct ExecutionReport {
-    AnyToEVMTollMessage[] messages;
+    Any2EVMTollMessage[] messages;
     bytes32[] proofs;
     uint256 proofFlagsBits;
   }

@@ -9,7 +9,7 @@ contract PriceFeedRegistry is OwnerIsCreator {
   error FeedAlreadyAdded();
   error FeedDoesNotExist();
   error NoFeeds();
-  error TokenFeedMistmatch();
+  error TokenFeedMismatch();
   error InvalidPriceFeedConfig();
 
   event FeedAdded(IERC20 token, AggregatorV2V3Interface feed);
@@ -68,7 +68,7 @@ contract PriceFeedRegistry is OwnerIsCreator {
     // Check if the feed exists
     if (address(oldConfig.feed) == address(0)) revert FeedDoesNotExist();
     // Sanity check
-    if (address(oldConfig.feed) != address(feed)) revert TokenFeedMistmatch();
+    if (address(oldConfig.feed) != address(feed)) revert TokenFeedMismatch();
 
     // In the list, swap the feed token in question with the last item,
     // Update the index of the item swapped, then pop from the list to remove.

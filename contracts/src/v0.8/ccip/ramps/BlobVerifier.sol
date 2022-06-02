@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.13;
 
-import "../interfaces/OffRampInterface.sol";
+import "../interfaces/TollOffRampInterface.sol";
 import "../../interfaces/TypeAndVersionInterface.sol";
 import "../ocr/OCR2Base.sol";
 import "../utils/CCIP.sol";
@@ -11,8 +11,8 @@ import "../../vendor/Address.sol";
 import "./PriceFeedRegistry.sol";
 import "../../vendor/SafeERC20.sol";
 
-contract OffRamp is
-  OffRampInterface,
+contract BlobVerifier is
+  TollOffRampInterface,
   TypeAndVersionInterface,
   HealthChecker,
   TokenPoolRegistry,
@@ -40,7 +40,7 @@ contract OffRamp is
   // Configuration values
   OffRampConfig private s_config;
   // Router
-  OffRampRouterInterface private s_router;
+  TollOffRampRouterInterface private s_router;
 
   /**
    * @dev sourceTokens are mapped to pools, and therefore should be the same length arrays.
@@ -51,7 +51,7 @@ contract OffRamp is
    * @param pools Array token token pools on this chain (Must map 1:1 with sourceTokens)
    * @param afn AFN contract
    * @param config containing:
-   * - maxTimeWithoutAFNSignal Maximum number of seconds allows between AFN singals
+   * - maxTimeWithoutAFNSignal Maximum number of seconds allows between AFN signals
    * - executionDelaySeconds Delay, in seconds, between the relay and execution of a message
    * - maxTokensLength The maximum number of different tokens allowed to be sent in a single message
    * - executionFeeJuels The execution fee, denominated in JUELS
@@ -129,7 +129,7 @@ contract OffRamp is
     if (reportTimestamp + uint256(s_config.executionDelaySeconds) >= block.timestamp) revert ExecutionDelayError();
 
     for (uint256 i = 0; i < report.messages.length; i++) {
-      CCIP.AnyToEVMTollMessage memory message = report.messages[i];
+      CCIP.Any2EVMTollMessage memory message = report.messages[i];
 
       // Disallow double-execution.
       if (s_executed[message.sequenceNumber]) revert AlreadyExecuted(message.sequenceNumber);
@@ -214,9 +214,9 @@ contract OffRamp is
     return a < b ? _hashInternalNode(a, b) : _hashInternalNode(b, a);
   }
 
-  function _hashLeafNode(CCIP.AnyToEVMTollMessage memory message) private pure returns (bytes32) {
+  function _hashLeafNode(CCIP.Any2EVMTollMessage memory message) private pure returns (bytes32) {
     // The hash offchain is keccak256(LEAF_DOMAIN_SEPARATOR || CrossChainSendRequested event data),
-    // where the CrossChainSendRequested event data is abi.encode(CCIP.AnyToEVMTollMessage).
+    // where the CrossChainSendRequested event data is abi.encode(CCIP.Any2EVMTollMessage).
     return keccak256(abi.encodePacked(LEAF_DOMAIN_SEPARATOR, abi.encode(message)));
   }
 
@@ -232,12 +232,12 @@ contract OffRamp is
   /**
    * @notice Message receiver checks
    */
-  function _validateReceiver(CCIP.AnyToEVMTollMessage memory message) private view {
+  function _validateReceiver(CCIP.Any2EVMTollMessage memory message) private view {
     if (address(message.receiver) == address(this) || isPool(address(message.receiver)))
       revert InvalidReceiver(message.receiver);
   }
 
-  function _isWellFormed(CCIP.AnyToEVMTollMessage memory message) private view {
+  function _isWellFormed(CCIP.Any2EVMTollMessage memory message) private view {
     if (message.sourceChainId != SOURCE_CHAIN_ID) revert InvalidSourceChain(message.sourceChainId);
     if (message.tokens.length > uint256(s_config.maxTokensLength) || message.tokens.length != message.amounts.length) {
       revert UnsupportedNumberOfTokens();
@@ -273,12 +273,12 @@ contract OffRamp is
     // TODO
   }
 
-  function setRouter(OffRampRouterInterface router) external onlyOwner {
+  function setRouter(TollOffRampRouterInterface router) external onlyOwner {
     s_router = router;
     emit OffRampRouterSet(router);
   }
 
-  function getRouter() external view returns (OffRampRouterInterface) {
+  function getRouter() external view returns (TollOffRampRouterInterface) {
     return s_router;
   }
 

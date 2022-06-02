@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.13;
 
-import "../../interfaces/OnRampInterface.sol";
+import "../../interfaces/TollOnRampInterface.sol";
 
-contract MockOnRamp is OnRampInterface {
+contract MockOnRamp is TollOnRampInterface {
   uint256 public immutable CHAIN_ID;
   PoolInterface public immutable POOL;
   uint256 public immutable DESTINATION_CHAIN_ID;
   uint256 public immutable FEE;
 
-  CCIP.EVMToAnyTollMessage public mp;
+  CCIP.EVM2AnyTollMessage public mp;
 
   event GetRequiredFee(IERC20 token);
   event GetTokenPool(IERC20 token);
@@ -26,7 +26,7 @@ contract MockOnRamp is OnRampInterface {
     FEE = fee;
   }
 
-  function forwardFromRouter(CCIP.EVMToAnyTollMessage memory message, address originalSender)
+  function forwardFromRouter(CCIP.EVM2AnyTollMessage memory message, address originalSender)
     external
     override
     returns (uint64)

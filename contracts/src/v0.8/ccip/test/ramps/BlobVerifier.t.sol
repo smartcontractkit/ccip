@@ -6,11 +6,11 @@ import "../mocks/MockAFN.sol";
 import "../mocks/MockPool.sol";
 import "../../../tests/MockV3Aggregator.sol";
 import "../../utils/CCIP.sol";
-import "../../ramps/OffRampRouter.sol";
-import "../helpers/OffRampHelper.sol";
+import "../../ramps/toll/Any2EVMTollOffRampRouter.sol";
+import "../helpers/BlobVerifierHelper.sol";
 import "forge-std/Test.sol";
 
-contract OffRampTest is Test {
+contract BlobVerifierTest is Test {
   uint256 _sourceChainId = 1;
   uint256 _destChainId = 2;
   address public _owner;
@@ -21,8 +21,8 @@ contract OffRampTest is Test {
   PoolInterface[] _pools;
   AggregatorV2V3Interface[] _feeds;
   MockAFN _afn;
-  OffRampRouter _router;
-  OffRampHelper _offRamp;
+  TollOffRampRouterInterface _router;
+  BlobVerifierHelper _blobVerifier;
 
   function setUp() public {
     _owner = 0x00007e64E1fB0C487F25dd6D3601ff6aF8d32e4e;
@@ -34,17 +34,27 @@ contract OffRampTest is Test {
     _pools.push(new MockPool(5));
     _feeds.push(new MockV3Aggregator(0, 1));
 
-    _offRamp = new OffRampHelper(_sourceChainId, _destChainId, _sourceTokens, _pools, _feeds, _afn, 1e18, 0, 5);
+    _blobVerifier = new BlobVerifierHelper(
+      _sourceChainId,
+      _destChainId,
+      _sourceTokens,
+      _pools,
+      _feeds,
+      _afn,
+      1e18,
+      0,
+      5
+    );
 
-    OffRampInterface[] memory _offRamps = new OffRampInterface[](1);
-    _offRamps[0] = _offRamp;
-    _router = new OffRampRouter(_offRamps);
-    _offRamp.setRouter(_router);
+    TollOffRampInterface[] memory _blobVerifiers = new TollOffRampInterface[](1);
+    _blobVerifiers[0] = _blobVerifier;
+    _router = new Any2EVMTollOffRampRouter(_blobVerifiers);
+    _blobVerifier.setRouter(_router);
   }
 
   function testStaticReport() public {
     bytes memory report = abi.encode(CCIP.RelayReport("testing a normal reporting phase", 824, 931));
-    _offRamp.report(report);
+    _blobVerifier.report(report);
   }
 
   function testReportFuzzing(
@@ -54,16 +64,16 @@ contract OffRampTest is Test {
   ) public {
     vm.assume(min <= max);
     bytes memory report = abi.encode(CCIP.RelayReport(hash, min, max));
-    _offRamp.report(report);
+    _blobVerifier.report(report);
   }
 
-  function loadReports(uint64 sequenceNumber) private returns (CCIP.AnyToEVMTollMessage memory) {
+  function loadReports(uint64 sequenceNumber) private returns (CCIP.Any2EVMTollMessage memory) {
     IERC20[] memory tokens;
     uint256[] memory amounts;
     IERC20 feeToken = IERC20(0x5FbDB2315678afecb367f032d93F642f64180aa3);
     bytes memory data = abi.encode(0);
     return
-      CCIP.AnyToEVMTollMessage({
+      CCIP.Any2EVMTollMessage({
         sourceChainId: _sourceChainId,
         sequenceNumber: sequenceNumber,
         sender: 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC,
@@ -78,7 +88,7 @@ contract OffRampTest is Test {
   }
 
   function testMerkleMulti1of4() public {
-    CCIP.AnyToEVMTollMessage[] memory messages = new CCIP.AnyToEVMTollMessage[](1);
+    CCIP.Any2EVMTollMessage[] memory messages = new CCIP.Any2EVMTollMessage[](1);
     messages[0] = loadReports(3);
     bytes32[] memory proofs = new bytes32[](2);
     proofs[0] = 0x5c67041d5ec270155627ea0409140f393b40330294f7592ca2eae2a680143858;
@@ -86,11 +96,11 @@ contract OffRampTest is Test {
 
     CCIP.ExecutionReport memory report = CCIP.ExecutionReport(messages, proofs, 0);
 
-    assertEq(_offRamp.merkleRoot(report), merkleRoot);
+    assertEq(_blobVerifier.merkleRoot(report), merkleRoot);
   }
 
   function testMerkleMulti2of4() public {
-    CCIP.AnyToEVMTollMessage[] memory messages = new CCIP.AnyToEVMTollMessage[](2);
+    CCIP.Any2EVMTollMessage[] memory messages = new CCIP.Any2EVMTollMessage[](2);
     messages[0] = loadReports(3);
     messages[1] = loadReports(4);
     bytes32[] memory proofs = new bytes32[](2);
@@ -99,11 +109,11 @@ contract OffRampTest is Test {
 
     CCIP.ExecutionReport memory report = CCIP.ExecutionReport(messages, proofs, 4);
 
-    assertEq(_offRamp.merkleRoot(report), merkleRoot);
+    assertEq(_blobVerifier.merkleRoot(report), merkleRoot);
   }
 
   function testMerkleMulti3of4() public {
-    CCIP.AnyToEVMTollMessage[] memory messages = new CCIP.AnyToEVMTollMessage[](3);
+    CCIP.Any2EVMTollMessage[] memory messages = new CCIP.Any2EVMTollMessage[](3);
     messages[0] = loadReports(3);
     messages[1] = loadReports(1);
     messages[2] = loadReports(4);
@@ -112,11 +122,11 @@ contract OffRampTest is Test {
 
     CCIP.ExecutionReport memory report = CCIP.ExecutionReport(messages, proofs, 5);
 
-    assertEq(_offRamp.merkleRoot(report), merkleRoot);
+    assertEq(_blobVerifier.merkleRoot(report), merkleRoot);
   }
 
   function testMerkleMulti4of4() public {
-    CCIP.AnyToEVMTollMessage[] memory messages = new CCIP.AnyToEVMTollMessage[](4);
+    CCIP.Any2EVMTollMessage[] memory messages = new CCIP.Any2EVMTollMessage[](4);
     messages[0] = loadReports(1);
     messages[1] = loadReports(3);
     messages[2] = loadReports(4);
@@ -125,6 +135,6 @@ contract OffRampTest is Test {
 
     CCIP.ExecutionReport memory report = CCIP.ExecutionReport(messages, proofs, 7);
 
-    assertEq(_offRamp.merkleRoot(report), merkleRoot);
+    assertEq(_blobVerifier.merkleRoot(report), merkleRoot);
   }
 }

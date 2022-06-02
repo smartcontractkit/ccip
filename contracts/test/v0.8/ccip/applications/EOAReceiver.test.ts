@@ -4,7 +4,7 @@ import { Roles, getUsers } from '../../../test-helpers/setup'
 import { MockERC20, MockOffRamp, ReceiverDapp } from '../../../../typechain'
 import { Artifact } from 'hardhat/types'
 import { evmRevert } from '../../../test-helpers/matchers'
-import { AnyToEVMTollMessage } from '../../../test-helpers/ccip/ccip'
+import { Any2EVMTollMessage } from '../../../test-helpers/ccip/ccip'
 import { BigNumber } from '@ethersproject/bignumber'
 
 const { deployContract } = hre.waffle
@@ -69,7 +69,7 @@ describe('ReceiverDapp', () => {
     let accountAddr: string
 
     it('fails if the sender is not the off ramp', async () => {
-      const message: AnyToEVMTollMessage = {
+      const message: Any2EVMTollMessage = {
         sequenceNumber: BigNumber.from(1),
         sourceChainId: BigNumber.from(1),
         sender: ethers.constants.AddressZero,
@@ -100,7 +100,7 @@ describe('ReceiverDapp', () => {
         )
         sequenceNumber = BigNumber.from(1)
         amount = balance
-        const message: AnyToEVMTollMessage = {
+        const message: Any2EVMTollMessage = {
           sequenceNumber,
           sourceChainId: BigNumber.from(5),
           sender: receiverContract.address,

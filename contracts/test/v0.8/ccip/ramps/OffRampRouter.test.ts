@@ -9,7 +9,7 @@ import hre from 'hardhat'
 import { Artifact } from 'hardhat/types'
 import { MockERC20, SimpleMessageReceiver } from '../../../../typechain'
 import {
-  AnyToEVMTollMessage,
+  Any2EVMTollMessage,
   messageDeepEqual,
 } from '../../../test-helpers/ccip/ccip'
 import { evmRevert } from '../../../test-helpers/matchers'
@@ -32,9 +32,11 @@ before(async () => {
   roles = users.roles
 })
 
-describe('OffRampRouter', () => {
+describe('EVM2AnyTollOnRampRouter', () => {
   beforeEach(async () => {
-    OffRampRouterFactory = await hre.ethers.getContractFactory('OffRampRouter')
+    OffRampRouterFactory = await hre.ethers.getContractFactory(
+      'Any2EVMTollOffRampRouter',
+    )
     SimpleMessageReceiverArtifact = await hre.artifacts.readArtifact(
       'SimpleMessageReceiver',
     )
@@ -146,7 +148,7 @@ describe('OffRampRouter', () => {
   })
 
   describe('#routeMessage', () => {
-    let message: AnyToEVMTollMessage
+    let message: Any2EVMTollMessage
     beforeEach(async () => {
       message = {
         sequenceNumber: BigNumber.from(1),

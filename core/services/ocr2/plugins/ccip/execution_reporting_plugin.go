@@ -14,8 +14,8 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/onramp"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/blob_verifier"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/evm_2_evm_toll_onramp"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
 )
@@ -113,18 +113,18 @@ type ExecutionReportingPluginFactory struct {
 	lggr         logger.Logger
 	source, dest logpoller.LogPoller
 	executor     common.Address
-	onRamp       *onramp.OnRamp
-	offRamp      *offramp.OffRamp
+	onRamp       *evm_2_evm_toll_onramp.EVM2EVMTollOnRamp
+	blobVerifier *blob_verifier.BlobVerifier
 }
 
 func NewExecutionReportingPluginFactory(
 	lggr logger.Logger,
-	onRamp *onramp.OnRamp,
-	offRamp *offramp.OffRamp,
+	onRamp *evm_2_evm_toll_onramp.EVM2EVMTollOnRamp,
+	blobVerifier *blob_verifier.BlobVerifier,
 	source, dest logpoller.LogPoller,
 	executor common.Address,
 ) types.ReportingPluginFactory {
-	return &ExecutionReportingPluginFactory{lggr: lggr, onRamp: onRamp, offRamp: offRamp, executor: executor, source: source, dest: dest}
+	return &ExecutionReportingPluginFactory{lggr: lggr, onRamp: onRamp, blobVerifier: blobVerifier, executor: executor, source: source, dest: dest}
 }
 
 func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.ReportingPluginConfig) (types.ReportingPlugin, types.ReportingPluginInfo, error) {
@@ -137,7 +137,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			F:              config.F,
 			executor:       rf.executor,
 			onRamp:         rf.onRamp,
-			offRamp:        rf.offRamp,
+			blobVerifier:   rf.blobVerifier,
 			source:         rf.source,
 			dest:           rf.dest,
 			offchainConfig: offchainConfig,
@@ -156,8 +156,8 @@ type ExecutionReportingPlugin struct {
 	lggr         logger.Logger
 	F            int
 	executor     common.Address
-	onRamp       *onramp.OnRamp
-	offRamp      *offramp.OffRamp
+	onRamp       *evm_2_evm_toll_onramp.EVM2EVMTollOnRamp
+	blobVerifier *blob_verifier.BlobVerifier
 	source, dest logpoller.LogPoller
 	// We need to synchronize access to the inflight structure
 	// as reporting plugin methods may be called from separate goroutines,
@@ -178,15 +178,15 @@ func (r *ExecutionReportingPlugin) Query(ctx context.Context, timestamp types.Re
 }
 
 // getRelayedReports returns them in sorted order.
-func (r *ExecutionReportingPlugin) getRelayedReports(min, max uint64) ([]offramp.OffRampReportAccepted, error) {
+func (r *ExecutionReportingPlugin) getRelayedReports(min, max uint64) ([]blob_verifier.BlobVerifierReportAccepted, error) {
 	// Get all reports where minSeqNum is >= min as a lower bound.
-	reportLogs, err := r.dest.LogsDataWordGreaterThan(ReportAccepted, r.offRamp.Address(), ReportAcceptedMinSequenceNumberIndex, EvmWord(min), 1)
+	reportLogs, err := r.dest.LogsDataWordGreaterThan(ReportAccepted, r.blobVerifier.Address(), ReportAcceptedMinSequenceNumberIndex, EvmWord(min), 1)
 	if err != nil {
 		return nil, err
 	}
-	var reports []offramp.OffRampReportAccepted
+	var reports []blob_verifier.BlobVerifierReportAccepted
 	for _, reportLog := range reportLogs {
-		report, err := r.offRamp.ParseReportAccepted(gethtypes.Log{Data: reportLog.Data, Topics: reportLog.GetTopics()})
+		report, err := r.blobVerifier.ParseReportAccepted(gethtypes.Log{Data: reportLog.Data, Topics: reportLog.GetTopics()})
 		if err != nil {
 			return nil, err
 		}
@@ -216,13 +216,13 @@ func (r *ExecutionReportingPlugin) getExecutedMessages() (map[uint64]struct{}, e
 	}
 	// TODO: This scans all logs in the history of the offramp.
 	// To optimize, we only need to scan finalized blocks once and remember the set of unexecuted.
-	executedLogs, err := r.dest.Logs(1, blk, CrossChainMessageExecuted, r.offRamp.Address())
+	executedLogs, err := r.dest.Logs(1, blk, CrossChainMessageExecuted, r.blobVerifier.Address())
 	if err != nil {
 		return nil, err
 	}
 	var executedMp = make(map[uint64]struct{})
 	for _, executedLog := range executedLogs {
-		e, err := r.offRamp.ParseCrossChainMessageExecuted(gethtypes.Log{Data: executedLog.Data, Topics: executedLog.GetTopics()})
+		e, err := r.blobVerifier.ParseCrossChainMessageExecuted(gethtypes.Log{Data: executedLog.Data, Topics: executedLog.GetTopics()})
 		if err != nil {
 			return nil, err
 		}
@@ -233,10 +233,10 @@ func (r *ExecutionReportingPlugin) getExecutedMessages() (map[uint64]struct{}, e
 
 func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp types.ReportTimestamp, query types.Query) (types.Observation, error) {
 	lggr := r.lggr.Named("Observation")
-	if isOffRampDownNow(r.lggr, r.offRamp) {
+	if isOffRampDownNow(r.lggr, r.blobVerifier) {
 		return nil, ErrOffRampIsDown
 	}
-	rep, err := r.offRamp.GetLastReport(nil)
+	rep, err := r.blobVerifier.GetLastReport(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -266,12 +266,12 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 	}.Marshal()
 }
 
-func (r *ExecutionReportingPlugin) getMessagesInRangeWithExecutor(min, max uint64) ([]onramp.OnRampCCIPSendRequested, error) {
+func (r *ExecutionReportingPlugin) getMessagesInRangeWithExecutor(min, max uint64) ([]evm_2_evm_toll_onramp.EVM2EVMTollOnRampCCIPSendRequested, error) {
 	msgs, err := r.source.LogsDataWordRange(CCIPSendRequested, r.onRamp.Address(), SendRequestedSequenceNumberIndex, EvmWord(min), EvmWord(max), int(r.offchainConfig.SourceIncomingConfirmations))
 	if err != nil {
 		return nil, err
 	}
-	var reqs []onramp.OnRampCCIPSendRequested
+	var reqs []evm_2_evm_toll_onramp.EVM2EVMTollOnRampCCIPSendRequested
 	for _, msg := range msgs {
 		req, err := r.onRamp.ParseCCIPSendRequested(gethtypes.Log{Data: msg.Data, Topics: msg.GetTopics()})
 		if err != nil {
@@ -291,7 +291,7 @@ func min(a, b uint64) uint64 {
 
 // Assumes non-empty report. Messages to execute can be span more than one report, but are assumed to be in order of increasing
 // sequence number.
-func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, report offramp.OffRampReportAccepted, msgsToExecute []Message) ([]byte, error) {
+func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, report blob_verifier.BlobVerifierReportAccepted, msgsToExecute []Message) ([]byte, error) {
 	allMsgs, err2 := r.getMessagesInRangeWithExecutor(report.Report.MinSequenceNumber, report.Report.MaxSequenceNumber)
 	if err2 != nil {
 		return nil, err2
@@ -332,7 +332,7 @@ func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, report offram
 
 func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.ReportTimestamp, query types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
 	lggr := r.lggr.Named("Report")
-	if isOffRampDownNow(lggr, r.offRamp) {
+	if isOffRampDownNow(lggr, r.blobVerifier) {
 		return false, nil, ErrOffRampIsDown
 	}
 	var nonEmptyObservations = getNonEmptyObservations(r.lggr, observations)
@@ -357,7 +357,7 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 	if maxSeqNum < minSeqNum {
 		return false, nil, errors.New("max seq num smaller than min")
 	}
-	lastRep, err := r.offRamp.GetLastReport(nil)
+	lastRep, err := r.blobVerifier.GetLastReport(nil)
 	if err != nil {
 		return false, nil, err
 	}
@@ -389,7 +389,7 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 	}
 	var events []Message
 	for _, m := range msgs {
-		events = append(events, EVMToEVMTollEventToMessage(m.Message))
+		events = append(events, EVM2EVMTollEventToMessage(m.Message))
 	}
 	// We only operate on one report at a time
 	report, err := r.buildReport(lggr, reports[0], events)

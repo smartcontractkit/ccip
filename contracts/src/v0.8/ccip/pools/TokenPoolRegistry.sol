@@ -9,7 +9,7 @@ contract TokenPoolRegistry is OwnerIsCreator {
   error PoolAlreadyAdded();
   error NoPools();
   error PoolDoesNotExist();
-  error TokenPoolMistmatch();
+  error TokenPoolMismatch();
 
   event PoolAdded(IERC20 token, PoolInterface pool);
   event PoolRemoved(IERC20 token, PoolInterface pool);
@@ -75,7 +75,7 @@ contract TokenPoolRegistry is OwnerIsCreator {
     // Check if the pool exists
     if (address(oldConfig.pool) == address(0)) revert PoolDoesNotExist();
     // Sanity check
-    if (address(oldConfig.pool) != address(pool)) revert TokenPoolMistmatch();
+    if (address(oldConfig.pool) != address(pool)) revert TokenPoolMismatch();
 
     // In the list, swap the pool token in question with the last item,
     // Update the index of the item swapped, then pop from the list to remove.

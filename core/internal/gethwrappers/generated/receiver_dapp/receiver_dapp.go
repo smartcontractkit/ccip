@@ -27,7 +27,7 @@ var (
 	_ = event.NewSubscription
 )
 
-type CCIPAnyToEVMTollMessage struct {
+type CCIPAny2EVMTollMessage struct {
 	SourceChainId  *big.Int
 	SequenceNumber uint64
 	Sender         common.Address
@@ -41,7 +41,7 @@ type CCIPAnyToEVMTollMessage struct {
 }
 
 var ReceiverDappMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"internalType\":\"contractOffRampRouterInterface\",\"name\":\"router\",\"type\":\"address\"},{\"internalType\":\"contractIERC20\",\"name\":\"token\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"deliverer\",\"type\":\"address\"}],\"name\":\"InvalidDeliverer\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"ROUTER\",\"outputs\":[{\"internalType\":\"contractOffRampRouterInterface\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"TOKEN\",\"outputs\":[{\"internalType\":\"contractIERC20\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"sourceChainId\",\"type\":\"uint256\"},{\"internalType\":\"uint64\",\"name\":\"sequenceNumber\",\"type\":\"uint64\"},{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"receiver\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"},{\"internalType\":\"contractIERC20[]\",\"name\":\"tokens\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"amounts\",\"type\":\"uint256[]\"},{\"internalType\":\"contractIERC20\",\"name\":\"feeToken\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"feeTokenAmount\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"gasLimit\",\"type\":\"uint256\"}],\"internalType\":\"structCCIP.AnyToEVMTollMessage\",\"name\":\"message\",\"type\":\"tuple\"}],\"name\":\"receiveMessage\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"typeAndVersion\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"pure\",\"type\":\"function\"}]",
+	ABI: "[{\"inputs\":[{\"internalType\":\"contractTollOffRampRouterInterface\",\"name\":\"router\",\"type\":\"address\"},{\"internalType\":\"contractIERC20\",\"name\":\"token\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"deliverer\",\"type\":\"address\"}],\"name\":\"InvalidDeliverer\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"ROUTER\",\"outputs\":[{\"internalType\":\"contractTollOffRampRouterInterface\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"TOKEN\",\"outputs\":[{\"internalType\":\"contractIERC20\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"sourceChainId\",\"type\":\"uint256\"},{\"internalType\":\"uint64\",\"name\":\"sequenceNumber\",\"type\":\"uint64\"},{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"receiver\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"},{\"internalType\":\"contractIERC20[]\",\"name\":\"tokens\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"amounts\",\"type\":\"uint256[]\"},{\"internalType\":\"contractIERC20\",\"name\":\"feeToken\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"feeTokenAmount\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"gasLimit\",\"type\":\"uint256\"}],\"internalType\":\"structCCIP.Any2EVMTollMessage\",\"name\":\"message\",\"type\":\"tuple\"}],\"name\":\"receiveMessage\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"typeAndVersion\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"pure\",\"type\":\"function\"}]",
 	Bin: "0x60c060405234801561001057600080fd5b5060405161066038038061066083398101604081905261002f9161005e565b6001600160a01b039182166080521660a052610098565b6001600160a01b038116811461005b57600080fd5b50565b6000806040838503121561007157600080fd5b825161007c81610046565b602084015190925061008d81610046565b809150509250929050565b60805160a0516105976100c96000396000818160ff015261026d01526000818160b3015261013901526105976000f3fe608060405234801561001057600080fd5b506004361061004c5760003560e01c806313d3e05e14610051578063181f5a771461006657806332fe7b26146100ae57806382bfefc8146100fa575b600080fd5b61006461005f3660046102f4565b610121565b005b604080518082018252601281527f52656365697665724461707020302e302e310000000000000000000000000000602082015290516100a59190610337565b60405180910390f35b6100d57f000000000000000000000000000000000000000000000000000000000000000081565b60405173ffffffffffffffffffffffffffffffffffffffff90911681526020016100a5565b6100d57f000000000000000000000000000000000000000000000000000000000000000081565b3373ffffffffffffffffffffffffffffffffffffffff7f00000000000000000000000000000000000000000000000000000000000000001614610196576040517f0af9f1b600000000000000000000000000000000000000000000000000000000815233600482015260240160405180910390fd5b60006101a560808301836103aa565b8101906101b2919061043f565b91505060005b6101c560a0840184610472565b90508110156102ef5760006101dd60c0850185610472565b838181106101ed576101ed6104da565b602002919091013591505073ffffffffffffffffffffffffffffffffffffffff83161580159061021c57508015155b156102dc576040517fa9059cbb00000000000000000000000000000000000000000000000000000000815273ffffffffffffffffffffffffffffffffffffffff8481166004830152602482018390527f0000000000000000000000000000000000000000000000000000000000000000169063a9059cbb906044016020604051808303816000875af11580156102b6573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906102da9190610509565b505b50806102e78161052b565b9150506101b8565b505050565b60006020828403121561030657600080fd5b813567ffffffffffffffff81111561031d57600080fd5b8201610140818503121561033057600080fd5b9392505050565b600060208083528351808285015260005b8181101561036457858101830151858201604001528201610348565b81811115610376576000604083870101525b50601f017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe016929092016040019392505050565b60008083357fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe18436030181126103df57600080fd5b83018035915067ffffffffffffffff8211156103fa57600080fd5b60200191503681900382131561040f57600080fd5b9250929050565b803573ffffffffffffffffffffffffffffffffffffffff8116811461043a57600080fd5b919050565b6000806040838503121561045257600080fd5b61045b83610416565b915061046960208401610416565b90509250929050565b60008083357fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe18436030181126104a757600080fd5b83018035915067ffffffffffffffff8211156104c257600080fd5b6020019150600581901b360382131561040f57600080fd5b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603260045260246000fd5b60006020828403121561051b57600080fd5b8151801515811461033057600080fd5b60007fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8203610583577f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b506001019056fea164736f6c634300080d000a",
 }
 
@@ -247,15 +247,15 @@ func (_ReceiverDapp *ReceiverDappCallerSession) TypeAndVersion() (string, error)
 	return _ReceiverDapp.Contract.TypeAndVersion(&_ReceiverDapp.CallOpts)
 }
 
-func (_ReceiverDapp *ReceiverDappTransactor) ReceiveMessage(opts *bind.TransactOpts, message CCIPAnyToEVMTollMessage) (*types.Transaction, error) {
+func (_ReceiverDapp *ReceiverDappTransactor) ReceiveMessage(opts *bind.TransactOpts, message CCIPAny2EVMTollMessage) (*types.Transaction, error) {
 	return _ReceiverDapp.contract.Transact(opts, "receiveMessage", message)
 }
 
-func (_ReceiverDapp *ReceiverDappSession) ReceiveMessage(message CCIPAnyToEVMTollMessage) (*types.Transaction, error) {
+func (_ReceiverDapp *ReceiverDappSession) ReceiveMessage(message CCIPAny2EVMTollMessage) (*types.Transaction, error) {
 	return _ReceiverDapp.Contract.ReceiveMessage(&_ReceiverDapp.TransactOpts, message)
 }
 
-func (_ReceiverDapp *ReceiverDappTransactorSession) ReceiveMessage(message CCIPAnyToEVMTollMessage) (*types.Transaction, error) {
+func (_ReceiverDapp *ReceiverDappTransactorSession) ReceiveMessage(message CCIPAny2EVMTollMessage) (*types.Transaction, error) {
 	return _ReceiverDapp.Contract.ReceiveMessage(&_ReceiverDapp.TransactOpts, message)
 }
 
@@ -270,7 +270,7 @@ type ReceiverDappInterface interface {
 
 	TypeAndVersion(opts *bind.CallOpts) (string, error)
 
-	ReceiveMessage(opts *bind.TransactOpts, message CCIPAnyToEVMTollMessage) (*types.Transaction, error)
+	ReceiveMessage(opts *bind.TransactOpts, message CCIPAny2EVMTollMessage) (*types.Transaction, error)
 
 	Address() common.Address
 }

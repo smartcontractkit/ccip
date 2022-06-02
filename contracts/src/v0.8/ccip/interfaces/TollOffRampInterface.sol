@@ -2,11 +2,11 @@
 pragma solidity ^0.8.0;
 
 import "../interfaces/PoolInterface.sol";
-import "../interfaces/OffRampRouterInterface.sol";
+import "../interfaces/TollOffRampRouterInterface.sol";
 import "../interfaces/CrossChainMessageReceiverInterface.sol";
 import "../utils/CCIP.sol";
 
-interface OffRampInterface {
+interface TollOffRampInterface {
   error RelayReportError();
   error SequenceError(uint64 lastMaxSequenceNumber, uint64 newMinSequenceNumber);
   error MerkleProofError(bytes32 root);
@@ -28,7 +28,7 @@ interface OffRampInterface {
   event CrossChainMessageExecuted(uint64 indexed sequenceNumber);
   event OffRampConfigSet(OffRampConfig config);
   event FeesWithdrawn(IERC20 feeToken, address recipient, uint256 amount);
-  event OffRampRouterSet(OffRampRouterInterface router);
+  event OffRampRouterSet(TollOffRampRouterInterface router);
 
   struct OffRampConfig {
     // Execution fee in Juels (smallest denomination of LINK)

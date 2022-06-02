@@ -20,10 +20,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/afn_contract"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/blob_verifier"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/blob_verifier_helper"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/native_token_pool"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp_helper"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
 )
 
@@ -34,7 +34,7 @@ func TestRelayReportSize(t *testing.T) {
 	p.Property("bounded relay report size", prop.ForAll(func(root []byte, min, max uint64) bool {
 		var root32 [32]byte
 		copy(root32[:], root)
-		rep, err := EncodeRelayReport(&offramp.CCIPRelayReport{MerkleRoot: root32, MinSequenceNumber: min, MaxSequenceNumber: max})
+		rep, err := EncodeRelayReport(&blob_verifier.CCIPRelayReport{MerkleRoot: root32, MinSequenceNumber: min, MaxSequenceNumber: max})
 		require.NoError(t, err)
 		return len(rep) <= MaxRelayReportLength
 	}, gen.SliceOfN(32, gen.UInt8()), gen.UInt64(), gen.UInt64()))
@@ -74,7 +74,7 @@ func TestRelayReportEncoding(t *testing.T) {
 		big.NewInt(1),
 	)
 
-	offRampAddress, _, _, err := offramp_helper.DeployOffRampHelper(
+	blobVerifierAddress, _, _, err := blob_verifier_helper.DeployBlobVerifierHelper(
 		destUser,                               // user
 		destChain,                              // client
 		big.NewInt(1337),                       // source chain id
@@ -88,14 +88,14 @@ func TestRelayReportEncoding(t *testing.T) {
 		1000,                                   // maxTokensLength
 	)
 	require.NoError(t, err)
-	offRamp, err := offramp_helper.NewOffRampHelper(offRampAddress, destChain)
+	blobVerifier, err := blob_verifier_helper.NewBlobVerifierHelper(blobVerifierAddress, destChain)
 	require.NoError(t, err)
 	destChain.Commit()
 
 	mctx := merklemulti.NewKeccakCtx()
 	tree := merklemulti.NewTree(mctx, [][32]byte{mctx.HashLeaf([]byte{0xaa})})
 	root := tree.Root()
-	report := offramp.CCIPRelayReport{
+	report := blob_verifier.CCIPRelayReport{
 		MerkleRoot:        root,
 		MinSequenceNumber: 1,
 		MaxSequenceNumber: 10,
@@ -106,18 +106,18 @@ func TestRelayReportEncoding(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, &report, decodedReport)
 
-	tx, err := offRamp.Report(destUser, out)
+	tx, err := blobVerifier.Report(destUser, out)
 	require.NoError(t, err)
 	destChain.Commit()
 	res, err := destChain.TransactionReceipt(context.Background(), tx.Hash())
 	require.NoError(t, err)
 	assert.Equal(t, uint64(1), res.Status)
 
-	rep, err := offRamp.GetLastReport(nil)
+	rep, err := blobVerifier.GetLastReport(nil)
 	require.NoError(t, err)
 	// Verify it locally
 	require.Equal(t, rep.MerkleRoot, root, fmt.Sprintf("Got %v want %v", hexutil.Encode(root[:]), hexutil.Encode(rep.MerkleRoot[:])))
-	exists, err := offRamp.GetMerkleRoot(nil, rep.MerkleRoot)
+	exists, err := blobVerifier.GetMerkleRoot(nil, rep.MerkleRoot)
 	require.NoError(t, err)
 	require.True(t, exists.Int64() > 0)
 }

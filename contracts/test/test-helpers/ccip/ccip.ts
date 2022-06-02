@@ -4,7 +4,7 @@ import { ethers } from 'hardhat'
 import { expect } from 'chai'
 import { stripHexPrefix } from '../helpers'
 
-export interface EVMToAnyTollMessage {
+export interface EVM2AnyTollMessage {
   receiver: string
   data: BytesLike
   tokens: string[]
@@ -14,7 +14,7 @@ export interface EVMToAnyTollMessage {
   gasLimit: BigNumberish
 }
 
-export interface EVMToAnyTollEvent {
+export interface EVM2AnyTollEvent {
   sourceChainId: BigNumber
   sequenceNumber: BigNumber
   sender: string
@@ -27,7 +27,7 @@ export interface EVMToAnyTollEvent {
   gasLimit: BigNumberish
 }
 
-export interface AnyToEVMTollMessage {
+export interface Any2EVMTollMessage {
   sourceChainId: BigNumber
   sequenceNumber: BigNumber
   sender: string
@@ -40,14 +40,14 @@ export interface AnyToEVMTollMessage {
   gasLimit: BigNumberish
 }
 
-export const AnyToEVMTollMessageTuple = `tuple(uint256 sourceChainId, uint64 sequenceNumber, address sender, address receiver, bytes data, address[] tokens, uint256[] amounts, address feeToken, uint256 feeTokenAmount, uint256 gasLimit)`
+export const Any2EVMTollMessageTuple = `tuple(uint256 sourceChainId, uint64 sequenceNumber, address sender, address receiver, bytes data, address[] tokens, uint256[] amounts, address feeToken, uint256 feeTokenAmount, uint256 gasLimit)`
 
 export interface ExecutionReport {
-  messages: AnyToEVMTollMessage[]
+  messages: Any2EVMTollMessage[]
   proofs: string[]
   proofFlagsBits: BigNumberish
 }
-export const ExecutionReportTuple = `tuple(${AnyToEVMTollMessageTuple}[] messages, bytes32[] proofs, uint256 proofFlagsBits)`
+export const ExecutionReportTuple = `tuple(${Any2EVMTollMessageTuple}[] messages, bytes32[] proofs, uint256 proofFlagsBits)`
 
 export interface RelayReport {
   merkleRoot: string
@@ -62,15 +62,15 @@ export const RelayReportTuple = `tuple(bytes32 merkleRoot, uint64 minSequenceNum
  */
 export class MerkleMultiTree {
   public tree?: MerkleTree
-  public messages: { [hash: string]: AnyToEVMTollMessage } = {}
+  public messages: { [hash: string]: Any2EVMTollMessage } = {}
   public minSequenceNumber?: BigNumber
   public maxSequenceNumber?: BigNumber
 
   /**
    * @notice Create a new MerkleMultiTree
-   * @param rawMessages AnyToEVMTollMessage[] array of messages
+   * @param rawMessages Any2EVMTollMessage[] array of messages
    */
-  constructor(rawMessages: AnyToEVMTollMessage[]) {
+  constructor(rawMessages: Any2EVMTollMessage[]) {
     rawMessages.map((rm) => {
       this.messages[this.hashMessage(rm)] = rm
       if (
@@ -164,9 +164,9 @@ export class MerkleMultiTree {
     return bitmap
   }
 
-  private hashMessage(message: AnyToEVMTollMessage): string {
+  private hashMessage(message: Any2EVMTollMessage): string {
     const bytesMessage = ethers.utils.defaultAbiCoder.encode(
-      [AnyToEVMTollMessageTuple],
+      [Any2EVMTollMessageTuple],
       [message],
     )
     return this.hashLeaf(bytesMessage)
@@ -223,7 +223,7 @@ export function executionReportDeepEqual(
 
 export function messageDeepEqual(
   actualMessage: any,
-  expectedMessage: AnyToEVMTollMessage,
+  expectedMessage: Any2EVMTollMessage,
 ) {
   expect(actualMessage?.sequenceNumber).to.equal(expectedMessage.sequenceNumber)
   expect(actualMessage?.sourceChainId).to.equal(expectedMessage.sourceChainId)

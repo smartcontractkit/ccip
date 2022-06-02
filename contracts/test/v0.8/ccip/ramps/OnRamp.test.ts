@@ -7,13 +7,13 @@ import {
   NativeTokenPool,
   MockAFN,
   MockAggregator,
-  OnRamp,
+  EVM2EVMTollOnRamp,
 } from '../../../../typechain'
 import { Artifact } from 'hardhat/types'
 import { expect } from 'chai'
 import { evmRevert } from '../../../test-helpers/matchers'
 import {
-  EVMToAnyTollMessage,
+  EVM2AnyTollMessage,
   requestEventArgsEqual,
 } from '../../../test-helpers/ccip/ccip'
 
@@ -28,7 +28,7 @@ let RampArtifact: Artifact
 let roles: Roles
 
 let afn: MockAFN
-let ramp: OnRamp
+let ramp: EVM2EVMTollOnRamp
 const numberOfTokensPoolsAndFeeds = 3
 let tokens: Array<MockERC20>
 let pools: Array<NativeTokenPool>
@@ -49,7 +49,7 @@ before(async () => {
   roles = users.roles
 })
 
-describe('OnRamp', () => {
+describe('EVM2EVMTollOnRamp', () => {
   beforeEach(async () => {
     bucketRate = BigNumber.from('10000000000000000')
     bucketCapactiy = BigNumber.from('100000000000000000')
@@ -59,7 +59,7 @@ describe('OnRamp', () => {
     TokenArtifact = await hre.artifacts.readArtifact('MockERC20')
     PoolArtifact = await hre.artifacts.readArtifact('NativeTokenPool')
     PriceFeedArtifact = await hre.artifacts.readArtifact('MockAggregator')
-    RampArtifact = await hre.artifacts.readArtifact('OnRamp')
+    RampArtifact = await hre.artifacts.readArtifact('EVM2EVMTollOnRamp')
 
     afn = <MockAFN>await deployContract(roles.defaultAccount, MockAFNArtifact)
     maxTimeWithoutAFNSignal = BigNumber.from(60).mul(60) // 1 hour
@@ -100,22 +100,24 @@ describe('OnRamp', () => {
       .connect(roles.defaultAccount)
       .setLatestAnswer(priceFeedLatestAnswer)
 
-    ramp = <OnRamp>await deployContract(roles.defaultAccount, RampArtifact, [
-      sourceChainId,
-      destinationChainId,
-      tokens.map((t) => t.address),
-      pools.map((p) => p.address),
-      [priceFeed.address, constants.AddressZero, constants.AddressZero],
-      [await roles.defaultAccount.getAddress()],
-      afn.address,
-      maxTimeWithoutAFNSignal,
-      {
-        router: await roles.oracleNode.getAddress(),
-        maxTokensLength: maxTokensLength,
-        maxDataSize: maxDataSize,
-        relayingFeeJuels: relayingFeeJuels,
-      },
-    ])
+    ramp = <EVM2EVMTollOnRamp>(
+      await deployContract(roles.defaultAccount, RampArtifact, [
+        sourceChainId,
+        destinationChainId,
+        tokens.map((t) => t.address),
+        pools.map((p) => p.address),
+        [priceFeed.address, constants.AddressZero, constants.AddressZero],
+        [await roles.defaultAccount.getAddress()],
+        afn.address,
+        maxTimeWithoutAFNSignal,
+        {
+          router: await roles.oracleNode.getAddress(),
+          maxTokensLength: maxTokensLength,
+          maxDataSize: maxDataSize,
+          relayingFeeJuels: relayingFeeJuels,
+        },
+      ])
+    )
 
     for (let i = 0; i < numberOfTokensPoolsAndFeeds; i++) {
       pools[i].connect(roles.defaultAccount).setOnRamp(ramp.address, true)
@@ -124,7 +126,7 @@ describe('OnRamp', () => {
 
   it('has a limited public interface [ @skip-coverage ]', async () => {
     publicAbi(ramp, [
-      // OnRamp
+      // EVM2EVMTollOnRamp
       'forwardFromRouter',
       'CHAIN_ID',
       'DESTINATION_CHAIN_ID',
@@ -257,7 +259,7 @@ describe('OnRamp', () => {
     let receiver: string
     let messageData: string
     let amounts: Array<BigNumber>
-    let evmToAnyTollMessage: EVMToAnyTollMessage
+    let evmToAnyTollMessage: EVM2AnyTollMessage
 
     beforeEach(async () => {
       receiver = await roles.stranger.getAddress()

@@ -1,32 +1,32 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.13;
 
-import "../interfaces/OffRampInterface.sol";
-import "../../interfaces/TypeAndVersionInterface.sol";
-import "../ocr/OCR2Base.sol";
-import "../utils/CCIP.sol";
-import "../../vendor/SafeERC20.sol";
+import "../../interfaces/TollOffRampInterface.sol";
+import "../../../interfaces/TypeAndVersionInterface.sol";
+import "../../ocr/OCR2Base.sol";
+import "../../utils/CCIP.sol";
+import "../../../vendor/SafeERC20.sol";
 
 /**
- * @notice OffRampExecutor enables OCR networks to execute multiple messages
+ * @notice Any2EVMTollOffRamp enables OCR networks to execute multiple messages
  * in an OffRamp in a single transaction.
  */
-contract OffRampExecutor is TypeAndVersionInterface, OCR2Base {
+contract Any2EVMTollOffRamp is TypeAndVersionInterface, OCR2Base {
   using SafeERC20 for IERC20;
 
   event FeesWithdrawn(IERC20 feeToken, address recipient, uint256 amount);
 
-  OffRampInterface private immutable s_offRamp;
+  TollOffRampInterface private immutable s_offRamp;
   bool private s_needFee;
 
-  constructor(OffRampInterface offRamp, bool needFee) OCR2Base(true) {
+  constructor(TollOffRampInterface offRamp, bool needFee) OCR2Base(true) {
     s_offRamp = offRamp;
     s_needFee = needFee;
   }
 
   /**
    * @notice Entry point for execution, called by the OCR network
-   * @dev Expects an encoded array of ExectableMessage tuples.
+   * @dev Expects an encoded array of ExecutableMessage tuples.
    */
   function _report(
     bytes32, /*configDigest*/
@@ -72,7 +72,7 @@ contract OffRampExecutor is TypeAndVersionInterface, OCR2Base {
     return s_needFee;
   }
 
-  function getOffRamp() external view returns (OffRampInterface) {
+  function getOffRamp() external view returns (TollOffRampInterface) {
     return s_offRamp;
   }
 

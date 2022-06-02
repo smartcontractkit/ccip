@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.13;
 
-import "../../interfaces/OffRampInterface.sol";
+import "../../interfaces/TollOffRampInterface.sol";
 
-contract MockOffRamp is OffRampInterface {
+contract MockOffRamp is TollOffRampInterface {
   event MessageExecuted(CCIP.ExecutionReport report, bool needFee);
 
   IERC20 public s_token;
 
-  function deliverMessageTo(CrossChainMessageReceiverInterface recipient, CCIP.AnyToEVMTollMessage calldata message)
+  function deliverMessageTo(CrossChainMessageReceiverInterface recipient, CCIP.Any2EVMTollMessage calldata message)
     external
   {
     recipient.receiveMessage(message);

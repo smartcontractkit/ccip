@@ -6,15 +6,15 @@ import {
   MockERC20,
   NativeTokenPool,
   ReceiverDapp,
-  OnRamp,
   SenderDapp,
   MockAFN,
   MockAggregator,
-  OnRampRouter,
+  EVM2AnyTollOnRampRouter,
+  EVM2EVMTollOnRamp,
 } from '../../../../typechain'
 import { Artifact } from 'hardhat/types'
 import {
-  AnyToEVMTollMessage,
+  Any2EVMTollMessage,
   encodeRelayReport,
   MerkleMultiTree,
 } from '../../../test-helpers/ccip/ccip'
@@ -26,15 +26,15 @@ let priceFeed1: MockAggregator
 
 let chain1OnApp: SenderDapp
 let chain1AFN: MockAFN
-let chain1OnRampRouter: OnRampRouter
-let chain1OnRamp: OnRamp
+let chain1OnRampRouter: EVM2AnyTollOnRampRouter
+let chain1OnRamp: EVM2EVMTollOnRamp
 let chain1Token: MockERC20
 let chain1Pool: NativeTokenPool
 const chain1ID: number = 1
 
 // This has to be ethers.Contract because of an issue with
 // `address.call(abi.encodeWithSelector(...))` and try-catch using typechain artifacts.
-let chain2OffRamp: Contract
+let chain2BlobVerifier: Contract
 let chain2Router: Contract
 let chain2AFN: MockAFN
 let chain2OffApp: ReceiverDapp
@@ -64,15 +64,21 @@ describe('Single Token EOA End to End (through dapp contract)', () => {
     const PoolArtifact: Artifact = await hre.artifacts.readArtifact(
       'NativeTokenPool',
     )
-    const offRampFactory = await ethers.getContractFactory('OffRampHelper')
-    const routerFactory = await hre.ethers.getContractFactory('OffRampRouter')
+    const blobVerifierHelperFactory = await ethers.getContractFactory(
+      'BlobVerifierHelper',
+    )
+    const routerFactory = await hre.ethers.getContractFactory(
+      'Any2EVMTollOffRampRouter',
+    )
     const OnRampSenderArtifact: Artifact = await hre.artifacts.readArtifact(
       'SenderDapp',
     )
     const OnRampRouterArtifact: Artifact = await hre.artifacts.readArtifact(
-      'OnRampRouter',
+      'EVM2AnyTollOnRampRouter',
     )
-    const OnRampArtifact: Artifact = await hre.artifacts.readArtifact('OnRamp')
+    const OnRampArtifact: Artifact = await hre.artifacts.readArtifact(
+      'EVM2EVMTollOnRamp',
+    )
     const OffRampReceiverArtifact: Artifact = await hre.artifacts.readArtifact(
       'ReceiverDapp',
     )
@@ -112,7 +118,7 @@ describe('Single Token EOA End to End (through dapp contract)', () => {
         BigNumber.from('100000000000000000000'),
       ])
     )
-    chain2OffRamp = await offRampFactory
+    chain2BlobVerifier = await blobVerifierHelperFactory
       .connect(roles.defaultAccount)
       .deploy(
         chain1ID,
@@ -127,11 +133,11 @@ describe('Single Token EOA End to End (through dapp contract)', () => {
       )
     chain2Router = await routerFactory
       .connect(roles.defaultAccount)
-      .deploy([chain2OffRamp.address])
-    await chain2OffRamp.setRouter(chain2Router.address)
+      .deploy([chain2BlobVerifier.address])
+    await chain2BlobVerifier.setRouter(chain2Router.address)
     await chain2Pool
       .connect(roles.defaultAccount)
-      .setOffRamp(chain2OffRamp.address, true)
+      .setOffRamp(chain2BlobVerifier.address, true)
     await chain2Token
       .connect(roles.defaultAccount)
       .transfer(chain2Pool.address, sendAmount)
@@ -153,10 +159,10 @@ describe('Single Token EOA End to End (through dapp contract)', () => {
     chain1AFN = <MockAFN>(
       await deployContract(roles.defaultAccount, MockAFNArtifact)
     )
-    chain1OnRampRouter = <OnRampRouter>(
+    chain1OnRampRouter = <EVM2AnyTollOnRampRouter>(
       await deployContract(roles.defaultAccount, OnRampRouterArtifact)
     )
-    chain1OnRamp = <OnRamp>(
+    chain1OnRamp = <EVM2EVMTollOnRamp>(
       await deployContract(roles.defaultAccount, OnRampArtifact, [
         chain1ID,
         chain2ID,
@@ -220,7 +226,7 @@ describe('Single Token EOA End to End (through dapp contract)', () => {
     )
 
     // Send message to chain2
-    const message: AnyToEVMTollMessage = {
+    const message: Any2EVMTollMessage = {
       sequenceNumber: log.args.message.sequenceNumber,
       sourceChainId: BigNumber.from(chain1ID),
       sender: log.args.message.sender,
@@ -234,10 +240,10 @@ describe('Single Token EOA End to End (through dapp contract)', () => {
     }
     // DON encodes, reports and executes the message
     const tree = new MerkleMultiTree([message])
-    await chain2OffRamp
+    await chain2BlobVerifier
       .connect(roles.defaultAccount)
       .report(encodeRelayReport(tree.generateRelayReport()))
-    tx = await chain2OffRamp
+    tx = await chain2BlobVerifier
       .connect(roles.defaultAccount)
       .executeTransaction(tree.generateExecutionReport([0]), false)
     receipt = await tx.wait()

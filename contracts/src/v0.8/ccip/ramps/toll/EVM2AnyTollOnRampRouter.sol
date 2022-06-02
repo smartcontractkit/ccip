@@ -1,31 +1,29 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.13;
 
-import "../pools/PoolCollector.sol";
-import "../../interfaces/TypeAndVersionInterface.sol";
-import "../access/OwnerIsCreator.sol";
+import "../../pools/PoolCollector.sol";
+import "../../../interfaces/TypeAndVersionInterface.sol";
+import "../../access/OwnerIsCreator.sol";
+import "../../interfaces/TollOnRampInterface.sol";
+import "../../interfaces/TollOnRampRouterInterface.sol";
 
-contract OnRampRouter is TypeAndVersionInterface, OwnerIsCreator, PoolCollector {
+contract EVM2AnyTollOnRampRouter is TollOnRampRouterInterface, TypeAndVersionInterface, OwnerIsCreator, PoolCollector {
   using SafeERC20 for IERC20;
 
-  error OnRampAlreadySet(uint256 chainId, OnRampInterface onRamp);
-
-  event OnRampSet(uint256 indexed chainId, OnRampInterface indexed onRamp);
-
   // destination chain id => OnRampInterface
-  mapping(uint256 => OnRampInterface) private s_onRamps;
+  mapping(uint256 => TollOnRampInterface) private s_onRamps;
 
   /**
    * @notice Request a message to be sent to the destination chain
    * @param destinationChainId The destination chain ID
    * @param message The message payload
-   * @return The sequence number of the message
+   * @return The sequence number assigned to message
    */
-  function ccipSend(uint256 destinationChainId, CCIP.EVMToAnyTollMessage memory message) external returns (uint64) {
+  function ccipSend(uint256 destinationChainId, CCIP.EVM2AnyTollMessage memory message) external returns (uint64) {
     address sender = msg.sender;
-    OnRampInterface onRamp = s_onRamps[destinationChainId];
-    if (address(onRamp) == address(0)) revert OnRampInterface.UnsupportedDestinationChain(destinationChainId);
-    if (message.tokens.length != message.amounts.length) revert OnRampInterface.UnsupportedNumberOfTokens();
+    TollOnRampInterface onRamp = s_onRamps[destinationChainId];
+    if (address(onRamp) == address(0)) revert TollOnRampInterface.UnsupportedDestinationChain(destinationChainId);
+    if (message.tokens.length != message.amounts.length) revert TollOnRampInterface.UnsupportedNumberOfTokens();
 
     uint256 feeTaken = _collectTokens(
       onRamp,
@@ -45,7 +43,7 @@ contract OnRampRouter is TypeAndVersionInterface, OwnerIsCreator, PoolCollector 
    * @param chainId destination chain ID
    * @param onRamp OnRamp to use for that destination chain
    */
-  function setOnRamp(uint256 chainId, OnRampInterface onRamp) external onlyOwner {
+  function setOnRamp(uint256 chainId, TollOnRampInterface onRamp) external onlyOwner {
     if (address(s_onRamps[chainId]) == address(onRamp)) revert OnRampAlreadySet(chainId, onRamp);
     s_onRamps[chainId] = onRamp;
     emit OnRampSet(chainId, onRamp);
@@ -56,7 +54,7 @@ contract OnRampRouter is TypeAndVersionInterface, OwnerIsCreator, PoolCollector 
    * @param chainId Chain ID to get ramp details for
    * @return onRamp
    */
-  function getOnRamp(uint256 chainId) external view returns (OnRampInterface) {
+  function getOnRamp(uint256 chainId) external view returns (TollOnRampInterface) {
     return s_onRamps[chainId];
   }
 

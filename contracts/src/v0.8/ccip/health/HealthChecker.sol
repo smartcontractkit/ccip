@@ -66,7 +66,7 @@ contract HealthChecker is Pausable, OwnerIsCreator {
   }
 
   /**
-   * @notice Change the mixumum time allowed without a heartbeat
+   * @notice Change the maximum time allowed without a heartbeat
    * @dev only callable by the owner
    * @param newTime the new max time
    */

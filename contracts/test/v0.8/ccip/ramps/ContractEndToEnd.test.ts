@@ -7,16 +7,16 @@ import {
   MockERC20,
   NativeTokenPool,
   SimpleMessageReceiver,
-  OnRamp,
-  OnRampRouter,
   MockAFN,
   MockAggregator,
+  EVM2AnyTollOnRampRouter,
+  EVM2EVMTollOnRamp,
 } from '../../../../typechain'
 import { Artifact } from 'hardhat/types'
 import {
-  AnyToEVMTollMessage,
+  Any2EVMTollMessage,
   encodeRelayReport,
-  EVMToAnyTollMessage,
+  EVM2AnyTollMessage,
   MerkleMultiTree,
   messageDeepEqual,
 } from '../../../test-helpers/ccip/ccip'
@@ -26,15 +26,15 @@ const { deployContract } = hre.waffle
 let roles: Roles
 
 let chain1AFN: MockAFN
-let chain1OnRampRouter: OnRampRouter
-let chain1OnRamp: OnRamp
+let chain1OnRampRouter: EVM2AnyTollOnRampRouter
+let chain1OnRamp: EVM2EVMTollOnRamp
 let chain1Token: MockERC20
 let chain1Pool: NativeTokenPool
 const chain1ID: number = 1
 
 // This has to be ethers.Contract because of an issue with
 // `address.call(abi.encodeWithSelector(...))` using typechain artifacts.
-let chain2OffRamp: Contract
+let chain2BlobVerifier: Contract
 let chain2Router: Contract
 let chain2AFN: MockAFN
 let chain2Token: MockERC20
@@ -71,15 +71,21 @@ describe('Contract End to End', () => {
     const PoolArtifact: Artifact = await hre.artifacts.readArtifact(
       'NativeTokenPool',
     )
-    const offRampFactory = await ethers.getContractFactory('OffRampHelper')
-    const routerFactory = await hre.ethers.getContractFactory('OffRampRouter')
+    const blobVerifierHelperFactory = await ethers.getContractFactory(
+      'BlobVerifierHelper',
+    )
+    const routerFactory = await hre.ethers.getContractFactory(
+      'Any2EVMTollOffRampRouter',
+    )
     const PriceFeedFactory: Artifact = await hre.artifacts.readArtifact(
       'MockAggregator',
     )
     const OnRampRouterArtifact: Artifact = await hre.artifacts.readArtifact(
-      'OnRampRouter',
+      'EVM2AnyTollOnRampRouter',
     )
-    const OnRampArtifact: Artifact = await hre.artifacts.readArtifact('OnRamp')
+    const OnRampArtifact: Artifact = await hre.artifacts.readArtifact(
+      'EVM2EVMTollOnRamp',
+    )
     const SimpleMessageReceiverArtifact: Artifact =
       await hre.artifacts.readArtifact('SimpleMessageReceiver')
 
@@ -120,7 +126,7 @@ describe('Contract End to End', () => {
       ])
     )
     // Chain 2 OffRamp
-    chain2OffRamp = await offRampFactory
+    chain2BlobVerifier = await blobVerifierHelperFactory
       .connect(roles.defaultAccount)
       .deploy(
         chain1ID,
@@ -135,11 +141,11 @@ describe('Contract End to End', () => {
       )
     chain2Router = await routerFactory
       .connect(roles.defaultAccount)
-      .deploy([chain2OffRamp.address])
-    await chain2OffRamp.setRouter(chain2Router.address)
+      .deploy([chain2BlobVerifier.address])
+    await chain2BlobVerifier.setRouter(chain2Router.address)
     await chain2Pool
       .connect(roles.defaultAccount)
-      .setOffRamp(chain2OffRamp.address, true)
+      .setOffRamp(chain2BlobVerifier.address, true)
     await chain2Token
       .connect(roles.defaultAccount)
       .transfer(chain2Pool.address, sendAmount)
@@ -158,10 +164,10 @@ describe('Contract End to End', () => {
     chain1AFN = <MockAFN>(
       await deployContract(roles.defaultAccount, MockAFNArtifact)
     )
-    chain1OnRampRouter = <OnRampRouter>(
+    chain1OnRampRouter = <EVM2AnyTollOnRampRouter>(
       await deployContract(roles.defaultAccount, OnRampRouterArtifact)
     )
-    chain1OnRamp = <OnRamp>(
+    chain1OnRamp = <EVM2EVMTollOnRamp>(
       await deployContract(roles.defaultAccount, OnRampArtifact, [
         chain1ID,
         chain2ID,
@@ -187,7 +193,7 @@ describe('Contract End to End', () => {
 
   it('should send a message and tokens from chain1 to chain2', async () => {
     const messagedata = stringToBytes('Message')
-    const evmToAnyTollMessage: EVMToAnyTollMessage = {
+    const evmToAnyTollMessage: EVM2AnyTollMessage = {
       receiver: chain2Receiver.address,
       data: messagedata,
       tokens: [chain1Token.address],
@@ -221,7 +227,7 @@ describe('Contract End to End', () => {
     const log = chain1OnRamp.interface.parseLog(
       receipt.logs[receipt.logs.length - 1],
     )
-    const donMessage: AnyToEVMTollMessage = {
+    const donMessage: Any2EVMTollMessage = {
       sequenceNumber: log.args.message.sequenceNumber,
       sourceChainId: BigNumber.from(chain1ID),
       sender: log.args.message.sender,
@@ -236,17 +242,17 @@ describe('Contract End to End', () => {
 
     // DON encodes, reports and executes the message
     const tree = new MerkleMultiTree([donMessage])
-    await chain2OffRamp
+    await chain2BlobVerifier
       .connect(roles.defaultAccount)
       .report(encodeRelayReport(tree.generateRelayReport()))
-    tx = await chain2OffRamp
+    tx = await chain2BlobVerifier
       .connect(roles.defaultAccount)
       .executeTransaction(tree.generateExecutionReport([0]), false)
     receipt = await tx.wait()
 
     // Check that events are emitted and receiver receives the message
     await expect(tx)
-      .to.emit(chain2OffRamp, 'CrossChainMessageExecuted')
+      .to.emit(chain2BlobVerifier, 'CrossChainMessageExecuted')
       .withArgs(donMessage.sequenceNumber)
 
     await expect(tx).to.emit(chain2Receiver, 'MessageReceived')

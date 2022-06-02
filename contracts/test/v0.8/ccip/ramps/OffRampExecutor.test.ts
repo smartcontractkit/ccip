@@ -1,14 +1,10 @@
 import hre from 'hardhat'
 import { expect } from 'chai'
 import { Roles, getUsers } from '../../../test-helpers/setup'
-import {
-  MockERC20,
-  MockOffRamp,
-  OffRampExecutorHelper,
-} from '../../../../typechain'
+import { MockERC20, MockOffRamp, OffRampHelper } from '../../../../typechain'
 import { Artifact } from 'hardhat/types'
 import {
-  AnyToEVMTollMessage,
+  Any2EVMTollMessage,
   encodeExecutionReport,
   executionReportDeepEqual,
   MerkleMultiTree,
@@ -24,7 +20,7 @@ let RampArtifact: Artifact
 let ExecutorArtifact: Artifact
 
 let ramp: MockOffRamp
-let executor: OffRampExecutorHelper
+let executor: OffRampHelper
 let token: MockERC20
 
 beforeEach(async () => {
@@ -32,10 +28,10 @@ beforeEach(async () => {
   roles = users.roles
 })
 
-describe('OffRampExecutor', () => {
+describe('Any2EVMTollOffRamp', () => {
   beforeEach(async () => {
     RampArtifact = await hre.artifacts.readArtifact('MockOffRamp')
-    ExecutorArtifact = await hre.artifacts.readArtifact('OffRampExecutorHelper')
+    ExecutorArtifact = await hre.artifacts.readArtifact('OffRampHelper')
 
     const adminAddress = await roles.defaultAccount.getAddress()
     const TokenArtifact: Artifact = await hre.artifacts.readArtifact(
@@ -54,7 +50,7 @@ describe('OffRampExecutor', () => {
     ramp = <MockOffRamp>(
       await deployContract(roles.defaultAccount, RampArtifact, [])
     )
-    executor = <OffRampExecutorHelper>(
+    executor = <OffRampHelper>(
       await deployContract(roles.defaultAccount, ExecutorArtifact, [
         ramp.address,
         false,
@@ -91,7 +87,7 @@ describe('OffRampExecutor', () => {
   })
 
   it('executes a payload of 2 messages', async () => {
-    const message1: AnyToEVMTollMessage = {
+    const message1: Any2EVMTollMessage = {
       sourceChainId: BigNumber.from(1),
       sequenceNumber: BigNumber.from(1),
       sender: await roles.oracleNode1.getAddress(),
@@ -103,7 +99,7 @@ describe('OffRampExecutor', () => {
       feeTokenAmount: 0,
       gasLimit: 0,
     }
-    const message2: AnyToEVMTollMessage = {
+    const message2: Any2EVMTollMessage = {
       sourceChainId: BigNumber.from(1),
       sequenceNumber: BigNumber.from(2),
       sender: await roles.oracleNode3.getAddress(),

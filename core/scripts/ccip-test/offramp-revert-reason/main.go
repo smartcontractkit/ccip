@@ -13,7 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/blob_verifier"
 )
 
 func panicErr(err error) {
@@ -71,7 +71,7 @@ func main() {
 	}
 	data, err := hex.DecodeString(splits[1][2:])
 	panicErr(err)
-	offrampABI, err := abi.JSON(strings.NewReader(offramp.OffRampABI))
+	offrampABI, err := abi.JSON(strings.NewReader(blob_verifier.BlobVerifierABI))
 	panicErr(err)
 
 	for k, abiError := range offrampABI.Errors {

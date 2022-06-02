@@ -8,8 +8,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/onramp"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/blob_verifier"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/evm_2_evm_toll_onramp"
 	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
@@ -38,24 +38,24 @@ func init() {
 		}
 		return event.ID
 	}
-	onRampABI, err := abi.JSON(strings.NewReader(onramp.OnRampABI))
+	onRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_toll_onramp.EVM2EVMTollOnRampABI))
 	if err != nil {
 		panic(err)
 	}
-	offRampABI, err := abi.JSON(strings.NewReader(offramp.OffRampABI))
+	blobVerifierABI, err := abi.JSON(strings.NewReader(blob_verifier.BlobVerifierABI))
 	if err != nil {
 		panic(err)
 	}
 	CCIPSendRequested = getIDOrPanic("CCIPSendRequested", onRampABI)
-	ReportAccepted = getIDOrPanic("ReportAccepted", offRampABI)
-	CrossChainMessageExecuted = getIDOrPanic("CrossChainMessageExecuted", offRampABI)
-	ConfigSet = getIDOrPanic("ConfigSet", offRampABI)
+	ReportAccepted = getIDOrPanic("ReportAccepted", blobVerifierABI)
+	CrossChainMessageExecuted = getIDOrPanic("CrossChainMessageExecuted", blobVerifierABI)
+	ConfigSet = getIDOrPanic("ConfigSet", blobVerifierABI)
 }
 
-// DecodeCCIPMessage decodes the bytecode message into an offramp.CCIPAnyToEVMTollMessage
+// DecodeCCIPMessage decodes the bytecode message into a blob_verifier.CCIPAny2EVMTollMessage
 // This function returns an error if there is no message in the bytecode or
 // when the payload is malformed.
-func DecodeCCIPMessage(b []byte) (*offramp.CCIPAnyToEVMTollMessage, error) {
+func DecodeCCIPMessage(b []byte) (*blob_verifier.CCIPAny2EVMTollMessage, error) {
 	unpacked, err := MakeCCIPMsgArgs().Unpack(b)
 	if err != nil {
 		return nil, err
@@ -79,7 +79,7 @@ func DecodeCCIPMessage(b []byte) (*offramp.CCIPAnyToEVMTollMessage, error) {
 	if !ok {
 		return nil, fmt.Errorf("invalid format have %T want %T", unpacked[0], receivedCp)
 	}
-	return &offramp.CCIPAnyToEVMTollMessage{
+	return &blob_verifier.CCIPAny2EVMTollMessage{
 		SourceChainId:  receivedCp.SourceChainId,
 		SequenceNumber: receivedCp.SequenceNumber,
 		Sender:         receivedCp.Sender,
@@ -93,7 +93,7 @@ func DecodeCCIPMessage(b []byte) (*offramp.CCIPAnyToEVMTollMessage, error) {
 	}, nil
 }
 
-func EVMToEVMTollEventToMessage(event onramp.CCIPEVMToEVMTollEvent) Message {
+func EVM2EVMTollEventToMessage(event evm_2_evm_toll_onramp.CCIPEVM2EVMTollEvent) Message {
 	return Message{
 		SourceChainId:  event.SourceChainId,
 		SequenceNumber: event.SequenceNumber,

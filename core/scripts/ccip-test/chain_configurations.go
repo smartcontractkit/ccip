@@ -29,12 +29,12 @@ type EvmChainConfig struct {
 	PriceFeeds      []common.Address
 	OnRamp          common.Address
 	OnRampRouter    common.Address
-	OffRamp         common.Address
+	BlobVerifier    common.Address
 	OffRampRouter   common.Address
 	TokenSender     common.Address
 	MessageReceiver common.Address
 	TokenReceiver   common.Address
-	OffRampExecutor common.Address
+	OffRamp         common.Address
 	Afn             common.Address
 }
 
@@ -70,7 +70,7 @@ var Rinkeby = EvmChainConfig{
 	PriceFeeds:    []common.Address{common.HexToAddress("0x8eDcf07BfF3ee235B6b8Ba7FAe907E385c24e175")},
 	OnRamp:        common.HexToAddress("0xda92A4766e1cFF0Aa77470fEccd095e471D8295F"),
 	OnRampRouter:  common.HexToAddress(""),
-	OffRamp:       common.Address{},
+	BlobVerifier:  common.Address{},
 	OffRampRouter: common.HexToAddress(""),
 	TokenSender:   common.HexToAddress("0xC2F8a293ca968c449795d47337497F26b2813434"),
 	Afn:           common.HexToAddress("0xA4E4fd20121f268674d2C5c771e4cd27eAD0C543"),
@@ -95,11 +95,11 @@ var Kovan = EvmChainConfig{
 	PriceFeeds:      []common.Address{common.HexToAddress("0x7c132A947feC9C1aA17Db2d11eBc562243d4f331")},
 	OnRamp:          common.Address{},
 	OnRampRouter:    common.HexToAddress(""),
-	OffRamp:         common.HexToAddress("0x5B48C82ED450e20E04E6133D26ddcA1eFF33D062"),
+	BlobVerifier:    common.HexToAddress("0x5B48C82ED450e20E04E6133D26ddcA1eFF33D062"),
 	OffRampRouter:   common.HexToAddress(""),
 	MessageReceiver: common.HexToAddress("0x1a224Ab562D640aDE0FBc203bE619D5Cd3CEf935"),
 	TokenReceiver:   common.HexToAddress("0xC4ED6c4F56ef4bD105e398BA320cF08e99C36E06"),
-	OffRampExecutor: common.HexToAddress("0x97403d2377e02eFc2D6e60D129435c0BA0917c9A"),
+	OffRamp:         common.HexToAddress("0x97403d2377e02eFc2D6e60D129435c0BA0917c9A"),
 	Afn:             common.HexToAddress("0xE0271CC39005530A228E91bdF9454deEfdE47DCd"),
 	DeploySettings: DeploySettings{
 		DeployAFN:        false,
@@ -121,10 +121,10 @@ var BSCTestnet = EvmChainConfig{
 	TokenPools:      []common.Address{common.HexToAddress("0x6beeDC9AD88818d5B7658cD8F2ebd6BCa5302B22")},
 	PriceFeeds:      []common.Address{common.HexToAddress("0x4082CE8081140b8369dD4c65B9ac7d360b47eeC5")},
 	OnRamp:          common.Address{},
-	OffRamp:         common.HexToAddress("0x57c9639Fd47Ba84F0ac5DCe3d6c368D8eDDEEf94"),
+	BlobVerifier:    common.HexToAddress("0x57c9639Fd47Ba84F0ac5DCe3d6c368D8eDDEEf94"),
 	MessageReceiver: common.HexToAddress("0xE2e54DF7E28e1Fa2ebAebBc9A0796A884Eb7B9BB"),
 	TokenReceiver:   common.HexToAddress("0xD9B7CD57A2ADB88A28D48D61c3552DA748247a22"),
-	OffRampExecutor: common.HexToAddress("0x1e936E6e617E20ba3E73D7BF02b5A8b0bBb2673A"),
+	OffRamp:         common.HexToAddress("0x1e936E6e617E20ba3E73D7BF02b5A8b0bBb2673A"),
 	Afn:             common.HexToAddress("0xaa9DFC20A535886974acdD23192D85f6A4c9a8D1"),
 	DeploySettings: DeploySettings{
 		DeployAFN:        false,
@@ -146,10 +146,10 @@ var PolygonMumbai = EvmChainConfig{
 	PriceFeeds:      []common.Address{common.HexToAddress("0xB42E8f41F21b3ce8C857a45972106ccE57cea0Fa")},
 	TokenPools:      []common.Address{common.HexToAddress("0xf45818c983DD98792576062F128B4ad6E4b93632")},
 	OnRamp:          common.Address{},
-	OffRamp:         common.HexToAddress("0xB16eaA4596a2CedD765B85334448DB6C6Cb5c2FE"),
+	BlobVerifier:    common.HexToAddress("0xB16eaA4596a2CedD765B85334448DB6C6Cb5c2FE"),
 	MessageReceiver: common.HexToAddress("0x887F2081E5d3A3780098E3110E8b027848efF01c"),
 	TokenReceiver:   common.HexToAddress("0x82a91b70A1470976979BE3862615A1A569fBb701"),
-	OffRampExecutor: common.HexToAddress("0xe3B3001a415072AF66A533376eb3182b1f47f646"),
+	OffRamp:         common.HexToAddress("0xe3B3001a415072AF66A533376eb3182b1f47f646"),
 	Afn:             common.HexToAddress("0x1c5cE558D50FaaFee9a9da89F5Db20aC7037E3Fb"),
 	DeploySettings: DeploySettings{
 		DeployAFN:        false,

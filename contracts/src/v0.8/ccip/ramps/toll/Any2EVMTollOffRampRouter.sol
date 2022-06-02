@@ -1,22 +1,22 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.13;
 
-import "../../vendor/SafeERC20.sol";
-import "../access/OwnerIsCreator.sol";
-import "../interfaces/OffRampInterface.sol";
-import "../interfaces/OffRampRouterInterface.sol";
+import "../../../vendor/SafeERC20.sol";
+import "../../access/OwnerIsCreator.sol";
+import "../../interfaces/TollOffRampInterface.sol";
+import "../../interfaces/TollOffRampRouterInterface.sol";
 
-contract OffRampRouter is OffRampRouterInterface, OwnerIsCreator {
+contract Any2EVMTollOffRampRouter is TollOffRampRouterInterface, OwnerIsCreator {
   using Address for address;
   using SafeERC20 for IERC20;
 
-  error OffRampNotConfigured(OffRampInterface offRamp);
-  error AlreadyConfigured(OffRampInterface offRamp);
+  error OffRampNotConfigured(TollOffRampInterface offRamp);
+  error AlreadyConfigured(TollOffRampInterface offRamp);
   error NoOffRampsConfigured();
   error MessageFailure(uint64 sequenceNumber, bytes reason);
 
-  event OffRampAdded(OffRampInterface indexed offRamp);
-  event OffRampRemoved(OffRampInterface indexed offRamp);
+  event OffRampAdded(TollOffRampInterface indexed offRamp);
+  event OffRampRemoved(TollOffRampInterface indexed offRamp);
 
   struct OffRampDetails {
     uint96 listIndex;
@@ -24,11 +24,11 @@ contract OffRampRouter is OffRampRouterInterface, OwnerIsCreator {
   }
 
   // OffRamp allowlist mapping
-  mapping(OffRampInterface => OffRampDetails) private s_offRamps;
+  mapping(TollOffRampInterface => OffRampDetails) private s_offRamps;
   // OffRamp list
-  OffRampInterface[] private s_offRampsList;
+  TollOffRampInterface[] private s_offRampsList;
 
-  constructor(OffRampInterface[] memory offRamps) {
+  constructor(TollOffRampInterface[] memory offRamps) {
     s_offRampsList = offRamps;
     for (uint256 i; i < offRamps.length; i++) {
       s_offRamps[offRamps[i]] = OffRampDetails({listIndex: uint96(i), allowed: true});
@@ -38,9 +38,9 @@ contract OffRampRouter is OffRampRouterInterface, OwnerIsCreator {
   /**
    * @notice Route the message to its intended receiver contract
    * @param receiver Receiver contract implementing CrossChainMessageReceiverInterface
-   * @param message CCIP.AnyToEVMTollMessage struct
+   * @param message CCIP.Any2EVMTollMessage struct
    */
-  function routeMessage(CrossChainMessageReceiverInterface receiver, CCIP.AnyToEVMTollMessage calldata message)
+  function routeMessage(CrossChainMessageReceiverInterface receiver, CCIP.Any2EVMTollMessage calldata message)
     external
     override
     onlyOffRamp
@@ -52,10 +52,10 @@ contract OffRampRouter is OffRampRouterInterface, OwnerIsCreator {
 
   /**
    * @notice Owner can add an offRamp from the allowlist
-   * @dev Onlw callable by the owner
+   * @dev Only callable by the owner
    * @param offRamp The offRamp to add
    */
-  function addOffRamp(OffRampInterface offRamp) external onlyOwner {
+  function addOffRamp(TollOffRampInterface offRamp) external onlyOwner {
     OffRampDetails memory details = s_offRamps[offRamp];
     // Check if the offramp is already allowed
     if (details.allowed) revert AlreadyConfigured(offRamp);
@@ -72,11 +72,11 @@ contract OffRampRouter is OffRampRouterInterface, OwnerIsCreator {
   }
 
   /**
-   * @notice Owner can remove a speicific offRamp from the allowlist
-   * @dev Onlw callable by the owner
+   * @notice Owner can remove a specific offRamp from the allowlist
+   * @dev Only callable by the owner
    * @param offRamp The offRamp to remove
    */
-  function removeOffRamp(OffRampInterface offRamp) external onlyOwner {
+  function removeOffRamp(TollOffRampInterface offRamp) external onlyOwner {
     // Check that there are any feeds to remove
     uint256 listLength = s_offRampsList.length;
     if (listLength == 0) revert NoOffRampsConfigured();
@@ -88,7 +88,7 @@ contract OffRampRouter is OffRampRouterInterface, OwnerIsCreator {
     // Swap the last item in the s_offRampsList with the item being removed,
     // update the index of the item moved from the end of the list to its new place,
     // then pop from the end of the list to remove.
-    OffRampInterface lastItem = s_offRampsList[listLength - 1];
+    TollOffRampInterface lastItem = s_offRampsList[listLength - 1];
     // Perform swap
     s_offRampsList[listLength - 1] = s_offRampsList[oldDetails.listIndex];
     s_offRampsList[oldDetails.listIndex] = lastItem;
@@ -101,16 +101,16 @@ contract OffRampRouter is OffRampRouterInterface, OwnerIsCreator {
     emit OffRampRemoved(offRamp);
   }
 
-  function getOffRamps() external view returns (OffRampInterface[] memory offRamps) {
+  function getOffRamps() external view returns (TollOffRampInterface[] memory offRamps) {
     offRamps = s_offRampsList;
   }
 
-  function isOffRamp(OffRampInterface offRamp) external view returns (bool allowed) {
+  function isOffRamp(TollOffRampInterface offRamp) external view returns (bool allowed) {
     return s_offRamps[offRamp].allowed;
   }
 
   modifier onlyOffRamp() {
-    OffRampInterface offRamp = OffRampInterface(msg.sender);
+    TollOffRampInterface offRamp = TollOffRampInterface(msg.sender);
     if (!s_offRamps[offRamp].allowed) revert OffRampNotConfigured(offRamp);
     _;
   }

@@ -3,13 +3,13 @@ pragma solidity ^0.8.13;
 
 import "../mocks/MockERC20.sol";
 import "../mocks/MockAFN.sol";
-import "../../ramps/OnRamp.sol";
+import "../../ramps/toll/EVM2EVMTollOnRamp.sol";
 import "../mocks/MockPool.sol";
 import "../../../tests/MockV3Aggregator.sol";
 import "../mocks/MockOnRampRouter.sol";
-import "../../interfaces/OnRampInterface.sol";
+import "../../interfaces/TollOnRampInterface.sol";
 import "../../utils/CCIP.sol";
-import "../../ramps/EVMTollOnRampRouter.sol";
+import "../../ramps/toll/EVM2AnyTollOnRampRouter.sol";
 import "forge-std/Test.sol";
 
 contract OnRampTest is Test {
@@ -22,22 +22,22 @@ contract OnRampTest is Test {
   MockAFN public s_afn;
   PoolInterface[] public s_pools;
   AggregatorV2V3Interface[] public s_feeds;
-  OnRampRouter public s_router;
-  OnRamp public s_onRamp;
+  EVM2AnyTollOnRampRouter public s_router;
+  EVM2EVMTollOnRamp public s_onRamp;
 
   function setUp() public {
     s_owner = 0x00007e64E1fB0C487F25dd6D3601ff6aF8d32e4e;
     // Set the sender to s_owner
     vm.startPrank(s_owner);
 
-    s_router = new OnRampRouter();
+    s_router = new EVM2AnyTollOnRampRouter();
     s_tokens.push(new MockERC20("LINK", "LNK", s_owner, 2**256 - 1));
     s_afn = new MockAFN();
     s_pools.push(new MockPool(5));
     s_feeds.push(new MockV3Aggregator(0, 1));
-    OnRampInterface.OnRampConfig memory Config = OnRampInterface.OnRampConfig(address(s_router), 0, 2e6, 5);
+    TollOnRampInterface.OnRampConfig memory Config = TollOnRampInterface.OnRampConfig(address(s_router), 0, 2e6, 5);
 
-    s_onRamp = new OnRamp(
+    s_onRamp = new EVM2EVMTollOnRamp(
       s_chainID,
       s_destinationChainId,
       s_tokens,
@@ -76,7 +76,7 @@ contract OnRampTest is Test {
   ) public {
     s_router.ccipSend(
       s_destinationChainId,
-      CCIP.EVMToAnyTollMessage({
+      CCIP.EVM2AnyTollMessage({
         receiver: s_owner,
         data: data,
         tokens: tokens,

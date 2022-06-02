@@ -1,41 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.13;
 
-import "../../ramps/OffRamp.sol";
+import "../../ramps/toll/Any2EVMTollOffRamp.sol";
 
-contract OffRampHelper is OffRamp {
-  constructor(
-    uint256 sourceChainId,
-    uint256 chainId,
-    IERC20[] memory sourceTokens,
-    PoolInterface[] memory pools,
-    AggregatorV2V3Interface[] memory feeds,
-    AFNInterface afn,
-    uint256 maxTimeWithoutAFNSignal,
-    uint64 executionDelaySeconds,
-    uint64 maxTokensLength
-  )
-    OffRamp(
-      sourceChainId,
-      chainId,
-      sourceTokens,
-      pools,
-      feeds,
-      afn,
-      maxTimeWithoutAFNSignal,
-      OffRampConfig({
-        executionFeeJuels: 1,
-        executionDelaySeconds: executionDelaySeconds,
-        maxDataSize: 1000,
-        maxTokensLength: maxTokensLength
-      })
-    )
-  {}
+contract OffRampHelper is Any2EVMTollOffRamp {
+  constructor(TollOffRampInterface offRamp, bool needFee) Any2EVMTollOffRamp(offRamp, needFee) {}
 
-  /**
-   * @dev Expose _report for tests
-   */
-  function report(bytes memory merkle) external {
-    _report(bytes32(0), 0, merkle);
+  function report(bytes memory executableMessages) external {
+    _report(bytes32(0), 0, executableMessages);
   }
 }

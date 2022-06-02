@@ -5,7 +5,7 @@ import "../utils/CCIP.sol";
 import "../interfaces/PoolInterface.sol";
 import "../interfaces/AFNInterface.sol";
 
-interface OnRampInterface {
+interface TollOnRampInterface {
   error TokenMismatch();
   error MessageTooLarge(uint256 maxSize, uint256 actualSize);
   error UnsupportedNumberOfTokens();
@@ -16,7 +16,7 @@ interface OnRampInterface {
   error MustBeCalledByRouter();
   error RouterMustSetOriginalSender();
 
-  event CCIPSendRequested(CCIP.EVMToEVMTollEvent message);
+  event CCIPSendRequested(CCIP.EVM2EVMTollEvent message);
   event AllowlistEnabledSet(bool enabled);
   event AllowlistSet(address[] allowlist);
   event NewTokenBucketConstructed(uint256 rate, uint256 capacity, bool full);
@@ -35,11 +35,11 @@ interface OnRampInterface {
 
   /**
    * @notice Request a message to be sent to the destination chain
-   * @param message the EVMToAnyTollMessage containing all message information
+   * @param message the EVM2AnyTollMessage containing all message information
    * @param originalSender Original sender of the message if sent by a Router
    * @return The sequence number of the message
    */
-  function forwardFromRouter(CCIP.EVMToAnyTollMessage memory message, address originalSender) external returns (uint64);
+  function forwardFromRouter(CCIP.EVM2AnyTollMessage memory message, address originalSender) external returns (uint64);
 
   function getRequiredFee(IERC20 feeToken) external returns (uint256);
 

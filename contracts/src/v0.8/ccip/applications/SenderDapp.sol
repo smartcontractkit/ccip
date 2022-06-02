@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.13;
 
-import "../ramps/EVMTollOnRampRouter.sol";
 import "../../interfaces/TypeAndVersionInterface.sol";
 import "../utils/CCIP.sol";
 import "../../vendor/SafeERC20.sol";
+import "../interfaces/TollOnRampRouterInterface.sol";
 
 /**
  * @notice This contract enables EOAs to send a single asset across to the chain
@@ -15,7 +15,7 @@ contract SenderDapp is TypeAndVersionInterface {
   using SafeERC20 for IERC20;
 
   // On ramp contract responsible for interacting with the DON.
-  OnRampRouter public immutable ON_RAMP_ROUTER;
+  TollOnRampRouterInterface public immutable ON_RAMP_ROUTER;
   uint256 public immutable DESTINATION_CHAIN_ID;
   // Corresponding contract on the destination chain responsible for receiving the message
   // and enabling the EOA on the destination chain to access the tokens that are sent.
@@ -25,7 +25,7 @@ contract SenderDapp is TypeAndVersionInterface {
   error InvalidDestinationAddress(address invalidAddress);
 
   constructor(
-    OnRampRouter onRampRouter,
+    TollOnRampRouterInterface onRampRouter,
     uint256 destinationChainId,
     address destinationContract
   ) {
@@ -55,7 +55,7 @@ contract SenderDapp is TypeAndVersionInterface {
     //  - EOA destination address
     sequenceNumber = ON_RAMP_ROUTER.ccipSend(
       DESTINATION_CHAIN_ID,
-      CCIP.EVMToAnyTollMessage({
+      CCIP.EVM2AnyTollMessage({
         receiver: destinationAddress,
         data: abi.encode(originalSender, destinationAddress),
         tokens: tokens,

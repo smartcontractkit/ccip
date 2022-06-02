@@ -4,14 +4,14 @@ import { ContractTransaction } from 'ethers'
 import hre from 'hardhat'
 import { Artifact } from 'hardhat/types'
 import {
+  EVM2AnyTollOnRampRouter,
   MockERC20,
   MockOnRamp,
   MockPool,
-  OnRampRouter,
 } from '../../../../typechain'
 import { evmRevert } from '../../../test-helpers/matchers'
 import { getUsers, Roles } from '../../../test-helpers/setup'
-import { EVMToAnyTollMessage } from '../../../test-helpers/ccip/ccip'
+import { EVM2AnyTollMessage } from '../../../test-helpers/ccip/ccip'
 
 const { deployContract } = hre.waffle
 
@@ -28,7 +28,7 @@ const destinationChainId = 2
 let tokens: Array<MockERC20>
 let onRamp: MockOnRamp
 let pool: MockPool
-let router: OnRampRouter
+let router: EVM2AnyTollOnRampRouter
 let mintAmount: BigNumber
 let fee = BigNumber.from(1)
 
@@ -37,20 +37,20 @@ before(async () => {
   roles = users.roles
 })
 
-describe('OnRampRouter', () => {
+describe('EVM2AnyTollOnRampRouter', () => {
   beforeEach(async () => {
     mintAmount = BigNumber.from('1000000000000000000')
 
     TokenArtifact = await hre.artifacts.readArtifact('MockERC20')
     OnRampArtifact = await hre.artifacts.readArtifact('MockOnRamp')
-    RouterArtifact = await hre.artifacts.readArtifact('OnRampRouter')
+    RouterArtifact = await hre.artifacts.readArtifact('EVM2AnyTollOnRampRouter')
     MockPoolArtifact = await hre.artifacts.readArtifact('MockPool')
 
     pool = <MockPool>(
       await deployContract(roles.defaultAccount, MockPoolArtifact, [1])
     )
     tokens = new Array<MockERC20>()
-    router = <OnRampRouter>(
+    router = <EVM2AnyTollOnRampRouter>(
       await deployContract(roles.defaultAccount, RouterArtifact)
     )
 
@@ -93,7 +93,7 @@ describe('OnRampRouter', () => {
     let receiver: string
     let messagedata: string
     let amounts: Array<BigNumber>
-    let payload: EVMToAnyTollMessage
+    let payload: EVM2AnyTollMessage
 
     beforeEach(async () => {
       const amount = BigNumber.from('10000000000000000')

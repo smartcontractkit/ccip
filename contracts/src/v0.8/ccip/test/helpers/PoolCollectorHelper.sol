@@ -5,7 +5,7 @@ import "../../pools/PoolCollector.sol";
 
 contract PoolCollectorHelper is PoolCollector {
   function collectTokens(
-    OnRampInterface onRamp,
+    TollOnRampInterface onRamp,
     IERC20[] calldata tokens,
     uint256[] calldata amounts,
     IERC20 feeToken,

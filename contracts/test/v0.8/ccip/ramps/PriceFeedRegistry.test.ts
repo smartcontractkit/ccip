@@ -149,7 +149,7 @@ describe('PriceFeedRegistry', () => {
           registry
             .connect(roles.defaultAccount)
             .removeFeed(tokens[2].address, feeds[3].address),
-          'TokenFeedMistmatch()',
+          'TokenFeedMismatch()',
         )
       })
     })

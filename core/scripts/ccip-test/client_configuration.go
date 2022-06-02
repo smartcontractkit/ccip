@@ -21,13 +21,13 @@ import (
 
 	evmclient "github.com/smartcontractkit/chainlink/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/afn_contract"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/any_2_evm_toll_offramp"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/any_2_evm_toll_offramp_router"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/blob_verifier"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/evm_2_evm_toll_onramp"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/evm_2_evm_toll_onramp_router"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/native_token_pool"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp_executor"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp_router"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/onramp"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/onramp_router"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/receiver_dapp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/sender_dapp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/simple_message_receiver"
@@ -53,8 +53,8 @@ type Client struct {
 
 type SourceClient struct {
 	Client
-	OnRamp       *onramp.OnRamp
-	OnRampRouter *onramp_router.OnRampRouter
+	OnRamp       *evm_2_evm_toll_onramp.EVM2EVMTollOnRamp
+	OnRampRouter *evm_2_evm_toll_onramp_router.EVM2AnyTollOnRampRouter
 	SenderDapp   *sender_dapp.SenderDapp
 }
 
@@ -71,11 +71,11 @@ func NewSourceClient(t *testing.T, config EvmChainConfig) SourceClient {
 
 	afn, err := afn_contract.NewAFNContract(config.Afn, client)
 	require.NoError(t, err)
-	onRamp, err := onramp.NewOnRamp(config.OnRamp, client)
+	onRamp, err := evm_2_evm_toll_onramp.NewEVM2EVMTollOnRamp(config.OnRamp, client)
 	require.NoError(t, err)
 	tokenSender, err := sender_dapp.NewSenderDapp(config.TokenSender, client)
 	require.NoError(t, err)
-	onRampRouter, err := onramp_router.NewOnRampRouter(config.OnRampRouter, client)
+	onRampRouter, err := evm_2_evm_toll_onramp_router.NewEVM2AnyTollOnRampRouter(config.OnRampRouter, client)
 	require.NoError(t, err)
 
 	return SourceClient{
@@ -97,11 +97,11 @@ func NewSourceClient(t *testing.T, config EvmChainConfig) SourceClient {
 
 type DestClient struct {
 	Client
-	OffRamp         *offramp.OffRamp
+	BlobVerifier    *blob_verifier.BlobVerifier
 	MessageReceiver *simple_message_receiver.SimpleMessageReceiver
 	ReceiverDapp    *receiver_dapp.ReceiverDapp
-	OffRampRouter   *offramp_router.OffRampRouter
-	OffRampExecutor *offramp_executor.OffRampExecutor
+	OffRamp         *any_2_evm_toll_offramp.Any2EVMTollOffRamp
+	OffRampRouter   *any_2_evm_toll_offramp_router.Any2EVMTollOffRampRouter
 }
 
 func NewDestinationClient(t *testing.T, config EvmChainConfig) DestClient {
@@ -118,15 +118,15 @@ func NewDestinationClient(t *testing.T, config EvmChainConfig) DestClient {
 
 	afn, err := afn_contract.NewAFNContract(config.Afn, client)
 	require.NoError(t, err)
-	offRamp, err := offramp.NewOffRamp(config.OffRamp, client)
+	blobVerifier, err := blob_verifier.NewBlobVerifier(config.BlobVerifier, client)
 	require.NoError(t, err)
-	offRampExecutor, err := offramp_executor.NewOffRampExecutor(config.OffRampExecutor, client)
+	offRamp, err := any_2_evm_toll_offramp.NewAny2EVMTollOffRamp(config.OffRamp, client)
 	require.NoError(t, err)
 	messageReceiver, err := simple_message_receiver.NewSimpleMessageReceiver(config.MessageReceiver, client)
 	require.NoError(t, err)
 	receiverDapp, err := receiver_dapp.NewReceiverDapp(config.TokenReceiver, client)
 	require.NoError(t, err)
-	offRampRouter, err := offramp_router.NewOffRampRouter(config.OffRampRouter, client)
+	offRampRouter, err := any_2_evm_toll_offramp_router.NewAny2EVMTollOffRampRouter(config.OffRampRouter, client)
 	require.NoError(t, err)
 
 	return DestClient{
@@ -140,11 +140,11 @@ func NewDestinationClient(t *testing.T, config EvmChainConfig) DestClient {
 			logger:           logger.TestLogger(t).Named(helpers.ChainName(config.ChainId.Int64())),
 			t:                t,
 		},
-		OffRamp:         offRamp,
+		BlobVerifier:    blobVerifier,
 		OffRampRouter:   offRampRouter,
 		MessageReceiver: messageReceiver,
 		ReceiverDapp:    receiverDapp,
-		OffRampExecutor: offRampExecutor,
+		OffRamp:         offRamp,
 	}
 }
 
@@ -265,7 +265,7 @@ func (client CCIPClient) SendMessage(t *testing.T) {
 	bytes, err := hex.DecodeString("00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000005626c616e6b000000000000000000000000000000000000000000000000000000")
 	require.NoError(t, err)
 
-	msg := onramp_router.CCIPEVMToAnyTollMessage{
+	msg := evm_2_evm_toll_onramp_router.CCIPEVM2AnyTollMessage{
 		Receiver:       client.Dest.MessageReceiver.Address(),
 		Data:           bytes,
 		Tokens:         []common.Address{client.Source.LinkTokenAddress},
@@ -285,12 +285,12 @@ func (client CCIPClient) DonExecutionHappyPath(t *testing.T) {
 	amount := big.NewInt(100)
 	client.Source.ApproveLink(t, client.Source.OnRamp.Address(), amount)
 	DestBlockNum := GetCurrentBlockNumber(client.Dest.Client.Client)
-	crossChainRequest := client.SendToOnrampWithExecution(client.Source, client.Source.Owner, client.Dest.Owner.From, amount, client.Dest.OffRampExecutor.Address())
+	crossChainRequest := client.SendToOnrampWithExecution(client.Source, client.Source.Owner, client.Dest.Owner.From, amount, client.Dest.OffRamp.Address())
 	client.Source.logger.Infof("Don executed tx submitted with sequence number: %d", crossChainRequest.Message.SequenceNumber)
 	client.Source.logger.Infof("Waiting for Destination funds transfer...")
 
-	events := make(chan *offramp.OffRampCrossChainMessageExecuted)
-	sub, err := client.Dest.OffRamp.WatchCrossChainMessageExecuted(
+	events := make(chan *blob_verifier.BlobVerifierCrossChainMessageExecuted)
+	sub, err := client.Dest.BlobVerifier.WatchCrossChainMessageExecuted(
 		&bind.WatchOpts{
 			Context: context.Background(),
 			Start:   &DestBlockNum,
@@ -347,13 +347,13 @@ func (client CCIPClient) CrossChainSendPausedOnrampShouldFail(t *testing.T) {
 	amount := big.NewInt(100)
 	client.Source.ApproveLink(t, client.Source.SenderDapp.Address(), amount)
 	client.Source.Owner.GasLimit = 1e6
-	tx, err := client.Source.SenderDapp.SendTokens(client.Source.Owner, client.Dest.Owner.From, []common.Address{client.Source.LinkTokenAddress}, []*big.Int{amount}, client.Dest.OffRampExecutor.Address())
+	tx, err := client.Source.SenderDapp.SendTokens(client.Source.Owner, client.Dest.Owner.From, []common.Address{client.Source.LinkTokenAddress}, []*big.Int{amount}, client.Dest.OffRamp.Address())
 	require.NoError(t, err)
 	WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), false)
 }
 
 func (client CCIPClient) CrossChainSendPausedOfframpShouldFail(t *testing.T) {
-	client.PauseOfframp()
+	client.PauseBlobVerifier()
 	ctx := context.Background()
 	offrampBlockNumber := GetCurrentBlockNumber(client.Dest.Client.Client)
 
@@ -374,7 +374,7 @@ func (client CCIPClient) NotEnoughFundsInBucketShouldFail(t *testing.T) {
 	amount := big.NewInt(2e18) // 2 LINK, bucket size is 1 LINK
 	client.Source.ApproveLink(t, client.Source.SenderDapp.Address(), amount)
 	client.Source.Owner.GasLimit = 1e6
-	tx, err := client.Source.SenderDapp.SendTokens(client.Source.Owner, client.Dest.Owner.From, []common.Address{client.Source.LinkTokenAddress}, []*big.Int{amount}, client.Dest.OffRampExecutor.Address())
+	tx, err := client.Source.SenderDapp.SendTokens(client.Source.Owner, client.Dest.Owner.From, []common.Address{client.Source.LinkTokenAddress}, []*big.Int{amount}, client.Dest.OffRamp.Address())
 	require.NoError(t, err)
 	WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), false)
 }
@@ -427,7 +427,7 @@ func (client CCIPClient) ScalingAndBatching(t *testing.T) {
 		go func(user *bind.TransactOpts) {
 			defer wg.Done()
 			client.Source.ApproveLinkFrom(t, user, client.Source.SenderDapp.Address(), amount)
-			crossChainRequest := client.SendToDappWithExecution(client.Source, user, toAddress, amount, client.Dest.OffRampExecutor.Address())
+			crossChainRequest := client.SendToDappWithExecution(client.Source, user, toAddress, amount, client.Dest.OffRamp.Address())
 			client.Source.logger.Info("Don executed tx submitted with sequence number: ", crossChainRequest.Message.SequenceNumber)
 		}(user)
 	}
@@ -443,13 +443,13 @@ func (client CCIPClient) ExecuteOffRampTransaction(t *testing.T, proof merklemul
 
 	client.Dest.logger.Infof("Cross chain message %+v", decodedMsg)
 
-	report := offramp.CCIPExecutionReport{
-		Messages:       []offramp.CCIPAnyToEVMTollMessage{*decodedMsg},
+	report := blob_verifier.CCIPExecutionReport{
+		Messages:       []blob_verifier.CCIPAny2EVMTollMessage{*decodedMsg},
 		Proofs:         proof.Hashes,
 		ProofFlagsBits: ccip.ProofFlagsToBits(proof.SourceFlags),
 	}
 
-	tx, err := client.Dest.OffRamp.ExecuteTransaction(client.Dest.Owner, report, false)
+	tx, err := client.Dest.BlobVerifier.ExecuteTransaction(client.Dest.Owner, report, false)
 	if err != nil {
 		reason, err2 := evmclient.ExtractRevertReasonFromRPCError(err)
 		require.NoError(t, err2)
@@ -462,8 +462,8 @@ func (client CCIPClient) ExecuteOffRampTransaction(t *testing.T, proof merklemul
 func (client CCIPClient) GetCrossChainSendRequestsForRange(
 	ctx context.Context,
 	t *testing.T,
-	report offramp.CCIPRelayReport,
-	onrampBlockNumber uint64) []*onramp.OnRampCCIPSendRequested {
+	report blob_verifier.CCIPRelayReport,
+	onrampBlockNumber uint64) []*evm_2_evm_toll_onramp.EVM2EVMTollOnRampCCIPSendRequested {
 	// Get the other transactions in the proof, we look 1000 blocks back for transaction
 	// should be fine? Needs fine-tuning after improved batching strategies are developed
 	// in milestone 4
@@ -473,7 +473,7 @@ func (client CCIPClient) GetCrossChainSendRequestsForRange(
 	})
 	require.NoError(t, err)
 
-	var requests []*onramp.OnRampCCIPSendRequested
+	var requests []*evm_2_evm_toll_onramp.EVM2EVMTollOnRampCCIPSendRequested
 	var minFound = report.MaxSequenceNumber
 
 	for reqsIterator.Next() {
@@ -497,11 +497,11 @@ func (client CCIPClient) GetCrossChainSendRequestsForRange(
 }
 
 // GetReportForSequenceNumber return the offramp.CCIPRelayReport for a given ccip requests sequence number.
-func (client CCIPClient) GetReportForSequenceNumber(ctx context.Context, sequenceNumber uint64, minBlockNumber uint64) (offramp.CCIPRelayReport, error) {
+func (client CCIPClient) GetReportForSequenceNumber(ctx context.Context, sequenceNumber uint64, minBlockNumber uint64) (blob_verifier.CCIPRelayReport, error) {
 	client.Dest.logger.Infof("Looking for sequenceNumber %d", sequenceNumber)
-	report, err := client.Dest.OffRamp.GetLastReport(&bind.CallOpts{Context: ctx, Pending: false})
+	report, err := client.Dest.BlobVerifier.GetLastReport(&bind.CallOpts{Context: ctx, Pending: false})
 	if err != nil {
-		return offramp.CCIPRelayReport{}, err
+		return blob_verifier.CCIPRelayReport{}, err
 	}
 
 	client.Dest.logger.Infof("Last report found for range %d-%d", report.MinSequenceNumber, report.MaxSequenceNumber)
@@ -513,9 +513,9 @@ func (client CCIPClient) GetReportForSequenceNumber(ctx context.Context, sequenc
 	if sequenceNumber > report.MaxSequenceNumber {
 		maxIterations := CrossChainTimout / RetryTiming
 		for i := 0; i < int(maxIterations); i++ {
-			report, err = client.Dest.OffRamp.GetLastReport(&bind.CallOpts{Context: ctx, Pending: false})
+			report, err = client.Dest.BlobVerifier.GetLastReport(&bind.CallOpts{Context: ctx, Pending: false})
 			if err != nil {
-				return offramp.CCIPRelayReport{}, err
+				return blob_verifier.CCIPRelayReport{}, err
 			}
 			client.Dest.logger.Infof("Last report found for range %d-%d", report.MinSequenceNumber, report.MaxSequenceNumber)
 			if sequenceNumber >= report.MinSequenceNumber && sequenceNumber <= report.MaxSequenceNumber {
@@ -523,18 +523,18 @@ func (client CCIPClient) GetReportForSequenceNumber(ctx context.Context, sequenc
 			}
 			time.Sleep(RetryTiming)
 		}
-		return offramp.CCIPRelayReport{}, errors.New("No report found within the given timeout")
+		return blob_verifier.CCIPRelayReport{}, errors.New("No report found within the given timeout")
 	}
 
 	// it is in a past report, start looking at the earliest block number possible, the one
 	// before we started the entire transaction on the onramp.
-	reports, err := client.Dest.OffRamp.FilterReportAccepted(&bind.FilterOpts{
+	reports, err := client.Dest.BlobVerifier.FilterReportAccepted(&bind.FilterOpts{
 		Start:   minBlockNumber,
 		End:     nil,
 		Context: ctx,
 	})
 	if err != nil {
-		return offramp.CCIPRelayReport{}, err
+		return blob_verifier.CCIPRelayReport{}, err
 	}
 
 	for reports.Next() {
@@ -546,7 +546,7 @@ func (client CCIPClient) GetReportForSequenceNumber(ctx context.Context, sequenc
 
 	// Somehow the transaction was not included in any report within blocks produced after
 	// the transaction was initialized but the sequence number is lower than we are currently at
-	return offramp.CCIPRelayReport{}, errors.New("No report found for given sequence number")
+	return blob_verifier.CCIPRelayReport{}, errors.New("No report found for given sequence number")
 }
 
 func GetCurrentBlockNumber(chain *ethclient.Client) uint64 {
@@ -557,9 +557,9 @@ func GetCurrentBlockNumber(chain *ethclient.Client) uint64 {
 
 func (client CCIPClient) ValidateMerkleRoot(
 	t *testing.T,
-	request *onramp.OnRampCCIPSendRequested,
-	reportRequests []*onramp.OnRampCCIPSendRequested,
-	report offramp.CCIPRelayReport,
+	request *evm_2_evm_toll_onramp.EVM2EVMTollOnRampCCIPSendRequested,
+	reportRequests []*evm_2_evm_toll_onramp.EVM2EVMTollOnRampCCIPSendRequested,
+	report blob_verifier.CCIPRelayReport,
 ) merklemulti.Proof[[32]byte] {
 	mctx := merklemulti.NewKeccakCtx()
 	var leafHashes [][32]byte
@@ -574,7 +574,7 @@ func (client CCIPClient) ValidateMerkleRoot(
 		t.FailNow()
 	}
 
-	exists, err := client.Dest.OffRamp.GetMerkleRoot(nil, tree.Root())
+	exists, err := client.Dest.BlobVerifier.GetMerkleRoot(nil, tree.Root())
 	require.NoError(t, err)
 	if exists.Uint64() < 1 {
 		panic("Path is not present in the offramp")
@@ -600,7 +600,7 @@ func (client CCIPClient) TryGetTokensFromPausedPool() {
 }
 
 // SendToDappWithExecution executes a cross chain transactions using the sender dapp interface.
-func (client CCIPClient) SendToDappWithExecution(source SourceClient, from *bind.TransactOpts, toAddress common.Address, amount *big.Int, executor common.Address) *onramp.OnRampCCIPSendRequested {
+func (client CCIPClient) SendToDappWithExecution(source SourceClient, from *bind.TransactOpts, toAddress common.Address, amount *big.Int, executor common.Address) *evm_2_evm_toll_onramp.EVM2EVMTollOnRampCCIPSendRequested {
 	SourceBlockNumber := GetCurrentBlockNumber(source.Client.Client)
 
 	tx, err := source.SenderDapp.SendTokens(from, toAddress, []common.Address{client.Source.LinkTokenAddress}, []*big.Int{amount}, executor)
@@ -612,9 +612,9 @@ func (client CCIPClient) SendToDappWithExecution(source SourceClient, from *bind
 }
 
 // SendToOnrampWithExecution executes a cross chain transactions using the onramp interface.
-func (client CCIPClient) SendToOnrampWithExecution(source SourceClient, from *bind.TransactOpts, toAddress common.Address, amount *big.Int, executor common.Address) *onramp.OnRampCCIPSendRequested {
+func (client CCIPClient) SendToOnrampWithExecution(source SourceClient, from *bind.TransactOpts, toAddress common.Address, amount *big.Int, executor common.Address) *evm_2_evm_toll_onramp.EVM2EVMTollOnRampCCIPSendRequested {
 	SourceBlockNumber := GetCurrentBlockNumber(source.Client.Client)
-	payload := onramp_router.CCIPEVMToAnyTollMessage{
+	payload := evm_2_evm_toll_onramp_router.CCIPEVM2AnyTollMessage{
 		Tokens:         []common.Address{source.LinkTokenAddress},
 		Amounts:        []*big.Int{amount},
 		Receiver:       toAddress,
@@ -631,7 +631,7 @@ func (client CCIPClient) SendToOnrampWithExecution(source SourceClient, from *bi
 
 // WaitForCrossChainSendRequest checks on chain for a successful onramp send event with the given tx hash.
 // If not immediately found it will keep retrying in intervals of the globally specified RetryTiming.
-func WaitForCrossChainSendRequest(source SourceClient, fromBlockNum uint64, txhash common.Hash) *onramp.OnRampCCIPSendRequested {
+func WaitForCrossChainSendRequest(source SourceClient, fromBlockNum uint64, txhash common.Hash) *evm_2_evm_toll_onramp.EVM2EVMTollOnRampCCIPSendRequested {
 	filter := bind.FilterOpts{Start: fromBlockNum}
 	for {
 		iterator, err := source.OnRamp.FilterCCIPSendRequested(&filter)
@@ -711,14 +711,14 @@ func (client CCIPClient) PauseOnramp() {
 	WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 }
 
-func (client CCIPClient) PauseOfframp() {
-	paused, err := client.Dest.OffRamp.Paused(nil)
+func (client CCIPClient) PauseBlobVerifier() {
+	paused, err := client.Dest.BlobVerifier.Paused(nil)
 	helpers.PanicErr(err)
 	if paused {
 		return
 	}
 	client.Dest.logger.Info("pausing offramp...")
-	tx, err := client.Dest.OffRamp.Pause(client.Dest.Owner)
+	tx, err := client.Dest.BlobVerifier.Pause(client.Dest.Owner)
 	helpers.PanicErr(err)
 	client.Dest.logger.Info("Offramp paused, tx hash: %s", tx.Hash())
 	WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
@@ -737,14 +737,14 @@ func (client CCIPClient) UnpauseOnramp() {
 	WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 }
 
-func (client CCIPClient) UnpauseOfframp() {
-	paused, err := client.Dest.OffRamp.Paused(nil)
+func (client CCIPClient) UnpauseBlobVerifier() {
+	paused, err := client.Dest.BlobVerifier.Paused(nil)
 	helpers.PanicErr(err)
 	if !paused {
 		return
 	}
 	client.Dest.logger.Info("unpausing offramp...")
-	tx, err := client.Dest.OffRamp.Unpause(client.Dest.Owner)
+	tx, err := client.Dest.BlobVerifier.Unpause(client.Dest.Owner)
 	helpers.PanicErr(err)
 	client.Dest.logger.Info("Offramp unpaused, tx hash: %s", tx.Hash())
 	WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
@@ -759,7 +759,7 @@ func (client CCIPClient) UnpauseAll() {
 	}()
 	go func() {
 		defer wg.Done()
-		client.UnpauseOfframp()
+		client.UnpauseBlobVerifier()
 	}()
 	go func() {
 		defer wg.Done()
@@ -804,7 +804,7 @@ func (client CCIPClient) SetConfig() {
 	transmitterAddresses, err := ocrcommon.AccountToAddress(transmitters)
 	helpers.PanicErr(err)
 
-	tx, err := client.Dest.OffRamp.SetConfig(
+	tx, err := client.Dest.BlobVerifier.SetConfig(
 		client.Dest.Owner,
 		signerAddresses,
 		transmitterAddresses,
@@ -817,7 +817,7 @@ func (client CCIPClient) SetConfig() {
 	WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 	client.Dest.logger.Infof("Config set on offramp %s", helpers.ExplorerLink(client.Dest.ChainId.Int64(), tx.Hash()))
 
-	tx, err = client.Dest.OffRampExecutor.SetConfig(
+	tx, err = client.Dest.OffRamp.SetConfig(
 		client.Dest.Owner,
 		signerAddresses,
 		transmitterAddresses,
@@ -832,11 +832,11 @@ func (client CCIPClient) SetConfig() {
 }
 
 func (client CCIPClient) AcceptOwnership(t *testing.T) {
-	tx, err := client.Dest.OffRamp.AcceptOwnership(client.Dest.Owner)
+	tx, err := client.Dest.BlobVerifier.AcceptOwnership(client.Dest.Owner)
 	require.NoError(t, err)
 	WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 
-	tx, err = client.Dest.OffRampExecutor.AcceptOwnership(client.Dest.Owner)
+	tx, err = client.Dest.OffRamp.AcceptOwnership(client.Dest.Owner)
 	require.NoError(t, err)
 	WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 }
@@ -845,7 +845,7 @@ func (client CCIPClient) SetAFNTimeout(t *testing.T) {
 	tx, err := client.Source.OnRamp.SetMaxSecondsWithoutAFNHeartbeat(client.Source.Owner, big.NewInt(defaultAFNTimeout))
 	require.NoError(t, err)
 	WaitForMined(t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
-	tx, err = client.Dest.OffRamp.SetMaxSecondsWithoutAFNHeartbeat(client.Dest.Owner, big.NewInt(defaultAFNTimeout))
+	tx, err = client.Dest.BlobVerifier.SetMaxSecondsWithoutAFNHeartbeat(client.Dest.Owner, big.NewInt(defaultAFNTimeout))
 	require.NoError(t, err)
 	WaitForMined(t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 }

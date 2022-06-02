@@ -1,21 +1,21 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.13;
 
-import "../pools/PoolCollector.sol";
-import "../interfaces/OnRampInterface.sol";
-import "../../interfaces/TypeAndVersionInterface.sol";
-import "../utils/CCIP.sol";
-import "../health/HealthChecker.sol";
-import "../pools/TokenPoolRegistry.sol";
-import "./PriceFeedRegistry.sol";
-import "../../vendor/SafeERC20.sol";
+import "../../pools/PoolCollector.sol";
+import "../../interfaces/TollOnRampInterface.sol";
+import "../../../interfaces/TypeAndVersionInterface.sol";
+import "../../utils/CCIP.sol";
+import "../../health/HealthChecker.sol";
+import "../../pools/TokenPoolRegistry.sol";
+import "../PriceFeedRegistry.sol";
+import "../../../vendor/SafeERC20.sol";
 
 /**
  * @notice An implementation of an On Ramp, which enables just a single token to be
  * used in the protocol.
  */
-contract OnRamp is
-  OnRampInterface,
+contract EVM2EVMTollOnRamp is
+  TollOnRampInterface,
   TypeAndVersionInterface,
   HealthChecker,
   TokenPoolRegistry,
@@ -72,7 +72,7 @@ contract OnRamp is
    * @param message Message struct to send
    * @param originalSender The original initiator of the CCIP request
    */
-  function forwardFromRouter(CCIP.EVMToAnyTollMessage memory message, address originalSender)
+  function forwardFromRouter(CCIP.EVM2AnyTollMessage memory message, address originalSender)
     external
     override
     whenNotPaused
@@ -100,7 +100,7 @@ contract OnRamp is
 
     uint64 sequenceNumber = s_sequenceNumber;
     // Emit message request
-    CCIP.EVMToEVMTollEvent memory tollEvent = CCIP.EVMToEVMTollEvent({
+    CCIP.EVM2EVMTollEvent memory tollEvent = CCIP.EVM2EVMTollEvent({
       sequenceNumber: sequenceNumber,
       sourceChainId: CHAIN_ID,
       sender: originalSender,

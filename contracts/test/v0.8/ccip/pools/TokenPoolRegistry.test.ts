@@ -150,7 +150,7 @@ describe('TokenPoolRegistry', () => {
           registry
             .connect(roles.defaultAccount)
             .removePool(tokens[2].address, pools[3].address),
-          'TokenPoolMistmatch()',
+          'TokenPoolMismatch()',
         )
       })
     })
