@@ -33,6 +33,7 @@ yarndep: ## Ensure all yarn dependencies are installed.
 .PHONY: install-chainlink
 install-chainlink: chainlink ## Install the chainlink binary.
 	mkdir -p $(GOBIN)
+	rm -f $(GOBIN)/chainlink
 	cp $< $(GOBIN)/chainlink
 
 chainlink: operator-ui ## Build the chainlink binary.
@@ -41,6 +42,7 @@ chainlink: operator-ui ## Build the chainlink binary.
 .PHONY: chainlink-build
 chainlink-build: ## Build & install the chainlink binary.
 	go build $(GOFLAGS) -o chainlink ./core/
+	rm -f $(GOBIN)/chainlink
 	cp chainlink $(GOBIN)/chainlink
 
 .PHONY: operator-ui
@@ -79,7 +81,7 @@ presubmit: ## Format go files and imports.
 
 .PHONY: mockery
 mockery: $(mockery) ## Install mockery.
-	go install github.com/vektra/mockery/v2@v2.12.2
+	go install github.com/vektra/mockery/v2@v2.13.0-beta.1
 
 .PHONY: telemetry-protobuf
 telemetry-protobuf: $(telemetry-protobuf) ## Generate telemetry protocol buffers.

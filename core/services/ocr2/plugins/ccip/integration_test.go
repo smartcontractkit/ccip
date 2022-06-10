@@ -31,7 +31,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
 	eth "github.com/smartcontractkit/chainlink/core/chains/evm/client"
-	evmclient "github.com/smartcontractkit/chainlink/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/headtracker"
 	httypes "github.com/smartcontractkit/chainlink/core/chains/evm/headtracker/types"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/log"
@@ -367,8 +366,8 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 	require.NoError(t, err)
 	_, err = chainORM.CreateChain(*utils.NewBig(destChainID), &evmtypes.ChainCfg{})
 	require.NoError(t, err)
-	sourceClient := evmclient.NewSimulatedBackendClient(t, sourceChain, sourceChainID)
-	destClient := evmclient.NewSimulatedBackendClient(t, destChain, destChainID)
+	sourceClient := cltest.NewSimulatedBackendClient(t, sourceChain, sourceChainID)
+	destClient := cltest.NewSimulatedBackendClient(t, destChain, destChainID)
 
 	keyStore := keystore.New(db, utils.FastScryptParams, lggr, config)
 	simEthKeyStore := EthKeyStoreSim{Eth: keyStore.Eth()}
