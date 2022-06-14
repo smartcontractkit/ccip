@@ -27,7 +27,7 @@ contract ReceiverDapp is CrossChainMessageReceiverInterface, TypeAndVersionInter
    * the tokens sent with it to the designated EOA
    * @param message CCIP Message
    */
-  function receiveMessage(CCIP.Any2EVMTollMessage calldata message) external override {
+  function ccipReceive(CCIP.Any2EVMTollMessage calldata message) external override {
     if (msg.sender != address(ROUTER)) revert InvalidDeliverer(msg.sender);
     (
       ,

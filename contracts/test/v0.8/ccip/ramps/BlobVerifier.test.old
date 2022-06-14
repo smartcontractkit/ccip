@@ -211,7 +211,6 @@ describe('BlobVerifier', () => {
   it('has a limited public interface [ @skip-coverage ]', async () => {
     publicAbi(blobVerifier, [
       // Ramp
-      'SOURCE_CHAIN_ID',
       'CHAIN_ID',
       'executeTransaction',
       'withdrawAccumulatedFees',
@@ -221,25 +220,12 @@ describe('BlobVerifier', () => {
       'getLastReport',
       'getOffRampConfig',
       'setOffRampConfig',
-      'getRouter',
-      'setRouter',
       // HealthChecker
       'setAFN',
       'getAFN',
       'setMaxSecondsWithoutAFNHeartbeat',
       'getMaxSecondsWithoutAFNHeartbeat',
       'isHealthy',
-      // TokenPoolRegistry
-      'addPool',
-      'removePool',
-      'getPool',
-      'isPool',
-      'getPoolTokens',
-      // PriceFeedRegistry
-      'addFeed',
-      'removeFeed',
-      'getFeed',
-      'getFeedTokens',
       // OffRampHelper
       'report',
       // OCR2Abstract

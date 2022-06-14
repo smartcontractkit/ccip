@@ -2,7 +2,7 @@
 src = 'contracts/src/v0.8/ccip'
 test = 'contracts/src/v0.8/ccip/test'
 out = 'contracts/foundry-artifacts'
-libs = ['contracts/node_modules']
+libs = ["contracts/node_modules", "lib"]
 optimizer_runs = 1000000
 
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config

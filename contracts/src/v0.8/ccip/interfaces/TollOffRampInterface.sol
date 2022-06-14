@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.13;
 
 import "../interfaces/PoolInterface.sol";
 import "../interfaces/TollOffRampRouterInterface.sol";
@@ -7,32 +7,25 @@ import "../interfaces/CrossChainMessageReceiverInterface.sol";
 import "../utils/CCIP.sol";
 
 interface TollOffRampInterface {
-  error RelayReportError();
-  error SequenceError(uint64 lastMaxSequenceNumber, uint64 newMinSequenceNumber);
-  error MerkleProofError(bytes32 root);
-  error TokenMismatch();
-  error UnsupportedNumberOfTokens();
-  error UnsupportedToken(IERC20 token);
   error AlreadyExecuted(uint64 sequenceNumber);
-  error InvalidExecutor(uint64 sequenceNumber);
+  error CanOnlySelfCall();
   error ExecutionError(uint64 sequenceNumber, bytes reason);
-  error FeeError();
-  error ExecutionDelayError();
   error InvalidReceiver(address receiver);
   error InvalidSourceChain(uint256 sourceChainId);
+  error NoMessagesToExecute();
   error MessageTooLarge(uint256 maxSize, uint256 actualSize);
-  error UnexpectedPayloadData(uint64 sequenceNumber);
   error RouterNotSet();
+  error RootNotRelayed();
+  error UnsupportedNumberOfTokens(uint64 sequenceNumber);
+  error UnsupportedToken(IERC20 token);
 
-  event ReportAccepted(CCIP.RelayReport report);
-  event CrossChainMessageExecuted(uint64 indexed sequenceNumber);
+  event ExecutionCompleted(CCIP.ExecutionResult indexed results);
   event OffRampConfigSet(OffRampConfig config);
-  event FeesWithdrawn(IERC20 feeToken, address recipient, uint256 amount);
   event OffRampRouterSet(TollOffRampRouterInterface router);
 
   struct OffRampConfig {
-    // Execution fee in Juels (smallest denomination of LINK)
-    uint64 executionFeeJuels;
+    // The ID of the source chain
+    uint256 sourceChainId;
     // execution delay in seconds
     uint64 executionDelaySeconds;
     // maximum payload data size
@@ -42,9 +35,30 @@ interface TollOffRampInterface {
   }
 
   /**
-   * @notice Execute the delivery of a message by using its merkle proof
+   * @notice setRouter sets a new router
+   * @param router the new Router
+   * @dev only the owner should be able to call this function
+   */
+  function setRouter(TollOffRampRouterInterface router) external;
+
+  /**
+   * @notice ccipReceive implements the receive function to create a
+   * collision if some other method happens to hash to the same signature/
+   */
+  function ccipReceive(CCIP.Any2EVMTollMessage calldata message) external;
+
+  /**
+   * @notice Execute a series of one or more messages using a merkle proof
    * @param report ExecutionReport
    * @param needFee Whether or not the executor requires a fee
    */
-  function executeTransaction(CCIP.ExecutionReport memory report, bool needFee) external;
+  function execute(CCIP.ExecutionReport memory report, bool needFee) external returns (CCIP.ExecutionResult[] memory);
+
+  /**
+   * @notice Execute a single message
+   * @param message The Any2EVMTollMessage message that will be executed
+   * @dev this can only be called by the contract itself. It is part of
+   * the Execute call, as we can only try/catch on external calls.
+   */
+  function executeSingleMessage(CCIP.Any2EVMTollMessage memory message) external;
 }

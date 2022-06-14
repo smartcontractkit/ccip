@@ -12,5 +12,5 @@ interface CrossChainMessageReceiverInterface {
    * @notice Called by the OffRamp to deliver a message
    * @param message CCIP Message
    */
-  function receiveMessage(CCIP.Any2EVMTollMessage calldata message) external;
+  function ccipReceive(CCIP.Any2EVMTollMessage calldata message) external;
 }

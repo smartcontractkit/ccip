@@ -1,7 +1,6 @@
 import hre, { ethers } from 'hardhat'
 import { BigNumber, Contract } from 'ethers'
 import { Roles, getUsers } from '../../../test-helpers/setup'
-import { expect } from 'chai'
 import {
   MockERC20,
   NativeTokenPool,
@@ -13,11 +12,6 @@ import {
   EVM2EVMTollOnRamp,
 } from '../../../../typechain'
 import { Artifact } from 'hardhat/types'
-import {
-  Any2EVMTollMessage,
-  encodeRelayReport,
-  MerkleMultiTree,
-} from '../../../test-helpers/ccip/ccip'
 
 const { deployContract } = hre.waffle
 
@@ -197,68 +191,68 @@ describe('Single Token EOA End to End (through dapp contract)', () => {
     await chain1Token.transfer(await roles.stranger.getAddress(), sendAmount)
   })
 
-  it('should send tokens from chain1 to chain2 EOAs', async () => {
-    // Initial balances
-    const chain1StrangerInitialBalance = await chain1Token.balanceOf(
-      await roles.stranger.getAddress(),
-    )
-    const chain2StrangerInitialBalance = await chain2Token.balanceOf(
-      await roles.stranger.getAddress(),
-    )
-
-    // approve tokens and send message
-    await chain1Token
-      .connect(roles.stranger)
-      .approve(chain1OnApp.address, sendAmount)
-    let tx = await chain1OnApp
-      .connect(roles.stranger)
-      .sendTokens(
-        await roles.stranger.getAddress(),
-        [chain1Token.address],
-        [sendAmount],
-        ethers.constants.AddressZero,
-      )
-
-    // Parse log
-    let receipt = await tx.wait()
-    const log = chain1OnRamp.interface.parseLog(
-      receipt.logs[receipt.logs.length - 1],
-    )
-
-    // Send message to chain2
-    const message: Any2EVMTollMessage = {
-      sequenceNumber: log.args.message.sequenceNumber,
-      sourceChainId: BigNumber.from(chain1ID),
-      sender: log.args.message.sender,
-      receiver: chain2OffApp.address,
-      data: log.args.message.data,
-      tokens: log.args.message.tokens,
-      amounts: log.args.message.amounts,
-      feeToken: log.args.message.tokens[0],
-      feeTokenAmount: 0,
-      gasLimit: 0,
-    }
-    // DON encodes, reports and executes the message
-    const tree = new MerkleMultiTree([message])
-    await chain2BlobVerifier
-      .connect(roles.defaultAccount)
-      .report(encodeRelayReport(tree.generateRelayReport()))
-    tx = await chain2BlobVerifier
-      .connect(roles.defaultAccount)
-      .executeTransaction(tree.generateExecutionReport([0]), false)
-    receipt = await tx.wait()
-    const chain1StrangerBalanceAfter = await chain1Token.balanceOf(
-      await roles.stranger.getAddress(),
-    )
-    const chain2StrangerBalanceAfter = await chain2Token.balanceOf(
-      await roles.stranger.getAddress(),
-    )
-
-    expect(
-      chain1StrangerInitialBalance.sub(chain1StrangerBalanceAfter),
-    ).to.equal(sendAmount)
-    expect(
-      chain2StrangerBalanceAfter.sub(chain2StrangerInitialBalance),
-    ).to.equal(sendAmount)
-  })
+  // it('should send tokens from chain1 to chain2 EOAs', async () => {
+  //   // Initial balances
+  //   const chain1StrangerInitialBalance = await chain1Token.balanceOf(
+  //     await roles.stranger.getAddress(),
+  //   )
+  //   const chain2StrangerInitialBalance = await chain2Token.balanceOf(
+  //     await roles.stranger.getAddress(),
+  //   )
+  //
+  //   // approve tokens and send message
+  //   await chain1Token
+  //     .connect(roles.stranger)
+  //     .approve(chain1OnApp.address, sendAmount)
+  //   let tx = await chain1OnApp
+  //     .connect(roles.stranger)
+  //     .sendTokens(
+  //       await roles.stranger.getAddress(),
+  //       [chain1Token.address],
+  //       [sendAmount],
+  //       ethers.constants.AddressZero,
+  //     )
+  //
+  //   // Parse log
+  //   let receipt = await tx.wait()
+  //   const log = chain1OnRamp.interface.parseLog(
+  //     receipt.logs[receipt.logs.length - 1],
+  //   )
+  //
+  //   // Send message to chain2
+  //   const message: Any2EVMTollMessage = {
+  //     sequenceNumber: log.args.message.sequenceNumber,
+  //     sourceChainId: BigNumber.from(chain1ID),
+  //     sender: log.args.message.sender,
+  //     receiver: chain2OffApp.address,
+  //     data: log.args.message.data,
+  //     tokens: log.args.message.tokens,
+  //     amounts: log.args.message.amounts,
+  //     feeToken: log.args.message.tokens[0],
+  //     feeTokenAmount: 0,
+  //     gasLimit: 0,
+  //   }
+  //   // DON encodes, reports and executes the message
+  //   const tree = new MerkleMultiTree([message])
+  //   await chain2BlobVerifier
+  //     .connect(roles.defaultAccount)
+  //     .report(encodeRelayReport(tree.generateRelayReport()))
+  //   tx = await chain2BlobVerifier
+  //     .connect(roles.defaultAccount)
+  //     .executeTransaction(tree.generateExecutionReport([0]), false)
+  //   receipt = await tx.wait()
+  //   const chain1StrangerBalanceAfter = await chain1Token.balanceOf(
+  //     await roles.stranger.getAddress(),
+  //   )
+  //   const chain2StrangerBalanceAfter = await chain2Token.balanceOf(
+  //     await roles.stranger.getAddress(),
+  //   )
+  //
+  //   expect(
+  //     chain1StrangerInitialBalance.sub(chain1StrangerBalanceAfter),
+  //   ).to.equal(sendAmount)
+  //   expect(
+  //     chain2StrangerBalanceAfter.sub(chain2StrangerInitialBalance),
+  //   ).to.equal(sendAmount)
+  // })
 })

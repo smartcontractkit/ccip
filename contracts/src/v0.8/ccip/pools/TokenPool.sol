@@ -4,7 +4,7 @@ pragma solidity 0.8.13;
 
 import "../../vendor/SafeERC20.sol";
 import "../../vendor/Pausable.sol";
-import "../interfaces/TollOnRampInterface.sol";
+import "../onRamp/interfaces/TollOnRampInterface.sol";
 import "../interfaces/TollOffRampInterface.sol";
 import "../interfaces/PoolInterface.sol";
 import "../access/OwnerIsCreator.sol";

@@ -4,7 +4,7 @@ pragma solidity 0.8.13;
 import "../../interfaces/TypeAndVersionInterface.sol";
 import "../utils/CCIP.sol";
 import "../../vendor/SafeERC20.sol";
-import "../interfaces/TollOnRampRouterInterface.sol";
+import "../onRamp/interfaces/TollOnRampRouterInterface.sol";
 
 /**
  * @notice This contract enables EOAs to send a single asset across to the chain

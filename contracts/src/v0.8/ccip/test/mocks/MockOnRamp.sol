@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.13;
 
-import "../../interfaces/TollOnRampInterface.sol";
+import "../../onRamp/interfaces/TollOnRampInterface.sol";
 
 contract MockOnRamp is TollOnRampInterface {
   uint256 public immutable CHAIN_ID;
@@ -56,8 +56,11 @@ contract MockOnRamp is TollOnRampInterface {
     return FEE;
   }
 
-  function getTokenPool(IERC20 token) external override returns (PoolInterface) {
-    emit GetTokenPool(token);
+  function getSequenceNumber() external view returns (uint64) {
+    return 1;
+  }
+
+  function getTokenPool(IERC20 token) external returns (PoolInterface) {
     return POOL;
   }
 }

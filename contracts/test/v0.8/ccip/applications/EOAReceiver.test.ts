@@ -83,7 +83,7 @@ describe('ReceiverDapp', () => {
       }
       accountAddr = await roles.defaultAccount.getAddress()
       await evmRevert(
-        receiverContract.connect(roles.defaultAccount).receiveMessage(message),
+        receiverContract.connect(roles.defaultAccount).ccipReceive(message),
         `InvalidDeliverer("${accountAddr}")`,
       )
     })

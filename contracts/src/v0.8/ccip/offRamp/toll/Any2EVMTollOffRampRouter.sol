@@ -45,7 +45,8 @@ contract Any2EVMTollOffRampRouter is TollOffRampRouterInterface, OwnerIsCreator 
     override
     onlyOffRamp
   {
-    try receiver.receiveMessage(message) {} catch (bytes memory reason) {
+    try receiver.ccipReceive(message) {} catch (bytes memory reason) {
+      // TODO: use RouterResults and exact gas
       revert MessageFailure(message.sequenceNumber, reason);
     }
   }

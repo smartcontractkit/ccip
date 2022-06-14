@@ -75,7 +75,7 @@ package gethwrappers
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.13/Any2EVMTollOffRampRouter.abi ../../../contracts/solc/v0.8.13/Any2EVMTollOffRampRouter.bin Any2EVMTollOffRampRouter any_2_evm_toll_offramp_router
 
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.13/BlobVerifierHelper.abi ../../../contracts/solc/v0.8.13/BlobVerifierHelper.bin BlobVerifierHelper blob_verifier_helper
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.13/OffRampHelper.abi ../../../contracts/solc/v0.8.13/OffRampHelper.bin OffRampHelper offramp_helper
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.13/Any2EVMTollOffRampHelper.abi ../../../contracts/solc/v0.8.13/Any2EVMTollOffRampHelper.bin Any2EVMTollOffRampHelper any_2_evm_toll_offramp_helper
 
 // Generic CCIP
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.13/NativeTokenPool.abi ../../../contracts/solc/v0.8.13/NativeTokenPool.bin NativeTokenPool native_token_pool

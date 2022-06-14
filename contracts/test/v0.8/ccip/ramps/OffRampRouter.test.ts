@@ -8,10 +8,7 @@ import {
 import hre from 'hardhat'
 import { Artifact } from 'hardhat/types'
 import { MockERC20, SimpleMessageReceiver } from '../../../../typechain'
-import {
-  Any2EVMTollMessage,
-  messageDeepEqual,
-} from '../../../test-helpers/ccip/ccip'
+import { Any2EVMTollMessage } from '../../../test-helpers/ccip/ccip'
 import { evmRevert } from '../../../test-helpers/matchers'
 
 import { getUsers, Roles } from '../../../test-helpers/setup'
@@ -187,8 +184,6 @@ describe('EVM2AnyTollOnRampRouter', () => {
           .connect(roles.defaultAccount)
           .routeMessage(receiver.address, message)
         await expect(tx).to.emit(receiver, 'MessageReceived')
-        const response = await receiver.getMessage()
-        messageDeepEqual(response, message)
       })
     })
   })

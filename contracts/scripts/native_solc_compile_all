@@ -81,7 +81,7 @@ $SCRIPTPATH/native_solc8_6_compile dev/DerivedPriceFeed.sol
 $SCRIPTPATH/native_solc8_6_compile tests/LogEmitter.sol
 
 # CCIP
-$SCRIPTPATH/native_solc8_13_compile ccip/test/helpers/OffRampHelper.sol
+$SCRIPTPATH/native_solc8_13_compile ccip/test/helpers/Any2EVMTollOffRampHelper.sol
 $SCRIPTPATH/native_solc8_13_compile ccip/test/helpers/BlobVerifierHelper.sol
 $SCRIPTPATH/native_solc8_13_compile ccip/test/helpers/SimpleMessageReceiver.sol
 $SCRIPTPATH/native_solc8_13_compile ccip/test/helpers/NoStorageMessageReceiver.sol
@@ -89,9 +89,9 @@ $SCRIPTPATH/native_solc8_13_compile ccip/applications/SenderDapp.sol
 $SCRIPTPATH/native_solc8_13_compile ccip/applications/ReceiverDapp.sol
 $SCRIPTPATH/native_solc8_13_compile ccip/pools/NativeTokenPool.sol
 $SCRIPTPATH/native_solc8_13_compile ccip/health/AFN.sol
-$SCRIPTPATH/native_solc8_13_compile ccip/ramps/BlobVerifier.sol
+$SCRIPTPATH/native_solc8_13_compile ccip/blobVerifier/BlobVerifier.sol
 
-$SCRIPTPATH/native_solc8_13_compile ccip/ramps/toll/Any2EVMTollOffRamp.sol
-$SCRIPTPATH/native_solc8_13_compile ccip/ramps/toll/Any2EVMTollOffRampRouter.sol
-$SCRIPTPATH/native_solc8_13_compile ccip/ramps/toll/EVM2EVMTollOnRamp.sol
-$SCRIPTPATH/native_solc8_13_compile ccip/ramps/toll/EVM2AnyTollOnRampRouter.sol
+$SCRIPTPATH/native_solc8_13_compile ccip/offRamp/toll/Any2EVMTollOffRamp.sol
+$SCRIPTPATH/native_solc8_13_compile ccip/offRamp/toll/Any2EVMTollOffRampRouter.sol
+$SCRIPTPATH/native_solc8_13_compile ccip/onRamp/toll/EVM2EVMTollOnRamp.sol
+$SCRIPTPATH/native_solc8_13_compile ccip/onRamp/toll/EVM2AnyTollOnRampRouter.sol

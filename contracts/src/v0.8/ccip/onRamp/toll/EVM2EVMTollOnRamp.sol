@@ -1,45 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.13;
 
-import "../../pools/PoolCollector.sol";
-import "../../interfaces/TollOnRampInterface.sol";
 import "../../../interfaces/TypeAndVersionInterface.sol";
+import "../interfaces/TollOnRampInterface.sol";
 import "../../utils/CCIP.sol";
-import "../../health/HealthChecker.sol";
-import "../../pools/TokenPoolRegistry.sol";
-import "../PriceFeedRegistry.sol";
-import "../../../vendor/SafeERC20.sol";
+import "../BaseOnRamp.sol";
 
 /**
- * @notice An implementation of an On Ramp, which enables just a single token to be
- * used in the protocol.
+ * @notice An implementation of a toll OnRamp.
  */
-contract EVM2EVMTollOnRamp is
-  TollOnRampInterface,
-  TypeAndVersionInterface,
-  HealthChecker,
-  TokenPoolRegistry,
-  PriceFeedRegistry,
-  PoolCollector
-{
-  using SafeERC20 for IERC20;
-
-  // Chain ID of the source chain (where this contract is deployed)
-  uint256 public immutable CHAIN_ID;
-  // Chain ID of the destination chain (where this contract sends messages)
-  uint256 public immutable DESTINATION_CHAIN_ID;
-
-  // Destination chain => sequence number
-  uint64 private s_sequenceNumber;
+contract EVM2EVMTollOnRamp is TollOnRampInterface, BaseOnRamp, TypeAndVersionInterface {
   // OnRamp config
   OnRampConfig private s_config;
-
-  // Whether the allowlist is enabled
-  bool private s_allowlistEnabled;
-  // Addresses that are allowed to send messages
-  mapping(address => bool) private s_allowed;
-  // List of allowed addresses
-  address[] private s_allowList;
 
   constructor(
     uint256 chainId,
@@ -51,17 +23,7 @@ contract EVM2EVMTollOnRamp is
     AFNInterface afn,
     uint256 maxTimeWithoutAFNSignal,
     OnRampConfig memory config
-  ) HealthChecker(afn, maxTimeWithoutAFNSignal) TokenPoolRegistry(tokens, pools) PriceFeedRegistry(tokens, feeds) {
-    CHAIN_ID = chainId;
-    DESTINATION_CHAIN_ID = destinationChainId;
-    s_sequenceNumber = 1;
-    if (allowlist.length > 0) {
-      s_allowlistEnabled = true;
-      s_allowList = allowlist;
-    }
-    for (uint256 i = 0; i < allowlist.length; i++) {
-      s_allowed[allowlist[i]] = true;
-    }
+  ) BaseOnRamp(chainId, destinationChainId, tokens, pools, feeds, allowlist, afn, maxTimeWithoutAFNSignal) {
     s_config = config;
   }
 
@@ -98,10 +60,9 @@ contract EVM2EVMTollOnRamp is
       pool.lockOrBurn(amount);
     }
 
-    uint64 sequenceNumber = s_sequenceNumber;
     // Emit message request
     CCIP.EVM2EVMTollEvent memory tollEvent = CCIP.EVM2EVMTollEvent({
-      sequenceNumber: sequenceNumber,
+      sequenceNumber: s_sequenceNumber++,
       sourceChainId: CHAIN_ID,
       sender: originalSender,
       receiver: message.receiver,
@@ -112,7 +73,6 @@ contract EVM2EVMTollOnRamp is
       feeTokenAmount: message.feeTokenAmount,
       gasLimit: message.gasLimit
     });
-    s_sequenceNumber = sequenceNumber + 1;
     emit CCIPSendRequested(tollEvent);
     return tollEvent.sequenceNumber;
   }
@@ -128,43 +88,6 @@ contract EVM2EVMTollOnRamp is
     return s_config.relayingFeeJuels * uint256(feed.latestAnswer());
   }
 
-  /**
-   * @notice Get the pool for a specific token
-   * @param token token to get the pool for
-   * @return pool PoolInterface
-   */
-  function getTokenPool(IERC20 token) external view override returns (PoolInterface) {
-    return getPool(token);
-  }
-
-  function setAllowlistEnabled(bool enabled) external onlyOwner {
-    s_allowlistEnabled = enabled;
-    emit AllowlistEnabledSet(enabled);
-  }
-
-  function getAllowlistEnabled() external view returns (bool) {
-    return s_allowlistEnabled;
-  }
-
-  function setAllowlist(address[] calldata allowlist) external onlyOwner {
-    // Remove existing allowlist
-    address[] memory existingList = s_allowList;
-    for (uint256 i = 0; i < existingList.length; i++) {
-      s_allowed[existingList[i]] = false;
-    }
-
-    // Set the new allowlist
-    s_allowList = allowlist;
-    for (uint256 i = 0; i < allowlist.length; i++) {
-      s_allowed[allowlist[i]] = true;
-    }
-    emit AllowlistSet(allowlist);
-  }
-
-  function getAllowlist() external view returns (address[] memory) {
-    return s_allowList;
-  }
-
   function setConfig(OnRampConfig calldata config) external onlyOwner {
     s_config = config;
     emit OnRampConfigSet(config);
@@ -174,11 +97,7 @@ contract EVM2EVMTollOnRamp is
     return s_config;
   }
 
-  function getSequenceNumber() external view returns (uint64) {
-    return s_sequenceNumber;
-  }
-
   function typeAndVersion() external pure override returns (string memory) {
-    return "OnRamp 0.0.1";
+    return "EVM2EVMTollOnRamp 1.0.0";
   }
 }

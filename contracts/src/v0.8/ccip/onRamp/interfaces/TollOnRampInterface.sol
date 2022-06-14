@@ -1,27 +1,14 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.13;
 
-import "../utils/CCIP.sol";
-import "../interfaces/PoolInterface.sol";
-import "../interfaces/AFNInterface.sol";
+import "../../utils/CCIP.sol";
+import "./BaseOnRampInterface.sol";
 
-interface TollOnRampInterface {
-  error TokenMismatch();
-  error MessageTooLarge(uint256 maxSize, uint256 actualSize);
-  error UnsupportedNumberOfTokens();
-  error UnsupportedToken(IERC20 token);
+interface TollOnRampInterface is BaseOnRampInterface {
   error UnsupportedFeeToken(IERC20 token);
-  error SenderNotAllowed(address sender);
-  error UnsupportedDestinationChain(uint256 destinationChainId);
-  error MustBeCalledByRouter();
-  error RouterMustSetOriginalSender();
 
   event CCIPSendRequested(CCIP.EVM2EVMTollEvent message);
-  event AllowlistEnabledSet(bool enabled);
-  event AllowlistSet(address[] allowlist);
-  event NewTokenBucketConstructed(uint256 rate, uint256 capacity, bool full);
   event OnRampConfigSet(OnRampConfig config);
-  event RouterSet(address router);
 
   struct OnRampConfig {
     address router;
@@ -42,6 +29,4 @@ interface TollOnRampInterface {
   function forwardFromRouter(CCIP.EVM2AnyTollMessage memory message, address originalSender) external returns (uint64);
 
   function getRequiredFee(IERC20 feeToken) external returns (uint256);
-
-  function getTokenPool(IERC20 token) external returns (PoolInterface);
 }
