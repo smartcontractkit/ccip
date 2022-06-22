@@ -2,14 +2,12 @@ package ccip
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
@@ -34,7 +32,7 @@ func TestRelayReportSize(t *testing.T) {
 	p.Property("bounded relay report size", prop.ForAll(func(root []byte, min, max uint64) bool {
 		var root32 [32]byte
 		copy(root32[:], root)
-		rep, err := EncodeRelayReport(&blob_verifier.CCIPRelayReport{MerkleRoot: root32, MinSequenceNumber: min, MaxSequenceNumber: max})
+		rep, err := EncodeRelayReport(&blob_verifier.CCIPRelayReport{MerkleRoots: [][32]byte{root32}, Intervals: []blob_verifier.CCIPInterval{{Min: min, Max: max}}})
 		require.NoError(t, err)
 		return len(rep) <= MaxRelayReportLength
 	}, gen.SliceOfN(32, gen.UInt8()), gen.UInt64(), gen.UInt64()))
@@ -42,17 +40,22 @@ func TestRelayReportSize(t *testing.T) {
 }
 
 func TestRelayReportEncoding(t *testing.T) {
+	// Set up a user.
 	key, err := crypto.GenerateKey()
 	require.NoError(t, err)
 	destUser, err := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
 	destChain := backends.NewSimulatedBackend(core.GenesisAlloc{
 		destUser.From: {Balance: big.NewInt(0).Mul(big.NewInt(100), big.NewInt(1e18))}},
 		ethconfig.Defaults.Miner.GasCeil)
+
+	// Deploy link token.
 	destLinkTokenAddress, _, _, err := link_token_interface.DeployLinkToken(destUser, destChain)
 	require.NoError(t, err)
 	destChain.Commit()
 	_, err = link_token_interface.NewLinkToken(destLinkTokenAddress, destChain)
 	require.NoError(t, err)
+
+	// Deploy link token pool.
 	destPoolAddress, _, _, err := native_token_pool.DeployNativeTokenPool(destUser, destChain, destLinkTokenAddress,
 		native_token_pool.PoolInterfaceBucketConfig{
 			Rate:     big.NewInt(1),
@@ -65,6 +68,8 @@ func TestRelayReportEncoding(t *testing.T) {
 	destChain.Commit()
 	_, err = native_token_pool.NewNativeTokenPool(destPoolAddress, destChain)
 	require.NoError(t, err)
+
+	// Deploy AFN.
 	afnAddress, _, _, err := afn_contract.DeployAFNContract(
 		destUser,
 		destChain,
@@ -74,31 +79,34 @@ func TestRelayReportEncoding(t *testing.T) {
 		big.NewInt(1),
 	)
 
+	// Deploy blob verifier.
+	onRampAddress := common.HexToAddress("0x01BE23585060835E02B77ef475b0Cc51aA1e0709")
 	blobVerifierAddress, _, _, err := blob_verifier_helper.DeployBlobVerifierHelper(
-		destUser,                               // user
-		destChain,                              // client
-		big.NewInt(1337),                       // source chain id
-		big.NewInt(1338),                       // dest chain id
-		[]common.Address{destLinkTokenAddress}, // source tokens, as it doesn't matter for this test we use dest link address
-		[]common.Address{destPoolAddress},      // dest pool addresses
-		[]common.Address{destPoolAddress},      // Feeds
-		afnAddress,                             // AFN address
-		big.NewInt(86400),                      // max timeout without AFN signal  86400 seconds = one day
-		0,                                      // executionDelaySeconds
-		1000,                                   // maxTokensLength
+		destUser,          // user
+		destChain,         // client
+		big.NewInt(1338),  // dest chain id
+		afnAddress,        // AFN address
+		big.NewInt(86400), // max timeout without AFN signal  86400 seconds = one day
+		blob_verifier_helper.BlobVerifierInterfaceBlobVerifierConfig{
+			SourceChainId:    big.NewInt(1337),
+			OnRamps:          []common.Address{onRampAddress},
+			MinSeqNrByOnRamp: []uint64{1},
+		},
 	)
 	require.NoError(t, err)
 	blobVerifier, err := blob_verifier_helper.NewBlobVerifierHelper(blobVerifierAddress, destChain)
 	require.NoError(t, err)
 	destChain.Commit()
 
+	// Send a report.
 	mctx := merklemulti.NewKeccakCtx()
 	tree := merklemulti.NewTree(mctx, [][32]byte{mctx.HashLeaf([]byte{0xaa})})
 	root := tree.Root()
 	report := blob_verifier.CCIPRelayReport{
-		MerkleRoot:        root,
-		MinSequenceNumber: 1,
-		MaxSequenceNumber: 10,
+		OnRamps:     []common.Address{onRampAddress},
+		MerkleRoots: [][32]byte{root},
+		Intervals:   []blob_verifier.CCIPInterval{{Min: 1, Max: 10}},
+		RootOfRoots: root,
 	}
 	out, err := EncodeRelayReport(&report)
 	require.NoError(t, err)
@@ -113,11 +121,8 @@ func TestRelayReportEncoding(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, uint64(1), res.Status)
 
-	rep, err := blobVerifier.GetLastReport(nil)
+	// Ensure root exists.
+	ts, err := blobVerifier.GetMerkleRoot(nil, root)
 	require.NoError(t, err)
-	// Verify it locally
-	require.Equal(t, rep.MerkleRoot, root, fmt.Sprintf("Got %v want %v", hexutil.Encode(root[:]), hexutil.Encode(rep.MerkleRoot[:])))
-	exists, err := blobVerifier.GetMerkleRoot(nil, rep.MerkleRoot)
-	require.NoError(t, err)
-	require.True(t, exists.Int64() > 0)
+	require.NotEqual(t, ts.String(), "0")
 }

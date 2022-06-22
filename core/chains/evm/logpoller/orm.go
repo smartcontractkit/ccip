@@ -3,6 +3,7 @@ package logpoller
 import (
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/lib/pq"
@@ -125,6 +126,20 @@ func (o *ORM) SelectLogsByBlockRangeFilter(start, end int64, address common.Addr
 			WHERE logs.block_number >= $1 AND logs.block_number <= $2 AND logs.evm_chain_id = $3 
 			AND address = $4 AND event_sig = $5 
 			ORDER BY (logs.block_number, logs.log_index)`, start, end, utils.NewBig(o.chainID), address, eventSig)
+	if err != nil {
+		return nil, err
+	}
+	return logs, nil
+}
+
+// SelectLogsCreatedAfter finds logs created after some timestamp.
+func (o *ORM) SelectLogsCreatedAfter(eventSig []byte, address common.Address, after time.Time, qopts ...pg.QOpt) ([]Log, error) {
+	var logs []Log
+	q := o.q.WithOpts(qopts...)
+	err := q.Select(&logs, `
+		SELECT * FROM logs 
+			WHERE evm_chain_id = $1 AND address = $2 AND event_sig = $3 AND created_at > $4
+			ORDER BY created_at ASC`, utils.NewBig(o.chainID), address, eventSig, after)
 	if err != nil {
 		return nil, err
 	}

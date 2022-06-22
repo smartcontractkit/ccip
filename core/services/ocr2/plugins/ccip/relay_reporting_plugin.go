@@ -7,20 +7,19 @@ import (
 	"sync"
 	"time"
 
-	gethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/blob_verifier"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/evm_2_evm_toll_onramp"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
 )
 
 const (
 	RelayMaxInflightTimeSeconds = 180
-	MaxRelayReportLength        = 96
+	MaxRelayReportLength        = 1000 // TODO: Need to rethink this based on root of roots report.
 )
 
 var (
@@ -30,7 +29,9 @@ var (
 
 // EncodeRelayReport abi encodes an offramp.CCIPRelayReport.
 func EncodeRelayReport(relayReport *blob_verifier.CCIPRelayReport) (types.Report, error) {
-	report, err := makeRelayReportArgs().PackValues([]interface{}{relayReport.MerkleRoot, relayReport.MinSequenceNumber, relayReport.MaxSequenceNumber})
+	report, err := makeRelayReportArgs().PackValues([]interface{}{
+		relayReport,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -43,52 +44,44 @@ func DecodeRelayReport(report types.Report) (*blob_verifier.CCIPRelayReport, err
 	if err != nil {
 		return nil, err
 	}
-	if len(unpacked) != 3 {
-		return nil, errors.New("invalid num fields in report")
+	if len(unpacked) != 1 {
+		return nil, errors.New("expected single struct value")
 	}
-	root, ok := unpacked[0].([32]byte)
+	relayReport, ok := unpacked[0].(struct {
+		OnRamps   []common.Address `json:"onRamps"`
+		Intervals []struct {
+			Min uint64 `json:"min"`
+			Max uint64 `json:"max"`
+		} `json:"intervals"`
+		MerkleRoots [][32]byte `json:"merkleRoots"`
+		RootOfRoots [32]byte   `json:"rootOfRoots"`
+	})
 	if !ok {
-		return nil, errors.New("invalid root")
+		return nil, errors.Errorf("invalid relay report got %T", unpacked[0])
 	}
-	min, ok := unpacked[1].(uint64)
-	if !ok {
-		return nil, errors.New("invalid min")
-	}
-	max, ok := unpacked[2].(uint64)
-	if !ok {
-		return nil, errors.New("invalid max")
+	var intervalsF []blob_verifier.CCIPInterval
+	for i := range relayReport.Intervals {
+		intervalsF = append(intervalsF, blob_verifier.CCIPInterval{
+			Min: relayReport.Intervals[i].Min,
+			Max: relayReport.Intervals[i].Max,
+		})
 	}
 	return &blob_verifier.CCIPRelayReport{
-		MerkleRoot:        root,
-		MinSequenceNumber: min,
-		MaxSequenceNumber: max,
+		OnRamps:     relayReport.OnRamps,
+		Intervals:   intervalsF,
+		MerkleRoots: relayReport.MerkleRoots,
+		RootOfRoots: relayReport.RootOfRoots,
 	}, nil
 }
 
-// parseLogs preserves the log order.
-func parseLogs(onRamp *evm_2_evm_toll_onramp.EVM2EVMTollOnRamp, logs []logpoller.Log) ([]evm_2_evm_toll_onramp.EVM2EVMTollOnRampCCIPSendRequested, error) {
-	var unstartedReqs []evm_2_evm_toll_onramp.EVM2EVMTollOnRampCCIPSendRequested
-	for _, log := range logs {
-		reqParsed, err := onRamp.ParseCCIPSendRequested(gethtypes.Log{
-			Data:   log.Data,
-			Topics: log.GetTopics(),
-		})
-		if err != nil {
-			return nil, err
-		}
-		unstartedReqs = append(unstartedReqs, *reqParsed)
-	}
-	return unstartedReqs, nil
-}
-
-func isOffRampDownNow(lggr logger.Logger, offRamp *blob_verifier.BlobVerifier) bool {
-	paused, err := offRamp.Paused(nil)
+func isBlobVerifierDownNow(lggr logger.Logger, blobVerifier *blob_verifier.BlobVerifier) bool {
+	paused, err := blobVerifier.Paused(nil)
 	if err != nil {
 		// Air on side of caution by halting if we cannot read the state?
 		lggr.Errorw("Unable to read offramp paused", "err", err)
 		return true
 	}
-	healthy, err := offRamp.IsHealthy(nil, big.NewInt(time.Now().Unix()))
+	healthy, err := blobVerifier.IsHealthy(nil, big.NewInt(time.Now().Unix()))
 	if err != nil {
 		lggr.Errorw("Unable to read offramp afn", "err", err)
 		return true
@@ -102,10 +95,11 @@ type InflightReport struct {
 }
 
 type RelayReportingPluginFactory struct {
-	lggr         logger.Logger
-	source       logpoller.LogPoller
-	onRamp       *evm_2_evm_toll_onramp.EVM2EVMTollOnRamp
-	blobVerifier *blob_verifier.BlobVerifier
+	lggr             logger.Logger
+	source           logpoller.LogPoller
+	onRampSeqParsers map[common.Address]func(log logpoller.Log) (uint64, error)
+	onRamps          []common.Address
+	blobVerifier     *blob_verifier.BlobVerifier
 }
 
 // NewRelayReportingPluginFactory return a new RelayReportingPluginFactory.
@@ -113,9 +107,10 @@ func NewRelayReportingPluginFactory(
 	lggr logger.Logger,
 	source logpoller.LogPoller,
 	blobVerifier *blob_verifier.BlobVerifier,
-	onRamp *evm_2_evm_toll_onramp.EVM2EVMTollOnRamp,
+	onRampSeqParsers map[common.Address]func(log logpoller.Log) (uint64, error),
+	onRamps []common.Address,
 ) types.ReportingPluginFactory {
-	return &RelayReportingPluginFactory{lggr: lggr, blobVerifier: blobVerifier, onRamp: onRamp, source: source}
+	return &RelayReportingPluginFactory{lggr: lggr, blobVerifier: blobVerifier, onRampSeqParsers: onRampSeqParsers, onRamps: onRamps, source: source}
 }
 
 // NewReportingPlugin returns the ccip RelayReportingPlugin and satisfies the ReportingPluginFactory interface.
@@ -125,13 +120,14 @@ func (rf *RelayReportingPluginFactory) NewReportingPlugin(config types.Reporting
 		return nil, types.ReportingPluginInfo{}, err
 	}
 	return &RelayReportingPlugin{
-			lggr:           rf.lggr.Named("RelayReportingPlugin"),
-			F:              config.F,
-			source:         rf.source,
-			onRamp:         rf.onRamp,
-			blobVerifier:   rf.blobVerifier,
-			inFlight:       make(map[[32]byte]InflightReport),
-			offchainConfig: offchainConfig,
+			lggr:             rf.lggr.Named("RelayReportingPlugin"),
+			F:                config.F,
+			source:           rf.source,
+			onRampSeqParsers: rf.onRampSeqParsers,
+			onRamps:          rf.onRamps,
+			blobVerifier:     rf.blobVerifier,
+			inFlight:         make(map[[32]byte]InflightReport),
+			offchainConfig:   offchainConfig,
 		},
 		types.ReportingPluginInfo{
 			Name:          "CCIPRelay",
@@ -145,11 +141,12 @@ func (rf *RelayReportingPluginFactory) NewReportingPlugin(config types.Reporting
 }
 
 type RelayReportingPlugin struct {
-	lggr         logger.Logger
-	F            int
-	source       logpoller.LogPoller
-	onRamp       *evm_2_evm_toll_onramp.EVM2EVMTollOnRamp
-	blobVerifier *blob_verifier.BlobVerifier
+	lggr             logger.Logger
+	F                int
+	source           logpoller.LogPoller
+	onRamps          []common.Address
+	onRampSeqParsers map[common.Address]func(log logpoller.Log) (uint64, error)
+	blobVerifier     *blob_verifier.BlobVerifier
 	// We need to synchronize access to the inflight structure
 	// as reporting plugin methods may be called from separate goroutines,
 	// e.g. reporting vs transmission protocol.
@@ -158,49 +155,33 @@ type RelayReportingPlugin struct {
 	offchainConfig OffchainConfig
 }
 
-func (r *RelayReportingPlugin) nextMinSeqNumForOffRamp() (uint64, error) {
-	lastReport, err := r.blobVerifier.GetLastReport(nil)
-	if err != nil {
-		return 0, err
-	}
-	if lastReport.MerkleRoot == [32]byte{} {
-		return 1, nil
-	}
-	return lastReport.MaxSequenceNumber + 1, nil
+func (r *RelayReportingPlugin) nextMinSeqNumForOffRamp(onRamp common.Address) (uint64, error) {
+	return r.blobVerifier.SExpectedNextMinByOnRamp(nil, onRamp)
 }
 
-func (r *RelayReportingPlugin) nextMinSeqNumForInFlight() uint64 {
+func (r *RelayReportingPlugin) nextMinSeqNumForInFlight(onRampIdx int) uint64 {
 	r.inFlightMu.RLock()
 	defer r.inFlightMu.RUnlock()
 	max := uint64(0)
+	// TODO is is more ergonomic to make it a struct
 	for _, report := range r.inFlight {
-		if report.report.MaxSequenceNumber > max {
-			max = report.report.MaxSequenceNumber
+		if report.report.Intervals[onRampIdx].Max > max {
+			max = report.report.Intervals[onRampIdx].Max
 		}
 	}
 	return max + 1
 }
 
-func (r *RelayReportingPlugin) nextMinSeqNum() (uint64, error) {
-	nextMin, err := r.nextMinSeqNumForOffRamp()
+func (r *RelayReportingPlugin) nextMinSeqNum(onRampIdx int, onRamp common.Address) (uint64, error) {
+	nextMin, err := r.nextMinSeqNumForOffRamp(onRamp)
 	if err != nil {
 		return 0, err
 	}
-	nextMinInFlight := r.nextMinSeqNumForInFlight()
+	nextMinInFlight := r.nextMinSeqNumForInFlight(onRampIdx)
 	if nextMinInFlight > nextMin {
 		nextMin = nextMinInFlight
 	}
 	return nextMin, nil
-}
-
-func (r *RelayReportingPlugin) contiguousReqs(min, max uint64, reqs []evm_2_evm_toll_onramp.EVM2EVMTollOnRampCCIPSendRequested) bool {
-	for i, j := min, 0; i < max && j < len(reqs); i, j = i+1, j+1 {
-		if reqs[j].Message.SequenceNumber != i {
-			r.lggr.Errorw("unexpected gap in seq nums", "seq", i)
-			return false
-		}
-	}
-	return true
 }
 
 func (r *RelayReportingPlugin) Query(ctx context.Context, timestamp types.ReportTimestamp) (types.Query, error) {
@@ -208,103 +189,138 @@ func (r *RelayReportingPlugin) Query(ctx context.Context, timestamp types.Report
 }
 
 func (r *RelayReportingPlugin) Observation(ctx context.Context, timestamp types.ReportTimestamp, query types.Query) (types.Observation, error) {
-	lggr := r.lggr.Named("Observation")
-	if isOffRampDownNow(lggr, r.blobVerifier) {
-		return nil, errors.New("offRamp is down")
+	lggr := r.lggr.Named("RelayObservation")
+	if isBlobVerifierDownNow(lggr, r.blobVerifier) {
+		return nil, ErrBlobVerifierIsDown
 	}
-	minSeqNum, err := r.nextMinSeqNum()
-	if err != nil {
-		return nil, err
+	intervalsByOnRamp := make(map[common.Address]blob_verifier.CCIPInterval)
+	for onRampIdx, onRamp := range r.onRamps {
+		nextMin, err := r.nextMinSeqNum(onRampIdx, onRamp)
+		if err != nil {
+			return nil, err
+		}
+		// All available messages that have not been relayed yet and have sufficient confirmations.
+		reqs, err := r.source.LogsDataWordGreaterThan(CCIPSendRequested, onRamp, SendRequestedSequenceNumberIndex, EvmWord(nextMin), int(r.offchainConfig.SourceIncomingConfirmations))
+		if err != nil {
+			return nil, err
+		}
+		if len(reqs) == 0 {
+			r.lggr.Infow("no requests", "onRamp", onRamp)
+			continue
+		}
+		var seqNrs []uint64
+		for _, req := range reqs {
+			seqNr, err := r.onRampSeqParsers[onRamp](req)
+			if err != nil {
+				r.lggr.Errorw("error parsing seq num", "err", err)
+				continue
+			}
+			seqNrs = append(seqNrs, seqNr)
+		}
+		min := seqNrs[0]
+		max := seqNrs[len(seqNrs)-1]
+		if !contiguousReqs(r.lggr, min, max, seqNrs) {
+			return nil, errors.New("unexpected gap in seq nums")
+		}
+		intervalsByOnRamp[onRamp] = blob_verifier.CCIPInterval{
+			Min: min,
+			Max: max,
+		}
+		lggr.Infof("onRamp %v: min %v max %v", onRamp, min, max)
 	}
-	// All available messages that have not been relayed yet and have sufficient confirmations.
-	reqs, err := r.source.LogsDataWordGreaterThan(CCIPSendRequested, r.onRamp.Address(), SendRequestedSequenceNumberIndex, EvmWord(minSeqNum), int(r.offchainConfig.SourceIncomingConfirmations))
-	if err != nil {
-		return nil, err
-	}
-	unstartedReqs, err := parseLogs(r.onRamp, reqs)
-	if err != nil {
-		return nil, err
-	}
-	if len(unstartedReqs) == 0 {
+	if len(intervalsByOnRamp) == 0 {
+		r.lggr.Infow("No observations")
 		return []byte{}, nil
 	}
-	min := unstartedReqs[0].Message.SequenceNumber
-	max := unstartedReqs[len(unstartedReqs)-1].Message.SequenceNumber
-	if !r.contiguousReqs(min, max, unstartedReqs) {
-		return nil, errors.New("unexpected gap in seq nums")
-	}
-	lggr.Infof("Messages %v", unstartedReqs)
-	return Observation{
-		MinSeqNum: min,
-		MaxSeqNum: max,
+	return RelayObservation{
+		IntervalsByOnRamp: intervalsByOnRamp,
 	}.Marshal()
 }
 
 // buildReport assumes there is at least one message in reqs.
-func (r *RelayReportingPlugin) buildReport(minSeqNum, maxSeqNum uint64) (*blob_verifier.CCIPRelayReport, error) {
-	// Logs are guaranteed to be in order of seq num, since these are finalized logs only
-	// and the contract's seq num is auto-incrementing.
-	logs, err := r.source.LogsDataWordRange(CCIPSendRequested, r.onRamp.Address(), SendRequestedSequenceNumberIndex, EvmWord(minSeqNum), EvmWord(maxSeqNum), int(r.offchainConfig.SourceIncomingConfirmations))
+func (r *RelayReportingPlugin) buildReport(intervalByOnRamp map[common.Address]blob_verifier.CCIPInterval) (*blob_verifier.CCIPRelayReport, error) {
+	leafsByOnRamp, err := leafsFromIntervals(r.lggr, r.onRampSeqParsers, intervalByOnRamp, r.source)
 	if err != nil {
 		return nil, err
 	}
-	reqs, err := parseLogs(r.onRamp, logs)
-	if err != nil {
-		return nil, err
-	}
-	if !r.contiguousReqs(minSeqNum, maxSeqNum, reqs) {
-		return nil, errors.New("unexpected gap in seq nums")
-	}
-	// Take all these request and produce a merkle root of them
+	// Produce a root for each onramp, then a root of roots.
+	var (
+		onRamps   []common.Address
+		roots     [][32]byte
+		intervals []blob_verifier.CCIPInterval
+	)
 	mctx := merklemulti.NewKeccakCtx()
-	var leaves [][32]byte
-	for _, req := range reqs {
-		leaves = append(leaves, mctx.HashLeaf(req.Raw.Data))
+	for onRamp, leaves := range leafsByOnRamp {
+		tree := merklemulti.NewTree(mctx, leaves)
+		roots = append(roots, tree.Root())
+		onRamps = append(onRamps, onRamp)
+		interval := intervalByOnRamp[onRamp]
+		intervals = append(intervals, blob_verifier.CCIPInterval{
+			Min: interval.Min,
+			Max: interval.Max,
+		})
 	}
-	tree := merklemulti.NewTree(mctx, leaves)
+	// Make a root of roots
+	outerTree := merklemulti.NewTree(mctx, roots)
 	return &blob_verifier.CCIPRelayReport{
-		MerkleRoot:        tree.Root(),
-		MinSequenceNumber: reqs[0].Message.SequenceNumber,
-		MaxSequenceNumber: reqs[len(reqs)-1].Message.SequenceNumber,
+		MerkleRoots: roots,
+		Intervals:   intervals,
+		OnRamps:     onRamps,
+		RootOfRoots: outerTree.Root(),
 	}, nil
 }
 
 func (r *RelayReportingPlugin) Report(ctx context.Context, timestamp types.ReportTimestamp, query types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
 	lggr := r.lggr.Named("Report")
-	if isOffRampDownNow(lggr, r.blobVerifier) {
-		return false, nil, errors.New("offRamp is down")
+	if isBlobVerifierDownNow(lggr, r.blobVerifier) {
+		return false, nil, ErrBlobVerifierIsDown
 	}
-	var nonEmptyObservations = getNonEmptyObservations(r.lggr, observations)
+	nonEmptyObservations := getNonEmptyObservations[RelayObservation](r.lggr, observations)
 	// Need at least F+1 valid observations
 	if len(nonEmptyObservations) <= r.F {
-		lggr.Tracew("Non-empty observations <= F, need at least F+1 to continue")
+		lggr.Debugf("Non-empty observations <= F, need at least F+1 to continue")
 		return false, nil, nil
 	}
-	// We have at least F+1 valid observations
-	// Extract the min and max
-	sort.Slice(nonEmptyObservations, func(i, j int) bool {
-		return nonEmptyObservations[i].MinSeqNum < nonEmptyObservations[j].MinSeqNum
-	})
-	// r.F < len(nonEmptyObservations) because of the check above and therefore this is safe
-	minSeqNum := nonEmptyObservations[r.F].MinSeqNum
-	sort.Slice(nonEmptyObservations, func(i, j int) bool {
-		return nonEmptyObservations[i].MaxSeqNum < nonEmptyObservations[j].MaxSeqNum
-	})
-	// We use a conservative maximum. If we pick a value that some honest oracles might not
-	// have seen they’ll end up not agreeing on a msg, stalling the protocol.
-	maxSeqNum := nonEmptyObservations[r.F].MaxSeqNum
-	if maxSeqNum < minSeqNum {
-		return false, nil, errors.New("max seq num smaller than min")
+	// Group intervals by onramp.
+	intervalsByOnRamp := make(map[common.Address][]blob_verifier.CCIPInterval)
+	for _, obs := range nonEmptyObservations {
+		for onRamp, interval := range obs.IntervalsByOnRamp {
+			intervalsByOnRamp[onRamp] = append(intervalsByOnRamp[onRamp], interval)
+		}
 	}
-	nextMin, err := r.nextMinSeqNumForOffRamp()
-	if err != nil {
-		return false, nil, err
+	intervalByOnRamp := make(map[common.Address]blob_verifier.CCIPInterval)
+	for onRamp, intervals := range intervalsByOnRamp {
+		// We have at least F+1 valid observations
+		// Extract the min and max
+		sort.Slice(intervals, func(i, j int) bool {
+			return intervals[i].Min < intervals[j].Min
+		})
+		// r.F < len(intervals) because of the check above and therefore this is safe
+		minSeqNum := intervals[r.F].Min
+		sort.Slice(intervals, func(i, j int) bool {
+			return intervals[i].Max < intervals[j].Max
+		})
+		// We use a conservative maximum. If we pick a value that some honest oracles might not
+		// have seen they’ll end up not agreeing on a msg, stalling the protocol.
+		maxSeqNum := intervals[r.F].Max
+		// TODO: Do we for sure want to fail everything here?
+		if maxSeqNum < minSeqNum {
+			return false, nil, errors.New("max seq num smaller than min")
+		}
+		nextMin, err := r.nextMinSeqNumForOffRamp(onRamp)
+		if err != nil {
+			return false, nil, err
+		}
+		// Contract would revert
+		if nextMin > minSeqNum {
+			return false, nil, errors.Errorf("invalid min seq number got %v want %v", minSeqNum, nextMin)
+		}
+		intervalByOnRamp[onRamp] = blob_verifier.CCIPInterval{
+			Min: minSeqNum,
+			Max: maxSeqNum,
+		}
 	}
-	// Contract would revert
-	if nextMin > minSeqNum {
-		return false, nil, errors.Errorf("invalid min seq number got %v want %v", minSeqNum, nextMin)
-	}
-	report, err := r.buildReport(minSeqNum, maxSeqNum)
+	report, err := r.buildReport(intervalByOnRamp)
 	if err != nil {
 		return false, nil, err
 	}
@@ -312,7 +328,7 @@ func (r *RelayReportingPlugin) Report(ctx context.Context, timestamp types.Repor
 	if err != nil {
 		return false, nil, err
 	}
-	lggr.Infow("Built report", "min", minSeqNum, "max", maxSeqNum)
+	lggr.Infow("Built report", "intervalByOnRamp", intervalByOnRamp)
 	return true, encodedReport, nil
 }
 
@@ -322,12 +338,12 @@ func (r *RelayReportingPlugin) updateInflight(lggr logger.Logger, report *blob_v
 	// Reap any expired entries from inflight.
 	for root, inFlightReport := range r.inFlight {
 		if time.Since(inFlightReport.createdAt) > RelayMaxInflightTimeSeconds {
-			lggr.Warnw("Inflight report expired, retrying", "min", inFlightReport.report.MinSequenceNumber, "max", inFlightReport.report.MaxSequenceNumber)
+			lggr.Warnw("Inflight report expired, retrying")
 			delete(r.inFlight, root)
 		}
 	}
 	// Set new inflight ones as pending
-	r.inFlight[report.MerkleRoot] = InflightReport{
+	r.inFlight[report.RootOfRoots] = InflightReport{
 		report:    report,
 		createdAt: time.Now(),
 	}
@@ -345,7 +361,7 @@ func (r *RelayReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context, 
 		return false, nil
 	}
 	r.updateInflight(lggr, parsedReport)
-	lggr.Infow("Accepting finalized report", "min", parsedReport.MinSequenceNumber, "max", parsedReport.MaxSequenceNumber)
+	lggr.Infow("Accepting finalized report")
 	return true, nil
 }
 
@@ -361,20 +377,22 @@ func (r *RelayReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context,
 }
 
 func (r *RelayReportingPlugin) isStaleReport(report *blob_verifier.CCIPRelayReport) bool {
-	if isOffRampDownNow(r.lggr, r.blobVerifier) {
+	if isBlobVerifierDownNow(r.lggr, r.blobVerifier) {
 		return true
 	}
-	nextMin, err := r.nextMinSeqNumForOffRamp()
-	if err != nil {
-		// Assume it's a transient issue getting the last report
-		// Will try again on the next round
-		return true
-	}
-	// If the next min is already greater than this reports min,
-	// this report is stale.
-	if nextMin > report.MinSequenceNumber {
-		r.lggr.Warnw("report is stale", "onchain min", nextMin, "report min", report.MinSequenceNumber)
-		return true
+	for i, onRamp := range report.OnRamps {
+		nextMin, err := r.nextMinSeqNumForOffRamp(onRamp)
+		if err != nil {
+			// Assume it's a transient issue getting the last report
+			// Will try again on the next round
+			return true
+		}
+		// If the next min is already greater than this reports min,
+		// this report is stale.
+		if nextMin > report.Intervals[i].Min {
+			r.lggr.Warnw("report is stale", "onchain min", nextMin, "report min", report.Intervals[i].Min)
+			return true
+		}
 	}
 	return false
 }

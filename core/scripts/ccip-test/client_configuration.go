@@ -1,5 +1,6 @@
 package main
 
+/*
 import (
 	"context"
 	"encoding/hex"
@@ -849,3 +850,4 @@ func (client CCIPClient) SetAFNTimeout(t *testing.T) {
 	require.NoError(t, err)
 	WaitForMined(t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 }
+*/

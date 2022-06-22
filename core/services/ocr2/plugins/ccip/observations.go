@@ -11,11 +11,12 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/blob_verifier"
 	"github.com/smartcontractkit/chainlink/core/logger"
 )
 
 const (
-	MaxObservationLength = 67
+	MaxObservationLength = 200 // TODO: Think about what to set this too
 )
 
 func EvmWord(i uint64) common.Hash {
@@ -24,26 +25,35 @@ func EvmWord(i uint64) common.Hash {
 	return common.BigToHash(big.NewInt(0).SetBytes(b))
 }
 
-type Observation struct {
-	MinSeqNum uint64 `json:"minSeqNum"`
-	MaxSeqNum uint64 `json:"maxSeqNum"`
+type RelayObservation struct {
+	IntervalsByOnRamp map[common.Address]blob_verifier.CCIPInterval `json:"intervalsByOnRamp"`
 }
 
-func (o Observation) Marshal() ([]byte, error) {
+func (o RelayObservation) Marshal() ([]byte, error) {
+	return json.Marshal(&o)
+}
+
+type ExecutionObservation struct {
+	SeqNrs           []uint64                  `json:"seqNrs"`
+	TokensPerFeeCoin map[common.Address]uint64 `json:"tokensPerFeeCoin"`
+}
+
+func (o ExecutionObservation) Marshal() ([]byte, error) {
 	return json.Marshal(&o)
 }
 
 // getNonEmptyObservations checks the given observations for formatting and value errors.
 // It returns all valid observations, potentially being an empty list. It will log
 // malformed observations but never error.
-func getNonEmptyObservations(l logger.Logger, observations []types.AttributedObservation) (nonEmptyObservations []Observation) {
+func getNonEmptyObservations[O RelayObservation | ExecutionObservation](l logger.Logger, observations []types.AttributedObservation) []O {
+	var nonEmptyObservations []O
 	for _, ao := range observations {
 		if len(ao.Observation) == 0 {
 			// Empty observation
 			l.Tracew("Discarded empty observation %+v", ao)
 			continue
 		}
-		var ob Observation
+		var ob O
 		err := json.Unmarshal(ao.Observation, &ob)
 		if err != nil {
 			l.Errorw("Received unmarshallable observation", "err", err, "observation", string(ao.Observation))
@@ -58,23 +68,23 @@ func getNonEmptyObservations(l logger.Logger, observations []types.AttributedObs
 // a given set of observations and F. F is an upper bound on the number of faulty nodes.
 // This function can return an error on bad input or invalid results.
 // Note this mutates the observation slice by sorting it.
-func getMinMaxSequenceNumbers(observations []Observation, F int) (minSeqNum uint64, maxSeqNum uint64, err error) {
+func getMinMaxSequenceNumbers(observations []ExecutionObservation, F int) (minSeqNum uint64, maxSeqNum uint64, err error) {
 	if len(observations) <= F {
 		return 0, 0, fmt.Errorf("number of observations (%d) too low for given F (%d)", len(observations), F)
 	}
 	// Extract the min and max
 	sort.Slice(observations, func(i, j int) bool {
-		return observations[i].MinSeqNum < observations[j].MinSeqNum
+		return observations[i].SeqNrs[0] < observations[j].SeqNrs[0]
 	})
 	// r.F < len(nonEmptyObservations) because of the check above and therefore this is safe
-	minSeqNum = observations[F].MinSeqNum
+	minSeqNum = observations[F].SeqNrs[0]
 
 	sort.Slice(observations, func(i, j int) bool {
-		return observations[i].MaxSeqNum < observations[j].MaxSeqNum
+		return observations[i].SeqNrs[len(observations[i].SeqNrs)-1] < observations[j].SeqNrs[len(observations[i].SeqNrs)-1]
 	})
 	// We use a conservative maximum. If we pick a value that some honest oracles might not
 	// have seen they’ll end up not agreeing on a msg, stalling the protocol.
-	maxSeqNum = observations[F].MaxSeqNum
+	maxSeqNum = observations[F].SeqNrs[len(observations[F].SeqNrs)-1]
 
 	if maxSeqNum < minSeqNum {
 		return 0, 0, errors.New("max seq num smaller than min")

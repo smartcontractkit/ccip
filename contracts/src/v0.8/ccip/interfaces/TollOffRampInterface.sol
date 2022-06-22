@@ -18,8 +18,9 @@ interface TollOffRampInterface {
   error RootNotRelayed();
   error UnsupportedNumberOfTokens(uint64 sequenceNumber);
   error UnsupportedToken(IERC20 token);
+  error MissingFeeCoinPrice(address feeCoin);
 
-  event ExecutionCompleted(CCIP.ExecutionResult indexed results);
+  event ExecutionCompleted(uint64 sequenceNumber, CCIP.MessageExecutionState state);
   event OffRampConfigSet(OffRampConfig config);
   event OffRampRouterSet(TollOffRampRouterInterface router);
 

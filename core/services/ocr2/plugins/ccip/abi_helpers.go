@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/any_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/blob_verifier"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/evm_2_evm_toll_onramp"
 	"github.com/smartcontractkit/chainlink/core/utils"
@@ -27,7 +28,8 @@ var (
 const (
 	SendRequestedSequenceNumberIndex             = 2
 	ReportAcceptedMinSequenceNumberIndex         = 1
-	CrossChainMessageExecutedSequenceNumberIndex = 1
+	ReportAcceptedMaxSequenceNumberIndex         = 2
+	CrossChainMessageExecutedSequenceNumberIndex = 0
 )
 
 func init() {
@@ -42,20 +44,24 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+	offRampABI, err := abi.JSON(strings.NewReader(any_2_evm_toll_offramp.Any2EVMTollOffRampABI))
+	if err != nil {
+		panic(err)
+	}
 	blobVerifierABI, err := abi.JSON(strings.NewReader(blob_verifier.BlobVerifierABI))
 	if err != nil {
 		panic(err)
 	}
 	CCIPSendRequested = getIDOrPanic("CCIPSendRequested", onRampABI)
 	ReportAccepted = getIDOrPanic("ReportAccepted", blobVerifierABI)
-	CrossChainMessageExecuted = getIDOrPanic("CrossChainMessageExecuted", blobVerifierABI)
+	CrossChainMessageExecuted = getIDOrPanic("ExecutionCompleted", offRampABI)
 	ConfigSet = getIDOrPanic("ConfigSet", blobVerifierABI)
 }
 
 // DecodeCCIPMessage decodes the bytecode message into a blob_verifier.CCIPAny2EVMTollMessage
 // This function returns an error if there is no message in the bytecode or
 // when the payload is malformed.
-func DecodeCCIPMessage(b []byte) (*blob_verifier.CCIPAny2EVMTollMessage, error) {
+func DecodeCCIPMessage(b []byte) (*evm_2_evm_toll_onramp.CCIPEVM2EVMTollEvent, error) {
 	unpacked, err := MakeCCIPMsgArgs().Unpack(b)
 	if err != nil {
 		return nil, err
@@ -79,7 +85,7 @@ func DecodeCCIPMessage(b []byte) (*blob_verifier.CCIPAny2EVMTollMessage, error) 
 	if !ok {
 		return nil, fmt.Errorf("invalid format have %T want %T", unpacked[0], receivedCp)
 	}
-	return &blob_verifier.CCIPAny2EVMTollMessage{
+	return &evm_2_evm_toll_onramp.CCIPEVM2EVMTollEvent{
 		SourceChainId:  receivedCp.SourceChainId,
 		SequenceNumber: receivedCp.SequenceNumber,
 		Sender:         receivedCp.Sender,
@@ -175,12 +181,6 @@ type Message struct {
 	GasLimit       *big.Int         `json:"gasLimit"`
 }
 
-type ExecutionReport struct {
-	Messages      []Message  `json:"messages"`
-	Proofs        [][32]byte `json:"proofs"`
-	ProofFlagBits *big.Int   `json:"proofFlagBits"`
-}
-
 func ProofFlagsToBits(proofFlags []bool) *big.Int {
 	// TODO: Support larger than int64?
 	var a int64
@@ -198,57 +198,35 @@ func makeExecutionReportArgs() abi.Arguments {
 			Name: "ExecutionReport",
 			Type: utils.MustAbiType("tuple", []abi.ArgumentMarshaling{
 				{
-					Name: "Messages",
-					Type: "tuple[]",
-					Components: []abi.ArgumentMarshaling{
-						{
-							Name: "sourceChainId",
-							Type: "uint256",
-						},
-						{
-							Name: "sequenceNumber",
-							Type: "uint64",
-						},
-						{
-							Name: "sender",
-							Type: "address",
-						},
-						{
-							Name: "receiver",
-							Type: "address",
-						},
-						{
-							Name: "data",
-							Type: "bytes",
-						},
-						{
-							Name: "tokens",
-							Type: "address[]",
-						},
-						{
-							Name: "amounts",
-							Type: "uint256[]",
-						},
-						{
-							Name: "feeToken",
-							Type: "address",
-						},
-						{
-							Name: "feeTokenAmount",
-							Type: "uint256",
-						},
-						{
-							Name: "gasLimit",
-							Type: "uint256",
-						},
-					},
+					Name: "sequenceNumbers",
+					Type: "uint64[]",
 				},
 				{
-					Name: "Proofs",
+					Name: "tokenPerFeeCoinAddresses",
+					Type: "address[]",
+				},
+				{
+					Name: "tokenPerFeeCoin",
+					Type: "uint256[]",
+				},
+				{
+					Name: "encodedMessages",
+					Type: "bytes[]",
+				},
+				{
+					Name: "innerProofs",
 					Type: "bytes32[]",
 				},
 				{
-					Name: "ProofFlagBits",
+					Name: "innerProofFlagBits",
+					Type: "uint256",
+				},
+				{
+					Name: "outerProofs",
+					Type: "bytes32[]",
+				},
+				{
+					Name: "outerProofFlagBits",
 					Type: "uint256",
 				},
 			}),
@@ -259,16 +237,35 @@ func makeExecutionReportArgs() abi.Arguments {
 func makeRelayReportArgs() abi.Arguments {
 	return []abi.Argument{
 		{
-			Name: "merkleRoot",
-			Type: utils.MustAbiType("bytes32", nil),
-		},
-		{
-			Name: "minSequenceNumber",
-			Type: utils.MustAbiType("uint64", nil),
-		},
-		{
-			Name: "maxSequenceNumber",
-			Type: utils.MustAbiType("uint64", nil),
+			Name: "RelayReport",
+			Type: utils.MustAbiType("tuple", []abi.ArgumentMarshaling{
+				{
+					Name: "onRamps",
+					Type: "address[]",
+				},
+				{
+					Name: "intervals",
+					Type: "tuple[]",
+					Components: []abi.ArgumentMarshaling{
+						{
+							Name: "min",
+							Type: "uint64",
+						},
+						{
+							Name: "max",
+							Type: "uint64",
+						},
+					},
+				},
+				{
+					Name: "merkleRoots",
+					Type: "bytes32[]",
+				},
+				{
+					Name: "rootOfRoots",
+					Type: "bytes32",
+				},
+			}),
 		},
 	}
 }

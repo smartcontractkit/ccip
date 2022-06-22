@@ -114,7 +114,8 @@ contract Any2EVMTollOffRamp is
       decodedMessages[i] = abi.decode(report.encodedMessages[i], (CCIP.Any2EVMTollMessage));
       // TODO: hasher
       // https://app.shortcut.com/chainlinklabs/story/41625/hasher-encoder
-      hashedLeaves[i] = keccak256(abi.encode(decodedMessages[i]));
+      bytes memory data = bytes.concat(hex"00", abi.encode(decodedMessages[i]));
+      hashedLeaves[i] = keccak256(data);
     }
 
     (uint256 timestampRelayed, uint256 gasUsedByMerkle) = _verifyMessages(
@@ -157,7 +158,7 @@ contract Any2EVMTollOffRamp is
         state: newState
       });
       executionResults[i] = executionResult;
-      emit ExecutionCompleted(executionResult);
+      emit ExecutionCompleted(executionResult.sequenceNumber, executionResult.state);
     }
 
     return executionResults;
@@ -255,7 +256,23 @@ contract Any2EVMTollOffRamp is
         (CCIP.Any2EVMTollMessage)
       );
       PoolInterface pool = _getPool(message.feeToken);
-      uint256 feeForGas = executionResult[i].gasUsed * tx.gasprice * executionReport.tokenPerFeeCoin[i];
+      uint256 tokenPerFeeCoin;
+      for (uint256 j = 0; j < executionReport.tokenPerFeeCoinAddresses.length; j++) {
+        if (executionReport.tokenPerFeeCoinAddresses[j] == address(message.feeToken)) {
+          tokenPerFeeCoin = executionReport.tokenPerFeeCoin[j];
+        }
+      }
+      if (tokenPerFeeCoin == uint256(0)) {
+        revert MissingFeeCoinPrice(address(message.feeToken));
+      }
+      // Example with token being link. 1 LINK = 1e18 Juels.
+      // tx.gasprice is wei / gas
+      // gas * wei/gas * (juels / wei) (problem is that juels per wei could be < 1, say since 1 link < 1 eth)
+      // instead we use juels per unit ETH, which > 1, assuming 1 juel < 1 ETH (safe).
+      // gas * wei/gas * (juels / (ETH * 1e18 WEI/ETH))
+      // gas * wei/gas * juels/ETH / (1e18 wei/ETH)
+      // Example 1e6 gas * (200e9 wei / gas) * (6253149865160030 juels / ETH) / (1e18 wei/ETH) = 1.25e15 juels
+      uint256 feeForGas = (executionResult[i].gasUsed * tx.gasprice * tokenPerFeeCoin) / 1e18;
       uint256 refund = message.feeTokenAmount - feeForGas;
       _releaseOrMintToken(message.feeToken, refund, message.receiver);
     }

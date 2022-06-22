@@ -1,5 +1,6 @@
 package main
 
+/*
 import (
 	"fmt"
 	"math/big"
@@ -286,8 +287,8 @@ func fillPoolWithTokens(t *testing.T, client *EvmChainConfig, pool *native_token
 func printContractConfig(source *EvmChainConfig, destination *EvmChainConfig) {
 	source.Logger.Infof("Source chain config")
 	source.Logger.Infof(`
-Source chain config	
-	
+Source chain config
+
 LinkToken:    common.HexToAddress("%s"),
 BridgeTokens: %s,
 TokenPools:   %s,
@@ -299,8 +300,8 @@ Afn:          common.HexToAddress("%s"),
 `, source.LinkToken, source.BridgeTokens, source.TokenPools, source.PriceFeeds, source.TokenSender, source.OnRamp, source.Afn)
 
 	destination.Logger.Infof(`
-Destination chain config	
-	
+Destination chain config
+
 LinkToken:       common.HexToAddress("%s"),
 BridgeTokens:    %s,
 TokenPools:      %s,
@@ -316,3 +317,4 @@ Afn:             common.HexToAddress("%s"),
 	PrintJobSpecs(source.OnRamp, destination.BlobVerifier, destination.OffRamp, source.ChainId, destination.ChainId)
 
 }
+*/

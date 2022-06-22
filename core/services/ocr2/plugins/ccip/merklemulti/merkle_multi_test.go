@@ -74,7 +74,6 @@ func TestMerkleMultiProof(t *testing.T) {
 	// For every size tree from 0..len(leaves)
 	for len_ := 1; len_ <= len(leafHashes); len_++ {
 		tr := NewTree(NewKeccakCtx(), leafHashes[:len_])
-		t.Log(tr)
 		expectedRoot := expectedRoots[len_-1]
 		require.Equal(t, tr.Root(), expectedRoot)
 		// Prove every subset of its leaves
@@ -82,7 +81,6 @@ func TestMerkleMultiProof(t *testing.T) {
 			gen := combin.NewCombinationGenerator(len_, k)
 			for gen.Next() {
 				leaveIndices := gen.Combination(nil)
-				t.Log("indices", leaveIndices)
 				proof := tr.Prove(leaveIndices)
 				var leavesToProve [][32]byte
 				for _, idx := range leaveIndices {

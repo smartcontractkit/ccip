@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -15,14 +16,14 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/smartcontractkit/libocr/gethwrappers/link_token_interface"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/afn_contract"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/any_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/any_2_evm_toll_offramp_router"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/blob_verifier"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/blob_verifier_helper"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/mock_v3_aggregator_contract"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/evm_2_evm_toll_onramp"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/native_token_pool"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/no_storage_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp_helper"
@@ -33,8 +34,8 @@ import (
 type ExecutionContracts struct {
 	// Has all the link and 100ETH
 	user                       *bind.TransactOpts
-	executorHelper             *offramp_helper.OffRampHelper
-	offRampHelper              *blob_verifier_helper.BlobVerifierHelper
+	offRampHelper              *offramp_helper.OffRampHelper
+	blobVerifier               *blob_verifier_helper.BlobVerifierHelper
 	receiver                   *no_storage_message_receiver.NoStorageMessageReceiver
 	linkTokenAddress           common.Address
 	destChainID, sourceChainID *big.Int
@@ -90,27 +91,41 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	require.NoError(t, err)
 	destChain.Commit()
 
-	// LINK/ETH price
-	feedAddress, _, _, err := mock_v3_aggregator_contract.DeployMockV3AggregatorContract(destUser, destChain, 18, big.NewInt(6000000000000000))
-	require.NoError(t, err)
-
-	offRampAddress, _, _, err := blob_verifier_helper.DeployBlobVerifierHelper(
-		destUser,
-		destChain,
-		sourceChainID,
-		destChainID,
-		[]common.Address{destLinkTokenAddress}, // source tokens
-		[]common.Address{destPoolAddress},      // dest pool addresses
-		[]common.Address{feedAddress},          // feeds
-		afnAddress,                             // AFN address
-		big.NewInt(86400),                      // max timeout without AFN signal  86400 seconds = one day
-		0,                                      // executionDelaySeconds
-		5,                                      // maxTokensLength
+	onRampAddress := common.HexToAddress("0x01BE23585060835E02B77ef475b0Cc51aA1e0709")
+	linkTokenSourceAddress := common.HexToAddress("0x01BE23585060835E02B77ef475b0Cc51aA1e0709")
+	blobVerifierAddress, _, _, err := blob_verifier_helper.DeployBlobVerifierHelper(
+		destUser,          // user
+		destChain,         // client
+		big.NewInt(1338),  // dest chain id
+		afnAddress,        // AFN address
+		big.NewInt(86400), // max timeout without AFN signal  86400 seconds = one day
+		blob_verifier_helper.BlobVerifierInterfaceBlobVerifierConfig{
+			SourceChainId:    big.NewInt(1337),
+			OnRamps:          []common.Address{onRampAddress},
+			MinSeqNrByOnRamp: []uint64{1},
+		},
 	)
 	require.NoError(t, err)
-	offRamp, err := blob_verifier_helper.NewBlobVerifierHelper(offRampAddress, destChain)
+	blobVerifier, err := blob_verifier_helper.NewBlobVerifierHelper(blobVerifierAddress, destChain)
 	require.NoError(t, err)
 	destChain.Commit()
+	offRampAddress, _, _, err := any_2_evm_toll_offramp.DeployAny2EVMTollOffRamp(destUser,
+		destChain, destChainID, any_2_evm_toll_offramp.TollOffRampInterfaceOffRampConfig{
+			SourceChainId:         sourceChainID,
+			ExecutionDelaySeconds: 0,
+			MaxDataSize:           1e12,
+			MaxTokensLength:       5,
+		},
+		blobVerifier.Address(),
+		onRampAddress,
+		afnAddress,
+		[]common.Address{linkTokenSourceAddress},
+		[]common.Address{destPoolAddress},
+		big.NewInt(time.Now().Unix()*2),
+	)
+	require.NoError(t, err)
+	offRamp, err := any_2_evm_toll_offramp.NewAny2EVMTollOffRamp(offRampAddress, destChain)
+	require.NoError(t, err)
 	_, err = destPool.SetOffRamp(destUser, offRampAddress, true)
 	require.NoError(t, err)
 	receiverAddress, _, _, err := no_storage_message_receiver.DeployNoStorageMessageReceiver(destUser, destChain)
@@ -135,8 +150,8 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	require.NoError(t, err)
 	destChain.Commit()
 	return ExecutionContracts{user: destUser,
-		executorHelper:   executor,
-		offRampHelper:    offRamp,
+		offRampHelper:    executor,
+		blobVerifier:     blobVerifier,
 		receiver:         receiver,
 		linkTokenAddress: destLinkTokenAddress,
 		destChainID:      destChainID,
@@ -144,10 +159,12 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 }
 
 type messageBatch struct {
-	msgs       []ccip.Message
-	helperMsgs []blob_verifier.CCIPAny2EVMTollMessage
-	proof      merklemulti.Proof[[32]byte]
-	root       [32]byte
+	msgs        []ccip.Message
+	allMsgBytes [][]byte
+	seqNums     []uint64
+	helperMsgs  []evm_2_evm_toll_onramp.CCIPEVM2EVMTollEvent
+	proof       merklemulti.Proof[[32]byte]
+	root        [32]byte
 }
 
 func (e ExecutionContracts) generateMessageBatch(t *testing.T, payloadSize int, nMessages int, nTokensPerMessage int) messageBatch {
@@ -165,12 +182,15 @@ func (e ExecutionContracts) generateMessageBatch(t *testing.T, payloadSize int, 
 	var indices []int
 	var tokens []common.Address
 	var amounts []*big.Int
-	var helperMsgs []blob_verifier.CCIPAny2EVMTollMessage
+	var helperMsgs []evm_2_evm_toll_onramp.CCIPEVM2EVMTollEvent
 	for i := 0; i < nTokensPerMessage; i++ {
 		tokens = append(tokens, e.linkTokenAddress)
 		amounts = append(amounts, big.NewInt(1))
 	}
+	var seqNums []uint64
+	var allMsgBytes [][]byte
 	for i := 0; i < nMessages; i++ {
+		seqNums = append(seqNums, 1+uint64(i))
 		message := ccip.Message{
 			SequenceNumber: 1 + uint64(i),
 			SourceChainId:  e.sourceChainID,
@@ -183,8 +203,9 @@ func (e ExecutionContracts) generateMessageBatch(t *testing.T, payloadSize int, 
 			FeeTokenAmount: big.NewInt(4),
 			GasLimit:       big.NewInt(100_000),
 		}
+
 		// Unfortunately have to do this to use the helper's gethwrappers.
-		helperMsgs = append(helperMsgs, blob_verifier.CCIPAny2EVMTollMessage{
+		helperMsgs = append(helperMsgs, evm_2_evm_toll_onramp.CCIPEVM2EVMTollEvent{
 			SequenceNumber: message.SequenceNumber,
 			SourceChainId:  message.SourceChainId,
 			Sender:         message.Sender,
@@ -200,13 +221,14 @@ func (e ExecutionContracts) generateMessageBatch(t *testing.T, payloadSize int, 
 		indices = append(indices, i)
 		msgBytes, err := ccip.MakeCCIPMsgArgs().PackValues([]interface{}{message})
 		require.NoError(t, err)
+		allMsgBytes = append(allMsgBytes, msgBytes)
 		leafHashes = append(leafHashes, mctx.HashLeaf(msgBytes))
 	}
 	tree := merklemulti.NewTree(mctx, leafHashes)
 	proof := tree.Prove(indices)
 	rootLocal, err := merklemulti.VerifyComputeRoot(mctx, leafHashes, proof)
 	require.NoError(t, err)
-	return messageBatch{msgs: msgs, proof: proof, root: rootLocal, helperMsgs: helperMsgs}
+	return messageBatch{allMsgBytes: allMsgBytes, seqNums: seqNums, msgs: msgs, proof: proof, root: rootLocal, helperMsgs: helperMsgs}
 }
 
 func TestMaxExecutionReportSize(t *testing.T) {
@@ -214,18 +236,25 @@ func TestMaxExecutionReportSize(t *testing.T) {
 	// Our report size is under the tx size limit.
 	c := setupContractsForExecution(t)
 	mb := c.generateMessageBatch(t, ccip.MaxPayloadLength, ccip.MaxNumMessagesInExecutionReport, ccip.MaxTokensPerMessage)
+	ctx := merklemulti.NewKeccakCtx()
+	outerTree := merklemulti.NewTree(ctx, [][32]byte{mb.root})
+	outerProof := outerTree.Prove([]int{0})
 	// Ensure execution report size is valid
 	executorReport, err := ccip.EncodeExecutionReport(
-		mb.msgs,
+		mb.seqNums,
+		map[common.Address]uint64{},
+		mb.allMsgBytes,
 		mb.proof.Hashes,
 		mb.proof.SourceFlags,
+		outerProof.Hashes,
+		outerProof.SourceFlags,
 	)
 	require.NoError(t, err)
 	t.Log("execution report length", len(executorReport), ccip.MaxExecutionReportLength)
 	require.True(t, len(executorReport) <= ccip.MaxExecutionReportLength)
 
 	// Check can get into mempool i.e. tx size limit is respected.
-	a := c.executorHelper.Address()
+	a := c.offRampHelper.Address()
 	bi, _ := abi.JSON(strings.NewReader(offramp_helper.OffRampHelperABI))
 	b, err := bi.Pack("report", []byte(executorReport))
 	require.NoError(t, err)
@@ -249,21 +278,23 @@ func TestExecutionReportEncoding(t *testing.T) {
 	// but I think that would essentially be testing geth's abi library
 	// as our encode/decode is a thin wrapper around that.
 	c := setupContractsForExecution(t)
-	mb := c.generateMessageBatch(t, ccip.MaxPayloadLength, 3, ccip.MaxTokensPerMessage)
-	report := ccip.ExecutionReport{
-		Messages:      mb.msgs,
-		Proofs:        mb.proof.Hashes,
-		ProofFlagBits: ccip.ProofFlagsToBits(mb.proof.SourceFlags),
+	mb := c.generateMessageBatch(t, 1, 1, 1)
+	ctx := merklemulti.NewKeccakCtx()
+	outerTree := merklemulti.NewTree(ctx, [][32]byte{mb.root})
+	outerProof := outerTree.Prove([]int{0})
+	report := any_2_evm_toll_offramp.CCIPExecutionReport{
+		SequenceNumbers:          mb.seqNums,
+		TokenPerFeeCoin:          []*big.Int{},
+		TokenPerFeeCoinAddresses: []common.Address{},
+		EncodedMessages:          mb.allMsgBytes,
+		InnerProofs:              mb.proof.Hashes,
+		InnerProofFlagBits:       ccip.ProofFlagsToBits(mb.proof.SourceFlags),
+		OuterProofs:              outerProof.Hashes,
+		OuterProofFlagBits:       ccip.ProofFlagsToBits(outerProof.SourceFlags),
 	}
-	encodeRelayReport, err := ccip.EncodeExecutionReport(mb.msgs, mb.proof.Hashes, mb.proof.SourceFlags)
+	encodeRelayReport, err := ccip.EncodeExecutionReport(report.SequenceNumbers, map[common.Address]uint64{}, report.EncodedMessages, report.InnerProofs, mb.proof.SourceFlags, report.OuterProofs, outerProof.SourceFlags)
 	require.NoError(t, err)
 	decodeRelayReport, err := ccip.DecodeExecutionReport(encodeRelayReport)
 	require.NoError(t, err)
 	require.Equal(t, &report, decodeRelayReport)
-
-	executorReport, err := ccip.EncodeExecutionReport([]ccip.Message{}, [][32]byte{}, []bool{})
-	require.NoError(t, err)
-	_, err = ccip.DecodeExecutionReport(executorReport)
-	require.Error(t, err)
-	require.Equal(t, "assumptionViolation: expected at least one element", err.Error())
 }

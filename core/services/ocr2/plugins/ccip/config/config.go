@@ -1,33 +1,31 @@
 package config
 
 import (
-	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
-	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
 	"github.com/smartcontractkit/chainlink/core/store/models"
 )
 
 // RelayPluginConfig contains the plugin specific variables for the ccip.CCIPRelay plugin.
+// We use ID here to keep it as general as possible, e.g. abstracting for chains which don't have an address concept.
 type RelayPluginConfig struct {
-	SourceChainID int64           `json:"sourceChainID"`
-	DestChainID   int64           `json:"destChainID"`
-	OnRampID      types.Account   `json:"onRampID"`
-	PollPeriod    models.Duration `json:"pollPeriod"`
+	SourceChainID uint64 `json:"sourceChainID"`
+	DestChainID   uint64 `json:"destChainID"`
+	// We relay from multiple onramps from the same source chain. E.g. different message types.
+	OnRampIDs  []string        `json:"onRampIDs"`
+	PollPeriod models.Duration `json:"pollPeriod"`
 }
 
 // ValidateRelayPluginConfig validates the arguments for the CCIP Relay plugin.
 // It will return an error if there is anything wrong with the provided config.
 func (rp *RelayPluginConfig) ValidateRelayPluginConfig() error {
-	if rp.SourceChainID <= 0 {
-		return errors.Errorf("Invalid source chain value %d", rp.SourceChainID)
-	}
-	if rp.DestChainID <= 0 {
-		return errors.Errorf("Invalid destination chain value %d", rp.DestChainID)
-	}
-
-	if _, err := hexutil.Decode(string(rp.OnRampID)); err != nil {
-		return err
+	// TODO: Validation based on chainID
+	// for now, all EVM.
+	for _, onRamp := range rp.OnRampIDs {
+		if !common.IsHexAddress(onRamp) {
+			return errors.Errorf("%v is not a valid EIP155 address", onRamp)
+		}
 	}
 
 	return nil
@@ -35,20 +33,23 @@ func (rp *RelayPluginConfig) ValidateRelayPluginConfig() error {
 
 // ExecutionPluginConfig contains the plugin specific variables for the ccip.CCIPExecution plugin.
 type ExecutionPluginConfig struct {
-	RelayPluginConfig
-	OffRampID types.Account `json:"offRampID"`
+	SourceChainID uint64 `json:"sourceChainID"`
+	DestChainID   uint64 `json:"destChainID"`
+	// We execute for a single on/offramp pair (lane) between a given source/dest chain. E.g. a single message types.
+	OnRampID string `json:"onRampID"`
+	// BlobVerifierID
+	BlobVerifierID string `json:"blobVerifierID"`
 }
 
 // ValidateExecutionPluginConfig validates the arguments for the CCIP Execution plugin.
 // It will return an error if there is anything wrong with the provided config.
 func (ep *ExecutionPluginConfig) ValidateExecutionPluginConfig() error {
-	if err := ep.ValidateRelayPluginConfig(); err != nil {
-		return err
+	// TODO: Validation based on chainIDs, for now all EVM.
+	if !common.IsHexAddress(ep.OnRampID) {
+		return errors.Errorf("%v is not a valid EIP155 address", ep.OnRampID)
 	}
-
-	if _, err := hexutil.Decode(string(ep.OffRampID)); err != nil {
-		return err
+	if !common.IsHexAddress(ep.BlobVerifierID) {
+		return errors.Errorf("%v is not a valid EIP155 address", ep.BlobVerifierID)
 	}
-
 	return nil
 }

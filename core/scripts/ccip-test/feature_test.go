@@ -1,5 +1,6 @@
 package main
 
+/*
 import (
 	"os"
 	"testing"
@@ -103,3 +104,4 @@ func runCommand(t *testing.T, ownerKey string, command string) {
 		t.Errorf("Unknown command \"%s\"", command)
 	}
 }
+*/
