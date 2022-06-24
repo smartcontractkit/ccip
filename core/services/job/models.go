@@ -277,6 +277,10 @@ type OCR2PluginType string
 const (
 	// Median refers to the median.Median plugin
 	Median OCR2PluginType = "median"
+
+	DKG OCR2PluginType = "dkg"
+
+	OCR2VRF OCR2PluginType = "ocr2vrf"
 	// CCIPRelay refers to the ccip.CCIPRelay plugin
 	CCIPRelay OCR2PluginType = "ccip-relay"
 	// CCIPExecution refers to the ccip.CCIPExecution plugin

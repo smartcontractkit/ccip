@@ -130,7 +130,7 @@ func newConfigProvider(lggr logger.Logger, chainSet evm.ChainSet, args relaytype
 	}, nil
 }
 
-func getContractTransmitter(lggr logger.Logger, rargs relaytypes.RelayArgs, transmitterID string, configWatcher *configWatcher) (*ContractTransmitter, error) {
+func newContractTransmitter(lggr logger.Logger, rargs relaytypes.RelayArgs, transmitterID string, configWatcher *configWatcher) (*ContractTransmitter, error) {
 	transmitterAddress := common.HexToAddress(transmitterID)
 	strategy := txm.NewQueueingTxStrategy(rargs.ExternalJobID, configWatcher.chain.Config().OCRDefaultTransactionQueueDepth())
 	var checker txm.TransmitCheckerSpec
@@ -152,7 +152,7 @@ func (r *Relayer) NewMedianProvider(rargs relaytypes.RelayArgs, pargs relaytypes
 	if err != nil {
 		return nil, err
 	}
-	contractTransmitter, err := getContractTransmitter(r.lggr, rargs, pargs.TransmitterID, configWatcher)
+	contractTransmitter, err := newContractTransmitter(r.lggr, rargs, pargs.TransmitterID, configWatcher)
 	if err != nil {
 		return nil, err
 	}
@@ -193,6 +193,69 @@ func (p *medianProvider) MedianContract() median.MedianContract {
 	return p.medianContract
 }
 
+// Relayer with added DKG and OCR2VRF provider functions.
+type ocr2vrfRelayer struct {
+	*Relayer
+}
+
+var _ relaytypes.OCR2VRFRelayer = (*ocr2vrfRelayer)(nil)
+
+func NewOCR2VRFRelayer(relayer interface{}) relaytypes.OCR2VRFRelayer {
+	return &ocr2vrfRelayer{relayer.(*Relayer)}
+}
+
+type dkgProvider struct {
+	*configWatcher
+	contractTransmitter *ContractTransmitter
+}
+
+var _ relaytypes.DKGProvider = (*dkgProvider)(nil)
+
+func (r *ocr2vrfRelayer) NewDKGProvider(rargs relaytypes.RelayArgs, transmitterID string) (relaytypes.DKGProvider, error) {
+	configWatcher, err := newConfigProvider(r.lggr, r.chainSet, rargs)
+	if err != nil {
+		return nil, err
+	}
+	contractTransmitter, err := newContractTransmitter(r.lggr, rargs, transmitterID, configWatcher)
+	if err != nil {
+		return nil, err
+	}
+	return &dkgProvider{
+		configWatcher:       configWatcher,
+		contractTransmitter: contractTransmitter,
+	}, nil
+}
+
+func (c *dkgProvider) ContractTransmitter() types.ContractTransmitter {
+	return c.contractTransmitter
+}
+
+type vrfProvider struct {
+	*configWatcher
+	contractTransmitter *ContractTransmitter
+}
+
+var _ relaytypes.DKGProvider = (*dkgProvider)(nil)
+
+func (r *ocr2vrfRelayer) NewOCR2VRFProvider(rargs relaytypes.RelayArgs, transmitterID string) (relaytypes.OCR2VRFProvider, error) {
+	configWatcher, err := newConfigProvider(r.lggr, r.chainSet, rargs)
+	if err != nil {
+		return nil, err
+	}
+	contractTransmitter, err := newContractTransmitter(r.lggr, rargs, transmitterID, configWatcher)
+	if err != nil {
+		return nil, err
+	}
+	return &dkgProvider{
+		configWatcher:       configWatcher,
+		contractTransmitter: contractTransmitter,
+	}, nil
+}
+
+func (c *vrfProvider) ContractTransmitter() types.ContractTransmitter {
+	return c.contractTransmitter
+}
+
 // CCIPRelayer is a relayer wrapper with added CCIP provider methods.
 type ccipRelayer struct {
 	*Relayer
@@ -216,7 +279,7 @@ func (c *ccipRelayer) NewCCIPRelayProvider(rargs relaytypes.RelayArgs, transmitt
 	if err != nil {
 		return nil, err
 	}
-	contractTransmitter, err := getContractTransmitter(c.lggr, rargs, transmitterID, configWatcher)
+	contractTransmitter, err := newContractTransmitter(c.lggr, rargs, transmitterID, configWatcher)
 	if err != nil {
 		return nil, err
 	}
@@ -242,7 +305,7 @@ func (c *ccipRelayer) NewCCIPExecutionProvider(rargs relaytypes.RelayArgs, trans
 	if err != nil {
 		return nil, err
 	}
-	contractTransmitter, err := getContractTransmitter(c.lggr, rargs, transmitterID, configWatcher)
+	contractTransmitter, err := newContractTransmitter(c.lggr, rargs, transmitterID, configWatcher)
 	if err != nil {
 		return nil, err
 	}
