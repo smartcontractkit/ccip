@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../interfaces/AFNInterface.sol";
+import "../../health/interfaces/AFNInterface.sol";
 
 contract MockAFN is AFNInterface {
   Heartbeat public s_lastHeartbeat;

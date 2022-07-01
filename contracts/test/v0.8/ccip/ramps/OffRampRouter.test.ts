@@ -7,7 +7,7 @@ import {
 } from 'ethers'
 import hre from 'hardhat'
 import { Artifact } from 'hardhat/types'
-import { MockERC20, SimpleMessageReceiver } from '../../../../typechain'
+import { SimpleMessageReceiver, MockERC20 } from '../../../../typechain'
 import { Any2EVMTollMessage } from '../../../test-helpers/ccip/ccip'
 import { evmRevert } from '../../../test-helpers/matchers'
 
@@ -29,7 +29,7 @@ before(async () => {
   roles = users.roles
 })
 
-describe('EVM2AnyTollOnRampRouter', () => {
+describe('EVM2AnyTollOffRampRouter', () => {
   beforeEach(async () => {
     OffRampRouterFactory = await hre.ethers.getContractFactory(
       'Any2EVMTollOffRampRouter',
@@ -111,7 +111,7 @@ describe('EVM2AnyTollOnRampRouter', () => {
         const addr = await roles.oracleNode.getAddress()
         await evmRevert(
           router.connect(roles.defaultAccount).removeOffRamp(addr),
-          `OffRampNotConfigured("${addr}")`,
+          `OffRampNotAllowed("${addr}")`,
         )
       })
       it('fails if there are no offramps configured', async () => {
@@ -166,7 +166,7 @@ describe('EVM2AnyTollOnRampRouter', () => {
           router
             .connect(roles.oracleNode)
             .routeMessage(receiver.address, message),
-          `OffRampNotConfigured("${await roles.oracleNode.getAddress()}")`,
+          `MustCallFromOffRamp("${await roles.oracleNode.getAddress()}")`,
         )
       })
       it('emits a message failure if the receiver is not a contract', async () => {

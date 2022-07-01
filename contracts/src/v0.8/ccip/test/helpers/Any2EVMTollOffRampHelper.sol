@@ -10,7 +10,6 @@ contract Any2EVMTollOffRampHelper is Any2EVMTollOffRamp {
     BlobVerifierInterface blobVerifier,
     address onRampAddress,
     AFNInterface afn,
-    // TODO token limiter
     IERC20[] memory sourceTokens,
     PoolInterface[] memory pools,
     uint256 maxTimeWithoutAFNSignal

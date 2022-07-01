@@ -156,7 +156,7 @@ type RelayReportingPlugin struct {
 }
 
 func (r *RelayReportingPlugin) nextMinSeqNumForOffRamp(onRamp common.Address) (uint64, error) {
-	return r.blobVerifier.SExpectedNextMinByOnRamp(nil, onRamp)
+	return r.blobVerifier.GetExpectedNextSequenceNumber(nil, onRamp)
 }
 
 func (r *RelayReportingPlugin) nextMinSeqNumForInFlight(onRampIdx int) uint64 {

@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../interfaces/AFNInterface.sol";
+import "./interfaces/AFNInterface.sol";
 import "../access/OwnerIsCreator.sol";
 import "../../interfaces/TypeAndVersionInterface.sol";
 
 contract AFN is AFNInterface, OwnerIsCreator, TypeAndVersionInterface {
+  string public constant override typeAndVersion = "AFN 0.0.1";
+
   // AFN participant addresses and weights
   mapping(address => uint256) private s_weightByParticipant;
   // List of AFN participant addresses
@@ -194,7 +196,7 @@ contract AFN is AFNInterface, OwnerIsCreator, TypeAndVersionInterface {
    */
   function _clearBadVotes() private {
     address[] memory badVoters = s_badVoters;
-    for (uint256 i = 0; i < badVoters.length; i++) {
+    for (uint256 i = 0; i < badVoters.length; ++i) {
       s_hasVotedBad[badVoters[i]] = false;
     }
     s_badVotes = 0;
@@ -224,7 +226,7 @@ contract AFN is AFNInterface, OwnerIsCreator, TypeAndVersionInterface {
     }
     // Unset existing participants
     address[] memory existingParticipants = s_participantList;
-    for (uint256 i = 0; i < existingParticipants.length; i++) {
+    for (uint256 i = 0; i < existingParticipants.length; ++i) {
       s_weightByParticipant[existingParticipants[i]] = 0;
     }
 
@@ -238,7 +240,7 @@ contract AFN is AFNInterface, OwnerIsCreator, TypeAndVersionInterface {
     uint256 weightTotal = 0;
     // Set new participants
     s_participantList = participants;
-    for (uint256 i = 0; i < participants.length; i++) {
+    for (uint256 i = 0; i < participants.length; ++i) {
       if (participants[i] == address(0)) revert InvalidConfig();
       if (weights[i] == 0) revert InvalidWeight();
       s_weightByParticipant[participants[i]] = weights[i];
@@ -247,10 +249,6 @@ contract AFN is AFNInterface, OwnerIsCreator, TypeAndVersionInterface {
     if (weightTotal < weightThresholdForHeartbeat || weightTotal < weightThresholdForBadSignal) {
       revert InvalidConfig();
     }
-    emit ConfigSet(participants, weights, weightThresholdForHeartbeat, weightThresholdForBadSignal);
-  }
-
-  function typeAndVersion() external pure override returns (string memory) {
-    return "AFN 0.0.1";
+    emit AFNConfigSet(participants, weights, weightThresholdForHeartbeat, weightThresholdForBadSignal);
   }
 }

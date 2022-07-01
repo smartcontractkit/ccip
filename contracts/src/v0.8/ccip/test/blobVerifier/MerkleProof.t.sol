@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.15;
+pragma solidity 0.8.15;
 
 import "./BlobVerifierSetup.t.sol";
 import "../helpers/MerkleHelper.sol";
 
-contract MerkleProofTest is BlobVerifierSetup {
+contract BlobVerifier_merkleRoot is BlobVerifierSetup {
+  MerkleHelper s_merkleHelper;
+
   function setUp() public virtual override {
     BlobVerifierSetup.setUp();
+    s_merkleHelper = new MerkleHelper();
   }
 
   function testMerkleRoot2() public {
@@ -67,11 +70,10 @@ contract MerkleProofTest is BlobVerifierSetup {
     proofs[0] = proof1;
     proofs[1] = proof2;
 
-    MerkleHelper merkleHelper = new MerkleHelper();
     // Proof flag = false
-    bytes32 result = merkleHelper.hashPair(leaves[0], proofs[0]);
+    bytes32 result = s_merkleHelper.hashPair(leaves[0], proofs[0]);
     // Proof flag = false
-    result = merkleHelper.hashPair(result, proofs[1]);
+    result = s_merkleHelper.hashPair(result, proofs[1]);
 
     assertEq(s_blobVerifier.merkleRoot(leaves, proofs, 0), result);
   }
@@ -89,13 +91,12 @@ contract MerkleProofTest is BlobVerifierSetup {
     proofs[0] = proof1;
     proofs[1] = proof2;
 
-    MerkleHelper merkleHelper = new MerkleHelper();
     // Proof flag = false
-    bytes32 result1 = merkleHelper.hashPair(leaves[0], proofs[0]);
+    bytes32 result1 = s_merkleHelper.hashPair(leaves[0], proofs[0]);
     // Proof flag = false
-    bytes32 result2 = merkleHelper.hashPair(leaves[1], proofs[1]);
+    bytes32 result2 = s_merkleHelper.hashPair(leaves[1], proofs[1]);
     // Proof flag = true
-    bytes32 finalResult = merkleHelper.hashPair(result1, result2);
+    bytes32 finalResult = s_merkleHelper.hashPair(result1, result2);
 
     assertEq(s_blobVerifier.merkleRoot(leaves, proofs, 4), finalResult);
   }
@@ -113,13 +114,12 @@ contract MerkleProofTest is BlobVerifierSetup {
     bytes32[] memory proofs = new bytes32[](1);
     proofs[0] = proof;
 
-    MerkleHelper merkleHelper = new MerkleHelper();
     // Proof flag = true
-    bytes32 result1 = merkleHelper.hashPair(leaves[0], leaves[1]);
+    bytes32 result1 = s_merkleHelper.hashPair(leaves[0], leaves[1]);
     // Proof flag = false
-    bytes32 result2 = merkleHelper.hashPair(leaves[2], proofs[0]);
+    bytes32 result2 = s_merkleHelper.hashPair(leaves[2], proofs[0]);
     // Proof flag = true
-    bytes32 finalResult = merkleHelper.hashPair(result1, result2);
+    bytes32 finalResult = s_merkleHelper.hashPair(result1, result2);
 
     assertEq(s_blobVerifier.merkleRoot(leaves, proofs, 5), finalResult);
   }
@@ -137,13 +137,12 @@ contract MerkleProofTest is BlobVerifierSetup {
     leaves[3] = leaf4;
     bytes32[] memory proofs = new bytes32[](0);
 
-    MerkleHelper merkleHelper = new MerkleHelper();
     // Proof flag = true
-    bytes32 result1 = merkleHelper.hashPair(leaves[0], leaves[1]);
+    bytes32 result1 = s_merkleHelper.hashPair(leaves[0], leaves[1]);
     // Proof flag = true
-    bytes32 result2 = merkleHelper.hashPair(leaves[2], leaves[3]);
+    bytes32 result2 = s_merkleHelper.hashPair(leaves[2], leaves[3]);
     // Proof flag = true
-    bytes32 finalResult = merkleHelper.hashPair(result1, result2);
+    bytes32 finalResult = s_merkleHelper.hashPair(result1, result2);
 
     assertEq(s_blobVerifier.merkleRoot(leaves, proofs, 7), finalResult);
   }

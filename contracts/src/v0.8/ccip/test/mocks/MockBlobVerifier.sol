@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.15;
+pragma solidity 0.8.15;
 
-import "../../interfaces/BlobVerifierInterface.sol";
+import "../../blobVerifier/interfaces/BlobVerifierInterface.sol";
 
 contract MockBlobVerifier is BlobVerifierInterface {
   function setConfig(BlobVerifierConfig calldata config) external {}

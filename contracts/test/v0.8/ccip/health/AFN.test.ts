@@ -408,7 +408,7 @@ describe('AFN', () => {
 
       it('emits an event', async () => {
         await expect(tx)
-          .to.emit(afn, 'ConfigSet')
+          .to.emit(afn, 'AFNConfigSet')
           .withArgs(newParties, newWeights, newGoodQuorum, newBadQuorum)
       })
     })

@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: MIT
-
 pragma solidity 0.8.15;
 
 import "../../../vendor/ERC20.sol";
@@ -10,7 +9,7 @@ contract MockERC20 is ERC20 {
     string memory symbol,
     address initialAccount,
     uint256 initialBalance
-  ) payable ERC20(name, symbol) {
+  ) ERC20(name, symbol) {
     _mint(initialAccount, initialBalance);
   }
 

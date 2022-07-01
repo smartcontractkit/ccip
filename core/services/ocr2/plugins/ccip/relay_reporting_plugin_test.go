@@ -82,13 +82,13 @@ func TestRelayReportEncoding(t *testing.T) {
 	// Deploy blob verifier.
 	onRampAddress := common.HexToAddress("0x01BE23585060835E02B77ef475b0Cc51aA1e0709")
 	blobVerifierAddress, _, _, err := blob_verifier_helper.DeployBlobVerifierHelper(
-		destUser,          // user
-		destChain,         // client
-		big.NewInt(1338),  // dest chain id
+		destUser,         // user
+		destChain,        // client
+		big.NewInt(1338), // dest chain id
+		big.NewInt(1337),
 		afnAddress,        // AFN address
 		big.NewInt(86400), // max timeout without AFN signal  86400 seconds = one day
 		blob_verifier_helper.BlobVerifierInterfaceBlobVerifierConfig{
-			SourceChainId:    big.NewInt(1337),
 			OnRamps:          []common.Address{onRampAddress},
 			MinSeqNrByOnRamp: []uint64{1},
 		},

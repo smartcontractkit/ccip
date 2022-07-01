@@ -108,8 +108,6 @@ describe('PoolCollector', () => {
             newOnRamp.address,
             payload.tokens,
             payload.amounts,
-            payload.tokens[0],
-            feeAmount,
           ),
           `UnsupportedToken("${tokens[0].address}")`,
         )
@@ -135,10 +133,8 @@ describe('PoolCollector', () => {
       })
 
       it('calls getRequiredFee on the onRamp', async () => {
-        const tx = await poolCollector.collectTokens(
+        const tx = await poolCollector.chargeFee(
           onRamp.address,
-          payload.tokens,
-          payload.amounts,
           payload.tokens[0],
           feeAmount,
         )
@@ -147,10 +143,8 @@ describe('PoolCollector', () => {
           .withArgs(tokens[0].address)
       })
       it('transfers the feeToken fee amount to this contract', async () => {
-        await poolCollector.collectTokens(
+        await poolCollector.chargeFee(
           onRamp.address,
-          payload.tokens,
-          payload.amounts,
           payload.tokens[0],
           feeAmount,
         )
@@ -166,38 +160,20 @@ describe('PoolCollector', () => {
             poolCollector.address,
             BigNumber.from(amounts[0] + feeAmount * 2),
           )
-        await poolCollector.collectTokens(
+
+        await poolCollector.chargeFee(
           onRamp.address,
-          payload.tokens,
-          payload.amounts,
           payload.tokens[0],
           feeAmount * 2,
         )
-        const amountAfterFee = BigNumber.from(payload.amounts[0]).add(feeAmount)
         const balance = await tokens[0].balanceOf(pool.address)
-        expect(balance).to.equal(amountAfterFee)
-      })
-      it('calls getTokenPool on the onRamp for each token', async () => {
-        const tx = await poolCollector.collectTokens(
-          onRamp.address,
-          payload.tokens,
-          payload.amounts,
-          payload.tokens[0],
-          feeAmount,
-        )
-        for (let i = 0; i < tokens.length; i++) {
-          await expect(tx)
-            .to.emit(onRamp, 'GetTokenPool')
-            .withArgs(tokens[i].address)
-        }
+        expect(balance).to.equal(feeAmount)
       })
       it('transfers each of the payload tokens to a token pool', async () => {
         await poolCollector.collectTokens(
           onRamp.address,
           payload.tokens,
           payload.amounts,
-          payload.tokens[0],
-          feeAmount,
         )
         for (let i = 0; i < tokens.length; i++) {
           const balance = await tokens[i].balanceOf(pool.address)

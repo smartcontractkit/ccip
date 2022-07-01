@@ -20,13 +20,13 @@ import (
 
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/afn_contract"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/any_2_evm_toll_offramp"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/any_2_evm_toll_offramp_helper"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/any_2_evm_toll_offramp_router"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/blob_verifier_helper"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/evm_2_evm_toll_onramp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/native_token_pool"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/no_storage_message_receiver"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/offramp_helper"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/simple_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
 )
@@ -34,9 +34,9 @@ import (
 type ExecutionContracts struct {
 	// Has all the link and 100ETH
 	user                       *bind.TransactOpts
-	offRampHelper              *offramp_helper.OffRampHelper
+	offRamp                    *any_2_evm_toll_offramp.Any2EVMTollOffRamp
 	blobVerifier               *blob_verifier_helper.BlobVerifierHelper
-	receiver                   *no_storage_message_receiver.NoStorageMessageReceiver
+	receiver                   *simple_message_receiver.SimpleMessageReceiver
 	linkTokenAddress           common.Address
 	destChainID, sourceChainID *big.Int
 	destChain                  *backends.SimulatedBackend
@@ -97,10 +97,10 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 		destUser,          // user
 		destChain,         // client
 		big.NewInt(1338),  // dest chain id
+		big.NewInt(1337),  // source chain id
 		afnAddress,        // AFN address
 		big.NewInt(86400), // max timeout without AFN signal  86400 seconds = one day
 		blob_verifier_helper.BlobVerifierInterfaceBlobVerifierConfig{
-			SourceChainId:    big.NewInt(1337),
 			OnRamps:          []common.Address{onRampAddress},
 			MinSeqNrByOnRamp: []uint64{1},
 		},
@@ -110,7 +110,7 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	require.NoError(t, err)
 	destChain.Commit()
 	offRampAddress, _, _, err := any_2_evm_toll_offramp.DeployAny2EVMTollOffRamp(destUser,
-		destChain, destChainID, any_2_evm_toll_offramp.TollOffRampInterfaceOffRampConfig{
+		destChain, destChainID, any_2_evm_toll_offramp.BaseOffRampInterfaceOffRampConfig{
 			SourceChainId:         sourceChainID,
 			ExecutionDelaySeconds: 0,
 			MaxDataSize:           1e12,
@@ -128,9 +128,9 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	require.NoError(t, err)
 	_, err = destPool.SetOffRamp(destUser, offRampAddress, true)
 	require.NoError(t, err)
-	receiverAddress, _, _, err := no_storage_message_receiver.DeployNoStorageMessageReceiver(destUser, destChain)
+	receiverAddress, _, _, err := simple_message_receiver.DeploySimpleMessageReceiver(destUser, destChain)
 	require.NoError(t, err)
-	receiver, err := no_storage_message_receiver.NewNoStorageMessageReceiver(receiverAddress, destChain)
+	receiver, err := simple_message_receiver.NewSimpleMessageReceiver(receiverAddress, destChain)
 	require.NoError(t, err)
 	destChain.Commit()
 	routerAddress, _, _, err := any_2_evm_toll_offramp_router.DeployAny2EVMTollOffRampRouter(destUser, destChain, []common.Address{offRampAddress})
@@ -140,17 +140,10 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	require.NoError(t, err)
 	destChain.Commit()
 
-	executorAddress, _, _, err := offramp_helper.DeployOffRampHelper(
-		destUser,
-		destChain,
-		offRampAddress,
-		false)
-	require.NoError(t, err)
-	executor, err := offramp_helper.NewOffRampHelper(executorAddress, destChain)
 	require.NoError(t, err)
 	destChain.Commit()
 	return ExecutionContracts{user: destUser,
-		offRampHelper:    executor,
+		offRamp:          offRamp,
 		blobVerifier:     blobVerifier,
 		receiver:         receiver,
 		linkTokenAddress: destLinkTokenAddress,
@@ -254,8 +247,8 @@ func TestMaxExecutionReportSize(t *testing.T) {
 	require.True(t, len(executorReport) <= ccip.MaxExecutionReportLength)
 
 	// Check can get into mempool i.e. tx size limit is respected.
-	a := c.offRampHelper.Address()
-	bi, _ := abi.JSON(strings.NewReader(offramp_helper.OffRampHelperABI))
+	a := c.offRamp.Address()
+	bi, _ := abi.JSON(strings.NewReader(any_2_evm_toll_offramp_helper.Any2EVMTollOffRampHelperABI))
 	b, err := bi.Pack("report", []byte(executorReport))
 	require.NoError(t, err)
 	n, err := c.destChain.NonceAt(context.Background(), c.user.From, nil)

@@ -19,7 +19,7 @@ var (
 	CCIPSendRequested common.Hash
 	// merkleRoot || minSeqNum || maxSeqNum
 	ReportAccepted common.Hash
-	// SeqNum
+	// sig || SeqNum || ...
 	CrossChainMessageExecuted common.Hash
 	ConfigSet                 common.Hash
 )
@@ -29,7 +29,7 @@ const (
 	SendRequestedSequenceNumberIndex             = 2
 	ReportAcceptedMinSequenceNumberIndex         = 1
 	ReportAcceptedMaxSequenceNumberIndex         = 2
-	CrossChainMessageExecutedSequenceNumberIndex = 0
+	CrossChainMessageExecutedSequenceNumberIndex = 1
 )
 
 func init() {

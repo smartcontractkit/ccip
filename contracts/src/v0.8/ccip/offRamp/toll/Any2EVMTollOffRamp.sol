@@ -2,44 +2,23 @@
 pragma solidity 0.8.15;
 
 import "../../../interfaces/TypeAndVersionInterface.sol";
-import "../../../vendor/SafeERC20.sol";
-import "../../interfaces/TollOffRampInterface.sol";
-import "../../interfaces/BlobVerifierInterface.sol";
 import "../../ocr/OCR2Base.sol";
-import "../../health/HealthChecker.sol";
-import "../../utils/CCIP.sol";
-import "../../pools/TokenPoolRegistry.sol";
+import "../interfaces/Any2EVMTollOffRampInterface.sol";
+import "../../applications/interfaces/CrossChainMessageReceiverInterface.sol";
+import "../BaseOffRamp.sol";
 
 /**
  * @notice Any2EVMTollOffRamp enables OCR networks to execute multiple messages
  * in an OffRamp in a single transaction.
  */
-contract Any2EVMTollOffRamp is
-  TollOffRampInterface,
-  HealthChecker,
-  TokenPoolRegistry,
-  TypeAndVersionInterface,
-  OCR2Base
-{
+contract Any2EVMTollOffRamp is Any2EVMTollOffRampInterface, BaseOffRamp, TypeAndVersionInterface, OCR2Base {
   using Address for address;
   using SafeERC20 for IERC20;
 
-  // Chain ID of the source chain
-  uint256 public immutable SOURCE_CHAIN_ID;
-  // Chain ID of this chain
-  uint256 public immutable CHAIN_ID;
+  string public constant override typeAndVersion = "Any2EVMTollOffRamp 1.0.0";
 
   // The router through which all transactions will be executed
-  TollOffRampRouterInterface public s_router;
-  // The blob verifier contract
-  BlobVerifierInterface private s_blobVerifier;
-
-  // The on chain offRamp configuration values
-  OffRampConfig private s_config;
-
-  // A mapping of sequence numbers to execution state.
-  // This makes sure we never execute a message twice.
-  mapping(uint64 => CCIP.MessageExecutionState) public executedMessages;
+  Any2EVMTollOffRampRouterInterface private s_router;
 
   constructor(
     uint256 chainId,
@@ -53,21 +32,19 @@ contract Any2EVMTollOffRamp is
     IERC20[] memory sourceTokens,
     PoolInterface[] memory pools,
     uint256 maxTimeWithoutAFNSignal
-  ) OCR2Base(true) HealthChecker(afn, maxTimeWithoutAFNSignal) TokenPoolRegistry(sourceTokens, pools) {
-    SOURCE_CHAIN_ID = offRampConfig.sourceChainId;
-    CHAIN_ID = chainId;
-    s_config = offRampConfig;
-    s_blobVerifier = blobVerifier;
-  }
+  )
+    OCR2Base(true)
+    BaseOffRamp(chainId, offRampConfig, blobVerifier, onRampAddress, afn, sourceTokens, pools, maxTimeWithoutAFNSignal)
+  {}
 
   /**
    * @notice setRouter sets a new router
    * @param router the new Router
    * @dev only the owner can call this function
    */
-  function setRouter(TollOffRampRouterInterface router) external onlyOwner {
+  function setRouter(Any2EVMTollOffRampRouterInterface router) external onlyOwner {
     s_router = router;
-    emit OffRampRouterSet(router);
+    emit OffRampRouterSet(address(router));
   }
 
   /**
@@ -95,14 +72,13 @@ contract Any2EVMTollOffRamp is
   /**
    * @notice Execute a series of one or more messages using a merkle proof
    * @param report ExecutionReport
-   * @param needFee Whether or not the executor requires a fee
+   * @param manualExecution Whether the DON auto executes or it is manually initiated
    */
-  function execute(CCIP.ExecutionReport memory report, bool needFee)
+  function execute(CCIP.ExecutionReport memory report, bool manualExecution)
     external
     override
     whenNotPaused
     whenHealthy
-    returns (CCIP.ExecutionResult[] memory)
   {
     if (address(s_router) == address(0)) revert RouterNotSet();
     uint256 numMsgs = report.encodedMessages.length;
@@ -110,11 +86,11 @@ contract Any2EVMTollOffRamp is
     bytes32[] memory hashedLeaves = new bytes32[](numMsgs);
     CCIP.Any2EVMTollMessage[] memory decodedMessages = new CCIP.Any2EVMTollMessage[](numMsgs);
 
-    for (uint256 i = 0; i < numMsgs; i++) {
+    for (uint256 i = 0; i < numMsgs; ++i) {
       decodedMessages[i] = abi.decode(report.encodedMessages[i], (CCIP.Any2EVMTollMessage));
       // TODO: hasher
       // https://app.shortcut.com/chainlinklabs/story/41625/hasher-encoder
-      bytes memory data = bytes.concat(hex"00", abi.encode(decodedMessages[i]));
+      bytes memory data = bytes.concat(hex"00", report.encodedMessages[i]);
       hashedLeaves[i] = keccak256(data);
     }
 
@@ -127,13 +103,14 @@ contract Any2EVMTollOffRamp is
     );
     uint256 merkleGasShare = gasUsedByMerkle / decodedMessages.length;
 
-    CCIP.ExecutionResult[] memory executionResults = new CCIP.ExecutionResult[](numMsgs);
+    // only allow manual execution if the report is old enough
+    if (manualExecution && (block.timestamp - timestampRelayed) < s_config.permissionLessExecutionThresholdSeconds) {
+      revert ManualExecutionNotYetEnabled();
+    }
 
-    for (uint256 i = 0; i < numMsgs; i++) {
-      uint256 gasBegin = gasleft();
-
+    for (uint256 i = 0; i < numMsgs; ++i) {
       CCIP.Any2EVMTollMessage memory message = decodedMessages[i];
-      CCIP.MessageExecutionState state = _getExecutionState(message.sequenceNumber);
+      CCIP.MessageExecutionState state = getExecutionState(message.sequenceNumber);
       if (state == CCIP.MessageExecutionState.Success) revert AlreadyExecuted(message.sequenceNumber);
 
       _isWellFormed(message);
@@ -142,44 +119,38 @@ contract Any2EVMTollOffRamp is
         _getPool(message.tokens[j]);
       }
 
-      if (state != CCIP.MessageExecutionState.Failure && needFee) {
+      // If it's the first DON execution attempt, charge the fee.
+      if (state == CCIP.MessageExecutionState.Untouched && !manualExecution) {
+        // Charge the gas share & gas limit of the message multiplied by the token per fee coin for
+        // the given message.
+        // Example with token being link. 1 LINK = 1e18 Juels.
+        // tx.gasprice is wei / gas
+        // gas * wei/gas * (juels / wei) (problem is that juels per wei could be < 1, say since 1 link < 1 eth)
+        // instead we use juels per unit ETH, which > 1, assuming 1 juel < 1 ETH (safe).
+        // gas * wei/gas * (juels / (ETH * 1e18 WEI/ETH))
+        // gas * wei/gas * juels/ETH / (1e18 wei/ETH)
+        // Example 1e6 gas * (200e9 wei / gas) * (6253149865160030 juels / ETH) / (1e18 wei/ETH) = 1.25e15 juels
+        uint256 tokenPerFeeCoin;
+        for (uint256 j = 0; j < report.tokenPerFeeCoinAddresses.length; ++j) {
+          if (report.tokenPerFeeCoinAddresses[j] == address(message.feeToken)) {
+            tokenPerFeeCoin = report.tokenPerFeeCoin[j];
+          }
+        }
+        if (tokenPerFeeCoin == uint256(0)) {
+          revert MissingFeeCoinPrice(address(message.feeToken));
+        }
+        uint256 feeForGas = ((merkleGasShare + message.gasLimit) * tx.gasprice * tokenPerFeeCoin) / 1e18;
+        if (feeForGas > message.feeTokenAmount) {
+          revert InsufficientFeeAmount(message.sequenceNumber);
+        }
         _releaseOrMintToken(message.feeToken, message.feeTokenAmount, address(this));
       }
 
-      executedMessages[message.sequenceNumber] = CCIP.MessageExecutionState.InProgress;
+      s_executedMessages[message.sequenceNumber] = CCIP.MessageExecutionState.InProgress;
       CCIP.MessageExecutionState newState = _trialExecute(message);
-      executedMessages[message.sequenceNumber] = newState;
+      s_executedMessages[message.sequenceNumber] = newState;
 
-      uint256 gasUsed = gasBegin - gasleft() + merkleGasShare;
-      CCIP.ExecutionResult memory executionResult = CCIP.ExecutionResult({
-        sequenceNumber: message.sequenceNumber,
-        gasUsed: gasUsed,
-        timestampRelayed: timestampRelayed,
-        state: newState
-      });
-      executionResults[i] = executionResult;
-      emit ExecutionCompleted(executionResult.sequenceNumber, executionResult.state);
-    }
-
-    return executionResults;
-  }
-
-  function _releaseOrMintToken(
-    IERC20 token,
-    uint256 amount,
-    address receiver
-  ) internal {
-    PoolInterface pool = _getPool(token);
-    pool.releaseOrMint(receiver, amount);
-  }
-
-  function _releaseOrMintTokens(
-    IERC20[] memory tokens,
-    uint256[] memory amounts,
-    address receiver
-  ) internal {
-    for (uint256 i = 0; i < tokens.length; i++) {
-      _releaseOrMintToken(tokens[i], amounts[i], receiver);
+      emit ExecutionCompleted(message.sequenceNumber, newState);
     }
   }
 
@@ -191,36 +162,13 @@ contract Any2EVMTollOffRamp is
 
   function _trialExecute(CCIP.Any2EVMTollMessage memory message) internal returns (CCIP.MessageExecutionState) {
     // TODO(Alex) improve external execution flow
-    try this.executeSingleMessage(message) {} catch (bytes memory reason) {
+    try this.executeSingleMessage(message) {} catch (bytes memory) {
       return CCIP.MessageExecutionState.Failure;
       // TODO execution failure states
       // https://app.shortcut.com/chainlinklabs/story/41622/contract-scaffolding-execution-failure-states
       // revert ExecutionError(message.sequenceNumber, reason);
     }
     return CCIP.MessageExecutionState.Success;
-  }
-
-  function _verifyMessages(
-    bytes32[] memory hashedLeaves,
-    bytes32[] memory innerProofs,
-    uint256 innerProofFlagBits,
-    bytes32[] memory outerProofs,
-    uint256 outerProofFlagBits
-  ) internal returns (uint256, uint256) {
-    uint256 gasBegin = gasleft();
-    uint256 timestamp_relayed = s_blobVerifier.verify(
-      hashedLeaves,
-      innerProofs,
-      innerProofFlagBits,
-      outerProofs,
-      outerProofFlagBits
-    );
-    if (timestamp_relayed <= 0) revert RootNotRelayed();
-    return (timestamp_relayed, gasBegin - gasleft());
-  }
-
-  function _getExecutionState(uint64 sequenceNumber) internal view returns (CCIP.MessageExecutionState) {
-    return executedMessages[sequenceNumber];
   }
 
   function _isWellFormed(CCIP.Any2EVMTollMessage memory message) private view {
@@ -232,9 +180,8 @@ contract Any2EVMTollOffRamp is
       revert MessageTooLarge(uint256(s_config.maxDataSize), message.data.length);
   }
 
-  function _getPool(IERC20 token) private view returns (PoolInterface pool) {
-    pool = getPool(token);
-    if (address(pool) == address(0)) revert UnsupportedToken(token);
+  function getRouter() external view returns (Any2EVMTollOffRampRouterInterface) {
+    return s_router;
   }
 
   // ******* OCR BASE ***********
@@ -247,51 +194,15 @@ contract Any2EVMTollOffRamp is
     uint40, /*epochAndRound*/
     bytes memory report
   ) internal override {
-    CCIP.ExecutionReport memory executionReport = abi.decode(report, (CCIP.ExecutionReport));
-    CCIP.ExecutionResult[] memory executionResult = this.execute(executionReport, true);
-
-    for (uint256 i = 0; i < executionReport.encodedMessages.length; i++) {
-      CCIP.Any2EVMTollMessage memory message = abi.decode(
-        executionReport.encodedMessages[i],
-        (CCIP.Any2EVMTollMessage)
-      );
-      PoolInterface pool = _getPool(message.feeToken);
-      uint256 tokenPerFeeCoin;
-      for (uint256 j = 0; j < executionReport.tokenPerFeeCoinAddresses.length; j++) {
-        if (executionReport.tokenPerFeeCoinAddresses[j] == address(message.feeToken)) {
-          tokenPerFeeCoin = executionReport.tokenPerFeeCoin[j];
-        }
-      }
-      if (tokenPerFeeCoin == uint256(0)) {
-        revert MissingFeeCoinPrice(address(message.feeToken));
-      }
-      // Example with token being link. 1 LINK = 1e18 Juels.
-      // tx.gasprice is wei / gas
-      // gas * wei/gas * (juels / wei) (problem is that juels per wei could be < 1, say since 1 link < 1 eth)
-      // instead we use juels per unit ETH, which > 1, assuming 1 juel < 1 ETH (safe).
-      // gas * wei/gas * (juels / (ETH * 1e18 WEI/ETH))
-      // gas * wei/gas * juels/ETH / (1e18 wei/ETH)
-      // Example 1e6 gas * (200e9 wei / gas) * (6253149865160030 juels / ETH) / (1e18 wei/ETH) = 1.25e15 juels
-      uint256 feeForGas = (executionResult[i].gasUsed * tx.gasprice * tokenPerFeeCoin) / 1e18;
-      uint256 refund = message.feeTokenAmount - feeForGas;
-      _releaseOrMintToken(message.feeToken, refund, message.receiver);
-    }
+    this.execute(abi.decode(report, (CCIP.ExecutionReport)), false);
   }
 
-  function _beforeSetConfig(uint8 _threshold, bytes memory _onchainConfig) internal override {
-    // TODO
-  }
+  function _beforeSetConfig(uint8 _threshold, bytes memory _onchainConfig) internal override {}
 
   function _afterSetConfig(
     uint8, /* f */
     bytes memory /* onchainConfig */
   ) internal override {}
 
-  function _payTransmitter(uint32 initialGas, address transmitter) internal override {
-    // TODO
-  }
-
-  function typeAndVersion() external pure override returns (string memory) {
-    return "Any2EVMTollOffRamp 1.0.0";
-  }
+  function _payTransmitter(uint32 initialGas, address transmitter) internal override {}
 }

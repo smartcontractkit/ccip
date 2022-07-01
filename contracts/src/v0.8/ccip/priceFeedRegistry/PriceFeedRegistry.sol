@@ -36,7 +36,7 @@ contract PriceFeedRegistry is OwnerIsCreator {
     if (tokens.length != feeds.length) revert InvalidPriceFeedConfig();
 
     s_tokenList = tokens;
-    for (uint256 i = 0; i < tokens.length; i++) {
+    for (uint256 i = 0; i < tokens.length; ++i) {
       AggregatorV2V3Interface feed = feeds[i];
       s_feeds[tokens[i]] = FeedConfig({feed: feed, listIndex: uint96(i)});
     }

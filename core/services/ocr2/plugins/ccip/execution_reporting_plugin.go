@@ -442,7 +442,7 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 			finalSequenceNumbers = append(finalSequenceNumbers, seqNr)
 		}
 	}
-	nextMin, err := r.blobVerifier.SExpectedNextMinByOnRamp(nil, r.onRamp)
+	nextMin, err := r.blobVerifier.GetExpectedNextSequenceNumber(nil, r.onRamp)
 	if err != nil {
 		return false, nil, err
 	}
@@ -521,7 +521,7 @@ func (r *ExecutionReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Cont
 
 func (r *ExecutionReportingPlugin) isStaleReport(min uint64) (bool, error) {
 	// If the first message is executed already, this execution report is stale.
-	msgState, err := r.offRamp.ExecutedMessages(nil, min)
+	msgState, err := r.offRamp.GetExecutionState(nil, min)
 	if err != nil {
 		// TODO: do we need to check for not present error?
 		return true, err

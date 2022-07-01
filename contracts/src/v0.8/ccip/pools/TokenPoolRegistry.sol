@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../interfaces/PoolInterface.sol";
+import "./interfaces/PoolInterface.sol";
 import "../access/OwnerIsCreator.sol";
 
 contract TokenPoolRegistry is OwnerIsCreator {
@@ -39,7 +39,7 @@ contract TokenPoolRegistry is OwnerIsCreator {
 
     // Set new tokens and pools
     s_tokenList = tokens;
-    for (uint256 i = 0; i < tokens.length; i++) {
+    for (uint256 i = 0; i < tokens.length; ++i) {
       PoolInterface pool = pools[i];
       s_pools[tokens[i]] = PoolConfig({pool: pool, listIndex: uint96(i)});
       s_tokenPoolConfigured[pool] = true;

@@ -129,7 +129,7 @@ func NewCCIPExecution(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm
 type OffRamp interface {
 	GetPoolTokens(opts *bind.CallOpts) ([]common.Address, error)
 	GetPool(opts *bind.CallOpts, sourceToken common.Address) (common.Address, error)
-	ExecutedMessages(opts *bind.CallOpts, arg0 uint64) (uint8, error)
+	GetExecutionState(opts *bind.CallOpts, arg0 uint64) (uint8, error)
 	// TODO: make generic for sub offramp.
 	ParseExecutionCompleted(log types.Log) (*any_2_evm_toll_offramp.Any2EVMTollOffRampExecutionCompleted, error)
 }

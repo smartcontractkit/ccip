@@ -148,7 +148,7 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
       s_transmitters.pop();
     }
 
-    for (uint256 i = 0; i < args.signers.length; i++) {
+    for (uint256 i = 0; i < args.signers.length; ++i) {
       // add new signer/transmitter addresses
       require(s_oracles[args.signers[i]].role == Role.Unset, "repeated signer address");
       s_oracles[args.signers[i]] = Oracle(uint8(i), Role.Signer);
@@ -351,7 +351,7 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
       bool[maxNumOracles] memory signed;
 
       Oracle memory o;
-      for (uint256 i = 0; i < rs.length; i++) {
+      for (uint256 i = 0; i < rs.length; ++i) {
         address signer = ecrecover(h, uint8(rawVs[i]) + 27, rs[i], ss[i]);
         o = s_oracles[signer];
         require(o.role == Role.Signer, "address not authorized to sign");

@@ -27,6 +27,18 @@ var (
 	_ = event.NewSubscription
 )
 
+type CCIPAny2EVMSubscriptionMessage struct {
+	SourceChainId  *big.Int
+	SequenceNumber uint64
+	Sender         common.Address
+	Receiver       common.Address
+	Nonce          uint64
+	Data           []byte
+	Tokens         []common.Address
+	Amounts        []*big.Int
+	GasLimit       *big.Int
+}
+
 type CCIPAny2EVMTollMessage struct {
 	SourceChainId  *big.Int
 	SequenceNumber uint64
@@ -41,8 +53,8 @@ type CCIPAny2EVMTollMessage struct {
 }
 
 var ReceiverDappMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"internalType\":\"contractTollOffRampRouterInterface\",\"name\":\"router\",\"type\":\"address\"},{\"internalType\":\"contractIERC20\",\"name\":\"token\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"deliverer\",\"type\":\"address\"}],\"name\":\"InvalidDeliverer\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"ROUTER\",\"outputs\":[{\"internalType\":\"contractTollOffRampRouterInterface\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"TOKEN\",\"outputs\":[{\"internalType\":\"contractIERC20\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"sourceChainId\",\"type\":\"uint256\"},{\"internalType\":\"uint64\",\"name\":\"sequenceNumber\",\"type\":\"uint64\"},{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"receiver\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"},{\"internalType\":\"contractIERC20[]\",\"name\":\"tokens\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"amounts\",\"type\":\"uint256[]\"},{\"internalType\":\"contractIERC20\",\"name\":\"feeToken\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"feeTokenAmount\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"gasLimit\",\"type\":\"uint256\"}],\"internalType\":\"structCCIP.Any2EVMTollMessage\",\"name\":\"message\",\"type\":\"tuple\"}],\"name\":\"ccipReceive\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"typeAndVersion\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"pure\",\"type\":\"function\"}]",
-	Bin: "0x60c060405234801561001057600080fd5b5060405161066038038061066083398101604081905261002f9161005e565b6001600160a01b039182166080521660a052610098565b6001600160a01b038116811461005b57600080fd5b50565b6000806040838503121561007157600080fd5b825161007c81610046565b602084015190925061008d81610046565b809150509250929050565b60805160a0516105976100c96000396000818160ea015261026d015260008181609e015261013901526105976000f3fe608060405234801561001057600080fd5b506004361061004c5760003560e01c8063181f5a771461005157806332fe7b261461009957806382bfefc8146100e55780638bbad0661461010c575b600080fd5b604080518082018252601281527f52656365697665724461707020302e302e3100000000000000000000000000006020820152905161009091906102f4565b60405180910390f35b6100c07f000000000000000000000000000000000000000000000000000000000000000081565b60405173ffffffffffffffffffffffffffffffffffffffff9091168152602001610090565b6100c07f000000000000000000000000000000000000000000000000000000000000000081565b61011f61011a366004610367565b610121565b005b3373ffffffffffffffffffffffffffffffffffffffff7f00000000000000000000000000000000000000000000000000000000000000001614610196576040517f0af9f1b600000000000000000000000000000000000000000000000000000000815233600482015260240160405180910390fd5b60006101a560808301836103aa565b8101906101b2919061043f565b91505060005b6101c560a0840184610472565b90508110156102ef5760006101dd60c0850185610472565b838181106101ed576101ed6104da565b602002919091013591505073ffffffffffffffffffffffffffffffffffffffff83161580159061021c57508015155b156102dc576040517fa9059cbb00000000000000000000000000000000000000000000000000000000815273ffffffffffffffffffffffffffffffffffffffff8481166004830152602482018390527f0000000000000000000000000000000000000000000000000000000000000000169063a9059cbb906044016020604051808303816000875af11580156102b6573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906102da9190610509565b505b50806102e78161052b565b9150506101b8565b505050565b600060208083528351808285015260005b8181101561032157858101830151858201604001528201610305565b81811115610333576000604083870101525b50601f017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe016929092016040019392505050565b60006020828403121561037957600080fd5b813567ffffffffffffffff81111561039057600080fd5b820161014081850312156103a357600080fd5b9392505050565b60008083357fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe18436030181126103df57600080fd5b83018035915067ffffffffffffffff8211156103fa57600080fd5b60200191503681900382131561040f57600080fd5b9250929050565b803573ffffffffffffffffffffffffffffffffffffffff8116811461043a57600080fd5b919050565b6000806040838503121561045257600080fd5b61045b83610416565b915061046960208401610416565b90509250929050565b60008083357fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe18436030181126104a757600080fd5b83018035915067ffffffffffffffff8211156104c257600080fd5b6020019150600581901b360382131561040f57600080fd5b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603260045260246000fd5b60006020828403121561051b57600080fd5b815180151581146103a357600080fd5b60007fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8203610583577f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b506001019056fea164736f6c634300080f000a",
+	ABI: "[{\"inputs\":[{\"internalType\":\"contractAny2EVMTollOffRampRouterInterface\",\"name\":\"router\",\"type\":\"address\"},{\"internalType\":\"contractIERC20\",\"name\":\"token\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"deliverer\",\"type\":\"address\"}],\"name\":\"InvalidDeliverer\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"ROUTER\",\"outputs\":[{\"internalType\":\"contractAny2EVMTollOffRampRouterInterface\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"TOKEN\",\"outputs\":[{\"internalType\":\"contractIERC20\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"sourceChainId\",\"type\":\"uint256\"},{\"internalType\":\"uint64\",\"name\":\"sequenceNumber\",\"type\":\"uint64\"},{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"receiver\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"},{\"internalType\":\"contractIERC20[]\",\"name\":\"tokens\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"amounts\",\"type\":\"uint256[]\"},{\"internalType\":\"contractIERC20\",\"name\":\"feeToken\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"feeTokenAmount\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"gasLimit\",\"type\":\"uint256\"}],\"internalType\":\"structCCIP.Any2EVMTollMessage\",\"name\":\"message\",\"type\":\"tuple\"}],\"name\":\"ccipReceive\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"sourceChainId\",\"type\":\"uint256\"},{\"internalType\":\"uint64\",\"name\":\"sequenceNumber\",\"type\":\"uint64\"},{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"receiver\",\"type\":\"address\"},{\"internalType\":\"uint64\",\"name\":\"nonce\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"},{\"internalType\":\"contractIERC20[]\",\"name\":\"tokens\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"amounts\",\"type\":\"uint256[]\"},{\"internalType\":\"uint256\",\"name\":\"gasLimit\",\"type\":\"uint256\"}],\"internalType\":\"structCCIP.Any2EVMSubscriptionMessage\",\"name\":\"message\",\"type\":\"tuple\"}],\"name\":\"ccipReceive\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getSubscriptionManager\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"typeAndVersion\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]",
+	Bin: "0x60c060405234801561001057600080fd5b506040516108de3803806108de83398101604081905261002f91610070565b6001600160a01b039182166080521660a052600080546001600160a01b031916331790556100aa565b6001600160a01b038116811461006d57600080fd5b50565b6000806040838503121561008357600080fd5b825161008e81610058565b602084015190925061009f81610058565b809150509250929050565b60805160a0516107fb6100e36000396000818161011a015261049501526000818160ce0152818161019a01526102db01526107fb6000f3fe608060405234801561001057600080fd5b50600436106100725760003560e01c80638bbad066116100505780638bbad0661461013c578063a988980814610151578063e2a92e281461016457600080fd5b8063181f5a771461007757806332fe7b26146100c957806382bfefc814610115575b600080fd5b6100b36040518060400160405280601281526020017f52656365697665724461707020312e302e30000000000000000000000000000081525081565b6040516100c0919061051c565b60405180910390f35b6100f07f000000000000000000000000000000000000000000000000000000000000000081565b60405173ffffffffffffffffffffffffffffffffffffffff90911681526020016100c0565b6100f07f000000000000000000000000000000000000000000000000000000000000000081565b61014f61014a36600461058f565b610182565b005b61014f61015f3660046105d2565b6102c3565b60005473ffffffffffffffffffffffffffffffffffffffff166100f0565b3373ffffffffffffffffffffffffffffffffffffffff7f000000000000000000000000000000000000000000000000000000000000000016146101f8576040517f0af9f1b60000000000000000000000000000000000000000000000000000000081523360048201526024015b60405180910390fd5b6102c0610208608083018361060e565b8080601f01602080910402602001604051908101604052809392919081815260200183838082843760009201919091525061024a9250505060a084018461067a565b808060200260200160405190810160405280939291908181526020018383602002808284376000920191909152506102899250505060c085018561067a565b808060200260200160405190810160405280939291908181526020018383602002808284376000920191909152506103c592505050565b50565b3373ffffffffffffffffffffffffffffffffffffffff7f00000000000000000000000000000000000000000000000000000000000000001614610334576040517f0af9f1b60000000000000000000000000000000000000000000000000000000081523360048201526024016101ef565b6102c061034460a083018361060e565b8080601f0160208091040260200160405190810160405280939291908181526020018383808284376000920191909152506103869250505060c084018461067a565b808060200260200160405190810160405280939291908181526020018383602002808284376000920191909152506102899250505060e085018561067a565b6000838060200190518101906103db919061070b565b91505060005b83518110156105155760008382815181106103fe576103fe61073e565b60200260200101519050600073ffffffffffffffffffffffffffffffffffffffff168373ffffffffffffffffffffffffffffffffffffffff161415801561044457508015155b15610504576040517fa9059cbb00000000000000000000000000000000000000000000000000000000815273ffffffffffffffffffffffffffffffffffffffff8481166004830152602482018390527f0000000000000000000000000000000000000000000000000000000000000000169063a9059cbb906044016020604051808303816000875af11580156104de573d6000803e3d6000fd5b505050506040513d601f19601f82011682018060405250810190610502919061076d565b505b5061050e8161078f565b90506103e1565b5050505050565b600060208083528351808285015260005b818110156105495785810183015185820160400152820161052d565b8181111561055b576000604083870101525b50601f017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe016929092016040019392505050565b6000602082840312156105a157600080fd5b813567ffffffffffffffff8111156105b857600080fd5b820161014081850312156105cb57600080fd5b9392505050565b6000602082840312156105e457600080fd5b813567ffffffffffffffff8111156105fb57600080fd5b820161012081850312156105cb57600080fd5b60008083357fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe184360301811261064357600080fd5b83018035915067ffffffffffffffff82111561065e57600080fd5b60200191503681900382131561067357600080fd5b9250929050565b60008083357fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe18436030181126106af57600080fd5b83018035915067ffffffffffffffff8211156106ca57600080fd5b6020019150600581901b360382131561067357600080fd5b805173ffffffffffffffffffffffffffffffffffffffff8116811461070657600080fd5b919050565b6000806040838503121561071e57600080fd5b610727836106e2565b9150610735602084016106e2565b90509250929050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603260045260246000fd5b60006020828403121561077f57600080fd5b815180151581146105cb57600080fd5b60007fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff82036107e7577f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b506001019056fea164736f6c634300080f000a",
 }
 
 var ReceiverDappABI = ReceiverDappMetaData.ABI
@@ -225,6 +237,28 @@ func (_ReceiverDapp *ReceiverDappCallerSession) TOKEN() (common.Address, error) 
 	return _ReceiverDapp.Contract.TOKEN(&_ReceiverDapp.CallOpts)
 }
 
+func (_ReceiverDapp *ReceiverDappCaller) GetSubscriptionManager(opts *bind.CallOpts) (common.Address, error) {
+	var out []interface{}
+	err := _ReceiverDapp.contract.Call(opts, &out, "getSubscriptionManager")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
+}
+
+func (_ReceiverDapp *ReceiverDappSession) GetSubscriptionManager() (common.Address, error) {
+	return _ReceiverDapp.Contract.GetSubscriptionManager(&_ReceiverDapp.CallOpts)
+}
+
+func (_ReceiverDapp *ReceiverDappCallerSession) GetSubscriptionManager() (common.Address, error) {
+	return _ReceiverDapp.Contract.GetSubscriptionManager(&_ReceiverDapp.CallOpts)
+}
+
 func (_ReceiverDapp *ReceiverDappCaller) TypeAndVersion(opts *bind.CallOpts) (string, error) {
 	var out []interface{}
 	err := _ReceiverDapp.contract.Call(opts, &out, "typeAndVersion")
@@ -259,6 +293,18 @@ func (_ReceiverDapp *ReceiverDappTransactorSession) CcipReceive(message CCIPAny2
 	return _ReceiverDapp.Contract.CcipReceive(&_ReceiverDapp.TransactOpts, message)
 }
 
+func (_ReceiverDapp *ReceiverDappTransactor) CcipReceive0(opts *bind.TransactOpts, message CCIPAny2EVMSubscriptionMessage) (*types.Transaction, error) {
+	return _ReceiverDapp.contract.Transact(opts, "ccipReceive0", message)
+}
+
+func (_ReceiverDapp *ReceiverDappSession) CcipReceive0(message CCIPAny2EVMSubscriptionMessage) (*types.Transaction, error) {
+	return _ReceiverDapp.Contract.CcipReceive0(&_ReceiverDapp.TransactOpts, message)
+}
+
+func (_ReceiverDapp *ReceiverDappTransactorSession) CcipReceive0(message CCIPAny2EVMSubscriptionMessage) (*types.Transaction, error) {
+	return _ReceiverDapp.Contract.CcipReceive0(&_ReceiverDapp.TransactOpts, message)
+}
+
 func (_ReceiverDapp *ReceiverDapp) Address() common.Address {
 	return _ReceiverDapp.address
 }
@@ -268,9 +314,13 @@ type ReceiverDappInterface interface {
 
 	TOKEN(opts *bind.CallOpts) (common.Address, error)
 
+	GetSubscriptionManager(opts *bind.CallOpts) (common.Address, error)
+
 	TypeAndVersion(opts *bind.CallOpts) (string, error)
 
 	CcipReceive(opts *bind.TransactOpts, message CCIPAny2EVMTollMessage) (*types.Transaction, error)
+
+	CcipReceive0(opts *bind.TransactOpts, message CCIPAny2EVMSubscriptionMessage) (*types.Transaction, error)
 
 	Address() common.Address
 }

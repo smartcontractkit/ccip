@@ -182,12 +182,12 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 		[]common.Address{},                       // allow list
 		afnSourceAddress,                         // AFN
 		big.NewInt(86400),                        //maxTimeWithoutAFNSignal 86400 seconds = one day
-		evm_2_evm_toll_onramp.TollOnRampInterfaceOnRampConfig{
-			Router:           onRampRouterAddress,
+		evm_2_evm_toll_onramp.BaseOnRampInterfaceOnRampConfig{
 			RelayingFeeJuels: 0,
 			MaxDataSize:      1e12,
 			MaxTokensLength:  5,
 		},
+		onRampRouterAddress,
 	)
 	require.NoError(t, err)
 	// We do this so onRamp.Address() works
@@ -215,15 +215,15 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 
 	// Deploy offramp dest chain
 	blobVerifierAddress, _, _, err := blob_verifier.DeployBlobVerifier(
-		destUser,       // user
-		destChain,      // client
-		destChainID,    // dest chain id
+		destUser,    // user
+		destChain,   // client
+		destChainID, // dest chain id
+		sourceChainID,
 		afnDestAddress, // AFN address
 		// We set this above the current unix timestamp
 		// so we do not even have to send a heartbeat for it to be healthy.
 		big.NewInt(time.Now().Unix()*2),
 		blob_verifier.BlobVerifierInterfaceBlobVerifierConfig{
-			SourceChainId:    sourceChainID,
 			OnRamps:          []common.Address{onRampAddress},
 			MinSeqNrByOnRamp: []uint64{1},
 		},
@@ -234,7 +234,7 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 	// Set the pool to be the offramp
 	destChain.Commit()
 	offRampAddress, _, _, err := any_2_evm_toll_offramp.DeployAny2EVMTollOffRamp(destUser,
-		destChain, destChainID, any_2_evm_toll_offramp.TollOffRampInterfaceOffRampConfig{
+		destChain, destChainID, any_2_evm_toll_offramp.BaseOffRampInterfaceOffRampConfig{
 			SourceChainId:         sourceChainID,
 			ExecutionDelaySeconds: 0,
 			MaxDataSize:           1e12,
@@ -535,7 +535,13 @@ func (node *Node) eventuallyHasExecutedSeqNum(t *testing.T, ccipContracts CCIPCo
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
 		ccipContracts.sourceChain.Commit()
 		ccipContracts.destChain.Commit()
-		lgs, err := c.LogPoller().LogsDataWordRange(ccip.CrossChainMessageExecuted, ccipContracts.offRamp.Address(), ccip.CrossChainMessageExecutedSequenceNumberIndex, ccip.EvmWord(uint64(seqNum)), ccip.EvmWord(uint64(seqNum)), 1)
+		lgs, err := c.LogPoller().IndexedLogsTopicRange(
+			ccip.CrossChainMessageExecuted,
+			ccipContracts.offRamp.Address(),
+			ccip.CrossChainMessageExecutedSequenceNumberIndex,
+			ccip.EvmWord(uint64(seqNum)),
+			ccip.EvmWord(uint64(seqNum)),
+			1)
 		require.NoError(t, err)
 		t.Log("Executed logs", lgs)
 		if len(lgs) == 1 {
@@ -608,7 +614,7 @@ func sendRequest(t *testing.T, ccipContracts CCIPContracts, msgPayload string, t
 
 func eventuallyReportRelayed(t *testing.T, ccipContracts CCIPContracts, min, max int) {
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
-		minSeqNum, err := ccipContracts.blobVerifier.SExpectedNextMinByOnRamp(nil, ccipContracts.onRamp.Address())
+		minSeqNum, err := ccipContracts.blobVerifier.GetExpectedNextSequenceNumber(nil, ccipContracts.onRamp.Address())
 		require.NoError(t, err)
 		ccipContracts.sourceChain.Commit()
 		ccipContracts.destChain.Commit()

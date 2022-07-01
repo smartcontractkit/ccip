@@ -1,21 +1,64 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.15;
+pragma solidity ^0.8.0;
 
-import "../../interfaces/PoolInterface.sol";
+import "../../pools/interfaces/PoolInterface.sol";
+import "../../utils/interfaces/AllowListInterface.sol";
 
-interface BaseOnRampInterface {
+interface BaseOnRampInterface is AllowListInterface {
   error MessageTooLarge(uint256 maxSize, uint256 actualSize);
   error UnsupportedNumberOfTokens();
   error UnsupportedToken(IERC20 token);
-  error SenderNotAllowed(address sender);
   error MustBeCalledByRouter();
   error RouterMustSetOriginalSender();
+  error TokenConfigMismatch();
+  error RouterNotSet();
 
-  event AllowlistSet(address[] allowlist);
-  event AllowlistEnabledSet(bool enabled);
   event RouterSet(address router);
+  event OnRampConfigSet(OnRampConfig config);
 
+  struct OnRampConfig {
+    // Fee for sending message taken in this contract
+    uint64 relayingFeeJuels;
+    // maximum payload data size
+    uint64 maxDataSize;
+    // Maximum number of distinct ERC20 tokens that can be sent in a message
+    uint64 maxTokensLength;
+  }
+
+  /**
+   * @notice Get the pool for a specific token
+   * @param token token to get the pool for
+   * @return pool PoolInterface
+   */
   function getTokenPool(IERC20 token) external returns (PoolInterface);
 
-  function getSequenceNumber() external view returns (uint64);
+  /**
+   * @notice Gets the next sequence number to be used in the onRamp
+   * @return the next sequence number to be used
+   */
+  function getExpectedNextSequenceNumber() external view returns (uint64);
+
+  /**
+   * @notice Sets the router to the given router
+   * @param router The new router
+   */
+  function setRouter(address router) external;
+
+  /**
+   * @notice Gets the configured router
+   * @return The set router
+   */
+  function getRouter() external view returns (address);
+
+  /**
+   * @notice Sets the onRamp config to the given OnRampConfig object
+   * @param config The new OnRampConfig
+   */
+  function setConfig(OnRampConfig calldata config) external;
+
+  /**
+   * @notice Gets the current onRamp configuration
+   * @return config The current configuration
+   */
+  function getConfig() external view returns (OnRampConfig memory config);
 }

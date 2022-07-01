@@ -6,10 +6,11 @@ import "../../blobVerifier/BlobVerifier.sol";
 contract BlobVerifierHelper is BlobVerifier {
   constructor(
     uint256 chainId,
+    uint256 sourceChainId,
     AFNInterface afn,
     uint256 maxTimeWithoutAFNSignal,
     BlobVerifierConfig memory config
-  ) BlobVerifier(chainId, afn, maxTimeWithoutAFNSignal, config) {}
+  ) BlobVerifier(chainId, sourceChainId, afn, maxTimeWithoutAFNSignal, config) {}
 
   /**
    * @dev Expose _report for tests

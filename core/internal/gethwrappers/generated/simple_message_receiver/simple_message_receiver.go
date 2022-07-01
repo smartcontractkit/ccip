@@ -29,6 +29,18 @@ var (
 	_ = event.NewSubscription
 )
 
+type CCIPAny2EVMSubscriptionMessage struct {
+	SourceChainId  *big.Int
+	SequenceNumber uint64
+	Sender         common.Address
+	Receiver       common.Address
+	Nonce          uint64
+	Data           []byte
+	Tokens         []common.Address
+	Amounts        []*big.Int
+	GasLimit       *big.Int
+}
+
 type CCIPAny2EVMTollMessage struct {
 	SourceChainId  *big.Int
 	SequenceNumber uint64
@@ -43,8 +55,8 @@ type CCIPAny2EVMTollMessage struct {
 }
 
 var SimpleMessageReceiverMetaData = &bind.MetaData{
-	ABI: "[{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"message\",\"type\":\"uint256\"}],\"name\":\"MessageReceived\",\"type\":\"event\"},{\"inputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"sourceChainId\",\"type\":\"uint256\"},{\"internalType\":\"uint64\",\"name\":\"sequenceNumber\",\"type\":\"uint64\"},{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"receiver\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"},{\"internalType\":\"contractIERC20[]\",\"name\":\"tokens\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"amounts\",\"type\":\"uint256[]\"},{\"internalType\":\"contractIERC20\",\"name\":\"feeToken\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"feeTokenAmount\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"gasLimit\",\"type\":\"uint256\"}],\"internalType\":\"structCCIP.Any2EVMTollMessage\",\"name\":\"message\",\"type\":\"tuple\"}],\"name\":\"ccipReceive\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
-	Bin: "0x608060405234801561001057600080fd5b50610101806100206000396000f3fe6080604052348015600f57600080fd5b506004361060285760003560e01c80638bbad06614602d575b600080fd5b603c6038366004608c565b603e565b005b7fd975dc53483f681e69c6732f27f4976038dcb70b17188c82e43b48534a5bd4fc606d604083016020840160cc565b60405167ffffffffffffffff909116815260200160405180910390a150565b600060208284031215609d57600080fd5b813567ffffffffffffffff81111560b357600080fd5b8201610140818503121560c557600080fd5b9392505050565b60006020828403121560dd57600080fd5b813567ffffffffffffffff8116811460c557600080fdfea164736f6c634300080f000a",
+	ABI: "[{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"message\",\"type\":\"uint256\"}],\"name\":\"MessageReceived\",\"type\":\"event\"},{\"inputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"sourceChainId\",\"type\":\"uint256\"},{\"internalType\":\"uint64\",\"name\":\"sequenceNumber\",\"type\":\"uint64\"},{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"receiver\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"},{\"internalType\":\"contractIERC20[]\",\"name\":\"tokens\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"amounts\",\"type\":\"uint256[]\"},{\"internalType\":\"contractIERC20\",\"name\":\"feeToken\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"feeTokenAmount\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"gasLimit\",\"type\":\"uint256\"}],\"internalType\":\"structCCIP.Any2EVMTollMessage\",\"name\":\"message\",\"type\":\"tuple\"}],\"name\":\"ccipReceive\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"sourceChainId\",\"type\":\"uint256\"},{\"internalType\":\"uint64\",\"name\":\"sequenceNumber\",\"type\":\"uint64\"},{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"receiver\",\"type\":\"address\"},{\"internalType\":\"uint64\",\"name\":\"nonce\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"},{\"internalType\":\"contractIERC20[]\",\"name\":\"tokens\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"amounts\",\"type\":\"uint256[]\"},{\"internalType\":\"uint256\",\"name\":\"gasLimit\",\"type\":\"uint256\"}],\"internalType\":\"structCCIP.Any2EVMSubscriptionMessage\",\"name\":\"message\",\"type\":\"tuple\"}],\"name\":\"ccipReceive\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getSubscriptionManager\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]",
+	Bin: "0x608060405234801561001057600080fd5b50600080546001600160a01b0319163317905561019b806100326000396000f3fe608060405234801561001057600080fd5b50600436106100415760003560e01c80638bbad06614610046578063a98898081461005b578063e2a92e2814610069575b600080fd5b6100596100543660046100e5565b610095565b005b610059610054366004610128565b6000546040805173ffffffffffffffffffffffffffffffffffffffff9092168252519081900360200190f35b7fd975dc53483f681e69c6732f27f4976038dcb70b17188c82e43b48534a5bd4fc6100c66040830160208401610164565b60405167ffffffffffffffff909116815260200160405180910390a150565b6000602082840312156100f757600080fd5b813567ffffffffffffffff81111561010e57600080fd5b8201610140818503121561012157600080fd5b9392505050565b60006020828403121561013a57600080fd5b813567ffffffffffffffff81111561015157600080fd5b8201610120818503121561012157600080fd5b60006020828403121561017657600080fd5b813567ffffffffffffffff8116811461012157600080fdfea164736f6c634300080f000a",
 }
 
 var SimpleMessageReceiverABI = SimpleMessageReceiverMetaData.ABI
@@ -183,6 +195,28 @@ func (_SimpleMessageReceiver *SimpleMessageReceiverTransactorRaw) Transact(opts 
 	return _SimpleMessageReceiver.Contract.contract.Transact(opts, method, params...)
 }
 
+func (_SimpleMessageReceiver *SimpleMessageReceiverCaller) GetSubscriptionManager(opts *bind.CallOpts) (common.Address, error) {
+	var out []interface{}
+	err := _SimpleMessageReceiver.contract.Call(opts, &out, "getSubscriptionManager")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
+}
+
+func (_SimpleMessageReceiver *SimpleMessageReceiverSession) GetSubscriptionManager() (common.Address, error) {
+	return _SimpleMessageReceiver.Contract.GetSubscriptionManager(&_SimpleMessageReceiver.CallOpts)
+}
+
+func (_SimpleMessageReceiver *SimpleMessageReceiverCallerSession) GetSubscriptionManager() (common.Address, error) {
+	return _SimpleMessageReceiver.Contract.GetSubscriptionManager(&_SimpleMessageReceiver.CallOpts)
+}
+
 func (_SimpleMessageReceiver *SimpleMessageReceiverTransactor) CcipReceive(opts *bind.TransactOpts, message CCIPAny2EVMTollMessage) (*types.Transaction, error) {
 	return _SimpleMessageReceiver.contract.Transact(opts, "ccipReceive", message)
 }
@@ -193,6 +227,18 @@ func (_SimpleMessageReceiver *SimpleMessageReceiverSession) CcipReceive(message 
 
 func (_SimpleMessageReceiver *SimpleMessageReceiverTransactorSession) CcipReceive(message CCIPAny2EVMTollMessage) (*types.Transaction, error) {
 	return _SimpleMessageReceiver.Contract.CcipReceive(&_SimpleMessageReceiver.TransactOpts, message)
+}
+
+func (_SimpleMessageReceiver *SimpleMessageReceiverTransactor) CcipReceive0(opts *bind.TransactOpts, message CCIPAny2EVMSubscriptionMessage) (*types.Transaction, error) {
+	return _SimpleMessageReceiver.contract.Transact(opts, "ccipReceive0", message)
+}
+
+func (_SimpleMessageReceiver *SimpleMessageReceiverSession) CcipReceive0(message CCIPAny2EVMSubscriptionMessage) (*types.Transaction, error) {
+	return _SimpleMessageReceiver.Contract.CcipReceive0(&_SimpleMessageReceiver.TransactOpts, message)
+}
+
+func (_SimpleMessageReceiver *SimpleMessageReceiverTransactorSession) CcipReceive0(message CCIPAny2EVMSubscriptionMessage) (*types.Transaction, error) {
+	return _SimpleMessageReceiver.Contract.CcipReceive0(&_SimpleMessageReceiver.TransactOpts, message)
 }
 
 type SimpleMessageReceiverMessageReceivedIterator struct {
@@ -331,7 +377,11 @@ func (_SimpleMessageReceiver *SimpleMessageReceiver) Address() common.Address {
 }
 
 type SimpleMessageReceiverInterface interface {
+	GetSubscriptionManager(opts *bind.CallOpts) (common.Address, error)
+
 	CcipReceive(opts *bind.TransactOpts, message CCIPAny2EVMTollMessage) (*types.Transaction, error)
+
+	CcipReceive0(opts *bind.TransactOpts, message CCIPAny2EVMSubscriptionMessage) (*types.Transaction, error)
 
 	FilterMessageReceived(opts *bind.FilterOpts) (*SimpleMessageReceiverMessageReceivedIterator, error)
 

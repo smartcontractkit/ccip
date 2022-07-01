@@ -110,7 +110,7 @@ func (eb *ExecutionBatchBuilder) getUnexpiredRelayReports() ([]blob_verifier.CCI
 }
 
 func (eb *ExecutionBatchBuilder) getExecutedSeqNrsInRange(min, max uint64) (map[uint64]struct{}, error) {
-	executedLogs, err := eb.dstLogPoller.LogsDataWordRange(CrossChainMessageExecuted, eb.offRampAddr, CrossChainMessageExecutedSequenceNumberIndex, logpoller.EvmWord(min), logpoller.EvmWord(max), int(eb.config.DestIncomingConfirmations))
+	executedLogs, err := eb.dstLogPoller.IndexedLogsTopicRange(CrossChainMessageExecuted, eb.offRampAddr, CrossChainMessageExecutedSequenceNumberIndex, logpoller.EvmWord(min), logpoller.EvmWord(max), int(eb.config.DestIncomingConfirmations))
 	if err != nil {
 		return nil, err
 	}

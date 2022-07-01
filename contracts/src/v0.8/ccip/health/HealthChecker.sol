@@ -2,7 +2,7 @@
 pragma solidity 0.8.15;
 
 import "../../vendor/Pausable.sol";
-import "../interfaces/AFNInterface.sol";
+import "../health/interfaces/AFNInterface.sol";
 import "../access/OwnerIsCreator.sol";
 
 contract HealthChecker is Pausable, OwnerIsCreator {

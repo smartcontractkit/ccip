@@ -4,36 +4,36 @@ pragma solidity 0.8.15;
 import "../../pools/PoolCollector.sol";
 import "../../../interfaces/TypeAndVersionInterface.sol";
 import "../../access/OwnerIsCreator.sol";
-import "../interfaces/TollOnRampInterface.sol";
-import "../interfaces/TollOnRampRouterInterface.sol";
+import "../interfaces/Any2EVMTollOnRampInterface.sol";
+import "../interfaces/Any2EVMTollOnRampRouterInterface.sol";
 
-contract EVM2AnyTollOnRampRouter is TollOnRampRouterInterface, TypeAndVersionInterface, OwnerIsCreator, PoolCollector {
+contract EVM2AnyTollOnRampRouter is
+  Any2EVMTollOnRampRouterInterface,
+  TypeAndVersionInterface,
+  OwnerIsCreator,
+  PoolCollector
+{
   using SafeERC20 for IERC20;
 
-  // destination chain id => OnRampInterface
-  mapping(uint256 => TollOnRampInterface) private s_onRamps;
+  string public constant override typeAndVersion = "EVM2AnyTollOnRampRouter 1.0.0";
 
-  /// @inheritdoc TollOnRampRouterInterface
+  // destination chain id => OnRampInterface
+  mapping(uint256 => Any2EVMTollOnRampInterface) private s_onRamps;
+
+  /// @inheritdoc Any2EVMTollOnRampRouterInterface
   function ccipSend(uint256 destinationChainId, CCIP.EVM2AnyTollMessage memory message) external returns (uint64) {
-    address sender = msg.sender;
-    TollOnRampInterface onRamp = s_onRamps[destinationChainId];
+    Any2EVMTollOnRampInterface onRamp = s_onRamps[destinationChainId];
     if (address(onRamp) == address(0)) revert UnsupportedDestinationChain(destinationChainId);
     if (message.tokens.length != message.amounts.length) revert BaseOnRampInterface.UnsupportedNumberOfTokens();
 
-    uint256 feeTaken = _collectTokens(
-      onRamp,
-      message.tokens,
-      message.amounts,
-      message.feeToken,
-      message.feeTokenAmount
-    );
-    message.feeTokenAmount -= feeTaken;
+    message.feeTokenAmount -= _chargeFee(onRamp, message.feeToken, message.feeTokenAmount);
+    _collectTokens(onRamp, message.tokens, message.amounts);
 
-    return onRamp.forwardFromRouter(message, sender);
+    return onRamp.forwardFromRouter(message, msg.sender);
   }
 
-  /// @inheritdoc TollOnRampRouterInterface
-  function setOnRamp(uint256 chainId, TollOnRampInterface onRamp) external onlyOwner {
+  /// @inheritdoc Any2EVMTollOnRampRouterInterface
+  function setOnRamp(uint256 chainId, Any2EVMTollOnRampInterface onRamp) external onlyOwner {
     if (address(s_onRamps[chainId]) == address(onRamp)) revert OnRampAlreadySet(chainId, onRamp);
     s_onRamps[chainId] = onRamp;
     emit OnRampSet(chainId, onRamp);
@@ -44,15 +44,12 @@ contract EVM2AnyTollOnRampRouter is TollOnRampRouterInterface, TypeAndVersionInt
    * @param chainId Chain ID to get ramp details for
    * @return onRamp
    */
-  function getOnRamp(uint256 chainId) external view returns (TollOnRampInterface) {
+  function getOnRamp(uint256 chainId) external view returns (Any2EVMTollOnRampInterface) {
     return s_onRamps[chainId];
   }
 
+  /// @inheritdoc BaseOnRampRouterInterface
   function isChainSupported(uint256 chainId) external view returns (bool supported) {
     return address(s_onRamps[chainId]) != address(0);
-  }
-
-  function typeAndVersion() external pure override returns (string memory) {
-    return "EVM2AnyTollOnRampRouter 1.0.0";
   }
 }

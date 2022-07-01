@@ -7,14 +7,18 @@ import "../health/HealthChecker.sol";
 import "../ocr/OCR2Base.sol";
 import "../utils/CCIP.sol";
 import "../../interfaces/TypeAndVersionInterface.sol";
-import "../interfaces/BlobVerifierInterface.sol";
+import "./interfaces/BlobVerifierInterface.sol";
 
 contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthChecker, OCR2Base {
   using Address for address;
   using SafeERC20 for IERC20;
 
+  string public constant override typeAndVersion = "BlobVerifier 1.0.0";
+
   // Chain ID of this chain
   uint256 public immutable CHAIN_ID;
+  // Chain ID of the source chain
+  uint256 public immutable SOURCE_CHAIN_ID;
   // Offchain leaf domain separator
   bytes1 private constant LEAF_DOMAIN_SEPARATOR = 0x00;
   // Internal domain separator used in proofs
@@ -27,7 +31,7 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
   BlobVerifierConfig private s_config;
 
   // Mapping of the expected next sequence number by onRamp
-  mapping(address => uint64) public s_expectedNextMinByOnRamp;
+  mapping(address => uint64) private s_expectedNextMinByOnRamp;
 
   /**
    * @dev sourceTokens are mapped to pools, and therefore should be the same length arrays.
@@ -43,28 +47,36 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
    */
   constructor(
     uint256 chainId,
+    uint256 sourceChainId,
     AFNInterface afn,
     uint256 maxTimeWithoutAFNSignal,
     BlobVerifierConfig memory config
   ) OCR2Base(true) HealthChecker(afn, maxTimeWithoutAFNSignal) {
     CHAIN_ID = chainId;
+    SOURCE_CHAIN_ID = sourceChainId;
     s_config = config;
+    if (s_config.onRamps.length != s_config.minSeqNrByOnRamp.length) {
+      revert InvalidConfiguration();
+    }
     for (uint256 i = 0; i < s_config.onRamps.length; ++i) {
       s_expectedNextMinByOnRamp[s_config.onRamps[i]] = s_config.minSeqNrByOnRamp[i];
     }
   }
 
-  /**
-   * @notice Sets the new BlobVerifierConfig and updates the s_expectedNextMinByOnRamp
-   * mapping. This will overwrite the existing expected minimum sequence numbers
-   * for the supplied onRamps but will not change them for onRamps that are not
-   * included in the BlobVerifierConfig.onRamps property.
-   */
+  /// @inheritdoc BlobVerifierInterface
   function setConfig(BlobVerifierConfig calldata config) external onlyOwner {
+    uint256 newRampLength = config.onRamps.length;
+    if (newRampLength != config.minSeqNrByOnRamp.length || newRampLength == 0) {
+      revert InvalidConfiguration();
+    }
+    uint256 onRampLength = s_config.onRamps.length;
+    for (uint256 i = 0; i < onRampLength; ++i) {
+      delete s_expectedNextMinByOnRamp[s_config.onRamps[i]];
+    }
+
     s_config = config;
-    // TODO overwriting mappings is hard. Old values can persist with this implementation
-    for (uint256 i = 0; i < s_config.onRamps.length; ++i) {
-      s_expectedNextMinByOnRamp[s_config.onRamps[i]] = s_config.minSeqNrByOnRamp[i];
+    for (uint256 i = 0; i < newRampLength; ++i) {
+      s_expectedNextMinByOnRamp[config.onRamps[i]] = config.minSeqNrByOnRamp[i];
     }
 
     emit BlobVerifierConfigSet(config);
@@ -75,6 +87,13 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
    */
   function getConfig() external view returns (BlobVerifierConfig memory) {
     return s_config;
+  }
+
+  /**
+   * @notice Returns the next expected sequence number for a given onRamp.
+   */
+  function getExpectedNextSequenceNumber(address onRamp) public view returns (uint64) {
+    return s_expectedNextMinByOnRamp[onRamp];
   }
 
   /**
@@ -109,7 +128,7 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
       CCIP.Interval memory repInterval = report.intervals[i];
 
       if (expectedMinSeqNum == 0) {
-        revert UnSupportedOnRamp(onRamp);
+        revert UnsupportedOnRamp(onRamp);
       }
       if (expectedMinSeqNum != repInterval.min || repInterval.min > repInterval.max) {
         revert InvalidInterval(repInterval, onRamp);
@@ -121,7 +140,10 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
   }
 
   /**
-   * @notice Returns timestamp of when root was accepted or -1 if verification fails
+   * @notice Returns timestamp of when root was accepted or -1 if verification fails.
+   * @dev This method uses a merkle tree within a merkle tree, with the hashedLeaves,
+   *        innerProofs and innerProofFlagBits being used to get the root of the inner
+   *        tree. This root is then used as the singular leaf of the outer tree.
    */
   function verify(
     bytes32[] calldata hashedLeaves,
@@ -138,7 +160,15 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
   }
 
   /**
-   * @notice Generate a Merkle Root
+   * @notice Generates a Merkle Root based on the given leaves, proofs and proofFlagBits.
+   *          This method can proof multiple leaves at the same time.
+   * @param leaves The leaf hashes of the merkle tree.
+   * @param proofs The hashes to be used instead of a leaf hash when the proofFlagBits
+   *          indicates a proof should be used.
+   * @param proofFlagBits A single uint256 of which each bit indicates whether a leaf or
+   *          a proof needs to be used in a hash operation.
+   * @dev the maximum number of hash operations it set to 256. Any input that would require
+   *          more than 256 hashes to get to a root will revert.
    */
   function merkleRoot(
     bytes32[] memory leaves,
@@ -168,34 +198,35 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
     }
   }
 
+  /**
+   * @notice Returns a previously relayed merkle root if it exists.
+   */
   function getMerkleRoot(bytes32 root) external view returns (uint256) {
     return s_roots[root];
   }
 
+  /**
+   * @notice Hashes two bytes32 objects. The order is taken into account,
+   *          using the lower value first.
+   */
   function hashPair(bytes32 a, bytes32 b) private pure returns (bytes32) {
     return a < b ? _hashInternalNode(a, b) : _hashInternalNode(b, a);
   }
 
+  /**
+   * @notice Hashes two bytes32 objects in their given order, prepended by the
+   *          INTERNAL_DOMAIN_SEPARATOR.
+   */
   function _hashInternalNode(bytes32 left, bytes32 right) private pure returns (bytes32 hash) {
     return keccak256(abi.encodePacked(INTERNAL_DOMAIN_SEPARATOR, left, right));
   }
 
-  function _beforeSetConfig(uint8 _threshold, bytes memory _onchainConfig) internal override {
-    // TODO
-  }
+  function _beforeSetConfig(uint8 _threshold, bytes memory _onchainConfig) internal override {}
 
   function _afterSetConfig(
     uint8, /* f */
     bytes memory /* onchainConfig */
-  ) internal override {
-    // TODO
-  }
+  ) internal override {}
 
-  function _payTransmitter(uint32 initialGas, address transmitter) internal override {
-    // TODO
-  }
-
-  function typeAndVersion() external pure override returns (string memory) {
-    return "BlobVerifier 1.0.0";
-  }
+  function _payTransmitter(uint32 initialGas, address transmitter) internal override {}
 }
