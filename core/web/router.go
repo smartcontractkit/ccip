@@ -319,7 +319,9 @@ func v2Routes(app chainlink.Application, r *gin.RouterGroup) {
 		}{
 			{"solana", NewSolanaKeysController(app)},
 			{"terra", NewTerraKeysController(app)},
+			{"starknet", NewStarkNetKeysController(app)},
 			{"dkgsign", NewDKGSignKeysController(app)},
+			{"dkgencrypt", NewDKGEncryptKeysController(app)},
 		} {
 			authv2.GET("/keys/"+keys.path, keys.kc.Index)
 			authv2.POST("/keys/"+keys.path, keys.kc.Create)
