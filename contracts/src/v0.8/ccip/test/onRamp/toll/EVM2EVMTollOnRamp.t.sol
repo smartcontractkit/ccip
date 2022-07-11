@@ -33,8 +33,7 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
     // Since we'll mostly be testing for valid calls from the router we'll
     // mock all calls to be originating from the router and re-mock in
     // tests that require failure.
-    vm.stopPrank();
-    vm.startPrank(address(s_onRampRouter));
+    changePrank(address(s_onRampRouter));
   }
 
   // Success
@@ -46,8 +45,7 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
   // Reverts
 
   function testPausedReverts() public {
-    vm.stopPrank();
-    vm.startPrank(OWNER);
+    changePrank(OWNER);
     s_onRamp.pause();
     vm.expectRevert("Pausable: paused");
     s_onRamp.forwardFromRouter(getEmptyMessage(), OWNER);
@@ -60,8 +58,7 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
   }
 
   function testPermissionsReverts() public {
-    vm.stopPrank();
-    vm.startPrank(OWNER);
+    changePrank(OWNER);
     vm.expectRevert(BaseOnRampInterface.MustBeCalledByRouter.selector);
     s_onRamp.forwardFromRouter(getEmptyMessage(), OWNER);
   }
@@ -104,12 +101,11 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
   }
 
   function testSenderNotAllowedReverts() public {
-    vm.stopPrank();
-    vm.prank(OWNER);
+    changePrank(OWNER);
     s_onRamp.setAllowlistEnabled(true);
 
     vm.expectRevert(abi.encodeWithSelector(AllowListInterface.SenderNotAllowed.selector, STRANGER));
-    vm.prank(address(s_onRampRouter));
+    changePrank(address(s_onRampRouter));
     s_onRamp.forwardFromRouter(getEmptyMessage(), STRANGER);
   }
 

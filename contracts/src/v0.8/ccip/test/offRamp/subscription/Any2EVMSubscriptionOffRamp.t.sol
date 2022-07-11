@@ -48,8 +48,7 @@ contract Any2EVMSubscriptionOffRamp_setRouter is Any2EVMSubscriptionOffRampSetup
   function testOwnerReverts() public {
     Any2EVMSubscriptionOffRampRouterInterface newRouter = Any2EVMSubscriptionOffRampRouter(address(1));
 
-    vm.stopPrank();
-    vm.startPrank(address(STRANGER));
+    changePrank(STRANGER);
     vm.expectRevert("Only callable by owner");
     s_offRamp.setRouter(newRouter);
   }
@@ -71,8 +70,7 @@ contract Any2EVMSubscriptionOffRamp_executeSingleMessage is Any2EVMSubscriptionO
 
   // Assert that a self call to executeSingleMessage with a valid receiver will succeed.
   function testSuccessNoTokensSuccess() public {
-    vm.stopPrank();
-    vm.prank(address(s_offRamp));
+    changePrank(address(s_offRamp));
     s_offRamp.executeSingleMessage(getAny2EVMSubscriptionMessageNoTokens(1, 1));
   }
 
@@ -86,8 +84,7 @@ contract Any2EVMSubscriptionOffRamp_executeSingleMessage is Any2EVMSubscriptionO
   }
 
   function testUnsupportedTokenReverts() public {
-    vm.stopPrank();
-    vm.prank(address(s_offRamp));
+    changePrank(address(s_offRamp));
     CCIP.Any2EVMSubscriptionMessage[] memory messages = generateMessagesWithTokens();
     messages[0].tokens[0] = s_destTokens[0];
     vm.expectRevert(abi.encodeWithSelector(BaseOffRampInterface.UnsupportedToken.selector, s_destTokens[0]));
@@ -97,8 +94,7 @@ contract Any2EVMSubscriptionOffRamp_executeSingleMessage is Any2EVMSubscriptionO
   // Assert that any call to executeSingleMessage with an invalid receiver
   // will revert.
   function testInvalidReceiver() public {
-    vm.stopPrank();
-    vm.prank(address(s_offRamp));
+    changePrank(address(s_offRamp));
     CCIP.Any2EVMSubscriptionMessage memory message = getAny2EVMSubscriptionMessageNoTokens(1, 1);
     message.receiver = STRANGER;
     vm.expectRevert(abi.encodeWithSelector(BaseOffRampInterface.InvalidReceiver.selector, STRANGER));

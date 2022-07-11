@@ -65,8 +65,7 @@ contract Any2EVMTollOffRamp_setRouter is Any2EVMTollOffRampSetup {
   function testOwnerReverts() public {
     Any2EVMTollOffRampRouterInterface newRouter = _generateNewRouter();
 
-    vm.stopPrank();
-    vm.startPrank(address(STRANGER));
+    changePrank(STRANGER);
     vm.expectRevert("Only callable by owner");
     s_offRamp.setRouter(newRouter);
   }
@@ -260,8 +259,7 @@ contract Any2EVMTollOffRamp_executeSingleMessage is Any2EVMTollOffRampSetup {
     offRamps[0] = s_offRamp;
     s_router = new Any2EVMTollOffRampRouter(offRamps);
     s_offRamp.setRouter(s_router);
-    vm.stopPrank();
-    vm.startPrank(address(s_offRamp));
+    changePrank(address(s_offRamp));
   }
 
   // Success

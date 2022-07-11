@@ -35,8 +35,7 @@ contract Any2EVMSubscriptionOffRampRouter_routeMessage is Any2EVMSubscriptionOff
 
   function setUp() public virtual override {
     Any2EVMSubscriptionOffRampSetup.setUp();
-    vm.stopPrank();
-    vm.startPrank(address(s_offRamp));
+    changePrank(address(s_offRamp));
 
     s_revertingReceiver = new RevertingMessageReceiver();
   }
@@ -53,8 +52,7 @@ contract Any2EVMSubscriptionOffRampRouter_routeMessage is Any2EVMSubscriptionOff
 
   // Reverts
   function testMustCallFromOffRampReverts() public {
-    vm.stopPrank();
-    vm.startPrank(OWNER);
+    changePrank(OWNER);
     vm.expectRevert(
       abi.encodeWithSelector(BaseOffRampRouterInterface.MustCallFromOffRamp.selector, BaseOffRampInterface(OWNER))
     );
@@ -84,8 +82,7 @@ contract Any2EVMSubscriptionOffRampRouter_chargeSubscription is Any2EVMSubscript
 
   function setUp() public virtual override {
     Any2EVMSubscriptionOffRampSetup.setUp();
-    vm.stopPrank();
-    vm.startPrank(address(s_offRamp));
+    changePrank(address(s_offRamp));
   }
 
   // Success
@@ -103,8 +100,7 @@ contract Any2EVMSubscriptionOffRampRouter_chargeSubscription is Any2EVMSubscript
 
   // Reverts
   function testMustCallFromOffRampReverts() public {
-    vm.stopPrank();
-    vm.startPrank(OWNER);
+    changePrank(OWNER);
     vm.expectRevert(abi.encodeWithSelector(BaseOffRampRouterInterface.MustCallFromOffRamp.selector, OWNER));
     s_router.chargeSubscription(address(s_receiver), OWNER, SUBSCRIPTION_BALANCE);
   }

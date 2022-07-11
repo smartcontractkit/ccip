@@ -48,8 +48,8 @@ contract Any2EVMTollReceiverDapp_ccipReceive is ReceiverDappSetup {
     uint256 startingBalanceOwner = s_feeToken.balanceOf(OWNER);
     uint256 startingBalanceContract = s_feeToken.balanceOf(address(s_receiverDapp));
 
-    vm.stopPrank();
-    vm.prank(address(s_mockRouter));
+    changePrank(address(s_mockRouter));
+
     s_receiverDapp.ccipReceive(message);
 
     assertEq(transferAmount, s_feeToken.balanceOf(OWNER) - startingBalanceOwner);

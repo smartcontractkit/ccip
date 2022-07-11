@@ -85,8 +85,7 @@ contract Any2EVMTollOffRampRouter_routeMessage is Any2EVMTollOffRampRouterSetup 
     (CrossChainMessageReceiverInterface receiver, CCIP.Any2EVMTollMessage memory message) = _generateMockMessage(
       address(s_receiver)
     );
-    vm.stopPrank();
-    vm.prank(address(s_offRamps[0]));
+    changePrank(address(s_offRamps[0]));
     vm.expectEmit(false, false, false, true);
     emit MessageReceived(message.sequenceNumber);
 
@@ -109,8 +108,7 @@ contract Any2EVMTollOffRampRouter_routeMessage is Any2EVMTollOffRampRouterSetup 
     (CrossChainMessageReceiverInterface receiver, CCIP.Any2EVMTollMessage memory message) = _generateMockMessage(
       address(0)
     );
-    vm.stopPrank();
-    vm.prank(address(s_offRamps[0]));
+    changePrank(address(s_offRamps[0]));
     vm.expectRevert();
     s_router.routeMessage(receiver, message);
   }
@@ -119,8 +117,7 @@ contract Any2EVMTollOffRampRouter_routeMessage is Any2EVMTollOffRampRouterSetup 
     (CrossChainMessageReceiverInterface receiver, CCIP.Any2EVMTollMessage memory message) = _generateMockMessage(
       address(s_revertingReceiver)
     );
-    vm.stopPrank();
-    vm.prank(address(s_offRamps[0]));
+    changePrank(address(s_offRamps[0]));
     bytes memory reason;
     vm.expectRevert(
       abi.encodeWithSelector(BaseOffRampRouterInterface.MessageFailure.selector, message.sequenceNumber, reason)

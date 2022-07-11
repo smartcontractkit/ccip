@@ -183,11 +183,10 @@ contract EVM2AnySubscriptionOnRampRouter_fundSubscription is EVM2EVMSubscription
   }
 
   function testFundsTooLowReverts() public {
-    vm.stopPrank();
     address mockAddress = address(9);
     assertEq(0, s_onRampRouter.getBalance(mockAddress));
     vm.expectRevert("ERC20: transfer amount exceeds balance");
-    vm.prank(mockAddress);
+    changePrank(mockAddress);
     s_onRampRouter.fundSubscription(2**256 - 1);
     assertEq(0, s_onRampRouter.getBalance(mockAddress));
   }

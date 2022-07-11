@@ -16,13 +16,9 @@ contract BaseTest is Test {
   AFNInterface internal s_afn;
 
   function setUp() public virtual {
-    // Stop any running pranks
-    // This is needed when a contract inherits from multiple contracts that
-    // each inherit BaseTest as only one prank can be running at the same
-    // time.
-    vm.stopPrank();
     // Set the sender to OWNER permanently
-    vm.startPrank(OWNER);
+    changePrank(OWNER);
+
     // Set the block time to a constant known value
     vm.warp(BLOCK_TIME);
 

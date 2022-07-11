@@ -48,8 +48,7 @@ contract BaseOffRampRouter_addOffRamp is BaseOffRampRouterSetup {
   // Reverts
 
   function testOwnerReverts() public {
-    vm.stopPrank();
-    vm.prank(STRANGER);
+    changePrank(STRANGER);
     vm.expectRevert("Only callable by owner");
     s_router.addOffRamp(s_newOffRamp);
   }
@@ -86,8 +85,7 @@ contract BaseOffRampRouter_removeOffRamp is BaseOffRampRouterSetup {
   // Reverts
 
   function testOwnerReverts() public {
-    vm.stopPrank();
-    vm.prank(STRANGER);
+    changePrank(STRANGER);
     vm.expectRevert("Only callable by owner");
     s_router.removeOffRamp(s_offRamps[0]);
   }
