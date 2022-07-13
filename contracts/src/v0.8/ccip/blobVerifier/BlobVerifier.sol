@@ -82,16 +82,12 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
     emit BlobVerifierConfigSet(config);
   }
 
-  /**
-   * @notice Returns the current config.
-   */
+  /// @inheritdoc BlobVerifierInterface
   function getConfig() external view returns (BlobVerifierConfig memory) {
     return s_config;
   }
 
-  /**
-   * @notice Returns the next expected sequence number for a given onRamp.
-   */
+  /// @inheritdoc BlobVerifierInterface
   function getExpectedNextSequenceNumber(address onRamp) public view returns (uint64) {
     return s_expectedNextMinByOnRamp[onRamp];
   }
@@ -107,44 +103,7 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
     }
   }
 
-  /**
-   * @notice Extending OCR2Base._report
-   * @dev assumes the report is a bytes encoded CCIP.RelayReport
-   * @dev report is called by the Relaying DON through the ReportingPlugin
-   */
-  function _report(
-    bytes32, /*configDigest*/
-    uint40, /*epochAndRound*/
-    bytes memory encodedReport
-  ) internal override whenNotPaused whenHealthy {
-    CCIP.RelayReport memory report = abi.decode(encodedReport, (CCIP.RelayReport));
-    uint256 reportLength = report.onRamps.length;
-    if (reportLength != report.intervals.length || reportLength != report.merkleRoots.length) {
-      revert InvalidRelayReport(report);
-    }
-    for (uint256 i = 0; i < reportLength; ++i) {
-      address onRamp = report.onRamps[i];
-      uint64 expectedMinSeqNum = s_expectedNextMinByOnRamp[onRamp];
-      CCIP.Interval memory repInterval = report.intervals[i];
-
-      if (expectedMinSeqNum == 0) {
-        revert UnsupportedOnRamp(onRamp);
-      }
-      if (expectedMinSeqNum != repInterval.min || repInterval.min > repInterval.max) {
-        revert InvalidInterval(repInterval, onRamp);
-      }
-      s_expectedNextMinByOnRamp[onRamp] = repInterval.max + 1;
-    }
-    s_roots[report.rootOfRoots] = block.timestamp;
-    emit ReportAccepted(report);
-  }
-
-  /**
-   * @notice Returns timestamp of when root was accepted or -1 if verification fails.
-   * @dev This method uses a merkle tree within a merkle tree, with the hashedLeaves,
-   *        innerProofs and innerProofFlagBits being used to get the root of the inner
-   *        tree. This root is then used as the singular leaf of the outer tree.
-   */
+  /// @inheritdoc BlobVerifierInterface
   function verify(
     bytes32[] calldata hashedLeaves,
     bytes32[] calldata innerProofs,
@@ -159,17 +118,7 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
     return s_roots[outerRoot];
   }
 
-  /**
-   * @notice Generates a Merkle Root based on the given leaves, proofs and proofFlagBits.
-   *          This method can proof multiple leaves at the same time.
-   * @param leaves The leaf hashes of the merkle tree.
-   * @param proofs The hashes to be used instead of a leaf hash when the proofFlagBits
-   *          indicates a proof should be used.
-   * @param proofFlagBits A single uint256 of which each bit indicates whether a leaf or
-   *          a proof needs to be used in a hash operation.
-   * @dev the maximum number of hash operations it set to 256. Any input that would require
-   *          more than 256 hashes to get to a root will revert.
-   */
+  /// @inheritdoc BlobVerifierInterface
   function merkleRoot(
     bytes32[] memory leaves,
     bytes32[] memory proofs,
@@ -198,11 +147,37 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
     }
   }
 
-  /**
-   * @notice Returns a previously relayed merkle root if it exists.
-   */
+  /// @inheritdoc BlobVerifierInterface
   function getMerkleRoot(bytes32 root) external view returns (uint256) {
     return s_roots[root];
+  }
+
+  /// @inheritdoc OCR2Base
+  function _report(
+    bytes32, /*configDigest*/
+    uint40, /*epochAndRound*/
+    bytes memory encodedReport
+  ) internal override whenNotPaused whenHealthy {
+    CCIP.RelayReport memory report = abi.decode(encodedReport, (CCIP.RelayReport));
+    uint256 reportLength = report.onRamps.length;
+    if (reportLength != report.intervals.length || reportLength != report.merkleRoots.length) {
+      revert InvalidRelayReport(report);
+    }
+    for (uint256 i = 0; i < reportLength; ++i) {
+      address onRamp = report.onRamps[i];
+      uint64 expectedMinSeqNum = s_expectedNextMinByOnRamp[onRamp];
+      CCIP.Interval memory repInterval = report.intervals[i];
+
+      if (expectedMinSeqNum == 0) {
+        revert UnsupportedOnRamp(onRamp);
+      }
+      if (expectedMinSeqNum != repInterval.min || repInterval.min > repInterval.max) {
+        revert InvalidInterval(repInterval, onRamp);
+      }
+      s_expectedNextMinByOnRamp[onRamp] = repInterval.max + 1;
+    }
+    s_roots[report.rootOfRoots] = block.timestamp;
+    emit ReportAccepted(report);
   }
 
   /**

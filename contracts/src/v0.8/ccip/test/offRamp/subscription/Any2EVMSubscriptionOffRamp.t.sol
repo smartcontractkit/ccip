@@ -21,6 +21,10 @@ contract Any2EVMSubscriptionOffRamp_constructor is Any2EVMSubscriptionOffRampSet
     assertEq(pools.length, s_sourceTokens.length);
     assertTrue(address(pools[0]) == address(s_sourceTokens[0]));
     assertTrue(address(pools[1]) == address(s_sourceTokens[1]));
+
+    // HealthChecker
+    assertEq(HEARTBEAT, s_offRamp.getMaxSecondsWithoutAFNHeartbeat());
+    assertEq(address(s_afn), address(s_offRamp.getAFN()));
   }
 }
 

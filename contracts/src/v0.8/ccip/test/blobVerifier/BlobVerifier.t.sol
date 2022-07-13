@@ -7,8 +7,6 @@ import "../helpers/MerkleHelper.sol";
 /// @notice #constructor
 contract BlobVerifier_constructor is BaseTest {
   function testSuccess() public {
-    // TODO: HealthChecker config (afn, heartbeat time)
-
     address[] memory onRamps = new address[](3);
     onRamps[0] = ON_RAMP_ADDRESS;
     onRamps[1] = 0x2C44CDDdB6a900Fa2B585dd299E03D12Fa4293Bc;
@@ -21,19 +19,26 @@ contract BlobVerifier_constructor is BaseTest {
       onRamps: onRamps,
       minSeqNrByOnRamp: minSequenceNumbers
     });
-    BlobVerifier blobVerifier = new BlobVerifier(DEST_CHAIN_ID, SOURCE_CHAIN_ID, s_afn, 1e18, config);
+    BlobVerifier blobVerifier = new BlobVerifier(DEST_CHAIN_ID, SOURCE_CHAIN_ID, s_afn, HEARTBEAT, config);
 
     // BlobVerifier config
     assertEq(minSequenceNumbers[0], blobVerifier.getExpectedNextSequenceNumber(onRamps[0]));
     assertEq(minSequenceNumbers[1], blobVerifier.getExpectedNextSequenceNumber(onRamps[1]));
     assertEq(minSequenceNumbers[2], blobVerifier.getExpectedNextSequenceNumber(onRamps[2]));
-    // TODO: getConfig
+
+    BlobVerifierInterface.BlobVerifierConfig memory contractConfig = blobVerifier.getConfig();
+    assertEq(keccak256(abi.encode(config.minSeqNrByOnRamp)), keccak256(abi.encode(contractConfig.minSeqNrByOnRamp)));
+    assertEq(config.onRamps, contractConfig.onRamps);
 
     // typeAndVersion
     assertEq("BlobVerifier 1.0.0", blobVerifier.typeAndVersion());
 
     // owner
     assertEq(OWNER, blobVerifier.owner());
+
+    // HealthChecker
+    assertEq(HEARTBEAT, blobVerifier.getMaxSecondsWithoutAFNHeartbeat());
+    assertEq(address(s_afn), address(blobVerifier.getAFN()));
   }
 
   function testInvalidConfigurationReverts() public {
@@ -46,7 +51,7 @@ contract BlobVerifier_constructor is BaseTest {
       DEST_CHAIN_ID,
       SOURCE_CHAIN_ID,
       s_afn,
-      1e18,
+      HEARTBEAT,
       BlobVerifierInterface.BlobVerifierConfig({onRamps: onRamps, minSeqNrByOnRamp: minSequenceNumbers})
     );
   }
@@ -82,16 +87,55 @@ contract BlobVerifier_setConfig is BlobVerifierSetup {
 
   // Reverts
 
-  // TODO: testOwnerFail, testInvalidConfigMismatchLengthFail, testInvalidConfigZeroLengthFail
+  function testOnlyOwnerReverts() public {
+    vm.stopPrank();
+    vm.expectRevert("Only callable by owner");
+    BlobVerifierInterface.BlobVerifierConfig memory newConfig;
+    s_blobVerifier.setConfig(newConfig);
+  }
+
+  function testInvalidConfigurationLengthMismatchReverts() public {
+    address[] memory onRamps = new address[](2);
+    uint64[] memory minSeqNrByOnRamp = new uint64[](1);
+    BlobVerifierInterface.BlobVerifierConfig memory newConfig = BlobVerifierInterface.BlobVerifierConfig({
+      onRamps: onRamps,
+      minSeqNrByOnRamp: minSeqNrByOnRamp
+    });
+    vm.expectRevert(BlobVerifierInterface.InvalidConfiguration.selector);
+
+    s_blobVerifier.setConfig(newConfig);
+  }
+
+  function testInvalidConfigurationZeroRampsReverts() public {
+    address[] memory onRamps = new address[](0);
+    uint64[] memory minSeqNrByOnRamp = new uint64[](0);
+    BlobVerifierInterface.BlobVerifierConfig memory newConfig = BlobVerifierInterface.BlobVerifierConfig({
+      onRamps: onRamps,
+      minSeqNrByOnRamp: minSeqNrByOnRamp
+    });
+    vm.expectRevert(BlobVerifierInterface.InvalidConfiguration.selector);
+
+    s_blobVerifier.setConfig(newConfig);
+  }
 }
 
 /// @notice #resetUnblessedRoots
 contract BlobVerifier_resetUnblessedRoots is BlobVerifierSetup {
-  // TODO
+  // TODO proper AFN blessing handling
+
+  // Reverts
+  function testOnlyOwnerReverts() public {
+    vm.stopPrank();
+    vm.expectRevert("Only callable by owner");
+    bytes32[] memory rootToReset;
+    s_blobVerifier.resetUnblessedRoots(rootToReset);
+  }
 }
 
 /// @notice #report
 contract BlobVerifier_report is BlobVerifierSetup {
+  event ReportAccepted(CCIP.RelayReport report);
+
   // Success
 
   function testSuccess() public {
@@ -112,17 +156,119 @@ contract BlobVerifier_report is BlobVerifierSetup {
       merkleRoots: merkleRoots,
       rootOfRoots: "root"
     });
+
+    vm.expectEmit(true, false, false, true);
+
     s_blobVerifier.report(abi.encode(report));
+    emit ReportAccepted(report);
 
     assertEq(max1 + 1, s_blobVerifier.getExpectedNextSequenceNumber(s_config.onRamps[0]));
     assertEq(max2 + 1, s_blobVerifier.getExpectedNextSequenceNumber(s_config.onRamps[1]));
     assertEq(max3 + 1, s_blobVerifier.getExpectedNextSequenceNumber(s_config.onRamps[2]));
   }
+
+  // Reverts
+
+  function testPausedReverts() public {
+    s_blobVerifier.pause();
+    vm.expectRevert("Pausable: paused");
+    bytes memory report;
+    s_blobVerifier.report(report);
+  }
+
+  function testUnhealthyReverts() public {
+    s_afn.voteBad();
+    vm.expectRevert(HealthChecker.BadAFNSignal.selector);
+    bytes memory report;
+    s_blobVerifier.report(report);
+  }
+
+  function testInvalidRelayReportRootLengthReverts() public {
+    CCIP.Interval[] memory intervals = new CCIP.Interval[](3);
+    bytes32[] memory merkleRoots = new bytes32[](2);
+    CCIP.RelayReport memory report = CCIP.RelayReport({
+      onRamps: s_config.onRamps,
+      intervals: intervals,
+      merkleRoots: merkleRoots,
+      rootOfRoots: "root"
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(BlobVerifierInterface.InvalidRelayReport.selector, report));
+
+    s_blobVerifier.report(abi.encode(report));
+  }
+
+  function testInvalidRelayReportIntervalLengthReverts() public {
+    CCIP.Interval[] memory intervals = new CCIP.Interval[](2);
+    bytes32[] memory merkleRoots = new bytes32[](3);
+    CCIP.RelayReport memory report = CCIP.RelayReport({
+      onRamps: s_config.onRamps,
+      intervals: intervals,
+      merkleRoots: merkleRoots,
+      rootOfRoots: "root"
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(BlobVerifierInterface.InvalidRelayReport.selector, report));
+
+    s_blobVerifier.report(abi.encode(report));
+  }
+
+  function testUnsupportedOnRampReverts() public {
+    CCIP.Interval[] memory intervals = new CCIP.Interval[](1);
+    address[] memory onRamps = new address[](1);
+    bytes32[] memory merkleRoots = new bytes32[](1);
+    CCIP.RelayReport memory report = CCIP.RelayReport({
+      onRamps: onRamps,
+      intervals: intervals,
+      merkleRoots: merkleRoots,
+      rootOfRoots: "root"
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(BlobVerifierInterface.UnsupportedOnRamp.selector, onRamps[0]));
+
+    s_blobVerifier.report(abi.encode(report));
+  }
+
+  function testInvalidIntervalReverts() public {
+    CCIP.Interval[] memory intervals = new CCIP.Interval[](1);
+    intervals[0] = CCIP.Interval(2, 2);
+    address[] memory onRamps = new address[](1);
+    onRamps[0] = s_config.onRamps[0];
+    bytes32[] memory merkleRoots = new bytes32[](1);
+    CCIP.RelayReport memory report = CCIP.RelayReport({
+      onRamps: onRamps,
+      intervals: intervals,
+      merkleRoots: merkleRoots,
+      rootOfRoots: "root"
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(BlobVerifierInterface.InvalidInterval.selector, intervals[0], onRamps[0]));
+
+    s_blobVerifier.report(abi.encode(report));
+  }
+
+  function testInvalidIntervalMinLargerThanMaxReverts() public {
+    CCIP.Interval[] memory intervals = new CCIP.Interval[](1);
+    intervals[0] = CCIP.Interval(1, 0);
+    address[] memory onRamps = new address[](1);
+    onRamps[0] = s_config.onRamps[0];
+    bytes32[] memory merkleRoots = new bytes32[](1);
+    CCIP.RelayReport memory report = CCIP.RelayReport({
+      onRamps: onRamps,
+      intervals: intervals,
+      merkleRoots: merkleRoots,
+      rootOfRoots: "root"
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(BlobVerifierInterface.InvalidInterval.selector, intervals[0], onRamps[0]));
+
+    s_blobVerifier.report(abi.encode(report));
+  }
 }
 
 /// @notice #verify
 contract BlobVerifier_verify is BlobVerifierSetup {
-  function testSingleRampSuccess() public {
+  function testSuccess() public {
     CCIP.Interval[] memory intervals = new CCIP.Interval[](1);
     intervals[0] = CCIP.Interval(1, 2);
     bytes32[] memory merkleRoots = new bytes32[](1);
@@ -146,6 +292,12 @@ contract BlobVerifier_verify is BlobVerifierSetup {
 
   // Reverts
 
-  // TODO: testPausedFail, testUnhealthyFail, testIntervalsLengthFail, testMerkleRootsLengthFail
-  // TODO: testUnsupportedOnRampFail, testSequenceNumberNotMinFail, testIntervalMinLargerThanMaxFail
+  function testTooManyLeavesReverts() public {
+    bytes32[] memory merkleRoots = new bytes32[](258);
+    bytes32[] memory proofs = new bytes32[](0);
+
+    vm.expectRevert();
+
+    s_blobVerifier.verify(merkleRoots, proofs, 0, proofs, 0);
+  }
 }

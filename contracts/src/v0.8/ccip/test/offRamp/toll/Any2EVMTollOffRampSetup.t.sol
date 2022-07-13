@@ -43,7 +43,7 @@ contract Any2EVMTollOffRampSetup is TokenSetup {
       s_afn,
       s_sourceTokens,
       s_destPools,
-      2**20
+      HEARTBEAT
     );
   }
 

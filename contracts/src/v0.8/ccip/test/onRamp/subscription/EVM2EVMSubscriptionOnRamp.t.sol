@@ -23,7 +23,9 @@ contract EVM2EVMSubscriptionOnRamp_constructor is EVM2EVMSubscriptionOnRampSetup
     assertEq(address(s_onRampRouter), s_onRamp.getRouter());
     assertEq(1, s_onRamp.getExpectedNextSequenceNumber());
 
-    // TODO: AFN and Heartbeat timestamp getters
+    // HealthChecker
+    assertEq(HEARTBEAT, s_onRamp.getMaxSecondsWithoutAFNHeartbeat());
+    assertEq(address(s_afn), address(s_onRamp.getAFN()));
   }
 }
 

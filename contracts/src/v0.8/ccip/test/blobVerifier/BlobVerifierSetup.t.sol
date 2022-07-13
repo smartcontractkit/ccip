@@ -23,6 +23,6 @@ contract BlobVerifierSetup is BaseTest {
     minSequenceNumbers[1] = 1;
     minSequenceNumbers[2] = 1;
     s_config = BlobVerifierInterface.BlobVerifierConfig({onRamps: onRamps, minSeqNrByOnRamp: minSequenceNumbers});
-    s_blobVerifier = new BlobVerifierHelper(DEST_CHAIN_ID, SOURCE_CHAIN_ID, s_afn, 1e18, s_config);
+    s_blobVerifier = new BlobVerifierHelper(DEST_CHAIN_ID, SOURCE_CHAIN_ID, s_afn, HEARTBEAT, s_config);
   }
 }

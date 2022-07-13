@@ -14,6 +14,7 @@ contract BaseTest is Test {
   address internal constant ON_RAMP_ADDRESS = 0x11118e64e1FB0c487f25dD6D3601FF6aF8d32E4e;
 
   AFNInterface internal s_afn;
+  uint256 internal constant HEARTBEAT = 1e18;
 
   function setUp() public virtual {
     // Set the sender to OWNER permanently

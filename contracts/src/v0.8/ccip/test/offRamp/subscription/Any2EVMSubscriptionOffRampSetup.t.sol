@@ -60,7 +60,7 @@ contract Any2EVMSubscriptionOffRampSetup is TokenSetup {
       s_afn,
       s_sourceTokens,
       s_destPools,
-      2**20
+      HEARTBEAT
     );
     s_subscriptionConfig = SubscriptionInterface.SubscriptionConfig(100, 100, s_destFeeToken);
     BaseOffRampInterface[] memory offRamps = new BaseOffRampInterface[](1);
