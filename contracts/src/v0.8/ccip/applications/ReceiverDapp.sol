@@ -15,15 +15,13 @@ contract ReceiverDapp is CrossChainMessageReceiverInterface, TypeAndVersionInter
   string public constant override typeAndVersion = "ReceiverDapp 1.0.0";
 
   Any2EVMTollOffRampRouterInterface public immutable ROUTER;
-  IERC20 public immutable TOKEN;
 
   address s_manager;
 
   error InvalidDeliverer(address deliverer);
 
-  constructor(Any2EVMTollOffRampRouterInterface router, IERC20 token) {
+  constructor(Any2EVMTollOffRampRouterInterface router) {
     ROUTER = router;
-    TOKEN = token;
     s_manager = msg.sender;
   }
 
@@ -36,8 +34,7 @@ contract ReceiverDapp is CrossChainMessageReceiverInterface, TypeAndVersionInter
    * the tokens sent with it to the designated EOA
    * @param message CCIP Message
    */
-  function ccipReceive(CCIP.Any2EVMTollMessage calldata message) external override {
-    if (msg.sender != address(ROUTER)) revert InvalidDeliverer(msg.sender);
+  function ccipReceive(CCIP.Any2EVMTollMessage calldata message) external override onlyRouter {
     handleMessage(message.data, message.tokens, message.amounts);
   }
 
@@ -46,8 +43,7 @@ contract ReceiverDapp is CrossChainMessageReceiverInterface, TypeAndVersionInter
    * the tokens sent with it to the designated EOA
    * @param message CCIP Message
    */
-  function ccipReceive(CCIP.Any2EVMSubscriptionMessage calldata message) external override {
-    if (msg.sender != address(ROUTER)) revert InvalidDeliverer(msg.sender);
+  function ccipReceive(CCIP.Any2EVMSubscriptionMessage calldata message) external override onlyRouter {
     handleMessage(message.data, message.tokens, message.amounts);
   }
 
@@ -64,8 +60,16 @@ contract ReceiverDapp is CrossChainMessageReceiverInterface, TypeAndVersionInter
     for (uint256 i = 0; i < tokens.length; ++i) {
       uint256 amount = amounts[i];
       if (destinationAddress != address(0) && amount != 0) {
-        TOKEN.transfer(destinationAddress, amount);
+        tokens[i].transfer(destinationAddress, amount);
       }
     }
+  }
+
+  /**
+   * @dev only calls from the set router are accepted.
+   */
+  modifier onlyRouter() {
+    if (msg.sender != address(ROUTER)) revert InvalidDeliverer(msg.sender);
+    _;
   }
 }

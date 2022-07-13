@@ -74,7 +74,6 @@ package gethwrappers
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.15/NativeTokenPool.abi ../../../contracts/solc/v0.8.15/NativeTokenPool.bin NativeTokenPool native_token_pool
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.15/AFN.abi ../../../contracts/solc/v0.8.15/AFN.bin AFNContract afn_contract
 
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.15/SenderDapp.abi ../../../contracts/solc/v0.8.15/SenderDapp.bin SenderDapp sender_dapp
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.15/ReceiverDapp.abi ../../../contracts/solc/v0.8.15/ReceiverDapp.bin ReceiverDapp receiver_dapp
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.15/SimpleMessageReceiver.abi ../../../contracts/solc/v0.8.15/SimpleMessageReceiver.bin SimpleMessageReceiver simple_message_receiver
 
@@ -84,12 +83,14 @@ package gethwrappers
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.15/Any2EVMTollOffRamp.abi ../../../contracts/solc/v0.8.15/Any2EVMTollOffRamp.bin Any2EVMTollOffRamp any_2_evm_toll_offramp
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.15/Any2EVMTollOffRampRouter.abi ../../../contracts/solc/v0.8.15/Any2EVMTollOffRampRouter.bin Any2EVMTollOffRampRouter any_2_evm_toll_offramp_router
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.15/Any2EVMTollOffRampHelper.abi ../../../contracts/solc/v0.8.15/Any2EVMTollOffRampHelper.bin Any2EVMTollOffRampHelper any_2_evm_toll_offramp_helper
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.15/TollSenderDapp.abi ../../../contracts/solc/v0.8.15/TollSenderDapp.bin TollSenderDapp toll_sender_dapp
 
 // Subscription
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.15/EVM2AnySubscriptionOnRampRouter.abi ../../../contracts/solc/v0.8.15/EVM2AnySubscriptionOnRampRouter.bin EVM2AnySubscriptionOnRampRouter evm_2_evm_subscription_onramp_router
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.15/EVM2EVMSubscriptionOnRamp.abi ../../../contracts/solc/v0.8.15/EVM2EVMSubscriptionOnRamp.bin EVM2EVMSubscriptionOnRamp evm_2_evm_subscription_onramp
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.15/Any2EVMSubscriptionOffRamp.abi ../../../contracts/solc/v0.8.15/Any2EVMSubscriptionOffRamp.bin Any2EVMSubscriptionOffRamp any_2_evm_subscription_offramp
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.15/Any2EVMSubscriptionOffRampRouter.abi ../../../contracts/solc/v0.8.15/Any2EVMSubscriptionOffRampRouter.bin Any2EVMSubscriptionOffRampRouter any_2_evm_subscription_offramp_router
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.15/SubscriptionSenderDapp.abi ../../../contracts/solc/v0.8.15/SubscriptionSenderDapp.bin SubscriptionSenderDapp subscription_sender_dapp
 
 // To run these commands, you must either install docker, or the correct version
 // of abigen. The latter can be installed with these commands, at least on linux:

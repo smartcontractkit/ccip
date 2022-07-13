@@ -11,10 +11,10 @@ import "../onRamp/interfaces/Any2EVMTollOnRampRouterInterface.sol";
  * represented by the On Ramp. Consider this an "Application Layer" contract that utilise the
  * underlying protocol.
  */
-contract SenderDapp is TypeAndVersionInterface {
+contract TollSenderDapp is TypeAndVersionInterface {
   using SafeERC20 for IERC20;
 
-  string public constant override typeAndVersion = "SenderDapp 1.0.0";
+  string public constant override typeAndVersion = "TollSenderDapp 1.0.0";
 
   // On ramp contract responsible for interacting with the DON.
   Any2EVMTollOnRampRouterInterface public immutable ON_RAMP_ROUTER;
@@ -46,9 +46,8 @@ contract SenderDapp is TypeAndVersionInterface {
     uint256[] memory amounts
   ) external returns (uint64 sequenceNumber) {
     if (destinationAddress == address(0)) revert InvalidDestinationAddress(destinationAddress);
-    address originalSender = msg.sender;
     for (uint256 i = 0; i < tokens.length; ++i) {
-      tokens[i].safeTransferFrom(originalSender, address(this), amounts[i]);
+      tokens[i].safeTransferFrom(msg.sender, address(this), amounts[i]);
       tokens[i].approve(address(ON_RAMP_ROUTER), amounts[i]);
     }
     // `data` format:
@@ -57,8 +56,8 @@ contract SenderDapp is TypeAndVersionInterface {
     sequenceNumber = ON_RAMP_ROUTER.ccipSend(
       DESTINATION_CHAIN_ID,
       CCIP.EVM2AnyTollMessage({
-        receiver: destinationAddress,
-        data: abi.encode(originalSender, destinationAddress),
+        receiver: DESTINATION_CONTRACT,
+        data: abi.encode(msg.sender, destinationAddress),
         tokens: tokens,
         amounts: amounts,
         feeToken: tokens[0],

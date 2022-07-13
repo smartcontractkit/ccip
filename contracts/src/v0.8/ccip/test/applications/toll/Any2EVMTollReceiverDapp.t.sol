@@ -17,7 +17,7 @@ contract ReceiverDappSetup is TokenSetup {
     s_feeToken = s_destTokens[0];
 
     s_mockRouter = new MockTollOffRampRouter();
-    s_receiverDapp = new ReceiverDapp(s_mockRouter, s_feeToken);
+    s_receiverDapp = new ReceiverDapp(s_mockRouter);
 
     s_destTokens[0].transfer(address(s_receiverDapp), 2**64);
     s_destTokens[1].transfer(address(s_receiverDapp), 2**64);

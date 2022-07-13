@@ -46,8 +46,6 @@ import (
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/mock_v3_aggregator_contract"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/native_token_pool"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/receiver_dapp"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/sender_dapp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/simple_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/core/internal/testutils/configtest"
@@ -86,8 +84,6 @@ type CCIPContracts struct {
 	blobVerifier                   *blob_verifier.BlobVerifier
 	offRampRouter                  *any_2_evm_toll_offramp_router.Any2EVMTollOffRampRouter
 	messageReceiver                *simple_message_receiver.SimpleMessageReceiver
-	senderDapp                     *sender_dapp.SenderDapp
-	receiverDapp                   *receiver_dapp.ReceiverDapp
 	offRamp                        *any_2_evm_toll_offramp.Any2EVMTollOffRamp
 }
 
@@ -266,16 +262,6 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 	require.NoError(t, err)
 	messageReceiver, err := simple_message_receiver.NewSimpleMessageReceiver(messageReceiverAddress, destChain)
 	require.NoError(t, err)
-	// Deploy offramp token receiver dapp
-	receiverDappAddress, _, _, err := receiver_dapp.DeployReceiverDapp(destUser, destChain, offRampRouterAddress, destLinkTokenAddress)
-	require.NoError(t, err)
-	eoaTokenReceiver, err := receiver_dapp.NewReceiverDapp(receiverDappAddress, destChain)
-	require.NoError(t, err)
-	// Deploy onramp token sender dapp
-	senderDappAddress, _, _, err := sender_dapp.DeploySenderDapp(sourceUser, sourceChain, onRampRouterAddress, destChainID, receiverDappAddress)
-	require.NoError(t, err)
-	eoaTokenSender, err := sender_dapp.NewSenderDapp(senderDappAddress, sourceChain)
-	require.NoError(t, err)
 
 	// Need to commit here, or we will hit the block gas limit when deploying the executor
 	sourceChain.Commit()
@@ -305,8 +291,6 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 		blobVerifier:    blobVerifier,
 		offRampRouter:   offRampRouter,
 		messageReceiver: messageReceiver,
-		receiverDapp:    eoaTokenReceiver,
-		senderDapp:      eoaTokenSender,
 		offRamp:         offRamp,
 	}
 }
