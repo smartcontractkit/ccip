@@ -32,6 +32,7 @@ type LogPoller interface {
 
 	// General queries
 	Logs(start, end int64, eventSig common.Hash, address common.Address, qopts ...pg.QOpt) ([]Log, error)
+	LogsWithSigs(start, end int64, eventSigs []common.Hash, address common.Address, qopts ...pg.QOpt) ([]Log, error)
 	LogsCreatedAfter(eventSig common.Hash, address common.Address, time time.Time, qopts ...pg.QOpt) ([]Log, error)
 	LatestLogByEventSigWithConfs(eventSig common.Hash, address common.Address, confs int, qopts ...pg.QOpt) (*Log, error)
 	LatestLogEventSigsAddrs(fromBlock int64, eventSigs []common.Hash, addresses []common.Address, qopts ...pg.QOpt) ([]Log, error)
@@ -81,7 +82,7 @@ func NewLogPoller(orm *ORM, ec client.Client, lggr logger.Logger, pollPeriod tim
 }
 
 // MergeFilter will update the filter with the new topics and addresses.
-// Clients may chose to MergeFilter and then replay in order to ensure desired logs are present.
+// Clients may choose to MergeFilter and then replay in order to ensure desired logs are present.
 func (lp *logPoller) MergeFilter(topics []common.Hash, address common.Address) {
 	lp.filterMu.Lock()
 	defer lp.filterMu.Unlock()
@@ -439,6 +440,14 @@ func (lp *logPoller) findLCA(h common.Hash) (int64, error) {
 // which are canonical at time of query.
 func (lp *logPoller) Logs(start, end int64, eventSig common.Hash, address common.Address, qopts ...pg.QOpt) ([]Log, error) {
 	return lp.orm.SelectLogsByBlockRangeFilter(start, end, address, eventSig[:], qopts...)
+}
+
+func (lp *logPoller) LogsWithSigs(start, end int64, eventSigs []common.Hash, address common.Address, qopts ...pg.QOpt) ([]Log, error) {
+	sigs := make([][]byte, 0, len(eventSigs))
+	for _, sig := range eventSigs {
+		sigs = append(sigs, sig.Bytes())
+	}
+	return lp.orm.SelectLogsWithSigsByBlockRangeFilter(start, end, address, sigs, qopts...)
 }
 
 func (lp *logPoller) LogsCreatedAfter(eventSig common.Hash, address common.Address, after time.Time, qopts ...pg.QOpt) ([]Log, error) {

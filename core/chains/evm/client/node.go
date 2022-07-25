@@ -288,10 +288,11 @@ func (n *node) verify(callerCtx context.Context) (err error) {
 		promEVMPoolRPCNodeVerifiesFailed.WithLabelValues(n.chainID.String(), n.name).Inc()
 	}
 
-	switch n.state {
+	st := n.State()
+	switch st {
 	case NodeStateDialed, NodeStateOutOfSync, NodeStateInvalidChainID:
 	default:
-		panic(fmt.Sprintf("cannot verify node in state %v", n.state))
+		panic(fmt.Sprintf("cannot verify node in state %v", st))
 	}
 
 	var chainID *big.Int
@@ -548,6 +549,7 @@ func (n *node) SendTransaction(ctx context.Context, tx *types.Transaction) error
 	return err
 }
 
+// PendingNonceAt returns one higher than the highest nonce from both mempool and mined transactions
 func (n *node) PendingNonceAt(ctx context.Context, account common.Address) (nonce uint64, err error) {
 	ctx, cancel, err := n.makeLiveQueryCtx(ctx)
 	if err != nil {
