@@ -29,8 +29,11 @@ contract EVM2AnySubscriptionOnRampRouter_ccipSend is EVM2EVMSubscriptionOnRampSe
   }
 
   function testTokensSuccess() public {
-    uint256 balance0Pre = s_sourceTokens[0].balanceOf(address(s_sourcePools[0]));
-    uint256 balance1Pre = s_sourceTokens[1].balanceOf(address(s_sourcePools[1]));
+    uint256 poolBalance0Before = s_sourceTokens[0].balanceOf(address(s_sourcePools[0]));
+    uint256 poolBalance1Before = s_sourceTokens[1].balanceOf(address(s_sourcePools[1]));
+
+    uint256 userBalance0Before = s_sourceTokens[0].balanceOf(OWNER);
+    uint256 userBalance1Before = s_sourceTokens[1].balanceOf(OWNER);
 
     s_sourceTokens[0].approve(address(s_onRampRouter), TOKEN_AMOUNT_0);
     s_sourceTokens[1].approve(address(s_onRampRouter), TOKEN_AMOUNT_1);
@@ -40,8 +43,12 @@ contract EVM2AnySubscriptionOnRampRouter_ccipSend is EVM2EVMSubscriptionOnRampSe
     emit CCIPSendRequested(messageToEvent(message, 1, 1));
 
     s_onRampRouter.ccipSend(DEST_CHAIN_ID, message);
-    assertEq(balance0Pre + TOKEN_AMOUNT_0, s_sourceTokens[0].balanceOf(address(s_sourcePools[0])));
-    assertEq(balance1Pre + TOKEN_AMOUNT_1, s_sourceTokens[1].balanceOf(address(s_sourcePools[1])));
+    // Assert the user balance is lowered by the tokens sent
+    assertEq(userBalance0Before - message.amounts[0], s_sourceTokens[0].balanceOf(OWNER));
+    assertEq(userBalance1Before - message.amounts[1], s_sourceTokens[1].balanceOf(OWNER));
+    // Asserts the tokens are all sent to the proper pools
+    assertEq(poolBalance0Before + TOKEN_AMOUNT_0, s_sourceTokens[0].balanceOf(address(s_sourcePools[0])));
+    assertEq(poolBalance1Before + TOKEN_AMOUNT_1, s_sourceTokens[1].balanceOf(address(s_sourcePools[1])));
   }
 
   function testChargeSubscriptionFundingSuccess() public {
@@ -224,5 +231,15 @@ contract EVM2AnySubscriptionOnRampRouter_unfundSubscription is EVM2EVMSubscripti
     s_onRampRouter.unfundSubscription(FUNDING_AMOUNT * 2);
 
     assertEq(FUNDING_AMOUNT, s_onRampRouter.getBalance(OWNER));
+  }
+}
+
+/// @notice #isChainSupported
+contract EVM2AnySubscriptionOnRampRouter_isChainSupported is EVM2EVMSubscriptionOnRampSetup {
+  // Success
+  function testSuccess() public {
+    assertTrue(s_onRampRouter.isChainSupported(DEST_CHAIN_ID));
+    assertFalse(s_onRampRouter.isChainSupported(DEST_CHAIN_ID + 1));
+    assertFalse(s_onRampRouter.isChainSupported(0));
   }
 }

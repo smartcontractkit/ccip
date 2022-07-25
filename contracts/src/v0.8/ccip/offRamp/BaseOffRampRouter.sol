@@ -1,14 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../vendor/SafeERC20.sol";
 import "../access/OwnerIsCreator.sol";
 import "./interfaces/BaseOffRampRouterInterface.sol";
 
 contract BaseOffRampRouter is BaseOffRampRouterInterface, OwnerIsCreator {
-  using Address for address;
-  using SafeERC20 for IERC20;
-
   // Mapping from offRamp to allowed status
   mapping(BaseOffRampInterface => OffRampDetails) internal s_offRamps;
   // List of all offRamps that have  OffRampDetails

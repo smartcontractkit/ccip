@@ -3,7 +3,6 @@ pragma solidity ^0.8.0;
 
 import "../../applications/interfaces/CrossChainMessageReceiverInterface.sol";
 import "../../utils/interfaces/SubscriptionInterface.sol";
-import "../interfaces/Any2EVMSubscriptionOffRampInterface.sol";
 import "./BaseOffRampRouterInterface.sol";
 
 interface Any2EVMSubscriptionOffRampRouterInterface is SubscriptionInterface, BaseOffRampRouterInterface {

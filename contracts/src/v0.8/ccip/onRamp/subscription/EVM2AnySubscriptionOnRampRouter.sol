@@ -3,7 +3,6 @@ pragma solidity 0.8.15;
 
 import "../../../interfaces/TypeAndVersionInterface.sol";
 import "../../pools/PoolCollector.sol";
-import "../../access/OwnerIsCreator.sol";
 import "../interfaces/Any2EVMSubscriptionOnRampRouterInterface.sol";
 
 contract EVM2AnySubscriptionOnRampRouter is
@@ -33,12 +32,16 @@ contract EVM2AnySubscriptionOnRampRouter is
     external
     returns (uint64)
   {
+    // Find and put the correct onRamp on the stack.
     Any2EVMSubscriptionOnRampInterface onRamp = s_onRamps[destinationChainId];
+    // Check if the onRamp is a zero address, meaning the chain is not supported.
     if (address(onRamp) == address(0)) revert UnsupportedDestinationChain(destinationChainId);
+    // If fees are enabled, charge the subscription.
     if (s_config.fee > 0) {
       s_subscriptionBalance[msg.sender] -= uint256(s_config.fee);
     }
 
+    // Transfer the tokens to the token pools.
     _collectTokens(onRamp, message.tokens, message.amounts);
 
     return onRamp.forwardFromRouter(message, msg.sender);

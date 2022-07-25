@@ -12,9 +12,6 @@ import "./interfaces/BaseOffRampInterface.sol";
  * @notice A base OffRamp contract that every OffRamp should expand on
  */
 contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry {
-  using Address for address;
-  using SafeERC20 for IERC20;
-
   // Chain ID of the source chain
   uint256 public immutable SOURCE_CHAIN_ID;
   // Chain ID of this chain

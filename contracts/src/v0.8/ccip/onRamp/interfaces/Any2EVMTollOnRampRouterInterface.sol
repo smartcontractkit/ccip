@@ -25,4 +25,11 @@ interface Any2EVMTollOnRampRouterInterface is BaseOnRampRouterInterface {
    * @param onRamp OnRamp to use for that destination chain
    */
   function setOnRamp(uint256 chainId, Any2EVMTollOnRampInterface onRamp) external;
+
+  /**
+   * @notice Gets the current OnRamp for the specified chain ID
+   * @param chainId Chain ID to get ramp details for
+   * @return onRamp
+   */
+  function getOnRamp(uint256 chainId) external view returns (Any2EVMTollOnRampInterface);
 }

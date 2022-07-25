@@ -3,7 +3,6 @@ pragma solidity 0.8.15;
 
 import "../../../interfaces/TypeAndVersionInterface.sol";
 import "../../../vendor/SafeERC20.sol";
-import "../../access/OwnerIsCreator.sol";
 import "../../utils/Subscription.sol";
 import "../interfaces/Any2EVMSubscriptionOffRampRouterInterface.sol";
 import "../BaseOffRampRouter.sol";
@@ -14,9 +13,6 @@ contract Any2EVMSubscriptionOffRampRouter is
   Subscription,
   TypeAndVersionInterface
 {
-  using Address for address;
-  using SafeERC20 for IERC20;
-
   string public constant override typeAndVersion = "Any2EVMSubscriptionOffRampRouter 1.0.0";
 
   constructor(

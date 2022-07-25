@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "../../pools/interfaces/PoolInterface.sol";
-import "./BaseOffRampInterface.sol";
 import "./Any2EVMSubscriptionOffRampRouterInterface.sol";
 
 interface Any2EVMSubscriptionOffRampInterface is BaseOffRampInterface {

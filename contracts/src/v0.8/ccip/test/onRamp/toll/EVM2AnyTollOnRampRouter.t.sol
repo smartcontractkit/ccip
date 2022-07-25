@@ -27,10 +27,19 @@ contract EVM2AnyTollOnRampRouter_ccipSend is EVM2EVMTollOnRampSetup {
     message.tokens = new IERC20[](1);
     message.tokens[0] = s_sourceTokens[0];
 
+    uint256 balanceBefore = s_sourceTokens[0].balanceOf(OWNER);
+
     vm.expectEmit(false, false, false, true);
     emit CCIPSendRequested(messageToEvent(message, 1));
 
     assertEq(1, s_onRampRouter.ccipSend(DEST_CHAIN_ID, message));
+    // Assert the user balance is lowered by the tokens sent and the fee amount
+    uint256 expectedBalance = balanceBefore - (message.amounts[0] + FEE_AMOUNT);
+    assertEq(expectedBalance, s_sourceTokens[0].balanceOf(OWNER));
+    // Asserts the tokens are sent to the pool
+    assertEq(message.amounts[0], s_sourceTokens[0].balanceOf(address(s_sourcePools[0])));
+    // Asserts the fee amount is left in the router
+    assertEq(FEE_AMOUNT, s_sourceTokens[0].balanceOf(address(s_onRampRouter)));
   }
 
   function testExactApproveSuccess() public {
@@ -42,7 +51,15 @@ contract EVM2AnyTollOnRampRouter_ccipSend is EVM2EVMTollOnRampSetup {
     message.tokens = new IERC20[](1);
     message.tokens[0] = s_sourceTokens[0];
 
+    uint256 balanceBefore = s_sourceTokens[0].balanceOf(OWNER);
+
+    vm.expectEmit(false, false, false, true);
+    emit CCIPSendRequested(messageToEvent(message, 1));
+
+    uint256 expectedBalance = balanceBefore - (message.amounts[0] + FEE_AMOUNT);
+
     assertEq(1, s_onRampRouter.ccipSend(DEST_CHAIN_ID, message));
+    assertEq(expectedBalance, s_sourceTokens[0].balanceOf(OWNER));
   }
 
   function testShouldIncrementSeqNumSuccess() public {
@@ -88,5 +105,58 @@ contract EVM2AnyTollOnRampRouter_ccipSend is EVM2EVMTollOnRampSetup {
     vm.expectRevert(PoolCollector.FeeTokenAmountTooLow.selector);
 
     s_onRampRouter.ccipSend(DEST_CHAIN_ID, message);
+  }
+}
+
+/// @notice #setOnRamp
+contract EVM2AnyTollOnRampRouter_setOnRamp is EVM2EVMTollOnRampSetup {
+  event OnRampSet(uint256 indexed chainId, Any2EVMTollOnRampInterface indexed onRamp);
+
+  // Success
+
+  // Asserts that setOnRamp changes the configured onramp. Also tests getOnRamp
+  // and isChainSupported.
+  function testSuccess() public {
+    Any2EVMTollOnRampInterface onramp = Any2EVMTollOnRampInterface(address(1));
+    uint256 chainId = 1337;
+    Any2EVMTollOnRampInterface before = s_onRampRouter.getOnRamp(chainId);
+    assertEq(address(0), address(before));
+    assertFalse(s_onRampRouter.isChainSupported(chainId));
+
+    vm.expectEmit(true, true, false, true);
+    emit OnRampSet(chainId, onramp);
+
+    s_onRampRouter.setOnRamp(chainId, onramp);
+    Any2EVMTollOnRampInterface afterSet = s_onRampRouter.getOnRamp(chainId);
+    assertEq(address(onramp), address(afterSet));
+    assertTrue(s_onRampRouter.isChainSupported(chainId));
+  }
+
+  // Reverts
+
+  // Asserts that setOnRamp reverts when the config was already set to
+  // the same onRamp.
+  function testAlreadySetReverts() public {
+    vm.expectRevert(
+      abi.encodeWithSelector(Any2EVMTollOnRampRouterInterface.OnRampAlreadySet.selector, DEST_CHAIN_ID, s_onRamp)
+    );
+    s_onRampRouter.setOnRamp(DEST_CHAIN_ID, s_onRamp);
+  }
+
+  // Asserts that setOnRamp can only be called by the owner.
+  function testOnlyOwnerReverts() public {
+    vm.stopPrank();
+    vm.expectRevert("Only callable by owner");
+    s_onRampRouter.setOnRamp(1337, Any2EVMTollOnRampInterface(address(1)));
+  }
+}
+
+/// @notice #isChainSupported
+contract EVM2AnyTollOnRampRouter_isChainSupported is EVM2EVMTollOnRampSetup {
+  // Success
+  function testSuccess() public {
+    assertTrue(s_onRampRouter.isChainSupported(DEST_CHAIN_ID));
+    assertFalse(s_onRampRouter.isChainSupported(DEST_CHAIN_ID + 1));
+    assertFalse(s_onRampRouter.isChainSupported(0));
   }
 }

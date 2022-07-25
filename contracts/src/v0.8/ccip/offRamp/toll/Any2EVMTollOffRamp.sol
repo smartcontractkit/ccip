@@ -3,9 +3,9 @@ pragma solidity 0.8.15;
 
 import "../../../interfaces/TypeAndVersionInterface.sol";
 import "../../ocr/OCR2Base.sol";
-import "../interfaces/Any2EVMTollOffRampInterface.sol";
 import "../../applications/interfaces/CrossChainMessageReceiverInterface.sol";
 import "../BaseOffRamp.sol";
+import "../interfaces/Any2EVMTollOffRampInterface.sol";
 
 /**
  * @notice Any2EVMTollOffRamp enables OCR networks to execute multiple messages
@@ -13,7 +13,6 @@ import "../BaseOffRamp.sol";
  */
 contract Any2EVMTollOffRamp is Any2EVMTollOffRampInterface, BaseOffRamp, TypeAndVersionInterface, OCR2Base {
   using Address for address;
-  using SafeERC20 for IERC20;
 
   string public constant override typeAndVersion = "Any2EVMTollOffRamp 1.0.0";
 

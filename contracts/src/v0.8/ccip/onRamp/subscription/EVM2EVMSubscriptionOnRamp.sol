@@ -3,7 +3,6 @@ pragma solidity 0.8.15;
 
 import "../../../interfaces/TypeAndVersionInterface.sol";
 import "../../utils/CCIP.sol";
-import "../interfaces/Any2EVMSubscriptionOnRampInterface.sol";
 import "./EVM2AnySubscriptionOnRampRouter.sol";
 import "../BaseOnRamp.sol";
 

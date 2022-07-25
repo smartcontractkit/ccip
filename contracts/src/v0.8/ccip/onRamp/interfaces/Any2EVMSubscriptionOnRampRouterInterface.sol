@@ -43,7 +43,7 @@ interface Any2EVMSubscriptionOnRampRouterInterface is BaseOnRampRouterInterface 
   function setOnRamp(uint256 chainId, Any2EVMSubscriptionOnRampInterface onRamp) external;
 
   /**
-   * @notice Retrieve current and proposed OnRamp details for the specified chain ID
+   * @notice Gets the current OnRamp for the specified chain ID
    * @param chainId Chain ID to get ramp details for
    * @return onRamp
    */

@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../pools/PoolCollector.sol";
 import "../../../interfaces/TypeAndVersionInterface.sol";
-import "../../access/OwnerIsCreator.sol";
-import "../interfaces/Any2EVMTollOnRampInterface.sol";
+import "../../pools/PoolCollector.sol";
 import "../interfaces/Any2EVMTollOnRampRouterInterface.sol";
 
 contract EVM2AnyTollOnRampRouter is
@@ -13,8 +11,6 @@ contract EVM2AnyTollOnRampRouter is
   OwnerIsCreator,
   PoolCollector
 {
-  using SafeERC20 for IERC20;
-
   string public constant override typeAndVersion = "EVM2AnyTollOnRampRouter 1.0.0";
 
   // destination chain id => OnRampInterface
@@ -22,11 +18,16 @@ contract EVM2AnyTollOnRampRouter is
 
   /// @inheritdoc Any2EVMTollOnRampRouterInterface
   function ccipSend(uint256 destinationChainId, CCIP.EVM2AnyTollMessage memory message) external returns (uint64) {
+    // Find and put the correct onRamp on the stack.
     Any2EVMTollOnRampInterface onRamp = s_onRamps[destinationChainId];
+    // Check if the onRamp is a zero address, meaning the chain is not supported.
     if (address(onRamp) == address(0)) revert UnsupportedDestinationChain(destinationChainId);
     if (message.tokens.length != message.amounts.length) revert BaseOnRampInterface.UnsupportedNumberOfTokens();
 
+    // Charge the fee and subtract that amount from the feeTokenAmount. This will revert if
+    // the given feeTokenAmount is too low for the needed fee.
     message.feeTokenAmount -= _chargeFee(onRamp, message.feeToken, message.feeTokenAmount);
+    // Transfer the tokens to the token pools.
     _collectTokens(onRamp, message.tokens, message.amounts);
 
     return onRamp.forwardFromRouter(message, msg.sender);
@@ -39,11 +40,7 @@ contract EVM2AnyTollOnRampRouter is
     emit OnRampSet(chainId, onRamp);
   }
 
-  /**
-   * @notice Retrieve current and proposed OnRamp details for the specified chain ID
-   * @param chainId Chain ID to get ramp details for
-   * @return onRamp
-   */
+  /// @inheritdoc Any2EVMTollOnRampRouterInterface
   function getOnRamp(uint256 chainId) external view returns (Any2EVMTollOnRampInterface) {
     return s_onRamps[chainId];
   }
