@@ -10,13 +10,15 @@ import (
 
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/any_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/blob_verifier"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/evm_2_evm_subscription_onramp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/evm_2_evm_toll_onramp"
 	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
 var (
 	// offset || sourceChainID || seqNum || ...
-	CCIPSendRequested common.Hash
+	CCIPSendRequested    common.Hash
+	CCIPSubSendRequested common.Hash
 	// merkleRoot || minSeqNum || maxSeqNum
 	ReportAccepted common.Hash
 	// sig || SeqNum || ...
@@ -26,7 +28,7 @@ var (
 
 // Zero indexed
 const (
-	SendRequestedSequenceNumberIndex             = 2
+	SendRequestedSequenceNumberIndex             = 2 // Valid for both toll and sub
 	ReportAcceptedMinSequenceNumberIndex         = 1
 	ReportAcceptedMaxSequenceNumberIndex         = 2
 	CrossChainMessageExecutedSequenceNumberIndex = 1
@@ -44,6 +46,10 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+	subOnRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRampABI))
+	if err != nil {
+		panic(err)
+	}
 	offRampABI, err := abi.JSON(strings.NewReader(any_2_evm_toll_offramp.Any2EVMTollOffRampABI))
 	if err != nil {
 		panic(err)
@@ -53,6 +59,7 @@ func init() {
 		panic(err)
 	}
 	CCIPSendRequested = getIDOrPanic("CCIPSendRequested", onRampABI)
+	CCIPSubSendRequested = getIDOrPanic("CCIPSendRequested", subOnRampABI)
 	ReportAccepted = getIDOrPanic("ReportAccepted", blobVerifierABI)
 	CrossChainMessageExecuted = getIDOrPanic("ExecutionCompleted", offRampABI)
 	ConfigSet = getIDOrPanic("ConfigSet", blobVerifierABI)

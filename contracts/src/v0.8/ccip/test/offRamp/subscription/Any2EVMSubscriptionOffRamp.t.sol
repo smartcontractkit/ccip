@@ -368,7 +368,7 @@ contract Any2EVMSubscriptionOffRamp_execute is Any2EVMSubscriptionOffRampSetup {
     messages[2] = getAny2EVMSubscriptionMessageNoTokens(3, 3);
 
     CCIP.ExecutionReport memory report = _generateReportFromMessages(messages);
-    report.tokenPerFeeCoin[0] = 1e5;
+    report.tokenPerFeeCoin[0] = 1e25;
 
     vm.expectRevert(SubscriptionInterface.BalanceTooLow.selector);
 

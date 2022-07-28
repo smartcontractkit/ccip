@@ -15,6 +15,7 @@ import (
 	eth "github.com/smartcontractkit/chainlink/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/blob_verifier"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/evm_2_evm_subscription_onramp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/evm_2_evm_toll_onramp"
 	type_and_version "github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/type_and_version_interface_wrapper"
 	"github.com/smartcontractkit/chainlink/core/logger"
@@ -24,12 +25,13 @@ import (
 )
 
 type CCIPRelay struct {
-	lggr              logger.Logger
-	spec              *job.OCR2OracleSpec
-	sourceChainPoller logpoller.LogPoller
-	blobVerifier      *blob_verifier.BlobVerifier
-	onRamps           []common.Address
-	onRampSeqParsers  map[common.Address]func(log logpoller.Log) (uint64, error)
+	lggr                logger.Logger
+	spec                *job.OCR2OracleSpec
+	sourceChainPoller   logpoller.LogPoller
+	blobVerifier        *blob_verifier.BlobVerifier
+	onRamps             []common.Address
+	onRampSeqParsers    map[common.Address]func(log logpoller.Log) (uint64, error)
+	onRampToReqEventSig map[common.Address]common.Hash
 }
 
 var _ plugins.OraclePlugin = &CCIPRelay{}
@@ -99,6 +101,7 @@ func NewCCIPRelay(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm.Cha
 		return nil, errors.Wrap(err, "failed creating a new offramp")
 	}
 	onRampSeqParsers := make(map[common.Address]func(log logpoller.Log) (uint64, error))
+	onRampToReqEventSig := make(map[common.Address]common.Hash)
 	var onRamps []common.Address
 	for _, onRampID := range pluginConfig.OnRampIDs {
 		addr := common.HexToAddress(onRampID)
@@ -119,19 +122,38 @@ func NewCCIPRelay(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm.Cha
 			}
 			// Subscribe to all relevant relay logs.
 			sourceChain.LogPoller().MergeFilter([]common.Hash{CCIPSendRequested}, onRamp.Address())
+			onRampToReqEventSig[onRamp.Address()] = CCIPSendRequested
+		case EVM2EVMSubscriptionOnRamp:
+			onRamp, err := evm_2_evm_subscription_onramp.NewEVM2EVMSubscriptionOnRamp(addr, sourceChain.Client())
+			if err != nil {
+				return nil, errors.Wrap(err, "failed creating a new onramp")
+			}
+			onRampSeqParsers[common.HexToAddress(onRampID)] = func(log logpoller.Log) (uint64, error) {
+				req, err := onRamp.ParseCCIPSendRequested(types.Log{Data: log.Data, Topics: log.GetTopics()})
+				if err != nil {
+					return 0, err
+				}
+				return req.Message.SequenceNumber, nil
+			}
+			// Subscribe to all relevant relay logs.
+			sourceChain.LogPoller().MergeFilter([]common.Hash{CCIPSubSendRequested}, onRamp.Address())
+			onRampToReqEventSig[onRamp.Address()] = CCIPSubSendRequested
+		default:
+			return nil, errors.Errorf("unrecognized onramp %v", onRampID)
 		}
 	}
 	return &CCIPRelay{
-		lggr:              lggr,
-		blobVerifier:      blobVerifier,
-		onRampSeqParsers:  onRampSeqParsers,
-		sourceChainPoller: sourceChain.LogPoller(),
-		onRamps:           onRamps,
+		lggr:                lggr,
+		blobVerifier:        blobVerifier,
+		onRampSeqParsers:    onRampSeqParsers,
+		onRampToReqEventSig: onRampToReqEventSig,
+		sourceChainPoller:   sourceChain.LogPoller(),
+		onRamps:             onRamps,
 	}, nil
 }
 
 func (c *CCIPRelay) GetPluginFactory() (plugin ocrtypes.ReportingPluginFactory, err error) {
-	return NewRelayReportingPluginFactory(c.lggr, c.sourceChainPoller, c.blobVerifier, c.onRampSeqParsers, c.onRamps), nil
+	return NewRelayReportingPluginFactory(c.lggr, c.sourceChainPoller, c.blobVerifier, c.onRampSeqParsers, c.onRampToReqEventSig, c.onRamps), nil
 }
 
 func (c *CCIPRelay) GetServices() ([]job.ServiceCtx, error) {

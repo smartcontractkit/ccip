@@ -95,11 +95,12 @@ type InflightReport struct {
 }
 
 type RelayReportingPluginFactory struct {
-	lggr             logger.Logger
-	source           logpoller.LogPoller
-	onRampSeqParsers map[common.Address]func(log logpoller.Log) (uint64, error)
-	onRamps          []common.Address
-	blobVerifier     *blob_verifier.BlobVerifier
+	lggr                logger.Logger
+	source              logpoller.LogPoller
+	onRampSeqParsers    map[common.Address]func(log logpoller.Log) (uint64, error)
+	onRampToReqEventSig map[common.Address]common.Hash
+	onRamps             []common.Address
+	blobVerifier        *blob_verifier.BlobVerifier
 }
 
 // NewRelayReportingPluginFactory return a new RelayReportingPluginFactory.
@@ -108,9 +109,10 @@ func NewRelayReportingPluginFactory(
 	source logpoller.LogPoller,
 	blobVerifier *blob_verifier.BlobVerifier,
 	onRampSeqParsers map[common.Address]func(log logpoller.Log) (uint64, error),
+	onRampToReqEventSig map[common.Address]common.Hash,
 	onRamps []common.Address,
 ) types.ReportingPluginFactory {
-	return &RelayReportingPluginFactory{lggr: lggr, blobVerifier: blobVerifier, onRampSeqParsers: onRampSeqParsers, onRamps: onRamps, source: source}
+	return &RelayReportingPluginFactory{lggr: lggr, blobVerifier: blobVerifier, onRampToReqEventSig: onRampToReqEventSig, onRampSeqParsers: onRampSeqParsers, onRamps: onRamps, source: source}
 }
 
 // NewReportingPlugin returns the ccip RelayReportingPlugin and satisfies the ReportingPluginFactory interface.
@@ -120,14 +122,15 @@ func (rf *RelayReportingPluginFactory) NewReportingPlugin(config types.Reporting
 		return nil, types.ReportingPluginInfo{}, err
 	}
 	return &RelayReportingPlugin{
-			lggr:             rf.lggr.Named("RelayReportingPlugin"),
-			F:                config.F,
-			source:           rf.source,
-			onRampSeqParsers: rf.onRampSeqParsers,
-			onRamps:          rf.onRamps,
-			blobVerifier:     rf.blobVerifier,
-			inFlight:         make(map[[32]byte]InflightReport),
-			offchainConfig:   offchainConfig,
+			lggr:                rf.lggr.Named("RelayReportingPlugin"),
+			F:                   config.F,
+			source:              rf.source,
+			onRampSeqParsers:    rf.onRampSeqParsers,
+			onRampToReqEventSig: rf.onRampToReqEventSig,
+			onRamps:             rf.onRamps,
+			blobVerifier:        rf.blobVerifier,
+			inFlight:            make(map[[32]byte]InflightReport),
+			offchainConfig:      offchainConfig,
 		},
 		types.ReportingPluginInfo{
 			Name:          "CCIPRelay",
@@ -141,12 +144,13 @@ func (rf *RelayReportingPluginFactory) NewReportingPlugin(config types.Reporting
 }
 
 type RelayReportingPlugin struct {
-	lggr             logger.Logger
-	F                int
-	source           logpoller.LogPoller
-	onRamps          []common.Address
-	onRampSeqParsers map[common.Address]func(log logpoller.Log) (uint64, error)
-	blobVerifier     *blob_verifier.BlobVerifier
+	lggr                logger.Logger
+	F                   int
+	source              logpoller.LogPoller
+	onRamps             []common.Address
+	onRampToReqEventSig map[common.Address]common.Hash
+	onRampSeqParsers    map[common.Address]func(log logpoller.Log) (uint64, error)
+	blobVerifier        *blob_verifier.BlobVerifier
 	// We need to synchronize access to the inflight structure
 	// as reporting plugin methods may be called from separate goroutines,
 	// e.g. reporting vs transmission protocol.
@@ -159,25 +163,29 @@ func (r *RelayReportingPlugin) nextMinSeqNumForOffRamp(onRamp common.Address) (u
 	return r.blobVerifier.GetExpectedNextSequenceNumber(nil, onRamp)
 }
 
-func (r *RelayReportingPlugin) nextMinSeqNumForInFlight(onRampIdx int) uint64 {
+func (r *RelayReportingPlugin) nextMinSeqNumForInFlight(onRamp common.Address) uint64 {
 	r.inFlightMu.RLock()
 	defer r.inFlightMu.RUnlock()
 	max := uint64(0)
-	// TODO is is more ergonomic to make it a struct
 	for _, report := range r.inFlight {
-		if report.report.Intervals[onRampIdx].Max > max {
-			max = report.report.Intervals[onRampIdx].Max
+		// TODO: it is more ergonomic to make it a struct
+		for i, or := range report.report.OnRamps {
+			if or == onRamp {
+				if report.report.Intervals[i].Max > max {
+					max = report.report.Intervals[i].Max
+				}
+			}
 		}
 	}
 	return max + 1
 }
 
-func (r *RelayReportingPlugin) nextMinSeqNum(onRampIdx int, onRamp common.Address) (uint64, error) {
+func (r *RelayReportingPlugin) nextMinSeqNum(onRamp common.Address) (uint64, error) {
 	nextMin, err := r.nextMinSeqNumForOffRamp(onRamp)
 	if err != nil {
 		return 0, err
 	}
-	nextMinInFlight := r.nextMinSeqNumForInFlight(onRampIdx)
+	nextMinInFlight := r.nextMinSeqNumForInFlight(onRamp)
 	if nextMinInFlight > nextMin {
 		nextMin = nextMinInFlight
 	}
@@ -194,13 +202,13 @@ func (r *RelayReportingPlugin) Observation(ctx context.Context, timestamp types.
 		return nil, ErrBlobVerifierIsDown
 	}
 	intervalsByOnRamp := make(map[common.Address]blob_verifier.CCIPInterval)
-	for onRampIdx, onRamp := range r.onRamps {
-		nextMin, err := r.nextMinSeqNum(onRampIdx, onRamp)
+	for _, onRamp := range r.onRamps {
+		nextMin, err := r.nextMinSeqNum(onRamp)
 		if err != nil {
 			return nil, err
 		}
 		// All available messages that have not been relayed yet and have sufficient confirmations.
-		reqs, err := r.source.LogsDataWordGreaterThan(CCIPSendRequested, onRamp, SendRequestedSequenceNumberIndex, EvmWord(nextMin), int(r.offchainConfig.SourceIncomingConfirmations))
+		reqs, err := r.source.LogsDataWordGreaterThan(r.onRampToReqEventSig[onRamp], onRamp, SendRequestedSequenceNumberIndex, EvmWord(nextMin), int(r.offchainConfig.SourceIncomingConfirmations))
 		if err != nil {
 			return nil, err
 		}
@@ -239,7 +247,7 @@ func (r *RelayReportingPlugin) Observation(ctx context.Context, timestamp types.
 
 // buildReport assumes there is at least one message in reqs.
 func (r *RelayReportingPlugin) buildReport(intervalByOnRamp map[common.Address]blob_verifier.CCIPInterval) (*blob_verifier.CCIPRelayReport, error) {
-	leafsByOnRamp, err := leafsFromIntervals(r.lggr, r.onRampSeqParsers, intervalByOnRamp, r.source)
+	leafsByOnRamp, err := leafsFromIntervals(r.lggr, r.onRampToReqEventSig, r.onRampSeqParsers, intervalByOnRamp, r.source)
 	if err != nil {
 		return nil, err
 	}

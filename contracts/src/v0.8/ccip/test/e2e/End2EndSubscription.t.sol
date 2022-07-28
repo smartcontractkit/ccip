@@ -36,9 +36,9 @@ contract E2E_subscription is EVM2EVMSubscriptionOnRampSetup, BlobVerifierSetup, 
     assertEq(subscriptionBalance - messages.length * s_onRampRouter.getFee(), s_onRampRouter.getBalance(OWNER));
 
     bytes32[] memory hashedMessages = new bytes32[](3);
-    hashedMessages[0] = keccak256(abi.encode(messages[0]));
-    hashedMessages[1] = keccak256(abi.encode(messages[1]));
-    hashedMessages[2] = keccak256(abi.encode(messages[2]));
+    hashedMessages[0] = keccak256(bytes.concat(hex"00", abi.encode(messages[0])));
+    hashedMessages[1] = keccak256(bytes.concat(hex"00", abi.encode(messages[1])));
+    hashedMessages[2] = keccak256(bytes.concat(hex"00", abi.encode(messages[2])));
 
     CCIP.Interval[] memory intervals = new CCIP.Interval[](1);
     intervals[0] = CCIP.Interval(messages[0].sequenceNumber, messages[2].sequenceNumber);

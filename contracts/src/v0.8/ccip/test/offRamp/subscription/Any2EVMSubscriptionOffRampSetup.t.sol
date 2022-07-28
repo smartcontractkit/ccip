@@ -136,9 +136,9 @@ contract Any2EVMSubscriptionOffRampSetup is TokenSetup {
     bytes32[] memory outerProofs = new bytes32[](0);
     address[] memory tokenPerFeeCoinAddresses = new address[](3);
     uint256[] memory tokenPerFeeCoin = new uint256[](3);
-    tokenPerFeeCoin[0] = 1;
-    tokenPerFeeCoin[1] = 1;
-    tokenPerFeeCoin[2] = 1;
+    tokenPerFeeCoin[0] = 1e18;
+    tokenPerFeeCoin[1] = 1e18;
+    tokenPerFeeCoin[2] = 1e18;
 
     return
       CCIP.ExecutionReport({

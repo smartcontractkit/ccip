@@ -92,7 +92,8 @@ contract Any2EVMSubscriptionOffRamp is
       decodedMessages[i] = abi.decode(report.encodedMessages[i], (CCIP.Any2EVMSubscriptionMessage));
       // TODO: hasher
       // https://app.shortcut.com/chainlinklabs/story/41625/hasher-encoder
-      hashedLeaves[i] = keccak256(report.encodedMessages[i]);
+      bytes memory data = bytes.concat(hex"00", report.encodedMessages[i]);
+      hashedLeaves[i] = keccak256(data);
     }
 
     (uint256 timestampRelayed, uint256 gasUsedByMerkle) = _verifyMessages(
@@ -147,7 +148,7 @@ contract Any2EVMSubscriptionOffRamp is
         s_router.chargeSubscription(
           message.receiver,
           message.sender,
-          (gasBegin - gasleft() + merkleGasShare) * tx.gasprice * tokenPerFeeCoin[i]
+          ((gasBegin - gasleft() + merkleGasShare) * tx.gasprice * tokenPerFeeCoin[i]) / 1e18
         );
       }
       emit ExecutionCompleted(message.sequenceNumber, newState);

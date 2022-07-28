@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
@@ -133,6 +132,7 @@ type ExecutionReportingPluginFactory struct {
 	blobVerifier        *blob_verifier.BlobVerifier
 	builder             BatchBuilder
 	onRampSeqParser     func(log logpoller.Log) (uint64, error)
+	reqEventSig         common.Hash
 }
 
 func NewExecutionReportingPluginFactory(
@@ -144,8 +144,10 @@ func NewExecutionReportingPluginFactory(
 	offRamp OffRamp,
 	builder BatchBuilder,
 	onRampSeqParser func(log logpoller.Log) (uint64, error),
+	reqEventSig common.Hash,
 ) types.ReportingPluginFactory {
-	return &ExecutionReportingPluginFactory{lggr: lggr, onRamp: onRamp, blobVerifier: blobVerifier, offRamp: offRamp, source: source, dest: dest, offRampAddr: offRampAddr, builder: builder, onRampSeqParser: onRampSeqParser}
+	return &ExecutionReportingPluginFactory{lggr: lggr, onRamp: onRamp, blobVerifier: blobVerifier, offRamp: offRamp, source: source, dest: dest, offRampAddr: offRampAddr, builder: builder,
+		onRampSeqParser: onRampSeqParser, reqEventSig: reqEventSig}
 }
 
 type dummyDataSource struct{}
@@ -162,17 +164,20 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 		return nil, types.ReportingPluginInfo{}, err
 	}
 	return &ExecutionReportingPlugin{
-			lggr:            rf.lggr.Named("ExecutionReportingPlugin"),
-			F:               config.F,
-			offRampAddr:     rf.offRampAddr,
-			offRamp:         rf.offRamp,
-			onRamp:          rf.onRamp,
-			blobVerifier:    rf.blobVerifier,
-			source:          rf.source,
-			dest:            rf.dest,
-			offchainConfig:  offchainConfig,
-			builder:         NewExecutionBatchBuilder(BatchGasLimit, RootSnoozeTime, rf.blobVerifier, rf.onRamp, rf.offRampAddr, rf.source, rf.dest, rf.builder, offchainConfig, rf.offRamp),
+			lggr:           rf.lggr.Named("ExecutionReportingPlugin"),
+			F:              config.F,
+			offRampAddr:    rf.offRampAddr,
+			offRamp:        rf.offRamp,
+			onRamp:         rf.onRamp,
+			blobVerifier:   rf.blobVerifier,
+			source:         rf.source,
+			dest:           rf.dest,
+			offchainConfig: offchainConfig,
+			builder: NewExecutionBatchBuilder(
+				BatchGasLimit,
+				RootSnoozeTime, rf.blobVerifier, rf.onRamp, rf.offRampAddr, rf.source, rf.dest, rf.builder, offchainConfig, rf.offRamp, rf.reqEventSig, rf.lggr),
 			onRampSeqParser: rf.onRampSeqParser,
+			reqEventSig:     rf.reqEventSig,
 			dataSource:      dummyDataSource{},
 		}, types.ReportingPluginInfo{
 			Name:          "CCIPExecution",
@@ -201,6 +206,7 @@ type ExecutionReportingPlugin struct {
 	offchainConfig  OffchainConfig
 	builder         *ExecutionBatchBuilder
 	onRampSeqParser func(log logpoller.Log) (uint64, error)
+	reqEventSig     common.Hash
 	dataSource      DataSource
 }
 
@@ -263,7 +269,7 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 	if len(executableSequenceNumbers) == 0 {
 		return []byte{}, nil
 	}
-	lggr.Infof("executable seq nums %v", executableSequenceNumbers)
+	lggr.Infof("executable seq nums %v %x", executableSequenceNumbers, r.reqEventSig)
 	return ExecutionObservation{
 		SeqNrs:           executableSequenceNumbers,
 		TokensPerFeeCoin: tokensPerFeeCoin,
@@ -280,13 +286,12 @@ func contiguousReqs(lggr logger.Logger, min, max uint64, seqNrs []uint64) bool {
 	return true
 }
 
-func leafsFromIntervals(lggr logger.Logger, seqParsers map[common.Address]func(logpoller.Log) (uint64, error), intervalByOnRamp map[common.Address]blob_verifier.CCIPInterval, srcLogPoller logpoller.LogPoller) (map[common.Address][][32]byte, error) {
+func leafsFromIntervals(lggr logger.Logger, onRampToEventSig map[common.Address]common.Hash, seqParsers map[common.Address]func(logpoller.Log) (uint64, error), intervalByOnRamp map[common.Address]blob_verifier.CCIPInterval, srcLogPoller logpoller.LogPoller) (map[common.Address][][32]byte, error) {
 	leafsByOnRamp := make(map[common.Address][][32]byte)
 	for onRamp, interval := range intervalByOnRamp {
 		// Logs are guaranteed to be in order of seq num, since these are finalized logs only
 		// and the contract's seq num is auto-incrementing.
-		// TODO: Could be different event_sig/index per onRamp
-		logs, err := srcLogPoller.LogsDataWordRange(CCIPSendRequested, onRamp, SendRequestedSequenceNumberIndex, logpoller.EvmWord(interval.Min), logpoller.EvmWord(interval.Max), 1)
+		logs, err := srcLogPoller.LogsDataWordRange(onRampToEventSig[onRamp], onRamp, SendRequestedSequenceNumberIndex, logpoller.EvmWord(interval.Min), logpoller.EvmWord(interval.Max), 1)
 		if err != nil {
 			return nil, err
 		}
@@ -326,11 +331,11 @@ func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNums 
 		merkleRootsByOnRamp[onRamp] = rep.MerkleRoots[i]
 	}
 	interval := intervalsByOnRamp[r.onRamp]
-	msgsInRoot, err := r.source.LogsDataWordRange(CCIPSendRequested, r.onRamp, SendRequestedSequenceNumberIndex, EvmWord(interval.Min), EvmWord(interval.Max), int(r.offchainConfig.SourceIncomingConfirmations))
+	msgsInRoot, err := r.source.LogsDataWordRange(r.reqEventSig, r.onRamp, SendRequestedSequenceNumberIndex, EvmWord(interval.Min), EvmWord(interval.Max), int(r.offchainConfig.SourceIncomingConfirmations))
 	if err != nil {
 		return nil, err
 	}
-	leafsByOnRamp, err := leafsFromIntervals(r.lggr, map[common.Address]func(log logpoller.Log) (uint64, error){
+	leafsByOnRamp, err := leafsFromIntervals(r.lggr, map[common.Address]common.Hash{r.onRamp: r.reqEventSig}, map[common.Address]func(log logpoller.Log) (uint64, error){
 		r.onRamp: r.onRampSeqParser,
 	}, map[common.Address]blob_verifier.CCIPInterval{
 		r.onRamp: intervalsByOnRamp[r.onRamp],
@@ -370,8 +375,8 @@ func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNums 
 	if res.Cmp(big.NewInt(0)) == 0 {
 		ir := innerTree.Root()
 		or := outerTree.Root()
-		r.lggr.Errorf("Root does not verify: our inner root %v our outer root %v contract outer root %v",
-			hexutil.Encode(ir[:]), hexutil.Encode(or[:]), rep.RootOfRoots)
+		r.lggr.Errorf("Root does not verify: our inner root %x our outer root %x contract outer root %x",
+			ir[:], or[:], rep.RootOfRoots[:])
 		return nil, errors.New("root does not verify")
 	}
 	er, err := EncodeExecutionReport(finalSeqNums, tokensPerFeeCoin, encMsgs, innerProof.Hashes, innerProof.SourceFlags, outerProof.Hashes, outerProof.SourceFlags)

@@ -9,6 +9,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/blob_verifier"
+	"github.com/smartcontractkit/chainlink/core/logger"
 )
 
 const (
@@ -37,9 +38,12 @@ type ExecutionBatchBuilder struct {
 	srcLogPoller, dstLogPoller logpoller.LogPoller
 	config                     OffchainConfig
 	snoozedRoots               map[[32]byte]time.Time
+	reqEventSig                common.Hash
+	lggr                       logger.Logger
 }
 
-func NewExecutionBatchBuilder(gasLimit uint64, snoozeTime time.Duration, blobVerifier *blob_verifier.BlobVerifier, onRamp, offRampAddr common.Address, srcLogPoller, dstLogPoller logpoller.LogPoller, builder BatchBuilder, config OffchainConfig, offRamp OffRamp) *ExecutionBatchBuilder {
+func NewExecutionBatchBuilder(gasLimit uint64, snoozeTime time.Duration, blobVerifier *blob_verifier.BlobVerifier,
+	onRamp, offRampAddr common.Address, srcLogPoller, dstLogPoller logpoller.LogPoller, builder BatchBuilder, config OffchainConfig, offRamp OffRamp, reqEventSig common.Hash, lggr logger.Logger) *ExecutionBatchBuilder {
 	return &ExecutionBatchBuilder{
 		gasLimit:     gasLimit,
 		snoozeTime:   snoozeTime,
@@ -52,6 +56,8 @@ func NewExecutionBatchBuilder(gasLimit uint64, snoozeTime time.Duration, blobVer
 		offRampAddr:  offRampAddr,
 		config:       config,
 		snoozedRoots: make(map[[32]byte]time.Time),
+		reqEventSig:  reqEventSig,
+		lggr:         lggr,
 	}
 }
 
@@ -110,17 +116,18 @@ func (eb *ExecutionBatchBuilder) getUnexpiredRelayReports() ([]blob_verifier.CCI
 }
 
 func (eb *ExecutionBatchBuilder) getExecutedSeqNrsInRange(min, max uint64) (map[uint64]struct{}, error) {
+	// Should be able to keep this log constant across msg types.
 	executedLogs, err := eb.dstLogPoller.IndexedLogsTopicRange(CrossChainMessageExecuted, eb.offRampAddr, CrossChainMessageExecutedSequenceNumberIndex, logpoller.EvmWord(min), logpoller.EvmWord(max), int(eb.config.DestIncomingConfirmations))
 	if err != nil {
 		return nil, err
 	}
 	executedMp := make(map[uint64]struct{})
 	for _, executedLog := range executedLogs {
-		e, err := eb.offRamp.ParseExecutionCompleted(types.Log{Data: executedLog.Data, Topics: executedLog.GetTopics()})
+		sn, err := eb.offRamp.ParseSeqNumFromExecutionCompleted(types.Log{Data: executedLog.Data, Topics: executedLog.GetTopics()})
 		if err != nil {
 			return nil, err
 		}
-		executedMp[e.SequenceNumber] = struct{}{}
+		executedMp[sn] = struct{}{}
 	}
 	return executedMp, nil
 }
@@ -132,22 +139,28 @@ func (eb *ExecutionBatchBuilder) getExecutableSeqNrs(maxGasPrice uint64, tokensP
 	}
 	for _, unexpiredReport := range unexpiredReports {
 		var idx int
+		var found bool
 		for i, onRamp := range unexpiredReport.OnRamps {
 			if onRamp == eb.onRamp {
 				idx = i
+				found = true
 			}
+		}
+		if !found {
+			eb.lggr.Infof("onRamp not found in report skipping", "onRamp", eb.onRamp)
+			continue
 		}
 		snoozeUntil, haveSnoozed := eb.snoozedRoots[unexpiredReport.MerkleRoots[idx]]
 		if haveSnoozed && time.Now().Before(snoozeUntil) {
 			continue
 		}
 		// Check this root for executable messages
-		srcLogs, err := eb.srcLogPoller.LogsDataWordRange(CCIPSendRequested, eb.onRamp, SendRequestedSequenceNumberIndex, logpoller.EvmWord(unexpiredReport.Intervals[idx].Min), logpoller.EvmWord(unexpiredReport.Intervals[idx].Max), int(eb.config.SourceIncomingConfirmations))
+		srcLogs, err := eb.srcLogPoller.LogsDataWordRange(eb.reqEventSig, eb.onRamp, SendRequestedSequenceNumberIndex, logpoller.EvmWord(unexpiredReport.Intervals[idx].Min), logpoller.EvmWord(unexpiredReport.Intervals[idx].Max), int(eb.config.SourceIncomingConfirmations))
 		if err != nil {
 			return nil, err
 		}
 		if len(srcLogs) == 0 {
-			return nil, errors.Errorf("unexpected empty log set for root %v", unexpiredReport.MerkleRoots[idx])
+			return nil, errors.Errorf("unexpected empty log set for root %x, interval [%v,%v], event_sig %x", unexpiredReport.MerkleRoots[idx], unexpiredReport.Intervals[idx].Min, unexpiredReport.Intervals[idx].Max, eb.reqEventSig)
 		}
 		executedMp, err := eb.getExecutedSeqNrsInRange(unexpiredReport.Intervals[idx].Min, unexpiredReport.Intervals[idx].Max)
 		if err != nil {

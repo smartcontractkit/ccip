@@ -38,9 +38,13 @@ import (
 	"github.com/smartcontractkit/chainlink/core/internal/cltest"
 	"github.com/smartcontractkit/chainlink/core/internal/cltest/heavyweight"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/afn_contract"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/any_2_evm_subscription_offramp"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/any_2_evm_subscription_offramp_router"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/any_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/any_2_evm_toll_offramp_router"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/blob_verifier"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/evm_2_evm_subscription_onramp"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/evm_2_evm_subscription_onramp_router"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/evm_2_evm_toll_onramp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/evm_2_evm_toll_onramp_router"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/link_token_interface"
@@ -78,13 +82,21 @@ type CCIPContracts struct {
 	sourceUser, destUser           *bind.TransactOpts
 	sourceChain, destChain         *backends.SimulatedBackend
 	sourcePool, destPool           *native_token_pool.NativeTokenPool
-	onRamp                         *evm_2_evm_toll_onramp.EVM2EVMTollOnRamp
-	onRampRouter                   *evm_2_evm_toll_onramp_router.EVM2AnyTollOnRampRouter
 	sourceLinkToken, destLinkToken *link_token_interface.LinkToken
 	blobVerifier                   *blob_verifier.BlobVerifier
-	offRampRouter                  *any_2_evm_toll_offramp_router.Any2EVMTollOffRampRouter
 	messageReceiver                *simple_message_receiver.SimpleMessageReceiver
-	offRamp                        *any_2_evm_toll_offramp.Any2EVMTollOffRamp
+
+	// Toll contracts
+	onRampRouter  *evm_2_evm_toll_onramp_router.EVM2AnyTollOnRampRouter
+	onRamp        *evm_2_evm_toll_onramp.EVM2EVMTollOnRamp
+	offRampRouter *any_2_evm_toll_offramp_router.Any2EVMTollOffRampRouter
+	offRamp       *any_2_evm_toll_offramp.Any2EVMTollOffRamp
+
+	// Sub contracts
+	subOnRampRouter  *evm_2_evm_subscription_onramp_router.EVM2AnySubscriptionOnRampRouter
+	subOnRamp        *evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRamp
+	subOffRampRouter *any_2_evm_subscription_offramp_router.Any2EVMSubscriptionOffRampRouter
+	subOffRamp       *any_2_evm_subscription_offramp.Any2EVMSubscriptionOffRamp
 }
 
 func setupCCIPContracts(t *testing.T) CCIPContracts {
@@ -131,18 +143,11 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 	destPool, err := native_token_pool.NewNativeTokenPool(destPoolAddress, destChain)
 	require.NoError(t, err)
 	destChain.Commit()
-	releaseBucket, err := destPool.GetReleaseOrMintBucket(nil)
-	require.NoError(t, err)
-	t.Logf("release bucket %v %v\n", releaseBucket.Tokens, releaseBucket.Capacity)
 
-	// Float the offramp pool with 1M juels
-	// Dest user is the owner of the dest pool, so he can store
+	// Float the offramp pool
 	o, err := destPool.Owner(nil)
 	require.NoError(t, err)
 	require.Equal(t, destUser.From.String(), o.String())
-	b, err := destLinkToken.BalanceOf(nil, destUser.From)
-	require.NoError(t, err)
-	t.Log("balance", b)
 	_, err = destLinkToken.Transfer(destUser, destPoolAddress, big.NewInt(9e18))
 	require.NoError(t, err)
 	destChain.Commit()
@@ -186,7 +191,6 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 		onRampRouterAddress,
 	)
 	require.NoError(t, err)
-	// We do this so onRamp.Address() works
 	onRamp, err := evm_2_evm_toll_onramp.NewEVM2EVMTollOnRamp(onRampAddress, sourceChain)
 	require.NoError(t, err)
 	_, err = sourcePool.SetOnRamp(sourceUser, onRampAddress, true)
@@ -219,10 +223,7 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 		// We set this above the current unix timestamp
 		// so we do not even have to send a heartbeat for it to be healthy.
 		big.NewInt(time.Now().Unix()*2),
-		blob_verifier.BlobVerifierInterfaceBlobVerifierConfig{
-			OnRamps:          []common.Address{onRampAddress},
-			MinSeqNrByOnRamp: []uint64{1},
-		},
+		blob_verifier.BlobVerifierInterfaceBlobVerifierConfig{},
 	)
 	require.NoError(t, err)
 	blobVerifier, err := blob_verifier.NewBlobVerifier(blobVerifierAddress, destChain)
@@ -262,11 +263,83 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 	require.NoError(t, err)
 	messageReceiver, err := simple_message_receiver.NewSimpleMessageReceiver(messageReceiverAddress, destChain)
 	require.NoError(t, err)
-
 	// Need to commit here, or we will hit the block gas limit when deploying the executor
 	sourceChain.Commit()
 	destChain.Commit()
 
+	// Setup subscription contracts.
+	subOnRampRouterAddress, _, _, err := evm_2_evm_subscription_onramp_router.DeployEVM2AnySubscriptionOnRampRouter(
+		sourceUser, sourceChain, evm_2_evm_subscription_onramp_router.Any2EVMSubscriptionOnRampRouterInterfaceRouterConfig{
+			Fee:      big.NewInt(0),
+			FeeToken: sourceLinkTokenAddress,
+			FeeAdmin: sourceUser.From,
+		})
+	require.NoError(t, err)
+	subOnRampRouter, _ := evm_2_evm_subscription_onramp_router.NewEVM2AnySubscriptionOnRampRouter(subOnRampRouterAddress, sourceChain)
+	subOnRampAddress, _, _, err := evm_2_evm_subscription_onramp.DeployEVM2EVMSubscriptionOnRamp(sourceUser, sourceChain, sourceChainID, destChainID,
+		[]common.Address{sourceLinkTokenAddress}, // tokens
+		[]common.Address{sourcePoolAddress},      // pools
+		[]common.Address{feedAddress},
+		[]common.Address{}, // allow list
+		afnSourceAddress,   // AFN
+		big.NewInt(86400),  //maxTimeWithoutAFNSignal 86400 seconds = one day
+		evm_2_evm_subscription_onramp.BaseOnRampInterfaceOnRampConfig{
+			RelayingFeeJuels: 0,
+			MaxDataSize:      1e12,
+			MaxTokensLength:  5,
+		},
+		onRampRouterAddress,
+	)
+	require.NoError(t, err)
+	_, err = sourcePool.SetOnRamp(sourceUser, subOnRampAddress, true)
+	require.NoError(t, err)
+	subOnRamp, _ := evm_2_evm_subscription_onramp.NewEVM2EVMSubscriptionOnRamp(subOnRampAddress, sourceChain)
+	_, err = subOnRamp.SetRouter(sourceUser, subOnRampRouterAddress)
+	require.NoError(t, err)
+	_, err = subOnRampRouter.SetOnRamp(sourceUser, destChainID, subOnRampAddress)
+	require.NoError(t, err)
+
+	subOffRampRouterAddress, _, _, err := any_2_evm_subscription_offramp_router.DeployAny2EVMSubscriptionOffRampRouter(
+		destUser, destChain, []common.Address{}, any_2_evm_subscription_offramp_router.SubscriptionInterfaceSubscriptionConfig{
+			SetSubscriptionSenderDelay: 0,
+			WithdrawalDelay:            0,
+			FeeToken:                   destLinkTokenAddress,
+		})
+	require.NoError(t, err)
+	destChain.Commit()
+	subOffRampRouter, err := any_2_evm_subscription_offramp_router.NewAny2EVMSubscriptionOffRampRouter(subOffRampRouterAddress, destChain)
+	require.NoError(t, err)
+	subOffRampAddress, _, _, err := any_2_evm_subscription_offramp.DeployAny2EVMSubscriptionOffRamp(destUser, destChain, destChainID,
+		any_2_evm_subscription_offramp.BaseOffRampInterfaceOffRampConfig{
+			SourceChainId:         sourceChainID,
+			ExecutionDelaySeconds: 0,
+			MaxDataSize:           1e12,
+			MaxTokensLength:       5,
+		},
+		blobVerifier.Address(),
+		subOnRampAddress,
+		afnDestAddress,
+		[]common.Address{sourceLinkTokenAddress},
+		[]common.Address{destPoolAddress},
+		big.NewInt(time.Now().Unix()*2))
+	require.NoError(t, err)
+	subOffRamp, _ := any_2_evm_subscription_offramp.NewAny2EVMSubscriptionOffRamp(subOffRampAddress, destChain)
+	_, err = destPool.SetOffRamp(destUser, subOffRampAddress, true)
+	require.NoError(t, err)
+	_, err = subOffRamp.SetRouter(destUser, subOffRampRouterAddress)
+	require.NoError(t, err)
+	_, err = subOffRampRouter.AddOffRamp(destUser, subOffRampAddress)
+	require.NoError(t, err)
+
+	_, err = subOffRampRouter.GetSupportedTokensForExecutionFee(nil)
+	require.NoError(t, err)
+	_, err = subOffRampRouter.GetFeeToken(nil)
+	require.NoError(t, err)
+	// Enable onramps on blob verifier.
+	blobVerifier.SetConfig(destUser, blob_verifier.BlobVerifierInterfaceBlobVerifierConfig{
+		OnRamps:          []common.Address{onRampAddress, subOnRampAddress},
+		MinSeqNrByOnRamp: []uint64{1, 1},
+	})
 	// Ensure we have at least finality blocks.
 	for i := 0; i < 50; i++ {
 		sourceChain.Commit()
@@ -284,14 +357,22 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 		destChain:       destChain,
 		sourcePool:      sourcePool,
 		destPool:        destPool,
-		onRamp:          onRamp,
-		onRampRouter:    onRampRouter,
 		sourceLinkToken: sourceLinkToken,
 		destLinkToken:   destLinkToken,
 		blobVerifier:    blobVerifier,
+
+		// Toll
+		onRamp:          onRamp,
+		onRampRouter:    onRampRouter,
 		offRampRouter:   offRampRouter,
 		messageReceiver: messageReceiver,
 		offRamp:         offRamp,
+
+		// Sub
+		subOnRamp:        subOnRamp,
+		subOnRampRouter:  subOnRampRouter,
+		subOffRampRouter: subOffRampRouter,
+		subOffRamp:       subOffRamp,
 	}
 }
 
@@ -493,14 +574,14 @@ type Node struct {
 	kb          ocr2key.KeyBundle
 }
 
-func (node *Node) eventuallyHasReqSeqNum(t *testing.T, ccipContracts CCIPContracts, seqNum int) logpoller.Log {
+func (node *Node) eventuallyHasReqSeqNum(t *testing.T, ccipContracts CCIPContracts, eventSig common.Hash, onRamp common.Address, seqNum int) logpoller.Log {
 	c, err := node.app.GetChains().EVM.Get(sourceChainID)
 	require.NoError(t, err)
 	var log logpoller.Log
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
 		ccipContracts.sourceChain.Commit()
 		ccipContracts.destChain.Commit()
-		lgs, err := c.LogPoller().LogsDataWordRange(ccip.CCIPSendRequested, ccipContracts.onRamp.Address(), ccip.SendRequestedSequenceNumberIndex, ccip.EvmWord(uint64(seqNum)), ccip.EvmWord(uint64(seqNum)), 1)
+		lgs, err := c.LogPoller().LogsDataWordRange(eventSig, onRamp, ccip.SendRequestedSequenceNumberIndex, ccip.EvmWord(uint64(seqNum)), ccip.EvmWord(uint64(seqNum)), 1)
 		require.NoError(t, err)
 		t.Log("Send requested", len(lgs))
 		if len(lgs) == 1 {
@@ -512,7 +593,7 @@ func (node *Node) eventuallyHasReqSeqNum(t *testing.T, ccipContracts CCIPContrac
 	return log
 }
 
-func (node *Node) eventuallyHasExecutedSeqNum(t *testing.T, ccipContracts CCIPContracts, seqNum int) logpoller.Log {
+func (node *Node) eventuallyHasExecutedSeqNum(t *testing.T, ccipContracts CCIPContracts, offRamp common.Address, seqNum int) logpoller.Log {
 	c, err := node.app.GetChains().EVM.Get(destChainID)
 	require.NoError(t, err)
 	var log logpoller.Log
@@ -521,7 +602,7 @@ func (node *Node) eventuallyHasExecutedSeqNum(t *testing.T, ccipContracts CCIPCo
 		ccipContracts.destChain.Commit()
 		lgs, err := c.LogPoller().IndexedLogsTopicRange(
 			ccip.CrossChainMessageExecuted,
-			ccipContracts.offRamp.Address(),
+			offRamp,
 			ccip.CrossChainMessageExecutedSequenceNumberIndex,
 			ccip.EvmWord(uint64(seqNum)),
 			ccip.EvmWord(uint64(seqNum)),
@@ -551,20 +632,33 @@ func (node *Node) addBootstrapJob(t *testing.T, spec string) {
 	require.NoError(t, err)
 }
 
-func allNodesHaveReqSeqNum(t *testing.T, ccipContracts CCIPContracts, nodes []Node, seqNum int) logpoller.Log {
+func allNodesHaveReqSeqNum(t *testing.T, ccipContracts CCIPContracts, eventSig common.Hash, onRamp common.Address, nodes []Node, seqNum int) logpoller.Log {
 	var log logpoller.Log
 	for _, node := range nodes {
-		log = node.eventuallyHasReqSeqNum(t, ccipContracts, seqNum)
+		log = node.eventuallyHasReqSeqNum(t, ccipContracts, eventSig, onRamp, seqNum)
 	}
 	return log
 }
 
-func allNodesHaveExecutedSeqNum(t *testing.T, ccipContracts CCIPContracts, nodes []Node, seqNum int) logpoller.Log {
+func allNodesHaveExecutedSeqNum(t *testing.T, ccipContracts CCIPContracts, offRamp common.Address, nodes []Node, seqNum int) logpoller.Log {
 	var log logpoller.Log
 	for _, node := range nodes {
-		log = node.eventuallyHasExecutedSeqNum(t, ccipContracts, seqNum)
+		log = node.eventuallyHasExecutedSeqNum(t, ccipContracts, offRamp, seqNum)
 	}
 	return log
+}
+
+func queueSubRequest(t *testing.T, ccipContracts CCIPContracts, msgPayload string, tokens []common.Address, amounts []*big.Int, gasLimit *big.Int) *gethtypes.Transaction {
+	msg := evm_2_evm_subscription_onramp_router.CCIPEVM2AnySubscriptionMessage{
+		Receiver: ccipContracts.messageReceiver.Address(),
+		Data:     []byte(msgPayload),
+		Tokens:   tokens,
+		Amounts:  amounts,
+		GasLimit: gasLimit,
+	}
+	tx, err := ccipContracts.subOnRampRouter.CcipSend(ccipContracts.sourceUser, destChainID, msg)
+	require.NoError(t, err)
+	return tx
 }
 
 func queueRequest(t *testing.T, ccipContracts CCIPContracts, msgPayload string, tokens []common.Address, amounts []*big.Int, feeTokenAmount *big.Int, gasLimit *big.Int) *gethtypes.Transaction {
@@ -591,14 +685,19 @@ func confirmTxs(t *testing.T, txs []*gethtypes.Transaction, chain *backends.Simu
 	}
 }
 
+func sendSubRequest(t *testing.T, ccipContracts CCIPContracts, msgPayload string, tokens []common.Address, amounts []*big.Int, gasLimit *big.Int) {
+	tx := queueSubRequest(t, ccipContracts, msgPayload, tokens, amounts, gasLimit)
+	confirmTxs(t, []*gethtypes.Transaction{tx}, ccipContracts.sourceChain)
+}
+
 func sendRequest(t *testing.T, ccipContracts CCIPContracts, msgPayload string, tokens []common.Address, amounts []*big.Int, feeTokenAmount *big.Int, gasLimit *big.Int) {
 	tx := queueRequest(t, ccipContracts, msgPayload, tokens, amounts, feeTokenAmount, gasLimit)
 	confirmTxs(t, []*gethtypes.Transaction{tx}, ccipContracts.sourceChain)
 }
 
-func eventuallyReportRelayed(t *testing.T, ccipContracts CCIPContracts, min, max int) {
+func eventuallyReportRelayed(t *testing.T, ccipContracts CCIPContracts, onRamp common.Address, min, max int) {
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
-		minSeqNum, err := ccipContracts.blobVerifier.GetExpectedNextSequenceNumber(nil, ccipContracts.onRamp.Address())
+		minSeqNum, err := ccipContracts.blobVerifier.GetExpectedNextSequenceNumber(nil, onRamp)
 		require.NoError(t, err)
 		ccipContracts.sourceChain.Commit()
 		ccipContracts.destChain.Commit()
@@ -648,7 +747,7 @@ func executeMessage(t *testing.T, ccipContracts CCIPContracts, req logpoller.Log
 }
 */
 
-func setupAndStartNodes(t *testing.T, ctx context.Context, ccipContracts CCIPContracts, bootstrapNodePort int64) (Node, []Node) {
+func setupAndStartNodes(t *testing.T, ctx context.Context, ccipContracts CCIPContracts, bootstrapNodePort int64) (Node, []Node, int64) {
 	appBootstrap, bootstrapPeerID, bootstrapTransmitter, bootstrapKb, _, _ := setupNodeCCIP(t, ccipContracts.destUser, bootstrapNodePort, "bootstrap_ccip", ccipContracts.sourceChain, ccipContracts.destChain)
 	var (
 		oracles []confighelper2.OracleIdentityExtra
@@ -696,8 +795,8 @@ func setupAndStartNodes(t *testing.T, ctx context.Context, ccipContracts CCIPCon
 		DestIncomingConfirmations:   1,
 	}.Encode()
 	require.NoError(t, err)
-	setupOnchainConfig(t, ccipContracts, oracles, reportingPluginConfig)
-	return bootstrapNode, nodes
+	configBlock := setupOnchainConfig(t, ccipContracts, oracles, reportingPluginConfig)
+	return bootstrapNode, nodes, configBlock
 }
 
 func TestIntegration_CCIP(t *testing.T) {
@@ -705,7 +804,7 @@ func TestIntegration_CCIP(t *testing.T) {
 	bootstrapNodePort := int64(19599)
 	ctx := context.Background()
 	// Starts nodes and configures them in the OCR contracts.
-	bootstrapNode, nodes := setupAndStartNodes(t, ctx, ccipContracts, bootstrapNodePort)
+	bootstrapNode, nodes, configBlock := setupAndStartNodes(t, ctx, ccipContracts, bootstrapNodePort)
 
 	// Add the bootstrap job
 	bootstrapNode.addBootstrapJob(t, fmt.Sprintf(`
@@ -725,7 +824,7 @@ chainID = %s
 		node.addJob(t, fmt.Sprintf(`
 type                = "offchainreporting2"
 pluginType          = "ccip-relay"
-relay 				= "evm"
+relay               = "evm"
 schemaVersion      	= 1
 name               	= "ccip-job-%d"
 contractID 			= "%s"
@@ -735,7 +834,7 @@ contractConfigConfirmations = 1
 contractConfigTrackerPollInterval = "1s"
 
 [pluginConfig]
-onRampIDs            = ["%s"]
+onRampIDs            = ["%s", "%s"]
 sourceChainID       = %s
 destChainID         = %s
 pollPeriod          = "1s"
@@ -743,22 +842,22 @@ pollPeriod          = "1s"
 [relayConfig]
 chainID             = "%s"
 
-`, i, ccipContracts.blobVerifier.Address(), node.kb.ID(), node.transmitter, ccipContracts.onRamp.Address(), sourceChainID, destChainID, destChainID))
+`, i, ccipContracts.blobVerifier.Address(), node.kb.ID(), node.transmitter, ccipContracts.onRamp.Address(), ccipContracts.subOnRamp.Address(), sourceChainID, destChainID, destChainID))
 		node.addJob(t, fmt.Sprintf(`
 type                = "offchainreporting2"
 pluginType          = "ccip-execution"
-relay 				= "evm"
-schemaVersion      	= 1
-name               	= "ccip-executor-job-%d"
-contractID 			= "%s"
+relay               = "evm"
+schemaVersion       = 1
+name                = "ccip-executor-job-toll-%d"
+contractID          = "%s"
 ocrKeyBundleID      = "%s"
-transmitterID 		= "%s"
+transmitterID       = "%s"
 contractConfigConfirmations = 1
 contractConfigTrackerPollInterval = "1s"
 
 [pluginConfig]
 onRampID            = "%s"
-blobVerifierID           = "%s"
+blobVerifierID      = "%s"
 sourceChainID       = %s
 destChainID         = %s
 pollPeriod          = "1s"
@@ -767,87 +866,138 @@ pollPeriod          = "1s"
 chainID             = "%s"
 
 `, i, ccipContracts.offRamp.Address(), node.kb.ID(), node.transmitter, ccipContracts.onRamp.Address(), ccipContracts.blobVerifier.Address(), sourceChainID, destChainID, destChainID))
+		node.addJob(t, fmt.Sprintf(`
+type                = "offchainreporting2"
+pluginType          = "ccip-execution"
+relay               = "evm"
+schemaVersion       = 1
+name                = "ccip-executor-job-subscription-%d"
+contractID 			= "%s"
+ocrKeyBundleID      = "%s"
+transmitterID       = "%s"
+contractConfigConfirmations = 1
+contractConfigTrackerPollInterval = "1s"
+
+[pluginConfig]
+onRampID            = "%s"
+blobVerifierID      = "%s"
+sourceChainID       = %s
+destChainID         = %s
+pollPeriod          = "1s"
+
+[relayConfig]
+chainID             = "%s"
+
+`, i, ccipContracts.subOffRamp.Address(), node.kb.ID(), node.transmitter, ccipContracts.subOnRamp.Address(), ccipContracts.blobVerifier.Address(), sourceChainID, destChainID, destChainID))
 	}
 	// With jobs present, replay the config log.
-	b, err := ccipContracts.destChain.BlockByNumber(context.Background(), nil)
-	require.NoError(t, err)
 	for _, node := range nodes {
 		c, err := node.app.GetChains().EVM.Get(destChainID)
 		require.NoError(t, err)
-		require.NoError(t, c.LogPoller().Replay(context.Background(), int64(b.NumberU64()-1)))
+		require.NoError(t, c.LogPoller().Replay(context.Background(), configBlock))
 	}
 
-	currentSeqNum := 1
+	tollCurrentSeqNum := 1
+	subCurrentSeqNum := 1
+	var err error
 	/*
 		t.Run("single self-execute", func(t *testing.T) {
 			sendRequest(t, ccipContracts, "single req", []common.Address{ccipContracts.sourceLinkToken.Address()}, []*big.Int{big.NewInt(100)}, big.NewInt(0), big.NewInt(0))
-			req := allNodesHaveReqSeqNum(t, ccipContracts, nodes, currentSeqNum)
-			report := eventuallyReportRelayed(t, ccipContracts, currentSeqNum, currentSeqNum)
+			req := allNodesHaveReqSeqNum(t, ccipContracts, nodes, tollCurrentSeqNum)
+			report := eventuallyReportRelayed(t, ccipContracts, tollCurrentSeqNum, tollCurrentSeqNum)
 			executeMessage(t, ccipContracts, req, []logpoller.Log{req}, report)
-			allNodesHaveExecutedSeqNum(t, ccipContracts, nodes, currentSeqNum)
+			allNodesHaveExecutedSeqNum(t, ccipContracts, nodes, tollCurrentSeqNum)
 			receivedMsg, err := ccipContracts.messageReceiver.SMessage(nil)
 			require.NoError(t, err)
 			assert.Equal(t, "single req", string(receivedMsg.Data))
-			currentSeqNum++
+			tollCurrentSeqNum++
 		})
 
 		t.Run("batch self-execute", func(t *testing.T) {
 			var txs []*gethtypes.Transaction
 			n := 3
 			for i := 0; i < n; i++ {
-				txs = append(txs, queueRequest(t, ccipContracts, fmt.Sprintf("batch request %d", currentSeqNum+i), []common.Address{ccipContracts.sourceLinkToken.Address()}, []*big.Int{big.NewInt(100)}, big.NewInt(0), big.NewInt(0)))
+				txs = append(txs, queueRequest(t, ccipContracts, fmt.Sprintf("batch request %d", tollCurrentSeqNum+i), []common.Address{ccipContracts.sourceLinkToken.Address()}, []*big.Int{big.NewInt(100)}, big.NewInt(0), big.NewInt(0)))
 			}
 			// Send a batch of requests in a single block
 			confirmTxs(t, txs, ccipContracts.sourceChain)
 			// All nodes should have all 3.
 			var reqs []logpoller.Log
 			for i := 0; i < n; i++ {
-				reqs = append(reqs, allNodesHaveReqSeqNum(t, ccipContracts, nodes, currentSeqNum+i))
+				reqs = append(reqs, allNodesHaveReqSeqNum(t, ccipContracts, nodes, tollCurrentSeqNum+i))
 			}
 			// Should see a report with the full range
-			report := eventuallyReportRelayed(t, ccipContracts, currentSeqNum, currentSeqNum+n-1)
+			report := eventuallyReportRelayed(t, ccipContracts, tollCurrentSeqNum, tollCurrentSeqNum+n-1)
 			// Execute them all
 			for _, req := range reqs {
 				executeMessage(t, ccipContracts, req, reqs, report)
 			}
 			for i := range reqs {
-				allNodesHaveExecutedSeqNum(t, ccipContracts, nodes, currentSeqNum+i)
+				allNodesHaveExecutedSeqNum(t, ccipContracts, nodes, tollCurrentSeqNum+i)
 			}
 			receivedMsg, err := ccipContracts.messageReceiver.SMessage(nil)
 			require.NoError(t, err)
-			assert.Equal(t, fmt.Sprintf("batch request %d", currentSeqNum+n-1), string(receivedMsg.Data))
-			currentSeqNum += n
+			assert.Equal(t, fmt.Sprintf("batch request %d", tollCurrentSeqNum+n-1), string(receivedMsg.Data))
+			tollCurrentSeqNum += n
 		})
 	*/
 
-	t.Run("single auto-execute", func(t *testing.T) {
+	t.Run("single auto-execute toll", func(t *testing.T) {
 		sendRequest(t, ccipContracts, "hey DON, execute for me", []common.Address{ccipContracts.sourceLinkToken.Address()}, []*big.Int{big.NewInt(100)}, big.NewInt(1e16), big.NewInt(0))
-		allNodesHaveReqSeqNum(t, ccipContracts, nodes, currentSeqNum)
-		eventuallyReportRelayed(t, ccipContracts, currentSeqNum, currentSeqNum)
-		allNodesHaveExecutedSeqNum(t, ccipContracts, nodes, currentSeqNum)
-		currentSeqNum++
+		allNodesHaveReqSeqNum(t, ccipContracts, ccip.CCIPSendRequested, ccipContracts.onRamp.Address(), nodes, tollCurrentSeqNum)
+		eventuallyReportRelayed(t, ccipContracts, ccipContracts.onRamp.Address(), tollCurrentSeqNum, tollCurrentSeqNum)
+		allNodesHaveExecutedSeqNum(t, ccipContracts, ccipContracts.offRamp.Address(), nodes, tollCurrentSeqNum)
+		tollCurrentSeqNum++
 	})
 
-	t.Run("batch auto-execute", func(t *testing.T) {
+	t.Run("single auto-execute subscription", func(t *testing.T) {
+		// Fund a 100 juels for relay fees.
+		_, err = ccipContracts.sourceLinkToken.Approve(ccipContracts.sourceUser, ccipContracts.subOnRampRouter.Address(), big.NewInt(100))
+		require.NoError(t, err)
+		_, err = ccipContracts.subOnRampRouter.FundSubscription(ccipContracts.sourceUser, big.NewInt(100))
+		require.NoError(t, err)
+		// Fund 1e17 juels on the destination for execution fees.
+		_, err = ccipContracts.destLinkToken.Approve(ccipContracts.destUser, ccipContracts.subOffRampRouter.Address(), big.NewInt(1e17))
+		require.NoError(t, err)
+		_, err = ccipContracts.subOffRampRouter.CreateSubscription(ccipContracts.destUser, any_2_evm_subscription_offramp_router.SubscriptionInterfaceOffRampSubscription{
+			Senders:          []common.Address{ccipContracts.sourceUser.From},
+			Receiver:         ccipContracts.messageReceiver.Address(),
+			StrictSequencing: false,
+			Balance:          big.NewInt(1e17), // Needs to be sufficient to cover default gas price of 200gwei.
+		})
+		require.NoError(t, err)
+		_, err = ccipContracts.sourceLinkToken.Approve(ccipContracts.sourceUser, ccipContracts.subOnRampRouter.Address(), big.NewInt(1))
+		require.NoError(t, err)
+		ccipContracts.sourceChain.Commit()
+		ccipContracts.destChain.Commit()
+		sendSubRequest(t, ccipContracts, "hey DON, execute for me", []common.Address{ccipContracts.sourceLinkToken.Address()},
+			[]*big.Int{big.NewInt(1)}, big.NewInt(10))
+		allNodesHaveReqSeqNum(t, ccipContracts, ccip.CCIPSubSendRequested, ccipContracts.subOnRamp.Address(), nodes, subCurrentSeqNum)
+		eventuallyReportRelayed(t, ccipContracts, ccipContracts.subOnRamp.Address(), subCurrentSeqNum, subCurrentSeqNum)
+		allNodesHaveExecutedSeqNum(t, ccipContracts, ccipContracts.subOffRamp.Address(), nodes, subCurrentSeqNum)
+		subCurrentSeqNum++
+	})
+
+	t.Run("batch auto-execute toll", func(t *testing.T) {
 		var txs []*gethtypes.Transaction
 		n := 3
 		for i := 0; i < n; i++ {
-			txs = append(txs, queueRequest(t, ccipContracts, fmt.Sprintf("batch request %d", currentSeqNum+i), []common.Address{ccipContracts.sourceLinkToken.Address()}, []*big.Int{big.NewInt(100)}, big.NewInt(1e16), big.NewInt(0)))
+			txs = append(txs, queueRequest(t, ccipContracts, fmt.Sprintf("batch request %d", tollCurrentSeqNum+i), []common.Address{ccipContracts.sourceLinkToken.Address()}, []*big.Int{big.NewInt(100)}, big.NewInt(1e16), big.NewInt(0)))
 		}
 		// Send a batch of requests in a single block
 		confirmTxs(t, txs, ccipContracts.sourceChain)
 		// All nodes should have all 3.
 		var reqs []logpoller.Log
 		for i := 0; i < n; i++ {
-			reqs = append(reqs, allNodesHaveReqSeqNum(t, ccipContracts, nodes, currentSeqNum+i))
+			reqs = append(reqs, allNodesHaveReqSeqNum(t, ccipContracts, ccip.CCIPSendRequested, ccipContracts.onRamp.Address(), nodes, tollCurrentSeqNum+i))
 		}
 		// Should see a report with the full range
-		eventuallyReportRelayed(t, ccipContracts, currentSeqNum, currentSeqNum+n-1)
+		eventuallyReportRelayed(t, ccipContracts, ccipContracts.onRamp.Address(), tollCurrentSeqNum, tollCurrentSeqNum+n-1)
 		// Should all be executed
 		for i := range reqs {
-			allNodesHaveExecutedSeqNum(t, ccipContracts, nodes, currentSeqNum+i)
+			allNodesHaveExecutedSeqNum(t, ccipContracts, ccipContracts.offRamp.Address(), nodes, tollCurrentSeqNum+i)
 		}
-		currentSeqNum += n
+		tollCurrentSeqNum += n
 	})
 
 	/*
@@ -879,10 +1029,10 @@ chainID             = "%s"
 			require.NoError(t, err)
 			ccipContracts.sourceChain.Commit()
 
-			allNodesHaveReqSeqNum(t, ccipContracts, nodes, currentSeqNum)
-			eventuallyReportRelayed(t, ccipContracts, currentSeqNum, currentSeqNum)
+			allNodesHaveReqSeqNum(t, ccipContracts, nodes, tollCurrentSeqNum)
+			eventuallyReportRelayed(t, ccipContracts, tollCurrentSeqNum, tollCurrentSeqNum)
 			//executeMessage(t, ccipContracts, req2, []logpoller.Log{req2}, report2)
-			allNodesHaveExecutedSeqNum(t, ccipContracts, nodes, currentSeqNum)
+			allNodesHaveExecutedSeqNum(t, ccipContracts, nodes, tollCurrentSeqNum)
 
 			// The destination user's balance should increase
 			endBalanceSource, err := ccipContracts.sourceLinkToken.BalanceOf(nil, ccipContracts.sourceUser.From)
@@ -895,7 +1045,7 @@ chainID             = "%s"
 	*/
 }
 
-func setupOnchainConfig(t *testing.T, ccipContracts CCIPContracts, oracles []confighelper2.OracleIdentityExtra, reportingPluginConfig []byte) {
+func setupOnchainConfig(t *testing.T, ccipContracts CCIPContracts, oracles []confighelper2.OracleIdentityExtra, reportingPluginConfig []byte) int64 {
 	// Note We do NOT set the payees, payment is done in the OCR2Base implementation
 	// Set the offramp offchainConfig.
 	signers, transmitters, threshold, onchainConfig, offchainConfigVersion, offchainConfig, err := confighelper2.ContractSetConfigArgsForTests(
@@ -908,8 +1058,8 @@ func setupOnchainConfig(t *testing.T, ccipContracts CCIPContracts, oracles []con
 		[]int{1, 1, 1, 1},
 		oracles,
 		reportingPluginConfig,
-		50*time.Millisecond,
-		50*time.Millisecond,
+		50*time.Millisecond,  // Max duration query
+		200*time.Millisecond, // Max duration observation
 		50*time.Millisecond,
 		50*time.Millisecond,
 		50*time.Millisecond,
@@ -932,6 +1082,8 @@ func setupOnchainConfig(t *testing.T, ccipContracts CCIPContracts, oracles []con
 	transmitterAddresses, err := ocrcommon.AccountToAddress(transmitters)
 	require.NoError(t, err)
 
+	blockBeforeConfig, err := ccipContracts.destChain.BlockByNumber(context.Background(), nil)
+	require.NoError(t, err)
 	// Set the DON on the offramp
 	_, err = ccipContracts.blobVerifier.SetConfig0(
 		ccipContracts.destUser,
@@ -945,7 +1097,7 @@ func setupOnchainConfig(t *testing.T, ccipContracts CCIPContracts, oracles []con
 	require.NoError(t, err)
 	ccipContracts.destChain.Commit()
 
-	// Same DON on the message executor
+	// Same DON on the toll offramp
 	_, err = ccipContracts.offRamp.SetConfig(
 		ccipContracts.destUser,
 		signerAddresses,
@@ -957,4 +1109,17 @@ func setupOnchainConfig(t *testing.T, ccipContracts CCIPContracts, oracles []con
 	)
 	require.NoError(t, err)
 	ccipContracts.destChain.Commit()
+
+	// Same DON on the sub offramp
+	_, err = ccipContracts.subOffRamp.SetConfig(
+		ccipContracts.destUser,
+		signerAddresses,
+		transmitterAddresses,
+		threshold,
+		onchainConfig,
+		offchainConfigVersion,
+		offchainConfig,
+	)
+	require.NoError(t, err)
+	return blockBeforeConfig.Number().Int64()
 }

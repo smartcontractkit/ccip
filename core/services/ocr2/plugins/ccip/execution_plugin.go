@@ -1,6 +1,7 @@
 package ccip
 
 import (
+	"bytes"
 	"encoding/json"
 	"math/big"
 
@@ -12,8 +13,11 @@ import (
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/any_2_evm_subscription_offramp"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/any_2_evm_subscription_offramp_router"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/any_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/blob_verifier"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/evm_2_evm_subscription_onramp"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/evm_2_evm_toll_onramp"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/job"
@@ -31,6 +35,7 @@ type CCIPExecution struct {
 	offRamp                            OffRamp
 	batchBuilder                       BatchBuilder
 	onRampSeqParser                    func(log logpoller.Log) (uint64, error)
+	reqEventSig                        common.Hash
 }
 
 var _ plugins.OraclePlugin = &CCIPExecution{}
@@ -69,6 +74,7 @@ func NewCCIPExecution(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm
 		return nil, err
 	}
 	var onRampSeqParser func(log logpoller.Log) (uint64, error)
+	var reqEventSig common.Hash
 	switch onRampType {
 	case EVM2EVMTollOnRamp:
 		onRamp, err2 := evm_2_evm_toll_onramp.NewEVM2EVMTollOnRamp(onRampAddr, sourceChain.Client())
@@ -84,8 +90,22 @@ func NewCCIPExecution(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm
 		}
 		// Subscribe to all relevant relay logs.
 		sourceChain.LogPoller().MergeFilter([]common.Hash{CCIPSendRequested}, onRampAddr)
+		reqEventSig = CCIPSendRequested
 	case EVM2EVMSubscriptionOnRamp:
-		// TODO: need event sigs for sub onramp
+		onRamp, err2 := evm_2_evm_subscription_onramp.NewEVM2EVMSubscriptionOnRamp(onRampAddr, sourceChain.Client())
+		if err2 != nil {
+			return nil, err2
+		}
+		onRampSeqParser = func(log logpoller.Log) (uint64, error) {
+			req, err3 := onRamp.ParseCCIPSendRequested(types.Log{Data: log.Data, Topics: log.GetTopics()})
+			if err3 != nil {
+				return 0, err3
+			}
+			return req.Message.SequenceNumber, nil
+		}
+		// Subscribe to all relevant relay logs.
+		sourceChain.LogPoller().MergeFilter([]common.Hash{CCIPSubSendRequested}, onRampAddr)
+		reqEventSig = CCIPSubSendRequested
 	default:
 		return nil, errors.Errorf("unrecognized onramp, is %v the correct onramp address?", onRampAddr)
 	}
@@ -94,24 +114,26 @@ func NewCCIPExecution(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm
 	if err != nil {
 		return nil, err
 	}
-	var batchBuilder BatchBuilder
-	var offRamp OffRamp
+	var (
+		batchBuilder BatchBuilder
+		offRamp      OffRamp
+		err2         error
+	)
 	switch offRampType {
 	case Any2EVMTollOffRamp:
 		batchBuilder = NewTollBatchBuilder(lggr)
-		offRampAddr := common.HexToAddress(spec.ContractID)
-		tollOffRamp, err := any_2_evm_toll_offramp.NewAny2EVMTollOffRamp(offRampAddr, destChain.Client())
-		if err != nil {
-			return nil, err
-		}
-		offRamp = tollOffRamp
-		destChain.LogPoller().MergeFilter([]common.Hash{CrossChainMessageExecuted}, offRampAddr) // May be common to all offramps?
+		offRamp, err2 = NewTollOffRamp(common.HexToAddress(spec.ContractID), destChain)
 	case Any2EVMSubscriptionOffRamp:
-		// TODO: get sub fee token from subscription contract itself
-		batchBuilder = NewSubscriptionBatchBuilder(lggr, common.Address{})
+		var subFeeToken common.Address
+		offRamp, subFeeToken, err2 = NewSubOffRamp(common.HexToAddress(spec.ContractID), destChain)
+		batchBuilder = NewSubscriptionBatchBuilder(lggr, subFeeToken)
 	default:
 		return nil, errors.Errorf("unrecognized offramp, is %v the correct offramp address?", spec.ContractID)
 	}
+	if err2 != nil {
+		return nil, err
+	}
+	destChain.LogPoller().MergeFilter([]common.Hash{CrossChainMessageExecuted}, offRamp.Address())
 	// TODO: Can also check the on/offramp pair is compatible
 	return &CCIPExecution{
 		lggr:              lggr,
@@ -123,6 +145,7 @@ func NewCCIPExecution(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm
 		destChainPoller:   destChain.LogPoller(),
 		batchBuilder:      batchBuilder,
 		onRampSeqParser:   onRampSeqParser,
+		reqEventSig:       reqEventSig,
 	}, nil
 }
 
@@ -130,8 +153,63 @@ type OffRamp interface {
 	GetPoolTokens(opts *bind.CallOpts) ([]common.Address, error)
 	GetPool(opts *bind.CallOpts, sourceToken common.Address) (common.Address, error)
 	GetExecutionState(opts *bind.CallOpts, arg0 uint64) (uint8, error)
-	// TODO: make generic for sub offramp.
-	ParseExecutionCompleted(log types.Log) (*any_2_evm_toll_offramp.Any2EVMTollOffRampExecutionCompleted, error)
+	ParseSeqNumFromExecutionCompleted(log types.Log) (uint64, error)
+	Address() common.Address
+}
+
+type subOffRamp struct {
+	*any_2_evm_subscription_offramp.Any2EVMSubscriptionOffRamp
+}
+
+func (s subOffRamp) ParseSeqNumFromExecutionCompleted(log types.Log) (uint64, error) {
+	ec, err := s.ParseExecutionCompleted(log)
+	if err != nil {
+		return 0, err
+	}
+	return ec.SequenceNumber, nil
+}
+
+func NewSubOffRamp(addr common.Address, destChain evm.Chain) (OffRamp, common.Address, error) {
+	offRamp, err := any_2_evm_subscription_offramp.NewAny2EVMSubscriptionOffRamp(addr, destChain.Client())
+	if err != nil {
+		return nil, common.Address{}, err
+	}
+	routerAddr, err := offRamp.SRouter(nil)
+	if err != nil {
+		return nil, common.Address{}, err
+	}
+	if bytes.Equal(routerAddr.Bytes(), common.Address{}.Bytes()) {
+		return nil, common.Address{}, errors.New("router unset")
+	}
+	router, err := any_2_evm_subscription_offramp_router.NewAny2EVMSubscriptionOffRampRouter(routerAddr, destChain.Client())
+	if err != nil {
+		return nil, common.Address{}, err
+	}
+	subFeeToken, err := router.GetFeeToken(nil)
+	if err != nil {
+		return nil, common.Address{}, err
+	}
+	return &subOffRamp{offRamp}, subFeeToken, nil
+}
+
+type tollOffRamp struct {
+	*any_2_evm_toll_offramp.Any2EVMTollOffRamp
+}
+
+func (s tollOffRamp) ParseSeqNumFromExecutionCompleted(log types.Log) (uint64, error) {
+	ec, err := s.ParseExecutionCompleted(log)
+	if err != nil {
+		return 0, err
+	}
+	return ec.SequenceNumber, nil
+}
+
+func NewTollOffRamp(addr common.Address, destChain evm.Chain) (OffRamp, error) {
+	offRamp, err := any_2_evm_toll_offramp.NewAny2EVMTollOffRamp(addr, destChain.Client())
+	if err != nil {
+		return nil, err
+	}
+	return &tollOffRamp{offRamp}, nil
 }
 
 func (c *CCIPExecution) GetPluginFactory() (plugin ocrtypes.ReportingPluginFactory, err error) {
@@ -145,6 +223,7 @@ func (c *CCIPExecution) GetPluginFactory() (plugin ocrtypes.ReportingPluginFacto
 		c.offRamp,
 		c.batchBuilder,
 		c.onRampSeqParser,
+		c.reqEventSig,
 	), nil
 }
 

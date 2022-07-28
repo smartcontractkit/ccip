@@ -9,7 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/evm_2_evm_toll_onramp"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/evm_2_evm_subscription_onramp"
 	"github.com/smartcontractkit/chainlink/core/logger"
 )
 
@@ -44,8 +44,7 @@ func NewSubscriptionBatch(maxGasLimit uint64, maxGasPrice uint64, subTokenPerFee
 	}
 }
 
-// TODO: Need sub message
-func (seb *SubscriptionBatch) Add(msg *evm_2_evm_toll_onramp.EVM2EVMTollOnRampCCIPSendRequested) bool {
+func (seb *SubscriptionBatch) Add(msg *evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRampCCIPSendRequested) bool {
 	if seb.remainingGasLimit-(msg.Message.GasLimit.Uint64()+MAX_OVERHEAD_GAS_SUBSCRIPTION) < 0 {
 		return false
 	}
@@ -73,8 +72,7 @@ type SubscriptionBatchBuilder struct {
 }
 
 func NewSubscriptionBatchBuilder(lggr logger.Logger, subFeeToken common.Address) *SubscriptionBatchBuilder {
-	// TODO: real sub ABI
-	subABI, _ := abi.JSON(strings.NewReader(evm_2_evm_toll_onramp.EVM2EVMTollOnRampABI))
+	subABI, _ := abi.JSON(strings.NewReader(evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRampABI))
 	return &SubscriptionBatchBuilder{lggr: lggr, subABI: subABI, subFeeToken: subFeeToken}
 }
 
@@ -113,9 +111,8 @@ func (sb *SubscriptionBatchBuilder) BuildBatch(srcToDst map[common.Address]commo
 	return subBatch.SeqNrs()
 }
 
-// TODO: Needs to be the subscription onramp
-func (sb *SubscriptionBatchBuilder) parseLog(log types.Log) (*evm_2_evm_toll_onramp.EVM2EVMTollOnRampCCIPSendRequested, error) {
-	event := new(evm_2_evm_toll_onramp.EVM2EVMTollOnRampCCIPSendRequested)
+func (sb *SubscriptionBatchBuilder) parseLog(log types.Log) (*evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRampCCIPSendRequested, error) {
+	event := new(evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRampCCIPSendRequested)
 	err := bind.NewBoundContract(common.Address{}, sb.subABI, nil, nil, nil).UnpackLog(event, "CCIPSendRequested", log)
 	if err != nil {
 		return nil, err
@@ -123,7 +120,7 @@ func (sb *SubscriptionBatchBuilder) parseLog(log types.Log) (*evm_2_evm_toll_onr
 	return event, nil
 }
 
-func maxSubCharge(maxGasPrice uint64, subTokenPerFeeCoin uint64, msg *evm_2_evm_toll_onramp.EVM2EVMTollOnRampCCIPSendRequested) uint64 {
+func maxSubCharge(maxGasPrice uint64, subTokenPerFeeCoin uint64, msg *evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRampCCIPSendRequested) uint64 {
 	totalGasLimit := msg.Message.GasLimit.Uint64() + MAX_OVERHEAD_GAS_SUBSCRIPTION
 	// TODO: Adjust once subscription contracts available.
 	return totalGasLimit * maxGasPrice * subTokenPerFeeCoin
@@ -135,8 +132,9 @@ func (sb *SubscriptionBatchBuilder) inflightAndReservedBalances(maxGasPrice uint
 	for _, r := range inflight {
 		for _, encMsg := range r.report.EncodedMessages {
 			subMsg, err := sb.parseLog(types.Log{
-				// TODO: do we need topics?
-				Data: encMsg,
+				// Note this needs to change if we start indexing things.
+				Topics: []common.Hash{CCIPSubSendRequested},
+				Data:   encMsg,
 			})
 			if err != nil {
 				return nil, nil, err
