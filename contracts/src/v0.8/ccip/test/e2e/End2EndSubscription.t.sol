@@ -20,21 +20,39 @@ contract E2E_subscription is EVM2EVMSubscriptionOnRampSetup, BlobVerifierSetup, 
     deployOffRampAndRouter(s_blobVerifier);
   }
 
-  function testSuccess() public {
+  function testSuccessWithTokens() public {
     uint256 balance0Pre = s_sourceTokens[0].balanceOf(OWNER);
     uint256 balance1Pre = s_sourceTokens[1].balanceOf(OWNER);
     uint256 subscriptionBalance = s_onRampRouter.getBalance(OWNER);
 
     CCIP.Any2EVMSubscriptionMessage[] memory messages = new CCIP.Any2EVMSubscriptionMessage[](3);
-    messages[0] = parseEventToDestChainMessage(sendRequest(1));
-    messages[1] = parseEventToDestChainMessage(sendRequest(2));
-    messages[2] = parseEventToDestChainMessage(sendRequest(3));
+    messages[0] = parseEventToDestChainMessage(sendRequest(getTokenMessage(), 1));
+    messages[1] = parseEventToDestChainMessage(sendRequest(getTokenMessage(), 2));
+    messages[2] = parseEventToDestChainMessage(sendRequest(getTokenMessage(), 3));
 
     // Asserts that the tokens have been sent and the fee has been paid.
     assertEq(balance0Pre - messages.length * TOKEN_AMOUNT_0, s_sourceTokens[0].balanceOf(OWNER));
     assertEq(balance1Pre - messages.length * TOKEN_AMOUNT_1, s_sourceTokens[1].balanceOf(OWNER));
     assertEq(subscriptionBalance - messages.length * s_onRampRouter.getFee(), s_onRampRouter.getBalance(OWNER));
 
+    _relayAndExecute(messages);
+  }
+
+  function testSuccessWithoutTokens() public {
+    uint256 subscriptionBalance = s_onRampRouter.getBalance(OWNER);
+
+    CCIP.Any2EVMSubscriptionMessage[] memory messages = new CCIP.Any2EVMSubscriptionMessage[](3);
+    messages[0] = parseEventToDestChainMessage(sendRequest(getEmptyMessage(), 1));
+    messages[1] = parseEventToDestChainMessage(sendRequest(getEmptyMessage(), 2));
+    messages[2] = parseEventToDestChainMessage(sendRequest(getEmptyMessage(), 3));
+
+    // Asserts that the tokens have been sent and the fee has been paid.
+    assertEq(subscriptionBalance - messages.length * s_onRampRouter.getFee(), s_onRampRouter.getBalance(OWNER));
+
+    _relayAndExecute(messages);
+  }
+
+  function _relayAndExecute(CCIP.Any2EVMSubscriptionMessage[] memory messages) internal {
     bytes32[] memory hashedMessages = new bytes32[](3);
     hashedMessages[0] = keccak256(bytes.concat(hex"00", abi.encode(messages[0])));
     hashedMessages[1] = keccak256(bytes.concat(hex"00", abi.encode(messages[1])));
@@ -78,11 +96,14 @@ contract E2E_subscription is EVM2EVMSubscriptionOnRampSetup, BlobVerifierSetup, 
     s_offRamp.execute(_generateReportFromMessages(messages), false);
   }
 
-  function sendRequest(uint64 expectedSeqNum) public returns (CCIP.EVM2EVMSubscriptionEvent memory) {
-    CCIP.EVM2AnySubscriptionMessage memory message = getTokenMessage();
-
-    s_sourceTokens[0].approve(address(s_onRampRouter), TOKEN_AMOUNT_0);
-    s_sourceTokens[1].approve(address(s_onRampRouter), TOKEN_AMOUNT_1);
+  function sendRequest(CCIP.EVM2AnySubscriptionMessage memory message, uint64 expectedSeqNum)
+    public
+    returns (CCIP.EVM2EVMSubscriptionEvent memory)
+  {
+    if (message.amounts.length != 0) {
+      s_sourceTokens[0].approve(address(s_onRampRouter), TOKEN_AMOUNT_0);
+      s_sourceTokens[1].approve(address(s_onRampRouter), TOKEN_AMOUNT_1);
+    }
 
     message.receiver = address(s_receiver);
     uint64 expectedNonce = expectedSeqNum;
