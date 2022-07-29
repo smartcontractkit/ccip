@@ -20,4 +20,10 @@ interface CrossChainMessageReceiverInterface is SubscriptionManagerInterface {
    * @param message CCIP Message
    */
   function ccipReceive(CCIP.Any2EVMTollMessage calldata message) external;
+
+  /**
+   * @notice Called by the OffRamp to deliver a message
+   * @param message CCIP Message
+   */
+  function ccipReceive(CCIP.Any2EVMMOMessage calldata message) external;
 }

@@ -47,6 +47,13 @@ contract ReceiverDapp is CrossChainMessageReceiverInterface, TypeAndVersionInter
     handleMessage(message.data, message.tokens, message.amounts);
   }
 
+  /**
+   * @notice Called by the OffRamp, this function receives a message and forwards
+   * the tokens sent with it to the designated EOA
+   * @param message CCIP Message
+   */
+  function ccipReceive(CCIP.Any2EVMMOMessage calldata message) external override onlyRouter {}
+
   function handleMessage(
     bytes memory data,
     IERC20[] memory tokens,

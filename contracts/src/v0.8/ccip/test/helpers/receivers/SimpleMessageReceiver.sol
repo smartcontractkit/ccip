@@ -24,4 +24,8 @@ contract SimpleMessageReceiver is CrossChainMessageReceiverInterface {
   function ccipReceive(CCIP.Any2EVMTollMessage calldata message) external override {
     emit MessageReceived(message.sequenceNumber);
   }
+
+  function ccipReceive(CCIP.Any2EVMMOMessage calldata message) external override {
+    emit MessageReceived(message.sequenceNumber);
+  }
 }

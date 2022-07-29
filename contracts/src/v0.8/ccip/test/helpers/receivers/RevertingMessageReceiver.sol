@@ -21,4 +21,8 @@ contract RevertingMessageReceiver is CrossChainMessageReceiverInterface {
   function ccipReceive(CCIP.Any2EVMTollMessage calldata) external pure override {
     revert();
   }
+
+  function ccipReceive(CCIP.Any2EVMMOMessage calldata) external pure override {
+    revert();
+  }
 }

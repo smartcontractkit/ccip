@@ -29,6 +29,22 @@ contract CCIP {
     uint256 gasLimit;
   }
 
+  struct EVM2AnyMOMessage {
+    address receiver;
+    bytes data;
+    uint256 gasLimit;
+  }
+
+  struct EVM2EVMMOEvent {
+    uint256 sourceChainId;
+    uint64 sequenceNumber;
+    address sender;
+    address receiver;
+    uint64 nonce;
+    bytes data;
+    uint256 gasLimit;
+  }
+
   // @notice The cross chain message that gets relayed to EVM toll chains
   struct Any2EVMTollMessage {
     uint256 sourceChainId;
@@ -74,6 +90,17 @@ contract CCIP {
     bytes data;
     IERC20[] tokens;
     uint256[] amounts;
+    uint256 gasLimit;
+  }
+
+  // @notice The cross chain message that gets relayed to EVM MO chains
+  struct Any2EVMMOMessage {
+    uint256 sourceChainId;
+    uint64 sequenceNumber;
+    address sender;
+    address receiver;
+    uint64 nonce;
+    bytes data;
     uint256 gasLimit;
   }
 
