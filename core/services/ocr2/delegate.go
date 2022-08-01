@@ -33,7 +33,6 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/relay"
 	evmrelay "github.com/smartcontractkit/chainlink/core/services/relay/evm"
 	"github.com/smartcontractkit/chainlink/core/services/telemetry"
-	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
 type Delegate struct {
@@ -281,12 +280,6 @@ func (d Delegate) ServicesForSpec(jobSpec job.Job) ([]job.ServiceCtx, error) {
 			return nil, errors.Wrap(err2, "decode DKG key ID")
 		}
 
-		coordinatorORM := ocr2coordinator.NewORM(
-			d.db,
-			*utils.NewBig(chain.ID()),
-			lggr.Named("OCR2VRFCoordinatorORM"),
-		)
-
 		coordinator, err2 := ocr2coordinator.New(
 			lggr.Named("OCR2VRFCoordinator"),
 			common.HexToAddress(spec.ContractID),
@@ -294,7 +287,6 @@ func (d Delegate) ServicesForSpec(jobSpec job.Job) ([]job.ServiceCtx, error) {
 			chain.Client(),
 			cfg.LookbackBlocks,
 			chain.LogPoller(),
-			coordinatorORM,
 		)
 		if err2 != nil {
 			return nil, errors.Wrap(err2, "create ocr2vrf coordinator")

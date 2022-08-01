@@ -121,7 +121,7 @@ func NewCCIPRelay(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm.Cha
 				return req.Message.SequenceNumber, nil
 			}
 			// Subscribe to all relevant relay logs.
-			sourceChain.LogPoller().MergeFilter([]common.Hash{CCIPSendRequested}, onRamp.Address())
+			sourceChain.LogPoller().MergeFilter([]common.Hash{CCIPSendRequested}, []common.Address{onRamp.Address()})
 			onRampToReqEventSig[onRamp.Address()] = CCIPSendRequested
 		case EVM2EVMSubscriptionOnRamp:
 			onRamp, err := evm_2_evm_subscription_onramp.NewEVM2EVMSubscriptionOnRamp(addr, sourceChain.Client())
@@ -136,7 +136,7 @@ func NewCCIPRelay(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm.Cha
 				return req.Message.SequenceNumber, nil
 			}
 			// Subscribe to all relevant relay logs.
-			sourceChain.LogPoller().MergeFilter([]common.Hash{CCIPSubSendRequested}, onRamp.Address())
+			sourceChain.LogPoller().MergeFilter([]common.Hash{CCIPSubSendRequested}, []common.Address{onRamp.Address()})
 			onRampToReqEventSig[onRamp.Address()] = CCIPSubSendRequested
 		default:
 			return nil, errors.Errorf("unrecognized onramp %v", onRampID)

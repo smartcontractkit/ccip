@@ -28,6 +28,7 @@ import (
 	"gopkg.in/guregu/null.v4"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
+	"github.com/smartcontractkit/chainlink/core/chains/evm/client"
 	eth "github.com/smartcontractkit/chainlink/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/headtracker"
 	httypes "github.com/smartcontractkit/chainlink/core/chains/evm/headtracker/types"
@@ -428,8 +429,8 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 	require.NoError(t, err)
 	_, err = chainORM.CreateChain(*utils.NewBig(destChainID), &evmtypes.ChainCfg{})
 	require.NoError(t, err)
-	sourceClient := cltest.NewSimulatedBackendClient(t, sourceChain, sourceChainID)
-	destClient := cltest.NewSimulatedBackendClient(t, destChain, destChainID)
+	sourceClient := client.NewSimulatedBackendClient(t, sourceChain, sourceChainID)
+	destClient := client.NewSimulatedBackendClient(t, destChain, destChainID)
 
 	keyStore := keystore.New(db, utils.FastScryptParams, lggr, config)
 	simEthKeyStore := EthKeyStoreSim{Eth: keyStore.Eth()}

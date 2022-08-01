@@ -89,7 +89,7 @@ func NewCCIPExecution(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm
 			return req.Message.SequenceNumber, nil
 		}
 		// Subscribe to all relevant relay logs.
-		sourceChain.LogPoller().MergeFilter([]common.Hash{CCIPSendRequested}, onRampAddr)
+		sourceChain.LogPoller().MergeFilter([]common.Hash{CCIPSendRequested}, []common.Address{onRampAddr})
 		reqEventSig = CCIPSendRequested
 	case EVM2EVMSubscriptionOnRamp:
 		onRamp, err2 := evm_2_evm_subscription_onramp.NewEVM2EVMSubscriptionOnRamp(onRampAddr, sourceChain.Client())
@@ -104,12 +104,12 @@ func NewCCIPExecution(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm
 			return req.Message.SequenceNumber, nil
 		}
 		// Subscribe to all relevant relay logs.
-		sourceChain.LogPoller().MergeFilter([]common.Hash{CCIPSubSendRequested}, onRampAddr)
+		sourceChain.LogPoller().MergeFilter([]common.Hash{CCIPSubSendRequested}, []common.Address{onRampAddr})
 		reqEventSig = CCIPSubSendRequested
 	default:
 		return nil, errors.Errorf("unrecognized onramp, is %v the correct onramp address?", onRampAddr)
 	}
-	destChain.LogPoller().MergeFilter([]common.Hash{ReportAccepted}, verifier.Address())
+	destChain.LogPoller().MergeFilter([]common.Hash{ReportAccepted}, []common.Address{verifier.Address()})
 	offRampType, _, _ := typeAndVersion(common.HexToAddress(spec.ContractID), destChain.Client())
 	if err != nil {
 		return nil, err
@@ -133,7 +133,7 @@ func NewCCIPExecution(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm
 	if err2 != nil {
 		return nil, err
 	}
-	destChain.LogPoller().MergeFilter([]common.Hash{CrossChainMessageExecuted}, offRamp.Address())
+	destChain.LogPoller().MergeFilter([]common.Hash{CrossChainMessageExecuted}, []common.Address{offRamp.Address()})
 	// TODO: Can also check the on/offramp pair is compatible
 	return &CCIPExecution{
 		lggr:              lggr,
