@@ -11,9 +11,13 @@ contract MockPool is PoolInterface {
     s_uid = uid;
   }
 
-  function lockOrBurn(uint256 amount) external override {}
+  function lockOrBurn(uint256 amount) external override {
+    emit Locked(msg.sender, amount);
+  }
 
-  function releaseOrMint(address recipient, uint256 amount) external override {}
+  function releaseOrMint(address recipient, uint256 amount) external override {
+    emit Released(msg.sender, recipient, amount);
+  }
 
   function getToken() external view override returns (IERC20 pool) {}
 

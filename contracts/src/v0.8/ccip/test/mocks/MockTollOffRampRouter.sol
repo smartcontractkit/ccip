@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../offRamp/interfaces/Any2EVMTollOffRampRouterInterface.sol";
+import "../../offRamp/interfaces/Any2EVMOffRampRouterInterface.sol";
 
-contract MockTollOffRampRouter is Any2EVMTollOffRampRouterInterface {
-  function routeMessage(CrossChainMessageReceiverInterface receiver, CCIP.Any2EVMTollMessage calldata message)
-    external
-  {}
+contract MockTollOffRampRouter is Any2EVMOffRampRouterInterface {
+  function routeMessage(CCIP.Any2EVMMessage calldata message) external override returns (bool success) {}
 
   function addOffRamp(BaseOffRampInterface) external {}
 

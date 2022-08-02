@@ -2,22 +2,22 @@
 pragma solidity 0.8.15;
 
 import "../blobVerifier/BlobVerifierSetup.t.sol";
-import "../offRamp/toll/Any2EVMTollOffRampSetup.t.sol";
+import "../offRamp/toll/EVM2EVMTollOffRampSetup.t.sol";
 import "../helpers/MerkleHelper.sol";
 import "../../onRamp/toll/EVM2AnyTollOnRampRouter.sol";
 import "../../onRamp/toll/EVM2EVMTollOnRamp.sol";
 import "../onRamp/toll/EVM2EVMTollOnRampSetup.t.sol";
 import "../../offRamp/toll/Any2EVMTollOffRampRouter.sol";
 
-contract E2E_toll is EVM2EVMTollOnRampSetup, BlobVerifierSetup, Any2EVMTollOffRampSetup {
-  Any2EVMTollOffRampRouterInterface public s_router;
+contract E2E_toll is EVM2EVMTollOnRampSetup, BlobVerifierSetup, EVM2EVMTollOffRampSetup {
+  Any2EVMOffRampRouterInterface public s_router;
 
   MerkleHelper public s_merkleHelper;
 
-  function setUp() public virtual override(EVM2EVMTollOnRampSetup, BlobVerifierSetup, Any2EVMTollOffRampSetup) {
+  function setUp() public virtual override(EVM2EVMTollOnRampSetup, BlobVerifierSetup, EVM2EVMTollOffRampSetup) {
     EVM2EVMTollOnRampSetup.setUp();
     BlobVerifierSetup.setUp();
-    Any2EVMTollOffRampSetup.setUp();
+    EVM2EVMTollOffRampSetup.setUp();
 
     s_merkleHelper = new MerkleHelper();
 
@@ -31,7 +31,7 @@ contract E2E_toll is EVM2EVMTollOnRampSetup, BlobVerifierSetup, Any2EVMTollOffRa
     uint256 balance0Pre = s_sourceTokens[0].balanceOf(OWNER);
     uint256 balance1Pre = s_sourceTokens[1].balanceOf(OWNER);
 
-    CCIP.Any2EVMTollMessage[] memory messages = new CCIP.Any2EVMTollMessage[](3);
+    CCIP.EVM2EVMTollMessage[] memory messages = new CCIP.EVM2EVMTollMessage[](3);
     messages[0] = parseEventToDestChainMessage(sendRequest(1));
     messages[1] = parseEventToDestChainMessage(sendRequest(2));
     messages[2] = parseEventToDestChainMessage(sendRequest(3));
@@ -72,25 +72,25 @@ contract E2E_toll is EVM2EVMTollOnRampSetup, BlobVerifierSetup, Any2EVMTollOffRa
     vm.warp(BLOCK_TIME + 2000);
 
     vm.expectEmit(false, false, false, true);
-    emit ExecutionCompleted(messages[0].sequenceNumber, CCIP.MessageExecutionState.Success);
+    emit ExecutionStateChanged(messages[0].sequenceNumber, CCIP.MessageExecutionState.SUCCESS);
 
     vm.expectEmit(false, false, false, true);
-    emit ExecutionCompleted(messages[1].sequenceNumber, CCIP.MessageExecutionState.Success);
+    emit ExecutionStateChanged(messages[1].sequenceNumber, CCIP.MessageExecutionState.SUCCESS);
 
     vm.expectEmit(false, false, false, true);
-    emit ExecutionCompleted(messages[2].sequenceNumber, CCIP.MessageExecutionState.Success);
+    emit ExecutionStateChanged(messages[2].sequenceNumber, CCIP.MessageExecutionState.SUCCESS);
 
     s_offRamp.execute(_generateReportFromMessages(messages), false);
   }
 
   function sendRequest(uint64 expectedSeqNum) public returns (CCIP.EVM2EVMTollEvent memory) {
-    CCIP.EVM2AnyTollMessage memory message = getTokenMessage();
+    CCIP.EVM2AnyTollMessage memory message = _generateTokenMessage();
 
     s_sourceTokens[0].approve(address(s_onRampRouter), TOKEN_AMOUNT_0 + FEE_AMOUNT);
     s_sourceTokens[1].approve(address(s_onRampRouter), TOKEN_AMOUNT_1);
 
     message.receiver = address(s_receiver);
-    CCIP.EVM2EVMTollEvent memory tollEvent = messageToEvent(message, expectedSeqNum);
+    CCIP.EVM2EVMTollEvent memory tollEvent = _messageToEvent(message, expectedSeqNum);
     vm.expectEmit(false, false, false, true);
 
     emit CCIPSendRequested(tollEvent);
@@ -103,10 +103,10 @@ contract E2E_toll is EVM2EVMTollOnRampSetup, BlobVerifierSetup, Any2EVMTollOffRa
   function parseEventToDestChainMessage(CCIP.EVM2EVMTollEvent memory sendEvent)
     public
     pure
-    returns (CCIP.Any2EVMTollMessage memory)
+    returns (CCIP.EVM2EVMTollMessage memory)
   {
     return
-      CCIP.Any2EVMTollMessage({
+      CCIP.EVM2EVMTollMessage({
         sourceChainId: sendEvent.sourceChainId,
         sequenceNumber: sendEvent.sequenceNumber,
         sender: sendEvent.sender,

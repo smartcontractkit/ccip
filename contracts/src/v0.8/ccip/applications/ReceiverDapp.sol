@@ -3,24 +3,24 @@ pragma solidity 0.8.15;
 
 import "../../vendor/SafeERC20.sol";
 import "../../interfaces/TypeAndVersionInterface.sol";
-import "../offRamp/interfaces/Any2EVMTollOffRampRouterInterface.sol";
-import "./interfaces/CrossChainMessageReceiverInterface.sol";
+import "../offRamp/interfaces/Any2EVMOffRampRouterInterface.sol";
+import "./interfaces/Any2EVMMessageReceiverInterface.sol";
 
 /**
  * @notice Application contract for receiving messages from the OffRamp on behalf of an EOA
  */
-contract ReceiverDapp is CrossChainMessageReceiverInterface, TypeAndVersionInterface {
+contract ReceiverDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterface {
   using SafeERC20 for IERC20;
 
   string public constant override typeAndVersion = "ReceiverDapp 1.0.0";
 
-  Any2EVMTollOffRampRouterInterface public immutable ROUTER;
+  Any2EVMOffRampRouterInterface public immutable ROUTER;
 
   address s_manager;
 
   error InvalidDeliverer(address deliverer);
 
-  constructor(Any2EVMTollOffRampRouterInterface router) {
+  constructor(Any2EVMOffRampRouterInterface router) {
     ROUTER = router;
     s_manager = msg.sender;
   }
@@ -34,16 +34,7 @@ contract ReceiverDapp is CrossChainMessageReceiverInterface, TypeAndVersionInter
    * the tokens sent with it to the designated EOA
    * @param message CCIP Message
    */
-  function ccipReceive(CCIP.Any2EVMTollMessage calldata message) external override onlyRouter {
-    handleMessage(message.data, message.tokens, message.amounts);
-  }
-
-  /**
-   * @notice Called by the OffRamp, this function receives a message and forwards
-   * the tokens sent with it to the designated EOA
-   * @param message CCIP Message
-   */
-  function ccipReceive(CCIP.Any2EVMSubscriptionMessage calldata message) external override onlyRouter {
+  function ccipReceive(CCIP.Any2EVMMessage calldata message) external override onlyRouter {
     handleMessage(message.data, message.tokens, message.amounts);
   }
 

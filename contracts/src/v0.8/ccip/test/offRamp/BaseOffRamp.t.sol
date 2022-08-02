@@ -2,7 +2,7 @@
 pragma solidity 0.8.15;
 
 import "../TokenSetup.t.sol";
-import "../../offRamp/BaseOffRampHelper.sol";
+import "../helpers/BaseOffRampHelper.sol";
 import "../mocks/MockBlobVerifier.sol";
 import "../../pools/NativeTokenPool.sol";
 
@@ -20,7 +20,6 @@ contract BaseOffRampSetup is TokenSetup {
   function setUp() public virtual override {
     TokenSetup.setUp();
     s_offRampConfig = BaseOffRampInterface.OffRampConfig({
-      sourceChainId: SOURCE_CHAIN_ID,
       executionDelaySeconds: 0,
       maxDataSize: 500,
       maxTokensLength: 5,
@@ -40,6 +39,7 @@ contract BaseOffRampSetup is TokenSetup {
     vm.warp(BLOCK_TIME);
 
     s_offRamp = new BaseOffRampHelper(
+      SOURCE_CHAIN_ID,
       DEST_CHAIN_ID,
       s_offRampConfig,
       s_mockBlobVerifier,
@@ -57,7 +57,6 @@ contract BaseOffRampSetup is TokenSetup {
   function assertSameConfig(BaseOffRampInterface.OffRampConfig memory a, BaseOffRampInterface.OffRampConfig memory b)
     public
   {
-    assertEq(a.sourceChainId, b.sourceChainId);
     assertEq(a.executionDelaySeconds, b.executionDelaySeconds);
     assertEq(a.maxDataSize, b.maxDataSize);
     assertEq(a.maxTokensLength, b.maxTokensLength);
@@ -88,6 +87,7 @@ contract BaseOffRamp_constructor is BaseOffRampSetup {
 
     IERC20[] memory wrongTokens = new IERC20[](5);
     s_offRamp = new BaseOffRampHelper(
+      SOURCE_CHAIN_ID,
       DEST_CHAIN_ID,
       s_offRampConfig,
       s_mockBlobVerifier,
@@ -106,15 +106,15 @@ contract BaseOffRamp_getExecutionState is BaseOffRampSetup {
   function testSuccess() public {
     // setting the execution state is done with a helper function. This
     // is normally not exposed.
-    s_offRamp.setExecutionState(1, CCIP.MessageExecutionState.Failure);
-    s_offRamp.setExecutionState(10, CCIP.MessageExecutionState.InProgress);
-    s_offRamp.setExecutionState(33, CCIP.MessageExecutionState.Untouched);
-    s_offRamp.setExecutionState(50, CCIP.MessageExecutionState.Success);
+    s_offRamp.setExecutionState(1, CCIP.MessageExecutionState.FAILURE);
+    s_offRamp.setExecutionState(10, CCIP.MessageExecutionState.IN_PROGRESS);
+    s_offRamp.setExecutionState(33, CCIP.MessageExecutionState.UNTOUCHED);
+    s_offRamp.setExecutionState(50, CCIP.MessageExecutionState.SUCCESS);
 
-    assertEq(uint256(CCIP.MessageExecutionState.Failure), uint256(s_offRamp.getExecutionState(1)));
-    assertEq(uint256(CCIP.MessageExecutionState.InProgress), uint256(s_offRamp.getExecutionState(10)));
-    assertEq(uint256(CCIP.MessageExecutionState.Untouched), uint256(s_offRamp.getExecutionState(33)));
-    assertEq(uint256(CCIP.MessageExecutionState.Success), uint256(s_offRamp.getExecutionState(50)));
+    assertEq(uint256(CCIP.MessageExecutionState.FAILURE), uint256(s_offRamp.getExecutionState(1)));
+    assertEq(uint256(CCIP.MessageExecutionState.IN_PROGRESS), uint256(s_offRamp.getExecutionState(10)));
+    assertEq(uint256(CCIP.MessageExecutionState.UNTOUCHED), uint256(s_offRamp.getExecutionState(33)));
+    assertEq(uint256(CCIP.MessageExecutionState.SUCCESS), uint256(s_offRamp.getExecutionState(50)));
   }
 }
 
@@ -155,17 +155,9 @@ contract BaseOffRamp_setConfig is BaseOffRampSetup {
     s_offRamp.setConfig(s_offRampConfig);
   }
 
-  function testInvalidSourceChainReverts() public {
-    BaseOffRampInterface.OffRampConfig memory newConfig = generateNewConfig();
-    newConfig.sourceChainId++;
-    vm.expectRevert(abi.encodeWithSelector(BaseOffRampInterface.InvalidSourceChain.selector, newConfig.sourceChainId));
-    s_offRamp.setConfig(newConfig);
-  }
-
   function generateNewConfig() internal pure returns (BaseOffRampInterface.OffRampConfig memory) {
     return
       BaseOffRampInterface.OffRampConfig({
-        sourceChainId: SOURCE_CHAIN_ID,
         executionDelaySeconds: 20,
         maxDataSize: 1,
         maxTokensLength: 15,
@@ -174,7 +166,7 @@ contract BaseOffRamp_setConfig is BaseOffRampSetup {
   }
 }
 
-/// @notice #_releaseOrMintToken
+/// @notice #_releaseOrMintToken internal function
 contract BaseOffRamp__releaseOrMintToken is BaseOffRampSetup {
   // Success
   function testSuccess() public {
@@ -215,9 +207,9 @@ contract BaseOffRamp__releaseOrMintTokens is BaseOffRampSetup {
   }
 
   // Revert
+
   function testUnsupportedTokenReverts() public {
     uint256[] memory amounts = new uint256[](2);
-
     vm.expectRevert(abi.encodeWithSelector(BaseOffRampInterface.UnsupportedToken.selector, s_destTokens[0]));
     s_offRamp.releaseOrMintTokens(s_destTokens, amounts, OWNER);
   }

@@ -34,7 +34,7 @@ import (
 type ExecutionContracts struct {
 	// Has all the link and 100ETH
 	user                       *bind.TransactOpts
-	offRamp                    *any_2_evm_toll_offramp.Any2EVMTollOffRamp
+	offRamp                    *any_2_evm_toll_offramp.EVM2EVMTollOffRamp
 	blobVerifier               *blob_verifier_helper.BlobVerifierHelper
 	receiver                   *simple_message_receiver.SimpleMessageReceiver
 	linkTokenAddress           common.Address
@@ -109,9 +109,8 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	blobVerifier, err := blob_verifier_helper.NewBlobVerifierHelper(blobVerifierAddress, destChain)
 	require.NoError(t, err)
 	destChain.Commit()
-	offRampAddress, _, _, err := any_2_evm_toll_offramp.DeployAny2EVMTollOffRamp(destUser,
-		destChain, destChainID, any_2_evm_toll_offramp.BaseOffRampInterfaceOffRampConfig{
-			SourceChainId:         sourceChainID,
+	offRampAddress, _, _, err := any_2_evm_toll_offramp.DeployEVM2EVMTollOffRamp(destUser,
+		destChain, sourceChainID, destChainID, any_2_evm_toll_offramp.BaseOffRampInterfaceOffRampConfig{
 			ExecutionDelaySeconds: 0,
 			MaxDataSize:           1e12,
 			MaxTokensLength:       5,
@@ -124,7 +123,7 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 		big.NewInt(time.Now().Unix()*2),
 	)
 	require.NoError(t, err)
-	offRamp, err := any_2_evm_toll_offramp.NewAny2EVMTollOffRamp(offRampAddress, destChain)
+	offRamp, err := any_2_evm_toll_offramp.NewEVM2EVMTollOffRamp(offRampAddress, destChain)
 	require.NoError(t, err)
 	_, err = destPool.SetOffRamp(destUser, offRampAddress, true)
 	require.NoError(t, err)
@@ -248,7 +247,7 @@ func TestMaxExecutionReportSize(t *testing.T) {
 
 	// Check can get into mempool i.e. tx size limit is respected.
 	a := c.offRamp.Address()
-	bi, _ := abi.JSON(strings.NewReader(any_2_evm_toll_offramp_helper.Any2EVMTollOffRampHelperABI))
+	bi, _ := abi.JSON(strings.NewReader(any_2_evm_toll_offramp_helper.EVM2EVMTollOffRampHelperABI))
 	b, err := bi.Pack("report", []byte(executorReport))
 	require.NoError(t, err)
 	n, err := c.destChain.NonceAt(context.Background(), c.user.From, nil)

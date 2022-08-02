@@ -1,9 +1,10 @@
 pragma solidity ^0.8.0;
 
-import "./BaseOffRamp.sol";
+import "../../offRamp/BaseOffRamp.sol";
 
 contract BaseOffRampHelper is BaseOffRamp {
   constructor(
+    uint256 sourceChainId,
     uint256 chainId,
     OffRampConfig memory offRampConfig,
     BlobVerifierInterface blobVerifier,
@@ -13,7 +14,17 @@ contract BaseOffRampHelper is BaseOffRamp {
     PoolInterface[] memory pools,
     uint256 maxTimeWithoutAFNSignal
   )
-    BaseOffRamp(chainId, offRampConfig, blobVerifier, onRampAddress, afn, sourceTokens, pools, maxTimeWithoutAFNSignal)
+    BaseOffRamp(
+      sourceChainId,
+      chainId,
+      offRampConfig,
+      blobVerifier,
+      onRampAddress,
+      afn,
+      sourceTokens,
+      pools,
+      maxTimeWithoutAFNSignal
+    )
   {}
 
   function setExecutionState(uint64 sequenceNumber, CCIP.MessageExecutionState state) public {

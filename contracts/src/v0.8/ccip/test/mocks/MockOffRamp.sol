@@ -1,15 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../applications/interfaces/CrossChainMessageReceiverInterface.sol";
-import "../../offRamp/interfaces/Any2EVMTollOffRampInterface.sol";
+import "../../applications/interfaces/Any2EVMMessageReceiverInterface.sol";
+import "../../offRamp/interfaces/BaseOffRampInterface.sol";
 
-contract MockOffRamp is Any2EVMTollOffRampInterface {
+contract MockOffRamp is BaseOffRampInterface {
   IERC20 public s_token;
 
-  function deliverMessageTo(CrossChainMessageReceiverInterface recipient, CCIP.Any2EVMTollMessage calldata message)
-    external
-  {
+  function deliverMessageTo(Any2EVMMessageReceiverInterface recipient, CCIP.Any2EVMMessage calldata message) external {
     recipient.ccipReceive(message);
   }
 
@@ -17,19 +15,23 @@ contract MockOffRamp is Any2EVMTollOffRampInterface {
 
   function CHAIN_ID() external view returns (uint256) {}
 
-  function setRouter(Any2EVMTollOffRampRouterInterface router) external {}
+  function setRouter(Any2EVMOffRampRouterInterface router) external {}
+
+  function getRouter() external pure override returns (Any2EVMOffRampRouterInterface) {
+    return Any2EVMOffRampRouterInterface(address(0));
+  }
 
   /**
    * @notice ccipReceive implements the receive function to create a
    * collision if some other method happens to hash to the same signature/
    */
-  function ccipReceive(CCIP.Any2EVMTollMessage calldata) external pure override {
+  function ccipReceive(CCIP.Any2EVMMessage calldata) external pure {
     revert();
   }
 
   function execute(CCIP.ExecutionReport memory report, bool needFee) external override {}
 
-  function executeSingleMessage(CCIP.Any2EVMTollMessage memory message) external {}
+  function executeSingleMessage(CCIP.EVM2EVMTollMessage memory message) external {}
 
   function setToken(IERC20 token) external {
     s_token = token;
@@ -41,7 +43,7 @@ contract MockOffRamp is Any2EVMTollOffRampInterface {
 
   /// @inheritdoc BaseOffRampInterface
   function getExecutionState(uint64) public pure returns (CCIP.MessageExecutionState) {
-    return CCIP.MessageExecutionState.Success;
+    return CCIP.MessageExecutionState.SUCCESS;
   }
 
   /// @inheritdoc BaseOffRampInterface

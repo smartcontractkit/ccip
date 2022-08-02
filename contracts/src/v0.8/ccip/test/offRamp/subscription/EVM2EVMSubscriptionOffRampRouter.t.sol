@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "./Any2EVMSubscriptionOffRampSetup.t.sol";
+import "./EVM2EVMSubscriptionOffRampSetup.t.sol";
 import "../../helpers/receivers/RevertingMessageReceiver.sol";
+import "forge-std/console2.sol";
 
 /// @notice #constructor
-contract Any2EVMSubscriptionOffRampRouter_constructor is Any2EVMSubscriptionOffRampSetup {
+contract EVM2EVMSubscriptionOffRampRouter_constructor is EVM2EVMSubscriptionOffRampSetup {
   function testSuccess() public {
     // typeAndVersion
     assertEq("Any2EVMSubscriptionOffRampRouter 1.0.0", s_router.typeAndVersion());
@@ -28,13 +29,13 @@ contract Any2EVMSubscriptionOffRampRouter_constructor is Any2EVMSubscriptionOffR
 }
 
 /// @notice #routeMessage
-contract Any2EVMSubscriptionOffRampRouter_routeMessage is Any2EVMSubscriptionOffRampSetup {
+contract EVM2EVMSubscriptionOffRampRouter_routeMessage is EVM2EVMSubscriptionOffRampSetup {
   event MessageReceived(uint256 sequenceNumber);
 
-  CrossChainMessageReceiverInterface s_revertingReceiver;
+  Any2EVMMessageReceiverInterface s_revertingReceiver;
 
   function setUp() public virtual override {
-    Any2EVMSubscriptionOffRampSetup.setUp();
+    EVM2EVMSubscriptionOffRampSetup.setUp();
     changePrank(address(s_offRamp));
 
     s_revertingReceiver = new RevertingMessageReceiver();
@@ -42,46 +43,56 @@ contract Any2EVMSubscriptionOffRampRouter_routeMessage is Any2EVMSubscriptionOff
 
   // Success
   function testSuccess() public {
-    CCIP.Any2EVMSubscriptionMessage memory message = getAny2EVMSubscriptionMessageNoTokens(1, 1);
+    CCIP.Any2EVMMessage memory message = _convertSubscriptionToGeneralMessage(
+      _generateAny2EVMSubscriptionMessageNoTokens(1, 1)
+    );
 
     vm.expectEmit(false, false, false, true);
     emit MessageReceived(message.sequenceNumber);
 
-    s_router.routeMessage(s_receiver, message);
+    assertTrue(s_router.routeMessage(message));
+  }
+
+  function testMessageFailureReturnsFalseSuccess() public {
+    CCIP.Any2EVMMessage memory message = _convertSubscriptionToGeneralMessage(
+      _generateAny2EVMSubscriptionMessageNoTokens(1, 1)
+    );
+    message.receiver = address(s_revertingReceiver);
+    assertFalse(s_router.routeMessage(message));
+  }
+
+  function testNotEnoughMessageGasLimitReturnsFalseSuccess() public {
+    CCIP.Any2EVMMessage memory message = _convertSubscriptionToGeneralMessage(
+      _generateAny2EVMSubscriptionMessageNoTokens(1, 1)
+    );
+    message.gasLimit = 1;
+    assertFalse(s_router.routeMessage(message));
+  }
+
+  function testMessageFailureReturnsFalse() public {
+    CCIP.Any2EVMMessage memory message = _convertSubscriptionToGeneralMessage(
+      _generateAny2EVMSubscriptionMessageNoTokens(1, 1)
+    );
+    message.receiver = address(s_revertingReceiver);
+    assertFalse(s_router.routeMessage(message));
   }
 
   // Reverts
   function testMustCallFromOffRampReverts() public {
     changePrank(OWNER);
     vm.expectRevert(
-      abi.encodeWithSelector(BaseOffRampRouterInterface.MustCallFromOffRamp.selector, BaseOffRampInterface(OWNER))
+      abi.encodeWithSelector(Any2EVMOffRampRouterInterface.MustCallFromOffRamp.selector, BaseOffRampInterface(OWNER))
     );
-    s_router.routeMessage(s_receiver, getAny2EVMSubscriptionMessageNoTokens(1, 1));
-  }
-
-  function testZeroAddressReceiverReverts() public {
-    vm.expectRevert();
-
-    s_router.routeMessage(CrossChainMessageReceiverInterface(address(0)), getAny2EVMSubscriptionMessageNoTokens(1, 1));
-  }
-
-  function testMessageFailureReverts() public {
-    CCIP.Any2EVMSubscriptionMessage memory message = getAny2EVMSubscriptionMessageNoTokens(1, 1);
-    message.receiver = address(s_revertingReceiver);
-    bytes memory reason;
-    vm.expectRevert(
-      abi.encodeWithSelector(BaseOffRampRouterInterface.MessageFailure.selector, message.sequenceNumber, reason)
-    );
-    s_router.routeMessage(s_revertingReceiver, message);
+    s_router.routeMessage(_convertSubscriptionToGeneralMessage(_generateAny2EVMSubscriptionMessageNoTokens(1, 1)));
   }
 }
 
 /// @notice #chargeSubscription
-contract Any2EVMSubscriptionOffRampRouter_chargeSubscription is Any2EVMSubscriptionOffRampSetup {
+contract EVM2EVMSubscriptionOffRampRouter_chargeSubscription is EVM2EVMSubscriptionOffRampSetup {
   event SubscriptionCharged(address receiver, uint256 amount);
 
   function setUp() public virtual override {
-    Any2EVMSubscriptionOffRampSetup.setUp();
+    EVM2EVMSubscriptionOffRampSetup.setUp();
     changePrank(address(s_offRamp));
   }
 
@@ -101,17 +112,17 @@ contract Any2EVMSubscriptionOffRampRouter_chargeSubscription is Any2EVMSubscript
   // Reverts
   function testMustCallFromOffRampReverts() public {
     changePrank(OWNER);
-    vm.expectRevert(abi.encodeWithSelector(BaseOffRampRouterInterface.MustCallFromOffRamp.selector, OWNER));
+    vm.expectRevert(abi.encodeWithSelector(Any2EVMOffRampRouterInterface.MustCallFromOffRamp.selector, OWNER));
     s_router.chargeSubscription(address(s_receiver), OWNER, SUBSCRIPTION_BALANCE);
   }
 
   function testBalanceTooLowReverts() public {
-    vm.expectRevert(SubscriptionInterface.BalanceTooLow.selector);
+    vm.expectRevert(stdError.arithmeticError);
     s_router.chargeSubscription(address(s_receiver), OWNER, SUBSCRIPTION_BALANCE + 1);
   }
 
   function testSenderNotAllowedReverts() public {
-    vm.expectRevert(abi.encodeWithSelector(BaseOffRampRouterInterface.SenderNotAllowed.selector, STRANGER));
+    vm.expectRevert(abi.encodeWithSelector(Any2EVMOffRampRouterInterface.SenderNotAllowed.selector, STRANGER));
     s_router.chargeSubscription(address(s_receiver), STRANGER, SUBSCRIPTION_BALANCE);
   }
 }

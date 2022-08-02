@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../offRamp/subscription/Any2EVMSubscriptionOffRamp.sol";
+import "../../offRamp/toll/EVM2EVMTollOffRamp.sol";
 
-contract Any2EVMSubscriptionOffRampHelper is Any2EVMSubscriptionOffRamp {
+contract EVM2EVMTollOffRampHelper is EVM2EVMTollOffRamp {
   constructor(
+    uint256 sourceChainId,
     uint256 chainId,
     OffRampConfig memory offRampConfig,
     BlobVerifierInterface blobVerifier,
@@ -14,7 +15,8 @@ contract Any2EVMSubscriptionOffRampHelper is Any2EVMSubscriptionOffRamp {
     PoolInterface[] memory pools,
     uint256 maxTimeWithoutAFNSignal
   )
-    Any2EVMSubscriptionOffRamp(
+    EVM2EVMTollOffRamp(
+      sourceChainId,
       chainId,
       offRampConfig,
       blobVerifier,
@@ -28,9 +30,5 @@ contract Any2EVMSubscriptionOffRampHelper is Any2EVMSubscriptionOffRamp {
 
   function report(bytes memory executableMessages) external {
     _report(bytes32(0), 0, executableMessages);
-  }
-
-  function setMessageState(uint64 sequenceNumber, CCIP.MessageExecutionState state) public {
-    s_executedMessages[sequenceNumber] = state;
   }
 }

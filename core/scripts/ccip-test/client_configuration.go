@@ -101,7 +101,7 @@ type DestClient struct {
 	BlobVerifier    *blob_verifier.BlobVerifier
 	MessageReceiver *simple_message_receiver.SimpleMessageReceiver
 	ReceiverDapp    *receiver_dapp.ReceiverDapp
-	OffRamp         *any_2_evm_toll_offramp.Any2EVMTollOffRamp
+	OffRamp         *any_2_evm_toll_offramp.EVM2EVMTollOffRamp
 	OffRampRouter   *any_2_evm_toll_offramp_router.Any2EVMTollOffRampRouter
 }
 
@@ -121,13 +121,13 @@ func NewDestinationClient(t *testing.T, config EvmChainConfig) DestClient {
 	require.NoError(t, err)
 	blobVerifier, err := blob_verifier.NewBlobVerifier(config.BlobVerifier, client)
 	require.NoError(t, err)
-	offRamp, err := any_2_evm_toll_offramp.NewAny2EVMTollOffRamp(config.OffRamp, client)
+	offRamp, err := any_2_evm_toll_offramp.NewEVM2EVMTollOffRamp(config.OffRamp, client)
 	require.NoError(t, err)
 	messageReceiver, err := simple_message_receiver.NewSimpleMessageReceiver(config.MessageReceiver, client)
 	require.NoError(t, err)
 	receiverDapp, err := receiver_dapp.NewReceiverDapp(config.TokenReceiver, client)
 	require.NoError(t, err)
-	offRampRouter, err := any_2_evm_toll_offramp_router.NewAny2EVMTollOffRampRouter(config.OffRampRouter, client)
+	offRampRouter, err := any_2_evm_toll_offramp_router.NewEVM2EVMTollOffRampRouter(config.OffRampRouter, client)
 	require.NoError(t, err)
 
 	return DestClient{

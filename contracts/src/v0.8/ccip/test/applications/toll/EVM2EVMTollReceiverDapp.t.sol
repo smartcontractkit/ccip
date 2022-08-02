@@ -25,7 +25,7 @@ contract ReceiverDappSetup is TokenSetup {
 }
 
 /// @notice #constructor
-contract Any2EVMTollReceiverDapp_constructor is ReceiverDappSetup {
+contract EVM2EVMTollReceiverDapp_constructor is ReceiverDappSetup {
   // Success
   function testSuccess() public {
     // typeAndVersion
@@ -34,11 +34,11 @@ contract Any2EVMTollReceiverDapp_constructor is ReceiverDappSetup {
 }
 
 /// @notice #ccipReceive
-contract Any2EVMTollReceiverDapp_ccipReceive is ReceiverDappSetup {
+contract EVM2EVMTollReceiverDapp_ccipReceive is ReceiverDappSetup {
   // Success
 
   function testSuccess() public {
-    CCIP.Any2EVMTollMessage memory message;
+    CCIP.Any2EVMMessage memory message;
     uint256 transferAmount = 5000;
     message.tokens = s_destTokens;
     message.amounts = new uint256[](2);
@@ -60,7 +60,7 @@ contract Any2EVMTollReceiverDapp_ccipReceive is ReceiverDappSetup {
 
   function testInvalidDelivererReverts() public {
     vm.expectRevert(abi.encodeWithSelector(ReceiverDapp.InvalidDeliverer.selector, OWNER));
-    CCIP.Any2EVMTollMessage memory message;
+    CCIP.Any2EVMMessage memory message;
 
     s_receiverDapp.ccipReceive(message);
   }

@@ -91,13 +91,13 @@ type CCIPContracts struct {
 	onRampRouter  *evm_2_evm_toll_onramp_router.EVM2AnyTollOnRampRouter
 	onRamp        *evm_2_evm_toll_onramp.EVM2EVMTollOnRamp
 	offRampRouter *any_2_evm_toll_offramp_router.Any2EVMTollOffRampRouter
-	offRamp       *any_2_evm_toll_offramp.Any2EVMTollOffRamp
+	offRamp       *any_2_evm_toll_offramp.EVM2EVMTollOffRamp
 
 	// Sub contracts
 	subOnRampRouter  *evm_2_evm_subscription_onramp_router.EVM2AnySubscriptionOnRampRouter
 	subOnRamp        *evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRamp
 	subOffRampRouter *any_2_evm_subscription_offramp_router.Any2EVMSubscriptionOffRampRouter
-	subOffRamp       *any_2_evm_subscription_offramp.Any2EVMSubscriptionOffRamp
+	subOffRamp       *any_2_evm_subscription_offramp.EVM2EVMSubscriptionOffRamp
 }
 
 func setupCCIPContracts(t *testing.T) CCIPContracts {
@@ -231,9 +231,8 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 	require.NoError(t, err)
 	// Set the pool to be the offramp
 	destChain.Commit()
-	offRampAddress, _, _, err := any_2_evm_toll_offramp.DeployAny2EVMTollOffRamp(destUser,
-		destChain, destChainID, any_2_evm_toll_offramp.BaseOffRampInterfaceOffRampConfig{
-			SourceChainId:         sourceChainID,
+	offRampAddress, _, _, err := any_2_evm_toll_offramp.DeployEVM2EVMTollOffRamp(destUser,
+		destChain, sourceChainID, destChainID, any_2_evm_toll_offramp.BaseOffRampInterfaceOffRampConfig{
 			ExecutionDelaySeconds: 0,
 			MaxDataSize:           1e12,
 			MaxTokensLength:       5,
@@ -246,7 +245,7 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 		big.NewInt(time.Now().Unix()*2),
 	)
 	require.NoError(t, err)
-	offRamp, err := any_2_evm_toll_offramp.NewAny2EVMTollOffRamp(offRampAddress, destChain)
+	offRamp, err := any_2_evm_toll_offramp.NewEVM2EVMTollOffRamp(offRampAddress, destChain)
 	require.NoError(t, err)
 	_, err = destPool.SetOffRamp(destUser, offRampAddress, true)
 	require.NoError(t, err)
@@ -310,9 +309,8 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 	destChain.Commit()
 	subOffRampRouter, err := any_2_evm_subscription_offramp_router.NewAny2EVMSubscriptionOffRampRouter(subOffRampRouterAddress, destChain)
 	require.NoError(t, err)
-	subOffRampAddress, _, _, err := any_2_evm_subscription_offramp.DeployAny2EVMSubscriptionOffRamp(destUser, destChain, destChainID,
+	subOffRampAddress, _, _, err := any_2_evm_subscription_offramp.DeployEVM2EVMSubscriptionOffRamp(destUser, destChain, sourceChainID, destChainID,
 		any_2_evm_subscription_offramp.BaseOffRampInterfaceOffRampConfig{
-			SourceChainId:         sourceChainID,
 			ExecutionDelaySeconds: 0,
 			MaxDataSize:           1e12,
 			MaxTokensLength:       5,
@@ -324,7 +322,7 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 		[]common.Address{destPoolAddress},
 		big.NewInt(time.Now().Unix()*2))
 	require.NoError(t, err)
-	subOffRamp, _ := any_2_evm_subscription_offramp.NewAny2EVMSubscriptionOffRamp(subOffRampAddress, destChain)
+	subOffRamp, _ := any_2_evm_subscription_offramp.NewEVM2EVMSubscriptionOffRamp(subOffRampAddress, destChain)
 	_, err = destPool.SetOffRamp(destUser, subOffRampAddress, true)
 	require.NoError(t, err)
 	_, err = subOffRamp.SetRouter(destUser, subOffRampRouterAddress)

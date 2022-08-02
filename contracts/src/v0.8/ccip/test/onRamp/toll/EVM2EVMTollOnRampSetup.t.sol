@@ -54,7 +54,7 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
     s_sourceTokens[0].approve(address(s_onRampRouter), 2**128);
   }
 
-  function getTokenMessage() public view returns (CCIP.EVM2AnyTollMessage memory) {
+  function _generateTokenMessage() public view returns (CCIP.EVM2AnyTollMessage memory) {
     uint256[] memory amounts = new uint256[](2);
     amounts[0] = TOKEN_AMOUNT_0;
     amounts[1] = TOKEN_AMOUNT_1;
@@ -67,11 +67,11 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
         amounts: amounts,
         feeToken: s_sourceTokens[0],
         feeTokenAmount: 1,
-        gasLimit: 0
+        gasLimit: GAS_LIMIT
       });
   }
 
-  function getEmptyMessage() public view returns (CCIP.EVM2AnyTollMessage memory) {
+  function _generateEmptyMessage() public view returns (CCIP.EVM2AnyTollMessage memory) {
     uint256[] memory amounts = new uint256[](0);
     IERC20[] memory tokens = new IERC20[](0);
     return
@@ -82,11 +82,11 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
         amounts: amounts,
         feeToken: s_sourceTokens[0],
         feeTokenAmount: 1,
-        gasLimit: 0
+        gasLimit: GAS_LIMIT
       });
   }
 
-  function messageToEvent(CCIP.EVM2AnyTollMessage memory message, uint64 seqNum)
+  function _messageToEvent(CCIP.EVM2AnyTollMessage memory message, uint64 seqNum)
     public
     pure
     returns (CCIP.EVM2EVMTollEvent memory)

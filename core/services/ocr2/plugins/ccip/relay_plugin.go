@@ -40,14 +40,14 @@ type ContractType string
 
 var (
 	EVM2EVMTollOnRamp          ContractType = "EVM2EVMTollOnRamp"
-	Any2EVMTollOffRamp         ContractType = "Any2EVMTollOffRamp"
+	EVM2EVMTollOffRamp         ContractType = "EVM2EVMTollOffRamp"
 	EVM2EVMSubscriptionOnRamp  ContractType = "EVM2EVMSubscriptionOnRamp"
-	Any2EVMSubscriptionOffRamp ContractType = "Any2EVMSubscriptionOffRamp"
+	EVM2EVMSubscriptionOffRamp ContractType = "EVM2EVMSubscriptionOffRamp"
 	ContractTypes                           = map[ContractType]struct{}{
 		EVM2EVMTollOnRamp:          {},
-		Any2EVMTollOffRamp:         {},
+		EVM2EVMTollOffRamp:         {},
 		EVM2EVMSubscriptionOnRamp:  {},
-		Any2EVMSubscriptionOffRamp: {},
+		EVM2EVMSubscriptionOffRamp: {},
 	}
 )
 

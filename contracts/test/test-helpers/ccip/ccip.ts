@@ -27,7 +27,7 @@ export interface EVM2AnyTollEvent {
   gasLimit: BigNumberish
 }
 
-export interface Any2EVMTollMessage {
+export interface EVM2EVMTollMessage {
   sourceChainId: BigNumber
   sequenceNumber: BigNumber
   sender: string
@@ -43,7 +43,7 @@ export interface Any2EVMTollMessage {
 export const Any2EVMTollMessageTuple = `tuple(uint256 sourceChainId, uint64 sequenceNumber, address sender, address receiver, bytes data, address[] tokens, uint256[] amounts, address feeToken, uint256 feeTokenAmount, uint256 gasLimit)`
 
 export interface ExecutionReport {
-  messages: Any2EVMTollMessage[]
+  messages: EVM2EVMTollMessage[]
   proofs: string[]
   proofFlagsBits: BigNumberish
 }
@@ -62,15 +62,15 @@ export const RelayReportTuple = `tuple(bytes32 merkleRoot, uint64 minSequenceNum
  */
 export class MerkleMultiTree {
   public tree?: MerkleTree
-  public messages: { [hash: string]: Any2EVMTollMessage } = {}
+  public messages: { [hash: string]: EVM2EVMTollMessage } = {}
   public minSequenceNumber?: BigNumber
   public maxSequenceNumber?: BigNumber
 
   /**
    * @notice Create a new MerkleMultiTree
-   * @param rawMessages Any2EVMTollMessage[] array of messages
+   * @param rawMessages EVM2EVMTollMessage[] array of messages
    */
-  constructor(rawMessages: Any2EVMTollMessage[]) {
+  constructor(rawMessages: EVM2EVMTollMessage[]) {
     rawMessages.map((rm) => {
       this.messages[this.hashMessage(rm)] = rm
       if (
@@ -164,7 +164,7 @@ export class MerkleMultiTree {
     return bitmap
   }
 
-  private hashMessage(message: Any2EVMTollMessage): string {
+  private hashMessage(message: EVM2EVMTollMessage): string {
     const bytesMessage = ethers.utils.defaultAbiCoder.encode(
       [Any2EVMTollMessageTuple],
       [message],
@@ -223,7 +223,7 @@ export function executionReportDeepEqual(
 
 export function messageDeepEqual(
   actualMessage: any,
-  expectedMessage: Any2EVMTollMessage,
+  expectedMessage: EVM2EVMTollMessage,
 ) {
   expect(actualMessage?.sequenceNumber).to.equal(expectedMessage.sequenceNumber)
   expect(actualMessage?.sourceChainId).to.equal(expectedMessage.sourceChainId)

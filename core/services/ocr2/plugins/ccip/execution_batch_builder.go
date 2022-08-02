@@ -123,7 +123,7 @@ func (eb *ExecutionBatchBuilder) getExecutedSeqNrsInRange(min, max uint64) (map[
 	}
 	executedMp := make(map[uint64]struct{})
 	for _, executedLog := range executedLogs {
-		sn, err := eb.offRamp.ParseSeqNumFromExecutionCompleted(types.Log{Data: executedLog.Data, Topics: executedLog.GetTopics()})
+		sn, err := eb.offRamp.ParseSeqNumFromExecutionStateChanged(types.Log{Data: executedLog.Data, Topics: executedLog.GetTopics()})
 		if err != nil {
 			return nil, err
 		}

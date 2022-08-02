@@ -3,9 +3,8 @@ pragma solidity ^0.8.0;
 
 import "./BaseOffRampInterface.sol";
 
-interface BaseOffRampRouterInterface {
+interface Any2EVMOffRampRouterInterface {
   error NoOffRampsConfigured();
-  error MessageFailure(uint64 sequenceNumber, bytes reason);
   error MustCallFromOffRamp(address sender);
   error SenderNotAllowed(address sender);
   error InvalidAddress();
@@ -46,4 +45,10 @@ interface BaseOffRampRouterInterface {
    * @return allowed True if the offRamp is allowed, false if not.
    */
   function isOffRamp(BaseOffRampInterface offRamp) external view returns (bool allowed);
+
+  /**
+   * @notice Route the message to its intended receiver contract
+   * @param message CCIP.Any2EVMMessage struct
+   */
+  function routeMessage(CCIP.Any2EVMMessage calldata message) external returns (bool success);
 }

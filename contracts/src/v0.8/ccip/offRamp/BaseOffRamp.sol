@@ -7,15 +7,21 @@ import "../health/HealthChecker.sol";
 import "../utils/CCIP.sol";
 import "../pools/TokenPoolRegistry.sol";
 import "./interfaces/BaseOffRampInterface.sol";
+import "../ocr/OCR2Base.sol";
 
 /**
  * @notice A base OffRamp contract that every OffRamp should expand on
  */
 contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry {
+  using Address for address;
+
   // Chain ID of the source chain
   uint256 public immutable SOURCE_CHAIN_ID;
   // Chain ID of this chain
   uint256 public immutable CHAIN_ID;
+
+  // The router through which all transactions will be executed
+  Any2EVMOffRampRouterInterface public s_router;
 
   // The blob verifier contract
   BlobVerifierInterface internal s_blobVerifier;
@@ -28,6 +34,7 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry {
   mapping(uint64 => CCIP.MessageExecutionState) internal s_executedMessages;
 
   constructor(
+    uint256 sourceChainId,
     uint256 chainId,
     OffRampConfig memory offRampConfig,
     BlobVerifierInterface blobVerifier,
@@ -41,38 +48,10 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry {
     uint256 maxTimeWithoutAFNSignal
   ) HealthChecker(afn, maxTimeWithoutAFNSignal) TokenPoolRegistry(sourceTokens, pools) {
     // TokenPoolRegistry does a check on tokens.length != pools.length
-    SOURCE_CHAIN_ID = offRampConfig.sourceChainId;
+    SOURCE_CHAIN_ID = sourceChainId;
     CHAIN_ID = chainId;
     s_config = offRampConfig;
     s_blobVerifier = blobVerifier;
-  }
-
-  /// @inheritdoc BaseOffRampInterface
-  function getExecutionState(uint64 sequenceNumber) public view returns (CCIP.MessageExecutionState) {
-    return s_executedMessages[sequenceNumber];
-  }
-
-  /// @inheritdoc BaseOffRampInterface
-  function getBlobVerifier() public view returns (BlobVerifierInterface) {
-    return s_blobVerifier;
-  }
-
-  /// @inheritdoc BaseOffRampInterface
-  function setBlobVerifier(BlobVerifierInterface blobVerifier) public onlyOwner {
-    s_blobVerifier = blobVerifier;
-  }
-
-  /// @inheritdoc BaseOffRampInterface
-  function getConfig() public view returns (OffRampConfig memory) {
-    return s_config;
-  }
-
-  /// @inheritdoc BaseOffRampInterface
-  function setConfig(OffRampConfig memory config) public onlyOwner {
-    if (SOURCE_CHAIN_ID != config.sourceChainId) revert InvalidSourceChain(config.sourceChainId);
-    s_config = config;
-
-    emit OffRampConfigSet(config);
   }
 
   /**
@@ -124,6 +103,91 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry {
     );
     if (timestamp_relayed <= 0) revert RootNotRelayed();
     return (timestamp_relayed, gasBegin - gasleft());
+  }
+
+  /**
+   * @notice Try executing a message
+   * @param message CCIP.Any2EVMMessage memory message
+   * @return CCIP.ExecutionState
+   */
+  function _trialExecute(CCIP.Any2EVMMessage memory message) internal returns (CCIP.MessageExecutionState) {
+    try this.executeSingleMessage(message) {} catch (bytes memory err) {
+      if (BaseOffRampInterface.ReceiverError.selector == bytes4(err)) {
+        return CCIP.MessageExecutionState.FAILURE;
+      } else {
+        revert ExecutionError();
+      }
+    }
+    return CCIP.MessageExecutionState.SUCCESS;
+  }
+
+  /**
+   * @notice Execute a single message
+   * @param message The Any2EVMMessage message that will be executed
+   * @dev this can only be called by the contract itself. It is part of
+   * the Execute call, as we can only try/catch on external calls.
+   */
+  function executeSingleMessage(CCIP.Any2EVMMessage memory message) external {
+    if (msg.sender != address(this)) revert CanOnlySelfCall();
+    // TODO: token limiter logic
+    // https://app.shortcut.com/chainlinklabs/story/41867/contract-scaffolding-aggregatetokenlimiter-contract
+    _releaseOrMintTokens(message.tokens, message.amounts, message.receiver);
+    _callReceiver(message);
+  }
+
+  function _callReceiver(CCIP.Any2EVMMessage memory message) internal {
+    if (!message.receiver.isContract()) return;
+    if (!s_router.routeMessage(message)) revert ReceiverError();
+  }
+
+  /**
+   * @notice Reverts as this contract should not access CCIP messages
+   */
+  function ccipReceive(CCIP.Any2EVMMessage calldata) external pure {
+    revert();
+  }
+
+  /// @inheritdoc BaseOffRampInterface
+  function execute(CCIP.ExecutionReport memory report, bool manualExecution) external virtual override {
+    revert();
+  }
+
+  /// @inheritdoc BaseOffRampInterface
+  function setRouter(Any2EVMOffRampRouterInterface router) external onlyOwner {
+    s_router = router;
+    emit OffRampRouterSet(address(router));
+  }
+
+  /// @inheritdoc BaseOffRampInterface
+  function getRouter() external view override returns (Any2EVMOffRampRouterInterface) {
+    return s_router;
+  }
+
+  /// @inheritdoc BaseOffRampInterface
+  function getExecutionState(uint64 sequenceNumber) public view returns (CCIP.MessageExecutionState) {
+    return s_executedMessages[sequenceNumber];
+  }
+
+  /// @inheritdoc BaseOffRampInterface
+  function getBlobVerifier() public view returns (BlobVerifierInterface) {
+    return s_blobVerifier;
+  }
+
+  /// @inheritdoc BaseOffRampInterface
+  function setBlobVerifier(BlobVerifierInterface blobVerifier) public onlyOwner {
+    s_blobVerifier = blobVerifier;
+  }
+
+  /// @inheritdoc BaseOffRampInterface
+  function getConfig() public view returns (OffRampConfig memory) {
+    return s_config;
+  }
+
+  /// @inheritdoc BaseOffRampInterface
+  function setConfig(OffRampConfig memory config) public onlyOwner {
+    s_config = config;
+
+    emit OffRampConfigSet(config);
   }
 
   /**

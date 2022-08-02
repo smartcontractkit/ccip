@@ -2,11 +2,11 @@
 pragma solidity 0.8.15;
 
 import "../TokenSetup.t.sol";
-import "../../offRamp/BaseOffRampRouter.sol";
+import "../helpers/BaseOffRampRouterHelper.sol";
 import "../mocks/MockOffRamp.sol";
 
 contract BaseOffRampRouterSetup is TokenSetup {
-  BaseOffRampRouter s_router;
+  BaseOffRampRouterHelper s_router;
   BaseOffRampInterface[] s_offRamps;
 
   function setUp() public virtual override {
@@ -15,9 +15,11 @@ contract BaseOffRampRouterSetup is TokenSetup {
     s_offRamps = new BaseOffRampInterface[](2);
     s_offRamps[0] = BaseOffRampInterface(address(10));
     s_offRamps[1] = BaseOffRampInterface(address(11));
-    s_router = new BaseOffRampRouter(s_offRamps);
+    s_router = new BaseOffRampRouterHelper(s_offRamps);
   }
 }
+
+// TODO _callWithExactGas
 
 /// @notice #addOffRamp
 contract BaseOffRampRouter_addOffRamp is BaseOffRampRouterSetup {
@@ -55,12 +57,12 @@ contract BaseOffRampRouter_addOffRamp is BaseOffRampRouterSetup {
 
   function testAlreadyConfiguredReverts() public {
     BaseOffRampInterface existingOffRamp = s_offRamps[0];
-    vm.expectRevert(abi.encodeWithSelector(BaseOffRampRouterInterface.AlreadyConfigured.selector, existingOffRamp));
+    vm.expectRevert(abi.encodeWithSelector(Any2EVMOffRampRouterInterface.AlreadyConfigured.selector, existingOffRamp));
     s_router.addOffRamp(existingOffRamp);
   }
 
   function testZeroAddressReverts() public {
-    vm.expectRevert(BaseOffRampRouterInterface.InvalidAddress.selector);
+    vm.expectRevert(Any2EVMOffRampRouterInterface.InvalidAddress.selector);
     s_router.addOffRamp(BaseOffRampInterface(address(0)));
   }
 }
@@ -96,13 +98,13 @@ contract BaseOffRampRouter_removeOffRamp is BaseOffRampRouterSetup {
 
     assertEq(0, s_router.getOffRamps().length);
 
-    vm.expectRevert(BaseOffRampRouterInterface.NoOffRampsConfigured.selector);
+    vm.expectRevert(Any2EVMOffRampRouterInterface.NoOffRampsConfigured.selector);
     s_router.removeOffRamp(s_offRamps[0]);
   }
 
   function testOffRampNotAllowedReverts() public {
     BaseOffRampInterface newRamp = new MockOffRamp();
-    vm.expectRevert(abi.encodeWithSelector(BaseOffRampRouterInterface.OffRampNotAllowed.selector, newRamp));
+    vm.expectRevert(abi.encodeWithSelector(Any2EVMOffRampRouterInterface.OffRampNotAllowed.selector, newRamp));
     s_router.removeOffRamp(newRamp);
   }
 }

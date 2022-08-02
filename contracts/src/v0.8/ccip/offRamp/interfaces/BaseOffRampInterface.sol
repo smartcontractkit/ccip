@@ -3,12 +3,11 @@ pragma solidity ^0.8.0;
 
 import "../../utils/CCIP.sol";
 import "../../blobVerifier/interfaces/BlobVerifierInterface.sol";
+import "./Any2EVMOffRampRouterInterface.sol";
 
 interface BaseOffRampInterface {
   error AlreadyExecuted(uint64 sequenceNumber);
-  error CanOnlySelfCall();
-  error ExecutionError(uint64 sequenceNumber, bytes reason);
-  error InvalidReceiver(address receiver);
+  error ExecutionError();
   error InvalidSourceChain(uint256 sourceChainId);
   error NoMessagesToExecute();
   error ManualExecutionNotYetEnabled();
@@ -18,14 +17,17 @@ interface BaseOffRampInterface {
   error UnsupportedNumberOfTokens(uint64 sequenceNumber);
   error TokenAndAmountMisMatch();
   error UnsupportedToken(IERC20 token);
+  error CanOnlySelfCall();
+  error ReceiverError();
+  error MissingFeeCoinPrice(address feeCoin);
+  error InsufficientFeeAmount(uint256 sequenceNumber);
+  error IncorrectNonce(uint64 nonce);
 
-  event ExecutionCompleted(uint64 indexed sequenceNumber, CCIP.MessageExecutionState state);
+  event ExecutionStateChanged(uint64 indexed sequenceNumber, CCIP.MessageExecutionState state);
   event OffRampRouterSet(address indexed router);
   event OffRampConfigSet(OffRampConfig config);
 
   struct OffRampConfig {
-    // The ID of the source chain
-    uint256 sourceChainId;
     // execution delay in seconds
     uint64 executionDelaySeconds;
     // maximum payload data size
@@ -35,6 +37,26 @@ interface BaseOffRampInterface {
     // The waiting time before manual execution is enabled
     uint32 permissionLessExecutionThresholdSeconds;
   }
+
+  /**
+   * @notice setRouter sets a new router
+   * @param router the new Router
+   * @dev only the owner should be able to call this function
+   */
+  function setRouter(Any2EVMOffRampRouterInterface router) external;
+
+  /**
+   * @notice get the current router
+   * @return Any2EVMOffRampRouterInterface
+   */
+  function getRouter() external view returns (Any2EVMOffRampRouterInterface);
+
+  /**
+   * @notice Execute a series of one or more messages using a merkle proof
+   * @param report ExecutionReport
+   * @param manualExecution Whether or not it is manual or DON execution
+   */
+  function execute(CCIP.ExecutionReport memory report, bool manualExecution) external;
 
   /**
    * @notice Returns the current execution state of a message based on its

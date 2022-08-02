@@ -43,7 +43,7 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
   // Success
 
   function testSuccess() public {
-    s_onRamp.forwardFromRouter(getEmptyMessage(), OWNER);
+    s_onRamp.forwardFromRouter(_generateEmptyMessage(), OWNER);
   }
 
   // Reverts
@@ -52,28 +52,28 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
     changePrank(OWNER);
     s_onRamp.pause();
     vm.expectRevert("Pausable: paused");
-    s_onRamp.forwardFromRouter(getEmptyMessage(), OWNER);
+    s_onRamp.forwardFromRouter(_generateEmptyMessage(), OWNER);
   }
 
   function testUnhealthyReverts() public {
     s_afn.voteBad();
     vm.expectRevert(HealthChecker.BadAFNSignal.selector);
-    s_onRamp.forwardFromRouter(getEmptyMessage(), OWNER);
+    s_onRamp.forwardFromRouter(_generateEmptyMessage(), OWNER);
   }
 
   function testPermissionsReverts() public {
     changePrank(OWNER);
     vm.expectRevert(BaseOnRampInterface.MustBeCalledByRouter.selector);
-    s_onRamp.forwardFromRouter(getEmptyMessage(), OWNER);
+    s_onRamp.forwardFromRouter(_generateEmptyMessage(), OWNER);
   }
 
   function testOriginalSenderReverts() public {
     vm.expectRevert(BaseOnRampInterface.RouterMustSetOriginalSender.selector);
-    s_onRamp.forwardFromRouter(getEmptyMessage(), address(0));
+    s_onRamp.forwardFromRouter(_generateEmptyMessage(), address(0));
   }
 
   function testMessageTooLargeReverts() public {
-    CCIP.EVM2AnyTollMessage memory message = getEmptyMessage();
+    CCIP.EVM2AnyTollMessage memory message = _generateEmptyMessage();
     message.data = "000000000000000000000000000000000000000000000000000";
     vm.expectRevert(
       abi.encodeWithSelector(
@@ -88,7 +88,7 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
 
   function testTooManyTokensReverts() public {
     assertEq(3, s_onRamp.getConfig().maxTokensLength);
-    CCIP.EVM2AnyTollMessage memory message = getEmptyMessage();
+    CCIP.EVM2AnyTollMessage memory message = _generateEmptyMessage();
     uint256 tooMany = 4;
     message.tokens = new IERC20[](tooMany);
     message.amounts = new uint256[](tooMany);
@@ -97,7 +97,7 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
   }
 
   function testTokenNumberMismatchReverts() public {
-    CCIP.EVM2AnyTollMessage memory message = getEmptyMessage();
+    CCIP.EVM2AnyTollMessage memory message = _generateEmptyMessage();
     message.tokens = new IERC20[](1);
     message.amounts = new uint256[](2);
     vm.expectRevert(BaseOnRampInterface.UnsupportedNumberOfTokens.selector);
@@ -110,13 +110,13 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
 
     vm.expectRevert(abi.encodeWithSelector(AllowListInterface.SenderNotAllowed.selector, STRANGER));
     changePrank(address(s_onRampRouter));
-    s_onRamp.forwardFromRouter(getEmptyMessage(), STRANGER);
+    s_onRamp.forwardFromRouter(_generateEmptyMessage(), STRANGER);
   }
 
   function testUnsupportedTokenReverts() public {
     IERC20 wrongToken = IERC20(address(1));
 
-    CCIP.EVM2AnyTollMessage memory message = getEmptyMessage();
+    CCIP.EVM2AnyTollMessage memory message = _generateEmptyMessage();
     message.tokens = new IERC20[](1);
     message.tokens[0] = wrongToken;
     message.amounts = new uint256[](1);

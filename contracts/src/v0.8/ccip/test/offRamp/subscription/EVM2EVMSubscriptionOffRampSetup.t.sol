@@ -3,36 +3,35 @@ pragma solidity 0.8.15;
 
 import "../../../blobVerifier/interfaces/BlobVerifierInterface.sol";
 import "../../../health/interfaces/AFNInterface.sol";
-import "../../../offRamp/interfaces/Any2EVMSubscriptionOffRampRouterInterface.sol";
-import "../../../offRamp/subscription/Any2EVMSubscriptionOffRamp.sol";
+import "../../../offRamp/interfaces/Any2EVMOffRampRouterInterface.sol";
+import "../../../offRamp/subscription/EVM2EVMSubscriptionOffRamp.sol";
 import "../../../offRamp/subscription/Any2EVMSubscriptionOffRampRouter.sol";
 import "../../helpers/receivers/SimpleMessageReceiver.sol";
-import "../../helpers/Any2EVMSubscriptionOffRampHelper.sol";
+import "../../helpers/EVM2EVMSubscriptionOffRampHelper.sol";
 import "../../helpers/MerkleHelper.sol";
 import "../../mocks/MockBlobVerifier.sol";
 import "../../TokenSetup.t.sol";
 
-contract Any2EVMSubscriptionOffRampSetup is TokenSetup {
-  Any2EVMSubscriptionOffRampHelper s_offRamp;
+contract EVM2EVMSubscriptionOffRampSetup is TokenSetup {
+  EVM2EVMSubscriptionOffRampHelper s_offRamp;
   Any2EVMSubscriptionOffRampRouter s_router;
 
   BaseOffRampInterface.OffRampConfig s_offRampConfig;
   SubscriptionInterface.SubscriptionConfig s_subscriptionConfig;
   BlobVerifierInterface s_mockBlobVerifier;
-  CrossChainMessageReceiverInterface s_receiver;
-  CrossChainMessageReceiverInterface s_secondary_receiver;
+  SimpleMessageReceiver s_receiver;
+  Any2EVMMessageReceiverInterface s_secondary_receiver;
   MerkleHelper s_merkleHelper;
 
-  event ExecutionCompleted(uint64 indexed sequenceNumber, CCIP.MessageExecutionState state);
+  event ExecutionStateChanged(uint64 indexed sequenceNumber, CCIP.MessageExecutionState state);
 
   IERC20 s_destFeeToken;
 
-  uint256 immutable SUBSCRIPTION_BALANCE = 1e7;
+  uint256 constant SUBSCRIPTION_BALANCE = 1e7;
 
   function setUp() public virtual override {
     TokenSetup.setUp();
     s_offRampConfig = BaseOffRampInterface.OffRampConfig({
-      sourceChainId: SOURCE_CHAIN_ID,
       executionDelaySeconds: 0,
       maxDataSize: 500,
       maxTokensLength: 5,
@@ -46,13 +45,14 @@ contract Any2EVMSubscriptionOffRampSetup is TokenSetup {
 
     s_merkleHelper = new MerkleHelper();
 
-    deployOffRampAndRouter(s_mockBlobVerifier);
+    _deployOffRampAndRouter(s_mockBlobVerifier);
   }
 
   // This function us re-used in the e2e test as we need a real blob verifier
   // there while we require a mock version for all other tests.
-  function deployOffRampAndRouter(BlobVerifierInterface blobVerifier) internal {
-    s_offRamp = new Any2EVMSubscriptionOffRampHelper(
+  function _deployOffRampAndRouter(BlobVerifierInterface blobVerifier) internal {
+    s_offRamp = new EVM2EVMSubscriptionOffRampHelper(
+      SOURCE_CHAIN_ID,
       DEST_CHAIN_ID,
       s_offRampConfig,
       blobVerifier,
@@ -68,40 +68,53 @@ contract Any2EVMSubscriptionOffRampSetup is TokenSetup {
     s_router = new Any2EVMSubscriptionOffRampRouter(offRamps, s_subscriptionConfig);
     s_offRamp.setRouter(s_router);
 
-    createSubscription(s_receiver, s_router, SUBSCRIPTION_BALANCE);
-    createSubscription(s_secondary_receiver, s_router, SUBSCRIPTION_BALANCE);
+    _createSubscription(SubscriptionManagerInterface(address(s_receiver)), s_router, SUBSCRIPTION_BALANCE, true);
+    _createSubscription(
+      SubscriptionManagerInterface(address(s_secondary_receiver)),
+      s_router,
+      SUBSCRIPTION_BALANCE,
+      true
+    );
   }
 
-  function getAny2EVMSubscriptionMessageNoTokens(uint64 sequenceNumber, uint64 nonce)
-    public
+  function _generateAny2EVMSubscriptionMessageNoTokens(uint64 sequenceNumber, uint64 nonce)
+    internal
     view
-    returns (CCIP.Any2EVMSubscriptionMessage memory)
+    returns (CCIP.EVM2EVMSubscriptionMessage memory)
   {
     IERC20[] memory tokens;
     uint256[] memory amounts;
 
-    return getAny2EVMSubscriptionMessage(sequenceNumber, nonce, tokens, amounts);
+    return _generateAny2EVMSubscriptionMessage(sequenceNumber, nonce, tokens, amounts);
   }
 
-  function generateMessagesWithTokens() internal view returns (CCIP.Any2EVMSubscriptionMessage[] memory) {
-    CCIP.Any2EVMSubscriptionMessage[] memory messages = new CCIP.Any2EVMSubscriptionMessage[](2);
+  function _generateAny2EVMSubscriptionMessageWithTokens(
+    uint64 sequenceNumber,
+    uint64 nonce,
+    uint256[] memory amounts
+  ) internal view returns (CCIP.EVM2EVMSubscriptionMessage memory) {
+    return _generateAny2EVMSubscriptionMessage(sequenceNumber, nonce, s_sourceTokens, amounts);
+  }
+
+  function _generateMessagesWithTokens() internal view returns (CCIP.EVM2EVMSubscriptionMessage[] memory) {
+    CCIP.EVM2EVMSubscriptionMessage[] memory messages = new CCIP.EVM2EVMSubscriptionMessage[](2);
     uint256[] memory amounts = new uint256[](2);
     amounts[0] = 1000;
     amounts[1] = 50;
-    messages[0] = getAny2EVMSubscriptionMessage(10, 1, s_sourceTokens, amounts);
-    messages[1] = getAny2EVMSubscriptionMessage(11, 2, s_sourceTokens, amounts);
+    messages[0] = _generateAny2EVMSubscriptionMessage(1, 1, s_sourceTokens, amounts);
+    messages[1] = _generateAny2EVMSubscriptionMessage(2, 2, s_sourceTokens, amounts);
     return messages;
   }
 
-  function getAny2EVMSubscriptionMessage(
+  function _generateAny2EVMSubscriptionMessage(
     uint64 sequenceNumber,
     uint64 nonce,
     IERC20[] memory tokens,
     uint256[] memory amounts
-  ) internal view returns (CCIP.Any2EVMSubscriptionMessage memory) {
+  ) internal view returns (CCIP.EVM2EVMSubscriptionMessage memory) {
     bytes memory data = abi.encode(0);
     return
-      CCIP.Any2EVMSubscriptionMessage(
+      CCIP.EVM2EVMSubscriptionMessage(
         SOURCE_CHAIN_ID,
         sequenceNumber,
         OWNER,
@@ -110,18 +123,36 @@ contract Any2EVMSubscriptionOffRampSetup is TokenSetup {
         data,
         tokens,
         amounts,
-        0
+        GAS_LIMIT
       );
   }
 
-  function _generateBasicMessages() public view returns (CCIP.Any2EVMSubscriptionMessage[] memory) {
-    CCIP.Any2EVMSubscriptionMessage[] memory messages = new CCIP.Any2EVMSubscriptionMessage[](1);
-    messages[0] = getAny2EVMSubscriptionMessageNoTokens(1, 1);
+  function _convertSubscriptionToGeneralMessage(CCIP.EVM2EVMSubscriptionMessage memory original)
+    internal
+    pure
+    returns (CCIP.Any2EVMMessage memory)
+  {
+    return
+      CCIP.Any2EVMMessage({
+        sourceChainId: original.sourceChainId,
+        sequenceNumber: original.sequenceNumber,
+        sender: abi.encode(original.sender),
+        receiver: original.receiver,
+        data: original.data,
+        tokens: original.tokens,
+        amounts: original.amounts,
+        gasLimit: original.gasLimit
+      });
+  }
+
+  function _generateBasicMessages() internal view returns (CCIP.EVM2EVMSubscriptionMessage[] memory) {
+    CCIP.EVM2EVMSubscriptionMessage[] memory messages = new CCIP.EVM2EVMSubscriptionMessage[](1);
+    messages[0] = _generateAny2EVMSubscriptionMessageNoTokens(1, 1);
     return messages;
   }
 
-  function _generateReportFromMessages(CCIP.Any2EVMSubscriptionMessage[] memory messages)
-    public
+  function _generateReportFromMessages(CCIP.EVM2EVMSubscriptionMessage[] memory messages)
+    internal
     pure
     returns (CCIP.ExecutionReport memory)
   {
@@ -153,29 +184,20 @@ contract Any2EVMSubscriptionOffRampSetup is TokenSetup {
       });
   }
 
-  function _generateMessagesWithTokens() public view returns (CCIP.Any2EVMSubscriptionMessage[] memory) {
-    CCIP.Any2EVMSubscriptionMessage[] memory messages = new CCIP.Any2EVMSubscriptionMessage[](2);
-    uint256[] memory amounts = new uint256[](2);
-    amounts[0] = 1000;
-    amounts[1] = 50;
-    messages[0] = getAny2EVMSubscriptionMessage(1, 1, s_sourceTokens, amounts);
-    messages[1] = getAny2EVMSubscriptionMessage(2, 2, s_sourceTokens, amounts);
-    return messages;
-  }
-
-  function createSubscription(
+  function _createSubscription(
     SubscriptionManagerInterface receiver,
-    Any2EVMSubscriptionOffRampRouterInterface router,
-    uint256 funding
-  ) public {
+    Any2EVMOffRampRouterInterface router,
+    uint256 funding,
+    bool strictSequencing
+  ) internal {
     address[] memory senders = new address[](1);
     senders[0] = OWNER;
     s_destFeeToken.approve(address(router), funding);
-    router.createSubscription(
+    Subscription(address(router)).createSubscription(
       SubscriptionInterface.OffRampSubscription({
         senders: senders,
         receiver: receiver,
-        strictSequencing: true,
+        strictSequencing: strictSequencing,
         balance: funding
       })
     );

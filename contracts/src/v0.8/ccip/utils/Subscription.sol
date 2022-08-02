@@ -45,16 +45,17 @@ contract Subscription is SubscriptionInterface {
     external
     onlySubscriptionManager(address(subscription.receiver))
   {
-    if (address(s_subscriptions[address(subscription.receiver)].receiver) != address(0)) {
+    address receiver = address(subscription.receiver);
+    if (address(s_subscriptions[receiver].receiver) != address(0)) {
       revert SubscriptionAlreadyExists();
     }
-    s_subscriptions[address(subscription.receiver)] = subscription;
+    s_subscriptions[receiver] = subscription;
 
     if (subscription.balance > 0) {
       s_config.feeToken.safeTransferFrom(msg.sender, address(this), subscription.balance);
     }
 
-    emit SubscriptionCreated(address(subscription.receiver));
+    emit SubscriptionCreated(receiver);
   }
 
   /// @inheritdoc SubscriptionInterface
@@ -96,7 +97,6 @@ contract Subscription is SubscriptionInterface {
         revert AddressMismatch(prepared.newSenders[i], newSenders[i]);
       }
     }
-
     s_subscriptions[receiver].senders = newSenders;
 
     delete s_preparedNewSenders[receiver];

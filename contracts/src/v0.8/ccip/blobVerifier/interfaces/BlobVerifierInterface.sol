@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "../../offRamp/interfaces/Any2EVMTollOffRampRouterInterface.sol";
+import "../../offRamp/interfaces/Any2EVMOffRampRouterInterface.sol";
 import "../../utils/CCIP.sol";
 
 interface BlobVerifierInterface {

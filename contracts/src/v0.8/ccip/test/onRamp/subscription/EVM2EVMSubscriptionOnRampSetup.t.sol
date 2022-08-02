@@ -56,21 +56,35 @@ contract EVM2EVMSubscriptionOnRampSetup is TokenSetup {
     s_sourceFeeToken.approve(address(s_onRampRouter), 2**128);
   }
 
-  function getTokenMessage() public view returns (CCIP.EVM2AnySubscriptionMessage memory) {
+  function _generateTokenMessage() public view returns (CCIP.EVM2AnySubscriptionMessage memory) {
     uint256[] memory amounts = new uint256[](2);
     amounts[0] = TOKEN_AMOUNT_0;
     amounts[1] = TOKEN_AMOUNT_1;
     IERC20[] memory tokens = s_sourceTokens;
-    return CCIP.EVM2AnySubscriptionMessage({receiver: OWNER, data: "", tokens: tokens, amounts: amounts, gasLimit: 0});
+    return
+      CCIP.EVM2AnySubscriptionMessage({
+        receiver: OWNER,
+        data: "",
+        tokens: tokens,
+        amounts: amounts,
+        gasLimit: GAS_LIMIT
+      });
   }
 
-  function getEmptyMessage() public pure returns (CCIP.EVM2AnySubscriptionMessage memory) {
+  function _generateEmptyMessage() public pure returns (CCIP.EVM2AnySubscriptionMessage memory) {
     uint256[] memory amounts = new uint256[](0);
     IERC20[] memory tokens = new IERC20[](0);
-    return CCIP.EVM2AnySubscriptionMessage({receiver: OWNER, data: "", tokens: tokens, amounts: amounts, gasLimit: 0});
+    return
+      CCIP.EVM2AnySubscriptionMessage({
+        receiver: OWNER,
+        data: "",
+        tokens: tokens,
+        amounts: amounts,
+        gasLimit: GAS_LIMIT
+      });
   }
 
-  function messageToEvent(
+  function _messageToEvent(
     CCIP.EVM2AnySubscriptionMessage memory message,
     uint64 seqNum,
     uint64 nonce

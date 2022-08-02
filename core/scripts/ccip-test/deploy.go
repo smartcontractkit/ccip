@@ -107,7 +107,7 @@ func deployDestinationContracts(t *testing.T, client *EvmChainConfig, onRampChai
 	client.TokenReceiver = tokenReceiverAddress
 
 	// Deploy the message executor contract
-	executorAddress, tx, _, err := any_2_evm_toll_offramp.DeployAny2EVMTollOffRamp(client.Owner, client.Client, offRamp.Address(), false)
+	executorAddress, tx, _, err := any_2_evm_toll_offramp.DeployEVM2EVMTollOffRamp(client.Owner, client.Client, offRamp.Address(), false)
 	require.NoError(t, err)
 	WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 	client.Logger.Infof("OffRamp executor contract deployed on %s in tx: %s", executorAddress.Hex(), helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash()))

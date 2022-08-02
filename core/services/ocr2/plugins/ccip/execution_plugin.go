@@ -120,10 +120,10 @@ func NewCCIPExecution(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm
 		err2         error
 	)
 	switch offRampType {
-	case Any2EVMTollOffRamp:
+	case EVM2EVMTollOffRamp:
 		batchBuilder = NewTollBatchBuilder(lggr)
 		offRamp, err2 = NewTollOffRamp(common.HexToAddress(spec.ContractID), destChain)
-	case Any2EVMSubscriptionOffRamp:
+	case EVM2EVMSubscriptionOffRamp:
 		var subFeeToken common.Address
 		offRamp, subFeeToken, err2 = NewSubOffRamp(common.HexToAddress(spec.ContractID), destChain)
 		batchBuilder = NewSubscriptionBatchBuilder(lggr, subFeeToken)
@@ -153,16 +153,16 @@ type OffRamp interface {
 	GetPoolTokens(opts *bind.CallOpts) ([]common.Address, error)
 	GetPool(opts *bind.CallOpts, sourceToken common.Address) (common.Address, error)
 	GetExecutionState(opts *bind.CallOpts, arg0 uint64) (uint8, error)
-	ParseSeqNumFromExecutionCompleted(log types.Log) (uint64, error)
+	ParseSeqNumFromExecutionStateChanged(log types.Log) (uint64, error)
 	Address() common.Address
 }
 
 type subOffRamp struct {
-	*any_2_evm_subscription_offramp.Any2EVMSubscriptionOffRamp
+	*any_2_evm_subscription_offramp.EVM2EVMSubscriptionOffRamp
 }
 
-func (s subOffRamp) ParseSeqNumFromExecutionCompleted(log types.Log) (uint64, error) {
-	ec, err := s.ParseExecutionCompleted(log)
+func (s subOffRamp) ParseSeqNumFromExecutionStateChanged(log types.Log) (uint64, error) {
+	ec, err := s.ParseExecutionStateChanged(log)
 	if err != nil {
 		return 0, err
 	}
@@ -170,7 +170,7 @@ func (s subOffRamp) ParseSeqNumFromExecutionCompleted(log types.Log) (uint64, er
 }
 
 func NewSubOffRamp(addr common.Address, destChain evm.Chain) (OffRamp, common.Address, error) {
-	offRamp, err := any_2_evm_subscription_offramp.NewAny2EVMSubscriptionOffRamp(addr, destChain.Client())
+	offRamp, err := any_2_evm_subscription_offramp.NewEVM2EVMSubscriptionOffRamp(addr, destChain.Client())
 	if err != nil {
 		return nil, common.Address{}, err
 	}
@@ -193,11 +193,11 @@ func NewSubOffRamp(addr common.Address, destChain evm.Chain) (OffRamp, common.Ad
 }
 
 type tollOffRamp struct {
-	*any_2_evm_toll_offramp.Any2EVMTollOffRamp
+	*any_2_evm_toll_offramp.EVM2EVMTollOffRamp
 }
 
-func (s tollOffRamp) ParseSeqNumFromExecutionCompleted(log types.Log) (uint64, error) {
-	ec, err := s.ParseExecutionCompleted(log)
+func (s tollOffRamp) ParseSeqNumFromExecutionStateChanged(log types.Log) (uint64, error) {
+	ec, err := s.ParseExecutionStateChanged(log)
 	if err != nil {
 		return 0, err
 	}
@@ -205,7 +205,7 @@ func (s tollOffRamp) ParseSeqNumFromExecutionCompleted(log types.Log) (uint64, e
 }
 
 func NewTollOffRamp(addr common.Address, destChain evm.Chain) (OffRamp, error) {
-	offRamp, err := any_2_evm_toll_offramp.NewAny2EVMTollOffRamp(addr, destChain.Client())
+	offRamp, err := any_2_evm_toll_offramp.NewEVM2EVMTollOffRamp(addr, destChain.Client())
 	if err != nil {
 		return nil, err
 	}

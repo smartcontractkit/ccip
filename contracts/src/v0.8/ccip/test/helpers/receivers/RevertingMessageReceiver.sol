@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../../applications/interfaces/CrossChainMessageReceiverInterface.sol";
+import "../../../applications/interfaces/Any2EVMMessageReceiverInterface.sol";
 
-contract RevertingMessageReceiver is CrossChainMessageReceiverInterface {
+contract RevertingMessageReceiver is Any2EVMMessageReceiverInterface {
   address s_manager;
 
   constructor() {
@@ -14,11 +14,7 @@ contract RevertingMessageReceiver is CrossChainMessageReceiverInterface {
     return s_manager;
   }
 
-  function ccipReceive(CCIP.Any2EVMSubscriptionMessage calldata) external pure override {
-    revert();
-  }
-
-  function ccipReceive(CCIP.Any2EVMTollMessage calldata) external pure override {
+  function ccipReceive(CCIP.Any2EVMMessage calldata) external pure override {
     revert();
   }
 }

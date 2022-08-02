@@ -3,21 +3,21 @@ pragma solidity 0.8.15;
 
 import "../blobVerifier/BlobVerifierSetup.t.sol";
 import "../onRamp/subscription/EVM2EVMSubscriptionOnRampSetup.t.sol";
-import "../offRamp/subscription/Any2EVMSubscriptionOffRampSetup.t.sol";
+import "../offRamp/subscription/EVM2EVMSubscriptionOffRampSetup.t.sol";
 
-contract E2E_subscription is EVM2EVMSubscriptionOnRampSetup, BlobVerifierSetup, Any2EVMSubscriptionOffRampSetup {
+contract E2E_subscription is EVM2EVMSubscriptionOnRampSetup, BlobVerifierSetup, EVM2EVMSubscriptionOffRampSetup {
   function setUp()
     public
     virtual
-    override(EVM2EVMSubscriptionOnRampSetup, BlobVerifierSetup, Any2EVMSubscriptionOffRampSetup)
+    override(EVM2EVMSubscriptionOnRampSetup, BlobVerifierSetup, EVM2EVMSubscriptionOffRampSetup)
   {
     EVM2EVMSubscriptionOnRampSetup.setUp();
     BlobVerifierSetup.setUp();
-    Any2EVMSubscriptionOffRampSetup.setUp();
+    EVM2EVMSubscriptionOffRampSetup.setUp();
 
-    // This overwrites the setup done in Any2EVMSubscriptionOffRampSetup because
+    // This overwrites the setup done in EVM2EVMSubscriptionOffRampSetup because
     // we need to use a real blob verifier and not a mock.
-    deployOffRampAndRouter(s_blobVerifier);
+    _deployOffRampAndRouter(s_blobVerifier);
   }
 
   function testSuccessWithTokens() public {
@@ -25,10 +25,10 @@ contract E2E_subscription is EVM2EVMSubscriptionOnRampSetup, BlobVerifierSetup, 
     uint256 balance1Pre = s_sourceTokens[1].balanceOf(OWNER);
     uint256 subscriptionBalance = s_onRampRouter.getBalance(OWNER);
 
-    CCIP.Any2EVMSubscriptionMessage[] memory messages = new CCIP.Any2EVMSubscriptionMessage[](3);
-    messages[0] = parseEventToDestChainMessage(sendRequest(getTokenMessage(), 1));
-    messages[1] = parseEventToDestChainMessage(sendRequest(getTokenMessage(), 2));
-    messages[2] = parseEventToDestChainMessage(sendRequest(getTokenMessage(), 3));
+    CCIP.EVM2EVMSubscriptionMessage[] memory messages = new CCIP.EVM2EVMSubscriptionMessage[](3);
+    messages[0] = parseEventToDestChainMessage(sendRequest(_generateTokenMessage(), 1));
+    messages[1] = parseEventToDestChainMessage(sendRequest(_generateTokenMessage(), 2));
+    messages[2] = parseEventToDestChainMessage(sendRequest(_generateTokenMessage(), 3));
 
     // Asserts that the tokens have been sent and the fee has been paid.
     assertEq(balance0Pre - messages.length * TOKEN_AMOUNT_0, s_sourceTokens[0].balanceOf(OWNER));
@@ -41,10 +41,10 @@ contract E2E_subscription is EVM2EVMSubscriptionOnRampSetup, BlobVerifierSetup, 
   function testSuccessWithoutTokens() public {
     uint256 subscriptionBalance = s_onRampRouter.getBalance(OWNER);
 
-    CCIP.Any2EVMSubscriptionMessage[] memory messages = new CCIP.Any2EVMSubscriptionMessage[](3);
-    messages[0] = parseEventToDestChainMessage(sendRequest(getEmptyMessage(), 1));
-    messages[1] = parseEventToDestChainMessage(sendRequest(getEmptyMessage(), 2));
-    messages[2] = parseEventToDestChainMessage(sendRequest(getEmptyMessage(), 3));
+    CCIP.EVM2EVMSubscriptionMessage[] memory messages = new CCIP.EVM2EVMSubscriptionMessage[](3);
+    messages[0] = parseEventToDestChainMessage(sendRequest(_generateEmptyMessage(), 1));
+    messages[1] = parseEventToDestChainMessage(sendRequest(_generateEmptyMessage(), 2));
+    messages[2] = parseEventToDestChainMessage(sendRequest(_generateEmptyMessage(), 3));
 
     // Asserts that the tokens have been sent and the fee has been paid.
     assertEq(subscriptionBalance - messages.length * s_onRampRouter.getFee(), s_onRampRouter.getBalance(OWNER));
@@ -52,7 +52,7 @@ contract E2E_subscription is EVM2EVMSubscriptionOnRampSetup, BlobVerifierSetup, 
     _relayAndExecute(messages);
   }
 
-  function _relayAndExecute(CCIP.Any2EVMSubscriptionMessage[] memory messages) internal {
+  function _relayAndExecute(CCIP.EVM2EVMSubscriptionMessage[] memory messages) internal {
     bytes32[] memory hashedMessages = new bytes32[](3);
     hashedMessages[0] = keccak256(bytes.concat(hex"00", abi.encode(messages[0])));
     hashedMessages[1] = keccak256(bytes.concat(hex"00", abi.encode(messages[1])));
@@ -85,13 +85,13 @@ contract E2E_subscription is EVM2EVMSubscriptionOnRampSetup, BlobVerifierSetup, 
     vm.warp(BLOCK_TIME + 2000);
 
     vm.expectEmit(false, false, false, true);
-    emit ExecutionCompleted(messages[0].sequenceNumber, CCIP.MessageExecutionState.Success);
+    emit ExecutionStateChanged(messages[0].sequenceNumber, CCIP.MessageExecutionState.SUCCESS);
 
     vm.expectEmit(false, false, false, true);
-    emit ExecutionCompleted(messages[1].sequenceNumber, CCIP.MessageExecutionState.Success);
+    emit ExecutionStateChanged(messages[1].sequenceNumber, CCIP.MessageExecutionState.SUCCESS);
 
     vm.expectEmit(false, false, false, true);
-    emit ExecutionCompleted(messages[2].sequenceNumber, CCIP.MessageExecutionState.Success);
+    emit ExecutionStateChanged(messages[2].sequenceNumber, CCIP.MessageExecutionState.SUCCESS);
 
     s_offRamp.execute(_generateReportFromMessages(messages), false);
   }
@@ -100,10 +100,8 @@ contract E2E_subscription is EVM2EVMSubscriptionOnRampSetup, BlobVerifierSetup, 
     public
     returns (CCIP.EVM2EVMSubscriptionEvent memory)
   {
-    if (message.amounts.length != 0) {
-      s_sourceTokens[0].approve(address(s_onRampRouter), TOKEN_AMOUNT_0);
-      s_sourceTokens[1].approve(address(s_onRampRouter), TOKEN_AMOUNT_1);
-    }
+    s_sourceTokens[0].approve(address(s_onRampRouter), TOKEN_AMOUNT_0);
+    s_sourceTokens[1].approve(address(s_onRampRouter), TOKEN_AMOUNT_1);
 
     message.receiver = address(s_receiver);
     uint64 expectedNonce = expectedSeqNum;
@@ -111,7 +109,7 @@ contract E2E_subscription is EVM2EVMSubscriptionOnRampSetup, BlobVerifierSetup, 
       expectedNonce = 1;
       message.receiver = address(s_secondary_receiver);
     }
-    CCIP.EVM2EVMSubscriptionEvent memory subscriptionEvent = messageToEvent(message, expectedSeqNum, expectedNonce);
+    CCIP.EVM2EVMSubscriptionEvent memory subscriptionEvent = _messageToEvent(message, expectedSeqNum, expectedNonce);
 
     vm.expectEmit(false, false, false, true);
     emit CCIPSendRequested(subscriptionEvent);
@@ -124,10 +122,10 @@ contract E2E_subscription is EVM2EVMSubscriptionOnRampSetup, BlobVerifierSetup, 
   function parseEventToDestChainMessage(CCIP.EVM2EVMSubscriptionEvent memory sendEvent)
     public
     pure
-    returns (CCIP.Any2EVMSubscriptionMessage memory)
+    returns (CCIP.EVM2EVMSubscriptionMessage memory)
   {
     return
-      CCIP.Any2EVMSubscriptionMessage({
+      CCIP.EVM2EVMSubscriptionMessage({
         sourceChainId: sendEvent.sourceChainId,
         sequenceNumber: sendEvent.sequenceNumber,
         sender: sendEvent.sender,

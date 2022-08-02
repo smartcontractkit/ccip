@@ -4,15 +4,9 @@ pragma solidity 0.8.15;
 import "../../../interfaces/TypeAndVersionInterface.sol";
 import "../../../vendor/SafeERC20.sol";
 import "../../utils/Subscription.sol";
-import "../interfaces/Any2EVMSubscriptionOffRampRouterInterface.sol";
 import "../BaseOffRampRouter.sol";
 
-contract Any2EVMSubscriptionOffRampRouter is
-  BaseOffRampRouter,
-  Any2EVMSubscriptionOffRampRouterInterface,
-  Subscription,
-  TypeAndVersionInterface
-{
+contract Any2EVMSubscriptionOffRampRouter is BaseOffRampRouter, Subscription, TypeAndVersionInterface {
   string public constant override typeAndVersion = "Any2EVMSubscriptionOffRampRouter 1.0.0";
 
   constructor(
@@ -20,28 +14,20 @@ contract Any2EVMSubscriptionOffRampRouter is
     SubscriptionInterface.SubscriptionConfig memory subscriptionConfig
   ) BaseOffRampRouter(offRamps) Subscription(subscriptionConfig) {}
 
-  /// @inheritdoc Any2EVMSubscriptionOffRampRouterInterface
-  function routeMessage(CrossChainMessageReceiverInterface receiver, CCIP.Any2EVMSubscriptionMessage calldata message)
-    external
-    override
-    onlyOffRamp
-  {
-    try receiver.ccipReceive(message) {} catch (bytes memory reason) {
-      // TODO: use RouterResults and exact gas
-      revert MessageFailure(message.sequenceNumber, reason);
-    }
-  }
-
-  /// @inheritdoc Any2EVMSubscriptionOffRampRouterInterface
+  /**
+   * @notice Charges a subscription
+   * @param receiver Receiver address of the subscription that is to be charged
+   * @param sender The sender of the cross chain message that is charging
+   *          the subscription
+   * @param amount The fee amount to be charged
+   * @dev should be called from the OffRamp
+   */
   function chargeSubscription(
     address receiver,
     address sender,
     uint256 amount
   ) public onlyOffRamp {
     OffRampSubscription memory subscription = s_subscriptions[receiver];
-    if (subscription.balance < amount) {
-      revert BalanceTooLow();
-    }
     address[] memory allowedSenders = subscription.senders;
     for (uint256 i = 0; i < allowedSenders.length; ++i) {
       if (allowedSenders[i] == sender) {

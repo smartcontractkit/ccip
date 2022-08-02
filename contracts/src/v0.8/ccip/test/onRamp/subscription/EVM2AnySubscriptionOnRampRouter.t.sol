@@ -20,10 +20,10 @@ contract EVM2AnySubscriptionOnRampRouter_ccipSend is EVM2EVMSubscriptionOnRampSe
 
   // Asserts that ccipSend with proper arguments succeeds
   function testSuccess() public {
-    CCIP.EVM2AnySubscriptionMessage memory message = getEmptyMessage();
+    CCIP.EVM2AnySubscriptionMessage memory message = _generateEmptyMessage();
 
     vm.expectEmit(false, false, false, true);
-    emit CCIPSendRequested(messageToEvent(message, 1, 1));
+    emit CCIPSendRequested(_messageToEvent(message, 1, 1));
 
     s_onRampRouter.ccipSend(DEST_CHAIN_ID, message);
   }
@@ -37,10 +37,10 @@ contract EVM2AnySubscriptionOnRampRouter_ccipSend is EVM2EVMSubscriptionOnRampSe
 
     s_sourceTokens[0].approve(address(s_onRampRouter), TOKEN_AMOUNT_0);
     s_sourceTokens[1].approve(address(s_onRampRouter), TOKEN_AMOUNT_1);
-    CCIP.EVM2AnySubscriptionMessage memory message = getTokenMessage();
+    CCIP.EVM2AnySubscriptionMessage memory message = _generateTokenMessage();
 
     vm.expectEmit(false, false, false, true);
-    emit CCIPSendRequested(messageToEvent(message, 1, 1));
+    emit CCIPSendRequested(_messageToEvent(message, 1, 1));
 
     s_onRampRouter.ccipSend(DEST_CHAIN_ID, message);
     // Assert the user balance is lowered by the tokens sent
@@ -52,13 +52,13 @@ contract EVM2AnySubscriptionOnRampRouter_ccipSend is EVM2EVMSubscriptionOnRampSe
   }
 
   function testChargeSubscriptionFundingSuccess() public {
-    CCIP.EVM2AnySubscriptionMessage memory message = getEmptyMessage();
+    CCIP.EVM2AnySubscriptionMessage memory message = _generateEmptyMessage();
     uint96 newFee = 100;
     s_onRampRouter.setFee(newFee);
     s_onRampRouter.fundSubscription(newFee);
 
     vm.expectEmit(false, false, false, true);
-    emit CCIPSendRequested(messageToEvent(message, 1, 1));
+    emit CCIPSendRequested(_messageToEvent(message, 1, 1));
 
     s_onRampRouter.ccipSend(DEST_CHAIN_ID, message);
   }
@@ -66,7 +66,7 @@ contract EVM2AnySubscriptionOnRampRouter_ccipSend is EVM2EVMSubscriptionOnRampSe
   // Reverts
 
   function testTokensNoApproveReverts() public {
-    CCIP.EVM2AnySubscriptionMessage memory message = getTokenMessage();
+    CCIP.EVM2AnySubscriptionMessage memory message = _generateTokenMessage();
 
     vm.expectRevert("ERC20: transfer amount exceeds allowance");
 
@@ -77,7 +77,7 @@ contract EVM2AnySubscriptionOnRampRouter_ccipSend is EVM2EVMSubscriptionOnRampSe
   function testUnsupportedDestinationChainReverts() public {
     uint256 wrongChain = DEST_CHAIN_ID + 1;
     vm.expectRevert(abi.encodeWithSelector(BaseOnRampRouterInterface.UnsupportedDestinationChain.selector, wrongChain));
-    s_onRampRouter.ccipSend(wrongChain, getEmptyMessage());
+    s_onRampRouter.ccipSend(wrongChain, _generateEmptyMessage());
   }
 
   function testChargeSubscriptionFundingTooLowReverts() public {
@@ -86,7 +86,7 @@ contract EVM2AnySubscriptionOnRampRouter_ccipSend is EVM2EVMSubscriptionOnRampSe
 
     vm.expectRevert(stdError.arithmeticError);
 
-    s_onRampRouter.ccipSend(DEST_CHAIN_ID, getEmptyMessage());
+    s_onRampRouter.ccipSend(DEST_CHAIN_ID, _generateEmptyMessage());
   }
 }
 

@@ -45,24 +45,24 @@ contract EVM2EVMSubscriptionOnRamp_forwardFromRouter is EVM2EVMSubscriptionOnRam
   // Asserts that forwardFromRouter succeeds when called from the
   // router.
   function testSuccess() public {
-    s_onRamp.forwardFromRouter(getEmptyMessage(), OWNER);
+    s_onRamp.forwardFromRouter(_generateEmptyMessage(), OWNER);
   }
 
   // Asserts that multiple forwardFromRouter calls should result in
   // incrementing sequence number values.
   function testShouldIncrementSeqNumSuccess() public {
-    uint64 seqNum = s_onRamp.forwardFromRouter(getEmptyMessage(), OWNER);
+    uint64 seqNum = s_onRamp.forwardFromRouter(_generateEmptyMessage(), OWNER);
     assertEq(seqNum, 1);
-    seqNum = s_onRamp.forwardFromRouter(getEmptyMessage(), OWNER);
+    seqNum = s_onRamp.forwardFromRouter(_generateEmptyMessage(), OWNER);
     assertEq(seqNum, 2);
-    seqNum = s_onRamp.forwardFromRouter(getEmptyMessage(), OWNER);
+    seqNum = s_onRamp.forwardFromRouter(_generateEmptyMessage(), OWNER);
     assertEq(seqNum, 3);
   }
 
   // Asserts that forwardFromRouter emits the correct event when sending
   // properly approved tokens.
   function testExactApproveSuccess() public {
-    CCIP.EVM2AnySubscriptionMessage memory message = getEmptyMessage();
+    CCIP.EVM2AnySubscriptionMessage memory message = _generateEmptyMessage();
     uint256[] memory amounts = new uint256[](1);
     amounts[0] = 2**128;
     IERC20[] memory tokens = new IERC20[](1);
@@ -71,7 +71,7 @@ contract EVM2EVMSubscriptionOnRamp_forwardFromRouter is EVM2EVMSubscriptionOnRam
     message.tokens = tokens;
 
     vm.expectEmit(false, false, false, true);
-    emit CCIPSendRequested(messageToEvent(message, 1, 1));
+    emit CCIPSendRequested(_messageToEvent(message, 1, 1));
 
     s_onRamp.forwardFromRouter(message, OWNER);
   }
@@ -79,23 +79,23 @@ contract EVM2EVMSubscriptionOnRamp_forwardFromRouter is EVM2EVMSubscriptionOnRam
   // Assert that sending messages increments the nonce and the sequence numbers
   // on the onramp. Sending to a different receiver should start at 1 again.
   function testShouldIncrementReceiverNonceSuccess() public {
-    CCIP.EVM2AnySubscriptionMessage memory message = getEmptyMessage();
-    CCIP.EVM2EVMSubscriptionEvent memory tollEvent = messageToEvent(message, 1, 1);
+    CCIP.EVM2AnySubscriptionMessage memory message = _generateEmptyMessage();
+    CCIP.EVM2EVMSubscriptionEvent memory tollEvent = _messageToEvent(message, 1, 1);
 
     vm.expectEmit(false, false, false, true);
     emit CCIPSendRequested(tollEvent);
     s_onRamp.forwardFromRouter(message, OWNER);
 
-    message = getEmptyMessage();
-    tollEvent = messageToEvent(message, 2, 2);
+    message = _generateEmptyMessage();
+    tollEvent = _messageToEvent(message, 2, 2);
 
     vm.expectEmit(false, false, false, true);
     emit CCIPSendRequested(tollEvent);
     s_onRamp.forwardFromRouter(message, OWNER);
 
-    message = getEmptyMessage();
+    message = _generateEmptyMessage();
     message.receiver = address(s_onRampRouter);
-    tollEvent = messageToEvent(message, 3, 1);
+    tollEvent = _messageToEvent(message, 3, 1);
 
     vm.expectEmit(false, false, false, true);
     emit CCIPSendRequested(tollEvent);
@@ -108,13 +108,13 @@ contract EVM2EVMSubscriptionOnRamp_forwardFromRouter is EVM2EVMSubscriptionOnRam
     changePrank(OWNER);
     s_onRamp.pause();
     vm.expectRevert("Pausable: paused");
-    s_onRamp.forwardFromRouter(getEmptyMessage(), OWNER);
+    s_onRamp.forwardFromRouter(_generateEmptyMessage(), OWNER);
   }
 
   function testUnhealthyReverts() public {
     s_afn.voteBad();
     vm.expectRevert(HealthChecker.BadAFNSignal.selector);
-    s_onRamp.forwardFromRouter(getEmptyMessage(), OWNER);
+    s_onRamp.forwardFromRouter(_generateEmptyMessage(), OWNER);
   }
 
   function testSenderNotAllowedReverts() public {
@@ -123,14 +123,14 @@ contract EVM2EVMSubscriptionOnRamp_forwardFromRouter is EVM2EVMSubscriptionOnRam
 
     vm.expectRevert(abi.encodeWithSelector(AllowListInterface.SenderNotAllowed.selector, STRANGER));
     changePrank(address(s_onRampRouter));
-    s_onRamp.forwardFromRouter(getEmptyMessage(), STRANGER);
+    s_onRamp.forwardFromRouter(_generateEmptyMessage(), STRANGER);
   }
 
   function testUnsupportedTokenReverts() public {
     IERC20 wrongToken = IERC20(address(1));
 
     vm.expectRevert(abi.encodeWithSelector(BaseOnRampInterface.UnsupportedToken.selector, wrongToken));
-    CCIP.EVM2AnySubscriptionMessage memory message = getEmptyMessage();
+    CCIP.EVM2AnySubscriptionMessage memory message = _generateEmptyMessage();
     message.tokens = new IERC20[](1);
     message.tokens[0] = wrongToken;
     message.amounts = new uint256[](1);
@@ -143,20 +143,20 @@ contract EVM2EVMSubscriptionOnRamp_forwardFromRouter is EVM2EVMSubscriptionOnRam
   function testMustBeCalledByRouterReverts() public {
     vm.stopPrank();
     vm.expectRevert(BaseOnRampInterface.MustBeCalledByRouter.selector);
-    s_onRamp.forwardFromRouter(getEmptyMessage(), OWNER);
+    s_onRamp.forwardFromRouter(_generateEmptyMessage(), OWNER);
   }
 
   // Asserts that forwardFromRouter reverts when the original sender
   // is not set by the router.
   function testRouterMustSetOriginalSenderReverts() public {
     vm.expectRevert(BaseOnRampInterface.RouterMustSetOriginalSender.selector);
-    s_onRamp.forwardFromRouter(getEmptyMessage(), address(0));
+    s_onRamp.forwardFromRouter(_generateEmptyMessage(), address(0));
   }
 
   // Asserts that forwardFromRouter reverts when the number of supplied tokens
   // is larger than the maxTokenLength.
   function testUnsupportedNumberOfTokensReverts() public {
-    CCIP.EVM2AnySubscriptionMessage memory message = getEmptyMessage();
+    CCIP.EVM2AnySubscriptionMessage memory message = _generateEmptyMessage();
     message.tokens = new IERC20[](s_onRampConfig.maxTokensLength + 1);
     vm.expectRevert(BaseOnRampInterface.UnsupportedNumberOfTokens.selector);
     s_onRamp.forwardFromRouter(message, OWNER);
@@ -164,7 +164,7 @@ contract EVM2EVMSubscriptionOnRamp_forwardFromRouter is EVM2EVMSubscriptionOnRam
 
   // Asserts that forwardFromRouter reverts when the data length is too long.
   function testMessageTooLargeReverts() public {
-    CCIP.EVM2AnySubscriptionMessage memory message = getEmptyMessage();
+    CCIP.EVM2AnySubscriptionMessage memory message = _generateEmptyMessage();
     message.data = "000000000000000000000000000000000000000000000000000";
     vm.expectRevert(
       abi.encodeWithSelector(

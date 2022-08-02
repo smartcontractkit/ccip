@@ -4,14 +4,14 @@ pragma solidity 0.8.15;
 import "../../TokenSetup.t.sol";
 
 // setup
-contract Any2EVMTollSenderDappSetup is TokenSetup {
+contract EVM2EVMTollSenderDappSetup is TokenSetup {
   function setUp() public virtual override {
     TokenSetup.setUp();
   }
 }
 
 /// @notice #constructor
-contract Any2EVMTollSenderDapp_constructor is Any2EVMTollSenderDappSetup {
+contract EVM2EVMTollSenderDapp_constructor is EVM2EVMTollSenderDappSetup {
   // Success
   function testSuccess() public {}
   // it('should set the onRamp', async () => {

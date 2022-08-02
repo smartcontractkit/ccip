@@ -50,7 +50,7 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	offRampABI, err := abi.JSON(strings.NewReader(any_2_evm_toll_offramp.Any2EVMTollOffRampABI))
+	offRampABI, err := abi.JSON(strings.NewReader(any_2_evm_toll_offramp.EVM2EVMTollOffRampABI))
 	if err != nil {
 		panic(err)
 	}
@@ -61,7 +61,7 @@ func init() {
 	CCIPSendRequested = getIDOrPanic("CCIPSendRequested", onRampABI)
 	CCIPSubSendRequested = getIDOrPanic("CCIPSendRequested", subOnRampABI)
 	ReportAccepted = getIDOrPanic("ReportAccepted", blobVerifierABI)
-	CrossChainMessageExecuted = getIDOrPanic("ExecutionCompleted", offRampABI)
+	CrossChainMessageExecuted = getIDOrPanic("ExecutionStateChanged", offRampABI)
 	ConfigSet = getIDOrPanic("ConfigSet", blobVerifierABI)
 }
 

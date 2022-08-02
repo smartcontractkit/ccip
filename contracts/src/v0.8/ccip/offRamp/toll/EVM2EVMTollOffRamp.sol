@@ -2,24 +2,21 @@
 pragma solidity 0.8.15;
 
 import "../../../interfaces/TypeAndVersionInterface.sol";
-import "../../ocr/OCR2Base.sol";
-import "../../applications/interfaces/CrossChainMessageReceiverInterface.sol";
+import "../../applications/interfaces/Any2EVMMessageReceiverInterface.sol";
 import "../BaseOffRamp.sol";
-import "../interfaces/Any2EVMTollOffRampInterface.sol";
 
 /**
- * @notice Any2EVMTollOffRamp enables OCR networks to execute multiple messages
+ * @notice EVM2EVMTollOffRamp enables OCR networks to execute multiple messages
  * in an OffRamp in a single transaction.
  */
-contract Any2EVMTollOffRamp is Any2EVMTollOffRampInterface, BaseOffRamp, TypeAndVersionInterface, OCR2Base {
+contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
   using Address for address;
+  using CCIP for CCIP.EVM2EVMTollMessage;
 
-  string public constant override typeAndVersion = "Any2EVMTollOffRamp 1.0.0";
-
-  // The router through which all transactions will be executed
-  Any2EVMTollOffRampRouterInterface private s_router;
+  string public constant override typeAndVersion = "EVM2EVMTollOffRamp 1.0.0";
 
   constructor(
+    uint256 sourceChainId,
     uint256 chainId,
     OffRampConfig memory offRampConfig,
     BlobVerifierInterface blobVerifier,
@@ -33,40 +30,18 @@ contract Any2EVMTollOffRamp is Any2EVMTollOffRampInterface, BaseOffRamp, TypeAnd
     uint256 maxTimeWithoutAFNSignal
   )
     OCR2Base(true)
-    BaseOffRamp(chainId, offRampConfig, blobVerifier, onRampAddress, afn, sourceTokens, pools, maxTimeWithoutAFNSignal)
+    BaseOffRamp(
+      sourceChainId,
+      chainId,
+      offRampConfig,
+      blobVerifier,
+      onRampAddress,
+      afn,
+      sourceTokens,
+      pools,
+      maxTimeWithoutAFNSignal
+    )
   {}
-
-  /**
-   * @notice setRouter sets a new router
-   * @param router the new Router
-   * @dev only the owner can call this function
-   */
-  function setRouter(Any2EVMTollOffRampRouterInterface router) external onlyOwner {
-    s_router = router;
-    emit OffRampRouterSet(address(router));
-  }
-
-  /**
-   * @notice ccipReceive implements the receive function to create a
-   * collision if some other method happens to hash to the same signature
-   */
-  function ccipReceive(CCIP.Any2EVMTollMessage calldata) external pure override {
-    revert();
-  }
-
-  /**
-   * @notice Execute a single message
-   * @param message The Any2EVMTollMessage message that will be executed
-   * @dev this can only be called by the contract itself. It is part of
-   * the Execute call, as we can only try/catch on external calls.
-   */
-  function executeSingleMessage(CCIP.Any2EVMTollMessage memory message) external {
-    if (msg.sender != address(this)) revert CanOnlySelfCall();
-    // TODO: token limiter logic
-    // https://app.shortcut.com/chainlinklabs/story/41867/contract-scaffolding-aggregatetokenlimiter-contract
-    _releaseOrMintTokens(message.tokens, message.amounts, message.receiver);
-    _callReceiver(message);
-  }
 
   /**
    * @notice Execute a series of one or more messages using a merkle proof
@@ -83,10 +58,10 @@ contract Any2EVMTollOffRamp is Any2EVMTollOffRampInterface, BaseOffRamp, TypeAnd
     uint256 numMsgs = report.encodedMessages.length;
     if (numMsgs == 0) revert NoMessagesToExecute();
     bytes32[] memory hashedLeaves = new bytes32[](numMsgs);
-    CCIP.Any2EVMTollMessage[] memory decodedMessages = new CCIP.Any2EVMTollMessage[](numMsgs);
+    CCIP.EVM2EVMTollMessage[] memory decodedMessages = new CCIP.EVM2EVMTollMessage[](numMsgs);
 
     for (uint256 i = 0; i < numMsgs; ++i) {
-      decodedMessages[i] = abi.decode(report.encodedMessages[i], (CCIP.Any2EVMTollMessage));
+      decodedMessages[i] = abi.decode(report.encodedMessages[i], (CCIP.EVM2EVMTollMessage));
       // TODO: hasher
       // https://app.shortcut.com/chainlinklabs/story/41625/hasher-encoder
       bytes memory data = bytes.concat(hex"00", report.encodedMessages[i]);
@@ -108,9 +83,9 @@ contract Any2EVMTollOffRamp is Any2EVMTollOffRampInterface, BaseOffRamp, TypeAnd
     }
 
     for (uint256 i = 0; i < numMsgs; ++i) {
-      CCIP.Any2EVMTollMessage memory message = decodedMessages[i];
+      CCIP.EVM2EVMTollMessage memory message = decodedMessages[i];
       CCIP.MessageExecutionState state = getExecutionState(message.sequenceNumber);
-      if (state == CCIP.MessageExecutionState.Success) revert AlreadyExecuted(message.sequenceNumber);
+      if (state == CCIP.MessageExecutionState.SUCCESS) revert AlreadyExecuted(message.sequenceNumber);
 
       _isWellFormed(message);
 
@@ -119,7 +94,7 @@ contract Any2EVMTollOffRamp is Any2EVMTollOffRampInterface, BaseOffRamp, TypeAnd
       }
 
       // If it's the first DON execution attempt, charge the fee.
-      if (state == CCIP.MessageExecutionState.Untouched && !manualExecution) {
+      if (state == CCIP.MessageExecutionState.UNTOUCHED && !manualExecution) {
         // Charge the gas share & gas limit of the message multiplied by the token per fee coin for
         // the given message.
         // Example with token being link. 1 LINK = 1e18 Juels.
@@ -145,42 +120,21 @@ contract Any2EVMTollOffRamp is Any2EVMTollOffRampInterface, BaseOffRamp, TypeAnd
         _releaseOrMintToken(message.feeToken, message.feeTokenAmount, address(this));
       }
 
-      s_executedMessages[message.sequenceNumber] = CCIP.MessageExecutionState.InProgress;
-      CCIP.MessageExecutionState newState = _trialExecute(message);
+      s_executedMessages[message.sequenceNumber] = CCIP.MessageExecutionState.IN_PROGRESS;
+      CCIP.MessageExecutionState newState = _trialExecute(message._toAny2EVMMessage());
       s_executedMessages[message.sequenceNumber] = newState;
 
-      emit ExecutionCompleted(message.sequenceNumber, newState);
+      emit ExecutionStateChanged(message.sequenceNumber, newState);
     }
   }
 
-  function _callReceiver(CCIP.Any2EVMTollMessage memory message) internal {
-    if (!message.receiver.isContract()) revert InvalidReceiver(message.receiver);
-    CrossChainMessageReceiverInterface msgReceiver = CrossChainMessageReceiverInterface(message.receiver);
-    s_router.routeMessage(msgReceiver, message);
-  }
-
-  function _trialExecute(CCIP.Any2EVMTollMessage memory message) internal returns (CCIP.MessageExecutionState) {
-    // TODO(Alex) improve external execution flow
-    try this.executeSingleMessage(message) {} catch (bytes memory) {
-      return CCIP.MessageExecutionState.Failure;
-      // TODO execution failure states
-      // https://app.shortcut.com/chainlinklabs/story/41622/contract-scaffolding-execution-failure-states
-      // revert ExecutionError(message.sequenceNumber, reason);
-    }
-    return CCIP.MessageExecutionState.Success;
-  }
-
-  function _isWellFormed(CCIP.Any2EVMTollMessage memory message) private view {
+  function _isWellFormed(CCIP.EVM2EVMTollMessage memory message) private view {
     if (message.sourceChainId != SOURCE_CHAIN_ID) revert InvalidSourceChain(message.sourceChainId);
     if (message.tokens.length > uint256(s_config.maxTokensLength) || message.tokens.length != message.amounts.length) {
       revert UnsupportedNumberOfTokens(message.sequenceNumber);
     }
     if (message.data.length > uint256(s_config.maxDataSize))
       revert MessageTooLarge(uint256(s_config.maxDataSize), message.data.length);
-  }
-
-  function getRouter() external view returns (Any2EVMTollOffRampRouterInterface) {
-    return s_router;
   }
 
   // ******* OCR BASE ***********

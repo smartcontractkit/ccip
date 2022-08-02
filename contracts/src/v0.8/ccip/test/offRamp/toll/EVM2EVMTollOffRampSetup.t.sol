@@ -3,28 +3,27 @@ pragma solidity 0.8.15;
 
 import "../../../blobVerifier/interfaces/BlobVerifierInterface.sol";
 import "../../../health/interfaces/AFNInterface.sol";
-import "../../../offRamp/interfaces/Any2EVMTollOffRampInterface.sol";
-import "../../../offRamp/toll/Any2EVMTollOffRamp.sol";
+import "../../../offRamp/interfaces/BaseOffRampInterface.sol";
+import "../../../offRamp/toll/EVM2EVMTollOffRamp.sol";
 import "../../mocks/MockBlobVerifier.sol";
 import "../../TokenSetup.t.sol";
-import "../../helpers/Any2EVMTollOffRampHelper.sol";
+import "../../helpers/EVM2EVMTollOffRampHelper.sol";
 import "../../mocks/MockTollOffRampRouter.sol";
 import "../../helpers/receivers/SimpleMessageReceiver.sol";
 
-contract Any2EVMTollOffRampSetup is TokenSetup {
-  Any2EVMTollOffRampInterface.OffRampConfig internal s_offRampConfig;
+contract EVM2EVMTollOffRampSetup is TokenSetup {
+  BaseOffRampInterface.OffRampConfig internal s_offRampConfig;
   BlobVerifierInterface internal s_mockBlobVerifier;
-  CrossChainMessageReceiverInterface internal s_receiver;
-  CrossChainMessageReceiverInterface internal s_secondary_receiver;
+  Any2EVMMessageReceiverInterface internal s_receiver;
+  Any2EVMMessageReceiverInterface internal s_secondary_receiver;
 
-  Any2EVMTollOffRampHelper internal s_offRamp;
+  EVM2EVMTollOffRampHelper internal s_offRamp;
 
-  event ExecutionCompleted(uint64 indexed sequenceNumber, CCIP.MessageExecutionState state);
+  event ExecutionStateChanged(uint64 indexed sequenceNumber, CCIP.MessageExecutionState state);
 
   function setUp() public virtual override {
     TokenSetup.setUp();
     s_offRampConfig = BaseOffRampInterface.OffRampConfig({
-      sourceChainId: SOURCE_CHAIN_ID,
       executionDelaySeconds: 10,
       maxDataSize: 500,
       maxTokensLength: 5,
@@ -35,7 +34,8 @@ contract Any2EVMTollOffRampSetup is TokenSetup {
     s_receiver = new SimpleMessageReceiver();
     s_secondary_receiver = new SimpleMessageReceiver();
 
-    s_offRamp = new Any2EVMTollOffRampHelper(
+    s_offRamp = new EVM2EVMTollOffRampHelper(
+      SOURCE_CHAIN_ID,
       DEST_CHAIN_ID,
       s_offRampConfig,
       s_mockBlobVerifier,
@@ -47,15 +47,33 @@ contract Any2EVMTollOffRampSetup is TokenSetup {
     );
   }
 
-  function _generateNewRouter() internal returns (Any2EVMTollOffRampRouterInterface newRouter) {
+  function _generateNewRouter() internal returns (Any2EVMOffRampRouterInterface newRouter) {
     newRouter = new MockTollOffRampRouter();
     assertTrue(address(newRouter) != address(s_offRamp.getRouter()));
+  }
+
+  function _convertTollToGeneralMessage(CCIP.EVM2EVMTollMessage memory original)
+    internal
+    pure
+    returns (CCIP.Any2EVMMessage memory message)
+  {
+    return
+      CCIP.Any2EVMMessage({
+        sourceChainId: original.sourceChainId,
+        sequenceNumber: original.sequenceNumber,
+        sender: abi.encode(original.sender),
+        receiver: original.receiver,
+        data: original.data,
+        tokens: original.tokens,
+        amounts: original.amounts,
+        gasLimit: original.gasLimit
+      });
   }
 
   function _generateAny2EVMTollMessageNoTokens(uint64 sequenceNumber)
     internal
     view
-    returns (CCIP.Any2EVMTollMessage memory)
+    returns (CCIP.EVM2EVMTollMessage memory)
   {
     IERC20[] memory tokens;
     uint256[] memory amounts;
@@ -63,14 +81,22 @@ contract Any2EVMTollOffRampSetup is TokenSetup {
     return _generateAny2EVMTollMessage(sequenceNumber, tokens, amounts);
   }
 
+  function _generateAny2EVMTollMessageWithTokens(uint64 sequenceNumber, uint256[] memory amounts)
+    internal
+    view
+    returns (CCIP.EVM2EVMTollMessage memory)
+  {
+    return _generateAny2EVMTollMessage(sequenceNumber, s_sourceTokens, amounts);
+  }
+
   function _generateAny2EVMTollMessage(
     uint64 sequenceNumber,
     IERC20[] memory tokens,
     uint256[] memory amounts
-  ) internal view returns (CCIP.Any2EVMTollMessage memory) {
+  ) internal view returns (CCIP.EVM2EVMTollMessage memory) {
     bytes memory data = abi.encode(0);
     return
-      CCIP.Any2EVMTollMessage(
+      CCIP.EVM2EVMTollMessage(
         SOURCE_CHAIN_ID,
         sequenceNumber,
         OWNER,
@@ -80,18 +106,18 @@ contract Any2EVMTollOffRampSetup is TokenSetup {
         amounts,
         s_sourceTokens[0],
         0,
-        0
+        GAS_LIMIT
       );
   }
 
-  function _generateBasicMessages() internal view returns (CCIP.Any2EVMTollMessage[] memory) {
-    CCIP.Any2EVMTollMessage[] memory messages = new CCIP.Any2EVMTollMessage[](1);
+  function _generateBasicMessages() internal view returns (CCIP.EVM2EVMTollMessage[] memory) {
+    CCIP.EVM2EVMTollMessage[] memory messages = new CCIP.EVM2EVMTollMessage[](1);
     messages[0] = _generateAny2EVMTollMessageNoTokens(1);
     return messages;
   }
 
-  function _generateMessagesWithTokens() internal view returns (CCIP.Any2EVMTollMessage[] memory) {
-    CCIP.Any2EVMTollMessage[] memory messages = new CCIP.Any2EVMTollMessage[](2);
+  function _generateMessagesWithTokens() internal view returns (CCIP.EVM2EVMTollMessage[] memory) {
+    CCIP.EVM2EVMTollMessage[] memory messages = new CCIP.EVM2EVMTollMessage[](2);
     uint256[] memory amounts = new uint256[](2);
     amounts[0] = 1000;
     amounts[1] = 50;
@@ -102,7 +128,7 @@ contract Any2EVMTollOffRampSetup is TokenSetup {
     return messages;
   }
 
-  function _generateReportFromMessages(CCIP.Any2EVMTollMessage[] memory messages)
+  function _generateReportFromMessages(CCIP.EVM2EVMTollMessage[] memory messages)
     internal
     view
     returns (CCIP.ExecutionReport memory)
