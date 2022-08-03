@@ -20,11 +20,13 @@ contract EVM2EVMSubscriptionOffRampRouter_constructor is EVM2EVMSubscriptionOffR
     assertEq(address(s_offRamp), address(configuredOffRamps[0]));
     assertTrue(s_router.isOffRamp(s_offRamp));
 
-    SubscriptionInterface.SubscriptionConfig memory subscriptionConfig = s_router.getSubscriptionConfig();
+    SubscriptionInterface.SubscriptionConfig memory configured = s_router.getSubscriptionConfig();
 
-    assertEq(s_subscriptionConfig.setSubscriptionSenderDelay, subscriptionConfig.setSubscriptionSenderDelay);
-    assertEq(s_subscriptionConfig.withdrawalDelay, subscriptionConfig.withdrawalDelay);
-    assertEq(address(s_subscriptionConfig.feeToken), address(subscriptionConfig.feeToken));
+    SubscriptionInterface.SubscriptionConfig memory expected = subscriptionConfig(s_destFeeToken);
+
+    assertEq(expected.setSubscriptionSenderDelay, configured.setSubscriptionSenderDelay);
+    assertEq(expected.withdrawalDelay, configured.withdrawalDelay);
+    assertEq(address(expected.feeToken), address(configured.feeToken));
   }
 }
 

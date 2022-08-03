@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
 import "../../TokenSetup.t.sol";
@@ -15,7 +16,6 @@ contract EVM2EVMSubscriptionOnRampSetup is TokenSetup {
 
   EVM2AnySubscriptionOnRampRouter public s_onRampRouter;
   EVM2EVMSubscriptionOnRamp public s_onRamp;
-  BaseOnRampInterface.OnRampConfig public s_onRampConfig;
 
   uint256 immutable TOKEN_AMOUNT_0 = 9;
   uint256 immutable TOKEN_AMOUNT_1 = 7;
@@ -31,8 +31,6 @@ contract EVM2EVMSubscriptionOnRampSetup is TokenSetup {
       Any2EVMSubscriptionOnRampRouterInterface.RouterConfig(0, s_sourceFeeToken, OWNER)
     );
 
-    s_onRampConfig = BaseOnRampInterface.OnRampConfig({relayingFeeJuels: 0, maxDataSize: 50, maxTokensLength: 3});
-
     s_onRamp = new EVM2EVMSubscriptionOnRamp(
       SOURCE_CHAIN_ID,
       DEST_CHAIN_ID,
@@ -42,7 +40,7 @@ contract EVM2EVMSubscriptionOnRampSetup is TokenSetup {
       s_allowList,
       s_afn,
       HEARTBEAT,
-      s_onRampConfig,
+      onRampConfig(),
       s_onRampRouter
     );
 

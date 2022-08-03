@@ -13,9 +13,9 @@ contract EVM2EVMSubscriptionOnRamp_constructor is EVM2EVMSubscriptionOnRampSetup
     assertEq(OWNER, s_onRamp.owner());
 
     // baseOnRamp
-    assertEq(s_onRampConfig.relayingFeeJuels, s_onRamp.getConfig().relayingFeeJuels);
-    assertEq(s_onRampConfig.maxDataSize, s_onRamp.getConfig().maxDataSize);
-    assertEq(s_onRampConfig.maxTokensLength, s_onRamp.getConfig().maxTokensLength);
+    assertEq(RELAYING_FEE_JUELS, s_onRamp.getConfig().relayingFeeJuels);
+    assertEq(MAX_DATA_SIZE, s_onRamp.getConfig().maxDataSize);
+    assertEq(MAX_TOKENS_LENGTH, s_onRamp.getConfig().maxTokensLength);
 
     assertEq(SOURCE_CHAIN_ID, s_onRamp.CHAIN_ID());
     assertEq(DEST_CHAIN_ID, s_onRamp.DESTINATION_CHAIN_ID());
@@ -157,7 +157,7 @@ contract EVM2EVMSubscriptionOnRamp_forwardFromRouter is EVM2EVMSubscriptionOnRam
   // is larger than the maxTokenLength.
   function testUnsupportedNumberOfTokensReverts() public {
     CCIP.EVM2AnySubscriptionMessage memory message = _generateEmptyMessage();
-    message.tokens = new IERC20[](s_onRampConfig.maxTokensLength + 1);
+    message.tokens = new IERC20[](MAX_TOKENS_LENGTH + 1);
     vm.expectRevert(BaseOnRampInterface.UnsupportedNumberOfTokens.selector);
     s_onRamp.forwardFromRouter(message, OWNER);
   }
@@ -165,11 +165,11 @@ contract EVM2EVMSubscriptionOnRamp_forwardFromRouter is EVM2EVMSubscriptionOnRam
   // Asserts that forwardFromRouter reverts when the data length is too long.
   function testMessageTooLargeReverts() public {
     CCIP.EVM2AnySubscriptionMessage memory message = _generateEmptyMessage();
-    message.data = "000000000000000000000000000000000000000000000000000";
+    message.data = new bytes(MAX_DATA_SIZE + 1);
     vm.expectRevert(
       abi.encodeWithSelector(
         BaseOnRampInterface.MessageTooLarge.selector,
-        s_onRampConfig.maxDataSize,
+        onRampConfig().maxDataSize,
         message.data.length
       )
     );

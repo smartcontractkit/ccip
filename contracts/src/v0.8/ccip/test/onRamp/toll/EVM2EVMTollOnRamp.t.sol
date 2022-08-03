@@ -13,9 +13,10 @@ contract EVM2EVMTollOnRamp_constructor is EVM2EVMTollOnRampSetup {
     assertEq(OWNER, s_onRamp.owner());
 
     // baseOnRamp
-    assertEq(s_onRampConfig.relayingFeeJuels, s_onRamp.getConfig().relayingFeeJuels);
-    assertEq(s_onRampConfig.maxDataSize, s_onRamp.getConfig().maxDataSize);
-    assertEq(s_onRampConfig.maxTokensLength, s_onRamp.getConfig().maxTokensLength);
+    BaseOnRampInterface.OnRampConfig memory onRampConfig = onRampConfig();
+    assertEq(onRampConfig.relayingFeeJuels, s_onRamp.getConfig().relayingFeeJuels);
+    assertEq(onRampConfig.maxDataSize, s_onRamp.getConfig().maxDataSize);
+    assertEq(onRampConfig.maxTokensLength, s_onRamp.getConfig().maxTokensLength);
 
     assertEq(SOURCE_CHAIN_ID, s_onRamp.CHAIN_ID());
     assertEq(DEST_CHAIN_ID, s_onRamp.DESTINATION_CHAIN_ID());
@@ -74,11 +75,11 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
 
   function testMessageTooLargeReverts() public {
     CCIP.EVM2AnyTollMessage memory message = _generateEmptyMessage();
-    message.data = "000000000000000000000000000000000000000000000000000";
+    message.data = new bytes(MAX_DATA_SIZE + 1);
     vm.expectRevert(
       abi.encodeWithSelector(
         BaseOnRampInterface.MessageTooLarge.selector,
-        s_onRampConfig.maxDataSize,
+        onRampConfig().maxDataSize,
         message.data.length
       )
     );
@@ -87,9 +88,9 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
   }
 
   function testTooManyTokensReverts() public {
-    assertEq(3, s_onRamp.getConfig().maxTokensLength);
+    assertEq(MAX_TOKENS_LENGTH, s_onRamp.getConfig().maxTokensLength);
     CCIP.EVM2AnyTollMessage memory message = _generateEmptyMessage();
-    uint256 tooMany = 4;
+    uint256 tooMany = MAX_TOKENS_LENGTH + 1;
     message.tokens = new IERC20[](tooMany);
     message.amounts = new uint256[](tooMany);
     vm.expectRevert(BaseOnRampInterface.UnsupportedNumberOfTokens.selector);
@@ -134,7 +135,7 @@ contract EVM2EVMTollOnRamp_getRequiredFee is EVM2EVMTollOnRampSetup {
   // Asserts that the fee is calculated correctly.
   function testGetRequiredFeeSuccess() public {
     uint256 fee = s_onRamp.getRequiredFee(s_sourceTokens[0]);
-    uint256 expectedFee = s_onRampConfig.relayingFeeJuels * uint256(s_sourceFeeds[0].latestAnswer());
+    uint256 expectedFee = RELAYING_FEE_JUELS * uint256(s_sourceFeeds[0].latestAnswer());
     assertEq(expectedFee, fee);
   }
 

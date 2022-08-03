@@ -13,30 +13,22 @@ import "../../mocks/MockBlobVerifier.sol";
 import "../../TokenSetup.t.sol";
 
 contract EVM2EVMSubscriptionOffRampSetup is TokenSetup {
-  EVM2EVMSubscriptionOffRampHelper s_offRamp;
-  Any2EVMSubscriptionOffRampRouter s_router;
+  EVM2EVMSubscriptionOffRampHelper internal s_offRamp;
+  Any2EVMSubscriptionOffRampRouter internal s_router;
 
-  BaseOffRampInterface.OffRampConfig s_offRampConfig;
-  SubscriptionInterface.SubscriptionConfig s_subscriptionConfig;
-  BlobVerifierInterface s_mockBlobVerifier;
-  SimpleMessageReceiver s_receiver;
-  Any2EVMMessageReceiverInterface s_secondary_receiver;
-  MerkleHelper s_merkleHelper;
+  BlobVerifierInterface internal s_mockBlobVerifier;
+  SimpleMessageReceiver internal s_receiver;
+  Any2EVMMessageReceiverInterface internal s_secondary_receiver;
+  MerkleHelper internal s_merkleHelper;
 
   event ExecutionStateChanged(uint64 indexed sequenceNumber, CCIP.MessageExecutionState state);
 
-  IERC20 s_destFeeToken;
+  IERC20 internal s_destFeeToken;
 
   uint256 internal constant SUBSCRIPTION_BALANCE = 1e18;
 
   function setUp() public virtual override {
     TokenSetup.setUp();
-    s_offRampConfig = BaseOffRampInterface.OffRampConfig({
-      executionDelaySeconds: 0,
-      maxDataSize: 500,
-      maxTokensLength: 5,
-      permissionLessExecutionThresholdSeconds: 500
-    });
     s_destFeeToken = s_destTokens[0];
 
     s_mockBlobVerifier = new MockBlobVerifier();
@@ -54,7 +46,7 @@ contract EVM2EVMSubscriptionOffRampSetup is TokenSetup {
     s_offRamp = new EVM2EVMSubscriptionOffRampHelper(
       SOURCE_CHAIN_ID,
       DEST_CHAIN_ID,
-      s_offRampConfig,
+      offRampConfig(),
       blobVerifier,
       ON_RAMP_ADDRESS,
       s_afn,
@@ -62,10 +54,9 @@ contract EVM2EVMSubscriptionOffRampSetup is TokenSetup {
       s_destPools,
       HEARTBEAT
     );
-    s_subscriptionConfig = SubscriptionInterface.SubscriptionConfig(100, 100, s_destFeeToken);
     BaseOffRampInterface[] memory offRamps = new BaseOffRampInterface[](1);
     offRamps[0] = s_offRamp;
-    s_router = new Any2EVMSubscriptionOffRampRouter(offRamps, s_subscriptionConfig);
+    s_router = new Any2EVMSubscriptionOffRampRouter(offRamps, subscriptionConfig(s_destFeeToken));
     s_offRamp.setRouter(s_router);
 
     NativeTokenPool(address(s_destPools[0])).setOffRamp(BaseOffRampInterface(address(s_offRamp)), true);

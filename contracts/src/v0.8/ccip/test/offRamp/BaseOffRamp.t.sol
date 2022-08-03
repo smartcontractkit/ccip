@@ -10,21 +10,11 @@ contract BaseOffRampSetup is TokenSetup {
   event OffRampConfigSet(BaseOffRampInterface.OffRampConfig config);
 
   BaseOffRampHelper s_offRamp;
-  BaseOffRampInterface.OffRampConfig s_offRampConfig;
-
   MockBlobVerifier s_mockBlobVerifier;
   NativeTokenPool s_nativePool;
 
-  uint256 immutable POOL_BALANCE = 5000;
-
   function setUp() public virtual override {
     TokenSetup.setUp();
-    s_offRampConfig = BaseOffRampInterface.OffRampConfig({
-      executionDelaySeconds: 0,
-      maxDataSize: 500,
-      maxTokensLength: 5,
-      permissionLessExecutionThresholdSeconds: 500
-    });
 
     s_mockBlobVerifier = new MockBlobVerifier();
 
@@ -41,7 +31,7 @@ contract BaseOffRampSetup is TokenSetup {
     s_offRamp = new BaseOffRampHelper(
       SOURCE_CHAIN_ID,
       DEST_CHAIN_ID,
-      s_offRampConfig,
+      offRampConfig(),
       s_mockBlobVerifier,
       ON_RAMP_ADDRESS,
       s_afn,
@@ -76,7 +66,7 @@ contract BaseOffRamp_constructor is BaseOffRampSetup {
     assertEq(SOURCE_CHAIN_ID, s_offRamp.SOURCE_CHAIN_ID());
     assertEq(DEST_CHAIN_ID, s_offRamp.CHAIN_ID());
 
-    assertSameConfig(s_offRampConfig, s_offRamp.getConfig());
+    assertSameConfig(offRampConfig(), s_offRamp.getConfig());
   }
 
   // Revert
@@ -89,7 +79,7 @@ contract BaseOffRamp_constructor is BaseOffRampSetup {
     s_offRamp = new BaseOffRampHelper(
       SOURCE_CHAIN_ID,
       DEST_CHAIN_ID,
-      s_offRampConfig,
+      offRampConfig(),
       s_mockBlobVerifier,
       ON_RAMP_ADDRESS,
       s_afn,
@@ -130,7 +120,7 @@ contract BaseOffRamp_getBlobVerifier is BaseOffRampSetup {
 contract BaseOffRamp_getConfig is BaseOffRampSetup {
   // Success
   function testSuccess() public {
-    assertSameConfig(s_offRampConfig, s_offRamp.getConfig());
+    assertSameConfig(offRampConfig(), s_offRamp.getConfig());
   }
 }
 
@@ -152,7 +142,7 @@ contract BaseOffRamp_setConfig is BaseOffRampSetup {
   function testOnlyOwnerReverts() public {
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
-    s_offRamp.setConfig(s_offRampConfig);
+    s_offRamp.setConfig(offRampConfig());
   }
 
   function generateNewConfig() internal pure returns (BaseOffRampInterface.OffRampConfig memory) {

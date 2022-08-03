@@ -238,7 +238,7 @@ contract EVM2EVMTollOffRamp_execute is EVM2EVMTollOffRampSetup {
     vm.expectRevert(
       abi.encodeWithSelector(
         BaseOffRampInterface.MessageTooLarge.selector,
-        s_offRampConfig.maxDataSize,
+        MAX_DATA_SIZE,
         messages[0].data.length
       )
     );

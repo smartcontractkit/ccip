@@ -16,9 +16,7 @@ contract SubscriptionSetup is BaseTest {
 
   Subscription s_subscriptionContract;
   IERC20 s_feeToken;
-  uint256 immutable APPROVED_AMOUNT = 100;
-  uint32 immutable SET_SUBSCRIPTION_SENDER_DELAY = 2 * 60 * 60;
-  uint32 immutable WITHDRAWAL_DELAY = 2 * 60 * 60;
+  uint256 internal constant APPROVED_AMOUNT = 100;
 
   SubscriptionManagerInterface s_receiver;
 

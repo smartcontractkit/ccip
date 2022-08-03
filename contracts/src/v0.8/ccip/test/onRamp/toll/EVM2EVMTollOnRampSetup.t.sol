@@ -10,7 +10,6 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
   // Duplicate event of the CCIPSendRequested in the TollOnRampInterface
   event CCIPSendRequested(CCIP.EVM2EVMTollEvent message);
 
-  uint256 immutable RELAY_FEE_AMOUNT = 1e18;
   uint256 immutable TOKEN_AMOUNT_0 = 9;
   uint256 immutable TOKEN_AMOUNT_1 = 7;
 
@@ -18,18 +17,11 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
 
   EVM2AnyTollOnRampRouter internal s_onRampRouter;
   EVM2EVMTollOnRamp internal s_onRamp;
-  BaseOnRampInterface.OnRampConfig internal s_onRampConfig;
 
   function setUp() public virtual override {
     TokenSetup.setUp();
 
     s_onRampRouter = new EVM2AnyTollOnRampRouter();
-
-    s_onRampConfig = BaseOnRampInterface.OnRampConfig({
-      relayingFeeJuels: uint64(RELAY_FEE_AMOUNT),
-      maxDataSize: 50,
-      maxTokensLength: 3
-    });
 
     s_onRamp = new EVM2EVMTollOnRamp(
       SOURCE_CHAIN_ID,
@@ -40,7 +32,7 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
       s_allowList,
       s_afn,
       HEARTBEAT,
-      s_onRampConfig,
+      onRampConfig(),
       s_onRampRouter
     );
 
@@ -66,7 +58,7 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
         tokens: tokens,
         amounts: amounts,
         feeToken: s_sourceTokens[0],
-        feeTokenAmount: RELAY_FEE_AMOUNT,
+        feeTokenAmount: RELAYING_FEE_JUELS,
         gasLimit: GAS_LIMIT
       });
   }
@@ -81,7 +73,7 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
         tokens: tokens,
         amounts: amounts,
         feeToken: s_sourceTokens[0],
-        feeTokenAmount: RELAY_FEE_AMOUNT,
+        feeTokenAmount: RELAYING_FEE_JUELS,
         gasLimit: GAS_LIMIT
       });
   }
@@ -101,7 +93,7 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
         tokens: message.tokens,
         amounts: message.amounts,
         feeToken: message.feeToken,
-        feeTokenAmount: message.feeTokenAmount - RELAY_FEE_AMOUNT,
+        feeTokenAmount: message.feeTokenAmount - RELAYING_FEE_JUELS,
         gasLimit: message.gasLimit
       });
   }

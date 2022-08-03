@@ -150,8 +150,9 @@ contract BlobVerifier_report is BlobVerifierSetup {
     merkleRoots[0] = "test #1";
     merkleRoots[1] = "test #2";
     merkleRoots[2] = "test #3";
+    BlobVerifierInterface.BlobVerifierConfig memory config = blobVerifierConfig();
     CCIP.RelayReport memory report = CCIP.RelayReport({
-      onRamps: s_config.onRamps,
+      onRamps: config.onRamps,
       intervals: intervals,
       merkleRoots: merkleRoots,
       rootOfRoots: "root"
@@ -162,9 +163,9 @@ contract BlobVerifier_report is BlobVerifierSetup {
     s_blobVerifier.report(abi.encode(report));
     emit ReportAccepted(report);
 
-    assertEq(max1 + 1, s_blobVerifier.getExpectedNextSequenceNumber(s_config.onRamps[0]));
-    assertEq(max2 + 1, s_blobVerifier.getExpectedNextSequenceNumber(s_config.onRamps[1]));
-    assertEq(max3 + 1, s_blobVerifier.getExpectedNextSequenceNumber(s_config.onRamps[2]));
+    assertEq(max1 + 1, s_blobVerifier.getExpectedNextSequenceNumber(config.onRamps[0]));
+    assertEq(max2 + 1, s_blobVerifier.getExpectedNextSequenceNumber(config.onRamps[1]));
+    assertEq(max3 + 1, s_blobVerifier.getExpectedNextSequenceNumber(config.onRamps[2]));
   }
 
   // Reverts
@@ -187,7 +188,7 @@ contract BlobVerifier_report is BlobVerifierSetup {
     CCIP.Interval[] memory intervals = new CCIP.Interval[](3);
     bytes32[] memory merkleRoots = new bytes32[](2);
     CCIP.RelayReport memory report = CCIP.RelayReport({
-      onRamps: s_config.onRamps,
+      onRamps: blobVerifierConfig().onRamps,
       intervals: intervals,
       merkleRoots: merkleRoots,
       rootOfRoots: "root"
@@ -202,7 +203,7 @@ contract BlobVerifier_report is BlobVerifierSetup {
     CCIP.Interval[] memory intervals = new CCIP.Interval[](2);
     bytes32[] memory merkleRoots = new bytes32[](3);
     CCIP.RelayReport memory report = CCIP.RelayReport({
-      onRamps: s_config.onRamps,
+      onRamps: blobVerifierConfig().onRamps,
       intervals: intervals,
       merkleRoots: merkleRoots,
       rootOfRoots: "root"
@@ -233,7 +234,7 @@ contract BlobVerifier_report is BlobVerifierSetup {
     CCIP.Interval[] memory intervals = new CCIP.Interval[](1);
     intervals[0] = CCIP.Interval(2, 2);
     address[] memory onRamps = new address[](1);
-    onRamps[0] = s_config.onRamps[0];
+    onRamps[0] = blobVerifierConfig().onRamps[0];
     bytes32[] memory merkleRoots = new bytes32[](1);
     CCIP.RelayReport memory report = CCIP.RelayReport({
       onRamps: onRamps,
@@ -251,7 +252,7 @@ contract BlobVerifier_report is BlobVerifierSetup {
     CCIP.Interval[] memory intervals = new CCIP.Interval[](1);
     intervals[0] = CCIP.Interval(1, 0);
     address[] memory onRamps = new address[](1);
-    onRamps[0] = s_config.onRamps[0];
+    onRamps[0] = blobVerifierConfig().onRamps[0];
     bytes32[] memory merkleRoots = new bytes32[](1);
     CCIP.RelayReport memory report = CCIP.RelayReport({
       onRamps: onRamps,
@@ -274,7 +275,7 @@ contract BlobVerifier_verify is BlobVerifierSetup {
     bytes32[] memory merkleRoots = new bytes32[](1);
     merkleRoots[0] = "rootAndAlsoRootOfRoots";
     address[] memory onRamps = new address[](1);
-    onRamps[0] = s_config.onRamps[0];
+    onRamps[0] = blobVerifierConfig().onRamps[0];
     s_blobVerifier.report(
       abi.encode(
         CCIP.RelayReport({

@@ -65,7 +65,7 @@ contract E2E_subscription is EVM2EVMSubscriptionOnRampSetup, BlobVerifierSetup, 
     merkleRoots[0] = s_merkleHelper.getMerkleRoot(hashedMessages);
 
     address[] memory onRamps = new address[](1);
-    onRamps[0] = s_config.onRamps[0];
+    onRamps[0] = blobVerifierConfig().onRamps[0];
 
     CCIP.RelayReport memory report = CCIP.RelayReport({
       onRamps: onRamps,

@@ -12,7 +12,6 @@ import "../../mocks/MockTollOffRampRouter.sol";
 import "../../helpers/receivers/SimpleMessageReceiver.sol";
 
 contract EVM2EVMTollOffRampSetup is TokenSetup {
-  BaseOffRampInterface.OffRampConfig internal s_offRampConfig;
   BlobVerifierInterface internal s_mockBlobVerifier;
   Any2EVMMessageReceiverInterface internal s_receiver;
   Any2EVMMessageReceiverInterface internal s_secondary_receiver;
@@ -25,12 +24,6 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
 
   function setUp() public virtual override {
     TokenSetup.setUp();
-    s_offRampConfig = BaseOffRampInterface.OffRampConfig({
-      executionDelaySeconds: 10,
-      maxDataSize: 500,
-      maxTokensLength: 5,
-      permissionLessExecutionThresholdSeconds: 500
-    });
 
     s_mockBlobVerifier = new MockBlobVerifier();
     s_receiver = new SimpleMessageReceiver();
@@ -39,7 +32,7 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
     s_offRamp = new EVM2EVMTollOffRampHelper(
       SOURCE_CHAIN_ID,
       DEST_CHAIN_ID,
-      s_offRampConfig,
+      offRampConfig(),
       s_mockBlobVerifier,
       ON_RAMP_ADDRESS,
       s_afn,

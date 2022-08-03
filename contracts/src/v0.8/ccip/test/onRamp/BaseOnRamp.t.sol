@@ -12,13 +12,10 @@ contract BaseOnrampSetup is TokenSetup {
 
   address public s_onRampRouter;
   BaseOnRamp public s_onRamp;
-  BaseOnRampInterface.OnRampConfig public s_onRampConfig;
 
   function setUp() public virtual override {
     TokenSetup.setUp();
     s_onRampRouter = address(50);
-
-    s_onRampConfig = BaseOnRampInterface.OnRampConfig({relayingFeeJuels: 0, maxDataSize: 50, maxTokensLength: 3});
 
     s_onRamp = new BaseOnRamp(
       SOURCE_CHAIN_ID,
@@ -29,7 +26,7 @@ contract BaseOnrampSetup is TokenSetup {
       s_allowList,
       s_afn,
       HEARTBEAT,
-      s_onRampConfig,
+      onRampConfig(),
       s_onRampRouter
     );
 
@@ -52,7 +49,7 @@ contract BaseOnramp_constructor is BaseOnrampSetup {
     assertEq(DEST_CHAIN_ID, s_onRamp.DESTINATION_CHAIN_ID());
     assertEq(s_onRampRouter, s_onRamp.getRouter());
     assertEq(1, s_onRamp.getExpectedNextSequenceNumber());
-    assertSameConfig(s_onRampConfig, s_onRamp.getConfig());
+    assertSameConfig(onRampConfig(), s_onRamp.getConfig());
   }
 }
 
@@ -127,7 +124,7 @@ contract BaseOnramp_setConfig is BaseOnrampSetup {
   function testSetConfigOnlyOwnerReverts() public {
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
-    s_onRamp.setConfig(s_onRampConfig);
+    s_onRamp.setConfig(onRampConfig());
   }
 }
 
@@ -135,6 +132,6 @@ contract BaseOnramp_setConfig is BaseOnrampSetup {
 contract BaseOnramp_getConfig is BaseOnrampSetup {
   // Success
   function testSuccess() public {
-    assertSameConfig(s_onRampConfig, s_onRamp.getConfig());
+    assertSameConfig(onRampConfig(), s_onRamp.getConfig());
   }
 }
