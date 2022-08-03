@@ -64,8 +64,8 @@ contract EVM2EVMSubscriptionOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR
       decodedMessages[i] = abi.decode(report.encodedMessages[i], (CCIP.EVM2EVMSubscriptionMessage));
       // TODO: hasher
       // https://app.shortcut.com/chainlinklabs/story/41625/hasher-encoder
-      bytes memory data = bytes.concat(hex"00", report.encodedMessages[i]);
-      hashedLeaves[i] = keccak256(data);
+      // check abi.encodePacked usage for hash preimages, compare gas
+      hashedLeaves[i] = keccak256(bytes.concat(hex"00", report.encodedMessages[i]));
     }
 
     (uint256 timestampRelayed, uint256 gasUsedByMerkle) = _verifyMessages(
@@ -104,7 +104,7 @@ contract EVM2EVMSubscriptionOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR
 
       _isWellFormed(message);
 
-      for (uint256 j = 0; j < message.tokens.length; j++) {
+      for (uint256 j = 0; j < message.tokens.length; ++j) {
         _getPool(message.tokens[j]);
       }
 
@@ -130,7 +130,7 @@ contract EVM2EVMSubscriptionOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR
           // example: 100k gas, 20 gwei = 1e5 * 20e9  = 2e15
           // Gas cost in token: costInWei * 1e18 / tokenPerFeeCoin
           // example: costInWei 2e15, tokenPerFeeCoin 2e20 = 2e15 * 2e20 / 1e18 = 4e17 tokens
-          ((gasBegin - gasleft() + merkleGasShare) * tx.gasprice * tokenPerFeeCoin[i]) / 1e18
+          ((gasBegin - gasleft() + merkleGasShare) * tx.gasprice * tokenPerFeeCoin[i]) / 1 ether
         );
       }
     }

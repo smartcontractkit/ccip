@@ -111,9 +111,9 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
     bytes32[] calldata outerProofs,
     uint256 outerProofFlagBits
   ) external view returns (uint256 timestamp) {
-    bytes32 innerRoot = merkleRoot(hashedLeaves, innerProofs, innerProofFlagBits);
     bytes32[] memory outerLeaves = new bytes32[](1);
-    outerLeaves[0] = innerRoot;
+    // Use the result of the inner merkle proof as the single leaf of the outer merkle tree.
+    outerLeaves[0] = merkleRoot(hashedLeaves, innerProofs, innerProofFlagBits);
     bytes32 outerRoot = merkleRoot(outerLeaves, outerProofs, outerProofFlagBits);
     return s_roots[outerRoot];
   }
@@ -126,24 +126,27 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
   ) public pure returns (bytes32) {
     uint256 leavesLen = leaves.length;
     uint256 totalHashes = leavesLen + proofs.length - 1;
+    if (totalHashes == 0) {
+      return leaves[0];
+    }
     require(totalHashes <= 256);
+    bytes32[] memory hashes = new bytes32[](totalHashes);
+    (uint256 leafPos, uint256 hashPos, uint256 proofPos) = (0, 0, 0);
+
     unchecked {
-      bytes32[] memory hashes = new bytes32[](totalHashes);
-      uint256 leafPos = 0;
-      uint256 hashPos = 0;
-      uint256 proofPos = 0;
       for (uint256 i = 0; i < totalHashes; ++i) {
-        bool proofFlag = ((proofFlagBits >> i) & uint256(1)) == 1;
         hashes[i] = hashPair(
-          proofFlag ? (leafPos < leavesLen ? leaves[leafPos++] : hashes[hashPos++]) : proofs[proofPos++],
+          // Checks if the bit flag signals the use of a supplied proof or a leaf/previous hash.
+          ((proofFlagBits >> i) & uint256(1)) == 1
+            ? (leafPos < leavesLen ? leaves[leafPos++] : hashes[hashPos++]) // Use a leaf or a previously computed hash
+            : proofs[proofPos++], // Use a supplied proof.
+          // The second part of the hashed pair is never a proof as hashing two proofs would result in a
+          // hash that can already be computed offchain.
           leafPos < leavesLen ? leaves[leafPos++] : hashes[hashPos++]
         );
       }
-
-      if (totalHashes > 0) {
-        return hashes[totalHashes - 1];
-      }
-      return leaves[0];
+      // Return the last hash.
+      return hashes[totalHashes - 1];
     }
   }
 
@@ -166,11 +169,11 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
     for (uint256 i = 0; i < reportLength; ++i) {
       address onRamp = report.onRamps[i];
       uint64 expectedMinSeqNum = s_expectedNextMinByOnRamp[onRamp];
-      CCIP.Interval memory repInterval = report.intervals[i];
-
       if (expectedMinSeqNum == 0) {
         revert UnsupportedOnRamp(onRamp);
       }
+      CCIP.Interval memory repInterval = report.intervals[i];
+
       if (expectedMinSeqNum != repInterval.min || repInterval.min > repInterval.max) {
         revert InvalidInterval(repInterval, onRamp);
       }
