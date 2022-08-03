@@ -34,12 +34,12 @@ contract EVM2AnyTollOnRampRouter_ccipSend is EVM2EVMTollOnRampSetup {
 
     assertEq(1, s_onRampRouter.ccipSend(DEST_CHAIN_ID, message));
     // Assert the user balance is lowered by the tokens sent and the fee amount
-    uint256 expectedBalance = balanceBefore - (message.amounts[0] + FEE_AMOUNT);
+    uint256 expectedBalance = balanceBefore - (message.amounts[0] + RELAY_FEE_AMOUNT);
     assertEq(expectedBalance, s_sourceTokens[0].balanceOf(OWNER));
     // Asserts the tokens are sent to the pool
     assertEq(message.amounts[0], s_sourceTokens[0].balanceOf(address(s_sourcePools[0])));
     // Asserts the fee amount is left in the router
-    assertEq(FEE_AMOUNT, s_sourceTokens[0].balanceOf(address(s_onRampRouter)));
+    assertEq(RELAY_FEE_AMOUNT, s_sourceTokens[0].balanceOf(address(s_onRampRouter)));
   }
 
   function testExactApproveSuccess() public {
@@ -47,7 +47,7 @@ contract EVM2AnyTollOnRampRouter_ccipSend is EVM2EVMTollOnRampSetup {
     message.amounts = new uint256[](1);
     // since the fee token is the same we should reduce the amount sent
     // when we want an exact approve.
-    message.amounts[0] = 2**128 - FEE_AMOUNT;
+    message.amounts[0] = 2**128 - RELAY_FEE_AMOUNT;
     message.tokens = new IERC20[](1);
     message.tokens[0] = s_sourceTokens[0];
 
@@ -56,7 +56,7 @@ contract EVM2AnyTollOnRampRouter_ccipSend is EVM2EVMTollOnRampSetup {
     vm.expectEmit(false, false, false, true);
     emit CCIPSendRequested(_messageToEvent(message, 1));
 
-    uint256 expectedBalance = balanceBefore - (message.amounts[0] + FEE_AMOUNT);
+    uint256 expectedBalance = balanceBefore - (message.amounts[0] + RELAY_FEE_AMOUNT);
 
     assertEq(1, s_onRampRouter.ccipSend(DEST_CHAIN_ID, message));
     assertEq(expectedBalance, s_sourceTokens[0].balanceOf(OWNER));

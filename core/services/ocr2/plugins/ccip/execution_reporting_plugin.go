@@ -49,7 +49,7 @@ var (
 	ErrBlobVerifierIsDown                              = errors.New("blobVerifier is down")
 )
 
-func EncodeExecutionReport(seqNums []uint64, tokensPerFeeCoin map[common.Address]uint64, msgs [][]byte, innerProofs [][32]byte, innerProofSourceFlags []bool, outerProofs [][32]byte, outerProofSourceFlags []bool) (types.Report, error) {
+func EncodeExecutionReport(seqNums []uint64, tokensPerFeeCoin map[common.Address]*big.Int, msgs [][]byte, innerProofs [][32]byte, innerProofSourceFlags []bool, outerProofs [][32]byte, outerProofSourceFlags []bool) (types.Report, error) {
 	var tokensPerFeeCoinAddresses []common.Address
 	var tokensPerFeeCoinValues []*big.Int
 	for addr := range tokensPerFeeCoin {
@@ -60,7 +60,7 @@ func EncodeExecutionReport(seqNums []uint64, tokensPerFeeCoin map[common.Address
 		return bytes.Compare(tokensPerFeeCoinAddresses[i].Bytes(), tokensPerFeeCoinAddresses[j].Bytes()) < 0
 	})
 	for _, addr := range tokensPerFeeCoinAddresses {
-		tokensPerFeeCoinValues = append(tokensPerFeeCoinValues, big.NewInt(int64(tokensPerFeeCoin[addr])))
+		tokensPerFeeCoinValues = append(tokensPerFeeCoinValues, tokensPerFeeCoin[addr])
 	}
 	report, err := makeExecutionReportArgs().PackValues([]interface{}{&any_2_evm_toll_offramp.CCIPExecutionReport{
 		SequenceNumbers:          seqNums,
@@ -105,15 +105,10 @@ func DecodeExecutionReport(report types.Report) (*any_2_evm_toll_offramp.CCIPExe
 		return nil, errors.New("assumptionViolation: expected at least one element")
 	}
 	var er any_2_evm_toll_offramp.CCIPExecutionReport
-	for _, msg := range erStruct.EncodedMessages {
-		er.EncodedMessages = append(er.EncodedMessages, msg)
-	}
-	for _, proof := range erStruct.InnerProofs {
-		er.InnerProofs = append(er.InnerProofs, proof)
-	}
-	for _, proof := range erStruct.OuterProofs {
-		er.OuterProofs = append(er.OuterProofs, proof)
-	}
+	er.EncodedMessages = append(er.EncodedMessages, erStruct.EncodedMessages...)
+	er.InnerProofs = append(er.InnerProofs, erStruct.InnerProofs...)
+	er.OuterProofs = append(er.OuterProofs, erStruct.OuterProofs...)
+
 	er.SequenceNumbers = erStruct.SequenceNumbers
 	// Unpack will populate with big.Int{false, <allocated empty nat>} for 0 values,
 	// which is different from the expected big.NewInt(0). Rebuild to the expected value for this case.
@@ -152,10 +147,17 @@ func NewExecutionReportingPluginFactory(
 
 type dummyDataSource struct{}
 
-func (d dummyDataSource) GetPrice(address common.Address) (uint64, error) {
+// GetPrice should fetch the price of an asset on the destination chain.
+func (d dummyDataSource) GetPrice(address common.Address) (*big.Int, error) {
 	// TODO: Actually query data source. For now just return a juels/ETH value.
-	//  0.006 link/eth or 6e15 juels/eth
-	return 6000000000000000, nil
+	// As the feed is in wei/link and not juels/eth we need to transform it
+	//  0.005 eth/link or 5e15 wei/link or 2e20 juels/eth
+	weiPerLink := big.NewInt(5e15)
+	precision := big.NewInt(0)
+	// 1e18 * 1e18 = 1e36
+	precision.SetString("1000000000000000000000000000000000000", 10)
+	juelsPerFeeCoin := big.NewInt(0).Div(precision, weiPerLink)
+	return juelsPerFeeCoin, nil
 }
 
 func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.ReportingPluginConfig) (types.ReportingPlugin, types.ReportingPluginInfo, error) {
@@ -211,7 +213,7 @@ type ExecutionReportingPlugin struct {
 }
 
 type DataSource interface {
-	GetPrice(token common.Address) (uint64, error)
+	GetPrice(token common.Address) (*big.Int, error)
 }
 
 type InflightExecutionReport struct {
@@ -245,17 +247,17 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 	if isBlobVerifierDownNow(r.lggr, r.blobVerifier) {
 		return nil, ErrBlobVerifierIsDown
 	}
-	tokens, err := r.offRamp.GetPoolTokens(nil)
+	destTokens, err := r.offRamp.GetDestinationTokens(nil)
 	if err != nil {
 		return nil, err
 	}
-	tokensPerFeeCoin := make(map[common.Address]uint64)
-	for _, token := range tokens {
-		price, err2 := r.dataSource.GetPrice(token)
+	tokensPerFeeCoin := make(map[common.Address]*big.Int)
+	for _, destToken := range destTokens {
+		price, err2 := r.dataSource.GetPrice(destToken)
 		if err2 != nil {
 			return nil, err2
 		}
-		tokensPerFeeCoin[token] = price
+		tokensPerFeeCoin[destToken] = price
 	}
 	// Read and make a copy for the builder.
 	r.inFlightMu.RLock()
@@ -317,9 +319,9 @@ func leafsFromIntervals(lggr logger.Logger, onRampToEventSig map[common.Address]
 	return leafsByOnRamp, nil
 }
 
-// Assumes non-empty report. Messages to execute can be span more than one report, but are assumed to be in order of increasing
+// Assumes non-empty report. Messages to execute can span more than one report, but are assumed to be in order of increasing
 // sequence number.
-func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNums []uint64, tokensPerFeeCoin map[common.Address]uint64) ([]byte, error) {
+func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNums []uint64, tokensPerFeeCoin map[common.Address]*big.Int) ([]byte, error) {
 	rep, err := r.builder.relayedReport(finalSeqNums[0])
 	if err != nil {
 		return nil, err
@@ -386,11 +388,11 @@ func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNums 
 	return er, nil
 }
 
-func median[T uint64](vals []T) T {
-	valsCopy := make([]T, len(vals))
+func median(vals []*big.Int) *big.Int {
+	valsCopy := make([]*big.Int, len(vals))
 	copy(valsCopy[:], vals[:])
 	sort.Slice(valsCopy, func(i, j int) bool {
-		return valsCopy[i] < valsCopy[j]
+		return valsCopy[i].Cmp(valsCopy[j]) == -1
 	})
 	return valsCopy[len(valsCopy)/2]
 }
@@ -402,11 +404,11 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 	}
 	actualMaybeObservations := getNonEmptyObservations[ExecutionObservation](r.lggr, observations)
 	var actualObservations []ExecutionObservation
-	tokens, err := r.offRamp.GetPoolTokens(nil)
+	tokens, err := r.offRamp.GetDestinationTokens(nil)
 	if err != nil {
 		return false, nil, err
 	}
-	priceObservations := make(map[common.Address][]uint64)
+	priceObservations := make(map[common.Address][]*big.Int)
 	for _, obs := range actualMaybeObservations {
 		hasAllPrices := true
 		for _, token := range tokens {
@@ -430,9 +432,9 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 		lggr.Tracew("Non-empty observations <= F, need at least F+1 to continue")
 		return false, nil, nil
 	}
-	tokensPerFeeCoin := make(map[common.Address]uint64)
+	tokensPerFeeCoin := make(map[common.Address]*big.Int)
 	for _, token := range tokens {
-		tokensPerFeeCoin[token] = median[uint64](priceObservations[token])
+		tokensPerFeeCoin[token] = median(priceObservations[token])
 	}
 	tally := make(map[uint64]int)
 	for _, obs := range actualObservations {

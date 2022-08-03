@@ -10,7 +10,7 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
   // Duplicate event of the CCIPSendRequested in the TollOnRampInterface
   event CCIPSendRequested(CCIP.EVM2EVMTollEvent message);
 
-  uint256 immutable FEE_AMOUNT = 1;
+  uint256 immutable RELAY_FEE_AMOUNT = 1e18;
   uint256 immutable TOKEN_AMOUNT_0 = 9;
   uint256 immutable TOKEN_AMOUNT_1 = 7;
 
@@ -26,7 +26,7 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
     s_onRampRouter = new EVM2AnyTollOnRampRouter();
 
     s_onRampConfig = BaseOnRampInterface.OnRampConfig({
-      relayingFeeJuels: uint64(FEE_AMOUNT),
+      relayingFeeJuels: uint64(RELAY_FEE_AMOUNT),
       maxDataSize: 50,
       maxTokensLength: 3
     });
@@ -66,7 +66,7 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
         tokens: tokens,
         amounts: amounts,
         feeToken: s_sourceTokens[0],
-        feeTokenAmount: 1,
+        feeTokenAmount: RELAY_FEE_AMOUNT,
         gasLimit: GAS_LIMIT
       });
   }
@@ -81,7 +81,7 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
         tokens: tokens,
         amounts: amounts,
         feeToken: s_sourceTokens[0],
-        feeTokenAmount: 1,
+        feeTokenAmount: RELAY_FEE_AMOUNT,
         gasLimit: GAS_LIMIT
       });
   }
@@ -101,7 +101,7 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
         tokens: message.tokens,
         amounts: message.amounts,
         feeToken: message.feeToken,
-        feeTokenAmount: message.feeTokenAmount - FEE_AMOUNT,
+        feeTokenAmount: message.feeTokenAmount - RELAY_FEE_AMOUNT,
         gasLimit: message.gasLimit
       });
   }

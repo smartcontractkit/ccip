@@ -1,6 +1,7 @@
 package ccip
 
 import (
+	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -23,7 +24,7 @@ type BatchBuilder interface {
 		executed map[uint64]struct{},
 		gasLimit uint64,
 		gasPrice uint64,
-		tokensPerFeeCoin map[common.Address]uint64,
+		tokensPerFeeCoin map[common.Address]*big.Int,
 		inflight []InflightExecutionReport) []uint64
 }
 
@@ -117,7 +118,7 @@ func (eb *ExecutionBatchBuilder) getUnexpiredRelayReports() ([]blob_verifier.CCI
 
 func (eb *ExecutionBatchBuilder) getExecutedSeqNrsInRange(min, max uint64) (map[uint64]struct{}, error) {
 	// Should be able to keep this log constant across msg types.
-	executedLogs, err := eb.dstLogPoller.IndexedLogsTopicRange(CrossChainMessageExecuted, eb.offRampAddr, CrossChainMessageExecutedSequenceNumberIndex, logpoller.EvmWord(min), logpoller.EvmWord(max), int(eb.config.DestIncomingConfirmations))
+	executedLogs, err := eb.dstLogPoller.IndexedLogsTopicRange(ExecutionStateChanged, eb.offRampAddr, CrossChainMessageExecutedSequenceNumberIndex, logpoller.EvmWord(min), logpoller.EvmWord(max), int(eb.config.DestIncomingConfirmations))
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +133,7 @@ func (eb *ExecutionBatchBuilder) getExecutedSeqNrsInRange(min, max uint64) (map[
 	return executedMp, nil
 }
 
-func (eb *ExecutionBatchBuilder) getExecutableSeqNrs(maxGasPrice uint64, tokensPerFeeCoin map[common.Address]uint64, inflight []InflightExecutionReport) ([]uint64, error) {
+func (eb *ExecutionBatchBuilder) getExecutableSeqNrs(maxGasPrice uint64, tokensPerFeeCoin map[common.Address]*big.Int, inflight []InflightExecutionReport) ([]uint64, error) {
 	unexpiredReports, err := eb.getUnexpiredRelayReports()
 	if err != nil {
 		return nil, err
@@ -166,13 +167,15 @@ func (eb *ExecutionBatchBuilder) getExecutableSeqNrs(maxGasPrice uint64, tokensP
 		if err != nil {
 			return nil, err
 		}
+
+		// TODO don't build on every batch builder call but only change on changing configuration
 		srcToDst := make(map[common.Address]common.Address)
 		sourceTokens, err := eb.offRamp.GetPoolTokens(nil)
 		if err != nil {
 			return nil, err
 		}
 		for _, sourceToken := range sourceTokens {
-			dst, err := eb.offRamp.GetPool(nil, sourceToken)
+			dst, err := eb.offRamp.GetDestinationToken(nil, sourceToken)
 			if err != nil {
 				return nil, err
 			}

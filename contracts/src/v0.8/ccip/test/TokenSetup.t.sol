@@ -16,6 +16,8 @@ contract TokenSetup is BaseTest {
 
   AggregatorV2V3Interface[] internal s_sourceFeeds;
 
+  uint256 internal constant TOKENS_PER_FEE_COIN = 2e20;
+
   function setUp() public virtual override {
     BaseTest.setUp();
     if (s_sourceTokens.length == 0) {
@@ -36,8 +38,12 @@ contract TokenSetup is BaseTest {
     }
 
     if (s_destPools.length == 0) {
-      s_destPools.push(new MockPool(5));
-      s_destPools.push(new MockPool(10));
+      s_destPools.push(new NativeTokenPool(s_destTokens[0], bucketConfig, bucketConfig));
+      s_destPools.push(new NativeTokenPool(s_destTokens[1], bucketConfig, bucketConfig));
+
+      // Float the pools with funds
+      s_destTokens[0].transfer(address(s_destPools[0]), 1e25);
+      s_destTokens[1].transfer(address(s_destPools[1]), 1e25);
     }
 
     if (s_sourceFeeds.length == 0) {

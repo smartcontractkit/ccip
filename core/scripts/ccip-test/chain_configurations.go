@@ -33,12 +33,13 @@ type EvmChainConfig struct {
 	OffRampRouter   common.Address
 	TokenSender     common.Address
 	MessageReceiver common.Address
-	TokenReceiver   common.Address
+	ReceiverDapp    common.Address
 	OffRamp         common.Address
 	Afn             common.Address
 }
 
 var defaultAFNTimeout = int64((14 * 24 * time.Hour).Seconds())
+var pollPeriod = "1m0s"
 
 // EVMGasSettings specifies the gas configuration for an EVM chain.
 type EVMGasSettings struct {
@@ -51,60 +52,62 @@ type EVMGasSettings struct {
 var DefaultGasTipFee = big.NewInt(1e9)
 
 type DeploySettings struct {
-	DeployAFN        bool
-	DeployTokenPools bool
-	DeployPriceFeeds bool
+	DeployAFN          bool
+	DeployTokenPools   bool
+	DeployPriceFeeds   bool
+	DeployRamp         bool
+	DeployRouter       bool
+	DeployBlobVerifier bool
 }
 
-// Rinkeby is configured to work as an onramp for Kovan
+// Rinkeby is configured to work as an onramp for Goerli
 var Rinkeby = EvmChainConfig{
 	ChainId: big.NewInt(4),
-	EthUrl:  "wss://geth-rinkeby.eth.devnet.tools/ws",
+	EthUrl:  "wss://dawn-nameless-frog.rinkeby.quiknode.pro/2b88748d89f29acd9c33ed30a4e7690cd269a260/",
 	GasSettings: EVMGasSettings{
 		EIP1559:   true,
 		GasTipCap: DefaultGasTipFee,
 	},
-	LinkToken:     common.HexToAddress("0x01be23585060835e02b77ef475b0cc51aa1e0709"),
-	BridgeTokens:  []common.Address{common.HexToAddress("0x01be23585060835e02b77ef475b0cc51aa1e0709")},
-	TokenPools:    []common.Address{common.HexToAddress("0x232bc33b22501fC010835e872EA47969F0afb97A")},
-	PriceFeeds:    []common.Address{common.HexToAddress("0x8eDcf07BfF3ee235B6b8Ba7FAe907E385c24e175")},
-	OnRamp:        common.HexToAddress("0xda92A4766e1cFF0Aa77470fEccd095e471D8295F"),
-	OnRampRouter:  common.HexToAddress(""),
-	BlobVerifier:  common.Address{},
-	OffRampRouter: common.HexToAddress(""),
-	TokenSender:   common.HexToAddress("0xC2F8a293ca968c449795d47337497F26b2813434"),
-	Afn:           common.HexToAddress("0xA4E4fd20121f268674d2C5c771e4cd27eAD0C543"),
+	LinkToken:    common.HexToAddress("0x01be23585060835e02b77ef475b0cc51aa1e0709"),
+	BridgeTokens: []common.Address{common.HexToAddress("0x01be23585060835e02b77ef475b0cc51aa1e0709")},
+	TokenPools:   []common.Address{common.HexToAddress("0xcB6f8a746db85f60a58Eba211E476601fd40A999")},
+	PriceFeeds:   []common.Address{common.HexToAddress("0x676f9261ecB2fd1B9d047BaC003bD30be61fDf24")},
+	OnRamp:       common.HexToAddress("0x989996F826e37BCD6aeD6649838292F45A7eC732"),
+	OnRampRouter: common.HexToAddress("0xABca0Bb6227Fe4a23b1A46DF0c8764abE2759F75"),
+	TokenSender:  common.HexToAddress("0x1859E433Cb8B9a5Dcf2E3DffB460A299FC5Dd06D"),
+	Afn:          common.HexToAddress("0x3fb839502b242896f61f400615Ef0d4257c822cf"),
 	DeploySettings: DeploySettings{
 		DeployAFN:        false,
 		DeployTokenPools: false,
 		DeployPriceFeeds: false,
+		DeployRamp:       true,
+		DeployRouter:     true,
 	},
 }
 
-// Kovan is configured to be an offramp for Rinkeby
-var Kovan = EvmChainConfig{
-	ChainId: big.NewInt(42),
-	EthUrl:  "wss://parity-kovan.eth.devnet.tools/ws",
+// Goerli is configured to work as an offRamp for Rinkeby
+var Goerli = EvmChainConfig{
+	ChainId: big.NewInt(5),
+	EthUrl:  "wss://url",
 	GasSettings: EVMGasSettings{
 		EIP1559:   true,
 		GasTipCap: DefaultGasTipFee,
 	},
-	LinkToken:       common.HexToAddress("0xa36085F69e2889c224210F603D836748e7dC0088"),
-	BridgeTokens:    []common.Address{common.HexToAddress("0xa36085F69e2889c224210F603D836748e7dC0088")},
-	TokenPools:      []common.Address{common.HexToAddress("0x8E63731A427d2D3E4b9358cDc7d75ff2650A6989")},
-	PriceFeeds:      []common.Address{common.HexToAddress("0x7c132A947feC9C1aA17Db2d11eBc562243d4f331")},
-	OnRamp:          common.Address{},
-	OnRampRouter:    common.HexToAddress(""),
-	BlobVerifier:    common.HexToAddress("0x5B48C82ED450e20E04E6133D26ddcA1eFF33D062"),
-	OffRampRouter:   common.HexToAddress(""),
-	MessageReceiver: common.HexToAddress("0x1a224Ab562D640aDE0FBc203bE619D5Cd3CEf935"),
-	TokenReceiver:   common.HexToAddress("0xC4ED6c4F56ef4bD105e398BA320cF08e99C36E06"),
-	OffRamp:         common.HexToAddress("0x97403d2377e02eFc2D6e60D129435c0BA0917c9A"),
-	Afn:             common.HexToAddress("0xE0271CC39005530A228E91bdF9454deEfdE47DCd"),
+	LinkToken:       common.HexToAddress("0x326C977E6efc84E512bB9C30f76E30c160eD06FB"),
+	BridgeTokens:    []common.Address{common.HexToAddress("0x326C977E6efc84E512bB9C30f76E30c160eD06FB")},
+	TokenPools:      []common.Address{common.HexToAddress("0xa978DC2298DaB6dCEfAB06CC22fFeeb67dFD31C5")},
+	OffRamp:         common.HexToAddress("0xfC67c4DBfB4873D6DB48eBc4B26Ac310Ac0aBfA1"),
+	OffRampRouter:   common.HexToAddress("0x77ad33c539Eff83732379B1C0474901Db6EB4B44"),
+	BlobVerifier:    common.HexToAddress("0x4fe34eeD1b57F555BcA1A672eE5d5E8cD60AcAAE"),
+	MessageReceiver: common.HexToAddress("0xc99148f5e687CB16511EFcA6668F2b6eCe63458C"),
+	ReceiverDapp:    common.HexToAddress("0x9FeE875aEcfED6Fe87d1297A4420854FC07D5626"),
+	Afn:             common.HexToAddress("0x1ea60e6afD1855eAEbDe4f2D10a65dD4EA2DC6fB"),
 	DeploySettings: DeploySettings{
-		DeployAFN:        false,
-		DeployTokenPools: false,
-		DeployPriceFeeds: false,
+		DeployAFN:          false,
+		DeployTokenPools:   false,
+		DeployBlobVerifier: true,
+		DeployRamp:         true,
+		DeployRouter:       true,
 	},
 }
 
@@ -114,22 +117,23 @@ var BSCTestnet = EvmChainConfig{
 	EthUrl:  "wss://binance-testnet.eth.devnet.tools/ws",
 	GasSettings: EVMGasSettings{
 		EIP1559:  false,
-		GasPrice: big.NewInt(2e10),
+		GasPrice: big.NewInt(20e9),
 	},
 	LinkToken:       common.HexToAddress("0x84b9b910527ad5c03a9ca831909e21e236ea7b06"),
 	BridgeTokens:    []common.Address{common.HexToAddress("0x84b9b910527ad5c03a9ca831909e21e236ea7b06")},
-	TokenPools:      []common.Address{common.HexToAddress("0x6beeDC9AD88818d5B7658cD8F2ebd6BCa5302B22")},
-	PriceFeeds:      []common.Address{common.HexToAddress("0x4082CE8081140b8369dD4c65B9ac7d360b47eeC5")},
-	OnRamp:          common.Address{},
-	BlobVerifier:    common.HexToAddress("0x57c9639Fd47Ba84F0ac5DCe3d6c368D8eDDEEf94"),
-	MessageReceiver: common.HexToAddress("0xE2e54DF7E28e1Fa2ebAebBc9A0796A884Eb7B9BB"),
-	TokenReceiver:   common.HexToAddress("0xD9B7CD57A2ADB88A28D48D61c3552DA748247a22"),
-	OffRamp:         common.HexToAddress("0x1e936E6e617E20ba3E73D7BF02b5A8b0bBb2673A"),
-	Afn:             common.HexToAddress("0xaa9DFC20A535886974acdD23192D85f6A4c9a8D1"),
+	TokenPools:      []common.Address{common.HexToAddress("0xc99148f5e687CB16511EFcA6668F2b6eCe63458C")},
+	OffRamp:         common.HexToAddress("0xC0a1fFeAefd1544A454A49f3c4319B11cD4fDf1D"),
+	OffRampRouter:   common.HexToAddress("0x3a9e41F6a28331bcc3a4ca4c58b844Cd2Fd217bb"),
+	BlobVerifier:    common.HexToAddress("0x3755b7B14e9c71C080787e084471e5f51BBD2Cc6"),
+	MessageReceiver: common.HexToAddress("0xB0Fa66B3B165D10ED46F3e33E2a45926d958d391"),
+	ReceiverDapp:    common.HexToAddress("0xB71eA7F248DA49D62209066196480e740d18cE14"),
+	Afn:             common.HexToAddress("0x77ad33c539Eff83732379B1C0474901Db6EB4B44"),
 	DeploySettings: DeploySettings{
-		DeployAFN:        false,
-		DeployTokenPools: false,
-		DeployPriceFeeds: false,
+		DeployAFN:          true,
+		DeployTokenPools:   true,
+		DeployBlobVerifier: true,
+		DeployRamp:         true,
+		DeployRouter:       true,
 	},
 }
 
@@ -148,13 +152,13 @@ var PolygonMumbai = EvmChainConfig{
 	OnRamp:          common.Address{},
 	BlobVerifier:    common.HexToAddress("0xB16eaA4596a2CedD765B85334448DB6C6Cb5c2FE"),
 	MessageReceiver: common.HexToAddress("0x887F2081E5d3A3780098E3110E8b027848efF01c"),
-	TokenReceiver:   common.HexToAddress("0x82a91b70A1470976979BE3862615A1A569fBb701"),
+	ReceiverDapp:    common.HexToAddress("0x82a91b70A1470976979BE3862615A1A569fBb701"),
 	OffRamp:         common.HexToAddress("0xe3B3001a415072AF66A533376eb3182b1f47f646"),
 	Afn:             common.HexToAddress("0x1c5cE558D50FaaFee9a9da89F5Db20aC7037E3Fb"),
 	DeploySettings: DeploySettings{
-		DeployAFN:        false,
-		DeployTokenPools: false,
-		DeployPriceFeeds: false,
+		DeployAFN:        true,
+		DeployTokenPools: true,
+		DeployPriceFeeds: true,
 	},
 }
 
@@ -167,10 +171,10 @@ func toOffchainPublicKey(s string) (key ocrtypes2.OffchainPublicKey) {
 }
 
 var keyBundleIDs = []string{
-	"1f1e25712701487c3f151e0eefbda7d3e1c6eb4786ccaf21ad2ad80cb7eefc75",
-	"d81a2ee830974527f8fb45c3b8e7c021a85ab9f38f26aafe2bad90a5bfc0f3a3",
-	"f212a4890a7db7fd8b6c6d76674aad221a74d38c37e1253078feaf8e3a8b88df",
-	"52695bb2d815885932b89c55ada7a5c344b7e7df43bb8b37fad10c7013f71833"}
+	"4e57ae6c96090fe59e837feb9bc4bc265bb9f2328a7fd4b6fde9e803fb6d5665",
+	"17a2fd5637323d1665f2a991459cd60a8aa5fbcb084e18f45b82f1fd8dcadb57",
+	"c07e9aa1246e97731cc7344699173d60a170cb7ff88cca4543a02005a70c252b",
+	"c7ec6a5fcd84bfc91ed2b163f5f0ab52f5c03dd56647387cd45119f5dbf9fe82"}
 
 var transmitterAccounts = map[int64]map[int]string{
 	4: {

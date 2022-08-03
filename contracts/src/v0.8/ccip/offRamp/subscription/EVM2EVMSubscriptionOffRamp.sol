@@ -126,6 +126,10 @@ contract EVM2EVMSubscriptionOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR
         Any2EVMSubscriptionOffRampRouter(routerAddress).chargeSubscription(
           message.receiver,
           message.sender,
+          // Gas cost in wei: gasUsed * gasPrice
+          // example: 100k gas, 20 gwei = 1e5 * 20e9  = 2e15
+          // Gas cost in token: costInWei * 1e18 / tokenPerFeeCoin
+          // example: costInWei 2e15, tokenPerFeeCoin 2e20 = 2e15 * 2e20 / 1e18 = 4e17 tokens
           ((gasBegin - gasleft() + merkleGasShare) * tx.gasprice * tokenPerFeeCoin[i]) / 1e18
         );
       }

@@ -27,7 +27,7 @@ contract EVM2EVMSubscriptionOffRampSetup is TokenSetup {
 
   IERC20 s_destFeeToken;
 
-  uint256 constant SUBSCRIPTION_BALANCE = 1e7;
+  uint256 internal constant SUBSCRIPTION_BALANCE = 1e18;
 
   function setUp() public virtual override {
     TokenSetup.setUp();
@@ -67,6 +67,9 @@ contract EVM2EVMSubscriptionOffRampSetup is TokenSetup {
     offRamps[0] = s_offRamp;
     s_router = new Any2EVMSubscriptionOffRampRouter(offRamps, s_subscriptionConfig);
     s_offRamp.setRouter(s_router);
+
+    NativeTokenPool(address(s_destPools[0])).setOffRamp(BaseOffRampInterface(address(s_offRamp)), true);
+    NativeTokenPool(address(s_destPools[1])).setOffRamp(BaseOffRampInterface(address(s_offRamp)), true);
 
     _createSubscription(SubscriptionManagerInterface(address(s_receiver)), s_router, SUBSCRIPTION_BALANCE, true);
     _createSubscription(
@@ -167,9 +170,9 @@ contract EVM2EVMSubscriptionOffRampSetup is TokenSetup {
     bytes32[] memory outerProofs = new bytes32[](0);
     address[] memory tokenPerFeeCoinAddresses = new address[](3);
     uint256[] memory tokenPerFeeCoin = new uint256[](3);
-    tokenPerFeeCoin[0] = 1e18;
-    tokenPerFeeCoin[1] = 1e18;
-    tokenPerFeeCoin[2] = 1e18;
+    tokenPerFeeCoin[0] = TOKENS_PER_FEE_COIN;
+    tokenPerFeeCoin[1] = TOKENS_PER_FEE_COIN;
+    tokenPerFeeCoin[2] = TOKENS_PER_FEE_COIN;
 
     return
       CCIP.ExecutionReport({

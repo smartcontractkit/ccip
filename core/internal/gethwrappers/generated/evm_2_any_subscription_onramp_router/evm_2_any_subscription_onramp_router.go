@@ -1,7 +1,7 @@
 // Code generated - DO NOT EDIT.
 // This file is a generated binding and any manual changes will be lost.
 
-package evm_2_evm_subscription_onramp_router
+package evm_2_any_subscription_onramp_router
 
 import (
 	"errors"

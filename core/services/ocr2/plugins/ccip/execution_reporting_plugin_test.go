@@ -234,7 +234,7 @@ func TestMaxExecutionReportSize(t *testing.T) {
 	// Ensure execution report size is valid
 	executorReport, err := ccip.EncodeExecutionReport(
 		mb.seqNums,
-		map[common.Address]uint64{},
+		map[common.Address]*big.Int{},
 		mb.allMsgBytes,
 		mb.proof.Hashes,
 		mb.proof.SourceFlags,
@@ -284,7 +284,7 @@ func TestExecutionReportEncoding(t *testing.T) {
 		OuterProofs:              outerProof.Hashes,
 		OuterProofFlagBits:       ccip.ProofFlagsToBits(outerProof.SourceFlags),
 	}
-	encodeRelayReport, err := ccip.EncodeExecutionReport(report.SequenceNumbers, map[common.Address]uint64{}, report.EncodedMessages, report.InnerProofs, mb.proof.SourceFlags, report.OuterProofs, outerProof.SourceFlags)
+	encodeRelayReport, err := ccip.EncodeExecutionReport(report.SequenceNumbers, map[common.Address]*big.Int{}, report.EncodedMessages, report.InnerProofs, mb.proof.SourceFlags, report.OuterProofs, outerProof.SourceFlags)
 	require.NoError(t, err)
 	decodeRelayReport, err := ccip.DecodeExecutionReport(encodeRelayReport)
 	require.NoError(t, err)

@@ -105,18 +105,27 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
         // gas * wei/gas * juels/ETH / (1e18 wei/ETH)
         // Example 1e6 gas * (200e9 wei / gas) * (6253149865160030 juels / ETH) / (1e18 wei/ETH) = 1.25e15 juels
         uint256 tokenPerFeeCoin;
+        // tokenPerFeeCoinAddresses is keyed in destination chain tokens so we need to convert the feeToken
+        // before we do the lookup
+        address destinationFeeTokenAddress = address(_getPool(message.feeToken).getToken());
         for (uint256 j = 0; j < report.tokenPerFeeCoinAddresses.length; ++j) {
-          if (report.tokenPerFeeCoinAddresses[j] == address(message.feeToken)) {
+          if (report.tokenPerFeeCoinAddresses[j] == destinationFeeTokenAddress) {
             tokenPerFeeCoin = report.tokenPerFeeCoin[j];
           }
         }
         if (tokenPerFeeCoin == uint256(0)) {
-          revert MissingFeeCoinPrice(address(message.feeToken));
+          revert MissingFeeCoinPrice(destinationFeeTokenAddress);
         }
+        // Gas cost in wei: gasUsed * gasPrice
+        // example: 100k gas, 20 gwei = 1e5 * 20e9  = 2e15
+        // Gas cost in token: costInWei * 1e18 / tokenPerFeeCoin
+        // example: costInWei 2e15, tokenPerFeeCoin 2e20 = 2e15 * 2e20 / 1e18 = 4e17 tokens
         uint256 feeForGas = ((merkleGasShare + message.gasLimit) * tx.gasprice * tokenPerFeeCoin) / 1e18;
         if (feeForGas > message.feeTokenAmount) {
-          revert InsufficientFeeAmount(message.sequenceNumber);
+          revert InsufficientFeeAmount(message.sequenceNumber, feeForGas, message.feeTokenAmount);
         }
+
+        // _releaseOrMintToken converts the message.feeToken to the proper destination token
         _releaseOrMintToken(message.feeToken, message.feeTokenAmount, address(this));
       }
 

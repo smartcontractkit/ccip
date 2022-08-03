@@ -34,8 +34,8 @@ func (o RelayObservation) Marshal() ([]byte, error) {
 }
 
 type ExecutionObservation struct {
-	SeqNrs           []uint64                  `json:"seqNrs"`
-	TokensPerFeeCoin map[common.Address]uint64 `json:"tokensPerFeeCoin"`
+	SeqNrs           []uint64                    `json:"seqNrs"`
+	TokensPerFeeCoin map[common.Address]*big.Int `json:"tokensPerFeeCoin"`
 }
 
 func (o ExecutionObservation) Marshal() ([]byte, error) {

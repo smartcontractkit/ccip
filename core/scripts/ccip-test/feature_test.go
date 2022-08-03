@@ -1,6 +1,5 @@
 package main
 
-/*
 import (
 	"os"
 	"testing"
@@ -32,11 +31,11 @@ func TestFullFeatureCCIP(t *testing.T) {
 	case "deploy":
 		deployCCIPContracts(t, ownerKey,
 			&Rinkeby,
-			&Kovan)
+			&Goerli)
 	case "printJobs":
 		printContractConfig(
 			GetSetupChain(t, ownerKey, Rinkeby),
-			GetSetupChain(t, ownerKey, Kovan))
+			GetSetupChain(t, ownerKey, Goerli))
 	default:
 		runCommand(t, ownerKey, command)
 	}
@@ -57,7 +56,7 @@ func runCommand(t *testing.T, ownerKey string, command string) {
 		// Source chain
 		Rinkeby,
 		// Dest chain
-		Kovan,
+		Goerli,
 		ownerKey,
 		seedKey,
 	)
@@ -69,13 +68,13 @@ func runCommand(t *testing.T, ownerKey string, command string) {
 	switch command {
 	case "setConfig":
 		// Set the config to the message executor and the offramp
-		client.SetConfig()
-	case "externalExecution":
-		// Cross chain request with the client manually proving and executing the transaction
-		client.ExternalExecutionHappyPath(t)
-	case "noRepeat":
-		// Executing the same request twice should fail
-		client.ExternalExecutionSubmitOfframpTwiceShouldFail(t)
+		client.SetOCRConfig()
+	//case "externalExecution":
+	//	// Cross chain request with the client manually proving and executing the transaction
+	//	client.ExternalExecutionHappyPath(t)
+	//case "noRepeat":
+	//	// Executing the same request twice should fail
+	//	client.ExternalExecutionSubmitOfframpTwiceShouldFail(t)
 	case "don":
 		// Cross chain request with DON execution
 		client.DonExecutionHappyPath(t)
@@ -88,9 +87,9 @@ func runCommand(t *testing.T, ownerKey string, command string) {
 	case "tryPausedPool":
 		// Should fail because the pool is paused
 		client.TryGetTokensFromPausedPool()
-	case "tryPausedOfframp":
-		// Should not be included in a report because the offramp is paused
-		client.CrossChainSendPausedOfframpShouldFail(t)
+	//case "tryPausedOfframp":
+	//	// Should not be included in a report because the offramp is paused
+	//	client.CrossChainSendPausedOfframpShouldFail(t)
 	case "tryPausedOnramp":
 		// Should not succeed because the onramp is paused
 		client.CrossChainSendPausedOnrampShouldFail(t)
@@ -104,4 +103,3 @@ func runCommand(t *testing.T, ownerKey string, command string) {
 		t.Errorf("Unknown command \"%s\"", command)
 	}
 }
-*/

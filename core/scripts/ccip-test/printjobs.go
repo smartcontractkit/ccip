@@ -10,17 +10,34 @@ import (
 )
 
 // PrintJobSpecs prints the job spec for each node and CCIP spec type, as well as a bootstrap spec.
-func PrintJobSpecs(onramp, offramp, executor common.Address, sourceChainID, destChainID *big.Int) {
-	jobs := fmt.Sprintf(bootstrapTemplate, helpers.ChainName(destChainID.Int64()), offramp, destChainID)
+func PrintJobSpecs(onramp, blobVerifier, offRamp common.Address, sourceChainID, destChainID *big.Int) {
+	jobs := fmt.Sprintf(bootstrapTemplate+"\n", helpers.ChainName(destChainID.Int64()), blobVerifier, destChainID)
 	oracles := getOraclesForChain(destChainID.Int64())
 	for i, oracle := range oracles {
-		jobs += "\n" + fmt.Sprintf(relayTemplate, i, helpers.ChainName(sourceChainID.Int64())+"-"+helpers.ChainName(destChainID.Int64()), offramp, keyBundleIDs[i],
-			oracle.OracleIdentity.TransmitAccount, BootstrapPeer,
-			onramp, sourceChainID, destChainID, destChainID,
+		jobs += fmt.Sprintf("// [Node %d]\n", i)
+		jobs += fmt.Sprintf(relayTemplate+"\n",
+			helpers.ChainName(sourceChainID.Int64())+"-"+helpers.ChainName(destChainID.Int64()),
+			blobVerifier,
+			keyBundleIDs[i],
+			oracle.OracleIdentity.TransmitAccount,
+			BootstrapPeer,
+			sourceChainID,
+			destChainID,
+			onramp,
+			pollPeriod,
+			destChainID,
 		)
-		jobs += fmt.Sprintf(executionTemplate, helpers.ChainName(sourceChainID.Int64())+"-"+helpers.ChainName(destChainID.Int64()), executor, keyBundleIDs[i],
-			oracle.OracleIdentity.TransmitAccount, BootstrapPeer,
-			onramp, offramp, sourceChainID, destChainID, destChainID,
+		jobs += fmt.Sprintf(executionTemplate+"\n",
+			helpers.ChainName(sourceChainID.Int64())+"-"+helpers.ChainName(destChainID.Int64()),
+			offRamp,
+			keyBundleIDs[i],
+			oracle.OracleIdentity.TransmitAccount,
+			BootstrapPeer,
+			sourceChainID,
+			destChainID,
+			onramp,
+			blobVerifier,
+			destChainID,
 		)
 	}
 	fmt.Println(jobs)
@@ -41,7 +58,6 @@ chainID                            = %s
 `
 
 const relayTemplate = `
-// Node %d
 # CCIPRelaySpec
 type               = "offchainreporting2"
 name               = "ccip-relay-%s"
@@ -54,9 +70,10 @@ transmitterID      = "%s"
 p2pBootstrapPeers  = ["%s"]
 
 [pluginConfig]
-onRampID           = "%s"
 sourceChainID      = %d
 destChainID        = %d
+onRampIDs          = ["%s"]
+pollPeriod         = "%s"
 
 [relayConfig]
 chainID            = "%d"
@@ -75,10 +92,10 @@ transmitterID     = "%s"
 p2pBootstrapPeers = ["%s"]
 
 [pluginConfig]
-onRampID          = "%s"
-offRampID         = "%s"
 sourceChainID     = %d
 destChainID       = %d
+onRampID          = "%s"
+blobVerifierID    = "%s"
 
 [relayConfig]
 chainID           = "%d"

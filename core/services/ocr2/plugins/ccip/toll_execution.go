@@ -1,6 +1,7 @@
 package ccip
 
 import (
+	"math/big"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -21,11 +22,11 @@ type TollExecutionBatch struct {
 	remainingGasLimit    uint64
 	maxGasPrice          uint64
 	srcToDstToken        map[common.Address]common.Address
-	tollTokensPerFeeCoin map[common.Address]uint64
+	tollTokensPerFeeCoin map[common.Address]*big.Int
 	seqNrs               []uint64
 }
 
-func NewTollExecutionBatch(maxGasLimit uint64, maxGasPrice uint64, srcToDstToken map[common.Address]common.Address, tokensPerFeeCoin map[common.Address]uint64) *TollExecutionBatch {
+func NewTollExecutionBatch(maxGasLimit uint64, maxGasPrice uint64, srcToDstToken map[common.Address]common.Address, tokensPerFeeCoin map[common.Address]*big.Int) *TollExecutionBatch {
 	return &TollExecutionBatch{
 		remainingGasLimit:    maxGasLimit,
 		maxGasPrice:          maxGasPrice,
@@ -35,7 +36,7 @@ func NewTollExecutionBatch(maxGasLimit uint64, maxGasPrice uint64, srcToDstToken
 }
 
 func (teb *TollExecutionBatch) Add(msg Message) bool {
-	if teb.remainingGasLimit-msg.GasLimit.Uint64() < 0 {
+	if big.NewInt(int64(teb.remainingGasLimit)).Cmp(msg.GasLimit) < 1 {
 		return false
 	}
 	dstToken, present := teb.srcToDstToken[msg.FeeToken]
@@ -43,7 +44,14 @@ func (teb *TollExecutionBatch) Add(msg Message) bool {
 		// TODO: error?
 		return false
 	}
-	if msg.FeeTokenAmount.Uint64() < (teb.tollTokensPerFeeCoin[dstToken] * teb.maxGasPrice) {
+	tollTokensPerFeeCoin := teb.tollTokensPerFeeCoin[dstToken]
+	if tollTokensPerFeeCoin == nil {
+		// TODO: error?
+		return false
+	}
+
+	maxCostInFeeCoin := new(big.Int).Div(new(big.Int).Mul(new(big.Int).Mul(big.NewInt(MaxGasPrice), msg.GasLimit), tollTokensPerFeeCoin), big.NewInt(1e18))
+	if msg.FeeTokenAmount.Cmp(maxCostInFeeCoin) == -1 {
 		return false
 	}
 	teb.remainingGasLimit -= msg.GasLimit.Uint64() // TODO: this should probably include overhead?
@@ -77,9 +85,9 @@ func (tb *TollBatchBuilder) parseLog(log types.Log) (*evm_2_evm_toll_onramp.EVM2
 	return event, nil
 }
 
-func (tb *TollBatchBuilder) BuildBatch(srcToDst map[common.Address]common.Address, msgs []logpoller.Log, executed map[uint64]struct{}, gasLimit uint64, gasPrice uint64, tollTokensPerFeeCoin map[common.Address]uint64, inflight []InflightExecutionReport) []uint64 {
+func (tb *TollBatchBuilder) BuildBatch(srcToDst map[common.Address]common.Address, msgs []logpoller.Log, executed map[uint64]struct{}, gasLimit uint64, gasPrice uint64, tollTokensPerFeeCoin map[common.Address]*big.Int, inflight []InflightExecutionReport) []uint64 {
 	inflightSeqNrs := tb.inflightSeqNrs(inflight)
-	tollBatch := NewTollExecutionBatch(gasPrice, gasLimit, srcToDst, tollTokensPerFeeCoin)
+	tollBatch := NewTollExecutionBatch(gasLimit, gasPrice, srcToDst, tollTokensPerFeeCoin)
 	haveOne := false
 	for _, msg := range msgs {
 		tollMsgEvent, err := tb.parseLog(types.Log{

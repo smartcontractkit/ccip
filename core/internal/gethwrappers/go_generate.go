@@ -83,7 +83,7 @@ package gethwrappers
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.15/SimpleMessageReceiver.abi ../../../contracts/solc/v0.8.15/SimpleMessageReceiver.bin SimpleMessageReceiver simple_message_receiver
 
 // Toll
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.15/EVM2AnyTollOnRampRouter.abi ../../../contracts/solc/v0.8.15/EVM2AnyTollOnRampRouter.bin EVM2AnyTollOnRampRouter evm_2_evm_toll_onramp_router
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.15/EVM2AnyTollOnRampRouter.abi ../../../contracts/solc/v0.8.15/EVM2AnyTollOnRampRouter.bin EVM2AnyTollOnRampRouter evm_2_any_toll_onramp_router
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.15/EVM2EVMTollOnRamp.abi ../../../contracts/solc/v0.8.15/EVM2EVMTollOnRamp.bin EVM2EVMTollOnRamp evm_2_evm_toll_onramp
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.15/EVM2EVMTollOffRamp.abi ../../../contracts/solc/v0.8.15/EVM2EVMTollOffRamp.bin EVM2EVMTollOffRamp any_2_evm_toll_offramp
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.15/Any2EVMTollOffRampRouter.abi ../../../contracts/solc/v0.8.15/Any2EVMTollOffRampRouter.bin Any2EVMTollOffRampRouter any_2_evm_toll_offramp_router
@@ -91,7 +91,7 @@ package gethwrappers
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.15/TollSenderDapp.abi ../../../contracts/solc/v0.8.15/TollSenderDapp.bin TollSenderDapp toll_sender_dapp
 
 // Subscription
-//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.15/EVM2AnySubscriptionOnRampRouter.abi ../../../contracts/solc/v0.8.15/EVM2AnySubscriptionOnRampRouter.bin EVM2AnySubscriptionOnRampRouter evm_2_evm_subscription_onramp_router
+//go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.15/EVM2AnySubscriptionOnRampRouter.abi ../../../contracts/solc/v0.8.15/EVM2AnySubscriptionOnRampRouter.bin EVM2AnySubscriptionOnRampRouter evm_2_any_subscription_onramp_router
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.15/EVM2EVMSubscriptionOnRamp.abi ../../../contracts/solc/v0.8.15/EVM2EVMSubscriptionOnRamp.bin EVM2EVMSubscriptionOnRamp evm_2_evm_subscription_onramp
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.15/EVM2EVMSubscriptionOffRamp.abi ../../../contracts/solc/v0.8.15/EVM2EVMSubscriptionOffRamp.bin EVM2EVMSubscriptionOffRamp any_2_evm_subscription_offramp
 //go:generate go run ./generation/generate/wrap.go ../../../contracts/solc/v0.8.15/Any2EVMSubscriptionOffRampRouter.abi ../../../contracts/solc/v0.8.15/Any2EVMSubscriptionOffRampRouter.bin Any2EVMSubscriptionOffRampRouter any_2_evm_subscription_offramp_router

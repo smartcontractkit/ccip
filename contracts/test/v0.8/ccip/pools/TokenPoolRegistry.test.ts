@@ -71,6 +71,8 @@ describe('TokenPoolRegistry', () => {
       'getPool',
       'isPool',
       'getPoolTokens',
+      'getDestinationToken',
+      'getDestinationTokens',
       // Ownership
       'owner',
       'transferOwnership',

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/lib/pq"
 
 	"github.com/smartcontractkit/chainlink/core/utils"
@@ -31,6 +32,20 @@ type Log struct {
 	TxHash      common.Hash
 	Data        []byte
 	CreatedAt   time.Time
+}
+
+func (l *Log) GetGethLog() types.Log {
+	return types.Log{
+		Address:     l.Address,
+		Topics:      l.GetTopics(),
+		Data:        l.Data,
+		BlockNumber: uint64(l.BlockNumber),
+		TxHash:      l.TxHash,
+		TxIndex:     0,
+		BlockHash:   l.BlockHash,
+		Index:       uint(l.LogIndex),
+		Removed:     false,
+	}
 }
 
 func (l *Log) GetTopics() []common.Hash {

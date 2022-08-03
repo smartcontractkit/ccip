@@ -19,6 +19,8 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
 
   EVM2EVMTollOffRampHelper internal s_offRamp;
 
+  uint256 internal constant EXECUTION_FEE_AMOUNT = 1e18;
+
   event ExecutionStateChanged(uint64 indexed sequenceNumber, CCIP.MessageExecutionState state);
 
   function setUp() public virtual override {
@@ -45,6 +47,9 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
       s_destPools,
       HEARTBEAT
     );
+
+    NativeTokenPool(address(s_destPools[0])).setOffRamp(BaseOffRampInterface(address(s_offRamp)), true);
+    NativeTokenPool(address(s_destPools[1])).setOffRamp(BaseOffRampInterface(address(s_offRamp)), true);
   }
 
   function _generateNewRouter() internal returns (Any2EVMOffRampRouterInterface newRouter) {
@@ -105,7 +110,7 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
         tokens,
         amounts,
         s_sourceTokens[0],
-        0,
+        EXECUTION_FEE_AMOUNT,
         GAS_LIMIT
       );
   }
@@ -122,9 +127,11 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
     amounts[0] = 1000;
     amounts[1] = 50;
     messages[0] = _generateAny2EVMTollMessage(10, s_sourceTokens, amounts);
-    messages[0].feeTokenAmount = 10;
+    messages[0].feeToken = s_sourceTokens[0];
+    messages[0].feeTokenAmount = EXECUTION_FEE_AMOUNT;
     messages[1] = _generateAny2EVMTollMessage(11, s_sourceTokens, amounts);
-    messages[1].feeTokenAmount = 10;
+    messages[1].feeToken = s_sourceTokens[0];
+    messages[1].feeTokenAmount = EXECUTION_FEE_AMOUNT;
     return messages;
   }
 
@@ -142,13 +149,11 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
 
     bytes32[] memory innerProofs = new bytes32[](0);
     bytes32[] memory outerProofs = new bytes32[](0);
-    address[] memory tokenPerFeeCoinAddresses = new address[](3);
+    address[] memory tokenPerFeeCoinAddresses = new address[](1);
+    // The first destination token is the fee token
     tokenPerFeeCoinAddresses[0] = address(s_destTokens[0]);
-    tokenPerFeeCoinAddresses[1] = address(s_sourceTokens[0]);
-    uint256[] memory tokenPerFeeCoin = new uint256[](3);
-    tokenPerFeeCoin[0] = 1;
-    tokenPerFeeCoin[1] = 1;
-    tokenPerFeeCoin[2] = 1;
+    uint256[] memory tokenPerFeeCoin = new uint256[](1);
+    tokenPerFeeCoin[0] = TOKENS_PER_FEE_COIN;
 
     return
       CCIP.ExecutionReport({

@@ -148,7 +148,7 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry {
   }
 
   /// @inheritdoc BaseOffRampInterface
-  function execute(CCIP.ExecutionReport memory report, bool manualExecution) external virtual override {
+  function execute(CCIP.ExecutionReport memory, bool) external virtual override {
     revert();
   }
 
@@ -191,8 +191,7 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry {
   }
 
   /**
-   * @notice Returns the current execution state of a message based on its
-   *          sequenceNumber.
+   * @notice Returns the pool for a given source chain token.
    */
   function _getPool(IERC20 token) internal view returns (PoolInterface pool) {
     pool = getPool(token);

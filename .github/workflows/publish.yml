@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - ccip-develop
-      - prototype-mo
+      - revive-deploy-scripts
 
 jobs:
   build-and-publish:

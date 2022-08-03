@@ -89,8 +89,8 @@ func NewCCIPExecution(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm
 			return req.Message.SequenceNumber, nil
 		}
 		// Subscribe to all relevant relay logs.
-		sourceChain.LogPoller().MergeFilter([]common.Hash{CCIPSendRequested}, []common.Address{onRampAddr})
-		reqEventSig = CCIPSendRequested
+		sourceChain.LogPoller().MergeFilter([]common.Hash{CCIPTollSendRequested}, []common.Address{onRampAddr})
+		reqEventSig = CCIPTollSendRequested
 	case EVM2EVMSubscriptionOnRamp:
 		onRamp, err2 := evm_2_evm_subscription_onramp.NewEVM2EVMSubscriptionOnRamp(onRampAddr, sourceChain.Client())
 		if err2 != nil {
@@ -133,7 +133,7 @@ func NewCCIPExecution(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm
 	if err2 != nil {
 		return nil, err
 	}
-	destChain.LogPoller().MergeFilter([]common.Hash{CrossChainMessageExecuted}, []common.Address{offRamp.Address()})
+	destChain.LogPoller().MergeFilter([]common.Hash{ExecutionStateChanged}, []common.Address{offRamp.Address()})
 	// TODO: Can also check the on/offramp pair is compatible
 	return &CCIPExecution{
 		lggr:              lggr,
@@ -151,6 +151,8 @@ func NewCCIPExecution(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm
 
 type OffRamp interface {
 	GetPoolTokens(opts *bind.CallOpts) ([]common.Address, error)
+	GetDestinationTokens(opts *bind.CallOpts) ([]common.Address, error)
+	GetDestinationToken(opts *bind.CallOpts, sourceToken common.Address) (common.Address, error)
 	GetPool(opts *bind.CallOpts, sourceToken common.Address) (common.Address, error)
 	GetExecutionState(opts *bind.CallOpts, arg0 uint64) (uint8, error)
 	ParseSeqNumFromExecutionStateChanged(log types.Log) (uint64, error)

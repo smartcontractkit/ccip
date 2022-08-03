@@ -227,7 +227,7 @@ contract EVM2EVMSubscriptionOffRamp_execute is EVM2EVMSubscriptionOffRampSetup {
     // No exact gas calculations here because they can change very easily. It just checks
     // that some reasonable amount of gas was taken from the proper subscription.
     assertTrue(balancePreTx - 1e5 > balancePostTx);
-    assertTrue(balancePostTx > SUBSCRIPTION_BALANCE - 3e5);
+    assertTrue(balancePostTx - 2e5 < balancePreTx);
   }
 
   // Asserts that a failed message can be executed even when the nonce is out
@@ -371,7 +371,7 @@ contract EVM2EVMSubscriptionOffRamp_execute is EVM2EVMSubscriptionOffRampSetup {
   }
 
   // Asserts that the tx reverts when a subscription is not found.
-  function testSubscriptionNotFound() public {
+  function testSubscriptionNotFoundReverts() public {
     CCIP.EVM2EVMSubscriptionMessage[] memory messages = _generateMessagesWithTokens();
     SimpleMessageReceiver new_receiver = new SimpleMessageReceiver();
     messages[0].receiver = address(new_receiver);
@@ -382,14 +382,14 @@ contract EVM2EVMSubscriptionOffRamp_execute is EVM2EVMSubscriptionOffRampSetup {
 
   // Asserts that the tx reverts when the balance of the subscription is
   // too low.
-  function testBalanceTooLow() public {
+  function testBalanceTooLowReverts() public {
     CCIP.EVM2EVMSubscriptionMessage[] memory messages = new CCIP.EVM2EVMSubscriptionMessage[](3);
     messages[0] = _generateAny2EVMSubscriptionMessageNoTokens(1, 1);
     messages[1] = _generateAny2EVMSubscriptionMessageNoTokens(2, 2);
     messages[2] = _generateAny2EVMSubscriptionMessageNoTokens(3, 3);
 
     CCIP.ExecutionReport memory report = _generateReportFromMessages(messages);
-    report.tokenPerFeeCoin[0] = 1e25;
+    report.tokenPerFeeCoin[0] = TOKENS_PER_FEE_COIN * 1e11;
 
     vm.expectRevert(stdError.arithmeticError);
 

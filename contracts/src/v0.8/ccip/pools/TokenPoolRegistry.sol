@@ -119,4 +119,26 @@ contract TokenPoolRegistry is OwnerIsCreator {
   function getPoolTokens() public view returns (IERC20[] memory) {
     return s_tokenList;
   }
+
+  /**
+   * @notice Get all configured destination tokens
+   * @return tokens Array of configured destination tokens
+   */
+  function getDestinationTokens() external view returns (IERC20[] memory tokens) {
+    tokens = new IERC20[](s_tokenList.length);
+    for (uint256 i = 0; i < s_tokenList.length; ++i) {
+      tokens[i] = getDestinationToken(s_tokenList[i]);
+    }
+  }
+
+  /**
+   * @notice Get the destination token from the pool based on a given source token.
+   * @param sourceToken The source token
+   * @return the destination token
+   */
+  function getDestinationToken(IERC20 sourceToken) public view returns (IERC20) {
+    PoolInterface pool = s_pools[sourceToken].pool;
+    if (address(pool) == address(0)) revert PoolDoesNotExist();
+    return s_pools[sourceToken].pool.getToken();
+  }
 }

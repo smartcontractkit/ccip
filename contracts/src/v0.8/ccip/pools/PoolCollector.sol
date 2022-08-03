@@ -33,13 +33,12 @@ contract PoolCollector is OwnerIsCreator {
         }
         feeToken.safeTransferFrom(sender, address(this), fee);
         feeTokenAmount -= fee;
-
-        if (feeTokenAmount > 0) {
-          // Send the fee token to the pool
-          PoolInterface feeTokenPool = onRamp.getTokenPool(feeToken);
-          if (address(feeTokenPool) == address(0)) revert BaseOnRampInterface.UnsupportedToken(feeToken);
-          feeToken.safeTransferFrom(sender, address(feeTokenPool), feeTokenAmount);
-        }
+      }
+      if (feeTokenAmount > 0) {
+        // Send the fee token to the pool
+        PoolInterface feeTokenPool = onRamp.getTokenPool(feeToken);
+        if (address(feeTokenPool) == address(0)) revert BaseOnRampInterface.UnsupportedToken(feeToken);
+        feeToken.safeTransferFrom(sender, address(feeTokenPool), feeTokenAmount);
       }
       emit FeeCharged(sender, address(this), fee);
     }

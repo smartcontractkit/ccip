@@ -13,7 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 
-	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/blob_verifier"
+	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/any_2_evm_toll_offramp"
 )
 
 func panicErr(err error) {
@@ -56,22 +56,9 @@ func main() {
 	err = json.Unmarshal(b, &callErr)
 	panicErr(err)
 
-	splits := strings.Split(callErr.Data, " ")
-
-	// Indicates an unexpected input. Parsing as an error message instead.
-	if len(splits) < 2 {
-		var msg struct {
-			Code    int    `json:"code"`
-			Message string `json:"message"`
-		}
-
-		err = json.Unmarshal(b, &msg)
-		panicErr(err)
-		panic(fmt.Sprintf("%+v", msg))
-	}
-	data, err := hex.DecodeString(splits[1][2:])
+	data, err := hex.DecodeString(callErr.Data[2:])
 	panicErr(err)
-	offrampABI, err := abi.JSON(strings.NewReader(blob_verifier.BlobVerifierABI))
+	offrampABI, err := abi.JSON(strings.NewReader(any_2_evm_toll_offramp.EVM2EVMTollOffRampABI))
 	panicErr(err)
 
 	for k, abiError := range offrampABI.Errors {

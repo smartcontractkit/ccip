@@ -17,13 +17,13 @@ import (
 
 var (
 	// offset || sourceChainID || seqNum || ...
-	CCIPSendRequested    common.Hash
-	CCIPSubSendRequested common.Hash
+	CCIPTollSendRequested common.Hash
+	CCIPSubSendRequested  common.Hash
 	// merkleRoot || minSeqNum || maxSeqNum
 	ReportAccepted common.Hash
 	// sig || SeqNum || ...
-	CrossChainMessageExecuted common.Hash
-	ConfigSet                 common.Hash
+	ExecutionStateChanged common.Hash
+	ConfigSet             common.Hash
 )
 
 // Zero indexed
@@ -34,6 +34,16 @@ const (
 	CrossChainMessageExecutedSequenceNumberIndex = 1
 )
 
+// MessageExecutionState defines the execution states of CCIP messages.
+type MessageExecutionState uint64
+
+const (
+	Untouched MessageExecutionState = iota
+	InProgress
+	Success
+	Failure
+)
+
 func init() {
 	getIDOrPanic := func(name string, abi2 abi.ABI) common.Hash {
 		event, ok := abi2.Events[name]
@@ -42,7 +52,7 @@ func init() {
 		}
 		return event.ID
 	}
-	onRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_toll_onramp.EVM2EVMTollOnRampABI))
+	tollOnRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_toll_onramp.EVM2EVMTollOnRampABI))
 	if err != nil {
 		panic(err)
 	}
@@ -58,10 +68,10 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	CCIPSendRequested = getIDOrPanic("CCIPSendRequested", onRampABI)
+	CCIPTollSendRequested = getIDOrPanic("CCIPSendRequested", tollOnRampABI)
 	CCIPSubSendRequested = getIDOrPanic("CCIPSendRequested", subOnRampABI)
 	ReportAccepted = getIDOrPanic("ReportAccepted", blobVerifierABI)
-	CrossChainMessageExecuted = getIDOrPanic("ExecutionStateChanged", offRampABI)
+	ExecutionStateChanged = getIDOrPanic("ExecutionStateChanged", offRampABI)
 	ConfigSet = getIDOrPanic("ConfigSet", blobVerifierABI)
 }
 

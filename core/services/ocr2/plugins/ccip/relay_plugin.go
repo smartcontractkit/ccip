@@ -60,8 +60,8 @@ func typeAndVersion(addr common.Address, client eth.Client) (ContractType, semve
 	if err != nil {
 		return "", semver.Version{}, errors.Wrap(err, "failed to call type and version")
 	}
-	typeAndVersion := strings.Split(tvStr, " ")
-	contractType, version := typeAndVersion[0], typeAndVersion[1]
+	typeAndVersionValues := strings.Split(tvStr, " ")
+	contractType, version := typeAndVersionValues[0], typeAndVersionValues[1]
 	v, err := semver.NewVersion(version)
 	if err != nil {
 		return "", semver.Version{}, err
@@ -116,13 +116,14 @@ func NewCCIPRelay(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm.Cha
 			onRampSeqParsers[common.HexToAddress(onRampID)] = func(log logpoller.Log) (uint64, error) {
 				req, err := onRamp.ParseCCIPSendRequested(types.Log{Data: log.Data, Topics: log.GetTopics()})
 				if err != nil {
+					lggr.Warnf("failed to parse log: %+v", log)
 					return 0, err
 				}
 				return req.Message.SequenceNumber, nil
 			}
 			// Subscribe to all relevant relay logs.
-			sourceChain.LogPoller().MergeFilter([]common.Hash{CCIPSendRequested}, []common.Address{onRamp.Address()})
-			onRampToReqEventSig[onRamp.Address()] = CCIPSendRequested
+			sourceChain.LogPoller().MergeFilter([]common.Hash{CCIPTollSendRequested}, []common.Address{onRamp.Address()})
+			onRampToReqEventSig[onRamp.Address()] = CCIPTollSendRequested
 		case EVM2EVMSubscriptionOnRamp:
 			onRamp, err := evm_2_evm_subscription_onramp.NewEVM2EVMSubscriptionOnRamp(addr, sourceChain.Client())
 			if err != nil {
@@ -131,6 +132,7 @@ func NewCCIPRelay(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm.Cha
 			onRampSeqParsers[common.HexToAddress(onRampID)] = func(log logpoller.Log) (uint64, error) {
 				req, err := onRamp.ParseCCIPSendRequested(types.Log{Data: log.Data, Topics: log.GetTopics()})
 				if err != nil {
+					lggr.Warnf("failed to parse log: %+v", log)
 					return 0, err
 				}
 				return req.Message.SequenceNumber, nil
