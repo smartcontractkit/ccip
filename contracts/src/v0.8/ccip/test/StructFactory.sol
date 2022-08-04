@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../offRamp/interfaces/BaseOffRampInterface.sol";
-import "../onRamp/interfaces/BaseOnRampInterface.sol";
-import "../blobVerifier/interfaces/BlobVerifierInterface.sol";
-import "../utils/interfaces/SubscriptionInterface.sol";
+import "../interfaces/BlobVerifierInterface.sol";
+import "../interfaces/offRamp/Any2EVMOffRampInterface.sol";
+import "../interfaces/onRamp/BaseOnRampInterface.sol";
+import "../interfaces/subscription/SubscriptionInterface.sol";
 
 contract StructFactory {
   // addresses

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
+import "../interfaces/onRamp/Any2EVMTollOnRampInterface.sol";
 import "../../vendor/SafeERC20.sol";
 import "../access/OwnerIsCreator.sol";
-import "../onRamp/interfaces/Any2EVMTollOnRampInterface.sol";
 
 contract PoolCollector is OwnerIsCreator {
   using SafeERC20 for IERC20;

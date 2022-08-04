@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../offRamp/interfaces/Any2EVMOffRampRouterInterface.sol";
+import "../../interfaces/offRamp/Any2EVMOffRampRouterInterface.sol";
 
 contract MockTollOffRampRouter is Any2EVMOffRampRouterInterface {
   function routeMessage(CCIP.Any2EVMMessage calldata message) external override returns (bool success) {}

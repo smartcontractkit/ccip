@@ -3,7 +3,7 @@ pragma solidity 0.8.15;
 
 import "../BaseTest.t.sol";
 import "../mocks/MockERC20.sol";
-import "../../utils/AllowList.sol";
+import "../../access/AllowList.sol";
 
 contract AllowListSetup is BaseTest {
   event AllowListSet(address[] allowlist);

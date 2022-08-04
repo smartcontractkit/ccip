@@ -3,10 +3,10 @@ pragma solidity 0.8.15;
 
 import "../../vendor/SafeERC20.sol";
 import "../../vendor/Pausable.sol";
-import "./interfaces/PoolInterface.sol";
 import "../access/OwnerIsCreator.sol";
 import "../onRamp/BaseOnRamp.sol";
-import "../offRamp/interfaces/BaseOffRampInterface.sol";
+import "../interfaces/onRamp/BaseOnRampInterface.sol";
+import "../interfaces/offRamp/Any2EVMOffRampInterface.sol";
 
 /**
  * @notice Base abstract class with common functions for all token pools

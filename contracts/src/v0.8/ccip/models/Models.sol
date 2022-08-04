@@ -4,7 +4,63 @@ pragma solidity ^0.8.0;
 import "../../vendor/IERC20.sol";
 
 library CCIP {
-  ////----**** TOLL ****----////
+  ////////////////////////////////
+  ////         COMMON         ////
+  ////////////////////////////////
+
+  /// @notice Generalized EVM message type that is sent from EVM routers
+  // to the contracts that implement the Any2EVMMessageReceiverInterface
+  struct Any2EVMMessage {
+    uint256 sourceChainId;
+    uint64 sequenceNumber;
+    bytes sender;
+    address receiver;
+    bytes data;
+    IERC20[] tokens;
+    uint256[] amounts;
+    uint256 gasLimit;
+  }
+
+  /// @notice a sequenceNumber interval
+  struct Interval {
+    uint64 min;
+    uint64 max;
+  }
+
+  /// @notice Report that is relayed by the observing DON at the relay phase
+  struct RelayReport {
+    address[] onRamps;
+    Interval[] intervals;
+    bytes32[] merkleRoots;
+    bytes32 rootOfRoots;
+  }
+
+  struct ExecutionReport {
+    uint64[] sequenceNumbers;
+    address[] tokenPerFeeCoinAddresses;
+    uint256[] tokenPerFeeCoin;
+    bytes[] encodedMessages;
+    bytes32[] innerProofs;
+    uint256 innerProofFlagBits;
+    bytes32[] outerProofs;
+    uint256 outerProofFlagBits;
+  }
+
+  enum MessageExecutionState {
+    UNTOUCHED,
+    IN_PROGRESS,
+    SUCCESS,
+    FAILURE
+  }
+
+  struct ExecutionResult {
+    uint64 sequenceNumber;
+    MessageExecutionState state;
+  }
+
+  ////////////////////////////////
+  ////          TOLL          ////
+  ////////////////////////////////
 
   /// @notice The Toll message type for EVM chains.
   struct EVM2AnyTollMessage {
@@ -62,7 +118,9 @@ library CCIP {
     });
   }
 
-  ////----**** SUSBCRIPTION ****----////
+  ////////////////////////////////
+  ////      SUBSCRIPTION      ////
+  ////////////////////////////////
 
   struct EVM2AnySubscriptionMessage {
     address receiver;
@@ -113,56 +171,5 @@ library CCIP {
       amounts: original.amounts,
       gasLimit: original.gasLimit
     });
-  }
-
-  ////----**** COMMON ****----////
-
-  /// @notice Generalized received EVM message
-  struct Any2EVMMessage {
-    uint256 sourceChainId;
-    uint64 sequenceNumber;
-    bytes sender;
-    address receiver;
-    bytes data;
-    IERC20[] tokens;
-    uint256[] amounts;
-    uint256 gasLimit;
-  }
-
-  /// @notice a sequenceNumber interval
-  struct Interval {
-    uint64 min;
-    uint64 max;
-  }
-
-  /// @notice Report that is relayed by the observing DON at the relay phase
-  struct RelayReport {
-    address[] onRamps;
-    Interval[] intervals;
-    bytes32[] merkleRoots;
-    bytes32 rootOfRoots;
-  }
-
-  struct ExecutionReport {
-    uint64[] sequenceNumbers;
-    address[] tokenPerFeeCoinAddresses;
-    uint256[] tokenPerFeeCoin;
-    bytes[] encodedMessages;
-    bytes32[] innerProofs;
-    uint256 innerProofFlagBits;
-    bytes32[] outerProofs;
-    uint256 outerProofFlagBits;
-  }
-
-  enum MessageExecutionState {
-    UNTOUCHED,
-    IN_PROGRESS,
-    SUCCESS,
-    FAILURE
-  }
-
-  struct ExecutionResult {
-    uint64 sequenceNumber;
-    MessageExecutionState state;
   }
 }

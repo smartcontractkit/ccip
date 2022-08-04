@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../applications/interfaces/Any2EVMMessageReceiverInterface.sol";
-import "../../offRamp/interfaces/BaseOffRampInterface.sol";
+import "../../interfaces/offRamp/Any2EVMOffRampInterface.sol";
+import "../../interfaces/applications/Any2EVMMessageReceiverInterface.sol";
+import "../../interfaces/BlobVerifierInterface.sol";
 
 contract MockOffRamp is BaseOffRampInterface {
   IERC20 public s_token;

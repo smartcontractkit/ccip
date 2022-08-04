@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../../applications/interfaces/Any2EVMMessageReceiverInterface.sol";
+import "../../../interfaces/applications/Any2EVMMessageReceiverInterface.sol";
 
 contract RevertingMessageReceiver is Any2EVMMessageReceiverInterface {
   address s_manager;

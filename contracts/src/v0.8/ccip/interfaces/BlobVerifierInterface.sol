@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "../../offRamp/interfaces/Any2EVMOffRampRouterInterface.sol";
-import "../../utils/CCIP.sol";
+import "../models/Models.sol";
 
 interface BlobVerifierInterface {
   error UnsupportedOnRamp(address onRamp);

@@ -2,8 +2,8 @@
 pragma solidity 0.8.15;
 
 import "../access/OwnerIsCreator.sol";
-import "./interfaces/Any2EVMOffRampRouterInterface.sol";
-import "../applications/interfaces/Any2EVMMessageReceiverInterface.sol";
+import "../interfaces/offRamp/Any2EVMOffRampRouterInterface.sol";
+import "../interfaces/applications/Any2EVMMessageReceiverInterface.sol";
 
 abstract contract BaseOffRampRouter is Any2EVMOffRampRouterInterface, OwnerIsCreator {
   uint256 private constant GAS_FOR_CALL_EXACT_CHECK = 5_000;

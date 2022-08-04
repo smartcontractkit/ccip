@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../utils/TokenLimits.sol";
+import "../../rateLimiter/TokenLimits.sol";
 
 contract TokenLimitsHelper {
   using TokenLimits for TokenLimits.TokenBucket;

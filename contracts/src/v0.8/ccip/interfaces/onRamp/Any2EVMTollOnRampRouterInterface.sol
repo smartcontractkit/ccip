@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../utils/CCIP.sol";
+import "../../models/Models.sol";
 import "./Any2EVMTollOnRampInterface.sol";
 import "./BaseOnRampRouterInterface.sol";
 

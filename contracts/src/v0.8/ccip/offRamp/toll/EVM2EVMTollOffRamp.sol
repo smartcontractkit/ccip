@@ -2,7 +2,8 @@
 pragma solidity 0.8.15;
 
 import "../../../interfaces/TypeAndVersionInterface.sol";
-import "../../applications/interfaces/Any2EVMMessageReceiverInterface.sol";
+import "../../interfaces/offRamp/Any2EVMOffRampInterface.sol";
+import "../../interfaces/BlobVerifierInterface.sol";
 import "../BaseOffRamp.sol";
 
 /**

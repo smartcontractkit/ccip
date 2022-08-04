@@ -2,7 +2,7 @@
 pragma solidity 0.8.15;
 
 import "../../TokenSetup.t.sol";
-import "../../../utils/CCIP.sol";
+import "../../../models/Models.sol";
 import "../../../onRamp/subscription/EVM2EVMSubscriptionOnRamp.sol";
 import "../../../onRamp/subscription/EVM2AnySubscriptionOnRampRouter.sol";
 

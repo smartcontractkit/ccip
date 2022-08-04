@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "../../utils/CCIP.sol";
-import "../../blobVerifier/interfaces/BlobVerifierInterface.sol";
+import "../../models/Models.sol";
 import "./Any2EVMOffRampRouterInterface.sol";
+import "../BlobVerifierInterface.sol";
 
 interface BaseOffRampInterface {
   error AlreadyExecuted(uint64 sequenceNumber);

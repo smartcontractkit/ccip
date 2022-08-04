@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "../../../vendor/IERC20.sol";
-import "../../utils/TokenLimits.sol";
+import "../../rateLimiter/TokenLimits.sol";
 
 // Shared public interface for multiple pool types.
 // Each pool type handles a different child token model (lock/unlock, mint/burn.)

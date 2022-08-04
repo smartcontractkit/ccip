@@ -2,7 +2,7 @@
 pragma solidity 0.8.15;
 
 import "../../../interfaces/TypeAndVersionInterface.sol";
-import "../../utils/Subscription.sol";
+import "../../subscription/Subscription.sol";
 import "./Any2EVMSubscriptionOffRampRouter.sol";
 import "../BaseOffRamp.sol";
 

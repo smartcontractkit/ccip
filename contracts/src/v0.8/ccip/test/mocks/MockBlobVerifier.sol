@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../blobVerifier/interfaces/BlobVerifierInterface.sol";
+import "../../interfaces/BlobVerifierInterface.sol";
 
 contract MockBlobVerifier is BlobVerifierInterface {
   /// @inheritdoc BlobVerifierInterface

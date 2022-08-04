@@ -2,8 +2,7 @@
 pragma solidity 0.8.15;
 
 import "../../vendor/SafeERC20.sol";
-import "./interfaces/SubscriptionManagerInterface.sol";
-import "./interfaces/SubscriptionInterface.sol";
+import "../interfaces/subscription/SubscriptionInterface.sol";
 
 contract Subscription is SubscriptionInterface {
   using Address for address;

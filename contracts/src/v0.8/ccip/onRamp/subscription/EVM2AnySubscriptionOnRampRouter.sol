@@ -2,8 +2,8 @@
 pragma solidity 0.8.15;
 
 import "../../../interfaces/TypeAndVersionInterface.sol";
+import "../../interfaces/onRamp/Any2EVMSubscriptionOnRampRouterInterface.sol";
 import "../../pools/PoolCollector.sol";
-import "../interfaces/Any2EVMSubscriptionOnRampRouterInterface.sol";
 
 contract EVM2AnySubscriptionOnRampRouter is
   Any2EVMSubscriptionOnRampRouterInterface,

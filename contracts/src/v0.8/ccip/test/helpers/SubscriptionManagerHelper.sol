@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../utils/interfaces/SubscriptionManagerInterface.sol";
+import "../../interfaces/subscription/SubscriptionManagerInterface.sol";
 
 contract SubscriptionManagerHelper is SubscriptionManagerInterface {
   address s_manager;

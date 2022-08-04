@@ -2,7 +2,7 @@
 pragma solidity 0.8.15;
 
 import "../../vendor/SafeERC20.sol";
-import "./interfaces/AllowListInterface.sol";
+import "../interfaces/access/AllowListInterface.sol";
 import "../access/OwnerIsCreator.sol";
 
 contract AllowList is AllowListInterface, OwnerIsCreator {

@@ -3,8 +3,8 @@ pragma solidity 0.8.15;
 
 import "../../vendor/SafeERC20.sol";
 import "../../interfaces/TypeAndVersionInterface.sol";
-import "../offRamp/interfaces/Any2EVMOffRampRouterInterface.sol";
-import "./interfaces/Any2EVMMessageReceiverInterface.sol";
+import "../interfaces/applications/Any2EVMMessageReceiverInterface.sol";
+import "../interfaces/offRamp/Any2EVMOffRampRouterInterface.sol";
 
 /**
  * @notice Application contract for receiving messages from the OffRamp on behalf of an EOA

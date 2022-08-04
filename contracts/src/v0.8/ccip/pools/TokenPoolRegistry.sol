@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "./interfaces/PoolInterface.sol";
+import "../interfaces/pools/PoolInterface.sol";
 import "../access/OwnerIsCreator.sol";
 
 contract TokenPoolRegistry is OwnerIsCreator {

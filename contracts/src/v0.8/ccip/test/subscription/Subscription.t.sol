@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../utils/Subscription.sol";
+import "../../subscription/Subscription.sol";
 import "../BaseTest.t.sol";
 import "../mocks/MockERC20.sol";
 import "../helpers/SubscriptionManagerHelper.sol";

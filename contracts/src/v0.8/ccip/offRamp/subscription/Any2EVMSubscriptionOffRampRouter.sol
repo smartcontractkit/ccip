@@ -3,7 +3,7 @@ pragma solidity 0.8.15;
 
 import "../../../interfaces/TypeAndVersionInterface.sol";
 import "../../../vendor/SafeERC20.sol";
-import "../../utils/Subscription.sol";
+import "../../subscription/Subscription.sol";
 import "../BaseOffRampRouter.sol";
 
 contract Any2EVMSubscriptionOffRampRouter is BaseOffRampRouter, Subscription, TypeAndVersionInterface {

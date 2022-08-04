@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
+import "../../interfaces/onRamp/Any2EVMTollOnRampRouterInterface.sol";
 import "../../../interfaces/TypeAndVersionInterface.sol";
-import "../../utils/CCIP.sol";
+import "../../models/Models.sol";
 import "../BaseOnRamp.sol";
-import "../interfaces/Any2EVMTollOnRampRouterInterface.sol";
 
 /**
  * @notice An implementation of a toll OnRamp.

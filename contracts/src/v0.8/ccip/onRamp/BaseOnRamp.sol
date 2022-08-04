@@ -6,8 +6,7 @@ import "../pools/TokenPoolRegistry.sol";
 import "../health/HealthChecker.sol";
 import "../priceFeedRegistry/PriceFeedRegistry.sol";
 import "../pools/PoolCollector.sol";
-import "./interfaces/BaseOnRampInterface.sol";
-import "../utils/AllowList.sol";
+import "../access/AllowList.sol";
 
 contract BaseOnRamp is
   BaseOnRampInterface,
