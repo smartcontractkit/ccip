@@ -236,11 +236,7 @@ contract EVM2EVMTollOffRamp_execute is EVM2EVMTollOffRampSetup {
 
     CCIP.ExecutionReport memory executionReport = _generateReportFromMessages(messages);
     vm.expectRevert(
-      abi.encodeWithSelector(
-        BaseOffRampInterface.MessageTooLarge.selector,
-        MAX_DATA_SIZE,
-        messages[0].data.length
-      )
+      abi.encodeWithSelector(BaseOffRampInterface.MessageTooLarge.selector, MAX_DATA_SIZE, messages[0].data.length)
     );
     s_offRamp.execute(executionReport, false);
   }

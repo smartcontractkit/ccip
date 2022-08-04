@@ -124,16 +124,21 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
     bytes32[] memory proofs,
     uint256 proofFlagBits
   ) public pure returns (bytes32) {
-    uint256 leavesLen = leaves.length;
-    uint256 totalHashes = leavesLen + proofs.length - 1;
-    if (totalHashes == 0) {
-      return leaves[0];
-    }
-    require(totalHashes <= 256);
-    bytes32[] memory hashes = new bytes32[](totalHashes);
-    (uint256 leafPos, uint256 hashPos, uint256 proofPos) = (0, 0, 0);
-
     unchecked {
+      uint256 leavesLen = leaves.length;
+      // As of Solidity 0.6.5, overflow is not possible here because in-memory arrays are limited to
+      // a max length of 2**64-1. Two uint64 values will not overflow a uint256.
+      // See: https://blog.soliditylang.org/2020/04/06/memory-creation-overflow-bug/
+      // Underflow is possible if leaves and proofs are empty, resulting in totalHashes = 2**256-1
+      // This will be caught in the `require(totalHashes <= 256)` statement.
+      uint256 totalHashes = leavesLen + proofs.length - 1;
+      if (totalHashes == 0) {
+        return leaves[0];
+      }
+      require(totalHashes <= 256);
+      bytes32[] memory hashes = new bytes32[](totalHashes);
+      (uint256 leafPos, uint256 hashPos, uint256 proofPos) = (0, 0, 0);
+
       for (uint256 i = 0; i < totalHashes; ++i) {
         hashes[i] = hashPair(
           // Checks if the bit flag signals the use of a supplied proof or a leaf/previous hash.
