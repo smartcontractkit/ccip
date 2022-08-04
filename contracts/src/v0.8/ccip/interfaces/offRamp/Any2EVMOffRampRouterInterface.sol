@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "./Any2EVMOffRampInterface.sol";
+import "../../models/Models.sol";
 
 interface Any2EVMOffRampRouterInterface {
   error NoOffRampsConfigured();

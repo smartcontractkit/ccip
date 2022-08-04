@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "../../models/Models.sol";
 import "./Any2EVMOffRampRouterInterface.sol";
 import "../BlobVerifierInterface.sol";
 
