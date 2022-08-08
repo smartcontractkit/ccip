@@ -151,6 +151,11 @@ func (d Delegate) ServicesForSpec(jobSpec job.Job) ([]job.ServiceCtx, error) {
 	if err != nil {
 		return nil, err
 	}
+	var forwardingAllowed bool
+	if jobSpec.ForwardingAllowed.Valid {
+		forwardingAllowed = jobSpec.ForwardingAllowed.Bool
+	}
+
 	runResults := make(chan pipeline.Run, d.cfg.JobPipelineResultWriteQueueDepth())
 
 	var pluginOracle plugins.OraclePlugin
@@ -159,10 +164,11 @@ func (d Delegate) ServicesForSpec(jobSpec job.Job) ([]job.ServiceCtx, error) {
 	case job.Median:
 		medianProvider, err2 := relayer.NewMedianProvider(
 			types.RelayArgs{
-				ExternalJobID: jobSpec.ExternalJobID,
-				JobID:         spec.ID,
-				ContractID:    spec.ContractID,
-				RelayConfig:   spec.RelayConfig.Bytes(),
+				ExternalJobID:     jobSpec.ExternalJobID,
+				JobID:             spec.ID,
+				ContractID:        spec.ContractID,
+				RelayConfig:       spec.RelayConfig.Bytes(),
+				ForwardingAllowed: forwardingAllowed,
 			}, types.PluginArgs{
 				TransmitterID: spec.TransmitterID.String,
 				PluginConfig:  spec.PluginConfig.Bytes(),
@@ -185,10 +191,11 @@ func (d Delegate) ServicesForSpec(jobSpec job.Job) ([]job.ServiceCtx, error) {
 		ocr2vrfRelayer := evmrelay.NewOCR2VRFRelayer(d.db, chain, lggr.Named("OCR2VRFRelayer"))
 		dkgProvider, err2 := ocr2vrfRelayer.NewDKGProvider(
 			types.RelayArgs{
-				ExternalJobID: jobSpec.ExternalJobID,
-				JobID:         spec.ID,
-				ContractID:    spec.ContractID,
-				RelayConfig:   spec.RelayConfig.Bytes(),
+				ExternalJobID:     jobSpec.ExternalJobID,
+				JobID:             spec.ID,
+				ContractID:        spec.ContractID,
+				RelayConfig:       spec.RelayConfig.Bytes(),
+				ForwardingAllowed: forwardingAllowed,
 			}, types.PluginArgs{
 				TransmitterID: spec.TransmitterID.String,
 				PluginConfig:  spec.PluginConfig.Bytes(),
@@ -234,10 +241,11 @@ func (d Delegate) ServicesForSpec(jobSpec job.Job) ([]job.ServiceCtx, error) {
 
 		vrfProvider, err2 := ocr2vrfRelayer.NewOCR2VRFProvider(
 			types.RelayArgs{
-				ExternalJobID: jobSpec.ExternalJobID,
-				JobID:         spec.ID,
-				ContractID:    spec.ContractID,
-				RelayConfig:   spec.RelayConfig.Bytes(),
+				ExternalJobID:     jobSpec.ExternalJobID,
+				JobID:             spec.ID,
+				ContractID:        spec.ContractID,
+				RelayConfig:       spec.RelayConfig.Bytes(),
+				ForwardingAllowed: forwardingAllowed,
 			}, types.PluginArgs{
 				TransmitterID: spec.TransmitterID.String,
 				PluginConfig:  spec.PluginConfig.Bytes(),
@@ -248,10 +256,11 @@ func (d Delegate) ServicesForSpec(jobSpec job.Job) ([]job.ServiceCtx, error) {
 
 		dkgProvider, err2 := ocr2vrfRelayer.NewDKGProvider(
 			types.RelayArgs{
-				ExternalJobID: jobSpec.ExternalJobID,
-				JobID:         spec.ID,
-				ContractID:    cfg.DKGContractAddress,
-				RelayConfig:   spec.RelayConfig.Bytes(),
+				ExternalJobID:     jobSpec.ExternalJobID,
+				JobID:             spec.ID,
+				ContractID:        cfg.DKGContractAddress,
+				RelayConfig:       spec.RelayConfig.Bytes(),
+				ForwardingAllowed: forwardingAllowed,
 			}, types.PluginArgs{
 				TransmitterID: spec.TransmitterID.String,
 				PluginConfig:  spec.PluginConfig.Bytes(),
@@ -291,7 +300,6 @@ func (d Delegate) ServicesForSpec(jobSpec job.Job) ([]job.ServiceCtx, error) {
 		if err2 != nil {
 			return nil, errors.Wrap(err2, "create ocr2vrf coordinator")
 		}
-
 		l := d.lggr.Named("OCR2VRF").With(
 			"jobName", jobSpec.Name.ValueOrZero(),
 			"jobID", jobSpec.ID,
@@ -328,7 +336,6 @@ func (d Delegate) ServicesForSpec(jobSpec job.Job) ([]job.ServiceCtx, error) {
 			Serializer:                   reportserializer.NewReportSerializer(&altbn_128.G1{}),
 			JulesPerFeeCoin:              juelsPerFeeCoin,
 			Coordinator:                  coordinator,
-			ConfirmationDelays:           cfg.ConfirmationDelays,
 			Esk:                          encryptionSecretKey.KyberScalar(),
 			Ssk:                          signingSecretKey.KyberScalar(),
 			KeyID:                        keyID,
