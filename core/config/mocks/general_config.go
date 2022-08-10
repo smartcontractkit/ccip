@@ -1224,14 +1224,14 @@ func (_m *GeneralConfig) GlobalEvmGasFeeCapDefault() (*big.Int, bool) {
 }
 
 // GlobalEvmGasLimitDRJobType provides a mock function with given fields:
-func (_m *GeneralConfig) GlobalEvmGasLimitDRJobType() (uint64, bool) {
+func (_m *GeneralConfig) GlobalEvmGasLimitDRJobType() (uint32, bool) {
 	ret := _m.Called()
 
-	var r0 uint64
-	if rf, ok := ret.Get(0).(func() uint64); ok {
+	var r0 uint32
+	if rf, ok := ret.Get(0).(func() uint32); ok {
 		r0 = rf()
 	} else {
-		r0 = ret.Get(0).(uint64)
+		r0 = ret.Get(0).(uint32)
 	}
 
 	var r1 bool
@@ -1245,14 +1245,14 @@ func (_m *GeneralConfig) GlobalEvmGasLimitDRJobType() (uint64, bool) {
 }
 
 // GlobalEvmGasLimitDefault provides a mock function with given fields:
-func (_m *GeneralConfig) GlobalEvmGasLimitDefault() (uint64, bool) {
+func (_m *GeneralConfig) GlobalEvmGasLimitDefault() (uint32, bool) {
 	ret := _m.Called()
 
-	var r0 uint64
-	if rf, ok := ret.Get(0).(func() uint64); ok {
+	var r0 uint32
+	if rf, ok := ret.Get(0).(func() uint32); ok {
 		r0 = rf()
 	} else {
-		r0 = ret.Get(0).(uint64)
+		r0 = ret.Get(0).(uint32)
 	}
 
 	var r1 bool
@@ -1266,14 +1266,14 @@ func (_m *GeneralConfig) GlobalEvmGasLimitDefault() (uint64, bool) {
 }
 
 // GlobalEvmGasLimitFMJobType provides a mock function with given fields:
-func (_m *GeneralConfig) GlobalEvmGasLimitFMJobType() (uint64, bool) {
+func (_m *GeneralConfig) GlobalEvmGasLimitFMJobType() (uint32, bool) {
 	ret := _m.Called()
 
-	var r0 uint64
-	if rf, ok := ret.Get(0).(func() uint64); ok {
+	var r0 uint32
+	if rf, ok := ret.Get(0).(func() uint32); ok {
 		r0 = rf()
 	} else {
-		r0 = ret.Get(0).(uint64)
+		r0 = ret.Get(0).(uint32)
 	}
 
 	var r1 bool
@@ -1287,14 +1287,14 @@ func (_m *GeneralConfig) GlobalEvmGasLimitFMJobType() (uint64, bool) {
 }
 
 // GlobalEvmGasLimitKeeperJobType provides a mock function with given fields:
-func (_m *GeneralConfig) GlobalEvmGasLimitKeeperJobType() (uint64, bool) {
+func (_m *GeneralConfig) GlobalEvmGasLimitKeeperJobType() (uint32, bool) {
 	ret := _m.Called()
 
-	var r0 uint64
-	if rf, ok := ret.Get(0).(func() uint64); ok {
+	var r0 uint32
+	if rf, ok := ret.Get(0).(func() uint32); ok {
 		r0 = rf()
 	} else {
-		r0 = ret.Get(0).(uint64)
+		r0 = ret.Get(0).(uint32)
 	}
 
 	var r1 bool
@@ -1329,14 +1329,14 @@ func (_m *GeneralConfig) GlobalEvmGasLimitMultiplier() (float32, bool) {
 }
 
 // GlobalEvmGasLimitOCRJobType provides a mock function with given fields:
-func (_m *GeneralConfig) GlobalEvmGasLimitOCRJobType() (uint64, bool) {
+func (_m *GeneralConfig) GlobalEvmGasLimitOCRJobType() (uint32, bool) {
 	ret := _m.Called()
 
-	var r0 uint64
-	if rf, ok := ret.Get(0).(func() uint64); ok {
+	var r0 uint32
+	if rf, ok := ret.Get(0).(func() uint32); ok {
 		r0 = rf()
 	} else {
-		r0 = ret.Get(0).(uint64)
+		r0 = ret.Get(0).(uint32)
 	}
 
 	var r1 bool
@@ -1350,14 +1350,14 @@ func (_m *GeneralConfig) GlobalEvmGasLimitOCRJobType() (uint64, bool) {
 }
 
 // GlobalEvmGasLimitTransfer provides a mock function with given fields:
-func (_m *GeneralConfig) GlobalEvmGasLimitTransfer() (uint64, bool) {
+func (_m *GeneralConfig) GlobalEvmGasLimitTransfer() (uint32, bool) {
 	ret := _m.Called()
 
-	var r0 uint64
-	if rf, ok := ret.Get(0).(func() uint64); ok {
+	var r0 uint32
+	if rf, ok := ret.Get(0).(func() uint32); ok {
 		r0 = rf()
 	} else {
-		r0 = ret.Get(0).(uint64)
+		r0 = ret.Get(0).(uint32)
 	}
 
 	var r1 bool
@@ -1371,14 +1371,14 @@ func (_m *GeneralConfig) GlobalEvmGasLimitTransfer() (uint64, bool) {
 }
 
 // GlobalEvmGasLimitVRFJobType provides a mock function with given fields:
-func (_m *GeneralConfig) GlobalEvmGasLimitVRFJobType() (uint64, bool) {
+func (_m *GeneralConfig) GlobalEvmGasLimitVRFJobType() (uint32, bool) {
 	ret := _m.Called()
 
-	var r0 uint64
-	if rf, ok := ret.Get(0).(func() uint64); ok {
+	var r0 uint32
+	if rf, ok := ret.Get(0).(func() uint32); ok {
 		r0 = rf()
 	} else {
-		r0 = ret.Get(0).(uint64)
+		r0 = ret.Get(0).(uint32)
 	}
 
 	var r1 bool
@@ -2174,28 +2174,28 @@ func (_m *GeneralConfig) KeeperMaximumGracePeriod() int64 {
 }
 
 // KeeperRegistryCheckGasOverhead provides a mock function with given fields:
-func (_m *GeneralConfig) KeeperRegistryCheckGasOverhead() uint64 {
+func (_m *GeneralConfig) KeeperRegistryCheckGasOverhead() uint32 {
 	ret := _m.Called()
 
-	var r0 uint64
-	if rf, ok := ret.Get(0).(func() uint64); ok {
+	var r0 uint32
+	if rf, ok := ret.Get(0).(func() uint32); ok {
 		r0 = rf()
 	} else {
-		r0 = ret.Get(0).(uint64)
+		r0 = ret.Get(0).(uint32)
 	}
 
 	return r0
 }
 
 // KeeperRegistryPerformGasOverhead provides a mock function with given fields:
-func (_m *GeneralConfig) KeeperRegistryPerformGasOverhead() uint64 {
+func (_m *GeneralConfig) KeeperRegistryPerformGasOverhead() uint32 {
 	ret := _m.Called()
 
-	var r0 uint64
-	if rf, ok := ret.Get(0).(func() uint64); ok {
+	var r0 uint32
+	if rf, ok := ret.Get(0).(func() uint32); ok {
 		r0 = rf()
 	} else {
-		r0 = ret.Get(0).(uint64)
+		r0 = ret.Get(0).(uint32)
 	}
 
 	return r0
