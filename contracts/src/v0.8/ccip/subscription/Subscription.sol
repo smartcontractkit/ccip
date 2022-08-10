@@ -5,7 +5,6 @@ import "../../vendor/SafeERC20.sol";
 import "../interfaces/subscription/SubscriptionInterface.sol";
 
 contract Subscription is SubscriptionInterface {
-  using Address for address;
   using SafeERC20 for IERC20;
 
   // The subscription config
@@ -116,7 +115,7 @@ contract Subscription is SubscriptionInterface {
   }
 
   /// @inheritdoc SubscriptionInterface
-  function withdrawal(address receiver, uint256 amount) external onlySubscriptionManager(address(receiver)) {
+  function withdrawal(address receiver, uint256 amount) external onlySubscriptionManager(receiver) {
     PreparedWithdrawal memory prepared = s_preparedWithdrawals[receiver];
     if (prepared.timestamp > block.timestamp) {
       revert DelayNotPassedYet(prepared.timestamp);

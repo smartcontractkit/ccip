@@ -4,6 +4,7 @@ pragma solidity 0.8.15;
 import "../../../interfaces/TypeAndVersionInterface.sol";
 import "../../subscription/Subscription.sol";
 import "./Any2EVMSubscriptionOffRampRouter.sol";
+import "../../ocr/OCR2Base.sol";
 import "../BaseOffRamp.sol";
 
 /**

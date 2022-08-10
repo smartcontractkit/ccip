@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../subscription/Subscription.sol";
-import "../BaseTest.t.sol";
 import "../mocks/MockERC20.sol";
 import "../helpers/SubscriptionManagerHelper.sol";
+import "../BaseTest.t.sol";
+import "../../subscription/Subscription.sol";
 
 contract SubscriptionSetup is BaseTest {
   event SubscriptionFunded(address receiver, uint256 funding);

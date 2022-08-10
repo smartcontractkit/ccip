@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../TokenSetup.t.sol";
-import "../helpers/BaseOffRampHelper.sol";
 import "../mocks/MockBlobVerifier.sol";
-import "../../pools/NativeTokenPool.sol";
+import "../helpers/BaseOffRampHelper.sol";
+import "../TokenSetup.t.sol";
 
 contract BaseOffRampSetup is TokenSetup {
   event OffRampConfigSet(BaseOffRampInterface.OffRampConfig config);

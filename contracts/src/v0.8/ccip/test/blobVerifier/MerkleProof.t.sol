@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "./BlobVerifierSetup.t.sol";
 import "../helpers/MerkleHelper.sol";
+import "./BlobVerifier.t.sol";
 
 contract BlobVerifier_merkleRoot is BlobVerifierSetup {
   MerkleHelper s_merkleHelper;
@@ -18,7 +18,9 @@ contract BlobVerifier_merkleRoot is BlobVerifierSetup {
     leaves[0] = keccak256("a");
     leaves[1] = keccak256("b");
     bytes32[] memory proofs = new bytes32[](0);
+
     bytes32 root = s_blobVerifier.merkleRoot(leaves, proofs, 2**100 - 1);
+
     assertEq(root, expectedRoot);
   }
 
@@ -30,7 +32,9 @@ contract BlobVerifier_merkleRoot is BlobVerifierSetup {
     leaves[2] = keccak256("c");
     leaves[3] = keccak256("d");
     bytes32[] memory proofs = new bytes32[](0);
+
     bytes32 root = s_blobVerifier.merkleRoot(leaves, proofs, 2**100 - 1);
+
     assertEq(root, expectedRoot);
   }
 
@@ -44,7 +48,9 @@ contract BlobVerifier_merkleRoot is BlobVerifierSetup {
     leaves[4] = keccak256("e");
     leaves[5] = keccak256("f");
     bytes32[] memory proofs = new bytes32[](0);
+
     bytes32 root = s_blobVerifier.merkleRoot(leaves, proofs, 2**100 - 1);
+
     assertEq(root, expectedRoot);
   }
 
@@ -55,7 +61,9 @@ contract BlobVerifier_merkleRoot is BlobVerifierSetup {
       leaves[i] = keccak256("a");
     }
     bytes32[] memory proofs = new bytes32[](0);
+
     bytes32 root = s_blobVerifier.merkleRoot(leaves, proofs, 2**256 - 1);
+
     assertEq(root, expectedRoot);
   }
 

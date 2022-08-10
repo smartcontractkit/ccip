@@ -44,7 +44,31 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
   // Success
 
   function testSuccess() public {
-    s_onRamp.forwardFromRouter(_generateEmptyMessage(), OWNER);
+    CCIP.EVM2AnyTollMessage memory message = _generateEmptyMessage();
+
+    vm.expectEmit(false, false, false, true);
+    emit CCIPSendRequested(_messageToEventNoFee(message, 1));
+
+    s_onRamp.forwardFromRouter(message, OWNER);
+  }
+
+  function testShouldIncrementSeqNumSuccess() public {
+    CCIP.EVM2AnyTollMessage memory message = _generateEmptyMessage();
+
+    vm.expectEmit(false, false, false, true);
+    emit CCIPSendRequested(_messageToEventNoFee(message, 1));
+
+    s_onRamp.forwardFromRouter(message, OWNER);
+
+    vm.expectEmit(false, false, false, true);
+    emit CCIPSendRequested(_messageToEventNoFee(message, 2));
+
+    s_onRamp.forwardFromRouter(message, OWNER);
+
+    vm.expectEmit(false, false, false, true);
+    emit CCIPSendRequested(_messageToEventNoFee(message, 3));
+
+    s_onRamp.forwardFromRouter(message, OWNER);
   }
 
   // Reverts
@@ -75,7 +99,7 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
 
   function testMessageTooLargeReverts() public {
     CCIP.EVM2AnyTollMessage memory message = _generateEmptyMessage();
-    message.data = new bytes(MAX_DATA_SIZE + 1);
+    message.data = new bytes(onRampConfig().maxDataSize + 1);
     vm.expectRevert(
       abi.encodeWithSelector(
         BaseOnRampInterface.MessageTooLarge.selector,

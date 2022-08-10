@@ -3,11 +3,8 @@ pragma solidity 0.8.15;
 
 import "../../vendor/SafeERC20.sol";
 import "../health/HealthChecker.sol";
-import "../models/Models.sol";
 import "../pools/TokenPoolRegistry.sol";
-import "../ocr/OCR2Base.sol";
 import "../interfaces/offRamp/Any2EVMOffRampInterface.sol";
-import "../interfaces/BlobVerifierInterface.sol";
 
 /**
  * @notice A base OffRamp contract that every OffRamp should expand on

@@ -2,7 +2,6 @@
 pragma solidity 0.8.15;
 
 import "../../../interfaces/TypeAndVersionInterface.sol";
-import "../../models/Models.sol";
 import "./EVM2AnySubscriptionOnRampRouter.sol";
 import "../BaseOnRamp.sol";
 

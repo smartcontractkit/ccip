@@ -2,7 +2,6 @@
 pragma solidity 0.8.15;
 
 import "../TokenSetup.t.sol";
-import "../../onRamp/BaseOnRamp.sol";
 
 contract BaseOnrampSetup is TokenSetup {
   event RouterSet(address router);

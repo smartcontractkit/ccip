@@ -2,7 +2,6 @@
 pragma solidity 0.8.15;
 
 import "../../TokenSetup.t.sol";
-import "../../../models/Models.sol";
 import "../../../onRamp/toll/EVM2EVMTollOnRamp.sol";
 import "../../../onRamp/toll/EVM2AnyTollOnRampRouter.sol";
 
@@ -94,6 +93,26 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
         amounts: message.amounts,
         feeToken: message.feeToken,
         feeTokenAmount: message.feeTokenAmount - RELAYING_FEE_JUELS,
+        gasLimit: message.gasLimit
+      });
+  }
+
+  function _messageToEventNoFee(CCIP.EVM2AnyTollMessage memory message, uint64 seqNum)
+    public
+    pure
+    returns (CCIP.EVM2EVMTollEvent memory)
+  {
+    return
+      CCIP.EVM2EVMTollEvent({
+        sequenceNumber: seqNum,
+        sourceChainId: SOURCE_CHAIN_ID,
+        sender: OWNER,
+        receiver: message.receiver,
+        data: message.data,
+        tokens: message.tokens,
+        amounts: message.amounts,
+        feeToken: message.feeToken,
+        feeTokenAmount: message.feeTokenAmount,
         gasLimit: message.gasLimit
       });
   }

@@ -4,6 +4,7 @@ pragma solidity 0.8.15;
 import "../../../interfaces/TypeAndVersionInterface.sol";
 import "../../interfaces/offRamp/Any2EVMOffRampInterface.sol";
 import "../../interfaces/BlobVerifierInterface.sol";
+import "../../ocr/OCR2Base.sol";
 import "../BaseOffRamp.sol";
 
 /**

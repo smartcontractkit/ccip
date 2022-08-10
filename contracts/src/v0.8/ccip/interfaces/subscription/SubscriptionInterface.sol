@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "../../../vendor/SafeERC20.sol";
+import "../../../vendor/IERC20.sol";
 import "./SubscriptionManagerInterface.sol";
 
 interface SubscriptionInterface {
@@ -15,7 +15,7 @@ interface SubscriptionInterface {
   error FundingAmountNotPositive();
 
   event SubscriptionCreated(address receiver);
-  event SubscriptionFunded(address receiver, uint256 funding);
+  event SubscriptionFunded(address receiver, uint256 amount);
   event PreparedSetSenders(address receiver, address[] newSenders);
   event NewSendersSet(address receiver, address[] newSenders);
   event PreparedWithdrawalRequest(address receiver, uint256 amount);

@@ -2,9 +2,7 @@
 pragma solidity 0.8.15;
 
 import "../../TokenSetup.t.sol";
-import "../../../models/Models.sol";
 import "../../../onRamp/subscription/EVM2EVMSubscriptionOnRamp.sol";
-import "../../../onRamp/subscription/EVM2AnySubscriptionOnRampRouter.sol";
 
 contract EVM2EVMSubscriptionOnRampSetup is TokenSetup {
   // Duplicate event of the CCIPSendRequested in the TollOnRampInterface

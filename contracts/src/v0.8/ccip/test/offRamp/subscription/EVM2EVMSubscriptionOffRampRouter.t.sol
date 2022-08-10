@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "./EVM2EVMSubscriptionOffRampSetup.t.sol";
 import "../../helpers/receivers/RevertingMessageReceiver.sol";
-import "forge-std/console2.sol";
+import "./EVM2EVMSubscriptionOffRampSetup.t.sol";
 
 /// @notice #constructor
 contract EVM2EVMSubscriptionOffRampRouter_constructor is EVM2EVMSubscriptionOffRampSetup {

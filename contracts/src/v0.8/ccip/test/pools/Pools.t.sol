@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../pools/TokenPoolRegistry.sol";
 import "../TokenSetup.t.sol";
 
 contract TokenPoolRegistrySetup is TokenSetup {

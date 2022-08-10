@@ -3,7 +3,6 @@ pragma solidity 0.8.15;
 
 import "../../interfaces/onRamp/Any2EVMTollOnRampRouterInterface.sol";
 import "../../../interfaces/TypeAndVersionInterface.sol";
-import "../../models/Models.sol";
 import "../BaseOnRamp.sol";
 
 /**

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../blobVerifier/BlobVerifierSetup.t.sol";
 import "../onRamp/subscription/EVM2EVMSubscriptionOnRampSetup.t.sol";
 import "../offRamp/subscription/EVM2EVMSubscriptionOffRampSetup.t.sol";
+import "../blobVerifier/BlobVerifier.t.sol";
 
 contract E2E_subscription is EVM2EVMSubscriptionOnRampSetup, BlobVerifierSetup, EVM2EVMSubscriptionOffRampSetup {
   function setUp()

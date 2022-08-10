@@ -1,15 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../../interfaces/BlobVerifierInterface.sol";
-import "../../../interfaces/applications/Any2EVMMessageReceiverInterface.sol";
-import "../../../health/interfaces/AFNInterface.sol";
-import "../../../offRamp/subscription/EVM2EVMSubscriptionOffRamp.sol";
-import "../../../offRamp/subscription/Any2EVMSubscriptionOffRampRouter.sol";
+import "../../mocks/MockBlobVerifier.sol";
 import "../../helpers/receivers/SimpleMessageReceiver.sol";
 import "../../helpers/EVM2EVMSubscriptionOffRampHelper.sol";
 import "../../helpers/MerkleHelper.sol";
-import "../../mocks/MockBlobVerifier.sol";
 import "../../TokenSetup.t.sol";
 
 contract EVM2EVMSubscriptionOffRampSetup is TokenSetup {
