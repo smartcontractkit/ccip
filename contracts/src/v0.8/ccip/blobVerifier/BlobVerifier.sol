@@ -37,7 +37,6 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
    * @dev The AFN contract should be deployed already
    * @param chainId The ID that this contract is deployed to
    * @param afn AFN contract
-   * @param maxTimeWithoutAFNSignal An AFN config setting
    * @param config containing:
    * sourceChainId: the source chain ID
    * onRamps: the addresses of the connected onRamps on the source chain for when overwriting
@@ -48,9 +47,8 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
     uint256 chainId,
     uint256 sourceChainId,
     AFNInterface afn,
-    uint256 maxTimeWithoutAFNSignal,
     BlobVerifierConfig memory config
-  ) OCR2Base(true) HealthChecker(afn, maxTimeWithoutAFNSignal) {
+  ) OCR2Base(true) HealthChecker(afn) {
     CHAIN_ID = chainId;
     SOURCE_CHAIN_ID = sourceChainId;
     s_config = config;

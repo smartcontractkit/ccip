@@ -24,7 +24,6 @@ contract BaseOnrampSetup is TokenSetup {
       s_sourceFeeds,
       s_allowList,
       s_afn,
-      HEARTBEAT,
       onRampConfig(),
       s_onRampRouter
     );

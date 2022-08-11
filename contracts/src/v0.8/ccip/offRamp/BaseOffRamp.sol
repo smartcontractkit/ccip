@@ -41,9 +41,8 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry {
     // TODO token limiter contract
     // https://app.shortcut.com/chainlinklabs/story/41867/contract-scaffolding-aggregatetokenlimiter-contract
     IERC20[] memory sourceTokens,
-    PoolInterface[] memory pools,
-    uint256 maxTimeWithoutAFNSignal
-  ) HealthChecker(afn, maxTimeWithoutAFNSignal) TokenPoolRegistry(sourceTokens, pools) {
+    PoolInterface[] memory pools
+  ) HealthChecker(afn) TokenPoolRegistry(sourceTokens, pools) {
     // TokenPoolRegistry does a check on tokens.length != pools.length
     SOURCE_CHAIN_ID = sourceChainId;
     CHAIN_ID = chainId;

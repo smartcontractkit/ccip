@@ -13,7 +13,7 @@ contract BlobVerifierSetup is BaseTest {
   function setUp() public virtual override {
     BaseTest.setUp();
 
-    s_blobVerifier = new BlobVerifierHelper(DEST_CHAIN_ID, SOURCE_CHAIN_ID, s_afn, HEARTBEAT, blobVerifierConfig());
+    s_blobVerifier = new BlobVerifierHelper(DEST_CHAIN_ID, SOURCE_CHAIN_ID, s_afn, blobVerifierConfig());
   }
 }
 
@@ -32,7 +32,7 @@ contract BlobVerifier_constructor is BaseTest {
       onRamps: onRamps,
       minSeqNrByOnRamp: minSequenceNumbers
     });
-    BlobVerifier blobVerifier = new BlobVerifier(DEST_CHAIN_ID, SOURCE_CHAIN_ID, s_afn, HEARTBEAT, config);
+    BlobVerifier blobVerifier = new BlobVerifier(DEST_CHAIN_ID, SOURCE_CHAIN_ID, s_afn, config);
 
     // BlobVerifier config
     assertEq(minSequenceNumbers[0], blobVerifier.getExpectedNextSequenceNumber(onRamps[0]));
@@ -50,7 +50,6 @@ contract BlobVerifier_constructor is BaseTest {
     assertEq(OWNER, blobVerifier.owner());
 
     // HealthChecker
-    assertEq(HEARTBEAT, blobVerifier.getMaxSecondsWithoutAFNHeartbeat());
     assertEq(address(s_afn), address(blobVerifier.getAFN()));
   }
 
@@ -64,7 +63,6 @@ contract BlobVerifier_constructor is BaseTest {
       DEST_CHAIN_ID,
       SOURCE_CHAIN_ID,
       s_afn,
-      HEARTBEAT,
       BlobVerifierInterface.BlobVerifierConfig({onRamps: onRamps, minSeqNrByOnRamp: minSequenceNumbers})
     );
   }

@@ -86,8 +86,7 @@ func TestRelayReportEncoding(t *testing.T) {
 		destChain,        // client
 		big.NewInt(1338), // dest chain id
 		big.NewInt(1337),
-		afnAddress,        // AFN address
-		big.NewInt(86400), // max timeout without AFN signal  86400 seconds = one day
+		afnAddress, // AFN address
 		blob_verifier_helper.BlobVerifierInterfaceBlobVerifierConfig{
 			OnRamps:          []common.Address{onRampAddress},
 			MinSeqNrByOnRamp: []uint64{1},

@@ -138,16 +138,15 @@ func deployOnRamp(t *testing.T, client *EvmChainConfig, destinationChain *big.In
 
 	client.Logger.Infof("Deploying OnRamp: destinationChains %+v, bridgeTokens %+v, poolAddresses %+v, priceFeeds %+v", destinationChain, client.BridgeTokens, client.TokenPools, client.PriceFeeds)
 	onRampAddress, tx, _, err := evm_2_evm_toll_onramp.DeployEVM2EVMTollOnRamp(
-		client.Owner,                  // user
-		client.Client,                 // client
-		client.ChainId,                // source chain id
-		destinationChain,              // destinationChainId
-		client.BridgeTokens,           // tokens
-		client.TokenPools,             // pools
-		client.PriceFeeds,             // Feeds
-		[]common.Address{},            // allow list
-		client.Afn,                    // AFN
-		big.NewInt(defaultAFNTimeout), // max timeout without AFN signal
+		client.Owner,        // user
+		client.Client,       // client
+		client.ChainId,      // source chain id
+		destinationChain,    // destinationChainId
+		client.BridgeTokens, // tokens
+		client.TokenPools,   // pools
+		client.PriceFeeds,   // Feeds
+		[]common.Address{},  // allow list
+		client.Afn,          // AFN
 		evm_2_evm_toll_onramp.BaseOnRampInterfaceOnRampConfig{
 			RelayingFeeJuels: 0,
 			MaxDataSize:      1e6,
@@ -197,8 +196,7 @@ func deployOffRamp(t *testing.T, destClient *EvmChainConfig, sourceClient *EvmCh
 		destClient.OnRamp,
 		destClient.Afn,
 		sourceClient.BridgeTokens,
-		destClient.TokenPools,
-		big.NewInt(defaultAFNTimeout))
+		destClient.TokenPools)
 	require.NoError(t, err)
 	WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
 
@@ -250,12 +248,11 @@ func deployBlobVerifier(t *testing.T, destClient *EvmChainConfig, sourceClient *
 	destClient.Logger.Infof("Deploying blob verifier")
 
 	blobVerifierAddress, tx, _, err := blob_verifier.DeployBlobVerifier(
-		destClient.Owner,              // user
-		destClient.Client,             // client
-		destClient.ChainId,            // dest chain id
-		sourceClient.ChainId,          // source chain id
-		destClient.Afn,                // AFN address
-		big.NewInt(defaultAFNTimeout), // max timeout without AFN signal
+		destClient.Owner,     // user
+		destClient.Client,    // client
+		destClient.ChainId,   // dest chain id
+		sourceClient.ChainId, // source chain id
+		destClient.Afn,       // AFN address
 		blob_verifier.BlobVerifierInterfaceBlobVerifierConfig{
 			OnRamps:          []common.Address{sourceClient.OnRamp},
 			MinSeqNrByOnRamp: []uint64{1},

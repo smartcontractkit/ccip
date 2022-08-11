@@ -61,8 +61,6 @@ func runCommand(t *testing.T, ownerKey string, command string) {
 		seedKey,
 	)
 
-	client.Source.Client.AssureHealth(t)
-	client.Dest.Client.AssureHealth(t)
 	client.UnpauseAll()
 
 	switch command {
@@ -96,9 +94,6 @@ func runCommand(t *testing.T, ownerKey string, command string) {
 	case "acceptOwnership":
 		// Should accept ownership on the destination chain OffRamp & Executor
 		client.AcceptOwnership(t)
-	case "setTimeout":
-		// Should set the AFN timeout on the on- and offramp to the defaultAFNTimeout
-		client.SetAFNTimeout(t)
 	default:
 		t.Errorf("Unknown command \"%s\"", command)
 	}

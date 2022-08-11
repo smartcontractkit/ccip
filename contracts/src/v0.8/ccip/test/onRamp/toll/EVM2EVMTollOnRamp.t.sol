@@ -25,7 +25,6 @@ contract EVM2EVMTollOnRamp_constructor is EVM2EVMTollOnRampSetup {
     assertEq(1, s_onRamp.getExpectedNextSequenceNumber());
 
     // HealthChecker
-    assertEq(HEARTBEAT, s_onRamp.getMaxSecondsWithoutAFNHeartbeat());
     assertEq(address(s_afn), address(s_onRamp.getAFN()));
   }
 }

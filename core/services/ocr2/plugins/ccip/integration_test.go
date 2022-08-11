@@ -187,7 +187,6 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 		[]common.Address{feedAddress},            // Feeds
 		[]common.Address{},                       // allow list
 		afnSourceAddress,                         // AFN
-		big.NewInt(86400),                        //maxTimeWithoutAFNSignal 86400 seconds = one day
 		evm_2_evm_toll_onramp.BaseOnRampInterfaceOnRampConfig{
 			RelayingFeeJuels: 0,
 			MaxDataSize:      1e12,
@@ -225,9 +224,6 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 		destChainID, // dest chain id
 		sourceChainID,
 		afnDestAddress, // AFN address
-		// We set this above the current unix timestamp
-		// so we do not even have to send a heartbeat for it to be healthy.
-		big.NewInt(time.Now().Unix()*2),
 		blob_verifier.BlobVerifierInterfaceBlobVerifierConfig{},
 	)
 	require.NoError(t, err)
@@ -246,7 +242,6 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 		afnDestAddress,
 		[]common.Address{sourceLinkTokenAddress},
 		[]common.Address{destPoolAddress},
-		big.NewInt(time.Now().Unix()*2),
 	)
 	require.NoError(t, err)
 	offRamp, err := any_2_evm_toll_offramp.NewEVM2EVMTollOffRamp(offRampAddress, destChain)
@@ -286,7 +281,6 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 		[]common.Address{feedAddress},
 		[]common.Address{}, // allow list
 		afnSourceAddress,   // AFN
-		big.NewInt(86400),  //maxTimeWithoutAFNSignal 86400 seconds = one day
 		evm_2_evm_subscription_onramp.BaseOnRampInterfaceOnRampConfig{
 			RelayingFeeJuels: 0,
 			MaxDataSize:      1e12,
@@ -324,7 +318,7 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 		afnDestAddress,
 		[]common.Address{sourceLinkTokenAddress},
 		[]common.Address{destPoolAddress},
-		big.NewInt(time.Now().Unix()*2))
+	)
 	require.NoError(t, err)
 	subOffRamp, _ := any_2_evm_subscription_offramp.NewEVM2EVMSubscriptionOffRamp(subOffRampAddress, destChain)
 	_, err = destPool.SetOffRamp(destUser, subOffRampAddress, true)
@@ -1025,7 +1019,6 @@ chainID             = "%s"
 		}
 		tollCurrentSeqNum += n
 	})
-
 	/*
 		t.Run("eoa2eoa", func(t *testing.T) {
 			// Now let's send an EOA to EOA request

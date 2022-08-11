@@ -15,7 +15,7 @@ abstract contract BaseOffRampRouter is Any2EVMOffRampRouterInterface, OwnerIsCre
 
   constructor(BaseOffRampInterface[] memory offRamps) {
     s_offRampsList = offRamps;
-    for (uint256 i; i < offRamps.length; ++i) {
+    for (uint256 i = 0; i < offRamps.length; ++i) {
       s_offRamps[offRamps[i]] = OffRampDetails({listIndex: uint96(i), allowed: true});
     }
   }

@@ -26,7 +26,6 @@ contract EVM2EVMTollOffRamp_constructor is EVM2EVMTollOffRampSetup {
     assertTrue(address(pools[1]) == address(s_sourceTokens[1]));
 
     // HealthChecker
-    assertEq(HEARTBEAT, s_offRamp.getMaxSecondsWithoutAFNHeartbeat());
     assertEq(address(s_afn), address(s_offRamp.getAFN()));
   }
 }

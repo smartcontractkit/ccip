@@ -12,8 +12,7 @@ contract EVM2EVMSubscriptionOffRampHelper is EVM2EVMSubscriptionOffRamp {
     address onRampAddress,
     AFNInterface afn,
     IERC20[] memory sourceTokens,
-    PoolInterface[] memory pools,
-    uint256 maxTimeWithoutAFNSignal
+    PoolInterface[] memory pools
   )
     EVM2EVMSubscriptionOffRamp(
       sourceChainId,
@@ -23,8 +22,7 @@ contract EVM2EVMSubscriptionOffRampHelper is EVM2EVMSubscriptionOffRamp {
       onRampAddress,
       afn,
       sourceTokens,
-      pools,
-      maxTimeWithoutAFNSignal
+      pools
     )
   {}
 

@@ -233,25 +233,6 @@ func (client *Client) SetOwnerAndUsers(t *testing.T, ownerPrivateKey string, see
 	client.Users = users
 }
 
-func (client *Client) AssureHealth(t *testing.T) {
-	status, err := client.Afn.GetLastHeartbeat(&bind.CallOpts{
-		Pending: false,
-		Context: nil,
-	})
-	require.NoError(t, err)
-	timeNow := time.Now().Unix()
-
-	if timeNow > status.Timestamp.Int64()+defaultAFNTimeout {
-		client.logger.Infof("%s AFN not healthy, sending healthy vote...", helpers.ChainName(client.ChainId.Int64()))
-		tx, err := client.Afn.VoteGood(client.Owner, big.NewInt(status.Round.Int64()+1))
-		require.NoError(t, err)
-		WaitForMined(client.t, client.logger, client.Client, tx.Hash(), true)
-		client.logger.Infof("[HEALTH] %s set healthy for %d hours", helpers.ChainName(client.ChainId.Int64()), defaultAFNTimeout/60/60)
-	} else {
-		client.logger.Infof("[HEALTH] %s is already healthy for %d more hours\n", helpers.ChainName(client.ChainId.Int64()), (defaultAFNTimeout-(timeNow-status.Timestamp.Int64()))/60/60)
-	}
-}
-
 func (client *Client) ApproveLinkFrom(t *testing.T, user *bind.TransactOpts, approvedFor common.Address, amount *big.Int) {
 	client.logger.Warnf("Approving %d link for %s", amount.Int64(), approvedFor.Hex())
 	tx, err := client.LinkToken.Approve(user, approvedFor, amount)
@@ -932,13 +913,4 @@ func (client CCIPClient) AcceptOwnership(t *testing.T) {
 	tx, err = client.Dest.OffRamp.AcceptOwnership(client.Dest.Owner)
 	require.NoError(t, err)
 	WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
-}
-
-func (client CCIPClient) SetAFNTimeout(t *testing.T) {
-	tx, err := client.Source.OnRamp.SetMaxSecondsWithoutAFNHeartbeat(client.Source.Owner, big.NewInt(defaultAFNTimeout))
-	require.NoError(t, err)
-	WaitForMined(t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
-	tx, err = client.Dest.BlobVerifier.SetMaxSecondsWithoutAFNHeartbeat(client.Dest.Owner, big.NewInt(defaultAFNTimeout))
-	require.NoError(t, err)
-	WaitForMined(t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 }

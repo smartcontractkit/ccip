@@ -8,9 +8,8 @@ contract BlobVerifierHelper is BlobVerifier {
     uint256 chainId,
     uint256 sourceChainId,
     AFNInterface afn,
-    uint256 maxTimeWithoutAFNSignal,
     BlobVerifierConfig memory config
-  ) BlobVerifier(chainId, sourceChainId, afn, maxTimeWithoutAFNSignal, config) {}
+  ) BlobVerifier(chainId, sourceChainId, afn, config) {}
 
   /**
    * @dev Expose _report for tests

@@ -12,21 +12,8 @@ contract EVM2EVMTollOffRampHelper is EVM2EVMTollOffRamp {
     address onRampAddress,
     AFNInterface afn,
     IERC20[] memory sourceTokens,
-    PoolInterface[] memory pools,
-    uint256 maxTimeWithoutAFNSignal
-  )
-    EVM2EVMTollOffRamp(
-      sourceChainId,
-      chainId,
-      offRampConfig,
-      blobVerifier,
-      onRampAddress,
-      afn,
-      sourceTokens,
-      pools,
-      maxTimeWithoutAFNSignal
-    )
-  {}
+    PoolInterface[] memory pools
+  ) EVM2EVMTollOffRamp(sourceChainId, chainId, offRampConfig, blobVerifier, onRampAddress, afn, sourceTokens, pools) {}
 
   function report(bytes memory executableMessages) external {
     _report(bytes32(0), 0, executableMessages);

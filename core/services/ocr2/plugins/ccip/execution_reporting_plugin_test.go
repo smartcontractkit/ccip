@@ -5,7 +5,6 @@ import (
 	"math/big"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -94,12 +93,11 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	onRampAddress := common.HexToAddress("0x01BE23585060835E02B77ef475b0Cc51aA1e0709")
 	linkTokenSourceAddress := common.HexToAddress("0x01BE23585060835E02B77ef475b0Cc51aA1e0709")
 	blobVerifierAddress, _, _, err := blob_verifier_helper.DeployBlobVerifierHelper(
-		destUser,          // user
-		destChain,         // client
-		big.NewInt(1338),  // dest chain id
-		big.NewInt(1337),  // source chain id
-		afnAddress,        // AFN address
-		big.NewInt(86400), // max timeout without AFN signal  86400 seconds = one day
+		destUser,         // user
+		destChain,        // client
+		big.NewInt(1338), // dest chain id
+		big.NewInt(1337), // source chain id
+		afnAddress,       // AFN address
 		blob_verifier_helper.BlobVerifierInterfaceBlobVerifierConfig{
 			OnRamps:          []common.Address{onRampAddress},
 			MinSeqNrByOnRamp: []uint64{1},
@@ -120,7 +118,6 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 		afnAddress,
 		[]common.Address{linkTokenSourceAddress},
 		[]common.Address{destPoolAddress},
-		big.NewInt(time.Now().Unix()*2),
 	)
 	require.NoError(t, err)
 	offRamp, err := any_2_evm_toll_offramp.NewEVM2EVMTollOffRamp(offRampAddress, destChain)

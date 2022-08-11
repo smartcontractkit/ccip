@@ -31,21 +31,10 @@ contract EVM2EVMSubscriptionOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR
     // TODO token limiter contract
     // https://app.shortcut.com/chainlinklabs/story/41867/contract-scaffolding-aggregatetokenlimiter-contract
     IERC20[] memory sourceTokens,
-    PoolInterface[] memory pools,
-    uint256 maxTimeWithoutAFNSignal
+    PoolInterface[] memory pools
   )
     OCR2Base(true)
-    BaseOffRamp(
-      sourceChainId,
-      chainId,
-      offRampConfig,
-      blobVerifier,
-      onRampAddress,
-      afn,
-      sourceTokens,
-      pools,
-      maxTimeWithoutAFNSignal
-    )
+    BaseOffRamp(sourceChainId, chainId, offRampConfig, blobVerifier, onRampAddress, afn, sourceTokens, pools)
   {}
 
   function execute(CCIP.ExecutionReport memory report, bool manualExecution)

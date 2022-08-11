@@ -33,8 +33,7 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
       ON_RAMP_ADDRESS,
       s_afn,
       s_sourceTokens,
-      s_destPools,
-      HEARTBEAT
+      s_destPools
     );
 
     NativeTokenPool(address(s_destPools[0])).setOffRamp(BaseOffRampInterface(address(s_offRamp)), true);

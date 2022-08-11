@@ -35,8 +35,7 @@ contract BaseOffRampSetup is TokenSetup {
       ON_RAMP_ADDRESS,
       s_afn,
       s_sourceTokens,
-      pools,
-      2**10
+      pools
     );
 
     s_nativePool.setOffRamp(s_offRamp, true);
@@ -83,8 +82,7 @@ contract BaseOffRamp_constructor is BaseOffRampSetup {
       ON_RAMP_ADDRESS,
       s_afn,
       wrongTokens,
-      pools,
-      2**10
+      pools
     );
   }
 }

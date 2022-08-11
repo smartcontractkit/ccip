@@ -1,30 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../health/interfaces/AFNInterface.sol";
+import "../../interfaces/health/AFNInterface.sol";
 
 contract MockAFN is AFNInterface {
-  Heartbeat public s_lastHeartbeat;
   bool public s_badSignal;
 
-  constructor() {
-    s_lastHeartbeat = Heartbeat({round: 1, timestamp: block.timestamp, committeeVersion: 1});
-  }
-
-  function setTimestamp(uint64 newTimestamp) external {
-    s_lastHeartbeat.timestamp = newTimestamp;
-  }
-
-  function hasBadSignal() external view override returns (bool) {
+  function badSignalReceived() external view override returns (bool) {
     return s_badSignal;
   }
 
-  function getLastHeartbeat() external view override returns (Heartbeat memory) {
-    return s_lastHeartbeat;
-  }
-
-  function voteGood(
-    uint256 /*round*/
+  function voteToBlessRoots(
+    bytes32[] calldata /*rootsWithOrigin*/
   ) external override {
     s_badSignal = false;
   }
@@ -33,11 +20,31 @@ contract MockAFN is AFNInterface {
     s_badSignal = true;
   }
 
-  function recover() external override {
+  function recoverFromBadSignal() external override {
     s_badSignal = false;
   }
 
-  function setConfig(
+  function isBlessed(bytes32) external view override returns (bool) {
+    return !s_badSignal;
+  }
+
+  function getWeightThresholds() external override returns (uint256 blessing, uint256 badSignal) {}
+
+  function getParticipants() external override returns (address[] memory) {}
+
+  function getVotesToBlessRoot(bytes32 root) public view override returns (uint256) {}
+
+  function getWeightByParticipant(address) external view override returns (uint256) {}
+
+  function hasVotedToBlessRoot(address participant, bytes32 root) public view override returns (bool) {}
+
+  function getConfigVersion() external view override returns (uint256) {}
+
+  function getBadVotersAndVotes() external view override returns (address[] memory voters, uint256 votes) {}
+
+  function hasVotedBad(address participant) external view override returns (bool) {}
+
+  function setAFNConfig(
     address[] memory parties,
     uint256[] memory weights,
     uint256 goodQuorum,

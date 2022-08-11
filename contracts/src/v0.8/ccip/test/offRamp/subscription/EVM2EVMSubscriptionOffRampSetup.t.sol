@@ -46,8 +46,7 @@ contract EVM2EVMSubscriptionOffRampSetup is TokenSetup {
       ON_RAMP_ADDRESS,
       s_afn,
       s_sourceTokens,
-      s_destPools,
-      HEARTBEAT
+      s_destPools
     );
     BaseOffRampInterface[] memory offRamps = new BaseOffRampInterface[](1);
     offRamps[0] = s_offRamp;

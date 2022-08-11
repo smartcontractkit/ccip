@@ -2,7 +2,6 @@ package ccip
 
 import (
 	"context"
-	"math/big"
 	"sort"
 	"sync"
 	"time"
@@ -81,7 +80,7 @@ func isBlobVerifierDownNow(lggr logger.Logger, blobVerifier *blob_verifier.BlobV
 		lggr.Errorw("Unable to read offramp paused", "err", err)
 		return true
 	}
-	healthy, err := blobVerifier.IsHealthy(nil, big.NewInt(time.Now().Unix()))
+	healthy, err := blobVerifier.IsAFNHealthy(nil)
 	if err != nil {
 		lggr.Errorw("Unable to read offramp afn", "err", err)
 		return true

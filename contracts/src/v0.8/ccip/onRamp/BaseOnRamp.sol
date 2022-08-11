@@ -41,15 +41,9 @@ contract BaseOnRamp is
     AggregatorV2V3Interface[] memory feeds,
     address[] memory allowlist,
     AFNInterface afn,
-    uint256 maxTimeWithoutAFNSignal,
     OnRampConfig memory config,
     address router
-  )
-    HealthChecker(afn, maxTimeWithoutAFNSignal)
-    TokenPoolRegistry(tokens, pools)
-    PriceFeedRegistry(tokens, feeds)
-    AllowList(allowlist)
-  {
+  ) HealthChecker(afn) TokenPoolRegistry(tokens, pools) PriceFeedRegistry(tokens, feeds) AllowList(allowlist) {
     // TokenPoolRegistry does a check on tokens.length != pools.length
     CHAIN_ID = chainId;
     DESTINATION_CHAIN_ID = destinationChainId;
