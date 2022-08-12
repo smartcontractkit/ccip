@@ -154,4 +154,11 @@ contract BlobVerifier_merkleRoot is BlobVerifierSetup {
 
     assertEq(s_blobVerifier.merkleRoot(leaves, proofs, 7), finalResult);
   }
+
+  function testMerkleRootSingleLeafSuccess() public {
+    bytes32[] memory leaves = new bytes32[](1);
+    leaves[0] = "root";
+    bytes32[] memory proofs = new bytes32[](0);
+    assertEq(s_blobVerifier.merkleRoot(leaves, proofs, 0), leaves[0]);
+  }
 }

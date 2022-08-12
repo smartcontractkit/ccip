@@ -309,3 +309,25 @@ contract EVM2EVMTollOffRamp_executeSingleMessage is EVM2EVMTollOffRampSetup {
     s_offRamp.executeSingleMessage(_convertTollToGeneralMessage(messages[0]));
   }
 }
+
+/// @notice #_report
+contract EVM2EVMTollOffRamp__report is EVM2EVMTollOffRampSetup {
+  Any2EVMOffRampRouterInterface s_router;
+
+  function setUp() public virtual override {
+    EVM2EVMTollOffRampSetup.setUp();
+    BaseOffRampInterface[] memory offRamps = new BaseOffRampInterface[](1);
+    offRamps[0] = s_offRamp;
+    s_router = new Any2EVMTollOffRampRouter(offRamps);
+    s_offRamp.setRouter(s_router);
+  }
+
+  // Asserts that execute is called with the proper arguments.
+  function testSuccess() public {
+    CCIP.ExecutionReport memory report = _generateReportFromMessages(_generateBasicMessages());
+
+    vm.expectCall(address(s_offRamp), abi.encodeCall(s_offRamp.execute, (report, false)));
+
+    s_offRamp.report(abi.encode(report));
+  }
+}

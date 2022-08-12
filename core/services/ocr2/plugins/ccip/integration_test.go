@@ -974,7 +974,7 @@ chainID             = "%s"
 		require.NoError(t, err)
 
 		// Fund 1e17 juels on the destination for execution fees.
-		subscriptionBalance := big.NewInt(1e17)
+		subscriptionBalance := big.NewInt(0).Mul(big.NewInt(5), big.NewInt(1e18))
 		_, err = ccipContracts.destLinkToken.Approve(ccipContracts.destUser, ccipContracts.subOffRampRouter.Address(), subscriptionBalance)
 		require.NoError(t, err)
 		_, err = ccipContracts.subOffRampRouter.CreateSubscription(ccipContracts.destUser, any_2_evm_subscription_offramp_router.SubscriptionInterfaceOffRampSubscription{

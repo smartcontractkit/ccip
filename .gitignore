@@ -66,3 +66,4 @@ tmp-manifest-*.yaml
 
 cache
 core/services/ocr2/plugins/ccip/transactions.rlp
+lcov.info

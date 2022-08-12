@@ -145,8 +145,7 @@ contract EVM2EVMSubscriptionOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR
     uint40, /*epochAndRound*/
     bytes memory report
   ) internal override {
-    CCIP.ExecutionReport memory executionReport = abi.decode(report, (CCIP.ExecutionReport));
-    this.execute(executionReport, true);
+    this.execute(abi.decode(report, (CCIP.ExecutionReport)), false);
   }
 
   function _beforeSetConfig(uint8 _threshold, bytes memory _onchainConfig) internal override {}

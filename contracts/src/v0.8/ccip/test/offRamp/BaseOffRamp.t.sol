@@ -113,6 +113,19 @@ contract BaseOffRamp_getBlobVerifier is BaseOffRampSetup {
   }
 }
 
+/// @notice #setBlobVerifier
+contract BaseOffRamp_setBlobVerifier is BaseOffRampSetup {
+  // Success
+  function testSuccess() public {
+    assertEq(address(s_mockBlobVerifier), address(s_offRamp.getBlobVerifier()));
+
+    MockBlobVerifier blobVerifier = new MockBlobVerifier();
+    s_offRamp.setBlobVerifier(blobVerifier);
+
+    assertEq(address(blobVerifier), address(s_offRamp.getBlobVerifier()));
+  }
+}
+
 /// @notice #getConfig
 contract BaseOffRamp_getConfig is BaseOffRampSetup {
   // Success
@@ -235,5 +248,15 @@ contract BaseOffRamp__getPool is BaseOffRampSetup {
 
     vm.expectRevert(abi.encodeWithSelector(BaseOffRampInterface.UnsupportedToken.selector, wrongToken));
     s_offRamp.getPool_helper(wrongToken);
+  }
+}
+
+/// @notice #execute
+contract BaseOffRamp_execute is BaseOffRampSetup {
+  // Reverts
+  function testReverts() public {
+    vm.expectRevert();
+    CCIP.ExecutionReport memory report;
+    s_offRamp.execute(report, false);
   }
 }

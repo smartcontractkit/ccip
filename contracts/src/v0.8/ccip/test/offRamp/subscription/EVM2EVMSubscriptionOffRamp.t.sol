@@ -391,3 +391,15 @@ contract EVM2EVMSubscriptionOffRamp_execute is EVM2EVMSubscriptionOffRampSetup {
     s_offRamp.execute(report, false);
   }
 }
+
+/// @notice #_report
+contract EVM2EVMSubscriptionOffRamp__report is EVM2EVMSubscriptionOffRampSetup {
+  // Asserts that execute is called with the proper arguments.
+  function testSuccess() public {
+    CCIP.ExecutionReport memory report = _generateReportFromMessages(_generateBasicMessages());
+
+    vm.expectCall(address(s_offRamp), abi.encodeCall(s_offRamp.execute, (report, false)));
+
+    s_offRamp.report(abi.encode(report));
+  }
+}
