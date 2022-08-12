@@ -59,6 +59,7 @@ type Feature struct {
 	FeedsManager *bool
 	LogPoller    *bool
 	UICSAKeys    *bool
+	CCIP         *bool
 }
 
 type Database struct {

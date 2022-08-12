@@ -187,6 +187,7 @@ func TestConfig_Marshal(t *testing.T) {
 		FeedsManager: ptr(true),
 		LogPoller:    ptr(true),
 		UICSAKeys:    ptr(true),
+		CCIP:         ptr(true),
 	}
 	full.Database = &config.Database{
 		DefaultIdleInTxSessionTimeout: models.MustNewDuration(time.Minute),
@@ -530,6 +531,7 @@ ShutdownGracePeriod = '10s'
 FeedsManager = true
 LogPoller = true
 UICSAKeys = true
+CCIP = true
 `},
 		{"Database", Config{Core: config.Core{Database: full.Database}}, `
 [Database]
