@@ -13,9 +13,9 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry {
   using Address for address;
 
   // Chain ID of the source chain
-  uint256 public immutable SOURCE_CHAIN_ID;
+  uint256 public immutable i_sourceChainId;
   // Chain ID of this chain
-  uint256 public immutable CHAIN_ID;
+  uint256 public immutable i_chainId;
 
   // The router through which all transactions will be executed
   Any2EVMOffRampRouterInterface public s_router;
@@ -44,8 +44,8 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry {
     PoolInterface[] memory pools
   ) HealthChecker(afn) TokenPoolRegistry(sourceTokens, pools) {
     // TokenPoolRegistry does a check on tokens.length != pools.length
-    SOURCE_CHAIN_ID = sourceChainId;
-    CHAIN_ID = chainId;
+    i_sourceChainId = sourceChainId;
+    i_chainId = chainId;
     s_config = offRampConfig;
     s_blobVerifier = blobVerifier;
   }
@@ -90,15 +90,15 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry {
     uint256 outerProofFlagBits
   ) internal returns (uint256, uint256) {
     uint256 gasBegin = gasleft();
-    uint256 timestamp_relayed = s_blobVerifier.verify(
+    uint256 timestampRelayed = s_blobVerifier.verify(
       hashedLeaves,
       innerProofs,
       innerProofFlagBits,
       outerProofs,
       outerProofFlagBits
     );
-    if (timestamp_relayed <= 0) revert RootNotRelayed();
-    return (timestamp_relayed, gasBegin - gasleft());
+    if (timestampRelayed <= 0) revert RootNotRelayed();
+    return (timestampRelayed, gasBegin - gasleft());
   }
 
   /**

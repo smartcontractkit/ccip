@@ -17,8 +17,8 @@ contract EVM2EVMSubscriptionOnRamp_constructor is EVM2EVMSubscriptionOnRampSetup
     assertEq(MAX_DATA_SIZE, s_onRamp.getConfig().maxDataSize);
     assertEq(MAX_TOKENS_LENGTH, s_onRamp.getConfig().maxTokensLength);
 
-    assertEq(SOURCE_CHAIN_ID, s_onRamp.CHAIN_ID());
-    assertEq(DEST_CHAIN_ID, s_onRamp.DESTINATION_CHAIN_ID());
+    assertEq(SOURCE_CHAIN_ID, s_onRamp.i_chainId());
+    assertEq(DEST_CHAIN_ID, s_onRamp.i_destinationChainId());
 
     assertEq(address(s_onRampRouter), s_onRamp.getRouter());
     assertEq(1, s_onRamp.getExpectedNextSequenceNumber());

@@ -19,9 +19,9 @@ contract BaseOnRamp is
   using SafeERC20 for IERC20;
 
   // Chain ID of the source chain (where this contract is deployed)
-  uint256 public immutable CHAIN_ID;
+  uint256 public immutable i_chainId;
   // Chain ID of the destination chain (where this contract sends messages)
-  uint256 public immutable DESTINATION_CHAIN_ID;
+  uint256 public immutable i_destinationChainId;
 
   // The last used sequence number. This is zero in the case where no
   // messages has been sent yet. 0 is not a valid sequence number for any
@@ -45,8 +45,8 @@ contract BaseOnRamp is
     address router
   ) HealthChecker(afn) TokenPoolRegistry(tokens, pools) PriceFeedRegistry(tokens, feeds) AllowList(allowlist) {
     // TokenPoolRegistry does a check on tokens.length != pools.length
-    CHAIN_ID = chainId;
-    DESTINATION_CHAIN_ID = destinationChainId;
+    i_chainId = chainId;
+    i_destinationChainId = destinationChainId;
     s_config = config;
     s_router = router;
     s_sequenceNumber = 0;

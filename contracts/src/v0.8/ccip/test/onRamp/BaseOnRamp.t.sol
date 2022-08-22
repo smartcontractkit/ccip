@@ -43,8 +43,8 @@ contract BaseOnrampSetup is TokenSetup {
 contract BaseOnramp_constructor is BaseOnrampSetup {
   // Success
   function testSuccess() public {
-    assertEq(SOURCE_CHAIN_ID, s_onRamp.CHAIN_ID());
-    assertEq(DEST_CHAIN_ID, s_onRamp.DESTINATION_CHAIN_ID());
+    assertEq(SOURCE_CHAIN_ID, s_onRamp.i_chainId());
+    assertEq(DEST_CHAIN_ID, s_onRamp.i_destinationChainId());
     assertEq(s_onRampRouter, s_onRamp.getRouter());
     assertEq(1, s_onRamp.getExpectedNextSequenceNumber());
     assertSameConfig(onRampConfig(), s_onRamp.getConfig());

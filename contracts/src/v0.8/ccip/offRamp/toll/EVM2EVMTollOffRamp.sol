@@ -129,7 +129,7 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
   }
 
   function _isWellFormed(CCIP.EVM2EVMTollMessage memory message) private view {
-    if (message.sourceChainId != SOURCE_CHAIN_ID) revert InvalidSourceChain(message.sourceChainId);
+    if (message.sourceChainId != i_sourceChainId) revert InvalidSourceChain(message.sourceChainId);
     if (message.tokens.length > uint256(s_config.maxTokensLength) || message.tokens.length != message.amounts.length) {
       revert UnsupportedNumberOfTokens(message.sequenceNumber);
     }

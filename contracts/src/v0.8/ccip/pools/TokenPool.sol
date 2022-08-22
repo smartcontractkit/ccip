@@ -14,7 +14,7 @@ import "../interfaces/offRamp/Any2EVMOffRampInterface.sol";
 abstract contract TokenPool is PoolInterface, OwnerIsCreator, Pausable {
   using TokenLimits for TokenLimits.TokenBucket;
 
-  IERC20 internal immutable s_token;
+  IERC20 internal immutable i_token;
   mapping(BaseOnRampInterface => bool) internal s_onRamps;
   mapping(BaseOffRampInterface => bool) internal s_offRamps;
   TokenLimits.TokenBucket internal s_lockOrBurnBucket;
@@ -27,7 +27,7 @@ abstract contract TokenPool is PoolInterface, OwnerIsCreator, Pausable {
     BucketConfig memory lockOrBurnConfig,
     BucketConfig memory releaseOrMintConfig
   ) {
-    s_token = token;
+    i_token = token;
     s_lockOrBurnBucket = TokenLimits.constructTokenBucket(lockOrBurnConfig.rate, lockOrBurnConfig.capacity, true);
     s_releaseOrMintBucket = TokenLimits.constructTokenBucket(
       releaseOrMintConfig.rate,
@@ -141,7 +141,7 @@ abstract contract TokenPool is PoolInterface, OwnerIsCreator, Pausable {
    * @return token
    */
   function getToken() public view override returns (IERC20 token) {
-    return s_token;
+    return i_token;
   }
 
   /**

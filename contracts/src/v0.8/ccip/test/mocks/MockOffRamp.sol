@@ -12,9 +12,9 @@ contract MockOffRamp is BaseOffRampInterface {
     recipient.ccipReceive(message);
   }
 
-  function SOURCE_CHAIN_ID() external view returns (uint256) {}
+  function i_sourceChainId() external view returns (uint256) {}
 
-  function CHAIN_ID() external view returns (uint256) {}
+  function i_chainId() external view returns (uint256) {}
 
   function setRouter(Any2EVMOffRampRouterInterface router) external {}
 

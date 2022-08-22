@@ -35,10 +35,10 @@ contract E2E_toll is EVM2EVMTollOnRampSetup, BlobVerifierSetup, EVM2EVMTollOffRa
 
     // Asserts that the tokens have been sent and the fee has been paid.
     assertEq(
-      balance0Pre - messages.length * (TOKEN_AMOUNT_0 + RELAYING_FEE_JUELS + EXECUTION_FEE_AMOUNT),
+      balance0Pre - messages.length * (i_tokenAmount0 + RELAYING_FEE_JUELS + EXECUTION_FEE_AMOUNT),
       s_sourceTokens[0].balanceOf(OWNER)
     );
-    assertEq(balance1Pre - messages.length * TOKEN_AMOUNT_1, s_sourceTokens[1].balanceOf(OWNER));
+    assertEq(balance1Pre - messages.length * i_tokenAmount1, s_sourceTokens[1].balanceOf(OWNER));
 
     bytes32[] memory hashedMessages = new bytes32[](3);
     hashedMessages[0] = keccak256(bytes.concat(hex"00", abi.encode(messages[0])));
@@ -87,8 +87,8 @@ contract E2E_toll is EVM2EVMTollOnRampSetup, BlobVerifierSetup, EVM2EVMTollOffRa
     CCIP.EVM2AnyTollMessage memory message = _generateTokenMessage();
     message.feeTokenAmount = RELAYING_FEE_JUELS + EXECUTION_FEE_AMOUNT;
 
-    s_sourceTokens[0].approve(address(s_onRampRouter), TOKEN_AMOUNT_0 + RELAYING_FEE_JUELS + EXECUTION_FEE_AMOUNT);
-    s_sourceTokens[1].approve(address(s_onRampRouter), TOKEN_AMOUNT_1);
+    s_sourceTokens[0].approve(address(s_onRampRouter), i_tokenAmount0 + RELAYING_FEE_JUELS + EXECUTION_FEE_AMOUNT);
+    s_sourceTokens[1].approve(address(s_onRampRouter), i_tokenAmount1);
 
     message.receiver = address(s_receiver);
     CCIP.EVM2EVMTollEvent memory tollEvent = _messageToEvent(message, expectedSeqNum);

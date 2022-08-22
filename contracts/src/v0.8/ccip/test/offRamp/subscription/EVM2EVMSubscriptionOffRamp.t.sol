@@ -14,8 +14,8 @@ contract EVM2EVMSubscriptionOffRamp_constructor is EVM2EVMSubscriptionOffRampSet
     assertEq(OWNER, s_offRamp.owner());
 
     // OffRamp config
-    assertEq(SOURCE_CHAIN_ID, s_offRamp.SOURCE_CHAIN_ID());
-    assertEq(DEST_CHAIN_ID, s_offRamp.CHAIN_ID());
+    assertEq(SOURCE_CHAIN_ID, s_offRamp.i_sourceChainId());
+    assertEq(DEST_CHAIN_ID, s_offRamp.i_chainId());
     assertEq(address(s_afn), address(s_offRamp.getAFN()));
     IERC20[] memory pools = s_offRamp.getPoolTokens();
     assertEq(pools.length, s_sourceTokens.length);

@@ -12,14 +12,14 @@ contract EVM2EVMSubscriptionOnRampSetup is TokenSetup {
   event SubscriptionFunded(address indexed sender, uint256 amount);
   event SubscriptionUnfunded(address indexed sender, uint256 amount);
 
-  EVM2AnySubscriptionOnRampRouter public s_onRampRouter;
-  EVM2EVMSubscriptionOnRamp public s_onRamp;
+  EVM2AnySubscriptionOnRampRouter internal s_onRampRouter;
+  EVM2EVMSubscriptionOnRamp internal s_onRamp;
 
-  uint256 immutable TOKEN_AMOUNT_0 = 9;
-  uint256 immutable TOKEN_AMOUNT_1 = 7;
+  uint256 internal immutable i_tokenAmount0 = 9;
+  uint256 internal immutable i_tokenAmount1 = 7;
 
-  IERC20 s_sourceFeeToken;
-  address[] public s_allowList;
+  IERC20 internal s_sourceFeeToken;
+  address[] internal s_allowList;
 
   function setUp() public virtual override {
     TokenSetup.setUp();
@@ -53,8 +53,8 @@ contract EVM2EVMSubscriptionOnRampSetup is TokenSetup {
 
   function _generateTokenMessage() public view returns (CCIP.EVM2AnySubscriptionMessage memory) {
     uint256[] memory amounts = new uint256[](2);
-    amounts[0] = TOKEN_AMOUNT_0;
-    amounts[1] = TOKEN_AMOUNT_1;
+    amounts[0] = i_tokenAmount0;
+    amounts[1] = i_tokenAmount1;
     IERC20[] memory tokens = s_sourceTokens;
     return
       CCIP.EVM2AnySubscriptionMessage({

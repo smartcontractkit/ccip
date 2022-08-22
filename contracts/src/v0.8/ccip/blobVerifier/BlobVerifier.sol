@@ -15,9 +15,9 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
   string public constant override typeAndVersion = "BlobVerifier 1.0.0";
 
   // Chain ID of this chain
-  uint256 public immutable CHAIN_ID;
+  uint256 public immutable i_chainId;
   // Chain ID of the source chain
-  uint256 public immutable SOURCE_CHAIN_ID;
+  uint256 public immutable i_sourceChainId;
   // Offchain leaf domain separator
   bytes1 private constant LEAF_DOMAIN_SEPARATOR = 0x00;
   // Internal domain separator used in proofs
@@ -49,8 +49,8 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
     AFNInterface afn,
     BlobVerifierConfig memory config
   ) OCR2Base(true) HealthChecker(afn) {
-    CHAIN_ID = chainId;
-    SOURCE_CHAIN_ID = sourceChainId;
+    i_chainId = chainId;
+    i_sourceChainId = sourceChainId;
     s_config = config;
     if (s_config.onRamps.length != s_config.minSeqNrByOnRamp.length) {
       revert InvalidConfiguration();

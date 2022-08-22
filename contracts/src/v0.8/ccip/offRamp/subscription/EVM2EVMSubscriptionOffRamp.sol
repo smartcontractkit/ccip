@@ -127,7 +127,7 @@ contract EVM2EVMSubscriptionOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR
   }
 
   function _isWellFormed(CCIP.EVM2EVMSubscriptionMessage memory message) private view {
-    if (message.sourceChainId != SOURCE_CHAIN_ID) revert InvalidSourceChain(message.sourceChainId);
+    if (message.sourceChainId != i_sourceChainId) revert InvalidSourceChain(message.sourceChainId);
     if (message.tokens.length > uint256(s_config.maxTokensLength) || message.tokens.length != message.amounts.length) {
       revert UnsupportedNumberOfTokens(message.sequenceNumber);
     }

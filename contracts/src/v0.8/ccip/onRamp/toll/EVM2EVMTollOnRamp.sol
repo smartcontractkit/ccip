@@ -41,7 +41,7 @@ contract EVM2EVMTollOnRamp is Any2EVMTollOnRampInterface, BaseOnRamp, TypeAndVer
     // we need the next available sequence number so we increment before we use the value
     CCIP.EVM2EVMTollEvent memory tollEvent = CCIP.EVM2EVMTollEvent({
       sequenceNumber: ++s_sequenceNumber,
-      sourceChainId: CHAIN_ID,
+      sourceChainId: i_chainId,
       sender: originalSender,
       receiver: message.receiver,
       data: message.data,

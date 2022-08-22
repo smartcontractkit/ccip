@@ -16,12 +16,12 @@ contract TollSenderDapp is TypeAndVersionInterface {
   string public constant override typeAndVersion = "TollSenderDapp 1.0.0";
 
   // On ramp contract responsible for interacting with the DON.
-  Any2EVMTollOnRampRouterInterface public immutable ON_RAMP_ROUTER;
-  uint256 public immutable DESTINATION_CHAIN_ID;
+  Any2EVMTollOnRampRouterInterface public immutable i_onRampRouter;
+  uint256 public immutable i_destinationChainId;
   // Corresponding contract on the destination chain responsible for receiving the message
   // and enabling the EOA on the destination chain to access the tokens that are sent.
   // For this scenario, it would be the address of a deployed EOASingleTokenReceiver.
-  address public immutable DESTINATION_CONTRACT;
+  address public immutable i_destinationContract;
 
   error InvalidDestinationAddress(address invalidAddress);
 
@@ -30,9 +30,9 @@ contract TollSenderDapp is TypeAndVersionInterface {
     uint256 destinationChainId,
     address destinationContract
   ) {
-    ON_RAMP_ROUTER = onRampRouter;
-    DESTINATION_CHAIN_ID = destinationChainId;
-    DESTINATION_CONTRACT = destinationContract;
+    i_onRampRouter = onRampRouter;
+    i_destinationChainId = destinationChainId;
+    i_destinationContract = destinationContract;
   }
 
   /**
@@ -47,15 +47,15 @@ contract TollSenderDapp is TypeAndVersionInterface {
     if (destinationAddress == address(0)) revert InvalidDestinationAddress(destinationAddress);
     for (uint256 i = 0; i < tokens.length; ++i) {
       tokens[i].safeTransferFrom(msg.sender, address(this), amounts[i]);
-      tokens[i].approve(address(ON_RAMP_ROUTER), amounts[i]);
+      tokens[i].approve(address(i_onRampRouter), amounts[i]);
     }
     // `data` format:
     //  - EOA sender address
     //  - EOA destination address
-    sequenceNumber = ON_RAMP_ROUTER.ccipSend(
-      DESTINATION_CHAIN_ID,
+    sequenceNumber = i_onRampRouter.ccipSend(
+      i_destinationChainId,
       CCIP.EVM2AnyTollMessage({
-        receiver: DESTINATION_CONTRACT,
+        receiver: i_destinationContract,
         data: abi.encode(msg.sender, destinationAddress),
         tokens: tokens,
         amounts: amounts,

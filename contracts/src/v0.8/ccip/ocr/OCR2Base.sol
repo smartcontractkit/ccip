@@ -15,10 +15,10 @@ import "./OCR2Abstract.sol";
  * @dev THIS CONTRACT HAS NOT GONE THROUGH ANY SECURITY REVIEW. DO NOT USE IN PROD
  */
 abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
-  bool internal immutable UNIQUE_REPORTS;
+  bool internal immutable i_uniqueReports;
 
   constructor(bool uniqueReports) {
-    UNIQUE_REPORTS = uniqueReports;
+    i_uniqueReports = uniqueReports;
   }
 
   uint256 private constant maxUint32 = (1 << 32) - 1;
@@ -329,7 +329,7 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
       requireExpectedMsgDataLength(report, rs, ss);
 
       uint256 expectedNumSignatures;
-      if (UNIQUE_REPORTS) {
+      if (i_uniqueReports) {
         expectedNumSignatures = (configInfo.n + configInfo.f) / 2 + 1;
       } else {
         expectedNumSignatures = configInfo.f + 1;

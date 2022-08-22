@@ -53,7 +53,7 @@ contract EVM2EVMSubscriptionOnRamp is Any2EVMSubscriptionOnRampInterface, BaseOn
     // we need the next nonce so we increment before we use the value
     CCIP.EVM2EVMSubscriptionEvent memory subscriptionEvent = CCIP.EVM2EVMSubscriptionEvent({
       sequenceNumber: ++s_sequenceNumber,
-      sourceChainId: CHAIN_ID,
+      sourceChainId: i_chainId,
       sender: originalSender,
       receiver: message.receiver,
       nonce: ++s_receiverToNonce[message.receiver],

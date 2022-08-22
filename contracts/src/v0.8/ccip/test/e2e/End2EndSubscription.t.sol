@@ -31,8 +31,8 @@ contract E2E_subscription is EVM2EVMSubscriptionOnRampSetup, BlobVerifierSetup, 
     messages[2] = parseEventToDestChainMessage(sendRequest(_generateTokenMessage(), 3));
 
     // Asserts that the tokens have been sent and the fee has been paid.
-    assertEq(balance0Pre - messages.length * TOKEN_AMOUNT_0, s_sourceTokens[0].balanceOf(OWNER));
-    assertEq(balance1Pre - messages.length * TOKEN_AMOUNT_1, s_sourceTokens[1].balanceOf(OWNER));
+    assertEq(balance0Pre - messages.length * i_tokenAmount0, s_sourceTokens[0].balanceOf(OWNER));
+    assertEq(balance1Pre - messages.length * i_tokenAmount1, s_sourceTokens[1].balanceOf(OWNER));
     assertEq(subscriptionBalance - messages.length * s_onRampRouter.getFee(), s_onRampRouter.getBalance(OWNER));
 
     _relayAndExecute(messages);
@@ -100,8 +100,8 @@ contract E2E_subscription is EVM2EVMSubscriptionOnRampSetup, BlobVerifierSetup, 
     public
     returns (CCIP.EVM2EVMSubscriptionEvent memory)
   {
-    s_sourceTokens[0].approve(address(s_onRampRouter), TOKEN_AMOUNT_0);
-    s_sourceTokens[1].approve(address(s_onRampRouter), TOKEN_AMOUNT_1);
+    s_sourceTokens[0].approve(address(s_onRampRouter), i_tokenAmount0);
+    s_sourceTokens[1].approve(address(s_onRampRouter), i_tokenAmount1);
 
     message.receiver = address(s_receiver);
     uint64 expectedNonce = expectedSeqNum;

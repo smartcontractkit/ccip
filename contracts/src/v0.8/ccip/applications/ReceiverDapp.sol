@@ -14,14 +14,14 @@ contract ReceiverDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterfac
 
   string public constant override typeAndVersion = "ReceiverDapp 1.0.0";
 
-  Any2EVMOffRampRouterInterface public immutable ROUTER;
+  Any2EVMOffRampRouterInterface public immutable i_router;
 
   address s_manager;
 
   error InvalidDeliverer(address deliverer);
 
   constructor(Any2EVMOffRampRouterInterface router) {
-    ROUTER = router;
+    i_router = router;
     s_manager = msg.sender;
   }
 
@@ -60,7 +60,7 @@ contract ReceiverDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterfac
    * @dev only calls from the set router are accepted.
    */
   modifier onlyRouter() {
-    if (msg.sender != address(ROUTER)) revert InvalidDeliverer(msg.sender);
+    if (msg.sender != address(i_router)) revert InvalidDeliverer(msg.sender);
     _;
   }
 }

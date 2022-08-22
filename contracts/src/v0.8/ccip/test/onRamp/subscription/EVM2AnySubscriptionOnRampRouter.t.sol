@@ -35,8 +35,8 @@ contract EVM2AnySubscriptionOnRampRouter_ccipSend is EVM2EVMSubscriptionOnRampSe
     uint256 userBalance0Before = s_sourceTokens[0].balanceOf(OWNER);
     uint256 userBalance1Before = s_sourceTokens[1].balanceOf(OWNER);
 
-    s_sourceTokens[0].approve(address(s_onRampRouter), TOKEN_AMOUNT_0);
-    s_sourceTokens[1].approve(address(s_onRampRouter), TOKEN_AMOUNT_1);
+    s_sourceTokens[0].approve(address(s_onRampRouter), i_tokenAmount0);
+    s_sourceTokens[1].approve(address(s_onRampRouter), i_tokenAmount1);
     CCIP.EVM2AnySubscriptionMessage memory message = _generateTokenMessage();
 
     vm.expectEmit(false, false, false, true);
@@ -47,8 +47,8 @@ contract EVM2AnySubscriptionOnRampRouter_ccipSend is EVM2EVMSubscriptionOnRampSe
     assertEq(userBalance0Before - message.amounts[0], s_sourceTokens[0].balanceOf(OWNER));
     assertEq(userBalance1Before - message.amounts[1], s_sourceTokens[1].balanceOf(OWNER));
     // Asserts the tokens are all sent to the proper pools
-    assertEq(poolBalance0Before + TOKEN_AMOUNT_0, s_sourceTokens[0].balanceOf(address(s_sourcePools[0])));
-    assertEq(poolBalance1Before + TOKEN_AMOUNT_1, s_sourceTokens[1].balanceOf(address(s_sourcePools[1])));
+    assertEq(poolBalance0Before + i_tokenAmount0, s_sourceTokens[0].balanceOf(address(s_sourcePools[0])));
+    assertEq(poolBalance1Before + i_tokenAmount1, s_sourceTokens[1].balanceOf(address(s_sourcePools[1])));
   }
 
   function testChargeSubscriptionFundingSuccess() public {
@@ -201,22 +201,22 @@ contract EVM2AnySubscriptionOnRampRouter_fundSubscription is EVM2EVMSubscription
 
 /// @notice #unfundSubscription
 contract EVM2AnySubscriptionOnRampRouter_unfundSubscription is EVM2EVMSubscriptionOnRampSetup {
-  uint256 immutable FUNDING_AMOUNT = 500;
+  uint256 internal immutable i_fundingAmount = 500;
 
   function setUp() public virtual override {
     EVM2EVMSubscriptionOnRampSetup.setUp();
-    s_onRampRouter.fundSubscription(FUNDING_AMOUNT);
+    s_onRampRouter.fundSubscription(i_fundingAmount);
   }
 
   // Success
 
   function testSuccess() public {
-    assertEq(FUNDING_AMOUNT, s_onRampRouter.getBalance(OWNER));
+    assertEq(i_fundingAmount, s_onRampRouter.getBalance(OWNER));
 
     vm.expectEmit(false, false, false, true);
-    emit SubscriptionUnfunded(OWNER, FUNDING_AMOUNT);
+    emit SubscriptionUnfunded(OWNER, i_fundingAmount);
 
-    s_onRampRouter.unfundSubscription(FUNDING_AMOUNT);
+    s_onRampRouter.unfundSubscription(i_fundingAmount);
 
     assertEq(0, s_onRampRouter.getBalance(OWNER));
   }
@@ -224,13 +224,13 @@ contract EVM2AnySubscriptionOnRampRouter_unfundSubscription is EVM2EVMSubscripti
   // Reverts
 
   function testFundingTooLowReverts() public {
-    assertEq(FUNDING_AMOUNT, s_onRampRouter.getBalance(OWNER));
+    assertEq(i_fundingAmount, s_onRampRouter.getBalance(OWNER));
 
     vm.expectRevert(stdError.arithmeticError);
 
-    s_onRampRouter.unfundSubscription(FUNDING_AMOUNT * 2);
+    s_onRampRouter.unfundSubscription(i_fundingAmount * 2);
 
-    assertEq(FUNDING_AMOUNT, s_onRampRouter.getBalance(OWNER));
+    assertEq(i_fundingAmount, s_onRampRouter.getBalance(OWNER));
   }
 }
 

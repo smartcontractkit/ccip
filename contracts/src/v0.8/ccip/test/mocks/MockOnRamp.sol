@@ -4,10 +4,10 @@ pragma solidity 0.8.15;
 import "../../interfaces/onRamp/Any2EVMTollOnRampInterface.sol";
 
 contract MockOnRamp is Any2EVMTollOnRampInterface {
-  uint256 public immutable CHAIN_ID;
-  PoolInterface public immutable POOL;
-  uint256 public immutable DESTINATION_CHAIN_ID;
-  uint256 public immutable FEE;
+  uint256 public immutable i_chainId;
+  PoolInterface public immutable i_pool;
+  uint256 public immutable i_destinationChainId;
+  uint256 public immutable i_fee;
 
   CCIP.EVM2AnyTollMessage public mp;
 
@@ -20,10 +20,10 @@ contract MockOnRamp is Any2EVMTollOnRampInterface {
     uint256 destinationChainId,
     uint256 fee
   ) {
-    CHAIN_ID = chainId;
-    POOL = pool;
-    DESTINATION_CHAIN_ID = destinationChainId;
-    FEE = fee;
+    i_chainId = chainId;
+    i_pool = pool;
+    i_destinationChainId = destinationChainId;
+    i_fee = fee;
   }
 
   function forwardFromRouter(CCIP.EVM2AnyTollMessage memory message, address) external override returns (uint64) {
@@ -49,7 +49,7 @@ contract MockOnRamp is Any2EVMTollOnRampInterface {
 
   function getRequiredFee(IERC20 token) external override returns (uint256) {
     emit GetRequiredFee(token);
-    return FEE;
+    return i_fee;
   }
 
   function getExpectedNextSequenceNumber() external pure returns (uint64) {
@@ -57,7 +57,7 @@ contract MockOnRamp is Any2EVMTollOnRampInterface {
   }
 
   function getTokenPool(IERC20) external view returns (PoolInterface) {
-    return POOL;
+    return i_pool;
   }
 
   function setRouter(address) external override {}

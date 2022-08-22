@@ -9,8 +9,8 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
   // Duplicate event of the CCIPSendRequested in the TollOnRampInterface
   event CCIPSendRequested(CCIP.EVM2EVMTollEvent message);
 
-  uint256 immutable TOKEN_AMOUNT_0 = 9;
-  uint256 immutable TOKEN_AMOUNT_1 = 7;
+  uint256 internal immutable i_tokenAmount0 = 9;
+  uint256 internal immutable i_tokenAmount1 = 7;
 
   address[] internal s_allowList;
 
@@ -46,8 +46,8 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
 
   function _generateTokenMessage() public view returns (CCIP.EVM2AnyTollMessage memory) {
     uint256[] memory amounts = new uint256[](2);
-    amounts[0] = TOKEN_AMOUNT_0;
-    amounts[1] = TOKEN_AMOUNT_1;
+    amounts[0] = i_tokenAmount0;
+    amounts[1] = i_tokenAmount1;
     IERC20[] memory tokens = s_sourceTokens;
     return
       CCIP.EVM2AnyTollMessage({

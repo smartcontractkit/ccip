@@ -61,8 +61,8 @@ contract BaseOffRamp_constructor is BaseOffRampSetup {
 
     assertEq(address(s_mockBlobVerifier), address(s_offRamp.getBlobVerifier()));
 
-    assertEq(SOURCE_CHAIN_ID, s_offRamp.SOURCE_CHAIN_ID());
-    assertEq(DEST_CHAIN_ID, s_offRamp.CHAIN_ID());
+    assertEq(SOURCE_CHAIN_ID, s_offRamp.i_sourceChainId());
+    assertEq(DEST_CHAIN_ID, s_offRamp.i_chainId());
 
     assertSameConfig(offRampConfig(), s_offRamp.getConfig());
   }
