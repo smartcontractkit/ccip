@@ -181,11 +181,6 @@ func (chain *EvmChainConfig) SetupChain(t *testing.T, ownerPrivateKey string) {
 	chain.Logger = logger.TestLogger(t).Named(helpers.ChainName(chain.ChainId.Int64()))
 
 	require.Equal(t, len(chain.BridgeTokens), len(chain.TokenPools))
-	if chain.OnRamp != common.HexToAddress("") {
-		require.Equal(t, len(chain.BridgeTokens), len(chain.PriceFeeds))
-
-	}
-
 	chain.Logger.Info("Completed chain setup")
 }
 

@@ -83,4 +83,6 @@ contract MockOnRamp is Any2EVMTollOnRampInterface {
   function getAllowlist() external pure override returns (address[] memory addresses) {
     addresses = new address[](0);
   }
+
+  function setFeeConfig(FeeConfig calldata feeConfig) external override {}
 }

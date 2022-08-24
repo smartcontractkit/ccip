@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"math"
 	"math/big"
 	"strings"
 	"testing"
@@ -24,6 +23,7 @@ import (
 	ocrnetworking "github.com/smartcontractkit/libocr/networking"
 	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	ocrtypes2 "github.com/smartcontractkit/libocr/offchainreporting2/types"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v4"
 
@@ -47,9 +47,8 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_subscription_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/mock_v3_aggregator_contract"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/native_token_pool"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/simple_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/internal/cltest"
 	"github.com/smartcontractkit/chainlink/core/internal/cltest/heavyweight"
 	"github.com/smartcontractkit/chainlink/core/internal/testutils"
@@ -79,21 +78,28 @@ func setupChain(t *testing.T) (*backends.SimulatedBackend, *bind.TransactOpts) {
 	return chain, user
 }
 
+type MaybeRevertReceiver struct {
+	Receiver *maybe_revert_message_receiver.MaybeRevertMessageReceiver
+	Strict   bool
+}
+
 type CCIPContracts struct {
 	sourceUser, destUser           *bind.TransactOpts
 	sourceChain, destChain         *backends.SimulatedBackend
 	sourcePool, destPool           *native_token_pool.NativeTokenPool
 	sourceLinkToken, destLinkToken *link_token_interface.LinkToken
 	blobVerifier                   *blob_verifier.BlobVerifier
-	messageReceiver                *simple_message_receiver.SimpleMessageReceiver
+	receivers                      []MaybeRevertReceiver
 
 	// Toll contracts
-	onRampRouter  *evm_2_any_toll_onramp_router.EVM2AnyTollOnRampRouter
-	onRamp        *evm_2_evm_toll_onramp.EVM2EVMTollOnRamp
-	offRampRouter *any_2_evm_toll_offramp_router.Any2EVMTollOffRampRouter
-	offRamp       *any_2_evm_toll_offramp.EVM2EVMTollOffRamp
+	tollOnRampFees    map[common.Address]*big.Int
+	tollOnRampRouter  *evm_2_any_toll_onramp_router.EVM2AnyTollOnRampRouter
+	tollOnRamp        *evm_2_evm_toll_onramp.EVM2EVMTollOnRamp
+	tollOffRampRouter *any_2_evm_toll_offramp_router.Any2EVMTollOffRampRouter
+	tollOffRamp       *any_2_evm_toll_offramp.EVM2EVMTollOffRamp
 
 	// Sub contracts
+	subOnRampFee     *big.Int
 	subOnRampRouter  *evm_2_any_subscription_onramp_router.EVM2AnySubscriptionOnRampRouter
 	subOnRamp        *evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRamp
 	subOffRampRouter *any_2_evm_subscription_offramp_router.Any2EVMSubscriptionOffRampRouter
@@ -168,9 +174,6 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 	require.NoError(t, err)
 	sourceChain.Commit()
 
-	// LINK/ETH price
-	feedAddress, _, _, err := mock_v3_aggregator_contract.DeployMockV3AggregatorContract(sourceUser, sourceChain, 18, big.NewInt(6000000000000000))
-	require.NoError(t, err)
 	// Create onramp router
 	onRampRouterAddress, _, _, err := evm_2_any_toll_onramp_router.DeployEVM2AnyTollOnRampRouter(sourceUser, sourceChain)
 	require.NoError(t, err)
@@ -184,7 +187,6 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 		destChainID,                              // destinationChainIds
 		[]common.Address{sourceLinkTokenAddress}, // tokens
 		[]common.Address{sourcePoolAddress},      // pools
-		[]common.Address{feedAddress},            // Feeds
 		[]common.Address{},                       // allow list
 		afnSourceAddress,                         // AFN
 		evm_2_evm_toll_onramp.BaseOnRampInterfaceOnRampConfig{
@@ -195,14 +197,22 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 		onRampRouterAddress,
 	)
 	require.NoError(t, err)
-	onRamp, err := evm_2_evm_toll_onramp.NewEVM2EVMTollOnRamp(onRampAddress, sourceChain)
+	tollOnRamp, err := evm_2_evm_toll_onramp.NewEVM2EVMTollOnRamp(onRampAddress, sourceChain)
+	require.NoError(t, err)
+	tollOnRampFees := map[common.Address]*big.Int{
+		sourceLinkTokenAddress: big.NewInt(1), // 1 juel relay fee.
+	}
+	_, err = tollOnRamp.SetFeeConfig(sourceUser, evm_2_evm_toll_onramp.Any2EVMTollOnRampInterfaceFeeConfig{
+		Fees:      []*big.Int{tollOnRampFees[sourceLinkTokenAddress]},
+		FeeTokens: []common.Address{sourceLinkTokenAddress},
+	})
 	require.NoError(t, err)
 	_, err = sourcePool.SetOnRamp(sourceUser, onRampAddress, true)
 	require.NoError(t, err)
 	sourceChain.Commit()
-	onRampRouter, err := evm_2_any_toll_onramp_router.NewEVM2AnyTollOnRampRouter(onRampRouterAddress, sourceChain)
+	tollOnRampRouter, err := evm_2_any_toll_onramp_router.NewEVM2AnyTollOnRampRouter(onRampRouterAddress, sourceChain)
 	require.NoError(t, err)
-	_, err = onRampRouter.SetOnRamp(sourceUser, destChainID, onRampAddress)
+	_, err = tollOnRampRouter.SetOnRamp(sourceUser, destChainID, onRampAddress)
 	require.NoError(t, err)
 	sourceChain.Commit()
 
@@ -244,24 +254,26 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 		[]common.Address{destPoolAddress},
 	)
 	require.NoError(t, err)
-	offRamp, err := any_2_evm_toll_offramp.NewEVM2EVMTollOffRamp(offRampAddress, destChain)
+	tollOffRamp, err := any_2_evm_toll_offramp.NewEVM2EVMTollOffRamp(offRampAddress, destChain)
 	require.NoError(t, err)
 	_, err = destPool.SetOffRamp(destUser, offRampAddress, true)
 	require.NoError(t, err)
 	// Create offRampAddr router
-	offRampRouterAddress, _, offRampRouter, err := any_2_evm_toll_offramp_router.DeployAny2EVMTollOffRampRouter(destUser, destChain, []common.Address{offRampAddress})
+	offRampRouterAddress, _, tollOffRampRouter, err := any_2_evm_toll_offramp_router.DeployAny2EVMTollOffRampRouter(destUser, destChain, []common.Address{offRampAddress})
 	require.NoError(t, err)
 	destChain.Commit()
-	offRampRouter, err = any_2_evm_toll_offramp_router.NewAny2EVMTollOffRampRouter(offRampRouterAddress, destChain)
+	tollOffRampRouter, err = any_2_evm_toll_offramp_router.NewAny2EVMTollOffRampRouter(offRampRouterAddress, destChain)
 	require.NoError(t, err)
-	_, err = offRamp.SetRouter(destUser, offRampRouterAddress)
+	_, err = tollOffRamp.SetRouter(destUser, offRampRouterAddress)
 	require.NoError(t, err)
 
-	// Deploy offramp contract token receiver
-	messageReceiverAddress, _, _, err := simple_message_receiver.DeploySimpleMessageReceiver(destUser, destChain)
+	// Deploy 2 revertable (one SS one non-SS)
+	revertingMessageReceiver1Address, _, _, err := maybe_revert_message_receiver.DeployMaybeRevertMessageReceiver(destUser, destChain, false)
 	require.NoError(t, err)
-	messageReceiver, err := simple_message_receiver.NewSimpleMessageReceiver(messageReceiverAddress, destChain)
+	revertingMessageReceiver1, _ := maybe_revert_message_receiver.NewMaybeRevertMessageReceiver(revertingMessageReceiver1Address, destChain)
+	revertingMessageReceiver2Address, _, _, err := maybe_revert_message_receiver.DeployMaybeRevertMessageReceiver(destUser, destChain, false)
 	require.NoError(t, err)
+	revertingMessageReceiver2, _ := maybe_revert_message_receiver.NewMaybeRevertMessageReceiver(revertingMessageReceiver2Address, destChain)
 	// Need to commit here, or we will hit the block gas limit when deploying the executor
 	sourceChain.Commit()
 	destChain.Commit()
@@ -278,9 +290,8 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 	subOnRampAddress, _, _, err := evm_2_evm_subscription_onramp.DeployEVM2EVMSubscriptionOnRamp(sourceUser, sourceChain, sourceChainID, destChainID,
 		[]common.Address{sourceLinkTokenAddress}, // tokens
 		[]common.Address{sourcePoolAddress},      // pools
-		[]common.Address{feedAddress},
-		[]common.Address{}, // allow list
-		afnSourceAddress,   // AFN
+		[]common.Address{},                       // allow list
+		afnSourceAddress,                         // AFN
 		evm_2_evm_subscription_onramp.BaseOnRampInterfaceOnRampConfig{
 			RelayingFeeJuels: 0,
 			MaxDataSize:      1e12,
@@ -295,6 +306,9 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 	_, err = subOnRamp.SetRouter(sourceUser, subOnRampRouterAddress)
 	require.NoError(t, err)
 	_, err = subOnRampRouter.SetOnRamp(sourceUser, destChainID, subOnRampAddress)
+	require.NoError(t, err)
+	subOnRampFee := big.NewInt(1)
+	_, err = subOnRampRouter.SetFee(sourceUser, subOnRampFee)
 	require.NoError(t, err)
 
 	subOffRampRouterAddress, _, _, err := any_2_evm_subscription_offramp_router.DeployAny2EVMSubscriptionOffRampRouter(
@@ -342,13 +356,6 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 		sourceChain.Commit()
 		destChain.Commit()
 	}
-	// (practically) Infinite approval source user (owner of all the link) to onramp router.
-	sourceUser.GasLimit = 500000
-	maxApproveAmount := big.NewInt(0)
-	maxApproveAmount.SetString("1000000000000000000000000000000", 10)
-	_, err = sourceLinkToken.Approve(sourceUser, onRampRouter.Address(), maxApproveAmount)
-	sourceChain.Commit()
-
 	return CCIPContracts{
 		sourceUser:      sourceUser,
 		destUser:        destUser,
@@ -359,15 +366,17 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 		sourceLinkToken: sourceLinkToken,
 		destLinkToken:   destLinkToken,
 		blobVerifier:    blobVerifier,
+		receivers:       []MaybeRevertReceiver{{Receiver: revertingMessageReceiver1, Strict: false}, {Receiver: revertingMessageReceiver2, Strict: true}},
 
 		// Toll
-		onRamp:          onRamp,
-		onRampRouter:    onRampRouter,
-		offRampRouter:   offRampRouter,
-		messageReceiver: messageReceiver,
-		offRamp:         offRamp,
+		tollOnRampFees:    tollOnRampFees,
+		tollOnRamp:        tollOnRamp,
+		tollOnRampRouter:  tollOnRampRouter,
+		tollOffRampRouter: tollOffRampRouter,
+		tollOffRamp:       tollOffRamp,
 
 		// Sub
+		subOnRampFee:     subOnRampFee,
 		subOnRamp:        subOnRamp,
 		subOnRampRouter:  subOnRampRouter,
 		subOffRampRouter: subOffRampRouter,
@@ -647,9 +656,9 @@ func allNodesHaveExecutedSeqNum(t *testing.T, ccipContracts CCIPContracts, offRa
 	return log
 }
 
-func queueSubRequest(t *testing.T, ccipContracts CCIPContracts, msgPayload string, tokens []common.Address, amounts []*big.Int, gasLimit *big.Int) *gethtypes.Transaction {
+func queueSubRequest(t *testing.T, ccipContracts CCIPContracts, msgPayload string, tokens []common.Address, amounts []*big.Int, gasLimit *big.Int, receiver common.Address) *gethtypes.Transaction {
 	msg := evm_2_any_subscription_onramp_router.CCIPEVM2AnySubscriptionMessage{
-		Receiver: ccipContracts.messageReceiver.Address(),
+		Receiver: receiver,
 		Data:     []byte(msgPayload),
 		Tokens:   tokens,
 		Amounts:  amounts,
@@ -660,17 +669,17 @@ func queueSubRequest(t *testing.T, ccipContracts CCIPContracts, msgPayload strin
 	return tx
 }
 
-func queueRequest(t *testing.T, ccipContracts CCIPContracts, msgPayload string, tokens []common.Address, amounts []*big.Int, feeTokenAmount *big.Int, gasLimit *big.Int) *gethtypes.Transaction {
+func queueRequest(t *testing.T, ccipContracts CCIPContracts, msgPayload string, tokens []common.Address, amounts []*big.Int, feeToken common.Address, feeTokenAmount *big.Int, gasLimit *big.Int) *gethtypes.Transaction {
 	msg := evm_2_any_toll_onramp_router.CCIPEVM2AnyTollMessage{
-		Receiver:       ccipContracts.messageReceiver.Address(),
+		Receiver:       ccipContracts.receivers[0].Receiver.Address(),
 		Data:           []byte(msgPayload),
 		Tokens:         tokens,
 		Amounts:        amounts,
-		FeeToken:       tokens[0],
+		FeeToken:       feeToken,
 		FeeTokenAmount: feeTokenAmount,
 		GasLimit:       gasLimit,
 	}
-	tx, err := ccipContracts.onRampRouter.CcipSend(ccipContracts.sourceUser, destChainID, msg)
+	tx, err := ccipContracts.tollOnRampRouter.CcipSend(ccipContracts.sourceUser, destChainID, msg)
 	require.NoError(t, err)
 	return tx
 }
@@ -684,13 +693,13 @@ func confirmTxs(t *testing.T, txs []*gethtypes.Transaction, chain *backends.Simu
 	}
 }
 
-func sendSubRequest(t *testing.T, ccipContracts CCIPContracts, msgPayload string, tokens []common.Address, amounts []*big.Int, gasLimit *big.Int) {
-	tx := queueSubRequest(t, ccipContracts, msgPayload, tokens, amounts, gasLimit)
+func sendSubRequest(t *testing.T, ccipContracts CCIPContracts, msgPayload string, tokens []common.Address, amounts []*big.Int, gasLimit *big.Int, receiver common.Address) {
+	tx := queueSubRequest(t, ccipContracts, msgPayload, tokens, amounts, gasLimit, receiver)
 	confirmTxs(t, []*gethtypes.Transaction{tx}, ccipContracts.sourceChain)
 }
 
-func sendRequest(t *testing.T, ccipContracts CCIPContracts, msgPayload string, tokens []common.Address, amounts []*big.Int, feeTokenAmount *big.Int, gasLimit *big.Int) {
-	tx := queueRequest(t, ccipContracts, msgPayload, tokens, amounts, feeTokenAmount, gasLimit)
+func sendRequest(t *testing.T, ccipContracts CCIPContracts, msgPayload string, tokens []common.Address, amounts []*big.Int, feeToken common.Address, feeTokenAmount *big.Int, gasLimit *big.Int) {
+	tx := queueRequest(t, ccipContracts, msgPayload, tokens, amounts, feeToken, feeTokenAmount, gasLimit)
 	confirmTxs(t, []*gethtypes.Transaction{tx}, ccipContracts.sourceChain)
 }
 
@@ -799,7 +808,7 @@ func setupAndStartNodes(t *testing.T, ctx context.Context, ccipContracts CCIPCon
 }
 
 func AssertTxSuccess(t *testing.T, ccipContracts CCIPContracts, log logpoller.Log) {
-	executionStateChanged, err := ccipContracts.offRamp.ParseExecutionStateChanged(log.GetGethLog())
+	executionStateChanged, err := ccipContracts.tollOffRamp.ParseExecutionStateChanged(log.GetGethLog())
 	require.NoError(t, err)
 	if ccip.MessageExecutionState(executionStateChanged.State) != ccip.Success {
 		t.Log("Execution failed")
@@ -808,10 +817,6 @@ func AssertTxSuccess(t *testing.T, ccipContracts CCIPContracts, log logpoller.Lo
 }
 
 func TestIntegration_CCIP(t *testing.T) {
-	feeTokenAmount := big.NewInt(math.MaxInt64)
-	gasLimit := big.NewInt(3e5)
-	tokenAmount := big.NewInt(100)
-
 	ccipContracts := setupCCIPContracts(t)
 	bootstrapNodePort := int64(19599)
 	ctx := context.Background()
@@ -854,7 +859,7 @@ pollPeriod          = "1s"
 [relayConfig]
 chainID             = "%s"
 
-`, i, ccipContracts.blobVerifier.Address(), node.kb.ID(), node.transmitter, ccipContracts.onRamp.Address(), ccipContracts.subOnRamp.Address(), sourceChainID, destChainID, destChainID))
+`, i, ccipContracts.blobVerifier.Address(), node.kb.ID(), node.transmitter, ccipContracts.tollOnRamp.Address(), ccipContracts.subOnRamp.Address(), sourceChainID, destChainID, destChainID))
 		node.addJob(t, fmt.Sprintf(`
 type                = "offchainreporting2"
 pluginType          = "ccip-execution"
@@ -877,7 +882,7 @@ pollPeriod          = "1s"
 [relayConfig]
 chainID             = "%s"
 
-`, i, ccipContracts.offRamp.Address(), node.kb.ID(), node.transmitter, ccipContracts.onRamp.Address(), ccipContracts.blobVerifier.Address(), sourceChainID, destChainID, destChainID))
+`, i, ccipContracts.tollOffRamp.Address(), node.kb.ID(), node.transmitter, ccipContracts.tollOnRamp.Address(), ccipContracts.blobVerifier.Address(), sourceChainID, destChainID, destChainID))
 		node.addJob(t, fmt.Sprintf(`
 type                = "offchainreporting2"
 pluginType          = "ccip-execution"
@@ -912,8 +917,6 @@ chainID             = "%s"
 	require.NoError(t, err)
 	require.NoError(t, bc.LogPoller().Replay(context.Background(), configBlock))
 
-	tollCurrentSeqNum := 1
-	subCurrentSeqNum := 1
 	/*
 		t.Run("single self-execute", func(t *testing.T) {
 			sendRequest(t, ccipContracts, "single req", []common.Address{ccipContracts.sourceLinkToken.Address()}, []*big.Int{big.NewInt(100)}, big.NewInt(0), big.NewInt(0))
@@ -921,7 +924,7 @@ chainID             = "%s"
 			report := eventuallyReportRelayed(t, ccipContracts, tollCurrentSeqNum, tollCurrentSeqNum)
 			executeMessage(t, ccipContracts, req, []logpoller.Log{req}, report)
 			allNodesHaveExecutedSeqNum(t, ccipContracts, nodes, tollCurrentSeqNum)
-			receivedMsg, err := ccipContracts.messageReceiver.SMessage(nil)
+			receivedMsg, err := ccipContracts.successReceivers[0].SMessage(nil)
 			require.NoError(t, err)
 			assert.Equal(t, "single req", string(receivedMsg.Data))
 			tollCurrentSeqNum++
@@ -949,47 +952,166 @@ chainID             = "%s"
 			for i := range reqs {
 				allNodesHaveExecutedSeqNum(t, ccipContracts, nodes, tollCurrentSeqNum+i)
 			}
-			receivedMsg, err := ccipContracts.messageReceiver.SMessage(nil)
+			receivedMsg, err := ccipContracts.successReceivers[0].SMessage(nil)
 			require.NoError(t, err)
 			assert.Equal(t, fmt.Sprintf("batch request %d", tollCurrentSeqNum+n-1), string(receivedMsg.Data))
 			tollCurrentSeqNum += n
 		})
 	*/
 
-	t.Run("single auto-execute toll", func(t *testing.T) {
-		sendRequest(t, ccipContracts, "hey DON, execute for me", []common.Address{ccipContracts.sourceLinkToken.Address()}, []*big.Int{tokenAmount}, feeTokenAmount, gasLimit)
-		allNodesHaveReqSeqNum(t, ccipContracts, ccip.CCIPTollSendRequested, ccipContracts.onRamp.Address(), nodes, tollCurrentSeqNum)
-		eventuallyReportRelayed(t, ccipContracts, ccipContracts.onRamp.Address(), tollCurrentSeqNum, tollCurrentSeqNum)
-		executionLog := allNodesHaveExecutedSeqNum(t, ccipContracts, ccipContracts.offRamp.Address(), nodes, tollCurrentSeqNum)
-		AssertTxSuccess(t, ccipContracts, executionLog)
-		tollCurrentSeqNum++
-	})
+	tollCurrentSeqNum := 1
+	subCurrentSeqNum := 1
 
-	t.Run("single auto-execute subscription", func(t *testing.T) {
-		// Fund a 100 juels for relay fees.
-		relayFee := big.NewInt(100)
+	// Create src sub and dst sub, funded for 10 msgs with 100k callback and 1 token.
+	// Needs to be sufficient to cover default gas price of 200gwei.
+	// Costs ~7 link for 100k callback @ 200gwei.
+	for _, receiver := range ccipContracts.receivers {
+		relayFee := big.NewInt(0).Mul(ccipContracts.subOnRampFee, big.NewInt(10))
 		_, err = ccipContracts.sourceLinkToken.Approve(ccipContracts.sourceUser, ccipContracts.subOnRampRouter.Address(), relayFee)
 		require.NoError(t, err)
 		_, err = ccipContracts.subOnRampRouter.FundSubscription(ccipContracts.sourceUser, relayFee)
 		require.NoError(t, err)
-
-		// Fund 1e17 juels on the destination for execution fees.
-		subscriptionBalance := big.NewInt(0).Mul(big.NewInt(5), big.NewInt(1e18))
+		ccipContracts.sourceChain.Commit()
+		subscriptionBalance := big.NewInt(0).Mul(big.NewInt(80), big.NewInt(1e18))
 		_, err = ccipContracts.destLinkToken.Approve(ccipContracts.destUser, ccipContracts.subOffRampRouter.Address(), subscriptionBalance)
 		require.NoError(t, err)
 		_, err = ccipContracts.subOffRampRouter.CreateSubscription(ccipContracts.destUser, any_2_evm_subscription_offramp_router.SubscriptionInterfaceOffRampSubscription{
 			Senders:          []common.Address{ccipContracts.sourceUser.From},
-			Receiver:         ccipContracts.messageReceiver.Address(),
-			StrictSequencing: false,
-			Balance:          subscriptionBalance, // Needs to be sufficient to cover default gas price of 200gwei.
+			Receiver:         receiver.Receiver.Address(),
+			StrictSequencing: receiver.Strict,
+			Balance:          subscriptionBalance,
 		})
+		require.NoError(t, err)
+	}
+
+	ccipContracts.destChain.Commit()
+
+	t.Run("single auto-execute toll", func(t *testing.T) {
+		// Approve router to take source token.
+		tokenAmount := big.NewInt(100)
+		// Example sending a msg with 100k callback execution on eth mainnet.
+		// Gas price 200e9 wei/gas * 1e5 gas * (2e20 juels/eth / 1e18wei/eth)
+		// 4e18 juels = 4 link, which does not include gas used outside the callback.
+		// Gas outside the callback for 1 token is ~100k in the worst case.
+		feeTokenAmount := big.NewInt(0).Mul(big.NewInt(10), big.NewInt(1e18))
+		_, err = ccipContracts.sourceLinkToken.Approve(ccipContracts.sourceUser, ccipContracts.tollOnRampRouter.Address(), big.NewInt(0).Add(tokenAmount, feeTokenAmount))
+		require.NoError(t, err)
+		ccipContracts.sourceChain.Commit()
+
+		startReceiver, _ := ccipContracts.destLinkToken.BalanceOf(nil, ccipContracts.receivers[0].Receiver.Address())
+		startPool, _ := ccipContracts.destLinkToken.BalanceOf(nil, ccipContracts.destPool.Address())
+		sendRequest(t, ccipContracts, "hey DON, execute for me",
+			[]common.Address{ccipContracts.sourceLinkToken.Address()},
+			[]*big.Int{tokenAmount}, ccipContracts.sourceLinkToken.Address(),
+			feeTokenAmount,
+			big.NewInt(100_000))
+		allNodesHaveReqSeqNum(t, ccipContracts, ccip.CCIPTollSendRequested, ccipContracts.tollOnRamp.Address(), nodes, tollCurrentSeqNum)
+		eventuallyReportRelayed(t, ccipContracts, ccipContracts.tollOnRamp.Address(), tollCurrentSeqNum, tollCurrentSeqNum)
+		executionLog := allNodesHaveExecutedSeqNum(t, ccipContracts, ccipContracts.tollOffRamp.Address(), nodes, tollCurrentSeqNum)
+		AssertTxSuccess(t, ccipContracts, executionLog)
+		endReceiver, _ := ccipContracts.destLinkToken.BalanceOf(nil, ccipContracts.receivers[0].Receiver.Address())
+		endPool, _ := ccipContracts.destLinkToken.BalanceOf(nil, ccipContracts.destPool.Address())
+		// We expect that the receiver should have their tokens.
+		assert.Equal(t, tokenAmount.String(), big.NewInt(0).Sub(endReceiver, startReceiver).String())
+		// TODO: Assert change forwarding. Change forwarding not implemented yet??
+		t.Log(startPool, endPool)
+		tollCurrentSeqNum++
+	})
+
+	t.Run("single auto-execute subscription", func(t *testing.T) {
+		tokenAmount := big.NewInt(100)
+		subBefore, err := ccipContracts.subOffRampRouter.GetSubscription(nil, ccipContracts.receivers[0].Receiver.Address())
 		require.NoError(t, err)
 		_, err = ccipContracts.sourceLinkToken.Approve(ccipContracts.sourceUser, ccipContracts.subOnRampRouter.Address(), tokenAmount)
 		require.NoError(t, err)
 		ccipContracts.sourceChain.Commit()
-		ccipContracts.destChain.Commit()
+
+		startReceiver, _ := ccipContracts.destLinkToken.BalanceOf(nil, ccipContracts.receivers[0].Receiver.Address())
 		sendSubRequest(t, ccipContracts, "hey DON, execute for me", []common.Address{ccipContracts.sourceLinkToken.Address()},
-			[]*big.Int{tokenAmount}, gasLimit)
+			[]*big.Int{tokenAmount}, big.NewInt(100_000), ccipContracts.receivers[0].Receiver.Address())
+		allNodesHaveReqSeqNum(t, ccipContracts, ccip.CCIPSubSendRequested, ccipContracts.subOnRamp.Address(), nodes, subCurrentSeqNum)
+		eventuallyReportRelayed(t, ccipContracts, ccipContracts.subOnRamp.Address(), subCurrentSeqNum, subCurrentSeqNum)
+		executionLog := allNodesHaveExecutedSeqNum(t, ccipContracts, ccipContracts.subOffRamp.Address(), nodes, subCurrentSeqNum)
+		AssertTxSuccess(t, ccipContracts, executionLog)
+
+		endReceiver, _ := ccipContracts.destLinkToken.BalanceOf(nil, ccipContracts.receivers[0].Receiver.Address())
+		subAfter, err := ccipContracts.subOffRampRouter.GetSubscription(nil, ccipContracts.receivers[0].Receiver.Address())
+		require.NoError(t, err)
+		// Subscription should decrease. Tricky to measure exactly since we measure gas consumption directly in sub offramp.
+		assert.Equal(t, 1, subBefore.Balance.Cmp(subAfter.Balance), "before %v after %v", subBefore.Balance, subAfter.Balance)
+		// We should see the tokenAmount transferred.
+		assert.Equal(t, tokenAmount.String(), big.NewInt(0).Sub(endReceiver, startReceiver).String(), "before %v after %v", startReceiver, endReceiver)
+		subCurrentSeqNum++
+	})
+
+	t.Run("batch auto-execute toll", func(t *testing.T) {
+		tokenAmount := big.NewInt(100)
+		feeTokenAmount := big.NewInt(0).Mul(big.NewInt(10), big.NewInt(1e18))
+		var txs []*gethtypes.Transaction
+		n := 3
+		for i := 0; i < n; i++ {
+			_, err = ccipContracts.sourceLinkToken.Approve(ccipContracts.sourceUser, ccipContracts.tollOnRampRouter.Address(), big.NewInt(0).Add(tokenAmount, feeTokenAmount))
+			require.NoError(t, err)
+			txs = append(txs, queueRequest(t, ccipContracts, fmt.Sprintf("batch request %d", tollCurrentSeqNum+i), []common.Address{ccipContracts.sourceLinkToken.Address()}, []*big.Int{tokenAmount},
+				ccipContracts.sourceLinkToken.Address(), feeTokenAmount, big.NewInt(100_000)))
+		}
+		// Send a batch of requests in a single block
+		confirmTxs(t, txs, ccipContracts.sourceChain)
+		// All nodes should have all 3.
+		var reqs []logpoller.Log
+		for i := 0; i < n; i++ {
+			reqs = append(reqs, allNodesHaveReqSeqNum(t, ccipContracts, ccip.CCIPTollSendRequested, ccipContracts.tollOnRamp.Address(), nodes, tollCurrentSeqNum+i))
+		}
+		// Should see a report with the full range
+		eventuallyReportRelayed(t, ccipContracts, ccipContracts.tollOnRamp.Address(), tollCurrentSeqNum, tollCurrentSeqNum+n-1)
+		// Should all be executed
+		for i := range reqs {
+			executionLog := allNodesHaveExecutedSeqNum(t, ccipContracts, ccipContracts.tollOffRamp.Address(), nodes, tollCurrentSeqNum+i)
+			AssertTxSuccess(t, ccipContracts, executionLog)
+		}
+		tollCurrentSeqNum += n
+	})
+
+	t.Run("batch auto-execute subscription", func(t *testing.T) {
+		subBefore, _ := ccipContracts.subOffRampRouter.GetSubscription(nil, ccipContracts.receivers[0].Receiver.Address())
+		tokenAmount := big.NewInt(100)
+		var txs []*gethtypes.Transaction
+		n := 3
+		for i := 0; i < n; i++ {
+			_, err = ccipContracts.sourceLinkToken.Approve(ccipContracts.sourceUser, ccipContracts.subOnRampRouter.Address(), tokenAmount)
+			require.NoError(t, err)
+			txs = append(txs, queueSubRequest(t, ccipContracts, "hey DON, execute for me", []common.Address{ccipContracts.sourceLinkToken.Address()},
+				[]*big.Int{tokenAmount}, big.NewInt(100_000), ccipContracts.receivers[0].Receiver.Address()))
+		}
+		ccipContracts.sourceChain.Commit()
+		// Send a batch of requests in a single block
+		confirmTxs(t, txs, ccipContracts.sourceChain)
+		var reqs []logpoller.Log
+		for i := 0; i < n; i++ {
+			reqs = append(reqs, allNodesHaveReqSeqNum(t, ccipContracts, ccip.CCIPSubSendRequested, ccipContracts.subOnRamp.Address(), nodes, subCurrentSeqNum+i))
+		}
+		// Should see a report with the full range
+		eventuallyReportRelayed(t, ccipContracts, ccipContracts.subOnRamp.Address(), subCurrentSeqNum, subCurrentSeqNum+n-1)
+		// Should all be executed
+		for i := range reqs {
+			executionLog := allNodesHaveExecutedSeqNum(t, ccipContracts, ccipContracts.subOffRamp.Address(), nodes, subCurrentSeqNum+i)
+			AssertTxSuccess(t, ccipContracts, executionLog)
+		}
+		// Check subscription balance after
+		subAfter, _ := ccipContracts.subOffRampRouter.GetSubscription(nil, ccipContracts.receivers[0].Receiver.Address())
+		require.Equal(t, 1, subBefore.Balance.Cmp(subAfter.Balance), "before %v after %v", subBefore.Balance, subAfter.Balance)
+		b := big.NewInt(0).Sub(subBefore.Balance, subAfter.Balance).String()
+		t.Log("Balance change", b)
+		subCurrentSeqNum += n
+	})
+
+	t.Run("single strict sequencing auto-execute subscription", func(t *testing.T) {
+		tokenAmount := big.NewInt(100)
+		_, err = ccipContracts.sourceLinkToken.Approve(ccipContracts.sourceUser, ccipContracts.subOnRampRouter.Address(), tokenAmount)
+		require.NoError(t, err)
+		ccipContracts.sourceChain.Commit()
+		sendSubRequest(t, ccipContracts, "hey DON, execute for me", []common.Address{ccipContracts.sourceLinkToken.Address()},
+			[]*big.Int{tokenAmount}, big.NewInt(100_000), ccipContracts.receivers[1].Receiver.Address())
 		allNodesHaveReqSeqNum(t, ccipContracts, ccip.CCIPSubSendRequested, ccipContracts.subOnRamp.Address(), nodes, subCurrentSeqNum)
 		eventuallyReportRelayed(t, ccipContracts, ccipContracts.subOnRamp.Address(), subCurrentSeqNum, subCurrentSeqNum)
 		executionLog := allNodesHaveExecutedSeqNum(t, ccipContracts, ccipContracts.subOffRamp.Address(), nodes, subCurrentSeqNum)
@@ -997,28 +1119,9 @@ chainID             = "%s"
 		subCurrentSeqNum++
 	})
 
-	t.Run("batch auto-execute toll", func(t *testing.T) {
-		var txs []*gethtypes.Transaction
-		n := 3
-		for i := 0; i < n; i++ {
-			txs = append(txs, queueRequest(t, ccipContracts, fmt.Sprintf("batch request %d", tollCurrentSeqNum+i), []common.Address{ccipContracts.sourceLinkToken.Address()}, []*big.Int{tokenAmount}, feeTokenAmount, gasLimit))
-		}
-		// Send a batch of requests in a single block
-		confirmTxs(t, txs, ccipContracts.sourceChain)
-		// All nodes should have all 3.
-		var reqs []logpoller.Log
-		for i := 0; i < n; i++ {
-			reqs = append(reqs, allNodesHaveReqSeqNum(t, ccipContracts, ccip.CCIPTollSendRequested, ccipContracts.onRamp.Address(), nodes, tollCurrentSeqNum+i))
-		}
-		// Should see a report with the full range
-		eventuallyReportRelayed(t, ccipContracts, ccipContracts.onRamp.Address(), tollCurrentSeqNum, tollCurrentSeqNum+n-1)
-		// Should all be executed
-		for i := range reqs {
-			executionLog := allNodesHaveExecutedSeqNum(t, ccipContracts, ccipContracts.offRamp.Address(), nodes, tollCurrentSeqNum+i)
-			AssertTxSuccess(t, ccipContracts, executionLog)
-		}
-		tollCurrentSeqNum += n
-	})
+	// TODO: One reverted SS should block subsequent SS
+	// then we should be able to manually execute.
+
 	/*
 		t.Run("eoa2eoa", func(t *testing.T) {
 			// Now let's send an EOA to EOA request
@@ -1044,7 +1147,7 @@ chainID             = "%s"
 				FeeTokenAmount: feeTokenAmount,
 				GasLimit:       big.NewInt(1e6),
 			}
-			_, err = ccipContracts.onRampRouter.CcipSend(ccipContracts.sourceUser, destChainID, msg)
+			_, err = ccipContracts.tollOnRampRouter.CcipSend(ccipContracts.sourceUser, destChainID, msg)
 			require.NoError(t, err)
 			ccipContracts.sourceChain.Commit()
 
@@ -1117,7 +1220,7 @@ func setupOnchainConfig(t *testing.T, ccipContracts CCIPContracts, oracles []con
 	ccipContracts.destChain.Commit()
 
 	// Same DON on the toll offramp
-	_, err = ccipContracts.offRamp.SetConfig(
+	_, err = ccipContracts.tollOffRamp.SetConfig(
 		ccipContracts.destUser,
 		signerAddresses,
 		transmitterAddresses,

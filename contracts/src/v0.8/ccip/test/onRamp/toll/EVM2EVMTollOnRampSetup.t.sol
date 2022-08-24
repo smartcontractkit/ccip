@@ -2,6 +2,7 @@
 pragma solidity 0.8.15;
 
 import "../../TokenSetup.t.sol";
+import "../../../interfaces/onRamp/Any2EVMTollOnRampInterface.sol";
 import "../../../onRamp/toll/EVM2EVMTollOnRamp.sol";
 import "../../../onRamp/toll/EVM2AnyTollOnRampRouter.sol";
 
@@ -27,13 +28,16 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
       DEST_CHAIN_ID,
       s_sourceTokens,
       s_sourcePools,
-      s_sourceFeeds,
       s_allowList,
       s_afn,
       onRampConfig(),
       s_onRampRouter
     );
-
+    uint256[] memory fees = new uint256[](1);
+    fees[0] = uint256(RELAYING_FEE_JUELS);
+    IERC20[] memory feeTokens = new IERC20[](1);
+    feeTokens[0] = s_sourceTokens[0];
+    s_onRamp.setFeeConfig(Any2EVMTollOnRampInterface.FeeConfig({feeTokens: feeTokens, fees: fees}));
     NativeTokenPool(address(s_sourcePools[0])).setOnRamp(s_onRamp, true);
     NativeTokenPool(address(s_sourcePools[1])).setOnRamp(s_onRamp, true);
 

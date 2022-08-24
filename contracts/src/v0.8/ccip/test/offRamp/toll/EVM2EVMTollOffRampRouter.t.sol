@@ -2,10 +2,10 @@
 pragma solidity 0.8.15;
 
 import "../../mocks/MockOffRamp.sol";
-import "../../helpers/receivers/RevertingMessageReceiver.sol";
 import "../../helpers/receivers/SimpleMessageReceiver.sol";
 import "../../BaseTest.t.sol";
 import "../../../offRamp/toll/Any2EVMTollOffRampRouter.sol";
+import "../../helpers/receivers/MaybeRevertMessageReceiver.sol";
 
 contract EVM2EVMTollOffRampRouterSetup is BaseTest {
   event MessageReceived(uint256 sequenceNumber);
@@ -62,13 +62,13 @@ contract EVM2EVMTollOffRampRouter_constructor is EVM2EVMTollOffRampRouterSetup {
 
 /// @notice #routeMessage
 contract EVM2EVMTollOffRampRouter_routeMessage is EVM2EVMTollOffRampRouterSetup {
-  Any2EVMMessageReceiverInterface internal s_revertingReceiver;
+  MaybeRevertMessageReceiver internal s_revertingReceiver;
   Any2EVMMessageReceiverInterface internal s_receiver;
 
   function setUp() public virtual override {
     EVM2EVMTollOffRampRouterSetup.setUp();
 
-    s_revertingReceiver = new RevertingMessageReceiver();
+    s_revertingReceiver = new MaybeRevertMessageReceiver(true);
     s_receiver = new SimpleMessageReceiver();
   }
 

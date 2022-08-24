@@ -3,6 +3,7 @@ package ccip
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"sort"
@@ -32,15 +33,11 @@ const (
 	BatchGasLimit                   = 1_000_000 // TODO: think if a good value for this
 	RootSnoozeTime                  = 1 * 3600 * time.Second
 	ExecutionMaxInflightTimeSeconds = 180
-	// Note user research is required for setting (MaxPayloadLength, MaxTokensPerMessage).
-	// TODO: If we really want this to be constant and not dynamic, then we need to wait
-	// until we have gas limits per message and ensure the block gas limit constraint is respected
-	// as well as the tx size limit.
-	MaxNumMessagesInExecutionReport = 50
 	MaxPayloadLength                = 1000
 	MaxTokensPerMessage             = 5
 	MaxExecutionReportLength        = 150_000 // TODO
-	MaxGasPrice                     = 200_000 // Gwei, TODO: probably want this to be some dynamic value, a multiplier of the current gas price.
+	MaxGasPrice                     = 200e9   // 200 gwei. TODO: probably want this to be some dynamic value, a multiplier of the current gas price.
+	TokenPriceBufferPercent         = 10      // Amount that the leader adds as a token price buffer in Query.
 )
 
 var (
@@ -177,7 +174,17 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			offchainConfig: offchainConfig,
 			builder: NewExecutionBatchBuilder(
 				BatchGasLimit,
-				RootSnoozeTime, rf.blobVerifier, rf.onRamp, rf.offRampAddr, rf.source, rf.dest, rf.builder, offchainConfig, rf.offRamp, rf.reqEventSig, rf.lggr),
+				RootSnoozeTime,
+				rf.blobVerifier,
+				rf.onRamp,
+				rf.offRampAddr,
+				rf.source,
+				rf.dest,
+				rf.builder,
+				offchainConfig,
+				rf.offRamp,
+				rf.reqEventSig,
+				rf.lggr),
 			onRampSeqParser: rf.onRampSeqParser,
 			reqEventSig:     rf.reqEventSig,
 			dataSource:      dummyDataSource{},
@@ -185,7 +192,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			Name:          "CCIPExecution",
 			UniqueReports: true,
 			Limits: types.ReportingPluginLimits{
-				MaxQueryLength:       0,
+				MaxQueryLength:       MaxQueryLength,
 				MaxObservationLength: MaxObservationLength,
 				MaxReportLength:      MaxExecutionReportLength,
 			},
@@ -221,9 +228,32 @@ type InflightExecutionReport struct {
 	report    any_2_evm_toll_offramp.CCIPExecutionReport
 }
 
+// expect percentMultiplier to be [0, 100]
+func (r *ExecutionReportingPlugin) tokenPrices(percentMultiplier *big.Int) (map[common.Address]*big.Int, error) {
+	tokensPerFeeCoin := make(map[common.Address]*big.Int)
+	executionFeeTokens, err := r.offRamp.GetSupportedTokensForExecutionFee()
+	if err != nil {
+		return nil, err
+	}
+	for _, token := range executionFeeTokens {
+		price, err := r.dataSource.GetPrice(token)
+		if err != nil {
+			return nil, err
+		}
+		buffer := big.NewInt(0).Div(price, percentMultiplier)
+		tokensPerFeeCoin[token] = big.NewInt(0).Add(price, buffer)
+	}
+	return tokensPerFeeCoin, nil
+}
+
 func (r *ExecutionReportingPlugin) Query(ctx context.Context, timestamp types.ReportTimestamp) (types.Query, error) {
-	// We don't use a query for this reporting plugin, so we can just leave it empty here
-	return types.Query{}, nil
+	// The leader queries an overestimated set of token prices, which are used by all the followers
+	// to compute message executability, ensuring that the set of executable messages is deterministic.
+	tokensPerFeeCoin, err := r.tokenPrices(big.NewInt(TokenPriceBufferPercent))
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(tokensPerFeeCoin)
 }
 
 func (r *ExecutionReportingPlugin) inflightSeqNums() map[uint64]struct{} {
@@ -243,28 +273,27 @@ func (r *ExecutionReportingPlugin) maxGasPrice() uint64 {
 }
 
 func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp types.ReportTimestamp, query types.Query) (types.Observation, error) {
+	// Query contains the tokenPricesPerFeeCoin
 	lggr := r.lggr.Named("ExecutionObservation")
 	if isBlobVerifierDownNow(r.lggr, r.blobVerifier) {
 		return nil, ErrBlobVerifierIsDown
 	}
-	destTokens, err := r.offRamp.GetDestinationTokens(nil)
-	if err != nil {
+	leaderTokensPerFeeCoin := make(map[common.Address]*big.Int)
+	if err := json.Unmarshal(query, &leaderTokensPerFeeCoin); err != nil {
 		return nil, err
 	}
-	tokensPerFeeCoin := make(map[common.Address]*big.Int)
-	for _, destToken := range destTokens {
-		price, err2 := r.dataSource.GetPrice(destToken)
-		if err2 != nil {
-			return nil, err2
-		}
-		tokensPerFeeCoin[destToken] = price
+	followerTokensPerFeeCoin, err := r.tokenPrices(big.NewInt(TokenPriceBufferPercent))
+	if err != nil {
+		return nil, err
 	}
 	// Read and make a copy for the builder.
 	r.inFlightMu.RLock()
 	inFlight := make([]InflightExecutionReport, len(r.inFlight))
 	copy(inFlight[:], r.inFlight[:])
 	r.inFlightMu.RUnlock()
-	executableSequenceNumbers, err := r.builder.getExecutableSeqNrs(r.maxGasPrice(), tokensPerFeeCoin, inFlight)
+
+	// IMPORTANT: We build executable set based on the leaders token prices, ensuring consistency across followers.
+	executableSequenceNumbers, err := r.builder.getExecutableSeqNrs(r.maxGasPrice(), leaderTokensPerFeeCoin, inFlight)
 	if err != nil {
 		return nil, err
 	}
@@ -274,7 +303,7 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 	lggr.Infof("executable seq nums %v %x", executableSequenceNumbers, r.reqEventSig)
 	return ExecutionObservation{
 		SeqNrs:           executableSequenceNumbers,
-		TokensPerFeeCoin: tokensPerFeeCoin,
+		TokensPerFeeCoin: followerTokensPerFeeCoin,
 	}.Marshal()
 }
 
@@ -404,7 +433,7 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 	}
 	actualMaybeObservations := getNonEmptyObservations[ExecutionObservation](r.lggr, observations)
 	var actualObservations []ExecutionObservation
-	tokens, err := r.offRamp.GetDestinationTokens(nil)
+	tokens, err := r.offRamp.GetSupportedTokensForExecutionFee()
 	if err != nil {
 		return false, nil, err
 	}
@@ -421,7 +450,6 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 			continue
 		}
 		// If it has all the prices, add each price to observations
-		// TODO: Implement according to https://github.com/smartcontractkit/ccip-spec/issues/71
 		for token, price := range obs.TokensPerFeeCoin {
 			priceObservations[token] = append(priceObservations[token], price)
 		}
@@ -432,19 +460,35 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 		lggr.Tracew("Non-empty observations <= F, need at least F+1 to continue")
 		return false, nil, nil
 	}
-	tokensPerFeeCoin := make(map[common.Address]*big.Int)
-	for _, token := range tokens {
-		tokensPerFeeCoin[token] = median(priceObservations[token])
+	// If we have sufficient observations, only build a report if
+	// the leaders prices is >= the median of the followers prices.
+	// Note we accept that this can result in the leader stalling progress,
+	// by setting an extremely high set of prices, but a malicious leader always had that ability
+	// and eventually we'll elect a new one.
+	leaderTokensPerFeeCoin := make(map[common.Address]*big.Int)
+	if err2 := json.Unmarshal(query, &leaderTokensPerFeeCoin); err2 != nil {
+		return false, nil, err2
 	}
+	medianTokensPerFeeCoin := make(map[common.Address]*big.Int)
+	for _, token := range tokens {
+		medianTokensPerFeeCoin[token] = median(priceObservations[token])
+		if medianTokensPerFeeCoin[token].Cmp(leaderTokensPerFeeCoin[token]) == 1 {
+			// Leader specified a price which is too low, reject this report.
+			// TODO: Error or not here?
+			r.lggr.Warnw("Leader price is too low, skipping report", "leader", leaderTokensPerFeeCoin[token], "followers", medianTokensPerFeeCoin[token])
+			return false, nil, nil
+		}
+	}
+	// If we make it here, the leader has specified a valid set of prices.
 	tally := make(map[uint64]int)
 	for _, obs := range actualObservations {
 		for _, seq_nr := range obs.SeqNrs {
 			tally[seq_nr]++
 		}
 	}
-	// TODO: Will change in https://github.com/smartcontractkit/ccip-spec/issues/71
 	var finalSequenceNumbers []uint64
 	for seqNr, count := range tally {
+		// Note spec deviation - I think its ok to rely on the batch builder for capping the number of messages vs capping in two places/ways?
 		if count > r.F {
 			finalSequenceNumbers = append(finalSequenceNumbers, seqNr)
 		}
@@ -456,11 +500,13 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 	if mathutil.Max(finalSequenceNumbers[0], finalSequenceNumbers[1:]...) >= nextMin {
 		return false, nil, errors.Errorf("Cannot execute unrelayed seq num. nextMin %v, seqNums %v", nextMin, finalSequenceNumbers)
 	}
-	report, err := r.buildReport(lggr, finalSequenceNumbers, tokensPerFeeCoin)
+	// Important we actually execute based on the medianTokensPrices, which we ensure
+	// is <= than prices used to determine executability.
+	report, err := r.buildReport(lggr, finalSequenceNumbers, medianTokensPerFeeCoin)
 	if err != nil {
 		return false, nil, err
 	}
-	r.lggr.Infow("Built report", "onRamp", r.onRamp, "finalSeqNums", finalSequenceNumbers)
+	r.lggr.Infow("Built report", "onRamp", r.onRamp, "finalSeqNums", finalSequenceNumbers, "executionPrices", medianTokensPerFeeCoin)
 	return true, report, nil
 }
 

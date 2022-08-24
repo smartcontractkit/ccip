@@ -224,7 +224,7 @@ func TestMaxExecutionReportSize(t *testing.T) {
 	// Ensure that given max payload size and max num tokens,
 	// Our report size is under the tx size limit.
 	c := setupContractsForExecution(t)
-	mb := c.generateMessageBatch(t, ccip.MaxPayloadLength, ccip.MaxNumMessagesInExecutionReport, ccip.MaxTokensPerMessage)
+	mb := c.generateMessageBatch(t, ccip.MaxPayloadLength, 50, ccip.MaxTokensPerMessage)
 	ctx := merklemulti.NewKeccakCtx()
 	outerTree := merklemulti.NewTree(ctx, [][32]byte{mb.root})
 	outerProof := outerTree.Prove([]int{0})

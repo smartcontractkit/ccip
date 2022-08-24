@@ -21,7 +21,6 @@ contract BaseOnrampSetup is TokenSetup {
       DEST_CHAIN_ID,
       s_sourceTokens,
       s_sourcePools,
-      s_sourceFeeds,
       s_allowList,
       s_afn,
       onRampConfig(),

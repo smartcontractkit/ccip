@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../helpers/receivers/RevertingMessageReceiver.sol";
 import "./EVM2EVMSubscriptionOffRampSetup.t.sol";
+import "../../helpers/receivers/MaybeRevertMessageReceiver.sol";
 
 /// @notice #constructor
 contract EVM2EVMSubscriptionOffRamp_constructor is EVM2EVMSubscriptionOffRampSetup {
@@ -165,7 +165,7 @@ contract EVM2EVMSubscriptionOffRamp_execute is EVM2EVMSubscriptionOffRampSetup {
   // to execute the individual tx fails. The resulting tx state is set to Failed.
   function testNoTokensSingleMessageFailedCallSuccess() public {
     CCIP.EVM2EVMSubscriptionMessage[] memory messages = _generateBasicMessages();
-    RevertingMessageReceiver newReceiver = new RevertingMessageReceiver();
+    MaybeRevertMessageReceiver newReceiver = new MaybeRevertMessageReceiver(true);
     _createSubscription(SubscriptionManagerInterface(address(newReceiver)), s_router, SUBSCRIPTION_BALANCE, true);
     messages[0].receiver = address(newReceiver);
 

@@ -24,24 +24,23 @@ contract PoolCollector is OwnerIsCreator {
     IERC20 feeToken,
     uint256 feeTokenAmount
   ) internal returns (uint256 fee) {
-    if (address(feeToken) != address(0)) {
-      fee = onRamp.getRequiredFee(feeToken);
-      address sender = msg.sender;
-      if (fee > 0) {
-        if (fee > feeTokenAmount) {
-          revert FeeTokenAmountTooLow();
-        }
-        feeToken.safeTransferFrom(sender, address(this), fee);
-        feeTokenAmount -= fee;
+    // Ensure fee token is valid.
+    PoolInterface feeTokenPool = onRamp.getTokenPool(feeToken);
+    if (address(feeTokenPool) == address(0)) revert BaseOnRampInterface.UnsupportedToken(feeToken);
+    fee = onRamp.getRequiredFee(feeToken);
+    address sender = msg.sender;
+    if (fee > 0) {
+      if (fee > feeTokenAmount) {
+        revert FeeTokenAmountTooLow();
       }
-      if (feeTokenAmount > 0) {
-        // Send the fee token to the pool
-        PoolInterface feeTokenPool = onRamp.getTokenPool(feeToken);
-        if (address(feeTokenPool) == address(0)) revert BaseOnRampInterface.UnsupportedToken(feeToken);
-        feeToken.safeTransferFrom(sender, address(feeTokenPool), feeTokenAmount);
-      }
-      emit FeeCharged(sender, address(this), fee);
+      feeTokenAmount -= fee;
+      feeToken.safeTransferFrom(sender, address(this), fee);
     }
+    if (feeTokenAmount > 0) {
+      // Send the fee token to the pool
+      feeToken.safeTransferFrom(sender, address(feeTokenPool), feeTokenAmount);
+    }
+    emit FeeCharged(sender, address(this), fee);
   }
 
   /**

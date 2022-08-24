@@ -126,7 +126,7 @@ func NewCCIPExecution(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm
 	case EVM2EVMSubscriptionOffRamp:
 		var subFeeToken common.Address
 		offRamp, subFeeToken, err2 = NewSubOffRamp(common.HexToAddress(spec.ContractID), destChain)
-		batchBuilder = NewSubscriptionBatchBuilder(lggr, subFeeToken)
+		batchBuilder = NewSubscriptionBatchBuilder(lggr, subFeeToken, offRamp.(*subOffRamp))
 	default:
 		return nil, errors.Errorf("unrecognized offramp, is %v the correct offramp address?", spec.ContractID)
 	}
@@ -157,10 +157,19 @@ type OffRamp interface {
 	GetExecutionState(opts *bind.CallOpts, arg0 uint64) (uint8, error)
 	ParseSeqNumFromExecutionStateChanged(log types.Log) (uint64, error)
 	Address() common.Address
+	// Destination chain addresses.
+	// Toll: dest pool addresses
+	// Sub:  dest sub token address (not necessarily in a pool)
+	GetSupportedTokensForExecutionFee() ([]common.Address, error)
 }
 
 type subOffRamp struct {
 	*any_2_evm_subscription_offramp.EVM2EVMSubscriptionOffRamp
+	router *any_2_evm_subscription_offramp_router.Any2EVMSubscriptionOffRampRouter
+}
+
+func (s subOffRamp) GetSupportedTokensForExecutionFee() ([]common.Address, error) {
+	return s.router.GetSupportedTokensForExecutionFee(nil)
 }
 
 func (s subOffRamp) ParseSeqNumFromExecutionStateChanged(log types.Log) (uint64, error) {
@@ -191,7 +200,7 @@ func NewSubOffRamp(addr common.Address, destChain evm.Chain) (OffRamp, common.Ad
 	if err != nil {
 		return nil, common.Address{}, err
 	}
-	return &subOffRamp{offRamp}, subFeeToken, nil
+	return &subOffRamp{EVM2EVMSubscriptionOffRamp: offRamp, router: router}, subFeeToken, nil
 }
 
 type tollOffRamp struct {
@@ -204,6 +213,12 @@ func (s tollOffRamp) ParseSeqNumFromExecutionStateChanged(log types.Log) (uint64
 		return 0, err
 	}
 	return ec.SequenceNumber, nil
+}
+
+func (s tollOffRamp) GetSupportedTokensForExecutionFee() ([]common.Address, error) {
+	// TODO: Toll offramp contract is missing ExecConfig?
+	// for now support all source tokens as fee tokens
+	return s.EVM2EVMTollOffRamp.GetDestinationTokens(nil)
 }
 
 func NewTollOffRamp(addr common.Address, destChain evm.Chain) (OffRamp, error) {

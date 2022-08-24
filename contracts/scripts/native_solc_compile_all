@@ -95,6 +95,7 @@ $SCRIPTPATH/native_solc8_15_compile ccip/health/AFN.sol
 
 $SCRIPTPATH/native_solc8_15_compile ccip/applications/ReceiverDapp.sol
 $SCRIPTPATH/native_solc8_15_compile ccip/test/helpers/receivers/SimpleMessageReceiver.sol
+$SCRIPTPATH/native_solc8_15_compile ccip/test/helpers/receivers/MaybeRevertMessageReceiver.sol
 
 ## Toll
 $SCRIPTPATH/native_solc8_15_compile ccip/onRamp/toll/EVM2AnyTollOnRampRouter.sol

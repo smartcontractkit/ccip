@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../helpers/receivers/RevertingMessageReceiver.sol";
 import "./EVM2EVMTollOffRampSetup.t.sol";
 import "../../../offRamp/toll/Any2EVMTollOffRampRouter.sol";
+import "../../helpers/receivers/MaybeRevertMessageReceiver.sol";
 
 /// @notice #constructor
 contract EVM2EVMTollOffRamp_constructor is EVM2EVMTollOffRampSetup {
@@ -111,7 +111,7 @@ contract EVM2EVMTollOffRamp_execute is EVM2EVMTollOffRampSetup {
   // not disrupt the overall execution of the batch
   function testSingleMessageFailureSuccess() public {
     CCIP.EVM2EVMTollMessage[] memory messages = _generateBasicMessages();
-    RevertingMessageReceiver newReceiver = new RevertingMessageReceiver();
+    MaybeRevertMessageReceiver newReceiver = new MaybeRevertMessageReceiver(true);
     messages[0].receiver = address(newReceiver);
 
     vm.expectEmit(false, false, false, true);

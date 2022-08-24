@@ -158,18 +158,54 @@ contract EVM2EVMTollOnRamp_getRequiredFee is EVM2EVMTollOnRampSetup {
   // Asserts that the fee is calculated correctly.
   function testGetRequiredFeeSuccess() public {
     uint256 fee = s_onRamp.getRequiredFee(s_sourceTokens[0]);
-    uint256 expectedFee = RELAYING_FEE_JUELS * uint256(s_sourceFeeds[0].latestAnswer());
+    uint256 expectedFee = RELAYING_FEE_JUELS;
     assertEq(expectedFee, fee);
+  }
+}
+
+/// @notice #setFeeConfig
+contract EVM2EVMTollOnRamp_setFeeConfig is EVM2EVMTollOnRampSetup {
+  Any2EVMTollOnRampInterface.FeeConfig s_feeConfig1;
+  Any2EVMTollOnRampInterface.FeeConfig s_feeConfig2;
+  uint256 constant FEE = 1;
+
+  function setUp() public virtual override {
+    EVM2EVMTollOnRampSetup.setUp();
+
+    // Set up arguments for fee config.
+    IERC20[] memory feeTokens1 = new IERC20[](1);
+    feeTokens1[0] = s_sourceTokens[0];
+    IERC20[] memory feeTokens2 = new IERC20[](1);
+    feeTokens2[0] = s_sourceTokens[1];
+    uint256[] memory fees = new uint256[](1);
+    fees[0] = FEE;
+    s_feeConfig1 = Any2EVMTollOnRampInterface.FeeConfig({feeTokens: feeTokens1, fees: fees});
+    s_feeConfig2 = Any2EVMTollOnRampInterface.FeeConfig({feeTokens: feeTokens2, fees: fees});
+  }
+
+  // Success
+
+  function testSetFeeConfigSuccess() public {
+    s_onRamp.setFeeConfig(s_feeConfig1);
+    // Only configured fee should be set.
+    uint256 fee = s_onRamp.getRequiredFee(s_sourceTokens[0]);
+    assertEq(FEE, fee);
+    uint256 fee2 = s_onRamp.getRequiredFee(s_sourceTokens[1]);
+    assertEq(0, fee2);
+
+    // Should clear old fees upon setting.
+    s_onRamp.setFeeConfig(s_feeConfig2);
+    fee = s_onRamp.getRequiredFee(s_sourceTokens[0]);
+    assertEq(0, fee);
+    fee2 = s_onRamp.getRequiredFee(s_sourceTokens[1]);
+    assertEq(FEE, fee2);
   }
 
   // Reverts
 
-  // Asserts that the fee is calculated correctly.
-  function testGetRequiredFeeUnsupportedFeeToken() public {
-    IERC20 wrongToken = IERC20(address(1));
-
-    vm.expectRevert(abi.encodeWithSelector(Any2EVMTollOnRampInterface.UnsupportedFeeToken.selector, wrongToken));
-
-    s_onRamp.getRequiredFee(wrongToken);
+  function testSetFeeConfigNotOwnerReverts() public {
+    changePrank(STRANGER);
+    vm.expectRevert("Only callable by owner");
+    s_onRamp.setFeeConfig(s_feeConfig1);
   }
 }

@@ -26,7 +26,6 @@ type EvmChainConfig struct {
 	LinkToken       common.Address
 	BridgeTokens    []common.Address
 	TokenPools      []common.Address
-	PriceFeeds      []common.Address
 	OnRamp          common.Address
 	OnRampRouter    common.Address
 	BlobVerifier    common.Address
@@ -71,7 +70,6 @@ var Rinkeby = EvmChainConfig{
 	LinkToken:    common.HexToAddress("0x01be23585060835e02b77ef475b0cc51aa1e0709"),
 	BridgeTokens: []common.Address{common.HexToAddress("0x01be23585060835e02b77ef475b0cc51aa1e0709")},
 	TokenPools:   []common.Address{common.HexToAddress("0xcB6f8a746db85f60a58Eba211E476601fd40A999")},
-	PriceFeeds:   []common.Address{common.HexToAddress("0x676f9261ecB2fd1B9d047BaC003bD30be61fDf24")},
 	OnRamp:       common.HexToAddress("0x989996F826e37BCD6aeD6649838292F45A7eC732"),
 	OnRampRouter: common.HexToAddress("0xABca0Bb6227Fe4a23b1A46DF0c8764abE2759F75"),
 	TokenSender:  common.HexToAddress("0x1859E433Cb8B9a5Dcf2E3DffB460A299FC5Dd06D"),
@@ -147,7 +145,6 @@ var PolygonMumbai = EvmChainConfig{
 	},
 	LinkToken:       common.HexToAddress("0x326C977E6efc84E512bB9C30f76E30c160eD06FB"),
 	BridgeTokens:    []common.Address{common.HexToAddress("0x326C977E6efc84E512bB9C30f76E30c160eD06FB")},
-	PriceFeeds:      []common.Address{common.HexToAddress("0xB42E8f41F21b3ce8C857a45972106ccE57cea0Fa")},
 	TokenPools:      []common.Address{common.HexToAddress("0xf45818c983DD98792576062F128B4ad6E4b93632")},
 	OnRamp:          common.Address{},
 	BlobVerifier:    common.HexToAddress("0xB16eaA4596a2CedD765B85334448DB6C6Cb5c2FE"),

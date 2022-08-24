@@ -15,6 +15,19 @@ import (
 
 const (
 	PERMISSIONLESS_EXECUTION_THRESHOLD_SECONDS = 2 * 7 * 24 * 60 * 60
+	EVM_ADDRESS_LENGTH_BYTES                   = 20
+	EVM_WORD_BYTES                             = 32
+	CALLDATA_GAS_PER_BYTE                      = 16
+	PER_TOKEN_OVERHEAD_GAS                     = (2_100 + // COLD_SLOAD_COST for first reading the pool
+		2_100 + // COLD_SLOAD_COST for pool to ensure allowed offramp calls it
+		2_100 + // COLD_SLOAD_COST for accessing pool balance slot
+		5_000 + // SSTORE_RESET_GAS for decreasing pool balance from non-zero to non-zero
+		2_100 + // COLD_SLOAD_COST for accessing receiver balance
+		20_000 + // SSTORE_SET_GAS for increasing receiver balance from zero to non-zero
+		2_100) // COLD_SLOAD_COST for obtanining price of token to use for aggregate token bucket
+	RATE_LIMITER_OVERHEAD_GAS = (2_100 + // COLD_SLOAD_COST for accessing token bucket
+		5_000) // SSTORE_RESET_GAS for updating & decreasing token bucket
+	EXTERNAL_CALL_OVERHEAD_GAS = 2600 // because the receiver will be untouched initially
 )
 
 type BatchBuilder interface {
@@ -69,7 +82,7 @@ func (eb *ExecutionBatchBuilder) relayedReport(seqNr uint64) (blob_verifier.CCIP
 	}
 	// Since the report accepted logs now contain intervals per onramp, we don't have a simple way of looking
 	// up the relayed report for a given sequence number from the chain.
-	// TODO: Follow up with a more efficient way, ideally we use the chain only to obtain natural reorg self-healing.
+	// TODO(https://app.shortcut.com/chainlinklabs/story/51129/efficient-report-from-seq-num-lookup): Follow up with a more efficient way, ideally we use the chain only to obtain natural reorg self-healing.
 	// One option is to emit a log per onramp (i.e. ReportAccepted(root, onRamp, min, max)) so we could easily search for the relevant log?
 	logs, err := eb.dstLogPoller.Logs(1, latest, ReportAccepted, eb.blobVerifier.Address())
 	if err != nil {
@@ -111,6 +124,7 @@ func (eb *ExecutionBatchBuilder) getUnexpiredRelayReports() ([]blob_verifier.CCI
 		if err != nil {
 			return nil, err
 		}
+		// TODO: Need to check only blessed roots (need https://github.com/smartcontractkit/ccip-spec/pull/89)
 		reports = append(reports, reportAccepted.Report)
 	}
 	return reports, nil
@@ -133,7 +147,11 @@ func (eb *ExecutionBatchBuilder) getExecutedSeqNrsInRange(min, max uint64) (map[
 	return executedMp, nil
 }
 
-func (eb *ExecutionBatchBuilder) getExecutableSeqNrs(maxGasPrice uint64, tokensPerFeeCoin map[common.Address]*big.Int, inflight []InflightExecutionReport) ([]uint64, error) {
+func (eb *ExecutionBatchBuilder) getExecutableSeqNrs(
+	maxGasPrice uint64,
+	tokensPerFeeCoin map[common.Address]*big.Int,
+	inflight []InflightExecutionReport,
+) ([]uint64, error) {
 	unexpiredReports, err := eb.getUnexpiredRelayReports()
 	if err != nil {
 		return nil, err
@@ -148,7 +166,7 @@ func (eb *ExecutionBatchBuilder) getExecutableSeqNrs(maxGasPrice uint64, tokensP
 			}
 		}
 		if !found {
-			eb.lggr.Infof("onRamp not found in report skipping", "onRamp", eb.onRamp)
+			eb.lggr.Infow("onRamp not found in report skipping", "onRamp", eb.onRamp)
 			continue
 		}
 		snoozeUntil, haveSnoozed := eb.snoozedRoots[unexpiredReport.MerkleRoots[idx]]

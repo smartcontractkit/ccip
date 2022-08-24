@@ -14,8 +14,6 @@ contract TokenSetup is BaseTest {
   PoolInterface[] internal s_sourcePools;
   PoolInterface[] internal s_destPools;
 
-  AggregatorV2V3Interface[] internal s_sourceFeeds;
-
   uint256 internal constant TOKENS_PER_FEE_COIN = 2e20;
 
   function setUp() public virtual override {
@@ -44,11 +42,6 @@ contract TokenSetup is BaseTest {
       // Float the pools with funds
       s_destTokens[0].transfer(address(s_destPools[0]), 1e25);
       s_destTokens[1].transfer(address(s_destPools[1]), 1e25);
-    }
-
-    if (s_sourceFeeds.length == 0) {
-      s_sourceFeeds.push(new MockV3Aggregator(0, 1));
-      s_sourceFeeds.push(new MockV3Aggregator(0, 2));
     }
   }
 }

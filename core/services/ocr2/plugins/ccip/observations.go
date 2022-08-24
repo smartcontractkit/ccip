@@ -17,6 +17,7 @@ import (
 
 const (
 	MaxObservationLength = 200 // TODO: Think about what to set this too
+	MaxQueryLength       = 200 // TODO: Think about what to set this too, roughly maxTokens*maxPriceInBytesPerToken
 )
 
 func EvmWord(i uint64) common.Hash {

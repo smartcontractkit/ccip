@@ -93,7 +93,7 @@ contract EVM2AnyTollOnRampRouter_ccipSend is EVM2EVMTollOnRampSetup {
     IERC20 wrongFeeToken = IERC20(address(1));
     message.feeToken = wrongFeeToken;
 
-    vm.expectRevert(abi.encodeWithSelector(Any2EVMTollOnRampInterface.UnsupportedFeeToken.selector, wrongFeeToken));
+    vm.expectRevert(abi.encodeWithSelector(BaseOnRampInterface.UnsupportedToken.selector, wrongFeeToken));
 
     s_onRampRouter.ccipSend(DEST_CHAIN_ID, message);
   }

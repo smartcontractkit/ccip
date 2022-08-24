@@ -75,6 +75,7 @@ package gethwrappers
 
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/ReceiverDapp.abi ../../contracts/solc/v0.8.15/ReceiverDapp.bin ReceiverDapp receiver_dapp
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/SimpleMessageReceiver.abi ../../contracts/solc/v0.8.15/SimpleMessageReceiver.bin SimpleMessageReceiver simple_message_receiver
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/MaybeRevertMessageReceiver.abi ../../contracts/solc/v0.8.15/MaybeRevertMessageReceiver.bin MaybeRevertMessageReceiver maybe_revert_message_receiver
 
 // Toll
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2AnyTollOnRampRouter.abi ../../contracts/solc/v0.8.15/EVM2AnyTollOnRampRouter.bin EVM2AnyTollOnRampRouter evm_2_any_toll_onramp_router

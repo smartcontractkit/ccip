@@ -10,9 +10,7 @@ interface BaseOnRampInterface is AllowListInterface {
   error UnsupportedToken(IERC20 token);
   error MustBeCalledByRouter();
   error RouterMustSetOriginalSender();
-  error TokenConfigMismatch();
   error RouterNotSet();
-
   event RouterSet(address router);
   event OnRampConfigSet(OnRampConfig config);
 

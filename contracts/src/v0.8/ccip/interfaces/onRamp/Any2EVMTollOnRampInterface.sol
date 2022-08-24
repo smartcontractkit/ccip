@@ -5,7 +5,7 @@ import "../../models/Models.sol";
 import "./BaseOnRampInterface.sol";
 
 interface Any2EVMTollOnRampInterface is BaseOnRampInterface {
-  error UnsupportedFeeToken(IERC20 token);
+  error InvalidFeeConfig();
 
   event CCIPSendRequested(CCIP.EVM2EVMTollEvent message);
 
@@ -17,6 +17,19 @@ interface Any2EVMTollOnRampInterface is BaseOnRampInterface {
    * @param originalSender The original initiator of the CCIP request
    */
   function forwardFromRouter(CCIP.EVM2AnyTollMessage memory message, address originalSender) external returns (uint64);
+
+  struct FeeConfig {
+    // Fees per fee token
+    uint256[] fees;
+    // Supported fee tokens
+    IERC20[] feeTokens;
+  }
+
+  /**
+   * @notice Set the required fee by fee token.
+   * @param feeConfig fees by token.
+   */
+  function setFeeConfig(FeeConfig calldata feeConfig) external;
 
   /**
    * @notice Get the required fee for a specific fee token

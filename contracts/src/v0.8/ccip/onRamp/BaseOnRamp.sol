@@ -4,18 +4,10 @@ pragma solidity 0.8.15;
 import "../../vendor/SafeERC20.sol";
 import "../pools/TokenPoolRegistry.sol";
 import "../health/HealthChecker.sol";
-import "../priceFeedRegistry/PriceFeedRegistry.sol";
 import "../pools/PoolCollector.sol";
 import "../access/AllowList.sol";
 
-contract BaseOnRamp is
-  BaseOnRampInterface,
-  HealthChecker,
-  TokenPoolRegistry,
-  PriceFeedRegistry,
-  PoolCollector,
-  AllowList
-{
+contract BaseOnRamp is BaseOnRampInterface, HealthChecker, TokenPoolRegistry, PoolCollector, AllowList {
   using SafeERC20 for IERC20;
 
   // Chain ID of the source chain (where this contract is deployed)
@@ -38,12 +30,11 @@ contract BaseOnRamp is
     uint256 destinationChainId,
     IERC20[] memory tokens,
     PoolInterface[] memory pools,
-    AggregatorV2V3Interface[] memory feeds,
     address[] memory allowlist,
     AFNInterface afn,
     OnRampConfig memory config,
     address router
-  ) HealthChecker(afn) TokenPoolRegistry(tokens, pools) PriceFeedRegistry(tokens, feeds) AllowList(allowlist) {
+  ) HealthChecker(afn) TokenPoolRegistry(tokens, pools) AllowList(allowlist) {
     // TokenPoolRegistry does a check on tokens.length != pools.length
     i_chainId = chainId;
     i_destinationChainId = destinationChainId;

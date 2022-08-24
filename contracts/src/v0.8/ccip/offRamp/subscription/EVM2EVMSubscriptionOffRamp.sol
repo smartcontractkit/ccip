@@ -72,7 +72,8 @@ contract EVM2EVMSubscriptionOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR
       revert ManualExecutionNotYetEnabled();
     }
 
-    uint256[] memory tokenPerFeeCoin = report.tokenPerFeeCoin;
+    // tokenPerFeeCoin[0] is used because all subscriptions use the same payment token
+    uint256 tokenPerFeeCoin = report.tokenPerFeeCoin[0];
     for (uint256 i = 0; i < numMsgs; ++i) {
       uint256 gasBegin = gasleft();
       CCIP.EVM2EVMSubscriptionMessage memory message = decodedMessages[i];
@@ -98,18 +99,15 @@ contract EVM2EVMSubscriptionOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR
         _getPool(message.tokens[j]);
       }
 
-      // Reduce stack pressure
-      {
-        s_executedMessages[message.sequenceNumber] = CCIP.MessageExecutionState.IN_PROGRESS;
-        CCIP.MessageExecutionState newState = _trialExecute(message._toAny2EVMMessage());
-        s_executedMessages[message.sequenceNumber] = newState;
-        emit ExecutionStateChanged(message.sequenceNumber, newState);
+      s_executedMessages[message.sequenceNumber] = CCIP.MessageExecutionState.IN_PROGRESS;
+      CCIP.MessageExecutionState newState = _trialExecute(message._toAny2EVMMessage());
+      s_executedMessages[message.sequenceNumber] = newState;
+      emit ExecutionStateChanged(message.sequenceNumber, newState);
 
-        // Increment the nonce of the receiver if it's the next nonce in line and it was successfully
-        // executed or if the subscription doesn't require strict sequencing.
-        if (isNextInSequence && (newState == CCIP.MessageExecutionState.SUCCESS || !subscription.strictSequencing)) {
-          s_receiverToNonce[message.receiver]++;
-        }
+      // Increment the nonce of the receiver if it's the next nonce in line and it was successfully
+      // executed or if the subscription doesn't require strict sequencing.
+      if (isNextInSequence && (newState == CCIP.MessageExecutionState.SUCCESS || !subscription.strictSequencing)) {
+        s_receiverToNonce[message.receiver]++;
       }
 
       if (!manualExecution) {
@@ -120,7 +118,7 @@ contract EVM2EVMSubscriptionOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR
           // example: 100k gas, 20 gwei = 1e5 * 20e9  = 2e15
           // Gas cost in token: costInWei * 1e18 / tokenPerFeeCoin
           // example: costInWei 2e15, tokenPerFeeCoin 2e20 = 2e15 * 2e20 / 1e18 = 4e17 tokens
-          ((gasBegin - gasleft() + merkleGasShare) * tx.gasprice * tokenPerFeeCoin[i]) / 1 ether
+          ((gasBegin - gasleft() + merkleGasShare) * tx.gasprice * tokenPerFeeCoin) / 1 ether
         );
       }
     }

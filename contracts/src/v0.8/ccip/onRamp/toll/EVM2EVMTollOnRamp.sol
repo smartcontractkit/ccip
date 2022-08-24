@@ -14,17 +14,20 @@ contract EVM2EVMTollOnRamp is Any2EVMTollOnRampInterface, BaseOnRamp, TypeAndVer
 
   string public constant override typeAndVersion = "EVM2EVMTollOnRamp 1.0.0";
 
+  // Fees per token.
+  IERC20[] internal s_feeTokens;
+  mapping(IERC20 => uint256) internal s_feesByToken;
+
   constructor(
     uint256 chainId,
     uint256 destinationChainId,
     IERC20[] memory tokens,
     PoolInterface[] memory pools,
-    AggregatorV2V3Interface[] memory feeds,
     address[] memory allowlist,
     AFNInterface afn,
     OnRampConfig memory config,
     Any2EVMTollOnRampRouterInterface router
-  ) BaseOnRamp(chainId, destinationChainId, tokens, pools, feeds, allowlist, afn, config, address(router)) {}
+  ) BaseOnRamp(chainId, destinationChainId, tokens, pools, allowlist, afn, config, address(router)) {}
 
   /// @inheritdoc Any2EVMTollOnRampInterface
   function forwardFromRouter(CCIP.EVM2AnyTollMessage memory message, address originalSender)
@@ -56,9 +59,29 @@ contract EVM2EVMTollOnRamp is Any2EVMTollOnRampInterface, BaseOnRamp, TypeAndVer
   }
 
   /// @inheritdoc Any2EVMTollOnRampInterface
-  function getRequiredFee(IERC20 feeToken) public view override returns (uint256) {
-    AggregatorV2V3Interface feed = getFeed(feeToken);
-    if (address(feed) == address(0)) revert UnsupportedFeeToken(feeToken);
-    return s_config.relayingFeeJuels * uint256(feed.latestAnswer());
+  // If the fee is not explicitly set, we use the solidity default of zero.
+  // The set of tokens in the pool registry defines the whitelist of fee tokens.
+  function setFeeConfig(FeeConfig memory feeConfig) external override onlyOwner {
+    if (feeConfig.fees.length != feeConfig.feeTokens.length) {
+      revert InvalidFeeConfig();
+    }
+    // Clear previously set fees.
+    for (uint256 i = 0; i < s_feeTokens.length; i++) {
+      delete s_feesByToken[s_feeTokens[i]];
+    }
+    // Set new fees
+    for (uint256 i = 0; i < feeConfig.feeTokens.length; i++) {
+      if (address(feeConfig.feeTokens[i]) == address(0)) {
+        revert InvalidFeeConfig();
+      }
+      s_feesByToken[feeConfig.feeTokens[i]] = feeConfig.fees[i];
+    }
+    s_feeTokens = feeConfig.feeTokens;
+  }
+
+  /// @inheritdoc Any2EVMTollOnRampInterface
+  // NOTE: Assumes fee token is valid.
+  function getRequiredFee(IERC20 feeToken) external view override returns (uint256) {
+    return s_feesByToken[feeToken];
   }
 }

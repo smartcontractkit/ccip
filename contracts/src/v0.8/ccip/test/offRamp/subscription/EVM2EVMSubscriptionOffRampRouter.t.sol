@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../helpers/receivers/RevertingMessageReceiver.sol";
 import "./EVM2EVMSubscriptionOffRampSetup.t.sol";
+import "../../helpers/receivers/MaybeRevertMessageReceiver.sol";
 
 /// @notice #constructor
 contract EVM2EVMSubscriptionOffRampRouter_constructor is EVM2EVMSubscriptionOffRampSetup {
@@ -33,13 +33,13 @@ contract EVM2EVMSubscriptionOffRampRouter_constructor is EVM2EVMSubscriptionOffR
 contract EVM2EVMSubscriptionOffRampRouter_routeMessage is EVM2EVMSubscriptionOffRampSetup {
   event MessageReceived(uint256 sequenceNumber);
 
-  Any2EVMMessageReceiverInterface s_revertingReceiver;
+  MaybeRevertMessageReceiver s_revertingReceiver;
 
   function setUp() public virtual override {
     EVM2EVMSubscriptionOffRampSetup.setUp();
     changePrank(address(s_offRamp));
 
-    s_revertingReceiver = new RevertingMessageReceiver();
+    s_revertingReceiver = new MaybeRevertMessageReceiver(true);
   }
 
   // Success

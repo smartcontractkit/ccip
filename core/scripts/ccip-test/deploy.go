@@ -15,7 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_toll_onramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/mock_v3_aggregator_contract"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/native_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/receiver_dapp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/simple_message_receiver"
@@ -56,8 +55,6 @@ func deploySourceContracts(t *testing.T, source *EvmChainConfig, offRampChainID 
 	tokenPools := deployNativeTokenPool(t, source)
 	// Updates source.AFN if any new contracts are deployed
 	deployAFN(t, source)
-	// Updates source.PriceFeeds if any new contracts are deployed
-	deployPriceFeed(t, source)
 	// Updates source.OnRampRouter if any new contracts are deployed
 	deployOnRampRouter(t, source)
 	// Updates source.OnRamp if any new contracts are deployed
@@ -136,7 +133,7 @@ func deployOnRamp(t *testing.T, client *EvmChainConfig, destinationChain *big.In
 		return onRamp
 	}
 
-	client.Logger.Infof("Deploying OnRamp: destinationChains %+v, bridgeTokens %+v, poolAddresses %+v, priceFeeds %+v", destinationChain, client.BridgeTokens, client.TokenPools, client.PriceFeeds)
+	client.Logger.Infof("Deploying OnRamp: destinationChains %+v, bridgeTokens %+v, poolAddresses %+v", destinationChain, client.BridgeTokens, client.TokenPools)
 	onRampAddress, tx, _, err := evm_2_evm_toll_onramp.DeployEVM2EVMTollOnRamp(
 		client.Owner,        // user
 		client.Client,       // client
@@ -144,7 +141,6 @@ func deployOnRamp(t *testing.T, client *EvmChainConfig, destinationChain *big.In
 		destinationChain,    // destinationChainId
 		client.BridgeTokens, // tokens
 		client.TokenPools,   // pools
-		client.PriceFeeds,   // Feeds
 		[]common.Address{},  // allow list
 		client.Afn,          // AFN
 		evm_2_evm_toll_onramp.BaseOnRampInterfaceOnRampConfig{
@@ -351,28 +347,6 @@ func deployAFN(t *testing.T, client *EvmChainConfig) *afn_contract.AFNContract {
 	return afn
 }
 
-func deployPriceFeed(t *testing.T, client *EvmChainConfig) []common.Address {
-	var priceFeeds []common.Address
-
-	for _, feed := range client.PriceFeeds {
-		if client.DeploySettings.DeployPriceFeeds {
-			address, tx, _, err := mock_v3_aggregator_contract.DeployMockV3AggregatorContract(client.Owner, client.Client, 18, big.NewInt(6e12))
-			require.NoError(t, err)
-			WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
-			client.Logger.Infof("Mock feed deployed on %s in tx: %s", address, helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash()))
-			priceFeeds = append(priceFeeds, address)
-		} else {
-			if feed.Hex() == "0x0000000000000000000000000000000000000000" {
-				t.Error("deploy new price feed set to false but no price feed given in config")
-			}
-			priceFeeds = append(priceFeeds, feed)
-		}
-	}
-
-	client.PriceFeeds = priceFeeds
-	return priceFeeds
-}
-
 func fillPoolWithTokens(t *testing.T, client *EvmChainConfig, pool *native_token_pool.NativeTokenPool) {
 	destLinkToken, err := link_token_interface.NewLinkToken(client.LinkToken, client.Client)
 	require.NoError(t, err)
@@ -408,7 +382,6 @@ Afn:          common.HexToAddress("%s"),
 		source.LinkToken,
 		source.BridgeTokens,
 		source.TokenPools,
-		source.PriceFeeds,
 		source.OnRamp,
 		source.OnRampRouter,
 		source.TokenSender,

@@ -37,7 +37,10 @@ library CCIP {
 
   struct ExecutionReport {
     uint64[] sequenceNumbers;
+    // Only used by toll as subscriptions use a known fee token.
     address[] tokenPerFeeCoinAddresses;
+    // For subscriptions only the first value is used as
+    // all subscriptions use the same fee token.
     uint256[] tokenPerFeeCoin;
     bytes[] encodedMessages;
     bytes32[] innerProofs;
