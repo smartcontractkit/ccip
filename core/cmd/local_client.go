@@ -127,14 +127,14 @@ func (cli *Client) runNode(c *clipkg.Context) error {
 	// From now on, DB locks and DB connection will be released on every return.
 	// Keep watching on logger.Fatal* calls and os.Exit(), because defer will not be executed.
 
-	app, err := cli.AppFactory.NewApplication(cli.Config, ldb.DB())
+	app, err := cli.AppFactory.NewApplication(rootCtx, cli.Config, ldb.DB())
 	if err != nil {
 		return cli.errorOut(errors.Wrap(err, "fatal error instantiating application"))
 	}
 
 	sessionORM := app.SessionORM()
 	keyStore := app.GetKeyStore()
-	err = cli.KeyStoreAuthenticator.authenticate(c, keyStore)
+	err = cli.KeyStoreAuthenticator.authenticate(c, keyStore, cli.Config)
 	if err != nil {
 		return errors.Wrap(err, "error authenticating keystore")
 	}
@@ -143,18 +143,15 @@ func (cli *Client) runNode(c *clipkg.Context) error {
 	var fileErr error
 	vrfPasswordFile := c.String("vrfpassword")
 	if len(vrfPasswordFile) != 0 {
-		vrfpwd, fileErr = passwordFromFile(vrfPasswordFile)
+		// TODO: In config V2 this is handled while building the config struct
+		vrfpwd, fileErr = utils.PasswordFromFile(vrfPasswordFile)
 		if fileErr != nil {
 			return errors.Wrapf(fileErr,
 				"error reading VRF password from vrfpassword file \"%s\"",
 				vrfPasswordFile)
 		}
-		if strings.TrimSpace(vrfpwd) != vrfpwd {
-			return ErrPasswordWhitespace
-		}
-		if len(vrfpwd) == 0 {
-			return ErrEmptyPasswordInFile
-		}
+	} else {
+		vrfpwd = cli.Config.VRFPassword()
 	}
 
 	evmChainSet := app.GetChains().EVM
@@ -336,15 +333,6 @@ func checkFilePermissions(lggr logger.Logger, rootDir string) error {
 	return nil
 }
 
-func passwordFromFile(pwdFile string) (string, error) {
-	if len(pwdFile) == 0 {
-		return "", nil
-	}
-	dat, err := ioutil.ReadFile(pwdFile)
-	// handle POSIX case, when text files may have a trailing \n
-	return strings.TrimSuffix(string(dat), "\n"), err
-}
-
 // RebroadcastTransactions run locally to force manual rebroadcasting of
 // transactions in a given nonce range.
 func (cli *Client) RebroadcastTransactions(c *clipkg.Context) (err error) {
@@ -366,7 +354,7 @@ func (cli *Client) RebroadcastTransactions(c *clipkg.Context) (err error) {
 		var ok bool
 		chainID, ok = big.NewInt(0).SetString(chainIDStr, 10)
 		if !ok {
-			return cli.errorOut(errors.Wrap(err, "invalid evmChainID"))
+			return cli.errorOut(errors.New("invalid evmChainID"))
 		}
 	}
 
@@ -377,7 +365,7 @@ func (cli *Client) RebroadcastTransactions(c *clipkg.Context) (err error) {
 	}
 	defer lggr.ErrorIfClosing(db, "db")
 
-	app, err := cli.AppFactory.NewApplication(cli.Config, db)
+	app, err := cli.AppFactory.NewApplication(context.TODO(), cli.Config, db)
 	if err != nil {
 		return cli.errorOut(errors.Wrap(err, "fatal error instantiating application"))
 	}
@@ -386,7 +374,7 @@ func (cli *Client) RebroadcastTransactions(c *clipkg.Context) (err error) {
 			err = multierr.Append(err, serr)
 		}
 	}()
-	pwd, err := passwordFromFile(c.String("password"))
+	pwd, err := utils.PasswordFromFile(c.String("password"))
 	if err != nil {
 		return cli.errorOut(fmt.Errorf("error reading password: %+v", err))
 	}
@@ -784,33 +772,4 @@ func insertFixtures(config config.GeneralConfig, pathToFixtures string) (err err
 	}
 	_, err = db.Exec(string(fixturesSQL))
 	return err
-}
-
-// SetNextNonce manually updates the keys.next_nonce field for the given key with the given nonce value
-func (cli *Client) SetNextNonce(c *clipkg.Context) error {
-	addressHex := c.String("address")
-	nextNonce := c.Uint64("nextNonce")
-
-	db, err := newConnection(cli.Config, cli.Logger)
-	if err != nil {
-		return cli.errorOut(err)
-	}
-
-	address, err := hexutil.Decode(addressHex)
-	if err != nil {
-		return cli.errorOut(errors.Wrap(err, "could not decode address"))
-	}
-
-	res, err := db.Exec(`UPDATE eth_key_states SET next_nonce = $1 WHERE address = $2`, nextNonce, address)
-	if err != nil {
-		return cli.errorOut(err)
-	}
-	rowsAffected, err := res.RowsAffected()
-	if err != nil {
-		return cli.errorOut(err)
-	}
-	if rowsAffected == 0 {
-		return cli.errorOut(fmt.Errorf("no key found matching address %s", addressHex))
-	}
-	return nil
 }

@@ -53,12 +53,20 @@ func NewApp(client *Client) *cli.App {
 		},
 		cli.StringFlag{
 			Name:   "config, c",
+			Hidden: !v2.CLDev,
 			Usage:  "EXPERIMENTAL: TOML configuration file via flag, or raw TOML via env var. If used, legacy env vars must not be set.",
 			EnvVar: "CL_CONFIG",
+		},
+		cli.StringFlag{
+			Name:   "secrets, s",
+			Hidden: !v2.CLDev,
+			Usage:  "EXPERIMENTAL: TOML configuration file for secrets. Must be set if and only if config is set.",
 		},
 	}
 	app.Before = func(c *cli.Context) error {
 		if c.IsSet("config") {
+			var err error
+
 			// TOML
 			configTOML := os.Getenv("CL_CONFIG")
 			if configTOML == "" {
@@ -69,14 +77,26 @@ func NewApp(client *Client) *cli.App {
 				}
 				configTOML = string(b)
 			}
-			var err error
-			client.Config, err = chainlink.NewGeneralConfig(configTOML)
+
+			secretsTOML := ""
+			if c.IsSet(("secrets")) {
+				secretsFileName := c.String("secrets")
+				b, err := os.ReadFile(secretsFileName)
+				if err != nil {
+					return errors.Wrapf(err, "failed to read secrets file: %s", secretsFileName)
+				}
+				secretsTOML = string(b)
+			}
+			client.Config, err = chainlink.NewGeneralConfig(configTOML, secretsTOML, c)
 			if err != nil {
 				return err
 			}
 			//TODO error if any legacy env vars set https://app.shortcut.com/chainlinklabs/story/33615/create-new-implementation-of-chainscopedconfig-generalconfig-interfaces-that-sources-config-from-a-config-toml-file
 		} else {
 			// Legacy ENV
+			if c.IsSet("secrets") {
+				panic("secrets file must not be used without a core config file")
+			}
 			client.Config = config.NewGeneralConfig(client.Logger)
 		}
 		logDeprecatedClientEnvWarnings(client.Logger)
@@ -458,6 +478,31 @@ func NewApp(client *Client) *cli.App {
 							},
 							Action: client.ExportETHKey,
 						},
+						{
+							Name:   "chain",
+							Usage:  "Update an EVM key for the given chain",
+							Action: client.UpdateChainEVMKey,
+							Flags: []cli.Flag{
+								cli.StringFlag{
+									Name:     "address",
+									Usage:    "address of the key",
+									Required: true,
+								},
+								cli.StringFlag{
+									Name:     "evmChainID",
+									Usage:    "chain ID of the key",
+									Required: true,
+								},
+								cli.Uint64Flag{
+									Name:  "setNextNonce",
+									Usage: "manually set the next nonce for the key on the given chain. This should not be necessary during normal operation. USE WITH CAUTION: Setting this incorrectly can break your node",
+								},
+								cli.BoolFlag{
+									Name:  "setEnabled",
+									Usage: "enable/disable the key for the given chain",
+								},
+							},
+						},
 					},
 				},
 
@@ -750,21 +795,6 @@ func NewApp(client *Client) *cli.App {
 			Usage:       "Commands for admin actions that must be run locally",
 			Description: "Commands can only be run from on the same machine as the Chainlink node.",
 			Subcommands: []cli.Command{
-				{
-					Name:   "setnextnonce",
-					Usage:  "Manually set the next nonce for a key. This should NEVER be necessary during normal operation. USE WITH CAUTION: Setting this incorrectly can break your node.",
-					Action: client.SetNextNonce,
-					Flags: []cli.Flag{
-						cli.StringFlag{
-							Name:  "address",
-							Usage: "address of the key for which to set the nonce",
-						},
-						cli.Uint64Flag{
-							Name:  "nextNonce",
-							Usage: "the next nonce in the sequence",
-						},
-					},
-				},
 				{
 					Name:    "start",
 					Aliases: []string{"node", "n"},

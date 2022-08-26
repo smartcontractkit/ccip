@@ -74,7 +74,6 @@ func ExampleRun() {
 	//    --admin-credentials-file FILE  optional, applies only in client mode when making remote API calls. If provided, FILE containing admin credentials will be used for logging in, allowing to avoid an additional login step. If `FILE` is missing, it will be ignored. Defaults to <RootDir>/apicredentials
 	//    --remote-node-url URL          optional, applies only in client mode when making remote API calls. If provided, URL will be used as the remote Chainlink API endpoint (default: "http://localhost:6688")
 	//    --insecure-skip-verify         optional, applies only in client mode when making remote API calls. If turned on, SSL certificate verification will be disabled. This is mostly useful for people who want to use Chainlink with a self-signed TLS certificate
-	//    --config value, -c value       EXPERIMENTAL: TOML configuration file via flag, or raw TOML via env var. If used, legacy env vars must not be set. [$CL_CONFIG]
 	//    --help, -h                     show help
 	//    --version, -v                  print the version
 	// core.test version 0.0.0@exampleSHA
@@ -232,6 +231,7 @@ func ExampleRun_keys_eth() {
 	//    delete  Delete the ETH key by address
 	//    import  Import an ETH key from a JSON file
 	//    export  Exports an ETH key to a JSON file
+	//    chain   Update an EVM key for the given chain
 	//
 	// OPTIONS:
 	//    --help, -h  show help
@@ -446,7 +446,6 @@ func ExampleRun_node() {
 	//    core.test node command [command options] [arguments...]
 	//
 	// COMMANDS:
-	//    setnextnonce              Manually set the next nonce for a key. This should NEVER be necessary during normal operation. USE WITH CAUTION: Setting this incorrectly can break your node.
 	//    start, node, n            Run the Chainlink node
 	//    rebroadcast-transactions  Manually rebroadcast txs matching nonce range with the specified gas price. This is useful in emergencies e.g. high gas prices and/or network congestion to forcibly clear out the pending TX queue
 	//    status                    Displays the health of various services running inside the node.

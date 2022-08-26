@@ -499,6 +499,7 @@ func TestFluxMonitor_Deviation(t *testing.T) {
 	contractAddress   = "%s"
 	threshold = 2.0
 	absoluteThreshold = 0.0
+	evmChainID        = 1337
 
 	idleTimerPeriod = "10s"
 	idleTimerDisabled = false
@@ -833,8 +834,6 @@ func TestFluxMonitor_InvalidSubmission(t *testing.T) {
 	app := startApplication(t, fa, func(cfg *configtest.TestGeneralConfig) {
 		cfg.Overrides.SetDefaultHTTPTimeout(100 * time.Millisecond)
 		cfg.Overrides.SetTriggerFallbackDBPollInterval(1 * time.Second)
-		cfg.Overrides.GlobalEvmFinalityDepth = null.IntFrom(2)
-		cfg.Overrides.GlobalEvmHeadTrackerMaxBufferSize = null.IntFrom(100)
 	})
 
 	// Report a price that is above the maximum allowed value,

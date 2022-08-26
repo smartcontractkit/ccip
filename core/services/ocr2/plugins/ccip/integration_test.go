@@ -452,7 +452,7 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 		destLp logpoller.LogPoller = logpoller.NewLogPoller(logpoller.NewORM(destChainID, db, lggr, config), destClient,
 			lggr, 500*time.Millisecond, 10, 2)
 	)
-	evmChain, err := evm.LoadChainSet(evm.ChainSetOpts{
+	evmChain, err := evm.LoadChainSet(nil, evm.ChainSetOpts{
 		ORM:              chainORM,
 		Config:           config,
 		Logger:           lggr,
@@ -550,11 +550,11 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 
 	_, err = app.GetKeyStore().Eth().Create(destChainID)
 	require.NoError(t, err)
-	sendingKeys, err := app.GetKeyStore().Eth().SendingKeys(destChainID)
+	sendingKeys, err := app.GetKeyStore().Eth().EnabledKeysForChain(destChainID)
 	require.NoError(t, err)
 	require.Len(t, sendingKeys, 1)
-	transmitter := sendingKeys[0].Address.Address()
-	s, err := app.GetKeyStore().Eth().GetState(sendingKeys[0].ID())
+	transmitter := sendingKeys[0].Address
+	s, err := app.GetKeyStore().Eth().GetState(sendingKeys[0].ID(), destChainID)
 	require.NoError(t, err)
 	lggr.Debug(fmt.Sprintf("Transmitter address %s chainID %s", transmitter, s.EVMChainID.String()))
 
