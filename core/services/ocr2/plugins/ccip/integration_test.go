@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -536,6 +538,8 @@ func setupNodeCCIP(t *testing.T, owner *bind.TransactOpts, port int64, dbName st
 		CloseLogger: func() error {
 			return nil
 		},
+		UnrestrictedHTTPClient: &http.Client{},
+		RestrictedHTTPClient:   &http.Client{},
 	})
 	require.NoError(t, err)
 	require.NoError(t, app.GetKeyStore().Unlock("password"))
@@ -836,6 +840,11 @@ contractConfigTrackerPollInterval = "1s"
 chainID = %s
 `, ccipContracts.blobVerifier.Address(), destChainID))
 
+	linkEth := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := w.Write([]byte(`{"JuelsPerETH": "200000000000000000000"}`))
+		require.NoError(t, err)
+	}))
+	defer linkEth.Close()
 	// For each node add a relayer and executor job.
 	for i, node := range nodes {
 		node.addJob(t, fmt.Sprintf(`
@@ -878,11 +887,18 @@ blobVerifierID      = "%s"
 sourceChainID       = %s
 destChainID         = %s
 pollPeriod          = "1s"
+tokensPerFeeCoinPipeline = """
+// Price 1 
+link [type=http method=GET url="%s"];
+link_parse [type=jsonparse path="JuelsPerETH"];
+link->link_parse;
+merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];
+"""
 
 [relayConfig]
 chainID             = "%s"
 
-`, i, ccipContracts.tollOffRamp.Address(), node.kb.ID(), node.transmitter, ccipContracts.tollOnRamp.Address(), ccipContracts.blobVerifier.Address(), sourceChainID, destChainID, destChainID))
+`, i, ccipContracts.tollOffRamp.Address(), node.kb.ID(), node.transmitter, ccipContracts.tollOnRamp.Address(), ccipContracts.blobVerifier.Address(), sourceChainID, destChainID, linkEth.URL, ccipContracts.destLinkToken.Address(), destChainID))
 		node.addJob(t, fmt.Sprintf(`
 type                = "offchainreporting2"
 pluginType          = "ccip-execution"
@@ -901,11 +917,17 @@ blobVerifierID      = "%s"
 sourceChainID       = %s
 destChainID         = %s
 pollPeriod          = "1s"
+tokensPerFeeCoinPipeline = """
+link [type=http method=GET url="%s"];
+link_parse [type=jsonparse path="JuelsPerETH"];
+link->link_parse;
+merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];
+"""
 
 [relayConfig]
 chainID             = "%s"
 
-`, i, ccipContracts.subOffRamp.Address(), node.kb.ID(), node.transmitter, ccipContracts.subOnRamp.Address(), ccipContracts.blobVerifier.Address(), sourceChainID, destChainID, destChainID))
+`, i, ccipContracts.subOffRamp.Address(), node.kb.ID(), node.transmitter, ccipContracts.subOnRamp.Address(), ccipContracts.blobVerifier.Address(), sourceChainID, destChainID, linkEth.URL, ccipContracts.destLinkToken.Address(), destChainID))
 	}
 	// With jobs present, replay the config log.
 	for _, node := range nodes {

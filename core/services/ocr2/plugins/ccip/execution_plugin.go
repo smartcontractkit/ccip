@@ -23,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/job"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins"
 	ccipconfig "github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/core/services/pipeline"
 )
 
 type CCIPExecution struct {
@@ -36,11 +37,13 @@ type CCIPExecution struct {
 	batchBuilder                       BatchBuilder
 	onRampSeqParser                    func(log logpoller.Log) (uint64, error)
 	reqEventSig                        common.Hash
+	priceGetter                        PriceGetter
 }
 
 var _ plugins.OraclePlugin = &CCIPExecution{}
 
-func NewCCIPExecution(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm.ChainSet) (*CCIPExecution, error) {
+func NewCCIPExecution(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, pr pipeline.Runner) (*CCIPExecution, error) {
+	spec := jb.OCR2OracleSpec
 	var pluginConfig ccipconfig.ExecutionPluginConfig
 	err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
 	if err != nil {
@@ -135,6 +138,10 @@ func NewCCIPExecution(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm
 	}
 	destChain.LogPoller().MergeFilter([]common.Hash{ExecutionStateChanged}, []common.Address{offRamp.Address()})
 	// TODO: Can also check the on/offramp pair is compatible
+	priceGetter, err := NewPriceGetter(pluginConfig.TokensPerFeeCoinPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
+	if err2 != nil {
+		return nil, err
+	}
 	return &CCIPExecution{
 		lggr:              lggr,
 		spec:              spec,
@@ -146,6 +153,7 @@ func NewCCIPExecution(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm
 		batchBuilder:      batchBuilder,
 		onRampSeqParser:   onRampSeqParser,
 		reqEventSig:       reqEventSig,
+		priceGetter:       priceGetter,
 	}, nil
 }
 
@@ -241,6 +249,7 @@ func (c *CCIPExecution) GetPluginFactory() (plugin ocrtypes.ReportingPluginFacto
 		c.batchBuilder,
 		c.onRampSeqParser,
 		c.reqEventSig,
+		c.priceGetter,
 	), nil
 }
 

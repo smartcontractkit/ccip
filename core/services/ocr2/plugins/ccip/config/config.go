@@ -4,6 +4,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 
+	"github.com/smartcontractkit/chainlink/core/services/pipeline"
 	"github.com/smartcontractkit/chainlink/core/store/models"
 )
 
@@ -38,7 +39,8 @@ type ExecutionPluginConfig struct {
 	// We execute for a single on/offramp pair (lane) between a given source/dest chain. E.g. a single message types.
 	OnRampID string `json:"onRampID"`
 	// BlobVerifierID
-	BlobVerifierID string `json:"blobVerifierID"`
+	BlobVerifierID           string `json:"blobVerifierID"`
+	TokensPerFeeCoinPipeline string `json:"tokensPerFeeCoinPipeline"`
 }
 
 // ValidateExecutionPluginConfig validates the arguments for the CCIP Execution plugin.
@@ -51,5 +53,6 @@ func (ep *ExecutionPluginConfig) ValidateExecutionPluginConfig() error {
 	if !common.IsHexAddress(ep.BlobVerifierID) {
 		return errors.Errorf("%v is not a valid EIP155 address", ep.BlobVerifierID)
 	}
-	return nil
+	_, err := pipeline.Parse(ep.TokensPerFeeCoinPipeline)
+	return err
 }

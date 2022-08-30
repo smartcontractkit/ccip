@@ -125,6 +125,7 @@ type ExecutionReportingPluginFactory struct {
 	builder             BatchBuilder
 	onRampSeqParser     func(log logpoller.Log) (uint64, error)
 	reqEventSig         common.Hash
+	priceGetter         PriceGetter
 }
 
 func NewExecutionReportingPluginFactory(
@@ -137,24 +138,10 @@ func NewExecutionReportingPluginFactory(
 	builder BatchBuilder,
 	onRampSeqParser func(log logpoller.Log) (uint64, error),
 	reqEventSig common.Hash,
+	priceGetter PriceGetter,
 ) types.ReportingPluginFactory {
 	return &ExecutionReportingPluginFactory{lggr: lggr, onRamp: onRamp, blobVerifier: blobVerifier, offRamp: offRamp, source: source, dest: dest, offRampAddr: offRampAddr, builder: builder,
-		onRampSeqParser: onRampSeqParser, reqEventSig: reqEventSig}
-}
-
-type dummyDataSource struct{}
-
-// GetPrice should fetch the price of an asset on the destination chain.
-func (d dummyDataSource) GetPrice(address common.Address) (*big.Int, error) {
-	// TODO: Actually query data source. For now just return a juels/ETH value.
-	// As the feed is in wei/link and not juels/eth we need to transform it
-	//  0.005 eth/link or 5e15 wei/link or 2e20 juels/eth
-	weiPerLink := big.NewInt(5e15)
-	precision := big.NewInt(0)
-	// 1e18 * 1e18 = 1e36
-	precision.SetString("1000000000000000000000000000000000000", 10)
-	juelsPerFeeCoin := big.NewInt(0).Div(precision, weiPerLink)
-	return juelsPerFeeCoin, nil
+		onRampSeqParser: onRampSeqParser, reqEventSig: reqEventSig, priceGetter: priceGetter}
 }
 
 func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.ReportingPluginConfig) (types.ReportingPlugin, types.ReportingPluginInfo, error) {
@@ -187,7 +174,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 				rf.lggr),
 			onRampSeqParser: rf.onRampSeqParser,
 			reqEventSig:     rf.reqEventSig,
-			dataSource:      dummyDataSource{},
+			priceGetter:     rf.priceGetter,
 		}, types.ReportingPluginInfo{
 			Name:          "CCIPExecution",
 			UniqueReports: true,
@@ -216,11 +203,7 @@ type ExecutionReportingPlugin struct {
 	builder         *ExecutionBatchBuilder
 	onRampSeqParser func(log logpoller.Log) (uint64, error)
 	reqEventSig     common.Hash
-	dataSource      DataSource
-}
-
-type DataSource interface {
-	GetPrice(token common.Address) (*big.Int, error)
+	priceGetter     PriceGetter
 }
 
 type InflightExecutionReport struct {
@@ -235,11 +218,11 @@ func (r *ExecutionReportingPlugin) tokenPrices(percentMultiplier *big.Int) (map[
 	if err != nil {
 		return nil, err
 	}
-	for _, token := range executionFeeTokens {
-		price, err := r.dataSource.GetPrice(token)
-		if err != nil {
-			return nil, err
-		}
+	prices, err := r.priceGetter.TokensPerFeeCoin(context.Background(), executionFeeTokens)
+	if err != nil {
+		return nil, err
+	}
+	for token, price := range prices {
 		buffer := big.NewInt(0).Div(price, percentMultiplier)
 		tokensPerFeeCoin[token] = big.NewInt(0).Add(price, buffer)
 	}

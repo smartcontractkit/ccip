@@ -389,7 +389,7 @@ func (d Delegate) ServicesForSpec(jobSpec job.Job) ([]job.ServiceCtx, error) {
 			return nil, err2
 		}
 		ocr2Provider = ccipProvider
-		pluginOracle, err = ccip.NewCCIPExecution(lggr, spec, d.chainSet)
+		pluginOracle, err = ccip.NewCCIPExecution(lggr, jobSpec, d.chainSet, d.pipelineRunner)
 	default:
 		return nil, errors.Errorf("plugin type %s not supported", spec.PluginType)
 	}
