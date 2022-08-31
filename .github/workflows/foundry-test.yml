@@ -1,24 +1,36 @@
 name: Foundry Tests
 on: [pull_request]
 
+env:
+  FOUNDRY_PROFILE: ci
+
 jobs:
   check:
-    name: Foundry Gas Test
+    name: Foundry Test
     runs-on: ubuntu-20.04
 
     steps:
       - uses: actions/checkout@v3
+        with:
+          submodules: recursive
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
           version: nightly
 
-      - name: Install dependencies
-        run: forge install
+      - name: Run Forge build
+        run: |
+          forge --version
+          forge build --sizes
+        id: build
 
-      - name: Run tests
-        run: forge test -vv
+      - name: Run Forge tests
+        run: |
+          forge test -vvv
+        id: test
 
       - name: Check gas snapshots
-        run: forge snapshot --check
+        run: |
+          forge snapshot --check
+        id: gas-check
