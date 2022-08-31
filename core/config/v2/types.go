@@ -47,6 +47,8 @@ type Core struct {
 
 	AutoPprof *AutoPprof
 
+	Pyroscope *Pyroscope
+
 	Sentry *Sentry
 }
 
@@ -304,6 +306,12 @@ type AutoPprof struct {
 	MutexProfileFraction *int64 // runtime.SetMutexProfileFraction
 	MemThreshold         *utils.FileSize
 	GoroutineThreshold   *int64
+}
+
+type Pyroscope struct {
+	AuthToken     *string
+	ServerAddress *string
+	Environment   *string
 }
 
 type Sentry struct {
