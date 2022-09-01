@@ -2,7 +2,6 @@
 pragma solidity 0.8.15;
 
 import "../../../interfaces/TypeAndVersionInterface.sol";
-import "../../../vendor/SafeERC20.sol";
 import "../../subscription/Subscription.sol";
 import "../BaseOffRampRouter.sol";
 
@@ -17,8 +16,7 @@ contract Any2EVMSubscriptionOffRampRouter is BaseOffRampRouter, Subscription, Ty
   /**
    * @notice Charges a subscription
    * @param receiver Receiver address of the subscription that is to be charged
-   * @param sender The sender of the cross chain message that is charging
-   *          the subscription
+   * @param sender The sender of the cross chain message that is charging the subscription
    * @param amount The fee amount to be charged
    * @dev should be called from the OffRamp
    */
@@ -27,8 +25,7 @@ contract Any2EVMSubscriptionOffRampRouter is BaseOffRampRouter, Subscription, Ty
     address sender,
     uint256 amount
   ) public onlyOffRamp {
-    OffRampSubscription memory subscription = s_subscriptions[receiver];
-    address[] memory allowedSenders = subscription.senders;
+    address[] memory allowedSenders = s_subscriptions[receiver].senders;
     for (uint256 i = 0; i < allowedSenders.length; ++i) {
       if (allowedSenders[i] == sender) {
         s_subscriptions[receiver].balance -= amount;

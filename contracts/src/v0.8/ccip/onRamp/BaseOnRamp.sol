@@ -1,15 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../vendor/SafeERC20.sol";
 import "../pools/TokenPoolRegistry.sol";
 import "../health/HealthChecker.sol";
 import "../pools/PoolCollector.sol";
 import "../access/AllowList.sol";
 
 contract BaseOnRamp is BaseOnRampInterface, HealthChecker, TokenPoolRegistry, PoolCollector, AllowList {
-  using SafeERC20 for IERC20;
-
   // Chain ID of the source chain (where this contract is deployed)
   uint256 public immutable i_chainId;
   // Chain ID of the destination chain (where this contract sends messages)

@@ -12,7 +12,6 @@ import "../BaseOffRamp.sol";
  * in an OffRamp in a single transaction.
  */
 contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
-  using Address for address;
   using CCIP for CCIP.EVM2EVMTollMessage;
 
   string public constant override typeAndVersion = "EVM2EVMTollOffRamp 1.0.0";

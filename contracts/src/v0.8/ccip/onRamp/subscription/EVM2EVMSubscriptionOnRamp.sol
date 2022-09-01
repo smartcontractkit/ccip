@@ -9,9 +9,6 @@ import "../BaseOnRamp.sol";
  * @notice An implementation of a subscription OnRamp.
  */
 contract EVM2EVMSubscriptionOnRamp is Any2EVMSubscriptionOnRampInterface, BaseOnRamp, TypeAndVersionInterface {
-  using Address for address;
-  using SafeERC20 for IERC20;
-
   string public constant override typeAndVersion = "EVM2EVMSubscriptionOnRamp 1.0.0";
 
   // The last used sequence number per receiver address. This is zero in the case

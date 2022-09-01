@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../vendor/SafeERC20.sol";
+import "../../vendor/Address.sol";
 import "../health/HealthChecker.sol";
 import "../pools/TokenPoolRegistry.sol";
 import "../interfaces/offRamp/Any2EVMOffRampInterface.sol";

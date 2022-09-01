@@ -1,13 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../vendor/SafeERC20.sol";
 import "../interfaces/access/AllowListInterface.sol";
 import "../access/OwnerIsCreator.sol";
 
 contract AllowList is AllowListInterface, OwnerIsCreator {
-  using Address for address;
-
   // Whether the allowlist is enabled
   bool internal s_allowlistEnabled;
   // List of allowed addresses

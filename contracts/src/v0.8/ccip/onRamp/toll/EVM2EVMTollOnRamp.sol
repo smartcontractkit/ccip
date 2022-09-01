@@ -9,9 +9,6 @@ import "../BaseOnRamp.sol";
  * @notice An implementation of a toll OnRamp.
  */
 contract EVM2EVMTollOnRamp is Any2EVMTollOnRampInterface, BaseOnRamp, TypeAndVersionInterface {
-  using Address for address;
-  using SafeERC20 for IERC20;
-
   string public constant override typeAndVersion = "EVM2EVMTollOnRamp 1.0.0";
 
   // Fees per token.

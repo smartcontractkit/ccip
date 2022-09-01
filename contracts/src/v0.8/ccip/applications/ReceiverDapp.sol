@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../vendor/SafeERC20.sol";
 import "../../interfaces/TypeAndVersionInterface.sol";
 import "../interfaces/applications/Any2EVMMessageReceiverInterface.sol";
 import "../interfaces/offRamp/Any2EVMOffRampRouterInterface.sol";
@@ -10,8 +9,6 @@ import "../interfaces/offRamp/Any2EVMOffRampRouterInterface.sol";
  * @notice Application contract for receiving messages from the OffRamp on behalf of an EOA
  */
 contract ReceiverDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterface {
-  using SafeERC20 for IERC20;
-
   string public constant override typeAndVersion = "ReceiverDapp 1.0.0";
 
   Any2EVMOffRampRouterInterface public immutable i_router;
