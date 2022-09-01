@@ -5,13 +5,13 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	ocrtypes2 "github.com/smartcontractkit/libocr/offchainreporting2/types"
 
 	"github.com/smartcontractkit/chainlink/core/logger"
+	"github.com/smartcontractkit/chainlink/core/scripts/common"
 )
 
 type EvmChainConfig struct {
@@ -23,18 +23,18 @@ type EvmChainConfig struct {
 	Logger         logger.Logger
 	DeploySettings DeploySettings
 
-	LinkToken       common.Address
-	BridgeTokens    []common.Address
-	TokenPools      []common.Address
-	OnRamp          common.Address
-	OnRampRouter    common.Address
-	BlobVerifier    common.Address
-	OffRampRouter   common.Address
-	TokenSender     common.Address
-	MessageReceiver common.Address
-	ReceiverDapp    common.Address
-	OffRamp         common.Address
-	Afn             common.Address
+	LinkToken       gethcommon.Address
+	BridgeTokens    []gethcommon.Address
+	TokenPools      []gethcommon.Address
+	OnRamp          gethcommon.Address
+	OnRampRouter    gethcommon.Address
+	BlobVerifier    gethcommon.Address
+	OffRampRouter   gethcommon.Address
+	TokenSender     gethcommon.Address
+	MessageReceiver gethcommon.Address
+	ReceiverDapp    gethcommon.Address
+	OffRamp         gethcommon.Address
+	Afn             gethcommon.Address
 }
 
 var defaultAFNTimeout = int64((14 * 24 * time.Hour).Seconds())
@@ -67,13 +67,13 @@ var Rinkeby = EvmChainConfig{
 		EIP1559:   true,
 		GasTipCap: DefaultGasTipFee,
 	},
-	LinkToken:    common.HexToAddress("0x01be23585060835e02b77ef475b0cc51aa1e0709"),
-	BridgeTokens: []common.Address{common.HexToAddress("0x01be23585060835e02b77ef475b0cc51aa1e0709")},
-	TokenPools:   []common.Address{common.HexToAddress("0xcB6f8a746db85f60a58Eba211E476601fd40A999")},
-	OnRamp:       common.HexToAddress("0x989996F826e37BCD6aeD6649838292F45A7eC732"),
-	OnRampRouter: common.HexToAddress("0xABca0Bb6227Fe4a23b1A46DF0c8764abE2759F75"),
-	TokenSender:  common.HexToAddress("0x1859E433Cb8B9a5Dcf2E3DffB460A299FC5Dd06D"),
-	Afn:          common.HexToAddress("0x3fb839502b242896f61f400615Ef0d4257c822cf"),
+	LinkToken:    gethcommon.HexToAddress("0x01be23585060835e02b77ef475b0cc51aa1e0709"),
+	BridgeTokens: []gethcommon.Address{gethcommon.HexToAddress("0x01be23585060835e02b77ef475b0cc51aa1e0709")},
+	TokenPools:   []gethcommon.Address{gethcommon.HexToAddress("0xcB6f8a746db85f60a58Eba211E476601fd40A999")},
+	OnRamp:       gethcommon.HexToAddress("0x989996F826e37BCD6aeD6649838292F45A7eC732"),
+	OnRampRouter: gethcommon.HexToAddress("0xABca0Bb6227Fe4a23b1A46DF0c8764abE2759F75"),
+	TokenSender:  gethcommon.HexToAddress("0x1859E433Cb8B9a5Dcf2E3DffB460A299FC5Dd06D"),
+	Afn:          gethcommon.HexToAddress("0x3fb839502b242896f61f400615Ef0d4257c822cf"),
 	DeploySettings: DeploySettings{
 		DeployAFN:        false,
 		DeployTokenPools: false,
@@ -91,15 +91,15 @@ var Goerli = EvmChainConfig{
 		EIP1559:   true,
 		GasTipCap: DefaultGasTipFee,
 	},
-	LinkToken:       common.HexToAddress("0x326C977E6efc84E512bB9C30f76E30c160eD06FB"),
-	BridgeTokens:    []common.Address{common.HexToAddress("0x326C977E6efc84E512bB9C30f76E30c160eD06FB")},
-	TokenPools:      []common.Address{common.HexToAddress("0xa978DC2298DaB6dCEfAB06CC22fFeeb67dFD31C5")},
-	OffRamp:         common.HexToAddress("0xfC67c4DBfB4873D6DB48eBc4B26Ac310Ac0aBfA1"),
-	OffRampRouter:   common.HexToAddress("0x77ad33c539Eff83732379B1C0474901Db6EB4B44"),
-	BlobVerifier:    common.HexToAddress("0x4fe34eeD1b57F555BcA1A672eE5d5E8cD60AcAAE"),
-	MessageReceiver: common.HexToAddress("0xc99148f5e687CB16511EFcA6668F2b6eCe63458C"),
-	ReceiverDapp:    common.HexToAddress("0x9FeE875aEcfED6Fe87d1297A4420854FC07D5626"),
-	Afn:             common.HexToAddress("0x1ea60e6afD1855eAEbDe4f2D10a65dD4EA2DC6fB"),
+	LinkToken:       gethcommon.HexToAddress("0x326C977E6efc84E512bB9C30f76E30c160eD06FB"),
+	BridgeTokens:    []gethcommon.Address{gethcommon.HexToAddress("0x326C977E6efc84E512bB9C30f76E30c160eD06FB")},
+	TokenPools:      []gethcommon.Address{gethcommon.HexToAddress("0xa978DC2298DaB6dCEfAB06CC22fFeeb67dFD31C5")},
+	OffRamp:         gethcommon.HexToAddress("0xfC67c4DBfB4873D6DB48eBc4B26Ac310Ac0aBfA1"),
+	OffRampRouter:   gethcommon.HexToAddress("0x77ad33c539Eff83732379B1C0474901Db6EB4B44"),
+	BlobVerifier:    gethcommon.HexToAddress("0x4fe34eeD1b57F555BcA1A672eE5d5E8cD60AcAAE"),
+	MessageReceiver: gethcommon.HexToAddress("0xc99148f5e687CB16511EFcA6668F2b6eCe63458C"),
+	ReceiverDapp:    gethcommon.HexToAddress("0x9FeE875aEcfED6Fe87d1297A4420854FC07D5626"),
+	Afn:             gethcommon.HexToAddress("0x1ea60e6afD1855eAEbDe4f2D10a65dD4EA2DC6fB"),
 	DeploySettings: DeploySettings{
 		DeployAFN:          false,
 		DeployTokenPools:   false,
@@ -117,15 +117,15 @@ var BSCTestnet = EvmChainConfig{
 		EIP1559:  false,
 		GasPrice: big.NewInt(20e9),
 	},
-	LinkToken:       common.HexToAddress("0x84b9b910527ad5c03a9ca831909e21e236ea7b06"),
-	BridgeTokens:    []common.Address{common.HexToAddress("0x84b9b910527ad5c03a9ca831909e21e236ea7b06")},
-	TokenPools:      []common.Address{common.HexToAddress("0xc99148f5e687CB16511EFcA6668F2b6eCe63458C")},
-	OffRamp:         common.HexToAddress("0xC0a1fFeAefd1544A454A49f3c4319B11cD4fDf1D"),
-	OffRampRouter:   common.HexToAddress("0x3a9e41F6a28331bcc3a4ca4c58b844Cd2Fd217bb"),
-	BlobVerifier:    common.HexToAddress("0x3755b7B14e9c71C080787e084471e5f51BBD2Cc6"),
-	MessageReceiver: common.HexToAddress("0xB0Fa66B3B165D10ED46F3e33E2a45926d958d391"),
-	ReceiverDapp:    common.HexToAddress("0xB71eA7F248DA49D62209066196480e740d18cE14"),
-	Afn:             common.HexToAddress("0x77ad33c539Eff83732379B1C0474901Db6EB4B44"),
+	LinkToken:       gethcommon.HexToAddress("0x84b9b910527ad5c03a9ca831909e21e236ea7b06"),
+	BridgeTokens:    []gethcommon.Address{gethcommon.HexToAddress("0x84b9b910527ad5c03a9ca831909e21e236ea7b06")},
+	TokenPools:      []gethcommon.Address{gethcommon.HexToAddress("0xc99148f5e687CB16511EFcA6668F2b6eCe63458C")},
+	OffRamp:         gethcommon.HexToAddress("0xC0a1fFeAefd1544A454A49f3c4319B11cD4fDf1D"),
+	OffRampRouter:   gethcommon.HexToAddress("0x3a9e41F6a28331bcc3a4ca4c58b844Cd2Fd217bb"),
+	BlobVerifier:    gethcommon.HexToAddress("0x3755b7B14e9c71C080787e084471e5f51BBD2Cc6"),
+	MessageReceiver: gethcommon.HexToAddress("0xB0Fa66B3B165D10ED46F3e33E2a45926d958d391"),
+	ReceiverDapp:    gethcommon.HexToAddress("0xB71eA7F248DA49D62209066196480e740d18cE14"),
+	Afn:             gethcommon.HexToAddress("0x77ad33c539Eff83732379B1C0474901Db6EB4B44"),
 	DeploySettings: DeploySettings{
 		DeployAFN:          true,
 		DeployTokenPools:   true,
@@ -143,15 +143,15 @@ var PolygonMumbai = EvmChainConfig{
 		EIP1559:  false,
 		GasPrice: nil,
 	},
-	LinkToken:       common.HexToAddress("0x326C977E6efc84E512bB9C30f76E30c160eD06FB"),
-	BridgeTokens:    []common.Address{common.HexToAddress("0x326C977E6efc84E512bB9C30f76E30c160eD06FB")},
-	TokenPools:      []common.Address{common.HexToAddress("0xf45818c983DD98792576062F128B4ad6E4b93632")},
-	OnRamp:          common.Address{},
-	BlobVerifier:    common.HexToAddress("0xB16eaA4596a2CedD765B85334448DB6C6Cb5c2FE"),
-	MessageReceiver: common.HexToAddress("0x887F2081E5d3A3780098E3110E8b027848efF01c"),
-	ReceiverDapp:    common.HexToAddress("0x82a91b70A1470976979BE3862615A1A569fBb701"),
-	OffRamp:         common.HexToAddress("0xe3B3001a415072AF66A533376eb3182b1f47f646"),
-	Afn:             common.HexToAddress("0x1c5cE558D50FaaFee9a9da89F5Db20aC7037E3Fb"),
+	LinkToken:       gethcommon.HexToAddress("0x326C977E6efc84E512bB9C30f76E30c160eD06FB"),
+	BridgeTokens:    []gethcommon.Address{gethcommon.HexToAddress("0x326C977E6efc84E512bB9C30f76E30c160eD06FB")},
+	TokenPools:      []gethcommon.Address{gethcommon.HexToAddress("0xf45818c983DD98792576062F128B4ad6E4b93632")},
+	OnRamp:          gethcommon.Address{},
+	BlobVerifier:    gethcommon.HexToAddress("0xB16eaA4596a2CedD765B85334448DB6C6Cb5c2FE"),
+	MessageReceiver: gethcommon.HexToAddress("0x887F2081E5d3A3780098E3110E8b027848efF01c"),
+	ReceiverDapp:    gethcommon.HexToAddress("0x82a91b70A1470976979BE3862615A1A569fBb701"),
+	OffRamp:         gethcommon.HexToAddress("0xe3B3001a415072AF66A533376eb3182b1f47f646"),
+	Afn:             gethcommon.HexToAddress("0x1c5cE558D50FaaFee9a9da89F5Db20aC7037E3Fb"),
 	DeploySettings: DeploySettings{
 		DeployAFN:        true,
 		DeployTokenPools: true,
@@ -161,11 +161,6 @@ var PolygonMumbai = EvmChainConfig{
 
 // BootstrapPeer in the format <BOOTSTRAP-PEER-ID>@<BOOTSTRAP-HOST>:<PORT>
 const BootstrapPeer = "12D3KooWQDAsmFP4x8T8tfdgizgZpvVGJQpgPM1A8UcfbPz7jZiv@ccip-b-tcp.staging.org.devnet.tools:5001"
-
-func toOffchainPublicKey(s string) (key ocrtypes2.OffchainPublicKey) {
-	copy(key[:], hexutil.MustDecode(s)[:])
-	return
-}
 
 var keyBundleIDs = []string{
 	"4e57ae6c96090fe59e837feb9bc4bc265bb9f2328a7fd4b6fde9e803fb6d5665",
@@ -211,38 +206,38 @@ func getOraclesForChain(chainID int64) (or []confighelper2.OracleIdentityExtra) 
 		{
 			// Node 0
 			OracleIdentity: confighelper2.OracleIdentity{
-				OnchainPublicKey:  common.HexToAddress("0x6590f85d9719b4ef1933e81c9f6edcea61c44132").Bytes(),
-				OffchainPublicKey: toOffchainPublicKey("0x189c67b68665252873a9adba2a9e35595ac449e845af79902e863b796b674234"),
+				OnchainPublicKey:  gethcommon.HexToAddress("0x6590f85d9719b4ef1933e81c9f6edcea61c44132").Bytes(),
+				OffchainPublicKey: common.ToOffchainPublicKey("0x189c67b68665252873a9adba2a9e35595ac449e845af79902e863b796b674234"),
 				PeerID:            "12D3KooWAwAN688dKMPn9b4An4sJZYWZ9kGE6kpbREWqda3c3hPz",
 			},
-			ConfigEncryptionPublicKey: stringTo32Bytes("0x8fc27f57ff9488c7b50b37933a40d6f064c0db6d7c0064d33a914e28326af613"),
+			ConfigEncryptionPublicKey: common.StringTo32Bytes("0x8fc27f57ff9488c7b50b37933a40d6f064c0db6d7c0064d33a914e28326af613"),
 		},
 		{
 			// Node 1
 			OracleIdentity: confighelper2.OracleIdentity{
-				OnchainPublicKey:  common.HexToAddress("0xfcea0c0f454b9d6b8a9fc632a65c9b4aa683e7e8").Bytes(),
-				OffchainPublicKey: toOffchainPublicKey("0x66f1d0aeb6d29dcb3b0c8033cb03b851fb9ddc3cc9605c8c64914beab923ebbe"),
+				OnchainPublicKey:  gethcommon.HexToAddress("0xfcea0c0f454b9d6b8a9fc632a65c9b4aa683e7e8").Bytes(),
+				OffchainPublicKey: common.ToOffchainPublicKey("0x66f1d0aeb6d29dcb3b0c8033cb03b851fb9ddc3cc9605c8c64914beab923ebbe"),
 				PeerID:            "12D3KooWJb2extYFf9n67Sh9dnyb5Gc1xVTCdQjrWBdBg66gdUB5",
 			},
-			ConfigEncryptionPublicKey: stringTo32Bytes("0xe764a3b5d6f167609e5cccfead27665cd8ff2a1f3adf3349b933a6be8b947332"),
+			ConfigEncryptionPublicKey: common.StringTo32Bytes("0xe764a3b5d6f167609e5cccfead27665cd8ff2a1f3adf3349b933a6be8b947332"),
 		},
 		{
 			// Node 2
 			OracleIdentity: confighelper2.OracleIdentity{
-				OnchainPublicKey:  common.HexToAddress("0x951ac5f47cf795db69e1cc38e0c05b5fbdef2cc0").Bytes(),
-				OffchainPublicKey: toOffchainPublicKey("0x4a1a3ca0bc64d7d3cad969bde281d5a299b5b8b0f2ebc58bc43ac882588bda8b"),
+				OnchainPublicKey:  gethcommon.HexToAddress("0x951ac5f47cf795db69e1cc38e0c05b5fbdef2cc0").Bytes(),
+				OffchainPublicKey: common.ToOffchainPublicKey("0x4a1a3ca0bc64d7d3cad969bde281d5a299b5b8b0f2ebc58bc43ac882588bda8b"),
 				PeerID:            "12D3KooWBTLWnqv5YxUMacUvdRfFJw4LjGcAj56yq9ni2Jj99y27",
 			},
-			ConfigEncryptionPublicKey: stringTo32Bytes("0x696c138605964599a56a33a0db0030ae7fd0644730b8f5ba145c7dfecbdaa64a"),
+			ConfigEncryptionPublicKey: common.StringTo32Bytes("0x696c138605964599a56a33a0db0030ae7fd0644730b8f5ba145c7dfecbdaa64a"),
 		},
 		{
 			// Node 3
 			OracleIdentity: confighelper2.OracleIdentity{
-				OnchainPublicKey:  common.HexToAddress("0x5ae86428953108e602767f03ed58cfd4c7d28acb").Bytes(),
-				OffchainPublicKey: toOffchainPublicKey("0xc5c254874d4ab6136418bfdb61ac4bf940a7728983fb55cba66ef4227a47d401"),
+				OnchainPublicKey:  gethcommon.HexToAddress("0x5ae86428953108e602767f03ed58cfd4c7d28acb").Bytes(),
+				OffchainPublicKey: common.ToOffchainPublicKey("0xc5c254874d4ab6136418bfdb61ac4bf940a7728983fb55cba66ef4227a47d401"),
 				PeerID:            "12D3KooWCHu8ja9Y5emXQmR9RLKa6TfUNC2L74EeYK11FXbrWzMq",
 			},
-			ConfigEncryptionPublicKey: stringTo32Bytes("0x2ba36ed1cffac6feed29306c71a4a7d1b13ec0c8b279d572458680bf366b0479"),
+			ConfigEncryptionPublicKey: common.StringTo32Bytes("0x2ba36ed1cffac6feed29306c71a4a7d1b13ec0c8b279d572458680bf366b0479"),
 		},
 	}
 
@@ -250,10 +245,4 @@ func getOraclesForChain(chainID int64) (or []confighelper2.OracleIdentityExtra) 
 		oracles[i].TransmitAccount = ocrtypes2.Account(transmitterAccounts[chainID][i])
 	}
 	return oracles
-}
-
-func stringTo32Bytes(s string) [32]byte {
-	var b [32]byte
-	copy(b[:], hexutil.MustDecode(s))
-	return b
 }

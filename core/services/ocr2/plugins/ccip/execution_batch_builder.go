@@ -156,6 +156,7 @@ func (eb *ExecutionBatchBuilder) getExecutableSeqNrs(
 	if err != nil {
 		return nil, err
 	}
+	eb.lggr.Infow("unexpired roots", "n", len(unexpiredReports))
 	for _, unexpiredReport := range unexpiredReports {
 		var idx int
 		var found bool

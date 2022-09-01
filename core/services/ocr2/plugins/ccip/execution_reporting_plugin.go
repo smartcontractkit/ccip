@@ -280,10 +280,10 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 	if err != nil {
 		return nil, err
 	}
+	lggr.Infof("executable seq nums %v %x", executableSequenceNumbers, r.reqEventSig)
 	if len(executableSequenceNumbers) == 0 {
 		return []byte{}, nil
 	}
-	lggr.Infof("executable seq nums %v %x", executableSequenceNumbers, r.reqEventSig)
 	return ExecutionObservation{
 		SeqNrs:           executableSequenceNumbers,
 		TokensPerFeeCoin: followerTokensPerFeeCoin,

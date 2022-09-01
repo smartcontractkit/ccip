@@ -11,6 +11,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	types2 "github.com/smartcontractkit/libocr/offchainreporting2/types"
+
 	avaxclient "github.com/ava-labs/coreth/ethclient"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -320,4 +323,15 @@ func ChainName(chainID int64) string {
 	default: // Unknown chain, return chainID as string
 		return strconv.FormatInt(chainID, 10)
 	}
+}
+
+func ToOffchainPublicKey(s string) (key types2.OffchainPublicKey) {
+	copy(key[:], hexutil.MustDecode(s)[:])
+	return
+}
+
+func StringTo32Bytes(s string) [32]byte {
+	var b [32]byte
+	copy(b[:], hexutil.MustDecode(s))
+	return b
 }

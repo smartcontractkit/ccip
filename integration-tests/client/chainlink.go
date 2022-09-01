@@ -10,14 +10,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rs/zerolog/log"
-
 	"github.com/go-resty/resty/v2"
-
-	"golang.org/x/sync/errgroup"
-
+	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/chainlink-env/environment"
 	chainlinkChart "github.com/smartcontractkit/chainlink-env/pkg/helm/chainlink"
+	"golang.org/x/sync/errgroup"
 )
 
 // OneLINK representation of a single LINK token
@@ -473,6 +470,20 @@ func (c *Chainlink) PrimaryEthAddress() (string, error) {
 	return c.primaryEthAddress, nil
 }
 
+// PrimaryEthAddressForChain returns the primary ETH address for the Chainlink node for mentioned chain
+func (c *Chainlink) PrimaryEthAddressForChain(chainId string) (string, error) {
+	ethKeys, err := c.MustReadETHKeys()
+	if err != nil {
+		return "", err
+	}
+	for _, ethKey := range ethKeys.Data {
+		if ethKey.Attributes.ChainID == chainId {
+			return ethKey.Attributes.Address, nil
+		}
+	}
+	return "", nil
+}
+
 // CreateTxKey creates a tx key on the Chainlink node
 func (c *Chainlink) CreateTxKey(chain string) (*TxKey, *http.Response, error) {
 	txKey := &TxKey{}
@@ -898,4 +909,31 @@ func VerifyStatusCode(actStatusCd, expStatusCd int) error {
 		)
 	}
 	return nil
+}
+
+func NodesWithKeysBundle(nodes []*Chainlink, chainType string, chainId *big.Int) ([]*CLNodesWithKeys, error) {
+	nodeWithKeys := []*CLNodesWithKeys{}
+	for _, node := range nodes {
+		ocr2Key, _, err := node.CreateOCR2Key(chainType)
+		if err != nil {
+			return nil, err
+		}
+		ethAddress, err := node.PrimaryEthAddressForChain(chainId.String())
+		if err != nil {
+			return nil, err
+		}
+		p2pKeys, err := node.MustReadP2PKeys()
+		if err != nil {
+			return nil, err
+		}
+		nodeWithKeys = append(nodeWithKeys, &CLNodesWithKeys{
+			Node: node,
+			KeysBundle: KeysBundle{
+				OCR2Key:    ocr2Key,
+				EthAddress: ethAddress,
+				P2PKey:     p2pKeys,
+			},
+		})
+	}
+	return nodeWithKeys, nil
 }

@@ -105,7 +105,7 @@ test_install_ginkgo: ## Install ginkgo executable to run tests
 test_smoke: ## Run all integration smoke tests, using only simulated networks, default behavior
 	ginkgo -v -r --junit-report=tests-smoke-report.xml \
 	--keep-going --trace --randomize-all --randomize-suites \
-	--progress --focus @simulated $(args) ./integration-tests/smoke
+	--progress $(args) ./integration-tests/smoke
 
 .PHONY: test_smoke_simulated
 test_smoke_simulated: ## Run all integration smoke tests, using only simulated networks, default behavior (you can use `make test_smoke`)

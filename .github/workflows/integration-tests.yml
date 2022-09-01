@@ -52,6 +52,7 @@ jobs:
   eth-smoke-tests:
     environment: integration
     permissions:
+      issues: read
       checks: write
       pull-requests: write
       id-token: write
@@ -85,6 +86,7 @@ jobs:
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
+          CGO_ENABLED: "1"
 
       ## Run this step when changes that do not need the test to run are made
       - name: Run Setup
@@ -136,6 +138,7 @@ jobs:
   solana-smoke-tests:
     environment: integration
     permissions:
+      issues: read
       checks: write
       pull-requests: write
       id-token: write

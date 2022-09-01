@@ -98,9 +98,11 @@ func (tb *TollBatchBuilder) BuildBatch(
 			continue
 		}
 		if _, inflight := inflightSeqNrs[tollMsg.Message.SequenceNumber]; inflight {
+			tb.lggr.Infow("Skipping message already inflight", "seqNr", tollMsg.Message.SequenceNumber)
 			continue
 		}
 		if _, executed := executed[tollMsg.Message.SequenceNumber]; executed {
+			tb.lggr.Infow("Skipping message already executed", "seqNr", tollMsg.Message.SequenceNumber)
 			continue
 		}
 		// Check solvency

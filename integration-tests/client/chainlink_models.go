@@ -873,22 +873,23 @@ observationSource                      = """
 // OCR2TaskJobSpec represents an OCR2 job that is given to other nodes, meant to communicate with the bootstrap node,
 // and provide their answers
 type OCR2TaskJobSpec struct {
-	Name                     string            `toml:"name"`
-	JobType                  string            `toml:"type"`
-	ContractID               string            `toml:"contractID"`                             // Address of the OCR contract/account(s)
-	Relay                    string            `toml:"relay"`                                  // Name of blockchain relay to use
-	PluginType               string            `toml:"pluginType"`                             // Type of report plugin to use
-	RelayConfig              map[string]string `toml:"relayConfig"`                            // Relay spec object in stringified form
-	P2PV2Bootstrappers       []P2PData         `toml:"p2pv2Bootstrappers"`                     // P2P ID of the bootstrap node
-	OCRKeyBundleID           string            `toml:"ocrKeyBundleID"`                         // ID of this node's OCR key bundle
-	MonitoringEndpoint       string            `toml:"monitoringEndpoint"`                     // Typically "chain.link:4321"
-	TransmitterID            string            `toml:"transmitterID"`                          // ID of address this node will use to transmit
-	BlockChainTimeout        time.Duration     `toml:"blockchainTimeout"`                      // Optional
-	TrackerSubscribeInterval time.Duration     `toml:"contractConfigTrackerSubscribeInterval"` // Optional
-	TrackerPollInterval      time.Duration     `toml:"contractConfigTrackerPollInterval"`      // Optional
-	ContractConfirmations    int               `toml:"contractConfigConfirmations"`            // Optional
-	ObservationSource        string            `toml:"observationSource"`                      // List of commands for the Chainlink node
-	JuelsPerFeeCoinSource    string            `toml:"juelsPerFeeCoinSource"`                  // List of commands to fetch JuelsPerFeeCoin value (used to calculate ocr payments)
+	Name                     string                 `toml:"name"`
+	JobType                  string                 `toml:"type"`
+	ContractID               string                 `toml:"contractID"`                             // Address of the OCR contract/account(s)
+	Relay                    string                 `toml:"relay"`                                  // Name of blockchain relay to use
+	PluginType               string                 `toml:"pluginType"`                             // Type of report plugin to use
+	RelayConfig              map[string]string      `toml:"relayConfig"`                            // Relay spec object in stringified form
+	P2PV2Bootstrappers       []P2PData              `toml:"p2pv2Bootstrappers"`                     // P2P ID of the bootstrap node
+	OCRKeyBundleID           string                 `toml:"ocrKeyBundleID"`                         // ID of this node's OCR key bundle
+	MonitoringEndpoint       string                 `toml:"monitoringEndpoint"`                     // Typically "chain.link:4321"
+	TransmitterID            string                 `toml:"transmitterID"`                          // ID of address this node will use to transmit
+	BlockChainTimeout        time.Duration          `toml:"blockchainTimeout"`                      // Optional
+	TrackerSubscribeInterval time.Duration          `toml:"contractConfigTrackerSubscribeInterval"` // Optional
+	TrackerPollInterval      time.Duration          `toml:"contractConfigTrackerPollInterval"`      // Optional
+	ContractConfirmations    int                    `toml:"contractConfigConfirmations"`            // Optional
+	ObservationSource        string                 `toml:"observationSource"`                      // List of commands for the Chainlink node
+	JuelsPerFeeCoinSource    string                 `toml:"juelsPerFeeCoinSource"`                  // List of commands to fetch JuelsPerFeeCoin value (used to calculate ocr payments)
+	PluginConfig             map[string]interface{} `toml:"pluginConfig"`                           // Relay spec
 }
 
 // Type returns the type of the job
@@ -897,13 +898,13 @@ func (o *OCR2TaskJobSpec) Type() string { return o.JobType }
 // String representation of the job
 func (o *OCR2TaskJobSpec) String() (string, error) {
 	ocr2TemplateString := `type = "{{ .JobType }}"
-schemaVersion                          = 1
-blockchainTimeout                      ={{if not .BlockChainTimeout}} "20s" {{else}} "{{.BlockChainTimeout}}" {{end}}
-contractConfigConfirmations            ={{if not .ContractConfirmations}} 3 {{else}} {{.ContractConfirmations}} {{end}}
-contractConfigTrackerPollInterval      ={{if not .TrackerPollInterval}} "1m" {{else}} "{{.TrackerPollInterval}}" {{end}}
-contractConfigTrackerSubscribeInterval ={{if not .TrackerSubscribeInterval}} "2m" {{else}} "{{.TrackerSubscribeInterval}}" {{end}}
-name 																	 = "{{.Name}}"
-relay																	 = "{{.Relay}}"
+schemaVersion                            = 1
+blockchainTimeout                        ={{if not .BlockChainTimeout}} "20s" {{else}} "{{.BlockChainTimeout}}" {{end}}
+contractConfigConfirmations              ={{if not .ContractConfirmations}} 3 {{else}} {{.ContractConfirmations}} {{end}}
+contractConfigTrackerPollInterval        ={{if not .TrackerPollInterval}} "1m" {{else}} "{{.TrackerPollInterval}}" {{end}}
+contractConfigTrackerSubscribeInterval   ={{if not .TrackerSubscribeInterval}} "2m" {{else}} "{{.TrackerSubscribeInterval}}" {{end}}
+name 								     = "{{.Name}}"
+relay									 = "{{.Relay}}"
 contractID		                         = "{{.ContractID}}"
 {{if .P2PV2Bootstrappers}}
 p2pv2Bootstrappers                      = [
@@ -926,6 +927,9 @@ observationSource                      = """
 juelsPerFeeCoinSource                  = """
 {{.JuelsPerFeeCoinSource}}
 """
+{{range $key, $value := .PluginConfig}}
+{{$key}} = {{$value}}
+{{end}}
 {{end}}
 
 [relayConfig]
@@ -1157,4 +1161,16 @@ func NewBlankChainlinkProfileResults() *ChainlinkProfileResults {
 		results.Reports = append(results.Reports, &ChainlinkProfileResult{Type: profile})
 	}
 	return results
+}
+
+type CLNodesWithKeys struct {
+	Node       *Chainlink
+	KeysBundle KeysBundle
+}
+
+type KeysBundle struct {
+	OCR2Key    *OCR2Key
+	EthAddress string
+	TxKey      TxKey
+	P2PKey     *P2PKeys
 }

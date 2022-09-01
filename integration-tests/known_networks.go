@@ -21,6 +21,32 @@ var (
 	// SimulatedEVM represents a simulated network
 	SimulatedEVM *blockchain.EVMNetwork = blockchain.SimulatedEVMNetwork
 
+	NetworkAlpha = &blockchain.EVMNetwork{
+		Name:      "source-chain",
+		Simulated: true,
+		ChainID:   1337,
+		PrivateKeys: []string{
+			"ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+		},
+		ChainlinkTransactionLimit: 500000,
+		Timeout:                   2 * time.Minute,
+		MinimumConfirmations:      1,
+		GasEstimationBuffer:       10000,
+	}
+
+	NetworkBeta = &blockchain.EVMNetwork{
+		Name:      "dest-chain",
+		Simulated: true,
+		ChainID:   2337,
+		PrivateKeys: []string{
+			"ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+		},
+		ChainlinkTransactionLimit: 500000,
+		Timeout:                   2 * time.Minute,
+		MinimumConfirmations:      1,
+		GasEstimationBuffer:       10000,
+	}
+
 	// SepoliaTestnet https://sepolia.dev/
 	SepoliaTestnet *blockchain.EVMNetwork = &blockchain.EVMNetwork{
 		Name:                      "Sepolia Testnet",
