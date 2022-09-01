@@ -42,7 +42,7 @@ contract EVM2EVMTollOnRamp is Any2EVMTollOnRampInterface, BaseOnRamp, TypeAndVer
 
     // Emit message request
     // we need the next available sequence number so we increment before we use the value
-    CCIP.EVM2EVMTollEvent memory tollEvent = CCIP.EVM2EVMTollEvent({
+    CCIP.EVM2EVMTollMessage memory tollMsg = CCIP.EVM2EVMTollMessage({
       sequenceNumber: ++s_sequenceNumber,
       sourceChainId: i_chainId,
       sender: originalSender,
@@ -54,8 +54,8 @@ contract EVM2EVMTollOnRamp is Any2EVMTollOnRampInterface, BaseOnRamp, TypeAndVer
       feeTokenAmount: message.feeTokenAmount,
       gasLimit: message.gasLimit
     });
-    emit CCIPSendRequested(tollEvent);
-    return tollEvent.sequenceNumber;
+    emit CCIPSendRequested(tollMsg);
+    return tollMsg.sequenceNumber;
   }
 
   /// @inheritdoc Any2EVMTollOnRampInterface

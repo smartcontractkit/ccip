@@ -76,20 +76,6 @@ library CCIP {
     uint256 gasLimit;
   }
 
-  /// @notice The event that gets emitted when an EVM to EVM cross chain toll request is made.
-  struct EVM2EVMTollEvent {
-    uint256 sourceChainId;
-    uint64 sequenceNumber;
-    address sender;
-    address receiver;
-    bytes data;
-    IERC20[] tokens;
-    uint256[] amounts;
-    IERC20 feeToken;
-    uint256 feeTokenAmount;
-    uint256 gasLimit;
-  }
-
   // @notice The cross chain message that gets relayed to EVM toll chains
   struct EVM2EVMTollMessage {
     uint256 sourceChainId;
@@ -127,19 +113,6 @@ library CCIP {
 
   struct EVM2AnySubscriptionMessage {
     address receiver;
-    bytes data;
-    IERC20[] tokens;
-    uint256[] amounts;
-    uint256 gasLimit;
-  }
-
-  /// @notice The event that gets emitted when an EVM to EVM cross chain subscription request is made.
-  struct EVM2EVMSubscriptionEvent {
-    uint256 sourceChainId;
-    uint64 sequenceNumber;
-    address sender;
-    address receiver;
-    uint64 nonce;
     bytes data;
     IERC20[] tokens;
     uint256[] amounts;

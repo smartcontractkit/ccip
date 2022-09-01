@@ -78,7 +78,7 @@ func init() {
 // DecodeCCIPMessage decodes the bytecode message into a blob_verifier.CCIPAny2EVMTollMessage
 // This function returns an error if there is no message in the bytecode or
 // when the payload is malformed.
-func DecodeCCIPMessage(b []byte) (*evm_2_evm_toll_onramp.CCIPEVM2EVMTollEvent, error) {
+func DecodeCCIPMessage(b []byte) (*evm_2_evm_toll_onramp.CCIPEVM2EVMTollMessage, error) {
 	unpacked, err := MakeCCIPMsgArgs().Unpack(b)
 	if err != nil {
 		return nil, err
@@ -102,7 +102,7 @@ func DecodeCCIPMessage(b []byte) (*evm_2_evm_toll_onramp.CCIPEVM2EVMTollEvent, e
 	if !ok {
 		return nil, fmt.Errorf("invalid format have %T want %T", unpacked[0], receivedCp)
 	}
-	return &evm_2_evm_toll_onramp.CCIPEVM2EVMTollEvent{
+	return &evm_2_evm_toll_onramp.CCIPEVM2EVMTollMessage{
 		SourceChainId:  receivedCp.SourceChainId,
 		SequenceNumber: receivedCp.SequenceNumber,
 		Sender:         receivedCp.Sender,
@@ -114,21 +114,6 @@ func DecodeCCIPMessage(b []byte) (*evm_2_evm_toll_onramp.CCIPEVM2EVMTollEvent, e
 		FeeTokenAmount: receivedCp.FeeTokenAmount,
 		GasLimit:       receivedCp.GasLimit,
 	}, nil
-}
-
-func EVM2EVMTollEventToMessage(event evm_2_evm_toll_onramp.CCIPEVM2EVMTollEvent) Message {
-	return Message{
-		SourceChainId:  event.SourceChainId,
-		SequenceNumber: event.SequenceNumber,
-		Sender:         event.Sender,
-		Receiver:       event.Receiver,
-		Data:           event.Data,
-		Tokens:         event.Tokens,
-		Amounts:        event.Amounts,
-		FeeToken:       event.FeeToken,
-		FeeTokenAmount: event.FeeTokenAmount,
-		GasLimit:       event.GasLimit,
-	}
 }
 
 // MakeCCIPMsgArgs is a static function that always returns the abi.Arguments

@@ -643,7 +643,7 @@ func (client CCIPClient) SendToOnrampWithExecution(t *testing.T, source SourceCl
 	return WaitForCrossChainSendRequest(source, SourceBlockNumber, tx.Hash())
 }
 
-func (client CCIPClient) manuallyExecuteTx(event evm_2_evm_toll_onramp.CCIPEVM2EVMTollEvent) {
+func (client CCIPClient) manuallyExecuteTx(event evm_2_evm_toll_onramp.CCIPEVM2EVMTollMessage) {
 	packedPayload, err := ccip.MakeCCIPMsgArgs().PackValues([]interface{}{event})
 	helpers.PanicErr(err)
 	report := any_2_evm_toll_offramp.CCIPExecutionReport{

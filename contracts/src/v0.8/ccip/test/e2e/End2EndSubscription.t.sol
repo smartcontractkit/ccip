@@ -98,7 +98,7 @@ contract E2E_subscription is EVM2EVMSubscriptionOnRampSetup, BlobVerifierSetup, 
 
   function sendRequest(CCIP.EVM2AnySubscriptionMessage memory message, uint64 expectedSeqNum)
     public
-    returns (CCIP.EVM2EVMSubscriptionEvent memory)
+    returns (CCIP.EVM2EVMSubscriptionMessage memory)
   {
     s_sourceTokens[0].approve(address(s_onRampRouter), i_tokenAmount0);
     s_sourceTokens[1].approve(address(s_onRampRouter), i_tokenAmount1);
@@ -109,7 +109,7 @@ contract E2E_subscription is EVM2EVMSubscriptionOnRampSetup, BlobVerifierSetup, 
       expectedNonce = 1;
       message.receiver = address(s_secondary_receiver);
     }
-    CCIP.EVM2EVMSubscriptionEvent memory subscriptionEvent = _messageToEvent(message, expectedSeqNum, expectedNonce);
+    CCIP.EVM2EVMSubscriptionMessage memory subscriptionEvent = _messageToEvent(message, expectedSeqNum, expectedNonce);
 
     vm.expectEmit(false, false, false, true);
     emit CCIPSendRequested(subscriptionEvent);
@@ -119,7 +119,7 @@ contract E2E_subscription is EVM2EVMSubscriptionOnRampSetup, BlobVerifierSetup, 
     return subscriptionEvent;
   }
 
-  function parseEventToDestChainMessage(CCIP.EVM2EVMSubscriptionEvent memory sendEvent)
+  function parseEventToDestChainMessage(CCIP.EVM2EVMSubscriptionMessage memory sendEvent)
     public
     pure
     returns (CCIP.EVM2EVMSubscriptionMessage memory)

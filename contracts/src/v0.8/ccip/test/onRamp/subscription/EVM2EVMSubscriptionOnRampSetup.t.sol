@@ -6,7 +6,7 @@ import "../../../onRamp/subscription/EVM2EVMSubscriptionOnRamp.sol";
 
 contract EVM2EVMSubscriptionOnRampSetup is TokenSetup {
   // Duplicate event of the CCIPSendRequested in the TollOnRampInterface
-  event CCIPSendRequested(CCIP.EVM2EVMSubscriptionEvent message);
+  event CCIPSendRequested(CCIP.EVM2EVMSubscriptionMessage message);
   event OnRampSet(uint256 indexed chainId, Any2EVMSubscriptionOnRampInterface indexed onRamp);
   event FeeSet(uint96);
   event SubscriptionFunded(address indexed sender, uint256 amount);
@@ -82,9 +82,9 @@ contract EVM2EVMSubscriptionOnRampSetup is TokenSetup {
     CCIP.EVM2AnySubscriptionMessage memory message,
     uint64 seqNum,
     uint64 nonce
-  ) public pure returns (CCIP.EVM2EVMSubscriptionEvent memory) {
+  ) public pure returns (CCIP.EVM2EVMSubscriptionMessage memory) {
     return
-      CCIP.EVM2EVMSubscriptionEvent({
+      CCIP.EVM2EVMSubscriptionMessage({
         sequenceNumber: seqNum,
         sourceChainId: SOURCE_CHAIN_ID,
         sender: OWNER,

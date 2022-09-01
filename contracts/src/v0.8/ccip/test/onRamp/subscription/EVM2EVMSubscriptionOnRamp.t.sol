@@ -79,7 +79,7 @@ contract EVM2EVMSubscriptionOnRamp_forwardFromRouter is EVM2EVMSubscriptionOnRam
   // on the onramp. Sending to a different receiver should start at 1 again.
   function testShouldIncrementReceiverNonceSuccess() public {
     CCIP.EVM2AnySubscriptionMessage memory message = _generateEmptyMessage();
-    CCIP.EVM2EVMSubscriptionEvent memory tollEvent = _messageToEvent(message, 1, 1);
+    CCIP.EVM2EVMSubscriptionMessage memory tollEvent = _messageToEvent(message, 1, 1);
 
     vm.expectEmit(false, false, false, true);
     emit CCIPSendRequested(tollEvent);

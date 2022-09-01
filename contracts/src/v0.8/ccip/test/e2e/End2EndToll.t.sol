@@ -83,7 +83,7 @@ contract E2E_toll is EVM2EVMTollOnRampSetup, BlobVerifierSetup, EVM2EVMTollOffRa
     s_offRamp.execute(_generateReportFromMessages(messages), false);
   }
 
-  function sendRequest(uint64 expectedSeqNum) public returns (CCIP.EVM2EVMTollEvent memory) {
+  function sendRequest(uint64 expectedSeqNum) public returns (CCIP.EVM2EVMTollMessage memory) {
     CCIP.EVM2AnyTollMessage memory message = _generateTokenMessage();
     message.feeTokenAmount = RELAYING_FEE_JUELS + EXECUTION_FEE_AMOUNT;
 
@@ -91,7 +91,7 @@ contract E2E_toll is EVM2EVMTollOnRampSetup, BlobVerifierSetup, EVM2EVMTollOffRa
     s_sourceTokens[1].approve(address(s_onRampRouter), i_tokenAmount1);
 
     message.receiver = address(s_receiver);
-    CCIP.EVM2EVMTollEvent memory tollEvent = _messageToEvent(message, expectedSeqNum);
+    CCIP.EVM2EVMTollMessage memory tollEvent = _messageToEvent(message, expectedSeqNum);
     vm.expectEmit(false, false, false, true);
 
     emit CCIPSendRequested(tollEvent);
@@ -101,7 +101,7 @@ contract E2E_toll is EVM2EVMTollOnRampSetup, BlobVerifierSetup, EVM2EVMTollOffRa
     return tollEvent;
   }
 
-  function parseEventToDestChainMessage(CCIP.EVM2EVMTollEvent memory sendEvent)
+  function parseEventToDestChainMessage(CCIP.EVM2EVMTollMessage memory sendEvent)
     public
     pure
     returns (CCIP.EVM2EVMTollMessage memory)

@@ -50,7 +50,7 @@ contract EVM2EVMSubscriptionOnRamp is Any2EVMSubscriptionOnRampInterface, BaseOn
     // Emit message request
     // we need the next available sequence number so we increment before we use the value
     // we need the next nonce so we increment before we use the value
-    CCIP.EVM2EVMSubscriptionEvent memory subscriptionEvent = CCIP.EVM2EVMSubscriptionEvent({
+    CCIP.EVM2EVMSubscriptionMessage memory subscriptionMsg = CCIP.EVM2EVMSubscriptionMessage({
       sequenceNumber: ++s_sequenceNumber,
       sourceChainId: i_chainId,
       sender: originalSender,
@@ -61,7 +61,7 @@ contract EVM2EVMSubscriptionOnRamp is Any2EVMSubscriptionOnRampInterface, BaseOn
       amounts: message.amounts,
       gasLimit: message.gasLimit
     });
-    emit CCIPSendRequested(subscriptionEvent);
-    return subscriptionEvent.sequenceNumber;
+    emit CCIPSendRequested(subscriptionMsg);
+    return subscriptionMsg.sequenceNumber;
   }
 }

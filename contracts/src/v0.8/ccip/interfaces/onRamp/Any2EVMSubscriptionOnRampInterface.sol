@@ -5,7 +5,7 @@ import "../../models/Models.sol";
 import "./BaseOnRampInterface.sol";
 
 interface Any2EVMSubscriptionOnRampInterface is BaseOnRampInterface {
-  event CCIPSendRequested(CCIP.EVM2EVMSubscriptionEvent message);
+  event CCIPSendRequested(CCIP.EVM2EVMSubscriptionMessage message);
 
   function forwardFromRouter(CCIP.EVM2AnySubscriptionMessage memory message, address originalSender)
     external

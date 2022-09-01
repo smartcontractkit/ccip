@@ -7,7 +7,7 @@ import "./BaseOnRampInterface.sol";
 interface Any2EVMTollOnRampInterface is BaseOnRampInterface {
   error InvalidFeeConfig();
 
-  event CCIPSendRequested(CCIP.EVM2EVMTollEvent message);
+  event CCIPSendRequested(CCIP.EVM2EVMTollMessage message);
 
   /**
    * @notice Send a message to the remote chain

@@ -8,7 +8,7 @@ import "../../../onRamp/toll/EVM2AnyTollOnRampRouter.sol";
 
 contract EVM2EVMTollOnRampSetup is TokenSetup {
   // Duplicate event of the CCIPSendRequested in the TollOnRampInterface
-  event CCIPSendRequested(CCIP.EVM2EVMTollEvent message);
+  event CCIPSendRequested(CCIP.EVM2EVMTollMessage message);
 
   uint256 internal immutable i_tokenAmount0 = 9;
   uint256 internal immutable i_tokenAmount1 = 7;
@@ -83,10 +83,10 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
   function _messageToEvent(CCIP.EVM2AnyTollMessage memory message, uint64 seqNum)
     public
     pure
-    returns (CCIP.EVM2EVMTollEvent memory)
+    returns (CCIP.EVM2EVMTollMessage memory)
   {
     return
-      CCIP.EVM2EVMTollEvent({
+      CCIP.EVM2EVMTollMessage({
         sequenceNumber: seqNum,
         sourceChainId: SOURCE_CHAIN_ID,
         sender: OWNER,
@@ -103,10 +103,10 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
   function _messageToEventNoFee(CCIP.EVM2AnyTollMessage memory message, uint64 seqNum)
     public
     pure
-    returns (CCIP.EVM2EVMTollEvent memory)
+    returns (CCIP.EVM2EVMTollMessage memory)
   {
     return
-      CCIP.EVM2EVMTollEvent({
+      CCIP.EVM2EVMTollMessage({
         sequenceNumber: seqNum,
         sourceChainId: SOURCE_CHAIN_ID,
         sender: OWNER,

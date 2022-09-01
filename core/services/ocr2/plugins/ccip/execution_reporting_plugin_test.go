@@ -151,7 +151,7 @@ type messageBatch struct {
 	msgs        []ccip.Message
 	allMsgBytes [][]byte
 	seqNums     []uint64
-	helperMsgs  []evm_2_evm_toll_onramp.CCIPEVM2EVMTollEvent
+	helperMsgs  []evm_2_evm_toll_onramp.CCIPEVM2EVMTollMessage
 	proof       merklemulti.Proof[[32]byte]
 	root        [32]byte
 }
@@ -171,7 +171,7 @@ func (e ExecutionContracts) generateMessageBatch(t *testing.T, payloadSize int, 
 	var indices []int
 	var tokens []common.Address
 	var amounts []*big.Int
-	var helperMsgs []evm_2_evm_toll_onramp.CCIPEVM2EVMTollEvent
+	var helperMsgs []evm_2_evm_toll_onramp.CCIPEVM2EVMTollMessage
 	for i := 0; i < nTokensPerMessage; i++ {
 		tokens = append(tokens, e.linkTokenAddress)
 		amounts = append(amounts, big.NewInt(1))
@@ -194,7 +194,7 @@ func (e ExecutionContracts) generateMessageBatch(t *testing.T, payloadSize int, 
 		}
 
 		// Unfortunately have to do this to use the helper's gethwrappers.
-		helperMsgs = append(helperMsgs, evm_2_evm_toll_onramp.CCIPEVM2EVMTollEvent{
+		helperMsgs = append(helperMsgs, evm_2_evm_toll_onramp.CCIPEVM2EVMTollMessage{
 			SequenceNumber: message.SequenceNumber,
 			SourceChainId:  message.SourceChainId,
 			Sender:         message.Sender,
