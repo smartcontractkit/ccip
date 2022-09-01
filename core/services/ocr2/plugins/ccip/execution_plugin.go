@@ -9,7 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
-	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2/types"
+	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
@@ -21,37 +21,20 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/job"
-	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins"
 	ccipconfig "github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/core/services/pipeline"
 )
 
-type CCIPExecution struct {
-	lggr                               logger.Logger
-	spec                               *job.OCR2OracleSpec
-	sourceChainPoller, destChainPoller logpoller.LogPoller
-	destChain                          evm.Chain
-	blobVerifier                       *blob_verifier.BlobVerifier
-	onRamp                             common.Address
-	offRamp                            OffRamp
-	batchBuilder                       BatchBuilder
-	onRampSeqParser                    func(log logpoller.Log) (uint64, error)
-	reqEventSig                        common.Hash
-	priceGetter                        PriceGetter
-}
-
-var _ plugins.OraclePlugin = &CCIPExecution{}
-
-func NewCCIPExecution(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, pr pipeline.Runner) (*CCIPExecution, error) {
+func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OracleArgs) ([]job.ServiceCtx, error) {
 	spec := jb.OCR2OracleSpec
 	var pluginConfig ccipconfig.ExecutionPluginConfig
 	err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
 	if err != nil {
-		return &CCIPExecution{}, err
+		return nil, err
 	}
 	err = pluginConfig.ValidateExecutionPluginConfig()
 	if err != nil {
-		return &CCIPExecution{}, err
+		return nil, err
 	}
 	lggr.Infof("CCIP execution plugin initialized with offchainConfig: %+v", pluginConfig)
 
@@ -142,19 +125,33 @@ func NewCCIPExecution(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, pr 
 	if err2 != nil {
 		return nil, err
 	}
-	return &CCIPExecution{
-		lggr:              lggr,
-		spec:              spec,
-		blobVerifier:      verifier,
-		onRamp:            common.HexToAddress(pluginConfig.OnRampID),
-		offRamp:           offRamp,
-		sourceChainPoller: sourceChain.LogPoller(),
-		destChainPoller:   destChain.LogPoller(),
-		batchBuilder:      batchBuilder,
-		onRampSeqParser:   onRampSeqParser,
-		reqEventSig:       reqEventSig,
-		priceGetter:       priceGetter,
-	}, nil
+	argsNoPlugin.ReportingPluginFactory = NewExecutionReportingPluginFactory(
+		lggr,
+		onRampAddr,
+		verifier,
+		sourceChain.LogPoller(), destChain.LogPoller(),
+		common.HexToAddress(spec.ContractID),
+		offRamp,
+		batchBuilder,
+		onRampSeqParser,
+		reqEventSig,
+		priceGetter)
+	oracle, err := libocr2.NewOracle(argsNoPlugin)
+	if err != nil {
+		return nil, err
+	}
+	// If this is a brand new job, then we make use of the start blocks. If not then we're rebooting and log poller will pick up where we left off.
+	if new {
+		return []job.ServiceCtx{NewBackfilledOracle(
+			lggr,
+			sourceChain.LogPoller(),
+			destChain.LogPoller(),
+			pluginConfig.SourceStartBlock,
+			pluginConfig.DestStartBlock,
+			job.NewServiceAdapter(oracle)),
+		}, nil
+	}
+	return []job.ServiceCtx{job.NewServiceAdapter(oracle)}, nil
 }
 
 type OffRamp interface {
@@ -235,24 +232,4 @@ func NewTollOffRamp(addr common.Address, destChain evm.Chain) (OffRamp, error) {
 		return nil, err
 	}
 	return &tollOffRamp{offRamp}, nil
-}
-
-func (c *CCIPExecution) GetPluginFactory() (plugin ocrtypes.ReportingPluginFactory, err error) {
-	return NewExecutionReportingPluginFactory(
-		c.lggr,
-		c.onRamp,
-		c.blobVerifier,
-		c.sourceChainPoller,
-		c.destChainPoller,
-		common.HexToAddress(c.spec.ContractID),
-		c.offRamp,
-		c.batchBuilder,
-		c.onRampSeqParser,
-		c.reqEventSig,
-		c.priceGetter,
-	), nil
-}
-
-func (c *CCIPExecution) GetServices() ([]job.ServiceCtx, error) {
-	return []job.ServiceCtx{}, nil
 }

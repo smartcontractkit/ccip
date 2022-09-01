@@ -9,7 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
-	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2/types"
+	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
 	eth "github.com/smartcontractkit/chainlink/core/chains/evm/client"
@@ -20,21 +20,8 @@ import (
 	type_and_version "github.com/smartcontractkit/chainlink/core/gethwrappers/generated/type_and_version_interface_wrapper"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/job"
-	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins"
 	ccipconfig "github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/config"
 )
-
-type CCIPRelay struct {
-	lggr                logger.Logger
-	spec                *job.OCR2OracleSpec
-	sourceChainPoller   logpoller.LogPoller
-	blobVerifier        *blob_verifier.BlobVerifier
-	onRamps             []common.Address
-	onRampSeqParsers    map[common.Address]func(log logpoller.Log) (uint64, error)
-	onRampToReqEventSig map[common.Address]common.Hash
-}
-
-var _ plugins.OraclePlugin = &CCIPRelay{}
 
 type ContractType string
 
@@ -72,15 +59,15 @@ func typeAndVersion(addr common.Address, client eth.Client) (ContractType, semve
 	return ContractType(contractType), *v, nil
 }
 
-func NewCCIPRelay(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm.ChainSet) (*CCIPRelay, error) {
+func NewRelayServices(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm.ChainSet, new bool, argsNoPlugin libocr2.OracleArgs) ([]job.ServiceCtx, error) {
 	var pluginConfig ccipconfig.RelayPluginConfig
 	err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
 	if err != nil {
-		return &CCIPRelay{}, err
+		return nil, err
 	}
 	err = pluginConfig.ValidateRelayPluginConfig()
 	if err != nil {
-		return &CCIPRelay{}, err
+		return nil, err
 	}
 	lggr.Infof("CCIP relay plugin initialized with offchainConfig: %+v", pluginConfig)
 
@@ -144,20 +131,21 @@ func NewCCIPRelay(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm.Cha
 			return nil, errors.Errorf("unrecognized onramp %v", onRampID)
 		}
 	}
-	return &CCIPRelay{
-		lggr:                lggr,
-		blobVerifier:        blobVerifier,
-		onRampSeqParsers:    onRampSeqParsers,
-		onRampToReqEventSig: onRampToReqEventSig,
-		sourceChainPoller:   sourceChain.LogPoller(),
-		onRamps:             onRamps,
-	}, nil
-}
-
-func (c *CCIPRelay) GetPluginFactory() (plugin ocrtypes.ReportingPluginFactory, err error) {
-	return NewRelayReportingPluginFactory(c.lggr, c.sourceChainPoller, c.blobVerifier, c.onRampSeqParsers, c.onRampToReqEventSig, c.onRamps), nil
-}
-
-func (c *CCIPRelay) GetServices() ([]job.ServiceCtx, error) {
-	return []job.ServiceCtx{}, nil
+	argsNoPlugin.ReportingPluginFactory = NewRelayReportingPluginFactory(lggr, sourceChain.LogPoller(), blobVerifier, onRampSeqParsers, onRampToReqEventSig, onRamps)
+	oracle, err := libocr2.NewOracle(argsNoPlugin)
+	if err != nil {
+		return nil, err
+	}
+	// If this is a brand new job, then we make use of the start blocks. If not then we're rebooting and log poller will pick up where we left off.
+	if new {
+		return []job.ServiceCtx{&BackfilledOracle{
+			srcStartBlock: pluginConfig.SourceStartBlock,
+			dstStartBlock: pluginConfig.DestStartBlock,
+			src:           sourceChain.LogPoller(),
+			dst:           destChain.LogPoller(),
+			oracle:        job.NewServiceAdapter(oracle),
+			lggr:          lggr,
+		}}, nil
+	}
+	return []job.ServiceCtx{job.NewServiceAdapter(oracle)}, nil
 }

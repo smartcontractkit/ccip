@@ -110,6 +110,8 @@ func (d Delegate) ServicesForSpec(jobSpec job.Job) (services []job.ServiceCtx, e
 func (d Delegate) AfterJobCreated(spec job.Job) {
 }
 
+func (Delegate) BeforeJobCreated(spec job.Job) {}
+
 // BeforeJobDeleted satisfies the job.Delegate interface.
 func (d Delegate) BeforeJobDeleted(spec job.Job) {
 }

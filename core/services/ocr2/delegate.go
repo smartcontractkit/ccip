@@ -48,6 +48,7 @@ type Delegate struct {
 	dkgSignKs             keystore.DKGSign
 	dkgEncryptKs          keystore.DKGEncrypt
 	relayers              map[relay.Network]types.Relayer
+	new                   bool
 }
 
 var _ job.Delegate = (*Delegate)(nil)
@@ -79,21 +80,25 @@ func NewDelegate(
 		dkgSignKs,
 		dkgEncryptKs,
 		relayers,
+		false,
 	}
 }
 
-func (d Delegate) JobType() job.Type {
+func (d *Delegate) JobType() job.Type {
 	return job.OffchainReporting2
 }
 
-func (Delegate) OnJobCreated(spec job.Job) {}
-func (Delegate) OnJobDeleted(spec job.Job) {}
-
-func (Delegate) AfterJobCreated(spec job.Job)  {}
-func (Delegate) BeforeJobDeleted(spec job.Job) {}
+func (d *Delegate) OnJobCreated(spec job.Job) {}
+func (d *Delegate) OnJobDeleted(spec job.Job) {}
+func (d *Delegate) BeforeJobCreated(spec job.Job) {
+	// This is only called first time the job is created
+	d.new = true
+}
+func (d *Delegate) AfterJobCreated(spec job.Job)  {}
+func (d *Delegate) BeforeJobDeleted(spec job.Job) {}
 
 // ServicesForSpec returns the OCR2 services that need to run for this job
-func (d Delegate) ServicesForSpec(jobSpec job.Job) ([]job.ServiceCtx, error) {
+func (d *Delegate) ServicesForSpec(jobSpec job.Job) ([]job.ServiceCtx, error) {
 	spec := jobSpec.OCR2OracleSpec
 	if spec == nil {
 		return nil, errors.Errorf("offchainreporting2.Delegate expects an *job.Offchainreporting2OracleSpec to be present, got %v", jobSpec)
@@ -372,8 +377,20 @@ func (d Delegate) ServicesForSpec(jobSpec job.Job) ([]job.ServiceCtx, error) {
 		if err2 != nil {
 			return nil, err2
 		}
-		ocr2Provider = ccipProvider
-		pluginOracle, err = ccip.NewCCIPRelay(lggr, spec, d.chainSet)
+		oracleArgsNoPlugin := libocr2.OracleArgs{
+			BinaryNetworkEndpointFactory: peerWrapper.Peer2,
+			V2Bootstrappers:              bootstrapPeers,
+			ContractTransmitter:          ccipProvider.ContractTransmitter(),
+			ContractConfigTracker:        ccipProvider.ContractConfigTracker(),
+			Database:                     ocrDB,
+			LocalConfig:                  lc,
+			Logger:                       ocrLogger,
+			MonitoringEndpoint:           d.monitoringEndpointGen.GenMonitoringEndpoint(spec.ContractID),
+			OffchainConfigDigester:       ccipProvider.OffchainConfigDigester(),
+			OffchainKeyring:              kb,
+			OnchainKeyring:               kb,
+		}
+		return ccip.NewRelayServices(lggr, spec, d.chainSet, d.new, oracleArgsNoPlugin)
 	case job.CCIPExecution:
 		if spec.Relay != relay.EVM {
 			return nil, errors.New("Non evm chains are not supported for CCIP execution")
@@ -388,8 +405,20 @@ func (d Delegate) ServicesForSpec(jobSpec job.Job) ([]job.ServiceCtx, error) {
 		if err2 != nil {
 			return nil, err2
 		}
-		ocr2Provider = ccipProvider
-		pluginOracle, err = ccip.NewCCIPExecution(lggr, jobSpec, d.chainSet, d.pipelineRunner)
+		oracleArgsNoPlugin := libocr2.OracleArgs{
+			BinaryNetworkEndpointFactory: peerWrapper.Peer2,
+			V2Bootstrappers:              bootstrapPeers,
+			ContractTransmitter:          ccipProvider.ContractTransmitter(),
+			ContractConfigTracker:        ccipProvider.ContractConfigTracker(),
+			Database:                     ocrDB,
+			LocalConfig:                  lc,
+			Logger:                       ocrLogger,
+			MonitoringEndpoint:           d.monitoringEndpointGen.GenMonitoringEndpoint(spec.ContractID),
+			OffchainConfigDigester:       ccipProvider.OffchainConfigDigester(),
+			OffchainKeyring:              kb,
+			OnchainKeyring:               kb,
+		}
+		return ccip.NewExecutionServices(lggr, jobSpec, d.chainSet, d.new, d.pipelineRunner, oracleArgsNoPlugin)
 	default:
 		return nil, errors.Errorf("plugin type %s not supported", spec.PluginType)
 	}

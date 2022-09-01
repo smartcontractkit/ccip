@@ -72,6 +72,7 @@ func (d Delegate) JobType() job.Type {
 }
 
 func (Delegate) AfterJobCreated(spec job.Job)  {}
+func (Delegate) BeforeJobCreated(spec job.Job) {}
 func (Delegate) BeforeJobDeleted(spec job.Job) {}
 
 // ServicesForSpec returns the OCR services that need to run for this job

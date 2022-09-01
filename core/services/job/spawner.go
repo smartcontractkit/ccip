@@ -55,6 +55,7 @@ type (
 		// job. In case a given job type relies upon well-defined startup/shutdown
 		// ordering for services, they are started in the order they are given
 		// and stopped in reverse order.
+		BeforeJobCreated(spec Job)
 		ServicesForSpec(spec Job) ([]ServiceCtx, error)
 		AfterJobCreated(spec Job)
 		BeforeJobDeleted(spec Job)
@@ -231,10 +232,10 @@ func (js *spawner) CreateJob(jb *Job, qopts ...pg.QOpt) error {
 		return err
 	}
 
+	delegate.BeforeJobCreated(*jb)
 	if err = js.StartService(q.ParentCtx, *jb); err != nil {
 		return err
 	}
-
 	delegate.AfterJobCreated(*jb)
 
 	js.lggr.Infow("Created job", "type", jb.Type, "jobID", jb.ID)
@@ -331,5 +332,6 @@ func (n *NullDelegate) ServicesForSpec(spec Job) (s []ServiceCtx, err error) {
 	return
 }
 
+func (*NullDelegate) BeforeJobCreated(spec Job) {}
 func (*NullDelegate) AfterJobCreated(spec Job)  {}
 func (*NullDelegate) BeforeJobDeleted(spec Job) {}

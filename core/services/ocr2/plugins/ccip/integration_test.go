@@ -864,11 +864,12 @@ onRampIDs            = ["%s", "%s"]
 sourceChainID       = %s
 destChainID         = %s
 pollPeriod          = "1s"
+destStartBlock      = %d
 
 [relayConfig]
 chainID             = "%s"
 
-`, i, ccipContracts.blobVerifier.Address(), node.kb.ID(), node.transmitter, ccipContracts.tollOnRamp.Address(), ccipContracts.subOnRamp.Address(), sourceChainID, destChainID, destChainID))
+`, i, ccipContracts.blobVerifier.Address(), node.kb.ID(), node.transmitter, ccipContracts.tollOnRamp.Address(), ccipContracts.subOnRamp.Address(), sourceChainID, destChainID, configBlock, destChainID))
 		node.addJob(t, fmt.Sprintf(`
 type                = "offchainreporting2"
 pluginType          = "ccip-execution"
@@ -887,6 +888,7 @@ blobVerifierID      = "%s"
 sourceChainID       = %s
 destChainID         = %s
 pollPeriod          = "1s"
+destStartBlock      = %d
 tokensPerFeeCoinPipeline = """
 // Price 1 
 link [type=http method=GET url="%s"];
@@ -898,7 +900,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];
 [relayConfig]
 chainID             = "%s"
 
-`, i, ccipContracts.tollOffRamp.Address(), node.kb.ID(), node.transmitter, ccipContracts.tollOnRamp.Address(), ccipContracts.blobVerifier.Address(), sourceChainID, destChainID, linkEth.URL, ccipContracts.destLinkToken.Address(), destChainID))
+`, i, ccipContracts.tollOffRamp.Address(), node.kb.ID(), node.transmitter, ccipContracts.tollOnRamp.Address(), ccipContracts.blobVerifier.Address(), sourceChainID, destChainID, configBlock, linkEth.URL, ccipContracts.destLinkToken.Address(), destChainID))
 		node.addJob(t, fmt.Sprintf(`
 type                = "offchainreporting2"
 pluginType          = "ccip-execution"
@@ -917,6 +919,7 @@ blobVerifierID      = "%s"
 sourceChainID       = %s
 destChainID         = %s
 pollPeriod          = "1s"
+destStartBlock      = %d
 tokensPerFeeCoinPipeline = """
 link [type=http method=GET url="%s"];
 link_parse [type=jsonparse path="JuelsPerETH"];
@@ -927,18 +930,12 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];
 [relayConfig]
 chainID             = "%s"
 
-`, i, ccipContracts.subOffRamp.Address(), node.kb.ID(), node.transmitter, ccipContracts.subOnRamp.Address(), ccipContracts.blobVerifier.Address(), sourceChainID, destChainID, linkEth.URL, ccipContracts.destLinkToken.Address(), destChainID))
+`, i, ccipContracts.subOffRamp.Address(), node.kb.ID(), node.transmitter, ccipContracts.subOnRamp.Address(), ccipContracts.blobVerifier.Address(), sourceChainID, destChainID, configBlock, linkEth.URL, ccipContracts.destLinkToken.Address(), destChainID))
 	}
-	// With jobs present, replay the config log.
-	for _, node := range nodes {
-		c, err := node.app.GetChains().EVM.Get(destChainID)
-		require.NoError(t, err)
-		require.NoError(t, c.LogPoller().Replay(context.Background(), configBlock))
-	}
+	// Replay for bootstrap.
 	bc, err := bootstrapNode.app.GetChains().EVM.Get(destChainID)
 	require.NoError(t, err)
 	require.NoError(t, bc.LogPoller().Replay(context.Background(), configBlock))
-
 	/*
 		t.Run("single self-execute", func(t *testing.T) {
 			sendRequest(t, ccipContracts, "single req", []common.Address{ccipContracts.sourceLinkToken.Address()}, []*big.Int{big.NewInt(100)}, big.NewInt(0), big.NewInt(0))
@@ -983,7 +980,6 @@ chainID             = "%s"
 
 	tollCurrentSeqNum := 1
 	subCurrentSeqNum := 1
-
 	// Create src sub and dst sub, funded for 10 msgs with 100k callback and 1 token.
 	// Needs to be sufficient to cover default gas price of 200gwei.
 	// Costs ~7 link for 100k callback @ 200gwei.
