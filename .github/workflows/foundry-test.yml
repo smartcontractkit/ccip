@@ -10,6 +10,15 @@ jobs:
     runs-on: ubuntu-20.04
 
     steps:
+      - name: Collect Metrics
+        id: collect-gha-metrics
+        uses: smartcontractkit/push-gha-metrics-action@v1
+        with:
+          basic-auth: ${{ secrets.GRAFANA_CLOUD_BASIC_AUTH }}
+          hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
+          this-job-name: Foundry Test
+        continue-on-error: true
+
       - uses: actions/checkout@v3
         with:
           submodules: recursive
