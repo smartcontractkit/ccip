@@ -1172,12 +1172,5 @@ func NewBlankChainlinkProfileResults() *ChainlinkProfileResults {
 
 type CLNodesWithKeys struct {
 	Node       *Chainlink
-	KeysBundle KeysBundle
-}
-
-type KeysBundle struct {
-	OCR2Key    *OCR2Key
-	EthAddress string
-	TxKey      TxKey
-	P2PKey     *P2PKeys
+	KeysBundle NodeKeysBundle
 }
