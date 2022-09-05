@@ -372,7 +372,7 @@ func NewFluxAggregatorRoundConfirmer(
 	}
 }
 
-// ReceiveBlock will query the latest FluxAggregator round and check to see whether the round has confirmed
+// ReceiveHeader will query the latest FluxAggregator round and check to see whether the round has confirmed
 func (f *FluxAggregatorRoundConfirmer) ReceiveHeader(header blockchain.NodeHeader) error {
 	if f.complete {
 		return nil
@@ -385,7 +385,7 @@ func (f *FluxAggregatorRoundConfirmer) ReceiveHeader(header blockchain.NodeHeade
 		Str("Contract Address", f.fluxInstance.Address()).
 		Int64("Current Round", lr.Int64()).
 		Int64("Waiting for Round", f.roundID.Int64()).
-		Uint64("Block Number", header.Number.Uint64())
+		Uint64("Header Number", header.Number.Uint64())
 	if lr.Cmp(f.roundID) >= 0 {
 		fluxLog.Msg("FluxAggregator round completed")
 		f.complete = true
@@ -440,7 +440,7 @@ func NewVRFConsumerRoundConfirmer(
 	}
 }
 
-// ReceiveBlock will query the latest VRFConsumer round and check to see whether the round has confirmed
+// ReceiveHeader will query the latest VRFConsumer round and check to see whether the round has confirmed
 func (f *VRFConsumerRoundConfirmer) ReceiveHeader(header blockchain.NodeHeader) error {
 	if f.done {
 		return nil
@@ -453,7 +453,7 @@ func (f *VRFConsumerRoundConfirmer) ReceiveHeader(header blockchain.NodeHeader) 
 		Str("Contract Address", f.consumer.Address()).
 		Int64("Waiting for Round", f.roundID.Int64()).
 		Int64("Current round ID", roundID.Int64()).
-		Uint64("Block Number", header.Number.Uint64())
+		Uint64("Header Number", header.Number.Uint64())
 	if roundID.Int64() == f.roundID.Int64() {
 		randomness, err := f.consumer.RandomnessOutput(context.Background())
 		if err != nil {
@@ -826,7 +826,7 @@ func NewRunlogRoundConfirmer(
 	}
 }
 
-// ReceiveBlock will query the latest Runlog round and check to see whether the round has confirmed
+// ReceiveHeader will query the latest Runlog round and check to see whether the round has confirmed
 func (o *RunlogRoundConfirmer) ReceiveHeader(_ blockchain.NodeHeader) error {
 	currentRoundID, err := o.consumer.RoundID(context.Background())
 	if err != nil {
@@ -889,7 +889,7 @@ func NewOffchainAggregatorRoundConfirmer(
 	}
 }
 
-// ReceiveBlock will query the latest OffchainAggregator round and check to see whether the round has confirmed
+// ReceiveHeader will query the latest OffchainAggregator round and check to see whether the round has confirmed
 func (o *OffchainAggregatorRoundConfirmer) ReceiveHeader(_ blockchain.NodeHeader) error {
 	if channelClosed(o.doneChan) {
 		return nil

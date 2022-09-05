@@ -911,29 +911,32 @@ func VerifyStatusCode(actStatusCd, expStatusCd int) error {
 	return nil
 }
 
-func NodesWithKeysBundle(nodes []*Chainlink, chainType string, chainId *big.Int) ([]*CLNodesWithKeys, error) {
-	nodeWithKeys := []*CLNodesWithKeys{}
-	for _, node := range nodes {
-		ocr2Key, _, err := node.CreateOCR2Key(chainType)
+func (c *Chainlink) CreateNodeKeysBundle(nodes []*Chainlink, chainName string, chainId string) ([]NodeKeysBundle, error) {
+	nkb := make([]NodeKeysBundle, 0)
+	for _, n := range nodes {
+		p2pkeys, err := n.MustReadP2PKeys()
 		if err != nil {
 			return nil, err
 		}
-		ethAddress, err := node.PrimaryEthAddressForChain(chainId.String())
+
+		peerID := p2pkeys.Data[0].Attributes.PeerID
+		txKey, _, err := n.CreateTxKey(chainId)
 		if err != nil {
 			return nil, err
 		}
-		p2pKeys, err := node.MustReadP2PKeys()
+
+		ocrKey, _, err := n.CreateOCR2Key(chainName)
 		if err != nil {
 			return nil, err
 		}
-		nodeWithKeys = append(nodeWithKeys, &CLNodesWithKeys{
-			Node: node,
-			KeysBundle: KeysBundle{
-				OCR2Key:    ocr2Key,
-				EthAddress: ethAddress,
-				P2PKey:     p2pKeys,
-			},
+		nkb = append(nkb, NodeKeysBundle{
+			PeerID:  peerID,
+			OCR2Key: *ocrKey,
+			TXKey:   *txKey,
+			P2PKeys: *p2pkeys,
 		})
+
 	}
-	return nodeWithKeys, nil
+
+	return nkb, nil
 }
