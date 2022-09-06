@@ -26,15 +26,16 @@ import (
 )
 
 type CCIPCommon struct {
-	ChainClient      blockchain.EVMClient
-	Deployer         *ccip.CCIPContractsDeployer
-	LinkToken        contracts.LinkToken
-	BridgeTokens     []contracts.LinkToken // as of now considering the bridge token is same as link token
-	NativeTokenPools []*ccip.NativeTokenPool
-	TokenPoolConfig  ccip.NativeTokenConfig
-	AFNConfig        ccip.AFNConfig
-	AFN              *ccip.AFN
-	TransferAmount   *big.Int
+	ChainClient       blockchain.EVMClient
+	Deployer          *ccip.CCIPContractsDeployer
+	LinkToken         contracts.LinkToken
+	BridgeTokens      []contracts.LinkToken // as of now considering the bridge token is same as link token
+	BridgeTokenPrices []*big.Int
+	NativeTokenPools  []*ccip.NativeTokenPool
+	RateLimiterConfig ccip.RateLimiterConfig
+	AFNConfig         ccip.AFNConfig
+	AFN               *ccip.AFN
+	TransferAmount    *big.Int
 }
 
 // DeployContracts deploys the contracts which are necessary in both source and dest chain
@@ -45,11 +46,14 @@ func (ccipModule *CCIPCommon) DeployContracts(cd *ccip.CCIPContractsDeployer) {
 	ccipModule.LinkToken = token
 	// deploy bridge token. as of now keeping the bridge token same as link token,
 	ccipModule.BridgeTokens = []contracts.LinkToken{token}
+	// Set price of the bridge tokens to 1
+	ccipModule.BridgeTokenPrices = []*big.Int{big.NewInt(1)}
+
 	err = ccipModule.ChainClient.WaitForEvents()
 	Expect(err).ShouldNot(HaveOccurred(), "Error waiting for Link Token deployments")
 	// deploy native token pool
-	for _, token := range ccipModule.BridgeTokens {
-		ntp, err := cd.DeployNativeTokenPoolContract(token.Address(), ccipModule.TokenPoolConfig)
+	for _, token = range ccipModule.BridgeTokens {
+		ntp, err := cd.DeployNativeTokenPoolContract(token.Address())
 		Expect(err).ShouldNot(HaveOccurred(), "Deploying Native TokenPool Contract shouldn't fail")
 		ccipModule.NativeTokenPools = append(ccipModule.NativeTokenPools, ntp)
 		err = ccipModule.ChainClient.WaitForEvents()
@@ -62,18 +66,11 @@ func (ccipModule *CCIPCommon) DeployContracts(cd *ccip.CCIPContractsDeployer) {
 }
 
 func DefaultCCIPModule(chainClient blockchain.EVMClient, transferamount *big.Int) *CCIPCommon {
-	npoolConfig := struct {
-		Rate     *big.Int
-		Capacity *big.Int
-	}{
-		Rate:     ccip.HundredCoins,
-		Capacity: ccip.HundredCoins,
-	}
 	return &CCIPCommon{
 		ChainClient: chainClient,
-		TokenPoolConfig: ccip.NativeTokenConfig{
-			ReleaseConfig: npoolConfig,
-			LockConfig:    npoolConfig,
+		RateLimiterConfig: ccip.RateLimiterConfig{
+			Rate:     ccip.HundredCoins,
+			Capacity: ccip.HundredCoins,
 		},
 		AFNConfig: ccip.AFNConfig{
 			AFNWeightsByParticipants: map[string]*big.Int{
@@ -133,9 +130,15 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts() {
 	// onRamp
 	sourceCCIP.OnRamp, err = contractDeployer.DeployOnRamp(
 		sourceCCIP.Common.ChainClient.GetChainID(), sourceCCIP.DestinationChainId,
-		tokens, pools, []common.Address{}, sourceCCIP.Common.AFN.EthAddress, sourceCCIP.OnRampRouter.EthAddress)
+		tokens, pools, []common.Address{}, sourceCCIP.Common.AFN.EthAddress, sourceCCIP.OnRampRouter.EthAddress, sourceCCIP.Common.RateLimiterConfig)
 	err = sourceCCIP.Common.ChainClient.WaitForEvents()
 	Expect(err).ShouldNot(HaveOccurred(), "Error waiting for OnRamp deployment")
+
+	// Set token prices on the onRamp
+	err = sourceCCIP.OnRamp.SetTokenPrices(tokens, sourceCCIP.Common.BridgeTokenPrices)
+	Expect(err).ShouldNot(HaveOccurred(), "Setting prices shouldn't fail")
+	err = sourceCCIP.Common.ChainClient.WaitForEvents()
+	Expect(err).ShouldNot(HaveOccurred(), "Error waiting for setting prices")
 
 	// update onRampRouter with OnRamp address
 	err = sourceCCIP.OnRampRouter.SetOnRamp(sourceCCIP.DestinationChainId, sourceCCIP.OnRamp.EthAddress)
@@ -193,9 +196,12 @@ func (destCCIP *DestCCIPModule) DeployContracts(sourceCCIP SourceCCIPModule) {
 	err = destCCIP.Common.ChainClient.WaitForEvents()
 	Expect(err).ShouldNot(HaveOccurred(), "Error waiting for setting destination contracts")
 
-	var sourceTokens, pools []common.Address
+	var sourceTokens, destTokens, pools []common.Address
 	for _, token := range sourceCCIP.Common.BridgeTokens {
 		sourceTokens = append(sourceTokens, common.HexToAddress(token.Address()))
+	}
+	for _, token := range destCCIP.Common.BridgeTokens {
+		destTokens = append(destTokens, common.HexToAddress(token.Address()))
 	}
 	for _, pool := range destCCIP.Common.NativeTokenPools {
 		pools = append(pools, pool.EthAddress)
@@ -204,10 +210,15 @@ func (destCCIP *DestCCIPModule) DeployContracts(sourceCCIP SourceCCIPModule) {
 	// offRamp
 	destCCIP.OffRamp, err = contractDeployer.DeployOffRamp(destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID(),
 		destCCIP.BlobVerifier.EthAddress, sourceCCIP.OnRamp.EthAddress, destCCIP.Common.AFN.EthAddress,
-		sourceTokens, pools)
+		sourceTokens, pools, destCCIP.Common.RateLimiterConfig)
 	Expect(err).ShouldNot(HaveOccurred(), "Deploying OffRamp shouldn't fail")
 	err = destCCIP.Common.ChainClient.WaitForEvents()
 	Expect(err).ShouldNot(HaveOccurred(), "Error waiting for deploying offramp")
+	// Set token prices on the offRamp
+	err = destCCIP.OffRamp.SetTokenPrices(destTokens, destCCIP.Common.BridgeTokenPrices)
+	Expect(err).ShouldNot(HaveOccurred(), "Setting prices shouldn't fail")
+	err = destCCIP.Common.ChainClient.WaitForEvents()
+	Expect(err).ShouldNot(HaveOccurred(), "Error waiting for setting prices")
 	// OffRampRouter
 	destCCIP.OffRampRouter, err = contractDeployer.DeployOffRampRouter([]common.Address{destCCIP.OffRamp.EthAddress})
 	Expect(err).ShouldNot(HaveOccurred(), "Deploying OffRampRouter shouldn't fail")
@@ -416,7 +427,7 @@ func CreateOCRJobsForCCIP(
 ) {
 	bootstrapNodeWithKey := chainlinkNodes[0]
 	bootstrapNode := chainlinkNodes[0].Node
-	bootstrapP2PIds := bootstrapNodeWithKey.KeysBundle.P2PKey
+	bootstrapP2PIds := bootstrapNodeWithKey.KeysBundle.P2PKeys
 	bootstrapP2PId := bootstrapP2PIds.Data[0].Attributes.PeerID
 	bootstrapSpec := &client.OCR2TaskJobSpec{
 		Name:       fmt.Sprintf("bootstrap-%s-%s", destChainName, uuid.NewV4().String()),
@@ -431,7 +442,7 @@ func CreateOCRJobsForCCIP(
 	Expect(err).ShouldNot(HaveOccurred(), "Shouldn't fail creating bootstrap job on bootstrap node")
 
 	for nodeIndex := 1; nodeIndex < len(chainlinkNodes); nodeIndex++ {
-		nodeTransmitterAddress := chainlinkNodes[nodeIndex].KeysBundle.EthAddress
+		nodeTransmitterAddress := chainlinkNodes[nodeIndex].EthAddress
 		nodeOCR2Key := chainlinkNodes[nodeIndex].KeysBundle.OCR2Key
 		nodeOCR2KeyId := nodeOCR2Key.Data.ID
 		ocr2SpecRelay := &client.OCR2TaskJobSpec{
@@ -463,7 +474,7 @@ func CreateOCRJobsForCCIP(
 		_, err = chainlinkNodes[nodeIndex].Node.MustCreateJob(ocr2SpecRelay)
 		Expect(err).ShouldNot(HaveOccurred(), "Shouldn't fail creating CCIP-Relay OCR Task job on OCR node %d", nodeIndex+1)
 		tokenFeeConversionRateURL := fmt.Sprintf("%s/%s", mockserver.Config.ClusterURL,
-			nodeContractPair(chainlinkNodes[nodeIndex].KeysBundle.EthAddress, destLinkTokenAddr))
+			nodeContractPair(chainlinkNodes[nodeIndex].EthAddress, destLinkTokenAddr))
 		ocr2SpecExec := &client.OCR2TaskJobSpec{
 			JobType:               "offchainreporting2",
 			Name:                  fmt.Sprintf("ccip-exec-%s-%s", sourceChainName, destChainName),
@@ -513,7 +524,7 @@ func SetMockServerWithSameTokenFeeConversionValue(
 	for tokenAddr, value := range tokenValueAddress {
 		for _, n := range chainlinkNodes {
 			valueAdditions.Add(1)
-			nodeTokenPairID := nodeContractPair(n.KeysBundle.EthAddress, tokenAddr)
+			nodeTokenPairID := nodeContractPair(n.EthAddress, tokenAddr)
 			path := fmt.Sprintf("/%s", nodeTokenPairID)
 			go func(path string) {
 				defer valueAdditions.Done()

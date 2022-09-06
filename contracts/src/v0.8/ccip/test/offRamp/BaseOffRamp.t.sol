@@ -10,22 +10,11 @@ contract BaseOffRampSetup is TokenSetup {
 
   BaseOffRampHelper s_offRamp;
   MockBlobVerifier s_mockBlobVerifier;
-  NativeTokenPool s_nativePool;
 
   function setUp() public virtual override {
     TokenSetup.setUp();
 
     s_mockBlobVerifier = new MockBlobVerifier();
-
-    PoolInterface.BucketConfig memory bucketConfig = PoolInterface.BucketConfig({rate: 1e16, capacity: 1e16});
-
-    PoolInterface[] memory pools = new PoolInterface[](2);
-    pools[0] = s_sourcePools[0];
-    vm.warp(0);
-
-    s_nativePool = new NativeTokenPool(s_sourceTokens[1], bucketConfig, bucketConfig);
-    pools[1] = s_nativePool;
-    vm.warp(BLOCK_TIME);
 
     s_offRamp = new BaseOffRampHelper(
       SOURCE_CHAIN_ID,
@@ -35,11 +24,15 @@ contract BaseOffRampSetup is TokenSetup {
       ON_RAMP_ADDRESS,
       s_afn,
       s_sourceTokens,
-      pools
+      s_destPools,
+      rateLimiterConfig(),
+      TOKEN_LIMIT_ADMIN
     );
 
-    s_nativePool.setOffRamp(s_offRamp, true);
-    s_nativePool.getToken().transfer(address(s_nativePool), POOL_BALANCE);
+    s_offRamp.setPrices(s_destTokens, getTokenPrices());
+
+    NativeTokenPool(address(s_destPools[0])).setOffRamp(s_offRamp, true);
+    NativeTokenPool(address(s_destPools[1])).setOffRamp(s_offRamp, true);
   }
 
   function assertSameConfig(BaseOffRampInterface.OffRampConfig memory a, BaseOffRampInterface.OffRampConfig memory b)
@@ -82,7 +75,9 @@ contract BaseOffRamp_constructor is BaseOffRampSetup {
       ON_RAMP_ADDRESS,
       s_afn,
       wrongTokens,
-      pools
+      pools,
+      rateLimiterConfig(),
+      TOKEN_LIMIT_ADMIN
     );
   }
 }
@@ -170,21 +165,16 @@ contract BaseOffRamp_setConfig is BaseOffRampSetup {
 contract BaseOffRamp__releaseOrMintToken is BaseOffRampSetup {
   // Success
   function testSuccess() public {
-    uint256 startingBalance = s_sourceTokens[1].balanceOf(OWNER);
+    uint256 startingBalance = s_destTokens[1].balanceOf(OWNER);
     uint256 amount = POOL_BALANCE / 2;
-    s_offRamp.releaseOrMintToken(s_sourceTokens[1], amount, OWNER);
-    assertEq(startingBalance + amount, s_sourceTokens[1].balanceOf(OWNER));
+    s_offRamp.releaseOrMintToken(s_destPools[1], amount, OWNER);
+    assertEq(startingBalance + amount, s_destTokens[1].balanceOf(OWNER));
   }
 
   // Revert
   function testExceedsPoolReverts() public {
     vm.expectRevert("ERC20: transfer amount exceeds balance");
-    s_offRamp.releaseOrMintToken(s_sourceTokens[1], POOL_BALANCE * 2, OWNER);
-  }
-
-  function testUnsupportedTokenReverts() public {
-    vm.expectRevert(abi.encodeWithSelector(BaseOffRampInterface.UnsupportedToken.selector, s_destTokens[1]));
-    s_offRamp.releaseOrMintToken(s_destTokens[1], POOL_BALANCE / 2, OWNER);
+    s_offRamp.releaseOrMintToken(s_destPools[1], POOL_BALANCE * 2, OWNER);
   }
 }
 
@@ -192,33 +182,27 @@ contract BaseOffRamp__releaseOrMintToken is BaseOffRampSetup {
 contract BaseOffRamp__releaseOrMintTokens is BaseOffRampSetup {
   // Success
   function testSuccess() public {
-    uint256 startingBalance = s_sourceTokens[1].balanceOf(OWNER);
+    uint256 startingBalance = s_destTokens[1].balanceOf(OWNER);
 
-    IERC20[] memory tokens = new IERC20[](2);
-    tokens[0] = s_sourceTokens[1];
-    tokens[1] = s_sourceTokens[1];
+    PoolInterface[] memory pools = new PoolInterface[](2);
+    pools[0] = s_destPools[1];
+    pools[1] = s_destPools[1];
 
     uint256[] memory amounts = new uint256[](2);
     amounts[0] = 100;
     amounts[1] = 50;
 
-    s_offRamp.releaseOrMintTokens(tokens, amounts, OWNER);
-    assertEq(startingBalance + amounts[0] + amounts[1], s_sourceTokens[1].balanceOf(OWNER));
+    s_offRamp.releaseOrMintTokens(pools, amounts, OWNER);
+    assertEq(startingBalance + amounts[0] + amounts[1], s_destTokens[1].balanceOf(OWNER));
   }
 
   // Revert
-
-  function testUnsupportedTokenReverts() public {
-    uint256[] memory amounts = new uint256[](2);
-    vm.expectRevert(abi.encodeWithSelector(BaseOffRampInterface.UnsupportedToken.selector, s_destTokens[0]));
-    s_offRamp.releaseOrMintTokens(s_destTokens, amounts, OWNER);
-  }
 
   function testTokenAndAmountMisMatchReverts() public {
     uint256[] memory amounts = new uint256[](1);
 
     vm.expectRevert(BaseOffRampInterface.TokenAndAmountMisMatch.selector);
-    s_offRamp.releaseOrMintTokens(s_destTokens, amounts, OWNER);
+    s_offRamp.releaseOrMintTokens(s_destPools, amounts, OWNER);
   }
 }
 
@@ -237,8 +221,8 @@ contract BaseOffRamp__verifyMessages is BaseOffRampSetup {
 contract BaseOffRamp__getPool is BaseOffRampSetup {
   // Success
   function testSuccess() public {
-    address expectedPoolAddress = address(s_nativePool);
-    address actualPoolAddress = address(s_offRamp.getPool(s_nativePool.getToken()));
+    address expectedPoolAddress = address(s_destPools[0]);
+    address actualPoolAddress = address(s_offRamp.getPool(s_sourceTokens[0]));
     assertEq(expectedPoolAddress, actualPoolAddress);
   }
 

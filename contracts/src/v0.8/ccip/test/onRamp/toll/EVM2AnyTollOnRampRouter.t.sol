@@ -47,7 +47,7 @@ contract EVM2AnyTollOnRampRouter_ccipSend is EVM2EVMTollOnRampSetup {
     message.amounts = new uint256[](1);
     // since the fee token is the same we should reduce the amount sent
     // when we want an exact approve.
-    message.amounts[0] = 2**128 - RELAYING_FEE_JUELS;
+    message.amounts[0] = 2**64 - RELAYING_FEE_JUELS;
     message.tokens = new IERC20[](1);
     message.tokens[0] = s_sourceTokens[0];
 

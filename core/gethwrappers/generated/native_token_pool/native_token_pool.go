@@ -29,28 +29,16 @@ var (
 	_ = event.NewSubscription
 )
 
-type PoolInterfaceBucketConfig struct {
-	Rate     *big.Int
-	Capacity *big.Int
-}
-
-type TokenLimitsTokenBucket struct {
-	Rate        *big.Int
-	Capacity    *big.Int
-	Tokens      *big.Int
-	LastUpdated *big.Int
-}
-
 var NativeTokenPoolMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"internalType\":\"contractIERC20\",\"name\":\"token\",\"type\":\"address\"},{\"components\":[{\"internalType\":\"uint256\",\"name\":\"rate\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"capacity\",\"type\":\"uint256\"}],\"internalType\":\"structPoolInterface.BucketConfig\",\"name\":\"lockConfig\",\"type\":\"tuple\"},{\"components\":[{\"internalType\":\"uint256\",\"name\":\"rate\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"capacity\",\"type\":\"uint256\"}],\"internalType\":\"structPoolInterface.BucketConfig\",\"name\":\"releaseConfig\",\"type\":\"tuple\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[],\"name\":\"BucketOverfilled\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"currentLimit\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"requested\",\"type\":\"uint256\"}],\"name\":\"ExceedsTokenLimit\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"PermissionsError\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"TimeError\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"Burned\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"Locked\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"recipient\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"Minted\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"rate\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"capacity\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"bool\",\"name\":\"full\",\"type\":\"bool\"}],\"name\":\"NewLockBurnBucketConstructed\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"rate\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"capacity\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"bool\",\"name\":\"full\",\"type\":\"bool\"}],\"name\":\"NewReleaseMintBucketConstructed\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"OwnershipTransferRequested\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"Paused\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"recipient\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"Released\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"Unpaused\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"acceptOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getLockOrBurnBucket\",\"outputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"rate\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"capacity\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"tokens\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"lastUpdated\",\"type\":\"uint256\"}],\"internalType\":\"structTokenLimits.TokenBucket\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getReleaseOrMintBucket\",\"outputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"rate\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"capacity\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"tokens\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"lastUpdated\",\"type\":\"uint256\"}],\"internalType\":\"structTokenLimits.TokenBucket\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getToken\",\"outputs\":[{\"internalType\":\"contractIERC20\",\"name\":\"token\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"contractBaseOffRampInterface\",\"name\":\"offRamp\",\"type\":\"address\"}],\"name\":\"isOffRamp\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"contractBaseOnRampInterface\",\"name\":\"onRamp\",\"type\":\"address\"}],\"name\":\"isOnRamp\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"lockOrBurn\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"pause\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"paused\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"recipient\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"releaseOrMint\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"rate\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"capacity\",\"type\":\"uint256\"},{\"internalType\":\"bool\",\"name\":\"full\",\"type\":\"bool\"}],\"name\":\"setLockOrBurnBucket\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"contractBaseOffRampInterface\",\"name\":\"offRamp\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"permission\",\"type\":\"bool\"}],\"name\":\"setOffRamp\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"contractBaseOnRampInterface\",\"name\":\"onRamp\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"permission\",\"type\":\"bool\"}],\"name\":\"setOnRamp\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"rate\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"capacity\",\"type\":\"uint256\"},{\"internalType\":\"bool\",\"name\":\"full\",\"type\":\"bool\"}],\"name\":\"setReleaseOrMintBucket\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"unpause\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
-	Bin: "0x60a06040523480156200001157600080fd5b5060405162001813380380620018138339810160408190526200003491620002d1565b82828233806000816200008e5760405162461bcd60e51b815260206004820152601860248201527f43616e6e6f7420736574206f776e657220746f207a65726f000000000000000060448201526064015b60405180910390fd5b600080546001600160a01b0319166001600160a01b0384811691909117909155811615620000c157620000c18162000162565b50506001805460ff60a01b191681556001600160a01b0385166080528351602080860151620000fd9450919290620008926200020d821b17901c565b805160045560208082015160055560408201516006556060909101516007558151828201516200013992600190620008926200020d821b17901c565b805160085560208101516009556040810151600a5560600151600b55506200032a945050505050565b336001600160a01b03821603620001bc5760405162461bcd60e51b815260206004820152601760248201527f43616e6e6f74207472616e7366657220746f2073656c66000000000000000000604482015260640162000085565b600180546001600160a01b0319166001600160a01b0383811691821790925560008054604051929316917fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae12789190a350565b620002396040518060800160405280600081526020016000815260200160008152602001600081525090565b600082620002495760006200024b565b835b6040805160808101825296875260208701959095529385019390935250504260608301525090565b6000604082840312156200028657600080fd5b604080519081016001600160401b0381118282101715620002b757634e487b7160e01b600052604160045260246000fd5b604052825181526020928301519281019290925250919050565b600080600060a08486031215620002e757600080fd5b83516001600160a01b0381168114620002ff57600080fd5b925062000310856020860162000273565b915062000321856060860162000273565b90509250925092565b6080516114c66200034d6000396000818161017001526107ad01526114c66000f3fe608060405234801561001057600080fd5b506004361061011b5760003560e01c806379ba5097116100b2578063bd4612c411610081578063ea6192a211610066578063ea6192a2146102e3578063f0c6ff26146102f6578063f2fde38b146102fe57600080fd5b8063bd4612c4146102bd578063cc8af2e8146102d057600080fd5b806379ba50971461027c5780638456cb591461028457806384f525011461028c5780638da5cb5b1461029f57600080fd5b8063503c2858116100ee578063503c2858146101fa5780635c975abb1461020d57806369e946d4146102305780636f32b8721461024357600080fd5b80631d7a74a01461012057806321df0da71461016e57806335e1e1e8146101b55780633f4ba83a146101f0575b600080fd5b61015961012e366004611282565b73ffffffffffffffffffffffffffffffffffffffff1660009081526003602052604090205460ff1690565b60405190151581526020015b60405180910390f35b7f00000000000000000000000000000000000000000000000000000000000000005b60405173ffffffffffffffffffffffffffffffffffffffff9091168152602001610165565b6101bd610311565b60405161016591908151815260208083015190820152604080830151908201526060918201519181019190915260800190565b6101f8610369565b005b6101f861020836600461129f565b61037b565b60015474010000000000000000000000000000000000000000900460ff16610159565b6101f861023e3660046112c6565b610450565b610159610251366004611282565b73ffffffffffffffffffffffffffffffffffffffff1660009081526002602052604090205460ff1690565b6101f86104ae565b6101f86105ab565b6101f861029a3660046112ff565b6105bb565b60005473ffffffffffffffffffffffffffffffffffffffff16610190565b6101f86102cb3660046112ff565b610631565b6101f86102de3660046112c6565b61069e565b6101f86102f1366004611338565b6106fc565b6101bd610826565b6101f861030c366004611282565b61087e565b61033c6040518060800160405280600081526020016000815260200160008152602001600081525090565b50604080516080810182526004548152600554602082015260065491810191909152600754606082015290565b6103716108fb565b61037961097c565b565b60015474010000000000000000000000000000000000000000900460ff1615610405576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601060248201527f5061757361626c653a207061757365640000000000000000000000000000000060448201526064015b60405180910390fd5b8061040e610a75565b61041781610ae5565b60405182815233907f9f1ec8c880f76798e7b793325d625e9b60e4082a553c98f42b6cda368dd600089060200160405180910390a25050565b6104586108fb565b73ffffffffffffffffffffffffffffffffffffffff91909116600090815260036020526040902080547fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0016911515919091179055565b60015473ffffffffffffffffffffffffffffffffffffffff16331461052f576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601660248201527f4d7573742062652070726f706f736564206f776e65720000000000000000000060448201526064016103fc565b60008054337fffffffffffffffffffffffff00000000000000000000000000000000000000008083168217845560018054909116905560405173ffffffffffffffffffffffffffffffffffffffff90921692909183917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e091a350565b6105b36108fb565b610379610b34565b6105c36108fb565b6105ce838383610892565b80516004556020808201516005556040808301516006556060928301516007558051868152918201859052831515908201527f4bab560bebbbda366298430a0e5cd55e85ea36dc92834dc281b93dc21b9683a291015b60405180910390a1505050565b6106396108fb565b610644838383610892565b8051600855602080820151600955604080830151600a55606092830151600b558051868152918201859052831515908201527f8586e57eb58352bf12165ebd6104b5991cb1c22a183a9965a2961b7b462bc2df9101610624565b6106a66108fb565b73ffffffffffffffffffffffffffffffffffffffff91909116600090815260026020526040902080547fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0016911515919091179055565b60015474010000000000000000000000000000000000000000900460ff1615610781576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601060248201527f5061757361626c653a207061757365640000000000000000000000000000000060448201526064016103fc565b8061078a610c20565b61079381610c5b565b6107d473ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000168484610caa565b60405182815273ffffffffffffffffffffffffffffffffffffffff84169033907f2d87480f50083e2b2759522a8fdda59802650a8055e609a7772cf70c07748f529060200160405180910390a3505050565b6108516040518060800160405280600081526020016000815260200160008152602001600081525090565b506040805160808101825260085481526009546020820152600a5491810191909152600b54606082015290565b6108866108fb565b61088f81610d3c565b50565b6108bd6040518060800160405280600081526020016000815260200160008152602001600081525090565b6000826108cb5760006108cd565b835b90506040518060800160405280868152602001858152602001828152602001428152509150505b9392505050565b60005473ffffffffffffffffffffffffffffffffffffffff163314610379576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601660248201527f4f6e6c792063616c6c61626c65206279206f776e65720000000000000000000060448201526064016103fc565b60015474010000000000000000000000000000000000000000900460ff16610a00576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601460248201527f5061757361626c653a206e6f742070617573656400000000000000000000000060448201526064016103fc565b600180547fffffffffffffffffffffff00ffffffffffffffffffffffffffffffffffffffff1690557f5db9ee0a495bf2e6ff9c91a7834c1ba4fdd244a5e8aa4e537bd38aeae4b073aa335b60405173ffffffffffffffffffffffffffffffffffffffff909116815260200160405180910390a1565b60005473ffffffffffffffffffffffffffffffffffffffff163314801590610aae57503360009081526002602052604090205460ff165b155b15610379576040517f5307f5ab00000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b610af0600482610e31565b61088f576006546040517f331220f70000000000000000000000000000000000000000000000000000000081526004810191909152602481018290526044016103fc565b60015474010000000000000000000000000000000000000000900460ff1615610bb9576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601060248201527f5061757361626c653a207061757365640000000000000000000000000000000060448201526064016103fc565b600180547fffffffffffffffffffffff00ffffffffffffffffffffffffffffffffffffffff16740100000000000000000000000000000000000000001790557f62e78cea01bee320cd4e420270b5ea74000d11b0c9f74754ebdbfc544b05a258610a4b3390565b60005473ffffffffffffffffffffffffffffffffffffffff163314801590610aae57503360009081526003602052604090205460ff16610aac565b610c66600882610e31565b61088f57600a546040517f331220f70000000000000000000000000000000000000000000000000000000081526004810191909152602481018290526044016103fc565b6040805173ffffffffffffffffffffffffffffffffffffffff8416602482015260448082018490528251808303909101815260649091019091526020810180517bffffffffffffffffffffffffffffffffffffffffffffffffffffffff167fa9059cbb00000000000000000000000000000000000000000000000000000000179052610d37908490610e74565b505050565b3373ffffffffffffffffffffffffffffffffffffffff821603610dbb576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601760248201527f43616e6e6f74207472616e7366657220746f2073656c6600000000000000000060448201526064016103fc565b600180547fffffffffffffffffffffffff00000000000000000000000000000000000000001673ffffffffffffffffffffffffffffffffffffffff83811691821790925560008054604051929316917fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae12789190a350565b6000610e3c83610f80565b8183600201541015610e5057506000610e6e565b81836002016000828254610e649190611393565b9091555060019150505b92915050565b6000610ed6826040518060400160405280602081526020017f5361666545524332303a206c6f772d6c6576656c2063616c6c206661696c65648152508573ffffffffffffffffffffffffffffffffffffffff166110609092919063ffffffff16565b805190915015610d375780806020019051810190610ef491906113aa565b610d37576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152602a60248201527f5361666545524332303a204552433230206f7065726174696f6e20646964206e60448201527f6f7420737563636565640000000000000000000000000000000000000000000060648201526084016103fc565b806001015481600201541115610fc2576040517f9725942a00000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b8060010154816002015403610fd45750565b60038101544290811015611014576040517ff01f197500000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b60008260030154826110269190611393565b600184015484549192506110529161103e90846113c7565b856002015461104d9190611404565b611077565b600284015550600390910155565b606061106f848460008561108d565b949350505050565b600081831061108657816108f4565b5090919050565b60608247101561111f576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152602660248201527f416464726573733a20696e73756666696369656e742062616c616e636520666f60448201527f722063616c6c000000000000000000000000000000000000000000000000000060648201526084016103fc565b843b611187576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601d60248201527f416464726573733a2063616c6c20746f206e6f6e2d636f6e747261637400000060448201526064016103fc565b6000808673ffffffffffffffffffffffffffffffffffffffff1685876040516111b0919061144c565b60006040518083038185875af1925050503d80600081146111ed576040519150601f19603f3d011682016040523d82523d6000602084013e6111f2565b606091505b509150915061120282828661120d565b979650505050505050565b6060831561121c5750816108f4565b82511561122c5782518084602001fd5b816040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016103fc9190611468565b73ffffffffffffffffffffffffffffffffffffffff8116811461088f57600080fd5b60006020828403121561129457600080fd5b81356108f481611260565b6000602082840312156112b157600080fd5b5035919050565b801515811461088f57600080fd5b600080604083850312156112d957600080fd5b82356112e481611260565b915060208301356112f4816112b8565b809150509250929050565b60008060006060848603121561131457600080fd5b8335925060208401359150604084013561132d816112b8565b809150509250925092565b6000806040838503121561134b57600080fd5b823561135681611260565b946020939093013593505050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b6000828210156113a5576113a5611364565b500390565b6000602082840312156113bc57600080fd5b81516108f4816112b8565b6000817fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff04831182151516156113ff576113ff611364565b500290565b6000821982111561141757611417611364565b500190565b60005b8381101561143757818101518382015260200161141f565b83811115611446576000848401525b50505050565b6000825161145e81846020870161141c565b9190910192915050565b602081526000825180602084015261148781604085016020870161141c565b601f017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe016919091016040019291505056fea164736f6c634300080f000a",
+	ABI: "[{\"inputs\":[{\"internalType\":\"contractIERC20\",\"name\":\"token\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"currentLimit\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"requested\",\"type\":\"uint256\"}],\"name\":\"ExceedsTokenLimit\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"PermissionsError\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"Burned\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"Locked\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"recipient\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"Minted\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"OwnershipTransferRequested\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"Paused\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"recipient\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"Released\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"Unpaused\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"acceptOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getToken\",\"outputs\":[{\"internalType\":\"contractIERC20\",\"name\":\"token\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"contractBaseOffRampInterface\",\"name\":\"offRamp\",\"type\":\"address\"}],\"name\":\"isOffRamp\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"contractBaseOnRampInterface\",\"name\":\"onRamp\",\"type\":\"address\"}],\"name\":\"isOnRamp\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"lockOrBurn\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"pause\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"paused\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"recipient\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"releaseOrMint\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"contractBaseOffRampInterface\",\"name\":\"offRamp\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"permission\",\"type\":\"bool\"}],\"name\":\"setOffRamp\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"contractBaseOnRampInterface\",\"name\":\"onRamp\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"permission\",\"type\":\"bool\"}],\"name\":\"setOnRamp\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"unpause\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+	Bin: "0x60a060405234801561001057600080fd5b5060405161101b38038061101b83398101604081905261002f91610181565b8033806000816100865760405162461bcd60e51b815260206004820152601860248201527f43616e6e6f7420736574206f776e657220746f207a65726f000000000000000060448201526064015b60405180910390fd5b600080546001600160a01b0319166001600160a01b03848116919091179091558116156100b6576100b6816100d8565b50506001805460ff60a01b19169055506001600160a01b0316608052506101b1565b336001600160a01b038216036101305760405162461bcd60e51b815260206004820152601760248201527f43616e6e6f74207472616e7366657220746f2073656c66000000000000000000604482015260640161007d565b600180546001600160a01b0319166001600160a01b0383811691821790925560008054604051929316917fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae12789190a350565b60006020828403121561019357600080fd5b81516001600160a01b03811681146101aa57600080fd5b9392505050565b608051610e486101d360003960008181610134015261056a0152610e486000f3fe608060405234801561001057600080fd5b50600436106100df5760003560e01c80636f32b8721161008c5780638da5cb5b116100665780638da5cb5b14610215578063cc8af2e814610233578063ea6192a214610246578063f2fde38b1461025957600080fd5b80636f32b872146101cc57806379ba5097146102055780638456cb591461020d57600080fd5b8063503c2858116100bd578063503c2858146101835780635c975abb1461019657806369e946d4146101b957600080fd5b80631d7a74a0146100e457806321df0da7146101325780633f4ba83a14610179575b600080fd5b61011d6100f2366004610cd8565b73ffffffffffffffffffffffffffffffffffffffff1660009081526003602052604090205460ff1690565b60405190151581526020015b60405180910390f35b7f00000000000000000000000000000000000000000000000000000000000000005b60405173ffffffffffffffffffffffffffffffffffffffff9091168152602001610129565b61018161026c565b005b610181610191366004610cf5565b61027e565b60015474010000000000000000000000000000000000000000900460ff1661011d565b6101816101c7366004610d1c565b61032e565b61011d6101da366004610cd8565b73ffffffffffffffffffffffffffffffffffffffff1660009081526002602052604090205460ff1690565b61018161038c565b61018161046f565b60005473ffffffffffffffffffffffffffffffffffffffff16610154565b610181610241366004610d1c565b61047f565b610181610254366004610d55565b6104dd565b610181610267366004610cd8565b6105e2565b6102746105f6565b61027c61065d565b565b60015474010000000000000000000000000000000000000000900460ff16156102ee5760405162461bcd60e51b815260206004820152601060248201527f5061757361626c653a207061757365640000000000000000000000000000000060448201526064015b60405180910390fd5b6102f661073c565b60405181815233907f9f1ec8c880f76798e7b793325d625e9b60e4082a553c98f42b6cda368dd600089060200160405180910390a250565b6103366105f6565b73ffffffffffffffffffffffffffffffffffffffff91909116600090815260036020526040902080547fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0016911515919091179055565b60015473ffffffffffffffffffffffffffffffffffffffff1633146103f35760405162461bcd60e51b815260206004820152601660248201527f4d7573742062652070726f706f736564206f776e65720000000000000000000060448201526064016102e5565b60008054337fffffffffffffffffffffffff00000000000000000000000000000000000000008083168217845560018054909116905560405173ffffffffffffffffffffffffffffffffffffffff90921692909183917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e091a350565b6104776105f6565b61027c6107ac565b6104876105f6565b73ffffffffffffffffffffffffffffffffffffffff91909116600090815260026020526040902080547fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0016911515919091179055565b60015474010000000000000000000000000000000000000000900460ff16156105485760405162461bcd60e51b815260206004820152601060248201527f5061757361626c653a207061757365640000000000000000000000000000000060448201526064016102e5565b61055061087e565b61059173ffffffffffffffffffffffffffffffffffffffff7f00000000000000000000000000000000000000000000000000000000000000001683836108b9565b60405181815273ffffffffffffffffffffffffffffffffffffffff83169033907f2d87480f50083e2b2759522a8fdda59802650a8055e609a7772cf70c07748f529060200160405180910390a35050565b6105ea6105f6565b6105f38161094b565b50565b60005473ffffffffffffffffffffffffffffffffffffffff16331461027c5760405162461bcd60e51b815260206004820152601660248201527f4f6e6c792063616c6c61626c65206279206f776e65720000000000000000000060448201526064016102e5565b60015474010000000000000000000000000000000000000000900460ff166106c75760405162461bcd60e51b815260206004820152601460248201527f5061757361626c653a206e6f742070617573656400000000000000000000000060448201526064016102e5565b600180547fffffffffffffffffffffff00ffffffffffffffffffffffffffffffffffffffff1690557f5db9ee0a495bf2e6ff9c91a7834c1ba4fdd244a5e8aa4e537bd38aeae4b073aa335b60405173ffffffffffffffffffffffffffffffffffffffff909116815260200160405180910390a1565b60005473ffffffffffffffffffffffffffffffffffffffff16331480159061077557503360009081526002602052604090205460ff165b155b1561027c576040517f5307f5ab00000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b60015474010000000000000000000000000000000000000000900460ff16156108175760405162461bcd60e51b815260206004820152601060248201527f5061757361626c653a207061757365640000000000000000000000000000000060448201526064016102e5565b600180547fffffffffffffffffffffff00ffffffffffffffffffffffffffffffffffffffff16740100000000000000000000000000000000000000001790557f62e78cea01bee320cd4e420270b5ea74000d11b0c9f74754ebdbfc544b05a2586107123390565b60005473ffffffffffffffffffffffffffffffffffffffff16331480159061077557503360009081526003602052604090205460ff16610773565b6040805173ffffffffffffffffffffffffffffffffffffffff8416602482015260448082018490528251808303909101815260649091019091526020810180517bffffffffffffffffffffffffffffffffffffffffffffffffffffffff167fa9059cbb00000000000000000000000000000000000000000000000000000000179052610946908490610a26565b505050565b3373ffffffffffffffffffffffffffffffffffffffff8216036109b05760405162461bcd60e51b815260206004820152601760248201527f43616e6e6f74207472616e7366657220746f2073656c6600000000000000000060448201526064016102e5565b600180547fffffffffffffffffffffffff00000000000000000000000000000000000000001673ffffffffffffffffffffffffffffffffffffffff83811691821790925560008054604051929316917fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae12789190a350565b6000610a88826040518060400160405280602081526020017f5361666545524332303a206c6f772d6c6576656c2063616c6c206661696c65648152508573ffffffffffffffffffffffffffffffffffffffff16610b189092919063ffffffff16565b8051909150156109465780806020019051810190610aa69190610d81565b6109465760405162461bcd60e51b815260206004820152602a60248201527f5361666545524332303a204552433230206f7065726174696f6e20646964206e60448201527f6f7420737563636565640000000000000000000000000000000000000000000060648201526084016102e5565b6060610b278484600085610b31565b90505b9392505050565b606082471015610ba95760405162461bcd60e51b815260206004820152602660248201527f416464726573733a20696e73756666696369656e742062616c616e636520666f60448201527f722063616c6c000000000000000000000000000000000000000000000000000060648201526084016102e5565b843b610bf75760405162461bcd60e51b815260206004820152601d60248201527f416464726573733a2063616c6c20746f206e6f6e2d636f6e747261637400000060448201526064016102e5565b6000808673ffffffffffffffffffffffffffffffffffffffff168587604051610c209190610dce565b60006040518083038185875af1925050503d8060008114610c5d576040519150601f19603f3d011682016040523d82523d6000602084013e610c62565b606091505b5091509150610c72828286610c7d565b979650505050505050565b60608315610c8c575081610b2a565b825115610c9c5782518084602001fd5b8160405162461bcd60e51b81526004016102e59190610dea565b73ffffffffffffffffffffffffffffffffffffffff811681146105f357600080fd5b600060208284031215610cea57600080fd5b8135610b2a81610cb6565b600060208284031215610d0757600080fd5b5035919050565b80151581146105f357600080fd5b60008060408385031215610d2f57600080fd5b8235610d3a81610cb6565b91506020830135610d4a81610d0e565b809150509250929050565b60008060408385031215610d6857600080fd5b8235610d7381610cb6565b946020939093013593505050565b600060208284031215610d9357600080fd5b8151610b2a81610d0e565b60005b83811015610db9578181015183820152602001610da1565b83811115610dc8576000848401525b50505050565b60008251610de0818460208701610d9e565b9190910192915050565b6020815260008251806020840152610e09816040850160208701610d9e565b601f017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe016919091016040019291505056fea164736f6c634300080f000a",
 }
 
 var NativeTokenPoolABI = NativeTokenPoolMetaData.ABI
 
 var NativeTokenPoolBin = NativeTokenPoolMetaData.Bin
 
-func DeployNativeTokenPool(auth *bind.TransactOpts, backend bind.ContractBackend, token common.Address, lockConfig PoolInterfaceBucketConfig, releaseConfig PoolInterfaceBucketConfig) (common.Address, *types.Transaction, *NativeTokenPool, error) {
+func DeployNativeTokenPool(auth *bind.TransactOpts, backend bind.ContractBackend, token common.Address) (common.Address, *types.Transaction, *NativeTokenPool, error) {
 	parsed, err := NativeTokenPoolMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -59,7 +47,7 @@ func DeployNativeTokenPool(auth *bind.TransactOpts, backend bind.ContractBackend
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
 
-	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(NativeTokenPoolBin), backend, token, lockConfig, releaseConfig)
+	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(NativeTokenPoolBin), backend, token)
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
@@ -180,50 +168,6 @@ func (_NativeTokenPool *NativeTokenPoolTransactorRaw) Transfer(opts *bind.Transa
 
 func (_NativeTokenPool *NativeTokenPoolTransactorRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
 	return _NativeTokenPool.Contract.contract.Transact(opts, method, params...)
-}
-
-func (_NativeTokenPool *NativeTokenPoolCaller) GetLockOrBurnBucket(opts *bind.CallOpts) (TokenLimitsTokenBucket, error) {
-	var out []interface{}
-	err := _NativeTokenPool.contract.Call(opts, &out, "getLockOrBurnBucket")
-
-	if err != nil {
-		return *new(TokenLimitsTokenBucket), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(TokenLimitsTokenBucket)).(*TokenLimitsTokenBucket)
-
-	return out0, err
-
-}
-
-func (_NativeTokenPool *NativeTokenPoolSession) GetLockOrBurnBucket() (TokenLimitsTokenBucket, error) {
-	return _NativeTokenPool.Contract.GetLockOrBurnBucket(&_NativeTokenPool.CallOpts)
-}
-
-func (_NativeTokenPool *NativeTokenPoolCallerSession) GetLockOrBurnBucket() (TokenLimitsTokenBucket, error) {
-	return _NativeTokenPool.Contract.GetLockOrBurnBucket(&_NativeTokenPool.CallOpts)
-}
-
-func (_NativeTokenPool *NativeTokenPoolCaller) GetReleaseOrMintBucket(opts *bind.CallOpts) (TokenLimitsTokenBucket, error) {
-	var out []interface{}
-	err := _NativeTokenPool.contract.Call(opts, &out, "getReleaseOrMintBucket")
-
-	if err != nil {
-		return *new(TokenLimitsTokenBucket), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(TokenLimitsTokenBucket)).(*TokenLimitsTokenBucket)
-
-	return out0, err
-
-}
-
-func (_NativeTokenPool *NativeTokenPoolSession) GetReleaseOrMintBucket() (TokenLimitsTokenBucket, error) {
-	return _NativeTokenPool.Contract.GetReleaseOrMintBucket(&_NativeTokenPool.CallOpts)
-}
-
-func (_NativeTokenPool *NativeTokenPoolCallerSession) GetReleaseOrMintBucket() (TokenLimitsTokenBucket, error) {
-	return _NativeTokenPool.Contract.GetReleaseOrMintBucket(&_NativeTokenPool.CallOpts)
 }
 
 func (_NativeTokenPool *NativeTokenPoolCaller) GetToken(opts *bind.CallOpts) (common.Address, error) {
@@ -384,18 +328,6 @@ func (_NativeTokenPool *NativeTokenPoolTransactorSession) ReleaseOrMint(recipien
 	return _NativeTokenPool.Contract.ReleaseOrMint(&_NativeTokenPool.TransactOpts, recipient, amount)
 }
 
-func (_NativeTokenPool *NativeTokenPoolTransactor) SetLockOrBurnBucket(opts *bind.TransactOpts, rate *big.Int, capacity *big.Int, full bool) (*types.Transaction, error) {
-	return _NativeTokenPool.contract.Transact(opts, "setLockOrBurnBucket", rate, capacity, full)
-}
-
-func (_NativeTokenPool *NativeTokenPoolSession) SetLockOrBurnBucket(rate *big.Int, capacity *big.Int, full bool) (*types.Transaction, error) {
-	return _NativeTokenPool.Contract.SetLockOrBurnBucket(&_NativeTokenPool.TransactOpts, rate, capacity, full)
-}
-
-func (_NativeTokenPool *NativeTokenPoolTransactorSession) SetLockOrBurnBucket(rate *big.Int, capacity *big.Int, full bool) (*types.Transaction, error) {
-	return _NativeTokenPool.Contract.SetLockOrBurnBucket(&_NativeTokenPool.TransactOpts, rate, capacity, full)
-}
-
 func (_NativeTokenPool *NativeTokenPoolTransactor) SetOffRamp(opts *bind.TransactOpts, offRamp common.Address, permission bool) (*types.Transaction, error) {
 	return _NativeTokenPool.contract.Transact(opts, "setOffRamp", offRamp, permission)
 }
@@ -418,18 +350,6 @@ func (_NativeTokenPool *NativeTokenPoolSession) SetOnRamp(onRamp common.Address,
 
 func (_NativeTokenPool *NativeTokenPoolTransactorSession) SetOnRamp(onRamp common.Address, permission bool) (*types.Transaction, error) {
 	return _NativeTokenPool.Contract.SetOnRamp(&_NativeTokenPool.TransactOpts, onRamp, permission)
-}
-
-func (_NativeTokenPool *NativeTokenPoolTransactor) SetReleaseOrMintBucket(opts *bind.TransactOpts, rate *big.Int, capacity *big.Int, full bool) (*types.Transaction, error) {
-	return _NativeTokenPool.contract.Transact(opts, "setReleaseOrMintBucket", rate, capacity, full)
-}
-
-func (_NativeTokenPool *NativeTokenPoolSession) SetReleaseOrMintBucket(rate *big.Int, capacity *big.Int, full bool) (*types.Transaction, error) {
-	return _NativeTokenPool.Contract.SetReleaseOrMintBucket(&_NativeTokenPool.TransactOpts, rate, capacity, full)
-}
-
-func (_NativeTokenPool *NativeTokenPoolTransactorSession) SetReleaseOrMintBucket(rate *big.Int, capacity *big.Int, full bool) (*types.Transaction, error) {
-	return _NativeTokenPool.Contract.SetReleaseOrMintBucket(&_NativeTokenPool.TransactOpts, rate, capacity, full)
 }
 
 func (_NativeTokenPool *NativeTokenPoolTransactor) TransferOwnership(opts *bind.TransactOpts, to common.Address) (*types.Transaction, error) {
@@ -843,244 +763,6 @@ func (_NativeTokenPool *NativeTokenPoolFilterer) WatchMinted(opts *bind.WatchOpt
 func (_NativeTokenPool *NativeTokenPoolFilterer) ParseMinted(log types.Log) (*NativeTokenPoolMinted, error) {
 	event := new(NativeTokenPoolMinted)
 	if err := _NativeTokenPool.contract.UnpackLog(event, "Minted", log); err != nil {
-		return nil, err
-	}
-	event.Raw = log
-	return event, nil
-}
-
-type NativeTokenPoolNewLockBurnBucketConstructedIterator struct {
-	Event *NativeTokenPoolNewLockBurnBucketConstructed
-
-	contract *bind.BoundContract
-	event    string
-
-	logs chan types.Log
-	sub  ethereum.Subscription
-	done bool
-	fail error
-}
-
-func (it *NativeTokenPoolNewLockBurnBucketConstructedIterator) Next() bool {
-
-	if it.fail != nil {
-		return false
-	}
-
-	if it.done {
-		select {
-		case log := <-it.logs:
-			it.Event = new(NativeTokenPoolNewLockBurnBucketConstructed)
-			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-				it.fail = err
-				return false
-			}
-			it.Event.Raw = log
-			return true
-
-		default:
-			return false
-		}
-	}
-
-	select {
-	case log := <-it.logs:
-		it.Event = new(NativeTokenPoolNewLockBurnBucketConstructed)
-		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-			it.fail = err
-			return false
-		}
-		it.Event.Raw = log
-		return true
-
-	case err := <-it.sub.Err():
-		it.done = true
-		it.fail = err
-		return it.Next()
-	}
-}
-
-func (it *NativeTokenPoolNewLockBurnBucketConstructedIterator) Error() error {
-	return it.fail
-}
-
-func (it *NativeTokenPoolNewLockBurnBucketConstructedIterator) Close() error {
-	it.sub.Unsubscribe()
-	return nil
-}
-
-type NativeTokenPoolNewLockBurnBucketConstructed struct {
-	Rate     *big.Int
-	Capacity *big.Int
-	Full     bool
-	Raw      types.Log
-}
-
-func (_NativeTokenPool *NativeTokenPoolFilterer) FilterNewLockBurnBucketConstructed(opts *bind.FilterOpts) (*NativeTokenPoolNewLockBurnBucketConstructedIterator, error) {
-
-	logs, sub, err := _NativeTokenPool.contract.FilterLogs(opts, "NewLockBurnBucketConstructed")
-	if err != nil {
-		return nil, err
-	}
-	return &NativeTokenPoolNewLockBurnBucketConstructedIterator{contract: _NativeTokenPool.contract, event: "NewLockBurnBucketConstructed", logs: logs, sub: sub}, nil
-}
-
-func (_NativeTokenPool *NativeTokenPoolFilterer) WatchNewLockBurnBucketConstructed(opts *bind.WatchOpts, sink chan<- *NativeTokenPoolNewLockBurnBucketConstructed) (event.Subscription, error) {
-
-	logs, sub, err := _NativeTokenPool.contract.WatchLogs(opts, "NewLockBurnBucketConstructed")
-	if err != nil {
-		return nil, err
-	}
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case log := <-logs:
-
-				event := new(NativeTokenPoolNewLockBurnBucketConstructed)
-				if err := _NativeTokenPool.contract.UnpackLog(event, "NewLockBurnBucketConstructed", log); err != nil {
-					return err
-				}
-				event.Raw = log
-
-				select {
-				case sink <- event:
-				case err := <-sub.Err():
-					return err
-				case <-quit:
-					return nil
-				}
-			case err := <-sub.Err():
-				return err
-			case <-quit:
-				return nil
-			}
-		}
-	}), nil
-}
-
-func (_NativeTokenPool *NativeTokenPoolFilterer) ParseNewLockBurnBucketConstructed(log types.Log) (*NativeTokenPoolNewLockBurnBucketConstructed, error) {
-	event := new(NativeTokenPoolNewLockBurnBucketConstructed)
-	if err := _NativeTokenPool.contract.UnpackLog(event, "NewLockBurnBucketConstructed", log); err != nil {
-		return nil, err
-	}
-	event.Raw = log
-	return event, nil
-}
-
-type NativeTokenPoolNewReleaseMintBucketConstructedIterator struct {
-	Event *NativeTokenPoolNewReleaseMintBucketConstructed
-
-	contract *bind.BoundContract
-	event    string
-
-	logs chan types.Log
-	sub  ethereum.Subscription
-	done bool
-	fail error
-}
-
-func (it *NativeTokenPoolNewReleaseMintBucketConstructedIterator) Next() bool {
-
-	if it.fail != nil {
-		return false
-	}
-
-	if it.done {
-		select {
-		case log := <-it.logs:
-			it.Event = new(NativeTokenPoolNewReleaseMintBucketConstructed)
-			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-				it.fail = err
-				return false
-			}
-			it.Event.Raw = log
-			return true
-
-		default:
-			return false
-		}
-	}
-
-	select {
-	case log := <-it.logs:
-		it.Event = new(NativeTokenPoolNewReleaseMintBucketConstructed)
-		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-			it.fail = err
-			return false
-		}
-		it.Event.Raw = log
-		return true
-
-	case err := <-it.sub.Err():
-		it.done = true
-		it.fail = err
-		return it.Next()
-	}
-}
-
-func (it *NativeTokenPoolNewReleaseMintBucketConstructedIterator) Error() error {
-	return it.fail
-}
-
-func (it *NativeTokenPoolNewReleaseMintBucketConstructedIterator) Close() error {
-	it.sub.Unsubscribe()
-	return nil
-}
-
-type NativeTokenPoolNewReleaseMintBucketConstructed struct {
-	Rate     *big.Int
-	Capacity *big.Int
-	Full     bool
-	Raw      types.Log
-}
-
-func (_NativeTokenPool *NativeTokenPoolFilterer) FilterNewReleaseMintBucketConstructed(opts *bind.FilterOpts) (*NativeTokenPoolNewReleaseMintBucketConstructedIterator, error) {
-
-	logs, sub, err := _NativeTokenPool.contract.FilterLogs(opts, "NewReleaseMintBucketConstructed")
-	if err != nil {
-		return nil, err
-	}
-	return &NativeTokenPoolNewReleaseMintBucketConstructedIterator{contract: _NativeTokenPool.contract, event: "NewReleaseMintBucketConstructed", logs: logs, sub: sub}, nil
-}
-
-func (_NativeTokenPool *NativeTokenPoolFilterer) WatchNewReleaseMintBucketConstructed(opts *bind.WatchOpts, sink chan<- *NativeTokenPoolNewReleaseMintBucketConstructed) (event.Subscription, error) {
-
-	logs, sub, err := _NativeTokenPool.contract.WatchLogs(opts, "NewReleaseMintBucketConstructed")
-	if err != nil {
-		return nil, err
-	}
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case log := <-logs:
-
-				event := new(NativeTokenPoolNewReleaseMintBucketConstructed)
-				if err := _NativeTokenPool.contract.UnpackLog(event, "NewReleaseMintBucketConstructed", log); err != nil {
-					return err
-				}
-				event.Raw = log
-
-				select {
-				case sink <- event:
-				case err := <-sub.Err():
-					return err
-				case <-quit:
-					return nil
-				}
-			case err := <-sub.Err():
-				return err
-			case <-quit:
-				return nil
-			}
-		}
-	}), nil
-}
-
-func (_NativeTokenPool *NativeTokenPoolFilterer) ParseNewReleaseMintBucketConstructed(log types.Log) (*NativeTokenPoolNewReleaseMintBucketConstructed, error) {
-	event := new(NativeTokenPoolNewReleaseMintBucketConstructed)
-	if err := _NativeTokenPool.contract.UnpackLog(event, "NewReleaseMintBucketConstructed", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
@@ -1738,10 +1420,6 @@ func (_NativeTokenPool *NativeTokenPool) ParseLog(log types.Log) (generated.Abig
 		return _NativeTokenPool.ParseLocked(log)
 	case _NativeTokenPool.abi.Events["Minted"].ID:
 		return _NativeTokenPool.ParseMinted(log)
-	case _NativeTokenPool.abi.Events["NewLockBurnBucketConstructed"].ID:
-		return _NativeTokenPool.ParseNewLockBurnBucketConstructed(log)
-	case _NativeTokenPool.abi.Events["NewReleaseMintBucketConstructed"].ID:
-		return _NativeTokenPool.ParseNewReleaseMintBucketConstructed(log)
 	case _NativeTokenPool.abi.Events["OwnershipTransferRequested"].ID:
 		return _NativeTokenPool.ParseOwnershipTransferRequested(log)
 	case _NativeTokenPool.abi.Events["OwnershipTransferred"].ID:
@@ -1770,14 +1448,6 @@ func (NativeTokenPoolMinted) Topic() common.Hash {
 	return common.HexToHash("0x9d228d69b5fdb8d273a2336f8fb8612d039631024ea9bf09c424a9503aa078f0")
 }
 
-func (NativeTokenPoolNewLockBurnBucketConstructed) Topic() common.Hash {
-	return common.HexToHash("0x4bab560bebbbda366298430a0e5cd55e85ea36dc92834dc281b93dc21b9683a2")
-}
-
-func (NativeTokenPoolNewReleaseMintBucketConstructed) Topic() common.Hash {
-	return common.HexToHash("0x8586e57eb58352bf12165ebd6104b5991cb1c22a183a9965a2961b7b462bc2df")
-}
-
 func (NativeTokenPoolOwnershipTransferRequested) Topic() common.Hash {
 	return common.HexToHash("0xed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae1278")
 }
@@ -1803,10 +1473,6 @@ func (_NativeTokenPool *NativeTokenPool) Address() common.Address {
 }
 
 type NativeTokenPoolInterface interface {
-	GetLockOrBurnBucket(opts *bind.CallOpts) (TokenLimitsTokenBucket, error)
-
-	GetReleaseOrMintBucket(opts *bind.CallOpts) (TokenLimitsTokenBucket, error)
-
 	GetToken(opts *bind.CallOpts) (common.Address, error)
 
 	IsOffRamp(opts *bind.CallOpts, offRamp common.Address) (bool, error)
@@ -1825,13 +1491,9 @@ type NativeTokenPoolInterface interface {
 
 	ReleaseOrMint(opts *bind.TransactOpts, recipient common.Address, amount *big.Int) (*types.Transaction, error)
 
-	SetLockOrBurnBucket(opts *bind.TransactOpts, rate *big.Int, capacity *big.Int, full bool) (*types.Transaction, error)
-
 	SetOffRamp(opts *bind.TransactOpts, offRamp common.Address, permission bool) (*types.Transaction, error)
 
 	SetOnRamp(opts *bind.TransactOpts, onRamp common.Address, permission bool) (*types.Transaction, error)
-
-	SetReleaseOrMintBucket(opts *bind.TransactOpts, rate *big.Int, capacity *big.Int, full bool) (*types.Transaction, error)
 
 	TransferOwnership(opts *bind.TransactOpts, to common.Address) (*types.Transaction, error)
 
@@ -1854,18 +1516,6 @@ type NativeTokenPoolInterface interface {
 	WatchMinted(opts *bind.WatchOpts, sink chan<- *NativeTokenPoolMinted, sender []common.Address, recipient []common.Address) (event.Subscription, error)
 
 	ParseMinted(log types.Log) (*NativeTokenPoolMinted, error)
-
-	FilterNewLockBurnBucketConstructed(opts *bind.FilterOpts) (*NativeTokenPoolNewLockBurnBucketConstructedIterator, error)
-
-	WatchNewLockBurnBucketConstructed(opts *bind.WatchOpts, sink chan<- *NativeTokenPoolNewLockBurnBucketConstructed) (event.Subscription, error)
-
-	ParseNewLockBurnBucketConstructed(log types.Log) (*NativeTokenPoolNewLockBurnBucketConstructed, error)
-
-	FilterNewReleaseMintBucketConstructed(opts *bind.FilterOpts) (*NativeTokenPoolNewReleaseMintBucketConstructedIterator, error)
-
-	WatchNewReleaseMintBucketConstructed(opts *bind.WatchOpts, sink chan<- *NativeTokenPoolNewReleaseMintBucketConstructed) (event.Subscription, error)
-
-	ParseNewReleaseMintBucketConstructed(log types.Log) (*NativeTokenPoolNewReleaseMintBucketConstructed, error)
 
 	FilterOwnershipTransferRequested(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*NativeTokenPoolOwnershipTransferRequestedIterator, error)
 

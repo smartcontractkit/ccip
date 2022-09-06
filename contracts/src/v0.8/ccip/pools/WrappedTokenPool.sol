@@ -9,20 +9,13 @@ import "../../vendor/ERC20.sol";
  * on a source chain - similar to WBTC.
  */
 contract WrappedTokenPool is TokenPool, ERC20 {
-  using TokenLimits for TokenLimits.TokenBucket;
-
-  constructor(
-    string memory name,
-    string memory symbol,
-    BucketConfig memory burnConfig,
-    BucketConfig memory mintConfig
-  ) TokenPool(IERC20(address(this)), burnConfig, mintConfig) ERC20(name, symbol) {}
+  constructor(string memory name, string memory symbol) TokenPool(IERC20(address(this))) ERC20(name, symbol) {}
 
   /**
    * @notice Burn the token in the pool
    * @param amount Amount to burn
    */
-  function lockOrBurn(uint256 amount) external override whenNotPaused assertLockOrBurn(amount) {
+  function lockOrBurn(uint256 amount) external override whenNotPaused assertLockOrBurn {
     _burn(address(this), amount);
     emit Burned(msg.sender, amount);
   }
@@ -32,12 +25,7 @@ contract WrappedTokenPool is TokenPool, ERC20 {
    * @param recipient Recipient address
    * @param amount Amount to mint
    */
-  function releaseOrMint(address recipient, uint256 amount)
-    external
-    override
-    whenNotPaused
-    assertMintOrRelease(amount)
-  {
+  function releaseOrMint(address recipient, uint256 amount) external override whenNotPaused assertMintOrRelease {
     _mint(recipient, amount);
     emit Minted(msg.sender, recipient, amount);
   }

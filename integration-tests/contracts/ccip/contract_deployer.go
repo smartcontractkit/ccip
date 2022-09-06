@@ -51,28 +51,17 @@ func (e *CCIPContractsDeployer) DeployLinkTokenContract() (contracts.LinkToken, 
 	return e.EthDeployer.DeployLinkTokenContract()
 }
 
-func (e *CCIPContractsDeployer) DeployNativeTokenPoolContract(
-	linkAddr string,
-	opts NativeTokenConfig,
-) (
+func (e *CCIPContractsDeployer) DeployNativeTokenPoolContract(linkAddr string) (
 	*NativeTokenPool,
 	error,
 ) {
 	log.Debug().Str("token", linkAddr).Msg("Deploying native token pool")
 	token := common.HexToAddress(linkAddr)
-	lockConfig := native_token_pool.PoolInterfaceBucketConfig{
-		Rate:     opts.LockConfig.Rate,
-		Capacity: opts.LockConfig.Capacity,
-	}
-	releaseConfig := native_token_pool.PoolInterfaceBucketConfig{
-		Rate:     opts.ReleaseConfig.Rate,
-		Capacity: opts.ReleaseConfig.Capacity,
-	}
 	address, _, instance, err := e.evmClient.DeployContract("Native Token Pool", func(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return native_token_pool.DeployNativeTokenPool(auth, backend, token, lockConfig, releaseConfig)
+		return native_token_pool.DeployNativeTokenPool(auth, backend, token)
 	})
 
 	if err != nil {
@@ -153,7 +142,8 @@ func (e *CCIPContractsDeployer) DeploySimpleMessageReceiver() (
 func (e *CCIPContractsDeployer) DeployOffRamp(
 	sourceChainId, destChainId *big.Int,
 	blobVerifier, onRamp, afn common.Address,
-	sourceToken, pools []common.Address) (
+	sourceToken, pools []common.Address,
+	opts RateLimiterConfig) (
 	*OffRamp,
 	error,
 ) {
@@ -168,7 +158,17 @@ func (e *CCIPContractsDeployer) DeployOffRamp(
 				MaxDataSize:                             1e5,
 				MaxTokensLength:                         15,
 				PermissionLessExecutionThresholdSeconds: 60,
-			}, blobVerifier, onRamp, afn, sourceToken, pools)
+			},
+			blobVerifier,
+			onRamp,
+			afn,
+			sourceToken,
+			pools,
+			any_2_evm_toll_offramp.AggregateRateLimiterInterfaceRateLimiterConfig{
+				Rate:     opts.Rate,
+				Capacity: opts.Capacity,
+			},
+			auth.From)
 	})
 	return &OffRamp{
 		client:     e.evmClient,
@@ -257,6 +257,7 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 	chainId, destChainId *big.Int,
 	tokens, pools, allowList []common.Address,
 	afn, router common.Address,
+	opts RateLimiterConfig,
 ) (
 	*OnRamp,
 	error,
@@ -272,7 +273,13 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 		}
 		return evm_2_evm_toll_onramp.DeployEVM2EVMTollOnRamp(
 			auth, backend, chainId, destChainId, tokens, pools,
-			allowList, afn, config, router)
+			allowList, afn, config,
+			evm_2_evm_toll_onramp.AggregateRateLimiterInterfaceRateLimiterConfig{
+				Rate:     opts.Rate,
+				Capacity: opts.Rate,
+			},
+			auth.From,
+			router)
 	})
 	if err != nil {
 		return nil, err
@@ -341,7 +348,7 @@ func NewOffChainAggregatorV2Config(
 ) {
 	oracleIdentities := make([]ocrConfigHelper2.OracleIdentityExtra, 0)
 	ocrConfig := DefaultOffChainAggregatorV2Config(len(nodes))
-	onChainKeys := []ocrtypes2.OnchainPublicKey{}
+	var onChainKeys []ocrtypes2.OnchainPublicKey
 	for i, nodeWithKeys := range nodes {
 		ocr2Key := nodeWithKeys.KeysBundle.OCR2Key.Data
 		log.Info().Interface("OCR2 Key", ocr2Key).Msg("Key details delete later")
@@ -358,8 +365,8 @@ func NewOffChainAggregatorV2Config(
 		copy(cfgPubKeyBytes[:], cfgPubKeyTemp)
 		offChainPubKey := [curve25519.PointSize]byte{}
 		copy(offChainPubKey[:], offChainPubKeyTemp)
-		ethAddress := nodeWithKeys.KeysBundle.EthAddress
-		p2pKeys := nodeWithKeys.KeysBundle.P2PKey
+		ethAddress := nodeWithKeys.EthAddress
+		p2pKeys := nodeWithKeys.KeysBundle.P2PKeys
 		peerID := p2pKeys.Data[0].Attributes.PeerID
 		oracleIdentities = append(oracleIdentities, ocrConfigHelper2.OracleIdentityExtra{
 			OracleIdentity: ocrConfigHelper2.OracleIdentity{

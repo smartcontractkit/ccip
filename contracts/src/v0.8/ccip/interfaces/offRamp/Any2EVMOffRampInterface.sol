@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import "./Any2EVMOffRampRouterInterface.sol";
 import "../BlobVerifierInterface.sol";
+import "../../../vendor/IERC20.sol";
 
 interface BaseOffRampInterface {
   error AlreadyExecuted(uint64 sequenceNumber);

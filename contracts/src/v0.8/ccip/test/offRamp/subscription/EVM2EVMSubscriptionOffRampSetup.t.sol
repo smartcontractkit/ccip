@@ -46,8 +46,13 @@ contract EVM2EVMSubscriptionOffRampSetup is TokenSetup {
       ON_RAMP_ADDRESS,
       s_afn,
       s_sourceTokens,
-      s_destPools
+      s_destPools,
+      rateLimiterConfig(),
+      TOKEN_LIMIT_ADMIN
     );
+
+    s_offRamp.setPrices(s_destTokens, getTokenPrices());
+
     BaseOffRampInterface[] memory offRamps = new BaseOffRampInterface[](1);
     offRamps[0] = s_offRamp;
     s_router = new Any2EVMSubscriptionOffRampRouter(offRamps, subscriptionConfig(s_destFeeToken));
@@ -117,17 +122,27 @@ contract EVM2EVMSubscriptionOffRampSetup is TokenSetup {
 
   function _convertSubscriptionToGeneralMessage(CCIP.EVM2EVMSubscriptionMessage memory original)
     internal
-    pure
-    returns (CCIP.Any2EVMMessage memory)
+    view
+    returns (CCIP.Any2EVMMessageFromSender memory)
   {
+    uint256 numberOfTokens = original.tokens.length;
+    IERC20[] memory destTokens = new IERC20[](numberOfTokens);
+    PoolInterface[] memory destPools = new PoolInterface[](numberOfTokens);
+
+    for (uint256 i = 0; i < numberOfTokens; ++i) {
+      PoolInterface pool = s_offRamp.getPool(original.tokens[i]);
+      destPools[i] = pool;
+      destTokens[i] = pool.getToken();
+    }
+
     return
-      CCIP.Any2EVMMessage({
+      CCIP.Any2EVMMessageFromSender({
         sourceChainId: original.sourceChainId,
-        sequenceNumber: original.sequenceNumber,
         sender: abi.encode(original.sender),
         receiver: original.receiver,
         data: original.data,
-        tokens: original.tokens,
+        destTokens: destTokens,
+        destPools: destPools,
         amounts: original.amounts,
         gasLimit: original.gasLimit
       });

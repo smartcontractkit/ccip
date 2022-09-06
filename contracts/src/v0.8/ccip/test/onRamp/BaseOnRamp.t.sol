@@ -24,8 +24,12 @@ contract BaseOnrampSetup is TokenSetup {
       s_allowList,
       s_afn,
       onRampConfig(),
+      rateLimiterConfig(),
+      TOKEN_LIMIT_ADMIN,
       s_onRampRouter
     );
+
+    s_onRamp.setPrices(s_sourceTokens, getTokenPrices());
 
     NativeTokenPool(address(s_sourcePools[0])).setOnRamp(s_onRamp, true);
     NativeTokenPool(address(s_sourcePools[1])).setOnRamp(s_onRamp, true);

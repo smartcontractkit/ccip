@@ -148,6 +148,11 @@ func deployOnRamp(t *testing.T, client *EvmChainConfig, destinationChain *big.In
 			MaxDataSize:      1e6,
 			MaxTokensLength:  5,
 		},
+		evm_2_evm_toll_onramp.AggregateRateLimiterInterfaceRateLimiterConfig{
+			Capacity: big.NewInt(1e18),
+			Rate:     big.NewInt(1e18),
+		},
+		client.Owner.From,
 		client.OnRampRouter,
 	)
 	require.NoError(t, err)
@@ -163,6 +168,9 @@ func deployOnRamp(t *testing.T, client *EvmChainConfig, destinationChain *big.In
 	tx, err = onRampRouter.SetOnRamp(client.Owner, destinationChain, onRampAddress)
 	require.NoError(t, err)
 	WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
+
+	_, err = onRamp.SetPrices(client.Owner, []common.Address{client.LinkToken}, []*big.Int{big.NewInt(1)})
+	require.NoError(t, err)
 
 	return onRamp
 }
@@ -192,7 +200,12 @@ func deployOffRamp(t *testing.T, destClient *EvmChainConfig, sourceClient *EvmCh
 		destClient.OnRamp,
 		destClient.Afn,
 		sourceClient.BridgeTokens,
-		destClient.TokenPools)
+		destClient.TokenPools,
+		any_2_evm_toll_offramp.AggregateRateLimiterInterfaceRateLimiterConfig{
+			Capacity: big.NewInt(1e18),
+			Rate:     big.NewInt(1e18),
+		},
+		destClient.Owner.From)
 	require.NoError(t, err)
 	WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
 
@@ -200,6 +213,10 @@ func deployOffRamp(t *testing.T, destClient *EvmChainConfig, sourceClient *EvmCh
 	destClient.OffRamp = tollOffRampAddress
 	offRamp, err := any_2_evm_toll_offramp.NewEVM2EVMTollOffRamp(destClient.OffRamp, destClient.Client)
 	require.NoError(t, err)
+
+	_, err = offRamp.SetPrices(destClient.Owner, []common.Address{sourceClient.LinkToken}, []*big.Int{big.NewInt(1)})
+	require.NoError(t, err)
+
 	return offRamp
 }
 
@@ -283,17 +300,8 @@ func deployNativeTokenPool(t *testing.T, client *EvmChainConfig) []*native_token
 
 	for i, bridgeToken := range client.BridgeTokens {
 		if client.DeploySettings.DeployTokenPools {
-			tenCoins := new(big.Int).Mul(big.NewInt(1e18), big.NewInt(10))
 			client.Logger.Infof("Deploying token pool for token %s", bridgeToken.Hex())
-			lockConfig := native_token_pool.PoolInterfaceBucketConfig{
-				Rate:     tenCoins,
-				Capacity: tenCoins,
-			}
-			releaseConfig := native_token_pool.PoolInterfaceBucketConfig{
-				Rate:     tenCoins,
-				Capacity: tenCoins,
-			}
-			tokenPoolAddress, tx, _, err := native_token_pool.DeployNativeTokenPool(client.Owner, client.Client, bridgeToken, lockConfig, releaseConfig)
+			tokenPoolAddress, tx, _, err := native_token_pool.DeployNativeTokenPool(client.Owner, client.Client, bridgeToken)
 			require.NoError(t, err)
 			WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 			client.Logger.Infof("Native token pool deployed on %s in tx %s", tokenPoolAddress, helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash()))

@@ -24,15 +24,9 @@ import (
 
 var HundredCoins = new(big.Int).Mul(big.NewInt(1e18), big.NewInt(100))
 
-type NativeTokenConfig struct {
-	ReleaseConfig struct {
-		Rate     *big.Int
-		Capacity *big.Int
-	}
-	LockConfig struct {
-		Rate     *big.Int
-		Capacity *big.Int
-	}
+type RateLimiterConfig struct {
+	Rate     *big.Int
+	Capacity *big.Int
 }
 
 type AFNConfig struct {
@@ -205,6 +199,21 @@ func (onRamp *OnRamp) SetFeeConfig(tokens []common.Address, fees []*big.Int) err
 	return onRamp.client.ProcessTransaction(tx)
 }
 
+func (onRamp *OnRamp) SetTokenPrices(tokens []common.Address, prices []*big.Int) error {
+	opts, err := onRamp.client.TransactionOpts(onRamp.client.DefaultWallet)
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Str("OnRamp", onRamp.Address()).
+		Msg("Setting onramp token prices")
+	tx, err := onRamp.instance.SetPrices(opts, tokens, prices)
+	if err != nil {
+		return err
+	}
+	return onRamp.client.ProcessTransaction(tx)
+}
+
 type BlobVerifier struct {
 	client     *blockchain.EthereumClient
 	instance   *blob_verifier.BlobVerifier
@@ -276,7 +285,7 @@ func (offRamp *OffRamp) Address() string {
 }
 
 // SetConfig sets the offchain reporting protocol configuration
-func (o *OffRamp) SetConfig(
+func (offRamp *OffRamp) SetConfig(
 	signers []common.Address,
 	transmitters []common.Address,
 	f uint8,
@@ -284,9 +293,9 @@ func (o *OffRamp) SetConfig(
 	offchainConfigVersion uint64,
 	offchainConfig []byte,
 ) error {
-	log.Info().Str("Contract Address", o.Address()).Msg("Configuring Offramp Contract")
+	log.Info().Str("Contract Address", offRamp.Address()).Msg("Configuring Offramp Contract")
 	// Set Config
-	opts, err := o.client.TransactionOpts(o.client.GetDefaultWallet())
+	opts, err := offRamp.client.TransactionOpts(offRamp.client.GetDefaultWallet())
 	if err != nil {
 		return err
 	}
@@ -294,7 +303,7 @@ func (o *OffRamp) SetConfig(
 		Interface("signerAddresses", signers).
 		Interface("transmitterAddresses", transmitters).
 		Msg("Configuring OffRamp")
-	tx, err := o.instance.SetConfig(
+	tx, err := offRamp.instance.SetConfig(
 		opts,
 		signers,
 		transmitters,
@@ -307,7 +316,7 @@ func (o *OffRamp) SetConfig(
 	if err != nil {
 		return err
 	}
-	return o.client.ProcessTransaction(tx)
+	return offRamp.client.ProcessTransaction(tx)
 }
 
 func (offRamp *OffRamp) SetRouter(offRampRouterAddress common.Address) error {
@@ -332,6 +341,21 @@ func (offRamp *OffRamp) FilterExecutionStateChanged(seqNumber []uint64) (
 	*any_2_evm_toll_offramp.EVM2EVMTollOffRampExecutionStateChangedIterator, error,
 ) {
 	return offRamp.instance.FilterExecutionStateChanged(nil, seqNumber)
+}
+
+func (offRamp *OffRamp) SetTokenPrices(tokens []common.Address, prices []*big.Int) error {
+	opts, err := offRamp.client.TransactionOpts(offRamp.client.DefaultWallet)
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Str("Offramp", offRamp.Address()).
+		Msg("Setting offramp token prices")
+	tx, err := offRamp.instance.SetPrices(opts, tokens, prices)
+	if err != nil {
+		return err
+	}
+	return offRamp.client.ProcessTransaction(tx)
 }
 
 type OffRampRouter struct {

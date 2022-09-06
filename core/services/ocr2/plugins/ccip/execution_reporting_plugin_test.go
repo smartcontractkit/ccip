@@ -58,14 +58,7 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	require.NoError(t, err)
 
 	// Deploy destination pool
-	destPoolAddress, _, _, err := native_token_pool.DeployNativeTokenPool(destUser, destChain, destLinkTokenAddress,
-		native_token_pool.PoolInterfaceBucketConfig{
-			Rate:     big.NewInt(1),
-			Capacity: big.NewInt(1e9),
-		}, native_token_pool.PoolInterfaceBucketConfig{
-			Rate:     big.NewInt(1),
-			Capacity: big.NewInt(1e9),
-		})
+	destPoolAddress, _, _, err := native_token_pool.DeployNativeTokenPool(destUser, destChain, destLinkTokenAddress)
 	require.NoError(t, err)
 	destChain.Commit()
 	destPool, err := native_token_pool.NewNativeTokenPool(destPoolAddress, destChain)
@@ -107,8 +100,12 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	blobVerifier, err := blob_verifier_helper.NewBlobVerifierHelper(blobVerifierAddress, destChain)
 	require.NoError(t, err)
 	destChain.Commit()
-	offRampAddress, _, _, err := any_2_evm_toll_offramp.DeployEVM2EVMTollOffRamp(destUser,
-		destChain, sourceChainID, destChainID, any_2_evm_toll_offramp.BaseOffRampInterfaceOffRampConfig{
+	offRampAddress, _, _, err := any_2_evm_toll_offramp.DeployEVM2EVMTollOffRamp(
+		destUser,
+		destChain,
+		sourceChainID,
+		destChainID,
+		any_2_evm_toll_offramp.BaseOffRampInterfaceOffRampConfig{
 			ExecutionDelaySeconds: 0,
 			MaxDataSize:           1e12,
 			MaxTokensLength:       5,
@@ -118,6 +115,11 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 		afnAddress,
 		[]common.Address{linkTokenSourceAddress},
 		[]common.Address{destPoolAddress},
+		any_2_evm_toll_offramp.AggregateRateLimiterInterfaceRateLimiterConfig{
+			Capacity: big.NewInt(1e18),
+			Rate:     big.NewInt(1e18),
+		},
+		destUser.From,
 	)
 	require.NoError(t, err)
 	offRamp, err := any_2_evm_toll_offramp.NewEVM2EVMTollOffRamp(offRampAddress, destChain)

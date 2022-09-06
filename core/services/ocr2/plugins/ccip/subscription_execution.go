@@ -136,26 +136,29 @@ func (sb *SubscriptionBatchBuilder) BuildBatch(
 	gasPrice uint64,
 	tokensPerFeeCoin map[common.Address]*big.Int,
 	inflight []InflightExecutionReport,
+	aggregateTokenLimit *big.Int,
+	tokenLimitPrices map[common.Address]*big.Int,
 ) []uint64 {
 	subTokenPerFeeCoin := tokensPerFeeCoin[sb.subFeeToken]
 	if subTokenPerFeeCoin == nil {
 		sb.lggr.Errorf("Fee token price not found for token: %s", sb.subFeeToken.Hex())
 	}
-	inflightSeqNrs, reserved, nonces, err := sb.inflight(gasPrice, subTokenPerFeeCoin, inflight, len(msgs))
+	inflightSeqNrs, reserved, nonces, inflightAggregateValue, err := sb.inflight(gasPrice, subTokenPerFeeCoin, inflight, len(msgs), tokenLimitPrices, srcToDst)
 	if err != nil {
 		sb.lggr.Errorw("Unexpected error computing inflight values", "err", err)
 		return []uint64{}
 	}
+	aggregateTokenLimit.Sub(aggregateTokenLimit, inflightAggregateValue)
 	stalledSub := make(map[common.Address]struct{})
 	subscriptionBalances := make(map[common.Address]*big.Int)
 	var executableSeqNrs []uint64
 	for _, msg := range msgs {
-		subMsg, err := sb.parseLog(types.Log{
+		subMsg, err2 := sb.parseLog(types.Log{
 			Topics: msg.GetTopics(),
 			Data:   msg.Data,
 		})
-		if err != nil {
-			sb.lggr.Errorw("unable to parse message", "err", err, "msg", msg)
+		if err2 != nil {
+			sb.lggr.Errorw("unable to parse message", "err", err2, "msg", msg)
 			continue
 		}
 		// Skip inflight
@@ -170,9 +173,14 @@ func (sb *SubscriptionBatchBuilder) BuildBatch(
 		if _, stalled := stalledSub[subMsg.Message.Receiver]; stalled {
 			continue
 		}
-		strict, err := sb.subCache.IsStrict(subMsg.Message.Receiver)
-		if err != nil {
+		strict, err2 := sb.subCache.IsStrict(subMsg.Message.Receiver)
+		if err2 != nil {
 			// Skip if we're unable to determine its strictness.
+			continue
+		}
+		messageValue := aggregateTokenValue(tokenLimitPrices, srcToDst, subMsg.Message.Tokens, subMsg.Message.Amounts)
+		// if token limit is smaller than message value skip message
+		if aggregateTokenLimit.Cmp(messageValue) == -1 {
 			continue
 		}
 		if strict {
@@ -214,6 +222,7 @@ func (sb *SubscriptionBatchBuilder) BuildBatch(
 		}
 		subscriptionBalances[subMsg.Message.Receiver] = big.NewInt(0).Sub(subscriptionBalances[subMsg.Message.Receiver], maxCharge)
 		batchGasLimit -= totalGasLimit
+		aggregateTokenLimit.Sub(aggregateTokenLimit, messageValue)
 		sb.lggr.Infow("Adding sub msg to batch", "seqNum", subMsg.Message.SequenceNumber, "maxCharge", maxCharge, "maxGasOverhead", maxOverhead, "strict", strict)
 		executableSeqNrs = append(executableSeqNrs, subMsg.Message.SequenceNumber)
 	}
@@ -234,21 +243,23 @@ func (sb *SubscriptionBatchBuilder) inflight(
 	subTokenPerFeeCoin *big.Int,
 	inflight []InflightExecutionReport,
 	numMsgsInRoot int,
-) (map[uint64]struct{}, map[common.Address]*big.Int, map[common.Address]uint64, error) {
-	reserved := make(map[common.Address]*big.Int)
-	inflightSeqNrs := make(map[uint64]struct{})
-	nonces := make(map[common.Address]uint64)
-	// TODO: aggregate token value once we have
-	// https://app.shortcut.com/chainlinklabs/story/41867/contract-scaffolding-aggregatetokenlimiter-contract
+	tokenLimitPrices map[common.Address]*big.Int,
+	srcToDst map[common.Address]common.Address,
+) (inflightSeqNrs map[uint64]struct{}, reserved map[common.Address]*big.Int, nonces map[common.Address]uint64, inflightAggregateValue *big.Int, err error) {
+	inflightSeqNrs = make(map[uint64]struct{})
+	reserved = make(map[common.Address]*big.Int)
+	nonces = make(map[common.Address]uint64)
+	inflightAggregateValue = big.NewInt(0)
+
 	for _, r := range inflight {
 		for _, encMsg := range r.report.EncodedMessages {
-			msg, err := sb.parseLog(types.Log{
+			msg, err2 := sb.parseLog(types.Log{
 				// Note this needs to change if we start indexing things.
 				Topics: []common.Hash{CCIPSubSendRequested},
 				Data:   encMsg,
 			})
-			if err != nil {
-				return nil, nil, nil, err
+			if err2 != nil {
+				return nil, nil, nil, nil, err2
 			}
 			totalGasLimit := maxGasOverHeadGasSubscription(numMsgsInRoot, msg) + msg.Message.GasLimit.Uint64()
 			if reserved[msg.Message.Receiver] == nil {
@@ -263,8 +274,9 @@ func (sb *SubscriptionBatchBuilder) inflight(
 				// Save max inflight nonce
 				nonces[msg.Message.Receiver] = msg.Message.Nonce
 			}
+			inflightAggregateValue.Add(inflightAggregateValue, aggregateTokenValue(tokenLimitPrices, srcToDst, msg.Message.Tokens, msg.Message.Amounts))
 			inflightSeqNrs[msg.Message.SequenceNumber] = struct{}{}
 		}
 	}
-	return inflightSeqNrs, reserved, nonces, nil
+	return inflightSeqNrs, reserved, nonces, inflightAggregateValue, nil
 }

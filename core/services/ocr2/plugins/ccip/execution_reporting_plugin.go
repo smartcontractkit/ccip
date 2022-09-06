@@ -116,6 +116,16 @@ func DecodeExecutionReport(report types.Report) (*any_2_evm_toll_offramp.CCIPExe
 	return &er, nil
 }
 
+func aggregateTokenValue(tokenLimitPrices map[common.Address]*big.Int, srcToDst map[common.Address]common.Address, tokens []common.Address, amounts []*big.Int) *big.Int {
+	sum := big.NewInt(0)
+
+	for i := 0; i < len(tokens); i++ {
+		sum.Add(sum, new(big.Int).Mul(tokenLimitPrices[srcToDst[tokens[i]]], amounts[i]))
+	}
+
+	return sum
+}
+
 type ExecutionReportingPluginFactory struct {
 	lggr                logger.Logger
 	source, dest        logpoller.LogPoller

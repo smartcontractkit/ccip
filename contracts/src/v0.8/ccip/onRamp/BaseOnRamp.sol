@@ -5,8 +5,16 @@ import "../pools/TokenPoolRegistry.sol";
 import "../health/HealthChecker.sol";
 import "../pools/PoolCollector.sol";
 import "../access/AllowList.sol";
+import "../rateLimiter/AggregateRateLimiter.sol";
 
-contract BaseOnRamp is BaseOnRampInterface, HealthChecker, TokenPoolRegistry, PoolCollector, AllowList {
+contract BaseOnRamp is
+  BaseOnRampInterface,
+  HealthChecker,
+  TokenPoolRegistry,
+  PoolCollector,
+  AllowList,
+  AggregateRateLimiter
+{
   // Chain ID of the source chain (where this contract is deployed)
   uint256 public immutable i_chainId;
   // Chain ID of the destination chain (where this contract sends messages)
@@ -30,8 +38,15 @@ contract BaseOnRamp is BaseOnRampInterface, HealthChecker, TokenPoolRegistry, Po
     address[] memory allowlist,
     AFNInterface afn,
     OnRampConfig memory config,
+    RateLimiterConfig memory rateLimiterConfig,
+    address tokenLimitsAdmin,
     address router
-  ) HealthChecker(afn) TokenPoolRegistry(tokens, pools) AllowList(allowlist) {
+  )
+    HealthChecker(afn)
+    TokenPoolRegistry(tokens, pools)
+    AllowList(allowlist)
+    AggregateRateLimiter(rateLimiterConfig, tokenLimitsAdmin)
+  {
     // TokenPoolRegistry does a check on tokens.length != pools.length
     i_chainId = chainId;
     i_destinationChainId = destinationChainId;
@@ -95,6 +110,8 @@ contract BaseOnRamp is BaseOnRampInterface, HealthChecker, TokenPoolRegistry, Po
       revert UnsupportedNumberOfTokens();
 
     if (s_allowlistEnabled && !s_allowed[originalSender]) revert SenderNotAllowed(originalSender);
+
+    _removeTokens(tokens, amounts);
 
     // Lock all tokens in their corresponding pools
     for (uint256 i = 0; i < tokenLength; ++i) {

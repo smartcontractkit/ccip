@@ -272,7 +272,7 @@ contract EVM2EVMTollOffRamp_executeSingleMessage is EVM2EVMTollOffRampSetup {
   }
 
   function testNonContractSuccess() public {
-    CCIP.Any2EVMMessage memory message = _convertTollToGeneralMessage(_generateAny2EVMTollMessageNoTokens(1));
+    CCIP.Any2EVMMessageFromSender memory message = _convertTollToGeneralMessage(_generateAny2EVMTollMessageNoTokens(1));
     message.receiver = STRANGER;
     s_offRamp.executeSingleMessage(message);
   }
@@ -287,7 +287,7 @@ contract EVM2EVMTollOffRamp_executeSingleMessage is EVM2EVMTollOffRampSetup {
     emit Released(address(s_offRamp), STRANGER, amounts[0]);
     vm.expectEmit(true, true, false, true);
     emit Released(address(s_offRamp), STRANGER, amounts[1]);
-    CCIP.Any2EVMMessage memory message = _convertTollToGeneralMessage(
+    CCIP.Any2EVMMessageFromSender memory message = _convertTollToGeneralMessage(
       _generateAny2EVMTollMessageWithTokens(1, amounts)
     );
     message.receiver = STRANGER;
@@ -300,13 +300,6 @@ contract EVM2EVMTollOffRamp_executeSingleMessage is EVM2EVMTollOffRampSetup {
     vm.stopPrank();
     vm.expectRevert(BaseOffRampInterface.CanOnlySelfCall.selector);
     s_offRamp.executeSingleMessage(_convertTollToGeneralMessage(_generateAny2EVMTollMessageNoTokens(1)));
-  }
-
-  function testUnsupportedTokenReverts() public {
-    CCIP.EVM2EVMTollMessage[] memory messages = _generateMessagesWithTokens();
-    messages[0].tokens[0] = s_destTokens[0];
-    vm.expectRevert(abi.encodeWithSelector(BaseOffRampInterface.UnsupportedToken.selector, s_destTokens[0]));
-    s_offRamp.executeSingleMessage(_convertTollToGeneralMessage(messages[0]));
   }
 }
 

@@ -37,8 +37,12 @@ contract EVM2EVMSubscriptionOnRampSetup is TokenSetup {
       s_allowList,
       s_afn,
       onRampConfig(),
+      rateLimiterConfig(),
+      TOKEN_LIMIT_ADMIN,
       s_onRampRouter
     );
+
+    s_onRamp.setPrices(s_sourceTokens, getTokenPrices());
 
     NativeTokenPool(address(s_sourcePools[0])).setOnRamp(s_onRamp, true);
     NativeTokenPool(address(s_sourcePools[1])).setOnRamp(s_onRamp, true);
@@ -47,7 +51,7 @@ contract EVM2EVMSubscriptionOnRampSetup is TokenSetup {
 
     // Pre approve the fee token so the gas estimates of the tests
     // only cover actual gas usage from the ramps
-    s_sourceFeeToken.approve(address(s_onRampRouter), 2**128);
+    s_sourceFeeToken.approve(address(s_onRampRouter), 2**64);
   }
 
   function _generateTokenMessage() public view returns (CCIP.EVM2AnySubscriptionMessage memory) {

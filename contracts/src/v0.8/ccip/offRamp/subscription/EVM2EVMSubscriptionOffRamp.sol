@@ -12,8 +12,6 @@ import "../BaseOffRamp.sol";
  * in an OffRamp in a single transaction.
  */
 contract EVM2EVMSubscriptionOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
-  using CCIP for CCIP.EVM2EVMSubscriptionMessage;
-
   string public constant override typeAndVersion = "EVM2EVMSubscriptionOffRamp 1.0.0";
 
   mapping(address => uint64) public s_receiverToNonce;
@@ -26,13 +24,24 @@ contract EVM2EVMSubscriptionOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR
     // OnrampAddress, needed for hashing in the future so already added to the interface
     address onRampAddress,
     AFNInterface afn,
-    // TODO token limiter contract
-    // https://app.shortcut.com/chainlinklabs/story/41867/contract-scaffolding-aggregatetokenlimiter-contract
     IERC20[] memory sourceTokens,
-    PoolInterface[] memory pools
+    PoolInterface[] memory pools,
+    RateLimiterConfig memory rateLimiterConfig,
+    address tokenLimitsAdmin
   )
     OCR2Base(true)
-    BaseOffRamp(sourceChainId, chainId, offRampConfig, blobVerifier, onRampAddress, afn, sourceTokens, pools)
+    BaseOffRamp(
+      sourceChainId,
+      chainId,
+      offRampConfig,
+      blobVerifier,
+      onRampAddress,
+      afn,
+      sourceTokens,
+      pools,
+      rateLimiterConfig,
+      tokenLimitsAdmin
+    )
   {}
 
   function execute(CCIP.ExecutionReport memory report, bool manualExecution)
@@ -93,12 +102,8 @@ contract EVM2EVMSubscriptionOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR
 
       _isWellFormed(message);
 
-      for (uint256 j = 0; j < message.tokens.length; ++j) {
-        _getPool(message.tokens[j]);
-      }
-
       s_executedMessages[message.sequenceNumber] = CCIP.MessageExecutionState.IN_PROGRESS;
-      CCIP.MessageExecutionState newState = _trialExecute(message._toAny2EVMMessage());
+      CCIP.MessageExecutionState newState = _trialExecute(_toAny2EVMMessageFromSender(message));
       s_executedMessages[message.sequenceNumber] = newState;
       emit ExecutionStateChanged(message.sequenceNumber, newState);
 
@@ -120,6 +125,33 @@ contract EVM2EVMSubscriptionOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR
         );
       }
     }
+  }
+
+  function _toAny2EVMMessageFromSender(CCIP.EVM2EVMSubscriptionMessage memory original)
+    internal
+    view
+    returns (CCIP.Any2EVMMessageFromSender memory message)
+  {
+    uint256 numberOfTokens = original.tokens.length;
+    IERC20[] memory destTokens = new IERC20[](numberOfTokens);
+    PoolInterface[] memory destPools = new PoolInterface[](numberOfTokens);
+
+    for (uint256 i = 0; i < numberOfTokens; ++i) {
+      PoolInterface pool = _getPool(original.tokens[i]);
+      destPools[i] = pool;
+      destTokens[i] = pool.getToken();
+    }
+
+    message = CCIP.Any2EVMMessageFromSender({
+      sourceChainId: original.sourceChainId,
+      sender: abi.encode(original.sender),
+      receiver: original.receiver,
+      data: original.data,
+      destTokens: destTokens,
+      destPools: destPools,
+      amounts: original.amounts,
+      gasLimit: original.gasLimit
+    });
   }
 
   function _isWellFormed(CCIP.EVM2EVMSubscriptionMessage memory message) private view {

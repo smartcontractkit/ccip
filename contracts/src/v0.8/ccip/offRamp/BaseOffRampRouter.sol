@@ -6,6 +6,8 @@ import "../interfaces/offRamp/Any2EVMOffRampRouterInterface.sol";
 import "../interfaces/applications/Any2EVMMessageReceiverInterface.sol";
 
 abstract contract BaseOffRampRouter is Any2EVMOffRampRouterInterface, OwnerIsCreator {
+  using CCIP for CCIP.Any2EVMMessageFromSender;
+
   uint256 private constant GAS_FOR_CALL_EXACT_CHECK = 5_000;
 
   // Mapping from offRamp to allowed status
@@ -21,8 +23,15 @@ abstract contract BaseOffRampRouter is Any2EVMOffRampRouterInterface, OwnerIsCre
   }
 
   /// @inheritdoc Any2EVMOffRampRouterInterface
-  function routeMessage(CCIP.Any2EVMMessage calldata message) external override onlyOffRamp returns (bool success) {
-    bytes memory callData = abi.encodeWithSelector(Any2EVMMessageReceiverInterface.ccipReceive.selector, message);
+  function routeMessage(CCIP.Any2EVMMessageFromSender calldata message)
+    external
+    override
+    onlyOffRamp
+    returns (bool success)
+  {
+    CCIP.Any2EVMMessage memory minMessage = message._toAny2EVMMessage();
+
+    bytes memory callData = abi.encodeWithSelector(Any2EVMMessageReceiverInterface.ccipReceive.selector, minMessage);
     return _callWithExactGas(message.gasLimit, message.receiver, 0, callData);
   }
 

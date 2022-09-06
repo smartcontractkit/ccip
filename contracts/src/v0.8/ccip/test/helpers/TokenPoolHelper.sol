@@ -8,19 +8,7 @@ contract TokenPoolHelper is TokenPool {
   event ReleaseOrMint(address indexed recipient, uint256 amount);
   event AssertionPassed();
 
-  constructor(
-    IERC20 token,
-    uint256 lockBucketRate,
-    uint256 lockBucketCapacity,
-    uint256 releaseBucketRate,
-    uint256 releaseBucketCapacity
-  )
-    TokenPool(
-      token,
-      BucketConfig({rate: lockBucketRate, capacity: lockBucketCapacity}),
-      BucketConfig({rate: releaseBucketRate, capacity: releaseBucketCapacity})
-    )
-  {}
+  constructor(IERC20 token) TokenPool(token) {}
 
   function lockOrBurn(uint256 amount) external override {
     emit LockOrBurn(amount);
@@ -30,11 +18,11 @@ contract TokenPoolHelper is TokenPool {
     emit ReleaseOrMint(recipient, amount);
   }
 
-  function assertLockOrBurnModifier(uint256 amount) external assertLockOrBurn(amount) {
+  function assertLockOrBurnModifier(uint256) external assertLockOrBurn {
     emit AssertionPassed();
   }
 
-  function assertMintOrReleaseModifier(uint256 amount) external assertMintOrRelease(amount) {
+  function assertMintOrReleaseModifier(uint256) external assertMintOrRelease {
     emit AssertionPassed();
   }
 }

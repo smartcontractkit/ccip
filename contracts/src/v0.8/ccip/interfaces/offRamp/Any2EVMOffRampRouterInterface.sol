@@ -49,7 +49,7 @@ interface Any2EVMOffRampRouterInterface {
 
   /**
    * @notice Route the message to its intended receiver contract
-   * @param message CCIP.Any2EVMMessage struct
+   * @param message CCIP.Any2EVMMessageFromSender struct
    */
-  function routeMessage(CCIP.Any2EVMMessage calldata message) external returns (bool success);
+  function routeMessage(CCIP.Any2EVMMessageFromSender calldata message) external returns (bool success);
 }

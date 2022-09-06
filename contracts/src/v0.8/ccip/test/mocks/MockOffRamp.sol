@@ -26,7 +26,7 @@ contract MockOffRamp is BaseOffRampInterface {
    * @notice ccipReceive implements the receive function to create a
    * collision if some other method happens to hash to the same signature/
    */
-  function ccipReceive(CCIP.Any2EVMMessage calldata) external pure {
+  function ccipReceive(CCIP.Any2EVMMessageFromSender calldata) external pure {
     revert();
   }
 

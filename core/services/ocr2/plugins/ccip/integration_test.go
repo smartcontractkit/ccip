@@ -75,7 +75,7 @@ func setupChain(t *testing.T) (*backends.SimulatedBackend, *bind.TransactOpts) {
 	require.NoError(t, err)
 	user, err := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
 	chain := backends.NewSimulatedBackend(core.GenesisAlloc{
-		user.From: {Balance: big.NewInt(0).Mul(big.NewInt(100), big.NewInt(1000000000000000000))}},
+		user.From: {Balance: big.NewInt(0).Mul(big.NewInt(1000), big.NewInt(1e18))}},
 		ethconfig.Defaults.Miner.GasCeil)
 	return chain, user
 }
@@ -124,14 +124,7 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 	require.NoError(t, err)
 	sourcePoolAddress, _, _, err := native_token_pool.DeployNativeTokenPool(sourceUser,
 		sourceChain,
-		sourceLinkTokenAddress,
-		native_token_pool.PoolInterfaceBucketConfig{
-			Rate:     big.NewInt(1e12),
-			Capacity: hundredLink,
-		}, native_token_pool.PoolInterfaceBucketConfig{
-			Rate:     big.NewInt(1e12),
-			Capacity: hundredLink,
-		})
+		sourceLinkTokenAddress)
 	require.NoError(t, err)
 	sourceChain.Commit()
 	sourcePool, err := native_token_pool.NewNativeTokenPool(sourcePoolAddress, sourceChain)
@@ -143,14 +136,7 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 	destChain.Commit()
 	destLinkToken, err := link_token_interface.NewLinkToken(destLinkTokenAddress, destChain)
 	require.NoError(t, err)
-	destPoolAddress, _, _, err := native_token_pool.DeployNativeTokenPool(destUser, destChain, destLinkTokenAddress,
-		native_token_pool.PoolInterfaceBucketConfig{
-			Rate:     big.NewInt(1e18),
-			Capacity: hundredLink,
-		}, native_token_pool.PoolInterfaceBucketConfig{
-			Rate:     big.NewInt(1e18),
-			Capacity: hundredLink,
-		})
+	destPoolAddress, _, _, err := native_token_pool.DeployNativeTokenPool(destUser, destChain, destLinkTokenAddress)
 	require.NoError(t, err)
 	destChain.Commit()
 	destPool, err := native_token_pool.NewNativeTokenPool(destPoolAddress, destChain)
@@ -196,6 +182,11 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 			MaxDataSize:      1e12,
 			MaxTokensLength:  5,
 		},
+		evm_2_evm_toll_onramp.AggregateRateLimiterInterfaceRateLimiterConfig{
+			Capacity: hundredLink,
+			Rate:     big.NewInt(1e18),
+		},
+		sourceUser.From,
 		onRampRouterAddress,
 	)
 	require.NoError(t, err)
@@ -212,6 +203,8 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 	_, err = sourcePool.SetOnRamp(sourceUser, onRampAddress, true)
 	require.NoError(t, err)
 	sourceChain.Commit()
+	_, err = tollOnRamp.SetPrices(sourceUser, []common.Address{sourceLinkTokenAddress}, []*big.Int{big.NewInt(1)})
+	require.NoError(t, err)
 	tollOnRampRouter, err := evm_2_any_toll_onramp_router.NewEVM2AnyTollOnRampRouter(onRampRouterAddress, sourceChain)
 	require.NoError(t, err)
 	_, err = tollOnRampRouter.SetOnRamp(sourceUser, destChainID, onRampAddress)
@@ -243,8 +236,12 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 	require.NoError(t, err)
 	// Set the pool to be the offramp
 	destChain.Commit()
-	offRampAddress, _, _, err := any_2_evm_toll_offramp.DeployEVM2EVMTollOffRamp(destUser,
-		destChain, sourceChainID, destChainID, any_2_evm_toll_offramp.BaseOffRampInterfaceOffRampConfig{
+	offRampAddress, _, _, err := any_2_evm_toll_offramp.DeployEVM2EVMTollOffRamp(
+		destUser,
+		destChain,
+		sourceChainID,
+		destChainID,
+		any_2_evm_toll_offramp.BaseOffRampInterfaceOffRampConfig{
 			ExecutionDelaySeconds: 0,
 			MaxDataSize:           1e12,
 			MaxTokensLength:       5,
@@ -254,6 +251,11 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 		afnDestAddress,
 		[]common.Address{sourceLinkTokenAddress},
 		[]common.Address{destPoolAddress},
+		any_2_evm_toll_offramp.AggregateRateLimiterInterfaceRateLimiterConfig{
+			Capacity: hundredLink,
+			Rate:     big.NewInt(1e18),
+		},
+		sourceUser.From,
 	)
 	require.NoError(t, err)
 	tollOffRamp, err := any_2_evm_toll_offramp.NewEVM2EVMTollOffRamp(offRampAddress, destChain)
@@ -267,6 +269,8 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 	tollOffRampRouter, err = any_2_evm_toll_offramp_router.NewAny2EVMTollOffRampRouter(offRampRouterAddress, destChain)
 	require.NoError(t, err)
 	_, err = tollOffRamp.SetRouter(destUser, offRampRouterAddress)
+	require.NoError(t, err)
+	_, err = tollOffRamp.SetPrices(destUser, []common.Address{destLinkTokenAddress}, []*big.Int{big.NewInt(1)})
 	require.NoError(t, err)
 
 	// Deploy 2 revertable (one SS one non-SS)
@@ -299,6 +303,11 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 			MaxDataSize:      1e12,
 			MaxTokensLength:  5,
 		},
+		evm_2_evm_subscription_onramp.AggregateRateLimiterInterfaceRateLimiterConfig{
+			Capacity: hundredLink,
+			Rate:     big.NewInt(1e18),
+		},
+		sourceUser.From,
 		onRampRouterAddress,
 	)
 	require.NoError(t, err)
@@ -311,6 +320,9 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 	require.NoError(t, err)
 	subOnRampFee := big.NewInt(1)
 	_, err = subOnRampRouter.SetFee(sourceUser, subOnRampFee)
+	require.NoError(t, err)
+	sourceChain.Commit()
+	_, err = subOnRamp.SetPrices(sourceUser, []common.Address{sourceLinkTokenAddress}, []*big.Int{big.NewInt(1)})
 	require.NoError(t, err)
 
 	subOffRampRouterAddress, _, _, err := any_2_evm_subscription_offramp_router.DeployAny2EVMSubscriptionOffRampRouter(
@@ -334,6 +346,11 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 		afnDestAddress,
 		[]common.Address{sourceLinkTokenAddress},
 		[]common.Address{destPoolAddress},
+		any_2_evm_subscription_offramp.AggregateRateLimiterInterfaceRateLimiterConfig{
+			Capacity: hundredLink,
+			Rate:     big.NewInt(1e18),
+		},
+		sourceUser.From,
 	)
 	require.NoError(t, err)
 	subOffRamp, _ := any_2_evm_subscription_offramp.NewEVM2EVMSubscriptionOffRamp(subOffRampAddress, destChain)
@@ -342,6 +359,9 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 	_, err = subOffRamp.SetRouter(destUser, subOffRampRouterAddress)
 	require.NoError(t, err)
 	_, err = subOffRampRouter.AddOffRamp(destUser, subOffRampAddress)
+	require.NoError(t, err)
+	destChain.Commit()
+	_, err = subOffRamp.SetPrices(destUser, []common.Address{destLinkTokenAddress}, []*big.Int{big.NewInt(1)})
 	require.NoError(t, err)
 
 	_, err = subOffRampRouter.GetSupportedTokensForExecutionFee(nil)

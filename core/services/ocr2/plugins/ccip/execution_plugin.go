@@ -166,6 +166,8 @@ type OffRamp interface {
 	// Toll: dest pool addresses
 	// Sub:  dest sub token address (not necessarily in a pool)
 	GetSupportedTokensForExecutionFee() ([]common.Address, error)
+	GetAllowedTokensAmount(opts *bind.CallOpts) (*big.Int, error)
+	GetPricesForTokens(opts *bind.CallOpts, tokens []common.Address) ([]*big.Int, error)
 }
 
 type subOffRamp struct {
@@ -183,6 +185,14 @@ func (s subOffRamp) ParseSeqNumFromExecutionStateChanged(log types.Log) (uint64,
 		return 0, err
 	}
 	return ec.SequenceNumber, nil
+}
+
+func (s subOffRamp) GetAllowedTokensAmount(opts *bind.CallOpts) (*big.Int, error) {
+	bucket, err := s.EVM2EVMSubscriptionOffRamp.CalculateCurrentTokenBucketState(opts)
+	if err != nil {
+		return nil, err
+	}
+	return bucket.Tokens, nil
 }
 
 func NewSubOffRamp(addr common.Address, destChain evm.Chain) (OffRamp, common.Address, error) {
@@ -224,6 +234,14 @@ func (s tollOffRamp) GetSupportedTokensForExecutionFee() ([]common.Address, erro
 	// TODO: Toll offramp contract is missing ExecConfig?
 	// for now support all source tokens as fee tokens
 	return s.EVM2EVMTollOffRamp.GetDestinationTokens(nil)
+}
+
+func (s tollOffRamp) GetAllowedTokensAmount(opts *bind.CallOpts) (*big.Int, error) {
+	bucket, err := s.EVM2EVMTollOffRamp.CalculateCurrentTokenBucketState(opts)
+	if err != nil {
+		return nil, err
+	}
+	return bucket.Tokens, nil
 }
 
 func NewTollOffRamp(addr common.Address, destChain evm.Chain) (OffRamp, error) {

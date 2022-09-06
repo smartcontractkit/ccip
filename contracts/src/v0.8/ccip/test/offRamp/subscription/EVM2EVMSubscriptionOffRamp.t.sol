@@ -82,7 +82,7 @@ contract EVM2EVMSubscriptionOffRamp_executeSingleMessage is EVM2EVMSubscriptionO
   // Assert that any call to executeSingleMessage with an EOA will still succeed
   function testNonContractSuccess() public {
     changePrank(address(s_offRamp));
-    CCIP.Any2EVMMessage memory message = _convertSubscriptionToGeneralMessage(
+    CCIP.Any2EVMMessageFromSender memory message = _convertSubscriptionToGeneralMessage(
       _generateAny2EVMSubscriptionMessageNoTokens(1, 1)
     );
     message.receiver = STRANGER;
@@ -101,7 +101,7 @@ contract EVM2EVMSubscriptionOffRamp_executeSingleMessage is EVM2EVMSubscriptionO
     emit Released(address(s_offRamp), STRANGER, amounts[0]);
     vm.expectEmit(true, true, false, true);
     emit Released(address(s_offRamp), STRANGER, amounts[1]);
-    CCIP.Any2EVMMessage memory message = _convertSubscriptionToGeneralMessage(
+    CCIP.Any2EVMMessageFromSender memory message = _convertSubscriptionToGeneralMessage(
       _generateAny2EVMSubscriptionMessageWithTokens(1, 1, amounts)
     );
     message.receiver = STRANGER;
@@ -117,14 +117,6 @@ contract EVM2EVMSubscriptionOffRamp_executeSingleMessage is EVM2EVMSubscriptionO
     s_offRamp.executeSingleMessage(
       _convertSubscriptionToGeneralMessage(_generateAny2EVMSubscriptionMessageNoTokens(1, 1))
     );
-  }
-
-  function testUnsupportedTokenReverts() public {
-    changePrank(address(s_offRamp));
-    CCIP.EVM2EVMSubscriptionMessage[] memory messages = _generateMessagesWithTokens();
-    messages[0].tokens[0] = s_destTokens[0];
-    vm.expectRevert(abi.encodeWithSelector(BaseOffRampInterface.UnsupportedToken.selector, s_destTokens[0]));
-    s_offRamp.executeSingleMessage(_convertSubscriptionToGeneralMessage(messages[0]));
   }
 }
 

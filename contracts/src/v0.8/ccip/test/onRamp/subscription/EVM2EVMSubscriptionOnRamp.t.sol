@@ -62,12 +62,10 @@ contract EVM2EVMSubscriptionOnRamp_forwardFromRouter is EVM2EVMSubscriptionOnRam
   // properly approved tokens.
   function testExactApproveSuccess() public {
     CCIP.EVM2AnySubscriptionMessage memory message = _generateEmptyMessage();
-    uint256[] memory amounts = new uint256[](1);
-    amounts[0] = 2**128;
-    IERC20[] memory tokens = new IERC20[](1);
-    tokens[0] = s_sourceTokens[0];
-    message.amounts = amounts;
-    message.tokens = tokens;
+    message.amounts = new uint256[](1);
+    message.amounts[0] = 2**64;
+    message.tokens = new IERC20[](1);
+    message.tokens[0] = s_sourceTokens[0];
 
     vm.expectEmit(false, false, false, true);
     emit CCIPSendRequested(_messageToEvent(message, 1, 1));
@@ -128,12 +126,21 @@ contract EVM2EVMSubscriptionOnRamp_forwardFromRouter is EVM2EVMSubscriptionOnRam
   function testUnsupportedTokenReverts() public {
     IERC20 wrongToken = IERC20(address(1));
 
-    vm.expectRevert(abi.encodeWithSelector(BaseOnRampInterface.UnsupportedToken.selector, wrongToken));
     CCIP.EVM2AnySubscriptionMessage memory message = _generateEmptyMessage();
     message.tokens = new IERC20[](1);
     message.tokens[0] = wrongToken;
     message.amounts = new uint256[](1);
+    message.amounts[0] = 1;
 
+    // We need to set the price of this new token to be able to reach
+    // the proper revert point. This must be called by the owner.
+    changePrank(OWNER);
+    s_onRamp.setPrices(message.tokens, message.amounts);
+
+    // Change back to the router
+    changePrank(address(s_onRampRouter));
+
+    vm.expectRevert(abi.encodeWithSelector(BaseOnRampInterface.UnsupportedToken.selector, wrongToken));
     s_onRamp.forwardFromRouter(message, OWNER);
   }
 
@@ -172,6 +179,32 @@ contract EVM2EVMSubscriptionOnRamp_forwardFromRouter is EVM2EVMSubscriptionOnRam
         message.data.length
       )
     );
+
+    s_onRamp.forwardFromRouter(message, OWNER);
+  }
+
+  function testValueExceedsAllowedThresholdReverts() public {
+    CCIP.EVM2AnySubscriptionMessage memory message = _generateEmptyMessage();
+    message.amounts = new uint256[](1);
+    message.amounts[0] = 2**128;
+    message.tokens = new IERC20[](1);
+    message.tokens[0] = s_sourceTokens[0];
+
+    s_sourceTokens[0].approve(address(s_onRamp), 2**128);
+
+    vm.expectRevert(AggregateRateLimiterInterface.ValueExceedsAllowedThreshold.selector);
+
+    s_onRamp.forwardFromRouter(message, OWNER);
+  }
+
+  function testPriceNotFoundForTokenReverts() public {
+    CCIP.EVM2AnySubscriptionMessage memory message = _generateEmptyMessage();
+    address fakeToken = address(1);
+    message.amounts = new uint256[](1);
+    message.tokens = new IERC20[](1);
+    message.tokens[0] = IERC20(fakeToken);
+
+    vm.expectRevert(abi.encodeWithSelector(AggregateRateLimiterInterface.PriceNotFoundForToken.selector, fakeToken));
 
     s_onRamp.forwardFromRouter(message, OWNER);
   }

@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "../../vendor/IERC20.sol";
+import "../pools/TokenPool.sol";
 
 library CCIP {
   ////////////////////////////////
@@ -10,15 +11,37 @@ library CCIP {
 
   /// @notice Generalized EVM message type that is sent from EVM routers
   // to the contracts that implement the Any2EVMMessageReceiverInterface
-  struct Any2EVMMessage {
+  struct Any2EVMMessageFromSender {
     uint256 sourceChainId;
-    uint64 sequenceNumber;
     bytes sender;
     address receiver;
     bytes data;
-    IERC20[] tokens;
+    IERC20[] destTokens;
+    PoolInterface[] destPools;
     uint256[] amounts;
     uint256 gasLimit;
+  }
+
+  struct Any2EVMMessage {
+    uint256 sourceChainId;
+    bytes sender;
+    bytes data;
+    IERC20[] destTokens;
+    uint256[] amounts;
+  }
+
+  function _toAny2EVMMessage(CCIP.Any2EVMMessageFromSender memory original)
+    internal
+    pure
+    returns (CCIP.Any2EVMMessage memory message)
+  {
+    message = CCIP.Any2EVMMessage({
+      sourceChainId: original.sourceChainId,
+      sender: abi.encode(original.sender),
+      data: original.data,
+      destTokens: original.destTokens,
+      amounts: original.amounts
+    });
   }
 
   /// @notice a sequenceNumber interval
@@ -90,23 +113,6 @@ library CCIP {
     uint256 gasLimit;
   }
 
-  function _toAny2EVMMessage(CCIP.EVM2EVMTollMessage memory original)
-    internal
-    pure
-    returns (CCIP.Any2EVMMessage memory message)
-  {
-    message = CCIP.Any2EVMMessage({
-      sourceChainId: original.sourceChainId,
-      sequenceNumber: original.sequenceNumber,
-      sender: abi.encode(original.sender),
-      receiver: original.receiver,
-      data: original.data,
-      tokens: original.tokens,
-      amounts: original.amounts,
-      gasLimit: original.gasLimit
-    });
-  }
-
   ////////////////////////////////
   ////      SUBSCRIPTION      ////
   ////////////////////////////////
@@ -130,22 +136,5 @@ library CCIP {
     IERC20[] tokens;
     uint256[] amounts;
     uint256 gasLimit;
-  }
-
-  function _toAny2EVMMessage(CCIP.EVM2EVMSubscriptionMessage memory original)
-    internal
-    pure
-    returns (CCIP.Any2EVMMessage memory message)
-  {
-    message = CCIP.Any2EVMMessage({
-      sourceChainId: original.sourceChainId,
-      sequenceNumber: original.sequenceNumber,
-      sender: abi.encode(original.sender),
-      receiver: original.receiver,
-      data: original.data,
-      tokens: original.tokens,
-      amounts: original.amounts,
-      gasLimit: original.gasLimit
-    });
   }
 }

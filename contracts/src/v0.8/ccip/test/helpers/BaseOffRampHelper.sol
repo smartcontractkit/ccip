@@ -11,23 +11,38 @@ contract BaseOffRampHelper is BaseOffRamp {
     address onRampAddress,
     AFNInterface afn,
     IERC20[] memory sourceTokens,
-    PoolInterface[] memory pools
-  ) BaseOffRamp(sourceChainId, chainId, offRampConfig, blobVerifier, onRampAddress, afn, sourceTokens, pools) {}
+    PoolInterface[] memory pools,
+    RateLimiterConfig memory rateLimiterConfig,
+    address tokenLimitsAdmin
+  )
+    BaseOffRamp(
+      sourceChainId,
+      chainId,
+      offRampConfig,
+      blobVerifier,
+      onRampAddress,
+      afn,
+      sourceTokens,
+      pools,
+      rateLimiterConfig,
+      tokenLimitsAdmin
+    )
+  {}
 
   function setExecutionState(uint64 sequenceNumber, CCIP.MessageExecutionState state) public {
     s_executedMessages[sequenceNumber] = state;
   }
 
   function releaseOrMintToken(
-    IERC20 token,
+    PoolInterface pool,
     uint256 amount,
     address receiver
   ) external {
-    _releaseOrMintToken(token, amount, receiver);
+    _releaseOrMintToken(pool, amount, receiver);
   }
 
   function releaseOrMintTokens(
-    IERC20[] memory tokens,
+    PoolInterface[] memory tokens,
     uint256[] memory amounts,
     address receiver
   ) external {

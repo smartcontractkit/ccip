@@ -23,8 +23,23 @@ contract EVM2EVMTollOnRamp is Any2EVMTollOnRampInterface, BaseOnRamp, TypeAndVer
     address[] memory allowlist,
     AFNInterface afn,
     OnRampConfig memory config,
+    RateLimiterConfig memory rateLimiterConfig,
+    address tokenLimitsAdmin,
     Any2EVMTollOnRampRouterInterface router
-  ) BaseOnRamp(chainId, destinationChainId, tokens, pools, allowlist, afn, config, address(router)) {}
+  )
+    BaseOnRamp(
+      chainId,
+      destinationChainId,
+      tokens,
+      pools,
+      allowlist,
+      afn,
+      config,
+      rateLimiterConfig,
+      tokenLimitsAdmin,
+      address(router)
+    )
+  {}
 
   /// @inheritdoc Any2EVMTollOnRampInterface
   function forwardFromRouter(CCIP.EVM2AnyTollMessage memory message, address originalSender)

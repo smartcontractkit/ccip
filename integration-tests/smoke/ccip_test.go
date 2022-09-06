@@ -160,7 +160,9 @@ var _ = FDescribe("CCIP interactions test @ccip", func() {
 
 		// create node keys
 		for i, node := range chainlinkNodes {
-			clNodes = append(clNodes, &client.CLNodesWithKeys{Node: node, KeysBundle: bundle[i]})
+			ethAddress, err := node.PrimaryEthAddressForChain(destChainClient.GetChainID().String())
+			Expect(err).ShouldNot(HaveOccurred())
+			clNodes = append(clNodes, &client.CLNodesWithKeys{Node: node, KeysBundle: bundle[i], EthAddress: ethAddress})
 		}
 
 		// deploy all source contracts

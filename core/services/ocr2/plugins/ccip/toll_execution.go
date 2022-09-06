@@ -85,16 +85,23 @@ func (tb *TollBatchBuilder) BuildBatch(
 	gasPrice uint64,
 	tollTokensPerFeeCoin map[common.Address]*big.Int,
 	inflight []InflightExecutionReport,
-) []uint64 {
-	inflightSeqNrs := tb.inflight(inflight)
-	var executableSeqNrs []uint64
+	aggregateTokenLimit *big.Int,
+	tokenLimitPrices map[common.Address]*big.Int,
+) (executableSeqNrs []uint64) {
+	inflightSeqNrs, inflightAggregateValue, err := tb.inflight(inflight, tokenLimitPrices, srcToDst)
+	if err != nil {
+		tb.lggr.Errorw("Unexpected error computing inflight values", "err", err)
+		return []uint64{}
+	}
+	aggregateTokenLimit.Sub(aggregateTokenLimit, inflightAggregateValue)
+
 	for _, msg := range msgs {
-		tollMsg, err := tb.parseLog(types.Log{
+		tollMsg, err2 := tb.parseLog(types.Log{
 			Topics: msg.GetTopics(),
 			Data:   msg.Data,
 		})
-		if err != nil {
-			tb.lggr.Errorw("unable to parse message", "err", err, "msg", msg)
+		if err2 != nil {
+			tb.lggr.Errorw("unable to parse message", "err", err2, "msg", msg)
 			continue
 		}
 		if _, inflight := inflightSeqNrs[tollMsg.Message.SequenceNumber]; inflight {
@@ -103,6 +110,11 @@ func (tb *TollBatchBuilder) BuildBatch(
 		}
 		if _, executed := executed[tollMsg.Message.SequenceNumber]; executed {
 			tb.lggr.Infow("Skipping message already executed", "seqNr", tollMsg.Message.SequenceNumber)
+			continue
+		}
+		messageValue := aggregateTokenValue(tokenLimitPrices, srcToDst, tollMsg.Message.Tokens, tollMsg.Message.Amounts)
+		// if token limit is smaller than message value skip message
+		if aggregateTokenLimit.Cmp(messageValue) == -1 {
 			continue
 		}
 		// Check solvency
@@ -123,18 +135,37 @@ func (tb *TollBatchBuilder) BuildBatch(
 			continue
 		}
 		batchGasLimit -= totalGasLimit
+		aggregateTokenLimit.Sub(aggregateTokenLimit, messageValue)
 		tb.lggr.Infow("Adding toll msg to batch", "seqNum", tollMsg.Message.SequenceNumber, "maxCharge", maxCharge, "maxGasOverhead", maxGasOverhead)
 		executableSeqNrs = append(executableSeqNrs, tollMsg.Message.SequenceNumber)
 	}
 	return executableSeqNrs
 }
 
-func (tb *TollBatchBuilder) inflight(inflight []InflightExecutionReport) map[uint64]struct{} {
-	inflightSeqNrs := make(map[uint64]struct{})
+func (tb *TollBatchBuilder) inflight(
+	inflight []InflightExecutionReport,
+	tokenLimitPrices map[common.Address]*big.Int,
+	srcToDst map[common.Address]common.Address,
+) (inflightSeqNrs map[uint64]struct{}, inflightAggregateValue *big.Int, err error) {
+	inflightSeqNrs = make(map[uint64]struct{})
+	inflightAggregateValue = big.NewInt(0)
+
 	for _, rep := range inflight {
 		for _, seqNr := range rep.report.SequenceNumbers {
 			inflightSeqNrs[seqNr] = struct{}{}
 		}
+		for _, encMsg := range rep.report.EncodedMessages {
+			msg, err2 := tb.parseLog(types.Log{
+				// Note this needs to change if we start indexing things.
+				Topics: []common.Hash{CCIPTollSendRequested},
+				Data:   encMsg,
+			})
+			if err2 != nil {
+				return nil, nil, err2
+			}
+			inflightAggregateValue.Add(inflightAggregateValue, aggregateTokenValue(tokenLimitPrices, srcToDst, msg.Message.Tokens, msg.Message.Amounts))
+
+		}
 	}
-	return inflightSeqNrs
+	return inflightSeqNrs, inflightAggregateValue, nil
 }

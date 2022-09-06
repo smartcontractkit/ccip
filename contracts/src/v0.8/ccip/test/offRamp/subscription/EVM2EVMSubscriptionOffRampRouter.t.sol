@@ -31,7 +31,7 @@ contract EVM2EVMSubscriptionOffRampRouter_constructor is EVM2EVMSubscriptionOffR
 
 /// @notice #routeMessage
 contract EVM2EVMSubscriptionOffRampRouter_routeMessage is EVM2EVMSubscriptionOffRampSetup {
-  event MessageReceived(uint256 sequenceNumber);
+  event MessageReceived();
 
   MaybeRevertMessageReceiver s_revertingReceiver;
 
@@ -44,18 +44,18 @@ contract EVM2EVMSubscriptionOffRampRouter_routeMessage is EVM2EVMSubscriptionOff
 
   // Success
   function testSuccess() public {
-    CCIP.Any2EVMMessage memory message = _convertSubscriptionToGeneralMessage(
+    CCIP.Any2EVMMessageFromSender memory message = _convertSubscriptionToGeneralMessage(
       _generateAny2EVMSubscriptionMessageNoTokens(1, 1)
     );
 
     vm.expectEmit(false, false, false, true);
-    emit MessageReceived(message.sequenceNumber);
+    emit MessageReceived();
 
     assertTrue(s_router.routeMessage(message));
   }
 
   function testMessageFailureReturnsFalseSuccess() public {
-    CCIP.Any2EVMMessage memory message = _convertSubscriptionToGeneralMessage(
+    CCIP.Any2EVMMessageFromSender memory message = _convertSubscriptionToGeneralMessage(
       _generateAny2EVMSubscriptionMessageNoTokens(1, 1)
     );
     message.receiver = address(s_revertingReceiver);
@@ -63,7 +63,7 @@ contract EVM2EVMSubscriptionOffRampRouter_routeMessage is EVM2EVMSubscriptionOff
   }
 
   function testNotEnoughMessageGasLimitReturnsFalseSuccess() public {
-    CCIP.Any2EVMMessage memory message = _convertSubscriptionToGeneralMessage(
+    CCIP.Any2EVMMessageFromSender memory message = _convertSubscriptionToGeneralMessage(
       _generateAny2EVMSubscriptionMessageNoTokens(1, 1)
     );
     message.gasLimit = 1;
@@ -71,7 +71,7 @@ contract EVM2EVMSubscriptionOffRampRouter_routeMessage is EVM2EVMSubscriptionOff
   }
 
   function testMessageFailureReturnsFalse() public {
-    CCIP.Any2EVMMessage memory message = _convertSubscriptionToGeneralMessage(
+    CCIP.Any2EVMMessageFromSender memory message = _convertSubscriptionToGeneralMessage(
       _generateAny2EVMSubscriptionMessageNoTokens(1, 1)
     );
     message.receiver = address(s_revertingReceiver);

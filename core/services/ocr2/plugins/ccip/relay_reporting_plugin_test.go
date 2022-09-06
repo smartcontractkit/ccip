@@ -56,14 +56,7 @@ func TestRelayReportEncoding(t *testing.T) {
 	require.NoError(t, err)
 
 	// Deploy link token pool.
-	destPoolAddress, _, _, err := native_token_pool.DeployNativeTokenPool(destUser, destChain, destLinkTokenAddress,
-		native_token_pool.PoolInterfaceBucketConfig{
-			Rate:     big.NewInt(1),
-			Capacity: big.NewInt(1e9),
-		}, native_token_pool.PoolInterfaceBucketConfig{
-			Rate:     big.NewInt(1),
-			Capacity: big.NewInt(1e9),
-		})
+	destPoolAddress, _, _, err := native_token_pool.DeployNativeTokenPool(destUser, destChain, destLinkTokenAddress)
 	require.NoError(t, err)
 	destChain.Commit()
 	_, err = native_token_pool.NewNativeTokenPool(destPoolAddress, destChain)

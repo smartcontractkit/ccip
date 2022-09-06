@@ -40,7 +40,7 @@ contract EVM2EVMTollReceiverDapp_ccipReceive is ReceiverDappSetup {
   function testSuccess() public {
     CCIP.Any2EVMMessage memory message;
     uint256 transferAmount = 5000;
-    message.tokens = s_destTokens;
+    message.destTokens = s_destTokens;
     message.amounts = new uint256[](2);
     message.amounts[0] = transferAmount;
     message.data = abi.encode(OWNER, OWNER);

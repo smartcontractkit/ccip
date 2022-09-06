@@ -5,11 +5,12 @@ import "../../vendor/Address.sol";
 import "../health/HealthChecker.sol";
 import "../pools/TokenPoolRegistry.sol";
 import "../interfaces/offRamp/Any2EVMOffRampInterface.sol";
+import "../rateLimiter/AggregateRateLimiter.sol";
 
 /**
  * @notice A base OffRamp contract that every OffRamp should expand on
  */
-contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry {
+contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry, AggregateRateLimiter {
   using Address for address;
 
   // Chain ID of the source chain
@@ -38,11 +39,15 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry {
     // OnrampAddress, needed for hashing in the future so already added to the interface
     address,
     AFNInterface afn,
-    // TODO token limiter contract
-    // https://app.shortcut.com/chainlinklabs/story/41867/contract-scaffolding-aggregatetokenlimiter-contract
     IERC20[] memory sourceTokens,
-    PoolInterface[] memory pools
-  ) HealthChecker(afn) TokenPoolRegistry(sourceTokens, pools) {
+    PoolInterface[] memory pools,
+    RateLimiterConfig memory rateLimiterConfig,
+    address tokenLimitsAdmin
+  )
+    HealthChecker(afn)
+    TokenPoolRegistry(sourceTokens, pools)
+    AggregateRateLimiter(rateLimiterConfig, tokenLimitsAdmin)
+  {
     // TokenPoolRegistry does a check on tokens.length != pools.length
     i_sourceChainId = sourceChainId;
     i_chainId = chainId;
@@ -55,11 +60,10 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry {
    *          the given `receiver` address.
    */
   function _releaseOrMintToken(
-    IERC20 token,
+    PoolInterface pool,
     uint256 amount,
     address receiver
   ) internal {
-    PoolInterface pool = _getPool(token);
     pool.releaseOrMint(receiver, amount);
   }
 
@@ -68,13 +72,13 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry {
    *           and send them to the given `receiver` address.
    */
   function _releaseOrMintTokens(
-    IERC20[] memory tokens,
+    PoolInterface[] memory pools,
     uint256[] memory amounts,
     address receiver
   ) internal {
-    if (tokens.length != amounts.length) revert TokenAndAmountMisMatch();
-    for (uint256 i = 0; i < tokens.length; ++i) {
-      _releaseOrMintToken(tokens[i], amounts[i], receiver);
+    if (pools.length != amounts.length) revert TokenAndAmountMisMatch();
+    for (uint256 i = 0; i < pools.length; ++i) {
+      _releaseOrMintToken(pools[i], amounts[i], receiver);
     }
   }
 
@@ -103,10 +107,10 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry {
 
   /**
    * @notice Try executing a message
-   * @param message CCIP.Any2EVMMessage memory message
+   * @param message CCIP.Any2EVMMessageFromSender memory message
    * @return CCIP.ExecutionState
    */
-  function _trialExecute(CCIP.Any2EVMMessage memory message) internal returns (CCIP.MessageExecutionState) {
+  function _trialExecute(CCIP.Any2EVMMessageFromSender memory message) internal returns (CCIP.MessageExecutionState) {
     try this.executeSingleMessage(message) {} catch (bytes memory err) {
       if (BaseOffRampInterface.ReceiverError.selector == bytes4(err)) {
         return CCIP.MessageExecutionState.FAILURE;
@@ -119,19 +123,21 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry {
 
   /**
    * @notice Execute a single message
-   * @param message The Any2EVMMessage message that will be executed
+   * @param message The Any2EVMMessageFromSender message that will be executed
    * @dev this can only be called by the contract itself. It is part of
    * the Execute call, as we can only try/catch on external calls.
    */
-  function executeSingleMessage(CCIP.Any2EVMMessage memory message) external {
+  function executeSingleMessage(CCIP.Any2EVMMessageFromSender memory message) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
-    // TODO: token limiter logic
-    // https://app.shortcut.com/chainlinklabs/story/41867/contract-scaffolding-aggregatetokenlimiter-contract
-    _releaseOrMintTokens(message.tokens, message.amounts, message.receiver);
+    if (message.destTokens.length > 0) {
+      _removeTokens(message.destTokens, message.amounts);
+      _releaseOrMintTokens(message.destPools, message.amounts, message.receiver);
+    }
+
     _callReceiver(message);
   }
 
-  function _callReceiver(CCIP.Any2EVMMessage memory message) internal {
+  function _callReceiver(CCIP.Any2EVMMessageFromSender memory message) internal {
     if (!message.receiver.isContract()) return;
     if (!s_router.routeMessage(message)) revert ReceiverError();
   }
@@ -139,7 +145,7 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry {
   /**
    * @notice Reverts as this contract should not access CCIP messages
    */
-  function ccipReceive(CCIP.Any2EVMMessage calldata) external pure {
+  function ccipReceive(CCIP.Any2EVMMessageFromSender calldata) external pure {
     revert();
   }
 

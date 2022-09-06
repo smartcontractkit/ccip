@@ -32,7 +32,7 @@ contract ReceiverDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterfac
    * @param message CCIP Message
    */
   function ccipReceive(CCIP.Any2EVMMessage calldata message) external override onlyRouter {
-    handleMessage(message.data, message.tokens, message.amounts);
+    handleMessage(message.data, message.destTokens, message.amounts);
   }
 
   function handleMessage(

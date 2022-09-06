@@ -28,20 +28,18 @@ contract TokenSetup is BaseTest {
       s_destTokens.push(new MockERC20("dETH", "dETH", OWNER, 2**128));
     }
 
-    PoolInterface.BucketConfig memory bucketConfig = PoolInterface.BucketConfig({rate: 1e50, capacity: 1e50});
-
     if (s_sourcePools.length == 0) {
-      s_sourcePools.push(new NativeTokenPool(s_sourceTokens[0], bucketConfig, bucketConfig));
-      s_sourcePools.push(new NativeTokenPool(s_sourceTokens[1], bucketConfig, bucketConfig));
+      s_sourcePools.push(new NativeTokenPool(s_sourceTokens[0]));
+      s_sourcePools.push(new NativeTokenPool(s_sourceTokens[1]));
     }
 
     if (s_destPools.length == 0) {
-      s_destPools.push(new NativeTokenPool(s_destTokens[0], bucketConfig, bucketConfig));
-      s_destPools.push(new NativeTokenPool(s_destTokens[1], bucketConfig, bucketConfig));
+      s_destPools.push(new NativeTokenPool(s_destTokens[0]));
+      s_destPools.push(new NativeTokenPool(s_destTokens[1]));
 
       // Float the pools with funds
-      s_destTokens[0].transfer(address(s_destPools[0]), 1e25);
-      s_destTokens[1].transfer(address(s_destPools[1]), 1e25);
+      s_destTokens[0].transfer(address(s_destPools[0]), POOL_BALANCE);
+      s_destTokens[1].transfer(address(s_destPools[1]), POOL_BALANCE);
     }
   }
 }

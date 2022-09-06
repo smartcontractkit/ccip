@@ -31,6 +31,8 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
       s_allowList,
       s_afn,
       onRampConfig(),
+      rateLimiterConfig(),
+      TOKEN_LIMIT_ADMIN,
       s_onRampRouter
     );
     uint256[] memory fees = new uint256[](1);
@@ -38,6 +40,9 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
     IERC20[] memory feeTokens = new IERC20[](1);
     feeTokens[0] = s_sourceTokens[0];
     s_onRamp.setFeeConfig(Any2EVMTollOnRampInterface.FeeConfig({feeTokens: feeTokens, fees: fees}));
+
+    s_onRamp.setPrices(s_sourceTokens, getTokenPrices());
+
     NativeTokenPool(address(s_sourcePools[0])).setOnRamp(s_onRamp, true);
     NativeTokenPool(address(s_sourcePools[1])).setOnRamp(s_onRamp, true);
 

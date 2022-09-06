@@ -5,6 +5,7 @@ import "../interfaces/BlobVerifierInterface.sol";
 import "../interfaces/offRamp/Any2EVMOffRampInterface.sol";
 import "../interfaces/onRamp/BaseOnRampInterface.sol";
 import "../interfaces/subscription/SubscriptionInterface.sol";
+import "../interfaces/rateLimiter/AggregateRateLimiterInterface.sol";
 
 contract StructFactory {
   // addresses
@@ -60,7 +61,7 @@ contract StructFactory {
   uint256 internal constant BLOCK_TIME = 1234567890;
 
   // offRamp
-  uint256 internal constant POOL_BALANCE = 5000;
+  uint256 internal constant POOL_BALANCE = 1e25;
   uint64 internal constant EXECUTION_DELAY_SECONDS = 0;
   uint64 internal constant MAX_DATA_SIZE = 500;
   uint64 internal constant MAX_TOKENS_LENGTH = 5;
@@ -107,5 +108,19 @@ contract StructFactory {
 
   function subscriptionConfig(IERC20 feeToken) internal pure returns (SubscriptionInterface.SubscriptionConfig memory) {
     return SubscriptionInterface.SubscriptionConfig(SET_SUBSCRIPTION_SENDER_DELAY, WITHDRAWAL_DELAY, feeToken);
+  }
+
+  // Rate limiter
+  address constant TOKEN_LIMIT_ADMIN = 0x11118e64e1FB0c487f25dD6D3601FF6aF8d32E4e;
+
+  function rateLimiterConfig() internal pure returns (AggregateRateLimiterInterface.RateLimiterConfig memory) {
+    return AggregateRateLimiterInterface.RateLimiterConfig({capacity: 100e28, rate: 1e15});
+  }
+
+  function getTokenPrices() internal pure returns (uint256[] memory prices) {
+    prices = new uint256[](2);
+    prices[0] = 1;
+    prices[1] = 8;
+    return prices;
   }
 }

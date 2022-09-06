@@ -38,7 +38,9 @@ type BatchBuilder interface {
 		gasLimit uint64,
 		gasPrice uint64,
 		tokensPerFeeCoin map[common.Address]*big.Int,
-		inflight []InflightExecutionReport) []uint64
+		inflight []InflightExecutionReport,
+		aggregateTokenLimit *big.Int,
+		tokenLimitPrices map[common.Address]*big.Int) []uint64
 }
 
 type ExecutionBatchBuilder struct {
@@ -200,7 +202,31 @@ func (eb *ExecutionBatchBuilder) getExecutableSeqNrs(
 			}
 			srcToDst[sourceToken] = dst
 		}
-		batch := eb.builder.BuildBatch(srcToDst, srcLogs, executedMp, eb.gasLimit, maxGasPrice, tokensPerFeeCoin, inflight)
+		// This could result in slightly different values on each call as
+		// the function returns the allowed amount at the time of the last block.
+		// Since this will only increase over time, the highest observed value will
+		// always be the lower bound of what would be available on chain
+		// since we already account for inflight txs.
+		allowedTokenAmount, err := eb.offRamp.GetAllowedTokensAmount(nil)
+		if err != nil {
+			return nil, err
+		}
+
+		supportedDestTokens := make([]common.Address, 0, len(srcToDst))
+		for _, destTokens := range srcToDst {
+			supportedDestTokens = append(supportedDestTokens, destTokens)
+		}
+
+		destTokenPrices, err := eb.offRamp.GetPricesForTokens(nil, supportedDestTokens)
+		if err != nil {
+			return nil, err
+		}
+		pricePerDestToken := make(map[common.Address]*big.Int)
+		for i, destToken := range supportedDestTokens {
+			pricePerDestToken[destToken] = destTokenPrices[i]
+		}
+
+		batch := eb.builder.BuildBatch(srcToDst, srcLogs, executedMp, eb.gasLimit, maxGasPrice, tokensPerFeeCoin, inflight, allowedTokenAmount, pricePerDestToken)
 		if len(batch) != 0 {
 			return batch, nil
 		}

@@ -24,8 +24,23 @@ contract EVM2EVMSubscriptionOnRamp is Any2EVMSubscriptionOnRampInterface, BaseOn
     address[] memory allowlist,
     AFNInterface afn,
     OnRampConfig memory config,
+    RateLimiterConfig memory rateLimiterConfig,
+    address tokenLimitsAdmin,
     Any2EVMSubscriptionOnRampRouterInterface router
-  ) BaseOnRamp(chainId, destinationChainId, tokens, pools, allowlist, afn, config, address(router)) {}
+  )
+    BaseOnRamp(
+      chainId,
+      destinationChainId,
+      tokens,
+      pools,
+      allowlist,
+      afn,
+      config,
+      rateLimiterConfig,
+      tokenLimitsAdmin,
+      address(router)
+    )
+  {}
 
   /**
    * @notice Send a message to the remote chain

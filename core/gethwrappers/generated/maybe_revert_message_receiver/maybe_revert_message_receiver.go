@@ -30,19 +30,16 @@ var (
 )
 
 type CCIPAny2EVMMessage struct {
-	SourceChainId  *big.Int
-	SequenceNumber uint64
-	Sender         []byte
-	Receiver       common.Address
-	Data           []byte
-	Tokens         []common.Address
-	Amounts        []*big.Int
-	GasLimit       *big.Int
+	SourceChainId *big.Int
+	Sender        []byte
+	Data          []byte
+	DestTokens    []common.Address
+	Amounts       []*big.Int
 }
 
 var MaybeRevertMessageReceiverMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"toRevert\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"message\",\"type\":\"uint256\"}],\"name\":\"MessageReceived\",\"type\":\"event\"},{\"inputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"sourceChainId\",\"type\":\"uint256\"},{\"internalType\":\"uint64\",\"name\":\"sequenceNumber\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"sender\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"receiver\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"},{\"internalType\":\"contractIERC20[]\",\"name\":\"tokens\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"amounts\",\"type\":\"uint256[]\"},{\"internalType\":\"uint256\",\"name\":\"gasLimit\",\"type\":\"uint256\"}],\"internalType\":\"structCCIP.Any2EVMMessage\",\"name\":\"message\",\"type\":\"tuple\"}],\"name\":\"ccipReceive\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getSubscriptionManager\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"s_toRevert\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"toRevert\",\"type\":\"bool\"}],\"name\":\"setRevert\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
-	Bin: "0x608060405234801561001057600080fd5b506040516102c43803806102c483398101604081905261002f9161005d565b600080546001600160a81b0319163360ff60a01b191617600160a01b92151592909202919091179055610086565b60006020828403121561006f57600080fd5b8151801515811461007f57600080fd5b9392505050565b61022f806100956000396000f3fe608060405234801561001057600080fd5b506004361061004c5760003560e01c80635100fc21146100515780638fb5f1711461008b578063e2a92e28146100e5578063e402bc541461010d575b600080fd5b6000546100769074010000000000000000000000000000000000000000900460ff1681565b60405190151581526020015b60405180910390f35b6100e3610099366004610193565b6000805491151574010000000000000000000000000000000000000000027fffffffffffffffffffffff00ffffffffffffffffffffffffffffffffffffffff909216919091179055565b005b60005460405173ffffffffffffffffffffffffffffffffffffffff9091168152602001610082565b6100e361011b3660046101bc565b60005474010000000000000000000000000000000000000000900460ff161561014357600080fd5b7fd975dc53483f681e69c6732f27f4976038dcb70b17188c82e43b48534a5bd4fc61017460408301602084016101f8565b60405167ffffffffffffffff909116815260200160405180910390a150565b6000602082840312156101a557600080fd5b813580151581146101b557600080fd5b9392505050565b6000602082840312156101ce57600080fd5b813567ffffffffffffffff8111156101e557600080fd5b820161010081850312156101b557600080fd5b60006020828403121561020a57600080fd5b813567ffffffffffffffff811681146101b557600080fdfea164736f6c634300080f000a",
+	ABI: "[{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"toRevert\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"MessageReceived\",\"type\":\"event\"},{\"inputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"sourceChainId\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"sender\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"},{\"internalType\":\"contractIERC20[]\",\"name\":\"destTokens\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"amounts\",\"type\":\"uint256[]\"}],\"internalType\":\"structCCIP.Any2EVMMessage\",\"name\":\"\",\"type\":\"tuple\"}],\"name\":\"ccipReceive\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getSubscriptionManager\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"s_toRevert\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"toRevert\",\"type\":\"bool\"}],\"name\":\"setRevert\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+	Bin: "0x608060405234801561001057600080fd5b5060405161027a38038061027a83398101604081905261002f9161005d565b600080546001600160a81b0319163360ff60a01b191617600160a01b92151592909202919091179055610086565b60006020828403121561006f57600080fd5b8151801515811461007f57600080fd5b9392505050565b6101e5806100956000396000f3fe608060405234801561001057600080fd5b506004361061004c5760003560e01c80635100fc21146100515780638fb5f1711461008b578063a0c6df15146100e5578063e2a92e28146100f8575b600080fd5b6000546100769074010000000000000000000000000000000000000000900460ff1681565b60405190151581526020015b60405180910390f35b6100e3610099366004610174565b6000805491151574010000000000000000000000000000000000000000027fffffffffffffffffffffff00ffffffffffffffffffffffffffffffffffffffff909216919091179055565b005b6100e36100f336600461019d565b610120565b60005460405173ffffffffffffffffffffffffffffffffffffffff9091168152602001610082565b60005474010000000000000000000000000000000000000000900460ff161561014857600080fd5b6040517fd82ce31e3523f6eeb2d24317b2b4133001e8472729657f663b68624c45f8f3e890600090a150565b60006020828403121561018657600080fd5b8135801515811461019657600080fd5b9392505050565b6000602082840312156101af57600080fd5b813567ffffffffffffffff8111156101c657600080fd5b820160a0818503121561019657600080fdfea164736f6c634300080f000a",
 }
 
 var MaybeRevertMessageReceiverABI = MaybeRevertMessageReceiverMetaData.ABI
@@ -225,16 +222,16 @@ func (_MaybeRevertMessageReceiver *MaybeRevertMessageReceiverCallerSession) SToR
 	return _MaybeRevertMessageReceiver.Contract.SToRevert(&_MaybeRevertMessageReceiver.CallOpts)
 }
 
-func (_MaybeRevertMessageReceiver *MaybeRevertMessageReceiverTransactor) CcipReceive(opts *bind.TransactOpts, message CCIPAny2EVMMessage) (*types.Transaction, error) {
-	return _MaybeRevertMessageReceiver.contract.Transact(opts, "ccipReceive", message)
+func (_MaybeRevertMessageReceiver *MaybeRevertMessageReceiverTransactor) CcipReceive(opts *bind.TransactOpts, arg0 CCIPAny2EVMMessage) (*types.Transaction, error) {
+	return _MaybeRevertMessageReceiver.contract.Transact(opts, "ccipReceive", arg0)
 }
 
-func (_MaybeRevertMessageReceiver *MaybeRevertMessageReceiverSession) CcipReceive(message CCIPAny2EVMMessage) (*types.Transaction, error) {
-	return _MaybeRevertMessageReceiver.Contract.CcipReceive(&_MaybeRevertMessageReceiver.TransactOpts, message)
+func (_MaybeRevertMessageReceiver *MaybeRevertMessageReceiverSession) CcipReceive(arg0 CCIPAny2EVMMessage) (*types.Transaction, error) {
+	return _MaybeRevertMessageReceiver.Contract.CcipReceive(&_MaybeRevertMessageReceiver.TransactOpts, arg0)
 }
 
-func (_MaybeRevertMessageReceiver *MaybeRevertMessageReceiverTransactorSession) CcipReceive(message CCIPAny2EVMMessage) (*types.Transaction, error) {
-	return _MaybeRevertMessageReceiver.Contract.CcipReceive(&_MaybeRevertMessageReceiver.TransactOpts, message)
+func (_MaybeRevertMessageReceiver *MaybeRevertMessageReceiverTransactorSession) CcipReceive(arg0 CCIPAny2EVMMessage) (*types.Transaction, error) {
+	return _MaybeRevertMessageReceiver.Contract.CcipReceive(&_MaybeRevertMessageReceiver.TransactOpts, arg0)
 }
 
 func (_MaybeRevertMessageReceiver *MaybeRevertMessageReceiverTransactor) SetRevert(opts *bind.TransactOpts, toRevert bool) (*types.Transaction, error) {
@@ -310,8 +307,7 @@ func (it *MaybeRevertMessageReceiverMessageReceivedIterator) Close() error {
 }
 
 type MaybeRevertMessageReceiverMessageReceived struct {
-	Message *big.Int
-	Raw     types.Log
+	Raw types.Log
 }
 
 func (_MaybeRevertMessageReceiver *MaybeRevertMessageReceiverFilterer) FilterMessageReceived(opts *bind.FilterOpts) (*MaybeRevertMessageReceiverMessageReceivedIterator, error) {
@@ -377,7 +373,7 @@ func (_MaybeRevertMessageReceiver *MaybeRevertMessageReceiver) ParseLog(log type
 }
 
 func (MaybeRevertMessageReceiverMessageReceived) Topic() common.Hash {
-	return common.HexToHash("0xd975dc53483f681e69c6732f27f4976038dcb70b17188c82e43b48534a5bd4fc")
+	return common.HexToHash("0xd82ce31e3523f6eeb2d24317b2b4133001e8472729657f663b68624c45f8f3e8")
 }
 
 func (_MaybeRevertMessageReceiver *MaybeRevertMessageReceiver) Address() common.Address {
@@ -389,7 +385,7 @@ type MaybeRevertMessageReceiverInterface interface {
 
 	SToRevert(opts *bind.CallOpts) (bool, error)
 
-	CcipReceive(opts *bind.TransactOpts, message CCIPAny2EVMMessage) (*types.Transaction, error)
+	CcipReceive(opts *bind.TransactOpts, arg0 CCIPAny2EVMMessage) (*types.Transaction, error)
 
 	SetRevert(opts *bind.TransactOpts, toRevert bool) (*types.Transaction, error)
 

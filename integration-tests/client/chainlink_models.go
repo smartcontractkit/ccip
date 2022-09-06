@@ -1173,4 +1173,5 @@ func NewBlankChainlinkProfileResults() *ChainlinkProfileResults {
 type CLNodesWithKeys struct {
 	Node       *Chainlink
 	KeysBundle NodeKeysBundle
+	EthAddress string
 }

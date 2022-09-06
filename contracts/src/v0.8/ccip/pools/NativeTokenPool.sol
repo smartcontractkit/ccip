@@ -10,17 +10,13 @@ import "./TokenPool.sol";
 contract NativeTokenPool is TokenPool {
   using SafeERC20 for IERC20;
 
-  constructor(
-    IERC20 token,
-    BucketConfig memory lockConfig,
-    BucketConfig memory releaseConfig
-  ) TokenPool(token, lockConfig, releaseConfig) {}
+  constructor(IERC20 token) TokenPool(token) {}
 
   /**
    * @notice Locks the token in the pool
    * @param amount Amount to lock
    */
-  function lockOrBurn(uint256 amount) external override whenNotPaused assertLockOrBurn(amount) {
+  function lockOrBurn(uint256 amount) external override whenNotPaused assertLockOrBurn {
     emit Locked(msg.sender, amount);
   }
 
@@ -29,12 +25,7 @@ contract NativeTokenPool is TokenPool {
    * @param recipient Recipient address
    * @param amount Amount to release
    */
-  function releaseOrMint(address recipient, uint256 amount)
-    external
-    override
-    whenNotPaused
-    assertMintOrRelease(amount)
-  {
+  function releaseOrMint(address recipient, uint256 amount) external override whenNotPaused assertMintOrRelease {
     getToken().safeTransfer(recipient, amount);
     emit Released(msg.sender, recipient, amount);
   }

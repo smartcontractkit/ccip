@@ -4,7 +4,7 @@ pragma solidity 0.8.15;
 import "../../../interfaces/applications/Any2EVMMessageReceiverInterface.sol";
 
 contract SimpleMessageReceiver is Any2EVMMessageReceiverInterface {
-  event MessageReceived(uint256 message);
+  event MessageReceived();
 
   address public s_manager;
 
@@ -16,7 +16,7 @@ contract SimpleMessageReceiver is Any2EVMMessageReceiverInterface {
     return s_manager;
   }
 
-  function ccipReceive(CCIP.Any2EVMMessage calldata message) external override {
-    emit MessageReceived(message.sequenceNumber);
+  function ccipReceive(CCIP.Any2EVMMessage calldata) external override {
+    emit MessageReceived();
   }
 }

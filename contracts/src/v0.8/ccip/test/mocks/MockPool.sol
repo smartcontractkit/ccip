@@ -21,26 +21,6 @@ contract MockPool is PoolInterface {
 
   function getToken() external view override returns (IERC20 pool) {}
 
-  function setLockOrBurnBucket(
-    uint256 rate,
-    uint256 capacity,
-    bool full
-  ) external override {}
-
-  function setReleaseOrMintBucket(
-    uint256 rate,
-    uint256 capacity,
-    bool full
-  ) external override {}
-
-  function getLockOrBurnBucket() external view override returns (TokenLimits.TokenBucket memory) {
-    return TokenLimits.constructTokenBucket(0, 0, true);
-  }
-
-  function getReleaseOrMintBucket() external view override returns (TokenLimits.TokenBucket memory) {
-    return TokenLimits.constructTokenBucket(0, 0, true);
-  }
-
   function pause() external override {}
 
   function unpause() external override {}

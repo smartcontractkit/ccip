@@ -3,7 +3,7 @@ src = 'contracts/src/v0.8/ccip'
 test = 'contracts/src/v0.8/ccip/test'
 out = 'contracts/foundry-artifacts'
 libs = ["contracts/node_modules", "lib"]
-optimizer_runs = 1000000
+optimizer_runs = 5000
 
 gas_price = 1
 

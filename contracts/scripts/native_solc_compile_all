@@ -88,27 +88,27 @@ $SCRIPTPATH/native_solc8_6_compile dev/DerivedPriceFeed.sol
 $SCRIPTPATH/native_solc8_6_compile tests/LogEmitter.sol
 
 # CCIP
-$SCRIPTPATH/native_solc8_15_compile ccip/blobVerifier/BlobVerifier.sol
-$SCRIPTPATH/native_solc8_15_compile ccip/test/helpers/BlobVerifierHelper.sol
-$SCRIPTPATH/native_solc8_15_compile ccip/pools/NativeTokenPool.sol
-$SCRIPTPATH/native_solc8_15_compile ccip/health/AFN.sol
+$SCRIPTPATH/native_solc8_15_compile_ccip ccip/blobVerifier/BlobVerifier.sol
+$SCRIPTPATH/native_solc8_15_compile_ccip ccip/test/helpers/BlobVerifierHelper.sol
+$SCRIPTPATH/native_solc8_15_compile_ccip ccip/pools/NativeTokenPool.sol
+$SCRIPTPATH/native_solc8_15_compile_ccip ccip/health/AFN.sol
 
-$SCRIPTPATH/native_solc8_15_compile ccip/applications/ReceiverDapp.sol
-$SCRIPTPATH/native_solc8_15_compile ccip/test/helpers/receivers/SimpleMessageReceiver.sol
-$SCRIPTPATH/native_solc8_15_compile ccip/test/helpers/receivers/MaybeRevertMessageReceiver.sol
+$SCRIPTPATH/native_solc8_15_compile_ccip ccip/applications/ReceiverDapp.sol
+$SCRIPTPATH/native_solc8_15_compile_ccip ccip/test/helpers/receivers/SimpleMessageReceiver.sol
+$SCRIPTPATH/native_solc8_15_compile_ccip ccip/test/helpers/receivers/MaybeRevertMessageReceiver.sol
 
 ## Toll
-$SCRIPTPATH/native_solc8_15_compile ccip/onRamp/toll/EVM2AnyTollOnRampRouter.sol
-$SCRIPTPATH/native_solc8_15_compile ccip/onRamp/toll/EVM2EVMTollOnRamp.sol
-$SCRIPTPATH/native_solc8_15_compile ccip/offRamp/toll/EVM2EVMTollOffRamp.sol
-$SCRIPTPATH/native_solc8_15_compile ccip/offRamp/toll/Any2EVMTollOffRampRouter.sol
-$SCRIPTPATH/native_solc8_15_compile ccip/test/helpers/EVM2EVMTollOffRampHelper.sol
-$SCRIPTPATH/native_solc8_15_compile ccip/applications/TollSenderDapp.sol
+$SCRIPTPATH/native_solc8_15_compile_ccip ccip/onRamp/toll/EVM2AnyTollOnRampRouter.sol
+$SCRIPTPATH/native_solc8_15_compile_ccip ccip/onRamp/toll/EVM2EVMTollOnRamp.sol
+$SCRIPTPATH/native_solc8_15_compile_ccip ccip/offRamp/toll/EVM2EVMTollOffRamp.sol
+$SCRIPTPATH/native_solc8_15_compile_ccip ccip/offRamp/toll/Any2EVMTollOffRampRouter.sol
+$SCRIPTPATH/native_solc8_15_compile_ccip ccip/test/helpers/EVM2EVMTollOffRampHelper.sol
+$SCRIPTPATH/native_solc8_15_compile_ccip ccip/applications/TollSenderDapp.sol
 
 
 ## Subscription
-$SCRIPTPATH/native_solc8_15_compile ccip/onRamp/subscription/EVM2AnySubscriptionOnRampRouter.sol
-$SCRIPTPATH/native_solc8_15_compile ccip/onRamp/subscription/EVM2EVMSubscriptionOnRamp.sol
-$SCRIPTPATH/native_solc8_15_compile ccip/offRamp/subscription/EVM2EVMSubscriptionOffRamp.sol
-$SCRIPTPATH/native_solc8_15_compile ccip/offRamp/subscription/Any2EVMSubscriptionOffRampRouter.sol
-$SCRIPTPATH/native_solc8_15_compile ccip/applications/SubscriptionSenderDapp.sol
+$SCRIPTPATH/native_solc8_15_compile_ccip ccip/onRamp/subscription/EVM2AnySubscriptionOnRampRouter.sol
+$SCRIPTPATH/native_solc8_15_compile_ccip ccip/onRamp/subscription/EVM2EVMSubscriptionOnRamp.sol
+$SCRIPTPATH/native_solc8_15_compile_ccip ccip/offRamp/subscription/EVM2EVMSubscriptionOffRamp.sol
+$SCRIPTPATH/native_solc8_15_compile_ccip ccip/offRamp/subscription/Any2EVMSubscriptionOffRampRouter.sol
+$SCRIPTPATH/native_solc8_15_compile_ccip ccip/applications/SubscriptionSenderDapp.sol

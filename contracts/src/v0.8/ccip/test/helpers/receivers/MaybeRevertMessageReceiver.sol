@@ -5,7 +5,7 @@ import "../../../interfaces/applications/Any2EVMMessageReceiverInterface.sol";
 contract MaybeRevertMessageReceiver is Any2EVMMessageReceiverInterface {
   address private s_manager;
   bool public s_toRevert;
-  event MessageReceived(uint256 message);
+  event MessageReceived();
 
   constructor(bool toRevert) {
     s_manager = msg.sender;
@@ -20,10 +20,10 @@ contract MaybeRevertMessageReceiver is Any2EVMMessageReceiverInterface {
     return s_manager;
   }
 
-  function ccipReceive(CCIP.Any2EVMMessage calldata message) external override {
+  function ccipReceive(CCIP.Any2EVMMessage calldata) external override {
     if (s_toRevert) {
       revert();
     }
-    emit MessageReceived(message.sequenceNumber);
+    emit MessageReceived();
   }
 }
