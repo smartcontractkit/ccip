@@ -15,7 +15,7 @@ on:
 
 jobs:
   analyze:
-    name: Analyze
+    name: Analyze ${{ matrix.language }} 
     runs-on: ubuntu-latest
 
     strategy:
@@ -33,7 +33,7 @@ jobs:
         with:
           basic-auth: ${{ secrets.GRAFANA_CLOUD_BASIC_AUTH }}
           hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
-          this-job-name: Analyze
+          this-job-name: Analyze ${{ matrix.language }}
         continue-on-error: true
 
       - name: Checkout repository
