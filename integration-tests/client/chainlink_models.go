@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"gopkg.in/guregu/null.v4"
+
+	"github.com/smartcontractkit/chainlink/core/services/job"
 )
 
 // EIServiceConfig represents External Initiator service config
@@ -76,10 +78,11 @@ type TaskRun struct {
 }
 
 type NodeKeysBundle struct {
-	OCR2Key OCR2Key
-	PeerID  string
-	TXKey   TxKey
-	P2PKeys P2PKeys
+	OCR2Key    OCR2Key
+	PeerID     string
+	TXKey      TxKey
+	P2PKeys    P2PKeys
+	EthAddress string
 }
 
 // RunInputs run inputs (value)
@@ -802,6 +805,13 @@ type P2PData struct {
 	PeerID     string
 }
 
+func (p P2PData) P2PV2Bootstrapper() string {
+	if p.RemotePort == "" {
+		p.RemotePort = "6690"
+	}
+	return fmt.Sprintf("%s@%s:%s", p.PeerID, p.RemoteIP, p.RemotePort)
+}
+
 // Type returns the type of the job
 func (o *OCRTaskJobSpec) Type() string { return "offchainreporting" }
 
@@ -880,23 +890,10 @@ observationSource                      = """
 // OCR2TaskJobSpec represents an OCR2 job that is given to other nodes, meant to communicate with the bootstrap node,
 // and provide their answers
 type OCR2TaskJobSpec struct {
-	Name                     string                 `toml:"name"`
-	JobType                  string                 `toml:"type"`
-	ContractID               string                 `toml:"contractID"`                             // Address of the OCR contract/account(s)
-	Relay                    string                 `toml:"relay"`                                  // Name of blockchain relay to use
-	PluginType               string                 `toml:"pluginType"`                             // Type of report plugin to use
-	RelayConfig              map[string]string      `toml:"relayConfig"`                            // Relay spec object in stringified form
-	P2PV2Bootstrappers       []P2PData              `toml:"p2pv2Bootstrappers"`                     // P2P ID of the bootstrap node
-	OCRKeyBundleID           string                 `toml:"ocrKeyBundleID"`                         // ID of this node's OCR key bundle
-	MonitoringEndpoint       string                 `toml:"monitoringEndpoint"`                     // Typically "chain.link:4321"
-	TransmitterID            string                 `toml:"transmitterID"`                          // ID of address this node will use to transmit
-	BlockChainTimeout        time.Duration          `toml:"blockchainTimeout"`                      // Optional
-	TrackerSubscribeInterval time.Duration          `toml:"contractConfigTrackerSubscribeInterval"` // Optional
-	TrackerPollInterval      time.Duration          `toml:"contractConfigTrackerPollInterval"`      // Optional
-	ContractConfirmations    int                    `toml:"contractConfigConfirmations"`            // Optional
-	ObservationSource        string                 `toml:"observationSource"`                      // List of commands for the Chainlink node
-	JuelsPerFeeCoinSource    string                 `toml:"juelsPerFeeCoinSource"`                  // List of commands to fetch JuelsPerFeeCoin value (used to calculate ocr payments)
-	PluginConfig             map[string]interface{} `toml:"pluginConfig"`                           // Relay spec
+	Name              string `toml:"name"`
+	JobType           string `toml:"type"`
+	OCR2OracleSpec    job.OCR2OracleSpec
+	ObservationSource string `toml:"observationSource"` // List of commands for the Chainlink node
 }
 
 // Type returns the type of the job
@@ -904,19 +901,52 @@ func (o *OCR2TaskJobSpec) Type() string { return o.JobType }
 
 // String representation of the job
 func (o *OCR2TaskJobSpec) String() (string, error) {
+	specWrap := struct {
+		Name                     string
+		JobType                  string
+		ContractID               string
+		Relay                    string
+		PluginType               string
+		RelayConfig              map[string]interface{}
+		PluginConfig             map[string]interface{}
+		P2PV2Bootstrappers       []string
+		OCRKeyBundleID           string
+		MonitoringEndpoint       string
+		TransmitterID            string
+		BlockchainTimeout        time.Duration
+		TrackerSubscribeInterval time.Duration
+		TrackerPollInterval      time.Duration
+		ContractConfirmations    uint16
+		ObservationSource        string
+	}{
+		Name:                  o.Name,
+		JobType:               o.JobType,
+		ContractID:            o.OCR2OracleSpec.ContractID,
+		Relay:                 string(o.OCR2OracleSpec.Relay),
+		PluginType:            string(o.OCR2OracleSpec.PluginType),
+		RelayConfig:           o.OCR2OracleSpec.RelayConfig,
+		PluginConfig:          o.OCR2OracleSpec.PluginConfig,
+		P2PV2Bootstrappers:    o.OCR2OracleSpec.P2PV2Bootstrappers,
+		OCRKeyBundleID:        o.OCR2OracleSpec.OCRKeyBundleID.String,
+		MonitoringEndpoint:    o.OCR2OracleSpec.MonitoringEndpoint.String,
+		TransmitterID:         o.OCR2OracleSpec.TransmitterID.String,
+		BlockchainTimeout:     o.OCR2OracleSpec.BlockchainTimeout.Duration(),
+		ContractConfirmations: o.OCR2OracleSpec.ContractConfigConfirmations,
+		TrackerPollInterval:   o.OCR2OracleSpec.ContractConfigTrackerPollInterval.Duration(),
+		ObservationSource:     o.ObservationSource,
+	}
 	ocr2TemplateString := `type = "{{ .JobType }}"
-schemaVersion                            = 1
-blockchainTimeout                        ={{if not .BlockChainTimeout}} "20s" {{else}} "{{.BlockChainTimeout}}" {{end}}
-contractConfigConfirmations              ={{if not .ContractConfirmations}} 3 {{else}} {{.ContractConfirmations}} {{end}}
-contractConfigTrackerPollInterval        ={{if not .TrackerPollInterval}} "1m" {{else}} "{{.TrackerPollInterval}}" {{end}}
-contractConfigTrackerSubscribeInterval   ={{if not .TrackerSubscribeInterval}} "2m" {{else}} "{{.TrackerSubscribeInterval}}" {{end}}
-name 								     = "{{.Name}}"
-relay									 = "{{.Relay}}"
+schemaVersion                          = 1
+blockchainTimeout                      ={{if not .BlockchainTimeout}} "20s" {{else}} "{{.BlockchainTimeout}}" {{end}}
+contractConfigConfirmations            ={{if not .ContractConfirmations}} 3 {{else}} {{.ContractConfirmations}} {{end}}
+contractConfigTrackerPollInterval      ={{if not .TrackerPollInterval}} "1m" {{else}} "{{.TrackerPollInterval}}" {{end}}
+contractConfigTrackerSubscribeInterval ={{if not .TrackerSubscribeInterval}} "2m" {{else}} "{{.TrackerSubscribeInterval}}" {{end}}
+name 																	 = "{{.Name}}"
+relay																	 = "{{.Relay}}"
 contractID		                         = "{{.ContractID}}"
 {{if .P2PV2Bootstrappers}}
 p2pv2Bootstrappers                      = [
-  {{range $peer := .P2PV2Bootstrappers}}
-  "{{$peer.PeerID}}@{{$peer.RemoteIP}}:{{if $peer.RemotePort}}{{$peer.RemotePort}}{{else}}6690{{end}}",
+  {{range .P2PV2Bootstrappers}}"{{.}}",
   {{end}}
 ]
 {{else}}
@@ -931,20 +961,16 @@ observationSource                      = """
 {{.ObservationSource}}
 """
 [pluginConfig]
-juelsPerFeeCoinSource                  = """
-{{.JuelsPerFeeCoinSource}}
-"""
 {{range $key, $value := .PluginConfig}}
 {{$key}} = {{$value}}
 {{end}}
 {{end}}
-
 [relayConfig]
 {{range $key, $value := .RelayConfig}}
-{{$key}} = "{{$value}}"
+{{$key}} = {{$value}}
 {{end}}`
 
-	return marshallTemplate(o, "OCR2 Job", ocr2TemplateString)
+	return marshallTemplate(specWrap, "OCR2 Job", ocr2TemplateString)
 }
 
 // VRFV2JobSpec represents a VRFV2 job
@@ -1173,5 +1199,4 @@ func NewBlankChainlinkProfileResults() *ChainlinkProfileResults {
 type CLNodesWithKeys struct {
 	Node       *Chainlink
 	KeysBundle NodeKeysBundle
-	EthAddress string
 }

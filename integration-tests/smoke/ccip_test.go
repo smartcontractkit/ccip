@@ -154,16 +154,9 @@ var _ = FDescribe("CCIP interactions test @ccip", func() {
 		err = actions.FundChainlinkNodesForChain(chainlinkNodes, destChainClient, big.NewFloat(10))
 		Expect(err).ShouldNot(HaveOccurred())
 
-		var clNodes []*client.CLNodesWithKeys
-		bundle, err := chainlinkNodes[0].CreateNodeKeysBundle(chainlinkNodes, "evm", destChainClient.GetChainID().String())
-		Expect(err).ShouldNot(HaveOccurred())
-
 		// create node keys
-		for i, node := range chainlinkNodes {
-			ethAddress, err := node.PrimaryEthAddressForChain(destChainClient.GetChainID().String())
-			Expect(err).ShouldNot(HaveOccurred())
-			clNodes = append(clNodes, &client.CLNodesWithKeys{Node: node, KeysBundle: bundle[i], EthAddress: ethAddress})
-		}
+		_, clNodes, err := client.CreateNodeKeysBundle(chainlinkNodes, "evm", destChainClient.GetChainID().String())
+		Expect(err).ShouldNot(HaveOccurred())
 
 		// deploy all source contracts
 		sourceCCIP := actions.DefaultSourceCCIPModule(sourceChainClient, destChainClient.GetChainID(), big.NewInt(5e17))

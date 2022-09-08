@@ -365,7 +365,7 @@ func NewOffChainAggregatorV2Config(
 		copy(cfgPubKeyBytes[:], cfgPubKeyTemp)
 		offChainPubKey := [curve25519.PointSize]byte{}
 		copy(offChainPubKey[:], offChainPubKeyTemp)
-		ethAddress := nodeWithKeys.EthAddress
+		ethAddress := nodeWithKeys.KeysBundle.EthAddress
 		p2pKeys := nodeWithKeys.KeysBundle.P2PKeys
 		peerID := p2pKeys.Data[0].Attributes.PeerID
 		oracleIdentities = append(oracleIdentities, ocrConfigHelper2.OracleIdentityExtra{

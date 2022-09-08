@@ -13,12 +13,14 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
+	"gopkg.in/guregu/null.v4"
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/blob_verifier"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_toll_onramp_router"
 	"github.com/smartcontractkit/chainlink/core/services/job"
 	ccipPlugin "github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/core/services/relay"
+	"github.com/smartcontractkit/chainlink/core/store/models"
 	bigmath "github.com/smartcontractkit/chainlink/core/utils/big_math"
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
@@ -430,82 +432,88 @@ func CreateOCRJobsForCCIP(
 	bootstrapP2PIds := bootstrapNodeWithKey.KeysBundle.P2PKeys
 	bootstrapP2PId := bootstrapP2PIds.Data[0].Attributes.PeerID
 	bootstrapSpec := &client.OCR2TaskJobSpec{
-		Name:       fmt.Sprintf("bootstrap-%s-%s", destChainName, uuid.NewV4().String()),
-		JobType:    "bootstrap",
-		ContractID: blobVerifier,
-		Relay:      string(relay.EVM),
-		RelayConfig: map[string]string{
-			"chainID": destChainID.String(),
+		Name:    fmt.Sprintf("bootstrap-%s-%s", destChainName, uuid.NewV4().String()),
+		JobType: "bootstrap",
+		OCR2OracleSpec: job.OCR2OracleSpec{
+			ContractID: blobVerifier,
+			Relay:      relay.EVM,
+			RelayConfig: map[string]interface{}{
+				"chainID": destChainID.String(),
+			},
 		},
 	}
 	_, err := bootstrapNode.MustCreateJob(bootstrapSpec)
 	Expect(err).ShouldNot(HaveOccurred(), "Shouldn't fail creating bootstrap job on bootstrap node")
 
 	for nodeIndex := 1; nodeIndex < len(chainlinkNodes); nodeIndex++ {
-		nodeTransmitterAddress := chainlinkNodes[nodeIndex].EthAddress
+		nodeTransmitterAddress := chainlinkNodes[nodeIndex].KeysBundle.EthAddress
 		nodeOCR2Key := chainlinkNodes[nodeIndex].KeysBundle.OCR2Key
 		nodeOCR2KeyId := nodeOCR2Key.Data.ID
 		ocr2SpecRelay := &client.OCR2TaskJobSpec{
-			JobType:               "offchainreporting2",
-			Name:                  fmt.Sprintf("ccip-relay-%s-%s", sourceChainName, destChainName),
-			Relay:                 string(relay.EVM),
-			PluginType:            string(job.CCIPRelay),
-			ContractID:            blobVerifier,
-			OCRKeyBundleID:        nodeOCR2KeyId,
-			TransmitterID:         nodeTransmitterAddress,
-			ContractConfirmations: 1,
-			TrackerPollInterval:   1 * time.Second,
-			P2PV2Bootstrappers: []client.P2PData{
-				{
-					RemoteIP: bootstrapNode.RemoteIP(),
-					PeerID:   bootstrapP2PId,
+			JobType: "offchainreporting2",
+			Name:    fmt.Sprintf("ccip-relay-%s-%s", sourceChainName, destChainName),
+			OCR2OracleSpec: job.OCR2OracleSpec{
+				Relay:                             relay.EVM,
+				PluginType:                        job.CCIPRelay,
+				ContractID:                        blobVerifier,
+				OCRKeyBundleID:                    null.StringFrom(nodeOCR2KeyId),
+				TransmitterID:                     null.StringFrom(nodeTransmitterAddress),
+				ContractConfigConfirmations:       1,
+				ContractConfigTrackerPollInterval: models.Interval(1 * time.Second),
+				P2PV2Bootstrappers: []string{
+					client.P2PData{
+						RemoteIP: bootstrapNode.RemoteIP(),
+						PeerID:   bootstrapP2PId,
+					}.P2PV2Bootstrapper(),
 				},
-			},
-			PluginConfig: map[string]interface{}{
-				"sourceChainID": sourceChainID,
-				"destChainID":   destChainID,
-				"onRampIDs":     []string{fmt.Sprintf("\"%s\"", onramp)},
-				"pollPeriod":    `"1s"`,
-			},
-			RelayConfig: map[string]string{
-				"chainID": destChainID.String(),
+				PluginConfig: map[string]interface{}{
+					"sourceChainID": sourceChainID,
+					"destChainID":   destChainID,
+					"onRampIDs":     []string{fmt.Sprintf("\"%s\"", onramp)},
+					"pollPeriod":    `"1s"`,
+				},
+				RelayConfig: map[string]interface{}{
+					"chainID": fmt.Sprintf("\"%s\"", destChainID.String()),
+				},
 			},
 		}
 		_, err = chainlinkNodes[nodeIndex].Node.MustCreateJob(ocr2SpecRelay)
 		Expect(err).ShouldNot(HaveOccurred(), "Shouldn't fail creating CCIP-Relay OCR Task job on OCR node %d", nodeIndex+1)
 		tokenFeeConversionRateURL := fmt.Sprintf("%s/%s", mockserver.Config.ClusterURL,
-			nodeContractPair(chainlinkNodes[nodeIndex].EthAddress, destLinkTokenAddr))
+			nodeContractPair(chainlinkNodes[nodeIndex].KeysBundle.EthAddress, destLinkTokenAddr))
 		ocr2SpecExec := &client.OCR2TaskJobSpec{
-			JobType:               "offchainreporting2",
-			Name:                  fmt.Sprintf("ccip-exec-%s-%s", sourceChainName, destChainName),
-			Relay:                 string(relay.EVM),
-			PluginType:            string(job.CCIPExecution),
-			ContractID:            offRamp,
-			OCRKeyBundleID:        nodeOCR2KeyId,
-			TransmitterID:         nodeTransmitterAddress,
-			ContractConfirmations: 1,
-			TrackerPollInterval:   1 * time.Second,
-			P2PV2Bootstrappers: []client.P2PData{
-				{
-					RemoteIP: bootstrapNode.RemoteIP(),
-					PeerID:   bootstrapP2PId,
+			JobType: "offchainreporting2",
+			Name:    fmt.Sprintf("ccip-exec-%s-%s", sourceChainName, destChainName),
+			OCR2OracleSpec: job.OCR2OracleSpec{
+				Relay:                             relay.EVM,
+				PluginType:                        job.CCIPExecution,
+				ContractID:                        offRamp,
+				OCRKeyBundleID:                    null.StringFrom(nodeOCR2KeyId),
+				TransmitterID:                     null.StringFrom(nodeTransmitterAddress),
+				ContractConfigConfirmations:       1,
+				ContractConfigTrackerPollInterval: models.Interval(1 * time.Second),
+				P2PV2Bootstrappers: []string{
+					client.P2PData{
+						RemoteIP: bootstrapNode.RemoteIP(),
+						PeerID:   bootstrapP2PId,
+					}.P2PV2Bootstrapper(),
 				},
-			},
-			PluginConfig: map[string]interface{}{
-				"sourceChainID":  sourceChainID,
-				"destChainID":    destChainID,
-				"onRampID":       fmt.Sprintf("\"%s\"", onramp),
-				"blobVerifierID": fmt.Sprintf("\"%s\"", blobVerifier),
-				"pollPeriod":     `"1s"`,
-				"tokensPerFeeCoinPipeline": fmt.Sprintf(`"""
+				PluginConfig: map[string]interface{}{
+					"sourceChainID":  sourceChainID,
+					"destChainID":    destChainID,
+					"onRampID":       fmt.Sprintf("\"%s\"", onramp),
+					"blobVerifierID": fmt.Sprintf("\"%s\"", blobVerifier),
+					"pollPeriod":     `"1s"`,
+					"tokensPerFeeCoinPipeline": fmt.Sprintf(`"""
 link [type=http method=GET url="%s"];
 link_parse [type=jsonparse path="Data,Result"];
 link->link_parse;
 merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];
 """`, tokenFeeConversionRateURL, destLinkTokenAddr),
-			},
-			RelayConfig: map[string]string{
-				"chainID": destChainID.String(),
+				},
+				RelayConfig: map[string]interface{}{
+					"chainID": fmt.Sprintf("\"%s\"", destChainID.String()),
+				},
 			},
 		}
 		_, err = chainlinkNodes[nodeIndex].Node.MustCreateJob(ocr2SpecExec)
@@ -524,7 +532,7 @@ func SetMockServerWithSameTokenFeeConversionValue(
 	for tokenAddr, value := range tokenValueAddress {
 		for _, n := range chainlinkNodes {
 			valueAdditions.Add(1)
-			nodeTokenPairID := nodeContractPair(n.EthAddress, tokenAddr)
+			nodeTokenPairID := nodeContractPair(n.KeysBundle.EthAddress, tokenAddr)
 			path := fmt.Sprintf("/%s", nodeTokenPairID)
 			go func(path string) {
 				defer valueAdditions.Done()
