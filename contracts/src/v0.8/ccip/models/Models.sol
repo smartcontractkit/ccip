@@ -9,6 +9,12 @@ library CCIP {
   ////         COMMON         ////
   ////////////////////////////////
 
+  // Offchain leaf domain separator
+  bytes32 public constant LEAF_DOMAIN_SEPARATOR = 0x0000000000000000000000000000000000000000000000000000000000000000;
+  // Internal domain separator used in proofs
+  bytes32 public constant INTERNAL_DOMAIN_SEPARATOR =
+    0x0000000000000000000000000000000000000000000000000000000000000001;
+
   /// @notice Generalized EVM message type that is sent from EVM routers
   // to the contracts that implement the Any2EVMMessageReceiverInterface
   struct Any2EVMMessageFromSender {
@@ -113,6 +119,27 @@ library CCIP {
     uint256 gasLimit;
   }
 
+  bytes32 internal constant EVM_2_EVM_TOLL_MESSAGE_HASH = keccak256("EVM2EVMTollMessagePlus");
+
+  function _hash(CCIP.EVM2EVMTollMessage memory original, bytes32 metadataHash) internal pure returns (bytes32) {
+    return
+      keccak256(
+        abi.encode(
+          LEAF_DOMAIN_SEPARATOR,
+          metadataHash,
+          original.sequenceNumber,
+          original.sender,
+          original.receiver,
+          keccak256(original.data),
+          keccak256(abi.encode(original.tokens)),
+          keccak256(abi.encode(original.amounts)),
+          original.gasLimit,
+          original.feeToken,
+          original.feeTokenAmount
+        )
+      );
+  }
+
   ////////////////////////////////
   ////      SUBSCRIPTION      ////
   ////////////////////////////////
@@ -136,5 +163,29 @@ library CCIP {
     IERC20[] tokens;
     uint256[] amounts;
     uint256 gasLimit;
+  }
+
+  bytes32 internal constant EVM_2_EVM_SUBSCRIPTION_MESSAGE_HASH = keccak256("EVM2EVMSubscriptionMessagePlus");
+
+  function _hash(CCIP.EVM2EVMSubscriptionMessage memory original, bytes32 metadataHash)
+    internal
+    pure
+    returns (bytes32)
+  {
+    return
+      keccak256(
+        abi.encode(
+          LEAF_DOMAIN_SEPARATOR,
+          metadataHash,
+          original.sequenceNumber,
+          original.sender,
+          original.receiver,
+          keccak256(original.data),
+          keccak256(abi.encode(original.tokens)),
+          keccak256(abi.encode(original.amounts)),
+          original.gasLimit,
+          original.nonce
+        )
+      );
   }
 }

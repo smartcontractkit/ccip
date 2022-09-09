@@ -23,9 +23,6 @@ contract TokenPoolRegistry is OwnerIsCreator {
   mapping(IERC20 => PoolConfig) private s_pools;
   // List of tokens
   IERC20[] private s_tokenList;
-  // Mapping of whether token pools have been configured here
-  // Checked when executing messages - make sure the receiver of the message is not a configured pool
-  mapping(PoolInterface => bool) private s_tokenPoolConfigured;
 
   /**
    * @notice The `tokens` and `pools` passed to this constructor depend on which chain this contract
@@ -42,7 +39,6 @@ contract TokenPoolRegistry is OwnerIsCreator {
     for (uint256 i = 0; i < tokens.length; ++i) {
       PoolInterface pool = pools[i];
       s_pools[tokens[i]] = PoolConfig({pool: pool, listIndex: uint96(i)});
-      s_tokenPoolConfigured[pool] = true;
     }
   }
 
@@ -59,9 +55,6 @@ contract TokenPoolRegistry is OwnerIsCreator {
 
     // Add to the s_tokenList
     s_tokenList.push(token);
-
-    // Set configured to true
-    s_tokenPoolConfigured[pool] = true;
 
     emit PoolAdded(token, pool);
   }
@@ -90,9 +83,6 @@ contract TokenPoolRegistry is OwnerIsCreator {
     s_tokenList.pop();
     delete s_pools[token];
 
-    // Set configured to false
-    s_tokenPoolConfigured[pool] = false;
-
     emit PoolRemoved(token, pool);
   }
 
@@ -106,29 +96,11 @@ contract TokenPoolRegistry is OwnerIsCreator {
   }
 
   /**
-   * @notice Check if a token pool has been configured
-   */
-  function isPool(address addr) public view returns (bool) {
-    return s_tokenPoolConfigured[PoolInterface(addr)];
-  }
-
-  /**
    * @notice Get all configured source tokens
    * @return Array of configured source tokens
    */
   function getPoolTokens() public view returns (IERC20[] memory) {
     return s_tokenList;
-  }
-
-  /**
-   * @notice Get all configured destination tokens
-   * @return tokens Array of configured destination tokens
-   */
-  function getDestinationTokens() external view returns (IERC20[] memory tokens) {
-    tokens = new IERC20[](s_tokenList.length);
-    for (uint256 i = 0; i < s_tokenList.length; ++i) {
-      tokens[i] = getDestinationToken(s_tokenList[i]);
-    }
   }
 
   /**
@@ -140,5 +112,16 @@ contract TokenPoolRegistry is OwnerIsCreator {
     PoolInterface pool = s_pools[sourceToken].pool;
     if (address(pool) == address(0)) revert PoolDoesNotExist();
     return s_pools[sourceToken].pool.getToken();
+  }
+
+  /**
+   * @notice Get all configured destination tokens
+   * @return tokens Array of configured destination tokens
+   */
+  function getDestinationTokens() external view returns (IERC20[] memory tokens) {
+    tokens = new IERC20[](s_tokenList.length);
+    for (uint256 i = 0; i < s_tokenList.length; ++i) {
+      tokens[i] = getDestinationToken(s_tokenList[i]);
+    }
   }
 }

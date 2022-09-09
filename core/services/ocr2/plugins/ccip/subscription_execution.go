@@ -63,7 +63,7 @@ func (sbc *SubscriptionCache) Balance(addr common.Address) *big.Int {
 }
 
 func (sbc *SubscriptionCache) Nonce(addr common.Address) uint64 {
-	nonce, err := sbc.offramp.SReceiverToNonce(nil, addr)
+	nonce, err := sbc.offramp.GetNonce(nil, addr)
 	if err != nil {
 		sbc.lggr.Errorw("Unable to get nonce for sub", "addr", addr)
 		return 0

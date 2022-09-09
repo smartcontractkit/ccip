@@ -2,7 +2,6 @@
 pragma solidity 0.8.15;
 
 import "../../../interfaces/TypeAndVersionInterface.sol";
-import "../../subscription/Subscription.sol";
 import "./Any2EVMSubscriptionOffRampRouter.sol";
 import "../../ocr/OCR2Base.sol";
 import "../BaseOffRamp.sol";
@@ -12,17 +11,17 @@ import "../BaseOffRamp.sol";
  * in an OffRamp in a single transaction.
  */
 contract EVM2EVMSubscriptionOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
+  using CCIP for CCIP.EVM2EVMSubscriptionMessage;
+
   string public constant override typeAndVersion = "EVM2EVMSubscriptionOffRamp 1.0.0";
 
-  mapping(address => uint64) public s_receiverToNonce;
+  mapping(address => uint64) internal s_receiverToNonce;
 
   constructor(
     uint256 sourceChainId,
     uint256 chainId,
     OffRampConfig memory offRampConfig,
     BlobVerifierInterface blobVerifier,
-    // OnrampAddress, needed for hashing in the future so already added to the interface
-    address onRampAddress,
     AFNInterface afn,
     IERC20[] memory sourceTokens,
     PoolInterface[] memory pools,
@@ -35,7 +34,6 @@ contract EVM2EVMSubscriptionOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR
       chainId,
       offRampConfig,
       blobVerifier,
-      onRampAddress,
       afn,
       sourceTokens,
       pools,
@@ -54,15 +52,21 @@ contract EVM2EVMSubscriptionOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR
     if (routerAddress == address(0)) revert RouterNotSet();
     uint256 numMsgs = report.encodedMessages.length;
     if (numMsgs == 0) revert NoMessagesToExecute();
-    bytes32[] memory hashedLeaves = new bytes32[](numMsgs);
-    CCIP.EVM2EVMSubscriptionMessage[] memory decodedMessages = new CCIP.EVM2EVMSubscriptionMessage[](numMsgs);
 
+    CCIP.EVM2EVMSubscriptionMessage[] memory decodedMessages = new CCIP.EVM2EVMSubscriptionMessage[](numMsgs);
+    bytes32[] memory hashedLeaves = new bytes32[](numMsgs);
+    // TODO optimise gas cost of hashing/caching hash
+    bytes32 metadataHash = _metadataHash(CCIP.EVM_2_EVM_SUBSCRIPTION_MESSAGE_HASH);
     for (uint256 i = 0; i < numMsgs; ++i) {
-      decodedMessages[i] = abi.decode(report.encodedMessages[i], (CCIP.EVM2EVMSubscriptionMessage));
-      // TODO: hasher
-      // https://app.shortcut.com/chainlinklabs/story/41625/hasher-encoder
-      // check abi.encodePacked usage for hash preimages, compare gas
-      hashedLeaves[i] = keccak256(bytes.concat(hex"00", report.encodedMessages[i]));
+      CCIP.EVM2EVMSubscriptionMessage memory decodedMessage = abi.decode(
+        report.encodedMessages[i],
+        (CCIP.EVM2EVMSubscriptionMessage)
+      );
+      // We do this hash here instead of in _verifyMessages to avoid two separate loops
+      // over the same data, which increases gas cost
+      // TODO: golf check
+      hashedLeaves[i] = decodedMessage._hash(metadataHash);
+      decodedMessages[i] = decodedMessage;
     }
 
     (uint256 timestampRelayed, uint256 gasUsedByMerkle) = _verifyMessages(
@@ -93,24 +97,27 @@ contract EVM2EVMSubscriptionOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR
         revert SubscriptionInterface.SubscriptionNotFound(message.receiver);
       }
 
-      // Any message with a nonce that is n + 1 is allowed.
-      // If strict sequencing is disabled then any failed message can be re-executed out-of-order.
-      bool isNextInSequence = s_receiverToNonce[message.receiver] + 1 == message.nonce;
-      if (!(isNextInSequence || (!subscription.strictSequencing && state == CCIP.MessageExecutionState.FAILURE))) {
-        revert IncorrectNonce(message.nonce);
-      }
+      // Reduce stack pressure
+      {
+        // Any message with a nonce that is n + 1 is allowed.
+        // If strict sequencing is disabled then any failed message can be re-executed out-of-order.
+        bool isNextInSequence = s_receiverToNonce[message.receiver] + 1 == message.nonce;
+        if (!(isNextInSequence || (!subscription.strictSequencing && state == CCIP.MessageExecutionState.FAILURE))) {
+          revert IncorrectNonce(message.nonce);
+        }
 
-      _isWellFormed(message);
+        _isWellFormed(message);
 
-      s_executedMessages[message.sequenceNumber] = CCIP.MessageExecutionState.IN_PROGRESS;
-      CCIP.MessageExecutionState newState = _trialExecute(_toAny2EVMMessageFromSender(message));
-      s_executedMessages[message.sequenceNumber] = newState;
-      emit ExecutionStateChanged(message.sequenceNumber, newState);
+        s_executedMessages[message.sequenceNumber] = CCIP.MessageExecutionState.IN_PROGRESS;
+        CCIP.MessageExecutionState newState = _trialExecute(_toAny2EVMMessageFromSender(message));
+        s_executedMessages[message.sequenceNumber] = newState;
+        emit ExecutionStateChanged(message.sequenceNumber, newState);
 
-      // Increment the nonce of the receiver if it's the next nonce in line and it was successfully
-      // executed or if the subscription doesn't require strict sequencing.
-      if (isNextInSequence && (newState == CCIP.MessageExecutionState.SUCCESS || !subscription.strictSequencing)) {
-        s_receiverToNonce[message.receiver]++;
+        // Increment the nonce of the receiver if it's the next nonce in line and it was successfully
+        // executed or if the subscription doesn't require strict sequencing.
+        if (isNextInSequence && (newState == CCIP.MessageExecutionState.SUCCESS || !subscription.strictSequencing)) {
+          s_receiverToNonce[message.receiver]++;
+        }
       }
 
       if (!manualExecution) {
@@ -152,6 +159,10 @@ contract EVM2EVMSubscriptionOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR
       amounts: original.amounts,
       gasLimit: original.gasLimit
     });
+  }
+
+  function getNonce(address receiver) external view returns (uint64) {
+    return s_receiverToNonce[receiver];
   }
 
   function _isWellFormed(CCIP.EVM2EVMSubscriptionMessage memory message) private view {

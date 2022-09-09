@@ -14,7 +14,7 @@ contract EVM2EVMSubscriptionOnRamp is Any2EVMSubscriptionOnRampInterface, BaseOn
   // The last used sequence number per receiver address. This is zero in the case
   // where no messages has been sent yet. 0 is not a valid sequence number for any
   // real transaction.
-  mapping(address => uint64) s_receiverToNonce;
+  mapping(address => uint64) internal s_receiverToNonce;
 
   constructor(
     uint256 chainId,

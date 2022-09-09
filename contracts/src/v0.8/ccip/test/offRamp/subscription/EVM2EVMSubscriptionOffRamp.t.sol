@@ -14,8 +14,9 @@ contract EVM2EVMSubscriptionOffRamp_constructor is EVM2EVMSubscriptionOffRampSet
     assertEq(OWNER, s_offRamp.owner());
 
     // OffRamp config
-    assertEq(SOURCE_CHAIN_ID, s_offRamp.i_sourceChainId());
-    assertEq(DEST_CHAIN_ID, s_offRamp.i_chainId());
+    (uint256 source, uint256 dest) = s_offRamp.getChainIDs();
+    assertEq(SOURCE_CHAIN_ID, source);
+    assertEq(DEST_CHAIN_ID, dest);
     assertEq(address(s_afn), address(s_offRamp.getAFN()));
     IERC20[] memory pools = s_offRamp.getPoolTokens();
     assertEq(pools.length, s_sourceTokens.length);
@@ -34,16 +35,16 @@ contract EVM2EVMSubscriptionOffRamp_setRouter is EVM2EVMSubscriptionOffRampSetup
   // Assert that setRouter will set the router to the given router argument.
   function testSuccess() public {
     Any2EVMOffRampRouterInterface newRouter = Any2EVMSubscriptionOffRampRouter(address(1));
-    assertTrue(address(newRouter) != address(s_offRamp.s_router()));
+    assertTrue(address(newRouter) != address(s_offRamp.getRouter()));
     s_offRamp.setRouter(newRouter);
-    assertEq(address(newRouter), address(s_offRamp.s_router()));
+    assertEq(address(newRouter), address(s_offRamp.getRouter()));
   }
 
   function testZeroRouterSuccess() public {
     Any2EVMOffRampRouterInterface newRouter = Any2EVMSubscriptionOffRampRouter(address(0));
-    assertTrue(address(newRouter) != address(s_offRamp.s_router()));
+    assertTrue(address(newRouter) != address(s_offRamp.getRouter()));
     s_offRamp.setRouter(newRouter);
-    assertEq(address(newRouter), address(s_offRamp.s_router()));
+    assertEq(address(newRouter), address(s_offRamp.getRouter()));
   }
 
   // Reverts

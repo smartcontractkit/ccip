@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../interfaces/offRamp/Any2EVMOffRampInterface.sol";
+import "../../interfaces/offRamp/BaseOffRampInterface.sol";
 import "../../interfaces/applications/Any2EVMMessageReceiverInterface.sol";
 import "../../interfaces/BlobVerifierInterface.sol";
 

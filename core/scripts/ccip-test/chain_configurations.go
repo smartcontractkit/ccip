@@ -2,7 +2,6 @@ package main
 
 import (
 	"math/big"
-	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -37,7 +36,6 @@ type EvmChainConfig struct {
 	Afn             gethcommon.Address
 }
 
-var defaultAFNTimeout = int64((14 * 24 * time.Hour).Seconds())
 var pollPeriod = "1m0s"
 
 // EVMGasSettings specifies the gas configuration for an EVM chain.
@@ -53,7 +51,6 @@ var DefaultGasTipFee = big.NewInt(1e9)
 type DeploySettings struct {
 	DeployAFN          bool
 	DeployTokenPools   bool
-	DeployPriceFeeds   bool
 	DeployRamp         bool
 	DeployRouter       bool
 	DeployBlobVerifier bool
@@ -75,9 +72,8 @@ var Rinkeby = EvmChainConfig{
 	TokenSender:  gethcommon.HexToAddress("0x1859E433Cb8B9a5Dcf2E3DffB460A299FC5Dd06D"),
 	Afn:          gethcommon.HexToAddress("0x3fb839502b242896f61f400615Ef0d4257c822cf"),
 	DeploySettings: DeploySettings{
-		DeployAFN:        false,
-		DeployTokenPools: false,
-		DeployPriceFeeds: false,
+		DeployAFN:        true,
+		DeployTokenPools: true,
 		DeployRamp:       true,
 		DeployRouter:     true,
 	},
@@ -101,8 +97,8 @@ var Goerli = EvmChainConfig{
 	ReceiverDapp:    gethcommon.HexToAddress("0x9FeE875aEcfED6Fe87d1297A4420854FC07D5626"),
 	Afn:             gethcommon.HexToAddress("0x1ea60e6afD1855eAEbDe4f2D10a65dD4EA2DC6fB"),
 	DeploySettings: DeploySettings{
-		DeployAFN:          false,
-		DeployTokenPools:   false,
+		DeployAFN:          true,
+		DeployTokenPools:   true,
 		DeployBlobVerifier: true,
 		DeployRamp:         true,
 		DeployRouter:       true,
@@ -155,7 +151,6 @@ var PolygonMumbai = EvmChainConfig{
 	DeploySettings: DeploySettings{
 		DeployAFN:        true,
 		DeployTokenPools: true,
-		DeployPriceFeeds: true,
 	},
 }
 

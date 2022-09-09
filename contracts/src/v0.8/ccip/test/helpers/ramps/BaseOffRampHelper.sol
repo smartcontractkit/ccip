@@ -1,6 +1,6 @@
 pragma solidity ^0.8.0;
 
-import "../../offRamp/BaseOffRamp.sol";
+import "../../../offRamp/BaseOffRamp.sol";
 
 contract BaseOffRampHelper is BaseOffRamp {
   constructor(
@@ -8,7 +8,6 @@ contract BaseOffRampHelper is BaseOffRamp {
     uint256 chainId,
     OffRampConfig memory offRampConfig,
     BlobVerifierInterface blobVerifier,
-    address onRampAddress,
     AFNInterface afn,
     IERC20[] memory sourceTokens,
     PoolInterface[] memory pools,
@@ -20,7 +19,6 @@ contract BaseOffRampHelper is BaseOffRamp {
       chainId,
       offRampConfig,
       blobVerifier,
-      onRampAddress,
       afn,
       sourceTokens,
       pools,

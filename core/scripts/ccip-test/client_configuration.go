@@ -36,6 +36,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/logger"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
 	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
 )
@@ -430,7 +431,7 @@ func (client CCIPClient) ScalingAndBatching(t *testing.T) {
 //func (client CCIPClient) ExecuteOffRampTransaction(t *testing.T, proof merklemulti.Proof[[32]byte], encodedMessage []byte) (*types.Transaction, error) {
 //	decodedMsg, err := ccip.DecodeCCIPMessage(encodedMessage)
 //	require.NoError(t, err)
-//	_, err = ccip.MakeCCIPMsgArgs().PackValues([]interface{}{*decodedMsg})
+//	_, err = ccip.MakeTollCCIPMsgArgs().PackValues([]interface{}{*decodedMsg})
 //	require.NoError(t, err)
 //
 //	client.Dest.logger.Infof("Cross chain message %+v", decodedMsg)
@@ -563,10 +564,10 @@ func (client CCIPClient) ValidateMerkleRoot(
 	reportRequests []*evm_2_evm_toll_onramp.EVM2EVMTollOnRampCCIPSendRequested,
 	report blob_verifier.CCIPRelayReport,
 ) merklemulti.Proof[[32]byte] {
-	mctx := merklemulti.NewKeccakCtx()
+	mctx := hasher.NewKeccakCtx()
 	var leafHashes [][32]byte
 	for _, req := range reportRequests {
-		leafHashes = append(leafHashes, mctx.HashLeaf(req.Raw.Data))
+		leafHashes = append(leafHashes, mctx.Hash(req.Raw.Data))
 	}
 
 	tree := merklemulti.NewTree(mctx, leafHashes)
@@ -644,7 +645,7 @@ func (client CCIPClient) SendToOnrampWithExecution(t *testing.T, source SourceCl
 }
 
 func (client CCIPClient) manuallyExecuteTx(event evm_2_evm_toll_onramp.CCIPEVM2EVMTollMessage) {
-	packedPayload, err := ccip.MakeCCIPMsgArgs().PackValues([]interface{}{event})
+	packedPayload, err := ccip.MakeTollCCIPMsgArgs().PackValues([]interface{}{event})
 	helpers.PanicErr(err)
 	report := any_2_evm_toll_offramp.CCIPExecutionReport{
 		SequenceNumbers:          []uint64{event.SequenceNumber},
@@ -886,7 +887,7 @@ func (client CCIPClient) SetOCRConfig() {
 	WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 	client.Dest.logger.Infof("Config set on blob verifier %s", helpers.ExplorerLink(client.Dest.ChainId.Int64(), tx.Hash()))
 
-	tx, err = client.Dest.OffRamp.SetConfig(
+	tx, err = client.Dest.OffRamp.SetConfig0(
 		client.Dest.Owner,
 		signerAddresses,
 		transmitterAddresses,

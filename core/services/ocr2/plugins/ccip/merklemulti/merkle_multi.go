@@ -1,59 +1,21 @@
 package merklemulti
 
 import (
-	"bytes"
 	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
 
-	"github.com/smartcontractkit/chainlink/core/utils"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
 )
 
-// Add additional hash types e.g. [20]byte as needed here.
-type Hash interface {
-	[32]byte
-}
-
-type Ctx[H Hash] interface {
-	HashLeaf(l []byte) H
-	HashInternal(a, b H) H
-	ZeroHash() H
-}
-
-type keccakCtx struct{}
-
-func NewKeccakCtx() Ctx[[32]byte] {
-	return keccakCtx{}
-}
-
-func (k keccakCtx) HashLeaf(l []byte) [32]byte {
-	// Note this Keccak256 cannot error https://github.com/golang/crypto/blob/master/sha3/sha3.go#L126
-	// if we start supporting hashing algos which do, we can change this API to include an error.
-	return utils.Keccak256Fixed(append([]byte{0x00}, l...))
-}
-
-func (k keccakCtx) HashInternal(a, b [32]byte) [32]byte {
-	if bytes.Compare(a[:], b[:]) < 0 {
-		return utils.Keccak256Fixed(append([]byte{0x01}, append(a[:], b[:]...)...))
-	}
-	return utils.Keccak256Fixed(append([]byte{0x01}, append(b[:], a[:]...)...))
-}
-
-// We use empty bytes32 for zeroHash
-// on the solidity side, this needs to match.
-func (k keccakCtx) ZeroHash() [32]byte {
-	var zeroes [32]byte
-	return zeroes
-}
-
-type singleLayerProof[H Hash] struct {
+type singleLayerProof[H hasher.Hash] struct {
 	nextIndices []int
 	subProof    []H
 	sourceFlags []bool
 }
 
-type Proof[H Hash] struct {
+type Proof[H hasher.Hash] struct {
 	Hashes      []H    `json:"hashes"`
 	SourceFlags []bool `json:"source_flags"`
 }
@@ -80,7 +42,7 @@ func siblingIndex(idx int) int {
 	return idx ^ 1
 }
 
-func proveSingleLayer[H Hash](layer []H, indices []int) singleLayerProof[H] {
+func proveSingleLayer[H hasher.Hash](layer []H, indices []int) singleLayerProof[H] {
 	var (
 		authIndices []int
 		nextIndices []int
@@ -110,12 +72,12 @@ func proveSingleLayer[H Hash](layer []H, indices []int) singleLayerProof[H] {
 	}
 }
 
-type Tree[H Hash] struct {
+type Tree[H hasher.Hash] struct {
 	layers [][]H
-	ctx    Ctx[H]
+	ctx    hasher.Ctx[H]
 }
 
-func NewTree[H Hash](ctx Ctx[H], leafHashes []H) *Tree[H] {
+func NewTree[H hasher.Hash](ctx hasher.Ctx[H], leafHashes []H) *Tree[H] {
 	var layer = make([]H, len(leafHashes))
 	copy(layer, leafHashes)
 
@@ -134,6 +96,7 @@ func NewTree[H Hash](ctx Ctx[H], leafHashes []H) *Tree[H] {
 }
 
 // Revive appears confused with the generics "receiver name t should be consistent with previous receiver name p for invalid-type"
+//
 //revive:disable:receiver-naming
 func (t *Tree[H]) String() string {
 	b := strings.Builder{}
@@ -158,7 +121,7 @@ func (t *Tree[H]) Prove(indices []int) Proof[H] {
 	return proof
 }
 
-func computeNextLayer[H Hash](ctx Ctx[H], layer []H) ([]H, []H) {
+func computeNextLayer[H hasher.Hash](ctx hasher.Ctx[H], layer []H) ([]H, []H) {
 	if len(layer) == 1 {
 		return layer, layer
 	}
@@ -172,7 +135,7 @@ func computeNextLayer[H Hash](ctx Ctx[H], layer []H) ([]H, []H) {
 	return layer, nextLayer
 }
 
-func VerifyComputeRoot[H Hash](ctx Ctx[H], leafHashes []H, proof Proof[H]) (H, error) {
+func VerifyComputeRoot[H hasher.Hash](ctx hasher.Ctx[H], leafHashes []H, proof Proof[H]) (H, error) {
 	totalHashes := len(leafHashes) + len(proof.Hashes) - 1
 	if totalHashes != len(proof.SourceFlags) {
 		return ctx.ZeroHash(), errors.Errorf("hashes %d != sourceFlags %d", totalHashes, len(proof.SourceFlags))
@@ -192,6 +155,7 @@ func VerifyComputeRoot[H Hash](ctx Ctx[H], leafHashes []H, proof Proof[H]) (H, e
 	)
 	for i := 0; i < totalHashes; i++ {
 		var a, b H
+		//nolint:gosimple
 		if proof.SourceFlags[i] == SourceFromHashes {
 			if leafPos < len(leafHashes) {
 				a = leafHashes[leafPos]
@@ -200,6 +164,7 @@ func VerifyComputeRoot[H Hash](ctx Ctx[H], leafHashes []H, proof Proof[H]) (H, e
 				a = hashes[hashPos]
 				hashPos++
 			}
+			//nolint:gosimple
 		} else if proof.SourceFlags[i] == SourceFromProof {
 			a = proof.Hashes[proofPos]
 			proofPos++

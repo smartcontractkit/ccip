@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/blob_verifier"
 	"github.com/smartcontractkit/chainlink/core/logger"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
 )
 
@@ -100,6 +101,7 @@ type RelayReportingPluginFactory struct {
 	onRampToReqEventSig map[common.Address]common.Hash
 	onRamps             []common.Address
 	blobVerifier        *blob_verifier.BlobVerifier
+	onRampToHasher      map[common.Address]LeafHasher[[32]byte]
 }
 
 // NewRelayReportingPluginFactory return a new RelayReportingPluginFactory.
@@ -110,8 +112,9 @@ func NewRelayReportingPluginFactory(
 	onRampSeqParsers map[common.Address]func(log logpoller.Log) (uint64, error),
 	onRampToReqEventSig map[common.Address]common.Hash,
 	onRamps []common.Address,
+	onRampToHasher map[common.Address]LeafHasher[[32]byte],
 ) types.ReportingPluginFactory {
-	return &RelayReportingPluginFactory{lggr: lggr, blobVerifier: blobVerifier, onRampToReqEventSig: onRampToReqEventSig, onRampSeqParsers: onRampSeqParsers, onRamps: onRamps, source: source}
+	return &RelayReportingPluginFactory{lggr: lggr, blobVerifier: blobVerifier, onRampToReqEventSig: onRampToReqEventSig, onRampSeqParsers: onRampSeqParsers, onRamps: onRamps, source: source, onRampToHasher: onRampToHasher}
 }
 
 // NewReportingPlugin returns the ccip RelayReportingPlugin and satisfies the ReportingPluginFactory interface.
@@ -130,6 +133,7 @@ func (rf *RelayReportingPluginFactory) NewReportingPlugin(config types.Reporting
 			blobVerifier:        rf.blobVerifier,
 			inFlight:            make(map[[32]byte]InflightReport),
 			offchainConfig:      offchainConfig,
+			onRampToHasher:      rf.onRampToHasher,
 		},
 		types.ReportingPluginInfo{
 			Name:          "CCIPRelay",
@@ -156,6 +160,7 @@ type RelayReportingPlugin struct {
 	inFlightMu     sync.RWMutex
 	inFlight       map[[32]byte]InflightReport
 	offchainConfig OffchainConfig
+	onRampToHasher map[common.Address]LeafHasher[[32]byte]
 }
 
 func (r *RelayReportingPlugin) nextMinSeqNumForOffRamp(onRamp common.Address) (uint64, error) {
@@ -248,7 +253,7 @@ func (r *RelayReportingPlugin) Observation(ctx context.Context, timestamp types.
 
 // buildReport assumes there is at least one message in reqs.
 func (r *RelayReportingPlugin) buildReport(intervalByOnRamp map[common.Address]blob_verifier.CCIPInterval) (*blob_verifier.CCIPRelayReport, error) {
-	leafsByOnRamp, err := leafsFromIntervals(r.lggr, r.onRampToReqEventSig, r.onRampSeqParsers, intervalByOnRamp, r.source)
+	leafsByOnRamp, err := leafsFromIntervals(r.lggr, r.onRampToReqEventSig, r.onRampSeqParsers, intervalByOnRamp, r.source, r.onRampToHasher)
 	if err != nil {
 		return nil, err
 	}
@@ -258,7 +263,7 @@ func (r *RelayReportingPlugin) buildReport(intervalByOnRamp map[common.Address]b
 		roots     [][32]byte
 		intervals []blob_verifier.CCIPInterval
 	)
-	mctx := merklemulti.NewKeccakCtx()
+	mctx := hasher.NewKeccakCtx()
 	for onRamp, leaves := range leafsByOnRamp {
 		tree := merklemulti.NewTree(mctx, leaves)
 		roots = append(roots, tree.Root())

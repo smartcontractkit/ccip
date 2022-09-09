@@ -2,8 +2,9 @@
 pragma solidity 0.8.15;
 
 import "../mocks/MockBlobVerifier.sol";
-import "../helpers/BaseOffRampHelper.sol";
+import "../helpers/ramps/BaseOffRampHelper.sol";
 import "../TokenSetup.t.sol";
+import "../../interfaces/rateLimiter/AggregateRateLimiterInterface.sol";
 
 contract BaseOffRampSetup is TokenSetup {
   event OffRampConfigSet(BaseOffRampInterface.OffRampConfig config);
@@ -21,7 +22,6 @@ contract BaseOffRampSetup is TokenSetup {
       DEST_CHAIN_ID,
       offRampConfig(),
       s_mockBlobVerifier,
-      ON_RAMP_ADDRESS,
       s_afn,
       s_sourceTokens,
       s_destPools,
@@ -54,8 +54,9 @@ contract BaseOffRamp_constructor is BaseOffRampSetup {
 
     assertEq(address(s_mockBlobVerifier), address(s_offRamp.getBlobVerifier()));
 
-    assertEq(SOURCE_CHAIN_ID, s_offRamp.i_sourceChainId());
-    assertEq(DEST_CHAIN_ID, s_offRamp.i_chainId());
+    (uint256 source, uint256 dest) = s_offRamp.getChainIDs();
+    assertEq(SOURCE_CHAIN_ID, source);
+    assertEq(DEST_CHAIN_ID, dest);
 
     assertSameConfig(offRampConfig(), s_offRamp.getConfig());
   }
@@ -72,12 +73,37 @@ contract BaseOffRamp_constructor is BaseOffRampSetup {
       DEST_CHAIN_ID,
       offRampConfig(),
       s_mockBlobVerifier,
-      ON_RAMP_ADDRESS,
       s_afn,
       wrongTokens,
       pools,
       rateLimiterConfig(),
       TOKEN_LIMIT_ADMIN
+    );
+  }
+
+  function testZeroOnRampAddressReverts() public {
+    PoolInterface[] memory pools = new PoolInterface[](2);
+    pools[0] = s_sourcePools[0];
+    pools[1] = new NativeTokenPool(s_sourceTokens[1]);
+
+    vm.expectRevert(BaseOffRampInterface.ZeroAddressNotAllowed.selector);
+
+    BaseOffRampInterface.OffRampConfig memory offRampConfig = offRampConfig();
+    offRampConfig.onRampAddress = ZERO_ADDRESS;
+
+    AggregateRateLimiterInterface.RateLimiterConfig memory rateLimiterConfig = AggregateRateLimiterInterface
+      .RateLimiterConfig({rate: 1e20, capacity: 1e20});
+
+    s_offRamp = new BaseOffRampHelper(
+      SOURCE_CHAIN_ID,
+      DEST_CHAIN_ID,
+      offRampConfig,
+      s_mockBlobVerifier,
+      s_afn,
+      s_sourceTokens,
+      pools,
+      rateLimiterConfig,
+      OWNER
     );
   }
 }
@@ -153,6 +179,7 @@ contract BaseOffRamp_setConfig is BaseOffRampSetup {
   function generateNewConfig() internal pure returns (BaseOffRampInterface.OffRampConfig memory) {
     return
       BaseOffRampInterface.OffRampConfig({
+        onRampAddress: address(123),
         executionDelaySeconds: 20,
         maxDataSize: 1,
         maxTokensLength: 15,

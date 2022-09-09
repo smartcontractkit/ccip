@@ -3,7 +3,7 @@ pragma solidity 0.8.15;
 
 import "../../mocks/MockBlobVerifier.sol";
 import "../../helpers/receivers/SimpleMessageReceiver.sol";
-import "../../helpers/EVM2EVMSubscriptionOffRampHelper.sol";
+import "../../helpers/ramps/EVM2EVMSubscriptionOffRampHelper.sol";
 import "../../helpers/MerkleHelper.sol";
 import "../../TokenSetup.t.sol";
 
@@ -43,7 +43,6 @@ contract EVM2EVMSubscriptionOffRampSetup is TokenSetup {
       DEST_CHAIN_ID,
       offRampConfig(),
       blobVerifier,
-      ON_RAMP_ADDRESS,
       s_afn,
       s_sourceTokens,
       s_destPools,

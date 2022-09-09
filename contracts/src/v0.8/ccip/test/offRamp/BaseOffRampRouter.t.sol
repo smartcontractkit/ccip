@@ -2,7 +2,7 @@
 pragma solidity 0.8.15;
 
 import "../mocks/MockOffRamp.sol";
-import "../helpers/BaseOffRampRouterHelper.sol";
+import "../helpers/ramps/BaseOffRampRouterHelper.sol";
 import "../TokenSetup.t.sol";
 
 contract BaseOffRampRouterSetup is TokenSetup {

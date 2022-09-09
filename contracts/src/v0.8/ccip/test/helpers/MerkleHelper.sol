@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-contract MerkleHelper {
-  // Internal domain separator used in proofs
-  bytes1 private constant INTERNAL_DOMAIN_SEPARATOR = 0x01;
+import "../../models/Models.sol";
 
+contract MerkleHelper {
   /**
    * @notice Generate a Merkle Root from a full set of leaves. When a tree is unbalanced
    * the value is brought up in the tree. For example consider (a,b,c) as leaves. This would
@@ -52,6 +51,6 @@ contract MerkleHelper {
   }
 
   function _hashInternalNode(bytes32 left, bytes32 right) private pure returns (bytes32 hash) {
-    return keccak256(abi.encodePacked(INTERNAL_DOMAIN_SEPARATOR, left, right));
+    return keccak256(abi.encode(CCIP.INTERNAL_DOMAIN_SEPARATOR, left, right));
   }
 }

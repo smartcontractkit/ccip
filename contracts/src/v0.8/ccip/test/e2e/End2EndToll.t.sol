@@ -7,6 +7,8 @@ import "../onRamp/toll/EVM2EVMTollOnRampSetup.t.sol";
 import "../blobVerifier/BlobVerifier.t.sol";
 
 contract E2E_toll is EVM2EVMTollOnRampSetup, BlobVerifierSetup, EVM2EVMTollOffRampSetup {
+  using CCIP for CCIP.EVM2EVMTollMessage;
+
   Any2EVMOffRampRouterInterface public s_router;
 
   MerkleHelper public s_merkleHelper;
@@ -15,6 +17,8 @@ contract E2E_toll is EVM2EVMTollOnRampSetup, BlobVerifierSetup, EVM2EVMTollOffRa
     EVM2EVMTollOnRampSetup.setUp();
     BlobVerifierSetup.setUp();
     EVM2EVMTollOffRampSetup.setUp();
+
+    deployOffRamp(s_blobVerifier);
 
     s_merkleHelper = new MerkleHelper();
 
@@ -40,10 +44,12 @@ contract E2E_toll is EVM2EVMTollOnRampSetup, BlobVerifierSetup, EVM2EVMTollOffRa
     );
     assertEq(balance1Pre - messages.length * i_tokenAmount1, s_sourceTokens[1].balanceOf(OWNER));
 
+    bytes32 metaDataHash = s_offRamp.metadataHash();
+
     bytes32[] memory hashedMessages = new bytes32[](3);
-    hashedMessages[0] = keccak256(bytes.concat(hex"00", abi.encode(messages[0])));
-    hashedMessages[1] = keccak256(bytes.concat(hex"00", abi.encode(messages[1])));
-    hashedMessages[2] = keccak256(bytes.concat(hex"00", abi.encode(messages[2])));
+    hashedMessages[0] = messages[0]._hash(metaDataHash);
+    hashedMessages[1] = messages[1]._hash(metaDataHash);
+    hashedMessages[2] = messages[2]._hash(metaDataHash);
 
     CCIP.Interval[] memory intervals = new CCIP.Interval[](1);
     intervals[0] = CCIP.Interval(messages[0].sequenceNumber, messages[2].sequenceNumber);

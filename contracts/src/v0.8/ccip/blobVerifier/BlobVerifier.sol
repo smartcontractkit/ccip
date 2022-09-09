@@ -13,10 +13,6 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
   uint256 public immutable i_chainId;
   // Chain ID of the source chain
   uint256 public immutable i_sourceChainId;
-  // Offchain leaf domain separator
-  bytes1 private constant LEAF_DOMAIN_SEPARATOR = 0x00;
-  // Internal domain separator used in proofs
-  bytes1 private constant INTERNAL_DOMAIN_SEPARATOR = 0x01;
 
   // merkleRoot => timestamp when received
   mapping(bytes32 => uint256) private s_roots;
@@ -193,7 +189,7 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
    *          INTERNAL_DOMAIN_SEPARATOR.
    */
   function _hashInternalNode(bytes32 left, bytes32 right) private pure returns (bytes32 hash) {
-    return keccak256(abi.encodePacked(INTERNAL_DOMAIN_SEPARATOR, left, right));
+    return keccak256(abi.encode(CCIP.INTERNAL_DOMAIN_SEPARATOR, left, right));
   }
 
   function _beforeSetConfig(uint8 _threshold, bytes memory _onchainConfig) internal override {}

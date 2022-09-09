@@ -2,7 +2,7 @@
 pragma solidity 0.8.15;
 
 import "../../../interfaces/TypeAndVersionInterface.sol";
-import "../../interfaces/offRamp/Any2EVMOffRampInterface.sol";
+import "../../interfaces/offRamp/BaseOffRampInterface.sol";
 import "../../interfaces/BlobVerifierInterface.sol";
 import "../../ocr/OCR2Base.sol";
 import "../BaseOffRamp.sol";
@@ -12,6 +12,8 @@ import "../BaseOffRamp.sol";
  * in an OffRamp in a single transaction.
  */
 contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
+  using CCIP for CCIP.EVM2EVMTollMessage;
+
   string public constant override typeAndVersion = "EVM2EVMTollOffRamp 1.0.0";
 
   constructor(
@@ -19,8 +21,6 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
     uint256 chainId,
     OffRampConfig memory offRampConfig,
     BlobVerifierInterface blobVerifier,
-    // OnrampAddress, needed for hashing in the future so already added to the interface
-    address onRampAddress,
     AFNInterface afn,
     IERC20[] memory sourceTokens,
     PoolInterface[] memory pools,
@@ -33,7 +33,6 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
       chainId,
       offRampConfig,
       blobVerifier,
-      onRampAddress,
       afn,
       sourceTokens,
       pools,
@@ -56,15 +55,16 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
     if (address(s_router) == address(0)) revert RouterNotSet();
     uint256 numMsgs = report.encodedMessages.length;
     if (numMsgs == 0) revert NoMessagesToExecute();
-    bytes32[] memory hashedLeaves = new bytes32[](numMsgs);
-    CCIP.EVM2EVMTollMessage[] memory decodedMessages = new CCIP.EVM2EVMTollMessage[](numMsgs);
 
+    CCIP.EVM2EVMTollMessage[] memory decodedMessages = new CCIP.EVM2EVMTollMessage[](numMsgs);
+    bytes32[] memory hashedLeaves = new bytes32[](numMsgs);
+    bytes32 metadataHash = _metadataHash(CCIP.EVM_2_EVM_TOLL_MESSAGE_HASH);
     for (uint256 i = 0; i < numMsgs; ++i) {
-      decodedMessages[i] = abi.decode(report.encodedMessages[i], (CCIP.EVM2EVMTollMessage));
-      // TODO: hasher
-      // https://app.shortcut.com/chainlinklabs/story/41625/hasher-encoder
-      // check abi.encodePacked usage for hash preimages, compare gas
-      hashedLeaves[i] = keccak256(bytes.concat(hex"00", report.encodedMessages[i]));
+      CCIP.EVM2EVMTollMessage memory decodedMessage = abi.decode(report.encodedMessages[i], (CCIP.EVM2EVMTollMessage));
+      // We do this hash here instead of in _verifyMessages to avoid two separate loops
+      // over the same data, which increases gas cost
+      hashedLeaves[i] = decodedMessage._hash(metadataHash);
+      decodedMessages[i] = decodedMessage;
     }
 
     (uint256 timestampRelayed, uint256 gasUsedByMerkle) = _verifyMessages(

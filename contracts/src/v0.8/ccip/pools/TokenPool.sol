@@ -6,7 +6,7 @@ import "../../vendor/Pausable.sol";
 import "../access/OwnerIsCreator.sol";
 import "../onRamp/BaseOnRamp.sol";
 import "../interfaces/onRamp/BaseOnRampInterface.sol";
-import "../interfaces/offRamp/Any2EVMOffRampInterface.sol";
+import "../interfaces/offRamp/BaseOffRampInterface.sol";
 
 /**
  * @notice Base abstract class with common functions for all token pools

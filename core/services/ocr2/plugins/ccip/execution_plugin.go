@@ -22,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/job"
 	ccipconfig "github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/core/services/pipeline"
 )
 
@@ -37,12 +38,13 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 		return nil, err
 	}
 	lggr.Infof("CCIP execution plugin initialized with offchainConfig: %+v", pluginConfig)
+	sourceChainId, destChainId := big.NewInt(0).SetUint64(pluginConfig.SourceChainID), big.NewInt(0).SetUint64(pluginConfig.DestChainID)
 
-	sourceChain, err := chainSet.Get(big.NewInt(0).SetUint64(pluginConfig.SourceChainID))
+	sourceChain, err := chainSet.Get(sourceChainId)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to open source chain")
 	}
-	destChain, err := chainSet.Get(big.NewInt(0).SetUint64(pluginConfig.DestChainID))
+	destChain, err := chainSet.Get(destChainId)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to open destination chain")
 	}
@@ -61,6 +63,9 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	}
 	var onRampSeqParser func(log logpoller.Log) (uint64, error)
 	var reqEventSig common.Hash
+	var onRampToHasher = make(map[common.Address]LeafHasher[[32]byte])
+	hashingCtx := hasher.NewKeccakCtx()
+
 	switch onRampType {
 	case EVM2EVMTollOnRamp:
 		onRamp, err2 := evm_2_evm_toll_onramp.NewEVM2EVMTollOnRamp(onRampAddr, sourceChain.Client())
@@ -77,6 +82,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 		// Subscribe to all relevant relay logs.
 		sourceChain.LogPoller().MergeFilter([]common.Hash{CCIPTollSendRequested}, []common.Address{onRampAddr})
 		reqEventSig = CCIPTollSendRequested
+		onRampToHasher[onRampAddr] = NewTollLeafHasher(sourceChainId, destChainId, onRampAddr, hashingCtx)
 	case EVM2EVMSubscriptionOnRamp:
 		onRamp, err2 := evm_2_evm_subscription_onramp.NewEVM2EVMSubscriptionOnRamp(onRampAddr, sourceChain.Client())
 		if err2 != nil {
@@ -92,6 +98,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 		// Subscribe to all relevant relay logs.
 		sourceChain.LogPoller().MergeFilter([]common.Hash{CCIPSubSendRequested}, []common.Address{onRampAddr})
 		reqEventSig = CCIPSubSendRequested
+		onRampToHasher[onRampAddr] = NewSubscriptionLeafHasher(sourceChainId, destChainId, onRampAddr, hashingCtx)
 	default:
 		return nil, errors.Errorf("unrecognized onramp, is %v the correct onramp address?", onRampAddr)
 	}
@@ -135,7 +142,8 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 		batchBuilder,
 		onRampSeqParser,
 		reqEventSig,
-		priceGetter)
+		priceGetter,
+		onRampToHasher)
 	oracle, err := libocr2.NewOracle(argsNoPlugin)
 	if err != nil {
 		return nil, err
@@ -200,7 +208,7 @@ func NewSubOffRamp(addr common.Address, destChain evm.Chain) (OffRamp, common.Ad
 	if err != nil {
 		return nil, common.Address{}, err
 	}
-	routerAddr, err := offRamp.SRouter(nil)
+	routerAddr, err := offRamp.GetRouter(nil)
 	if err != nil {
 		return nil, common.Address{}, err
 	}

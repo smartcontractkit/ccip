@@ -3,7 +3,7 @@ pragma solidity 0.8.15;
 
 import "../../mocks/MockBlobVerifier.sol";
 import "../../mocks/MockTollOffRampRouter.sol";
-import "../../helpers/EVM2EVMTollOffRampHelper.sol";
+import "../../helpers/ramps/EVM2EVMTollOffRampHelper.sol";
 import "../../helpers/receivers/SimpleMessageReceiver.sol";
 import "../../TokenSetup.t.sol";
 
@@ -25,12 +25,15 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
     s_receiver = new SimpleMessageReceiver();
     s_secondary_receiver = new SimpleMessageReceiver();
 
+    deployOffRamp(s_mockBlobVerifier);
+  }
+
+  function deployOffRamp(BlobVerifierInterface blobVerifier) internal {
     s_offRamp = new EVM2EVMTollOffRampHelper(
       SOURCE_CHAIN_ID,
       DEST_CHAIN_ID,
       offRampConfig(),
-      s_mockBlobVerifier,
-      ON_RAMP_ADDRESS,
+      blobVerifier,
       s_afn,
       s_sourceTokens,
       s_destPools,

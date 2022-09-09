@@ -4,8 +4,8 @@ pragma solidity 0.8.15;
 import "../../vendor/Address.sol";
 import "../health/HealthChecker.sol";
 import "../pools/TokenPoolRegistry.sol";
-import "../interfaces/offRamp/Any2EVMOffRampInterface.sol";
 import "../rateLimiter/AggregateRateLimiter.sol";
+import "../interfaces/offRamp/BaseOffRampInterface.sol";
 
 /**
  * @notice A base OffRamp contract that every OffRamp should expand on
@@ -14,12 +14,12 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry, 
   using Address for address;
 
   // Chain ID of the source chain
-  uint256 public immutable i_sourceChainId;
+  uint256 internal immutable i_sourceChainId;
   // Chain ID of this chain
-  uint256 public immutable i_chainId;
+  uint256 internal immutable i_chainId;
 
   // The router through which all transactions will be executed
-  Any2EVMOffRampRouterInterface public s_router;
+  Any2EVMOffRampRouterInterface internal s_router;
 
   // The blob verifier contract
   BlobVerifierInterface internal s_blobVerifier;
@@ -36,8 +36,6 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry, 
     uint256 chainId,
     OffRampConfig memory offRampConfig,
     BlobVerifierInterface blobVerifier,
-    // OnrampAddress, needed for hashing in the future so already added to the interface
-    address,
     AFNInterface afn,
     IERC20[] memory sourceTokens,
     PoolInterface[] memory pools,
@@ -48,6 +46,7 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry, 
     TokenPoolRegistry(sourceTokens, pools)
     AggregateRateLimiter(rateLimiterConfig, tokenLimitsAdmin)
   {
+    if (offRampConfig.onRampAddress == address(0)) revert ZeroAddressNotAllowed();
     // TokenPoolRegistry does a check on tokens.length != pools.length
     i_sourceChainId = sourceChainId;
     i_chainId = chainId;
@@ -171,25 +170,31 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry, 
   }
 
   /// @inheritdoc BaseOffRampInterface
-  function getBlobVerifier() public view returns (BlobVerifierInterface) {
+  function getBlobVerifier() external view returns (BlobVerifierInterface) {
     return s_blobVerifier;
   }
 
   /// @inheritdoc BaseOffRampInterface
-  function setBlobVerifier(BlobVerifierInterface blobVerifier) public onlyOwner {
+  function setBlobVerifier(BlobVerifierInterface blobVerifier) external onlyOwner {
     s_blobVerifier = blobVerifier;
   }
 
   /// @inheritdoc BaseOffRampInterface
-  function getConfig() public view returns (OffRampConfig memory) {
+  function getConfig() external view returns (OffRampConfig memory) {
     return s_config;
   }
 
   /// @inheritdoc BaseOffRampInterface
-  function setConfig(OffRampConfig memory config) public onlyOwner {
+  function setConfig(OffRampConfig memory config) external onlyOwner {
+    if (config.onRampAddress == address(0)) revert ZeroAddressNotAllowed();
     s_config = config;
 
     emit OffRampConfigSet(config);
+  }
+
+  function getChainIDs() external view returns (uint256 sourceChainId, uint256 chainId) {
+    sourceChainId = i_sourceChainId;
+    chainId = i_chainId;
   }
 
   /**
@@ -198,5 +203,9 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry, 
   function _getPool(IERC20 token) internal view returns (PoolInterface pool) {
     pool = getPool(token);
     if (address(pool) == address(0)) revert UnsupportedToken(token);
+  }
+
+  function _metadataHash(bytes32 prefix) internal view returns (bytes32) {
+    return keccak256(abi.encode(prefix, i_sourceChainId, i_chainId, s_config.onRampAddress));
   }
 }

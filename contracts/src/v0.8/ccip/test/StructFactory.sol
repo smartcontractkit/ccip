@@ -2,7 +2,7 @@
 pragma solidity 0.8.15;
 
 import "../interfaces/BlobVerifierInterface.sol";
-import "../interfaces/offRamp/Any2EVMOffRampInterface.sol";
+import "../interfaces/offRamp/BaseOffRampInterface.sol";
 import "../interfaces/onRamp/BaseOnRampInterface.sol";
 import "../interfaces/subscription/SubscriptionInterface.sol";
 import "../interfaces/rateLimiter/AggregateRateLimiterInterface.sol";
@@ -70,6 +70,7 @@ contract StructFactory {
   function offRampConfig() internal pure returns (BaseOffRampInterface.OffRampConfig memory) {
     return
       BaseOffRampInterface.OffRampConfig({
+        onRampAddress: ON_RAMP_ADDRESS,
         executionDelaySeconds: EXECUTION_DELAY_SECONDS,
         maxDataSize: MAX_DATA_SIZE,
         maxTokensLength: MAX_TOKENS_LENGTH,

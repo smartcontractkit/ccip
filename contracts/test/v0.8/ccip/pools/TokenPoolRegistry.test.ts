@@ -69,9 +69,7 @@ describe('TokenPoolRegistry', () => {
       'addPool',
       'removePool',
       'getPool',
-      'isPool',
       'getPoolTokens',
-      'getDestinationToken',
       'getDestinationTokens',
       // Ownership
       'owner',
@@ -90,11 +88,6 @@ describe('TokenPoolRegistry', () => {
     })
     it('sets the source tokens list', async () => {
       expect(await registry.getPoolTokens()).to.deep.equal(tokensAddresses)
-    })
-    it('sets that each token pool is configured', async () => {
-      for (let i = 0; i < numberOfPools; i++) {
-        expect(await registry.isPool(poolsAddresses[i])).to.be.true
-      }
     })
     it('sets the owner', async () => {
       expect(await registry.owner()).to.equal(
@@ -181,10 +174,6 @@ describe('TokenPoolRegistry', () => {
           .to.emit(registry, 'PoolRemoved')
           .withArgs(theToken, thePool)
       })
-      it('sets the isPool flag to false', async () => {
-        const response = await registry.isPool(thePool)
-        expect(response).to.be.false
-      })
     })
   })
 
@@ -259,10 +248,6 @@ describe('TokenPoolRegistry', () => {
         await expect(tx)
           .to.emit(registry, 'PoolAdded')
           .withArgs(newToken.address, newPool.address)
-      })
-      it('sets the configured flag to true', async () => {
-        const response = await registry.isPool(newPool.address)
-        expect(response).to.be.true
       })
     })
   })

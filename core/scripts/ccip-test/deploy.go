@@ -185,19 +185,18 @@ func deployOffRamp(t *testing.T, destClient *EvmChainConfig, sourceClient *EvmCh
 
 	destClient.Logger.Infof("Deploying OffRamp")
 	tollOffRampAddress, tx, _, err := any_2_evm_toll_offramp.DeployEVM2EVMTollOffRamp(
-
 		destClient.Owner,
 		destClient.Client,
 		sourceClient.ChainId,
 		destClient.ChainId,
 		any_2_evm_toll_offramp.BaseOffRampInterfaceOffRampConfig{
+			OnRampAddress:                           sourceClient.OnRamp,
 			ExecutionDelaySeconds:                   60,
 			MaxDataSize:                             1e5,
 			MaxTokensLength:                         15,
 			PermissionLessExecutionThresholdSeconds: 60,
 		},
 		destClient.BlobVerifier,
-		destClient.OnRamp,
 		destClient.Afn,
 		sourceClient.BridgeTokens,
 		destClient.TokenPools,
@@ -381,7 +380,6 @@ Source chain config
 LinkToken:    common.HexToAddress("%s"),
 BridgeTokens: %s,
 TokenPools:   %s,
-PriceFeeds:   %s,
 OnRamp:       common.HexToAddress("%s"),
 OnRampRouter: common.HexToAddress("%s"),
 TokenSender:  common.HexToAddress("%s"),

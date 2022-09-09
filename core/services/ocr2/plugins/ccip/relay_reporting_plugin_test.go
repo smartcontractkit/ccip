@@ -22,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/blob_verifier_helper"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/native_token_pool"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
 )
 
@@ -91,8 +92,8 @@ func TestRelayReportEncoding(t *testing.T) {
 	destChain.Commit()
 
 	// Send a report.
-	mctx := merklemulti.NewKeccakCtx()
-	tree := merklemulti.NewTree(mctx, [][32]byte{mctx.HashLeaf([]byte{0xaa})})
+	mctx := hasher.NewKeccakCtx()
+	tree := merklemulti.NewTree(mctx, [][32]byte{mctx.Hash([]byte{0xaa})})
 	root := tree.Root()
 	report := blob_verifier.CCIPRelayReport{
 		OnRamps:     []common.Address{onRampAddress},

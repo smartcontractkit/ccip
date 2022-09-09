@@ -6,6 +6,7 @@ import "../BlobVerifierInterface.sol";
 import "../../../vendor/IERC20.sol";
 
 interface BaseOffRampInterface {
+  error ZeroAddressNotAllowed();
   error AlreadyExecuted(uint64 sequenceNumber);
   error ExecutionError();
   error InvalidSourceChain(uint256 sourceChainId);
@@ -28,14 +29,16 @@ interface BaseOffRampInterface {
   event OffRampConfigSet(OffRampConfig config);
 
   struct OffRampConfig {
+    // On ramp address on the source chain
+    address onRampAddress;
+    // The waiting time before manual execution is enabled
+    uint32 permissionLessExecutionThresholdSeconds;
     // execution delay in seconds
     uint64 executionDelaySeconds;
     // maximum payload data size
     uint64 maxDataSize;
     // Maximum number of distinct ERC20 tokens that can be sent in a message
     uint64 maxTokensLength;
-    // The waiting time before manual execution is enabled
-    uint32 permissionLessExecutionThresholdSeconds;
   }
 
   /**

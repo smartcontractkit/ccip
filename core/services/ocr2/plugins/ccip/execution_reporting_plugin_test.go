@@ -27,6 +27,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/native_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/simple_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
 )
 
@@ -106,12 +107,12 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 		sourceChainID,
 		destChainID,
 		any_2_evm_toll_offramp.BaseOffRampInterfaceOffRampConfig{
+			OnRampAddress:         onRampAddress,
 			ExecutionDelaySeconds: 0,
 			MaxDataSize:           1e12,
 			MaxTokensLength:       5,
 		},
 		blobVerifier.Address(),
-		onRampAddress,
 		afnAddress,
 		[]common.Address{linkTokenSourceAddress},
 		[]common.Address{destPoolAddress},
@@ -159,7 +160,7 @@ type messageBatch struct {
 }
 
 func (e ExecutionContracts) generateMessageBatch(t *testing.T, payloadSize int, nMessages int, nTokensPerMessage int) messageBatch {
-	mctx := merklemulti.NewKeccakCtx()
+	mctx := hasher.NewKeccakCtx()
 	maxData := func() []byte {
 		var b []byte
 		for i := 0; i < payloadSize; i++ {
@@ -210,10 +211,10 @@ func (e ExecutionContracts) generateMessageBatch(t *testing.T, payloadSize int, 
 		})
 		msgs = append(msgs, message)
 		indices = append(indices, i)
-		msgBytes, err := ccip.MakeCCIPMsgArgs().PackValues([]interface{}{message})
+		msgBytes, err := ccip.MakeTollCCIPMsgArgs().PackValues([]interface{}{message})
 		require.NoError(t, err)
 		allMsgBytes = append(allMsgBytes, msgBytes)
-		leafHashes = append(leafHashes, mctx.HashLeaf(msgBytes))
+		leafHashes = append(leafHashes, mctx.Hash(msgBytes))
 	}
 	tree := merklemulti.NewTree(mctx, leafHashes)
 	proof := tree.Prove(indices)
@@ -227,7 +228,7 @@ func TestMaxExecutionReportSize(t *testing.T) {
 	// Our report size is under the tx size limit.
 	c := setupContractsForExecution(t)
 	mb := c.generateMessageBatch(t, ccip.MaxPayloadLength, 50, ccip.MaxTokensPerMessage)
-	ctx := merklemulti.NewKeccakCtx()
+	ctx := hasher.NewKeccakCtx()
 	outerTree := merklemulti.NewTree(ctx, [][32]byte{mb.root})
 	outerProof := outerTree.Prove([]int{0})
 	// Ensure execution report size is valid
@@ -270,7 +271,7 @@ func TestExecutionReportEncoding(t *testing.T) {
 	// as our encode/decode is a thin wrapper around that.
 	c := setupContractsForExecution(t)
 	mb := c.generateMessageBatch(t, 1, 1, 1)
-	ctx := merklemulti.NewKeccakCtx()
+	ctx := hasher.NewKeccakCtx()
 	outerTree := merklemulti.NewTree(ctx, [][32]byte{mb.root})
 	outerProof := outerTree.Prove([]int{0})
 	report := any_2_evm_toll_offramp.CCIPExecutionReport{

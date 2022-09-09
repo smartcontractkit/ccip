@@ -154,13 +154,13 @@ func (e *CCIPContractsDeployer) DeployOffRamp(
 		return any_2_evm_toll_offramp.DeployEVM2EVMTollOffRamp(
 			auth, backend, sourceChainId, destChainId,
 			any_2_evm_toll_offramp.BaseOffRampInterfaceOffRampConfig{
+				OnRampAddress:                           onRamp,
 				ExecutionDelaySeconds:                   60,
 				MaxDataSize:                             1e5,
 				MaxTokensLength:                         15,
 				PermissionLessExecutionThresholdSeconds: 60,
 			},
 			blobVerifier,
-			onRamp,
 			afn,
 			sourceToken,
 			pools,
@@ -309,20 +309,20 @@ func DefaultOffChainAggregatorV2Config(numberNodes int) contracts.OffChainAggreg
 		faultyNodes = 1
 	}
 	return contracts.OffChainAggregatorV2Config{
-		DeltaProgress:                           2 * time.Second,
-		DeltaResend:                             1 * time.Second,
-		DeltaRound:                              1 * time.Second,
-		DeltaGrace:                              500 * time.Millisecond,
-		DeltaStage:                              2 * time.Second,
-		RMax:                                    3,
+		DeltaProgress:                           40 * time.Second,
+		DeltaResend:                             10 * time.Second,
+		DeltaRound:                              30 * time.Second,
+		DeltaGrace:                              1 * time.Second,
+		DeltaStage:                              60 * time.Second,
+		RMax:                                    5,
 		S:                                       s,
 		F:                                       faultyNodes,
 		Oracles:                                 []ocrConfigHelper2.OracleIdentityExtra{},
-		MaxDurationQuery:                        50 * time.Millisecond,
-		MaxDurationObservation:                  200 * time.Millisecond,
-		MaxDurationReport:                       100 * time.Millisecond,
-		MaxDurationShouldAcceptFinalizedReport:  100 * time.Millisecond,
-		MaxDurationShouldTransmitAcceptedReport: 100 * time.Millisecond,
+		MaxDurationQuery:                        5 * time.Second,
+		MaxDurationObservation:                  5 * time.Second,
+		MaxDurationReport:                       5 * time.Second,
+		MaxDurationShouldAcceptFinalizedReport:  5 * time.Second,
+		MaxDurationShouldTransmitAcceptedReport: 5 * time.Second,
 		OnchainConfig:                           []byte{},
 	}
 }

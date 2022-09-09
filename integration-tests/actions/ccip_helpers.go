@@ -467,10 +467,11 @@ func CreateOCRJobsForCCIP(
 					}.P2PV2Bootstrapper(),
 				},
 				PluginConfig: map[string]interface{}{
-					"sourceChainID": sourceChainID,
-					"destChainID":   destChainID,
-					"onRampIDs":     []string{fmt.Sprintf("\"%s\"", onramp)},
-					"pollPeriod":    `"1s"`,
+					"sourceChainID":  sourceChainID,
+					"destChainID":    destChainID,
+					"onRampIDs":      []string{fmt.Sprintf("\"%s\"", onramp)},
+					"pollPeriod":     `"1s"`,
+					"destStartBlock": 1,
 				},
 				RelayConfig: map[string]interface{}{
 					"chainID": fmt.Sprintf("\"%s\"", destChainID.String()),
@@ -504,6 +505,7 @@ func CreateOCRJobsForCCIP(
 					"onRampID":       fmt.Sprintf("\"%s\"", onramp),
 					"blobVerifierID": fmt.Sprintf("\"%s\"", blobVerifier),
 					"pollPeriod":     `"1s"`,
+					"destStartBlock": 1,
 					"tokensPerFeeCoinPipeline": fmt.Sprintf(`"""
 link [type=http method=GET url="%s"];
 link_parse [type=jsonparse path="Data,Result"];

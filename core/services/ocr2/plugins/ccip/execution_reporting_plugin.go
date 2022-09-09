@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/blob_verifier"
 	"github.com/smartcontractkit/chainlink/core/logger"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
 	"github.com/smartcontractkit/chainlink/core/utils/mathutil"
 )
@@ -136,6 +137,7 @@ type ExecutionReportingPluginFactory struct {
 	onRampSeqParser     func(log logpoller.Log) (uint64, error)
 	reqEventSig         common.Hash
 	priceGetter         PriceGetter
+	onRampToHasher      map[common.Address]LeafHasher[[32]byte]
 }
 
 func NewExecutionReportingPluginFactory(
@@ -149,9 +151,10 @@ func NewExecutionReportingPluginFactory(
 	onRampSeqParser func(log logpoller.Log) (uint64, error),
 	reqEventSig common.Hash,
 	priceGetter PriceGetter,
+	onRampToHasher map[common.Address]LeafHasher[[32]byte],
 ) types.ReportingPluginFactory {
 	return &ExecutionReportingPluginFactory{lggr: lggr, onRamp: onRamp, blobVerifier: blobVerifier, offRamp: offRamp, source: source, dest: dest, offRampAddr: offRampAddr, builder: builder,
-		onRampSeqParser: onRampSeqParser, reqEventSig: reqEventSig, priceGetter: priceGetter}
+		onRampSeqParser: onRampSeqParser, reqEventSig: reqEventSig, priceGetter: priceGetter, onRampToHasher: onRampToHasher}
 }
 
 func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.ReportingPluginConfig) (types.ReportingPlugin, types.ReportingPluginInfo, error) {
@@ -185,6 +188,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			onRampSeqParser: rf.onRampSeqParser,
 			reqEventSig:     rf.reqEventSig,
 			priceGetter:     rf.priceGetter,
+			onRampToHasher:  rf.onRampToHasher,
 		}, types.ReportingPluginInfo{
 			Name:          "CCIPExecution",
 			UniqueReports: true,
@@ -214,6 +218,7 @@ type ExecutionReportingPlugin struct {
 	onRampSeqParser func(log logpoller.Log) (uint64, error)
 	reqEventSig     common.Hash
 	priceGetter     PriceGetter
+	onRampToHasher  map[common.Address]LeafHasher[[32]byte]
 }
 
 type InflightExecutionReport struct {
@@ -310,7 +315,7 @@ func contiguousReqs(lggr logger.Logger, min, max uint64, seqNrs []uint64) bool {
 	return true
 }
 
-func leafsFromIntervals(lggr logger.Logger, onRampToEventSig map[common.Address]common.Hash, seqParsers map[common.Address]func(logpoller.Log) (uint64, error), intervalByOnRamp map[common.Address]blob_verifier.CCIPInterval, srcLogPoller logpoller.LogPoller) (map[common.Address][][32]byte, error) {
+func leafsFromIntervals(lggr logger.Logger, onRampToEventSig map[common.Address]common.Hash, seqParsers map[common.Address]func(logpoller.Log) (uint64, error), intervalByOnRamp map[common.Address]blob_verifier.CCIPInterval, srcLogPoller logpoller.LogPoller, onRampToHasher map[common.Address]LeafHasher[[32]byte]) (map[common.Address][][32]byte, error) {
 	leafsByOnRamp := make(map[common.Address][][32]byte)
 	for onRamp, interval := range intervalByOnRamp {
 		// Logs are guaranteed to be in order of seq num, since these are finalized logs only
@@ -332,9 +337,11 @@ func leafsFromIntervals(lggr logger.Logger, onRampToEventSig map[common.Address]
 		}
 		var leafs [][32]byte
 		for _, log := range logs {
-			// TODO: Hasher
-			ctx := merklemulti.NewKeccakCtx()
-			leafs = append(leafs, ctx.HashLeaf(log.Data))
+			hash, err2 := onRampToHasher[onRamp].HashLeaf(LogPollerLogToEthLog(log))
+			if err2 != nil {
+				return nil, err2
+			}
+			leafs = append(leafs, hash)
 		}
 		leafsByOnRamp[onRamp] = leafs
 	}
@@ -359,11 +366,13 @@ func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNums 
 	if err != nil {
 		return nil, err
 	}
-	leafsByOnRamp, err := leafsFromIntervals(r.lggr, map[common.Address]common.Hash{r.onRamp: r.reqEventSig}, map[common.Address]func(log logpoller.Log) (uint64, error){
-		r.onRamp: r.onRampSeqParser,
-	}, map[common.Address]blob_verifier.CCIPInterval{
-		r.onRamp: intervalsByOnRamp[r.onRamp],
-	}, r.source)
+	leafsByOnRamp, err := leafsFromIntervals(
+		r.lggr,
+		map[common.Address]common.Hash{r.onRamp: r.reqEventSig},
+		map[common.Address]func(log logpoller.Log) (uint64, error){r.onRamp: r.onRampSeqParser},
+		map[common.Address]blob_verifier.CCIPInterval{r.onRamp: interval},
+		r.source,
+		r.onRampToHasher)
 	if err != nil {
 		return nil, err
 	}
@@ -375,7 +384,7 @@ func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNums 
 		}
 		outerTreeLeafs = append(outerTreeLeafs, merkleRootsByOnRamp[onRamp])
 	}
-	ctx := merklemulti.NewKeccakCtx()
+	ctx := hasher.NewKeccakCtx()
 	outerTree := merklemulti.NewTree[[32]byte](ctx, outerTreeLeafs)
 	outerProof := outerTree.Prove([]int{onRampIdx})
 	innerTree := merklemulti.NewTree[[32]byte](ctx, leafsByOnRamp[r.onRamp])
@@ -383,11 +392,14 @@ func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNums 
 	var encMsgs [][]byte
 	var hashes [][32]byte
 	for _, seqNum := range finalSeqNums {
-		innerIdx := int(seqNum - intervalsByOnRamp[r.onRamp].Min)
+		innerIdx := int(seqNum - interval.Min)
 		innerIdxs = append(innerIdxs, innerIdx)
-		// TODO: Use hasher
 		encMsgs = append(encMsgs, msgsInRoot[innerIdx].Data)
-		hashes = append(hashes, ctx.HashLeaf(msgsInRoot[innerIdx].Data))
+		hash, err2 := r.onRampToHasher[r.onRamp].HashLeaf(LogPollerLogToEthLog(msgsInRoot[innerIdx]))
+		if err2 != nil {
+			return nil, err2
+		}
+		hashes = append(hashes, hash)
 	}
 	innerProof := innerTree.Prove(innerIdxs)
 	// Double check this verifies before sending.

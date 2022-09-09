@@ -303,7 +303,7 @@ func (offRamp *OffRamp) SetConfig(
 		Interface("signerAddresses", signers).
 		Interface("transmitterAddresses", transmitters).
 		Msg("Configuring OffRamp")
-	tx, err := offRamp.instance.SetConfig(
+	tx, err := offRamp.instance.SetConfig0(
 		opts,
 		signers,
 		transmitters,

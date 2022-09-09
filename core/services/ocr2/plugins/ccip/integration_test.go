@@ -242,12 +242,12 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 		sourceChainID,
 		destChainID,
 		any_2_evm_toll_offramp.BaseOffRampInterfaceOffRampConfig{
+			OnRampAddress:         onRampAddress,
 			ExecutionDelaySeconds: 0,
 			MaxDataSize:           1e12,
 			MaxTokensLength:       5,
 		},
 		blobVerifier.Address(),
-		onRampAddress,
 		afnDestAddress,
 		[]common.Address{sourceLinkTokenAddress},
 		[]common.Address{destPoolAddress},
@@ -337,12 +337,12 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 	require.NoError(t, err)
 	subOffRampAddress, _, _, err := any_2_evm_subscription_offramp.DeployEVM2EVMSubscriptionOffRamp(destUser, destChain, sourceChainID, destChainID,
 		any_2_evm_subscription_offramp.BaseOffRampInterfaceOffRampConfig{
+			OnRampAddress:         subOnRampAddress,
 			ExecutionDelaySeconds: 0,
 			MaxDataSize:           1e12,
 			MaxTokensLength:       5,
 		},
 		blobVerifier.Address(),
-		subOnRampAddress,
 		afnDestAddress,
 		[]common.Address{sourceLinkTokenAddress},
 		[]common.Address{destPoolAddress},
@@ -749,7 +749,7 @@ func executeMessage(t *testing.T, ccipContracts CCIPContracts, req logpoller.Log
 	mctx := merklemulti.NewKeccakCtx()
 	var leafHashes [][32]byte
 	for _, otherReq := range allReqs {
-		leafHashes = append(leafHashes, mctx.HashLeaf(otherReq.Data))
+		leafHashes = append(leafHashes, mctx.Hash(otherReq.Data))
 	}
 	tree := merklemulti.NewTree(mctx, leafHashes)
 
@@ -1258,7 +1258,7 @@ func setupOnchainConfig(t *testing.T, ccipContracts CCIPContracts, oracles []con
 	ccipContracts.destChain.Commit()
 
 	// Same DON on the toll offramp
-	_, err = ccipContracts.tollOffRamp.SetConfig(
+	_, err = ccipContracts.tollOffRamp.SetConfig0(
 		ccipContracts.destUser,
 		signerAddresses,
 		transmitterAddresses,
@@ -1271,7 +1271,7 @@ func setupOnchainConfig(t *testing.T, ccipContracts CCIPContracts, oracles []con
 	ccipContracts.destChain.Commit()
 
 	// Same DON on the sub offramp
-	_, err = ccipContracts.subOffRamp.SetConfig(
+	_, err = ccipContracts.subOffRamp.SetConfig0(
 		ccipContracts.destUser,
 		signerAddresses,
 		transmitterAddresses,

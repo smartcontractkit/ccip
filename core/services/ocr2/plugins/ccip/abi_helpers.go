@@ -79,7 +79,7 @@ func init() {
 // This function returns an error if there is no message in the bytecode or
 // when the payload is malformed.
 func DecodeCCIPMessage(b []byte) (*evm_2_evm_toll_onramp.CCIPEVM2EVMTollMessage, error) {
-	unpacked, err := MakeCCIPMsgArgs().Unpack(b)
+	unpacked, err := MakeTollCCIPMsgArgs().Unpack(b)
 	if err != nil {
 		return nil, err
 	}
@@ -116,9 +116,9 @@ func DecodeCCIPMessage(b []byte) (*evm_2_evm_toll_onramp.CCIPEVM2EVMTollMessage,
 	}, nil
 }
 
-// MakeCCIPMsgArgs is a static function that always returns the abi.Arguments
+// MakeTollCCIPMsgArgs is a static function that always returns the abi.Arguments
 // for a CCIP message.
-func MakeCCIPMsgArgs() abi.Arguments {
+func MakeTollCCIPMsgArgs() abi.Arguments {
 	var tuples = []abi.ArgumentMarshaling{
 		{
 			Name: "sourceChainId",
@@ -155,6 +155,53 @@ func MakeCCIPMsgArgs() abi.Arguments {
 		{
 			Name: "feeTokenAmount",
 			Type: "uint256",
+		},
+		{
+			Name: "gasLimit",
+			Type: "uint256",
+		},
+	}
+	ty, _ := abi.NewType("tuple", "", tuples)
+	return abi.Arguments{
+		{
+			Type: ty,
+		},
+	}
+}
+
+func MakeSubscriptionCCIPMsgArgs() abi.Arguments {
+	var tuples = []abi.ArgumentMarshaling{
+		{
+			Name: "sourceChainId",
+			Type: "uint256",
+		},
+		{
+			Name: "sequenceNumber",
+			Type: "uint64",
+		},
+		{
+			Name: "sender",
+			Type: "address",
+		},
+		{
+			Name: "receiver",
+			Type: "address",
+		},
+		{
+			Name: "nonce",
+			Type: "uint64",
+		},
+		{
+			Name: "data",
+			Type: "bytes",
+		},
+		{
+			Name: "tokens",
+			Type: "address[]",
+		},
+		{
+			Name: "amounts",
+			Type: "uint256[]",
 		},
 		{
 			Name: "gasLimit",
