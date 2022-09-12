@@ -421,9 +421,8 @@ func SetOCRConfigs(chainlinkNodes []*client.CLNodesWithKeys, destCCIP DestCCIPMo
 // sets up ccip-relay and ccip-execution plugin
 func CreateOCRJobsForCCIP(
 	chainlinkNodes []*client.CLNodesWithKeys,
-	onramp, blobVerifier, offRamp,
-	sourceChainName, destChainName string,
-	sourceChainID, destChainID *big.Int,
+	onramp, blobVerifier, offRamp string,
+	sourceChainClient, destChainClient blockchain.EVMClient,
 	destLinkTokenAddr string,
 	mockserver *ctfClient.MockserverClient,
 ) {
@@ -431,19 +430,33 @@ func CreateOCRJobsForCCIP(
 	bootstrapNode := chainlinkNodes[0].Node
 	bootstrapP2PIds := bootstrapNodeWithKey.KeysBundle.P2PKeys
 	bootstrapP2PId := bootstrapP2PIds.Data[0].Attributes.PeerID
+	sourceChainID := sourceChainClient.GetChainID()
+	destChainID := destChainClient.GetChainID()
+	sourceChainName := sourceChainClient.GetNetworkName()
+	destChainName := destChainClient.GetNetworkName()
 	bootstrapSpec := &client.OCR2TaskJobSpec{
 		Name:    fmt.Sprintf("bootstrap-%s-%s", destChainName, uuid.NewV4().String()),
 		JobType: "bootstrap",
 		OCR2OracleSpec: job.OCR2OracleSpec{
-			ContractID: blobVerifier,
-			Relay:      relay.EVM,
+			ContractID:                        blobVerifier,
+			Relay:                             relay.EVM,
+			ContractConfigConfirmations:       1,
+			ContractConfigTrackerPollInterval: models.Interval(1 * time.Second),
 			RelayConfig: map[string]interface{}{
-				"chainID": destChainID.String(),
+				"chainID": fmt.Sprintf("\"%s\"", destChainID.String()),
 			},
 		},
 	}
 	_, err := bootstrapNode.MustCreateJob(bootstrapSpec)
 	Expect(err).ShouldNot(HaveOccurred(), "Shouldn't fail creating bootstrap job on bootstrap node")
+	// save the current block numbers. If there is a delay between job start up and ocr config set up, the jobs will
+	// replay the log polling from these mentioned block number. The dest block number should ideally be the block number on which
+	// contract config is set and the source block number should be the one on which the ccip send request is performed.
+	// Here for simplicity we are just taking the current block number just before the job is created.
+	currentBlockOnSource, err := sourceChainClient.LatestBlockNumber(context.Background())
+	Expect(err).ShouldNot(HaveOccurred(), "Getting current block should be successful in source chain")
+	currentBlockOnDest, err := destChainClient.LatestBlockNumber(context.Background())
+	Expect(err).ShouldNot(HaveOccurred(), "Getting current block should be successful in dest chain")
 
 	for nodeIndex := 1; nodeIndex < len(chainlinkNodes); nodeIndex++ {
 		nodeTransmitterAddress := chainlinkNodes[nodeIndex].KeysBundle.EthAddress
@@ -467,11 +480,12 @@ func CreateOCRJobsForCCIP(
 					}.P2PV2Bootstrapper(),
 				},
 				PluginConfig: map[string]interface{}{
-					"sourceChainID":  sourceChainID,
-					"destChainID":    destChainID,
-					"onRampIDs":      []string{fmt.Sprintf("\"%s\"", onramp)},
-					"pollPeriod":     `"1s"`,
-					"destStartBlock": 1,
+					"sourceChainID":    sourceChainID,
+					"destChainID":      destChainID,
+					"onRampIDs":        []string{fmt.Sprintf("\"%s\"", onramp)},
+					"pollPeriod":       `"1s"`,
+					"destStartBlock":   currentBlockOnDest,
+					"sourceStartBlock": currentBlockOnSource,
 				},
 				RelayConfig: map[string]interface{}{
 					"chainID": fmt.Sprintf("\"%s\"", destChainID.String()),
@@ -500,12 +514,13 @@ func CreateOCRJobsForCCIP(
 					}.P2PV2Bootstrapper(),
 				},
 				PluginConfig: map[string]interface{}{
-					"sourceChainID":  sourceChainID,
-					"destChainID":    destChainID,
-					"onRampID":       fmt.Sprintf("\"%s\"", onramp),
-					"blobVerifierID": fmt.Sprintf("\"%s\"", blobVerifier),
-					"pollPeriod":     `"1s"`,
-					"destStartBlock": 1,
+					"sourceChainID":    sourceChainID,
+					"destChainID":      destChainID,
+					"onRampID":         fmt.Sprintf("\"%s\"", onramp),
+					"blobVerifierID":   fmt.Sprintf("\"%s\"", blobVerifier),
+					"pollPeriod":       `"1s"`,
+					"destStartBlock":   currentBlockOnDest,
+					"sourceStartBlock": currentBlockOnSource,
 					"tokensPerFeeCoinPipeline": fmt.Sprintf(`"""
 link [type=http method=GET url="%s"];
 link_parse [type=jsonparse path="Data,Result"];

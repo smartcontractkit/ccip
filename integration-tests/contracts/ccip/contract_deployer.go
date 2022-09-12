@@ -309,20 +309,20 @@ func DefaultOffChainAggregatorV2Config(numberNodes int) contracts.OffChainAggreg
 		faultyNodes = 1
 	}
 	return contracts.OffChainAggregatorV2Config{
-		DeltaProgress:                           40 * time.Second,
-		DeltaResend:                             10 * time.Second,
-		DeltaRound:                              30 * time.Second,
-		DeltaGrace:                              1 * time.Second,
-		DeltaStage:                              60 * time.Second,
-		RMax:                                    5,
+		DeltaProgress:                           10 * time.Second,
+		DeltaResend:                             2 * time.Second,
+		DeltaRound:                              5 * time.Second,
+		DeltaGrace:                              500 * time.Millisecond,
+		DeltaStage:                              10 * time.Second,
+		RMax:                                    3,
 		S:                                       s,
 		F:                                       faultyNodes,
 		Oracles:                                 []ocrConfigHelper2.OracleIdentityExtra{},
-		MaxDurationQuery:                        5 * time.Second,
-		MaxDurationObservation:                  5 * time.Second,
-		MaxDurationReport:                       5 * time.Second,
-		MaxDurationShouldAcceptFinalizedReport:  5 * time.Second,
-		MaxDurationShouldTransmitAcceptedReport: 5 * time.Second,
+		MaxDurationQuery:                        1 * time.Second,
+		MaxDurationObservation:                  1 * time.Second,
+		MaxDurationReport:                       1 * time.Second,
+		MaxDurationShouldAcceptFinalizedReport:  1 * time.Second,
+		MaxDurationShouldTransmitAcceptedReport: 1 * time.Second,
 		OnchainConfig:                           []byte{},
 	}
 }

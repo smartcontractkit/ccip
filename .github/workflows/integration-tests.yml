@@ -82,6 +82,7 @@ jobs:
       CHAINLINK_ENV_USER: ${{ github.actor }}
       TEST_TRIGGERED_BY: core-CI-eth
       TEST_LOG_LEVEL: debug
+      KEEP_ENVIRONMENTS: ONFAIL
     steps:
       - name: Collect Metrics
         id: collect-gha-metrics
@@ -124,9 +125,9 @@ jobs:
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
 
-      ## Run Cleanup regardless
+      ## Run Cleanup if the job succeeds
       - name: cleanup
-        if: always()
+       # if: always()
         uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/cleanup@1f3c81b148e53caaa0563f8963f884f0e5a4f82d # v2.0.15
         with:
           triggered_by: ${{ env.TEST_TRIGGERED_BY }}

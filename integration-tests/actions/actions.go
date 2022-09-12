@@ -24,6 +24,7 @@ import (
 	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
 	"github.com/smartcontractkit/chainlink-testing-framework/testreporters"
+
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
 )
@@ -229,7 +230,7 @@ func TeardownSuite(
 	switch strings.ToUpper(keepEnvs) {
 	case "ALWAYS":
 	case "ONFAIL":
-		if ginkgo.CurrentSpecReport().Failed() {
+		if !ginkgo.CurrentSpecReport().Failed() {
 			return env.Shutdown()
 		}
 	case "NEVER":
