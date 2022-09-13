@@ -21,7 +21,6 @@ jobs:
           hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
           this-job-name: Lint
         continue-on-error: true
-
       - name: Setup node
         uses: actions/setup-node@v2
         with:
@@ -58,7 +57,6 @@ jobs:
           hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
           this-job-name: Prettier Formatting
         continue-on-error: true
-
       - name: Setup node
         uses: actions/setup-node@v2
         with:

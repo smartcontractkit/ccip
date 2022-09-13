@@ -41,7 +41,6 @@ jobs:
           hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
           this-job-name: Core Tests (${{ matrix.cmd }})
         continue-on-error: true
-
       - name: Checkout the repo
         uses: actions/checkout@v2
       - name: Set up Go
@@ -68,8 +67,6 @@ jobs:
             ${{ runner.os }}-build-
             ${{ runner.os }}-
       - run: yarn install --frozen-lockfile
-      #      - name: Install terrad
-      #        run: ./tools/ci/install_terrad
       - name: Install solana cli
         run: ./tools/ci/install_solana
       - name: Setup DB
