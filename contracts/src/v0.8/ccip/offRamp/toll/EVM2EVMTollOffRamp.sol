@@ -6,6 +6,7 @@ import "../../interfaces/offRamp/BaseOffRampInterface.sol";
 import "../../interfaces/BlobVerifierInterface.sol";
 import "../../ocr/OCR2Base.sol";
 import "../BaseOffRamp.sol";
+import "../../models/Models.sol";
 
 /**
  * @notice EVM2EVMTollOffRamp enables OCR networks to execute multiple messages
@@ -15,6 +16,18 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
   using CCIP for CCIP.EVM2EVMTollMessage;
 
   string public constant override typeAndVersion = "EVM2EVMTollOffRamp 1.0.0";
+  uint256 private constant TOLL_CONSTANT_MESSAGE_PART_BYTES = (20 + // receiver
+    20 + // sender
+    2 + // chain id
+    8 + // sequence number
+    32 + // gas limit
+    20 + // fee token address
+    32); // fee token amount
+  uint256 private constant TOLL_EXECUTION_STATE_PROCESSING_OVERHEAD_GAS = (2_100 + // COLD_SLOAD_COST for first reading the state
+    20_000 + // SSTORE_SET_GAS for writing from 0 (untouched) to non-zero (in-progress)
+    100); // SLOAD_GAS = WARM_STORAGE_READ_COST for rewriting from non-zero (in-progress) to non-zero (success/failure)
+
+  mapping(uint256 => uint256) public feeTaken;
 
   constructor(
     uint256 sourceChainId,
@@ -40,6 +53,72 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
       tokenLimitsAdmin
     )
   {}
+
+  /**
+   * @notice Compute the overhead gas for a given message given its share of the merkle root verification costs.
+   * We need to compute this to bill the user upfront so we can let them know how much of a refund they get.
+   */
+  function overheadGasToll(uint256 merkleGasShare, CCIP.EVM2EVMTollMessage memory message)
+    public
+    pure
+    returns (uint256)
+  {
+    uint256 messageBytes = (TOLL_CONSTANT_MESSAGE_PART_BYTES +
+      (EVM_ADDRESS_LENGTH_BYTES + EVM_WORD_BYTES) *
+      message.tokens.length +
+      message.data.length);
+    uint256 messageCalldataGas = messageBytes * CALLDATA_GAS_PER_BYTE;
+    return (messageCalldataGas +
+      merkleGasShare +
+      TOLL_EXECUTION_STATE_PROCESSING_OVERHEAD_GAS +
+      PER_TOKEN_OVERHEAD_GAS *
+      (message.tokens.length + 1) +
+      RATE_LIMITER_OVERHEAD_GAS +
+      EXTERNAL_CALL_OVERHEAD_GAS);
+  }
+
+  /**
+   * @notice Compute the fee for a given message using token prices in report.
+   * @dev Reduces stack pressure to have an explicit function for this.
+   */
+  function computeFee(
+    uint256 merkleGasShare,
+    CCIP.ExecutionReport memory report,
+    CCIP.EVM2EVMTollMessage memory message
+  ) internal view returns (uint256) {
+    // Charge the gas share & gas limit of the message multiplied by the token per fee coin for
+    // the given message.
+    // Example with token being link. 1 LINK = 1e18 Juels.
+    // tx.gasprice is wei / gas
+    // gas * wei/gas * (juels / wei) (problem is that juels per wei could be < 1, say since 1 link < 1 eth)
+    // instead we use juels per unit ETH, which > 1, assuming 1 juel < 1 ETH (safe).
+    // gas * wei/gas * (juels / (ETH * 1e18 WEI/ETH))
+    // gas * wei/gas * juels/ETH / (1e18 wei/ETH)
+    // Example 1e6 gas * (200e9 wei / gas) * (6253149865160030 juels / ETH) / (1e18 wei/ETH) = 1.25e15 juels
+    uint256 tokenPerFeeCoin;
+    // tokenPerFeeCoinAddresses is keyed in destination chain tokens so we need to convert the feeToken
+    // before we do the lookup
+    address destinationFeeTokenAddress = address(_getPool(message.feeToken).getToken());
+    for (uint256 j = 0; j < report.tokenPerFeeCoinAddresses.length; ++j) {
+      if (report.tokenPerFeeCoinAddresses[j] == destinationFeeTokenAddress) {
+        tokenPerFeeCoin = report.tokenPerFeeCoin[j];
+      }
+    }
+    if (tokenPerFeeCoin == uint256(0)) {
+      revert MissingFeeCoinPrice(destinationFeeTokenAddress);
+    }
+    // Gas cost in wei: gasUsed * gasPrice
+    // example: 100k gas, 20 gwei = 1e5 * 20e9  = 2e15
+    // Gas cost in token: costInWei * 1e18 / tokenPerFeeCoin
+    // example: costInWei 2e15, tokenPerFeeCoin 2e20 = 2e15 * 2e20 / 1e18 = 4e17 tokens
+    uint256 feeTokenCharged = ((overheadGasToll(merkleGasShare, message) + message.gasLimit) *
+      tx.gasprice *
+      tokenPerFeeCoin) / 1 ether;
+    if (feeTokenCharged > message.feeTokenAmount) {
+      revert InsufficientFeeAmount(message.sequenceNumber, feeTokenCharged, message.feeTokenAmount);
+    }
+    return feeTokenCharged;
+  }
 
   /**
    * @notice Execute a series of one or more messages using a merkle proof
@@ -74,76 +153,69 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
       report.outerProofs,
       report.outerProofFlagBits
     );
-    uint256 merkleGasShare = gasUsedByMerkle / decodedMessages.length;
-
-    // only allow manual execution if the report is old enough
-    if (manualExecution && (block.timestamp - timestampRelayed) < s_config.permissionLessExecutionThresholdSeconds) {
-      revert ManualExecutionNotYetEnabled();
-    }
+    bool isOldRelayReport = (block.timestamp - timestampRelayed) > s_config.permissionLessExecutionThresholdSeconds;
 
     for (uint256 i = 0; i < numMsgs; ++i) {
       CCIP.EVM2EVMTollMessage memory message = decodedMessages[i];
-      CCIP.MessageExecutionState state = getExecutionState(message.sequenceNumber);
-      if (state == CCIP.MessageExecutionState.SUCCESS) revert AlreadyExecuted(message.sequenceNumber);
+      CCIP.MessageExecutionState originalState = getExecutionState(message.sequenceNumber);
+      if (originalState == CCIP.MessageExecutionState.SUCCESS) revert AlreadyExecuted(message.sequenceNumber);
+
+      // Manually execution is fine if we previously failed or if the relay report is just too old
+      if (!(!manualExecution || isOldRelayReport || originalState == CCIP.MessageExecutionState.FAILURE)) {
+        revert ManualExecutionNotYetEnabled();
+      }
 
       _isWellFormed(message);
 
+      uint256 feeTokenCharged;
       // If it's the first DON execution attempt, charge the fee.
-      if (state == CCIP.MessageExecutionState.UNTOUCHED && !manualExecution) {
-        // Charge the gas share & gas limit of the message multiplied by the token per fee coin for
-        // the given message.
-        // Example with token being link. 1 LINK = 1e18 Juels.
-        // tx.gasprice is wei / gas
-        // gas * wei/gas * (juels / wei) (problem is that juels per wei could be < 1, say since 1 link < 1 eth)
-        // instead we use juels per unit ETH, which > 1, assuming 1 juel < 1 ETH (safe).
-        // gas * wei/gas * (juels / (ETH * 1e18 WEI/ETH))
-        // gas * wei/gas * juels/ETH / (1e18 wei/ETH)
-        // Example 1e6 gas * (200e9 wei / gas) * (6253149865160030 juels / ETH) / (1e18 wei/ETH) = 1.25e15 juels
-        uint256 tokenPerFeeCoin;
-        // tokenPerFeeCoinAddresses is keyed in destination chain tokens so we need to convert the feeToken
-        // before we do the lookup
-        address destinationFeeTokenAddress = address(_getPool(message.feeToken).getToken());
-        for (uint256 j = 0; j < report.tokenPerFeeCoinAddresses.length; ++j) {
-          if (report.tokenPerFeeCoinAddresses[j] == destinationFeeTokenAddress) {
-            tokenPerFeeCoin = report.tokenPerFeeCoin[j];
-          }
-        }
-        if (tokenPerFeeCoin == uint256(0)) {
-          revert MissingFeeCoinPrice(destinationFeeTokenAddress);
-        }
-        // Gas cost in wei: gasUsed * gasPrice
-        // example: 100k gas, 20 gwei = 1e5 * 20e9  = 2e15
-        // Gas cost in token: costInWei * 1e18 / tokenPerFeeCoin
-        // example: costInWei 2e15, tokenPerFeeCoin 2e20 = 2e15 * 2e20 / 1e18 = 4e17 tokens
-        uint256 feeForGas = ((merkleGasShare + message.gasLimit) * tx.gasprice * tokenPerFeeCoin) / 1 ether;
-        if (feeForGas > message.feeTokenAmount) {
-          revert InsufficientFeeAmount(message.sequenceNumber, feeForGas, message.feeTokenAmount);
-        }
-
+      if (originalState == CCIP.MessageExecutionState.UNTOUCHED && !manualExecution) {
+        feeTokenCharged = computeFee(gasUsedByMerkle / decodedMessages.length, report, message);
+        // Take the fee charged to this contract.
         // _releaseOrMintToken converts the message.feeToken to the proper destination token
         PoolInterface feeTokenPool = _getPool(message.feeToken);
-        _releaseOrMintToken(feeTokenPool, message.feeTokenAmount, address(this));
+        _releaseOrMintToken(feeTokenPool, feeTokenCharged, address(this));
+        // Forward the refund amount to the user so they know how much they were refunded.
+        message.feeTokenAmount -= feeTokenCharged;
+      }
+
+      if (originalState != CCIP.MessageExecutionState.UNTOUCHED) {
+        // We have taken a fee already, remove from message to avoid
+        // double-minting.
+        message.feeTokenAmount -= feeTaken[message.sequenceNumber];
       }
 
       s_executedMessages[message.sequenceNumber] = CCIP.MessageExecutionState.IN_PROGRESS;
+      // NOTE: toAny2EVMMessageFromSender merges the fee token into the token set.
       CCIP.MessageExecutionState newState = _trialExecute(_toAny2EVMMessageFromSender(message));
       s_executedMessages[message.sequenceNumber] = newState;
+
+      if (originalState == CCIP.MessageExecutionState.UNTOUCHED && newState == CCIP.MessageExecutionState.FAILURE) {
+        feeTaken[message.sequenceNumber] = feeTokenCharged;
+      }
 
       emit ExecutionStateChanged(message.sequenceNumber, newState);
     }
   }
 
+  // @notice IMPORTANT: Merges the fee token into the set of (tokens, amounts)
   function _toAny2EVMMessageFromSender(CCIP.EVM2EVMTollMessage memory original)
     internal
     view
     returns (CCIP.Any2EVMMessageFromSender memory message)
   {
-    uint256 numberOfTokens = original.tokens.length;
+    (IERC20[] memory tokens, uint256[] memory amounts) = CCIP.addToTokensAmounts(
+      original.tokens,
+      original.amounts,
+      original.feeToken,
+      original.feeTokenAmount
+    );
+    uint256 numberOfTokens = tokens.length;
     IERC20[] memory destTokens = new IERC20[](numberOfTokens);
     PoolInterface[] memory destPools = new PoolInterface[](numberOfTokens);
 
     for (uint256 i = 0; i < numberOfTokens; ++i) {
-      PoolInterface pool = _getPool(original.tokens[i]);
+      PoolInterface pool = _getPool(tokens[i]);
       destPools[i] = pool;
       destTokens[i] = pool.getToken();
     }
@@ -155,7 +227,7 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
       data: original.data,
       destTokens: destTokens,
       destPools: destPools,
-      amounts: original.amounts,
+      amounts: amounts,
       gasLimit: original.gasLimit
     });
   }

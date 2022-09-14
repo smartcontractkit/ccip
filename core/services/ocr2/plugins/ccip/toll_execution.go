@@ -28,8 +28,7 @@ const (
 		100) //# SLOAD_GAS = WARM_STORAGE_READ_COST for rewriting from non-zero (in-progress) to non-zero (success/failure)
 )
 
-// Note: this is only used offchain.
-// Onchain: we simply measure the gas usage and bill accordingly
+// Onchain: we bill deterministically for tolls so that we can notify clients how much of a refund they get.
 // Offchain: we compute the max overhead gas to determine msg executability.
 func overheadGasToll(merkleGasShare uint64, tollMsg *evm_2_evm_toll_onramp.EVM2EVMTollOnRampCCIPSendRequested) uint64 {
 	messageBytes := TOLL_CONSTANT_MESSAGE_PART_BYTES +

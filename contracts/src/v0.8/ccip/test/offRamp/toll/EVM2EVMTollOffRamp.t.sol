@@ -106,6 +106,9 @@ contract EVM2EVMTollOffRamp_execute is EVM2EVMTollOffRampSetup {
     emit ExecutionStateChanged(messages[0].sequenceNumber, CCIP.MessageExecutionState.SUCCESS);
 
     s_offRamp.execute(_generateReportFromMessages(messages), false);
+
+    // Assert no fee taken on success
+    assertEq(0, s_offRamp.feeTaken(messages[0].sequenceNumber));
   }
 
   // Asserts that a message execution fails, but it does
@@ -119,6 +122,12 @@ contract EVM2EVMTollOffRamp_execute is EVM2EVMTollOffRampSetup {
     emit ExecutionStateChanged(messages[0].sequenceNumber, CCIP.MessageExecutionState.FAILURE);
 
     s_offRamp.execute(_generateReportFromMessages(messages), false);
+
+    // Assert fee taken on failure.
+    // Note gas price is 1 so gas=wei and our juels/eth price is 2e20.
+    // Sanity check of feeTaken:
+    // 35360400 juels / (2e20 juels/eth * 1eth/1e18wei) = 176k wei = 176k gas.
+    assertEq(35360400, s_offRamp.feeTaken(messages[0].sequenceNumber));
   }
 
   function testTwoMessagesWithTokensSuccess() public {

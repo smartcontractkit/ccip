@@ -119,6 +119,32 @@ library CCIP {
     uint256 gasLimit;
   }
 
+  function addToTokensAmounts(
+    IERC20[] memory tokens,
+    uint256[] memory amounts,
+    IERC20 token,
+    uint256 amount
+  ) internal pure returns (IERC20[] memory, uint256[] memory) {
+    // Assumes tokens.length = amounts.length
+    for (uint256 i = 0; i < tokens.length; ++i) {
+      if (tokens[i] == token) {
+        // already present, just add amount
+        amounts[i] += amount;
+        return (tokens, amounts);
+      }
+    }
+    // Token is not already present, need to reallocate.
+    IERC20[] memory newTokens = new IERC20[](tokens.length + 1);
+    uint256[] memory newAmounts = new uint256[](amounts.length + 1);
+    for (uint256 i = 0; i < tokens.length; ++i) {
+      newTokens[i] = tokens[i];
+      newAmounts[i] = amounts[i];
+    }
+    newTokens[tokens.length] = token;
+    newAmounts[amounts.length] = amount;
+    return (newTokens, newAmounts);
+  }
+
   bytes32 internal constant EVM_2_EVM_TOLL_MESSAGE_HASH = keccak256("EVM2EVMTollMessagePlus");
 
   function _hash(CCIP.EVM2EVMTollMessage memory original, bytes32 metadataHash) internal pure returns (bytes32) {

@@ -27,6 +27,19 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry, 
   // The on chain offRamp configuration values
   OffRampConfig internal s_config;
 
+  uint256 internal constant EXTERNAL_CALL_OVERHEAD_GAS = 2600;
+  uint256 internal constant RATE_LIMITER_OVERHEAD_GAS = (2_100 + 5_000); // COLD_SLOAD_COST for accessing token bucket // SSTORE_RESET_GAS for updating & decreasing token bucket
+  uint256 internal constant EVM_ADDRESS_LENGTH_BYTES = 20;
+  uint256 internal constant EVM_WORD_BYTES = 32;
+  uint256 internal constant CALLDATA_GAS_PER_BYTE = 16;
+  uint256 internal constant PER_TOKEN_OVERHEAD_GAS = (2_100 + // COLD_SLOAD_COST for first reading the pool
+    2_100 + // COLD_SLOAD_COST for pool to ensure allowed offramp calls it
+    2_100 + // COLD_SLOAD_COST for accessing pool balance slot
+    5_000 + // SSTORE_RESET_GAS for decreasing pool balance from non-zero to non-zero
+    2_100 + // COLD_SLOAD_COST for accessing receiver balance
+    20_000 + // SSTORE_SET_GAS for increasing receiver balance from zero to non-zero
+    2_100); // COLD_SLOAD_COST for obtanining price of token to use for aggregate token bucket
+
   // A mapping of sequence numbers to execution state.
   // This makes sure we never execute a message twice.
   mapping(uint64 => CCIP.MessageExecutionState) internal s_executedMessages;

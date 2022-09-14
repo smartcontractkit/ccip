@@ -69,6 +69,8 @@ contract EVM2EVMSubscriptionOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR
       decodedMessages[i] = decodedMessage;
     }
 
+    // TODO: Spec difference measuring gas used by verification vs calculating it?
+    // imo billing calculated values > billing measured to help with cost predictability
     (uint256 timestampRelayed, uint256 gasUsedByMerkle) = _verifyMessages(
       hashedLeaves,
       report.innerProofs,

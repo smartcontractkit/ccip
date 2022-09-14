@@ -86,6 +86,7 @@ type MaybeRevertReceiver struct {
 }
 
 type CCIPContracts struct {
+	t                              *testing.T
 	sourceUser, destUser           *bind.TransactOpts
 	sourceChain, destChain         *backends.SimulatedBackend
 	sourcePool, destPool           *native_token_pool.NativeTokenPool
@@ -287,7 +288,7 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 	// Setup subscription contracts.
 	subOnRampRouterAddress, _, _, err := evm_2_any_subscription_onramp_router.DeployEVM2AnySubscriptionOnRampRouter(
 		sourceUser, sourceChain, evm_2_any_subscription_onramp_router.Any2EVMSubscriptionOnRampRouterInterfaceRouterConfig{
-			Fee:      big.NewInt(0),
+			Fee:      big.NewInt(1),
 			FeeToken: sourceLinkTokenAddress,
 			FeeAdmin: sourceUser.From,
 		})
@@ -379,6 +380,7 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 		destChain.Commit()
 	}
 	return CCIPContracts{
+		t:               t,
 		sourceUser:      sourceUser,
 		destUser:        destUser,
 		sourceChain:     sourceChain,
@@ -404,6 +406,69 @@ func setupCCIPContracts(t *testing.T) CCIPContracts {
 		subOffRampRouter: subOffRampRouter,
 		subOffRamp:       subOffRamp,
 	}
+}
+
+type balanceAssertion struct {
+	name     string
+	address  common.Address
+	expected string
+	getter   func(addr common.Address) *big.Int
+	within   string
+}
+
+type balanceReq struct {
+	name   string
+	addr   common.Address
+	getter func(addr common.Address) *big.Int
+}
+
+func (c *CCIPContracts) getSourceSubBalance(addr common.Address) *big.Int {
+	bal, err := c.subOnRampRouter.GetBalance(nil, addr)
+	require.NoError(c.t, err)
+	return bal
+}
+
+func (c *CCIPContracts) getDestSubBalance(addr common.Address) *big.Int {
+	sub, err := c.subOffRampRouter.GetSubscription(nil, addr)
+	require.NoError(c.t, err)
+	return sub.Balance
+}
+
+func (c *CCIPContracts) getSourceLinkBalance(addr common.Address) *big.Int {
+	bal, err := c.sourceLinkToken.BalanceOf(nil, addr)
+	require.NoError(c.t, err)
+	return bal
+}
+func (c *CCIPContracts) getDestLinkBalance(addr common.Address) *big.Int {
+	bal, err := c.destLinkToken.BalanceOf(nil, addr)
+	require.NoError(c.t, err)
+	return bal
+}
+
+func (c *CCIPContracts) assertBalances(bas []balanceAssertion) {
+	for _, b := range bas {
+		actual := b.getter(b.address)
+		require.NotNil(c.t, actual, "%v getter return nil", b.name)
+		if b.within == "" {
+			assert.Equal(c.t, b.expected, actual.String(), "wrong balance for %s got %s want %s", b.name, actual, b.expected)
+		} else {
+			bi, _ := big.NewInt(0).SetString(b.expected, 10)
+			withinI, _ := big.NewInt(0).SetString(b.within, 10)
+			high := big.NewInt(0).Add(bi, withinI)
+			low := big.NewInt(0).Sub(bi, withinI)
+			assert.Equal(c.t, -1, actual.Cmp(high), "wrong balance for %s got %s outside expected range [%s, %s]", b.name, actual, low, high)
+			assert.Equal(c.t, 1, actual.Cmp(low), "wrong balance for %s got %s outside expected range [%s, %s]", b.name, actual, low, high)
+		}
+	}
+}
+
+func (c *CCIPContracts) getBalances(brs []balanceReq) map[string]*big.Int {
+	m := make(map[string]*big.Int)
+	for _, br := range brs {
+		m[br.name] = br.getter(br.addr)
+		require.NotNil(c.t, m[br.name], "%v getter return nil", br.name)
+	}
+	return m
 }
 
 var (
@@ -840,6 +905,34 @@ func AssertTxSuccess(t *testing.T, ccipContracts CCIPContracts, log logpoller.Lo
 	}
 }
 
+func mustAddBigInt(a *big.Int, b string) *big.Int {
+	bi, _ := big.NewInt(0).SetString(b, 10)
+	return big.NewInt(0).Add(a, bi)
+}
+
+func mustSubBigInt(a *big.Int, b string) *big.Int {
+	bi, _ := big.NewInt(0).SetString(b, 10)
+	return big.NewInt(0).Sub(a, bi)
+}
+
+var (
+	// Source
+	SourcePool       = "source pool"
+	SourceSub        = "source sub"
+	TollOnRampRouter = "toll onramp router"
+	TollOnRamp       = "toll onramp"
+	SubOnRamp        = "sub onramp"
+	SubOnRampRouter  = "sub onramp router"
+
+	// Dest
+	TollOffRampRouter = "toll offramp router"
+	TollOffRamp       = "toll offramp"
+	SubOffRampRouter  = "sub offramp router"
+	DestPool          = "dest pool"
+	DestSub           = "dest sub"
+	Receiver          = "receiver"
+)
+
 func TestIntegration_CCIP(t *testing.T) {
 	ccipContracts := setupCCIPContracts(t)
 	bootstrapNodePort := int64(19599)
@@ -1036,8 +1129,16 @@ chainID             = "%s"
 		require.NoError(t, err)
 		ccipContracts.sourceChain.Commit()
 
-		startReceiver, _ := ccipContracts.destLinkToken.BalanceOf(nil, ccipContracts.receivers[0].Receiver.Address())
-		startPool, _ := ccipContracts.destLinkToken.BalanceOf(nil, ccipContracts.destPool.Address())
+		sourceBalances := ccipContracts.getBalances([]balanceReq{
+			{SourcePool, ccipContracts.sourcePool.Address(), ccipContracts.getSourceLinkBalance},
+			{TollOnRamp, ccipContracts.tollOnRamp.Address(), ccipContracts.getSourceLinkBalance},
+			{TollOnRampRouter, ccipContracts.tollOnRampRouter.Address(), ccipContracts.getSourceLinkBalance},
+		})
+		destBalances := ccipContracts.getBalances([]balanceReq{
+			{Receiver, ccipContracts.receivers[0].Receiver.Address(), ccipContracts.getDestLinkBalance},
+			{DestPool, ccipContracts.destPool.Address(), ccipContracts.getDestLinkBalance},
+			{TollOffRamp, ccipContracts.tollOffRamp.Address(), ccipContracts.getDestLinkBalance},
+		})
 		sendRequest(t, ccipContracts, "hey DON, execute for me",
 			[]common.Address{ccipContracts.sourceLinkToken.Address()},
 			[]*big.Int{tokenAmount}, ccipContracts.sourceLinkToken.Address(),
@@ -1047,24 +1148,37 @@ chainID             = "%s"
 		eventuallyReportRelayed(t, ccipContracts, ccipContracts.tollOnRamp.Address(), tollCurrentSeqNum, tollCurrentSeqNum)
 		executionLog := allNodesHaveExecutedSeqNum(t, ccipContracts, ccipContracts.tollOffRamp.Address(), nodes, tollCurrentSeqNum)
 		AssertTxSuccess(t, ccipContracts, executionLog)
-		endReceiver, _ := ccipContracts.destLinkToken.BalanceOf(nil, ccipContracts.receivers[0].Receiver.Address())
-		endPool, _ := ccipContracts.destLinkToken.BalanceOf(nil, ccipContracts.destPool.Address())
-		// We expect that the receiver should have their tokens.
-		assert.Equal(t, tokenAmount.String(), big.NewInt(0).Sub(endReceiver, startReceiver).String())
-		// TODO: Assert change forwarding. Change forwarding not implemented yet??
-		t.Log(startPool, endPool)
+		ccipContracts.assertBalances([]balanceAssertion{
+			{SourcePool, ccipContracts.sourcePool.Address(), mustAddBigInt(sourceBalances[SourcePool], "10000000000000000099").String(), ccipContracts.getSourceLinkBalance, ""}, // 10e18 + 100 transfer - 1 fee
+			{TollOnRamp, ccipContracts.tollOnRamp.Address(), sourceBalances[TollOnRamp].String(), ccipContracts.getSourceLinkBalance, ""},
+			{TollOnRampRouter, ccipContracts.tollOnRampRouter.Address(), mustAddBigInt(sourceBalances[TollOnRampRouter], "1").String(), ccipContracts.getSourceLinkBalance, ""},
+		})
+		ccipContracts.assertBalances([]balanceAssertion{
+			{Receiver, ccipContracts.receivers[0].Receiver.Address(), mustAddBigInt(destBalances[Receiver], "9049107200000000099").String(), ccipContracts.getDestLinkBalance, "1000000000000000000"}, // Roughly 200k gas * 200e9 wei/gas * (2e20 link/eth / 1e18wei/eth)
+			{DestPool, ccipContracts.destPool.Address(), mustSubBigInt(destBalances[DestPool], "10000000000000000099").String(), ccipContracts.getDestLinkBalance, ""},                                // We lose 10 link from the pool
+			{TollOffRamp, ccipContracts.tollOffRamp.Address(), mustAddBigInt(destBalances[TollOffRamp], "950954400000000000").String(), ccipContracts.getDestLinkBalance, ""},
+		})
 		tollCurrentSeqNum++
 	})
 
 	t.Run("single auto-execute subscription", func(t *testing.T) {
 		tokenAmount := big.NewInt(100)
-		subBefore, err := ccipContracts.subOffRampRouter.GetSubscription(nil, ccipContracts.receivers[0].Receiver.Address())
-		require.NoError(t, err)
 		_, err = ccipContracts.sourceLinkToken.Approve(ccipContracts.sourceUser, ccipContracts.subOnRampRouter.Address(), tokenAmount)
 		require.NoError(t, err)
 		ccipContracts.sourceChain.Commit()
 
-		startReceiver, _ := ccipContracts.destLinkToken.BalanceOf(nil, ccipContracts.receivers[0].Receiver.Address())
+		sourceBalances := ccipContracts.getBalances([]balanceReq{
+			{SourcePool, ccipContracts.sourcePool.Address(), ccipContracts.getSourceLinkBalance},
+			{SubOnRamp, ccipContracts.subOnRamp.Address(), ccipContracts.getSourceLinkBalance},
+			{SubOnRampRouter, ccipContracts.subOnRampRouter.Address(), ccipContracts.getSourceLinkBalance},
+			{SourceSub, ccipContracts.sourceUser.From, ccipContracts.getSourceSubBalance},
+		})
+		destBalances := ccipContracts.getBalances([]balanceReq{
+			{Receiver, ccipContracts.receivers[0].Receiver.Address(), ccipContracts.getDestLinkBalance},
+			{DestPool, ccipContracts.destPool.Address(), ccipContracts.getDestLinkBalance},
+			{SubOffRampRouter, ccipContracts.subOffRampRouter.Address(), ccipContracts.getDestLinkBalance},
+			{DestSub, ccipContracts.receivers[0].Receiver.Address(), ccipContracts.getDestSubBalance},
+		})
 		sendSubRequest(t, ccipContracts, "hey DON, execute for me", []common.Address{ccipContracts.sourceLinkToken.Address()},
 			[]*big.Int{tokenAmount}, big.NewInt(100_000), ccipContracts.receivers[0].Receiver.Address())
 		allNodesHaveReqSeqNum(t, ccipContracts, ccip.CCIPSubSendRequested, ccipContracts.subOnRamp.Address(), nodes, subCurrentSeqNum)
@@ -1072,17 +1186,31 @@ chainID             = "%s"
 		executionLog := allNodesHaveExecutedSeqNum(t, ccipContracts, ccipContracts.subOffRamp.Address(), nodes, subCurrentSeqNum)
 		AssertTxSuccess(t, ccipContracts, executionLog)
 
-		endReceiver, _ := ccipContracts.destLinkToken.BalanceOf(nil, ccipContracts.receivers[0].Receiver.Address())
-		subAfter, err := ccipContracts.subOffRampRouter.GetSubscription(nil, ccipContracts.receivers[0].Receiver.Address())
-		require.NoError(t, err)
-		// Subscription should decrease. Tricky to measure exactly since we measure gas consumption directly in sub offramp.
-		assert.Equal(t, 1, subBefore.Balance.Cmp(subAfter.Balance), "before %v after %v", subBefore.Balance, subAfter.Balance)
-		// We should see the tokenAmount transferred.
-		assert.Equal(t, tokenAmount.String(), big.NewInt(0).Sub(endReceiver, startReceiver).String(), "before %v after %v", startReceiver, endReceiver)
+		ccipContracts.assertBalances([]balanceAssertion{
+			{SourcePool, ccipContracts.sourcePool.Address(), mustAddBigInt(sourceBalances[SourcePool], "100").String(), ccipContracts.getSourceLinkBalance, ""}, // 100 transfer
+			{SubOnRamp, ccipContracts.subOnRamp.Address(), sourceBalances[SubOnRamp].String(), ccipContracts.getSourceLinkBalance, ""},
+			{SubOnRampRouter, ccipContracts.subOnRampRouter.Address(), sourceBalances[SubOnRampRouter].String(), ccipContracts.getSourceLinkBalance, ""}, // No change, internal account of fee to us.
+			{SourceSub, ccipContracts.sourceUser.From, mustSubBigInt(sourceBalances[SourceSub], "1").String(), ccipContracts.getSourceSubBalance, ""},    // Pays 1 in fee
+		})
+		ccipContracts.assertBalances([]balanceAssertion{
+			{Receiver, ccipContracts.receivers[0].Receiver.Address(), mustAddBigInt(destBalances[Receiver], "100").String(), ccipContracts.getDestLinkBalance, ""},                               // Full amount gets transferred
+			{DestPool, ccipContracts.destPool.Address(), mustSubBigInt(destBalances[DestPool], "100").String(), ccipContracts.getDestLinkBalance, ""},                                            // We lose 100 link from the pool
+			{SubOffRampRouter, ccipContracts.subOffRampRouter.Address(), destBalances[SubOffRampRouter].String(), ccipContracts.getDestLinkBalance, ""},                                          // Gas reimbursement for nop
+			{DestSub, ccipContracts.receivers[0].Receiver.Address(), mustSubBigInt(destBalances[DestSub], "617786400000000000").String(), ccipContracts.getDestSubBalance, "100000000000000000"}, // Costs ~0.65 link. +/- 0.1
+		})
 		subCurrentSeqNum++
 	})
 
 	t.Run("batch auto-execute toll", func(t *testing.T) {
+		sourceBalances := ccipContracts.getBalances([]balanceReq{
+			{SourcePool, ccipContracts.sourcePool.Address(), ccipContracts.getSourceLinkBalance},
+			{TollOnRampRouter, ccipContracts.tollOnRampRouter.Address(), ccipContracts.getSourceLinkBalance},
+		})
+		destBalances := ccipContracts.getBalances([]balanceReq{
+			{Receiver, ccipContracts.receivers[0].Receiver.Address(), ccipContracts.getDestLinkBalance},
+			{DestPool, ccipContracts.destPool.Address(), ccipContracts.getDestLinkBalance},
+			{TollOffRampRouter, ccipContracts.tollOffRampRouter.Address(), ccipContracts.getDestLinkBalance},
+		})
 		tokenAmount := big.NewInt(100)
 		feeTokenAmount := big.NewInt(0).Mul(big.NewInt(10), big.NewInt(1e18))
 		var txs []*gethtypes.Transaction
@@ -1107,11 +1235,28 @@ chainID             = "%s"
 			executionLog := allNodesHaveExecutedSeqNum(t, ccipContracts, ccipContracts.tollOffRamp.Address(), nodes, tollCurrentSeqNum+i)
 			AssertTxSuccess(t, ccipContracts, executionLog)
 		}
+		ccipContracts.assertBalances([]balanceAssertion{
+			{SourcePool, ccipContracts.sourcePool.Address(), mustAddBigInt(sourceBalances[SourcePool], "30000000000000000297").String(), ccipContracts.getSourceLinkBalance, ""}, // (10e18 + 100 - 1)*3
+			{TollOnRampRouter, ccipContracts.tollOnRampRouter.Address(), mustAddBigInt(sourceBalances[TollOnRampRouter], "3").String(), ccipContracts.getSourceLinkBalance, ""},
+		})
+		ccipContracts.assertBalances([]balanceAssertion{
+			{Receiver, ccipContracts.receivers[0].Receiver.Address(), mustAddBigInt(destBalances[Receiver], "27225848400000000297").String(), ccipContracts.getDestLinkBalance, "1000000000000000000"}, // 3 toll fees +/- 1 link
+			{DestPool, ccipContracts.destPool.Address(), mustSubBigInt(destBalances[DestPool], "30000000000000000297").String(), ccipContracts.getDestLinkBalance, ""},
+			{TollOffRampRouter, ccipContracts.tollOffRamp.Address(), mustAddBigInt(destBalances[TollOffRampRouter], "2852678400000000000").String(), ccipContracts.getDestLinkBalance, "1000000000000000000"}, // +/- 1 link
+		})
 		tollCurrentSeqNum += n
 	})
 
 	t.Run("batch auto-execute subscription", func(t *testing.T) {
-		subBefore, _ := ccipContracts.subOffRampRouter.GetSubscription(nil, ccipContracts.receivers[0].Receiver.Address())
+		sourceBalances := ccipContracts.getBalances([]balanceReq{
+			{SourcePool, ccipContracts.sourcePool.Address(), ccipContracts.getSourceLinkBalance},
+			{SourceSub, ccipContracts.sourceUser.From, ccipContracts.getSourceSubBalance},
+		})
+		destBalances := ccipContracts.getBalances([]balanceReq{
+			{Receiver, ccipContracts.receivers[0].Receiver.Address(), ccipContracts.getDestLinkBalance},
+			{DestPool, ccipContracts.destPool.Address(), ccipContracts.getDestLinkBalance},
+			{DestSub, ccipContracts.receivers[0].Receiver.Address(), ccipContracts.getDestSubBalance},
+		})
 		tokenAmount := big.NewInt(100)
 		var txs []*gethtypes.Transaction
 		n := 3
@@ -1135,15 +1280,28 @@ chainID             = "%s"
 			executionLog := allNodesHaveExecutedSeqNum(t, ccipContracts, ccipContracts.subOffRamp.Address(), nodes, subCurrentSeqNum+i)
 			AssertTxSuccess(t, ccipContracts, executionLog)
 		}
-		// Check subscription balance after
-		subAfter, _ := ccipContracts.subOffRampRouter.GetSubscription(nil, ccipContracts.receivers[0].Receiver.Address())
-		require.Equal(t, 1, subBefore.Balance.Cmp(subAfter.Balance), "before %v after %v", subBefore.Balance, subAfter.Balance)
-		b := big.NewInt(0).Sub(subBefore.Balance, subAfter.Balance).String()
-		t.Log("Balance change", b)
+		ccipContracts.assertBalances([]balanceAssertion{
+			{SourcePool, ccipContracts.sourcePool.Address(), mustAddBigInt(sourceBalances[SourcePool], "300").String(), ccipContracts.getSourceLinkBalance, ""}, // 100 transfer
+			{SourceSub, ccipContracts.sourceUser.From, mustSubBigInt(sourceBalances[SourceSub], "3").String(), ccipContracts.getSourceSubBalance, ""},           // Pays 1 in fee
+		})
+		ccipContracts.assertBalances([]balanceAssertion{
+			{Receiver, ccipContracts.receivers[0].Receiver.Address(), mustAddBigInt(destBalances[Receiver], "300").String(), ccipContracts.getDestLinkBalance, ""},                                 // Full amount gets transferred
+			{DestPool, ccipContracts.destPool.Address(), mustSubBigInt(destBalances[DestPool], "300").String(), ccipContracts.getDestLinkBalance, ""},                                              // We lose 100 link from the pool
+			{DestSub, ccipContracts.receivers[0].Receiver.Address(), mustSubBigInt(destBalances[DestSub], "1864160000000000000").String(), ccipContracts.getDestSubBalance, "1000000000000000000"}, // Costs ~0.65 link. Varies slightly due to variable calldata encoding gas costs.
+		})
 		subCurrentSeqNum += n
 	})
 
 	t.Run("single strict sequencing auto-execute subscription", func(t *testing.T) {
+		sourceBalances := ccipContracts.getBalances([]balanceReq{
+			{SourcePool, ccipContracts.sourcePool.Address(), ccipContracts.getSourceLinkBalance},
+			{SourceSub, ccipContracts.sourceUser.From, ccipContracts.getSourceSubBalance},
+		})
+		destBalances := ccipContracts.getBalances([]balanceReq{
+			{Receiver, ccipContracts.receivers[1].Receiver.Address(), ccipContracts.getDestLinkBalance},
+			{DestPool, ccipContracts.destPool.Address(), ccipContracts.getDestLinkBalance},
+			{DestSub, ccipContracts.receivers[1].Receiver.Address(), ccipContracts.getDestSubBalance},
+		})
 		tokenAmount := big.NewInt(100)
 		_, err = ccipContracts.sourceLinkToken.Approve(ccipContracts.sourceUser, ccipContracts.subOnRampRouter.Address(), tokenAmount)
 		require.NoError(t, err)
@@ -1154,6 +1312,15 @@ chainID             = "%s"
 		eventuallyReportRelayed(t, ccipContracts, ccipContracts.subOnRamp.Address(), subCurrentSeqNum, subCurrentSeqNum)
 		executionLog := allNodesHaveExecutedSeqNum(t, ccipContracts, ccipContracts.subOffRamp.Address(), nodes, subCurrentSeqNum)
 		AssertTxSuccess(t, ccipContracts, executionLog)
+		ccipContracts.assertBalances([]balanceAssertion{
+			{SourcePool, ccipContracts.sourcePool.Address(), mustAddBigInt(sourceBalances[SourcePool], "100").String(), ccipContracts.getSourceLinkBalance, ""}, // 100 transfer
+			{SourceSub, ccipContracts.sourceUser.From, mustSubBigInt(sourceBalances[SourceSub], "1").String(), ccipContracts.getSourceSubBalance, ""},           // Pays 1 in fee
+		})
+		ccipContracts.assertBalances([]balanceAssertion{
+			{Receiver, ccipContracts.receivers[1].Receiver.Address(), mustAddBigInt(destBalances[Receiver], "100").String(), ccipContracts.getDestLinkBalance, ""},                               // Full amount gets transferred
+			{DestPool, ccipContracts.destPool.Address(), mustSubBigInt(destBalances[DestPool], "100").String(), ccipContracts.getDestLinkBalance, ""},                                            // We lose 100 link from the pool
+			{DestSub, ccipContracts.receivers[1].Receiver.Address(), mustSubBigInt(destBalances[DestSub], "654720000000000000").String(), ccipContracts.getDestSubBalance, "100000000000000000"}, // Costs ~0.65 link. Varies slightly due to variable calldata encoding gas costs.
+		})
 		subCurrentSeqNum++
 	})
 
