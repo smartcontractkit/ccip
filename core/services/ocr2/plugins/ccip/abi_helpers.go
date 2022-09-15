@@ -116,6 +116,41 @@ func DecodeCCIPMessage(b []byte) (*evm_2_evm_toll_onramp.CCIPEVM2EVMTollMessage,
 	}, nil
 }
 
+func DecodeCCIPSubMessage(b []byte) (*evm_2_evm_subscription_onramp.CCIPEVM2EVMSubscriptionMessage, error) {
+	unpacked, err := MakeSubscriptionCCIPMsgArgs().Unpack(b)
+	if err != nil {
+		return nil, err
+	}
+	if len(unpacked) == 0 {
+		return nil, fmt.Errorf("no message found when unpacking")
+	}
+	// Note must use unnamed type here
+	receivedCp, ok := unpacked[0].(struct {
+		SourceChainId  *big.Int         `json:"sourceChainId"`
+		SequenceNumber uint64           `json:"sequenceNumber"`
+		Sender         common.Address   `json:"sender"`
+		Receiver       common.Address   `json:"receiver"`
+		Nonce          uint64           `json:"nonce"`
+		Data           []byte           `json:"data"`
+		Tokens         []common.Address `json:"tokens"`
+		Amounts        []*big.Int       `json:"amounts"`
+		GasLimit       *big.Int         `json:"gasLimit"`
+	})
+	if !ok {
+		return nil, fmt.Errorf("invalid format have %T want %T", unpacked[0], receivedCp)
+	}
+	return &evm_2_evm_subscription_onramp.CCIPEVM2EVMSubscriptionMessage{
+		SourceChainId:  receivedCp.SourceChainId,
+		SequenceNumber: receivedCp.SequenceNumber,
+		Sender:         receivedCp.Sender,
+		Receiver:       receivedCp.Receiver,
+		Data:           receivedCp.Data,
+		Tokens:         receivedCp.Tokens,
+		Amounts:        receivedCp.Amounts,
+		GasLimit:       receivedCp.GasLimit,
+	}, nil
+}
+
 // MakeTollCCIPMsgArgs is a static function that always returns the abi.Arguments
 // for a CCIP message.
 func MakeTollCCIPMsgArgs() abi.Arguments {

@@ -32,7 +32,7 @@ const (
 
 const (
 	BatchGasLimit                   = 1_000_000 // TODO: think if a good value for this
-	RootSnoozeTime                  = 1 * 3600 * time.Second
+	RootSnoozeTime                  = 1 * 10 * time.Second
 	ExecutionMaxInflightTimeSeconds = 180
 	MaxPayloadLength                = 1000
 	MaxTokensPerMessage             = 5

@@ -363,11 +363,19 @@ func InitiateTokenTransfer(sourceCCIP SourceCCIPModule, destCCIP DestCCIPModule)
 			sourceCCIP.Common.ChainClient.GetDefaultWallet().Address())
 
 	// verify that receiver balance is increased by transferAmount
-	Expect(bigmath.Equal(
-		balanceAfterDest,
-		bigmath.Add(sourceCCIP.Common.TransferAmount, balanceBeforeDest))).
-		Should(BeTrue(), "BalanceAfter-BalanceBefore should match the transfer amount for Address %s",
-			destCCIP.Common.ChainClient.GetDefaultWallet().Address())
+	// TODO use generic method for balance assertion
+	unusedFee := big.NewInt(9.0491e18) // for single transaction
+	expectedBalance := bigmath.Add(bigmath.Add(sourceCCIP.Common.TransferAmount, unusedFee), balanceBeforeDest)
+	high := big.NewInt(0).Add(expectedBalance, big.NewInt(1e18))
+	low := big.NewInt(0).Sub(expectedBalance, big.NewInt(1e18))
+	Expect(balanceAfterDest.Cmp(high)).
+		Should(BeNumerically("==", -1),
+			"Receiver balance diff between BalanceAfter-%v BalanceBefore-%v should be lesser than %v",
+			balanceAfterDest, balanceBeforeDest, high)
+	Expect(balanceAfterDest.Cmp(low)).
+		Should(BeNumerically("==", 1),
+			"Receiver balance diff between BalanceAfter-%v BalanceBefore-%v should be greater than %v",
+			balanceAfterDest, balanceBeforeDest, low)
 }
 
 func PrintSourceContractDetails(sourceCCIP SourceCCIPModule, destCCIP DestCCIPModule) {
