@@ -15,7 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	types3 "github.com/ethereum/go-ethereum/core/types"
 	"github.com/onsi/gomega"
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/networking"
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
@@ -189,9 +189,9 @@ func SetupNodeCCIP(
 	// (the wrapped sims faking different chainIDs)
 	var (
 		sourceLp logpoller.LogPoller = logpoller.NewLogPoller(logpoller.NewORM(sourceChainID, db, lggr, config), sourceClient,
-			lggr, 500*time.Millisecond, 10, 2)
+			lggr, 500*time.Millisecond, 10, 2, 2)
 		destLp logpoller.LogPoller = logpoller.NewLogPoller(logpoller.NewORM(destChainID, db, lggr, config), destClient,
-			lggr, 500*time.Millisecond, 10, 2)
+			lggr, 500*time.Millisecond, 10, 2, 2)
 	)
 	evmChain, err := evm.LoadChainSet(nil, evm.ChainSetOpts{
 		ORM:              chainORM,
