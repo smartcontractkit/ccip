@@ -2,11 +2,11 @@
 pragma solidity 0.8.15;
 
 import "../../../interfaces/TypeAndVersionInterface.sol";
-import "../../interfaces/onRamp/Any2EVMSubscriptionOnRampRouterInterface.sol";
+import "../../interfaces/onRamp/EVM2AnySubscriptionOnRampRouterInterface.sol";
 import "../../pools/PoolCollector.sol";
 
 contract EVM2AnySubscriptionOnRampRouter is
-  Any2EVMSubscriptionOnRampRouterInterface,
+  EVM2AnySubscriptionOnRampRouterInterface,
   TypeAndVersionInterface,
   OwnerIsCreator,
   PoolCollector
@@ -16,7 +16,7 @@ contract EVM2AnySubscriptionOnRampRouter is
   string public constant override typeAndVersion = "EVM2AnySubscriptionOnRampRouter 1.0.0";
 
   // destination chain id => OnRamp
-  mapping(uint256 => Any2EVMSubscriptionOnRampInterface) private s_onRamps;
+  mapping(uint256 => EVM2EVMSubscriptionOnRampInterface) private s_onRamps;
   // A mapping to get the balance of a given subscription
   mapping(address => uint256) private s_subscriptionBalance;
 
@@ -27,13 +27,13 @@ contract EVM2AnySubscriptionOnRampRouter is
     s_config = config;
   }
 
-  /// @inheritdoc Any2EVMSubscriptionOnRampRouterInterface
+  /// @inheritdoc EVM2AnySubscriptionOnRampRouterInterface
   function ccipSend(uint256 destinationChainId, CCIP.EVM2AnySubscriptionMessage memory message)
     external
     returns (uint64)
   {
     // Find and put the correct onRamp on the stack.
-    Any2EVMSubscriptionOnRampInterface onRamp = s_onRamps[destinationChainId];
+    EVM2EVMSubscriptionOnRampInterface onRamp = s_onRamps[destinationChainId];
     // Check if the onRamp is a zero address, meaning the chain is not supported.
     if (address(onRamp) == address(0)) revert UnsupportedDestinationChain(destinationChainId);
     // If fees are enabled, charge the subscription.
@@ -47,15 +47,15 @@ contract EVM2AnySubscriptionOnRampRouter is
     return onRamp.forwardFromRouter(message, msg.sender);
   }
 
-  /// @inheritdoc Any2EVMSubscriptionOnRampRouterInterface
-  function setOnRamp(uint256 chainId, Any2EVMSubscriptionOnRampInterface onRamp) external onlyOwner {
+  /// @inheritdoc EVM2AnySubscriptionOnRampRouterInterface
+  function setOnRamp(uint256 chainId, EVM2EVMSubscriptionOnRampInterface onRamp) external onlyOwner {
     if (address(s_onRamps[chainId]) == address(onRamp)) revert OnRampAlreadySet(chainId, onRamp);
     s_onRamps[chainId] = onRamp;
     emit OnRampSet(chainId, onRamp);
   }
 
-  /// @inheritdoc Any2EVMSubscriptionOnRampRouterInterface
-  function getOnRamp(uint256 chainId) external view returns (Any2EVMSubscriptionOnRampInterface) {
+  /// @inheritdoc EVM2AnySubscriptionOnRampRouterInterface
+  function getOnRamp(uint256 chainId) external view returns (EVM2EVMSubscriptionOnRampInterface) {
     return s_onRamps[chainId];
   }
 
@@ -64,18 +64,18 @@ contract EVM2AnySubscriptionOnRampRouter is
     return address(s_onRamps[chainId]) != address(0);
   }
 
-  /// @inheritdoc Any2EVMSubscriptionOnRampRouterInterface
+  /// @inheritdoc EVM2AnySubscriptionOnRampRouterInterface
   function setFee(uint96 newFee) external onlyFeeAdmin {
     s_config.fee = newFee;
     emit FeeSet(newFee);
   }
 
-  /// @inheritdoc Any2EVMSubscriptionOnRampRouterInterface
+  /// @inheritdoc EVM2AnySubscriptionOnRampRouterInterface
   function getFee() external view returns (uint96) {
     return s_config.fee;
   }
 
-  /// @inheritdoc Any2EVMSubscriptionOnRampRouterInterface
+  /// @inheritdoc EVM2AnySubscriptionOnRampRouterInterface
   function fundSubscription(uint256 amount) external {
     // TODO after spec work revisit this to improve subscriptions
     address sender = msg.sender;
@@ -85,7 +85,7 @@ contract EVM2AnySubscriptionOnRampRouter is
     emit SubscriptionFunded(sender, amount);
   }
 
-  /// @inheritdoc Any2EVMSubscriptionOnRampRouterInterface
+  /// @inheritdoc EVM2AnySubscriptionOnRampRouterInterface
   function unfundSubscription(uint256 amount) external {
     address sender = msg.sender;
     s_subscriptionBalance[sender] -= amount;
@@ -94,7 +94,7 @@ contract EVM2AnySubscriptionOnRampRouter is
     emit SubscriptionUnfunded(sender, amount);
   }
 
-  /// @inheritdoc Any2EVMSubscriptionOnRampRouterInterface
+  /// @inheritdoc EVM2AnySubscriptionOnRampRouterInterface
   function getBalance(address sender) external view returns (uint256 balance) {
     return s_subscriptionBalance[sender];
   }

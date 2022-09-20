@@ -199,8 +199,8 @@ contract EVM2EVMTollOnRamp_getRequiredFee is EVM2EVMTollOnRampSetup {
 
 /// @notice #setFeeConfig
 contract EVM2EVMTollOnRamp_setFeeConfig is EVM2EVMTollOnRampSetup {
-  Any2EVMTollOnRampInterface.FeeConfig s_feeConfig1;
-  Any2EVMTollOnRampInterface.FeeConfig s_feeConfig2;
+  EVM2EVMTollOnRampInterface.FeeConfig s_feeConfig1;
+  EVM2EVMTollOnRampInterface.FeeConfig s_feeConfig2;
   uint256 constant FEE = 1;
 
   function setUp() public virtual override {
@@ -213,8 +213,8 @@ contract EVM2EVMTollOnRamp_setFeeConfig is EVM2EVMTollOnRampSetup {
     feeTokens2[0] = s_sourceTokens[1];
     uint256[] memory fees = new uint256[](1);
     fees[0] = FEE;
-    s_feeConfig1 = Any2EVMTollOnRampInterface.FeeConfig({feeTokens: feeTokens1, fees: fees});
-    s_feeConfig2 = Any2EVMTollOnRampInterface.FeeConfig({feeTokens: feeTokens2, fees: fees});
+    s_feeConfig1 = EVM2EVMTollOnRampInterface.FeeConfig({feeTokens: feeTokens1, fees: fees});
+    s_feeConfig2 = EVM2EVMTollOnRampInterface.FeeConfig({feeTokens: feeTokens2, fees: fees});
   }
 
   // Success

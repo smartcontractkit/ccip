@@ -3,14 +3,14 @@ pragma solidity ^0.8.0;
 
 import "../../models/Models.sol";
 import "./BaseOnRampRouterInterface.sol";
-import "./Any2EVMSubscriptionOnRampInterface.sol";
+import "./EVM2EVMSubscriptionOnRampInterface.sol";
 
-interface Any2EVMSubscriptionOnRampRouterInterface is BaseOnRampRouterInterface {
-  error OnRampAlreadySet(uint256 chainId, Any2EVMSubscriptionOnRampInterface onRamp);
+interface EVM2AnySubscriptionOnRampRouterInterface is BaseOnRampRouterInterface {
+  error OnRampAlreadySet(uint256 chainId, EVM2EVMSubscriptionOnRampInterface onRamp);
   error FundingTooLow(address sender);
   error OnlyCallableByFeeAdmin();
 
-  event OnRampSet(uint256 indexed chainId, Any2EVMSubscriptionOnRampInterface indexed onRamp);
+  event OnRampSet(uint256 indexed chainId, EVM2EVMSubscriptionOnRampInterface indexed onRamp);
   event FeeSet(uint96);
   event SubscriptionFunded(address indexed sender, uint256 amount);
   event SubscriptionUnfunded(address indexed sender, uint256 amount);
@@ -40,14 +40,14 @@ interface Any2EVMSubscriptionOnRampRouterInterface is BaseOnRampRouterInterface 
    * @param chainId destination chain ID
    * @param onRamp OnRamp to use for that destination chain
    */
-  function setOnRamp(uint256 chainId, Any2EVMSubscriptionOnRampInterface onRamp) external;
+  function setOnRamp(uint256 chainId, EVM2EVMSubscriptionOnRampInterface onRamp) external;
 
   /**
    * @notice Gets the current OnRamp for the specified chain ID
    * @param chainId Chain ID to get ramp details for
    * @return onRamp
    */
-  function getOnRamp(uint256 chainId) external view returns (Any2EVMSubscriptionOnRampInterface);
+  function getOnRamp(uint256 chainId) external view returns (EVM2EVMSubscriptionOnRampInterface);
 
   /**
    * @notice Changes the fee amount

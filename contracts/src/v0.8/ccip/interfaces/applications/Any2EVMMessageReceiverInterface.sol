@@ -6,7 +6,7 @@ import "../subscription/SubscriptionManagerInterface.sol";
 
 /**
  * @notice Application contracts that intend to receive messages from
- * the OffRamp should implement this interface.
+ * the OffRampRouter should implement this interface.
  */
 interface Any2EVMMessageReceiverInterface is SubscriptionManagerInterface {
   /**

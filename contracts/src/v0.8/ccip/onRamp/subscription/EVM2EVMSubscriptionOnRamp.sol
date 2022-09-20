@@ -8,7 +8,7 @@ import "../BaseOnRamp.sol";
 /**
  * @notice An implementation of a subscription OnRamp.
  */
-contract EVM2EVMSubscriptionOnRamp is Any2EVMSubscriptionOnRampInterface, BaseOnRamp, TypeAndVersionInterface {
+contract EVM2EVMSubscriptionOnRamp is EVM2EVMSubscriptionOnRampInterface, BaseOnRamp, TypeAndVersionInterface {
   string public constant override typeAndVersion = "EVM2EVMSubscriptionOnRamp 1.0.0";
 
   // The last used sequence number per receiver address. This is zero in the case
@@ -26,7 +26,7 @@ contract EVM2EVMSubscriptionOnRamp is Any2EVMSubscriptionOnRampInterface, BaseOn
     OnRampConfig memory config,
     RateLimiterConfig memory rateLimiterConfig,
     address tokenLimitsAdmin,
-    Any2EVMSubscriptionOnRampRouterInterface router
+    EVM2AnySubscriptionOnRampRouterInterface router
   )
     BaseOnRamp(
       chainId,

@@ -5,7 +5,7 @@ import "../../pools/PoolCollector.sol";
 
 contract PoolCollectorHelper is PoolCollector {
   function collectTokens(
-    Any2EVMTollOnRampInterface onRamp,
+    EVM2EVMTollOnRampInterface onRamp,
     IERC20[] calldata tokens,
     uint256[] calldata amounts
   ) external {
@@ -13,7 +13,7 @@ contract PoolCollectorHelper is PoolCollector {
   }
 
   function chargeFee(
-    Any2EVMTollOnRampInterface onRamp,
+    EVM2EVMTollOnRampInterface onRamp,
     IERC20 feeToken,
     uint256 feeTokenAmount
   ) external {

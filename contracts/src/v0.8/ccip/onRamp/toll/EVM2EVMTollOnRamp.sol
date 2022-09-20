@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../interfaces/onRamp/Any2EVMTollOnRampRouterInterface.sol";
+import "../../interfaces/onRamp/EVM2AnyTollOnRampRouterInterface.sol";
 import "../../../interfaces/TypeAndVersionInterface.sol";
 import "../BaseOnRamp.sol";
 
 /**
  * @notice An implementation of a toll OnRamp.
  */
-contract EVM2EVMTollOnRamp is Any2EVMTollOnRampInterface, BaseOnRamp, TypeAndVersionInterface {
+contract EVM2EVMTollOnRamp is EVM2EVMTollOnRampInterface, BaseOnRamp, TypeAndVersionInterface {
   string public constant override typeAndVersion = "EVM2EVMTollOnRamp 1.0.0";
 
   // Fees per token.
@@ -25,7 +25,7 @@ contract EVM2EVMTollOnRamp is Any2EVMTollOnRampInterface, BaseOnRamp, TypeAndVer
     OnRampConfig memory config,
     RateLimiterConfig memory rateLimiterConfig,
     address tokenLimitsAdmin,
-    Any2EVMTollOnRampRouterInterface router
+    EVM2AnyTollOnRampRouterInterface router
   )
     BaseOnRamp(
       chainId,
@@ -41,7 +41,7 @@ contract EVM2EVMTollOnRamp is Any2EVMTollOnRampInterface, BaseOnRamp, TypeAndVer
     )
   {}
 
-  /// @inheritdoc Any2EVMTollOnRampInterface
+  /// @inheritdoc EVM2EVMTollOnRampInterface
   function forwardFromRouter(CCIP.EVM2AnyTollMessage memory message, address originalSender)
     external
     override
@@ -70,7 +70,7 @@ contract EVM2EVMTollOnRamp is Any2EVMTollOnRampInterface, BaseOnRamp, TypeAndVer
     return tollMsg.sequenceNumber;
   }
 
-  /// @inheritdoc Any2EVMTollOnRampInterface
+  /// @inheritdoc EVM2EVMTollOnRampInterface
   // If the fee is not explicitly set, we use the solidity default of zero.
   // The set of tokens in the pool registry defines the whitelist of fee tokens.
   function setFeeConfig(FeeConfig memory feeConfig) external override onlyOwner {
@@ -91,7 +91,7 @@ contract EVM2EVMTollOnRamp is Any2EVMTollOnRampInterface, BaseOnRamp, TypeAndVer
     s_feeTokens = feeConfig.feeTokens;
   }
 
-  /// @inheritdoc Any2EVMTollOnRampInterface
+  /// @inheritdoc EVM2EVMTollOnRampInterface
   // NOTE: Assumes fee token is valid.
   function getRequiredFee(IERC20 feeToken) external view override returns (uint256) {
     return s_feesByToken[feeToken];

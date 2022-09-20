@@ -217,7 +217,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 	tollOnRampFees := map[common.Address]*big.Int{
 		sourceLinkTokenAddress: big.NewInt(1), // 1 juel relay fee.
 	}
-	_, err = tollOnRamp.SetFeeConfig(sourceUser, evm_2_evm_toll_onramp.Any2EVMTollOnRampInterfaceFeeConfig{
+	_, err = tollOnRamp.SetFeeConfig(sourceUser, evm_2_evm_toll_onramp.EVM2EVMTollOnRampInterfaceFeeConfig{
 		Fees:      []*big.Int{tollOnRampFees[sourceLinkTokenAddress]},
 		FeeTokens: []common.Address{sourceLinkTokenAddress},
 	})
@@ -308,7 +308,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 
 	// Setup subscription contracts.
 	subOnRampRouterAddress, _, _, err := evm_2_any_subscription_onramp_router.DeployEVM2AnySubscriptionOnRampRouter(
-		sourceUser, sourceChain, evm_2_any_subscription_onramp_router.Any2EVMSubscriptionOnRampRouterInterfaceRouterConfig{
+		sourceUser, sourceChain, evm_2_any_subscription_onramp_router.EVM2AnySubscriptionOnRampRouterInterfaceRouterConfig{
 			Fee:      big.NewInt(0),
 			FeeToken: sourceLinkTokenAddress,
 			FeeAdmin: sourceUser.From,

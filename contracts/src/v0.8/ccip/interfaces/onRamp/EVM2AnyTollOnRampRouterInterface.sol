@@ -2,13 +2,13 @@
 pragma solidity 0.8.15;
 
 import "../../models/Models.sol";
-import "./Any2EVMTollOnRampInterface.sol";
+import "./EVM2EVMTollOnRampInterface.sol";
 import "./BaseOnRampRouterInterface.sol";
 
-interface Any2EVMTollOnRampRouterInterface is BaseOnRampRouterInterface {
-  error OnRampAlreadySet(uint256 chainId, Any2EVMTollOnRampInterface onRamp);
+interface EVM2AnyTollOnRampRouterInterface is BaseOnRampRouterInterface {
+  error OnRampAlreadySet(uint256 chainId, EVM2EVMTollOnRampInterface onRamp);
 
-  event OnRampSet(uint256 indexed chainId, Any2EVMTollOnRampInterface indexed onRamp);
+  event OnRampSet(uint256 indexed chainId, EVM2EVMTollOnRampInterface indexed onRamp);
 
   /**
    * @notice Request a message to be sent to the destination chain
@@ -24,12 +24,12 @@ interface Any2EVMTollOnRampRouterInterface is BaseOnRampRouterInterface {
    * @param chainId destination chain ID
    * @param onRamp OnRamp to use for that destination chain
    */
-  function setOnRamp(uint256 chainId, Any2EVMTollOnRampInterface onRamp) external;
+  function setOnRamp(uint256 chainId, EVM2EVMTollOnRampInterface onRamp) external;
 
   /**
    * @notice Gets the current OnRamp for the specified chain ID
    * @param chainId Chain ID to get ramp details for
    * @return onRamp
    */
-  function getOnRamp(uint256 chainId) external view returns (Any2EVMTollOnRampInterface);
+  function getOnRamp(uint256 chainId) external view returns (EVM2EVMTollOnRampInterface);
 }

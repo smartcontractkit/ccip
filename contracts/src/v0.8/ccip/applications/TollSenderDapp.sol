@@ -3,7 +3,7 @@ pragma solidity 0.8.15;
 
 import "../../interfaces/TypeAndVersionInterface.sol";
 import "../../vendor/SafeERC20.sol";
-import "../interfaces/onRamp/Any2EVMTollOnRampRouterInterface.sol";
+import "../interfaces/onRamp/EVM2AnyTollOnRampRouterInterface.sol";
 
 /**
  * @notice This contract enables EOAs to send a single asset across to the chain
@@ -16,7 +16,7 @@ contract TollSenderDapp is TypeAndVersionInterface {
   string public constant override typeAndVersion = "TollSenderDapp 1.0.0";
 
   // On ramp contract responsible for interacting with the DON.
-  Any2EVMTollOnRampRouterInterface public immutable i_onRampRouter;
+  EVM2AnyTollOnRampRouterInterface public immutable i_onRampRouter;
   uint256 public immutable i_destinationChainId;
   // Corresponding contract on the destination chain responsible for receiving the message
   // and enabling the EOA on the destination chain to access the tokens that are sent.
@@ -26,7 +26,7 @@ contract TollSenderDapp is TypeAndVersionInterface {
   error InvalidDestinationAddress(address invalidAddress);
 
   constructor(
-    Any2EVMTollOnRampRouterInterface onRampRouter,
+    EVM2AnyTollOnRampRouterInterface onRampRouter,
     uint256 destinationChainId,
     address destinationContract
   ) {

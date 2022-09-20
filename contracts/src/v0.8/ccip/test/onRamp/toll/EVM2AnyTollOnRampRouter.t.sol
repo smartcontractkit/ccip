@@ -110,16 +110,16 @@ contract EVM2AnyTollOnRampRouter_ccipSend is EVM2EVMTollOnRampSetup {
 
 /// @notice #setOnRamp
 contract EVM2AnyTollOnRampRouter_setOnRamp is EVM2EVMTollOnRampSetup {
-  event OnRampSet(uint256 indexed chainId, Any2EVMTollOnRampInterface indexed onRamp);
+  event OnRampSet(uint256 indexed chainId, EVM2EVMTollOnRampInterface indexed onRamp);
 
   // Success
 
   // Asserts that setOnRamp changes the configured onramp. Also tests getOnRamp
   // and isChainSupported.
   function testSuccess() public {
-    Any2EVMTollOnRampInterface onramp = Any2EVMTollOnRampInterface(address(1));
+    EVM2EVMTollOnRampInterface onramp = EVM2EVMTollOnRampInterface(address(1));
     uint256 chainId = 1337;
-    Any2EVMTollOnRampInterface before = s_onRampRouter.getOnRamp(chainId);
+    EVM2EVMTollOnRampInterface before = s_onRampRouter.getOnRamp(chainId);
     assertEq(address(0), address(before));
     assertFalse(s_onRampRouter.isChainSupported(chainId));
 
@@ -127,7 +127,7 @@ contract EVM2AnyTollOnRampRouter_setOnRamp is EVM2EVMTollOnRampSetup {
     emit OnRampSet(chainId, onramp);
 
     s_onRampRouter.setOnRamp(chainId, onramp);
-    Any2EVMTollOnRampInterface afterSet = s_onRampRouter.getOnRamp(chainId);
+    EVM2EVMTollOnRampInterface afterSet = s_onRampRouter.getOnRamp(chainId);
     assertEq(address(onramp), address(afterSet));
     assertTrue(s_onRampRouter.isChainSupported(chainId));
   }
@@ -138,7 +138,7 @@ contract EVM2AnyTollOnRampRouter_setOnRamp is EVM2EVMTollOnRampSetup {
   // the same onRamp.
   function testAlreadySetReverts() public {
     vm.expectRevert(
-      abi.encodeWithSelector(Any2EVMTollOnRampRouterInterface.OnRampAlreadySet.selector, DEST_CHAIN_ID, s_onRamp)
+      abi.encodeWithSelector(EVM2AnyTollOnRampRouterInterface.OnRampAlreadySet.selector, DEST_CHAIN_ID, s_onRamp)
     );
     s_onRampRouter.setOnRamp(DEST_CHAIN_ID, s_onRamp);
   }
@@ -147,7 +147,7 @@ contract EVM2AnyTollOnRampRouter_setOnRamp is EVM2EVMTollOnRampSetup {
   function testOnlyOwnerReverts() public {
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
-    s_onRampRouter.setOnRamp(1337, Any2EVMTollOnRampInterface(address(1)));
+    s_onRampRouter.setOnRamp(1337, EVM2EVMTollOnRampInterface(address(1)));
   }
 }
 

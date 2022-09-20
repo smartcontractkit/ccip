@@ -3,7 +3,7 @@ pragma solidity 0.8.15;
 
 import "../../interfaces/TypeAndVersionInterface.sol";
 import "../../vendor/SafeERC20.sol";
-import "../interfaces/onRamp/Any2EVMSubscriptionOnRampRouterInterface.sol";
+import "../interfaces/onRamp/EVM2AnySubscriptionOnRampRouterInterface.sol";
 
 /**
  * @notice This contract enables EOAs to send a single asset across to the chain
@@ -16,7 +16,7 @@ contract SubscriptionSenderDapp is TypeAndVersionInterface {
   string public constant override typeAndVersion = "SubscriptionSenderDapp 1.0.0";
 
   // On ramp contract responsible for interacting with the DON.
-  Any2EVMSubscriptionOnRampRouterInterface public immutable i_onRampRouter;
+  EVM2AnySubscriptionOnRampRouterInterface public immutable i_onRampRouter;
   uint256 public immutable i_destinationChainId;
   // Corresponding contract on the destination chain responsible for receiving the message
   // and enabling the EOA on the destination chain to access the tokens that are sent.
@@ -26,7 +26,7 @@ contract SubscriptionSenderDapp is TypeAndVersionInterface {
   error InvalidDestinationAddress(address invalidAddress);
 
   constructor(
-    Any2EVMSubscriptionOnRampRouterInterface onRampRouter,
+    EVM2AnySubscriptionOnRampRouterInterface onRampRouter,
     uint256 destinationChainId,
     address destinationContract
   ) {

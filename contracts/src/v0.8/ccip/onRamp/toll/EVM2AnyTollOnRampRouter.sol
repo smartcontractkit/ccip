@@ -2,11 +2,11 @@
 pragma solidity 0.8.15;
 
 import "../../../interfaces/TypeAndVersionInterface.sol";
-import "../../interfaces/onRamp/Any2EVMTollOnRampRouterInterface.sol";
+import "../../interfaces/onRamp/EVM2AnyTollOnRampRouterInterface.sol";
 import "../../pools/PoolCollector.sol";
 
 contract EVM2AnyTollOnRampRouter is
-  Any2EVMTollOnRampRouterInterface,
+  EVM2AnyTollOnRampRouterInterface,
   TypeAndVersionInterface,
   OwnerIsCreator,
   PoolCollector
@@ -14,12 +14,12 @@ contract EVM2AnyTollOnRampRouter is
   string public constant override typeAndVersion = "EVM2AnyTollOnRampRouter 1.0.0";
 
   // destination chain id => OnRampInterface
-  mapping(uint256 => Any2EVMTollOnRampInterface) private s_onRamps;
+  mapping(uint256 => EVM2EVMTollOnRampInterface) private s_onRamps;
 
-  /// @inheritdoc Any2EVMTollOnRampRouterInterface
+  /// @inheritdoc EVM2AnyTollOnRampRouterInterface
   function ccipSend(uint256 destinationChainId, CCIP.EVM2AnyTollMessage memory message) external returns (uint64) {
     // Find and put the correct onRamp on the stack.
-    Any2EVMTollOnRampInterface onRamp = s_onRamps[destinationChainId];
+    EVM2EVMTollOnRampInterface onRamp = s_onRamps[destinationChainId];
     // Check if the onRamp is a zero address, meaning the chain is not supported.
     if (address(onRamp) == address(0)) revert UnsupportedDestinationChain(destinationChainId);
     if (message.tokens.length != message.amounts.length) revert BaseOnRampInterface.UnsupportedNumberOfTokens();
@@ -33,15 +33,15 @@ contract EVM2AnyTollOnRampRouter is
     return onRamp.forwardFromRouter(message, msg.sender);
   }
 
-  /// @inheritdoc Any2EVMTollOnRampRouterInterface
-  function setOnRamp(uint256 chainId, Any2EVMTollOnRampInterface onRamp) external onlyOwner {
+  /// @inheritdoc EVM2AnyTollOnRampRouterInterface
+  function setOnRamp(uint256 chainId, EVM2EVMTollOnRampInterface onRamp) external onlyOwner {
     if (address(s_onRamps[chainId]) == address(onRamp)) revert OnRampAlreadySet(chainId, onRamp);
     s_onRamps[chainId] = onRamp;
     emit OnRampSet(chainId, onRamp);
   }
 
-  /// @inheritdoc Any2EVMTollOnRampRouterInterface
-  function getOnRamp(uint256 chainId) external view returns (Any2EVMTollOnRampInterface) {
+  /// @inheritdoc EVM2AnyTollOnRampRouterInterface
+  function getOnRamp(uint256 chainId) external view returns (EVM2EVMTollOnRampInterface) {
     return s_onRamps[chainId];
   }
 

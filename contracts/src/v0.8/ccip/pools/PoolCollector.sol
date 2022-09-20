@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../interfaces/onRamp/Any2EVMTollOnRampInterface.sol";
+import "../interfaces/onRamp/EVM2EVMTollOnRampInterface.sol";
 import "../../vendor/SafeERC20.sol";
 import "../access/OwnerIsCreator.sol";
 
@@ -20,7 +20,7 @@ contract PoolCollector is OwnerIsCreator {
    * @param feeTokenAmount the amount of feeToken that is available
    */
   function _chargeFee(
-    Any2EVMTollOnRampInterface onRamp,
+    EVM2EVMTollOnRampInterface onRamp,
     IERC20 feeToken,
     uint256 feeTokenAmount
   ) internal returns (uint256 fee) {

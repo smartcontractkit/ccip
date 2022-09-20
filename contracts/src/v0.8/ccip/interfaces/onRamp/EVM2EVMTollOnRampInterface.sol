@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "../../models/Models.sol";
 import "./BaseOnRampInterface.sol";
 
-interface Any2EVMTollOnRampInterface is BaseOnRampInterface {
+interface EVM2EVMTollOnRampInterface is BaseOnRampInterface {
   error InvalidFeeConfig();
 
   event CCIPSendRequested(CCIP.EVM2EVMTollMessage message);

@@ -2,7 +2,7 @@
 pragma solidity 0.8.15;
 
 import "../../TokenSetup.t.sol";
-import "../../../interfaces/onRamp/Any2EVMTollOnRampInterface.sol";
+import "../../../interfaces/onRamp/EVM2EVMTollOnRampInterface.sol";
 import "../../../onRamp/toll/EVM2EVMTollOnRamp.sol";
 import "../../../onRamp/toll/EVM2AnyTollOnRampRouter.sol";
 
@@ -39,7 +39,7 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
     fees[0] = uint256(RELAYING_FEE_JUELS);
     IERC20[] memory feeTokens = new IERC20[](1);
     feeTokens[0] = s_sourceTokens[0];
-    s_onRamp.setFeeConfig(Any2EVMTollOnRampInterface.FeeConfig({feeTokens: feeTokens, fees: fees}));
+    s_onRamp.setFeeConfig(EVM2EVMTollOnRampInterface.FeeConfig({feeTokens: feeTokens, fees: fees}));
 
     s_onRamp.setPrices(s_sourceTokens, getTokenPrices());
 

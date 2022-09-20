@@ -7,7 +7,7 @@ import "../../../onRamp/subscription/EVM2EVMSubscriptionOnRamp.sol";
 contract EVM2EVMSubscriptionOnRampSetup is TokenSetup {
   // Duplicate event of the CCIPSendRequested in the TollOnRampInterface
   event CCIPSendRequested(CCIP.EVM2EVMSubscriptionMessage message);
-  event OnRampSet(uint256 indexed chainId, Any2EVMSubscriptionOnRampInterface indexed onRamp);
+  event OnRampSet(uint256 indexed chainId, EVM2EVMSubscriptionOnRampInterface indexed onRamp);
   event FeeSet(uint96);
   event SubscriptionFunded(address indexed sender, uint256 amount);
   event SubscriptionUnfunded(address indexed sender, uint256 amount);
@@ -26,7 +26,7 @@ contract EVM2EVMSubscriptionOnRampSetup is TokenSetup {
     s_sourceFeeToken = s_sourceTokens[0];
 
     s_onRampRouter = new EVM2AnySubscriptionOnRampRouter(
-      Any2EVMSubscriptionOnRampRouterInterface.RouterConfig(0, s_sourceFeeToken, OWNER)
+      EVM2AnySubscriptionOnRampRouterInterface.RouterConfig(0, s_sourceFeeToken, OWNER)
     );
 
     s_onRamp = new EVM2EVMSubscriptionOnRamp(

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../interfaces/onRamp/Any2EVMTollOnRampInterface.sol";
+import "../../interfaces/onRamp/EVM2EVMTollOnRampInterface.sol";
 
-contract MockOnRamp is Any2EVMTollOnRampInterface {
+contract MockOnRamp is EVM2EVMTollOnRampInterface {
   uint256 public immutable i_chainId;
   PoolInterface public immutable i_pool;
   uint256 public immutable i_destinationChainId;
