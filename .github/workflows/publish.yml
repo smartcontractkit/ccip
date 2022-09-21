@@ -42,6 +42,11 @@ jobs:
             type=sha
             type=sha,format=long
             type=semver,pattern={{version}},value=v0.0.1
+      - name: Fetch operator-ui
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: make operator-ui 
       - name: Build and push
         id: docker_build
         uses: docker/build-push-action@1814d3dfb36d6f84174e61f4a4b05bd84089a4b9 # v2.8.0
