@@ -24,8 +24,7 @@ import (
 // HINT: if you are coming here because of this error:
 // `web/middleware.go:28:12: pattern assets: no matching files found`
 // then you must first run `make operator-ui` in the root dir to fetch the frontend
-//nolint
-//go:embed "assets"
+// nolint
 var uiEmbedFs embed.FS
 
 // assetFs is the singleton file system instance that is used to serve the static
