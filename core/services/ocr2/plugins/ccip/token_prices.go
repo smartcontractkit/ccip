@@ -76,7 +76,7 @@ func (d *priceGetter) TokensPerFeeCoin(ctx context.Context, tokens []common.Addr
 	// The mapping of token address to source of token price has to live offchain.
 	// Best we can do is sanity check that the token price spec covers all our desired execution token prices.
 	for _, token := range tokens {
-		if _, ok := priceMap[token]; !ok {
+		if _, ok = priceMap[token]; !ok {
 			return nil, errors.Errorf("missing token %s from tokensForFeeCoin spec", token)
 		}
 	}

@@ -73,7 +73,10 @@ func (sbc *SubscriptionCache) Nonce(addr common.Address) uint64 {
 
 func (sbc *SubscriptionCache) IsStrict(addr common.Address) (bool, error) {
 	if _, ok := sbc.strict[addr]; !ok {
-		sub, _ := sbc.router.GetSubscription(nil, addr)
+		sub, err := sbc.router.GetSubscription(nil, addr)
+		if err != nil {
+			return false, err
+		}
 		if sub.Receiver == [common.AddressLength]byte{} {
 			return false, errors.Errorf("subscription does not exist for addr %v", addr)
 		}
@@ -125,7 +128,7 @@ type SubscriptionBatchBuilder struct {
 func NewSubscriptionBatchBuilder(lggr logger.Logger, subFeeToken common.Address, subOffRamp *subOffRamp) *SubscriptionBatchBuilder {
 	subABI, _ := abi.JSON(strings.NewReader(evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRampABI))
 	subCache := NewSubscriptionCache(subOffRamp.router, subOffRamp.EVM2EVMSubscriptionOffRamp, lggr)
-	return &SubscriptionBatchBuilder{lggr: lggr, subABI: subABI, subFeeToken: subFeeToken, subCache: subCache}
+	return &SubscriptionBatchBuilder{lggr: lggr.Named("SubscriptionBatchBuilder").With("offRamp", subOffRamp.Address()), subABI: subABI, subFeeToken: subFeeToken, subCache: subCache}
 }
 
 func (sb *SubscriptionBatchBuilder) BuildBatch(
@@ -158,34 +161,40 @@ func (sb *SubscriptionBatchBuilder) BuildBatch(
 			Data:   msg.Data,
 		})
 		if err2 != nil {
-			sb.lggr.Errorw("unable to parse message", "err", err2, "msg", msg)
+			sb.lggr.Errorw("Skipping msg, unable to parse message", "err", err2, "msg", msg)
 			continue
 		}
+		lggr := sb.lggr.With("seqNr", subMsg.Message.SequenceNumber, "nonce", subMsg.Message.Nonce, "sender", subMsg.Message.Sender, "receiver", subMsg.Message.Receiver)
 		// Skip inflight
 		if _, inflight := inflightSeqNrs[subMsg.Message.SequenceNumber]; inflight {
+			lggr.Infow("Skipping msg, inflight")
 			continue
 		}
 		// Skip executed
 		if _, executed := executed[subMsg.Message.SequenceNumber]; executed {
+			lggr.Infow("Skipping msg, executed")
 			continue
 		}
 		// Skip if sub is stalled
 		if _, stalled := stalledSub[subMsg.Message.Receiver]; stalled {
+			lggr.Infow("Skipping msg, stalled sub")
 			continue
 		}
 		strict, err2 := sb.subCache.IsStrict(subMsg.Message.Receiver)
 		if err2 != nil {
-			// Skip if we're unable to determine its strictness.
+			lggr.Infow("Skipping msg, unable to determine strictness", "err", err2)
 			continue
 		}
 		messageValue := aggregateTokenValue(tokenLimitPrices, srcToDst, subMsg.Message.Tokens, subMsg.Message.Amounts)
 		// if token limit is smaller than message value skip message
 		if aggregateTokenLimit.Cmp(messageValue) == -1 {
+			lggr.Infow("Skipping msg, token limit exceeded", "token limit", aggregateTokenLimit, "value", messageValue)
 			continue
 		}
 		if strict {
 			if sb.subCache.MostRecentExecution(subMsg.Message.Receiver) == MessageStateFailure {
 				stalledSub[subMsg.Message.Receiver] = struct{}{}
+				lggr.Infow("Skipping msg, Most recent execution errored, stalled sub", "receiver", subMsg.Message.Receiver)
 				continue
 			}
 		}
@@ -193,7 +202,7 @@ func (sb *SubscriptionBatchBuilder) BuildBatch(
 		totalGasLimit := maxOverhead + subMsg.Message.GasLimit.Uint64()
 		// Skip if insufficient gas left in the batch
 		if batchGasLimit < totalGasLimit {
-			sb.lggr.Infow("Insufficient remaining gas in batch limit", "batchGasLimit", batchGasLimit, "totalGasLimit", totalGasLimit)
+			lggr.Infow("Skipping msg, insufficient remaining gas in batch limit", "batchGasLimit", batchGasLimit, "totalGasLimit", totalGasLimit)
 			continue
 		}
 		maxCharge := maxSubCharge(gasPrice, subTokenPerFeeCoin, totalGasLimit)
@@ -206,24 +215,23 @@ func (sb *SubscriptionBatchBuilder) BuildBatch(
 		}
 		// Skip if insufficient balance
 		if subscriptionBalances[subMsg.Message.Receiver].Cmp(maxCharge) < 0 {
-			sb.lggr.Infow("Insufficient sub balance to execute msg", "balance", subscriptionBalances[subMsg.Message.Receiver], "maxCharge", maxCharge)
+			lggr.Infow("Skipping msg, insufficient sub balance to execute msg", "balance", subscriptionBalances[subMsg.Message.Receiver], "maxCharge", maxCharge)
 			continue
 		}
-		if strict {
-			if _, ok := nonces[subMsg.Message.Receiver]; !ok {
-				nonces[subMsg.Message.Receiver] = sb.subCache.Nonce(subMsg.Message.Receiver)
-			}
-			if subMsg.Message.Nonce != nonces[subMsg.Message.Receiver]+1 {
-				sb.lggr.Infow("Invalid nonce", "nonce", subMsg.Message.Nonce, "expectedNonce", nonces[subMsg.Message.Receiver])
-				continue
-			}
-			// We have the correct nonce, increment.
-			nonces[subMsg.Message.Receiver] = subMsg.Message.Nonce
+		if _, ok := nonces[subMsg.Message.Receiver]; !ok {
+			// First time getting the nonce
+			nonces[subMsg.Message.Receiver] = sb.subCache.Nonce(subMsg.Message.Receiver)
 		}
+		if subMsg.Message.Nonce != nonces[subMsg.Message.Receiver]+1 {
+			lggr.Infow("Skipping msg, invalid nonce", "expectedNonce", nonces[subMsg.Message.Receiver])
+			continue
+		}
+		// We have the correct nonce, increment.
+		nonces[subMsg.Message.Receiver] = subMsg.Message.Nonce
 		subscriptionBalances[subMsg.Message.Receiver] = big.NewInt(0).Sub(subscriptionBalances[subMsg.Message.Receiver], maxCharge)
 		batchGasLimit -= totalGasLimit
 		aggregateTokenLimit.Sub(aggregateTokenLimit, messageValue)
-		sb.lggr.Infow("Adding sub msg to batch", "seqNum", subMsg.Message.SequenceNumber, "maxCharge", maxCharge, "maxGasOverhead", maxOverhead, "strict", strict)
+		lggr.Infow("Adding sub msg to batch", "maxCharge", maxCharge, "maxGasOverhead", maxOverhead, "strict", strict)
 		executableSeqNrs = append(executableSeqNrs, subMsg.Message.SequenceNumber)
 	}
 	return executableSeqNrs

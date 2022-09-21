@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - ccip-develop
+      - testnet-smartcon
 
 jobs:
   build-and-publish:

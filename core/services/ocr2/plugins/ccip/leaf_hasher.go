@@ -85,7 +85,6 @@ func (t *TollLeafHasher) ParseEVM2EVMTollLog(log types.Log) (*evm_2_evm_toll_onr
 type SubscriptionLeafHasher struct {
 	subABI       abi.ABI
 	metaDataHash [32]byte
-	typeHash     [32]byte
 	ctx          hasher.Ctx[[32]byte]
 }
 

@@ -12,7 +12,18 @@ import (
 // COMMAND    what function to run e.g. "deploy", "setConfig", or "externalExecution".
 //
 // Use "-v" as a Go tool argument for streaming log output.
-func TestFullFeatureCCIP(t *testing.T) {
+func TestPrintState(t *testing.T) {
+	ownerKey := os.Getenv("OWNER_KEY")
+	if ownerKey == "" {
+		t.Log("No command given, skipping ccip-test-script. This is intended behaviour for automated testing.")
+		t.SkipNow()
+	}
+	printCCIPState(
+		GetSetupChain(t, ownerKey, Rinkeby),
+		GetSetupChain(t, ownerKey, Goerli))
+}
+
+func TestCCIP(t *testing.T) {
 	ownerKey := os.Getenv("OWNER_KEY")
 	command := os.Getenv("COMMAND")
 	if ownerKey == "" {
@@ -29,13 +40,9 @@ func TestFullFeatureCCIP(t *testing.T) {
 		t.Log("No command given, exit successfully")
 		t.SkipNow()
 	case "deploy":
-		deployCCIPContracts(t, ownerKey,
+		deploySubscriptionContracts(t, ownerKey,
 			&Rinkeby,
 			&Goerli)
-	case "printJobs":
-		printContractConfig(
-			GetSetupChain(t, ownerKey, Rinkeby),
-			GetSetupChain(t, ownerKey, Goerli))
 	default:
 		runCommand(t, ownerKey, command)
 	}
@@ -73,6 +80,10 @@ func runCommand(t *testing.T, ownerKey string, command string) {
 	//case "noRepeat":
 	//	// Executing the same request twice should fail
 	//	client.ExternalExecutionSubmitOfframpTwiceShouldFail(t)
+	case "dapp":
+		client.SendDappTx(t)
+	case "gov":
+		client.ChangeGovernanceParameters(t)
 	case "don":
 		// Cross chain request with DON execution
 		client.DonExecutionHappyPath(t)
@@ -94,6 +105,8 @@ func runCommand(t *testing.T, ownerKey string, command string) {
 	case "acceptOwnership":
 		// Should accept ownership on the destination chain OffRamp & Executor
 		client.AcceptOwnership(t)
+	case "wip":
+		client.wip(t, GetSetupChain(t, ownerKey, Rinkeby), GetSetupChain(t, ownerKey, Goerli))
 	default:
 		t.Errorf("Unknown command \"%s\"", command)
 	}

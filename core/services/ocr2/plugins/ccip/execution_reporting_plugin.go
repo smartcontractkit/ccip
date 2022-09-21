@@ -31,8 +31,8 @@ const (
 )
 
 const (
-	BatchGasLimit                   = 1_000_000 // TODO: think if a good value for this
-	RootSnoozeTime                  = 1 * 10 * time.Second
+	BatchGasLimit                   = 4_000_000 // TODO: think if a good value for this
+	RootSnoozeTime                  = 60 * time.Minute
 	ExecutionMaxInflightTimeSeconds = 180
 	MaxPayloadLength                = 1000
 	MaxTokensPerMessage             = 5
@@ -254,18 +254,6 @@ func (r *ExecutionReportingPlugin) Query(ctx context.Context, timestamp types.Re
 	return json.Marshal(tokensPerFeeCoin)
 }
 
-func (r *ExecutionReportingPlugin) inflightSeqNums() map[uint64]struct{} {
-	r.inFlightMu.RLock()
-	defer r.inFlightMu.RUnlock()
-	inFlightSeqNums := make(map[uint64]struct{})
-	for _, report := range r.inFlight {
-		for _, seqNr := range report.report.SequenceNumbers {
-			inFlightSeqNums[seqNr] = struct{}{}
-		}
-	}
-	return inFlightSeqNums
-}
-
 func (r *ExecutionReportingPlugin) maxGasPrice() uint64 {
 	return MaxGasPrice
 }
@@ -326,9 +314,9 @@ func leafsFromIntervals(lggr logger.Logger, onRampToEventSig map[common.Address]
 		}
 		var seqNrs []uint64
 		for _, log := range logs {
-			seqNr, err := seqParsers[onRamp](log)
-			if err != nil {
-				return nil, err
+			seqNr, err2 := seqParsers[onRamp](log)
+			if err2 != nil {
+				return nil, err2
 			}
 			seqNrs = append(seqNrs, seqNr)
 		}

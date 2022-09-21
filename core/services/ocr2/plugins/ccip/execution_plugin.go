@@ -57,7 +57,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	}
 	// Subscribe to the correct logs based on onramp type.
 	onRampAddr := common.HexToAddress(pluginConfig.OnRampID)
-	onRampType, _, err := typeAndVersion(onRampAddr, sourceChain.Client())
+	onRampType, _, err := TypeAndVersion(onRampAddr, sourceChain.Client())
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +80,10 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 			return req.Message.SequenceNumber, nil
 		}
 		// Subscribe to all relevant relay logs.
-		sourceChain.LogPoller().MergeFilter([]common.Hash{CCIPTollSendRequested}, []common.Address{onRampAddr})
+		err = sourceChain.LogPoller().MergeFilter([]common.Hash{CCIPTollSendRequested}, []common.Address{onRampAddr})
+		if err != nil {
+			return nil, err
+		}
 		reqEventSig = CCIPTollSendRequested
 		onRampToHasher[onRampAddr] = NewTollLeafHasher(sourceChainId, destChainId, onRampAddr, hashingCtx)
 	case EVM2EVMSubscriptionOnRamp:
@@ -96,14 +99,20 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 			return req.Message.SequenceNumber, nil
 		}
 		// Subscribe to all relevant relay logs.
-		sourceChain.LogPoller().MergeFilter([]common.Hash{CCIPSubSendRequested}, []common.Address{onRampAddr})
+		err = sourceChain.LogPoller().MergeFilter([]common.Hash{CCIPSubSendRequested}, []common.Address{onRampAddr})
+		if err != nil {
+			return nil, err
+		}
 		reqEventSig = CCIPSubSendRequested
 		onRampToHasher[onRampAddr] = NewSubscriptionLeafHasher(sourceChainId, destChainId, onRampAddr, hashingCtx)
 	default:
 		return nil, errors.Errorf("unrecognized onramp, is %v the correct onramp address?", onRampAddr)
 	}
-	destChain.LogPoller().MergeFilter([]common.Hash{ReportAccepted}, []common.Address{verifier.Address()})
-	offRampType, _, _ := typeAndVersion(common.HexToAddress(spec.ContractID), destChain.Client())
+	err = destChain.LogPoller().MergeFilter([]common.Hash{ReportAccepted}, []common.Address{verifier.Address()})
+	if err != nil {
+		return nil, err
+	}
+	offRampType, _, err := TypeAndVersion(common.HexToAddress(spec.ContractID), destChain.Client())
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +135,10 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	if err2 != nil {
 		return nil, err
 	}
-	destChain.LogPoller().MergeFilter([]common.Hash{ExecutionStateChanged}, []common.Address{offRamp.Address()})
+	err = destChain.LogPoller().MergeFilter([]common.Hash{ExecutionStateChanged}, []common.Address{offRamp.Address()})
+	if err != nil {
+		return nil, err
+	}
 	// TODO: Can also check the on/offramp pair is compatible
 	priceGetter, err := NewPriceGetter(pluginConfig.TokensPerFeeCoinPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
 	if err2 != nil {

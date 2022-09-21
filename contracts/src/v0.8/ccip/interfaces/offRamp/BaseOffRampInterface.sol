@@ -8,7 +8,7 @@ import "../../../vendor/IERC20.sol";
 interface BaseOffRampInterface {
   error ZeroAddressNotAllowed();
   error AlreadyExecuted(uint64 sequenceNumber);
-  error ExecutionError();
+  error ExecutionError(bytes error);
   error InvalidSourceChain(uint256 sourceChainId);
   error NoMessagesToExecute();
   error ManualExecutionNotYetEnabled();

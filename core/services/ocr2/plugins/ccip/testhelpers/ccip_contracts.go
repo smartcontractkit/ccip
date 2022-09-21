@@ -285,10 +285,10 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 	_, err = destPool.SetOffRamp(destUser, offRampAddress, true)
 	require.NoError(t, err)
 	// Create offRampAddr router
-	offRampRouterAddress, _, tollOffRampRouter, err := any_2_evm_toll_offramp_router.DeployAny2EVMTollOffRampRouter(destUser, destChain, []common.Address{offRampAddress})
+	offRampRouterAddress, _, _, err := any_2_evm_toll_offramp_router.DeployAny2EVMTollOffRampRouter(destUser, destChain, []common.Address{offRampAddress})
 	require.NoError(t, err)
 	destChain.Commit()
-	tollOffRampRouter, err = any_2_evm_toll_offramp_router.NewAny2EVMTollOffRampRouter(offRampRouterAddress, destChain)
+	tollOffRampRouter, err := any_2_evm_toll_offramp_router.NewAny2EVMTollOffRampRouter(offRampRouterAddress, destChain)
 	require.NoError(t, err)
 	_, err = tollOffRamp.SetRouter(destUser, offRampRouterAddress)
 	require.NoError(t, err)
@@ -391,10 +391,11 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 	_, err = subOffRampRouter.GetFeeToken(nil)
 	require.NoError(t, err)
 	// Enable onramps on blob verifier.
-	blobVerifier.SetConfig(destUser, blob_verifier.BlobVerifierInterfaceBlobVerifierConfig{
+	_, err = blobVerifier.SetConfig(destUser, blob_verifier.BlobVerifierInterfaceBlobVerifierConfig{
 		OnRamps:          []common.Address{onRampAddress, subOnRampAddress},
 		MinSeqNrByOnRamp: []uint64{1, 1},
 	})
+	require.NoError(t, err)
 	// Ensure we have at least finality blocks.
 	for i := 0; i < 50; i++ {
 		sourceChain.Commit()

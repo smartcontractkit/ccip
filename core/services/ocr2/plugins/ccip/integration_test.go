@@ -57,7 +57,7 @@ func TestIntegration_CCIP(t *testing.T) {
 	bootstrapNodePort := int64(19599)
 	ctx := context.Background()
 	// Starts nodes and configures them in the OCR contracts.
-	bootstrapNode, nodes, configBlock := testhelpers.SetupAndStartNodes(t, ctx, ccipContracts, bootstrapNodePort)
+	bootstrapNode, nodes, configBlock := testhelpers.SetupAndStartNodes(ctx, t, ccipContracts, bootstrapNodePort)
 
 	// Add the bootstrap job
 	bootstrapNode.AddBootstrapJob(t, fmt.Sprintf(`

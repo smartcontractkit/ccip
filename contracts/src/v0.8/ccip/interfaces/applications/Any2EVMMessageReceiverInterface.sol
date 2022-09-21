@@ -10,7 +10,7 @@ import "../subscription/SubscriptionManagerInterface.sol";
  */
 interface Any2EVMMessageReceiverInterface is SubscriptionManagerInterface {
   /**
-   * @notice Called by the OffRamp to deliver a message
+   * @notice Called by the OffRampRouter to deliver a message
    * @param message CCIP Message
    */
   function ccipReceive(CCIP.Any2EVMMessage calldata message) external;

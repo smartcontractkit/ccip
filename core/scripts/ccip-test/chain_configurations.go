@@ -10,6 +10,7 @@ import (
 	ocrtypes2 "github.com/smartcontractkit/libocr/offchainreporting2/types"
 
 	"github.com/smartcontractkit/chainlink/core/logger"
+	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/secrets"
 	"github.com/smartcontractkit/chainlink/core/scripts/common"
 )
 
@@ -32,6 +33,7 @@ type EvmChainConfig struct {
 	TokenSender     gethcommon.Address
 	MessageReceiver gethcommon.Address
 	ReceiverDapp    gethcommon.Address
+	GovernanceDapp  gethcommon.Address
 	OffRamp         gethcommon.Address
 	Afn             gethcommon.Address
 }
@@ -49,66 +51,98 @@ type EVMGasSettings struct {
 var DefaultGasTipFee = big.NewInt(1e9)
 
 type DeploySettings struct {
-	DeployAFN          bool
-	DeployTokenPools   bool
-	DeployRamp         bool
-	DeployRouter       bool
-	DeployBlobVerifier bool
+	DeployAFN            bool
+	DeployTokenPools     bool
+	DeployRamp           bool
+	DeployRouter         bool
+	DeployBlobVerifier   bool
+	DeployGovernanceDapp bool
+	DeployedAt           uint64
 }
 
 // Rinkeby is configured to work as an onramp for Goerli
 var Rinkeby = EvmChainConfig{
 	ChainId: big.NewInt(4),
-	EthUrl:  "wss://dawn-nameless-frog.rinkeby.quiknode.pro/2b88748d89f29acd9c33ed30a4e7690cd269a260/",
+	EthUrl:  secrets.RinkebyEthURL,
 	GasSettings: EVMGasSettings{
 		EIP1559:   true,
 		GasTipCap: DefaultGasTipFee,
 	},
-	LinkToken:    gethcommon.HexToAddress("0x01be23585060835e02b77ef475b0cc51aa1e0709"),
-	BridgeTokens: []gethcommon.Address{gethcommon.HexToAddress("0x01be23585060835e02b77ef475b0cc51aa1e0709")},
-	TokenPools:   []gethcommon.Address{gethcommon.HexToAddress("0xcB6f8a746db85f60a58Eba211E476601fd40A999")},
-	OnRamp:       gethcommon.HexToAddress("0x989996F826e37BCD6aeD6649838292F45A7eC732"),
-	OnRampRouter: gethcommon.HexToAddress("0xABca0Bb6227Fe4a23b1A46DF0c8764abE2759F75"),
-	TokenSender:  gethcommon.HexToAddress("0x1859E433Cb8B9a5Dcf2E3DffB460A299FC5Dd06D"),
-	Afn:          gethcommon.HexToAddress("0x3fb839502b242896f61f400615Ef0d4257c822cf"),
+	LinkToken:      gethcommon.HexToAddress("0x01be23585060835e02b77ef475b0cc51aa1e0709"),
+	BridgeTokens:   []gethcommon.Address{gethcommon.HexToAddress("0x01be23585060835e02b77ef475b0cc51aa1e0709")},
+	TokenPools:     []gethcommon.Address{gethcommon.HexToAddress("0x9698EB719d6807348cE0C8269d7dd6f12700fC69")},
+	OnRamp:         gethcommon.HexToAddress("0x0a33b4fd85Ed50AB3484eDfd3a7D49783fAd2Cf2"),
+	OnRampRouter:   gethcommon.HexToAddress("0x5C535256fCac5493df2DBE54B7E097590A77f6fA"),
+	TokenSender:    gethcommon.HexToAddress("0x4a96E9DCD32A5de534A4DEC740f68262ddBe5B58"),
+	GovernanceDapp: gethcommon.HexToAddress("0xf7f19036d8fb9e9D0F1bA91CAb6f460781355e83"),
+	Afn:            gethcommon.HexToAddress("0xd65C654AbF5D79e1cc4615E62C647a814E98c5D5"),
 	DeploySettings: DeploySettings{
-		DeployAFN:        true,
-		DeployTokenPools: true,
-		DeployRamp:       true,
-		DeployRouter:     true,
+		DeployAFN:            false,
+		DeployTokenPools:     false,
+		DeployRamp:           false,
+		DeployRouter:         false,
+		DeployGovernanceDapp: true,
+		DeployedAt:           11352595,
 	},
 }
 
 // Goerli is configured to work as an offRamp for Rinkeby
 var Goerli = EvmChainConfig{
 	ChainId: big.NewInt(5),
-	EthUrl:  "wss://url",
+	EthUrl:  secrets.GoerliEthURL,
 	GasSettings: EVMGasSettings{
 		EIP1559:   true,
 		GasTipCap: DefaultGasTipFee,
 	},
 	LinkToken:       gethcommon.HexToAddress("0x326C977E6efc84E512bB9C30f76E30c160eD06FB"),
 	BridgeTokens:    []gethcommon.Address{gethcommon.HexToAddress("0x326C977E6efc84E512bB9C30f76E30c160eD06FB")},
-	TokenPools:      []gethcommon.Address{gethcommon.HexToAddress("0xa978DC2298DaB6dCEfAB06CC22fFeeb67dFD31C5")},
-	OffRamp:         gethcommon.HexToAddress("0xfC67c4DBfB4873D6DB48eBc4B26Ac310Ac0aBfA1"),
-	OffRampRouter:   gethcommon.HexToAddress("0x77ad33c539Eff83732379B1C0474901Db6EB4B44"),
-	BlobVerifier:    gethcommon.HexToAddress("0x4fe34eeD1b57F555BcA1A672eE5d5E8cD60AcAAE"),
-	MessageReceiver: gethcommon.HexToAddress("0xc99148f5e687CB16511EFcA6668F2b6eCe63458C"),
-	ReceiverDapp:    gethcommon.HexToAddress("0x9FeE875aEcfED6Fe87d1297A4420854FC07D5626"),
-	Afn:             gethcommon.HexToAddress("0x1ea60e6afD1855eAEbDe4f2D10a65dD4EA2DC6fB"),
+	TokenPools:      []gethcommon.Address{gethcommon.HexToAddress("0x4E4cdb6cEB8Fb2940a97Cf0dBC8581c8A420Ee6f")},
+	BlobVerifier:    gethcommon.HexToAddress("0xf32202e2C0B75854851EF7e4e9E9929bBB6C35EC"),
+	OffRamp:         gethcommon.HexToAddress("0x235dC05991791f199D766A1b3fB2D1b80E1CfD6B"),
+	OffRampRouter:   gethcommon.HexToAddress("0xf36B9824dD342a9F69Ad4FB3599f1A7FC9373608"),
+	MessageReceiver: gethcommon.HexToAddress("0x430a78789539e80B6eD1A6F3E52f51280A159BCd"),
+	ReceiverDapp:    gethcommon.HexToAddress("0x4308444c67DeeA56644a861460231F5fdBC1Ad0b"),
+	GovernanceDapp:  gethcommon.HexToAddress("0xebAd1E6cd98A93C5Df4e8A9FEf7b7d1AE892A764"),
+	Afn:             gethcommon.HexToAddress("0x77b04A38e53fCF18edc2220dcBD7635f9E5D8F76"),
 	DeploySettings: DeploySettings{
-		DeployAFN:          true,
-		DeployTokenPools:   true,
-		DeployBlobVerifier: true,
-		DeployRamp:         true,
-		DeployRouter:       true,
+		DeployAFN:            false,
+		DeployTokenPools:     false,
+		DeployBlobVerifier:   false,
+		DeployRamp:           true,
+		DeployRouter:         true,
+		DeployGovernanceDapp: true,
+		DeployedAt:           7573621,
+	},
+}
+
+// Sepolia is configured to work as an onramp for Goerli
+var Sepolia = EvmChainConfig{
+	ChainId: big.NewInt(11155111),
+	EthUrl:  secrets.SepoliaEthURL,
+	GasSettings: EVMGasSettings{
+		EIP1559:   true,
+		GasTipCap: DefaultGasTipFee,
+	},
+	LinkToken:    gethcommon.HexToAddress("0xb227f007804c16546Bd054dfED2E7A1fD5437678"),
+	BridgeTokens: []gethcommon.Address{gethcommon.HexToAddress("0xb227f007804c16546Bd054dfED2E7A1fD5437678")},
+	TokenPools:   []gethcommon.Address{gethcommon.HexToAddress("")},
+	OnRamp:       gethcommon.HexToAddress(""),
+	OnRampRouter: gethcommon.HexToAddress(""),
+	TokenSender:  gethcommon.HexToAddress(""),
+	Afn:          gethcommon.HexToAddress(""),
+	DeploySettings: DeploySettings{
+		DeployAFN:        false,
+		DeployTokenPools: false,
+		DeployRamp:       false,
+		DeployRouter:     false,
+		DeployedAt:       1592304,
 	},
 }
 
 // BSCTestnet is configured to be an offramp for Rinkeby
 var BSCTestnet = EvmChainConfig{
 	ChainId: big.NewInt(97),
-	EthUrl:  "wss://binance-testnet.eth.devnet.tools/ws",
+	EthUrl:  secrets.BSCEthURL,
 	GasSettings: EVMGasSettings{
 		EIP1559:  false,
 		GasPrice: big.NewInt(20e9),
@@ -120,12 +154,12 @@ var BSCTestnet = EvmChainConfig{
 	OffRampRouter:   gethcommon.HexToAddress("0x3a9e41F6a28331bcc3a4ca4c58b844Cd2Fd217bb"),
 	BlobVerifier:    gethcommon.HexToAddress("0x3755b7B14e9c71C080787e084471e5f51BBD2Cc6"),
 	MessageReceiver: gethcommon.HexToAddress("0xB0Fa66B3B165D10ED46F3e33E2a45926d958d391"),
-	ReceiverDapp:    gethcommon.HexToAddress("0xB71eA7F248DA49D62209066196480e740d18cE14"),
+	ReceiverDapp:    gethcommon.HexToAddress("0xbaEf074daeE1F4Cdc48eb9F6877C03fEA3039Fd8"),
 	Afn:             gethcommon.HexToAddress("0x77ad33c539Eff83732379B1C0474901Db6EB4B44"),
 	DeploySettings: DeploySettings{
-		DeployAFN:          true,
-		DeployTokenPools:   true,
-		DeployBlobVerifier: true,
+		DeployAFN:          false,
+		DeployTokenPools:   false,
+		DeployBlobVerifier: false,
 		DeployRamp:         true,
 		DeployRouter:       true,
 	},
@@ -134,7 +168,7 @@ var BSCTestnet = EvmChainConfig{
 // PolygonMumbai is configured to be an offramp for Rinkeby
 var PolygonMumbai = EvmChainConfig{
 	ChainId: big.NewInt(80001),
-	EthUrl:  "wss://link-matic.getblock.io/testnet/axej8woh-seej-6ash-4Yu7-eyib1495dhno/",
+	EthUrl:  secrets.PolygonEthURL,
 	GasSettings: EVMGasSettings{
 		EIP1559:  false,
 		GasPrice: nil,

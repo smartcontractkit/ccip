@@ -1,9 +1,18 @@
 [profile.default]
+solc_version = '0.8.15'
+auto_detect_solc = false
+optimizer_runs = 900
+
 src = 'contracts/src/v0.8/ccip'
 test = 'contracts/src/v0.8/ccip/test'
 out = 'contracts/foundry-artifacts'
 libs = ["contracts/node_modules", "lib"]
-optimizer_runs = 900
+
+remappings = [
+    '@openzeppelin/=lib/openzeppelin-contracts/',
+    'forge-std/=lib/forge-std/src/',
+    'ds-test/=lib/forge-std/lib/ds-test/src/'
+]
 
 gas_price = 1
 

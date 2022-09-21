@@ -196,9 +196,9 @@ func (eb *ExecutionBatchBuilder) getExecutableSeqNrs(
 			return nil, err
 		}
 		for _, sourceToken := range sourceTokens {
-			dst, err := eb.offRamp.GetDestinationToken(nil, sourceToken)
-			if err != nil {
-				return nil, err
+			dst, err2 := eb.offRamp.GetDestinationToken(nil, sourceToken)
+			if err2 != nil {
+				return nil, err2
 			}
 			srcToDst[sourceToken] = dst
 		}

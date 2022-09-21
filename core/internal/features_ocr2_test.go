@@ -282,7 +282,7 @@ chainID 			= 1337
 			URL:  models.WebURL(*u),
 		})
 
-		ocrJob, err := validate.ValidatedOracleSpecToml(apps[i].Config, fmt.Sprintf(`
+		ocrJob, err = validate.ValidatedOracleSpecToml(apps[i].Config, fmt.Sprintf(`
 type               = "offchainreporting2"
 relay              = "evm"
 schemaVersion      = 1

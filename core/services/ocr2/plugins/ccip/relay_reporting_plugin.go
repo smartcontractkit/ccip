@@ -212,14 +212,14 @@ func (r *RelayReportingPlugin) Observation(ctx context.Context, timestamp types.
 			return nil, err
 		}
 		// All available messages that have not been relayed yet and have sufficient confirmations.
-		lggr.Infof("Looking for requests with sig %s and nextMin %d on tollOnRamp %s", r.onRampToReqEventSig[onRamp].Hex(), nextMin, onRamp.Hex())
+		lggr.Infof("Looking for requests with sig %s and nextMin %d on onRamp %s", r.onRampToReqEventSig[onRamp].Hex(), nextMin, onRamp.Hex())
 		reqs, err := r.source.LogsDataWordGreaterThan(r.onRampToReqEventSig[onRamp], onRamp, SendRequestedSequenceNumberIndex, EvmWord(nextMin), int(r.offchainConfig.SourceIncomingConfirmations))
 		if err != nil {
 			return nil, err
 		}
-		lggr.Infof("%d requests found for tollOnRamp %s", len(reqs), onRamp.Hex())
+		lggr.Infof("%d requests found for onRamp %s", len(reqs), onRamp.Hex())
 		if len(reqs) == 0 {
-			r.lggr.Infow("no requests", "tollOnRamp", onRamp)
+			r.lggr.Infow("no requests", "onRamp", onRamp)
 			continue
 		}
 		var seqNrs []uint64
@@ -240,7 +240,7 @@ func (r *RelayReportingPlugin) Observation(ctx context.Context, timestamp types.
 			Min: min,
 			Max: max,
 		}
-		lggr.Infof("tollOnRamp %v: min %v max %v", onRamp, min, max)
+		lggr.Infof("OnRamp %v: min %v max %v", onRamp, min, max)
 	}
 	if len(intervalsByOnRamp) == 0 {
 		r.lggr.Infow("No observations")
@@ -305,11 +305,11 @@ func (r *RelayReportingPlugin) Report(ctx context.Context, timestamp types.Repor
 	intervalByOnRamp := make(map[common.Address]blob_verifier.CCIPInterval)
 	for onRamp, intervals := range intervalsByOnRamp {
 		if len(intervals) <= r.F {
-			lggr.Debugf("Observations for tollOnRamp %s 1 < #obs <= F, need at least F+1 to continue", onRamp.Hex())
+			lggr.Debugf("Observations for OnRamp %s 1 < #obs <= F, need at least F+1 to continue", onRamp.Hex())
 			continue
 		}
 
-		// We have at least F+1 valid observations for the given tollOnRamp
+		// We have at least F+1 valid observations for the given OnRamp
 		// Extract the min and max
 		sort.Slice(intervals, func(i, j int) bool {
 			return intervals[i].Min < intervals[j].Min

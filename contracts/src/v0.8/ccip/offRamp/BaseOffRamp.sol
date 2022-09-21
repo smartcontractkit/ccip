@@ -127,7 +127,7 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry, 
       if (BaseOffRampInterface.ReceiverError.selector == bytes4(err)) {
         return CCIP.MessageExecutionState.FAILURE;
       } else {
-        revert ExecutionError();
+        revert ExecutionError(err);
       }
     }
     return CCIP.MessageExecutionState.SUCCESS;

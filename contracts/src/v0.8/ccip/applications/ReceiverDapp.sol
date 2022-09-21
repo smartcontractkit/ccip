@@ -11,15 +11,19 @@ import "../interfaces/offRamp/Any2EVMOffRampRouterInterface.sol";
 contract ReceiverDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterface {
   string public constant override typeAndVersion = "ReceiverDapp 1.0.0";
 
-  Any2EVMOffRampRouterInterface public immutable i_router;
+  Any2EVMOffRampRouterInterface public s_router;
 
   address s_manager;
 
   error InvalidDeliverer(address deliverer);
 
   constructor(Any2EVMOffRampRouterInterface router) {
-    i_router = router;
+    s_router = router;
     s_manager = msg.sender;
+  }
+
+  function setRouter(Any2EVMOffRampRouterInterface router) public {
+    s_router = router;
   }
 
   function getSubscriptionManager() external view returns (address) {
@@ -57,7 +61,7 @@ contract ReceiverDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterfac
    * @dev only calls from the set router are accepted.
    */
   modifier onlyRouter() {
-    if (msg.sender != address(i_router)) revert InvalidDeliverer(msg.sender);
+    if (msg.sender != address(s_router)) revert InvalidDeliverer(msg.sender);
     _;
   }
 }

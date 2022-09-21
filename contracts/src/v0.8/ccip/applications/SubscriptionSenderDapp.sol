@@ -59,7 +59,7 @@ contract SubscriptionSenderDapp is TypeAndVersionInterface {
         data: abi.encode(msg.sender, destinationAddress),
         tokens: tokens,
         amounts: amounts,
-        gasLimit: 0
+        gasLimit: 3e5
       })
     );
   }

@@ -50,7 +50,7 @@ interface AggregateRateLimiterInterface {
    * @notice Sets the rate limited config.
    * @param config The new rate limiter config.
    * @dev should only be callable by the owner or token limit admin.
-   * @dev the max rate is uint240.max
+   * @dev the max rate is uint208.max
    */
   function setRateLimiterConfig(RateLimiterConfig memory config) external;
 

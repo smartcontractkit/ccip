@@ -74,7 +74,6 @@ func proveSingleLayer[H hasher.Hash](layer []H, indices []int) singleLayerProof[
 
 type Tree[H hasher.Hash] struct {
 	layers [][]H
-	ctx    hasher.Ctx[H]
 }
 
 func NewTree[H hasher.Hash](ctx hasher.Ctx[H], leafHashes []H) *Tree[H] {

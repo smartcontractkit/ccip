@@ -193,7 +193,7 @@ func SetupNodeCCIP(
 		destLp logpoller.LogPoller = logpoller.NewLogPoller(logpoller.NewORM(destChainID, db, lggr, config), destClient,
 			lggr, 500*time.Millisecond, 10, 2, 2)
 	)
-	evmChain, err := evm.LoadChainSet(nil, evm.ChainSetOpts{
+	evmChain, err := evm.LoadChainSet(context.Background(), evm.ChainSetOpts{
 		ORM:              chainORM,
 		Config:           config,
 		Logger:           lggr,
@@ -253,9 +253,9 @@ func SetupNodeCCIP(
 		},
 		GenTxManager: func(c types.DBChain) txmgr.TxManager {
 			if c.ID.String() == sourceChainID.String() {
-				return txmgr.NewTxm(db, sourceClient, evmtest.NewChainScopedConfig(t, config), simEthKeyStore, eventBroadcaster, lggr, &txmgr.CheckerFactory{sourceClient}, sourceLp)
+				return txmgr.NewTxm(db, sourceClient, evmtest.NewChainScopedConfig(t, config), simEthKeyStore, eventBroadcaster, lggr, &txmgr.CheckerFactory{Client: sourceClient}, sourceLp)
 			} else if c.ID.String() == destChainID.String() {
-				return txmgr.NewTxm(db, destClient, evmtest.NewChainScopedConfig(t, config), simEthKeyStore, eventBroadcaster, lggr, &txmgr.CheckerFactory{destClient}, destLp)
+				return txmgr.NewTxm(db, destClient, evmtest.NewChainScopedConfig(t, config), simEthKeyStore, eventBroadcaster, lggr, &txmgr.CheckerFactory{Client: destClient}, destLp)
 			}
 			t.Fatalf("invalid chain ID %v", c.ID.String())
 			return nil
@@ -343,7 +343,7 @@ func NoNodesHaveExecutedSeqNum(t *testing.T, ccipContracts CCIPContracts, offRam
 	return log
 }
 
-func SetupAndStartNodes(t *testing.T, ctx context.Context, ccipContracts CCIPContracts, bootstrapNodePort int64) (Node, []Node, int64) {
+func SetupAndStartNodes(ctx context.Context, t *testing.T, ccipContracts CCIPContracts, bootstrapNodePort int64) (Node, []Node, int64) {
 	appBootstrap, bootstrapPeerID, bootstrapTransmitter, bootstrapKb, _, _ := SetupNodeCCIP(t, ccipContracts.DestUser, bootstrapNodePort, "bootstrap_ccip", ccipContracts.SourceChain, ccipContracts.DestChain, ccipContracts.SourceChainID, ccipContracts.DestChainID)
 	var (
 		oracles []confighelper.OracleIdentityExtra
@@ -379,7 +379,7 @@ func SetupAndStartNodes(t *testing.T, ctx context.Context, ccipContracts CCIPCon
 			},
 			ConfigEncryptionPublicKey: kb.ConfigEncryptionPublicKey(),
 		})
-		err := app.Start(ctx)
+		err = app.Start(ctx)
 		require.NoError(t, err)
 		t.Cleanup(func() {
 			app.Stop()
