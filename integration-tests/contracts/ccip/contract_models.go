@@ -10,13 +10,17 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/afn_contract"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/blob_verifier"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_subscription_onramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_toll_onramp_router"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_subscription_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/native_token_pool"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/receiver_dapp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/simple_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/toll_sender_dapp"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
@@ -102,7 +106,7 @@ func (pool *NativeTokenPool) SetOffRamp(offRamp common.Address) error {
 	}
 	log.Info().
 		Str("Token Pool", pool.Address()).
-		Msg("Setting off ramp for onramp router")
+		Msg("Setting off ramp for Token Pool")
 	tx, err := pool.instance.SetOffRamp(opts, offRamp, true)
 	if err != nil {
 		return err
@@ -124,35 +128,35 @@ func (afn *AFN) Address() string {
 	return afn.EthAddress.Hex()
 }
 
-type OnRampRouter struct {
+type TollOnRampRouter struct {
 	client     *blockchain.EthereumClient
 	instance   *evm_2_any_toll_onramp_router.EVM2AnyTollOnRampRouter
 	EthAddress common.Address
 }
 
-func (router *OnRampRouter) Address() string {
+func (router *TollOnRampRouter) Address() string {
 	return router.EthAddress.Hex()
 }
 
-func (router *OnRampRouter) SetOnRamp(chainID *big.Int, onRamp common.Address) error {
+func (router *TollOnRampRouter) SetOnRamp(chainID *big.Int, onRamp common.Address) error {
 	opts, err := router.client.TransactionOpts(router.client.DefaultWallet)
 	if err != nil {
 		return err
 	}
 	log.Info().
-		Str("Router", router.Address()).
+		Str("TollOnRampRouter", router.Address()).
 		Msg("Setting on ramp for onramp router")
 	tx, err := router.instance.SetOnRamp(opts, chainID, onRamp)
 	if err != nil {
 		return err
 	}
 	log.Info().
-		Str("onramp", onRamp.Hex()).
-		Msg("onramp router is configured")
+		Str("TollOnRamp", onRamp.Hex()).
+		Msg("TollOnRampRouter router is configured")
 	return router.client.ProcessTransaction(tx)
 }
 
-func (router *OnRampRouter) CCIPSend(destChainId *big.Int, msg evm_2_any_toll_onramp_router.CCIPEVM2AnyTollMessage) (*types.Transaction, error) {
+func (router *TollOnRampRouter) CCIPSend(destChainId *big.Int, msg evm_2_any_toll_onramp_router.CCIPEVM2AnyTollMessage) (*types.Transaction, error) {
 	opts, err := router.client.TransactionOpts(router.client.DefaultWallet)
 	if err != nil {
 		return nil, err
@@ -164,31 +168,108 @@ func (router *OnRampRouter) CCIPSend(destChainId *big.Int, msg evm_2_any_toll_on
 	return tx, router.client.ProcessTransaction(tx)
 }
 
-type OnRamp struct {
+type SubOnRampRouter struct {
+	client     *blockchain.EthereumClient
+	instance   *evm_2_any_subscription_onramp_router.EVM2AnySubscriptionOnRampRouter
+	EthAddress common.Address
+}
+
+func (router *SubOnRampRouter) Address() string {
+	return router.EthAddress.Hex()
+}
+
+func (router *SubOnRampRouter) SetOnRamp(chainID *big.Int, onRamp common.Address) error {
+	opts, err := router.client.TransactionOpts(router.client.DefaultWallet)
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Str("SubOnRampRouter", router.Address()).
+		Msg("Setting on ramp for onramp router")
+	tx, err := router.instance.SetOnRamp(opts, chainID, onRamp)
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Str("SubOnRamp", onRamp.Hex()).
+		Msg("SubOnRampRouter is configured")
+	return router.client.ProcessTransaction(tx)
+}
+
+func (router *SubOnRampRouter) SetFee(fee *big.Int) error {
+	opts, err := router.client.TransactionOpts(router.client.DefaultWallet)
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Str("fee", fee.String()).
+		Msg("Setting fee on SubOnRampRouter")
+	tx, err := router.instance.SetFee(opts, fee)
+	if err != nil {
+		return err
+	}
+	return router.client.ProcessTransaction(tx)
+}
+
+func (router *SubOnRampRouter) CCIPSend(destChainId *big.Int, msg evm_2_any_subscription_onramp_router.CCIPEVM2AnySubscriptionMessage) (*types.Transaction, error) {
+	opts, err := router.client.TransactionOpts(router.client.DefaultWallet)
+	if err != nil {
+		return nil, err
+	}
+	tx, err := router.instance.CcipSend(opts, destChainId, msg)
+	if err != nil {
+		return nil, err
+	}
+	return tx, router.client.ProcessTransaction(tx)
+}
+
+func (router *SubOnRampRouter) FundSubscription(fee *big.Int) error {
+	opts, err := router.client.TransactionOpts(router.client.DefaultWallet)
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Str("fee", fee.String()).
+		Msg("funding FundSubscription SubOnRampRouter")
+	tx, err := router.instance.FundSubscription(opts, fee)
+	if err != nil {
+		return err
+	}
+	return router.client.ProcessTransaction(tx)
+}
+
+func (router *SubOnRampRouter) GetBalance(sender common.Address) (*big.Int, error) {
+	log.Info().
+		Str("sender", sender.Hex()).
+		Msg("getting subscription SubOnRampRouter")
+	return router.instance.GetBalance(nil, sender)
+}
+
+type TollOnRamp struct {
 	client     *blockchain.EthereumClient
 	instance   *evm_2_evm_toll_onramp.EVM2EVMTollOnRamp
 	EthAddress common.Address
 }
 
-func (onRamp *OnRamp) Address() string {
+func (onRamp *TollOnRamp) Address() string {
 	return onRamp.EthAddress.Hex()
 }
 
-func (onRamp *OnRamp) FilterCCIPSendRequested(
+func (onRamp *TollOnRamp) FilterCCIPSendRequested(
 	currentBlock uint64,
 ) (*evm_2_evm_toll_onramp.EVM2EVMTollOnRampCCIPSendRequestedIterator, error) {
 	filter := bind.FilterOpts{Start: currentBlock}
 	return onRamp.instance.FilterCCIPSendRequested(&filter)
 }
 
-func (onRamp *OnRamp) SetFeeConfig(tokens []common.Address, fees []*big.Int) error {
+func (onRamp *TollOnRamp) SetFeeConfig(tokens []common.Address, fees []*big.Int) error {
 	opts, err := onRamp.client.TransactionOpts(onRamp.client.DefaultWallet)
 	if err != nil {
 		return err
 	}
 	log.Info().
-		Str("Router", onRamp.Address()).
-		Msg("Setting Fee config onramp")
+		Str("TollOnRamp", onRamp.Address()).
+		Msg("Setting Fee config TollOnRamp")
 	tx, err := onRamp.instance.SetFeeConfig(opts, evm_2_evm_toll_onramp.EVM2EVMTollOnRampInterfaceFeeConfig{
 		Fees:      fees,
 		FeeTokens: tokens,
@@ -199,14 +280,46 @@ func (onRamp *OnRamp) SetFeeConfig(tokens []common.Address, fees []*big.Int) err
 	return onRamp.client.ProcessTransaction(tx)
 }
 
-func (onRamp *OnRamp) SetTokenPrices(tokens []common.Address, prices []*big.Int) error {
+func (onRamp *TollOnRamp) SetTokenPrices(tokens []common.Address, prices []*big.Int) error {
 	opts, err := onRamp.client.TransactionOpts(onRamp.client.DefaultWallet)
 	if err != nil {
 		return err
 	}
 	log.Info().
-		Str("OnRamp", onRamp.Address()).
-		Msg("Setting onramp token prices")
+		Str("TollOnRamp", onRamp.Address()).
+		Msg("Setting TollOnRamp token prices")
+	tx, err := onRamp.instance.SetPrices(opts, tokens, prices)
+	if err != nil {
+		return err
+	}
+	return onRamp.client.ProcessTransaction(tx)
+}
+
+type SubOnRamp struct {
+	client     *blockchain.EthereumClient
+	instance   *evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRamp
+	EthAddress common.Address
+}
+
+func (onRamp *SubOnRamp) Address() string {
+	return onRamp.EthAddress.Hex()
+}
+
+func (onRamp *SubOnRamp) FilterCCIPSendRequested(
+	currentBlock uint64,
+) (*evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRampCCIPSendRequestedIterator, error) {
+	filter := bind.FilterOpts{Start: currentBlock}
+	return onRamp.instance.FilterCCIPSendRequested(&filter)
+}
+
+func (onRamp *SubOnRamp) SetTokenPrices(tokens []common.Address, prices []*big.Int) error {
+	opts, err := onRamp.client.TransactionOpts(onRamp.client.DefaultWallet)
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Str("SubOnRamp", onRamp.Address()).
+		Msg("Setting SubOnRamp token prices")
 	tx, err := onRamp.instance.SetPrices(opts, tokens, prices)
 	if err != nil {
 		return err
@@ -274,18 +387,18 @@ type MessageReceiver struct {
 	EthAddress common.Address
 }
 
-type OffRamp struct {
+type TollOffRamp struct {
 	client     *blockchain.EthereumClient
 	instance   *any_2_evm_toll_offramp.EVM2EVMTollOffRamp
 	EthAddress common.Address
 }
 
-func (offRamp *OffRamp) Address() string {
+func (offRamp *TollOffRamp) Address() string {
 	return offRamp.EthAddress.Hex()
 }
 
 // SetConfig sets the offchain reporting protocol configuration
-func (offRamp *OffRamp) SetConfig(
+func (offRamp *TollOffRamp) SetConfig(
 	signers []common.Address,
 	transmitters []common.Address,
 	f uint8,
@@ -293,7 +406,7 @@ func (offRamp *OffRamp) SetConfig(
 	offchainConfigVersion uint64,
 	offchainConfig []byte,
 ) error {
-	log.Info().Str("Contract Address", offRamp.Address()).Msg("Configuring Offramp Contract")
+	log.Info().Str("Contract Address", offRamp.Address()).Msg("Configuring TollOffRamp Contract")
 	// Set Config
 	opts, err := offRamp.client.TransactionOpts(offRamp.client.GetDefaultWallet())
 	if err != nil {
@@ -302,7 +415,7 @@ func (offRamp *OffRamp) SetConfig(
 	log.Info().
 		Interface("signerAddresses", signers).
 		Interface("transmitterAddresses", transmitters).
-		Msg("Configuring OffRamp")
+		Msg("Configuring TollOffRamp")
 	tx, err := offRamp.instance.SetConfig0(
 		opts,
 		signers,
@@ -319,13 +432,13 @@ func (offRamp *OffRamp) SetConfig(
 	return offRamp.client.ProcessTransaction(tx)
 }
 
-func (offRamp *OffRamp) SetRouter(offRampRouterAddress common.Address) error {
+func (offRamp *TollOffRamp) SetRouter(offRampRouterAddress common.Address) error {
 	opts, err := offRamp.client.TransactionOpts(offRamp.client.DefaultWallet)
 	if err != nil {
 		return err
 	}
 	log.Info().
-		Str("Offramp", offRamp.Address()).
+		Str("TollOffRamp", offRamp.Address()).
 		Msg("Setting router for offramp")
 	tx, err := offRamp.instance.SetRouter(opts, offRampRouterAddress)
 	if err != nil {
@@ -333,24 +446,24 @@ func (offRamp *OffRamp) SetRouter(offRampRouterAddress common.Address) error {
 	}
 	log.Info().
 		Str("offRampRouterAddress", offRampRouterAddress.Hex()).
-		Msg("offRamp router is configured")
+		Msg("TollOffRamp router is configured")
 	return offRamp.client.ProcessTransaction(tx)
 }
 
-func (offRamp *OffRamp) FilterExecutionStateChanged(seqNumber []uint64) (
+func (offRamp *TollOffRamp) FilterExecutionStateChanged(seqNumber []uint64, currentBlockOnDest uint64) (
 	*any_2_evm_toll_offramp.EVM2EVMTollOffRampExecutionStateChangedIterator, error,
 ) {
-	return offRamp.instance.FilterExecutionStateChanged(nil, seqNumber)
+	return offRamp.instance.FilterExecutionStateChanged(&bind.FilterOpts{Start: currentBlockOnDest}, seqNumber)
 }
 
-func (offRamp *OffRamp) SetTokenPrices(tokens []common.Address, prices []*big.Int) error {
+func (offRamp *TollOffRamp) SetTokenPrices(tokens []common.Address, prices []*big.Int) error {
 	opts, err := offRamp.client.TransactionOpts(offRamp.client.DefaultWallet)
 	if err != nil {
 		return err
 	}
 	log.Info().
-		Str("Offramp", offRamp.Address()).
-		Msg("Setting offramp token prices")
+		Str("TollOffRamp", offRamp.Address()).
+		Msg("Setting TollOffRamp token prices")
 	tx, err := offRamp.instance.SetPrices(opts, tokens, prices)
 	if err != nil {
 		return err
@@ -358,19 +471,147 @@ func (offRamp *OffRamp) SetTokenPrices(tokens []common.Address, prices []*big.In
 	return offRamp.client.ProcessTransaction(tx)
 }
 
-type OffRampRouter struct {
+type SubOffRamp struct {
+	client     *blockchain.EthereumClient
+	instance   *any_2_evm_subscription_offramp.EVM2EVMSubscriptionOffRamp
+	EthAddress common.Address
+}
+
+func (offRamp *SubOffRamp) Address() string {
+	return offRamp.EthAddress.Hex()
+}
+
+// SetConfig sets the offchain reporting protocol configuration
+func (offRamp *SubOffRamp) SetConfig(
+	signers []common.Address,
+	transmitters []common.Address,
+	f uint8,
+	onchainConfig []byte,
+	offchainConfigVersion uint64,
+	offchainConfig []byte,
+) error {
+	log.Info().Str("Contract Address", offRamp.Address()).Msg("Configuring SubOffRamp Contract")
+	// Set Config
+	opts, err := offRamp.client.TransactionOpts(offRamp.client.GetDefaultWallet())
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Interface("signerAddresses", signers).
+		Interface("transmitterAddresses", transmitters).
+		Msg("Configuring SubOffRamp")
+	tx, err := offRamp.instance.SetConfig0(
+		opts,
+		signers,
+		transmitters,
+		f,
+		onchainConfig,
+		offchainConfigVersion,
+		offchainConfig,
+	)
+
+	if err != nil {
+		return err
+	}
+	return offRamp.client.ProcessTransaction(tx)
+}
+
+func (offRamp *SubOffRamp) SetRouter(offRampRouterAddress common.Address) error {
+	opts, err := offRamp.client.TransactionOpts(offRamp.client.DefaultWallet)
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Str("SubOffRamp", offRamp.Address()).
+		Msg("Setting router for SubOffRamp")
+	tx, err := offRamp.instance.SetRouter(opts, offRampRouterAddress)
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Str("SubOffRampRouterAddress", offRampRouterAddress.Hex()).
+		Msg("SubOffRamp router is configured")
+	return offRamp.client.ProcessTransaction(tx)
+}
+
+func (offRamp *SubOffRamp) FilterExecutionStateChanged(seqNumber []uint64, currentBlock uint64) (
+	*any_2_evm_subscription_offramp.EVM2EVMSubscriptionOffRampExecutionStateChangedIterator, error,
+) {
+	return offRamp.instance.FilterExecutionStateChanged(&bind.FilterOpts{Start: currentBlock}, seqNumber)
+}
+
+func (offRamp *SubOffRamp) SetTokenPrices(tokens []common.Address, prices []*big.Int) error {
+	opts, err := offRamp.client.TransactionOpts(offRamp.client.DefaultWallet)
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Str("SubOffRamp", offRamp.Address()).
+		Msg("Setting SubOffRamp token prices")
+	tx, err := offRamp.instance.SetPrices(opts, tokens, prices)
+	if err != nil {
+		return err
+	}
+	return offRamp.client.ProcessTransaction(tx)
+}
+
+type TollOffRampRouter struct {
 	client     *blockchain.EthereumClient
 	instance   *any_2_evm_toll_offramp_router.Any2EVMTollOffRampRouter
 	EthAddress common.Address
 }
 
-func (orr *OffRampRouter) Address() string {
+func (orr *TollOffRampRouter) Address() string {
 	return orr.EthAddress.Hex()
+}
+
+type SubOffRampRouter struct {
+	client     *blockchain.EthereumClient
+	instance   *any_2_evm_subscription_offramp_router.Any2EVMSubscriptionOffRampRouter
+	EthAddress common.Address
+}
+
+func (orr *SubOffRampRouter) Address() string {
+	return orr.EthAddress.Hex()
+}
+
+func (orr *SubOffRampRouter) CreateSubscription(senders []common.Address, receiver common.Address, strict bool, balance *big.Int) error {
+	opts, err := orr.client.TransactionOpts(orr.client.DefaultWallet)
+	if err != nil {
+		return err
+	}
+	sub := any_2_evm_subscription_offramp_router.SubscriptionInterfaceOffRampSubscription{
+		Senders:          senders,
+		Receiver:         receiver,
+		StrictSequencing: strict,
+		Balance:          balance,
+	}
+	log.Info().
+		Str("SubOffRampRouter", orr.Address()).
+		Interface("Subscription", sub).
+		Msg("creating subscription")
+	tx, err := orr.instance.CreateSubscription(opts, sub)
+	if err != nil {
+		return err
+	}
+	return orr.client.ProcessTransaction(tx)
+}
+
+func (orr *SubOffRampRouter) GetSubscription(receiver common.Address) (*big.Int, error) {
+	log.Info().
+		Str("SubOffRampRouter", orr.Address()).
+		Interface("receiver", receiver.Hex()).
+		Msg("getting subscription")
+	sub, err := orr.instance.GetSubscription(nil, receiver)
+	if err != nil {
+		return nil, err
+	}
+	return sub.Balance, nil
 }
 
 type ReceiverDapp struct {
 	client     *blockchain.EthereumClient
-	instance   *receiver_dapp.ReceiverDapp
+	instance   *maybe_revert_message_receiver.MaybeRevertMessageReceiver
 	EthAddress common.Address
 }
 

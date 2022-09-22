@@ -2,6 +2,7 @@ package testhelpers
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"testing"
 	"time"
@@ -35,6 +36,25 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
 	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
+)
+
+var (
+	// Source
+	SourcePool       = "source pool"
+	SourceSub        = "source sub"
+	TollOnRampRouter = "toll onramp router"
+	TollOnRamp       = "toll onramp"
+	SubOnRamp        = "sub onramp"
+	SubOnRampRouter  = "sub onramp router"
+
+	// Dest
+	TollOffRampRouter = "toll offramp router"
+	TollOffRamp       = "toll offramp"
+	SubOffRampRouter  = "sub offramp router"
+	DestPool          = "dest pool"
+	DestSub           = "dest sub"
+	Receiver          = "receiver"
+	Sender            = "sender"
 )
 
 type MaybeRevertReceiver struct {
@@ -121,13 +141,25 @@ func (c *CCIPContracts) AssertBalances(bas []BalanceAssertion) {
 	}
 }
 
-func (c *CCIPContracts) GetBalances(brs []BalanceReq) map[string]*big.Int {
+func GetBalances(brs []BalanceReq) (map[string]*big.Int, error) {
 	m := make(map[string]*big.Int)
 	for _, br := range brs {
 		m[br.Name] = br.Getter(br.Addr)
-		require.NotNil(c.t, m[br.Name], "%v getter return nil", br.Name)
+		if m[br.Name] == nil {
+			return nil, fmt.Errorf("%v getter return nil", br.Name)
+		}
 	}
-	return m
+	return m, nil
+}
+
+func MustAddBigInt(a *big.Int, b string) *big.Int {
+	bi, _ := big.NewInt(0).SetString(b, 10)
+	return big.NewInt(0).Add(a, bi)
+}
+
+func MustSubBigInt(a *big.Int, b string) *big.Int {
+	bi, _ := big.NewInt(0).SetString(b, 10)
+	return big.NewInt(0).Sub(a, bi)
 }
 
 func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPContracts {
@@ -285,10 +317,10 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 	_, err = destPool.SetOffRamp(destUser, offRampAddress, true)
 	require.NoError(t, err)
 	// Create offRampAddr router
-	offRampRouterAddress, _, _, err := any_2_evm_toll_offramp_router.DeployAny2EVMTollOffRampRouter(destUser, destChain, []common.Address{offRampAddress})
+	offRampRouterAddress, _, tollOffRampRouter, err := any_2_evm_toll_offramp_router.DeployAny2EVMTollOffRampRouter(destUser, destChain, []common.Address{offRampAddress})
 	require.NoError(t, err)
 	destChain.Commit()
-	tollOffRampRouter, err := any_2_evm_toll_offramp_router.NewAny2EVMTollOffRampRouter(offRampRouterAddress, destChain)
+	tollOffRampRouter, err = any_2_evm_toll_offramp_router.NewAny2EVMTollOffRampRouter(offRampRouterAddress, destChain)
 	require.NoError(t, err)
 	_, err = tollOffRamp.SetRouter(destUser, offRampRouterAddress)
 	require.NoError(t, err)
@@ -391,11 +423,10 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 	_, err = subOffRampRouter.GetFeeToken(nil)
 	require.NoError(t, err)
 	// Enable onramps on blob verifier.
-	_, err = blobVerifier.SetConfig(destUser, blob_verifier.BlobVerifierInterfaceBlobVerifierConfig{
+	blobVerifier.SetConfig(destUser, blob_verifier.BlobVerifierInterfaceBlobVerifierConfig{
 		OnRamps:          []common.Address{onRampAddress, subOnRampAddress},
 		MinSeqNrByOnRamp: []uint64{1, 1},
 	})
-	require.NoError(t, err)
 	// Ensure we have at least finality blocks.
 	for i := 0; i < 50; i++ {
 		sourceChain.Commit()

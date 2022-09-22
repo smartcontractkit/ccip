@@ -28,6 +28,8 @@ var (
 		PrivateKeys: []string{
 			"ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
 		},
+		URLs:                      []string{"ws://source-chain-ethereum-geth:8546"},
+		HTTPURLs:                  []string{"http://source-chain-ethereum-geth:8544"},
 		ChainlinkTransactionLimit: 500000,
 		Timeout:                   2 * time.Minute,
 		MinimumConfirmations:      1,
@@ -41,6 +43,8 @@ var (
 		PrivateKeys: []string{
 			"ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
 		},
+		URLs:                      []string{"ws://dest-chain-ethereum-geth:8546"},
+		HTTPURLs:                  []string{"http://dest-chain-ethereum-geth:8544"},
 		ChainlinkTransactionLimit: 500000,
 		Timeout:                   2 * time.Minute,
 		MinimumConfirmations:      1,

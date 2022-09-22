@@ -23,35 +23,6 @@ var (
 	destChainID   = big.NewInt(1337)
 )
 
-func mustAddBigInt(a *big.Int, b string) *big.Int {
-	bi, _ := big.NewInt(0).SetString(b, 10)
-	return big.NewInt(0).Add(a, bi)
-}
-
-func mustSubBigInt(a *big.Int, b string) *big.Int {
-	bi, _ := big.NewInt(0).SetString(b, 10)
-	return big.NewInt(0).Sub(a, bi)
-}
-
-var (
-	// Source
-	SourcePool       = "source pool"
-	SourceSub        = "source sub"
-	TollOnRampRouter = "toll onramp router"
-	TollOnRamp       = "toll onramp"
-	SubOnRamp        = "sub onramp"
-	SubOnRampRouter  = "sub onramp router"
-
-	// Dest
-	TollOffRampRouter = "toll offramp router"
-	TollOffRamp       = "toll offramp"
-	SubOffRampRouter  = "sub offramp router"
-	DestPool          = "dest pool"
-	DestSub           = "dest sub"
-	Receiver          = "receiver"
-	Sender            = "sender"
-)
-
 func TestIntegration_CCIP(t *testing.T) {
 	ccipContracts := testhelpers.SetupCCIPContracts(t, sourceChainID, destChainID)
 	bootstrapNodePort := int64(19599)
@@ -207,16 +178,18 @@ chainID             = "%s"
 		require.NoError(t, err)
 		ccipContracts.SourceChain.Commit()
 
-		sourceBalances := ccipContracts.GetBalances([]testhelpers.BalanceReq{
-			{Name: SourcePool, Addr: ccipContracts.SourcePool.Address(), Getter: ccipContracts.GetSourceLinkBalance},
-			{Name: TollOnRamp, Addr: ccipContracts.TollOnRamp.Address(), Getter: ccipContracts.GetSourceLinkBalance},
-			{Name: TollOnRampRouter, Addr: ccipContracts.TollOnRampRouter.Address(), Getter: ccipContracts.GetSourceLinkBalance},
+		sourceBalances, err := testhelpers.GetBalances([]testhelpers.BalanceReq{
+			{Name: testhelpers.SourcePool, Addr: ccipContracts.SourcePool.Address(), Getter: ccipContracts.GetSourceLinkBalance},
+			{Name: testhelpers.TollOnRamp, Addr: ccipContracts.TollOnRamp.Address(), Getter: ccipContracts.GetSourceLinkBalance},
+			{Name: testhelpers.TollOnRampRouter, Addr: ccipContracts.TollOnRampRouter.Address(), Getter: ccipContracts.GetSourceLinkBalance},
 		})
-		destBalances := ccipContracts.GetBalances([]testhelpers.BalanceReq{
-			{Name: Receiver, Addr: ccipContracts.Receivers[0].Receiver.Address(), Getter: ccipContracts.GetDestLinkBalance},
-			{Name: DestPool, Addr: ccipContracts.DestPool.Address(), Getter: ccipContracts.GetDestLinkBalance},
-			{Name: TollOffRamp, Addr: ccipContracts.TollOffRamp.Address(), Getter: ccipContracts.GetDestLinkBalance},
+		require.NoError(t, err)
+		destBalances, err := testhelpers.GetBalances([]testhelpers.BalanceReq{
+			{Name: testhelpers.Receiver, Addr: ccipContracts.Receivers[0].Receiver.Address(), Getter: ccipContracts.GetDestLinkBalance},
+			{Name: testhelpers.DestPool, Addr: ccipContracts.DestPool.Address(), Getter: ccipContracts.GetDestLinkBalance},
+			{Name: testhelpers.TollOffRamp, Addr: ccipContracts.TollOffRamp.Address(), Getter: ccipContracts.GetDestLinkBalance},
 		})
+		require.NoError(t, err)
 
 		testhelpers.SendRequest(t, ccipContracts, "hey DON, execute for me",
 			[]common.Address{ccipContracts.SourceLinkToken.Address()},
@@ -230,40 +203,40 @@ chainID             = "%s"
 
 		ccipContracts.AssertBalances([]testhelpers.BalanceAssertion{
 			{
-				Name:     SourcePool,
+				Name:     testhelpers.SourcePool,
 				Address:  ccipContracts.SourcePool.Address(),
-				Expected: mustAddBigInt(sourceBalances[SourcePool], "10000000000000000099").String(), // 10e18 + 100 transfer - 1 fee
+				Expected: testhelpers.MustAddBigInt(sourceBalances[testhelpers.SourcePool], "10000000000000000099").String(), // 10e18 + 100 transfer - 1 fee
 				Getter:   ccipContracts.GetSourceLinkBalance,
-				Within:   ""},
+			},
 			{
-				Name:     TollOnRamp,
+				Name:     testhelpers.TollOnRamp,
 				Address:  ccipContracts.TollOnRamp.Address(),
-				Expected: sourceBalances[TollOnRamp].String(),
+				Expected: sourceBalances[testhelpers.TollOnRamp].String(),
 				Getter:   ccipContracts.GetSourceLinkBalance},
 			{
-				Name:     TollOnRampRouter,
+				Name:     testhelpers.TollOnRampRouter,
 				Address:  ccipContracts.TollOnRampRouter.Address(),
-				Expected: mustAddBigInt(sourceBalances[TollOnRampRouter], "1").String(),
+				Expected: testhelpers.MustAddBigInt(sourceBalances[testhelpers.TollOnRampRouter], "1").String(),
 				Getter:   ccipContracts.GetSourceLinkBalance,
 			},
 		})
 		ccipContracts.AssertBalances([]testhelpers.BalanceAssertion{
 			{
-				Name:     Receiver,
+				Name:     testhelpers.Receiver,
 				Address:  ccipContracts.Receivers[0].Receiver.Address(),
-				Expected: mustAddBigInt(destBalances[Receiver], "9049107200000000099").String(),
+				Expected: testhelpers.MustAddBigInt(destBalances[testhelpers.Receiver], "9049107200000000099").String(),
 				Getter:   ccipContracts.GetDestLinkBalance,
 				Within:   "1000000000000000000"}, // Roughly 200k gas * 200e9 wei/gas * (2e20 link/eth / 1e18wei/eth)
 			{
-				Name:     DestPool,
+				Name:     testhelpers.DestPool,
 				Address:  ccipContracts.DestPool.Address(),
-				Expected: mustSubBigInt(destBalances[DestPool], "10000000000000000099").String(),
+				Expected: testhelpers.MustSubBigInt(destBalances[testhelpers.DestPool], "10000000000000000099").String(),
 				Getter:   ccipContracts.GetDestLinkBalance,
 			}, // We lose 10 link from the pool
 			{
-				Name:     TollOffRamp,
+				Name:     testhelpers.TollOffRamp,
 				Address:  ccipContracts.TollOffRamp.Address(),
-				Expected: mustAddBigInt(destBalances[TollOffRamp], "950954400000000000").String(),
+				Expected: testhelpers.MustAddBigInt(destBalances[testhelpers.TollOffRamp], "950954400000000000").String(),
 				Getter:   ccipContracts.GetDestLinkBalance,
 			},
 		})
@@ -276,18 +249,21 @@ chainID             = "%s"
 		require.NoError(t, err)
 		ccipContracts.SourceChain.Commit()
 
-		sourceBalances := ccipContracts.GetBalances([]testhelpers.BalanceReq{
-			{Name: SourcePool, Addr: ccipContracts.SourcePool.Address(), Getter: ccipContracts.GetSourceLinkBalance},
-			{Name: SubOnRamp, Addr: ccipContracts.SubOnRamp.Address(), Getter: ccipContracts.GetSourceLinkBalance},
-			{Name: SubOnRampRouter, Addr: ccipContracts.SubOnRampRouter.Address(), Getter: ccipContracts.GetSourceLinkBalance},
-			{Name: SourceSub, Addr: ccipContracts.SourceUser.From, Getter: ccipContracts.GetSourceSubBalance},
+		sourceBalances, err := testhelpers.GetBalances([]testhelpers.BalanceReq{
+			{Name: testhelpers.SourcePool, Addr: ccipContracts.SourcePool.Address(), Getter: ccipContracts.GetSourceLinkBalance},
+			{Name: testhelpers.SubOnRamp, Addr: ccipContracts.SubOnRamp.Address(), Getter: ccipContracts.GetSourceLinkBalance},
+			{Name: testhelpers.SubOnRampRouter, Addr: ccipContracts.SubOnRampRouter.Address(), Getter: ccipContracts.GetSourceLinkBalance},
+			{Name: testhelpers.SourceSub, Addr: ccipContracts.SourceUser.From, Getter: ccipContracts.GetSourceSubBalance},
 		})
-		destBalances := ccipContracts.GetBalances([]testhelpers.BalanceReq{
-			{Name: Receiver, Addr: ccipContracts.Receivers[0].Receiver.Address(), Getter: ccipContracts.GetDestLinkBalance},
-			{Name: DestPool, Addr: ccipContracts.DestPool.Address(), Getter: ccipContracts.GetDestLinkBalance},
-			{Name: SubOffRampRouter, Addr: ccipContracts.SubOffRampRouter.Address(), Getter: ccipContracts.GetDestLinkBalance},
-			{Name: DestSub, Addr: ccipContracts.Receivers[0].Receiver.Address(), Getter: ccipContracts.GetDestSubBalance},
+		require.NoError(t, err, "fetching source balance")
+		destBalances, err := testhelpers.GetBalances([]testhelpers.BalanceReq{
+			{Name: testhelpers.Receiver, Addr: ccipContracts.Receivers[0].Receiver.Address(), Getter: ccipContracts.GetDestLinkBalance},
+			{Name: testhelpers.DestPool, Addr: ccipContracts.DestPool.Address(), Getter: ccipContracts.GetDestLinkBalance},
+			{Name: testhelpers.SubOffRampRouter, Addr: ccipContracts.SubOffRampRouter.Address(), Getter: ccipContracts.GetDestLinkBalance},
+			{Name: testhelpers.DestSub, Addr: ccipContracts.Receivers[0].Receiver.Address(), Getter: ccipContracts.GetDestSubBalance},
 		})
+		require.NoError(t, err, "fetching dest balance")
+
 		testhelpers.SendSubRequest(t, ccipContracts, "hey DON, execute for me", []common.Address{ccipContracts.SourceLinkToken.Address()},
 			[]*big.Int{tokenAmount}, big.NewInt(100_000), ccipContracts.Receivers[0].Receiver.Address())
 		testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, ccip.CCIPSubSendRequested, ccipContracts.SubOnRamp.Address(), nodes, subCurrentSeqNum)
@@ -297,51 +273,51 @@ chainID             = "%s"
 
 		ccipContracts.AssertBalances([]testhelpers.BalanceAssertion{
 			{
-				Name:     SourcePool,
+				Name:     testhelpers.SourcePool,
 				Address:  ccipContracts.SourcePool.Address(),
-				Expected: mustAddBigInt(sourceBalances[SourcePool], "100").String(),
+				Expected: testhelpers.MustAddBigInt(sourceBalances[testhelpers.SourcePool], "100").String(),
 				Getter:   ccipContracts.GetSourceLinkBalance,
 			}, // 100 transfer
 			{
-				Name: SubOnRamp, Address: ccipContracts.SubOnRamp.Address(),
-				Expected: sourceBalances[SubOnRamp].String(),
+				Name: testhelpers.SubOnRamp, Address: ccipContracts.SubOnRamp.Address(),
+				Expected: sourceBalances[testhelpers.SubOnRamp].String(),
 				Getter:   ccipContracts.GetSourceLinkBalance,
 			},
 			{
-				Name: SubOnRampRouter, Address: ccipContracts.SubOnRampRouter.Address(),
-				Expected: sourceBalances[SubOnRampRouter].String(),
+				Name: testhelpers.SubOnRampRouter, Address: ccipContracts.SubOnRampRouter.Address(),
+				Expected: sourceBalances[testhelpers.SubOnRampRouter].String(),
 				Getter:   ccipContracts.GetSourceLinkBalance,
 			}, // No change, internal account of fee to us.
 			{
-				Name:     SourceSub,
+				Name:     testhelpers.SourceSub,
 				Address:  ccipContracts.SourceUser.From,
-				Expected: mustSubBigInt(sourceBalances[SourceSub], "1").String(),
+				Expected: testhelpers.MustSubBigInt(sourceBalances[testhelpers.SourceSub], "1").String(),
 				Getter:   ccipContracts.GetSourceSubBalance,
 			}, // Pays 1 in fee
 		})
 		ccipContracts.AssertBalances([]testhelpers.BalanceAssertion{
 			{
-				Name:     Receiver,
+				Name:     testhelpers.Receiver,
 				Address:  ccipContracts.Receivers[0].Receiver.Address(),
-				Expected: mustAddBigInt(destBalances[Receiver], "100").String(),
+				Expected: testhelpers.MustAddBigInt(destBalances[testhelpers.Receiver], "100").String(),
 				Getter:   ccipContracts.GetDestLinkBalance,
 			}, // Full amount gets transferred
 			{
-				Name:     DestPool,
+				Name:     testhelpers.DestPool,
 				Address:  ccipContracts.DestPool.Address(),
-				Expected: mustSubBigInt(destBalances[DestPool], "100").String(),
+				Expected: testhelpers.MustSubBigInt(destBalances[testhelpers.DestPool], "100").String(),
 				Getter:   ccipContracts.GetDestLinkBalance,
 			}, // We lose 100 link from the pool
 			{
-				Name:     SubOffRampRouter,
+				Name:     testhelpers.SubOffRampRouter,
 				Address:  ccipContracts.SubOffRampRouter.Address(),
-				Expected: destBalances[SubOffRampRouter].String(),
+				Expected: destBalances[testhelpers.SubOffRampRouter].String(),
 				Getter:   ccipContracts.GetDestLinkBalance,
 			}, // Gas reimbursement for nop
 			{
-				Name:     DestSub,
+				Name:     testhelpers.DestSub,
 				Address:  ccipContracts.Receivers[0].Receiver.Address(),
-				Expected: mustSubBigInt(destBalances[DestSub], "617786400000000000").String(),
+				Expected: testhelpers.MustSubBigInt(destBalances[testhelpers.DestSub], "617786400000000000").String(),
 				Getter:   ccipContracts.GetDestSubBalance,
 				Within:   "100000000000000000",
 			}, // Costs ~0.65 link. +/- 0.1
@@ -350,15 +326,18 @@ chainID             = "%s"
 	})
 
 	t.Run("batch auto-execute toll", func(t *testing.T) {
-		sourceBalances := ccipContracts.GetBalances([]testhelpers.BalanceReq{
-			{Name: SourcePool, Addr: ccipContracts.SourcePool.Address(), Getter: ccipContracts.GetSourceLinkBalance},
-			{Name: TollOnRampRouter, Addr: ccipContracts.TollOnRampRouter.Address(), Getter: ccipContracts.GetSourceLinkBalance},
+		sourceBalances, err := testhelpers.GetBalances([]testhelpers.BalanceReq{
+			{Name: testhelpers.SourcePool, Addr: ccipContracts.SourcePool.Address(), Getter: ccipContracts.GetSourceLinkBalance},
+			{Name: testhelpers.TollOnRampRouter, Addr: ccipContracts.TollOnRampRouter.Address(), Getter: ccipContracts.GetSourceLinkBalance},
 		})
-		destBalances := ccipContracts.GetBalances([]testhelpers.BalanceReq{
-			{Name: Receiver, Addr: ccipContracts.Receivers[0].Receiver.Address(), Getter: ccipContracts.GetDestLinkBalance},
-			{Name: DestPool, Addr: ccipContracts.DestPool.Address(), Getter: ccipContracts.GetDestLinkBalance},
-			{Name: TollOffRampRouter, Addr: ccipContracts.TollOffRampRouter.Address(), Getter: ccipContracts.GetDestLinkBalance},
+		require.NoError(t, err, "fetching source balance")
+		destBalances, err := testhelpers.GetBalances([]testhelpers.BalanceReq{
+			{Name: testhelpers.Receiver, Addr: ccipContracts.Receivers[0].Receiver.Address(), Getter: ccipContracts.GetDestLinkBalance},
+			{Name: testhelpers.DestPool, Addr: ccipContracts.DestPool.Address(), Getter: ccipContracts.GetDestLinkBalance},
+			{Name: testhelpers.TollOffRampRouter, Addr: ccipContracts.TollOffRampRouter.Address(), Getter: ccipContracts.GetDestLinkBalance},
 		})
+		require.NoError(t, err, "fetching dest balance")
+
 		tokenAmount := big.NewInt(100)
 		feeTokenAmount := big.NewInt(0).Mul(big.NewInt(10), big.NewInt(1e18))
 		var txs []*gethtypes.Transaction
@@ -385,36 +364,36 @@ chainID             = "%s"
 		}
 		ccipContracts.AssertBalances([]testhelpers.BalanceAssertion{
 			{
-				Name:     SourcePool,
+				Name:     testhelpers.SourcePool,
 				Address:  ccipContracts.SourcePool.Address(),
-				Expected: mustAddBigInt(sourceBalances[SourcePool], "30000000000000000297").String(),
+				Expected: testhelpers.MustAddBigInt(sourceBalances[testhelpers.SourcePool], "30000000000000000297").String(),
 				Getter:   ccipContracts.GetSourceLinkBalance,
 			}, // (10e18 + 100 - 1)*3
 			{
-				Name:     TollOnRampRouter,
+				Name:     testhelpers.TollOnRampRouter,
 				Address:  ccipContracts.TollOnRampRouter.Address(),
-				Expected: mustAddBigInt(sourceBalances[TollOnRampRouter], "3").String(),
+				Expected: testhelpers.MustAddBigInt(sourceBalances[testhelpers.TollOnRampRouter], "3").String(),
 				Getter:   ccipContracts.GetSourceLinkBalance,
 			},
 		})
 		ccipContracts.AssertBalances([]testhelpers.BalanceAssertion{
 			{
-				Name:     Receiver,
+				Name:     testhelpers.Receiver,
 				Address:  ccipContracts.Receivers[0].Receiver.Address(),
-				Expected: mustAddBigInt(destBalances[Receiver], "27225848400000000297").String(),
+				Expected: testhelpers.MustAddBigInt(destBalances[testhelpers.Receiver], "27225848400000000297").String(),
 				Getter:   ccipContracts.GetDestLinkBalance,
 				Within:   "1000000000000000000",
 			}, // 3 toll fees +/- 1 link
 			{
-				Name:     DestPool,
+				Name:     testhelpers.DestPool,
 				Address:  ccipContracts.DestPool.Address(),
-				Expected: mustSubBigInt(destBalances[DestPool], "30000000000000000297").String(),
+				Expected: testhelpers.MustSubBigInt(destBalances[testhelpers.DestPool], "30000000000000000297").String(),
 				Getter:   ccipContracts.GetDestLinkBalance,
 			},
 			{
-				Name:     TollOffRampRouter,
+				Name:     testhelpers.TollOffRampRouter,
 				Address:  ccipContracts.TollOffRamp.Address(),
-				Expected: mustAddBigInt(destBalances[TollOffRampRouter], "2852678400000000000").String(),
+				Expected: testhelpers.MustAddBigInt(destBalances[testhelpers.TollOffRampRouter], "2852678400000000000").String(),
 				Getter:   ccipContracts.GetDestLinkBalance,
 				Within:   "1000000000000000000",
 			}, // +/- 1 link
@@ -423,15 +402,18 @@ chainID             = "%s"
 	})
 
 	t.Run("batch auto-execute subscription", func(t *testing.T) {
-		sourceBalances := ccipContracts.GetBalances([]testhelpers.BalanceReq{
-			{Name: SourcePool, Addr: ccipContracts.SourcePool.Address(), Getter: ccipContracts.GetSourceLinkBalance},
-			{Name: SourceSub, Addr: ccipContracts.SourceUser.From, Getter: ccipContracts.GetSourceSubBalance},
+		sourceBalances, err := testhelpers.GetBalances([]testhelpers.BalanceReq{
+			{Name: testhelpers.SourcePool, Addr: ccipContracts.SourcePool.Address(), Getter: ccipContracts.GetSourceLinkBalance},
+			{Name: testhelpers.SourceSub, Addr: ccipContracts.SourceUser.From, Getter: ccipContracts.GetSourceSubBalance},
 		})
-		destBalances := ccipContracts.GetBalances([]testhelpers.BalanceReq{
-			{Name: Receiver, Addr: ccipContracts.Receivers[0].Receiver.Address(), Getter: ccipContracts.GetDestLinkBalance},
-			{Name: DestPool, Addr: ccipContracts.DestPool.Address(), Getter: ccipContracts.GetDestLinkBalance},
-			{Name: DestSub, Addr: ccipContracts.Receivers[0].Receiver.Address(), Getter: ccipContracts.GetDestSubBalance},
+		require.NoError(t, err, "fetching source balance")
+		destBalances, err := testhelpers.GetBalances([]testhelpers.BalanceReq{
+			{Name: testhelpers.Receiver, Addr: ccipContracts.Receivers[0].Receiver.Address(), Getter: ccipContracts.GetDestLinkBalance},
+			{Name: testhelpers.DestPool, Addr: ccipContracts.DestPool.Address(), Getter: ccipContracts.GetDestLinkBalance},
+			{Name: testhelpers.DestSub, Addr: ccipContracts.Receivers[0].Receiver.Address(), Getter: ccipContracts.GetDestSubBalance},
 		})
+		require.NoError(t, err, "fetching dest balance")
+
 		tokenAmount := big.NewInt(100)
 		var txs []*gethtypes.Transaction
 		n := 3
@@ -457,35 +439,35 @@ chainID             = "%s"
 		}
 		ccipContracts.AssertBalances([]testhelpers.BalanceAssertion{
 			{
-				Name:     SourcePool,
+				Name:     testhelpers.SourcePool,
 				Address:  ccipContracts.SourcePool.Address(),
-				Expected: mustAddBigInt(sourceBalances[SourcePool], "300").String(),
+				Expected: testhelpers.MustAddBigInt(sourceBalances[testhelpers.SourcePool], "300").String(),
 				Getter:   ccipContracts.GetSourceLinkBalance,
 			}, // 100 transfer
 			{
-				Name:     SourceSub,
+				Name:     testhelpers.SourceSub,
 				Address:  ccipContracts.SourceUser.From,
-				Expected: mustSubBigInt(sourceBalances[SourceSub], "3").String(),
+				Expected: testhelpers.MustSubBigInt(sourceBalances[testhelpers.SourceSub], "3").String(),
 				Getter:   ccipContracts.GetSourceSubBalance,
 			}, // Pays 1 in fee
 		})
 		ccipContracts.AssertBalances([]testhelpers.BalanceAssertion{
 			{
-				Name:     Receiver,
+				Name:     testhelpers.Receiver,
 				Address:  ccipContracts.Receivers[0].Receiver.Address(),
-				Expected: mustAddBigInt(destBalances[Receiver], "300").String(),
+				Expected: testhelpers.MustAddBigInt(destBalances[testhelpers.Receiver], "300").String(),
 				Getter:   ccipContracts.GetDestLinkBalance,
 			}, // Full amount gets transferred
 			{
-				Name:     DestPool,
+				Name:     testhelpers.DestPool,
 				Address:  ccipContracts.DestPool.Address(),
-				Expected: mustSubBigInt(destBalances[DestPool], "300").String(),
+				Expected: testhelpers.MustSubBigInt(destBalances[testhelpers.DestPool], "300").String(),
 				Getter:   ccipContracts.GetDestLinkBalance,
 			}, // We lose 100 link from the pool
 			{
-				Name:     DestSub,
+				Name:     testhelpers.DestSub,
 				Address:  ccipContracts.Receivers[0].Receiver.Address(),
-				Expected: mustSubBigInt(destBalances[DestSub], "1864160000000000000").String(),
+				Expected: testhelpers.MustSubBigInt(destBalances[testhelpers.DestSub], "1864160000000000000").String(),
 				Getter:   ccipContracts.GetDestSubBalance,
 				Within:   "1000000000000000000"}, // Costs ~0.65 link. Varies slightly due to variable calldata encoding gas costs.
 		})
@@ -493,15 +475,17 @@ chainID             = "%s"
 	})
 
 	t.Run("single strict sequencing auto-execute subscription", func(t *testing.T) {
-		sourceBalances := ccipContracts.GetBalances([]testhelpers.BalanceReq{
-			{Name: SourcePool, Addr: ccipContracts.SourcePool.Address(), Getter: ccipContracts.GetSourceLinkBalance},
-			{Name: SourceSub, Addr: ccipContracts.SourceUser.From, Getter: ccipContracts.GetSourceSubBalance},
+		sourceBalances, err := testhelpers.GetBalances([]testhelpers.BalanceReq{
+			{Name: testhelpers.SourcePool, Addr: ccipContracts.SourcePool.Address(), Getter: ccipContracts.GetSourceLinkBalance},
+			{Name: testhelpers.SourceSub, Addr: ccipContracts.SourceUser.From, Getter: ccipContracts.GetSourceSubBalance},
 		})
-		destBalances := ccipContracts.GetBalances([]testhelpers.BalanceReq{
-			{Name: Receiver, Addr: ccipContracts.Receivers[1].Receiver.Address(), Getter: ccipContracts.GetDestLinkBalance},
-			{Name: DestPool, Addr: ccipContracts.DestPool.Address(), Getter: ccipContracts.GetDestLinkBalance},
-			{Name: DestSub, Addr: ccipContracts.Receivers[1].Receiver.Address(), Getter: ccipContracts.GetDestSubBalance},
+		require.NoError(t, err, "fetching source balance")
+		destBalances, err := testhelpers.GetBalances([]testhelpers.BalanceReq{
+			{Name: testhelpers.Receiver, Addr: ccipContracts.Receivers[1].Receiver.Address(), Getter: ccipContracts.GetDestLinkBalance},
+			{Name: testhelpers.DestPool, Addr: ccipContracts.DestPool.Address(), Getter: ccipContracts.GetDestLinkBalance},
+			{Name: testhelpers.DestSub, Addr: ccipContracts.Receivers[1].Receiver.Address(), Getter: ccipContracts.GetDestSubBalance},
 		})
+		require.NoError(t, err, "fetching dest balance")
 		tokenAmount := big.NewInt(100)
 		_, err = ccipContracts.SourceLinkToken.Approve(ccipContracts.SourceUser, ccipContracts.SubOnRampRouter.Address(), tokenAmount)
 		require.NoError(t, err)
@@ -514,33 +498,33 @@ chainID             = "%s"
 		testhelpers.AssertSubExecSuccess(t, ccipContracts, executionLog)
 		ccipContracts.AssertBalances([]testhelpers.BalanceAssertion{
 			{
-				Name:     SourcePool,
+				Name:     testhelpers.SourcePool,
 				Address:  ccipContracts.SourcePool.Address(),
-				Expected: mustAddBigInt(sourceBalances[SourcePool], "100").String(),
+				Expected: testhelpers.MustAddBigInt(sourceBalances[testhelpers.SourcePool], "100").String(),
 				Getter:   ccipContracts.GetSourceLinkBalance,
 			}, // 100 transfer
 			{
-				Name: SourceSub, Address: ccipContracts.SourceUser.From,
-				Expected: mustSubBigInt(sourceBalances[SourceSub], "1").String(),
+				Name: testhelpers.SourceSub, Address: ccipContracts.SourceUser.From,
+				Expected: testhelpers.MustSubBigInt(sourceBalances[testhelpers.SourceSub], "1").String(),
 				Getter:   ccipContracts.GetSourceSubBalance,
 			}, // Pays 1 in fee
 		})
 		ccipContracts.AssertBalances([]testhelpers.BalanceAssertion{
 			{
-				Name:     Receiver,
+				Name:     testhelpers.Receiver,
 				Address:  ccipContracts.Receivers[1].Receiver.Address(),
-				Expected: mustAddBigInt(destBalances[Receiver], "100").String(),
+				Expected: testhelpers.MustAddBigInt(destBalances[testhelpers.Receiver], "100").String(),
 				Getter:   ccipContracts.GetDestLinkBalance,
 			}, // Full amount gets transferred
 			{
-				Name:     DestPool,
+				Name:     testhelpers.DestPool,
 				Address:  ccipContracts.DestPool.Address(),
-				Expected: mustSubBigInt(destBalances[DestPool], "100").String(),
+				Expected: testhelpers.MustSubBigInt(destBalances[testhelpers.DestPool], "100").String(),
 				Getter:   ccipContracts.GetDestLinkBalance,
 			}, // We lose 100 link from the pool
 			{
-				Name: DestSub, Address: ccipContracts.Receivers[1].Receiver.Address(),
-				Expected: mustSubBigInt(destBalances[DestSub], "654720000000000000").String(),
+				Name: testhelpers.DestSub, Address: ccipContracts.Receivers[1].Receiver.Address(),
+				Expected: testhelpers.MustSubBigInt(destBalances[testhelpers.DestSub], "654720000000000000").String(),
 				Getter:   ccipContracts.GetDestSubBalance,
 				Within:   "100000000000000000",
 			}, // Costs ~0.65 link. Varies slightly due to variable calldata encoding gas costs.
@@ -558,16 +542,18 @@ chainID             = "%s"
 		}
 		totalTokenAmount := big.NewInt(100) // total amount sent in this scenario
 		strTotalAmount := totalTokenAmount.String()
-		sourceBalances := ccipContracts.GetBalances([]testhelpers.BalanceReq{
-			{Name: SourcePool, Addr: ccipContracts.SourcePool.Address(), Getter: ccipContracts.GetSourceLinkBalance},
-			{Name: Sender, Addr: ccipContracts.SourceUser.From, Getter: ccipContracts.GetSourceLinkBalance},
-			{Name: SourceSub, Addr: ccipContracts.SourceUser.From, Getter: ccipContracts.GetSourceSubBalance},
+		sourceBalances, err := testhelpers.GetBalances([]testhelpers.BalanceReq{
+			{Name: testhelpers.SourcePool, Addr: ccipContracts.SourcePool.Address(), Getter: ccipContracts.GetSourceLinkBalance},
+			{Name: testhelpers.Sender, Addr: ccipContracts.SourceUser.From, Getter: ccipContracts.GetSourceLinkBalance},
+			{Name: testhelpers.SourceSub, Addr: ccipContracts.SourceUser.From, Getter: ccipContracts.GetSourceSubBalance},
 		})
-		destBalances := ccipContracts.GetBalances([]testhelpers.BalanceReq{
-			{Name: Receiver, Addr: ccipContracts.Receivers[1].Receiver.Address(), Getter: ccipContracts.GetDestLinkBalance},
-			{Name: DestPool, Addr: ccipContracts.DestPool.Address(), Getter: ccipContracts.GetDestLinkBalance},
-			{Name: DestSub, Addr: ccipContracts.Receivers[1].Receiver.Address(), Getter: ccipContracts.GetDestSubBalance},
+		require.NoError(t, err, "fetching source balance")
+		destBalances, err := testhelpers.GetBalances([]testhelpers.BalanceReq{
+			{Name: testhelpers.Receiver, Addr: ccipContracts.Receivers[1].Receiver.Address(), Getter: ccipContracts.GetDestLinkBalance},
+			{Name: testhelpers.DestPool, Addr: ccipContracts.DestPool.Address(), Getter: ccipContracts.GetDestLinkBalance},
+			{Name: testhelpers.DestSub, Addr: ccipContracts.Receivers[1].Receiver.Address(), Getter: ccipContracts.GetDestSubBalance},
 		})
+		require.NoError(t, err, "fetching dest balance")
 
 		// approve the total amount to be sent
 		_, err = ccipContracts.SourceLinkToken.Approve(ccipContracts.SourceUser, ccipContracts.SubOnRampRouter.Address(), totalTokenAmount)
@@ -623,43 +609,43 @@ chainID             = "%s"
 
 		ccipContracts.AssertBalances([]testhelpers.BalanceAssertion{
 			{
-				Name:     SourcePool,
+				Name:     testhelpers.SourcePool,
 				Address:  ccipContracts.SourcePool.Address(),
-				Expected: mustAddBigInt(sourceBalances[SourcePool], strTotalAmount).String(),
+				Expected: testhelpers.MustAddBigInt(sourceBalances[testhelpers.SourcePool], strTotalAmount).String(),
 				Getter:   ccipContracts.GetSourceLinkBalance,
 			}, // 100 transfer
 			{
-				Name:     SourceSub,
+				Name:     testhelpers.SourceSub,
 				Address:  ccipContracts.SourceUser.From,
-				Expected: mustSubBigInt(sourceBalances[SourceSub], "4").String(),
+				Expected: testhelpers.MustSubBigInt(sourceBalances[testhelpers.SourceSub], "4").String(),
 				Getter:   ccipContracts.GetSourceSubBalance,
 			}, // Pays 4 in fee
 			{
-				Name:     Sender,
+				Name:     testhelpers.Sender,
 				Address:  ccipContracts.SourceUser.From,
-				Expected: mustSubBigInt(sourceBalances[Sender], strTotalAmount).String(),
+				Expected: testhelpers.MustSubBigInt(sourceBalances[testhelpers.Sender], strTotalAmount).String(),
 				Getter:   ccipContracts.GetSourceLinkBalance,
 			}, // 100 transfer
 		})
-		t.Logf("destBalances[DestSub] %v", destBalances[DestSub])
+		t.Logf("destBalances[DestSub] %v", destBalances[testhelpers.DestSub])
 		ccipContracts.AssertBalances([]testhelpers.BalanceAssertion{
 			{
-				Name:     Receiver,
+				Name:     testhelpers.Receiver,
 				Address:  ccipContracts.Receivers[1].Receiver.Address(),
-				Expected: mustAddBigInt(destBalances[Receiver], strTotalAmount).String(),
+				Expected: testhelpers.MustAddBigInt(destBalances[testhelpers.Receiver], strTotalAmount).String(),
 				Getter:   ccipContracts.GetDestLinkBalance,
 			}, // Full amount gets transferred
 			{
-				Name:     DestPool,
+				Name:     testhelpers.DestPool,
 				Address:  ccipContracts.DestPool.Address(),
-				Expected: mustSubBigInt(destBalances[DestPool], strTotalAmount).String(),
+				Expected: testhelpers.MustSubBigInt(destBalances[testhelpers.DestPool], strTotalAmount).String(),
 				Getter:   ccipContracts.GetDestLinkBalance,
 			}, // We lose 100 link from the pool
 
 			{
-				Name:     DestSub,
+				Name:     testhelpers.DestSub,
 				Address:  ccipContracts.Receivers[1].Receiver.Address(),
-				Expected: mustSubBigInt(destBalances[DestSub], "2311120000000000000").String(),
+				Expected: testhelpers.MustSubBigInt(destBalances[testhelpers.DestSub], "2311120000000000000").String(),
 				Getter:   ccipContracts.GetDestSubBalance,
 				Within:   "100000000000000000",
 			}, // Costs ~0.77 link per transfer for 3 auto req. Varies slightly due to variable calldata encoding gas costs.
