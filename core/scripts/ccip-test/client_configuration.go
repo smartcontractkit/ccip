@@ -786,7 +786,7 @@ func (client *CCIPClient) SendToDappWithExecution(source SourceClient, from *bin
 func (client *CCIPClient) SendToOnrampWithExecution(t *testing.T, source SourceClient, from *bind.TransactOpts, toAddress common.Address, amount *big.Int) *evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRampCCIPSendRequested {
 	SourceBlockNumber := GetCurrentBlockNumber(source.Client.Client)
 
-	senderAndReceiver, err := utils.GenericEncode([]string{"address", "address"}, source.Owner.From, source.Owner.From)
+	senderAndReceiver, err := utils.ABIEncode(`[{"type":"address"}, {"type":"address"}]`, source.Owner.From, source.Owner.From)
 	helpers.PanicErr(err)
 
 	payload := evm_2_any_subscription_onramp_router.CCIPEVM2AnySubscriptionMessage{

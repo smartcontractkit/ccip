@@ -47,17 +47,17 @@ func (t *TollLeafHasher) HashLeaf(log types.Log) ([32]byte, error) {
 	if err != nil {
 		return [32]byte{}, err
 	}
-	tokens, err := utils.GenericEncode([]string{"address[]"}, event.Message.Tokens)
+	tokens, err := utils.ABIEncode(`[{"type":"address[]"}]`, event.Message.Tokens)
 	if err != nil {
 		return [32]byte{}, err
 	}
-	amounts, err := utils.GenericEncode([]string{"uint256[]"}, event.Message.Amounts)
+	amounts, err := utils.ABIEncode(`[{"type":"uint256[]"}]`, event.Message.Amounts)
 	if err != nil {
 		return [32]byte{}, err
 	}
 
-	packedValues, err := utils.GenericEncode(
-		[]string{"bytes1", "bytes32", "uint64", "address", "address", "bytes32", "bytes32", "bytes32", "uint256", "address", "uint256"},
+	packedValues, err := utils.ABIEncode(
+		`[{"type":"bytes1"},{"type":"bytes32"},{"type":"uint64"},{"type":"address"},{"type":"address"},{"type":"bytes32"},{"type":"bytes32"},{"type":"bytes32"},{"type":"uint256"},{"type":"address"},{"type":"uint256"}]`,
 		LeafDomainSeparator,
 		t.metaDataHash,
 		event.Message.SequenceNumber,
@@ -104,17 +104,17 @@ func (s *SubscriptionLeafHasher) HashLeaf(log types.Log) ([32]byte, error) {
 	if err != nil {
 		return [32]byte{}, err
 	}
-	tokens, err := utils.GenericEncode([]string{"address[]"}, event.Message.Tokens)
+	tokens, err := utils.ABIEncode(`[{"type":"address[]"}]`, event.Message.Tokens)
 	if err != nil {
 		return [32]byte{}, err
 	}
-	amounts, err := utils.GenericEncode([]string{"uint256[]"}, event.Message.Amounts)
+	amounts, err := utils.ABIEncode(`[{"type":"uint256[]"}]`, event.Message.Amounts)
 	if err != nil {
 		return [32]byte{}, err
 	}
 
-	packedValues, err := utils.GenericEncode(
-		[]string{"bytes1", "bytes32", "uint64", "address", "address", "bytes32", "bytes32", "bytes32", "uint256", "uint64"},
+	packedValues, err := utils.ABIEncode(
+		`[{"type":"bytes1"},{"type":"bytes32"},{"type":"uint64"},{"type":"address"},{"type":"address"},{"type":"bytes32"},{"type":"bytes32"},{"type":"bytes32"},{"type":"uint256"},{"type":"uint64"}]`,
 		LeafDomainSeparator,
 		s.metaDataHash,
 		event.Message.SequenceNumber,

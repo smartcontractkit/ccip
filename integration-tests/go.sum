@@ -1482,8 +1482,8 @@ github.com/onsi/ginkgo v1.16.4/go.mod h1:dX+/inL/fNMqNlz0e9LfyB9TswhZpCVdJM/Z6Vv
 github.com/onsi/ginkgo v1.16.5 h1:8xi0RTUf59SOSfEtZMvwTvXYMzG4gV23XVHOZiXNtnE=
 github.com/onsi/ginkgo v1.16.5/go.mod h1:+E8gABHa3K6zRBolWtd+ROzc/U5bkGt0FwiG042wbpU=
 github.com/onsi/ginkgo/v2 v2.1.3/go.mod h1:vw5CSIxN1JObi/U8gcbwft7ZxR2dgaR70JSE3/PpL4c=
-github.com/onsi/ginkgo/v2 v2.1.6 h1:Fx2POJZfKRQcM1pH49qSZiYeu319wji004qX+GDovrU=
-github.com/onsi/ginkgo/v2 v2.1.6/go.mod h1:MEH45j8TBi6u9BMogfbp0stKC5cdGjumZj5Y7AG4VIk=
+github.com/onsi/ginkgo/v2 v2.2.0 h1:3ZNA3L1c5FYDFTTxbFeVGGD8jYvjYauHD30YgLxVsNI=
+github.com/onsi/ginkgo/v2 v2.2.0/go.mod h1:MEH45j8TBi6u9BMogfbp0stKC5cdGjumZj5Y7AG4VIk=
 github.com/onsi/gomega v0.0.0-20170829124025-dcabb60a477c/go.mod h1:C1qb7wdrVGGVU+Z6iS04AVkA3Q65CEZX59MT0QO5uiA=
 github.com/onsi/gomega v1.4.1/go.mod h1:C1qb7wdrVGGVU+Z6iS04AVkA3Q65CEZX59MT0QO5uiA=
 github.com/onsi/gomega v1.4.3/go.mod h1:ex+gbHU/CVuBBDIJjb2X0qEXbFg53c61hWP/1CpauHY=
@@ -1694,8 +1694,8 @@ github.com/sirupsen/logrus v1.8.1 h1:dJKuHgqk1NNQlqoA6BTlM1Wf9DOH3NBjQyu0h9+AZZE
 github.com/sirupsen/logrus v1.8.1/go.mod h1:yWOB1SBYBC5VeMP7gHvWumXLIWorT60ONWic61uBYv0=
 github.com/slack-go/slack v0.11.2 h1:IWl90Rk+jqPEVyiBytH27CSN/TFAg2vuDDfoPRog/nc=
 github.com/slack-go/slack v0.11.2/go.mod h1:hlGi5oXA+Gt+yWTPP0plCdRKmjsDxecdHxYQdlMQKOw=
-github.com/smartcontractkit/chainlink-env v0.2.37 h1:qsR75t+IuTgDoIbtgRp6XvKhzG0R3arKODEv2D6mJxI=
-github.com/smartcontractkit/chainlink-env v0.2.37/go.mod h1:QbD84f6yyME/lWlOJ9LF7sZ4bt2i8UvUht3UdjM6tek=
+github.com/smartcontractkit/chainlink-env v0.2.39 h1:XXnjMUOI45Rkpmwaw9ULpnvFXFkTA69RCy30xZjdEhw=
+github.com/smartcontractkit/chainlink-env v0.2.39/go.mod h1:QbD84f6yyME/lWlOJ9LF7sZ4bt2i8UvUht3UdjM6tek=
 github.com/smartcontractkit/chainlink-relay v0.1.6-0.20220824173548-dab4ac0a6595 h1:B3OCQ+Zb+kgpWtoLvJTE7co38SOEtn4qt1B5QDPGlFk=
 github.com/smartcontractkit/chainlink-relay v0.1.6-0.20220824173548-dab4ac0a6595/go.mod h1:f6ju2ncT/Q1loAdiT2/8M7dtpkXwCaZvhfddyeBESXE=
 github.com/smartcontractkit/chainlink-solana v0.2.20-0.20220829192456-1cce38dd3129 h1:t7vEkHvn5pl0txpr6DUGBhvLgMuUqbz1gKd8n6mnbgk=
@@ -1705,8 +1705,8 @@ github.com/smartcontractkit/chainlink-starknet/relayer v0.0.0-20220913010951-94d
 github.com/smartcontractkit/chainlink-starknet/relayer v0.0.0-20220913010951-94dd0368b953/go.mod h1:IurdtTjI48EMwZ50KrnLhNi+ZpgArDUn7nRJciFy2Tc=
 github.com/smartcontractkit/chainlink-terra v0.1.4-0.20220824174951-d1e2bcd51e46 h1:Yb+oJqTniiluQKGnTFvK+QWnfQSur3wL4kqCXQ4cBYQ=
 github.com/smartcontractkit/chainlink-terra v0.1.4-0.20220824174951-d1e2bcd51e46/go.mod h1:4b37Z1FVslnJ1TLo1r1XtuB9ym1uF/minZFcZlIBAV0=
-github.com/smartcontractkit/chainlink-testing-framework v1.6.2 h1:uivIsCZMQtt1YvUkwsBX9nMQgAgVnCb1QYIvotCYcP0=
-github.com/smartcontractkit/chainlink-testing-framework v1.6.2/go.mod h1:l999UXI0BmwE/c9bnKGPnhVLOSTY2SDoojfH/XOjXUE=
+github.com/smartcontractkit/chainlink-testing-framework v1.6.6 h1:/GKZ0Mz9HnnTveowrBe+9BjVyAoTPXqJz/vSMF+Xh7Q=
+github.com/smartcontractkit/chainlink-testing-framework v1.6.6/go.mod h1:I8TrhYWo0uynZVCcsXOszcIzCROX/sCzSqRrdiSeLKw=
 github.com/smartcontractkit/libocr v0.0.0-20220812191430-db92a9fdaa52 h1:Nac1UCKJwt0AY15bAaorscflOcBs/FnmO7NoCh8Tons=
 github.com/smartcontractkit/libocr v0.0.0-20220812191430-db92a9fdaa52/go.mod h1:5JnCHuYgmIP9ZyXzgAfI5Iwu0WxBtBKp+ApeT5o1Cjw=
 github.com/smartcontractkit/ocr2vrf v0.0.0-20220915095942-76b59bf918bc h1:ROWOiJINb4fdWH3YmdJjTgHxqW5UML6oXk9aXUzDZok=
