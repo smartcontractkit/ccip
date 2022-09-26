@@ -7,9 +7,10 @@ import (
 	"time"
 
 	"github.com/lib/pq"
+	"gopkg.in/guregu/null.v4"
+
 	"github.com/smartcontractkit/chainlink/core/services/relay"
 	"github.com/smartcontractkit/chainlink/core/store/models"
-	"gopkg.in/guregu/null.v4"
 )
 
 // EIServiceConfig represents External Initiator service config
@@ -894,9 +895,12 @@ observationSource                      = """
 type TempOCR2PluginType string
 
 const (
-	Median  TempOCR2PluginType = "median"
-	DKG     TempOCR2PluginType = "dkg"
-	OCR2VRF TempOCR2PluginType = "ocr2vrf"
+	Median    TempOCR2PluginType = "median"
+	DKG       TempOCR2PluginType = "dkg"
+	OCR2VRF   TempOCR2PluginType = "ocr2vrf"
+	CCIPRelay TempOCR2PluginType = "ccip-relay"
+	// CCIPExecution refers to the ccip.CCIPExecution plugin
+	CCIPExecution TempOCR2PluginType = "ccip-execution"
 )
 
 type TempJSONConfig map[string]interface{}
