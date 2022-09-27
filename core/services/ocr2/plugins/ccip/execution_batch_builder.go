@@ -159,6 +159,45 @@ func (eb *ExecutionBatchBuilder) getExecutableSeqNrs(
 		return nil, err
 	}
 	eb.lggr.Infow("unexpired roots", "n", len(unexpiredReports))
+
+	// This could result in slightly different values on each call as
+	// the function returns the allowed amount at the time of the last block.
+	// Since this will only increase over time, the highest observed value will
+	// always be the lower bound of what would be available on chain
+	// since we already account for inflight txs.
+	allowedTokenAmount, err := eb.offRamp.GetAllowedTokensAmount(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO don't build on every batch builder call but only change on changing configuration
+	srcToDst := make(map[common.Address]common.Address)
+	sourceTokens, err := eb.offRamp.GetPoolTokens(nil)
+	if err != nil {
+		return nil, err
+	}
+	for _, sourceToken := range sourceTokens {
+		dst, err2 := eb.offRamp.GetDestinationToken(nil, sourceToken)
+		if err2 != nil {
+			return nil, err2
+		}
+		srcToDst[sourceToken] = dst
+	}
+
+	supportedDestTokens := make([]common.Address, 0, len(srcToDst))
+	for _, destTokens := range srcToDst {
+		supportedDestTokens = append(supportedDestTokens, destTokens)
+	}
+
+	destTokenPrices, err := eb.offRamp.GetPricesForTokens(nil, supportedDestTokens)
+	if err != nil {
+		return nil, err
+	}
+	pricePerDestToken := make(map[common.Address]*big.Int)
+	for i, destToken := range supportedDestTokens {
+		pricePerDestToken[destToken] = destTokenPrices[i]
+	}
+
 	for _, unexpiredReport := range unexpiredReports {
 		var idx int
 		var found bool
@@ -187,43 +226,6 @@ func (eb *ExecutionBatchBuilder) getExecutableSeqNrs(
 		executedMp, err := eb.getExecutedSeqNrsInRange(unexpiredReport.Intervals[idx].Min, unexpiredReport.Intervals[idx].Max)
 		if err != nil {
 			return nil, err
-		}
-
-		// TODO don't build on every batch builder call but only change on changing configuration
-		srcToDst := make(map[common.Address]common.Address)
-		sourceTokens, err := eb.offRamp.GetPoolTokens(nil)
-		if err != nil {
-			return nil, err
-		}
-		for _, sourceToken := range sourceTokens {
-			dst, err2 := eb.offRamp.GetDestinationToken(nil, sourceToken)
-			if err2 != nil {
-				return nil, err2
-			}
-			srcToDst[sourceToken] = dst
-		}
-		// This could result in slightly different values on each call as
-		// the function returns the allowed amount at the time of the last block.
-		// Since this will only increase over time, the highest observed value will
-		// always be the lower bound of what would be available on chain
-		// since we already account for inflight txs.
-		allowedTokenAmount, err := eb.offRamp.GetAllowedTokensAmount(nil)
-		if err != nil {
-			return nil, err
-		}
-
-		supportedDestTokens := make([]common.Address, 0, len(srcToDst))
-		for _, destTokens := range srcToDst {
-			supportedDestTokens = append(supportedDestTokens, destTokens)
-		}
-
-		destTokenPrices, err := eb.offRamp.GetPricesForTokens(nil, supportedDestTokens)
-		if err != nil {
-			return nil, err
-		}
-		pricePerDestToken := make(map[common.Address]*big.Int)
-		for i, destToken := range supportedDestTokens {
-			pricePerDestToken[destToken] = destTokenPrices[i]
 		}
 
 		batch := eb.builder.BuildBatch(srcToDst, srcLogs, executedMp, eb.gasLimit, maxGasPrice, tokensPerFeeCoin, inflight, allowedTokenAmount, pricePerDestToken)
