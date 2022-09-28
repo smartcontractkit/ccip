@@ -1,6 +1,7 @@
 package merklemulti
 
 import (
+	"encoding/hex"
 	"fmt"
 	"testing"
 
@@ -18,24 +19,35 @@ var (
 	a, b, c, d, e, f = ctx.Hash([]byte{0xa}), ctx.Hash([]byte{0xb}), ctx.Hash([]byte{0xc}), ctx.Hash([]byte{0xd}), ctx.Hash([]byte{0xe}), ctx.Hash([]byte{0xf})
 )
 
-func TestSpecFixture(t *testing.T) {
-	var leafHashes [][32]byte
-	for _, leaf := range fixtures.TestVectorProofLeaves {
-		var leaf32 [32]byte
-		copy(leaf32[:], hexutil.MustDecode(fmt.Sprintf("0x%s", leaf)))
-		leafHashes = append(leafHashes, leaf32)
+func hashesFromHexStrings(hexStrs []string) [][32]byte {
+	var hashes [][32]byte
+	for _, hexStr := range hexStrs {
+		var hash [32]byte
+		copy(hash[:], hexutil.MustDecode(fmt.Sprintf("0x%s", hexStr)))
+		hashes = append(hashes, hash)
 	}
-	var proofHashes [][32]byte
-	for _, proofHash := range fixtures.TestVectorProofHashes {
-		var proofHash32 [32]byte
-		copy(proofHash32[:], hexutil.MustDecode(fmt.Sprintf("0x%s", proofHash)))
-		proofHashes = append(proofHashes, proofHash32)
+	return hashes
+}
+func TestSpecFixtureVerifyProof(t *testing.T) {
+	for _, testVector := range fixtures.TestVectors {
+		var leafHashes = hashesFromHexStrings(testVector.ProofLeaves)
+		var proofHashes = hashesFromHexStrings(testVector.ProofHashes)
+		computedRoot, err := VerifyComputeRoot(ctx, leafHashes, Proof[[32]byte]{
+			Hashes: proofHashes, SourceFlags: testVector.ProofFlags,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, hexutil.MustDecode(fmt.Sprintf("0x%s", testVector.ExpectedRoot)), computedRoot[:])
 	}
-	computedRoot, err := VerifyComputeRoot(ctx, leafHashes, Proof[[32]byte]{
-		Hashes: proofHashes, SourceFlags: fixtures.TestVectorProofFlags,
-	})
-	require.NoError(t, err)
-	assert.Equal(t, hexutil.MustDecode(fmt.Sprintf("0x%s", fixtures.TestVectorExpectedRoot)), computedRoot[:])
+}
+
+func TestSpecFixtureNewTree(t *testing.T) {
+	for _, testVector := range fixtures.TestVectors {
+		var leafHashes = hashesFromHexStrings(testVector.AllLeafs)
+		mctx := hasher.NewKeccakCtx()
+		tree := NewTree(mctx, leafHashes)
+		actual_root := tree.Root()
+		assert.Equal(t, testVector.ExpectedRoot, hex.EncodeToString(actual_root[:]))
+	}
 }
 
 func TestPadding(t *testing.T) {

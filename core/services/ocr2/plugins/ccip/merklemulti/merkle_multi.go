@@ -79,7 +79,6 @@ type Tree[H hasher.Hash] struct {
 func NewTree[H hasher.Hash](ctx hasher.Ctx[H], leafHashes []H) *Tree[H] {
 	var layer = make([]H, len(leafHashes))
 	copy(layer, leafHashes)
-
 	var layers = [][]H{layer}
 	var curr int
 	for len(layer) > 1 {

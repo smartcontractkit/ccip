@@ -44,9 +44,12 @@ func (k keccakCtx) HashInternal(a, b [32]byte) [32]byte {
 	return k.Hash(append(k.InternalDomainSeparator[:], append(b[:], a[:]...)...))
 }
 
-// ZeroHash returns the zero hash.
-// We use empty bytes32 for zeroHash on the solidity side, this needs to match.
+// ZeroHash returns the zero hash: 0xFF..FF
+// We use bytes32 0xFF..FF for zeroHash in the spec, this needs to match.
 func (k keccakCtx) ZeroHash() [32]byte {
 	var zeroes [32]byte
+	for i := 0; i < 32; i++ {
+		zeroes[i] = 0xFF
+	}
 	return zeroes
 }
