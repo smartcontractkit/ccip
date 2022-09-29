@@ -70,7 +70,7 @@ pollPeriod          = "1s"
 destStartBlock      = %d
 
 [relayConfig]
-chainID             = "%s"
+chainID             = %s
 
 `, i, ccipContracts.BlobVerifier.Address(), node.KeyBundle.ID(), node.Transmitter, ccipContracts.TollOnRamp.Address(), ccipContracts.SubOnRamp.Address(), sourceChainID, destChainID, configBlock, destChainID))
 		node.AddJob(t, fmt.Sprintf(`
@@ -101,7 +101,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];
 """
 
 [relayConfig]
-chainID             = "%s"
+chainID             = %s
 
 `, i, ccipContracts.TollOffRamp.Address(), node.KeyBundle.ID(), node.Transmitter, ccipContracts.TollOnRamp.Address(), ccipContracts.BlobVerifier.Address(), sourceChainID, destChainID, configBlock, linkEth.URL, ccipContracts.DestLinkToken.Address(), destChainID))
 		node.AddJob(t, fmt.Sprintf(`
@@ -131,7 +131,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];
 """
 
 [relayConfig]
-chainID             = "%s"
+chainID             = %s
 
 `, i, ccipContracts.SubOffRamp.Address(), node.KeyBundle.ID(), node.Transmitter, ccipContracts.SubOnRamp.Address(), ccipContracts.BlobVerifier.Address(), sourceChainID, destChainID, configBlock, linkEth.URL, ccipContracts.DestLinkToken.Address(), destChainID))
 	}

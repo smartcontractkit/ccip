@@ -430,7 +430,7 @@ SourceStartBlock   = %d
 DestStartBlock     = %d
 
 [relayConfig]
-chainID            = "%d"
+chainID            = %d
 `
 
 const executionTemplate = `
@@ -455,5 +455,5 @@ DestStartBlock    = %d
 tokensPerFeeCoinPipeline = """merge [type=merge left="{}" right="{\\\"%s\\\":\\\"1000000000000000000\\\"}"];"""
 
 [relayConfig]
-chainID           = "%d"
+chainID           = %d
 `
