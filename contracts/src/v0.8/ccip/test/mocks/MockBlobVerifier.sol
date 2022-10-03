@@ -42,4 +42,8 @@ contract MockBlobVerifier is BlobVerifierInterface {
   function getMerkleRoot(bytes32) external pure returns (uint256) {
     return 1;
   }
+
+  function isBlessed(bytes32 root) external view returns (bool) {
+    return true;
+  }
 }

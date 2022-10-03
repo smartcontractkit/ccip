@@ -17,7 +17,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/afn_contract"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp"
@@ -29,6 +28,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/maybe_revert_message_receiver"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/mock_afn_contract"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/native_token_pool"
 	"github.com/smartcontractkit/chainlink/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/core/logger"
@@ -205,13 +205,9 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 	require.NoError(t, err)
 	destChain.Commit()
 
-	afnSourceAddress, _, _, err := afn_contract.DeployAFNContract(
+	afnSourceAddress, _, _, err := mock_afn_contract.DeployMockAFNContract(
 		sourceUser,
 		sourceChain,
-		[]common.Address{sourceUser.From},
-		[]*big.Int{big.NewInt(1)},
-		big.NewInt(1),
-		big.NewInt(1),
 	)
 	require.NoError(t, err)
 	sourceChain.Commit()
@@ -265,13 +261,9 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 	require.NoError(t, err)
 	sourceChain.Commit()
 
-	afnDestAddress, _, _, err := afn_contract.DeployAFNContract(
+	afnDestAddress, _, _, err := mock_afn_contract.DeployMockAFNContract(
 		destUser,
 		destChain,
-		[]common.Address{destUser.From},
-		[]*big.Int{big.NewInt(1)},
-		big.NewInt(1),
-		big.NewInt(1),
 	)
 	require.NoError(t, err)
 	destChain.Commit()

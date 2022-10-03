@@ -74,6 +74,7 @@ package gethwrappers
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/BlobVerifierHelper.abi ../../contracts/solc/v0.8.15/BlobVerifierHelper.bin BlobVerifierHelper blob_verifier_helper
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/NativeTokenPool.abi ../../contracts/solc/v0.8.15/NativeTokenPool.bin NativeTokenPool native_token_pool
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/AFN.abi ../../contracts/solc/v0.8.15/AFN.bin AFNContract afn_contract
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/MockAFN.abi ../../contracts/solc/v0.8.15/MockAFN.bin MockAFNContract mock_afn_contract
 
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/ReceiverDapp.abi ../../contracts/solc/v0.8.15/ReceiverDapp.bin ReceiverDapp receiver_dapp
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/SimpleMessageReceiver.abi ../../contracts/solc/v0.8.15/SimpleMessageReceiver.bin SimpleMessageReceiver simple_message_receiver

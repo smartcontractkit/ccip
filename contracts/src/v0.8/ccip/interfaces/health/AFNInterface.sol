@@ -90,10 +90,10 @@ interface AFNInterface {
 
   /**
    * @notice Check if a root is blessed
-   * @param root bytes32
+   * @param rootWithOrigin bytes32
    * @return isBlessed bool
    */
-  function isBlessed(bytes32 root) external returns (bool);
+  function isBlessed(bytes32 rootWithOrigin) external view returns (bool);
 
   /**
    * @notice Recover from a bad signal

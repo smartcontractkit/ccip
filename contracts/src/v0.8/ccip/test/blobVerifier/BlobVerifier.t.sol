@@ -4,6 +4,7 @@ pragma solidity 0.8.15;
 import "../helpers/MerkleHelper.sol";
 import "../helpers/BlobVerifierHelper.sol";
 import "../BaseTest.t.sol";
+import "../../health/AFN.sol";
 
 contract BlobVerifierSetup is BaseTest {
   event BlobVerifierConfigSet(BlobVerifierInterface.BlobVerifierConfig config);
@@ -14,6 +15,20 @@ contract BlobVerifierSetup is BaseTest {
     BaseTest.setUp();
 
     s_blobVerifier = new BlobVerifierHelper(DEST_CHAIN_ID, SOURCE_CHAIN_ID, s_afn, blobVerifierConfig());
+  }
+}
+
+contract BlobVerifierRealAFNSetup is BaseTest {
+  BlobVerifierHelper s_blobVerifier;
+
+  function setUp() public virtual override {
+    BaseTest.setUp();
+    address[] memory participants = new address[](1);
+    participants[0] = OWNER;
+    uint256[] memory weights = new uint256[](1);
+    weights[0] = 1;
+    s_afn = new AFN(participants, weights, 1, 1); // Overwrite base mock afn with real.
+    s_blobVerifier = new BlobVerifierHelper(SOURCE_CHAIN_ID, DEST_CHAIN_ID, s_afn, blobVerifierConfig());
   }
 }
 
@@ -279,8 +294,8 @@ contract BlobVerifier_report is BlobVerifierSetup {
 }
 
 /// @notice #verify
-contract BlobVerifier_verify is BlobVerifierSetup {
-  function testSuccess() public {
+contract BlobVerifier_verify is BlobVerifierRealAFNSetup {
+  function testNotBlessedSuccess() public {
     CCIP.Interval[] memory intervals = new CCIP.Interval[](1);
     intervals[0] = CCIP.Interval(1, 2);
     bytes32[] memory merkleRoots = new bytes32[](1);
@@ -297,6 +312,33 @@ contract BlobVerifier_verify is BlobVerifierSetup {
         })
       )
     );
+    bytes32[] memory proofs = new bytes32[](0);
+    // We have not blessed this root, should return 0.
+    uint256 timestamp = s_blobVerifier.verify(merkleRoots, proofs, 2**1, proofs, 2**1);
+    assertEq(uint256(0), timestamp);
+  }
+
+  function testBlessedSuccess() public {
+    CCIP.Interval[] memory intervals = new CCIP.Interval[](1);
+    intervals[0] = CCIP.Interval(1, 2);
+    bytes32[] memory merkleRoots = new bytes32[](1);
+    merkleRoots[0] = "rootAndAlsoRootOfRoots";
+    address[] memory onRamps = new address[](1);
+    onRamps[0] = blobVerifierConfig().onRamps[0];
+    s_blobVerifier.report(
+      abi.encode(
+        CCIP.RelayReport({
+          onRamps: onRamps,
+          intervals: intervals,
+          merkleRoots: merkleRoots,
+          rootOfRoots: merkleRoots[0]
+        })
+      )
+    );
+    // Bless that root.
+    bytes32[] memory rootsWithOrigin = new bytes32[](1);
+    rootsWithOrigin[0] = keccak256(abi.encode(address(s_blobVerifier), merkleRoots[0]));
+    s_afn.voteToBlessRoots(rootsWithOrigin);
     bytes32[] memory proofs = new bytes32[](0);
     uint256 timestamp = s_blobVerifier.verify(merkleRoots, proofs, 2**1, proofs, 2**1);
     assertEq(BLOCK_TIME, timestamp);

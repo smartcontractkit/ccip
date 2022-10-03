@@ -7,7 +7,7 @@ import "../access/OwnerIsCreator.sol";
 
 contract HealthChecker is Pausable, OwnerIsCreator {
   // AFN contract to check health of the system
-  AFNInterface private s_afn;
+  AFNInterface internal s_afn;
 
   error BadAFNSignal();
   error BadHealthConfig();

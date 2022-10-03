@@ -97,4 +97,11 @@ interface BlobVerifierInterface {
    *          relayed.
    */
   function getMerkleRoot(bytes32 root) external view returns (uint256);
+
+  /**
+   * @notice Returns if a root is blessed or not.
+   * @param root The merkle root to check the blessing status for.
+   * @return whether the root is blessed or not.
+   */
+  function isBlessed(bytes32 root) external view returns (bool);
 }

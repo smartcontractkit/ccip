@@ -86,7 +86,7 @@ func init() { // compute rootDir
 // Most of the compiler artifacts should contain output from sol-compiler, or
 // "yarn compile". The relevant parts of its schema are
 //
-//    { "sourceCodes": { "<filePath>": "<code>", ... } }
+//	{ "sourceCodes": { "<filePath>": "<code>", ... } }
 //
 // where <filePath> is the path to the contract, below the truffle contracts/
 // directory, and <code> is the source code of the contract at the time the JSON

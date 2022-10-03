@@ -1,5 +1,5 @@
 GETH_VERSION: 1.10.23
-afn_contract: ../../contracts/solc/v0.8.15/AFN.abi ../../contracts/solc/v0.8.15/AFN.bin 3ccf99c44de4f71d6206539a30adbfab60356fca72822999476333c5f64f16d6
+afn_contract: ../../contracts/solc/v0.8.15/AFN.abi ../../contracts/solc/v0.8.15/AFN.bin 0df90fc3eba87858f83111245698ef72003b3800eab5f460457ea425a8e4d8c3
 aggregator_v2v3_interface: ../../contracts/solc/v0.8.6/AggregatorV2V3Interface.abi ../../contracts/solc/v0.8.6/AggregatorV2V3Interface.bin 95e8814b408bb05bf21742ef580d98698b7db6a9bac6a35c3de12b23aec4ee28
 aggregator_v3_interface: ../../contracts/solc/v0.8.6/AggregatorV3Interface.abi ../../contracts/solc/v0.8.6/AggregatorV3Interface.bin 351b55d3b0f04af67db6dfb5c92f1c64479400ca1fec77afc20bc0ce65cb49ab
 any_2_evm_subscription_offramp: ../../contracts/solc/v0.8.15/EVM2EVMSubscriptionOffRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMSubscriptionOffRamp.bin 7b2f82468884e2a1562542e2695081309d4a7c10a417f655ed4bb569e8e4ff8a
@@ -11,8 +11,8 @@ authorized_forwarder: ../../contracts/solc/v0.7/AuthorizedForwarder.abi ../../co
 authorized_receiver: ../../contracts/solc/v0.7/AuthorizedReceiver.abi ../../contracts/solc/v0.7/AuthorizedReceiver.bin 18e8969ba3234b027e1b16c11a783aca58d0ea5c2361010ec597f134b7bf1c4f
 batch_blockhash_store: ../../contracts/solc/v0.8.6/BatchBlockhashStore.abi ../../contracts/solc/v0.8.6/BatchBlockhashStore.bin 9220f1ed6c576863a2f5b34263846660e742f3513c19eb9e2562a374cb70c252
 batch_vrf_coordinator_v2: ../../contracts/solc/v0.8.6/BatchVRFCoordinatorV2.abi ../../contracts/solc/v0.8.6/BatchVRFCoordinatorV2.bin d0a54963260d8c1f1bbd984b758285e6027cfb5a7e42701bcb562ab123219332
-blob_verifier: ../../contracts/solc/v0.8.15/BlobVerifier.abi ../../contracts/solc/v0.8.15/BlobVerifier.bin 842ae54b889fc94006409cdb1d8a5ee7d6844140e6e32cf4cd21cebafedb7bd1
-blob_verifier_helper: ../../contracts/solc/v0.8.15/BlobVerifierHelper.abi ../../contracts/solc/v0.8.15/BlobVerifierHelper.bin cc73566a70cc60083d2889fe89874477ac1fc686f53573093c4d7375aea30124
+blob_verifier: ../../contracts/solc/v0.8.15/BlobVerifier.abi ../../contracts/solc/v0.8.15/BlobVerifier.bin b86c76b18216f8b1a5bff59d4c61688d507768525155496fdc787bf672213789
+blob_verifier_helper: ../../contracts/solc/v0.8.15/BlobVerifierHelper.abi ../../contracts/solc/v0.8.15/BlobVerifierHelper.bin 055275661e1a6c8e1e2ca47223f2f5367e8014b0dbd216be1c950e9c2332b47e
 blockhash_store: ../../contracts/solc/v0.6/BlockhashStore.abi ../../contracts/solc/v0.6/BlockhashStore.bin 6b3da771f033b3a5e53bf112396d0698debf65a8dcd81370f07d72948c8b14d9
 consumer_wrapper: ../../contracts/solc/v0.7/Consumer.abi ../../contracts/solc/v0.7/Consumer.bin 894d1cbd920dccbd36d92918c1037c6ded34f66f417ccb18ec3f33c64ef83ec5
 cron_upkeep_factory_wrapper: ../../contracts/solc/v0.8.6/CronUpkeepFactory.abi - dacb0f8cdf54ae9d2781c5e720fc314b32ed5e58eddccff512c75d6067292cd7
@@ -33,6 +33,7 @@ keeper_registry_wrapper1_3: ../../contracts/solc/v0.8.6/KeeperRegistry1_3.abi ..
 keepers_vrf_consumer: ../../contracts/solc/v0.8.6/KeepersVRFConsumer.abi ../../contracts/solc/v0.8.6/KeepersVRFConsumer.bin fa75572e689c9e84705c63e8dbe1b7b8aa1a8fe82d66356c4873d024bb9166e8
 log_emitter: ../../contracts/solc/v0.8.6/LogEmitter.abi ../../contracts/solc/v0.8.6/LogEmitter.bin 375488d19b6ee1c180d42048be10abea9146e2a58347fd180358850d435cb854
 maybe_revert_message_receiver: ../../contracts/solc/v0.8.15/MaybeRevertMessageReceiver.abi ../../contracts/solc/v0.8.15/MaybeRevertMessageReceiver.bin 98b432b4e8b6bd68f7dcedf266c5fe26469ff8f8c5051984ca4b338018b2aad2
+mock_afn_contract: ../../contracts/solc/v0.8.15/MockAFN.abi ../../contracts/solc/v0.8.15/MockAFN.bin 9e85e4f38acc6977d5e727e5c3ecdd9894fc51324f8021a7b2e374eb5c60ba4e
 multiwordconsumer_wrapper: ../../contracts/solc/v0.7/MultiWordConsumer.abi ../../contracts/solc/v0.7/MultiWordConsumer.bin 6e68abdf614e3ed0f5066c1b5f9d7c1199f1e7c5c5251fe8a471344a59afc6ba
 native_token_pool: ../../contracts/solc/v0.8.15/NativeTokenPool.abi ../../contracts/solc/v0.8.15/NativeTokenPool.bin b031b53831c6675dc0c44ead4a0194744204922e6130f67cfe8963ada26733b9
 offchain_aggregator_wrapper: OffchainAggregator/OffchainAggregator.abi - 5f97dc197fd4e2b999856b9b3fa7c2aaf0c700c71d7009d7d017d233bc855877

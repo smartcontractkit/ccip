@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
 
@@ -126,8 +127,15 @@ func (eb *ExecutionBatchBuilder) getUnexpiredRelayReports() ([]blob_verifier.CCI
 		if err != nil {
 			return nil, err
 		}
-		// TODO: Need to check only blessed roots (need https://github.com/smartcontractkit/ccip-spec/pull/89)
-		reports = append(reports, reportAccepted.Report)
+		blessed, err := eb.blobVerifier.IsBlessed(nil, reportAccepted.Report.RootOfRoots)
+		if err != nil {
+			return nil, err
+		}
+		if blessed {
+			reports = append(reports, reportAccepted.Report)
+		} else {
+			eb.lggr.Infow("report is accepted but not blessed", "report", hexutil.Encode(reportAccepted.Report.RootOfRoots[:]))
+		}
 	}
 	return reports, nil
 }

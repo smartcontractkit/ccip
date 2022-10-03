@@ -91,6 +91,14 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
     }
   }
 
+  function hashBlobVerifierWithRoot(bytes32 root) internal view returns (bytes32) {
+    return keccak256(abi.encode(address(this), root));
+  }
+
+  function isBlessed(bytes32 root) public view returns (bool) {
+    return s_afn.isBlessed(hashBlobVerifierWithRoot(root));
+  }
+
   /// @inheritdoc BlobVerifierInterface
   function verify(
     bytes32[] calldata hashedLeaves,
@@ -103,6 +111,10 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
     // Use the result of the inner merkle proof as the single leaf of the outer merkle tree.
     outerLeaves[0] = merkleRoot(hashedLeaves, innerProofs, innerProofFlagBits);
     bytes32 outerRoot = merkleRoot(outerLeaves, outerProofs, outerProofFlagBits);
+    // Only return non-zero if present and blessed.
+    if (s_roots[outerRoot] == 0 || !isBlessed(outerRoot)) {
+      return uint256(0);
+    }
     return s_roots[outerRoot];
   }
 

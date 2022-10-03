@@ -112,8 +112,8 @@ contract AFN is AFNInterface, OwnerIsCreator, TypeAndVersionInterface {
   }
 
   /// @inheritdoc AFNInterface
-  function isBlessed(bytes32 root) public view override returns (bool) {
-    return s_blessedRoots[root];
+  function isBlessed(bytes32 rootWithOrigin) public view override returns (bool) {
+    return s_blessedRoots[rootWithOrigin];
   }
 
   /// @inheritdoc AFNInterface
