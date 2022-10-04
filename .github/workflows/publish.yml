@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - ccip-develop
-      - testnet-smartcon
+      - CCIP_FMS
 
 jobs:
   build-and-publish:

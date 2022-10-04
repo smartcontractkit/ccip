@@ -40,6 +40,7 @@ offchain_aggregator_wrapper: OffchainAggregator/OffchainAggregator.abi - 5f97dc1
 operator_factory: ../../contracts/solc/v0.7/OperatorFactory.abi ../../contracts/solc/v0.7/OperatorFactory.bin 065cff92e71cf0dc384bfdd6598c2c13c2290f64c26e0d18a1a326d08552e717
 operator_wrapper: ../../contracts/solc/v0.7/Operator.abi ../../contracts/solc/v0.7/Operator.bin 08965dbb26f62739c1ce4d0941f30c0dd08003648823e7d722900b48270ffc2b
 oracle_wrapper: ../../contracts/solc/v0.6/Oracle.abi ../../contracts/solc/v0.6/Oracle.bin 7af2fbac22a6e8c2847e8e685a5400cac5101d72ddf5365213beb79e4dede43a
+ping_pong_demo: ../../contracts/solc/v0.8.15/PingPongDemo.abi ../../contracts/solc/v0.8.15/PingPongDemo.bin add93ec49472cf447441e26db4a4244e70365029e6864b1d0aed46986d61bfee
 receiver_dapp: ../../contracts/solc/v0.8.15/ReceiverDapp.abi ../../contracts/solc/v0.8.15/ReceiverDapp.bin c6a6795dc3c124f6b3caeaddf6be77226746f172f46ecc0b83d3f838eaf5342b
 simple_message_receiver: ../../contracts/solc/v0.8.15/SimpleMessageReceiver.abi ../../contracts/solc/v0.8.15/SimpleMessageReceiver.bin ce5a81ca45ba5084ba1c10888b25cb248cf87255b321dbe8146b28c44d926c34
 solidity_vrf_consumer_interface: ../../contracts/solc/v0.6/VRFConsumer.abi ../../contracts/solc/v0.6/VRFConsumer.bin a79da241ca9525f6a96adc5f55651b1f91e1579b85fec7b02a51d06bd6018ee3

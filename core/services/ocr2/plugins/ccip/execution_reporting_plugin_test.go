@@ -216,7 +216,8 @@ func (e ExecutionContracts) generateMessageBatch(t *testing.T, payloadSize int, 
 		allMsgBytes = append(allMsgBytes, msgBytes)
 		leafHashes = append(leafHashes, mctx.Hash(msgBytes))
 	}
-	tree := merklemulti.NewTree(mctx, leafHashes)
+	tree, err := merklemulti.NewTree(mctx, leafHashes)
+	require.NoError(t, err)
 	proof := tree.Prove(indices)
 	rootLocal, err := merklemulti.VerifyComputeRoot(mctx, leafHashes, proof)
 	require.NoError(t, err)
@@ -229,7 +230,8 @@ func TestMaxExecutionReportSize(t *testing.T) {
 	c := setupContractsForExecution(t)
 	mb := c.generateMessageBatch(t, ccip.MaxPayloadLength, 50, ccip.MaxTokensPerMessage)
 	ctx := hasher.NewKeccakCtx()
-	outerTree := merklemulti.NewTree(ctx, [][32]byte{mb.root})
+	outerTree, err := merklemulti.NewTree(ctx, [][32]byte{mb.root})
+	require.NoError(t, err)
 	outerProof := outerTree.Prove([]int{0})
 	// Ensure execution report size is valid
 	executorReport, err := ccip.EncodeExecutionReport(
@@ -272,7 +274,8 @@ func TestExecutionReportEncoding(t *testing.T) {
 	c := setupContractsForExecution(t)
 	mb := c.generateMessageBatch(t, 1, 1, 1)
 	ctx := hasher.NewKeccakCtx()
-	outerTree := merklemulti.NewTree(ctx, [][32]byte{mb.root})
+	outerTree, err := merklemulti.NewTree(ctx, [][32]byte{mb.root})
+	require.NoError(t, err)
 	outerProof := outerTree.Prove([]int{0})
 	report := any_2_evm_toll_offramp.CCIPExecutionReport{
 		SequenceNumbers:          mb.seqNums,

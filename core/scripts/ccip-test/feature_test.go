@@ -3,7 +3,12 @@ package main
 import (
 	"os"
 	"testing"
+
+	"github.com/smartcontractkit/chainlink/core/logger"
 )
+
+var SOURCE = GoerliConfig
+var DESTINATION = RinkebyConfig
 
 // FullFeatureCCIP can be run as a test (prefix with Test) with the following config
 // Env vars:
@@ -19,8 +24,8 @@ func TestPrintState(t *testing.T) {
 		t.SkipNow()
 	}
 	printCCIPState(
-		GetSetupChain(t, ownerKey, Rinkeby),
-		GetSetupChain(t, ownerKey, Goerli))
+		GetSetupChain(t, ownerKey, SOURCE),
+		GetSetupChain(t, ownerKey, DESTINATION))
 }
 
 func TestCCIP(t *testing.T) {
@@ -41,8 +46,13 @@ func TestCCIP(t *testing.T) {
 		t.SkipNow()
 	case "deploy":
 		deploySubscriptionContracts(t, ownerKey,
-			&Rinkeby,
-			&Goerli)
+			&SOURCE,
+			&DESTINATION)
+	case "readOCRKeys":
+		don := NewDON(Staging, logger.TestLogger(t))
+		don.WIP()
+		//don.ListJobSpecs()
+		//don.WriteConfig()
 	default:
 		runCommand(t, ownerKey, command)
 	}
@@ -60,26 +70,32 @@ func runCommand(t *testing.T, ownerKey string, command string) {
 	// After updating any contracts be sure to update the network defaults to reflect
 	// those changes.
 	client := NewCcipClient(t,
-		// Source chain
-		Rinkeby,
-		// Dest chain
-		Goerli,
+		SOURCE,
+		DESTINATION,
 		ownerKey,
 		seedKey,
 	)
 
+	// Auto unpauses all contracts if they're paused.
 	client.UnpauseAll()
 
 	switch command {
+	// Deploys a new set of PingPong contracts, configures them to talk to each other
+	// and creates destination chain subscriptions for both.
+	case "deployPingPong":
+		deployPingPongDapps(t, GetSetupChain(t, ownerKey, SOURCE), GetSetupChain(t, ownerKey, DESTINATION))
+
+		// Starts and unpauses the PingPong dapp that is on the `source` chain.
+	case "startPingPong":
+		client.startPingPong(t)
+
+		// Stops the PingPong dapp by pausing the source chain dapp.
+	case "stopPingPong":
+		client.setPingPongPaused(t, true)
+
 	case "setConfig":
-		// Set the config to the message executor and the offramp
+		// Set the config to the blobVerifier and the offramp
 		client.SetOCRConfig()
-	//case "externalExecution":
-	//	// Cross chain request with the client manually proving and executing the transaction
-	//	client.ExternalExecutionHappyPath(t)
-	//case "noRepeat":
-	//	// Executing the same request twice should fail
-	//	client.ExternalExecutionSubmitOfframpTwiceShouldFail(t)
 	case "dapp":
 		client.SendDappTx(t)
 	case "gov":
@@ -105,8 +121,14 @@ func runCommand(t *testing.T, ownerKey string, command string) {
 	case "acceptOwnership":
 		// Should accept ownership on the destination chain OffRamp & Executor
 		client.AcceptOwnership(t)
+		//case "externalExecution":
+	//	// Cross chain request with the client manually proving and executing the transaction
+	//	client.ExternalExecutionHappyPath(t)
+	//case "noRepeat":
+	//	// Executing the same request twice should fail
+	//	client.ExternalExecutionSubmitOfframpTwiceShouldFail(t)
 	case "wip":
-		client.wip(t, GetSetupChain(t, ownerKey, Rinkeby), GetSetupChain(t, ownerKey, Goerli))
+		client.wip(t, GetSetupChain(t, ownerKey, SOURCE), GetSetupChain(t, ownerKey, DESTINATION))
 	default:
 		t.Errorf("Unknown command \"%s\"", command)
 	}

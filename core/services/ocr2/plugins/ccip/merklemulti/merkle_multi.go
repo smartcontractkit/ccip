@@ -76,7 +76,10 @@ type Tree[H hasher.Hash] struct {
 	layers [][]H
 }
 
-func NewTree[H hasher.Hash](ctx hasher.Ctx[H], leafHashes []H) *Tree[H] {
+func NewTree[H hasher.Hash](ctx hasher.Ctx[H], leafHashes []H) (*Tree[H], error) {
+	if len(leafHashes) == 0 {
+		return nil, errors.New("Cannot construct a tree without leaves")
+	}
 	var layer = make([]H, len(leafHashes))
 	copy(layer, leafHashes)
 	var layers = [][]H{layer}
@@ -90,7 +93,7 @@ func NewTree[H hasher.Hash](ctx hasher.Ctx[H], leafHashes []H) *Tree[H] {
 	}
 	return &Tree[H]{
 		layers: layers,
-	}
+	}, nil
 }
 
 // Revive appears confused with the generics "receiver name t should be consistent with previous receiver name p for invalid-type"

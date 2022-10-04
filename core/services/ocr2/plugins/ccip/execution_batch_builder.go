@@ -1,6 +1,7 @@
 package ccip
 
 import (
+	"encoding/hex"
 	"math/big"
 	"time"
 
@@ -41,7 +42,7 @@ type BatchBuilder interface {
 		tokensPerFeeCoin map[common.Address]*big.Int,
 		inflight []InflightExecutionReport,
 		aggregateTokenLimit *big.Int,
-		tokenLimitPrices map[common.Address]*big.Int) []uint64
+		tokenLimitPrices map[common.Address]*big.Int) ([]uint64, bool)
 }
 
 type ExecutionBatchBuilder struct {
@@ -236,7 +237,14 @@ func (eb *ExecutionBatchBuilder) getExecutableSeqNrs(
 			return nil, err
 		}
 
-		batch := eb.builder.BuildBatch(srcToDst, srcLogs, executedMp, eb.gasLimit, maxGasPrice, tokensPerFeeCoin, inflight, allowedTokenAmount, pricePerDestToken)
+		batch, allMessagesExecuted := eb.builder.BuildBatch(srcToDst, srcLogs, executedMp, eb.gasLimit, maxGasPrice, tokensPerFeeCoin, inflight, allowedTokenAmount, pricePerDestToken)
+		// If all messages are already executed, snooze the root for the PERMISSIONLESS_EXECUTION_THRESHOLD_SECONDS,
+		// so it will never be considered again.
+		if allMessagesExecuted {
+			eb.lggr.Infof("Snoozing root %s forever since there are no executable txs anymore", hex.EncodeToString(unexpiredReport.MerkleRoots[idx][:]))
+			eb.snoozedRoots[unexpiredReport.MerkleRoots[idx]] = time.Now().Add(PERMISSIONLESS_EXECUTION_THRESHOLD_SECONDS * time.Second)
+			continue
+		}
 		if len(batch) != 0 {
 			return batch, nil
 		}

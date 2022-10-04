@@ -116,3 +116,4 @@ $SCRIPTPATH/native_solc8_15_compile_ccip ccip/offRamp/subscription/EVM2EVMSubscr
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/offRamp/subscription/Any2EVMSubscriptionOffRampRouter.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/applications/SubscriptionSenderDapp.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/applications/GovernanceDapp.sol
+$SCRIPTPATH/native_solc8_15_compile_ccip ccip/applications/PingPongDemo.sol

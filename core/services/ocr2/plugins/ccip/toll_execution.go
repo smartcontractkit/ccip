@@ -86,14 +86,14 @@ func (tb *TollBatchBuilder) BuildBatch(
 	inflight []InflightExecutionReport,
 	aggregateTokenLimit *big.Int,
 	tokenLimitPrices map[common.Address]*big.Int,
-) (executableSeqNrs []uint64) {
+) (executableSeqNrs []uint64, executedAllMessages bool) {
 	inflightSeqNrs, inflightAggregateValue, err := tb.inflight(inflight, tokenLimitPrices, srcToDst)
 	if err != nil {
 		tb.lggr.Errorw("Unexpected error computing inflight values", "err", err)
-		return []uint64{}
+		return []uint64{}, false
 	}
 	aggregateTokenLimit.Sub(aggregateTokenLimit, inflightAggregateValue)
-
+	executedAllMessages = true
 	for _, msg := range msgs {
 		tollMsg, err2 := tb.parseLog(types.Log{
 			Topics: msg.GetTopics(),
@@ -101,16 +101,20 @@ func (tb *TollBatchBuilder) BuildBatch(
 		})
 		if err2 != nil {
 			tb.lggr.Errorw("unable to parse message", "err", err2, "msg", msg)
-			continue
-		}
-		if _, inflight := inflightSeqNrs[tollMsg.Message.SequenceNumber]; inflight {
-			tb.lggr.Infow("Skipping message already inflight", "seqNr", tollMsg.Message.SequenceNumber)
+			// Unable to parse so don't mark as executed
+			executedAllMessages = false
 			continue
 		}
 		if _, executed := executed[tollMsg.Message.SequenceNumber]; executed {
 			tb.lggr.Infow("Skipping message already executed", "seqNr", tollMsg.Message.SequenceNumber)
 			continue
 		}
+		executedAllMessages = false
+		if _, inflight := inflightSeqNrs[tollMsg.Message.SequenceNumber]; inflight {
+			tb.lggr.Infow("Skipping message already inflight", "seqNr", tollMsg.Message.SequenceNumber)
+			continue
+		}
+
 		messageValue := aggregateTokenValue(tokenLimitPrices, srcToDst, tollMsg.Message.Tokens, tollMsg.Message.Amounts)
 		// if token limit is smaller than message value skip message
 		if aggregateTokenLimit.Cmp(messageValue) == -1 {
@@ -138,7 +142,7 @@ func (tb *TollBatchBuilder) BuildBatch(
 		tb.lggr.Infow("Adding toll msg to batch", "seqNum", tollMsg.Message.SequenceNumber, "maxCharge", maxCharge, "maxGasOverhead", maxGasOverhead)
 		executableSeqNrs = append(executableSeqNrs, tollMsg.Message.SequenceNumber)
 	}
-	return executableSeqNrs
+	return executableSeqNrs, executedAllMessages
 }
 
 func (tb *TollBatchBuilder) inflight(

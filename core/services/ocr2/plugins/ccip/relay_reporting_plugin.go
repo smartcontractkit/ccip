@@ -265,7 +265,14 @@ func (r *RelayReportingPlugin) buildReport(intervalByOnRamp map[common.Address]b
 	)
 	mctx := hasher.NewKeccakCtx()
 	for onRamp, leaves := range leafsByOnRamp {
-		tree := merklemulti.NewTree(mctx, leaves)
+		if len(leaves) == 0 {
+			r.lggr.Warnf("Tried building a tree without leaves for onRamp %s. %+v", onRamp.Hex(), leafsByOnRamp)
+			continue
+		}
+		tree, err2 := merklemulti.NewTree(mctx, leaves)
+		if err2 != nil {
+			return nil, err2
+		}
 		roots = append(roots, tree.Root())
 		onRamps = append(onRamps, onRamp)
 		interval := intervalByOnRamp[onRamp]
@@ -274,8 +281,15 @@ func (r *RelayReportingPlugin) buildReport(intervalByOnRamp map[common.Address]b
 			Max: interval.Max,
 		})
 	}
+	if len(roots) == 0 {
+		r.lggr.Warn("No valid roots found")
+		return &blob_verifier.CCIPRelayReport{}, errors.New("No valid roots found")
+	}
 	// Make a root of roots
-	outerTree := merklemulti.NewTree(mctx, roots)
+	outerTree, err := merklemulti.NewTree(mctx, roots)
+	if err != nil {
+		return nil, err
+	}
 	return &blob_verifier.CCIPRelayReport{
 		MerkleRoots: roots,
 		Intervals:   intervals,

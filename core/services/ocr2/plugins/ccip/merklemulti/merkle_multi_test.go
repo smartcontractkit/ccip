@@ -44,16 +44,19 @@ func TestSpecFixtureNewTree(t *testing.T) {
 	for _, testVector := range fixtures.TestVectors {
 		var leafHashes = hashesFromHexStrings(testVector.AllLeafs)
 		mctx := hasher.NewKeccakCtx()
-		tree := NewTree(mctx, leafHashes)
-		actual_root := tree.Root()
-		assert.Equal(t, testVector.ExpectedRoot, hex.EncodeToString(actual_root[:]))
+		tree, err := NewTree(mctx, leafHashes)
+		assert.NoError(t, err)
+		actualRoot := tree.Root()
+		assert.Equal(t, testVector.ExpectedRoot, hex.EncodeToString(actualRoot[:]))
 	}
 }
 
 func TestPadding(t *testing.T) {
-	tr4 := NewTree(ctx, [][32]byte{a, b, c})
+	tr4, err := NewTree(ctx, [][32]byte{a, b, c})
+	require.NoError(t, err)
 	assert.Equal(t, 4, len(tr4.layers[0]))
-	tr8 := NewTree(ctx, [][32]byte{a, b, c, d, e})
+	tr8, err := NewTree(ctx, [][32]byte{a, b, c, d, e})
+	require.NoError(t, err)
 	assert.Equal(t, 6, len(tr8.layers[0]))
 	assert.Equal(t, 4, len(tr8.layers[1]))
 	p := tr8.Prove([]int{0})
@@ -65,11 +68,13 @@ func TestPadding(t *testing.T) {
 }
 
 func TestMerkleMultiProofSecondPreimage(t *testing.T) {
-	tr := NewTree(ctx, [][32]byte{a, b})
+	tr, err := NewTree(ctx, [][32]byte{a, b})
+	require.NoError(t, err)
 	root, err := VerifyComputeRoot(ctx, [][32]byte{a}, tr.Prove([]int{0}))
 	require.NoError(t, err)
 	assert.Equal(t, root, tr.Root())
-	tr2 := NewTree(ctx, [][32]byte{ctx.Hash(append(a[:], b[:]...))})
+	tr2, err := NewTree(ctx, [][32]byte{ctx.Hash(append(a[:], b[:]...))})
+	require.NoError(t, err)
 	assert.NotEqual(t, tr2.Root(), tr.Root())
 }
 
@@ -85,7 +90,8 @@ func TestMerkleMultiProof(t *testing.T) {
 	}
 	// For every size tree from 0..len(leaves)
 	for len_ := 1; len_ <= len(leafHashes); len_++ {
-		tr := NewTree(ctx, leafHashes[:len_])
+		tr, err := NewTree(ctx, leafHashes[:len_])
+		require.NoError(t, err)
 		expectedRoot := expectedRoots[len_-1]
 		require.Equal(t, tr.Root(), expectedRoot)
 		// Prove every subset of its leaves

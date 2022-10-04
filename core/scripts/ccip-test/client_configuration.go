@@ -32,6 +32,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/governance_dapp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/native_token_pool"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ping_pong_demo"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/receiver_dapp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/simple_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/subscription_sender_dapp"
@@ -44,8 +45,22 @@ import (
 	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
-func (client *CCIPClient) wip(t *testing.T, source *EvmChainConfig, dest *EvmChainConfig) {
+func (client *CCIPClient) wip(t *testing.T, sourceClient *EvmChainConfig, destClient *EvmChainConfig) {
+	tx, err := client.Source.PingPongDapp.StartPingPong(client.Source.Owner)
+	require.NoError(t, err)
+	WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+}
 
+func (client *CCIPClient) startPingPong(t *testing.T) {
+	tx, err := client.Source.PingPongDapp.StartPingPong(client.Source.Owner)
+	require.NoError(t, err)
+	WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+}
+
+func (client *CCIPClient) setPingPongPaused(t *testing.T, paused bool) {
+	tx, err := client.Source.PingPongDapp.SetPaused(client.Source.Owner, paused)
+	require.NoError(t, err)
+	WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 }
 
 type Client struct {
@@ -57,6 +72,7 @@ type Client struct {
 	LinkTokenAddress common.Address
 	TokenPools       []*native_token_pool.NativeTokenPool
 	GovernanceDapp   *governance_dapp.GovernanceDapp
+	PingPongDapp     *ping_pong_demo.PingPongDemo
 	Afn              *afn_contract.AFNContract
 	logger           logger.Logger
 	t                *testing.T
@@ -90,6 +106,8 @@ func NewSourceClient(t *testing.T, config EvmChainConfig) SourceClient {
 	require.NoError(t, err)
 	governanceDapp, err := governance_dapp.NewGovernanceDapp(config.GovernanceDapp, client)
 	require.NoError(t, err)
+	pingPongDapp, err := ping_pong_demo.NewPingPongDemo(config.PingPongDapp, client)
+	require.NoError(t, err)
 
 	return SourceClient{
 		Client: Client{
@@ -100,6 +118,7 @@ func NewSourceClient(t *testing.T, config EvmChainConfig) SourceClient {
 			Afn:              afn,
 			TokenPools:       tokenPools,
 			GovernanceDapp:   governanceDapp,
+			PingPongDapp:     pingPongDapp,
 			logger:           logger.TestLogger(t).Named(helpers.ChainName(config.ChainId.Int64())),
 			t:                t,
 		},
@@ -144,6 +163,8 @@ func NewDestinationClient(t *testing.T, config EvmChainConfig) DestClient {
 	require.NoError(t, err)
 	governanceDapp, err := governance_dapp.NewGovernanceDapp(config.GovernanceDapp, client)
 	require.NoError(t, err)
+	pingPongDapp, err := ping_pong_demo.NewPingPongDemo(config.PingPongDapp, client)
+	require.NoError(t, err)
 
 	return DestClient{
 		Client: Client{
@@ -153,6 +174,7 @@ func NewDestinationClient(t *testing.T, config EvmChainConfig) DestClient {
 			LinkToken:        LinkToken,
 			TokenPools:       tokenPools,
 			GovernanceDapp:   governanceDapp,
+			PingPongDapp:     pingPongDapp,
 			Afn:              afn,
 			logger:           logger.TestLogger(t).Named(helpers.ChainName(config.ChainId.Int64())),
 			t:                t,
@@ -194,6 +216,7 @@ func (chain *EvmChainConfig) SetupChain(t *testing.T, ownerPrivateKey string) {
 	chain.Owner = GetOwner(t, ownerPrivateKey, chain.ChainId, chain.GasSettings)
 	chain.Client = GetClient(t, chain.EthUrl)
 	chain.Logger = logger.TestLogger(t).Named(helpers.ChainName(chain.ChainId.Int64()))
+	chain.Owner.GasLimit = 5e6
 
 	require.Equal(t, len(chain.BridgeTokens), len(chain.TokenPools))
 	chain.Logger.Info("Completed chain setup")
@@ -360,7 +383,7 @@ func (client *CCIPClient) WaitForExecution(t *testing.T, DestBlockNum uint64, se
 func (client *CCIPClient) ExecuteManually(seqNr uint64) error {
 	// Find the seq num
 	// Find the corresponding relay report
-	end := uint64(7580682)
+	end := uint64(11436244)
 	reportIterator, err := client.Dest.BlobVerifier.FilterReportAccepted(&bind.FilterOpts{
 		Start: end - 10000,
 		End:   &end,
@@ -389,7 +412,7 @@ func (client *CCIPClient) ExecuteManually(seqNr uint64) error {
 	ctx := hasher.NewKeccakCtx()
 	leafHasher := ccip.NewSubscriptionLeafHasher(client.Source.ChainId, client.Dest.ChainId, client.Source.OnRamp.Address(), ctx)
 	// Get all seqNrs in that range.
-	end = uint64(11369525)
+	end = uint64(7651526)
 	sendRequestedIterator, err := client.Source.OnRamp.FilterCCIPSendRequested(&bind.FilterOpts{
 		Start: end - 10000,
 		End:   &end,
@@ -421,12 +444,18 @@ func (client *CCIPClient) ExecuteManually(seqNr uint64) error {
 	if originalMsg == nil {
 		return errors.New("unable to find")
 	}
-	tree := merklemulti.NewTree(ctx, leaves)
+	tree, err := merklemulti.NewTree(ctx, leaves)
+	if err != nil {
+		return err
+	}
 	innerProof := tree.Prove([]int{prove})
 	if tree.Root() != report.MerkleRoots[onRampIdx] {
 		return errors.New("inner root doesn't match")
 	}
-	outerTree := merklemulti.NewTree(ctx, report.MerkleRoots)
+	outerTree, err := merklemulti.NewTree(ctx, report.MerkleRoots)
+	if err != nil {
+		return err
+	}
 	if outerTree.Root() != report.RootOfRoots {
 		return errors.New("outer root doesn't match")
 	}
@@ -733,7 +762,8 @@ func (client *CCIPClient) ValidateMerkleRoot(
 		leafHashes = append(leafHashes, mctx.Hash(req.Raw.Data))
 	}
 
-	tree := merklemulti.NewTree(mctx, leafHashes)
+	tree, err := merklemulti.NewTree(mctx, leafHashes)
+	require.NoError(t, err)
 	rootIndex := -1
 	for i, root := range report.MerkleRoots {
 		if tree.Root() == root {
@@ -991,17 +1021,19 @@ func (client *CCIPClient) SetOCRConfig() {
 	}.Encode()
 	helpers.PanicErr(err)
 
+	don := NewDON(Staging, client.Dest.logger)
+
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := confighelper2.ContractSetConfigArgsForTests(
 		60*time.Second, // deltaProgress
-		1*time.Second,  // deltaResend
-		20*time.Second, // deltaRound
+		5*time.Second,  // deltaResend
+		30*time.Second, // deltaRound
 		2*time.Second,  // deltaGrace
 		30*time.Second, // deltaStage
 		3,
 		[]int{1, 2, 3, 4}, // Transmission schedule: 1 oracle in first deltaStage, 2 in the second and so on.
-		getOraclesForChain(client.Dest.ChainId.Int64()),
+		don.GenerateOracleIdentities(client.Dest.ChainId.String()),
 		ccipConfig,
-		1*time.Second,
+		5*time.Second,
 		10*time.Second,
 		20*time.Second,
 		10*time.Second,
@@ -1054,15 +1086,15 @@ func (client *CCIPClient) AcceptOwnership(t *testing.T) {
 }
 
 func (client *CCIPClient) PrepareSetSenders(t *testing.T) {
-	sender := []common.Address{client.Source.GovernanceDapp.Address()}
-	tx, err := client.Dest.OffRampRouter.PrepareSetSubscriptionSenders(client.Dest.Owner, client.Dest.GovernanceDapp.Address(), sender)
+	sender := []common.Address{client.Source.SenderDapp.Address()}
+	tx, err := client.Dest.OffRampRouter.PrepareSetSubscriptionSenders(client.Dest.Owner, client.Dest.ReceiverDapp.Address(), sender)
 	require.NoError(t, err)
 	WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 }
 
 func (client *CCIPClient) SetSubscriptionSenders(t *testing.T) {
-	sender := []common.Address{client.Source.GovernanceDapp.Address()}
-	tx, err := client.Dest.OffRampRouter.SetSubscriptionSenders(client.Dest.Owner, client.Dest.GovernanceDapp.Address(), sender)
+	sender := []common.Address{client.Source.SenderDapp.Address()}
+	tx, err := client.Dest.OffRampRouter.SetSubscriptionSenders(client.Dest.Owner, client.Dest.ReceiverDapp.Address(), sender)
 	require.NoError(t, err)
 	WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 }

@@ -4,6 +4,8 @@ pragma solidity 0.8.15;
 import "../../interfaces/TypeAndVersionInterface.sol";
 import "../interfaces/applications/Any2EVMMessageReceiverInterface.sol";
 import "../interfaces/onRamp/EVM2AnySubscriptionOnRampRouterInterface.sol";
+import "../access/OwnerIsCreator.sol";
+import "../interfaces/offRamp/Any2EVMOffRampRouterInterface.sol";
 
 contract GovernanceDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterface, OwnerIsCreator {
   string public constant override typeAndVersion = "GovernanceDapp 1.0.0";

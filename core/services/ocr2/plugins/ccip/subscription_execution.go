@@ -141,7 +141,7 @@ func (sb *SubscriptionBatchBuilder) BuildBatch(
 	inflight []InflightExecutionReport,
 	aggregateTokenLimit *big.Int,
 	tokenLimitPrices map[common.Address]*big.Int,
-) []uint64 {
+) ([]uint64, bool) {
 	subTokenPerFeeCoin := tokensPerFeeCoin[sb.subFeeToken]
 	if subTokenPerFeeCoin == nil {
 		sb.lggr.Errorf("Fee token price not found for token: %s", sb.subFeeToken.Hex())
@@ -149,12 +149,13 @@ func (sb *SubscriptionBatchBuilder) BuildBatch(
 	inflightSeqNrs, reserved, nonces, inflightAggregateValue, err := sb.inflight(gasPrice, subTokenPerFeeCoin, inflight, len(msgs), tokenLimitPrices, srcToDst)
 	if err != nil {
 		sb.lggr.Errorw("Unexpected error computing inflight values", "err", err)
-		return []uint64{}
+		return []uint64{}, false
 	}
 	aggregateTokenLimit.Sub(aggregateTokenLimit, inflightAggregateValue)
 	stalledSub := make(map[common.Address]struct{})
 	subscriptionBalances := make(map[common.Address]*big.Int)
 	var executableSeqNrs []uint64
+	allMessagesExecuted := true
 	for _, msg := range msgs {
 		subMsg, err2 := sb.parseLog(types.Log{
 			Topics: msg.GetTopics(),
@@ -162,17 +163,22 @@ func (sb *SubscriptionBatchBuilder) BuildBatch(
 		})
 		if err2 != nil {
 			sb.lggr.Errorw("Skipping msg, unable to parse message", "err", err2, "msg", msg)
+			// Unable to parse so don't mark as executed
+			allMessagesExecuted = false
 			continue
 		}
 		lggr := sb.lggr.With("seqNr", subMsg.Message.SequenceNumber, "nonce", subMsg.Message.Nonce, "sender", subMsg.Message.Sender, "receiver", subMsg.Message.Receiver)
-		// Skip inflight
-		if _, inflight := inflightSeqNrs[subMsg.Message.SequenceNumber]; inflight {
-			lggr.Infow("Skipping msg, inflight")
-			continue
-		}
+
 		// Skip executed
 		if _, executed := executed[subMsg.Message.SequenceNumber]; executed {
 			lggr.Infow("Skipping msg, executed")
+			continue
+		}
+		// Not all messages are executed yet
+		allMessagesExecuted = false
+		// Skip inflight
+		if _, inflight := inflightSeqNrs[subMsg.Message.SequenceNumber]; inflight {
+			lggr.Infow("Skipping msg, inflight")
 			continue
 		}
 		// Skip if sub is stalled
@@ -234,7 +240,7 @@ func (sb *SubscriptionBatchBuilder) BuildBatch(
 		lggr.Infow("Adding sub msg to batch", "maxCharge", maxCharge, "maxGasOverhead", maxOverhead, "strict", strict)
 		executableSeqNrs = append(executableSeqNrs, subMsg.Message.SequenceNumber)
 	}
-	return executableSeqNrs
+	return executableSeqNrs, allMessagesExecuted
 }
 
 func (sb *SubscriptionBatchBuilder) parseLog(log types.Log) (*evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRampCCIPSendRequested, error) {

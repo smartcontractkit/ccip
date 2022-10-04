@@ -278,8 +278,11 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 	copy(inFlight[:], r.inFlight[:])
 	r.inFlightMu.RUnlock()
 
+	batchBuilderStart := time.Now()
 	// IMPORTANT: We build executable set based on the leaders token prices, ensuring consistency across followers.
 	executableSequenceNumbers, err := r.builder.getExecutableSeqNrs(r.maxGasPrice(), leaderTokensPerFeeCoin, inFlight)
+	lggr.Infof("Batch building took %d ms", time.Since(batchBuilderStart).Milliseconds())
+
 	if err != nil {
 		return nil, err
 	}
@@ -287,6 +290,7 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 	if len(executableSequenceNumbers) == 0 {
 		return []byte{}, nil
 	}
+
 	return ExecutionObservation{
 		SeqNrs:           executableSequenceNumbers,
 		TokensPerFeeCoin: followerTokensPerFeeCoin,
@@ -373,9 +377,15 @@ func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNums 
 		outerTreeLeafs = append(outerTreeLeafs, merkleRootsByOnRamp[onRamp])
 	}
 	ctx := hasher.NewKeccakCtx()
-	outerTree := merklemulti.NewTree[[32]byte](ctx, outerTreeLeafs)
+	outerTree, err := merklemulti.NewTree[[32]byte](ctx, outerTreeLeafs)
+	if err != nil {
+		return nil, err
+	}
 	outerProof := outerTree.Prove([]int{onRampIdx})
-	innerTree := merklemulti.NewTree[[32]byte](ctx, leafsByOnRamp[r.onRamp])
+	innerTree, err := merklemulti.NewTree[[32]byte](ctx, leafsByOnRamp[r.onRamp])
+	if err != nil {
+		return nil, err
+	}
 	var innerIdxs []int
 	var encMsgs [][]byte
 	var hashes [][32]byte

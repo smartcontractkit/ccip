@@ -93,7 +93,8 @@ func TestRelayReportEncoding(t *testing.T) {
 
 	// Send a report.
 	mctx := hasher.NewKeccakCtx()
-	tree := merklemulti.NewTree(mctx, [][32]byte{mctx.Hash([]byte{0xaa})})
+	tree, err := merklemulti.NewTree(mctx, [][32]byte{mctx.Hash([]byte{0xaa})})
+	require.NoError(t, err)
 	root := tree.Root()
 	report := blob_verifier.CCIPRelayReport{
 		OnRamps:     []common.Address{onRampAddress},

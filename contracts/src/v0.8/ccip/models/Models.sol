@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "../../vendor/IERC20.sol";
-import "../pools/TokenPool.sol";
+import "../interfaces/pools/PoolInterface.sol";
 
 library CCIP {
   ////////////////////////////////

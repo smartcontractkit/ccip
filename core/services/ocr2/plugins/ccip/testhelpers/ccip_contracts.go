@@ -696,7 +696,8 @@ func ExecuteSubMessage(
 	decodedMsg, err := ccip.DecodeCCIPSubMessage(req.Data)
 	require.NoError(t, err)
 	innerIdx := int(decodedMsg.SequenceNumber - interval.Min)
-	innerTree := merklemulti.NewTree(mctx, leafHashes)
+	innerTree, err := merklemulti.NewTree(mctx, leafHashes)
+	require.NoError(t, err)
 	innerProof := innerTree.Prove([]int{innerIdx})
 	var onRampIdx int
 	var outerTreeLeafs [][32]byte
@@ -706,7 +707,8 @@ func ExecuteSubMessage(
 		}
 		outerTreeLeafs = append(outerTreeLeafs, merkleRootsByOnRamp[onRamp])
 	}
-	outerTree := merklemulti.NewTree(mctx, outerTreeLeafs)
+	outerTree, err := merklemulti.NewTree(mctx, outerTreeLeafs)
+	require.NoError(t, err)
 	require.Equal(t, outerTree.Root(), report.RootOfRoots, "Roots donot match")
 
 	outerProof := outerTree.Prove([]int{onRampIdx})
