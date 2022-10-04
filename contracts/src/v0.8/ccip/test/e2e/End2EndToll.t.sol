@@ -96,7 +96,7 @@ contract E2E_toll is EVM2EVMTollOnRampSetup, BlobVerifierSetup, EVM2EVMTollOffRa
     s_sourceTokens[0].approve(address(s_onRampRouter), i_tokenAmount0 + RELAYING_FEE_JUELS + EXECUTION_FEE_AMOUNT);
     s_sourceTokens[1].approve(address(s_onRampRouter), i_tokenAmount1);
 
-    message.receiver = address(s_receiver);
+    message.receiver = abi.encode(address(s_receiver));
     CCIP.EVM2EVMTollMessage memory tollEvent = _messageToEvent(message, expectedSeqNum);
     vm.expectEmit(false, false, false, true);
 

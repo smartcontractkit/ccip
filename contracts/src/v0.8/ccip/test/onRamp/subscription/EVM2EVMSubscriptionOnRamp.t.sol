@@ -91,7 +91,7 @@ contract EVM2EVMSubscriptionOnRamp_forwardFromRouter is EVM2EVMSubscriptionOnRam
     s_onRamp.forwardFromRouter(message, OWNER);
 
     message = _generateEmptyMessage();
-    message.receiver = address(s_onRampRouter);
+    message.receiver = abi.encode(address(s_onRampRouter));
     tollEvent = _messageToEvent(message, 3, 1);
 
     vm.expectEmit(false, false, false, true);

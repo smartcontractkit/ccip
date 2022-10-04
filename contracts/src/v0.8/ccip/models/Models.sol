@@ -96,7 +96,7 @@ library CCIP {
 
   /// @notice The Toll message type for EVM chains.
   struct EVM2AnyTollMessage {
-    address receiver;
+    bytes receiver;
     bytes data;
     IERC20[] tokens;
     uint256[] amounts;
@@ -171,7 +171,7 @@ library CCIP {
   ////////////////////////////////
 
   struct EVM2AnySubscriptionMessage {
-    address receiver;
+    bytes receiver;
     bytes data;
     IERC20[] tokens;
     uint256[] amounts;

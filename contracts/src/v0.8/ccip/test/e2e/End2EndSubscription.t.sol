@@ -107,11 +107,11 @@ contract E2E_subscription is EVM2EVMSubscriptionOnRampSetup, BlobVerifierSetup, 
     s_sourceTokens[0].approve(address(s_onRampRouter), i_tokenAmount0);
     s_sourceTokens[1].approve(address(s_onRampRouter), i_tokenAmount1);
 
-    message.receiver = address(s_receiver);
+    message.receiver = abi.encode(address(s_receiver));
     uint64 expectedNonce = expectedSeqNum;
     if (expectedSeqNum == 3) {
       expectedNonce = 1;
-      message.receiver = address(s_secondary_receiver);
+      message.receiver = abi.encode(s_secondary_receiver);
     }
     CCIP.EVM2EVMSubscriptionMessage memory subscriptionEvent = _messageToEvent(message, expectedSeqNum, expectedNonce);
 

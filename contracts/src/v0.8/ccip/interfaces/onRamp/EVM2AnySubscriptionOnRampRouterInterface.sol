@@ -30,7 +30,7 @@ interface EVM2AnySubscriptionOnRampRouterInterface is BaseOnRampRouterInterface 
    * @param message The message payload
    * @return The sequence number assigned to message
    */
-  function ccipSend(uint256 destinationChainId, CCIP.EVM2AnySubscriptionMessage memory message)
+  function ccipSend(uint256 destinationChainId, CCIP.EVM2AnySubscriptionMessage calldata message)
     external
     returns (uint64);
 

@@ -36,6 +36,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
 	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
+	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
 var (
@@ -160,6 +161,12 @@ func MustAddBigInt(a *big.Int, b string) *big.Int {
 func MustSubBigInt(a *big.Int, b string) *big.Int {
 	bi, _ := big.NewInt(0).SetString(b, 10)
 	return big.NewInt(0).Sub(a, bi)
+}
+
+func MustEncodeAddress(t *testing.T, address common.Address) []byte {
+	bts, err := utils.ABIEncode(`[{"type":"address"}]`, address)
+	require.NoError(t, err)
+	return bts
 }
 
 func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPContracts {
@@ -467,7 +474,7 @@ func QueueSubRequest(
 	receiver common.Address,
 ) *types.Transaction {
 	msg := evm_2_any_subscription_onramp_router.CCIPEVM2AnySubscriptionMessage{
-		Receiver: receiver,
+		Receiver: MustEncodeAddress(t, receiver),
 		Data:     []byte(msgPayload),
 		Tokens:   tokens,
 		Amounts:  amounts,
@@ -480,7 +487,7 @@ func QueueSubRequest(
 
 func QueueRequest(t *testing.T, ccipContracts CCIPContracts, msgPayload string, tokens []common.Address, amounts []*big.Int, feeToken common.Address, feeTokenAmount *big.Int, gasLimit *big.Int) *types.Transaction {
 	msg := evm_2_any_toll_onramp_router.CCIPEVM2AnyTollMessage{
-		Receiver:       ccipContracts.Receivers[0].Receiver.Address(),
+		Receiver:       MustEncodeAddress(t, ccipContracts.Receivers[0].Receiver.Address()),
 		Data:           []byte(msgPayload),
 		Tokens:         tokens,
 		Amounts:        amounts,

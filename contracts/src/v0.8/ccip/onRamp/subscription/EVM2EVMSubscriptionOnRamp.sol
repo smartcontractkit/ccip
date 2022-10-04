@@ -59,6 +59,7 @@ contract EVM2EVMSubscriptionOnRamp is EVM2EVMSubscriptionOnRampInterface, BaseOn
     if (msg.sender != address(s_router)) revert MustBeCalledByRouter();
     handleForwardFromRouter(message.data.length, message.tokens, message.amounts, originalSender);
 
+    address receiver = abi.decode(message.receiver, (address));
     // Emit message request
     // we need the next available sequence number so we increment before we use the value
     // we need the next nonce so we increment before we use the value
@@ -66,8 +67,8 @@ contract EVM2EVMSubscriptionOnRamp is EVM2EVMSubscriptionOnRampInterface, BaseOn
       sequenceNumber: ++s_sequenceNumber,
       sourceChainId: i_chainId,
       sender: originalSender,
-      receiver: message.receiver,
-      nonce: ++s_receiverToNonce[message.receiver],
+      receiver: receiver,
+      nonce: ++s_receiverToNonce[receiver],
       data: message.data,
       tokens: message.tokens,
       amounts: message.amounts,

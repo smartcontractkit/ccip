@@ -16,7 +16,7 @@ interface EVM2AnyTollOnRampRouterInterface is BaseOnRampRouterInterface {
    * @param message The message payload
    * @return The sequence number assigned to message
    */
-  function ccipSend(uint256 destinationChainId, CCIP.EVM2AnyTollMessage memory message) external returns (uint64);
+  function ccipSend(uint256 destinationChainId, CCIP.EVM2AnyTollMessage calldata message) external returns (uint64);
 
   /**
    * @notice Set chainId => onRamp mapping

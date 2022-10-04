@@ -41,6 +41,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/testhelpers"
 	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
 	"github.com/smartcontractkit/chainlink/core/utils"
 )
@@ -307,7 +308,7 @@ func (client *CCIPClient) SendMessage(t *testing.T) {
 	require.NoError(t, err)
 
 	msg := evm_2_any_subscription_onramp_router.CCIPEVM2AnySubscriptionMessage{
-		Receiver: client.Dest.MessageReceiver.Address(),
+		Receiver: testhelpers.MustEncodeAddress(t, client.Dest.MessageReceiver.Address()),
 		Data:     bts,
 		Tokens:   []common.Address{client.Source.LinkTokenAddress},
 		Amounts:  []*big.Int{big.NewInt(1)},
@@ -822,7 +823,7 @@ func (client *CCIPClient) SendToOnrampWithExecution(t *testing.T, source SourceC
 	payload := evm_2_any_subscription_onramp_router.CCIPEVM2AnySubscriptionMessage{
 		Tokens:   []common.Address{},
 		Amounts:  []*big.Int{},
-		Receiver: toAddress,
+		Receiver: testhelpers.MustEncodeAddress(t, toAddress),
 		Data:     senderAndReceiver,
 		GasLimit: big.NewInt(3e5),
 	}

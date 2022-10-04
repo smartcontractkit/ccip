@@ -58,7 +58,7 @@ contract GovernanceDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterf
       CrossChainClone memory clone = s_crossChainClones[i];
 
       CCIP.EVM2AnySubscriptionMessage memory message = CCIP.EVM2AnySubscriptionMessage({
-        receiver: clone.contractAddress,
+        receiver: abi.encode(clone.contractAddress),
         data: data,
         tokens: new IERC20[](0),
         amounts: new uint256[](0),

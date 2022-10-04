@@ -619,9 +619,12 @@ func TokenTransferWithToll(sourceCCIP SourceCCIPModule, destCCIP DestCCIPModule)
 	seqNumberBefore, err := destCCIP.BlobVerifier.GetNextSeqNumber(sourceCCIP.TollOnRamp.EthAddress)
 	Expect(err).ShouldNot(HaveOccurred(), "Getting expected seq number should be successful")
 
+	receiver, err := utils.ABIEncode(`[{"type":"address"}]`, destCCIP.ReceiverDapp.EthAddress)
+	Expect(err).ShouldNot(HaveOccurred(), "Failed encoding the receiver address")
+
 	// form the message for transfer
 	msg := evm_2_any_toll_onramp_router.CCIPEVM2AnyTollMessage{
-		Receiver:       destCCIP.ReceiverDapp.EthAddress,
+		Receiver:       receiver,
 		Data:           []byte("Token transfer by DON"),
 		Tokens:         sourceTokens,
 		Amounts:        sourceCCIP.TransferAmount,
@@ -702,9 +705,12 @@ func TokenTransferWithSub(sourceCCIP SourceCCIPModule, destCCIP DestCCIPModule) 
 	seqNumber, err := destCCIP.BlobVerifier.GetNextSeqNumber(sourceCCIP.SubOnRamp.EthAddress)
 	Expect(err).ShouldNot(HaveOccurred(), "Getting expected seq number should be successful")
 
+	receiver, err := utils.ABIEncode(`[{"type":"address"}]`, destCCIP.ReceiverDapp.EthAddress)
+	Expect(err).ShouldNot(HaveOccurred(), "Failed encoding the receiver address")
+
 	// form the message for transfer
 	msg := evm_2_any_subscription_onramp_router.CCIPEVM2AnySubscriptionMessage{
-		Receiver: destCCIP.ReceiverDapp.EthAddress,
+		Receiver: receiver,
 		Data:     []byte("Token transfer subscription model"),
 		Tokens:   sourceTokens,
 		Amounts:  sourceCCIP.TransferAmount,

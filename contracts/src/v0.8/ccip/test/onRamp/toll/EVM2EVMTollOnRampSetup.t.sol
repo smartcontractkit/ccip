@@ -60,7 +60,7 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
     IERC20[] memory tokens = s_sourceTokens;
     return
       CCIP.EVM2AnyTollMessage({
-        receiver: OWNER,
+        receiver: abi.encode(OWNER),
         data: "",
         tokens: tokens,
         amounts: amounts,
@@ -75,7 +75,7 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
     IERC20[] memory tokens = new IERC20[](0);
     return
       CCIP.EVM2AnyTollMessage({
-        receiver: OWNER,
+        receiver: abi.encode(OWNER),
         data: "",
         tokens: tokens,
         amounts: amounts,
@@ -95,7 +95,7 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
         sequenceNumber: seqNum,
         sourceChainId: SOURCE_CHAIN_ID,
         sender: OWNER,
-        receiver: message.receiver,
+        receiver: abi.decode(message.receiver, (address)),
         data: message.data,
         tokens: message.tokens,
         amounts: message.amounts,
@@ -115,7 +115,7 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
         sequenceNumber: seqNum,
         sourceChainId: SOURCE_CHAIN_ID,
         sender: OWNER,
-        receiver: message.receiver,
+        receiver: abi.decode(message.receiver, (address)),
         data: message.data,
         tokens: message.tokens,
         amounts: message.amounts,

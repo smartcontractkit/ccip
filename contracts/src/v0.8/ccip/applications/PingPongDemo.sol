@@ -6,7 +6,7 @@ import "../../vendor/IERC20.sol";
 
 interface CCIPRouterInterface {
   struct Message {
-    address receiver;
+    bytes receiver;
     bytes data;
     IERC20[] tokens;
     uint256[] amounts;
@@ -68,7 +68,7 @@ contract PingPongDemo is CCIPReceiverInterface, OwnerIsCreator {
 
     bytes memory data = abi.encode(pingPongCount);
     CCIPRouterInterface.Message memory message = CCIPRouterInterface.Message({
-      receiver: s_counterpartAddress,
+      receiver: abi.encode(s_counterpartAddress),
       data: data,
       tokens: new IERC20[](0),
       amounts: new uint256[](0),

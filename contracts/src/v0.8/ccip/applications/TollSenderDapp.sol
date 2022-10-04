@@ -55,7 +55,7 @@ contract TollSenderDapp is TypeAndVersionInterface {
     sequenceNumber = i_onRampRouter.ccipSend(
       i_destinationChainId,
       CCIP.EVM2AnyTollMessage({
-        receiver: i_destinationContract,
+        receiver: abi.encode(i_destinationContract),
         data: abi.encode(msg.sender, destinationAddress),
         tokens: tokens,
         amounts: amounts,

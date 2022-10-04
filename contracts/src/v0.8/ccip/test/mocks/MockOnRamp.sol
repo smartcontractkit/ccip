@@ -35,7 +35,7 @@ contract MockOnRamp is EVM2EVMTollOnRampInterface {
     external
     view
     returns (
-      address receiver,
+      bytes memory receiver,
       bytes memory data,
       IERC20[] memory tokens,
       uint256[] memory amounts

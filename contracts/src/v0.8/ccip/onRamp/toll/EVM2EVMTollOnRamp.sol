@@ -58,7 +58,7 @@ contract EVM2EVMTollOnRamp is EVM2EVMTollOnRampInterface, BaseOnRamp, TypeAndVer
       sequenceNumber: ++s_sequenceNumber,
       sourceChainId: i_chainId,
       sender: originalSender,
-      receiver: message.receiver,
+      receiver: abi.decode(message.receiver, (address)),
       data: message.data,
       tokens: message.tokens,
       amounts: message.amounts,

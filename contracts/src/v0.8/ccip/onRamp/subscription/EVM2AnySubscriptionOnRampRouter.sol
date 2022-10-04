@@ -28,7 +28,7 @@ contract EVM2AnySubscriptionOnRampRouter is
   }
 
   /// @inheritdoc EVM2AnySubscriptionOnRampRouterInterface
-  function ccipSend(uint256 destinationChainId, CCIP.EVM2AnySubscriptionMessage memory message)
+  function ccipSend(uint256 destinationChainId, CCIP.EVM2AnySubscriptionMessage calldata message)
     external
     returns (uint64)
   {
