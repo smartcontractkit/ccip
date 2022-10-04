@@ -8,6 +8,7 @@ interface BlobVerifierInterface {
   error InvalidInterval(CCIP.Interval interval, address onRamp);
   error InvalidRelayReport(CCIP.RelayReport report);
   error InvalidConfiguration();
+  error InvalidProof();
 
   event ReportAccepted(CCIP.RelayReport report);
   event BlobVerifierConfigSet(BlobVerifierConfig config);

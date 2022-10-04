@@ -135,7 +135,9 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
       if (totalHashes == 0) {
         return leaves[0];
       }
-      require(totalHashes <= 256);
+      if (totalHashes > 256) {
+        revert InvalidProof();
+      }
       bytes32[] memory hashes = new bytes32[](totalHashes);
       (uint256 leafPos, uint256 hashPos, uint256 proofPos) = (0, 0, 0);
 

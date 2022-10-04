@@ -393,14 +393,15 @@ func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNums 
 	// Double check this verifies before sending.
 	res, err := r.blobVerifier.Verify(nil, hashes, innerProof.Hashes, ProofFlagsToBits(innerProof.SourceFlags), outerProof.Hashes, ProofFlagsToBits(outerProof.SourceFlags))
 	if err != nil {
+		r.lggr.Errorw("Unable to call verify", "seqNums", finalSeqNums, "indices", innerIdxs, "root", rep.RootOfRoots[:], "seqRange", rep.Intervals[onRampIdx], "onRampReport", rep.OnRamps[onRampIdx].Hex(), "onRampHave", r.onRamp.Hex(), "err", err)
 		return nil, err
 	}
 	// No timestamp, means failed to verify root.
 	if res.Cmp(big.NewInt(0)) == 0 {
 		ir := innerTree.Root()
 		or := outerTree.Root()
-		r.lggr.Errorf("Root does not verify: our inner root %x our outer root %x contract outer root %x",
-			ir[:], or[:], rep.RootOfRoots[:])
+		r.lggr.Errorf("Root does not verify for messages: %v (indicies %v) our inner root %x our outer root %x contract outer root %x",
+			finalSeqNums, innerIdxs, ir[:], or[:], rep.RootOfRoots[:])
 		return nil, errors.New("root does not verify")
 	}
 	er, err := EncodeExecutionReport(finalSeqNums, tokensPerFeeCoin, encMsgs, innerProof.Hashes, innerProof.SourceFlags, outerProof.Hashes, outerProof.SourceFlags)
@@ -486,6 +487,10 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 			finalSequenceNumbers = append(finalSequenceNumbers, seqNr)
 		}
 	}
+	// buildReport expects sorted sequence numbers (tally map is non-deterministic).
+	sort.Slice(finalSequenceNumbers, func(i, j int) bool {
+		return finalSequenceNumbers[i] < finalSequenceNumbers[j]
+	})
 	nextMin, err := r.blobVerifier.GetExpectedNextSequenceNumber(nil, r.onRamp)
 	if err != nil {
 		return false, nil, err

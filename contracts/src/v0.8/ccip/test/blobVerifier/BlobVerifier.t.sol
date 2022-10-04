@@ -350,7 +350,7 @@ contract BlobVerifier_verify is BlobVerifierRealAFNSetup {
     bytes32[] memory merkleRoots = new bytes32[](258);
     bytes32[] memory proofs = new bytes32[](0);
 
-    vm.expectRevert();
+    vm.expectRevert(BlobVerifierInterface.InvalidProof.selector);
 
     s_blobVerifier.verify(merkleRoots, proofs, 0, proofs, 0);
   }
