@@ -17,7 +17,6 @@ import (
 	ocrtypes2 "github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"golang.org/x/crypto/curve25519"
 
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/afn_contract"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp"
@@ -28,6 +27,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_subscription_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/maybe_revert_message_receiver"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/mock_afn_contract"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/native_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/simple_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/toll_sender_dapp"
@@ -78,29 +78,16 @@ func (e *CCIPContractsDeployer) DeployNativeTokenPoolContract(linkAddr string) (
 	}, err
 }
 
-func (e *CCIPContractsDeployer) DeployAFNContract(
-	weightByParticipants map[string]*big.Int,
-	blessThreshold *big.Int,
-	bagSignalThreshold *big.Int,
-) (
-	*AFN,
-	error,
-) {
-	var weights []*big.Int
-	var participants []common.Address
-	for addr, weight := range weightByParticipants {
-		weights = append(weights, weight)
-		participants = append(participants, common.HexToAddress(addr))
-	}
+func (e *CCIPContractsDeployer) DeployAFNContract() (*AFN, error) {
 	address, _, instance, err := e.evmClient.DeployContract("AFN Contract", func(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return afn_contract.DeployAFNContract(auth, backend, participants, weights, blessThreshold, bagSignalThreshold)
+		return mock_afn_contract.DeployMockAFNContract(auth, backend)
 	})
 	return &AFN{
 		client:     e.evmClient,
-		instance:   instance.(*afn_contract.AFNContract),
+		instance:   instance.(*mock_afn_contract.MockAFNContract),
 		EthAddress: *address,
 	}, err
 }

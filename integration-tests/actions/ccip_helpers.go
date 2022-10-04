@@ -99,8 +99,7 @@ func (ccipModule *CCIPCommon) DeployContracts(cd *ccip.CCIPContractsDeployer, no
 	Expect(err).ShouldNot(HaveOccurred(), "Error waiting for Native TokenPool deployments")
 
 	// deploy AFN
-	ccipModule.AFN, err = cd.DeployAFNContract(
-		ccipModule.AFNConfig.AFNWeightsByParticipants, ccipModule.AFNConfig.ThresholdForBlessing, ccipModule.AFNConfig.ThresholdForBadSignal)
+	ccipModule.AFN, err = cd.DeployAFNContract()
 	Expect(err).ShouldNot(HaveOccurred(), "Deploying AFN Contract shouldn't fail")
 }
 
@@ -531,8 +530,8 @@ func (destCCIP *DestCCIPModule) BalanceAssertions(model billingModel, prevBalanc
 			Name:     name,
 			Address:  destCCIP.ReceiverDapp.EthAddress,
 			Getter:   destCCIP.SubscriptionBalance,
-			Expected: bigmath.Sub(prevBalances[name], big.NewInt(6.94e17)).String(),
-			Within:   "100000000000000000",
+			Expected: bigmath.Sub(prevBalances[name], big.NewInt(6.95e17)).String(),
+			Within:   big.NewInt(1e17).String(),
 		})
 	}
 	return balAssertions
@@ -834,7 +833,7 @@ func CreateOCRJobsForCCIP(
 					"sourceStartBlock": currentBlockOnSource,
 				},
 				RelayConfig: map[string]interface{}{
-					"chainID": fmt.Sprintf("\"%s\"", destChainID.String()),
+					"chainID": destChainID,
 				},
 			},
 		}
@@ -872,7 +871,7 @@ func CreateOCRJobsForCCIP(
 """`, tokensPerFeeCoinPipeline),
 				},
 				RelayConfig: map[string]interface{}{
-					"chainID": fmt.Sprintf("\"%s\"", destChainID.String()),
+					"chainID": destChainID,
 				},
 			},
 		}
@@ -909,7 +908,7 @@ func CreateOCRJobsForCCIP(
 """`, tokensPerFeeCoinPipeline),
 				},
 				RelayConfig: map[string]interface{}{
-					"chainID": fmt.Sprintf("\"%s\"", destChainID.String()),
+					"chainID": destChainID,
 				},
 			},
 		}
