@@ -1,7 +1,7 @@
 [profile.default]
 solc_version = '0.8.15'
 auto_detect_solc = false
-optimizer_runs = 900
+optimizer_runs = 10000
 
 src = 'contracts/src/v0.8/ccip'
 test = 'contracts/src/v0.8/ccip/test'

@@ -236,8 +236,9 @@ chainID             = %s
 			{
 				Name:     testhelpers.TollOffRamp,
 				Address:  ccipContracts.TollOffRamp.Address(),
-				Expected: testhelpers.MustAddBigInt(destBalances[testhelpers.TollOffRamp], "965857200000000000").String(),
+				Expected: testhelpers.MustAddBigInt(destBalances[testhelpers.TollOffRamp], "965804400000000000").String(),
 				Getter:   ccipContracts.GetDestLinkBalance,
+				Within:   "100000000000000", // To account for change in the number of contract optimizations
 			},
 		})
 		tollCurrentSeqNum++

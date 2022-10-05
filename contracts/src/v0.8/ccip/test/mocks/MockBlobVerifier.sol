@@ -43,7 +43,7 @@ contract MockBlobVerifier is BlobVerifierInterface {
     return 1;
   }
 
-  function isBlessed(bytes32 root) external view returns (bool) {
+  function isBlessed(bytes32) external pure returns (bool) {
     return true;
   }
 }
