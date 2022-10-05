@@ -283,6 +283,8 @@ const (
 	DKG OCR2PluginType = "dkg"
 
 	OCR2VRF OCR2PluginType = "ocr2vrf"
+
+	OCR2Keeper OCR2PluginType = "ocr2keeper"
 	// CCIPRelay refers to the ccip.CCIPRelay plugin
 	CCIPRelay OCR2PluginType = "ccip-relay"
 	// CCIPExecution refers to the ccip.CCIPExecution plugin
