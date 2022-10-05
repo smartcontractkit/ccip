@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
@@ -319,7 +318,7 @@ func (don *DON) AddTwoWaySpecs(chainA EvmChainConfig, chainB EvmChainConfig) {
 	don.AddJobSpecs(executionSpecBA)
 }
 
-func (don *DON) AddJobSpecs(spec client.OCR2TaskJobSpec) {
+func (don *DON) AddJobSpecs(spec job.Job) {
 	chainID := spec.OCR2OracleSpec.RelayConfig["chainID"].(string)
 
 	for i, node := range don.nodes {
@@ -351,11 +350,10 @@ func (don *DON) AddJobSpecs(spec client.OCR2TaskJobSpec) {
 	}
 }
 
-func CreateJob(node *client.Chainlink, spec client.OCR2TaskJobSpec) (*client.Job, *http.Response, error) {
+func CreateJob(node *client.Chainlink, spec job.Job) (*client.Job, *http.Response, error) {
 	job := &client.Job{}
 	specString := RelaySpecToString(spec)
 
-	log.Info().Str("Node URL", node.Config.URL).Str("Type", spec.Type()).Msg("Creating Job")
 	resp, err := node.APIClient.R().
 		SetBody(&client.JobForm{
 			TOML: specString,
@@ -368,7 +366,7 @@ func CreateJob(node *client.Chainlink, spec client.OCR2TaskJobSpec) (*client.Job
 	return job, resp.RawResponse, err
 }
 
-func RelaySpecToString(spec client.OCR2TaskJobSpec) string {
+func RelaySpecToString(spec job.Job) string {
 	bootstrapper := spec.OCR2OracleSpec.P2PV2Bootstrappers[0]
 	onRamp := spec.OCR2OracleSpec.PluginConfig["onRampIDs"].([]string)[0]
 
@@ -397,7 +395,7 @@ chainID            = "%s"
 `
 
 	return fmt.Sprintf(relayTemplate+"\n",
-		spec.Name,
+		spec.Name.String,
 		spec.OCR2OracleSpec.ContractID,
 		spec.OCR2OracleSpec.OCRKeyBundleID.String,
 		spec.OCR2OracleSpec.TransmitterID.String,
@@ -412,7 +410,7 @@ chainID            = "%s"
 	)
 }
 
-func ExecSpecToString(spec client.OCR2TaskJobSpec) string {
+func ExecSpecToString(spec job.Job) string {
 	bootstrapper := spec.OCR2OracleSpec.P2PV2Bootstrappers[0]
 
 	const relayTemplate = `
@@ -441,7 +439,7 @@ chainID            = "%s"
 `
 
 	return fmt.Sprintf(relayTemplate+"\n",
-		spec.Name,
+		spec.Name.String,
 		spec.OCR2OracleSpec.ContractID,
 		spec.OCR2OracleSpec.OCRKeyBundleID.String,
 		spec.OCR2OracleSpec.TransmitterID.String,

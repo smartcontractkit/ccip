@@ -200,24 +200,24 @@ func SetupNodeCCIP(
 		DB:               db,
 		KeyStore:         simEthKeyStore,
 		EventBroadcaster: eventBroadcaster,
-		GenEthClient: func(c types.DBChain) client.Client {
-			if c.ID.String() == sourceChainID.String() {
+		GenEthClient: func(chainID *big.Int) client.Client {
+			if chainID.String() == sourceChainID.String() {
 				return sourceClient
-			} else if c.ID.String() == destChainID.String() {
+			} else if chainID.String() == destChainID.String() {
 				return destClient
 			}
-			t.Fatalf("invalid chain ID %v", c.ID.String())
+			t.Fatalf("invalid chain ID %v", chainID.String())
 			return nil
 		},
-		GenHeadTracker: func(c types.DBChain, hb types2.HeadBroadcaster) types2.HeadTracker {
-			if c.ID.String() == sourceChainID.String() {
+		GenHeadTracker: func(chainID *big.Int, hb types2.HeadBroadcaster) types2.HeadTracker {
+			if chainID.String() == sourceChainID.String() {
 				return headtracker.NewHeadTracker(
 					lggr, sourceClient,
 					evmtest.NewChainScopedConfig(t, config),
 					hb,
 					headtracker.NewHeadSaver(lggr, headtracker.NewORM(db, lggr, pgtest.NewPGCfg(false), *sourceClient.ChainID()), evmCfg),
 				)
-			} else if c.ID.String() == destChainID.String() {
+			} else if chainID.String() == destChainID.String() {
 				return headtracker.NewHeadTracker(
 					lggr,
 					destClient,
@@ -226,38 +226,38 @@ func SetupNodeCCIP(
 					headtracker.NewHeadSaver(lggr, headtracker.NewORM(db, lggr, pgtest.NewPGCfg(false), *destClient.ChainID()), evmCfg),
 				)
 			}
-			t.Fatalf("invalid chain ID %v", c.ID.String())
+			t.Fatalf("invalid chain ID %v", chainID.String())
 			return nil
 		},
-		GenLogPoller: func(c types.DBChain) logpoller.LogPoller {
-			if c.ID.String() == sourceChainID.String() {
+		GenLogPoller: func(chainID *big.Int) logpoller.LogPoller {
+			if chainID.String() == sourceChainID.String() {
 				t.Log("Generating log broadcaster source")
 				return sourceLp
-			} else if c.ID.String() == destChainID.String() {
+			} else if chainID.String() == destChainID.String() {
 				return destLp
 			}
-			t.Fatalf("invalid chain ID %v", c.ID.String())
+			t.Fatalf("invalid chain ID %v", chainID.String())
 			return nil
 		},
-		GenLogBroadcaster: func(c types.DBChain) log.Broadcaster {
-			if c.ID.String() == sourceChainID.String() {
+		GenLogBroadcaster: func(chainID *big.Int) log.Broadcaster {
+			if chainID.String() == sourceChainID.String() {
 				t.Log("Generating log broadcaster source")
 				return log.NewBroadcaster(log.NewORM(db, lggr, config, *sourceChainID), sourceClient,
 					evmtest.NewChainScopedConfig(t, config), lggr, nil)
-			} else if c.ID.String() == destChainID.String() {
+			} else if chainID.String() == destChainID.String() {
 				return log.NewBroadcaster(log.NewORM(db, lggr, config, *destChainID), destClient,
 					evmtest.NewChainScopedConfig(t, config), lggr, nil)
 			}
-			t.Fatalf("invalid chain ID %v", c.ID.String())
+			t.Fatalf("invalid chain ID %v", chainID.String())
 			return nil
 		},
-		GenTxManager: func(c types.DBChain) txmgr.TxManager {
-			if c.ID.String() == sourceChainID.String() {
+		GenTxManager: func(chainID *big.Int) txmgr.TxManager {
+			if chainID.String() == sourceChainID.String() {
 				return txmgr.NewTxm(db, sourceClient, evmtest.NewChainScopedConfig(t, config), simEthKeyStore, eventBroadcaster, lggr, &txmgr.CheckerFactory{Client: sourceClient}, sourceLp)
-			} else if c.ID.String() == destChainID.String() {
+			} else if chainID.String() == destChainID.String() {
 				return txmgr.NewTxm(db, destClient, evmtest.NewChainScopedConfig(t, config), simEthKeyStore, eventBroadcaster, lggr, &txmgr.CheckerFactory{Client: destClient}, destLp)
 			}
-			t.Fatalf("invalid chain ID %v", c.ID.String())
+			t.Fatalf("invalid chain ID %v", chainID.String())
 			return nil
 		},
 	})

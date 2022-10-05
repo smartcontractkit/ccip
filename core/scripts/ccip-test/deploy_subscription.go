@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/stretchr/testify/require"
 	null2 "gopkg.in/guregu/null.v4"
 
@@ -545,11 +544,11 @@ func fillPoolWithTokens(t *testing.T, client *EvmChainConfig, pool *native_token
 	client.Logger.Infof("Pool filled with tokens: %s", helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash()))
 }
 
-func generateRelayJobSpecs(sourceClient *EvmChainConfig, destClient *EvmChainConfig, bootstrapPeer string) client.OCR2TaskJobSpec {
-	return client.OCR2TaskJobSpec{
-		Name:    fmt.Sprintf("ccip-relay-%s-%s", helpers.ChainName(sourceClient.ChainId.Int64()), helpers.ChainName(destClient.ChainId.Int64())),
-		JobType: "offchainreporting2",
-		OCR2OracleSpec: job.OCR2OracleSpec{
+func generateRelayJobSpecs(sourceClient *EvmChainConfig, destClient *EvmChainConfig, bootstrapPeer string) job.Job {
+	return job.Job{
+		Name: null2.StringFrom(fmt.Sprintf("ccip-relay-%s-%s", helpers.ChainName(sourceClient.ChainId.Int64()), helpers.ChainName(destClient.ChainId.Int64()))),
+		Type: "offchainreporting2",
+		OCR2OracleSpec: &job.OCR2OracleSpec{
 			PluginType:                  job.CCIPRelay,
 			ContractID:                  destClient.BlobVerifier.Hex(),
 			Relay:                       "evm",
@@ -570,11 +569,11 @@ func generateRelayJobSpecs(sourceClient *EvmChainConfig, destClient *EvmChainCon
 	}
 }
 
-func generateExecutionJobSpecs(sourceClient *EvmChainConfig, destClient *EvmChainConfig, bootstrapPeer string) client.OCR2TaskJobSpec {
-	return client.OCR2TaskJobSpec{
-		Name:    fmt.Sprintf("ccip-exec-%s-%s", helpers.ChainName(sourceClient.ChainId.Int64()), helpers.ChainName(destClient.ChainId.Int64())),
-		JobType: "offchainreporting2",
-		OCR2OracleSpec: job.OCR2OracleSpec{
+func generateExecutionJobSpecs(sourceClient *EvmChainConfig, destClient *EvmChainConfig, bootstrapPeer string) job.Job {
+	return job.Job{
+		Name: null2.StringFrom(fmt.Sprintf("ccip-exec-%s-%s", helpers.ChainName(sourceClient.ChainId.Int64()), helpers.ChainName(destClient.ChainId.Int64()))),
+		Type: "offchainreporting2",
+		OCR2OracleSpec: &job.OCR2OracleSpec{
 			PluginType:                  job.CCIPExecution,
 			ContractID:                  destClient.OffRamp.Hex(),
 			Relay:                       "evm",
