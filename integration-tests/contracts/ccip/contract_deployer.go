@@ -79,7 +79,7 @@ func (e *CCIPContractsDeployer) DeployNativeTokenPoolContract(linkAddr string) (
 }
 
 func (e *CCIPContractsDeployer) DeployAFNContract() (*AFN, error) {
-	address, _, instance, err := e.evmClient.DeployContract("AFN Contract", func(
+	address, _, instance, err := e.evmClient.DeployContract("Mock AFN Contract", func(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
@@ -213,22 +213,16 @@ func (e *CCIPContractsDeployer) DeploySubOffRamp(
 	blobVerifier, onRamp, afn common.Address,
 	sourceToken, pools []common.Address,
 	opts RateLimiterConfig,
-) (
-	*SubOffRamp,
-	error,
-) {
+	offRampConfig any_2_evm_subscription_offramp.BaseOffRampInterfaceOffRampConfig,
+) (*SubOffRamp, error) {
+	offRampConfig.OnRampAddress = onRamp
 	address, _, instance, err := e.evmClient.DeployContract("Sub OffRamp Contract", func(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
 		return any_2_evm_subscription_offramp.DeployEVM2EVMSubscriptionOffRamp(
 			auth, backend, sourceChainId, destChainId,
-			any_2_evm_subscription_offramp.BaseOffRampInterfaceOffRampConfig{
-				OnRampAddress:         onRamp,
-				ExecutionDelaySeconds: 0,
-				MaxDataSize:           1e12,
-				MaxTokensLength:       15,
-			},
+			offRampConfig,
 			blobVerifier,
 			afn,
 			sourceToken,
@@ -371,26 +365,17 @@ func (e *CCIPContractsDeployer) DeploySubOnRamp(
 	chainId, destChainId *big.Int,
 	tokens, pools, allowList []common.Address,
 	afn, router common.Address,
-) (
-	*SubOnRamp,
-	error,
-) {
+	onRampConfig evm_2_evm_subscription_onramp.BaseOnRampInterfaceOnRampConfig,
+	rateLimiterConfig evm_2_evm_subscription_onramp.AggregateRateLimiterInterfaceRateLimiterConfig,
+) (*SubOnRamp, error) {
 	address, _, instance, err := e.evmClient.DeployContract("SubOnRamp", func(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
 		return evm_2_evm_subscription_onramp.DeployEVM2EVMSubscriptionOnRamp(
 			auth, backend, chainId, destChainId, tokens, pools,
-			allowList, afn,
-			evm_2_evm_subscription_onramp.BaseOnRampInterfaceOnRampConfig{
-				RelayingFeeJuels: 0,
-				MaxDataSize:      1e12,
-				MaxTokensLength:  5,
-			},
-			evm_2_evm_subscription_onramp.AggregateRateLimiterInterfaceRateLimiterConfig{
-				Capacity: HundredCoins,
-				Rate:     big.NewInt(1e18),
-			},
+			allowList, afn, onRampConfig,
+			rateLimiterConfig,
 			auth.From,
 			router)
 	})
@@ -464,7 +449,6 @@ func NewOffChainAggregatorV2Config(
 	var onChainKeys []ocrtypes2.OnchainPublicKey
 	for i, nodeWithKeys := range nodes {
 		ocr2Key := nodeWithKeys.KeysBundle.OCR2Key.Data
-		log.Info().Interface("OCR2 Key", ocr2Key).Msg("Key details delete later")
 		offChainPubKeyTemp, err := hex.DecodeString(stripKeyPrefix(ocr2Key.Attributes.OffChainPublicKey))
 		if err != nil {
 			return nil, nil, 0, nil, 0, nil, err

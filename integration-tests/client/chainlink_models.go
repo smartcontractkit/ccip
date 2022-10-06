@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/lib/pq"
+
 	"gopkg.in/guregu/null.v4"
 
 	"github.com/smartcontractkit/chainlink/core/services/relay"
@@ -918,9 +919,10 @@ observationSource                      = """
 type TempOCR2PluginType string
 
 const (
-	Median    TempOCR2PluginType = "median"
-	DKG       TempOCR2PluginType = "dkg"
-	OCR2VRF   TempOCR2PluginType = "ocr2vrf"
+	Median  TempOCR2PluginType = "median"
+	DKG     TempOCR2PluginType = "dkg"
+	OCR2VRF TempOCR2PluginType = "ocr2vrf"
+	// CCIPRelay refers to the ccip.CCIPRelay plugin
 	CCIPRelay TempOCR2PluginType = "ccip-relay"
 	// CCIPExecution refers to the ccip.CCIPExecution plugin
 	CCIPExecution TempOCR2PluginType = "ccip-execution"

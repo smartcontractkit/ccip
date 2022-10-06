@@ -94,10 +94,10 @@ var _ = FDescribe("CCIP interactions test @ccip", func() {
 			destCCIP   *actions.DestCCIPModule
 		)
 		By("Deploying the environment")
-		testEnvironment = actions.DeployEnvironments(sourceNetwork, destNetwork)
+		testEnvironment = actions.DeployEnvironments(sourceNetwork, destNetwork, &environment.Config{NamespacePrefix: "smoke-ccip"})
 
 		By("Setting up chainlink nodes")
-		testSetUp := actions.SetUpNodesAndKeys(sourceNetwork, destNetwork, testEnvironment)
+		testSetUp := actions.SetUpNodesAndKeys(sourceNetwork, destNetwork, testEnvironment, big.NewFloat(10))
 		clNodes := testSetUp.CLNodesWithKeys
 		mockServer := testSetUp.MockServer
 		chainlinkNodes = testSetUp.CLNodes
@@ -148,7 +148,7 @@ var _ = FDescribe("CCIP interactions test @ccip", func() {
 		// initiate transfer with subscription and verify
 		By("Multiple Token transfer with subscription, watch for updated sequence numbers and events logs, " +
 			"verify receiver,sender and subscription balance pre and post transfer")
-		actions.CreateAndFundSubscription(*sourceCCIP, *destCCIP, big.NewInt(0).Mul(big.NewInt(80), big.NewInt(1e18)))
+		actions.CreateAndFundSubscription(*sourceCCIP, *destCCIP, big.NewInt(0).Mul(big.NewInt(80), big.NewInt(1e18)), 2)
 		actions.TokenTransferWithSub(*sourceCCIP, *destCCIP)
 	},
 		diffNetworkEntries,

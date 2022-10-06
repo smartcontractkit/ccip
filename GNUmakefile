@@ -127,6 +127,11 @@ test_soak_ocr: test_need_operator_assets ## Run the OCR soak test
 test_soak_keeper: test_need_operator_assets ## Run the OCR soak test
 	cd ./integration-tests && go test -v -run ^TestKeeperSoak$$ ./soak -count=1 && cd ..
 
+.PHONY: test_load_ccip
+test_load_ccip: test_need_operator_assets ## Run the CCIP load test
+	go install github.com/jstemmer/go-junit-report@latest
+	cd ./integration-tests && go test -timeout 4h -v -run ^TestCCIPLoad ./load -count=1 2>&1| go-junit-report -set-exit-code > tests-load-report.xml && cd ..
+
 .PHONY: test_perf
 test_perf: test_need_operator_assets ## Run core node performance tests.
 	ginkgo -v -r --junit-report=tests-perf-report.xml \
