@@ -43,7 +43,7 @@ library CCIP {
   {
     message = CCIP.Any2EVMMessage({
       sourceChainId: original.sourceChainId,
-      sender: abi.encode(original.sender),
+      sender: original.sender,
       data: original.data,
       destTokens: original.destTokens,
       amounts: original.amounts
