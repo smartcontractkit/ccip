@@ -80,7 +80,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 			return req.Message.SequenceNumber, nil
 		}
 		// Subscribe to all relevant relay logs.
-		err = sourceChain.LogPoller().MergeFilter([]common.Hash{CCIPTollSendRequested}, []common.Address{onRampAddr})
+		_, err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{CCIPTollSendRequested}, Addresses: []common.Address{onRampAddr}})
 		if err != nil {
 			return nil, err
 		}
@@ -99,7 +99,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 			return req.Message.SequenceNumber, nil
 		}
 		// Subscribe to all relevant relay logs.
-		err = sourceChain.LogPoller().MergeFilter([]common.Hash{CCIPSubSendRequested}, []common.Address{onRampAddr})
+		_, err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{CCIPSubSendRequested}, Addresses: []common.Address{onRampAddr}})
 		if err != nil {
 			return nil, err
 		}
@@ -108,7 +108,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	default:
 		return nil, errors.Errorf("unrecognized onramp, is %v the correct onramp address?", onRampAddr)
 	}
-	err = destChain.LogPoller().MergeFilter([]common.Hash{ReportAccepted}, []common.Address{verifier.Address()})
+	_, err = destChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{ReportAccepted}, Addresses: []common.Address{verifier.Address()}})
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +135,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	if err2 != nil {
 		return nil, err
 	}
-	err = destChain.LogPoller().MergeFilter([]common.Hash{ExecutionStateChanged}, []common.Address{offRamp.Address()})
+	_, err = destChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{ExecutionStateChanged}, Addresses: []common.Address{offRamp.Address()}})
 	if err != nil {
 		return nil, err
 	}

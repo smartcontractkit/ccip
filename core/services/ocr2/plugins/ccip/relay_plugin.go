@@ -121,7 +121,7 @@ func NewRelayServices(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm
 				return req.Message.SequenceNumber, nil
 			}
 			// Subscribe to all relevant relay logs.
-			err = sourceChain.LogPoller().MergeFilter([]common.Hash{CCIPTollSendRequested}, []common.Address{onRamp.Address()})
+			_, err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{CCIPTollSendRequested}, Addresses: []common.Address{onRamp.Address()}})
 			if err != nil {
 				return nil, err
 			}
@@ -141,7 +141,7 @@ func NewRelayServices(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm
 				return req.Message.SequenceNumber, nil
 			}
 			// Subscribe to all relevant relay logs.
-			err = sourceChain.LogPoller().MergeFilter([]common.Hash{CCIPSubSendRequested}, []common.Address{onRamp.Address()})
+			_, err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{CCIPSubSendRequested}, Addresses: []common.Address{onRamp.Address()}})
 			if err != nil {
 				return nil, err
 			}

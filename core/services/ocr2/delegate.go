@@ -7,7 +7,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
-	"github.com/smartcontractkit/chainlink-relay/pkg/types"
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2"
 	ocr2keepers "github.com/smartcontractkit/ocr2keepers/pkg"
 	"github.com/smartcontractkit/ocr2vrf/altbn_128"
@@ -16,6 +15,7 @@ import (
 	"github.com/smartcontractkit/sqlx"
 	"gopkg.in/guregu/null.v4"
 
+	"github.com/smartcontractkit/chainlink-relay/pkg/types"
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/job"
@@ -125,8 +125,11 @@ func (d *Delegate) ServicesForSpec(jobSpec job.Job) ([]job.ServiceCtx, error) {
 		if !ok {
 			return nil, errors.New("chainID must be provided in relay config")
 		}
-		chainID := int64(chainIDInterface.(float64))
-		chain, err2 := d.chainSet.Get(big.NewInt(chainID))
+		chainID, ok := chainIDInterface.(float64)
+		if !ok {
+			return nil, errors.Errorf("invalid chain type got %T want float64", chainIDInterface)
+		}
+		chain, err2 := d.chainSet.Get(big.NewInt(int64(chainID)))
 		if err2 != nil {
 			return nil, errors.Wrap(err2, "get chainset")
 		}
@@ -388,7 +391,7 @@ func (d *Delegate) ServicesForSpec(jobSpec job.Job) ([]job.ServiceCtx, error) {
 		oracleCtx := job.NewServiceAdapter(oracles)
 		return []job.ServiceCtx{runResultSaver, vrfProvider, oracleCtx}, nil
 	case job.OCR2Keeper:
-		keeperProvider, rgstry, encoder, err2 := ocr2keeper.EVMDependencies(jobSpec, d.db, lggr, d.chainSet)
+		keeperProvider, rgstry, encoder, err2 := ocr2keeper.EVMDependencies(jobSpec, d.db, lggr, d.chainSet, d.pipelineRunner)
 		if err2 != nil {
 			return nil, errors.Wrap(err2, "could not build dependencies for ocr2 keepers")
 		}

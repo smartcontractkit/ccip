@@ -66,7 +66,7 @@ require (
 	github.com/smartcontractkit/chainlink-terra v0.1.4-0.20220930034731-ef9eb53de886
 	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20221004222120-7e264f91662f
 	github.com/smartcontractkit/libocr v0.0.0-20220812191430-db92a9fdaa52
-	github.com/smartcontractkit/ocr2keepers v0.3.9
+	github.com/smartcontractkit/ocr2keepers v0.3.10
 	github.com/smartcontractkit/ocr2vrf v0.0.0-20220915095942-76b59bf918bc
 	github.com/smartcontractkit/sqlx v1.3.5-0.20210805004948-4be295aacbeb
 	github.com/smartcontractkit/terra.go v1.0.3-0.20220108002221-62b39252ee16
