@@ -55,7 +55,6 @@ require (
 	github.com/prometheus/client_model v0.2.0
 	github.com/pyroscope-io/client v0.3.0
 	github.com/robfig/cron/v3 v3.0.1
-	github.com/rs/zerolog v1.28.0
 	github.com/satori/go.uuid v1.2.0
 	github.com/scylladb/go-reflectx v1.0.1
 	github.com/shirou/gopsutil/v3 v3.22.9
@@ -356,6 +355,7 @@ require (
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/rjeczalik/notify v0.9.2 // indirect
 	github.com/rs/cors v1.8.0 // indirect
+	github.com/rs/zerolog v1.28.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sasha-s/go-deadlock v0.2.1-0.20190427202633-1595213edefa // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect

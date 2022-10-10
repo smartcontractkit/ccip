@@ -518,7 +518,13 @@ func (client *CCIPClient) CrossChainSendPausedOnrampShouldFail(t *testing.T) {
 	amount := big.NewInt(100)
 	client.Source.ApproveLink(t, client.Source.SenderDapp.Address(), amount)
 	client.Source.Owner.GasLimit = 1e6
-	tx, err := client.Source.SenderDapp.SendTokens(client.Source.Owner, client.Dest.Owner.From, []common.Address{client.Source.LinkTokenAddress}, []*big.Int{amount})
+	tx, err := client.Source.SenderDapp.SendMessage(client.Source.Owner,
+		subscription_sender_dapp.CCIPEVM2AnySubscriptionMessage{
+			Receiver: testhelpers.MustEncodeAddress(t, client.Dest.Owner.From),
+			Tokens:   []common.Address{client.Source.LinkTokenAddress},
+			Amounts:  []*big.Int{amount},
+			GasLimit: big.NewInt(100_000),
+		})
 	require.NoError(t, err)
 	WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), false)
 }
@@ -545,7 +551,13 @@ func (client *CCIPClient) NotEnoughFundsInBucketShouldFail(t *testing.T) {
 	amount := big.NewInt(2e18) // 2 LINK, bucket size is 1 LINK
 	client.Source.ApproveLink(t, client.Source.SenderDapp.Address(), amount)
 	client.Source.Owner.GasLimit = 1e6
-	tx, err := client.Source.SenderDapp.SendTokens(client.Source.Owner, client.Dest.Owner.From, []common.Address{client.Source.LinkTokenAddress}, []*big.Int{amount})
+	tx, err := client.Source.SenderDapp.SendMessage(client.Source.Owner,
+		subscription_sender_dapp.CCIPEVM2AnySubscriptionMessage{
+			Receiver: testhelpers.MustEncodeAddress(t, client.Dest.Owner.From),
+			Tokens:   []common.Address{client.Source.LinkTokenAddress},
+			Amounts:  []*big.Int{amount},
+			GasLimit: big.NewInt(100_000),
+		})
 	require.NoError(t, err)
 	WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), false)
 }
@@ -592,7 +604,7 @@ func (client *CCIPClient) SendDappTx(t *testing.T) {
 	destBlockNumber := GetCurrentBlockNumber(client.Dest.Client.Client)
 
 	client.Source.ApproveLink(t, client.Source.SenderDapp.Address(), amount)
-	crossChainRequest := client.SendToDappWithExecution(client.Source, client.Source.Owner, client.Dest.Owner.From, amount)
+	crossChainRequest := client.SendToDappWithExecution(t, client.Source, client.Source.Owner, client.Dest.Owner.From, amount)
 	client.WaitForRelay(t, destBlockNumber)
 	client.WaitForExecution(t, destBlockNumber, crossChainRequest.Message.SequenceNumber)
 }
@@ -610,7 +622,7 @@ func (client *CCIPClient) ScalingAndBatching(t *testing.T) {
 		go func(user *bind.TransactOpts) {
 			defer wg.Done()
 			client.Source.ApproveLinkFrom(t, user, client.Source.SenderDapp.Address(), amount)
-			crossChainRequest := client.SendToDappWithExecution(client.Source, user, toAddress, amount)
+			crossChainRequest := client.SendToDappWithExecution(t, client.Source, user, toAddress, amount)
 			client.Source.logger.Info("Don executed tx submitted with sequence number: ", crossChainRequest.Message.SequenceNumber)
 			seqNum = crossChainRequest.Message.SequenceNumber
 		}(user)
@@ -803,10 +815,15 @@ func (client *CCIPClient) TryGetTokensFromPausedPool() {
 }
 
 // SendToDappWithExecution executes a cross chain transactions using the sender dapp interface.
-func (client *CCIPClient) SendToDappWithExecution(source SourceClient, from *bind.TransactOpts, toAddress common.Address, amount *big.Int) *evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRampCCIPSendRequested {
+func (client *CCIPClient) SendToDappWithExecution(t *testing.T, source SourceClient, from *bind.TransactOpts, toAddress common.Address, amount *big.Int) *evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRampCCIPSendRequested {
 	SourceBlockNumber := GetCurrentBlockNumber(source.Client.Client)
 
-	tx, err := source.SenderDapp.SendTokens(from, toAddress, []common.Address{source.LinkTokenAddress}, []*big.Int{amount})
+	tx, err := source.SenderDapp.SendMessage(from, subscription_sender_dapp.CCIPEVM2AnySubscriptionMessage{
+		Receiver: testhelpers.MustEncodeAddress(t, toAddress),
+		Tokens:   []common.Address{source.LinkTokenAddress},
+		Amounts:  []*big.Int{amount},
+		GasLimit: big.NewInt(100_000),
+	})
 	helpers.PanicErr(err)
 	source.logger.Infof("Send tokens tx %s", helpers.ExplorerLink(source.ChainId.Int64(), tx.Hash()))
 

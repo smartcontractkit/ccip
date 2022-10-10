@@ -30,6 +30,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/mock_afn_contract"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/native_token_pool"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/subscription_sender_dapp"
 	"github.com/smartcontractkit/chainlink/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
@@ -86,6 +87,9 @@ type CCIPContracts struct {
 	SubOnRamp        *evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRamp
 	SubOffRampRouter *any_2_evm_subscription_offramp_router.Any2EVMSubscriptionOffRampRouter
 	SubOffRamp       *any_2_evm_subscription_offramp.EVM2EVMSubscriptionOffRamp
+
+	// Sender dApps
+	SubSenderApp *subscription_sender_dapp.SubscriptionSenderDapp
 }
 
 type BalanceAssertion struct {
@@ -427,6 +431,12 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 		MinSeqNrByOnRamp: []uint64{1, 1},
 	})
 	require.NoError(t, err)
+
+	senderDappAddr, _, _, err := subscription_sender_dapp.DeploySubscriptionSenderDapp(sourceUser, sourceChain, subOnRampRouterAddress, destChainID)
+	require.NoError(t, err)
+	senderDapp, err := subscription_sender_dapp.NewSubscriptionSenderDapp(senderDappAddr, sourceChain)
+	require.NoError(t, err)
+
 	// Ensure we have at least finality blocks.
 	for i := 0; i < 50; i++ {
 		sourceChain.Commit()
@@ -461,6 +471,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 		SubOnRampRouter:  subOnRampRouter,
 		SubOffRampRouter: subOffRampRouter,
 		SubOffRamp:       subOffRamp,
+		SubSenderApp:     senderDapp,
 	}
 }
 
@@ -481,6 +492,27 @@ func QueueSubRequest(
 		GasLimit: gasLimit,
 	}
 	tx, err := ccipContracts.SubOnRampRouter.CcipSend(ccipContracts.SourceUser, ccipContracts.DestChainID, msg)
+	require.NoError(t, err)
+	return tx
+}
+
+func QueueSubRequestByDapp(
+	t *testing.T,
+	ccipContracts CCIPContracts,
+	msgPayload string,
+	tokens []common.Address,
+	amounts []*big.Int,
+	gasLimit *big.Int,
+	receiver common.Address,
+) *types.Transaction {
+	msg := subscription_sender_dapp.CCIPEVM2AnySubscriptionMessage{
+		Receiver: MustEncodeAddress(t, receiver),
+		Data:     []byte(msgPayload),
+		Tokens:   tokens,
+		Amounts:  amounts,
+		GasLimit: gasLimit,
+	}
+	tx, err := ccipContracts.SubSenderApp.SendMessage(ccipContracts.SourceUser, msg)
 	require.NoError(t, err)
 	return tx
 }
@@ -510,6 +542,19 @@ func SendSubRequest(
 	receiver common.Address,
 ) {
 	tx := QueueSubRequest(t, ccipContracts, msgPayload, tokens, amounts, gasLimit, receiver)
+	ConfirmTxs(t, []*types.Transaction{tx}, ccipContracts.SourceChain)
+}
+
+func SendSubRequestByDapp(
+	t *testing.T,
+	ccipContracts CCIPContracts,
+	msgPayload string,
+	tokens []common.Address,
+	amounts []*big.Int,
+	gasLimit *big.Int,
+	receiver common.Address,
+) {
+	tx := QueueSubRequestByDapp(t, ccipContracts, msgPayload, tokens, amounts, gasLimit, receiver)
 	ConfirmTxs(t, []*types.Transaction{tx}, ccipContracts.SourceChain)
 }
 

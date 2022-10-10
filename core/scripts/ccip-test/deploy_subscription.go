@@ -57,7 +57,7 @@ func deploySourceAndDestContracts(t *testing.T, source *EvmChainConfig, destinat
 }
 
 func deploySenderDapp(t *testing.T, source *EvmChainConfig, dest *EvmChainConfig) {
-	tokenSenderAddress, tx, _, err := subscription_sender_dapp.DeploySubscriptionSenderDapp(source.Owner, source.Client, source.OnRampRouter, dest.ChainId, dest.ReceiverDapp)
+	tokenSenderAddress, tx, _, err := subscription_sender_dapp.DeploySubscriptionSenderDapp(source.Owner, source.Client, source.OnRampRouter, dest.ChainId)
 	require.NoError(t, err)
 	WaitForMined(t, source.Logger, source.Client, tx.Hash(), true)
 	source.Logger.Infof("Token sender dapp deployed on %s in tx: %s", tokenSenderAddress.Hex(), helpers.ExplorerLink(source.ChainId.Int64(), tx.Hash()))
@@ -71,6 +71,7 @@ func deploySourceContracts(t *testing.T, source *EvmChainConfig, offRampChainID 
 	tokenPools := deployNativeTokenPool(t, source)
 	// Updates source.AFN if any new contracts are deployed
 	deployAFN(t, source)
+	// Updates source.OnRampRouter if any new contracts are deployed
 	// Updates source.OnRampRouter if any new contracts are deployed
 	deployOnRampRouter(t, source)
 	// Updates source.OnRamp if any new contracts are deployed

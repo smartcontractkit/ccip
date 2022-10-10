@@ -152,11 +152,21 @@ chainID             = %s
 		_, err = ccipContracts.SubOnRampRouter.FundSubscription(ccipContracts.SourceUser, relayFee)
 		require.NoError(t, err)
 		ccipContracts.SourceChain.Commit()
+		// if using senderDapp
+		_, err = ccipContracts.SourceLinkToken.Transfer(ccipContracts.SourceUser, ccipContracts.SubSenderApp.Address(), relayFee)
+		require.NoError(t, err)
+		_, err = ccipContracts.SourceLinkToken.Approve(ccipContracts.SourceUser, ccipContracts.SubSenderApp.Address(), relayFee)
+		require.NoError(t, err)
+		ccipContracts.SourceChain.Commit()
+		_, err = ccipContracts.SubSenderApp.FundSubscription(ccipContracts.SourceUser, ccipContracts.SourceLinkToken.Address(), relayFee)
+		require.NoError(t, err)
+		ccipContracts.SourceChain.Commit()
+
 		subscriptionBalance := big.NewInt(0).Mul(big.NewInt(80), big.NewInt(1e18))
 		_, err = ccipContracts.DestLinkToken.Approve(ccipContracts.DestUser, ccipContracts.SubOffRampRouter.Address(), subscriptionBalance)
 		require.NoError(t, err)
 		_, err = ccipContracts.SubOffRampRouter.CreateSubscription(ccipContracts.DestUser, any_2_evm_subscription_offramp_router.SubscriptionInterfaceOffRampSubscription{
-			Senders:          []common.Address{ccipContracts.SourceUser.From},
+			Senders:          []common.Address{ccipContracts.SourceUser.From, ccipContracts.SubSenderApp.Address()},
 			Receiver:         receiver.Receiver.Address(),
 			StrictSequencing: receiver.Strict,
 			Balance:          subscriptionBalance,
@@ -326,6 +336,90 @@ chainID             = %s
 		subCurrentSeqNum++
 	})
 
+	t.Run("single auto-execute subscription by senderDapp", func(t *testing.T) {
+		tokenAmount := big.NewInt(100)
+
+		// approve the token amount for senderdapp
+		_, err = ccipContracts.SourceLinkToken.Approve(ccipContracts.SourceUser, ccipContracts.SubSenderApp.Address(), tokenAmount)
+		require.NoError(t, err)
+		ccipContracts.SourceChain.Commit()
+
+		sourceBalances, err := testhelpers.GetBalances([]testhelpers.BalanceReq{
+			{Name: testhelpers.SourcePool, Addr: ccipContracts.SourcePool.Address(), Getter: ccipContracts.GetSourceLinkBalance},
+			{Name: testhelpers.SubOnRamp, Addr: ccipContracts.SubOnRamp.Address(), Getter: ccipContracts.GetSourceLinkBalance},
+			{Name: testhelpers.SubOnRampRouter, Addr: ccipContracts.SubOnRampRouter.Address(), Getter: ccipContracts.GetSourceLinkBalance},
+			{Name: testhelpers.SourceSub, Addr: ccipContracts.SubSenderApp.Address(), Getter: ccipContracts.GetSourceSubBalance},
+		})
+		require.NoError(t, err, "fetching source balance")
+		destBalances, err := testhelpers.GetBalances([]testhelpers.BalanceReq{
+			{Name: testhelpers.Receiver, Addr: ccipContracts.Receivers[0].Receiver.Address(), Getter: ccipContracts.GetDestLinkBalance},
+			{Name: testhelpers.DestPool, Addr: ccipContracts.DestPool.Address(), Getter: ccipContracts.GetDestLinkBalance},
+			{Name: testhelpers.SubOffRampRouter, Addr: ccipContracts.SubOffRampRouter.Address(), Getter: ccipContracts.GetDestLinkBalance},
+			{Name: testhelpers.DestSub, Addr: ccipContracts.Receivers[0].Receiver.Address(), Getter: ccipContracts.GetDestSubBalance},
+		})
+		require.NoError(t, err, "fetching dest balance")
+
+		testhelpers.SendSubRequestByDapp(t, ccipContracts, "hey DON, execute for me", []common.Address{ccipContracts.SourceLinkToken.Address()},
+			[]*big.Int{tokenAmount}, big.NewInt(100_000), ccipContracts.Receivers[0].Receiver.Address())
+		testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, ccip.CCIPSubSendRequested, ccipContracts.SubOnRamp.Address(), nodes, subCurrentSeqNum)
+		testhelpers.EventuallyReportRelayed(t, ccipContracts, ccipContracts.SubOnRamp.Address(), subCurrentSeqNum, subCurrentSeqNum)
+		executionLog := testhelpers.AllNodesHaveExecutedSeqNum(t, ccipContracts, ccipContracts.SubOffRamp.Address(), nodes, subCurrentSeqNum)
+		testhelpers.AssertSubExecSuccess(t, ccipContracts, executionLog)
+
+		ccipContracts.AssertBalances([]testhelpers.BalanceAssertion{
+			{
+				Name:     testhelpers.SourcePool,
+				Address:  ccipContracts.SourcePool.Address(),
+				Expected: testhelpers.MustAddBigInt(sourceBalances[testhelpers.SourcePool], "100").String(),
+				Getter:   ccipContracts.GetSourceLinkBalance,
+			}, // 100 transfer
+			{
+				Name: testhelpers.SubOnRamp, Address: ccipContracts.SubOnRamp.Address(),
+				Expected: sourceBalances[testhelpers.SubOnRamp].String(),
+				Getter:   ccipContracts.GetSourceLinkBalance,
+			},
+			{
+				Name: testhelpers.SubOnRampRouter, Address: ccipContracts.SubOnRampRouter.Address(),
+				Expected: sourceBalances[testhelpers.SubOnRampRouter].String(),
+				Getter:   ccipContracts.GetSourceLinkBalance,
+			}, // No change, internal account of fee to us.
+			{
+				Name:     testhelpers.SourceSub,
+				Address:  ccipContracts.SubSenderApp.Address(),
+				Expected: testhelpers.MustSubBigInt(sourceBalances[testhelpers.SourceSub], "1").String(),
+				Getter:   ccipContracts.GetSourceSubBalance,
+			}, // Pays 1 in fee
+		})
+		ccipContracts.AssertBalances([]testhelpers.BalanceAssertion{
+			{
+				Name:     testhelpers.Receiver,
+				Address:  ccipContracts.Receivers[0].Receiver.Address(),
+				Expected: testhelpers.MustAddBigInt(destBalances[testhelpers.Receiver], "100").String(),
+				Getter:   ccipContracts.GetDestLinkBalance,
+			}, // Full amount gets transferred
+			{
+				Name:     testhelpers.DestPool,
+				Address:  ccipContracts.DestPool.Address(),
+				Expected: testhelpers.MustSubBigInt(destBalances[testhelpers.DestPool], "100").String(),
+				Getter:   ccipContracts.GetDestLinkBalance,
+			}, // We lose 100 link from the pool
+			{
+				Name:     testhelpers.SubOffRampRouter,
+				Address:  ccipContracts.SubOffRampRouter.Address(),
+				Expected: destBalances[testhelpers.SubOffRampRouter].String(),
+				Getter:   ccipContracts.GetDestLinkBalance,
+			}, // Gas reimbursement for nop
+			{
+				Name:     testhelpers.DestSub,
+				Address:  ccipContracts.Receivers[0].Receiver.Address(),
+				Expected: testhelpers.MustSubBigInt(destBalances[testhelpers.DestSub], "627786400000000000").String(),
+				Getter:   ccipContracts.GetDestSubBalance,
+				Within:   "100000000000000000",
+			}, // Costs ~0.65 link. +/- 0.1
+		})
+		subCurrentSeqNum++
+	})
+
 	t.Run("batch auto-execute toll", func(t *testing.T) {
 		sourceBalances, err := testhelpers.GetBalances([]testhelpers.BalanceReq{
 			{Name: testhelpers.SourcePool, Addr: ccipContracts.SourcePool.Address(), Getter: ccipContracts.GetSourceLinkBalance},
@@ -421,8 +515,7 @@ chainID             = %s
 		for i := 0; i < n; i++ {
 			_, err = ccipContracts.SourceLinkToken.Approve(ccipContracts.SourceUser, ccipContracts.SubOnRampRouter.Address(), tokenAmount)
 			require.NoError(t, err)
-			txs = append(txs, testhelpers.QueueSubRequest(t, ccipContracts, "hey DON, execute for me", []common.Address{ccipContracts.SourceLinkToken.Address()},
-				[]*big.Int{tokenAmount}, big.NewInt(100_000), ccipContracts.Receivers[0].Receiver.Address()))
+			txs = append(txs, testhelpers.QueueSubRequest(t, ccipContracts, "hey DON, execute for me", []common.Address{ccipContracts.SourceLinkToken.Address()}, []*big.Int{tokenAmount}, big.NewInt(100_000), ccipContracts.Receivers[0].Receiver.Address()))
 		}
 		ccipContracts.SourceChain.Commit()
 		// Send a batch of requests in a single block
@@ -505,7 +598,8 @@ chainID             = %s
 				Getter:   ccipContracts.GetSourceLinkBalance,
 			}, // 100 transfer
 			{
-				Name: testhelpers.SourceSub, Address: ccipContracts.SourceUser.From,
+				Name:     testhelpers.SourceSub,
+				Address:  ccipContracts.SourceUser.From,
 				Expected: testhelpers.MustSubBigInt(sourceBalances[testhelpers.SourceSub], "1").String(),
 				Getter:   ccipContracts.GetSourceSubBalance,
 			}, // Pays 1 in fee
@@ -524,7 +618,8 @@ chainID             = %s
 				Getter:   ccipContracts.GetDestLinkBalance,
 			}, // We lose 100 link from the pool
 			{
-				Name: testhelpers.DestSub, Address: ccipContracts.Receivers[1].Receiver.Address(),
+				Name:     testhelpers.DestSub,
+				Address:  ccipContracts.Receivers[1].Receiver.Address(),
 				Expected: testhelpers.MustSubBigInt(destBalances[testhelpers.DestSub], "654720000000000000").String(),
 				Getter:   ccipContracts.GetDestSubBalance,
 				Within:   "100000000000000000",
