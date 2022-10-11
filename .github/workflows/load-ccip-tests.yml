@@ -1,8 +1,38 @@
 name: Load CCIP Tests
 on:
   schedule:
-    - cron: "0 1,13 * * *"
+    - cron: "0 13 * * 3"
   workflow_dispatch:
+    inputs:
+      duration:
+        description: 'Duration(in minutes) for the load sequence'
+        required: true
+        default: 5
+        type: number
+      phase_time_out:
+        description: 'Max time(in minutes) to wait for individual events in ccip flow'
+        required: true
+        default: 3
+        type: number
+      send_request_per_second:
+        description: 'Number of ccip-send requests to trigger per second'
+        required: true
+        default: 4
+        type: number
+      type-of-transfer:
+        description: 'Type of message to be sent'
+        required: true
+        default: WithoutToken
+        type: choice
+        options:
+            - WithoutToken
+            - WithToken
+      slack-notify:
+        description: 'Notify Slack channel'
+        required: true
+        default: false
+        type: boolean
+
 
 
 # Only run 1 of this workflow at a time per PR
@@ -59,6 +89,10 @@ jobs:
       KEEP_ENVIRONMENTS: ONFAIL
       DATABASE_URL: postgresql://postgres:node@localhost:5432/chainlink_test?sslmode=disable
       GH_TOKEN: ${{ github.token }}
+      LOAD_TEST_DURATION: ${{ inputs.duration }}
+      LOAD_TEST_CALLTIMEOUT: ${{ inputs.phase_time_out }}
+      LOAD_TEST_TPS: ${{ inputs.send_request_per_second }}
+      LOAD_TEST_MSG_TYPE: ${{ inputs.type-of-transfer }}
     steps:
       - name: Collect Metrics
         id: collect-gha-metrics
@@ -70,28 +104,39 @@ jobs:
         continue-on-error: true
       - name: Checkout the repo
         uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # v3.0.2
+      - name: "Set environmental variables"
+        run: |
+          echo "GH_RUN_URL=https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}" >> $GITHUB_ENV
       - name: Run Tests
         uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@02c9ae5ec7f88250088bab88f14b4b043162b46d # v2.0.18
         with:
           test_command_to_run: make test_load_ccip
           test_download_vendor_packages_command: make gomod
+          test_download_ginkgo_command: make test_install_ginkgo
           cl_repo: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
           cl_image_tag: latest.${{ github.sha }}
           artifacts_location: ./integration-tests/load/logs
           publish_check_name: CCIP Load Test Results
-          publish_report_paths: ./integration-tests/tests-load-report.xml
+          publish_report_paths: ./tests-load-report.xml
           triggered_by: ${{ env.TEST_TRIGGERED_BY }}
           go_mod_path: ./integration-tests/go.mod
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
           CGO_ENABLED: "1"
-      ## TODO change this send-slack with avg stats after the security request gets approved
       - name: Publish Artifacts
         uses: actions/upload-artifact@v3
         with:
           name: load-test-stats
           path: ./integration-tests/load/logs/stats
+      - name: Slack Notify
+        if: ${{ env.GITHUB_EVENT_NAME == 'schedule' || inputs.slack-notify != false}}
+        uses: slackapi/slack-github-action@v1.22.0
+        with:
+          payload-file-path: "./integration-tests/load/logs/payload-slack-content.json"
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
 
       ## Run Cleanup if the job succeeds
       - name: cleanup

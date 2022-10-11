@@ -129,8 +129,9 @@ test_soak_keeper: test_need_operator_assets ## Run the OCR soak test
 
 .PHONY: test_load_ccip
 test_load_ccip: test_need_operator_assets ## Run the CCIP load test
-	go install github.com/jstemmer/go-junit-report@latest
-	cd ./integration-tests && go test -timeout 4h -v -run ^TestCCIPLoad ./load -count=1 2>&1| go-junit-report -set-exit-code > tests-load-report.xml && cd ..
+	ginkgo -v -r --junit-report=tests-load-report.xml \
+    	--keep-going --trace --randomize-all --randomize-suites \
+    	--progress $(args) ./integration-tests/load
 
 .PHONY: test_perf
 test_perf: test_need_operator_assets ## Run core node performance tests.

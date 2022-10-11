@@ -9,14 +9,13 @@ import (
 	"os"
 	"sort"
 	"sync"
-	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	. "github.com/onsi/gomega"
 	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/chainlink-testing-framework/client"
-	"github.com/stretchr/testify/require"
+	"github.com/smartcontractkit/chainlink-testing-framework/testreporters"
 	"go.uber.org/atomic"
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_subscription_onramp_router"
@@ -25,6 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/testhelpers"
 	"github.com/smartcontractkit/chainlink/core/utils"
 	bigmath "github.com/smartcontractkit/chainlink/core/utils/big_math"
+
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 )
 
@@ -44,21 +44,22 @@ const (
 )
 
 type CCIPE2ELoad struct {
-	Source          *actions.SourceCCIPModule // all source contracts
-	Destination     *actions.DestCCIPModule   // all destination contracts
-	Model           actions.BillingModel      // toll Or sub
-	NoOfReq         int64                     // no of Request fired - required for balance assertion at the end
-	BalanceStats    BalanceStats              // balance assertion details
-	CurrentMsgID    *atomic.Int64             // current msg serial number in the load sequence
-	InitialBlockNum uint64                    // blocknumber before the first message is fired in the load sequence
-	sentMsgMu       *sync.Mutex
-	SentMsg         map[uint64]evm_2_evm_subscription_onramp.CCIPEVM2EVMSubscriptionMessage // track the messages by seq num for debugging purpose
-	CallTimeOut     time.Duration                                                           // max time to wait for various on-chain events
-	TickerDuration  time.Duration                                                           // poll frequency while waiting for on-chain events
-	callStatsMu     *sync.Mutex
-	callStats       map[int64]map[phase]StatParams // keeps track of various phase related metrics
-	seqNumRelayedMu *sync.Mutex
-	seqNumRelayed   map[uint64]uint64 // key : seqNumber in the ReportAccepted event, value : blocknumber for corresponding event
+	Source                *actions.SourceCCIPModule // all source contracts
+	Destination           *actions.DestCCIPModule   // all destination contracts
+	Model                 actions.BillingModel      // toll Or sub
+	NoOfReq               int64                     // no of Request fired - required for balance assertion at the end
+	BalanceStats          BalanceStats              // balance assertion details
+	CurrentMsgID          *atomic.Int64             // current msg serial number in the load sequence
+	InitialSourceBlockNum uint64
+	InitialDestBlockNum   uint64 // blocknumber before the first message is fired in the load sequence
+	sentMsgMu             *sync.Mutex
+	SentMsg               map[uint64]evm_2_evm_subscription_onramp.CCIPEVM2EVMSubscriptionMessage // track the messages by seq num for debugging purpose
+	CallTimeOut           time.Duration                                                           // max time to wait for various on-chain events
+	TickerDuration        time.Duration                                                           // poll frequency while waiting for on-chain events
+	callStatsMu           *sync.Mutex
+	callStats             map[int64]map[phase]StatParams // keeps track of various phase related metrics
+	seqNumRelayedMu       *sync.Mutex
+	seqNumRelayed         map[uint64]uint64 // key : seqNumber in the ReportAccepted event, value : blocknumber for corresponding event
 }
 
 type StatParams struct {
@@ -83,6 +84,24 @@ type BalanceStats struct {
 type JsonStats struct {
 	MsgId int64                `json:"msgSerialNumber"`
 	Stats map[phase]StatParams `json:"phaseDetails"`
+}
+
+type SlackStats struct {
+	AvgE2EDuration                  float64 `json:"avgOverallRelayAndExecution,omitempty"`
+	AvgRelayDuration                float64 `json:"avgRelay,omitempty"`
+	AvgExecDuration                 float64 `json:"avgExecution,omitempty"`
+	LongestE2EDuration              float64 `json:"longestOverallRelayAndExecution,omitempty"`
+	LongestRelayDuration            float64 `json:"longestRelay,omitempty"`
+	LongestExecDuration             float64 `json:"longestExecution,omitempty"`
+	FastestE2EDuration              float64 `json:"fastestOverallRelayAndExecution,omitempty"`
+	FastestRelayDuration            float64 `json:"fastestRelay,omitempty"`
+	FastestExecDuration             float64 `json:"fastestExecution,omitempty"`
+	TotalNumberOfFailedRequests     int     `json:"noOfFailedRequests,omitempty"`
+	TotalNumberOfSuccessfulRequests int     `json:"noOfSuccessfulRequests,omitempty"`
+	FailedRelay                     int     `json:"noOfFailedRelay,omitempty"`
+	FailedExecution                 int     `json:"noOfFailedExecution,omitempty"`
+	FailedSendTransaction           int     `json:"noOfFailedSendTransaction,omitempty"`
+	FailedCCIPSendRequested         int     `json:"noOfFailedCCIPSendRequested,omitempty"`
 }
 
 func NewCCIPLoad(source *actions.SourceCCIPModule, dest *actions.DestCCIPModule, model actions.BillingModel, timeout time.Duration, noOfReq int64) *CCIPE2ELoad {
@@ -123,6 +142,13 @@ func (c *CCIPE2ELoad) BeforeAllCall() {
 	if c.Model == actions.SUB {
 		actions.CreateAndFundSubscription(*sourceCCIP, *destCCIP, bigmath.Mul(big.NewInt(c.NoOfReq*100), big.NewInt(1e18)), c.NoOfReq)
 	}
+	// save the current block numbers to use in various filter log requests
+	currentBlockOnSource, err := sourceCCIP.Common.ChainClient.LatestBlockNumber(context.Background())
+	Expect(err).ShouldNot(HaveOccurred(), "failed to fetch latest source block num")
+	currentBlockOnDest, err := destCCIP.Common.ChainClient.LatestBlockNumber(context.Background())
+	Expect(err).ShouldNot(HaveOccurred(), "failed to fetch latest dest block num")
+	c.InitialDestBlockNum = currentBlockOnDest
+	c.InitialSourceBlockNum = currentBlockOnSource
 	// collect the balance requirement to verify balances after transfer
 	sourceBalances, err := testhelpers.GetBalances(sourceCCIP.CollectBalanceRequirements(c.Model))
 	Expect(err).ShouldNot(HaveOccurred(), "fetching source balance")
@@ -152,17 +178,6 @@ func (c *CCIPE2ELoad) Call(msgType interface{}) client.CallResult {
 	for _, token := range sourceCCIP.Common.BridgeTokens {
 		sourceTokens = append(sourceTokens, common.HexToAddress(token.Address()))
 	}
-	// save the current block numbers to use in various filter log requests
-	currentBlockOnSource, err := sourceCCIP.Common.ChainClient.LatestBlockNumber(context.Background())
-	if err != nil {
-		res.Error = fmt.Errorf("cannot retrieve source block - %s", err.Error())
-		return res
-	}
-	currentBlockOnDest, err := destCCIP.Common.ChainClient.LatestBlockNumber(context.Background())
-	if err != nil {
-		res.Error = fmt.Errorf("cannot retrieve destination block - %s", err.Error())
-		return res
-	}
 	// form the message for transfer
 	msgStr := fmt.Sprintf("message with Id %d", msgID)
 	receiver, err := utils.ABIEncode(`[{"type":"address"}]`, destCCIP.ReceiverDapp.EthAddress)
@@ -187,14 +202,11 @@ func (c *CCIPE2ELoad) Call(msgType interface{}) client.CallResult {
 	}
 	c.updatestats(msgID, "", TX, time.Since(startTime), success)
 
-	if msgID == 1 {
-		c.InitialBlockNum = currentBlockOnDest
-	}
 	// wait for
 	// - CCIPSendRequested Event log to be generated,
 	ticker := time.NewTicker(c.TickerDuration)
 	defer ticker.Stop()
-	sentMsg, err := c.waitForCCIPSendRequested(ticker, currentBlockOnSource-2, msgID, sendTx.Hash().Hex(), time.Now())
+	sentMsg, err := c.waitForCCIPSendRequested(ticker, c.InitialSourceBlockNum, msgID, sendTx.Hash().Hex(), time.Now())
 	if err != nil {
 		res.Error = err
 		return res
@@ -216,7 +228,7 @@ func (c *CCIPE2ELoad) Call(msgType interface{}) client.CallResult {
 		return res
 	}
 	// wait for ReportAccepted event
-	err = c.waitForReportAccepted(ticker, msgID, seqNum, currentBlockOnDest-2, relayStartTime)
+	err = c.waitForReportAccepted(ticker, msgID, seqNum, c.InitialDestBlockNum, relayStartTime)
 	if err != nil {
 		res.Error = err
 		return res
@@ -279,17 +291,21 @@ func (c *CCIPE2ELoad) updatestats(msgId int64, seqNum string, step phase, durati
 	}
 }
 
-func (c *CCIPE2ELoad) PrintStats(t *testing.T) {
+func (c *CCIPE2ELoad) PrintStats(failed bool, rps, duration int) {
 	if _, err := os.Stat("./logs/stats"); os.IsNotExist(err) {
 		os.MkdirAll("./logs/stats", 0700)
 	}
-	tempFile, err := os.CreateTemp("./logs/stats", fmt.Sprintf("%s_complete*.json", t.Name()))
+	tempFile, err := os.Create("./logs/stats/CCIPLoad_complete.json")
 	defer tempFile.Close()
-	require.NoError(t, err)
+	Expect(err).ShouldNot(HaveOccurred(), "creating stat file")
 
-	tempStatFile, err := os.CreateTemp("./logs/stats", fmt.Sprintf("%s_avg*.json", t.Name()))
+	tempStatFile, err := os.Create("./logs/stats/CCIPLoad_avg.json")
 	defer tempStatFile.Close()
-	require.NoError(t, err)
+	Expect(err).ShouldNot(HaveOccurred(), "creating stat file")
+
+	slackFile, err := os.Create("./logs/payload-slack-content.json")
+	defer slackFile.Close()
+	Expect(err).ShouldNot(HaveOccurred(), "creating stat file")
 
 	log.Info().Msg("Msg Stats")
 	keys := make([]int64, 0, len(c.callStats))
@@ -299,10 +315,12 @@ func (c *CCIPE2ELoad) PrintStats(t *testing.T) {
 	sort.Slice(keys, func(i, j int) bool {
 		return keys[i] < keys[j]
 	})
-	durationMap := make(map[phase]float64)
+	durationSumMap := make(map[phase]float64)
+	durationMap := make(map[phase][]float64)
 	successCount := make(map[phase]int)
 	failureCount := make(map[phase]int)
 	var jsonstats []JsonStats
+
 	for _, msgId := range keys {
 		stats := c.callStats[msgId]
 		event := log.Info()
@@ -313,10 +331,14 @@ func (c *CCIPE2ELoad) PrintStats(t *testing.T) {
 		for step, stat := range stats {
 			event.Float64(fmt.Sprintf("%s%s", step, stat.ReqStatus), stat.Duration)
 			if stat.ReqStatus == success {
-				durationMap[step] += stat.Duration
+				durationSumMap[step] += stat.Duration
+				if _, ok := durationMap[step]; !ok {
+					durationMap[step] = []float64{stat.Duration}
+				} else {
+					durationMap[step] = append(durationMap[step], stat.Duration)
+				}
 				successCount[step] += 1
 			} else {
-				t.Fail()
 				failureCount[step] += 1
 			}
 		}
@@ -324,7 +346,7 @@ func (c *CCIPE2ELoad) PrintStats(t *testing.T) {
 	}
 	event := log.Info()
 	overallStats := make(map[phase]AvgStatParams)
-	for step, d := range durationMap {
+	for step, d := range durationSumMap {
 		avg := d / float64(successCount[step])
 		overallStats[step] = AvgStatParams{
 			Duration: avg,
@@ -335,23 +357,66 @@ func (c *CCIPE2ELoad) PrintStats(t *testing.T) {
 	}
 	// if all the requests fail for a particular step
 	for step, f := range failureCount {
-		if _, ok := durationMap[step]; !ok {
+		if _, ok := durationSumMap[step]; !ok {
 			overallStats[step] = AvgStatParams{
 				Failed: f,
 			}
 		}
 	}
+	for step, _ := range durationMap {
+		sort.Slice(durationMap[step], func(i, j int) bool {
+			return durationMap[step][i] < durationMap[step][j]
+		})
+	}
+	slackStats := SlackStats{
+		AvgE2EDuration:                  overallStats[E2E].Duration,
+		AvgRelayDuration:                overallStats[SeqNumAndRepAccIncrease].Duration,
+		AvgExecDuration:                 overallStats[ExecStateChanged].Duration,
+		LongestE2EDuration:              durationMap[E2E][len(durationMap[E2E])-1],
+		LongestRelayDuration:            durationMap[SeqNumAndRepAccIncrease][len(durationMap[SeqNumAndRepAccIncrease])-1],
+		LongestExecDuration:             durationMap[ExecStateChanged][len(durationMap[ExecStateChanged])-1],
+		FastestE2EDuration:              durationMap[E2E][0],
+		FastestRelayDuration:            durationMap[SeqNumAndRepAccIncrease][0],
+		FastestExecDuration:             durationMap[ExecStateChanged][0],
+		TotalNumberOfFailedRequests:     failureCount[E2E],
+		TotalNumberOfSuccessfulRequests: successCount[E2E],
+		FailedRelay:                     failureCount[SeqNumAndRepAccIncrease],
+		FailedExecution:                 failureCount[ExecStateChanged],
+		FailedSendTransaction:           failureCount[TX],
+		FailedCCIPSendRequested:         failureCount[CCIPSendRe],
+	}
+
 	stats, err := json.MarshalIndent(overallStats, "", "  ")
-	require.NoError(t, err)
-	tempStatFile.Write(stats)
+	Expect(err).ShouldNot(HaveOccurred(), "marshal overallStats")
+	_, err = tempStatFile.Write(stats)
+	Expect(err).ShouldNot(HaveOccurred(), "writing overallStats")
+
 	stats, err = json.MarshalIndent(jsonstats, "", "  ")
-	require.NoError(t, err)
-	tempFile.Write(stats)
+	Expect(err).ShouldNot(HaveOccurred(), "marshal avg stats")
+	_, err = tempFile.Write(stats)
+	Expect(err).ShouldNot(HaveOccurred(), "writing avg stats")
+
+	headerText := ":white_check_mark: CCIP Load Test PASSED :white_check_mark:"
+	if failed {
+		headerText = ":x: CCIP Load Test FAILED :x:"
+	}
+	stats, err = json.MarshalIndent(slackStats, "", "  ")
+	Expect(err).ShouldNot(HaveOccurred())
+
+	runUrl := os.Getenv("GH_RUN_URL")
+	if runUrl != "" {
+		testreporters.SlackNotifyBlocks(headerText, []string{fmt.Sprintf(
+			"Load sequence ran for %dm sending %d ccip-send request(s) per second", duration, rps),
+			fmt.Sprintf("Detailed Run Results are available in artifacts: %s", runUrl),
+			"Load stats for the run:",
+			string(stats)}, slackFile)
+	}
+
 	event.Int("No of Successful Requests", successCount[E2E])
 	event.Msgf("Average Duration for successful requests")
 	log.Info().Msg("Relay Report stats")
-	it, err := c.Destination.BlobVerifier.FilterReportAccepted(c.InitialBlockNum)
-	require.NoError(t, err)
+	it, err := c.Destination.BlobVerifier.FilterReportAccepted(c.InitialDestBlockNum)
+	Expect(err).ShouldNot(HaveOccurred(), "report relayed result")
 	i := 1
 	event = log.Info()
 	for it.Next() {

@@ -538,7 +538,7 @@ func (destCCIP *DestCCIPModule) BalanceAssertions(model BillingModel, prevBalanc
 			Name:     name,
 			Address:  destCCIP.ReceiverDapp.EthAddress,
 			Getter:   destCCIP.SubscriptionBalance,
-			Expected: bigmath.Sub(prevBalances[name], bigmath.Mul(big.NewInt(noOfReq), big.NewInt(6.95e17))).String(),
+			Expected: bigmath.Sub(prevBalances[name], bigmath.Mul(big.NewInt(noOfReq), big.NewInt(7e17))).String(),
 			Within:   big.NewInt(1e17).String(),
 		})
 	}
@@ -1164,6 +1164,7 @@ func CCIPDefaultTestSetUpForLoad(sourceNetwork *blockchain.EVMNetwork, destNetwo
 	destChainClient := testSetUp.DestChainClient
 	sourceChainClient.ParallelTransactions(false)
 	destChainClient.ParallelTransactions(false)
+
 	// transfer more than one token
 	transferAmounts := []*big.Int{big.NewInt(1e8)}
 
