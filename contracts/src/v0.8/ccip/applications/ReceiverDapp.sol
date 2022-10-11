@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../interfaces/TypeAndVersionInterface.sol";
-import "../interfaces/applications/Any2EVMMessageReceiverInterface.sol";
-import "../interfaces/offRamp/Any2EVMOffRampRouterInterface.sol";
+import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
+import {Any2EVMMessageReceiverInterface} from "../interfaces/applications/Any2EVMMessageReceiverInterface.sol";
+import {Any2EVMOffRampRouterInterface} from "../interfaces/offRamp/Any2EVMOffRampRouterInterface.sol";
+import {CCIP, IERC20} from "../models/Models.sol";
 
 /**
  * @notice Application contract for receiving messages from the OffRamp on behalf of an EOA
@@ -13,7 +14,7 @@ contract ReceiverDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterfac
 
   Any2EVMOffRampRouterInterface public s_router;
 
-  address s_manager;
+  address internal s_manager;
 
   error InvalidDeliverer(address deliverer);
 

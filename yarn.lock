@@ -10618,6 +10618,10 @@ solc@0.7.3, solc@^0.4.20, solc@^0.6.3, solc@^0.6.4:
     semver "^5.5.0"
     tmp "0.0.33"
 
+"solhint-plugin-chainlink-solidity@link:contracts/src/v0.8/ccip/tools/solhint":
+  version "0.0.0"
+  uid ""
+
 solhint-plugin-prettier@^0.0.5:
   version "0.0.5"
   resolved "https://registry.npmjs.org/solhint-plugin-prettier/-/solhint-plugin-prettier-0.0.5.tgz#e3b22800ba435cd640a9eca805a7f8bc3e3e6a6b"

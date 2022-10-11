@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "../../models/Models.sol";
-import "./BaseOnRampInterface.sol";
+import {CCIP, IERC20} from "../../models/Models.sol";
+import {BaseOnRampInterface} from "./BaseOnRampInterface.sol";
 
 interface EVM2EVMTollOnRampInterface is BaseOnRampInterface {
   error InvalidFeeConfig();

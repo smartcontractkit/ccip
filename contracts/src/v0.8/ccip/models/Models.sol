@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "../../vendor/IERC20.sol";
-import "../interfaces/pools/PoolInterface.sol";
+import {IERC20} from "../../vendor/IERC20.sol";
+import {PoolInterface} from "../interfaces/pools/PoolInterface.sol";
 
 library CCIP {
   ////////////////////////////////

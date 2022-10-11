@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../access/OwnerIsCreator.sol";
-import "../interfaces/offRamp/Any2EVMOffRampRouterInterface.sol";
-import "../interfaces/applications/Any2EVMMessageReceiverInterface.sol";
+import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
+import {Any2EVMOffRampRouterInterface, BaseOffRampInterface} from "../interfaces/offRamp/Any2EVMOffRampRouterInterface.sol";
+import {Any2EVMMessageReceiverInterface} from "../interfaces/applications/Any2EVMMessageReceiverInterface.sol";
+import {CCIP} from "../models/Models.sol";
 
 abstract contract BaseOffRampRouter is Any2EVMOffRampRouterInterface, OwnerIsCreator {
   using CCIP for CCIP.Any2EVMMessageFromSender;
@@ -48,6 +49,7 @@ abstract contract BaseOffRampRouter is Any2EVMOffRampRouterInterface, OwnerIsCre
     uint256 value,
     bytes memory data
   ) internal returns (bool success) {
+    // solhint-disable-next-line no-inline-assembly
     assembly {
       let g := gas()
       // Compute g -= GAS_FOR_CALL_EXACT_CHECK and check for underflow

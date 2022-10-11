@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../vendor/SafeERC20.sol";
-import "../interfaces/subscription/SubscriptionInterface.sol";
+import {SafeERC20, IERC20} from "../../vendor/SafeERC20.sol";
+import {SubscriptionInterface, SubscriptionManagerInterface} from "../interfaces/subscription/SubscriptionInterface.sol";
 
 contract Subscription is SubscriptionInterface {
   using SafeERC20 for IERC20;
 
   // The subscription config
-  SubscriptionConfig s_config;
+  SubscriptionConfig internal s_config;
 
   // A mapping from receiver to subscription
   mapping(address => OffRampSubscription) internal s_subscriptions;

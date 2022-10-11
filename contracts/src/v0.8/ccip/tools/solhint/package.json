@@ -1,0 +1,5 @@
+{
+  "name": "solhint-plugin-chainlink-solidity",
+  "version": "1.0.0",
+  "main": "index.js"
+}

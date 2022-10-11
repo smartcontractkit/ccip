@@ -2,6 +2,7 @@
 pragma solidity 0.8.15;
 
 import "./EVM2EVMSubscriptionOnRampSetup.t.sol";
+import "../../../interfaces/onRamp/BaseOnRampRouterInterface.sol";
 
 /// @notice #constructor
 contract EVM2AnySubscriptionOnRampRouter_constructor is EVM2EVMSubscriptionOnRampSetup {

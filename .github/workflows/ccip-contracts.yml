@@ -1,11 +1,37 @@
-name: Foundry Tests
+name: CCIP Contract Tests
 on: [pull_request]
 
 env:
   FOUNDRY_PROFILE: ci
 
 jobs:
-  check:
+  solhint:
+    name: Solhint
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Collect Metrics
+        id: collect-gha-metrics
+        uses: smartcontractkit/push-gha-metrics-action@v1
+        with:
+          basic-auth: ${{ secrets.GRAFANA_CLOUD_BASIC_AUTH }}
+          hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
+          this-job-name: Solhint
+        continue-on-error: true
+      - name: Checkout the repo
+        uses: actions/checkout@v2
+      - name: Setup node
+        uses: actions/setup-node@v3
+        with:
+          node-version: "16"
+          cache: 'yarn'
+      - run: yarn install --frozen-lockfile
+      - name: Run Solhint
+        run: |
+          cd ./contracts/
+          yarn lint:ccip
+
+  foundry:
     name: Foundry Test
     runs-on: ubuntu-20.04
 

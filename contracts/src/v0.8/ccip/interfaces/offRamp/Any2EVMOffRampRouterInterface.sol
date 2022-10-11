@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "./BaseOffRampInterface.sol";
-import "../../models/Models.sol";
+import {BaseOffRampInterface} from "./BaseOffRampInterface.sol";
+import {CCIP} from "../../models/Models.sol";
 
 interface Any2EVMOffRampRouterInterface {
   error NoOffRampsConfigured();

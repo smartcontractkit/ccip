@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../interfaces/access/AllowListInterface.sol";
-import "../access/OwnerIsCreator.sol";
+import {AllowListInterface} from "../interfaces/access/AllowListInterface.sol";
+import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
 
 contract AllowList is AllowListInterface, OwnerIsCreator {
   // Whether the allowlist is enabled

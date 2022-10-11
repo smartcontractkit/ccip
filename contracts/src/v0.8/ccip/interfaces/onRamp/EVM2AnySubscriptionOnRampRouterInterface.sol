@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "../../models/Models.sol";
-import "./BaseOnRampRouterInterface.sol";
-import "./EVM2EVMSubscriptionOnRampInterface.sol";
+import {CCIP, IERC20} from "../../models/Models.sol";
+import {BaseOnRampRouterInterface} from "./BaseOnRampRouterInterface.sol";
+import {EVM2EVMSubscriptionOnRampInterface} from "./EVM2EVMSubscriptionOnRampInterface.sol";
 
 interface EVM2AnySubscriptionOnRampRouterInterface is BaseOnRampRouterInterface {
   error OnRampAlreadySet(uint256 chainId, EVM2EVMSubscriptionOnRampInterface onRamp);

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../../interfaces/TypeAndVersionInterface.sol";
-import "../../subscription/Subscription.sol";
-import "../BaseOffRampRouter.sol";
+import {TypeAndVersionInterface} from "../../../interfaces/TypeAndVersionInterface.sol";
+import {Subscription, SubscriptionInterface} from "../../subscription/Subscription.sol";
+import {BaseOffRampRouter, BaseOffRampInterface} from "../BaseOffRampRouter.sol";
 
 contract Any2EVMSubscriptionOffRampRouter is BaseOffRampRouter, Subscription, TypeAndVersionInterface {
   string public constant override typeAndVersion = "Any2EVMSubscriptionOffRampRouter 1.0.0";

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../interfaces/health/AFNInterface.sol";
-import "../access/OwnerIsCreator.sol";
-import "../../interfaces/TypeAndVersionInterface.sol";
+import {AFNInterface} from "../interfaces/health/AFNInterface.sol";
+import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
+import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
 
 contract AFN is AFNInterface, OwnerIsCreator, TypeAndVersionInterface {
   string public constant override typeAndVersion = "AFN 1.0.0";

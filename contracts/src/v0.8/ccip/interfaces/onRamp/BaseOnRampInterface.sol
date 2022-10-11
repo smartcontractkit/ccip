@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "../access/AllowListInterface.sol";
-import "../pools/PoolInterface.sol";
+import {AllowListInterface} from "../access/AllowListInterface.sol";
+import {PoolInterface, IERC20} from "../pools/PoolInterface.sol";
 
 interface BaseOnRampInterface is AllowListInterface {
   error MessageTooLarge(uint256 maxSize, uint256 actualSize);

@@ -2,6 +2,7 @@
 pragma solidity 0.8.15;
 
 import "../../interfaces/onRamp/EVM2EVMTollOnRampInterface.sol";
+import "../../interfaces/pools/PoolInterface.sol";
 
 contract MockOnRamp is EVM2EVMTollOnRampInterface {
   uint256 public immutable i_chainId;

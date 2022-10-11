@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../pools/TokenPoolRegistry.sol";
-import "../health/HealthChecker.sol";
-import "../pools/PoolCollector.sol";
-import "../access/AllowList.sol";
-import "../rateLimiter/AggregateRateLimiter.sol";
+import {TokenPoolRegistry, PoolInterface} from "../pools/TokenPoolRegistry.sol";
+import {HealthChecker, AFNInterface} from "../health/HealthChecker.sol";
+import {PoolCollector, IERC20} from "../pools/PoolCollector.sol";
+import {AllowList} from "../access/AllowList.sol";
+import {AggregateRateLimiter} from "../rateLimiter/AggregateRateLimiter.sol";
+import {BaseOnRampInterface} from "../interfaces/onRamp/BaseOnRampInterface.sol";
 
 contract BaseOnRamp is
   BaseOnRampInterface,
@@ -26,7 +27,7 @@ contract BaseOnRamp is
   uint64 internal s_sequenceNumber;
 
   // The current configuration of the onRamp.
-  OnRampConfig s_config;
+  OnRampConfig internal s_config;
   // The router that is allowed to interact with this onRamp.
   address internal s_router;
 

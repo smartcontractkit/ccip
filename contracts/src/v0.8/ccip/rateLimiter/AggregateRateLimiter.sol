@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../interfaces/rateLimiter/AggregateRateLimiterInterface.sol";
-import "../access/OwnerIsCreator.sol";
-import "../../vendor/IERC20.sol";
+import {AggregateRateLimiterInterface} from "../interfaces/rateLimiter/AggregateRateLimiterInterface.sol";
+import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
+import {IERC20} from "../../vendor/IERC20.sol";
 
 contract AggregateRateLimiter is AggregateRateLimiterInterface, OwnerIsCreator {
   // The address of the token limit admin that has the same permissions as

@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../../interfaces/TypeAndVersionInterface.sol";
-import "./EVM2AnySubscriptionOnRampRouter.sol";
-import "../BaseOnRamp.sol";
+import {TypeAndVersionInterface} from "../../../interfaces/TypeAndVersionInterface.sol";
+import {EVM2EVMSubscriptionOnRampInterface} from "../../interfaces/onRamp/EVM2EVMSubscriptionOnRampInterface.sol";
+import {EVM2AnySubscriptionOnRampRouterInterface} from "../../interfaces/onRamp/EVM2AnySubscriptionOnRampRouterInterface.sol";
+import {AFNInterface} from "../../interfaces/health/AFNInterface.sol";
+import {EVM2AnySubscriptionOnRampRouter} from "./EVM2AnySubscriptionOnRampRouter.sol";
+import {BaseOnRamp} from "../BaseOnRamp.sol";
+import {CCIP, IERC20, PoolInterface} from "../../models/Models.sol";
 
 /**
  * @notice An implementation of a subscription OnRamp.

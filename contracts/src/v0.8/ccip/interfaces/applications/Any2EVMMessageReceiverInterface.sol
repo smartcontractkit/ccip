@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "../../models/Models.sol";
-import "../subscription/SubscriptionManagerInterface.sol";
+import {CCIP} from "../../models/Models.sol";
+import {SubscriptionManagerInterface} from "../subscription/SubscriptionManagerInterface.sol";
 
 /**
  * @notice Application contracts that intend to receive messages from

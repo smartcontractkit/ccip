@@ -6,6 +6,8 @@ import "./mocks/MockERC20.sol";
 import "./mocks/MockPool.sol";
 import "../../tests/MockV3Aggregator.sol";
 import "../pools/NativeTokenPool.sol";
+import "../health/HealthChecker.sol";
+import "../pools/TokenPoolRegistry.sol";
 
 contract TokenSetup is BaseTest {
   IERC20[] internal s_sourceTokens;

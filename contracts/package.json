@@ -15,7 +15,8 @@
     "setup": "yarn compile",
     "prepublishOnly": "yarn compile && ./scripts/prepublish_generate_abi_folder",
     "publish-beta": "yarn publish --tag beta",
-    "publish-prod": "yarn tag add @chainlink/contracts@0.5.1 latest"
+    "publish-prod": "yarn tag add @chainlink/contracts@0.5.1 latest",
+    "lint:ccip": "solhint --config ./src/v0.8/ccip/tools/.solhint.json --ignore-path .ccip-solhint-ignore --max-warnings 0 \"./src/v0.8/ccip/**/*.sol\""
   },
   "files": [
     "src/",
@@ -46,6 +47,7 @@
     "moment": "^2.29.4",
     "prettier-plugin-solidity": "1.0.0-beta.18",
     "solhint": "^3.3.6",
+    "solhint-plugin-chainlink-solidity": "link:src/v0.8/ccip/tools/solhint",
     "solhint-plugin-prettier": "^0.0.5",
     "solidity-coverage": "^0.7.17",
     "ts-node": "^10.0.0",

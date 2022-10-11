@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../interfaces/TypeAndVersionInterface.sol";
-import "../interfaces/BlobVerifierInterface.sol";
-import "../health/HealthChecker.sol";
-import "../ocr/OCR2Base.sol";
+import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
+import {BlobVerifierInterface} from "../interfaces/BlobVerifierInterface.sol";
+import {HealthChecker, AFNInterface} from "../health/HealthChecker.sol";
+import {OCR2Base} from "../ocr/OCR2Base.sol";
+import {CCIP} from "../models/Models.sol";
 
 contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthChecker, OCR2Base {
   string public constant override typeAndVersion = "BlobVerifier 1.0.0";

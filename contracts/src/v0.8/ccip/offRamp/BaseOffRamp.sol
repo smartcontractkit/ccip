@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../vendor/Address.sol";
-import "../health/HealthChecker.sol";
-import "../pools/TokenPoolRegistry.sol";
-import "../rateLimiter/AggregateRateLimiter.sol";
-import "../interfaces/offRamp/BaseOffRampInterface.sol";
+import {Address} from "../../vendor/Address.sol";
+import {HealthChecker, AFNInterface} from "../health/HealthChecker.sol";
+import {TokenPoolRegistry} from "../pools/TokenPoolRegistry.sol";
+import {AggregateRateLimiter} from "../rateLimiter/AggregateRateLimiter.sol";
+import {BaseOffRampInterface, Any2EVMOffRampRouterInterface, BlobVerifierInterface} from "../interfaces/offRamp/BaseOffRampInterface.sol";
+import {CCIP, IERC20, PoolInterface} from "../models/Models.sol";
 
 /**
  * @notice A base OffRamp contract that every OffRamp should expand on
@@ -158,11 +159,13 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry, 
    * @notice Reverts as this contract should not access CCIP messages
    */
   function ccipReceive(CCIP.Any2EVMMessageFromSender calldata) external pure {
+    // solhint-disable-next-line reason-string
     revert();
   }
 
   /// @inheritdoc BaseOffRampInterface
   function execute(CCIP.ExecutionReport memory, bool) external virtual override {
+    // solhint-disable-next-line reason-string
     revert();
   }
 

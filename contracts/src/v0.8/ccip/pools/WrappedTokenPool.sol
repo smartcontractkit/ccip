@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "./TokenPool.sol";
-import "../../vendor/ERC20.sol";
+import {TokenPool} from "./TokenPool.sol";
+import {IERC20, ERC20} from "../../vendor/ERC20.sol";
 
 /**
  * @notice This pool mints and burns its own tokens, representing a wrapped form of the native token

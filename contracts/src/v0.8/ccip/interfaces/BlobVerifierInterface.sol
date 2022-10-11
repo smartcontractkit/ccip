@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "../models/Models.sol";
+import {CCIP} from "../models/Models.sol";
 
 interface BlobVerifierInterface {
   error UnsupportedOnRamp(address onRamp);

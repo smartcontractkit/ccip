@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../interfaces/TypeAndVersionInterface.sol";
-import "../interfaces/applications/Any2EVMMessageReceiverInterface.sol";
-import "../interfaces/onRamp/EVM2AnySubscriptionOnRampRouterInterface.sol";
-import "../access/OwnerIsCreator.sol";
-import "../interfaces/offRamp/Any2EVMOffRampRouterInterface.sol";
+import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
+import {Any2EVMMessageReceiverInterface} from "../interfaces/applications/Any2EVMMessageReceiverInterface.sol";
+import {EVM2AnySubscriptionOnRampRouterInterface, CCIP, IERC20} from "../interfaces/onRamp/EVM2AnySubscriptionOnRampRouterInterface.sol";
+import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
+import {Any2EVMOffRampRouterInterface} from "../interfaces/offRamp/Any2EVMOffRampRouterInterface.sol";
 
 contract GovernanceDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterface, OwnerIsCreator {
   string public constant override typeAndVersion = "GovernanceDapp 1.0.0";
@@ -25,8 +25,8 @@ contract GovernanceDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterf
     address contractAddress;
   }
 
-  FeeConfig s_feeConfig;
-  CrossChainClone[] s_crossChainClones;
+  FeeConfig internal s_feeConfig;
+  CrossChainClone[] internal s_crossChainClones;
 
   Any2EVMOffRampRouterInterface internal s_receivingRouter;
   EVM2AnySubscriptionOnRampRouterInterface internal s_sendingRouter;

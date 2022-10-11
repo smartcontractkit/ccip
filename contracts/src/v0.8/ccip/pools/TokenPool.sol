@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../vendor/SafeERC20.sol";
-import "../../vendor/Pausable.sol";
-import "../access/OwnerIsCreator.sol";
-import "../onRamp/BaseOnRamp.sol";
-import "../interfaces/onRamp/BaseOnRampInterface.sol";
-import "../interfaces/offRamp/BaseOffRampInterface.sol";
+import {SafeERC20} from "../../vendor/SafeERC20.sol";
+import {Pausable} from "../../vendor/Pausable.sol";
+import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
+import {BaseOnRamp, BaseOnRampInterface, PoolInterface, IERC20} from "../onRamp/BaseOnRamp.sol";
+import {BaseOffRampInterface} from "../interfaces/offRamp/BaseOffRampInterface.sol";
 
 /**
  * @notice Base abstract class with common functions for all token pools
