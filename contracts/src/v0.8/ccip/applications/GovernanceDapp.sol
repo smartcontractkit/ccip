@@ -46,12 +46,12 @@ contract GovernanceDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterf
     // Count if votes >= threshold
     // if votes passes
     if (s_sendingRouter != EVM2AnySubscriptionOnRampRouterInterface(address(0))) {
-      propagateFeeConfigChange(feeConfig);
+      _propagateFeeConfigChange(feeConfig);
     }
     s_feeConfig = feeConfig;
   }
 
-  function propagateFeeConfigChange(FeeConfig calldata feeConfig) private {
+  function _propagateFeeConfigChange(FeeConfig calldata feeConfig) private {
     bytes memory data = abi.encode(feeConfig);
     uint256 numberOfClones = s_crossChainClones.length;
     for (uint256 i = 0; i < numberOfClones; ++i) {

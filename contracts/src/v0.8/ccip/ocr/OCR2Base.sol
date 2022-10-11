@@ -277,7 +277,7 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
       32 + // word containing length of ss
       0; // placeholder
 
-  function requireExpectedMsgDataLength(
+  function _requireExpectedMsgDataLength(
     bytes calldata report,
     bytes32[] calldata rs,
     bytes32[] calldata ss
@@ -326,7 +326,7 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
       ConfigInfo memory configInfo = s_configInfo;
       require(configInfo.latestConfigDigest == configDigest, "configDigest mismatch");
 
-      requireExpectedMsgDataLength(report, rs, ss);
+      _requireExpectedMsgDataLength(report, rs, ss);
 
       uint256 expectedNumSignatures;
       if (i_uniqueReports) {

@@ -143,7 +143,7 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
       (uint256 leafPos, uint256 hashPos, uint256 proofPos) = (0, 0, 0);
 
       for (uint256 i = 0; i < totalHashes; ++i) {
-        hashes[i] = hashPair(
+        hashes[i] = _hashPair(
           // Checks if the bit flag signals the use of a supplied proof or a leaf/previous hash.
           ((proofFlagBits >> i) & uint256(1)) == 1
             ? (leafPos < leavesLen ? leaves[leafPos++] : hashes[hashPos++]) // Use a leaf or a previously computed hash
@@ -195,7 +195,7 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
    * @notice Hashes two bytes32 objects. The order is taken into account,
    *          using the lower value first.
    */
-  function hashPair(bytes32 a, bytes32 b) private pure returns (bytes32) {
+  function _hashPair(bytes32 a, bytes32 b) private pure returns (bytes32) {
     return a < b ? _hashInternalNode(a, b) : _hashInternalNode(b, a);
   }
 
