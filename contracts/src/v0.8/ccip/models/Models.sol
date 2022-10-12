@@ -119,7 +119,7 @@ library CCIP {
     uint256 gasLimit;
   }
 
-  function addToTokensAmounts(
+  function _addToTokensAmounts(
     IERC20[] memory tokens,
     uint256[] memory amounts,
     IERC20 token,

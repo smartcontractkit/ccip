@@ -53,7 +53,7 @@ abstract contract BaseOffRampRouter is Any2EVMOffRampRouterInterface, OwnerIsCre
     assembly {
       let g := gas()
       // Compute g -= GAS_FOR_CALL_EXACT_CHECK and check for underflow
-      // The gas actually passed to the callee is min(gasAmount, 63//64*gas available).
+      // The gas actually passed to the callee is _min(gasAmount, 63//64*gas available).
       // We want to ensure that we revert if gasAmount >  63//64*gas available
       // as we do not want to provide them with less, however that check itself costs
       // gas.  GAS_FOR_CALL_EXACT_CHECK ensures we have at least enough gas to be able

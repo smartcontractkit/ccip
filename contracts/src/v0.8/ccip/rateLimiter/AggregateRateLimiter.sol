@@ -55,7 +55,7 @@ contract AggregateRateLimiter is AggregateRateLimiterInterface, OwnerIsCreator {
 
     // Overflow doesn't happen here because bucket.rate is <= type(uint208).max
     // leaving 48 bits for the time difference. 2 ** 48 seconds = 9e6 years.
-    bucket.tokens = min(bucket.capacity, bucket.tokens + difference * bucket.rate);
+    bucket.tokens = _min(bucket.capacity, bucket.tokens + difference * bucket.rate);
     bucket.lastUpdated = timeNow;
     return bucket;
   }
@@ -69,11 +69,11 @@ contract AggregateRateLimiter is AggregateRateLimiterInterface, OwnerIsCreator {
     }
     // First update the bucket to make sure the proper rate is used for all the time
     // up until the config change.
-    update(s_tokenBucket);
+    _update(s_tokenBucket);
 
     s_tokenBucket.capacity = config.capacity;
     s_tokenBucket.rate = config.rate;
-    s_tokenBucket.tokens = min(config.capacity, s_tokenBucket.tokens);
+    s_tokenBucket.tokens = _min(config.capacity, s_tokenBucket.tokens);
 
     emit ConfigChanged(config.capacity, config.rate);
   }
@@ -138,7 +138,7 @@ contract AggregateRateLimiter is AggregateRateLimiterInterface, OwnerIsCreator {
     // If there is no value to remove skip this step to reduce gas usage
     if (value > 0) {
       // Refill the bucket if possible
-      update(s_tokenBucket);
+      _update(s_tokenBucket);
       if (s_tokenBucket.tokens < value) {
         revert ValueExceedsAllowedThreshold();
       }
@@ -148,7 +148,7 @@ contract AggregateRateLimiter is AggregateRateLimiterInterface, OwnerIsCreator {
     }
   }
 
-  function update(TokenBucket storage bucket) internal {
+  function _update(TokenBucket storage bucket) internal {
     uint256 timeNow = block.timestamp;
 
     // Return if there's nothing to update
@@ -156,7 +156,7 @@ contract AggregateRateLimiter is AggregateRateLimiterInterface, OwnerIsCreator {
     // Revert if the tokens in the bucket exceed its capacity
     if (bucket.tokens > bucket.capacity) revert BucketOverfilled();
     uint256 difference = timeNow - bucket.lastUpdated;
-    bucket.tokens = min(bucket.capacity, bucket.tokens + difference * bucket.rate);
+    bucket.tokens = _min(bucket.capacity, bucket.tokens + difference * bucket.rate);
     bucket.lastUpdated = timeNow;
   }
 
@@ -166,7 +166,7 @@ contract AggregateRateLimiter is AggregateRateLimiterInterface, OwnerIsCreator {
    * @param b second int
    * @return smallest
    */
-  function min(uint256 a, uint256 b) internal pure returns (uint256) {
+  function _min(uint256 a, uint256 b) internal pure returns (uint256) {
     return a < b ? a : b;
   }
 

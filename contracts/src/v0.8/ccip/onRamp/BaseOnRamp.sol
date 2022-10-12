@@ -96,7 +96,7 @@ contract BaseOnRamp is
    * @param amounts The amounts corresponding to the tokens.
    * @param originalSender The original sender of the message on the router.
    */
-  function handleForwardFromRouter(
+  function _handleForwardFromRouter(
     uint256 dataLength,
     IERC20[] memory tokens,
     uint256[] memory amounts,

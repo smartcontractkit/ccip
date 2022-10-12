@@ -92,12 +92,12 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
     }
   }
 
-  function hashBlobVerifierWithRoot(bytes32 root) internal view returns (bytes32) {
+  function _hashBlobVerifierWithRoot(bytes32 root) internal view returns (bytes32) {
     return keccak256(abi.encode(address(this), root));
   }
 
   function isBlessed(bytes32 root) public view returns (bool) {
-    return s_afn.isBlessed(hashBlobVerifierWithRoot(root));
+    return s_afn.isBlessed(_hashBlobVerifierWithRoot(root));
   }
 
   /// @inheritdoc BlobVerifierInterface

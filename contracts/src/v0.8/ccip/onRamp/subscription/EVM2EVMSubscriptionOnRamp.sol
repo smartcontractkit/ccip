@@ -61,7 +61,7 @@ contract EVM2EVMSubscriptionOnRamp is EVM2EVMSubscriptionOnRampInterface, BaseOn
     returns (uint64)
   {
     if (msg.sender != address(s_router)) revert MustBeCalledByRouter();
-    handleForwardFromRouter(message.data.length, message.tokens, message.amounts, originalSender);
+    _handleForwardFromRouter(message.data.length, message.tokens, message.amounts, originalSender);
 
     address receiver = abi.decode(message.receiver, (address));
     // Emit message request

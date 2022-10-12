@@ -83,7 +83,7 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
    * @notice Compute the fee for a given message using token prices in report.
    * @dev Reduces stack pressure to have an explicit function for this.
    */
-  function computeFee(
+  function _computeFee(
     uint256 merkleGasShare,
     CCIP.ExecutionReport memory report,
     CCIP.EVM2EVMTollMessage memory message
@@ -172,7 +172,7 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
       uint256 feeTokenCharged;
       // If it's the first DON execution attempt, charge the fee.
       if (originalState == CCIP.MessageExecutionState.UNTOUCHED && !manualExecution) {
-        feeTokenCharged = computeFee(gasUsedByMerkle / decodedMessages.length, report, message);
+        feeTokenCharged = _computeFee(gasUsedByMerkle / decodedMessages.length, report, message);
         // Take the fee charged to this contract.
         // _releaseOrMintToken converts the message.feeToken to the proper destination token
         PoolInterface feeTokenPool = _getPool(message.feeToken);
@@ -206,7 +206,7 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
     view
     returns (CCIP.Any2EVMMessageFromSender memory message)
   {
-    (IERC20[] memory tokens, uint256[] memory amounts) = CCIP.addToTokensAmounts(
+    (IERC20[] memory tokens, uint256[] memory amounts) = CCIP._addToTokensAmounts(
       original.tokens,
       original.amounts,
       original.feeToken,
