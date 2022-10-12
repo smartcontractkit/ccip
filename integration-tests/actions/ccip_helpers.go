@@ -534,12 +534,13 @@ func (destCCIP *DestCCIPModule) BalanceAssertions(model BillingModel, prevBalanc
 	})
 	if model == SUB {
 		name := fmt.Sprintf("%s-Subscription-%s", testhelpers.Receiver, destCCIP.ReceiverDapp.Address())
+		log.Info().Interface("PrevBalance", prevBalances[name]).Msg(name)
 		balAssertions = append(balAssertions, testhelpers.BalanceAssertion{
 			Name:     name,
 			Address:  destCCIP.ReceiverDapp.EthAddress,
 			Getter:   destCCIP.SubscriptionBalance,
-			Expected: bigmath.Sub(prevBalances[name], bigmath.Mul(big.NewInt(noOfReq), big.NewInt(7e17))).String(),
-			Within:   big.NewInt(1e17).String(),
+			Expected: bigmath.Sub(prevBalances[name], bigmath.Mul(big.NewInt(noOfReq), big.NewInt(0.79e18))).String(),
+			Within:   big.NewInt(0.1e18).String(),
 		})
 	}
 	return balAssertions

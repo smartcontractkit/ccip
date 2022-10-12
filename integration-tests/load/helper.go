@@ -90,7 +90,5 @@ func (loadArgs *loadArgs) Run() {
 func (loadArgs *loadArgs) TearDown() {
 	loadArgs.envTear()
 	testFailed := ginkgo.CurrentSpecReport().Failed()
-	d, err := strconv.Atoi(os.Getenv("LOAD_TEST_DURATION"))
-	Expect(err).ShouldNot(HaveOccurred())
-	loadArgs.ccipLoad.PrintStats(testFailed, loadArgs.rps, d)
+	loadArgs.ccipLoad.PrintStats(testFailed, loadArgs.rps, loadArgs.duration.Minutes())
 }

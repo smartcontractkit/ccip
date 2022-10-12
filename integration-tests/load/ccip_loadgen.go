@@ -96,8 +96,8 @@ type SlackStats struct {
 	FastestE2EDuration              float64 `json:"fastestOverallRelayAndExecution,omitempty"`
 	FastestRelayDuration            float64 `json:"fastestRelay,omitempty"`
 	FastestExecDuration             float64 `json:"fastestExecution,omitempty"`
-	TotalNumberOfFailedRequests     int     `json:"noOfFailedRequests,omitempty"`
-	TotalNumberOfSuccessfulRequests int     `json:"noOfSuccessfulRequests,omitempty"`
+	TotalNumberOfFailedRequests     int     `json:"totalFailedRequests,omitempty"`
+	TotalNumberOfSuccessfulRequests int     `json:"totalSuccessfulRequests,omitempty"`
 	FailedRelay                     int     `json:"noOfFailedRelay,omitempty"`
 	FailedExecution                 int     `json:"noOfFailedExecution,omitempty"`
 	FailedSendTransaction           int     `json:"noOfFailedSendTransaction,omitempty"`
@@ -291,7 +291,7 @@ func (c *CCIPE2ELoad) updatestats(msgId int64, seqNum string, step phase, durati
 	}
 }
 
-func (c *CCIPE2ELoad) PrintStats(failed bool, rps, duration int) {
+func (c *CCIPE2ELoad) PrintStats(failed bool, rps int, duration float64) {
 	if _, err := os.Stat("./logs/stats"); os.IsNotExist(err) {
 		os.MkdirAll("./logs/stats", 0700)
 	}
@@ -406,9 +406,10 @@ func (c *CCIPE2ELoad) PrintStats(failed bool, rps, duration int) {
 	runUrl := os.Getenv("GH_RUN_URL")
 	if runUrl != "" {
 		testreporters.SlackNotifyBlocks(headerText, []string{fmt.Sprintf(
-			"Load sequence ran for %dm sending %d ccip-send request(s) per second", duration, rps),
-			fmt.Sprintf("Detailed Run Results are available in artifacts: %s", runUrl),
-			"Load stats for the run:",
+			"Load sequence ran for %.0fm sending a total of %d transactions at a rate of %d tx(s) per second",
+			duration, successCount[E2E]+failureCount[E2E], rps),
+			fmt.Sprintf("<%s|Detailed Run Results are available in artifacts>", runUrl),
+			"\nLoad Run Summary:",
 			string(stats)}, slackFile)
 	}
 
