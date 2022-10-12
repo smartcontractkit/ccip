@@ -189,9 +189,9 @@ func SetupNodeCCIP(
 	// (the wrapped sims faking different chainIDs)
 	var (
 		sourceLp logpoller.LogPoller = logpoller.NewLogPoller(logpoller.NewORM(sourceChainID, db, lggr, config), sourceClient,
-			lggr, 500*time.Millisecond, 10, 2, 2)
+			lggr, 500*time.Millisecond, 10, 2, 2, int64(evmCfg.EvmLogKeepBlocksDepth()))
 		destLp logpoller.LogPoller = logpoller.NewLogPoller(logpoller.NewORM(destChainID, db, lggr, config), destClient,
-			lggr, 500*time.Millisecond, 10, 2, 2)
+			lggr, 500*time.Millisecond, 10, 2, 2, int64(evmCfg.EvmLogKeepBlocksDepth()))
 	)
 	evmChain, err := evm.LoadChainSet(context.Background(), evm.ChainSetOpts{
 		ORM:              chainORM,

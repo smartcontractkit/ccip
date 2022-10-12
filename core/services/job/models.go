@@ -284,7 +284,10 @@ const (
 
 	OCR2VRF OCR2PluginType = "ocr2vrf"
 
-	OCR2Keeper OCR2PluginType = "ocr2keeper"
+	// Keeper was rebranded to automation. For now the plugin type required in job spec points
+	// to the new name (automation) but in code we refer it to keepers
+	// TODO: sc-55296 to rename ocr2keeper to ocr2automation in code
+	OCR2Keeper OCR2PluginType = "ocr2automation"
 	// CCIPRelay refers to the ccip.CCIPRelay plugin
 	CCIPRelay OCR2PluginType = "ccip-relay"
 	// CCIPExecution refers to the ccip.CCIPExecution plugin
