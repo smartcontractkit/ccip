@@ -23,6 +23,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	ocrTypes "github.com/smartcontractkit/libocr/offchainreporting2/types"
 	ocr2keepers "github.com/smartcontractkit/ocr2keepers/pkg/types"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo/abi"
 	"gopkg.in/guregu/null.v4"
@@ -129,7 +130,7 @@ func setupNode(
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
-		app.Stop()
+		assert.NoError(t, app.Stop())
 	})
 
 	return app, peerID.Raw(), nodeKey.Address, kb, config
@@ -198,7 +199,7 @@ func TestIntegration_KeeperPlugin(t *testing.T) {
 	}
 
 	backend := cltest.NewSimulatedBackend(t, genesisData, uint32(ethconfig.Defaults.Miner.GasCeil))
-	stopMining := cltest.Mine(backend, 3*time.Second)
+	stopMining := cltest.Mine(backend, 6*time.Second) // Should be greater than deltaRound since we cannot access old blocks on simulated blockchain
 	defer stopMining()
 
 	// Deploy contracts
@@ -261,11 +262,10 @@ func TestIntegration_KeeperPlugin(t *testing.T) {
 	for i, node := range nodes {
 		node.AddJob(t, fmt.Sprintf(`
 		type = "offchainreporting2"
-		pluginType = "ocr2keeper"
+		pluginType = "ocr2automation"
 		relay = "evm"
 		name = "ocr2keepers-%d"
 		schemaVersion = 1
-		maxTaskDuration = "1s"
 		contractID = "%s"
 		contractConfigTrackerPollInterval = "1s"
 		ocrKeyBundleID = "%s"
@@ -377,7 +377,7 @@ func TestIntegration_KeeperPlugin(t *testing.T) {
 		require.NoError(t, err2)
 		return received
 	}
-	g.Eventually(receivedBytes, 60*time.Second, cltest.DBPollingInterval).Should(gomega.Equal(payload1))
+	g.Eventually(receivedBytes, testutils.WaitTimeout(t), cltest.DBPollingInterval).Should(gomega.Equal(payload1))
 
 	// check pipeline runs
 	var allRuns []pipeline.Run
@@ -398,6 +398,6 @@ func TestIntegration_KeeperPlugin(t *testing.T) {
 		require.NoError(t, err)
 
 		// observe 2nd job run and received payload changes
-		g.Eventually(receivedBytes, 60*time.Second, cltest.DBPollingInterval).Should(gomega.Equal(payload2))
+		g.Eventually(receivedBytes, testutils.WaitTimeout(t), cltest.DBPollingInterval).Should(gomega.Equal(payload2))
 	*/
 }
