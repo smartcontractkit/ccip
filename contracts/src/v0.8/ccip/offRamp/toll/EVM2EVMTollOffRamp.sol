@@ -214,11 +214,11 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
     );
     uint256 numberOfTokens = tokens.length;
     IERC20[] memory destTokens = new IERC20[](numberOfTokens);
-    PoolInterface[] memory destPools = new PoolInterface[](numberOfTokens);
+    address[] memory destPools = new address[](numberOfTokens);
 
     for (uint256 i = 0; i < numberOfTokens; ++i) {
       PoolInterface pool = _getPool(tokens[i]);
-      destPools[i] = pool;
+      destPools[i] = address(pool);
       destTokens[i] = pool.getToken();
     }
 

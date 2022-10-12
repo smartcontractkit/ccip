@@ -24,7 +24,7 @@ contract BaseOffRampSetup is TokenSetup {
       s_mockBlobVerifier,
       s_afn,
       s_sourceTokens,
-      s_destPools,
+      getCastedDestinationPools(),
       rateLimiterConfig(),
       TOKEN_LIMIT_ADMIN
     );
@@ -83,7 +83,7 @@ contract BaseOffRamp_constructor is BaseOffRampSetup {
 
   function testZeroOnRampAddressReverts() public {
     PoolInterface[] memory pools = new PoolInterface[](2);
-    pools[0] = s_sourcePools[0];
+    pools[0] = PoolInterface(s_sourcePools[0]);
     pools[1] = new NativeTokenPool(s_sourceTokens[1]);
 
     vm.expectRevert(BaseOffRampInterface.ZeroAddressNotAllowed.selector);
@@ -194,14 +194,14 @@ contract BaseOffRamp__releaseOrMintToken is BaseOffRampSetup {
   function testSuccess() public {
     uint256 startingBalance = s_destTokens[1].balanceOf(OWNER);
     uint256 amount = POOL_BALANCE / 2;
-    s_offRamp.releaseOrMintToken(s_destPools[1], amount, OWNER);
+    s_offRamp.releaseOrMintToken(PoolInterface(s_destPools[1]), amount, OWNER);
     assertEq(startingBalance + amount, s_destTokens[1].balanceOf(OWNER));
   }
 
   // Revert
   function testExceedsPoolReverts() public {
     vm.expectRevert("ERC20: transfer amount exceeds balance");
-    s_offRamp.releaseOrMintToken(s_destPools[1], POOL_BALANCE * 2, OWNER);
+    s_offRamp.releaseOrMintToken(PoolInterface(s_destPools[1]), POOL_BALANCE * 2, OWNER);
   }
 }
 
@@ -211,7 +211,7 @@ contract BaseOffRamp__releaseOrMintTokens is BaseOffRampSetup {
   function testSuccess() public {
     uint256 startingBalance = s_destTokens[1].balanceOf(OWNER);
 
-    PoolInterface[] memory pools = new PoolInterface[](2);
+    address[] memory pools = new address[](2);
     pools[0] = s_destPools[1];
     pools[1] = s_destPools[1];
 

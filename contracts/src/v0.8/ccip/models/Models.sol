@@ -2,7 +2,6 @@
 pragma solidity ^0.8.0;
 
 import {IERC20} from "../../vendor/IERC20.sol";
-import {PoolInterface} from "../interfaces/pools/PoolInterface.sol";
 
 library CCIP {
   ////////////////////////////////
@@ -23,7 +22,7 @@ library CCIP {
     address receiver;
     bytes data;
     IERC20[] destTokens;
-    PoolInterface[] destPools;
+    address[] destPools;
     uint256[] amounts;
     uint256 gasLimit;
   }

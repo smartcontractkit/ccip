@@ -36,7 +36,7 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
       blobVerifier,
       s_afn,
       s_sourceTokens,
-      s_destPools,
+      getCastedDestinationPools(),
       rateLimiterConfig(),
       TOKEN_LIMIT_ADMIN
     );
@@ -59,11 +59,11 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
   {
     uint256 numberOfTokens = original.tokens.length;
     IERC20[] memory destTokens = new IERC20[](numberOfTokens);
-    PoolInterface[] memory destPools = new PoolInterface[](numberOfTokens);
+    address[] memory destPools = new address[](numberOfTokens);
 
     for (uint256 i = 0; i < numberOfTokens; ++i) {
       PoolInterface pool = s_offRamp.getPool(original.tokens[i]);
-      destPools[i] = pool;
+      destPools[i] = address(pool);
       destTokens[i] = pool.getToken();
     }
 

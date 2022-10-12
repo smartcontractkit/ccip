@@ -23,7 +23,7 @@ contract EVM2EVMTollOffRampRouterSetup is BaseTest {
   function _generateMockMessage(address receiver) internal pure returns (CCIP.Any2EVMMessageFromSender memory) {
     IERC20[] memory tokens = new IERC20[](0);
     uint256[] memory amounts = new uint256[](0);
-    PoolInterface[] memory pools = new PoolInterface[](0);
+    address[] memory pools = new address[](0);
     return (
       CCIP.Any2EVMMessageFromSender({
         sourceChainId: SOURCE_CHAIN_ID,

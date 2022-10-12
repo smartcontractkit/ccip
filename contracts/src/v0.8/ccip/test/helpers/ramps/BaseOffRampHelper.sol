@@ -40,7 +40,7 @@ contract BaseOffRampHelper is BaseOffRamp {
   }
 
   function releaseOrMintTokens(
-    PoolInterface[] memory tokens,
+    address[] memory tokens,
     uint256[] memory amounts,
     address receiver
   ) external {

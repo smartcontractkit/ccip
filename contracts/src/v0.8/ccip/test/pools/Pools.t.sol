@@ -8,19 +8,19 @@ contract TokenPoolRegistrySetup is TokenSetup {
 
   function setUp() public virtual override {
     TokenSetup.setUp();
-    tokenPoolRegistry = new TokenPoolRegistry(s_sourceTokens, s_destPools);
+    tokenPoolRegistry = new TokenPoolRegistry(s_sourceTokens, getCastedDestinationPools());
   }
 }
 
 contract TokenPoolRegistry_getDestinationToken is TokenPoolRegistrySetup {
   function testSuccess() public {
-    address expectedToken = address(s_destPools[0].getToken());
+    address expectedToken = address(PoolInterface(s_destPools[0]).getToken());
 
     address actualToken = address(tokenPoolRegistry.getDestinationToken(s_sourceTokens[0]));
 
     assertEq(expectedToken, actualToken);
 
-    expectedToken = address(s_destPools[1].getToken());
+    expectedToken = address(PoolInterface(s_destPools[1]).getToken());
 
     actualToken = address(tokenPoolRegistry.getDestinationToken(s_sourceTokens[1]));
 

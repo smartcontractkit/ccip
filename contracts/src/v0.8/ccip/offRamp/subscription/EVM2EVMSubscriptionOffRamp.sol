@@ -5,7 +5,8 @@ import {TypeAndVersionInterface} from "../../../interfaces/TypeAndVersionInterfa
 import {Any2EVMSubscriptionOffRampRouter} from "./Any2EVMSubscriptionOffRampRouter.sol";
 import {OCR2Base} from "../../ocr/OCR2Base.sol";
 import {BaseOffRamp} from "../BaseOffRamp.sol";
-import {CCIP, IERC20, PoolInterface} from "../../models/Models.sol";
+import {CCIP, IERC20} from "../../models/Models.sol";
+import {PoolInterface} from "../../interfaces/pools/PoolInterface.sol";
 import {BlobVerifierInterface} from "../../interfaces/BlobVerifierInterface.sol";
 import {AFNInterface} from "../../interfaces/health/AFNInterface.sol";
 import {Subscription, SubscriptionInterface} from "../../subscription/Subscription.sol";
@@ -147,11 +148,11 @@ contract EVM2EVMSubscriptionOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR
   {
     uint256 numberOfTokens = original.tokens.length;
     IERC20[] memory destTokens = new IERC20[](numberOfTokens);
-    PoolInterface[] memory destPools = new PoolInterface[](numberOfTokens);
+    address[] memory destPools = new address[](numberOfTokens);
 
     for (uint256 i = 0; i < numberOfTokens; ++i) {
       PoolInterface pool = _getPool(original.tokens[i]);
-      destPools[i] = pool;
+      destPools[i] = address(pool);
       destTokens[i] = pool.getToken();
     }
 

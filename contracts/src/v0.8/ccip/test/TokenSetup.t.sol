@@ -13,8 +13,8 @@ contract TokenSetup is BaseTest {
   IERC20[] internal s_sourceTokens;
   IERC20[] internal s_destTokens;
 
-  PoolInterface[] internal s_sourcePools;
-  PoolInterface[] internal s_destPools;
+  address[] internal s_sourcePools;
+  address[] internal s_destPools;
 
   uint256 internal constant TOKENS_PER_FEE_COIN = 2e20;
 
@@ -31,17 +31,27 @@ contract TokenSetup is BaseTest {
     }
 
     if (s_sourcePools.length == 0) {
-      s_sourcePools.push(new NativeTokenPool(s_sourceTokens[0]));
-      s_sourcePools.push(new NativeTokenPool(s_sourceTokens[1]));
+      s_sourcePools.push(address(new NativeTokenPool(s_sourceTokens[0])));
+      s_sourcePools.push(address(new NativeTokenPool(s_sourceTokens[1])));
     }
 
     if (s_destPools.length == 0) {
-      s_destPools.push(new NativeTokenPool(s_destTokens[0]));
-      s_destPools.push(new NativeTokenPool(s_destTokens[1]));
+      s_destPools.push(address(new NativeTokenPool(s_destTokens[0])));
+      s_destPools.push(address(new NativeTokenPool(s_destTokens[1])));
 
       // Float the pools with funds
       s_destTokens[0].transfer(address(s_destPools[0]), POOL_BALANCE);
       s_destTokens[1].transfer(address(s_destPools[1]), POOL_BALANCE);
     }
+  }
+
+  function getCastedSourcePools() internal view returns (PoolInterface[] memory sourcePools) {
+    // Convert address array into PoolInterface array in one line
+    sourcePools = abi.decode(abi.encode(s_sourcePools), (PoolInterface[]));
+  }
+
+  function getCastedDestinationPools() internal view returns (PoolInterface[] memory destPools) {
+    // Convert address array into PoolInterface array in one line
+    destPools = abi.decode(abi.encode(s_destPools), (PoolInterface[]));
   }
 }

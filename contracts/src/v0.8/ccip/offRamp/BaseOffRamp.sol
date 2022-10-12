@@ -6,7 +6,8 @@ import {HealthChecker, AFNInterface} from "../health/HealthChecker.sol";
 import {TokenPoolRegistry} from "../pools/TokenPoolRegistry.sol";
 import {AggregateRateLimiter} from "../rateLimiter/AggregateRateLimiter.sol";
 import {BaseOffRampInterface, Any2EVMOffRampRouterInterface, BlobVerifierInterface} from "../interfaces/offRamp/BaseOffRampInterface.sol";
-import {CCIP, IERC20, PoolInterface} from "../models/Models.sol";
+import {CCIP, IERC20} from "../models/Models.sol";
+import {PoolInterface} from "../interfaces/pools/PoolInterface.sol";
 
 /**
  * @notice A base OffRamp contract that every OffRamp should expand on
@@ -85,13 +86,13 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry, 
    *           and send them to the given `receiver` address.
    */
   function _releaseOrMintTokens(
-    PoolInterface[] memory pools,
+    address[] memory pools,
     uint256[] memory amounts,
     address receiver
   ) internal {
     if (pools.length != amounts.length) revert TokenAndAmountMisMatch();
     for (uint256 i = 0; i < pools.length; ++i) {
-      _releaseOrMintToken(pools[i], amounts[i], receiver);
+      _releaseOrMintToken(PoolInterface(pools[i]), amounts[i], receiver);
     }
   }
 

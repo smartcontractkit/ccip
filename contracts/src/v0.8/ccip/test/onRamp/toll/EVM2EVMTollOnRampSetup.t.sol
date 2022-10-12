@@ -27,7 +27,7 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
       SOURCE_CHAIN_ID,
       DEST_CHAIN_ID,
       s_sourceTokens,
-      s_sourcePools,
+      getCastedSourcePools(),
       s_allowList,
       s_afn,
       onRampConfig(),
