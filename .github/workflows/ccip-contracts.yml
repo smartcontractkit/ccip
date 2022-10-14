@@ -1,4 +1,4 @@
-name: CCIP Contract Tests
+name: CCIP Contracts
 on: [pull_request]
 
 env:
@@ -7,7 +7,7 @@ env:
 jobs:
   solhint:
     name: Solhint
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
 
     steps:
       - name: Collect Metrics
@@ -31,9 +31,9 @@ jobs:
           cd ./contracts/
           yarn lint:ccip
 
-  foundry:
-    name: Foundry Test
-    runs-on: ubuntu-20.04
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
 
     steps:
       - name: Collect Metrics
@@ -42,7 +42,52 @@ jobs:
         with:
           basic-auth: ${{ secrets.GRAFANA_CLOUD_BASIC_AUTH }}
           hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
-          this-job-name: Foundry Test
+          this-job-name: Coverage
+        continue-on-error: true
+
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Run Forge build
+        run: |
+          forge --version
+          forge build
+        id: build
+      
+      - name: Run coverage
+        run: forge coverage --report lcov
+
+      - name: Prune report
+        run: |
+          sudo apt-get install lcov
+          ./tools/ci/ccip_lcov_prune ./lcov.info ./lcov.info.pruned
+
+      - name: Report code coverage
+        uses: zgosalvez/github-actions-report-lcov@v1
+        with:
+          coverage-files: lcov.info.pruned
+          minimum-coverage: 77
+          artifact-name: code-coverage-report
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Collect Metrics
+        id: collect-gha-metrics
+        uses: smartcontractkit/push-gha-metrics-action@v1
+        with:
+          basic-auth: ${{ secrets.GRAFANA_CLOUD_BASIC_AUTH }}
+          hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
+          this-job-name: Tests
         continue-on-error: true
 
       - uses: actions/checkout@v3
@@ -64,6 +109,35 @@ jobs:
         run: |
           forge test -vvv
         id: test
+
+  gas:
+    name: Gas
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Collect Metrics
+        id: collect-gha-metrics
+        uses: smartcontractkit/push-gha-metrics-action@v1
+        with:
+          basic-auth: ${{ secrets.GRAFANA_CLOUD_BASIC_AUTH }}
+          hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
+          this-job-name: Gas
+        continue-on-error: true
+
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Run Forge build
+        run: |
+          forge --version
+          forge build
+        id: build
 
       - name: Check gas snapshots
         run: |

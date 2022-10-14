@@ -8,12 +8,6 @@ test = 'contracts/src/v0.8/ccip/test'
 out = 'contracts/foundry-artifacts'
 libs = ["contracts/node_modules", "lib"]
 
-remappings = [
-    '@openzeppelin/=lib/openzeppelin-contracts/',
-    'forge-std/=lib/forge-std/src/',
-    'ds-test/=lib/forge-std/lib/ds-test/src/'
-]
-
 gas_price = 1
 
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config

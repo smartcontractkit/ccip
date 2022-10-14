@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+set -e
+
+lcov --remove $1 -o $2 \
+  '*/ccip/test/*' \
+  'contracts/src/v0.8/ConfirmedOwnerWithProposal.sol' \
+  'contracts/src/v0.8/tests/MockV3Aggregator.sol' \
+  'contracts/src/v0.8/vendor/Address.sol' \
+  'contracts/src/v0.8/vendor/Context.sol' \
+  'contracts/src/v0.8/vendor/ERC20.sol' \
+  'contracts/src/v0.8/vendor/Pausable.sol' \
+  'contracts/src/v0.8/vendor/SafeERC20.sol'
