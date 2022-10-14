@@ -24,7 +24,7 @@ import (
 	"gopkg.in/guregu/null.v4"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm/types"
-	any_2_evm_subscription_offramp2 "github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/blob_verifier"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_subscription_onramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_toll_onramp_router"
@@ -434,7 +434,7 @@ func (destCCIP *DestCCIPModule) DeployContracts(sourceCCIP SourceCCIPModule) {
 		destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID(), destCCIP.BlobVerifier.EthAddress,
 		sourceCCIP.SubOnRamp.EthAddress, destCCIP.Common.AFN.EthAddress, sourceTokens, pools,
 		destCCIP.Common.RateLimiterConfig,
-		any_2_evm_subscription_offramp2.BaseOffRampInterfaceOffRampConfig{ExecutionDelaySeconds: 0, MaxDataSize: 10e12, MaxTokensLength: 15})
+		any_2_evm_subscription_offramp.BaseOffRampInterfaceOffRampConfig{ExecutionDelaySeconds: 0, MaxDataSize: 10e12, MaxTokensLength: 15})
 	Expect(err).ShouldNot(HaveOccurred(), "Deploying SubOffRamp shouldn't fail")
 	err = destCCIP.Common.ChainClient.WaitForEvents()
 	Expect(err).ShouldNot(HaveOccurred(), "Error waiting for deploying SubOffRamp")

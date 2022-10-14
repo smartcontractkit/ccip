@@ -679,7 +679,7 @@ chainID             = %s
 		require.NoError(t, err, "setting revert to false on the receiver")
 		ccipContracts.DestChain.Commit()
 
-		// send a bunch of subsequent ones and it should not be executed
+		// send a bunch of subsequent ones which should not be executed
 		var pendingReqNumbers []int
 		for i := 1; i <= 3; i++ {
 			testhelpers.SendSubRequest(t, ccipContracts, "hey DON, execute for me", []common.Address{ccipContracts.SourceLinkToken.Address()},
@@ -693,14 +693,14 @@ chainID             = %s
 		}
 
 		// manually execute the failed request
+		currentBlockNumber = ccipContracts.DestChain.Blockchain().CurrentBlock().Number().Uint64()
 		failedSeqNum := testhelpers.ExecuteSubMessage(t, ccipContracts, failedReq, []logpoller.Log{failedReq}, reportForFailedReq)
-		testhelpers.EventuallyExecutionStateChangedToSuccess(t, ccipContracts, []uint64{failedSeqNum})
+		testhelpers.EventuallyExecutionStateChangedToSuccess(t, ccipContracts, []uint64{failedSeqNum}, currentBlockNumber)
 
-		// verify all of the pending requests should be successfully executed now
+		// verify all the pending requests should be successfully executed now
 		for _, seqNo := range pendingReqNumbers {
 			t.Logf("Verify execution for pending seq Number %d", seqNo)
-			executionLog := testhelpers.AllNodesHaveExecutedSeqNum(t, ccipContracts, ccipContracts.SubOffRamp.Address(), nodes, seqNo)
-			testhelpers.AssertSubExecSuccess(t, ccipContracts, executionLog)
+			testhelpers.EventuallyExecutionStateChangedToSuccess(t, ccipContracts, []uint64{uint64(seqNo)}, currentBlockNumber)
 		}
 
 		ccipContracts.AssertBalances([]testhelpers.BalanceAssertion{
@@ -741,7 +741,7 @@ chainID             = %s
 			{
 				Name:     testhelpers.DestSub,
 				Address:  ccipContracts.Receivers[1].Receiver.Address(),
-				Expected: testhelpers.MustSubBigInt(destBalances[testhelpers.DestSub], "2311120000000000000").String(),
+				Expected: testhelpers.MustSubBigInt(destBalances[testhelpers.DestSub], "2371120000000000000").String(),
 				Getter:   ccipContracts.GetDestSubBalance,
 				Within:   "100000000000000000",
 			}, // Costs ~0.77 link per transfer for 3 auto req. Varies slightly due to variable calldata encoding gas costs.

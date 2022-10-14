@@ -687,20 +687,20 @@ func EventuallyReportRelayed(t *testing.T, ccipContracts CCIPContracts, onRamp c
 	}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue(), "report has not been relayed")
 }
 
-func EventuallyExecutionStateChangedToSuccess(t *testing.T, ccipContracts CCIPContracts, seqNum []uint64) {
-	g := gomega.NewGomegaWithT(t)
-	g.Eventually(func() ccip.MessageExecutionState {
-		it, err := ccipContracts.SubOffRamp.FilterExecutionStateChanged(nil, seqNum)
-		g.Expect(err).NotTo(gomega.HaveOccurred(), "Error filtering ExecutionStateChanged event")
-		g.Expect(it.Next()).To(gomega.BeTrue(), "No ExecutionStateChanged event found")
-		var state ccip.MessageExecutionState
-		// if multiple events found return the last one
+func EventuallyExecutionStateChangedToSuccess(t *testing.T, ccipContracts CCIPContracts, seqNum []uint64, blockNum uint64) {
+	gomega.NewGomegaWithT(t).Eventually(func() bool {
+		it, err := ccipContracts.SubOffRamp.FilterExecutionStateChanged(&bind.FilterOpts{Start: blockNum}, seqNum)
+		require.NoError(t, err)
+		ccipContracts.SourceChain.Commit()
+		ccipContracts.DestChain.Commit()
 		for it.Next() {
-			state = ccip.MessageExecutionState(it.Event.State)
+			if ccip.MessageExecutionState(it.Event.State) == ccip.Success {
+				return true
+			}
 		}
-		return state
+		return false
 	}, testutils.WaitTimeout(t), time.Second).
-		Should(gomega.Equal(ccip.Success), "ExecutionStateChanged Event")
+		Should(gomega.BeTrue(), "ExecutionStateChanged Event")
 }
 
 func EventuallyRelayReportAccepted(t *testing.T, ccipContracts CCIPContracts, currentBlock uint64) blob_verifier.CCIPRelayReport {
@@ -780,9 +780,10 @@ func ExecuteSubMessage(
 	tx, err := ccipContracts.SubOffRamp.Execute(ccipContracts.DestUser, offRampProof, true)
 	require.NoError(t, err, "Executing manually")
 	ccipContracts.DestChain.Commit()
+	ccipContracts.SourceChain.Commit()
 	rec, err := ccipContracts.DestChain.TransactionReceipt(context.Background(), tx.Hash())
 	require.NoError(t, err)
 	require.Equal(t, uint64(1), rec.Status, "manual execution failed")
-	t.Log("Manual Execution completed")
+	t.Logf("Manual Execution completed for seqNum %d", decodedMsg.SequenceNumber)
 	return decodedMsg.SequenceNumber
 }
