@@ -21,7 +21,7 @@ contract GovernanceDappSetup is EVM2EVMSubscriptionOnRampSetup {
 
     s_crossChainClone = GovernanceDapp.CrossChainClone({chainId: DEST_CHAIN_ID, contractAddress: address(1)});
 
-    s_feeToken = s_sourceTokens[0];
+    s_feeToken = IERC20(s_sourceTokens[0]);
     s_governanceDapp = new GovernanceDapp(s_receivingRouter, s_onRampRouter, s_feeConfig);
     s_governanceDapp.addClone(s_crossChainClone);
   }
@@ -55,7 +55,7 @@ contract GovernanceDapp_voteForNewFeeConfig is GovernanceDappSetup {
       receiver: s_crossChainClone.contractAddress,
       nonce: 1,
       data: data,
-      tokens: new IERC20[](0),
+      tokens: new address[](0),
       amounts: new uint256[](0),
       gasLimit: 3e5
     });
@@ -81,7 +81,7 @@ contract GovernanceDapp_ccipReceive is GovernanceDappSetup {
       changedAtBlock: 100
     });
 
-    IERC20[] memory tokens = new IERC20[](0);
+    address[] memory tokens = new address[](0);
     uint256[] memory amounts = new uint256[](0);
 
     CCIP.Any2EVMMessage memory message = CCIP.Any2EVMMessage({

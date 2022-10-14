@@ -6,7 +6,8 @@ import {HealthChecker, AFNInterface} from "../health/HealthChecker.sol";
 import {TokenPoolRegistry} from "../pools/TokenPoolRegistry.sol";
 import {AggregateRateLimiter} from "../rateLimiter/AggregateRateLimiter.sol";
 import {BaseOffRampInterface, Any2EVMOffRampRouterInterface, BlobVerifierInterface} from "../interfaces/offRamp/BaseOffRampInterface.sol";
-import {CCIP, IERC20} from "../models/Models.sol";
+import {CCIP} from "../models/Models.sol";
+import {IERC20} from "../../vendor/IERC20.sol";
 import {PoolInterface} from "../interfaces/pools/PoolInterface.sol";
 
 /**

@@ -5,7 +5,8 @@ import {TypeAndVersionInterface} from "../../../interfaces/TypeAndVersionInterfa
 import {Any2EVMSubscriptionOffRampRouter} from "./Any2EVMSubscriptionOffRampRouter.sol";
 import {OCR2Base} from "../../ocr/OCR2Base.sol";
 import {BaseOffRamp} from "../BaseOffRamp.sol";
-import {CCIP, IERC20} from "../../models/Models.sol";
+import {CCIP} from "../../models/Models.sol";
+import {IERC20} from "../../../vendor/IERC20.sol";
 import {PoolInterface} from "../../interfaces/pools/PoolInterface.sol";
 import {BlobVerifierInterface} from "../../interfaces/BlobVerifierInterface.sol";
 import {AFNInterface} from "../../interfaces/health/AFNInterface.sol";
@@ -147,13 +148,13 @@ contract EVM2EVMSubscriptionOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR
     returns (CCIP.Any2EVMMessageFromSender memory message)
   {
     uint256 numberOfTokens = original.tokens.length;
-    IERC20[] memory destTokens = new IERC20[](numberOfTokens);
+    address[] memory destTokens = new address[](numberOfTokens);
     address[] memory destPools = new address[](numberOfTokens);
 
     for (uint256 i = 0; i < numberOfTokens; ++i) {
-      PoolInterface pool = _getPool(original.tokens[i]);
+      PoolInterface pool = _getPool(IERC20(original.tokens[i]));
       destPools[i] = address(pool);
-      destTokens[i] = pool.getToken();
+      destTokens[i] = address(pool.getToken());
     }
 
     message = CCIP.Any2EVMMessageFromSender({

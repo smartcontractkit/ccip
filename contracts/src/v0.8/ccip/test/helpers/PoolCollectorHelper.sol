@@ -6,7 +6,7 @@ import "../../pools/PoolCollector.sol";
 contract PoolCollectorHelper is PoolCollector {
   function collectTokens(
     EVM2EVMTollOnRampInterface onRamp,
-    IERC20[] calldata tokens,
+    address[] calldata tokens,
     uint256[] calldata amounts
   ) external {
     _collectTokens(onRamp, tokens, amounts);

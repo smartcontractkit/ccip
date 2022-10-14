@@ -35,13 +35,13 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
       offRampConfig(),
       blobVerifier,
       s_afn,
-      s_sourceTokens,
+      getCastedSourceTokens(),
       getCastedDestinationPools(),
       rateLimiterConfig(),
       TOKEN_LIMIT_ADMIN
     );
 
-    s_offRamp.setPrices(s_destTokens, getTokenPrices());
+    s_offRamp.setPrices(getCastedDestinationTokens(), getTokenPrices());
 
     NativeTokenPool(address(s_destPools[0])).setOffRamp(BaseOffRampInterface(address(s_offRamp)), true);
     NativeTokenPool(address(s_destPools[1])).setOffRamp(BaseOffRampInterface(address(s_offRamp)), true);
@@ -58,13 +58,13 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
     returns (CCIP.Any2EVMMessageFromSender memory message)
   {
     uint256 numberOfTokens = original.tokens.length;
-    IERC20[] memory destTokens = new IERC20[](numberOfTokens);
+    address[] memory destTokens = new address[](numberOfTokens);
     address[] memory destPools = new address[](numberOfTokens);
 
     for (uint256 i = 0; i < numberOfTokens; ++i) {
-      PoolInterface pool = s_offRamp.getPool(original.tokens[i]);
+      PoolInterface pool = s_offRamp.getPool(IERC20(original.tokens[i]));
       destPools[i] = address(pool);
-      destTokens[i] = pool.getToken();
+      destTokens[i] = address(pool.getToken());
     }
 
     return
@@ -85,7 +85,7 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
     view
     returns (CCIP.EVM2EVMTollMessage memory)
   {
-    IERC20[] memory tokens;
+    address[] memory tokens;
     uint256[] memory amounts;
 
     return _generateAny2EVMTollMessage(sequenceNumber, tokens, amounts);
@@ -101,7 +101,7 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
 
   function _generateAny2EVMTollMessage(
     uint64 sequenceNumber,
-    IERC20[] memory tokens,
+    address[] memory tokens,
     uint256[] memory amounts
   ) internal view returns (CCIP.EVM2EVMTollMessage memory) {
     bytes memory data = abi.encode(0);

@@ -10,8 +10,8 @@ import "../health/HealthChecker.sol";
 import "../pools/TokenPoolRegistry.sol";
 
 contract TokenSetup is BaseTest {
-  IERC20[] internal s_sourceTokens;
-  IERC20[] internal s_destTokens;
+  address[] internal s_sourceTokens;
+  address[] internal s_destTokens;
 
   address[] internal s_sourcePools;
   address[] internal s_destPools;
@@ -21,28 +21,38 @@ contract TokenSetup is BaseTest {
   function setUp() public virtual override {
     BaseTest.setUp();
     if (s_sourceTokens.length == 0) {
-      s_sourceTokens.push(new MockERC20("sLINK", "sLNK", OWNER, 2**256 - 1));
-      s_sourceTokens.push(new MockERC20("sETH", "sETH", OWNER, 2**128));
+      s_sourceTokens.push(address(new MockERC20("sLINK", "sLNK", OWNER, 2**256 - 1)));
+      s_sourceTokens.push(address(new MockERC20("sETH", "sETH", OWNER, 2**128)));
     }
 
     if (s_destTokens.length == 0) {
-      s_destTokens.push(new MockERC20("dLINK", "dLNK", OWNER, 2**256 - 1));
-      s_destTokens.push(new MockERC20("dETH", "dETH", OWNER, 2**128));
+      s_destTokens.push(address(new MockERC20("dLINK", "dLNK", OWNER, 2**256 - 1)));
+      s_destTokens.push(address(new MockERC20("dETH", "dETH", OWNER, 2**128)));
     }
 
     if (s_sourcePools.length == 0) {
-      s_sourcePools.push(address(new NativeTokenPool(s_sourceTokens[0])));
-      s_sourcePools.push(address(new NativeTokenPool(s_sourceTokens[1])));
+      s_sourcePools.push(address(new NativeTokenPool(IERC20(s_sourceTokens[0]))));
+      s_sourcePools.push(address(new NativeTokenPool(IERC20(s_sourceTokens[1]))));
     }
 
     if (s_destPools.length == 0) {
-      s_destPools.push(address(new NativeTokenPool(s_destTokens[0])));
-      s_destPools.push(address(new NativeTokenPool(s_destTokens[1])));
+      s_destPools.push(address(new NativeTokenPool(IERC20(s_destTokens[0]))));
+      s_destPools.push(address(new NativeTokenPool(IERC20(s_destTokens[1]))));
 
       // Float the pools with funds
-      s_destTokens[0].transfer(address(s_destPools[0]), POOL_BALANCE);
-      s_destTokens[1].transfer(address(s_destPools[1]), POOL_BALANCE);
+      IERC20(s_destTokens[0]).transfer(address(s_destPools[0]), POOL_BALANCE);
+      IERC20(s_destTokens[1]).transfer(address(s_destPools[1]), POOL_BALANCE);
     }
+  }
+
+  function getCastedSourceTokens() internal view returns (IERC20[] memory sourceTokens) {
+    // Convert address array into IERC20 array in one line
+    sourceTokens = abi.decode(abi.encode(s_sourceTokens), (IERC20[]));
+  }
+
+  function getCastedDestinationTokens() internal view returns (IERC20[] memory destTokens) {
+    // Convert address array into IERC20 array in one line
+    destTokens = abi.decode(abi.encode(s_destTokens), (IERC20[]));
   }
 
   function getCastedSourcePools() internal view returns (PoolInterface[] memory sourcePools) {

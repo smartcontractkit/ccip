@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {CCIP, IERC20} from "../../models/Models.sol";
+import {CCIP} from "../../models/Models.sol";
+import {IERC20} from "../../../vendor/IERC20.sol";
 import {BaseOnRampInterface} from "./BaseOnRampInterface.sol";
 
 interface EVM2EVMTollOnRampInterface is BaseOnRampInterface {

@@ -8,7 +8,7 @@ contract AggregateRateLimiterHelper is AggregateRateLimiter {
     AggregateRateLimiter(config, tokenLimitsAdmin)
   {}
 
-  function removeTokens(IERC20[] memory tokens, uint256[] memory amounts) public {
+  function removeTokens(address[] memory tokens, uint256[] memory amounts) public {
     _removeTokens(tokens, amounts);
   }
 }

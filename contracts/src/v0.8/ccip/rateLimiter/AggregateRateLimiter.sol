@@ -125,10 +125,10 @@ contract AggregateRateLimiter is AggregateRateLimiterInterface, OwnerIsCreator {
    *          amount allowed in the bucket.
    * @dev Will only remove and therefore emit removal of value if the value is > 0.
    */
-  function _removeTokens(IERC20[] memory tokens, uint256[] memory amounts) internal {
+  function _removeTokens(address[] memory tokens, uint256[] memory amounts) internal {
     uint256 value = 0;
     for (uint256 i = 0; i < tokens.length; ++i) {
-      uint256 pricePerToken = s_priceByToken[tokens[i]];
+      uint256 pricePerToken = s_priceByToken[IERC20(tokens[i])];
       if (pricePerToken == 0) {
         revert PriceNotFoundForToken(address(tokens[i]));
       }

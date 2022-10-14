@@ -24,7 +24,7 @@ contract EVM2EVMSubscriptionOffRampSetup is TokenSetup {
 
   function setUp() public virtual override {
     TokenSetup.setUp();
-    s_destFeeToken = s_destTokens[0];
+    s_destFeeToken = IERC20(s_destTokens[0]);
 
     s_mockBlobVerifier = new MockBlobVerifier();
     s_receiver = new SimpleMessageReceiver();
@@ -44,13 +44,13 @@ contract EVM2EVMSubscriptionOffRampSetup is TokenSetup {
       offRampConfig(),
       blobVerifier,
       s_afn,
-      s_sourceTokens,
+      getCastedSourceTokens(),
       getCastedDestinationPools(),
       rateLimiterConfig(),
       TOKEN_LIMIT_ADMIN
     );
 
-    s_offRamp.setPrices(s_destTokens, getTokenPrices());
+    s_offRamp.setPrices(getCastedDestinationTokens(), getTokenPrices());
 
     BaseOffRampInterface[] memory offRamps = new BaseOffRampInterface[](1);
     offRamps[0] = s_offRamp;
@@ -74,7 +74,7 @@ contract EVM2EVMSubscriptionOffRampSetup is TokenSetup {
     view
     returns (CCIP.EVM2EVMSubscriptionMessage memory)
   {
-    IERC20[] memory tokens;
+    address[] memory tokens;
     uint256[] memory amounts;
 
     return _generateAny2EVMSubscriptionMessage(sequenceNumber, nonce, tokens, amounts);
@@ -101,7 +101,7 @@ contract EVM2EVMSubscriptionOffRampSetup is TokenSetup {
   function _generateAny2EVMSubscriptionMessage(
     uint64 sequenceNumber,
     uint64 nonce,
-    IERC20[] memory tokens,
+    address[] memory tokens,
     uint256[] memory amounts
   ) internal view returns (CCIP.EVM2EVMSubscriptionMessage memory) {
     bytes memory data = abi.encode(0);
@@ -125,13 +125,13 @@ contract EVM2EVMSubscriptionOffRampSetup is TokenSetup {
     returns (CCIP.Any2EVMMessageFromSender memory)
   {
     uint256 numberOfTokens = original.tokens.length;
-    IERC20[] memory destTokens = new IERC20[](numberOfTokens);
+    address[] memory destTokens = new address[](numberOfTokens);
     address[] memory destPools = new address[](numberOfTokens);
 
     for (uint256 i = 0; i < numberOfTokens; ++i) {
-      PoolInterface pool = s_offRamp.getPool(original.tokens[i]);
+      PoolInterface pool = s_offRamp.getPool(IERC20(original.tokens[i]));
       destPools[i] = address(pool);
-      destTokens[i] = pool.getToken();
+      destTokens[i] = address(pool.getToken());
     }
 
     return

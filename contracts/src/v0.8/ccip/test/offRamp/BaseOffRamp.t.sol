@@ -23,13 +23,13 @@ contract BaseOffRampSetup is TokenSetup {
       offRampConfig(),
       s_mockBlobVerifier,
       s_afn,
-      s_sourceTokens,
+      getCastedSourceTokens(),
       getCastedDestinationPools(),
       rateLimiterConfig(),
       TOKEN_LIMIT_ADMIN
     );
 
-    s_offRamp.setPrices(s_destTokens, getTokenPrices());
+    s_offRamp.setPrices(getCastedDestinationTokens(), getTokenPrices());
 
     NativeTokenPool(address(s_destPools[0])).setOffRamp(s_offRamp, true);
     NativeTokenPool(address(s_destPools[1])).setOffRamp(s_offRamp, true);
@@ -84,7 +84,7 @@ contract BaseOffRamp_constructor is BaseOffRampSetup {
   function testZeroOnRampAddressReverts() public {
     PoolInterface[] memory pools = new PoolInterface[](2);
     pools[0] = PoolInterface(s_sourcePools[0]);
-    pools[1] = new NativeTokenPool(s_sourceTokens[1]);
+    pools[1] = new NativeTokenPool(IERC20(s_sourceTokens[1]));
 
     vm.expectRevert(BaseOffRampInterface.ZeroAddressNotAllowed.selector);
 
@@ -100,7 +100,7 @@ contract BaseOffRamp_constructor is BaseOffRampSetup {
       offRampConfig,
       s_mockBlobVerifier,
       s_afn,
-      s_sourceTokens,
+      getCastedSourceTokens(),
       pools,
       rateLimiterConfig,
       OWNER
@@ -192,10 +192,11 @@ contract BaseOffRamp_setConfig is BaseOffRampSetup {
 contract BaseOffRamp__releaseOrMintToken is BaseOffRampSetup {
   // Success
   function testSuccess() public {
-    uint256 startingBalance = s_destTokens[1].balanceOf(OWNER);
+    IERC20 destToken1 = IERC20(s_destTokens[1]);
+    uint256 startingBalance = destToken1.balanceOf(OWNER);
     uint256 amount = POOL_BALANCE / 2;
     s_offRamp.releaseOrMintToken(PoolInterface(s_destPools[1]), amount, OWNER);
-    assertEq(startingBalance + amount, s_destTokens[1].balanceOf(OWNER));
+    assertEq(startingBalance + amount, destToken1.balanceOf(OWNER));
   }
 
   // Revert
@@ -209,7 +210,8 @@ contract BaseOffRamp__releaseOrMintToken is BaseOffRampSetup {
 contract BaseOffRamp__releaseOrMintTokens is BaseOffRampSetup {
   // Success
   function testSuccess() public {
-    uint256 startingBalance = s_destTokens[1].balanceOf(OWNER);
+    IERC20 destToken1 = IERC20(s_destTokens[1]);
+    uint256 startingBalance = destToken1.balanceOf(OWNER);
 
     address[] memory pools = new address[](2);
     pools[0] = s_destPools[1];
@@ -220,7 +222,7 @@ contract BaseOffRamp__releaseOrMintTokens is BaseOffRampSetup {
     amounts[1] = 50;
 
     s_offRamp.releaseOrMintTokens(pools, amounts, OWNER);
-    assertEq(startingBalance + amounts[0] + amounts[1], s_destTokens[1].balanceOf(OWNER));
+    assertEq(startingBalance + amounts[0] + amounts[1], destToken1.balanceOf(OWNER));
   }
 
   // Revert
@@ -249,7 +251,7 @@ contract BaseOffRamp__getPool is BaseOffRampSetup {
   // Success
   function testSuccess() public {
     address expectedPoolAddress = address(s_destPools[0]);
-    address actualPoolAddress = address(s_offRamp.getPool(s_sourceTokens[0]));
+    address actualPoolAddress = address(s_offRamp.getPool(IERC20(s_sourceTokens[0])));
     assertEq(expectedPoolAddress, actualPoolAddress);
   }
 

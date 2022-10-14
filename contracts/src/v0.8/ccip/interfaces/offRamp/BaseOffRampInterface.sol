@@ -3,7 +3,8 @@ pragma solidity ^0.8.0;
 
 import {Any2EVMOffRampRouterInterface} from "./Any2EVMOffRampRouterInterface.sol";
 import {BlobVerifierInterface} from "../BlobVerifierInterface.sol";
-import {IERC20, CCIP} from "../../models/Models.sol";
+import {CCIP} from "../../models/Models.sol";
+import {IERC20} from "../../../vendor/IERC20.sol";
 
 interface BaseOffRampInterface {
   error ZeroAddressNotAllowed();

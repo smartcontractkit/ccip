@@ -8,8 +8,8 @@ contract Models__hash is TokenSetup {
   using CCIP for CCIP.EVM2EVMTollMessage;
 
   function testSubscriptionHashSuccess() public {
-    IERC20[] memory tokens = new IERC20[](1);
-    tokens[0] = IERC20(address(0x4440000000000000000000000000000000000001));
+    address[] memory tokens = new address[](1);
+    tokens[0] = address(0x4440000000000000000000000000000000000001);
     uint256[] memory amounts = new uint256[](1);
     amounts[0] = 12345678900;
 
@@ -43,9 +43,9 @@ contract Models__hash is TokenSetup {
   }
 
   function testSubscriptionHashTwoTokensSuccess() public {
-    IERC20[] memory tokens = new IERC20[](2);
-    tokens[0] = IERC20(address(0x4440000000000000000000000000000000000001));
-    tokens[1] = IERC20(address(0x6660000000000000000000000000000000000001));
+    address[] memory tokens = new address[](2);
+    tokens[0] = address(0x4440000000000000000000000000000000000001);
+    tokens[1] = address(0x6660000000000000000000000000000000000001);
     uint256[] memory amounts = new uint256[](2);
     amounts[0] = 12345678900;
     amounts[1] = 4204242;
@@ -80,8 +80,8 @@ contract Models__hash is TokenSetup {
   }
 
   function testTollHashSuccess() public {
-    IERC20[] memory tokens = new IERC20[](1);
-    tokens[0] = IERC20(address(0x4440000000000000000000000000000000000001));
+    address[] memory tokens = new address[](1);
+    tokens[0] = address(0x4440000000000000000000000000000000000001);
     uint256[] memory amounts = new uint256[](1);
     amounts[0] = 12345678900;
 
@@ -97,7 +97,7 @@ contract Models__hash is TokenSetup {
       tokens: tokens,
       amounts: amounts,
       gasLimit: 100,
-      feeToken: IERC20(0x3330000000000000000000000000000000000001),
+      feeToken: address(0x3330000000000000000000000000000000000001),
       feeTokenAmount: 987654321
     });
 
@@ -116,9 +116,9 @@ contract Models__hash is TokenSetup {
   }
 
   function testTollHashTwoTokensSuccess() public {
-    IERC20[] memory tokens = new IERC20[](2);
-    tokens[0] = IERC20(address(0x4440000000000000000000000000000000000001));
-    tokens[1] = IERC20(address(0x6660000000000000000000000000000000000001));
+    address[] memory tokens = new address[](2);
+    tokens[0] = address(0x4440000000000000000000000000000000000001);
+    tokens[1] = address(0x6660000000000000000000000000000000000001);
     uint256[] memory amounts = new uint256[](2);
     amounts[0] = 12345678900;
     amounts[1] = 4204242;
@@ -135,7 +135,7 @@ contract Models__hash is TokenSetup {
       tokens: tokens,
       amounts: amounts,
       gasLimit: 100,
-      feeToken: IERC20(0x3330000000000000000000000000000000000001),
+      feeToken: address(0x3330000000000000000000000000000000000001),
       feeTokenAmount: 987654321
     });
 

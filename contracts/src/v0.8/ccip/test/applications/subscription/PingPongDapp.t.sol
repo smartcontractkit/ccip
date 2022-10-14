@@ -20,7 +20,7 @@ contract PingPongDappSetup is EVM2EVMSubscriptionOnRampSetup {
 
     s_receivingRouter = Any2EVMOffRampRouterInterface(address(100));
 
-    s_feeToken = s_sourceTokens[0];
+    s_feeToken = IERC20(s_sourceTokens[0]);
     s_pingPong = new PingPongDemo(
       CCIPRouterInterface(address(s_receivingRouter)),
       CCIPRouterInterface(address(s_onRampRouter))
@@ -45,7 +45,7 @@ contract PingPong_startPingPong is PingPongDappSetup {
       receiver: i_pongContract,
       nonce: 1,
       data: data,
-      tokens: new IERC20[](0),
+      tokens: new address[](0),
       amounts: new uint256[](0),
       gasLimit: 2e5
     });

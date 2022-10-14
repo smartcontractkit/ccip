@@ -23,7 +23,7 @@ contract EVM2EVMSubscriptionOnRampSetup is TokenSetup {
 
   function setUp() public virtual override {
     TokenSetup.setUp();
-    s_sourceFeeToken = s_sourceTokens[0];
+    s_sourceFeeToken = IERC20(s_sourceTokens[0]);
 
     s_onRampRouter = new EVM2AnySubscriptionOnRampRouter(
       EVM2AnySubscriptionOnRampRouterInterface.RouterConfig(0, s_sourceFeeToken, OWNER)
@@ -32,7 +32,7 @@ contract EVM2EVMSubscriptionOnRampSetup is TokenSetup {
     s_onRamp = new EVM2EVMSubscriptionOnRamp(
       SOURCE_CHAIN_ID,
       DEST_CHAIN_ID,
-      s_sourceTokens,
+      getCastedSourceTokens(),
       getCastedSourcePools(),
       s_allowList,
       s_afn,
@@ -42,7 +42,7 @@ contract EVM2EVMSubscriptionOnRampSetup is TokenSetup {
       s_onRampRouter
     );
 
-    s_onRamp.setPrices(s_sourceTokens, getTokenPrices());
+    s_onRamp.setPrices(getCastedSourceTokens(), getTokenPrices());
 
     NativeTokenPool(address(s_sourcePools[0])).setOnRamp(s_onRamp, true);
     NativeTokenPool(address(s_sourcePools[1])).setOnRamp(s_onRamp, true);
@@ -58,7 +58,7 @@ contract EVM2EVMSubscriptionOnRampSetup is TokenSetup {
     uint256[] memory amounts = new uint256[](2);
     amounts[0] = i_tokenAmount0;
     amounts[1] = i_tokenAmount1;
-    IERC20[] memory tokens = s_sourceTokens;
+    address[] memory tokens = s_sourceTokens;
     return
       CCIP.EVM2AnySubscriptionMessage({
         receiver: abi.encode(OWNER),
@@ -71,7 +71,7 @@ contract EVM2EVMSubscriptionOnRampSetup is TokenSetup {
 
   function _generateEmptyMessage() public pure returns (CCIP.EVM2AnySubscriptionMessage memory) {
     uint256[] memory amounts = new uint256[](0);
-    IERC20[] memory tokens = new IERC20[](0);
+    address[] memory tokens = new address[](0);
     return
       CCIP.EVM2AnySubscriptionMessage({
         receiver: abi.encode(OWNER),

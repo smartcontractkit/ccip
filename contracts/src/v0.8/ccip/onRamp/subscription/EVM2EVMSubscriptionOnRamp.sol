@@ -7,7 +7,8 @@ import {EVM2AnySubscriptionOnRampRouterInterface} from "../../interfaces/onRamp/
 import {AFNInterface} from "../../interfaces/health/AFNInterface.sol";
 import {EVM2AnySubscriptionOnRampRouter} from "./EVM2AnySubscriptionOnRampRouter.sol";
 import {BaseOnRamp} from "../BaseOnRamp.sol";
-import {CCIP, IERC20} from "../../models/Models.sol";
+import {CCIP} from "../../models/Models.sol";
+import {IERC20} from "../../../vendor/IERC20.sol";
 import {PoolInterface} from "../../interfaces/pools/PoolInterface.sol";
 
 /**

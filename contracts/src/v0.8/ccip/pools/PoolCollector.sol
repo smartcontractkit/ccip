@@ -53,12 +53,12 @@ contract PoolCollector is OwnerIsCreator {
    */
   function _collectTokens(
     BaseOnRampInterface onRamp,
-    IERC20[] memory tokens,
+    address[] memory tokens,
     uint256[] memory amounts
   ) internal {
     // Send the tokens to the pools
     for (uint256 i = 0; i < tokens.length; ++i) {
-      IERC20 token = tokens[i];
+      IERC20 token = IERC20(tokens[i]);
       PoolInterface pool = onRamp.getTokenPool(token);
       if (address(pool) == address(0)) revert BaseOnRampInterface.UnsupportedToken(token);
       token.safeTransferFrom(msg.sender, address(pool), amounts[i]);

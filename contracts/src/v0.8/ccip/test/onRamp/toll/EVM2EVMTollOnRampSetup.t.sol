@@ -26,7 +26,7 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
     s_onRamp = new EVM2EVMTollOnRamp(
       SOURCE_CHAIN_ID,
       DEST_CHAIN_ID,
-      s_sourceTokens,
+      getCastedSourceTokens(),
       getCastedSourcePools(),
       s_allowList,
       s_afn,
@@ -38,10 +38,10 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
     uint256[] memory fees = new uint256[](1);
     fees[0] = uint256(RELAYING_FEE_JUELS);
     IERC20[] memory feeTokens = new IERC20[](1);
-    feeTokens[0] = s_sourceTokens[0];
+    feeTokens[0] = IERC20(s_sourceTokens[0]);
     s_onRamp.setFeeConfig(EVM2EVMTollOnRampInterface.FeeConfig({feeTokens: feeTokens, fees: fees}));
 
-    s_onRamp.setPrices(s_sourceTokens, getTokenPrices());
+    s_onRamp.setPrices(getCastedSourceTokens(), getTokenPrices());
 
     NativeTokenPool(address(s_sourcePools[0])).setOnRamp(s_onRamp, true);
     NativeTokenPool(address(s_sourcePools[1])).setOnRamp(s_onRamp, true);
@@ -50,14 +50,14 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
 
     // Pre approve the first token so the gas estimates of the tests
     // only cover actual gas usage from the ramps
-    s_sourceTokens[0].approve(address(s_onRampRouter), 2**128);
+    IERC20(s_sourceTokens[0]).approve(address(s_onRampRouter), 2**128);
   }
 
   function _generateTokenMessage() public view returns (CCIP.EVM2AnyTollMessage memory) {
     uint256[] memory amounts = new uint256[](2);
     amounts[0] = i_tokenAmount0;
     amounts[1] = i_tokenAmount1;
-    IERC20[] memory tokens = s_sourceTokens;
+    address[] memory tokens = s_sourceTokens;
     return
       CCIP.EVM2AnyTollMessage({
         receiver: abi.encode(OWNER),
@@ -72,7 +72,7 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
 
   function _generateEmptyMessage() public view returns (CCIP.EVM2AnyTollMessage memory) {
     uint256[] memory amounts = new uint256[](0);
-    IERC20[] memory tokens = new IERC20[](0);
+    address[] memory tokens = new address[](0);
     return
       CCIP.EVM2AnyTollMessage({
         receiver: abi.encode(OWNER),

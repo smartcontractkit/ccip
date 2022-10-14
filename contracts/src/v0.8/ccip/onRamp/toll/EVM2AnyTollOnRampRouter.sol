@@ -7,6 +7,7 @@ import {BaseOnRampInterface} from "../../interfaces/onRamp/BaseOnRampInterface.s
 import {PoolCollector} from "../../pools/PoolCollector.sol";
 import {OwnerIsCreator} from "../../access/OwnerIsCreator.sol";
 import {CCIP} from "../../models/Models.sol";
+import {IERC20} from "../../../vendor/IERC20.sol";
 
 contract EVM2AnyTollOnRampRouter is
   EVM2AnyTollOnRampRouterInterface,
@@ -29,7 +30,7 @@ contract EVM2AnyTollOnRampRouter is
 
     // Charge the fee and subtract that amount from the feeTokenAmount. This will revert if
     // the given feeTokenAmount is too low for the needed fee.
-    message.feeTokenAmount -= _chargeFee(onRamp, message.feeToken, message.feeTokenAmount);
+    message.feeTokenAmount -= _chargeFee(onRamp, IERC20(message.feeToken), message.feeTokenAmount);
     // Transfer the tokens to the token pools.
     _collectTokens(onRamp, message.tokens, message.amounts);
 

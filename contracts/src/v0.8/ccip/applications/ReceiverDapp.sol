@@ -4,7 +4,8 @@ pragma solidity 0.8.15;
 import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
 import {Any2EVMMessageReceiverInterface} from "../interfaces/applications/Any2EVMMessageReceiverInterface.sol";
 import {Any2EVMOffRampRouterInterface} from "../interfaces/offRamp/Any2EVMOffRampRouterInterface.sol";
-import {CCIP, IERC20} from "../models/Models.sol";
+import {CCIP} from "../models/Models.sol";
+import {IERC20} from "../../vendor/IERC20.sol";
 
 /**
  * @notice Application contract for receiving messages from the OffRamp on behalf of an EOA
@@ -42,7 +43,7 @@ contract ReceiverDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterfac
 
   function _handleMessage(
     bytes memory data,
-    IERC20[] memory tokens,
+    address[] memory tokens,
     uint256[] memory amounts
   ) internal {
     (
@@ -53,7 +54,7 @@ contract ReceiverDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterfac
     for (uint256 i = 0; i < tokens.length; ++i) {
       uint256 amount = amounts[i];
       if (destinationAddress != address(0) && amount != 0) {
-        tokens[i].transfer(destinationAddress, amount);
+        IERC20(tokens[i]).transfer(destinationAddress, amount);
       }
     }
   }

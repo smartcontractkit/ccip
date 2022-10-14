@@ -42,13 +42,13 @@ contract TollSenderDapp is TypeAndVersionInterface {
    */
   function sendTokens(
     address destinationAddress,
-    IERC20[] memory tokens,
+    address[] memory tokens,
     uint256[] memory amounts
   ) external returns (uint64 sequenceNumber) {
     if (destinationAddress == address(0)) revert InvalidDestinationAddress(destinationAddress);
     for (uint256 i = 0; i < tokens.length; ++i) {
-      tokens[i].safeTransferFrom(msg.sender, address(this), amounts[i]);
-      tokens[i].approve(address(i_onRampRouter), amounts[i]);
+      IERC20(tokens[i]).safeTransferFrom(msg.sender, address(this), amounts[i]);
+      IERC20(tokens[i]).approve(address(i_onRampRouter), amounts[i]);
     }
     // `data` format:
     //  - EOA sender address

@@ -14,13 +14,13 @@ contract ReceiverDappSetup is TokenSetup {
   function setUp() public virtual override {
     TokenSetup.setUp();
 
-    s_feeToken = s_destTokens[0];
+    s_feeToken = IERC20(s_destTokens[0]);
 
     s_mockRouter = new MockTollOffRampRouter();
     s_receiverDapp = new ReceiverDapp(s_mockRouter);
 
-    s_destTokens[0].transfer(address(s_receiverDapp), 2**64);
-    s_destTokens[1].transfer(address(s_receiverDapp), 2**64);
+    IERC20(s_destTokens[0]).transfer(address(s_receiverDapp), 2**64);
+    IERC20(s_destTokens[1]).transfer(address(s_receiverDapp), 2**64);
   }
 }
 

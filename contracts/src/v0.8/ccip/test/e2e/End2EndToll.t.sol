@@ -29,8 +29,10 @@ contract E2E_toll is EVM2EVMTollOnRampSetup, BlobVerifierSetup, EVM2EVMTollOffRa
   }
 
   function testSuccess() public {
-    uint256 balance0Pre = s_sourceTokens[0].balanceOf(OWNER);
-    uint256 balance1Pre = s_sourceTokens[1].balanceOf(OWNER);
+    IERC20 token0 = IERC20(s_sourceTokens[0]);
+    IERC20 token1 = IERC20(s_sourceTokens[1]);
+    uint256 balance0Pre = token0.balanceOf(OWNER);
+    uint256 balance1Pre = token1.balanceOf(OWNER);
 
     CCIP.EVM2EVMTollMessage[] memory messages = new CCIP.EVM2EVMTollMessage[](3);
     messages[0] = parseEventToDestChainMessage(sendRequest(1));
@@ -40,9 +42,9 @@ contract E2E_toll is EVM2EVMTollOnRampSetup, BlobVerifierSetup, EVM2EVMTollOffRa
     // Asserts that the tokens have been sent and the fee has been paid.
     assertEq(
       balance0Pre - messages.length * (i_tokenAmount0 + RELAYING_FEE_JUELS + EXECUTION_FEE_AMOUNT),
-      s_sourceTokens[0].balanceOf(OWNER)
+      token0.balanceOf(OWNER)
     );
-    assertEq(balance1Pre - messages.length * i_tokenAmount1, s_sourceTokens[1].balanceOf(OWNER));
+    assertEq(balance1Pre - messages.length * i_tokenAmount1, token1.balanceOf(OWNER));
 
     bytes32 metaDataHash = s_offRamp.metadataHash();
 
@@ -93,8 +95,11 @@ contract E2E_toll is EVM2EVMTollOnRampSetup, BlobVerifierSetup, EVM2EVMTollOffRa
     CCIP.EVM2AnyTollMessage memory message = _generateTokenMessage();
     message.feeTokenAmount = RELAYING_FEE_JUELS + EXECUTION_FEE_AMOUNT;
 
-    s_sourceTokens[0].approve(address(s_onRampRouter), i_tokenAmount0 + RELAYING_FEE_JUELS + EXECUTION_FEE_AMOUNT);
-    s_sourceTokens[1].approve(address(s_onRampRouter), i_tokenAmount1);
+    IERC20(s_sourceTokens[0]).approve(
+      address(s_onRampRouter),
+      i_tokenAmount0 + RELAYING_FEE_JUELS + EXECUTION_FEE_AMOUNT
+    );
+    IERC20(s_sourceTokens[1]).approve(address(s_onRampRouter), i_tokenAmount1);
 
     message.receiver = abi.encode(address(s_receiver));
     CCIP.EVM2EVMTollMessage memory tollEvent = _messageToEvent(message, expectedSeqNum);

@@ -6,7 +6,8 @@ import {BaseOffRampInterface} from "../../interfaces/offRamp/BaseOffRampInterfac
 import {BlobVerifierInterface} from "../../interfaces/BlobVerifierInterface.sol";
 import {OCR2Base} from "../../ocr/OCR2Base.sol";
 import {BaseOffRamp} from "../BaseOffRamp.sol";
-import {CCIP, IERC20} from "../../models/Models.sol";
+import {CCIP} from "../../models/Models.sol";
+import {IERC20} from "../../../vendor/IERC20.sol";
 import {AFNInterface} from "../../interfaces/health/AFNInterface.sol";
 import {PoolInterface} from "../../interfaces/pools/PoolInterface.sol";
 
@@ -100,7 +101,7 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
     uint256 tokenPerFeeCoin;
     // tokenPerFeeCoinAddresses is keyed in destination chain tokens so we need to convert the feeToken
     // before we do the lookup
-    address destinationFeeTokenAddress = address(_getPool(message.feeToken).getToken());
+    address destinationFeeTokenAddress = address(_getPool(IERC20(message.feeToken)).getToken());
     for (uint256 j = 0; j < report.tokenPerFeeCoinAddresses.length; ++j) {
       if (report.tokenPerFeeCoinAddresses[j] == destinationFeeTokenAddress) {
         tokenPerFeeCoin = report.tokenPerFeeCoin[j];
@@ -175,7 +176,7 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
         feeTokenCharged = _computeFee(gasUsedByMerkle / decodedMessages.length, report, message);
         // Take the fee charged to this contract.
         // _releaseOrMintToken converts the message.feeToken to the proper destination token
-        PoolInterface feeTokenPool = _getPool(message.feeToken);
+        PoolInterface feeTokenPool = _getPool(IERC20(message.feeToken));
         _releaseOrMintToken(feeTokenPool, feeTokenCharged, address(this));
         // Forward the refund amount to the user so they know how much they were refunded.
         message.feeTokenAmount -= feeTokenCharged;
@@ -206,20 +207,20 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
     view
     returns (CCIP.Any2EVMMessageFromSender memory message)
   {
-    (IERC20[] memory tokens, uint256[] memory amounts) = CCIP._addToTokensAmounts(
+    (address[] memory tokens, uint256[] memory amounts) = CCIP._addToTokensAmounts(
       original.tokens,
       original.amounts,
       original.feeToken,
       original.feeTokenAmount
     );
     uint256 numberOfTokens = tokens.length;
-    IERC20[] memory destTokens = new IERC20[](numberOfTokens);
+    address[] memory destTokens = new address[](numberOfTokens);
     address[] memory destPools = new address[](numberOfTokens);
 
     for (uint256 i = 0; i < numberOfTokens; ++i) {
-      PoolInterface pool = _getPool(tokens[i]);
+      PoolInterface pool = _getPool(IERC20(tokens[i]));
       destPools[i] = address(pool);
-      destTokens[i] = pool.getToken();
+      destTokens[i] = address(pool.getToken());
     }
 
     message = CCIP.Any2EVMMessageFromSender({

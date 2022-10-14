@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IERC20} from "../../vendor/IERC20.sol";
-
 library CCIP {
   ////////////////////////////////
   ////         COMMON         ////
@@ -21,7 +19,7 @@ library CCIP {
     bytes sender;
     address receiver;
     bytes data;
-    IERC20[] destTokens;
+    address[] destTokens;
     address[] destPools;
     uint256[] amounts;
     uint256 gasLimit;
@@ -31,7 +29,7 @@ library CCIP {
     uint256 sourceChainId;
     bytes sender;
     bytes data;
-    IERC20[] destTokens;
+    address[] destTokens;
     uint256[] amounts;
   }
 
@@ -97,9 +95,9 @@ library CCIP {
   struct EVM2AnyTollMessage {
     bytes receiver;
     bytes data;
-    IERC20[] tokens;
+    address[] tokens;
     uint256[] amounts;
-    IERC20 feeToken;
+    address feeToken;
     uint256 feeTokenAmount;
     uint256 gasLimit;
   }
@@ -111,19 +109,19 @@ library CCIP {
     address sender;
     address receiver;
     bytes data;
-    IERC20[] tokens;
+    address[] tokens;
     uint256[] amounts;
-    IERC20 feeToken;
+    address feeToken;
     uint256 feeTokenAmount;
     uint256 gasLimit;
   }
 
   function _addToTokensAmounts(
-    IERC20[] memory tokens,
+    address[] memory tokens,
     uint256[] memory amounts,
-    IERC20 token,
+    address token,
     uint256 amount
-  ) internal pure returns (IERC20[] memory, uint256[] memory) {
+  ) internal pure returns (address[] memory, uint256[] memory) {
     // Assumes tokens.length = amounts.length
     for (uint256 i = 0; i < tokens.length; ++i) {
       if (tokens[i] == token) {
@@ -133,7 +131,7 @@ library CCIP {
       }
     }
     // Token is not already present, need to reallocate.
-    IERC20[] memory newTokens = new IERC20[](tokens.length + 1);
+    address[] memory newTokens = new address[](tokens.length + 1);
     uint256[] memory newAmounts = new uint256[](amounts.length + 1);
     for (uint256 i = 0; i < tokens.length; ++i) {
       newTokens[i] = tokens[i];
@@ -172,7 +170,7 @@ library CCIP {
   struct EVM2AnySubscriptionMessage {
     bytes receiver;
     bytes data;
-    IERC20[] tokens;
+    address[] tokens;
     uint256[] amounts;
     uint256 gasLimit;
   }
@@ -185,7 +183,7 @@ library CCIP {
     address receiver;
     uint64 nonce;
     bytes data;
-    IERC20[] tokens;
+    address[] tokens;
     uint256[] amounts;
     uint256 gasLimit;
   }

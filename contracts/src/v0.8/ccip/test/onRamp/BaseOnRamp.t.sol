@@ -20,7 +20,7 @@ contract BaseOnrampSetup is TokenSetup {
     s_onRamp = new BaseOnRamp(
       SOURCE_CHAIN_ID,
       DEST_CHAIN_ID,
-      s_sourceTokens,
+      getCastedSourceTokens(),
       getCastedSourcePools(),
       s_allowList,
       s_afn,
@@ -30,7 +30,7 @@ contract BaseOnrampSetup is TokenSetup {
       s_onRampRouter
     );
 
-    s_onRamp.setPrices(s_sourceTokens, getTokenPrices());
+    s_onRamp.setPrices(getCastedSourceTokens(), getTokenPrices());
 
     NativeTokenPool(address(s_sourcePools[0])).setOnRamp(s_onRamp, true);
     NativeTokenPool(address(s_sourcePools[1])).setOnRamp(s_onRamp, true);
@@ -59,10 +59,10 @@ contract BaseOnramp_constructor is BaseOnrampSetup {
 contract BaseOnramp_getTokenPool is BaseOnrampSetup {
   // Success
   function testSuccess() public {
-    assertEq(address(s_sourcePools[0]), address(s_onRamp.getPool(s_sourceTokens[0])));
-    assertEq(address(s_sourcePools[1]), address(s_onRamp.getPool(s_sourceTokens[1])));
+    assertEq(s_sourcePools[0], address(s_onRamp.getPool(IERC20(s_sourceTokens[0]))));
+    assertEq(s_sourcePools[1], address(s_onRamp.getPool(IERC20(s_sourceTokens[1]))));
 
-    assertEq(address(0), address(s_onRamp.getPool(s_destTokens[0])));
+    assertEq(address(0), address(s_onRamp.getPool(IERC20(s_destTokens[0]))));
   }
 }
 

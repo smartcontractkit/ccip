@@ -30,14 +30,16 @@ contract EVM2AnySubscriptionOnRampRouter_ccipSend is EVM2EVMSubscriptionOnRampSe
   }
 
   function testTokensSuccess() public {
-    uint256 poolBalance0Before = s_sourceTokens[0].balanceOf(address(s_sourcePools[0]));
-    uint256 poolBalance1Before = s_sourceTokens[1].balanceOf(address(s_sourcePools[1]));
+    IERC20 sourceToken0 = IERC20(s_sourceTokens[0]);
+    IERC20 sourceToken1 = IERC20(s_sourceTokens[1]);
+    uint256 poolBalance0Before = sourceToken0.balanceOf(address(s_sourcePools[0]));
+    uint256 poolBalance1Before = sourceToken1.balanceOf(address(s_sourcePools[1]));
 
-    uint256 userBalance0Before = s_sourceTokens[0].balanceOf(OWNER);
-    uint256 userBalance1Before = s_sourceTokens[1].balanceOf(OWNER);
+    uint256 userBalance0Before = sourceToken0.balanceOf(OWNER);
+    uint256 userBalance1Before = sourceToken1.balanceOf(OWNER);
 
-    s_sourceTokens[0].approve(address(s_onRampRouter), i_tokenAmount0);
-    s_sourceTokens[1].approve(address(s_onRampRouter), i_tokenAmount1);
+    sourceToken0.approve(address(s_onRampRouter), i_tokenAmount0);
+    sourceToken1.approve(address(s_onRampRouter), i_tokenAmount1);
     CCIP.EVM2AnySubscriptionMessage memory message = _generateTokenMessage();
 
     vm.expectEmit(false, false, false, true);
@@ -45,11 +47,11 @@ contract EVM2AnySubscriptionOnRampRouter_ccipSend is EVM2EVMSubscriptionOnRampSe
 
     s_onRampRouter.ccipSend(DEST_CHAIN_ID, message);
     // Assert the user balance is lowered by the tokens sent
-    assertEq(userBalance0Before - message.amounts[0], s_sourceTokens[0].balanceOf(OWNER));
-    assertEq(userBalance1Before - message.amounts[1], s_sourceTokens[1].balanceOf(OWNER));
+    assertEq(userBalance0Before - message.amounts[0], sourceToken0.balanceOf(OWNER));
+    assertEq(userBalance1Before - message.amounts[1], sourceToken1.balanceOf(OWNER));
     // Asserts the tokens are all sent to the proper pools
-    assertEq(poolBalance0Before + i_tokenAmount0, s_sourceTokens[0].balanceOf(address(s_sourcePools[0])));
-    assertEq(poolBalance1Before + i_tokenAmount1, s_sourceTokens[1].balanceOf(address(s_sourcePools[1])));
+    assertEq(poolBalance0Before + i_tokenAmount0, sourceToken0.balanceOf(address(s_sourcePools[0])));
+    assertEq(poolBalance1Before + i_tokenAmount1, sourceToken1.balanceOf(address(s_sourcePools[1])));
   }
 
   function testChargeSubscriptionFundingSuccess() public {

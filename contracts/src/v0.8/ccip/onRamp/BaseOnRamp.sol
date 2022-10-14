@@ -98,7 +98,7 @@ contract BaseOnRamp is
    */
   function _handleForwardFromRouter(
     uint256 dataLength,
-    IERC20[] memory tokens,
+    address[] memory tokens,
     uint256[] memory amounts,
     address originalSender
   ) internal {
@@ -116,7 +116,7 @@ contract BaseOnRamp is
 
     // Lock all tokens in their corresponding pools
     for (uint256 i = 0; i < tokenLength; ++i) {
-      IERC20 token = tokens[i];
+      IERC20 token = IERC20(tokens[i]);
       PoolInterface pool = getPool(token);
       if (address(pool) == address(0)) revert UnsupportedToken(token);
       pool.lockOrBurn(amounts[i]);

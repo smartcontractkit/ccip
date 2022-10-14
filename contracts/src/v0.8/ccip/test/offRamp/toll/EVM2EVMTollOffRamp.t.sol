@@ -229,7 +229,7 @@ contract EVM2EVMTollOffRamp_execute is EVM2EVMTollOffRampSetup {
 
   function testUnsupportedNumberOfTokensReverts() public {
     CCIP.EVM2EVMTollMessage[] memory messages = _generateBasicMessages();
-    IERC20[] memory newTokens = new IERC20[](1);
+    address[] memory newTokens = new address[](1);
     newTokens[0] = s_sourceTokens[0];
     messages[0].tokens = newTokens;
 
