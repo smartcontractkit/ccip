@@ -3,19 +3,12 @@ pragma solidity 0.8.15;
 
 import {TokenPoolRegistry, PoolInterface} from "../pools/TokenPoolRegistry.sol";
 import {HealthChecker, AFNInterface} from "../health/HealthChecker.sol";
-import {PoolCollector, IERC20} from "../pools/PoolCollector.sol";
+import {IERC20} from "../pools/PoolCollector.sol";
 import {AllowList} from "../access/AllowList.sol";
 import {AggregateRateLimiter} from "../rateLimiter/AggregateRateLimiter.sol";
 import {BaseOnRampInterface} from "../interfaces/onRamp/BaseOnRampInterface.sol";
 
-contract BaseOnRamp is
-  BaseOnRampInterface,
-  HealthChecker,
-  TokenPoolRegistry,
-  PoolCollector,
-  AllowList,
-  AggregateRateLimiter
-{
+contract BaseOnRamp is BaseOnRampInterface, HealthChecker, TokenPoolRegistry, AllowList, AggregateRateLimiter {
   // Chain ID of the source chain (where this contract is deployed)
   uint256 public immutable i_chainId;
   // Chain ID of the destination chain (where this contract sends messages)
