@@ -29,6 +29,7 @@
     ],
     "chainlink-solidity/explicit-imports": "warn",
     "chainlink-solidity/prefix-private-functions-with-underscore": "warn",
-    "chainlink-solidity/prefix-internal-functions-with-underscore": "warn"
+    "chainlink-solidity/prefix-internal-functions-with-underscore": "warn",
+    "chainlink-solidity/prefix-storage-variables-with-s-underscore": "warn"
   }
 }
