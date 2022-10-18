@@ -29,6 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/config/parse"
 	v2 "github.com/smartcontractkit/chainlink/core/config/v2"
 	"github.com/smartcontractkit/chainlink/core/logger"
+	"github.com/smartcontractkit/chainlink/core/logger/audit"
 	"github.com/smartcontractkit/chainlink/core/services/keystore/keys/ethkey"
 	"github.com/smartcontractkit/chainlink/core/services/keystore/keys/p2pkey"
 	"github.com/smartcontractkit/chainlink/core/store/dialects"
@@ -151,7 +152,8 @@ func (g *generalConfig) TerraConfigs() terra.TerraConfigs {
 }
 
 func (g *generalConfig) Validate() error {
-	return multierr.Combine(g.c.Validate(), g.secrets.Validate())
+	_, err := utils.MultiErrorList(multierr.Combine(g.c.Validate(), g.secrets.Validate()))
+	return err
 }
 
 func (g *generalConfig) LogConfiguration(log coreconfig.LogFn) {
@@ -303,6 +305,29 @@ func (g *generalConfig) StarkNetEnabled() bool {
 
 func (g *generalConfig) AllowOrigins() string {
 	return *g.c.WebServer.AllowOrigins
+}
+
+func (g *generalConfig) AuditLoggerEnabled() bool {
+	return *g.c.AuditLogger.Enabled
+}
+
+func (g *generalConfig) AuditLoggerForwardToUrl() (models.URL, error) {
+	return *g.c.AuditLogger.ForwardToUrl, nil
+}
+
+func (g *generalConfig) AuditLoggerHeaders() (audit.ServiceHeaders, error) {
+	return *g.c.AuditLogger.Headers, nil
+}
+
+func (g *generalConfig) AuditLoggerEnvironment() string {
+	if g.Dev() {
+		return "develop"
+	}
+	return "production"
+}
+
+func (g *generalConfig) AuditLoggerJsonWrapperKey() string {
+	return *g.c.AuditLogger.JsonWrapperKey
 }
 
 func (g *generalConfig) AuthenticatedRateLimit() int64 {
@@ -469,15 +494,15 @@ func (g *generalConfig) KeeperDefaultTransactionQueueDepth() uint32 {
 	return *g.c.Keeper.DefaultTransactionQueueDepth
 }
 
-func (g *generalConfig) KeeperGasPriceBufferPercent() uint32 {
+func (g *generalConfig) KeeperGasPriceBufferPercent() uint16 {
 	return *g.c.Keeper.GasPriceBufferPercent
 }
 
-func (g *generalConfig) KeeperGasTipCapBufferPercent() uint32 {
+func (g *generalConfig) KeeperGasTipCapBufferPercent() uint16 {
 	return *g.c.Keeper.GasTipCapBufferPercent
 }
 
-func (g *generalConfig) KeeperBaseFeeBufferPercent() uint32 {
+func (g *generalConfig) KeeperBaseFeeBufferPercent() uint16 {
 	return *g.c.Keeper.BaseFeeBufferPercent
 }
 
@@ -564,10 +589,6 @@ func (g *generalConfig) ORMMaxOpenConns() int {
 	return int(*g.c.Database.MaxOpenConns)
 }
 
-func (g *generalConfig) OCRBootstrapCheckInterval() time.Duration {
-	return g.c.P2P.V1.BootstrapCheckInterval.Duration()
-}
-
 func (g *generalConfig) OCRBlockchainTimeout() time.Duration {
 	return g.c.OCR.BlockchainTimeout.Duration()
 }
@@ -579,13 +600,6 @@ func (g *generalConfig) OCRContractPollInterval() time.Duration {
 func (g *generalConfig) OCRContractSubscribeInterval() time.Duration {
 	return g.c.OCR.ContractSubscribeInterval.Duration()
 }
-func (g *generalConfig) OCRDHTLookupInterval() int {
-	return int(*g.c.P2P.V1.DHTLookupInterval)
-}
-
-func (g *generalConfig) OCRIncomingMessageBufferSize() int {
-	return int(*g.c.P2P.IncomingMessageBufferSize)
-}
 
 func (g *generalConfig) OCRKeyBundleID() (string, error) {
 	b := g.c.OCR.KeyBundleID
@@ -593,14 +607,6 @@ func (g *generalConfig) OCRKeyBundleID() (string, error) {
 		return "", nil
 	}
 	return b.String(), nil
-}
-
-func (g *generalConfig) OCRNewStreamTimeout() time.Duration {
-	return g.c.P2P.V1.NewStreamTimeout.Duration()
-}
-
-func (g *generalConfig) OCROutgoingMessageBufferSize() int {
-	return int(*g.c.P2P.OutgoingMessageBufferSize)
 }
 
 func (g *generalConfig) OCRObservationTimeout() time.Duration {
@@ -672,11 +678,11 @@ func (g *generalConfig) P2PNetworkingStackRaw() string {
 }
 
 func (g *generalConfig) P2PPeerID() p2pkey.PeerID {
-	return *g.c.P2P.V1.PeerID
+	return *g.c.P2P.PeerID
 }
 
 func (g *generalConfig) P2PPeerIDRaw() string {
-	return g.c.P2P.V1.PeerID.String()
+	return g.c.P2P.PeerID.String()
 }
 
 func (g *generalConfig) P2PIncomingMessageBufferSize() int {
@@ -753,74 +759,51 @@ func (g *generalConfig) P2PPeerstoreWriteInterval() time.Duration {
 }
 
 func (g *generalConfig) P2PV2AnnounceAddresses() []string {
-	if p := g.c.P2P; p != nil {
-		if v2 := p.V2; v2 != nil {
-			if v := v2.AnnounceAddresses; v != nil {
-				return *v
-			}
-		}
+	if v := g.c.P2P.V2.AnnounceAddresses; v != nil {
+		return *v
 	}
 	return nil
 }
 
 func (g *generalConfig) P2PV2Bootstrappers() (locators []commontypes.BootstrapperLocator) {
-	if p := g.c.P2P; p != nil {
-		if v2 := p.V2; v2 != nil {
-			if v := v2.DefaultBootstrappers; v != nil {
-				return *v
-			}
-		}
+	if v := g.c.P2P.V2.DefaultBootstrappers; v != nil {
+		return *v
 	}
 	return nil
 }
 
 func (g *generalConfig) P2PV2BootstrappersRaw() (s []string) {
-	if p := g.c.P2P; p != nil {
-		if v2 := p.V2; v2 != nil {
-			if v := v2.DefaultBootstrappers; v != nil {
-				for _, b := range *v {
-					t, err := b.MarshalText()
-					if err != nil {
-						// log panic matches old behavior - only called for UI presentation
-						panic(fmt.Sprintf("Failed to marshal bootstrapper: %v", err))
-					}
-					s = append(s, string(t))
-				}
+	if v := g.c.P2P.V2.DefaultBootstrappers; v != nil {
+		for _, b := range *v {
+			t, err := b.MarshalText()
+			if err != nil {
+				// log panic matches old behavior - only called for UI presentation
+				panic(fmt.Sprintf("Failed to marshal bootstrapper: %v", err))
 			}
+			s = append(s, string(t))
 		}
 	}
 	return
 }
 
 func (g *generalConfig) P2PV2DeltaDial() models.Duration {
-	if p := g.c.P2P; p != nil {
-		if v2 := p.V2; v2 != nil {
-			if v := v2.DeltaDial; v != nil {
-				return *v
-			}
-		}
+	if v := g.c.P2P.V2.DeltaDial; v != nil {
+		return *v
 	}
 	return models.Duration{}
 }
 
 func (g *generalConfig) P2PV2DeltaReconcile() models.Duration {
-	if p := g.c.P2P; p != nil {
-		if v2 := p.V2; v2 != nil {
-			if v := v2.DeltaReconcile; v != nil {
-				return *v
-			}
-		}
+	if v := g.c.P2P.V2.DeltaReconcile; v != nil {
+		return *v
+
 	}
 	return models.Duration{}
 }
 
 func (g *generalConfig) P2PV2ListenAddresses() []string {
-	if p := g.c.P2P; p != nil {
-		if v2 := p.V2; v2 != nil {
-			if v := v2.ListenAddresses; v != nil {
-				return *v
-			}
-		}
+	if v := g.c.P2P.V2.ListenAddresses; v != nil {
+		return *v
 	}
 	return nil
 }

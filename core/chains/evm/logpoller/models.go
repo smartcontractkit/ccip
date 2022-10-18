@@ -55,3 +55,15 @@ func (l *Log) GetTopics() []common.Hash {
 	}
 	return tps
 }
+
+func (l *Log) ToGethLog() types.Log {
+	return types.Log{
+		Data:        l.Data,
+		Address:     l.Address,
+		BlockHash:   l.BlockHash,
+		BlockNumber: uint64(l.BlockNumber),
+		Topics:      l.GetTopics(),
+		TxHash:      l.TxHash,
+		Index:       uint(l.LogIndex),
+	}
+}
