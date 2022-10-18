@@ -1,0 +1,8 @@
+{
+  "calculateCurrentTokenBucketState()": "90c2339b",
+  "getPricesForTokens(address[])": "4741062e",
+  "getTokenLimitAdmin()": "599f6431",
+  "setPrices(address[],uint256[])": "4352fa9f",
+  "setRateLimiterConfig((uint256,uint256))": "91872543",
+  "setTokenLimitAdmin(address)": "39aa9264"
+}

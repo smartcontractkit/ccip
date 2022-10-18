@@ -1,0 +1,11 @@
+{
+  "acceptOwnership()": "79ba5097",
+  "calculateCurrentTokenBucketState()": "90c2339b",
+  "getPricesForTokens(address[])": "4741062e",
+  "getTokenLimitAdmin()": "599f6431",
+  "owner()": "8da5cb5b",
+  "setPrices(address[],uint256[])": "4352fa9f",
+  "setRateLimiterConfig((uint256,uint256))": "91872543",
+  "setTokenLimitAdmin(address)": "39aa9264",
+  "transferOwnership(address)": "f2fde38b"
+}

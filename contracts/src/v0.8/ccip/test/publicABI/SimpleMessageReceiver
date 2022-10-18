@@ -1,0 +1,5 @@
+{
+  "ccipReceive((uint256,bytes,bytes,address[],uint256[]))": "a0c6df15",
+  "getSubscriptionManager()": "e2a92e28",
+  "s_manager()": "75634c90"
+}

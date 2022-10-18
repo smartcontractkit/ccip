@@ -1,0 +1,6 @@
+{
+  "ccipSend(uint256,(bytes,bytes,address[],uint256[],address,uint256,uint256))": "a26e30ed",
+  "getOnRamp(uint256)": "d8a98f8c",
+  "isChainSupported(uint256)": "5221c1f0",
+  "setOnRamp(uint256,address)": "f1927cae"
+}

@@ -1,0 +1,13 @@
+{
+  "acceptOwnership()": "79ba5097",
+  "ccipReceive((uint256,bytes,bytes,address[],uint256[]))": "a0c6df15",
+  "getRouters()": "f88c31ce",
+  "getSubscriptionManager()": "e2a92e28",
+  "owner()": "8da5cb5b",
+  "s_counterpartAddress()": "1a92c7a2",
+  "s_counterpartChainId()": "9f575b94",
+  "setCounterpart(uint256,address)": "ddcba0e7",
+  "setRouters(address,address)": "5ead6fb0",
+  "startPingPong()": "2874d8bf",
+  "transferOwnership(address)": "f2fde38b"
+}

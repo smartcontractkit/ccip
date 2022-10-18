@@ -107,11 +107,11 @@ jobs:
 
       - name: Run Forge tests
         run: |
-          forge test -vvv
+          forge snapshot -vvv --check
         id: test
 
-  gas:
-    name: Gas
+  abi:
+    name: ABI
     runs-on: ubuntu-latest
 
     steps:
@@ -121,7 +121,7 @@ jobs:
         with:
           basic-auth: ${{ secrets.GRAFANA_CLOUD_BASIC_AUTH }}
           hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
-          this-job-name: Gas
+          this-job-name: ABI
         continue-on-error: true
 
       - uses: actions/checkout@v3
@@ -139,7 +139,7 @@ jobs:
           forge build
         id: build
 
-      - name: Check gas snapshots
+      - name: Check Public ABIs
         run: |
-          forge snapshot --check
-        id: gas-check
+          ./tools/ci/ccip_public_abi_check
+        id: abi-check
