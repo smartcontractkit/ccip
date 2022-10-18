@@ -38,6 +38,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/internal/testutils/evmtest"
 	"github.com/smartcontractkit/chainlink/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/core/logger"
+	"github.com/smartcontractkit/chainlink/core/logger/audit"
 	"github.com/smartcontractkit/chainlink/core/services/chainlink"
 	"github.com/smartcontractkit/chainlink/core/services/keystore"
 	"github.com/smartcontractkit/chainlink/core/services/keystore/chaintype"
@@ -279,6 +280,7 @@ func SetupNodeCCIP(
 		},
 		UnrestrictedHTTPClient: &http.Client{},
 		RestrictedHTTPClient:   &http.Client{},
+		AuditLogger:            audit.NoopLogger,
 	})
 	require.NoError(t, err)
 	require.NoError(t, app.GetKeyStore().Unlock("password"))
