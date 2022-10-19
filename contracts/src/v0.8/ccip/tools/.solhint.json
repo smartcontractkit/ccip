@@ -33,6 +33,7 @@
     "chainlink-solidity/inherited-constructor-args-not-in-contract-definition": "warn",
     "chainlink-solidity/all-caps-constant-storage-variables": "warn",
     "chainlink-solidity/prefix-storage-variables-with-s-underscore": "warn",
-    "chainlink-solidity/prefix-immutable-variables-with-i": "warn"
+    "chainlink-solidity/prefix-immutable-variables-with-i": "warn",
+    "chainlink-solidity/no-require-statements": "warn"
   }
 }

@@ -29,6 +29,9 @@ interface CCIPReceiverInterface {
 }
 
 contract PingPongDemo is CCIPReceiverInterface, OwnerIsCreator {
+  error WrongSourceChain(uint256 expected, uint256 actual);
+  error WrongSender(address expected, address actual);
+
   event Ping(uint256 pingPongCount);
   event Pong(uint256 pingPongCount);
 
@@ -75,8 +78,10 @@ contract PingPongDemo is CCIPReceiverInterface, OwnerIsCreator {
   }
 
   function ccipReceive(ReceivedMessage memory message) external override onlyRouter {
-    require(message.sourceChainId == s_counterpartChainId, "wrong source chain");
-    require(abi.decode(message.sender, (address)) == s_counterpartAddress, "wrong sender");
+    if (message.sourceChainId != s_counterpartChainId)
+      revert WrongSourceChain(s_counterpartChainId, message.sourceChainId);
+    if (abi.decode(message.sender, (address)) != s_counterpartAddress)
+      revert WrongSender(s_counterpartAddress, abi.decode(message.sender, (address)));
 
     uint256 pingPongCount = abi.decode(message.data, (uint256));
     _respond(pingPongCount + 1);

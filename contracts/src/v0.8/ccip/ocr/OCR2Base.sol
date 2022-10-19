@@ -15,6 +15,9 @@ import {OCR2Abstract} from "./OCR2Abstract.sol";
  * @dev THIS CONTRACT HAS NOT GONE THROUGH ANY SECURITY REVIEW. DO NOT USE IN PROD
  */
 abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
+  error InvalidConfig(string message);
+  error WrongMessageLength(uint256 expected, uint256 actual);
+
   bool internal immutable i_uniqueReports;
 
   constructor(bool uniqueReports) {
@@ -78,10 +81,10 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
     uint256 _numTransmitters,
     uint256 _f
   ) {
-    require(_numSigners <= MAX_NUM_ORACLES, "too many signers");
-    require(_f > 0, "f must be positive");
-    require(_numSigners == _numTransmitters, "oracle addresses out of registration");
-    require(_numSigners > 3 * _f, "faulty-oracle f too high");
+    if (_numSigners > MAX_NUM_ORACLES) revert InvalidConfig("too many signers");
+    if (_f == 0) revert InvalidConfig("f must be positive");
+    if (_numSigners != _numTransmitters) revert InvalidConfig("oracle addresses out of registration");
+    if (_numSigners <= 3 * _f) revert InvalidConfig("faulty-oracle f too high");
     _;
   }
 
@@ -150,9 +153,9 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
 
     for (uint256 i = 0; i < args.signers.length; ++i) {
       // add new signer/transmitter addresses
-      require(s_oracles[args.signers[i]].role == Role.Unset, "repeated signer address");
+      if (s_oracles[args.signers[i]].role != Role.Unset) revert InvalidConfig("repeated signer address");
       s_oracles[args.signers[i]] = Oracle(uint8(i), Role.Signer);
-      require(s_oracles[args.transmitters[i]].role == Role.Unset, "repeated transmitter address");
+      if (s_oracles[args.transmitters[i]].role != Role.Unset) revert InvalidConfig("repeated transmitter address");
       s_oracles[args.transmitters[i]] = Oracle(uint8(i), Role.Transmitter);
       s_signers.push(args.signers[i]);
       s_transmitters.push(args.transmitters[i]);
@@ -259,7 +262,7 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
       ss.length *
       32 + // 32 bytes per entry in _ss
       0; // placeholder
-    require(msg.data.length == expected, "calldata length mismatch");
+    if (msg.data.length != expected) revert WrongMessageLength(expected, msg.data.length);
   }
 
   /**

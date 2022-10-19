@@ -6,6 +6,7 @@ const InheritedConstructorArgsNotInContractDefinition = require('./rules/inherit
 const AllCapsConstantStorageVariables = require('./rules/allCapsConstantStorageVariables.js')
 const PrefixStorageVariablesWithSUnderscore = require('./rules/prefixStorageVariablesWithSUnderscore.js')
 const PrefixImmutableVariablesWithI = require('./rules/prefixImmutableVariablesWithI.js')
+const NoRequireStatements = require('./rules/noRequireStatements.js')
 
 module.exports = [
   ExplicitImports,
@@ -15,4 +16,5 @@ module.exports = [
   AllCapsConstantStorageVariables,
   PrefixStorageVariablesWithSUnderscore,
   PrefixImmutableVariablesWithI,
+  NoRequireStatements,
 ]
