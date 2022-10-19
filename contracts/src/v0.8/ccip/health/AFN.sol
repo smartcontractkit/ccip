@@ -202,9 +202,7 @@ contract AFN is AFNInterface, OwnerIsCreator, TypeAndVersionInterface {
       weightThresholdForBlessing == 0 ||
       weightThresholdForBadSignal == 0 ||
       configVersion == 0
-    ) {
-      revert InvalidConfig();
-    }
+    ) revert InvalidConfig();
     // Unset existing participants
     address[] memory existingParticipants = s_participantList;
     for (uint256 i = 0; i < existingParticipants.length; ++i) {
@@ -227,9 +225,7 @@ contract AFN is AFNInterface, OwnerIsCreator, TypeAndVersionInterface {
       s_weightByParticipant[participants[i]] = weights[i];
       weightTotal += weights[i];
     }
-    if (weightTotal < weightThresholdForBlessing || weightTotal < weightThresholdForBadSignal) {
-      revert InvalidConfig();
-    }
+    if (weightTotal < weightThresholdForBlessing || weightTotal < weightThresholdForBadSignal) revert InvalidConfig();
     emit AFNConfigSet(participants, weights, weightThresholdForBlessing, weightThresholdForBadSignal);
   }
 

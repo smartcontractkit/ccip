@@ -79,18 +79,14 @@ contract EVM2EVMTollOnRamp is EVM2EVMTollOnRampInterface, BaseOnRamp, TypeAndVer
   // If the fee is not explicitly set, we use the solidity default of zero.
   // The set of tokens in the pool registry defines the whitelist of fee tokens.
   function setFeeConfig(FeeConfig memory feeConfig) external override onlyOwner {
-    if (feeConfig.fees.length != feeConfig.feeTokens.length) {
-      revert InvalidFeeConfig();
-    }
+    if (feeConfig.fees.length != feeConfig.feeTokens.length) revert InvalidFeeConfig();
     // Clear previously set fees.
     for (uint256 i = 0; i < s_feeTokens.length; i++) {
       delete s_feesByToken[s_feeTokens[i]];
     }
     // Set new fees
     for (uint256 i = 0; i < feeConfig.feeTokens.length; i++) {
-      if (address(feeConfig.feeTokens[i]) == address(0)) {
-        revert InvalidFeeConfig();
-      }
+      if (address(feeConfig.feeTokens[i]) == address(0)) revert InvalidFeeConfig();
       s_feesByToken[feeConfig.feeTokens[i]] = feeConfig.fees[i];
     }
     s_feeTokens = feeConfig.feeTokens;

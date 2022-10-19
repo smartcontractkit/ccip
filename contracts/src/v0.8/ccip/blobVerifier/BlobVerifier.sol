@@ -45,9 +45,7 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
     i_chainId = chainId;
     i_sourceChainId = sourceChainId;
     s_config = config;
-    if (s_config.onRamps.length != s_config.minSeqNrByOnRamp.length) {
-      revert InvalidConfiguration();
-    }
+    if (s_config.onRamps.length != s_config.minSeqNrByOnRamp.length) revert InvalidConfiguration();
     for (uint256 i = 0; i < s_config.onRamps.length; ++i) {
       s_expectedNextMinByOnRamp[s_config.onRamps[i]] = s_config.minSeqNrByOnRamp[i];
     }
@@ -56,9 +54,7 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
   /// @inheritdoc BlobVerifierInterface
   function setConfig(BlobVerifierConfig calldata config) external onlyOwner {
     uint256 newRampLength = config.onRamps.length;
-    if (newRampLength != config.minSeqNrByOnRamp.length || newRampLength == 0) {
-      revert InvalidConfiguration();
-    }
+    if (newRampLength != config.minSeqNrByOnRamp.length || newRampLength == 0) revert InvalidConfiguration();
     uint256 onRampLength = s_config.onRamps.length;
     for (uint256 i = 0; i < onRampLength; ++i) {
       delete s_expectedNextMinByOnRamp[s_config.onRamps[i]];
@@ -137,9 +133,7 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
       if (totalHashes == 0) {
         return leaves[0];
       }
-      if (totalHashes > 256) {
-        revert InvalidProof();
-      }
+      if (totalHashes > 256) revert InvalidProof();
       bytes32[] memory hashes = new bytes32[](totalHashes);
       (uint256 leafPos, uint256 hashPos, uint256 proofPos) = (0, 0, 0);
 
@@ -172,20 +166,16 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
   ) internal override whenNotPaused whenHealthy {
     CCIP.RelayReport memory report = abi.decode(encodedReport, (CCIP.RelayReport));
     uint256 reportLength = report.onRamps.length;
-    if (reportLength != report.intervals.length || reportLength != report.merkleRoots.length) {
+    if (reportLength != report.intervals.length || reportLength != report.merkleRoots.length)
       revert InvalidRelayReport(report);
-    }
     for (uint256 i = 0; i < reportLength; ++i) {
       address onRamp = report.onRamps[i];
       uint64 expectedMinSeqNum = s_expectedNextMinByOnRamp[onRamp];
-      if (expectedMinSeqNum == 0) {
-        revert UnsupportedOnRamp(onRamp);
-      }
+      if (expectedMinSeqNum == 0) revert UnsupportedOnRamp(onRamp);
       CCIP.Interval memory repInterval = report.intervals[i];
 
-      if (expectedMinSeqNum != repInterval.min || repInterval.min > repInterval.max) {
+      if (expectedMinSeqNum != repInterval.min || repInterval.min > repInterval.max)
         revert InvalidInterval(repInterval, onRamp);
-      }
       s_expectedNextMinByOnRamp[onRamp] = repInterval.max + 1;
     }
     s_roots[report.rootOfRoots] = block.timestamp;

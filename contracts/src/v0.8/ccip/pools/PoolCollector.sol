@@ -31,9 +31,7 @@ contract PoolCollector is OwnerIsCreator {
     fee = onRamp.getRequiredFee(feeToken);
     address sender = msg.sender;
     if (fee > 0) {
-      if (fee > feeTokenAmount) {
-        revert FeeTokenAmountTooLow();
-      }
+      if (fee > feeTokenAmount) revert FeeTokenAmountTooLow();
       feeTokenAmount -= fee;
       feeToken.safeTransferFrom(sender, address(this), fee);
     }

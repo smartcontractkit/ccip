@@ -64,9 +64,7 @@ contract AggregateRateLimiter is AggregateRateLimiterInterface, OwnerIsCreator {
   function setRateLimiterConfig(RateLimiterConfig memory config) public requireAdminOrOwner {
     // We only allow a refill rate of uint208 so we don't have to deal with any
     // overflows for the next ~9 million years. Any sensible rate is way below this value.
-    if (config.rate >= type(uint208).max) {
-      revert RefillRateTooHigh();
-    }
+    if (config.rate >= type(uint208).max) revert RefillRateTooHigh();
     // First update the bucket to make sure the proper rate is used for all the time
     // up until the config change.
     _update(s_tokenBucket);
@@ -92,9 +90,7 @@ contract AggregateRateLimiter is AggregateRateLimiterInterface, OwnerIsCreator {
   /// @inheritdoc AggregateRateLimiterInterface
   function setPrices(IERC20[] memory tokens, uint256[] memory prices) public requireAdminOrOwner {
     uint256 newTokenLength = tokens.length;
-    if (newTokenLength != prices.length) {
-      revert TokensAndPriceLengthMismatch();
-    }
+    if (newTokenLength != prices.length) revert TokensAndPriceLengthMismatch();
 
     // Remove all old entries
     uint256 setTokensLength = s_allowedTokens.length;
@@ -104,9 +100,7 @@ contract AggregateRateLimiter is AggregateRateLimiterInterface, OwnerIsCreator {
 
     for (uint256 i = 0; i < newTokenLength; ++i) {
       IERC20 token = tokens[i];
-      if (token == IERC20(address(0))) {
-        revert AddressCannotBeZero();
-      }
+      if (token == IERC20(address(0))) revert AddressCannotBeZero();
       s_priceByToken[token] = prices[i];
       emit TokenPriceChanged(address(token), prices[i]);
     }
@@ -129,9 +123,7 @@ contract AggregateRateLimiter is AggregateRateLimiterInterface, OwnerIsCreator {
     uint256 value = 0;
     for (uint256 i = 0; i < tokens.length; ++i) {
       uint256 pricePerToken = s_priceByToken[IERC20(tokens[i])];
-      if (pricePerToken == 0) {
-        revert PriceNotFoundForToken(address(tokens[i]));
-      }
+      if (pricePerToken == 0) revert PriceNotFoundForToken(address(tokens[i]));
       value += pricePerToken * amounts[i];
     }
 
@@ -139,9 +131,7 @@ contract AggregateRateLimiter is AggregateRateLimiterInterface, OwnerIsCreator {
     if (value > 0) {
       // Refill the bucket if possible
       _update(s_tokenBucket);
-      if (s_tokenBucket.tokens < value) {
-        revert ValueExceedsAllowedThreshold();
-      }
+      if (s_tokenBucket.tokens < value) revert ValueExceedsAllowedThreshold();
 
       s_tokenBucket.tokens -= value;
       emit TokensRemovedFromBucket(value);
@@ -175,9 +165,7 @@ contract AggregateRateLimiter is AggregateRateLimiterInterface, OwnerIsCreator {
    *          it is applied to.
    */
   modifier requireAdminOrOwner() {
-    if (msg.sender != owner() && msg.sender != s_tokenLimitAdmin) {
-      revert OnlyCallableByAdminOrOwner();
-    }
+    if (msg.sender != owner() && msg.sender != s_tokenLimitAdmin) revert OnlyCallableByAdminOrOwner();
     _;
   }
 }

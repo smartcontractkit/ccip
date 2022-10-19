@@ -44,9 +44,7 @@ contract Subscription is SubscriptionInterface {
     onlySubscriptionManager(address(subscription.receiver))
   {
     address receiver = address(subscription.receiver);
-    if (address(s_subscriptions[receiver].receiver) != address(0)) {
-      revert SubscriptionAlreadyExists();
-    }
+    if (address(s_subscriptions[receiver].receiver) != address(0)) revert SubscriptionAlreadyExists();
     s_subscriptions[receiver] = subscription;
 
     if (subscription.balance > 0) {
@@ -58,9 +56,7 @@ contract Subscription is SubscriptionInterface {
 
   /// @inheritdoc SubscriptionInterface
   function fundSubscription(address receiver, uint256 amount) external {
-    if (amount <= 0) {
-      revert FundingAmountNotPositive();
-    }
+    if (amount <= 0) revert FundingAmountNotPositive();
     s_subscriptions[receiver].balance += amount;
     s_config.feeToken.safeTransferFrom(msg.sender, address(this), amount);
 
@@ -86,14 +82,10 @@ contract Subscription is SubscriptionInterface {
     onlySubscriptionManager(receiver)
   {
     PreparedNewSenders memory prepared = s_preparedNewSenders[receiver];
-    if (prepared.timestamp > block.timestamp) {
-      revert DelayNotPassedYet(prepared.timestamp);
-    }
+    if (prepared.timestamp > block.timestamp) revert DelayNotPassedYet(prepared.timestamp);
 
     for (uint256 i = 0; i < newSenders.length; ++i) {
-      if (newSenders[i] != prepared.newSenders[i]) {
-        revert AddressMismatch(prepared.newSenders[i], newSenders[i]);
-      }
+      if (newSenders[i] != prepared.newSenders[i]) revert AddressMismatch(prepared.newSenders[i], newSenders[i]);
     }
     s_subscriptions[receiver].senders = newSenders;
 
@@ -103,9 +95,7 @@ contract Subscription is SubscriptionInterface {
 
   /// @inheritdoc SubscriptionInterface
   function prepareWithdrawal(address receiver, uint256 amount) external onlySubscriptionManager(receiver) {
-    if (amount > s_subscriptions[receiver].balance) {
-      revert BalanceTooLow();
-    }
+    if (amount > s_subscriptions[receiver].balance) revert BalanceTooLow();
     s_preparedWithdrawals[receiver] = PreparedWithdrawal({
       amount: amount,
       timestamp: block.timestamp + s_config.withdrawalDelay
@@ -117,15 +107,9 @@ contract Subscription is SubscriptionInterface {
   /// @inheritdoc SubscriptionInterface
   function withdrawal(address receiver, uint256 amount) external onlySubscriptionManager(receiver) {
     PreparedWithdrawal memory prepared = s_preparedWithdrawals[receiver];
-    if (prepared.timestamp > block.timestamp) {
-      revert DelayNotPassedYet(prepared.timestamp);
-    }
-    if (prepared.amount != amount) {
-      revert AmountMismatch(prepared.amount, amount);
-    }
-    if (amount > s_subscriptions[receiver].balance) {
-      revert BalanceTooLow();
-    }
+    if (prepared.timestamp > block.timestamp) revert DelayNotPassedYet(prepared.timestamp);
+    if (prepared.amount != amount) revert AmountMismatch(prepared.amount, amount);
+    if (amount > s_subscriptions[receiver].balance) revert BalanceTooLow();
     s_subscriptions[receiver].balance -= amount;
     delete s_preparedWithdrawals[receiver];
     s_config.feeToken.safeTransfer(msg.sender, amount);
@@ -140,9 +124,7 @@ contract Subscription is SubscriptionInterface {
 
   modifier onlySubscriptionManager(address contractAddress) {
     SubscriptionManagerInterface subscriptionManager = SubscriptionManagerInterface(contractAddress);
-    if (subscriptionManager.getSubscriptionManager() != msg.sender) {
-      revert InvalidManager();
-    }
+    if (subscriptionManager.getSubscriptionManager() != msg.sender) revert InvalidManager();
     _;
   }
 }

@@ -107,9 +107,7 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
         tokenPerFeeCoin = report.tokenPerFeeCoin[j];
       }
     }
-    if (tokenPerFeeCoin == uint256(0)) {
-      revert MissingFeeCoinPrice(destinationFeeTokenAddress);
-    }
+    if (tokenPerFeeCoin == uint256(0)) revert MissingFeeCoinPrice(destinationFeeTokenAddress);
     // Gas cost in wei: gasUsed * gasPrice
     // example: 100k gas, 20 gwei = 1e5 * 20e9  = 2e15
     // Gas cost in token: costInWei * 1e18 / tokenPerFeeCoin
@@ -117,9 +115,8 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
     uint256 feeTokenCharged = ((overheadGasToll(merkleGasShare, message) + message.gasLimit) *
       tx.gasprice *
       tokenPerFeeCoin) / 1 ether;
-    if (feeTokenCharged > message.feeTokenAmount) {
+    if (feeTokenCharged > message.feeTokenAmount)
       revert InsufficientFeeAmount(message.sequenceNumber, feeTokenCharged, message.feeTokenAmount);
-    }
     return feeTokenCharged;
   }
 
@@ -164,9 +161,8 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
       if (originalState == CCIP.MessageExecutionState.SUCCESS) revert AlreadyExecuted(message.sequenceNumber);
 
       // Manually execution is fine if we previously failed or if the relay report is just too old
-      if (!(!manualExecution || isOldRelayReport || originalState == CCIP.MessageExecutionState.FAILURE)) {
+      if (!(!manualExecution || isOldRelayReport || originalState == CCIP.MessageExecutionState.FAILURE))
         revert ManualExecutionNotYetEnabled();
-      }
 
       _isWellFormed(message);
 
@@ -237,9 +233,8 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
 
   function _isWellFormed(CCIP.EVM2EVMTollMessage memory message) private view {
     if (message.sourceChainId != i_sourceChainId) revert InvalidSourceChain(message.sourceChainId);
-    if (message.tokens.length > uint256(s_config.maxTokensLength) || message.tokens.length != message.amounts.length) {
+    if (message.tokens.length > uint256(s_config.maxTokensLength) || message.tokens.length != message.amounts.length)
       revert UnsupportedNumberOfTokens(message.sequenceNumber);
-    }
     if (message.data.length > uint256(s_config.maxDataSize))
       revert MessageTooLarge(uint256(s_config.maxDataSize), message.data.length);
   }

@@ -87,9 +87,8 @@ contract EVM2EVMSubscriptionOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR
     uint256 merkleGasShare = gasUsedByMerkle / decodedMessages.length;
 
     // only allow manual execution if the report is old enough
-    if (manualExecution && (block.timestamp - timestampRelayed) < s_config.permissionLessExecutionThresholdSeconds) {
+    if (manualExecution && (block.timestamp - timestampRelayed) < s_config.permissionLessExecutionThresholdSeconds)
       revert ManualExecutionNotYetEnabled();
-    }
 
     // tokenPerFeeCoin[0] is used because all subscriptions use the same payment token
     uint256 tokenPerFeeCoin = report.tokenPerFeeCoin[0];
@@ -101,18 +100,16 @@ contract EVM2EVMSubscriptionOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR
       SubscriptionInterface.OffRampSubscription memory subscription = Subscription(routerAddress).getSubscription(
         message.receiver
       );
-      if (address(subscription.receiver) == address(0)) {
+      if (address(subscription.receiver) == address(0))
         revert SubscriptionInterface.SubscriptionNotFound(message.receiver);
-      }
 
       // Reduce stack pressure
       {
         // Any message with a nonce that is n + 1 is allowed.
         // If strict sequencing is disabled then any failed message can be re-executed out-of-order.
         bool isNextInSequence = s_receiverToNonce[message.receiver] + 1 == message.nonce;
-        if (!(isNextInSequence || (!subscription.strictSequencing && state == CCIP.MessageExecutionState.FAILURE))) {
+        if (!(isNextInSequence || (!subscription.strictSequencing && state == CCIP.MessageExecutionState.FAILURE)))
           revert IncorrectNonce(message.nonce);
-        }
 
         _isWellFormed(message);
 
@@ -175,9 +172,8 @@ contract EVM2EVMSubscriptionOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR
 
   function _isWellFormed(CCIP.EVM2EVMSubscriptionMessage memory message) private view {
     if (message.sourceChainId != i_sourceChainId) revert InvalidSourceChain(message.sourceChainId);
-    if (message.tokens.length > uint256(s_config.maxTokensLength) || message.tokens.length != message.amounts.length) {
+    if (message.tokens.length > uint256(s_config.maxTokensLength) || message.tokens.length != message.amounts.length)
       revert UnsupportedNumberOfTokens(message.sequenceNumber);
-    }
     if (message.data.length > uint256(s_config.maxDataSize))
       revert MessageTooLarge(uint256(s_config.maxDataSize), message.data.length);
   }
