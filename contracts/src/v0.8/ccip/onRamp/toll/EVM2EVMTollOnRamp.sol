@@ -13,6 +13,7 @@ import {CCIP} from "../../models/Models.sol";
  * @notice An implementation of a toll OnRamp.
  */
 contract EVM2EVMTollOnRamp is EVM2EVMTollOnRampInterface, BaseOnRamp, TypeAndVersionInterface {
+  // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "EVM2EVMTollOnRamp 1.0.0";
 
   // Fees per token.

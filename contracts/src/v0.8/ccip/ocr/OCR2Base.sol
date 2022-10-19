@@ -21,7 +21,7 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
     i_uniqueReports = uniqueReports;
   }
 
-  uint256 private constant maxUint32 = (1 << 32) - 1;
+  uint256 private constant MAX_UINT32 = (1 << 32) - 1;
 
   // Storing these fields used on the hot path in a ConfigInfo variable reduces the
   // retrieval of all of them to a single SLOAD. If any further fields are
@@ -78,7 +78,7 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
     uint256 _numTransmitters,
     uint256 _f
   ) {
-    require(_numSigners <= maxNumOracles, "too many signers");
+    require(_numSigners <= MAX_NUM_ORACLES, "too many signers");
     require(_f > 0, "f must be positive");
     require(_numSigners == _numTransmitters, "oracle addresses out of registration");
     require(_numSigners > 3 * _f, "faulty-oracle f too high");
@@ -265,8 +265,8 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
   /**
    * @notice transmit is called to post a new report to the contract
    * @param report serialized report, which the signatures are signing.
-   * @param rs ith element is the R components of the ith signature on report. Must have at most maxNumOracles entries
-   * @param ss ith element is the S components of the ith signature on report. Must have at most maxNumOracles entries
+   * @param rs ith element is the R components of the ith signature on report. Must have at most MAX_NUM_ORACLES entries
+   * @param ss ith element is the S components of the ith signature on report. Must have at most MAX_NUM_ORACLES entries
    * @param rawVs ith element is the the V component of the ith signature
    */
   function transmit(
@@ -317,7 +317,7 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
     {
       // Verify signatures attached to report
       bytes32 h = keccak256(abi.encodePacked(keccak256(report), reportContext));
-      bool[maxNumOracles] memory signed;
+      bool[MAX_NUM_ORACLES] memory signed;
 
       Oracle memory o;
       for (uint256 i = 0; i < rs.length; ++i) {
@@ -329,7 +329,7 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
       }
     }
 
-    assert(initialGas < maxUint32);
+    assert(initialGas < MAX_UINT32);
     _payTransmitter(uint32(initialGas), msg.sender);
   }
 }

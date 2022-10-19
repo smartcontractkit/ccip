@@ -18,7 +18,7 @@ import {Subscription, SubscriptionInterface} from "../../subscription/Subscripti
  */
 contract EVM2EVMSubscriptionOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
   using CCIP for CCIP.EVM2EVMSubscriptionMessage;
-
+  // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "EVM2EVMSubscriptionOffRamp 1.0.0";
 
   mapping(address => uint64) internal s_receiverToNonce;

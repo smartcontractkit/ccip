@@ -3,6 +3,7 @@ const ExplicitImports = require('./rules/explicitImports.js')
 const PrefixPrivateFunctionsWithUnderscore = require('./rules/prefixPrivateFunctionsWithUnderscore.js')
 const PrefixInternalFunctionsWithUnderscore = require('./rules/prefixInternalFunctionsWithUnderscore.js')
 const InheritedConstructorArgsNotInContractDefinition = require('./rules/inheritedConstructorArgsNotInContractDefinition.js')
+const AllCapsConstantStorageVariables = require('./rules/allCapsConstantStorageVariables.js')
 const PrefixStorageVariablesWithSUnderscore = require('./rules/prefixStorageVariablesWithSUnderscore.js')
 const PrefixImmutableVariablesWithI = require('./rules/prefixImmutableVariablesWithI.js')
 
@@ -11,6 +12,7 @@ module.exports = [
   PrefixPrivateFunctionsWithUnderscore,
   PrefixInternalFunctionsWithUnderscore,
   InheritedConstructorArgsNotInContractDefinition,
+  AllCapsConstantStorageVariables,
   PrefixStorageVariablesWithSUnderscore,
   PrefixImmutableVariablesWithI,
 ]

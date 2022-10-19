@@ -6,6 +6,7 @@ import {Subscription, SubscriptionInterface} from "../../subscription/Subscripti
 import {BaseOffRampRouter, BaseOffRampInterface} from "../BaseOffRampRouter.sol";
 
 contract Any2EVMSubscriptionOffRampRouter is BaseOffRampRouter, Subscription, TypeAndVersionInterface {
+  // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "Any2EVMSubscriptionOffRampRouter 1.0.0";
 
   constructor(

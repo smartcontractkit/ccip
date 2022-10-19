@@ -15,6 +15,7 @@ import {PoolInterface} from "../../interfaces/pools/PoolInterface.sol";
  * @notice An implementation of a subscription OnRamp.
  */
 contract EVM2EVMSubscriptionOnRamp is EVM2EVMSubscriptionOnRampInterface, BaseOnRamp, TypeAndVersionInterface {
+  // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "EVM2EVMSubscriptionOnRamp 1.0.0";
 
   // The last used sequence number per receiver address. This is zero in the case

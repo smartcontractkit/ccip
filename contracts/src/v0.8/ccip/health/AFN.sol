@@ -6,6 +6,7 @@ import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
 import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
 
 contract AFN is AFNInterface, OwnerIsCreator, TypeAndVersionInterface {
+  // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "AFN 1.0.0";
 
   // AFN participant addresses and weights

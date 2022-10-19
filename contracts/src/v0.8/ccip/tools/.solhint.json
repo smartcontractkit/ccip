@@ -31,6 +31,7 @@
     "chainlink-solidity/prefix-private-functions-with-underscore": "warn",
     "chainlink-solidity/prefix-internal-functions-with-underscore": "warn",
     "chainlink-solidity/inherited-constructor-args-not-in-contract-definition": "warn",
+    "chainlink-solidity/all-caps-constant-storage-variables": "warn",
     "chainlink-solidity/prefix-storage-variables-with-s-underscore": "warn",
     "chainlink-solidity/prefix-immutable-variables-with-i": "warn"
   }

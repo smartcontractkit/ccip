@@ -14,6 +14,7 @@ import {CCIP} from "../models/Models.sol";
 contract TollSenderDapp is TypeAndVersionInterface {
   using SafeERC20 for IERC20;
 
+  // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "TollSenderDapp 1.0.0";
 
   // On ramp contract responsible for interacting with the DON.

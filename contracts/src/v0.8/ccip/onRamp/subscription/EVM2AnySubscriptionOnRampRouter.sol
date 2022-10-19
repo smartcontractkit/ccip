@@ -16,7 +16,7 @@ contract EVM2AnySubscriptionOnRampRouter is
   PoolCollector
 {
   using SafeERC20 for IERC20;
-
+  // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "EVM2AnySubscriptionOnRampRouter 1.0.0";
 
   // destination chain id => OnRamp

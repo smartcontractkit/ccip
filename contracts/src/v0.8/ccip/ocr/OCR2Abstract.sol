@@ -5,7 +5,7 @@ import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.
 
 abstract contract OCR2Abstract is TypeAndVersionInterface {
   // Maximum number of oracles the offchain reporting protocol is designed for
-  uint256 internal constant maxNumOracles = 31;
+  uint256 internal constant MAX_NUM_ORACLES = 31;
 
   /**
    * @notice triggers a new run of the offchain reporting protocol
@@ -126,8 +126,8 @@ abstract contract OCR2Abstract is TypeAndVersionInterface {
   /**
    * @notice transmit is called to post a new report to the contract
    * @param report serialized report, which the signatures are signing.
-   * @param rs ith element is the R components of the ith signature on report. Must have at most maxNumOracles entries
-   * @param ss ith element is the S components of the ith signature on report. Must have at most maxNumOracles entries
+   * @param rs ith element is the R components of the ith signature on report. Must have at most MAX_NUM_ORACLES entries
+   * @param ss ith element is the S components of the ith signature on report. Must have at most MAX_NUM_ORACLES entries
    * @param rawVs ith element is the the V component of the ith signature
    */
   function transmit(

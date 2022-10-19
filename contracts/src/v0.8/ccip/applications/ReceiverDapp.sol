@@ -11,6 +11,7 @@ import {IERC20} from "../../vendor/IERC20.sol";
  * @notice Application contract for receiving messages from the OffRamp on behalf of an EOA
  */
 contract ReceiverDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterface {
+  // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "ReceiverDapp 1.0.0";
 
   Any2EVMOffRampRouterInterface public s_router;

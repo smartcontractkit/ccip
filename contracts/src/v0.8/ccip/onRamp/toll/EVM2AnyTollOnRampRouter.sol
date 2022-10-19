@@ -15,6 +15,7 @@ contract EVM2AnyTollOnRampRouter is
   OwnerIsCreator,
   PoolCollector
 {
+  // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "EVM2AnyTollOnRampRouter 1.0.0";
 
   // destination chain id => OnRampInterface

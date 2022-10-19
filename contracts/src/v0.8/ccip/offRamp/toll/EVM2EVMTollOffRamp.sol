@@ -17,7 +17,7 @@ import {PoolInterface} from "../../interfaces/pools/PoolInterface.sol";
  */
 contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
   using CCIP for CCIP.EVM2EVMTollMessage;
-
+  // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "EVM2EVMTollOffRamp 1.0.0";
   uint256 private constant TOLL_CONSTANT_MESSAGE_PART_BYTES = (20 + // receiver
     20 + // sender

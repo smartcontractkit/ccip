@@ -8,6 +8,7 @@ import {OCR2Base} from "../ocr/OCR2Base.sol";
 import {CCIP} from "../models/Models.sol";
 
 contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthChecker, OCR2Base {
+  // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "BlobVerifier 1.0.0";
 
   // Chain ID of this chain
