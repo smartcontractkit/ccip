@@ -1,6 +1,7 @@
-package main
+package metis
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -20,17 +21,20 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ping_pong_demo"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/receiver_dapp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/subscription_sender_dapp"
+	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/dione"
+	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
 )
 
-func printCCIPState(source *EvmChainConfig, destination *EvmChainConfig) {
+func PrintCCIPState(source *rhea.EvmChainConfig, destination *rhea.EvmChainConfig) {
 	printPoolBalances(source)
 	printPoolBalances(destination)
 
 	printDappSanityCheck(source)
 	printDappSanityCheck(destination)
-	printRampSanityCheck(source)
-	printRampSanityCheck(destination)
+
+	printRampSanityCheck(source, destination.OnRamp)
+	printRampSanityCheck(destination, source.OnRamp)
 
 	printSourceSubscriptionBalances(source)
 	printDestinationSubscriptionBalances(destination)
@@ -42,8 +46,6 @@ func printCCIPState(source *EvmChainConfig, destination *EvmChainConfig) {
 	printRateLimitingStatus(destination)
 
 	printTxStatuses(source, destination)
-
-	printContractConfig(source, destination)
 }
 
 type CCIPTXStatus struct {
@@ -76,12 +78,15 @@ func (e ExecutionStatus) String() string {
 	}
 }
 
-func printTxStatuses(source *EvmChainConfig, destination *EvmChainConfig) {
+func printTxStatuses(source *rhea.EvmChainConfig, destination *rhea.EvmChainConfig) {
 	onRamp, err := evm_2_evm_subscription_onramp.NewEVM2EVMSubscriptionOnRamp(source.OnRamp, source.Client)
 	helpers.PanicErr(err)
 
+	block, err := source.Client.BlockNumber(context.Background())
+	helpers.PanicErr(err)
+
 	sendRequested, err := onRamp.FilterCCIPSendRequested(&bind.FilterOpts{
-		Start: source.DeploySettings.DeployedAt,
+		Start: block - 9990,
 	})
 	helpers.PanicErr(err)
 
@@ -102,8 +107,11 @@ func printTxStatuses(source *EvmChainConfig, destination *EvmChainConfig) {
 	blobVerifier, err := blob_verifier.NewBlobVerifier(destination.BlobVerifier, destination.Client)
 	helpers.PanicErr(err)
 
+	block, err = destination.Client.BlockNumber(context.Background())
+	helpers.PanicErr(err)
+
 	reports, err := blobVerifier.FilterReportAccepted(&bind.FilterOpts{
-		Start: destination.DeploySettings.DeployedAt,
+		Start: block - 9990,
 	})
 	helpers.PanicErr(err)
 
@@ -113,7 +121,9 @@ func printTxStatuses(source *EvmChainConfig, destination *EvmChainConfig) {
 				continue
 			}
 			for j := interval.Min; j <= interval.Max; j++ {
-				txs[j].relayReport = reports.Event
+				if _, ok := txs[j]; ok {
+					txs[j].relayReport = reports.Event
+				}
 			}
 		}
 	}
@@ -122,11 +132,17 @@ func printTxStatuses(source *EvmChainConfig, destination *EvmChainConfig) {
 	helpers.PanicErr(err)
 
 	stateChanges, err := offRamp.FilterExecutionStateChanged(&bind.FilterOpts{
-		Start: destination.DeploySettings.DeployedAt,
+		Start: block - 9990,
 	}, seqNums)
 	helpers.PanicErr(err)
 
 	for stateChanges.Next() {
+		if _, ok := txs[stateChanges.Event.SequenceNumber]; !ok {
+			txs[stateChanges.Event.SequenceNumber] = &CCIPTXStatus{}
+			if stateChanges.Event.SequenceNumber > maxSeqNum {
+				maxSeqNum = stateChanges.Event.SequenceNumber
+			}
+		}
 		txs[stateChanges.Event.SequenceNumber].execStatus = stateChanges.Event
 	}
 
@@ -140,6 +156,10 @@ func printTxStatuses(source *EvmChainConfig, destination *EvmChainConfig) {
 	for i := uint64(1); i <= maxSeqNum; i++ {
 		tx := txs[i]
 		relayedAt := "-"
+		if tx == nil {
+			sb.WriteString(fmt.Sprintf("| %18d | %18s | %41s | \n", i, "TX MISSING", "Probably > 10k blocks in the past"))
+			continue
+		}
 		if tx.relayReport != nil {
 			relayedAt = strconv.Itoa(int(tx.relayReport.Raw.BlockNumber))
 		}
@@ -169,7 +189,7 @@ func printTxStatuses(source *EvmChainConfig, destination *EvmChainConfig) {
 	destination.Logger.Info(sb.String())
 }
 
-func printDappSanityCheck(source *EvmChainConfig) {
+func printDappSanityCheck(source *rhea.EvmChainConfig) {
 	var sb strings.Builder
 	sb.WriteString("\n")
 	sb.WriteString(fmt.Sprintf("Dapp sanity checks for %s\n", helpers.ChainName(source.ChainId.Int64())))
@@ -179,24 +199,9 @@ func printDappSanityCheck(source *EvmChainConfig) {
 
 	sb.WriteString(generateHeader(tableHeaders, headerLengths))
 
-	onRamp, err := evm_2_evm_subscription_onramp.NewEVM2EVMSubscriptionOnRamp(source.OnRamp, source.Client)
-	helpers.PanicErr(err)
-	router, err := onRamp.GetRouter(&bind.CallOpts{})
-	helpers.PanicErr(err)
-	sb.WriteString(fmt.Sprintf("| %-30s | %15t |\n", "OnRamp", router == source.OnRampRouter))
-
-	offRamp, err := any_2_evm_subscription_offramp.NewEVM2EVMSubscriptionOffRamp(source.OffRamp, source.Client)
-	helpers.PanicErr(err)
-	router, err = offRamp.GetRouter(&bind.CallOpts{})
-	helpers.PanicErr(err)
-
-	sb.WriteString(fmt.Sprintf("| %-30s | %15t |\n", "OffRamp", router == source.OffRampRouter))
-
-	sb.WriteString(generateSeparator(headerLengths))
-
 	senderDapp, err := subscription_sender_dapp.NewSubscriptionSenderDapp(source.TokenSender, source.Client)
 	helpers.PanicErr(err)
-	router, err = senderDapp.IOnRampRouter(&bind.CallOpts{})
+	router, err := senderDapp.IOnRampRouter(&bind.CallOpts{})
 	helpers.PanicErr(err)
 	sb.WriteString(fmt.Sprintf("| %-30s | %15t |\n", "Sender dapp", router == source.OnRampRouter))
 
@@ -206,29 +211,87 @@ func printDappSanityCheck(source *EvmChainConfig) {
 	helpers.PanicErr(err)
 	sb.WriteString(fmt.Sprintf("| %-30s | %15t |\n", "Receiver dapp", router == source.OffRampRouter))
 
-	pingDapp, err := ping_pong_demo.NewPingPongDemo(source.PingPongDapp, source.Client)
-	helpers.PanicErr(err)
-	receiver, sender, err := pingDapp.GetRouters(&bind.CallOpts{})
-	helpers.PanicErr(err)
-	sb.WriteString(fmt.Sprintf("| %-30s | %15t |\n", "Ping dapp receiver", receiver == source.OffRampRouter))
-	sb.WriteString(fmt.Sprintf("| %-30s | %15t |\n", "Ping dapp sender", sender == source.OnRampRouter))
+	if source.PingPongDapp != common.HexToAddress("") {
+		pingDapp, err := ping_pong_demo.NewPingPongDemo(source.PingPongDapp, source.Client)
+		helpers.PanicErr(err)
+		receiver, sender, err := pingDapp.GetRouters(&bind.CallOpts{})
+		helpers.PanicErr(err)
+		sb.WriteString(fmt.Sprintf("| %-30s | %15t |\n", "Ping dapp receiver", receiver == source.OffRampRouter))
+		sb.WriteString(fmt.Sprintf("| %-30s | %15t |\n", "Ping dapp sender", sender == source.OnRampRouter))
+	}
 
 	sb.WriteString(generateSeparator(headerLengths))
 
 	source.Logger.Info(sb.String())
 }
 
-func printRampSanityCheck(chain *EvmChainConfig) {
+func printRampSanityCheck(chain *rhea.EvmChainConfig, sourceOnRamp common.Address) {
+	var sb strings.Builder
+	sb.WriteString("\n")
+	sb.WriteString(fmt.Sprintf("Ramp checks for %s\n", helpers.ChainName(chain.ChainId.Int64())))
+
+	tableHeaders := []string{"Contract", "Config correct"}
+	headerLengths := []int{30, 15}
+
+	sb.WriteString(generateHeader(tableHeaders, headerLengths))
+
 	afn, err := afn_contract.NewAFNContract(chain.Afn, chain.Client)
 	helpers.PanicErr(err)
-
 	badSignal, err := afn.BadSignalReceived(&bind.CallOpts{})
 	helpers.PanicErr(err)
 
-	chain.Logger.Infof("AFN healthy: %t", !badSignal)
+	sb.WriteString(fmt.Sprintf("| %-30s | %15t |\n", "AFN healthy", !badSignal))
+
+	onRamp, err := evm_2_evm_subscription_onramp.NewEVM2EVMSubscriptionOnRamp(chain.OnRamp, chain.Client)
+	helpers.PanicErr(err)
+	router, err := onRamp.GetRouter(&bind.CallOpts{})
+	helpers.PanicErr(err)
+	sb.WriteString(fmt.Sprintf("| %-30s | %15t |\n", "OnRamp Router set", router == chain.OnRampRouter))
+
+	offRamp, err := any_2_evm_subscription_offramp.NewEVM2EVMSubscriptionOffRamp(chain.OffRamp, chain.Client)
+	helpers.PanicErr(err)
+	router, err = offRamp.GetRouter(&bind.CallOpts{})
+	helpers.PanicErr(err)
+
+	sb.WriteString(fmt.Sprintf("| %-30s | %15t |\n", "OffRamp Router set", router == chain.OffRampRouter))
+
+	configDetails, err := offRamp.LatestConfigDetails(&bind.CallOpts{})
+	helpers.PanicErr(err)
+	sb.WriteString(fmt.Sprintf("| %-30s | %15t |\n", "OffRamp OCR2 configured", configDetails.ConfigCount != 0))
+
+	blobVerifier, err := blob_verifier.NewBlobVerifier(chain.BlobVerifier, chain.Client)
+	helpers.PanicErr(err)
+
+	config, err := blobVerifier.GetConfig(&bind.CallOpts{})
+	helpers.PanicErr(err)
+
+	rampSet := false
+	for _, ramp := range config.OnRamps {
+		if ramp == sourceOnRamp {
+			rampSet = true
+		}
+	}
+
+	sb.WriteString(fmt.Sprintf("| %-30s | %15t |\n", "BlobVerifier Onramp set", rampSet))
+
+	blobConfigDetails, err := blobVerifier.LatestConfigDetails(&bind.CallOpts{})
+	helpers.PanicErr(err)
+	sb.WriteString(fmt.Sprintf("| %-30s | %15t |\n", "BlobVerifier OCR2 configured", blobConfigDetails.ConfigCount != 0))
+
+	offRampRouter, err := any_2_evm_subscription_offramp_router.NewAny2EVMSubscriptionOffRampRouter(chain.OffRampRouter, chain.Client)
+	helpers.PanicErr(err)
+
+	isRamp, err := offRampRouter.IsOffRamp(&bind.CallOpts{}, chain.OffRamp)
+	helpers.PanicErr(err)
+
+	sb.WriteString(fmt.Sprintf("| %-30s | %15t |\n", "OffRampRouter has offRamp Set", isRamp))
+
+	sb.WriteString(generateSeparator(headerLengths))
+
+	chain.Logger.Info(sb.String())
 }
 
-func printSourceSubscriptionBalances(source *EvmChainConfig) {
+func printSourceSubscriptionBalances(source *rhea.EvmChainConfig) {
 	onRampRouter, err := evm_2_any_subscription_onramp_router.NewEVM2AnySubscriptionOnRampRouter(source.OnRampRouter, source.Client)
 	helpers.PanicErr(err)
 
@@ -282,7 +345,7 @@ func printSourceSubscriptionBalances(source *EvmChainConfig) {
 	source.Logger.Info(sb.String())
 }
 
-func printDestinationSubscriptionBalances(destination *EvmChainConfig) {
+func printDestinationSubscriptionBalances(destination *rhea.EvmChainConfig) {
 	offRampRouter, err := any_2_evm_subscription_offramp_router.NewAny2EVMSubscriptionOffRampRouter(destination.OffRampRouter, destination.Client)
 	helpers.PanicErr(err)
 
@@ -316,7 +379,7 @@ func printDestinationSubscriptionBalances(destination *EvmChainConfig) {
 	destination.Logger.Info(sb.String())
 }
 
-func printRateLimitingStatus(chain *EvmChainConfig) {
+func printRateLimitingStatus(chain *rhea.EvmChainConfig) {
 	var sb strings.Builder
 	sb.WriteString("\n")
 	sb.WriteString(fmt.Sprintf("Rate limits for %s\n", helpers.ChainName(chain.ChainId.Int64())))
@@ -344,7 +407,7 @@ func printRateLimitingStatus(chain *EvmChainConfig) {
 	chain.Logger.Info(sb.String())
 }
 
-func printPaused(chain *EvmChainConfig) {
+func printPaused(chain *rhea.EvmChainConfig) {
 	var sb strings.Builder
 	sb.WriteString("\n")
 	sb.WriteString(fmt.Sprintf("Paused addresses for %s\n", helpers.ChainName(chain.ChainId.Int64())))
@@ -388,7 +451,7 @@ func printPaused(chain *EvmChainConfig) {
 	chain.Logger.Info(sb.String())
 }
 
-func printPoolBalances(chain *EvmChainConfig) {
+func printPoolBalances(chain *rhea.EvmChainConfig) {
 	var sb strings.Builder
 	sb.WriteString("\n")
 	sb.WriteString(fmt.Sprintf("Pool balances for %s\n", helpers.ChainName(chain.ChainId.Int64())))
@@ -444,10 +507,10 @@ func generateSeparator(headerLengths []int) string {
 	for _, headerLength := range headerLengths {
 		length += headerLength + 3
 	}
-	return strings.Repeat("-", length) + "\n"
+	return strings.Repeat("─", length) + "\n"
 }
 
-func printContractConfig(source *EvmChainConfig, destination *EvmChainConfig) {
+func PrintContractConfig(source *rhea.EvmChainConfig, destination *rhea.EvmChainConfig) {
 	source.Logger.Infof(`
 Source chain config
 
@@ -498,27 +561,24 @@ PingPongDapp:    common.HexToAddress("%s"),
 		destination.Afn,
 		destination.GovernanceDapp,
 		destination.PingPongDapp)
-
-	PrintJobSpecs(source.OnRamp, destination.BlobVerifier, destination.OffRamp, source.ChainId, destination.ChainId, destination.LinkToken, source.DeploySettings.DeployedAt, destination.DeploySettings.DeployedAt)
 }
 
 // PrintJobSpecs prints the job spec for each node and CCIP spec type, as well as a bootstrap spec.
-func PrintJobSpecs(onramp, blobVerifier, offRamp common.Address, sourceChainID, destChainID *big.Int, destLinkToken common.Address, sourceReplayFrom, destReplayFrom uint64) {
+func PrintJobSpecs(env dione.Environment, onramp, blobVerifier, offRamp common.Address, sourceChainID, destChainID *big.Int, destLinkToken common.Address, sourceReplayFrom, destReplayFrom uint64) {
 	jobs := fmt.Sprintf(bootstrapTemplate+"\n", helpers.ChainName(destChainID.Int64()), blobVerifier, destChainID)
-	don := NewDON(Staging, nil)
+	don := dione.NewDON(env, nil)
 
-	for i, oracle := range don.config.Nodes {
+	for i, oracle := range don.Config.Nodes {
 		jobs += fmt.Sprintf("// [Node %d]\n", i)
 		jobs += fmt.Sprintf(relayTemplate+"\n",
 			helpers.ChainName(sourceChainID.Int64())+"-"+helpers.ChainName(destChainID.Int64()),
 			blobVerifier,
-			GetOCRkeysForChainType(oracle.OCRKeys, "evm").ID,
+			dione.GetOCRkeysForChainType(oracle.OCRKeys, "evm").ID,
 			oracle.EthKeys[destChainID.String()],
-			don.GetBootstrapPeerID(),
 			sourceChainID,
 			destChainID,
 			onramp,
-			pollPeriod,
+			dione.PollPeriod,
 			sourceReplayFrom,
 			destReplayFrom,
 			destChainID,
@@ -526,9 +586,8 @@ func PrintJobSpecs(onramp, blobVerifier, offRamp common.Address, sourceChainID, 
 		jobs += fmt.Sprintf(executionTemplate+"\n",
 			helpers.ChainName(sourceChainID.Int64())+"-"+helpers.ChainName(destChainID.Int64()),
 			offRamp,
-			GetOCRkeysForChainType(oracle.OCRKeys, "evm").ID,
+			dione.GetOCRkeysForChainType(oracle.OCRKeys, "evm").ID,
 			oracle.EthKeys[destChainID.String()],
-			don.GetBootstrapPeerID(),
 			sourceChainID,
 			destChainID,
 			onramp,
@@ -566,7 +625,6 @@ schemaVersion      = 1
 contractID         = "%s"
 ocrKeyBundleID     = "%s"
 transmitterID      = "%s"
-p2pv2Bootstrappers  = ["%s"]
 
 [pluginConfig]
 sourceChainID      = %d
@@ -590,7 +648,6 @@ schemaVersion     = 1
 contractID        = "%s"
 ocrKeyBundleID    = "%s"
 transmitterID     = "%s"
-p2pv2Bootstrappers = ["%s"]
 
 [pluginConfig]
 sourceChainID     = %d

@@ -1,20 +1,29 @@
-package main
+package dione
 
 import (
+	"context"
+	"crypto/ecdsa"
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/big"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
-	"github.com/smartcontractkit/libocr/offchainreporting2/types"
+	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2/types"
+	null2 "gopkg.in/guregu/null.v4"
 
 	"github.com/smartcontractkit/chainlink/core/logger"
+	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
 	"github.com/smartcontractkit/chainlink/core/scripts/common"
+	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
 	"github.com/smartcontractkit/chainlink/core/services/job"
 )
 
@@ -22,13 +31,16 @@ const (
 	JSON_FOLDER  = "json"
 	CHAIN_FOLDER = "chain"
 	NODES_FOLDER = "nodes"
+
+	PollPeriod = "1s"
 )
 
 type Environment string
 
 const (
-	Staging    Environment = "staging"
-	Production Environment = "prod"
+	StagingAlpha Environment = "staging-alpha"
+	StagingBeta  Environment = "staging-beta"
+	Production   Environment = "prod"
 )
 
 type JobType string
@@ -42,9 +54,11 @@ const (
 type Chain string
 
 const (
-	Rinkeby Chain = "Rinkeby"
-	Goerli  Chain = "Goerli"
-	Sepolia Chain = "Sepolia"
+	Rinkeby        Chain = "Rinkeby"
+	Goerli         Chain = "Goerli"
+	OptimismGoerli Chain = "420"
+	Sepolia        Chain = "Sepolia"
+	AvaxFuji       Chain = "Avax Fuji"
 )
 
 type ChainConfig struct {
@@ -83,9 +97,9 @@ type NodeConfig struct {
 }
 
 type DON struct {
-	nodes     []*client.Chainlink
+	Nodes     []*client.Chainlink
 	bootstrap *client.Chainlink
-	config    NodesConfig
+	Config    NodesConfig
 	env       Environment
 	lggr      logger.Logger
 }
@@ -96,9 +110,9 @@ func NewDON(env Environment, lggr logger.Logger) DON {
 	common.PanicErr(err)
 
 	return DON{
-		nodes:     nodes,
+		Nodes:     nodes,
 		bootstrap: bootstrap,
-		config:    config,
+		Config:    config,
 		env:       env,
 		lggr:      lggr,
 	}
@@ -148,94 +162,158 @@ func LoadNodes(configs NodesConfig) (nodes []*client.Chainlink, bootstrap *clien
 	return nodes, bootstrap, nil
 }
 
-func (don *DON) PopulateOCR2Keys() {
-	for i, node := range don.nodes {
-		keys, _, err := node.ReadOCR2Keys()
-		common.PanicErr(err)
-		don.config.Nodes[i].OCRKeys = *keys
+func (don *DON) FundNodeKeys(chainConfig rhea.EvmChainConfig, ownerPrivKey string, amount *big.Int) {
+	nonce, err := chainConfig.Client.PendingNonceAt(context.Background(), chainConfig.Owner.From)
+	helpers.PanicErr(err)
+	var gasTipCap *big.Int
+	if chainConfig.GasSettings.EIP1559 {
+		gasTipCap, err = chainConfig.Client.SuggestGasTipCap(context.Background())
+		helpers.PanicErr(err)
+	}
+	gasPrice, err := chainConfig.Client.SuggestGasPrice(context.Background())
+	helpers.PanicErr(err)
+
+	ownerKey, err := crypto.HexToECDSA(ownerPrivKey)
+	helpers.PanicErr(err)
+
+	for i, node := range don.Config.Nodes {
+		to := gethcommon.HexToAddress(node.EthKeys[chainConfig.ChainId.String()])
+		if to == gethcommon.HexToAddress("0x") {
+			don.lggr.Warnf("Node %2d has no sending key configured. Skipping funding")
+			continue
+		}
+		if chainConfig.GasSettings.EIP1559 {
+			sendEthEIP1559(to, chainConfig, nonce+uint64(i), gasTipCap, ownerKey, amount)
+		} else {
+			sendEth(to, chainConfig, nonce+uint64(i), gasPrice, ownerKey, amount)
+		}
+		don.lggr.Infof("Sent %s wei to %s", amount.String(), to.Hex())
 	}
 }
 
-func (don *DON) WIP() {
+func sendEth(to gethcommon.Address, chainConfig rhea.EvmChainConfig, nonce uint64, gasPrice *big.Int, ownerKey *ecdsa.PrivateKey, amount *big.Int) {
+	tx := types.NewTx(
+		&types.LegacyTx{
+			Nonce:    nonce,
+			GasPrice: gasPrice,
+			Gas:      21_000,
+			To:       &to,
+			Value:    amount,
+			Data:     []byte{},
+		},
+	)
 
+	signedTx, err := types.SignTx(tx, types.NewLondonSigner(chainConfig.ChainId), ownerKey)
+	helpers.PanicErr(err)
+	err = chainConfig.Client.SendTransaction(context.Background(), signedTx)
+	helpers.PanicErr(err)
 }
 
-//func createKey(c *client.Chainlink, chain string) (*http.Response, error) {
-//	createUrl := url.URL{
-//		Path: "/v2/keys/evm",
-//	}
-//	query := createUrl.Query()
-//	query.Set("evmChainID", chain)
-//
-//	createUrl.RawQuery = query.Encode()
-//
-//	resp, err := c.APIClient.R().Get(createUrl.String())
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	return resp.RawResponse, nil
-//}
-//
-//func readKey(c *client.Chainlink) (*client.TxKeys, *http.Response, error) {
-//	txKeys := &client.TxKeys{}
-//	log.Info().Str("Node URL", c.Config.URL).Msg("Reading Tx Keys")
-//	resp, err := c.APIClient.R().
-//		SetResult(txKeys).
-//		Get("/v2/keys/evm")
-//	if err != nil {
-//		return nil, nil, err
-//	}
-//	return txKeys, resp.RawResponse, err
-//}
-//func deleteKey(c *client.Chainlink, keyString string) (*http.Response, error) {
-//	log.Info().Str("Node URL", c.Config.URL).Str("ID", keyString).Msg("Deleting Tx Key")
-//	resp, err := c.APIClient.R().
-//		SetPathParams(map[string]string{
-//			"id": keyString,
-//		}).
-//		Delete("/v2/keys/evm/{id}")
-//	if err != nil {
-//		return nil, err
-//	}
-//	return resp.RawResponse, err
-//}
+func sendEthEIP1559(to gethcommon.Address, chainConfig rhea.EvmChainConfig, nonce uint64, gasTipCap *big.Int, ownerKey *ecdsa.PrivateKey, amount *big.Int) {
+	tx := types.NewTx(
+		&types.DynamicFeeTx{
+			ChainID:    chainConfig.ChainId,
+			Nonce:      nonce,
+			GasTipCap:  gasTipCap,
+			GasFeeCap:  big.NewInt(2e9),
+			Gas:        uint64(21_000),
+			To:         &to,
+			Value:      amount,
+			Data:       []byte{},
+			AccessList: types.AccessList{},
+		},
+	)
 
-//func (cli *Client) DeleteETHKey(c *cli.Context) (err error) {
-//if !c.Args().Present() {
-//	return cli.errorOut(errors.New("Must pass the address of the key to be deleted"))
-//}
-//address := c.Args().Get(0)
-//deleteUrl := url.URL{
-//	Path: "/v2/keys/evm/" + address,
-//}
-//query := deleteUrl.Query()
-//
-//if c.Bool("hard") && !confirmAction(c) {
-//	return nil
-//}
+	signedTx, err := types.SignTx(tx, types.NewLondonSigner(chainConfig.ChainId), ownerKey)
+	helpers.PanicErr(err)
+	err = chainConfig.Client.SendTransaction(context.Background(), signedTx)
+	helpers.PanicErr(err)
+}
+
+func (don *DON) PopulateOCR2Keys() {
+	for i, node := range don.Nodes {
+		keys, _, err := node.ReadOCR2Keys()
+		common.PanicErr(err)
+		don.Config.Nodes[i].OCRKeys = *keys
+	}
+}
+
+func createKey(c *client.Chainlink, chain string) (*http.Response, error) {
+	createUrl := url.URL{
+		Path: "/v2/keys/evm",
+	}
+	query := createUrl.Query()
+	query.Set("evmChainID", chain)
+
+	createUrl.RawQuery = query.Encode()
+	resp, err := c.APIClient.R().Post(createUrl.String())
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.RawResponse, nil
+}
+
+func deleteKnownETHKey(node *client.Chainlink, key string) (*http.Response, error) {
+	deleteUrl := url.URL{
+		Path: "/v2/keys/evm/" + key,
+	}
+	query := deleteUrl.Query()
+	query.Set("hard", "true")
+	deleteUrl.RawQuery = query.Encode()
+
+	resp, err := node.APIClient.R().
+		Delete(deleteUrl.String())
+	if err != nil {
+		return nil, err
+	}
+	return resp.RawResponse, err
+}
+
+func (don *DON) DeleteKnownKey(chainID string) {
+	for i, node := range don.Nodes {
+		// Only remove a key if it exists
+		if key, ok := don.Config.Nodes[i].EthKeys[chainID]; ok {
+			resp, err := deleteKnownETHKey(node, key)
+			if err != nil {
+				don.lggr.Infof("Failed to delete key: %s", resp.Status)
+			}
+		}
+	}
+}
+
+func (don *DON) CreateNewEthKeysForChain(chainID *big.Int) {
+	for i, node := range don.Nodes {
+		_, err := createKey(node, chainID.String())
+		common.PanicErr(err)
+		don.lggr.Infof("Node [%2d] Created new eth key", i)
+	}
+}
 
 func (don *DON) PopulatePeerId() {
-	for i, node := range don.nodes {
+	for i, node := range don.Nodes {
 		p2pkeys, err := node.MustReadP2PKeys()
 		common.PanicErr(err)
 
-		don.config.Nodes[i].PeerID = p2pkeys.Data[0].Attributes.PeerID
+		don.Config.Nodes[i].PeerID = p2pkeys.Data[0].Attributes.PeerID
 	}
 
 	p2pkeys, err := don.bootstrap.MustReadP2PKeys()
 	common.PanicErr(err)
-	don.config.Bootstrap.PeerID = p2pkeys.Data[0].Attributes.PeerID
+	don.Config.Bootstrap.PeerID = p2pkeys.Data[0].Attributes.PeerID
 }
 
 func (don *DON) PopulateEthKeys() {
-	for i, node := range don.nodes {
+	for i, node := range don.Nodes {
 		keys, err := node.MustReadETHKeys()
-		common.PanicErr(err)
+		if err != nil {
+			don.lggr.Infof("Failed getting keys for node %d", i)
+		}
 
-		don.config.Nodes[i].EthKeys = make(map[string]string)
+		don.Config.Nodes[i].EthKeys = make(map[string]string)
+		don.lggr.Infof("Read %d keys for node %2d", len(keys.Data), i)
 		for _, key := range keys.Data {
-			don.config.Nodes[i].EthKeys[key.Attributes.ChainID] = key.Attributes.Address
+			don.Config.Nodes[i].EthKeys[key.Attributes.ChainID] = key.Attributes.Address
 		}
 	}
 }
@@ -243,7 +321,7 @@ func (don *DON) PopulateEthKeys() {
 func (don *DON) ClearJobSpecs(jobType JobType, source Chain, destination Chain) {
 	jobToDelete := fmt.Sprintf("ccip-%s-%s-%s", jobType, source, destination)
 
-	for i, node := range don.nodes {
+	for i, node := range don.Nodes {
 		jobs, _, err := node.ReadJobs()
 		common.PanicErr(err)
 
@@ -256,15 +334,16 @@ func (don *DON) ClearJobSpecs(jobType JobType, source Chain, destination Chain) 
 
 			if jobToDelete == jobName {
 				don.lggr.Infof("Node [%2d]:Deleting job %s: %s", i, id, jobName)
-				_, err = node.DeleteJob(id)
+				s, err := node.DeleteJob(id)
 				common.PanicErr(err)
+				don.lggr.Infof(s.Status)
 			}
 		}
 	}
 }
 
 func (don *DON) ListJobSpecs() {
-	for i, node := range don.nodes {
+	for i, node := range don.Nodes {
 		jobs, _, err := node.ReadJobs()
 		common.PanicErr(err)
 
@@ -282,15 +361,11 @@ func (don *DON) AddRawJobSpec(node *client.Chainlink, spec string) {
 	jb, tx, err := node.CreateJobRaw(spec)
 	common.PanicErr(err)
 
-	if tx.StatusCode == 200 {
-		don.lggr.Infof("Created job %3s", jb.Data.ID)
-	} else {
-		panic(tx.Status)
-	}
+	don.lggr.Infof("Created job %3s. Status code %s", jb.Data.ID, tx.Status)
 }
 
 func (don *DON) GetBootstrapPeerID() string {
-	return fmt.Sprintf("%s@%s:5001", don.config.Bootstrap.PeerID, strings.TrimSuffix(strings.TrimPrefix(don.bootstrap.Config.URL, "https://"), "/"))
+	return fmt.Sprintf("%s@%s:5001", don.Config.Bootstrap.PeerID, strings.TrimSuffix(strings.TrimPrefix(don.bootstrap.Config.URL, "https://"), "/"))
 }
 
 func (don *DON) LoadCurrentNodeParams() {
@@ -307,23 +382,24 @@ func (don *DON) ClearAllJobs(chainA Chain, chainB Chain) {
 	don.ClearJobSpecs(Execution, chainB, chainA)
 }
 
-func (don *DON) AddTwoWaySpecs(chainA EvmChainConfig, chainB EvmChainConfig) {
-	relaySpecAB := generateRelayJobSpecs(&chainA, &chainB, don.GetBootstrapPeerID())
+func (don *DON) AddTwoWaySpecs(chainA rhea.EvmChainConfig, chainB rhea.EvmChainConfig) {
+	bootstrapPeerID := don.GetBootstrapPeerID()
+	relaySpecAB := generateRelayJobSpecs(&chainA, &chainB, bootstrapPeerID)
 	don.AddJobSpecs(relaySpecAB)
-	executionSpecAB := generateExecutionJobSpecs(&chainA, &chainB, don.GetBootstrapPeerID())
+	executionSpecAB := generateExecutionJobSpecs(&chainA, &chainB, bootstrapPeerID)
 	don.AddJobSpecs(executionSpecAB)
-	relaySpecBA := generateRelayJobSpecs(&chainB, &chainA, don.GetBootstrapPeerID())
+	relaySpecBA := generateRelayJobSpecs(&chainB, &chainA, bootstrapPeerID)
 	don.AddJobSpecs(relaySpecBA)
-	executionSpecBA := generateExecutionJobSpecs(&chainB, &chainA, don.GetBootstrapPeerID())
+	executionSpecBA := generateExecutionJobSpecs(&chainB, &chainA, bootstrapPeerID)
 	don.AddJobSpecs(executionSpecBA)
 }
 
 func (don *DON) AddJobSpecs(spec job.Job) {
 	chainID := spec.OCR2OracleSpec.RelayConfig["chainID"].(string)
 
-	for i, node := range don.nodes {
-		evmKeyBundle := GetOCRkeysForChainType(don.config.Nodes[i].OCRKeys, "evm")
-		transmitterIDs := don.config.Nodes[i].EthKeys
+	for i, node := range don.Nodes {
+		evmKeyBundle := GetOCRkeysForChainType(don.Config.Nodes[i].OCRKeys, "evm")
+		transmitterIDs := don.Config.Nodes[i].EthKeys
 
 		spec.OCR2OracleSpec.OCRKeyBundleID.SetValid(evmKeyBundle.ID)
 		spec.OCR2OracleSpec.TransmitterID.SetValid(transmitterIDs[chainID])
@@ -336,17 +412,6 @@ func (don *DON) AddJobSpecs(spec job.Job) {
 		}
 		don.lggr.Infof(specString)
 		don.AddRawJobSpec(node, specString)
-
-		//job, tx, err := node.CreateJob(&spec)
-		//common.PanicErr(err)
-		//
-		//if tx.StatusCode == 200 {
-		//	don.lggr.Infof("Created job %3s", job.Data.ID)
-		//} else {
-		//	panic(tx.Status)
-		//}
-
-		//return
 	}
 }
 
@@ -367,7 +432,6 @@ func CreateJob(node *client.Chainlink, spec job.Job) (*client.Job, *http.Respons
 }
 
 func RelaySpecToString(spec job.Job) string {
-	bootstrapper := spec.OCR2OracleSpec.P2PV2Bootstrappers[0]
 	onRamp := spec.OCR2OracleSpec.PluginConfig["onRampIDs"].([]string)[0]
 
 	const relayTemplate = `
@@ -380,7 +444,6 @@ schemaVersion      = 1
 contractID         = "%s"
 ocrKeyBundleID     = "%s"
 transmitterID      = "%s"
-p2pv2Bootstrappers  = ["%s"]
 
 [pluginConfig]
 sourceChainID      = %s
@@ -391,7 +454,7 @@ SourceStartBlock   = %d
 DestStartBlock     = %d
 
 [relayConfig]
-chainID            = "%s"
+chainID            = %s
 `
 
 	return fmt.Sprintf(relayTemplate+"\n",
@@ -399,11 +462,10 @@ chainID            = "%s"
 		spec.OCR2OracleSpec.ContractID,
 		spec.OCR2OracleSpec.OCRKeyBundleID.String,
 		spec.OCR2OracleSpec.TransmitterID.String,
-		bootstrapper,
 		spec.OCR2OracleSpec.PluginConfig["sourceChainID"],
 		spec.OCR2OracleSpec.PluginConfig["destChainID"],
 		onRamp,
-		pollPeriod,
+		PollPeriod,
 		spec.OCR2OracleSpec.PluginConfig["SourceStartBlock"],
 		spec.OCR2OracleSpec.PluginConfig["DestStartBlock"],
 		spec.OCR2OracleSpec.PluginConfig["destChainID"],
@@ -411,8 +473,6 @@ chainID            = "%s"
 }
 
 func ExecSpecToString(spec job.Job) string {
-	bootstrapper := spec.OCR2OracleSpec.P2PV2Bootstrappers[0]
-
 	const relayTemplate = `
 # CCIPExecutionSpec
 type               = "offchainreporting2"
@@ -423,7 +483,6 @@ schemaVersion      = 1
 contractID         = "%s"
 ocrKeyBundleID     = "%s"
 transmitterID      = "%s"
-p2pv2Bootstrappers  = ["%s"]
 
 [pluginConfig]
 sourceChainID      = %s
@@ -435,7 +494,7 @@ DestStartBlock     = %d
 tokensPerFeeCoinPipeline = %s
 
 [relayConfig]
-chainID            = "%s"
+chainID            = %s
 `
 
 	return fmt.Sprintf(relayTemplate+"\n",
@@ -443,7 +502,6 @@ chainID            = "%s"
 		spec.OCR2OracleSpec.ContractID,
 		spec.OCR2OracleSpec.OCRKeyBundleID.String,
 		spec.OCR2OracleSpec.TransmitterID.String,
-		bootstrapper,
 		spec.OCR2OracleSpec.PluginConfig["sourceChainID"],
 		spec.OCR2OracleSpec.PluginConfig["destChainID"],
 		spec.OCR2OracleSpec.PluginConfig["onRampID"],
@@ -458,13 +516,13 @@ chainID            = "%s"
 func (don *DON) GenerateOracleIdentities(chain string) []confighelper2.OracleIdentityExtra {
 	var oracles []confighelper2.OracleIdentityExtra
 
-	for _, node := range don.config.Nodes {
+	for _, node := range don.Config.Nodes {
 		evmKeys := GetOCRkeysForChainType(node.OCRKeys, "evm")
 
 		oracles = append(oracles,
 			confighelper2.OracleIdentityExtra{
 				OracleIdentity: confighelper2.OracleIdentity{
-					TransmitAccount:   types.Account(node.EthKeys[chain]),
+					TransmitAccount:   ocr2types.Account(node.EthKeys[chain]),
 					OnchainPublicKey:  gethcommon.HexToAddress(strings.TrimPrefix(evmKeys.Attributes.OnChainPublicKey, "ocr2on_evm_")).Bytes(),
 					OffchainPublicKey: common.ToOffchainPublicKey("0x" + strings.TrimPrefix(evmKeys.Attributes.OffChainPublicKey, "ocr2off_evm_")),
 					PeerID:            node.PeerID,
@@ -477,7 +535,7 @@ func (don *DON) GenerateOracleIdentities(chain string) []confighelper2.OracleIde
 
 func (don *DON) WriteConfig() error {
 	jsonFile := GetNodesFileLocation(don.env)
-	file, err := json.MarshalIndent(don.config, "", "  ")
+	file, err := json.MarshalIndent(don.Config, "", "  ")
 	if err != nil {
 		return err
 	}
@@ -486,7 +544,7 @@ func (don *DON) WriteConfig() error {
 }
 
 func (don *DON) PrintConfig() {
-	file, err := json.MarshalIndent(don.config, "", "  ")
+	file, err := json.MarshalIndent(don.Config, "", "  ")
 	common.PanicErr(err)
 
 	don.lggr.Infof(string(file))
@@ -500,4 +558,56 @@ func GetOCRkeysForChainType(OCRKeys client.OCR2Keys, chainType string) client.OC
 	}
 
 	panic("Keys not found for chain")
+}
+
+func generateRelayJobSpecs(sourceClient *rhea.EvmChainConfig, destClient *rhea.EvmChainConfig, bootstrapPeer string) job.Job {
+	return job.Job{
+		Name: null2.StringFrom(fmt.Sprintf("ccip-relay-%s-%s", helpers.ChainName(sourceClient.ChainId.Int64()), helpers.ChainName(destClient.ChainId.Int64()))),
+		Type: "offchainreporting2",
+		OCR2OracleSpec: &job.OCR2OracleSpec{
+			PluginType:                  job.CCIPRelay,
+			ContractID:                  destClient.BlobVerifier.Hex(),
+			Relay:                       "evm",
+			RelayConfig:                 map[string]interface{}{"chainID": destClient.ChainId.String()},
+			P2PV2Bootstrappers:          []string{bootstrapPeer},
+			OCRKeyBundleID:              null2.String{}, // Set per node
+			TransmitterID:               null2.String{}, // Set per node
+			ContractConfigConfirmations: 2,
+			PluginConfig: map[string]interface{}{
+				"sourceChainID":    sourceClient.ChainId.String(),
+				"destChainID":      destClient.ChainId.String(),
+				"onRampIDs":        []string{sourceClient.OnRamp.String()},
+				"pollPeriod":       PollPeriod,
+				"SourceStartBlock": sourceClient.DeploySettings.DeployedAt,
+				"DestStartBlock":   destClient.DeploySettings.DeployedAt,
+			},
+		},
+	}
+}
+
+func generateExecutionJobSpecs(sourceClient *rhea.EvmChainConfig, destClient *rhea.EvmChainConfig, bootstrapPeer string) job.Job {
+	return job.Job{
+		Name: null2.StringFrom(fmt.Sprintf("ccip-exec-%s-%s", helpers.ChainName(sourceClient.ChainId.Int64()), helpers.ChainName(destClient.ChainId.Int64()))),
+		Type: "offchainreporting2",
+		OCR2OracleSpec: &job.OCR2OracleSpec{
+			PluginType:                  job.CCIPExecution,
+			ContractID:                  destClient.OffRamp.Hex(),
+			Relay:                       "evm",
+			RelayConfig:                 map[string]interface{}{"chainID": destClient.ChainId.String()},
+			P2PV2Bootstrappers:          []string{bootstrapPeer},
+			OCRKeyBundleID:              null2.String{}, // Set per node
+			TransmitterID:               null2.String{}, // Set per node
+			ContractConfigConfirmations: 2,
+			PluginConfig: map[string]interface{}{
+				"sourceChainID":            sourceClient.ChainId.String(),
+				"destChainID":              destClient.ChainId.String(),
+				"onRampID":                 sourceClient.OnRamp.String(),
+				"pollPeriod":               PollPeriod,
+				"blobVerifierID":           destClient.BlobVerifier.Hex(),
+				"SourceStartBlock":         sourceClient.DeploySettings.DeployedAt,
+				"DestStartBlock":           destClient.DeploySettings.DeployedAt,
+				"tokensPerFeeCoinPipeline": fmt.Sprintf(`"""merge [type=merge left="{}" right="{\\\"%s\\\":\\\"1000000000000000000\\\"}"];"""`, destClient.LinkToken.Hex()),
+			},
+		},
+	}
 }

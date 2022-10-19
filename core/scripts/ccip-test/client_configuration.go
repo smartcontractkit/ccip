@@ -37,6 +37,9 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/simple_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/subscription_sender_dapp"
 	"github.com/smartcontractkit/chainlink/core/logger"
+	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/dione"
+	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
+	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/shared"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
@@ -46,22 +49,29 @@ import (
 	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
-func (client *CCIPClient) wip(t *testing.T, sourceClient *EvmChainConfig, destClient *EvmChainConfig) {
-	tx, err := client.Source.PingPongDapp.StartPingPong(client.Source.Owner)
-	require.NoError(t, err)
-	WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+func (client *CCIPClient) wip(t *testing.T, sourceClient *rhea.EvmChainConfig, destClient *rhea.EvmChainConfig) {
+
 }
 
 func (client *CCIPClient) startPingPong(t *testing.T) {
 	tx, err := client.Source.PingPongDapp.StartPingPong(client.Source.Owner)
 	require.NoError(t, err)
-	WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 }
 
 func (client *CCIPClient) setPingPongPaused(t *testing.T, paused bool) {
 	tx, err := client.Source.PingPongDapp.SetPaused(client.Source.Owner, paused)
 	require.NoError(t, err)
-	WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+}
+
+func (client *CCIPClient) fundPingPong(t *testing.T) {
+	fundingAmount := big.NewInt(1e18)
+	client.Dest.ApproveLinkFrom(t, client.Dest.Owner, client.Dest.OffRampRouter.Address(), fundingAmount)
+	tx, err := client.Dest.OffRampRouter.FundSubscription(client.Dest.Owner, client.Dest.PingPongDapp.Address(), fundingAmount)
+	require.NoError(t, err)
+	shared.WaitForMined(t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
+	client.Dest.logger.Infof(fmt.Sprintf("Ping pong funded %s", helpers.ExplorerLink(client.Dest.ChainId.Int64(), tx.Hash())))
 }
 
 type Client struct {
@@ -86,8 +96,8 @@ type SourceClient struct {
 	SenderDapp   *subscription_sender_dapp.SubscriptionSenderDapp
 }
 
-func NewSourceClient(t *testing.T, config EvmChainConfig) SourceClient {
-	client := GetClient(t, config.EthUrl)
+func NewSourceClient(t *testing.T, config rhea.EvmChainConfig) SourceClient {
+	client := rhea.GetClient(t, config.EthUrl)
 	LinkToken, err := link_token_interface.NewLinkToken(config.LinkToken, client)
 	require.NoError(t, err)
 	var tokenPools []*native_token_pool.NativeTokenPool
@@ -138,8 +148,8 @@ type DestClient struct {
 	OffRampRouter   *any_2_evm_subscription_offramp_router.Any2EVMSubscriptionOffRampRouter
 }
 
-func NewDestinationClient(t *testing.T, config EvmChainConfig) DestClient {
-	client := GetClient(t, config.EthUrl)
+func NewDestinationClient(t *testing.T, config rhea.EvmChainConfig) DestClient {
+	client := rhea.GetClient(t, config.EthUrl)
 	LinkToken, err := link_token_interface.NewLinkToken(config.LinkToken, client)
 	require.NoError(t, err)
 
@@ -196,7 +206,7 @@ type CCIPClient struct {
 }
 
 // NewCcipClient returns a new CCIPClient with initialised source and destination clients.
-func NewCcipClient(t *testing.T, sourceConfig EvmChainConfig, destConfig EvmChainConfig, ownerKey string, seedKey string) CCIPClient {
+func NewCcipClient(t *testing.T, sourceConfig rhea.EvmChainConfig, destConfig rhea.EvmChainConfig, ownerKey string, seedKey string) CCIPClient {
 	source := NewSourceClient(t, sourceConfig)
 	source.SetOwnerAndUsers(t, ownerKey, seedKey, sourceConfig.GasSettings)
 	dest := NewDestinationClient(t, destConfig)
@@ -208,45 +218,15 @@ func NewCcipClient(t *testing.T, sourceConfig EvmChainConfig, destConfig EvmChai
 	}
 }
 
-func GetSetupChain(t *testing.T, ownerPrivateKey string, chain EvmChainConfig) *EvmChainConfig {
+func GetSetupChain(t *testing.T, ownerPrivateKey string, chain rhea.EvmChainConfig) *rhea.EvmChainConfig {
 	chain.SetupChain(t, ownerPrivateKey)
 	return &chain
 }
 
-func (chain *EvmChainConfig) SetupChain(t *testing.T, ownerPrivateKey string) {
-	chain.Owner = GetOwner(t, ownerPrivateKey, chain.ChainId, chain.GasSettings)
-	chain.Client = GetClient(t, chain.EthUrl)
-	chain.Logger = logger.TestLogger(t).Named(helpers.ChainName(chain.ChainId.Int64()))
-	chain.Owner.GasLimit = 5e6
-
-	require.Equal(t, len(chain.BridgeTokens), len(chain.TokenPools))
-	chain.Logger.Info("Completed chain setup")
-}
-
-// GetOwner sets the owner user credentials and ensures a GasTipCap is set for the resulting user.
-func GetOwner(t *testing.T, ownerPrivateKey string, chainId *big.Int, gasSettings EVMGasSettings) *bind.TransactOpts {
-	ownerKey, err := crypto.HexToECDSA(ownerPrivateKey)
-	require.NoError(t, err)
-	user, err := bind.NewKeyedTransactorWithChainID(ownerKey, chainId)
-	require.NoError(t, err)
-	fmt.Println("--- Owner address ")
-	fmt.Println(user.From.Hex())
-	SetGasFees(user, gasSettings)
-
-	return user
-}
-
-// GetClient dials a given EVM client url and returns the resulting client.
-func GetClient(t *testing.T, ethUrl string) *ethclient.Client {
-	client, err := ethclient.Dial(ethUrl)
-	require.NoError(t, err)
-	return client
-}
-
 // SetOwnerAndUsers sets the owner and 10 users on a given client. It also set the proper
 // gas parameters on these users.
-func (client *Client) SetOwnerAndUsers(t *testing.T, ownerPrivateKey string, seedKey string, gasSettings EVMGasSettings) {
-	client.Owner = GetOwner(t, ownerPrivateKey, client.ChainId, gasSettings)
+func (client *Client) SetOwnerAndUsers(t *testing.T, ownerPrivateKey string, seedKey string, gasSettings rhea.EVMGasSettings) {
+	client.Owner = rhea.GetOwner(t, ownerPrivateKey, client.ChainId, gasSettings)
 
 	var users []*bind.TransactOpts
 	seedKeyWithoutFirstChar := seedKey[1:]
@@ -258,7 +238,7 @@ func (client *Client) SetOwnerAndUsers(t *testing.T, ownerPrivateKey string, see
 		require.NoError(t, err)
 		user, err := bind.NewKeyedTransactorWithChainID(key, client.ChainId)
 		require.NoError(t, err)
-		SetGasFees(user, gasSettings)
+		rhea.SetGasFees(user, gasSettings)
 		users = append(users, user)
 		fmt.Println(user.From.Hex())
 	}
@@ -276,7 +256,7 @@ func (client *Client) ApproveLinkFrom(t *testing.T, user *bind.TransactOpts, app
 	tx, err := client.LinkToken.Approve(user, approvedFor, amount)
 	require.NoError(t, err)
 
-	WaitForMined(client.t, client.logger, client.Client, tx.Hash(), true)
+	shared.WaitForMined(client.t, client.logger, client.Client, tx.Hash(), true)
 	client.logger.Warnf("Link approved %s", helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash()))
 }
 
@@ -317,7 +297,7 @@ func (client *CCIPClient) SendMessage(t *testing.T) {
 
 	tx, err := client.Source.OnRampRouter.CcipSend(client.Source.Owner, client.Dest.ChainId, msg)
 	require.NoError(t, err)
-	WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 	client.WaitForRelay(t, DestBlockNum)
 }
 
@@ -526,7 +506,7 @@ func (client *CCIPClient) CrossChainSendPausedOnrampShouldFail(t *testing.T) {
 			GasLimit: big.NewInt(100_000),
 		})
 	require.NoError(t, err)
-	WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), false)
+	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), false)
 }
 
 //func (client CCIPClient) CrossChainSendPausedOfframpShouldFail(t *testing.T) {
@@ -559,7 +539,7 @@ func (client *CCIPClient) NotEnoughFundsInBucketShouldFail(t *testing.T) {
 			GasLimit: big.NewInt(100_000),
 		})
 	require.NoError(t, err)
-	WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), false)
+	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), false)
 }
 
 //func (client CCIPClient) ExternalExecutionSubmitOfframpTwiceShouldFail(t *testing.T) {
@@ -754,7 +734,7 @@ func (client *CCIPClient) SetBlobVerifierConfig(t *testing.T) {
 	}
 	tx, err := client.Dest.BlobVerifier.SetConfig(client.Dest.Owner, config)
 	require.NoError(t, err)
-	WaitForMined(t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
+	shared.WaitForMined(t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 }
 
 func GetCurrentBlockNumber(chain *ethclient.Client) uint64 {
@@ -811,7 +791,7 @@ func (client *CCIPClient) TryGetTokensFromPausedPool() {
 	client.Source.Owner.GasLimit = 2e6
 	tx, err := client.Source.TokenPools[0].LockOrBurn(client.Source.Owner, big.NewInt(1000))
 	helpers.PanicErr(err)
-	WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), false)
+	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), false)
 }
 
 // SendToDappWithExecution executes a cross chain transactions using the sender dapp interface.
@@ -888,7 +868,7 @@ func WaitForCrossChainSendRequest(source SourceClient, fromBlockNum uint64, txha
 				return iterator.Event
 			}
 		}
-		time.Sleep(RetryTiming)
+		time.Sleep(shared.RetryTiming)
 	}
 }
 
@@ -902,7 +882,7 @@ func (client *CCIPClient) PauseOfframpPool() {
 	tx, err := client.Dest.TokenPools[0].Pause(client.Dest.Owner)
 	helpers.PanicErr(err)
 	client.Dest.logger.Info("Offramp pool paused, tx hash: %s", tx.Hash())
-	WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
+	shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 }
 
 func (client *CCIPClient) PauseOnrampPool() {
@@ -915,7 +895,7 @@ func (client *CCIPClient) PauseOnrampPool() {
 	tx, err := client.Source.TokenPools[0].Pause(client.Source.Owner)
 	helpers.PanicErr(err)
 	client.Source.logger.Info("Onramp pool paused, tx hash: %s", tx.Hash())
-	WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 }
 
 func (client *CCIPClient) UnpauseOfframpPool() {
@@ -928,7 +908,7 @@ func (client *CCIPClient) UnpauseOfframpPool() {
 	tx, err := client.Dest.TokenPools[0].Unpause(client.Dest.Owner)
 	helpers.PanicErr(err)
 	client.Dest.logger.Info("Offramp pool unpaused, tx hash: %s", tx.Hash())
-	WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
+	shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 }
 
 func (client *CCIPClient) UnpauseOnrampPool() {
@@ -941,7 +921,7 @@ func (client *CCIPClient) UnpauseOnrampPool() {
 	tx, err := client.Source.TokenPools[0].Unpause(client.Source.Owner)
 	helpers.PanicErr(err)
 	client.Source.logger.Info("Onramp pool unpaused, tx hash: %s", tx.Hash())
-	WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 }
 
 func (client *CCIPClient) PauseOnramp() {
@@ -954,7 +934,7 @@ func (client *CCIPClient) PauseOnramp() {
 	tx, err := client.Source.OnRamp.Pause(client.Source.Owner)
 	helpers.PanicErr(err)
 	client.Source.logger.Info("Onramp paused, tx hash: %s", tx.Hash())
-	WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 }
 
 func (client *CCIPClient) PauseBlobVerifier() {
@@ -967,7 +947,7 @@ func (client *CCIPClient) PauseBlobVerifier() {
 	tx, err := client.Dest.BlobVerifier.Pause(client.Dest.Owner)
 	helpers.PanicErr(err)
 	client.Dest.logger.Info("Offramp paused, tx hash: %s", tx.Hash())
-	WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
+	shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 }
 
 func (client *CCIPClient) UnpauseOnramp() {
@@ -980,7 +960,7 @@ func (client *CCIPClient) UnpauseOnramp() {
 	tx, err := client.Source.OnRamp.Unpause(client.Source.Owner)
 	helpers.PanicErr(err)
 	client.Source.logger.Info("Onramp unpaused, tx hash: %s", tx.Hash())
-	WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 }
 
 func (client *CCIPClient) UnpauseBlobVerifier() {
@@ -993,7 +973,7 @@ func (client *CCIPClient) UnpauseBlobVerifier() {
 	tx, err := client.Dest.BlobVerifier.Unpause(client.Dest.Owner)
 	helpers.PanicErr(err)
 	client.Dest.logger.Info("Offramp unpaused, tx hash: %s", tx.Hash())
-	WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
+	shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 }
 
 func (client *CCIPClient) UnpauseAll() {
@@ -1018,7 +998,7 @@ func (client *CCIPClient) UnpauseAll() {
 	wg.Wait()
 }
 
-func (client *CCIPClient) SetOCRConfig() {
+func (client *CCIPClient) SetOCRConfig(env dione.Environment) {
 	verifierOCRConfig, err := client.Dest.BlobVerifier.LatestConfigDetails(&bind.CallOpts{})
 	helpers.PanicErr(err)
 	if verifierOCRConfig.BlockNumber != 0 {
@@ -1034,29 +1014,30 @@ func (client *CCIPClient) SetOCRConfig() {
 	}
 
 	ccipConfig, err := ccip.OffchainConfig{
-		SourceIncomingConfirmations: 1,
-		DestIncomingConfirmations:   1,
+		SourceIncomingConfirmations: 10,
+		DestIncomingConfirmations:   10,
 	}.Encode()
 	helpers.PanicErr(err)
 
-	don := NewDON(Staging, client.Dest.logger)
+	don := dione.NewDON(env, client.Dest.logger)
+	faults := len(don.Nodes) / 3
 
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := confighelper2.ContractSetConfigArgsForTests(
-		60*time.Second, // deltaProgress
+		70*time.Second, // deltaProgress
 		5*time.Second,  // deltaResend
 		30*time.Second, // deltaRound
 		2*time.Second,  // deltaGrace
-		30*time.Second, // deltaStage
+		40*time.Second, // deltaStage
 		3,
-		[]int{1, 2, 3, 4}, // Transmission schedule: 1 oracle in first deltaStage, 2 in the second and so on.
+		[]int{1, 1, 2, 3}, // Transmission schedule: 1 oracle in first deltaStage, 2 in the second and so on.
 		don.GenerateOracleIdentities(client.Dest.ChainId.String()),
 		ccipConfig,
 		5*time.Second,
-		10*time.Second,
+		32*time.Second,
 		20*time.Second,
 		10*time.Second,
 		10*time.Second,
-		1, // faults
+		faults,
 		nil,
 	)
 	helpers.PanicErr(err)
@@ -1076,7 +1057,7 @@ func (client *CCIPClient) SetOCRConfig() {
 		offchainConfig,
 	)
 	helpers.PanicErr(err)
-	WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
+	shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 	client.Dest.logger.Infof("Config set on blob verifier %s", helpers.ExplorerLink(client.Dest.ChainId.Int64(), tx.Hash()))
 
 	tx, err = client.Dest.OffRamp.SetConfig0(
@@ -1089,30 +1070,30 @@ func (client *CCIPClient) SetOCRConfig() {
 		offchainConfig,
 	)
 	helpers.PanicErr(err)
-	WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
+	shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 	client.Dest.logger.Infof("Config set on offramp %s", helpers.ExplorerLink(client.Dest.ChainId.Int64(), tx.Hash()))
 }
 
 func (client *CCIPClient) AcceptOwnership(t *testing.T) {
 	tx, err := client.Dest.BlobVerifier.AcceptOwnership(client.Dest.Owner)
 	require.NoError(t, err)
-	WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
+	shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 
 	tx, err = client.Dest.OffRamp.AcceptOwnership(client.Dest.Owner)
 	require.NoError(t, err)
-	WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
+	shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 }
 
 func (client *CCIPClient) PrepareSetSenders(t *testing.T) {
 	sender := []common.Address{client.Source.SenderDapp.Address()}
 	tx, err := client.Dest.OffRampRouter.PrepareSetSubscriptionSenders(client.Dest.Owner, client.Dest.ReceiverDapp.Address(), sender)
 	require.NoError(t, err)
-	WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
+	shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 }
 
 func (client *CCIPClient) SetSubscriptionSenders(t *testing.T) {
 	sender := []common.Address{client.Source.SenderDapp.Address()}
 	tx, err := client.Dest.OffRampRouter.SetSubscriptionSenders(client.Dest.Owner, client.Dest.ReceiverDapp.Address(), sender)
 	require.NoError(t, err)
-	WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
+	shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 }

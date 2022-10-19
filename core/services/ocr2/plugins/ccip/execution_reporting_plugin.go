@@ -32,7 +32,7 @@ const (
 
 const (
 	BatchGasLimit                   = 4_000_000 // TODO: think if a good value for this
-	RootSnoozeTime                  = 10 * time.Second
+	RootSnoozeTime                  = 10 * time.Minute
 	ExecutionMaxInflightTimeSeconds = 180
 	MaxPayloadLength                = 1000
 	MaxTokensPerMessage             = 5
@@ -261,15 +261,11 @@ func (r *ExecutionReportingPlugin) maxGasPrice() uint64 {
 func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp types.ReportTimestamp, query types.Query) (types.Observation, error) {
 	// Query contains the tokenPricesPerFeeCoin
 	lggr := r.lggr.Named("ExecutionObservation")
-	if isBlobVerifierDownNow(r.lggr, r.blobVerifier) {
+	if isBlobVerifierDownNow(lggr, r.blobVerifier) {
 		return nil, ErrBlobVerifierIsDown
 	}
 	leaderTokensPerFeeCoin := make(map[common.Address]*big.Int)
 	if err := json.Unmarshal(query, &leaderTokensPerFeeCoin); err != nil {
-		return nil, err
-	}
-	followerTokensPerFeeCoin, err := r.tokenPrices(big.NewInt(TokenPriceBufferPercent))
-	if err != nil {
 		return nil, err
 	}
 	// Read and make a copy for the builder.
@@ -291,6 +287,10 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 		return []byte{}, nil
 	}
 
+	followerTokensPerFeeCoin, err := r.tokenPrices(big.NewInt(TokenPriceBufferPercent))
+	if err != nil {
+		return nil, err
+	}
 	return ExecutionObservation{
 		SeqNrs:           executableSequenceNumbers,
 		TokensPerFeeCoin: followerTokensPerFeeCoin,
@@ -347,19 +347,27 @@ func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNums 
 	if err != nil {
 		return nil, err
 	}
-	intervalsByOnRamp := make(map[common.Address]blob_verifier.CCIPInterval)
-	merkleRootsByOnRamp := make(map[common.Address][32]byte)
+	lggr.Infow("Building execution report", "finalSeqNums", finalSeqNums, "report", rep)
+	var interval blob_verifier.CCIPInterval
+	var onRampIdx int
+	var outerTreeLeafs [][32]byte
+
 	for i, onRamp := range rep.OnRamps {
-		intervalsByOnRamp[onRamp] = rep.Intervals[i]
-		merkleRootsByOnRamp[onRamp] = rep.MerkleRoots[i]
+		if onRamp == r.onRamp {
+			interval = rep.Intervals[i]
+			onRampIdx = i
+		}
+		outerTreeLeafs = append(outerTreeLeafs, rep.MerkleRoots[i])
 	}
-	interval := intervalsByOnRamp[r.onRamp]
+	if interval.Max == 0 {
+		return nil, errors.New("interval not found for ramp " + r.onRamp.Hex())
+	}
 	msgsInRoot, err := r.source.LogsDataWordRange(r.reqEventSig, r.onRamp, SendRequestedSequenceNumberIndex, EvmWord(interval.Min), EvmWord(interval.Max), int(r.offchainConfig.SourceIncomingConfirmations))
 	if err != nil {
 		return nil, err
 	}
 	leafsByOnRamp, err := leafsFromIntervals(
-		r.lggr,
+		lggr,
 		map[common.Address]common.Hash{r.onRamp: r.reqEventSig},
 		map[common.Address]func(log logpoller.Log) (uint64, error){r.onRamp: r.onRampSeqParser},
 		map[common.Address]blob_verifier.CCIPInterval{r.onRamp: interval},
@@ -367,14 +375,6 @@ func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNums 
 		r.onRampToHasher)
 	if err != nil {
 		return nil, err
-	}
-	var outerTreeLeafs [][32]byte
-	var onRampIdx int
-	for i, onRamp := range rep.OnRamps {
-		if onRamp == r.onRamp {
-			onRampIdx = i
-		}
-		outerTreeLeafs = append(outerTreeLeafs, merkleRootsByOnRamp[onRamp])
 	}
 	ctx := hasher.NewKeccakCtx()
 	outerTree, err := merklemulti.NewTree[[32]byte](ctx, outerTreeLeafs)
@@ -403,14 +403,14 @@ func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNums 
 	// Double check this verifies before sending.
 	res, err := r.blobVerifier.Verify(nil, hashes, innerProof.Hashes, ProofFlagsToBits(innerProof.SourceFlags), outerProof.Hashes, ProofFlagsToBits(outerProof.SourceFlags))
 	if err != nil {
-		r.lggr.Errorw("Unable to call verify", "seqNums", finalSeqNums, "indices", innerIdxs, "root", rep.RootOfRoots[:], "seqRange", rep.Intervals[onRampIdx], "onRampReport", rep.OnRamps[onRampIdx].Hex(), "onRampHave", r.onRamp.Hex(), "err", err)
+		lggr.Errorw("Unable to call verify", "seqNums", finalSeqNums, "indices", innerIdxs, "root", rep.RootOfRoots[:], "seqRange", rep.Intervals[onRampIdx], "onRampReport", rep.OnRamps[onRampIdx].Hex(), "onRampHave", r.onRamp.Hex(), "err", err)
 		return nil, err
 	}
 	// No timestamp, means failed to verify root.
 	if res.Cmp(big.NewInt(0)) == 0 {
 		ir := innerTree.Root()
 		or := outerTree.Root()
-		r.lggr.Errorf("Root does not verify for messages: %v (indicies %v) our inner root %x our outer root %x contract outer root %x",
+		lggr.Errorf("Root does not verify for messages: %v (indices %v) our inner root %x our outer root %x contract outer root %x",
 			finalSeqNums, innerIdxs, ir[:], or[:], rep.RootOfRoots[:])
 		return nil, errors.New("root does not verify")
 	}
@@ -435,7 +435,7 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 	if isBlobVerifierDownNow(lggr, r.blobVerifier) {
 		return false, nil, ErrBlobVerifierIsDown
 	}
-	actualMaybeObservations := getNonEmptyObservations[ExecutionObservation](r.lggr, observations)
+	actualMaybeObservations := getNonEmptyObservations[ExecutionObservation](lggr, observations)
 	var actualObservations []ExecutionObservation
 	tokens, err := r.offRamp.GetSupportedTokensForExecutionFee()
 	if err != nil {
@@ -479,20 +479,20 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 		if medianTokensPerFeeCoin[token].Cmp(leaderTokensPerFeeCoin[token]) == 1 {
 			// Leader specified a price which is too low, reject this report.
 			// TODO: Error or not here?
-			r.lggr.Warnw("Leader price is too low, skipping report", "leader", leaderTokensPerFeeCoin[token], "followers", medianTokensPerFeeCoin[token])
+			lggr.Warnw("Leader price is too low, skipping report", "leader", leaderTokensPerFeeCoin[token], "followers", medianTokensPerFeeCoin[token])
 			return false, nil, nil
 		}
 	}
 	// If we make it here, the leader has specified a valid set of prices.
 	tally := make(map[uint64]int)
 	for _, obs := range actualObservations {
-		for _, seq_nr := range obs.SeqNrs {
-			tally[seq_nr]++
+		for _, seqNr := range obs.SeqNrs {
+			tally[seqNr]++
 		}
 	}
 	var finalSequenceNumbers []uint64
 	for seqNr, count := range tally {
-		// Note spec deviation - I think its ok to rely on the batch builder for capping the number of messages vs capping in two places/ways?
+		// Note spec deviation - I think it's ok to rely on the batch builder for capping the number of messages vs capping in two places/ways?
 		if count > r.F {
 			finalSequenceNumbers = append(finalSequenceNumbers, seqNr)
 		}
@@ -514,14 +514,14 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 	if err != nil {
 		return false, nil, err
 	}
-	r.lggr.Infow("Built report", "onRamp", r.onRamp, "finalSeqNums", finalSequenceNumbers, "executionPrices", medianTokensPerFeeCoin)
+	lggr.Infow("Built report", "onRamp", r.onRamp, "finalSeqNums", finalSequenceNumbers, "executionPrices", medianTokensPerFeeCoin)
 	return true, report, nil
 }
 
 func (r *ExecutionReportingPlugin) updateInFlight(lggr logger.Logger, er any_2_evm_toll_offramp.CCIPExecutionReport) error {
 	r.inFlightMu.Lock()
 	defer r.inFlightMu.Unlock()
-	// Reap old inflights and check if any messages in the report are inflight.
+	// Reap old inflight txs and check if any messages in the report are inflight.
 	var stillInFlight []InflightExecutionReport
 	for _, report := range r.inFlight {
 		// TODO: Think about if this fails in reorgs
@@ -546,11 +546,11 @@ func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Conte
 	lggr := r.lggr.Named("ShouldAcceptFinalizedReport")
 	er, err := DecodeExecutionReport(report)
 	if err != nil {
-		r.lggr.Errorw("unable to decode report", "err", err)
+		lggr.Errorw("unable to decode report", "err", err)
 		return false, nil
 	}
 	if len(er.SequenceNumbers) == 0 {
-		r.lggr.Warnw("Received empty report")
+		lggr.Warnw("Received empty report")
 		return false, nil
 	}
 	lggr.Infof("Seq nums %v", er.SequenceNumbers)
@@ -562,7 +562,7 @@ func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Conte
 	if stale {
 		return false, err
 	}
-	if err := r.updateInFlight(lggr, *er); err != nil {
+	if err = r.updateInFlight(lggr, *er); err != nil {
 		return false, err
 	}
 	return true, nil

@@ -140,7 +140,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 		return nil, err
 	}
 	// TODO: Can also check the on/offramp pair is compatible
-	priceGetter, err := NewPriceGetter(pluginConfig.TokensPerFeeCoinPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
+	priceGetterObject, err := NewPriceGetter(pluginConfig.TokensPerFeeCoinPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
 	if err2 != nil {
 		return nil, err
 	}
@@ -154,13 +154,13 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 		batchBuilder,
 		onRampSeqParser,
 		reqEventSig,
-		priceGetter,
+		priceGetterObject,
 		onRampToHasher)
 	oracle, err := libocr2.NewOracle(argsNoPlugin)
 	if err != nil {
 		return nil, err
 	}
-	// If this is a brand new job, then we make use of the start blocks. If not then we're rebooting and log poller will pick up where we left off.
+	// If this is a brand-new job, then we make use of the start blocks. If not then we're rebooting and log poller will pick up where we left off.
 	if new {
 		return []job.ServiceCtx{NewBackfilledOracle(
 			lggr,

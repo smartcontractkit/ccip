@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - ccip-develop
-      - CCIP_FMS
 
 jobs:
   build-and-publish:

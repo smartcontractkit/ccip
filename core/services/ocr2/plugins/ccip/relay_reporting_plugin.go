@@ -219,21 +219,21 @@ func (r *RelayReportingPlugin) Observation(ctx context.Context, timestamp types.
 		}
 		lggr.Infof("%d requests found for onRamp %s", len(reqs), onRamp.Hex())
 		if len(reqs) == 0 {
-			r.lggr.Infow("no requests", "onRamp", onRamp)
+			lggr.Infow("no requests", "onRamp", onRamp)
 			continue
 		}
 		var seqNrs []uint64
 		for _, req := range reqs {
 			seqNr, err := r.onRampSeqParsers[onRamp](req)
 			if err != nil {
-				r.lggr.Errorw("error parsing seq num", "err", err)
+				lggr.Errorw("error parsing seq num", "err", err)
 				continue
 			}
 			seqNrs = append(seqNrs, seqNr)
 		}
 		min := seqNrs[0]
 		max := seqNrs[len(seqNrs)-1]
-		if !contiguousReqs(r.lggr, min, max, seqNrs) {
+		if !contiguousReqs(lggr, min, max, seqNrs) {
 			return nil, errors.New("unexpected gap in seq nums")
 		}
 		intervalsByOnRamp[onRamp] = blob_verifier.CCIPInterval{
@@ -243,7 +243,7 @@ func (r *RelayReportingPlugin) Observation(ctx context.Context, timestamp types.
 		lggr.Infof("OnRamp %v: min %v max %v", onRamp, min, max)
 	}
 	if len(intervalsByOnRamp) == 0 {
-		r.lggr.Infow("No observations")
+		lggr.Infow("No observations")
 		return []byte{}, nil
 	}
 	return RelayObservation{
@@ -253,7 +253,8 @@ func (r *RelayReportingPlugin) Observation(ctx context.Context, timestamp types.
 
 // buildReport assumes there is at least one message in reqs.
 func (r *RelayReportingPlugin) buildReport(intervalByOnRamp map[common.Address]blob_verifier.CCIPInterval) (*blob_verifier.CCIPRelayReport, error) {
-	leafsByOnRamp, err := leafsFromIntervals(r.lggr, r.onRampToReqEventSig, r.onRampSeqParsers, intervalByOnRamp, r.source, r.onRampToHasher)
+	lggr := r.lggr.Named("BuildReport")
+	leafsByOnRamp, err := leafsFromIntervals(lggr, r.onRampToReqEventSig, r.onRampSeqParsers, intervalByOnRamp, r.source, r.onRampToHasher)
 	if err != nil {
 		return nil, err
 	}
@@ -266,7 +267,7 @@ func (r *RelayReportingPlugin) buildReport(intervalByOnRamp map[common.Address]b
 	mctx := hasher.NewKeccakCtx()
 	for onRamp, leaves := range leafsByOnRamp {
 		if len(leaves) == 0 {
-			r.lggr.Warnf("Tried building a tree without leaves for onRamp %s. %+v", onRamp.Hex(), leafsByOnRamp)
+			lggr.Warnf("Tried building a tree without leaves for onRamp %s. %+v", onRamp.Hex(), leafsByOnRamp)
 			continue
 		}
 		tree, err2 := merklemulti.NewTree(mctx, leaves)
@@ -282,7 +283,7 @@ func (r *RelayReportingPlugin) buildReport(intervalByOnRamp map[common.Address]b
 		})
 	}
 	if len(roots) == 0 {
-		r.lggr.Warn("No valid roots found")
+		lggr.Warn("No valid roots found")
 		return &blob_verifier.CCIPRelayReport{}, errors.New("No valid roots found")
 	}
 	// Make a root of roots
@@ -303,7 +304,7 @@ func (r *RelayReportingPlugin) Report(ctx context.Context, timestamp types.Repor
 	if isBlobVerifierDownNow(lggr, r.blobVerifier) {
 		return false, nil, ErrBlobVerifierIsDown
 	}
-	nonEmptyObservations := getNonEmptyObservations[RelayObservation](r.lggr, observations)
+	nonEmptyObservations := getNonEmptyObservations[RelayObservation](lggr, observations)
 	// Need at least F+1 valid observations
 	if len(nonEmptyObservations) <= r.F {
 		lggr.Debugf("Non-empty observations <= F, need at least F+1 to continue")

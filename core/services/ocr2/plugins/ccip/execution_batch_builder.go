@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	PERMISSIONLESS_EXECUTION_THRESHOLD_SECONDS = 2 * 7 * 24 * 60 * 60
+	PERMISSIONLESS_EXECUTION_THRESHOLD_SECONDS = 7 * 24 * 60 * 60
 	EVM_ADDRESS_LENGTH_BYTES                   = 20
 	EVM_WORD_BYTES                             = 32
 	CALLDATA_GAS_PER_BYTE                      = 16
@@ -128,15 +128,7 @@ func (eb *ExecutionBatchBuilder) getUnexpiredRelayReports() ([]blob_verifier.CCI
 		if err != nil {
 			return nil, err
 		}
-		blessed, err := eb.blobVerifier.IsBlessed(nil, reportAccepted.Report.RootOfRoots)
-		if err != nil {
-			return nil, err
-		}
-		if blessed {
-			reports = append(reports, reportAccepted.Report)
-		} else {
-			eb.lggr.Infow("report is accepted but not blessed", "report", hexutil.Encode(reportAccepted.Report.RootOfRoots[:]))
-		}
+		reports = append(reports, reportAccepted.Report)
 	}
 	return reports, nil
 }
@@ -168,6 +160,9 @@ func (eb *ExecutionBatchBuilder) getExecutableSeqNrs(
 		return nil, err
 	}
 	eb.lggr.Infow("unexpired roots", "n", len(unexpiredReports))
+	if len(unexpiredReports) == 0 {
+		return []uint64{}, nil
+	}
 
 	// This could result in slightly different values on each call as
 	// the function returns the allowed amount at the time of the last block.
@@ -222,6 +217,14 @@ func (eb *ExecutionBatchBuilder) getExecutableSeqNrs(
 		}
 		snoozeUntil, haveSnoozed := eb.snoozedRoots[unexpiredReport.MerkleRoots[idx]]
 		if haveSnoozed && time.Now().Before(snoozeUntil) {
+			continue
+		}
+		blessed, err := eb.blobVerifier.IsBlessed(nil, unexpiredReport.RootOfRoots)
+		if err != nil {
+			return nil, err
+		}
+		if !blessed {
+			eb.lggr.Infow("report is accepted but not blessed", "report", hexutil.Encode(unexpiredReport.RootOfRoots[:]))
 			continue
 		}
 		// Check this root for executable messages

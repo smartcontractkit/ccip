@@ -1,4 +1,4 @@
-package main
+package rhea
 
 import (
 	"fmt"
@@ -7,7 +7,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
-	null2 "gopkg.in/guregu/null.v4"
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/afn_contract"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp"
@@ -17,19 +16,20 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_subscription_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/governance_dapp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/mock_afn_contract"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/native_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ping_pong_demo"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/receiver_dapp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/simple_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/subscription_sender_dapp"
+	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/shared"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
-	"github.com/smartcontractkit/chainlink/core/services/job"
 )
 
-// deploySubscriptionContracts will deploy all source and Destination chain contracts using the
+// DeploySubscriptionContracts will deploy all source and Destination chain contracts using the
 // owner key. Only run this of the currently deployed contracts are outdated or
 // when initializing a new chain.
-func deploySubscriptionContracts(t *testing.T, ownerKey string, sourceChain *EvmChainConfig, destChain *EvmChainConfig) {
+func DeploySubscriptionContracts(t *testing.T, ownerKey string, sourceChain *EvmChainConfig, destChain *EvmChainConfig) {
 	sourceChain.SetupChain(t, ownerKey)
 	destChain.SetupChain(t, ownerKey)
 	deploySourceAndDestContracts(t, sourceChain, destChain)
@@ -51,15 +51,13 @@ func deploySourceAndDestContracts(t *testing.T, source *EvmChainConfig, destinat
 	// Deploy governance dapps
 	deployGovernanceDapps(t, source, destination)
 
-	deployPingPongDapps(t, source, destination)
-
-	printContractConfig(source, destination)
+	DeployPingPongDapps(t, source, destination)
 }
 
 func deploySenderDapp(t *testing.T, source *EvmChainConfig, dest *EvmChainConfig) {
 	tokenSenderAddress, tx, _, err := subscription_sender_dapp.DeploySubscriptionSenderDapp(source.Owner, source.Client, source.OnRampRouter, dest.ChainId)
 	require.NoError(t, err)
-	WaitForMined(t, source.Logger, source.Client, tx.Hash(), true)
+	shared.WaitForMined(t, source.Logger, source.Client, tx.Hash(), true)
 	source.Logger.Infof("Token sender dapp deployed on %s in tx: %s", tokenSenderAddress.Hex(), helpers.ExplorerLink(source.ChainId.Int64(), tx.Hash()))
 	source.TokenSender = tokenSenderAddress
 
@@ -72,7 +70,6 @@ func deploySourceContracts(t *testing.T, source *EvmChainConfig, offRampChainID 
 	// Updates source.AFN if any new contracts are deployed
 	deployAFN(t, source)
 	// Updates source.OnRampRouter if any new contracts are deployed
-	// Updates source.OnRampRouter if any new contracts are deployed
 	deployOnRampRouter(t, source)
 	// Updates source.OnRamp if any new contracts are deployed
 	deployOnRamp(t, source, offRampChainID)
@@ -83,6 +80,7 @@ func deploySourceContracts(t *testing.T, source *EvmChainConfig, offRampChainID 
 			// Configure onramp address on pool
 			tx, err := tokenPool.SetOnRamp(source.Owner, source.OnRamp, true)
 			require.NoError(t, err)
+			shared.WaitForMined(t, source.Logger, source.Client, tx.Hash(), true)
 			source.Logger.Infof("Onramp pool configured with onramp: %s", helpers.ExplorerLink(source.ChainId.Int64(), tx.Hash()))
 		}
 	}
@@ -99,7 +97,7 @@ func deployDestinationContracts(t *testing.T, destClient *EvmChainConfig, source
 	// Deploy offramp contract message receiver
 	messageReceiverAddress, tx, _, err := simple_message_receiver.DeploySimpleMessageReceiver(destClient.Owner, destClient.Client)
 	require.NoError(t, err)
-	WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
+	shared.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
 	destClient.Logger.Infof("Offramp message receiver deployed on %s in tx: %s", messageReceiverAddress.Hex(), helpers.ExplorerLink(destClient.ChainId.Int64(), tx.Hash()))
 	destClient.MessageReceiver = messageReceiverAddress
 
@@ -107,6 +105,17 @@ func deployDestinationContracts(t *testing.T, destClient *EvmChainConfig, source
 	deployOffRamp(t, destClient, sourceClient)
 	// Updates source.OffRampRouter if any new contracts are deployed
 	deployOffRampRouter(t, destClient)
+
+	if destClient.DeploySettings.DeployRamp || destClient.DeploySettings.DeployRouter {
+		offRamp, err2 := any_2_evm_subscription_offramp.NewEVM2EVMSubscriptionOffRamp(destClient.OffRamp, destClient.Client)
+		require.NoError(t, err2)
+
+		tx, err = offRamp.SetRouter(destClient.Owner, destClient.OffRampRouter)
+		require.NoError(t, err)
+		shared.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
+		destClient.Logger.Infof(fmt.Sprintf("OffRampRouter set on offRamp in tx %s", helpers.ExplorerLink(destClient.ChainId.Int64(), tx.Hash())))
+	}
+
 	// Updates source.ReceiverDapp if any new contracts are deployed
 	deployReceiverDapp(t, destClient)
 
@@ -115,7 +124,7 @@ func deployDestinationContracts(t *testing.T, destClient *EvmChainConfig, source
 			// Configure offramp address on pool
 			tx, err = tokenPool.SetOffRamp(destClient.Owner, destClient.OffRamp, true)
 			require.NoError(t, err)
-			WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
+			shared.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
 			destClient.Logger.Infof("Offramp pool configured with offramp address: %s", helpers.ExplorerLink(destClient.ChainId.Int64(), tx.Hash()))
 		}
 	}
@@ -139,7 +148,7 @@ func deployOnRampRouter(t *testing.T, client *EvmChainConfig) *evm_2_any_subscri
 			FeeAdmin: client.Owner.From,
 		})
 	require.NoError(t, err)
-	WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
+	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 	client.OnRampRouter = onRampRouterAddress
 
 	client.Logger.Infof(fmt.Sprintf("OnRampRouter deployed on %s in tx %s", onRampRouterAddress.String(), helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash())))
@@ -155,13 +164,13 @@ func deployOnRampRouter(t *testing.T, client *EvmChainConfig) *evm_2_any_subscri
 	//
 	//tx, err = sourceLinkToken.Approve(client.Owner, onRampRouter.Address(), fundingAmount)
 	//require.NoError(t, err)
-	//WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
+	//shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 	//client.Logger.Infof(fmt.Sprintf("Approved link for onramp subscription funding in tx %s", helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash())))
 	//
 	//// Fund subscription with 0.01 LINK, enough for 1000 txs at 1e13 each
 	//tx, err = onRampRouter.FundSubscription(client.Owner, fundingAmount)
 	//require.NoError(t, err)
-	//WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
+	//shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 	//client.Logger.Infof(fmt.Sprintf("Funded onramp subscription in tx %s", helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash())))
 
 	return onRampRouter
@@ -198,7 +207,7 @@ func deployOnRamp(t *testing.T, client *EvmChainConfig, destinationChain *big.In
 		client.OnRampRouter,
 	)
 	require.NoError(t, err)
-	WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
+	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 
 	onRamp, err := evm_2_evm_subscription_onramp.NewEVM2EVMSubscriptionOnRamp(onRampAddress, client.Client)
 	require.NoError(t, err)
@@ -209,11 +218,12 @@ func deployOnRamp(t *testing.T, client *EvmChainConfig, destinationChain *big.In
 	require.NoError(t, err)
 	tx, err = onRampRouter.SetOnRamp(client.Owner, destinationChain, onRampAddress)
 	require.NoError(t, err)
-	WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
+	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 
 	// Prices are used by the rate limiter and dictate what tokens are supported
-	_, err = onRamp.SetPrices(client.Owner, []common.Address{client.LinkToken}, []*big.Int{big.NewInt(10)})
+	tx, err = onRamp.SetPrices(client.Owner, []common.Address{client.LinkToken}, []*big.Int{big.NewInt(10)})
 	require.NoError(t, err)
+	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 
 	return onRamp
 }
@@ -249,7 +259,7 @@ func deployOffRamp(t *testing.T, destClient *EvmChainConfig, sourceClient *EvmCh
 		},
 		destClient.Owner.From)
 	require.NoError(t, err)
-	WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
+	shared.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
 
 	destClient.Logger.Infof("OffRamp contract deployed on %s in tx: %s", offRampAddress.Hex(), helpers.ExplorerLink(destClient.ChainId.Int64(), tx.Hash()))
 	destClient.OffRamp = offRampAddress
@@ -257,8 +267,9 @@ func deployOffRamp(t *testing.T, destClient *EvmChainConfig, sourceClient *EvmCh
 	require.NoError(t, err)
 
 	// Prices are used by the rate limiter and dictate what tokens are supported
-	_, err = offRamp.SetPrices(destClient.Owner, []common.Address{destClient.LinkToken}, []*big.Int{big.NewInt(10)})
+	tx, err = offRamp.SetPrices(destClient.Owner, []common.Address{destClient.LinkToken}, []*big.Int{big.NewInt(10)})
 	require.NoError(t, err)
+	shared.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
 
 	return offRamp
 }
@@ -268,6 +279,14 @@ func deployOffRampRouter(t *testing.T, destClient *EvmChainConfig) *any_2_evm_su
 		destClient.Logger.Infof("Skipping OffRampRouter deployment, using OffRampRouter on %s", destClient.OffRampRouter)
 		offRampRouter, err := any_2_evm_subscription_offramp_router.NewAny2EVMSubscriptionOffRampRouter(destClient.OffRampRouter, destClient.Client)
 		require.NoError(t, err)
+
+		if destClient.DeploySettings.DeployRamp {
+			tx, err := offRampRouter.AddOffRamp(destClient.Owner, destClient.OffRamp)
+			require.NoError(t, err)
+			shared.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
+			destClient.Logger.Infof(fmt.Sprintf("Offramp configured for alraedy deployed router  in tx %s", helpers.ExplorerLink(destClient.ChainId.Int64(), tx.Hash())))
+		}
+
 		return offRampRouter
 	}
 
@@ -283,21 +302,13 @@ func deployOffRampRouter(t *testing.T, destClient *EvmChainConfig) *any_2_evm_su
 		},
 	)
 	require.NoError(t, err)
-	WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
+	shared.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
 	destClient.OffRampRouter = offRampRouterAddress
 
 	destClient.Logger.Infof(fmt.Sprintf("OffRampRouter deployed on %s in tx %s", offRampRouterAddress.String(), helpers.ExplorerLink(destClient.ChainId.Int64(), tx.Hash())))
 
 	offRampRouter, err := any_2_evm_subscription_offramp_router.NewAny2EVMSubscriptionOffRampRouter(destClient.OffRampRouter, destClient.Client)
 	require.NoError(t, err)
-
-	offRamp, err := any_2_evm_subscription_offramp.NewEVM2EVMSubscriptionOffRamp(destClient.OffRamp, destClient.Client)
-	require.NoError(t, err)
-
-	tx, err = offRamp.SetRouter(destClient.Owner, offRampRouterAddress)
-	require.NoError(t, err)
-	WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
-	destClient.Logger.Infof(fmt.Sprintf("OffRampRouter set on offRamp in tx %s", helpers.ExplorerLink(destClient.ChainId.Int64(), tx.Hash())))
 
 	return offRampRouter
 }
@@ -324,7 +335,7 @@ func deployBlobVerifier(t *testing.T, destClient *EvmChainConfig, sourceClient *
 		},
 	)
 	require.NoError(t, err)
-	WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
+	shared.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
 	destClient.Logger.Infof("Blob verifier deployed on %s in tx: %s", blobVerifierAddress.Hex(), helpers.ExplorerLink(destClient.ChainId.Int64(), tx.Hash()))
 	destClient.BlobVerifier = blobVerifierAddress
 
@@ -344,7 +355,7 @@ func createDestSubscription(t *testing.T, client *EvmChainConfig, receiver commo
 
 	tx, err := linkToken.Approve(client.Owner, client.OffRampRouter, fundingAmount)
 	require.NoError(t, err)
-	WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
+	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 	client.Logger.Infof(fmt.Sprintf("Approved link for offramp subscription funding in tx %s", helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash())))
 
 	tx, err = offRampRouter.CreateSubscription(client.Owner, any_2_evm_subscription_offramp_router.SubscriptionInterfaceOffRampSubscription{
@@ -354,7 +365,7 @@ func createDestSubscription(t *testing.T, client *EvmChainConfig, receiver commo
 		Balance:          fundingAmount,
 	})
 	require.NoError(t, err)
-	WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
+	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 	client.Logger.Infof(fmt.Sprintf("Created offramp subscription in tx %s", helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash())))
 }
 
@@ -362,7 +373,7 @@ func deployReceiverDapp(t *testing.T, destClient *EvmChainConfig) *receiver_dapp
 	destClient.Logger.Infof("Deploying ReceiverDapp")
 	receiverDappAddress, tx, _, err := receiver_dapp.DeployReceiverDapp(destClient.Owner, destClient.Client, destClient.OffRampRouter)
 	require.NoError(t, err)
-	WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
+	shared.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
 	destClient.Logger.Infof("Offramp receiver dapp deployed on %s in tx: %s", receiverDappAddress.Hex(), helpers.ExplorerLink(destClient.ChainId.Int64(), tx.Hash()))
 	destClient.ReceiverDapp = receiverDappAddress
 
@@ -381,7 +392,7 @@ func deployNativeTokenPool(t *testing.T, client *EvmChainConfig) []*native_token
 			client.Logger.Infof("Deploying token pool for token %s", bridgeToken.Hex())
 			tokenPoolAddress, tx, _, err := native_token_pool.DeployNativeTokenPool(client.Owner, client.Client, bridgeToken)
 			require.NoError(t, err)
-			WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
+			shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 			client.Logger.Infof("Native token pool deployed on %s in tx %s", tokenPoolAddress, helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash()))
 			pool, err := native_token_pool.NewNativeTokenPool(tokenPoolAddress, client.Client)
 			require.NoError(t, err)
@@ -404,14 +415,14 @@ func deployNativeTokenPool(t *testing.T, client *EvmChainConfig) []*native_token
 	return pools
 }
 
-func deployPingPongDapps(t *testing.T, sourceClient *EvmChainConfig, destClient *EvmChainConfig) {
+func DeployPingPongDapps(t *testing.T, sourceClient *EvmChainConfig, destClient *EvmChainConfig) {
 	if sourceClient.DeploySettings.DeployPingPongDapp {
 		sourceClient.Logger.Infof("Deploying source chain ping pong dapp")
 
 		pingPongDappAddress, tx, _, err := ping_pong_demo.DeployPingPongDemo(sourceClient.Owner, sourceClient.Client, sourceClient.OffRampRouter, sourceClient.OnRampRouter)
 		require.NoError(t, err)
 
-		WaitForMined(t, sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
+		shared.WaitForMined(t, sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
 		sourceClient.Logger.Infof("Ping pong deployed on %s in tx: %s", pingPongDappAddress.Hex(), helpers.ExplorerLink(sourceClient.ChainId.Int64(), tx.Hash()))
 
 		sourceClient.PingPongDapp = pingPongDappAddress
@@ -423,7 +434,7 @@ func deployPingPongDapps(t *testing.T, sourceClient *EvmChainConfig, destClient 
 		pingPongDappAddress, tx, _, err := ping_pong_demo.DeployPingPongDemo(destClient.Owner, destClient.Client, destClient.OffRampRouter, destClient.OnRampRouter)
 		require.NoError(t, err)
 
-		WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
+		shared.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
 		destClient.Logger.Infof("Ping pong deployed on %s in tx: %s", pingPongDappAddress.Hex(), helpers.ExplorerLink(destClient.ChainId.Int64(), tx.Hash()))
 
 		destClient.PingPongDapp = pingPongDappAddress
@@ -435,7 +446,7 @@ func deployPingPongDapps(t *testing.T, sourceClient *EvmChainConfig, destClient 
 
 		tx, err := pingDapp.SetCounterpart(sourceClient.Owner, destClient.ChainId, destClient.PingPongDapp)
 		require.NoError(t, err)
-		WaitForMined(t, sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
+		shared.WaitForMined(t, sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
 		sourceClient.Logger.Infof("Ping pong dapp configured in tx: %s", helpers.ExplorerLink(sourceClient.ChainId.Int64(), tx.Hash()))
 
 		pongDapp, err := ping_pong_demo.NewPingPongDemo(destClient.PingPongDapp, destClient.Client)
@@ -443,11 +454,13 @@ func deployPingPongDapps(t *testing.T, sourceClient *EvmChainConfig, destClient 
 
 		tx, err = pongDapp.SetCounterpart(destClient.Owner, sourceClient.ChainId, sourceClient.PingPongDapp)
 		require.NoError(t, err)
-		WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
+		shared.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
 		sourceClient.Logger.Infof("Ping pong dapp configured in tx: %s", helpers.ExplorerLink(sourceClient.ChainId.Int64(), tx.Hash()))
 
 		createDestSubscription(t, sourceClient, sourceClient.PingPongDapp, []common.Address{destClient.PingPongDapp})
 		createDestSubscription(t, destClient, destClient.PingPongDapp, []common.Address{sourceClient.PingPongDapp})
+	} else {
+		sourceClient.Logger.Infof("Skipping ping pong deployment")
 	}
 }
 
@@ -463,7 +476,7 @@ func deployGovernanceDapps(t *testing.T, sourceClient *EvmChainConfig, destClien
 		governanceDappAddress, tx, _, err := governance_dapp.DeployGovernanceDapp(sourceClient.Owner, sourceClient.Client, sourceClient.OffRampRouter, sourceClient.OnRampRouter, feeConfig)
 		require.NoError(t, err)
 
-		WaitForMined(t, sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
+		shared.WaitForMined(t, sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
 		sourceClient.Logger.Infof("GovernanceDapp deployed on %s in tx: %s", governanceDappAddress.Hex(), helpers.ExplorerLink(sourceClient.ChainId.Int64(), tx.Hash()))
 
 		sourceClient.GovernanceDapp = governanceDappAddress
@@ -474,7 +487,7 @@ func deployGovernanceDapps(t *testing.T, sourceClient *EvmChainConfig, destClien
 		governanceDappAddress, tx, _, err := governance_dapp.DeployGovernanceDapp(destClient.Owner, destClient.Client, destClient.OffRampRouter, destClient.OnRampRouter, feeConfig)
 		require.NoError(t, err)
 
-		WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
+		shared.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
 		destClient.Logger.Infof("GovernanceDapp deployed on %s in tx: %s", governanceDappAddress.Hex(), helpers.ExplorerLink(destClient.ChainId.Int64(), tx.Hash()))
 
 		destClient.GovernanceDapp = governanceDappAddress
@@ -493,7 +506,7 @@ func deployGovernanceDapps(t *testing.T, sourceClient *EvmChainConfig, destClien
 
 		tx, err := governanceDapp.AddClone(sourceClient.Owner, governanceClone)
 		require.NoError(t, err)
-		WaitForMined(t, sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
+		shared.WaitForMined(t, sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
 		sourceClient.Logger.Infof("GovernanceDapp configured in tx: %s", helpers.ExplorerLink(sourceClient.ChainId.Int64(), tx.Hash()))
 	}
 }
@@ -501,16 +514,9 @@ func deployGovernanceDapps(t *testing.T, sourceClient *EvmChainConfig, destClien
 func deployAFN(t *testing.T, client *EvmChainConfig) *afn_contract.AFNContract {
 	if client.DeploySettings.DeployAFN {
 		client.Logger.Infof("Deploying AFN")
-		address, tx, _, err := afn_contract.DeployAFNContract(
-			client.Owner,
-			client.Client,
-			[]common.Address{client.Owner.From},
-			[]*big.Int{big.NewInt(1)},
-			big.NewInt(1),
-			big.NewInt(1),
-		)
+		address, tx, _, err := mock_afn_contract.DeployMockAFNContract(client.Owner, client.Client)
 		require.NoError(t, err)
-		WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
+		shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 		client.Logger.Infof("AFN deployed on %s in tx: %s", address.Hex(), helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash()))
 		client.Afn = address
 
@@ -536,63 +542,11 @@ func fillPoolWithTokens(t *testing.T, client *EvmChainConfig, pool *native_token
 	tx, err := destLinkToken.Transfer(client.Owner, pool.Address(), amount)
 	require.NoError(t, err)
 	client.Logger.Infof("Transferring token to token pool: %s", helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash()))
-	WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
+	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 
 	client.Logger.Infof("Locking tokens in pool")
 	tx, err = pool.LockOrBurn(client.Owner, amount)
 	require.NoError(t, err)
-	WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
+	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 	client.Logger.Infof("Pool filled with tokens: %s", helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash()))
-}
-
-func generateRelayJobSpecs(sourceClient *EvmChainConfig, destClient *EvmChainConfig, bootstrapPeer string) job.Job {
-	return job.Job{
-		Name: null2.StringFrom(fmt.Sprintf("ccip-relay-%s-%s", helpers.ChainName(sourceClient.ChainId.Int64()), helpers.ChainName(destClient.ChainId.Int64()))),
-		Type: "offchainreporting2",
-		OCR2OracleSpec: &job.OCR2OracleSpec{
-			PluginType:                  job.CCIPRelay,
-			ContractID:                  destClient.BlobVerifier.Hex(),
-			Relay:                       "evm",
-			RelayConfig:                 map[string]interface{}{"chainID": destClient.ChainId.String()},
-			P2PV2Bootstrappers:          []string{bootstrapPeer},
-			OCRKeyBundleID:              null2.String{}, // Set per node
-			TransmitterID:               null2.String{}, // Set per node
-			ContractConfigConfirmations: 2,
-			PluginConfig: map[string]interface{}{
-				"sourceChainID":    sourceClient.ChainId.String(),
-				"destChainID":      destClient.ChainId.String(),
-				"onRampIDs":        []string{sourceClient.OnRamp.String()},
-				"pollPeriod":       pollPeriod,
-				"SourceStartBlock": sourceClient.DeploySettings.DeployedAt,
-				"DestStartBlock":   destClient.DeploySettings.DeployedAt,
-			},
-		},
-	}
-}
-
-func generateExecutionJobSpecs(sourceClient *EvmChainConfig, destClient *EvmChainConfig, bootstrapPeer string) job.Job {
-	return job.Job{
-		Name: null2.StringFrom(fmt.Sprintf("ccip-exec-%s-%s", helpers.ChainName(sourceClient.ChainId.Int64()), helpers.ChainName(destClient.ChainId.Int64()))),
-		Type: "offchainreporting2",
-		OCR2OracleSpec: &job.OCR2OracleSpec{
-			PluginType:                  job.CCIPExecution,
-			ContractID:                  destClient.OffRamp.Hex(),
-			Relay:                       "evm",
-			RelayConfig:                 map[string]interface{}{"chainID": destClient.ChainId.String()},
-			P2PV2Bootstrappers:          []string{bootstrapPeer},
-			OCRKeyBundleID:              null2.String{}, // Set per node
-			TransmitterID:               null2.String{}, // Set per node
-			ContractConfigConfirmations: 2,
-			PluginConfig: map[string]interface{}{
-				"sourceChainID":            sourceClient.ChainId.String(),
-				"destChainID":              destClient.ChainId.String(),
-				"onRampID":                 sourceClient.OnRamp.String(),
-				"pollPeriod":               pollPeriod,
-				"blobVerifierID":           destClient.BlobVerifier.Hex(),
-				"SourceStartBlock":         sourceClient.DeploySettings.DeployedAt,
-				"DestStartBlock":           destClient.DeploySettings.DeployedAt,
-				"tokensPerFeeCoinPipeline": fmt.Sprintf(`"""merge [type=merge left="{}" right="{\\\"%s\\\":\\\"1000000000000000000\\\"}"];"""`, destClient.LinkToken.Hex()),
-			},
-		},
-	}
 }

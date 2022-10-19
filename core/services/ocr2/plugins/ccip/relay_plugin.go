@@ -156,7 +156,7 @@ func NewRelayServices(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm
 	if err != nil {
 		return nil, err
 	}
-	// If this is a brand new job, then we make use of the start blocks. If not then we're rebooting and log poller will pick up where we left off.
+	// If this is a brand-new job, then we make use of the start blocks. If not then we're rebooting and log poller will pick up where we left off.
 	if new {
 		return []job.ServiceCtx{&BackfilledOracle{
 			srcStartBlock: pluginConfig.SourceStartBlock,

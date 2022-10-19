@@ -321,6 +321,8 @@ func ChainName(chainID int64) string {
 		return "Polygon"
 	case 4002:
 		return "Fantom testnet"
+	case 43113:
+		return "Avax Fuji"
 	case 80001:
 		return "Polygon Mumbai"
 	default: // Unknown chain, return chainID as string
