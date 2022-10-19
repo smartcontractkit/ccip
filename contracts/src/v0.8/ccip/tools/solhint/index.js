@@ -4,6 +4,7 @@ const PrefixPrivateFunctionsWithUnderscore = require('./rules/prefixPrivateFunct
 const PrefixInternalFunctionsWithUnderscore = require('./rules/prefixInternalFunctionsWithUnderscore.js')
 const InheritedConstructorArgsNotInContractDefinition = require('./rules/inheritedConstructorArgsNotInContractDefinition.js')
 const PrefixStorageVariablesWithSUnderscore = require('./rules/prefixStorageVariablesWithSUnderscore.js')
+const PrefixImmutableVariablesWithI = require('./rules/prefixImmutableVariablesWithI.js')
 
 module.exports = [
   ExplicitImports,
@@ -11,4 +12,5 @@ module.exports = [
   PrefixInternalFunctionsWithUnderscore,
   InheritedConstructorArgsNotInContractDefinition,
   PrefixStorageVariablesWithSUnderscore,
+  PrefixImmutableVariablesWithI,
 ]
