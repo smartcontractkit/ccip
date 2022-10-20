@@ -47,7 +47,7 @@
     "moment": "^2.29.4",
     "prettier-plugin-solidity": "1.0.0-beta.18",
     "solhint": "^3.3.6",
-    "solhint-plugin-chainlink-solidity": "link:src/v0.8/ccip/tools/solhint",
+    "solhint-plugin-chainlink-solidity": "git+https://github.com/smartcontractkit/chainlink-solhint-rules.git",
     "solhint-plugin-prettier": "^0.0.5",
     "solidity-coverage": "^0.7.17",
     "ts-node": "^10.0.0",
