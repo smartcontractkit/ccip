@@ -60,7 +60,8 @@ func TestDione(t *testing.T) {
 	DESTINATION.SetupChain(t, ownerKey)
 
 	don := dione.NewDON(ENV, logger.TestLogger(t))
-	don.AddTwoWaySpecs(SOURCE, DESTINATION)
+	//don := dione.NewOfflineDON(ENV, logger.TestLogger(t))
+	don.WriteToFile()
 
 	//don.FundNodeKeys(DESTINATION, ownerKey, big.NewInt(1e18))
 	//don.FundNodeKeys(DESTINATION, ownerKey, big.NewInt(9e17))
@@ -72,7 +73,7 @@ func TestDione(t *testing.T) {
 	//don.CreateNewEthKeysForChain(OptimismGoerliConfig.ChainId)
 	//don.WIP()
 	//don.ClearAllJobs(Rinkeby, Goerli)
-	//don.WriteConfig()
+	//don.WriteToFile()
 }
 
 // TestCCIP can be run as a test with the following config

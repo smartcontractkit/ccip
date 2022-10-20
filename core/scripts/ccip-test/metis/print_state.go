@@ -566,7 +566,7 @@ PingPongDapp:    common.HexToAddress("%s"),
 // PrintJobSpecs prints the job spec for each node and CCIP spec type, as well as a bootstrap spec.
 func PrintJobSpecs(env dione.Environment, onramp, blobVerifier, offRamp common.Address, sourceChainID, destChainID *big.Int, destLinkToken common.Address, sourceReplayFrom, destReplayFrom uint64) {
 	jobs := fmt.Sprintf(bootstrapTemplate+"\n", helpers.ChainName(destChainID.Int64()), blobVerifier, destChainID)
-	don := dione.NewDON(env, nil)
+	don := dione.NewOfflineDON(env, nil)
 
 	for i, oracle := range don.Config.Nodes {
 		jobs += fmt.Sprintf("// [Node %d]\n", i)

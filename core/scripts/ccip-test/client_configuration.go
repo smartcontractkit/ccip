@@ -1019,8 +1019,8 @@ func (client *CCIPClient) SetOCRConfig(env dione.Environment) {
 	}.Encode()
 	helpers.PanicErr(err)
 
-	don := dione.NewDON(env, client.Dest.logger)
-	faults := len(don.Nodes) / 3
+	don := dione.NewOfflineDON(env, client.Dest.logger)
+	faults := len(don.Config.Nodes) / 3
 
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := confighelper2.ContractSetConfigArgsForTests(
 		70*time.Second, // deltaProgress
