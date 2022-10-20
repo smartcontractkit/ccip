@@ -232,8 +232,8 @@ func (eb *ExecutionBatchBuilder) getExecutableSeqNrs(
 		if err != nil {
 			return nil, err
 		}
-		if len(srcLogs) == 0 {
-			return nil, errors.Errorf("unexpected empty log set for root %x, interval [%v,%v], event_sig %x", unexpiredReport.MerkleRoots[idx], unexpiredReport.Intervals[idx].Min, unexpiredReport.Intervals[idx].Max, eb.reqEventSig)
+		if len(srcLogs) != int(unexpiredReport.Intervals[idx].Max-unexpiredReport.Intervals[idx].Min+1) {
+			return nil, errors.Errorf("unexpected missing msgs in relayed root %x have %d want %d", unexpiredReport.MerkleRoots[idx], len(srcLogs), int(unexpiredReport.Intervals[idx].Max-unexpiredReport.Intervals[idx].Min+1))
 		}
 		executedMp, err := eb.getExecutedSeqNrsInRange(unexpiredReport.Intervals[idx].Min, unexpiredReport.Intervals[idx].Max)
 		if err != nil {

@@ -309,12 +309,12 @@ func contiguousReqs(lggr logger.Logger, min, max uint64, seqNrs []uint64) bool {
 	return true
 }
 
-func leafsFromIntervals(lggr logger.Logger, onRampToEventSig map[common.Address]common.Hash, seqParsers map[common.Address]func(logpoller.Log) (uint64, error), intervalByOnRamp map[common.Address]blob_verifier.CCIPInterval, srcLogPoller logpoller.LogPoller, onRampToHasher map[common.Address]LeafHasher[[32]byte]) (map[common.Address][][32]byte, error) {
+func leafsFromIntervals(lggr logger.Logger, onRampToEventSig map[common.Address]common.Hash, seqParsers map[common.Address]func(logpoller.Log) (uint64, error), intervalByOnRamp map[common.Address]blob_verifier.CCIPInterval, srcLogPoller logpoller.LogPoller, onRampToHasher map[common.Address]LeafHasher[[32]byte], confs int) (map[common.Address][][32]byte, error) {
 	leafsByOnRamp := make(map[common.Address][][32]byte)
 	for onRamp, interval := range intervalByOnRamp {
 		// Logs are guaranteed to be in order of seq num, since these are finalized logs only
 		// and the contract's seq num is auto-incrementing.
-		logs, err := srcLogPoller.LogsDataWordRange(onRampToEventSig[onRamp], onRamp, SendRequestedSequenceNumberIndex, logpoller.EvmWord(interval.Min), logpoller.EvmWord(interval.Max), 1)
+		logs, err := srcLogPoller.LogsDataWordRange(onRampToEventSig[onRamp], onRamp, SendRequestedSequenceNumberIndex, logpoller.EvmWord(interval.Min), logpoller.EvmWord(interval.Max), confs)
 		if err != nil {
 			return nil, err
 		}
@@ -368,13 +368,16 @@ func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNums 
 	if err != nil {
 		return nil, err
 	}
+	if len(msgsInRoot) != int(interval.Max-interval.Min+1) {
+		return nil, errors.Errorf("unexpected missing msgs in relayed root %x have %d want %d", rep.MerkleRoots[onRampIdx], len(msgsInRoot), int(interval.Max-interval.Min+1))
+	}
 	leafsByOnRamp, err := leafsFromIntervals(
 		lggr,
 		map[common.Address]common.Hash{r.onRamp: r.reqEventSig},
 		map[common.Address]func(log logpoller.Log) (uint64, error){r.onRamp: r.onRampSeqParser},
 		map[common.Address]blob_verifier.CCIPInterval{r.onRamp: interval},
 		r.source,
-		r.onRampToHasher)
+		r.onRampToHasher, int(r.offchainConfig.SourceIncomingConfirmations))
 	if err != nil {
 		return nil, err
 	}
@@ -388,10 +391,15 @@ func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNums 
 	if err != nil {
 		return nil, err
 	}
+
 	var innerIdxs []int
 	var encMsgs [][]byte
 	var hashes [][32]byte
 	for _, seqNum := range finalSeqNums {
+		if seqNum < interval.Min || seqNum > interval.Max {
+			// We only return messages from a single root (the root of the first message).
+			continue
+		}
 		innerIdx := int(seqNum - interval.Min)
 		innerIdxs = append(innerIdxs, innerIdx)
 		encMsgs = append(encMsgs, msgsInRoot[innerIdx].Data)

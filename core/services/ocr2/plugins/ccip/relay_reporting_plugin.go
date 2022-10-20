@@ -254,7 +254,7 @@ func (r *RelayReportingPlugin) Observation(ctx context.Context, timestamp types.
 // buildReport assumes there is at least one message in reqs.
 func (r *RelayReportingPlugin) buildReport(intervalByOnRamp map[common.Address]blob_verifier.CCIPInterval) (*blob_verifier.CCIPRelayReport, error) {
 	lggr := r.lggr.Named("BuildReport")
-	leafsByOnRamp, err := leafsFromIntervals(lggr, r.onRampToReqEventSig, r.onRampSeqParsers, intervalByOnRamp, r.source, r.onRampToHasher)
+	leafsByOnRamp, err := leafsFromIntervals(lggr, r.onRampToReqEventSig, r.onRampSeqParsers, intervalByOnRamp, r.source, r.onRampToHasher, int(r.offchainConfig.SourceIncomingConfirmations))
 	if err != nil {
 		return nil, err
 	}
