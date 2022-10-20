@@ -17,6 +17,7 @@ blockhash_store: ../../contracts/solc/v0.6/BlockhashStore.abi ../../contracts/so
 consumer_wrapper: ../../contracts/solc/v0.7/Consumer.abi ../../contracts/solc/v0.7/Consumer.bin 894d1cbd920dccbd36d92918c1037c6ded34f66f417ccb18ec3f33c64ef83ec5
 cron_upkeep_factory_wrapper: ../../contracts/solc/v0.8.6/CronUpkeepFactory.abi - dacb0f8cdf54ae9d2781c5e720fc314b32ed5e58eddccff512c75d6067292cd7
 cron_upkeep_wrapper: ../../contracts/solc/v0.8.6/CronUpkeep.abi - b1257293e0016a6d32f6febec5ff4cd8d7276d228c12228e6b6e143111f0c5ed
+custom_token_pool: ../../contracts/solc/v0.8.15/CustomTokenPool.abi ../../contracts/solc/v0.8.15/CustomTokenPool.bin 3236547cf9cb03dc0a02f3d8591891752008a4b5189c79aa7ed5328679858ac2
 derived_price_feed_wrapper: ../../contracts/solc/v0.8.6/DerivedPriceFeed.abi ../../contracts/solc/v0.8.6/DerivedPriceFeed.bin c8542e6c850c2d0fffb79a7f7213dc927ec64e6ddd54e1224cb2fb4a13aabdd0
 evm_2_any_subscription_onramp_router: ../../contracts/solc/v0.8.15/EVM2AnySubscriptionOnRampRouter.abi ../../contracts/solc/v0.8.15/EVM2AnySubscriptionOnRampRouter.bin 1e91ba7242743e7d75e5ccf1c4f4a1b1be3a737b425cb03dd686c1c07fe1f0a0
 evm_2_any_toll_onramp_router: ../../contracts/solc/v0.8.15/EVM2AnyTollOnRampRouter.abi ../../contracts/solc/v0.8.15/EVM2AnyTollOnRampRouter.bin 904cec559ec0bcffee588587bbe3fd807bab94ca4f7b9a214308010e11b58aac

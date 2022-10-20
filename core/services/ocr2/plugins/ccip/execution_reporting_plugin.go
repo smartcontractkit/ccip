@@ -117,14 +117,16 @@ func DecodeExecutionReport(report types.Report) (*any_2_evm_toll_offramp.CCIPExe
 	return &er, nil
 }
 
-func aggregateTokenValue(tokenLimitPrices map[common.Address]*big.Int, srcToDst map[common.Address]common.Address, tokens []common.Address, amounts []*big.Int) *big.Int {
+func aggregateTokenValue(tokenLimitPrices map[common.Address]*big.Int, srcToDst map[common.Address]common.Address, tokens []common.Address, amounts []*big.Int) (*big.Int, error) {
 	sum := big.NewInt(0)
-
 	for i := 0; i < len(tokens); i++ {
-		sum.Add(sum, new(big.Int).Mul(tokenLimitPrices[srcToDst[tokens[i]]], amounts[i]))
+		price, ok := tokenLimitPrices[srcToDst[tokens[i]]]
+		if !ok {
+			return nil, errors.Errorf("do not have price for src token %x", tokens[i])
+		}
+		sum.Add(sum, new(big.Int).Mul(price, amounts[i]))
 	}
-
-	return sum
+	return sum, nil
 }
 
 type ExecutionReportingPluginFactory struct {

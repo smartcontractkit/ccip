@@ -254,6 +254,18 @@ chainID             = %s
 		tollCurrentSeqNum++
 	})
 
+	t.Run("single auto-execute subscription custom token", func(t *testing.T) {
+		tokenAmount := big.NewInt(100)
+		_, err = ccipContracts.SourceCustomToken.Approve(ccipContracts.SourceUser, ccipContracts.SubOnRampRouter.Address(), tokenAmount)
+		require.NoError(t, err)
+		ccipContracts.SourceChain.Commit()
+		testhelpers.SendSubRequest(t, ccipContracts, "hey DON, execute for me", []common.Address{ccipContracts.SourceCustomToken.Address()},
+			[]*big.Int{tokenAmount}, big.NewInt(100_000), ccipContracts.Receivers[0].Receiver.Address())
+		executionLog := testhelpers.AllNodesHaveExecutedSeqNum(t, ccipContracts, ccipContracts.SubOffRamp.Address(), nodes, subCurrentSeqNum)
+		subCurrentSeqNum++
+		testhelpers.AssertSubExecSuccess(t, ccipContracts, executionLog)
+	})
+
 	t.Run("single auto-execute subscription", func(t *testing.T) {
 		tokenAmount := big.NewInt(100)
 		_, err = ccipContracts.SourceLinkToken.Approve(ccipContracts.SourceUser, ccipContracts.SubOnRampRouter.Address(), tokenAmount)

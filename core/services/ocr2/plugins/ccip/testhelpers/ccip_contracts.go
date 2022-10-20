@@ -22,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/blob_verifier"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/custom_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_subscription_onramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_toll_onramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_subscription_onramp"
@@ -65,14 +66,16 @@ type MaybeRevertReceiver struct {
 }
 
 type CCIPContracts struct {
-	t                              *testing.T
-	SourceChainID, DestChainID     *big.Int
-	SourceUser, DestUser           *bind.TransactOpts
-	SourceChain, DestChain         *backends.SimulatedBackend
-	SourcePool, DestPool           *native_token_pool.NativeTokenPool
-	SourceLinkToken, DestLinkToken *link_token_interface.LinkToken
-	BlobVerifier                   *blob_verifier.BlobVerifier
-	Receivers                      []MaybeRevertReceiver
+	t                                  *testing.T
+	SourceChainID, DestChainID         *big.Int
+	SourceUser, DestUser               *bind.TransactOpts
+	SourceChain, DestChain             *backends.SimulatedBackend
+	SourcePool, DestPool               *native_token_pool.NativeTokenPool
+	SourceCustomPool, DestCustomPool   *custom_token_pool.CustomTokenPool
+	SourceCustomToken, DestCustomToken *link_token_interface.LinkToken
+	SourceLinkToken, DestLinkToken     *link_token_interface.LinkToken
+	BlobVerifier                       *blob_verifier.BlobVerifier
+	Receivers                          []MaybeRevertReceiver
 
 	// Toll contracts
 	TollOnRampFees    map[common.Address]*big.Int
@@ -213,6 +216,30 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 	require.NoError(t, err)
 	require.Equal(t, destUser.From.String(), o.String())
 	_, err = destLinkToken.Transfer(destUser, destPoolAddress, hundredLink)
+	require.NoError(t, err)
+	destChain.Commit()
+
+	// Deploy custom token pool source
+	sourceCustomTokenAddress, _, _, err := link_token_interface.DeployLinkToken(sourceUser, sourceChain) // Just re-use this, its an ERC20.
+	require.NoError(t, err)
+	sourceCustomToken, err := link_token_interface.NewLinkToken(sourceCustomTokenAddress, sourceChain)
+	require.NoError(t, err)
+	sourceCustomPoolAddress, _, _, err := custom_token_pool.DeployCustomTokenPool(sourceUser, sourceChain, sourceCustomTokenAddress)
+	require.NoError(t, err)
+	destChain.Commit()
+	sourceCustomPool, err := custom_token_pool.NewCustomTokenPool(sourceCustomPoolAddress, sourceChain)
+	require.NoError(t, err)
+	destChain.Commit()
+
+	// Deploy custom token pool dest
+	destCustomTokenAddress, _, _, err := link_token_interface.DeployLinkToken(destUser, destChain) // Just re-use this, its an ERC20.
+	require.NoError(t, err)
+	destCustomToken, err := link_token_interface.NewLinkToken(destCustomTokenAddress, destChain)
+	require.NoError(t, err)
+	destCustomPoolAddress, _, _, err := custom_token_pool.DeployCustomTokenPool(destUser, destChain, destCustomTokenAddress)
+	require.NoError(t, err)
+	destChain.Commit()
+	destCustomPool, err := custom_token_pool.NewCustomTokenPool(destCustomPoolAddress, destChain)
 	require.NoError(t, err)
 	destChain.Commit()
 
@@ -370,16 +397,21 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 	require.NoError(t, err)
 	_, err = sourcePool.SetOnRamp(sourceUser, subOnRampAddress, true)
 	require.NoError(t, err)
+	_, err = sourceCustomPool.SetOnRamp(sourceUser, subOnRampAddress, true)
+	require.NoError(t, err)
 	subOnRamp, _ := evm_2_evm_subscription_onramp.NewEVM2EVMSubscriptionOnRamp(subOnRampAddress, sourceChain)
 	_, err = subOnRamp.SetRouter(sourceUser, subOnRampRouterAddress)
 	require.NoError(t, err)
 	_, err = subOnRampRouter.SetOnRamp(sourceUser, destChainID, subOnRampAddress)
 	require.NoError(t, err)
+	// Add a custom pool after onramp deployed.
+	_, err = subOnRamp.AddPool(sourceUser, sourceCustomTokenAddress, sourceCustomPoolAddress)
+	require.NoError(t, err)
 	subOnRampFee := big.NewInt(1)
 	_, err = subOnRampRouter.SetFee(sourceUser, subOnRampFee)
 	require.NoError(t, err)
 	sourceChain.Commit()
-	_, err = subOnRamp.SetPrices(sourceUser, []common.Address{sourceLinkTokenAddress}, []*big.Int{big.NewInt(1)})
+	_, err = subOnRamp.SetPrices(sourceUser, []common.Address{sourceLinkTokenAddress, sourceCustomTokenAddress}, []*big.Int{big.NewInt(1), big.NewInt(1)})
 	require.NoError(t, err)
 
 	subOffRampRouterAddress, _, _, err := any_2_evm_subscription_offramp_router.DeployAny2EVMSubscriptionOffRampRouter(
@@ -413,12 +445,16 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 	subOffRamp, _ := any_2_evm_subscription_offramp.NewEVM2EVMSubscriptionOffRamp(subOffRampAddress, destChain)
 	_, err = destPool.SetOffRamp(destUser, subOffRampAddress, true)
 	require.NoError(t, err)
+	_, err = destCustomPool.SetOffRamp(destUser, subOffRampAddress, true)
+	require.NoError(t, err)
+	_, err = subOffRamp.AddPool(destUser, sourceCustomTokenAddress, destCustomPoolAddress)
+	require.NoError(t, err)
 	_, err = subOffRamp.SetRouter(destUser, subOffRampRouterAddress)
 	require.NoError(t, err)
 	_, err = subOffRampRouter.AddOffRamp(destUser, subOffRampAddress)
 	require.NoError(t, err)
 	destChain.Commit()
-	_, err = subOffRamp.SetPrices(destUser, []common.Address{destLinkTokenAddress}, []*big.Int{big.NewInt(1)})
+	_, err = subOffRamp.SetPrices(destUser, []common.Address{destLinkTokenAddress, destCustomTokenAddress}, []*big.Int{big.NewInt(1), big.NewInt(1)})
 	require.NoError(t, err)
 
 	_, err = subOffRampRouter.GetSupportedTokensForExecutionFee(nil)
@@ -444,19 +480,21 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 	}
 
 	return CCIPContracts{
-		t:               t,
-		SourceChainID:   sourceChainID,
-		DestChainID:     destChainID,
-		SourceUser:      sourceUser,
-		DestUser:        destUser,
-		SourceChain:     sourceChain,
-		DestChain:       destChain,
-		SourcePool:      sourcePool,
-		DestPool:        destPool,
-		SourceLinkToken: sourceLinkToken,
-		DestLinkToken:   destLinkToken,
-		BlobVerifier:    blobVerifier,
-		Receivers:       []MaybeRevertReceiver{{Receiver: revertingMessageReceiver1, Strict: false}, {Receiver: revertingMessageReceiver2, Strict: true}},
+		t:                 t,
+		SourceChainID:     sourceChainID,
+		DestChainID:       destChainID,
+		SourceUser:        sourceUser,
+		DestUser:          destUser,
+		SourceChain:       sourceChain,
+		DestChain:         destChain,
+		SourcePool:        sourcePool,
+		DestPool:          destPool,
+		SourceLinkToken:   sourceLinkToken,
+		DestLinkToken:     destLinkToken,
+		SourceCustomToken: sourceCustomToken,
+		DestCustomToken:   destCustomToken,
+		BlobVerifier:      blobVerifier,
+		Receivers:         []MaybeRevertReceiver{{Receiver: revertingMessageReceiver1, Strict: false}, {Receiver: revertingMessageReceiver2, Strict: true}},
 
 		// Toll
 		TollOnRampFees:    tollOnRampFees,

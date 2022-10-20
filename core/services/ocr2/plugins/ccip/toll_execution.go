@@ -115,9 +115,13 @@ func (tb *TollBatchBuilder) BuildBatch(
 			continue
 		}
 
-		messageValue := aggregateTokenValue(tokenLimitPrices, srcToDst, tollMsg.Message.Tokens, tollMsg.Message.Amounts)
+		msgValue, err := aggregateTokenValue(tokenLimitPrices, srcToDst, tollMsg.Message.Tokens, tollMsg.Message.Amounts)
+		if err != nil {
+			tb.lggr.Errorw("Skipping message unable to compute aggregate value", "err", err)
+			continue
+		}
 		// if token limit is smaller than message value skip message
-		if aggregateTokenLimit.Cmp(messageValue) == -1 {
+		if aggregateTokenLimit.Cmp(msgValue) == -1 {
 			continue
 		}
 		// Check solvency
@@ -138,7 +142,7 @@ func (tb *TollBatchBuilder) BuildBatch(
 			continue
 		}
 		batchGasLimit -= totalGasLimit
-		aggregateTokenLimit.Sub(aggregateTokenLimit, messageValue)
+		aggregateTokenLimit.Sub(aggregateTokenLimit, msgValue)
 		tb.lggr.Infow("Adding toll msg to batch", "seqNum", tollMsg.Message.SequenceNumber, "maxCharge", maxCharge, "maxGasOverhead", maxGasOverhead)
 		executableSeqNrs = append(executableSeqNrs, tollMsg.Message.SequenceNumber)
 	}
@@ -149,25 +153,27 @@ func (tb *TollBatchBuilder) inflight(
 	inflight []InflightExecutionReport,
 	tokenLimitPrices map[common.Address]*big.Int,
 	srcToDst map[common.Address]common.Address,
-) (inflightSeqNrs map[uint64]struct{}, inflightAggregateValue *big.Int, err error) {
-	inflightSeqNrs = make(map[uint64]struct{})
-	inflightAggregateValue = big.NewInt(0)
-
+) (map[uint64]struct{}, *big.Int, error) {
+	inflightSeqNrs := make(map[uint64]struct{})
+	inflightAggregateValue := big.NewInt(0)
 	for _, rep := range inflight {
 		for _, seqNr := range rep.report.SequenceNumbers {
 			inflightSeqNrs[seqNr] = struct{}{}
 		}
 		for _, encMsg := range rep.report.EncodedMessages {
-			msg, err2 := tb.parseLog(types.Log{
+			msg, err := tb.parseLog(types.Log{
 				// Note this needs to change if we start indexing things.
 				Topics: []common.Hash{CCIPTollSendRequested},
 				Data:   encMsg,
 			})
-			if err2 != nil {
-				return nil, nil, err2
+			if err != nil {
+				return nil, nil, err
 			}
-			inflightAggregateValue.Add(inflightAggregateValue, aggregateTokenValue(tokenLimitPrices, srcToDst, msg.Message.Tokens, msg.Message.Amounts))
-
+			msgValue, err := aggregateTokenValue(tokenLimitPrices, srcToDst, msg.Message.Tokens, msg.Message.Amounts)
+			if err != nil {
+				return nil, nil, err
+			}
+			inflightAggregateValue.Add(inflightAggregateValue, msgValue)
 		}
 	}
 	return inflightSeqNrs, inflightAggregateValue, nil
