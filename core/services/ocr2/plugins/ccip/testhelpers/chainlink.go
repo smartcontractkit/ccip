@@ -23,6 +23,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/client"
+	v2 "github.com/smartcontractkit/chainlink/core/chains/evm/config/v2"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/headtracker"
 	types2 "github.com/smartcontractkit/chainlink/core/chains/evm/headtracker/types"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/log"
@@ -31,7 +32,6 @@ import (
 	"github.com/smartcontractkit/chainlink/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/core/internal/cltest/heavyweight"
 	"github.com/smartcontractkit/chainlink/core/internal/testutils"
-	"github.com/smartcontractkit/chainlink/core/internal/testutils/configtest"
 	"github.com/smartcontractkit/chainlink/core/internal/testutils/evmtest"
 	"github.com/smartcontractkit/chainlink/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/core/logger"
@@ -146,32 +146,26 @@ func SetupNodeCCIP(
 	bootstrapPeerID string,
 	bootstrapPort int64,
 ) (chainlink.Application, string, common.Address, ocr2key.KeyBundle) {
-	p2paddresses := []string{
-		fmt.Sprintf("127.0.0.1:%d", port),
-	}
+	trueRef, falseRef := true, false
+
 	// Do not want to load fixtures as they contain a dummy chainID.
 	config, db := heavyweight.FullTestDBNoFixturesV2(t, fmt.Sprintf("%s%d", dbName, port), func(c *chainlink.Config, s *chainlink.Secrets) {
-		// Disables ocr spec validation so we can have fast polling for the test.
-		c.DevMode = true
-
-		true := true
-		false := false
-
-		c.Feature.CCIP = &true
-		c.OCR.Enabled = &false
-		c.OCR2.Enabled = &true
-		c.Feature.LogPoller = &true
-		c.P2P.V2.Enabled = &true
+		p2pAddresses := []string{
+			fmt.Sprintf("127.0.0.1:%d", port),
+		}
+		// Disables ocr spec validation, so we can have fast polling for the test.
+		c.DevMode = trueRef
+		c.Feature.CCIP = &trueRef
+		c.OCR.Enabled = &falseRef
+		c.OCR2.Enabled = &trueRef
+		c.Feature.LogPoller = &trueRef
+		c.P2P.V2.Enabled = &trueRef
 		c.P2P.V2.DeltaDial = models.MustNewDuration(500 * time.Millisecond)
 		c.P2P.V2.DeltaReconcile = models.MustNewDuration(5 * time.Second)
-		c.P2P.V2.ListenAddresses = &p2paddresses
-		c.P2P.V2.AnnounceAddresses = &p2paddresses
+		c.P2P.V2.ListenAddresses = &p2pAddresses
+		c.P2P.V2.AnnounceAddresses = &p2pAddresses
 
-		for i := range c.EVM {
-			// NOTE: For the executor jobs, the default of 500k is insufficient for a 3 message batch
-			limit := uint32(1500000)
-			c.EVM[i].GasEstimator.LimitDefault = &limit
-		}
+		c.EVM = []*v2.EVMConfig{createConfigV2Chain(t, sourceChainID), createConfigV2Chain(t, destChainID)}
 
 		if bootstrapPeerID != "" {
 			// Supply the bootstrap IP and port as a V2 peer address
@@ -181,10 +175,6 @@ func SetupNodeCCIP(
 				}},
 			}
 		}
-
-		//config.Overrides.DefaultChainID = nil
-		//config.Overrides.P2PListenPort = null.NewInt(0, true)
-		//config.Overrides.P2PNetworkingStack = networking.NetworkingStackV2
 	})
 
 	var lggr = logger.TestLogger(t)
@@ -199,13 +189,12 @@ func SetupNodeCCIP(
 	require.NoError(t, err)
 	sourceClient := client.NewSimulatedBackendClient(t, sourceChain, sourceChainID)
 	destClient := client.NewSimulatedBackendClient(t, destChain, destChainID)
-
 	keyStore := keystore.New(db, utils.FastScryptParams, lggr, config)
 	simEthKeyStore := EthKeyStoreSim{Eth: keyStore.Eth()}
-	cfg := configtest.NewTestGeneralConfig(t)
-	evmCfg := evmtest.NewChainScopedConfig(t, cfg)
 
-	// Create our chainset manually so we can have custom eth clients
+	evmCfg := evmtest.NewChainScopedConfig(t, config)
+
+	// Create our chainset manually, so we can have custom eth clients
 	// (the wrapped sims faking different chainIDs)
 	var (
 		sourceLp logpoller.LogPoller = logpoller.NewLogPoller(logpoller.NewORM(sourceChainID, db, lggr, config), sourceClient,
@@ -214,7 +203,6 @@ func SetupNodeCCIP(
 			lggr, 500*time.Millisecond, 10, 2, 2, int64(evmCfg.EvmLogKeepBlocksDepth()))
 	)
 	evmChain, err := evm.LoadChainSet(context.Background(), evm.ChainSetOpts{
-		ORM:              chainORM,
 		Config:           config,
 		Logger:           lggr,
 		DB:               db,
@@ -235,7 +223,7 @@ func SetupNodeCCIP(
 					lggr, sourceClient,
 					evmtest.NewChainScopedConfig(t, config),
 					hb,
-					headtracker.NewHeadSaver(lggr, headtracker.NewORM(db, lggr, pgtest.NewPGCfg(false), *sourceClient.ChainID()), evmCfg),
+					headtracker.NewHeadSaver(lggr, headtracker.NewORM(db, lggr, pgtest.NewPGCfg(falseRef), *sourceClient.ChainID()), evmCfg),
 				)
 			} else if chainID.String() == destChainID.String() {
 				return headtracker.NewHeadTracker(
@@ -243,7 +231,7 @@ func SetupNodeCCIP(
 					destClient,
 					evmtest.NewChainScopedConfig(t, config),
 					hb,
-					headtracker.NewHeadSaver(lggr, headtracker.NewORM(db, lggr, pgtest.NewPGCfg(false), *destClient.ChainID()), evmCfg),
+					headtracker.NewHeadSaver(lggr, headtracker.NewORM(db, lggr, pgtest.NewPGCfg(falseRef), *destClient.ChainID()), evmCfg),
 				)
 			}
 			t.Fatalf("invalid chain ID %v", chainID.String())
@@ -284,6 +272,7 @@ func SetupNodeCCIP(
 	if err != nil {
 		lggr.Fatal(err)
 	}
+
 	app, err := chainlink.NewApplication(chainlink.ApplicationOpts{
 		Config:           config,
 		EventBroadcaster: eventBroadcaster,
@@ -335,6 +324,21 @@ func SetupNodeCCIP(
 	kb, err := app.GetKeyStore().OCR2().Create(chaintype.EVM)
 	require.NoError(t, err)
 	return app, peerID.Raw(), transmitter, kb
+}
+
+func createConfigV2Chain(t *testing.T, chainId *big.Int) *v2.EVMConfig {
+	// NOTE: For the executor jobs, the default of 500k is insufficient for a 3 message batch
+	defaultGasLimit := uint32(1500000)
+	tr := true
+
+	sourceC, _ := v2.Defaults((*utils.Big)(chainId))
+	sourceC.GasEstimator.LimitDefault = &defaultGasLimit
+	return &v2.EVMConfig{
+		ChainID: (*utils.Big)(chainId),
+		Enabled: &tr,
+		Chain:   sourceC,
+		Nodes:   v2.EVMNodes{&v2.Node{}},
+	}
 }
 
 func AllNodesHaveReqSeqNum(t *testing.T, ccipContracts CCIPContracts, eventSig common.Hash, onRamp common.Address, nodes []Node, seqNum int) logpoller.Log {
