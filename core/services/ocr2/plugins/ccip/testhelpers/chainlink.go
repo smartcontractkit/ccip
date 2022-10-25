@@ -17,11 +17,9 @@ import (
 	"github.com/onsi/gomega"
 	uuid "github.com/satori/go.uuid"
 	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/smartcontractkit/libocr/networking"
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	types4 "github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/guregu/null.v4"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/client"
@@ -46,6 +44,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/validate"
 	"github.com/smartcontractkit/chainlink/core/services/ocrbootstrap"
 	"github.com/smartcontractkit/chainlink/core/services/pg"
+	"github.com/smartcontractkit/chainlink/core/store/models"
 	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
@@ -144,28 +143,49 @@ func SetupNodeCCIP(
 	port int64, dbName string,
 	sourceChain *backends.SimulatedBackend, destChain *backends.SimulatedBackend,
 	sourceChainID *big.Int, destChainID *big.Int,
-) (chainlink.Application, string, common.Address, ocr2key.KeyBundle, *configtest.TestGeneralConfig, func()) {
+	bootstrapPeerID string,
+	bootstrapPort int64,
+) (chainlink.Application, string, common.Address, ocr2key.KeyBundle) {
 	p2paddresses := []string{
 		fmt.Sprintf("127.0.0.1:%d", port),
 	}
 	// Do not want to load fixtures as they contain a dummy chainID.
-	config, db := heavyweight.FullTestDBNoFixtures(t, fmt.Sprintf("%s%d", dbName, port))
-	config.Overrides.FeatureOffchainReporting = null.BoolFrom(false)
-	config.Overrides.FeatureOffchainReporting2 = null.BoolFrom(true)
-	config.Overrides.FeatureCCIP = null.BoolFrom(true)
-	config.Overrides.FeatureLogPoller = null.BoolFrom(true)
-	config.Overrides.GlobalGasEstimatorMode = null.NewString("FixedPrice", true)
-	config.Overrides.SetP2PV2DeltaDial(500 * time.Millisecond)
-	config.Overrides.SetP2PV2DeltaReconcile(5 * time.Second)
-	config.Overrides.DefaultChainID = nil
-	config.Overrides.P2PListenPort = null.NewInt(0, true)
-	config.Overrides.P2PV2ListenAddresses = p2paddresses
-	config.Overrides.P2PV2AnnounceAddresses = p2paddresses
-	config.Overrides.P2PNetworkingStack = networking.NetworkingStackV2
-	// NOTE: For the executor jobs, the default of 500k is insufficient for a 3 message batch
-	config.Overrides.GlobalEvmGasLimitDefault = null.NewInt(1500000, true)
-	// Disables ocr spec validation so we can have fast polling for the test.
-	config.Overrides.Dev = null.BoolFrom(true)
+	config, db := heavyweight.FullTestDBNoFixturesV2(t, fmt.Sprintf("%s%d", dbName, port), func(c *chainlink.Config, s *chainlink.Secrets) {
+		// Disables ocr spec validation so we can have fast polling for the test.
+		c.DevMode = true
+
+		true := true
+		false := false
+
+		c.Feature.CCIP = &true
+		c.OCR.Enabled = &false
+		c.OCR2.Enabled = &true
+		c.Feature.LogPoller = &true
+		c.P2P.V2.Enabled = &true
+		c.P2P.V2.DeltaDial = models.MustNewDuration(500 * time.Millisecond)
+		c.P2P.V2.DeltaReconcile = models.MustNewDuration(5 * time.Second)
+		c.P2P.V2.ListenAddresses = &p2paddresses
+		c.P2P.V2.AnnounceAddresses = &p2paddresses
+
+		for i := range c.EVM {
+			// NOTE: For the executor jobs, the default of 500k is insufficient for a 3 message batch
+			limit := uint32(1500000)
+			c.EVM[i].GasEstimator.LimitDefault = &limit
+		}
+
+		if bootstrapPeerID != "" {
+			// Supply the bootstrap IP and port as a V2 peer address
+			c.P2P.V2.DefaultBootstrappers = &[]commontypes.BootstrapperLocator{{
+				PeerID: bootstrapPeerID, Addrs: []string{
+					fmt.Sprintf("127.0.0.1:%d", bootstrapPort),
+				}},
+			}
+		}
+
+		//config.Overrides.DefaultChainID = nil
+		//config.Overrides.P2PListenPort = null.NewInt(0, true)
+		//config.Overrides.P2PNetworkingStack = networking.NetworkingStackV2
+	})
 
 	var lggr = logger.TestLogger(t)
 
@@ -290,7 +310,6 @@ func SetupNodeCCIP(
 	require.NoError(t, err)
 	require.Len(t, p2pIDs, 1)
 	peerID := p2pIDs[0].PeerID()
-	config.Overrides.P2PPeerID = peerID
 
 	_, err = app.GetKeyStore().Eth().Create(destChainID)
 	require.NoError(t, err)
@@ -315,9 +334,7 @@ func SetupNodeCCIP(
 
 	kb, err := app.GetKeyStore().OCR2().Create(chaintype.EVM)
 	require.NoError(t, err)
-	return app, peerID.Raw(), transmitter, kb, config, func() {
-		app.Stop()
-	}
+	return app, peerID.Raw(), transmitter, kb
 }
 
 func AllNodesHaveReqSeqNum(t *testing.T, ccipContracts CCIPContracts, eventSig common.Hash, onRamp common.Address, nodes []Node, seqNum int) logpoller.Log {
@@ -345,7 +362,7 @@ func NoNodesHaveExecutedSeqNum(t *testing.T, ccipContracts CCIPContracts, offRam
 }
 
 func SetupAndStartNodes(ctx context.Context, t *testing.T, ccipContracts CCIPContracts, bootstrapNodePort int64) (Node, []Node, int64) {
-	appBootstrap, bootstrapPeerID, bootstrapTransmitter, bootstrapKb, _, _ := SetupNodeCCIP(t, ccipContracts.DestUser, bootstrapNodePort, "bootstrap_ccip", ccipContracts.SourceChain, ccipContracts.DestChain, ccipContracts.SourceChainID, ccipContracts.DestChainID)
+	appBootstrap, bootstrapPeerID, bootstrapTransmitter, bootstrapKb := SetupNodeCCIP(t, ccipContracts.DestUser, bootstrapNodePort, "bootstrap_ccip", ccipContracts.SourceChain, ccipContracts.DestChain, ccipContracts.SourceChainID, ccipContracts.DestChainID, "", 0)
 	var (
 		oracles []confighelper.OracleIdentityExtra
 		nodes   []Node
@@ -360,16 +377,8 @@ func SetupAndStartNodes(ctx context.Context, t *testing.T, ccipContracts CCIPCon
 	}
 	// Set up the minimum 4 oracles all funded with destination ETH
 	for i := int64(0); i < 4; i++ {
-		app, peerID, transmitter, kb, cfg, _ := SetupNodeCCIP(t, ccipContracts.DestUser, bootstrapNodePort+1+i, fmt.Sprintf("oracle_ccip%d", i), ccipContracts.SourceChain, ccipContracts.DestChain, ccipContracts.SourceChainID, ccipContracts.DestChainID)
-		// Supply the bootstrap IP and port as a V2 peer address
-		cfg.Overrides.P2PV2Bootstrappers = []commontypes.BootstrapperLocator{
-			{PeerID: bootstrapPeerID, Addrs: []string{
-				fmt.Sprintf("127.0.0.1:%d", bootstrapNodePort),
-			}},
-		}
-		nodes = append(nodes, Node{
-			app, transmitter, kb,
-		})
+		app, peerID, transmitter, kb := SetupNodeCCIP(t, ccipContracts.DestUser, bootstrapNodePort+1+i, fmt.Sprintf("oracle_ccip%d", i), ccipContracts.SourceChain, ccipContracts.DestChain, ccipContracts.SourceChainID, ccipContracts.DestChainID, bootstrapPeerID, bootstrapNodePort)
+		nodes = append(nodes, Node{app, transmitter, kb})
 		offchainPublicKey, _ := hex.DecodeString(strings.TrimPrefix(kb.OnChainPublicKey(), "0x"))
 		oracles = append(oracles, confighelper.OracleIdentityExtra{
 			OracleIdentity: confighelper.OracleIdentity{
