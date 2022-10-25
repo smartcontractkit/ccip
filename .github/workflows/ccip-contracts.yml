@@ -5,12 +5,30 @@ env:
   FOUNDRY_PROFILE: ci
 
 jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      changes: ${{ steps.changes.outputs.src }}
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # v3.1.0
+      - uses: dorny/paths-filter@b2feaf19c27470162a626bd6fa8438ae5b263721 # v2.10.2
+        id: changes
+        with:
+          filters: |
+            src:
+              - 'contracts/**/*'
+              - '.github/workflows/ccip-contracts.yml'
+
   solhint:
+    needs: [changes]
     name: Solhint
     runs-on: ubuntu-latest
 
     steps:
       - name: Collect Metrics
+        if: ${{ needs.changes.outputs.changes == 'true' }}
         id: collect-gha-metrics
         uses: smartcontractkit/push-gha-metrics-action@v1
         with:
@@ -19,24 +37,23 @@ jobs:
           this-job-name: Solhint
         continue-on-error: true
       - name: Checkout the repo
-        uses: actions/checkout@v2
-      - name: Setup node
-        uses: actions/setup-node@v3
-        with:
-          node-version: "16"
-          cache: 'yarn'
-      - run: yarn install --frozen-lockfile
+        uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # v3.1.0
+      - name: Setup NodeJS
+        if: ${{ needs.changes.outputs.changes == 'true' }}
+        uses: ./.github/actions/setup-nodejs
       - name: Run Solhint
-        run: |
-          cd ./contracts/
-          yarn lint:ccip
+        if: ${{ needs.changes.outputs.changes == 'true' }}
+        working-directory: contracts
+        run: pnpm lint:ccip
 
   coverage:
+    needs: [changes]
     name: Coverage
     runs-on: ubuntu-latest
 
     steps:
       - name: Collect Metrics
+        if: ${{ needs.changes.outputs.changes == 'true' }}
         id: collect-gha-metrics
         uses: smartcontractkit/push-gha-metrics-action@v1
         with:
@@ -45,30 +62,35 @@ jobs:
           this-job-name: Coverage
         continue-on-error: true
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # v3.1.0
         with:
           submodules: recursive
 
       - name: Install Foundry
+        if: ${{ needs.changes.outputs.changes == 'true' }}
         uses: foundry-rs/foundry-toolchain@v1
         with:
           version: nightly
 
       - name: Run Forge build
+        if: ${{ needs.changes.outputs.changes == 'true' }}
         run: |
           forge --version
           forge build
         id: build
       
       - name: Run coverage
+        if: ${{ needs.changes.outputs.changes == 'true' }}
         run: forge coverage --report lcov
 
       - name: Prune report
+        if: ${{ needs.changes.outputs.changes == 'true' }}
         run: |
           sudo apt-get install lcov
           ./tools/ci/ccip_lcov_prune ./lcov.info ./lcov.info.pruned
 
       - name: Report code coverage
+        if: ${{ needs.changes.outputs.changes == 'true' }}
         uses: zgosalvez/github-actions-report-lcov@v1
         with:
           coverage-files: lcov.info.pruned
@@ -90,7 +112,7 @@ jobs:
           this-job-name: Tests
         continue-on-error: true
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # v3.1.0
         with:
           submodules: recursive
 
@@ -111,11 +133,13 @@ jobs:
         id: test
 
   abi:
+    needs: [changes]
     name: ABI
     runs-on: ubuntu-latest
 
     steps:
       - name: Collect Metrics
+        if: ${{ needs.changes.outputs.changes == 'true' }}
         id: collect-gha-metrics
         uses: smartcontractkit/push-gha-metrics-action@v1
         with:
@@ -124,22 +148,25 @@ jobs:
           this-job-name: ABI
         continue-on-error: true
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # v3.1.0
         with:
           submodules: recursive
 
       - name: Install Foundry
+        if: ${{ needs.changes.outputs.changes == 'true' }}
         uses: foundry-rs/foundry-toolchain@v1
         with:
           version: nightly
 
       - name: Run Forge build
+        if: ${{ needs.changes.outputs.changes == 'true' }}
         run: |
           forge --version
           forge build
         id: build
 
       - name: Check Public ABIs
+        if: ${{ needs.changes.outputs.changes == 'true' }}
         run: |
           ./tools/ci/ccip_public_abi_check
         id: abi-check
