@@ -139,6 +139,49 @@ contract EVM2AnySubscriptionOnRampRouter_setOnRamp is EVM2EVMSubscriptionOnRampS
   }
 }
 
+/// @notice #removeOnRamp
+contract EVM2AnySubscriptionOnRampRouter_removeOnRamp is EVM2EVMSubscriptionOnRampSetup {
+  // Success
+
+  function testSuccess() public {
+    EVM2EVMSubscriptionOnRampInterface onramp = EVM2EVMSubscriptionOnRampInterface(address(1));
+    uint256 chainId = 1337;
+    s_onRampRouter.setOnRamp(chainId, onramp);
+
+    vm.expectEmit(false, true, false, true);
+    emit OnRampRemoved(chainId, onramp);
+
+    s_onRampRouter.removeOnRamp(chainId, onramp);
+
+    EVM2EVMSubscriptionOnRampInterface afterSet = s_onRampRouter.getOnRamp(chainId);
+    assertEq(address(0), address(afterSet));
+    assertEq(false, s_onRampRouter.isChainSupported(chainId));
+  }
+
+  // Reverts
+
+  function testWrongAddressReverts() public {
+    EVM2EVMSubscriptionOnRampInterface onramp = EVM2EVMSubscriptionOnRampInterface(address(1));
+    uint256 chainId = 1337;
+    s_onRampRouter.setOnRamp(chainId, onramp);
+
+    address wrongRamp = address(10000);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(EVM2AnySubscriptionOnRampRouterInterface.WrongOnRamp.selector, wrongRamp, address(onramp))
+    );
+
+    s_onRampRouter.removeOnRamp(chainId, EVM2EVMSubscriptionOnRampInterface(wrongRamp));
+  }
+
+  // Asserts that it can only be called by the owner.
+  function testOnlyOwnerReverts() public {
+    vm.stopPrank();
+    vm.expectRevert("Only callable by owner");
+    s_onRampRouter.removeOnRamp(1337, EVM2EVMSubscriptionOnRampInterface(address(1)));
+  }
+}
+
 /// @notice #setFee
 contract EVM2AnySubscriptionOnRampRouter_setFee is EVM2EVMSubscriptionOnRampSetup {
   // Success

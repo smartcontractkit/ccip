@@ -8,6 +8,7 @@ contract EVM2EVMSubscriptionOnRampSetup is TokenSetup {
   // Duplicate event of the CCIPSendRequested in the TollOnRampInterface
   event CCIPSendRequested(CCIP.EVM2EVMSubscriptionMessage message);
   event OnRampSet(uint256 indexed chainId, EVM2EVMSubscriptionOnRampInterface indexed onRamp);
+  event OnRampRemoved(uint256 indexed chainId, EVM2EVMSubscriptionOnRampInterface indexed onRamp);
   event FeeSet(uint96);
   event SubscriptionFunded(address indexed sender, uint256 amount);
   event SubscriptionUnfunded(address indexed sender, uint256 amount);

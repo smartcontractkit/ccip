@@ -5,6 +5,7 @@
   "getFee()": "ced72f87",
   "getOnRamp(uint256)": "d8a98f8c",
   "isChainSupported(uint256)": "5221c1f0",
+  "removeOnRamp(uint256,address)": "b2c20480",
   "setFee(uint96)": "ae275dce",
   "setOnRamp(uint256,address)": "f1927cae",
   "unfundSubscription(uint256)": "95e712db"

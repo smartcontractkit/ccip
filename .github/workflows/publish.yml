@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - ccip-develop
+      - free-offramp
 
 jobs:
   build-and-publish:

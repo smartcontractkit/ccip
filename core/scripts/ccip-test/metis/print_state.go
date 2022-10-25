@@ -92,6 +92,7 @@ func printTxStatuses(source *rhea.EvmChainConfig, destination *rhea.EvmChainConf
 
 	txs := make(map[uint64]*CCIPTXStatus)
 	maxSeqNum := uint64(0)
+	minSeqNum := uint64(1)
 	var seqNums []uint64
 
 	for sendRequested.Next() {
@@ -100,6 +101,9 @@ func printTxStatuses(source *rhea.EvmChainConfig, destination *rhea.EvmChainConf
 		}
 		if sendRequested.Event.Message.SequenceNumber > maxSeqNum {
 			maxSeqNum = sendRequested.Event.Message.SequenceNumber
+		}
+		if minSeqNum == 1 {
+			minSeqNum = sendRequested.Event.Message.SequenceNumber
 		}
 		seqNums = append(seqNums, sendRequested.Event.Message.SequenceNumber)
 	}
@@ -153,11 +157,15 @@ func printTxStatuses(source *rhea.EvmChainConfig, destination *rhea.EvmChainConf
 
 	sb.WriteString(generateHeader(tableHeaders, headerLengths))
 
-	for i := uint64(1); i <= maxSeqNum; i++ {
+	if minSeqNum > 1 {
+		sb.WriteString(fmt.Sprintf("| %18d | %18d | %41s | %18s | \n", 1, minSeqNum-1, "Probably > 10k blocks in the past", ""))
+	}
+
+	for i := minSeqNum; i <= maxSeqNum; i++ {
 		tx := txs[i]
 		relayedAt := "-"
 		if tx == nil {
-			sb.WriteString(fmt.Sprintf("| %18d | %18s | %41s | \n", i, "TX MISSING", "Probably > 10k blocks in the past"))
+			sb.WriteString(fmt.Sprintf("| %18d | %18s | %41s | %18s | \n", i, "TX MISSING", "", ""))
 			continue
 		}
 		if tx.relayReport != nil {
@@ -451,6 +459,27 @@ func printPaused(chain *rhea.EvmChainConfig) {
 	chain.Logger.Info(sb.String())
 }
 
+func PrintNodeBalances(chain *rhea.EvmChainConfig, addresses []common.Address) {
+	var sb strings.Builder
+	sb.WriteString("\n")
+	sb.WriteString(fmt.Sprintf("Paused addresses for %s\n", helpers.ChainName(chain.ChainId.Int64())))
+
+	tableHeaders := []string{"Sender", "Balance"}
+	headerLengths := []int{42, 18}
+
+	sb.WriteString(generateHeader(tableHeaders, headerLengths))
+
+	for _, sender := range addresses {
+		balanceAt, err := chain.Client.BalanceAt(context.Background(), sender, nil)
+		helpers.PanicErr(err)
+
+		sb.WriteString(fmt.Sprintf("| %42s |   %-16s |\n", sender.Hex(), new(big.Float).Quo(new(big.Float).SetInt(balanceAt), big.NewFloat(1e18)).String()))
+	}
+
+	sb.WriteString(generateSeparator(headerLengths))
+	chain.Logger.Info(sb.String())
+}
+
 func printPoolBalances(chain *rhea.EvmChainConfig) {
 	var sb strings.Builder
 	sb.WriteString("\n")
@@ -508,59 +537,6 @@ func generateSeparator(headerLengths []int) string {
 		length += headerLength + 3
 	}
 	return strings.Repeat("─", length) + "\n"
-}
-
-func PrintContractConfig(source *rhea.EvmChainConfig, destination *rhea.EvmChainConfig) {
-	source.Logger.Infof(`
-Source chain config
-
-LinkToken:      common.HexToAddress("%s"),
-BridgeTokens:   %s,
-TokenPools:     %s,
-OnRamp:         common.HexToAddress("%s"),
-OnRampRouter:   common.HexToAddress("%s"),
-TokenSender:    common.HexToAddress("%s"),
-Afn:            common.HexToAddress("%s"),
-GovernanceDapp: common.HexToAddress("%s"),
-PingPongDapp:   common.HexToAddress("%s"),
-	
-`,
-		source.LinkToken,
-		source.BridgeTokens,
-		source.TokenPools,
-		source.OnRamp,
-		source.OnRampRouter,
-		source.TokenSender,
-		source.Afn,
-		source.GovernanceDapp,
-		source.PingPongDapp)
-
-	destination.Logger.Infof(`
-Destination chain config
-
-LinkToken:       common.HexToAddress("%s"),
-BridgeTokens:    %s,
-TokenPools:      %s,
-OffRamp:         common.HexToAddress("%s"),
-OffRampRouter:   common.HexToAddress("%s"),
-BlobVerifier:    common.HexToAddress("%s"),	
-MessageReceiver: common.HexToAddress("%s"),
-ReceiverDapp:    common.HexToAddress("%s"),
-Afn:             common.HexToAddress("%s"),
-GovernanceDapp:  common.HexToAddress("%s"),
-PingPongDapp:    common.HexToAddress("%s"),
-`,
-		destination.LinkToken,
-		destination.BridgeTokens,
-		destination.TokenPools,
-		destination.OffRamp,
-		destination.OffRampRouter,
-		destination.BlobVerifier,
-		destination.MessageReceiver,
-		destination.ReceiverDapp,
-		destination.Afn,
-		destination.GovernanceDapp,
-		destination.PingPongDapp)
 }
 
 // PrintJobSpecs prints the job spec for each node and CCIP spec type, as well as a bootstrap spec.

@@ -9,7 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp"
@@ -54,12 +53,13 @@ func NewSubscriptionCache(
 }
 
 func (sbc *SubscriptionCache) Balance(addr common.Address) *big.Int {
-	sub, err := sbc.router.GetSubscription(nil, addr)
-	if err != nil {
-		sbc.lggr.Errorw("No sub found", "addr", addr)
-		return big.NewInt(0)
-	}
-	return sub.Balance
+	return big.NewInt(0).Mul(big.NewInt(100), big.NewInt(1e18))
+	//sub, err := sbc.router.GetSubscription(nil, addr)
+	//if err != nil {
+	//	sbc.lggr.Errorw("No sub found", "addr", addr)
+	//	return big.NewInt(0)
+	//}
+	//return sub.Balance
 }
 
 func (sbc *SubscriptionCache) Nonce(addr common.Address) uint64 {
@@ -72,17 +72,18 @@ func (sbc *SubscriptionCache) Nonce(addr common.Address) uint64 {
 }
 
 func (sbc *SubscriptionCache) IsStrict(addr common.Address) (bool, error) {
-	if _, ok := sbc.strict[addr]; !ok {
-		sub, err := sbc.router.GetSubscription(nil, addr)
-		if err != nil {
-			return false, err
-		}
-		if sub.Receiver == [common.AddressLength]byte{} {
-			return false, errors.Errorf("subscription does not exist for addr %v", addr)
-		}
-		sbc.strict[addr] = sub.StrictSequencing
-	}
-	return sbc.strict[addr], nil
+	return false, nil
+	//if _, ok := sbc.strict[addr]; !ok {
+	//	sub, err := sbc.router.GetSubscription(nil, addr)
+	//	if err != nil {
+	//		return false, err
+	//	}
+	//	if sub.Receiver == [common.AddressLength]byte{} {
+	//		return false, errors.Errorf("subscription does not exist for addr %v", addr)
+	//	}
+	//	sbc.strict[addr] = sub.StrictSequencing
+	//}
+	//return sbc.strict[addr], nil
 }
 
 func (sbc *SubscriptionCache) MostRecentExecution(addr common.Address) MessageExecutionState {

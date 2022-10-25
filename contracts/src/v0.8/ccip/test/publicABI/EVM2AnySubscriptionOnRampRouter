@@ -7,6 +7,7 @@
   "getOnRamp(uint256)": "d8a98f8c",
   "isChainSupported(uint256)": "5221c1f0",
   "owner()": "8da5cb5b",
+  "removeOnRamp(uint256,address)": "b2c20480",
   "setFee(uint96)": "ae275dce",
   "setOnRamp(uint256,address)": "f1927cae",
   "transferOwnership(address)": "f2fde38b",

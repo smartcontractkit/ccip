@@ -4,6 +4,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/dione"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/metis"
@@ -11,9 +13,9 @@ import (
 )
 
 var (
-	SOURCE      = rhea.GoerliAvaxConfig
-	DESTINATION = rhea.AvaxFuji
-	ENV         = dione.StagingAlpha
+	SOURCE      = rhea.Staging_Beta_GoerliToAvaxFuji
+	DESTINATION = rhea.Staging_Beta_AvaxFujiToGoerli
+	ENV         = dione.StagingBeta
 )
 
 // These functions can be run as a test (prefix with Test) with the following config
@@ -33,7 +35,31 @@ func TestMetisPrintState(t *testing.T) {
 
 	metis.PrintCCIPState(&SOURCE, &DESTINATION)
 
-	metis.PrintContractConfig(&SOURCE, &DESTINATION)
+	rhea.PrintContractConfig(&SOURCE, &DESTINATION)
+}
+
+// TestMetisPrintNodeBalances can be run as a test with the following config
+// OWNER_KEY  private key used to deploy all contracts and is used as default in all single user tests.
+func TestMetisPrintNodeBalances(t *testing.T) {
+	ownerKey := os.Getenv("OWNER_KEY")
+	if ownerKey == "" {
+		t.Log("No command given, skipping ccip-test-script. This is intended behaviour for automated testing.")
+		t.SkipNow()
+	}
+
+	SOURCE.SetupChain(t, ownerKey)
+	DESTINATION.SetupChain(t, ownerKey)
+
+	don := dione.NewOfflineDON(ENV, logger.TestLogger(t))
+
+	var sourceKeys, destKeys []common.Address
+
+	for _, node := range don.Config.Nodes {
+		sourceKeys = append(sourceKeys, common.HexToAddress(node.EthKeys[SOURCE.ChainId.String()]))
+		destKeys = append(destKeys, common.HexToAddress(node.EthKeys[DESTINATION.ChainId.String()]))
+	}
+	metis.PrintNodeBalances(&SOURCE, sourceKeys)
+	metis.PrintNodeBalances(&DESTINATION, destKeys)
 }
 
 // TestDeploySubscription can be run as a test with the following config
@@ -45,7 +71,7 @@ func TestRheaDeploySubscription(t *testing.T) {
 		t.SkipNow()
 	}
 	rhea.DeploySubscriptionContracts(t, ownerKey, &SOURCE, &DESTINATION)
-	metis.PrintContractConfig(&SOURCE, &DESTINATION)
+	rhea.PrintContractConfig(&SOURCE, &DESTINATION)
 }
 
 // TestDione can be run as a test with the following config
@@ -112,14 +138,17 @@ func runCommand(t *testing.T, ownerKey string, seedKey string, command string) {
 		seedKey,
 	)
 
+	SOURCE.SetupChain(t, ownerKey)
+	DESTINATION.SetupChain(t, ownerKey)
+
 	// Auto unpauses all contracts if they're paused.
-	client.UnpauseAll()
+	//client.UnpauseAll()
 
 	switch command {
 	// Deploys a new set of PingPong contracts, configures them to talk to each other
 	// and creates destination chain subscriptions for both.
 	case "deployPingPong":
-		rhea.DeployPingPongDapps(t, GetSetupChain(t, ownerKey, SOURCE), GetSetupChain(t, ownerKey, DESTINATION))
+		rhea.DeployPingPongDapps(t, &SOURCE, &DESTINATION)
 		// Starts and unpauses the PingPong dapp that is on the `source` chain.
 	case "startPingPong":
 		client.startPingPong(t)
@@ -133,6 +162,8 @@ func runCommand(t *testing.T, ownerKey string, seedKey string, command string) {
 	case "setConfig":
 		// Set the config to the blobVerifier and the offramp
 		client.SetOCRConfig(ENV)
+	case "upgradeLane":
+		rhea.UpgradeLane(t, &SOURCE, &DESTINATION)
 	case "dapp":
 		client.SendDappTx(t)
 		// Sends a new config to the governance dapp, spreading it to all configured chains

@@ -8,10 +8,12 @@ import {EVM2EVMSubscriptionOnRampInterface} from "./EVM2EVMSubscriptionOnRampInt
 
 interface EVM2AnySubscriptionOnRampRouterInterface is BaseOnRampRouterInterface {
   error OnRampAlreadySet(uint256 chainId, EVM2EVMSubscriptionOnRampInterface onRamp);
+  error WrongOnRamp(address got, address expected);
   error FundingTooLow(address sender);
   error OnlyCallableByFeeAdmin();
 
   event OnRampSet(uint256 indexed chainId, EVM2EVMSubscriptionOnRampInterface indexed onRamp);
+  event OnRampRemoved(uint256 indexed chainId, EVM2EVMSubscriptionOnRampInterface indexed onRamp);
   event FeeSet(uint96);
   event SubscriptionFunded(address indexed sender, uint256 amount);
   event SubscriptionUnfunded(address indexed sender, uint256 amount);
@@ -42,6 +44,14 @@ interface EVM2AnySubscriptionOnRampRouterInterface is BaseOnRampRouterInterface 
    * @param onRamp OnRamp to use for that destination chain
    */
   function setOnRamp(uint256 chainId, EVM2EVMSubscriptionOnRampInterface onRamp) external;
+
+  /**
+   * @notice Delete chainId => onRamp mapping
+   * @dev only callable by owner
+   * @param chainId destination chain ID
+   * @param onRamp OnRamp to use for that destination chain
+   */
+  function removeOnRamp(uint256 chainId, EVM2EVMSubscriptionOnRampInterface onRamp) external;
 
   /**
    * @notice Gets the current OnRamp for the specified chain ID

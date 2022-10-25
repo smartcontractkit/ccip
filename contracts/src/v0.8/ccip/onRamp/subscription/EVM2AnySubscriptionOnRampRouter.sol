@@ -58,6 +58,13 @@ contract EVM2AnySubscriptionOnRampRouter is
     emit OnRampSet(chainId, onRamp);
   }
 
+  function removeOnRamp(uint256 chainId, EVM2EVMSubscriptionOnRampInterface onRamp) external onlyOwner {
+    if (address(s_onRamps[chainId]) != address(onRamp))
+      revert WrongOnRamp(address(onRamp), address(s_onRamps[chainId]));
+    delete s_onRamps[chainId];
+    emit OnRampRemoved(chainId, onRamp);
+  }
+
   /// @inheritdoc EVM2AnySubscriptionOnRampRouterInterface
   function getOnRamp(uint256 chainId) external view returns (EVM2EVMSubscriptionOnRampInterface) {
     return s_onRamps[chainId];

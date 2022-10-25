@@ -101,3 +101,56 @@ func SetGasFees(owner *bind.TransactOpts, config EVMGasSettings) {
 		owner.GasPrice = config.GasPrice
 	}
 }
+
+func PrintContractConfig(source *EvmChainConfig, destination *EvmChainConfig) {
+	source.Logger.Infof(`
+Source chain config
+
+LinkToken:      common.HexToAddress("%s"),
+BridgeTokens:   %s,
+TokenPools:     %s,
+OnRamp:         common.HexToAddress("%s"),
+OnRampRouter:   common.HexToAddress("%s"),
+TokenSender:    common.HexToAddress("%s"),
+Afn:            common.HexToAddress("%s"),
+GovernanceDapp: common.HexToAddress("%s"),
+PingPongDapp:   common.HexToAddress("%s"),
+	
+`,
+		source.LinkToken,
+		source.BridgeTokens,
+		source.TokenPools,
+		source.OnRamp,
+		source.OnRampRouter,
+		source.TokenSender,
+		source.Afn,
+		source.GovernanceDapp,
+		source.PingPongDapp)
+
+	destination.Logger.Infof(`
+Destination chain config
+
+LinkToken:       common.HexToAddress("%s"),
+BridgeTokens:    %s,
+TokenPools:      %s,
+OffRamp:         common.HexToAddress("%s"),
+OffRampRouter:   common.HexToAddress("%s"),
+BlobVerifier:    common.HexToAddress("%s"),	
+MessageReceiver: common.HexToAddress("%s"),
+ReceiverDapp:    common.HexToAddress("%s"),
+Afn:             common.HexToAddress("%s"),
+GovernanceDapp:  common.HexToAddress("%s"),
+PingPongDapp:    common.HexToAddress("%s"),
+`,
+		destination.LinkToken,
+		destination.BridgeTokens,
+		destination.TokenPools,
+		destination.OffRamp,
+		destination.OffRampRouter,
+		destination.BlobVerifier,
+		destination.MessageReceiver,
+		destination.ReceiverDapp,
+		destination.Afn,
+		destination.GovernanceDapp,
+		destination.PingPongDapp)
+}
