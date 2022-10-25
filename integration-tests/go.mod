@@ -6,7 +6,6 @@ require (
 	github.com/ethereum/go-ethereum v1.10.25
 	github.com/go-resty/resty/v2 v2.7.0
 	github.com/imdario/mergo v0.3.13
-	github.com/lib/pq v1.10.7
 	github.com/onsi/ginkgo/v2 v2.2.0
 	github.com/onsi/gomega v1.20.2
 	github.com/pkg/errors v0.9.1
@@ -14,8 +13,8 @@ require (
 	github.com/satori/go.uuid v1.2.0
 	github.com/slack-go/slack v0.11.3
 	github.com/smartcontractkit/chainlink v1.8.0
-	github.com/smartcontractkit/chainlink-env v0.2.41
-	github.com/smartcontractkit/chainlink-testing-framework v1.7.2
+	github.com/smartcontractkit/chainlink-env v0.2.43
+	github.com/smartcontractkit/chainlink-testing-framework v1.7.3
 	github.com/smartcontractkit/libocr v0.0.0-20220812191430-db92a9fdaa52
 	github.com/stretchr/testify v1.8.0
 	go.uber.org/atomic v1.9.0
@@ -191,6 +190,7 @@ require (
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/leanovate/gopter v0.2.10-0.20210127095200-9abe2343507a // indirect
 	github.com/leodido/go-urn v1.2.1 // indirect
+	github.com/lib/pq v1.10.7 // indirect
 	github.com/libp2p/go-addr-util v0.0.2 // indirect
 	github.com/libp2p/go-buffer-pool v0.0.2 // indirect
 	github.com/libp2p/go-cidranger v1.1.0 // indirect
@@ -299,7 +299,7 @@ require (
 	github.com/smartcontractkit/chainlink-solana v1.0.2-0.20220930034647-edd5a863b876 // indirect
 	github.com/smartcontractkit/chainlink-starknet/relayer v0.0.0-20220930034704-572ac07611cb // indirect
 	github.com/smartcontractkit/chainlink-terra v0.1.4-0.20220930034731-ef9eb53de886 // indirect
-	github.com/smartcontractkit/ocr2keepers v0.4.4 // indirect
+	github.com/smartcontractkit/ocr2keepers v0.4.7 // indirect
 	github.com/smartcontractkit/ocr2vrf v0.0.0-20221017160540-1ebacaf4c7e7 // indirect
 	github.com/smartcontractkit/sqlx v1.3.5-0.20210805004948-4be295aacbeb // indirect
 	github.com/smartcontractkit/terra.go v1.0.3-0.20220108002221-62b39252ee16 // indirect
@@ -353,7 +353,7 @@ require (
 	golang.org/x/oauth2 v0.0.0-20220822191816-0ebed06d0094 // indirect
 	golang.org/x/sys v0.0.0-20221013171732-95e765b1cc43 // indirect
 	golang.org/x/term v0.0.0-20220722155259-a9ba230a4035 // indirect
-	golang.org/x/text v0.3.7 // indirect
+	golang.org/x/text v0.4.0 // indirect
 	golang.org/x/time v0.0.0-20220722155302-e5dcc9cfc0b9 // indirect
 	golang.org/x/tools v0.1.12 // indirect
 	gonum.org/v1/gonum v0.11.0 // indirect
@@ -406,5 +406,4 @@ replace github.com/CosmWasm/wasmvm => github.com/CosmWasm/wasmvm v1.0.0
 // See https://github.com/99designs/keyring/issues/94
 replace github.com/keybase/go-keychain => github.com/99designs/go-keychain v0.0.0-20191008050251-8e49817e8af4
 
-// Test our local version
-replace github.com/smartcontractkit/chainlink => ../../chainlink-ccip
+replace github.com/smartcontractkit/chainlink => ../

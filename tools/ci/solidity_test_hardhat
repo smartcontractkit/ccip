@@ -1,7 +1,0 @@
-#!/usr/bin/env bash
-
-set -e
-
-export NODE_OPTIONS="--max-old-space-size=8192"
-yarn workspace @chainlink/contracts compile
-yarn workspace @chainlink/contracts test

@@ -47,7 +47,7 @@ UseBatchSend = true
 Enabled = false
 ForwardToUrl = ''
 JsonWrapperKey = ''
-Headers = ''
+Headers = []
 
 [Log]
 DatabaseQueries = false
