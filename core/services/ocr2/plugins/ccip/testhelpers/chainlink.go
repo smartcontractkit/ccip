@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	types4 "github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/client"
@@ -155,6 +156,7 @@ func SetupNodeCCIP(
 		}
 		// Disables ocr spec validation, so we can have fast polling for the test.
 		c.DevMode = trueRef
+		c.Log.Level = zap.DebugLevel
 		c.Feature.CCIP = &trueRef
 		c.OCR.Enabled = &falseRef
 		c.OCR2.Enabled = &trueRef
@@ -333,6 +335,8 @@ func createConfigV2Chain(t *testing.T, chainId *big.Int) *v2.EVMConfig {
 
 	sourceC, _ := v2.Defaults((*utils.Big)(chainId))
 	sourceC.GasEstimator.LimitDefault = &defaultGasLimit
+	fixedPrice := "FixedPrice"
+	sourceC.GasEstimator.Mode = &fixedPrice
 	return &v2.EVMConfig{
 		ChainID: (*utils.Big)(chainId),
 		Enabled: &tr,

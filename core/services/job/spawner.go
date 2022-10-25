@@ -237,6 +237,7 @@ func (js *spawner) CreateJob(jb *Job, qopts ...pg.QOpt) (err error) {
 	}
 	js.lggr.Infow("Created job", "type", jb.Type, "jobID", jb.ID)
 
+	delegate.BeforeJobCreated(*jb)
 	err = js.StartService(q.ParentCtx, *jb)
 	if err != nil {
 		js.lggr.Errorw("Error starting job services", "type", jb.Type, "jobID", jb.ID, "error", err)
