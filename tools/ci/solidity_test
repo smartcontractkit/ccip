@@ -1,9 +1,0 @@
-#!/usr/bin/env bash
-
-set -e
-
-yarn setup:contracts
-
-export NODE_OPTIONS="--max-old-space-size=8192"
-# These should be merged into a global test command
-yarn workspace @chainlink/contracts test "$1"

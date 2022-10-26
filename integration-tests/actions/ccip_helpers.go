@@ -29,6 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_subscription_onramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_toll_onramp_router"
 	evm_2_evm_subscription_onramp2 "github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_subscription_onramp"
+	"github.com/smartcontractkit/chainlink/core/services/job"
 	ccipPlugin "github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/testhelpers"
 	"github.com/smartcontractkit/chainlink/core/services/relay"
@@ -785,7 +786,7 @@ func CreateOCRJobsForCCIP(
 	bootstrapSpec := &client.OCR2TaskJobSpec{
 		Name:    fmt.Sprintf("bootstrap-%s-%s", destChainName, uuid.NewV4().String()),
 		JobType: "bootstrap",
-		OCR2OracleSpec: client.TempOCR2OracleSpec{
+		OCR2OracleSpec: job.OCR2OracleSpec{
 			ContractID:                        blobVerifier,
 			Relay:                             relay.EVM,
 			ContractConfigConfirmations:       1,
@@ -819,9 +820,9 @@ func CreateOCRJobsForCCIP(
 		ocr2SpecRelay := &client.OCR2TaskJobSpec{
 			JobType: "offchainreporting2",
 			Name:    fmt.Sprintf("ccip-relay-%s-%s", sourceChainName, destChainName),
-			OCR2OracleSpec: client.TempOCR2OracleSpec{
+			OCR2OracleSpec: job.OCR2OracleSpec{
 				Relay:                             relay.EVM,
-				PluginType:                        client.CCIPRelay,
+				PluginType:                        job.CCIPRelay,
 				ContractID:                        blobVerifier,
 				OCRKeyBundleID:                    null.StringFrom(nodeOCR2KeyId),
 				TransmitterID:                     null.StringFrom(nodeTransmitterAddress),
@@ -853,9 +854,9 @@ func CreateOCRJobsForCCIP(
 		ocr2SpecExec := &client.OCR2TaskJobSpec{
 			JobType: "offchainreporting2",
 			Name:    fmt.Sprintf("ccip-exec-toll-%s-%s", sourceChainName, destChainName),
-			OCR2OracleSpec: client.TempOCR2OracleSpec{
+			OCR2OracleSpec: job.OCR2OracleSpec{
 				Relay:                             relay.EVM,
-				PluginType:                        client.CCIPExecution,
+				PluginType:                        job.CCIPExecution,
 				ContractID:                        tollOffRamp,
 				OCRKeyBundleID:                    null.StringFrom(nodeOCR2KeyId),
 				TransmitterID:                     null.StringFrom(nodeTransmitterAddress),
@@ -890,9 +891,9 @@ func CreateOCRJobsForCCIP(
 		ocr3SpecExec := &client.OCR2TaskJobSpec{
 			JobType: "offchainreporting2",
 			Name:    fmt.Sprintf("ccip-exec-sub-%s-%s", sourceChainName, destChainName),
-			OCR2OracleSpec: client.TempOCR2OracleSpec{
+			OCR2OracleSpec: job.OCR2OracleSpec{
 				Relay:                             relay.EVM,
-				PluginType:                        client.CCIPExecution,
+				PluginType:                        job.CCIPExecution,
 				ContractID:                        subOffRamp,
 				OCRKeyBundleID:                    null.StringFrom(nodeOCR2KeyId),
 				TransmitterID:                     null.StringFrom(nodeTransmitterAddress),
