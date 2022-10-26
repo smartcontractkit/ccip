@@ -60,6 +60,10 @@ operator-ui: ## Fetch the frontend
 ccip-abi-generate: ## Generate Public ABI file for a contract
 	./tools/bin/ccip_public_abi_generate $(c)
 
+.PHONY: ccip-abi-fix
+ccip-abi-fix: ## Fix contract ABIs that don't match their expected public ABIs
+	./tools/bin/ccip_public_abi_fix
+
 .PHONY: ccip-abi-check
 ccip-abi-check: ## Check contract ABIs against their expected public ABIs
 	./tools/ci/ccip_public_abi_check
