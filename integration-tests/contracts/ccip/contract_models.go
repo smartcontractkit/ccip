@@ -216,6 +216,7 @@ func (router *SubOnRampRouter) CCIPSend(destChainId *big.Int, msg evm_2_any_subs
 	if err != nil {
 		return nil, err
 	}
+	opts.GasLimit = 5000000
 	tx, err := router.instance.CcipSend(opts, destChainId, msg)
 	if err != nil {
 		return nil, err

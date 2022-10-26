@@ -65,7 +65,11 @@ func PopulateAndValidate() *loadArgs {
 }
 
 func (loadArgs *loadArgs) Setup(sourceNetwork, destNetwork *blockchain.EVMNetwork) {
-	source, dest, tearDown := actions.CCIPDefaultTestSetUpForLoad(sourceNetwork, destNetwork, "load-ccip-sim-geth")
+	_, source, dest, _, tearDown := actions.CCIPDefaultTestSetUp(sourceNetwork, destNetwork, "load-ccip-sim-geth",
+		map[string]interface{}{
+			"replicas": "6",
+			"env":      actions.DefaultCCIPCLNodeEnv,
+		}, 5, true)
 	loadArgs.envTear = tearDown
 	ccipLoad := NewCCIPLoad(source, dest, actions.SUB, loadArgs.ccipTimeout, 100000)
 	ccipLoad.BeforeAllCall()

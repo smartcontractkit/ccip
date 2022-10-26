@@ -65,3 +65,5 @@ cache
 core/services/ocr2/plugins/ccip/transactions.rlp
 lcov.info
 core/scripts/ccip-test/secrets/secrets.go
+
+core/scripts/ccip-test/json/credentials

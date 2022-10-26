@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
 	ctfUtils "github.com/smartcontractkit/chainlink-testing-framework/utils"
+	"golang.org/x/exp/slices"
 	"gopkg.in/guregu/null.v4"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm/types"
@@ -46,13 +49,39 @@ type BillingModel string
 const (
 	SUB  BillingModel = "subscription"
 	TOLL BillingModel = "toll"
+
+	ChaosGroupRelayFaultyPlus     = "RelayMajority"          // >f number of nodes
+	ChaosGroupRelayFaulty         = "RelayMinority"          //  f number of nodes
+	ChaosGroupExecutionFaultyPlus = "ExecutionNodesMajority" // > f number of nodes
+	ChaosGroupExecutionFaulty     = "ExecutionNodesMinority" //  f number of nodes
 )
 
 var (
 	// TODO dynamic calculation of tollfee for multiple tokens in a msg
 
-	TollFee   = big.NewInt(0).Mul(big.NewInt(12), big.NewInt(1e18)) // "maxCharge":"10784576000000000000" for a msg with two tokens
-	UnusedFee = big.NewInt(0).Mul(big.NewInt(11), big.NewInt(1e18)) // for a msg with two tokens
+	TollFee              = big.NewInt(0).Mul(big.NewInt(12), big.NewInt(1e18)) // "maxCharge":"10784576000000000000" for a msg with two tokens
+	UnusedFee            = big.NewInt(0).Mul(big.NewInt(11), big.NewInt(1e18)) // for a msg with two tokens
+	DefaultCCIPCLNodeEnv = map[string]interface{}{
+		"FEATURE_CCIP":                   "true",
+		"FEATURE_OFFCHAIN_REPORTING2":    "true",
+		"feature_offchain_reporting":     "false",
+		"FEATURE_LOG_POLLER":             "true",
+		"GAS_ESTIMATOR_MODE":             "FixedPrice",
+		"P2P_NETWORKING_STACK":           "V2",
+		"P2PV2_LISTEN_ADDRESSES":         "0.0.0.0:6690",
+		"P2PV2_ANNOUNCE_ADDRESSES":       "0.0.0.0:6690",
+		"P2PV2_DELTA_DIAL":               "500ms",
+		"P2PV2_DELTA_RECONCILE":          "5s",
+		"ETH_GAS_LIMIT_DEFAULT":          "5000000",
+		"ETH_LOG_POLL_INTERVAL":          "1s",
+		"p2p_listen_port":                "0",
+		"ETH_FINALITY_DEPTH":             "50",
+		"ETH_HEAD_TRACKER_HISTORY_DEPTH": "100",
+		// It is not permitted to set both ETH_URL and EVM_NODES,
+		// imposing blank values to stop getting the env variable set as default node set up in qa-charts
+		"ETH_URL":      "",
+		"ETH_CHAIN_ID": "0",
+	}
 )
 
 type CCIPCommon struct {
@@ -326,26 +355,84 @@ func (sourceCCIP *SourceCCIPModule) SubscriptionBalance(addr common.Address) *bi
 	return bal
 }
 
-func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(model BillingModel, txHash string, seqNum, currentBlockOnSource uint64) {
+func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(model BillingModel, txHash string, currentBlockOnSource uint64, timeout time.Duration) uint64 {
 	log.Info().Msg("Waiting for CCIPSendRequested event")
+	var seqNum uint64
 	switch model {
 	case TOLL:
-		Eventually(func(g Gomega) {
+		Eventually(func(g Gomega) bool {
 			iterator, err := sourceCCIP.TollOnRamp.FilterCCIPSendRequested(currentBlockOnSource)
 			g.Expect(err).NotTo(HaveOccurred(), "Error filtering CCIPSendRequested event")
-			g.Expect(iterator.Next()).To(BeTrue(), "No CCIPSendRequested event found")
-			g.Expect(iterator.Event.Raw.TxHash.Hex()).Should(Equal(txHash), "txhash on CCIPSendRequested")
-			g.Expect(iterator.Event.Message.SequenceNumber).Should(Equal(seqNum), "SequenceNumber on CCIPSendRequested")
-		}, "1m", "1s").Should(Succeed(), "CCIPSendRequested")
+			for iterator.Next() {
+				if strings.EqualFold(iterator.Event.Raw.TxHash.Hex(), txHash) {
+					seqNum = iterator.Event.Message.SequenceNumber
+					return true
+				}
+			}
+			return false
+		}, timeout, "1s").Should(BeTrue(), "No CCIPSendRequested event found with txHash %s", txHash)
 	case SUB:
-		Eventually(func(g Gomega) {
+		Eventually(func(g Gomega) bool {
 			iterator, err := sourceCCIP.SubOnRamp.FilterCCIPSendRequested(currentBlockOnSource)
 			g.Expect(err).NotTo(HaveOccurred(), "Error filtering CCIPSendRequested event")
-			g.Expect(iterator.Next()).To(BeTrue(), "No CCIPSendRequested event found")
-			g.Expect(iterator.Event.Raw.TxHash.Hex()).Should(Equal(txHash), "txhash on CCIPSendRequested")
-			g.Expect(iterator.Event.Message.SequenceNumber).Should(Equal(seqNum), "SequenceNumber on CCIPSendRequested")
-		}, "1m", "1s").Should(Succeed(), "CCIPSendRequested")
+			for iterator.Next() {
+				if strings.EqualFold(iterator.Event.Raw.TxHash.Hex(), txHash) {
+					seqNum = iterator.Event.Message.SequenceNumber
+					return true
+				}
+			}
+			return false
+		}, timeout, "1s").Should(BeTrue(), "CCIPSendRequested")
 	}
+	return seqNum
+}
+
+func (sourceCCIP *SourceCCIPModule) SendSubRequest(receiver common.Address, sourceTokens []common.Address, amount []*big.Int, data string) string {
+	receiverAddr, err := utils.ABIEncode(`[{"type":"address"}]`, receiver)
+	Expect(err).ShouldNot(HaveOccurred(), "Failed encoding the receiver address")
+
+	// form the message for transfer
+	msg := evm_2_any_subscription_onramp_router.CCIPEVM2AnySubscriptionMessage{
+		Receiver: receiverAddr,
+		Data:     []byte(data),
+		Tokens:   sourceTokens,
+		Amounts:  amount,
+		GasLimit: big.NewInt(100_000),
+	}
+	log.Info().Interface("msg details", msg).Msg("ccip message to be sent")
+
+	// initiate the transfer
+	sendTx, err := sourceCCIP.SubOnRampRouter.CCIPSend(sourceCCIP.DestinationChainId, msg)
+	Expect(err).ShouldNot(HaveOccurred(), "CCIPSend should be initiated successfully")
+	log.Info().Str("send token transaction", sendTx.Hash().String()).Msg("Sending token")
+	err = sourceCCIP.Common.ChainClient.WaitForEvents()
+	Expect(err).ShouldNot(HaveOccurred(), "Failed to wait for events")
+	return sendTx.Hash().Hex()
+}
+
+func (sourceCCIP *SourceCCIPModule) SendTollRequest(receiver common.Address, sourceTokens []common.Address, amount []*big.Int, data string, feeToken common.Address, tollFee *big.Int) string {
+	receiverAddr, err := utils.ABIEncode(`[{"type":"address"}]`, receiver)
+	Expect(err).ShouldNot(HaveOccurred(), "Failed encoding the receiver address")
+
+	// form the message for transfer
+	msg := evm_2_any_toll_onramp_router.CCIPEVM2AnyTollMessage{
+		Receiver:       receiverAddr,
+		Data:           []byte(data),
+		Tokens:         sourceTokens,
+		Amounts:        amount,
+		FeeToken:       feeToken,
+		FeeTokenAmount: tollFee,
+		GasLimit:       big.NewInt(100_000),
+	}
+	log.Info().Interface("msg details", msg).Msg("ccip message to be sent")
+
+	// initiate the transfer
+	sendTx, err := sourceCCIP.TollOnRampRouter.CCIPSend(sourceCCIP.DestinationChainId, msg)
+	Expect(err).ShouldNot(HaveOccurred(), "send token should be initiated successfully")
+	log.Info().Str("toll send token transaction", sendTx.Hash().String()).Msg("Sending token")
+	err = sourceCCIP.Common.ChainClient.WaitForEvents()
+	Expect(err).ShouldNot(HaveOccurred(), "Failed to wait for events")
+	return sendTx.Hash().Hex()
 }
 
 func DefaultSourceCCIPModule(chainClient blockchain.EVMClient, destChain *big.Int, transferamount []*big.Int) *SourceCCIPModule {
@@ -505,7 +592,7 @@ func (destCCIP *DestCCIPModule) SubscriptionBalance(addr common.Address) *big.In
 	return sub
 }
 
-func (destCCIP *DestCCIPModule) BalanceAssertions(model BillingModel, prevBalances map[string]*big.Int, transferAmount []*big.Int, unusedFee *big.Int, noOfReq int64) []testhelpers.BalanceAssertion {
+func (destCCIP *DestCCIPModule) BalanceAssertions(model BillingModel, prevBalances map[string]*big.Int, transferAmount []*big.Int, unusedFee *big.Int, noOfReq int64, subFeeDeducted *big.Int) []testhelpers.BalanceAssertion {
 	var balAssertions []testhelpers.BalanceAssertion
 	for i, token := range destCCIP.Common.BridgeTokens {
 		name := fmt.Sprintf("%s-BridgeToken-%s", testhelpers.Receiver, token.Address())
@@ -540,50 +627,58 @@ func (destCCIP *DestCCIPModule) BalanceAssertions(model BillingModel, prevBalanc
 			Name:     name,
 			Address:  destCCIP.ReceiverDapp.EthAddress,
 			Getter:   destCCIP.SubscriptionBalance,
-			Expected: bigmath.Sub(prevBalances[name], bigmath.Mul(big.NewInt(noOfReq), big.NewInt(0.79e18))).String(),
+			Expected: bigmath.Sub(prevBalances[name], subFeeDeducted).String(),
 			Within:   big.NewInt(0.1e18).String(),
 		})
 	}
 	return balAssertions
 }
 
-func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(model BillingModel, prevSeqNum uint64, currentBlockOnDest uint64) {
-	log.Info().Msg("Waiting for ExecutionStateChanged event")
+func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(model BillingModel, seqNum uint64, currentBlockOnDest uint64, timeout time.Duration) {
+	log.Info().Int64("seqNum", int64(seqNum)).Msg("Waiting for ExecutionStateChanged event")
 	switch model {
 	case TOLL:
 		Eventually(func(g Gomega) ccipPlugin.MessageExecutionState {
-			iterator, err := destCCIP.TollOffRamp.FilterExecutionStateChanged([]uint64{prevSeqNum}, currentBlockOnDest)
-			g.Expect(err).NotTo(HaveOccurred(), "Error filtering ExecutionStateChanged event")
-			g.Expect(iterator.Next()).To(BeTrue(), "No ExecutionStateChanged event found")
+			iterator, err := destCCIP.TollOffRamp.FilterExecutionStateChanged([]uint64{seqNum}, currentBlockOnDest)
+			g.Expect(err).NotTo(HaveOccurred(), "Error filtering ExecutionStateChanged event for seqNum %d", seqNum)
+			g.Expect(iterator.Next()).To(BeTrue(), "No ExecutionStateChanged event found for seqNum %d", seqNum)
 			return ccipPlugin.MessageExecutionState(iterator.Event.State)
-		}, "1m", "1s").Should(Equal(ccipPlugin.Success))
+		}, timeout, "1s").Should(Equal(ccipPlugin.Success))
 	case SUB:
 		Eventually(func(g Gomega) ccipPlugin.MessageExecutionState {
-			iterator, err := destCCIP.SubOffRamp.FilterExecutionStateChanged([]uint64{prevSeqNum}, currentBlockOnDest)
-			g.Expect(err).NotTo(HaveOccurred(), "Error filtering ExecutionStateChanged event")
-			g.Expect(iterator.Next()).To(BeTrue(), "No ExecutionStateChanged event found")
+			iterator, err := destCCIP.SubOffRamp.FilterExecutionStateChanged([]uint64{seqNum}, currentBlockOnDest)
+			g.Expect(err).NotTo(HaveOccurred(), "Error filtering ExecutionStateChanged event for seqNum %d", seqNum)
+			g.Expect(iterator.Next()).To(BeTrue(), "No ExecutionStateChanged event found for seqNum %d", seqNum)
 			return ccipPlugin.MessageExecutionState(iterator.Event.State)
-		}, "1m", "1s").Should(Equal(ccipPlugin.Success), "Execution should be successful")
+		}, timeout, "1s").Should(Equal(ccipPlugin.Success), "Execution should be successful for seqNum %d", seqNum)
 	}
 }
 
-func (destCCIP *DestCCIPModule) AssertEventReportAccepted(onRamp []common.Address, currentBlockOnDest uint64) {
-	log.Info().Msg("Waiting for ReportAccepted event")
-	Eventually(func(g Gomega) []common.Address {
+func (destCCIP *DestCCIPModule) AssertEventReportAccepted(onRamp common.Address, seqNum, currentBlockOnDest uint64, timeout time.Duration) {
+	log.Info().Int64("seqNum", int64(seqNum)).Msg("Waiting for ReportAccepted event")
+	Eventually(func(g Gomega) bool {
 		iterator, err := destCCIP.BlobVerifier.FilterReportAccepted(currentBlockOnDest)
 		g.Expect(err).NotTo(HaveOccurred(), "Error filtering ReportAccepted event")
-		g.Expect(iterator.Next()).To(BeTrue(), "No ReportAccepted event found")
-		return iterator.Event.Report.OnRamps
-	}, "1m", "1s").Should(ContainElements(onRamp))
+		for iterator.Next() {
+			if slices.Contains(iterator.Event.Report.OnRamps, onRamp) {
+				for _, ints := range iterator.Event.Report.Intervals {
+					if ints.Min <= seqNum && ints.Max >= seqNum {
+						return true
+					}
+				}
+			}
+		}
+		return false
+	}, timeout, "1s").Should(BeTrue(), "No ReportAccepted Event found for onRamp %s and seq num %d", onRamp.Hex(), seqNum)
 }
 
-func (destCCIP *DestCCIPModule) AssertSeqNumberExecuted(onRamp common.Address, seqNumberBefore uint64) {
-	log.Info().Msg("Waiting for SeqNumber to be executed")
+func (destCCIP *DestCCIPModule) AssertSeqNumberExecuted(onRamp common.Address, seqNumberBefore uint64, timeout time.Duration) {
+	log.Info().Int64("seqNum", int64(seqNumberBefore)).Msg("Waiting to be executed")
 	Eventually(func(g Gomega) {
 		seqNumberAfter, err := destCCIP.BlobVerifier.GetNextSeqNumber(onRamp)
-		g.Expect(err).ShouldNot(HaveOccurred(), "Getting expected seq number should be successful")
+		g.Expect(err).ShouldNot(HaveOccurred(), "Getting expected seq number should be successful %d", seqNumberBefore)
 		g.Expect(seqNumberAfter).Should(BeNumerically(">", seqNumberBefore), "Next Sequence number is not increased")
-	}, "1m", "1s").Should(Succeed(), "Error Executing Sequence number")
+	}, timeout, "1s").Should(Succeed(), "Error Executing Sequence number %d", seqNumberBefore)
 }
 
 func DefaultDestinationCCIPModule(chainClient blockchain.EVMClient, sourceChain *big.Int) *DestCCIPModule {
@@ -593,79 +688,138 @@ func DefaultDestinationCCIPModule(chainClient blockchain.EVMClient, sourceChain 
 	}
 }
 
-// TokenTransferWithToll initiates transfer of token with an amount as defined in sourceCCIP module. It waits for
-// CCIPSendRequestedEvent, ReportRelayedEvent and ExecutionStateChanged Event to ensure that transfer has taken place
-// and verifies senders and receiver's balance pre- and post-transfer
-func TokenTransferWithToll(sourceCCIP SourceCCIPModule, destCCIP DestCCIPModule) {
+func NewCCIPTest(sourceCCIP *SourceCCIPModule, destCCIP *DestCCIPModule, subBalance, totalSubFee *big.Int, timeout time.Duration) *CCIPTest {
+	return &CCIPTest{
+		Source:            sourceCCIP,
+		Dest:              destCCIP,
+		SubBalance:        subBalance,
+		ValidationTimeout: timeout,
+		subFeeDeducted:    totalSubFee,
+	}
+}
+
+type CCIPTest struct {
+	Source                  *SourceCCIPModule
+	Dest                    *DestCCIPModule
+	NumberOfTollReq         int
+	NumberOfSubReq          int
+	SourceBalances          map[string]*big.Int
+	DestBalances            map[string]*big.Int
+	StartBlockOnSource      uint64
+	StartBlockOnDestination uint64
+	SubBalance              *big.Int
+	SentSubReqHashes        []string
+	SentTollReqHashes       []string
+	ValidationTimeout       time.Duration
+	subFeeDeducted          *big.Int
+}
+
+func (c *CCIPTest) SendSubRequests(noOfRequests int) {
+	c.NumberOfSubReq = noOfRequests
+	CreateAndFundSubscription(*c.Source, *c.Dest, c.SubBalance, int64(c.NumberOfSubReq))
 	var sourceTokens []common.Address
-	for i, token := range sourceCCIP.Common.BridgeTokens {
+	for i, token := range c.Source.Common.BridgeTokens {
 		sourceTokens = append(sourceTokens, common.HexToAddress(token.Address()))
 		// approve the onramp router so that it can initiate transferring the token
-		err := token.Approve(sourceCCIP.TollOnRampRouter.Address(), sourceCCIP.TransferAmount[i])
+		err := token.Approve(c.Source.SubOnRampRouter.Address(), bigmath.Mul(c.Source.TransferAmount[i], big.NewInt(int64(c.NumberOfSubReq))))
+		Expect(err).ShouldNot(HaveOccurred(), "Could not approve permissions for the onRamp router "+
+			"on the source link token contract")
+	}
+	err := c.Source.Common.ChainClient.WaitForEvents()
+	Expect(err).ShouldNot(HaveOccurred(), "Failed to wait for events")
+
+	// collect the balance requirement to verify balances after transfer
+	c.SourceBalances, err = testhelpers.GetBalances(c.Source.CollectBalanceRequirements(SUB))
+	Expect(err).ShouldNot(HaveOccurred(), "fetching source balance")
+	c.DestBalances, err = testhelpers.GetBalances(c.Dest.CollectBalanceRequirements(SUB))
+	Expect(err).ShouldNot(HaveOccurred(), "fetching dest balance")
+
+	// save the current block numbers to use in various filter log requests
+	c.StartBlockOnSource, err = c.Source.Common.ChainClient.LatestBlockNumber(context.Background())
+	Expect(err).ShouldNot(HaveOccurred(), "Getting current block should be successful in source chain")
+	c.StartBlockOnDestination, err = c.Dest.Common.ChainClient.LatestBlockNumber(context.Background())
+	Expect(err).ShouldNot(HaveOccurred(), "Getting current block should be successful in dest chain")
+	for i := 1; i <= c.NumberOfSubReq; i++ {
+		txHash := c.Source.SendSubRequest(c.Dest.ReceiverDapp.EthAddress, sourceTokens, c.Source.TransferAmount, fmt.Sprintf("msg %d", i))
+		c.SentSubReqHashes = append(c.SentSubReqHashes, txHash)
+	}
+}
+
+func (c *CCIPTest) ValidateSubRequests() {
+	for _, txHash := range c.SentSubReqHashes {
+		// Verify if
+		// - CCIPSendRequested Event log generated,
+		// - NextSeqNumber from blobVerifier got increased
+		seqNumber := c.Source.AssertEventCCIPSendRequested(SUB, txHash, c.StartBlockOnSource, c.ValidationTimeout)
+		c.Dest.AssertSeqNumberExecuted(c.Source.SubOnRamp.EthAddress, seqNumber, c.ValidationTimeout)
+
+		// Verify whether blobVerifier has accepted the report
+		c.Dest.AssertEventReportAccepted(c.Source.SubOnRamp.EthAddress, seqNumber, c.StartBlockOnDestination, c.ValidationTimeout)
+
+		// Verify whether the execution state is changed and the transfer is successful
+		c.Dest.AssertEventExecutionStateChanged(SUB, seqNumber, c.StartBlockOnDestination, c.ValidationTimeout)
+	}
+	// no change forwarding for sub
+	unusedFee := big.NewInt(0)
+	AssertBalances(c.Source.BalanceAssertions(SUB, c.SourceBalances, int64(c.NumberOfSubReq)))
+	AssertBalances(c.Dest.BalanceAssertions(SUB, c.DestBalances, c.Source.TransferAmount, unusedFee, int64(c.NumberOfSubReq), c.subFeeDeducted))
+}
+
+func (c *CCIPTest) SendTollRequests(noOfRequests int) {
+	c.NumberOfTollReq = noOfRequests
+	var sourceTokens []common.Address
+	for i, token := range c.Source.Common.BridgeTokens {
+		sourceTokens = append(sourceTokens, common.HexToAddress(token.Address()))
+		// approve the onramp router so that it can initiate transferring the token
+		err := token.Approve(c.Source.TollOnRampRouter.Address(), bigmath.Mul(c.Source.TransferAmount[i], big.NewInt(int64(c.NumberOfTollReq))))
 		Expect(err).ShouldNot(HaveOccurred(), "Could not approve permissions for the onRamp router "+
 			"on the source link token contract")
 	}
 	// approve onramp router to use the feetoken
-	err := sourceCCIP.Common.FeeToken.Approve(sourceCCIP.TollOnRampRouter.Address(), sourceCCIP.TollFeeAmount)
+	err := c.Source.Common.FeeToken.Approve(c.Source.TollOnRampRouter.Address(), bigmath.Mul(c.Source.TollFeeAmount, big.NewInt(int64(c.NumberOfTollReq))))
 	Expect(err).ShouldNot(HaveOccurred(), "Could not approve permissions for the onRamp router "+
 		"on the source link token contract")
-	err = sourceCCIP.Common.ChainClient.WaitForEvents()
+	err = c.Source.Common.ChainClient.WaitForEvents()
 	Expect(err).ShouldNot(HaveOccurred(), "Failed to wait for events")
 
 	// collect the balance requirement to verify balances after transfer
-	sourceBalances, err := testhelpers.GetBalances(sourceCCIP.CollectBalanceRequirements(TOLL))
+	c.SourceBalances, err = testhelpers.GetBalances(c.Source.CollectBalanceRequirements(TOLL))
 	Expect(err).ShouldNot(HaveOccurred(), "fetching source balance")
-	destBalances, err := testhelpers.GetBalances(destCCIP.CollectBalanceRequirements(TOLL))
+	c.DestBalances, err = testhelpers.GetBalances(c.Dest.CollectBalanceRequirements(TOLL))
 	Expect(err).ShouldNot(HaveOccurred(), "fetching dest balance")
 
 	// save the current block numbers to use in various filter log requests
-	currentBlockOnSource, err := sourceCCIP.Common.ChainClient.LatestBlockNumber(context.Background())
+	c.StartBlockOnSource, err = c.Source.Common.ChainClient.LatestBlockNumber(context.Background())
 	Expect(err).ShouldNot(HaveOccurred(), "Getting current block should be successful in source chain")
-	currentBlockOnDest, err := destCCIP.Common.ChainClient.LatestBlockNumber(context.Background())
+	c.StartBlockOnDestination, err = c.Dest.Common.ChainClient.LatestBlockNumber(context.Background())
 	Expect(err).ShouldNot(HaveOccurred(), "Getting current block should be successful in dest chain")
-
-	// save the next seq number to compare with NextSeqNumber generated after transfer
-	seqNumberBefore, err := destCCIP.BlobVerifier.GetNextSeqNumber(sourceCCIP.TollOnRamp.EthAddress)
-	Expect(err).ShouldNot(HaveOccurred(), "Getting expected seq number should be successful")
-
-	receiver, err := utils.ABIEncode(`[{"type":"address"}]`, destCCIP.ReceiverDapp.EthAddress)
-	Expect(err).ShouldNot(HaveOccurred(), "Failed encoding the receiver address")
-
-	// form the message for transfer
-	msg := evm_2_any_toll_onramp_router.CCIPEVM2AnyTollMessage{
-		Receiver:       receiver,
-		Data:           []byte("Token transfer by DON"),
-		Tokens:         sourceTokens,
-		Amounts:        sourceCCIP.TransferAmount,
-		FeeToken:       common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
-		FeeTokenAmount: sourceCCIP.TollFeeAmount,
-		GasLimit:       big.NewInt(100_000),
+	for i := 1; i <= c.NumberOfTollReq; i++ {
+		txHash := c.Source.SendTollRequest(
+			c.Dest.ReceiverDapp.EthAddress, sourceTokens,
+			c.Source.TransferAmount, fmt.Sprintf("msg %d", i),
+			common.HexToAddress(c.Source.Common.FeeToken.Address()), c.Source.TollFeeAmount)
+		c.SentTollReqHashes = append(c.SentTollReqHashes, txHash)
 	}
-	log.Info().Interface("msg details", msg).Msg("ccip message to be sent")
+}
 
-	// initiate the transfer
-	sendTx, err := sourceCCIP.TollOnRampRouter.CCIPSend(destCCIP.Common.ChainClient.GetChainID(), msg)
-	Expect(err).ShouldNot(HaveOccurred(), "send token should be initiated successfully")
-	log.Info().Str("send token transaction", sendTx.Hash().String()).Msg("Sending token")
-	err = sourceCCIP.Common.ChainClient.WaitForEvents()
-	Expect(err).ShouldNot(HaveOccurred(), "Failed to wait for events")
+func (c *CCIPTest) ValidateTollRequests() {
+	for _, txHash := range c.SentTollReqHashes {
+		// Verify if
+		// - CCIPSendRequested Event log generated,
+		// - NextSeqNumber from blobVerifier got increased
+		seqNumber := c.Source.AssertEventCCIPSendRequested(TOLL, txHash, c.StartBlockOnSource, c.ValidationTimeout)
+		c.Dest.AssertSeqNumberExecuted(c.Source.TollOnRamp.EthAddress, seqNumber, c.ValidationTimeout)
 
-	// Verify if
-	// - CCIPSendRequested Event log generated,
-	// - NextSeqNumber from blobVerifier got increased
-	sourceCCIP.AssertEventCCIPSendRequested(TOLL, sendTx.Hash().Hex(), seqNumberBefore, currentBlockOnSource)
-	destCCIP.AssertSeqNumberExecuted(sourceCCIP.TollOnRamp.EthAddress, seqNumberBefore)
+		// Verify whether blobVerifier has accepted the report
+		c.Dest.AssertEventReportAccepted(c.Source.TollOnRamp.EthAddress, seqNumber, c.StartBlockOnDestination, c.ValidationTimeout)
 
-	// Verify whether blobVerifier has accepted the report
-	destCCIP.AssertEventReportAccepted([]common.Address{sourceCCIP.TollOnRamp.EthAddress}, currentBlockOnDest)
-
-	// Verify whether the execution state is changed and the transfer is successful
-	destCCIP.AssertEventExecutionStateChanged(TOLL, seqNumberBefore, currentBlockOnDest)
-
+		// Verify whether the execution state is changed and the transfer is successful
+		c.Dest.AssertEventExecutionStateChanged(TOLL, seqNumber, c.StartBlockOnDestination, c.ValidationTimeout)
+	}
 	// verify the fee amount is deducted from sender, added to receiver token balances and
 	// unused fee is returned to receiver fee token account
-	AssertBalances(sourceCCIP.BalanceAssertions(TOLL, sourceBalances, 1))
-	AssertBalances(destCCIP.BalanceAssertions(TOLL, destBalances, sourceCCIP.TransferAmount, UnusedFee, 1))
+	AssertBalances(c.Source.BalanceAssertions(TOLL, c.SourceBalances, int64(c.NumberOfTollReq)))
+	AssertBalances(c.Dest.BalanceAssertions(TOLL, c.DestBalances, c.Source.TransferAmount, UnusedFee, int64(c.NumberOfTollReq), big.NewInt(0)))
 }
 
 func CreateAndFundSubscription(sourceCCIP SourceCCIPModule, destCCIP DestCCIPModule, subscriptionBalance *big.Int, noOfReq int64) {
@@ -686,78 +840,20 @@ func CreateAndFundSubscription(sourceCCIP SourceCCIPModule, destCCIP DestCCIPMod
 	Expect(err).ShouldNot(HaveOccurred(), "Failed to wait for creating and funding subscription")
 }
 
-func TokenTransferWithSub(sourceCCIP SourceCCIPModule, destCCIP DestCCIPModule) {
-	var sourceTokens []common.Address
-	for i, token := range sourceCCIP.Common.BridgeTokens {
-		sourceTokens = append(sourceTokens, common.HexToAddress(token.Address()))
-		// approve the onramp router so that it can initiate transferring the token
-		err := token.Approve(sourceCCIP.SubOnRampRouter.Address(), sourceCCIP.TransferAmount[i])
-		Expect(err).ShouldNot(HaveOccurred(), "Could not approve permissions for the onRamp router "+
-			"on the source link token contract")
-	}
-	err := sourceCCIP.Common.ChainClient.WaitForEvents()
-	Expect(err).ShouldNot(HaveOccurred(), "Failed to wait for events")
-
-	// collect the balance requirement to verify balances after transfer
-	sourceBalances, err := testhelpers.GetBalances(sourceCCIP.CollectBalanceRequirements(SUB))
-	Expect(err).ShouldNot(HaveOccurred(), "fetching source balance")
-	destBalances, err := testhelpers.GetBalances(destCCIP.CollectBalanceRequirements(SUB))
-	Expect(err).ShouldNot(HaveOccurred(), "fetching dest balance")
-
-	// save the current block numbers to use in various filter log requests
-	currentBlockOnSource, err := sourceCCIP.Common.ChainClient.LatestBlockNumber(context.Background())
-	Expect(err).ShouldNot(HaveOccurred(), "Getting current block should be successful in source chain")
-	currentBlockOnDest, err := destCCIP.Common.ChainClient.LatestBlockNumber(context.Background())
-	Expect(err).ShouldNot(HaveOccurred(), "Getting current block should be successful in dest chain")
-
-	// save the next seq number to compare with NextSeqNumber generated after transfer
-	seqNumber, err := destCCIP.BlobVerifier.GetNextSeqNumber(sourceCCIP.SubOnRamp.EthAddress)
-	Expect(err).ShouldNot(HaveOccurred(), "Getting expected seq number should be successful")
-
-	receiver, err := utils.ABIEncode(`[{"type":"address"}]`, destCCIP.ReceiverDapp.EthAddress)
-	Expect(err).ShouldNot(HaveOccurred(), "Failed encoding the receiver address")
-
-	// form the message for transfer
-	msg := evm_2_any_subscription_onramp_router.CCIPEVM2AnySubscriptionMessage{
-		Receiver: receiver,
-		Data:     []byte("Token transfer subscription model"),
-		Tokens:   sourceTokens,
-		Amounts:  sourceCCIP.TransferAmount,
-		GasLimit: big.NewInt(100_000),
-	}
-	log.Info().Interface("msg details", msg).Msg("ccip message to be sent")
-
-	// initiate the transfer
-	sendTx, err := sourceCCIP.SubOnRampRouter.CCIPSend(destCCIP.Common.ChainClient.GetChainID(), msg)
-	Expect(err).ShouldNot(HaveOccurred(), "CCIPSend should be initiated successfully")
-	log.Info().Str("send token transaction", sendTx.Hash().String()).Msg("Sending token")
-	err = sourceCCIP.Common.ChainClient.WaitForEvents()
-	Expect(err).ShouldNot(HaveOccurred(), "Failed to wait for events")
-
-	// Verify if
-	// - CCIPSendRequested Event log generated,
-	// - NextSeqNumber from blobVerifier got increased
-	sourceCCIP.AssertEventCCIPSendRequested(SUB, sendTx.Hash().Hex(), seqNumber, currentBlockOnSource)
-	destCCIP.AssertSeqNumberExecuted(sourceCCIP.SubOnRamp.EthAddress, seqNumber)
-
-	// Verify whether blobVerifier has accepted the report
-	destCCIP.AssertEventReportAccepted([]common.Address{sourceCCIP.SubOnRamp.EthAddress}, currentBlockOnDest)
-
-	// Verify whether the execution state is changed and the transfer is successful
-	destCCIP.AssertEventExecutionStateChanged(SUB, seqNumber, currentBlockOnDest)
-
-	// no change forwarding for sub
-	unusedFee := big.NewInt(0)
-	AssertBalances(sourceCCIP.BalanceAssertions(SUB, sourceBalances, 1))
-	AssertBalances(destCCIP.BalanceAssertions(SUB, destBalances, sourceCCIP.TransferAmount, unusedFee, 1))
-}
-
-func SetOCRConfigs(chainlinkNodes []*client.CLNodesWithKeys, destCCIP DestCCIPModule) {
+// SetOCRConfigs sets the oracle config in ocr2 contracts
+// nil value in execNodes denotes relay and execution jobs are to be set up in same DON
+func SetOCRConfigs(relayNodes, execNodes []*client.CLNodesWithKeys, destCCIP DestCCIPModule) {
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err :=
-		ccip.NewOffChainAggregatorV2Config(chainlinkNodes)
+		ccip.NewOffChainAggregatorV2Config(relayNodes)
 	Expect(err).ShouldNot(HaveOccurred(), "Shouldn't fail while getting the config values for ocr2 type contract")
 	err = destCCIP.BlobVerifier.SetOCRConfig(signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig)
 	Expect(err).ShouldNot(HaveOccurred(), "Shouldn't fail while setting blobverifier config")
+	// if relay and exec job is set up in different DON
+	if len(execNodes) > 0 {
+		signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err =
+			ccip.NewOffChainAggregatorV2Config(execNodes)
+	}
+	Expect(err).ShouldNot(HaveOccurred(), "Shouldn't fail while getting the config values for ocr2 type contract")
 	err = destCCIP.TollOffRamp.SetConfig(signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig)
 	Expect(err).ShouldNot(HaveOccurred(), "Shouldn't fail while setting TollOffRamp config")
 	err = destCCIP.SubOffRamp.SetConfig(signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig)
@@ -768,36 +864,53 @@ func SetOCRConfigs(chainlinkNodes []*client.CLNodesWithKeys, destCCIP DestCCIPMo
 
 // CreateOCRJobsForCCIP bootstraps the first node and to the other nodes sends ocr jobs that
 // sets up ccip-relay and ccip-execution plugin
+// nil value in bootstrapExec and execNodes denotes relay and execution jobs are to be set up in same DON
 func CreateOCRJobsForCCIP(
-	chainlinkNodes []*client.CLNodesWithKeys,
+	bootstrapRelay *client.CLNodesWithKeys,
+	bootstrapExec *client.CLNodesWithKeys,
+	relayNodes, execNodes []*client.CLNodesWithKeys,
 	tollOnRamp, subOnRamp, blobVerifier, tollOffRamp, subOffRamp string,
 	sourceChainClient, destChainClient blockchain.EVMClient,
 	linkTokenAddr []string,
 	mockServer *ctfClient.MockserverClient,
 ) {
-	bootstrapNodeWithKey := chainlinkNodes[0]
-	bootstrapNode := chainlinkNodes[0].Node
-	bootstrapP2PIds := bootstrapNodeWithKey.KeysBundle.P2PKeys
-	bootstrapP2PId := bootstrapP2PIds.Data[0].Attributes.PeerID
+	bootstrapRelayP2PIds := bootstrapRelay.KeysBundle.P2PKeys
+	bootstrapRelayP2PId := bootstrapRelayP2PIds.Data[0].Attributes.PeerID
+	var bootstrapExecP2PId string
+	if bootstrapExec == nil {
+		bootstrapExec = bootstrapRelay
+		bootstrapExecP2PId = bootstrapRelayP2PId
+	} else {
+		bootstrapExecP2PId = bootstrapExec.KeysBundle.P2PKeys.Data[0].Attributes.PeerID
+	}
 	sourceChainID := sourceChainClient.GetChainID()
 	destChainID := destChainClient.GetChainID()
 	sourceChainName := sourceChainClient.GetNetworkName()
 	destChainName := destChainClient.GetNetworkName()
-	bootstrapSpec := &client.OCR2TaskJobSpec{
-		Name:    fmt.Sprintf("bootstrap-%s-%s", destChainName, uuid.NewV4().String()),
-		JobType: "bootstrap",
-		OCR2OracleSpec: job.OCR2OracleSpec{
-			ContractID:                        blobVerifier,
-			Relay:                             relay.EVM,
-			ContractConfigConfirmations:       1,
-			ContractConfigTrackerPollInterval: models.Interval(1 * time.Second),
-			RelayConfig: map[string]interface{}{
-				"chainID": fmt.Sprintf("\"%s\"", destChainID.String()),
+	bootstrapSpec := func(contractID string) *client.OCR2TaskJobSpec {
+		return &client.OCR2TaskJobSpec{
+			Name:    fmt.Sprintf("bootstrap-%s-%s", destChainName, uuid.NewV4().String()),
+			JobType: "bootstrap",
+			OCR2OracleSpec: job.OCR2OracleSpec{
+				ContractID:                        contractID,
+				Relay:                             relay.EVM,
+				ContractConfigConfirmations:       1,
+				ContractConfigTrackerPollInterval: models.Interval(1 * time.Second),
+				RelayConfig: map[string]interface{}{
+					"chainID": fmt.Sprintf("\"%s\"", destChainID.String()),
+				},
 			},
-		},
+		}
 	}
-	_, err := bootstrapNode.MustCreateJob(bootstrapSpec)
+
+	_, err := bootstrapRelay.Node.MustCreateJob(bootstrapSpec(blobVerifier))
 	Expect(err).ShouldNot(HaveOccurred(), "Shouldn't fail creating bootstrap job on bootstrap node")
+	if bootstrapExec != nil && len(execNodes) > 0 {
+		_, err := bootstrapExec.Node.MustCreateJob(bootstrapSpec(subOffRamp))
+		Expect(err).ShouldNot(HaveOccurred(), "Shouldn't fail creating bootstrap job on bootstrap node")
+	} else {
+		execNodes = relayNodes
+	}
 	// save the current block numbers. If there is a delay between job start up and ocr config set up, the jobs will
 	// replay the log polling from these mentioned block number. The dest block number should ideally be the block number on which
 	// contract config is set and the source block number should be the one on which the ccip send request is performed.
@@ -811,12 +924,9 @@ func CreateOCRJobsForCCIP(
 	for _, token := range linkTokenAddr {
 		tokenFeeConv[token] = "200000000000000000000"
 	}
-	SetMockServerWithSameTokenFeeConversionValue(tokenFeeConv, chainlinkNodes[1:], mockServer)
+	SetMockServerWithSameTokenFeeConversionValue(tokenFeeConv, execNodes, mockServer)
 
-	for nodeIndex := 1; nodeIndex < len(chainlinkNodes); nodeIndex++ {
-		nodeTransmitterAddress := chainlinkNodes[nodeIndex].KeysBundle.EthAddress
-		nodeOCR2Key := chainlinkNodes[nodeIndex].KeysBundle.OCR2Key
-		nodeOCR2KeyId := nodeOCR2Key.Data.ID
+	addRelayJob := func(node *client.Chainlink, nodeTransmitterAddress, nodeOCR2KeyId string) error {
 		ocr2SpecRelay := &client.OCR2TaskJobSpec{
 			JobType: "offchainreporting2",
 			Name:    fmt.Sprintf("ccip-relay-%s-%s", sourceChainName, destChainName),
@@ -830,8 +940,8 @@ func CreateOCRJobsForCCIP(
 				ContractConfigTrackerPollInterval: models.Interval(1 * time.Second),
 				P2PV2Bootstrappers: []string{
 					client.P2PData{
-						RemoteIP: bootstrapNode.RemoteIP(),
-						PeerID:   bootstrapP2PId,
+						RemoteIP: bootstrapRelay.Node.RemoteIP(),
+						PeerID:   bootstrapRelayP2PId,
 					}.P2PV2Bootstrapper(),
 				},
 				PluginConfig: map[string]interface{}{
@@ -847,70 +957,35 @@ func CreateOCRJobsForCCIP(
 				},
 			},
 		}
-		_, err = chainlinkNodes[nodeIndex].Node.MustCreateJob(ocr2SpecRelay)
-		Expect(err).ShouldNot(HaveOccurred(), "Shouldn't fail creating CCIP-Relay OCR Task job on OCR node %d", nodeIndex+1)
+		_, err = node.MustCreateJob(ocr2SpecRelay)
+		return err
+	}
 
-		tokensPerFeeCoinPipeline := TokenFeeForMultipleTokenAddr(chainlinkNodes[nodeIndex], linkTokenAddr, mockServer)
+	addExecJob := func(node *client.CLNodesWithKeys, jobname, nodeTransmitterAddress, nodeOCR2KeyId, offRamp, onRamp string) error {
+		tokensPerFeeCoinPipeline := TokenFeeForMultipleTokenAddr(node, linkTokenAddr, mockServer)
 		ocr2SpecExec := &client.OCR2TaskJobSpec{
 			JobType: "offchainreporting2",
-			Name:    fmt.Sprintf("ccip-exec-toll-%s-%s", sourceChainName, destChainName),
+			Name:    jobname,
 			OCR2OracleSpec: job.OCR2OracleSpec{
 				Relay:                             relay.EVM,
 				PluginType:                        job.CCIPExecution,
-				ContractID:                        tollOffRamp,
+				ContractID:                        offRamp,
 				OCRKeyBundleID:                    null.StringFrom(nodeOCR2KeyId),
 				TransmitterID:                     null.StringFrom(nodeTransmitterAddress),
 				ContractConfigConfirmations:       1,
 				ContractConfigTrackerPollInterval: models.Interval(1 * time.Second),
 				P2PV2Bootstrappers: []string{
 					client.P2PData{
-						RemoteIP: bootstrapNode.RemoteIP(),
-						PeerID:   bootstrapP2PId,
+						RemoteIP: bootstrapExec.Node.RemoteIP(),
+						PeerID:   bootstrapExecP2PId,
 					}.P2PV2Bootstrapper(),
 				},
 				PluginConfig: map[string]interface{}{
 					"sourceChainID":    sourceChainID,
 					"destChainID":      destChainID,
-					"onRampID":         fmt.Sprintf("\"%s\"", tollOnRamp),
+					"onRampID":         fmt.Sprintf("\"%s\"", onRamp),
 					"blobVerifierID":   fmt.Sprintf("\"%s\"", blobVerifier),
 					"pollPeriod":       `"1s"`,
-					"destStartBlock":   currentBlockOnDest,
-					"sourceStartBlock": currentBlockOnSource,
-					"tokensPerFeeCoinPipeline": fmt.Sprintf(`"""
-		%s
-		"""`, tokensPerFeeCoinPipeline),
-				},
-				RelayConfig: map[string]interface{}{
-					"chainID": destChainID,
-				},
-			},
-		}
-		_, err = chainlinkNodes[nodeIndex].Node.MustCreateJob(ocr2SpecExec)
-		Expect(err).ShouldNot(HaveOccurred(), "Shouldn't fail creating CCIP-Exec-toll OCR Task job on OCR node %d", nodeIndex+1)
-
-		ocr3SpecExec := &client.OCR2TaskJobSpec{
-			JobType: "offchainreporting2",
-			Name:    fmt.Sprintf("ccip-exec-sub-%s-%s", sourceChainName, destChainName),
-			OCR2OracleSpec: job.OCR2OracleSpec{
-				Relay:                             relay.EVM,
-				PluginType:                        job.CCIPExecution,
-				ContractID:                        subOffRamp,
-				OCRKeyBundleID:                    null.StringFrom(nodeOCR2KeyId),
-				TransmitterID:                     null.StringFrom(nodeTransmitterAddress),
-				ContractConfigConfirmations:       1,
-				ContractConfigTrackerPollInterval: models.Interval(1 * time.Second),
-				P2PV2Bootstrappers: []string{
-					client.P2PData{
-						RemoteIP: bootstrapNode.RemoteIP(),
-						PeerID:   bootstrapP2PId,
-					}.P2PV2Bootstrapper(),
-				},
-				PluginConfig: map[string]interface{}{
-					"sourceChainID":    sourceChainID,
-					"destChainID":      destChainID,
-					"onRampID":         fmt.Sprintf("\"%s\"", subOnRamp),
-					"blobVerifierID":   fmt.Sprintf("\"%s\"", blobVerifier),
-					"pollPeriod":       `"0.5s"`,
 					"destStartBlock":   currentBlockOnDest,
 					"sourceStartBlock": currentBlockOnSource,
 					"tokensPerFeeCoinPipeline": fmt.Sprintf(`"""
@@ -922,7 +997,28 @@ func CreateOCRJobsForCCIP(
 				},
 			},
 		}
-		_, err = chainlinkNodes[nodeIndex].Node.MustCreateJob(ocr3SpecExec)
+		_, err = node.Node.MustCreateJob(ocr2SpecExec)
+		return err
+	}
+
+	for nodeIndex := 0; nodeIndex < len(relayNodes); nodeIndex++ {
+		nodeTransmitterAddress := relayNodes[nodeIndex].KeysBundle.EthAddress
+		nodeOCR2Key := relayNodes[nodeIndex].KeysBundle.OCR2Key
+		nodeOCR2KeyId := nodeOCR2Key.Data.ID
+		err := addRelayJob(relayNodes[nodeIndex].Node, nodeTransmitterAddress, nodeOCR2KeyId)
+		Expect(err).ShouldNot(HaveOccurred(), "Shouldn't fail creating CCIP-Relay OCR Task job on OCR node %d", nodeIndex+1)
+	}
+
+	for nodeIndex := 0; nodeIndex < len(execNodes); nodeIndex++ {
+		nodeTransmitterAddress := execNodes[nodeIndex].KeysBundle.EthAddress
+		nodeOCR2Key := execNodes[nodeIndex].KeysBundle.OCR2Key
+		nodeOCR2KeyId := nodeOCR2Key.Data.ID
+		err = addExecJob(execNodes[nodeIndex], fmt.Sprintf("ccip-exec-toll-%s-%s", sourceChainName, destChainName),
+			nodeTransmitterAddress, nodeOCR2KeyId, tollOffRamp, tollOnRamp)
+		Expect(err).ShouldNot(HaveOccurred(), "Shouldn't fail creating CCIP-Exec-toll OCR Task job on OCR node %d", nodeIndex+1)
+
+		err = addExecJob(execNodes[nodeIndex], fmt.Sprintf("ccip-exec-sub-%s-%s", sourceChainName, destChainName),
+			nodeTransmitterAddress, nodeOCR2KeyId, subOffRamp, subOnRamp)
 		Expect(err).ShouldNot(HaveOccurred(), "Shouldn't fail creating CCIP-Exec-sub OCR Task job on OCR node %d", nodeIndex+1)
 	}
 }
@@ -973,16 +1069,46 @@ func nodeContractPair(nodeAddr, contractAddr string) string {
 	return fmt.Sprintf("node_%s_contract_%s", nodeAddr[2:12], contractAddr[2:12])
 }
 
-type CCIPTest struct {
-	MockServer        *ctfClient.MockserverClient
-	CLNodesWithKeys   []*client.CLNodesWithKeys
-	CLNodes           []*client.Chainlink
-	SourceChainClient blockchain.EVMClient
-	DestChainClient   blockchain.EVMClient
-	TestEnv           *environment.Environment
+type CCIPTestEnv struct {
+	MockServer              *ctfClient.MockserverClient
+	CLNodesWithKeys         []*client.CLNodesWithKeys
+	CLNodes                 []*client.Chainlink
+	execNodeStartIndex      int
+	relayNodeStartIndex     int
+	numOfAllowedFaultyRelay int
+	numOfAllowedFaultyExec  int
+	SourceChainClient       blockchain.EVMClient
+	DestChainClient         blockchain.EVMClient
+	TestEnv                 *environment.Environment
 }
 
-func DeployEnvironments(sourceNetwork *blockchain.EVMNetwork, destNetwork *blockchain.EVMNetwork, envconfig *environment.Config) *environment.Environment {
+func (c CCIPTestEnv) ChaosLabel() {
+	for i := c.relayNodeStartIndex; i < len(c.CLNodes); i++ {
+		labelSelector := map[string]string{
+			"app":      "chainlink-0",
+			"instance": strconv.Itoa(i),
+		}
+		// relay node starts from index 2
+		if i >= c.relayNodeStartIndex && i < c.relayNodeStartIndex+c.numOfAllowedFaultyRelay+1 {
+			err := c.TestEnv.Client.LabelChaosGroupByLabels(c.TestEnv.Cfg.Namespace, labelSelector, ChaosGroupRelayFaultyPlus)
+			Expect(err).ShouldNot(HaveOccurred())
+		}
+		if i >= c.relayNodeStartIndex && i < c.relayNodeStartIndex+c.numOfAllowedFaultyRelay {
+			err := c.TestEnv.Client.LabelChaosGroupByLabels(c.TestEnv.Cfg.Namespace, labelSelector, ChaosGroupRelayFaulty)
+			Expect(err).ShouldNot(HaveOccurred())
+		}
+		if i >= c.execNodeStartIndex && i < c.execNodeStartIndex+c.numOfAllowedFaultyExec+1 {
+			err := c.TestEnv.Client.LabelChaosGroupByLabels(c.TestEnv.Cfg.Namespace, labelSelector, ChaosGroupExecutionFaultyPlus)
+			Expect(err).ShouldNot(HaveOccurred())
+		}
+		if i >= c.execNodeStartIndex && i < c.execNodeStartIndex+c.numOfAllowedFaultyExec {
+			err := c.TestEnv.Client.LabelChaosGroupByLabels(c.TestEnv.Cfg.Namespace, labelSelector, ChaosGroupExecutionFaulty)
+			Expect(err).ShouldNot(HaveOccurred())
+		}
+	}
+}
+
+func DeployEnvironments(sourceNetwork *blockchain.EVMNetwork, destNetwork *blockchain.EVMNetwork, envconfig *environment.Config, clProps map[string]interface{}) *environment.Environment {
 	evmNodes, err := json.Marshal([]types.NewNode{
 		{
 			Name:       "primary_0_source",
@@ -1000,6 +1126,10 @@ func DeployEnvironments(sourceNetwork *blockchain.EVMNetwork, destNetwork *block
 		},
 	})
 	Expect(err).ShouldNot(HaveOccurred())
+	// update EVM_NODES
+	clEnv := clProps["env"].(map[string]interface{})
+	clEnv["EVM_NODES"] = string(evmNodes)
+	clProps["env"] = clEnv
 
 	testEnvironment := environment.New(envconfig)
 	err = testEnvironment.
@@ -1042,31 +1172,7 @@ func DeployEnvironments(sourceNetwork *blockchain.EVMNetwork, destNetwork *block
 	// related https://app.shortcut.com/chainlinklabs/story/38295/creating-an-evm-chain-via-cli-or-api-immediately-polling-the-nodes-and-returning-an-error
 	// node must work and reconnect even if network is not working
 	time.Sleep(30 * time.Second)
-	err = testEnvironment.AddHelm(chainlink.New(0, map[string]interface{}{
-		"replicas": 6,
-		"env": map[string]interface{}{
-			"FEATURE_CCIP":                   "true",
-			"FEATURE_OFFCHAIN_REPORTING2":    "true",
-			"feature_offchain_reporting":     "false",
-			"FEATURE_LOG_POLLER":             "true",
-			"GAS_ESTIMATOR_MODE":             "FixedPrice",
-			"P2P_NETWORKING_STACK":           "V2",
-			"P2PV2_LISTEN_ADDRESSES":         "0.0.0.0:6690",
-			"P2PV2_ANNOUNCE_ADDRESSES":       "0.0.0.0:6690",
-			"P2PV2_DELTA_DIAL":               "500ms",
-			"P2PV2_DELTA_RECONCILE":          "5s",
-			"ETH_GAS_LIMIT_DEFAULT":          "5000000",
-			"ETH_LOG_POLL_INTERVAL":          "1s",
-			"p2p_listen_port":                "0",
-			"ETH_FINALITY_DEPTH":             "50",
-			"ETH_HEAD_TRACKER_HISTORY_DEPTH": "100",
-			// It is not permitted to set both ETH_URL and EVM_NODES,
-			// imposing blank values to stop getting the env variable set as default node set up in qa-charts
-			"ETH_URL":      "",
-			"ETH_CHAIN_ID": "0",
-			"EVM_NODES":    string(evmNodes),
-		},
-	})).Run()
+	err = testEnvironment.AddHelm(chainlink.New(0, clProps)).Run()
 	Expect(err).ShouldNot(HaveOccurred())
 	return testEnvironment
 }
@@ -1076,7 +1182,7 @@ func SetUpNodesAndKeys(
 	destNetwork *blockchain.EVMNetwork,
 	testEnvironment *environment.Environment,
 	nodeFund *big.Float,
-) CCIPTest {
+) CCIPTestEnv {
 	log.Info().Msg("Connecting to launched resources")
 	sourceChainClient, err := blockchain.NewEVMClient(sourceNetwork, testEnvironment)
 	Expect(err).ShouldNot(HaveOccurred(), "Connecting to blockchain nodes shouldn't fail")
@@ -1101,7 +1207,7 @@ func SetUpNodesAndKeys(
 	// create node keys
 	_, clNodes, err := client.CreateNodeKeysBundle(chainlinkNodes, "evm", destChainClient.GetChainID().String())
 	Expect(err).ShouldNot(HaveOccurred())
-	return CCIPTest{
+	return CCIPTestEnv{
 		MockServer:        mockServer,
 		CLNodesWithKeys:   clNodes,
 		CLNodes:           chainlinkNodes,
@@ -1154,11 +1260,18 @@ func GetterForLinkToken(token contracts.LinkToken, addr string) func(_ common.Ad
 	}
 }
 
-func CCIPDefaultTestSetUpForLoad(sourceNetwork *blockchain.EVMNetwork, destNetwork *blockchain.EVMNetwork, envName string) (*SourceCCIPModule, *DestCCIPModule, func()) {
+func CCIPDefaultTestSetUp(
+	sourceNetwork *blockchain.EVMNetwork,
+	destNetwork *blockchain.EVMNetwork,
+	envName string,
+	clProps map[string]interface{},
+	numOfRelayNodes int,
+	relayAndExecOnSameDON bool,
+) (*environment.Environment, *SourceCCIPModule, *DestCCIPModule, CCIPTestEnv, func()) {
 	testEnvironment := DeployEnvironments(sourceNetwork, destNetwork, &environment.Config{
 		TTL:             1 * time.Hour,
-		NamespacePrefix: "load-ccip",
-	})
+		NamespacePrefix: envName,
+	}, clProps)
 	testSetUp := SetUpNodesAndKeys(sourceNetwork, destNetwork, testEnvironment, big.NewFloat(10))
 	clNodes := testSetUp.CLNodesWithKeys
 	mockServer := testSetUp.MockServer
@@ -1184,9 +1297,24 @@ func CCIPDefaultTestSetUpForLoad(sourceNetwork *blockchain.EVMNetwork, destNetwo
 		tokenAddr = append(tokenAddr, token.Address())
 	}
 	tokenAddr = append(tokenAddr, destCCIP.Common.FeeToken.Address())
-
+	bootstrapRelay := clNodes[0]
+	var bootstrapExec *client.CLNodesWithKeys
+	var execNodes []*client.CLNodesWithKeys
+	relayNodes := clNodes[1:]
+	testSetUp.relayNodeStartIndex = 1
+	testSetUp.execNodeStartIndex = 1
+	testSetUp.numOfAllowedFaultyExec = 1
+	testSetUp.numOfAllowedFaultyRelay = 1
+	if !relayAndExecOnSameDON {
+		bootstrapExec = clNodes[1]
+		relayNodes = clNodes[2 : 2+numOfRelayNodes]
+		execNodes = clNodes[2+numOfRelayNodes:]
+		testSetUp.relayNodeStartIndex = 2
+		testSetUp.execNodeStartIndex = 7
+	}
 	CreateOCRJobsForCCIP(
-		clNodes, sourceCCIP.TollOnRamp.Address(),
+		bootstrapRelay, bootstrapExec, relayNodes, execNodes,
+		sourceCCIP.TollOnRamp.Address(),
 		sourceCCIP.SubOnRamp.Address(),
 		destCCIP.BlobVerifier.Address(),
 		destCCIP.TollOffRamp.Address(),
@@ -1197,12 +1325,13 @@ func CCIPDefaultTestSetUpForLoad(sourceNetwork *blockchain.EVMNetwork, destNetwo
 	)
 
 	// set up ocr2 config
-	SetOCRConfigs(clNodes[1:], *destCCIP) // first node is the bootstrapper
+	SetOCRConfigs(relayNodes, execNodes, *destCCIP) // first node is the bootstrapper
 	tearDown := func() {
 		sourceChainClient.GasStats().PrintStats()
 		destChainClient.GasStats().PrintStats()
 		err := TeardownSuite(testEnvironment, ctfUtils.ProjectRoot, testSetUp.CLNodes, nil, sourceChainClient)
 		Expect(err).ShouldNot(HaveOccurred(), "Environment teardown shouldn't fail")
 	}
-	return sourceCCIP, destCCIP, tearDown
+
+	return testEnvironment, sourceCCIP, destCCIP, testSetUp, tearDown
 }

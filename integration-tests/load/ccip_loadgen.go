@@ -162,7 +162,8 @@ func (c *CCIPE2ELoad) BeforeAllCall() {
 
 func (c *CCIPE2ELoad) AfterAllCall() {
 	c.BalanceStats.DestBalanceAssertions = c.Destination.BalanceAssertions(
-		c.Model, c.BalanceStats.DestBalanceReq, c.Source.TransferAmount, big.NewInt(0), c.NoOfReq)
+		c.Model, c.BalanceStats.DestBalanceReq, c.Source.TransferAmount, big.NewInt(0),
+		c.NoOfReq, bigmath.Mul(big.NewInt(c.NoOfReq), big.NewInt(0.79e18)))
 	c.BalanceStats.SourceBalanceAssertions = c.Source.BalanceAssertions(c.Model, c.BalanceStats.SourceBalanceReq, c.NoOfReq)
 	actions.AssertBalances(c.BalanceStats.DestBalanceAssertions)
 	actions.AssertBalances(c.BalanceStats.SourceBalanceAssertions)

@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	. "github.com/onsi/ginkgo/v2"
@@ -94,7 +95,12 @@ var _ = FDescribe("CCIP interactions test @ccip", func() {
 			destCCIP   *actions.DestCCIPModule
 		)
 		By("Deploying the environment")
-		testEnvironment = actions.DeployEnvironments(sourceNetwork, destNetwork, &environment.Config{NamespacePrefix: "smoke-ccip"})
+		testEnvironment = actions.DeployEnvironments(
+			sourceNetwork, destNetwork, &environment.Config{NamespacePrefix: "smoke-ccip"},
+			map[string]interface{}{
+				"replicas": "6",
+				"env":      actions.DefaultCCIPCLNodeEnv,
+			})
 
 		By("Setting up chainlink nodes")
 		testSetUp := actions.SetUpNodesAndKeys(sourceNetwork, destNetwork, testEnvironment, big.NewFloat(10))
@@ -124,9 +130,9 @@ var _ = FDescribe("CCIP interactions test @ccip", func() {
 			tokenAddr = append(tokenAddr, token.Address())
 		}
 		tokenAddr = append(tokenAddr, destCCIP.Common.FeeToken.Address())
-
 		actions.CreateOCRJobsForCCIP(
-			clNodes, sourceCCIP.TollOnRamp.Address(),
+			clNodes[0], nil, clNodes[1:], nil,
+			sourceCCIP.TollOnRamp.Address(),
 			sourceCCIP.SubOnRamp.Address(),
 			destCCIP.BlobVerifier.Address(),
 			destCCIP.TollOffRamp.Address(),
@@ -138,18 +144,22 @@ var _ = FDescribe("CCIP interactions test @ccip", func() {
 
 		// set up ocr2 config
 		By("Setting up ocr config in blob verifier and offramp")
-		actions.SetOCRConfigs(clNodes[1:], *destCCIP) // first node is the bootstrapper
+		actions.SetOCRConfigs(clNodes[1:], nil, *destCCIP) // first node is the bootstrapper
+
+		ccipTest := actions.NewCCIPTest(
+			sourceCCIP, destCCIP, big.NewInt(0).Mul(big.NewInt(80), big.NewInt(1e18)), big.NewInt(0.79e18), time.Minute)
 
 		// initiate transfer with toll and verify
 		By("Multiple Token transfer with toll, watch for updated sequence numbers and events logs, " +
 			"verify balance in receiving and sending account pre and post transfer")
-		actions.TokenTransferWithToll(*sourceCCIP, *destCCIP)
+		ccipTest.SendTollRequests(1)
+		ccipTest.ValidateTollRequests()
 
 		// initiate transfer with subscription and verify
 		By("Multiple Token transfer with subscription, watch for updated sequence numbers and events logs, " +
 			"verify receiver,sender and subscription balance pre and post transfer")
-		actions.CreateAndFundSubscription(*sourceCCIP, *destCCIP, big.NewInt(0).Mul(big.NewInt(80), big.NewInt(1e18)), 2)
-		actions.TokenTransferWithSub(*sourceCCIP, *destCCIP)
+		ccipTest.SendSubRequests(1)
+		ccipTest.ValidateSubRequests()
 	},
 		diffNetworkEntries,
 	)
