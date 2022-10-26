@@ -49,7 +49,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
-func (client *CCIPClient) wip(t *testing.T, sourceClient *rhea.EvmChainConfig, destClient *rhea.EvmChainConfig) {
+func (client *CCIPClient) wip(t *testing.T, sourceClient *rhea.EvmDeploymentConfig, destClient *rhea.EvmDeploymentConfig) {
 
 }
 
@@ -96,41 +96,41 @@ type SourceClient struct {
 	SenderDapp   *subscription_sender_dapp.SubscriptionSenderDapp
 }
 
-func NewSourceClient(t *testing.T, config rhea.EvmChainConfig) SourceClient {
-	client := rhea.GetClient(t, config.EthUrl)
-	LinkToken, err := link_token_interface.NewLinkToken(config.LinkToken, client)
+func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient {
+	client := rhea.GetClient(t, config.ChainConfig.EthUrl)
+	LinkToken, err := link_token_interface.NewLinkToken(config.ChainConfig.LinkToken, client)
 	require.NoError(t, err)
 	var tokenPools []*native_token_pool.NativeTokenPool
-	for _, poolAddress := range config.TokenPools {
+	for _, poolAddress := range config.ChainConfig.TokenPools {
 		tokenPool, err2 := native_token_pool.NewNativeTokenPool(poolAddress, client)
 		require.NoError(t, err2)
 		tokenPools = append(tokenPools, tokenPool)
 	}
 
-	afn, err := afn_contract.NewAFNContract(config.Afn, client)
+	afn, err := afn_contract.NewAFNContract(config.ChainConfig.Afn, client)
 	require.NoError(t, err)
-	onRamp, err := evm_2_evm_subscription_onramp.NewEVM2EVMSubscriptionOnRamp(config.OnRamp, client)
+	onRamp, err := evm_2_evm_subscription_onramp.NewEVM2EVMSubscriptionOnRamp(config.LaneConfig.OnRamp, client)
 	require.NoError(t, err)
-	senderDapp, err := subscription_sender_dapp.NewSubscriptionSenderDapp(config.TokenSender, client)
+	senderDapp, err := subscription_sender_dapp.NewSubscriptionSenderDapp(config.LaneConfig.TokenSender, client)
 	require.NoError(t, err)
-	onRampRouter, err := evm_2_any_subscription_onramp_router.NewEVM2AnySubscriptionOnRampRouter(config.OnRampRouter, client)
+	onRampRouter, err := evm_2_any_subscription_onramp_router.NewEVM2AnySubscriptionOnRampRouter(config.ChainConfig.OnRampRouter, client)
 	require.NoError(t, err)
-	governanceDapp, err := governance_dapp.NewGovernanceDapp(config.GovernanceDapp, client)
+	governanceDapp, err := governance_dapp.NewGovernanceDapp(config.LaneConfig.GovernanceDapp, client)
 	require.NoError(t, err)
-	pingPongDapp, err := ping_pong_demo.NewPingPongDemo(config.PingPongDapp, client)
+	pingPongDapp, err := ping_pong_demo.NewPingPongDemo(config.LaneConfig.PingPongDapp, client)
 	require.NoError(t, err)
 
 	return SourceClient{
 		Client: Client{
 			Client:           client,
-			ChainId:          config.ChainId,
-			LinkTokenAddress: config.LinkToken,
+			ChainId:          config.ChainConfig.ChainId,
+			LinkTokenAddress: config.ChainConfig.LinkToken,
 			LinkToken:        LinkToken,
 			Afn:              afn,
 			TokenPools:       tokenPools,
 			GovernanceDapp:   governanceDapp,
 			PingPongDapp:     pingPongDapp,
-			logger:           logger.TestLogger(t).Named(helpers.ChainName(config.ChainId.Int64())),
+			logger:           logger.TestLogger(t).Named(helpers.ChainName(config.ChainConfig.ChainId.Int64())),
 			t:                t,
 		},
 		OnRamp:       onRamp,
@@ -148,46 +148,46 @@ type DestClient struct {
 	OffRampRouter   *any_2_evm_subscription_offramp_router.Any2EVMSubscriptionOffRampRouter
 }
 
-func NewDestinationClient(t *testing.T, config rhea.EvmChainConfig) DestClient {
-	client := rhea.GetClient(t, config.EthUrl)
-	LinkToken, err := link_token_interface.NewLinkToken(config.LinkToken, client)
+func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestClient {
+	client := rhea.GetClient(t, config.ChainConfig.EthUrl)
+	LinkToken, err := link_token_interface.NewLinkToken(config.ChainConfig.LinkToken, client)
 	require.NoError(t, err)
 
 	var tokenPools []*native_token_pool.NativeTokenPool
-	for _, poolAddress := range config.TokenPools {
+	for _, poolAddress := range config.ChainConfig.TokenPools {
 		tokenPool, err2 := native_token_pool.NewNativeTokenPool(poolAddress, client)
 		require.NoError(t, err2)
 		tokenPools = append(tokenPools, tokenPool)
 	}
 
-	afn, err := afn_contract.NewAFNContract(config.Afn, client)
+	afn, err := afn_contract.NewAFNContract(config.ChainConfig.Afn, client)
 	require.NoError(t, err)
-	blobVerifier, err := blob_verifier.NewBlobVerifier(config.BlobVerifier, client)
+	blobVerifier, err := blob_verifier.NewBlobVerifier(config.LaneConfig.BlobVerifier, client)
 	require.NoError(t, err)
-	offRamp, err := any_2_evm_subscription_offramp.NewEVM2EVMSubscriptionOffRamp(config.OffRamp, client)
+	offRamp, err := any_2_evm_subscription_offramp.NewEVM2EVMSubscriptionOffRamp(config.LaneConfig.OffRamp, client)
 	require.NoError(t, err)
-	messageReceiver, err := simple_message_receiver.NewSimpleMessageReceiver(config.MessageReceiver, client)
+	messageReceiver, err := simple_message_receiver.NewSimpleMessageReceiver(config.LaneConfig.MessageReceiver, client)
 	require.NoError(t, err)
-	receiverDapp, err := receiver_dapp.NewReceiverDapp(config.ReceiverDapp, client)
+	receiverDapp, err := receiver_dapp.NewReceiverDapp(config.LaneConfig.ReceiverDapp, client)
 	require.NoError(t, err)
-	offRampRouter, err := any_2_evm_subscription_offramp_router.NewAny2EVMSubscriptionOffRampRouter(config.OffRampRouter, client)
+	offRampRouter, err := any_2_evm_subscription_offramp_router.NewAny2EVMSubscriptionOffRampRouter(config.ChainConfig.OffRampRouter, client)
 	require.NoError(t, err)
-	governanceDapp, err := governance_dapp.NewGovernanceDapp(config.GovernanceDapp, client)
+	governanceDapp, err := governance_dapp.NewGovernanceDapp(config.LaneConfig.GovernanceDapp, client)
 	require.NoError(t, err)
-	pingPongDapp, err := ping_pong_demo.NewPingPongDemo(config.PingPongDapp, client)
+	pingPongDapp, err := ping_pong_demo.NewPingPongDemo(config.LaneConfig.PingPongDapp, client)
 	require.NoError(t, err)
 
 	return DestClient{
 		Client: Client{
 			Client:           client,
-			ChainId:          config.ChainId,
-			LinkTokenAddress: config.LinkToken,
+			ChainId:          config.ChainConfig.ChainId,
+			LinkTokenAddress: config.ChainConfig.LinkToken,
 			LinkToken:        LinkToken,
 			TokenPools:       tokenPools,
 			GovernanceDapp:   governanceDapp,
 			PingPongDapp:     pingPongDapp,
 			Afn:              afn,
-			logger:           logger.TestLogger(t).Named(helpers.ChainName(config.ChainId.Int64())),
+			logger:           logger.TestLogger(t).Named(helpers.ChainName(config.ChainConfig.ChainId.Int64())),
 			t:                t,
 		},
 		BlobVerifier:    blobVerifier,
@@ -206,11 +206,11 @@ type CCIPClient struct {
 }
 
 // NewCcipClient returns a new CCIPClient with initialised source and destination clients.
-func NewCcipClient(t *testing.T, sourceConfig rhea.EvmChainConfig, destConfig rhea.EvmChainConfig, ownerKey string, seedKey string) CCIPClient {
+func NewCcipClient(t *testing.T, sourceConfig rhea.EvmDeploymentConfig, destConfig rhea.EvmDeploymentConfig, ownerKey string, seedKey string) CCIPClient {
 	source := NewSourceClient(t, sourceConfig)
-	source.SetOwnerAndUsers(t, ownerKey, seedKey, sourceConfig.GasSettings)
+	source.SetOwnerAndUsers(t, ownerKey, seedKey, sourceConfig.ChainConfig.GasSettings)
 	dest := NewDestinationClient(t, destConfig)
-	dest.SetOwnerAndUsers(t, ownerKey, seedKey, destConfig.GasSettings)
+	dest.SetOwnerAndUsers(t, ownerKey, seedKey, destConfig.ChainConfig.GasSettings)
 
 	return CCIPClient{
 		Source: source,
@@ -218,7 +218,7 @@ func NewCcipClient(t *testing.T, sourceConfig rhea.EvmChainConfig, destConfig rh
 	}
 }
 
-func GetSetupChain(t *testing.T, ownerPrivateKey string, chain rhea.EvmChainConfig) *rhea.EvmChainConfig {
+func GetSetupChain(t *testing.T, ownerPrivateKey string, chain rhea.EvmDeploymentConfig) *rhea.EvmDeploymentConfig {
 	chain.SetupChain(t, ownerPrivateKey)
 	return &chain
 }

@@ -36,18 +36,18 @@ package toll
 //func deploySourceAndDestContracts(t *testing.T, source *main.EvmChainConfig, destination *main.EvmChainConfig) {
 //	// After running this code please update the configuration to reflect the newly
 //	// deployed contract addresses.
-//	deploySourceContracts(t, source, destination.ChainId)
-//	source.Logger.Infof("%s contracts fully deployed as source chain", helpers.ChainName(source.ChainId.Int64()))
+//	deploySourceContracts(t, source, destination.ChainConfig.ChainId)
+//	source.Logger.Infof("%s contracts fully deployed as source chain", helpers.ChainName(source.ChainConfig.ChainId.Int64()))
 //
 //	deployDestinationContracts(t, destination, source)
-//	destination.Logger.Infof("%s contracts fully deployed as destination chain", helpers.ChainName(destination.ChainId.Int64()))
+//	destination.Logger.Infof("%s contracts fully deployed as destination chain", helpers.ChainName(destination.ChainConfig.ChainId.Int64()))
 //
 //	// Deploy onramp sender dapp
-//	tokenSenderAddress, tx, _, err := toll_sender_dapp.DeployTollSenderDapp(source.Owner, source.Client, source.OnRamp, destination.ChainId, destination.ReceiverDapp)
+//	tokenSenderAddress, tx, _, err := toll_sender_dapp.DeployTollSenderDapp(source.Owner, source.Client, source.OnRamp, destination.ChainConfig.ChainId, destination.ReceiverDapp)
 //	require.NoError(t, err)
 //	main.WaitForMined(t, destination.Logger, source.Client, tx.Hash(), true)
-//	source.Logger.Infof("Token sender dapp deployed on %s in tx: %s", tokenSenderAddress.Hex(), helpers.ExplorerLink(source.ChainId.Int64(), tx.Hash()))
-//	source.TokenSender = tokenSenderAddress
+//	source.Logger.Infof("Token sender dapp deployed on %s in tx: %s", tokenSenderAddress.Hex(), helpers.ExplorerLink(source.ChainConfig.ChainId.Int64(), tx.Hash()))
+//	source.LaneConfig.TokenSender = tokenSenderAddress
 //
 //	printContractConfig(source, destination)
 //}
@@ -57,7 +57,7 @@ package toll
 //	tokenPools := deployNativeTokenPool(t, source)
 //	// Updates source.AFN if any new contracts are deployed
 //	deployAFN(t, source)
-//	// Updates source.OnRampRouter if any new contracts are deployed
+//	// Updates source.ChainConfig.OnRampRouter if any new contracts are deployed
 //	deployOnRampRouter(t, source)
 //	// Updates source.OnRamp if any new contracts are deployed
 //	deployOnRamp(t, source, offRampChainID)
@@ -68,7 +68,7 @@ package toll
 //			// Configure onramp address on pool
 //			tx, err := tokenPool.SetOnRamp(source.Owner, source.OnRamp, true)
 //			require.NoError(t, err)
-//			source.Logger.Infof("Onramp pool configured with onramp: %s", helpers.ExplorerLink(source.ChainId.Int64(), tx.Hash()))
+//			source.Logger.Infof("Onramp pool configured with onramp: %s", helpers.ExplorerLink(source.ChainConfig.ChainId.Int64(), tx.Hash()))
 //		}
 //	}
 //}
@@ -85,7 +85,7 @@ package toll
 //	messageReceiverAddress, tx, _, err := simple_message_receiver.DeploySimpleMessageReceiver(destClient.Owner, destClient.Client)
 //	require.NoError(t, err)
 //	main.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
-//	destClient.Logger.Infof("Offramp message receiver deployed on %s in tx: %s", messageReceiverAddress.Hex(), helpers.ExplorerLink(destClient.ChainId.Int64(), tx.Hash()))
+//	destClient.Logger.Infof("Offramp message receiver deployed on %s in tx: %s", messageReceiverAddress.Hex(), helpers.ExplorerLink(destClient.ChainConfig.ChainId.Int64(), tx.Hash()))
 //	destClient.MessageReceiver = messageReceiverAddress
 //
 //	// Updates source.ReceiverDapp if any new contracts are deployed
@@ -98,18 +98,18 @@ package toll
 //	if destClient.DeploySettings.DeployRamp || destClient.DeploySettings.DeployTokenPools {
 //		for _, tokenPool := range tokenPools {
 //			// Configure offramp address on pool
-//			tx, err = tokenPool.SetOffRamp(destClient.Owner, destClient.BlobVerifier, true)
+//			tx, err = tokenPool.SetOffRamp(destClient.Owner, destClient.LaneConfig.BlobVerifier, true)
 //			require.NoError(t, err)
 //			main.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
-//			destClient.Logger.Infof("Offramp pool configured with offramp address: %s", helpers.ExplorerLink(destClient.ChainId.Int64(), tx.Hash()))
+//			destClient.Logger.Infof("Offramp pool configured with offramp address: %s", helpers.ExplorerLink(destClient.ChainConfig.ChainId.Int64(), tx.Hash()))
 //		}
 //	}
 //}
 //
 //func deployOnRampRouter(t *testing.T, client *main.EvmChainConfig) *evm_2_any_toll_onramp_router.EVM2AnyTollOnRampRouter {
 //	if !client.DeploySettings.DeployRouter {
-//		client.Logger.Infof("Skipping OnRampRouter deployment, using OnRampRouter on %s", client.OnRampRouter)
-//		onRampRouter, err := evm_2_any_toll_onramp_router.NewEVM2AnyTollOnRampRouter(client.OnRamp, client.Client)
+//		client.Logger.Infof("Skipping OnRampRouter deployment, using OnRampRouter on %s", Client.LaneConfig.OnRampRouter)
+//		onRampRouter, err := evm_2_any_toll_onramp_router.NewEVM2AnyTollOnRampRouter(Client.LaneConfig.OnRamp, client.Client)
 //		require.NoError(t, err)
 //		return onRampRouter
 //	}
@@ -118,33 +118,33 @@ package toll
 //	onRampRouterAddress, tx, _, err := evm_2_any_toll_onramp_router.DeployEVM2AnyTollOnRampRouter(client.Owner, client.Client)
 //	require.NoError(t, err)
 //	main.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
-//	client.OnRampRouter = onRampRouterAddress
+//	Client.LaneConfig.OnRampRouter = onRampRouterAddress
 //
-//	client.Logger.Infof(fmt.Sprintf("OnRampRouter deployed on %s in tx %s", onRampRouterAddress.String(), helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash())))
+//	client.Logger.Infof(fmt.Sprintf("OnRampRouter deployed on %s in tx %s", onRampRouterAddress.String(), helpers.ExplorerLink(Client.ChainConfig.ChainId.Int64(), tx.Hash())))
 //
-//	onRampRouter, err := evm_2_any_toll_onramp_router.NewEVM2AnyTollOnRampRouter(client.OnRamp, client.Client)
+//	onRampRouter, err := evm_2_any_toll_onramp_router.NewEVM2AnyTollOnRampRouter(Client.LaneConfig.OnRamp, client.Client)
 //	require.NoError(t, err)
 //	return onRampRouter
 //}
 //
 //func deployOnRamp(t *testing.T, client *main.EvmChainConfig, destinationChain *big.Int) *evm_2_evm_toll_onramp.EVM2EVMTollOnRamp {
 //	if !client.DeploySettings.DeployRamp {
-//		client.Logger.Infof("Skipping OnRamp deployment, using onRamp on %s", client.OnRamp)
-//		onRamp, err := evm_2_evm_toll_onramp.NewEVM2EVMTollOnRamp(client.OnRamp, client.Client)
+//		client.Logger.Infof("Skipping OnRamp deployment, using onRamp on %s", Client.LaneConfig.OnRamp)
+//		onRamp, err := evm_2_evm_toll_onramp.NewEVM2EVMTollOnRamp(Client.LaneConfig.OnRamp, client.Client)
 //		require.NoError(t, err)
 //		return onRamp
 //	}
 //
-//	client.Logger.Infof("Deploying OnRamp: destinationChains %+v, bridgeTokens %+v, poolAddresses %+v", destinationChain, client.BridgeTokens, client.TokenPools)
+//	client.Logger.Infof("Deploying OnRamp: destinationChains %+v, bridgeTokens %+v, poolAddresses %+v", destinationChain, client.ChainConfig.BridgeTokens, client.ChainConfig.TokenPools)
 //	onRampAddress, tx, _, err := evm_2_evm_toll_onramp.DeployEVM2EVMTollOnRamp(
 //		client.Owner,        // user
 //		client.Client,       // client
-//		client.ChainId,      // source chain id
+//		Client.ChainConfig.ChainId,      // source chain id
 //		destinationChain,    // destinationChainId
-//		client.BridgeTokens, // tokens
-//		client.TokenPools,   // pools
+//		client.ChainConfig.BridgeTokens, // tokens
+//		client.ChainConfig.TokenPools,   // pools
 //		[]common.Address{},  // allow list
-//		client.Afn,          // AFN
+//		client.ChainConfig.Afn,          // AFN
 //		evm_2_evm_toll_onramp.BaseOnRampInterfaceOnRampConfig{
 //			RelayingFeeJuels: 0,
 //			MaxDataSize:      1e6,
@@ -155,23 +155,23 @@ package toll
 //			Rate:     big.NewInt(1e18),
 //		},
 //		client.Owner.From,
-//		client.OnRampRouter,
+//		Client.LaneConfig.OnRampRouter,
 //	)
 //	require.NoError(t, err)
 //	main.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 //
 //	onRamp, err := evm_2_evm_toll_onramp.NewEVM2EVMTollOnRamp(onRampAddress, client.Client)
 //	require.NoError(t, err)
-//	client.Logger.Infof(fmt.Sprintf("Onramp deployed on %s in tx %s", onRampAddress.String(), helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash())))
-//	client.OnRamp = onRampAddress
+//	client.Logger.Infof(fmt.Sprintf("Onramp deployed on %s in tx %s", onRampAddress.String(), helpers.ExplorerLink(Client.ChainConfig.ChainId.Int64(), tx.Hash())))
+//	Client.LaneConfig.OnRamp = onRampAddress
 //
-//	onRampRouter, err := evm_2_any_toll_onramp_router.NewEVM2AnyTollOnRampRouterTransactor(client.OnRampRouter, client.Client)
+//	onRampRouter, err := evm_2_any_toll_onramp_router.NewEVM2AnyTollOnRampRouterTransactor(Client.LaneConfig.OnRampRouter, client.Client)
 //	require.NoError(t, err)
 //	tx, err = onRampRouter.SetOnRamp(client.Owner, destinationChain, onRampAddress)
 //	require.NoError(t, err)
 //	main.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 //
-//	_, err = onRamp.SetPrices(client.Owner, []common.Address{client.LinkToken}, []*big.Int{big.NewInt(1)})
+//	_, err = onRamp.SetPrices(client.Owner, []common.Address{client.ChainConfig.LinkToken}, []*big.Int{big.NewInt(1)})
 //	require.NoError(t, err)
 //
 //	return onRamp
@@ -179,8 +179,8 @@ package toll
 //
 //func deployOffRamp(t *testing.T, destClient *main.EvmChainConfig, sourceClient *main.EvmChainConfig) *any_2_evm_toll_offramp.EVM2EVMTollOffRamp {
 //	if !destClient.DeploySettings.DeployRamp {
-//		destClient.Logger.Infof("Skipping OffRamp deployment, using offRamp on %s", destClient.OnRamp)
-//		offRamp, err := any_2_evm_toll_offramp.NewEVM2EVMTollOffRamp(destClient.OffRamp, destClient.Client)
+//		destClient.Logger.Infof("Skipping OffRamp deployment, using offRamp on %s", destClient.LaneConfig.OnRamp)
+//		offRamp, err := any_2_evm_toll_offramp.NewEVM2EVMTollOffRamp(destClient.LaneConfig.OffRamp, destClient.Client)
 //		require.NoError(t, err)
 //		return offRamp
 //	}
@@ -189,19 +189,19 @@ package toll
 //	tollOffRampAddress, tx, _, err := any_2_evm_toll_offramp.DeployEVM2EVMTollOffRamp(
 //		destClient.Owner,
 //		destClient.Client,
-//		sourceClient.ChainId,
-//		destClient.ChainId,
+//		sourceClient.ChainConfig.ChainId,
+//		destClient.ChainConfig.ChainId,
 //		any_2_evm_toll_offramp.BaseOffRampInterfaceOffRampConfig{
-//			OnRampAddress:                           sourceClient.OnRamp,
+//			OnRampAddress:                           sourceClient.LaneConfig.OnRamp,
 //			ExecutionDelaySeconds:                   60,
 //			MaxDataSize:                             1e5,
 //			MaxTokensLength:                         15,
 //			PermissionLessExecutionThresholdSeconds: 60,
 //		},
-//		destClient.BlobVerifier,
-//		destClient.Afn,
-//		sourceClient.BridgeTokens,
-//		destClient.TokenPools,
+//		destClient.LaneConfig.BlobVerifier,
+//		destClient.ChainConfig.Afn,
+//		sourceclient.ChainConfig.BridgeTokens,
+//		destclient.ChainConfig.TokenPools,
 //		any_2_evm_toll_offramp.AggregateRateLimiterInterfaceRateLimiterConfig{
 //			Capacity: big.NewInt(1e18),
 //			Rate:     big.NewInt(1e18),
@@ -210,12 +210,12 @@ package toll
 //	require.NoError(t, err)
 //	main.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
 //
-//	destClient.Logger.Infof("OffRamp contract deployed on %s in tx: %s", tollOffRampAddress.Hex(), helpers.ExplorerLink(destClient.ChainId.Int64(), tx.Hash()))
-//	destClient.OffRamp = tollOffRampAddress
-//	offRamp, err := any_2_evm_toll_offramp.NewEVM2EVMTollOffRamp(destClient.OffRamp, destClient.Client)
+//	destClient.Logger.Infof("OffRamp contract deployed on %s in tx: %s", tollOffRampAddress.Hex(), helpers.ExplorerLink(destClient.ChainConfig.ChainId.Int64(), tx.Hash()))
+//	destClient.LaneConfig.OffRamp = tollOffRampAddress
+//	offRamp, err := any_2_evm_toll_offramp.NewEVM2EVMTollOffRamp(destClient.LaneConfig.OffRamp, destClient.Client)
 //	require.NoError(t, err)
 //
-//	_, err = offRamp.SetPrices(destClient.Owner, []common.Address{destClient.LinkToken}, []*big.Int{big.NewInt(1)})
+//	_, err = offRamp.SetPrices(destClient.Owner, []common.Address{destclient.ChainConfig.LinkToken}, []*big.Int{big.NewInt(1)})
 //	require.NoError(t, err)
 //
 //	return offRamp
@@ -223,38 +223,38 @@ package toll
 //
 //func deployOffRampRouter(t *testing.T, destClient *main.EvmChainConfig) *any_2_evm_toll_offramp_router.Any2EVMTollOffRampRouter {
 //	if !destClient.DeploySettings.DeployRouter {
-//		destClient.Logger.Infof("Skipping OffRampRouter deployment, using OffRampRouter on %s", destClient.OffRampRouter)
-//		offRampRouter, err := any_2_evm_toll_offramp_router.NewAny2EVMTollOffRampRouter(destClient.OffRampRouter, destClient.Client)
+//		destClient.Logger.Infof("Skipping OffRampRouter deployment, using OffRampRouter on %s", destClient.ChainConfig.OffRampRouter)
+//		offRampRouter, err := any_2_evm_toll_offramp_router.NewAny2EVMTollOffRampRouter(destClient.ChainConfig.OffRampRouter, destClient.Client)
 //		require.NoError(t, err)
 //		return offRampRouter
 //	}
 //
 //	destClient.Logger.Infof("Deploying OffRampRouter")
-//	offRampRouterAddress, tx, _, err := any_2_evm_toll_offramp_router.DeployAny2EVMTollOffRampRouter(destClient.Owner, destClient.Client, []common.Address{destClient.OffRamp})
+//	offRampRouterAddress, tx, _, err := any_2_evm_toll_offramp_router.DeployAny2EVMTollOffRampRouter(destClient.Owner, destClient.Client, []common.Address{destClient.LaneConfig.OffRamp})
 //	require.NoError(t, err)
 //	main.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
-//	destClient.OffRampRouter = offRampRouterAddress
+//	destClient.ChainConfig.OffRampRouter = offRampRouterAddress
 //
-//	destClient.Logger.Infof(fmt.Sprintf("OffRampRouter deployed on %s in tx %s", offRampRouterAddress.String(), helpers.ExplorerLink(destClient.ChainId.Int64(), tx.Hash())))
+//	destClient.Logger.Infof(fmt.Sprintf("OffRampRouter deployed on %s in tx %s", offRampRouterAddress.String(), helpers.ExplorerLink(destClient.ChainConfig.ChainId.Int64(), tx.Hash())))
 //
-//	offRampRouter, err := any_2_evm_toll_offramp_router.NewAny2EVMTollOffRampRouter(destClient.OffRampRouter, destClient.Client)
+//	offRampRouter, err := any_2_evm_toll_offramp_router.NewAny2EVMTollOffRampRouter(destClient.ChainConfig.OffRampRouter, destClient.Client)
 //	require.NoError(t, err)
 //
-//	offRamp, err := any_2_evm_toll_offramp.NewEVM2EVMTollOffRamp(destClient.OffRamp, destClient.Client)
+//	offRamp, err := any_2_evm_toll_offramp.NewEVM2EVMTollOffRamp(destClient.LaneConfig.OffRamp, destClient.Client)
 //	require.NoError(t, err)
 //
 //	tx, err = offRamp.SetRouter(destClient.Owner, offRampRouterAddress)
 //	require.NoError(t, err)
 //	main.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
-//	destClient.Logger.Infof(fmt.Sprintf("OffRampRouter set on offRamp in tx %s", helpers.ExplorerLink(destClient.ChainId.Int64(), tx.Hash())))
+//	destClient.Logger.Infof(fmt.Sprintf("OffRampRouter set on offRamp in tx %s", helpers.ExplorerLink(destClient.ChainConfig.ChainId.Int64(), tx.Hash())))
 //
 //	return offRampRouter
 //}
 //
 //func deployBlobVerifier(t *testing.T, destClient *main.EvmChainConfig, sourceClient *main.EvmChainConfig) *blob_verifier.BlobVerifier {
 //	if !destClient.DeploySettings.DeployBlobVerifier {
-//		destClient.Logger.Infof("Skipping BlobVerifier deployment, using BlobVerifier on %s", destClient.BlobVerifier)
-//		blobVerifier, err := blob_verifier.NewBlobVerifier(destClient.BlobVerifier, destClient.Client)
+//		destClient.Logger.Infof("Skipping BlobVerifier deployment, using BlobVerifier on %s", destClient.LaneConfig.BlobVerifier)
+//		blobVerifier, err := blob_verifier.NewBlobVerifier(destClient.LaneConfig.BlobVerifier, destClient.Client)
 //		require.NoError(t, err)
 //		return blobVerifier
 //	}
@@ -264,18 +264,18 @@ package toll
 //	blobVerifierAddress, tx, _, err := blob_verifier.DeployBlobVerifier(
 //		destClient.Owner,     // user
 //		destClient.Client,    // client
-//		destClient.ChainId,   // dest chain id
-//		sourceClient.ChainId, // source chain id
-//		destClient.Afn,       // AFN address
+//		destClient.ChainConfig.ChainId,   // dest chain id
+//		sourceClient.ChainConfig.ChainId, // source chain id
+//		destClient.ChainConfig.Afn,       // AFN address
 //		blob_verifier.BlobVerifierInterfaceBlobVerifierConfig{
-//			OnRamps:          []common.Address{sourceClient.OnRamp},
+//			OnRamps:          []common.Address{sourceClient.LaneConfig.OnRamp},
 //			MinSeqNrByOnRamp: []uint64{1},
 //		},
 //	)
 //	require.NoError(t, err)
 //	main.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
-//	destClient.Logger.Infof("Blob verifier deployed on %s in tx: %s", blobVerifierAddress.Hex(), helpers.ExplorerLink(destClient.ChainId.Int64(), tx.Hash()))
-//	destClient.BlobVerifier = blobVerifierAddress
+//	destClient.Logger.Infof("Blob verifier deployed on %s in tx: %s", blobVerifierAddress.Hex(), helpers.ExplorerLink(destClient.ChainConfig.ChainId.Int64(), tx.Hash()))
+//	destClient.LaneConfig.BlobVerifier = blobVerifierAddress
 //
 //	blobVerifier, err := blob_verifier.NewBlobVerifier(blobVerifierAddress, destClient.Client)
 //	require.NoError(t, err)
@@ -284,10 +284,10 @@ package toll
 //
 //func deployReceiverDapp(t *testing.T, destClient *main.EvmChainConfig) *receiver_dapp.ReceiverDapp {
 //	destClient.Logger.Infof("Deploying ReceiverDapp")
-//	receiverDappAddress, tx, _, err := receiver_dapp.DeployReceiverDapp(destClient.Owner, destClient.Client, destClient.OnRampRouter)
+//	receiverDappAddress, tx, _, err := receiver_dapp.DeployReceiverDapp(destClient.Owner, destClient.Client, destClient.LaneConfig.OnRampRouter)
 //	require.NoError(t, err)
 //	main.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
-//	destClient.Logger.Infof("Offramp receiver dapp deployed on %s in tx: %s", receiverDappAddress.Hex(), helpers.ExplorerLink(destClient.ChainId.Int64(), tx.Hash()))
+//	destClient.Logger.Infof("Offramp receiver dapp deployed on %s in tx: %s", receiverDappAddress.Hex(), helpers.ExplorerLink(destClient.ChainConfig.ChainId.Int64(), tx.Hash()))
 //	destClient.ReceiverDapp = receiverDappAddress
 //
 //	receiverDapp, err := receiver_dapp.NewReceiverDapp(receiverDappAddress, destClient.Client)
@@ -299,31 +299,31 @@ package toll
 //	var pools []*native_token_pool.NativeTokenPool
 //	var poolAddresses []common.Address
 //
-//	for i, bridgeToken := range client.BridgeTokens {
+//	for i, bridgeToken := range client.ChainConfig.BridgeTokens {
 //		if client.DeploySettings.DeployTokenPools {
 //			client.Logger.Infof("Deploying token pool for token %s", bridgeToken.Hex())
 //			tokenPoolAddress, tx, _, err := native_token_pool.DeployNativeTokenPool(client.Owner, client.Client, bridgeToken)
 //			require.NoError(t, err)
 //			main.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
-//			client.Logger.Infof("Native token pool deployed on %s in tx %s", tokenPoolAddress, helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash()))
+//			client.Logger.Infof("Native token pool deployed on %s in tx %s", tokenPoolAddress, helpers.ExplorerLink(Client.ChainConfig.ChainId.Int64(), tx.Hash()))
 //			pool, err := native_token_pool.NewNativeTokenPool(tokenPoolAddress, client.Client)
 //			require.NoError(t, err)
 //			fillPoolWithTokens(t, client, pool)
 //			pools = append(pools, pool)
 //			poolAddresses = append(poolAddresses, tokenPoolAddress)
 //		} else {
-//			if client.TokenPools[i].Hex() == "0x0000000000000000000000000000000000000000" {
+//			if client.ChainConfig.TokenPools[i].Hex() == "0x0000000000000000000000000000000000000000" {
 //				t.Error("deploy new lock unlock pool set to false but no lock unlock pool given in config")
 //			}
-//			pool, err := native_token_pool.NewNativeTokenPool(client.TokenPools[i], client.Client)
+//			pool, err := native_token_pool.NewNativeTokenPool(client.ChainConfig.TokenPools[i], client.Client)
 //			require.NoError(t, err)
 //			client.Logger.Infof("Lock unlock pool loaded from: %s", pool.Address().Hex())
 //			pools = append(pools, pool)
-//			poolAddresses = append(poolAddresses, client.TokenPools[i])
+//			poolAddresses = append(poolAddresses, client.ChainConfig.TokenPools[i])
 //		}
 //	}
 //
-//	client.TokenPools = poolAddresses
+//	client.ChainConfig.TokenPools = poolAddresses
 //	return pools
 //}
 //
@@ -340,38 +340,38 @@ package toll
 //		)
 //		require.NoError(t, err)
 //		main.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
-//		client.Logger.Infof("AFN deployed on %s in tx: %s", address.Hex(), helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash()))
-//		client.Afn = address
+//		client.Logger.Infof("AFN deployed on %s in tx: %s", address.Hex(), helpers.ExplorerLink(Client.ChainConfig.ChainId.Int64(), tx.Hash()))
+//		client.ChainConfig.Afn = address
 //
 //		afn, err := afn_contract.NewAFNContract(address, client.Client)
 //		require.NoError(t, err)
 //		return afn
 //	}
-//	if client.Afn.Hex() == "0x0000000000000000000000000000000000000000" {
+//	if client.ChainConfig.Afn.Hex() == "0x0000000000000000000000000000000000000000" {
 //		t.Error("deploy new afn set to false but no afn given in config")
 //	}
-//	afn, err := afn_contract.NewAFNContract(client.Afn, client.Client)
+//	afn, err := afn_contract.NewAFNContract(client.ChainConfig.Afn, client.Client)
 //	require.NoError(t, err)
 //	client.Logger.Infof("AFN loaded from: %s", afn.Address().Hex())
 //	return afn
 //}
 //
 //func fillPoolWithTokens(t *testing.T, client *main.EvmChainConfig, pool *native_token_pool.NativeTokenPool) {
-//	destLinkToken, err := link_token_interface.NewLinkToken(client.LinkToken, client.Client)
+//	destLinkToken, err := link_token_interface.NewLinkToken(client.ChainConfig.LinkToken, client.Client)
 //	require.NoError(t, err)
 //
 //	// fill offramp token pool with 0.5 LINK
 //	amount := big.NewInt(5e17)
 //	tx, err := destLinkToken.Transfer(client.Owner, pool.Address(), amount)
 //	require.NoError(t, err)
-//	client.Logger.Infof("Transferring token to token pool: %s", helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash()))
+//	client.Logger.Infof("Transferring token to token pool: %s", helpers.ExplorerLink(Client.ChainConfig.ChainId.Int64(), tx.Hash()))
 //	main.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 //
 //	client.Logger.Infof("Locking tokens in pool")
 //	tx, err = pool.LockOrBurn(client.Owner, amount)
 //	require.NoError(t, err)
 //	main.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
-//	client.Logger.Infof("Pool filled with tokens: %s", helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash()))
+//	client.Logger.Infof("Pool filled with tokens: %s", helpers.ExplorerLink(Client.ChainConfig.ChainId.Int64(), tx.Hash()))
 //}
 //
 //func printContractConfig(source *main.EvmChainConfig, destination *main.EvmChainConfig) {
@@ -391,8 +391,8 @@ package toll
 //		source.BridgeTokens,
 //		source.TokenPools,
 //		source.OnRamp,
-//		source.OnRampRouter,
-//		source.TokenSender,
+//		source.ChainConfig.OnRampRouter,
+//		source.LaneConfig.TokenSender,
 //		source.Afn)
 //
 //	destination.Logger.Infof(`
@@ -418,5 +418,5 @@ package toll
 //		destination.ReceiverDapp,
 //		destination.Afn)
 //
-//	main.PrintJobSpecs(source.OnRamp, destination.BlobVerifier, destination.OffRamp, source.ChainId, destination.ChainId)
+//	main.PrintJobSpecs(source.OnRamp, destination.BlobVerifier, destination.OffRamp, source.ChainConfig.ChainId, destination.ChainConfig.ChainId)
 //}

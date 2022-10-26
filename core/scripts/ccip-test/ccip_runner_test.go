@@ -10,11 +10,12 @@ import (
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/dione"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/metis"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
+	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea/deployments"
 )
 
 var (
-	SOURCE      = rhea.Staging_Beta_GoerliToAvaxFuji
-	DESTINATION = rhea.Staging_Beta_AvaxFujiToGoerli
+	SOURCE      = deployments.Beta_GoerliToAvaxFuji
+	DESTINATION = deployments.Beta_AvaxFujiToGoerli
 	ENV         = dione.StagingBeta
 )
 
@@ -55,8 +56,8 @@ func TestMetisPrintNodeBalances(t *testing.T) {
 	var sourceKeys, destKeys []common.Address
 
 	for _, node := range don.Config.Nodes {
-		sourceKeys = append(sourceKeys, common.HexToAddress(node.EthKeys[SOURCE.ChainId.String()]))
-		destKeys = append(destKeys, common.HexToAddress(node.EthKeys[DESTINATION.ChainId.String()]))
+		sourceKeys = append(sourceKeys, common.HexToAddress(node.EthKeys[SOURCE.ChainConfig.ChainId.String()]))
+		destKeys = append(destKeys, common.HexToAddress(node.EthKeys[DESTINATION.ChainConfig.ChainId.String()]))
 	}
 	metis.PrintNodeBalances(&SOURCE, sourceKeys)
 	metis.PrintNodeBalances(&DESTINATION, destKeys)
@@ -158,7 +159,8 @@ func runCommand(t *testing.T, ownerKey string, seedKey string, command string) {
 	case "fundPingPong":
 		client.fundPingPong(t)
 	case "printSpecs":
-		metis.PrintJobSpecs(ENV, SOURCE.OnRamp, DESTINATION.BlobVerifier, DESTINATION.OffRamp, SOURCE.ChainId, DESTINATION.ChainId, DESTINATION.LinkToken, SOURCE.DeploySettings.DeployedAt, DESTINATION.DeploySettings.DeployedAt)
+		metis.PrintJobSpecs(ENV, SOURCE.LaneConfig.OnRamp, DESTINATION.LaneConfig.BlobVerifier, DESTINATION.LaneConfig.OffRamp,
+			SOURCE.ChainConfig.ChainId, DESTINATION.ChainConfig.ChainId, DESTINATION.ChainConfig.LinkToken, SOURCE.DeploySettings.DeployedAt, DESTINATION.DeploySettings.DeployedAt)
 	case "setConfig":
 		// Set the config to the blobVerifier and the offramp
 		client.SetOCRConfig(ENV)

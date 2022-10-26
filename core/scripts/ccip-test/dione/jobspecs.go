@@ -104,23 +104,23 @@ func GetOCRkeysForChainType(OCRKeys client.OCR2Keys, chainType string) client.OC
 	panic("Keys not found for chain")
 }
 
-func generateRelayJobSpecs(sourceClient *rhea.EvmChainConfig, destClient *rhea.EvmChainConfig) job.Job {
+func generateRelayJobSpecs(sourceClient *rhea.EvmDeploymentConfig, destClient *rhea.EvmDeploymentConfig) job.Job {
 	return job.Job{
-		Name: null2.StringFrom(fmt.Sprintf("ccip-relay-%s-%s", helpers.ChainName(sourceClient.ChainId.Int64()), helpers.ChainName(destClient.ChainId.Int64()))),
+		Name: null2.StringFrom(fmt.Sprintf("ccip-relay-%s-%s", helpers.ChainName(sourceClient.ChainConfig.ChainId.Int64()), helpers.ChainName(destClient.ChainConfig.ChainId.Int64()))),
 		Type: "offchainreporting2",
 		OCR2OracleSpec: &job.OCR2OracleSpec{
 			PluginType:                  job.CCIPRelay,
-			ContractID:                  destClient.BlobVerifier.Hex(),
+			ContractID:                  destClient.LaneConfig.BlobVerifier.Hex(),
 			Relay:                       "evm",
-			RelayConfig:                 map[string]interface{}{"chainID": destClient.ChainId.String()},
+			RelayConfig:                 map[string]interface{}{"chainID": destClient.ChainConfig.ChainId.String()},
 			P2PV2Bootstrappers:          []string{},     // Set in env vars
 			OCRKeyBundleID:              null2.String{}, // Set per node
 			TransmitterID:               null2.String{}, // Set per node
 			ContractConfigConfirmations: 2,
 			PluginConfig: map[string]interface{}{
-				"sourceChainID":    sourceClient.ChainId.String(),
-				"destChainID":      destClient.ChainId.String(),
-				"onRampIDs":        []string{sourceClient.OnRamp.String()},
+				"sourceChainID":    sourceClient.ChainConfig.ChainId.String(),
+				"destChainID":      destClient.ChainConfig.ChainId.String(),
+				"onRampIDs":        []string{sourceClient.LaneConfig.OnRamp.String()},
 				"pollPeriod":       PollPeriod,
 				"SourceStartBlock": sourceClient.DeploySettings.DeployedAt,
 				"DestStartBlock":   destClient.DeploySettings.DeployedAt,
@@ -129,28 +129,28 @@ func generateRelayJobSpecs(sourceClient *rhea.EvmChainConfig, destClient *rhea.E
 	}
 }
 
-func generateExecutionJobSpecs(sourceClient *rhea.EvmChainConfig, destClient *rhea.EvmChainConfig) job.Job {
+func generateExecutionJobSpecs(sourceClient *rhea.EvmDeploymentConfig, destClient *rhea.EvmDeploymentConfig) job.Job {
 	return job.Job{
-		Name: null2.StringFrom(fmt.Sprintf("ccip-exec-%s-%s", helpers.ChainName(sourceClient.ChainId.Int64()), helpers.ChainName(destClient.ChainId.Int64()))),
+		Name: null2.StringFrom(fmt.Sprintf("ccip-exec-%s-%s", helpers.ChainName(sourceClient.ChainConfig.ChainId.Int64()), helpers.ChainName(destClient.ChainConfig.ChainId.Int64()))),
 		Type: "offchainreporting2",
 		OCR2OracleSpec: &job.OCR2OracleSpec{
 			PluginType:                  job.CCIPExecution,
-			ContractID:                  destClient.OffRamp.Hex(),
+			ContractID:                  destClient.LaneConfig.OffRamp.Hex(),
 			Relay:                       "evm",
-			RelayConfig:                 map[string]interface{}{"chainID": destClient.ChainId.String()},
+			RelayConfig:                 map[string]interface{}{"chainID": destClient.ChainConfig.ChainId.String()},
 			P2PV2Bootstrappers:          []string{},     // Set in env vars
 			OCRKeyBundleID:              null2.String{}, // Set per node
 			TransmitterID:               null2.String{}, // Set per node
 			ContractConfigConfirmations: 2,
 			PluginConfig: map[string]interface{}{
-				"sourceChainID":            sourceClient.ChainId.String(),
-				"destChainID":              destClient.ChainId.String(),
-				"onRampID":                 sourceClient.OnRamp.String(),
+				"sourceChainID":            sourceClient.ChainConfig.ChainId.String(),
+				"destChainID":              destClient.ChainConfig.ChainId.String(),
+				"onRampID":                 sourceClient.LaneConfig.OnRamp.String(),
 				"pollPeriod":               PollPeriod,
-				"blobVerifierID":           destClient.BlobVerifier.Hex(),
+				"blobVerifierID":           destClient.LaneConfig.BlobVerifier.Hex(),
 				"SourceStartBlock":         sourceClient.DeploySettings.DeployedAt,
 				"DestStartBlock":           destClient.DeploySettings.DeployedAt,
-				"tokensPerFeeCoinPipeline": fmt.Sprintf(`"""merge [type=merge left="{}" right="{\\\"%s\\\":\\\"1000000000000000000\\\"}"];"""`, destClient.LinkToken.Hex()),
+				"tokensPerFeeCoinPipeline": fmt.Sprintf(`"""merge [type=merge left="{}" right="{\\\"%s\\\":\\\"1000000000000000000\\\"}"];"""`, destClient.ChainConfig.LinkToken.Hex()),
 			},
 		},
 	}

@@ -55,11 +55,11 @@ func (don *OfflineDON) GenerateOracleIdentities(chain string) []confighelper2.Or
 	return oracles
 }
 
-func (don *OfflineDON) FundNodeKeys(chainConfig rhea.EvmChainConfig, ownerPrivKey string, amount *big.Int) {
+func (don *OfflineDON) FundNodeKeys(chainConfig rhea.EvmDeploymentConfig, ownerPrivKey string, amount *big.Int) {
 	nonce, err := chainConfig.Client.PendingNonceAt(context.Background(), chainConfig.Owner.From)
 	helpers.PanicErr(err)
 	var gasTipCap *big.Int
-	if chainConfig.GasSettings.EIP1559 {
+	if chainConfig.ChainConfig.GasSettings.EIP1559 {
 		gasTipCap, err = chainConfig.Client.SuggestGasTipCap(context.Background())
 		helpers.PanicErr(err)
 	}
@@ -70,12 +70,12 @@ func (don *OfflineDON) FundNodeKeys(chainConfig rhea.EvmChainConfig, ownerPrivKe
 	helpers.PanicErr(err)
 
 	for i, node := range don.Config.Nodes {
-		to := gethcommon.HexToAddress(node.EthKeys[chainConfig.ChainId.String()])
+		to := gethcommon.HexToAddress(node.EthKeys[chainConfig.ChainConfig.ChainId.String()])
 		if to == gethcommon.HexToAddress("0x") {
 			don.lggr.Warnf("Node %2d has no sending key configured. Skipping funding")
 			continue
 		}
-		if chainConfig.GasSettings.EIP1559 {
+		if chainConfig.ChainConfig.GasSettings.EIP1559 {
 			sendEthEIP1559(to, chainConfig, nonce+uint64(i), gasTipCap, ownerKey, amount)
 		} else {
 			sendEth(to, chainConfig, nonce+uint64(i), gasPrice, ownerKey, amount)
@@ -100,7 +100,7 @@ func (don *OfflineDON) PrintConfig() {
 	don.lggr.Infof(string(file))
 }
 
-func sendEth(to gethcommon.Address, chainConfig rhea.EvmChainConfig, nonce uint64, gasPrice *big.Int, ownerKey *ecdsa.PrivateKey, amount *big.Int) {
+func sendEth(to gethcommon.Address, chainConfig rhea.EvmDeploymentConfig, nonce uint64, gasPrice *big.Int, ownerKey *ecdsa.PrivateKey, amount *big.Int) {
 	tx := types.NewTx(
 		&types.LegacyTx{
 			Nonce:    nonce,
@@ -112,16 +112,16 @@ func sendEth(to gethcommon.Address, chainConfig rhea.EvmChainConfig, nonce uint6
 		},
 	)
 
-	signedTx, err := types.SignTx(tx, types.NewLondonSigner(chainConfig.ChainId), ownerKey)
+	signedTx, err := types.SignTx(tx, types.NewLondonSigner(chainConfig.ChainConfig.ChainId), ownerKey)
 	helpers.PanicErr(err)
 	err = chainConfig.Client.SendTransaction(context.Background(), signedTx)
 	helpers.PanicErr(err)
 }
 
-func sendEthEIP1559(to gethcommon.Address, chainConfig rhea.EvmChainConfig, nonce uint64, gasTipCap *big.Int, ownerKey *ecdsa.PrivateKey, amount *big.Int) {
+func sendEthEIP1559(to gethcommon.Address, chainConfig rhea.EvmDeploymentConfig, nonce uint64, gasTipCap *big.Int, ownerKey *ecdsa.PrivateKey, amount *big.Int) {
 	tx := types.NewTx(
 		&types.DynamicFeeTx{
-			ChainID:    chainConfig.ChainId,
+			ChainID:    chainConfig.ChainConfig.ChainId,
 			Nonce:      nonce,
 			GasTipCap:  gasTipCap,
 			GasFeeCap:  big.NewInt(2e9),
@@ -133,7 +133,7 @@ func sendEthEIP1559(to gethcommon.Address, chainConfig rhea.EvmChainConfig, nonc
 		},
 	)
 
-	signedTx, err := types.SignTx(tx, types.NewLondonSigner(chainConfig.ChainId), ownerKey)
+	signedTx, err := types.SignTx(tx, types.NewLondonSigner(chainConfig.ChainConfig.ChainId), ownerKey)
 	helpers.PanicErr(err)
 	err = chainConfig.Client.SendTransaction(context.Background(), signedTx)
 	helpers.PanicErr(err)

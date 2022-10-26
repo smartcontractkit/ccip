@@ -36,37 +36,48 @@ type DeploySettings struct {
 	DeployedAt           uint64
 }
 
-type EvmChainConfig struct {
-	Owner          *bind.TransactOpts
-	Client         *ethclient.Client
-	ChainId        *big.Int
-	EthUrl         string
-	GasSettings    EVMGasSettings
-	Logger         logger.Logger
-	DeploySettings DeploySettings
+type EVMChainConfig struct {
+	ChainId     *big.Int
+	GasSettings EVMGasSettings
+	EthUrl      string
 
-	LinkToken       gethcommon.Address
-	BridgeTokens    []gethcommon.Address
-	TokenPools      []gethcommon.Address
-	OnRamp          gethcommon.Address
-	OnRampRouter    gethcommon.Address
-	BlobVerifier    gethcommon.Address
-	OffRampRouter   gethcommon.Address
+	LinkToken    gethcommon.Address
+	BridgeTokens []gethcommon.Address
+	TokenPools   []gethcommon.Address
+
+	OnRampRouter  gethcommon.Address
+	OffRampRouter gethcommon.Address
+	Afn           gethcommon.Address
+}
+
+type EVMLaneConfig struct {
+	OnRamp       gethcommon.Address
+	OffRamp      gethcommon.Address
+	BlobVerifier gethcommon.Address
+
 	TokenSender     gethcommon.Address
 	MessageReceiver gethcommon.Address
 	ReceiverDapp    gethcommon.Address
 	GovernanceDapp  gethcommon.Address
 	PingPongDapp    gethcommon.Address
-	OffRamp         gethcommon.Address
-	Afn             gethcommon.Address
 }
 
-func (chain *EvmChainConfig) SetupChain(t *testing.T, ownerPrivateKey string) {
-	chain.Owner = GetOwner(t, ownerPrivateKey, chain.ChainId, chain.GasSettings)
-	chain.Client = GetClient(t, chain.EthUrl)
-	chain.Logger = logger.TestLogger(t).Named(helpers.ChainName(chain.ChainId.Int64()))
+type EvmDeploymentConfig struct {
+	Owner          *bind.TransactOpts
+	Client         *ethclient.Client
+	Logger         logger.Logger
+	DeploySettings DeploySettings
 
-	require.Equal(t, len(chain.BridgeTokens), len(chain.TokenPools))
+	ChainConfig EVMChainConfig
+	LaneConfig  EVMLaneConfig
+}
+
+func (chain *EvmDeploymentConfig) SetupChain(t *testing.T, ownerPrivateKey string) {
+	chain.Owner = GetOwner(t, ownerPrivateKey, chain.ChainConfig.ChainId, chain.ChainConfig.GasSettings)
+	chain.Client = GetClient(t, chain.ChainConfig.EthUrl)
+	chain.Logger = logger.TestLogger(t).Named(helpers.ChainName(chain.ChainConfig.ChainId.Int64()))
+
+	require.Equal(t, len(chain.ChainConfig.BridgeTokens), len(chain.ChainConfig.TokenPools))
 	chain.Logger.Info("Completed chain setup")
 }
 
@@ -102,7 +113,7 @@ func SetGasFees(owner *bind.TransactOpts, config EVMGasSettings) {
 	}
 }
 
-func PrintContractConfig(source *EvmChainConfig, destination *EvmChainConfig) {
+func PrintContractConfig(source *EvmDeploymentConfig, destination *EvmDeploymentConfig) {
 	source.Logger.Infof(`
 Source chain config
 
@@ -117,15 +128,15 @@ GovernanceDapp: common.HexToAddress("%s"),
 PingPongDapp:   common.HexToAddress("%s"),
 	
 `,
-		source.LinkToken,
-		source.BridgeTokens,
-		source.TokenPools,
-		source.OnRamp,
-		source.OnRampRouter,
-		source.TokenSender,
-		source.Afn,
-		source.GovernanceDapp,
-		source.PingPongDapp)
+		source.ChainConfig.LinkToken,
+		source.ChainConfig.BridgeTokens,
+		source.ChainConfig.TokenPools,
+		source.LaneConfig.OnRamp,
+		source.ChainConfig.OnRampRouter,
+		source.LaneConfig.TokenSender,
+		source.ChainConfig.Afn,
+		source.LaneConfig.GovernanceDapp,
+		source.LaneConfig.PingPongDapp)
 
 	destination.Logger.Infof(`
 Destination chain config
@@ -142,15 +153,15 @@ Afn:             common.HexToAddress("%s"),
 GovernanceDapp:  common.HexToAddress("%s"),
 PingPongDapp:    common.HexToAddress("%s"),
 `,
-		destination.LinkToken,
-		destination.BridgeTokens,
-		destination.TokenPools,
-		destination.OffRamp,
-		destination.OffRampRouter,
-		destination.BlobVerifier,
-		destination.MessageReceiver,
-		destination.ReceiverDapp,
-		destination.Afn,
-		destination.GovernanceDapp,
-		destination.PingPongDapp)
+		destination.ChainConfig.LinkToken,
+		destination.ChainConfig.BridgeTokens,
+		destination.ChainConfig.TokenPools,
+		destination.LaneConfig.OffRamp,
+		destination.ChainConfig.OffRampRouter,
+		destination.LaneConfig.BlobVerifier,
+		destination.LaneConfig.MessageReceiver,
+		destination.LaneConfig.ReceiverDapp,
+		destination.ChainConfig.Afn,
+		destination.LaneConfig.GovernanceDapp,
+		destination.LaneConfig.PingPongDapp)
 }

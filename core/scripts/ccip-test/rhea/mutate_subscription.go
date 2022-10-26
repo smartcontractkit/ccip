@@ -4,10 +4,10 @@ import (
 	"testing"
 )
 
-func UpgradeLane(t *testing.T, sourceClient *EvmChainConfig, destClient *EvmChainConfig) {
+func UpgradeLane(t *testing.T, sourceClient *EvmDeploymentConfig, destClient *EvmDeploymentConfig) {
 	if !sourceClient.DeploySettings.DeployRamp || !destClient.DeploySettings.DeployRamp {
 		sourceClient.Logger.Errorf("Please set \"DeployRamp\" to true for the given EvmChainConfigs and make sure "+
-			"the right ones are set. Source: %d, Dest %d", sourceClient.ChainId.Int64(), destClient.ChainId.Int64())
+			"the right ones are set. Source: %d, Dest %d", sourceClient.ChainConfig.ChainId.Int64(), destClient.ChainConfig.ChainId.Int64())
 		return
 	}
 
@@ -17,16 +17,16 @@ func UpgradeLane(t *testing.T, sourceClient *EvmChainConfig, destClient *EvmChai
 	PrintContractConfig(sourceClient, destClient)
 }
 
-func upgradeOnRamp(t *testing.T, sourceClient *EvmChainConfig, destClient *EvmChainConfig) {
+func upgradeOnRamp(t *testing.T, sourceClient *EvmDeploymentConfig, destClient *EvmDeploymentConfig) {
 	sourceClient.Logger.Infof("Upgrading onRamp")
-	deployOnRamp(t, sourceClient, destClient.ChainId)
+	deployOnRamp(t, sourceClient, destClient.ChainConfig.ChainId)
 	setOnRampOnTokenPools(t, sourceClient)
 	setOnRampOnBlobVerifier(t, sourceClient, destClient)
 
 	sourceClient.Logger.Info("Please deploy new relay jobs")
 }
 
-func upgradeOffRamp(t *testing.T, sourceClient *EvmChainConfig, destClient *EvmChainConfig) {
+func upgradeOffRamp(t *testing.T, sourceClient *EvmDeploymentConfig, destClient *EvmDeploymentConfig) {
 	destClient.Logger.Infof("Upgrading offRamp")
 	deployOffRamp(t, destClient, sourceClient)
 	setOffRampRouterOnOffRamp(t, destClient)
@@ -37,7 +37,7 @@ func upgradeOffRamp(t *testing.T, sourceClient *EvmChainConfig, destClient *EvmC
 }
 
 /*
-func removeOffRamp(t *testing.T, destClient *EvmChainConfig, offRampAddress common.Address) {
+func removeOffRamp(t *testing.T, destClient *EvmDeploymentConfig, offRampAddress common.Address) {
 	// Pause contract
 	revokeOffRampOnOffRampRouter(t, destClient, offRampAddress)
 	revokeOffRampOnTokenPools(t, destClient, offRampAddress)

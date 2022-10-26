@@ -229,7 +229,7 @@ func (don *DON) ClearAllJobs(chainA Chain, chainB Chain) {
 	don.ClearJobSpecs(Execution, chainB, chainA)
 }
 
-func (don *DON) AddTwoWaySpecs(chainA rhea.EvmChainConfig, chainB rhea.EvmChainConfig) {
+func (don *DON) AddTwoWaySpecs(chainA rhea.EvmDeploymentConfig, chainB rhea.EvmDeploymentConfig) {
 	relaySpecAB := generateRelayJobSpecs(&chainA, &chainB)
 	don.AddJobSpecs(relaySpecAB)
 	executionSpecAB := generateExecutionJobSpecs(&chainA, &chainB)
