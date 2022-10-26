@@ -31,8 +31,8 @@ contract BaseOffRampSetup is TokenSetup {
 
     s_offRamp.setPrices(getCastedDestinationTokens(), getTokenPrices());
 
-    NativeTokenPool(address(s_destPools[0])).setOffRamp(s_offRamp, true);
-    NativeTokenPool(address(s_destPools[1])).setOffRamp(s_offRamp, true);
+    TokenPool(address(s_destPools[0])).setOffRamp(s_offRamp, true);
+    TokenPool(address(s_destPools[1])).setOffRamp(s_offRamp, true);
   }
 
   function assertSameConfig(BaseOffRampInterface.OffRampConfig memory a, BaseOffRampInterface.OffRampConfig memory b)
@@ -192,17 +192,29 @@ contract BaseOffRamp_setConfig is BaseOffRampSetup {
 contract BaseOffRamp__releaseOrMintToken is BaseOffRampSetup {
   // Success
   function testSuccess() public {
+    IERC20 destToken0 = IERC20(s_destTokens[0]);
+    uint256 startingBalance = destToken0.balanceOf(OWNER);
+    uint256 amount = POOL_BALANCE / 2;
+    s_offRamp.releaseOrMintToken(PoolInterface(s_destPools[0]), amount, OWNER);
+    assertEq(startingBalance + amount, destToken0.balanceOf(OWNER));
+  }
+
+  // Success on BurnMintTokenPool
+  function testMintSuccess() public {
     IERC20 destToken1 = IERC20(s_destTokens[1]);
     uint256 startingBalance = destToken1.balanceOf(OWNER);
-    uint256 amount = POOL_BALANCE / 2;
+    uint256 amount = POOL_BALANCE * 2; // amount bigger than balance
+    uint256 startingPoolBalance = destToken1.balanceOf(s_destPools[1]);
     s_offRamp.releaseOrMintToken(PoolInterface(s_destPools[1]), amount, OWNER);
     assertEq(startingBalance + amount, destToken1.balanceOf(OWNER));
+    // pool balance doesn't change, because tokens were minted
+    assertEq(startingPoolBalance, destToken1.balanceOf(s_destPools[1]));
   }
 
   // Revert
   function testExceedsPoolReverts() public {
     vm.expectRevert("ERC20: transfer amount exceeds balance");
-    s_offRamp.releaseOrMintToken(PoolInterface(s_destPools[1]), POOL_BALANCE * 2, OWNER);
+    s_offRamp.releaseOrMintToken(PoolInterface(s_destPools[0]), POOL_BALANCE * 2, OWNER);
   }
 }
 

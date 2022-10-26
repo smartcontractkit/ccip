@@ -190,6 +190,9 @@ func runCommand(t *testing.T, ownerKey string, seedKey string, command string) {
 		// Should accept ownership on the destination chain OffRamp & Executor
 		client.AcceptOwnership(t)
 		// work in progress call, use for any custom scripting
+	case "syncTokenPools":
+		// Sync EvmChainConfig tokenPools to on-chain on/offRamp: remove deleted, add new BridgeTokens+TokenPools
+		client.SyncTokenPools(t)
 	case "wip":
 		client.wip(t, GetSetupChain(t, ownerKey, SOURCE), GetSetupChain(t, ownerKey, DESTINATION))
 	case "":

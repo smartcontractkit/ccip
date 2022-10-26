@@ -32,8 +32,8 @@ contract BaseOnrampSetup is TokenSetup {
 
     s_onRamp.setPrices(getCastedSourceTokens(), getTokenPrices());
 
-    NativeTokenPool(address(s_sourcePools[0])).setOnRamp(s_onRamp, true);
-    NativeTokenPool(address(s_sourcePools[1])).setOnRamp(s_onRamp, true);
+    TokenPool(address(s_sourcePools[0])).setOnRamp(s_onRamp, true);
+    TokenPool(address(s_sourcePools[1])).setOnRamp(s_onRamp, true);
   }
 
   function assertSameConfig(BaseOnRamp.OnRampConfig memory a, BaseOnRamp.OnRampConfig memory b) public {

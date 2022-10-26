@@ -289,6 +289,7 @@ contract EVM2EVMTollOffRamp_executeSingleMessage is EVM2EVMTollOffRampSetup {
   }
 
   event Released(address indexed sender, address indexed recipient, uint256 amount);
+  event Minted(address indexed sender, address indexed recipient, uint256 amount);
 
   function testNonContractWithTokensSuccess() public {
     uint256[] memory amounts = new uint256[](2);
@@ -297,7 +298,7 @@ contract EVM2EVMTollOffRamp_executeSingleMessage is EVM2EVMTollOffRampSetup {
     vm.expectEmit(true, true, false, true);
     emit Released(address(s_offRamp), STRANGER, amounts[0]);
     vm.expectEmit(true, true, false, true);
-    emit Released(address(s_offRamp), STRANGER, amounts[1]);
+    emit Minted(address(s_offRamp), STRANGER, amounts[1]);
     CCIP.Any2EVMMessageFromSender memory message = _convertTollToGeneralMessage(
       _generateAny2EVMTollMessageWithTokens(1, amounts)
     );

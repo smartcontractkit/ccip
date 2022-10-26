@@ -44,6 +44,7 @@ type EVMChainConfig struct {
 	LinkToken    gethcommon.Address
 	BridgeTokens []gethcommon.Address
 	TokenPools   []gethcommon.Address
+	TokenPrices  []*big.Int
 
 	OnRampRouter  gethcommon.Address
 	OffRampRouter gethcommon.Address

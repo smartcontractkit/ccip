@@ -15,6 +15,7 @@ batch_vrf_coordinator_v2: ../../contracts/solc/v0.8.6/BatchVRFCoordinatorV2.abi 
 blob_verifier: ../../contracts/solc/v0.8.15/BlobVerifier.abi ../../contracts/solc/v0.8.15/BlobVerifier.bin 388e9db7826a34c2d4dfe0c5ddd0504ae464729ecb0f3a307d7f08b3887174ff
 blob_verifier_helper: ../../contracts/solc/v0.8.15/BlobVerifierHelper.abi ../../contracts/solc/v0.8.15/BlobVerifierHelper.bin c7864d2dea01fd083b17ec6ca9e647a1821cfb6d2415a67a8381f849e745e847
 blockhash_store: ../../contracts/solc/v0.6/BlockhashStore.abi ../../contracts/solc/v0.6/BlockhashStore.bin 6b3da771f033b3a5e53bf112396d0698debf65a8dcd81370f07d72948c8b14d9
+burn_mint_token_pool: ../../contracts/solc/v0.8.15/BurnMintTokenPool.abi ../../contracts/solc/v0.8.15/BurnMintTokenPool.bin ad2810abdced0e45adace419a0264b953601d93f8cca911b533794b13960bb34
 consumer_wrapper: ../../contracts/solc/v0.7/Consumer.abi ../../contracts/solc/v0.7/Consumer.bin 894d1cbd920dccbd36d92918c1037c6ded34f66f417ccb18ec3f33c64ef83ec5
 cron_upkeep_factory_wrapper: ../../contracts/solc/v0.8.6/CronUpkeepFactory.abi - dacb0f8cdf54ae9d2781c5e720fc314b32ed5e58eddccff512c75d6067292cd7
 cron_upkeep_wrapper: ../../contracts/solc/v0.8.6/CronUpkeep.abi - b1257293e0016a6d32f6febec5ff4cd8d7276d228c12228e6b6e143111f0c5ed

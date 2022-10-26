@@ -91,6 +91,7 @@ contract EVM2EVMSubscriptionOffRamp_executeSingleMessage is EVM2EVMSubscriptionO
   }
 
   event Released(address indexed sender, address indexed recipient, uint256 amount);
+  event Minted(address indexed sender, address indexed recipient, uint256 amount);
 
   // Assert that any call to executeSingleMessage with an EOA will still succeed with tokens
   function testNonContractWithTokensSuccess() public {
@@ -101,7 +102,7 @@ contract EVM2EVMSubscriptionOffRamp_executeSingleMessage is EVM2EVMSubscriptionO
     vm.expectEmit(true, true, false, true);
     emit Released(address(s_offRamp), STRANGER, amounts[0]);
     vm.expectEmit(true, true, false, true);
-    emit Released(address(s_offRamp), STRANGER, amounts[1]);
+    emit Minted(address(s_offRamp), STRANGER, amounts[1]);
     CCIP.Any2EVMMessageFromSender memory message = _convertSubscriptionToGeneralMessage(
       _generateAny2EVMSubscriptionMessageWithTokens(1, 1, amounts)
     );

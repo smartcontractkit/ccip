@@ -51,7 +51,8 @@ contract EVM2AnySubscriptionOnRampRouter_ccipSend is EVM2EVMSubscriptionOnRampSe
     assertEq(userBalance1Before - message.amounts[1], sourceToken1.balanceOf(OWNER));
     // Asserts the tokens are all sent to the proper pools
     assertEq(poolBalance0Before + i_tokenAmount0, sourceToken0.balanceOf(address(s_sourcePools[0])));
-    assertEq(poolBalance1Before + i_tokenAmount1, sourceToken1.balanceOf(address(s_sourcePools[1])));
+    // BurnMintTokenPool burns the token upon lock, so poolBalance should not change
+    assertEq(poolBalance1Before, sourceToken1.balanceOf(address(s_sourcePools[1])));
   }
 
   function testChargeSubscriptionFundingSuccess() public {

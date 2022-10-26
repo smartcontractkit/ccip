@@ -16,12 +16,14 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
 	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/slices"
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/afn_contract"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp"
@@ -81,7 +83,9 @@ type Client struct {
 	ChainId          *big.Int
 	LinkToken        *link_token_interface.LinkToken
 	LinkTokenAddress common.Address
+	BridgeTokens     []common.Address
 	TokenPools       []*native_token_pool.NativeTokenPool
+	TokenPrices      []*big.Int
 	GovernanceDapp   *governance_dapp.GovernanceDapp
 	PingPongDapp     *ping_pong_demo.PingPongDemo
 	Afn              *afn_contract.AFNContract
@@ -127,7 +131,9 @@ func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient
 			LinkTokenAddress: config.ChainConfig.LinkToken,
 			LinkToken:        LinkToken,
 			Afn:              afn,
+			BridgeTokens:     config.ChainConfig.BridgeTokens,
 			TokenPools:       tokenPools,
+			TokenPrices:      config.ChainConfig.TokenPrices,
 			GovernanceDapp:   governanceDapp,
 			PingPongDapp:     pingPongDapp,
 			logger:           logger.TestLogger(t).Named(helpers.ChainName(config.ChainConfig.ChainId.Int64())),
@@ -183,7 +189,9 @@ func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestCli
 			ChainId:          config.ChainConfig.ChainId,
 			LinkTokenAddress: config.ChainConfig.LinkToken,
 			LinkToken:        LinkToken,
+			BridgeTokens:     config.ChainConfig.BridgeTokens,
 			TokenPools:       tokenPools,
+			TokenPrices:      config.ChainConfig.TokenPrices,
 			GovernanceDapp:   governanceDapp,
 			PingPongDapp:     pingPongDapp,
 			Afn:              afn,
@@ -1096,4 +1104,116 @@ func (client *CCIPClient) SetSubscriptionSenders(t *testing.T) {
 	tx, err := client.Dest.OffRampRouter.SetSubscriptionSenders(client.Dest.Owner, client.Dest.ReceiverDapp.Address(), sender)
 	require.NoError(t, err)
 	shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
+}
+
+type tokenPoolRegistry interface {
+	Address() common.Address
+	GetPoolTokens(opts *bind.CallOpts) ([]common.Address, error)
+	GetPool(opts *bind.CallOpts, token common.Address) (common.Address, error)
+	RemovePool(opts *bind.TransactOpts, token common.Address, pool common.Address) (*types.Transaction, error)
+	AddPool(opts *bind.TransactOpts, token common.Address, pool common.Address) (*types.Transaction, error)
+}
+
+type aggregateRateLimiter interface {
+	Address() common.Address
+	GetPricesForTokens(opts *bind.CallOpts, tokens []common.Address) ([]*big.Int, error)
+	SetPrices(opts *bind.TransactOpts, tokens []common.Address, prices []*big.Int) (*types.Transaction, error)
+}
+
+func syncPools(client *Client, registry tokenPoolRegistry, bridgeTokens []common.Address, txOpts *bind.TransactOpts) []*types.Transaction {
+	registeredTokens, err := registry.GetPoolTokens(&bind.CallOpts{})
+	require.NoError(client.t, err)
+
+	pendingTxs := make([]*types.Transaction, 0)
+	// remove registered tokenPools not present in config
+	for _, token := range registeredTokens {
+		if !slices.Contains(bridgeTokens, token) {
+			pool, err := registry.GetPool(&bind.CallOpts{}, token)
+			require.NoError(client.t, err)
+			tx, err := registry.RemovePool(txOpts, token, pool)
+			require.NoError(client.t, err)
+			client.logger.Infof("removePool(token=%s, pool=%s) from registry=%s: tx=%s", token, pool, registry.Address(), tx.Hash())
+			pendingTxs = append(pendingTxs, tx) // queue txs for wait
+			txOpts.Nonce.Add(txOpts.Nonce, big.NewInt(1)) // increment nonce
+		}
+	}
+	// add tokenPools present in config and not yet registered
+	for i, token := range bridgeTokens {
+		// remove tokenPools not present in config
+		if !slices.Contains(registeredTokens, token) {
+			pool := client.TokenPools[i].Address()
+			tx, err := registry.AddPool(txOpts, token, pool)
+			require.NoError(client.t, err)
+			client.logger.Infof("addPool(token=%s, pool=%s) from registry=%s: tx=%s", token, pool, registry.Address(), tx.Hash())
+			pendingTxs = append(pendingTxs, tx) // queue txs for wait
+			txOpts.Nonce.Add(txOpts.Nonce, big.NewInt(1)) // increment nonce
+		}
+	}
+	return pendingTxs
+}
+
+func syncPrices(client *Client, limiter aggregateRateLimiter, txOpts *bind.TransactOpts) *types.Transaction {
+	// sync tokenPrices if needed
+	if len(client.TokenPrices) == 0 {
+		return nil
+	}
+	if len(client.TokenPrices) != len(client.BridgeTokens) {
+		client.t.Fatal("if config.TokenPrices isn't empty, it must correspond to BridgeTokens")
+	}
+	limiterTokenPrices, err := limiter.GetPricesForTokens(&bind.CallOpts{}, client.BridgeTokens)
+	require.NoError(client.t, err)
+	for i := range client.BridgeTokens {
+		// on first difference, setPrices then return
+		if client.TokenPrices[i].Cmp(limiterTokenPrices[i]) != 0 {
+			tx, err := limiter.SetPrices(txOpts, client.BridgeTokens, client.TokenPrices)
+			require.NoError(client.t, err)
+			client.logger.Infof("setPrices(tokens=%s, prices=%s) for limiter=%s: tx=%s", client.BridgeTokens, client.TokenPrices, limiter.Address(), tx.Hash())
+			txOpts.Nonce.Add(txOpts.Nonce, big.NewInt(1)) // increment nonce
+			return tx
+		}
+	}
+	return nil
+}
+
+func waitPendingTxs(client *Client, pendingTxs *[]*types.Transaction) {
+	// wait for all queued txs
+	for _, tx := range *pendingTxs {
+		shared.WaitForMined(client.t, client.logger, client.Client, tx.Hash(), true)
+	}
+	*pendingTxs = (*pendingTxs)[:0] // clear pending txs
+}
+
+func (client *CCIPClient) SyncTokenPools(t *testing.T) {
+	// use local txOpts, so we can cache/increment nonce manually before waiting on all txs
+	sourceTxOpts := *client.Source.Owner
+	sourceTxOpts.GasLimit = 120_000 // hardcode gasLimit (enough for each tx here), to avoid race from mis-estimating
+	sourcePendingNonce, err := client.Source.Client.Client.PendingNonceAt(context.Background(), client.Source.Owner.From)
+	require.NoError(t, err)
+	sourceTxOpts.Nonce = big.NewInt(int64(sourcePendingNonce))
+
+	// onRamp maps source tokens to source pools
+	sourcePendingTxs := syncPools(&client.Source.Client, client.Source.OnRamp, client.Source.BridgeTokens, &sourceTxOpts)
+
+	// same as above, for offRamp
+	destTxOpts := *client.Dest.Owner
+	destTxOpts.GasLimit = 120_000 // hardcode gasLimit (enough for each tx here), to avoid race from mis-estimating
+	destPendingNonce, err := client.Dest.Client.Client.PendingNonceAt(context.Background(), client.Dest.Owner.From)
+	require.NoError(t, err)
+	destTxOpts.Nonce = big.NewInt(int64(destPendingNonce))
+
+	// offRamp maps *source* tokens to *dest* pools
+	destPendingTxs := syncPools(&client.Dest.Client, client.Dest.OffRamp, client.Source.BridgeTokens, &destTxOpts)
+
+	waitPendingTxs(&client.Source.Client, &sourcePendingTxs)
+	waitPendingTxs(&client.Dest.Client, &destPendingTxs)
+
+	if tx := syncPrices(&client.Source.Client, client.Source.OnRamp, &sourceTxOpts); tx != nil {
+		sourcePendingTxs = append(sourcePendingTxs, tx)
+	}
+	if tx := syncPrices(&client.Dest.Client, client.Dest.OffRamp, &destTxOpts); tx != nil {
+		destPendingTxs = append(destPendingTxs, tx)
+	}
+
+	waitPendingTxs(&client.Source.Client, &sourcePendingTxs)
+	waitPendingTxs(&client.Dest.Client, &destPendingTxs)
 }

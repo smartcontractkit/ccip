@@ -98,6 +98,7 @@ $SCRIPTPATH/native_solc8_6_compile dev/ocr2dr/OCR2DROracle.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/blobVerifier/BlobVerifier.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/test/helpers/BlobVerifierHelper.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/pools/NativeTokenPool.sol
+$SCRIPTPATH/native_solc8_15_compile_ccip ccip/pools/BurnMintTokenPool.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/test/helpers/CustomTokenPool.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/health/AFN.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/test/mocks/MockAFN.sol

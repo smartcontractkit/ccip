@@ -5,6 +5,7 @@ import "./BaseTest.t.sol";
 import "./mocks/MockERC20.sol";
 import "./mocks/MockPool.sol";
 import "../../tests/MockV3Aggregator.sol";
+import "../pools/BurnMintTokenPool.sol";
 import "../pools/NativeTokenPool.sol";
 import "../health/HealthChecker.sol";
 import "../pools/TokenPoolRegistry.sol";
@@ -32,12 +33,12 @@ contract TokenSetup is BaseTest {
 
     if (s_sourcePools.length == 0) {
       s_sourcePools.push(address(new NativeTokenPool(IERC20(s_sourceTokens[0]))));
-      s_sourcePools.push(address(new NativeTokenPool(IERC20(s_sourceTokens[1]))));
+      s_sourcePools.push(address(new BurnMintTokenPool(IBurnMintERC20(s_sourceTokens[1]))));
     }
 
     if (s_destPools.length == 0) {
       s_destPools.push(address(new NativeTokenPool(IERC20(s_destTokens[0]))));
-      s_destPools.push(address(new NativeTokenPool(IERC20(s_destTokens[1]))));
+      s_destPools.push(address(new BurnMintTokenPool(IBurnMintERC20(s_destTokens[1]))));
 
       // Float the pools with funds
       IERC20(s_destTokens[0]).transfer(address(s_destPools[0]), POOL_BALANCE);
