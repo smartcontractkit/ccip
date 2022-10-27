@@ -182,8 +182,8 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId *big.In
 			MaxTokensLength:  5,
 		},
 		evm_2_evm_subscription_onramp.AggregateRateLimiterInterfaceRateLimiterConfig{
-			Capacity: big.NewInt(1e18),
-			Rate:     big.NewInt(1e18),
+			Capacity: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
+			Rate:     new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
 		},
 		client.Owner.From,
 		client.ChainConfig.OnRampRouter,
@@ -232,8 +232,8 @@ func deployOffRamp(t *testing.T, destClient *EvmDeploymentConfig, sourceClient *
 		sourceClient.ChainConfig.BridgeTokens,
 		destClient.ChainConfig.TokenPools,
 		any_2_evm_free_offramp.AggregateRateLimiterInterfaceRateLimiterConfig{
-			Capacity: big.NewInt(1e18),
-			Rate:     big.NewInt(1e18),
+			Capacity: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
+			Rate:     new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
 		},
 		destClient.Owner.From)
 	require.NoError(t, err)

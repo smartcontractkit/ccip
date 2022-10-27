@@ -52,7 +52,22 @@ import (
 )
 
 func (client *CCIPClient) wip(t *testing.T, sourceClient *rhea.EvmDeploymentConfig, destClient *rhea.EvmDeploymentConfig) {
+}
 
+func (client *CCIPClient) setRateLimiterConfig(t *testing.T) {
+	tx, err := client.Source.OnRamp.SetRateLimiterConfig(client.Source.Owner, evm_2_evm_subscription_onramp.AggregateRateLimiterInterfaceRateLimiterConfig{
+		Rate:     new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
+		Capacity: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
+	})
+	require.NoError(t, err)
+	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+
+	tx, err = client.Dest.OffRamp.SetRateLimiterConfig(client.Dest.Owner, any_2_evm_subscription_offramp.AggregateRateLimiterInterfaceRateLimiterConfig{
+		Rate:     new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
+		Capacity: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
+	})
+	require.NoError(t, err)
+	shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 }
 
 func (client *CCIPClient) startPingPong(t *testing.T) {
@@ -1133,7 +1148,7 @@ func syncPools(client *Client, registry tokenPoolRegistry, bridgeTokens []common
 			tx, err := registry.RemovePool(txOpts, token, pool)
 			require.NoError(client.t, err)
 			client.logger.Infof("removePool(token=%s, pool=%s) from registry=%s: tx=%s", token, pool, registry.Address(), tx.Hash())
-			pendingTxs = append(pendingTxs, tx) // queue txs for wait
+			pendingTxs = append(pendingTxs, tx)           // queue txs for wait
 			txOpts.Nonce.Add(txOpts.Nonce, big.NewInt(1)) // increment nonce
 		}
 	}
@@ -1145,7 +1160,7 @@ func syncPools(client *Client, registry tokenPoolRegistry, bridgeTokens []common
 			tx, err := registry.AddPool(txOpts, token, pool)
 			require.NoError(client.t, err)
 			client.logger.Infof("addPool(token=%s, pool=%s) from registry=%s: tx=%s", token, pool, registry.Address(), tx.Hash())
-			pendingTxs = append(pendingTxs, tx) // queue txs for wait
+			pendingTxs = append(pendingTxs, tx)           // queue txs for wait
 			txOpts.Nonce.Add(txOpts.Nonce, big.NewInt(1)) // increment nonce
 		}
 	}

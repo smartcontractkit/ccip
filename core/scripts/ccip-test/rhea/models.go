@@ -82,6 +82,17 @@ func (chain *EvmDeploymentConfig) SetupChain(t *testing.T, ownerPrivateKey strin
 	chain.Logger.Info("Completed chain setup")
 }
 
+func (chain *EvmDeploymentConfig) SetupReadOnlyChain(lggr logger.Logger) error {
+	client, err := ethclient.Dial(chain.ChainConfig.EthUrl)
+	if err != nil {
+		return err
+	}
+	chain.Logger = lggr
+	chain.Client = client
+
+	return nil
+}
+
 // GetOwner sets the owner user credentials and ensures a GasTipCap is set for the resulting user.
 func GetOwner(t *testing.T, ownerPrivateKey string, chainId *big.Int, gasSettings EVMGasSettings) *bind.TransactOpts {
 	ownerKey, err := crypto.HexToECDSA(ownerPrivateKey)

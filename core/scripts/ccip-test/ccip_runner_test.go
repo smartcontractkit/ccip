@@ -8,7 +8,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/dione"
-	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/metis"
+	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/metis/printing"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea/deployments"
 )
@@ -22,46 +22,6 @@ var (
 // These functions can be run as a test (prefix with Test) with the following config
 // DATABASE_URL
 // Use "-v" as a Go tool argument for streaming log output.
-
-// TestPrintState can be run as a test with the following config
-// OWNER_KEY  private key used to deploy all contracts and is used as default in all single user tests.
-func TestMetisPrintState(t *testing.T) {
-	ownerKey := os.Getenv("OWNER_KEY")
-	if ownerKey == "" {
-		t.Log("No command given, skipping ccip-test-script. This is intended behaviour for automated testing.")
-		t.SkipNow()
-	}
-	SOURCE.SetupChain(t, ownerKey)
-	DESTINATION.SetupChain(t, ownerKey)
-
-	metis.PrintCCIPState(&SOURCE, &DESTINATION)
-
-	rhea.PrintContractConfig(&SOURCE, &DESTINATION)
-}
-
-// TestMetisPrintNodeBalances can be run as a test with the following config
-// OWNER_KEY  private key used to deploy all contracts and is used as default in all single user tests.
-func TestMetisPrintNodeBalances(t *testing.T) {
-	ownerKey := os.Getenv("OWNER_KEY")
-	if ownerKey == "" {
-		t.Log("No command given, skipping ccip-test-script. This is intended behaviour for automated testing.")
-		t.SkipNow()
-	}
-
-	SOURCE.SetupChain(t, ownerKey)
-	DESTINATION.SetupChain(t, ownerKey)
-
-	don := dione.NewOfflineDON(ENV, logger.TestLogger(t))
-
-	var sourceKeys, destKeys []common.Address
-
-	for _, node := range don.Config.Nodes {
-		sourceKeys = append(sourceKeys, common.HexToAddress(node.EthKeys[SOURCE.ChainConfig.ChainId.String()]))
-		destKeys = append(destKeys, common.HexToAddress(node.EthKeys[DESTINATION.ChainConfig.ChainId.String()]))
-	}
-	metis.PrintNodeBalances(&SOURCE, sourceKeys)
-	metis.PrintNodeBalances(&DESTINATION, destKeys)
-}
 
 // TestDeploySubscription can be run as a test with the following config
 // OWNER_KEY  private key used to deploy all contracts and is used as default in all single user tests.
@@ -128,6 +88,30 @@ func TestCCIP(t *testing.T) {
 	runCommand(t, ownerKey, seedKey, command)
 }
 
+// TestPrintNodeBalances can be run as a test with the following config
+// OWNER_KEY  private key used to deploy all contracts and is used as default in all single user tests.
+func TestPrintNodeBalances(t *testing.T) {
+	ownerKey := os.Getenv("OWNER_KEY")
+	if ownerKey == "" {
+		t.Log("No command given, skipping ccip-test-script. This is intended behaviour for automated testing.")
+		t.SkipNow()
+	}
+
+	SOURCE.SetupChain(t, ownerKey)
+	DESTINATION.SetupChain(t, ownerKey)
+
+	don := dione.NewOfflineDON(ENV, logger.TestLogger(t))
+
+	var sourceKeys, destKeys []common.Address
+
+	for _, node := range don.Config.Nodes {
+		sourceKeys = append(sourceKeys, common.HexToAddress(node.EthKeys[SOURCE.ChainConfig.ChainId.String()]))
+		destKeys = append(destKeys, common.HexToAddress(node.EthKeys[DESTINATION.ChainConfig.ChainId.String()]))
+	}
+	printing.PrintNodeBalances(&SOURCE, sourceKeys)
+	printing.PrintNodeBalances(&DESTINATION, destKeys)
+}
+
 func runCommand(t *testing.T, ownerKey string, seedKey string, command string) {
 	// Configures a client to run tests with using the network defaults and given keys.
 	// After updating any contracts be sure to update the network defaults to reflect
@@ -159,7 +143,7 @@ func runCommand(t *testing.T, ownerKey string, seedKey string, command string) {
 	case "fundPingPong":
 		client.fundPingPong(t)
 	case "printSpecs":
-		metis.PrintJobSpecs(ENV, SOURCE.LaneConfig.OnRamp, DESTINATION.LaneConfig.BlobVerifier, DESTINATION.LaneConfig.OffRamp,
+		printing.PrintJobSpecs(ENV, SOURCE.LaneConfig.OnRamp, DESTINATION.LaneConfig.BlobVerifier, DESTINATION.LaneConfig.OffRamp,
 			SOURCE.ChainConfig.ChainId, DESTINATION.ChainConfig.ChainId, DESTINATION.ChainConfig.LinkToken, SOURCE.DeploySettings.DeployedAt, DESTINATION.DeploySettings.DeployedAt)
 	case "setConfig":
 		// Set the config to the blobVerifier and the offramp
@@ -194,7 +178,7 @@ func runCommand(t *testing.T, ownerKey string, seedKey string, command string) {
 		// Sync EvmChainConfig tokenPools to on-chain on/offRamp: remove deleted, add new BridgeTokens+TokenPools
 		client.SyncTokenPools(t)
 	case "wip":
-		client.wip(t, GetSetupChain(t, ownerKey, SOURCE), GetSetupChain(t, ownerKey, DESTINATION))
+		client.wip(t, &SOURCE, &DESTINATION)
 	case "":
 		t.Log("No command given, exit successfully")
 		t.SkipNow()

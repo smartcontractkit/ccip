@@ -1,4 +1,4 @@
-package metis
+package printing
 
 import (
 	"context"
@@ -44,8 +44,6 @@ func PrintCCIPState(source *rhea.EvmDeploymentConfig, destination *rhea.EvmDeplo
 
 	printRateLimitingStatus(source)
 	printRateLimitingStatus(destination)
-
-	printTxStatuses(source, destination)
 }
 
 type CCIPTXStatus struct {
@@ -78,7 +76,14 @@ func (e ExecutionStatus) String() string {
 	}
 }
 
-func printTxStatuses(source *rhea.EvmDeploymentConfig, destination *rhea.EvmDeploymentConfig) {
+func printBool(b bool) string {
+	if b {
+		return "✅"
+	}
+	return "❌"
+}
+
+func PrintTxStatuses(source *rhea.EvmDeploymentConfig, destination *rhea.EvmDeploymentConfig) {
 	onRamp, err := evm_2_evm_subscription_onramp.NewEVM2EVMSubscriptionOnRamp(source.LaneConfig.OnRamp, source.Client)
 	helpers.PanicErr(err)
 
@@ -203,7 +208,7 @@ func printDappSanityCheck(source *rhea.EvmDeploymentConfig) {
 	sb.WriteString(fmt.Sprintf("Dapp sanity checks for %s\n", helpers.ChainName(source.ChainConfig.ChainId.Int64())))
 
 	tableHeaders := []string{"Dapp", "Router Set"}
-	headerLengths := []int{30, 15}
+	headerLengths := []int{30, 14}
 
 	sb.WriteString(generateHeader(tableHeaders, headerLengths))
 
@@ -211,21 +216,21 @@ func printDappSanityCheck(source *rhea.EvmDeploymentConfig) {
 	helpers.PanicErr(err)
 	router, err := senderDapp.IOnRampRouter(&bind.CallOpts{})
 	helpers.PanicErr(err)
-	sb.WriteString(fmt.Sprintf("| %-30s | %15t |\n", "Sender dapp", router == source.ChainConfig.OnRampRouter))
+	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "Sender dapp", printBool(router == source.ChainConfig.OnRampRouter)))
 
 	receiverDap, err := receiver_dapp.NewReceiverDapp(source.LaneConfig.ReceiverDapp, source.Client)
 	helpers.PanicErr(err)
 	router, err = receiverDap.SRouter(&bind.CallOpts{})
 	helpers.PanicErr(err)
-	sb.WriteString(fmt.Sprintf("| %-30s | %15t |\n", "Receiver dapp", router == source.ChainConfig.OffRampRouter))
+	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "Receiver dapp", printBool(router == source.ChainConfig.OffRampRouter)))
 
 	if source.LaneConfig.PingPongDapp != common.HexToAddress("") {
 		pingDapp, err := ping_pong_demo.NewPingPongDemo(source.LaneConfig.PingPongDapp, source.Client)
 		helpers.PanicErr(err)
 		receiver, sender, err := pingDapp.GetRouters(&bind.CallOpts{})
 		helpers.PanicErr(err)
-		sb.WriteString(fmt.Sprintf("| %-30s | %15t |\n", "Ping dapp receiver", receiver == source.ChainConfig.OffRampRouter))
-		sb.WriteString(fmt.Sprintf("| %-30s | %15t |\n", "Ping dapp sender", sender == source.ChainConfig.OnRampRouter))
+		sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "Ping dapp receiver", printBool(receiver == source.ChainConfig.OffRampRouter)))
+		sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "Ping dapp sender", printBool(sender == source.ChainConfig.OnRampRouter)))
 	}
 
 	sb.WriteString(generateSeparator(headerLengths))
@@ -239,7 +244,7 @@ func printRampSanityCheck(chain *rhea.EvmDeploymentConfig, sourceOnRamp common.A
 	sb.WriteString(fmt.Sprintf("Ramp checks for %s\n", helpers.ChainName(chain.ChainConfig.ChainId.Int64())))
 
 	tableHeaders := []string{"Contract", "Config correct"}
-	headerLengths := []int{30, 15}
+	headerLengths := []int{30, 14}
 
 	sb.WriteString(generateHeader(tableHeaders, headerLengths))
 
@@ -248,24 +253,24 @@ func printRampSanityCheck(chain *rhea.EvmDeploymentConfig, sourceOnRamp common.A
 	badSignal, err := afn.BadSignalReceived(&bind.CallOpts{})
 	helpers.PanicErr(err)
 
-	sb.WriteString(fmt.Sprintf("| %-30s | %15t |\n", "AFN healthy", !badSignal))
+	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "AFN healthy", printBool(!badSignal)))
 
 	onRamp, err := evm_2_evm_subscription_onramp.NewEVM2EVMSubscriptionOnRamp(chain.LaneConfig.OnRamp, chain.Client)
 	helpers.PanicErr(err)
 	router, err := onRamp.GetRouter(&bind.CallOpts{})
 	helpers.PanicErr(err)
-	sb.WriteString(fmt.Sprintf("| %-30s | %15t |\n", "OnRamp Router set", router == chain.ChainConfig.OnRampRouter))
+	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "OnRamp Router set", printBool(router == chain.ChainConfig.OnRampRouter)))
 
 	offRamp, err := any_2_evm_subscription_offramp.NewEVM2EVMSubscriptionOffRamp(chain.LaneConfig.OffRamp, chain.Client)
 	helpers.PanicErr(err)
 	router, err = offRamp.GetRouter(&bind.CallOpts{})
 	helpers.PanicErr(err)
 
-	sb.WriteString(fmt.Sprintf("| %-30s | %15t |\n", "OffRamp Router set", router == chain.ChainConfig.OffRampRouter))
+	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "OffRamp Router set", printBool(router == chain.ChainConfig.OffRampRouter)))
 
 	configDetails, err := offRamp.LatestConfigDetails(&bind.CallOpts{})
 	helpers.PanicErr(err)
-	sb.WriteString(fmt.Sprintf("| %-30s | %15t |\n", "OffRamp OCR2 configured", configDetails.ConfigCount != 0))
+	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "OffRamp OCR2 configured", printBool(configDetails.ConfigCount != 0)))
 
 	blobVerifier, err := blob_verifier.NewBlobVerifier(chain.LaneConfig.BlobVerifier, chain.Client)
 	helpers.PanicErr(err)
@@ -280,11 +285,11 @@ func printRampSanityCheck(chain *rhea.EvmDeploymentConfig, sourceOnRamp common.A
 		}
 	}
 
-	sb.WriteString(fmt.Sprintf("| %-30s | %15t |\n", "BlobVerifier Onramp set", rampSet))
+	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "BlobVerifier Onramp set", printBool(rampSet)))
 
 	blobConfigDetails, err := blobVerifier.LatestConfigDetails(&bind.CallOpts{})
 	helpers.PanicErr(err)
-	sb.WriteString(fmt.Sprintf("| %-30s | %15t |\n", "BlobVerifier OCR2 configured", blobConfigDetails.ConfigCount != 0))
+	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "BlobVerifier OCR2 configured", printBool(blobConfigDetails.ConfigCount != 0)))
 
 	offRampRouter, err := any_2_evm_subscription_offramp_router.NewAny2EVMSubscriptionOffRampRouter(chain.ChainConfig.OffRampRouter, chain.Client)
 	helpers.PanicErr(err)
@@ -292,7 +297,7 @@ func printRampSanityCheck(chain *rhea.EvmDeploymentConfig, sourceOnRamp common.A
 	isRamp, err := offRampRouter.IsOffRamp(&bind.CallOpts{}, chain.LaneConfig.OffRamp)
 	helpers.PanicErr(err)
 
-	sb.WriteString(fmt.Sprintf("| %-30s | %15t |\n", "OffRampRouter has offRamp Set", isRamp))
+	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "OffRampRouter has offRamp Set", printBool(isRamp)))
 
 	sb.WriteString(generateSeparator(headerLengths))
 
@@ -316,14 +321,7 @@ func printSourceSubscriptionBalances(source *rhea.EvmDeploymentConfig) {
 	helpers.PanicErr(err)
 
 	possibleTxs := "∞"
-	balance, err := onRampRouter.GetBalance(&bind.CallOpts{}, source.Owner.From)
-	helpers.PanicErr(err)
-	if fee.Int64() != 0 {
-		possibleTxs = big.NewInt(0).Div(balance, fee).String()
-	}
-	sb.WriteString(fmt.Sprintf("| %-20s | %42s | %22d | %22s |\n", "owner", source.Owner.From.Hex(), balance, possibleTxs))
-
-	balance, err = onRampRouter.GetBalance(&bind.CallOpts{}, source.LaneConfig.TokenSender)
+	balance, err := onRampRouter.GetBalance(&bind.CallOpts{}, source.LaneConfig.TokenSender)
 	helpers.PanicErr(err)
 	if fee.Int64() != 0 {
 		possibleTxs = big.NewInt(0).Div(balance, fee).String()
@@ -421,7 +419,7 @@ func printPaused(chain *rhea.EvmDeploymentConfig) {
 	sb.WriteString(fmt.Sprintf("Paused addresses for %s\n", helpers.ChainName(chain.ChainConfig.ChainId.Int64())))
 
 	tableHeaders := []string{"Contract", "Address", "Running"}
-	headerLengths := []int{25, 42, 20}
+	headerLengths := []int{25, 42, 14}
 
 	sb.WriteString(generateHeader(tableHeaders, headerLengths))
 
@@ -431,7 +429,7 @@ func printPaused(chain *rhea.EvmDeploymentConfig) {
 		paused, err := tokenPool.Paused(&bind.CallOpts{})
 		helpers.PanicErr(err)
 
-		sb.WriteString(fmt.Sprintf("| %-25s | %42s | %20t |\n", "token pool", pool.Hex(), !paused))
+		sb.WriteString(fmt.Sprintf("| %-25s | %42s | %14s |\n", "token pool", pool.Hex(), printBool(!paused)))
 	}
 
 	onRamp, err := evm_2_evm_subscription_onramp.NewEVM2EVMSubscriptionOnRamp(chain.LaneConfig.OnRamp, chain.Client)
@@ -439,21 +437,21 @@ func printPaused(chain *rhea.EvmDeploymentConfig) {
 	paused, err := onRamp.Paused(&bind.CallOpts{})
 	helpers.PanicErr(err)
 
-	sb.WriteString(fmt.Sprintf("| %-25s | %42s | %20t |\n", "onramp", onRamp.Address(), !paused))
+	sb.WriteString(fmt.Sprintf("| %-25s | %42s | %14s |\n", "onramp", onRamp.Address(), printBool(!paused)))
 
 	offRamp, err := any_2_evm_subscription_offramp.NewEVM2EVMSubscriptionOffRamp(chain.LaneConfig.OffRamp, chain.Client)
 	helpers.PanicErr(err)
 	paused, err = offRamp.Paused(&bind.CallOpts{})
 	helpers.PanicErr(err)
 
-	sb.WriteString(fmt.Sprintf("| %-25s | %42s | %20t |\n", "offramp", offRamp.Address(), !paused))
+	sb.WriteString(fmt.Sprintf("| %-25s | %42s | %14s |\n", "offramp", offRamp.Address(), printBool(!paused)))
 
 	blobVerifier, err := blob_verifier.NewBlobVerifier(chain.LaneConfig.BlobVerifier, chain.Client)
 	helpers.PanicErr(err)
 	paused, err = blobVerifier.Paused(&bind.CallOpts{})
 	helpers.PanicErr(err)
 
-	sb.WriteString(fmt.Sprintf("| %-25s | %42s | %20t |\n", "blobverifier", blobVerifier.Address(), !paused))
+	sb.WriteString(fmt.Sprintf("| %-25s | %42s | %14s |\n", "blobverifier", blobVerifier.Address(), printBool(!paused)))
 
 	sb.WriteString(generateSeparator(headerLengths))
 	chain.Logger.Info(sb.String())
@@ -485,10 +483,14 @@ func printPoolBalances(chain *rhea.EvmDeploymentConfig) {
 	sb.WriteString("\n")
 	sb.WriteString(fmt.Sprintf("Pool balances for %s\n", helpers.ChainName(chain.ChainConfig.ChainId.Int64())))
 
-	tableHeaders := []string{"Token", "Pool", "Balance", "Onramp", "OffRamp"}
-	headerLengths := []int{42, 42, 20, 10, 10}
+	tableHeaders := []string{"Token", "Pool", "Balance", "Onramp", "OffRamp", "Price"}
+	headerLengths := []int{32, 42, 20, 9, 9, 10}
 
 	sb.WriteString(generateHeader(tableHeaders, headerLengths))
+
+	onRamp, err := evm_2_evm_subscription_onramp.NewEVM2EVMSubscriptionOnRamp(chain.LaneConfig.OnRamp, chain.Client)
+	helpers.PanicErr(err)
+
 	for _, pool := range chain.ChainConfig.TokenPools {
 		tokenPool, err := native_token_pool.NewNativeTokenPool(pool, chain.Client)
 		helpers.PanicErr(err)
@@ -497,6 +499,12 @@ func printPoolBalances(chain *rhea.EvmDeploymentConfig) {
 		helpers.PanicErr(err)
 
 		token, err := link_token_interface.NewLinkToken(tokenAddress, chain.Client)
+		helpers.PanicErr(err)
+
+		name, err := token.Name(&bind.CallOpts{})
+		helpers.PanicErr(err)
+
+		price, err := onRamp.GetPricesForTokens(&bind.CallOpts{}, []common.Address{tokenAddress})
 		helpers.PanicErr(err)
 
 		balance, err := token.BalanceOf(&bind.CallOpts{}, pool)
@@ -508,7 +516,7 @@ func printPoolBalances(chain *rhea.EvmDeploymentConfig) {
 		isAllowedOffRamp, err := tokenPool.IsOffRamp(&bind.CallOpts{}, chain.LaneConfig.OffRamp)
 		helpers.PanicErr(err)
 
-		sb.WriteString(fmt.Sprintf("| %s | %s | %20d | %10t | %10t |\n", tokenAddress.Hex(), pool.Hex(), balance, isAllowedOnRamp, isAllowedOffRamp))
+		sb.WriteString(fmt.Sprintf("| %-32s | %s | %20d | %9s | %9s | %10s |\n", name, pool.Hex(), balance, printBool(isAllowedOnRamp), printBool(isAllowedOffRamp), price[0].String()))
 	}
 
 	sb.WriteString(generateSeparator(headerLengths))
