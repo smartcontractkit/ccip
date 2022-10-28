@@ -55,7 +55,7 @@ contract EVM2EVMTollOnRamp is EVM2EVMTollOnRampInterface, BaseOnRamp, TypeAndVer
     returns (uint64)
   {
     if (msg.sender != address(s_router)) revert MustBeCalledByRouter();
-    _handleForwardFromRouter(message.data.length, message.tokens, message.amounts, originalSender);
+    _handleForwardFromRouter(message.data.length, message.gasLimit, message.tokens, message.amounts, originalSender);
 
     // Emit message request
     // we need the next available sequence number so we increment before we use the value

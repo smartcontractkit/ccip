@@ -6,6 +6,7 @@ import {PoolInterface, IERC20} from "../pools/PoolInterface.sol";
 
 interface BaseOnRampInterface is AllowListInterface {
   error MessageTooLarge(uint256 maxSize, uint256 actualSize);
+  error MessageGasLimitTooHigh();
   error UnsupportedNumberOfTokens();
   error UnsupportedToken(IERC20 token);
   error MustBeCalledByRouter();
@@ -21,6 +22,8 @@ interface BaseOnRampInterface is AllowListInterface {
     uint64 maxDataSize;
     // Maximum number of distinct ERC20 tokens that can be sent in a message
     uint64 maxTokensLength;
+    // Maximum gasLimit for messages targeting EVMs
+    uint64 maxGasLimit;
   }
 
   /**

@@ -85,12 +85,14 @@ contract BaseOnRamp is BaseOnRampInterface, HealthChecker, TokenPoolRegistry, Al
    * @notice Handles common checks and token locking for forwardFromRouter calls.
    * @dev this function is generic over message types, thereby reducing code duplication.
    * @param dataLength The length of the data field of the message
+   * @param gasLimit The gasLimit set in message for destination execution
    * @param tokens The tokens to be sent. They will be locked into pools by this function.
    * @param amounts The amounts corresponding to the tokens.
    * @param originalSender The original sender of the message on the router.
    */
   function _handleForwardFromRouter(
     uint256 dataLength,
+    uint256 gasLimit,
     address[] memory tokens,
     uint256[] memory amounts,
     address originalSender
@@ -99,6 +101,7 @@ contract BaseOnRamp is BaseOnRampInterface, HealthChecker, TokenPoolRegistry, Al
     if (originalSender == address(0)) revert RouterMustSetOriginalSender();
     // Check that payload is formed correctly
     if (dataLength > uint256(s_config.maxDataSize)) revert MessageTooLarge(uint256(s_config.maxDataSize), dataLength);
+    if (gasLimit > uint256(s_config.maxGasLimit)) revert MessageGasLimitTooHigh();
     uint256 tokenLength = tokens.length;
     if (tokenLength > uint256(s_config.maxTokensLength) || tokenLength != amounts.length)
       revert UnsupportedNumberOfTokens();

@@ -512,6 +512,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 			RelayingFeeJuels: 0,
 			MaxDataSize:      1e12,
 			MaxTokensLength:  5,
+			MaxGasLimit:      ccip.BatchGasLimit,
 		},
 		evm_2_evm_toll_onramp.AggregateRateLimiterInterfaceRateLimiterConfig{
 			Capacity: HundredLink,
@@ -631,6 +632,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 			RelayingFeeJuels: 0,
 			MaxDataSize:      1e12,
 			MaxTokensLength:  5,
+			MaxGasLimit:      ccip.BatchGasLimit,
 		},
 		evm_2_evm_subscription_onramp.AggregateRateLimiterInterfaceRateLimiterConfig{
 			Capacity: HundredLink,

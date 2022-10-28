@@ -149,6 +149,7 @@ package toll
 //			RelayingFeeJuels: 0,
 //			MaxDataSize:      1e6,
 //			MaxTokensLength:  5,
+//			MaxGasLimit:      ccip.BatchGasLimit,
 //		},
 //		evm_2_evm_toll_onramp.AggregateRateLimiterInterfaceRateLimiterConfig{
 //			Capacity: big.NewInt(1e18),

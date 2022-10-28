@@ -314,6 +314,7 @@ func (e *CCIPContractsDeployer) DeployTollOnRamp(
 			RelayingFeeJuels: 0,
 			MaxDataSize:      1e6,
 			MaxTokensLength:  5,
+			MaxGasLimit:      ccip.BatchGasLimit,
 		}
 		return evm_2_evm_toll_onramp.DeployEVM2EVMTollOnRamp(
 			auth, backend, chainId, destChainId, tokens, pools,

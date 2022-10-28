@@ -22,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/simple_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/subscription_sender_dapp"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/shared"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
 )
 
@@ -180,6 +181,7 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId *big.In
 			RelayingFeeJuels: 0,
 			MaxDataSize:      1e6,
 			MaxTokensLength:  5,
+			MaxGasLimit:      ccip.BatchGasLimit,
 		},
 		evm_2_evm_subscription_onramp.AggregateRateLimiterInterfaceRateLimiterConfig{
 			Capacity: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),

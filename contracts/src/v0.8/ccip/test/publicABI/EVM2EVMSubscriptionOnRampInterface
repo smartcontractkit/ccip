@@ -8,6 +8,6 @@
   "getTokenPool(address)": "04c2a34a",
   "setAllowlist(address[])": "552b818b",
   "setAllowlistEnabled(bool)": "d7644ba2",
-  "setConfig((uint64,uint64,uint64))": "671dc337",
+  "setConfig((uint64,uint64,uint64,uint64))": "bcddbbd3",
   "setRouter(address)": "c0d78655"
 }

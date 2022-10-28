@@ -237,7 +237,7 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts() {
 		sourceCCIP.DestinationChainId,
 		tokens, pools, []common.Address{}, sourceCCIP.Common.AFN.EthAddress,
 		sourceCCIP.SubOnRampRouter.EthAddress,
-		evm_2_evm_subscription_onramp2.BaseOnRampInterfaceOnRampConfig{RelayingFeeJuels: 0, MaxDataSize: 10e12, MaxTokensLength: 5},
+		evm_2_evm_subscription_onramp2.BaseOnRampInterfaceOnRampConfig{RelayingFeeJuels: 0, MaxDataSize: 10e12, MaxTokensLength: 5, MaxGasLimit: ccipPlugin.BatchGasLimit},
 		evm_2_evm_subscription_onramp2.AggregateRateLimiterInterfaceRateLimiterConfig{Capacity: ccip.HundredCoins, Rate: bigmath.Mul(big.NewInt(1e18), big.NewInt(10))})
 	Expect(err).ShouldNot(HaveOccurred(), "Error on SubOnRamp deployment")
 	err = sourceCCIP.Common.ChainClient.WaitForEvents()

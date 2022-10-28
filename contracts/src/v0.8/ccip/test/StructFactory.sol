@@ -66,6 +66,7 @@ contract StructFactory {
   uint64 internal constant MAX_DATA_SIZE = 500;
   uint64 internal constant MAX_TOKENS_LENGTH = 5;
   uint32 internal constant PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS = 500;
+  uint64 internal constant MAX_GAS_LIMIT = 4_000_000;
 
   function offRampConfig() internal pure returns (BaseOffRampInterface.OffRampConfig memory) {
     return
@@ -86,7 +87,8 @@ contract StructFactory {
       BaseOnRampInterface.OnRampConfig({
         relayingFeeJuels: RELAYING_FEE_JUELS,
         maxDataSize: MAX_DATA_SIZE,
-        maxTokensLength: MAX_TOKENS_LENGTH
+        maxTokensLength: MAX_TOKENS_LENGTH,
+        maxGasLimit: MAX_GAS_LIMIT
       });
   }
 

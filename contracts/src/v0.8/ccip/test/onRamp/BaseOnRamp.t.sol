@@ -40,6 +40,7 @@ contract BaseOnrampSetup is TokenSetup {
     assertEq(a.relayingFeeJuels, b.relayingFeeJuels);
     assertEq(a.maxDataSize, b.maxDataSize);
     assertEq(a.maxTokensLength, b.maxTokensLength);
+    assertEq(a.maxGasLimit, b.maxGasLimit);
   }
 }
 
@@ -111,7 +112,8 @@ contract BaseOnramp_setConfig is BaseOnrampSetup {
     BaseOnRampInterface.OnRampConfig memory newConfig = BaseOnRampInterface.OnRampConfig({
       relayingFeeJuels: 2400,
       maxDataSize: 400,
-      maxTokensLength: 14
+      maxTokensLength: 14,
+      maxGasLimit: MAX_GAS_LIMIT / 2
     });
 
     vm.expectEmit(false, false, false, true);

@@ -25,7 +25,7 @@
   "setAFN(address)": "108ee5fc",
   "setAllowlist(address[])": "552b818b",
   "setAllowlistEnabled(bool)": "d7644ba2",
-  "setConfig((uint64,uint64,uint64))": "671dc337",
+  "setConfig((uint64,uint64,uint64,uint64))": "bcddbbd3",
   "setPrices(address[],uint256[])": "4352fa9f",
   "setRateLimiterConfig((uint256,uint256))": "91872543",
   "setRouter(address)": "c0d78655",

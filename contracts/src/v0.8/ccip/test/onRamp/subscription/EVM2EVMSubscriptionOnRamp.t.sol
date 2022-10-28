@@ -16,6 +16,7 @@ contract EVM2EVMSubscriptionOnRamp_constructor is EVM2EVMSubscriptionOnRampSetup
     assertEq(RELAYING_FEE_JUELS, s_onRamp.getConfig().relayingFeeJuels);
     assertEq(MAX_DATA_SIZE, s_onRamp.getConfig().maxDataSize);
     assertEq(MAX_TOKENS_LENGTH, s_onRamp.getConfig().maxTokensLength);
+    assertEq(MAX_GAS_LIMIT, s_onRamp.getConfig().maxGasLimit);
 
     assertEq(SOURCE_CHAIN_ID, s_onRamp.i_chainId());
     assertEq(DEST_CHAIN_ID, s_onRamp.i_destinationChainId());
@@ -206,6 +207,14 @@ contract EVM2EVMSubscriptionOnRamp_forwardFromRouter is EVM2EVMSubscriptionOnRam
 
     vm.expectRevert(abi.encodeWithSelector(AggregateRateLimiterInterface.PriceNotFoundForToken.selector, fakeToken));
 
+    s_onRamp.forwardFromRouter(message, OWNER);
+  }
+
+  // Asserts gasLimit must be <=20M
+  function testMessageGasLimitTooHighReverts() public {
+    CCIP.EVM2AnySubscriptionMessage memory message = _generateEmptyMessage();
+    message.gasLimit = MAX_GAS_LIMIT + 1;
+    vm.expectRevert(abi.encodeWithSelector(BaseOnRampInterface.MessageGasLimitTooHigh.selector));
     s_onRamp.forwardFromRouter(message, OWNER);
   }
 }
