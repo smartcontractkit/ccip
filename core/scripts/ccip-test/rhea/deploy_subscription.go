@@ -22,8 +22,8 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/simple_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/subscription_sender_dapp"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/shared"
-	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 )
 
 // DeploySubscriptionContracts will deploy all source and Destination chain contracts using the
