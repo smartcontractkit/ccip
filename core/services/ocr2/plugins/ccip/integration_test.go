@@ -693,7 +693,16 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		ccipContracts.DeployNewTollOnRamp()
 		ccipContracts.DeployNewTollOffRamp()
 		newConfigBlock := ccipContracts.DestChain.Blockchain().CurrentBlock().Number().Int64()
-
+		// create updated jobs
+		spec := ccipContracts.NewCCIPJobSpecParams(tokensPerFeeCoinPipeline)
+		for i, node := range nodes {
+			err = node.App.DeleteJob(context.Background(), 1)
+			require.NoError(t, err)
+			err = node.App.DeleteJob(context.Background(), 2)
+			require.NoError(t, err)
+			spec.AddCCIPRelayJob(t, fmt.Sprintf("ccip-relay-new-%d", i), node, newConfigBlock)
+			spec.AddCCIPTollExecutionJob(t, fmt.Sprintf("ccip-executor-toll-new-%d", i), node, configBlock)
+		}
 		// keep sending a number of send requests all of which would be in pending state
 		currentSeqNum := atomic.NewInt32(1) // start with 1 as it's a new onramp
 		startSeq := 1
@@ -733,16 +742,6 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 			}
 		}()
 
-		// create updated jobs
-		spec := ccipContracts.NewCCIPJobSpecParams(tokensPerFeeCoinPipeline)
-		for i, node := range nodes {
-			err = node.App.DeleteJob(context.Background(), 1)
-			require.NoError(t, err)
-			err = node.App.DeleteJob(context.Background(), 2)
-			require.NoError(t, err)
-			spec.AddCCIPRelayJob(t, fmt.Sprintf("ccip-relay-new-%d", i), node, newConfigBlock)
-			spec.AddCCIPTollExecutionJob(t, fmt.Sprintf("ccip-executor-toll-new-%d", i), node, configBlock)
-		}
 		// now enable the newly deployed on/offRamp
 		ccipContracts.EnableTollOnRamp()
 		ccipContracts.EnableTollOffRamp()
