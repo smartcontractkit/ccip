@@ -6,11 +6,14 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp_router"
@@ -28,7 +31,7 @@ func TestIntegration_CCIP(t *testing.T) {
 	bootstrapNodePort := int64(19598)
 	ctx := context.Background()
 	// Starts nodes and configures them in the OCR contracts.
-	bootstrapNode, nodes, configBlock := testhelpers.SetupAndStartNodes(ctx, t, ccipContracts, bootstrapNodePort)
+	bootstrapNode, nodes, configBlock := testhelpers.SetupAndStartNodes(ctx, t, &ccipContracts, bootstrapNodePort)
 
 	// Add the bootstrap job
 	bootstrapNode.AddBootstrapJob(t, fmt.Sprintf(`
@@ -47,93 +50,21 @@ chainID = %s
 		_, err := w.Write([]byte(`{"JuelsPerETH": "200000000000000000000"}`))
 		require.NoError(t, err)
 	}))
-	defer linkEth.Close()
-	// For each node add a relayer and executor job.
-	for i, node := range nodes {
-		node.AddJob(t, fmt.Sprintf(`
-type                = "offchainreporting2"
-pluginType          = "ccip-relay"
-relay               = "evm"
-schemaVersion      	= 1
-name               	= "ccip-relay-%d"
-contractID 			= "%s"
-ocrKeyBundleID      = "%s"
-transmitterID 		= "%s"
-contractConfigConfirmations = 1
-contractConfigTrackerPollInterval = "1s"
-
-[pluginConfig]
-onRampIDs            = ["%s", "%s"]
-sourceChainID       = %s
-destChainID         = %s
-pollPeriod          = "1s"
-destStartBlock      = %d
-
-[relayConfig]
-chainID             = %s
-
-`, i, ccipContracts.BlobVerifier.Address(), node.KeyBundle.ID(), node.Transmitter, ccipContracts.TollOnRamp.Address(), ccipContracts.SubOnRamp.Address(), sourceChainID, destChainID, configBlock, destChainID))
-		node.AddJob(t, fmt.Sprintf(`
-type                = "offchainreporting2"
-pluginType          = "ccip-execution"
-relay               = "evm"
-schemaVersion       = 1
-name                = "ccip-executor-toll-%d"
-contractID          = "%s"
-ocrKeyBundleID      = "%s"
-transmitterID       = "%s"
-contractConfigConfirmations = 1
-contractConfigTrackerPollInterval = "1s"
-
-[pluginConfig]
-onRampID            = "%s"
-blobVerifierID      = "%s"
-sourceChainID       = %s
-destChainID         = %s
-pollPeriod          = "1s"
-destStartBlock      = %d
-tokensPerFeeCoinPipeline = """
+	tokensPerFeeCoinPipeline := fmt.Sprintf(`
 // Price 1 
 link [type=http method=GET url="%s"];
 link_parse [type=jsonparse path="JuelsPerETH"];
 link->link_parse;
-merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];
-"""
+merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
+		linkEth.URL, ccipContracts.DestLinkToken.Address())
 
-[relayConfig]
-chainID             = %s
+	defer linkEth.Close()
+	spec := ccipContracts.NewCCIPJobSpecParams(tokensPerFeeCoinPipeline)
 
-`, i, ccipContracts.TollOffRamp.Address(), node.KeyBundle.ID(), node.Transmitter, ccipContracts.TollOnRamp.Address(), ccipContracts.BlobVerifier.Address(), sourceChainID, destChainID, configBlock, linkEth.URL, ccipContracts.DestLinkToken.Address(), destChainID))
-		node.AddJob(t, fmt.Sprintf(`
-type                = "offchainreporting2"
-pluginType          = "ccip-execution"
-relay               = "evm"
-schemaVersion       = 1
-name                = "ccip-executor-subscription-%d"
-contractID 			= "%s"
-ocrKeyBundleID      = "%s"
-transmitterID       = "%s"
-contractConfigConfirmations = 1
-contractConfigTrackerPollInterval = "1s"
-
-[pluginConfig]
-onRampID            = "%s"
-blobVerifierID      = "%s"
-sourceChainID       = %s
-destChainID         = %s
-pollPeriod          = "1s"
-destStartBlock      = %d
-tokensPerFeeCoinPipeline = """
-link [type=http method=GET url="%s"];
-link_parse [type=jsonparse path="JuelsPerETH"];
-link->link_parse;
-merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];
-"""
-
-[relayConfig]
-chainID             = %s
-
-`, i, ccipContracts.SubOffRamp.Address(), node.KeyBundle.ID(), node.Transmitter, ccipContracts.SubOnRamp.Address(), ccipContracts.BlobVerifier.Address(), sourceChainID, destChainID, configBlock, linkEth.URL, ccipContracts.DestLinkToken.Address(), destChainID))
+	for i, node := range nodes {
+		spec.AddCCIPRelayJob(t, fmt.Sprintf("ccip-relay-%d", i), node, configBlock)
+		spec.AddCCIPTollExecutionJob(t, fmt.Sprintf("ccip-executor-toll-%d", i), node, configBlock)
+		spec.AddCCIPSubExecutionJob(t, fmt.Sprintf("ccip-executor-subscription-%d", i), node, configBlock)
 	}
 	// Replay for bootstrap.
 	bc, err := bootstrapNode.App.GetChains().EVM.Get(destChainID)
@@ -202,10 +133,9 @@ chainID             = %s
 		require.NoError(t, err)
 
 		testhelpers.SendRequest(t, ccipContracts, "hey DON, execute for me",
-			[]common.Address{ccipContracts.SourceLinkToken.Address()},
-			[]*big.Int{tokenAmount}, ccipContracts.SourceLinkToken.Address(),
-			feeTokenAmount,
-			big.NewInt(100_000))
+			[]common.Address{ccipContracts.SourceLinkToken.Address()}, []*big.Int{tokenAmount},
+			ccipContracts.SourceLinkToken.Address(), feeTokenAmount, big.NewInt(100_000),
+			ccipContracts.Receivers[0].Receiver.Address())
 		testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, ccip.CCIPTollSendRequested, ccipContracts.TollOnRamp.Address(), nodes, tollCurrentSeqNum)
 		testhelpers.EventuallyReportRelayed(t, ccipContracts, ccipContracts.TollOnRamp.Address(), tollCurrentSeqNum, tollCurrentSeqNum)
 		executionLog := testhelpers.AllNodesHaveExecutedSeqNum(t, ccipContracts, ccipContracts.TollOffRamp.Address(), nodes, tollCurrentSeqNum)
@@ -452,8 +382,7 @@ chainID             = %s
 		for i := 0; i < n; i++ {
 			_, err = ccipContracts.SourceLinkToken.Approve(ccipContracts.SourceUser, ccipContracts.TollOnRampRouter.Address(), big.NewInt(0).Add(tokenAmount, feeTokenAmount))
 			require.NoError(t, err)
-			txs = append(txs, testhelpers.QueueRequest(t, ccipContracts, fmt.Sprintf("batch request %d", tollCurrentSeqNum+i), []common.Address{ccipContracts.SourceLinkToken.Address()}, []*big.Int{tokenAmount},
-				ccipContracts.SourceLinkToken.Address(), feeTokenAmount, big.NewInt(100_000)))
+			txs = append(txs, testhelpers.QueueRequest(t, ccipContracts, fmt.Sprintf("batch request %d", tollCurrentSeqNum+i), []common.Address{ccipContracts.SourceLinkToken.Address()}, []*big.Int{tokenAmount}, ccipContracts.SourceLinkToken.Address(), feeTokenAmount, big.NewInt(100_000), ccipContracts.Receivers[0].Receiver.Address()))
 		}
 		// Send a batch of requests in a single block
 		testhelpers.ConfirmTxs(t, txs, ccipContracts.SourceChain)
@@ -758,5 +687,78 @@ chainID             = %s
 				Within:   "100000000000000000",
 			}, // Costs ~0.77 link per transfer for 3 auto req. Varies slightly due to variable calldata encoding gas costs.
 		})
+	})
+
+	t.Run("upgrade contracts while transactions are pending", func(t *testing.T) {
+		ccipContracts.DeployNewTollOnRamp()
+		ccipContracts.DeployNewTollOffRamp()
+		newConfigBlock := ccipContracts.DestChain.Blockchain().CurrentBlock().Number().Int64()
+
+		// keep sending a number of send requests all of which would be in pending state
+		currentSeqNum := atomic.NewInt32(1) // start with 1 as it's a new onramp
+		startSeq := 1
+		ticker := time.NewTicker(1 * time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+		defer cancel()
+		wg := &sync.WaitGroup{}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-ticker.C:
+					// Approve router to take source token.
+					tokenAmount := big.NewInt(100)
+					feeTokenAmount := big.NewInt(0).Mul(big.NewInt(20), big.NewInt(1e18))
+					_, err = ccipContracts.SourceLinkToken.Approve(
+						ccipContracts.SourceUser,
+						ccipContracts.TollOnRampRouter.Address(),
+						big.NewInt(0).Add(tokenAmount, feeTokenAmount))
+					require.NoError(t, err)
+
+					t.Logf("sending request for seqnum %d", currentSeqNum.Load())
+					currentSeqNum.Inc()
+					testhelpers.SendRequest(t, ccipContracts,
+						"hey DON, execute for me",
+						[]common.Address{ccipContracts.SourceLinkToken.Address()},
+						[]*big.Int{tokenAmount},
+						ccipContracts.SourceLinkToken.Address(), feeTokenAmount,
+						big.NewInt(300_000),
+						ccipContracts.Receivers[0].Receiver.Address())
+					ccipContracts.SourceChain.Commit()
+					ccipContracts.DestChain.Commit()
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+
+		// create updated jobs
+		spec := ccipContracts.NewCCIPJobSpecParams(tokensPerFeeCoinPipeline)
+		for i, node := range nodes {
+			err = node.App.DeleteJob(context.Background(), 1)
+			require.NoError(t, err)
+			err = node.App.DeleteJob(context.Background(), 2)
+			require.NoError(t, err)
+			spec.AddCCIPRelayJob(t, fmt.Sprintf("ccip-relay-new-%d", i), node, newConfigBlock)
+			spec.AddCCIPTollExecutionJob(t, fmt.Sprintf("ccip-executor-toll-new-%d", i), node, configBlock)
+		}
+		// now enable the newly deployed on/offRamp
+		ccipContracts.EnableTollOnRamp()
+		ccipContracts.EnableTollOffRamp()
+		// wait for all requests to get triggered
+		wg.Wait()
+		// verify if all seqNums were delivered
+		endSeqNum := int(currentSeqNum.Load())
+		for i := startSeq; i < endSeqNum; i++ {
+			t.Logf("verifying seqnum %d", i)
+			testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, ccip.CCIPTollSendRequested,
+				ccipContracts.TollOnRamp.Address(), nodes, i)
+			testhelpers.EventuallyReportRelayed(t, ccipContracts, ccipContracts.TollOnRamp.Address(), i, i)
+			executionLog := testhelpers.AllNodesHaveExecutedSeqNum(t, ccipContracts,
+				ccipContracts.TollOffRamp.Address(), nodes, i)
+			testhelpers.AssertTollExecSuccess(t, ccipContracts, executionLog)
+		}
+		tollCurrentSeqNum = endSeqNum
 	})
 }

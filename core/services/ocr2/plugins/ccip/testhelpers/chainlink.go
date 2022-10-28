@@ -139,6 +139,90 @@ func (node *Node) AddBootstrapJob(t *testing.T, spec string) {
 	require.NoError(t, err)
 }
 
+type CCIPJobSpec struct {
+	TollOffRamp              common.Address
+	TollOnRamp               common.Address
+	SubOffRamp               common.Address
+	SubOnRamp                common.Address
+	BlobVerifier             common.Address
+	SourceChainId            *big.Int
+	DestChainId              *big.Int
+	TokensPerFeeCoinPipeline string
+}
+
+func (spec CCIPJobSpec) AddCCIPRelayJob(t *testing.T, jobName string, node Node, configBlock int64) {
+	node.AddJob(t, fmt.Sprintf(`
+type                = "offchainreporting2"
+pluginType          = "ccip-relay"
+relay               = "evm"
+schemaVersion       = 1
+name                = "%s"
+contractID          = "%s"
+ocrKeyBundleID      = "%s"
+transmitterID       = "%s"
+contractConfigConfirmations = 1
+contractConfigTrackerPollInterval = "1s"
+
+[pluginConfig]
+onRampIDs           = ["%s", "%s"]
+sourceChainID       = %s
+destChainID         = %s
+pollPeriod          = "1s"
+destStartBlock      = %d
+
+[relayConfig]
+chainID             = %s
+
+`, jobName, spec.BlobVerifier,
+		node.KeyBundle.ID(), node.Transmitter,
+		spec.TollOnRamp, spec.SubOnRamp,
+		spec.SourceChainId, spec.DestChainId,
+		configBlock, spec.DestChainId,
+	))
+}
+
+func (spec CCIPJobSpec) ExecJobSpec(jobName string, offRamp, onRamp common.Address, node Node, configBlock int64) string {
+	return fmt.Sprintf(`
+type                = "offchainreporting2"
+pluginType          = "ccip-execution"
+relay               = "evm"
+schemaVersion       = 1
+name                = "%s"
+contractID          = "%s"
+ocrKeyBundleID      = "%s"
+transmitterID       = "%s"
+contractConfigConfirmations = 1
+contractConfigTrackerPollInterval = "1s"
+
+[pluginConfig]
+onRampID            = "%s"
+blobVerifierID      = "%s"
+sourceChainID       = %s
+destChainID         = %s
+pollPeriod          = "1s"
+destStartBlock      = %d
+tokensPerFeeCoinPipeline = %s
+
+[relayConfig]
+chainID             = %s
+
+`, jobName, offRamp, node.KeyBundle.ID(), node.Transmitter,
+		onRamp, spec.BlobVerifier,
+		spec.SourceChainId, spec.DestChainId, configBlock,
+		fmt.Sprintf(`"""
+%s
+"""`, spec.TokensPerFeeCoinPipeline),
+		spec.DestChainId)
+}
+
+func (spec CCIPJobSpec) AddCCIPTollExecutionJob(t *testing.T, jobName string, node Node, configBlock int64) {
+	node.AddJob(t, spec.ExecJobSpec(jobName, spec.TollOffRamp, spec.TollOnRamp, node, configBlock))
+}
+
+func (spec CCIPJobSpec) AddCCIPSubExecutionJob(t *testing.T, jobName string, node Node, configBlock int64) {
+	node.AddJob(t, spec.ExecJobSpec(jobName, spec.SubOffRamp, spec.SubOnRamp, node, configBlock))
+}
+
 func SetupNodeCCIP(
 	t *testing.T, owner *bind.TransactOpts,
 	port int64, dbName string,
@@ -330,7 +414,7 @@ func SetupNodeCCIP(
 
 func createConfigV2Chain(t *testing.T, chainId *big.Int) *v2.EVMConfig {
 	// NOTE: For the executor jobs, the default of 500k is insufficient for a 3 message batch
-	defaultGasLimit := uint32(1500000)
+	defaultGasLimit := uint32(5000000)
 	tr := true
 
 	sourceC, _ := v2.Defaults((*utils.Big)(chainId))
@@ -369,7 +453,7 @@ func NoNodesHaveExecutedSeqNum(t *testing.T, ccipContracts CCIPContracts, offRam
 	return log
 }
 
-func SetupAndStartNodes(ctx context.Context, t *testing.T, ccipContracts CCIPContracts, bootstrapNodePort int64) (Node, []Node, int64) {
+func SetupAndStartNodes(ctx context.Context, t *testing.T, ccipContracts *CCIPContracts, bootstrapNodePort int64) (Node, []Node, int64) {
 	appBootstrap, bootstrapPeerID, bootstrapTransmitter, bootstrapKb := SetupNodeCCIP(t, ccipContracts.DestUser, bootstrapNodePort, "bootstrap_ccip", ccipContracts.SourceChain, ccipContracts.DestChain, ccipContracts.SourceChainID, ccipContracts.DestChainID, "", 0)
 	var (
 		oracles []confighelper.OracleIdentityExtra
@@ -409,6 +493,6 @@ func SetupAndStartNodes(ctx context.Context, t *testing.T, ccipContracts CCIPCon
 		DestIncomingConfirmations:   1,
 	}.Encode()
 	require.NoError(t, err)
-	configBlock := SetupOnchainConfig(t, ccipContracts, oracles, reportingPluginConfig)
+	configBlock := ccipContracts.SetupOnchainConfig(oracles, reportingPluginConfig)
 	return bootstrapNode, nodes, configBlock
 }

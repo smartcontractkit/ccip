@@ -58,6 +58,8 @@ var (
 	DestSub           = "dest sub"
 	Receiver          = "receiver"
 	Sender            = "sender"
+	Link              = func(amount int64) *big.Int { return new(big.Int).Mul(big.NewInt(1e18), big.NewInt(amount)) }
+	HundredLink       = Link(100)
 )
 
 type MaybeRevertReceiver struct {
@@ -76,6 +78,7 @@ type CCIPContracts struct {
 	SourceLinkToken, DestLinkToken     *link_token_interface.LinkToken
 	BlobVerifier                       *blob_verifier.BlobVerifier
 	Receivers                          []MaybeRevertReceiver
+	SourceAFN, DestAFN                 *mock_afn_contract.MockAFNContract
 
 	// Toll contracts
 	TollOnRampFees    map[common.Address]*big.Int
@@ -93,6 +96,17 @@ type CCIPContracts struct {
 
 	// Sender dApps
 	SubSenderApp *subscription_sender_dapp.SubscriptionSenderDapp
+
+	OCRConfig *OCR2Config
+}
+
+type OCR2Config struct {
+	Signers               []common.Address
+	Transmitters          []common.Address
+	F                     uint8
+	OnchainConfig         []byte
+	OffchainConfigVersion uint64
+	OffchainConfig        []byte
 }
 
 type BalanceAssertion struct {
@@ -126,6 +140,7 @@ func (c *CCIPContracts) GetSourceLinkBalance(addr common.Address) *big.Int {
 	require.NoError(c.t, err)
 	return bal
 }
+
 func (c *CCIPContracts) GetDestLinkBalance(addr common.Address) *big.Int {
 	bal, err := c.DestLinkToken.BalanceOf(nil, addr)
 	require.NoError(c.t, err)
@@ -146,6 +161,236 @@ func (c *CCIPContracts) AssertBalances(bas []BalanceAssertion) {
 			assert.Equal(c.t, -1, actual.Cmp(high), "wrong balance for %s got %s outside expected range [%s, %s]", b.Name, actual, low, high)
 			assert.Equal(c.t, 1, actual.Cmp(low), "wrong balance for %s got %s outside expected range [%s, %s]", b.Name, actual, low, high)
 		}
+	}
+}
+
+func (c *CCIPContracts) DeployNewTollOffRamp() {
+	offRampAddress, _, _, err := any_2_evm_toll_offramp.DeployEVM2EVMTollOffRamp(
+		c.DestUser,
+		c.DestChain,
+		c.SourceChainID,
+		c.DestChainID,
+		any_2_evm_toll_offramp.BaseOffRampInterfaceOffRampConfig{
+			OnRampAddress:                           c.TollOnRamp.Address(),
+			ExecutionDelaySeconds:                   60,
+			MaxDataSize:                             1e5,
+			MaxTokensLength:                         15,
+			PermissionLessExecutionThresholdSeconds: 60,
+		},
+		c.BlobVerifier.Address(),
+		c.DestAFN.Address(),
+		[]common.Address{c.SourceLinkToken.Address()},
+		[]common.Address{c.DestPool.Address()},
+		any_2_evm_toll_offramp.AggregateRateLimiterInterfaceRateLimiterConfig{
+			Capacity: HundredLink,
+			Rate:     big.NewInt(1e18),
+		},
+		c.DestUser.From,
+	)
+	require.NoError(c.t, err)
+	c.DestChain.Commit()
+
+	c.TollOffRamp, err = any_2_evm_toll_offramp.NewEVM2EVMTollOffRamp(offRampAddress, c.DestChain)
+	require.NoError(c.t, err)
+
+	_, err = c.TollOffRamp.SetPrices(c.DestUser, []common.Address{c.DestLinkToken.Address()}, []*big.Int{big.NewInt(1)})
+	require.NoError(c.t, err)
+	c.DestChain.Commit()
+	c.SourceChain.Commit()
+}
+
+func (c *CCIPContracts) EnableTollOffRamp() {
+	_, err := c.DestPool.SetOffRamp(c.DestUser, c.TollOffRamp.Address(), true)
+	require.NoError(c.t, err)
+	c.DestChain.Commit()
+
+	_, err = c.TollOffRamp.SetRouter(c.DestUser, c.TollOffRampRouter.Address())
+	require.NoError(c.t, err)
+	c.DestChain.Commit()
+
+	_, err = c.TollOffRampRouter.AddOffRamp(c.DestUser, c.TollOffRamp.Address())
+	require.NoError(c.t, err)
+	c.DestChain.Commit()
+
+	_, err = c.TollOffRamp.SetConfig0(
+		c.DestUser,
+		c.OCRConfig.Signers,
+		c.OCRConfig.Transmitters,
+		c.OCRConfig.F,
+		c.OCRConfig.OnchainConfig,
+		c.OCRConfig.OffchainConfigVersion,
+		c.OCRConfig.OffchainConfig,
+	)
+	require.NoError(c.t, err)
+	c.SourceChain.Commit()
+	c.DestChain.Commit()
+}
+
+func (c *CCIPContracts) DeployNewTollOnRamp() {
+	c.t.Log("Deploying new toll onRamp")
+	onRampAddress, _, _, err := evm_2_evm_toll_onramp.DeployEVM2EVMTollOnRamp(
+		c.SourceUser,    // user
+		c.SourceChain,   // client
+		c.SourceChainID, // source chain id
+		c.DestChainID,   // destinationChainIds
+		[]common.Address{c.SourceLinkToken.Address()}, // tokens
+		[]common.Address{c.SourcePool.Address()},      // pools
+		[]common.Address{},                            // allow list
+		c.SourceAFN.Address(),                         // AFN
+		evm_2_evm_toll_onramp.BaseOnRampInterfaceOnRampConfig{
+			RelayingFeeJuels: 0,
+			MaxDataSize:      1e12,
+			MaxTokensLength:  5,
+		},
+		evm_2_evm_toll_onramp.AggregateRateLimiterInterfaceRateLimiterConfig{
+			Capacity: HundredLink,
+			Rate:     big.NewInt(1e18),
+		},
+		c.SourceUser.From,
+		c.TollOnRampRouter.Address(),
+	)
+	require.NoError(c.t, err)
+	c.TollOnRamp, err = evm_2_evm_toll_onramp.NewEVM2EVMTollOnRamp(onRampAddress, c.SourceChain)
+	require.NoError(c.t, err)
+	c.SourceChain.Commit()
+
+	_, err = c.TollOnRamp.SetFeeConfig(c.SourceUser, evm_2_evm_toll_onramp.EVM2EVMTollOnRampInterfaceFeeConfig{
+		Fees:      []*big.Int{big.NewInt(1)},
+		FeeTokens: []common.Address{c.SourceLinkToken.Address()},
+	})
+	require.NoError(c.t, err)
+
+	_, err = c.TollOnRamp.SetPrices(c.SourceUser, []common.Address{c.SourceLinkToken.Address()}, []*big.Int{big.NewInt(1)})
+	require.NoError(c.t, err)
+
+	c.SourceChain.Commit()
+	c.DestChain.Commit()
+}
+
+func (c *CCIPContracts) EnableTollOnRamp() {
+	c.t.Log("Setting toll onRamp on source pool")
+	_, err := c.SourcePool.SetOnRamp(c.SourceUser, c.TollOnRamp.Address(), true)
+	require.NoError(c.t, err)
+	c.SourceChain.Commit()
+
+	c.t.Log("Setting toll onRamp on source router")
+	_, err = c.TollOnRampRouter.SetOnRamp(c.SourceUser, c.DestChainID, c.TollOnRamp.Address())
+	require.NoError(c.t, err)
+	c.SourceChain.Commit()
+
+	c.t.Log("Enabling toll onRamp on blob verifier")
+	config, err := c.BlobVerifier.GetConfig(&bind.CallOpts{})
+	require.NoError(c.t, err)
+
+	config.OnRamps = append(config.OnRamps, c.TollOnRamp.Address())
+	config.MinSeqNrByOnRamp = append(config.MinSeqNrByOnRamp, 1)
+
+	_, err = c.BlobVerifier.SetConfig(c.DestUser, config)
+	require.NoError(c.t, err)
+
+	c.SourceChain.Commit()
+	c.DestChain.Commit()
+}
+
+func (c *CCIPContracts) DeriveOCR2Config(oracles []confighelper.OracleIdentityExtra, reportingPluginConfig []byte) {
+	signers, transmitters, threshold, onchainConfig, offchainConfigVersion, offchainConfig, err := confighelper.ContractSetConfigArgsForTests(
+		2*time.Second,        // deltaProgress
+		1*time.Second,        // deltaResend
+		1*time.Second,        // deltaRound
+		500*time.Millisecond, // deltaGrace
+		2*time.Second,        // deltaStage
+		3,
+		[]int{1, 1, 1, 1},
+		oracles,
+		reportingPluginConfig,
+		50*time.Millisecond, // Max duration query
+		1*time.Second,       // Max duration observation
+		100*time.Millisecond,
+		100*time.Millisecond,
+		100*time.Millisecond,
+		1, // faults
+		nil,
+	)
+	require.NoError(c.t, err)
+	lggr := logger.TestLogger(c.t)
+	lggr.Infow("Setting Config on Oracle Contract",
+		"signers", signers,
+		"transmitters", transmitters,
+		"threshold", threshold,
+		"onchainConfig", onchainConfig,
+		"encodedConfigVersion", offchainConfigVersion,
+	)
+	signerAddresses, err := ocrcommon.OnchainPublicKeyToAddress(signers)
+	require.NoError(c.t, err)
+	transmitterAddresses, err := ocrcommon.AccountToAddress(transmitters)
+	require.NoError(c.t, err)
+
+	c.OCRConfig = &OCR2Config{
+		Signers:               signerAddresses,
+		Transmitters:          transmitterAddresses,
+		F:                     threshold,
+		OnchainConfig:         onchainConfig,
+		OffchainConfigVersion: offchainConfigVersion,
+		OffchainConfig:        offchainConfig,
+	}
+}
+
+func (ccipContracts *CCIPContracts) SetupOnchainConfig(oracles []confighelper.OracleIdentityExtra, reportingPluginConfig []byte) int64 {
+	// Note We do NOT set the payees, payment is done in the OCR2Base implementation
+	// Set the offramp offchainConfig.
+	ccipContracts.DeriveOCR2Config(oracles, reportingPluginConfig)
+	blockBeforeConfig, err := ccipContracts.DestChain.BlockByNumber(context.Background(), nil)
+	require.NoError(ccipContracts.t, err)
+	// Set the DON on the offramp
+	_, err = ccipContracts.BlobVerifier.SetConfig0(
+		ccipContracts.DestUser,
+		ccipContracts.OCRConfig.Signers,
+		ccipContracts.OCRConfig.Transmitters,
+		ccipContracts.OCRConfig.F,
+		ccipContracts.OCRConfig.OnchainConfig,
+		ccipContracts.OCRConfig.OffchainConfigVersion,
+		ccipContracts.OCRConfig.OffchainConfig,
+	)
+	require.NoError(ccipContracts.t, err)
+	ccipContracts.DestChain.Commit()
+
+	// Same DON on the toll offramp
+	_, err = ccipContracts.TollOffRamp.SetConfig0(
+		ccipContracts.DestUser,
+		ccipContracts.OCRConfig.Signers,
+		ccipContracts.OCRConfig.Transmitters,
+		ccipContracts.OCRConfig.F,
+		ccipContracts.OCRConfig.OnchainConfig,
+		ccipContracts.OCRConfig.OffchainConfigVersion,
+		ccipContracts.OCRConfig.OffchainConfig,
+	)
+	require.NoError(ccipContracts.t, err)
+	ccipContracts.DestChain.Commit()
+
+	// Same DON on the sub offramp
+	_, err = ccipContracts.SubOffRamp.SetConfig0(
+		ccipContracts.DestUser,
+		ccipContracts.OCRConfig.Signers,
+		ccipContracts.OCRConfig.Transmitters,
+		ccipContracts.OCRConfig.F,
+		ccipContracts.OCRConfig.OnchainConfig,
+		ccipContracts.OCRConfig.OffchainConfigVersion,
+		ccipContracts.OCRConfig.OffchainConfig,
+	)
+	require.NoError(ccipContracts.t, err)
+	return blockBeforeConfig.Number().Int64()
+}
+
+func (c CCIPContracts) NewCCIPJobSpecParams(tokensPerFeeCoinPipeline string) CCIPJobSpec {
+	return CCIPJobSpec{
+		TollOffRamp:              c.TollOffRamp.Address(),
+		TollOnRamp:               c.TollOnRamp.Address(),
+		SubOnRamp:                c.SubOnRamp.Address(),
+		SubOffRamp:               c.SubOffRamp.Address(),
+		BlobVerifier:             c.BlobVerifier.Address(),
+		SourceChainId:            c.SourceChainID,
+		DestChainId:              c.DestChainID,
+		TokensPerFeeCoinPipeline: tokensPerFeeCoinPipeline,
 	}
 }
 
@@ -180,10 +425,6 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 	sourceChain, sourceUser := SetupChain(t)
 	destChain, destUser := SetupChain(t)
 
-	var hundredLink = big.NewInt(0)
-	// 100 LINK
-	hundredLink.SetString("100000000000000000000", 10)
-
 	// Deploy link token and pool on source chain
 	sourceLinkTokenAddress, _, _, err := link_token_interface.DeployLinkToken(sourceUser, sourceChain)
 	require.NoError(t, err)
@@ -215,7 +456,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 	o, err := destPool.Owner(nil)
 	require.NoError(t, err)
 	require.Equal(t, destUser.From.String(), o.String())
-	_, err = destLinkToken.Transfer(destUser, destPoolAddress, hundredLink)
+	_, err = destLinkToken.Transfer(destUser, destPoolAddress, Link(200))
 	require.NoError(t, err)
 	destChain.Commit()
 
@@ -249,6 +490,8 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 	)
 	require.NoError(t, err)
 	sourceChain.Commit()
+	sourceAFN, err := mock_afn_contract.NewMockAFNContract(afnSourceAddress, sourceChain)
+	require.NoError(t, err)
 
 	// Create onramp router
 	onRampRouterAddress, _, _, err := evm_2_any_toll_onramp_router.DeployEVM2AnyTollOnRampRouter(sourceUser, sourceChain)
@@ -271,7 +514,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 			MaxTokensLength:  5,
 		},
 		evm_2_evm_toll_onramp.AggregateRateLimiterInterfaceRateLimiterConfig{
-			Capacity: hundredLink,
+			Capacity: HundredLink,
 			Rate:     big.NewInt(1e18),
 		},
 		sourceUser.From,
@@ -305,6 +548,8 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 	)
 	require.NoError(t, err)
 	destChain.Commit()
+	destAFN, err := mock_afn_contract.NewMockAFNContract(afnDestAddress, destChain)
+	require.NoError(t, err)
 
 	// Deploy offramp dest chain
 	blobVerifierAddress, _, _, err := blob_verifier.DeployBlobVerifier(
@@ -336,7 +581,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 		[]common.Address{sourceLinkTokenAddress},
 		[]common.Address{destPoolAddress},
 		any_2_evm_toll_offramp.AggregateRateLimiterInterfaceRateLimiterConfig{
-			Capacity: hundredLink,
+			Capacity: HundredLink,
 			Rate:     big.NewInt(1e18),
 		},
 		sourceUser.From,
@@ -388,7 +633,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 			MaxTokensLength:  5,
 		},
 		evm_2_evm_subscription_onramp.AggregateRateLimiterInterfaceRateLimiterConfig{
-			Capacity: hundredLink,
+			Capacity: HundredLink,
 			Rate:     big.NewInt(1e18),
 		},
 		sourceUser.From,
@@ -436,7 +681,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 		[]common.Address{sourceLinkTokenAddress},
 		[]common.Address{destPoolAddress},
 		any_2_evm_subscription_offramp.AggregateRateLimiterInterfaceRateLimiterConfig{
-			Capacity: hundredLink,
+			Capacity: HundredLink,
 			Rate:     big.NewInt(1e18),
 		},
 		sourceUser.From,
@@ -495,6 +740,8 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 		DestCustomToken:   destCustomToken,
 		BlobVerifier:      blobVerifier,
 		Receivers:         []MaybeRevertReceiver{{Receiver: revertingMessageReceiver1, Strict: false}, {Receiver: revertingMessageReceiver2, Strict: true}},
+		SourceAFN:         sourceAFN,
+		DestAFN:           destAFN,
 
 		// Toll
 		TollOnRampFees:    tollOnRampFees,
@@ -555,9 +802,19 @@ func QueueSubRequestByDapp(
 	return tx
 }
 
-func QueueRequest(t *testing.T, ccipContracts CCIPContracts, msgPayload string, tokens []common.Address, amounts []*big.Int, feeToken common.Address, feeTokenAmount *big.Int, gasLimit *big.Int) *types.Transaction {
+func QueueRequest(
+	t *testing.T,
+	ccipContracts CCIPContracts,
+	msgPayload string,
+	tokens []common.Address,
+	amounts []*big.Int,
+	feeToken common.Address,
+	feeTokenAmount *big.Int,
+	gasLimit *big.Int,
+	receiver common.Address,
+) *types.Transaction {
 	msg := evm_2_any_toll_onramp_router.CCIPEVM2AnyTollMessage{
-		Receiver:       MustEncodeAddress(t, ccipContracts.Receivers[0].Receiver.Address()),
+		Receiver:       MustEncodeAddress(t, receiver),
 		Data:           []byte(msgPayload),
 		Tokens:         tokens,
 		Amounts:        amounts,
@@ -596,88 +853,9 @@ func SendSubRequestByDapp(
 	ConfirmTxs(t, []*types.Transaction{tx}, ccipContracts.SourceChain)
 }
 
-func SendRequest(t *testing.T, ccipContracts CCIPContracts, msgPayload string, tokens []common.Address, amounts []*big.Int, feeToken common.Address, feeTokenAmount *big.Int, gasLimit *big.Int) {
-	tx := QueueRequest(t, ccipContracts, msgPayload, tokens, amounts, feeToken, feeTokenAmount, gasLimit)
+func SendRequest(t *testing.T, ccipContracts CCIPContracts, msgPayload string, tokens []common.Address, amounts []*big.Int, feeToken common.Address, feeTokenAmount *big.Int, gasLimit *big.Int, receiver common.Address) {
+	tx := QueueRequest(t, ccipContracts, msgPayload, tokens, amounts, feeToken, feeTokenAmount, gasLimit, receiver)
 	ConfirmTxs(t, []*types.Transaction{tx}, ccipContracts.SourceChain)
-}
-
-func SetupOnchainConfig(t *testing.T, ccipContracts CCIPContracts, oracles []confighelper.OracleIdentityExtra, reportingPluginConfig []byte) int64 {
-	// Note We do NOT set the payees, payment is done in the OCR2Base implementation
-	// Set the offramp offchainConfig.
-	signers, transmitters, threshold, onchainConfig, offchainConfigVersion, offchainConfig, err := confighelper.ContractSetConfigArgsForTests(
-		2*time.Second,        // deltaProgress
-		1*time.Second,        // deltaResend
-		1*time.Second,        // deltaRound
-		500*time.Millisecond, // deltaGrace
-		2*time.Second,        // deltaStage
-		3,
-		[]int{1, 1, 1, 1},
-		oracles,
-		reportingPluginConfig,
-		50*time.Millisecond, // Max duration query
-		1*time.Second,       // Max duration observation
-		100*time.Millisecond,
-		100*time.Millisecond,
-		100*time.Millisecond,
-		1, // faults
-		nil,
-	)
-
-	require.NoError(t, err)
-	lggr := logger.TestLogger(t)
-	lggr.Infow("Setting Config on Oracle Contract",
-		"signers", signers,
-		"transmitters", transmitters,
-		"threshold", threshold,
-		"onchainConfig", onchainConfig,
-		"encodedConfigVersion", offchainConfigVersion,
-	)
-
-	signerAddresses, err := ocrcommon.OnchainPublicKeyToAddress(signers)
-	require.NoError(t, err)
-	transmitterAddresses, err := ocrcommon.AccountToAddress(transmitters)
-	require.NoError(t, err)
-
-	blockBeforeConfig, err := ccipContracts.DestChain.BlockByNumber(context.Background(), nil)
-	require.NoError(t, err)
-	// Set the DON on the offramp
-	_, err = ccipContracts.BlobVerifier.SetConfig0(
-		ccipContracts.DestUser,
-		signerAddresses,
-		transmitterAddresses,
-		threshold,
-		onchainConfig,
-		offchainConfigVersion,
-		offchainConfig,
-	)
-	require.NoError(t, err)
-	ccipContracts.DestChain.Commit()
-
-	// Same DON on the toll offramp
-	_, err = ccipContracts.TollOffRamp.SetConfig0(
-		ccipContracts.DestUser,
-		signerAddresses,
-		transmitterAddresses,
-		threshold,
-		onchainConfig,
-		offchainConfigVersion,
-		offchainConfig,
-	)
-	require.NoError(t, err)
-	ccipContracts.DestChain.Commit()
-
-	// Same DON on the sub offramp
-	_, err = ccipContracts.SubOffRamp.SetConfig0(
-		ccipContracts.DestUser,
-		signerAddresses,
-		transmitterAddresses,
-		threshold,
-		onchainConfig,
-		offchainConfigVersion,
-		offchainConfig,
-	)
-	require.NoError(t, err)
-	return blockBeforeConfig.Number().Int64()
 }
 
 func AssertTollExecSuccess(t *testing.T, ccipContracts CCIPContracts, log logpoller.Log) {
