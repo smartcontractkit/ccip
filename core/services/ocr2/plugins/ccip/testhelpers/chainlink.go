@@ -31,6 +31,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/types"
+	configv2 "github.com/smartcontractkit/chainlink/core/config/v2"
 	"github.com/smartcontractkit/chainlink/core/internal/cltest/heavyweight"
 	"github.com/smartcontractkit/chainlink/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/core/internal/testutils/evmtest"
@@ -234,13 +235,14 @@ func SetupNodeCCIP(
 	trueRef, falseRef := true, false
 
 	// Do not want to load fixtures as they contain a dummy chainID.
+	loglevel := configv2.LogLevel(zap.DebugLevel)
 	config, db := heavyweight.FullTestDBNoFixturesV2(t, fmt.Sprintf("%s%d", dbName, port), func(c *chainlink.Config, s *chainlink.Secrets) {
 		p2pAddresses := []string{
 			fmt.Sprintf("127.0.0.1:%d", port),
 		}
 		// Disables ocr spec validation, so we can have fast polling for the test.
 		c.DevMode = trueRef
-		c.Log.Level = zap.DebugLevel
+		c.Log.Level = &loglevel
 		c.Feature.CCIP = &trueRef
 		c.OCR.Enabled = &falseRef
 		c.OCR2.Enabled = &trueRef
@@ -309,7 +311,7 @@ func SetupNodeCCIP(
 					lggr, sourceClient,
 					evmtest.NewChainScopedConfig(t, config),
 					hb,
-					headtracker.NewHeadSaver(lggr, headtracker.NewORM(db, lggr, pgtest.NewPGCfg(falseRef), *sourceClient.ChainID()), evmCfg),
+					headtracker.NewHeadSaver(lggr, headtracker.NewORM(db, lggr, pgtest.NewQConfig(falseRef), *sourceClient.ChainID()), evmCfg),
 				)
 			} else if chainID.String() == destChainID.String() {
 				return headtracker.NewHeadTracker(
@@ -317,7 +319,7 @@ func SetupNodeCCIP(
 					destClient,
 					evmtest.NewChainScopedConfig(t, config),
 					hb,
-					headtracker.NewHeadSaver(lggr, headtracker.NewORM(db, lggr, pgtest.NewPGCfg(falseRef), *destClient.ChainID()), evmCfg),
+					headtracker.NewHeadSaver(lggr, headtracker.NewORM(db, lggr, pgtest.NewQConfig(falseRef), *destClient.ChainID()), evmCfg),
 				)
 			}
 			t.Fatalf("invalid chain ID %v", chainID.String())
