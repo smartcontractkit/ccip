@@ -4,7 +4,6 @@ import (
 	_ "embed"
 	"math"
 	"net"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -20,14 +19,12 @@ import (
 	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	stkcfg "github.com/smartcontractkit/chainlink-starknet/relayer/pkg/chainlink/config"
 	tercfg "github.com/smartcontractkit/chainlink-terra/pkg/terra/config"
-
 	"github.com/smartcontractkit/chainlink/core/assets"
+	"github.com/smartcontractkit/chainlink/core/chains/evm/client"
+	evmcfg "github.com/smartcontractkit/chainlink/core/chains/evm/config/v2"
 	"github.com/smartcontractkit/chainlink/core/chains/solana"
 	"github.com/smartcontractkit/chainlink/core/chains/starknet"
 	"github.com/smartcontractkit/chainlink/core/chains/terra"
-
-	"github.com/smartcontractkit/chainlink/core/chains/evm/client"
-	evmcfg "github.com/smartcontractkit/chainlink/core/chains/evm/config/v2"
 	legacy "github.com/smartcontractkit/chainlink/core/config"
 	config "github.com/smartcontractkit/chainlink/core/config/v2"
 	"github.com/smartcontractkit/chainlink/core/logger"
@@ -44,8 +41,6 @@ var (
 	fullTOML string
 	//go:embed testdata/config-multi-chain.toml
 	multiChainTOML string
-	//go:embed testdata/secrets-full.toml
-	secretsTOML string
 
 	multiChain = Config{
 		Core: config.Core{
@@ -73,6 +68,7 @@ var (
 				},
 			},
 			Log: config.Log{
+				Level:       ptr(config.LogLevel(zapcore.PanicLevel)),
 				JSONConsole: ptr(true),
 			},
 			JobPipeline: config.JobPipeline{
@@ -247,10 +243,10 @@ func TestConfig_Marshal(t *testing.T) {
 		DefaultIdleInTxSessionTimeout: models.MustNewDuration(time.Minute),
 		DefaultLockTimeout:            models.MustNewDuration(time.Hour),
 		DefaultQueryTimeout:           models.MustNewDuration(time.Second),
-
-		MigrateOnStartup: ptr(true),
-		MaxIdleConns:     ptr[int64](7),
-		MaxOpenConns:     ptr[int64](13),
+		LogQueries:                    ptr(true),
+		MigrateOnStartup:              ptr(true),
+		MaxIdleConns:                  ptr[int64](7),
+		MaxOpenConns:                  ptr[int64](13),
 		Listener: config.DatabaseListener{
 			MaxReconnectDuration: models.MustNewDuration(time.Minute),
 			MinReconnectInterval: models.MustNewDuration(5 * time.Minute),
@@ -279,9 +275,9 @@ func TestConfig_Marshal(t *testing.T) {
 		UseBatchSend: ptr(true),
 	}
 	full.Log = config.Log{
-		JSONConsole:     ptr(true),
-		DatabaseQueries: ptr(true),
-		UnixTS:          ptr(true),
+		Level:       ptr(config.LogLevel(zapcore.DPanicLevel)),
+		JSONConsole: ptr(true),
+		UnixTS:      ptr(true),
 		File: config.LogFile{
 			Dir:        ptr("log/file/dir"),
 			MaxSize:    ptr[utils.FileSize](100 * utils.GB),
@@ -413,7 +409,6 @@ func TestConfig_Marshal(t *testing.T) {
 		GoroutineThreshold:   ptr[int64](999),
 	}
 	full.Pyroscope = config.Pyroscope{
-		AuthToken:     ptr("pyroscope-token"),
 		ServerAddress: ptr("http://localhost:4040"),
 		Environment:   ptr("tests"),
 	}
@@ -635,6 +630,7 @@ CCIP = true
 DefaultIdleInTxSessionTimeout = '1m0s'
 DefaultLockTimeout = '1h0m0s'
 DefaultQueryTimeout = '1s'
+LogQueries = true
 MaxIdleConns = 7
 MaxOpenConns = 13
 MigrateOnStartup = true
@@ -666,7 +662,7 @@ SendTimeout = '5s'
 UseBatchSend = true
 `},
 		{"Log", Config{Core: config.Core{Log: full.Log}}, `[Log]
-DatabaseQueries = true
+Level = 'crit'
 JSONConsole = true
 UnixTS = true
 
@@ -797,7 +793,6 @@ MemThreshold = '1.00gb'
 GoroutineThreshold = 999
 `},
 		{"Pyroscope", Config{Core: config.Core{Pyroscope: full.Pyroscope}}, `[Pyroscope]
-AuthToken = 'pyroscope-token'
 ServerAddress = 'http://localhost:4040'
 Environment = 'tests'
 `},
@@ -1133,35 +1128,60 @@ var (
 	emptyEffectiveTOML string
 	//go:embed testdata/config-multi-chain-effective.toml
 	multiChainEffectiveTOML string
+
+	//go:embed testdata/secrets-full.toml
+	secretsFullTOML string
+	//go:embed testdata/secrets-full-redacted.toml
+	secretsFullRedactedTOML string
+
+	//go:embed testdata/secrets-multi.toml
+	secretsMultiTOML string
+	//go:embed testdata/secrets-multi-redacted.toml
+	secretsMultiRedactedTOML string
 )
 
 func TestNewGeneralConfig_Logger(t *testing.T) {
 	const (
+		secrets   = "Secrets:\n"
 		input     = "Input Configuration:\n"
 		effective = "Effective Configuration, with defaults applied:\n"
 	)
 	tests := []struct {
-		name          string
-		inputConfig   string
+		name         string
+		inputConfig  string
+		inputSecrets string
+
 		wantConfig    string
 		wantEffective string
+		wantSecrets   string
 	}{
 		{name: "empty", wantEffective: emptyEffectiveTOML},
-		{name: "full", inputConfig: fullTOML, wantConfig: fullTOML, wantEffective: fullTOML},
-		{name: "multi-chain", inputConfig: multiChainTOML, wantConfig: multiChainTOML, wantEffective: multiChainEffectiveTOML},
-		// TODO: more test cases
+		{name: "full", inputSecrets: secretsFullTOML, inputConfig: fullTOML,
+			wantConfig: fullTOML, wantEffective: fullTOML, wantSecrets: secretsFullRedactedTOML},
+		{name: "multi-chain", inputSecrets: secretsMultiTOML, inputConfig: multiChainTOML,
+			wantConfig: multiChainTOML, wantEffective: multiChainEffectiveTOML, wantSecrets: secretsMultiRedactedTOML},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			lggr, observed := logger.TestLoggerObserved(t, zapcore.InfoLevel)
-			c, err := GeneralConfigTOML{Config: tt.inputConfig, Secrets: secretsTOML}.New(lggr)
+			opts := GeneralConfigOpts{SkipEnv: true}
+			require.NoError(t, opts.ParseTOML(tt.inputConfig, tt.inputSecrets))
+			c, err := opts.New(lggr)
 			require.NoError(t, err)
 			c.LogConfiguration(lggr.Info)
-			inputLogs := observed.FilterMessageSnippet(input).All()
+
+			inputLogs := observed.FilterMessageSnippet(secrets).All()
+			if assert.Len(t, inputLogs, 1) {
+				got := strings.TrimPrefix(inputLogs[0].Message, secrets)
+				assert.Equal(t, tt.wantSecrets, got)
+			}
+
+			inputLogs = observed.FilterMessageSnippet(input).All()
 			if assert.Len(t, inputLogs, 1) {
 				got := strings.TrimPrefix(inputLogs[0].Message, input)
 				assert.Equal(t, tt.wantConfig, got)
 			}
+
 			inputLogs = observed.FilterMessageSnippet(effective).All()
 			if assert.Len(t, inputLogs, 1) {
 				got := strings.TrimPrefix(inputLogs[0].Message, effective)
@@ -1173,14 +1193,16 @@ func TestNewGeneralConfig_Logger(t *testing.T) {
 
 func TestNewGeneralConfig_ParsingError_InvalidSyntax(t *testing.T) {
 	invalidTOML := "{ bad syntax {"
-	_, err := GeneralConfigTOML{Config: invalidTOML, Secrets: secretsTOML}.New(logger.TestLogger(t))
+	var opts GeneralConfigOpts
+	err := opts.ParseTOML(invalidTOML, secretsFullTOML)
 	assert.EqualError(t, err, "toml: invalid character at start of key: {")
 }
 
 func TestNewGeneralConfig_ParsingError_DuplicateField(t *testing.T) {
 	invalidTOML := `Dev = false
 Dev = true`
-	_, err := GeneralConfigTOML{Config: invalidTOML, Secrets: secretsTOML}.New(logger.TestLogger(t))
+	var opts GeneralConfigOpts
+	err := opts.ParseTOML(invalidTOML, secretsFullTOML)
 	assert.EqualError(t, err, "toml: key Dev is already defined")
 }
 
@@ -1189,19 +1211,14 @@ func TestNewGeneralConfig_SecretsOverrides(t *testing.T) {
 	const PWD_OVERRIDE = "great_password"
 	const DBURL_OVERRIDE = "http://user@db"
 
-	pwdFile, err := os.CreateTemp("", "")
-	assert.NoError(t, err)
-	defer os.Remove(pwdFile.Name())
-	_, err = pwdFile.WriteString(PWD_OVERRIDE)
-	assert.NoError(t, err)
-
-	filename := pwdFile.Name()
-
-	t.Setenv("DATABASE_URL", DBURL_OVERRIDE)
+	t.Setenv("CL_DATABASE_URL", DBURL_OVERRIDE)
 
 	// Check for two overrides
-	c, err := GeneralConfigTOML{Config: fullTOML, Secrets: secretsTOML, KeystorePasswordFileName: &filename}.New(logger.TestLogger(t))
+	var opts GeneralConfigOpts
+	require.NoError(t, opts.ParseTOML(fullTOML, secretsFullTOML))
+	c, err := opts.New(logger.TestLogger(t))
 	assert.NoError(t, err)
+	c.SetPasswords(ptr(PWD_OVERRIDE), nil)
 	assert.Equal(t, PWD_OVERRIDE, c.KeystorePassword())
 	dbURL := c.DatabaseURL()
 	assert.Equal(t, DBURL_OVERRIDE, (&dbURL).String())
@@ -1214,36 +1231,45 @@ func TestSecrets_Validate(t *testing.T) {
 		exp  string
 	}{
 		{name: "partial",
-			toml: `ExplorerAccessKey = "access_key"
-ExplorerSecret = "secret"`,
+			toml: `Explorer.AccessKey = "access_key"
+Explorer.Secret = "secret"`,
 			exp: `2 errors:
-	- DatabaseURL: empty: must be provided and non-empty
-	- KeystorePassword: empty: must be provided and non-empty`},
+	- Database.URL: empty: must be provided and non-empty
+	- Password.Keystore: empty: must be provided and non-empty`},
 
 		{name: "invalid-urls",
-			toml: `DatabaseURL = "postgresql://user:passlocalhost:5432/asdf"
-DatabaseBackupURL = "foo-bar?password=asdf"`,
-			exp: `3 errors:
-	- DatabaseURL: invalid value (*****): missing or insufficiently complex password: DB URL must be authenticated; plaintext URLs are not allowed. Database should be secured by a password matching the following complexity requirements: 
-Must have a length of 16-50 characters
-Must not comprise:
-	Leading or trailing whitespace (note that a trailing newline in the password file, if present, will be ignored)
+			toml: `[Database]
+URL = "postgresql://user:passlocalhost:5432/asdf"
+BackupURL = "foo-bar?password=asdf"`,
+			exp: `2 errors:
+	- Database: 2 errors:
+		- URL: invalid value (*****): missing or insufficiently complex password: DB URL must be authenticated; plaintext URLs are not allowed. Database should be secured by a password matching the following complexity requirements: 
+	Must have a length of 16-50 characters
+	Must not comprise:
+		Leading or trailing whitespace (note that a trailing newline in the password file, if present, will be ignored)
+	
+		- BackupURL: invalid value (*****): missing or insufficiently complex password: 
+	Expected password complexity:
+	Must be at least 16 characters long
+	Must not comprise:
+		Leading or trailing whitespace
+		A user's API email
+	
+	Faults:
+		password is less than 16 characters long
+	. Database should be secured by a password matching the following complexity requirements: 
+	Must have a length of 16-50 characters
+	Must not comprise:
+		Leading or trailing whitespace (note that a trailing newline in the password file, if present, will be ignored)
+	
+	- Password.Keystore: empty: must be provided and non-empty`},
 
-	- DatabaseBackupURL: invalid value (*****): missing or insufficiently complex password: 
-Expected password complexity:
-Must be at least 16 characters long
-Must not comprise:
-	Leading or trailing whitespace
-	A user's API email
-
-Faults:
-	password is less than 16 characters long
-. Database should be secured by a password matching the following complexity requirements: 
-Must have a length of 16-50 characters
-Must not comprise:
-	Leading or trailing whitespace (note that a trailing newline in the password file, if present, will be ignored)
-
-	- KeystorePassword: empty: must be provided and non-empty`},
+		{name: "invalid-urls-allowed",
+			toml: `[Database]
+URL = "postgresql://user:passlocalhost:5432/asdf"
+BackupURL = "foo-bar?password=asdf"
+AllowSimplePasswords = true`,
+			exp: `Password.Keystore: empty: must be provided and non-empty`},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var s Secrets
@@ -1272,4 +1298,22 @@ func TestConfig_setDefaults(t *testing.T) {
 		t.Log(s, err)
 	}
 	cfgtest.AssertFieldsNotNil(t, c.Core)
+}
+
+func Test_validateEnv(t *testing.T) {
+	validate := func() error { _, err := utils.MultiErrorList(validateEnv()); return err }
+	t.Setenv("LOG_LEVEL", "warn")
+	t.Setenv("DATABASE_URL", "foo")
+	assert.ErrorContains(t, validate(), `environment variables DATABASE_URL and CL_DATABASE_URL must be equal, or CL_DATABASE_URL must not be set`)
+
+	t.Setenv("CL_DATABASE_URL", "foo")
+	assert.NoError(t, validate())
+
+	t.Setenv("CL_DATABASE_URL", "bar")
+	t.Setenv("GAS_UPDATER_ENABLED", "true")
+	t.Setenv("ETH_GAS_BUMP_TX_DEPTH", "7")
+	assert.ErrorContains(t, validate(), `3 errors:
+	- environment variables DATABASE_URL and CL_DATABASE_URL must be equal, or CL_DATABASE_URL must not be set
+	- environment variable ETH_GAS_BUMP_TX_DEPTH must not be set: unsupported with config v2
+	- environment variable GAS_UPDATER_ENABLED must not be set: unsupported with config v2`)
 }

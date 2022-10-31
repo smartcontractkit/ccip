@@ -13,6 +13,7 @@ CCIP = false
 DefaultIdleInTxSessionTimeout = '1h0m0s'
 DefaultLockTimeout = '15s'
 DefaultQueryTimeout = '10s'
+LogQueries = false
 MaxIdleConns = 10
 MaxOpenConns = 20
 MigrateOnStartup = true
@@ -50,7 +51,7 @@ JsonWrapperKey = 'event'
 Headers = ['Authorization: token', 'X-SomeOther-Header: value with spaces | and a bar+*']
 
 [Log]
-DatabaseQueries = false
+Level = 'panic'
 JSONConsole = true
 UnixTS = false
 
@@ -181,14 +182,13 @@ MemThreshold = '4.00gb'
 GoroutineThreshold = 5000
 
 [Pyroscope]
-AuthToken = ''
 ServerAddress = ''
 Environment = 'mainnet'
 
 [Sentry]
 Debug = false
 DSN = ''
-Environment = 'prod'
+Environment = ''
 Release = ''
 
 [[EVM]]

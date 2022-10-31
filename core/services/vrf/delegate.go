@@ -56,7 +56,7 @@ func NewDelegate(
 	porm pipeline.ORM,
 	chainSet evm.ChainSet,
 	lggr logger.Logger,
-	cfg pg.LogConfig) *Delegate {
+	cfg pg.QConfig) *Delegate {
 	return &Delegate{
 		q:    pg.NewQ(db, lggr, cfg),
 		ks:   ks,
@@ -71,8 +71,8 @@ func (d *Delegate) JobType() job.Type {
 	return job.VRF
 }
 
-func (d *Delegate) AfterJobCreated(spec job.Job)  {}
 func (d *Delegate) BeforeJobCreated(spec job.Job) {}
+func (d *Delegate) AfterJobCreated(spec job.Job)  {}
 func (d *Delegate) BeforeJobDeleted(spec job.Job) {}
 
 // ServicesForSpec satisfies the job.Delegate interface.

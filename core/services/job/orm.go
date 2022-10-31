@@ -75,12 +75,17 @@ type ORM interface {
 	FindTaskResultByRunIDAndTaskName(runID int64, taskName string) ([]byte, error)
 }
 
+type ORMConfig interface {
+	DatabaseDefaultQueryTimeout() time.Duration
+}
+
 type orm struct {
 	q           pg.Q
 	chainSet    evm.ChainSet
 	keyStore    keystore.Master
 	pipelineORM pipeline.ORM
 	lggr        logger.Logger
+	cfg         pg.QConfig
 	bridgeORM   bridges.ORM
 }
 
@@ -93,7 +98,7 @@ func NewORM(
 	bridgeORM bridges.ORM,
 	keyStore keystore.Master, // needed to validation key properties on new job creation
 	lggr logger.Logger,
-	cfg pg.LogConfig,
+	cfg pg.QConfig,
 ) *orm {
 	namedLogger := lggr.Named("JobORM")
 	return &orm{
@@ -103,6 +108,7 @@ func NewORM(
 		pipelineORM: pipelineORM,
 		bridgeORM:   bridgeORM,
 		lggr:        namedLogger,
+		cfg:         cfg,
 	}
 }
 func (o *orm) Close() error {
@@ -725,7 +731,7 @@ func LoadEnvConfigVarsOCR(cfg OCRSpecConfig, p2pStore keystore.P2P, os OCROracle
 }
 
 func (o *orm) FindJobTx(id int32) (Job, error) {
-	ctx, cancel := pg.DefaultQueryCtx()
+	ctx, cancel := context.WithTimeout(context.Background(), o.cfg.DatabaseDefaultQueryTimeout())
 	defer cancel()
 	return o.FindJob(ctx, id)
 }
