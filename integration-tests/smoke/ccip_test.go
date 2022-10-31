@@ -69,7 +69,7 @@ func TestPrintRevertReason(t *testing.T) {
 	}
 }
 
-var _ = FDescribe("CCIP interactions test @ccip", func() {
+var _ = Describe("CCIP interactions test @ccip", func() {
 	var (
 		diffNetworkEntries = []TableEntry{
 			Entry("CCIP suite on 2 Geths @simulated", networks.NetworkAlpha, networks.NetworkBeta),

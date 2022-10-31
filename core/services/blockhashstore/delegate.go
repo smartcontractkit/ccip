@@ -133,7 +133,7 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 // AfterJobCreated satisfies the job.Delegate interface.
 func (d *Delegate) AfterJobCreated(spec job.Job) {}
 
-func (Delegate) BeforeJobCreated(spec job.Job) {}
+func (d *Delegate) BeforeJobCreated(spec job.Job) {}
 
 // BeforeJobDeleted satisfies the job.Delegate interface.
 func (d *Delegate) BeforeJobDeleted(spec job.Job) {}

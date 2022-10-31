@@ -36,7 +36,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
-	"go.uber.org/zap/zapcore"
 	"gopkg.in/guregu/null.v4"
 
 	starkkey "github.com/smartcontractkit/chainlink-starknet/relayer/pkg/chainlink/keys"
@@ -58,7 +57,6 @@ import (
 	"github.com/smartcontractkit/chainlink/core/chains/terra"
 	"github.com/smartcontractkit/chainlink/core/cmd"
 	"github.com/smartcontractkit/chainlink/core/config"
-	"github.com/smartcontractkit/chainlink/core/config/envvar"
 	"github.com/smartcontractkit/chainlink/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/core/internal/testutils/configtest"
 	configtest2 "github.com/smartcontractkit/chainlink/core/internal/testutils/configtest/v2"
@@ -146,10 +144,8 @@ func init() {
 	gomega.SetDefaultConsistentlyPollingInterval(100 * time.Millisecond)
 
 	logger.InitColor(true)
-	if ll, _ := envvar.LogLevel.Parse(); ll.Enabled(zapcore.DebugLevel) {
-		gin.DebugPrintRouteFunc = func(httpMethod, absolutePath, handlerName string, nuHandlers int) {
-			fmt.Printf("[gin] %-6s %-25s --> %s (%d handlers)\n", httpMethod, absolutePath, handlerName, nuHandlers)
-		}
+	gin.DebugPrintRouteFunc = func(httpMethod, absolutePath, handlerName string, nuHandlers int) {
+		fmt.Printf("[gin] %-6s %-25s --> %s (%d handlers)\n", httpMethod, absolutePath, handlerName, nuHandlers)
 	}
 
 	// Seed the random number generator, otherwise separate modules will take
@@ -373,11 +369,7 @@ func NewApplicationWithConfig(t testing.TB, cfg config.GeneralConfig, flagsAndDe
 	var eventBroadcaster pg.EventBroadcaster = pg.NewNullEventBroadcaster()
 
 	url := cfg.DatabaseURL()
-	db, err := pg.NewConnection(url.String(), cfg.GetDatabaseDialectConfiguredOrDefault(), pg.Config{
-		Logger:       lggr,
-		MaxOpenConns: cfg.ORMMaxOpenConns(),
-		MaxIdleConns: cfg.ORMMaxIdleConns(),
-	})
+	db, err := pg.NewConnection(url.String(), cfg.GetDatabaseDialectConfiguredOrDefault(), cfg)
 	require.NoError(t, err)
 	t.Cleanup(func() { assert.NoError(t, db.Close()) })
 
@@ -610,12 +602,12 @@ func NewEthMocksWithTransactionsOnBlocksAssertions(t testing.TB) *evmMocks.Clien
 	c.On("HeadByNumber", mock.Anything, big.NewInt(0)).Maybe().Return(Head(0), nil)
 	c.On("BatchCallContext", mock.Anything, mock.Anything).Maybe().Return(nil).Run(func(args mock.Arguments) {
 		elems := args.Get(1).([]rpc.BatchElem)
-		elems[0].Result = &gas.Block{
+		elems[0].Result = &evmtypes.Block{
 			Number:       42,
 			Hash:         utils.NewHash(),
 			Transactions: LegacyTransactionsFromGasPrices(9001, 9002),
 		}
-		elems[1].Result = &gas.Block{
+		elems[1].Result = &evmtypes.Block{
 			Number:       41,
 			Hash:         utils.NewHash(),
 			Transactions: LegacyTransactionsFromGasPrices(9003, 9004),
@@ -711,7 +703,6 @@ func (ta *TestApplication) NewClientAndRenderer() (*cmd.Client, *RendererMock) {
 		Renderer:                       r,
 		Config:                         ta.GetConfig(),
 		Logger:                         lggr,
-		CloseLogger:                    lggr.Sync,
 		AppFactory:                     seededAppFactory{ta.ChainlinkApplication},
 		FallbackAPIInitializer:         NewMockAPIInitializer(ta.t),
 		Runner:                         EmptyRunner{},
@@ -731,7 +722,6 @@ func (ta *TestApplication) NewAuthenticatingClient(prompter cmd.Prompter) *cmd.C
 		Renderer:                       &RendererMock{},
 		Config:                         ta.GetConfig(),
 		Logger:                         lggr,
-		CloseLogger:                    lggr.Sync,
 		AppFactory:                     seededAppFactory{ta.ChainlinkApplication},
 		FallbackAPIInitializer:         NewMockAPIInitializer(ta.t),
 		Runner:                         EmptyRunner{},
@@ -745,7 +735,7 @@ func (ta *TestApplication) NewAuthenticatingClient(prompter cmd.Prompter) *cmd.C
 }
 
 // NewKeyStore returns a new, unlocked keystore
-func NewKeyStore(t testing.TB, db *sqlx.DB, cfg pg.LogConfig) keystore.Master {
+func NewKeyStore(t testing.TB, db *sqlx.DB, cfg pg.QConfig) keystore.Master {
 	keystore := keystore.New(db, utils.FastScryptParams, logger.TestLogger(t), cfg)
 	require.NoError(t, keystore.Unlock(Password))
 	return keystore
@@ -1103,28 +1093,28 @@ func Head(val interface{}) *evmtypes.Head {
 }
 
 // LegacyTransactionsFromGasPrices returns transactions matching the given gas prices
-func LegacyTransactionsFromGasPrices(gasPrices ...int64) []gas.Transaction {
+func LegacyTransactionsFromGasPrices(gasPrices ...int64) []evmtypes.Transaction {
 	return LegacyTransactionsFromGasPricesTxType(0x0, gasPrices...)
 }
 
-func LegacyTransactionsFromGasPricesTxType(code gas.TxType, gasPrices ...int64) []gas.Transaction {
-	txs := make([]gas.Transaction, len(gasPrices))
+func LegacyTransactionsFromGasPricesTxType(code evmtypes.TxType, gasPrices ...int64) []evmtypes.Transaction {
+	txs := make([]evmtypes.Transaction, len(gasPrices))
 	for i, gasPrice := range gasPrices {
-		txs[i] = gas.Transaction{Type: code, GasPrice: assets.NewWeiI(gasPrice), GasLimit: 42}
+		txs[i] = evmtypes.Transaction{Type: code, GasPrice: assets.NewWeiI(gasPrice), GasLimit: 42}
 	}
 	return txs
 }
 
 // DynamicFeeTransactionsFromTipCaps returns EIP-1559 transactions with the
 // given TipCaps (FeeCap is arbitrary)
-func DynamicFeeTransactionsFromTipCaps(tipCaps ...int64) []gas.Transaction {
+func DynamicFeeTransactionsFromTipCaps(tipCaps ...int64) []evmtypes.Transaction {
 	return DynamicFeeTransactionsFromTipCapsTxType(0x02, tipCaps...)
 }
 
-func DynamicFeeTransactionsFromTipCapsTxType(code gas.TxType, tipCaps ...int64) []gas.Transaction {
-	txs := make([]gas.Transaction, len(tipCaps))
+func DynamicFeeTransactionsFromTipCapsTxType(code evmtypes.TxType, tipCaps ...int64) []evmtypes.Transaction {
+	txs := make([]evmtypes.Transaction, len(tipCaps))
 	for i, tipCap := range tipCaps {
-		txs[i] = gas.Transaction{Type: code, MaxPriorityFeePerGas: assets.NewWeiI(tipCap), GasLimit: 42, MaxFeePerGas: assets.GWei(5000)}
+		txs[i] = evmtypes.Transaction{Type: code, MaxPriorityFeePerGas: assets.NewWeiI(tipCap), GasLimit: 42, MaxFeePerGas: assets.GWei(5000)}
 	}
 	return txs
 }
@@ -1686,7 +1676,7 @@ func MustGetStateForKey(t testing.TB, kst keystore.Eth, key ethkey.KeyV2) ethkey
 	return states[0]
 }
 
-func NewTxmORM(t *testing.T, db *sqlx.DB, cfg pg.LogConfig) txmgr.ORM {
+func NewTxmORM(t *testing.T, db *sqlx.DB, cfg pg.QConfig) txmgr.ORM {
 	return txmgr.NewORM(db, logger.TestLogger(t), cfg)
 }
 

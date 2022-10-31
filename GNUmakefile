@@ -41,13 +41,13 @@ chainlink: operator-ui ## Build the chainlink binary.
 	go build $(GOFLAGS) -o $@ ./core/
 
 .PHONY: docker ## Build the chainlink docker image
-docker: operator-ui
+docker: 
 	docker buildx build \
 	--build-arg COMMIT_SHA=$(COMMIT_SHA) \
 	-f core/chainlink.Dockerfile .
 
 .PHONY: chainlink-build
-chainlink-build: ## Build & install the chainlink binary.
+chainlink-build: operator-ui ## Build & install the chainlink binary.
 	go build $(GOFLAGS) -o chainlink ./core/
 	rm -f $(GOBIN)/chainlink
 	cp chainlink $(GOBIN)/chainlink
@@ -126,13 +126,7 @@ test_smoke: test_need_operator_assets ## Run all integration smoke tests, using 
 
 .PHONY: test_smoke_simulated
 test_smoke_simulated: test_need_operator_assets ## Run all integration smoke tests, using only simulated networks, default behavior (you can use `make test_smoke`)
-	ginkgo -v -r --junit-report=tests-smoke-report.xml \
-	--keep-going --trace --randomize-all --randomize-suites \
-	--progress --focus @simulated $(args) ./integration-tests/smoke
-
-.PHONY: test_smoke_raw
-test_smoke_raw: test_need_operator_assets ## Run ALL integration smoke tests, only used for when focusing a specific suite or test
-	ginkgo -v -r --junit-report=tests-smoke-report.xml \
+	SELECTED_NETWORKS="SIMULATED" ginkgo -v -r --junit-report=tests-smoke-report.xml \
 	--keep-going --trace --randomize-all --randomize-suites \
 	--progress $(args) ./integration-tests/smoke
 
@@ -168,7 +162,7 @@ test_chaos: test_need_operator_assets ## Run core node chaos tests.
 
 .PHONY: config-docs
 config-docs: ## Generate core node configuration documentation
-	go run ./core/config/v2/docs/cmd/generate/main.go > ./docs/CONFIG.md
+	go run ./core/config/v2/docs/cmd/generate/main.go -o ./docs/
 
 .PHONY: golangci-lint
 golangci-lint: ## Run golangci-lint for all issues.

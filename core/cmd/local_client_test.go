@@ -74,23 +74,9 @@ func TestClient_RunNodeShowsEnv(t *testing.T) {
 	err = logFileSize.UnmarshalText([]byte("100mb"))
 	assert.NoError(t, err)
 
-	lcfg := logger.Config{
-		LogLevel:      zapcore.DebugLevel,
-		FileMaxSizeMB: int(logFileSize / utils.MB),
-		Dir:           t.TempDir(),
-	}
-
-	tmpFile, err := os.CreateTemp(lcfg.Dir, "*")
-	assert.NoError(t, err)
-	defer tmpFile.Close()
-
-	newLogger, closeLogger := lcfg.New()
-
 	runner := cltest.BlockedRunner{Done: make(chan struct{})}
 	client := cmd.Client{
 		Config:                 cfg,
-		Logger:                 newLogger,
-		CloseLogger:            closeLogger,
 		AppFactory:             cltest.InstanceAppFactory{App: app},
 		FallbackAPIInitializer: cltest.NewMockAPIInitializer(t),
 		Runner:                 runner,
@@ -204,7 +190,7 @@ CHAINLINK_TLS_HOST:
 CHAINLINK_TLS_PORT: 6689
 CHAINLINK_TLS_REDIRECT: false`, cfg.RootDir())
 
-	logs, err := cltest.ReadLogs(lcfg.Dir)
+	logs, err := cltest.ReadLogs(cfg.LogFileDir())
 	assert.NoError(t, err)
 
 	require.Contains(t, logs, expected, fmt.Sprintf("Expected to find:\n\n%s\n\nWithin:\n\n%s\n\nDiff:\n\n%s", expected, logs, diff.Diff(expected, logs)))
@@ -224,7 +210,7 @@ func TestClient_RunNodeWithPasswords(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			cfg := configtest.NewGeneralConfig(t, func(c *chainlink.Config, s *chainlink.Secrets) {
-				s.KeystorePassword = ptr("dummy")
+				s.Password.Keystore = models.NewSecret("dummy")
 				c.EVM[0].Nodes[0].Name = ptr("fake")
 				c.EVM[0].Nodes[0].HTTPURL = models.MustParseURL("http://fake.com")
 			})
@@ -258,18 +244,28 @@ func TestClient_RunNodeWithPasswords(t *testing.T) {
 				Runner:                 cltest.EmptyRunner{},
 				AppFactory:             cltest.InstanceAppFactory{App: app},
 				Logger:                 lggr,
-				CloseLogger:            lggr.Sync,
 			}
 
 			set := flag.NewFlagSet("test", 0)
 			set.String("password", test.pwdfile, "")
 			c := cli.NewContext(nil, set, nil)
 
+			run := func() error {
+				cli := cmd.NewApp(&client)
+				if err := cli.Before(c); err != nil {
+					return err
+				}
+				if err := client.RunNode(c); err != nil {
+					return err
+				}
+				return nil
+			}
+
 			if test.wantUnlocked {
-				assert.NoError(t, client.RunNode(c))
+				assert.NoError(t, run())
 				assert.Equal(t, 1, apiPrompt.Count)
 			} else {
-				assert.Error(t, client.RunNode(c))
+				assert.Error(t, run())
 				assert.Equal(t, 0, apiPrompt.Count)
 			}
 		})
@@ -291,7 +287,7 @@ func TestClient_RunNodeWithAPICredentialsFile(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			cfg := configtest.NewGeneralConfig(t, func(c *chainlink.Config, s *chainlink.Secrets) {
-				s.KeystorePassword = ptr("16charlengthp4SsW0rD1!@#_")
+				s.Password.Keystore = models.NewSecret("16charlengthp4SsW0rD1!@#_")
 				c.EVM[0].Nodes[0].Name = ptr("fake")
 				c.EVM[0].Nodes[0].HTTPURL = models.MustParseURL("http://fake.com")
 			})
@@ -332,7 +328,6 @@ func TestClient_RunNodeWithAPICredentialsFile(t *testing.T) {
 				FallbackAPIInitializer: apiPrompt,
 				Runner:                 cltest.EmptyRunner{},
 				Logger:                 lggr,
-				CloseLogger:            lggr.Sync,
 			}
 
 			set := flag.NewFlagSet("test", 0)
@@ -432,7 +427,6 @@ func TestClient_RebroadcastTransactions_Txm(t *testing.T) {
 		FallbackAPIInitializer: cltest.NewMockAPIInitializer(t),
 		Runner:                 cltest.EmptyRunner{},
 		Logger:                 lggr,
-		CloseLogger:            lggr.Sync,
 	}
 
 	for i := beginningNonce; i <= endingNonce; i++ {
@@ -502,7 +496,6 @@ func TestClient_RebroadcastTransactions_OutsideRange_Txm(t *testing.T) {
 				FallbackAPIInitializer: cltest.NewMockAPIInitializer(t),
 				Runner:                 cltest.EmptyRunner{},
 				Logger:                 lggr,
-				CloseLogger:            lggr.Sync,
 			}
 
 			for i := beginningNonce; i <= endingNonce; i++ {
