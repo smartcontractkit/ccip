@@ -837,7 +837,9 @@ func CreateAndFundSubscription(sourceCCIP SourceCCIPModule, destCCIP DestCCIPMod
 	err = destCCIP.SubOffRampRouter.CreateSubscription([]common.Address{sourceCCIP.Sender}, destCCIP.ReceiverDapp.EthAddress, false, subscriptionBalance)
 	Expect(err).ShouldNot(HaveOccurred(), "Error creating subscription on SubOffRampRouter")
 	err = sourceCCIP.Common.ChainClient.WaitForEvents()
-	Expect(err).ShouldNot(HaveOccurred(), "Failed to wait for creating and funding subscription")
+	Expect(err).ShouldNot(HaveOccurred(), "Failed to wait for funding subscription on source chain")
+	err = destCCIP.Common.ChainClient.WaitForEvents()
+	Expect(err).ShouldNot(HaveOccurred(), "Failed to wait for creating subscription on dest chain")
 }
 
 // SetOCRConfigs sets the oracle config in ocr2 contracts
