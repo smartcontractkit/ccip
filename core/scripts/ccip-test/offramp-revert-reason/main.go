@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"strings"
 
 	"github.com/ethereum/go-ethereum"
@@ -33,7 +34,7 @@ func panicErr(err error) {
 func main() {
 	// Need a node URL
 	// NOTE: this node needs to run in archive mode
-	ethUrl := secrets.GoerliEthURL
+	ethUrl := secrets.GetRPC(big.NewInt(5))
 	txHash := "0x97be8559164442595aba46b5f849c23257905b78e72ee43d9b998b28eee78b84"
 	requester := "0xe88ff73814fb891bb0e149f5578796fa41f20242"
 

@@ -12,6 +12,7 @@ import (
 	"github.com/test-go/testify/require"
 
 	"github.com/smartcontractkit/chainlink/core/logger"
+	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/secrets"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
 )
 
@@ -39,16 +40,17 @@ type DeploySettings struct {
 type EVMChainConfig struct {
 	ChainId     *big.Int
 	GasSettings EVMGasSettings
-	EthUrl      string
+	LinkToken   gethcommon.Address
 
-	LinkToken    gethcommon.Address
-	BridgeTokens []gethcommon.Address
-	TokenPools   []gethcommon.Address
-	TokenPrices  []*big.Int
+	SupportedTokens map[gethcommon.Address]EVMBridgedToken
+	OnRampRouter    gethcommon.Address
+	OffRampRouter   gethcommon.Address
+	Afn             gethcommon.Address
+}
 
-	OnRampRouter  gethcommon.Address
-	OffRampRouter gethcommon.Address
-	Afn           gethcommon.Address
+type EVMBridgedToken struct {
+	Pool  gethcommon.Address
+	Price *big.Int
 }
 
 type EVMLaneConfig struct {
@@ -75,15 +77,13 @@ type EvmDeploymentConfig struct {
 
 func (chain *EvmDeploymentConfig) SetupChain(t *testing.T, ownerPrivateKey string) {
 	chain.Owner = GetOwner(t, ownerPrivateKey, chain.ChainConfig.ChainId, chain.ChainConfig.GasSettings)
-	chain.Client = GetClient(t, chain.ChainConfig.EthUrl)
+	chain.Client = GetClient(t, secrets.GetRPC(chain.ChainConfig.ChainId))
 	chain.Logger = logger.TestLogger(t).Named(helpers.ChainName(chain.ChainConfig.ChainId.Int64()))
-
-	require.Equal(t, len(chain.ChainConfig.BridgeTokens), len(chain.ChainConfig.TokenPools))
 	chain.Logger.Info("Completed chain setup")
 }
 
 func (chain *EvmDeploymentConfig) SetupReadOnlyChain(lggr logger.Logger) error {
-	client, err := ethclient.Dial(chain.ChainConfig.EthUrl)
+	client, err := ethclient.Dial(secrets.GetRPC(chain.ChainConfig.ChainId))
 	if err != nil {
 		return err
 	}
@@ -130,7 +130,7 @@ func PrintContractConfig(source *EvmDeploymentConfig, destination *EvmDeployment
 Source chain config
 
 LinkToken:      common.HexToAddress("%s"),
-BridgeTokens:   %s,
+BridgeTokens:   %+v,
 TokenPools:     %s,
 OnRamp:         common.HexToAddress("%s"),
 OnRampRouter:   common.HexToAddress("%s"),
@@ -141,8 +141,7 @@ PingPongDapp:   common.HexToAddress("%s"),
 	
 `,
 		source.ChainConfig.LinkToken,
-		source.ChainConfig.BridgeTokens,
-		source.ChainConfig.TokenPools,
+		source.ChainConfig.SupportedTokens,
 		source.LaneConfig.OnRamp,
 		source.ChainConfig.OnRampRouter,
 		source.LaneConfig.TokenSender,
@@ -154,8 +153,7 @@ PingPongDapp:   common.HexToAddress("%s"),
 Destination chain config
 
 LinkToken:       common.HexToAddress("%s"),
-BridgeTokens:    %s,
-TokenPools:      %s,
+BridgeTokens:    %+v,
 OffRamp:         common.HexToAddress("%s"),
 OffRampRouter:   common.HexToAddress("%s"),
 BlobVerifier:    common.HexToAddress("%s"),	
@@ -166,8 +164,7 @@ GovernanceDapp:  common.HexToAddress("%s"),
 PingPongDapp:    common.HexToAddress("%s"),
 `,
 		destination.ChainConfig.LinkToken,
-		destination.ChainConfig.BridgeTokens,
-		destination.ChainConfig.TokenPools,
+		destination.ChainConfig.SupportedTokens,
 		destination.LaneConfig.OffRamp,
 		destination.ChainConfig.OffRampRouter,
 		destination.LaneConfig.BlobVerifier,

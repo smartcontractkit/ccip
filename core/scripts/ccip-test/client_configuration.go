@@ -98,14 +98,17 @@ type Client struct {
 	ChainId          *big.Int
 	LinkToken        *link_token_interface.LinkToken
 	LinkTokenAddress common.Address
-	BridgeTokens     []common.Address
-	TokenPools       []*native_token_pool.NativeTokenPool
-	TokenPrices      []*big.Int
+	SupportedTokens  map[common.Address]EVMBridgedToken
 	GovernanceDapp   *governance_dapp.GovernanceDapp
 	PingPongDapp     *ping_pong_demo.PingPongDemo
 	Afn              *afn_contract.AFNContract
 	logger           logger.Logger
 	t                *testing.T
+}
+
+type EVMBridgedToken struct {
+	Pool  *native_token_pool.NativeTokenPool
+	Price *big.Int
 }
 
 type SourceClient struct {
@@ -116,42 +119,43 @@ type SourceClient struct {
 }
 
 func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient {
-	client := rhea.GetClient(t, config.ChainConfig.EthUrl)
-	LinkToken, err := link_token_interface.NewLinkToken(config.ChainConfig.LinkToken, client)
+	LinkToken, err := link_token_interface.NewLinkToken(config.ChainConfig.LinkToken, config.Client)
 	require.NoError(t, err)
-	var tokenPools []*native_token_pool.NativeTokenPool
-	for _, poolAddress := range config.ChainConfig.TokenPools {
-		tokenPool, err2 := native_token_pool.NewNativeTokenPool(poolAddress, client)
+
+	supportedTokens := map[common.Address]EVMBridgedToken{}
+	for token, tokenConfig := range config.ChainConfig.SupportedTokens {
+		tokenPool, err2 := native_token_pool.NewNativeTokenPool(tokenConfig.Pool, config.Client)
 		require.NoError(t, err2)
-		tokenPools = append(tokenPools, tokenPool)
+		supportedTokens[token] = EVMBridgedToken{
+			Pool:  tokenPool,
+			Price: tokenConfig.Price,
+		}
 	}
 
-	afn, err := afn_contract.NewAFNContract(config.ChainConfig.Afn, client)
+	afn, err := afn_contract.NewAFNContract(config.ChainConfig.Afn, config.Client)
 	require.NoError(t, err)
-	onRamp, err := evm_2_evm_subscription_onramp.NewEVM2EVMSubscriptionOnRamp(config.LaneConfig.OnRamp, client)
+	onRamp, err := evm_2_evm_subscription_onramp.NewEVM2EVMSubscriptionOnRamp(config.LaneConfig.OnRamp, config.Client)
 	require.NoError(t, err)
-	senderDapp, err := subscription_sender_dapp.NewSubscriptionSenderDapp(config.LaneConfig.TokenSender, client)
+	senderDapp, err := subscription_sender_dapp.NewSubscriptionSenderDapp(config.LaneConfig.TokenSender, config.Client)
 	require.NoError(t, err)
-	onRampRouter, err := evm_2_any_subscription_onramp_router.NewEVM2AnySubscriptionOnRampRouter(config.ChainConfig.OnRampRouter, client)
+	onRampRouter, err := evm_2_any_subscription_onramp_router.NewEVM2AnySubscriptionOnRampRouter(config.ChainConfig.OnRampRouter, config.Client)
 	require.NoError(t, err)
-	governanceDapp, err := governance_dapp.NewGovernanceDapp(config.LaneConfig.GovernanceDapp, client)
+	governanceDapp, err := governance_dapp.NewGovernanceDapp(config.LaneConfig.GovernanceDapp, config.Client)
 	require.NoError(t, err)
-	pingPongDapp, err := ping_pong_demo.NewPingPongDemo(config.LaneConfig.PingPongDapp, client)
+	pingPongDapp, err := ping_pong_demo.NewPingPongDemo(config.LaneConfig.PingPongDapp, config.Client)
 	require.NoError(t, err)
 
 	return SourceClient{
 		Client: Client{
-			Client:           client,
+			Client:           config.Client,
 			ChainId:          config.ChainConfig.ChainId,
 			LinkTokenAddress: config.ChainConfig.LinkToken,
 			LinkToken:        LinkToken,
 			Afn:              afn,
-			BridgeTokens:     config.ChainConfig.BridgeTokens,
-			TokenPools:       tokenPools,
-			TokenPrices:      config.ChainConfig.TokenPrices,
+			SupportedTokens:  supportedTokens,
 			GovernanceDapp:   governanceDapp,
 			PingPongDapp:     pingPongDapp,
-			logger:           logger.TestLogger(t).Named(helpers.ChainName(config.ChainConfig.ChainId.Int64())),
+			logger:           config.Logger,
 			t:                t,
 		},
 		OnRamp:       onRamp,
@@ -170,47 +174,47 @@ type DestClient struct {
 }
 
 func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestClient {
-	client := rhea.GetClient(t, config.ChainConfig.EthUrl)
-	LinkToken, err := link_token_interface.NewLinkToken(config.ChainConfig.LinkToken, client)
+	LinkToken, err := link_token_interface.NewLinkToken(config.ChainConfig.LinkToken, config.Client)
 	require.NoError(t, err)
 
-	var tokenPools []*native_token_pool.NativeTokenPool
-	for _, poolAddress := range config.ChainConfig.TokenPools {
-		tokenPool, err2 := native_token_pool.NewNativeTokenPool(poolAddress, client)
+	supportedTokens := map[common.Address]EVMBridgedToken{}
+	for token, tokenConfig := range config.ChainConfig.SupportedTokens {
+		tokenPool, err2 := native_token_pool.NewNativeTokenPool(tokenConfig.Pool, config.Client)
 		require.NoError(t, err2)
-		tokenPools = append(tokenPools, tokenPool)
+		supportedTokens[token] = EVMBridgedToken{
+			Pool:  tokenPool,
+			Price: tokenConfig.Price,
+		}
 	}
 
-	afn, err := afn_contract.NewAFNContract(config.ChainConfig.Afn, client)
+	afn, err := afn_contract.NewAFNContract(config.ChainConfig.Afn, config.Client)
 	require.NoError(t, err)
-	blobVerifier, err := blob_verifier.NewBlobVerifier(config.LaneConfig.BlobVerifier, client)
+	blobVerifier, err := blob_verifier.NewBlobVerifier(config.LaneConfig.BlobVerifier, config.Client)
 	require.NoError(t, err)
-	offRamp, err := any_2_evm_subscription_offramp.NewEVM2EVMSubscriptionOffRamp(config.LaneConfig.OffRamp, client)
+	offRamp, err := any_2_evm_subscription_offramp.NewEVM2EVMSubscriptionOffRamp(config.LaneConfig.OffRamp, config.Client)
 	require.NoError(t, err)
-	messageReceiver, err := simple_message_receiver.NewSimpleMessageReceiver(config.LaneConfig.MessageReceiver, client)
+	messageReceiver, err := simple_message_receiver.NewSimpleMessageReceiver(config.LaneConfig.MessageReceiver, config.Client)
 	require.NoError(t, err)
-	receiverDapp, err := receiver_dapp.NewReceiverDapp(config.LaneConfig.ReceiverDapp, client)
+	receiverDapp, err := receiver_dapp.NewReceiverDapp(config.LaneConfig.ReceiverDapp, config.Client)
 	require.NoError(t, err)
-	offRampRouter, err := any_2_evm_subscription_offramp_router.NewAny2EVMSubscriptionOffRampRouter(config.ChainConfig.OffRampRouter, client)
+	offRampRouter, err := any_2_evm_subscription_offramp_router.NewAny2EVMSubscriptionOffRampRouter(config.ChainConfig.OffRampRouter, config.Client)
 	require.NoError(t, err)
-	governanceDapp, err := governance_dapp.NewGovernanceDapp(config.LaneConfig.GovernanceDapp, client)
+	governanceDapp, err := governance_dapp.NewGovernanceDapp(config.LaneConfig.GovernanceDapp, config.Client)
 	require.NoError(t, err)
-	pingPongDapp, err := ping_pong_demo.NewPingPongDemo(config.LaneConfig.PingPongDapp, client)
+	pingPongDapp, err := ping_pong_demo.NewPingPongDemo(config.LaneConfig.PingPongDapp, config.Client)
 	require.NoError(t, err)
 
 	return DestClient{
 		Client: Client{
-			Client:           client,
+			Client:           config.Client,
 			ChainId:          config.ChainConfig.ChainId,
 			LinkTokenAddress: config.ChainConfig.LinkToken,
 			LinkToken:        LinkToken,
-			BridgeTokens:     config.ChainConfig.BridgeTokens,
-			TokenPools:       tokenPools,
-			TokenPrices:      config.ChainConfig.TokenPrices,
+			SupportedTokens:  supportedTokens,
 			GovernanceDapp:   governanceDapp,
 			PingPongDapp:     pingPongDapp,
 			Afn:              afn,
-			logger:           logger.TestLogger(t).Named(helpers.ChainName(config.ChainConfig.ChainId.Int64())),
+			logger:           config.Logger,
 			t:                t,
 		},
 		BlobVerifier:    blobVerifier,
@@ -516,92 +520,6 @@ func (client *CCIPClient) ExecuteManually(seqNr uint64) error {
 //	client.Dest.logger.Infof("Cross chain tx sent %s", helpers.ExplorerLink(client.Dest.ChainId.Int64(), tx.Hash()))
 //}
 
-func (client *CCIPClient) CrossChainSendPausedOnrampShouldFail(t *testing.T) {
-	client.PauseOnramp()
-	amount := big.NewInt(100)
-	client.Source.ApproveLink(t, client.Source.SenderDapp.Address(), amount)
-	client.Source.Owner.GasLimit = 1e6
-	tx, err := client.Source.SenderDapp.SendMessage(client.Source.Owner,
-		subscription_sender_dapp.CCIPEVM2AnySubscriptionMessage{
-			Receiver: testhelpers.MustEncodeAddress(t, client.Dest.Owner.From),
-			Tokens:   []common.Address{client.Source.LinkTokenAddress},
-			Amounts:  []*big.Int{amount},
-			GasLimit: big.NewInt(100_000),
-		})
-	require.NoError(t, err)
-	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), false)
-}
-
-//func (client CCIPClient) CrossChainSendPausedOfframpShouldFail(t *testing.T) {
-//	client.PauseBlobVerifier()
-//	ctx := context.Background()
-//	offrampBlockNumber := GetCurrentBlockNumber(client.Dest.Client.Client)
-//
-//	amount, _ := new(big.Int).SetString("10", 10)
-//	client.Source.ApproveLink(t, client.Source.SenderDapp.Address(), amount)
-//	onrampRequest := client.SendToDappWithExecution(client.Source, client.Source.Owner, client.Dest.Owner.From, amount, common.HexToAddress("0x0000000000000000000000000000000000000000"))
-//
-//	client.Dest.logger.Info("Waiting for report...")
-//	_, err := client.GetReportForSequenceNumber(ctx, onrampRequest.Message.SequenceNumber, offrampBlockNumber)
-//	if err.Error() == "No report found within the given time" {
-//		client.Dest.logger.Info("Success, no oracle report sent to paused offramp.")
-//	} else {
-//		panic("report found despite paused offramp")
-//	}
-//}
-
-func (client *CCIPClient) NotEnoughFundsInBucketShouldFail(t *testing.T) {
-	amount := big.NewInt(2e18) // 2 LINK, bucket size is 1 LINK
-	client.Source.ApproveLink(t, client.Source.SenderDapp.Address(), amount)
-	client.Source.Owner.GasLimit = 1e6
-	tx, err := client.Source.SenderDapp.SendMessage(client.Source.Owner,
-		subscription_sender_dapp.CCIPEVM2AnySubscriptionMessage{
-			Receiver: testhelpers.MustEncodeAddress(t, client.Dest.Owner.From),
-			Tokens:   []common.Address{client.Source.LinkTokenAddress},
-			Amounts:  []*big.Int{amount},
-			GasLimit: big.NewInt(100_000),
-		})
-	require.NoError(t, err)
-	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), false)
-}
-
-//func (client CCIPClient) ExternalExecutionSubmitOfframpTwiceShouldFail(t *testing.T) {
-//	ctx := context.Background()
-//	offrampBlockNumber := GetCurrentBlockNumber(client.Dest.Client.Client)
-//	onrampBlockNumber := GetCurrentBlockNumber(client.Source.Client.Client)
-//
-//	amount, _ := new(big.Int).SetString("10", 10)
-//	client.Source.ApproveLink(t, client.Source.SenderDapp.Address(), amount)
-//
-//	onrampRequest := client.SendToDappWithExecution(client.Source, client.Source.Owner, client.Dest.Owner.From, amount, common.HexToAddress("0x0000000000000000000000000000000000000000"))
-//
-//	// Gets the report that our transaction is included in
-//	client.Dest.logger.Info("Getting report")
-//	report, err := client.GetReportForSequenceNumber(ctx, onrampRequest.Message.SequenceNumber, offrampBlockNumber)
-//	require.NoError(t, err)
-//
-//	// Get all requests included in the given report
-//	client.Dest.logger.Info("Getting recent cross chain requests")
-//	requests := client.GetCrossChainSendRequestsForRange(ctx, t, report, onrampBlockNumber)
-//
-//	// Generate the proof
-//	client.Dest.logger.Info("Generating proof")
-//	proof := client.ValidateMerkleRoot(t, onrampRequest, requests, report)
-//
-//	// Execute the transaction on the offramp
-//	client.Dest.logger.Info("Executing first offramp TX - should succeed")
-//	tx, err := client.ExecuteOffRampTransaction(t, proof, onrampRequest.Raw.Data)
-//	require.NoError(t, err)
-//	WaitForMined(t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
-//
-//	// Execute the transaction on the offramp
-//	client.Dest.logger.Info("Executing second offramp TX - should fail")
-//	client.Dest.Owner.GasLimit = 1e6
-//	tx, err = client.ExecuteOffRampTransaction(t, proof, onrampRequest.Raw.Data)
-//	require.NoError(t, err)
-//	WaitForMined(t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), false)
-//}
-
 func (client *CCIPClient) SendDappTx(t *testing.T) {
 	amount := big.NewInt(500)
 	destBlockNumber := GetCurrentBlockNumber(client.Dest.Client.Client)
@@ -802,21 +720,6 @@ func (client *CCIPClient) ValidateMerkleRoot(
 	return tree.Prove([]int{int(index)})
 }
 
-func (client *CCIPClient) TryGetTokensFromPausedPool() {
-	client.PauseOnrampPool()
-
-	paused, err := client.Source.TokenPools[0].Paused(nil)
-	helpers.PanicErr(err)
-	if !paused {
-		helpers.PanicErr(errors.New("Should be paused"))
-	}
-
-	client.Source.Owner.GasLimit = 2e6
-	tx, err := client.Source.TokenPools[0].LockOrBurn(client.Source.Owner, big.NewInt(1000))
-	helpers.PanicErr(err)
-	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), false)
-}
-
 // SendToDappWithExecution executes a cross chain transactions using the sender dapp interface.
 func (client *CCIPClient) SendToDappWithExecution(t *testing.T, source SourceClient, from *bind.TransactOpts, toAddress common.Address, amount *big.Int) *evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRampCCIPSendRequested {
 	SourceBlockNumber := GetCurrentBlockNumber(source.Client.Client)
@@ -896,55 +799,62 @@ func WaitForCrossChainSendRequest(source SourceClient, fromBlockNum uint64, txha
 }
 
 func (client *CCIPClient) PauseOfframpPool() {
-	paused, err := client.Dest.TokenPools[0].Paused(nil)
-	helpers.PanicErr(err)
-	if paused {
-		return
+	for _, tokenConfig := range client.Dest.SupportedTokens {
+		paused, err := tokenConfig.Pool.Paused(nil)
+		helpers.PanicErr(err)
+		if paused {
+			return
+		}
+		client.Dest.logger.Info("pausing offramp pool...")
+		tx, err := tokenConfig.Pool.Pause(client.Dest.Owner)
+		helpers.PanicErr(err)
+		client.Dest.logger.Info("Offramp pool paused, tx hash: %s", tx.Hash())
+		shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 	}
-	client.Dest.logger.Info("pausing offramp pool...")
-	tx, err := client.Dest.TokenPools[0].Pause(client.Dest.Owner)
-	helpers.PanicErr(err)
-	client.Dest.logger.Info("Offramp pool paused, tx hash: %s", tx.Hash())
-	shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 }
-
 func (client *CCIPClient) PauseOnrampPool() {
-	paused, err := client.Source.TokenPools[0].Paused(nil)
-	helpers.PanicErr(err)
-	if paused {
-		return
+	for _, tokenConfig := range client.Source.SupportedTokens {
+		paused, err := tokenConfig.Pool.Paused(nil)
+		helpers.PanicErr(err)
+		if paused {
+			return
+		}
+		client.Source.logger.Info("pausing onramp pool...")
+		tx, err := tokenConfig.Pool.Pause(client.Source.Owner)
+		helpers.PanicErr(err)
+		client.Source.logger.Info("Onramp pool paused, tx hash: %s", tx.Hash())
+		shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 	}
-	client.Source.logger.Info("pausing onramp pool...")
-	tx, err := client.Source.TokenPools[0].Pause(client.Source.Owner)
-	helpers.PanicErr(err)
-	client.Source.logger.Info("Onramp pool paused, tx hash: %s", tx.Hash())
-	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 }
 
 func (client *CCIPClient) UnpauseOfframpPool() {
-	paused, err := client.Dest.TokenPools[0].Paused(nil)
-	helpers.PanicErr(err)
-	if !paused {
-		return
+	for _, tokenConfig := range client.Dest.SupportedTokens {
+		paused, err := tokenConfig.Pool.Paused(nil)
+		helpers.PanicErr(err)
+		if !paused {
+			return
+		}
+		client.Dest.logger.Info("unpausing offramp pool...")
+		tx, err := tokenConfig.Pool.Unpause(client.Dest.Owner)
+		helpers.PanicErr(err)
+		client.Dest.logger.Info("Offramp pool unpaused, tx hash: %s", tx.Hash())
+		shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 	}
-	client.Dest.logger.Info("unpausing offramp pool...")
-	tx, err := client.Dest.TokenPools[0].Unpause(client.Dest.Owner)
-	helpers.PanicErr(err)
-	client.Dest.logger.Info("Offramp pool unpaused, tx hash: %s", tx.Hash())
-	shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 }
 
 func (client *CCIPClient) UnpauseOnrampPool() {
-	paused, err := client.Source.TokenPools[0].Paused(nil)
-	helpers.PanicErr(err)
-	if !paused {
-		return
+	for _, tokenConfig := range client.Source.SupportedTokens {
+		paused, err := tokenConfig.Pool.Paused(nil)
+		helpers.PanicErr(err)
+		if !paused {
+			return
+		}
+		client.Source.logger.Info("unpausing onramp pool...")
+		tx, err := tokenConfig.Pool.Unpause(client.Source.Owner)
+		helpers.PanicErr(err)
+		client.Source.logger.Info("Onramp pool unpaused, tx hash: %s", tx.Hash())
+		shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 	}
-	client.Source.logger.Info("unpausing onramp pool...")
-	tx, err := client.Source.TokenPools[0].Unpause(client.Source.Owner)
-	helpers.PanicErr(err)
-	client.Source.logger.Info("Onramp pool unpaused, tx hash: %s", tx.Hash())
-	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 }
 
 func (client *CCIPClient) PauseOnramp() {
@@ -1135,14 +1045,14 @@ type aggregateRateLimiter interface {
 	SetPrices(opts *bind.TransactOpts, tokens []common.Address, prices []*big.Int) (*types.Transaction, error)
 }
 
-func syncPools(client *Client, registry tokenPoolRegistry, bridgeTokens []common.Address, txOpts *bind.TransactOpts) []*types.Transaction {
+func syncPools(client *Client, registry tokenPoolRegistry, bridgeTokens map[common.Address]EVMBridgedToken, txOpts *bind.TransactOpts) []*types.Transaction {
 	registeredTokens, err := registry.GetPoolTokens(&bind.CallOpts{})
 	require.NoError(client.t, err)
 
 	pendingTxs := make([]*types.Transaction, 0)
 	// remove registered tokenPools not present in config
 	for _, token := range registeredTokens {
-		if !slices.Contains(bridgeTokens, token) {
+		if _, ok := bridgeTokens[token]; !ok {
 			pool, err := registry.GetPool(&bind.CallOpts{}, token)
 			require.NoError(client.t, err)
 			tx, err := registry.RemovePool(txOpts, token, pool)
@@ -1153,10 +1063,10 @@ func syncPools(client *Client, registry tokenPoolRegistry, bridgeTokens []common
 		}
 	}
 	// add tokenPools present in config and not yet registered
-	for i, token := range bridgeTokens {
+	for token, tokenConfig := range bridgeTokens {
 		// remove tokenPools not present in config
 		if !slices.Contains(registeredTokens, token) {
-			pool := client.TokenPools[i].Address()
+			pool := tokenConfig.Pool.Address()
 			tx, err := registry.AddPool(txOpts, token, pool)
 			require.NoError(client.t, err)
 			client.logger.Infof("addPool(token=%s, pool=%s) from registry=%s: tx=%s", token, pool, registry.Address(), tx.Hash())
@@ -1169,23 +1079,30 @@ func syncPools(client *Client, registry tokenPoolRegistry, bridgeTokens []common
 
 func syncPrices(client *Client, limiter aggregateRateLimiter, txOpts *bind.TransactOpts) *types.Transaction {
 	// sync tokenPrices if needed
-	if len(client.TokenPrices) == 0 {
+	if len(client.SupportedTokens) == 0 {
 		return nil
 	}
-	if len(client.TokenPrices) != len(client.BridgeTokens) {
-		client.t.Fatal("if config.TokenPrices isn't empty, it must correspond to BridgeTokens")
+
+	var tokens []common.Address
+	var prices []*big.Int
+	for token, tokenConfig := range client.SupportedTokens {
+		tokens = append(tokens, token)
+		prices = append(prices, tokenConfig.Price)
 	}
-	limiterTokenPrices, err := limiter.GetPricesForTokens(&bind.CallOpts{}, client.BridgeTokens)
+
+	limiterTokenPrices, err := limiter.GetPricesForTokens(&bind.CallOpts{}, tokens)
 	require.NoError(client.t, err)
-	for i := range client.BridgeTokens {
+	i := 0
+	for _, tokenConfig := range client.SupportedTokens {
 		// on first difference, setPrices then return
-		if client.TokenPrices[i].Cmp(limiterTokenPrices[i]) != 0 {
-			tx, err := limiter.SetPrices(txOpts, client.BridgeTokens, client.TokenPrices)
-			require.NoError(client.t, err)
-			client.logger.Infof("setPrices(tokens=%s, prices=%s) for limiter=%s: tx=%s", client.BridgeTokens, client.TokenPrices, limiter.Address(), tx.Hash())
+		if tokenConfig.Price.Cmp(limiterTokenPrices[i]) != 0 {
+			tx, err2 := limiter.SetPrices(txOpts, tokens, prices)
+			require.NoError(client.t, err2)
+			client.logger.Infof("setPrices(tokens=%s, prices=%s) for limiter=%s: tx=%s", tokens, prices, limiter.Address(), tx.Hash())
 			txOpts.Nonce.Add(txOpts.Nonce, big.NewInt(1)) // increment nonce
 			return tx
 		}
+		i++
 	}
 	return nil
 }
@@ -1207,7 +1124,7 @@ func (client *CCIPClient) SyncTokenPools(t *testing.T) {
 	sourceTxOpts.Nonce = big.NewInt(int64(sourcePendingNonce))
 
 	// onRamp maps source tokens to source pools
-	sourcePendingTxs := syncPools(&client.Source.Client, client.Source.OnRamp, client.Source.BridgeTokens, &sourceTxOpts)
+	sourcePendingTxs := syncPools(&client.Source.Client, client.Source.OnRamp, client.Source.SupportedTokens, &sourceTxOpts)
 
 	// same as above, for offRamp
 	destTxOpts := *client.Dest.Owner
@@ -1217,7 +1134,7 @@ func (client *CCIPClient) SyncTokenPools(t *testing.T) {
 	destTxOpts.Nonce = big.NewInt(int64(destPendingNonce))
 
 	// offRamp maps *source* tokens to *dest* pools
-	destPendingTxs := syncPools(&client.Dest.Client, client.Dest.OffRamp, client.Source.BridgeTokens, &destTxOpts)
+	destPendingTxs := syncPools(&client.Dest.Client, client.Dest.OffRamp, client.Source.SupportedTokens, &destTxOpts)
 
 	waitPendingTxs(&client.Source.Client, &sourcePendingTxs)
 	waitPendingTxs(&client.Dest.Client, &destPendingTxs)

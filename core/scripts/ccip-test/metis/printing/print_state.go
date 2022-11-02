@@ -423,13 +423,13 @@ func printPaused(chain *rhea.EvmDeploymentConfig) {
 
 	sb.WriteString(generateHeader(tableHeaders, headerLengths))
 
-	for _, pool := range chain.ChainConfig.TokenPools {
-		tokenPool, err := native_token_pool.NewNativeTokenPool(pool, chain.Client)
+	for _, tokenConfig := range chain.ChainConfig.SupportedTokens {
+		tokenPool, err := native_token_pool.NewNativeTokenPool(tokenConfig.Pool, chain.Client)
 		helpers.PanicErr(err)
 		paused, err := tokenPool.Paused(&bind.CallOpts{})
 		helpers.PanicErr(err)
 
-		sb.WriteString(fmt.Sprintf("| %-25s | %42s | %14s |\n", "token pool", pool.Hex(), printBool(!paused)))
+		sb.WriteString(fmt.Sprintf("| %-25s | %42s | %14s |\n", "token pool", tokenConfig.Pool.Hex(), printBool(!paused)))
 	}
 
 	onRamp, err := evm_2_evm_subscription_onramp.NewEVM2EVMSubscriptionOnRamp(chain.LaneConfig.OnRamp, chain.Client)
@@ -491,23 +491,23 @@ func printPoolBalances(chain *rhea.EvmDeploymentConfig) {
 	onRamp, err := evm_2_evm_subscription_onramp.NewEVM2EVMSubscriptionOnRamp(chain.LaneConfig.OnRamp, chain.Client)
 	helpers.PanicErr(err)
 
-	for _, pool := range chain.ChainConfig.TokenPools {
-		tokenPool, err := native_token_pool.NewNativeTokenPool(pool, chain.Client)
+	for token, tokenConfig := range chain.ChainConfig.SupportedTokens {
+		tokenPool, err := native_token_pool.NewNativeTokenPool(tokenConfig.Pool, chain.Client)
 		helpers.PanicErr(err)
 
 		tokenAddress, err := tokenPool.GetToken(&bind.CallOpts{})
 		helpers.PanicErr(err)
 
-		token, err := link_token_interface.NewLinkToken(tokenAddress, chain.Client)
+		tokenInstance, err := link_token_interface.NewLinkToken(tokenAddress, chain.Client)
 		helpers.PanicErr(err)
 
-		name, err := token.Name(&bind.CallOpts{})
+		name, err := tokenInstance.Name(&bind.CallOpts{})
 		helpers.PanicErr(err)
 
 		price, err := onRamp.GetPricesForTokens(&bind.CallOpts{}, []common.Address{tokenAddress})
 		helpers.PanicErr(err)
 
-		balance, err := token.BalanceOf(&bind.CallOpts{}, pool)
+		balance, err := tokenInstance.BalanceOf(&bind.CallOpts{}, tokenConfig.Pool)
 		helpers.PanicErr(err)
 
 		isAllowedOnRamp, err := tokenPool.IsOnRamp(&bind.CallOpts{}, chain.LaneConfig.OnRamp)
@@ -516,7 +516,11 @@ func printPoolBalances(chain *rhea.EvmDeploymentConfig) {
 		isAllowedOffRamp, err := tokenPool.IsOffRamp(&bind.CallOpts{}, chain.LaneConfig.OffRamp)
 		helpers.PanicErr(err)
 
-		sb.WriteString(fmt.Sprintf("| %-32s | %s | %20d | %9s | %9s | %10s |\n", name, pool.Hex(), balance, printBool(isAllowedOnRamp), printBool(isAllowedOffRamp), price[0].String()))
+		if tokenAddress != token {
+			sb.WriteString(fmt.Sprintf("| %-32s | TOKEN CONFIG MISMATCH ❌ | expected %s | pool token %s |\n", name, token.Hex(), tokenAddress.Hex()))
+		} else {
+			sb.WriteString(fmt.Sprintf("| %-32s | %s | %20d | %9s | %9s | %10s |\n", name, tokenConfig.Pool.Hex(), balance, printBool(isAllowedOnRamp), printBool(isAllowedOffRamp), price[0].String()))
+		}
 	}
 
 	sb.WriteString(generateSeparator(headerLengths))

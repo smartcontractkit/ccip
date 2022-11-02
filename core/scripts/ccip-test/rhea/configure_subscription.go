@@ -20,8 +20,8 @@ import (
 )
 
 func setOffRampOnTokenPools(t *testing.T, destClient *EvmDeploymentConfig) {
-	for _, tokenPoolAddress := range destClient.ChainConfig.TokenPools {
-		pool, err := native_token_pool.NewNativeTokenPool(tokenPoolAddress, destClient.Client)
+	for _, tokenConfig := range destClient.ChainConfig.SupportedTokens {
+		pool, err := native_token_pool.NewNativeTokenPool(tokenConfig.Pool, destClient.Client)
 		require.NoError(t, err)
 
 		// Configure offramp address on pool
@@ -43,8 +43,8 @@ func setOnRampOnOnRampRouter(t *testing.T, sourceClient *EvmDeploymentConfig, de
 }
 
 func setOnRampOnTokenPools(t *testing.T, sourceClient *EvmDeploymentConfig) {
-	for _, tokenPoolAddress := range sourceClient.ChainConfig.TokenPools {
-		pool, err := native_token_pool.NewNativeTokenPool(tokenPoolAddress, sourceClient.Client)
+	for _, tokenConfig := range sourceClient.ChainConfig.SupportedTokens {
+		pool, err := native_token_pool.NewNativeTokenPool(tokenConfig.Pool, sourceClient.Client)
 		require.NoError(t, err)
 
 		// Configure offramp address on pool

@@ -4,8 +4,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/dione"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/metis/printing"
@@ -26,41 +24,18 @@ var (
 // TestDeploySubscription can be run as a test with the following config
 // OWNER_KEY  private key used to deploy all contracts and is used as default in all single user tests.
 func TestRheaDeploySubscription(t *testing.T) {
-	ownerKey := os.Getenv("OWNER_KEY")
-	if ownerKey == "" {
-		t.Log("No key given, this test will be skipped. This is intended behaviour for automated testing.")
-		t.SkipNow()
-	}
-	rhea.DeploySubscriptionContracts(t, ownerKey, &SOURCE, &DESTINATION)
+	checkOwnerKeyAndSetupChain(t)
+
+	rhea.DeploySubscriptionContracts(t, &SOURCE, &DESTINATION)
 	rhea.PrintContractConfig(&SOURCE, &DESTINATION)
 }
 
 // TestDione can be run as a test with the following config
 // OWNER_KEY  private key used to deploy all contracts and is used as default in all single user tests.
 func TestDione(t *testing.T) {
-	ownerKey := os.Getenv("OWNER_KEY")
-	if ownerKey == "" {
-		t.Log("No key given, this test will be skipped. This is intended behaviour for automated testing.")
-		t.SkipNow()
-	}
-	SOURCE.SetupChain(t, ownerKey)
-	DESTINATION.SetupChain(t, ownerKey)
+	checkOwnerKeyAndSetupChain(t)
 
-	don := dione.NewDON(ENV, logger.TestLogger(t))
-	//don := dione.NewOfflineDON(ENV, logger.TestLogger(t))
-	don.WriteToFile()
-
-	//don.FundNodeKeys(DESTINATION, ownerKey, big.NewInt(1e18))
-	//don.FundNodeKeys(DESTINATION, ownerKey, big.NewInt(9e17))
-	//don.DeleteKnownKey("4")
-	//don.PopulateEthKeys()
-	//don.PrintConfig()
-	//don.ClearAllJobs(dione.Goerli, dione.AvaxFuji)
-	//don.AddTwoWaySpecs(SOURCE, DESTINATION)
-	//don.CreateNewEthKeysForChain(OptimismGoerliConfig.ChainId)
-	//don.WIP()
-	//don.ClearAllJobs(Rinkeby, Goerli)
-	//don.WriteToFile()
+	dione.NewOfflineDON(ENV, logger.TestLogger(t))
 }
 
 // TestCCIP can be run as a test with the following config
@@ -68,15 +43,11 @@ func TestDione(t *testing.T) {
 // SEED_KEY   private key used for multi-user tests. Not needed when using the "deploy" command.
 // COMMAND    what function to run e.g. "deploy", "setConfig", or "externalExecution".
 func TestCCIP(t *testing.T) {
-	ownerKey := os.Getenv("OWNER_KEY")
+	ownerKey := checkOwnerKeyAndSetupChain(t)
 	command := os.Getenv("COMMAND")
-	if ownerKey == "" {
-		if command == "" {
-			t.Log("No command given, skipping ccip-test-script. This is intended behaviour for automated testing.")
-			t.SkipNow()
-		}
-		t.Log("Must set owner key")
-		t.FailNow()
+	if command == "" {
+		t.Log("No command given, skipping ccip-test-script. This is intended behaviour for automated testing.")
+		t.SkipNow()
 	}
 	// The seed key is used to generate 10 keys from a single key by changing the
 	// first character of the given seed with the digits 0-9
@@ -85,34 +56,6 @@ func TestCCIP(t *testing.T) {
 		t.Error("must set seed key")
 	}
 
-	runCommand(t, ownerKey, seedKey, command)
-}
-
-// TestPrintNodeBalances can be run as a test with the following config
-// OWNER_KEY  private key used to deploy all contracts and is used as default in all single user tests.
-func TestPrintNodeBalances(t *testing.T) {
-	ownerKey := os.Getenv("OWNER_KEY")
-	if ownerKey == "" {
-		t.Log("No command given, skipping ccip-test-script. This is intended behaviour for automated testing.")
-		t.SkipNow()
-	}
-
-	SOURCE.SetupChain(t, ownerKey)
-	DESTINATION.SetupChain(t, ownerKey)
-
-	don := dione.NewOfflineDON(ENV, logger.TestLogger(t))
-
-	var sourceKeys, destKeys []common.Address
-
-	for _, node := range don.Config.Nodes {
-		sourceKeys = append(sourceKeys, common.HexToAddress(node.EthKeys[SOURCE.ChainConfig.ChainId.String()]))
-		destKeys = append(destKeys, common.HexToAddress(node.EthKeys[DESTINATION.ChainConfig.ChainId.String()]))
-	}
-	printing.PrintNodeBalances(&SOURCE, sourceKeys)
-	printing.PrintNodeBalances(&DESTINATION, destKeys)
-}
-
-func runCommand(t *testing.T, ownerKey string, seedKey string, command string) {
 	// Configures a client to run tests with using the network defaults and given keys.
 	// After updating any contracts be sure to update the network defaults to reflect
 	// those changes.
@@ -122,12 +65,6 @@ func runCommand(t *testing.T, ownerKey string, seedKey string, command string) {
 		ownerKey,
 		seedKey,
 	)
-
-	SOURCE.SetupChain(t, ownerKey)
-	DESTINATION.SetupChain(t, ownerKey)
-
-	// Auto unpauses all contracts if they're paused.
-	//client.UnpauseAll()
 
 	switch command {
 	// Deploys a new set of PingPong contracts, configures them to talk to each other
@@ -161,15 +98,6 @@ func runCommand(t *testing.T, ownerKey string, seedKey string, command string) {
 	case "batching":
 		// Submit 10 txs. This should result in the txs being batched together
 		client.ScalingAndBatching(t)
-	case "exceedBucket":
-		// Should not be able to send funds greater than the amount in the bucket
-		client.NotEnoughFundsInBucketShouldFail(t)
-	case "tryPausedPool":
-		// Should fail because the pool is paused
-		client.TryGetTokensFromPausedPool()
-	case "tryPausedOnramp":
-		// Should not succeed because the onramp is paused
-		client.CrossChainSendPausedOnrampShouldFail(t)
 	case "acceptOwnership":
 		// Should accept ownership on the destination chain OffRamp & Executor
 		client.AcceptOwnership(t)
@@ -185,4 +113,27 @@ func runCommand(t *testing.T, ownerKey string, seedKey string, command string) {
 	default:
 		t.Errorf("Unknown command \"%s\"", command)
 	}
+}
+
+// TestPrintNodeBalances can be run as a test with the following config
+// OWNER_KEY  private key used to deploy all contracts and is used as default in all single user tests.
+func TestPrintNodeBalances(t *testing.T) {
+	checkOwnerKeyAndSetupChain(t)
+
+	don := dione.NewOfflineDON(ENV, logger.TestLogger(t))
+
+	printing.PrintNodeBalances(&SOURCE, don.GetSendingKeys(SOURCE.ChainConfig.ChainId))
+	printing.PrintNodeBalances(&DESTINATION, don.GetSendingKeys(DESTINATION.ChainConfig.ChainId))
+}
+
+func checkOwnerKeyAndSetupChain(t *testing.T) string {
+	ownerKey := os.Getenv("OWNER_KEY")
+	if ownerKey == "" {
+		t.Log("No key given, this test will be skipped. This is intended behaviour for automated testing.")
+		t.SkipNow()
+	}
+	SOURCE.SetupChain(t, ownerKey)
+	DESTINATION.SetupChain(t, ownerKey)
+
+	return ownerKey
 }

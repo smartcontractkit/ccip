@@ -29,13 +29,7 @@ import (
 // DeploySubscriptionContracts will deploy all source and Destination chain contracts using the
 // owner key. Only run this of the currently deployed contracts are outdated or
 // when initializing a new chain.
-func DeploySubscriptionContracts(t *testing.T, ownerKey string, sourceChain *EvmDeploymentConfig, destChain *EvmDeploymentConfig) {
-	sourceChain.SetupChain(t, ownerKey)
-	destChain.SetupChain(t, ownerKey)
-	deploySourceAndDestContracts(t, sourceChain, destChain)
-}
-
-func deploySourceAndDestContracts(t *testing.T, source *EvmDeploymentConfig, destination *EvmDeploymentConfig) {
+func DeploySubscriptionContracts(t *testing.T, source *EvmDeploymentConfig, destination *EvmDeploymentConfig) {
 	// After running this code please update the configuration to reflect the newly
 	// deployed contract addresses.
 	deploySourceContracts(t, source, destination.ChainConfig.ChainId)
@@ -167,16 +161,22 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId *big.In
 		return onRamp
 	}
 
-	client.Logger.Infof("Deploying OnRamp: destinationChains %+v, bridgeTokens %+v, poolAddresses %+v", destChainId, client.ChainConfig.BridgeTokens, client.ChainConfig.TokenPools)
+	var bridgeTokens, tokenPools []common.Address
+	for token, tokenConfig := range client.ChainConfig.SupportedTokens {
+		bridgeTokens = append(bridgeTokens, token)
+		tokenPools = append(tokenPools, tokenConfig.Pool)
+	}
+
+	client.Logger.Infof("Deploying OnRamp: destinationChains %+v, bridgeTokens %+v, poolAddresses %+v", destChainId, bridgeTokens, tokenPools)
 	onRampAddress, tx, _, err := evm_2_evm_subscription_onramp.DeployEVM2EVMSubscriptionOnRamp(
-		client.Owner,                    // user
-		client.Client,                   // client
-		client.ChainConfig.ChainId,      // source chain id
-		destChainId,                     // destinationChainId
-		client.ChainConfig.BridgeTokens, // tokens
-		client.ChainConfig.TokenPools,   // pools
-		[]common.Address{},              // allow list
-		client.ChainConfig.Afn,          // AFN
+		client.Owner,               // user
+		client.Client,              // client
+		client.ChainConfig.ChainId, // source chain id
+		destChainId,                // destinationChainId
+		bridgeTokens,               // tokens
+		tokenPools,                 // pools
+		[]common.Address{},         // allow list
+		client.ChainConfig.Afn,     // AFN
 		evm_2_evm_subscription_onramp.BaseOnRampInterfaceOnRampConfig{
 			RelayingFeeJuels: 0,
 			MaxDataSize:      1e6,
@@ -215,6 +215,13 @@ func deployOffRamp(t *testing.T, destClient *EvmDeploymentConfig, sourceClient *
 		require.NoError(t, err)
 		return offRamp
 	}
+	var sourceTokens, tokenPools []common.Address
+	for _, tokenConfig := range destClient.ChainConfig.SupportedTokens {
+		tokenPools = append(tokenPools, tokenConfig.Pool)
+	}
+	for token := range sourceClient.ChainConfig.SupportedTokens {
+		sourceTokens = append(sourceTokens, token)
+	}
 
 	destClient.Logger.Infof("Deploying OffRamp")
 	offRampAddress, tx, _, err := any_2_evm_free_offramp.DeployEVM2EVMFreeOffRamp(
@@ -231,8 +238,8 @@ func deployOffRamp(t *testing.T, destClient *EvmDeploymentConfig, sourceClient *
 		},
 		destClient.LaneConfig.BlobVerifier,
 		destClient.ChainConfig.Afn,
-		sourceClient.ChainConfig.BridgeTokens,
-		destClient.ChainConfig.TokenPools,
+		sourceTokens,
+		tokenPools,
 		any_2_evm_free_offramp.AggregateRateLimiterInterfaceRateLimiterConfig{
 			Capacity: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 			Rate:     new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
@@ -340,12 +347,11 @@ func deployReceiverDapp(t *testing.T, destClient *EvmDeploymentConfig) *receiver
 
 func deployNativeTokenPool(t *testing.T, client *EvmDeploymentConfig) []*native_token_pool.NativeTokenPool {
 	var pools []*native_token_pool.NativeTokenPool
-	var poolAddresses []common.Address
 
-	for i, bridgeToken := range client.ChainConfig.BridgeTokens {
+	for token, tokenConfig := range client.ChainConfig.SupportedTokens {
 		if client.DeploySettings.DeployTokenPools {
-			client.Logger.Infof("Deploying token pool for token %s", bridgeToken.Hex())
-			tokenPoolAddress, tx, _, err := native_token_pool.DeployNativeTokenPool(client.Owner, client.Client, bridgeToken)
+			client.Logger.Infof("Deploying token pool for token %s", token.Hex())
+			tokenPoolAddress, tx, _, err := native_token_pool.DeployNativeTokenPool(client.Owner, client.Client, token)
 			require.NoError(t, err)
 			shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 			client.Logger.Infof("Native token pool deployed on %s in tx %s", tokenPoolAddress, helpers.ExplorerLink(client.ChainConfig.ChainId.Int64(), tx.Hash()))
@@ -353,20 +359,21 @@ func deployNativeTokenPool(t *testing.T, client *EvmDeploymentConfig) []*native_
 			require.NoError(t, err)
 			fillPoolWithTokens(t, client, pool)
 			pools = append(pools, pool)
-			poolAddresses = append(poolAddresses, tokenPoolAddress)
+			client.ChainConfig.SupportedTokens[token] = EVMBridgedToken{
+				Pool:  tokenPoolAddress,
+				Price: big.NewInt(1),
+			}
 		} else {
-			if client.ChainConfig.TokenPools[i].Hex() == "0x0000000000000000000000000000000000000000" {
+			if tokenConfig.Pool.Hex() == "0x0000000000000000000000000000000000000000" {
 				t.Error("deploy new lock unlock pool set to false but no lock unlock pool given in config")
 			}
-			pool, err := native_token_pool.NewNativeTokenPool(client.ChainConfig.TokenPools[i], client.Client)
+			pool, err := native_token_pool.NewNativeTokenPool(tokenConfig.Pool, client.Client)
 			require.NoError(t, err)
 			client.Logger.Infof("Lock unlock pool loaded from: %s", pool.Address().Hex())
 			pools = append(pools, pool)
-			poolAddresses = append(poolAddresses, client.ChainConfig.TokenPools[i])
 		}
 	}
 
-	client.ChainConfig.TokenPools = poolAddresses
 	return pools
 }
 

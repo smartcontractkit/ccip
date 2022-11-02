@@ -55,6 +55,12 @@ func (don *OfflineDON) GenerateOracleIdentities(chain string) []confighelper2.Or
 	return oracles
 }
 
+func (don *OfflineDON) GetSendingKeys(chain *big.Int) (keys []gethcommon.Address) {
+	for _, node := range don.Config.Nodes {
+		keys = append(keys, gethcommon.HexToAddress(node.EthKeys[chain.String()]))
+	}
+	return
+}
 func (don *OfflineDON) FundNodeKeys(chainConfig rhea.EvmDeploymentConfig, ownerPrivKey string, amount *big.Int) {
 	nonce, err := chainConfig.Client.PendingNonceAt(context.Background(), chainConfig.Owner.From)
 	helpers.PanicErr(err)
