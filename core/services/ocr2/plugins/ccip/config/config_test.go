@@ -3,12 +3,53 @@ package config
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink/core/store/models"
 )
 
-func TestConfig(t *testing.T) {
-	c := RelayPluginConfig{}
-	require.NoError(t, json.Unmarshal([]byte(`{"sourceChainID":1}`), &c))
-	t.Log(c)
+func TestRelayConfig(t *testing.T) {
+	exampleConfig := RelayPluginConfig{
+		SourceChainID:       1337,
+		DestChainID:         7331,
+		SourceStartBlock:    222,
+		DestStartBlock:      333,
+		OnRampIDs:           []string{"0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B", "0xC79b96044906550A5652BCf20a6EA02f139B9Ae5"},
+		PollPeriod:          models.MustMakeDuration(5 * time.Second),
+		InflightCacheExpiry: 23456,
+	}
+
+	bts, err := json.Marshal(exampleConfig)
+	require.NoError(t, err)
+
+	parsedConfig := RelayPluginConfig{}
+	require.NoError(t, json.Unmarshal(bts, &parsedConfig))
+
+	require.Equal(t, exampleConfig, parsedConfig)
+	require.NoError(t, parsedConfig.ValidateRelayPluginConfig())
+}
+
+func TestExecutionConfig(t *testing.T) {
+	exampleConfig := ExecutionPluginConfig{
+		SourceChainID:            1337,
+		DestChainID:              7331,
+		OnRampID:                 "0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B",
+		BlobVerifierID:           "0xC79b96044906550A5652BCf20a6EA02f139B9Ae5",
+		SourceStartBlock:         222,
+		DestStartBlock:           333,
+		TokensPerFeeCoinPipeline: `merge [type=merge left="{}" right="{\"0xC79b96044906550A5652BCf20a6EA02f139B9Ae5\":\"1000000000000000000\"}"];`,
+		InflightCacheExpiry:      64,
+		RootSnoozeTime:           128,
+	}
+
+	bts, err := json.Marshal(exampleConfig)
+	require.NoError(t, err)
+
+	parsedConfig := ExecutionPluginConfig{}
+	require.NoError(t, json.Unmarshal(bts, &parsedConfig))
+
+	require.Equal(t, exampleConfig, parsedConfig)
+	require.NoError(t, parsedConfig.ValidateExecutionPluginConfig())
 }

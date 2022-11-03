@@ -16,11 +16,11 @@ import (
 )
 
 const (
-	PERMISSIONLESS_EXECUTION_THRESHOLD_SECONDS = 7 * 24 * 60 * 60
-	EVM_ADDRESS_LENGTH_BYTES                   = 20
-	EVM_WORD_BYTES                             = 32
-	CALLDATA_GAS_PER_BYTE                      = 16
-	PER_TOKEN_OVERHEAD_GAS                     = (2_100 + // COLD_SLOAD_COST for first reading the pool
+	PERMISSIONLESS_EXECUTION_THRESHOLD = 7 * 24 * time.Hour
+	EVM_ADDRESS_LENGTH_BYTES           = 20
+	EVM_WORD_BYTES                     = 32
+	CALLDATA_GAS_PER_BYTE              = 16
+	PER_TOKEN_OVERHEAD_GAS             = (2_100 + // COLD_SLOAD_COST for first reading the pool
 		2_100 + // COLD_SLOAD_COST for pool to ensure allowed offramp calls it
 		2_100 + // COLD_SLOAD_COST for accessing pool balance slot
 		5_000 + // SSTORE_RESET_GAS for decreasing pool balance from non-zero to non-zero
@@ -60,8 +60,7 @@ type ExecutionBatchBuilder struct {
 	lggr                       logger.Logger
 }
 
-func NewExecutionBatchBuilder(gasLimit uint64, snoozeTime time.Duration, blobVerifier *blob_verifier.BlobVerifier,
-	onRamp, offRampAddr common.Address, srcLogPoller, dstLogPoller logpoller.LogPoller, builder BatchBuilder, config OffchainConfig, offRamp OffRamp, reqEventSig common.Hash, lggr logger.Logger) *ExecutionBatchBuilder {
+func NewExecutionBatchBuilder(gasLimit uint64, snoozeTime time.Duration, blobVerifier *blob_verifier.BlobVerifier, onRamp, offRampAddr common.Address, srcLogPoller, dstLogPoller logpoller.LogPoller, builder BatchBuilder, config OffchainConfig, offRamp OffRamp, reqEventSig common.Hash, lggr logger.Logger) *ExecutionBatchBuilder {
 	return &ExecutionBatchBuilder{
 		gasLimit:     gasLimit,
 		snoozeTime:   snoozeTime,
@@ -115,7 +114,7 @@ func (eb *ExecutionBatchBuilder) relayedReport(seqNr uint64) (blob_verifier.CCIP
 }
 
 func (eb *ExecutionBatchBuilder) getUnexpiredRelayReports() ([]blob_verifier.CCIPRelayReport, error) {
-	logs, err := eb.dstLogPoller.LogsCreatedAfter(ReportAccepted, eb.blobVerifier.Address(), time.Now().Add(-PERMISSIONLESS_EXECUTION_THRESHOLD_SECONDS*time.Second))
+	logs, err := eb.dstLogPoller.LogsCreatedAfter(ReportAccepted, eb.blobVerifier.Address(), time.Now().Add(-PERMISSIONLESS_EXECUTION_THRESHOLD))
 	if err != nil {
 		return nil, err
 	}
@@ -245,7 +244,7 @@ func (eb *ExecutionBatchBuilder) getExecutableSeqNrs(
 		// so it will never be considered again.
 		if allMessagesExecuted {
 			eb.lggr.Infof("Snoozing root %s forever since there are no executable txs anymore", hex.EncodeToString(unexpiredReport.MerkleRoots[idx][:]))
-			eb.snoozedRoots[unexpiredReport.MerkleRoots[idx]] = time.Now().Add(PERMISSIONLESS_EXECUTION_THRESHOLD_SECONDS * time.Second)
+			eb.snoozedRoots[unexpiredReport.MerkleRoots[idx]] = time.Now().Add(PERMISSIONLESS_EXECUTION_THRESHOLD)
 			continue
 		}
 		if len(batch) != 0 {

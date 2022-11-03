@@ -31,14 +31,12 @@ const (
 )
 
 const (
-	BatchGasLimit                   = 4_000_000 // TODO: think if a good value for this
-	RootSnoozeTime                  = 10 * time.Minute
-	ExecutionMaxInflightTimeSeconds = 180
-	MaxPayloadLength                = 1000
-	MaxTokensPerMessage             = 5
-	MaxExecutionReportLength        = 150_000 // TODO
-	MaxGasPrice                     = 200e9   // 200 gwei. TODO: probably want this to be some dynamic value, a multiplier of the current gas price.
-	TokenPriceBufferPercent         = 10      // Amount that the leader adds as a token price buffer in Query.
+	BatchGasLimit            = 4_000_000 // TODO: think if a good value for this
+	MaxPayloadLength         = 1000
+	MaxTokensPerMessage      = 5
+	MaxExecutionReportLength = 150_000 // TODO
+	MaxGasPrice              = 200e9   // 200 gwei. TODO: probably want this to be some dynamic value, a multiplier of the current gas price.
+	TokenPriceBufferPercent  = 10      // Amount that the leader adds as a token price buffer in Query.
 )
 
 var (
@@ -140,6 +138,8 @@ type ExecutionReportingPluginFactory struct {
 	reqEventSig         common.Hash
 	priceGetter         PriceGetter
 	onRampToHasher      map[common.Address]LeafHasher[[32]byte]
+	rootSnoozeTime      time.Duration
+	inflightCacheExpiry time.Duration
 }
 
 func NewExecutionReportingPluginFactory(
@@ -154,9 +154,11 @@ func NewExecutionReportingPluginFactory(
 	reqEventSig common.Hash,
 	priceGetter PriceGetter,
 	onRampToHasher map[common.Address]LeafHasher[[32]byte],
+	rootSnoozeTime time.Duration,
+	inflightCacheExpiry time.Duration,
 ) types.ReportingPluginFactory {
 	return &ExecutionReportingPluginFactory{lggr: lggr, onRamp: onRamp, blobVerifier: blobVerifier, offRamp: offRamp, source: source, dest: dest, offRampAddr: offRampAddr, builder: builder,
-		onRampSeqParser: onRampSeqParser, reqEventSig: reqEventSig, priceGetter: priceGetter, onRampToHasher: onRampToHasher}
+		onRampSeqParser: onRampSeqParser, reqEventSig: reqEventSig, priceGetter: priceGetter, onRampToHasher: onRampToHasher, rootSnoozeTime: rootSnoozeTime, inflightCacheExpiry: inflightCacheExpiry}
 }
 
 func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.ReportingPluginConfig) (types.ReportingPlugin, types.ReportingPluginInfo, error) {
@@ -176,7 +178,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			offchainConfig: offchainConfig,
 			builder: NewExecutionBatchBuilder(
 				BatchGasLimit,
-				RootSnoozeTime,
+				rf.rootSnoozeTime,
 				rf.blobVerifier,
 				rf.onRamp,
 				rf.offRampAddr,
@@ -187,10 +189,11 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 				rf.offRamp,
 				rf.reqEventSig,
 				rf.lggr),
-			onRampSeqParser: rf.onRampSeqParser,
-			reqEventSig:     rf.reqEventSig,
-			priceGetter:     rf.priceGetter,
-			onRampToHasher:  rf.onRampToHasher,
+			onRampSeqParser:     rf.onRampSeqParser,
+			reqEventSig:         rf.reqEventSig,
+			priceGetter:         rf.priceGetter,
+			onRampToHasher:      rf.onRampToHasher,
+			inflightCacheExpiry: rf.inflightCacheExpiry,
 		}, types.ReportingPluginInfo{
 			Name:          "CCIPExecution",
 			UniqueReports: true,
@@ -213,14 +216,15 @@ type ExecutionReportingPlugin struct {
 	// We need to synchronize access to the inflight structure
 	// as reporting plugin methods may be called from separate goroutines,
 	// e.g. reporting vs transmission protocol.
-	inFlightMu      sync.RWMutex
-	inFlight        []InflightExecutionReport
-	offchainConfig  OffchainConfig
-	builder         *ExecutionBatchBuilder
-	onRampSeqParser func(log logpoller.Log) (uint64, error)
-	reqEventSig     common.Hash
-	priceGetter     PriceGetter
-	onRampToHasher  map[common.Address]LeafHasher[[32]byte]
+	inFlightMu          sync.RWMutex
+	inFlight            []InflightExecutionReport
+	inflightCacheExpiry time.Duration
+	offchainConfig      OffchainConfig
+	builder             *ExecutionBatchBuilder
+	onRampSeqParser     func(log logpoller.Log) (uint64, error)
+	reqEventSig         common.Hash
+	priceGetter         PriceGetter
+	onRampToHasher      map[common.Address]LeafHasher[[32]byte]
 }
 
 type InflightExecutionReport struct {
@@ -538,7 +542,7 @@ func (r *ExecutionReportingPlugin) updateInFlight(lggr logger.Logger, er any_2_e
 		if report.report.SequenceNumbers[0] == er.SequenceNumbers[0] {
 			return errors.Errorf("report is already in flight")
 		}
-		if time.Since(report.createdAt) < ExecutionMaxInflightTimeSeconds {
+		if time.Since(report.createdAt) < r.inflightCacheExpiry {
 			stillInFlight = append(stillInFlight, report)
 		} else {
 			lggr.Warnw("Inflight report expired, retrying", "min", report.report.SequenceNumbers[0], "max", report.report.SequenceNumbers[len(report.report.SequenceNumbers)-1])

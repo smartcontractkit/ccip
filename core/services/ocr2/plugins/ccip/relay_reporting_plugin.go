@@ -17,10 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
 )
 
-const (
-	RelayMaxInflightTimeSeconds = 180
-	MaxRelayReportLength        = 1000 // TODO: Need to rethink this based on root of roots report.
-)
+const MaxRelayReportLength = 1000 // TODO: Need to rethink this based on root of roots report.
 
 var (
 	_ types.ReportingPluginFactory = &RelayReportingPluginFactory{}
@@ -102,6 +99,7 @@ type RelayReportingPluginFactory struct {
 	onRamps             []common.Address
 	blobVerifier        *blob_verifier.BlobVerifier
 	onRampToHasher      map[common.Address]LeafHasher[[32]byte]
+	inflightCacheExpiry time.Duration
 }
 
 // NewRelayReportingPluginFactory return a new RelayReportingPluginFactory.
@@ -113,8 +111,9 @@ func NewRelayReportingPluginFactory(
 	onRampToReqEventSig map[common.Address]common.Hash,
 	onRamps []common.Address,
 	onRampToHasher map[common.Address]LeafHasher[[32]byte],
+	inflightCacheExpiry time.Duration,
 ) types.ReportingPluginFactory {
-	return &RelayReportingPluginFactory{lggr: lggr, blobVerifier: blobVerifier, onRampToReqEventSig: onRampToReqEventSig, onRampSeqParsers: onRampSeqParsers, onRamps: onRamps, source: source, onRampToHasher: onRampToHasher}
+	return &RelayReportingPluginFactory{lggr: lggr, blobVerifier: blobVerifier, onRampToReqEventSig: onRampToReqEventSig, onRampSeqParsers: onRampSeqParsers, onRamps: onRamps, source: source, onRampToHasher: onRampToHasher, inflightCacheExpiry: inflightCacheExpiry}
 }
 
 // NewReportingPlugin returns the ccip RelayReportingPlugin and satisfies the ReportingPluginFactory interface.
@@ -134,6 +133,7 @@ func (rf *RelayReportingPluginFactory) NewReportingPlugin(config types.Reporting
 			inFlight:            make(map[[32]byte]InflightReport),
 			offchainConfig:      offchainConfig,
 			onRampToHasher:      rf.onRampToHasher,
+			inflightCacheExpiry: rf.inflightCacheExpiry,
 		},
 		types.ReportingPluginInfo{
 			Name:          "CCIPRelay",
@@ -157,10 +157,11 @@ type RelayReportingPlugin struct {
 	// We need to synchronize access to the inflight structure
 	// as reporting plugin methods may be called from separate goroutines,
 	// e.g. reporting vs transmission protocol.
-	inFlightMu     sync.RWMutex
-	inFlight       map[[32]byte]InflightReport
-	offchainConfig OffchainConfig
-	onRampToHasher map[common.Address]LeafHasher[[32]byte]
+	inFlightMu          sync.RWMutex
+	inFlight            map[[32]byte]InflightReport
+	offchainConfig      OffchainConfig
+	onRampToHasher      map[common.Address]LeafHasher[[32]byte]
+	inflightCacheExpiry time.Duration
 }
 
 func (r *RelayReportingPlugin) nextMinSeqNumForOffRamp(onRamp common.Address) (uint64, error) {
@@ -371,7 +372,7 @@ func (r *RelayReportingPlugin) updateInflight(lggr logger.Logger, report *blob_v
 	defer r.inFlightMu.Unlock()
 	// Reap any expired entries from inflight.
 	for root, inFlightReport := range r.inFlight {
-		if time.Since(inFlightReport.createdAt) > RelayMaxInflightTimeSeconds {
+		if time.Since(inFlightReport.createdAt) > r.inflightCacheExpiry {
 			lggr.Warnw("Inflight report expired, retrying")
 			delete(r.inFlight, root)
 		}

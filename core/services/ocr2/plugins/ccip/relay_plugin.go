@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"math/big"
 	"strings"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -85,6 +86,11 @@ func NewRelayServices(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm
 		return nil, errors.Wrap(err, "unable to open destination chain")
 	}
 
+	inflightCacheExpiry := DefaultInflightCacheExpiry
+	if pluginConfig.InflightCacheExpiry != 0 {
+		inflightCacheExpiry = time.Duration(pluginConfig.InflightCacheExpiry)
+	}
+
 	if !common.IsHexAddress(spec.ContractID) {
 		return nil, errors.Wrap(err, "spec.ContractID is not a valid hex address")
 	}
@@ -151,7 +157,7 @@ func NewRelayServices(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm
 			return nil, errors.Errorf("unrecognized onramp %v", onRampID)
 		}
 	}
-	argsNoPlugin.ReportingPluginFactory = NewRelayReportingPluginFactory(lggr, sourceChain.LogPoller(), blobVerifier, onRampSeqParsers, onRampToReqEventSig, onRamps, onRampToHasher)
+	argsNoPlugin.ReportingPluginFactory = NewRelayReportingPluginFactory(lggr, sourceChain.LogPoller(), blobVerifier, onRampSeqParsers, onRampToReqEventSig, onRamps, onRampToHasher, inflightCacheExpiry)
 	oracle, err := libocr2.NewOracle(argsNoPlugin)
 	if err != nil {
 		return nil, err

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -26,6 +27,11 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/pipeline"
 )
 
+const (
+	DefaultInflightCacheExpiry = 3 * time.Minute
+	DefaultRootSnoozeTime      = 10 * time.Minute
+)
+
 func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OracleArgs) ([]job.ServiceCtx, error) {
 	spec := jb.OCR2OracleSpec
 	var pluginConfig ccipconfig.ExecutionPluginConfig
@@ -39,7 +45,6 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	}
 	lggr.Infof("CCIP execution plugin initialized with offchainConfig: %+v", pluginConfig)
 	sourceChainId, destChainId := big.NewInt(0).SetUint64(pluginConfig.SourceChainID), big.NewInt(0).SetUint64(pluginConfig.DestChainID)
-
 	sourceChain, err := chainSet.Get(sourceChainId)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to open source chain")
@@ -47,6 +52,15 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	destChain, err := chainSet.Get(destChainId)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to open destination chain")
+	}
+
+	rootSnoozeTime := DefaultRootSnoozeTime
+	if pluginConfig.RootSnoozeTime != 0 {
+		rootSnoozeTime = time.Duration(pluginConfig.RootSnoozeTime)
+	}
+	inflightCacheExpiry := DefaultInflightCacheExpiry
+	if pluginConfig.InflightCacheExpiry != 0 {
+		inflightCacheExpiry = time.Duration(pluginConfig.InflightCacheExpiry)
 	}
 	if !common.IsHexAddress(spec.ContractID) {
 		return nil, errors.Wrap(err, "spec.OffRampID is not a valid hex address")
@@ -144,6 +158,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	if err2 != nil {
 		return nil, err
 	}
+
 	argsNoPlugin.ReportingPluginFactory = NewExecutionReportingPluginFactory(
 		lggr,
 		onRampAddr,
@@ -155,7 +170,9 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 		onRampSeqParser,
 		reqEventSig,
 		priceGetterObject,
-		onRampToHasher)
+		onRampToHasher,
+		rootSnoozeTime,
+		inflightCacheExpiry)
 	oracle, err := libocr2.NewOracle(argsNoPlugin)
 	if err != nil {
 		return nil, err

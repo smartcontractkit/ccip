@@ -12,11 +12,12 @@ import (
 // We use ID here to keep it as general as possible, e.g. abstracting for chains which don't have an address concept.
 type RelayPluginConfig struct {
 	SourceChainID                    uint64 `json:"sourceChainID"`
-	SourceStartBlock, DestStartBlock int64  // Only for first time job add.
 	DestChainID                      uint64 `json:"destChainID"`
+	SourceStartBlock, DestStartBlock int64  // Only for first time job add.
 	// We relay from multiple onramps from the same source chain. E.g. different message types.
-	OnRampIDs  []string        `json:"onRampIDs"`
-	PollPeriod models.Duration `json:"pollPeriod"`
+	OnRampIDs           []string        `json:"onRampIDs"`
+	PollPeriod          models.Duration `json:"pollPeriod"`
+	InflightCacheExpiry uint32          `json:"inflightCacheExpiry"`
 }
 
 // ValidateRelayPluginConfig validates the arguments for the CCIP Relay plugin.
@@ -38,11 +39,12 @@ type ExecutionPluginConfig struct {
 	SourceChainID uint64 `json:"sourceChainID"`
 	DestChainID   uint64 `json:"destChainID"`
 	// We execute for a single on/offramp pair (lane) between a given source/dest chain. E.g. a single message types.
-	OnRampID string `json:"onRampID"`
-	// BlobVerifierID
+	OnRampID                         string `json:"onRampID"`
 	BlobVerifierID                   string `json:"blobVerifierID"`
 	SourceStartBlock, DestStartBlock int64  // Only for first time job add.
 	TokensPerFeeCoinPipeline         string `json:"tokensPerFeeCoinPipeline"`
+	InflightCacheExpiry              uint32 `json:"inflightCacheExpiry"`
+	RootSnoozeTime                   uint32 `json:"rootSnoozeTime"`
 }
 
 // ValidateExecutionPluginConfig validates the arguments for the CCIP Execution plugin.
