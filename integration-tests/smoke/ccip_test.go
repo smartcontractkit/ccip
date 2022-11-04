@@ -72,7 +72,7 @@ func TestPrintRevertReason(t *testing.T) {
 var _ = Describe("CCIP interactions test @ccip", func() {
 	var (
 		diffNetworkEntries = []TableEntry{
-			Entry("CCIP suite on 2 Geths @simulated", networks.NetworkAlpha, networks.NetworkBeta),
+			Entry("CCIP suite on 2 Geths @simulated", networks.SimulatedEVMNonDev1, networks.SimulatedEVMNonDev2),
 		}
 		sourceChainClient blockchain.EVMClient
 		testEnvironment   *environment.Environment
