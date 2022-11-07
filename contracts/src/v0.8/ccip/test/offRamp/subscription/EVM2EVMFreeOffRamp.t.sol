@@ -268,15 +268,6 @@ contract EVM2EVMFreeOffRamp_execute is EVM2EVMFreeOffRampSetup {
     vm.clearMockedCalls();
   }
 
-  function testNotNextInSequenceReverts() public {
-    CCIP.EVM2EVMSubscriptionMessage[] memory messages = _generateBasicMessages();
-    messages[0].nonce = 100;
-
-    vm.expectRevert(abi.encodeWithSelector(BaseOffRampInterface.IncorrectNonce.selector, messages[0].nonce));
-
-    s_offRamp.execute(_generateReportFromMessages(messages), false);
-  }
-
   function testUnsupportedTokenReverts() public {
     CCIP.EVM2EVMSubscriptionMessage[] memory messages = _generateMessagesWithTokens();
     address unknownToken = address(50);
