@@ -229,10 +229,10 @@ func (c *CCIPContracts) EnableTollOffRamp() {
 func (c *CCIPContracts) DeployNewTollOnRamp() {
 	c.t.Log("Deploying new toll onRamp")
 	onRampAddress, _, _, err := evm_2_evm_toll_onramp.DeployEVM2EVMTollOnRamp(
-		c.SourceUser,                                  // user
-		c.SourceChain,                                 // client
-		c.SourceChainID,                               // source chain id
-		c.DestChainID,                                 // destinationChainIds
+		c.SourceUser,    // user
+		c.SourceChain,   // client
+		c.SourceChainID, // source chain id
+		c.DestChainID,   // destinationChainIds
 		[]common.Address{c.SourceLinkToken.Address()}, // tokens
 		[]common.Address{c.SourcePool.Address()},      // pools
 		[]common.Address{},                            // allow list
@@ -241,7 +241,7 @@ func (c *CCIPContracts) DeployNewTollOnRamp() {
 			RelayingFeeJuels: 0,
 			MaxDataSize:      1e12,
 			MaxTokensLength:  5,
-			MaxGasLimit:      ccip.BatchGasLimit,
+			MaxGasLimit:      ccip.GasLimitPerTx,
 		},
 		evm_2_evm_toll_onramp.AggregateRateLimiterInterfaceRateLimiterConfig{
 			Capacity: HundredLink,
@@ -513,7 +513,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 			RelayingFeeJuels: 0,
 			MaxDataSize:      1e12,
 			MaxTokensLength:  5,
-			MaxGasLimit:      ccip.BatchGasLimit,
+			MaxGasLimit:      ccip.GasLimitPerTx,
 		},
 		evm_2_evm_toll_onramp.AggregateRateLimiterInterfaceRateLimiterConfig{
 			Capacity: HundredLink,
@@ -633,7 +633,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 			RelayingFeeJuels: 0,
 			MaxDataSize:      1e12,
 			MaxTokensLength:  5,
-			MaxGasLimit:      ccip.BatchGasLimit,
+			MaxGasLimit:      ccip.GasLimitPerTx,
 		},
 		evm_2_evm_subscription_onramp.AggregateRateLimiterInterfaceRateLimiterConfig{
 			Capacity: HundredLink,

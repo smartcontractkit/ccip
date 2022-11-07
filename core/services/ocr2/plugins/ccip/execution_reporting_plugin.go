@@ -32,6 +32,7 @@ const (
 
 const (
 	BatchGasLimit            = 5_000_000 // TODO: think if a good value for this
+	GasLimitPerTx            = BatchGasLimit - 1_000_000 // Leave a buffer for overhead.
 	MaxPayloadLength         = 1000
 	MaxTokensPerMessage      = 5
 	MaxExecutionReportLength = 150_000 // TODO
