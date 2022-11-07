@@ -171,3 +171,52 @@ var Prod_AvaxFujiToGoerli = rhea.EvmDeploymentConfig{
 		DeployedAt:           14800337,
 	},
 }
+
+var Prod_OptimismGoerlitoAvaxFuji = rhea.EvmDeploymentConfig{
+	ChainConfig: Prod_OptimismGoerli,
+	LaneConfig: rhea.EVMLaneConfig{
+		BlobVerifier:    gethcommon.HexToAddress("0xD9AC310783242A17e347Ee334a90B6cF3411f384"),
+		OnRamp:          gethcommon.HexToAddress("0x9853a2E16adB1a7169A42d6a8079B3bb77322E4C"),
+		TokenSender:     gethcommon.HexToAddress("0xD42be8Af3761DC2cb547B91e8c1B80067243eCFe"),
+		OffRamp:         gethcommon.HexToAddress("0x8318a45D769FcffA103163a2A5eDce9da118A191"),
+		MessageReceiver: gethcommon.HexToAddress("0x6154b0a8Ada0Da450E4226bf8772b3A1B756A152"),
+		ReceiverDapp:    gethcommon.HexToAddress("0x201D1843707764CA2F236bd69E37CCbefF0827D4"),
+		GovernanceDapp:  gethcommon.HexToAddress(""),
+		PingPongDapp:    gethcommon.HexToAddress("0x35a926bc94654627443e436Bb3D197D62821cF05"),
+	},
+	DeploySettings: rhea.DeploySettings{
+		DeployAFN:            false,
+		DeployTokenPools:     false,
+		DeployBlobVerifier:   false,
+		DeployRamp:           false,
+		DeployRouter:         false,
+		DeployGovernanceDapp: false,
+		DeployPingPongDapp:   true,
+		DeployedAt:           2331440,
+	},
+}
+
+var Prod_AvaxFujitoOptimismGoerli = rhea.EvmDeploymentConfig{
+	ChainConfig: Prod_AvaxFuji,
+	LaneConfig: rhea.EVMLaneConfig{
+		BlobVerifier:    gethcommon.HexToAddress("0x6BEcd9eb4Df6Bf59152344fBcdC7919B9f38C6Ef"),
+		OnRamp:          gethcommon.HexToAddress("0x7b109C5d657014bfbA7b5d6DD9bEF69C51CCa222"),
+		TokenSender:     gethcommon.HexToAddress("0xa75b54b29Df4d38454f7Da5B6dF2f0a6b2c16514"),
+		OffRamp:         gethcommon.HexToAddress("0x14DF449690b8FCA67E4F7C61d47A5DC97E311A00"),
+		MessageReceiver: gethcommon.HexToAddress("0x651EF69F635f5017E281C2Ee09CDd4436560C89E"),
+		ReceiverDapp:    gethcommon.HexToAddress("0x6eA3dE96a33617c3620b7c33c22656f860DDC255"),
+		GovernanceDapp:  gethcommon.HexToAddress(""),
+		PingPongDapp:    gethcommon.HexToAddress("0x1E357fc2a4AaB4Ec3382D5231F8A86E966Da3F28"),
+	},
+
+	DeploySettings: rhea.DeploySettings{
+		DeployAFN:            false,
+		DeployTokenPools:     false,
+		DeployBlobVerifier:   false,
+		DeployRamp:           false,
+		DeployRouter:         false,
+		DeployGovernanceDapp: false,
+		DeployPingPongDapp:   true,
+		DeployedAt:           15106920,
+	},
+}
