@@ -93,6 +93,10 @@ contract EVM2EVMFreeOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
       CCIP.MessageExecutionState state = getExecutionState(message.sequenceNumber);
       if (state == CCIP.MessageExecutionState.SUCCESS) revert AlreadyExecuted(message.sequenceNumber);
 
+      // Any message with a nonce that is n + 1 is allowed.
+      bool isNextInSequence = s_receiverToNonce[message.receiver] + 1 == message.nonce;
+      if (!(isNextInSequence || state == CCIP.MessageExecutionState.FAILURE)) revert IncorrectNonce(message.nonce);
+
       _isWellFormed(message);
 
       s_executedMessages[message.sequenceNumber] = CCIP.MessageExecutionState.IN_PROGRESS;
@@ -101,8 +105,7 @@ contract EVM2EVMFreeOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
       emit ExecutionStateChanged(message.sequenceNumber, newState);
 
       // Increment the nonce of the receiver if it's the next nonce in line and it was successfully executed .
-      bool isNextInSequence = s_receiverToNonce[message.receiver] + 1 == message.nonce;
-      if (isNextInSequence && newState == CCIP.MessageExecutionState.SUCCESS) {
+      if (isNextInSequence) {
         s_receiverToNonce[message.receiver]++;
       }
     }
