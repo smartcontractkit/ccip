@@ -17,7 +17,7 @@ on:
       phase_time_out:
         description: 'Max time(in minutes) to wait for individual events in ccip flow'
         required: true
-        default: 3
+        default: 5
         type: number
       send_request_per_second:
         description: 'Number of ccip-send requests to trigger per second'

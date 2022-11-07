@@ -2,7 +2,6 @@ package actions
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -26,7 +25,6 @@ import (
 	"golang.org/x/exp/slices"
 	"gopkg.in/guregu/null.v4"
 
-	"github.com/smartcontractkit/chainlink/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/blob_verifier"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_subscription_onramp_router"
@@ -39,6 +37,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/store/models"
 	"github.com/smartcontractkit/chainlink/core/utils"
 	bigmath "github.com/smartcontractkit/chainlink/core/utils/big_math"
+	networks "github.com/smartcontractkit/chainlink/integration-tests"
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts/ccip"
@@ -54,33 +53,52 @@ const (
 	ChaosGroupRelayFaulty         = "RelayMinority"          //  f number of nodes
 	ChaosGroupExecutionFaultyPlus = "ExecutionNodesMajority" // > f number of nodes
 	ChaosGroupExecutionFaulty     = "ExecutionNodesMinority" //  f number of nodes
+	RootSnoozeTime                = uint64(10 * time.Second)
+	InflightExpiry                = uint64(10 * time.Second)
 )
 
 var (
 	// TODO dynamic calculation of tollfee for multiple tokens in a msg
 
-	TollFee              = big.NewInt(0).Mul(big.NewInt(12), big.NewInt(1e18)) // "maxCharge":"10784576000000000000" for a msg with two tokens
-	UnusedFee            = big.NewInt(0).Mul(big.NewInt(11), big.NewInt(1e18)) // for a msg with two tokens
-	DefaultCCIPCLNodeEnv = map[string]interface{}{
-		"FEATURE_CCIP":                   "true",
-		"FEATURE_OFFCHAIN_REPORTING2":    "true",
-		"feature_offchain_reporting":     "false",
-		"FEATURE_LOG_POLLER":             "true",
-		"GAS_ESTIMATOR_MODE":             "FixedPrice",
-		"P2P_NETWORKING_STACK":           "V2",
-		"P2PV2_LISTEN_ADDRESSES":         "0.0.0.0:6690",
-		"P2PV2_ANNOUNCE_ADDRESSES":       "0.0.0.0:6690",
-		"P2PV2_DELTA_DIAL":               "500ms",
-		"P2PV2_DELTA_RECONCILE":          "5s",
-		"ETH_GAS_LIMIT_DEFAULT":          "5000000",
-		"ETH_LOG_POLL_INTERVAL":          "1s",
-		"p2p_listen_port":                "0",
-		"ETH_FINALITY_DEPTH":             "50",
-		"ETH_HEAD_TRACKER_HISTORY_DEPTH": "100",
-		// It is not permitted to set both ETH_URL and EVM_NODES,
-		// imposing blank values to stop getting the env variable set as default node set up in qa-charts
-		"ETH_URL":      "",
-		"ETH_CHAIN_ID": "0",
+	TollFee   = big.NewInt(0).Mul(big.NewInt(12), big.NewInt(1e18)) // "maxCharge":"10784576000000000000" for a msg with two tokens
+	UnusedFee = big.NewInt(0).Mul(big.NewInt(11), big.NewInt(1e18)) // for a msg with two tokens
+
+	sourceNetwork, destNetwork = func() (blockchain.EVMNetwork, blockchain.EVMNetwork) {
+		if len(networks.SelectedNetworks) < 3 {
+			log.Fatal().
+				Interface("SELECTED_NETWORKS", networks.SelectedNetworks).
+				Msg("Set source and destination network in index 1 & 2 of env variable SELECTED_NETWORKS")
+		}
+		log.Info().
+			Interface("Source Network", networks.SelectedNetworks[1]).
+			Interface("Destination Network", networks.SelectedNetworks[2]).
+			Msg("SELECTED_NETWORKS")
+		return *networks.SelectedNetworks[1], *networks.SelectedNetworks[2]
+	}()
+
+	DefaultCCIPCLNodeEnv = func() map[string]interface{} {
+		nodes, err := networks.DeriveEVMNodesFromNetworkSettings(sourceNetwork, destNetwork)
+		Expect(err).ShouldNot(HaveOccurred())
+		return map[string]interface{}{
+			"FEATURE_CCIP":                   "true",
+			"FEATURE_OFFCHAIN_REPORTING2":    "true",
+			"feature_offchain_reporting":     "false",
+			"FEATURE_LOG_POLLER":             "true",
+			"GAS_ESTIMATOR_MODE":             "FixedPrice",
+			"P2P_NETWORKING_STACK":           "V2",
+			"P2PV2_LISTEN_ADDRESSES":         "0.0.0.0:6690",
+			"P2PV2_ANNOUNCE_ADDRESSES":       "0.0.0.0:6690",
+			"P2PV2_DELTA_DIAL":               "500ms",
+			"P2PV2_DELTA_RECONCILE":          "5s",
+			"ETH_GAS_LIMIT_DEFAULT":          "5000000",
+			"ETH_LOG_POLL_INTERVAL":          "1s",
+			"p2p_listen_port":                "0",
+			"ETH_FINALITY_DEPTH":             "50",
+			"ETH_HEAD_TRACKER_HISTORY_DEPTH": "100",
+			"ETH_URL":                        "",
+			"ETH_CHAIN_ID":                   "0",
+			"EVM_NODES":                      nodes,
+		}
 	}
 )
 
@@ -486,7 +504,7 @@ func (destCCIP *DestCCIPModule) DeployContracts(sourceCCIP SourceCCIPModule) {
 		destTokens = append(destTokens, common.HexToAddress(token.Address()))
 		pool := destCCIP.Common.BridgeTokenPools[i]
 		pools = append(pools, pool.EthAddress)
-		err = token.Transfer(pool.Address(), ccip.HundredCoins)
+		err = token.Transfer(pool.Address(), testhelpers.Link(1000))
 		Expect(err).ShouldNot(HaveOccurred())
 	}
 	// add the fee token and feetoken price for dest
@@ -494,7 +512,7 @@ func (destCCIP *DestCCIPModule) DeployContracts(sourceCCIP SourceCCIPModule) {
 	destCCIP.Common.TokenPrices = append(destCCIP.Common.TokenPrices, big.NewInt(1))
 
 	pools = append(pools, destCCIP.Common.FeeTokenPool.EthAddress)
-	err = destCCIP.Common.FeeToken.Transfer(destCCIP.Common.FeeTokenPool.Address(), ccip.HundredCoins)
+	err = destCCIP.Common.FeeToken.Transfer(destCCIP.Common.FeeTokenPool.Address(), testhelpers.Link(1000))
 	Expect(err).ShouldNot(HaveOccurred())
 
 	// Toll
@@ -628,7 +646,7 @@ func (destCCIP *DestCCIPModule) BalanceAssertions(model BillingModel, prevBalanc
 			Address:  destCCIP.ReceiverDapp.EthAddress,
 			Getter:   destCCIP.SubscriptionBalance,
 			Expected: bigmath.Sub(prevBalances[name], subFeeDeducted).String(),
-			Within:   big.NewInt(0.1e18).String(),
+			Within:   big.NewInt(0.5e18).String(),
 		})
 	}
 	return balAssertions
@@ -714,9 +732,11 @@ type CCIPTest struct {
 	subFeeDeducted          *big.Int
 }
 
-func (c *CCIPTest) SendSubRequests(noOfRequests int) {
+func (c *CCIPTest) SendSubRequests(noOfRequests int, createSub bool) {
 	c.NumberOfSubReq = noOfRequests
-	CreateAndFundSubscription(*c.Source, *c.Dest, c.SubBalance, int64(c.NumberOfSubReq))
+	if createSub {
+		CreateAndFundSubscription(*c.Source, *c.Dest, c.SubBalance, int64(c.NumberOfSubReq))
+	}
 	var sourceTokens []common.Address
 	for i, token := range c.Source.Common.BridgeTokens {
 		sourceTokens = append(sourceTokens, common.HexToAddress(token.Address()))
@@ -953,6 +973,7 @@ func CreateOCRJobsForCCIP(
 					"pollPeriod":       `"1s"`,
 					"destStartBlock":   currentBlockOnDest,
 					"sourceStartBlock": currentBlockOnSource,
+					//	"inflightCacheExpiry": InflightExpiry, TODO enable after fix - https://smartcontract-it.atlassian.net/browse/CCIP-41
 				},
 				RelayConfig: map[string]interface{}{
 					"chainID": destChainID,
@@ -987,12 +1008,13 @@ func CreateOCRJobsForCCIP(
 					"destChainID":      destChainID,
 					"onRampID":         fmt.Sprintf("\"%s\"", onRamp),
 					"blobVerifierID":   fmt.Sprintf("\"%s\"", blobVerifier),
-					"pollPeriod":       `"1s"`,
 					"destStartBlock":   currentBlockOnDest,
 					"sourceStartBlock": currentBlockOnSource,
 					"tokensPerFeeCoinPipeline": fmt.Sprintf(`"""
 %s
 """`, tokensPerFeeCoinPipeline),
+					//	"rootSnoozeTime":      RootSnoozeTime, TODO : https://smartcontract-it.atlassian.net/browse/CCIP-41
+					//	"inflightCacheExpiry": InflightExpiry,
 				},
 				RelayConfig: map[string]interface{}{
 					"chainID": destChainID,
@@ -1110,31 +1132,12 @@ func (c CCIPTestEnv) ChaosLabel() {
 	}
 }
 
-func DeployEnvironments(sourceNetwork *blockchain.EVMNetwork, destNetwork *blockchain.EVMNetwork, envconfig *environment.Config, clProps map[string]interface{}) *environment.Environment {
-	evmNodes, err := json.Marshal([]types.NewNode{
-		{
-			Name:       "primary_0_source",
-			EVMChainID: *utils.NewBigI(sourceNetwork.ChainID),
-			WSURL:      null.StringFrom(sourceNetwork.URLs[0]),
-			HTTPURL:    null.StringFrom(sourceNetwork.HTTPURLs[0]),
-			SendOnly:   false,
-		},
-		{
-			Name:       "primary_0_dest",
-			EVMChainID: *utils.NewBigI(destNetwork.ChainID),
-			WSURL:      null.StringFrom(destNetwork.URLs[0]),
-			HTTPURL:    null.StringFrom(destNetwork.HTTPURLs[0]),
-			SendOnly:   false,
-		},
-	})
-	Expect(err).ShouldNot(HaveOccurred())
-	// update EVM_NODES
-	clEnv := clProps["env"].(map[string]interface{})
-	clEnv["EVM_NODES"] = string(evmNodes)
-	clProps["env"] = clEnv
-
+func DeployEnvironments(
+	envconfig *environment.Config,
+	clProps map[string]interface{},
+) *environment.Environment {
 	testEnvironment := environment.New(envconfig)
-	err = testEnvironment.
+	err := testEnvironment.
 		AddHelm(mockservercfg.New(nil)).
 		AddHelm(mockserver.New(nil)).
 		AddHelm(reorg.New(&reorg.Props{
@@ -1145,6 +1148,15 @@ func DeployEnvironments(sourceNetwork *blockchain.EVMNetwork, destNetwork *block
 					"genesis": map[string]interface{}{
 						"networkId": fmt.Sprint(sourceNetwork.ChainID),
 					},
+					"tx": map[string]interface{}{
+						"replicas": "1",
+					},
+					"miner": map[string]interface{}{
+						"replicas": "0",
+					},
+				},
+				"bootnode": map[string]interface{}{
+					"replicas": "1",
 				},
 			},
 		})).
@@ -1156,6 +1168,15 @@ func DeployEnvironments(sourceNetwork *blockchain.EVMNetwork, destNetwork *block
 					"genesis": map[string]interface{}{
 						"networkId": fmt.Sprint(destNetwork.ChainID),
 					},
+					"tx": map[string]interface{}{
+						"replicas": "1",
+					},
+					"miner": map[string]interface{}{
+						"replicas": "0",
+					},
+				},
+				"bootnode": map[string]interface{}{
+					"replicas": "1",
 				},
 			},
 		})).
@@ -1180,15 +1201,13 @@ func DeployEnvironments(sourceNetwork *blockchain.EVMNetwork, destNetwork *block
 }
 
 func SetUpNodesAndKeys(
-	sourceNetwork *blockchain.EVMNetwork,
-	destNetwork *blockchain.EVMNetwork,
 	testEnvironment *environment.Environment,
 	nodeFund *big.Float,
 ) CCIPTestEnv {
 	log.Info().Msg("Connecting to launched resources")
-	sourceChainClient, err := blockchain.NewEVMClient(sourceNetwork, testEnvironment)
+	sourceChainClient, err := blockchain.NewEVMClient(&sourceNetwork, testEnvironment)
 	Expect(err).ShouldNot(HaveOccurred(), "Connecting to blockchain nodes shouldn't fail")
-	destChainClient, err := blockchain.NewEVMClient(destNetwork, testEnvironment)
+	destChainClient, err := blockchain.NewEVMClient(&destNetwork, testEnvironment)
 	Expect(err).ShouldNot(HaveOccurred(), "Connecting to blockchain nodes shouldn't fail")
 
 	chainlinkNodes, err := client.ConnectChainlinkNodes(testEnvironment)
@@ -1200,15 +1219,16 @@ func SetUpNodesAndKeys(
 	sourceChainClient.ParallelTransactions(true)
 	destChainClient.ParallelTransactions(true)
 
-	log.Info().Msg("Funding Chainlink nodes for both the chains")
-	err = FundChainlinkNodesForChain(chainlinkNodes, sourceChainClient, nodeFund)
-	Expect(err).ShouldNot(HaveOccurred())
-	err = FundChainlinkNodesForChain(chainlinkNodes, destChainClient, nodeFund)
-	Expect(err).ShouldNot(HaveOccurred())
-
-	// create node keys
+	log.Info().Msg("creating node keys")
 	_, clNodes, err := client.CreateNodeKeysBundle(chainlinkNodes, "evm", destChainClient.GetChainID().String())
 	Expect(err).ShouldNot(HaveOccurred())
+
+	log.Info().Msg("Funding Chainlink nodes for both the chains")
+	err = FundChainlinkNodesAddresses(chainlinkNodes, sourceChainClient, nodeFund)
+	Expect(err).ShouldNot(HaveOccurred())
+	err = FundChainlinkNodesAddresses(chainlinkNodes, destChainClient, nodeFund)
+	Expect(err).ShouldNot(HaveOccurred())
+
 	return CCIPTestEnv{
 		MockServer:        mockServer,
 		CLNodesWithKeys:   clNodes,
@@ -1263,18 +1283,17 @@ func GetterForLinkToken(token contracts.LinkToken, addr string) func(_ common.Ad
 }
 
 func CCIPDefaultTestSetUp(
-	sourceNetwork *blockchain.EVMNetwork,
-	destNetwork *blockchain.EVMNetwork,
 	envName string,
 	clProps map[string]interface{},
 	numOfRelayNodes int,
 	relayAndExecOnSameDON bool,
 ) (*environment.Environment, *SourceCCIPModule, *DestCCIPModule, CCIPTestEnv, func()) {
-	testEnvironment := DeployEnvironments(sourceNetwork, destNetwork, &environment.Config{
-		TTL:             1 * time.Hour,
-		NamespacePrefix: envName,
-	}, clProps)
-	testSetUp := SetUpNodesAndKeys(sourceNetwork, destNetwork, testEnvironment, big.NewFloat(10))
+	testEnvironment := DeployEnvironments(
+		&environment.Config{
+			TTL:             4 * time.Hour,
+			NamespacePrefix: envName,
+		}, clProps)
+	testSetUp := SetUpNodesAndKeys(testEnvironment, big.NewFloat(10))
 	clNodes := testSetUp.CLNodesWithKeys
 	mockServer := testSetUp.MockServer
 	sourceChainClient := testSetUp.SourceChainClient
@@ -1328,10 +1347,11 @@ func CCIPDefaultTestSetUp(
 
 	// set up ocr2 config
 	SetOCRConfigs(relayNodes, execNodes, *destCCIP) // first node is the bootstrapper
+
 	tearDown := func() {
 		sourceChainClient.GasStats().PrintStats()
 		destChainClient.GasStats().PrintStats()
-		err := TeardownSuite(testEnvironment, ctfUtils.ProjectRoot, testSetUp.CLNodes, nil, sourceChainClient)
+		err := TeardownSuite(testEnvironment, ctfUtils.ProjectRoot, testSetUp.CLNodes, nil, sourceChainClient, destChainClient)
 		Expect(err).ShouldNot(HaveOccurred(), "Environment teardown shouldn't fail")
 	}
 

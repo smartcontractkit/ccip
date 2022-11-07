@@ -2,79 +2,23 @@ package smoke
 
 //revive:disable:dot-imports
 import (
-	"bytes"
-	"encoding/hex"
-	"fmt"
 	"math/big"
-	"strings"
-	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/chainlink-env/environment"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
-	"github.com/stretchr/testify/require"
-
 	ctfUtils "github.com/smartcontractkit/chainlink-testing-framework/utils"
 
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
-	networks "github.com/smartcontractkit/chainlink/integration-tests"
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 )
 
-// not for usual test run. just a utility script to decode the event from topic hash
-// remove this later
-func TestPrintEvent(t *testing.T) {
-	t.Skip()
-	//dataError := []byte("0x894882b8")
-	data, err := hex.DecodeString("4cd172fb90d81a44670b97a6e2a5a3b01417f33a809b634a5a1764e93d338e1f")
-	inputs, err := hex.DecodeString("")
-	jsonABI, err := abi.JSON(strings.NewReader(evm_2_evm_toll_onramp.EVM2EVMTollOnRampABI))
-	require.NoError(t, err, "should be able to jsonify abi")
-	for _, abiEvent := range jsonABI.Events {
-		//fmt.Println(abiEvent.ID)
-		if bytes.Equal(data[:4], abiEvent.ID.Bytes()[:4]) {
-			// Found a matching error
-			v, _ := abiEvent.Inputs.Unpack(inputs)
-			log.Info().Interface("v", v).Msg("Event Name")
-			log.Info().Str("Event", abiEvent.Name).Msg("Event Name")
-			return
-		}
-	}
-}
-
-// not for usual test run. just a utility script to decode the revert reason from error id
-// remove this later
-func TestPrintRevertReason(t *testing.T) {
-	t.Skip()
-	//dataError := []byte("0x894882b8")
-	data, err := hex.DecodeString("894882b8")
-	jsonABI, err := abi.JSON(strings.NewReader(any_2_evm_toll_offramp.EVM2EVMTollOffRampABI))
-	require.NoError(t, err, "should be able to jsonify abi")
-	for k, abiError := range jsonABI.Errors {
-		fmt.Println(abiError.ID)
-		if bytes.Equal(data[:4], abiError.ID.Bytes()[:4]) {
-			// Found a matching error
-			v, err := abiError.Unpack(data)
-			require.NoError(t, err)
-			log.Info().Interface("Error", k).Interface("args - ", v).Msg("Revert Reason")
-			fmt.Println(k, v)
-			return
-		}
-	}
-}
-
-var _ = Describe("CCIP interactions test @ccip", func() {
+var _ = Describe("CCIP interactions test @smoke-ccip", func() {
 	var (
-		diffNetworkEntries = []TableEntry{
-			Entry("CCIP suite on 2 Geths @simulated", networks.SimulatedEVMNonDev1, networks.SimulatedEVMNonDev2),
-		}
 		sourceChainClient blockchain.EVMClient
+		destChainClient   blockchain.EVMClient
 		testEnvironment   *environment.Environment
 		chainlinkNodes    []*client.Chainlink
 	)
@@ -82,33 +26,30 @@ var _ = Describe("CCIP interactions test @ccip", func() {
 	AfterEach(func() {
 		By("Tearing down the environment")
 		sourceChainClient.GasStats().PrintStats()
-		err := actions.TeardownSuite(testEnvironment, ctfUtils.ProjectRoot, chainlinkNodes, nil, sourceChainClient)
+		err := actions.TeardownSuite(testEnvironment, ctfUtils.ProjectRoot, chainlinkNodes, nil, destChainClient, sourceChainClient)
 		Expect(err).ShouldNot(HaveOccurred(), "Environment teardown shouldn't fail")
 	})
 
-	DescribeTable("CCIP suite on different EVM networks", func(
-		sourceNetwork *blockchain.EVMNetwork,
-		destNetwork *blockchain.EVMNetwork,
-	) {
+	It("Deliver message with token in toll and subscription based model", func() {
 		var (
 			sourceCCIP *actions.SourceCCIPModule
 			destCCIP   *actions.DestCCIPModule
 		)
 		By("Deploying the environment")
 		testEnvironment = actions.DeployEnvironments(
-			sourceNetwork, destNetwork, &environment.Config{NamespacePrefix: "smoke-ccip"},
+			&environment.Config{NamespacePrefix: "smoke-ccip"},
 			map[string]interface{}{
 				"replicas": "6",
-				"env":      actions.DefaultCCIPCLNodeEnv,
+				"env":      actions.DefaultCCIPCLNodeEnv(),
 			})
 
 		By("Setting up chainlink nodes")
-		testSetUp := actions.SetUpNodesAndKeys(sourceNetwork, destNetwork, testEnvironment, big.NewFloat(10))
+		testSetUp := actions.SetUpNodesAndKeys(testEnvironment, big.NewFloat(10))
 		clNodes := testSetUp.CLNodesWithKeys
 		mockServer := testSetUp.MockServer
 		chainlinkNodes = testSetUp.CLNodes
 		sourceChainClient = testSetUp.SourceChainClient
-		destChainClient := testSetUp.DestChainClient
+		destChainClient = testSetUp.DestChainClient
 
 		// transfer more than one token
 		transferAmounts := []*big.Int{big.NewInt(5e17), big.NewInt(5e17)}
@@ -158,9 +99,7 @@ var _ = Describe("CCIP interactions test @ccip", func() {
 		// initiate transfer with subscription and verify
 		By("Multiple Token transfer with subscription, watch for updated sequence numbers and events logs, " +
 			"verify receiver,sender and subscription balance pre and post transfer")
-		ccipTest.SendSubRequests(1)
+		ccipTest.SendSubRequests(1, true)
 		ccipTest.ValidateSubRequests()
-	},
-		diffNetworkEntries,
-	)
+	})
 })

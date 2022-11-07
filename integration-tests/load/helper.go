@@ -7,7 +7,6 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/client"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
@@ -33,8 +32,8 @@ func PopulateAndValidate() *loadArgs {
 	p := &loadArgs{
 		rps:         4,
 		duration:    10 * time.Minute,
-		ccipTimeout: 3 * time.Minute,
-		loadTimeOut: 10 * time.Minute,
+		ccipTimeout: 5 * time.Minute,
+		loadTimeOut: 18 * time.Minute,
 		msgType:     DataOnlyTransfer,
 	}
 	if inputRps != "" {
@@ -64,11 +63,11 @@ func PopulateAndValidate() *loadArgs {
 	return p
 }
 
-func (loadArgs *loadArgs) Setup(sourceNetwork, destNetwork *blockchain.EVMNetwork) {
-	_, source, dest, _, tearDown := actions.CCIPDefaultTestSetUp(sourceNetwork, destNetwork, "load-ccip-sim-geth",
+func (loadArgs *loadArgs) Setup() {
+	_, source, dest, _, tearDown := actions.CCIPDefaultTestSetUp("load-ccip",
 		map[string]interface{}{
 			"replicas": "6",
-			"env":      actions.DefaultCCIPCLNodeEnv,
+			"env":      actions.DefaultCCIPCLNodeEnv(),
 		}, 5, true)
 	loadArgs.envTear = tearDown
 	ccipLoad := NewCCIPLoad(source, dest, actions.SUB, loadArgs.ccipTimeout, 100000)
@@ -92,7 +91,7 @@ func (loadArgs *loadArgs) Run() {
 }
 
 func (loadArgs *loadArgs) TearDown() {
-	loadArgs.envTear()
+	defer loadArgs.envTear()
 	testFailed := ginkgo.CurrentSpecReport().Failed()
 	loadArgs.ccipLoad.PrintStats(testFailed, loadArgs.rps, loadArgs.duration.Minutes())
 }
