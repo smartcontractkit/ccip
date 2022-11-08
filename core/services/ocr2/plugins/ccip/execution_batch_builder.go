@@ -211,7 +211,6 @@ func (eb *ExecutionBatchBuilder) getExecutableSeqNrs(
 			}
 		}
 		if !found {
-			eb.lggr.Infow("onRamp not found in report skipping", "onRamp", eb.onRamp)
 			continue
 		}
 		snoozeUntil, haveSnoozed := eb.snoozedRoots[unexpiredReport.MerkleRoots[idx]]
