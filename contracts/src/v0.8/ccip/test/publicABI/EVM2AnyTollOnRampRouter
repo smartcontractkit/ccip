@@ -1,6 +1,6 @@
 {
   "acceptOwnership()": "79ba5097",
-  "ccipSend(uint256,(bytes,bytes,address[],uint256[],address,uint256,uint256))": "a26e30ed",
+  "ccipSend(uint256,(bytes,bytes,address[],uint256[],address,uint256,bytes))": "70587681",
   "getOnRamp(uint256)": "d8a98f8c",
   "isChainSupported(uint256)": "5221c1f0",
   "owner()": "8da5cb5b",

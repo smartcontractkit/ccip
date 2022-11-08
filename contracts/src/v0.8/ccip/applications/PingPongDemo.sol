@@ -10,7 +10,7 @@ interface CCIPRouterInterface {
     bytes data;
     IERC20[] tokens;
     uint256[] amounts;
-    uint256 gasLimit;
+    bytes extraArgs;
   }
 
   function ccipSend(uint256 destinationChainId, Message memory message) external returns (uint64);
@@ -72,7 +72,7 @@ contract PingPongDemo is CCIPReceiverInterface, OwnerIsCreator {
       data: data,
       tokens: new IERC20[](0),
       amounts: new uint256[](0),
-      gasLimit: 200_000
+      extraArgs: _toBytes(EVMExtraArgsV1({gasLimit: 200_000}))
     });
     s_sendingRouter.ccipSend(s_counterpartChainId, message);
   }
@@ -87,6 +87,16 @@ contract PingPongDemo is CCIPReceiverInterface, OwnerIsCreator {
   /////////////////////////////////////////////////////////////////////
   // Plumbing
   /////////////////////////////////////////////////////////////////////
+
+  struct EVMExtraArgsV1 {
+    uint256 gasLimit;
+  }
+
+  bytes4 public constant EVM_EXTRA_ARGS_V1_TAG = 0x97a657c9;
+
+  function _toBytes(EVMExtraArgsV1 memory extraArgs) internal pure returns (bytes memory bts) {
+    return bytes.concat(EVM_EXTRA_ARGS_V1_TAG,  abi.encode(extraArgs.gasLimit));
+  }
 
   function setRouters(CCIPRouterInterface receivingRouter, CCIPRouterInterface sendingRouter) external onlyOwner {
     s_receivingRouter = receivingRouter;

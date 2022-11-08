@@ -32,6 +32,8 @@ contract EVM2EVMTollOnRamp_constructor is EVM2EVMTollOnRampSetup {
 
 /// @notice #forwardFromRouter
 contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
+  using CCIP for CCIP.EVMExtraArgsV1;
+
   function setUp() public virtual override {
     EVM2EVMTollOnRampSetup.setUp();
 
@@ -188,7 +190,7 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
   // Asserts gasLimit must be <=maxGasLimit
   function testMessageGasLimitTooHighReverts() public {
     CCIP.EVM2AnyTollMessage memory message = _generateEmptyMessage();
-    message.gasLimit = MAX_GAS_LIMIT + 1;
+    message.extraArgs = CCIP.EVMExtraArgsV1({gasLimit: MAX_GAS_LIMIT + 1})._toBytes();
     vm.expectRevert(abi.encodeWithSelector(BaseOnRampInterface.MessageGasLimitTooHigh.selector));
     s_onRamp.forwardFromRouter(message, OWNER);
   }

@@ -11,6 +11,8 @@ contract GovernanceDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterf
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "GovernanceDapp 1.0.0";
 
+  using CCIP for CCIP.EVMExtraArgsV1;
+
   error InvalidDeliverer(address deliverer);
   event ConfigPropagated(uint256 chainId, address contractAddress);
   event ReceivedConfig(uint256 feeAmount, address subscriptionManager, uint256 changedAtBlock);
@@ -63,7 +65,7 @@ contract GovernanceDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterf
         data: data,
         tokens: new address[](0),
         amounts: new uint256[](0),
-        gasLimit: 3e5
+        extraArgs: CCIP.EVMExtraArgsV1({gasLimit: 3e5})._toBytes()
       });
       s_sendingRouter.ccipSend(clone.chainId, message);
       emit ConfigPropagated(clone.chainId, clone.contractAddress);

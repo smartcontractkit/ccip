@@ -76,7 +76,7 @@ contract EVM2EVMFreeOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
     // TODO: Spec difference measuring gas used by verification vs calculating it?
     // imo billing calculated values > billing measured to help with cost predictability
     // solhint-disable-next-line no-unused-vars
-    (uint256 timestampRelayed, uint256 gasUsedByMerkle) = _verifyMessages(
+    (uint256 timestampRelayed,) = _verifyMessages(
       hashedLeaves,
       report.innerProofs,
       report.innerProofFlagBits,

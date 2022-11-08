@@ -87,6 +87,33 @@ library CCIP {
     MessageExecutionState state;
   }
 
+  error InvalidExtraArgsTag(bytes4 expected, bytes4 got);
+
+  struct EVMExtraArgsV1 {
+    uint256 gasLimit;
+  }
+
+  // bytes4(keccak256("CCIP EVMExtraArgsV1"));
+  bytes4 public constant EVM_EXTRA_ARGS_V1_TAG = 0x97a657c9;
+  uint256 public constant EVM_DEFAULT_GAS_LIMIT = 200_000;
+
+  function _toBytes(EVMExtraArgsV1 memory extraArgs) internal pure returns (bytes memory bts) {
+    return abi.encodeWithSelector(EVM_EXTRA_ARGS_V1_TAG, extraArgs);
+  }
+
+  function _fromBytes(bytes calldata extraArgs) internal pure returns (EVMExtraArgsV1 memory) {
+    if (extraArgs.length == 0) {
+      return CCIP.EVMExtraArgsV1({
+        gasLimit: EVM_DEFAULT_GAS_LIMIT
+      });
+    }
+    if (bytes4(extraArgs[:4]) != EVM_EXTRA_ARGS_V1_TAG) revert InvalidExtraArgsTag(EVM_EXTRA_ARGS_V1_TAG, bytes4(extraArgs[:4]));
+    return CCIP.EVMExtraArgsV1({
+      gasLimit: abi.decode(extraArgs[4:36], (uint256))
+    });
+  }
+
+
   ////////////////////////////////
   ////          TOLL          ////
   ////////////////////////////////
@@ -99,7 +126,7 @@ library CCIP {
     uint256[] amounts;
     address feeToken;
     uint256 feeTokenAmount;
-    uint256 gasLimit;
+    bytes extraArgs;
   }
 
   // @notice The cross chain message that gets relayed to EVM toll chains
@@ -172,7 +199,7 @@ library CCIP {
     bytes data;
     address[] tokens;
     uint256[] amounts;
-    uint256 gasLimit;
+    bytes extraArgs;
   }
 
   // @notice The cross chain message that gets relayed to EVM subscription chains

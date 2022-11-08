@@ -19,11 +19,9 @@ contract CustomTokenPool is TokenPool {
 
   /**
    * @notice Release tokens fromm the pool to the recipient
-   * @param recipient Recipient address
    * @param amount Amount to release
    */
-  // solhint-disable-next-line no-unused-vars
-  function releaseOrMint(address recipient, uint256 amount) external override whenNotPaused assertMintOrRelease {
+  function releaseOrMint(address, uint256 amount) external override whenNotPaused assertMintOrRelease {
     emit SynthMinted(amount);
   }
 }

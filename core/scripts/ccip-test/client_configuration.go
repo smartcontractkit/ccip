@@ -314,12 +314,15 @@ func (client *CCIPClient) SendMessage(t *testing.T) {
 	bts, err := hex.DecodeString("00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000005626c616e6b000000000000000000000000000000000000000000000000000000")
 	require.NoError(t, err)
 
+	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(3e5))
+	require.NoError(t, err)
+
 	msg := evm_2_any_subscription_onramp_router.CCIPEVM2AnySubscriptionMessage{
-		Receiver: testhelpers.MustEncodeAddress(t, client.Dest.MessageReceiver.Address()),
-		Data:     bts,
-		Tokens:   []common.Address{client.Source.LinkTokenAddress},
-		Amounts:  []*big.Int{big.NewInt(1)},
-		GasLimit: big.NewInt(3e5),
+		Receiver:  testhelpers.MustEncodeAddress(t, client.Dest.MessageReceiver.Address()),
+		Data:      bts,
+		Tokens:    []common.Address{client.Source.LinkTokenAddress},
+		Amounts:   []*big.Int{big.NewInt(1)},
+		ExtraArgs: extraArgsV1,
 	}
 
 	tx, err := client.Source.OnRampRouter.CcipSend(client.Source.Owner, client.Dest.ChainId, msg)
@@ -724,11 +727,14 @@ func (client *CCIPClient) ValidateMerkleRoot(
 func (client *CCIPClient) SendToDappWithExecution(t *testing.T, source SourceClient, from *bind.TransactOpts, toAddress common.Address, amount *big.Int) *evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRampCCIPSendRequested {
 	SourceBlockNumber := GetCurrentBlockNumber(source.Client.Client)
 
+	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(100_000))
+	helpers.PanicErr(err)
+
 	tx, err := source.SenderDapp.SendMessage(from, subscription_sender_dapp.CCIPEVM2AnySubscriptionMessage{
-		Receiver: testhelpers.MustEncodeAddress(t, toAddress),
-		Tokens:   []common.Address{source.LinkTokenAddress},
-		Amounts:  []*big.Int{amount},
-		GasLimit: big.NewInt(100_000),
+		Receiver:  testhelpers.MustEncodeAddress(t, toAddress),
+		Tokens:    []common.Address{source.LinkTokenAddress},
+		Amounts:   []*big.Int{amount},
+		ExtraArgs: extraArgsV1,
 	})
 	helpers.PanicErr(err)
 	source.logger.Infof("Send tokens tx %s", helpers.ExplorerLink(source.ChainId.Int64(), tx.Hash()))
@@ -743,12 +749,15 @@ func (client *CCIPClient) SendToOnrampWithExecution(t *testing.T, source SourceC
 	senderAndReceiver, err := utils.ABIEncode(`[{"type":"address"}, {"type":"address"}]`, source.Owner.From, source.Owner.From)
 	helpers.PanicErr(err)
 
+	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(3e5))
+	helpers.PanicErr(err)
+
 	payload := evm_2_any_subscription_onramp_router.CCIPEVM2AnySubscriptionMessage{
-		Tokens:   []common.Address{},
-		Amounts:  []*big.Int{},
-		Receiver: testhelpers.MustEncodeAddress(t, toAddress),
-		Data:     senderAndReceiver,
-		GasLimit: big.NewInt(3e5),
+		Tokens:    []common.Address{},
+		Amounts:   []*big.Int{},
+		Receiver:  testhelpers.MustEncodeAddress(t, toAddress),
+		Data:      senderAndReceiver,
+		ExtraArgs: extraArgsV1,
 	}
 	source.logger.Infof("Send tx with payload %+v", payload)
 

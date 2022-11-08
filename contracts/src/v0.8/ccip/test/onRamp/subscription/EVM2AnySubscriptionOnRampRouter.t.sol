@@ -24,7 +24,7 @@ contract EVM2AnySubscriptionOnRampRouter_ccipSend is EVM2EVMSubscriptionOnRampSe
     CCIP.EVM2AnySubscriptionMessage memory message = _generateEmptyMessage();
 
     vm.expectEmit(false, false, false, true);
-    emit CCIPSendRequested(_messageToEvent(message, 1, 1));
+    emit CCIPSendRequested(this._messageToEvent(message, 1, 1));
 
     s_onRampRouter.ccipSend(DEST_CHAIN_ID, message);
   }
@@ -43,7 +43,7 @@ contract EVM2AnySubscriptionOnRampRouter_ccipSend is EVM2EVMSubscriptionOnRampSe
     CCIP.EVM2AnySubscriptionMessage memory message = _generateTokenMessage();
 
     vm.expectEmit(false, false, false, true);
-    emit CCIPSendRequested(_messageToEvent(message, 1, 1));
+    emit CCIPSendRequested(this._messageToEvent(message, 1, 1));
 
     s_onRampRouter.ccipSend(DEST_CHAIN_ID, message);
     // Assert the user balance is lowered by the tokens sent
@@ -62,7 +62,7 @@ contract EVM2AnySubscriptionOnRampRouter_ccipSend is EVM2EVMSubscriptionOnRampSe
     s_onRampRouter.fundSubscription(newFee);
 
     vm.expectEmit(false, false, false, true);
-    emit CCIPSendRequested(_messageToEvent(message, 1, 1));
+    emit CCIPSendRequested(this._messageToEvent(message, 1, 1));
 
     s_onRampRouter.ccipSend(DEST_CHAIN_ID, message);
   }

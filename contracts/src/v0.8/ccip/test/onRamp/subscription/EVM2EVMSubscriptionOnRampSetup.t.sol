@@ -5,6 +5,9 @@ import "../../TokenSetup.t.sol";
 import "../../../onRamp/subscription/EVM2EVMSubscriptionOnRamp.sol";
 
 contract EVM2EVMSubscriptionOnRampSetup is TokenSetup {
+  using CCIP for CCIP.EVMExtraArgsV1;
+  using CCIP for bytes;
+
   // Duplicate event of the CCIPSendRequested in the TollOnRampInterface
   event CCIPSendRequested(CCIP.EVM2EVMSubscriptionMessage message);
   event OnRampSet(uint256 indexed chainId, EVM2EVMSubscriptionOnRampInterface indexed onRamp);
@@ -66,7 +69,7 @@ contract EVM2EVMSubscriptionOnRampSetup is TokenSetup {
         data: "",
         tokens: tokens,
         amounts: amounts,
-        gasLimit: GAS_LIMIT
+        extraArgs: CCIP.EVMExtraArgsV1({gasLimit: GAS_LIMIT})._toBytes()
       });
   }
 
@@ -79,15 +82,15 @@ contract EVM2EVMSubscriptionOnRampSetup is TokenSetup {
         data: "",
         tokens: tokens,
         amounts: amounts,
-        gasLimit: GAS_LIMIT
+        extraArgs: CCIP.EVMExtraArgsV1({gasLimit: GAS_LIMIT})._toBytes()
       });
   }
 
   function _messageToEvent(
-    CCIP.EVM2AnySubscriptionMessage memory message,
+    CCIP.EVM2AnySubscriptionMessage calldata message,
     uint64 seqNum,
     uint64 nonce
-  ) public pure returns (CCIP.EVM2EVMSubscriptionMessage memory) {
+  ) external pure returns (CCIP.EVM2EVMSubscriptionMessage memory) {
     return
       CCIP.EVM2EVMSubscriptionMessage({
         sequenceNumber: seqNum,
@@ -98,7 +101,7 @@ contract EVM2EVMSubscriptionOnRampSetup is TokenSetup {
         data: message.data,
         tokens: message.tokens,
         amounts: message.amounts,
-        gasLimit: message.gasLimit
+        gasLimit: message.extraArgs._fromBytes().gasLimit
       });
   }
 }

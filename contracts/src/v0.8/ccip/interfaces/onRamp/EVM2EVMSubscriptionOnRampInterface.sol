@@ -7,7 +7,7 @@ import {BaseOnRampInterface} from "./BaseOnRampInterface.sol";
 interface EVM2EVMSubscriptionOnRampInterface is BaseOnRampInterface {
   event CCIPSendRequested(CCIP.EVM2EVMSubscriptionMessage message);
 
-  function forwardFromRouter(CCIP.EVM2AnySubscriptionMessage memory message, address originalSender)
+  function forwardFromRouter(CCIP.EVM2AnySubscriptionMessage calldata message, address originalSender)
     external
     returns (uint64);
 }

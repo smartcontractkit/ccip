@@ -31,6 +31,8 @@ contract EVM2EVMSubscriptionOnRamp_constructor is EVM2EVMSubscriptionOnRampSetup
 
 /// @notice #forwardFromRouter
 contract EVM2EVMSubscriptionOnRamp_forwardFromRouter is EVM2EVMSubscriptionOnRampSetup {
+  using CCIP for CCIP.EVMExtraArgsV1;
+
   function setUp() public virtual override {
     EVM2EVMSubscriptionOnRampSetup.setUp();
 
@@ -69,7 +71,7 @@ contract EVM2EVMSubscriptionOnRamp_forwardFromRouter is EVM2EVMSubscriptionOnRam
     message.tokens[0] = s_sourceTokens[0];
 
     vm.expectEmit(false, false, false, true);
-    emit CCIPSendRequested(_messageToEvent(message, 1, 1));
+    emit CCIPSendRequested(this._messageToEvent(message, 1, 1));
 
     s_onRamp.forwardFromRouter(message, OWNER);
   }
@@ -78,14 +80,14 @@ contract EVM2EVMSubscriptionOnRamp_forwardFromRouter is EVM2EVMSubscriptionOnRam
   // on the onramp. Sending to a different receiver should start at 1 again.
   function testShouldIncrementReceiverNonceSuccess() public {
     CCIP.EVM2AnySubscriptionMessage memory message = _generateEmptyMessage();
-    CCIP.EVM2EVMSubscriptionMessage memory tollEvent = _messageToEvent(message, 1, 1);
+    CCIP.EVM2EVMSubscriptionMessage memory tollEvent = this._messageToEvent(message, 1, 1);
 
     vm.expectEmit(false, false, false, true);
     emit CCIPSendRequested(tollEvent);
     s_onRamp.forwardFromRouter(message, OWNER);
 
     message = _generateEmptyMessage();
-    tollEvent = _messageToEvent(message, 2, 2);
+    tollEvent = this._messageToEvent(message, 2, 2);
 
     vm.expectEmit(false, false, false, true);
     emit CCIPSendRequested(tollEvent);
@@ -93,7 +95,7 @@ contract EVM2EVMSubscriptionOnRamp_forwardFromRouter is EVM2EVMSubscriptionOnRam
 
     message = _generateEmptyMessage();
     message.receiver = abi.encode(address(s_onRampRouter));
-    tollEvent = _messageToEvent(message, 3, 1);
+    tollEvent = this._messageToEvent(message, 3, 1);
 
     vm.expectEmit(false, false, false, true);
     emit CCIPSendRequested(tollEvent);
@@ -213,7 +215,7 @@ contract EVM2EVMSubscriptionOnRamp_forwardFromRouter is EVM2EVMSubscriptionOnRam
   // Asserts gasLimit must be <=20M
   function testMessageGasLimitTooHighReverts() public {
     CCIP.EVM2AnySubscriptionMessage memory message = _generateEmptyMessage();
-    message.gasLimit = MAX_GAS_LIMIT + 1;
+    message.extraArgs = CCIP.EVMExtraArgsV1({gasLimit: MAX_GAS_LIMIT + 1})._toBytes();
     vm.expectRevert(abi.encodeWithSelector(BaseOnRampInterface.MessageGasLimitTooHigh.selector));
     s_onRamp.forwardFromRouter(message, OWNER);
   }

@@ -12,6 +12,7 @@ import {CCIP} from "../models/Models.sol";
  * underlying protocol.
  */
 contract TollSenderDapp is TypeAndVersionInterface {
+  using CCIP for CCIP.EVMExtraArgsV1;
   using SafeERC20 for IERC20;
 
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
@@ -63,7 +64,7 @@ contract TollSenderDapp is TypeAndVersionInterface {
         amounts: amounts,
         feeToken: tokens[0],
         feeTokenAmount: 0,
-        gasLimit: 0
+        extraArgs: CCIP.EVMExtraArgsV1({gasLimit: 3e5})._toBytes()
       })
     );
   }

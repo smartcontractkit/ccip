@@ -15,6 +15,8 @@ import {PoolInterface} from "../../interfaces/pools/PoolInterface.sol";
  * @notice An implementation of a subscription OnRamp.
  */
 contract EVM2EVMSubscriptionOnRamp is EVM2EVMSubscriptionOnRampInterface, BaseOnRamp, TypeAndVersionInterface {
+  using CCIP for bytes;
+
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "EVM2EVMSubscriptionOnRamp 1.0.0";
 
@@ -56,7 +58,7 @@ contract EVM2EVMSubscriptionOnRamp is EVM2EVMSubscriptionOnRampInterface, BaseOn
    * @param message Message struct to send
    * @param originalSender The original initiator of the CCIP request
    */
-  function forwardFromRouter(CCIP.EVM2AnySubscriptionMessage memory message, address originalSender)
+  function forwardFromRouter(CCIP.EVM2AnySubscriptionMessage calldata message, address originalSender)
     external
     override
     whenNotPaused
@@ -64,7 +66,8 @@ contract EVM2EVMSubscriptionOnRamp is EVM2EVMSubscriptionOnRampInterface, BaseOn
     returns (uint64)
   {
     if (msg.sender != address(s_router)) revert MustBeCalledByRouter();
-    _handleForwardFromRouter(message.data.length, message.gasLimit, message.tokens, message.amounts, originalSender);
+    uint256 gasLimit = message.extraArgs._fromBytes().gasLimit;
+    _handleForwardFromRouter(message.data.length, gasLimit, message.tokens, message.amounts, originalSender);
 
     address receiver = abi.decode(message.receiver, (address));
     // Emit message request
@@ -79,7 +82,7 @@ contract EVM2EVMSubscriptionOnRamp is EVM2EVMSubscriptionOnRampInterface, BaseOn
       data: message.data,
       tokens: message.tokens,
       amounts: message.amounts,
-      gasLimit: message.gasLimit
+      gasLimit: gasLimit
     });
     emit CCIPSendRequested(subscriptionMsg);
     return subscriptionMsg.sequenceNumber;

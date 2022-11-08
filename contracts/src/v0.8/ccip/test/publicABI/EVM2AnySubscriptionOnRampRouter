@@ -1,6 +1,6 @@
 {
   "acceptOwnership()": "79ba5097",
-  "ccipSend(uint256,(bytes,bytes,address[],uint256[],uint256))": "3ccc1524",
+  "ccipSend(uint256,(bytes,bytes,address[],uint256[],bytes))": "cc4a9c68",
   "fundSubscription(uint256)": "c1060653",
   "getBalance(address)": "f8b2cb4f",
   "getFee()": "ced72f87",

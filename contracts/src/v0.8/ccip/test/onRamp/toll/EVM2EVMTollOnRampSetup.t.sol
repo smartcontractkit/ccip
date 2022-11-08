@@ -5,8 +5,11 @@ import "../../TokenSetup.t.sol";
 import "../../../interfaces/onRamp/EVM2EVMTollOnRampInterface.sol";
 import "../../../onRamp/toll/EVM2EVMTollOnRamp.sol";
 import "../../../onRamp/toll/EVM2AnyTollOnRampRouter.sol";
+import "../../models/ExtraArgs.t.sol";
 
 contract EVM2EVMTollOnRampSetup is TokenSetup {
+  using CCIP for CCIP.EVMExtraArgsV1;
+
   // Duplicate event of the CCIPSendRequested in the TollOnRampInterface
   event CCIPSendRequested(CCIP.EVM2EVMTollMessage message);
 
@@ -66,7 +69,7 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
         amounts: amounts,
         feeToken: s_sourceTokens[0],
         feeTokenAmount: RELAYING_FEE_JUELS,
-        gasLimit: GAS_LIMIT
+        extraArgs: CCIP.EVMExtraArgsV1({gasLimit: GAS_LIMIT})._toBytes()
       });
   }
 
@@ -81,13 +84,13 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
         amounts: amounts,
         feeToken: s_sourceTokens[0],
         feeTokenAmount: RELAYING_FEE_JUELS,
-        gasLimit: GAS_LIMIT
+        extraArgs: CCIP.EVMExtraArgsV1({gasLimit: GAS_LIMIT})._toBytes()
       });
   }
 
   function _messageToEvent(CCIP.EVM2AnyTollMessage memory message, uint64 seqNum)
     public
-    pure
+    view
     returns (CCIP.EVM2EVMTollMessage memory)
   {
     return
@@ -101,13 +104,13 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
         amounts: message.amounts,
         feeToken: message.feeToken,
         feeTokenAmount: message.feeTokenAmount - RELAYING_FEE_JUELS,
-        gasLimit: message.gasLimit
+        gasLimit: this.fromBytesHelper(message.extraArgs).gasLimit
       });
   }
 
   function _messageToEventNoFee(CCIP.EVM2AnyTollMessage memory message, uint64 seqNum)
     public
-    pure
+    view
     returns (CCIP.EVM2EVMTollMessage memory)
   {
     return
@@ -121,7 +124,7 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
         amounts: message.amounts,
         feeToken: message.feeToken,
         feeTokenAmount: message.feeTokenAmount,
-        gasLimit: message.gasLimit
+        gasLimit: this.fromBytesHelper(message.extraArgs).gasLimit
       });
   }
 }

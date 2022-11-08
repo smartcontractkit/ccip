@@ -67,12 +67,12 @@ contract SomeOffRamp_firstFunction {
   function testZeroValueSuccess() public {
     ...
   }
-  
+
     ...
 
-  
+
   // Reverts
-  
+
   function testOwnerReverts() public {
     // test that an ownable function reverts when not called by the owner
     ...

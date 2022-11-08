@@ -409,13 +409,16 @@ func (sourceCCIP *SourceCCIPModule) SendSubRequest(receiver common.Address, sour
 	receiverAddr, err := utils.ABIEncode(`[{"type":"address"}]`, receiver)
 	Expect(err).ShouldNot(HaveOccurred(), "Failed encoding the receiver address")
 
+	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(100_000))
+	Expect(err).ShouldNot(HaveOccurred(), "Failed encoding the options field")
+
 	// form the message for transfer
 	msg := evm_2_any_subscription_onramp_router.CCIPEVM2AnySubscriptionMessage{
-		Receiver: receiverAddr,
-		Data:     []byte(data),
-		Tokens:   sourceTokens,
-		Amounts:  amount,
-		GasLimit: big.NewInt(100_000),
+		Receiver:  receiverAddr,
+		Data:      []byte(data),
+		Tokens:    sourceTokens,
+		Amounts:   amount,
+		ExtraArgs: extraArgsV1,
 	}
 	log.Info().Interface("msg details", msg).Msg("ccip message to be sent")
 
@@ -432,6 +435,9 @@ func (sourceCCIP *SourceCCIPModule) SendTollRequest(receiver common.Address, sou
 	receiverAddr, err := utils.ABIEncode(`[{"type":"address"}]`, receiver)
 	Expect(err).ShouldNot(HaveOccurred(), "Failed encoding the receiver address")
 
+	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(100_000))
+	Expect(err).ShouldNot(HaveOccurred(), "Failed encoding the options field")
+
 	// form the message for transfer
 	msg := evm_2_any_toll_onramp_router.CCIPEVM2AnyTollMessage{
 		Receiver:       receiverAddr,
@@ -440,7 +446,7 @@ func (sourceCCIP *SourceCCIPModule) SendTollRequest(receiver common.Address, sou
 		Amounts:        amount,
 		FeeToken:       feeToken,
 		FeeTokenAmount: tollFee,
-		GasLimit:       big.NewInt(100_000),
+		ExtraArgs:      extraArgsV1,
 	}
 	log.Info().Interface("msg details", msg).Msg("ccip message to be sent")
 
@@ -813,6 +819,7 @@ func (c *CCIPTest) SendTollRequests(noOfRequests int) {
 	Expect(err).ShouldNot(HaveOccurred(), "Getting current block should be successful in source chain")
 	c.StartBlockOnDestination, err = c.Dest.Common.ChainClient.LatestBlockNumber(context.Background())
 	Expect(err).ShouldNot(HaveOccurred(), "Getting current block should be successful in dest chain")
+
 	for i := 1; i <= c.NumberOfTollReq; i++ {
 		txHash := c.Source.SendTollRequest(
 			c.Dest.ReceiverDapp.EthAddress, sourceTokens,

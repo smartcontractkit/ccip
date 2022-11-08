@@ -772,12 +772,15 @@ func QueueSubRequest(
 	gasLimit *big.Int,
 	receiver common.Address,
 ) *types.Transaction {
+	extraArgsV1, err := GetEVMExtraArgsV1(gasLimit)
+	require.NoError(t, err)
+
 	msg := evm_2_any_subscription_onramp_router.CCIPEVM2AnySubscriptionMessage{
-		Receiver: MustEncodeAddress(t, receiver),
-		Data:     []byte(msgPayload),
-		Tokens:   tokens,
-		Amounts:  amounts,
-		GasLimit: gasLimit,
+		Receiver:  MustEncodeAddress(t, receiver),
+		Data:      []byte(msgPayload),
+		Tokens:    tokens,
+		Amounts:   amounts,
+		ExtraArgs: extraArgsV1,
 	}
 	tx, err := ccipContracts.SubOnRampRouter.CcipSend(ccipContracts.SourceUser, ccipContracts.DestChainID, msg)
 	require.NoError(t, err)
@@ -793,12 +796,14 @@ func QueueSubRequestByDapp(
 	gasLimit *big.Int,
 	receiver common.Address,
 ) *types.Transaction {
+	extraArgsV1, err := GetEVMExtraArgsV1(gasLimit)
+	require.NoError(t, err)
 	msg := subscription_sender_dapp.CCIPEVM2AnySubscriptionMessage{
-		Receiver: MustEncodeAddress(t, receiver),
-		Data:     []byte(msgPayload),
-		Tokens:   tokens,
-		Amounts:  amounts,
-		GasLimit: gasLimit,
+		Receiver:  MustEncodeAddress(t, receiver),
+		Data:      []byte(msgPayload),
+		Tokens:    tokens,
+		Amounts:   amounts,
+		ExtraArgs: extraArgsV1,
 	}
 	tx, err := ccipContracts.SubSenderApp.SendMessage(ccipContracts.SourceUser, msg)
 	require.NoError(t, err)
@@ -816,6 +821,8 @@ func QueueRequest(
 	gasLimit *big.Int,
 	receiver common.Address,
 ) *types.Transaction {
+	extraArgs, err := GetEVMExtraArgsV1(gasLimit)
+	require.NoError(t, err)
 	msg := evm_2_any_toll_onramp_router.CCIPEVM2AnyTollMessage{
 		Receiver:       MustEncodeAddress(t, receiver),
 		Data:           []byte(msgPayload),
@@ -823,7 +830,7 @@ func QueueRequest(
 		Amounts:        amounts,
 		FeeToken:       feeToken,
 		FeeTokenAmount: feeTokenAmount,
-		GasLimit:       gasLimit,
+		ExtraArgs:      extraArgs,
 	}
 	tx, err := ccipContracts.TollOnRampRouter.CcipSend(ccipContracts.SourceUser, ccipContracts.DestChainID, msg)
 	require.NoError(t, err)
@@ -1005,4 +1012,15 @@ func ExecuteSubMessage(
 	require.Equal(t, uint64(1), rec.Status, "manual execution failed")
 	t.Logf("Manual Execution completed for seqNum %d", decodedMsg.SequenceNumber)
 	return decodedMsg.SequenceNumber
+}
+
+func GetEVMExtraArgsV1(gasLimit *big.Int) ([]byte, error) {
+	EVMV1Tag := []byte{0x97, 0xa6, 0x57, 0xc9}
+
+	encodedArgs, err := utils.ABIEncode(`[{"type":"uint256"}]`, gasLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	return append(EVMV1Tag, encodedArgs...), nil
 }
