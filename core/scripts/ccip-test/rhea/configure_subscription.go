@@ -68,6 +68,7 @@ func setOnRampOnBlobVerifier(t *testing.T, sourceClient *EvmDeploymentConfig, de
 	tx, err := blobVerifier.SetConfig(destClient.Owner, config)
 	require.NoError(t, err)
 	destClient.Logger.Infof(fmt.Sprintf("Adding new onRamp to blobVerifier in tx %s", helpers.ExplorerLink(destClient.ChainConfig.ChainId.Int64(), tx.Hash())))
+	shared.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
 }
 
 func setOffRampRouterOnOffRamp(t *testing.T, destClient *EvmDeploymentConfig) {
