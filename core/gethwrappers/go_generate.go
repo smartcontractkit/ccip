@@ -75,8 +75,8 @@ package gethwrappers
 
 // CCIP
 // Generic
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/BlobVerifier.abi ../../contracts/solc/v0.8.15/BlobVerifier.bin BlobVerifier blob_verifier
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/BlobVerifierHelper.abi ../../contracts/solc/v0.8.15/BlobVerifierHelper.bin BlobVerifierHelper blob_verifier_helper
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/CommitStore.abi ../../contracts/solc/v0.8.15/CommitStore.bin CommitStore commit_store
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/CommitStoreHelper.abi ../../contracts/solc/v0.8.15/CommitStoreHelper.bin CommitStoreHelper commit_store_helper
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/BurnMintTokenPool.abi ../../contracts/solc/v0.8.15/BurnMintTokenPool.bin BurnMintTokenPool burn_mint_token_pool
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/NativeTokenPool.abi ../../contracts/solc/v0.8.15/NativeTokenPool.bin NativeTokenPool native_token_pool
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/CustomTokenPool.abi ../../contracts/solc/v0.8.15/CustomTokenPool.bin CustomTokenPool custom_token_pool
