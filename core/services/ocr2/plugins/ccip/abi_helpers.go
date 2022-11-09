@@ -88,31 +88,46 @@ func DecodeCCIPMessage(b []byte) (*evm_2_evm_toll_onramp.CCIPEVM2EVMTollMessage,
 	}
 	// Note must use unnamed type here
 	receivedCp, ok := unpacked[0].(struct {
-		SourceChainId  *big.Int         `json:"sourceChainId"`
-		SequenceNumber uint64           `json:"sequenceNumber"`
-		Sender         common.Address   `json:"sender"`
-		Receiver       common.Address   `json:"receiver"`
-		Data           []uint8          `json:"data"`
-		Tokens         []common.Address `json:"tokens"`
-		Amounts        []*big.Int       `json:"amounts"`
-		FeeToken       common.Address   `json:"feeToken"`
-		FeeTokenAmount *big.Int         `json:"feeTokenAmount"`
-		GasLimit       *big.Int         `json:"gasLimit"`
+		SourceChainId    *big.Int       `json:"sourceChainId"`
+		SequenceNumber   uint64         `json:"sequenceNumber"`
+		Sender           common.Address `json:"sender"`
+		Receiver         common.Address `json:"receiver"`
+		Data             []uint8        `json:"data"`
+		TokensAndAmounts []struct {
+			Token  common.Address `json:"token"`
+			Amount *big.Int       `json:"amount"`
+		} `json:"tokensAndAmounts"`
+		FeeTokenAndAmount struct {
+			Token  common.Address `json:"token"`
+			Amount *big.Int       `json:"amount"`
+		} `json:"feeTokenAndAmount"`
+		GasLimit *big.Int `json:"gasLimit"`
 	})
 	if !ok {
 		return nil, fmt.Errorf("invalid format have %T want %T", unpacked[0], receivedCp)
 	}
+
+	var tokensAndAmounts []evm_2_evm_toll_onramp.CCIPEVMTokenAndAmount
+
+	for _, tokenAndAmount := range receivedCp.TokensAndAmounts {
+		tokensAndAmounts = append(tokensAndAmounts, evm_2_evm_toll_onramp.CCIPEVMTokenAndAmount{
+			Token:  tokenAndAmount.Token,
+			Amount: tokenAndAmount.Amount,
+		})
+	}
+
 	return &evm_2_evm_toll_onramp.CCIPEVM2EVMTollMessage{
-		SourceChainId:  receivedCp.SourceChainId,
-		SequenceNumber: receivedCp.SequenceNumber,
-		Sender:         receivedCp.Sender,
-		Receiver:       receivedCp.Receiver,
-		Data:           receivedCp.Data,
-		Tokens:         receivedCp.Tokens,
-		Amounts:        receivedCp.Amounts,
-		FeeToken:       receivedCp.FeeToken,
-		FeeTokenAmount: receivedCp.FeeTokenAmount,
-		GasLimit:       receivedCp.GasLimit,
+		SourceChainId:    receivedCp.SourceChainId,
+		SequenceNumber:   receivedCp.SequenceNumber,
+		Sender:           receivedCp.Sender,
+		Receiver:         receivedCp.Receiver,
+		Data:             receivedCp.Data,
+		TokensAndAmounts: tokensAndAmounts,
+		FeeTokenAndAmount: evm_2_evm_toll_onramp.CCIPEVMTokenAndAmount{
+			Token:  receivedCp.FeeTokenAndAmount.Token,
+			Amount: receivedCp.FeeTokenAndAmount.Amount,
+		},
+		GasLimit: receivedCp.GasLimit,
 	}, nil
 }
 
@@ -126,28 +141,40 @@ func DecodeCCIPSubMessage(b []byte) (*evm_2_evm_subscription_onramp.CCIPEVM2EVMS
 	}
 	// Note must use unnamed type here
 	receivedCp, ok := unpacked[0].(struct {
-		SourceChainId  *big.Int         `json:"sourceChainId"`
-		SequenceNumber uint64           `json:"sequenceNumber"`
-		Sender         common.Address   `json:"sender"`
-		Receiver       common.Address   `json:"receiver"`
-		Nonce          uint64           `json:"nonce"`
-		Data           []byte           `json:"data"`
-		Tokens         []common.Address `json:"tokens"`
-		Amounts        []*big.Int       `json:"amounts"`
-		GasLimit       *big.Int         `json:"gasLimit"`
+		SourceChainId    *big.Int       `json:"sourceChainId"`
+		SequenceNumber   uint64         `json:"sequenceNumber"`
+		Sender           common.Address `json:"sender"`
+		Receiver         common.Address `json:"receiver"`
+		Nonce            uint64         `json:"nonce"`
+		Data             []byte         `json:"data"`
+		TokensAndAmounts []struct {
+			Token  common.Address `json:"token"`
+			Amount *big.Int       `json:"amount"`
+		} `json:"tokensAndAmounts"`
+		GasLimit *big.Int `json:"gasLimit"`
 	})
 	if !ok {
 		return nil, fmt.Errorf("invalid format have %T want %T", unpacked[0], receivedCp)
 	}
+
+	var tokensAndAmounts []evm_2_evm_subscription_onramp.CCIPEVMTokenAndAmount
+
+	for _, tokenAndAmount := range receivedCp.TokensAndAmounts {
+		tokensAndAmounts = append(tokensAndAmounts, evm_2_evm_subscription_onramp.CCIPEVMTokenAndAmount{
+			Token:  tokenAndAmount.Token,
+			Amount: tokenAndAmount.Amount,
+		})
+	}
+
 	return &evm_2_evm_subscription_onramp.CCIPEVM2EVMSubscriptionMessage{
-		SourceChainId:  receivedCp.SourceChainId,
-		SequenceNumber: receivedCp.SequenceNumber,
-		Sender:         receivedCp.Sender,
-		Receiver:       receivedCp.Receiver,
-		Data:           receivedCp.Data,
-		Tokens:         receivedCp.Tokens,
-		Amounts:        receivedCp.Amounts,
-		GasLimit:       receivedCp.GasLimit,
+		SourceChainId:    receivedCp.SourceChainId,
+		SequenceNumber:   receivedCp.SequenceNumber,
+		Sender:           receivedCp.Sender,
+		Receiver:         receivedCp.Receiver,
+		Nonce:            receivedCp.Nonce,
+		Data:             receivedCp.Data,
+		TokensAndAmounts: tokensAndAmounts,
+		GasLimit:         receivedCp.GasLimit,
 	}, nil
 }
 
@@ -176,20 +203,32 @@ func MakeTollCCIPMsgArgs() abi.Arguments {
 			Type: "bytes",
 		},
 		{
-			Name: "tokens",
-			Type: "address[]",
+			Name: "tokensAndAmounts",
+			Type: "tuple[]",
+			Components: []abi.ArgumentMarshaling{
+				{
+					Name: "token",
+					Type: "address",
+				},
+				{
+					Name: "amount",
+					Type: "uint256",
+				},
+			},
 		},
 		{
-			Name: "amounts",
-			Type: "uint256[]",
-		},
-		{
-			Name: "feeToken",
-			Type: "address",
-		},
-		{
-			Name: "feeTokenAmount",
-			Type: "uint256",
+			Name: "feeTokenAndAmount",
+			Type: "tuple",
+			Components: []abi.ArgumentMarshaling{
+				{
+					Name: "token",
+					Type: "address",
+				},
+				{
+					Name: "amount",
+					Type: "uint256",
+				},
+			},
 		},
 		{
 			Name: "gasLimit",
@@ -231,12 +270,18 @@ func MakeSubscriptionCCIPMsgArgs() abi.Arguments {
 			Type: "bytes",
 		},
 		{
-			Name: "tokens",
-			Type: "address[]",
-		},
-		{
-			Name: "amounts",
-			Type: "uint256[]",
+			Name: "tokensAndAmounts",
+			Type: "tuple[]",
+			Components: []abi.ArgumentMarshaling{
+				{
+					Name: "token",
+					Type: "address",
+				},
+				{
+					Name: "amount",
+					Type: "uint256",
+				},
+			},
 		},
 		{
 			Name: "gasLimit",
@@ -253,16 +298,14 @@ func MakeSubscriptionCCIPMsgArgs() abi.Arguments {
 
 // Message contains the data from a cross chain message
 type Message struct {
-	SourceChainId  *big.Int         `json:"sourceChainId"`
-	SequenceNumber uint64           `json:"sequenceNumber"`
-	Sender         common.Address   `json:"sender"`
-	Receiver       common.Address   `json:"receiver"`
-	Data           []uint8          `json:"data"`
-	Tokens         []common.Address `json:"tokens"`
-	Amounts        []*big.Int       `json:"amounts"`
-	FeeToken       common.Address   `json:"feeToken"`
-	FeeTokenAmount *big.Int         `json:"feeTokenAmount"`
-	GasLimit       *big.Int         `json:"gasLimit"`
+	SourceChainId     *big.Int                                      `json:"sourceChainId"`
+	SequenceNumber    uint64                                        `json:"sequenceNumber"`
+	Sender            common.Address                                `json:"sender"`
+	Receiver          common.Address                                `json:"receiver"`
+	Data              []uint8                                       `json:"data"`
+	TokensAndAmounts  []evm_2_evm_toll_onramp.CCIPEVMTokenAndAmount `json:"tokensAndAmounts"`
+	FeeTokenAndAmount evm_2_evm_toll_onramp.CCIPEVMTokenAndAmount   `json:"feeTokenAndAmount"`
+	GasLimit          *big.Int                                      `json:"gasLimit"`
 }
 
 func ProofFlagsToBits(proofFlags []bool) *big.Int {

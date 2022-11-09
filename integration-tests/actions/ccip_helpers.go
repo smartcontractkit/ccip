@@ -405,7 +405,7 @@ func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(model BillingMo
 	return seqNum
 }
 
-func (sourceCCIP *SourceCCIPModule) SendSubRequest(receiver common.Address, sourceTokens []common.Address, amount []*big.Int, data string) string {
+func (sourceCCIP *SourceCCIPModule) SendSubRequest(receiver common.Address, tokenAndAmounts []evm_2_any_subscription_onramp_router.CCIPEVMTokenAndAmount, data string) string {
 	receiverAddr, err := utils.ABIEncode(`[{"type":"address"}]`, receiver)
 	Expect(err).ShouldNot(HaveOccurred(), "Failed encoding the receiver address")
 
@@ -414,11 +414,10 @@ func (sourceCCIP *SourceCCIPModule) SendSubRequest(receiver common.Address, sour
 
 	// form the message for transfer
 	msg := evm_2_any_subscription_onramp_router.CCIPEVM2AnySubscriptionMessage{
-		Receiver:  receiverAddr,
-		Data:      []byte(data),
-		Tokens:    sourceTokens,
-		Amounts:   amount,
-		ExtraArgs: extraArgsV1,
+		Receiver:         receiverAddr,
+		Data:             []byte(data),
+		TokensAndAmounts: tokenAndAmounts,
+		ExtraArgs:        extraArgsV1,
 	}
 	log.Info().Interface("msg details", msg).Msg("ccip message to be sent")
 
@@ -431,7 +430,7 @@ func (sourceCCIP *SourceCCIPModule) SendSubRequest(receiver common.Address, sour
 	return sendTx.Hash().Hex()
 }
 
-func (sourceCCIP *SourceCCIPModule) SendTollRequest(receiver common.Address, sourceTokens []common.Address, amount []*big.Int, data string, feeToken common.Address, tollFee *big.Int) string {
+func (sourceCCIP *SourceCCIPModule) SendTollRequest(receiver common.Address, tokenAndAmounts []evm_2_any_toll_onramp_router.CCIPEVMTokenAndAmount, data string, feeToken evm_2_any_toll_onramp_router.CCIPEVMTokenAndAmount) string {
 	receiverAddr, err := utils.ABIEncode(`[{"type":"address"}]`, receiver)
 	Expect(err).ShouldNot(HaveOccurred(), "Failed encoding the receiver address")
 
@@ -440,13 +439,11 @@ func (sourceCCIP *SourceCCIPModule) SendTollRequest(receiver common.Address, sou
 
 	// form the message for transfer
 	msg := evm_2_any_toll_onramp_router.CCIPEVM2AnyTollMessage{
-		Receiver:       receiverAddr,
-		Data:           []byte(data),
-		Tokens:         sourceTokens,
-		Amounts:        amount,
-		FeeToken:       feeToken,
-		FeeTokenAmount: tollFee,
-		ExtraArgs:      extraArgsV1,
+		Receiver:          receiverAddr,
+		Data:              []byte(data),
+		TokensAndAmounts:  tokenAndAmounts,
+		FeeTokenAndAmount: feeToken,
+		ExtraArgs:         extraArgsV1,
 	}
 	log.Info().Interface("msg details", msg).Msg("ccip message to be sent")
 
@@ -743,9 +740,11 @@ func (c *CCIPTest) SendSubRequests(noOfRequests int, createSub bool) {
 	if createSub {
 		CreateAndFundSubscription(*c.Source, *c.Dest, c.SubBalance, int64(c.NumberOfSubReq))
 	}
-	var sourceTokens []common.Address
+	var tokenAndAmounts []evm_2_any_subscription_onramp_router.CCIPEVMTokenAndAmount
 	for i, token := range c.Source.Common.BridgeTokens {
-		sourceTokens = append(sourceTokens, common.HexToAddress(token.Address()))
+		tokenAndAmounts = append(tokenAndAmounts, evm_2_any_subscription_onramp_router.CCIPEVMTokenAndAmount{
+			Token: common.HexToAddress(token.Address()), Amount: c.Source.TransferAmount[i],
+		})
 		// approve the onramp router so that it can initiate transferring the token
 		err := token.Approve(c.Source.SubOnRampRouter.Address(), bigmath.Mul(c.Source.TransferAmount[i], big.NewInt(int64(c.NumberOfSubReq))))
 		Expect(err).ShouldNot(HaveOccurred(), "Could not approve permissions for the onRamp router "+
@@ -766,7 +765,7 @@ func (c *CCIPTest) SendSubRequests(noOfRequests int, createSub bool) {
 	c.StartBlockOnDestination, err = c.Dest.Common.ChainClient.LatestBlockNumber(context.Background())
 	Expect(err).ShouldNot(HaveOccurred(), "Getting current block should be successful in dest chain")
 	for i := 1; i <= c.NumberOfSubReq; i++ {
-		txHash := c.Source.SendSubRequest(c.Dest.ReceiverDapp.EthAddress, sourceTokens, c.Source.TransferAmount, fmt.Sprintf("msg %d", i))
+		txHash := c.Source.SendSubRequest(c.Dest.ReceiverDapp.EthAddress, tokenAndAmounts, fmt.Sprintf("msg %d", i))
 		c.SentSubReqHashes = append(c.SentSubReqHashes, txHash)
 	}
 }
@@ -793,9 +792,11 @@ func (c *CCIPTest) ValidateSubRequests() {
 
 func (c *CCIPTest) SendTollRequests(noOfRequests int) {
 	c.NumberOfTollReq = noOfRequests
-	var sourceTokens []common.Address
+	var tokenAndAmounts []evm_2_any_toll_onramp_router.CCIPEVMTokenAndAmount
 	for i, token := range c.Source.Common.BridgeTokens {
-		sourceTokens = append(sourceTokens, common.HexToAddress(token.Address()))
+		tokenAndAmounts = append(tokenAndAmounts, evm_2_any_toll_onramp_router.CCIPEVMTokenAndAmount{
+			Token: common.HexToAddress(token.Address()), Amount: c.Source.TransferAmount[i],
+		})
 		// approve the onramp router so that it can initiate transferring the token
 		err := token.Approve(c.Source.TollOnRampRouter.Address(), bigmath.Mul(c.Source.TransferAmount[i], big.NewInt(int64(c.NumberOfTollReq))))
 		Expect(err).ShouldNot(HaveOccurred(), "Could not approve permissions for the onRamp router "+
@@ -822,9 +823,13 @@ func (c *CCIPTest) SendTollRequests(noOfRequests int) {
 
 	for i := 1; i <= c.NumberOfTollReq; i++ {
 		txHash := c.Source.SendTollRequest(
-			c.Dest.ReceiverDapp.EthAddress, sourceTokens,
-			c.Source.TransferAmount, fmt.Sprintf("msg %d", i),
-			common.HexToAddress(c.Source.Common.FeeToken.Address()), c.Source.TollFeeAmount)
+			c.Dest.ReceiverDapp.EthAddress,
+			tokenAndAmounts,
+			fmt.Sprintf("msg %d", i),
+			evm_2_any_toll_onramp_router.CCIPEVMTokenAndAmount{
+				Token: common.HexToAddress(c.Source.Common.FeeToken.Address()), Amount: c.Source.TollFeeAmount,
+			},
+		)
 		c.SentTollReqHashes = append(c.SentTollReqHashes, txHash)
 	}
 }

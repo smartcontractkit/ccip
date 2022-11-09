@@ -632,8 +632,7 @@ func (sender *TollSender) Address() string {
 
 func (sender *TollSender) SendTokens(
 	receiverAddr common.Address,
-	tokens []common.Address,
-	amount []*big.Int,
+	tokens []toll_sender_dapp.CCIPEVMTokenAndAmount,
 ) (*types.Transaction, error) {
 	opts, err := sender.client.TransactionOpts(sender.client.GetDefaultWallet())
 	if err != nil {
@@ -642,9 +641,8 @@ func (sender *TollSender) SendTokens(
 	log.Info().
 		Str("Receiver Address", receiverAddr.String()).
 		Interface("Tokens", tokens).
-		Interface("Amounts", amount).
 		Msg("Sending tokens")
-	tx, err := sender.instance.SendTokens(opts, receiverAddr, tokens, amount)
+	tx, err := sender.instance.SendTokens(opts, receiverAddr, tokens)
 	if err != nil {
 		return nil, err
 	}

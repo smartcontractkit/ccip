@@ -144,14 +144,17 @@ contract EVM2EVMSubscriptionOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR
     view
     returns (CCIP.Any2EVMMessageFromSender memory message)
   {
-    uint256 numberOfTokens = original.tokens.length;
-    address[] memory destTokens = new address[](numberOfTokens);
+    uint256 numberOfTokens = original.tokensAndAmounts.length;
+    CCIP.EVMTokenAndAmount[] memory destTokensAndAmounts = new CCIP.EVMTokenAndAmount[](numberOfTokens);
     address[] memory destPools = new address[](numberOfTokens);
 
     for (uint256 i = 0; i < numberOfTokens; ++i) {
-      PoolInterface pool = _getPool(IERC20(original.tokens[i]));
+      PoolInterface pool = _getPool(IERC20(original.tokensAndAmounts[i].token));
       destPools[i] = address(pool);
-      destTokens[i] = address(pool.getToken());
+      destTokensAndAmounts[i] = CCIP.EVMTokenAndAmount({
+        token: address(pool.getToken()),
+        amount: original.tokensAndAmounts[i].amount
+      });
     }
 
     message = CCIP.Any2EVMMessageFromSender({
@@ -159,9 +162,8 @@ contract EVM2EVMSubscriptionOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR
       sender: abi.encode(original.sender),
       receiver: original.receiver,
       data: original.data,
-      destTokens: destTokens,
+      destTokensAndAmounts: destTokensAndAmounts,
       destPools: destPools,
-      amounts: original.amounts,
       gasLimit: original.gasLimit
     });
   }
@@ -172,7 +174,7 @@ contract EVM2EVMSubscriptionOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR
 
   function _isWellFormed(CCIP.EVM2EVMSubscriptionMessage memory message) private view {
     if (message.sourceChainId != i_sourceChainId) revert InvalidSourceChain(message.sourceChainId);
-    if (message.tokens.length > uint256(s_config.maxTokensLength) || message.tokens.length != message.amounts.length)
+    if (message.tokensAndAmounts.length > uint256(s_config.maxTokensLength))
       revert UnsupportedNumberOfTokens(message.sequenceNumber);
     if (message.data.length > uint256(s_config.maxDataSize))
       revert MessageTooLarge(uint256(s_config.maxDataSize), message.data.length);

@@ -17,6 +17,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp_router"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_subscription_onramp_router"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_toll_onramp_router"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/subscription_sender_dapp"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/testhelpers"
 )
@@ -133,8 +136,14 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		require.NoError(t, err)
 
 		testhelpers.SendRequest(t, ccipContracts, "hey DON, execute for me",
-			[]common.Address{ccipContracts.SourceLinkToken.Address()}, []*big.Int{tokenAmount},
-			ccipContracts.SourceLinkToken.Address(), feeTokenAmount, big.NewInt(100_000),
+			[]evm_2_any_toll_onramp_router.CCIPEVMTokenAndAmount{{
+				Token:  ccipContracts.SourceLinkToken.Address(),
+				Amount: tokenAmount,
+			}},
+			evm_2_any_toll_onramp_router.CCIPEVMTokenAndAmount{
+				Token:  ccipContracts.SourceLinkToken.Address(),
+				Amount: feeTokenAmount,
+			}, big.NewInt(100_000),
 			ccipContracts.Receivers[0].Receiver.Address())
 		testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, ccip.CCIPTollSendRequested, ccipContracts.TollOnRamp.Address(), nodes, tollCurrentSeqNum)
 		testhelpers.EventuallyReportRelayed(t, ccipContracts, ccipContracts.TollOnRamp.Address(), tollCurrentSeqNum, tollCurrentSeqNum)
@@ -189,8 +198,10 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		_, err = ccipContracts.SourceCustomToken.Approve(ccipContracts.SourceUser, ccipContracts.SubOnRampRouter.Address(), tokenAmount)
 		require.NoError(t, err)
 		ccipContracts.SourceChain.Commit()
-		testhelpers.SendSubRequest(t, ccipContracts, "hey DON, execute for me", []common.Address{ccipContracts.SourceCustomToken.Address()},
-			[]*big.Int{tokenAmount}, big.NewInt(100_000), ccipContracts.Receivers[0].Receiver.Address())
+		testhelpers.SendSubRequest(t, ccipContracts, "hey DON, execute for me", []evm_2_any_subscription_onramp_router.CCIPEVMTokenAndAmount{{
+			Token:  ccipContracts.SourceCustomToken.Address(),
+			Amount: tokenAmount,
+		}}, big.NewInt(100_000), ccipContracts.Receivers[0].Receiver.Address())
 		executionLog := testhelpers.AllNodesHaveExecutedSeqNum(t, ccipContracts, ccipContracts.SubOffRamp.Address(), nodes, subCurrentSeqNum)
 		subCurrentSeqNum++
 		testhelpers.AssertSubExecSuccess(t, ccipContracts, executionLog)
@@ -217,8 +228,10 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		})
 		require.NoError(t, err, "fetching dest balance")
 
-		testhelpers.SendSubRequest(t, ccipContracts, "hey DON, execute for me", []common.Address{ccipContracts.SourceLinkToken.Address()},
-			[]*big.Int{tokenAmount}, big.NewInt(100_000), ccipContracts.Receivers[0].Receiver.Address())
+		testhelpers.SendSubRequest(t, ccipContracts, "hey DON, execute for me", []evm_2_any_subscription_onramp_router.CCIPEVMTokenAndAmount{{
+			Token:  ccipContracts.SourceLinkToken.Address(),
+			Amount: tokenAmount,
+		}}, big.NewInt(100_000), ccipContracts.Receivers[0].Receiver.Address())
 		testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, ccip.CCIPSubSendRequested, ccipContracts.SubOnRamp.Address(), nodes, subCurrentSeqNum)
 		testhelpers.EventuallyReportRelayed(t, ccipContracts, ccipContracts.SubOnRamp.Address(), subCurrentSeqNum, subCurrentSeqNum)
 		executionLog := testhelpers.AllNodesHaveExecutedSeqNum(t, ccipContracts, ccipContracts.SubOffRamp.Address(), nodes, subCurrentSeqNum)
@@ -301,8 +314,10 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		})
 		require.NoError(t, err, "fetching dest balance")
 
-		testhelpers.SendSubRequestByDapp(t, ccipContracts, "hey DON, execute for me", []common.Address{ccipContracts.SourceLinkToken.Address()},
-			[]*big.Int{tokenAmount}, big.NewInt(100_000), ccipContracts.Receivers[0].Receiver.Address())
+		testhelpers.SendSubRequestByDapp(t, ccipContracts, "hey DON, execute for me", []subscription_sender_dapp.CCIPEVMTokenAndAmount{{
+			Token:  ccipContracts.SourceLinkToken.Address(),
+			Amount: tokenAmount,
+		}}, big.NewInt(100_000), ccipContracts.Receivers[0].Receiver.Address())
 		testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, ccip.CCIPSubSendRequested, ccipContracts.SubOnRamp.Address(), nodes, subCurrentSeqNum)
 		testhelpers.EventuallyReportRelayed(t, ccipContracts, ccipContracts.SubOnRamp.Address(), subCurrentSeqNum, subCurrentSeqNum)
 		executionLog := testhelpers.AllNodesHaveExecutedSeqNum(t, ccipContracts, ccipContracts.SubOffRamp.Address(), nodes, subCurrentSeqNum)
@@ -382,7 +397,13 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		for i := 0; i < n; i++ {
 			_, err = ccipContracts.SourceLinkToken.Approve(ccipContracts.SourceUser, ccipContracts.TollOnRampRouter.Address(), big.NewInt(0).Add(tokenAmount, feeTokenAmount))
 			require.NoError(t, err)
-			txs = append(txs, testhelpers.QueueRequest(t, ccipContracts, fmt.Sprintf("batch request %d", tollCurrentSeqNum+i), []common.Address{ccipContracts.SourceLinkToken.Address()}, []*big.Int{tokenAmount}, ccipContracts.SourceLinkToken.Address(), feeTokenAmount, big.NewInt(100_000), ccipContracts.Receivers[0].Receiver.Address()))
+			txs = append(txs, testhelpers.QueueRequest(t, ccipContracts, fmt.Sprintf("batch request %d", tollCurrentSeqNum+i), []evm_2_any_toll_onramp_router.CCIPEVMTokenAndAmount{{
+				Token:  ccipContracts.SourceLinkToken.Address(),
+				Amount: tokenAmount,
+			}}, evm_2_any_toll_onramp_router.CCIPEVMTokenAndAmount{
+				Token:  ccipContracts.SourceLinkToken.Address(),
+				Amount: feeTokenAmount,
+			}, big.NewInt(100_000), ccipContracts.Receivers[0].Receiver.Address()))
 		}
 		// Send a batch of requests in a single block
 		testhelpers.ConfirmTxs(t, txs, ccipContracts.SourceChain)
@@ -456,7 +477,10 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		for i := 0; i < n; i++ {
 			_, err = ccipContracts.SourceLinkToken.Approve(ccipContracts.SourceUser, ccipContracts.SubOnRampRouter.Address(), tokenAmount)
 			require.NoError(t, err)
-			txs = append(txs, testhelpers.QueueSubRequest(t, ccipContracts, "hey DON, execute for me", []common.Address{ccipContracts.SourceLinkToken.Address()}, []*big.Int{tokenAmount}, big.NewInt(100_000), ccipContracts.Receivers[0].Receiver.Address()))
+			txs = append(txs, testhelpers.QueueSubRequest(t, ccipContracts, "hey DON, execute for me", []evm_2_any_subscription_onramp_router.CCIPEVMTokenAndAmount{{
+				Token:  ccipContracts.SourceLinkToken.Address(),
+				Amount: tokenAmount,
+			}}, big.NewInt(100_000), ccipContracts.Receivers[0].Receiver.Address()))
 		}
 		ccipContracts.SourceChain.Commit()
 		// Send a batch of requests in a single block
@@ -525,8 +549,10 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		_, err = ccipContracts.SourceLinkToken.Approve(ccipContracts.SourceUser, ccipContracts.SubOnRampRouter.Address(), tokenAmount)
 		require.NoError(t, err)
 		ccipContracts.SourceChain.Commit()
-		testhelpers.SendSubRequest(t, ccipContracts, "hey DON, execute for me", []common.Address{ccipContracts.SourceLinkToken.Address()},
-			[]*big.Int{tokenAmount}, big.NewInt(100_000), ccipContracts.Receivers[1].Receiver.Address())
+		testhelpers.SendSubRequest(t, ccipContracts, "hey DON, execute for me", []evm_2_any_subscription_onramp_router.CCIPEVMTokenAndAmount{{
+			Token:  ccipContracts.SourceLinkToken.Address(),
+			Amount: tokenAmount,
+		}}, big.NewInt(100_000), ccipContracts.Receivers[1].Receiver.Address())
 		testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, ccip.CCIPSubSendRequested, ccipContracts.SubOnRamp.Address(), nodes, subCurrentSeqNum)
 		testhelpers.EventuallyReportRelayed(t, ccipContracts, ccipContracts.SubOnRamp.Address(), subCurrentSeqNum, subCurrentSeqNum)
 		executionLog := testhelpers.AllNodesHaveExecutedSeqNum(t, ccipContracts, ccipContracts.SubOffRamp.Address(), nodes, subCurrentSeqNum)
@@ -604,8 +630,10 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		currentBlockNumber := ccipContracts.DestChain.Blockchain().CurrentBlock().Number().Uint64()
 
 		// attempt sending a request and the execution should be reverted
-		testhelpers.SendSubRequest(t, ccipContracts, "hey DON, execute for me", []common.Address{ccipContracts.SourceLinkToken.Address()},
-			[]*big.Int{tokenAmounts[0]}, big.NewInt(100_000), ccipContracts.Receivers[1].Receiver.Address())
+		testhelpers.SendSubRequest(t, ccipContracts, "hey DON, execute for me", []evm_2_any_subscription_onramp_router.CCIPEVMTokenAndAmount{{
+			Token:  ccipContracts.SourceLinkToken.Address(),
+			Amount: tokenAmounts[0],
+		}}, big.NewInt(100_000), ccipContracts.Receivers[1].Receiver.Address())
 		failedReq := testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, ccip.CCIPSubSendRequested, ccipContracts.SubOnRamp.Address(), nodes, subCurrentSeqNum)
 		testhelpers.EventuallyReportRelayed(t, ccipContracts, ccipContracts.SubOnRamp.Address(), subCurrentSeqNum, subCurrentSeqNum)
 		reportForFailedReq := testhelpers.EventuallyRelayReportAccepted(t, ccipContracts, currentBlockNumber)
@@ -623,8 +651,10 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		// send a bunch of subsequent ones which should not be executed
 		var pendingReqNumbers []int
 		for i := 1; i <= 3; i++ {
-			testhelpers.SendSubRequest(t, ccipContracts, "hey DON, execute for me", []common.Address{ccipContracts.SourceLinkToken.Address()},
-				[]*big.Int{tokenAmounts[i]}, big.NewInt(100_000), ccipContracts.Receivers[1].Receiver.Address())
+			testhelpers.SendSubRequest(t, ccipContracts, "hey DON, execute for me", []evm_2_any_subscription_onramp_router.CCIPEVMTokenAndAmount{{
+				Token:  ccipContracts.SourceLinkToken.Address(),
+				Amount: tokenAmounts[i],
+			}}, big.NewInt(100_000), ccipContracts.Receivers[1].Receiver.Address())
 			testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, ccip.CCIPSubSendRequested, ccipContracts.SubOnRamp.Address(), nodes, subCurrentSeqNum)
 			testhelpers.EventuallyReportRelayed(t, ccipContracts, ccipContracts.SubOnRamp.Address(), subCurrentSeqNum, subCurrentSeqNum)
 			executionLog := testhelpers.NoNodesHaveExecutedSeqNum(t, ccipContracts, ccipContracts.SubOffRamp.Address(), nodes, subCurrentSeqNum)
@@ -729,9 +759,14 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 					currentSeqNum.Inc()
 					testhelpers.SendRequest(t, ccipContracts,
 						"hey DON, execute for me",
-						[]common.Address{ccipContracts.SourceLinkToken.Address()},
-						[]*big.Int{tokenAmount},
-						ccipContracts.SourceLinkToken.Address(), feeTokenAmount,
+						[]evm_2_any_toll_onramp_router.CCIPEVMTokenAndAmount{{
+							Token:  ccipContracts.SourceLinkToken.Address(),
+							Amount: tokenAmount,
+						}},
+						evm_2_any_toll_onramp_router.CCIPEVMTokenAndAmount{
+							Token:  ccipContracts.SourceLinkToken.Address(),
+							Amount: feeTokenAmount,
+						},
 						big.NewInt(300_000),
 						ccipContracts.Receivers[0].Receiver.Address())
 					ccipContracts.SourceChain.Commit()

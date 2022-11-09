@@ -8,10 +8,9 @@ contract Models__hash is TokenSetup {
   using CCIP for CCIP.EVM2EVMTollMessage;
 
   function testSubscriptionHashSuccess() public {
-    address[] memory tokens = new address[](1);
-    tokens[0] = address(0x4440000000000000000000000000000000000001);
-    uint256[] memory amounts = new uint256[](1);
-    amounts[0] = 12345678900;
+    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts = new CCIP.EVMTokenAndAmount[](1);
+    tokensAndAmounts[0].token = address(0x4440000000000000000000000000000000000001);
+    tokensAndAmounts[0].amount = 12345678900;
 
     uint256 sourceChain = 1;
     uint256 destChain = 4;
@@ -23,8 +22,7 @@ contract Models__hash is TokenSetup {
       receiver: address(0x2220000000000000000000000000000000000001),
       nonce: 666,
       data: "",
-      tokens: tokens,
-      amounts: amounts,
+      tokensAndAmounts: tokensAndAmounts,
       gasLimit: 100
     });
 
@@ -37,18 +35,17 @@ contract Models__hash is TokenSetup {
       )
     );
 
-    assertEq(0xe8b93c9d01a7a72ec6c7235e238701cf1511b267a31fdb78dd342649ee58c08d, metadataHash);
+    assertEq(metadataHash, 0xe8b93c9d01a7a72ec6c7235e238701cf1511b267a31fdb78dd342649ee58c08d);
     // Note this hash must match spec
-    assertEq(0xcae032f60dc29a4d98e135908afa3f562674954c9d3378606e8b0473d27e94c9, message._hash(metadataHash));
+    assertEq(message._hash(metadataHash), 0x6b4d88effbfa2121b6e1c16918d5a0003bb68437473117daaf631925e949bd02);
   }
 
   function testSubscriptionHashTwoTokensSuccess() public {
-    address[] memory tokens = new address[](2);
-    tokens[0] = address(0x4440000000000000000000000000000000000001);
-    tokens[1] = address(0x6660000000000000000000000000000000000001);
-    uint256[] memory amounts = new uint256[](2);
-    amounts[0] = 12345678900;
-    amounts[1] = 4204242;
+    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts = new CCIP.EVMTokenAndAmount[](2);
+    tokensAndAmounts[0].token = address(0x4440000000000000000000000000000000000001);
+    tokensAndAmounts[1].token = address(0x6660000000000000000000000000000000000001);
+    tokensAndAmounts[0].amount = 12345678900;
+    tokensAndAmounts[1].amount = 4204242;
 
     uint256 sourceChain = 1;
     uint256 destChain = 4;
@@ -60,8 +57,7 @@ contract Models__hash is TokenSetup {
       receiver: address(0x2220000000000000000000000000000000000001),
       nonce: 210,
       data: "foo bar baz",
-      tokens: tokens,
-      amounts: amounts,
+      tokensAndAmounts: tokensAndAmounts,
       gasLimit: 100
     });
 
@@ -74,16 +70,15 @@ contract Models__hash is TokenSetup {
       )
     );
 
-    assertEq(0xe8b93c9d01a7a72ec6c7235e238701cf1511b267a31fdb78dd342649ee58c08d, metadataHash);
+    assertEq(metadataHash, 0xe8b93c9d01a7a72ec6c7235e238701cf1511b267a31fdb78dd342649ee58c08d);
     // Note this hash must match spec
-    assertEq(0xaef2f373966c54aec50e619bacd6e66275f660c5b5ff3bd53b00386d345bcfa9, message._hash(metadataHash));
+    assertEq(message._hash(metadataHash), 0xfaa461863c42b1548d5687f535d81be27ec84db8b6f60d904beeac07abcad71a);
   }
 
   function testTollHashSuccess() public {
-    address[] memory tokens = new address[](1);
-    tokens[0] = address(0x4440000000000000000000000000000000000001);
-    uint256[] memory amounts = new uint256[](1);
-    amounts[0] = 12345678900;
+    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts = new CCIP.EVMTokenAndAmount[](1);
+    tokensAndAmounts[0].token = address(0x4440000000000000000000000000000000000001);
+    tokensAndAmounts[0].amount = 12345678900;
 
     uint256 sourceChain = 1;
     uint256 destChain = 4;
@@ -94,11 +89,9 @@ contract Models__hash is TokenSetup {
       sender: address(0x1110000000000000000000000000000000000001),
       receiver: address(0x2220000000000000000000000000000000000001),
       data: "",
-      tokens: tokens,
-      amounts: amounts,
+      tokensAndAmounts: tokensAndAmounts,
       gasLimit: 100,
-      feeToken: address(0x3330000000000000000000000000000000000001),
-      feeTokenAmount: 987654321
+      feeTokenAndAmount: CCIP.EVMTokenAndAmount({token: address(0x3330000000000000000000000000000000000001), amount: 987654321})
     });
 
     bytes32 metadataHash = keccak256(
@@ -110,18 +103,17 @@ contract Models__hash is TokenSetup {
       )
     );
 
-    assertEq(0x73ba062fc2abb9b2d37ef43de292ddd56a89f10ee0e344d500e63a0474073b03, metadataHash);
+    assertEq(metadataHash, 0x73ba062fc2abb9b2d37ef43de292ddd56a89f10ee0e344d500e63a0474073b03);
     // Note this hash must match spec
-    assertEq(0x9c014cce73a389409d5dbc863cb4d0054e61698bafb21eb88cafd670ee45ed12, message._hash(metadataHash));
+    assertEq(message._hash(metadataHash), 0xd4504baca27221b294969ab5a2989e2121cb3577a209b85d7d83371b3429df4d);
   }
 
   function testTollHashTwoTokensSuccess() public {
-    address[] memory tokens = new address[](2);
-    tokens[0] = address(0x4440000000000000000000000000000000000001);
-    tokens[1] = address(0x6660000000000000000000000000000000000001);
-    uint256[] memory amounts = new uint256[](2);
-    amounts[0] = 12345678900;
-    amounts[1] = 4204242;
+    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts = new CCIP.EVMTokenAndAmount[](2);
+    tokensAndAmounts[0].token = address(0x4440000000000000000000000000000000000001);
+    tokensAndAmounts[1].token = address(0x6660000000000000000000000000000000000001);
+    tokensAndAmounts[0].amount = 12345678900;
+    tokensAndAmounts[1].amount = 4204242;
 
     uint256 sourceChain = 1;
     uint256 destChain = 4;
@@ -132,11 +124,9 @@ contract Models__hash is TokenSetup {
       sender: address(0x1110000000000000000000000000000000000001),
       receiver: address(0x2220000000000000000000000000000000000001),
       data: "foo bar baz",
-      tokens: tokens,
-      amounts: amounts,
+      tokensAndAmounts: tokensAndAmounts,
       gasLimit: 100,
-      feeToken: address(0x3330000000000000000000000000000000000001),
-      feeTokenAmount: 987654321
+      feeTokenAndAmount: CCIP.EVMTokenAndAmount({token: address(0x3330000000000000000000000000000000000001), amount: 987654321})
     });
 
     bytes32 metadataHash = keccak256(
@@ -148,8 +138,8 @@ contract Models__hash is TokenSetup {
       )
     );
 
-    assertEq(0x73ba062fc2abb9b2d37ef43de292ddd56a89f10ee0e344d500e63a0474073b03, metadataHash);
+    assertEq(metadataHash, 0x73ba062fc2abb9b2d37ef43de292ddd56a89f10ee0e344d500e63a0474073b03);
     // Note this hash must match spec
-    assertEq(0xb70e53658377bb46b430d3ca5bbfed10c1e97d82dd8feb0af896224b4bf890c8, message._hash(metadataHash));
+    assertEq(message._hash(metadataHash), 0xc0b2bac538afab5af9c654028ff27f3a3cc5aa9e1082efc70656b8467dd41fb2);
   }
 }

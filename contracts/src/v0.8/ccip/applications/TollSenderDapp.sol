@@ -39,18 +39,17 @@ contract TollSenderDapp is TypeAndVersionInterface {
   }
 
   /**
-   * @notice Send tokens to the destination chain.
-   * @dev msg.sender must first call TOKEN.approve for this contract to spend the tokens.
+   * @notice Send tokensAndAmounts to the destination chain.
+   * @dev msg.sender must first call TOKEN.approve for this contract to spend the tokensAndAmounts.
    */
-  function sendTokens(
-    address destinationAddress,
-    address[] memory tokens,
-    uint256[] memory amounts
-  ) external returns (uint64 sequenceNumber) {
+  function sendTokens(address destinationAddress, CCIP.EVMTokenAndAmount[] memory tokensAndAmounts)
+    external
+    returns (uint64 sequenceNumber)
+  {
     if (destinationAddress == address(0)) revert InvalidDestinationAddress(destinationAddress);
-    for (uint256 i = 0; i < tokens.length; ++i) {
-      IERC20(tokens[i]).safeTransferFrom(msg.sender, address(this), amounts[i]);
-      IERC20(tokens[i]).approve(address(i_onRampRouter), amounts[i]);
+    for (uint256 i = 0; i < tokensAndAmounts.length; ++i) {
+      IERC20(tokensAndAmounts[i].token).safeTransferFrom(msg.sender, address(this), tokensAndAmounts[i].amount);
+      IERC20(tokensAndAmounts[i].token).approve(address(i_onRampRouter), tokensAndAmounts[i].amount);
     }
     // `data` format:
     //  - EOA sender address
@@ -60,10 +59,8 @@ contract TollSenderDapp is TypeAndVersionInterface {
       CCIP.EVM2AnyTollMessage({
         receiver: abi.encode(i_destinationContract),
         data: abi.encode(msg.sender, destinationAddress),
-        tokens: tokens,
-        amounts: amounts,
-        feeToken: tokens[0],
-        feeTokenAmount: 0,
+        tokensAndAmounts: tokensAndAmounts,
+        feeTokenAndAmount: tokensAndAmounts[0],
         extraArgs: CCIP.EVMExtraArgsV1({gasLimit: 3e5})._toBytes()
       })
     );

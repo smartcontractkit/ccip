@@ -23,22 +23,21 @@ func TestSubscriptionHasher(t *testing.T) {
 	hasher := NewSubscriptionLeafHasher(sourceChainId, destChainId, onRampAddress, hashingCtx)
 
 	message := evm_2_evm_subscription_onramp.CCIPEVM2EVMSubscriptionMessage{
-		SourceChainId:  sourceChainId,
-		SequenceNumber: 1337,
-		Sender:         common.HexToAddress("0x1110000000000000000000000000000000000001"),
-		Receiver:       common.HexToAddress("0x2220000000000000000000000000000000000001"),
-		Nonce:          666,
-		Data:           []byte{},
-		Tokens:         []common.Address{common.HexToAddress("0x4440000000000000000000000000000000000001")},
-		Amounts:        []*big.Int{big.NewInt(12345678900)},
-		GasLimit:       big.NewInt(100),
+		SourceChainId:    sourceChainId,
+		SequenceNumber:   1337,
+		Sender:           common.HexToAddress("0x1110000000000000000000000000000000000001"),
+		Receiver:         common.HexToAddress("0x2220000000000000000000000000000000000001"),
+		Nonce:            666,
+		Data:             []byte{},
+		TokensAndAmounts: []evm_2_evm_subscription_onramp.CCIPEVMTokenAndAmount{{Token: common.HexToAddress("0x4440000000000000000000000000000000000001"), Amount: big.NewInt(12345678900)}},
+		GasLimit:         big.NewInt(100),
 	}
 
 	hash, err := hasher.HashLeaf(generateSubscriptionLog(t, message))
 	require.NoError(t, err)
 
 	// NOTE: Must match spec
-	require.Equal(t, "cae032f60dc29a4d98e135908afa3f562674954c9d3378606e8b0473d27e94c9", hex.EncodeToString(hash[:]))
+	require.Equal(t, "6b4d88effbfa2121b6e1c16918d5a0003bb68437473117daaf631925e949bd02", hex.EncodeToString(hash[:]))
 
 	message = evm_2_evm_subscription_onramp.CCIPEVM2EVMSubscriptionMessage{
 		SourceChainId:  sourceChainId,
@@ -47,16 +46,18 @@ func TestSubscriptionHasher(t *testing.T) {
 		Receiver:       common.HexToAddress("0x2220000000000000000000000000000000000001"),
 		Nonce:          210,
 		Data:           []byte("foo bar baz"),
-		Tokens:         []common.Address{common.HexToAddress("0x4440000000000000000000000000000000000001"), common.HexToAddress("0x6660000000000000000000000000000000000001")},
-		Amounts:        []*big.Int{big.NewInt(12345678900), big.NewInt(4204242)},
-		GasLimit:       big.NewInt(100),
+		TokensAndAmounts: []evm_2_evm_subscription_onramp.CCIPEVMTokenAndAmount{
+			{Token: common.HexToAddress("0x4440000000000000000000000000000000000001"), Amount: big.NewInt(12345678900)},
+			{Token: common.HexToAddress("0x6660000000000000000000000000000000000001"), Amount: big.NewInt(4204242)},
+		},
+		GasLimit: big.NewInt(100),
 	}
 
 	hash, err = hasher.HashLeaf(generateSubscriptionLog(t, message))
 	require.NoError(t, err)
 
 	// NOTE: Must match spec
-	require.Equal(t, "aef2f373966c54aec50e619bacd6e66275f660c5b5ff3bd53b00386d345bcfa9", hex.EncodeToString(hash[:]))
+	require.Equal(t, "faa461863c42b1548d5687f535d81be27ec84db8b6f60d904beeac07abcad71a", hex.EncodeToString(hash[:]))
 }
 
 func generateSubscriptionLog(t *testing.T, message evm_2_evm_subscription_onramp.CCIPEVM2EVMSubscriptionMessage) types.Log {
@@ -78,23 +79,21 @@ func TestTollHasher(t *testing.T) {
 	hasher := NewTollLeafHasher(sourceChainId, destChainId, onRampAddress, hashingCtx)
 
 	message := evm_2_evm_toll_onramp.CCIPEVM2EVMTollMessage{
-		SourceChainId:  sourceChainId,
-		SequenceNumber: 1337,
-		Sender:         common.HexToAddress("0x1110000000000000000000000000000000000001"),
-		Receiver:       common.HexToAddress("0x2220000000000000000000000000000000000001"),
-		Data:           []byte{},
-		Tokens:         []common.Address{common.HexToAddress("0x4440000000000000000000000000000000000001")},
-		Amounts:        []*big.Int{big.NewInt(12345678900)},
-		GasLimit:       big.NewInt(100),
-		FeeToken:       common.HexToAddress("0x3330000000000000000000000000000000000001"),
-		FeeTokenAmount: big.NewInt(987654321),
+		SourceChainId:     sourceChainId,
+		SequenceNumber:    1337,
+		Sender:            common.HexToAddress("0x1110000000000000000000000000000000000001"),
+		Receiver:          common.HexToAddress("0x2220000000000000000000000000000000000001"),
+		Data:              []byte{},
+		TokensAndAmounts:  []evm_2_evm_toll_onramp.CCIPEVMTokenAndAmount{{Token: common.HexToAddress("0x4440000000000000000000000000000000000001"), Amount: big.NewInt(12345678900)}},
+		GasLimit:          big.NewInt(100),
+		FeeTokenAndAmount: evm_2_evm_toll_onramp.CCIPEVMTokenAndAmount{Token: common.HexToAddress("0x3330000000000000000000000000000000000001"), Amount: big.NewInt(987654321)},
 	}
 
 	hash, err := hasher.HashLeaf(generateTollLog(t, message))
 	require.NoError(t, err)
 
 	// NOTE: Must match spec
-	require.Equal(t, "9c014cce73a389409d5dbc863cb4d0054e61698bafb21eb88cafd670ee45ed12", hex.EncodeToString(hash[:]))
+	require.Equal(t, "d4504baca27221b294969ab5a2989e2121cb3577a209b85d7d83371b3429df4d", hex.EncodeToString(hash[:]))
 
 	message = evm_2_evm_toll_onramp.CCIPEVM2EVMTollMessage{
 		SourceChainId:  sourceChainId,
@@ -102,22 +101,23 @@ func TestTollHasher(t *testing.T) {
 		Sender:         common.HexToAddress("0x1110000000000000000000000000000000000001"),
 		Receiver:       common.HexToAddress("0x2220000000000000000000000000000000000001"),
 		Data:           []byte("foo bar baz"),
-		Tokens:         []common.Address{common.HexToAddress("0x4440000000000000000000000000000000000001"), common.HexToAddress("0x6660000000000000000000000000000000000001")},
-		Amounts:        []*big.Int{big.NewInt(12345678900), big.NewInt(4204242)},
-		GasLimit:       big.NewInt(100),
-		FeeToken:       common.HexToAddress("0x3330000000000000000000000000000000000001"),
-		FeeTokenAmount: big.NewInt(987654321),
+		TokensAndAmounts: []evm_2_evm_toll_onramp.CCIPEVMTokenAndAmount{
+			{Token: common.HexToAddress("0x4440000000000000000000000000000000000001"), Amount: big.NewInt(12345678900)},
+			{Token: common.HexToAddress("0x6660000000000000000000000000000000000001"), Amount: big.NewInt(4204242)},
+		},
+		GasLimit: big.NewInt(100),
+		FeeTokenAndAmount: evm_2_evm_toll_onramp.CCIPEVMTokenAndAmount{
+			Token: common.HexToAddress("0x3330000000000000000000000000000000000001"), Amount: big.NewInt(987654321)},
 	}
 
 	hash, err = hasher.HashLeaf(generateTollLog(t, message))
 	require.NoError(t, err)
 
 	// NOTE: Must match spec
-	require.Equal(t, "b70e53658377bb46b430d3ca5bbfed10c1e97d82dd8feb0af896224b4bf890c8", hex.EncodeToString(hash[:]))
+	require.Equal(t, "c0b2bac538afab5af9c654028ff27f3a3cc5aa9e1082efc70656b8467dd41fb2", hex.EncodeToString(hash[:]))
 }
 
 func generateTollLog(t *testing.T, message evm_2_evm_toll_onramp.CCIPEVM2EVMTollMessage) types.Log {
-
 	pack, err := MakeTollCCIPMsgArgs().Pack(message)
 	require.NoError(t, err)
 

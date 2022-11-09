@@ -57,33 +57,30 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
   }
 
   function _generateTokenMessage() public view returns (CCIP.EVM2AnyTollMessage memory) {
-    uint256[] memory amounts = new uint256[](2);
-    amounts[0] = i_tokenAmount0;
-    amounts[1] = i_tokenAmount1;
-    address[] memory tokens = s_sourceTokens;
+    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts = getCastedSourceEVMTokenAndAmountsWithZeroAmounts();
+    tokensAndAmounts[0].amount = i_tokenAmount0;
+    tokensAndAmounts[1].amount = i_tokenAmount1;
+    CCIP.EVMTokenAndAmount memory feeTokenAndAmount = CCIP.EVMTokenAndAmount({token: tokensAndAmounts[0].token, amount: RELAYING_FEE_JUELS});
     return
       CCIP.EVM2AnyTollMessage({
         receiver: abi.encode(OWNER),
         data: "",
-        tokens: tokens,
-        amounts: amounts,
-        feeToken: s_sourceTokens[0],
-        feeTokenAmount: RELAYING_FEE_JUELS,
+        tokensAndAmounts: tokensAndAmounts,
+        feeTokenAndAmount: feeTokenAndAmount,
         extraArgs: CCIP.EVMExtraArgsV1({gasLimit: GAS_LIMIT})._toBytes()
       });
   }
 
   function _generateEmptyMessage() public view returns (CCIP.EVM2AnyTollMessage memory) {
-    uint256[] memory amounts = new uint256[](0);
-    address[] memory tokens = new address[](0);
+    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts = new CCIP.EVMTokenAndAmount[](0);
+    CCIP.EVMTokenAndAmount memory feeTokenAndAmount = getCastedSourceEVMTokenAndAmountsWithZeroAmounts()[0];
+    feeTokenAndAmount.amount = RELAYING_FEE_JUELS;
     return
       CCIP.EVM2AnyTollMessage({
         receiver: abi.encode(OWNER),
         data: "",
-        tokens: tokens,
-        amounts: amounts,
-        feeToken: s_sourceTokens[0],
-        feeTokenAmount: RELAYING_FEE_JUELS,
+        tokensAndAmounts: tokensAndAmounts,
+        feeTokenAndAmount: feeTokenAndAmount,
         extraArgs: CCIP.EVMExtraArgsV1({gasLimit: GAS_LIMIT})._toBytes()
       });
   }
@@ -93,6 +90,10 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
     view
     returns (CCIP.EVM2EVMTollMessage memory)
   {
+    CCIP.EVMTokenAndAmount memory feeTokenAndAmount = CCIP.EVMTokenAndAmount({
+      token: message.feeTokenAndAmount.token,
+      amount: message.feeTokenAndAmount.amount - RELAYING_FEE_JUELS
+    });
     return
       CCIP.EVM2EVMTollMessage({
         sequenceNumber: seqNum,
@@ -100,10 +101,8 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
         sender: OWNER,
         receiver: abi.decode(message.receiver, (address)),
         data: message.data,
-        tokens: message.tokens,
-        amounts: message.amounts,
-        feeToken: message.feeToken,
-        feeTokenAmount: message.feeTokenAmount - RELAYING_FEE_JUELS,
+        tokensAndAmounts: message.tokensAndAmounts,
+        feeTokenAndAmount: feeTokenAndAmount,
         gasLimit: this.fromBytesHelper(message.extraArgs).gasLimit
       });
   }
@@ -120,10 +119,8 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
         sender: OWNER,
         receiver: abi.decode(message.receiver, (address)),
         data: message.data,
-        tokens: message.tokens,
-        amounts: message.amounts,
-        feeToken: message.feeToken,
-        feeTokenAmount: message.feeTokenAmount,
+        tokensAndAmounts: message.tokensAndAmounts,
+        feeTokenAndAmount: message.feeTokenAndAmount,
         gasLimit: this.fromBytesHelper(message.extraArgs).gasLimit
       });
   }

@@ -222,28 +222,31 @@ contract BaseOffRamp__releaseOrMintToken is BaseOffRampSetup {
 contract BaseOffRamp__releaseOrMintTokens is BaseOffRampSetup {
   // Success
   function testSuccess() public {
-    IERC20 destToken1 = IERC20(s_destTokens[1]);
+    CCIP.EVMTokenAndAmount[] memory destTokensAndAmounts = getCastedDestinationEVMTokenAndAmountsWithZeroAmounts();
+    IERC20 destToken1 = IERC20(destTokensAndAmounts[1].token);
     uint256 startingBalance = destToken1.balanceOf(OWNER);
 
     address[] memory pools = new address[](2);
     pools[0] = s_destPools[1];
     pools[1] = s_destPools[1];
 
-    uint256[] memory amounts = new uint256[](2);
-    amounts[0] = 100;
-    amounts[1] = 50;
+    uint256 amount1 = 100;
+    uint256 amount2 = 50;
 
-    s_offRamp.releaseOrMintTokens(pools, amounts, OWNER);
-    assertEq(startingBalance + amounts[0] + amounts[1], destToken1.balanceOf(OWNER));
+    destTokensAndAmounts[0].amount = 100;
+    destTokensAndAmounts[1].amount = 50;
+
+    s_offRamp.releaseOrMintTokens(pools, destTokensAndAmounts, OWNER);
+    assertEq(startingBalance + amount1 + amount2, destToken1.balanceOf(OWNER));
   }
 
   // Revert
 
   function testTokenAndAmountMisMatchReverts() public {
-    uint256[] memory amounts = new uint256[](1);
+    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts = new CCIP.EVMTokenAndAmount[](1);
 
     vm.expectRevert(BaseOffRampInterface.TokenAndAmountMisMatch.selector);
-    s_offRamp.releaseOrMintTokens(s_destPools, amounts, OWNER);
+    s_offRamp.releaseOrMintTokens(s_destPools, tokensAndAmounts, OWNER);
   }
 }
 

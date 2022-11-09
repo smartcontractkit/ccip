@@ -1,5 +1,5 @@
 {
-  "ccipReceive((uint256,bytes,bytes,address[],uint256[]))": "a0c6df15",
+  "ccipReceive((uint256,bytes,bytes,(address,uint256)[]))": "b06193dd",
   "getSubscriptionManager()": "e2a92e28",
   "s_router()": "e16e632c",
   "setRouter(address)": "c0d78655",

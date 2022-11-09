@@ -12,6 +12,11 @@ library CCIP {
   bytes32 public constant INTERNAL_DOMAIN_SEPARATOR =
     0x0000000000000000000000000000000000000000000000000000000000000001;
 
+  struct EVMTokenAndAmount {
+    address token;
+    uint256 amount;
+  }
+
   /// @notice Generalized EVM message type that is sent from EVM routers
   // to the contracts that implement the Any2EVMMessageReceiverInterface
   struct Any2EVMMessageFromSender {
@@ -19,9 +24,9 @@ library CCIP {
     bytes sender;
     address receiver;
     bytes data;
-    address[] destTokens;
+    // TODO consider another struct that contains pool, token and amount
     address[] destPools;
-    uint256[] amounts;
+    EVMTokenAndAmount[] destTokensAndAmounts;
     uint256 gasLimit;
   }
 
@@ -29,8 +34,7 @@ library CCIP {
     uint256 sourceChainId;
     bytes sender;
     bytes data;
-    address[] destTokens;
-    uint256[] amounts;
+    EVMTokenAndAmount[] destTokensAndAmounts;
   }
 
   function _toAny2EVMMessage(CCIP.Any2EVMMessageFromSender memory original)
@@ -42,8 +46,7 @@ library CCIP {
       sourceChainId: original.sourceChainId,
       sender: original.sender,
       data: original.data,
-      destTokens: original.destTokens,
-      amounts: original.amounts
+      destTokensAndAmounts: original.destTokensAndAmounts
     });
   }
 
@@ -122,10 +125,8 @@ library CCIP {
   struct EVM2AnyTollMessage {
     bytes receiver;
     bytes data;
-    address[] tokens;
-    uint256[] amounts;
-    address feeToken;
-    uint256 feeTokenAmount;
+    EVMTokenAndAmount[] tokensAndAmounts;
+    EVMTokenAndAmount feeTokenAndAmount;
     bytes extraArgs;
   }
 
@@ -136,37 +137,31 @@ library CCIP {
     address sender;
     address receiver;
     bytes data;
-    address[] tokens;
-    uint256[] amounts;
-    address feeToken;
-    uint256 feeTokenAmount;
+    EVMTokenAndAmount[] tokensAndAmounts;
+    EVMTokenAndAmount feeTokenAndAmount;
     uint256 gasLimit;
   }
 
-  function _addToTokensAmounts(
-    address[] memory tokens,
-    uint256[] memory amounts,
-    address token,
-    uint256 amount
-  ) internal pure returns (address[] memory, uint256[] memory) {
-    // Assumes tokens.length = amounts.length
-    for (uint256 i = 0; i < tokens.length; ++i) {
-      if (tokens[i] == token) {
+  function _addToTokensAmounts(EVMTokenAndAmount[] memory existingTokens, EVMTokenAndAmount memory newToken)
+    internal
+    pure
+    returns (EVMTokenAndAmount[] memory)
+  {
+    for (uint256 i = 0; i < existingTokens.length; ++i) {
+      if (existingTokens[i].token == newToken.token) {
         // already present, just add amount
-        amounts[i] += amount;
-        return (tokens, amounts);
+        existingTokens[i].amount += newToken.amount;
+        return existingTokens;
       }
     }
+
     // Token is not already present, need to reallocate.
-    address[] memory newTokens = new address[](tokens.length + 1);
-    uint256[] memory newAmounts = new uint256[](amounts.length + 1);
-    for (uint256 i = 0; i < tokens.length; ++i) {
-      newTokens[i] = tokens[i];
-      newAmounts[i] = amounts[i];
+    EVMTokenAndAmount[] memory newTokens = new EVMTokenAndAmount[](existingTokens.length + 1);
+    for (uint256 i = 0; i < existingTokens.length; ++i) {
+      newTokens[i] = existingTokens[i];
     }
-    newTokens[tokens.length] = token;
-    newAmounts[amounts.length] = amount;
-    return (newTokens, newAmounts);
+    newTokens[existingTokens.length] = newToken;
+    return newTokens;
   }
 
   bytes32 internal constant EVM_2_EVM_TOLL_MESSAGE_HASH = keccak256("EVM2EVMTollMessagePlus");
@@ -181,11 +176,9 @@ library CCIP {
           original.sender,
           original.receiver,
           keccak256(original.data),
-          keccak256(abi.encode(original.tokens)),
-          keccak256(abi.encode(original.amounts)),
+          keccak256(abi.encode(original.tokensAndAmounts)),
           original.gasLimit,
-          original.feeToken,
-          original.feeTokenAmount
+          original.feeTokenAndAmount
         )
       );
   }
@@ -197,8 +190,7 @@ library CCIP {
   struct EVM2AnySubscriptionMessage {
     bytes receiver;
     bytes data;
-    address[] tokens;
-    uint256[] amounts;
+    EVMTokenAndAmount[] tokensAndAmounts;
     bytes extraArgs;
   }
 
@@ -210,8 +202,7 @@ library CCIP {
     address receiver;
     uint64 nonce;
     bytes data;
-    address[] tokens;
-    uint256[] amounts;
+    EVMTokenAndAmount[] tokensAndAmounts;
     uint256 gasLimit;
   }
 
@@ -231,8 +222,7 @@ library CCIP {
           original.sender,
           original.receiver,
           keccak256(original.data),
-          keccak256(abi.encode(original.tokens)),
-          keccak256(abi.encode(original.amounts)),
+          keccak256(abi.encode(original.tokensAndAmounts)),
           original.gasLimit,
           original.nonce
         )

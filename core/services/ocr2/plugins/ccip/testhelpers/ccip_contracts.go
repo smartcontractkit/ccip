@@ -767,8 +767,7 @@ func QueueSubRequest(
 	t *testing.T,
 	ccipContracts CCIPContracts,
 	msgPayload string,
-	tokens []common.Address,
-	amounts []*big.Int,
+	tokens []evm_2_any_subscription_onramp_router.CCIPEVMTokenAndAmount,
 	gasLimit *big.Int,
 	receiver common.Address,
 ) *types.Transaction {
@@ -776,11 +775,10 @@ func QueueSubRequest(
 	require.NoError(t, err)
 
 	msg := evm_2_any_subscription_onramp_router.CCIPEVM2AnySubscriptionMessage{
-		Receiver:  MustEncodeAddress(t, receiver),
-		Data:      []byte(msgPayload),
-		Tokens:    tokens,
-		Amounts:   amounts,
-		ExtraArgs: extraArgsV1,
+		Receiver:         MustEncodeAddress(t, receiver),
+		Data:             []byte(msgPayload),
+		TokensAndAmounts: tokens,
+		ExtraArgs:        extraArgsV1,
 	}
 	tx, err := ccipContracts.SubOnRampRouter.CcipSend(ccipContracts.SourceUser, ccipContracts.DestChainID, msg)
 	require.NoError(t, err)
@@ -791,19 +789,17 @@ func QueueSubRequestByDapp(
 	t *testing.T,
 	ccipContracts CCIPContracts,
 	msgPayload string,
-	tokens []common.Address,
-	amounts []*big.Int,
+	tokens []subscription_sender_dapp.CCIPEVMTokenAndAmount,
 	gasLimit *big.Int,
 	receiver common.Address,
 ) *types.Transaction {
 	extraArgsV1, err := GetEVMExtraArgsV1(gasLimit)
 	require.NoError(t, err)
 	msg := subscription_sender_dapp.CCIPEVM2AnySubscriptionMessage{
-		Receiver:  MustEncodeAddress(t, receiver),
-		Data:      []byte(msgPayload),
-		Tokens:    tokens,
-		Amounts:   amounts,
-		ExtraArgs: extraArgsV1,
+		Receiver:         MustEncodeAddress(t, receiver),
+		Data:             []byte(msgPayload),
+		TokensAndAmounts: tokens,
+		ExtraArgs:        extraArgsV1,
 	}
 	tx, err := ccipContracts.SubSenderApp.SendMessage(ccipContracts.SourceUser, msg)
 	require.NoError(t, err)
@@ -814,23 +810,19 @@ func QueueRequest(
 	t *testing.T,
 	ccipContracts CCIPContracts,
 	msgPayload string,
-	tokens []common.Address,
-	amounts []*big.Int,
-	feeToken common.Address,
-	feeTokenAmount *big.Int,
+	tokens []evm_2_any_toll_onramp_router.CCIPEVMTokenAndAmount,
+	feeToken evm_2_any_toll_onramp_router.CCIPEVMTokenAndAmount,
 	gasLimit *big.Int,
 	receiver common.Address,
 ) *types.Transaction {
 	extraArgs, err := GetEVMExtraArgsV1(gasLimit)
 	require.NoError(t, err)
 	msg := evm_2_any_toll_onramp_router.CCIPEVM2AnyTollMessage{
-		Receiver:       MustEncodeAddress(t, receiver),
-		Data:           []byte(msgPayload),
-		Tokens:         tokens,
-		Amounts:        amounts,
-		FeeToken:       feeToken,
-		FeeTokenAmount: feeTokenAmount,
-		ExtraArgs:      extraArgs,
+		Receiver:          MustEncodeAddress(t, receiver),
+		Data:              []byte(msgPayload),
+		TokensAndAmounts:  tokens,
+		FeeTokenAndAmount: feeToken,
+		ExtraArgs:         extraArgs,
 	}
 	tx, err := ccipContracts.TollOnRampRouter.CcipSend(ccipContracts.SourceUser, ccipContracts.DestChainID, msg)
 	require.NoError(t, err)
@@ -841,12 +833,11 @@ func SendSubRequest(
 	t *testing.T,
 	ccipContracts CCIPContracts,
 	msgPayload string,
-	tokens []common.Address,
-	amounts []*big.Int,
+	tokens []evm_2_any_subscription_onramp_router.CCIPEVMTokenAndAmount,
 	gasLimit *big.Int,
 	receiver common.Address,
 ) {
-	tx := QueueSubRequest(t, ccipContracts, msgPayload, tokens, amounts, gasLimit, receiver)
+	tx := QueueSubRequest(t, ccipContracts, msgPayload, tokens, gasLimit, receiver)
 	ConfirmTxs(t, []*types.Transaction{tx}, ccipContracts.SourceChain)
 }
 
@@ -854,17 +845,16 @@ func SendSubRequestByDapp(
 	t *testing.T,
 	ccipContracts CCIPContracts,
 	msgPayload string,
-	tokens []common.Address,
-	amounts []*big.Int,
+	tokens []subscription_sender_dapp.CCIPEVMTokenAndAmount,
 	gasLimit *big.Int,
 	receiver common.Address,
 ) {
-	tx := QueueSubRequestByDapp(t, ccipContracts, msgPayload, tokens, amounts, gasLimit, receiver)
+	tx := QueueSubRequestByDapp(t, ccipContracts, msgPayload, tokens, gasLimit, receiver)
 	ConfirmTxs(t, []*types.Transaction{tx}, ccipContracts.SourceChain)
 }
 
-func SendRequest(t *testing.T, ccipContracts CCIPContracts, msgPayload string, tokens []common.Address, amounts []*big.Int, feeToken common.Address, feeTokenAmount *big.Int, gasLimit *big.Int, receiver common.Address) {
-	tx := QueueRequest(t, ccipContracts, msgPayload, tokens, amounts, feeToken, feeTokenAmount, gasLimit, receiver)
+func SendRequest(t *testing.T, ccipContracts CCIPContracts, msgPayload string, tokens []evm_2_any_toll_onramp_router.CCIPEVMTokenAndAmount, feeToken evm_2_any_toll_onramp_router.CCIPEVMTokenAndAmount, gasLimit *big.Int, receiver common.Address) {
+	tx := QueueRequest(t, ccipContracts, msgPayload, tokens, feeToken, gasLimit, receiver)
 	ConfirmTxs(t, []*types.Transaction{tx}, ccipContracts.SourceChain)
 }
 

@@ -293,16 +293,15 @@ contract AggregateTokenLimiter__removeTokens is AggregateTokenLimiterSetup {
     uint256 numberOfTokens = 15;
     uint256 value = numberOfTokens * TOKEN_PRICE;
 
-    address[] memory tokens = new address[](1);
-    tokens[0] = address(TOKEN);
-    uint256[] memory amounts = new uint256[](1);
-    amounts[0] = numberOfTokens;
+    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts = new CCIP.EVMTokenAndAmount[](1);
+    tokensAndAmounts[0].token = address(TOKEN);
+    tokensAndAmounts[0].amount = numberOfTokens;
 
     vm.expectEmit(false, false, false, true);
     emit TokensRemovedFromBucket(value);
 
     // Remove the value from the pool
-    s_rateLimiter.removeTokens(tokens, amounts);
+    s_rateLimiter.removeTokens(tokensAndAmounts);
 
     // Get the updated bucket status
     AggregateRateLimiterInterface.TokenBucket memory bucket = s_rateLimiter.calculateCurrentTokenBucketState();
@@ -312,13 +311,13 @@ contract AggregateTokenLimiter__removeTokens is AggregateTokenLimiterSetup {
     // Since value * 2 > bucket.capacity we cannot take it out twice.
     // Expect a revert when we try.
     vm.expectRevert(AggregateRateLimiterInterface.ValueExceedsAllowedThreshold.selector);
-    s_rateLimiter.removeTokens(tokens, amounts);
+    s_rateLimiter.removeTokens(tokensAndAmounts);
 
     // Move the block time forward by 10 so the bucket refills by 10 * rate
     vm.warp(BLOCK_TIME + 10);
 
     // The bucket has filled up enough so we can take out more tokens
-    s_rateLimiter.removeTokens(tokens, amounts);
+    s_rateLimiter.removeTokens(tokensAndAmounts);
     bucket = s_rateLimiter.calculateCurrentTokenBucketState();
     assertEq(bucket.capacity - value + 10 * s_config.rate - value, bucket.tokens);
   }
@@ -327,16 +326,15 @@ contract AggregateTokenLimiter__removeTokens is AggregateTokenLimiterSetup {
 
   function testUnknownTokenReverts() public {
     vm.expectRevert(abi.encodeWithSelector(AggregateRateLimiterInterface.PriceNotFoundForToken.selector, address(0)));
-    s_rateLimiter.removeTokens(new address[](1), new uint256[](1));
+    s_rateLimiter.removeTokens(new CCIP.EVMTokenAndAmount[](1));
   }
 
   function testValueExceedsAllowedThresholdReverts() public {
-    address[] memory tokens = new address[](1);
-    tokens[0] = address(TOKEN);
-    uint256[] memory amounts = new uint256[](1);
-    amounts[0] = 100;
+    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts = new CCIP.EVMTokenAndAmount[](1);
+    tokensAndAmounts[0].token = address(TOKEN);
+    tokensAndAmounts[0].amount = 100;
 
     vm.expectRevert(AggregateRateLimiterInterface.ValueExceedsAllowedThreshold.selector);
-    s_rateLimiter.removeTokens(tokens, amounts);
+    s_rateLimiter.removeTokens(tokensAndAmounts);
   }
 }

@@ -10,7 +10,9 @@ contract MockOnRamp is EVM2EVMTollOnRampInterface {
   uint256 public immutable i_destinationChainId;
   uint256 public immutable i_fee;
 
-  CCIP.EVM2AnyTollMessage public mp;
+  bytes public messageReceiver;
+  bytes public messageData;
+  bytes public messageTokens;
 
   event GetRequiredFee(IERC20 token);
   event GetTokenPool(IERC20 token);
@@ -28,7 +30,9 @@ contract MockOnRamp is EVM2EVMTollOnRampInterface {
   }
 
   function forwardFromRouter(CCIP.EVM2AnyTollMessage memory message, address) external override returns (uint64) {
-    mp = message;
+    messageReceiver = message.receiver;
+    messageData = message.data;
+    messageTokens = abi.encode(message.tokensAndAmounts);
     return 0;
   }
 
@@ -38,14 +42,12 @@ contract MockOnRamp is EVM2EVMTollOnRampInterface {
     returns (
       bytes memory receiver,
       bytes memory data,
-      address[] memory tokens,
-      uint256[] memory amounts
+      CCIP.EVMTokenAndAmount[] memory tokensAndAmounts
     )
   {
-    receiver = mp.receiver;
-    data = mp.data;
-    tokens = mp.tokens;
-    amounts = mp.amounts;
+    receiver = messageReceiver;
+    data = messageData;
+    tokensAndAmounts = abi.decode(messageTokens, (CCIP.EVMTokenAndAmount[]));
   }
 
   function getRequiredFee(IERC20 token) external override returns (uint256) {

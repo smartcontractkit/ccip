@@ -47,28 +47,22 @@ func (t *TollLeafHasher) HashLeaf(log types.Log) ([32]byte, error) {
 	if err != nil {
 		return [32]byte{}, err
 	}
-	tokens, err := utils.ABIEncode(`[{"type":"address[]"}]`, event.Message.Tokens)
-	if err != nil {
-		return [32]byte{}, err
-	}
-	amounts, err := utils.ABIEncode(`[{"type":"uint256[]"}]`, event.Message.Amounts)
+	encodedTokens, err := utils.ABIEncode(`[{"components": [{"name": "token","type": "address"}, {"name": "amount", "type": "uint256"}],"type": "tuple[]"}]`, event.Message.TokensAndAmounts)
 	if err != nil {
 		return [32]byte{}, err
 	}
 
 	packedValues, err := utils.ABIEncode(
-		`[{"type":"bytes1"},{"type":"bytes32"},{"type":"uint64"},{"type":"address"},{"type":"address"},{"type":"bytes32"},{"type":"bytes32"},{"type":"bytes32"},{"type":"uint256"},{"type":"address"},{"type":"uint256"}]`,
+		`[{"type":"bytes1"},{"type":"bytes32"},{"type":"uint64"},{"type":"address"},{"type":"address"},{"type":"bytes32"},{"type":"bytes32"},{"type":"uint256"},{"components": [{"name": "token","type": "address"}, {"name": "amount", "type": "uint256"}],"name": "feeToken","type": "tuple"}]`,
 		LeafDomainSeparator,
 		t.metaDataHash,
 		event.Message.SequenceNumber,
 		event.Message.Sender,
 		event.Message.Receiver,
 		t.ctx.Hash(event.Message.Data),
-		t.ctx.Hash(tokens),
-		t.ctx.Hash(amounts),
+		t.ctx.Hash(encodedTokens),
 		event.Message.GasLimit,
-		event.Message.FeeToken,
-		event.Message.FeeTokenAmount,
+		event.Message.FeeTokenAndAmount,
 	)
 	if err != nil {
 		return [32]byte{}, err
@@ -104,25 +98,19 @@ func (s *SubscriptionLeafHasher) HashLeaf(log types.Log) ([32]byte, error) {
 	if err != nil {
 		return [32]byte{}, err
 	}
-	tokens, err := utils.ABIEncode(`[{"type":"address[]"}]`, event.Message.Tokens)
+	encodedTokens, err := utils.ABIEncode(`[{"components": [{"name": "token","type": "address"}, {"name": "amount", "type": "uint256"}], "type": "tuple[]"}]`, event.Message.TokensAndAmounts)
 	if err != nil {
 		return [32]byte{}, err
 	}
-	amounts, err := utils.ABIEncode(`[{"type":"uint256[]"}]`, event.Message.Amounts)
-	if err != nil {
-		return [32]byte{}, err
-	}
-
 	packedValues, err := utils.ABIEncode(
-		`[{"type":"bytes1"},{"type":"bytes32"},{"type":"uint64"},{"type":"address"},{"type":"address"},{"type":"bytes32"},{"type":"bytes32"},{"type":"bytes32"},{"type":"uint256"},{"type":"uint64"}]`,
+		`[{"type":"bytes1"},{"type":"bytes32"},{"type":"uint64"},{"type":"address"},{"type":"address"},{"type":"bytes32"},{"type":"bytes32"},{"type":"uint256"},{"type":"uint64"}]`,
 		LeafDomainSeparator,
 		s.metaDataHash,
 		event.Message.SequenceNumber,
 		event.Message.Sender,
 		event.Message.Receiver,
 		s.ctx.Hash(event.Message.Data),
-		s.ctx.Hash(tokens),
-		s.ctx.Hash(amounts),
+		s.ctx.Hash(encodedTokens),
 		event.Message.GasLimit,
 		event.Message.Nonce,
 	)

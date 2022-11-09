@@ -40,11 +40,11 @@ contract BaseOffRampHelper is BaseOffRamp {
   }
 
   function releaseOrMintTokens(
-    address[] memory tokens,
-    uint256[] memory amounts,
+    address[] memory pools,
+    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts,
     address receiver
   ) external {
-    _releaseOrMintTokens(tokens, amounts, receiver);
+    _releaseOrMintTokens(pools, tokensAndAmounts, receiver);
   }
 
   function verifyMessages(

@@ -7,6 +7,7 @@ import {IERC20} from "../pools/PoolCollector.sol";
 import {AllowList} from "../access/AllowList.sol";
 import {AggregateRateLimiter} from "../rateLimiter/AggregateRateLimiter.sol";
 import {BaseOnRampInterface} from "../interfaces/onRamp/BaseOnRampInterface.sol";
+import {CCIP} from "../models/Models.sol";
 
 contract BaseOnRamp is BaseOnRampInterface, HealthChecker, TokenPoolRegistry, AllowList, AggregateRateLimiter {
   // Chain ID of the source chain (where this contract is deployed)
@@ -41,7 +42,7 @@ contract BaseOnRamp is BaseOnRampInterface, HealthChecker, TokenPoolRegistry, Al
     AllowList(allowlist)
     AggregateRateLimiter(rateLimiterConfig, tokenLimitsAdmin)
   {
-    // TokenPoolRegistry does a check on tokens.length != pools.length
+    // TokenPoolRegistry does a check on tokensAndAmounts.length != pools.length
     i_chainId = chainId;
     i_destinationChainId = destinationChainId;
     s_config = config;
@@ -86,15 +87,13 @@ contract BaseOnRamp is BaseOnRampInterface, HealthChecker, TokenPoolRegistry, Al
    * @dev this function is generic over message types, thereby reducing code duplication.
    * @param dataLength The length of the data field of the message
    * @param gasLimit The gasLimit set in message for destination execution
-   * @param tokens The tokens to be sent. They will be locked into pools by this function.
-   * @param amounts The amounts corresponding to the tokens.
+   * @param tokensAndAmounts The token payload to be sent. They will be locked into pools by this function.
    * @param originalSender The original sender of the message on the router.
    */
   function _handleForwardFromRouter(
     uint256 dataLength,
     uint256 gasLimit,
-    address[] memory tokens,
-    uint256[] memory amounts,
+    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts,
     address originalSender
   ) internal {
     if (s_router == address(0)) revert RouterNotSet();
@@ -102,20 +101,20 @@ contract BaseOnRamp is BaseOnRampInterface, HealthChecker, TokenPoolRegistry, Al
     // Check that payload is formed correctly
     if (dataLength > uint256(s_config.maxDataSize)) revert MessageTooLarge(uint256(s_config.maxDataSize), dataLength);
     if (gasLimit > uint256(s_config.maxGasLimit)) revert MessageGasLimitTooHigh();
-    uint256 tokenLength = tokens.length;
-    if (tokenLength > uint256(s_config.maxTokensLength) || tokenLength != amounts.length)
-      revert UnsupportedNumberOfTokens();
+    uint256 tokenLength = tokensAndAmounts.length;
+    if (tokenLength > uint256(s_config.maxTokensLength)) revert UnsupportedNumberOfTokens();
 
     if (s_allowlistEnabled && !s_allowed[originalSender]) revert SenderNotAllowed(originalSender);
 
-    _removeTokens(tokens, amounts);
+    _removeTokens(tokensAndAmounts);
 
     // Lock all tokens in their corresponding pools
     for (uint256 i = 0; i < tokenLength; ++i) {
-      IERC20 token = IERC20(tokens[i]);
+      CCIP.EVMTokenAndAmount memory ta = tokensAndAmounts[i];
+      IERC20 token = IERC20(ta.token);
       PoolInterface pool = getPool(token);
       if (address(pool) == address(0)) revert UnsupportedToken(token);
-      pool.lockOrBurn(amounts[i]);
+      pool.lockOrBurn(ta.amount);
     }
   }
 }

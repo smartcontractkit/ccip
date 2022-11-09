@@ -21,8 +21,7 @@ contract EVM2EVMTollOffRampRouterSetup is BaseTest {
   }
 
   function _generateMockMessage(address receiver) internal pure returns (CCIP.Any2EVMMessageFromSender memory) {
-    address[] memory tokens = new address[](0);
-    uint256[] memory amounts = new uint256[](0);
+    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts = new CCIP.EVMTokenAndAmount[](0);
     address[] memory pools = new address[](0);
     return (
       CCIP.Any2EVMMessageFromSender({
@@ -30,9 +29,8 @@ contract EVM2EVMTollOffRampRouterSetup is BaseTest {
         sender: abi.encode(STRANGER),
         receiver: receiver,
         data: abi.encode(0),
-        destTokens: tokens,
+        destTokensAndAmounts: tokensAndAmounts,
         destPools: pools,
-        amounts: amounts,
         gasLimit: GAS_LIMIT
       })
     );

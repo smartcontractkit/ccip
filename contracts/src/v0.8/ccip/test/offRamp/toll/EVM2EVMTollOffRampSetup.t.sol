@@ -57,14 +57,15 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
     view
     returns (CCIP.Any2EVMMessageFromSender memory message)
   {
-    uint256 numberOfTokens = original.tokens.length;
-    address[] memory destTokens = new address[](numberOfTokens);
+    uint256 numberOfTokens = original.tokensAndAmounts.length;
+    CCIP.EVMTokenAndAmount[] memory destTokensAndAmounts = new CCIP.EVMTokenAndAmount[](numberOfTokens);
     address[] memory destPools = new address[](numberOfTokens);
 
     for (uint256 i = 0; i < numberOfTokens; ++i) {
-      PoolInterface pool = s_offRamp.getPool(IERC20(original.tokens[i]));
+      PoolInterface pool = s_offRamp.getPool(IERC20(original.tokensAndAmounts[i].token));
       destPools[i] = address(pool);
-      destTokens[i] = address(pool.getToken());
+      destTokensAndAmounts[i].token = address(pool.getToken());
+      destTokensAndAmounts[i].amount = original.tokensAndAmounts[i].amount;
     }
 
     return
@@ -73,9 +74,8 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
         sender: abi.encode(original.sender),
         receiver: original.receiver,
         data: original.data,
-        destTokens: destTokens,
+        destTokensAndAmounts: destTokensAndAmounts,
         destPools: destPools,
-        amounts: original.amounts,
         gasLimit: original.gasLimit
       });
   }
@@ -85,10 +85,7 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
     view
     returns (CCIP.EVM2EVMTollMessage memory)
   {
-    address[] memory tokens;
-    uint256[] memory amounts;
-
-    return _generateAny2EVMTollMessage(sequenceNumber, tokens, amounts);
+    return _generateAny2EVMTollMessage(sequenceNumber, getCastedSourceEVMTokenAndAmountsWithZeroAmounts());
   }
 
   function _generateAny2EVMTollMessageWithTokens(uint64 sequenceNumber, uint256[] memory amounts)
@@ -96,15 +93,20 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
     view
     returns (CCIP.EVM2EVMTollMessage memory)
   {
-    return _generateAny2EVMTollMessage(sequenceNumber, s_sourceTokens, amounts);
+    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts = getCastedSourceEVMTokenAndAmountsWithZeroAmounts();
+    for (uint256 i = 0; i < tokensAndAmounts.length; ++i) {
+      tokensAndAmounts[i].amount = amounts[i];
+    }
+    return _generateAny2EVMTollMessage(sequenceNumber, tokensAndAmounts);
   }
 
-  function _generateAny2EVMTollMessage(
-    uint64 sequenceNumber,
-    address[] memory tokens,
-    uint256[] memory amounts
-  ) internal view returns (CCIP.EVM2EVMTollMessage memory) {
+  function _generateAny2EVMTollMessage(uint64 sequenceNumber, CCIP.EVMTokenAndAmount[] memory tokensAndAmounts)
+    internal
+    view
+    returns (CCIP.EVM2EVMTollMessage memory)
+  {
     bytes memory data = abi.encode(0);
+    CCIP.EVMTokenAndAmount memory feeToken = CCIP.EVMTokenAndAmount({token: tokensAndAmounts[0].token, amount: EXECUTION_FEE_AMOUNT});
     return
       CCIP.EVM2EVMTollMessage(
         SOURCE_CHAIN_ID,
@@ -112,10 +114,8 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
         OWNER,
         address(s_receiver),
         data,
-        tokens,
-        amounts,
-        s_sourceTokens[0],
-        EXECUTION_FEE_AMOUNT,
+        tokensAndAmounts,
+        feeToken,
         GAS_LIMIT
       );
   }
@@ -128,15 +128,15 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
 
   function _generateMessagesWithTokens() internal view returns (CCIP.EVM2EVMTollMessage[] memory) {
     CCIP.EVM2EVMTollMessage[] memory messages = new CCIP.EVM2EVMTollMessage[](2);
-    uint256[] memory amounts = new uint256[](2);
-    amounts[0] = 1000;
-    amounts[1] = 50;
-    messages[0] = _generateAny2EVMTollMessage(10, s_sourceTokens, amounts);
-    messages[0].feeToken = s_sourceTokens[0];
-    messages[0].feeTokenAmount = EXECUTION_FEE_AMOUNT;
-    messages[1] = _generateAny2EVMTollMessage(11, s_sourceTokens, amounts);
-    messages[1].feeToken = s_sourceTokens[0];
-    messages[1].feeTokenAmount = EXECUTION_FEE_AMOUNT;
+    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts = getCastedSourceEVMTokenAndAmountsWithZeroAmounts();
+    CCIP.EVMTokenAndAmount memory feeToken = tokensAndAmounts[0];
+    feeToken.amount = EXECUTION_FEE_AMOUNT;
+    tokensAndAmounts[0].amount = 1e18;
+    tokensAndAmounts[1].amount = 5e18;
+    messages[0] = _generateAny2EVMTollMessage(10, tokensAndAmounts);
+    messages[0].feeTokenAndAmount = feeToken;
+    messages[1] = _generateAny2EVMTollMessage(11, tokensAndAmounts);
+    messages[1].feeTokenAndAmount = feeToken;
     return messages;
   }
 

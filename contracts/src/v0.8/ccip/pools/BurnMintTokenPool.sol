@@ -20,7 +20,7 @@ contract BurnMintTokenPool is TokenPool {
   }
 
   /**
-   * @notice Mint tokens fromm the pool to the recipient
+   * @notice Mint tokens from the pool to the recipient
    * @param recipient Recipient address
    * @param amount Amount to mint
    */

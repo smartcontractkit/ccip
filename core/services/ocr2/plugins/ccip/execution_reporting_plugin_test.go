@@ -172,42 +172,39 @@ func (e ExecutionContracts) generateMessageBatch(t *testing.T, payloadSize int, 
 	var leafHashes [][32]byte
 	var msgs []ccip.Message
 	var indices []int
-	var tokens []common.Address
-	var amounts []*big.Int
+	var tokens []evm_2_evm_toll_onramp.CCIPEVMTokenAndAmount
 	var helperMsgs []evm_2_evm_toll_onramp.CCIPEVM2EVMTollMessage
 	for i := 0; i < nTokensPerMessage; i++ {
-		tokens = append(tokens, e.linkTokenAddress)
-		amounts = append(amounts, big.NewInt(1))
+		tokens = append(tokens, evm_2_evm_toll_onramp.CCIPEVMTokenAndAmount{
+			Token:  e.linkTokenAddress,
+			Amount: big.NewInt(1),
+		})
 	}
 	var seqNums []uint64
 	var allMsgBytes [][]byte
 	for i := 0; i < nMessages; i++ {
 		seqNums = append(seqNums, 1+uint64(i))
 		message := ccip.Message{
-			SequenceNumber: 1 + uint64(i),
-			SourceChainId:  e.sourceChainID,
-			Sender:         e.user.From,
-			Tokens:         tokens,
-			Amounts:        amounts,
-			Receiver:       e.receiver.Address(),
-			Data:           maxPayload,
-			FeeToken:       tokens[0],
-			FeeTokenAmount: big.NewInt(4),
-			GasLimit:       big.NewInt(100_000),
+			SequenceNumber:    1 + uint64(i),
+			SourceChainId:     e.sourceChainID,
+			Sender:            e.user.From,
+			TokensAndAmounts:  tokens,
+			Receiver:          e.receiver.Address(),
+			Data:              maxPayload,
+			FeeTokenAndAmount: tokens[0],
+			GasLimit:          big.NewInt(100_000),
 		}
 
 		// Unfortunately have to do this to use the helper's gethwrappers.
 		helperMsgs = append(helperMsgs, evm_2_evm_toll_onramp.CCIPEVM2EVMTollMessage{
-			SequenceNumber: message.SequenceNumber,
-			SourceChainId:  message.SourceChainId,
-			Sender:         message.Sender,
-			Tokens:         message.Tokens,
-			Amounts:        message.Amounts,
-			Receiver:       message.Receiver,
-			Data:           message.Data,
-			FeeToken:       message.FeeToken,
-			FeeTokenAmount: message.FeeTokenAmount,
-			GasLimit:       message.GasLimit,
+			SequenceNumber:    message.SequenceNumber,
+			SourceChainId:     message.SourceChainId,
+			Sender:            message.Sender,
+			TokensAndAmounts:  message.TokensAndAmounts,
+			Receiver:          message.Receiver,
+			Data:              message.Data,
+			FeeTokenAndAmount: message.FeeTokenAndAmount,
+			GasLimit:          message.GasLimit,
 		})
 		msgs = append(msgs, message)
 		indices = append(indices, i)

@@ -18,7 +18,7 @@ contract CustomTokenPool is TokenPool {
   }
 
   /**
-   * @notice Release tokens fromm the pool to the recipient
+   * @notice Release tokens from the pool to the recipient
    * @param amount Amount to release
    */
   function releaseOrMint(address, uint256 amount) external override whenNotPaused assertMintOrRelease {

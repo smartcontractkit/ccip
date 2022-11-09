@@ -58,7 +58,7 @@ contract EVM2EVMTollOnRamp is EVM2EVMTollOnRampInterface, BaseOnRamp, TypeAndVer
   {
     if (msg.sender != address(s_router)) revert MustBeCalledByRouter();
     uint256 gasLimit = message.extraArgs._fromBytes().gasLimit;
-    _handleForwardFromRouter(message.data.length, gasLimit, message.tokens, message.amounts, originalSender);
+    _handleForwardFromRouter(message.data.length, gasLimit, message.tokensAndAmounts, originalSender);
 
     // Emit message request
     // we need the next available sequence number so we increment before we use the value
@@ -68,10 +68,8 @@ contract EVM2EVMTollOnRamp is EVM2EVMTollOnRampInterface, BaseOnRamp, TypeAndVer
       sender: originalSender,
       receiver: abi.decode(message.receiver, (address)),
       data: message.data,
-      tokens: message.tokens,
-      amounts: message.amounts,
-      feeToken: message.feeToken,
-      feeTokenAmount: message.feeTokenAmount,
+      tokensAndAmounts: message.tokensAndAmounts,
+      feeTokenAndAmount: message.feeTokenAndAmount,
       gasLimit: gasLimit
     });
     emit CCIPSendRequested(tollMsg);

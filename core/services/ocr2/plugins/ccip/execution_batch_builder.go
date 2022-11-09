@@ -187,17 +187,17 @@ func (eb *ExecutionBatchBuilder) getExecutableSeqNrs(
 		srcToDst[sourceToken] = dst
 	}
 
-	supportedDestTokens := make([]common.Address, 0, len(srcToDst))
-	for _, destTokens := range srcToDst {
-		supportedDestTokens = append(supportedDestTokens, destTokens)
+	supporteddestTokensAndAmounts := make([]common.Address, 0, len(srcToDst))
+	for _, destTokensAndAmounts := range srcToDst {
+		supporteddestTokensAndAmounts = append(supporteddestTokensAndAmounts, destTokensAndAmounts)
 	}
 
-	destTokenPrices, err := eb.offRamp.GetPricesForTokens(nil, supportedDestTokens)
+	destTokenPrices, err := eb.offRamp.GetPricesForTokens(nil, supporteddestTokensAndAmounts)
 	if err != nil {
 		return nil, err
 	}
 	pricePerDestToken := make(map[common.Address]*big.Int)
-	for i, destToken := range supportedDestTokens {
+	for i, destToken := range supporteddestTokensAndAmounts {
 		pricePerDestToken[destToken] = destTokenPrices[i]
 	}
 

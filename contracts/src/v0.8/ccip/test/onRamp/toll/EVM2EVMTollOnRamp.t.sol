@@ -117,16 +117,7 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
     assertEq(MAX_TOKENS_LENGTH, s_onRamp.getConfig().maxTokensLength);
     CCIP.EVM2AnyTollMessage memory message = _generateEmptyMessage();
     uint256 tooMany = MAX_TOKENS_LENGTH + 1;
-    message.tokens = new address[](tooMany);
-    message.amounts = new uint256[](tooMany);
-    vm.expectRevert(BaseOnRampInterface.UnsupportedNumberOfTokens.selector);
-    s_onRamp.forwardFromRouter(message, STRANGER);
-  }
-
-  function testTokenNumberMismatchReverts() public {
-    CCIP.EVM2AnyTollMessage memory message = _generateEmptyMessage();
-    message.tokens = new address[](1);
-    message.amounts = new uint256[](2);
+    message.tokensAndAmounts = new CCIP.EVMTokenAndAmount[](tooMany);
     vm.expectRevert(BaseOnRampInterface.UnsupportedNumberOfTokens.selector);
     s_onRamp.forwardFromRouter(message, STRANGER);
   }
@@ -144,15 +135,16 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
     address wrongToken = address(1);
 
     CCIP.EVM2AnyTollMessage memory message = _generateEmptyMessage();
-    message.tokens = new address[](1);
-    message.tokens[0] = wrongToken;
-    message.amounts = new uint256[](1);
-    message.amounts[0] = 1;
+    message.tokensAndAmounts = new CCIP.EVMTokenAndAmount[](1);
+    message.tokensAndAmounts[0].token = wrongToken;
+    message.tokensAndAmounts[0].amount = 1;
 
     // We need to set the price of this new token to be able to reach
     // the proper revert point. This must be called by the owner.
     changePrank(OWNER);
-    s_onRamp.setPrices(abi.decode(abi.encode(message.tokens), (IERC20[])), message.amounts);
+    uint256[] memory prices = new uint256[](1);
+    prices[0] = 1;
+    s_onRamp.setPrices(abi.decode(abi.encode(message.tokensAndAmounts), (IERC20[])), prices);
 
     // Change back to the router
     changePrank(address(s_onRampRouter));
@@ -163,10 +155,9 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
 
   function testValueExceedsAllowedThresholdReverts() public {
     CCIP.EVM2AnyTollMessage memory message = _generateEmptyMessage();
-    message.amounts = new uint256[](1);
-    message.amounts[0] = 2**128;
-    message.tokens = new address[](1);
-    message.tokens[0] = s_sourceTokens[0];
+    message.tokensAndAmounts = new CCIP.EVMTokenAndAmount[](1);
+    message.tokensAndAmounts[0].amount = 2**128;
+    message.tokensAndAmounts[0].token = s_sourceTokens[0];
 
     IERC20(s_sourceTokens[0]).approve(address(s_onRamp), 2**128);
 
@@ -177,10 +168,10 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
 
   function testPriceNotFoundForTokenReverts() public {
     CCIP.EVM2AnyTollMessage memory message = _generateEmptyMessage();
+
     address fakeToken = address(1);
-    message.amounts = new uint256[](1);
-    message.tokens = new address[](1);
-    message.tokens[0] = fakeToken;
+    message.tokensAndAmounts = new CCIP.EVMTokenAndAmount[](1);
+    message.tokensAndAmounts[0].token = fakeToken;
 
     vm.expectRevert(abi.encodeWithSelector(AggregateRateLimiterInterface.PriceNotFoundForToken.selector, fakeToken));
 

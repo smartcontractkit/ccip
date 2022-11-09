@@ -4,12 +4,16 @@ pragma solidity 0.8.15;
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
 import {IERC20} from "../../vendor/IERC20.sol";
 
+struct EVMTokenAndAmount {
+  address token;
+  uint256 amount;
+}
+
 interface CCIPRouterInterface {
   struct Message {
     bytes receiver;
     bytes data;
-    IERC20[] tokens;
-    uint256[] amounts;
+    EVMTokenAndAmount[] tokensAndAmounts;
     bytes extraArgs;
   }
 
@@ -21,8 +25,7 @@ interface CCIPReceiverInterface {
     uint256 sourceChainId;
     bytes sender;
     bytes data;
-    IERC20[] tokens;
-    uint256[] amounts;
+    EVMTokenAndAmount[] tokensAndAmounts;
   }
 
   function ccipReceive(ReceivedMessage memory message) external;
@@ -70,8 +73,7 @@ contract PingPongDemo is CCIPReceiverInterface, OwnerIsCreator {
     CCIPRouterInterface.Message memory message = CCIPRouterInterface.Message({
       receiver: abi.encode(s_counterpartAddress),
       data: data,
-      tokens: new IERC20[](0),
-      amounts: new uint256[](0),
+      tokensAndAmounts: new EVMTokenAndAmount[](0),
       extraArgs: _toBytes(EVMExtraArgsV1({gasLimit: 200_000}))
     });
     s_sendingRouter.ccipSend(s_counterpartChainId, message);

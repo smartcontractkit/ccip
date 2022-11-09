@@ -21,7 +21,7 @@ contract NativeTokenPool is TokenPool {
   }
 
   /**
-   * @notice Release tokens fromm the pool to the recipient
+   * @notice Release tokens from the pool to the recipient
    * @param recipient Recipient address
    * @param amount Amount to release
    */

@@ -63,7 +63,7 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry, 
     AggregateRateLimiter(rateLimiterConfig, tokenLimitsAdmin)
   {
     if (offRampConfig.onRampAddress == address(0)) revert ZeroAddressNotAllowed();
-    // TokenPoolRegistry does a check on tokens.length != pools.length
+    // TokenPoolRegistry does a check on tokensAndAmounts.length != pools.length
     i_sourceChainId = sourceChainId;
     i_chainId = chainId;
     s_config = offRampConfig;
@@ -88,12 +88,12 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry, 
    */
   function _releaseOrMintTokens(
     address[] memory pools,
-    uint256[] memory amounts,
+    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts,
     address receiver
   ) internal {
-    if (pools.length != amounts.length) revert TokenAndAmountMisMatch();
+    if (pools.length != tokensAndAmounts.length) revert TokenAndAmountMisMatch();
     for (uint256 i = 0; i < pools.length; ++i) {
-      _releaseOrMintToken(PoolInterface(pools[i]), amounts[i], receiver);
+      _releaseOrMintToken(PoolInterface(pools[i]), tokensAndAmounts[i].amount, receiver);
     }
   }
 
@@ -144,9 +144,9 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry, 
    */
   function executeSingleMessage(CCIP.Any2EVMMessageFromSender memory message) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
-    if (message.destTokens.length > 0) {
-      _removeTokens(message.destTokens, message.amounts);
-      _releaseOrMintTokens(message.destPools, message.amounts, message.receiver);
+    if (message.destTokensAndAmounts.length > 0) {
+      _removeTokens(message.destTokensAndAmounts);
+      _releaseOrMintTokens(message.destPools, message.destTokensAndAmounts, message.receiver);
     }
 
     _callReceiver(message);

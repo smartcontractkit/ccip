@@ -30,11 +30,10 @@ contract SubscriptionSenderDapp is TypeAndVersionInterface {
    * @dev msg.sender must first call TOKEN.approve for this contract to spend the tokens.
    */
   function sendMessage(CCIP.EVM2AnySubscriptionMessage memory message) external returns (uint64 sequenceNumber) {
-    address[] memory tokens = message.tokens;
-    uint256[] memory amounts = message.amounts;
-    for (uint256 i = 0; i < tokens.length; ++i) {
-      IERC20(tokens[i]).safeTransferFrom(msg.sender, address(this), amounts[i]);
-      IERC20(tokens[i]).approve(address(i_onRampRouter), amounts[i]);
+    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts = message.tokensAndAmounts;
+    for (uint256 i = 0; i < tokensAndAmounts.length; ++i) {
+      IERC20(tokensAndAmounts[i].token).safeTransferFrom(msg.sender, address(this), tokensAndAmounts[i].amount);
+      IERC20(tokensAndAmounts[i].token).approve(address(i_onRampRouter), tokensAndAmounts[i].amount);
     }
     sequenceNumber = i_onRampRouter.ccipSend(i_destinationChainId, message);
   }

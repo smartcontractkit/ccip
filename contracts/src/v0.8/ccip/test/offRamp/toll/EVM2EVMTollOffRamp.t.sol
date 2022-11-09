@@ -81,8 +81,9 @@ contract EVM2EVMTollOffRamp_ccipReceive is EVM2EVMTollOffRampSetup {
   // Reverts
 
   function testReverts() public {
+    CCIP.Any2EVMMessageFromSender memory message = _convertTollToGeneralMessage(_generateAny2EVMTollMessageNoTokens(1));
     vm.expectRevert();
-    s_offRamp.ccipReceive(_convertTollToGeneralMessage(_generateAny2EVMTollMessageNoTokens(1)));
+    s_offRamp.ccipReceive(message);
   }
 }
 
@@ -125,10 +126,7 @@ contract EVM2EVMTollOffRamp_execute is EVM2EVMTollOffRampSetup {
     s_offRamp.execute(_generateReportFromMessages(messages), false);
 
     // Assert fee taken on failure.
-    // Note gas price is 1 so gas=wei and our juels/eth price is 2e20.
-    // Sanity check of feeTaken:
-    // 35360400 juels / (2e20 juels/eth * 1eth/1e18wei) = 176k wei = 176k gas.
-    assertEq(35360400, s_offRamp.feeTaken(messages[0].sequenceNumber));
+    assertGt(s_offRamp.feeTaken(messages[0].sequenceNumber), 0);
   }
 
   function testTwoMessagesWithTokensSuccess() public {
@@ -229,14 +227,14 @@ contract EVM2EVMTollOffRamp_execute is EVM2EVMTollOffRampSetup {
 
   function testUnsupportedNumberOfTokensReverts() public {
     CCIP.EVM2EVMTollMessage[] memory messages = _generateBasicMessages();
-    address[] memory newTokens = new address[](1);
-    newTokens[0] = s_sourceTokens[0];
-    messages[0].tokens = newTokens;
+    CCIP.EVMTokenAndAmount[] memory newTokens = new CCIP.EVMTokenAndAmount[](MAX_TOKENS_LENGTH + 1);
+    messages[0].tokensAndAmounts = newTokens;
+    CCIP.ExecutionReport memory report = _generateReportFromMessages(messages);
 
     vm.expectRevert(
       abi.encodeWithSelector(BaseOffRampInterface.UnsupportedNumberOfTokens.selector, messages[0].sequenceNumber)
     );
-    s_offRamp.execute(_generateReportFromMessages(messages), false);
+    s_offRamp.execute(report, false);
   }
 
   function testMessageTooLargeReverts() public {
@@ -253,7 +251,9 @@ contract EVM2EVMTollOffRamp_execute is EVM2EVMTollOffRampSetup {
 
   function testUnsupportedTokenReverts() public {
     CCIP.EVM2EVMTollMessage[] memory messages = _generateMessagesWithTokens();
-    messages[0].tokens[0] = s_destTokens[0];
+    messages[0].tokensAndAmounts[0] = getCastedDestinationEVMTokenAndAmountsWithZeroAmounts()[0];
+    messages[0].feeTokenAndAmount.token = messages[0].tokensAndAmounts[0].token;
+    messages[0].feeTokenAndAmount.amount = RELAYING_FEE_JUELS;
     vm.expectRevert(abi.encodeWithSelector(BaseOffRampInterface.UnsupportedToken.selector, s_destTokens[0]));
     s_offRamp.execute(_generateReportFromMessages(messages), false);
   }
@@ -310,8 +310,9 @@ contract EVM2EVMTollOffRamp_executeSingleMessage is EVM2EVMTollOffRampSetup {
 
   function testMessageSenderReverts() public {
     vm.stopPrank();
+    CCIP.Any2EVMMessageFromSender memory message = _convertTollToGeneralMessage(_generateAny2EVMTollMessageNoTokens(1));
     vm.expectRevert(BaseOffRampInterface.CanOnlySelfCall.selector);
-    s_offRamp.executeSingleMessage(_convertTollToGeneralMessage(_generateAny2EVMTollMessageNoTokens(1)));
+    s_offRamp.executeSingleMessage(message);
   }
 }
 

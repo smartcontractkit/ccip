@@ -4,6 +4,7 @@ pragma solidity 0.8.15;
 import {AggregateRateLimiterInterface} from "../interfaces/rateLimiter/AggregateRateLimiterInterface.sol";
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
 import {IERC20} from "../../vendor/IERC20.sol";
+import {CCIP} from "../models/Models.sol";
 
 contract AggregateRateLimiter is AggregateRateLimiterInterface, OwnerIsCreator {
   // The address of the token limit admin that has the same permissions as
@@ -112,19 +113,18 @@ contract AggregateRateLimiter is AggregateRateLimiterInterface, OwnerIsCreator {
    * @notice _removeTokens removes the given token values from the pool, lowering the
               value allowed to be transferred for subsequent calls. It will use the
               s_priceByToken mapping to determine value in a standardised unit.
-   * @param tokens The tokens that are send across the bridge. All of the tokens need
+   * @param tokensAndAmounts The tokensAndAmounts that are send across the bridge. All of the tokens need
    *          to have a corresponding price set in s_priceByToken.
-   * @param amounts The number of tokens sent across the bridge.
    * @dev Reverts when a token price is not found or when the tx value exceeds the
    *          amount allowed in the bucket.
    * @dev Will only remove and therefore emit removal of value if the value is > 0.
    */
-  function _removeTokens(address[] memory tokens, uint256[] memory amounts) internal {
+  function _removeTokens(CCIP.EVMTokenAndAmount[] memory tokensAndAmounts) internal {
     uint256 value = 0;
-    for (uint256 i = 0; i < tokens.length; ++i) {
-      uint256 pricePerToken = s_priceByToken[IERC20(tokens[i])];
-      if (pricePerToken == 0) revert PriceNotFoundForToken(address(tokens[i]));
-      value += pricePerToken * amounts[i];
+    for (uint256 i = 0; i < tokensAndAmounts.length; ++i) {
+      uint256 pricePerToken = s_priceByToken[IERC20(tokensAndAmounts[i].token)];
+      if (pricePerToken == 0) revert PriceNotFoundForToken(tokensAndAmounts[i].token);
+      value += pricePerToken * tokensAndAmounts[i].amount;
     }
 
     // If there is no value to remove skip this step to reduce gas usage

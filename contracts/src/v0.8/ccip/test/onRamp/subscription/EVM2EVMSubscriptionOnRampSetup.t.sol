@@ -59,29 +59,25 @@ contract EVM2EVMSubscriptionOnRampSetup is TokenSetup {
   }
 
   function _generateTokenMessage() public view returns (CCIP.EVM2AnySubscriptionMessage memory) {
-    uint256[] memory amounts = new uint256[](2);
-    amounts[0] = i_tokenAmount0;
-    amounts[1] = i_tokenAmount1;
-    address[] memory tokens = s_sourceTokens;
+    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts = getCastedSourceEVMTokenAndAmountsWithZeroAmounts();
+    tokensAndAmounts[0].amount = i_tokenAmount0;
+    tokensAndAmounts[1].amount = i_tokenAmount1;
     return
       CCIP.EVM2AnySubscriptionMessage({
         receiver: abi.encode(OWNER),
         data: "",
-        tokens: tokens,
-        amounts: amounts,
+        tokensAndAmounts: tokensAndAmounts,
         extraArgs: CCIP.EVMExtraArgsV1({gasLimit: GAS_LIMIT})._toBytes()
       });
   }
 
   function _generateEmptyMessage() public pure returns (CCIP.EVM2AnySubscriptionMessage memory) {
-    uint256[] memory amounts = new uint256[](0);
-    address[] memory tokens = new address[](0);
+    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts = new CCIP.EVMTokenAndAmount[](0);
     return
       CCIP.EVM2AnySubscriptionMessage({
         receiver: abi.encode(OWNER),
         data: "",
-        tokens: tokens,
-        amounts: amounts,
+        tokensAndAmounts: tokensAndAmounts,
         extraArgs: CCIP.EVMExtraArgsV1({gasLimit: GAS_LIMIT})._toBytes()
       });
   }
@@ -99,8 +95,7 @@ contract EVM2EVMSubscriptionOnRampSetup is TokenSetup {
         receiver: abi.decode(message.receiver, (address)),
         nonce: nonce,
         data: message.data,
-        tokens: message.tokens,
-        amounts: message.amounts,
+        tokensAndAmounts: message.tokensAndAmounts,
         gasLimit: message.extraArgs._fromBytes().gasLimit
       });
   }

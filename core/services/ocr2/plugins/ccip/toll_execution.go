@@ -32,13 +32,13 @@ const (
 // Offchain: we compute the max overhead gas to determine msg executability.
 func overheadGasToll(merkleGasShare uint64, tollMsg *evm_2_evm_toll_onramp.EVM2EVMTollOnRampCCIPSendRequested) uint64 {
 	messageBytes := TOLL_CONSTANT_MESSAGE_PART_BYTES +
-		(EVM_ADDRESS_LENGTH_BYTES+EVM_WORD_BYTES)*len(tollMsg.Message.Tokens) + // token address (address) + token amount (uint256)
+		(EVM_ADDRESS_LENGTH_BYTES+EVM_WORD_BYTES)*len(tollMsg.Message.TokensAndAmounts) + // token address (address) + token amount (uint256)
 		len(tollMsg.Message.Data)
 	messageCallDataGas := uint64(messageBytes * CALLDATA_GAS_PER_BYTE)
 	return messageCallDataGas +
 		merkleGasShare +
 		TOLL_EXECUTION_STATE_PROCESSING_OVERHEAD_GAS +
-		PER_TOKEN_OVERHEAD_GAS*uint64(len(tollMsg.Message.Tokens)+1) + // All tokens plus fee token
+		PER_TOKEN_OVERHEAD_GAS*uint64(len(tollMsg.Message.TokensAndAmounts)+1) + // All tokens plus fee token
 		RATE_LIMITER_OVERHEAD_GAS +
 		EXTERNAL_CALL_OVERHEAD_GAS
 }
@@ -114,8 +114,13 @@ func (tb *TollBatchBuilder) BuildBatch(
 			tb.lggr.Infow("Skipping message already inflight", "seqNr", tollMsg.Message.SequenceNumber)
 			continue
 		}
-
-		msgValue, err := aggregateTokenValue(tokenLimitPrices, srcToDst, tollMsg.Message.Tokens, tollMsg.Message.Amounts)
+		var tokens []common.Address
+		var amounts []*big.Int
+		for i := 0; i < len(tollMsg.Message.TokensAndAmounts); i++ {
+			tokens = append(tokens, tollMsg.Message.TokensAndAmounts[i].Token)
+			amounts = append(amounts, tollMsg.Message.TokensAndAmounts[i].Amount)
+		}
+		msgValue, err := aggregateTokenValue(tokenLimitPrices, srcToDst, tokens, amounts)
 		if err != nil {
 			tb.lggr.Errorw("Skipping message unable to compute aggregate value", "err", err)
 			continue
@@ -132,13 +137,13 @@ func (tb *TollBatchBuilder) BuildBatch(
 			tb.lggr.Infow("Insufficient remaining gas in batch limit", "gasLimit", batchGasLimit, "totalGasLimit", totalGasLimit)
 			continue
 		}
-		if _, ok := srcToDst[tollMsg.Message.FeeToken]; !ok {
-			tb.lggr.Errorw("Unknown fee token", "token", tollMsg.Message.FeeToken, "supported", srcToDst)
+		if _, ok := srcToDst[tollMsg.Message.FeeTokenAndAmount.Token]; !ok {
+			tb.lggr.Errorw("Unknown fee token", "token", tollMsg.Message.FeeTokenAndAmount, "supported", srcToDst)
 			continue
 		}
-		maxCharge := maxTollCharge(gasPrice, tollTokensPerFeeCoin[srcToDst[tollMsg.Message.FeeToken]], totalGasLimit)
-		if tollMsg.Message.FeeTokenAmount.Cmp(maxCharge) < 0 {
-			tb.lggr.Infow("Insufficient fee token to execute msg", "balance", tollMsg.Message.FeeTokenAmount, "maxCharge", maxCharge, "maxGasOverhead", maxGasOverhead)
+		maxCharge := maxTollCharge(gasPrice, tollTokensPerFeeCoin[srcToDst[tollMsg.Message.FeeTokenAndAmount.Token]], totalGasLimit)
+		if tollMsg.Message.FeeTokenAndAmount.Amount.Cmp(maxCharge) < 0 {
+			tb.lggr.Infow("Insufficient fee token to execute msg", "balance", tollMsg.Message.FeeTokenAndAmount.Amount, "maxCharge", maxCharge, "maxGasOverhead", maxGasOverhead)
 			continue
 		}
 		batchGasLimit -= totalGasLimit
@@ -169,7 +174,13 @@ func (tb *TollBatchBuilder) inflight(
 			if err != nil {
 				return nil, nil, err
 			}
-			msgValue, err := aggregateTokenValue(tokenLimitPrices, srcToDst, msg.Message.Tokens, msg.Message.Amounts)
+			var tokens []common.Address
+			var amounts []*big.Int
+			for i := 0; i < len(msg.Message.TokensAndAmounts); i++ {
+				tokens = append(tokens, msg.Message.TokensAndAmounts[i].Token)
+				amounts = append(amounts, msg.Message.TokensAndAmounts[i].Amount)
+			}
+			msgValue, err := aggregateTokenValue(tokenLimitPrices, srcToDst, tokens, amounts)
 			if err != nil {
 				return nil, nil, err
 			}

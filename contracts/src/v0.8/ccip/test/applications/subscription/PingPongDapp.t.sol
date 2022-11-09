@@ -45,8 +45,7 @@ contract PingPong_startPingPong is PingPongDappSetup {
       receiver: i_pongContract,
       nonce: 1,
       data: data,
-      tokens: new address[](0),
-      amounts: new uint256[](0),
+      tokensAndAmounts: new CCIP.EVMTokenAndAmount[](0),
       gasLimit: 2e5
     });
 
@@ -65,8 +64,7 @@ contract PingPong_ccipReceive is PingPongDappSetup {
   // Success
 
   function testSuccess() public {
-    IERC20[] memory tokens = new IERC20[](0);
-    uint256[] memory amounts = new uint256[](0);
+    EVMTokenAndAmount[] memory tokensAndAmounts = new EVMTokenAndAmount[](0);
 
     uint256 pingPongNumber = 5;
 
@@ -74,8 +72,7 @@ contract PingPong_ccipReceive is PingPongDappSetup {
       sourceChainId: DEST_CHAIN_ID,
       sender: abi.encode(i_pongContract),
       data: abi.encode(pingPongNumber),
-      tokens: tokens,
-      amounts: amounts
+      tokensAndAmounts: tokensAndAmounts
     });
 
     changePrank(address(s_receivingRouter));

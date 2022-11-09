@@ -100,13 +100,13 @@ func maxSubCharge(maxGasPrice uint64, subTokenPerFeeCoin *big.Int, totalGasLimit
 // Offchain: we compute the max overhead gas to determine msg executability.
 func overheadGasSubscription(merkleGasShare uint64, subMsg *evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRampCCIPSendRequested) uint64 {
 	messageBytes := SUBSCRIPTION_CONSTANT_MESSAGE_PART_BYTES +
-		(EVM_ADDRESS_LENGTH_BYTES+EVM_WORD_BYTES)*len(subMsg.Message.Tokens) + // token address (address) + token amount (uint256)
+		(EVM_ADDRESS_LENGTH_BYTES+EVM_WORD_BYTES)*len(subMsg.Message.TokensAndAmounts) + // token address (address) + token amount (uint256)
 		len(subMsg.Message.Data)
 	messageCallDataGas := uint64(messageBytes * CALLDATA_GAS_PER_BYTE)
 	return messageCallDataGas +
 		merkleGasShare +
 		SUBSCRIPTION_EXECUTION_STATE_PROCESSING_OVERHEAD_GAS +
-		PER_TOKEN_OVERHEAD_GAS*uint64(len(subMsg.Message.Tokens)) +
+		PER_TOKEN_OVERHEAD_GAS*uint64(len(subMsg.Message.TokensAndAmounts)) +
 		SUBSCRIPTION_FEE_CHARGING +
 		RATE_LIMITER_OVERHEAD_GAS +
 		EXTERNAL_CALL_OVERHEAD_GAS
@@ -192,7 +192,13 @@ func (sb *SubscriptionBatchBuilder) BuildBatch(
 			lggr.Infow("Skipping msg, unable to determine strictness", "err", err2)
 			continue
 		}
-		msgValue, err2 := aggregateTokenValue(tokenLimitPrices, srcToDst, subMsg.Message.Tokens, subMsg.Message.Amounts)
+		var tokens []common.Address
+		var amounts []*big.Int
+		for i := 0; i < len(subMsg.Message.TokensAndAmounts); i++ {
+			tokens = append(tokens, subMsg.Message.TokensAndAmounts[i].Token)
+			amounts = append(amounts, subMsg.Message.TokensAndAmounts[i].Amount)
+		}
+		msgValue, err2 := aggregateTokenValue(tokenLimitPrices, srcToDst, tokens, amounts)
 		if err2 != nil {
 			lggr.Errorw("Skipping msg, unable to compute aggregate token value", "err", err2)
 			continue
@@ -293,7 +299,13 @@ func (sb *SubscriptionBatchBuilder) inflight(
 				// Save max inflight nonce
 				nonces[msg.Message.Receiver] = msg.Message.Nonce
 			}
-			msgValue, err := aggregateTokenValue(tokenLimitPrices, srcToDst, msg.Message.Tokens, msg.Message.Amounts)
+			var tokens []common.Address
+			var amounts []*big.Int
+			for i := 0; i < len(msg.Message.TokensAndAmounts); i++ {
+				tokens = append(tokens, msg.Message.TokensAndAmounts[i].Token)
+				amounts = append(amounts, msg.Message.TokensAndAmounts[i].Amount)
+			}
+			msgValue, err := aggregateTokenValue(tokenLimitPrices, srcToDst, tokens, amounts)
 			if err != nil {
 				return nil, nil, nil, nil, err
 			}

@@ -24,10 +24,12 @@ contract EVM2AnyTollOnRampRouter_ccipSend is EVM2EVMTollOnRampSetup {
     address sourceToken0Address = s_sourceTokens[0];
     IERC20 sourceToken0 = IERC20(sourceToken0Address);
     CCIP.EVM2AnyTollMessage memory message = _generateEmptyMessage();
-    message.amounts = new uint256[](1);
-    message.amounts[0] = 2**64;
-    message.tokens = new address[](1);
-    message.tokens[0] = sourceToken0Address;
+
+    message.tokensAndAmounts = new CCIP.EVMTokenAndAmount[](1);
+    message.tokensAndAmounts[0].amount = 2**64;
+    message.tokensAndAmounts[0].token = sourceToken0Address;
+    message.feeTokenAndAmount.token = sourceToken0Address;
+    message.feeTokenAndAmount.amount = RELAYING_FEE_JUELS;
 
     uint256 balanceBefore = sourceToken0.balanceOf(OWNER);
 
@@ -35,11 +37,11 @@ contract EVM2AnyTollOnRampRouter_ccipSend is EVM2EVMTollOnRampSetup {
     emit CCIPSendRequested(_messageToEvent(message, 1));
 
     assertEq(1, s_onRampRouter.ccipSend(DEST_CHAIN_ID, message));
-    // Assert the user balance is lowered by the tokens sent and the fee amount
-    uint256 expectedBalance = balanceBefore - (message.amounts[0] + RELAYING_FEE_JUELS);
+    // Assert the user balance is lowered by the tokensAndAmounts sent and the fee amount
+    uint256 expectedBalance = balanceBefore - (message.tokensAndAmounts[0].amount + RELAYING_FEE_JUELS);
     assertEq(expectedBalance, sourceToken0.balanceOf(OWNER));
-    // Asserts the tokens are sent to the pool
-    assertEq(message.amounts[0], sourceToken0.balanceOf(address(s_sourcePools[0])));
+    // Asserts the tokensAndAmounts are sent to the pool
+    assertEq(message.tokensAndAmounts[0].amount, sourceToken0.balanceOf(address(s_sourcePools[0])));
     // Asserts the fee amount is left in the router
     assertEq(RELAYING_FEE_JUELS, sourceToken0.balanceOf(address(s_onRampRouter)));
   }
@@ -48,19 +50,18 @@ contract EVM2AnyTollOnRampRouter_ccipSend is EVM2EVMTollOnRampSetup {
     address sourceToken0Address = s_sourceTokens[0];
     IERC20 sourceToken0 = IERC20(sourceToken0Address);
     CCIP.EVM2AnyTollMessage memory message = _generateEmptyMessage();
-    message.amounts = new uint256[](1);
+    message.tokensAndAmounts = new CCIP.EVMTokenAndAmount[](1);
     // since the fee token is the same we should reduce the amount sent
     // when we want an exact approve.
-    message.amounts[0] = 2**64 - RELAYING_FEE_JUELS;
-    message.tokens = new address[](1);
-    message.tokens[0] = sourceToken0Address;
+    message.tokensAndAmounts[0].amount = 2**64 - RELAYING_FEE_JUELS;
+    message.tokensAndAmounts[0].token = sourceToken0Address;
 
     uint256 balanceBefore = sourceToken0.balanceOf(OWNER);
 
     vm.expectEmit(false, false, false, true);
     emit CCIPSendRequested(_messageToEvent(message, 1));
 
-    uint256 expectedBalance = balanceBefore - (message.amounts[0] + RELAYING_FEE_JUELS);
+    uint256 expectedBalance = balanceBefore - (message.tokensAndAmounts[0].amount + RELAYING_FEE_JUELS);
 
     assertEq(1, s_onRampRouter.ccipSend(DEST_CHAIN_ID, message));
     assertEq(expectedBalance, sourceToken0.balanceOf(OWNER));
@@ -83,19 +84,10 @@ contract EVM2AnyTollOnRampRouter_ccipSend is EVM2EVMTollOnRampSetup {
     s_onRampRouter.ccipSend(wrongChain, message);
   }
 
-  function testUnsupportedNumberOfTokensReverts() public {
-    CCIP.EVM2AnyTollMessage memory message = _generateEmptyMessage();
-    message.amounts = new uint256[](5);
-
-    vm.expectRevert(BaseOnRampInterface.UnsupportedNumberOfTokens.selector);
-
-    s_onRampRouter.ccipSend(DEST_CHAIN_ID, message);
-  }
-
   function testUnsupportedFeeTokenReverts() public {
     CCIP.EVM2AnyTollMessage memory message = _generateEmptyMessage();
     address wrongFeeToken = address(1);
-    message.feeToken = wrongFeeToken;
+    message.feeTokenAndAmount = CCIP.EVMTokenAndAmount({token: wrongFeeToken, amount: 0});
 
     vm.expectRevert(abi.encodeWithSelector(BaseOnRampInterface.UnsupportedToken.selector, wrongFeeToken));
 
@@ -104,7 +96,7 @@ contract EVM2AnyTollOnRampRouter_ccipSend is EVM2EVMTollOnRampSetup {
 
   function testFeeTokenAmountTooLowReverts() public {
     CCIP.EVM2AnyTollMessage memory message = _generateEmptyMessage();
-    message.feeTokenAmount = 0;
+    message.feeTokenAndAmount.amount = 0;
 
     vm.expectRevert(PoolCollector.FeeTokenAmountTooLow.selector);
 

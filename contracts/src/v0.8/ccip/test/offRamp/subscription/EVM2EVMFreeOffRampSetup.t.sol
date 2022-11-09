@@ -66,10 +66,7 @@ contract EVM2EVMFreeOffRampSetup is TokenSetup {
     view
     returns (CCIP.EVM2EVMSubscriptionMessage memory)
   {
-    address[] memory tokens;
-    uint256[] memory amounts;
-
-    return _generateAny2EVMSubscriptionMessage(sequenceNumber, nonce, tokens, amounts);
+    return _generateAny2EVMSubscriptionMessage(sequenceNumber, nonce, new CCIP.EVMTokenAndAmount[](0));
   }
 
   function _generateAny2EVMSubscriptionMessageWithTokens(
@@ -77,24 +74,27 @@ contract EVM2EVMFreeOffRampSetup is TokenSetup {
     uint64 nonce,
     uint256[] memory amounts
   ) internal view returns (CCIP.EVM2EVMSubscriptionMessage memory) {
-    return _generateAny2EVMSubscriptionMessage(sequenceNumber, nonce, s_sourceTokens, amounts);
+    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts = getCastedSourceEVMTokenAndAmountsWithZeroAmounts();
+    for (uint256 i = 0; i < tokensAndAmounts.length; i++) {
+      tokensAndAmounts[i].amount = amounts[i];
+    }
+    return _generateAny2EVMSubscriptionMessage(sequenceNumber, nonce, tokensAndAmounts);
   }
 
   function _generateMessagesWithTokens() internal view returns (CCIP.EVM2EVMSubscriptionMessage[] memory) {
     CCIP.EVM2EVMSubscriptionMessage[] memory messages = new CCIP.EVM2EVMSubscriptionMessage[](2);
-    uint256[] memory amounts = new uint256[](2);
-    amounts[0] = 1000;
-    amounts[1] = 50;
-    messages[0] = _generateAny2EVMSubscriptionMessage(1, 1, s_sourceTokens, amounts);
-    messages[1] = _generateAny2EVMSubscriptionMessage(2, 2, s_sourceTokens, amounts);
+    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts = getCastedSourceEVMTokenAndAmountsWithZeroAmounts();
+    tokensAndAmounts[0].amount = 1000;
+    tokensAndAmounts[1].amount = 50;
+    messages[0] = _generateAny2EVMSubscriptionMessage(1, 1, tokensAndAmounts);
+    messages[1] = _generateAny2EVMSubscriptionMessage(2, 2, tokensAndAmounts);
     return messages;
   }
 
   function _generateAny2EVMSubscriptionMessage(
     uint64 sequenceNumber,
     uint64 nonce,
-    address[] memory tokens,
-    uint256[] memory amounts
+    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts
   ) internal view returns (CCIP.EVM2EVMSubscriptionMessage memory) {
     bytes memory data = abi.encode(0);
     return
@@ -105,8 +105,7 @@ contract EVM2EVMFreeOffRampSetup is TokenSetup {
         address(s_receiver),
         nonce,
         data,
-        tokens,
-        amounts,
+        tokensAndAmounts,
         GAS_LIMIT
       );
   }
@@ -116,14 +115,15 @@ contract EVM2EVMFreeOffRampSetup is TokenSetup {
     view
     returns (CCIP.Any2EVMMessageFromSender memory)
   {
-    uint256 numberOfTokens = original.tokens.length;
-    address[] memory destTokens = new address[](numberOfTokens);
+    uint256 numberOfTokens = original.tokensAndAmounts.length;
+    CCIP.EVMTokenAndAmount[] memory destTokensAndAmounts = new CCIP.EVMTokenAndAmount[](numberOfTokens);
     address[] memory destPools = new address[](numberOfTokens);
 
     for (uint256 i = 0; i < numberOfTokens; ++i) {
-      PoolInterface pool = s_offRamp.getPool(IERC20(original.tokens[i]));
+      PoolInterface pool = s_offRamp.getPool(IERC20(original.tokensAndAmounts[i].token));
       destPools[i] = address(pool);
-      destTokens[i] = address(pool.getToken());
+      destTokensAndAmounts[i].token = address(pool.getToken());
+      destTokensAndAmounts[i].amount = original.tokensAndAmounts[i].amount;
     }
 
     return
@@ -132,9 +132,8 @@ contract EVM2EVMFreeOffRampSetup is TokenSetup {
         sender: abi.encode(original.sender),
         receiver: original.receiver,
         data: original.data,
-        destTokens: destTokens,
+        destTokensAndAmounts: destTokensAndAmounts,
         destPools: destPools,
-        amounts: original.amounts,
         gasLimit: original.gasLimit
       });
   }

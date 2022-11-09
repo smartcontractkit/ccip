@@ -271,7 +271,7 @@ contract EVM2EVMFreeOffRamp_execute is EVM2EVMFreeOffRampSetup {
   function testUnsupportedTokenReverts() public {
     CCIP.EVM2EVMSubscriptionMessage[] memory messages = _generateMessagesWithTokens();
     address unknownToken = address(50);
-    messages[0].tokens[0] = unknownToken;
+    messages[0].tokensAndAmounts[0].token = unknownToken;
 
     vm.expectRevert(abi.encodeWithSelector(BaseOffRampInterface.UnsupportedToken.selector, unknownToken));
 
@@ -287,20 +287,6 @@ contract EVM2EVMFreeOffRamp_execute is EVM2EVMFreeOffRampSetup {
       abi.encodeWithSelector(BaseOffRampInterface.AlreadyExecuted.selector, executionReport.sequenceNumbers[0])
     );
     s_offRamp.execute(executionReport, false);
-  }
-
-  // Asserts that a call to execute will revert if the tokens and amounts
-  // properties are not of the same length.
-  function testUnsupportedNumberOfTokensReverts() public {
-    CCIP.EVM2EVMSubscriptionMessage[] memory messages = _generateBasicMessages();
-    address[] memory newTokens = new address[](1);
-    newTokens[0] = s_sourceTokens[0];
-    messages[0].tokens = newTokens;
-
-    vm.expectRevert(
-      abi.encodeWithSelector(BaseOffRampInterface.UnsupportedNumberOfTokens.selector, messages[0].sequenceNumber)
-    );
-    s_offRamp.execute(_generateReportFromMessages(messages), false);
   }
 
   // Asserts that a call to execute will revert when a message has the wrong

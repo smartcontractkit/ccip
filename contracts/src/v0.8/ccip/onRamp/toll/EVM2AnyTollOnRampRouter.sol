@@ -27,13 +27,12 @@ contract EVM2AnyTollOnRampRouter is
     EVM2EVMTollOnRampInterface onRamp = s_onRamps[destinationChainId];
     // Check if the onRamp is a zero address, meaning the chain is not supported.
     if (address(onRamp) == address(0)) revert UnsupportedDestinationChain(destinationChainId);
-    if (message.tokens.length != message.amounts.length) revert BaseOnRampInterface.UnsupportedNumberOfTokens();
 
     // Charge the fee and subtract that amount from the feeTokenAmount. This will revert if
     // the given feeTokenAmount is too low for the needed fee.
-    message.feeTokenAmount -= _chargeFee(onRamp, IERC20(message.feeToken), message.feeTokenAmount);
-    // Transfer the tokens to the token pools.
-    _collectTokens(onRamp, message.tokens, message.amounts);
+    message.feeTokenAndAmount.amount -= _chargeFee(onRamp, IERC20(message.feeTokenAndAmount.token), message.feeTokenAndAmount.amount);
+    // Transfer the tokensAndAmounts to the token pools.
+    _collectTokens(onRamp, message.tokensAndAmounts);
 
     return onRamp.forwardFromRouter(message, msg.sender);
   }

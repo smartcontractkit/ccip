@@ -46,9 +46,9 @@ contract EVM2AnySubscriptionOnRampRouter_ccipSend is EVM2EVMSubscriptionOnRampSe
     emit CCIPSendRequested(this._messageToEvent(message, 1, 1));
 
     s_onRampRouter.ccipSend(DEST_CHAIN_ID, message);
-    // Assert the user balance is lowered by the tokens sent
-    assertEq(userBalance0Before - message.amounts[0], sourceToken0.balanceOf(OWNER));
-    assertEq(userBalance1Before - message.amounts[1], sourceToken1.balanceOf(OWNER));
+    // Assert the user balance is lowered by the tokensAndAmounts sent
+    assertEq(userBalance0Before - message.tokensAndAmounts[0].amount, sourceToken0.balanceOf(OWNER));
+    assertEq(userBalance1Before - message.tokensAndAmounts[1].amount, sourceToken1.balanceOf(OWNER));
     // Asserts the tokens are all sent to the proper pools
     assertEq(poolBalance0Before + i_tokenAmount0, sourceToken0.balanceOf(address(s_sourcePools[0])));
     // BurnMintTokenPool burns the token upon lock, so poolBalance should not change

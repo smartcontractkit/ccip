@@ -175,22 +175,28 @@ func (c *CCIPE2ELoad) Call(msgType interface{}) client.CallResult {
 	destCCIP := c.Destination
 	msgID := c.CurrentMsgID.Load()
 	c.CurrentMsgID.Inc()
-	var sourceTokens []common.Address
-	for _, token := range sourceCCIP.Common.BridgeTokens {
-		sourceTokens = append(sourceTokens, common.HexToAddress(token.Address()))
+	var sourceTokensAndAmounts []evm_2_any_subscription_onramp_router.CCIPEVMTokenAndAmount
+	for i, token := range sourceCCIP.Common.BridgeTokens {
+		sourceTokensAndAmounts = append(sourceTokensAndAmounts, evm_2_any_subscription_onramp_router.CCIPEVMTokenAndAmount{
+			Token:  common.HexToAddress(token.Address()),
+			Amount: sourceCCIP.TransferAmount[i],
+		})
 	}
+
+	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(100_000))
+	Expect(err).ShouldNot(HaveOccurred(), "Failed encoding the options field")
+
 	// form the message for transfer
 	msgStr := fmt.Sprintf("message with Id %d", msgID)
 	receiver, err := utils.ABIEncode(`[{"type":"address"}]`, destCCIP.ReceiverDapp.EthAddress)
 	Expect(err).ShouldNot(HaveOccurred(), "Failed encoding the receiver address")
 	msg := evm_2_any_subscription_onramp_router.CCIPEVM2AnySubscriptionMessage{
-		Receiver: receiver,
-		Data:     []byte(msgStr),
-		GasLimit: big.NewInt(100_000),
+		Receiver:  receiver,
+		Data:      []byte(msgStr),
+		ExtraArgs: extraArgsV1,
 	}
 	if msgType == TokenTransfer {
-		msg.Tokens = sourceTokens
-		msg.Amounts = sourceCCIP.TransferAmount
+		msg.TokensAndAmounts = sourceTokensAndAmounts
 	}
 	startTime := time.Now()
 	// initiate the transfer

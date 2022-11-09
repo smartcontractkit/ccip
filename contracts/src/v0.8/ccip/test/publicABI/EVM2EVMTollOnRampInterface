@@ -1,5 +1,5 @@
 {
-  "forwardFromRouter((bytes,bytes,address[],uint256[],address,uint256,bytes),address)": "875f3bf1",
+  "forwardFromRouter((bytes,bytes,(address,uint256)[],(address,uint256),bytes),address)": "4bd838ad",
   "getAllowlist()": "c5eff3d0",
   "getAllowlistEnabled()": "f78faa32",
   "getConfig()": "c3f909d4",

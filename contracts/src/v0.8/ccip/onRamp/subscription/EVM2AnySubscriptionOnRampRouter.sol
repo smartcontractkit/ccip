@@ -46,7 +46,7 @@ contract EVM2AnySubscriptionOnRampRouter is
     }
 
     // Transfer the tokens to the token pools.
-    _collectTokens(onRamp, message.tokens, message.amounts);
+    _collectTokens(onRamp, message.tokensAndAmounts);
 
     return onRamp.forwardFromRouter(message, msg.sender);
   }

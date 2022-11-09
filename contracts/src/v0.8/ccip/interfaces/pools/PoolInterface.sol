@@ -21,7 +21,7 @@ interface PoolInterface {
   function lockOrBurn(uint256 amount) external;
 
   /**
-   * @notice Release or mint tokens fromm the pool to the recipient
+   * @notice Release or mint tokens from the pool to the recipient
    * @param recipient Recipient address
    * @param amount Amount to release or mint
    */

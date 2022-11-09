@@ -10,7 +10,7 @@ do
 
   fileName=$( echo "$f" | sed "s/.*\///" )
   echo "Checking $fileName"
-
+  
   actualAbi=$( forge inspect $fileName methods | tr -d " \t\n\r" )
 
   if [[ "$expectedAbi" != "$actualAbi" ]]; then

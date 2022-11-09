@@ -138,8 +138,7 @@ contract E2E_subscription is EVM2EVMSubscriptionOnRampSetup, BlobVerifierSetup, 
         receiver: sendEvent.receiver,
         nonce: sendEvent.nonce,
         data: sendEvent.data,
-        tokens: sendEvent.tokens,
-        amounts: sendEvent.amounts,
+        tokensAndAmounts: sendEvent.tokensAndAmounts,
         gasLimit: sendEvent.gasLimit
       });
   }

@@ -55,8 +55,7 @@ contract GovernanceDapp_voteForNewFeeConfig is GovernanceDappSetup {
       receiver: s_crossChainClone.contractAddress,
       nonce: 1,
       data: data,
-      tokens: new address[](0),
-      amounts: new uint256[](0),
+      tokensAndAmounts: new CCIP.EVMTokenAndAmount[](0),
       gasLimit: 3e5
     });
 
@@ -81,15 +80,11 @@ contract GovernanceDapp_ccipReceive is GovernanceDappSetup {
       changedAtBlock: 100
     });
 
-    address[] memory tokens = new address[](0);
-    uint256[] memory amounts = new uint256[](0);
-
     CCIP.Any2EVMMessage memory message = CCIP.Any2EVMMessage({
       sourceChainId: SOURCE_CHAIN_ID,
       sender: abi.encode(OWNER),
       data: abi.encode(feeConfig),
-      destTokens: tokens,
-      amounts: amounts
+      destTokensAndAmounts: new CCIP.EVMTokenAndAmount[](0)
     });
 
     changePrank(address(s_receivingRouter));

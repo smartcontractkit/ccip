@@ -39,23 +39,19 @@ contract ReceiverDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterfac
    * @param message CCIP Message
    */
   function ccipReceive(CCIP.Any2EVMMessage calldata message) external override onlyRouter {
-    _handleMessage(message.data, message.destTokens, message.amounts);
+    _handleMessage(message.data, message.destTokensAndAmounts);
   }
 
-  function _handleMessage(
-    bytes memory data,
-    address[] memory tokens,
-    uint256[] memory amounts
-  ) internal {
+  function _handleMessage(bytes memory data, CCIP.EVMTokenAndAmount[] memory tokensAndAmounts) internal {
     (
       ,
       /* address originalSender */
       address destinationAddress
     ) = abi.decode(data, (address, address));
-    for (uint256 i = 0; i < tokens.length; ++i) {
-      uint256 amount = amounts[i];
+    for (uint256 i = 0; i < tokensAndAmounts.length; ++i) {
+      uint256 amount = tokensAndAmounts[i].amount;
       if (destinationAddress != address(0) && amount != 0) {
-        IERC20(tokens[i]).transfer(destinationAddress, amount);
+        IERC20(tokensAndAmounts[i].token).transfer(destinationAddress, amount);
       }
     }
   }

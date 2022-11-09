@@ -67,7 +67,7 @@ contract EVM2EVMSubscriptionOnRamp is EVM2EVMSubscriptionOnRampInterface, BaseOn
   {
     if (msg.sender != address(s_router)) revert MustBeCalledByRouter();
     uint256 gasLimit = message.extraArgs._fromBytes().gasLimit;
-    _handleForwardFromRouter(message.data.length, gasLimit, message.tokens, message.amounts, originalSender);
+    _handleForwardFromRouter(message.data.length, gasLimit, message.tokensAndAmounts, originalSender);
 
     address receiver = abi.decode(message.receiver, (address));
     // Emit message request
@@ -80,8 +80,7 @@ contract EVM2EVMSubscriptionOnRamp is EVM2EVMSubscriptionOnRampInterface, BaseOn
       receiver: receiver,
       nonce: ++s_receiverToNonce[receiver],
       data: message.data,
-      tokens: message.tokens,
-      amounts: message.amounts,
+      tokensAndAmounts: message.tokensAndAmounts,
       gasLimit: gasLimit
     });
     emit CCIPSendRequested(subscriptionMsg);

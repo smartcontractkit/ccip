@@ -93,7 +93,7 @@ contract E2E_toll is EVM2EVMTollOnRampSetup, BlobVerifierSetup, EVM2EVMTollOffRa
 
   function sendRequest(uint64 expectedSeqNum) public returns (CCIP.EVM2EVMTollMessage memory) {
     CCIP.EVM2AnyTollMessage memory message = _generateTokenMessage();
-    message.feeTokenAmount = RELAYING_FEE_JUELS + EXECUTION_FEE_AMOUNT;
+    message.feeTokenAndAmount.amount = RELAYING_FEE_JUELS + EXECUTION_FEE_AMOUNT;
 
     IERC20(s_sourceTokens[0]).approve(
       address(s_onRampRouter),
@@ -124,10 +124,8 @@ contract E2E_toll is EVM2EVMTollOnRampSetup, BlobVerifierSetup, EVM2EVMTollOffRa
         sender: sendEvent.sender,
         receiver: sendEvent.receiver,
         data: sendEvent.data,
-        tokens: sendEvent.tokens,
-        amounts: sendEvent.amounts,
-        feeToken: sendEvent.feeToken,
-        feeTokenAmount: sendEvent.feeTokenAmount,
+        tokensAndAmounts: sendEvent.tokensAndAmounts,
+        feeTokenAndAmount: sendEvent.feeTokenAndAmount,
         gasLimit: sendEvent.gasLimit
       });
   }

@@ -4,12 +4,8 @@ pragma solidity 0.8.15;
 import "../../pools/PoolCollector.sol";
 
 contract PoolCollectorHelper is PoolCollector {
-  function collectTokens(
-    EVM2EVMTollOnRampInterface onRamp,
-    address[] calldata tokens,
-    uint256[] calldata amounts
-  ) external {
-    _collectTokens(onRamp, tokens, amounts);
+  function collectTokens(EVM2EVMTollOnRampInterface onRamp, CCIP.EVMTokenAndAmount[] memory tokensAndAmounts) external {
+    _collectTokens(onRamp, tokensAndAmounts);
   }
 
   function chargeFee(

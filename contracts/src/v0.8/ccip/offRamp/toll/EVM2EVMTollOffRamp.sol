@@ -68,14 +68,14 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
   {
     uint256 messageBytes = (TOLL_CONSTANT_MESSAGE_PART_BYTES +
       (EVM_ADDRESS_LENGTH_BYTES + EVM_WORD_BYTES) *
-      message.tokens.length +
+      message.tokensAndAmounts.length +
       message.data.length);
     uint256 messageCalldataGas = messageBytes * CALLDATA_GAS_PER_BYTE;
     return (messageCalldataGas +
       merkleGasShare +
       TOLL_EXECUTION_STATE_PROCESSING_OVERHEAD_GAS +
       PER_TOKEN_OVERHEAD_GAS *
-      (message.tokens.length + 1) +
+      (message.tokensAndAmounts.length + 1) +
       RATE_LIMITER_OVERHEAD_GAS +
       EXTERNAL_CALL_OVERHEAD_GAS);
   }
@@ -101,7 +101,7 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
     uint256 tokenPerFeeCoin;
     // tokenPerFeeCoinAddresses is keyed in destination chain tokens so we need to convert the feeToken
     // before we do the lookup
-    address destinationFeeTokenAddress = address(_getPool(IERC20(message.feeToken)).getToken());
+    address destinationFeeTokenAddress = address(_getPool(IERC20(message.feeTokenAndAmount.token)).getToken());
     for (uint256 j = 0; j < report.tokenPerFeeCoinAddresses.length; ++j) {
       if (report.tokenPerFeeCoinAddresses[j] == destinationFeeTokenAddress) {
         tokenPerFeeCoin = report.tokenPerFeeCoin[j];
@@ -115,8 +115,8 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
     uint256 feeTokenCharged = ((overheadGasToll(merkleGasShare, message) + message.gasLimit) *
       tx.gasprice *
       tokenPerFeeCoin) / 1 ether;
-    if (feeTokenCharged > message.feeTokenAmount)
-      revert InsufficientFeeAmount(message.sequenceNumber, feeTokenCharged, message.feeTokenAmount);
+    if (feeTokenCharged > message.feeTokenAndAmount.amount)
+      revert InsufficientFeeAmount(message.sequenceNumber, feeTokenCharged, message.feeTokenAndAmount.amount);
     return feeTokenCharged;
   }
 
@@ -171,17 +171,17 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
       if (originalState == CCIP.MessageExecutionState.UNTOUCHED && !manualExecution) {
         feeTokenCharged = _computeFee(gasUsedByMerkle / decodedMessages.length, report, message);
         // Take the fee charged to this contract.
-        // _releaseOrMintToken converts the message.feeToken to the proper destination token
-        PoolInterface feeTokenPool = _getPool(IERC20(message.feeToken));
+        // _releaseOrMintToken converts the message.feeTokenAndAmount to the proper destination token
+        PoolInterface feeTokenPool = _getPool(IERC20(message.feeTokenAndAmount.token));
         _releaseOrMintToken(feeTokenPool, feeTokenCharged, address(this));
         // Forward the refund amount to the user so they know how much they were refunded.
-        message.feeTokenAmount -= feeTokenCharged;
+        message.feeTokenAndAmount.amount -= feeTokenCharged;
       }
 
       if (originalState != CCIP.MessageExecutionState.UNTOUCHED) {
         // We have taken a fee already, remove from message to avoid
         // double-minting.
-        message.feeTokenAmount -= feeTaken[message.sequenceNumber];
+        message.feeTokenAndAmount.amount -= feeTaken[message.sequenceNumber];
       }
 
       s_executedMessages[message.sequenceNumber] = CCIP.MessageExecutionState.IN_PROGRESS;
@@ -203,20 +203,18 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
     view
     returns (CCIP.Any2EVMMessageFromSender memory message)
   {
-    (address[] memory tokens, uint256[] memory amounts) = CCIP._addToTokensAmounts(
-      original.tokens,
-      original.amounts,
-      original.feeToken,
-      original.feeTokenAmount
-    );
-    uint256 numberOfTokens = tokens.length;
-    address[] memory destTokens = new address[](numberOfTokens);
+    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts = CCIP._addToTokensAmounts(original.tokensAndAmounts, original.feeTokenAndAmount);
+    uint256 numberOfTokens = tokensAndAmounts.length;
+    CCIP.EVMTokenAndAmount[] memory destTokensAndAmounts = new CCIP.EVMTokenAndAmount[](numberOfTokens);
     address[] memory destPools = new address[](numberOfTokens);
 
     for (uint256 i = 0; i < numberOfTokens; ++i) {
-      PoolInterface pool = _getPool(IERC20(tokens[i]));
+      PoolInterface pool = _getPool(IERC20(tokensAndAmounts[i].token));
       destPools[i] = address(pool);
-      destTokens[i] = address(pool.getToken());
+      destTokensAndAmounts[i] = CCIP.EVMTokenAndAmount({
+        token: address(pool.getToken()),
+        amount: tokensAndAmounts[i].amount
+      });
     }
 
     message = CCIP.Any2EVMMessageFromSender({
@@ -224,16 +222,15 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
       sender: abi.encode(original.sender),
       receiver: original.receiver,
       data: original.data,
-      destTokens: destTokens,
+      destTokensAndAmounts: destTokensAndAmounts,
       destPools: destPools,
-      amounts: amounts,
       gasLimit: original.gasLimit
     });
   }
 
   function _isWellFormed(CCIP.EVM2EVMTollMessage memory message) private view {
     if (message.sourceChainId != i_sourceChainId) revert InvalidSourceChain(message.sourceChainId);
-    if (message.tokens.length > uint256(s_config.maxTokensLength) || message.tokens.length != message.amounts.length)
+    if (message.tokensAndAmounts.length > uint256(s_config.maxTokensLength))
       revert UnsupportedNumberOfTokens(message.sequenceNumber);
     if (message.data.length > uint256(s_config.maxDataSize))
       revert MessageTooLarge(uint256(s_config.maxDataSize), message.data.length);
