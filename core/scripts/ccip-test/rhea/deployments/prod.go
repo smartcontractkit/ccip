@@ -168,7 +168,7 @@ var Prod_AvaxFujiToGoerli = rhea.EvmDeploymentConfig{
 		DeployRouter:         false,
 		DeployGovernanceDapp: false,
 		DeployPingPongDapp:   false,
-		DeployedAt:           15510161,
+		DeployedAt:           15510013,
 	},
 }
 
