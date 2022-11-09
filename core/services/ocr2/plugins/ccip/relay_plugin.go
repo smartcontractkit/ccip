@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"math/big"
 	"strings"
-	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -87,8 +86,8 @@ func NewRelayServices(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm
 	}
 
 	inflightCacheExpiry := DefaultInflightCacheExpiry
-	if pluginConfig.InflightCacheExpiry != 0 {
-		inflightCacheExpiry = time.Duration(pluginConfig.InflightCacheExpiry)
+	if pluginConfig.InflightCacheExpiry.Duration() != 0 {
+		inflightCacheExpiry = pluginConfig.InflightCacheExpiry.Duration()
 	}
 
 	if !common.IsHexAddress(spec.ContractID) {

@@ -55,12 +55,12 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	}
 
 	rootSnoozeTime := DefaultRootSnoozeTime
-	if pluginConfig.RootSnoozeTime != 0 {
-		rootSnoozeTime = time.Duration(pluginConfig.RootSnoozeTime)
+	if pluginConfig.RootSnoozeTime.Duration() != 0 {
+		rootSnoozeTime = pluginConfig.RootSnoozeTime.Duration()
 	}
 	inflightCacheExpiry := DefaultInflightCacheExpiry
-	if pluginConfig.InflightCacheExpiry != 0 {
-		inflightCacheExpiry = time.Duration(pluginConfig.InflightCacheExpiry)
+	if pluginConfig.InflightCacheExpiry.Duration() != 0 {
+		inflightCacheExpiry = pluginConfig.InflightCacheExpiry.Duration()
 	}
 	if !common.IsHexAddress(spec.ContractID) {
 		return nil, errors.Wrap(err, "spec.OffRampID is not a valid hex address")

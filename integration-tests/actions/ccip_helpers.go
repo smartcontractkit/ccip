@@ -53,8 +53,8 @@ const (
 	ChaosGroupRelayFaulty         = "RelayMinority"          //  f number of nodes
 	ChaosGroupExecutionFaultyPlus = "ExecutionNodesMajority" // > f number of nodes
 	ChaosGroupExecutionFaulty     = "ExecutionNodesMinority" //  f number of nodes
-	RootSnoozeTime                = uint64(10 * time.Second)
-	InflightExpiry                = uint64(10 * time.Second)
+	RootSnoozeTime                = 10 * time.Second
+	InflightExpiry                = 10 * time.Second
 )
 
 var (
@@ -974,13 +974,13 @@ func CreateOCRJobsForCCIP(
 					}.P2PV2Bootstrapper(),
 				},
 				PluginConfig: map[string]interface{}{
-					"sourceChainID":    sourceChainID,
-					"destChainID":      destChainID,
-					"onRampIDs":        fmt.Sprintf("[\"%s\",\"%s\"]", tollOnRamp, subOnRamp),
-					"pollPeriod":       `"1s"`,
-					"destStartBlock":   currentBlockOnDest,
-					"sourceStartBlock": currentBlockOnSource,
-					//	"inflightCacheExpiry": InflightExpiry, TODO enable after fix - https://smartcontract-it.atlassian.net/browse/CCIP-41
+					"sourceChainID":       sourceChainID,
+					"destChainID":         destChainID,
+					"onRampIDs":           fmt.Sprintf("[\"%s\",\"%s\"]", tollOnRamp, subOnRamp),
+					"pollPeriod":          `"1s"`,
+					"destStartBlock":      currentBlockOnDest,
+					"sourceStartBlock":    currentBlockOnSource,
+					"inflightCacheExpiry": fmt.Sprintf("\"%s\"", InflightExpiry.String()),
 				},
 				RelayConfig: map[string]interface{}{
 					"chainID": destChainID,
@@ -1020,8 +1020,8 @@ func CreateOCRJobsForCCIP(
 					"tokensPerFeeCoinPipeline": fmt.Sprintf(`"""
 %s
 """`, tokensPerFeeCoinPipeline),
-					//	"rootSnoozeTime":      RootSnoozeTime, TODO : https://smartcontract-it.atlassian.net/browse/CCIP-41
-					//	"inflightCacheExpiry": InflightExpiry,
+					"rootSnoozeTime":      fmt.Sprintf("\"%s\"", RootSnoozeTime.String()),
+					"inflightCacheExpiry": fmt.Sprintf("\"%s\"", InflightExpiry.String()),
 				},
 				RelayConfig: map[string]interface{}{
 					"chainID": destChainID,
