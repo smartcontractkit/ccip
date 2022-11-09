@@ -3,12 +3,9 @@ package ccip
 import (
 	"encoding/binary"
 	"encoding/json"
-	"fmt"
 	"math/big"
-	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/blob_verifier"
@@ -63,32 +60,4 @@ func getNonEmptyObservations[O RelayObservation | ExecutionObservation](l logger
 		nonEmptyObservations = append(nonEmptyObservations, ob)
 	}
 	return nonEmptyObservations
-}
-
-// getMinMaxSequenceNumbers retrieves the minimum and maximum sequence numbers for
-// a given set of observations and F. F is an upper bound on the number of faulty nodes.
-// This function can return an error on bad input or invalid results.
-// Note this mutates the observation slice by sorting it.
-func getMinMaxSequenceNumbers(observations []ExecutionObservation, F int) (minSeqNum uint64, maxSeqNum uint64, err error) {
-	if len(observations) <= F {
-		return 0, 0, fmt.Errorf("number of observations (%d) too low for given F (%d)", len(observations), F)
-	}
-	// Extract the min and max
-	sort.Slice(observations, func(i, j int) bool {
-		return observations[i].SeqNrs[0] < observations[j].SeqNrs[0]
-	})
-	// r.F < len(nonEmptyObservations) because of the check above and therefore this is safe
-	minSeqNum = observations[F].SeqNrs[0]
-
-	sort.Slice(observations, func(i, j int) bool {
-		return observations[i].SeqNrs[len(observations[i].SeqNrs)-1] < observations[j].SeqNrs[len(observations[i].SeqNrs)-1]
-	})
-	// We use a conservative maximum. If we pick a value that some honest oracles might not
-	// have seen they’ll end up not agreeing on a msg, stalling the protocol.
-	maxSeqNum = observations[F].SeqNrs[len(observations[F].SeqNrs)-1]
-
-	if maxSeqNum < minSeqNum {
-		return 0, 0, errors.New("max seq num smaller than min")
-	}
-	return
 }

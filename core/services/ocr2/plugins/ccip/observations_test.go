@@ -1,14 +1,12 @@
 package ccip
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/leanovate/gopter"
 	"github.com/leanovate/gopter/gen"
 	"github.com/leanovate/gopter/prop"
-	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -41,45 +39,4 @@ func TestObservationSize(t *testing.T) {
 		return len(b) <= MaxObservationLength
 	}, gen.UInt64(), gen.UInt64()))
 	p.TestingRun(t)
-}
-
-func TestGetMinMaxSequenceNumbers(t *testing.T) {
-	tests := []struct {
-		input     []ExecutionObservation
-		f         int
-		minSeqNum uint64
-		maxSeqNum uint64
-		err       error
-	}{
-		{[]ExecutionObservation{{SeqNrs: []uint64{1, 1}}}, 0, 1, 1, nil},
-		{[]ExecutionObservation{{SeqNrs: []uint64{0, 0}}}, 1, 0, 0,
-			fmt.Errorf("number of observations (%d) too low for given F (%d)", 1, 1)},
-		{[]ExecutionObservation{{SeqNrs: []uint64{10, 9}}}, 0, 0, 0,
-			errors.New("max seq num smaller than min")},
-		{[]ExecutionObservation{{SeqNrs: []uint64{5, 6}}, {SeqNrs: []uint64{4, 6}}}, 1, 5, 6, nil},
-	}
-
-	for i, tc := range tests {
-		t.Run(fmt.Sprintf("getMinMaxSequenceNumbers=%d", i), func(t *testing.T) {
-			minSeqNum, maxSeqNum, err := getMinMaxSequenceNumbers(tc.input, tc.f)
-			if tc.err == nil {
-				if err != nil {
-					t.Fatalf("got %v; want %v", err, tc.err)
-				}
-			} else {
-				if err == nil {
-					t.Fatalf("got %v; want %v", err, tc.err)
-				} else {
-					if err.Error() != tc.err.Error() {
-						t.Fatalf("got %v; want %v", err, tc.err)
-					}
-				}
-			}
-			if minSeqNum != tc.minSeqNum {
-				t.Fatalf("got %v; want %v", minSeqNum, tc.minSeqNum)
-			} else if maxSeqNum != tc.maxSeqNum {
-				t.Fatalf("got %v; want %v", maxSeqNum, tc.maxSeqNum)
-			}
-		})
-	}
 }
