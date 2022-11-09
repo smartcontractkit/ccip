@@ -1,24 +1,24 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../interfaces/BlobVerifierInterface.sol";
+import "../../interfaces/CommitStoreInterface.sol";
 
-contract MockBlobVerifier is BlobVerifierInterface {
-  /// @inheritdoc BlobVerifierInterface
-  function getConfig() external pure returns (BlobVerifierConfig memory) {
-    BlobVerifierConfig memory config;
+contract MockCommitStore is CommitStoreInterface {
+  /// @inheritdoc CommitStoreInterface
+  function getConfig() external pure returns (CommitStoreConfig memory) {
+    CommitStoreConfig memory config;
     return config;
   }
 
-  /// @inheritdoc BlobVerifierInterface
-  function setConfig(BlobVerifierConfig calldata config) external {}
+  /// @inheritdoc CommitStoreInterface
+  function setConfig(CommitStoreConfig calldata config) external {}
 
-  /// @inheritdoc BlobVerifierInterface
+  /// @inheritdoc CommitStoreInterface
   function getExpectedNextSequenceNumber(address) external pure returns (uint64) {
     return 1;
   }
 
-  /// @inheritdoc BlobVerifierInterface
+  /// @inheritdoc CommitStoreInterface
   function verify(
     bytes32[] calldata,
     bytes32[] calldata,
@@ -29,7 +29,7 @@ contract MockBlobVerifier is BlobVerifierInterface {
     return 1;
   }
 
-  /// @inheritdoc BlobVerifierInterface
+  /// @inheritdoc CommitStoreInterface
   function merkleRoot(
     bytes32[] memory leaves,
     bytes32[] memory,
@@ -38,7 +38,7 @@ contract MockBlobVerifier is BlobVerifierInterface {
     return leaves[0];
   }
 
-  /// @inheritdoc BlobVerifierInterface
+  /// @inheritdoc CommitStoreInterface
   function getMerkleRoot(bytes32) external pure returns (uint256) {
     return 1;
   }

@@ -246,8 +246,8 @@ contract EVM2EVMFreeOffRamp_execute is EVM2EVMFreeOffRampSetup {
 
   function testRootNotRelayedReverts() public {
     vm.mockCall(
-      address(s_mockBlobVerifier),
-      abi.encodeWithSelector(BlobVerifierInterface.verify.selector),
+      address(s_mockCommitStore),
+      abi.encodeWithSelector(CommitStoreInterface.verify.selector),
       abi.encode(0)
     );
     vm.expectRevert(BaseOffRampInterface.RootNotRelayed.selector);
@@ -258,8 +258,8 @@ contract EVM2EVMFreeOffRamp_execute is EVM2EVMFreeOffRampSetup {
 
   function testManualExecutionNotYetEnabledReverts() public {
     vm.mockCall(
-      address(s_mockBlobVerifier),
-      abi.encodeWithSelector(BlobVerifierInterface.verify.selector),
+      address(s_mockCommitStore),
+      abi.encodeWithSelector(CommitStoreInterface.verify.selector),
       abi.encode(BLOCK_TIME)
     );
     vm.expectRevert(BaseOffRampInterface.ManualExecutionNotYetEnabled.selector);

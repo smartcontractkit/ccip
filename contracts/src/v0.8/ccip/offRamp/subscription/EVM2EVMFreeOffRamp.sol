@@ -8,7 +8,7 @@ import {BaseOffRamp} from "../BaseOffRamp.sol";
 import {CCIP} from "../../models/Models.sol";
 import {IERC20} from "../../../vendor/IERC20.sol";
 import {PoolInterface} from "../../interfaces/pools/PoolInterface.sol";
-import {BlobVerifierInterface} from "../../interfaces/BlobVerifierInterface.sol";
+import {CommitStoreInterface} from "../../interfaces/CommitStoreInterface.sol";
 import {AFNInterface} from "../../interfaces/health/AFNInterface.sol";
 
 /**
@@ -26,7 +26,7 @@ contract EVM2EVMFreeOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
     uint256 sourceChainId,
     uint256 chainId,
     OffRampConfig memory offRampConfig,
-    BlobVerifierInterface blobVerifier,
+    CommitStoreInterface commitStore,
     AFNInterface afn,
     IERC20[] memory sourceTokens,
     PoolInterface[] memory pools,
@@ -38,7 +38,7 @@ contract EVM2EVMFreeOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
       sourceChainId,
       chainId,
       offRampConfig,
-      blobVerifier,
+      commitStore,
       afn,
       sourceTokens,
       pools,

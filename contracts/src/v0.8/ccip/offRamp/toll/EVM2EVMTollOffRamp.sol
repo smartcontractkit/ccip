@@ -3,7 +3,7 @@ pragma solidity 0.8.15;
 
 import {TypeAndVersionInterface} from "../../../interfaces/TypeAndVersionInterface.sol";
 import {BaseOffRampInterface} from "../../interfaces/offRamp/BaseOffRampInterface.sol";
-import {BlobVerifierInterface} from "../../interfaces/BlobVerifierInterface.sol";
+import {CommitStoreInterface} from "../../interfaces/CommitStoreInterface.sol";
 import {OCR2Base} from "../../ocr/OCR2Base.sol";
 import {BaseOffRamp} from "../BaseOffRamp.sol";
 import {CCIP} from "../../models/Models.sol";
@@ -36,7 +36,7 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
     uint256 sourceChainId,
     uint256 chainId,
     OffRampConfig memory offRampConfig,
-    BlobVerifierInterface blobVerifier,
+    CommitStoreInterface commitStore,
     AFNInterface afn,
     IERC20[] memory sourceTokens,
     PoolInterface[] memory pools,
@@ -48,7 +48,7 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
       sourceChainId,
       chainId,
       offRampConfig,
-      blobVerifier,
+      commitStore,
       afn,
       sourceTokens,
       pools,

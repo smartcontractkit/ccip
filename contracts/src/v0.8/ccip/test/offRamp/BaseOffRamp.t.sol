@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../mocks/MockBlobVerifier.sol";
+import "../mocks/MockCommitStore.sol";
 import "../helpers/ramps/BaseOffRampHelper.sol";
 import "../TokenSetup.t.sol";
 import "../../interfaces/rateLimiter/AggregateRateLimiterInterface.sol";
@@ -10,18 +10,18 @@ contract BaseOffRampSetup is TokenSetup {
   event OffRampConfigSet(BaseOffRampInterface.OffRampConfig config);
 
   BaseOffRampHelper s_offRamp;
-  MockBlobVerifier s_mockBlobVerifier;
+  MockCommitStore s_mockCommitStore;
 
   function setUp() public virtual override {
     TokenSetup.setUp();
 
-    s_mockBlobVerifier = new MockBlobVerifier();
+    s_mockCommitStore = new MockCommitStore();
 
     s_offRamp = new BaseOffRampHelper(
       SOURCE_CHAIN_ID,
       DEST_CHAIN_ID,
       offRampConfig(),
-      s_mockBlobVerifier,
+      s_mockCommitStore,
       s_afn,
       getCastedSourceTokens(),
       getCastedDestinationPools(),
@@ -52,7 +52,7 @@ contract BaseOffRamp_constructor is BaseOffRampSetup {
     // owner
     assertEq(OWNER, s_offRamp.owner());
 
-    assertEq(address(s_mockBlobVerifier), address(s_offRamp.getBlobVerifier()));
+    assertEq(address(s_mockCommitStore), address(s_offRamp.getCommitStore()));
 
     (uint256 source, uint256 dest) = s_offRamp.getChainIDs();
     assertEq(SOURCE_CHAIN_ID, source);
@@ -72,7 +72,7 @@ contract BaseOffRamp_constructor is BaseOffRampSetup {
       SOURCE_CHAIN_ID,
       DEST_CHAIN_ID,
       offRampConfig(),
-      s_mockBlobVerifier,
+      s_mockCommitStore,
       s_afn,
       wrongTokens,
       pools,
@@ -98,7 +98,7 @@ contract BaseOffRamp_constructor is BaseOffRampSetup {
       SOURCE_CHAIN_ID,
       DEST_CHAIN_ID,
       offRampConfig,
-      s_mockBlobVerifier,
+      s_mockCommitStore,
       s_afn,
       getCastedSourceTokens(),
       pools,
@@ -126,24 +126,24 @@ contract BaseOffRamp_getExecutionState is BaseOffRampSetup {
   }
 }
 
-/// @notice #getBlobVerifier
-contract BaseOffRamp_getBlobVerifier is BaseOffRampSetup {
+/// @notice #getCommitStore
+contract BaseOffRamp_getCommitStore is BaseOffRampSetup {
   // Success
   function testSuccess() public {
-    assertEq(address(s_mockBlobVerifier), address(s_offRamp.getBlobVerifier()));
+    assertEq(address(s_mockCommitStore), address(s_offRamp.getCommitStore()));
   }
 }
 
-/// @notice #setBlobVerifier
-contract BaseOffRamp_setBlobVerifier is BaseOffRampSetup {
+/// @notice #setCommitStore
+contract BaseOffRamp_setCommitStore is BaseOffRampSetup {
   // Success
   function testSuccess() public {
-    assertEq(address(s_mockBlobVerifier), address(s_offRamp.getBlobVerifier()));
+    assertEq(address(s_mockCommitStore), address(s_offRamp.getCommitStore()));
 
-    MockBlobVerifier blobVerifier = new MockBlobVerifier();
-    s_offRamp.setBlobVerifier(blobVerifier);
+    MockCommitStore commitStore = new MockCommitStore();
+    s_offRamp.setCommitStore(commitStore);
 
-    assertEq(address(blobVerifier), address(s_offRamp.getBlobVerifier()));
+    assertEq(address(commitStore), address(s_offRamp.getCommitStore()));
   }
 }
 
@@ -255,7 +255,7 @@ contract BaseOffRamp__verifyMessages is BaseOffRampSetup {
   // Success
   function testSuccess() public {
     bytes32[] memory mockBytes = new bytes32[](5);
-    // Since we use a mock blob verifier it should always return 1
+    // Since we use a mock commitStore it should always return 1
     (uint256 timestamp, ) = s_offRamp.verifyMessages(mockBytes, mockBytes, 1, mockBytes, 1);
     assertEq(1, timestamp);
   }

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import {Any2EVMOffRampRouterInterface} from "./Any2EVMOffRampRouterInterface.sol";
-import {BlobVerifierInterface} from "../BlobVerifierInterface.sol";
+import {CommitStoreInterface} from "../CommitStoreInterface.sol";
 import {CCIP} from "../../models/Models.sol";
 import {IERC20} from "../../../vendor/IERC20.sol";
 
@@ -69,15 +69,15 @@ interface BaseOffRampInterface {
   function getExecutionState(uint64 sequenceNumber) external view returns (CCIP.MessageExecutionState);
 
   /**
-   * @notice Returns the current blob verifier.
+   * @notice Returns the current commitStore.
    */
-  function getBlobVerifier() external view returns (BlobVerifierInterface);
+  function getCommitStore() external view returns (CommitStoreInterface);
 
   /**
-   * @notice Updates the blobVerifier.
-   * @param blobVerifier The new blobVerifier
+   * @notice Updates the commitStore.
+   * @param commitStore The new commitStore
    */
-  function setBlobVerifier(BlobVerifierInterface blobVerifier) external;
+  function setCommitStore(CommitStoreInterface commitStore) external;
 
   /**
    * @notice Returns the current config.

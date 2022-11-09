@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {CCIP} from "../models/Models.sol";
 
-interface BlobVerifierInterface {
+interface CommitStoreInterface {
   error UnsupportedOnRamp(address onRamp);
   error InvalidInterval(CCIP.Interval interval, address onRamp);
   error InvalidRelayReport(CCIP.RelayReport report);
@@ -11,27 +11,27 @@ interface BlobVerifierInterface {
   error InvalidProof();
 
   event ReportAccepted(CCIP.RelayReport report);
-  event BlobVerifierConfigSet(BlobVerifierConfig config);
+  event CommitStoreConfigSet(CommitStoreConfig config);
 
-  struct BlobVerifierConfig {
+  struct CommitStoreConfig {
     address[] onRamps;
     uint64[] minSeqNrByOnRamp;
   }
 
   /**
    * @notice Gets the current configuration.
-   * @return the currently configured BlobVerifierConfig.
+   * @return the currently configured CommitStoreConfig.
    */
-  function getConfig() external view returns (BlobVerifierConfig memory);
+  function getConfig() external view returns (CommitStoreConfig memory);
 
   /**
-   * @notice Sets the new BlobVerifierConfig and updates the s_expectedNextMinByOnRamp
+   * @notice Sets the new CommitStoreConfig and updates the s_expectedNextMinByOnRamp
    *      mapping. It will first blank the entire mapping and then input the new values.
    *      This means that any onRamp previously set but not included in the new config
    *      will be unsupported afterwards.
    * @param config The new configuration.
    */
-  function setConfig(BlobVerifierConfig calldata config) external;
+  function setConfig(CommitStoreConfig calldata config) external;
 
   /**
    * @notice Returns the next expected sequence number for a given onRamp.

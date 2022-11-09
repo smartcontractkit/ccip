@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../mocks/MockBlobVerifier.sol";
+import "../../mocks/MockCommitStore.sol";
 import "../../helpers/receivers/SimpleMessageReceiver.sol";
 import "../../helpers/ramps/EVM2EVMSubscriptionOffRampHelper.sol";
 import "../../helpers/MerkleHelper.sol";
@@ -11,7 +11,7 @@ contract EVM2EVMSubscriptionOffRampSetup is TokenSetup {
   EVM2EVMSubscriptionOffRampHelper internal s_offRamp;
   Any2EVMSubscriptionOffRampRouter internal s_router;
 
-  BlobVerifierInterface internal s_mockBlobVerifier;
+  CommitStoreInterface internal s_mockCommitStore;
   SimpleMessageReceiver internal s_receiver;
   Any2EVMMessageReceiverInterface internal s_secondary_receiver;
   MerkleHelper internal s_merkleHelper;
@@ -26,23 +26,23 @@ contract EVM2EVMSubscriptionOffRampSetup is TokenSetup {
     TokenSetup.setUp();
     s_destFeeToken = IERC20(s_destTokens[0]);
 
-    s_mockBlobVerifier = new MockBlobVerifier();
+    s_mockCommitStore = new MockCommitStore();
     s_receiver = new SimpleMessageReceiver();
     s_secondary_receiver = new SimpleMessageReceiver();
 
     s_merkleHelper = new MerkleHelper();
 
-    _deployOffRampAndRouter(s_mockBlobVerifier);
+    _deployOffRampAndRouter(s_mockCommitStore);
   }
 
-  // This function us re-used in the e2e test as we need a real blob verifier
+  // This function us re-used in the e2e test as we need a real commitStore
   // there while we require a mock version for all other tests.
-  function _deployOffRampAndRouter(BlobVerifierInterface blobVerifier) internal {
+  function _deployOffRampAndRouter(CommitStoreInterface commitStore) internal {
     s_offRamp = new EVM2EVMSubscriptionOffRampHelper(
       SOURCE_CHAIN_ID,
       DEST_CHAIN_ID,
       offRampConfig(),
-      blobVerifier,
+      commitStore,
       s_afn,
       getCastedSourceTokens(),
       getCastedDestinationPools(),

@@ -3,23 +3,23 @@ pragma solidity 0.8.15;
 
 import "../onRamp/subscription/EVM2EVMSubscriptionOnRampSetup.t.sol";
 import "../offRamp/subscription/EVM2EVMSubscriptionOffRampSetup.t.sol";
-import "../blobVerifier/BlobVerifier.t.sol";
+import "../commitStore/CommitStore.t.sol";
 
-contract E2E_subscription is EVM2EVMSubscriptionOnRampSetup, BlobVerifierSetup, EVM2EVMSubscriptionOffRampSetup {
+contract E2E_subscription is EVM2EVMSubscriptionOnRampSetup, CommitStoreSetup, EVM2EVMSubscriptionOffRampSetup {
   using CCIP for CCIP.EVM2EVMSubscriptionMessage;
 
   function setUp()
     public
     virtual
-    override(EVM2EVMSubscriptionOnRampSetup, BlobVerifierSetup, EVM2EVMSubscriptionOffRampSetup)
+    override(EVM2EVMSubscriptionOnRampSetup, CommitStoreSetup, EVM2EVMSubscriptionOffRampSetup)
   {
     EVM2EVMSubscriptionOnRampSetup.setUp();
-    BlobVerifierSetup.setUp();
+    CommitStoreSetup.setUp();
     EVM2EVMSubscriptionOffRampSetup.setUp();
 
     // This overwrites the setup done in EVM2EVMSubscriptionOffRampSetup because
-    // we need to use a real blob verifier and not a mock.
-    _deployOffRampAndRouter(s_blobVerifier);
+    // we need to use a real commitStore and not a mock.
+    _deployOffRampAndRouter(s_commitStore);
   }
 
   function testSuccessWithTokens() public {
@@ -71,7 +71,7 @@ contract E2E_subscription is EVM2EVMSubscriptionOnRampSetup, BlobVerifierSetup, 
     merkleRoots[0] = s_merkleHelper.getMerkleRoot(hashedMessages);
 
     address[] memory onRamps = new address[](1);
-    onRamps[0] = blobVerifierConfig().onRamps[0];
+    onRamps[0] = commitStoreConfig().onRamps[0];
 
     CCIP.RelayReport memory report = CCIP.RelayReport({
       onRamps: onRamps,
@@ -80,9 +80,9 @@ contract E2E_subscription is EVM2EVMSubscriptionOnRampSetup, BlobVerifierSetup, 
       rootOfRoots: merkleRoots[0]
     });
 
-    s_blobVerifier.report(abi.encode(report));
+    s_commitStore.report(abi.encode(report));
     bytes32[] memory proofs = new bytes32[](0);
-    uint256 timestamp = s_blobVerifier.verify(merkleRoots, proofs, 2**2 - 1, proofs, 2**2 - 1);
+    uint256 timestamp = s_commitStore.verify(merkleRoots, proofs, 2**2 - 1, proofs, 2**2 - 1);
     assertEq(BLOCK_TIME, timestamp);
 
     // We change the block time so when execute would e.g. use the current
