@@ -145,7 +145,7 @@ type CCIPJobSpec struct {
 	TollOnRamp               common.Address
 	SubOffRamp               common.Address
 	SubOnRamp                common.Address
-	BlobVerifier             common.Address
+	CommitStore              common.Address
 	SourceChainId            *big.Int
 	DestChainId              *big.Int
 	TokensPerFeeCoinPipeline string
@@ -174,7 +174,7 @@ destStartBlock      = %d
 [relayConfig]
 chainID             = %s
 
-`, jobName, spec.BlobVerifier,
+`, jobName, spec.CommitStore,
 		node.KeyBundle.ID(), node.Transmitter,
 		spec.TollOnRamp, spec.SubOnRamp,
 		spec.SourceChainId, spec.DestChainId,
@@ -197,7 +197,7 @@ contractConfigTrackerPollInterval = "1s"
 
 [pluginConfig]
 onRampID            = "%s"
-blobVerifierID      = "%s"
+commitStoreID      = "%s"
 sourceChainID       = %s
 destChainID         = %s
 pollPeriod          = "1s"
@@ -208,7 +208,7 @@ tokensPerFeeCoinPipeline = %s
 chainID             = %s
 
 `, jobName, offRamp, node.KeyBundle.ID(), node.Transmitter,
-		onRamp, spec.BlobVerifier,
+		onRamp, spec.CommitStore,
 		spec.SourceChainId, spec.DestChainId, configBlock,
 		fmt.Sprintf(`"""
 %s

@@ -21,7 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp_helper"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp_router"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/blob_verifier_helper"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store_helper"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/native_token_pool"
@@ -35,7 +35,7 @@ type ExecutionContracts struct {
 	// Has all the link and 100ETH
 	user                       *bind.TransactOpts
 	offRamp                    *any_2_evm_toll_offramp.EVM2EVMTollOffRamp
-	blobVerifier               *blob_verifier_helper.BlobVerifierHelper
+	commitStore                *commit_store_helper.CommitStoreHelper
 	receiver                   *simple_message_receiver.SimpleMessageReceiver
 	linkTokenAddress           common.Address
 	destChainID, sourceChainID *big.Int
@@ -86,19 +86,19 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 
 	onRampAddress := common.HexToAddress("0x01BE23585060835E02B77ef475b0Cc51aA1e0709")
 	linkTokenSourceAddress := common.HexToAddress("0x01BE23585060835E02B77ef475b0Cc51aA1e0709")
-	blobVerifierAddress, _, _, err := blob_verifier_helper.DeployBlobVerifierHelper(
+	commitStoreAddress, _, _, err := commit_store_helper.DeployCommitStoreHelper(
 		destUser,         // user
 		destChain,        // client
 		big.NewInt(1338), // dest chain id
 		big.NewInt(1337), // source chain id
 		afnAddress,       // AFN address
-		blob_verifier_helper.BlobVerifierInterfaceBlobVerifierConfig{
+		commit_store_helper.CommitStoreInterfaceCommitStoreConfig{
 			OnRamps:          []common.Address{onRampAddress},
 			MinSeqNrByOnRamp: []uint64{1},
 		},
 	)
 	require.NoError(t, err)
-	blobVerifier, err := blob_verifier_helper.NewBlobVerifierHelper(blobVerifierAddress, destChain)
+	commitStore, err := commit_store_helper.NewCommitStoreHelper(commitStoreAddress, destChain)
 	require.NoError(t, err)
 	destChain.Commit()
 	offRampAddress, _, _, err := any_2_evm_toll_offramp.DeployEVM2EVMTollOffRamp(
@@ -112,7 +112,7 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 			MaxDataSize:           1e12,
 			MaxTokensLength:       5,
 		},
-		blobVerifier.Address(),
+		commitStore.Address(),
 		afnAddress,
 		[]common.Address{linkTokenSourceAddress},
 		[]common.Address{destPoolAddress},
@@ -143,7 +143,7 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	destChain.Commit()
 	return ExecutionContracts{user: destUser,
 		offRamp:          offRamp,
-		blobVerifier:     blobVerifier,
+		commitStore:      commitStore,
 		receiver:         receiver,
 		linkTokenAddress: destLinkTokenAddress,
 		destChainID:      destChainID,

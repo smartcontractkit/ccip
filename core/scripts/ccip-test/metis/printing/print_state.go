@@ -10,10 +10,11 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
+
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/afn_contract"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp_router"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/blob_verifier"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_subscription_onramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_subscription_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
@@ -48,7 +49,7 @@ func PrintCCIPState(source *rhea.EvmDeploymentConfig, destination *rhea.EvmDeplo
 
 type CCIPTXStatus struct {
 	message     *evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRampCCIPSendRequested
-	relayReport *blob_verifier.BlobVerifierReportAccepted
+	relayReport *commit_store.CommitStoreReportAccepted
 	execStatus  *any_2_evm_subscription_offramp.EVM2EVMSubscriptionOffRampExecutionStateChanged
 }
 
@@ -113,13 +114,13 @@ func PrintTxStatuses(source *rhea.EvmDeploymentConfig, destination *rhea.EvmDepl
 		seqNums = append(seqNums, sendRequested.Event.Message.SequenceNumber)
 	}
 
-	blobVerifier, err := blob_verifier.NewBlobVerifier(destination.LaneConfig.BlobVerifier, destination.Client)
+	commitStore, err := commit_store.NewCommitStore(destination.LaneConfig.CommitStore, destination.Client)
 	helpers.PanicErr(err)
 
 	block, err = destination.Client.BlockNumber(context.Background())
 	helpers.PanicErr(err)
 
-	reports, err := blobVerifier.FilterReportAccepted(&bind.FilterOpts{
+	reports, err := commitStore.FilterReportAccepted(&bind.FilterOpts{
 		Start: block - 9990,
 	})
 	helpers.PanicErr(err)
@@ -272,10 +273,10 @@ func printRampSanityCheck(chain *rhea.EvmDeploymentConfig, sourceOnRamp common.A
 	helpers.PanicErr(err)
 	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "OffRamp OCR2 configured", printBool(configDetails.ConfigCount != 0)))
 
-	blobVerifier, err := blob_verifier.NewBlobVerifier(chain.LaneConfig.BlobVerifier, chain.Client)
+	commitStore, err := commit_store.NewCommitStore(chain.LaneConfig.CommitStore, chain.Client)
 	helpers.PanicErr(err)
 
-	config, err := blobVerifier.GetConfig(&bind.CallOpts{})
+	config, err := commitStore.GetConfig(&bind.CallOpts{})
 	helpers.PanicErr(err)
 
 	rampSet := false
@@ -285,11 +286,11 @@ func printRampSanityCheck(chain *rhea.EvmDeploymentConfig, sourceOnRamp common.A
 		}
 	}
 
-	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "BlobVerifier Onramp set", printBool(rampSet)))
+	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "CommitStore Onramp set", printBool(rampSet)))
 
-	blobConfigDetails, err := blobVerifier.LatestConfigDetails(&bind.CallOpts{})
+	blobConfigDetails, err := commitStore.LatestConfigDetails(&bind.CallOpts{})
 	helpers.PanicErr(err)
-	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "BlobVerifier OCR2 configured", printBool(blobConfigDetails.ConfigCount != 0)))
+	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "CommitStore OCR2 configured", printBool(blobConfigDetails.ConfigCount != 0)))
 
 	offRampRouter, err := any_2_evm_subscription_offramp_router.NewAny2EVMSubscriptionOffRampRouter(chain.ChainConfig.OffRampRouter, chain.Client)
 	helpers.PanicErr(err)
@@ -446,12 +447,12 @@ func printPaused(chain *rhea.EvmDeploymentConfig) {
 
 	sb.WriteString(fmt.Sprintf("| %-25s | %42s | %14s |\n", "offramp", offRamp.Address(), printBool(!paused)))
 
-	blobVerifier, err := blob_verifier.NewBlobVerifier(chain.LaneConfig.BlobVerifier, chain.Client)
+	commitStore, err := commit_store.NewCommitStore(chain.LaneConfig.CommitStore, chain.Client)
 	helpers.PanicErr(err)
-	paused, err = blobVerifier.Paused(&bind.CallOpts{})
+	paused, err = commitStore.Paused(&bind.CallOpts{})
 	helpers.PanicErr(err)
 
-	sb.WriteString(fmt.Sprintf("| %-25s | %42s | %14s |\n", "blobverifier", blobVerifier.Address(), printBool(!paused)))
+	sb.WriteString(fmt.Sprintf("| %-25s | %42s | %14s |\n", "blobverifier", commitStore.Address(), printBool(!paused)))
 
 	sb.WriteString(generateSeparator(headerLengths))
 	chain.Logger.Info(sb.String())
@@ -552,15 +553,15 @@ func generateSeparator(headerLengths []int) string {
 }
 
 // PrintJobSpecs prints the job spec for each node and CCIP spec type, as well as a bootstrap spec.
-func PrintJobSpecs(env dione.Environment, onramp, blobVerifier, offRamp common.Address, sourceChainID, destChainID *big.Int, destLinkToken common.Address, sourceReplayFrom, destReplayFrom uint64) {
-	jobs := fmt.Sprintf(bootstrapTemplate+"\n", helpers.ChainName(destChainID.Int64()), blobVerifier, destChainID)
+func PrintJobSpecs(env dione.Environment, onramp, commitStore, offRamp common.Address, sourceChainID, destChainID *big.Int, destLinkToken common.Address, sourceReplayFrom, destReplayFrom uint64) {
+	jobs := fmt.Sprintf(bootstrapTemplate+"\n", helpers.ChainName(destChainID.Int64()), commitStore, destChainID)
 	don := dione.NewOfflineDON(env, nil)
 
 	for i, oracle := range don.Config.Nodes {
 		jobs += fmt.Sprintf("// [Node %d]\n", i)
 		jobs += fmt.Sprintf(relayTemplate+"\n",
 			helpers.ChainName(sourceChainID.Int64())+"-"+helpers.ChainName(destChainID.Int64()),
-			blobVerifier,
+			commitStore,
 			dione.GetOCRkeysForChainType(oracle.OCRKeys, "evm").ID,
 			oracle.EthKeys[destChainID.String()],
 			sourceChainID,
@@ -579,7 +580,7 @@ func PrintJobSpecs(env dione.Environment, onramp, blobVerifier, offRamp common.A
 			sourceChainID,
 			destChainID,
 			onramp,
-			blobVerifier,
+			commitStore,
 			sourceReplayFrom,
 			destReplayFrom,
 			destLinkToken,
@@ -641,7 +642,7 @@ transmitterID     = "%s"
 sourceChainID     = %d
 destChainID       = %d
 onRampID          = "%s"
-blobVerifierID    = "%s"
+commitStoreID    = "%s"
 SourceStartBlock  = %d
 DestStartBlock    = %d
 tokensPerFeeCoinPipeline = """merge [type=merge left="{}" right="{\\\"%s\\\":\\\"1000000000000000000\\\"}"];"""

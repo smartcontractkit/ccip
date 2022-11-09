@@ -69,7 +69,7 @@ transmitterID      = "%s"
 sourceChainID      = %s
 destChainID        = %s
 onRampID           = "%s"
-blobVerifierID     = "%s"
+commitStoreID     = "%s"
 SourceStartBlock   = %d
 DestStartBlock     = %d
 tokensPerFeeCoinPipeline = %s
@@ -86,7 +86,7 @@ chainID            = %s
 		spec.OCR2OracleSpec.PluginConfig["sourceChainID"],
 		spec.OCR2OracleSpec.PluginConfig["destChainID"],
 		spec.OCR2OracleSpec.PluginConfig["onRampID"],
-		spec.OCR2OracleSpec.PluginConfig["blobVerifierID"],
+		spec.OCR2OracleSpec.PluginConfig["commitStoreID"],
 		spec.OCR2OracleSpec.PluginConfig["SourceStartBlock"],
 		spec.OCR2OracleSpec.PluginConfig["DestStartBlock"],
 		spec.OCR2OracleSpec.PluginConfig["tokensPerFeeCoinPipeline"],
@@ -110,7 +110,7 @@ func generateRelayJobSpecs(sourceClient *rhea.EvmDeploymentConfig, destClient *r
 		Type: "offchainreporting2",
 		OCR2OracleSpec: &job.OCR2OracleSpec{
 			PluginType:                  job.CCIPRelay,
-			ContractID:                  destClient.LaneConfig.BlobVerifier.Hex(),
+			ContractID:                  destClient.LaneConfig.CommitStore.Hex(),
 			Relay:                       "evm",
 			RelayConfig:                 map[string]interface{}{"chainID": destClient.ChainConfig.ChainId.String()},
 			P2PV2Bootstrappers:          []string{},     // Set in env vars
@@ -147,7 +147,7 @@ func generateExecutionJobSpecs(sourceClient *rhea.EvmDeploymentConfig, destClien
 				"destChainID":              destClient.ChainConfig.ChainId.String(),
 				"onRampID":                 sourceClient.LaneConfig.OnRamp.String(),
 				"pollPeriod":               PollPeriod,
-				"blobVerifierID":           destClient.LaneConfig.BlobVerifier.Hex(),
+				"commitStoreID":            destClient.LaneConfig.CommitStore.Hex(),
 				"SourceStartBlock":         sourceClient.DeploySettings.DeployedAt,
 				"DestStartBlock":           destClient.DeploySettings.DeployedAt,
 				"tokensPerFeeCoinPipeline": fmt.Sprintf(`"""merge [type=merge left="{}" right="{\\\"%s\\\":\\\"1000000000000000000\\\"}"];"""`, destClient.ChainConfig.LinkToken.Hex()),

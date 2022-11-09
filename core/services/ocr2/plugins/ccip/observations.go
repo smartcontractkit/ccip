@@ -8,7 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/blob_verifier"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/logger"
 )
 
@@ -24,7 +24,7 @@ func EvmWord(i uint64) common.Hash {
 }
 
 type RelayObservation struct {
-	IntervalsByOnRamp map[common.Address]blob_verifier.CCIPInterval `json:"intervalsByOnRamp"`
+	IntervalsByOnRamp map[common.Address]commit_store.CCIPInterval `json:"intervalsByOnRamp"`
 }
 
 func (o RelayObservation) Marshal() ([]byte, error) {

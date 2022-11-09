@@ -40,7 +40,7 @@ type ExecutionPluginConfig struct {
 	DestChainID   uint64 `json:"destChainID"`
 	// We execute for a single on/offramp pair (lane) between a given source/dest chain. E.g. a single message types.
 	OnRampID                         string          `json:"onRampID"`
-	BlobVerifierID                   string          `json:"blobVerifierID"`
+	CommitStoreID                    string          `json:"commitStoreID"`
 	SourceStartBlock, DestStartBlock int64           // Only for first time job add.
 	TokensPerFeeCoinPipeline         string          `json:"tokensPerFeeCoinPipeline"`
 	InflightCacheExpiry              models.Duration `json:"inflightCacheExpiry"`
@@ -54,8 +54,8 @@ func (ep *ExecutionPluginConfig) ValidateExecutionPluginConfig() error {
 	if !common.IsHexAddress(ep.OnRampID) {
 		return errors.Errorf("%v is not a valid EIP155 address", ep.OnRampID)
 	}
-	if !common.IsHexAddress(ep.BlobVerifierID) {
-		return errors.Errorf("%v is not a valid EIP155 address", ep.BlobVerifierID)
+	if !common.IsHexAddress(ep.CommitStoreID) {
+		return errors.Errorf("%v is not a valid EIP155 address", ep.CommitStoreID)
 	}
 	_, err := pipeline.Parse(ep.TokensPerFeeCoinPipeline)
 	return err

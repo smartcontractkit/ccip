@@ -80,10 +80,10 @@ func TestCCIP(t *testing.T) {
 	case "fundPingPong":
 		client.fundPingPong(t)
 	case "printSpecs":
-		printing.PrintJobSpecs(ENV, SOURCE.LaneConfig.OnRamp, DESTINATION.LaneConfig.BlobVerifier, DESTINATION.LaneConfig.OffRamp,
+		printing.PrintJobSpecs(ENV, SOURCE.LaneConfig.OnRamp, DESTINATION.LaneConfig.CommitStore, DESTINATION.LaneConfig.OffRamp,
 			SOURCE.ChainConfig.ChainId, DESTINATION.ChainConfig.ChainId, DESTINATION.ChainConfig.LinkToken, SOURCE.DeploySettings.DeployedAt, DESTINATION.DeploySettings.DeployedAt)
 	case "setConfig":
-		// Set the config to the blobVerifier and the offramp
+		// Set the config to the commitStore and the offramp
 		client.SetOCRConfig(ENV)
 	case "upgradeLane":
 		rhea.UpgradeLane(t, &SOURCE, &DESTINATION)

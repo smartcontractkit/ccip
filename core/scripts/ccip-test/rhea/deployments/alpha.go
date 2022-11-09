@@ -53,7 +53,7 @@ var Alpha_OptimismGoerli = rhea.EVMChainConfig{
 var Staging_Alpha_OptimismGoerlitoAvaxFuji = rhea.EvmDeploymentConfig{
 	ChainConfig: Alpha_OptimismGoerli,
 	LaneConfig: rhea.EVMLaneConfig{
-		BlobVerifier:    gethcommon.HexToAddress("0xf9B7595D64a380fFa605A1d11BFf5cd629FB7189"),
+		CommitStore:     gethcommon.HexToAddress("0xf9B7595D64a380fFa605A1d11BFf5cd629FB7189"),
 		OnRamp:          gethcommon.HexToAddress("0x4a827De1b7bB0F56c8Cd046dc8eA72C9f412f22c"),
 		TokenSender:     gethcommon.HexToAddress("0x0cA18254C9DFB652F0d6A3b6C88aBAc3793EDdf5"),
 		OffRamp:         gethcommon.HexToAddress("0xbAcf5cb76B2AbC6b754bCffAe8209C76bAE731aA"),
@@ -65,7 +65,7 @@ var Staging_Alpha_OptimismGoerlitoAvaxFuji = rhea.EvmDeploymentConfig{
 	DeploySettings: rhea.DeploySettings{
 		DeployAFN:            false,
 		DeployTokenPools:     false,
-		DeployBlobVerifier:   false,
+		DeployCommitStore:    false,
 		DeployRamp:           false,
 		DeployRouter:         false,
 		DeployGovernanceDapp: false,
@@ -77,7 +77,7 @@ var Staging_Alpha_OptimismGoerlitoAvaxFuji = rhea.EvmDeploymentConfig{
 var Staging_Alpha_AvaxFujitoOptimismGoerli = rhea.EvmDeploymentConfig{
 	ChainConfig: Alpha_AvaxFuji,
 	LaneConfig: rhea.EVMLaneConfig{
-		BlobVerifier:    gethcommon.HexToAddress("0x84B7B012c95f8A152B44Ab3e952f2dEE424fA8e1"),
+		CommitStore:     gethcommon.HexToAddress("0x84B7B012c95f8A152B44Ab3e952f2dEE424fA8e1"),
 		OnRamp:          gethcommon.HexToAddress("0x65120aF1C7Ecaa90294758AafbB87226D2b3B798"),
 		TokenSender:     gethcommon.HexToAddress("0x7854E73C73e7F9bb5b0D5B4861E997f4C6E8dcC6"),
 		OffRamp:         gethcommon.HexToAddress("0x832c8f2666adBeA842ef30C90DeB59225Bcd67aa"),
@@ -90,7 +90,7 @@ var Staging_Alpha_AvaxFujitoOptimismGoerli = rhea.EvmDeploymentConfig{
 	DeploySettings: rhea.DeploySettings{
 		DeployAFN:            false,
 		DeployTokenPools:     false,
-		DeployBlobVerifier:   false,
+		DeployCommitStore:    false,
 		DeployRamp:           false,
 		DeployRouter:         false,
 		DeployGovernanceDapp: false,

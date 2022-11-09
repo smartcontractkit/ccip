@@ -25,8 +25,9 @@ import (
 	"golang.org/x/exp/slices"
 	"gopkg.in/guregu/null.v4"
 
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
+
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/blob_verifier"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_subscription_onramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_toll_onramp_router"
 	evm_2_evm_subscription_onramp2 "github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_subscription_onramp"
@@ -468,7 +469,7 @@ func DefaultSourceCCIPModule(chainClient blockchain.EVMClient, destChain *big.In
 type DestCCIPModule struct {
 	Common            *CCIPCommon
 	SourceChainId     *big.Int
-	BlobVerifier      *ccip.BlobVerifier
+	CommitStore       *ccip.CommitStore
 	TollOffRamp       *ccip.TollOffRamp
 	TollOffRampRouter *ccip.TollOffRampRouter
 	SubOffRamp        *ccip.SubOffRamp
@@ -484,16 +485,16 @@ func (destCCIP *DestCCIPModule) DeployContracts(sourceCCIP SourceCCIPModule) {
 	contractDeployer := destCCIP.Common.Deployer
 	destCCIP.Common.DeployContracts(contractDeployer, len(sourceCCIP.TransferAmount))
 
-	// blobVerifier responsible for validating the transfer message
-	destCCIP.BlobVerifier, err = contractDeployer.DeployBlobVerifier(
+	// commitStore responsible for validating the transfer message
+	destCCIP.CommitStore, err = contractDeployer.DeployCommitStore(
 		destCCIP.SourceChainId,
 		destCCIP.Common.ChainClient.GetChainID(),
 		destCCIP.Common.AFN.EthAddress,
-		blob_verifier.BlobVerifierInterfaceBlobVerifierConfig{
+		commit_store.CommitStoreInterfaceCommitStoreConfig{
 			OnRamps:          []common.Address{sourceCCIP.TollOnRamp.EthAddress, sourceCCIP.SubOnRamp.EthAddress},
 			MinSeqNrByOnRamp: []uint64{1, 1},
 		})
-	Expect(err).ShouldNot(HaveOccurred(), "Deploying BlobVerifier shouldn't fail")
+	Expect(err).ShouldNot(HaveOccurred(), "Deploying CommitStore shouldn't fail")
 	err = destCCIP.Common.ChainClient.WaitForEvents()
 	Expect(err).ShouldNot(HaveOccurred(), "Error waiting for setting destination contracts")
 
@@ -521,7 +522,7 @@ func (destCCIP *DestCCIPModule) DeployContracts(sourceCCIP SourceCCIPModule) {
 	// Toll
 	// offRamp
 	destCCIP.TollOffRamp, err = contractDeployer.DeployTollOffRamp(destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID(),
-		destCCIP.BlobVerifier.EthAddress, sourceCCIP.TollOnRamp.EthAddress, destCCIP.Common.AFN.EthAddress,
+		destCCIP.CommitStore.EthAddress, sourceCCIP.TollOnRamp.EthAddress, destCCIP.Common.AFN.EthAddress,
 		sourceTokens, pools, destCCIP.Common.RateLimiterConfig)
 	Expect(err).ShouldNot(HaveOccurred(), "Deploying TollOffRamp shouldn't fail")
 	err = destCCIP.Common.ChainClient.WaitForEvents()
@@ -540,7 +541,7 @@ func (destCCIP *DestCCIPModule) DeployContracts(sourceCCIP SourceCCIPModule) {
 
 	// subscription
 	destCCIP.SubOffRamp, err = contractDeployer.DeploySubOffRamp(
-		destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID(), destCCIP.BlobVerifier.EthAddress,
+		destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID(), destCCIP.CommitStore.EthAddress,
 		sourceCCIP.SubOnRamp.EthAddress, destCCIP.Common.AFN.EthAddress, sourceTokens, pools,
 		destCCIP.Common.RateLimiterConfig,
 		any_2_evm_subscription_offramp.BaseOffRampInterfaceOffRampConfig{ExecutionDelaySeconds: 0, MaxDataSize: 10e12, MaxTokensLength: 15})
@@ -678,7 +679,7 @@ func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(model BillingMo
 func (destCCIP *DestCCIPModule) AssertEventReportAccepted(onRamp common.Address, seqNum, currentBlockOnDest uint64, timeout time.Duration) {
 	log.Info().Int64("seqNum", int64(seqNum)).Msg("Waiting for ReportAccepted event")
 	Eventually(func(g Gomega) bool {
-		iterator, err := destCCIP.BlobVerifier.FilterReportAccepted(currentBlockOnDest)
+		iterator, err := destCCIP.CommitStore.FilterReportAccepted(currentBlockOnDest)
 		g.Expect(err).NotTo(HaveOccurred(), "Error filtering ReportAccepted event")
 		for iterator.Next() {
 			if slices.Contains(iterator.Event.Report.OnRamps, onRamp) {
@@ -696,7 +697,7 @@ func (destCCIP *DestCCIPModule) AssertEventReportAccepted(onRamp common.Address,
 func (destCCIP *DestCCIPModule) AssertSeqNumberExecuted(onRamp common.Address, seqNumberBefore uint64, timeout time.Duration) {
 	log.Info().Int64("seqNum", int64(seqNumberBefore)).Msg("Waiting to be executed")
 	Eventually(func(g Gomega) {
-		seqNumberAfter, err := destCCIP.BlobVerifier.GetNextSeqNumber(onRamp)
+		seqNumberAfter, err := destCCIP.CommitStore.GetNextSeqNumber(onRamp)
 		g.Expect(err).ShouldNot(HaveOccurred(), "Getting expected seq number should be successful %d", seqNumberBefore)
 		g.Expect(seqNumberAfter).Should(BeNumerically(">", seqNumberBefore), "Next Sequence number is not increased")
 	}, timeout, "1s").Should(Succeed(), "Error Executing Sequence number %d", seqNumberBefore)
@@ -774,11 +775,11 @@ func (c *CCIPTest) ValidateSubRequests() {
 	for _, txHash := range c.SentSubReqHashes {
 		// Verify if
 		// - CCIPSendRequested Event log generated,
-		// - NextSeqNumber from blobVerifier got increased
+		// - NextSeqNumber from commitStore got increased
 		seqNumber := c.Source.AssertEventCCIPSendRequested(SUB, txHash, c.StartBlockOnSource, c.ValidationTimeout)
 		c.Dest.AssertSeqNumberExecuted(c.Source.SubOnRamp.EthAddress, seqNumber, c.ValidationTimeout)
 
-		// Verify whether blobVerifier has accepted the report
+		// Verify whether commitStore has accepted the report
 		c.Dest.AssertEventReportAccepted(c.Source.SubOnRamp.EthAddress, seqNumber, c.StartBlockOnDestination, c.ValidationTimeout)
 
 		// Verify whether the execution state is changed and the transfer is successful
@@ -838,11 +839,11 @@ func (c *CCIPTest) ValidateTollRequests() {
 	for _, txHash := range c.SentTollReqHashes {
 		// Verify if
 		// - CCIPSendRequested Event log generated,
-		// - NextSeqNumber from blobVerifier got increased
+		// - NextSeqNumber from commitStore got increased
 		seqNumber := c.Source.AssertEventCCIPSendRequested(TOLL, txHash, c.StartBlockOnSource, c.ValidationTimeout)
 		c.Dest.AssertSeqNumberExecuted(c.Source.TollOnRamp.EthAddress, seqNumber, c.ValidationTimeout)
 
-		// Verify whether blobVerifier has accepted the report
+		// Verify whether commitStore has accepted the report
 		c.Dest.AssertEventReportAccepted(c.Source.TollOnRamp.EthAddress, seqNumber, c.StartBlockOnDestination, c.ValidationTimeout)
 
 		// Verify whether the execution state is changed and the transfer is successful
@@ -880,7 +881,7 @@ func SetOCRConfigs(relayNodes, execNodes []*client.CLNodesWithKeys, destCCIP Des
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err :=
 		ccip.NewOffChainAggregatorV2Config(relayNodes)
 	Expect(err).ShouldNot(HaveOccurred(), "Shouldn't fail while getting the config values for ocr2 type contract")
-	err = destCCIP.BlobVerifier.SetOCRConfig(signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig)
+	err = destCCIP.CommitStore.SetOCRConfig(signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig)
 	Expect(err).ShouldNot(HaveOccurred(), "Shouldn't fail while setting blobverifier config")
 	// if relay and exec job is set up in different DON
 	if len(execNodes) > 0 {
@@ -903,7 +904,7 @@ func CreateOCRJobsForCCIP(
 	bootstrapRelay *client.CLNodesWithKeys,
 	bootstrapExec *client.CLNodesWithKeys,
 	relayNodes, execNodes []*client.CLNodesWithKeys,
-	tollOnRamp, subOnRamp, blobVerifier, tollOffRamp, subOffRamp string,
+	tollOnRamp, subOnRamp, commitStore, tollOffRamp, subOffRamp string,
 	sourceChainClient, destChainClient blockchain.EVMClient,
 	linkTokenAddr []string,
 	mockServer *ctfClient.MockserverClient,
@@ -937,7 +938,7 @@ func CreateOCRJobsForCCIP(
 		}
 	}
 
-	_, err := bootstrapRelay.Node.MustCreateJob(bootstrapSpec(blobVerifier))
+	_, err := bootstrapRelay.Node.MustCreateJob(bootstrapSpec(commitStore))
 	Expect(err).ShouldNot(HaveOccurred(), "Shouldn't fail creating bootstrap job on bootstrap node")
 	if bootstrapExec != nil && len(execNodes) > 0 {
 		_, err := bootstrapExec.Node.MustCreateJob(bootstrapSpec(subOffRamp))
@@ -967,7 +968,7 @@ func CreateOCRJobsForCCIP(
 			OCR2OracleSpec: job.OCR2OracleSpec{
 				Relay:                             relay.EVM,
 				PluginType:                        job.CCIPRelay,
-				ContractID:                        blobVerifier,
+				ContractID:                        commitStore,
 				OCRKeyBundleID:                    null.StringFrom(nodeOCR2KeyId),
 				TransmitterID:                     null.StringFrom(nodeTransmitterAddress),
 				ContractConfigConfirmations:       1,
@@ -1019,7 +1020,7 @@ func CreateOCRJobsForCCIP(
 					"sourceChainID":    sourceChainID,
 					"destChainID":      destChainID,
 					"onRampID":         fmt.Sprintf("\"%s\"", onRamp),
-					"blobVerifierID":   fmt.Sprintf("\"%s\"", blobVerifier),
+					"commitStoreID":    fmt.Sprintf("\"%s\"", commitStore),
 					"destStartBlock":   currentBlockOnDest,
 					"sourceStartBlock": currentBlockOnSource,
 					"tokensPerFeeCoinPipeline": fmt.Sprintf(`"""
@@ -1349,7 +1350,7 @@ func CCIPDefaultTestSetUp(
 		bootstrapRelay, bootstrapExec, relayNodes, execNodes,
 		sourceCCIP.TollOnRamp.Address(),
 		sourceCCIP.SubOnRamp.Address(),
-		destCCIP.BlobVerifier.Address(),
+		destCCIP.CommitStore.Address(),
 		destCCIP.TollOffRamp.Address(),
 		destCCIP.SubOffRamp.Address(),
 		sourceChainClient, destChainClient,

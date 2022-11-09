@@ -12,7 +12,7 @@ package toll
 //	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/afn_contract"
 //	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp"
 //	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp_router"
-//	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/blob_verifier"
+//	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 //	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_toll_onramp_router"
 //	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
 //	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
@@ -78,8 +78,8 @@ package toll
 //	tokenPools := deployNativeTokenPool(t, destClient)
 //	// Updates source.AFN if any new contracts are deployed
 //	deployAFN(t, destClient)
-//	// Updates source.BlobVerifier if any new contracts are deployed
-//	deployBlobVerifier(t, destClient, sourceClient)
+//	// Updates source.CommitStore if any new contracts are deployed
+//	deployCommitStore(t, destClient, sourceClient)
 //
 //	// Deploy offramp contract message receiver
 //	messageReceiverAddress, tx, _, err := simple_message_receiver.DeploySimpleMessageReceiver(destClient.Owner, destClient.Client)
@@ -98,7 +98,7 @@ package toll
 //	if destClient.DeploySettings.DeployRamp || destClient.DeploySettings.DeployTokenPools {
 //		for _, tokenPool := range tokenPools {
 //			// Configure offramp address on pool
-//			tx, err = tokenPool.SetOffRamp(destClient.Owner, destClient.LaneConfig.BlobVerifier, true)
+//			tx, err = tokenPool.SetOffRamp(destClient.Owner, destClient.LaneConfig.CommitStore, true)
 //			require.NoError(t, err)
 //			main.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
 //			destClient.Logger.Infof("Offramp pool configured with offramp address: %s", helpers.ExplorerLink(destClient.ChainConfig.ChainId.Int64(), tx.Hash()))
@@ -199,7 +199,7 @@ package toll
 //			MaxTokensLength:                         15,
 //			PermissionLessExecutionThresholdSeconds: 60,
 //		},
-//		destClient.LaneConfig.BlobVerifier,
+//		destClient.LaneConfig.CommitStore,
 //		destClient.ChainConfig.Afn,
 //		sourceclient.ChainConfig.BridgeTokens,
 //		destclient.ChainConfig.TokenPools,
@@ -252,35 +252,35 @@ package toll
 //	return offRampRouter
 //}
 //
-//func deployBlobVerifier(t *testing.T, destClient *main.EvmChainConfig, sourceClient *main.EvmChainConfig) *blob_verifier.BlobVerifier {
-//	if !destClient.DeploySettings.DeployBlobVerifier {
-//		destClient.Logger.Infof("Skipping BlobVerifier deployment, using BlobVerifier on %s", destClient.LaneConfig.BlobVerifier)
-//		blobVerifier, err := blob_verifier.NewBlobVerifier(destClient.LaneConfig.BlobVerifier, destClient.Client)
+//func deployCommitStore(t *testing.T, destClient *main.EvmChainConfig, sourceClient *main.EvmChainConfig) *commit_store.CommitStore {
+//	if !destClient.DeploySettings.DeployCommitStore {
+//		destClient.Logger.Infof("Skipping CommitStore deployment, using CommitStore on %s", destClient.LaneConfig.CommitStore)
+//		commitStore, err := commit_store.NewCommitStore(destClient.LaneConfig.CommitStore, destClient.Client)
 //		require.NoError(t, err)
-//		return blobVerifier
+//		return commitStore
 //	}
 //
 //	destClient.Logger.Infof("Deploying blob verifier")
 //
-//	blobVerifierAddress, tx, _, err := blob_verifier.DeployBlobVerifier(
+//	commitStoreAddress, tx, _, err := commit_store.DeployCommitStore(
 //		destClient.Owner,     // user
 //		destClient.Client,    // client
 //		destClient.ChainConfig.ChainId,   // dest chain id
 //		sourceClient.ChainConfig.ChainId, // source chain id
 //		destClient.ChainConfig.Afn,       // AFN address
-//		blob_verifier.BlobVerifierInterfaceBlobVerifierConfig{
+//		commit_store.CommitStoreInterfaceCommitStoreConfig{
 //			OnRamps:          []common.Address{sourceClient.LaneConfig.OnRamp},
 //			MinSeqNrByOnRamp: []uint64{1},
 //		},
 //	)
 //	require.NoError(t, err)
 //	main.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
-//	destClient.Logger.Infof("Blob verifier deployed on %s in tx: %s", blobVerifierAddress.Hex(), helpers.ExplorerLink(destClient.ChainConfig.ChainId.Int64(), tx.Hash()))
-//	destClient.LaneConfig.BlobVerifier = blobVerifierAddress
+//	destClient.Logger.Infof("Blob verifier deployed on %s in tx: %s", commitStoreAddress.Hex(), helpers.ExplorerLink(destClient.ChainConfig.ChainId.Int64(), tx.Hash()))
+//	destClient.LaneConfig.CommitStore = commitStoreAddress
 //
-//	blobVerifier, err := blob_verifier.NewBlobVerifier(blobVerifierAddress, destClient.Client)
+//	commitStore, err := commit_store.NewCommitStore(commitStoreAddress, destClient.Client)
 //	require.NoError(t, err)
-//	return blobVerifier
+//	return commitStore
 //}
 //
 //func deployReceiverDapp(t *testing.T, destClient *main.EvmChainConfig) *receiver_dapp.ReceiverDapp {
@@ -404,7 +404,7 @@ package toll
 //TokenPools:      %s,
 //OffRamp:         common.HexToAddress("%s"),
 //OffRampRouter:   common.HexToAddress("%s"),
-//BlobVerifier:    common.HexToAddress("%s"),
+//CommitStore:    common.HexToAddress("%s"),
 //MessageReceiver: common.HexToAddress("%s"),
 //ReceiverDapp:    common.HexToAddress("%s"),
 //Afn:             common.HexToAddress("%s"),
@@ -414,10 +414,10 @@ package toll
 //		destination.TokenPools,
 //		destination.OffRamp,
 //		destination.OffRampRouter,
-//		destination.BlobVerifier,
+//		destination.CommitStore,
 //		destination.MessageReceiver,
 //		destination.ReceiverDapp,
 //		destination.Afn)
 //
-//	main.PrintJobSpecs(source.OnRamp, destination.BlobVerifier, destination.OffRamp, source.ChainConfig.ChainId, destination.ChainConfig.ChainId)
+//	main.PrintJobSpecs(source.OnRamp, destination.CommitStore, destination.OffRamp, source.ChainConfig.ChainId, destination.ChainConfig.ChainId)
 //}

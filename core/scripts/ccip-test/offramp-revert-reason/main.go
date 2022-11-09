@@ -14,11 +14,12 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
+
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp_router"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/blob_verifier"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_subscription_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/secrets"
@@ -78,15 +79,15 @@ func getABIForContract(client *ethclient.Client, contractAddress common.Address)
 	case ccip.EVM2EVMTollOnRamp:
 		return []string{evm_2_evm_toll_onramp.EVM2EVMTollOnRampABI}
 	case ccip.EVM2EVMTollOffRamp:
-		return []string{any_2_evm_toll_offramp.EVM2EVMTollOffRampABI, any_2_evm_toll_offramp_router.Any2EVMTollOffRampRouterABI, blob_verifier.BlobVerifierABI}
+		return []string{any_2_evm_toll_offramp.EVM2EVMTollOffRampABI, any_2_evm_toll_offramp_router.Any2EVMTollOffRampRouterABI, commit_store.CommitStoreABI}
 		// SUBSCRIPTION
 	case ccip.EVM2EVMSubscriptionOnRamp:
 		return []string{evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRampABI}
 	case ccip.EVM2EVMSubscriptionOffRamp:
-		return []string{any_2_evm_subscription_offramp.EVM2EVMSubscriptionOffRampABI, any_2_evm_subscription_offramp_router.Any2EVMSubscriptionOffRampRouterABI, blob_verifier.BlobVerifierABI}
+		return []string{any_2_evm_subscription_offramp.EVM2EVMSubscriptionOffRampABI, any_2_evm_subscription_offramp_router.Any2EVMSubscriptionOffRampRouterABI, commit_store.CommitStoreABI}
 		// SHARED
-	case ccip.BlobVerifier:
-		return []string{blob_verifier.BlobVerifierABI}
+	case ccip.CommitStore:
+		return []string{commit_store.CommitStoreABI}
 	}
 	panic("Contract not found")
 }

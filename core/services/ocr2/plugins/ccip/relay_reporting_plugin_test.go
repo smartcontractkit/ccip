@@ -18,8 +18,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/afn_contract"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/blob_verifier"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/blob_verifier_helper"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store_helper"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/native_token_pool"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
@@ -33,7 +33,7 @@ func TestRelayReportSize(t *testing.T) {
 	p.Property("bounded relay report size", prop.ForAll(func(root []byte, min, max uint64) bool {
 		var root32 [32]byte
 		copy(root32[:], root)
-		rep, err := EncodeRelayReport(&blob_verifier.CCIPRelayReport{MerkleRoots: [][32]byte{root32}, Intervals: []blob_verifier.CCIPInterval{{Min: min, Max: max}}})
+		rep, err := EncodeRelayReport(&commit_store.CCIPRelayReport{MerkleRoots: [][32]byte{root32}, Intervals: []commit_store.CCIPInterval{{Min: min, Max: max}}})
 		require.NoError(t, err)
 		return len(rep) <= MaxRelayReportLength
 	}, gen.SliceOfN(32, gen.UInt8()), gen.UInt64(), gen.UInt64()))
@@ -75,19 +75,19 @@ func TestRelayReportEncoding(t *testing.T) {
 
 	// Deploy blob verifier.
 	onRampAddress := common.HexToAddress("0x01BE23585060835E02B77ef475b0Cc51aA1e0709")
-	blobVerifierAddress, _, _, err := blob_verifier_helper.DeployBlobVerifierHelper(
+	commitStoreAddress, _, _, err := commit_store_helper.DeployCommitStoreHelper(
 		destUser,         // user
 		destChain,        // client
 		big.NewInt(1338), // dest chain id
 		big.NewInt(1337),
 		afnAddress, // AFN address
-		blob_verifier_helper.BlobVerifierInterfaceBlobVerifierConfig{
+		commit_store_helper.CommitStoreInterfaceCommitStoreConfig{
 			OnRamps:          []common.Address{onRampAddress},
 			MinSeqNrByOnRamp: []uint64{1},
 		},
 	)
 	require.NoError(t, err)
-	blobVerifier, err := blob_verifier_helper.NewBlobVerifierHelper(blobVerifierAddress, destChain)
+	commitStore, err := commit_store_helper.NewCommitStoreHelper(commitStoreAddress, destChain)
 	require.NoError(t, err)
 	destChain.Commit()
 
@@ -96,10 +96,10 @@ func TestRelayReportEncoding(t *testing.T) {
 	tree, err := merklemulti.NewTree(mctx, [][32]byte{mctx.Hash([]byte{0xaa})})
 	require.NoError(t, err)
 	root := tree.Root()
-	report := blob_verifier.CCIPRelayReport{
+	report := commit_store.CCIPRelayReport{
 		OnRamps:     []common.Address{onRampAddress},
 		MerkleRoots: [][32]byte{root},
-		Intervals:   []blob_verifier.CCIPInterval{{Min: 1, Max: 10}},
+		Intervals:   []commit_store.CCIPInterval{{Min: 1, Max: 10}},
 		RootOfRoots: root,
 	}
 	out, err := EncodeRelayReport(&report)
@@ -108,7 +108,7 @@ func TestRelayReportEncoding(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, &report, decodedReport)
 
-	tx, err := blobVerifier.Report(destUser, out)
+	tx, err := commitStore.Report(destUser, out)
 	require.NoError(t, err)
 	destChain.Commit()
 	res, err := destChain.TransactionReceipt(context.Background(), tx.Hash())
@@ -116,7 +116,7 @@ func TestRelayReportEncoding(t *testing.T) {
 	assert.Equal(t, uint64(1), res.Status)
 
 	// Ensure root exists.
-	ts, err := blobVerifier.GetMerkleRoot(nil, root)
+	ts, err := commitStore.GetMerkleRoot(nil, root)
 	require.NoError(t, err)
 	require.NotEqual(t, ts.String(), "0")
 }

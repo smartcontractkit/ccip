@@ -47,7 +47,7 @@ contractConfigConfirmations = 1
 contractConfigTrackerPollInterval = "1s"
 [relayConfig]
 chainID = %s
-`, ccipContracts.BlobVerifier.Address(), destChainID))
+`, ccipContracts.CommitStore.Address(), destChainID))
 
 	linkEth := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, err := w.Write([]byte(`{"JuelsPerETH": "200000000000000000000"}`))

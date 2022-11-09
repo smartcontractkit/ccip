@@ -36,7 +36,7 @@ func TestExecutionConfig(t *testing.T) {
 		SourceChainID:            1337,
 		DestChainID:              7331,
 		OnRampID:                 "0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B",
-		BlobVerifierID:           "0xC79b96044906550A5652BCf20a6EA02f139B9Ae5",
+		CommitStoreID:            "0xC79b96044906550A5652BCf20a6EA02f139B9Ae5",
 		SourceStartBlock:         222,
 		DestStartBlock:           333,
 		TokensPerFeeCoinPipeline: `merge [type=merge left="{}" right="{\"0xC79b96044906550A5652BCf20a6EA02f139B9Ae5\":\"1000000000000000000\"}"];`,

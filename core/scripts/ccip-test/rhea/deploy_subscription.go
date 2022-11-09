@@ -8,10 +8,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
+
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/afn_contract"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_free_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp_router"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/blob_verifier"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_subscription_onramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_subscription_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/governance_dapp"
@@ -79,8 +80,8 @@ func deployDestinationContracts(t *testing.T, destClient *EvmDeploymentConfig, s
 	deployAFN(t, destClient)
 	// Updates destclient.ChainConfig.TokenPools if any new contracts are deployed
 	deployNativeTokenPool(t, destClient)
-	// Updates destClient.LaneConfig.BlobVerifier if any new contracts are deployed
-	deployBlobVerifier(t, destClient, sourceClient)
+	// Updates destClient.LaneConfig.CommitStore if any new contracts are deployed
+	deployCommitStore(t, destClient, sourceClient)
 
 	// Updates destClient.LaneConfig.OffRamp if any new contracts are deployed
 	deployOffRamp(t, destClient, sourceClient)
@@ -236,7 +237,7 @@ func deployOffRamp(t *testing.T, destClient *EvmDeploymentConfig, sourceClient *
 			MaxTokensLength:                         15,
 			PermissionLessExecutionThresholdSeconds: 60,
 		},
-		destClient.LaneConfig.BlobVerifier,
+		destClient.LaneConfig.CommitStore,
 		destClient.ChainConfig.Afn,
 		sourceTokens,
 		tokenPools,
@@ -300,35 +301,35 @@ func deployOffRampRouter(t *testing.T, destClient *EvmDeploymentConfig) *any_2_e
 	return offRampRouter
 }
 
-func deployBlobVerifier(t *testing.T, destClient *EvmDeploymentConfig, sourceClient *EvmDeploymentConfig) *blob_verifier.BlobVerifier {
-	if !destClient.DeploySettings.DeployBlobVerifier {
-		destClient.Logger.Infof("Skipping BlobVerifier deployment, using BlobVerifier on %s", destClient.LaneConfig.BlobVerifier)
-		blobVerifier, err := blob_verifier.NewBlobVerifier(destClient.LaneConfig.BlobVerifier, destClient.Client)
+func deployCommitStore(t *testing.T, destClient *EvmDeploymentConfig, sourceClient *EvmDeploymentConfig) *commit_store.CommitStore {
+	if !destClient.DeploySettings.DeployCommitStore {
+		destClient.Logger.Infof("Skipping CommitStore deployment, using CommitStore on %s", destClient.LaneConfig.CommitStore)
+		commitStore, err := commit_store.NewCommitStore(destClient.LaneConfig.CommitStore, destClient.Client)
 		require.NoError(t, err)
-		return blobVerifier
+		return commitStore
 	}
 
 	destClient.Logger.Infof("Deploying blob verifier")
 
-	blobVerifierAddress, tx, _, err := blob_verifier.DeployBlobVerifier(
+	commitStoreAddress, tx, _, err := commit_store.DeployCommitStore(
 		destClient.Owner,                 // user
 		destClient.Client,                // client
 		destClient.ChainConfig.ChainId,   // dest chain id
 		sourceClient.ChainConfig.ChainId, // source chain id
 		destClient.ChainConfig.Afn,       // AFN address
-		blob_verifier.BlobVerifierInterfaceBlobVerifierConfig{
+		commit_store.CommitStoreInterfaceCommitStoreConfig{
 			OnRamps:          []common.Address{sourceClient.LaneConfig.OnRamp},
 			MinSeqNrByOnRamp: []uint64{1},
 		},
 	)
 	require.NoError(t, err)
 	shared.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
-	destClient.Logger.Infof("Blob verifier deployed on %s in tx: %s", blobVerifierAddress.Hex(), helpers.ExplorerLink(destClient.ChainConfig.ChainId.Int64(), tx.Hash()))
-	destClient.LaneConfig.BlobVerifier = blobVerifierAddress
+	destClient.Logger.Infof("Blob verifier deployed on %s in tx: %s", commitStoreAddress.Hex(), helpers.ExplorerLink(destClient.ChainConfig.ChainId.Int64(), tx.Hash()))
+	destClient.LaneConfig.CommitStore = commitStoreAddress
 
-	blobVerifier, err := blob_verifier.NewBlobVerifier(blobVerifierAddress, destClient.Client)
+	commitStore, err := commit_store.NewCommitStore(commitStoreAddress, destClient.Client)
 	require.NoError(t, err)
-	return blobVerifier
+	return commitStore
 }
 
 func deployReceiverDapp(t *testing.T, destClient *EvmDeploymentConfig) *receiver_dapp.ReceiverDapp {

@@ -17,11 +17,12 @@ import (
 	ocrtypes2 "github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"golang.org/x/crypto/curve25519"
 
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
+
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp_router"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/blob_verifier"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_subscription_onramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_toll_onramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_subscription_onramp"
@@ -92,23 +93,23 @@ func (e *CCIPContractsDeployer) DeployAFNContract() (*AFN, error) {
 	}, err
 }
 
-func (e *CCIPContractsDeployer) DeployBlobVerifier(
+func (e *CCIPContractsDeployer) DeployCommitStore(
 	sourceChainId, destChainId *big.Int,
 	afn common.Address,
-	bConfig blob_verifier.BlobVerifierInterfaceBlobVerifierConfig,
+	bConfig commit_store.CommitStoreInterfaceCommitStoreConfig,
 ) (
-	*BlobVerifier,
+	*CommitStore,
 	error,
 ) {
-	address, _, instance, err := e.evmClient.DeployContract("BlobVerifier Contract", func(
+	address, _, instance, err := e.evmClient.DeployContract("CommitStore Contract", func(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return blob_verifier.DeployBlobVerifier(auth, backend, destChainId, sourceChainId, afn, bConfig)
+		return commit_store.DeployCommitStore(auth, backend, destChainId, sourceChainId, afn, bConfig)
 	})
-	return &BlobVerifier{
+	return &CommitStore{
 		client:     e.evmClient,
-		instance:   instance.(*blob_verifier.BlobVerifier),
+		instance:   instance.(*commit_store.CommitStore),
 		EthAddress: *address,
 	}, err
 }
@@ -132,7 +133,7 @@ func (e *CCIPContractsDeployer) DeploySimpleMessageReceiver() (
 
 func (e *CCIPContractsDeployer) DeployTollOffRamp(
 	sourceChainId, destChainId *big.Int,
-	blobVerifier, onRamp, afn common.Address,
+	commitStore, onRamp, afn common.Address,
 	sourceToken, pools []common.Address,
 	opts RateLimiterConfig) (
 	*TollOffRamp,
@@ -150,7 +151,7 @@ func (e *CCIPContractsDeployer) DeployTollOffRamp(
 				MaxDataSize:           1e12,
 				MaxTokensLength:       15,
 			},
-			blobVerifier,
+			commitStore,
 			afn,
 			sourceToken,
 			pools,
@@ -210,7 +211,7 @@ func (e *CCIPContractsDeployer) DeploySubOffRampRouter(
 
 func (e *CCIPContractsDeployer) DeploySubOffRamp(
 	sourceChainId, destChainId *big.Int,
-	blobVerifier, onRamp, afn common.Address,
+	commitStore, onRamp, afn common.Address,
 	sourceToken, pools []common.Address,
 	opts RateLimiterConfig,
 	offRampConfig any_2_evm_subscription_offramp.BaseOffRampInterfaceOffRampConfig,
@@ -223,7 +224,7 @@ func (e *CCIPContractsDeployer) DeploySubOffRamp(
 		return any_2_evm_subscription_offramp.DeployEVM2EVMSubscriptionOffRamp(
 			auth, backend, sourceChainId, destChainId,
 			offRampConfig,
-			blobVerifier,
+			commitStore,
 			afn,
 			sourceToken,
 			pools,

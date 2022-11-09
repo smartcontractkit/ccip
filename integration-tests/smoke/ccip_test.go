@@ -75,7 +75,7 @@ var _ = Describe("CCIP interactions test @smoke-ccip", func() {
 			clNodes[0], nil, clNodes[1:], nil,
 			sourceCCIP.TollOnRamp.Address(),
 			sourceCCIP.SubOnRamp.Address(),
-			destCCIP.BlobVerifier.Address(),
+			destCCIP.CommitStore.Address(),
 			destCCIP.TollOffRamp.Address(),
 			destCCIP.SubOffRamp.Address(),
 			sourceChainClient, destChainClient,

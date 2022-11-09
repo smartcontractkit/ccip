@@ -35,7 +35,7 @@ const (
 	E2E                     phase  = "i)OverallRelayAndExecution"
 	TX                      phase  = "ii)SendTxBlockConfirmation"
 	CCIPSendRe              phase  = "iii)CCIPSendRequested Event"
-	SeqNumAndRepAccIncrease phase  = "iv)ReportAcceptedByBlobVerifier(Relay)"
+	SeqNumAndRepAccIncrease phase  = "iv)ReportAcceptedByCommitStore(Relay)"
 	ExecStateChanged        phase  = "v)ExecutionStateChanged Event(Execution)"
 	success                 status = "✅"
 	fail                    status = "❌"
@@ -228,7 +228,7 @@ func (c *CCIPE2ELoad) Call(msgType interface{}) client.CallResult {
 	}
 
 	// wait for
-	// - BlobVerifier to increase the seq number,
+	// - CommitStore to increase the seq number,
 	err = c.waitForSeqNumberIncrease(ticker, seqNum, msgID, relayStartTime)
 	if err != nil {
 		res.Error = err
@@ -423,7 +423,7 @@ func (c *CCIPE2ELoad) PrintStats(failed bool, rps int, duration float64) {
 	event.Int("No of Successful Requests", successCount[E2E])
 	event.Msgf("Average Duration for successful requests")
 	log.Info().Msg("Relay Report stats")
-	it, err := c.Destination.BlobVerifier.FilterReportAccepted(c.InitialDestBlockNum)
+	it, err := c.Destination.CommitStore.FilterReportAccepted(c.InitialDestBlockNum)
 	Expect(err).ShouldNot(HaveOccurred(), "report relayed result")
 	i := 1
 	event = log.Info()
@@ -431,7 +431,7 @@ func (c *CCIPE2ELoad) PrintStats(failed bool, rps int, duration float64) {
 		event.Interface(fmt.Sprintf("%d Report Intervals", i), it.Event.Report.Intervals)
 		i++
 	}
-	event.Msgf("BlobVerifier-Reports Accepted")
+	event.Msgf("CommitStore-Reports Accepted")
 }
 
 func (c *CCIPE2ELoad) waitForExecStateChange(ticker *time.Ticker, seqNums []uint64, currentBlockOnDest uint64, msgID int64, timeNow time.Time) error {
@@ -479,7 +479,7 @@ func (c *CCIPE2ELoad) waitForSeqNumberIncrease(ticker *time.Ticker, seqNum uint6
 	for {
 		select {
 		case <-ticker.C:
-			seqNumberAfter, err := c.Destination.BlobVerifier.GetNextSeqNumber(c.Source.SubOnRamp.EthAddress)
+			seqNumberAfter, err := c.Destination.CommitStore.GetNextSeqNumber(c.Source.SubOnRamp.EthAddress)
 			if err != nil {
 				c.updatestats(msgID, fmt.Sprint(seqNum), SeqNumAndRepAccIncrease, time.Since(timeNow), fail)
 				return fmt.Errorf("error %v in GetNextExpectedSeqNumber by blobverifier for msg ID %d", err, msgID)
@@ -506,7 +506,7 @@ func (c *CCIPE2ELoad) waitForReportAccepted(ticker *time.Ticker, msgID int64, se
 				c.updatestats(msgID, fmt.Sprint(seqNum), SeqNumAndRepAccIncrease, time.Since(timeNow), success)
 				return nil
 			}
-			it, err := c.Destination.BlobVerifier.FilterReportAccepted(currentBlockOnDest)
+			it, err := c.Destination.CommitStore.FilterReportAccepted(currentBlockOnDest)
 			if err != nil {
 				c.updatestats(msgID, fmt.Sprint(seqNum), SeqNumAndRepAccIncrease, time.Since(timeNow), fail)
 				return fmt.Errorf("error %v in filtering by ReportAccepted event for seq num %d", err, seqNum)

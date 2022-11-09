@@ -9,11 +9,12 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
+
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp_router"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/blob_verifier"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_subscription_onramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_toll_onramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_subscription_onramp"
@@ -328,18 +329,18 @@ func (onRamp *SubOnRamp) SetTokenPrices(tokens []common.Address, prices []*big.I
 	return onRamp.client.ProcessTransaction(tx)
 }
 
-type BlobVerifier struct {
+type CommitStore struct {
 	client     *blockchain.EthereumClient
-	instance   *blob_verifier.BlobVerifier
+	instance   *commit_store.CommitStore
 	EthAddress common.Address
 }
 
-func (bv *BlobVerifier) Address() string {
+func (bv *CommitStore) Address() string {
 	return bv.EthAddress.Hex()
 }
 
 // SetOCRConfig sets the offchain reporting protocol configuration
-func (b *BlobVerifier) SetOCRConfig(
+func (b *CommitStore) SetOCRConfig(
 	signers []common.Address,
 	transmitters []common.Address,
 	f uint8,
@@ -347,7 +348,7 @@ func (b *BlobVerifier) SetOCRConfig(
 	offchainConfigVersion uint64,
 	offchainConfig []byte,
 ) error {
-	log.Info().Str("Contract Address", b.Address()).Msg("Configuring OCR config for BlobVerifier Contract")
+	log.Info().Str("Contract Address", b.Address()).Msg("Configuring OCR config for CommitStore Contract")
 	// Set Config
 	opts, err := b.client.TransactionOpts(b.client.GetDefaultWallet())
 	if err != nil {
@@ -357,7 +358,7 @@ func (b *BlobVerifier) SetOCRConfig(
 	log.Info().
 		Interface("signerAddresses", signers).
 		Interface("transmitterAddresses", transmitters).
-		Msg("Configuring BlobVerifier")
+		Msg("Configuring CommitStore")
 	tx, err := b.instance.SetConfig0(
 		opts,
 		signers,
@@ -374,11 +375,11 @@ func (b *BlobVerifier) SetOCRConfig(
 	return b.client.ProcessTransaction(tx)
 }
 
-func (b *BlobVerifier) FilterReportAccepted(currentBlock uint64) (*blob_verifier.BlobVerifierReportAcceptedIterator, error) {
+func (b *CommitStore) FilterReportAccepted(currentBlock uint64) (*commit_store.CommitStoreReportAcceptedIterator, error) {
 	return b.instance.FilterReportAccepted(&bind.FilterOpts{Start: currentBlock})
 }
 
-func (b *BlobVerifier) GetNextSeqNumber(onRamp common.Address) (uint64, error) {
+func (b *CommitStore) GetNextSeqNumber(onRamp common.Address) (uint64, error) {
 	return b.instance.GetExpectedNextSequenceNumber(nil, onRamp)
 }
 
