@@ -18,13 +18,13 @@ import (
 
 var _ = Describe("CCIP chaos test @chaos-ccip", Ordered, func() {
 	var (
-		tearDown        func()
-		numOfRelayNodes = 5
-		testEnvironment *environment.Environment
-		source          *actions.SourceCCIPModule
-		dest            *actions.DestCCIPModule
-		testSetup       actions.CCIPTestEnv
-		totalReq        = 20
+		tearDown         func()
+		numOfCommitNodes = 5
+		testEnvironment  *environment.Environment
+		source           *actions.SourceCCIPModule
+		dest             *actions.DestCCIPModule
+		testSetup        actions.CCIPTestEnv
+		totalReq         = 20
 	)
 
 	AfterAll(func() {
@@ -50,17 +50,17 @@ var _ = Describe("CCIP chaos test @chaos-ccip", Ordered, func() {
 						},
 					},
 				},
-			}, numOfRelayNodes, false)
+			}, numOfCommitNodes, false)
 		actions.CreateAndFundSubscription(*source, *dest, big.NewInt(0).Mul(big.NewInt(100), big.NewInt(1e18)), int64(totalReq))
 	})
 
 	Describe("CCIP chaos @chaos-ccip-ocr", func() {
 		var (
 			testScenarios = []TableEntry{
-				Entry("Must catch up pending requests if majority of relay nodes goes down for 1m @chaos-ccip-fail-relay-majority",
+				Entry("Must catch up pending requests if majority of commit nodes goes down for 1m @chaos-ccip-fail-commit-majority",
 					chaos.NewFailPods,
 					&chaos.Props{
-						LabelsSelector: &map[string]*string{actions.ChaosGroupRelayFaultyPlus: a.Str("1")},
+						LabelsSelector: &map[string]*string{actions.ChaosGroupCommitFaultyPlus: a.Str("1")},
 						DurationStr:    "1m",
 					}, true,
 					big.NewInt(2e18),
@@ -73,10 +73,10 @@ var _ = Describe("CCIP chaos test @chaos-ccip", Ordered, func() {
 					}, true,
 					big.NewInt(2.5e18),
 				),
-				Entry("Must continue ocr2 if minority of relay nodes get killed @chaos-ccip-fail-relay-minority",
+				Entry("Must continue ocr2 if minority of commit nodes get killed @chaos-ccip-fail-commit-minority",
 					chaos.NewFailPods,
 					&chaos.Props{
-						LabelsSelector: &map[string]*string{actions.ChaosGroupRelayFaulty: a.Str("1")},
+						LabelsSelector: &map[string]*string{actions.ChaosGroupCommitFaulty: a.Str("1")},
 						DurationStr:    "90s",
 					}, false,
 					big.NewInt(2.3e18),

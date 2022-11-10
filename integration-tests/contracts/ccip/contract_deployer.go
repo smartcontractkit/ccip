@@ -312,10 +312,10 @@ func (e *CCIPContractsDeployer) DeployTollOnRamp(
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
 		config := evm_2_evm_toll_onramp.BaseOnRampInterfaceOnRampConfig{
-			RelayingFeeJuels: 0,
-			MaxDataSize:      1e6,
-			MaxTokensLength:  5,
-			MaxGasLimit:      ccip.GasLimitPerTx,
+			CommitFeeJuels:  0,
+			MaxDataSize:     1e6,
+			MaxTokensLength: 5,
+			MaxGasLimit:     ccip.GasLimitPerTx,
 		}
 		return evm_2_evm_toll_onramp.DeployEVM2EVMTollOnRamp(
 			auth, backend, chainId, destChainId, tokens, pools,

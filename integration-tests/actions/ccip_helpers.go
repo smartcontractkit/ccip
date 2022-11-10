@@ -50,8 +50,8 @@ const (
 	SUB  BillingModel = "subscription"
 	TOLL BillingModel = "toll"
 
-	ChaosGroupRelayFaultyPlus     = "RelayMajority"          // >f number of nodes
-	ChaosGroupRelayFaulty         = "RelayMinority"          //  f number of nodes
+	ChaosGroupCommitFaultyPlus    = "CommitMajority"         // >f number of nodes
+	ChaosGroupCommitFaulty        = "CommitMinority"         //  f number of nodes
 	ChaosGroupExecutionFaultyPlus = "ExecutionNodesMajority" // > f number of nodes
 	ChaosGroupExecutionFaulty     = "ExecutionNodesMinority" //  f number of nodes
 	RootSnoozeTime                = 10 * time.Second
@@ -256,7 +256,7 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts() {
 		sourceCCIP.DestinationChainId,
 		tokens, pools, []common.Address{}, sourceCCIP.Common.AFN.EthAddress,
 		sourceCCIP.SubOnRampRouter.EthAddress,
-		evm_2_evm_subscription_onramp2.BaseOnRampInterfaceOnRampConfig{RelayingFeeJuels: 0, MaxDataSize: 10e12, MaxTokensLength: 5, MaxGasLimit: ccipPlugin.GasLimitPerTx},
+		evm_2_evm_subscription_onramp2.BaseOnRampInterfaceOnRampConfig{CommitFeeJuels: 0, MaxDataSize: 10e12, MaxTokensLength: 5, MaxGasLimit: ccipPlugin.GasLimitPerTx},
 		evm_2_evm_subscription_onramp2.AggregateRateLimiterInterfaceRateLimiterConfig{Capacity: ccip.HundredCoins, Rate: bigmath.Mul(big.NewInt(1e18), big.NewInt(10))})
 	Expect(err).ShouldNot(HaveOccurred(), "Error on SubOnRamp deployment")
 	err = sourceCCIP.Common.ChainClient.WaitForEvents()
@@ -856,8 +856,8 @@ func (c *CCIPTest) ValidateTollRequests() {
 }
 
 func CreateAndFundSubscription(sourceCCIP SourceCCIPModule, destCCIP DestCCIPModule, subscriptionBalance *big.Int, noOfReq int64) {
-	relayFee := big.NewInt(0).Mul(sourceCCIP.SubOnRampFee, big.NewInt(noOfReq)) // for noOfReq requests
-	err := sourceCCIP.Common.FeeToken.Approve(sourceCCIP.SubOnRampRouter.Address(), relayFee)
+	commitFee := big.NewInt(0).Mul(sourceCCIP.SubOnRampFee, big.NewInt(noOfReq)) // for noOfReq requests
+	err := sourceCCIP.Common.FeeToken.Approve(sourceCCIP.SubOnRampRouter.Address(), commitFee)
 	Expect(err).ShouldNot(HaveOccurred(), "Error approving fee token")
 	err = sourceCCIP.Common.ChainClient.WaitForEvents()
 	Expect(err).ShouldNot(HaveOccurred(), "Failed to wait for events")
@@ -865,7 +865,7 @@ func CreateAndFundSubscription(sourceCCIP SourceCCIPModule, destCCIP DestCCIPMod
 	Expect(err).ShouldNot(HaveOccurred(), "Error approving fee token")
 	err = destCCIP.Common.ChainClient.WaitForEvents()
 	Expect(err).ShouldNot(HaveOccurred(), "Failed to wait for events")
-	err = sourceCCIP.SubOnRampRouter.FundSubscription(relayFee)
+	err = sourceCCIP.SubOnRampRouter.FundSubscription(commitFee)
 	Expect(err).ShouldNot(HaveOccurred(), "Error funding subscription on SubOnRampRouter")
 	err = destCCIP.SubOffRampRouter.CreateSubscription([]common.Address{sourceCCIP.Sender}, destCCIP.ReceiverDapp.EthAddress, false, subscriptionBalance)
 	Expect(err).ShouldNot(HaveOccurred(), "Error creating subscription on SubOffRampRouter")
@@ -876,14 +876,14 @@ func CreateAndFundSubscription(sourceCCIP SourceCCIPModule, destCCIP DestCCIPMod
 }
 
 // SetOCRConfigs sets the oracle config in ocr2 contracts
-// nil value in execNodes denotes relay and execution jobs are to be set up in same DON
-func SetOCRConfigs(relayNodes, execNodes []*client.CLNodesWithKeys, destCCIP DestCCIPModule) {
+// nil value in execNodes denotes commit and execution jobs are to be set up in same DON
+func SetOCRConfigs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP DestCCIPModule) {
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err :=
-		ccip.NewOffChainAggregatorV2Config(relayNodes)
+		ccip.NewOffChainAggregatorV2Config(commitNodes)
 	Expect(err).ShouldNot(HaveOccurred(), "Shouldn't fail while getting the config values for ocr2 type contract")
 	err = destCCIP.CommitStore.SetOCRConfig(signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig)
 	Expect(err).ShouldNot(HaveOccurred(), "Shouldn't fail while setting blobverifier config")
-	// if relay and exec job is set up in different DON
+	// if commit and exec job is set up in different DON
 	if len(execNodes) > 0 {
 		signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err =
 			ccip.NewOffChainAggregatorV2Config(execNodes)
@@ -898,23 +898,23 @@ func SetOCRConfigs(relayNodes, execNodes []*client.CLNodesWithKeys, destCCIP Des
 }
 
 // CreateOCRJobsForCCIP bootstraps the first node and to the other nodes sends ocr jobs that
-// sets up ccip-relay and ccip-execution plugin
-// nil value in bootstrapExec and execNodes denotes relay and execution jobs are to be set up in same DON
+// sets up ccip-commit and ccip-execution plugin
+// nil value in bootstrapExec and execNodes denotes commit and execution jobs are to be set up in same DON
 func CreateOCRJobsForCCIP(
-	bootstrapRelay *client.CLNodesWithKeys,
+	bootstrapCommit *client.CLNodesWithKeys,
 	bootstrapExec *client.CLNodesWithKeys,
-	relayNodes, execNodes []*client.CLNodesWithKeys,
+	commitNodes, execNodes []*client.CLNodesWithKeys,
 	tollOnRamp, subOnRamp, commitStore, tollOffRamp, subOffRamp string,
 	sourceChainClient, destChainClient blockchain.EVMClient,
 	linkTokenAddr []string,
 	mockServer *ctfClient.MockserverClient,
 ) {
-	bootstrapRelayP2PIds := bootstrapRelay.KeysBundle.P2PKeys
-	bootstrapRelayP2PId := bootstrapRelayP2PIds.Data[0].Attributes.PeerID
+	bootstrapCommitP2PIds := bootstrapCommit.KeysBundle.P2PKeys
+	bootstrapCommitP2PId := bootstrapCommitP2PIds.Data[0].Attributes.PeerID
 	var bootstrapExecP2PId string
 	if bootstrapExec == nil {
-		bootstrapExec = bootstrapRelay
-		bootstrapExecP2PId = bootstrapRelayP2PId
+		bootstrapExec = bootstrapCommit
+		bootstrapExecP2PId = bootstrapCommitP2PId
 	} else {
 		bootstrapExecP2PId = bootstrapExec.KeysBundle.P2PKeys.Data[0].Attributes.PeerID
 	}
@@ -938,13 +938,13 @@ func CreateOCRJobsForCCIP(
 		}
 	}
 
-	_, err := bootstrapRelay.Node.MustCreateJob(bootstrapSpec(commitStore))
+	_, err := bootstrapCommit.Node.MustCreateJob(bootstrapSpec(commitStore))
 	Expect(err).ShouldNot(HaveOccurred(), "Shouldn't fail creating bootstrap job on bootstrap node")
 	if bootstrapExec != nil && len(execNodes) > 0 {
 		_, err := bootstrapExec.Node.MustCreateJob(bootstrapSpec(subOffRamp))
 		Expect(err).ShouldNot(HaveOccurred(), "Shouldn't fail creating bootstrap job on bootstrap node")
 	} else {
-		execNodes = relayNodes
+		execNodes = commitNodes
 	}
 	// save the current block numbers. If there is a delay between job start up and ocr config set up, the jobs will
 	// replay the log polling from these mentioned block number. The dest block number should ideally be the block number on which
@@ -961,8 +961,8 @@ func CreateOCRJobsForCCIP(
 	}
 	SetMockServerWithSameTokenFeeConversionValue(tokenFeeConv, execNodes, mockServer)
 
-	addRelayJob := func(node *client.Chainlink, nodeTransmitterAddress, nodeOCR2KeyId string) error {
-		ocr2SpecRelay := &client.OCR2TaskJobSpec{
+	addCommitJob := func(node *client.Chainlink, nodeTransmitterAddress, nodeOCR2KeyId string) error {
+		ocr2SpecCommit := &client.OCR2TaskJobSpec{
 			JobType: "offchainreporting2",
 			Name:    fmt.Sprintf("ccip-relay-%s-%s", sourceChainName, destChainName),
 			OCR2OracleSpec: job.OCR2OracleSpec{
@@ -975,8 +975,8 @@ func CreateOCRJobsForCCIP(
 				ContractConfigTrackerPollInterval: models.Interval(1 * time.Second),
 				P2PV2Bootstrappers: []string{
 					client.P2PData{
-						RemoteIP: bootstrapRelay.Node.RemoteIP(),
-						PeerID:   bootstrapRelayP2PId,
+						RemoteIP: bootstrapCommit.Node.RemoteIP(),
+						PeerID:   bootstrapCommitP2PId,
 					}.P2PV2Bootstrapper(),
 				},
 				PluginConfig: map[string]interface{}{
@@ -993,7 +993,7 @@ func CreateOCRJobsForCCIP(
 				},
 			},
 		}
-		_, err = node.MustCreateJob(ocr2SpecRelay)
+		_, err = node.MustCreateJob(ocr2SpecCommit)
 		return err
 	}
 
@@ -1038,12 +1038,12 @@ func CreateOCRJobsForCCIP(
 		return err
 	}
 
-	for nodeIndex := 0; nodeIndex < len(relayNodes); nodeIndex++ {
-		nodeTransmitterAddress := relayNodes[nodeIndex].KeysBundle.EthAddress
-		nodeOCR2Key := relayNodes[nodeIndex].KeysBundle.OCR2Key
+	for nodeIndex := 0; nodeIndex < len(commitNodes); nodeIndex++ {
+		nodeTransmitterAddress := commitNodes[nodeIndex].KeysBundle.EthAddress
+		nodeOCR2Key := commitNodes[nodeIndex].KeysBundle.OCR2Key
 		nodeOCR2KeyId := nodeOCR2Key.Data.ID
-		err := addRelayJob(relayNodes[nodeIndex].Node, nodeTransmitterAddress, nodeOCR2KeyId)
-		Expect(err).ShouldNot(HaveOccurred(), "Shouldn't fail creating CCIP-Relay OCR Task job on OCR node %d", nodeIndex+1)
+		err := addCommitJob(commitNodes[nodeIndex].Node, nodeTransmitterAddress, nodeOCR2KeyId)
+		Expect(err).ShouldNot(HaveOccurred(), "Shouldn't fail creating CCIP-Commit OCR Task job on OCR node %d", nodeIndex+1)
 	}
 
 	for nodeIndex := 0; nodeIndex < len(execNodes); nodeIndex++ {
@@ -1107,31 +1107,31 @@ func nodeContractPair(nodeAddr, contractAddr string) string {
 }
 
 type CCIPTestEnv struct {
-	MockServer              *ctfClient.MockserverClient
-	CLNodesWithKeys         []*client.CLNodesWithKeys
-	CLNodes                 []*client.Chainlink
-	execNodeStartIndex      int
-	relayNodeStartIndex     int
-	numOfAllowedFaultyRelay int
-	numOfAllowedFaultyExec  int
-	SourceChainClient       blockchain.EVMClient
-	DestChainClient         blockchain.EVMClient
-	TestEnv                 *environment.Environment
+	MockServer               *ctfClient.MockserverClient
+	CLNodesWithKeys          []*client.CLNodesWithKeys
+	CLNodes                  []*client.Chainlink
+	execNodeStartIndex       int
+	commitNodeStartIndex     int
+	numOfAllowedFaultyCommit int
+	numOfAllowedFaultyExec   int
+	SourceChainClient        blockchain.EVMClient
+	DestChainClient          blockchain.EVMClient
+	TestEnv                  *environment.Environment
 }
 
 func (c CCIPTestEnv) ChaosLabel() {
-	for i := c.relayNodeStartIndex; i < len(c.CLNodes); i++ {
+	for i := c.commitNodeStartIndex; i < len(c.CLNodes); i++ {
 		labelSelector := map[string]string{
 			"app":      "chainlink-0",
 			"instance": strconv.Itoa(i),
 		}
-		// relay node starts from index 2
-		if i >= c.relayNodeStartIndex && i < c.relayNodeStartIndex+c.numOfAllowedFaultyRelay+1 {
-			err := c.TestEnv.Client.LabelChaosGroupByLabels(c.TestEnv.Cfg.Namespace, labelSelector, ChaosGroupRelayFaultyPlus)
+		// commit node starts from index 2
+		if i >= c.commitNodeStartIndex && i < c.commitNodeStartIndex+c.numOfAllowedFaultyCommit+1 {
+			err := c.TestEnv.Client.LabelChaosGroupByLabels(c.TestEnv.Cfg.Namespace, labelSelector, ChaosGroupCommitFaultyPlus)
 			Expect(err).ShouldNot(HaveOccurred())
 		}
-		if i >= c.relayNodeStartIndex && i < c.relayNodeStartIndex+c.numOfAllowedFaultyRelay {
-			err := c.TestEnv.Client.LabelChaosGroupByLabels(c.TestEnv.Cfg.Namespace, labelSelector, ChaosGroupRelayFaulty)
+		if i >= c.commitNodeStartIndex && i < c.commitNodeStartIndex+c.numOfAllowedFaultyCommit {
+			err := c.TestEnv.Client.LabelChaosGroupByLabels(c.TestEnv.Cfg.Namespace, labelSelector, ChaosGroupCommitFaulty)
 			Expect(err).ShouldNot(HaveOccurred())
 		}
 		if i >= c.execNodeStartIndex && i < c.execNodeStartIndex+c.numOfAllowedFaultyExec+1 {
@@ -1298,8 +1298,8 @@ func GetterForLinkToken(token contracts.LinkToken, addr string) func(_ common.Ad
 func CCIPDefaultTestSetUp(
 	envName string,
 	clProps map[string]interface{},
-	numOfRelayNodes int,
-	relayAndExecOnSameDON bool,
+	numOfCommitNodes int,
+	commitAndExecOnSameDON bool,
 ) (*environment.Environment, *SourceCCIPModule, *DestCCIPModule, CCIPTestEnv, func()) {
 	testEnvironment := DeployEnvironments(
 		&environment.Config{
@@ -1331,23 +1331,23 @@ func CCIPDefaultTestSetUp(
 		tokenAddr = append(tokenAddr, token.Address())
 	}
 	tokenAddr = append(tokenAddr, destCCIP.Common.FeeToken.Address())
-	bootstrapRelay := clNodes[0]
+	bootstrapCommit := clNodes[0]
 	var bootstrapExec *client.CLNodesWithKeys
 	var execNodes []*client.CLNodesWithKeys
-	relayNodes := clNodes[1:]
-	testSetUp.relayNodeStartIndex = 1
+	commitNodes := clNodes[1:]
+	testSetUp.commitNodeStartIndex = 1
 	testSetUp.execNodeStartIndex = 1
 	testSetUp.numOfAllowedFaultyExec = 1
-	testSetUp.numOfAllowedFaultyRelay = 1
-	if !relayAndExecOnSameDON {
+	testSetUp.numOfAllowedFaultyCommit = 1
+	if !commitAndExecOnSameDON {
 		bootstrapExec = clNodes[1]
-		relayNodes = clNodes[2 : 2+numOfRelayNodes]
-		execNodes = clNodes[2+numOfRelayNodes:]
-		testSetUp.relayNodeStartIndex = 2
+		commitNodes = clNodes[2 : 2+numOfCommitNodes]
+		execNodes = clNodes[2+numOfCommitNodes:]
+		testSetUp.commitNodeStartIndex = 2
 		testSetUp.execNodeStartIndex = 7
 	}
 	CreateOCRJobsForCCIP(
-		bootstrapRelay, bootstrapExec, relayNodes, execNodes,
+		bootstrapCommit, bootstrapExec, commitNodes, execNodes,
 		sourceCCIP.TollOnRamp.Address(),
 		sourceCCIP.SubOnRamp.Address(),
 		destCCIP.CommitStore.Address(),
@@ -1359,7 +1359,7 @@ func CCIPDefaultTestSetUp(
 	)
 
 	// set up ocr2 config
-	SetOCRConfigs(relayNodes, execNodes, *destCCIP) // first node is the bootstrapper
+	SetOCRConfigs(commitNodes, execNodes, *destCCIP) // first node is the bootstrapper
 
 	tearDown := func() {
 		sourceChainClient.GasStats().PrintStats()

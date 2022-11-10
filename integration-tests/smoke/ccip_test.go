@@ -65,7 +65,7 @@ var _ = Describe("CCIP interactions test @smoke-ccip", func() {
 		destCCIP.DeployContracts(*sourceCCIP)
 
 		// set up ocr2 jobs
-		By("Setting up bootstrap, relay and execute job")
+		By("Setting up bootstrap, commit and execute job")
 		var tokenAddr []string
 		for _, token := range destCCIP.Common.BridgeTokens {
 			tokenAddr = append(tokenAddr, token.Address())
