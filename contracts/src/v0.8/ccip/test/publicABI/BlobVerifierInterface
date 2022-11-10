@@ -1,9 +1,0 @@
-{
-  "getConfig()": "c3f909d4",
-  "getExpectedNextSequenceNumber(address)": "c1131d8e",
-  "getMerkleRoot(bytes32)": "a7206cd6",
-  "isBlessed(bytes32)": "ff888fb1",
-  "merkleRoot(bytes32[],bytes32[],uint256)": "07761f3d",
-  "setConfig((address[],uint64[]))": "83ec5cf6",
-  "verify(bytes32[],bytes32[],uint256,bytes32[],uint256)": "e71e65ce"
-}

@@ -482,7 +482,7 @@ func (c *CCIPE2ELoad) waitForSeqNumberIncrease(ticker *time.Ticker, seqNum uint6
 			seqNumberAfter, err := c.Destination.CommitStore.GetNextSeqNumber(c.Source.SubOnRamp.EthAddress)
 			if err != nil {
 				c.updatestats(msgID, fmt.Sprint(seqNum), SeqNumAndRepAccIncrease, time.Since(timeNow), fail)
-				return fmt.Errorf("error %v in GetNextExpectedSeqNumber by blobverifier for msg ID %d", err, msgID)
+				return fmt.Errorf("error %v in GetNextExpectedSeqNumber by commitStore for msg ID %d", err, msgID)
 			}
 			if seqNumberAfter > seqNum {
 				return nil

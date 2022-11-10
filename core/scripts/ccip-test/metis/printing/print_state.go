@@ -452,7 +452,7 @@ func printPaused(chain *rhea.EvmDeploymentConfig) {
 	paused, err = commitStore.Paused(&bind.CallOpts{})
 	helpers.PanicErr(err)
 
-	sb.WriteString(fmt.Sprintf("| %-25s | %42s | %14s |\n", "blobverifier", commitStore.Address(), printBool(!paused)))
+	sb.WriteString(fmt.Sprintf("| %-25s | %42s | %14s |\n", "commitStore", commitStore.Address(), printBool(!paused)))
 
 	sb.WriteString(generateSeparator(headerLengths))
 	chain.Logger.Info(sb.String())

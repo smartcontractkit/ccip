@@ -882,7 +882,7 @@ func SetOCRConfigs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP De
 		ccip.NewOffChainAggregatorV2Config(commitNodes)
 	Expect(err).ShouldNot(HaveOccurred(), "Shouldn't fail while getting the config values for ocr2 type contract")
 	err = destCCIP.CommitStore.SetOCRConfig(signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig)
-	Expect(err).ShouldNot(HaveOccurred(), "Shouldn't fail while setting blobverifier config")
+	Expect(err).ShouldNot(HaveOccurred(), "Shouldn't fail while setting commitStore config")
 	// if commit and exec job is set up in different DON
 	if len(execNodes) > 0 {
 		signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err =
