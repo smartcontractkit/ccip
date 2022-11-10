@@ -65,7 +65,7 @@ jobs:
       - name: Checkout the repo
         uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # v3.0.2
       - name: Build Image
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@cd9e407a6e0aa8ef7f315067644c0333846ffd40 # v2.0.24
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@1533bff48f8a642089705dcc2dbebb0934ff7d9d # v2.0.26
         env:
           GH_TOKEN: ${{ github.token }}
         with:
@@ -113,7 +113,7 @@ jobs:
         run: |
           echo "GH_RUN_URL=https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}" >> $GITHUB_ENV
       - name: Run Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@cd9e407a6e0aa8ef7f315067644c0333846ffd40 # v2.0.24
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@1533bff48f8a642089705dcc2dbebb0934ff7d9d # v2.0.26
         with:
           test_command_to_run: make test_load_ccip
           test_download_vendor_packages_command: make gomod
@@ -146,7 +146,7 @@ jobs:
       ## Run Cleanup if the job succeeds
       - name: cleanup
         if: always()
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/cleanup@cd9e407a6e0aa8ef7f315067644c0333846ffd40 # v2.0.24
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/cleanup@1533bff48f8a642089705dcc2dbebb0934ff7d9d # v2.0.26
         with:
           triggered_by: ${{ env.TEST_TRIGGERED_BY }}
 
@@ -181,7 +181,7 @@ jobs:
       - name: Checkout the repo
         uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # v3.0.2
       - name: Run Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@cd9e407a6e0aa8ef7f315067644c0333846ffd40 # v2.0.24
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@1533bff48f8a642089705dcc2dbebb0934ff7d9d # v2.0.26
         with:
           test_command_to_run:  make test_chaos args="--focus @chaos-ccip"
           test_download_vendor_packages_command: make gomod
@@ -201,6 +201,6 @@ jobs:
       ## Run Cleanup if the job succeeds
       - name: cleanup
         if: always()
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/cleanup@cd9e407a6e0aa8ef7f315067644c0333846ffd40 # v2.0.24
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/cleanup@1533bff48f8a642089705dcc2dbebb0934ff7d9d # v2.0.26
         with:
           triggered_by: ${{ env.TEST_TRIGGERED_BY }}

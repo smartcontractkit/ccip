@@ -14,14 +14,17 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
-
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/afn_contract"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp_router"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_subscription_onramp_router"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_toll_onramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_subscription_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/native_token_pool"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/secrets"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 )
@@ -32,23 +35,36 @@ func panicErr(err error) {
 	}
 }
 
+// You can either add an error string (like "0x4e487b710000000000000000000000000000000000000000000000000000000000000032")
+// or you can specify an ethURL, txHash and requester.
 func main() {
-	// Need a node URL
-	// NOTE: this node needs to run in archive mode
-	ethUrl := secrets.GetRPC(big.NewInt(5))
-	txHash := "0x97be8559164442595aba46b5f849c23257905b78e72ee43d9b998b28eee78b84"
-	requester := "0xe88ff73814fb891bb0e149f5578796fa41f20242"
+	errorCodeString := ""
 
-	ec, ethErr := ethclient.Dial(ethUrl)
-	panicErr(ethErr)
-	errorString, contractAddress := getErrorForTx(ec, txHash, requester)
-	// Some nodes prepend "Reverted "
-	trimmed := strings.TrimPrefix(errorString, "Reverted ")
-	// Remove 0x before hex decoding
-	data, err := hex.DecodeString(trimmed[2:])
+	if errorCodeString == "" {
+		// Need a node URL
+		// NOTE: this node needs to run in archive mode
+		ethUrl := secrets.GetRPC(big.NewInt(5))
+		txHash := "0x97be8559164442595aba46b5f849c23257905b78e72ee43d9b998b28eee78b84"
+		requester := "0xe88ff73814fb891bb0e149f5578796fa41f20242"
+
+		ec, ethErr := ethclient.Dial(ethUrl)
+		panicErr(ethErr)
+		errorString, contractAddress := getErrorForTx(ec, txHash, requester)
+		// Some nodes prepend "Reverted " and we also remove the 0x
+		trimmed := strings.TrimPrefix(errorString, "Reverted ")[2:]
+
+		contractABIs := getABIForContract(ec, contractAddress)
+
+		decodeErrorStringFromABI(trimmed, contractABIs)
+	} else {
+		errorCodeString = strings.TrimPrefix(errorCodeString, "0x")
+		decodeErrorStringFromABI(errorCodeString, getAllABIs())
+	}
+}
+
+func decodeErrorStringFromABI(errorString string, contractABIs []string) {
+	data, err := hex.DecodeString(errorString)
 	panicErr(err)
-
-	contractABIs := getABIForContract(ec, contractAddress)
 
 	for _, contractABI := range contractABIs {
 		parsedAbi, err2 := abi.JSON(strings.NewReader(contractABI))
@@ -65,7 +81,33 @@ func main() {
 		}
 	}
 
-	fmt.Printf("Cannot match error with contract ABI. Error code \"%v\"\n", trimmed)
+	if len(errorString) > 8 && errorString[:8] == "4e487b71" {
+		fmt.Println("Assertion failure")
+		indicator := errorString[len(errorString)-2:]
+		switch indicator {
+		case "01":
+			fmt.Printf("If you call assert with an argument that evaluates to false.")
+		case "11":
+			fmt.Printf("If an arithmetic operation results in underflow or overflow outside of an unchecked { ... } block.")
+		case "12":
+			fmt.Printf("If you divide or modulo by zero (e.g. 5 / 0 or 23 modulo 0).")
+		case "21":
+			fmt.Printf("If you convert a value that is too big or negative into an enum type.")
+		case "31":
+			fmt.Printf("If you call .pop() on an empty array.")
+		case "32":
+			fmt.Printf("If you access an array, bytesN or an array slice at an out-of-bounds or negative index (i.e. x[i] where i >= x.length or i < 0).")
+		case "41":
+			fmt.Printf("If you allocate too much memory or create an array that is too large.")
+		case "51":
+			fmt.Printf("If you call a zero-initialized variable of internal function type.")
+		default:
+			fmt.Printf("This is a revert produced by an assertion failure. Exact code not found \"%s\"", indicator)
+		}
+		return
+	}
+
+	fmt.Printf("Cannot match error with contract ABI. Error code \"%v\"\n", "trimmed")
 }
 
 // getABIForContract. Since contracts interact with other contracts we return all ABIs we expect the given
@@ -74,22 +116,35 @@ func getABIForContract(client *ethclient.Client, contractAddress common.Address)
 	contractType, _, err := ccip.TypeAndVersion(contractAddress, client)
 	panicErr(err)
 
+	always := []string{afn_contract.AFNContractABI, native_token_pool.NativeTokenPoolABI}
+
 	switch contractType {
 	// TOLL
 	case ccip.EVM2EVMTollOnRamp:
-		return []string{evm_2_evm_toll_onramp.EVM2EVMTollOnRampABI}
+		return append(always, evm_2_evm_toll_onramp.EVM2EVMTollOnRampABI)
 	case ccip.EVM2EVMTollOffRamp:
-		return []string{any_2_evm_toll_offramp.EVM2EVMTollOffRampABI, any_2_evm_toll_offramp_router.Any2EVMTollOffRampRouterABI, commit_store.CommitStoreABI}
+		return append(always, any_2_evm_toll_offramp.EVM2EVMTollOffRampABI, any_2_evm_toll_offramp_router.Any2EVMTollOffRampRouterABI, commit_store.CommitStoreABI)
 		// SUBSCRIPTION
 	case ccip.EVM2EVMSubscriptionOnRamp:
-		return []string{evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRampABI}
+		return append(always, evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRampABI)
 	case ccip.EVM2EVMSubscriptionOffRamp:
-		return []string{any_2_evm_subscription_offramp.EVM2EVMSubscriptionOffRampABI, any_2_evm_subscription_offramp_router.Any2EVMSubscriptionOffRampRouterABI, commit_store.CommitStoreABI}
+		return append(always, any_2_evm_subscription_offramp.EVM2EVMSubscriptionOffRampABI, any_2_evm_subscription_offramp_router.Any2EVMSubscriptionOffRampRouterABI, commit_store.CommitStoreABI)
 		// SHARED
 	case ccip.CommitStore:
 		return []string{commit_store.CommitStoreABI}
 	}
 	panic("Contract not found")
+}
+
+func getAllABIs() []string {
+	return []string{afn_contract.AFNContractABI, native_token_pool.NativeTokenPoolABI, commit_store.CommitStoreABI,
+		// toll
+		evm_2_evm_toll_onramp.EVM2EVMTollOnRampABI, any_2_evm_toll_offramp.EVM2EVMTollOffRampABI,
+		evm_2_any_toll_onramp_router.EVM2AnyTollOnRampRouterABI, any_2_evm_toll_offramp_router.Any2EVMTollOffRampRouterABI,
+		// Sub
+		evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRampABI, any_2_evm_subscription_offramp.EVM2EVMSubscriptionOffRampABI,
+		evm_2_any_subscription_onramp_router.EVM2AnySubscriptionOnRampRouterABI, any_2_evm_subscription_offramp_router.Any2EVMSubscriptionOffRampRouterABI,
+	}
 }
 
 func getErrorForTx(client *ethclient.Client, txHash string, requester string) (string, common.Address) {

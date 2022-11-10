@@ -461,7 +461,7 @@ func printPaused(chain *rhea.EvmDeploymentConfig) {
 func PrintNodeBalances(chain *rhea.EvmDeploymentConfig, addresses []common.Address) {
 	var sb strings.Builder
 	sb.WriteString("\n")
-	sb.WriteString(fmt.Sprintf("Paused addresses for %s\n", helpers.ChainName(chain.ChainConfig.ChainId.Int64())))
+	sb.WriteString(fmt.Sprintf("Node balances for %s\n", helpers.ChainName(chain.ChainConfig.ChainId.Int64())))
 
 	tableHeaders := []string{"Sender", "Balance"}
 	headerLengths := []int{42, 18}
