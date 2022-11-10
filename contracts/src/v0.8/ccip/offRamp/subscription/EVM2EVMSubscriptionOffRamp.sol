@@ -77,7 +77,7 @@ contract EVM2EVMSubscriptionOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR
 
     // TODO: Spec difference measuring gas used by verification vs calculating it?
     // imo billing calculated values > billing measured to help with cost predictability
-    (uint256 timestampRelayed, uint256 gasUsedByMerkle) = _verifyMessages(
+    (uint256 timestampCommitted, uint256 gasUsedByMerkle) = _verifyMessages(
       hashedLeaves,
       report.innerProofs,
       report.innerProofFlagBits,
@@ -87,7 +87,7 @@ contract EVM2EVMSubscriptionOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR
     uint256 merkleGasShare = gasUsedByMerkle / decodedMessages.length;
 
     // only allow manual execution if the report is old enough
-    if (manualExecution && (block.timestamp - timestampRelayed) < s_config.permissionLessExecutionThresholdSeconds)
+    if (manualExecution && (block.timestamp - timestampCommitted) < s_config.permissionLessExecutionThresholdSeconds)
       revert ManualExecutionNotYetEnabled();
 
     // tokenPerFeeCoin[0] is used because all subscriptions use the same payment token

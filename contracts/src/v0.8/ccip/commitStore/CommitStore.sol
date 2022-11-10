@@ -164,10 +164,10 @@ contract CommitStore is CommitStoreInterface, TypeAndVersionInterface, HealthChe
     uint40, /*epochAndRound*/
     bytes memory encodedReport
   ) internal override whenNotPaused whenHealthy {
-    CCIP.RelayReport memory report = abi.decode(encodedReport, (CCIP.RelayReport));
+    CCIP.CommitReport memory report = abi.decode(encodedReport, (CCIP.CommitReport));
     uint256 reportLength = report.onRamps.length;
     if (reportLength != report.intervals.length || reportLength != report.merkleRoots.length)
-      revert InvalidRelayReport(report);
+      revert InvalidCommitReport(report);
     for (uint256 i = 0; i < reportLength; ++i) {
       address onRamp = report.onRamps[i];
       uint64 expectedMinSeqNum = s_expectedNextMinByOnRamp[onRamp];

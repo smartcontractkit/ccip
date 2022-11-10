@@ -15,7 +15,7 @@ interface BaseOffRampInterface {
   error ManualExecutionNotYetEnabled();
   error MessageTooLarge(uint256 maxSize, uint256 actualSize);
   error RouterNotSet();
-  error RootNotRelayed();
+  error RootNotCommitted();
   error UnsupportedNumberOfTokens(uint64 sequenceNumber);
   error TokenAndAmountMisMatch();
   error UnsupportedToken(IERC20 token);

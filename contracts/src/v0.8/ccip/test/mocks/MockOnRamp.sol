@@ -72,7 +72,7 @@ contract MockOnRamp is EVM2EVMTollOnRampInterface {
   function setConfig(OnRampConfig calldata) external override {}
 
   function getConfig() external pure override returns (OnRampConfig memory config) {
-    config = OnRampConfig({relayingFeeJuels: 0, maxDataSize: 0, maxTokensLength: 0, maxGasLimit: 0});
+    config = OnRampConfig({commitFeeJuels: 0, maxDataSize: 0, maxTokensLength: 0, maxGasLimit: 0});
   }
 
   function setAllowlistEnabled(bool) external override {}

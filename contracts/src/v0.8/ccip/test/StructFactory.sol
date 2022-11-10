@@ -80,12 +80,12 @@ contract StructFactory {
   }
 
   // onRamp
-  uint64 internal constant RELAYING_FEE_JUELS = 1e18;
+  uint64 internal constant COMMIT_FEE_JUELS = 1e18;
 
   function onRampConfig() internal pure returns (BaseOnRampInterface.OnRampConfig memory) {
     return
       BaseOnRampInterface.OnRampConfig({
-        relayingFeeJuels: RELAYING_FEE_JUELS,
+        commitFeeJuels: COMMIT_FEE_JUELS,
         maxDataSize: MAX_DATA_SIZE,
         maxTokensLength: MAX_TOKENS_LENGTH,
         maxGasLimit: MAX_GAS_LIMIT

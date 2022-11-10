@@ -41,7 +41,7 @@ contract E2E_toll is EVM2EVMTollOnRampSetup, CommitStoreSetup, EVM2EVMTollOffRam
 
     // Asserts that the tokens have been sent and the fee has been paid.
     assertEq(
-      balance0Pre - messages.length * (i_tokenAmount0 + RELAYING_FEE_JUELS + EXECUTION_FEE_AMOUNT),
+      balance0Pre - messages.length * (i_tokenAmount0 + COMMIT_FEE_JUELS + EXECUTION_FEE_AMOUNT),
       token0.balanceOf(OWNER)
     );
     assertEq(balance1Pre - messages.length * i_tokenAmount1, token1.balanceOf(OWNER));
@@ -62,7 +62,7 @@ contract E2E_toll is EVM2EVMTollOnRampSetup, CommitStoreSetup, EVM2EVMTollOffRam
     address[] memory onRamps = new address[](1);
     onRamps[0] = commitStoreConfig().onRamps[0];
 
-    CCIP.RelayReport memory report = CCIP.RelayReport({
+    CCIP.CommitReport memory report = CCIP.CommitReport({
       onRamps: onRamps,
       intervals: intervals,
       merkleRoots: merkleRoots,
@@ -75,7 +75,7 @@ contract E2E_toll is EVM2EVMTollOnRampSetup, CommitStoreSetup, EVM2EVMTollOffRam
     assertEq(BLOCK_TIME, timestamp);
 
     // We change the block time so when execute would e.g. use the current
-    // block time instead of the relayed block time the value would be
+    // block time instead of the committed block time the value would be
     // incorrect in the checks below.
     vm.warp(BLOCK_TIME + 2000);
 
@@ -93,11 +93,11 @@ contract E2E_toll is EVM2EVMTollOnRampSetup, CommitStoreSetup, EVM2EVMTollOffRam
 
   function sendRequest(uint64 expectedSeqNum) public returns (CCIP.EVM2EVMTollMessage memory) {
     CCIP.EVM2AnyTollMessage memory message = _generateTokenMessage();
-    message.feeTokenAndAmount.amount = RELAYING_FEE_JUELS + EXECUTION_FEE_AMOUNT;
+    message.feeTokenAndAmount.amount = COMMIT_FEE_JUELS + EXECUTION_FEE_AMOUNT;
 
     IERC20(s_sourceTokens[0]).approve(
       address(s_onRampRouter),
-      i_tokenAmount0 + RELAYING_FEE_JUELS + EXECUTION_FEE_AMOUNT
+      i_tokenAmount0 + COMMIT_FEE_JUELS + EXECUTION_FEE_AMOUNT
     );
     IERC20(s_sourceTokens[1]).approve(address(s_onRampRouter), i_tokenAmount1);
 

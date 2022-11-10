@@ -76,7 +76,7 @@ contract EVM2EVMFreeOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
     // TODO: Spec difference measuring gas used by verification vs calculating it?
     // imo billing calculated values > billing measured to help with cost predictability
     // solhint-disable-next-line no-unused-vars
-    (uint256 timestampRelayed,) = _verifyMessages(
+    (uint256 timestampCommitted,) = _verifyMessages(
       hashedLeaves,
       report.innerProofs,
       report.innerProofFlagBits,
@@ -85,7 +85,7 @@ contract EVM2EVMFreeOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
     );
 
     // only allow manual execution if the report is old enough
-    if (manualExecution && (block.timestamp - timestampRelayed) < s_config.permissionLessExecutionThresholdSeconds)
+    if (manualExecution && (block.timestamp - timestampCommitted) < s_config.permissionLessExecutionThresholdSeconds)
       revert ManualExecutionNotYetEnabled();
 
     for (uint256 i = 0; i < numMsgs; ++i) {

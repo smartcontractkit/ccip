@@ -160,7 +160,7 @@ contract CommitStore_resetUnblessedRoots is CommitStoreSetup {
 
 /// @notice #report
 contract CommitStore_report is CommitStoreSetup {
-  event ReportAccepted(CCIP.RelayReport report);
+  event ReportAccepted(CCIP.CommitReport report);
 
   // Success
 
@@ -177,7 +177,7 @@ contract CommitStore_report is CommitStoreSetup {
     merkleRoots[1] = "test #2";
     merkleRoots[2] = "test #3";
     CommitStoreInterface.CommitStoreConfig memory config = commitStoreConfig();
-    CCIP.RelayReport memory report = CCIP.RelayReport({
+    CCIP.CommitReport memory report = CCIP.CommitReport({
       onRamps: config.onRamps,
       intervals: intervals,
       merkleRoots: merkleRoots,
@@ -210,32 +210,32 @@ contract CommitStore_report is CommitStoreSetup {
     s_commitStore.report(report);
   }
 
-  function testInvalidRelayReportRootLengthReverts() public {
+  function testInvalidCommitReportRootLengthReverts() public {
     CCIP.Interval[] memory intervals = new CCIP.Interval[](3);
     bytes32[] memory merkleRoots = new bytes32[](2);
-    CCIP.RelayReport memory report = CCIP.RelayReport({
+    CCIP.CommitReport memory report = CCIP.CommitReport({
       onRamps: commitStoreConfig().onRamps,
       intervals: intervals,
       merkleRoots: merkleRoots,
       rootOfRoots: "root"
     });
 
-    vm.expectRevert(abi.encodeWithSelector(CommitStoreInterface.InvalidRelayReport.selector, report));
+    vm.expectRevert(abi.encodeWithSelector(CommitStoreInterface.InvalidCommitReport.selector, report));
 
     s_commitStore.report(abi.encode(report));
   }
 
-  function testInvalidRelayReportIntervalLengthReverts() public {
+  function testInvalidCommitReportIntervalLengthReverts() public {
     CCIP.Interval[] memory intervals = new CCIP.Interval[](2);
     bytes32[] memory merkleRoots = new bytes32[](3);
-    CCIP.RelayReport memory report = CCIP.RelayReport({
+    CCIP.CommitReport memory report = CCIP.CommitReport({
       onRamps: commitStoreConfig().onRamps,
       intervals: intervals,
       merkleRoots: merkleRoots,
       rootOfRoots: "root"
     });
 
-    vm.expectRevert(abi.encodeWithSelector(CommitStoreInterface.InvalidRelayReport.selector, report));
+    vm.expectRevert(abi.encodeWithSelector(CommitStoreInterface.InvalidCommitReport.selector, report));
 
     s_commitStore.report(abi.encode(report));
   }
@@ -244,7 +244,7 @@ contract CommitStore_report is CommitStoreSetup {
     CCIP.Interval[] memory intervals = new CCIP.Interval[](1);
     address[] memory onRamps = new address[](1);
     bytes32[] memory merkleRoots = new bytes32[](1);
-    CCIP.RelayReport memory report = CCIP.RelayReport({
+    CCIP.CommitReport memory report = CCIP.CommitReport({
       onRamps: onRamps,
       intervals: intervals,
       merkleRoots: merkleRoots,
@@ -262,7 +262,7 @@ contract CommitStore_report is CommitStoreSetup {
     address[] memory onRamps = new address[](1);
     onRamps[0] = commitStoreConfig().onRamps[0];
     bytes32[] memory merkleRoots = new bytes32[](1);
-    CCIP.RelayReport memory report = CCIP.RelayReport({
+    CCIP.CommitReport memory report = CCIP.CommitReport({
       onRamps: onRamps,
       intervals: intervals,
       merkleRoots: merkleRoots,
@@ -280,7 +280,7 @@ contract CommitStore_report is CommitStoreSetup {
     address[] memory onRamps = new address[](1);
     onRamps[0] = commitStoreConfig().onRamps[0];
     bytes32[] memory merkleRoots = new bytes32[](1);
-    CCIP.RelayReport memory report = CCIP.RelayReport({
+    CCIP.CommitReport memory report = CCIP.CommitReport({
       onRamps: onRamps,
       intervals: intervals,
       merkleRoots: merkleRoots,
@@ -304,7 +304,7 @@ contract CommitStore_verify is CommitStoreRealAFNSetup {
     onRamps[0] = commitStoreConfig().onRamps[0];
     s_commitStore.report(
       abi.encode(
-        CCIP.RelayReport({
+        CCIP.CommitReport({
           onRamps: onRamps,
           intervals: intervals,
           merkleRoots: merkleRoots,
@@ -327,7 +327,7 @@ contract CommitStore_verify is CommitStoreRealAFNSetup {
     onRamps[0] = commitStoreConfig().onRamps[0];
     s_commitStore.report(
       abi.encode(
-        CCIP.RelayReport({
+        CCIP.CommitReport({
           onRamps: onRamps,
           intervals: intervals,
           merkleRoots: merkleRoots,

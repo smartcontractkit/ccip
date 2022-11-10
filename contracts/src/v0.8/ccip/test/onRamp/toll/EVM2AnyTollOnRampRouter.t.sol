@@ -29,7 +29,7 @@ contract EVM2AnyTollOnRampRouter_ccipSend is EVM2EVMTollOnRampSetup {
     message.tokensAndAmounts[0].amount = 2**64;
     message.tokensAndAmounts[0].token = sourceToken0Address;
     message.feeTokenAndAmount.token = sourceToken0Address;
-    message.feeTokenAndAmount.amount = RELAYING_FEE_JUELS;
+    message.feeTokenAndAmount.amount = COMMIT_FEE_JUELS;
 
     uint256 balanceBefore = sourceToken0.balanceOf(OWNER);
 
@@ -38,12 +38,12 @@ contract EVM2AnyTollOnRampRouter_ccipSend is EVM2EVMTollOnRampSetup {
 
     assertEq(1, s_onRampRouter.ccipSend(DEST_CHAIN_ID, message));
     // Assert the user balance is lowered by the tokensAndAmounts sent and the fee amount
-    uint256 expectedBalance = balanceBefore - (message.tokensAndAmounts[0].amount + RELAYING_FEE_JUELS);
+    uint256 expectedBalance = balanceBefore - (message.tokensAndAmounts[0].amount + COMMIT_FEE_JUELS);
     assertEq(expectedBalance, sourceToken0.balanceOf(OWNER));
     // Asserts the tokensAndAmounts are sent to the pool
     assertEq(message.tokensAndAmounts[0].amount, sourceToken0.balanceOf(address(s_sourcePools[0])));
     // Asserts the fee amount is left in the router
-    assertEq(RELAYING_FEE_JUELS, sourceToken0.balanceOf(address(s_onRampRouter)));
+    assertEq(COMMIT_FEE_JUELS, sourceToken0.balanceOf(address(s_onRampRouter)));
   }
 
   function testExactApproveSuccess() public {
@@ -53,7 +53,7 @@ contract EVM2AnyTollOnRampRouter_ccipSend is EVM2EVMTollOnRampSetup {
     message.tokensAndAmounts = new CCIP.EVMTokenAndAmount[](1);
     // since the fee token is the same we should reduce the amount sent
     // when we want an exact approve.
-    message.tokensAndAmounts[0].amount = 2**64 - RELAYING_FEE_JUELS;
+    message.tokensAndAmounts[0].amount = 2**64 - COMMIT_FEE_JUELS;
     message.tokensAndAmounts[0].token = sourceToken0Address;
 
     uint256 balanceBefore = sourceToken0.balanceOf(OWNER);
@@ -61,7 +61,7 @@ contract EVM2AnyTollOnRampRouter_ccipSend is EVM2EVMTollOnRampSetup {
     vm.expectEmit(false, false, false, true);
     emit CCIPSendRequested(_messageToEvent(message, 1));
 
-    uint256 expectedBalance = balanceBefore - (message.tokensAndAmounts[0].amount + RELAYING_FEE_JUELS);
+    uint256 expectedBalance = balanceBefore - (message.tokensAndAmounts[0].amount + COMMIT_FEE_JUELS);
 
     assertEq(1, s_onRampRouter.ccipSend(DEST_CHAIN_ID, message));
     assertEq(expectedBalance, sourceToken0.balanceOf(OWNER));

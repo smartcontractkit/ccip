@@ -17,7 +17,7 @@ interface BaseOnRampInterface is AllowListInterface {
 
   struct OnRampConfig {
     // Fee for sending message taken in this contract
-    uint64 relayingFeeJuels;
+    uint64 commitFeeJuels;
     // maximum payload data size
     uint64 maxDataSize;
     // Maximum number of distinct ERC20 tokens that can be sent in a message

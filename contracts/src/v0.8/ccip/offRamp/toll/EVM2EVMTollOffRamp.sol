@@ -146,22 +146,22 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
       decodedMessages[i] = decodedMessage;
     }
 
-    (uint256 timestampRelayed, uint256 gasUsedByMerkle) = _verifyMessages(
+    (uint256 timestampCommitted, uint256 gasUsedByMerkle) = _verifyMessages(
       hashedLeaves,
       report.innerProofs,
       report.innerProofFlagBits,
       report.outerProofs,
       report.outerProofFlagBits
     );
-    bool isOldRelayReport = (block.timestamp - timestampRelayed) > s_config.permissionLessExecutionThresholdSeconds;
+    bool isOldCommitReport = (block.timestamp - timestampCommitted) > s_config.permissionLessExecutionThresholdSeconds;
 
     for (uint256 i = 0; i < numMsgs; ++i) {
       CCIP.EVM2EVMTollMessage memory message = decodedMessages[i];
       CCIP.MessageExecutionState originalState = getExecutionState(message.sequenceNumber);
       if (originalState == CCIP.MessageExecutionState.SUCCESS) revert AlreadyExecuted(message.sequenceNumber);
 
-      // Manually execution is fine if we previously failed or if the relay report is just too old
-      if (!(!manualExecution || isOldRelayReport || originalState == CCIP.MessageExecutionState.FAILURE))
+      // Manually execution is fine if we previously failed or if the commit report is just too old
+      if (!(!manualExecution || isOldCommitReport || originalState == CCIP.MessageExecutionState.FAILURE))
         revert ManualExecutionNotYetEnabled();
 
       _isWellFormed(message);

@@ -99,7 +99,7 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry, 
 
   /**
    * @notice Verifies that the given hashed messages are valid leaves of
-   *          a relayed merkle tree.
+   *          a committed merkle tree.
    */
   function _verifyMessages(
     bytes32[] memory hashedLeaves,
@@ -109,15 +109,15 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry, 
     uint256 outerProofFlagBits
   ) internal returns (uint256, uint256) {
     uint256 gasBegin = gasleft();
-    uint256 timestampRelayed = s_commitStore.verify(
+    uint256 timestampCommitted = s_commitStore.verify(
       hashedLeaves,
       innerProofs,
       innerProofFlagBits,
       outerProofs,
       outerProofFlagBits
     );
-    if (timestampRelayed <= 0) revert RootNotRelayed();
-    return (timestampRelayed, gasBegin - gasleft());
+    if (timestampCommitted <= 0) revert RootNotCommitted();
+    return (timestampCommitted, gasBegin - gasleft());
   }
 
   /**

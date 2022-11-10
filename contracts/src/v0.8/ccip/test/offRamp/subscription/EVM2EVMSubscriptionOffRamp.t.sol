@@ -267,13 +267,13 @@ contract EVM2EVMSubscriptionOffRamp_execute is EVM2EVMSubscriptionOffRampSetup {
     s_offRamp.execute(_generateReportFromMessages(messages), false);
   }
 
-  function testRootNotRelayedReverts() public {
+  function testRootNotCommittedReverts() public {
     vm.mockCall(
       address(s_mockCommitStore),
       abi.encodeWithSelector(CommitStoreInterface.verify.selector),
       abi.encode(0)
     );
-    vm.expectRevert(BaseOffRampInterface.RootNotRelayed.selector);
+    vm.expectRevert(BaseOffRampInterface.RootNotCommitted.selector);
 
     s_offRamp.execute(_generateReportFromMessages(_generateMessagesWithTokens()), true);
     vm.clearMockedCalls();

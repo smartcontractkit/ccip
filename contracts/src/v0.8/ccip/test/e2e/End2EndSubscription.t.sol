@@ -39,7 +39,7 @@ contract E2E_subscription is EVM2EVMSubscriptionOnRampSetup, CommitStoreSetup, E
     assertEq(balance1Pre - messages.length * i_tokenAmount1, token1.balanceOf(OWNER));
     assertEq(subscriptionBalance - messages.length * s_onRampRouter.getFee(), s_onRampRouter.getBalance(OWNER));
 
-    _relayAndExecute(messages);
+    _commitAndExecute(messages);
   }
 
   function testSuccessWithoutTokens() public {
@@ -53,10 +53,10 @@ contract E2E_subscription is EVM2EVMSubscriptionOnRampSetup, CommitStoreSetup, E
     // Asserts that the tokens have been sent and the fee has been paid.
     assertEq(subscriptionBalance - messages.length * s_onRampRouter.getFee(), s_onRampRouter.getBalance(OWNER));
 
-    _relayAndExecute(messages);
+    _commitAndExecute(messages);
   }
 
-  function _relayAndExecute(CCIP.EVM2EVMSubscriptionMessage[] memory messages) internal {
+  function _commitAndExecute(CCIP.EVM2EVMSubscriptionMessage[] memory messages) internal {
     bytes32[] memory hashedMessages = new bytes32[](3);
 
     bytes32 metadataHash = s_offRamp.metadataHash();
@@ -73,7 +73,7 @@ contract E2E_subscription is EVM2EVMSubscriptionOnRampSetup, CommitStoreSetup, E
     address[] memory onRamps = new address[](1);
     onRamps[0] = commitStoreConfig().onRamps[0];
 
-    CCIP.RelayReport memory report = CCIP.RelayReport({
+    CCIP.CommitReport memory report = CCIP.CommitReport({
       onRamps: onRamps,
       intervals: intervals,
       merkleRoots: merkleRoots,
@@ -86,7 +86,7 @@ contract E2E_subscription is EVM2EVMSubscriptionOnRampSetup, CommitStoreSetup, E
     assertEq(BLOCK_TIME, timestamp);
 
     // We change the block time so when execute would e.g. use the current
-    // block time instead of the relayed block time the value would be
+    // block time instead of the committed block time the value would be
     // incorrect in the checks below.
     vm.warp(BLOCK_TIME + 2000);
 
