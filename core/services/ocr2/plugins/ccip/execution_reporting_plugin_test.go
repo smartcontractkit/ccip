@@ -284,9 +284,9 @@ func TestExecutionReportEncoding(t *testing.T) {
 		OuterProofs:              outerProof.Hashes,
 		OuterProofFlagBits:       ccip.ProofFlagsToBits(outerProof.SourceFlags),
 	}
-	encodeRelayReport, err := ccip.EncodeExecutionReport(report.SequenceNumbers, map[common.Address]*big.Int{}, report.EncodedMessages, report.InnerProofs, mb.proof.SourceFlags, report.OuterProofs, outerProof.SourceFlags)
+	encodeCommitReport, err := ccip.EncodeExecutionReport(report.SequenceNumbers, map[common.Address]*big.Int{}, report.EncodedMessages, report.InnerProofs, mb.proof.SourceFlags, report.OuterProofs, outerProof.SourceFlags)
 	require.NoError(t, err)
-	decodeRelayReport, err := ccip.DecodeExecutionReport(encodeRelayReport)
+	decodeCommitReport, err := ccip.DecodeExecutionReport(encodeCommitReport)
 	require.NoError(t, err)
-	require.Equal(t, &report, decodeRelayReport)
+	require.Equal(t, &report, decodeCommitReport)
 }

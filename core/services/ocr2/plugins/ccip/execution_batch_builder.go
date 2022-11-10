@@ -78,21 +78,21 @@ func NewExecutionBatchBuilder(gasLimit uint64, snoozeTime time.Duration, commitS
 	}
 }
 
-func (eb *ExecutionBatchBuilder) relayedReport(seqNr uint64) (commit_store.CCIPRelayReport, error) {
+func (eb *ExecutionBatchBuilder) commitReport(seqNr uint64) (commit_store.CCIPCommitReport, error) {
 	latest, err := eb.dstLogPoller.LatestBlock()
 	if err != nil {
-		return commit_store.CCIPRelayReport{}, err
+		return commit_store.CCIPCommitReport{}, err
 	}
 	// Since the report accepted logs now contain intervals per onramp, we don't have a simple way of looking
-	// up the relayed report for a given sequence number from the chain.
+	// up the committed report for a given sequence number from the chain.
 	// TODO(https://app.shortcut.com/chainlinklabs/story/51129/efficient-report-from-seq-num-lookup): Follow up with a more efficient way, ideally we use the chain only to obtain natural reorg self-healing.
 	// One option is to emit a log per onramp (i.e. ReportAccepted(root, onRamp, min, max)) so we could easily search for the relevant log?
 	logs, err := eb.dstLogPoller.Logs(1, latest, ReportAccepted, eb.commitStore.Address())
 	if err != nil {
-		return commit_store.CCIPRelayReport{}, err
+		return commit_store.CCIPCommitReport{}, err
 	}
 	if len(logs) == 0 {
-		return commit_store.CCIPRelayReport{}, errors.Errorf("seq number not relayed, nothing relayed")
+		return commit_store.CCIPCommitReport{}, errors.Errorf("seq number not committed, nothing committed")
 	}
 	for _, log := range logs {
 		reportAccepted, err := eb.commitStore.ParseReportAccepted(types.Log{
@@ -100,7 +100,7 @@ func (eb *ExecutionBatchBuilder) relayedReport(seqNr uint64) (commit_store.CCIPR
 			Data:   log.Data,
 		})
 		if err != nil {
-			return commit_store.CCIPRelayReport{}, err
+			return commit_store.CCIPCommitReport{}, err
 		}
 		for i, onRamp := range reportAccepted.Report.OnRamps {
 			if onRamp == eb.onRamp {
@@ -110,15 +110,15 @@ func (eb *ExecutionBatchBuilder) relayedReport(seqNr uint64) (commit_store.CCIPR
 			}
 		}
 	}
-	return commit_store.CCIPRelayReport{}, errors.Errorf("seq number not relayed")
+	return commit_store.CCIPCommitReport{}, errors.Errorf("seq number not committed")
 }
 
-func (eb *ExecutionBatchBuilder) getUnexpiredRelayReports() ([]commit_store.CCIPRelayReport, error) {
+func (eb *ExecutionBatchBuilder) getUnexpiredCommitReports() ([]commit_store.CCIPCommitReport, error) {
 	logs, err := eb.dstLogPoller.LogsCreatedAfter(ReportAccepted, eb.commitStore.Address(), time.Now().Add(-PERMISSIONLESS_EXECUTION_THRESHOLD))
 	if err != nil {
 		return nil, err
 	}
-	var reports []commit_store.CCIPRelayReport
+	var reports []commit_store.CCIPCommitReport
 	for _, log := range logs {
 		reportAccepted, err := eb.commitStore.ParseReportAccepted(types.Log{
 			Topics: log.GetTopics(),
@@ -154,7 +154,7 @@ func (eb *ExecutionBatchBuilder) getExecutableSeqNrs(
 	tokensPerFeeCoin map[common.Address]*big.Int,
 	inflight []InflightExecutionReport,
 ) ([]uint64, error) {
-	unexpiredReports, err := eb.getUnexpiredRelayReports()
+	unexpiredReports, err := eb.getUnexpiredCommitReports()
 	if err != nil {
 		return nil, err
 	}
@@ -231,7 +231,7 @@ func (eb *ExecutionBatchBuilder) getExecutableSeqNrs(
 			return nil, err
 		}
 		if len(srcLogs) != int(unexpiredReport.Intervals[idx].Max-unexpiredReport.Intervals[idx].Min+1) {
-			return nil, errors.Errorf("unexpected missing msgs in relayed root %x have %d want %d", unexpiredReport.MerkleRoots[idx], len(srcLogs), int(unexpiredReport.Intervals[idx].Max-unexpiredReport.Intervals[idx].Min+1))
+			return nil, errors.Errorf("unexpected missing msgs in committed root %x have %d want %d", unexpiredReport.MerkleRoots[idx], len(srcLogs), int(unexpiredReport.Intervals[idx].Max-unexpiredReport.Intervals[idx].Min+1))
 		}
 		executedMp, err := eb.getExecutedSeqNrsInRange(unexpiredReport.Intervals[idx].Min, unexpiredReport.Intervals[idx].Max)
 		if err != nil {

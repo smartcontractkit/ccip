@@ -304,7 +304,7 @@ func (client *CCIPClient) ChangeGovernanceParameters(t *testing.T) {
 	tx, err := client.Source.GovernanceDapp.VoteForNewFeeConfig(client.Source.Owner, feeConfig)
 	require.NoError(t, err)
 	sendRequest := WaitForCrossChainSendRequest(client.Source, sourceBlockNum, tx.Hash())
-	client.WaitForRelay(t, DestBlockNum)
+	client.WaitForCommit(t, DestBlockNum)
 	client.WaitForExecution(t, DestBlockNum, sendRequest.Message.SequenceNumber)
 }
 
@@ -332,7 +332,7 @@ func (client *CCIPClient) SendMessage(t *testing.T) {
 	tx, err := client.Source.OnRampRouter.CcipSend(client.Source.Owner, client.Dest.ChainId, msg)
 	require.NoError(t, err)
 	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
-	client.WaitForRelay(t, DestBlockNum)
+	client.WaitForCommit(t, DestBlockNum)
 }
 
 func (client *CCIPClient) DonExecutionHappyPath(t *testing.T) {
@@ -345,27 +345,27 @@ func (client *CCIPClient) DonExecutionHappyPath(t *testing.T) {
 	crossChainRequest := client.SendToOnrampWithExecution(t, client.Source, client.Source.Owner, client.Dest.ReceiverDapp.Address(), tokenAmount)
 	client.Source.logger.Infof("Don executed tx submitted with sequence number: %d", crossChainRequest.Message.SequenceNumber)
 
-	client.WaitForRelay(t, DestBlockNum)
+	client.WaitForCommit(t, DestBlockNum)
 	client.WaitForExecution(t, DestBlockNum, crossChainRequest.Message.SequenceNumber)
 }
 
-func (client *CCIPClient) WaitForRelay(t *testing.T, DestBlockNum uint64) {
-	client.Dest.logger.Infof("Waiting for relay")
+func (client *CCIPClient) WaitForCommit(t *testing.T, DestBlockNum uint64) {
+	client.Dest.logger.Infof("Waiting for commit")
 
-	relayEvent := make(chan *commit_store.CommitStoreReportAccepted)
+	commitEvent := make(chan *commit_store.CommitStoreReportAccepted)
 	sub, err := client.Dest.CommitStore.WatchReportAccepted(
 		&bind.WatchOpts{
 			Context: context.Background(),
 			Start:   &DestBlockNum,
 		},
-		relayEvent,
+		commitEvent,
 	)
 	require.NoError(t, err)
 	defer sub.Unsubscribe()
 
 	select {
-	case event := <-relayEvent:
-		client.Dest.logger.Infof("Relay in tx %s", helpers.ExplorerLink(client.Dest.ChainId.Int64(), event.Raw.TxHash))
+	case event := <-commitEvent:
+		client.Dest.logger.Infof("Commit in tx %s", helpers.ExplorerLink(client.Dest.ChainId.Int64(), event.Raw.TxHash))
 		return
 	case err = <-sub.Err():
 		panic(err)
@@ -397,7 +397,7 @@ func (client *CCIPClient) WaitForExecution(t *testing.T, DestBlockNum uint64, se
 
 func (client *CCIPClient) ExecuteManually(seqNr uint64) error {
 	// Find the seq num
-	// Find the corresponding relay report
+	// Find the corresponding commit report
 	end := uint64(11436244)
 	reportIterator, err := client.Dest.CommitStore.FilterReportAccepted(&bind.FilterOpts{
 		Start: end - 10000,
@@ -407,7 +407,7 @@ func (client *CCIPClient) ExecuteManually(seqNr uint64) error {
 		return err
 	}
 	var onRampIdx int
-	var report *commit_store.CCIPRelayReport
+	var report *commit_store.CCIPCommitReport
 	for reportIterator.Next() {
 		for i, onRamp := range reportIterator.Event.Report.OnRamps {
 			if onRamp == client.Source.OnRamp.Address() {
@@ -533,7 +533,7 @@ func (client *CCIPClient) SendDappTx(t *testing.T) {
 
 	client.Source.ApproveLink(t, client.Source.SenderDapp.Address(), amount)
 	crossChainRequest := client.SendToDappWithExecution(t, client.Source, client.Source.Owner, client.Dest.Owner.From, amount)
-	client.WaitForRelay(t, destBlockNumber)
+	client.WaitForCommit(t, destBlockNumber)
 	client.WaitForExecution(t, destBlockNumber, crossChainRequest.Message.SequenceNumber)
 }
 
@@ -556,7 +556,7 @@ func (client *CCIPClient) ScalingAndBatching(t *testing.T) {
 		}(user)
 	}
 	wg.Wait()
-	client.WaitForRelay(t, DestBlockNum)
+	client.WaitForCommit(t, DestBlockNum)
 	client.WaitForExecution(t, DestBlockNum, seqNum)
 	client.Source.logger.Info("Sent 10 txs to onramp.")
 }
@@ -588,7 +588,7 @@ func (client *CCIPClient) ScalingAndBatching(t *testing.T) {
 //func (client CCIPClient) GetCrossChainSendRequestsForRange(
 //	ctx context.Context,
 //	t *testing.T,
-//	report commit_store.CCIPRelayReport,
+//	report commit_store.CCIPCommitReport,
 //	onrampBlockNumber uint64) []*evm_2_evm_toll_onramp.EVM2EVMTollOnRampCCIPSendRequested {
 //	// Get the other transactions in the proof, we look 1000 blocks back for transaction
 //	// should be fine? Needs fine-tuning after improved batching strategies are developed
@@ -622,12 +622,12 @@ func (client *CCIPClient) ScalingAndBatching(t *testing.T) {
 //	return requests
 //}
 
-//// GetReportForSequenceNumber return the offramp.CCIPRelayReport for a given ccip requests sequence number.
-//func (client CCIPClient) GetReportForSequenceNumber(ctx context.Context, sequenceNumber uint64, minBlockNumber uint64) (commit_store.CCIPRelayReport, error) {
+//// GetReportForSequenceNumber return the offramp.CCIPCommitReport for a given ccip requests sequence number.
+//func (client CCIPClient) GetReportForSequenceNumber(ctx context.Context, sequenceNumber uint64, minBlockNumber uint64) (commit_store.CCIPCommitReport, error) {
 //	client.Dest.logger.Infof("Looking for sequenceNumber %d", sequenceNumber)
 //	report, err := client.Dest.OffRamp.GetLastReport(&bind.CallOpts{Context: ctx, Pending: false})
 //	if err != nil {
-//		return commit_store.CCIPRelayReport{}, err
+//		return commit_store.CCIPCommitReport{}, err
 //	}
 //
 //	client.Dest.logger.Infof("Last report found for range %d-%d", report.MinSequenceNumber, report.MaxSequenceNumber)
@@ -641,7 +641,7 @@ func (client *CCIPClient) ScalingAndBatching(t *testing.T) {
 //		for i := 0; i < int(maxIterations); i++ {
 //			report, err = client.Dest.CommitStore.GetLastReport(&bind.CallOpts{Context: ctx, Pending: false})
 //			if err != nil {
-//				return commit_store.CCIPRelayReport{}, err
+//				return commit_store.CCIPCommitReport{}, err
 //			}
 //			client.Dest.logger.Infof("Last report found for range %d-%d", report.MinSequenceNumber, report.MaxSequenceNumber)
 //			if sequenceNumber >= report.MinSequenceNumber && sequenceNumber <= report.MaxSequenceNumber {
@@ -649,7 +649,7 @@ func (client *CCIPClient) ScalingAndBatching(t *testing.T) {
 //			}
 //			time.Sleep(RetryTiming)
 //		}
-//		return commit_store.CCIPRelayReport{}, errors.New("No report found within the given timeout")
+//		return commit_store.CCIPCommitReport{}, errors.New("No report found within the given timeout")
 //	}
 //
 //	// it is in a past report, start looking at the earliest block number possible, the one
@@ -660,7 +660,7 @@ func (client *CCIPClient) ScalingAndBatching(t *testing.T) {
 //		Context: ctx,
 //	})
 //	if err != nil {
-//		return commit_store.CCIPRelayReport{}, err
+//		return commit_store.CCIPCommitReport{}, err
 //	}
 //
 //	for reports.Next() {
@@ -672,7 +672,7 @@ func (client *CCIPClient) ScalingAndBatching(t *testing.T) {
 //
 //	// Somehow the transaction was not included in any report within blocks produced after
 //	// the transaction was initialized but the sequence number is lower than we are currently at
-//	return commit_store.CCIPRelayReport{}, errors.New("No report found for given sequence number")
+//	return commit_store.CCIPCommitReport{}, errors.New("No report found for given sequence number")
 //}
 
 func (client *CCIPClient) SetCommitStoreConfig(t *testing.T) {
@@ -695,7 +695,7 @@ func (client *CCIPClient) ValidateMerkleRoot(
 	t *testing.T,
 	request *evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRampCCIPSendRequested,
 	reportRequests []*evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRampCCIPSendRequested,
-	report commit_store.CCIPRelayReport,
+	report commit_store.CCIPCommitReport,
 ) merklemulti.Proof[[32]byte] {
 	mctx := hasher.NewKeccakCtx()
 	var leafHashes [][32]byte

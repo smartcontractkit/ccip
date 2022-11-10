@@ -8,21 +8,21 @@ import (
 	"github.com/smartcontractkit/chainlink/core/store/models"
 )
 
-// RelayPluginConfig contains the plugin specific variables for the ccip.CCIPRelay plugin.
+// CommitPluginConfig contains the plugin specific variables for the ccip.CCIPCommit plugin.
 // We use ID here to keep it as general as possible, e.g. abstracting for chains which don't have an address concept.
-type RelayPluginConfig struct {
+type CommitPluginConfig struct {
 	SourceChainID                    uint64 `json:"sourceChainID"`
 	DestChainID                      uint64 `json:"destChainID"`
 	SourceStartBlock, DestStartBlock int64  // Only for first time job add.
-	// We relay from multiple onramps from the same source chain. E.g. different message types.
+	// We commit from multiple onramps from the same source chain. E.g. different message types.
 	OnRampIDs           []string        `json:"onRampIDs"`
 	PollPeriod          models.Duration `json:"pollPeriod"`
 	InflightCacheExpiry models.Duration `json:"inflightCacheExpiry"`
 }
 
-// ValidateRelayPluginConfig validates the arguments for the CCIP Relay plugin.
+// ValidateCommitPluginConfig validates the arguments for the CCIP commit plugin.
 // It will return an error if there is anything wrong with the provided config.
-func (rp *RelayPluginConfig) ValidateRelayPluginConfig() error {
+func (rp *CommitPluginConfig) ValidateCommitPluginConfig() error {
 	// TODO: Validation based on chainID
 	// for now, all EVM.
 	for _, onRamp := range rp.OnRampIDs {

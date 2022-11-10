@@ -93,7 +93,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 			}
 			return req.Message.SequenceNumber, nil
 		}
-		// Subscribe to all relevant relay logs.
+		// Subscribe to all relevant commit logs.
 		_, err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{CCIPTollSendRequested}, Addresses: []common.Address{onRampAddr}})
 		if err != nil {
 			return nil, err
@@ -112,7 +112,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 			}
 			return req.Message.SequenceNumber, nil
 		}
-		// Subscribe to all relevant relay logs.
+		// Subscribe to all relevant commit logs.
 		_, err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{CCIPSubSendRequested}, Addresses: []common.Address{onRampAddr}})
 		if err != nil {
 			return nil, err

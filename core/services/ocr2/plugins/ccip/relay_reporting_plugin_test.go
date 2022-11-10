@@ -26,21 +26,21 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
 )
 
-func TestRelayReportSize(t *testing.T) {
+func TestCommitReportSize(t *testing.T) {
 	testParams := gopter.DefaultTestParameters()
 	testParams.MinSuccessfulTests = 100
 	p := gopter.NewProperties(testParams)
-	p.Property("bounded relay report size", prop.ForAll(func(root []byte, min, max uint64) bool {
+	p.Property("bounded commit report size", prop.ForAll(func(root []byte, min, max uint64) bool {
 		var root32 [32]byte
 		copy(root32[:], root)
-		rep, err := EncodeRelayReport(&commit_store.CCIPRelayReport{MerkleRoots: [][32]byte{root32}, Intervals: []commit_store.CCIPInterval{{Min: min, Max: max}}})
+		rep, err := EncodeCommitReport(&commit_store.CCIPCommitReport{MerkleRoots: [][32]byte{root32}, Intervals: []commit_store.CCIPInterval{{Min: min, Max: max}}})
 		require.NoError(t, err)
-		return len(rep) <= MaxRelayReportLength
+		return len(rep) <= MaxCommitReportLength
 	}, gen.SliceOfN(32, gen.UInt8()), gen.UInt64(), gen.UInt64()))
 	p.TestingRun(t)
 }
 
-func TestRelayReportEncoding(t *testing.T) {
+func TestCommitReportEncoding(t *testing.T) {
 	// Set up a user.
 	key, err := crypto.GenerateKey()
 	require.NoError(t, err)
@@ -96,15 +96,15 @@ func TestRelayReportEncoding(t *testing.T) {
 	tree, err := merklemulti.NewTree(mctx, [][32]byte{mctx.Hash([]byte{0xaa})})
 	require.NoError(t, err)
 	root := tree.Root()
-	report := commit_store.CCIPRelayReport{
+	report := commit_store.CCIPCommitReport{
 		OnRamps:     []common.Address{onRampAddress},
 		MerkleRoots: [][32]byte{root},
 		Intervals:   []commit_store.CCIPInterval{{Min: 1, Max: 10}},
 		RootOfRoots: root,
 	}
-	out, err := EncodeRelayReport(&report)
+	out, err := EncodeCommitReport(&report)
 	require.NoError(t, err)
-	decodedReport, err := DecodeRelayReport(out)
+	decodedReport, err := DecodeCommitReport(out)
 	require.NoError(t, err)
 	require.Equal(t, &report, decodedReport)
 

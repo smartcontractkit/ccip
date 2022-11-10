@@ -179,10 +179,10 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId *big.In
 		[]common.Address{},         // allow list
 		client.ChainConfig.Afn,     // AFN
 		evm_2_evm_subscription_onramp.BaseOnRampInterfaceOnRampConfig{
-			RelayingFeeJuels: 0,
-			MaxDataSize:      1e6,
-			MaxTokensLength:  5,
-			MaxGasLimit:      ccip.GasLimitPerTx,
+			CommitFeeJuels:  0,
+			MaxDataSize:     1e6,
+			MaxTokensLength: 5,
+			MaxGasLimit:     ccip.GasLimitPerTx,
 		},
 		evm_2_evm_subscription_onramp.AggregateRateLimiterInterfaceRateLimiterConfig{
 			Capacity: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),

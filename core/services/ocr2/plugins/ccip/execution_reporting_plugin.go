@@ -350,7 +350,7 @@ func leafsFromIntervals(lggr logger.Logger, onRampToEventSig map[common.Address]
 // Assumes non-empty report. Messages to execute can span more than one report, but are assumed to be in order of increasing
 // sequence number.
 func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNums []uint64, tokensPerFeeCoin map[common.Address]*big.Int) ([]byte, error) {
-	rep, err := r.builder.relayedReport(finalSeqNums[0])
+	rep, err := r.builder.commitReport(finalSeqNums[0])
 	if err != nil {
 		return nil, err
 	}
@@ -374,7 +374,7 @@ func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNums 
 		return nil, err
 	}
 	if len(msgsInRoot) != int(interval.Max-interval.Min+1) {
-		return nil, errors.Errorf("unexpected missing msgs in relayed root %x have %d want %d", rep.MerkleRoots[onRampIdx], len(msgsInRoot), int(interval.Max-interval.Min+1))
+		return nil, errors.Errorf("unexpected missing msgs in committed root %x have %d want %d", rep.MerkleRoots[onRampIdx], len(msgsInRoot), int(interval.Max-interval.Min+1))
 	}
 	leafsByOnRamp, err := leafsFromIntervals(
 		lggr,
@@ -521,7 +521,7 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 		return false, nil, err
 	}
 	if mathutil.Max(finalSequenceNumbers[0], finalSequenceNumbers[1:]...) >= nextMin {
-		return false, nil, errors.Errorf("Cannot execute unrelayed seq num. nextMin %v, seqNums %v", nextMin, finalSequenceNumbers)
+		return false, nil, errors.Errorf("Cannot execute uncommitted seq num. nextMin %v, seqNums %v", nextMin, finalSequenceNumbers)
 	}
 	// Important we actually execute based on the medianTokensPrices, which we ensure
 	// is <= than prices used to determine executability.

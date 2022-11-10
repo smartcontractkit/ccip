@@ -151,7 +151,7 @@ type CCIPJobSpec struct {
 	TokensPerFeeCoinPipeline string
 }
 
-func (spec CCIPJobSpec) AddCCIPRelayJob(t *testing.T, jobName string, node Node, configBlock int64) {
+func (spec CCIPJobSpec) AddCCIPCommitJob(t *testing.T, jobName string, node Node, configBlock int64) {
 	node.AddJob(t, fmt.Sprintf(`
 type                = "offchainreporting2"
 pluginType          = "ccip-relay"
@@ -398,7 +398,7 @@ func SetupNodeCCIP(
 	require.NoError(t, err)
 	lggr.Debug(fmt.Sprintf("Transmitter address %s chainID %s", transmitter, s.EVMChainID.String()))
 
-	// Fund the relayTransmitter address with some ETH
+	// Fund the commitTransmitter address with some ETH
 	n, err := destChain.NonceAt(context.Background(), owner.From, nil)
 	require.NoError(t, err)
 

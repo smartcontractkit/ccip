@@ -23,11 +23,11 @@ func EvmWord(i uint64) common.Hash {
 	return common.BigToHash(big.NewInt(0).SetBytes(b))
 }
 
-type RelayObservation struct {
+type CommitObservation struct {
 	IntervalsByOnRamp map[common.Address]commit_store.CCIPInterval `json:"intervalsByOnRamp"`
 }
 
-func (o RelayObservation) Marshal() ([]byte, error) {
+func (o CommitObservation) Marshal() ([]byte, error) {
 	return json.Marshal(&o)
 }
 
@@ -43,7 +43,7 @@ func (o ExecutionObservation) Marshal() ([]byte, error) {
 // getNonEmptyObservations checks the given observations for formatting and value errors.
 // It returns all valid observations, potentially being an empty list. It will log
 // malformed observations but never error.
-func getNonEmptyObservations[O RelayObservation | ExecutionObservation](l logger.Logger, observations []types.AttributedObservation) []O {
+func getNonEmptyObservations[O CommitObservation | ExecutionObservation](l logger.Logger, observations []types.AttributedObservation) []O {
 	var nonEmptyObservations []O
 	for _, ao := range observations {
 		if len(ao.Observation) == 0 {

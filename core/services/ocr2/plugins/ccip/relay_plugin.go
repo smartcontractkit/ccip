@@ -62,17 +62,17 @@ func TypeAndVersion(addr common.Address, client bind.ContractBackend) (ContractT
 	return ContractType(contractType), *v, nil
 }
 
-func NewRelayServices(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm.ChainSet, new bool, argsNoPlugin libocr2.OracleArgs) ([]job.ServiceCtx, error) {
-	var pluginConfig ccipconfig.RelayPluginConfig
+func NewCommitServices(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm.ChainSet, new bool, argsNoPlugin libocr2.OracleArgs) ([]job.ServiceCtx, error) {
+	var pluginConfig ccipconfig.CommitPluginConfig
 	err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
 	if err != nil {
 		return nil, err
 	}
-	err = pluginConfig.ValidateRelayPluginConfig()
+	err = pluginConfig.ValidateCommitPluginConfig()
 	if err != nil {
 		return nil, err
 	}
-	lggr.Infof("CCIP relay plugin initialized with offchainConfig: %+v", pluginConfig)
+	lggr.Infof("CCIP commit plugin initialized with offchainConfig: %+v", pluginConfig)
 
 	sourceChainId, destChainId := big.NewInt(0).SetUint64(pluginConfig.SourceChainID), big.NewInt(0).SetUint64(pluginConfig.DestChainID)
 
@@ -125,7 +125,7 @@ func NewRelayServices(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm
 				}
 				return req.Message.SequenceNumber, nil
 			}
-			// Subscribe to all relevant relay logs.
+			// Subscribe to all relevant commit logs.
 			_, err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{CCIPTollSendRequested}, Addresses: []common.Address{onRamp.Address()}})
 			if err != nil {
 				return nil, err
@@ -145,7 +145,7 @@ func NewRelayServices(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm
 				}
 				return req.Message.SequenceNumber, nil
 			}
-			// Subscribe to all relevant relay logs.
+			// Subscribe to all relevant commit logs.
 			_, err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{CCIPSubSendRequested}, Addresses: []common.Address{onRamp.Address()}})
 			if err != nil {
 				return nil, err
@@ -156,7 +156,7 @@ func NewRelayServices(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm
 			return nil, errors.Errorf("unrecognized onramp %v", onRampID)
 		}
 	}
-	argsNoPlugin.ReportingPluginFactory = NewRelayReportingPluginFactory(lggr, sourceChain.LogPoller(), commitStore, onRampSeqParsers, onRampToReqEventSig, onRamps, onRampToHasher, inflightCacheExpiry)
+	argsNoPlugin.ReportingPluginFactory = NewCommitReportingPluginFactory(lggr, sourceChain.LogPoller(), commitStore, onRampSeqParsers, onRampToReqEventSig, onRamps, onRampToHasher, inflightCacheExpiry)
 	oracle, err := libocr2.NewOracle(argsNoPlugin)
 	if err != nil {
 		return nil, err

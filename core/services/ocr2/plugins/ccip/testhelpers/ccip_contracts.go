@@ -238,10 +238,10 @@ func (c *CCIPContracts) DeployNewTollOnRamp() {
 		[]common.Address{},                            // allow list
 		c.SourceAFN.Address(),                         // AFN
 		evm_2_evm_toll_onramp.BaseOnRampInterfaceOnRampConfig{
-			RelayingFeeJuels: 0,
-			MaxDataSize:      1e12,
-			MaxTokensLength:  5,
-			MaxGasLimit:      ccip.GasLimitPerTx,
+			CommitFeeJuels:  0,
+			MaxDataSize:     1e12,
+			MaxTokensLength: 5,
+			MaxGasLimit:     ccip.GasLimitPerTx,
 		},
 		evm_2_evm_toll_onramp.AggregateRateLimiterInterfaceRateLimiterConfig{
 			Capacity: HundredLink,
@@ -510,10 +510,10 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 		[]common.Address{},                       // allow list
 		afnSourceAddress,                         // AFN
 		evm_2_evm_toll_onramp.BaseOnRampInterfaceOnRampConfig{
-			RelayingFeeJuels: 0,
-			MaxDataSize:      1e12,
-			MaxTokensLength:  5,
-			MaxGasLimit:      ccip.GasLimitPerTx,
+			CommitFeeJuels:  0,
+			MaxDataSize:     1e12,
+			MaxTokensLength: 5,
+			MaxGasLimit:     ccip.GasLimitPerTx,
 		},
 		evm_2_evm_toll_onramp.AggregateRateLimiterInterfaceRateLimiterConfig{
 			Capacity: HundredLink,
@@ -526,7 +526,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 	tollOnRamp, err := evm_2_evm_toll_onramp.NewEVM2EVMTollOnRamp(onRampAddress, sourceChain)
 	require.NoError(t, err)
 	tollOnRampFees := map[common.Address]*big.Int{
-		sourceLinkTokenAddress: big.NewInt(1), // 1 juel relay fee.
+		sourceLinkTokenAddress: big.NewInt(1), // 1 juel commit fee.
 	}
 	_, err = tollOnRamp.SetFeeConfig(sourceUser, evm_2_evm_toll_onramp.EVM2EVMTollOnRampInterfaceFeeConfig{
 		Fees:      []*big.Int{tollOnRampFees[sourceLinkTokenAddress]},
@@ -630,10 +630,10 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 		[]common.Address{},                       // allow list
 		afnSourceAddress,                         // AFN
 		evm_2_evm_subscription_onramp.BaseOnRampInterfaceOnRampConfig{
-			RelayingFeeJuels: 0,
-			MaxDataSize:      1e12,
-			MaxTokensLength:  5,
-			MaxGasLimit:      ccip.GasLimitPerTx,
+			CommitFeeJuels:  0,
+			MaxDataSize:     1e12,
+			MaxTokensLength: 5,
+			MaxGasLimit:     ccip.GasLimitPerTx,
 		},
 		evm_2_evm_subscription_onramp.AggregateRateLimiterInterfaceRateLimiterConfig{
 			Capacity: HundredLink,
@@ -892,7 +892,7 @@ func AssertSubExecFailure(t *testing.T, ccipContracts CCIPContracts, log logpoll
 	}
 }
 
-func EventuallyReportRelayed(t *testing.T, ccipContracts CCIPContracts, onRamp common.Address, min, max int) {
+func EventuallyReportCommitted(t *testing.T, ccipContracts CCIPContracts, onRamp common.Address, min, max int) {
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
 		minSeqNum, err := ccipContracts.CommitStore.GetExpectedNextSequenceNumber(nil, onRamp)
 		require.NoError(t, err)
@@ -900,7 +900,7 @@ func EventuallyReportRelayed(t *testing.T, ccipContracts CCIPContracts, onRamp c
 		ccipContracts.DestChain.Commit()
 		t.Log("min seq num reported", minSeqNum)
 		return minSeqNum > uint64(max)
-	}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue(), "report has not been relayed")
+	}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue(), "report has not been committed")
 }
 
 func EventuallyExecutionStateChangedToSuccess(t *testing.T, ccipContracts CCIPContracts, seqNum []uint64, blockNum uint64) {
@@ -919,9 +919,9 @@ func EventuallyExecutionStateChangedToSuccess(t *testing.T, ccipContracts CCIPCo
 		Should(gomega.BeTrue(), "ExecutionStateChanged Event")
 }
 
-func EventuallyRelayReportAccepted(t *testing.T, ccipContracts CCIPContracts, currentBlock uint64) commit_store.CCIPRelayReport {
+func EventuallyCommitReportAccepted(t *testing.T, ccipContracts CCIPContracts, currentBlock uint64) commit_store.CCIPCommitReport {
 	g := gomega.NewGomegaWithT(t)
-	var report commit_store.CCIPRelayReport
+	var report commit_store.CCIPCommitReport
 	g.Eventually(func() []common.Address {
 		it, err := ccipContracts.CommitStore.FilterReportAccepted(&bind.FilterOpts{Start: currentBlock})
 		g.Expect(err).NotTo(gomega.HaveOccurred(), "Error filtering ReportAccepted event")
@@ -932,7 +932,7 @@ func EventuallyRelayReportAccepted(t *testing.T, ccipContracts CCIPContracts, cu
 		}
 		return report.OnRamps
 	}, testutils.WaitTimeout(t), 1*time.Second).
-		Should(gomega.ContainElement(ccipContracts.SubOnRamp.Address()), "report has not been relayed")
+		Should(gomega.ContainElement(ccipContracts.SubOnRamp.Address()), "report has not been committed")
 	return report
 }
 
@@ -941,7 +941,7 @@ func ExecuteSubMessage(
 	ccipContracts CCIPContracts,
 	req logpoller.Log,
 	allReqs []logpoller.Log,
-	report commit_store.CCIPRelayReport,
+	report commit_store.CCIPCommitReport,
 ) uint64 {
 	t.Log("Executing request manually")
 	// Build full tree for report

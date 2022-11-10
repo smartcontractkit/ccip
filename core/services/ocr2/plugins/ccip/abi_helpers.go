@@ -361,10 +361,10 @@ func makeExecutionReportArgs() abi.Arguments {
 	}
 }
 
-func makeRelayReportArgs() abi.Arguments {
+func makeCommitReportArgs() abi.Arguments {
 	return []abi.Argument{
 		{
-			Name: "RelayReport",
+			Name: "CommitReport",
 			Type: utils.MustAbiType("tuple", []abi.ArgumentMarshaling{
 				{
 					Name: "onRamps",

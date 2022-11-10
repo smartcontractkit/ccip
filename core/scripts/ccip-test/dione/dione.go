@@ -29,7 +29,7 @@ const (
 type JobType string
 
 const (
-	Relay     JobType = "relay"
+	Commit    JobType = "relay"
 	Execution JobType = "exec"
 	Boostrap  JobType = "bootstrap"
 )
@@ -223,19 +223,19 @@ func (don *DON) LoadCurrentNodeParams() {
 }
 
 func (don *DON) ClearAllJobs(chainA Chain, chainB Chain) {
-	don.ClearJobSpecs(Relay, chainA, chainB)
+	don.ClearJobSpecs(Commit, chainA, chainB)
 	don.ClearJobSpecs(Execution, chainA, chainB)
-	don.ClearJobSpecs(Relay, chainB, chainA)
+	don.ClearJobSpecs(Commit, chainB, chainA)
 	don.ClearJobSpecs(Execution, chainB, chainA)
 }
 
 func (don *DON) AddTwoWaySpecs(chainA rhea.EvmDeploymentConfig, chainB rhea.EvmDeploymentConfig) {
-	relaySpecAB := generateRelayJobSpecs(&chainA, &chainB)
-	don.AddJobSpecs(relaySpecAB)
+	commitSpecAB := generateCommitJobSpecs(&chainA, &chainB)
+	don.AddJobSpecs(commitSpecAB)
 	executionSpecAB := generateExecutionJobSpecs(&chainA, &chainB)
 	don.AddJobSpecs(executionSpecAB)
-	relaySpecBA := generateRelayJobSpecs(&chainB, &chainA)
-	don.AddJobSpecs(relaySpecBA)
+	commitSpecBA := generateCommitJobSpecs(&chainB, &chainA)
+	don.AddJobSpecs(commitSpecBA)
 	executionSpecBA := generateExecutionJobSpecs(&chainB, &chainA)
 	don.AddJobSpecs(executionSpecBA)
 }
@@ -252,7 +252,7 @@ func (don *DON) AddJobSpecs(spec job.Job) {
 
 		var specString string
 		if spec.OCR2OracleSpec.PluginType == job.CCIPRelay {
-			specString = RelaySpecToString(spec)
+			specString = CommitSpecToString(spec)
 		} else {
 			specString = ExecSpecToString(spec)
 		}

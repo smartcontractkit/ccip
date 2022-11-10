@@ -65,7 +65,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 	spec := ccipContracts.NewCCIPJobSpecParams(tokensPerFeeCoinPipeline)
 
 	for i, node := range nodes {
-		spec.AddCCIPRelayJob(t, fmt.Sprintf("ccip-relay-%d", i), node, configBlock)
+		spec.AddCCIPCommitJob(t, fmt.Sprintf("ccip-relay-%d", i), node, configBlock)
 		spec.AddCCIPTollExecutionJob(t, fmt.Sprintf("ccip-executor-toll-%d", i), node, configBlock)
 		spec.AddCCIPSubExecutionJob(t, fmt.Sprintf("ccip-executor-subscription-%d", i), node, configBlock)
 	}
@@ -80,19 +80,19 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 	// Needs to be sufficient to cover default gas price of 200gwei.
 	// Costs ~7 link for 100k callback @ 200gwei.
 	for _, receiver := range ccipContracts.Receivers {
-		relayFee := big.NewInt(0).Mul(ccipContracts.SubOnRampFee, big.NewInt(10))
-		_, err = ccipContracts.SourceLinkToken.Approve(ccipContracts.SourceUser, ccipContracts.SubOnRampRouter.Address(), relayFee)
+		commitFee := big.NewInt(0).Mul(ccipContracts.SubOnRampFee, big.NewInt(10))
+		_, err = ccipContracts.SourceLinkToken.Approve(ccipContracts.SourceUser, ccipContracts.SubOnRampRouter.Address(), commitFee)
 		require.NoError(t, err)
-		_, err = ccipContracts.SubOnRampRouter.FundSubscription(ccipContracts.SourceUser, relayFee)
+		_, err = ccipContracts.SubOnRampRouter.FundSubscription(ccipContracts.SourceUser, commitFee)
 		require.NoError(t, err)
 		ccipContracts.SourceChain.Commit()
 		// if using senderDapp
-		_, err = ccipContracts.SourceLinkToken.Transfer(ccipContracts.SourceUser, ccipContracts.SubSenderApp.Address(), relayFee)
+		_, err = ccipContracts.SourceLinkToken.Transfer(ccipContracts.SourceUser, ccipContracts.SubSenderApp.Address(), commitFee)
 		require.NoError(t, err)
-		_, err = ccipContracts.SourceLinkToken.Approve(ccipContracts.SourceUser, ccipContracts.SubSenderApp.Address(), relayFee)
+		_, err = ccipContracts.SourceLinkToken.Approve(ccipContracts.SourceUser, ccipContracts.SubSenderApp.Address(), commitFee)
 		require.NoError(t, err)
 		ccipContracts.SourceChain.Commit()
-		_, err = ccipContracts.SubSenderApp.FundSubscription(ccipContracts.SourceUser, ccipContracts.SourceLinkToken.Address(), relayFee)
+		_, err = ccipContracts.SubSenderApp.FundSubscription(ccipContracts.SourceUser, ccipContracts.SourceLinkToken.Address(), commitFee)
 		require.NoError(t, err)
 		ccipContracts.SourceChain.Commit()
 
@@ -146,7 +146,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 			}, big.NewInt(100_000),
 			ccipContracts.Receivers[0].Receiver.Address())
 		testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, ccip.CCIPTollSendRequested, ccipContracts.TollOnRamp.Address(), nodes, tollCurrentSeqNum)
-		testhelpers.EventuallyReportRelayed(t, ccipContracts, ccipContracts.TollOnRamp.Address(), tollCurrentSeqNum, tollCurrentSeqNum)
+		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.TollOnRamp.Address(), tollCurrentSeqNum, tollCurrentSeqNum)
 		executionLog := testhelpers.AllNodesHaveExecutedSeqNum(t, ccipContracts, ccipContracts.TollOffRamp.Address(), nodes, tollCurrentSeqNum)
 		testhelpers.AssertTollExecSuccess(t, ccipContracts, executionLog)
 
@@ -233,7 +233,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 			Amount: tokenAmount,
 		}}, big.NewInt(100_000), ccipContracts.Receivers[0].Receiver.Address())
 		testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, ccip.CCIPSubSendRequested, ccipContracts.SubOnRamp.Address(), nodes, subCurrentSeqNum)
-		testhelpers.EventuallyReportRelayed(t, ccipContracts, ccipContracts.SubOnRamp.Address(), subCurrentSeqNum, subCurrentSeqNum)
+		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.SubOnRamp.Address(), subCurrentSeqNum, subCurrentSeqNum)
 		executionLog := testhelpers.AllNodesHaveExecutedSeqNum(t, ccipContracts, ccipContracts.SubOffRamp.Address(), nodes, subCurrentSeqNum)
 		testhelpers.AssertSubExecSuccess(t, ccipContracts, executionLog)
 
@@ -319,7 +319,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 			Amount: tokenAmount,
 		}}, big.NewInt(100_000), ccipContracts.Receivers[0].Receiver.Address())
 		testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, ccip.CCIPSubSendRequested, ccipContracts.SubOnRamp.Address(), nodes, subCurrentSeqNum)
-		testhelpers.EventuallyReportRelayed(t, ccipContracts, ccipContracts.SubOnRamp.Address(), subCurrentSeqNum, subCurrentSeqNum)
+		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.SubOnRamp.Address(), subCurrentSeqNum, subCurrentSeqNum)
 		executionLog := testhelpers.AllNodesHaveExecutedSeqNum(t, ccipContracts, ccipContracts.SubOffRamp.Address(), nodes, subCurrentSeqNum)
 		testhelpers.AssertSubExecSuccess(t, ccipContracts, executionLog)
 
@@ -413,7 +413,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 			reqs = append(reqs, testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, ccip.CCIPTollSendRequested, ccipContracts.TollOnRamp.Address(), nodes, tollCurrentSeqNum+i))
 		}
 		// Should see a report with the full range
-		testhelpers.EventuallyReportRelayed(t, ccipContracts, ccipContracts.TollOnRamp.Address(), tollCurrentSeqNum, tollCurrentSeqNum+n-1)
+		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.TollOnRamp.Address(), tollCurrentSeqNum, tollCurrentSeqNum+n-1)
 		// Should all be executed
 		for i := range reqs {
 			executionLog := testhelpers.AllNodesHaveExecutedSeqNum(t, ccipContracts, ccipContracts.TollOffRamp.Address(), nodes, tollCurrentSeqNum+i)
@@ -490,7 +490,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 			reqs = append(reqs, testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, ccip.CCIPSubSendRequested, ccipContracts.SubOnRamp.Address(), nodes, subCurrentSeqNum+i))
 		}
 		// Should see a report with the full range
-		testhelpers.EventuallyReportRelayed(t, ccipContracts, ccipContracts.SubOnRamp.Address(), subCurrentSeqNum, subCurrentSeqNum+n-1)
+		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.SubOnRamp.Address(), subCurrentSeqNum, subCurrentSeqNum+n-1)
 		// Should all be executed
 		for i := range reqs {
 			executionLog := testhelpers.AllNodesHaveExecutedSeqNum(t, ccipContracts, ccipContracts.SubOffRamp.Address(), nodes, subCurrentSeqNum+i)
@@ -554,7 +554,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 			Amount: tokenAmount,
 		}}, big.NewInt(100_000), ccipContracts.Receivers[1].Receiver.Address())
 		testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, ccip.CCIPSubSendRequested, ccipContracts.SubOnRamp.Address(), nodes, subCurrentSeqNum)
-		testhelpers.EventuallyReportRelayed(t, ccipContracts, ccipContracts.SubOnRamp.Address(), subCurrentSeqNum, subCurrentSeqNum)
+		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.SubOnRamp.Address(), subCurrentSeqNum, subCurrentSeqNum)
 		executionLog := testhelpers.AllNodesHaveExecutedSeqNum(t, ccipContracts, ccipContracts.SubOffRamp.Address(), nodes, subCurrentSeqNum)
 		testhelpers.AssertSubExecSuccess(t, ccipContracts, executionLog)
 		ccipContracts.AssertBalances([]testhelpers.BalanceAssertion{
@@ -635,8 +635,8 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 			Amount: tokenAmounts[0],
 		}}, big.NewInt(100_000), ccipContracts.Receivers[1].Receiver.Address())
 		failedReq := testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, ccip.CCIPSubSendRequested, ccipContracts.SubOnRamp.Address(), nodes, subCurrentSeqNum)
-		testhelpers.EventuallyReportRelayed(t, ccipContracts, ccipContracts.SubOnRamp.Address(), subCurrentSeqNum, subCurrentSeqNum)
-		reportForFailedReq := testhelpers.EventuallyRelayReportAccepted(t, ccipContracts, currentBlockNumber)
+		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.SubOnRamp.Address(), subCurrentSeqNum, subCurrentSeqNum)
+		reportForFailedReq := testhelpers.EventuallyCommitReportAccepted(t, ccipContracts, currentBlockNumber)
 		executionLog := testhelpers.AllNodesHaveExecutedSeqNum(t, ccipContracts, ccipContracts.SubOffRamp.Address(), nodes, subCurrentSeqNum)
 
 		// the transaction should get reverted and the execution status should be failed
@@ -656,7 +656,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 				Amount: tokenAmounts[i],
 			}}, big.NewInt(100_000), ccipContracts.Receivers[1].Receiver.Address())
 			testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, ccip.CCIPSubSendRequested, ccipContracts.SubOnRamp.Address(), nodes, subCurrentSeqNum)
-			testhelpers.EventuallyReportRelayed(t, ccipContracts, ccipContracts.SubOnRamp.Address(), subCurrentSeqNum, subCurrentSeqNum)
+			testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.SubOnRamp.Address(), subCurrentSeqNum, subCurrentSeqNum)
 			executionLog := testhelpers.NoNodesHaveExecutedSeqNum(t, ccipContracts, ccipContracts.SubOffRamp.Address(), nodes, subCurrentSeqNum)
 			require.Empty(t, executionLog)
 			pendingReqNumbers = append(pendingReqNumbers, subCurrentSeqNum)
@@ -730,7 +730,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 			require.NoError(t, err)
 			err = node.App.DeleteJob(context.Background(), 2)
 			require.NoError(t, err)
-			spec.AddCCIPRelayJob(t, fmt.Sprintf("ccip-relay-new-%d", i), node, newConfigBlock)
+			spec.AddCCIPCommitJob(t, fmt.Sprintf("ccip-relay-new-%d", i), node, newConfigBlock)
 			spec.AddCCIPTollExecutionJob(t, fmt.Sprintf("ccip-executor-toll-new-%d", i), node, configBlock)
 		}
 		// keep sending a number of send requests all of which would be in pending state
@@ -788,7 +788,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 			t.Logf("verifying seqnum %d", i)
 			testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, ccip.CCIPTollSendRequested,
 				ccipContracts.TollOnRamp.Address(), nodes, i)
-			testhelpers.EventuallyReportRelayed(t, ccipContracts, ccipContracts.TollOnRamp.Address(), i, i)
+			testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.TollOnRamp.Address(), i, i)
 			executionLog := testhelpers.AllNodesHaveExecutedSeqNum(t, ccipContracts,
 				ccipContracts.TollOffRamp.Address(), nodes, i)
 			testhelpers.AssertTollExecSuccess(t, ccipContracts, executionLog)

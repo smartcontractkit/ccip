@@ -23,7 +23,7 @@ func upgradeOnRamp(t *testing.T, sourceClient *EvmDeploymentConfig, destClient *
 	setOnRampOnTokenPools(t, sourceClient)
 	setOnRampOnCommitStore(t, sourceClient, destClient)
 
-	sourceClient.Logger.Info("Please deploy new relay jobs")
+	sourceClient.Logger.Info("Please deploy new commit jobs")
 }
 
 func upgradeOffRamp(t *testing.T, sourceClient *EvmDeploymentConfig, destClient *EvmDeploymentConfig) {

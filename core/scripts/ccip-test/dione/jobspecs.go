@@ -12,11 +12,11 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/job"
 )
 
-func RelaySpecToString(spec job.Job) string {
+func CommitSpecToString(spec job.Job) string {
 	onRamp := spec.OCR2OracleSpec.PluginConfig["onRampIDs"].([]string)[0]
 
-	const relayTemplate = `
-# CCIPRelaySpec
+	const commitTemplate = `
+# CCIP Commit spec
 type               = "offchainreporting2"
 name               = "%s"
 pluginType         = "ccip-relay"
@@ -38,7 +38,7 @@ DestStartBlock     = %d
 chainID            = %s
 `
 
-	return fmt.Sprintf(relayTemplate+"\n",
+	return fmt.Sprintf(commitTemplate+"\n",
 		spec.Name.String,
 		spec.OCR2OracleSpec.ContractID,
 		spec.OCR2OracleSpec.OCRKeyBundleID.String,
@@ -55,7 +55,7 @@ chainID            = %s
 
 func ExecSpecToString(spec job.Job) string {
 	const execTemplate = `
-# CCIPExecutionSpec
+# CCIP Execution spec
 type               = "offchainreporting2"
 name               = "%s"
 pluginType         = "ccip-execution"
@@ -104,7 +104,7 @@ func GetOCRkeysForChainType(OCRKeys client.OCR2Keys, chainType string) client.OC
 	panic("Keys not found for chain")
 }
 
-func generateRelayJobSpecs(sourceClient *rhea.EvmDeploymentConfig, destClient *rhea.EvmDeploymentConfig) job.Job {
+func generateCommitJobSpecs(sourceClient *rhea.EvmDeploymentConfig, destClient *rhea.EvmDeploymentConfig) job.Job {
 	return job.Job{
 		Name: null2.StringFrom(fmt.Sprintf("ccip-relay-%s-%s", helpers.ChainName(sourceClient.ChainConfig.ChainId.Int64()), helpers.ChainName(destClient.ChainConfig.ChainId.Int64()))),
 		Type: "offchainreporting2",

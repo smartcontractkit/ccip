@@ -17,12 +17,12 @@ import (
 
 func TestObservationFilter(t *testing.T) {
 	lggr := logger.TestLogger(t)
-	obs1 := RelayObservation{IntervalsByOnRamp: map[common.Address]commit_store.CCIPInterval{
+	obs1 := CommitObservation{IntervalsByOnRamp: map[common.Address]commit_store.CCIPInterval{
 		common.HexToAddress("0x5431F5F973781809D18643b87B44921b11355d81"): commit_store.CCIPInterval{Min: 1, Max: 10},
 	}}
 	b1, err := obs1.Marshal()
 	require.NoError(t, err)
-	nonEmpty := getNonEmptyObservations[RelayObservation](lggr, []types.AttributedObservation{{Observation: b1}, {Observation: []byte{}}})
+	nonEmpty := getNonEmptyObservations[CommitObservation](lggr, []types.AttributedObservation{{Observation: b1}, {Observation: []byte{}}})
 	require.NoError(t, err)
 	require.Equal(t, 1, len(nonEmpty))
 	assert.Equal(t, nonEmpty[0].IntervalsByOnRamp, obs1.IntervalsByOnRamp)

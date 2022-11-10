@@ -10,8 +10,8 @@ import (
 	"github.com/smartcontractkit/chainlink/core/store/models"
 )
 
-func TestRelayConfig(t *testing.T) {
-	exampleConfig := RelayPluginConfig{
+func TestCommitConfig(t *testing.T) {
+	exampleConfig := CommitPluginConfig{
 		SourceChainID:       1337,
 		DestChainID:         7331,
 		SourceStartBlock:    222,
@@ -24,11 +24,11 @@ func TestRelayConfig(t *testing.T) {
 	bts, err := json.Marshal(exampleConfig)
 	require.NoError(t, err)
 
-	parsedConfig := RelayPluginConfig{}
+	parsedConfig := CommitPluginConfig{}
 	require.NoError(t, json.Unmarshal(bts, &parsedConfig))
 
 	require.Equal(t, exampleConfig, parsedConfig)
-	require.NoError(t, parsedConfig.ValidateRelayPluginConfig())
+	require.NoError(t, parsedConfig.ValidateCommitPluginConfig())
 }
 
 func TestExecutionConfig(t *testing.T) {

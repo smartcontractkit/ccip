@@ -146,7 +146,7 @@ package toll
 //		[]common.Address{},  // allow list
 //		client.ChainConfig.Afn,          // AFN
 //		evm_2_evm_toll_onramp.BaseOnRampInterfaceOnRampConfig{
-//			RelayingFeeJuels: 0,
+//			CommitFeeJuels: 0,
 //			MaxDataSize:      1e6,
 //			MaxTokensLength:  5,
 //			MaxGasLimit:      ccip.BatchGasLimit,
