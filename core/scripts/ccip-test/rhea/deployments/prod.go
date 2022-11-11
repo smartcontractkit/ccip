@@ -144,7 +144,7 @@ var Prod_GoerliToAvaxFuji = rhea.EvmDeploymentConfig{
 		DeployRouter:         false,
 		DeployGovernanceDapp: false,
 		DeployPingPongDapp:   false,
-		DeployedAt:           7910311,
+		DeployedAt:           7932318,
 	},
 }
 
@@ -168,7 +168,7 @@ var Prod_AvaxFujiToGoerli = rhea.EvmDeploymentConfig{
 		DeployRouter:         false,
 		DeployGovernanceDapp: false,
 		DeployPingPongDapp:   false,
-		DeployedAt:           15510013,
+		DeployedAt:           15617046,
 	},
 }
 
@@ -192,7 +192,7 @@ var Prod_OptimismGoerlitoAvaxFuji = rhea.EvmDeploymentConfig{
 		DeployRouter:         false,
 		DeployGovernanceDapp: false,
 		DeployPingPongDapp:   false,
-		DeployedAt:           2517979,
+		DeployedAt:           2590979,
 	},
 }
 
@@ -217,6 +217,6 @@ var Prod_AvaxFujitoOptimismGoerli = rhea.EvmDeploymentConfig{
 		DeployRouter:         false,
 		DeployGovernanceDapp: false,
 		DeployPingPongDapp:   false,
-		DeployedAt:           15537046,
+		DeployedAt:           15617046,
 	},
 }

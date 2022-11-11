@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math/big"
 	"os"
 	"testing"
 
@@ -35,7 +36,9 @@ func TestRheaDeploySubscription(t *testing.T) {
 func TestDione(t *testing.T) {
 	checkOwnerKeyAndSetupChain(t)
 
-	dione.NewOfflineDON(ENV, logger.TestLogger(t))
+	don := dione.NewDON(ENV, logger.TestLogger(t))
+	don.ClearAllJobs(dione.OptimismGoerli, dione.AvaxFuji)
+	don.AddTwoWaySpecs(SOURCE, DESTINATION)
 }
 
 // TestCCIP can be run as a test with the following config
@@ -124,6 +127,13 @@ func TestPrintNodeBalances(t *testing.T) {
 
 	printing.PrintNodeBalances(&SOURCE, don.GetSendingKeys(SOURCE.ChainConfig.ChainId))
 	printing.PrintNodeBalances(&DESTINATION, don.GetSendingKeys(DESTINATION.ChainConfig.ChainId))
+}
+
+func TestFundNodes(t *testing.T) {
+	key := checkOwnerKeyAndSetupChain(t)
+
+	don := dione.NewOfflineDON(ENV, logger.TestLogger(t))
+	don.FundNodeKeys(SOURCE, key, big.NewInt(4e18))
 }
 
 func checkOwnerKeyAndSetupChain(t *testing.T) string {
