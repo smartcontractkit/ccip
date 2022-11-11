@@ -279,7 +279,7 @@ func (c *CCIPContracts) EnableTollOnRamp() {
 	require.NoError(c.t, err)
 	c.SourceChain.Commit()
 
-	c.t.Log("Enabling toll onRamp on blob verifier")
+	c.t.Log("Enabling toll onRamp on commitStore")
 	config, err := c.CommitStore.GetConfig(&bind.CallOpts{})
 	require.NoError(c.t, err)
 
@@ -709,7 +709,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 	require.NoError(t, err)
 	_, err = subOffRampRouter.GetFeeToken(nil)
 	require.NoError(t, err)
-	// Enable onramps on blob verifier.
+	// Enable onramps on commitStore.
 	_, err = commitStore.SetConfig(destUser, commit_store.CommitStoreInterfaceCommitStoreConfig{
 		OnRamps:          []common.Address{onRampAddress, subOnRampAddress},
 		MinSeqNrByOnRamp: []uint64{1, 1},
@@ -928,7 +928,7 @@ func EventuallyCommitReportAccepted(t *testing.T, ccipContracts CCIPContracts, c
 		g.Expect(it.Next()).To(gomega.BeTrue(), "No ReportAccepted event found")
 		report = it.Event.Report
 		if len(report.OnRamps) > 0 {
-			t.Log("Report Accepted by blob verifier")
+			t.Log("Report Accepted by commitStore")
 		}
 		return report.OnRamps
 	}, testutils.WaitTimeout(t), 1*time.Second).

@@ -84,7 +84,7 @@ var _ = Describe("CCIP interactions test @smoke-ccip", func() {
 		)
 
 		// set up ocr2 config
-		By("Setting up ocr config in blob verifier and offramp")
+		By("Setting up ocr config in commit store and offramp")
 		actions.SetOCRConfigs(clNodes[1:], nil, *destCCIP) // first node is the bootstrapper
 
 		ccipTest := actions.NewCCIPTest(

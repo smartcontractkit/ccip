@@ -73,7 +73,7 @@ func TestCommitReportEncoding(t *testing.T) {
 		big.NewInt(1),
 	)
 
-	// Deploy blob verifier.
+	// Deploy commitStore.
 	onRampAddress := common.HexToAddress("0x01BE23585060835E02B77ef475b0Cc51aA1e0709")
 	commitStoreAddress, _, _, err := commit_store_helper.DeployCommitStoreHelper(
 		destUser,         // user

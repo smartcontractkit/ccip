@@ -1005,7 +1005,7 @@ func (client *CCIPClient) SetOCRConfig(env dione.Environment) {
 	)
 	helpers.PanicErr(err)
 	shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
-	client.Dest.logger.Infof("Config set on blob verifier %s", helpers.ExplorerLink(client.Dest.ChainId.Int64(), tx.Hash()))
+	client.Dest.logger.Infof("Config set on commitStore %s", helpers.ExplorerLink(client.Dest.ChainId.Int64(), tx.Hash()))
 
 	tx, err = client.Dest.OffRamp.SetConfig0(
 		client.Dest.Owner,

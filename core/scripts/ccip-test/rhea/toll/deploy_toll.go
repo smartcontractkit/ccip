@@ -260,7 +260,7 @@ package toll
 //		return commitStore
 //	}
 //
-//	destClient.Logger.Infof("Deploying blob verifier")
+//	destClient.Logger.Infof("Deploying commitStore")
 //
 //	commitStoreAddress, tx, _, err := commit_store.DeployCommitStore(
 //		destClient.Owner,     // user
@@ -275,7 +275,7 @@ package toll
 //	)
 //	require.NoError(t, err)
 //	main.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
-//	destClient.Logger.Infof("Blob verifier deployed on %s in tx: %s", commitStoreAddress.Hex(), helpers.ExplorerLink(destClient.ChainConfig.ChainId.Int64(), tx.Hash()))
+//	destClient.Logger.Infof("commitStore deployed on %s in tx: %s", commitStoreAddress.Hex(), helpers.ExplorerLink(destClient.ChainConfig.ChainId.Int64(), tx.Hash()))
 //	destClient.LaneConfig.CommitStore = commitStoreAddress
 //
 //	commitStore, err := commit_store.NewCommitStore(commitStoreAddress, destClient.Client)
