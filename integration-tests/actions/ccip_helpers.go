@@ -961,8 +961,8 @@ func CreateOCRJobsForCCIP(
 	}
 	SetMockServerWithSameTokenFeeConversionValue(tokenFeeConv, execNodes, mockServer)
 	p2pBootstrappersCommit := &client.P2PData{
-		RemoteIP: bootstrapRelay.Node.RemoteIP(),
-		PeerID:   bootstrapRelayP2PId,
+		RemoteIP: bootstrapCommit.Node.RemoteIP(),
+		PeerID:   bootstrapCommitP2PId,
 	}
 	p2pBootstrappersExec := &client.P2PData{
 		RemoteIP: bootstrapExec.Node.RemoteIP(),
