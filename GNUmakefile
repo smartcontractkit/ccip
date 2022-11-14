@@ -41,7 +41,7 @@ chainlink: operator-ui ## Build the chainlink binary.
 	go build $(GOFLAGS) -o $@ ./core/
 
 .PHONY: docker ## Build the chainlink docker image
-docker: 
+docker:
 	docker buildx build \
 	--build-arg COMMIT_SHA=$(COMMIT_SHA) \
 	-f core/chainlink.Dockerfile .
@@ -54,7 +54,7 @@ chainlink-build: operator-ui ## Build & install the chainlink binary.
 
 .PHONY: operator-ui
 operator-ui: ## Fetch the frontend
-	./operator_ui/install.sh	
+	./operator_ui/install.sh
 
 .PHONY: ccip-abi-generate
 ccip-abi-generate: ## Generate Public ABI file for a contract
@@ -80,7 +80,15 @@ go-solidity-wrappers: abigen ## Recompiles solidity contracts and their go wrapp
 .PHONY: go-solidity-wrappers-ocr2vrf
 go-solidity-wrappers-ocr2vrf: abigen ## Recompiles solidity contracts and their go wrappers.
 	./contracts/scripts/native_solc_compile_all_ocr2vrf
+	# replace the go:generate_disabled directive with the regular go:generate directive
+	sed -i '' 's/go:generate_disabled/go:generate/g' core/gethwrappers/ocr2vrf/go_generate.go
 	go generate ./core/gethwrappers/ocr2vrf
+	# put the go:generate_disabled directive back
+	sed -i '' 's/go:generate/go:generate_disabled/g' core/gethwrappers/ocr2vrf/go_generate.go
+
+.PHONY: generate
+generate: abigen ## Execute all go:generate commands.
+	go generate -x ./...
 
 .PHONY: generate
 generate: abigen ## Execute all go:generate commands.
@@ -126,13 +134,13 @@ test_need_operator_assets: ## Add blank file in web assets if operator ui has no
 test_smoke: test_need_operator_assets ## Run all integration smoke tests, using only simulated networks, default behavior
 	ginkgo -v -r --junit-report=tests-smoke-report.xml \
 	--keep-going --trace --randomize-all --randomize-suites \
-	--progress $(args) ./integration-tests/smoke
+	$(args) ./integration-tests/smoke
 
 .PHONY: test_smoke_simulated
 test_smoke_simulated: test_need_operator_assets ## Run all integration smoke tests, using only simulated networks, default behavior (you can use `make test_smoke`)
 	SELECTED_NETWORKS="SIMULATED,SIMULATED_1,SIMULATED_2" ginkgo -v -r --junit-report=tests-smoke-report.xml \
 	--keep-going --trace --randomize-all --randomize-suites \
-	--progress $(args) ./integration-tests/smoke
+	$(args) ./integration-tests/smoke
 
 .PHONY: test_soak_ocr
 test_soak_ocr: test_need_operator_assets ## Run the OCR soak test
@@ -150,19 +158,19 @@ test_soak_keeper: test_need_operator_assets ## Run the OCR soak test
 test_load_ccip: test_need_operator_assets ## Run the CCIP load test
 	SELECTED_NETWORKS="SIMULATED,SIMULATED_1,SIMULATED_2" ginkgo -v -r --junit-report=tests-load-report.xml \
     	--keep-going --trace --randomize-all --randomize-suites \
-    	--progress $(args) ./integration-tests/load
+    	$(args) ./integration-tests/load
 
 .PHONY: test_perf
 test_perf: test_need_operator_assets ## Run core node performance tests.
 	ginkgo -v -r --junit-report=tests-perf-report.xml \
 	--keep-going --trace --randomize-all --randomize-suites \
-	--progress $(args) ./integration-tests/performance
+	$(args) ./integration-tests/performance
 
 .PHONY: test_chaos
 test_chaos: test_need_operator_assets ## Run core node chaos tests.
 	SELECTED_NETWORKS="SIMULATED,SIMULATED_1,SIMULATED_2" ginkgo -v -r --junit-report=tests-chaos-report.xml \
 	--keep-going --trace --randomize-all --randomize-suites \
-	--progress $(args) ./integration-tests/chaos
+	$(args) ./integration-tests/chaos
 
 .PHONY: config-docs
 config-docs: ## Generate core node configuration documentation
