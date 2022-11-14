@@ -1225,6 +1225,7 @@ func SetUpNodesAndKeys(
 
 	chainlinkNodes, err := client.ConnectChainlinkNodes(testEnvironment)
 	Expect(err).ShouldNot(HaveOccurred(), "Connecting to chainlink nodes shouldn't fail")
+	Expect(len(chainlinkNodes)).Should(BeNumerically(">", 0), "No CL node found")
 
 	mockServer, err := ctfClient.ConnectMockServer(testEnvironment)
 	Expect(err).ShouldNot(HaveOccurred(), "Creating mockserver clients shouldn't fail")
@@ -1235,6 +1236,7 @@ func SetUpNodesAndKeys(
 	log.Info().Msg("creating node keys")
 	_, clNodes, err := client.CreateNodeKeysBundle(chainlinkNodes, "evm", destChainClient.GetChainID().String())
 	Expect(err).ShouldNot(HaveOccurred())
+	Expect(len(clNodes)).Should(BeNumerically(">", 0), "No CL node with keys found")
 
 	log.Info().Msg("Funding Chainlink nodes for both the chains")
 	err = FundChainlinkNodesAddresses(chainlinkNodes, sourceChainClient, nodeFund)
