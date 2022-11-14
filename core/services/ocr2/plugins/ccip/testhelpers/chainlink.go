@@ -154,7 +154,7 @@ type CCIPJobSpec struct {
 func (spec CCIPJobSpec) AddCCIPCommitJob(t *testing.T, jobName string, node Node, configBlock int64) {
 	node.AddJob(t, fmt.Sprintf(`
 type                = "offchainreporting2"
-pluginType          = "ccip-relay"
+pluginType          = "ccip-commit"
 relay               = "evm"
 schemaVersion       = 1
 name                = "%s"

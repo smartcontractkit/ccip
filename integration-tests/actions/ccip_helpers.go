@@ -964,10 +964,10 @@ func CreateOCRJobsForCCIP(
 	addCommitJob := func(node *client.Chainlink, nodeTransmitterAddress, nodeOCR2KeyId string) error {
 		ocr2SpecCommit := &client.OCR2TaskJobSpec{
 			JobType: "offchainreporting2",
-			Name:    fmt.Sprintf("ccip-relay-%s-%s", sourceChainName, destChainName),
+			Name:    fmt.Sprintf("ccip-commit-%s-%s", sourceChainName, destChainName),
 			OCR2OracleSpec: job.OCR2OracleSpec{
 				Relay:                             relay.EVM,
-				PluginType:                        job.CCIPRelay,
+				PluginType:                        job.CCIPCommit,
 				ContractID:                        commitStore,
 				OCRKeyBundleID:                    null.StringFrom(nodeOCR2KeyId),
 				TransmitterID:                     null.StringFrom(nodeTransmitterAddress),

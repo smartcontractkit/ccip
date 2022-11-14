@@ -29,7 +29,7 @@ const (
 type JobType string
 
 const (
-	Commit    JobType = "relay"
+	Commit    JobType = "commit"
 	Execution JobType = "exec"
 	Boostrap  JobType = "bootstrap"
 )
@@ -251,7 +251,7 @@ func (don *DON) AddJobSpecs(spec job.Job) {
 		spec.OCR2OracleSpec.TransmitterID.SetValid(transmitterIDs[chainID])
 
 		var specString string
-		if spec.OCR2OracleSpec.PluginType == job.CCIPRelay {
+		if spec.OCR2OracleSpec.PluginType == job.CCIPCommit {
 			specString = CommitSpecToString(spec)
 		} else {
 			specString = ExecSpecToString(spec)

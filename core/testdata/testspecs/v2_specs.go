@@ -627,7 +627,7 @@ func GenerateCCIPSpec(params CCIPSpecParams) CCIPSpec {
 	}
 	template := `
 type             = "offchainreporting2"
-pluginType       = "ccip-relay"
+pluginType       = "ccip-commit"
 relay            = "evm"
 schemaVersion    = 1
 contractID       = "%s"

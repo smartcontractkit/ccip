@@ -607,8 +607,8 @@ chainID                            = %s
 const commitTemplate = `
 # CCIP commit spec
 type               = "offchainreporting2"
-name               = "ccip-relay-%s"
-pluginType         = "ccip-relay"
+name               = "ccip-commit-%s"
+pluginType         = "ccip-commit"
 relay              = "evm"
 schemaVersion      = 1
 contractID         = "%s"

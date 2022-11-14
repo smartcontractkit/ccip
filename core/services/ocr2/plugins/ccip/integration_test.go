@@ -65,7 +65,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 	spec := ccipContracts.NewCCIPJobSpecParams(tokensPerFeeCoinPipeline)
 
 	for i, node := range nodes {
-		spec.AddCCIPCommitJob(t, fmt.Sprintf("ccip-relay-%d", i), node, configBlock)
+		spec.AddCCIPCommitJob(t, fmt.Sprintf("ccip-commit-%d", i), node, configBlock)
 		spec.AddCCIPTollExecutionJob(t, fmt.Sprintf("ccip-executor-toll-%d", i), node, configBlock)
 		spec.AddCCIPSubExecutionJob(t, fmt.Sprintf("ccip-executor-subscription-%d", i), node, configBlock)
 	}
@@ -730,7 +730,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 			require.NoError(t, err)
 			err = node.App.DeleteJob(context.Background(), 2)
 			require.NoError(t, err)
-			spec.AddCCIPCommitJob(t, fmt.Sprintf("ccip-relay-new-%d", i), node, newConfigBlock)
+			spec.AddCCIPCommitJob(t, fmt.Sprintf("ccip-commit-new-%d", i), node, newConfigBlock)
 			spec.AddCCIPTollExecutionJob(t, fmt.Sprintf("ccip-executor-toll-new-%d", i), node, configBlock)
 		}
 		// keep sending a number of send requests all of which would be in pending state

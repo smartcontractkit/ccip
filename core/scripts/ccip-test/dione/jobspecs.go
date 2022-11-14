@@ -19,7 +19,7 @@ func CommitSpecToString(spec job.Job) string {
 # CCIP Commit spec
 type               = "offchainreporting2"
 name               = "%s"
-pluginType         = "ccip-relay"
+pluginType         = "ccip-commit"
 relay              = "evm"
 schemaVersion      = 1
 contractID         = "%s"
@@ -106,10 +106,10 @@ func GetOCRkeysForChainType(OCRKeys client.OCR2Keys, chainType string) client.OC
 
 func generateCommitJobSpecs(sourceClient *rhea.EvmDeploymentConfig, destClient *rhea.EvmDeploymentConfig) job.Job {
 	return job.Job{
-		Name: null2.StringFrom(fmt.Sprintf("ccip-relay-%s-%s", helpers.ChainName(sourceClient.ChainConfig.ChainId.Int64()), helpers.ChainName(destClient.ChainConfig.ChainId.Int64()))),
+		Name: null2.StringFrom(fmt.Sprintf("ccip-commit-%s-%s", helpers.ChainName(sourceClient.ChainConfig.ChainId.Int64()), helpers.ChainName(destClient.ChainConfig.ChainId.Int64()))),
 		Type: "offchainreporting2",
 		OCR2OracleSpec: &job.OCR2OracleSpec{
-			PluginType:                  job.CCIPRelay,
+			PluginType:                  job.CCIPCommit,
 			ContractID:                  destClient.LaneConfig.CommitStore.Hex(),
 			Relay:                       "evm",
 			RelayConfig:                 map[string]interface{}{"chainID": destClient.ChainConfig.ChainId.String()},
