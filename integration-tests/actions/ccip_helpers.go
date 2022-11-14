@@ -960,7 +960,7 @@ func CreateOCRJobsForCCIP(
 		tokenFeeConv[token] = "200000000000000000000"
 	}
 	SetMockServerWithSameTokenFeeConversionValue(tokenFeeConv, execNodes, mockServer)
-	p2pBootstrappersRelay := &client.P2PData{
+	p2pBootstrappersCommit := &client.P2PData{
 		RemoteIP: bootstrapRelay.Node.RemoteIP(),
 		PeerID:   bootstrapRelayP2PId,
 	}
@@ -981,7 +981,7 @@ func CreateOCRJobsForCCIP(
 				ContractConfigConfirmations:       1,
 				ContractConfigTrackerPollInterval: models.Interval(1 * time.Second),
 				P2PV2Bootstrappers: []string{
-					p2pBootstrappersRelay.P2PV2Bootstrapper(),
+					p2pBootstrappersCommit.P2PV2Bootstrapper(),
 				},
 				PluginConfig: map[string]interface{}{
 					"sourceChainID":       sourceChainID,
