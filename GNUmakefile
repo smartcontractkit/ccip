@@ -158,7 +158,7 @@ test_soak_keeper: test_need_operator_assets ## Run the OCR soak test
 test_load_ccip: test_need_operator_assets ## Run the CCIP load test
 	SELECTED_NETWORKS="SIMULATED,SIMULATED_1,SIMULATED_2" ginkgo -v -r --junit-report=tests-load-report.xml \
     	--keep-going --trace --randomize-all --randomize-suites \
-    	--progress $(args) ./integration-tests/load
+    	$(args) ./integration-tests/load
 
 .PHONY: test_perf
 test_perf: test_need_operator_assets ## Run core node performance tests.
@@ -170,7 +170,7 @@ test_perf: test_need_operator_assets ## Run core node performance tests.
 test_chaos: test_need_operator_assets ## Run core node chaos tests.
 	SELECTED_NETWORKS="SIMULATED,SIMULATED_1,SIMULATED_2" ginkgo -v -r --junit-report=tests-chaos-report.xml \
 	--keep-going --trace --randomize-all --randomize-suites \
-	--progress $(args) ./integration-tests/chaos
+	$(args) ./integration-tests/chaos
 
 .PHONY: config-docs
 config-docs: ## Generate core node configuration documentation

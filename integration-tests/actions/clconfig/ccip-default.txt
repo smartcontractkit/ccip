@@ -19,6 +19,7 @@ DeltaReconcile = '5s'
 {{range $networkIndex,$net := .Networks}}
 [[EVM]]
 ChainID = {{.ChainID}}
+MinContractPayment = '0'
 Enabled = true
 FinalityDepth = 50
 LogPollInterval = '1s'

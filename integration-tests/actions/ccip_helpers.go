@@ -93,10 +93,11 @@ var (
 		chainlinkTOML := client.NewDefaultTOMLBuilder().
 			AddRaw(ccipTOML).
 			String()
-		log.Info().Str("Env TOML", chainlinkTOML).Msg("Building CL node")
+		fmt.Println(chainlinkTOML)
 		Expect(err).ShouldNot(HaveOccurred())
 		return map[string]interface{}{
 			"cl_config": chainlinkTOML,
+			"CL_DEV":    "true",
 		}
 	}
 )
