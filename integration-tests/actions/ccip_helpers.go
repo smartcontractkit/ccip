@@ -2,6 +2,7 @@ package actions
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -57,12 +58,18 @@ const (
 	InflightExpiry                = 10 * time.Second
 )
 
+type CCIPTOMLEnv struct {
+	Networks []blockchain.EVMNetwork
+}
+
 var (
 	// TODO dynamic calculation of tollfee for multiple tokens in a msg
 
 	TollFee   = big.NewInt(0).Mul(big.NewInt(12), big.NewInt(1e18)) // "maxCharge":"10784576000000000000" for a msg with two tokens
 	UnusedFee = big.NewInt(0).Mul(big.NewInt(11), big.NewInt(1e18)) // for a msg with two tokens
 
+	//go:embed clconfig/ccip-default.txt
+	CLConfig                   string
 	sourceNetwork, destNetwork = func() (blockchain.EVMNetwork, blockchain.EVMNetwork) {
 		if len(networks.SelectedNetworks) < 3 {
 			log.Fatal().
@@ -77,27 +84,19 @@ var (
 	}()
 
 	DefaultCCIPCLNodeEnv = func() map[string]interface{} {
-		nodes, err := networks.DeriveEVMNodesFromNetworkSettings(sourceNetwork, destNetwork)
+		ccipTOML, err := client.MarshallTemplate(
+			CCIPTOMLEnv{
+				Networks: []blockchain.EVMNetwork{sourceNetwork, destNetwork},
+			},
+			"ccip env toml", CLConfig)
+		Expect(err).ShouldNot(HaveOccurred())
+		chainlinkTOML := client.NewDefaultTOMLBuilder().
+			AddRaw(ccipTOML).
+			String()
+		log.Info().Str("Env TOML", chainlinkTOML).Msg("Building CL node")
 		Expect(err).ShouldNot(HaveOccurred())
 		return map[string]interface{}{
-			"FEATURE_CCIP":                   "true",
-			"FEATURE_OFFCHAIN_REPORTING2":    "true",
-			"feature_offchain_reporting":     "false",
-			"FEATURE_LOG_POLLER":             "true",
-			"GAS_ESTIMATOR_MODE":             "FixedPrice",
-			"P2P_NETWORKING_STACK":           "V2",
-			"P2PV2_LISTEN_ADDRESSES":         "0.0.0.0:6690",
-			"P2PV2_ANNOUNCE_ADDRESSES":       "0.0.0.0:6690",
-			"P2PV2_DELTA_DIAL":               "500ms",
-			"P2PV2_DELTA_RECONCILE":          "5s",
-			"ETH_GAS_LIMIT_DEFAULT":          "5000000",
-			"ETH_LOG_POLL_INTERVAL":          "1s",
-			"p2p_listen_port":                "0",
-			"ETH_FINALITY_DEPTH":             "50",
-			"ETH_HEAD_TRACKER_HISTORY_DEPTH": "100",
-			"ETH_URL":                        "",
-			"ETH_CHAIN_ID":                   "0",
-			"EVM_NODES":                      nodes,
+			"cl_config": chainlinkTOML,
 		}
 	}
 )
@@ -959,7 +958,14 @@ func CreateOCRJobsForCCIP(
 		tokenFeeConv[token] = "200000000000000000000"
 	}
 	SetMockServerWithSameTokenFeeConversionValue(tokenFeeConv, execNodes, mockServer)
-
+	p2pBootstrappersRelay := &client.P2PData{
+		RemoteIP: bootstrapRelay.Node.RemoteIP(),
+		PeerID:   bootstrapRelayP2PId,
+	}
+	p2pBootstrappersExec := &client.P2PData{
+		RemoteIP: bootstrapExec.Node.RemoteIP(),
+		PeerID:   bootstrapExecP2PId,
+	}
 	addRelayJob := func(node *client.Chainlink, nodeTransmitterAddress, nodeOCR2KeyId string) error {
 		ocr2SpecRelay := &client.OCR2TaskJobSpec{
 			JobType: "offchainreporting2",
@@ -973,10 +979,7 @@ func CreateOCRJobsForCCIP(
 				ContractConfigConfirmations:       1,
 				ContractConfigTrackerPollInterval: models.Interval(1 * time.Second),
 				P2PV2Bootstrappers: []string{
-					client.P2PData{
-						RemoteIP: bootstrapRelay.Node.RemoteIP(),
-						PeerID:   bootstrapRelayP2PId,
-					}.P2PV2Bootstrapper(),
+					p2pBootstrappersRelay.P2PV2Bootstrapper(),
 				},
 				PluginConfig: map[string]interface{}{
 					"sourceChainID":       sourceChainID,
@@ -1010,10 +1013,7 @@ func CreateOCRJobsForCCIP(
 				ContractConfigConfirmations:       1,
 				ContractConfigTrackerPollInterval: models.Interval(1 * time.Second),
 				P2PV2Bootstrappers: []string{
-					client.P2PData{
-						RemoteIP: bootstrapExec.Node.RemoteIP(),
-						PeerID:   bootstrapExecP2PId,
-					}.P2PV2Bootstrapper(),
+					p2pBootstrappersExec.P2PV2Bootstrapper(),
 				},
 				PluginConfig: map[string]interface{}{
 					"sourceChainID":    sourceChainID,
