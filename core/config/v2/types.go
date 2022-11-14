@@ -420,6 +420,7 @@ func (l *LogFile) setFrom(f *LogFile) {
 type WebServer struct {
 	AllowOrigins            *string
 	BridgeResponseURL       *models.URL
+	BridgeCacheTTL          *models.Duration
 	HTTPWriteTimeout        *models.Duration
 	HTTPPort                *uint16
 	SecureCookies           *bool
@@ -437,6 +438,9 @@ func (w *WebServer) setFrom(f *WebServer) {
 	}
 	if v := f.BridgeResponseURL; v != nil {
 		w.BridgeResponseURL = v
+	}
+	if v := f.BridgeCacheTTL; v != nil {
+		w.BridgeCacheTTL = v
 	}
 	if v := f.HTTPWriteTimeout; v != nil {
 		w.HTTPWriteTimeout = v

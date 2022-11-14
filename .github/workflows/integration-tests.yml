@@ -96,14 +96,11 @@ jobs:
           - name: flux
             nodes: 1
             os: ubuntu-latest
-          - name: forwarder_ocr
-            nodes: 1
-            os: ubuntu-latest
           - name: keeper
             nodes: 27
             os: ubuntu20.04-32cores-128GB
           - name: ocr
-            nodes: 1
+            nodes: 3
             os: ubuntu-latest
           - name: runlog
             nodes: 1
@@ -145,7 +142,6 @@ jobs:
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
-          CGO_ENABLED: "1"
 
       ## Run this step when changes that do not need the test to run are made
       - name: Run Setup

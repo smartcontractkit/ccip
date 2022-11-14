@@ -1,0 +1,40 @@
+[Feature]
+LogPoller = true
+CCIP = true
+
+[OCR2]
+Enabled = true
+
+[OCR]
+Enabled = false
+
+[P2P]
+[P2P.V2]
+Enabled = true
+ListenAddresses = ['0.0.0.0:6690']
+AnnounceAddresses = ['0.0.0.0:6690']
+DeltaDial = '500ms'
+DeltaReconcile = '5s'
+
+{{range $networkIndex,$net := .Networks}}
+[[EVM]]
+ChainID = {{.ChainID}}
+MinContractPayment = '0'
+Enabled = true
+FinalityDepth = 50
+LogPollInterval = '1s'
+
+[EVM.HeadTracker]
+HistoryDepth = 100
+
+[EVM.GasEstimator]
+Mode = 'FixedPrice'
+LimitDefault = 5_000_000
+
+{{range $i,$url := .URLs }}
+[[EVM.Nodes]]
+Name = 'node-{{$networkIndex}}'
+WSURL = '{{$url}}'
+HTTPURL = '{{ index (index $.Networks $networkIndex).HTTPURLs $i}}'
+{{end}}
+{{end}}
