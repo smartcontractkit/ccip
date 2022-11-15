@@ -647,6 +647,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		_, err = ccipContracts.Receivers[1].Receiver.SetRevert(ccipContracts.DestUser, false)
 		require.NoError(t, err, "setting revert to false on the receiver")
 		ccipContracts.DestChain.Commit()
+		ccipContracts.SourceChain.Commit()
 
 		// send a bunch of subsequent ones which should not be executed
 		var pendingReqNumbers []int
@@ -664,6 +665,8 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		}
 
 		// manually execute the failed request
+		ccipContracts.DestChain.Commit()
+		ccipContracts.SourceChain.Commit()
 		currentBlockNumber = ccipContracts.DestChain.Blockchain().CurrentBlock().Number().Uint64()
 		failedSeqNum := testhelpers.ExecuteSubMessage(t, ccipContracts, failedReq, []logpoller.Log{failedReq}, reportForFailedReq)
 		testhelpers.EventuallyExecutionStateChangedToSuccess(t, ccipContracts, []uint64{failedSeqNum}, currentBlockNumber)

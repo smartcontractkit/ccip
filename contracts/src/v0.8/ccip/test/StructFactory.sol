@@ -128,7 +128,8 @@ contract StructFactory {
   }
 
   using CCIP for bytes;
-  function fromBytesHelper(bytes calldata bts) external pure returns (CCIP.EVMExtraArgsV1 memory){
+
+  function fromBytesHelper(bytes calldata bts) external pure returns (CCIP.EVMExtraArgsV1 memory) {
     return bts._fromBytes();
   }
 }

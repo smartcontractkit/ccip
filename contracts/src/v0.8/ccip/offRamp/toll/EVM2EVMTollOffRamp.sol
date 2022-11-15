@@ -120,17 +120,17 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
     return feeTokenCharged;
   }
 
+  /// @inheritdoc BaseOffRamp
+  function manuallyExecute(CCIP.ExecutionReport memory report) external override {
+    _execute(report, true);
+  }
+
   /**
    * @notice Execute a series of one or more messages using a merkle proof
    * @param report ExecutionReport
    * @param manualExecution Whether the DON auto executes or it is manually initiated
    */
-  function execute(CCIP.ExecutionReport memory report, bool manualExecution)
-    external
-    override
-    whenNotPaused
-    whenHealthy
-  {
+  function _execute(CCIP.ExecutionReport memory report, bool manualExecution) internal whenNotPaused whenHealthy {
     if (address(s_router) == address(0)) revert RouterNotSet();
     uint256 numMsgs = report.encodedMessages.length;
     if (numMsgs == 0) revert NoMessagesToExecute();
@@ -203,7 +203,10 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
     view
     returns (CCIP.Any2EVMMessageFromSender memory message)
   {
-    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts = CCIP._addToTokensAmounts(original.tokensAndAmounts, original.feeTokenAndAmount);
+    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts = CCIP._addToTokensAmounts(
+      original.tokensAndAmounts,
+      original.feeTokenAndAmount
+    );
     uint256 numberOfTokens = tokensAndAmounts.length;
     CCIP.EVMTokenAndAmount[] memory destTokensAndAmounts = new CCIP.EVMTokenAndAmount[](numberOfTokens);
     address[] memory destPools = new address[](numberOfTokens);
@@ -246,7 +249,7 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
     uint40, /*epochAndRound*/
     bytes memory report
   ) internal override {
-    this.execute(abi.decode(report, (CCIP.ExecutionReport)), false);
+    _execute(abi.decode(report, (CCIP.ExecutionReport)), false);
   }
 
   function _beforeSetConfig(uint8 _threshold, bytes memory _onchainConfig) internal override {}

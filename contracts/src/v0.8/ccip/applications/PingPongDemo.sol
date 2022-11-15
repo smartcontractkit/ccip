@@ -97,7 +97,7 @@ contract PingPongDemo is CCIPReceiverInterface, OwnerIsCreator {
   bytes4 public constant EVM_EXTRA_ARGS_V1_TAG = 0x97a657c9;
 
   function _toBytes(EVMExtraArgsV1 memory extraArgs) internal pure returns (bytes memory bts) {
-    return bytes.concat(EVM_EXTRA_ARGS_V1_TAG,  abi.encode(extraArgs.gasLimit));
+    return bytes.concat(EVM_EXTRA_ARGS_V1_TAG, abi.encode(extraArgs.gasLimit));
   }
 
   function setRouters(CCIPRouterInterface receivingRouter, CCIPRouterInterface sendingRouter) external onlyOwner {

@@ -22,6 +22,12 @@ contract MockOffRamp is BaseOffRampInterface {
     return Any2EVMOffRampRouterInterface(address(0));
   }
 
+  /// @inheritdoc BaseOffRampInterface
+  function manuallyExecute(CCIP.ExecutionReport memory) external virtual override {
+    // solhint-disable-next-line reason-string
+    revert();
+  }
+
   /**
    * @notice ccipReceive implements the receive function to create a
    * collision if some other method happens to hash to the same signature/
@@ -29,8 +35,6 @@ contract MockOffRamp is BaseOffRampInterface {
   function ccipReceive(CCIP.Any2EVMMessageFromSender calldata) external pure {
     revert();
   }
-
-  function execute(CCIP.ExecutionReport memory report, bool needFee) external override {}
 
   function executeSingleMessage(CCIP.EVM2EVMTollMessage memory message) external {}
 

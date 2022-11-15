@@ -56,11 +56,10 @@ interface BaseOffRampInterface {
   function getRouter() external view returns (Any2EVMOffRampRouterInterface);
 
   /**
-   * @notice Execute a series of one or more messages using a merkle proof
-   * @param report ExecutionReport
-   * @param manualExecution Whether or not it is manual or DON execution
+   * @notice Mannually execute a message
+   * @param report CCIP.ExecutionReport
    */
-  function execute(CCIP.ExecutionReport memory report, bool manualExecution) external;
+  function manuallyExecute(CCIP.ExecutionReport memory report) external;
 
   /**
    * @notice Returns the current execution state of a message based on its

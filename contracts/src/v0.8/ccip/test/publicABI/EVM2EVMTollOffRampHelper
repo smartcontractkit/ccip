@@ -21,6 +21,7 @@
   "isAFNHealthy()": "147809b3",
   "latestConfigDetails()": "81ff7048",
   "latestConfigDigestAndEpoch()": "afcb95d7",
+  "manuallyExecute((uint64[],address[],uint256[],bytes[],bytes32[],uint256,bytes32[],uint256))": "d30a364b",
   "metadataHash()": "c5a1d7f0",
   "overheadGasToll(uint256,(uint256,uint64,address,address,bytes,(address,uint256)[],(address,uint256),uint256))": "5b4dc812",
   "owner()": "8da5cb5b",

@@ -1,9 +1,9 @@
 {
-  "execute((uint64[],address[],uint256[],bytes[],bytes32[],uint256,bytes32[],uint256),bool)": "be9b03f1",
   "getBlobVerifier()": "6133dc24",
   "getConfig()": "c3f909d4",
   "getExecutionState(uint64)": "142a98fc",
   "getRouter()": "b0f479a1",
+  "manuallyExecute((uint64[],address[],uint256[],bytes[],bytes32[],uint256,bytes32[],uint256))": "d30a364b",
   "setBlobVerifier(address)": "a639d1c0",
   "setConfig((address,uint32,uint64,uint64,uint64))": "c9029f6a",
   "setRouter(address)": "c0d78655"

@@ -106,7 +106,10 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
     returns (CCIP.EVM2EVMTollMessage memory)
   {
     bytes memory data = abi.encode(0);
-    CCIP.EVMTokenAndAmount memory feeToken = CCIP.EVMTokenAndAmount({token: tokensAndAmounts[0].token, amount: EXECUTION_FEE_AMOUNT});
+    CCIP.EVMTokenAndAmount memory feeToken = CCIP.EVMTokenAndAmount({
+      token: tokensAndAmounts[0].token,
+      amount: EXECUTION_FEE_AMOUNT
+    });
     return
       CCIP.EVM2EVMTollMessage(
         SOURCE_CHAIN_ID,

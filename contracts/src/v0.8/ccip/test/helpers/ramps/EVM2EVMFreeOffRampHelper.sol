@@ -32,6 +32,10 @@ contract EVM2EVMFreeOffRampHelper is EVM2EVMFreeOffRamp {
     _report(bytes32(0), 0, executableMessages);
   }
 
+  function execute(CCIP.ExecutionReport memory rep, bool manualExecution) external {
+    _execute(rep, manualExecution);
+  }
+
   function setMessageState(uint64 sequenceNumber, CCIP.MessageExecutionState state) external {
     s_executedMessages[sequenceNumber] = state;
   }

@@ -115,7 +115,11 @@ contract E2E_subscription is EVM2EVMSubscriptionOnRampSetup, BlobVerifierSetup, 
       expectedNonce = 1;
       message.receiver = abi.encode(s_secondary_receiver);
     }
-    CCIP.EVM2EVMSubscriptionMessage memory subscriptionEvent = this._messageToEvent(message, expectedSeqNum, expectedNonce);
+    CCIP.EVM2EVMSubscriptionMessage memory subscriptionEvent = this._messageToEvent(
+      message,
+      expectedSeqNum,
+      expectedNonce
+    );
 
     vm.expectEmit(false, false, false, true);
     emit CCIPSendRequested(subscriptionEvent);

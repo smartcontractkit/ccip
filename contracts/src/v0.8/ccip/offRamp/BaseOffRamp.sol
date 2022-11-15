@@ -166,7 +166,7 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry, 
   }
 
   /// @inheritdoc BaseOffRampInterface
-  function execute(CCIP.ExecutionReport memory, bool) external virtual override {
+  function manuallyExecute(CCIP.ExecutionReport memory) external virtual override {
     // solhint-disable-next-line reason-string
     revert();
   }

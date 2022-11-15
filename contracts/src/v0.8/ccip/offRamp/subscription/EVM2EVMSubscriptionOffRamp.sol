@@ -48,12 +48,12 @@ contract EVM2EVMSubscriptionOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR
     )
   {}
 
-  function execute(CCIP.ExecutionReport memory report, bool manualExecution)
-    external
-    override
-    whenNotPaused
-    whenHealthy
-  {
+  /// @inheritdoc BaseOffRamp
+  function manuallyExecute(CCIP.ExecutionReport memory report) external override {
+    _execute(report, true);
+  }
+
+  function _execute(CCIP.ExecutionReport memory report, bool manualExecution) internal whenNotPaused whenHealthy {
     address routerAddress = address(s_router);
     if (routerAddress == address(0)) revert RouterNotSet();
     uint256 numMsgs = report.encodedMessages.length;
@@ -190,7 +190,7 @@ contract EVM2EVMSubscriptionOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR
     uint40, /*epochAndRound*/
     bytes memory report
   ) internal override {
-    this.execute(abi.decode(report, (CCIP.ExecutionReport)), false);
+    _execute(abi.decode(report, (CCIP.ExecutionReport)), false);
   }
 
   function _beforeSetConfig(uint8 _threshold, bytes memory _onchainConfig) internal override {}

@@ -91,7 +91,10 @@ contract Models__hash is TokenSetup {
       data: "",
       tokensAndAmounts: tokensAndAmounts,
       gasLimit: 100,
-      feeTokenAndAmount: CCIP.EVMTokenAndAmount({token: address(0x3330000000000000000000000000000000000001), amount: 987654321})
+      feeTokenAndAmount: CCIP.EVMTokenAndAmount({
+        token: address(0x3330000000000000000000000000000000000001),
+        amount: 987654321
+      })
     });
 
     bytes32 metadataHash = keccak256(
@@ -126,7 +129,10 @@ contract Models__hash is TokenSetup {
       data: "foo bar baz",
       tokensAndAmounts: tokensAndAmounts,
       gasLimit: 100,
-      feeTokenAndAmount: CCIP.EVMTokenAndAmount({token: address(0x3330000000000000000000000000000000000001), amount: 987654321})
+      feeTokenAndAmount: CCIP.EVMTokenAndAmount({
+        token: address(0x3330000000000000000000000000000000000001),
+        amount: 987654321
+      })
     });
 
     bytes32 metadataHash = keccak256(

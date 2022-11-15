@@ -30,7 +30,11 @@ contract EVM2AnyTollOnRampRouter is
 
     // Charge the fee and subtract that amount from the feeTokenAmount. This will revert if
     // the given feeTokenAmount is too low for the needed fee.
-    message.feeTokenAndAmount.amount -= _chargeFee(onRamp, IERC20(message.feeTokenAndAmount.token), message.feeTokenAndAmount.amount);
+    message.feeTokenAndAmount.amount -= _chargeFee(
+      onRamp,
+      IERC20(message.feeTokenAndAmount.token),
+      message.feeTokenAndAmount.amount
+    );
     // Transfer the tokensAndAmounts to the token pools.
     _collectTokens(onRamp, message.tokensAndAmounts);
 
