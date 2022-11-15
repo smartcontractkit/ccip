@@ -13,7 +13,7 @@ contract EVM2EVMSubscriptionOnRamp_constructor is EVM2EVMSubscriptionOnRampSetup
     assertEq(OWNER, s_onRamp.owner());
 
     // baseOnRamp
-    assertEq(RELAYING_FEE_JUELS, s_onRamp.getConfig().relayingFeeJuels);
+    assertEq(COMMIT_FEE_JUELS, s_onRamp.getConfig().commitFeeJuels);
     assertEq(MAX_DATA_SIZE, s_onRamp.getConfig().maxDataSize);
     assertEq(MAX_TOKENS_LENGTH, s_onRamp.getConfig().maxTokensLength);
     assertEq(MAX_GAS_LIMIT, s_onRamp.getConfig().maxGasLimit);

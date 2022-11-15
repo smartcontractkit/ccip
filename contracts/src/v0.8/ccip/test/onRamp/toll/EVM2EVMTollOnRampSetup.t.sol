@@ -39,7 +39,7 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
       s_onRampRouter
     );
     uint256[] memory fees = new uint256[](1);
-    fees[0] = uint256(RELAYING_FEE_JUELS);
+    fees[0] = uint256(COMMIT_FEE_JUELS);
     IERC20[] memory feeTokens = new IERC20[](1);
     feeTokens[0] = IERC20(s_sourceTokens[0]);
     s_onRamp.setFeeConfig(EVM2EVMTollOnRampInterface.FeeConfig({feeTokens: feeTokens, fees: fees}));
@@ -62,7 +62,7 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
     tokensAndAmounts[1].amount = i_tokenAmount1;
     CCIP.EVMTokenAndAmount memory feeTokenAndAmount = CCIP.EVMTokenAndAmount({
       token: tokensAndAmounts[0].token,
-      amount: RELAYING_FEE_JUELS
+      amount: COMMIT_FEE_JUELS
     });
     return
       CCIP.EVM2AnyTollMessage({
@@ -77,7 +77,7 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
   function _generateEmptyMessage() public view returns (CCIP.EVM2AnyTollMessage memory) {
     CCIP.EVMTokenAndAmount[] memory tokensAndAmounts = new CCIP.EVMTokenAndAmount[](0);
     CCIP.EVMTokenAndAmount memory feeTokenAndAmount = getCastedSourceEVMTokenAndAmountsWithZeroAmounts()[0];
-    feeTokenAndAmount.amount = RELAYING_FEE_JUELS;
+    feeTokenAndAmount.amount = COMMIT_FEE_JUELS;
     return
       CCIP.EVM2AnyTollMessage({
         receiver: abi.encode(OWNER),
@@ -95,7 +95,7 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
   {
     CCIP.EVMTokenAndAmount memory feeTokenAndAmount = CCIP.EVMTokenAndAmount({
       token: message.feeTokenAndAmount.token,
-      amount: message.feeTokenAndAmount.amount - RELAYING_FEE_JUELS
+      amount: message.feeTokenAndAmount.amount - COMMIT_FEE_JUELS
     });
     return
       CCIP.EVM2EVMTollMessage({

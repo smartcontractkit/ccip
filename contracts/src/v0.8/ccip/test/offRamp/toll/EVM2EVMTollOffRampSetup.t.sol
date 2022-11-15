@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../mocks/MockBlobVerifier.sol";
+import "../../mocks/MockCommitStore.sol";
 import "../../mocks/MockTollOffRampRouter.sol";
 import "../../helpers/ramps/EVM2EVMTollOffRampHelper.sol";
 import "../../helpers/receivers/SimpleMessageReceiver.sol";
 import "../../TokenSetup.t.sol";
 
 contract EVM2EVMTollOffRampSetup is TokenSetup {
-  BlobVerifierInterface internal s_mockBlobVerifier;
+  CommitStoreInterface internal s_mockCommitStore;
   Any2EVMMessageReceiverInterface internal s_receiver;
   Any2EVMMessageReceiverInterface internal s_secondary_receiver;
 
@@ -21,19 +21,19 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
   function setUp() public virtual override {
     TokenSetup.setUp();
 
-    s_mockBlobVerifier = new MockBlobVerifier();
+    s_mockCommitStore = new MockCommitStore();
     s_receiver = new SimpleMessageReceiver();
     s_secondary_receiver = new SimpleMessageReceiver();
 
-    deployOffRamp(s_mockBlobVerifier);
+    deployOffRamp(s_mockCommitStore);
   }
 
-  function deployOffRamp(BlobVerifierInterface blobVerifier) internal {
+  function deployOffRamp(CommitStoreInterface commitStore) internal {
     s_offRamp = new EVM2EVMTollOffRampHelper(
       SOURCE_CHAIN_ID,
       DEST_CHAIN_ID,
       offRampConfig(),
-      blobVerifier,
+      commitStore,
       s_afn,
       getCastedSourceTokens(),
       getCastedDestinationPools(),

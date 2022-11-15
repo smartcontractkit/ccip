@@ -187,7 +187,7 @@ contract EVM2AnySubscriptionOnRampRouter_removeOnRamp is EVM2EVMSubscriptionOnRa
 contract EVM2AnySubscriptionOnRampRouter_setFee is EVM2EVMSubscriptionOnRampSetup {
   // Success
 
-  // Asserts that setFee sets the relay fee.
+  // Asserts that setFee sets the commit fee.
   function testSuccess() public {
     uint96 newFee = 100000;
 

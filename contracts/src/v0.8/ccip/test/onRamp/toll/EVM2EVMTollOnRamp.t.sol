@@ -14,7 +14,7 @@ contract EVM2EVMTollOnRamp_constructor is EVM2EVMTollOnRampSetup {
 
     // baseOnRamp
     BaseOnRampInterface.OnRampConfig memory onRampConfig = onRampConfig();
-    assertEq(onRampConfig.relayingFeeJuels, s_onRamp.getConfig().relayingFeeJuels);
+    assertEq(onRampConfig.commitFeeJuels, s_onRamp.getConfig().commitFeeJuels);
     assertEq(onRampConfig.maxDataSize, s_onRamp.getConfig().maxDataSize);
     assertEq(onRampConfig.maxTokensLength, s_onRamp.getConfig().maxTokensLength);
     assertEq(onRampConfig.maxGasLimit, s_onRamp.getConfig().maxGasLimit);
@@ -194,7 +194,7 @@ contract EVM2EVMTollOnRamp_getRequiredFee is EVM2EVMTollOnRampSetup {
   // Asserts that the fee is calculated correctly.
   function testGetRequiredFeeSuccess() public {
     uint256 fee = s_onRamp.getRequiredFee(IERC20(s_sourceTokens[0]));
-    uint256 expectedFee = RELAYING_FEE_JUELS;
+    uint256 expectedFee = COMMIT_FEE_JUELS;
     assertEq(expectedFee, fee);
   }
 }

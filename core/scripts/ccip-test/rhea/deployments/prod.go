@@ -81,7 +81,7 @@ var Prod_GoerliToOptimism = rhea.EvmDeploymentConfig{
 	LaneConfig: rhea.EVMLaneConfig{
 		OnRamp:          gethcommon.HexToAddress("0xD3b06cEbF099CE7DA4AcCf578aaebFDBd6e88a93"),
 		OffRamp:         gethcommon.HexToAddress("0x07BFa2C37050d35825804a95cB698b80c7528c54"),
-		BlobVerifier:    gethcommon.HexToAddress("0x701Fe16916dd21EFE2f535CA59611D818B017877"),
+		CommitStore:     gethcommon.HexToAddress("0x701Fe16916dd21EFE2f535CA59611D818B017877"),
 		TokenSender:     gethcommon.HexToAddress("0xc3e8bB61e1db9adE45F76237d75AAfaCca2066AF"),
 		MessageReceiver: gethcommon.HexToAddress("0xe0D4860bD0429B87f508f0aE8d1789cC0adbbfcA"),
 		ReceiverDapp:    gethcommon.HexToAddress("0x84B7B012c95f8A152B44Ab3e952f2dEE424fA8e1"),
@@ -91,7 +91,7 @@ var Prod_GoerliToOptimism = rhea.EvmDeploymentConfig{
 	DeploySettings: rhea.DeploySettings{
 		DeployAFN:            false,
 		DeployTokenPools:     false,
-		DeployBlobVerifier:   false,
+		DeployCommitStore:    false,
 		DeployRamp:           false,
 		DeployRouter:         false,
 		DeployGovernanceDapp: false,
@@ -105,7 +105,7 @@ var Prod_OptimismToGoerli = rhea.EvmDeploymentConfig{
 	LaneConfig: rhea.EVMLaneConfig{
 		OnRamp:          gethcommon.HexToAddress("0x95B2D6e4119cC7d1832A7190b0126D034B642c6C"),
 		OffRamp:         gethcommon.HexToAddress("0xFc47e4a7153312D30B9dA9706DdF3EeaB8324b3B"),
-		BlobVerifier:    gethcommon.HexToAddress("0x4A1d9c5a7f9f9de7D5d8eC0f96f7213b0AB953d9"),
+		CommitStore:     gethcommon.HexToAddress("0x4A1d9c5a7f9f9de7D5d8eC0f96f7213b0AB953d9"),
 		TokenSender:     gethcommon.HexToAddress("0x51298c07eF8849f89552C2B3184741a759d4B37C"),
 		MessageReceiver: gethcommon.HexToAddress("0x2321F13659889c2f1e7a62A7700744E36F9C60E5"),
 		ReceiverDapp:    gethcommon.HexToAddress("0xA189971a2c5AcA0DFC5Ee7a2C44a2Ae27b3CF389"),
@@ -115,7 +115,7 @@ var Prod_OptimismToGoerli = rhea.EvmDeploymentConfig{
 	DeploySettings: rhea.DeploySettings{
 		DeployAFN:            false,
 		DeployTokenPools:     false,
-		DeployBlobVerifier:   false,
+		DeployCommitStore:    false,
 		DeployRamp:           false,
 		DeployRouter:         false,
 		DeployGovernanceDapp: false,
@@ -129,7 +129,7 @@ var Prod_GoerliToAvaxFuji = rhea.EvmDeploymentConfig{
 	LaneConfig: rhea.EVMLaneConfig{
 		OnRamp:          gethcommon.HexToAddress("0x25C819038b44183E746eA6dD12C49BF3E9e402aC"),
 		OffRamp:         gethcommon.HexToAddress("0xF6FfEDeCE09B16e3D8055038BE22d5635A53F787"),
-		BlobVerifier:    gethcommon.HexToAddress("0x56eDC4D8367932F0e36B966CbBd95dF48E9DB40F"),
+		CommitStore:     gethcommon.HexToAddress("0x56eDC4D8367932F0e36B966CbBd95dF48E9DB40F"),
 		TokenSender:     gethcommon.HexToAddress("0xC5662F413AffaE59d214FC84BE92B469a92c077C"),
 		MessageReceiver: gethcommon.HexToAddress("0x670bAeAa765CA179B82aDAA21947Ff02f819EbC0"),
 		ReceiverDapp:    gethcommon.HexToAddress("0x6D984b7515604C27413BEFF5E92b3a1146E84B18"),
@@ -139,7 +139,7 @@ var Prod_GoerliToAvaxFuji = rhea.EvmDeploymentConfig{
 	DeploySettings: rhea.DeploySettings{
 		DeployAFN:            false,
 		DeployTokenPools:     false,
-		DeployBlobVerifier:   false,
+		DeployCommitStore:    false,
 		DeployRamp:           false,
 		DeployRouter:         false,
 		DeployGovernanceDapp: false,
@@ -153,7 +153,7 @@ var Prod_AvaxFujiToGoerli = rhea.EvmDeploymentConfig{
 	LaneConfig: rhea.EVMLaneConfig{
 		OnRamp:          gethcommon.HexToAddress("0xA5007c13B7dF93e7647ffd671B9982cDced4E7Ff"),
 		OffRamp:         gethcommon.HexToAddress("0x35BA9712D65EFb35f5092A6C3E832E38B6d17ccc"),
-		BlobVerifier:    gethcommon.HexToAddress("0x177e068bc512AD99eC73dB6FEB7c731d9fea0CB3"),
+		CommitStore:     gethcommon.HexToAddress("0x177e068bc512AD99eC73dB6FEB7c731d9fea0CB3"),
 		TokenSender:     gethcommon.HexToAddress("0xD6B8378092f590a39C360e8196101290551a66EA"),
 		MessageReceiver: gethcommon.HexToAddress("0x4d57C6d8037C65fa66D6231844785a428310a735"),
 		ReceiverDapp:    gethcommon.HexToAddress("0x8AB103843ED9D28D2C5DAf5FdB9c3e1CE2B6c876"),
@@ -163,7 +163,7 @@ var Prod_AvaxFujiToGoerli = rhea.EvmDeploymentConfig{
 	DeploySettings: rhea.DeploySettings{
 		DeployAFN:            false,
 		DeployTokenPools:     false,
-		DeployBlobVerifier:   false,
+		DeployCommitStore:    false,
 		DeployRamp:           false,
 		DeployRouter:         false,
 		DeployGovernanceDapp: false,
@@ -177,7 +177,7 @@ var Prod_OptimismGoerlitoAvaxFuji = rhea.EvmDeploymentConfig{
 	LaneConfig: rhea.EVMLaneConfig{
 		OnRamp:          gethcommon.HexToAddress("0xCB07846c37aDaf8E90BD53f648Ac25B0bAaF970B"),
 		OffRamp:         gethcommon.HexToAddress("0xa75b54b29Df4d38454f7Da5B6dF2f0a6b2c16514"),
-		BlobVerifier:    gethcommon.HexToAddress("0xD9AC310783242A17e347Ee334a90B6cF3411f384"),
+		CommitStore:     gethcommon.HexToAddress("0xD9AC310783242A17e347Ee334a90B6cF3411f384"),
 		TokenSender:     gethcommon.HexToAddress("0xD42be8Af3761DC2cb547B91e8c1B80067243eCFe"),
 		MessageReceiver: gethcommon.HexToAddress("0x6154b0a8Ada0Da450E4226bf8772b3A1B756A152"),
 		ReceiverDapp:    gethcommon.HexToAddress("0x201D1843707764CA2F236bd69E37CCbefF0827D4"),
@@ -187,7 +187,7 @@ var Prod_OptimismGoerlitoAvaxFuji = rhea.EvmDeploymentConfig{
 	DeploySettings: rhea.DeploySettings{
 		DeployAFN:            false,
 		DeployTokenPools:     false,
-		DeployBlobVerifier:   false,
+		DeployCommitStore:    false,
 		DeployRamp:           false,
 		DeployRouter:         false,
 		DeployGovernanceDapp: false,
@@ -201,7 +201,7 @@ var Prod_AvaxFujitoOptimismGoerli = rhea.EvmDeploymentConfig{
 	LaneConfig: rhea.EVMLaneConfig{
 		OnRamp:          gethcommon.HexToAddress("0x6B6b328cb1467D906389a1BBE54359c56000422c"),
 		OffRamp:         gethcommon.HexToAddress("0x3E0df884042C21E83276abB368B4388a17f78A82"),
-		BlobVerifier:    gethcommon.HexToAddress("0x6BEcd9eb4Df6Bf59152344fBcdC7919B9f38C6Ef"),
+		CommitStore:     gethcommon.HexToAddress("0x6BEcd9eb4Df6Bf59152344fBcdC7919B9f38C6Ef"),
 		TokenSender:     gethcommon.HexToAddress("0xa75b54b29Df4d38454f7Da5B6dF2f0a6b2c16514"),
 		MessageReceiver: gethcommon.HexToAddress("0x651EF69F635f5017E281C2Ee09CDd4436560C89E"),
 		ReceiverDapp:    gethcommon.HexToAddress("0x6eA3dE96a33617c3620b7c33c22656f860DDC255"),
@@ -212,7 +212,7 @@ var Prod_AvaxFujitoOptimismGoerli = rhea.EvmDeploymentConfig{
 	DeploySettings: rhea.DeploySettings{
 		DeployAFN:            false,
 		DeployTokenPools:     false,
-		DeployBlobVerifier:   false,
+		DeployCommitStore:    false,
 		DeployRamp:           false,
 		DeployRouter:         false,
 		DeployGovernanceDapp: false,

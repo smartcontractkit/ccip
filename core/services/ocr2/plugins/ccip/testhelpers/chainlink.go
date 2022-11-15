@@ -145,16 +145,16 @@ type CCIPJobSpec struct {
 	TollOnRamp               common.Address
 	SubOffRamp               common.Address
 	SubOnRamp                common.Address
-	BlobVerifier             common.Address
+	CommitStore              common.Address
 	SourceChainId            *big.Int
 	DestChainId              *big.Int
 	TokensPerFeeCoinPipeline string
 }
 
-func (spec CCIPJobSpec) AddCCIPRelayJob(t *testing.T, jobName string, node Node, configBlock int64) {
+func (spec CCIPJobSpec) AddCCIPCommitJob(t *testing.T, jobName string, node Node, configBlock int64) {
 	node.AddJob(t, fmt.Sprintf(`
 type                = "offchainreporting2"
-pluginType          = "ccip-relay"
+pluginType          = "ccip-commit"
 relay               = "evm"
 schemaVersion       = 1
 name                = "%s"
@@ -174,7 +174,7 @@ destStartBlock      = %d
 [relayConfig]
 chainID             = %s
 
-`, jobName, spec.BlobVerifier,
+`, jobName, spec.CommitStore,
 		node.KeyBundle.ID(), node.Transmitter,
 		spec.TollOnRamp, spec.SubOnRamp,
 		spec.SourceChainId, spec.DestChainId,
@@ -197,7 +197,7 @@ contractConfigTrackerPollInterval = "1s"
 
 [pluginConfig]
 onRampID            = "%s"
-blobVerifierID      = "%s"
+commitStoreID       = "%s"
 sourceChainID       = %s
 destChainID         = %s
 pollPeriod          = "1s"
@@ -208,7 +208,7 @@ tokensPerFeeCoinPipeline = %s
 chainID             = %s
 
 `, jobName, offRamp, node.KeyBundle.ID(), node.Transmitter,
-		onRamp, spec.BlobVerifier,
+		onRamp, spec.CommitStore,
 		spec.SourceChainId, spec.DestChainId, configBlock,
 		fmt.Sprintf(`"""
 %s
@@ -398,7 +398,7 @@ func SetupNodeCCIP(
 	require.NoError(t, err)
 	lggr.Debug(fmt.Sprintf("Transmitter address %s chainID %s", transmitter, s.EVMChainID.String()))
 
-	// Fund the relayTransmitter address with some ETH
+	// Fund the commitTransmitter address with some ETH
 	n, err := destChain.NonceAt(context.Background(), owner.From, nil)
 	require.NoError(t, err)
 

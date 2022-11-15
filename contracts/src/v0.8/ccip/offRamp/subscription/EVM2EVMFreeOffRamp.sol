@@ -8,7 +8,7 @@ import {BaseOffRamp} from "../BaseOffRamp.sol";
 import {CCIP} from "../../models/Models.sol";
 import {IERC20} from "../../../vendor/IERC20.sol";
 import {PoolInterface} from "../../interfaces/pools/PoolInterface.sol";
-import {BlobVerifierInterface} from "../../interfaces/BlobVerifierInterface.sol";
+import {CommitStoreInterface} from "../../interfaces/CommitStoreInterface.sol";
 import {AFNInterface} from "../../interfaces/health/AFNInterface.sol";
 
 /**
@@ -26,7 +26,7 @@ contract EVM2EVMFreeOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
     uint256 sourceChainId,
     uint256 chainId,
     OffRampConfig memory offRampConfig,
-    BlobVerifierInterface blobVerifier,
+    CommitStoreInterface commitStore,
     AFNInterface afn,
     IERC20[] memory sourceTokens,
     PoolInterface[] memory pools,
@@ -38,7 +38,7 @@ contract EVM2EVMFreeOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
       sourceChainId,
       chainId,
       offRampConfig,
-      blobVerifier,
+      commitStore,
       afn,
       sourceTokens,
       pools,
@@ -76,7 +76,7 @@ contract EVM2EVMFreeOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
     // TODO: Spec difference measuring gas used by verification vs calculating it?
     // imo billing calculated values > billing measured to help with cost predictability
     // solhint-disable-next-line no-unused-vars
-    (uint256 timestampRelayed, ) = _verifyMessages(
+    (uint256 timestampCommitted, ) = _verifyMessages(
       hashedLeaves,
       report.innerProofs,
       report.innerProofFlagBits,
@@ -85,7 +85,7 @@ contract EVM2EVMFreeOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
     );
 
     // only allow manual execution if the report is old enough
-    if (manualExecution && (block.timestamp - timestampRelayed) < s_config.permissionLessExecutionThresholdSeconds)
+    if (manualExecution && (block.timestamp - timestampCommitted) < s_config.permissionLessExecutionThresholdSeconds)
       revert ManualExecutionNotYetEnabled();
 
     for (uint256 i = 0; i < numMsgs; ++i) {

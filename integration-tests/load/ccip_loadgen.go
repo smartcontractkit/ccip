@@ -32,10 +32,10 @@ type phase string
 type status string
 
 const (
-	E2E                     phase  = "i)OverallRelayAndExecution"
+	E2E                     phase  = "i)OverallCommitAndExecution"
 	TX                      phase  = "ii)SendTxBlockConfirmation"
 	CCIPSendRe              phase  = "iii)CCIPSendRequested Event"
-	SeqNumAndRepAccIncrease phase  = "iv)ReportAcceptedByBlobVerifier(Relay)"
+	SeqNumAndRepAccIncrease phase  = "iv)ReportAcceptedByCommitStore(Commit)"
 	ExecStateChanged        phase  = "v)ExecutionStateChanged Event(Execution)"
 	success                 status = "✅"
 	fail                    status = "❌"
@@ -58,8 +58,8 @@ type CCIPE2ELoad struct {
 	TickerDuration        time.Duration                                                           // poll frequency while waiting for on-chain events
 	callStatsMu           *sync.Mutex
 	callStats             map[int64]map[phase]StatParams // keeps track of various phase related metrics
-	seqNumRelayedMu       *sync.Mutex
-	seqNumRelayed         map[uint64]uint64 // key : seqNumber in the ReportAccepted event, value : blocknumber for corresponding event
+	seqNumCommittedMu     *sync.Mutex
+	seqNumCommitted       map[uint64]uint64 // key : seqNumber in the ReportAccepted event, value : blocknumber for corresponding event
 }
 
 type StatParams struct {
@@ -87,18 +87,18 @@ type JsonStats struct {
 }
 
 type SlackStats struct {
-	AvgE2EDuration                  float64 `json:"avgOverallRelayAndExecution,omitempty"`
-	AvgRelayDuration                float64 `json:"avgRelay,omitempty"`
+	AvgE2EDuration                  float64 `json:"avgOverallCommitAndExecution,omitempty"`
+	AvgCommitDuration               float64 `json:"avgCommit,omitempty"`
 	AvgExecDuration                 float64 `json:"avgExecution,omitempty"`
-	LongestE2EDuration              float64 `json:"longestOverallRelayAndExecution,omitempty"`
-	LongestRelayDuration            float64 `json:"longestRelay,omitempty"`
+	LongestE2EDuration              float64 `json:"longestOverallCommitAndExecution,omitempty"`
+	LongestCommitDuration           float64 `json:"longestCommit,omitempty"`
 	LongestExecDuration             float64 `json:"longestExecution,omitempty"`
-	FastestE2EDuration              float64 `json:"fastestOverallRelayAndExecution,omitempty"`
-	FastestRelayDuration            float64 `json:"fastestRelay,omitempty"`
+	FastestE2EDuration              float64 `json:"fastestOverallCommitAndExecution,omitempty"`
+	FastestCommitDuration           float64 `json:"fastestCommit,omitempty"`
 	FastestExecDuration             float64 `json:"fastestExecution,omitempty"`
 	TotalNumberOfFailedRequests     int     `json:"totalFailedRequests,omitempty"`
 	TotalNumberOfSuccessfulRequests int     `json:"totalSuccessfulRequests,omitempty"`
-	FailedRelay                     int     `json:"noOfFailedRelay,omitempty"`
+	FailedCommit                    int     `json:"noOfFailedCommit,omitempty"`
 	FailedExecution                 int     `json:"noOfFailedExecution,omitempty"`
 	FailedSendTransaction           int     `json:"noOfFailedSendTransaction,omitempty"`
 	FailedCCIPSendRequested         int     `json:"noOfFailedCCIPSendRequested,omitempty"`
@@ -106,19 +106,19 @@ type SlackStats struct {
 
 func NewCCIPLoad(source *actions.SourceCCIPModule, dest *actions.DestCCIPModule, model actions.BillingModel, timeout time.Duration, noOfReq int64) *CCIPE2ELoad {
 	return &CCIPE2ELoad{
-		Source:          source,
-		Destination:     dest,
-		Model:           model,
-		CurrentMsgID:    atomic.NewInt64(1),
-		sentMsgMu:       &sync.Mutex{},
-		SentMsg:         make(map[uint64]evm_2_evm_subscription_onramp.CCIPEVM2EVMSubscriptionMessage),
-		TickerDuration:  time.Second,
-		CallTimeOut:     timeout,
-		NoOfReq:         noOfReq,
-		callStats:       make(map[int64]map[phase]StatParams),
-		callStatsMu:     &sync.Mutex{},
-		seqNumRelayedMu: &sync.Mutex{},
-		seqNumRelayed:   make(map[uint64]uint64),
+		Source:            source,
+		Destination:       dest,
+		Model:             model,
+		CurrentMsgID:      atomic.NewInt64(1),
+		sentMsgMu:         &sync.Mutex{},
+		SentMsg:           make(map[uint64]evm_2_evm_subscription_onramp.CCIPEVM2EVMSubscriptionMessage),
+		TickerDuration:    time.Second,
+		CallTimeOut:       timeout,
+		NoOfReq:           noOfReq,
+		callStats:         make(map[int64]map[phase]StatParams),
+		callStatsMu:       &sync.Mutex{},
+		seqNumCommittedMu: &sync.Mutex{},
+		seqNumCommitted:   make(map[uint64]uint64),
 	}
 }
 
@@ -218,7 +218,7 @@ func (c *CCIPE2ELoad) Call(msgType interface{}) client.CallResult {
 		res.Error = err
 		return res
 	}
-	relayStartTime := time.Now()
+	commitStartTime := time.Now()
 	seqNum := sentMsg.SequenceNumber
 	if bytes.Compare(sentMsg.Data, []byte(msgStr)) == 0 {
 		c.updateSentMsgQueue(seqNum, sentMsg)
@@ -228,26 +228,26 @@ func (c *CCIPE2ELoad) Call(msgType interface{}) client.CallResult {
 	}
 
 	// wait for
-	// - BlobVerifier to increase the seq number,
-	err = c.waitForSeqNumberIncrease(ticker, seqNum, msgID, relayStartTime)
+	// - CommitStore to increase the seq number,
+	err = c.waitForSeqNumberIncrease(ticker, seqNum, msgID, commitStartTime)
 	if err != nil {
 		res.Error = err
 		return res
 	}
 	// wait for ReportAccepted event
-	err = c.waitForReportAccepted(ticker, msgID, seqNum, c.InitialDestBlockNum, relayStartTime)
+	err = c.waitForReportAccepted(ticker, msgID, seqNum, c.InitialDestBlockNum, commitStartTime)
 	if err != nil {
 		res.Error = err
 		return res
 	}
 
 	// wait for ExecutionStateChanged event
-	err = c.waitForExecStateChange(ticker, []uint64{seqNum}, c.seqNumRelayed[seqNum]-2, msgID, time.Now())
+	err = c.waitForExecStateChange(ticker, []uint64{seqNum}, c.seqNumCommitted[seqNum]-2, msgID, time.Now())
 	if err != nil {
 		res.Error = err
 		return res
 	}
-	c.updatestats(msgID, fmt.Sprint(seqNum), E2E, time.Since(relayStartTime), success)
+	c.updatestats(msgID, fmt.Sprint(seqNum), E2E, time.Since(commitStartTime), success)
 	res.Error = nil
 	res.Data = c.SentMsg[seqNum]
 	return res
@@ -259,14 +259,14 @@ func (c *CCIPE2ELoad) updateSentMsgQueue(seqNum uint64, sentMsg evm_2_evm_subscr
 	c.SentMsg[seqNum] = sentMsg
 }
 
-func (c *CCIPE2ELoad) updateSeqNumRelayed(seqNum []uint64, blockNum uint64) {
-	c.seqNumRelayedMu.Lock()
-	defer c.seqNumRelayedMu.Unlock()
+func (c *CCIPE2ELoad) updateSeqNumCommitted(seqNum []uint64, blockNum uint64) {
+	c.seqNumCommittedMu.Lock()
+	defer c.seqNumCommittedMu.Unlock()
 	for _, num := range seqNum {
-		if _, ok := c.seqNumRelayed[num]; ok {
+		if _, ok := c.seqNumCommitted[num]; ok {
 			return
 		}
-		c.seqNumRelayed[num] = blockNum
+		c.seqNumCommitted[num] = blockNum
 	}
 }
 
@@ -377,17 +377,17 @@ func (c *CCIPE2ELoad) PrintStats(failed bool, rps int, duration float64) {
 	}
 	slackStats := SlackStats{
 		AvgE2EDuration:                  overallStats[E2E].Duration,
-		AvgRelayDuration:                overallStats[SeqNumAndRepAccIncrease].Duration,
+		AvgCommitDuration:               overallStats[SeqNumAndRepAccIncrease].Duration,
 		AvgExecDuration:                 overallStats[ExecStateChanged].Duration,
 		LongestE2EDuration:              durationMap[E2E][len(durationMap[E2E])-1],
-		LongestRelayDuration:            durationMap[SeqNumAndRepAccIncrease][len(durationMap[SeqNumAndRepAccIncrease])-1],
+		LongestCommitDuration:           durationMap[SeqNumAndRepAccIncrease][len(durationMap[SeqNumAndRepAccIncrease])-1],
 		LongestExecDuration:             durationMap[ExecStateChanged][len(durationMap[ExecStateChanged])-1],
 		FastestE2EDuration:              durationMap[E2E][0],
-		FastestRelayDuration:            durationMap[SeqNumAndRepAccIncrease][0],
+		FastestCommitDuration:           durationMap[SeqNumAndRepAccIncrease][0],
 		FastestExecDuration:             durationMap[ExecStateChanged][0],
 		TotalNumberOfFailedRequests:     failureCount[E2E],
 		TotalNumberOfSuccessfulRequests: successCount[E2E],
-		FailedRelay:                     failureCount[SeqNumAndRepAccIncrease],
+		FailedCommit:                    failureCount[SeqNumAndRepAccIncrease],
 		FailedExecution:                 failureCount[ExecStateChanged],
 		FailedSendTransaction:           failureCount[TX],
 		FailedCCIPSendRequested:         failureCount[CCIPSendRe],
@@ -422,16 +422,16 @@ func (c *CCIPE2ELoad) PrintStats(failed bool, rps int, duration float64) {
 
 	event.Int("No of Successful Requests", successCount[E2E])
 	event.Msgf("Average Duration for successful requests")
-	log.Info().Msg("Relay Report stats")
-	it, err := c.Destination.BlobVerifier.FilterReportAccepted(c.InitialDestBlockNum)
-	Expect(err).ShouldNot(HaveOccurred(), "report relayed result")
+	log.Info().Msg("Commit Report stats")
+	it, err := c.Destination.CommitStore.FilterReportAccepted(c.InitialDestBlockNum)
+	Expect(err).ShouldNot(HaveOccurred(), "report committed result")
 	i := 1
 	event = log.Info()
 	for it.Next() {
 		event.Interface(fmt.Sprintf("%d Report Intervals", i), it.Event.Report.Intervals)
 		i++
 	}
-	event.Msgf("BlobVerifier-Reports Accepted")
+	event.Msgf("CommitStore-Reports Accepted")
 }
 
 func (c *CCIPE2ELoad) waitForExecStateChange(ticker *time.Ticker, seqNums []uint64, currentBlockOnDest uint64, msgID int64, timeNow time.Time) error {
@@ -479,10 +479,10 @@ func (c *CCIPE2ELoad) waitForSeqNumberIncrease(ticker *time.Ticker, seqNum uint6
 	for {
 		select {
 		case <-ticker.C:
-			seqNumberAfter, err := c.Destination.BlobVerifier.GetNextSeqNumber(c.Source.SubOnRamp.EthAddress)
+			seqNumberAfter, err := c.Destination.CommitStore.GetNextSeqNumber(c.Source.SubOnRamp.EthAddress)
 			if err != nil {
 				c.updatestats(msgID, fmt.Sprint(seqNum), SeqNumAndRepAccIncrease, time.Since(timeNow), fail)
-				return fmt.Errorf("error %v in GetNextExpectedSeqNumber by blobverifier for msg ID %d", err, msgID)
+				return fmt.Errorf("error %v in GetNextExpectedSeqNumber by commitStore for msg ID %d", err, msgID)
 			}
 			if seqNumberAfter > seqNum {
 				return nil
@@ -502,11 +502,11 @@ func (c *CCIPE2ELoad) waitForReportAccepted(ticker *time.Ticker, msgID int64, se
 		select {
 		case <-ticker.C:
 			// skip calling FilterReportAccepted if the seqNum is present in the map
-			if _, ok := c.seqNumRelayed[seqNum]; ok {
+			if _, ok := c.seqNumCommitted[seqNum]; ok {
 				c.updatestats(msgID, fmt.Sprint(seqNum), SeqNumAndRepAccIncrease, time.Since(timeNow), success)
 				return nil
 			}
-			it, err := c.Destination.BlobVerifier.FilterReportAccepted(currentBlockOnDest)
+			it, err := c.Destination.CommitStore.FilterReportAccepted(currentBlockOnDest)
 			if err != nil {
 				c.updatestats(msgID, fmt.Sprint(seqNum), SeqNumAndRepAccIncrease, time.Since(timeNow), fail)
 				return fmt.Errorf("error %v in filtering by ReportAccepted event for seq num %d", err, seqNum)
@@ -519,8 +519,8 @@ func (c *CCIPE2ELoad) waitForReportAccepted(ticker *time.Ticker, msgID int64, se
 						seqNums[i] = in.Min + i
 						i++
 					}
-					// update SeqNumRelayed map for all seqNums in the emitted ReportAccepted event
-					c.updateSeqNumRelayed(seqNums, it.Event.Raw.BlockNumber)
+					// update SeqNumCommitted map for all seqNums in the emitted ReportAccepted event
+					c.updateSeqNumCommitted(seqNums, it.Event.Raw.BlockNumber)
 					if in.Max >= seqNum && in.Min <= seqNum {
 						c.updatestats(msgID, fmt.Sprint(seqNum), SeqNumAndRepAccIncrease, time.Since(timeNow), success)
 						return nil

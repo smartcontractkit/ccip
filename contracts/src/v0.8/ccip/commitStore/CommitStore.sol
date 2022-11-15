@@ -2,14 +2,14 @@
 pragma solidity 0.8.15;
 
 import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
-import {BlobVerifierInterface} from "../interfaces/BlobVerifierInterface.sol";
+import {CommitStoreInterface} from "../interfaces/CommitStoreInterface.sol";
 import {HealthChecker, AFNInterface} from "../health/HealthChecker.sol";
 import {OCR2Base} from "../ocr/OCR2Base.sol";
 import {CCIP} from "../models/Models.sol";
 
-contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthChecker, OCR2Base {
+contract CommitStore is CommitStoreInterface, TypeAndVersionInterface, HealthChecker, OCR2Base {
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
-  string public constant override typeAndVersion = "BlobVerifier 1.0.0";
+  string public constant override typeAndVersion = "CommitStore 1.0.0";
 
   // Chain ID of this chain
   uint256 public immutable i_chainId;
@@ -19,8 +19,8 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
   // merkleRoot => timestamp when received
   mapping(bytes32 => uint256) private s_roots;
 
-  // The BlobVerifier configuration values
-  BlobVerifierConfig private s_config;
+  // The CommitStore configuration values
+  CommitStoreConfig private s_config;
 
   // Mapping of the expected next sequence number by onRamp
   mapping(address => uint64) private s_expectedNextMinByOnRamp;
@@ -40,7 +40,7 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
     uint256 chainId,
     uint256 sourceChainId,
     AFNInterface afn,
-    BlobVerifierConfig memory config
+    CommitStoreConfig memory config
   ) OCR2Base(true) HealthChecker(afn) {
     i_chainId = chainId;
     i_sourceChainId = sourceChainId;
@@ -51,8 +51,8 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
     }
   }
 
-  /// @inheritdoc BlobVerifierInterface
-  function setConfig(BlobVerifierConfig calldata config) external onlyOwner {
+  /// @inheritdoc CommitStoreInterface
+  function setConfig(CommitStoreConfig calldata config) external onlyOwner {
     uint256 newRampLength = config.onRamps.length;
     if (newRampLength != config.minSeqNrByOnRamp.length || newRampLength == 0) revert InvalidConfiguration();
     uint256 onRampLength = s_config.onRamps.length;
@@ -65,15 +65,15 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
       s_expectedNextMinByOnRamp[config.onRamps[i]] = config.minSeqNrByOnRamp[i];
     }
 
-    emit BlobVerifierConfigSet(config);
+    emit CommitStoreConfigSet(config);
   }
 
-  /// @inheritdoc BlobVerifierInterface
-  function getConfig() external view returns (BlobVerifierConfig memory) {
+  /// @inheritdoc CommitStoreInterface
+  function getConfig() external view returns (CommitStoreConfig memory) {
     return s_config;
   }
 
-  /// @inheritdoc BlobVerifierInterface
+  /// @inheritdoc CommitStoreInterface
   function getExpectedNextSequenceNumber(address onRamp) public view returns (uint64) {
     return s_expectedNextMinByOnRamp[onRamp];
   }
@@ -89,15 +89,15 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
     }
   }
 
-  function _hashBlobVerifierWithRoot(bytes32 root) internal view returns (bytes32) {
+  function _hashCommitStoreWithRoot(bytes32 root) internal view returns (bytes32) {
     return keccak256(abi.encode(address(this), root));
   }
 
   function isBlessed(bytes32 root) public view returns (bool) {
-    return s_afn.isBlessed(_hashBlobVerifierWithRoot(root));
+    return s_afn.isBlessed(_hashCommitStoreWithRoot(root));
   }
 
-  /// @inheritdoc BlobVerifierInterface
+  /// @inheritdoc CommitStoreInterface
   function verify(
     bytes32[] calldata hashedLeaves,
     bytes32[] calldata innerProofs,
@@ -116,7 +116,7 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
     return s_roots[outerRoot];
   }
 
-  /// @inheritdoc BlobVerifierInterface
+  /// @inheritdoc CommitStoreInterface
   function merkleRoot(
     bytes32[] memory leaves,
     bytes32[] memory proofs,
@@ -153,7 +153,7 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
     }
   }
 
-  /// @inheritdoc BlobVerifierInterface
+  /// @inheritdoc CommitStoreInterface
   function getMerkleRoot(bytes32 root) external view returns (uint256) {
     return s_roots[root];
   }
@@ -164,10 +164,10 @@ contract BlobVerifier is BlobVerifierInterface, TypeAndVersionInterface, HealthC
     uint40, /*epochAndRound*/
     bytes memory encodedReport
   ) internal override whenNotPaused whenHealthy {
-    CCIP.RelayReport memory report = abi.decode(encodedReport, (CCIP.RelayReport));
+    CCIP.CommitReport memory report = abi.decode(encodedReport, (CCIP.CommitReport));
     uint256 reportLength = report.onRamps.length;
     if (reportLength != report.intervals.length || reportLength != report.merkleRoots.length)
-      revert InvalidRelayReport(report);
+      revert InvalidCommitReport(report);
     for (uint256 i = 0; i < reportLength; ++i) {
       address onRamp = report.onRamps[i];
       uint64 expectedMinSeqNum = s_expectedNextMinByOnRamp[onRamp];

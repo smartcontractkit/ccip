@@ -244,13 +244,13 @@ contract EVM2EVMFreeOffRamp_execute is EVM2EVMFreeOffRampSetup {
     s_offRamp.execute(_generateReportFromMessages(messages), false);
   }
 
-  function testRootNotRelayedReverts() public {
+  function testRootNotCommittedReverts() public {
     vm.mockCall(
-      address(s_mockBlobVerifier),
-      abi.encodeWithSelector(BlobVerifierInterface.verify.selector),
+      address(s_mockCommitStore),
+      abi.encodeWithSelector(CommitStoreInterface.verify.selector),
       abi.encode(0)
     );
-    vm.expectRevert(BaseOffRampInterface.RootNotRelayed.selector);
+    vm.expectRevert(BaseOffRampInterface.RootNotCommitted.selector);
 
     s_offRamp.execute(_generateReportFromMessages(_generateMessagesWithTokens()), true);
     vm.clearMockedCalls();
@@ -258,8 +258,8 @@ contract EVM2EVMFreeOffRamp_execute is EVM2EVMFreeOffRampSetup {
 
   function testManualExecutionNotYetEnabledReverts() public {
     vm.mockCall(
-      address(s_mockBlobVerifier),
-      abi.encodeWithSelector(BlobVerifierInterface.verify.selector),
+      address(s_mockCommitStore),
+      abi.encodeWithSelector(CommitStoreInterface.verify.selector),
       abi.encode(BLOCK_TIME)
     );
     vm.expectRevert(BaseOffRampInterface.ManualExecutionNotYetEnabled.selector);

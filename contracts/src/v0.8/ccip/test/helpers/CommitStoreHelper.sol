@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../blobVerifier/BlobVerifier.sol";
+import "../../commitStore/CommitStore.sol";
 
-contract BlobVerifierHelper is BlobVerifier {
+contract CommitStoreHelper is CommitStore {
   constructor(
     uint256 chainId,
     uint256 sourceChainId,
     AFNInterface afn,
-    BlobVerifierConfig memory config
-  ) BlobVerifier(chainId, sourceChainId, afn, config) {}
+    CommitStoreConfig memory config
+  ) CommitStore(chainId, sourceChainId, afn, config) {}
 
   /**
    * @dev Expose _report for tests

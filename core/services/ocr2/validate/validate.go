@@ -105,7 +105,7 @@ func validateSpec(tree *toml.Tree, spec job.Job) error {
 	case job.OCR2DirectRequest:
 		// TODO validator for DR-OCR spec: https://app.shortcut.com/chainlinklabs/story/54054/ocr-plugin-for-directrequest-ocr
 		return nil
-	case job.CCIPExecution, job.CCIPRelay:
+	case job.CCIPExecution, job.CCIPCommit:
 	case "":
 		return errors.New("no plugin specified")
 	default:

@@ -37,7 +37,7 @@ contract BaseOnrampSetup is TokenSetup {
   }
 
   function assertSameConfig(BaseOnRamp.OnRampConfig memory a, BaseOnRamp.OnRampConfig memory b) public {
-    assertEq(a.relayingFeeJuels, b.relayingFeeJuels);
+    assertEq(a.commitFeeJuels, b.commitFeeJuels);
     assertEq(a.maxDataSize, b.maxDataSize);
     assertEq(a.maxTokensLength, b.maxTokensLength);
     assertEq(a.maxGasLimit, b.maxGasLimit);
@@ -110,7 +110,7 @@ contract BaseOnramp_setConfig is BaseOnrampSetup {
   // Success
   function testSuccess() public {
     BaseOnRampInterface.OnRampConfig memory newConfig = BaseOnRampInterface.OnRampConfig({
-      relayingFeeJuels: 2400,
+      commitFeeJuels: 2400,
       maxDataSize: 400,
       maxTokensLength: 14,
       maxGasLimit: MAX_GAS_LIMIT / 2

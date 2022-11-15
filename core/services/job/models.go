@@ -290,8 +290,8 @@ const (
 	OCR2Keeper OCR2PluginType = "ocr2automation"
 
 	OCR2DirectRequest OCR2PluginType = "directrequest"
-	// CCIPRelay refers to the ccip.CCIPRelay plugin
-	CCIPRelay OCR2PluginType = "ccip-relay"
+	// CCIPCommit refers to the ccip.CCIPCommit plugin
+	CCIPCommit OCR2PluginType = "ccip-commit"
 	// CCIPExecution refers to the ccip.CCIPExecution plugin
 	CCIPExecution OCR2PluginType = "ccip-execution"
 )

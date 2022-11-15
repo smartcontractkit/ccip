@@ -9,9 +9,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
+
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_free_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp_router"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/blob_verifier"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_subscription_onramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/native_token_pool"
@@ -55,19 +56,19 @@ func setOnRampOnTokenPools(t *testing.T, sourceClient *EvmDeploymentConfig) {
 	}
 }
 
-func setOnRampOnBlobVerifier(t *testing.T, sourceClient *EvmDeploymentConfig, destClient *EvmDeploymentConfig) {
-	blobVerifier, err := blob_verifier.NewBlobVerifier(destClient.LaneConfig.BlobVerifier, destClient.Client)
+func setOnRampOnCommitStore(t *testing.T, sourceClient *EvmDeploymentConfig, destClient *EvmDeploymentConfig) {
+	commitStore, err := commit_store.NewCommitStore(destClient.LaneConfig.CommitStore, destClient.Client)
 	require.NoError(t, err)
 
-	config, err := blobVerifier.GetConfig(&bind.CallOpts{})
+	config, err := commitStore.GetConfig(&bind.CallOpts{})
 	require.NoError(t, err)
 
 	config.OnRamps = append(config.OnRamps, sourceClient.LaneConfig.OnRamp)
 	config.MinSeqNrByOnRamp = append(config.MinSeqNrByOnRamp, 1)
 
-	tx, err := blobVerifier.SetConfig(destClient.Owner, config)
+	tx, err := commitStore.SetConfig(destClient.Owner, config)
 	require.NoError(t, err)
-	destClient.Logger.Infof(fmt.Sprintf("Adding new onRamp to blobVerifier in tx %s", helpers.ExplorerLink(destClient.ChainConfig.ChainId.Int64(), tx.Hash())))
+	destClient.Logger.Infof(fmt.Sprintf("Adding new onRamp to commitStore in tx %s", helpers.ExplorerLink(destClient.ChainConfig.ChainId.Int64(), tx.Hash())))
 	shared.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
 }
 

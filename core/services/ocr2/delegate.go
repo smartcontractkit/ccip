@@ -17,6 +17,7 @@ import (
 	"gopkg.in/guregu/null.v4"
 
 	"github.com/smartcontractkit/chainlink-relay/pkg/types"
+
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/dkg/persistence"
 
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2/types"
@@ -542,9 +543,9 @@ func (d *Delegate) ServicesForSpec(jobSpec job.Job) ([]job.ServiceCtx, error) {
 		// TODO replace with a DB: https://app.shortcut.com/chainlinklabs/story/54049/database-table-in-core-node
 		pluginORM := drocr_service.NewInMemoryORM()
 		pluginOracle, _ = directrequestocr.NewDROracle(jobSpec, d.pipelineRunner, d.jobORM, pluginORM, chain, lggr, ocrLogger)
-	case job.CCIPRelay:
+	case job.CCIPCommit:
 		if spec.Relay != relay.EVM {
-			return nil, errors.New("Non evm chains are not supported for CCIP relay")
+			return nil, errors.New("Non evm chains are not supported for CCIP commit")
 		}
 		ccipProvider, err2 := evmrelay.NewCCIPRelayer(relayer).NewCCIPRelayProvider(
 			types.RelayArgs{
@@ -569,7 +570,7 @@ func (d *Delegate) ServicesForSpec(jobSpec job.Job) ([]job.ServiceCtx, error) {
 			OffchainKeyring:              kb,
 			OnchainKeyring:               kb,
 		}
-		return ccip.NewRelayServices(lggr, spec, d.chainSet, d.isNewlyCreatedJob, oracleArgsNoPlugin)
+		return ccip.NewCommitServices(lggr, spec, d.chainSet, d.isNewlyCreatedJob, oracleArgsNoPlugin)
 	case job.CCIPExecution:
 		if spec.Relay != relay.EVM {
 			return nil, errors.New("Non evm chains are not supported for CCIP execution")

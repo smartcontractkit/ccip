@@ -19,7 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp_router"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/blob_verifier"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_subscription_onramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_toll_onramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_subscription_onramp"
@@ -123,21 +123,21 @@ func getABIForContract(client *ethclient.Client, contractAddress common.Address)
 	case ccip.EVM2EVMTollOnRamp:
 		return append(always, evm_2_evm_toll_onramp.EVM2EVMTollOnRampABI)
 	case ccip.EVM2EVMTollOffRamp:
-		return append(always, any_2_evm_toll_offramp.EVM2EVMTollOffRampABI, any_2_evm_toll_offramp_router.Any2EVMTollOffRampRouterABI, blob_verifier.BlobVerifierABI)
+		return append(always, any_2_evm_toll_offramp.EVM2EVMTollOffRampABI, any_2_evm_toll_offramp_router.Any2EVMTollOffRampRouterABI, commit_store.CommitStoreABI)
 		// SUBSCRIPTION
 	case ccip.EVM2EVMSubscriptionOnRamp:
 		return append(always, evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRampABI)
 	case ccip.EVM2EVMSubscriptionOffRamp:
-		return append(always, any_2_evm_subscription_offramp.EVM2EVMSubscriptionOffRampABI, any_2_evm_subscription_offramp_router.Any2EVMSubscriptionOffRampRouterABI, blob_verifier.BlobVerifierABI)
+		return append(always, any_2_evm_subscription_offramp.EVM2EVMSubscriptionOffRampABI, any_2_evm_subscription_offramp_router.Any2EVMSubscriptionOffRampRouterABI, commit_store.CommitStoreABI)
 		// SHARED
-	case ccip.BlobVerifier:
-		return append(always, blob_verifier.BlobVerifierABI)
+	case ccip.CommitStore:
+		return []string{commit_store.CommitStoreABI}
 	}
 	panic("Contract not found")
 }
 
 func getAllABIs() []string {
-	return []string{afn_contract.AFNContractABI, native_token_pool.NativeTokenPoolABI, blob_verifier.BlobVerifierABI,
+	return []string{afn_contract.AFNContractABI, native_token_pool.NativeTokenPoolABI, commit_store.CommitStoreABI,
 		// toll
 		evm_2_evm_toll_onramp.EVM2EVMTollOnRampABI, any_2_evm_toll_offramp.EVM2EVMTollOffRampABI,
 		evm_2_any_toll_onramp_router.EVM2AnyTollOnRampRouterABI, any_2_evm_toll_offramp_router.Any2EVMTollOffRampRouterABI,

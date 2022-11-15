@@ -284,8 +284,8 @@ func (o *orm) CreateJob(jb *Job, qopts ...pg.QOpt) error {
 					return err2
 				}
 			}
-			if jb.OCR2OracleSpec.PluginType == CCIPRelay {
-				var cfg ccipconfig.RelayPluginConfig
+			if jb.OCR2OracleSpec.PluginType == CCIPCommit {
+				var cfg ccipconfig.CommitPluginConfig
 				err := json.Unmarshal(jb.OCR2OracleSpec.PluginConfig.Bytes(), &cfg)
 				if err != nil {
 					return errors.Wrap(err, "failed to parse plugin config")

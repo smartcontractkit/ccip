@@ -60,7 +60,7 @@ var Beta_GoerliToAvaxFuji = rhea.EvmDeploymentConfig{
 	LaneConfig: rhea.EVMLaneConfig{
 		OnRamp:          gethcommon.HexToAddress("0x9213967a47FC3F15A16A0b813208e8Ccb63Dbba6"),
 		OffRamp:         gethcommon.HexToAddress("0x82D96373fB24Ce812B051db4B53E490a20CFbBfF"),
-		BlobVerifier:    gethcommon.HexToAddress("0x33BBb9c3Ee0f80F1777E973D3814f52740019A86"),
+		CommitStore:     gethcommon.HexToAddress("0x33BBb9c3Ee0f80F1777E973D3814f52740019A86"),
 		TokenSender:     gethcommon.HexToAddress("0x0f30449bcCaCCaA7221B3f7C3304c4AaD68068E8"),
 		MessageReceiver: gethcommon.HexToAddress("0x848683AaF65d62Cd326BA6e49F2a6417F7f6EEA7"),
 		ReceiverDapp:    gethcommon.HexToAddress("0x95074a4903719940516ED44aE101dbd1BFe101d2"),
@@ -70,7 +70,7 @@ var Beta_GoerliToAvaxFuji = rhea.EvmDeploymentConfig{
 	DeploySettings: rhea.DeploySettings{
 		DeployAFN:            false,
 		DeployTokenPools:     false,
-		DeployBlobVerifier:   false,
+		DeployCommitStore:    false,
 		DeployRamp:           false,
 		DeployRouter:         false,
 		DeployGovernanceDapp: false,
@@ -84,7 +84,7 @@ var Beta_AvaxFujiToGoerli = rhea.EvmDeploymentConfig{
 	LaneConfig: rhea.EVMLaneConfig{
 		OnRamp:          gethcommon.HexToAddress("0x05EBCE331e0201BaeA852A7c3c6f7e51A893D3F0"),
 		OffRamp:         gethcommon.HexToAddress("0x11BEe8AD23bA3Fd56fcbD88467D5C76375fD03ef"),
-		BlobVerifier:    gethcommon.HexToAddress("0x0fF6b6F3Ad10D66600Fd5CC25b98542A05Aa7Bc2"),
+		CommitStore:     gethcommon.HexToAddress("0x0fF6b6F3Ad10D66600Fd5CC25b98542A05Aa7Bc2"),
 		TokenSender:     gethcommon.HexToAddress("0x99cE75105D6A882Af40CD5F6166A9564b3003a07"),
 		MessageReceiver: gethcommon.HexToAddress("0x3B80b7Ef5c00Eb892CBe72800C028C47AD6380EF"),
 		ReceiverDapp:    gethcommon.HexToAddress("0x25d997d8618e1299418b3D905E40bC353ec89F61"),
@@ -94,7 +94,7 @@ var Beta_AvaxFujiToGoerli = rhea.EvmDeploymentConfig{
 	DeploySettings: rhea.DeploySettings{
 		DeployAFN:            false,
 		DeployTokenPools:     false,
-		DeployBlobVerifier:   false,
+		DeployCommitStore:    false,
 		DeployRamp:           false,
 		DeployRouter:         false,
 		DeployGovernanceDapp: false,

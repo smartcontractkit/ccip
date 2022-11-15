@@ -11,7 +11,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/blob_verifier"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/logger"
 )
 
@@ -49,7 +49,7 @@ type ExecutionBatchBuilder struct {
 	gasLimit                   uint64
 	snoozeTime                 time.Duration
 	builder                    BatchBuilder
-	blobVerifier               *blob_verifier.BlobVerifier
+	commitStore                *commit_store.CommitStore
 	onRamp                     common.Address
 	offRampAddr                common.Address
 	offRamp                    OffRamp
@@ -60,12 +60,12 @@ type ExecutionBatchBuilder struct {
 	lggr                       logger.Logger
 }
 
-func NewExecutionBatchBuilder(gasLimit uint64, snoozeTime time.Duration, blobVerifier *blob_verifier.BlobVerifier, onRamp, offRampAddr common.Address, srcLogPoller, dstLogPoller logpoller.LogPoller, builder BatchBuilder, config OffchainConfig, offRamp OffRamp, reqEventSig common.Hash, lggr logger.Logger) *ExecutionBatchBuilder {
+func NewExecutionBatchBuilder(gasLimit uint64, snoozeTime time.Duration, commitStore *commit_store.CommitStore, onRamp, offRampAddr common.Address, srcLogPoller, dstLogPoller logpoller.LogPoller, builder BatchBuilder, config OffchainConfig, offRamp OffRamp, reqEventSig common.Hash, lggr logger.Logger) *ExecutionBatchBuilder {
 	return &ExecutionBatchBuilder{
 		gasLimit:     gasLimit,
 		snoozeTime:   snoozeTime,
 		builder:      builder,
-		blobVerifier: blobVerifier,
+		commitStore:  commitStore,
 		dstLogPoller: dstLogPoller,
 		srcLogPoller: srcLogPoller,
 		offRamp:      offRamp,
@@ -78,29 +78,29 @@ func NewExecutionBatchBuilder(gasLimit uint64, snoozeTime time.Duration, blobVer
 	}
 }
 
-func (eb *ExecutionBatchBuilder) relayedReport(seqNr uint64) (blob_verifier.CCIPRelayReport, error) {
+func (eb *ExecutionBatchBuilder) commitReport(seqNr uint64) (commit_store.CCIPCommitReport, error) {
 	latest, err := eb.dstLogPoller.LatestBlock()
 	if err != nil {
-		return blob_verifier.CCIPRelayReport{}, err
+		return commit_store.CCIPCommitReport{}, err
 	}
 	// Since the report accepted logs now contain intervals per onramp, we don't have a simple way of looking
-	// up the relayed report for a given sequence number from the chain.
+	// up the committed report for a given sequence number from the chain.
 	// TODO(https://app.shortcut.com/chainlinklabs/story/51129/efficient-report-from-seq-num-lookup): Follow up with a more efficient way, ideally we use the chain only to obtain natural reorg self-healing.
 	// One option is to emit a log per onramp (i.e. ReportAccepted(root, onRamp, min, max)) so we could easily search for the relevant log?
-	logs, err := eb.dstLogPoller.Logs(1, latest, ReportAccepted, eb.blobVerifier.Address())
+	logs, err := eb.dstLogPoller.Logs(1, latest, ReportAccepted, eb.commitStore.Address())
 	if err != nil {
-		return blob_verifier.CCIPRelayReport{}, err
+		return commit_store.CCIPCommitReport{}, err
 	}
 	if len(logs) == 0 {
-		return blob_verifier.CCIPRelayReport{}, errors.Errorf("seq number not relayed, nothing relayed")
+		return commit_store.CCIPCommitReport{}, errors.Errorf("seq number not committed, nothing committed")
 	}
 	for _, log := range logs {
-		reportAccepted, err := eb.blobVerifier.ParseReportAccepted(types.Log{
+		reportAccepted, err := eb.commitStore.ParseReportAccepted(types.Log{
 			Topics: log.GetTopics(),
 			Data:   log.Data,
 		})
 		if err != nil {
-			return blob_verifier.CCIPRelayReport{}, err
+			return commit_store.CCIPCommitReport{}, err
 		}
 		for i, onRamp := range reportAccepted.Report.OnRamps {
 			if onRamp == eb.onRamp {
@@ -110,17 +110,17 @@ func (eb *ExecutionBatchBuilder) relayedReport(seqNr uint64) (blob_verifier.CCIP
 			}
 		}
 	}
-	return blob_verifier.CCIPRelayReport{}, errors.Errorf("seq number not relayed")
+	return commit_store.CCIPCommitReport{}, errors.Errorf("seq number not committed")
 }
 
-func (eb *ExecutionBatchBuilder) getUnexpiredRelayReports() ([]blob_verifier.CCIPRelayReport, error) {
-	logs, err := eb.dstLogPoller.LogsCreatedAfter(ReportAccepted, eb.blobVerifier.Address(), time.Now().Add(-PERMISSIONLESS_EXECUTION_THRESHOLD))
+func (eb *ExecutionBatchBuilder) getUnexpiredCommitReports() ([]commit_store.CCIPCommitReport, error) {
+	logs, err := eb.dstLogPoller.LogsCreatedAfter(ReportAccepted, eb.commitStore.Address(), time.Now().Add(-PERMISSIONLESS_EXECUTION_THRESHOLD))
 	if err != nil {
 		return nil, err
 	}
-	var reports []blob_verifier.CCIPRelayReport
+	var reports []commit_store.CCIPCommitReport
 	for _, log := range logs {
-		reportAccepted, err := eb.blobVerifier.ParseReportAccepted(types.Log{
+		reportAccepted, err := eb.commitStore.ParseReportAccepted(types.Log{
 			Topics: log.GetTopics(),
 			Data:   log.Data,
 		})
@@ -154,7 +154,7 @@ func (eb *ExecutionBatchBuilder) getExecutableSeqNrs(
 	tokensPerFeeCoin map[common.Address]*big.Int,
 	inflight []InflightExecutionReport,
 ) ([]uint64, error) {
-	unexpiredReports, err := eb.getUnexpiredRelayReports()
+	unexpiredReports, err := eb.getUnexpiredCommitReports()
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +217,7 @@ func (eb *ExecutionBatchBuilder) getExecutableSeqNrs(
 		if haveSnoozed && time.Now().Before(snoozeUntil) {
 			continue
 		}
-		blessed, err := eb.blobVerifier.IsBlessed(nil, unexpiredReport.RootOfRoots)
+		blessed, err := eb.commitStore.IsBlessed(nil, unexpiredReport.RootOfRoots)
 		if err != nil {
 			return nil, err
 		}
@@ -231,7 +231,7 @@ func (eb *ExecutionBatchBuilder) getExecutableSeqNrs(
 			return nil, err
 		}
 		if len(srcLogs) != int(unexpiredReport.Intervals[idx].Max-unexpiredReport.Intervals[idx].Min+1) {
-			return nil, errors.Errorf("unexpected missing msgs in relayed root %x have %d want %d", unexpiredReport.MerkleRoots[idx], len(srcLogs), int(unexpiredReport.Intervals[idx].Max-unexpiredReport.Intervals[idx].Min+1))
+			return nil, errors.Errorf("unexpected missing msgs in committed root %x have %d want %d", unexpiredReport.MerkleRoots[idx], len(srcLogs), int(unexpiredReport.Intervals[idx].Max-unexpiredReport.Intervals[idx].Min+1))
 		}
 		executedMp, err := eb.getExecutedSeqNrsInRange(unexpiredReport.Intervals[idx].Min, unexpiredReport.Intervals[idx].Max)
 		if err != nil {

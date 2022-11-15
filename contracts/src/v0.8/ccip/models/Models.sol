@@ -56,8 +56,8 @@ library CCIP {
     uint64 max;
   }
 
-  /// @notice Report that is relayed by the observing DON at the relay phase
-  struct RelayReport {
+  /// @notice Report that is committed by the observing DON at the committing phase
+  struct CommitReport {
     address[] onRamps;
     Interval[] intervals;
     bytes32[] merkleRoots;
@@ -126,7 +126,7 @@ library CCIP {
     bytes extraArgs;
   }
 
-  // @notice The cross chain message that gets relayed to EVM toll chains
+  // @notice The cross chain message that gets committed to EVM toll chains
   struct EVM2EVMTollMessage {
     uint256 sourceChainId;
     uint64 sequenceNumber;
@@ -190,7 +190,7 @@ library CCIP {
     bytes extraArgs;
   }
 
-  // @notice The cross chain message that gets relayed to EVM subscription chains
+  // @notice The cross chain message that gets committed to EVM subscription chains
   struct EVM2EVMSubscriptionMessage {
     uint256 sourceChainId;
     uint64 sequenceNumber;

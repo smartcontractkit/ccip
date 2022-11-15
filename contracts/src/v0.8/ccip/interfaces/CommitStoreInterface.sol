@@ -3,35 +3,35 @@ pragma solidity ^0.8.0;
 
 import {CCIP} from "../models/Models.sol";
 
-interface BlobVerifierInterface {
+interface CommitStoreInterface {
   error UnsupportedOnRamp(address onRamp);
   error InvalidInterval(CCIP.Interval interval, address onRamp);
-  error InvalidRelayReport(CCIP.RelayReport report);
+  error InvalidCommitReport(CCIP.CommitReport report);
   error InvalidConfiguration();
   error InvalidProof();
 
-  event ReportAccepted(CCIP.RelayReport report);
-  event BlobVerifierConfigSet(BlobVerifierConfig config);
+  event ReportAccepted(CCIP.CommitReport report);
+  event CommitStoreConfigSet(CommitStoreConfig config);
 
-  struct BlobVerifierConfig {
+  struct CommitStoreConfig {
     address[] onRamps;
     uint64[] minSeqNrByOnRamp;
   }
 
   /**
    * @notice Gets the current configuration.
-   * @return the currently configured BlobVerifierConfig.
+   * @return the currently configured CommitStoreConfig.
    */
-  function getConfig() external view returns (BlobVerifierConfig memory);
+  function getConfig() external view returns (CommitStoreConfig memory);
 
   /**
-   * @notice Sets the new BlobVerifierConfig and updates the s_expectedNextMinByOnRamp
+   * @notice Sets the new CommitStoreConfig and updates the s_expectedNextMinByOnRamp
    *      mapping. It will first blank the entire mapping and then input the new values.
    *      This means that any onRamp previously set but not included in the new config
    *      will be unsupported afterwards.
    * @param config The new configuration.
    */
-  function setConfig(BlobVerifierConfig calldata config) external;
+  function setConfig(CommitStoreConfig calldata config) external;
 
   /**
    * @notice Returns the next expected sequence number for a given onRamp.
@@ -91,11 +91,11 @@ interface BlobVerifierInterface {
   ) external pure returns (bytes32);
 
   /**
-   * @notice Returns the timestamp of a potentially previously relayed merkle root. If
-   *          the root was never relayed 0 will be returned.
-   * @param root The merkle root to check the relay status for.
-   * @return the timestamp of the relayed root or zero in the case that it was never
-   *          relayed.
+   * @notice Returns the timestamp of a potentially previously committed merkle root. If
+   *          the root was never committed 0 will be returned.
+   * @param root The merkle root to check the commit status for.
+   * @return the timestamp of the committed root or zero in the case that it was never
+   *          committed.
    */
   function getMerkleRoot(bytes32 root) external view returns (uint256);
 

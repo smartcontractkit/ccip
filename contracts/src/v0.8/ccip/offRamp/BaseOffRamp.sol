@@ -5,7 +5,7 @@ import {Address} from "../../vendor/Address.sol";
 import {HealthChecker, AFNInterface} from "../health/HealthChecker.sol";
 import {TokenPoolRegistry} from "../pools/TokenPoolRegistry.sol";
 import {AggregateRateLimiter} from "../rateLimiter/AggregateRateLimiter.sol";
-import {BaseOffRampInterface, Any2EVMOffRampRouterInterface, BlobVerifierInterface} from "../interfaces/offRamp/BaseOffRampInterface.sol";
+import {BaseOffRampInterface, Any2EVMOffRampRouterInterface, CommitStoreInterface} from "../interfaces/offRamp/BaseOffRampInterface.sol";
 import {CCIP} from "../models/Models.sol";
 import {IERC20} from "../../vendor/IERC20.sol";
 import {PoolInterface} from "../interfaces/pools/PoolInterface.sol";
@@ -24,8 +24,8 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry, 
   // The router through which all transactions will be executed
   Any2EVMOffRampRouterInterface internal s_router;
 
-  // The blob verifier contract
-  BlobVerifierInterface internal s_blobVerifier;
+  // The commitStore contract
+  CommitStoreInterface internal s_commitStore;
 
   // The on chain offRamp configuration values
   OffRampConfig internal s_config;
@@ -51,7 +51,7 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry, 
     uint256 sourceChainId,
     uint256 chainId,
     OffRampConfig memory offRampConfig,
-    BlobVerifierInterface blobVerifier,
+    CommitStoreInterface commitStore,
     AFNInterface afn,
     IERC20[] memory sourceTokens,
     PoolInterface[] memory pools,
@@ -67,7 +67,7 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry, 
     i_sourceChainId = sourceChainId;
     i_chainId = chainId;
     s_config = offRampConfig;
-    s_blobVerifier = blobVerifier;
+    s_commitStore = commitStore;
   }
 
   /**
@@ -99,7 +99,7 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry, 
 
   /**
    * @notice Verifies that the given hashed messages are valid leaves of
-   *          a relayed merkle tree.
+   *          a committed merkle tree.
    */
   function _verifyMessages(
     bytes32[] memory hashedLeaves,
@@ -109,15 +109,15 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry, 
     uint256 outerProofFlagBits
   ) internal returns (uint256, uint256) {
     uint256 gasBegin = gasleft();
-    uint256 timestampRelayed = s_blobVerifier.verify(
+    uint256 timestampCommitted = s_commitStore.verify(
       hashedLeaves,
       innerProofs,
       innerProofFlagBits,
       outerProofs,
       outerProofFlagBits
     );
-    if (timestampRelayed <= 0) revert RootNotRelayed();
-    return (timestampRelayed, gasBegin - gasleft());
+    if (timestampCommitted <= 0) revert RootNotCommitted();
+    return (timestampCommitted, gasBegin - gasleft());
   }
 
   /**
@@ -188,13 +188,13 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry, 
   }
 
   /// @inheritdoc BaseOffRampInterface
-  function getBlobVerifier() external view returns (BlobVerifierInterface) {
-    return s_blobVerifier;
+  function getCommitStore() external view returns (CommitStoreInterface) {
+    return s_commitStore;
   }
 
   /// @inheritdoc BaseOffRampInterface
-  function setBlobVerifier(BlobVerifierInterface blobVerifier) external onlyOwner {
-    s_blobVerifier = blobVerifier;
+  function setCommitStore(CommitStoreInterface commitStore) external onlyOwner {
+    s_commitStore = commitStore;
   }
 
   /// @inheritdoc BaseOffRampInterface

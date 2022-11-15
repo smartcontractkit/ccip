@@ -65,7 +65,7 @@ var _ = Describe("CCIP interactions test @smoke-ccip", func() {
 		destCCIP.DeployContracts(*sourceCCIP)
 
 		// set up ocr2 jobs
-		By("Setting up bootstrap, relay and execute job")
+		By("Setting up bootstrap, commit and execute job")
 		var tokenAddr []string
 		for _, token := range destCCIP.Common.BridgeTokens {
 			tokenAddr = append(tokenAddr, token.Address())
@@ -75,7 +75,7 @@ var _ = Describe("CCIP interactions test @smoke-ccip", func() {
 			clNodes[0], nil, clNodes[1:], nil,
 			sourceCCIP.TollOnRamp.Address(),
 			sourceCCIP.SubOnRamp.Address(),
-			destCCIP.BlobVerifier.Address(),
+			destCCIP.CommitStore.Address(),
 			destCCIP.TollOffRamp.Address(),
 			destCCIP.SubOffRamp.Address(),
 			sourceChainClient, destChainClient,
@@ -84,7 +84,7 @@ var _ = Describe("CCIP interactions test @smoke-ccip", func() {
 		)
 
 		// set up ocr2 config
-		By("Setting up ocr config in blob verifier and offramp")
+		By("Setting up ocr config in commit store and offramp")
 		actions.SetOCRConfigs(clNodes[1:], nil, *destCCIP) // first node is the bootstrapper
 
 		ccipTest := actions.NewCCIPTest(

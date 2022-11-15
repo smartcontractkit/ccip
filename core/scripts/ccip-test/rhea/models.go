@@ -31,7 +31,7 @@ type DeploySettings struct {
 	DeployTokenPools     bool
 	DeployRamp           bool
 	DeployRouter         bool
-	DeployBlobVerifier   bool
+	DeployCommitStore    bool
 	DeployGovernanceDapp bool
 	DeployPingPongDapp   bool
 	DeployedAt           uint64
@@ -54,9 +54,9 @@ type EVMBridgedToken struct {
 }
 
 type EVMLaneConfig struct {
-	OnRamp       gethcommon.Address
-	OffRamp      gethcommon.Address
-	BlobVerifier gethcommon.Address
+	OnRamp      gethcommon.Address
+	OffRamp     gethcommon.Address
+	CommitStore gethcommon.Address
 
 	TokenSender     gethcommon.Address
 	MessageReceiver gethcommon.Address
@@ -156,7 +156,7 @@ LinkToken:       common.HexToAddress("%s"),
 BridgeTokens:    %+v,
 OffRamp:         common.HexToAddress("%s"),
 OffRampRouter:   common.HexToAddress("%s"),
-BlobVerifier:    common.HexToAddress("%s"),	
+CommitStore:    common.HexToAddress("%s"),	
 MessageReceiver: common.HexToAddress("%s"),
 ReceiverDapp:    common.HexToAddress("%s"),
 Afn:             common.HexToAddress("%s"),
@@ -167,7 +167,7 @@ PingPongDapp:    common.HexToAddress("%s"),
 		destination.ChainConfig.SupportedTokens,
 		destination.LaneConfig.OffRamp,
 		destination.ChainConfig.OffRampRouter,
-		destination.LaneConfig.BlobVerifier,
+		destination.LaneConfig.CommitStore,
 		destination.LaneConfig.MessageReceiver,
 		destination.LaneConfig.ReceiverDapp,
 		destination.ChainConfig.Afn,

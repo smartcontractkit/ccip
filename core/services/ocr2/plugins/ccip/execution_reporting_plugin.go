@@ -16,7 +16,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/blob_verifier"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
@@ -31,7 +31,7 @@ const (
 )
 
 const (
-	BatchGasLimit            = 5_000_000 // TODO: think if a good value for this
+	BatchGasLimit            = 5_000_000                 // TODO: think if a good value for this
 	GasLimitPerTx            = BatchGasLimit - 1_000_000 // Leave a buffer for overhead.
 	MaxPayloadLength         = 1000
 	MaxTokensPerMessage      = 5
@@ -41,9 +41,9 @@ const (
 )
 
 var (
-	_                     types.ReportingPluginFactory = &ExecutionReportingPluginFactory{}
-	_                     types.ReportingPlugin        = &ExecutionReportingPlugin{}
-	ErrBlobVerifierIsDown                              = errors.New("blobVerifier is down")
+	_                    types.ReportingPluginFactory = &ExecutionReportingPluginFactory{}
+	_                    types.ReportingPlugin        = &ExecutionReportingPlugin{}
+	ErrCommitStoreIsDown                              = errors.New("commitStore is down")
 )
 
 func EncodeExecutionReport(seqNums []uint64, tokensPerFeeCoin map[common.Address]*big.Int, msgs [][]byte, innerProofs [][32]byte, innerProofSourceFlags []bool, outerProofs [][32]byte, outerProofSourceFlags []bool) (types.Report, error) {
@@ -133,7 +133,7 @@ type ExecutionReportingPluginFactory struct {
 	source, dest        logpoller.LogPoller
 	onRamp, offRampAddr common.Address
 	offRamp             OffRamp
-	blobVerifier        *blob_verifier.BlobVerifier
+	commitStore         *commit_store.CommitStore
 	builder             BatchBuilder
 	onRampSeqParser     func(log logpoller.Log) (uint64, error)
 	reqEventSig         common.Hash
@@ -146,7 +146,7 @@ type ExecutionReportingPluginFactory struct {
 func NewExecutionReportingPluginFactory(
 	lggr logger.Logger,
 	onRamp common.Address,
-	blobVerifier *blob_verifier.BlobVerifier,
+	commitStore *commit_store.CommitStore,
 	source, dest logpoller.LogPoller,
 	offRampAddr common.Address,
 	offRamp OffRamp,
@@ -158,7 +158,7 @@ func NewExecutionReportingPluginFactory(
 	rootSnoozeTime time.Duration,
 	inflightCacheExpiry time.Duration,
 ) types.ReportingPluginFactory {
-	return &ExecutionReportingPluginFactory{lggr: lggr, onRamp: onRamp, blobVerifier: blobVerifier, offRamp: offRamp, source: source, dest: dest, offRampAddr: offRampAddr, builder: builder,
+	return &ExecutionReportingPluginFactory{lggr: lggr, onRamp: onRamp, commitStore: commitStore, offRamp: offRamp, source: source, dest: dest, offRampAddr: offRampAddr, builder: builder,
 		onRampSeqParser: onRampSeqParser, reqEventSig: reqEventSig, priceGetter: priceGetter, onRampToHasher: onRampToHasher, rootSnoozeTime: rootSnoozeTime, inflightCacheExpiry: inflightCacheExpiry}
 }
 
@@ -173,14 +173,14 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			offRampAddr:    rf.offRampAddr,
 			offRamp:        rf.offRamp,
 			onRamp:         rf.onRamp,
-			blobVerifier:   rf.blobVerifier,
+			commitStore:    rf.commitStore,
 			source:         rf.source,
 			dest:           rf.dest,
 			offchainConfig: offchainConfig,
 			builder: NewExecutionBatchBuilder(
 				BatchGasLimit,
 				rf.rootSnoozeTime,
-				rf.blobVerifier,
+				rf.commitStore,
 				rf.onRamp,
 				rf.offRampAddr,
 				rf.source,
@@ -212,7 +212,7 @@ type ExecutionReportingPlugin struct {
 	offRampAddr  common.Address
 	onRamp       common.Address
 	offRamp      OffRamp
-	blobVerifier *blob_verifier.BlobVerifier
+	commitStore  *commit_store.CommitStore
 	source, dest logpoller.LogPoller
 	// We need to synchronize access to the inflight structure
 	// as reporting plugin methods may be called from separate goroutines,
@@ -268,8 +268,8 @@ func (r *ExecutionReportingPlugin) maxGasPrice() uint64 {
 func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp types.ReportTimestamp, query types.Query) (types.Observation, error) {
 	// Query contains the tokenPricesPerFeeCoin
 	lggr := r.lggr.Named("ExecutionObservation")
-	if isBlobVerifierDownNow(lggr, r.blobVerifier) {
-		return nil, ErrBlobVerifierIsDown
+	if isCommitStoreDownNow(lggr, r.commitStore) {
+		return nil, ErrCommitStoreIsDown
 	}
 	leaderTokensPerFeeCoin := make(map[common.Address]*big.Int)
 	if err := json.Unmarshal(query, &leaderTokensPerFeeCoin); err != nil {
@@ -314,7 +314,7 @@ func contiguousReqs(lggr logger.Logger, min, max uint64, seqNrs []uint64) bool {
 	return true
 }
 
-func leafsFromIntervals(lggr logger.Logger, onRampToEventSig map[common.Address]common.Hash, seqParsers map[common.Address]func(logpoller.Log) (uint64, error), intervalByOnRamp map[common.Address]blob_verifier.CCIPInterval, srcLogPoller logpoller.LogPoller, onRampToHasher map[common.Address]LeafHasher[[32]byte], confs int) (map[common.Address][][32]byte, error) {
+func leafsFromIntervals(lggr logger.Logger, onRampToEventSig map[common.Address]common.Hash, seqParsers map[common.Address]func(logpoller.Log) (uint64, error), intervalByOnRamp map[common.Address]commit_store.CCIPInterval, srcLogPoller logpoller.LogPoller, onRampToHasher map[common.Address]LeafHasher[[32]byte], confs int) (map[common.Address][][32]byte, error) {
 	leafsByOnRamp := make(map[common.Address][][32]byte)
 	for onRamp, interval := range intervalByOnRamp {
 		// Logs are guaranteed to be in order of seq num, since these are finalized logs only
@@ -350,12 +350,12 @@ func leafsFromIntervals(lggr logger.Logger, onRampToEventSig map[common.Address]
 // Assumes non-empty report. Messages to execute can span more than one report, but are assumed to be in order of increasing
 // sequence number.
 func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNums []uint64, tokensPerFeeCoin map[common.Address]*big.Int) ([]byte, error) {
-	rep, err := r.builder.relayedReport(finalSeqNums[0])
+	rep, err := r.builder.commitReport(finalSeqNums[0])
 	if err != nil {
 		return nil, err
 	}
 	lggr.Infow("Building execution report", "finalSeqNums", finalSeqNums, "report", rep)
-	var interval blob_verifier.CCIPInterval
+	var interval commit_store.CCIPInterval
 	var onRampIdx int
 	var outerTreeLeafs [][32]byte
 
@@ -374,13 +374,13 @@ func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNums 
 		return nil, err
 	}
 	if len(msgsInRoot) != int(interval.Max-interval.Min+1) {
-		return nil, errors.Errorf("unexpected missing msgs in relayed root %x have %d want %d", rep.MerkleRoots[onRampIdx], len(msgsInRoot), int(interval.Max-interval.Min+1))
+		return nil, errors.Errorf("unexpected missing msgs in committed root %x have %d want %d", rep.MerkleRoots[onRampIdx], len(msgsInRoot), int(interval.Max-interval.Min+1))
 	}
 	leafsByOnRamp, err := leafsFromIntervals(
 		lggr,
 		map[common.Address]common.Hash{r.onRamp: r.reqEventSig},
 		map[common.Address]func(log logpoller.Log) (uint64, error){r.onRamp: r.onRampSeqParser},
-		map[common.Address]blob_verifier.CCIPInterval{r.onRamp: interval},
+		map[common.Address]commit_store.CCIPInterval{r.onRamp: interval},
 		r.source,
 		r.onRampToHasher, int(r.offchainConfig.SourceIncomingConfirmations))
 	if err != nil {
@@ -416,7 +416,7 @@ func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNums 
 	}
 	innerProof := innerTree.Prove(innerIdxs)
 	// Double check this verifies before sending.
-	res, err := r.blobVerifier.Verify(nil, hashes, innerProof.Hashes, ProofFlagsToBits(innerProof.SourceFlags), outerProof.Hashes, ProofFlagsToBits(outerProof.SourceFlags))
+	res, err := r.commitStore.Verify(nil, hashes, innerProof.Hashes, ProofFlagsToBits(innerProof.SourceFlags), outerProof.Hashes, ProofFlagsToBits(outerProof.SourceFlags))
 	if err != nil {
 		lggr.Errorw("Unable to call verify", "seqNums", finalSeqNums, "indices", innerIdxs, "root", rep.RootOfRoots[:], "seqRange", rep.Intervals[onRampIdx], "onRampReport", rep.OnRamps[onRampIdx].Hex(), "onRampHave", r.onRamp.Hex(), "err", err)
 		return nil, err
@@ -447,8 +447,8 @@ func median(vals []*big.Int) *big.Int {
 
 func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.ReportTimestamp, query types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
 	lggr := r.lggr.Named("Report")
-	if isBlobVerifierDownNow(lggr, r.blobVerifier) {
-		return false, nil, ErrBlobVerifierIsDown
+	if isCommitStoreDownNow(lggr, r.commitStore) {
+		return false, nil, ErrCommitStoreIsDown
 	}
 	actualMaybeObservations := getNonEmptyObservations[ExecutionObservation](lggr, observations)
 	var actualObservations []ExecutionObservation
@@ -516,12 +516,12 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 	sort.Slice(finalSequenceNumbers, func(i, j int) bool {
 		return finalSequenceNumbers[i] < finalSequenceNumbers[j]
 	})
-	nextMin, err := r.blobVerifier.GetExpectedNextSequenceNumber(nil, r.onRamp)
+	nextMin, err := r.commitStore.GetExpectedNextSequenceNumber(nil, r.onRamp)
 	if err != nil {
 		return false, nil, err
 	}
 	if mathutil.Max(finalSequenceNumbers[0], finalSequenceNumbers[1:]...) >= nextMin {
-		return false, nil, errors.Errorf("Cannot execute unrelayed seq num. nextMin %v, seqNums %v", nextMin, finalSequenceNumbers)
+		return false, nil, errors.Errorf("Cannot execute uncommitted seq num. nextMin %v, seqNums %v", nextMin, finalSequenceNumbers)
 	}
 	// Important we actually execute based on the medianTokensPrices, which we ensure
 	// is <= than prices used to determine executability.

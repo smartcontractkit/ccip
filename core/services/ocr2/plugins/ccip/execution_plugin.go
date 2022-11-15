@@ -17,7 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/blob_verifier"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_subscription_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
 	"github.com/smartcontractkit/chainlink/core/logger"
@@ -65,7 +65,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	if !common.IsHexAddress(spec.ContractID) {
 		return nil, errors.Wrap(err, "spec.OffRampID is not a valid hex address")
 	}
-	verifier, err := blob_verifier.NewBlobVerifier(common.HexToAddress(pluginConfig.BlobVerifierID), destChain.Client())
+	verifier, err := commit_store.NewCommitStore(common.HexToAddress(pluginConfig.CommitStoreID), destChain.Client())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed creating a new onramp")
 	}
@@ -93,7 +93,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 			}
 			return req.Message.SequenceNumber, nil
 		}
-		// Subscribe to all relevant relay logs.
+		// Subscribe to all relevant commit logs.
 		_, err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{CCIPTollSendRequested}, Addresses: []common.Address{onRampAddr}})
 		if err != nil {
 			return nil, err
@@ -112,7 +112,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 			}
 			return req.Message.SequenceNumber, nil
 		}
-		// Subscribe to all relevant relay logs.
+		// Subscribe to all relevant commit logs.
 		_, err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{CCIPSubSendRequested}, Addresses: []common.Address{onRampAddr}})
 		if err != nil {
 			return nil, err

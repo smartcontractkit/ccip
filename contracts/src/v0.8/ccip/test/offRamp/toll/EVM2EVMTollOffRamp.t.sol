@@ -184,13 +184,13 @@ contract EVM2EVMTollOffRamp_execute is EVM2EVMTollOffRampSetup {
     s_offRamp.execute(_generateReportFromMessages(messages), false);
   }
 
-  function testRootNotRelayedReverts() public {
+  function testRootNotCommittedReverts() public {
     vm.mockCall(
-      address(s_mockBlobVerifier),
-      abi.encodeWithSelector(BlobVerifierInterface.verify.selector),
+      address(s_mockCommitStore),
+      abi.encodeWithSelector(CommitStoreInterface.verify.selector),
       abi.encode(0)
     );
-    vm.expectRevert(BaseOffRampInterface.RootNotRelayed.selector);
+    vm.expectRevert(BaseOffRampInterface.RootNotCommitted.selector);
 
     s_offRamp.execute(_generateReportFromMessages(_generateBasicMessages()), true);
     vm.clearMockedCalls();
@@ -198,8 +198,8 @@ contract EVM2EVMTollOffRamp_execute is EVM2EVMTollOffRampSetup {
 
   function testManualExecutionNotYetEnabledReverts() public {
     vm.mockCall(
-      address(s_mockBlobVerifier),
-      abi.encodeWithSelector(BlobVerifierInterface.verify.selector),
+      address(s_mockCommitStore),
+      abi.encodeWithSelector(CommitStoreInterface.verify.selector),
       abi.encode(BLOCK_TIME)
     );
     vm.expectRevert(BaseOffRampInterface.ManualExecutionNotYetEnabled.selector);
@@ -253,7 +253,7 @@ contract EVM2EVMTollOffRamp_execute is EVM2EVMTollOffRampSetup {
     CCIP.EVM2EVMTollMessage[] memory messages = _generateMessagesWithTokens();
     messages[0].tokensAndAmounts[0] = getCastedDestinationEVMTokenAndAmountsWithZeroAmounts()[0];
     messages[0].feeTokenAndAmount.token = messages[0].tokensAndAmounts[0].token;
-    messages[0].feeTokenAndAmount.amount = RELAYING_FEE_JUELS;
+    messages[0].feeTokenAndAmount.amount = COMMIT_FEE_JUELS;
     vm.expectRevert(abi.encodeWithSelector(BaseOffRampInterface.UnsupportedToken.selector, s_destTokens[0]));
     s_offRamp.execute(_generateReportFromMessages(messages), false);
   }

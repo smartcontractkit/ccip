@@ -12,14 +12,14 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/job"
 )
 
-func RelaySpecToString(spec job.Job) string {
+func CommitSpecToString(spec job.Job) string {
 	onRamp := spec.OCR2OracleSpec.PluginConfig["onRampIDs"].([]string)[0]
 
-	const relayTemplate = `
-# CCIPRelaySpec
+	const commitTemplate = `
+# CCIP Commit spec
 type               = "offchainreporting2"
 name               = "%s"
-pluginType         = "ccip-relay"
+pluginType         = "ccip-commit"
 relay              = "evm"
 schemaVersion      = 1
 contractID         = "%s"
@@ -38,7 +38,7 @@ DestStartBlock     = %d
 chainID            = %s
 `
 
-	return fmt.Sprintf(relayTemplate+"\n",
+	return fmt.Sprintf(commitTemplate+"\n",
 		spec.Name.String,
 		spec.OCR2OracleSpec.ContractID,
 		spec.OCR2OracleSpec.OCRKeyBundleID.String,
@@ -55,7 +55,7 @@ chainID            = %s
 
 func ExecSpecToString(spec job.Job) string {
 	const execTemplate = `
-# CCIPExecutionSpec
+# CCIP Execution spec
 type               = "offchainreporting2"
 name               = "%s"
 pluginType         = "ccip-execution"
@@ -69,7 +69,7 @@ transmitterID      = "%s"
 sourceChainID      = %s
 destChainID        = %s
 onRampID           = "%s"
-blobVerifierID     = "%s"
+commitStoreID     = "%s"
 SourceStartBlock   = %d
 DestStartBlock     = %d
 tokensPerFeeCoinPipeline = %s
@@ -86,7 +86,7 @@ chainID            = %s
 		spec.OCR2OracleSpec.PluginConfig["sourceChainID"],
 		spec.OCR2OracleSpec.PluginConfig["destChainID"],
 		spec.OCR2OracleSpec.PluginConfig["onRampID"],
-		spec.OCR2OracleSpec.PluginConfig["blobVerifierID"],
+		spec.OCR2OracleSpec.PluginConfig["commitStoreID"],
 		spec.OCR2OracleSpec.PluginConfig["SourceStartBlock"],
 		spec.OCR2OracleSpec.PluginConfig["DestStartBlock"],
 		spec.OCR2OracleSpec.PluginConfig["tokensPerFeeCoinPipeline"],
@@ -104,13 +104,13 @@ func GetOCRkeysForChainType(OCRKeys client.OCR2Keys, chainType string) client.OC
 	panic("Keys not found for chain")
 }
 
-func generateRelayJobSpecs(sourceClient *rhea.EvmDeploymentConfig, destClient *rhea.EvmDeploymentConfig) job.Job {
+func generateCommitJobSpecs(sourceClient *rhea.EvmDeploymentConfig, destClient *rhea.EvmDeploymentConfig) job.Job {
 	return job.Job{
-		Name: null2.StringFrom(fmt.Sprintf("ccip-relay-%s-%s", helpers.ChainName(sourceClient.ChainConfig.ChainId.Int64()), helpers.ChainName(destClient.ChainConfig.ChainId.Int64()))),
+		Name: null2.StringFrom(fmt.Sprintf("ccip-commit-%s-%s", helpers.ChainName(sourceClient.ChainConfig.ChainId.Int64()), helpers.ChainName(destClient.ChainConfig.ChainId.Int64()))),
 		Type: "offchainreporting2",
 		OCR2OracleSpec: &job.OCR2OracleSpec{
-			PluginType:                  job.CCIPRelay,
-			ContractID:                  destClient.LaneConfig.BlobVerifier.Hex(),
+			PluginType:                  job.CCIPCommit,
+			ContractID:                  destClient.LaneConfig.CommitStore.Hex(),
 			Relay:                       "evm",
 			RelayConfig:                 map[string]interface{}{"chainID": destClient.ChainConfig.ChainId.String()},
 			P2PV2Bootstrappers:          []string{},     // Set in env vars
@@ -147,7 +147,7 @@ func generateExecutionJobSpecs(sourceClient *rhea.EvmDeploymentConfig, destClien
 				"destChainID":              destClient.ChainConfig.ChainId.String(),
 				"onRampID":                 sourceClient.LaneConfig.OnRamp.String(),
 				"pollPeriod":               PollPeriod,
-				"blobVerifierID":           destClient.LaneConfig.BlobVerifier.Hex(),
+				"commitStoreID":            destClient.LaneConfig.CommitStore.Hex(),
 				"SourceStartBlock":         sourceClient.DeploySettings.DeployedAt,
 				"DestStartBlock":           destClient.DeploySettings.DeployedAt,
 				"tokensPerFeeCoinPipeline": fmt.Sprintf(`"""merge [type=merge left="{}" right="{\\\"%s\\\":\\\"1000000000000000000\\\"}"];"""`, destClient.ChainConfig.LinkToken.Hex()),

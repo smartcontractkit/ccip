@@ -2,24 +2,24 @@
 pragma solidity 0.8.15;
 
 import "../helpers/MerkleHelper.sol";
-import "../helpers/BlobVerifierHelper.sol";
+import "../helpers/CommitStoreHelper.sol";
 import "../BaseTest.t.sol";
 import "../../health/AFN.sol";
 
-contract BlobVerifierSetup is BaseTest {
-  event BlobVerifierConfigSet(BlobVerifierInterface.BlobVerifierConfig config);
+contract CommitStoreSetup is BaseTest {
+  event CommitStoreConfigSet(CommitStoreInterface.CommitStoreConfig config);
 
-  BlobVerifierHelper s_blobVerifier;
+  CommitStoreHelper s_commitStore;
 
   function setUp() public virtual override {
     BaseTest.setUp();
 
-    s_blobVerifier = new BlobVerifierHelper(DEST_CHAIN_ID, SOURCE_CHAIN_ID, s_afn, blobVerifierConfig());
+    s_commitStore = new CommitStoreHelper(DEST_CHAIN_ID, SOURCE_CHAIN_ID, s_afn, commitStoreConfig());
   }
 }
 
-contract BlobVerifierRealAFNSetup is BaseTest {
-  BlobVerifierHelper s_blobVerifier;
+contract CommitStoreRealAFNSetup is BaseTest {
+  CommitStoreHelper s_commitStore;
 
   function setUp() public virtual override {
     BaseTest.setUp();
@@ -28,12 +28,12 @@ contract BlobVerifierRealAFNSetup is BaseTest {
     uint256[] memory weights = new uint256[](1);
     weights[0] = 1;
     s_afn = new AFN(participants, weights, 1, 1); // Overwrite base mock afn with real.
-    s_blobVerifier = new BlobVerifierHelper(SOURCE_CHAIN_ID, DEST_CHAIN_ID, s_afn, blobVerifierConfig());
+    s_commitStore = new CommitStoreHelper(SOURCE_CHAIN_ID, DEST_CHAIN_ID, s_afn, commitStoreConfig());
   }
 }
 
 /// @notice #constructor
-contract BlobVerifier_constructor is BaseTest {
+contract CommitStore_constructor is BaseTest {
   function testSuccess() public {
     address[] memory onRamps = new address[](3);
     onRamps[0] = ON_RAMP_ADDRESS;
@@ -43,48 +43,48 @@ contract BlobVerifier_constructor is BaseTest {
     minSequenceNumbers[0] = 1;
     minSequenceNumbers[1] = 2;
     minSequenceNumbers[2] = 4;
-    BlobVerifierInterface.BlobVerifierConfig memory config = BlobVerifierInterface.BlobVerifierConfig({
+    CommitStoreInterface.CommitStoreConfig memory config = CommitStoreInterface.CommitStoreConfig({
       onRamps: onRamps,
       minSeqNrByOnRamp: minSequenceNumbers
     });
-    BlobVerifier blobVerifier = new BlobVerifier(DEST_CHAIN_ID, SOURCE_CHAIN_ID, s_afn, config);
+    CommitStore commitStore = new CommitStore(DEST_CHAIN_ID, SOURCE_CHAIN_ID, s_afn, config);
 
-    // BlobVerifier config
-    assertEq(minSequenceNumbers[0], blobVerifier.getExpectedNextSequenceNumber(onRamps[0]));
-    assertEq(minSequenceNumbers[1], blobVerifier.getExpectedNextSequenceNumber(onRamps[1]));
-    assertEq(minSequenceNumbers[2], blobVerifier.getExpectedNextSequenceNumber(onRamps[2]));
+    // CommitStore config
+    assertEq(minSequenceNumbers[0], commitStore.getExpectedNextSequenceNumber(onRamps[0]));
+    assertEq(minSequenceNumbers[1], commitStore.getExpectedNextSequenceNumber(onRamps[1]));
+    assertEq(minSequenceNumbers[2], commitStore.getExpectedNextSequenceNumber(onRamps[2]));
 
-    BlobVerifierInterface.BlobVerifierConfig memory contractConfig = blobVerifier.getConfig();
+    CommitStoreInterface.CommitStoreConfig memory contractConfig = commitStore.getConfig();
     assertEq(keccak256(abi.encode(config.minSeqNrByOnRamp)), keccak256(abi.encode(contractConfig.minSeqNrByOnRamp)));
     assertEq(config.onRamps, contractConfig.onRamps);
 
     // typeAndVersion
-    assertEq("BlobVerifier 1.0.0", blobVerifier.typeAndVersion());
+    assertEq("CommitStore 1.0.0", commitStore.typeAndVersion());
 
     // owner
-    assertEq(OWNER, blobVerifier.owner());
+    assertEq(OWNER, commitStore.owner());
 
     // HealthChecker
-    assertEq(address(s_afn), address(blobVerifier.getAFN()));
+    assertEq(address(s_afn), address(commitStore.getAFN()));
   }
 
   function testInvalidConfigurationReverts() public {
     address[] memory onRamps = new address[](3);
     uint64[] memory minSequenceNumbers = new uint64[](2);
 
-    vm.expectRevert(BlobVerifierInterface.InvalidConfiguration.selector);
+    vm.expectRevert(CommitStoreInterface.InvalidConfiguration.selector);
 
-    new BlobVerifier(
+    new CommitStore(
       DEST_CHAIN_ID,
       SOURCE_CHAIN_ID,
       s_afn,
-      BlobVerifierInterface.BlobVerifierConfig({onRamps: onRamps, minSeqNrByOnRamp: minSequenceNumbers})
+      CommitStoreInterface.CommitStoreConfig({onRamps: onRamps, minSeqNrByOnRamp: minSequenceNumbers})
     );
   }
 }
 
 /// @notice #setConfig
-contract BlobVerifier_setConfig is BlobVerifierSetup {
+contract CommitStore_setConfig is CommitStoreSetup {
   // Success
 
   function testSuccess() public {
@@ -92,23 +92,23 @@ contract BlobVerifier_setConfig is BlobVerifierSetup {
     onRamps[0] = address(1);
     uint64[] memory minSeqNrByOnRamp = new uint64[](1);
     minSeqNrByOnRamp[0] = 200;
-    BlobVerifierInterface.BlobVerifierConfig memory newConfig = BlobVerifierInterface.BlobVerifierConfig({
+    CommitStoreInterface.CommitStoreConfig memory newConfig = CommitStoreInterface.CommitStoreConfig({
       onRamps: onRamps,
       minSeqNrByOnRamp: minSeqNrByOnRamp
     });
     // Assert the current value for ON_RAMP_ADDRESS is set
-    assertEq(1, s_blobVerifier.getExpectedNextSequenceNumber(ON_RAMP_ADDRESS));
+    assertEq(1, s_commitStore.getExpectedNextSequenceNumber(ON_RAMP_ADDRESS));
 
     vm.expectEmit(false, false, false, false);
-    emit BlobVerifierConfigSet(newConfig);
+    emit CommitStoreConfigSet(newConfig);
 
-    s_blobVerifier.setConfig(newConfig);
+    s_commitStore.setConfig(newConfig);
 
     // Checks whether the new onramp is properly set to the given value
-    assertEq(minSeqNrByOnRamp[0], s_blobVerifier.getExpectedNextSequenceNumber(onRamps[0]));
+    assertEq(minSeqNrByOnRamp[0], s_commitStore.getExpectedNextSequenceNumber(onRamps[0]));
     // Assert the previously checked value is now 0, indicating successful removal
     // from the supported onRamps list.
-    assertEq(0, s_blobVerifier.getExpectedNextSequenceNumber(ON_RAMP_ADDRESS));
+    assertEq(0, s_commitStore.getExpectedNextSequenceNumber(ON_RAMP_ADDRESS));
   }
 
   // Reverts
@@ -116,37 +116,37 @@ contract BlobVerifier_setConfig is BlobVerifierSetup {
   function testOnlyOwnerReverts() public {
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
-    BlobVerifierInterface.BlobVerifierConfig memory newConfig;
-    s_blobVerifier.setConfig(newConfig);
+    CommitStoreInterface.CommitStoreConfig memory newConfig;
+    s_commitStore.setConfig(newConfig);
   }
 
   function testInvalidConfigurationLengthMismatchReverts() public {
     address[] memory onRamps = new address[](2);
     uint64[] memory minSeqNrByOnRamp = new uint64[](1);
-    BlobVerifierInterface.BlobVerifierConfig memory newConfig = BlobVerifierInterface.BlobVerifierConfig({
+    CommitStoreInterface.CommitStoreConfig memory newConfig = CommitStoreInterface.CommitStoreConfig({
       onRamps: onRamps,
       minSeqNrByOnRamp: minSeqNrByOnRamp
     });
-    vm.expectRevert(BlobVerifierInterface.InvalidConfiguration.selector);
+    vm.expectRevert(CommitStoreInterface.InvalidConfiguration.selector);
 
-    s_blobVerifier.setConfig(newConfig);
+    s_commitStore.setConfig(newConfig);
   }
 
   function testInvalidConfigurationZeroRampsReverts() public {
     address[] memory onRamps = new address[](0);
     uint64[] memory minSeqNrByOnRamp = new uint64[](0);
-    BlobVerifierInterface.BlobVerifierConfig memory newConfig = BlobVerifierInterface.BlobVerifierConfig({
+    CommitStoreInterface.CommitStoreConfig memory newConfig = CommitStoreInterface.CommitStoreConfig({
       onRamps: onRamps,
       minSeqNrByOnRamp: minSeqNrByOnRamp
     });
-    vm.expectRevert(BlobVerifierInterface.InvalidConfiguration.selector);
+    vm.expectRevert(CommitStoreInterface.InvalidConfiguration.selector);
 
-    s_blobVerifier.setConfig(newConfig);
+    s_commitStore.setConfig(newConfig);
   }
 }
 
 /// @notice #resetUnblessedRoots
-contract BlobVerifier_resetUnblessedRoots is BlobVerifierSetup {
+contract CommitStore_resetUnblessedRoots is CommitStoreSetup {
   // TODO proper AFN blessing handling
 
   // Reverts
@@ -154,13 +154,13 @@ contract BlobVerifier_resetUnblessedRoots is BlobVerifierSetup {
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
     bytes32[] memory rootToReset;
-    s_blobVerifier.resetUnblessedRoots(rootToReset);
+    s_commitStore.resetUnblessedRoots(rootToReset);
   }
 }
 
 /// @notice #report
-contract BlobVerifier_report is BlobVerifierSetup {
-  event ReportAccepted(CCIP.RelayReport report);
+contract CommitStore_report is CommitStoreSetup {
+  event ReportAccepted(CCIP.CommitReport report);
 
   // Success
 
@@ -176,8 +176,8 @@ contract BlobVerifier_report is BlobVerifierSetup {
     merkleRoots[0] = "test #1";
     merkleRoots[1] = "test #2";
     merkleRoots[2] = "test #3";
-    BlobVerifierInterface.BlobVerifierConfig memory config = blobVerifierConfig();
-    CCIP.RelayReport memory report = CCIP.RelayReport({
+    CommitStoreInterface.CommitStoreConfig memory config = commitStoreConfig();
+    CCIP.CommitReport memory report = CCIP.CommitReport({
       onRamps: config.onRamps,
       intervals: intervals,
       merkleRoots: merkleRoots,
@@ -186,125 +186,125 @@ contract BlobVerifier_report is BlobVerifierSetup {
 
     vm.expectEmit(true, false, false, true);
 
-    s_blobVerifier.report(abi.encode(report));
+    s_commitStore.report(abi.encode(report));
     emit ReportAccepted(report);
 
-    assertEq(max1 + 1, s_blobVerifier.getExpectedNextSequenceNumber(config.onRamps[0]));
-    assertEq(max2 + 1, s_blobVerifier.getExpectedNextSequenceNumber(config.onRamps[1]));
-    assertEq(max3 + 1, s_blobVerifier.getExpectedNextSequenceNumber(config.onRamps[2]));
+    assertEq(max1 + 1, s_commitStore.getExpectedNextSequenceNumber(config.onRamps[0]));
+    assertEq(max2 + 1, s_commitStore.getExpectedNextSequenceNumber(config.onRamps[1]));
+    assertEq(max3 + 1, s_commitStore.getExpectedNextSequenceNumber(config.onRamps[2]));
   }
 
   // Reverts
 
   function testPausedReverts() public {
-    s_blobVerifier.pause();
+    s_commitStore.pause();
     vm.expectRevert("Pausable: paused");
     bytes memory report;
-    s_blobVerifier.report(report);
+    s_commitStore.report(report);
   }
 
   function testUnhealthyReverts() public {
     s_afn.voteBad();
     vm.expectRevert(HealthChecker.BadAFNSignal.selector);
     bytes memory report;
-    s_blobVerifier.report(report);
+    s_commitStore.report(report);
   }
 
-  function testInvalidRelayReportRootLengthReverts() public {
+  function testInvalidCommitReportRootLengthReverts() public {
     CCIP.Interval[] memory intervals = new CCIP.Interval[](3);
     bytes32[] memory merkleRoots = new bytes32[](2);
-    CCIP.RelayReport memory report = CCIP.RelayReport({
-      onRamps: blobVerifierConfig().onRamps,
+    CCIP.CommitReport memory report = CCIP.CommitReport({
+      onRamps: commitStoreConfig().onRamps,
       intervals: intervals,
       merkleRoots: merkleRoots,
       rootOfRoots: "root"
     });
 
-    vm.expectRevert(abi.encodeWithSelector(BlobVerifierInterface.InvalidRelayReport.selector, report));
+    vm.expectRevert(abi.encodeWithSelector(CommitStoreInterface.InvalidCommitReport.selector, report));
 
-    s_blobVerifier.report(abi.encode(report));
+    s_commitStore.report(abi.encode(report));
   }
 
-  function testInvalidRelayReportIntervalLengthReverts() public {
+  function testInvalidCommitReportIntervalLengthReverts() public {
     CCIP.Interval[] memory intervals = new CCIP.Interval[](2);
     bytes32[] memory merkleRoots = new bytes32[](3);
-    CCIP.RelayReport memory report = CCIP.RelayReport({
-      onRamps: blobVerifierConfig().onRamps,
+    CCIP.CommitReport memory report = CCIP.CommitReport({
+      onRamps: commitStoreConfig().onRamps,
       intervals: intervals,
       merkleRoots: merkleRoots,
       rootOfRoots: "root"
     });
 
-    vm.expectRevert(abi.encodeWithSelector(BlobVerifierInterface.InvalidRelayReport.selector, report));
+    vm.expectRevert(abi.encodeWithSelector(CommitStoreInterface.InvalidCommitReport.selector, report));
 
-    s_blobVerifier.report(abi.encode(report));
+    s_commitStore.report(abi.encode(report));
   }
 
   function testUnsupportedOnRampReverts() public {
     CCIP.Interval[] memory intervals = new CCIP.Interval[](1);
     address[] memory onRamps = new address[](1);
     bytes32[] memory merkleRoots = new bytes32[](1);
-    CCIP.RelayReport memory report = CCIP.RelayReport({
+    CCIP.CommitReport memory report = CCIP.CommitReport({
       onRamps: onRamps,
       intervals: intervals,
       merkleRoots: merkleRoots,
       rootOfRoots: "root"
     });
 
-    vm.expectRevert(abi.encodeWithSelector(BlobVerifierInterface.UnsupportedOnRamp.selector, onRamps[0]));
+    vm.expectRevert(abi.encodeWithSelector(CommitStoreInterface.UnsupportedOnRamp.selector, onRamps[0]));
 
-    s_blobVerifier.report(abi.encode(report));
+    s_commitStore.report(abi.encode(report));
   }
 
   function testInvalidIntervalReverts() public {
     CCIP.Interval[] memory intervals = new CCIP.Interval[](1);
     intervals[0] = CCIP.Interval(2, 2);
     address[] memory onRamps = new address[](1);
-    onRamps[0] = blobVerifierConfig().onRamps[0];
+    onRamps[0] = commitStoreConfig().onRamps[0];
     bytes32[] memory merkleRoots = new bytes32[](1);
-    CCIP.RelayReport memory report = CCIP.RelayReport({
+    CCIP.CommitReport memory report = CCIP.CommitReport({
       onRamps: onRamps,
       intervals: intervals,
       merkleRoots: merkleRoots,
       rootOfRoots: "root"
     });
 
-    vm.expectRevert(abi.encodeWithSelector(BlobVerifierInterface.InvalidInterval.selector, intervals[0], onRamps[0]));
+    vm.expectRevert(abi.encodeWithSelector(CommitStoreInterface.InvalidInterval.selector, intervals[0], onRamps[0]));
 
-    s_blobVerifier.report(abi.encode(report));
+    s_commitStore.report(abi.encode(report));
   }
 
   function testInvalidIntervalMinLargerThanMaxReverts() public {
     CCIP.Interval[] memory intervals = new CCIP.Interval[](1);
     intervals[0] = CCIP.Interval(1, 0);
     address[] memory onRamps = new address[](1);
-    onRamps[0] = blobVerifierConfig().onRamps[0];
+    onRamps[0] = commitStoreConfig().onRamps[0];
     bytes32[] memory merkleRoots = new bytes32[](1);
-    CCIP.RelayReport memory report = CCIP.RelayReport({
+    CCIP.CommitReport memory report = CCIP.CommitReport({
       onRamps: onRamps,
       intervals: intervals,
       merkleRoots: merkleRoots,
       rootOfRoots: "root"
     });
 
-    vm.expectRevert(abi.encodeWithSelector(BlobVerifierInterface.InvalidInterval.selector, intervals[0], onRamps[0]));
+    vm.expectRevert(abi.encodeWithSelector(CommitStoreInterface.InvalidInterval.selector, intervals[0], onRamps[0]));
 
-    s_blobVerifier.report(abi.encode(report));
+    s_commitStore.report(abi.encode(report));
   }
 }
 
 /// @notice #verify
-contract BlobVerifier_verify is BlobVerifierRealAFNSetup {
+contract CommitStore_verify is CommitStoreRealAFNSetup {
   function testNotBlessedSuccess() public {
     CCIP.Interval[] memory intervals = new CCIP.Interval[](1);
     intervals[0] = CCIP.Interval(1, 2);
     bytes32[] memory merkleRoots = new bytes32[](1);
     merkleRoots[0] = "rootAndAlsoRootOfRoots";
     address[] memory onRamps = new address[](1);
-    onRamps[0] = blobVerifierConfig().onRamps[0];
-    s_blobVerifier.report(
+    onRamps[0] = commitStoreConfig().onRamps[0];
+    s_commitStore.report(
       abi.encode(
-        CCIP.RelayReport({
+        CCIP.CommitReport({
           onRamps: onRamps,
           intervals: intervals,
           merkleRoots: merkleRoots,
@@ -314,7 +314,7 @@ contract BlobVerifier_verify is BlobVerifierRealAFNSetup {
     );
     bytes32[] memory proofs = new bytes32[](0);
     // We have not blessed this root, should return 0.
-    uint256 timestamp = s_blobVerifier.verify(merkleRoots, proofs, 2**1, proofs, 2**1);
+    uint256 timestamp = s_commitStore.verify(merkleRoots, proofs, 2**1, proofs, 2**1);
     assertEq(uint256(0), timestamp);
   }
 
@@ -324,10 +324,10 @@ contract BlobVerifier_verify is BlobVerifierRealAFNSetup {
     bytes32[] memory merkleRoots = new bytes32[](1);
     merkleRoots[0] = "rootAndAlsoRootOfRoots";
     address[] memory onRamps = new address[](1);
-    onRamps[0] = blobVerifierConfig().onRamps[0];
-    s_blobVerifier.report(
+    onRamps[0] = commitStoreConfig().onRamps[0];
+    s_commitStore.report(
       abi.encode(
-        CCIP.RelayReport({
+        CCIP.CommitReport({
           onRamps: onRamps,
           intervals: intervals,
           merkleRoots: merkleRoots,
@@ -337,10 +337,10 @@ contract BlobVerifier_verify is BlobVerifierRealAFNSetup {
     );
     // Bless that root.
     bytes32[] memory rootsWithOrigin = new bytes32[](1);
-    rootsWithOrigin[0] = keccak256(abi.encode(address(s_blobVerifier), merkleRoots[0]));
+    rootsWithOrigin[0] = keccak256(abi.encode(address(s_commitStore), merkleRoots[0]));
     s_afn.voteToBlessRoots(rootsWithOrigin);
     bytes32[] memory proofs = new bytes32[](0);
-    uint256 timestamp = s_blobVerifier.verify(merkleRoots, proofs, 2**1, proofs, 2**1);
+    uint256 timestamp = s_commitStore.verify(merkleRoots, proofs, 2**1, proofs, 2**1);
     assertEq(BLOCK_TIME, timestamp);
   }
 
@@ -350,8 +350,8 @@ contract BlobVerifier_verify is BlobVerifierRealAFNSetup {
     bytes32[] memory merkleRoots = new bytes32[](258);
     bytes32[] memory proofs = new bytes32[](0);
 
-    vm.expectRevert(BlobVerifierInterface.InvalidProof.selector);
+    vm.expectRevert(CommitStoreInterface.InvalidProof.selector);
 
-    s_blobVerifier.verify(merkleRoots, proofs, 0, proofs, 0);
+    s_commitStore.verify(merkleRoots, proofs, 0, proofs, 0);
   }
 }

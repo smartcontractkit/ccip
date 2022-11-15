@@ -21,7 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp_router"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/blob_verifier"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/custom_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_subscription_onramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_toll_onramp_router"
@@ -76,7 +76,7 @@ type CCIPContracts struct {
 	SourceCustomPool, DestCustomPool   *custom_token_pool.CustomTokenPool
 	SourceCustomToken, DestCustomToken *link_token_interface.LinkToken
 	SourceLinkToken, DestLinkToken     *link_token_interface.LinkToken
-	BlobVerifier                       *blob_verifier.BlobVerifier
+	CommitStore                        *commit_store.CommitStore
 	Receivers                          []MaybeRevertReceiver
 	SourceAFN, DestAFN                 *mock_afn_contract.MockAFNContract
 
@@ -177,7 +177,7 @@ func (c *CCIPContracts) DeployNewTollOffRamp() {
 			MaxTokensLength:                         15,
 			PermissionLessExecutionThresholdSeconds: 60,
 		},
-		c.BlobVerifier.Address(),
+		c.CommitStore.Address(),
 		c.DestAFN.Address(),
 		[]common.Address{c.SourceLinkToken.Address()},
 		[]common.Address{c.DestPool.Address()},
@@ -238,10 +238,10 @@ func (c *CCIPContracts) DeployNewTollOnRamp() {
 		[]common.Address{},                            // allow list
 		c.SourceAFN.Address(),                         // AFN
 		evm_2_evm_toll_onramp.BaseOnRampInterfaceOnRampConfig{
-			RelayingFeeJuels: 0,
-			MaxDataSize:      1e12,
-			MaxTokensLength:  5,
-			MaxGasLimit:      ccip.GasLimitPerTx,
+			CommitFeeJuels:  0,
+			MaxDataSize:     1e12,
+			MaxTokensLength: 5,
+			MaxGasLimit:     ccip.GasLimitPerTx,
 		},
 		evm_2_evm_toll_onramp.AggregateRateLimiterInterfaceRateLimiterConfig{
 			Capacity: HundredLink,
@@ -279,14 +279,14 @@ func (c *CCIPContracts) EnableTollOnRamp() {
 	require.NoError(c.t, err)
 	c.SourceChain.Commit()
 
-	c.t.Log("Enabling toll onRamp on blob verifier")
-	config, err := c.BlobVerifier.GetConfig(&bind.CallOpts{})
+	c.t.Log("Enabling toll onRamp on commitStore")
+	config, err := c.CommitStore.GetConfig(&bind.CallOpts{})
 	require.NoError(c.t, err)
 
 	config.OnRamps = append(config.OnRamps, c.TollOnRamp.Address())
 	config.MinSeqNrByOnRamp = append(config.MinSeqNrByOnRamp, 1)
 
-	_, err = c.BlobVerifier.SetConfig(c.DestUser, config)
+	_, err = c.CommitStore.SetConfig(c.DestUser, config)
 	require.NoError(c.t, err)
 
 	c.SourceChain.Commit()
@@ -343,7 +343,7 @@ func (ccipContracts *CCIPContracts) SetupOnchainConfig(oracles []confighelper.Or
 	blockBeforeConfig, err := ccipContracts.DestChain.BlockByNumber(context.Background(), nil)
 	require.NoError(ccipContracts.t, err)
 	// Set the DON on the offramp
-	_, err = ccipContracts.BlobVerifier.SetConfig0(
+	_, err = ccipContracts.CommitStore.SetConfig0(
 		ccipContracts.DestUser,
 		ccipContracts.OCRConfig.Signers,
 		ccipContracts.OCRConfig.Transmitters,
@@ -389,7 +389,7 @@ func (c CCIPContracts) NewCCIPJobSpecParams(tokensPerFeeCoinPipeline string) CCI
 		TollOnRamp:               c.TollOnRamp.Address(),
 		SubOnRamp:                c.SubOnRamp.Address(),
 		SubOffRamp:               c.SubOffRamp.Address(),
-		BlobVerifier:             c.BlobVerifier.Address(),
+		CommitStore:              c.CommitStore.Address(),
 		SourceChainId:            c.SourceChainID,
 		DestChainId:              c.DestChainID,
 		TokensPerFeeCoinPipeline: tokensPerFeeCoinPipeline,
@@ -511,10 +511,10 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 		[]common.Address{},                       // allow list
 		afnSourceAddress,                         // AFN
 		evm_2_evm_toll_onramp.BaseOnRampInterfaceOnRampConfig{
-			RelayingFeeJuels: 0,
-			MaxDataSize:      1e12,
-			MaxTokensLength:  5,
-			MaxGasLimit:      ccip.GasLimitPerTx,
+			CommitFeeJuels:  0,
+			MaxDataSize:     1e12,
+			MaxTokensLength: 5,
+			MaxGasLimit:     ccip.GasLimitPerTx,
 		},
 		evm_2_evm_toll_onramp.AggregateRateLimiterInterfaceRateLimiterConfig{
 			Capacity: HundredLink,
@@ -527,7 +527,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 	tollOnRamp, err := evm_2_evm_toll_onramp.NewEVM2EVMTollOnRamp(onRampAddress, sourceChain)
 	require.NoError(t, err)
 	tollOnRampFees := map[common.Address]*big.Int{
-		sourceLinkTokenAddress: big.NewInt(1), // 1 juel relay fee.
+		sourceLinkTokenAddress: big.NewInt(1), // 1 juel commit fee.
 	}
 	_, err = tollOnRamp.SetFeeConfig(sourceUser, evm_2_evm_toll_onramp.EVM2EVMTollOnRampInterfaceFeeConfig{
 		Fees:      []*big.Int{tollOnRampFees[sourceLinkTokenAddress]},
@@ -555,16 +555,16 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 	require.NoError(t, err)
 
 	// Deploy offramp dest chain
-	blobVerifierAddress, _, _, err := blob_verifier.DeployBlobVerifier(
+	commitStoreAddress, _, _, err := commit_store.DeployCommitStore(
 		destUser,    // user
 		destChain,   // client
 		destChainID, // dest chain id
 		sourceChainID,
 		afnDestAddress, // AFN address
-		blob_verifier.BlobVerifierInterfaceBlobVerifierConfig{},
+		commit_store.CommitStoreInterfaceCommitStoreConfig{},
 	)
 	require.NoError(t, err)
-	blobVerifier, err := blob_verifier.NewBlobVerifier(blobVerifierAddress, destChain)
+	commitStore, err := commit_store.NewCommitStore(commitStoreAddress, destChain)
 	require.NoError(t, err)
 	// Set the pool to be the offramp
 	destChain.Commit()
@@ -579,7 +579,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 			MaxDataSize:           1e12,
 			MaxTokensLength:       5,
 		},
-		blobVerifier.Address(),
+		commitStore.Address(),
 		afnDestAddress,
 		[]common.Address{sourceLinkTokenAddress},
 		[]common.Address{destPoolAddress},
@@ -631,10 +631,10 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 		[]common.Address{},                       // allow list
 		afnSourceAddress,                         // AFN
 		evm_2_evm_subscription_onramp.BaseOnRampInterfaceOnRampConfig{
-			RelayingFeeJuels: 0,
-			MaxDataSize:      1e12,
-			MaxTokensLength:  5,
-			MaxGasLimit:      ccip.GasLimitPerTx,
+			CommitFeeJuels:  0,
+			MaxDataSize:     1e12,
+			MaxTokensLength: 5,
+			MaxGasLimit:     ccip.GasLimitPerTx,
 		},
 		evm_2_evm_subscription_onramp.AggregateRateLimiterInterfaceRateLimiterConfig{
 			Capacity: HundredLink,
@@ -680,7 +680,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 			MaxDataSize:           1e12,
 			MaxTokensLength:       5,
 		},
-		blobVerifier.Address(),
+		commitStore.Address(),
 		afnDestAddress,
 		[]common.Address{sourceLinkTokenAddress},
 		[]common.Address{destPoolAddress},
@@ -710,8 +710,8 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 	require.NoError(t, err)
 	_, err = subOffRampRouter.GetFeeToken(nil)
 	require.NoError(t, err)
-	// Enable onramps on blob verifier.
-	_, err = blobVerifier.SetConfig(destUser, blob_verifier.BlobVerifierInterfaceBlobVerifierConfig{
+	// Enable onramps on commitStore.
+	_, err = commitStore.SetConfig(destUser, commit_store.CommitStoreInterfaceCommitStoreConfig{
 		OnRamps:          []common.Address{onRampAddress, subOnRampAddress},
 		MinSeqNrByOnRamp: []uint64{1, 1},
 	})
@@ -742,7 +742,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 		DestLinkToken:     destLinkToken,
 		SourceCustomToken: sourceCustomToken,
 		DestCustomToken:   destCustomToken,
-		BlobVerifier:      blobVerifier,
+		CommitStore:       commitStore,
 		Receivers:         []MaybeRevertReceiver{{Receiver: revertingMessageReceiver1, Strict: false}, {Receiver: revertingMessageReceiver2, Strict: true}},
 		SourceAFN:         sourceAFN,
 		DestAFN:           destAFN,
@@ -893,15 +893,15 @@ func AssertSubExecFailure(t *testing.T, ccipContracts CCIPContracts, log logpoll
 	}
 }
 
-func EventuallyReportRelayed(t *testing.T, ccipContracts CCIPContracts, onRamp common.Address, min, max int) {
+func EventuallyReportCommitted(t *testing.T, ccipContracts CCIPContracts, onRamp common.Address, min, max int) {
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
-		minSeqNum, err := ccipContracts.BlobVerifier.GetExpectedNextSequenceNumber(nil, onRamp)
+		minSeqNum, err := ccipContracts.CommitStore.GetExpectedNextSequenceNumber(nil, onRamp)
 		require.NoError(t, err)
 		ccipContracts.SourceChain.Commit()
 		ccipContracts.DestChain.Commit()
 		t.Log("min seq num reported", minSeqNum)
 		return minSeqNum > uint64(max)
-	}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue(), "report has not been relayed")
+	}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue(), "report has not been committed")
 }
 
 func EventuallyExecutionStateChangedToSuccess(t *testing.T, ccipContracts CCIPContracts, seqNum []uint64, blockNum uint64) {
@@ -920,20 +920,20 @@ func EventuallyExecutionStateChangedToSuccess(t *testing.T, ccipContracts CCIPCo
 		Should(gomega.BeTrue(), "ExecutionStateChanged Event")
 }
 
-func EventuallyRelayReportAccepted(t *testing.T, ccipContracts CCIPContracts, currentBlock uint64) blob_verifier.CCIPRelayReport {
+func EventuallyCommitReportAccepted(t *testing.T, ccipContracts CCIPContracts, currentBlock uint64) commit_store.CCIPCommitReport {
 	g := gomega.NewGomegaWithT(t)
-	var report blob_verifier.CCIPRelayReport
+	var report commit_store.CCIPCommitReport
 	g.Eventually(func() []common.Address {
-		it, err := ccipContracts.BlobVerifier.FilterReportAccepted(&bind.FilterOpts{Start: currentBlock})
+		it, err := ccipContracts.CommitStore.FilterReportAccepted(&bind.FilterOpts{Start: currentBlock})
 		g.Expect(err).NotTo(gomega.HaveOccurred(), "Error filtering ReportAccepted event")
 		g.Expect(it.Next()).To(gomega.BeTrue(), "No ReportAccepted event found")
 		report = it.Event.Report
 		if len(report.OnRamps) > 0 {
-			t.Log("Report Accepted by blob verifier")
+			t.Log("Report Accepted by commitStore")
 		}
 		return report.OnRamps
 	}, testutils.WaitTimeout(t), 1*time.Second).
-		Should(gomega.ContainElement(ccipContracts.SubOnRamp.Address()), "report has not been relayed")
+		Should(gomega.ContainElement(ccipContracts.SubOnRamp.Address()), "report has not been committed")
 	return report
 }
 
@@ -942,7 +942,7 @@ func ExecuteSubMessage(
 	ccipContracts CCIPContracts,
 	req logpoller.Log,
 	allReqs []logpoller.Log,
-	report blob_verifier.CCIPRelayReport,
+	report commit_store.CCIPCommitReport,
 ) uint64 {
 	t.Log("Executing request manually")
 	// Build full tree for report
@@ -955,7 +955,7 @@ func ExecuteSubMessage(
 		require.NoError(t, err)
 		leafHashes = append(leafHashes, hash)
 	}
-	intervalsByOnRamp := make(map[common.Address]blob_verifier.CCIPInterval)
+	intervalsByOnRamp := make(map[common.Address]commit_store.CCIPInterval)
 	merkleRootsByOnRamp := make(map[common.Address][32]byte)
 	for i, onRamp := range report.OnRamps {
 		intervalsByOnRamp[onRamp] = report.Intervals[i]

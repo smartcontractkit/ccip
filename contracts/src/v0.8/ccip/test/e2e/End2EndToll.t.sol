@@ -4,21 +4,21 @@ pragma solidity 0.8.15;
 import "../../offRamp/toll/Any2EVMTollOffRampRouter.sol";
 import "../offRamp/toll/EVM2EVMTollOffRampSetup.t.sol";
 import "../onRamp/toll/EVM2EVMTollOnRampSetup.t.sol";
-import "../blobVerifier/BlobVerifier.t.sol";
+import "../commitStore/CommitStore.t.sol";
 
-contract E2E_toll is EVM2EVMTollOnRampSetup, BlobVerifierSetup, EVM2EVMTollOffRampSetup {
+contract E2E_toll is EVM2EVMTollOnRampSetup, CommitStoreSetup, EVM2EVMTollOffRampSetup {
   using CCIP for CCIP.EVM2EVMTollMessage;
 
   Any2EVMOffRampRouterInterface public s_router;
 
   MerkleHelper public s_merkleHelper;
 
-  function setUp() public virtual override(EVM2EVMTollOnRampSetup, BlobVerifierSetup, EVM2EVMTollOffRampSetup) {
+  function setUp() public virtual override(EVM2EVMTollOnRampSetup, CommitStoreSetup, EVM2EVMTollOffRampSetup) {
     EVM2EVMTollOnRampSetup.setUp();
-    BlobVerifierSetup.setUp();
+    CommitStoreSetup.setUp();
     EVM2EVMTollOffRampSetup.setUp();
 
-    deployOffRamp(s_blobVerifier);
+    deployOffRamp(s_commitStore);
 
     s_merkleHelper = new MerkleHelper();
 
@@ -41,7 +41,7 @@ contract E2E_toll is EVM2EVMTollOnRampSetup, BlobVerifierSetup, EVM2EVMTollOffRa
 
     // Asserts that the tokens have been sent and the fee has been paid.
     assertEq(
-      balance0Pre - messages.length * (i_tokenAmount0 + RELAYING_FEE_JUELS + EXECUTION_FEE_AMOUNT),
+      balance0Pre - messages.length * (i_tokenAmount0 + COMMIT_FEE_JUELS + EXECUTION_FEE_AMOUNT),
       token0.balanceOf(OWNER)
     );
     assertEq(balance1Pre - messages.length * i_tokenAmount1, token1.balanceOf(OWNER));
@@ -60,22 +60,22 @@ contract E2E_toll is EVM2EVMTollOnRampSetup, BlobVerifierSetup, EVM2EVMTollOffRa
     merkleRoots[0] = s_merkleHelper.getMerkleRoot(hashedMessages);
 
     address[] memory onRamps = new address[](1);
-    onRamps[0] = blobVerifierConfig().onRamps[0];
+    onRamps[0] = commitStoreConfig().onRamps[0];
 
-    CCIP.RelayReport memory report = CCIP.RelayReport({
+    CCIP.CommitReport memory report = CCIP.CommitReport({
       onRamps: onRamps,
       intervals: intervals,
       merkleRoots: merkleRoots,
       rootOfRoots: merkleRoots[0]
     });
 
-    s_blobVerifier.report(abi.encode(report));
+    s_commitStore.report(abi.encode(report));
     bytes32[] memory proofs = new bytes32[](0);
-    uint256 timestamp = s_blobVerifier.verify(merkleRoots, proofs, 2**2 - 1, proofs, 2**2 - 1);
+    uint256 timestamp = s_commitStore.verify(merkleRoots, proofs, 2**2 - 1, proofs, 2**2 - 1);
     assertEq(BLOCK_TIME, timestamp);
 
     // We change the block time so when execute would e.g. use the current
-    // block time instead of the relayed block time the value would be
+    // block time instead of the committed block time the value would be
     // incorrect in the checks below.
     vm.warp(BLOCK_TIME + 2000);
 
@@ -93,11 +93,11 @@ contract E2E_toll is EVM2EVMTollOnRampSetup, BlobVerifierSetup, EVM2EVMTollOffRa
 
   function sendRequest(uint64 expectedSeqNum) public returns (CCIP.EVM2EVMTollMessage memory) {
     CCIP.EVM2AnyTollMessage memory message = _generateTokenMessage();
-    message.feeTokenAndAmount.amount = RELAYING_FEE_JUELS + EXECUTION_FEE_AMOUNT;
+    message.feeTokenAndAmount.amount = COMMIT_FEE_JUELS + EXECUTION_FEE_AMOUNT;
 
     IERC20(s_sourceTokens[0]).approve(
       address(s_onRampRouter),
-      i_tokenAmount0 + RELAYING_FEE_JUELS + EXECUTION_FEE_AMOUNT
+      i_tokenAmount0 + COMMIT_FEE_JUELS + EXECUTION_FEE_AMOUNT
     );
     IERC20(s_sourceTokens[1]).approve(address(s_onRampRouter), i_tokenAmount1);
 

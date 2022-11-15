@@ -3,7 +3,7 @@ pragma solidity 0.8.15;
 
 import "../../interfaces/offRamp/BaseOffRampInterface.sol";
 import "../../interfaces/applications/Any2EVMMessageReceiverInterface.sol";
-import "../../interfaces/BlobVerifierInterface.sol";
+import "../../interfaces/CommitStoreInterface.sol";
 
 contract MockOffRamp is BaseOffRampInterface {
   IERC20 public s_token;
@@ -52,12 +52,12 @@ contract MockOffRamp is BaseOffRampInterface {
   }
 
   /// @inheritdoc BaseOffRampInterface
-  function getBlobVerifier() public pure returns (BlobVerifierInterface) {
-    return BlobVerifierInterface(address(1));
+  function getCommitStore() public pure returns (CommitStoreInterface) {
+    return CommitStoreInterface(address(1));
   }
 
   /// @inheritdoc BaseOffRampInterface
-  function setBlobVerifier(BlobVerifierInterface blobVerifier) public pure {}
+  function setCommitStore(CommitStoreInterface commitStore) public pure {}
 
   /// @inheritdoc BaseOffRampInterface
   function getConfig() public pure returns (OffRampConfig memory config) {}

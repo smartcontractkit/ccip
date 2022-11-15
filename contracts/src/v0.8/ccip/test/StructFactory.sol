@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../interfaces/BlobVerifierInterface.sol";
+import "../interfaces/CommitStoreInterface.sol";
 import "../interfaces/offRamp/BaseOffRampInterface.sol";
 import "../interfaces/onRamp/BaseOnRampInterface.sol";
 import "../interfaces/subscription/SubscriptionInterface.sol";
@@ -80,20 +80,20 @@ contract StructFactory {
   }
 
   // onRamp
-  uint64 internal constant RELAYING_FEE_JUELS = 1e18;
+  uint64 internal constant COMMIT_FEE_JUELS = 1e18;
 
   function onRampConfig() internal pure returns (BaseOnRampInterface.OnRampConfig memory) {
     return
       BaseOnRampInterface.OnRampConfig({
-        relayingFeeJuels: RELAYING_FEE_JUELS,
+        commitFeeJuels: COMMIT_FEE_JUELS,
         maxDataSize: MAX_DATA_SIZE,
         maxTokensLength: MAX_TOKENS_LENGTH,
         maxGasLimit: MAX_GAS_LIMIT
       });
   }
 
-  // blob verifier
-  function blobVerifierConfig() internal pure returns (BlobVerifierInterface.BlobVerifierConfig memory) {
+  // commitStore
+  function commitStoreConfig() internal pure returns (CommitStoreInterface.CommitStoreConfig memory) {
     address[] memory onRamps = new address[](3);
     onRamps[0] = ON_RAMP_ADDRESS;
     onRamps[1] = 0x2C44CDDdB6a900Fa2B585dd299E03D12Fa4293Bc;
@@ -102,7 +102,7 @@ contract StructFactory {
     minSequenceNumbers[0] = 1;
     minSequenceNumbers[1] = 1;
     minSequenceNumbers[2] = 1;
-    return BlobVerifierInterface.BlobVerifierConfig({onRamps: onRamps, minSeqNrByOnRamp: minSequenceNumbers});
+    return CommitStoreInterface.CommitStoreConfig({onRamps: onRamps, minSeqNrByOnRamp: minSequenceNumbers});
   }
 
   // subscription

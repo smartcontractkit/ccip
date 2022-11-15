@@ -11,23 +11,23 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/blob_verifier"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
 )
 
-const MaxRelayReportLength = 1000 // TODO: Need to rethink this based on root of roots report.
+const MaxCommitReportLength = 1000 // TODO: Need to rethink this based on root of roots report.
 
 var (
-	_ types.ReportingPluginFactory = &RelayReportingPluginFactory{}
-	_ types.ReportingPlugin        = &RelayReportingPlugin{}
+	_ types.ReportingPluginFactory = &CommitReportingPluginFactory{}
+	_ types.ReportingPlugin        = &CommitReportingPlugin{}
 )
 
-// EncodeRelayReport abi encodes an offramp.CCIPRelayReport.
-func EncodeRelayReport(relayReport *blob_verifier.CCIPRelayReport) (types.Report, error) {
-	report, err := makeRelayReportArgs().PackValues([]interface{}{
-		relayReport,
+// EncodeCommitReport abi encodes an offramp.CCIPCommitReport.
+func EncodeCommitReport(commitReport *commit_store.CCIPCommitReport) (types.Report, error) {
+	report, err := makeCommitReportArgs().PackValues([]interface{}{
+		commitReport,
 	})
 	if err != nil {
 		return nil, err
@@ -35,16 +35,16 @@ func EncodeRelayReport(relayReport *blob_verifier.CCIPRelayReport) (types.Report
 	return report, nil
 }
 
-// DecodeRelayReport abi decodes a types.Report to an offramp.CCIPRelayReport
-func DecodeRelayReport(report types.Report) (*blob_verifier.CCIPRelayReport, error) {
-	unpacked, err := makeRelayReportArgs().Unpack(report)
+// DecodeCommitReport abi decodes a types.Report to an offramp.CCIPCommitReport
+func DecodeCommitReport(report types.Report) (*commit_store.CCIPCommitReport, error) {
+	unpacked, err := makeCommitReportArgs().Unpack(report)
 	if err != nil {
 		return nil, err
 	}
 	if len(unpacked) != 1 {
 		return nil, errors.New("expected single struct value")
 	}
-	relayReport, ok := unpacked[0].(struct {
+	commitReport, ok := unpacked[0].(struct {
 		OnRamps   []common.Address `json:"onRamps"`
 		Intervals []struct {
 			Min uint64 `json:"min"`
@@ -54,31 +54,31 @@ func DecodeRelayReport(report types.Report) (*blob_verifier.CCIPRelayReport, err
 		RootOfRoots [32]byte   `json:"rootOfRoots"`
 	})
 	if !ok {
-		return nil, errors.Errorf("invalid relay report got %T", unpacked[0])
+		return nil, errors.Errorf("invalid commit report got %T", unpacked[0])
 	}
-	var intervalsF []blob_verifier.CCIPInterval
-	for i := range relayReport.Intervals {
-		intervalsF = append(intervalsF, blob_verifier.CCIPInterval{
-			Min: relayReport.Intervals[i].Min,
-			Max: relayReport.Intervals[i].Max,
+	var intervalsF []commit_store.CCIPInterval
+	for i := range commitReport.Intervals {
+		intervalsF = append(intervalsF, commit_store.CCIPInterval{
+			Min: commitReport.Intervals[i].Min,
+			Max: commitReport.Intervals[i].Max,
 		})
 	}
-	return &blob_verifier.CCIPRelayReport{
-		OnRamps:     relayReport.OnRamps,
+	return &commit_store.CCIPCommitReport{
+		OnRamps:     commitReport.OnRamps,
 		Intervals:   intervalsF,
-		MerkleRoots: relayReport.MerkleRoots,
-		RootOfRoots: relayReport.RootOfRoots,
+		MerkleRoots: commitReport.MerkleRoots,
+		RootOfRoots: commitReport.RootOfRoots,
 	}, nil
 }
 
-func isBlobVerifierDownNow(lggr logger.Logger, blobVerifier *blob_verifier.BlobVerifier) bool {
-	paused, err := blobVerifier.Paused(nil)
+func isCommitStoreDownNow(lggr logger.Logger, commitStore *commit_store.CommitStore) bool {
+	paused, err := commitStore.Paused(nil)
 	if err != nil {
 		// Air on side of caution by halting if we cannot read the state?
 		lggr.Errorw("Unable to read offramp paused", "err", err)
 		return true
 	}
-	healthy, err := blobVerifier.IsAFNHealthy(nil)
+	healthy, err := commitStore.IsAFNHealthy(nil)
 	if err != nil {
 		lggr.Errorw("Unable to read offramp afn", "err", err)
 		return true
@@ -87,73 +87,73 @@ func isBlobVerifierDownNow(lggr logger.Logger, blobVerifier *blob_verifier.BlobV
 }
 
 type InflightReport struct {
-	report    *blob_verifier.CCIPRelayReport
+	report    *commit_store.CCIPCommitReport
 	createdAt time.Time
 }
 
-type RelayReportingPluginFactory struct {
+type CommitReportingPluginFactory struct {
 	lggr                logger.Logger
 	source              logpoller.LogPoller
 	onRampSeqParsers    map[common.Address]func(log logpoller.Log) (uint64, error)
 	onRampToReqEventSig map[common.Address]common.Hash
 	onRamps             []common.Address
-	blobVerifier        *blob_verifier.BlobVerifier
+	commitStore         *commit_store.CommitStore
 	onRampToHasher      map[common.Address]LeafHasher[[32]byte]
 	inflightCacheExpiry time.Duration
 }
 
-// NewRelayReportingPluginFactory return a new RelayReportingPluginFactory.
-func NewRelayReportingPluginFactory(
+// NewCommitReportingPluginFactory return a new CommitReportingPluginFactory.
+func NewCommitReportingPluginFactory(
 	lggr logger.Logger,
 	source logpoller.LogPoller,
-	blobVerifier *blob_verifier.BlobVerifier,
+	commitStore *commit_store.CommitStore,
 	onRampSeqParsers map[common.Address]func(log logpoller.Log) (uint64, error),
 	onRampToReqEventSig map[common.Address]common.Hash,
 	onRamps []common.Address,
 	onRampToHasher map[common.Address]LeafHasher[[32]byte],
 	inflightCacheExpiry time.Duration,
 ) types.ReportingPluginFactory {
-	return &RelayReportingPluginFactory{lggr: lggr, blobVerifier: blobVerifier, onRampToReqEventSig: onRampToReqEventSig, onRampSeqParsers: onRampSeqParsers, onRamps: onRamps, source: source, onRampToHasher: onRampToHasher, inflightCacheExpiry: inflightCacheExpiry}
+	return &CommitReportingPluginFactory{lggr: lggr, commitStore: commitStore, onRampToReqEventSig: onRampToReqEventSig, onRampSeqParsers: onRampSeqParsers, onRamps: onRamps, source: source, onRampToHasher: onRampToHasher, inflightCacheExpiry: inflightCacheExpiry}
 }
 
-// NewReportingPlugin returns the ccip RelayReportingPlugin and satisfies the ReportingPluginFactory interface.
-func (rf *RelayReportingPluginFactory) NewReportingPlugin(config types.ReportingPluginConfig) (types.ReportingPlugin, types.ReportingPluginInfo, error) {
+// NewReportingPlugin returns the ccip CommitReportingPlugin and satisfies the ReportingPluginFactory interface.
+func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.ReportingPluginConfig) (types.ReportingPlugin, types.ReportingPluginInfo, error) {
 	offchainConfig, err := Decode(config.OffchainConfig)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
-	return &RelayReportingPlugin{
-			lggr:                rf.lggr.Named("RelayReportingPlugin"),
+	return &CommitReportingPlugin{
+			lggr:                rf.lggr.Named("CommitReportingPlugin"),
 			F:                   config.F,
 			source:              rf.source,
 			onRampSeqParsers:    rf.onRampSeqParsers,
 			onRampToReqEventSig: rf.onRampToReqEventSig,
 			onRamps:             rf.onRamps,
-			blobVerifier:        rf.blobVerifier,
+			commitStore:         rf.commitStore,
 			inFlight:            make(map[[32]byte]InflightReport),
 			offchainConfig:      offchainConfig,
 			onRampToHasher:      rf.onRampToHasher,
 			inflightCacheExpiry: rf.inflightCacheExpiry,
 		},
 		types.ReportingPluginInfo{
-			Name:          "CCIPRelay",
+			Name:          "CCIPCommit",
 			UniqueReports: true,
 			Limits: types.ReportingPluginLimits{
 				MaxQueryLength:       0,
 				MaxObservationLength: MaxObservationLength,
-				MaxReportLength:      MaxRelayReportLength,
+				MaxReportLength:      MaxCommitReportLength,
 			},
 		}, nil
 }
 
-type RelayReportingPlugin struct {
+type CommitReportingPlugin struct {
 	lggr                logger.Logger
 	F                   int
 	source              logpoller.LogPoller
 	onRamps             []common.Address
 	onRampToReqEventSig map[common.Address]common.Hash
 	onRampSeqParsers    map[common.Address]func(log logpoller.Log) (uint64, error)
-	blobVerifier        *blob_verifier.BlobVerifier
+	commitStore         *commit_store.CommitStore
 	// We need to synchronize access to the inflight structure
 	// as reporting plugin methods may be called from separate goroutines,
 	// e.g. reporting vs transmission protocol.
@@ -164,11 +164,11 @@ type RelayReportingPlugin struct {
 	inflightCacheExpiry time.Duration
 }
 
-func (r *RelayReportingPlugin) nextMinSeqNumForOffRamp(onRamp common.Address) (uint64, error) {
-	return r.blobVerifier.GetExpectedNextSequenceNumber(nil, onRamp)
+func (r *CommitReportingPlugin) nextMinSeqNumForOffRamp(onRamp common.Address) (uint64, error) {
+	return r.commitStore.GetExpectedNextSequenceNumber(nil, onRamp)
 }
 
-func (r *RelayReportingPlugin) nextMinSeqNumForInFlight(onRamp common.Address) uint64 {
+func (r *CommitReportingPlugin) nextMinSeqNumForInFlight(onRamp common.Address) uint64 {
 	r.inFlightMu.RLock()
 	defer r.inFlightMu.RUnlock()
 	max := uint64(0)
@@ -185,7 +185,7 @@ func (r *RelayReportingPlugin) nextMinSeqNumForInFlight(onRamp common.Address) u
 	return max + 1
 }
 
-func (r *RelayReportingPlugin) nextMinSeqNum(onRamp common.Address) (uint64, error) {
+func (r *CommitReportingPlugin) nextMinSeqNum(onRamp common.Address) (uint64, error) {
 	nextMin, err := r.nextMinSeqNumForOffRamp(onRamp)
 	if err != nil {
 		return 0, err
@@ -197,22 +197,22 @@ func (r *RelayReportingPlugin) nextMinSeqNum(onRamp common.Address) (uint64, err
 	return nextMin, nil
 }
 
-func (r *RelayReportingPlugin) Query(ctx context.Context, timestamp types.ReportTimestamp) (types.Query, error) {
+func (r *CommitReportingPlugin) Query(ctx context.Context, timestamp types.ReportTimestamp) (types.Query, error) {
 	return types.Query{}, nil
 }
 
-func (r *RelayReportingPlugin) Observation(ctx context.Context, timestamp types.ReportTimestamp, query types.Query) (types.Observation, error) {
-	lggr := r.lggr.Named("RelayObservation")
-	if isBlobVerifierDownNow(lggr, r.blobVerifier) {
-		return nil, ErrBlobVerifierIsDown
+func (r *CommitReportingPlugin) Observation(ctx context.Context, timestamp types.ReportTimestamp, query types.Query) (types.Observation, error) {
+	lggr := r.lggr.Named("CommitObservation")
+	if isCommitStoreDownNow(lggr, r.commitStore) {
+		return nil, ErrCommitStoreIsDown
 	}
-	intervalsByOnRamp := make(map[common.Address]blob_verifier.CCIPInterval)
+	intervalsByOnRamp := make(map[common.Address]commit_store.CCIPInterval)
 	for _, onRamp := range r.onRamps {
 		nextMin, err := r.nextMinSeqNum(onRamp)
 		if err != nil {
 			return nil, err
 		}
-		// All available messages that have not been relayed yet and have sufficient confirmations.
+		// All available messages that have not been committed yet and have sufficient confirmations.
 		lggr.Infof("Looking for requests with sig %s and nextMin %d on onRamp %s", r.onRampToReqEventSig[onRamp].Hex(), nextMin, onRamp.Hex())
 		reqs, err := r.source.LogsDataWordGreaterThan(r.onRampToReqEventSig[onRamp], onRamp, SendRequestedSequenceNumberIndex, EvmWord(nextMin), int(r.offchainConfig.SourceIncomingConfirmations))
 		if err != nil {
@@ -237,7 +237,7 @@ func (r *RelayReportingPlugin) Observation(ctx context.Context, timestamp types.
 		if !contiguousReqs(lggr, min, max, seqNrs) {
 			return nil, errors.New("unexpected gap in seq nums")
 		}
-		intervalsByOnRamp[onRamp] = blob_verifier.CCIPInterval{
+		intervalsByOnRamp[onRamp] = commit_store.CCIPInterval{
 			Min: min,
 			Max: max,
 		}
@@ -247,13 +247,13 @@ func (r *RelayReportingPlugin) Observation(ctx context.Context, timestamp types.
 		lggr.Infow("No observations")
 		return []byte{}, nil
 	}
-	return RelayObservation{
+	return CommitObservation{
 		IntervalsByOnRamp: intervalsByOnRamp,
 	}.Marshal()
 }
 
 // buildReport assumes there is at least one message in reqs.
-func (r *RelayReportingPlugin) buildReport(intervalByOnRamp map[common.Address]blob_verifier.CCIPInterval) (*blob_verifier.CCIPRelayReport, error) {
+func (r *CommitReportingPlugin) buildReport(intervalByOnRamp map[common.Address]commit_store.CCIPInterval) (*commit_store.CCIPCommitReport, error) {
 	lggr := r.lggr.Named("BuildReport")
 	leafsByOnRamp, err := leafsFromIntervals(lggr, r.onRampToReqEventSig, r.onRampSeqParsers, intervalByOnRamp, r.source, r.onRampToHasher, int(r.offchainConfig.SourceIncomingConfirmations))
 	if err != nil {
@@ -263,7 +263,7 @@ func (r *RelayReportingPlugin) buildReport(intervalByOnRamp map[common.Address]b
 	var (
 		onRamps   []common.Address
 		roots     [][32]byte
-		intervals []blob_verifier.CCIPInterval
+		intervals []commit_store.CCIPInterval
 	)
 	mctx := hasher.NewKeccakCtx()
 	for onRamp, leaves := range leafsByOnRamp {
@@ -278,21 +278,21 @@ func (r *RelayReportingPlugin) buildReport(intervalByOnRamp map[common.Address]b
 		roots = append(roots, tree.Root())
 		onRamps = append(onRamps, onRamp)
 		interval := intervalByOnRamp[onRamp]
-		intervals = append(intervals, blob_verifier.CCIPInterval{
+		intervals = append(intervals, commit_store.CCIPInterval{
 			Min: interval.Min,
 			Max: interval.Max,
 		})
 	}
 	if len(roots) == 0 {
 		lggr.Warn("No valid roots found")
-		return &blob_verifier.CCIPRelayReport{}, errors.New("No valid roots found")
+		return &commit_store.CCIPCommitReport{}, errors.New("No valid roots found")
 	}
 	// Make a root of roots
 	outerTree, err := merklemulti.NewTree(mctx, roots)
 	if err != nil {
 		return nil, err
 	}
-	return &blob_verifier.CCIPRelayReport{
+	return &commit_store.CCIPCommitReport{
 		MerkleRoots: roots,
 		Intervals:   intervals,
 		OnRamps:     onRamps,
@@ -300,25 +300,25 @@ func (r *RelayReportingPlugin) buildReport(intervalByOnRamp map[common.Address]b
 	}, nil
 }
 
-func (r *RelayReportingPlugin) Report(ctx context.Context, timestamp types.ReportTimestamp, query types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
+func (r *CommitReportingPlugin) Report(ctx context.Context, timestamp types.ReportTimestamp, query types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
 	lggr := r.lggr.Named("Report")
-	if isBlobVerifierDownNow(lggr, r.blobVerifier) {
-		return false, nil, ErrBlobVerifierIsDown
+	if isCommitStoreDownNow(lggr, r.commitStore) {
+		return false, nil, ErrCommitStoreIsDown
 	}
-	nonEmptyObservations := getNonEmptyObservations[RelayObservation](lggr, observations)
+	nonEmptyObservations := getNonEmptyObservations[CommitObservation](lggr, observations)
 	// Need at least F+1 valid observations
 	if len(nonEmptyObservations) <= r.F {
 		lggr.Debugf("Non-empty observations <= F, need at least F+1 to continue")
 		return false, nil, nil
 	}
 	// Group intervals by onramp.
-	intervalsByOnRamp := make(map[common.Address][]blob_verifier.CCIPInterval)
+	intervalsByOnRamp := make(map[common.Address][]commit_store.CCIPInterval)
 	for _, obs := range nonEmptyObservations {
 		for onRamp, interval := range obs.IntervalsByOnRamp {
 			intervalsByOnRamp[onRamp] = append(intervalsByOnRamp[onRamp], interval)
 		}
 	}
-	intervalByOnRamp := make(map[common.Address]blob_verifier.CCIPInterval)
+	intervalByOnRamp := make(map[common.Address]commit_store.CCIPInterval)
 	for onRamp, intervals := range intervalsByOnRamp {
 		if len(intervals) <= r.F {
 			lggr.Debugf("Observations for OnRamp %s 1 < #obs <= F, need at least F+1 to continue", onRamp.Hex())
@@ -350,7 +350,7 @@ func (r *RelayReportingPlugin) Report(ctx context.Context, timestamp types.Repor
 		if nextMin > minSeqNum {
 			return false, nil, errors.Errorf("invalid min seq number got %v want %v", minSeqNum, nextMin)
 		}
-		intervalByOnRamp[onRamp] = blob_verifier.CCIPInterval{
+		intervalByOnRamp[onRamp] = commit_store.CCIPInterval{
 			Min: minSeqNum,
 			Max: maxSeqNum,
 		}
@@ -359,7 +359,7 @@ func (r *RelayReportingPlugin) Report(ctx context.Context, timestamp types.Repor
 	if err != nil {
 		return false, nil, err
 	}
-	encodedReport, err := EncodeRelayReport(report)
+	encodedReport, err := EncodeCommitReport(report)
 	if err != nil {
 		return false, nil, err
 	}
@@ -367,7 +367,7 @@ func (r *RelayReportingPlugin) Report(ctx context.Context, timestamp types.Repor
 	return true, encodedReport, nil
 }
 
-func (r *RelayReportingPlugin) updateInflight(lggr logger.Logger, report *blob_verifier.CCIPRelayReport) {
+func (r *CommitReportingPlugin) updateInflight(lggr logger.Logger, report *commit_store.CCIPCommitReport) {
 	r.inFlightMu.Lock()
 	defer r.inFlightMu.Unlock()
 	// Reap any expired entries from inflight.
@@ -384,9 +384,9 @@ func (r *RelayReportingPlugin) updateInflight(lggr logger.Logger, report *blob_v
 	}
 }
 
-func (r *RelayReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context, timestamp types.ReportTimestamp, report types.Report) (bool, error) {
+func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context, timestamp types.ReportTimestamp, report types.Report) (bool, error) {
 	lggr := r.lggr.Named("ShouldAcceptFinalizedReport")
-	parsedReport, err := DecodeRelayReport(report)
+	parsedReport, err := DecodeCommitReport(report)
 	if err != nil {
 		return false, nil
 	}
@@ -400,19 +400,19 @@ func (r *RelayReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context, 
 	return true, nil
 }
 
-func (r *RelayReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context, timestamp types.ReportTimestamp, report types.Report) (bool, error) {
-	parsedReport, err := DecodeRelayReport(report)
+func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context, timestamp types.ReportTimestamp, report types.Report) (bool, error) {
+	parsedReport, err := DecodeCommitReport(report)
 	if err != nil {
 		return false, nil
 	}
 	// If report is not stale we transmit.
-	// When the relayTransmitter enqueues the tx for bptxm,
+	// When the commitTransmitter enqueues the tx for bptxm,
 	// we mark it as fulfilled, effectively removing it from the set of inflight messages.
 	return !r.isStaleReport(parsedReport), nil
 }
 
-func (r *RelayReportingPlugin) isStaleReport(report *blob_verifier.CCIPRelayReport) bool {
-	if isBlobVerifierDownNow(r.lggr, r.blobVerifier) {
+func (r *CommitReportingPlugin) isStaleReport(report *commit_store.CCIPCommitReport) bool {
+	if isCommitStoreDownNow(r.lggr, r.commitStore) {
 		return true
 	}
 	for i, onRamp := range report.OnRamps {
@@ -432,6 +432,6 @@ func (r *RelayReportingPlugin) isStaleReport(report *blob_verifier.CCIPRelayRepo
 	return false
 }
 
-func (r *RelayReportingPlugin) Close() error {
+func (r *CommitReportingPlugin) Close() error {
 	return nil
 }

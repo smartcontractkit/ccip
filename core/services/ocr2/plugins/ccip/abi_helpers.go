@@ -9,7 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/blob_verifier"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_subscription_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
 	"github.com/smartcontractkit/chainlink/core/utils"
@@ -64,18 +64,18 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	blobVerifierABI, err := abi.JSON(strings.NewReader(blob_verifier.BlobVerifierABI))
+	commitStoreABI, err := abi.JSON(strings.NewReader(commit_store.CommitStoreABI))
 	if err != nil {
 		panic(err)
 	}
 	CCIPTollSendRequested = getIDOrPanic("CCIPSendRequested", tollOnRampABI)
 	CCIPSubSendRequested = getIDOrPanic("CCIPSendRequested", subOnRampABI)
-	ReportAccepted = getIDOrPanic("ReportAccepted", blobVerifierABI)
+	ReportAccepted = getIDOrPanic("ReportAccepted", commitStoreABI)
 	ExecutionStateChanged = getIDOrPanic("ExecutionStateChanged", offRampABI)
-	ConfigSet = getIDOrPanic("ConfigSet", blobVerifierABI)
+	ConfigSet = getIDOrPanic("ConfigSet", commitStoreABI)
 }
 
-// DecodeCCIPMessage decodes the bytecode message into a blob_verifier.CCIPAny2EVMTollMessage
+// DecodeCCIPMessage decodes the bytecode message into a commit_store.CCIPAny2EVMTollMessage
 // This function returns an error if there is no message in the bytecode or
 // when the payload is malformed.
 func DecodeCCIPMessage(b []byte) (*evm_2_evm_toll_onramp.CCIPEVM2EVMTollMessage, error) {
@@ -361,10 +361,10 @@ func makeExecutionReportArgs() abi.Arguments {
 	}
 }
 
-func makeRelayReportArgs() abi.Arguments {
+func makeCommitReportArgs() abi.Arguments {
 	return []abi.Argument{
 		{
-			Name: "RelayReport",
+			Name: "CommitReport",
 			Type: utils.MustAbiType("tuple", []abi.ArgumentMarshaling{
 				{
 					Name: "onRamps",

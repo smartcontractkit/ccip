@@ -25,10 +25,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/slices"
 
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
+
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/afn_contract"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp_router"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/blob_verifier"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_subscription_onramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_subscription_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/governance_dapp"
@@ -166,7 +167,7 @@ func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient
 
 type DestClient struct {
 	Client
-	BlobVerifier    *blob_verifier.BlobVerifier
+	CommitStore     *commit_store.CommitStore
 	MessageReceiver *simple_message_receiver.SimpleMessageReceiver
 	ReceiverDapp    *receiver_dapp.ReceiverDapp
 	OffRamp         *any_2_evm_subscription_offramp.EVM2EVMSubscriptionOffRamp
@@ -189,7 +190,7 @@ func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestCli
 
 	afn, err := afn_contract.NewAFNContract(config.ChainConfig.Afn, config.Client)
 	require.NoError(t, err)
-	blobVerifier, err := blob_verifier.NewBlobVerifier(config.LaneConfig.BlobVerifier, config.Client)
+	commitStore, err := commit_store.NewCommitStore(config.LaneConfig.CommitStore, config.Client)
 	require.NoError(t, err)
 	offRamp, err := any_2_evm_subscription_offramp.NewEVM2EVMSubscriptionOffRamp(config.LaneConfig.OffRamp, config.Client)
 	require.NoError(t, err)
@@ -217,7 +218,7 @@ func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestCli
 			logger:           config.Logger,
 			t:                t,
 		},
-		BlobVerifier:    blobVerifier,
+		CommitStore:     commitStore,
 		OffRampRouter:   offRampRouter,
 		MessageReceiver: messageReceiver,
 		ReceiverDapp:    receiverDapp,
@@ -303,7 +304,7 @@ func (client *CCIPClient) ChangeGovernanceParameters(t *testing.T) {
 	tx, err := client.Source.GovernanceDapp.VoteForNewFeeConfig(client.Source.Owner, feeConfig)
 	require.NoError(t, err)
 	sendRequest := WaitForCrossChainSendRequest(client.Source, sourceBlockNum, tx.Hash())
-	client.WaitForRelay(t, DestBlockNum)
+	client.WaitForCommit(t, DestBlockNum)
 	client.WaitForExecution(t, DestBlockNum, sendRequest.Message.SequenceNumber)
 }
 
@@ -331,7 +332,7 @@ func (client *CCIPClient) SendMessage(t *testing.T) {
 	tx, err := client.Source.OnRampRouter.CcipSend(client.Source.Owner, client.Dest.ChainId, msg)
 	require.NoError(t, err)
 	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
-	client.WaitForRelay(t, DestBlockNum)
+	client.WaitForCommit(t, DestBlockNum)
 }
 
 func (client *CCIPClient) DonExecutionHappyPath(t *testing.T) {
@@ -344,27 +345,27 @@ func (client *CCIPClient) DonExecutionHappyPath(t *testing.T) {
 	crossChainRequest := client.SendToOnrampWithExecution(t, client.Source, client.Source.Owner, client.Dest.ReceiverDapp.Address(), tokenAmount)
 	client.Source.logger.Infof("Don executed tx submitted with sequence number: %d", crossChainRequest.Message.SequenceNumber)
 
-	client.WaitForRelay(t, DestBlockNum)
+	client.WaitForCommit(t, DestBlockNum)
 	client.WaitForExecution(t, DestBlockNum, crossChainRequest.Message.SequenceNumber)
 }
 
-func (client *CCIPClient) WaitForRelay(t *testing.T, DestBlockNum uint64) {
-	client.Dest.logger.Infof("Waiting for relay")
+func (client *CCIPClient) WaitForCommit(t *testing.T, DestBlockNum uint64) {
+	client.Dest.logger.Infof("Waiting for commit")
 
-	relayEvent := make(chan *blob_verifier.BlobVerifierReportAccepted)
-	sub, err := client.Dest.BlobVerifier.WatchReportAccepted(
+	commitEvent := make(chan *commit_store.CommitStoreReportAccepted)
+	sub, err := client.Dest.CommitStore.WatchReportAccepted(
 		&bind.WatchOpts{
 			Context: context.Background(),
 			Start:   &DestBlockNum,
 		},
-		relayEvent,
+		commitEvent,
 	)
 	require.NoError(t, err)
 	defer sub.Unsubscribe()
 
 	select {
-	case event := <-relayEvent:
-		client.Dest.logger.Infof("Relay in tx %s", helpers.ExplorerLink(client.Dest.ChainId.Int64(), event.Raw.TxHash))
+	case event := <-commitEvent:
+		client.Dest.logger.Infof("Commit in tx %s", helpers.ExplorerLink(client.Dest.ChainId.Int64(), event.Raw.TxHash))
 		return
 	case err = <-sub.Err():
 		panic(err)
@@ -396,9 +397,9 @@ func (client *CCIPClient) WaitForExecution(t *testing.T, DestBlockNum uint64, se
 
 func (client *CCIPClient) ExecuteManually(seqNr uint64) error {
 	// Find the seq num
-	// Find the corresponding relay report
+	// Find the corresponding commit report
 	end := uint64(11436244)
-	reportIterator, err := client.Dest.BlobVerifier.FilterReportAccepted(&bind.FilterOpts{
+	reportIterator, err := client.Dest.CommitStore.FilterReportAccepted(&bind.FilterOpts{
 		Start: end - 10000,
 		End:   &end,
 	})
@@ -406,7 +407,7 @@ func (client *CCIPClient) ExecuteManually(seqNr uint64) error {
 		return err
 	}
 	var onRampIdx int
-	var report *blob_verifier.CCIPRelayReport
+	var report *commit_store.CCIPCommitReport
 	for reportIterator.Next() {
 		for i, onRamp := range reportIterator.Event.Report.OnRamps {
 			if onRamp == client.Source.OnRamp.Address() {
@@ -532,7 +533,7 @@ func (client *CCIPClient) SendDappTx(t *testing.T) {
 
 	client.Source.ApproveLink(t, client.Source.SenderDapp.Address(), amount)
 	crossChainRequest := client.SendToDappWithExecution(t, client.Source, client.Source.Owner, client.Dest.Owner.From, amount)
-	client.WaitForRelay(t, destBlockNumber)
+	client.WaitForCommit(t, destBlockNumber)
 	client.WaitForExecution(t, destBlockNumber, crossChainRequest.Message.SequenceNumber)
 }
 
@@ -555,7 +556,7 @@ func (client *CCIPClient) ScalingAndBatching(t *testing.T) {
 		}(user)
 	}
 	wg.Wait()
-	client.WaitForRelay(t, DestBlockNum)
+	client.WaitForCommit(t, DestBlockNum)
 	client.WaitForExecution(t, DestBlockNum, seqNum)
 	client.Source.logger.Info("Sent 10 txs to onramp.")
 }
@@ -574,7 +575,7 @@ func (client *CCIPClient) ScalingAndBatching(t *testing.T) {
 //		ProofFlagsBits: ccip.ProofFlagsToBits(proof.SourceFlags),
 //	}
 //
-//	tx, err := client.Dest.BlobVerifier.ExecuteTransaction(client.Dest.Owner, report, false)
+//	tx, err := client.Dest.CommitStore.ExecuteTransaction(client.Dest.Owner, report, false)
 //	if err != nil {
 //		reason, err2 := evmclient.ExtractRevertReasonFromRPCError(err)
 //		require.NoError(t, err2)
@@ -587,7 +588,7 @@ func (client *CCIPClient) ScalingAndBatching(t *testing.T) {
 //func (client CCIPClient) GetCrossChainSendRequestsForRange(
 //	ctx context.Context,
 //	t *testing.T,
-//	report blob_verifier.CCIPRelayReport,
+//	report commit_store.CCIPCommitReport,
 //	onrampBlockNumber uint64) []*evm_2_evm_toll_onramp.EVM2EVMTollOnRampCCIPSendRequested {
 //	// Get the other transactions in the proof, we look 1000 blocks back for transaction
 //	// should be fine? Needs fine-tuning after improved batching strategies are developed
@@ -621,12 +622,12 @@ func (client *CCIPClient) ScalingAndBatching(t *testing.T) {
 //	return requests
 //}
 
-//// GetReportForSequenceNumber return the offramp.CCIPRelayReport for a given ccip requests sequence number.
-//func (client CCIPClient) GetReportForSequenceNumber(ctx context.Context, sequenceNumber uint64, minBlockNumber uint64) (blob_verifier.CCIPRelayReport, error) {
+//// GetReportForSequenceNumber return the offramp.CCIPCommitReport for a given ccip requests sequence number.
+//func (client CCIPClient) GetReportForSequenceNumber(ctx context.Context, sequenceNumber uint64, minBlockNumber uint64) (commit_store.CCIPCommitReport, error) {
 //	client.Dest.logger.Infof("Looking for sequenceNumber %d", sequenceNumber)
 //	report, err := client.Dest.OffRamp.GetLastReport(&bind.CallOpts{Context: ctx, Pending: false})
 //	if err != nil {
-//		return blob_verifier.CCIPRelayReport{}, err
+//		return commit_store.CCIPCommitReport{}, err
 //	}
 //
 //	client.Dest.logger.Infof("Last report found for range %d-%d", report.MinSequenceNumber, report.MaxSequenceNumber)
@@ -638,9 +639,9 @@ func (client *CCIPClient) ScalingAndBatching(t *testing.T) {
 //	if sequenceNumber > report.MaxSequenceNumber {
 //		maxIterations := CrossChainTimout / RetryTiming
 //		for i := 0; i < int(maxIterations); i++ {
-//			report, err = client.Dest.BlobVerifier.GetLastReport(&bind.CallOpts{Context: ctx, Pending: false})
+//			report, err = client.Dest.CommitStore.GetLastReport(&bind.CallOpts{Context: ctx, Pending: false})
 //			if err != nil {
-//				return blob_verifier.CCIPRelayReport{}, err
+//				return commit_store.CCIPCommitReport{}, err
 //			}
 //			client.Dest.logger.Infof("Last report found for range %d-%d", report.MinSequenceNumber, report.MaxSequenceNumber)
 //			if sequenceNumber >= report.MinSequenceNumber && sequenceNumber <= report.MaxSequenceNumber {
@@ -648,18 +649,18 @@ func (client *CCIPClient) ScalingAndBatching(t *testing.T) {
 //			}
 //			time.Sleep(RetryTiming)
 //		}
-//		return blob_verifier.CCIPRelayReport{}, errors.New("No report found within the given timeout")
+//		return commit_store.CCIPCommitReport{}, errors.New("No report found within the given timeout")
 //	}
 //
 //	// it is in a past report, start looking at the earliest block number possible, the one
 //	// before we started the entire transaction on the onramp.
-//	reports, err := client.Dest.BlobVerifier.FilterReportAccepted(&bind.FilterOpts{
+//	reports, err := client.Dest.CommitStore.FilterReportAccepted(&bind.FilterOpts{
 //		Start:   minBlockNumber,
 //		End:     nil,
 //		Context: ctx,
 //	})
 //	if err != nil {
-//		return blob_verifier.CCIPRelayReport{}, err
+//		return commit_store.CCIPCommitReport{}, err
 //	}
 //
 //	for reports.Next() {
@@ -671,15 +672,15 @@ func (client *CCIPClient) ScalingAndBatching(t *testing.T) {
 //
 //	// Somehow the transaction was not included in any report within blocks produced after
 //	// the transaction was initialized but the sequence number is lower than we are currently at
-//	return blob_verifier.CCIPRelayReport{}, errors.New("No report found for given sequence number")
+//	return commit_store.CCIPCommitReport{}, errors.New("No report found for given sequence number")
 //}
 
-func (client *CCIPClient) SetBlobVerifierConfig(t *testing.T) {
-	config := blob_verifier.BlobVerifierInterfaceBlobVerifierConfig{
+func (client *CCIPClient) SetCommitStoreConfig(t *testing.T) {
+	config := commit_store.CommitStoreInterfaceCommitStoreConfig{
 		OnRamps:          []common.Address{client.Source.OnRamp.Address()},
 		MinSeqNrByOnRamp: []uint64{3},
 	}
-	tx, err := client.Dest.BlobVerifier.SetConfig(client.Dest.Owner, config)
+	tx, err := client.Dest.CommitStore.SetConfig(client.Dest.Owner, config)
 	require.NoError(t, err)
 	shared.WaitForMined(t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 }
@@ -694,7 +695,7 @@ func (client *CCIPClient) ValidateMerkleRoot(
 	t *testing.T,
 	request *evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRampCCIPSendRequested,
 	reportRequests []*evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRampCCIPSendRequested,
-	report blob_verifier.CCIPRelayReport,
+	report commit_store.CCIPCommitReport,
 ) merklemulti.Proof[[32]byte] {
 	mctx := hasher.NewKeccakCtx()
 	var leafHashes [][32]byte
@@ -716,7 +717,7 @@ func (client *CCIPClient) ValidateMerkleRoot(
 		t.FailNow()
 	}
 
-	exists, err := client.Dest.BlobVerifier.GetMerkleRoot(nil, tree.Root())
+	exists, err := client.Dest.CommitStore.GetMerkleRoot(nil, tree.Root())
 	require.NoError(t, err)
 	if exists.Uint64() < 1 {
 		panic("Path is not present in the offramp")
@@ -883,14 +884,14 @@ func (client *CCIPClient) PauseOnramp() {
 	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 }
 
-func (client *CCIPClient) PauseBlobVerifier() {
-	paused, err := client.Dest.BlobVerifier.Paused(nil)
+func (client *CCIPClient) PauseCommitStore() {
+	paused, err := client.Dest.CommitStore.Paused(nil)
 	helpers.PanicErr(err)
 	if paused {
 		return
 	}
 	client.Dest.logger.Info("pausing offramp...")
-	tx, err := client.Dest.BlobVerifier.Pause(client.Dest.Owner)
+	tx, err := client.Dest.CommitStore.Pause(client.Dest.Owner)
 	helpers.PanicErr(err)
 	client.Dest.logger.Info("Offramp paused, tx hash: %s", tx.Hash())
 	shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
@@ -909,14 +910,14 @@ func (client *CCIPClient) UnpauseOnramp() {
 	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 }
 
-func (client *CCIPClient) UnpauseBlobVerifier() {
-	paused, err := client.Dest.BlobVerifier.Paused(nil)
+func (client *CCIPClient) UnpauseCommitStore() {
+	paused, err := client.Dest.CommitStore.Paused(nil)
 	helpers.PanicErr(err)
 	if !paused {
 		return
 	}
 	client.Dest.logger.Info("unpausing offramp...")
-	tx, err := client.Dest.BlobVerifier.Unpause(client.Dest.Owner)
+	tx, err := client.Dest.CommitStore.Unpause(client.Dest.Owner)
 	helpers.PanicErr(err)
 	client.Dest.logger.Info("Offramp unpaused, tx hash: %s", tx.Hash())
 	shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
@@ -931,7 +932,7 @@ func (client *CCIPClient) UnpauseAll() {
 	}()
 	go func() {
 		defer wg.Done()
-		client.UnpauseBlobVerifier()
+		client.UnpauseCommitStore()
 	}()
 	go func() {
 		defer wg.Done()
@@ -945,10 +946,10 @@ func (client *CCIPClient) UnpauseAll() {
 }
 
 func (client *CCIPClient) SetOCRConfig(env dione.Environment) {
-	verifierOCRConfig, err := client.Dest.BlobVerifier.LatestConfigDetails(&bind.CallOpts{})
+	verifierOCRConfig, err := client.Dest.CommitStore.LatestConfigDetails(&bind.CallOpts{})
 	helpers.PanicErr(err)
 	if verifierOCRConfig.BlockNumber != 0 {
-		client.Dest.logger.Infof("BlobVerifier OCR config already found: %+v", verifierOCRConfig.ConfigDigest)
+		client.Dest.logger.Infof("CommitStore OCR config already found: %+v", verifierOCRConfig.ConfigDigest)
 		client.Dest.logger.Infof("The new config will overwrite the current one.")
 	}
 
@@ -993,7 +994,7 @@ func (client *CCIPClient) SetOCRConfig(env dione.Environment) {
 	transmitterAddresses, err := ocrcommon.AccountToAddress(transmitters)
 	helpers.PanicErr(err)
 
-	tx, err := client.Dest.BlobVerifier.SetConfig0(
+	tx, err := client.Dest.CommitStore.SetConfig0(
 		client.Dest.Owner,
 		signerAddresses,
 		transmitterAddresses,
@@ -1004,7 +1005,7 @@ func (client *CCIPClient) SetOCRConfig(env dione.Environment) {
 	)
 	helpers.PanicErr(err)
 	shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
-	client.Dest.logger.Infof("Config set on blob verifier %s", helpers.ExplorerLink(client.Dest.ChainId.Int64(), tx.Hash()))
+	client.Dest.logger.Infof("Config set on commitStore %s", helpers.ExplorerLink(client.Dest.ChainId.Int64(), tx.Hash()))
 
 	tx, err = client.Dest.OffRamp.SetConfig0(
 		client.Dest.Owner,
@@ -1021,7 +1022,7 @@ func (client *CCIPClient) SetOCRConfig(env dione.Environment) {
 }
 
 func (client *CCIPClient) AcceptOwnership(t *testing.T) {
-	tx, err := client.Dest.BlobVerifier.AcceptOwnership(client.Dest.Owner)
+	tx, err := client.Dest.CommitStore.AcceptOwnership(client.Dest.Owner)
 	require.NoError(t, err)
 	shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 
