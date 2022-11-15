@@ -485,7 +485,7 @@ func (client *CCIPClient) ExecuteManually(seqNr uint64) error {
 		OuterProofs:              outerProof.Hashes,
 		OuterProofFlagBits:       ccip.ProofFlagsToBits(outerProof.SourceFlags),
 	}
-	tx, err := client.Dest.OffRamp.Execute(client.Dest.Owner, executionReport, true)
+	tx, err := client.Dest.OffRamp.ManuallyExecute(client.Dest.Owner, executionReport)
 	if err != nil {
 		fmt.Printf("%+v err %v\n", executionReport, err)
 		return err

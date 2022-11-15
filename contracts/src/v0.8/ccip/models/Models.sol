@@ -106,16 +106,12 @@ library CCIP {
 
   function _fromBytes(bytes calldata extraArgs) internal pure returns (EVMExtraArgsV1 memory) {
     if (extraArgs.length == 0) {
-      return CCIP.EVMExtraArgsV1({
-        gasLimit: EVM_DEFAULT_GAS_LIMIT
-      });
+      return CCIP.EVMExtraArgsV1({gasLimit: EVM_DEFAULT_GAS_LIMIT});
     }
-    if (bytes4(extraArgs[:4]) != EVM_EXTRA_ARGS_V1_TAG) revert InvalidExtraArgsTag(EVM_EXTRA_ARGS_V1_TAG, bytes4(extraArgs[:4]));
-    return CCIP.EVMExtraArgsV1({
-      gasLimit: abi.decode(extraArgs[4:36], (uint256))
-    });
+    if (bytes4(extraArgs[:4]) != EVM_EXTRA_ARGS_V1_TAG)
+      revert InvalidExtraArgsTag(EVM_EXTRA_ARGS_V1_TAG, bytes4(extraArgs[:4]));
+    return CCIP.EVMExtraArgsV1({gasLimit: abi.decode(extraArgs[4:36], (uint256))});
   }
-
 
   ////////////////////////////////
   ////          TOLL          ////

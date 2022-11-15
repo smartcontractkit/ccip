@@ -60,7 +60,10 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
     CCIP.EVMTokenAndAmount[] memory tokensAndAmounts = getCastedSourceEVMTokenAndAmountsWithZeroAmounts();
     tokensAndAmounts[0].amount = i_tokenAmount0;
     tokensAndAmounts[1].amount = i_tokenAmount1;
-    CCIP.EVMTokenAndAmount memory feeTokenAndAmount = CCIP.EVMTokenAndAmount({token: tokensAndAmounts[0].token, amount: COMMIT_FEE_JUELS});
+    CCIP.EVMTokenAndAmount memory feeTokenAndAmount = CCIP.EVMTokenAndAmount({
+      token: tokensAndAmounts[0].token,
+      amount: COMMIT_FEE_JUELS
+    });
     return
       CCIP.EVM2AnyTollMessage({
         receiver: abi.encode(OWNER),

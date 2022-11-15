@@ -379,6 +379,7 @@ func (ccipContracts *CCIPContracts) SetupOnchainConfig(oracles []confighelper.Or
 		ccipContracts.OCRConfig.OffchainConfig,
 	)
 	require.NoError(ccipContracts.t, err)
+	ccipContracts.DestChain.Commit()
 	return blockBeforeConfig.Number().Int64()
 }
 
@@ -907,13 +908,13 @@ func EventuallyExecutionStateChangedToSuccess(t *testing.T, ccipContracts CCIPCo
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
 		it, err := ccipContracts.SubOffRamp.FilterExecutionStateChanged(&bind.FilterOpts{Start: blockNum}, seqNum)
 		require.NoError(t, err)
-		ccipContracts.SourceChain.Commit()
-		ccipContracts.DestChain.Commit()
 		for it.Next() {
 			if ccip.MessageExecutionState(it.Event.State) == ccip.Success {
 				return true
 			}
 		}
+		ccipContracts.SourceChain.Commit()
+		ccipContracts.DestChain.Commit()
 		return false
 	}, testutils.WaitTimeout(t), time.Second).
 		Should(gomega.BeTrue(), "ExecutionStateChanged Event")
@@ -993,7 +994,7 @@ func ExecuteSubMessage(
 	}
 
 	// Execute.
-	tx, err := ccipContracts.SubOffRamp.Execute(ccipContracts.DestUser, offRampProof, true)
+	tx, err := ccipContracts.SubOffRamp.ManuallyExecute(ccipContracts.DestUser, offRampProof)
 	require.NoError(t, err, "Executing manually")
 	ccipContracts.DestChain.Commit()
 	ccipContracts.SourceChain.Commit()

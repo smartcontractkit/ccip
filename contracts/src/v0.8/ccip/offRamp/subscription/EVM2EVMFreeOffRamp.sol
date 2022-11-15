@@ -47,12 +47,12 @@ contract EVM2EVMFreeOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
     )
   {}
 
-  function execute(CCIP.ExecutionReport memory report, bool manualExecution)
-    external
-    override
-    whenNotPaused
-    whenHealthy
-  {
+  /// @inheritdoc BaseOffRamp
+  function manuallyExecute(CCIP.ExecutionReport memory report) external override {
+    _execute(report, true);
+  }
+
+  function _execute(CCIP.ExecutionReport memory report, bool manualExecution) internal whenNotPaused whenHealthy {
     if (address(s_router) == address(0)) revert RouterNotSet();
     uint256 numMsgs = report.encodedMessages.length;
     if (numMsgs == 0) revert NoMessagesToExecute();
@@ -76,7 +76,7 @@ contract EVM2EVMFreeOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
     // TODO: Spec difference measuring gas used by verification vs calculating it?
     // imo billing calculated values > billing measured to help with cost predictability
     // solhint-disable-next-line no-unused-vars
-    (uint256 timestampCommitted,) = _verifyMessages(
+    (uint256 timestampCommitted, ) = _verifyMessages(
       hashedLeaves,
       report.innerProofs,
       report.innerProofFlagBits,
@@ -160,7 +160,7 @@ contract EVM2EVMFreeOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
     uint40, /*epochAndRound*/
     bytes memory report
   ) internal override {
-    this.execute(abi.decode(report, (CCIP.ExecutionReport)), false);
+    _execute(abi.decode(report, (CCIP.ExecutionReport)), false);
   }
 
   function _beforeSetConfig(uint8 _threshold, bytes memory _onchainConfig) internal override {}

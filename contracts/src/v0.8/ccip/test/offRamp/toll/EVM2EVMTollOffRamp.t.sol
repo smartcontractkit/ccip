@@ -328,11 +328,13 @@ contract EVM2EVMTollOffRamp__report is EVM2EVMTollOffRampSetup {
     s_offRamp.setRouter(s_router);
   }
 
-  // Asserts that execute is called with the proper arguments.
+  // Asserts that execute completes
   function testSuccess() public {
-    CCIP.ExecutionReport memory report = _generateReportFromMessages(_generateBasicMessages());
+    CCIP.EVM2EVMTollMessage[] memory messages = _generateBasicMessages();
+    CCIP.ExecutionReport memory report = _generateReportFromMessages(messages);
 
-    vm.expectCall(address(s_offRamp), abi.encodeCall(s_offRamp.execute, (report, false)));
+    vm.expectEmit(true, true, false, false);
+    emit ExecutionStateChanged(messages[0].sequenceNumber, CCIP.MessageExecutionState.SUCCESS);
 
     s_offRamp.report(abi.encode(report));
   }

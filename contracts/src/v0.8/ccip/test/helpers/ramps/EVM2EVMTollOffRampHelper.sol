@@ -32,6 +32,10 @@ contract EVM2EVMTollOffRampHelper is EVM2EVMTollOffRamp {
     _report(bytes32(0), 0, executableMessages);
   }
 
+  function execute(CCIP.ExecutionReport memory rep, bool manualExecution) external {
+    _execute(rep, manualExecution);
+  }
+
   function metadataHash() external view returns (bytes32) {
     return _metadataHash(CCIP.EVM_2_EVM_TOLL_MESSAGE_HASH);
   }

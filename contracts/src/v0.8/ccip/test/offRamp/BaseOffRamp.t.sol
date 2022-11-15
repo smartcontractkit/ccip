@@ -278,13 +278,3 @@ contract BaseOffRamp__getPool is BaseOffRampSetup {
     s_offRamp.getPool_helper(wrongToken);
   }
 }
-
-/// @notice #execute
-contract BaseOffRamp_execute is BaseOffRampSetup {
-  // Reverts
-  function testReverts() public {
-    vm.expectRevert();
-    CCIP.ExecutionReport memory report;
-    s_offRamp.execute(report, false);
-  }
-}

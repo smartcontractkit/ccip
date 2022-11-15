@@ -46,7 +46,11 @@ contract TokenSetup is BaseTest {
     }
   }
 
-  function getCastedSourceEVMTokenAndAmountsWithZeroAmounts() internal view returns (CCIP.EVMTokenAndAmount[] memory tokensAndAmounts) {
+  function getCastedSourceEVMTokenAndAmountsWithZeroAmounts()
+    internal
+    view
+    returns (CCIP.EVMTokenAndAmount[] memory tokensAndAmounts)
+  {
     tokensAndAmounts = new CCIP.EVMTokenAndAmount[](s_sourceTokens.length);
     for (uint256 i = 0; i < tokensAndAmounts.length; i++) {
       tokensAndAmounts[i].token = s_sourceTokens[i];
