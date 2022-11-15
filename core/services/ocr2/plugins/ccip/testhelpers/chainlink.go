@@ -197,7 +197,7 @@ contractConfigTrackerPollInterval = "1s"
 
 [pluginConfig]
 onRampID            = "%s"
-commitStoreID      = "%s"
+commitStoreID       = "%s"
 sourceChainID       = %s
 destChainID         = %s
 pollPeriod          = "1s"

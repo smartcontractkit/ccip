@@ -545,7 +545,7 @@ func (d *Delegate) ServicesForSpec(jobSpec job.Job) ([]job.ServiceCtx, error) {
 		pluginOracle, _ = directrequestocr.NewDROracle(jobSpec, d.pipelineRunner, d.jobORM, pluginORM, chain, lggr, ocrLogger)
 	case job.CCIPCommit:
 		if spec.Relay != relay.EVM {
-			return nil, errors.New("Non evm chains are not supported for CCIP relay")
+			return nil, errors.New("Non evm chains are not supported for CCIP commit")
 		}
 		ccipProvider, err2 := evmrelay.NewCCIPRelayer(relayer).NewCCIPRelayProvider(
 			types.RelayArgs{
