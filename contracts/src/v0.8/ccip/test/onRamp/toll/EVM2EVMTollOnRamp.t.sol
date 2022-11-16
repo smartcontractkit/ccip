@@ -153,7 +153,7 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
     s_onRamp.forwardFromRouter(message, OWNER);
   }
 
-  function testValueExceedsAllowedThresholdReverts() public {
+  function testValueExceedsCapacityReverts() public {
     CCIP.EVM2AnyTollMessage memory message = _generateEmptyMessage();
     message.tokensAndAmounts = new CCIP.EVMTokenAndAmount[](1);
     message.tokensAndAmounts[0].amount = 2**128;
@@ -161,7 +161,13 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
 
     IERC20(s_sourceTokens[0]).approve(address(s_onRamp), 2**128);
 
-    vm.expectRevert(AggregateRateLimiterInterface.ValueExceedsAllowedThreshold.selector);
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        AggregateRateLimiterInterface.ValueExceedsCapacity.selector,
+        rateLimiterConfig().capacity,
+        message.tokensAndAmounts[0].amount * getTokenPrices()[0]
+      )
+    );
 
     s_onRamp.forwardFromRouter(message, OWNER);
   }

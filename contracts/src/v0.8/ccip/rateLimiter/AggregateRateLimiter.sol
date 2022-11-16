@@ -130,8 +130,15 @@ contract AggregateRateLimiter is AggregateRateLimiterInterface, OwnerIsCreator {
     // If there is no value to remove skip this step to reduce gas usage
     if (value > 0) {
       // Refill the bucket if possible
+      // This mutates s_tokenBucket in storage
       _update(s_tokenBucket);
-      if (s_tokenBucket.tokens < value) revert ValueExceedsAllowedThreshold();
+
+      if (s_tokenBucket.capacity < value) revert ValueExceedsCapacity(s_tokenBucket.capacity, value);
+      if (s_tokenBucket.tokens < value) {
+        // Seconds wait required until the bucket is refilled enough to accept this value
+        uint256 waitInSeconds = (value - s_tokenBucket.tokens) / s_tokenBucket.rate;
+        revert ValueExceedsAllowedThreshold(waitInSeconds);
+      }
 
       s_tokenBucket.tokens -= value;
       emit TokensRemovedFromBucket(value);

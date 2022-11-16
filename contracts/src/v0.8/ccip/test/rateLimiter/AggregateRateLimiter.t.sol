@@ -309,17 +309,20 @@ contract AggregateTokenLimiter__removeTokens is AggregateTokenLimiterSetup {
     assertEq(bucket.capacity - value, bucket.tokens);
 
     // Since value * 2 > bucket.capacity we cannot take it out twice.
-    // Expect a revert when we try.
-    vm.expectRevert(AggregateRateLimiterInterface.ValueExceedsAllowedThreshold.selector);
+    // Expect a revert when we try, with a wait time.
+    uint256 waitTime = 4;
+    vm.expectRevert(
+      abi.encodeWithSelector(AggregateRateLimiterInterface.ValueExceedsAllowedThreshold.selector, waitTime)
+    );
     s_rateLimiter.removeTokens(tokensAndAmounts);
 
     // Move the block time forward by 10 so the bucket refills by 10 * rate
-    vm.warp(BLOCK_TIME + 10);
+    vm.warp(BLOCK_TIME + waitTime);
 
     // The bucket has filled up enough so we can take out more tokens
     s_rateLimiter.removeTokens(tokensAndAmounts);
     bucket = s_rateLimiter.calculateCurrentTokenBucketState();
-    assertEq(bucket.capacity - value + 10 * s_config.rate - value, bucket.tokens);
+    assertEq(bucket.capacity - value + waitTime * s_config.rate - value, bucket.tokens);
   }
 
   // Reverts
@@ -329,12 +332,20 @@ contract AggregateTokenLimiter__removeTokens is AggregateTokenLimiterSetup {
     s_rateLimiter.removeTokens(new CCIP.EVMTokenAndAmount[](1));
   }
 
-  function testValueExceedsAllowedThresholdReverts() public {
+  function testValueExceedsCapacityReverts() public {
+    AggregateRateLimiterInterface.TokenBucket memory bucket = s_rateLimiter.calculateCurrentTokenBucketState();
+
     CCIP.EVMTokenAndAmount[] memory tokensAndAmounts = new CCIP.EVMTokenAndAmount[](1);
     tokensAndAmounts[0].token = address(TOKEN);
     tokensAndAmounts[0].amount = 100;
 
-    vm.expectRevert(AggregateRateLimiterInterface.ValueExceedsAllowedThreshold.selector);
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        AggregateRateLimiterInterface.ValueExceedsCapacity.selector,
+        bucket.capacity,
+        tokensAndAmounts[0].amount * TOKEN_PRICE
+      )
+    );
     s_rateLimiter.removeTokens(tokensAndAmounts);
   }
 }

@@ -6,7 +6,8 @@ import {IERC20} from "../../../vendor/IERC20.sol";
 interface AggregateRateLimiterInterface {
   error OnlyCallableByAdminOrOwner();
   error TokensAndPriceLengthMismatch();
-  error ValueExceedsAllowedThreshold();
+  error ValueExceedsAllowedThreshold(uint256 waitInSeconds);
+  error ValueExceedsCapacity(uint256 capacity, uint256 requested);
   error PriceNotFoundForToken(address token);
   error AddressCannotBeZero();
   error BucketOverfilled();
