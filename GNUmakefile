@@ -16,6 +16,7 @@ install-git-hooks: ## Install git hooks.
 
 .PHONY: install-chainlink-autoinstall
 install-chainlink-autoinstall: | gomod install-chainlink ## Autoinstall chainlink.
+
 .PHONY: operator-ui-autoinstall
 operator-ui-autoinstall: | operator-ui ## Autoinstall frontend UI.
 
@@ -85,10 +86,6 @@ go-solidity-wrappers-ocr2vrf: abigen ## Recompiles solidity contracts and their 
 	go generate ./core/gethwrappers/ocr2vrf
 	# put the go:generate_disabled directive back
 	sed -i '' 's/go:generate/go:generate_disabled/g' core/gethwrappers/ocr2vrf/go_generate.go
-
-.PHONY: generate
-generate: abigen ## Execute all go:generate commands.
-	go generate -x ./...
 
 .PHONY: generate
 generate: abigen ## Execute all go:generate commands.
@@ -179,6 +176,10 @@ config-docs: ## Generate core node configuration documentation
 .PHONY: golangci-lint
 golangci-lint: ## Run golangci-lint for all issues.
 	docker run --rm -v $(shell pwd):/app -w /app golangci/golangci-lint:latest golangci-lint run --max-issues-per-linter 0 --max-same-issues 0 > golangci-lint-output.txt
+
+.PHONY: snapshot
+snapshot:
+	cd ./contracts && forge snapshot --match-test _gas
 
 help:
 	@echo ""

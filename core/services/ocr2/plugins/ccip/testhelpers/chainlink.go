@@ -419,7 +419,7 @@ func createConfigV2Chain(t *testing.T, chainId *big.Int) *v2.EVMConfig {
 	defaultGasLimit := uint32(5000000)
 	tr := true
 
-	sourceC, _ := v2.Defaults((*utils.Big)(chainId))
+	sourceC := v2.Defaults((*utils.Big)(chainId))
 	sourceC.GasEstimator.LimitDefault = &defaultGasLimit
 	fixedPrice := "FixedPrice"
 	sourceC.GasEstimator.Mode = &fixedPrice

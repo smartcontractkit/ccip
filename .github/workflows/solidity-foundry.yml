@@ -1,4 +1,4 @@
-name: CCIP Contracts
+name: Solidity Foundry
 on: [pull_request]
 
 env:
@@ -19,7 +19,7 @@ jobs:
           filters: |
             src:
               - 'contracts/**/*'
-              - '.github/workflows/ccip-contracts.yml'
+              - '.github/workflows/solidity-foundry.yml'
 
   solhint:
     needs: [changes]
@@ -50,6 +50,8 @@ jobs:
     needs: [changes]
     name: Coverage
     runs-on: ubuntu-latest
+    env:
+      FOUNDRY_PROFILE: ccip
 
     steps:
       - name: Collect Metrics
@@ -66,6 +68,13 @@ jobs:
         with:
           submodules: recursive
 
+      # Only needed because we use the NPM versions of packages
+      # and not native Foundry. This is to make sure the dependencies
+      # stay in sync.
+      - name: Setup NodeJS
+        if: ${{ needs.changes.outputs.changes == 'true' }}
+        uses: ./.github/actions/setup-nodejs
+
       - name: Install Foundry
         if: ${{ needs.changes.outputs.changes == 'true' }}
         uses: foundry-rs/foundry-toolchain@v1
@@ -74,20 +83,22 @@ jobs:
 
       - name: Run Forge build
         if: ${{ needs.changes.outputs.changes == 'true' }}
+        working-directory: contracts
         run: |
           forge --version
           forge build
         id: build
-      
+
       - name: Run coverage
         if: ${{ needs.changes.outputs.changes == 'true' }}
+        working-directory: contracts
         run: forge coverage --report lcov
 
       - name: Prune report
         if: ${{ needs.changes.outputs.changes == 'true' }}
         run: |
           sudo apt-get install lcov
-          ./tools/ci/ccip_lcov_prune ./lcov.info ./lcov.info.pruned
+          ./tools/ci/ccip_lcov_prune ./contracts/lcov.info ./lcov.info.pruned
 
       - name: Report code coverage
         if: ${{ needs.changes.outputs.changes == 'true' }}
@@ -96,9 +107,11 @@ jobs:
           coverage-files: lcov.info.pruned
           minimum-coverage: 80
           artifact-name: code-coverage-report
+          working-directory: ./contracts
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
   tests:
+    needs: [changes]
     name: Tests
     runs-on: ubuntu-latest
 
@@ -109,33 +122,55 @@ jobs:
         with:
           basic-auth: ${{ secrets.GRAFANA_CLOUD_BASIC_AUTH }}
           hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
-          this-job-name: Tests
+          this-job-name: Foundry Tests
         continue-on-error: true
 
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # v3.1.0
+      - name: Checkout the repo
+        uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # v3.1.0
         with:
           submodules: recursive
 
+      # Only needed because we use the NPM versions of packages
+      # and not native Foundry. This is to make sure the dependencies
+      # stay in sync.
+      - name: Setup NodeJS
+        if: ${{ needs.changes.outputs.changes == 'true' }}
+        uses: ./.github/actions/setup-nodejs
+
       - name: Install Foundry
+        if: ${{ needs.changes.outputs.changes == 'true' }}
         uses: foundry-rs/foundry-toolchain@v1
         with:
           version: nightly
 
       - name: Run Forge build
+        if: ${{ needs.changes.outputs.changes == 'true' }}
         run: |
           forge --version
           forge build --sizes
         id: build
+        working-directory: contracts
 
       - name: Run Forge tests
+        if: ${{ needs.changes.outputs.changes == 'true' }}
         run: |
-          forge snapshot -vvv --check
+          forge test -vvv
         id: test
+        working-directory: contracts
+
+      - name: Run Forge snapshot
+        if: ${{ needs.changes.outputs.changes == 'true' }}
+        run: |
+          forge snapshot --match-test _gas --check
+        id: snapshot
+        working-directory: contracts
 
   abi:
     needs: [changes]
     name: ABI
     runs-on: ubuntu-latest
+    env:
+      FOUNDRY_PROFILE: ccip
 
     steps:
       - name: Collect Metrics
@@ -152,6 +187,13 @@ jobs:
         with:
           submodules: recursive
 
+      # Only needed because we use the NPM versions of packages
+      # and not native Foundry. This is to make sure the dependencies
+      # stay in sync.
+      - name: Setup NodeJS
+        if: ${{ needs.changes.outputs.changes == 'true' }}
+        uses: ./.github/actions/setup-nodejs
+
       - name: Install Foundry
         if: ${{ needs.changes.outputs.changes == 'true' }}
         uses: foundry-rs/foundry-toolchain@v1
@@ -160,6 +202,7 @@ jobs:
 
       - name: Run Forge build
         if: ${{ needs.changes.outputs.changes == 'true' }}
+        working-directory: contracts
         run: |
           forge --version
           forge build
@@ -168,5 +211,6 @@ jobs:
       - name: Check Public ABIs
         if: ${{ needs.changes.outputs.changes == 'true' }}
         run: |
-          ./tools/ci/ccip_public_abi_check
+          cd contracts
+          make ccip-abi-check
         id: abi-check

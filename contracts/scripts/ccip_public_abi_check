@@ -2,7 +2,7 @@
 
 set -e
 
-FILES="./contracts/src/v0.8/ccip/test/publicABI/*"
+FILES="./src/v0.8/ccip/test/publicABI/*"
 
 for f in $FILES
 do
@@ -14,11 +14,11 @@ do
   actualAbi=$( forge inspect $fileName methods | tr -d " \t\n\r" )
 
   if [[ "$expectedAbi" != "$actualAbi" ]]; then
-    printf "$fileName ABI does not match expected ABI. Fixing...\n"
-    make ccip-abi-generate c=$fileName
-    printf "Fixed.\n"
+    printf "ERROR: $fileName ABI does not match expected ABI. Try running this command:\n\n"
+    printf "make ccip-abi-fix\n\n"
+    exit 1
   fi
 
 done
 
-echo "ABI fix successful, don't forget to commit!"
+echo "ABI check successful"

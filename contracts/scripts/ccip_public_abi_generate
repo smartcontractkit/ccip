@@ -2,7 +2,7 @@
 
 set -e
 
-OUTPUT="./contracts/src/v0.8/ccip/test/publicABI/"
+OUTPUT="./src/v0.8/ccip/test/publicABI/"
 
 actualAbi=$( forge inspect $1 methods )
 outputFile="$OUTPUT$1"
