@@ -26,9 +26,9 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/job"
 	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
 	"github.com/smartcontractkit/chainlink/core/services/pipeline"
-	"github.com/smartcontractkit/chainlink/core/services/relay/evm/mercury"
-	types "github.com/smartcontractkit/chainlink/core/services/relay/evm/types"
 	"github.com/smartcontractkit/chainlink/core/services/relay"
+	"github.com/smartcontractkit/chainlink/core/services/relay/evm/mercury"
+	"github.com/smartcontractkit/chainlink/core/services/relay/evm/types"
 	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
@@ -433,7 +433,7 @@ func (c *ccipRelayer) NewCCIPRelayProvider(rargs relaytypes.RelayArgs, transmitt
 	}, nil
 }
 
-func (c *ccipRelayProvider) ContractTransmitter() types.ContractTransmitter {
+func (c *ccipRelayProvider) ContractTransmitter() ocrtypes.ContractTransmitter {
 	return c.contractTransmitter
 }
 
@@ -459,6 +459,6 @@ func (c *ccipRelayer) NewCCIPExecutionProvider(rargs relaytypes.RelayArgs, trans
 	}, nil
 }
 
-func (c *ccipExecutionProvider) ContractTransmitter() types.ContractTransmitter {
+func (c *ccipExecutionProvider) ContractTransmitter() ocrtypes.ContractTransmitter {
 	return c.contractTransmitter
 }
