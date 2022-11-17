@@ -35,7 +35,10 @@ var _ = Describe("CCIP chaos test @chaos-ccip", Ordered, func() {
 		testEnvironment, source, dest, testSetup, tearDown = actions.CCIPDefaultTestSetUp("chaos-ccip",
 			map[string]interface{}{
 				"replicas": "12",
-				"env":      actions.DefaultCCIPCLNodeEnv(),
+				"toml":     actions.DefaultCCIPCLNodeEnv(),
+				"env": map[string]interface{}{
+					"CL_DEV": "true",
+				},
 				"db": map[string]interface{}{
 					"stateful": true,
 					"capacity": "10Gi",

@@ -84,22 +84,14 @@ var (
 		return *networks.SelectedNetworks[1], *networks.SelectedNetworks[2]
 	}()
 
-	DefaultCCIPCLNodeEnv = func() map[string]interface{} {
+	DefaultCCIPCLNodeEnv = func() string {
 		ccipTOML, err := client.MarshallTemplate(
 			CCIPTOMLEnv{
 				Networks: []blockchain.EVMNetwork{sourceNetwork, destNetwork},
 			},
 			"ccip env toml", CLConfig)
 		Expect(err).ShouldNot(HaveOccurred())
-		chainlinkTOML := client.NewDefaultTOMLBuilder().
-			AddRaw(ccipTOML).
-			String()
-		fmt.Println(chainlinkTOML)
-		Expect(err).ShouldNot(HaveOccurred())
-		return map[string]interface{}{
-			"cl_config": chainlinkTOML,
-			"CL_DEV":    "true",
-		}
+		return ccipTOML
 	}
 )
 

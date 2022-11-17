@@ -15,7 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 )
 
-var _ = Describe("CCIP interactions test @smoke-ccip", func() {
+var _ = Describe("CCIP interactions test @ccip", func() {
 	var (
 		sourceChainClient blockchain.EVMClient
 		destChainClient   blockchain.EVMClient
@@ -40,7 +40,10 @@ var _ = Describe("CCIP interactions test @smoke-ccip", func() {
 			&environment.Config{NamespacePrefix: "smoke-ccip"},
 			map[string]interface{}{
 				"replicas": "6",
-				"env":      actions.DefaultCCIPCLNodeEnv(),
+				"toml":     actions.DefaultCCIPCLNodeEnv(),
+				"env": map[string]interface{}{
+					"CL_DEV": "true",
+				},
 			})
 
 		By("Setting up chainlink nodes")

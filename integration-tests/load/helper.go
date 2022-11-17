@@ -67,7 +67,10 @@ func (loadArgs *loadArgs) Setup() {
 	_, source, dest, _, tearDown := actions.CCIPDefaultTestSetUp("load-ccip",
 		map[string]interface{}{
 			"replicas": "6",
-			"env":      actions.DefaultCCIPCLNodeEnv(),
+			"toml":     actions.DefaultCCIPCLNodeEnv(),
+			"env": map[string]interface{}{
+				"CL_DEV": "true",
+			},
 		}, 5, true)
 	loadArgs.envTear = tearDown
 	ccipLoad := NewCCIPLoad(source, dest, actions.SUB, loadArgs.ccipTimeout, 100000)
