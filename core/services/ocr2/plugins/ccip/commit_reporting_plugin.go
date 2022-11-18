@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
@@ -206,6 +207,7 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, timestamp types
 	if isCommitStoreDownNow(lggr, r.commitStore) {
 		return nil, ErrCommitStoreIsDown
 	}
+	r.expireInflight(lggr)
 	intervalsByOnRamp := make(map[common.Address]commit_store.CCIPInterval)
 	for _, onRamp := range r.onRamps {
 		nextMin, err := r.nextMinSeqNum(onRamp)
@@ -367,17 +369,25 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, timestamp types.Repo
 	return true, encodedReport, nil
 }
 
-func (r *CommitReportingPlugin) updateInflight(lggr logger.Logger, report *commit_store.CCIPCommitReport) {
+func (r *CommitReportingPlugin) expireInflight(lggr logger.Logger) {
 	r.inFlightMu.Lock()
 	defer r.inFlightMu.Unlock()
 	// Reap any expired entries from inflight.
 	for root, inFlightReport := range r.inFlight {
 		if time.Since(inFlightReport.createdAt) > r.inflightCacheExpiry {
-			lggr.Warnw("Inflight report expired, retrying")
+			// Happy path: inflight report was successfully transmitted onchain, we remove it from inflight and onchain state reflects inflight.
+			// Sad path: inflight report reverts onchain, we remove it from inflight, onchain state does not reflect the chains so we retry.
+			lggr.Infow("Inflight report expired", "rootOfRoots", hexutil.Encode(inFlightReport.report.RootOfRoots[:]))
 			delete(r.inFlight, root)
 		}
 	}
+}
+
+func (r *CommitReportingPlugin) addToInflight(lggr logger.Logger, report *commit_store.CCIPCommitReport) {
+	r.inFlightMu.Lock()
+	defer r.inFlightMu.Unlock()
 	// Set new inflight ones as pending
+	lggr.Infow("Adding to inflight report", "rootOfRoots", hexutil.Encode(report.RootOfRoots[:]))
 	r.inFlight[report.RootOfRoots] = InflightReport{
 		report:    report,
 		createdAt: time.Now(),
@@ -395,8 +405,8 @@ func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context,
 	if r.isStaleReport(parsedReport) {
 		return false, nil
 	}
-	r.updateInflight(lggr, parsedReport)
-	lggr.Infow("Accepting finalized report")
+	r.addToInflight(lggr, parsedReport)
+	lggr.Infow("Accepting finalized report", "rootOfRoots", hexutil.Encode(parsedReport.RootOfRoots[:]))
 	return true, nil
 }
 

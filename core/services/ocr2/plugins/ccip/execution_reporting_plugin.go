@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
@@ -271,6 +272,9 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 	if isCommitStoreDownNow(lggr, r.commitStore) {
 		return nil, ErrCommitStoreIsDown
 	}
+	// Expire any inflight reports.
+	r.expireInflight(lggr)
+
 	leaderTokensPerFeeCoin := make(map[common.Address]*big.Int)
 	if err := json.Unmarshal(query, &leaderTokensPerFeeCoin); err != nil {
 		return nil, err
@@ -349,12 +353,8 @@ func leafsFromIntervals(lggr logger.Logger, onRampToEventSig map[common.Address]
 
 // Assumes non-empty report. Messages to execute can span more than one report, but are assumed to be in order of increasing
 // sequence number.
-func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNums []uint64, tokensPerFeeCoin map[common.Address]*big.Int) ([]byte, error) {
-	rep, err := r.builder.commitReport(finalSeqNums[0])
-	if err != nil {
-		return nil, err
-	}
-	lggr.Infow("Building execution report", "finalSeqNums", finalSeqNums, "report", rep)
+func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNums []uint64, tokensPerFeeCoin map[common.Address]*big.Int, rep commit_store.CCIPCommitReport) ([]byte, error) {
+	lggr.Infow("Building execution report", "finalSeqNums", finalSeqNums, "rootOfRoots", hexutil.Encode(rep.RootOfRoots[:]), "report", rep)
 	var interval commit_store.CCIPInterval
 	var onRampIdx int
 	var outerTreeLeafs [][32]byte
@@ -523,34 +523,54 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 	if mathutil.Max(finalSequenceNumbers[0], finalSequenceNumbers[1:]...) >= nextMin {
 		return false, nil, errors.Errorf("Cannot execute uncommitted seq num. nextMin %v, seqNums %v", nextMin, finalSequenceNumbers)
 	}
-	// Important we actually execute based on the medianTokensPrices, which we ensure
-	// is <= than prices used to determine executability.
-	report, err := r.buildReport(lggr, finalSequenceNumbers, medianTokensPerFeeCoin)
+	commitReport, err := r.builder.commitReport(finalSequenceNumbers[0])
 	if err != nil {
 		return false, nil, err
 	}
-	lggr.Infow("Built report", "onRamp", r.onRamp, "finalSeqNums", finalSequenceNumbers, "executionPrices", medianTokensPerFeeCoin)
+	// Important we actually execute based on the medianTokensPrices, which we ensure
+	// is <= than prices used to determine executability.
+	report, err := r.buildReport(lggr, finalSequenceNumbers, medianTokensPerFeeCoin, commitReport)
+	if err != nil {
+		return false, nil, err
+	}
+	lggr.Infow("Built report",
+		"onRamp", r.onRamp,
+		"finalSeqNums", finalSequenceNumbers,
+		"executionPrices", medianTokensPerFeeCoin,
+		"rootOfRoots", hexutil.Encode(commitReport.RootOfRoots[:]))
 	return true, report, nil
 }
 
-func (r *ExecutionReportingPlugin) updateInFlight(lggr logger.Logger, er any_2_evm_toll_offramp.CCIPExecutionReport) error {
+func (r *ExecutionReportingPlugin) expireInflight(lggr logger.Logger) {
 	r.inFlightMu.Lock()
 	defer r.inFlightMu.Unlock()
 	// Reap old inflight txs and check if any messages in the report are inflight.
 	var stillInFlight []InflightExecutionReport
 	for _, report := range r.inFlight {
+		if time.Since(report.createdAt) > r.inflightCacheExpiry {
+			// Happy path: inflight report was successfully transmitted onchain, we remove it from inflight and onchain state reflects inflight.
+			// Sad path: inflight report reverts onchain, we remove it from inflight, onchain state does not reflect the chains so we retry.
+			lggr.Infow("Inflight report expired", "seqNums", report.report.SequenceNumbers)
+		} else {
+			stillInFlight = append(stillInFlight, report)
+		}
+	}
+	r.inFlight = stillInFlight
+}
+
+func (r *ExecutionReportingPlugin) addToInflight(lggr logger.Logger, er any_2_evm_toll_offramp.CCIPExecutionReport) error {
+	r.inFlightMu.Lock()
+	defer r.inFlightMu.Unlock()
+	for _, report := range r.inFlight {
 		// TODO: Think about if this fails in reorgs
 		if report.report.SequenceNumbers[0] == er.SequenceNumbers[0] {
 			return errors.Errorf("report is already in flight")
 		}
-		if time.Since(report.createdAt) < r.inflightCacheExpiry {
-			stillInFlight = append(stillInFlight, report)
-		} else {
-			lggr.Warnw("Inflight report expired, retrying", "min", report.report.SequenceNumbers[0], "max", report.report.SequenceNumbers[len(report.report.SequenceNumbers)-1])
-		}
 	}
-	// Add new inflight
-	r.inFlight = append(stillInFlight, InflightExecutionReport{
+	// Otherwise not already in flight, add it.
+	lggr.Infow("Added report to inflight",
+		"seqNums", er.SequenceNumbers)
+	r.inFlight = append(r.inFlight, InflightExecutionReport{
 		createdAt: time.Now(),
 		report:    er,
 	})
@@ -577,7 +597,7 @@ func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Conte
 	if stale {
 		return false, err
 	}
-	if err = r.updateInFlight(lggr, *er); err != nil {
+	if err = r.addToInflight(lggr, *er); err != nil {
 		return false, err
 	}
 	return true, nil
