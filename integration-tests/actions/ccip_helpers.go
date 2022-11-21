@@ -642,7 +642,7 @@ func (destCCIP *DestCCIPModule) BalanceAssertions(model BillingModel, prevBalanc
 			Address:  destCCIP.ReceiverDapp.EthAddress,
 			Getter:   destCCIP.SubscriptionBalance,
 			Expected: bigmath.Sub(prevBalances[name], subFeeDeducted).String(),
-			Within:   big.NewInt(0.5e18).String(),
+			Within:   big.NewInt(1e18).String(),
 		})
 	}
 	return balAssertions

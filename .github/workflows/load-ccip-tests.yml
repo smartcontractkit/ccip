@@ -1,5 +1,8 @@
 name: Load and Chaos CCIP Tests
 on:
+  push:
+    branches:
+      - ccip-develop
   schedule:
     - cron: "0 13 * * 3"
   workflow_dispatch:
@@ -12,17 +15,17 @@ on:
       duration:
         description: 'Duration(in minutes) for the load sequence'
         required: true
-        default: 5
+        default: 4
         type: number
       phase_time_out:
         description: 'Max time(in minutes) to wait for individual events in ccip flow'
         required: true
-        default: 5
+        default: 15
         type: number
       send_request_per_second:
         description: 'Number of ccip-send requests to trigger per second'
         required: true
-        default: 4
+        default: 3
         type: number
       type-of-transfer:
         description: 'Type of message to be sent'
@@ -130,12 +133,13 @@ jobs:
           QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
           CGO_ENABLED: "1"
       - name: Publish Artifacts
+        if: always()
         uses: actions/upload-artifact@v3
         with:
           name: load-test-stats
           path: ./integration-tests/load/logs/stats
       - name: Slack Notify
-        if: ${{ github.event_name == 'schedule' || inputs.slack-notify != false}}
+        if: ${{ failure() && github.event_name == 'push' || always() && github.event_name == 'schedule' || inputs.slack-notify != false}}
         uses: slackapi/slack-github-action@v1.22.0
         with:
           payload-file-path: "./integration-tests/load/logs/payload-slack-content.json"

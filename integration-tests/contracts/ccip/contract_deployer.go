@@ -413,7 +413,7 @@ func DefaultOffChainAggregatorV2Config(numberNodes int) contracts.OffChainAggreg
 		DeltaResend:                             2 * time.Second,
 		DeltaRound:                              5 * time.Second,
 		DeltaGrace:                              500 * time.Millisecond,
-		DeltaStage:                              10 * time.Second,
+		DeltaStage:                              30 * time.Second,
 		RMax:                                    3,
 		S:                                       s,
 		F:                                       faultyNodes,

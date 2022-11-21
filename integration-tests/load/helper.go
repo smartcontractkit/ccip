@@ -30,9 +30,9 @@ func PopulateAndValidate() *loadArgs {
 	inputDuration := os.Getenv("LOAD_TEST_DURATION")
 	inputMsgType := os.Getenv("LOAD_TEST_MSG_TYPE")
 	p := &loadArgs{
-		rps:         4,
-		duration:    10 * time.Minute,
-		ccipTimeout: 5 * time.Minute,
+		rps:         3,
+		duration:    4 * time.Minute,
+		ccipTimeout: 15 * time.Minute,
 		loadTimeOut: 18 * time.Minute,
 		msgType:     DataOnlyTransfer,
 	}
@@ -46,7 +46,7 @@ func PopulateAndValidate() *loadArgs {
 		d, err := strconv.Atoi(inputTimeout)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(d).Should(BeNumerically(">", 1), "invalid timeout")
-		Expect(d).Should(BeNumerically("<", 10), "invalid timeout")
+		Expect(d).Should(BeNumerically("<", 20), "invalid timeout")
 		p.ccipTimeout = time.Duration(d) * time.Minute
 		p.loadTimeOut = time.Duration(d*3) * time.Minute
 	}
@@ -91,6 +91,7 @@ func (loadArgs *loadArgs) Run() {
 	loadArgs.loadGen.Run()
 	_, failed := loadArgs.loadGen.Wait()
 	Expect(failed).Should(BeFalse(), "load run is failed")
+	Expect(loadArgs.loadGen.Errors()).Should(BeEmpty(), "error in load sequence call")
 }
 
 func (loadArgs *loadArgs) TearDown() {
