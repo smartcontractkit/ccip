@@ -116,35 +116,35 @@ jobs:
     steps:
       - run: echo "${{ matrix.cmd }} have finished"
 
-  scan:
-    name: SonarQube Scan
-    needs: [core-complete]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Collect Metrics
-        id: collect-gha-metrics
-        uses: smartcontractkit/push-gha-metrics-action@v1
-        with:
-          basic-auth: ${{ secrets.GRAFANA_CLOUD_BASIC_AUTH }}
-          hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
-          this-job-name: sonarqube-scan
-        continue-on-error: true
-      - name: Checkout the repo
-        uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # v3.1.0
-      - name: Download all workflow run artifacts
-        uses: actions/download-artifact@9782bd6a9848b53b110e712e20e42d89988822b7 # v3.0.1
-      - name: Set SonarQube Report Paths
-        id: sonarqube_report_paths
-        shell: bash
-        run: |
-          echo "sonarqube_tests_report_paths=$(find go_core_tests_*_logs -name output.txt | paste -sd "," -)" >> $GITHUB_OUTPUT
-          echo "sonarqube_coverage_report_paths=$(find go_core_tests_*_logs -name coverage.txt | paste -sd "," -)" >> $GITHUB_OUTPUT
-      - name: SonarQube Scan
-        uses: sonarsource/sonarqube-scan-action@7295e71c9583053f5bf40e9d4068a0c974603ec8 # v1.1.0
-        with:
-          args: >
-            -Dsonar.go.tests.reportPaths=${{ steps.sonarqube_report_paths.outputs.sonarqube_tests_report_paths }}
-            -Dsonar.go.coverage.reportPaths=${{ steps.sonarqube_report_paths.outputs.sonarqube_coverage_report_paths }}
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+  #  scan:
+  #    name: SonarQube Scan
+  #    needs: [core-complete]
+  #    runs-on: ubuntu-latest
+  #    steps:
+  #      - name: Collect Metrics
+  #        id: collect-gha-metrics
+  #        uses: smartcontractkit/push-gha-metrics-action@v1
+  #        with:
+  #          basic-auth: ${{ secrets.GRAFANA_CLOUD_BASIC_AUTH }}
+  #          hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
+  #          this-job-name: sonarqube-scan
+  #        continue-on-error: true
+  #      - name: Checkout the repo
+  #        uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # v3.1.0
+  #      - name: Download all workflow run artifacts
+  #        uses: actions/download-artifact@9782bd6a9848b53b110e712e20e42d89988822b7 # v3.0.1
+  #      - name: Set SonarQube Report Paths
+  #        id: sonarqube_report_paths
+  #        shell: bash
+  #        run: |
+  #          echo "sonarqube_tests_report_paths=$(find go_core_tests_*_logs -name output.txt | paste -sd "," -)" >> $GITHUB_OUTPUT
+  #          echo "sonarqube_coverage_report_paths=$(find go_core_tests_*_logs -name coverage.txt | paste -sd "," -)" >> $GITHUB_OUTPUT
+  #      - name: SonarQube Scan
+  #        uses: sonarsource/sonarqube-scan-action@7295e71c9583053f5bf40e9d4068a0c974603ec8 # v1.1.0
+  #        with:
+  #          args: >
+  #            -Dsonar.go.tests.reportPaths=${{ steps.sonarqube_report_paths.outputs.sonarqube_tests_report_paths }}
+  #            -Dsonar.go.coverage.reportPaths=${{ steps.sonarqube_report_paths.outputs.sonarqube_coverage_report_paths }}
+  #        env:
+  #          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+  #          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}

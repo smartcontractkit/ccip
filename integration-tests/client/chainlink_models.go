@@ -993,6 +993,7 @@ observationSource                      = """
 [relayConfig]{{range $key, $value := .RelayConfig}}
 {{$key}} = {{$value}}{{end}}
 `
+
 	return MarshallTemplate(specWrap, "OCR2 Job", ocr2TemplateString)
 }
 
