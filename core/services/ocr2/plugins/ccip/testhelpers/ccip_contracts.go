@@ -195,10 +195,10 @@ func (c *CCIPContracts) EnableTollOffRamp() {
 func (c *CCIPContracts) DeployNewTollOnRamp() {
 	c.t.Log("Deploying new toll onRamp")
 	onRampAddress, _, _, err := evm_2_evm_toll_onramp.DeployEVM2EVMTollOnRamp(
-		c.SourceUser,                                  // user
-		c.SourceChain,                                 // client
-		c.SourceChainID,                               // source chain id
-		c.DestChainID,                                 // destinationChainIds
+		c.SourceUser,    // user
+		c.SourceChain,   // client
+		c.SourceChainID, // source chain id
+		c.DestChainID,   // destinationChainIds
 		[]common.Address{c.SourceLinkToken.Address()}, // tokens
 		[]common.Address{c.SourcePool.Address()},      // pools
 		[]common.Address{},                            // allow list
@@ -337,14 +337,17 @@ func (c *CCIPContracts) SetupOnchainConfig(oracles []confighelper.OracleIdentity
 	return blockBeforeConfig.Number().Int64()
 }
 
-func (c *CCIPContracts) NewCCIPJobSpecParams(tokensPerFeeCoinPipeline string) CCIPJobSpec {
-	return CCIPJobSpec{
-		TollOffRamp:              c.TollOffRamp.Address(),
-		TollOnRamp:               c.TollOnRamp.Address(),
+func (c CCIPContracts) NewCCIPJobSpecParams(tokensPerFeeCoinPipeline string, configBlock int64) CCIPJobSpecParams {
+	return CCIPJobSpecParams{
+		OnRampsOnCommit:          []common.Address{c.TollOnRamp.Address()},
 		CommitStore:              c.CommitStore.Address(),
 		SourceChainId:            c.SourceChainID,
 		DestChainId:              c.DestChainID,
+		SourceChainName:          "SimulatedSource",
+		DestChainName:            "SimulatedDest",
 		TokensPerFeeCoinPipeline: tokensPerFeeCoinPipeline,
+		PollPeriod:               time.Second,
+		DestStartBlock:           uint64(configBlock),
 	}
 }
 

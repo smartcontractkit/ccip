@@ -31,20 +31,6 @@ func TestIntegration_CCIP(t *testing.T) {
 	ctx := context.Background()
 	// Starts nodes and configures them in the OCR contracts.
 	bootstrapNode, nodes, configBlock := testhelpers.SetupAndStartNodes(ctx, t, &ccipContracts, bootstrapNodePort)
-
-	// Add the bootstrap job
-	bootstrapNode.AddBootstrapJob(t, fmt.Sprintf(`
-type               	= "bootstrap"
-relay 				= "evm"
-schemaVersion      	= 1
-name               	= "boot"
-contractID    	    = "%s"
-contractConfigConfirmations = 1
-contractConfigTrackerPollInterval = "1s"
-[relayConfig]
-chainID = %s
-`, ccipContracts.CommitStore.Address(), destChainID))
-
 	linkEth := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, err := w.Write([]byte(`{"JuelsPerETH": "200000000000000000000"}`))
 		require.NoError(t, err)
@@ -56,14 +42,13 @@ link_parse [type=jsonparse path="JuelsPerETH"];
 link->link_parse;
 merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		linkEth.URL, ccipContracts.DestLinkToken.Address())
-
+	jobParams := ccipContracts.NewCCIPJobSpecParams(tokensPerFeeCoinPipeline, configBlock)
 	defer linkEth.Close()
-	spec := ccipContracts.NewCCIPJobSpecParams(tokensPerFeeCoinPipeline)
 
-	for i, node := range nodes {
-		spec.AddCCIPCommitJob(t, fmt.Sprintf("ccip-commit-%d", i), node, configBlock)
-		spec.AddCCIPTollExecutionJob(t, fmt.Sprintf("ccip-executor-toll-%d", i), node, configBlock)
-	}
+	// Add the bootstrap job
+	bootstrapNode.AddBootstrapJob(t, jobParams.BootstrapJob(ccipContracts.CommitStore.Address().Hex()))
+	testhelpers.AddAllJobs(t, jobParams, ccipContracts, nodes)
+
 	// Replay for bootstrap.
 	bc, err := bootstrapNode.App.GetChains().EVM.Get(destChainID)
 	require.NoError(t, err)
@@ -241,16 +226,18 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		ccipContracts.DeployNewTollOnRamp()
 		ccipContracts.DeployNewTollOffRamp()
 		newConfigBlock := ccipContracts.DestChain.Blockchain().CurrentBlock().Number().Int64()
-		// create updated jobs
-		spec := ccipContracts.NewCCIPJobSpecParams(tokensPerFeeCoinPipeline)
-		for i, node := range nodes {
+
+		// delete previous jobs
+		for _, node := range nodes {
 			err = node.App.DeleteJob(context.Background(), 1)
 			require.NoError(t, err)
 			err = node.App.DeleteJob(context.Background(), 2)
 			require.NoError(t, err)
-			spec.AddCCIPCommitJob(t, fmt.Sprintf("ccip-commit-new-%d", i), node, newConfigBlock)
-			spec.AddCCIPTollExecutionJob(t, fmt.Sprintf("ccip-executor-toll-new-%d", i), node, configBlock)
 		}
+		// create updated jobs
+		jobParams = ccipContracts.NewCCIPJobSpecParams(tokensPerFeeCoinPipeline, newConfigBlock)
+		testhelpers.AddAllJobs(t, jobParams, ccipContracts, nodes)
+
 		// keep sending a number of send requests all of which would be in pending state
 		currentSeqNum := atomic.NewInt32(1) // start with 1 as it's a new onramp
 		startSeq := 1

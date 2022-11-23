@@ -22,6 +22,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
+	ctfClient "github.com/smartcontractkit/chainlink/integration-tests/client"
+
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/client"
 	v2 "github.com/smartcontractkit/chainlink/core/chains/evm/config/v2"
@@ -126,96 +128,45 @@ func (node *Node) ConsistentlySeqNumHasNotBeenExecuted(t *testing.T, ccipContrac
 	return log
 }
 
-func (node *Node) AddJob(t *testing.T, spec string) {
-	ccipJob, err := validate.ValidatedOracleSpecToml(node.App.GetConfig(), spec)
+func (node *Node) AddJob(t *testing.T, spec *ctfClient.OCR2TaskJobSpec) {
+	specString, err := spec.String()
+	require.NoError(t, err)
+	ccipJob, err := validate.ValidatedOracleSpecToml(node.App.GetConfig(), specString)
 	require.NoError(t, err)
 	err = node.App.AddJobV2(context.Background(), &ccipJob)
 	require.NoError(t, err)
 }
 
-func (node *Node) AddBootstrapJob(t *testing.T, spec string) {
-	ccipJob, err := ocrbootstrap.ValidatedBootstrapSpecToml(spec)
+func (node *Node) AddBootstrapJob(t *testing.T, spec *ctfClient.OCR2TaskJobSpec) {
+	specString, err := spec.String()
+	require.NoError(t, err)
+	ccipJob, err := ocrbootstrap.ValidatedBootstrapSpecToml(specString)
 	require.NoError(t, err)
 	err = node.App.AddJobV2(context.Background(), &ccipJob)
 	require.NoError(t, err)
 }
 
-type CCIPJobSpec struct {
-	TollOffRamp              common.Address
-	TollOnRamp               common.Address
-	CommitStore              common.Address
-	SourceChainId            *big.Int
-	DestChainId              *big.Int
-	TokensPerFeeCoinPipeline string
+func AddAllJobs(t *testing.T, jobParams CCIPJobSpecParams, ccipContracts CCIPContracts, nodes []Node) {
+	commitSpec, err := jobParams.CommitJobSpec()
+	require.NoError(t, err)
+	jobParams.OnRampForExecution = ccipContracts.TollOnRamp.Address()
+	jobParams.OffRamp = ccipContracts.TollOffRamp.Address()
+	tollExecutionSpec, err := jobParams.ExecutionJobSpec()
+	require.NoError(t, err)
+
+	for i, node := range nodes {
+		commitSpec.Name = fmt.Sprintf("ccip-commit-%d", i)
+		node.AddJobsWithSpec(t, commitSpec)
+		tollExecutionSpec.Name = fmt.Sprintf("ccip-exec-toll-%d", i)
+		node.AddJobsWithSpec(t, tollExecutionSpec)
+	}
 }
 
-func (spec CCIPJobSpec) AddCCIPCommitJob(t *testing.T, jobName string, node Node, configBlock int64) {
-	node.AddJob(t, fmt.Sprintf(`
-type                = "offchainreporting2"
-pluginType          = "ccip-commit"
-relay               = "evm"
-schemaVersion       = 1
-name                = "%s"
-contractID          = "%s"
-ocrKeyBundleID      = "%s"
-transmitterID       = "%s"
-contractConfigConfirmations = 1
-contractConfigTrackerPollInterval = "1s"
-
-[pluginConfig]
-onRampIDs           = ["%s"]
-sourceChainID       = %s
-destChainID         = %s
-pollPeriod          = "1s"
-destStartBlock      = %d
-
-[relayConfig]
-chainID             = %s
-
-`, jobName, spec.CommitStore,
-		node.KeyBundle.ID(), node.Transmitter,
-		spec.TollOnRamp,
-		spec.SourceChainId, spec.DestChainId,
-		configBlock, spec.DestChainId,
-	))
-}
-
-func (spec CCIPJobSpec) ExecJobSpec(jobName string, offRamp, onRamp common.Address, node Node, configBlock int64) string {
-	return fmt.Sprintf(`
-type                = "offchainreporting2"
-pluginType          = "ccip-execution"
-relay               = "evm"
-schemaVersion       = 1
-name                = "%s"
-contractID          = "%s"
-ocrKeyBundleID      = "%s"
-transmitterID       = "%s"
-contractConfigConfirmations = 1
-contractConfigTrackerPollInterval = "1s"
-
-[pluginConfig]
-onRampID            = "%s"
-commitStoreID       = "%s"
-sourceChainID       = %s
-destChainID         = %s
-pollPeriod          = "1s"
-destStartBlock      = %d
-tokensPerFeeCoinPipeline = %s
-
-[relayConfig]
-chainID             = %s
-
-`, jobName, offRamp, node.KeyBundle.ID(), node.Transmitter,
-		onRamp, spec.CommitStore,
-		spec.SourceChainId, spec.DestChainId, configBlock,
-		fmt.Sprintf(`"""
-%s
-"""`, spec.TokensPerFeeCoinPipeline),
-		spec.DestChainId)
-}
-
-func (spec CCIPJobSpec) AddCCIPTollExecutionJob(t *testing.T, jobName string, node Node, configBlock int64) {
-	node.AddJob(t, spec.ExecJobSpec(jobName, spec.TollOffRamp, spec.TollOnRamp, node, configBlock))
+func (node *Node) AddJobsWithSpec(t *testing.T, jobSpec *ctfClient.OCR2TaskJobSpec) {
+	// set node specific values
+	jobSpec.OCR2OracleSpec.OCRKeyBundleID.SetValid(node.KeyBundle.ID())
+	jobSpec.OCR2OracleSpec.TransmitterID.SetValid(node.Transmitter.Hex())
+	node.AddJob(t, jobSpec)
 }
 
 func SetupNodeCCIP(

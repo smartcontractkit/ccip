@@ -5,17 +5,17 @@ import (
 	"math/big"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
 	"github.com/smartcontractkit/chainlink/core/scripts/common"
-	"github.com/smartcontractkit/chainlink/core/services/job"
 )
 
 const (
-	PollPeriod = "1s"
+	PollPeriod = time.Second
 )
 
 type Environment string
@@ -208,13 +208,6 @@ func (don *DON) ListJobSpecs() {
 	}
 }
 
-func (don *DON) AddRawJobSpec(node *client.Chainlink, spec string) {
-	jb, tx, err := node.CreateJobRaw(spec)
-	common.PanicErr(err)
-
-	don.lggr.Infof("Created job %3s. Status code %s", jb.Data.ID, tx.Status)
-}
-
 func (don *DON) LoadCurrentNodeParams() {
 	don.PopulateOCR2Keys()
 	don.PopulateEthKeys()
@@ -230,33 +223,48 @@ func (don *DON) ClearAllJobs(chainA Chain, chainB Chain) {
 }
 
 func (don *DON) AddTwoWaySpecs(chainA rhea.EvmDeploymentConfig, chainB rhea.EvmDeploymentConfig) {
-	commitSpecAB := generateCommitJobSpecs(&chainA, &chainB)
-	don.AddJobSpecs(commitSpecAB)
-	executionSpecAB := generateExecutionJobSpecs(&chainA, &chainB)
-	don.AddJobSpecs(executionSpecAB)
-	commitSpecBA := generateCommitJobSpecs(&chainB, &chainA)
-	don.AddJobSpecs(commitSpecBA)
-	executionSpecBA := generateExecutionJobSpecs(&chainB, &chainA)
-	don.AddJobSpecs(executionSpecBA)
+	jobParamsAB := NewCCIPJobSpecParams(chainA, chainB)
+	relaySpecAB, err := jobParamsAB.CommitJobSpec()
+	if err != nil {
+		don.lggr.Errorf("commit jobspec error %v", err)
+	}
+	don.AddJobSpec(relaySpecAB)
+	executionSpecAB, err := jobParamsAB.ExecutionJobSpec()
+	if err != nil {
+		don.lggr.Errorf("exec jobspec error %v", err)
+	}
+	don.AddJobSpec(executionSpecAB)
+	jobParamsBA := NewCCIPJobSpecParams(chainB, chainA)
+	relaySpecBA, err := jobParamsBA.CommitJobSpec()
+	if err != nil {
+		don.lggr.Errorf("commit jobspec error %v", err)
+	}
+	don.AddJobSpec(relaySpecBA)
+	executionSpecBA, err := jobParamsBA.ExecutionJobSpec()
+	if err != nil {
+		don.lggr.Errorf("exec jobspec error %v", err)
+	}
+	don.AddJobSpec(executionSpecBA)
 }
 
-func (don *DON) AddJobSpecs(spec job.Job) {
-	chainID := spec.OCR2OracleSpec.RelayConfig["chainID"].(string)
+func (don *DON) AddJobSpec(spec *client.OCR2TaskJobSpec) {
+	chainID := spec.OCR2OracleSpec.RelayConfig["chainID"].(*big.Int)
 
 	for i, node := range don.Nodes {
 		evmKeyBundle := GetOCRkeysForChainType(don.Config.Nodes[i].OCRKeys, "evm")
 		transmitterIDs := don.Config.Nodes[i].EthKeys
 
+		// set node specific values
 		spec.OCR2OracleSpec.OCRKeyBundleID.SetValid(evmKeyBundle.ID)
-		spec.OCR2OracleSpec.TransmitterID.SetValid(transmitterIDs[chainID])
+		spec.OCR2OracleSpec.TransmitterID.SetValid(transmitterIDs[chainID.String()])
 
-		var specString string
-		if spec.OCR2OracleSpec.PluginType == job.CCIPCommit {
-			specString = CommitSpecToString(spec)
-		} else {
-			specString = ExecSpecToString(spec)
-		}
+		specString, err := spec.String()
+		common.PanicErr(err)
+
 		don.lggr.Infof(specString)
-		don.AddRawJobSpec(node, specString)
+		jb, tx, err := node.CreateJobRaw(specString)
+		common.PanicErr(err)
+
+		don.lggr.Infof("Created job %3s. Status code %s", jb.Data.ID, tx.Status)
 	}
 }

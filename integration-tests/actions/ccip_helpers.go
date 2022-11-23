@@ -13,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	. "github.com/onsi/gomega"
 	"github.com/rs/zerolog/log"
-	uuid "github.com/satori/go.uuid"
 	"github.com/smartcontractkit/chainlink-env/environment"
 	"github.com/smartcontractkit/chainlink-env/pkg/cdk8s/blockscout"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/chainlink"
@@ -24,15 +23,11 @@ import (
 	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
 	ctfUtils "github.com/smartcontractkit/chainlink-testing-framework/utils"
 	"golang.org/x/exp/slices"
-	"gopkg.in/guregu/null.v4"
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_toll_onramp_router"
-	"github.com/smartcontractkit/chainlink/core/services/job"
 	ccipPlugin "github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/testhelpers"
-	"github.com/smartcontractkit/chainlink/core/services/relay"
-	"github.com/smartcontractkit/chainlink/core/store/models"
 	"github.com/smartcontractkit/chainlink/core/utils"
 	bigmath "github.com/smartcontractkit/chainlink/core/utils/big_math"
 	networks "github.com/smartcontractkit/chainlink/integration-tests"
@@ -500,6 +495,7 @@ func (destCCIP *DestCCIPModule) BalanceAssertions(prevBalances map[string]*big.I
 		Expected: bigmath.Add(prevBalances[name], unusedFee.String()).String(),
 		Within:   big.NewInt(1e18).String(),
 	})
+
 	return balAssertions
 }
 
@@ -661,7 +657,7 @@ func CreateOCRJobsForCCIP(
 	bootstrapCommit *client.CLNodesWithKeys,
 	bootstrapExec *client.CLNodesWithKeys,
 	commitNodes, execNodes []*client.CLNodesWithKeys,
-	tollOnRamp, commitStore, tollOffRamp string,
+	tollOnRamp, commitStore, tollOffRamp common.Address,
 	sourceChainClient, destChainClient blockchain.EVMClient,
 	linkTokenAddr []string,
 	mockServer *ctfClient.MockserverClient,
@@ -675,33 +671,14 @@ func CreateOCRJobsForCCIP(
 	} else {
 		bootstrapExecP2PId = bootstrapExec.KeysBundle.P2PKeys.Data[0].Attributes.PeerID
 	}
-	sourceChainID := sourceChainClient.GetChainID()
-	destChainID := destChainClient.GetChainID()
-	sourceChainName := sourceChainClient.GetNetworkName()
-	destChainName := destChainClient.GetNetworkName()
-	bootstrapSpec := func(contractID string) *client.OCR2TaskJobSpec {
-		return &client.OCR2TaskJobSpec{
-			Name:    fmt.Sprintf("bootstrap-%s-%s", destChainName, uuid.NewV4().String()),
-			JobType: "bootstrap",
-			OCR2OracleSpec: job.OCR2OracleSpec{
-				ContractID:                        contractID,
-				Relay:                             relay.EVM,
-				ContractConfigConfirmations:       1,
-				ContractConfigTrackerPollInterval: models.Interval(1 * time.Second),
-				RelayConfig: map[string]interface{}{
-					"chainID": fmt.Sprintf("\"%s\"", destChainID.String()),
-				},
-			},
-		}
+	p2pBootstrappersCommit := &client.P2PData{
+		RemoteIP: bootstrapCommit.Node.RemoteIP(),
+		PeerID:   bootstrapCommitP2PId,
 	}
 
-	_, err := bootstrapCommit.Node.MustCreateJob(bootstrapSpec(commitStore))
-	Expect(err).ShouldNot(HaveOccurred(), "Shouldn't fail creating bootstrap job on bootstrap node")
-	if bootstrapExec != nil && len(execNodes) > 0 {
-		_, err := bootstrapExec.Node.MustCreateJob(bootstrapSpec(tollOffRamp))
-		Expect(err).ShouldNot(HaveOccurred(), "Shouldn't fail creating bootstrap job on bootstrap node")
-	} else {
-		execNodes = commitNodes
+	p2pBootstrappersExec := &client.P2PData{
+		RemoteIP: bootstrapExec.Node.RemoteIP(),
+		PeerID:   bootstrapExecP2PId,
 	}
 	// save the current block numbers. If there is a delay between job start up and ocr config set up, the jobs will
 	// replay the log polling from these mentioned block number. The dest block number should ideally be the block number on which
@@ -712,104 +689,69 @@ func CreateOCRJobsForCCIP(
 	currentBlockOnDest, err := destChainClient.LatestBlockNumber(context.Background())
 	Expect(err).ShouldNot(HaveOccurred(), "Getting current block should be successful in dest chain")
 
+	jobParams := testhelpers.CCIPJobSpecParams{
+		OnRampsOnCommit:    []common.Address{tollOnRamp},
+		CommitStore:        commitStore,
+		SourceChainName:    sourceChainClient.GetNetworkName(),
+		DestChainName:      destChainClient.GetNetworkName(),
+		SourceChainId:      sourceChainClient.GetChainID(),
+		DestChainId:        destChainClient.GetChainID(),
+		PollPeriod:         time.Second,
+		SourceStartBlock:   currentBlockOnSource,
+		DestStartBlock:     currentBlockOnDest,
+		RelayInflight:      InflightExpiry,
+		ExecInflight:       InflightExpiry,
+		RootSnooze:         RootSnoozeTime,
+		P2PV2Bootstrappers: []string{p2pBootstrappersCommit.P2PV2Bootstrapper()},
+	}
+
+	_, err = bootstrapCommit.Node.MustCreateJob(jobParams.BootstrapJob(commitStore.Hex()))
+	Expect(err).ShouldNot(HaveOccurred(), "Shouldn't fail creating bootstrap job on bootstrap node")
+	if bootstrapExec != nil && len(execNodes) > 0 {
+		_, err := bootstrapExec.Node.MustCreateJob(jobParams.BootstrapJob(tollOffRamp.Hex()))
+		Expect(err).ShouldNot(HaveOccurred(), "Shouldn't fail creating bootstrap job on bootstrap node")
+	} else {
+		execNodes = commitNodes
+	}
+
 	tokenFeeConv := make(map[string]interface{})
 	for _, token := range linkTokenAddr {
 		tokenFeeConv[token] = "200000000000000000000"
 	}
 	SetMockServerWithSameTokenFeeConversionValue(tokenFeeConv, execNodes, mockServer)
-	p2pBootstrappersCommit := &client.P2PData{
-		RemoteIP: bootstrapCommit.Node.RemoteIP(),
-		PeerID:   bootstrapCommitP2PId,
-	}
-	p2pBootstrappersExec := &client.P2PData{
-		RemoteIP: bootstrapExec.Node.RemoteIP(),
-		PeerID:   bootstrapExecP2PId,
-	}
-	addCommitJob := func(node *client.Chainlink, nodeTransmitterAddress, nodeOCR2KeyId string) error {
-		ocr2SpecCommit := &client.OCR2TaskJobSpec{
-			JobType: "offchainreporting2",
-			Name:    fmt.Sprintf("ccip-commit-%s-%s", sourceChainName, destChainName),
-			OCR2OracleSpec: job.OCR2OracleSpec{
-				Relay:                             relay.EVM,
-				PluginType:                        job.CCIPCommit,
-				ContractID:                        commitStore,
-				OCRKeyBundleID:                    null.StringFrom(nodeOCR2KeyId),
-				TransmitterID:                     null.StringFrom(nodeTransmitterAddress),
-				ContractConfigConfirmations:       1,
-				ContractConfigTrackerPollInterval: models.Interval(1 * time.Second),
-				P2PV2Bootstrappers: []string{
-					p2pBootstrappersCommit.P2PV2Bootstrapper(),
-				},
-				PluginConfig: map[string]interface{}{
-					"sourceChainID":       sourceChainID,
-					"destChainID":         destChainID,
-					"onRampIDs":           fmt.Sprintf("[\"%s\"]", tollOnRamp),
-					"pollPeriod":          `"1s"`,
-					"destStartBlock":      currentBlockOnDest,
-					"sourceStartBlock":    currentBlockOnSource,
-					"inflightCacheExpiry": fmt.Sprintf("\"%s\"", InflightExpiry.String()),
-				},
-				RelayConfig: map[string]interface{}{
-					"chainID": destChainID,
-				},
-			},
-		}
-		_, err = node.MustCreateJob(ocr2SpecCommit)
-		return err
-	}
 
-	addExecJob := func(node *client.CLNodesWithKeys, jobname, nodeTransmitterAddress, nodeOCR2KeyId, offRamp, onRamp string) error {
-		tokensPerFeeCoinPipeline := TokenFeeForMultipleTokenAddr(node, linkTokenAddr, mockServer)
-		ocr2SpecExec := &client.OCR2TaskJobSpec{
-			JobType: "offchainreporting2",
-			Name:    jobname,
-			OCR2OracleSpec: job.OCR2OracleSpec{
-				Relay:                             relay.EVM,
-				PluginType:                        job.CCIPExecution,
-				ContractID:                        offRamp,
-				OCRKeyBundleID:                    null.StringFrom(nodeOCR2KeyId),
-				TransmitterID:                     null.StringFrom(nodeTransmitterAddress),
-				ContractConfigConfirmations:       1,
-				ContractConfigTrackerPollInterval: models.Interval(1 * time.Second),
-				P2PV2Bootstrappers: []string{
-					p2pBootstrappersExec.P2PV2Bootstrapper(),
-				},
-				PluginConfig: map[string]interface{}{
-					"sourceChainID":    sourceChainID,
-					"destChainID":      destChainID,
-					"onRampID":         fmt.Sprintf("\"%s\"", onRamp),
-					"commitStoreID":    fmt.Sprintf("\"%s\"", commitStore),
-					"destStartBlock":   currentBlockOnDest,
-					"sourceStartBlock": currentBlockOnSource,
-					"tokensPerFeeCoinPipeline": fmt.Sprintf(`"""
-%s
-"""`, tokensPerFeeCoinPipeline),
-					"rootSnoozeTime":      fmt.Sprintf("\"%s\"", RootSnoozeTime.String()),
-					"inflightCacheExpiry": fmt.Sprintf("\"%s\"", InflightExpiry.String()),
-				},
-				RelayConfig: map[string]interface{}{
-					"chainID": destChainID,
-				},
-			},
-		}
-		_, err = node.Node.MustCreateJob(ocr2SpecExec)
-		return err
-	}
+	ocr2SpecCommit, err := jobParams.CommitJobSpec()
+	Expect(err).ShouldNot(HaveOccurred())
+	jobParams.OffRamp = tollOffRamp
+	jobParams.OnRampForExecution = tollOnRamp
+	jobParams.P2PV2Bootstrappers = []string{p2pBootstrappersExec.P2PV2Bootstrapper()}
+	ocr2SpecExecForToll, err := jobParams.ExecutionJobSpec()
+	Expect(err).ShouldNot(HaveOccurred())
+	ocr2SpecExecForToll.Name = fmt.Sprintf("%s-toll", ocr2SpecExecForToll.Name)
 
 	for nodeIndex := 0; nodeIndex < len(commitNodes); nodeIndex++ {
 		nodeTransmitterAddress := commitNodes[nodeIndex].KeysBundle.EthAddress
 		nodeOCR2Key := commitNodes[nodeIndex].KeysBundle.OCR2Key
 		nodeOCR2KeyId := nodeOCR2Key.Data.ID
-		err := addCommitJob(commitNodes[nodeIndex].Node, nodeTransmitterAddress, nodeOCR2KeyId)
+		ocr2SpecCommit.OCR2OracleSpec.OCRKeyBundleID.SetValid(nodeOCR2KeyId)
+		ocr2SpecCommit.OCR2OracleSpec.TransmitterID.SetValid(nodeTransmitterAddress)
+
+		_, err = commitNodes[nodeIndex].Node.MustCreateJob(ocr2SpecCommit)
 		Expect(err).ShouldNot(HaveOccurred(), "Shouldn't fail creating CCIP-Commit OCR Task job on OCR node %d", nodeIndex+1)
 	}
 
 	for nodeIndex := 0; nodeIndex < len(execNodes); nodeIndex++ {
+		tokensPerFeeCoinPipeline := TokenFeeForMultipleTokenAddr(execNodes[nodeIndex], linkTokenAddr, mockServer)
 		nodeTransmitterAddress := execNodes[nodeIndex].KeysBundle.EthAddress
 		nodeOCR2Key := execNodes[nodeIndex].KeysBundle.OCR2Key
 		nodeOCR2KeyId := nodeOCR2Key.Data.ID
-		err = addExecJob(execNodes[nodeIndex], fmt.Sprintf("ccip-exec-toll-%s-%s", sourceChainName, destChainName),
-			nodeTransmitterAddress, nodeOCR2KeyId, tollOffRamp, tollOnRamp)
+		ocr2SpecExecForToll.OCR2OracleSpec.PluginConfig["tokensPerFeeCoinPipeline"] = fmt.Sprintf(`"""
+%s
+"""`, tokensPerFeeCoinPipeline)
+		ocr2SpecExecForToll.OCR2OracleSpec.OCRKeyBundleID.SetValid(nodeOCR2KeyId)
+		ocr2SpecExecForToll.OCR2OracleSpec.TransmitterID.SetValid(nodeTransmitterAddress)
+
+		_, err = execNodes[nodeIndex].Node.MustCreateJob(ocr2SpecExecForToll)
 		Expect(err).ShouldNot(HaveOccurred(), "Shouldn't fail creating CCIP-Exec-toll OCR Task job on OCR node %d", nodeIndex+1)
 	}
 }
@@ -1104,9 +1046,9 @@ func CCIPDefaultTestSetUp(
 	}
 	CreateOCRJobsForCCIP(
 		bootstrapCommit, bootstrapExec, commitNodes, execNodes,
-		sourceCCIP.TollOnRamp.Address(),
-		destCCIP.CommitStore.Address(),
-		destCCIP.TollOffRamp.Address(),
+		sourceCCIP.TollOnRamp.EthAddress,
+		destCCIP.CommitStore.EthAddress,
+		destCCIP.TollOffRamp.EthAddress,
 		sourceChainClient, destChainClient,
 		tokenAddr,
 		mockServer,

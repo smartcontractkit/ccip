@@ -467,100 +467,40 @@ func generateSeparator(headerLengths []int) string {
 }
 
 // PrintJobSpecs prints the job spec for each node and CCIP spec type, as well as a bootstrap spec.
-func PrintJobSpecs(env dione.Environment, onramp, commitStore, offRamp common.Address, sourceChainID, destChainID *big.Int, destLinkToken common.Address, sourceReplayFrom, destReplayFrom uint64) {
-	jobs := fmt.Sprintf(bootstrapTemplate+"\n", helpers.ChainName(destChainID.Int64()), commitStore, destChainID)
+func PrintJobSpecs(env dione.Environment, sourceClient rhea.EvmDeploymentConfig, destClient rhea.EvmDeploymentConfig) {
 	don := dione.NewOfflineDON(env, nil)
+	// jobparams for the lane
+	jobParams := dione.NewCCIPJobSpecParams(sourceClient, destClient)
 
+	bootstrapSpec := jobParams.BootstrapJob(destClient.LaneConfig.CommitStore.Hex())
+	specString, err := bootstrapSpec.String()
+	helpers.PanicErr(err)
+	jobs := fmt.Sprintf("# BootstrapSpec%s", specString)
+
+	commitJobSpec, err := jobParams.CommitJobSpec()
+	helpers.PanicErr(err)
+	committingChainID := commitJobSpec.OCR2OracleSpec.RelayConfig["chainID"].(*big.Int)
+	executionSpec, err := jobParams.ExecutionJobSpec()
+	helpers.PanicErr(err)
+	execChainID := executionSpec.OCR2OracleSpec.RelayConfig["chainID"].(*big.Int)
 	for i, oracle := range don.Config.Nodes {
-		jobs += fmt.Sprintf("// [Node %d]\n", i)
-		jobs += fmt.Sprintf(commitTemplate+"\n",
-			helpers.ChainName(sourceChainID.Int64())+"-"+helpers.ChainName(destChainID.Int64()),
-			commitStore,
-			dione.GetOCRkeysForChainType(oracle.OCRKeys, "evm").ID,
-			oracle.EthKeys[destChainID.String()],
-			sourceChainID,
-			destChainID,
-			onramp,
-			dione.PollPeriod,
-			sourceReplayFrom,
-			destReplayFrom,
-			destChainID,
-		)
-		jobs += fmt.Sprintf(executionTemplate+"\n",
-			helpers.ChainName(sourceChainID.Int64())+"-"+helpers.ChainName(destChainID.Int64()),
-			offRamp,
-			dione.GetOCRkeysForChainType(oracle.OCRKeys, "evm").ID,
-			oracle.EthKeys[destChainID.String()],
-			sourceChainID,
-			destChainID,
-			onramp,
-			commitStore,
-			sourceReplayFrom,
-			destReplayFrom,
-			destLinkToken,
-			destChainID,
-		)
+		jobs += fmt.Sprintf("\n// [Node %d]\n", i)
+		evmKeyBundle := dione.GetOCRkeysForChainType(oracle.OCRKeys, "evm")
+		transmitterIDs := oracle.EthKeys
+
+		// set node specific values
+		commitJobSpec.OCR2OracleSpec.OCRKeyBundleID.SetValid(evmKeyBundle.ID)
+		commitJobSpec.OCR2OracleSpec.TransmitterID.SetValid(transmitterIDs[committingChainID.String()])
+		specString, err := commitJobSpec.String()
+		helpers.PanicErr(err)
+		jobs += fmt.Sprintf("\n# CCIP commit spec%s", specString)
+
+		// set node specific values
+		executionSpec.OCR2OracleSpec.OCRKeyBundleID.SetValid(evmKeyBundle.ID)
+		executionSpec.OCR2OracleSpec.TransmitterID.SetValid(transmitterIDs[execChainID.String()])
+		specString, err = executionSpec.String()
+		helpers.PanicErr(err)
+		jobs += fmt.Sprintf("\n# CCIP execution spec%s", specString)
 	}
 	fmt.Println(jobs)
 }
-
-const bootstrapTemplate = `
-// Bootstrap Node
-# BootstrapSpec
-type                               = "bootstrap"
-name                               = "bootstrap-%s"
-relay                              = "evm"
-schemaVersion                      = 1
-contractID                         = "%s"
-contractConfigConfirmations        = 1
-contractConfigTrackerPollInterval  = "60s"
-[relayConfig]
-chainID                            = %s
-`
-
-const commitTemplate = `
-# CCIP commit spec
-type               = "offchainreporting2"
-name               = "ccip-commit-%s"
-pluginType         = "ccip-commit"
-relay              = "evm"
-schemaVersion      = 1
-contractID         = "%s"
-ocrKeyBundleID     = "%s"
-transmitterID      = "%s"
-
-[pluginConfig]
-sourceChainID      = %d
-destChainID        = %d
-onRampIDs          = ["%s"]
-pollPeriod         = "%s"
-SourceStartBlock   = %d
-DestStartBlock     = %d
-
-[relayConfig]
-chainID            = %d
-`
-
-const executionTemplate = `
-# CCIP execution spec
-type              = "offchainreporting2"
-name              = "ccip-exec-%s"
-pluginType        = "ccip-execution"
-relay             = "evm"
-schemaVersion     = 1
-contractID        = "%s"
-ocrKeyBundleID    = "%s"
-transmitterID     = "%s"
-
-[pluginConfig]
-sourceChainID     = %d
-destChainID       = %d
-onRampID          = "%s"
-commitStoreID    = "%s"
-SourceStartBlock  = %d
-DestStartBlock    = %d
-tokensPerFeeCoinPipeline = """merge [type=merge left="{}" right="{\\\"%s\\\":\\\"1000000000000000000\\\"}"];"""
-
-[relayConfig]
-chainID           = %d
-`

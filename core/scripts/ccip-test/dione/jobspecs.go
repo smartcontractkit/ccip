@@ -3,95 +3,33 @@ package dione
 import (
 	"fmt"
 
-	null2 "gopkg.in/guregu/null.v4"
+	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
-	"github.com/smartcontractkit/chainlink/core/services/job"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/testhelpers"
 )
 
-func CommitSpecToString(spec job.Job) string {
-	onRamp := spec.OCR2OracleSpec.PluginConfig["onRampIDs"].([]string)[0]
-
-	const commitTemplate = `
-# CCIP Commit spec
-type               = "offchainreporting2"
-name               = "%s"
-pluginType         = "ccip-commit"
-relay              = "evm"
-schemaVersion      = 1
-contractID         = "%s"
-ocrKeyBundleID     = "%s"
-transmitterID      = "%s"
-
-[pluginConfig]
-sourceChainID      = %s
-destChainID        = %s
-onRampIDs          = ["%s"]
-pollPeriod         = "%s"
-SourceStartBlock   = %d
-DestStartBlock     = %d
-
-[relayConfig]
-chainID            = %s
-`
-
-	return fmt.Sprintf(commitTemplate+"\n",
-		spec.Name.String,
-		spec.OCR2OracleSpec.ContractID,
-		spec.OCR2OracleSpec.OCRKeyBundleID.String,
-		spec.OCR2OracleSpec.TransmitterID.String,
-		spec.OCR2OracleSpec.PluginConfig["sourceChainID"],
-		spec.OCR2OracleSpec.PluginConfig["destChainID"],
-		onRamp,
-		PollPeriod,
-		spec.OCR2OracleSpec.PluginConfig["SourceStartBlock"],
-		spec.OCR2OracleSpec.PluginConfig["DestStartBlock"],
-		spec.OCR2OracleSpec.PluginConfig["destChainID"],
-	)
-}
-
-func ExecSpecToString(spec job.Job) string {
-	const execTemplate = `
-# CCIP Execution spec
-type               = "offchainreporting2"
-name               = "%s"
-pluginType         = "ccip-execution"
-relay              = "evm"
-schemaVersion      = 1
-contractID         = "%s"
-ocrKeyBundleID     = "%s"
-transmitterID      = "%s"
-
-[pluginConfig]
-sourceChainID      = %s
-destChainID        = %s
-onRampID           = "%s"
-commitStoreID     = "%s"
-SourceStartBlock   = %d
-DestStartBlock     = %d
-tokensPerFeeCoinPipeline = %s
-
-[relayConfig]
-chainID            = %s
-`
-
-	return fmt.Sprintf(execTemplate+"\n",
-		spec.Name.String,
-		spec.OCR2OracleSpec.ContractID,
-		spec.OCR2OracleSpec.OCRKeyBundleID.String,
-		spec.OCR2OracleSpec.TransmitterID.String,
-		spec.OCR2OracleSpec.PluginConfig["sourceChainID"],
-		spec.OCR2OracleSpec.PluginConfig["destChainID"],
-		spec.OCR2OracleSpec.PluginConfig["onRampID"],
-		spec.OCR2OracleSpec.PluginConfig["commitStoreID"],
-		spec.OCR2OracleSpec.PluginConfig["SourceStartBlock"],
-		spec.OCR2OracleSpec.PluginConfig["DestStartBlock"],
-		spec.OCR2OracleSpec.PluginConfig["tokensPerFeeCoinPipeline"],
-		spec.OCR2OracleSpec.PluginConfig["destChainID"],
-	)
+// NewCCIPJobSpecParams returns set of parameters needed for setting up ccip jobs for sourceClient --> destClient
+func NewCCIPJobSpecParams(sourceClient rhea.EvmDeploymentConfig, destClient rhea.EvmDeploymentConfig) testhelpers.CCIPJobSpecParams {
+	return testhelpers.CCIPJobSpecParams{
+		OffRamp:            destClient.LaneConfig.OffRamp,
+		OnRampForExecution: sourceClient.LaneConfig.OnRamp,
+		OnRampsOnCommit:    []common.Address{sourceClient.LaneConfig.OnRamp},
+		CommitStore:        destClient.LaneConfig.CommitStore,
+		SourceChainName:    helpers.ChainName(sourceClient.ChainConfig.ChainId.Int64()),
+		DestChainName:      helpers.ChainName(destClient.ChainConfig.ChainId.Int64()),
+		SourceChainId:      sourceClient.ChainConfig.ChainId,
+		DestChainId:        destClient.ChainConfig.ChainId,
+		TokensPerFeeCoinPipeline: fmt.Sprintf(`merge [type=merge left="{}" right="{\\\"%s\\\":\\\"1000000000000000000\\\"}"];`,
+			destClient.ChainConfig.LinkToken.Hex()),
+		PollPeriod:         PollPeriod,
+		SourceStartBlock:   sourceClient.DeploySettings.DeployedAt,
+		DestStartBlock:     destClient.DeploySettings.DeployedAt,
+		P2PV2Bootstrappers: []string{}, // Set in env vars
+	}
 }
 
 func GetOCRkeysForChainType(OCRKeys client.OCR2Keys, chainType string) client.OCR2KeyData {
@@ -102,56 +40,4 @@ func GetOCRkeysForChainType(OCRKeys client.OCR2Keys, chainType string) client.OC
 	}
 
 	panic("Keys not found for chain")
-}
-
-func generateCommitJobSpecs(sourceClient *rhea.EvmDeploymentConfig, destClient *rhea.EvmDeploymentConfig) job.Job {
-	return job.Job{
-		Name: null2.StringFrom(fmt.Sprintf("ccip-commit-%s-%s", helpers.ChainName(sourceClient.ChainConfig.ChainId.Int64()), helpers.ChainName(destClient.ChainConfig.ChainId.Int64()))),
-		Type: "offchainreporting2",
-		OCR2OracleSpec: &job.OCR2OracleSpec{
-			PluginType:                  job.CCIPCommit,
-			ContractID:                  destClient.LaneConfig.CommitStore.Hex(),
-			Relay:                       "evm",
-			RelayConfig:                 map[string]interface{}{"chainID": destClient.ChainConfig.ChainId.String()},
-			P2PV2Bootstrappers:          []string{},     // Set in env vars
-			OCRKeyBundleID:              null2.String{}, // Set per node
-			TransmitterID:               null2.String{}, // Set per node
-			ContractConfigConfirmations: 2,
-			PluginConfig: map[string]interface{}{
-				"sourceChainID":    sourceClient.ChainConfig.ChainId.String(),
-				"destChainID":      destClient.ChainConfig.ChainId.String(),
-				"onRampIDs":        []string{sourceClient.LaneConfig.OnRamp.String()},
-				"pollPeriod":       PollPeriod,
-				"SourceStartBlock": sourceClient.DeploySettings.DeployedAt,
-				"DestStartBlock":   destClient.DeploySettings.DeployedAt,
-			},
-		},
-	}
-}
-
-func generateExecutionJobSpecs(sourceClient *rhea.EvmDeploymentConfig, destClient *rhea.EvmDeploymentConfig) job.Job {
-	return job.Job{
-		Name: null2.StringFrom(fmt.Sprintf("ccip-exec-%s-%s", helpers.ChainName(sourceClient.ChainConfig.ChainId.Int64()), helpers.ChainName(destClient.ChainConfig.ChainId.Int64()))),
-		Type: "offchainreporting2",
-		OCR2OracleSpec: &job.OCR2OracleSpec{
-			PluginType:                  job.CCIPExecution,
-			ContractID:                  destClient.LaneConfig.OffRamp.Hex(),
-			Relay:                       "evm",
-			RelayConfig:                 map[string]interface{}{"chainID": destClient.ChainConfig.ChainId.String()},
-			P2PV2Bootstrappers:          []string{},     // Set in env vars
-			OCRKeyBundleID:              null2.String{}, // Set per node
-			TransmitterID:               null2.String{}, // Set per node
-			ContractConfigConfirmations: 2,
-			PluginConfig: map[string]interface{}{
-				"sourceChainID":            sourceClient.ChainConfig.ChainId.String(),
-				"destChainID":              destClient.ChainConfig.ChainId.String(),
-				"onRampID":                 sourceClient.LaneConfig.OnRamp.String(),
-				"pollPeriod":               PollPeriod,
-				"commitStoreID":            destClient.LaneConfig.CommitStore.Hex(),
-				"SourceStartBlock":         sourceClient.DeploySettings.DeployedAt,
-				"DestStartBlock":           destClient.DeploySettings.DeployedAt,
-				"tokensPerFeeCoinPipeline": fmt.Sprintf(`"""merge [type=merge left="{}" right="{\\\"%s\\\":\\\"1000000000000000000\\\"}"];"""`, destClient.ChainConfig.LinkToken.Hex()),
-			},
-		},
-	}
 }

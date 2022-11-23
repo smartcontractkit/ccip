@@ -76,9 +76,9 @@ var _ = Describe("CCIP interactions test @ccip", func() {
 		tokenAddr = append(tokenAddr, destCCIP.Common.FeeToken.Address())
 		actions.CreateOCRJobsForCCIP(
 			clNodes[0], nil, clNodes[1:], nil,
-			sourceCCIP.TollOnRamp.Address(),
-			destCCIP.CommitStore.Address(),
-			destCCIP.TollOffRamp.Address(),
+			sourceCCIP.TollOnRamp.EthAddress,
+			destCCIP.CommitStore.EthAddress,
+			destCCIP.TollOffRamp.EthAddress,
 			sourceChainClient, destChainClient,
 			tokenAddr,
 			mockServer,
