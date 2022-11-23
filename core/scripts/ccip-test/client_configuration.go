@@ -25,13 +25,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/slices"
 
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
-
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/afn_contract"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp_router"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_subscription_onramp_router"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_subscription_onramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_offramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_onramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ge_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/governance_dapp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/native_token_pool"
@@ -56,14 +54,14 @@ func (client *CCIPClient) wip(t *testing.T, sourceClient *rhea.EvmDeploymentConf
 }
 
 func (client *CCIPClient) setRateLimiterConfig(t *testing.T) {
-	tx, err := client.Source.OnRamp.SetRateLimiterConfig(client.Source.Owner, evm_2_evm_subscription_onramp.AggregateRateLimiterInterfaceRateLimiterConfig{
+	tx, err := client.Source.OnRamp.SetRateLimiterConfig(client.Source.Owner, evm_2_evm_ge_onramp.AggregateRateLimiterInterfaceRateLimiterConfig{
 		Rate:     new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
 		Capacity: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 	})
 	require.NoError(t, err)
 	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 
-	tx, err = client.Dest.OffRamp.SetRateLimiterConfig(client.Dest.Owner, any_2_evm_subscription_offramp.AggregateRateLimiterInterfaceRateLimiterConfig{
+	tx, err = client.Dest.OffRamp.SetRateLimiterConfig(client.Dest.Owner, evm_2_evm_ge_offramp.AggregateRateLimiterInterfaceRateLimiterConfig{
 		Rate:     new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
 		Capacity: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 	})
@@ -84,12 +82,15 @@ func (client *CCIPClient) setPingPongPaused(t *testing.T, paused bool) {
 }
 
 func (client *CCIPClient) fundPingPong(t *testing.T) {
-	fundingAmount := big.NewInt(1e18)
-	client.Dest.ApproveLinkFrom(t, client.Dest.Owner, client.Dest.OffRampRouter.Address(), fundingAmount)
-	tx, err := client.Dest.OffRampRouter.FundSubscription(client.Dest.Owner, client.Dest.PingPongDapp.Address(), fundingAmount)
-	require.NoError(t, err)
-	shared.WaitForMined(t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
-	client.Dest.logger.Infof(fmt.Sprintf("Ping pong funded %s", helpers.ExplorerLink(client.Dest.ChainId.Int64(), tx.Hash())))
+	// TODO fund with ge:
+	// send tokens, approve them from dapp
+
+	//fundingAmount := big.NewInt(1e18)
+	//client.Dest.ApproveLinkFrom(t, client.Dest.Owner, client.Dest.OffRampRouter.Address(), fundingAmount)
+	//tx, err := client.Dest.OffRampRouter.FundSubscription(client.Dest.Owner, client.Dest.PingPongDapp.Address(), fundingAmount)
+	//require.NoError(t, err)
+	//shared.WaitForMined(t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
+	//client.Dest.logger.Infof(fmt.Sprintf("Ping pong funded %s", helpers.ExplorerLink(client.Dest.ChainId.Int64(), tx.Hash())))
 }
 
 type Client struct {
@@ -114,9 +115,9 @@ type EVMBridgedToken struct {
 
 type SourceClient struct {
 	Client
-	OnRamp       *evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRamp
-	OnRampRouter *evm_2_any_subscription_onramp_router.EVM2AnySubscriptionOnRampRouter
-	SenderDapp   *subscription_sender_dapp.SubscriptionSenderDapp
+	OnRamp     *evm_2_evm_ge_onramp.EVM2EVMGEOnRamp
+	Router     *ge_router.GERouter
+	SenderDapp *subscription_sender_dapp.SubscriptionSenderDapp
 }
 
 func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient {
@@ -135,11 +136,11 @@ func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient
 
 	afn, err := afn_contract.NewAFNContract(config.ChainConfig.Afn, config.Client)
 	require.NoError(t, err)
-	onRamp, err := evm_2_evm_subscription_onramp.NewEVM2EVMSubscriptionOnRamp(config.LaneConfig.OnRamp, config.Client)
+	onRamp, err := evm_2_evm_ge_onramp.NewEVM2EVMGEOnRamp(config.LaneConfig.OnRamp, config.Client)
 	require.NoError(t, err)
 	senderDapp, err := subscription_sender_dapp.NewSubscriptionSenderDapp(config.LaneConfig.TokenSender, config.Client)
 	require.NoError(t, err)
-	onRampRouter, err := evm_2_any_subscription_onramp_router.NewEVM2AnySubscriptionOnRampRouter(config.ChainConfig.OnRampRouter, config.Client)
+	onRampRouter, err := ge_router.NewGERouter(config.ChainConfig.Router, config.Client)
 	require.NoError(t, err)
 	governanceDapp, err := governance_dapp.NewGovernanceDapp(config.LaneConfig.GovernanceDapp, config.Client)
 	require.NoError(t, err)
@@ -159,9 +160,9 @@ func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient
 			logger:           config.Logger,
 			t:                t,
 		},
-		OnRamp:       onRamp,
-		OnRampRouter: onRampRouter,
-		SenderDapp:   senderDapp,
+		OnRamp:     onRamp,
+		Router:     onRampRouter,
+		SenderDapp: senderDapp,
 	}
 }
 
@@ -170,8 +171,8 @@ type DestClient struct {
 	CommitStore     *commit_store.CommitStore
 	MessageReceiver *simple_message_receiver.SimpleMessageReceiver
 	ReceiverDapp    *receiver_dapp.ReceiverDapp
-	OffRamp         *any_2_evm_subscription_offramp.EVM2EVMSubscriptionOffRamp
-	OffRampRouter   *any_2_evm_subscription_offramp_router.Any2EVMSubscriptionOffRampRouter
+	OffRamp         *evm_2_evm_ge_offramp.EVM2EVMGEOffRamp
+	Router          *ge_router.GERouter
 }
 
 func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestClient {
@@ -192,13 +193,13 @@ func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestCli
 	require.NoError(t, err)
 	commitStore, err := commit_store.NewCommitStore(config.LaneConfig.CommitStore, config.Client)
 	require.NoError(t, err)
-	offRamp, err := any_2_evm_subscription_offramp.NewEVM2EVMSubscriptionOffRamp(config.LaneConfig.OffRamp, config.Client)
+	offRamp, err := evm_2_evm_ge_offramp.NewEVM2EVMGEOffRamp(config.LaneConfig.OffRamp, config.Client)
 	require.NoError(t, err)
 	messageReceiver, err := simple_message_receiver.NewSimpleMessageReceiver(config.LaneConfig.MessageReceiver, config.Client)
 	require.NoError(t, err)
 	receiverDapp, err := receiver_dapp.NewReceiverDapp(config.LaneConfig.ReceiverDapp, config.Client)
 	require.NoError(t, err)
-	offRampRouter, err := any_2_evm_subscription_offramp_router.NewAny2EVMSubscriptionOffRampRouter(config.ChainConfig.OffRampRouter, config.Client)
+	router, err := ge_router.NewGERouter(config.ChainConfig.Router, config.Client)
 	require.NoError(t, err)
 	governanceDapp, err := governance_dapp.NewGovernanceDapp(config.LaneConfig.GovernanceDapp, config.Client)
 	require.NoError(t, err)
@@ -219,7 +220,7 @@ func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestCli
 			t:                t,
 		},
 		CommitStore:     commitStore,
-		OffRampRouter:   offRampRouter,
+		Router:          router,
 		MessageReceiver: messageReceiver,
 		ReceiverDapp:    receiverDapp,
 		OffRamp:         offRamp,
@@ -294,9 +295,8 @@ func (client *Client) ApproveLink(t *testing.T, approvedFor common.Address, amou
 
 func (client *CCIPClient) ChangeGovernanceParameters(t *testing.T) {
 	feeConfig := governance_dapp.GovernanceDappFeeConfig{
-		FeeAmount:           big.NewInt(10),
-		SubscriptionManager: client.Source.Owner.From,
-		ChangedAtBlock:      big.NewInt(0),
+		FeeAmount:      big.NewInt(10),
+		ChangedAtBlock: big.NewInt(0),
 	}
 	DestBlockNum := GetCurrentBlockNumber(client.Dest.Client.Client)
 	sourceBlockNum := GetCurrentBlockNumber(client.Source.Client.Client)
@@ -315,21 +315,22 @@ func (client *CCIPClient) SendMessage(t *testing.T) {
 	bts, err := hex.DecodeString("00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000005626c616e6b000000000000000000000000000000000000000000000000000000")
 	require.NoError(t, err)
 
-	token := evm_2_any_subscription_onramp_router.CCIPEVMTokenAndAmount{
+	token := ge_router.CCIPEVMTokenAndAmount{
 		Token:  client.Source.LinkTokenAddress,
 		Amount: big.NewInt(1),
 	}
 	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(3e5), false)
 	require.NoError(t, err)
 
-	msg := evm_2_any_subscription_onramp_router.CCIPEVM2AnySubscriptionMessage{
+	msg := ge_router.CCIPEVM2AnyGEMessage{
 		Receiver:         testhelpers.MustEncodeAddress(t, client.Dest.MessageReceiver.Address()),
 		Data:             bts,
-		TokensAndAmounts: []evm_2_any_subscription_onramp_router.CCIPEVMTokenAndAmount{token},
+		TokensAndAmounts: []ge_router.CCIPEVMTokenAndAmount{token},
 		ExtraArgs:        extraArgsV1,
+		FeeToken:         client.Source.LinkTokenAddress,
 	}
 
-	tx, err := client.Source.OnRampRouter.CcipSend(client.Source.Owner, client.Dest.ChainId, msg)
+	tx, err := client.Source.Router.CcipSend(client.Source.Owner, client.Dest.ChainId, msg)
 	require.NoError(t, err)
 	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 	client.WaitForCommit(t, DestBlockNum)
@@ -339,7 +340,7 @@ func (client *CCIPClient) DonExecutionHappyPath(t *testing.T) {
 	client.Source.logger.Infof("Starting cross chain tx with DON execution")
 
 	tokenAmount := big.NewInt(500)
-	client.Source.ApproveLink(t, client.Source.OnRampRouter.Address(), tokenAmount)
+	client.Source.ApproveLink(t, client.Source.Router.Address(), tokenAmount)
 
 	DestBlockNum := GetCurrentBlockNumber(client.Dest.Client.Client)
 	crossChainRequest := client.SendToOnrampWithExecution(t, client.Source, client.Source.Owner, client.Dest.ReceiverDapp.Address(), tokenAmount)
@@ -375,7 +376,7 @@ func (client *CCIPClient) WaitForCommit(t *testing.T, DestBlockNum uint64) {
 func (client *CCIPClient) WaitForExecution(t *testing.T, DestBlockNum uint64, sequenceNumber uint64) {
 	client.Dest.logger.Infof("Waiting for execution...")
 
-	events := make(chan *any_2_evm_subscription_offramp.EVM2EVMSubscriptionOffRampExecutionStateChanged)
+	events := make(chan *evm_2_evm_ge_offramp.EVM2EVMGEOffRampExecutionStateChanged)
 	sub, err := client.Dest.OffRamp.WatchExecutionStateChanged(
 		&bind.WatchOpts{
 			Context: context.Background(),
@@ -425,7 +426,7 @@ func (client *CCIPClient) ExecuteManually(seqNr uint64) error {
 		return errors.New("unable to find seq num")
 	}
 	ctx := hasher.NewKeccakCtx()
-	leafHasher := ccip.NewSubscriptionLeafHasher(client.Source.ChainId, client.Dest.ChainId, client.Source.OnRamp.Address(), ctx)
+	leafHasher := ccip.NewGELeafHasher(client.Source.ChainId, client.Dest.ChainId, client.Source.OnRamp.Address(), ctx)
 	// Get all seqNrs in that range.
 	end = uint64(7651526)
 	sendRequestedIterator, err := client.Source.OnRamp.FilterCCIPSendRequested(&bind.FilterOpts{
@@ -475,7 +476,7 @@ func (client *CCIPClient) ExecuteManually(seqNr uint64) error {
 		return errors.New("outer root doesn't match")
 	}
 	outerProof := outerTree.Prove([]int{onRampIdx})
-	executionReport := any_2_evm_subscription_offramp.CCIPExecutionReport{
+	executionReport := evm_2_evm_ge_offramp.CCIPExecutionReport{
 		SequenceNumbers:          []uint64{seqNr},
 		TokenPerFeeCoinAddresses: []common.Address{client.Dest.LinkTokenAddress},
 		TokenPerFeeCoin:          []*big.Int{big.NewInt(1)},
@@ -693,8 +694,8 @@ func GetCurrentBlockNumber(chain *ethclient.Client) uint64 {
 
 func (client *CCIPClient) ValidateMerkleRoot(
 	t *testing.T,
-	request *evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRampCCIPSendRequested,
-	reportRequests []*evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRampCCIPSendRequested,
+	request *evm_2_evm_ge_onramp.EVM2EVMGEOnRampCCIPSendRequested,
+	reportRequests []*evm_2_evm_ge_onramp.EVM2EVMGEOnRampCCIPSendRequested,
 	report commit_store.CCIPCommitReport,
 ) merklemulti.Proof[[32]byte] {
 	mctx := hasher.NewKeccakCtx()
@@ -728,7 +729,7 @@ func (client *CCIPClient) ValidateMerkleRoot(
 }
 
 // SendToDappWithExecution executes a cross chain transactions using the sender dapp interface.
-func (client *CCIPClient) SendToDappWithExecution(t *testing.T, source SourceClient, from *bind.TransactOpts, toAddress common.Address, amount *big.Int) *evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRampCCIPSendRequested {
+func (client *CCIPClient) SendToDappWithExecution(t *testing.T, source SourceClient, from *bind.TransactOpts, toAddress common.Address, amount *big.Int) *evm_2_evm_ge_onramp.EVM2EVMGEOnRampCCIPSendRequested {
 	SourceBlockNumber := GetCurrentBlockNumber(source.Client.Client)
 	token := subscription_sender_dapp.CCIPEVMTokenAndAmount{
 		Token:  client.Source.LinkTokenAddress,
@@ -749,7 +750,7 @@ func (client *CCIPClient) SendToDappWithExecution(t *testing.T, source SourceCli
 }
 
 // SendToOnrampWithExecution executes a cross chain transactions using the onramp interface.
-func (client *CCIPClient) SendToOnrampWithExecution(t *testing.T, source SourceClient, from *bind.TransactOpts, toAddress common.Address, amount *big.Int) *evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRampCCIPSendRequested {
+func (client *CCIPClient) SendToOnrampWithExecution(t *testing.T, source SourceClient, from *bind.TransactOpts, toAddress common.Address, amount *big.Int) *evm_2_evm_ge_onramp.EVM2EVMGEOnRampCCIPSendRequested {
 	SourceBlockNumber := GetCurrentBlockNumber(source.Client.Client)
 
 	senderAndReceiver, err := utils.ABIEncode(`[{"type":"address"}, {"type":"address"}]`, source.Owner.From, source.Owner.From)
@@ -758,18 +759,19 @@ func (client *CCIPClient) SendToOnrampWithExecution(t *testing.T, source SourceC
 	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(3e5), false)
 	helpers.PanicErr(err)
 
-	payload := evm_2_any_subscription_onramp_router.CCIPEVM2AnySubscriptionMessage{
-		TokensAndAmounts: []evm_2_any_subscription_onramp_router.CCIPEVMTokenAndAmount{},
+	payload := ge_router.CCIPEVM2AnyGEMessage{
+		TokensAndAmounts: []ge_router.CCIPEVMTokenAndAmount{},
 		Receiver:         testhelpers.MustEncodeAddress(t, toAddress),
 		Data:             senderAndReceiver,
 		ExtraArgs:        extraArgsV1,
+		FeeToken:         client.Source.LinkTokenAddress,
 	}
 	source.logger.Infof("Send tx with payload %+v", payload)
 
-	tx, err := source.OnRampRouter.CcipSend(from, client.Dest.ChainId, payload)
+	tx, err := source.Router.CcipSend(from, client.Dest.ChainId, payload)
 	if err != nil {
 		t.Log(err.Error())
-		printRevertReason(err, evm_2_any_subscription_onramp_router.EVM2AnySubscriptionOnRampRouterABI)
+		printRevertReason(err, ge_router.GERouterABI)
 	}
 	helpers.PanicErr(err)
 	source.logger.Infof("Send tokens tx %s", helpers.ExplorerLink(source.ChainId.Int64(), tx.Hash()))
@@ -795,7 +797,7 @@ func printRevertReason(errorData interface{}, abiString string) {
 
 // WaitForCrossChainSendRequest checks on chain for a successful onramp send event with the given tx hash.
 // If not immediately found it will keep retrying in intervals of the globally specified RetryTiming.
-func WaitForCrossChainSendRequest(source SourceClient, fromBlockNum uint64, txhash common.Hash) *evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRampCCIPSendRequested {
+func WaitForCrossChainSendRequest(source SourceClient, fromBlockNum uint64, txhash common.Hash) *evm_2_evm_ge_onramp.EVM2EVMGEOnRampCCIPSendRequested {
 	filter := bind.FilterOpts{Start: fromBlockNum}
 	source.logger.Infof("Waiting for cross chain send... ")
 
@@ -1007,7 +1009,7 @@ func (client *CCIPClient) SetOCRConfig(env dione.Environment) {
 	shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 	client.Dest.logger.Infof("Config set on commitStore %s", helpers.ExplorerLink(client.Dest.ChainId.Int64(), tx.Hash()))
 
-	tx, err = client.Dest.OffRamp.SetConfig0(
+	tx, err = client.Dest.OffRamp.SetConfig(
 		client.Dest.Owner,
 		signerAddresses,
 		transmitterAddresses,
@@ -1027,20 +1029,6 @@ func (client *CCIPClient) AcceptOwnership(t *testing.T) {
 	shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 
 	tx, err = client.Dest.OffRamp.AcceptOwnership(client.Dest.Owner)
-	require.NoError(t, err)
-	shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
-}
-
-func (client *CCIPClient) PrepareSetSenders(t *testing.T) {
-	sender := []common.Address{client.Source.SenderDapp.Address()}
-	tx, err := client.Dest.OffRampRouter.PrepareSetSubscriptionSenders(client.Dest.Owner, client.Dest.ReceiverDapp.Address(), sender)
-	require.NoError(t, err)
-	shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
-}
-
-func (client *CCIPClient) SetSubscriptionSenders(t *testing.T) {
-	sender := []common.Address{client.Source.SenderDapp.Address()}
-	tx, err := client.Dest.OffRampRouter.SetSubscriptionSenders(client.Dest.Owner, client.Dest.ReceiverDapp.Address(), sender)
 	require.NoError(t, err)
 	shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 }

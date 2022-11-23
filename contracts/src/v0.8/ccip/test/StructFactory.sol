@@ -4,7 +4,6 @@ pragma solidity 0.8.15;
 import "../interfaces/CommitStoreInterface.sol";
 import "../interfaces/offRamp/BaseOffRampInterface.sol";
 import "../interfaces/onRamp/BaseOnRampInterface.sol";
-import "../interfaces/subscription/SubscriptionInterface.sol";
 import "../interfaces/rateLimiter/AggregateRateLimiterInterface.sol";
 
 contract StructFactory {
@@ -102,14 +101,6 @@ contract StructFactory {
     minSequenceNumbers[1] = 1;
     minSequenceNumbers[2] = 1;
     return CommitStoreInterface.CommitStoreConfig({onRamps: onRamps, minSeqNrByOnRamp: minSequenceNumbers});
-  }
-
-  // subscription
-  uint32 internal constant SET_SUBSCRIPTION_SENDER_DELAY = 2 * 60 * 60;
-  uint32 internal constant WITHDRAWAL_DELAY = 2 * 60 * 60;
-
-  function subscriptionConfig(IERC20 feeToken) internal pure returns (SubscriptionInterface.SubscriptionConfig memory) {
-    return SubscriptionInterface.SubscriptionConfig(SET_SUBSCRIPTION_SENDER_DELAY, WITHDRAWAL_DELAY, feeToken);
   }
 
   // Rate limiter

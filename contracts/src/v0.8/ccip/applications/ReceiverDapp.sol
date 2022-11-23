@@ -29,10 +29,6 @@ contract ReceiverDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterfac
     s_router = router;
   }
 
-  function getSubscriptionManager() external view returns (address) {
-    return s_manager;
-  }
-
   /**
    * @notice Called by the OffRamp, this function receives a message and forwards
    * the tokens sent with it to the designated EOA

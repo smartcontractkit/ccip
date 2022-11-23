@@ -1,4 +1,3 @@
 {
-  "ccipReceive((uint256,bytes,bytes,(address,uint256)[]))": "b06193dd",
-  "getSubscriptionManager()": "e2a92e28"
+  "ccipReceive((uint256,bytes,bytes,(address,uint256)[]))": "b06193dd"
 }

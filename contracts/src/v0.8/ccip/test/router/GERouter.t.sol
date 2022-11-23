@@ -12,10 +12,10 @@ contract GERouter_constructor is EVM2EVMGEOnRampSetup {
 
   function testSuccess() public {
     // typeAndVersion
-    assertEq("GERouter 1.0.0", s_onRampRouter.typeAndVersion());
+    assertEq("GERouter 1.0.0", s_sourceRouter.typeAndVersion());
 
     // owner
-    assertEq(OWNER, s_onRampRouter.owner());
+    assertEq(OWNER, s_sourceRouter.owner());
   }
 }
 
@@ -30,14 +30,14 @@ contract GERouter_ccipSend is EVM2EVMGEOnRampSetup {
     IERC20 sourceToken1 = IERC20(sourceToken1Address);
     CCIP.EVM2AnyGEMessage memory message = _generateEmptyMessage();
 
-    sourceToken1.approve(address(s_onRampRouter), 2**64);
+    sourceToken1.approve(address(s_sourceRouter), 2**64);
 
     message.tokensAndAmounts = new CCIP.EVMTokenAndAmount[](1);
     message.tokensAndAmounts[0].amount = 2**64;
     message.tokensAndAmounts[0].token = sourceToken1Address;
     message.feeToken = s_sourceTokens[0];
 
-    uint256 expectedFee = s_onRampRouter.getFee(DEST_CHAIN_ID, message);
+    uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_ID, message);
 
     uint256 balanceBefore = sourceToken1.balanceOf(OWNER);
 
@@ -48,16 +48,16 @@ contract GERouter_ccipSend is EVM2EVMGEOnRampSetup {
     vm.expectEmit(false, false, false, true);
     emit CCIPSendRequested(_messageToEvent(message, 1, 1, expectedFee));
 
-    assertEq(1, s_onRampRouter.ccipSend(DEST_CHAIN_ID, message));
+    assertEq(1, s_sourceRouter.ccipSend(DEST_CHAIN_ID, message));
     // Assert the user balance is lowered by the tokensAndAmounts sent and the fee amount
     uint256 expectedBalance = balanceBefore - (message.tokensAndAmounts[0].amount);
     assertEq(expectedBalance, sourceToken1.balanceOf(OWNER));
   }
 
   function testShouldIncrementSeqNumSuccess() public {
-    assertEq(1, s_onRampRouter.ccipSend(DEST_CHAIN_ID, _generateEmptyMessage()));
-    assertEq(2, s_onRampRouter.ccipSend(DEST_CHAIN_ID, _generateEmptyMessage()));
-    assertEq(3, s_onRampRouter.ccipSend(DEST_CHAIN_ID, _generateEmptyMessage()));
+    assertEq(1, s_sourceRouter.ccipSend(DEST_CHAIN_ID, _generateEmptyMessage()));
+    assertEq(2, s_sourceRouter.ccipSend(DEST_CHAIN_ID, _generateEmptyMessage()));
+    assertEq(3, s_sourceRouter.ccipSend(DEST_CHAIN_ID, _generateEmptyMessage()));
   }
 
   // Reverts
@@ -68,7 +68,7 @@ contract GERouter_ccipSend is EVM2EVMGEOnRampSetup {
 
     vm.expectRevert(abi.encodeWithSelector(BaseOnRampRouterInterface.UnsupportedDestinationChain.selector, wrongChain));
 
-    s_onRampRouter.ccipSend(wrongChain, message);
+    s_sourceRouter.ccipSend(wrongChain, message);
   }
 
   function testUnsupportedFeeTokenReverts() public {
@@ -84,16 +84,16 @@ contract GERouter_ccipSend is EVM2EVMGEOnRampSetup {
       )
     );
 
-    s_onRampRouter.ccipSend(DEST_CHAIN_ID, message);
+    s_sourceRouter.ccipSend(DEST_CHAIN_ID, message);
   }
 
   function testFeeTokenAmountTooLowReverts() public {
     CCIP.EVM2AnyGEMessage memory message = _generateEmptyMessage();
-    IERC20(s_sourceTokens[0]).approve(address(s_onRampRouter), 0);
+    IERC20(s_sourceTokens[0]).approve(address(s_sourceRouter), 0);
 
     vm.expectRevert("ERC20: transfer amount exceeds allowance");
 
-    s_onRampRouter.ccipSend(DEST_CHAIN_ID, message);
+    s_sourceRouter.ccipSend(DEST_CHAIN_ID, message);
   }
 }
 
@@ -108,17 +108,17 @@ contract GERouter_setOnRamp is EVM2EVMGEOnRampSetup {
   function testSuccess() public {
     EVM2EVMGEOnRampInterface onramp = EVM2EVMGEOnRampInterface(address(1));
     uint256 chainId = 1337;
-    EVM2EVMGEOnRampInterface before = s_onRampRouter.getOnRamp(chainId);
+    EVM2EVMGEOnRampInterface before = s_sourceRouter.getOnRamp(chainId);
     assertEq(address(0), address(before));
-    assertFalse(s_onRampRouter.isChainSupported(chainId));
+    assertFalse(s_sourceRouter.isChainSupported(chainId));
 
     vm.expectEmit(true, true, false, true);
     emit OnRampSet(chainId, onramp);
 
-    s_onRampRouter.setOnRamp(chainId, onramp);
-    EVM2EVMGEOnRampInterface afterSet = s_onRampRouter.getOnRamp(chainId);
+    s_sourceRouter.setOnRamp(chainId, onramp);
+    EVM2EVMGEOnRampInterface afterSet = s_sourceRouter.getOnRamp(chainId);
     assertEq(address(onramp), address(afterSet));
-    assertTrue(s_onRampRouter.isChainSupported(chainId));
+    assertTrue(s_sourceRouter.isChainSupported(chainId));
   }
 
   // Reverts
@@ -127,14 +127,14 @@ contract GERouter_setOnRamp is EVM2EVMGEOnRampSetup {
   // the same onRamp.
   function testAlreadySetReverts() public {
     vm.expectRevert(abi.encodeWithSelector(GERouterInterface.OnRampAlreadySet.selector, DEST_CHAIN_ID, s_onRamp));
-    s_onRampRouter.setOnRamp(DEST_CHAIN_ID, s_onRamp);
+    s_sourceRouter.setOnRamp(DEST_CHAIN_ID, s_onRamp);
   }
 
   // Asserts that setOnRamp can only be called by the owner.
   function testOnlyOwnerReverts() public {
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
-    s_onRampRouter.setOnRamp(1337, EVM2EVMGEOnRampInterface(address(1)));
+    s_sourceRouter.setOnRamp(1337, EVM2EVMGEOnRampInterface(address(1)));
   }
 }
 
@@ -142,8 +142,8 @@ contract GERouter_setOnRamp is EVM2EVMGEOnRampSetup {
 contract GERouter_isChainSupported is EVM2EVMGEOnRampSetup {
   // Success
   function testSuccess() public {
-    assertTrue(s_onRampRouter.isChainSupported(DEST_CHAIN_ID));
-    assertFalse(s_onRampRouter.isChainSupported(DEST_CHAIN_ID + 1));
-    assertFalse(s_onRampRouter.isChainSupported(0));
+    assertTrue(s_sourceRouter.isChainSupported(DEST_CHAIN_ID));
+    assertFalse(s_sourceRouter.isChainSupported(DEST_CHAIN_ID + 1));
+    assertFalse(s_sourceRouter.isChainSupported(0));
   }
 }

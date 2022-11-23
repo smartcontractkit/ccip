@@ -14,6 +14,7 @@ interface CCIPRouterInterface {
     bytes receiver;
     bytes data;
     EVMTokenAndAmount[] tokensAndAmounts;
+    address feeToken;
     bytes extraArgs;
   }
 
@@ -35,8 +36,7 @@ contract PingPongDemo is CCIPReceiverInterface, OwnerIsCreator {
   event Ping(uint256 pingPongCount);
   event Pong(uint256 pingPongCount);
 
-  CCIPRouterInterface internal s_receivingRouter;
-  CCIPRouterInterface internal s_sendingRouter;
+  CCIPRouterInterface internal s_router;
 
   // The chain ID of the counterpart ping pong contract
   uint256 public s_counterpartChainId;
@@ -46,10 +46,13 @@ contract PingPongDemo is CCIPReceiverInterface, OwnerIsCreator {
   // Pause ping-ponging
   bool public s_isPaused;
 
-  constructor(CCIPRouterInterface receivingRouter, CCIPRouterInterface sendingRouter) {
-    s_receivingRouter = receivingRouter;
-    s_sendingRouter = sendingRouter;
+  // The fee token for CCIP billing
+  address internal immutable i_feeToken;
+
+  constructor(CCIPRouterInterface router, address feeToken) {
+    s_router = router;
     s_isPaused = false;
+    i_feeToken = feeToken;
   }
 
   function setCounterpart(uint256 counterpartChainId, address counterpartAddress) external onlyOwner {
@@ -74,9 +77,10 @@ contract PingPongDemo is CCIPReceiverInterface, OwnerIsCreator {
       receiver: abi.encode(s_counterpartAddress),
       data: data,
       tokensAndAmounts: new EVMTokenAndAmount[](0),
-      extraArgs: _toBytes(EVMExtraArgsV1({gasLimit: 200_000}))
+      extraArgs: _toBytes(EVMExtraArgsV1({gasLimit: 200_000})),
+      feeToken: i_feeToken
     });
-    s_sendingRouter.ccipSend(s_counterpartChainId, message);
+    s_router.ccipSend(s_counterpartChainId, message);
   }
 
   function ccipReceive(ReceivedMessage memory message) external override onlyRouter {
@@ -100,17 +104,12 @@ contract PingPongDemo is CCIPReceiverInterface, OwnerIsCreator {
     return bytes.concat(EVM_EXTRA_ARGS_V1_TAG, abi.encode(extraArgs.gasLimit));
   }
 
-  function setRouters(CCIPRouterInterface receivingRouter, CCIPRouterInterface sendingRouter) external onlyOwner {
-    s_receivingRouter = receivingRouter;
-    s_sendingRouter = sendingRouter;
+  function setRouter(CCIPRouterInterface router) external onlyOwner {
+    s_router = router;
   }
 
-  function getRouters() external view returns (CCIPRouterInterface, CCIPRouterInterface) {
-    return (s_receivingRouter, s_sendingRouter);
-  }
-
-  function getSubscriptionManager() external view returns (address) {
-    return owner();
+  function getRouter() external view returns (CCIPRouterInterface) {
+    return s_router;
   }
 
   function setPaused(bool isPaused) external onlyOwner {
@@ -123,7 +122,7 @@ contract PingPongDemo is CCIPReceiverInterface, OwnerIsCreator {
    * @dev only calls from the set router are accepted.
    */
   modifier onlyRouter() {
-    if (msg.sender != address(s_receivingRouter)) revert InvalidRouter(msg.sender);
+    if (msg.sender != address(s_router)) revert InvalidRouter(msg.sender);
     _;
   }
 }

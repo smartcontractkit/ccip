@@ -9,66 +9,9 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_subscription_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
 )
-
-func TestSubscriptionHasher(t *testing.T) {
-	sourceChainId, destChainId := big.NewInt(1), big.NewInt(4)
-	onRampAddress := common.HexToAddress("0x5550000000000000000000000000000000000001")
-
-	hashingCtx := hasher.NewKeccakCtx()
-
-	hasher := NewSubscriptionLeafHasher(sourceChainId, destChainId, onRampAddress, hashingCtx)
-
-	message := evm_2_evm_subscription_onramp.CCIPEVM2EVMSubscriptionMessage{
-		SourceChainId:    sourceChainId,
-		SequenceNumber:   1337,
-		Sender:           common.HexToAddress("0x1110000000000000000000000000000000000001"),
-		Receiver:         common.HexToAddress("0x2220000000000000000000000000000000000001"),
-		Nonce:            666,
-		Data:             []byte{},
-		TokensAndAmounts: []evm_2_evm_subscription_onramp.CCIPEVMTokenAndAmount{{Token: common.HexToAddress("0x4440000000000000000000000000000000000001"), Amount: big.NewInt(12345678900)}},
-		GasLimit:         big.NewInt(100),
-	}
-
-	hash, err := hasher.HashLeaf(generateSubscriptionLog(t, message))
-	require.NoError(t, err)
-
-	// NOTE: Must match spec
-	require.Equal(t, "6b4d88effbfa2121b6e1c16918d5a0003bb68437473117daaf631925e949bd02", hex.EncodeToString(hash[:]))
-
-	message = evm_2_evm_subscription_onramp.CCIPEVM2EVMSubscriptionMessage{
-		SourceChainId:  sourceChainId,
-		SequenceNumber: 1337,
-		Sender:         common.HexToAddress("0x1110000000000000000000000000000000000001"),
-		Receiver:       common.HexToAddress("0x2220000000000000000000000000000000000001"),
-		Nonce:          210,
-		Data:           []byte("foo bar baz"),
-		TokensAndAmounts: []evm_2_evm_subscription_onramp.CCIPEVMTokenAndAmount{
-			{Token: common.HexToAddress("0x4440000000000000000000000000000000000001"), Amount: big.NewInt(12345678900)},
-			{Token: common.HexToAddress("0x6660000000000000000000000000000000000001"), Amount: big.NewInt(4204242)},
-		},
-		GasLimit: big.NewInt(100),
-	}
-
-	hash, err = hasher.HashLeaf(generateSubscriptionLog(t, message))
-	require.NoError(t, err)
-
-	// NOTE: Must match spec
-	require.Equal(t, "faa461863c42b1548d5687f535d81be27ec84db8b6f60d904beeac07abcad71a", hex.EncodeToString(hash[:]))
-}
-
-func generateSubscriptionLog(t *testing.T, message evm_2_evm_subscription_onramp.CCIPEVM2EVMSubscriptionMessage) types.Log {
-	pack, err := MakeSubscriptionCCIPMsgArgs().Pack(message)
-	require.NoError(t, err)
-
-	return types.Log{
-		Topics: []common.Hash{CCIPSubSendRequested},
-		Data:   pack,
-	}
-}
 
 func TestTollHasher(t *testing.T) {
 	sourceChainId, destChainId := big.NewInt(1), big.NewInt(4)

@@ -16,8 +16,8 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
@@ -60,9 +60,9 @@ func EncodeExecutionReport(seqNums []uint64, tokensPerFeeCoin map[common.Address
 	for _, addr := range tokensPerFeeCoinAddresses {
 		tokensPerFeeCoinValues = append(tokensPerFeeCoinValues, tokensPerFeeCoin[addr])
 	}
-	report, err := makeExecutionReportArgs().PackValues([]interface{}{&any_2_evm_toll_offramp.CCIPExecutionReport{
+	report, err := makeExecutionReportArgs().PackValues([]interface{}{&evm_2_evm_toll_offramp.CCIPExecutionReport{
 		SequenceNumbers:          seqNums,
-		FeeUpdates:               []any_2_evm_toll_offramp.CCIPFeeUpdate{},
+		FeeUpdates:               []evm_2_evm_toll_offramp.CCIPFeeUpdate{},
 		EncodedMessages:          msgs,
 		TokenPerFeeCoinAddresses: tokensPerFeeCoinAddresses,
 		TokenPerFeeCoin:          tokensPerFeeCoinValues,
@@ -77,7 +77,7 @@ func EncodeExecutionReport(seqNums []uint64, tokensPerFeeCoin map[common.Address
 	return report, nil
 }
 
-func DecodeExecutionReport(report types.Report) (*any_2_evm_toll_offramp.CCIPExecutionReport, error) {
+func DecodeExecutionReport(report types.Report) (*evm_2_evm_toll_offramp.CCIPExecutionReport, error) {
 	unpacked, err := makeExecutionReportArgs().Unpack(report)
 	if err != nil {
 		return nil, err
@@ -107,15 +107,15 @@ func DecodeExecutionReport(report types.Report) (*any_2_evm_toll_offramp.CCIPExe
 	if len(erStruct.EncodedMessages) == 0 {
 		return nil, errors.New("assumptionViolation: expected at least one element")
 	}
-	var er any_2_evm_toll_offramp.CCIPExecutionReport
+	var er evm_2_evm_toll_offramp.CCIPExecutionReport
 	er.EncodedMessages = append(er.EncodedMessages, erStruct.EncodedMessages...)
 	er.InnerProofs = append(er.InnerProofs, erStruct.InnerProofs...)
 	er.OuterProofs = append(er.OuterProofs, erStruct.OuterProofs...)
 
-	er.FeeUpdates = []any_2_evm_toll_offramp.CCIPFeeUpdate{}
+	er.FeeUpdates = []evm_2_evm_toll_offramp.CCIPFeeUpdate{}
 
 	for _, feeUpdate := range erStruct.FeeUpdates {
-		er.FeeUpdates = append(er.FeeUpdates, any_2_evm_toll_offramp.CCIPFeeUpdate{
+		er.FeeUpdates = append(er.FeeUpdates, evm_2_evm_toll_offramp.CCIPFeeUpdate{
 			ChainId:  feeUpdate.ChainId,
 			GasPrice: feeUpdate.GasPrice,
 		})
@@ -245,7 +245,7 @@ type ExecutionReportingPlugin struct {
 
 type InflightExecutionReport struct {
 	createdAt time.Time
-	report    any_2_evm_toll_offramp.CCIPExecutionReport
+	report    evm_2_evm_toll_offramp.CCIPExecutionReport
 }
 
 // expect percentMultiplier to be [0, 100]
@@ -572,7 +572,7 @@ func (r *ExecutionReportingPlugin) expireInflight(lggr logger.Logger) {
 	r.inFlight = stillInFlight
 }
 
-func (r *ExecutionReportingPlugin) addToInflight(lggr logger.Logger, er any_2_evm_toll_offramp.CCIPExecutionReport) error {
+func (r *ExecutionReportingPlugin) addToInflight(lggr logger.Logger, er evm_2_evm_toll_offramp.CCIPExecutionReport) error {
 	r.inFlightMu.Lock()
 	defer r.inFlightMu.Unlock()
 	for _, report := range r.inFlight {

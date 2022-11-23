@@ -15,7 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_subscription_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
 	type_and_version "github.com/smartcontractkit/chainlink/core/gethwrappers/generated/type_and_version_interface_wrapper"
 	"github.com/smartcontractkit/chainlink/core/logger"
@@ -27,17 +26,13 @@ import (
 type ContractType string
 
 var (
-	EVM2EVMTollOnRamp          ContractType = "EVM2EVMTollOnRamp"
-	EVM2EVMTollOffRamp         ContractType = "EVM2EVMTollOffRamp"
-	EVM2EVMSubscriptionOnRamp  ContractType = "EVM2EVMSubscriptionOnRamp"
-	EVM2EVMSubscriptionOffRamp ContractType = "EVM2EVMSubscriptionOffRamp"
-	CommitStore                ContractType = "CommitStore"
-	ContractTypes                           = map[ContractType]struct{}{
-		EVM2EVMTollOnRamp:          {},
-		EVM2EVMTollOffRamp:         {},
-		EVM2EVMSubscriptionOnRamp:  {},
-		EVM2EVMSubscriptionOffRamp: {},
-		CommitStore:                {},
+	EVM2EVMTollOnRamp  ContractType = "EVM2EVMTollOnRamp"
+	EVM2EVMTollOffRamp ContractType = "EVM2EVMTollOffRamp"
+	CommitStore        ContractType = "CommitStore"
+	ContractTypes                   = map[ContractType]struct{}{
+		EVM2EVMTollOnRamp:  {},
+		EVM2EVMTollOffRamp: {},
+		CommitStore:        {},
 	}
 )
 
@@ -132,26 +127,6 @@ func NewCommitServices(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet ev
 			}
 			onRampToReqEventSig[onRamp.Address()] = CCIPTollSendRequested
 			onRampToHasher[onRamp.Address()] = NewTollLeafHasher(sourceChainId, destChainId, onRamp.Address(), hashingCtx)
-		case EVM2EVMSubscriptionOnRamp:
-			onRamp, err3 := evm_2_evm_subscription_onramp.NewEVM2EVMSubscriptionOnRamp(addr, sourceChain.Client())
-			if err3 != nil {
-				return nil, errors.Wrap(err3, "failed creating a new onramp")
-			}
-			onRampSeqParsers[common.HexToAddress(onRampID)] = func(log logpoller.Log) (uint64, error) {
-				req, err4 := onRamp.ParseCCIPSendRequested(types.Log{Data: log.Data, Topics: log.GetTopics()})
-				if err4 != nil {
-					lggr.Warnf("failed to parse log: %+v", log)
-					return 0, err4
-				}
-				return req.Message.SequenceNumber, nil
-			}
-			// Subscribe to all relevant commit logs.
-			_, err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{CCIPSubSendRequested}, Addresses: []common.Address{onRamp.Address()}})
-			if err != nil {
-				return nil, err
-			}
-			onRampToReqEventSig[onRamp.Address()] = CCIPSubSendRequested
-			onRampToHasher[onRamp.Address()] = NewSubscriptionLeafHasher(sourceChainId, destChainId, onRamp.Address(), hashingCtx)
 		default:
 			return nil, errors.Errorf("unrecognized onramp %v", onRampID)
 		}

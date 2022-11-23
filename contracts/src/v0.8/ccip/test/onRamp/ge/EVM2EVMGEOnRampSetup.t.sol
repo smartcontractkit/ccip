@@ -41,7 +41,7 @@ contract EVM2EVMGEOnRampSetup is TokenSetup, GESRouterSetup {
       onRampConfig(),
       rateLimiterConfig(),
       TOKEN_LIMIT_ADMIN,
-      s_onRampRouter,
+      s_sourceRouter,
       dynamicFeeCalculatorConfig(address(gasFeeCache))
     );
     s_onRamp.setPrices(getCastedSourceTokens(), getTokenPrices());
@@ -49,11 +49,11 @@ contract EVM2EVMGEOnRampSetup is TokenSetup, GESRouterSetup {
     NativeTokenPool(address(s_sourcePools[0])).setOnRamp(s_onRamp, true);
     NativeTokenPool(address(s_sourcePools[1])).setOnRamp(s_onRamp, true);
 
-    s_onRampRouter.setOnRamp(DEST_CHAIN_ID, s_onRamp);
+    s_sourceRouter.setOnRamp(DEST_CHAIN_ID, s_onRamp);
 
     // Pre approve the first token so the gas estimates of the tests
     // only cover actual gas usage from the ramps
-    IERC20(s_sourceTokens[0]).approve(address(s_onRampRouter), 2**128);
+    IERC20(s_sourceTokens[0]).approve(address(s_sourceRouter), 2**128);
   }
 
   function _generateTokenMessage() public view returns (CCIP.EVM2AnyGEMessage memory) {

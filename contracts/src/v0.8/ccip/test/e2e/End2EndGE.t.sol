@@ -38,7 +38,7 @@ contract E2E_GE is EVM2EVMGEOnRampSetup, CommitStoreSetup, EVM2EVMGEOffRampSetup
     messages[1] = sendRequest(2);
     messages[2] = sendRequest(3);
 
-    uint256 expectedFee = s_onRampRouter.getFee(DEST_CHAIN_ID, _generateTokenMessage());
+    uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_ID, _generateTokenMessage());
     // Asserts that the tokens have been sent and the fee has been paid.
     assertEq(balance0Pre - messages.length * (i_tokenAmount0 + expectedFee), token0.balanceOf(OWNER));
     assertEq(balance1Pre - messages.length * i_tokenAmount1, token1.balanceOf(OWNER));
@@ -90,10 +90,10 @@ contract E2E_GE is EVM2EVMGEOnRampSetup, CommitStoreSetup, EVM2EVMGEOffRampSetup
 
   function sendRequest(uint64 expectedSeqNum) public returns (CCIP.EVM2EVMGEMessage memory) {
     CCIP.EVM2AnyGEMessage memory message = _generateTokenMessage();
-    uint256 expectedFee = s_onRampRouter.getFee(DEST_CHAIN_ID, message);
+    uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_ID, message);
 
-    IERC20(s_sourceTokens[0]).approve(address(s_onRampRouter), i_tokenAmount0 + expectedFee);
-    IERC20(s_sourceTokens[1]).approve(address(s_onRampRouter), i_tokenAmount1);
+    IERC20(s_sourceTokens[0]).approve(address(s_sourceRouter), i_tokenAmount0 + expectedFee);
+    IERC20(s_sourceTokens[1]).approve(address(s_sourceRouter), i_tokenAmount1);
 
     message.receiver = abi.encode(address(s_receiver));
     CCIP.EVM2EVMGEMessage memory geEvent = _messageToEvent(message, expectedSeqNum, expectedSeqNum, expectedFee);
@@ -101,7 +101,7 @@ contract E2E_GE is EVM2EVMGEOnRampSetup, CommitStoreSetup, EVM2EVMGEOffRampSetup
     vm.expectEmit(false, false, false, true);
     emit CCIPSendRequested(geEvent);
 
-    s_onRampRouter.ccipSend(DEST_CHAIN_ID, message);
+    s_sourceRouter.ccipSend(DEST_CHAIN_ID, message);
 
     return geEvent;
   }

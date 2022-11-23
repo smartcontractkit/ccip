@@ -119,21 +119,12 @@ $SCRIPTPATH/native_solc8_15_compile_ccip ccip/offRamp/toll/Any2EVMTollOffRampRou
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/test/helpers/ramps/EVM2EVMTollOffRampHelper.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/applications/TollSenderDapp.sol
 
-
-## Subscription
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/onRamp/subscription/EVM2AnySubscriptionOnRampRouter.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/onRamp/subscription/EVM2EVMSubscriptionOnRamp.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/offRamp/subscription/EVM2EVMSubscriptionOffRamp.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/offRamp/subscription/Any2EVMSubscriptionOffRampRouter.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/applications/SubscriptionSenderDapp.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/applications/GovernanceDapp.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/applications/PingPongDemo.sol
-
-
 #GE
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/onRamp/ge/EVM2EVMGEOnRamp.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/offRamp/ge/EVM2EVMGEOffRamp.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/router/GERouter.sol
+$SCRIPTPATH/native_solc8_15_compile_ccip ccip/dynamicFeeCalculator/GasFeeCache.sol
 
-## Temp
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/offRamp/subscription/EVM2EVMFreeOffRamp.sol
+$SCRIPTPATH/native_solc8_15_compile_ccip ccip/applications/GovernanceDapp.sol
+$SCRIPTPATH/native_solc8_15_compile_ccip ccip/applications/PingPongDemo.sol
+

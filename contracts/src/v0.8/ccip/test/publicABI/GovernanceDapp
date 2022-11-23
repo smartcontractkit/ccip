@@ -3,10 +3,9 @@
   "addClone((uint256,address))": "3aa5113c",
   "ccipReceive((uint256,bytes,bytes,(address,uint256)[]))": "b06193dd",
   "getFeeConfig()": "5fbbc0d2",
-  "getSubscriptionManager()": "e2a92e28",
   "owner()": "8da5cb5b",
-  "setRouters(address,address)": "5ead6fb0",
+  "setRouters(address)": "f84f82bb",
   "transferOwnership(address)": "f2fde38b",
   "typeAndVersion()": "181f5a77",
-  "voteForNewFeeConfig((uint256,address,uint256))": "fa8c6d3a"
+  "voteForNewFeeConfig((uint256,uint256))": "8157c96c"
 }

@@ -20,7 +20,7 @@ import "../../VRFConsumerBaseV2.sol";
  * - calculatePaymentAmount will always return the premium being charged, and will not charge for gas used.
  *
  * In effect, subscriptions are not cancellable in NoCancelVRFCoordinatorV2, as the name suggests.
-*/
+ */
 contract NoCancelVRFCoordinatorV2 is
   VRF,
   ConfirmedOwner,

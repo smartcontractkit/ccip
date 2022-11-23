@@ -71,10 +71,7 @@ library CCIP {
 
   struct ExecutionReport {
     uint64[] sequenceNumbers;
-    // Only used by toll as subscriptions use a known fee token.
     address[] tokenPerFeeCoinAddresses;
-    // For subscriptions only the first value is used as
-    // all subscriptions use the same fee token.
     uint256[] tokenPerFeeCoin;
     FeeUpdate[] feeUpdates;
     bytes[] encodedMessages;
@@ -242,52 +239,6 @@ library CCIP {
           keccak256(abi.encode(original.tokensAndAmounts)),
           original.gasLimit,
           original.feeTokenAndAmount
-        )
-      );
-  }
-
-  ////////////////////////////////
-  ////      SUBSCRIPTION      ////
-  ////////////////////////////////
-
-  struct EVM2AnySubscriptionMessage {
-    bytes receiver;
-    bytes data;
-    EVMTokenAndAmount[] tokensAndAmounts;
-    bytes extraArgs;
-  }
-
-  // @notice The cross chain message that gets committed to EVM subscription chains
-  struct EVM2EVMSubscriptionMessage {
-    uint256 sourceChainId;
-    uint64 sequenceNumber;
-    address sender;
-    address receiver;
-    uint64 nonce;
-    bytes data;
-    EVMTokenAndAmount[] tokensAndAmounts;
-    uint256 gasLimit;
-  }
-
-  bytes32 internal constant EVM_2_EVM_SUBSCRIPTION_MESSAGE_HASH = keccak256("EVM2EVMSubscriptionMessagePlus");
-
-  function _hash(CCIP.EVM2EVMSubscriptionMessage memory original, bytes32 metadataHash)
-    internal
-    pure
-    returns (bytes32)
-  {
-    return
-      keccak256(
-        abi.encode(
-          LEAF_DOMAIN_SEPARATOR,
-          metadataHash,
-          original.sequenceNumber,
-          original.sender,
-          original.receiver,
-          keccak256(original.data),
-          keccak256(abi.encode(original.tokensAndAmounts)),
-          original.gasLimit,
-          original.nonce
         )
       );
   }

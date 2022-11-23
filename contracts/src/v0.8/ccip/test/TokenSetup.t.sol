@@ -17,6 +17,9 @@ contract TokenSetup is BaseTest {
   address[] internal s_sourcePools;
   address[] internal s_destPools;
 
+  address internal s_sourceFeeToken;
+  address internal s_destFeeToken;
+
   uint256 internal constant TOKENS_PER_FEE_COIN = 2e20;
 
   function setUp() public virtual override {
@@ -26,10 +29,14 @@ contract TokenSetup is BaseTest {
       s_sourceTokens.push(address(new MockERC20("sETH", "sETH", OWNER, 2**128)));
     }
 
+    s_sourceFeeToken = s_sourceTokens[0];
+
     if (s_destTokens.length == 0) {
       s_destTokens.push(address(new MockERC20("dLINK", "dLNK", OWNER, 2**256 - 1)));
       s_destTokens.push(address(new MockERC20("dETH", "dETH", OWNER, 2**128)));
     }
+
+    s_destFeeToken = s_destTokens[0];
 
     if (s_sourcePools.length == 0) {
       s_sourcePools.push(address(new NativeTokenPool(IERC20(s_sourceTokens[0]))));

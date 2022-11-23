@@ -1,7 +1,7 @@
 // Code generated - DO NOT EDIT.
 // This file is a generated binding and any manual changes will be lost.
 
-package any_2_evm_toll_offramp
+package evm_2_evm_toll_offramp
 
 import (
 	"errors"

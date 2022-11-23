@@ -22,7 +22,7 @@ contract EVM2EVMGEOnRamp_constructor is EVM2EVMGEOnRampSetup {
     assertEq(SOURCE_CHAIN_ID, s_onRamp.i_chainId());
     assertEq(DEST_CHAIN_ID, s_onRamp.i_destinationChainId());
 
-    assertEq(address(s_onRampRouter), s_onRamp.getRouter());
+    assertEq(address(s_sourceRouter), s_onRamp.getRouter());
     assertEq(1, s_onRamp.getExpectedNextSequenceNumber());
 
     // HealthChecker
@@ -40,7 +40,7 @@ contract EVM2EVMGEOnRamp_forwardFromRouter is EVM2EVMGEOnRampSetup {
     // Since we'll mostly be testing for valid calls from the router we'll
     // mock all calls to be originating from the router and re-mock in
     // tests that require failure.
-    changePrank(address(s_onRampRouter));
+    changePrank(address(s_sourceRouter));
   }
 
   // Success
@@ -127,7 +127,7 @@ contract EVM2EVMGEOnRamp_forwardFromRouter is EVM2EVMGEOnRampSetup {
     s_onRamp.setAllowlistEnabled(true);
 
     vm.expectRevert(abi.encodeWithSelector(AllowListInterface.SenderNotAllowed.selector, STRANGER));
-    changePrank(address(s_onRampRouter));
+    changePrank(address(s_sourceRouter));
     s_onRamp.forwardFromRouter(_generateEmptyMessage(), 0, STRANGER);
   }
 
@@ -147,7 +147,7 @@ contract EVM2EVMGEOnRamp_forwardFromRouter is EVM2EVMGEOnRampSetup {
     s_onRamp.setPrices(abi.decode(abi.encode(message.tokensAndAmounts), (IERC20[])), prices);
 
     // Change back to the router
-    changePrank(address(s_onRampRouter));
+    changePrank(address(s_sourceRouter));
     vm.expectRevert(abi.encodeWithSelector(BaseOnRampInterface.UnsupportedToken.selector, wrongToken));
 
     s_onRamp.forwardFromRouter(message, 0, OWNER);

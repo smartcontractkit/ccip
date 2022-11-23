@@ -94,26 +94,19 @@ package gethwrappers
 // Toll
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2AnyTollOnRampRouter.abi ../../contracts/solc/v0.8.15/EVM2AnyTollOnRampRouter.bin EVM2AnyTollOnRampRouter evm_2_any_toll_onramp_router
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2EVMTollOnRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMTollOnRamp.bin EVM2EVMTollOnRamp evm_2_evm_toll_onramp
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2EVMTollOffRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMTollOffRamp.bin EVM2EVMTollOffRamp any_2_evm_toll_offramp
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2EVMTollOffRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMTollOffRamp.bin EVM2EVMTollOffRamp evm_2_evm_toll_offramp
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/Any2EVMTollOffRampRouter.abi ../../contracts/solc/v0.8.15/Any2EVMTollOffRampRouter.bin Any2EVMTollOffRampRouter any_2_evm_toll_offramp_router
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2EVMTollOffRampHelper.abi ../../contracts/solc/v0.8.15/EVM2EVMTollOffRampHelper.bin EVM2EVMTollOffRampHelper any_2_evm_toll_offramp_helper
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/TollSenderDapp.abi ../../contracts/solc/v0.8.15/TollSenderDapp.bin TollSenderDapp toll_sender_dapp
 
-// Subscription
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2AnySubscriptionOnRampRouter.abi ../../contracts/solc/v0.8.15/EVM2AnySubscriptionOnRampRouter.bin EVM2AnySubscriptionOnRampRouter evm_2_any_subscription_onramp_router
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2EVMSubscriptionOnRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMSubscriptionOnRamp.bin EVM2EVMSubscriptionOnRamp evm_2_evm_subscription_onramp
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2EVMSubscriptionOffRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMSubscriptionOffRamp.bin EVM2EVMSubscriptionOffRamp any_2_evm_subscription_offramp
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/Any2EVMSubscriptionOffRampRouter.abi ../../contracts/solc/v0.8.15/Any2EVMSubscriptionOffRampRouter.bin Any2EVMSubscriptionOffRampRouter any_2_evm_subscription_offramp_router
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/SubscriptionSenderDapp.abi ../../contracts/solc/v0.8.15/SubscriptionSenderDapp.bin SubscriptionSenderDapp subscription_sender_dapp
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/GovernanceDapp.abi ../../contracts/solc/v0.8.15/GovernanceDapp.bin GovernanceDapp governance_dapp
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/PingPongDemo.abi ../../contracts/solc/v0.8.15/PingPongDemo.bin PingPongDemo ping_pong_demo
-
-// Temp
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2EVMFreeOffRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMFreeOffRamp.bin EVM2EVMFreeOffRamp any_2_evm_free_offramp
-
+// GE
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2EVMGEOnRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMGEOnRamp.bin EVM2EVMGEOnRamp evm_2_evm_ge_onramp
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2EVMGEOffRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMGEOffRamp.bin EVM2EVMGEOffRamp evm_2_evm_ge_offramp
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/GERouter.abi ../../contracts/solc/v0.8.15/GERouter.bin GERouter ge_router
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/GasFeeCache.abi ../../contracts/solc/v0.8.15/GasFeeCache.bin GasFeeCache gas_fee_cache
+
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/GovernanceDapp.abi ../../contracts/solc/v0.8.15/GovernanceDapp.bin GovernanceDapp governance_dapp
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/PingPongDemo.abi ../../contracts/solc/v0.8.15/PingPongDemo.bin PingPongDemo ping_pong_demo
 
 // To run these commands, you must either install docker, or the correct version
 // of abigen. The latter can be installed with these commands, at least on linux:

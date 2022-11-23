@@ -2,15 +2,14 @@
   "EVM_EXTRA_ARGS_V1_TAG()": "3ab8c0d0",
   "acceptOwnership()": "79ba5097",
   "ccipReceive((uint256,bytes,bytes,(address,uint256)[]))": "b06193dd",
-  "getRouters()": "f88c31ce",
-  "getSubscriptionManager()": "e2a92e28",
+  "getRouter()": "b0f479a1",
   "owner()": "8da5cb5b",
   "s_counterpartAddress()": "1a92c7a2",
   "s_counterpartChainId()": "9f575b94",
   "s_isPaused()": "5b3030a8",
   "setCounterpart(uint256,address)": "ddcba0e7",
   "setPaused(bool)": "16c38b3c",
-  "setRouters(address,address)": "5ead6fb0",
+  "setRouter(address)": "c0d78655",
   "startPingPong()": "2874d8bf",
   "transferOwnership(address)": "f2fde38b"
 }

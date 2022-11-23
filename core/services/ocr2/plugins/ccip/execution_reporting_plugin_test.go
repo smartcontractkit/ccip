@@ -18,10 +18,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/afn_contract"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp_helper"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store_helper"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/native_token_pool"
@@ -34,7 +34,7 @@ import (
 type ExecutionContracts struct {
 	// Has all the link and 100ETH
 	user                       *bind.TransactOpts
-	offRamp                    *any_2_evm_toll_offramp.EVM2EVMTollOffRamp
+	offRamp                    *evm_2_evm_toll_offramp.EVM2EVMTollOffRamp
 	commitStore                *commit_store_helper.CommitStoreHelper
 	receiver                   *simple_message_receiver.SimpleMessageReceiver
 	linkTokenAddress           common.Address
@@ -101,12 +101,12 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	commitStore, err := commit_store_helper.NewCommitStoreHelper(commitStoreAddress, destChain)
 	require.NoError(t, err)
 	destChain.Commit()
-	offRampAddress, _, _, err := any_2_evm_toll_offramp.DeployEVM2EVMTollOffRamp(
+	offRampAddress, _, _, err := evm_2_evm_toll_offramp.DeployEVM2EVMTollOffRamp(
 		destUser,
 		destChain,
 		sourceChainID,
 		destChainID,
-		any_2_evm_toll_offramp.BaseOffRampInterfaceOffRampConfig{
+		evm_2_evm_toll_offramp.BaseOffRampInterfaceOffRampConfig{
 			ExecutionDelaySeconds: 0,
 			MaxDataSize:           1e12,
 			MaxTokensLength:       5,
@@ -116,14 +116,14 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 		afnAddress,
 		[]common.Address{linkTokenSourceAddress},
 		[]common.Address{destPoolAddress},
-		any_2_evm_toll_offramp.AggregateRateLimiterInterfaceRateLimiterConfig{
+		evm_2_evm_toll_offramp.AggregateRateLimiterInterfaceRateLimiterConfig{
 			Capacity: big.NewInt(1e18),
 			Rate:     big.NewInt(1e18),
 		},
 		destUser.From,
 	)
 	require.NoError(t, err)
-	offRamp, err := any_2_evm_toll_offramp.NewEVM2EVMTollOffRamp(offRampAddress, destChain)
+	offRamp, err := evm_2_evm_toll_offramp.NewEVM2EVMTollOffRamp(offRampAddress, destChain)
 	require.NoError(t, err)
 	_, err = destPool.SetOffRamp(destUser, offRampAddress, true)
 	require.NoError(t, err)
@@ -274,11 +274,11 @@ func TestExecutionReportEncoding(t *testing.T) {
 	outerTree, err := merklemulti.NewTree(ctx, [][32]byte{mb.root})
 	require.NoError(t, err)
 	outerProof := outerTree.Prove([]int{0})
-	report := any_2_evm_toll_offramp.CCIPExecutionReport{
+	report := evm_2_evm_toll_offramp.CCIPExecutionReport{
 		SequenceNumbers:          mb.seqNums,
 		TokenPerFeeCoin:          []*big.Int{},
 		TokenPerFeeCoinAddresses: []common.Address{},
-		FeeUpdates:               []any_2_evm_toll_offramp.CCIPFeeUpdate{},
+		FeeUpdates:               []evm_2_evm_toll_offramp.CCIPFeeUpdate{},
 		EncodedMessages:          mb.allMsgBytes,
 		InnerProofs:              mb.proof.Hashes,
 		InnerProofFlagBits:       ccip.ProofFlagsToBits(mb.proof.SourceFlags),

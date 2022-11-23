@@ -27,9 +27,8 @@ var Prod_Goerli = rhea.EVMChainConfig{
 			Price: big.NewInt(1),
 		},
 	},
-	OnRampRouter:  gethcommon.HexToAddress("0xA189971a2c5AcA0DFC5Ee7a2C44a2Ae27b3CF389"),
-	OffRampRouter: gethcommon.HexToAddress("0xb78d314d32EB4B01C459EDE0774cc3b6AF244Dd7"),
-	Afn:           gethcommon.HexToAddress("0x8a710bBd77661D168D5A6725bD2E514ba1bFf59d"),
+	Router: gethcommon.HexToAddress("0xA189971a2c5AcA0DFC5Ee7a2C44a2Ae27b3CF389"),
+	Afn:    gethcommon.HexToAddress("0x8a710bBd77661D168D5A6725bD2E514ba1bFf59d"),
 }
 
 var Prod_OptimismGoerli = rhea.EVMChainConfig{
@@ -48,9 +47,8 @@ var Prod_OptimismGoerli = rhea.EVMChainConfig{
 			Price: big.NewInt(1),
 		},
 	},
-	OnRampRouter:  gethcommon.HexToAddress("0xE591bf0A0CF924A0674d7792db046B23CEbF5f34"),
-	OffRampRouter: gethcommon.HexToAddress("0x2b7aB40413DA5077E168546eA376920591Aee8E7"),
-	Afn:           gethcommon.HexToAddress("0x4c10d67E4B8e18a67A7606DEFDCe42CCc281D39B"),
+	Router: gethcommon.HexToAddress("0xE591bf0A0CF924A0674d7792db046B23CEbF5f34"),
+	Afn:    gethcommon.HexToAddress("0x4c10d67E4B8e18a67A7606DEFDCe42CCc281D39B"),
 }
 
 var Prod_AvaxFuji = rhea.EVMChainConfig{
@@ -69,9 +67,8 @@ var Prod_AvaxFuji = rhea.EVMChainConfig{
 			Price: big.NewInt(1),
 		},
 	},
-	OnRampRouter:  gethcommon.HexToAddress("0xc0A2c03115d1B48BAA59f676c108EfE5Ba3ee062"),
-	OffRampRouter: gethcommon.HexToAddress("0x7d5297c5506ee2A7Ef121Da9bE02b6a6AD30b392"),
-	Afn:           gethcommon.HexToAddress("0xb2958D1Bd07448865E555FeeFf32b58D254ffB4C"),
+	Router: gethcommon.HexToAddress("0xc0A2c03115d1B48BAA59f676c108EfE5Ba3ee062"),
+	Afn:    gethcommon.HexToAddress("0xb2958D1Bd07448865E555FeeFf32b58D254ffB4C"),
 }
 
 // Lanes

@@ -30,7 +30,7 @@ var _ = Describe("CCIP interactions test @ccip", func() {
 		Expect(err).ShouldNot(HaveOccurred(), "Environment teardown shouldn't fail")
 	})
 
-	It("Deliver message with token in toll and subscription based model", func() {
+	It("Deliver message with token in toll based model", func() {
 		var (
 			sourceCCIP *actions.SourceCCIPModule
 			destCCIP   *actions.DestCCIPModule
@@ -77,10 +77,8 @@ var _ = Describe("CCIP interactions test @ccip", func() {
 		actions.CreateOCRJobsForCCIP(
 			clNodes[0], nil, clNodes[1:], nil,
 			sourceCCIP.TollOnRamp.Address(),
-			sourceCCIP.SubOnRamp.Address(),
 			destCCIP.CommitStore.Address(),
 			destCCIP.TollOffRamp.Address(),
-			destCCIP.SubOffRamp.Address(),
 			sourceChainClient, destChainClient,
 			tokenAddr,
 			mockServer,
@@ -90,19 +88,12 @@ var _ = Describe("CCIP interactions test @ccip", func() {
 		By("Setting up ocr config in commit store and offramp")
 		actions.SetOCRConfigs(clNodes[1:], nil, *destCCIP) // first node is the bootstrapper
 
-		ccipTest := actions.NewCCIPTest(
-			sourceCCIP, destCCIP, big.NewInt(0).Mul(big.NewInt(80), big.NewInt(1e18)), big.NewInt(0.79e18), time.Minute)
+		ccipTest := actions.NewCCIPTest(sourceCCIP, destCCIP, time.Minute)
 
 		// initiate transfer with toll and verify
 		By("Multiple Token transfer with toll, watch for updated sequence numbers and events logs, " +
 			"verify balance in receiving and sending account pre and post transfer")
 		ccipTest.SendTollRequests(1)
 		ccipTest.ValidateTollRequests()
-
-		// initiate transfer with subscription and verify
-		By("Multiple Token transfer with subscription, watch for updated sequence numbers and events logs, " +
-			"verify receiver,sender and subscription balance pre and post transfer")
-		ccipTest.SendSubRequests(1, true)
-		ccipTest.ValidateSubRequests()
 	})
 })

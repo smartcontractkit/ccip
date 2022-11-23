@@ -3,9 +3,11 @@ pragma solidity 0.8.15;
 
 import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
 import {Any2EVMMessageReceiverInterface} from "../interfaces/applications/Any2EVMMessageReceiverInterface.sol";
-import {EVM2AnySubscriptionOnRampRouterInterface, CCIP, IERC20} from "../interfaces/onRamp/EVM2AnySubscriptionOnRampRouterInterface.sol";
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
 import {Any2EVMOffRampRouterInterface} from "../interfaces/offRamp/Any2EVMOffRampRouterInterface.sol";
+import {GERouterInterface} from "../interfaces/router/GERouterInterface.sol";
+import {CCIP} from "../models/Models.sol";
+import {IERC20} from "../../vendor/IERC20.sol";
 
 contract GovernanceDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterface, OwnerIsCreator {
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
@@ -15,11 +17,10 @@ contract GovernanceDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterf
 
   error InvalidDeliverer(address deliverer);
   event ConfigPropagated(uint256 chainId, address contractAddress);
-  event ReceivedConfig(uint256 feeAmount, address subscriptionManager, uint256 changedAtBlock);
+  event ReceivedConfig(uint256 feeAmount, uint256 changedAtBlock);
 
   struct FeeConfig {
     uint256 feeAmount;
-    address subscriptionManager;
     uint256 changedAtBlock;
   }
 
@@ -31,24 +32,26 @@ contract GovernanceDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterf
   FeeConfig internal s_feeConfig;
   CrossChainClone[] internal s_crossChainClones;
 
-  Any2EVMOffRampRouterInterface internal s_receivingRouter;
-  EVM2AnySubscriptionOnRampRouterInterface internal s_sendingRouter;
+  GERouterInterface internal s_router;
+
+  // The fee token for CCIP billing
+  address internal immutable i_feeToken;
 
   constructor(
-    Any2EVMOffRampRouterInterface receivingRouter,
-    EVM2AnySubscriptionOnRampRouterInterface sendingRouter,
-    FeeConfig memory feeConfig
+    GERouterInterface sendingRouter,
+    FeeConfig memory feeConfig,
+    address feeToken
   ) {
-    s_receivingRouter = receivingRouter;
-    s_sendingRouter = sendingRouter;
+    s_router = sendingRouter;
     s_feeConfig = feeConfig;
+    i_feeToken = feeToken;
   }
 
   function voteForNewFeeConfig(FeeConfig calldata feeConfig) public onlyOwner {
     // Call for new fee config
     // Count if votes >= threshold
     // if votes passes
-    if (s_sendingRouter != EVM2AnySubscriptionOnRampRouterInterface(address(0))) {
+    if (s_router != GERouterInterface(address(0))) {
       _propagateFeeConfigChange(feeConfig);
     }
     s_feeConfig = feeConfig;
@@ -60,13 +63,14 @@ contract GovernanceDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterf
     for (uint256 i = 0; i < numberOfClones; ++i) {
       CrossChainClone memory clone = s_crossChainClones[i];
 
-      CCIP.EVM2AnySubscriptionMessage memory message = CCIP.EVM2AnySubscriptionMessage({
+      CCIP.EVM2AnyGEMessage memory message = CCIP.EVM2AnyGEMessage({
         receiver: abi.encode(clone.contractAddress),
         data: data,
         tokensAndAmounts: new CCIP.EVMTokenAndAmount[](0),
+        feeToken: i_feeToken,
         extraArgs: CCIP.EVMExtraArgsV1({gasLimit: 3e5, strict: false})._toBytes()
       });
-      s_sendingRouter.ccipSend(clone.chainId, message);
+      s_router.ccipSend(clone.chainId, message);
       emit ConfigPropagated(clone.chainId, clone.contractAddress);
     }
   }
@@ -80,23 +84,15 @@ contract GovernanceDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterf
     FeeConfig memory newFeeConfig = abi.decode(message.data, (FeeConfig));
 
     s_feeConfig = newFeeConfig;
-    emit ReceivedConfig(newFeeConfig.feeAmount, newFeeConfig.subscriptionManager, newFeeConfig.changedAtBlock);
+    emit ReceivedConfig(newFeeConfig.feeAmount, newFeeConfig.changedAtBlock);
   }
 
   function addClone(CrossChainClone memory clone) public onlyOwner {
     s_crossChainClones.push(clone);
   }
 
-  function setRouters(
-    Any2EVMOffRampRouterInterface receivingRouter,
-    EVM2AnySubscriptionOnRampRouterInterface sendingRouter
-  ) public {
-    s_receivingRouter = receivingRouter;
-    s_sendingRouter = sendingRouter;
-  }
-
-  function getSubscriptionManager() external view returns (address) {
-    return s_feeConfig.subscriptionManager;
+  function setRouters(GERouterInterface router) public {
+    s_router = router;
   }
 
   function getFeeConfig() external view returns (FeeConfig memory) {
@@ -107,7 +103,7 @@ contract GovernanceDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterf
    * @dev only calls from the set router are accepted.
    */
   modifier onlyRouter() {
-    if (msg.sender != address(s_receivingRouter)) revert InvalidDeliverer(msg.sender);
+    if (msg.sender != address(s_router)) revert InvalidDeliverer(msg.sender);
     _;
   }
 }

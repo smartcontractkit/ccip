@@ -78,81 +78,81 @@ jobs:
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
 
-  ccip-load-tests:
-    environment: integration
-    permissions:
-      issues: read
-      checks: write
-      pull-requests: write
-      id-token: write
-      contents: read
-    name: ccip-load-tests
-    runs-on: ubuntu-latest
-    needs: [build-chainlink]
-    env:
-      CHAINLINK_COMMIT_SHA: ${{ github.sha }}
-      CHAINLINK_ENV_USER: ${{ github.actor }}
-      TEST_TRIGGERED_BY: ccip-cron-load-eth
-      TEST_LOG_LEVEL: debug
-      KEEP_ENVIRONMENTS: ONFAIL
-      DATABASE_URL: postgresql://postgres:node@localhost:5432/chainlink_test?sslmode=disable
-      GH_TOKEN: ${{ github.token }}
-      LOAD_TEST_DURATION: ${{ inputs.duration }}
-      LOAD_TEST_CALLTIMEOUT: ${{ inputs.phase_time_out }}
-      LOAD_TEST_TPS: ${{ inputs.send_request_per_second }}
-      LOAD_TEST_MSG_TYPE: ${{ inputs.type-of-transfer }}
-    steps:
-      - name: Collect Metrics
-        id: collect-gha-metrics
-        uses: smartcontractkit/push-gha-metrics-action@v1
-        with:
-          basic-auth: ${{ secrets.GRAFANA_CLOUD_BASIC_AUTH }}
-          hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
-          this-job-name: CCIP Load Test
-        continue-on-error: true
-      - name: Checkout the repo
-        uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # v3.0.2
-      - name: "Set environmental variables"
-        run: |
-          echo "GH_RUN_URL=https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}" >> $GITHUB_ENV
-      - name: Run Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@1533bff48f8a642089705dcc2dbebb0934ff7d9d # v2.0.26
-        with:
-          test_command_to_run: make test_load_ccip
-          test_download_vendor_packages_command: make gomod
-          test_download_ginkgo_command: make test_install_ginkgo
-          cl_repo: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
-          cl_image_tag: latest.${{ github.sha }}
-          artifacts_location: ./integration-tests/load/logs
-          publish_check_name: CCIP Load Test Results
-          publish_report_paths: ./tests-load-report.xml
-          triggered_by: ${{ env.TEST_TRIGGERED_BY }}
-          go_mod_path: ./integration-tests/go.mod
-          QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
-          QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
-          QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
-          CGO_ENABLED: "1"
-      - name: Publish Artifacts
-        if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: load-test-stats
-          path: ./integration-tests/load/logs/stats
-      - name: Slack Notify
-        if: ${{ failure() && github.event_name == 'push' || always() && github.event_name == 'schedule' || inputs.slack-notify != false}}
-        uses: slackapi/slack-github-action@v1.22.0
-        with:
-          payload-file-path: "./integration-tests/load/logs/payload-slack-content.json"
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
-
-      ## Run Cleanup if the job succeeds
-      - name: cleanup
-        if: always()
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/cleanup@1533bff48f8a642089705dcc2dbebb0934ff7d9d # v2.0.26
-        with:
-          triggered_by: ${{ env.TEST_TRIGGERED_BY }}
+  #  ccip-load-tests:
+  #    environment: integration
+  #    permissions:
+  #      issues: read
+  #      checks: write
+  #      pull-requests: write
+  #      id-token: write
+  #      contents: read
+  #    name: ccip-load-tests
+  #    runs-on: ubuntu-latest
+  #    needs: [build-chainlink]
+  #    env:
+  #      CHAINLINK_COMMIT_SHA: ${{ github.sha }}
+  #      CHAINLINK_ENV_USER: ${{ github.actor }}
+  #      TEST_TRIGGERED_BY: ccip-cron-load-eth
+  #      TEST_LOG_LEVEL: debug
+  #      KEEP_ENVIRONMENTS: ONFAIL
+  #      DATABASE_URL: postgresql://postgres:node@localhost:5432/chainlink_test?sslmode=disable
+  #      GH_TOKEN: ${{ github.token }}
+  #      LOAD_TEST_DURATION: ${{ inputs.duration }}
+  #      LOAD_TEST_CALLTIMEOUT: ${{ inputs.phase_time_out }}
+  #      LOAD_TEST_TPS: ${{ inputs.send_request_per_second }}
+  #      LOAD_TEST_MSG_TYPE: ${{ inputs.type-of-transfer }}
+  #    steps:
+  #      - name: Collect Metrics
+  #        id: collect-gha-metrics
+  #        uses: smartcontractkit/push-gha-metrics-action@v1
+  #        with:
+  #          basic-auth: ${{ secrets.GRAFANA_CLOUD_BASIC_AUTH }}
+  #          hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
+  #          this-job-name: CCIP Load Test
+  #        continue-on-error: true
+  #      - name: Checkout the repo
+  #        uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # v3.0.2
+  #      - name: "Set environmental variables"
+  #        run: |
+  #          echo "GH_RUN_URL=https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}" >> $GITHUB_ENV
+  #      - name: Run Tests
+  #        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@1533bff48f8a642089705dcc2dbebb0934ff7d9d # v2.0.26
+  #        with:
+  #          test_command_to_run: make test_load_ccip
+  #          test_download_vendor_packages_command: make gomod
+  #          test_download_ginkgo_command: make test_install_ginkgo
+  #          cl_repo: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
+  #          cl_image_tag: latest.${{ github.sha }}
+  #          artifacts_location: ./integration-tests/load/logs
+  #          publish_check_name: CCIP Load Test Results
+  #          publish_report_paths: ./tests-load-report.xml
+  #          triggered_by: ${{ env.TEST_TRIGGERED_BY }}
+  #          go_mod_path: ./integration-tests/go.mod
+  #          QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
+  #          QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+  #          QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
+  #          CGO_ENABLED: "1"
+  #      - name: Publish Artifacts
+  #        if: always()
+  #        uses: actions/upload-artifact@v3
+  #        with:
+  #          name: load-test-stats
+  #          path: ./integration-tests/load/logs/stats
+  #      - name: Slack Notify
+  #        if: ${{ failure() && github.event_name == 'push' || always() && github.event_name == 'schedule' || inputs.slack-notify != false}}
+  #        uses: slackapi/slack-github-action@v1.22.0
+  #        with:
+  #          payload-file-path: "./integration-tests/load/logs/payload-slack-content.json"
+  #        env:
+  #          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  #          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+  #
+  #      ## Run Cleanup if the job succeeds
+  #      - name: cleanup
+  #        if: always()
+  #        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/cleanup@1533bff48f8a642089705dcc2dbebb0934ff7d9d # v2.0.26
+  #        with:
+  #          triggered_by: ${{ env.TEST_TRIGGERED_BY }}
 
   ccip-chaos-tests:
     environment: integration

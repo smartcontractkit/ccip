@@ -1,7 +1,6 @@
 package ccip
 
 import (
-	"bytes"
 	"encoding/json"
 	"math/big"
 	"time"
@@ -14,11 +13,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_subscription_offramp_router"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_subscription_onramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/job"
@@ -100,25 +96,6 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 		}
 		reqEventSig = CCIPTollSendRequested
 		onRampToHasher[onRampAddr] = NewTollLeafHasher(sourceChainId, destChainId, onRampAddr, hashingCtx)
-	case EVM2EVMSubscriptionOnRamp:
-		onRamp, err2 := evm_2_evm_subscription_onramp.NewEVM2EVMSubscriptionOnRamp(onRampAddr, sourceChain.Client())
-		if err2 != nil {
-			return nil, err2
-		}
-		onRampSeqParser = func(log logpoller.Log) (uint64, error) {
-			req, err3 := onRamp.ParseCCIPSendRequested(types.Log{Data: log.Data, Topics: log.GetTopics()})
-			if err3 != nil {
-				return 0, err3
-			}
-			return req.Message.SequenceNumber, nil
-		}
-		// Subscribe to all relevant commit logs.
-		_, err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{CCIPSubSendRequested}, Addresses: []common.Address{onRampAddr}})
-		if err != nil {
-			return nil, err
-		}
-		reqEventSig = CCIPSubSendRequested
-		onRampToHasher[onRampAddr] = NewSubscriptionLeafHasher(sourceChainId, destChainId, onRampAddr, hashingCtx)
 	default:
 		return nil, errors.Errorf("unrecognized onramp, is %v the correct onramp address?", onRampAddr)
 	}
@@ -139,10 +116,6 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	case EVM2EVMTollOffRamp:
 		batchBuilder = NewTollBatchBuilder(lggr)
 		offRamp, err2 = NewTollOffRamp(common.HexToAddress(spec.ContractID), destChain)
-	case EVM2EVMSubscriptionOffRamp:
-		var subFeeToken common.Address
-		offRamp, subFeeToken, err2 = NewSubOffRamp(common.HexToAddress(spec.ContractID), destChain)
-		batchBuilder = NewSubscriptionBatchBuilder(lggr, subFeeToken, offRamp.(*subOffRamp))
 	default:
 		return nil, errors.Errorf("unrecognized offramp, is %v the correct offramp address?", spec.ContractID)
 	}
@@ -201,62 +174,13 @@ type OffRamp interface {
 	Address() common.Address
 	// Destination chain addresses.
 	// Toll: dest pool addresses
-	// Sub:  dest sub token address (not necessarily in a pool)
 	GetSupportedTokensForExecutionFee() ([]common.Address, error)
 	GetAllowedTokensAmount(opts *bind.CallOpts) (*big.Int, error)
 	GetPricesForTokens(opts *bind.CallOpts, tokens []common.Address) ([]*big.Int, error)
 }
 
-type subOffRamp struct {
-	*any_2_evm_subscription_offramp.EVM2EVMSubscriptionOffRamp
-	router *any_2_evm_subscription_offramp_router.Any2EVMSubscriptionOffRampRouter
-}
-
-func (s subOffRamp) GetSupportedTokensForExecutionFee() ([]common.Address, error) {
-	return s.router.GetSupportedTokensForExecutionFee(nil)
-}
-
-func (s subOffRamp) ParseSeqNumFromExecutionStateChanged(log types.Log) (uint64, error) {
-	ec, err := s.ParseExecutionStateChanged(log)
-	if err != nil {
-		return 0, err
-	}
-	return ec.SequenceNumber, nil
-}
-
-func (s subOffRamp) GetAllowedTokensAmount(opts *bind.CallOpts) (*big.Int, error) {
-	bucket, err := s.EVM2EVMSubscriptionOffRamp.CalculateCurrentTokenBucketState(opts)
-	if err != nil {
-		return nil, err
-	}
-	return bucket.Tokens, nil
-}
-
-func NewSubOffRamp(addr common.Address, destChain evm.Chain) (OffRamp, common.Address, error) {
-	offRamp, err := any_2_evm_subscription_offramp.NewEVM2EVMSubscriptionOffRamp(addr, destChain.Client())
-	if err != nil {
-		return nil, common.Address{}, err
-	}
-	routerAddr, err := offRamp.GetRouter(nil)
-	if err != nil {
-		return nil, common.Address{}, err
-	}
-	if bytes.Equal(routerAddr.Bytes(), common.Address{}.Bytes()) {
-		return nil, common.Address{}, errors.New("router unset")
-	}
-	router, err := any_2_evm_subscription_offramp_router.NewAny2EVMSubscriptionOffRampRouter(routerAddr, destChain.Client())
-	if err != nil {
-		return nil, common.Address{}, err
-	}
-	subFeeToken, err := router.GetFeeToken(nil)
-	if err != nil {
-		return nil, common.Address{}, err
-	}
-	return &subOffRamp{EVM2EVMSubscriptionOffRamp: offRamp, router: router}, subFeeToken, nil
-}
-
 type tollOffRamp struct {
-	*any_2_evm_toll_offramp.EVM2EVMTollOffRamp
+	*evm_2_evm_toll_offramp.EVM2EVMTollOffRamp
 }
 
 func (s tollOffRamp) ParseSeqNumFromExecutionStateChanged(log types.Log) (uint64, error) {
@@ -282,7 +206,7 @@ func (s tollOffRamp) GetAllowedTokensAmount(opts *bind.CallOpts) (*big.Int, erro
 }
 
 func NewTollOffRamp(addr common.Address, destChain evm.Chain) (OffRamp, error) {
-	offRamp, err := any_2_evm_toll_offramp.NewEVM2EVMTollOffRamp(addr, destChain.Client())
+	offRamp, err := evm_2_evm_toll_offramp.NewEVM2EVMTollOffRamp(addr, destChain.Client())
 	if err != nil {
 		return nil, err
 	}

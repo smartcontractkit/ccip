@@ -9,7 +9,6 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/smartcontractkit/chainlink-env/environment"
 
-	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/chainlink-env/chaos"
 	a "github.com/smartcontractkit/chainlink-env/pkg/alias"
 
@@ -24,7 +23,6 @@ var _ = Describe("CCIP chaos test @chaos-ccip", Ordered, func() {
 		source           *actions.SourceCCIPModule
 		dest             *actions.DestCCIPModule
 		testSetup        actions.CCIPTestEnv
-		totalReq         = 20
 	)
 
 	AfterAll(func() {
@@ -54,7 +52,6 @@ var _ = Describe("CCIP chaos test @chaos-ccip", Ordered, func() {
 					},
 				},
 			}, numOfCommitNodes, false)
-		actions.CreateAndFundSubscription(*source, *dest, big.NewInt(0).Mul(big.NewInt(100), big.NewInt(1e18)), int64(totalReq))
 	})
 
 	Describe("CCIP chaos @chaos-ccip-ocr", func() {
@@ -93,9 +90,8 @@ var _ = Describe("CCIP chaos test @chaos-ccip", Ordered, func() {
 					big.NewInt(2.3e18),
 				),
 			}
-			numOfSubRequests = 5
-			chaosId          string
-			err              error
+			chaosId string
+			err     error
 		)
 		AfterEach(func() {
 			if chaosId != "" {
@@ -110,19 +106,10 @@ var _ = Describe("CCIP chaos test @chaos-ccip", Ordered, func() {
 			subCost *big.Int,
 		) {
 			testSetup.ChaosLabel()
-			cTest := actions.NewCCIPTest(source, dest, big.NewInt(0).Mul(big.NewInt(10), big.NewInt(1e18)), subCost, 1*time.Minute)
+			actions.NewCCIPTest(source, dest, time.Minute)
 			// apply chaos
 			chaosId, err = testEnvironment.Chaos.Run(chaosFunc(testEnvironment.Cfg.Namespace, chaosProps))
 			Expect(err).ShouldNot(HaveOccurred())
-			// Send the ccip-request while the chaos is at play
-			cTest.SendSubRequests(numOfSubRequests, false)
-			if waitForChaosRecovery {
-				// wait for chaos to be recovered before further validation
-				testEnvironment.Chaos.WaitForAllRecovered(chaosId)
-			} else {
-				log.Info().Msg("proceeding without waiting for chaos recovery")
-			}
-			cTest.ValidateSubRequests()
 		},
 			testScenarios,
 		)

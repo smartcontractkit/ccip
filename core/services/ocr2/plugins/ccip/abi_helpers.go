@@ -8,9 +8,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_subscription_onramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
 	"github.com/smartcontractkit/chainlink/core/utils"
 )
@@ -18,7 +17,6 @@ import (
 var (
 	// offset || sourceChainID || seqNum || ...
 	CCIPTollSendRequested common.Hash
-	CCIPSubSendRequested  common.Hash
 	// merkleRoot || minSeqNum || maxSeqNum
 	ReportAccepted common.Hash
 	// sig || SeqNum || ...
@@ -28,7 +26,7 @@ var (
 
 // Zero indexed
 const (
-	SendRequestedSequenceNumberIndex             = 2 // Valid for both toll and sub
+	SendRequestedSequenceNumberIndex             = 2 // Valid for toll
 	ReportAcceptedMinSequenceNumberIndex         = 1
 	ReportAcceptedMaxSequenceNumberIndex         = 2
 	CrossChainMessageExecutedSequenceNumberIndex = 1
@@ -56,11 +54,7 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	subOnRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_subscription_onramp.EVM2EVMSubscriptionOnRampABI))
-	if err != nil {
-		panic(err)
-	}
-	offRampABI, err := abi.JSON(strings.NewReader(any_2_evm_toll_offramp.EVM2EVMTollOffRampABI))
+	offRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_toll_offramp.EVM2EVMTollOffRampABI))
 	if err != nil {
 		panic(err)
 	}
@@ -69,7 +63,6 @@ func init() {
 		panic(err)
 	}
 	CCIPTollSendRequested = getIDOrPanic("CCIPSendRequested", tollOnRampABI)
-	CCIPSubSendRequested = getIDOrPanic("CCIPSendRequested", subOnRampABI)
 	ReportAccepted = getIDOrPanic("ReportAccepted", commitStoreABI)
 	ExecutionStateChanged = getIDOrPanic("ExecutionStateChanged", offRampABI)
 	ConfigSet = getIDOrPanic("ConfigSet", commitStoreABI)
@@ -131,53 +124,6 @@ func DecodeCCIPMessage(b []byte) (*evm_2_evm_toll_onramp.CCIPEVM2EVMTollMessage,
 	}, nil
 }
 
-func DecodeCCIPSubMessage(b []byte) (*evm_2_evm_subscription_onramp.CCIPEVM2EVMSubscriptionMessage, error) {
-	unpacked, err := MakeSubscriptionCCIPMsgArgs().Unpack(b)
-	if err != nil {
-		return nil, err
-	}
-	if len(unpacked) == 0 {
-		return nil, fmt.Errorf("no message found when unpacking")
-	}
-	// Note must use unnamed type here
-	receivedCp, ok := unpacked[0].(struct {
-		SourceChainId    *big.Int       `json:"sourceChainId"`
-		SequenceNumber   uint64         `json:"sequenceNumber"`
-		Sender           common.Address `json:"sender"`
-		Receiver         common.Address `json:"receiver"`
-		Nonce            uint64         `json:"nonce"`
-		Data             []byte         `json:"data"`
-		TokensAndAmounts []struct {
-			Token  common.Address `json:"token"`
-			Amount *big.Int       `json:"amount"`
-		} `json:"tokensAndAmounts"`
-		GasLimit *big.Int `json:"gasLimit"`
-	})
-	if !ok {
-		return nil, fmt.Errorf("invalid format have %T want %T", unpacked[0], receivedCp)
-	}
-
-	var tokensAndAmounts []evm_2_evm_subscription_onramp.CCIPEVMTokenAndAmount
-
-	for _, tokenAndAmount := range receivedCp.TokensAndAmounts {
-		tokensAndAmounts = append(tokensAndAmounts, evm_2_evm_subscription_onramp.CCIPEVMTokenAndAmount{
-			Token:  tokenAndAmount.Token,
-			Amount: tokenAndAmount.Amount,
-		})
-	}
-
-	return &evm_2_evm_subscription_onramp.CCIPEVM2EVMSubscriptionMessage{
-		SourceChainId:    receivedCp.SourceChainId,
-		SequenceNumber:   receivedCp.SequenceNumber,
-		Sender:           receivedCp.Sender,
-		Receiver:         receivedCp.Receiver,
-		Nonce:            receivedCp.Nonce,
-		Data:             receivedCp.Data,
-		TokensAndAmounts: tokensAndAmounts,
-		GasLimit:         receivedCp.GasLimit,
-	}, nil
-}
-
 // MakeTollCCIPMsgArgs is a static function that always returns the abi.Arguments
 // for a CCIP message.
 func MakeTollCCIPMsgArgs() abi.Arguments {
@@ -219,59 +165,6 @@ func MakeTollCCIPMsgArgs() abi.Arguments {
 		{
 			Name: "feeTokenAndAmount",
 			Type: "tuple",
-			Components: []abi.ArgumentMarshaling{
-				{
-					Name: "token",
-					Type: "address",
-				},
-				{
-					Name: "amount",
-					Type: "uint256",
-				},
-			},
-		},
-		{
-			Name: "gasLimit",
-			Type: "uint256",
-		},
-	}
-	ty, _ := abi.NewType("tuple", "", tuples)
-	return abi.Arguments{
-		{
-			Type: ty,
-		},
-	}
-}
-
-func MakeSubscriptionCCIPMsgArgs() abi.Arguments {
-	var tuples = []abi.ArgumentMarshaling{
-		{
-			Name: "sourceChainId",
-			Type: "uint256",
-		},
-		{
-			Name: "sequenceNumber",
-			Type: "uint64",
-		},
-		{
-			Name: "sender",
-			Type: "address",
-		},
-		{
-			Name: "receiver",
-			Type: "address",
-		},
-		{
-			Name: "nonce",
-			Type: "uint64",
-		},
-		{
-			Name: "data",
-			Type: "bytes",
-		},
-		{
-			Name: "tokensAndAmounts",
-			Type: "tuple[]",
 			Components: []abi.ArgumentMarshaling{
 				{
 					Name: "token",

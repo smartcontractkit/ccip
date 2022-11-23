@@ -43,8 +43,7 @@ type EVMChainConfig struct {
 	LinkToken   gethcommon.Address
 
 	SupportedTokens map[gethcommon.Address]EVMBridgedToken
-	OnRampRouter    gethcommon.Address
-	OffRampRouter   gethcommon.Address
+	Router          gethcommon.Address
 	Afn             gethcommon.Address
 }
 
@@ -143,7 +142,7 @@ PingPongDapp:   common.HexToAddress("%s"),
 		source.ChainConfig.LinkToken,
 		source.ChainConfig.SupportedTokens,
 		source.LaneConfig.OnRamp,
-		source.ChainConfig.OnRampRouter,
+		source.ChainConfig.Router,
 		source.LaneConfig.TokenSender,
 		source.ChainConfig.Afn,
 		source.LaneConfig.GovernanceDapp,
@@ -155,8 +154,7 @@ Destination chain config
 LinkToken:       common.HexToAddress("%s"),
 BridgeTokens:    %+v,
 OffRamp:         common.HexToAddress("%s"),
-OffRampRouter:   common.HexToAddress("%s"),
-CommitStore:    common.HexToAddress("%s"),	
+CommitStore:     common.HexToAddress("%s"),	
 MessageReceiver: common.HexToAddress("%s"),
 ReceiverDapp:    common.HexToAddress("%s"),
 Afn:             common.HexToAddress("%s"),
@@ -166,7 +164,6 @@ PingPongDapp:    common.HexToAddress("%s"),
 		destination.ChainConfig.LinkToken,
 		destination.ChainConfig.SupportedTokens,
 		destination.LaneConfig.OffRamp,
-		destination.ChainConfig.OffRampRouter,
 		destination.LaneConfig.CommitStore,
 		destination.LaneConfig.MessageReceiver,
 		destination.LaneConfig.ReceiverDapp,

@@ -143,8 +143,6 @@ func (node *Node) AddBootstrapJob(t *testing.T, spec string) {
 type CCIPJobSpec struct {
 	TollOffRamp              common.Address
 	TollOnRamp               common.Address
-	SubOffRamp               common.Address
-	SubOnRamp                common.Address
 	CommitStore              common.Address
 	SourceChainId            *big.Int
 	DestChainId              *big.Int
@@ -165,7 +163,7 @@ contractConfigConfirmations = 1
 contractConfigTrackerPollInterval = "1s"
 
 [pluginConfig]
-onRampIDs           = ["%s", "%s"]
+onRampIDs           = ["%s"]
 sourceChainID       = %s
 destChainID         = %s
 pollPeriod          = "1s"
@@ -176,7 +174,7 @@ chainID             = %s
 
 `, jobName, spec.CommitStore,
 		node.KeyBundle.ID(), node.Transmitter,
-		spec.TollOnRamp, spec.SubOnRamp,
+		spec.TollOnRamp,
 		spec.SourceChainId, spec.DestChainId,
 		configBlock, spec.DestChainId,
 	))
@@ -218,10 +216,6 @@ chainID             = %s
 
 func (spec CCIPJobSpec) AddCCIPTollExecutionJob(t *testing.T, jobName string, node Node, configBlock int64) {
 	node.AddJob(t, spec.ExecJobSpec(jobName, spec.TollOffRamp, spec.TollOnRamp, node, configBlock))
-}
-
-func (spec CCIPJobSpec) AddCCIPSubExecutionJob(t *testing.T, jobName string, node Node, configBlock int64) {
-	node.AddJob(t, spec.ExecJobSpec(jobName, spec.SubOffRamp, spec.SubOnRamp, node, configBlock))
 }
 
 func SetupNodeCCIP(

@@ -12,10 +12,6 @@ contract SimpleMessageReceiver is Any2EVMMessageReceiverInterface {
     s_manager = msg.sender;
   }
 
-  function getSubscriptionManager() external view returns (address) {
-    return s_manager;
-  }
-
   function ccipReceive(CCIP.Any2EVMMessage calldata) external override {
     emit MessageReceived();
   }

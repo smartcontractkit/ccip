@@ -20,11 +20,6 @@ contract ExposedNoCancelVRFCoordinatorV2 is NoCancelVRFCoordinatorV2 {
     uint32 fulfillmentFlatFeeLinkPPM,
     uint256 weiPerUnitGas
   ) external returns (uint96) {
-    return calculatePaymentAmount(
-      gasleft(),
-      gasAfterPaymentCalculation,
-      fulfillmentFlatFeeLinkPPM,
-      weiPerUnitGas
-    );
+    return calculatePaymentAmount(gasleft(), gasAfterPaymentCalculation, fulfillmentFlatFeeLinkPPM, weiPerUnitGas);
   }
 }

@@ -16,10 +16,6 @@ contract MaybeRevertMessageReceiver is Any2EVMMessageReceiverInterface {
     s_toRevert = toRevert;
   }
 
-  function getSubscriptionManager() external view returns (address) {
-    return s_manager;
-  }
-
   function ccipReceive(CCIP.Any2EVMMessage calldata) external override {
     if (s_toRevert) {
       revert();
