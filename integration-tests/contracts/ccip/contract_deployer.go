@@ -146,11 +146,11 @@ func (e *CCIPContractsDeployer) DeployTollOffRamp(
 		return any_2_evm_toll_offramp.DeployEVM2EVMTollOffRamp(
 			auth, backend, sourceChainId, destChainId,
 			any_2_evm_toll_offramp.BaseOffRampInterfaceOffRampConfig{
-				OnRampAddress:         onRamp,
 				ExecutionDelaySeconds: 0,
 				MaxDataSize:           1e12,
 				MaxTokensLength:       15,
 			},
+			onRamp,
 			commitStore,
 			afn,
 			sourceToken,
@@ -216,7 +216,6 @@ func (e *CCIPContractsDeployer) DeploySubOffRamp(
 	opts RateLimiterConfig,
 	offRampConfig any_2_evm_subscription_offramp.BaseOffRampInterfaceOffRampConfig,
 ) (*SubOffRamp, error) {
-	offRampConfig.OnRampAddress = onRamp
 	address, _, instance, err := e.evmClient.DeployContract("Sub OffRamp Contract", func(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
@@ -224,6 +223,7 @@ func (e *CCIPContractsDeployer) DeploySubOffRamp(
 		return any_2_evm_subscription_offramp.DeployEVM2EVMSubscriptionOffRamp(
 			auth, backend, sourceChainId, destChainId,
 			offRampConfig,
+			onRamp,
 			commitStore,
 			afn,
 			sourceToken,

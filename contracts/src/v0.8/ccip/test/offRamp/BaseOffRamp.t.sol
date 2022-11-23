@@ -20,7 +20,7 @@ contract BaseOffRampSetup is TokenSetup {
     s_offRamp = new BaseOffRampHelper(
       SOURCE_CHAIN_ID,
       DEST_CHAIN_ID,
-      offRampConfig(),
+      ON_RAMP_ADDRESS,
       s_mockCommitStore,
       s_afn,
       getCastedSourceTokens(),
@@ -57,8 +57,6 @@ contract BaseOffRamp_constructor is BaseOffRampSetup {
     (uint256 source, uint256 dest) = s_offRamp.getChainIDs();
     assertEq(SOURCE_CHAIN_ID, source);
     assertEq(DEST_CHAIN_ID, dest);
-
-    assertSameConfig(offRampConfig(), s_offRamp.getConfig());
   }
 
   // Revert
@@ -71,7 +69,7 @@ contract BaseOffRamp_constructor is BaseOffRampSetup {
     s_offRamp = new BaseOffRampHelper(
       SOURCE_CHAIN_ID,
       DEST_CHAIN_ID,
-      offRampConfig(),
+      ON_RAMP_ADDRESS,
       s_mockCommitStore,
       s_afn,
       wrongTokens,
@@ -88,16 +86,13 @@ contract BaseOffRamp_constructor is BaseOffRampSetup {
 
     vm.expectRevert(BaseOffRampInterface.ZeroAddressNotAllowed.selector);
 
-    BaseOffRampInterface.OffRampConfig memory offRampConfig = offRampConfig();
-    offRampConfig.onRampAddress = ZERO_ADDRESS;
-
     AggregateRateLimiterInterface.RateLimiterConfig memory rateLimiterConfig = AggregateRateLimiterInterface
       .RateLimiterConfig({rate: 1e20, capacity: 1e20});
 
     s_offRamp = new BaseOffRampHelper(
       SOURCE_CHAIN_ID,
       DEST_CHAIN_ID,
-      offRampConfig,
+      ZERO_ADDRESS,
       s_mockCommitStore,
       s_afn,
       getCastedSourceTokens(),
@@ -144,47 +139,6 @@ contract BaseOffRamp_setCommitStore is BaseOffRampSetup {
     s_offRamp.setCommitStore(commitStore);
 
     assertEq(address(commitStore), address(s_offRamp.getCommitStore()));
-  }
-}
-
-/// @notice #getConfig
-contract BaseOffRamp_getConfig is BaseOffRampSetup {
-  // Success
-  function testSuccess() public {
-    assertSameConfig(offRampConfig(), s_offRamp.getConfig());
-  }
-}
-
-/// @notice #setConfig
-contract BaseOffRamp_setConfig is BaseOffRampSetup {
-  // Success
-  function testSuccess() public {
-    BaseOffRampInterface.OffRampConfig memory newConfig = generateNewConfig();
-
-    vm.expectEmit(false, false, false, true);
-    emit OffRampConfigSet(newConfig);
-
-    s_offRamp.setConfig(newConfig);
-
-    assertSameConfig(newConfig, s_offRamp.getConfig());
-  }
-
-  // Revert
-  function testOnlyOwnerReverts() public {
-    vm.stopPrank();
-    vm.expectRevert("Only callable by owner");
-    s_offRamp.setConfig(offRampConfig());
-  }
-
-  function generateNewConfig() internal pure returns (BaseOffRampInterface.OffRampConfig memory) {
-    return
-      BaseOffRampInterface.OffRampConfig({
-        onRampAddress: address(123),
-        executionDelaySeconds: 20,
-        maxDataSize: 1,
-        maxTokensLength: 15,
-        permissionLessExecutionThresholdSeconds: 200
-      });
   }
 }
 

@@ -129,5 +129,11 @@ $SCRIPTPATH/native_solc8_15_compile_ccip ccip/applications/SubscriptionSenderDap
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/applications/GovernanceDapp.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/applications/PingPongDemo.sol
 
+
+#GE
+$SCRIPTPATH/native_solc8_15_compile_ccip ccip/onRamp/ge/EVM2EVMGEOnRamp.sol
+$SCRIPTPATH/native_solc8_15_compile_ccip ccip/offRamp/ge/EVM2EVMGEOffRamp.sol
+$SCRIPTPATH/native_solc8_15_compile_ccip ccip/router/GERouter.sol
+
 ## Temp
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/offRamp/subscription/EVM2EVMFreeOffRamp.sol

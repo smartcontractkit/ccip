@@ -35,9 +35,9 @@ contract E2E_toll is EVM2EVMTollOnRampSetup, CommitStoreSetup, EVM2EVMTollOffRam
     uint256 balance1Pre = token1.balanceOf(OWNER);
 
     CCIP.EVM2EVMTollMessage[] memory messages = new CCIP.EVM2EVMTollMessage[](3);
-    messages[0] = parseEventToDestChainMessage(sendRequest(1));
-    messages[1] = parseEventToDestChainMessage(sendRequest(2));
-    messages[2] = parseEventToDestChainMessage(sendRequest(3));
+    messages[0] = sendRequest(1);
+    messages[1] = sendRequest(2);
+    messages[2] = sendRequest(3);
 
     // Asserts that the tokens have been sent and the fee has been paid.
     assertEq(
@@ -110,23 +110,5 @@ contract E2E_toll is EVM2EVMTollOnRampSetup, CommitStoreSetup, EVM2EVMTollOffRam
     s_onRampRouter.ccipSend(DEST_CHAIN_ID, message);
 
     return tollEvent;
-  }
-
-  function parseEventToDestChainMessage(CCIP.EVM2EVMTollMessage memory sendEvent)
-    public
-    pure
-    returns (CCIP.EVM2EVMTollMessage memory)
-  {
-    return
-      CCIP.EVM2EVMTollMessage({
-        sourceChainId: sendEvent.sourceChainId,
-        sequenceNumber: sendEvent.sequenceNumber,
-        sender: sendEvent.sender,
-        receiver: sendEvent.receiver,
-        data: sendEvent.data,
-        tokensAndAmounts: sendEvent.tokensAndAmounts,
-        feeTokenAndAmount: sendEvent.feeTokenAndAmount,
-        gasLimit: sendEvent.gasLimit
-      });
   }
 }

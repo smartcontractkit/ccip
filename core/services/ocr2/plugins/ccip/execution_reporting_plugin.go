@@ -62,6 +62,7 @@ func EncodeExecutionReport(seqNums []uint64, tokensPerFeeCoin map[common.Address
 	}
 	report, err := makeExecutionReportArgs().PackValues([]interface{}{&any_2_evm_toll_offramp.CCIPExecutionReport{
 		SequenceNumbers:          seqNums,
+		FeeUpdates:               []any_2_evm_toll_offramp.CCIPFeeUpdate{},
 		EncodedMessages:          msgs,
 		TokenPerFeeCoinAddresses: tokensPerFeeCoinAddresses,
 		TokenPerFeeCoin:          tokensPerFeeCoinValues,
@@ -90,11 +91,15 @@ func DecodeExecutionReport(report types.Report) (*any_2_evm_toll_offramp.CCIPExe
 		SequenceNumbers          []uint64         `json:"sequenceNumbers"`
 		TokenPerFeeCoinAddresses []common.Address `json:"tokenPerFeeCoinAddresses"`
 		TokenPerFeeCoin          []*big.Int       `json:"tokenPerFeeCoin"`
-		EncodedMessages          [][]byte         `json:"encodedMessages"`
-		InnerProofs              [][32]uint8      `json:"innerProofs"`
-		InnerProofFlagBits       *big.Int         `json:"innerProofFlagBits"`
-		OuterProofs              [][32]uint8      `json:"outerProofs"`
-		OuterProofFlagBits       *big.Int         `json:"outerProofFlagBits"`
+		FeeUpdates               []struct {
+			ChainId  *big.Int `json:"chainId"`
+			GasPrice *big.Int `json:"gasPrice"`
+		} `json:"feeUpdates"`
+		EncodedMessages    [][]byte    `json:"encodedMessages"`
+		InnerProofs        [][32]uint8 `json:"innerProofs"`
+		InnerProofFlagBits *big.Int    `json:"innerProofFlagBits"`
+		OuterProofs        [][32]uint8 `json:"outerProofs"`
+		OuterProofFlagBits *big.Int    `json:"outerProofFlagBits"`
 	})
 	if !ok {
 		return nil, fmt.Errorf("got %T", unpacked[0])
@@ -106,6 +111,15 @@ func DecodeExecutionReport(report types.Report) (*any_2_evm_toll_offramp.CCIPExe
 	er.EncodedMessages = append(er.EncodedMessages, erStruct.EncodedMessages...)
 	er.InnerProofs = append(er.InnerProofs, erStruct.InnerProofs...)
 	er.OuterProofs = append(er.OuterProofs, erStruct.OuterProofs...)
+
+	er.FeeUpdates = []any_2_evm_toll_offramp.CCIPFeeUpdate{}
+
+	for _, feeUpdate := range erStruct.FeeUpdates {
+		er.FeeUpdates = append(er.FeeUpdates, any_2_evm_toll_offramp.CCIPFeeUpdate{
+			ChainId:  feeUpdate.ChainId,
+			GasPrice: feeUpdate.GasPrice,
+		})
+	}
 
 	er.SequenceNumbers = erStruct.SequenceNumbers
 	// Unpack will populate with big.Int{false, <allocated empty nat>} for 0 values,

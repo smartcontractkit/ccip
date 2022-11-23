@@ -111,6 +111,10 @@ package gethwrappers
 // Temp
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2EVMFreeOffRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMFreeOffRamp.bin EVM2EVMFreeOffRamp any_2_evm_free_offramp
 
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2EVMGEOnRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMGEOnRamp.bin EVM2EVMGEOnRamp evm_2_evm_ge_onramp
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2EVMGEOffRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMGEOffRamp.bin EVM2EVMGEOffRamp evm_2_evm_ge_offramp
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/GERouter.abi ../../contracts/solc/v0.8.15/GERouter.bin GERouter ge_router
+
 // To run these commands, you must either install docker, or the correct version
 // of abigen. The latter can be installed with these commands, at least on linux:
 //

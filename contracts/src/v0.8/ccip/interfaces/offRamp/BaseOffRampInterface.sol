@@ -30,8 +30,6 @@ interface BaseOffRampInterface {
   event OffRampConfigSet(OffRampConfig config);
 
   struct OffRampConfig {
-    // On ramp address on the source chain
-    address onRampAddress;
     // The waiting time before manual execution is enabled
     uint32 permissionLessExecutionThresholdSeconds;
     // execution delay in seconds
@@ -77,14 +75,4 @@ interface BaseOffRampInterface {
    * @param commitStore The new commitStore
    */
   function setCommitStore(CommitStoreInterface commitStore) external;
-
-  /**
-   * @notice Returns the current config.
-   */
-  function getConfig() external view returns (OffRampConfig memory);
-
-  /**
-   * @notice Sets a new config.
-   */
-  function setConfig(OffRampConfig memory config) external;
 }

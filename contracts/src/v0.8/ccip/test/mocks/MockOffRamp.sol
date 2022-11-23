@@ -59,9 +59,7 @@ contract MockOffRamp is BaseOffRampInterface {
   /// @inheritdoc BaseOffRampInterface
   function setCommitStore(CommitStoreInterface commitStore) public pure {}
 
-  /// @inheritdoc BaseOffRampInterface
   function getConfig() public pure returns (OffRampConfig memory config) {}
 
-  /// @inheritdoc BaseOffRampInterface
   function setConfig(OffRampConfig memory config) public {}
 }

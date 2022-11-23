@@ -183,7 +183,7 @@ func (c *CCIPE2ELoad) Call(msgType interface{}) client.CallResult {
 		})
 	}
 
-	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(100_000))
+	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(100_000), false)
 	Expect(err).ShouldNot(HaveOccurred(), "Failed encoding the options field")
 
 	// form the message for transfer

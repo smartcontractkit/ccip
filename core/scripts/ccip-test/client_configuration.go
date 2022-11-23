@@ -319,7 +319,7 @@ func (client *CCIPClient) SendMessage(t *testing.T) {
 		Token:  client.Source.LinkTokenAddress,
 		Amount: big.NewInt(1),
 	}
-	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(3e5))
+	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(3e5), false)
 	require.NoError(t, err)
 
 	msg := evm_2_any_subscription_onramp_router.CCIPEVM2AnySubscriptionMessage{
@@ -734,7 +734,7 @@ func (client *CCIPClient) SendToDappWithExecution(t *testing.T, source SourceCli
 		Token:  client.Source.LinkTokenAddress,
 		Amount: amount,
 	}
-	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(100_000))
+	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(100_000), false)
 	helpers.PanicErr(err)
 
 	tx, err := source.SenderDapp.SendMessage(from, subscription_sender_dapp.CCIPEVM2AnySubscriptionMessage{
@@ -755,7 +755,7 @@ func (client *CCIPClient) SendToOnrampWithExecution(t *testing.T, source SourceC
 	senderAndReceiver, err := utils.ABIEncode(`[{"type":"address"}, {"type":"address"}]`, source.Owner.From, source.Owner.From)
 	helpers.PanicErr(err)
 
-	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(3e5))
+	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(3e5), false)
 	helpers.PanicErr(err)
 
 	payload := evm_2_any_subscription_onramp_router.CCIPEVM2AnySubscriptionMessage{

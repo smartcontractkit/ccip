@@ -33,6 +33,7 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
       SOURCE_CHAIN_ID,
       DEST_CHAIN_ID,
       offRampConfig(),
+      ON_RAMP_ADDRESS,
       commitStore,
       s_afn,
       getCastedSourceTokens(),
@@ -163,6 +164,8 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
     uint256[] memory tokenPerFeeCoin = new uint256[](1);
     tokenPerFeeCoin[0] = TOKENS_PER_FEE_COIN;
 
+    CCIP.FeeUpdate[] memory feeUpdates = new CCIP.FeeUpdate[](0);
+
     return
       CCIP.ExecutionReport({
         sequenceNumbers: sequenceNumbers,
@@ -172,7 +175,8 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
         outerProofFlagBits: 2**256 - 1,
         encodedMessages: encodedMessages,
         tokenPerFeeCoinAddresses: tokenPerFeeCoinAddresses,
-        tokenPerFeeCoin: tokenPerFeeCoin
+        tokenPerFeeCoin: tokenPerFeeCoin,
+        feeUpdates: feeUpdates
       });
   }
 }

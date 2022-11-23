@@ -23,10 +23,14 @@ contract EVM2EVMSubscriptionOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR
 
   mapping(address => uint64) internal s_receiverToNonce;
 
+  // The on chain offRamp configuration values
+  OffRampConfig internal s_config;
+
   constructor(
     uint256 sourceChainId,
     uint256 chainId,
     OffRampConfig memory offRampConfig,
+    address onRampAddress,
     CommitStoreInterface commitStore,
     AFNInterface afn,
     IERC20[] memory sourceTokens,
@@ -38,7 +42,7 @@ contract EVM2EVMSubscriptionOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR
     BaseOffRamp(
       sourceChainId,
       chainId,
-      offRampConfig,
+      onRampAddress,
       commitStore,
       afn,
       sourceTokens,
@@ -46,11 +50,23 @@ contract EVM2EVMSubscriptionOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR
       rateLimiterConfig,
       tokenLimitsAdmin
     )
-  {}
+  {
+    s_config = offRampConfig;
+  }
 
   /// @inheritdoc BaseOffRamp
   function manuallyExecute(CCIP.ExecutionReport memory report) external override {
     _execute(report, true);
+  }
+
+  function getConfig() external view returns (OffRampConfig memory) {
+    return s_config;
+  }
+
+  function setConfig(OffRampConfig memory config) external onlyOwner {
+    s_config = config;
+
+    emit OffRampConfigSet(config);
   }
 
   function _execute(CCIP.ExecutionReport memory report, bool manualExecution) internal whenNotPaused whenHealthy {

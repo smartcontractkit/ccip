@@ -231,12 +231,12 @@ func deployOffRamp(t *testing.T, destClient *EvmDeploymentConfig, sourceClient *
 		sourceClient.ChainConfig.ChainId,
 		destClient.ChainConfig.ChainId,
 		any_2_evm_free_offramp.BaseOffRampInterfaceOffRampConfig{
-			OnRampAddress:                           sourceClient.LaneConfig.OnRamp,
 			ExecutionDelaySeconds:                   60,
 			MaxDataSize:                             1e5,
 			MaxTokensLength:                         15,
 			PermissionLessExecutionThresholdSeconds: 60,
 		},
+		sourceClient.LaneConfig.OnRamp,
 		destClient.LaneConfig.CommitStore,
 		destClient.ChainConfig.Afn,
 		sourceTokens,

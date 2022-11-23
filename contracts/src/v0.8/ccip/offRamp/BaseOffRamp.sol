@@ -20,15 +20,14 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry, 
   uint256 internal immutable i_sourceChainId;
   // Chain ID of this chain
   uint256 internal immutable i_chainId;
+  // OnRamp address on the source chain
+  address internal immutable i_onRampAddress;
 
   // The router through which all transactions will be executed
   Any2EVMOffRampRouterInterface internal s_router;
 
   // The commitStore contract
   CommitStoreInterface internal s_commitStore;
-
-  // The on chain offRamp configuration values
-  OffRampConfig internal s_config;
 
   uint256 internal constant EXTERNAL_CALL_OVERHEAD_GAS = 2600;
   uint256 internal constant RATE_LIMITER_OVERHEAD_GAS = (2_100 + 5_000); // COLD_SLOAD_COST for accessing token bucket // SSTORE_RESET_GAS for updating & decreasing token bucket
@@ -50,7 +49,7 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry, 
   constructor(
     uint256 sourceChainId,
     uint256 chainId,
-    OffRampConfig memory offRampConfig,
+    address onRampAddress,
     CommitStoreInterface commitStore,
     AFNInterface afn,
     IERC20[] memory sourceTokens,
@@ -62,11 +61,11 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry, 
     TokenPoolRegistry(sourceTokens, pools)
     AggregateRateLimiter(rateLimiterConfig, tokenLimitsAdmin)
   {
-    if (offRampConfig.onRampAddress == address(0)) revert ZeroAddressNotAllowed();
+    if (onRampAddress == address(0)) revert ZeroAddressNotAllowed();
     // TokenPoolRegistry does a check on tokensAndAmounts.length != pools.length
     i_sourceChainId = sourceChainId;
     i_chainId = chainId;
-    s_config = offRampConfig;
+    i_onRampAddress = onRampAddress;
     s_commitStore = commitStore;
   }
 
@@ -197,19 +196,6 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry, 
     s_commitStore = commitStore;
   }
 
-  /// @inheritdoc BaseOffRampInterface
-  function getConfig() external view returns (OffRampConfig memory) {
-    return s_config;
-  }
-
-  /// @inheritdoc BaseOffRampInterface
-  function setConfig(OffRampConfig memory config) external onlyOwner {
-    if (config.onRampAddress == address(0)) revert ZeroAddressNotAllowed();
-    s_config = config;
-
-    emit OffRampConfigSet(config);
-  }
-
   function getChainIDs() external view returns (uint256 sourceChainId, uint256 chainId) {
     sourceChainId = i_sourceChainId;
     chainId = i_chainId;
@@ -224,6 +210,6 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry, 
   }
 
   function _metadataHash(bytes32 prefix) internal view returns (bytes32) {
-    return keccak256(abi.encode(prefix, i_sourceChainId, i_chainId, s_config.onRampAddress));
+    return keccak256(abi.encode(prefix, i_sourceChainId, i_chainId, i_onRampAddress));
   }
 }

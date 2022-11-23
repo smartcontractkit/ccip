@@ -219,7 +219,7 @@ contract EVM2EVMSubscriptionOnRamp_forwardFromRouter is EVM2EVMSubscriptionOnRam
   // Asserts gasLimit must be <=20M
   function testMessageGasLimitTooHighReverts() public {
     CCIP.EVM2AnySubscriptionMessage memory message = _generateEmptyMessage();
-    message.extraArgs = CCIP.EVMExtraArgsV1({gasLimit: MAX_GAS_LIMIT + 1})._toBytes();
+    message.extraArgs = CCIP.EVMExtraArgsV1({gasLimit: MAX_GAS_LIMIT + 1, strict: false})._toBytes();
     vm.expectRevert(abi.encodeWithSelector(BaseOnRampInterface.MessageGasLimitTooHigh.selector));
     s_onRamp.forwardFromRouter(message, OWNER);
   }

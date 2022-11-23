@@ -70,7 +70,7 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
         data: "",
         tokensAndAmounts: tokensAndAmounts,
         feeTokenAndAmount: feeTokenAndAmount,
-        extraArgs: CCIP.EVMExtraArgsV1({gasLimit: GAS_LIMIT})._toBytes()
+        extraArgs: CCIP.EVMExtraArgsV1({gasLimit: GAS_LIMIT, strict: false})._toBytes()
       });
   }
 
@@ -84,7 +84,7 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
         data: "",
         tokensAndAmounts: tokensAndAmounts,
         feeTokenAndAmount: feeTokenAndAmount,
-        extraArgs: CCIP.EVMExtraArgsV1({gasLimit: GAS_LIMIT})._toBytes()
+        extraArgs: CCIP.EVMExtraArgsV1({gasLimit: GAS_LIMIT, strict: false})._toBytes()
       });
   }
 

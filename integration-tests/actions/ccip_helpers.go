@@ -402,7 +402,7 @@ func (sourceCCIP *SourceCCIPModule) SendSubRequest(receiver common.Address, toke
 	receiverAddr, err := utils.ABIEncode(`[{"type":"address"}]`, receiver)
 	Expect(err).ShouldNot(HaveOccurred(), "Failed encoding the receiver address")
 
-	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(100_000))
+	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(100_000), false)
 	Expect(err).ShouldNot(HaveOccurred(), "Failed encoding the options field")
 
 	// form the message for transfer
@@ -427,7 +427,7 @@ func (sourceCCIP *SourceCCIPModule) SendTollRequest(receiver common.Address, tok
 	receiverAddr, err := utils.ABIEncode(`[{"type":"address"}]`, receiver)
 	Expect(err).ShouldNot(HaveOccurred(), "Failed encoding the receiver address")
 
-	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(100_000))
+	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(100_000), false)
 	Expect(err).ShouldNot(HaveOccurred(), "Failed encoding the options field")
 
 	// form the message for transfer

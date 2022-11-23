@@ -6,7 +6,7 @@ contract BaseOffRampHelper is BaseOffRamp {
   constructor(
     uint256 sourceChainId,
     uint256 chainId,
-    OffRampConfig memory offRampConfig,
+    address onRampAddress,
     CommitStoreInterface commitStore,
     AFNInterface afn,
     IERC20[] memory sourceTokens,
@@ -17,7 +17,7 @@ contract BaseOffRampHelper is BaseOffRamp {
     BaseOffRamp(
       sourceChainId,
       chainId,
-      offRampConfig,
+      onRampAddress,
       commitStore,
       afn,
       sourceTokens,

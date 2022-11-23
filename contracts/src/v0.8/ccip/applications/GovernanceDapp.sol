@@ -64,7 +64,7 @@ contract GovernanceDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterf
         receiver: abi.encode(clone.contractAddress),
         data: data,
         tokensAndAmounts: new CCIP.EVMTokenAndAmount[](0),
-        extraArgs: CCIP.EVMExtraArgsV1({gasLimit: 3e5})._toBytes()
+        extraArgs: CCIP.EVMExtraArgsV1({gasLimit: 3e5, strict: false})._toBytes()
       });
       s_sendingRouter.ccipSend(clone.chainId, message);
       emit ConfigPropagated(clone.chainId, clone.contractAddress);

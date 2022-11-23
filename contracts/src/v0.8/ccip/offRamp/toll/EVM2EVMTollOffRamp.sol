@@ -32,10 +32,14 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
 
   mapping(uint256 => uint256) public feeTaken;
 
+  // The on chain offRamp configuration values
+  OffRampConfig internal s_config;
+
   constructor(
     uint256 sourceChainId,
     uint256 chainId,
     OffRampConfig memory offRampConfig,
+    address onRampAddress,
     CommitStoreInterface commitStore,
     AFNInterface afn,
     IERC20[] memory sourceTokens,
@@ -47,7 +51,7 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
     BaseOffRamp(
       sourceChainId,
       chainId,
-      offRampConfig,
+      onRampAddress,
       commitStore,
       afn,
       sourceTokens,
@@ -55,7 +59,9 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
       rateLimiterConfig,
       tokenLimitsAdmin
     )
-  {}
+  {
+    s_config = offRampConfig;
+  }
 
   /**
    * @notice Compute the overhead gas for a given message given its share of the merkle root verification costs.
@@ -123,6 +129,16 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
   /// @inheritdoc BaseOffRamp
   function manuallyExecute(CCIP.ExecutionReport memory report) external override {
     _execute(report, true);
+  }
+
+  function getConfig() external view returns (OffRampConfig memory) {
+    return s_config;
+  }
+
+  function setConfig(OffRampConfig memory config) external onlyOwner {
+    s_config = config;
+
+    emit OffRampConfigSet(config);
   }
 
   /**

@@ -30,9 +30,9 @@ contract E2E_subscription is EVM2EVMSubscriptionOnRampSetup, CommitStoreSetup, E
     uint256 subscriptionBalance = s_onRampRouter.getBalance(OWNER);
 
     CCIP.EVM2EVMSubscriptionMessage[] memory messages = new CCIP.EVM2EVMSubscriptionMessage[](3);
-    messages[0] = parseEventToDestChainMessage(sendRequest(_generateTokenMessage(), 1));
-    messages[1] = parseEventToDestChainMessage(sendRequest(_generateTokenMessage(), 2));
-    messages[2] = parseEventToDestChainMessage(sendRequest(_generateTokenMessage(), 3));
+    messages[0] = sendRequest(_generateTokenMessage(), 1);
+    messages[1] = sendRequest(_generateTokenMessage(), 2);
+    messages[2] = sendRequest(_generateTokenMessage(), 3);
 
     // Asserts that the tokens have been sent and the fee has been paid.
     assertEq(balance0Pre - messages.length * i_tokenAmount0, token0.balanceOf(OWNER));
@@ -46,9 +46,9 @@ contract E2E_subscription is EVM2EVMSubscriptionOnRampSetup, CommitStoreSetup, E
     uint256 subscriptionBalance = s_onRampRouter.getBalance(OWNER);
 
     CCIP.EVM2EVMSubscriptionMessage[] memory messages = new CCIP.EVM2EVMSubscriptionMessage[](3);
-    messages[0] = parseEventToDestChainMessage(sendRequest(_generateEmptyMessage(), 1));
-    messages[1] = parseEventToDestChainMessage(sendRequest(_generateEmptyMessage(), 2));
-    messages[2] = parseEventToDestChainMessage(sendRequest(_generateEmptyMessage(), 3));
+    messages[0] = sendRequest(_generateEmptyMessage(), 1);
+    messages[1] = sendRequest(_generateEmptyMessage(), 2);
+    messages[2] = sendRequest(_generateEmptyMessage(), 3);
 
     // Asserts that the tokens have been sent and the fee has been paid.
     assertEq(subscriptionBalance - messages.length * s_onRampRouter.getFee(), s_onRampRouter.getBalance(OWNER));
@@ -127,23 +127,5 @@ contract E2E_subscription is EVM2EVMSubscriptionOnRampSetup, CommitStoreSetup, E
     s_onRampRouter.ccipSend(DEST_CHAIN_ID, message);
 
     return subscriptionEvent;
-  }
-
-  function parseEventToDestChainMessage(CCIP.EVM2EVMSubscriptionMessage memory sendEvent)
-    public
-    pure
-    returns (CCIP.EVM2EVMSubscriptionMessage memory)
-  {
-    return
-      CCIP.EVM2EVMSubscriptionMessage({
-        sourceChainId: sendEvent.sourceChainId,
-        sequenceNumber: sendEvent.sequenceNumber,
-        sender: sendEvent.sender,
-        receiver: sendEvent.receiver,
-        nonce: sendEvent.nonce,
-        data: sendEvent.data,
-        tokensAndAmounts: sendEvent.tokensAndAmounts,
-        gasLimit: sendEvent.gasLimit
-      });
   }
 }

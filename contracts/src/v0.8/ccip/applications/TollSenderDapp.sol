@@ -61,7 +61,7 @@ contract TollSenderDapp is TypeAndVersionInterface {
         data: abi.encode(msg.sender, destinationAddress),
         tokensAndAmounts: tokensAndAmounts,
         feeTokenAndAmount: tokensAndAmounts[0],
-        extraArgs: CCIP.EVMExtraArgsV1({gasLimit: 3e5})._toBytes()
+        extraArgs: CCIP.EVMExtraArgsV1({gasLimit: 3e5, strict: false})._toBytes()
       })
     );
   }

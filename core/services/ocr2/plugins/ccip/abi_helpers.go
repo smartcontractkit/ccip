@@ -337,6 +337,20 @@ func makeExecutionReportArgs() abi.Arguments {
 					Type: "uint256[]",
 				},
 				{
+					Name: "feeUpdates",
+					Type: "tuple[]",
+					Components: []abi.ArgumentMarshaling{
+						{
+							Name: "chainId",
+							Type: "uint256",
+						},
+						{
+							Name: "gasPrice",
+							Type: "uint256",
+						},
+					},
+				},
+				{
 					Name: "encodedMessages",
 					Type: "bytes[]",
 				},

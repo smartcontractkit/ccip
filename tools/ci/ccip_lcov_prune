@@ -4,6 +4,7 @@ set -e
 
 lcov --remove $1 -o $2 \
   '*/ccip/test/*' \
+  'src/v0.8/ccip/ocr/*' \
   'src/v0.8/ConfirmedOwnerWithProposal.sol' \
   'src/v0.8/tests/MockV3Aggregator.sol' \
   'src/v0.8/vendor/Address.sol' \

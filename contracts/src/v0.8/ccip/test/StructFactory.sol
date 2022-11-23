@@ -71,7 +71,6 @@ contract StructFactory {
   function offRampConfig() internal pure returns (BaseOffRampInterface.OffRampConfig memory) {
     return
       BaseOffRampInterface.OffRampConfig({
-        onRampAddress: ON_RAMP_ADDRESS,
         executionDelaySeconds: EXECUTION_DELAY_SECONDS,
         maxDataSize: MAX_DATA_SIZE,
         maxTokensLength: MAX_TOKENS_LENGTH,

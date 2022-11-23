@@ -8,9 +8,9 @@ contract ExtraArgs__toBytes is BaseTest {
   using CCIP for CCIP.EVMExtraArgsV1;
 
   function testSuccess() public {
-    CCIP.EVMExtraArgsV1 memory extraArgs = CCIP.EVMExtraArgsV1({gasLimit: 100});
+    CCIP.EVMExtraArgsV1 memory extraArgs = CCIP.EVMExtraArgsV1({gasLimit: 100, strict: false});
 
-    bytes memory expected = bytes.concat(CCIP.EVM_EXTRA_ARGS_V1_TAG, abi.encode(extraArgs.gasLimit));
+    bytes memory expected = bytes.concat(CCIP.EVM_EXTRA_ARGS_V1_TAG, abi.encode(extraArgs.gasLimit, extraArgs.strict));
     assertEq(expected, extraArgs._toBytes());
   }
 
@@ -24,11 +24,12 @@ contract ExtraArgs_fromBytes is BaseTest {
   using CCIP for CCIP.EVMExtraArgsV1;
 
   function testSuccess() public {
-    CCIP.EVMExtraArgsV1 memory extraArgs = CCIP.EVMExtraArgsV1({gasLimit: 1234567});
+    CCIP.EVMExtraArgsV1 memory extraArgs = CCIP.EVMExtraArgsV1({gasLimit: 1234567, strict: false});
 
     CCIP.EVMExtraArgsV1 memory extraArgs2 = this.fromBytesHelper(extraArgs._toBytes());
 
     assertEq(extraArgs.gasLimit, extraArgs2.gasLimit);
+    assertEq(extraArgs.strict, extraArgs2.strict);
   }
 
   function testDefaultsSuccess() public {

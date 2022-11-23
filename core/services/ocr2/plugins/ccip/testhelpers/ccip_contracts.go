@@ -171,12 +171,12 @@ func (c *CCIPContracts) DeployNewTollOffRamp() {
 		c.SourceChainID,
 		c.DestChainID,
 		any_2_evm_toll_offramp.BaseOffRampInterfaceOffRampConfig{
-			OnRampAddress:                           c.TollOnRamp.Address(),
 			ExecutionDelaySeconds:                   60,
 			MaxDataSize:                             1e5,
 			MaxTokensLength:                         15,
 			PermissionLessExecutionThresholdSeconds: 60,
 		},
+		c.TollOnRamp.Address(),
 		c.CommitStore.Address(),
 		c.DestAFN.Address(),
 		[]common.Address{c.SourceLinkToken.Address()},
@@ -574,11 +574,11 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 		sourceChainID,
 		destChainID,
 		any_2_evm_toll_offramp.BaseOffRampInterfaceOffRampConfig{
-			OnRampAddress:         onRampAddress,
 			ExecutionDelaySeconds: 0,
 			MaxDataSize:           1e12,
 			MaxTokensLength:       5,
 		},
+		onRampAddress,
 		commitStore.Address(),
 		afnDestAddress,
 		[]common.Address{sourceLinkTokenAddress},
@@ -675,11 +675,11 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 	require.NoError(t, err)
 	subOffRampAddress, _, _, err := any_2_evm_subscription_offramp.DeployEVM2EVMSubscriptionOffRamp(destUser, destChain, sourceChainID, destChainID,
 		any_2_evm_subscription_offramp.BaseOffRampInterfaceOffRampConfig{
-			OnRampAddress:         subOnRampAddress,
 			ExecutionDelaySeconds: 0,
 			MaxDataSize:           1e12,
 			MaxTokensLength:       5,
 		},
+		subOnRampAddress,
 		commitStore.Address(),
 		afnDestAddress,
 		[]common.Address{sourceLinkTokenAddress},
@@ -772,7 +772,7 @@ func QueueSubRequest(
 	gasLimit *big.Int,
 	receiver common.Address,
 ) *types.Transaction {
-	extraArgsV1, err := GetEVMExtraArgsV1(gasLimit)
+	extraArgsV1, err := GetEVMExtraArgsV1(gasLimit, false)
 	require.NoError(t, err)
 
 	msg := evm_2_any_subscription_onramp_router.CCIPEVM2AnySubscriptionMessage{
@@ -794,7 +794,7 @@ func QueueSubRequestByDapp(
 	gasLimit *big.Int,
 	receiver common.Address,
 ) *types.Transaction {
-	extraArgsV1, err := GetEVMExtraArgsV1(gasLimit)
+	extraArgsV1, err := GetEVMExtraArgsV1(gasLimit, false)
 	require.NoError(t, err)
 	msg := subscription_sender_dapp.CCIPEVM2AnySubscriptionMessage{
 		Receiver:         MustEncodeAddress(t, receiver),
@@ -816,7 +816,7 @@ func QueueRequest(
 	gasLimit *big.Int,
 	receiver common.Address,
 ) *types.Transaction {
-	extraArgs, err := GetEVMExtraArgsV1(gasLimit)
+	extraArgs, err := GetEVMExtraArgsV1(gasLimit, false)
 	require.NoError(t, err)
 	msg := evm_2_any_toll_onramp_router.CCIPEVM2AnyTollMessage{
 		Receiver:          MustEncodeAddress(t, receiver),
@@ -1005,10 +1005,10 @@ func ExecuteSubMessage(
 	return decodedMsg.SequenceNumber
 }
 
-func GetEVMExtraArgsV1(gasLimit *big.Int) ([]byte, error) {
+func GetEVMExtraArgsV1(gasLimit *big.Int, strict bool) ([]byte, error) {
 	EVMV1Tag := []byte{0x97, 0xa6, 0x57, 0xc9}
 
-	encodedArgs, err := utils.ABIEncode(`[{"type":"uint256"}]`, gasLimit)
+	encodedArgs, err := utils.ABIEncode(`[{"type":"uint256"},{"type":"bool"}]`, gasLimit, strict)
 	if err != nil {
 		return nil, err
 	}
