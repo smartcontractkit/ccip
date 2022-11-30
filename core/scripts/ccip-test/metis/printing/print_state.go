@@ -253,16 +253,16 @@ func printRampSanityCheck(chain *rhea.EvmDeploymentConfig, sourceOnRamp common.A
 
 	onRamp, err := evm_2_evm_ge_onramp.NewEVM2EVMGEOnRamp(chain.LaneConfig.OnRamp, chain.Client)
 	helpers.PanicErr(err)
-	router, err := onRamp.GetRouter(&bind.CallOpts{})
+	routerAddress, err := onRamp.GetRouter(&bind.CallOpts{})
 	helpers.PanicErr(err)
-	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "OnRamp Router set", printBool(router == chain.ChainConfig.Router)))
+	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "OnRamp Router set", printBool(routerAddress == chain.ChainConfig.Router)))
 
 	offRamp, err := evm_2_evm_ge_offramp.NewEVM2EVMGEOffRamp(chain.LaneConfig.OffRamp, chain.Client)
 	helpers.PanicErr(err)
-	router, err = offRamp.GetRouter(&bind.CallOpts{})
+	routerAddress, err = offRamp.GetRouter(&bind.CallOpts{})
 	helpers.PanicErr(err)
 
-	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "OffRamp Router set", printBool(router == chain.ChainConfig.Router)))
+	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "OffRamp Router set", printBool(routerAddress == chain.ChainConfig.Router)))
 
 	configDetails, err := offRamp.LatestConfigDetails(&bind.CallOpts{})
 	helpers.PanicErr(err)
@@ -287,13 +287,13 @@ func printRampSanityCheck(chain *rhea.EvmDeploymentConfig, sourceOnRamp common.A
 	helpers.PanicErr(err)
 	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "CommitStore OCR2 configured", printBool(blobConfigDetails.ConfigCount != 0)))
 
-	offRampRouter, err := ge_router.NewGERouter(chain.ChainConfig.Router, chain.Client)
+	router, err := ge_router.NewGERouter(chain.ChainConfig.Router, chain.Client)
 	helpers.PanicErr(err)
 
-	isRamp, err := offRampRouter.IsOffRamp(&bind.CallOpts{}, chain.LaneConfig.OffRamp)
+	isRamp, err := router.IsOffRamp(&bind.CallOpts{}, chain.LaneConfig.OffRamp)
 	helpers.PanicErr(err)
 
-	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "OffRampRouter has offRamp Set", printBool(isRamp)))
+	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "Router has offRamp Set", printBool(isRamp)))
 
 	sb.WriteString(generateSeparator(headerLengths))
 

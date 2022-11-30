@@ -60,6 +60,19 @@ contract GERouter_ccipSend is EVM2EVMGEOnRampSetup {
     assertEq(3, s_sourceRouter.ccipSend(DEST_CHAIN_ID, _generateEmptyMessage()));
   }
 
+  function testCCIPSendMinimal_gas() public {
+    s_sourceRouter.ccipSend(
+      DEST_CHAIN_ID,
+      CCIP.EVM2AnyGEMessage({
+        receiver: abi.encode(OWNER),
+        data: "",
+        tokensAndAmounts: new CCIP.EVMTokenAndAmount[](0),
+        feeToken: s_sourceFeeToken,
+        extraArgs: ""
+      })
+    );
+  }
+
   // Reverts
 
   function testUnsupportedDestinationChainReverts() public {

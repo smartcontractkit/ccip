@@ -36,7 +36,7 @@ func TestTollHasher(t *testing.T) {
 	require.NoError(t, err)
 
 	// NOTE: Must match spec
-	require.Equal(t, "d4504baca27221b294969ab5a2989e2121cb3577a209b85d7d83371b3429df4d", hex.EncodeToString(hash[:]))
+	require.Equal(t, "21d6ad1f79e659726a6c6b41b0f05cfd4e4d24590a67775f85b3bca4aaff4265", hex.EncodeToString(hash[:]))
 
 	message = evm_2_evm_toll_onramp.CCIPEVM2EVMTollMessage{
 		SourceChainId:  sourceChainId,
@@ -57,7 +57,7 @@ func TestTollHasher(t *testing.T) {
 	require.NoError(t, err)
 
 	// NOTE: Must match spec
-	require.Equal(t, "c0b2bac538afab5af9c654028ff27f3a3cc5aa9e1082efc70656b8467dd41fb2", hex.EncodeToString(hash[:]))
+	require.Equal(t, "26095ef772ff770beb4f2d69ec828ff194589e146dc9cd19c84711c631b3fd49", hex.EncodeToString(hash[:]))
 }
 
 func generateTollLog(t *testing.T, message evm_2_evm_toll_onramp.CCIPEVM2EVMTollMessage) types.Log {

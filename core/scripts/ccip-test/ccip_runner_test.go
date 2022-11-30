@@ -27,8 +27,7 @@ var (
 func TestRheaDeploySubscription(t *testing.T) {
 	checkOwnerKeyAndSetupChain(t)
 
-	//rhea.DeploySubscriptionContracts(t, &SOURCE, &DESTINATION) TODO
-	rhea.PrintContractConfig(&SOURCE, &DESTINATION)
+	rhea.DeployGELanes(t, &SOURCE, &DESTINATION)
 }
 
 // TestDione can be run as a test with the following config
@@ -73,7 +72,7 @@ func TestCCIP(t *testing.T) {
 	// Deploys a new set of PingPong contracts, configures them to talk to each other
 	// and creates destination chain subscriptions for both.
 	case "deployPingPong":
-		//rhea.DeployPingPongDapps(t, &SOURCE, &DESTINATION) TODO
+		rhea.DeployPingPongDapps(t, &SOURCE, &DESTINATION)
 		// Starts and unpauses the PingPong dapp that is on the `source` chain.
 	case "startPingPong":
 		client.startPingPong(t)
@@ -88,7 +87,7 @@ func TestCCIP(t *testing.T) {
 		// Set the config to the commitStore and the offramp
 		client.SetOCRConfig(ENV)
 	case "upgradeLane":
-		//rhea.UpgradeLane(t, &SOURCE, &DESTINATION) TODO
+		rhea.UpgradeLane(t, &SOURCE, &DESTINATION)
 	case "dapp":
 		client.SendDappTx(t)
 		// Sends a new config to the governance dapp, spreading it to all configured chains

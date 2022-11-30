@@ -104,6 +104,7 @@ type Client struct {
 	GovernanceDapp   *governance_dapp.GovernanceDapp
 	PingPongDapp     *ping_pong_demo.PingPongDemo
 	Afn              *afn_contract.AFNContract
+	Router           *ge_router.GERouter
 	logger           logger.Logger
 	t                *testing.T
 }
@@ -116,7 +117,6 @@ type EVMBridgedToken struct {
 type SourceClient struct {
 	Client
 	OnRamp     *evm_2_evm_ge_onramp.EVM2EVMGEOnRamp
-	Router     *ge_router.GERouter
 	SenderDapp *subscription_sender_dapp.SubscriptionSenderDapp
 }
 
@@ -140,7 +140,7 @@ func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient
 	require.NoError(t, err)
 	senderDapp, err := subscription_sender_dapp.NewSubscriptionSenderDapp(config.LaneConfig.TokenSender, config.Client)
 	require.NoError(t, err)
-	onRampRouter, err := ge_router.NewGERouter(config.ChainConfig.Router, config.Client)
+	router, err := ge_router.NewGERouter(config.ChainConfig.Router, config.Client)
 	require.NoError(t, err)
 	governanceDapp, err := governance_dapp.NewGovernanceDapp(config.LaneConfig.GovernanceDapp, config.Client)
 	require.NoError(t, err)
@@ -157,11 +157,11 @@ func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient
 			SupportedTokens:  supportedTokens,
 			GovernanceDapp:   governanceDapp,
 			PingPongDapp:     pingPongDapp,
+			Router:           router,
 			logger:           config.Logger,
 			t:                t,
 		},
 		OnRamp:     onRamp,
-		Router:     onRampRouter,
 		SenderDapp: senderDapp,
 	}
 }
@@ -172,7 +172,6 @@ type DestClient struct {
 	MessageReceiver *simple_message_receiver.SimpleMessageReceiver
 	ReceiverDapp    *receiver_dapp.ReceiverDapp
 	OffRamp         *evm_2_evm_ge_offramp.EVM2EVMGEOffRamp
-	Router          *ge_router.GERouter
 }
 
 func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestClient {
@@ -217,10 +216,10 @@ func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestCli
 			PingPongDapp:     pingPongDapp,
 			Afn:              afn,
 			logger:           config.Logger,
+			Router:           router,
 			t:                t,
 		},
 		CommitStore:     commitStore,
-		Router:          router,
 		MessageReceiver: messageReceiver,
 		ReceiverDapp:    receiverDapp,
 		OffRamp:         offRamp,

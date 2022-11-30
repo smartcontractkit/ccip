@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
 	"github.com/smartcontractkit/chainlink/core/utils"
@@ -17,6 +18,8 @@ import (
 var (
 	// offset || sourceChainID || seqNum || ...
 	CCIPTollSendRequested common.Hash
+	// offset || sourceChainID || seqNum || ...
+	CCIPGESendRequested common.Hash
 	// merkleRoot || minSeqNum || maxSeqNum
 	ReportAccepted common.Hash
 	// sig || SeqNum || ...
@@ -54,6 +57,10 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+	geOnRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_ge_onramp.EVM2EVMGEOnRampABI))
+	if err != nil {
+		panic(err)
+	}
 	offRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_toll_offramp.EVM2EVMTollOffRampABI))
 	if err != nil {
 		panic(err)
@@ -63,6 +70,7 @@ func init() {
 		panic(err)
 	}
 	CCIPTollSendRequested = getIDOrPanic("CCIPSendRequested", tollOnRampABI)
+	CCIPGESendRequested = getIDOrPanic("CCIPSendRequested", geOnRampABI)
 	ReportAccepted = getIDOrPanic("ReportAccepted", commitStoreABI)
 	ExecutionStateChanged = getIDOrPanic("ExecutionStateChanged", offRampABI)
 	ConfigSet = getIDOrPanic("ConfigSet", commitStoreABI)
@@ -189,20 +197,8 @@ func MakeTollCCIPMsgArgs() abi.Arguments {
 	}
 }
 
-// Message contains the data from a cross chain message
-type Message struct {
-	SourceChainId     *big.Int                                      `json:"sourceChainId"`
-	SequenceNumber    uint64                                        `json:"sequenceNumber"`
-	Sender            common.Address                                `json:"sender"`
-	Receiver          common.Address                                `json:"receiver"`
-	Data              []uint8                                       `json:"data"`
-	TokensAndAmounts  []evm_2_evm_toll_onramp.CCIPEVMTokenAndAmount `json:"tokensAndAmounts"`
-	FeeTokenAndAmount evm_2_evm_toll_onramp.CCIPEVMTokenAndAmount   `json:"feeTokenAndAmount"`
-	GasLimit          *big.Int                                      `json:"gasLimit"`
-}
-
 func ProofFlagsToBits(proofFlags []bool) *big.Int {
-	// TODO: Support larger than int64?
+	// TODO: Support larger than int64
 	var a int64
 	for i := 0; i < len(proofFlags); i++ {
 		if proofFlags[i] {
@@ -238,7 +234,7 @@ func makeExecutionReportArgs() abi.Arguments {
 							Type: "uint256",
 						},
 						{
-							Name: "gasPrice",
+							Name: "linkPerUnitGas",
 							Type: "uint256",
 						},
 					},

@@ -122,7 +122,7 @@ jobs:
         with:
           basic-auth: ${{ secrets.GRAFANA_CLOUD_BASIC_AUTH }}
           hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
-          this-job-name: Foundry Tests
+          this-job-name: Tests
         continue-on-error: true
 
       - name: Checkout the repo

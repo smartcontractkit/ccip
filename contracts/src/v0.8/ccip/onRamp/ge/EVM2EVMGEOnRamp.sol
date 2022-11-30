@@ -63,13 +63,13 @@ contract EVM2EVMGEOnRamp is EVM2EVMGEOnRampInterface, BaseOnRamp, DynamicFeeCalc
     // Emit message request
     // we need the next available sequence number so we increment before we use the value
     CCIP.EVM2EVMGEMessage memory GEMsg = CCIP.EVM2EVMGEMessage({
+      sourceChainId: i_chainId,
       sequenceNumber: ++s_sequenceNumber,
       feeTokenAmount: feeTokenAmount,
       sender: originalSender,
       nonce: ++s_nonceBySender[originalSender],
       gasLimit: extraArgs.gasLimit,
       strict: extraArgs.strict,
-      sourceChainId: i_chainId,
       receiver: abi.decode(message.receiver, (address)),
       data: message.data,
       tokensAndAmounts: message.tokensAndAmounts,

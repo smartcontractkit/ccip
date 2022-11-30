@@ -27,7 +27,7 @@ contract EVM2EVMGEOnRampSetup is TokenSetup, GESRouterSetup {
     GESRouterSetup.setUp();
 
     CCIP.FeeUpdate[] memory fees = new CCIP.FeeUpdate[](1);
-    fees[0] = CCIP.FeeUpdate({chainId: DEST_CHAIN_ID, gasPrice: 100});
+    fees[0] = CCIP.FeeUpdate({chainId: DEST_CHAIN_ID, linkPerUnitGas: 100});
     address[] memory feeUpdaters = new address[](0);
     GasFeeCacheInterface gasFeeCache = new GasFeeCache(fees, feeUpdaters);
 
@@ -65,19 +65,18 @@ contract EVM2EVMGEOnRampSetup is TokenSetup, GESRouterSetup {
         receiver: abi.encode(OWNER),
         data: "",
         tokensAndAmounts: tokensAndAmounts,
-        feeToken: tokensAndAmounts[0].token,
+        feeToken: s_sourceFeeToken,
         extraArgs: CCIP.EVMExtraArgsV1({gasLimit: GAS_LIMIT, strict: false})._toBytes()
       });
   }
 
   function _generateEmptyMessage() public view returns (CCIP.EVM2AnyGEMessage memory) {
-    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts = new CCIP.EVMTokenAndAmount[](0);
     return
       CCIP.EVM2AnyGEMessage({
         receiver: abi.encode(OWNER),
         data: "",
-        tokensAndAmounts: tokensAndAmounts,
-        feeToken: getCastedSourceEVMTokenAndAmountsWithZeroAmounts()[0].token,
+        tokensAndAmounts: new CCIP.EVMTokenAndAmount[](0),
+        feeToken: s_sourceFeeToken,
         extraArgs: CCIP.EVMExtraArgsV1({gasLimit: GAS_LIMIT, strict: false})._toBytes()
       });
   }

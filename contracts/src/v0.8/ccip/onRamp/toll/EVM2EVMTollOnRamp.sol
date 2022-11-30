@@ -63,8 +63,8 @@ contract EVM2EVMTollOnRamp is EVM2EVMTollOnRampInterface, BaseOnRamp, TypeAndVer
     // Emit message request
     // we need the next available sequence number so we increment before we use the value
     CCIP.EVM2EVMTollMessage memory tollMsg = CCIP.EVM2EVMTollMessage({
-      sequenceNumber: ++s_sequenceNumber,
       sourceChainId: i_chainId,
+      sequenceNumber: ++s_sequenceNumber,
       sender: originalSender,
       receiver: abi.decode(message.receiver, (address)),
       data: message.data,

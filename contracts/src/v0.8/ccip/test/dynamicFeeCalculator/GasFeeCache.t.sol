@@ -11,7 +11,7 @@ contract GasFeeCacheSetup is TokenSetup {
   function setUp() public virtual override {
     TokenSetup.setUp();
     CCIP.FeeUpdate[] memory fees = new CCIP.FeeUpdate[](1);
-    fees[0] = CCIP.FeeUpdate({chainId: DEST_CHAIN_ID, gasPrice: 100});
+    fees[0] = CCIP.FeeUpdate({chainId: DEST_CHAIN_ID, linkPerUnitGas: 100});
     address[] memory feeUpdaters = new address[](0);
 
     s_gasFeeCache = new GasFeeCache(fees, feeUpdaters);

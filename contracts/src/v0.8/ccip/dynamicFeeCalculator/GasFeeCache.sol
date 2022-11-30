@@ -11,7 +11,7 @@ contract GasFeeCache is GasFeeCacheInterface, OwnerIsCreator {
 
   constructor(CCIP.FeeUpdate[] memory feeUpdates, address[] memory feeUpdaters) {
     for (uint256 i = 0; i < feeUpdates.length; ++i) {
-      s_linkPerUnitGasByDestChainId[feeUpdates[i].chainId] = feeUpdates[i].gasPrice;
+      s_linkPerUnitGasByDestChainId[feeUpdates[i].chainId] = feeUpdates[i].linkPerUnitGas;
     }
 
     for (uint256 i = 0; i < feeUpdaters.length; ++i) {
@@ -37,13 +37,14 @@ contract GasFeeCache is GasFeeCacheInterface, OwnerIsCreator {
 
     uint256 numberOfFeeUpdates = feeUpdates.length;
     for (uint256 i = 0; i < numberOfFeeUpdates; ++i) {
-      s_linkPerUnitGasByDestChainId[feeUpdates[i].chainId] = feeUpdates[i].gasPrice;
-      emit GasFeeUpdated(feeUpdates[i].chainId, feeUpdates[i].gasPrice);
+      s_linkPerUnitGasByDestChainId[feeUpdates[i].chainId] = feeUpdates[i].linkPerUnitGas;
+      emit GasFeeUpdated(feeUpdates[i].chainId, feeUpdates[i].linkPerUnitGas);
     }
   }
 
   function getFee(uint256 destChainId) external view returns (uint256 fee) {
     fee = s_linkPerUnitGasByDestChainId[destChainId];
+    // Must have an initial price.
     if (fee == 0) revert ChainNotSupported(destChainId);
   }
 

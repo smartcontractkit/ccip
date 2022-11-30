@@ -11,80 +11,78 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_onramp"
 	"github.com/smartcontractkit/chainlink/core/logger"
 )
 
+type GEBatchBuilder struct {
+	geABI abi.ABI
+	lggr  logger.Logger
+}
+
 const (
-	TOLL_CONSTANT_MESSAGE_PART_BYTES = 20 + // receiver
+	GE_CONSTANT_MESSAGE_PART_BYTES = 32 + // sourceChainId
+		32 + // feeTokenAmount
+		8 + // sequenceNumber
 		20 + // sender
-		2 + // chain id
-		8 + // sequence number
 		32 + // gas limit
-		20 + // fee token address
-		32 // fee token amount
-	TOLL_EXECUTION_STATE_PROCESSING_OVERHEAD_GAS = 2_100 + // COLD_SLOAD_COST for first reading the state
+		8 + // nonce
+		1 + // strict
+		20 + // receiver
+		32 // fee token
+	GE_EXECUTION_STATE_PROCESSING_OVERHEAD_GAS = 2_100 + // COLD_SLOAD_COST for first reading the state
 		20_000 + // SSTORE_SET_GAS for writing from 0 (untouched) to non-zero (in-progress)
 		100 //# SLOAD_GAS = WARM_STORAGE_READ_COST for rewriting from non-zero (in-progress) to non-zero (success/failure)
 )
 
-// Onchain: we bill deterministically for tolls so that we can notify clients how much of a refund they get.
 // Offchain: we compute the max overhead gas to determine msg executability.
-func overheadGasToll(merkleGasShare uint64, tollMsg evm_2_evm_toll_onramp.CCIPEVM2EVMTollMessage) uint64 {
-	messageBytes := TOLL_CONSTANT_MESSAGE_PART_BYTES +
-		(EVM_ADDRESS_LENGTH_BYTES+EVM_WORD_BYTES)*len(tollMsg.TokensAndAmounts) + // token address (address) + token amount (uint256)
-		len(tollMsg.Data)
+func overheadGasGE(merkleGasShare uint64, geMsg evm_2_evm_ge_onramp.CCIPEVM2EVMGEMessage) uint64 {
+	messageBytes := GE_CONSTANT_MESSAGE_PART_BYTES +
+		(EVM_ADDRESS_LENGTH_BYTES+EVM_WORD_BYTES)*len(geMsg.TokensAndAmounts) + // token address (address) + token amount (uint256)
+		len(geMsg.Data)
 	messageCallDataGas := uint64(messageBytes * CALLDATA_GAS_PER_BYTE)
 
 	// Rate limiter only limits value in tokens. It's not called if there are no
 	// tokens in the message.
 	rateLimiterOverhead := uint64(0)
-	if len(tollMsg.TokensAndAmounts) >= 1 {
+	if len(geMsg.TokensAndAmounts) >= 1 {
 		rateLimiterOverhead = RATE_LIMITER_OVERHEAD_GAS
 	}
 
 	return messageCallDataGas +
 		merkleGasShare +
-		TOLL_EXECUTION_STATE_PROCESSING_OVERHEAD_GAS +
-		PER_TOKEN_OVERHEAD_GAS*uint64(len(tollMsg.TokensAndAmounts)+1) + // All tokens plus fee token
+		GE_EXECUTION_STATE_PROCESSING_OVERHEAD_GAS +
+		// TODO: can be reduced if fee token is only sent once per batch
+		PER_TOKEN_OVERHEAD_GAS*uint64(len(geMsg.TokensAndAmounts)+1) + // All tokens plus fee token
 		rateLimiterOverhead +
 		EXTERNAL_CALL_OVERHEAD_GAS
 }
 
-func maxGasOverHeadGasToll(numMsgs int, tollMsg evm_2_evm_toll_onramp.CCIPEVM2EVMTollMessage) uint64 {
-	merkleProofBytes := (math.Ceil(math.Log2(float64(numMsgs)))+2)*32 +
-		(1+2)*32 // only ever one outer root hash
+func maxGasOverHeadGasGE(numMsgs int, geMsg evm_2_evm_ge_onramp.CCIPEVM2EVMGEMessage) uint64 {
+	merkleProofBytes := (math.Ceil(math.Log2(float64(numMsgs)))+2)*32 + (1+2)*32 // only ever one outer root hash
 	merkleGasShare := uint64(merkleProofBytes * CALLDATA_GAS_PER_BYTE)
-	return overheadGasToll(merkleGasShare, tollMsg)
+
+	return overheadGasGE(merkleGasShare, geMsg)
 }
 
-func maxTollCharge(gasPrice *big.Int, subTokenPerFeeCoin *big.Int, totalGasLimit uint64) *big.Int {
-	return new(big.Int).Div(new(big.Int).Mul(new(big.Int).Mul(big.NewInt(int64(totalGasLimit)), gasPrice), subTokenPerFeeCoin), big.NewInt(1e18))
-}
-
-type TollBatchBuilder struct {
-	tollABI abi.ABI
-	lggr    logger.Logger
-}
-
-func NewTollBatchBuilder(lggr logger.Logger) *TollBatchBuilder {
-	tollABI, _ := abi.JSON(strings.NewReader(evm_2_evm_toll_onramp.EVM2EVMTollOnRampABI))
-	return &TollBatchBuilder{
-		tollABI: tollABI,
-		lggr:    lggr,
+func NewGEBatchBuilder(lggr logger.Logger) *GEBatchBuilder {
+	geABI, _ := abi.JSON(strings.NewReader(evm_2_evm_ge_onramp.EVM2EVMGEOnRampABI))
+	return &GEBatchBuilder{
+		geABI: geABI,
+		lggr:  lggr,
 	}
 }
 
-func (tb *TollBatchBuilder) parseLog(log types.Log) (*evm_2_evm_toll_onramp.EVM2EVMTollOnRampCCIPSendRequested, error) {
-	event := new(evm_2_evm_toll_onramp.EVM2EVMTollOnRampCCIPSendRequested)
-	err := bind.NewBoundContract(common.Address{}, tb.tollABI, nil, nil, nil).UnpackLog(event, "CCIPSendRequested", log)
+func (tb *GEBatchBuilder) parseLog(log types.Log) (*evm_2_evm_ge_onramp.EVM2EVMGEOnRampCCIPSendRequested, error) {
+	event := new(evm_2_evm_ge_onramp.EVM2EVMGEOnRampCCIPSendRequested)
+	err := bind.NewBoundContract(common.Address{}, tb.geABI, nil, nil, nil).UnpackLog(event, "CCIPSendRequested", log)
 	if err != nil {
 		return nil, err
 	}
 	return event, nil
 }
 
-func (tb *TollBatchBuilder) BuildBatch(
+func (tb *GEBatchBuilder) BuildBatch(
 	srcToDst map[common.Address]common.Address,
 	msgs []logpoller.Log,
 	executed map[uint64]struct{},
@@ -103,7 +101,7 @@ func (tb *TollBatchBuilder) BuildBatch(
 	aggregateTokenLimit.Sub(aggregateTokenLimit, inflightAggregateValue)
 	executedAllMessages = true
 	for _, msg := range msgs {
-		tollMsg, err2 := tb.parseLog(types.Log{
+		geMsg, err2 := tb.parseLog(types.Log{
 			Topics: msg.GetTopics(),
 			Data:   msg.Data,
 		})
@@ -113,20 +111,20 @@ func (tb *TollBatchBuilder) BuildBatch(
 			executedAllMessages = false
 			continue
 		}
-		if _, executed := executed[tollMsg.Message.SequenceNumber]; executed {
-			tb.lggr.Infow("Skipping message already executed", "seqNr", tollMsg.Message.SequenceNumber)
+		if _, executed := executed[geMsg.Message.SequenceNumber]; executed {
+			tb.lggr.Infow("Skipping message already executed", "seqNr", geMsg.Message.SequenceNumber)
 			continue
 		}
 		executedAllMessages = false
-		if _, inflight := inflightSeqNrs[tollMsg.Message.SequenceNumber]; inflight {
-			tb.lggr.Infow("Skipping message already inflight", "seqNr", tollMsg.Message.SequenceNumber)
+		if _, inflight := inflightSeqNrs[geMsg.Message.SequenceNumber]; inflight {
+			tb.lggr.Infow("Skipping message already inflight", "seqNr", geMsg.Message.SequenceNumber)
 			continue
 		}
 		var tokens []common.Address
 		var amounts []*big.Int
-		for i := 0; i < len(tollMsg.Message.TokensAndAmounts); i++ {
-			tokens = append(tokens, tollMsg.Message.TokensAndAmounts[i].Token)
-			amounts = append(amounts, tollMsg.Message.TokensAndAmounts[i].Amount)
+		for i := 0; i < len(geMsg.Message.TokensAndAmounts); i++ {
+			tokens = append(tokens, geMsg.Message.TokensAndAmounts[i].Token)
+			amounts = append(amounts, geMsg.Message.TokensAndAmounts[i].Amount)
 		}
 		msgValue, err := aggregateTokenValue(tokenLimitPrices, srcToDst, tokens, amounts)
 		if err != nil {
@@ -137,32 +135,31 @@ func (tb *TollBatchBuilder) BuildBatch(
 		if aggregateTokenLimit.Cmp(msgValue) == -1 {
 			continue
 		}
-		// Check solvency
-		maxGasOverhead := maxGasOverHeadGasToll(len(msgs), tollMsg.Message)
-		totalGasLimit := tollMsg.Message.GasLimit.Uint64() + maxGasOverhead
+		// TODO: fee boosting check
+		totalGasLimit := geMsg.Message.GasLimit.Uint64() + maxGasOverHeadGasGE(len(msgs), geMsg.Message)
 		// Check sufficient gas in batch
 		if batchGasLimit < totalGasLimit {
 			tb.lggr.Infow("Insufficient remaining gas in batch limit", "gasLimit", batchGasLimit, "totalGasLimit", totalGasLimit)
 			continue
 		}
-		if _, ok := srcToDst[tollMsg.Message.FeeTokenAndAmount.Token]; !ok {
-			tb.lggr.Errorw("Unknown fee token", "token", tollMsg.Message.FeeTokenAndAmount, "supported", srcToDst)
+		if _, ok := srcToDst[geMsg.Message.FeeToken]; !ok {
+			tb.lggr.Errorw("Unknown fee token", "token", geMsg.Message.FeeToken, "supported", srcToDst)
 			continue
 		}
-		maxCharge := maxTollCharge(gasPrice, tollTokensPerFeeCoin[srcToDst[tollMsg.Message.FeeTokenAndAmount.Token]], totalGasLimit)
-		if tollMsg.Message.FeeTokenAndAmount.Amount.Cmp(maxCharge) < 0 {
-			tb.lggr.Infow("Insufficient fee token to execute msg", "balance", tollMsg.Message.FeeTokenAndAmount.Amount, "maxCharge", maxCharge, "maxGasOverhead", maxGasOverhead)
-			continue
-		}
+		//maxCharge := maxTollCharge(gasPrice, tollTokensPerFeeCoin[srcToDst[geMsg.Message.FeeTokenAndAmount.Token]], totalGasLimit)
+		//if geMsg.Message.FeeTokenAndAmount.Amount.Cmp(maxCharge) < 0 {
+		//	tb.lggr.Infow("Insufficient fee token to execute msg", "balance", geMsg.Message.FeeTokenAndAmount.Amount, "maxCharge", maxCharge, "maxGasOverhead", maxGasOverhead)
+		//	continue
+		//}
 		batchGasLimit -= totalGasLimit
 		aggregateTokenLimit.Sub(aggregateTokenLimit, msgValue)
-		tb.lggr.Infow("Adding toll msg to batch", "seqNum", tollMsg.Message.SequenceNumber, "maxCharge", maxCharge, "maxGasOverhead", maxGasOverhead)
-		executableSeqNrs = append(executableSeqNrs, tollMsg.Message.SequenceNumber)
+		tb.lggr.Infow("Adding ge msg to batch", "seqNum", geMsg.Message.SequenceNumber)
+		executableSeqNrs = append(executableSeqNrs, geMsg.Message.SequenceNumber)
 	}
 	return executableSeqNrs, executedAllMessages
 }
 
-func (tb *TollBatchBuilder) inflight(
+func (tb *GEBatchBuilder) inflight(
 	inflight []InflightExecutionReport,
 	tokenLimitPrices map[common.Address]*big.Int,
 	srcToDst map[common.Address]common.Address,
@@ -176,7 +173,7 @@ func (tb *TollBatchBuilder) inflight(
 		for _, encMsg := range rep.report.EncodedMessages {
 			msg, err := tb.parseLog(types.Log{
 				// Note this needs to change if we start indexing things.
-				Topics: []common.Hash{CCIPTollSendRequested},
+				Topics: []common.Hash{CCIPGESendRequested},
 				Data:   encMsg,
 			})
 			if err != nil {

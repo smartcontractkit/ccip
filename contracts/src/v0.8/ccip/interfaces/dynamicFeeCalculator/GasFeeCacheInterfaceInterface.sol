@@ -18,5 +18,5 @@ interface GasFeeCacheInterface {
 
   function updateFees(CCIP.FeeUpdate[] memory feeUpdates) external;
 
-  function getFee(uint256 destChainId) external returns (uint256 fee);
+  function getFee(uint256 destChainId) external view returns (uint256 fee);
 }

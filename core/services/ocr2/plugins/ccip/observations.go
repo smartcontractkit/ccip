@@ -34,6 +34,7 @@ func (o CommitObservation) Marshal() ([]byte, error) {
 type ExecutionObservation struct {
 	SeqNrs           []uint64                    `json:"seqNrs"`
 	TokensPerFeeCoin map[common.Address]*big.Int `json:"tokensPerFeeCoin"`
+	SourceGasPrice   *big.Int                    `json:"sourceGasPrice"`
 }
 
 func (o ExecutionObservation) Marshal() ([]byte, error) {

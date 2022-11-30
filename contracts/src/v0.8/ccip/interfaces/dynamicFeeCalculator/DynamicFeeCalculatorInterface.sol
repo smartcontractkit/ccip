@@ -13,14 +13,20 @@ interface DynamicFeeCalculatorInterface {
 
   function setFeeConfig(DynamicFeeConfig calldata feeConfig) external;
 
-  function getFee(CCIP.EVM2AnyGEMessage calldata message) external returns (uint256 fee);
+  function getFee(CCIP.EVM2AnyGEMessage calldata message) external view returns (uint256 fee);
 
   struct DynamicFeeConfig {
+    // LINK
     address feeToken;
+    // Flat fee in LINK
     uint256 feeAmount;
+    // Extra gas charged on top of the gasLimit
     uint256 destGasOverhead;
+    // Price multiplier for gas costs
     uint256 multiplier;
+    // Gas fee cache contract
     address gasFeeCache;
+    // Destination chain ID
     uint256 destChainId;
   }
 }

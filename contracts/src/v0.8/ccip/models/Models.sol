@@ -66,14 +66,14 @@ library CCIP {
 
   struct FeeUpdate {
     uint256 chainId;
-    uint256 gasPrice;
+    uint256 linkPerUnitGas;
   }
 
   struct ExecutionReport {
     uint64[] sequenceNumbers;
     address[] tokenPerFeeCoinAddresses;
     uint256[] tokenPerFeeCoin;
-    FeeUpdate[] feeUpdates;
+    FeeUpdate[] feeUpdates; // TODO: Only relevant for GE, separate report for toll?
     bytes[] encodedMessages;
     bytes32[] innerProofs;
     uint256 innerProofFlagBits;
@@ -163,13 +163,13 @@ library CCIP {
 
   // @notice The cross chain message that gets committed to EVM GE chains
   struct EVM2EVMGEMessage {
+    uint256 sourceChainId;
     uint64 sequenceNumber;
     uint256 feeTokenAmount;
     address sender;
     uint64 nonce;
     uint256 gasLimit;
     bool strict;
-    uint256 sourceChainId;
     // User fields
     address receiver;
     bytes data;
@@ -177,7 +177,7 @@ library CCIP {
     address feeToken;
   }
 
-  bytes32 internal constant EVM_2_EVM_GE_MESSAGE_HASH = keccak256("EVM2EVMGEMessagePlus");
+  bytes32 internal constant EVM_2_EVM_GE_MESSAGE_HASH = keccak256("EVM2EVMGEMessageEvent");
 
   function _hash(CCIP.EVM2EVMGEMessage memory original, bytes32 metadataHash) internal pure returns (bytes32) {
     return
@@ -224,7 +224,7 @@ library CCIP {
     uint256 gasLimit;
   }
 
-  bytes32 internal constant EVM_2_EVM_TOLL_MESSAGE_HASH = keccak256("EVM2EVMTollMessagePlus");
+  bytes32 internal constant EVM_2_EVM_TOLL_MESSAGE_HASH = keccak256("EVM2EVMTollMessageEvent");
 
   function _hash(CCIP.EVM2EVMTollMessage memory original, bytes32 metadataHash) internal pure returns (bytes32) {
     return

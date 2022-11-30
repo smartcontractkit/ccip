@@ -37,9 +37,9 @@ contract Models__hash is TokenSetup {
       )
     );
 
-    assertEq(metadataHash, 0x73ba062fc2abb9b2d37ef43de292ddd56a89f10ee0e344d500e63a0474073b03);
+    assertEq(metadataHash, 0xa5d9be067fc21429efa4a6c47a0a5d867c500cde48c7057e1342285c9f3d2f1a);
     // Note this hash must match spec
-    assertEq(message._hash(metadataHash), 0xd4504baca27221b294969ab5a2989e2121cb3577a209b85d7d83371b3429df4d);
+    assertEq(message._hash(metadataHash), 0x21d6ad1f79e659726a6c6b41b0f05cfd4e4d24590a67775f85b3bca4aaff4265);
   }
 
   function testTollHashTwoTokensSuccess() public {
@@ -75,8 +75,8 @@ contract Models__hash is TokenSetup {
       )
     );
 
-    assertEq(metadataHash, 0x73ba062fc2abb9b2d37ef43de292ddd56a89f10ee0e344d500e63a0474073b03);
+    assertEq(metadataHash, 0xa5d9be067fc21429efa4a6c47a0a5d867c500cde48c7057e1342285c9f3d2f1a);
     // Note this hash must match spec
-    assertEq(message._hash(metadataHash), 0xc0b2bac538afab5af9c654028ff27f3a3cc5aa9e1082efc70656b8467dd41fb2);
+    assertEq(message._hash(metadataHash), 0x26095ef772ff770beb4f2d69ec828ff194589e146dc9cd19c84711c631b3fd49);
   }
 }

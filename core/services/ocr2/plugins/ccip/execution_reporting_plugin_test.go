@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp_helper"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store_helper"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
@@ -151,12 +152,24 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 }
 
 type messageBatch struct {
-	msgs        []ccip.Message
+	msgs        []Message
 	allMsgBytes [][]byte
 	seqNums     []uint64
 	helperMsgs  []evm_2_evm_toll_onramp.CCIPEVM2EVMTollMessage
 	proof       merklemulti.Proof[[32]byte]
 	root        [32]byte
+}
+
+// Message contains the data from a cross chain message
+type Message struct {
+	SourceChainId     *big.Int                                      `json:"sourceChainId"`
+	SequenceNumber    uint64                                        `json:"sequenceNumber"`
+	Sender            common.Address                                `json:"sender"`
+	Receiver          common.Address                                `json:"receiver"`
+	Data              []uint8                                       `json:"data"`
+	TokensAndAmounts  []evm_2_evm_toll_onramp.CCIPEVMTokenAndAmount `json:"tokensAndAmounts"`
+	FeeTokenAndAmount evm_2_evm_toll_onramp.CCIPEVMTokenAndAmount   `json:"feeTokenAndAmount"`
+	GasLimit          *big.Int                                      `json:"gasLimit"`
 }
 
 func (e ExecutionContracts) generateMessageBatch(t *testing.T, payloadSize int, nMessages int, nTokensPerMessage int) messageBatch {
@@ -170,7 +183,7 @@ func (e ExecutionContracts) generateMessageBatch(t *testing.T, payloadSize int, 
 	}
 	maxPayload := maxData()
 	var leafHashes [][32]byte
-	var msgs []ccip.Message
+	var msgs []Message
 	var indices []int
 	var tokens []evm_2_evm_toll_onramp.CCIPEVMTokenAndAmount
 	var helperMsgs []evm_2_evm_toll_onramp.CCIPEVM2EVMTollMessage
@@ -184,7 +197,7 @@ func (e ExecutionContracts) generateMessageBatch(t *testing.T, payloadSize int, 
 	var allMsgBytes [][]byte
 	for i := 0; i < nMessages; i++ {
 		seqNums = append(seqNums, 1+uint64(i))
-		message := ccip.Message{
+		message := Message{
 			SequenceNumber:    1 + uint64(i),
 			SourceChainId:     e.sourceChainID,
 			Sender:            e.user.From,
@@ -239,6 +252,7 @@ func TestMaxExecutionReportSize(t *testing.T) {
 		mb.proof.SourceFlags,
 		outerProof.Hashes,
 		outerProof.SourceFlags,
+		nil,
 	)
 	require.NoError(t, err)
 	t.Log("execution report length", len(executorReport), ccip.MaxExecutionReportLength)
@@ -274,18 +288,18 @@ func TestExecutionReportEncoding(t *testing.T) {
 	outerTree, err := merklemulti.NewTree(ctx, [][32]byte{mb.root})
 	require.NoError(t, err)
 	outerProof := outerTree.Prove([]int{0})
-	report := evm_2_evm_toll_offramp.CCIPExecutionReport{
+	report := evm_2_evm_ge_offramp.CCIPExecutionReport{
 		SequenceNumbers:          mb.seqNums,
 		TokenPerFeeCoin:          []*big.Int{},
 		TokenPerFeeCoinAddresses: []common.Address{},
-		FeeUpdates:               []evm_2_evm_toll_offramp.CCIPFeeUpdate{},
+		FeeUpdates:               []evm_2_evm_ge_offramp.CCIPFeeUpdate{},
 		EncodedMessages:          mb.allMsgBytes,
 		InnerProofs:              mb.proof.Hashes,
 		InnerProofFlagBits:       ccip.ProofFlagsToBits(mb.proof.SourceFlags),
 		OuterProofs:              outerProof.Hashes,
 		OuterProofFlagBits:       ccip.ProofFlagsToBits(outerProof.SourceFlags),
 	}
-	encodeCommitReport, err := ccip.EncodeExecutionReport(report.SequenceNumbers, map[common.Address]*big.Int{}, report.EncodedMessages, report.InnerProofs, mb.proof.SourceFlags, report.OuterProofs, outerProof.SourceFlags)
+	encodeCommitReport, err := ccip.EncodeExecutionReport(report.SequenceNumbers, map[common.Address]*big.Int{}, report.EncodedMessages, report.InnerProofs, mb.proof.SourceFlags, report.OuterProofs, outerProof.SourceFlags, nil)
 	require.NoError(t, err)
 	decodeCommitReport, err := ccip.DecodeExecutionReport(encodeCommitReport)
 	require.NoError(t, err)

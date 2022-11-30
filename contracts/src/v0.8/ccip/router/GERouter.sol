@@ -44,7 +44,8 @@ contract GERouter is GERouterInterface, BaseOffRampRouter, TypeAndVersionInterfa
   }
 
   /// @inheritdoc GERouterInterface
-  function getFee(uint256 destinationChainId, CCIP.EVM2AnyGEMessage memory message) public returns (uint256 fee) {
+  // @dev returns 0 fee on invalid message.
+  function getFee(uint256 destinationChainId, CCIP.EVM2AnyGEMessage memory message) public view returns (uint256 fee) {
     // Find and put the correct onRamp on the stack.
     EVM2EVMGEOnRampInterface onRamp = s_onRamps[destinationChainId];
     // Check if the onRamp is a zero address, meaning the chain is not supported.

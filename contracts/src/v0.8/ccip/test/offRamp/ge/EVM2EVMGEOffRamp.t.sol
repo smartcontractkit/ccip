@@ -113,6 +113,14 @@ contract EVM2EVMGEOffRamp_execute is EVM2EVMGEOffRampSetup {
     emit ExecutionStateChanged(messages[0].sequenceNumber, CCIP.MessageExecutionState.SUCCESS);
 
     s_offRamp.execute(_generateReportFromMessages(messages), false);
+
+    messages[0].nonce++;
+    messages[0].sequenceNumber++;
+
+    vm.expectEmit(false, false, false, true);
+    emit ExecutionStateChanged(messages[0].sequenceNumber, CCIP.MessageExecutionState.SUCCESS);
+
+    s_offRamp.execute(_generateReportFromMessages(messages), false);
   }
 
   // Asserts that a message execution fails, but it does

@@ -77,10 +77,10 @@ func (node *Node) EventuallyHasReqSeqNum(t *testing.T, ccipContracts CCIPContrac
 	return log
 }
 
-func (node *Node) EventuallyHasExecutedSeqNum(t *testing.T, ccipContracts CCIPContracts, offRamp common.Address, seqNum int) logpoller.Log {
+func (node *Node) EventuallyHasExecutedSeqNums(t *testing.T, ccipContracts CCIPContracts, offRamp common.Address, minSeqNum int, maxSeqNum int) []logpoller.Log {
 	c, err := node.App.GetChains().EVM.Get(ccipContracts.DestChainID)
 	require.NoError(t, err)
-	var log logpoller.Log
+	var logs []logpoller.Log
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
 		ccipContracts.SourceChain.Commit()
 		ccipContracts.DestChain.Commit()
@@ -88,19 +88,19 @@ func (node *Node) EventuallyHasExecutedSeqNum(t *testing.T, ccipContracts CCIPCo
 			ccip.ExecutionStateChanged,
 			offRamp,
 			ccip.CrossChainMessageExecutedSequenceNumberIndex,
-			ccip.EvmWord(uint64(seqNum)),
-			ccip.EvmWord(uint64(seqNum)),
+			ccip.EvmWord(uint64(minSeqNum)),
+			ccip.EvmWord(uint64(maxSeqNum)),
 			1)
 		require.NoError(t, err)
-		t.Log("Executed logs", lgs)
-		if len(lgs) == 1 {
-			log = lgs[0]
-			t.Logf("Seq Num %d executed", seqNum)
+		t.Log("Executed logs", len(lgs), lgs)
+		if len(lgs) == maxSeqNum-minSeqNum+1 {
+			logs = lgs
+			t.Logf("Seq Num %d-%d executed", minSeqNum, maxSeqNum)
 			return true
 		}
 		return false
 	}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue(), "eventually has not executed seq num")
-	return log
+	return logs
 }
 
 func (node *Node) ConsistentlySeqNumHasNotBeenExecuted(t *testing.T, ccipContracts CCIPContracts, offRamp common.Address, seqNum int) logpoller.Log {
@@ -154,11 +154,19 @@ func AddAllJobs(t *testing.T, jobParams CCIPJobSpecParams, ccipContracts CCIPCon
 	tollExecutionSpec, err := jobParams.ExecutionJobSpec()
 	require.NoError(t, err)
 
+	jobParams.OnRampForExecution = ccipContracts.GEOnRamp.Address()
+	jobParams.OffRamp = ccipContracts.GEOffRamp.Address()
+	geExecutionSpec, err := jobParams.ExecutionJobSpec()
+	require.NoError(t, err)
+
 	for i, node := range nodes {
 		commitSpec.Name = fmt.Sprintf("ccip-commit-%d", i)
 		node.AddJobsWithSpec(t, commitSpec)
 		tollExecutionSpec.Name = fmt.Sprintf("ccip-exec-toll-%d", i)
 		node.AddJobsWithSpec(t, tollExecutionSpec)
+
+		geExecutionSpec.Name = fmt.Sprintf("ccip-exec-ge-%d", i)
+		node.AddJobsWithSpec(t, geExecutionSpec)
 	}
 }
 
@@ -384,12 +392,12 @@ func AllNodesHaveReqSeqNum(t *testing.T, ccipContracts CCIPContracts, eventSig c
 	return log
 }
 
-func AllNodesHaveExecutedSeqNum(t *testing.T, ccipContracts CCIPContracts, offRamp common.Address, nodes []Node, seqNum int) logpoller.Log {
-	var log logpoller.Log
+func AllNodesHaveExecutedSeqNums(t *testing.T, ccipContracts CCIPContracts, offRamp common.Address, nodes []Node, minSeqNum int, maxSeqNum int) []logpoller.Log {
+	var logs []logpoller.Log
 	for _, node := range nodes {
-		log = node.EventuallyHasExecutedSeqNum(t, ccipContracts, offRamp, seqNum)
+		logs = node.EventuallyHasExecutedSeqNums(t, ccipContracts, offRamp, minSeqNum, maxSeqNum)
 	}
-	return log
+	return logs
 }
 
 func NoNodesHaveExecutedSeqNum(t *testing.T, ccipContracts CCIPContracts, offRamp common.Address, nodes []Node, seqNum int) logpoller.Log {

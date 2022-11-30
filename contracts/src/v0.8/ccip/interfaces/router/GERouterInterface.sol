@@ -19,7 +19,7 @@ interface GERouterInterface is BaseOnRampRouterInterface, Any2EVMOffRampRouterIn
    */
   function ccipSend(uint256 destinationChainId, CCIP.EVM2AnyGEMessage calldata message) external returns (uint64);
 
-  function getFee(uint256 destinationChainId, CCIP.EVM2AnyGEMessage memory message) external returns (uint256 fee);
+  function getFee(uint256 destinationChainId, CCIP.EVM2AnyGEMessage memory message) external view returns (uint256 fee);
 
   /**
    * @notice Set chainId => onRamp mapping

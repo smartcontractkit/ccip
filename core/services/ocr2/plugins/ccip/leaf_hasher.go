@@ -37,7 +37,7 @@ func NewTollLeafHasher(sourceChainId *big.Int, destChainId *big.Int, onRampId co
 	tollABI, _ := abi.JSON(strings.NewReader(evm_2_evm_toll_onramp.EVM2EVMTollOnRampABI))
 	return &TollLeafHasher{
 		tollABI:      tollABI,
-		metaDataHash: getMetaDataHash(ctx, ctx.Hash([]byte("EVM2EVMTollMessagePlus")), sourceChainId, onRampId, destChainId),
+		metaDataHash: getMetaDataHash(ctx, ctx.Hash([]byte("EVM2EVMTollMessageEvent")), sourceChainId, onRampId, destChainId),
 		ctx:          ctx,
 	}
 }
@@ -53,7 +53,17 @@ func (t *TollLeafHasher) HashLeaf(log types.Log) ([32]byte, error) {
 	}
 
 	packedValues, err := utils.ABIEncode(
-		`[{"type":"bytes1"},{"type":"bytes32"},{"type":"uint64"},{"type":"address"},{"type":"address"},{"type":"bytes32"},{"type":"bytes32"},{"type":"uint256"},{"components": [{"name": "token","type": "address"}, {"name": "amount", "type": "uint256"}],"name": "feeToken","type": "tuple"}]`,
+		`[
+{"name": "leafDomainSeparator","type":"bytes1"},
+{"name": "metadataHash","type":"bytes32"},
+{"name": "sequenceNumber","type":"uint64"},
+{"name": "sender","type":"address"},
+{"name": "receiver","type":"address"},
+{"name": "dataHash","type":"bytes32"},
+{"name": "tokenAmountsHash","type":"bytes32"},
+{"name": "gasLimit","type":"uint256"},
+{"name": "feeTokenAndAmount","components": [{"name": "token","type": "address"}, {"name": "amount", "type": "uint256"}],"type": "tuple"}]
+`,
 		LeafDomainSeparator,
 		t.metaDataHash,
 		event.Message.SequenceNumber,
@@ -88,11 +98,69 @@ func LogPollerLogToEthLog(log logpoller.Log) types.Log {
 	}
 }
 
-func NewGELeafHasher(sourceChainId *big.Int, destChainId *big.Int, onRampId common.Address, ctx hasher.Ctx[[32]byte]) *TollLeafHasher {
+type GELeafHasher struct {
+	geABI        abi.ABI
+	metaDataHash [32]byte
+	ctx          hasher.Ctx[[32]byte]
+}
+
+func NewGELeafHasher(sourceChainId *big.Int, destChainId *big.Int, onRampId common.Address, ctx hasher.Ctx[[32]byte]) *GELeafHasher {
 	geABI, _ := abi.JSON(strings.NewReader(evm_2_evm_ge_onramp.EVM2EVMGEOnRampABI))
-	return &TollLeafHasher{ // TODO GE Leaf hasher
-		tollABI:      geABI,
-		metaDataHash: getMetaDataHash(ctx, ctx.Hash([]byte("EVM2EVMGEMessagePlus")), sourceChainId, onRampId, destChainId),
+	return &GELeafHasher{
+		geABI:        geABI,
+		metaDataHash: getMetaDataHash(ctx, ctx.Hash([]byte("EVM2EVMGEMessageEvent")), sourceChainId, onRampId, destChainId),
 		ctx:          ctx,
 	}
+}
+
+var _ LeafHasher[[32]byte] = &GELeafHasher{}
+
+func (t *GELeafHasher) HashLeaf(log types.Log) ([32]byte, error) {
+	event, err := t.ParseEVM2EVMGELog(log)
+	if err != nil {
+		return [32]byte{}, err
+	}
+	encodedTokens, err := utils.ABIEncode(`[{"components": [{"name": "token","type": "address"}, {"name": "amount", "type": "uint256"}],"type": "tuple[]"}]`, event.Message.TokensAndAmounts)
+	if err != nil {
+		return [32]byte{}, err
+	}
+
+	packedValues, err := utils.ABIEncode(
+		`[
+{"name": "leafDomainSeparator","type":"bytes1"},
+{"name": "metadataHash", "type":"bytes32"},
+{"name": "sequenceNumber", "type":"uint64"},
+{"name": "nonce", "type":"uint64"},
+{"name": "sender", "type":"address"},
+{"name": "receiver", "type":"address"},
+{"name": "dataHash", "type":"bytes32"},
+{"name": "tokenAmountsHash", "type":"bytes32"},
+{"name": "gasLimit", "type":"uint256"},
+{"name": "strict", "type":"bool"},
+{"name": "feeToken","type": "address"},
+{"name": "feeTokenAmount","type": "uint256"}
+]`,
+		LeafDomainSeparator,
+		t.metaDataHash,
+		event.Message.SequenceNumber,
+		event.Message.Nonce,
+		event.Message.Sender,
+		event.Message.Receiver,
+		t.ctx.Hash(event.Message.Data),
+		t.ctx.Hash(encodedTokens),
+		event.Message.GasLimit,
+		event.Message.Strict,
+		event.Message.FeeToken,
+		event.Message.FeeTokenAmount,
+	)
+	if err != nil {
+		return [32]byte{}, err
+	}
+	return t.ctx.Hash(packedValues), nil
+}
+
+func (t *GELeafHasher) ParseEVM2EVMGELog(log types.Log) (*evm_2_evm_ge_onramp.EVM2EVMGEOnRampCCIPSendRequested, error) {
+	event := new(evm_2_evm_ge_onramp.EVM2EVMGEOnRampCCIPSendRequested)
+	err := bind.NewBoundContract(common.Address{}, t.geABI, nil, nil, nil).UnpackLog(event, "CCIPSendRequested", log)
+	return event, err
 }

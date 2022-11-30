@@ -27,10 +27,12 @@ type EVMGasSettings struct {
 }
 
 type DeploySettings struct {
-	DeployAFN            bool
-	DeployTokenPools     bool
+	DeployAFN         bool
+	DeployTokenPools  bool
+	DeployRouter      bool
+	DeployGasFeeCache bool
+
 	DeployRamp           bool
-	DeployRouter         bool
 	DeployCommitStore    bool
 	DeployGovernanceDapp bool
 	DeployPingPongDapp   bool
@@ -45,6 +47,7 @@ type EVMChainConfig struct {
 	SupportedTokens map[gethcommon.Address]EVMBridgedToken
 	Router          gethcommon.Address
 	Afn             gethcommon.Address
+	GasFeeCache     gethcommon.Address
 }
 
 type EVMBridgedToken struct {
@@ -122,52 +125,4 @@ func SetGasFees(owner *bind.TransactOpts, config EVMGasSettings) {
 	} else {
 		owner.GasPrice = config.GasPrice
 	}
-}
-
-func PrintContractConfig(source *EvmDeploymentConfig, destination *EvmDeploymentConfig) {
-	source.Logger.Infof(`
-Source chain config
-
-LinkToken:      common.HexToAddress("%s"),
-BridgeTokens:   %+v,
-TokenPools:     %s,
-OnRamp:         common.HexToAddress("%s"),
-OnRampRouter:   common.HexToAddress("%s"),
-TokenSender:    common.HexToAddress("%s"),
-Afn:            common.HexToAddress("%s"),
-GovernanceDapp: common.HexToAddress("%s"),
-PingPongDapp:   common.HexToAddress("%s"),
-	
-`,
-		source.ChainConfig.LinkToken,
-		source.ChainConfig.SupportedTokens,
-		source.LaneConfig.OnRamp,
-		source.ChainConfig.Router,
-		source.LaneConfig.TokenSender,
-		source.ChainConfig.Afn,
-		source.LaneConfig.GovernanceDapp,
-		source.LaneConfig.PingPongDapp)
-
-	destination.Logger.Infof(`
-Destination chain config
-
-LinkToken:       common.HexToAddress("%s"),
-BridgeTokens:    %+v,
-OffRamp:         common.HexToAddress("%s"),
-CommitStore:     common.HexToAddress("%s"),	
-MessageReceiver: common.HexToAddress("%s"),
-ReceiverDapp:    common.HexToAddress("%s"),
-Afn:             common.HexToAddress("%s"),
-GovernanceDapp:  common.HexToAddress("%s"),
-PingPongDapp:    common.HexToAddress("%s"),
-`,
-		destination.ChainConfig.LinkToken,
-		destination.ChainConfig.SupportedTokens,
-		destination.LaneConfig.OffRamp,
-		destination.LaneConfig.CommitStore,
-		destination.LaneConfig.MessageReceiver,
-		destination.LaneConfig.ReceiverDapp,
-		destination.ChainConfig.Afn,
-		destination.LaneConfig.GovernanceDapp,
-		destination.LaneConfig.PingPongDapp)
 }

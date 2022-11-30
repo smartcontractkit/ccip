@@ -14,6 +14,8 @@ import (
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_offramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
 	"github.com/smartcontractkit/chainlink/core/logger"
@@ -96,6 +98,25 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 		}
 		reqEventSig = CCIPTollSendRequested
 		onRampToHasher[onRampAddr] = NewTollLeafHasher(sourceChainId, destChainId, onRampAddr, hashingCtx)
+	case EVM2EVMGEOnRamp:
+		onRamp, err2 := evm_2_evm_ge_onramp.NewEVM2EVMGEOnRamp(onRampAddr, sourceChain.Client())
+		if err2 != nil {
+			return nil, err2
+		}
+		onRampSeqParser = func(log logpoller.Log) (uint64, error) {
+			req, err3 := onRamp.ParseCCIPSendRequested(types.Log{Data: log.Data, Topics: log.GetTopics()})
+			if err3 != nil {
+				return 0, err3
+			}
+			return req.Message.SequenceNumber, nil
+		}
+		// Subscribe to all relevant commit logs.
+		_, err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{CCIPGESendRequested}, Addresses: []common.Address{onRampAddr}})
+		if err != nil {
+			return nil, err
+		}
+		reqEventSig = CCIPGESendRequested
+		onRampToHasher[onRampAddr] = NewGELeafHasher(sourceChainId, destChainId, onRampAddr, hashingCtx)
 	default:
 		return nil, errors.Errorf("unrecognized onramp, is %v the correct onramp address?", onRampAddr)
 	}
@@ -116,6 +137,9 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	case EVM2EVMTollOffRamp:
 		batchBuilder = NewTollBatchBuilder(lggr)
 		offRamp, err2 = NewTollOffRamp(common.HexToAddress(spec.ContractID), destChain)
+	case EVM2EVMGEOffRamp:
+		batchBuilder = NewGEBatchBuilder(lggr)
+		offRamp, err2 = NewGEOffRamp(common.HexToAddress(spec.ContractID), destChain)
 	default:
 		return nil, errors.Errorf("unrecognized offramp, is %v the correct offramp address?", spec.ContractID)
 	}
@@ -145,7 +169,11 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 		priceGetterObject,
 		onRampToHasher,
 		rootSnoozeTime,
-		inflightCacheExpiry)
+		inflightCacheExpiry,
+		sourceChain.TxManager().GetGasEstimator(),
+		destChain.TxManager().GetGasEstimator(),
+		sourceChainId,
+	)
 	oracle, err := libocr2.NewOracle(argsNoPlugin)
 	if err != nil {
 		return nil, err
@@ -211,4 +239,38 @@ func NewTollOffRamp(addr common.Address, destChain evm.Chain) (OffRamp, error) {
 		return nil, err
 	}
 	return &tollOffRamp{offRamp}, nil
+}
+
+func NewGEOffRamp(addr common.Address, destChain evm.Chain) (OffRamp, error) {
+	offRamp, err := evm_2_evm_ge_offramp.NewEVM2EVMGEOffRamp(addr, destChain.Client())
+	if err != nil {
+		return nil, err
+	}
+	return &geOffRamp{offRamp}, nil
+}
+
+type geOffRamp struct {
+	*evm_2_evm_ge_offramp.EVM2EVMGEOffRamp
+}
+
+func (s geOffRamp) ParseSeqNumFromExecutionStateChanged(log types.Log) (uint64, error) {
+	ec, err := s.ParseExecutionStateChanged(log)
+	if err != nil {
+		return 0, err
+	}
+	return ec.SequenceNumber, nil
+}
+
+func (s geOffRamp) GetSupportedTokensForExecutionFee() ([]common.Address, error) {
+	// TODO: Toll offramp contract is missing ExecConfig?
+	// for now support all source tokens as fee tokens
+	return s.EVM2EVMGEOffRamp.GetDestinationTokens(nil)
+}
+
+func (s geOffRamp) GetAllowedTokensAmount(opts *bind.CallOpts) (*big.Int, error) {
+	bucket, err := s.EVM2EVMGEOffRamp.CalculateCurrentTokenBucketState(opts)
+	if err != nil {
+		return nil, err
+	}
+	return bucket.Tokens, nil
 }

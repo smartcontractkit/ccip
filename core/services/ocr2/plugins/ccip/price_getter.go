@@ -87,7 +87,7 @@ var _ PriceGetter = &fakePriceGetter{}
 
 type fakePriceGetter struct{}
 
-// GetPrice should fetch the price of an asset on the destination chain.
+// TokensPerFeeCoin should fetch the price of an asset on the destination chain.
 func (d fakePriceGetter) TokensPerFeeCoin(ctx context.Context, tokens []common.Address) (map[common.Address]*big.Int, error) {
 	// Just returns a juels/eth value for all tokens.
 	// As the feed is in wei/link and not juels/eth we need to transform it

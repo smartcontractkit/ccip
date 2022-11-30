@@ -17,14 +17,14 @@ contract DynamicFeeCalculator is DynamicFeeCalculatorInterface, OwnerIsCreator {
     emit FeeConfigSet(feeConfig);
   }
 
-  function getFee(CCIP.EVM2AnyGEMessage calldata message) public returns (uint256 fee) {
+  function getFee(CCIP.EVM2AnyGEMessage calldata message) public view returns (uint256 fee) {
     if (s_feeConfig.feeToken != message.feeToken) revert MismatchedFeeToken(s_feeConfig.feeToken, message.feeToken);
     uint256 gasLimit = message.extraArgs._fromBytes().gasLimit;
-    uint256 gasFee = GasFeeCacheInterface(s_feeConfig.gasFeeCache).getFee(s_feeConfig.destChainId);
+    uint256 linkPerUnitGas = GasFeeCacheInterface(s_feeConfig.gasFeeCache).getFee(s_feeConfig.destChainId);
 
     return
       s_feeConfig.feeAmount + // Flat fee
-      ((gasLimit + s_feeConfig.destGasOverhead) * gasFee * s_feeConfig.multiplier) / // Total gas reversed for tx
+      ((gasLimit + s_feeConfig.destGasOverhead) * linkPerUnitGas * s_feeConfig.multiplier) / // Total gas reserved for tx
       1 ether; // latest gas reported gas fee with a safety margin
   }
 

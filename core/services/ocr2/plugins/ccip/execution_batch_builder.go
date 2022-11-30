@@ -20,15 +20,15 @@ const (
 	EVM_ADDRESS_LENGTH_BYTES           = 20
 	EVM_WORD_BYTES                     = 32
 	CALLDATA_GAS_PER_BYTE              = 16
-	PER_TOKEN_OVERHEAD_GAS             = (2_100 + // COLD_SLOAD_COST for first reading the pool
+	PER_TOKEN_OVERHEAD_GAS             = 2_100 + // COLD_SLOAD_COST for first reading the pool
 		2_100 + // COLD_SLOAD_COST for pool to ensure allowed offramp calls it
 		2_100 + // COLD_SLOAD_COST for accessing pool balance slot
 		5_000 + // SSTORE_RESET_GAS for decreasing pool balance from non-zero to non-zero
 		2_100 + // COLD_SLOAD_COST for accessing receiver balance
 		20_000 + // SSTORE_SET_GAS for increasing receiver balance from zero to non-zero
-		2_100) // COLD_SLOAD_COST for obtanining price of token to use for aggregate token bucket
-	RATE_LIMITER_OVERHEAD_GAS = (2_100 + // COLD_SLOAD_COST for accessing token bucket
-		5_000) // SSTORE_RESET_GAS for updating & decreasing token bucket
+		2_100 // COLD_SLOAD_COST for obtanining price of token to use for aggregate token bucket
+	RATE_LIMITER_OVERHEAD_GAS = 2_100 + // COLD_SLOAD_COST for accessing token bucket
+		5_000 // SSTORE_RESET_GAS for updating & decreasing token bucket
 	EXTERNAL_CALL_OVERHEAD_GAS = 2600 // because the receiver will be untouched initially
 )
 
@@ -38,7 +38,7 @@ type BatchBuilder interface {
 		msgs []logpoller.Log,
 		executed map[uint64]struct{},
 		gasLimit uint64,
-		gasPrice uint64,
+		gasPrice *big.Int,
 		tokensPerFeeCoin map[common.Address]*big.Int,
 		inflight []InflightExecutionReport,
 		aggregateTokenLimit *big.Int,
@@ -150,7 +150,7 @@ func (eb *ExecutionBatchBuilder) getExecutedSeqNrsInRange(min, max uint64) (map[
 }
 
 func (eb *ExecutionBatchBuilder) getExecutableSeqNrs(
-	maxGasPrice uint64,
+	maxGasPrice *big.Int,
 	tokensPerFeeCoin map[common.Address]*big.Int,
 	inflight []InflightExecutionReport,
 ) ([]uint64, error) {
@@ -187,17 +187,17 @@ func (eb *ExecutionBatchBuilder) getExecutableSeqNrs(
 		srcToDst[sourceToken] = dst
 	}
 
-	supporteddestTokensAndAmounts := make([]common.Address, 0, len(srcToDst))
+	supportedDestTokensAndAmounts := make([]common.Address, 0, len(srcToDst))
 	for _, destTokensAndAmounts := range srcToDst {
-		supporteddestTokensAndAmounts = append(supporteddestTokensAndAmounts, destTokensAndAmounts)
+		supportedDestTokensAndAmounts = append(supportedDestTokensAndAmounts, destTokensAndAmounts)
 	}
 
-	destTokenPrices, err := eb.offRamp.GetPricesForTokens(nil, supporteddestTokensAndAmounts)
+	destTokenPrices, err := eb.offRamp.GetPricesForTokens(nil, supportedDestTokensAndAmounts)
 	if err != nil {
 		return nil, err
 	}
 	pricePerDestToken := make(map[common.Address]*big.Int)
-	for i, destToken := range supporteddestTokensAndAmounts {
+	for i, destToken := range supportedDestTokensAndAmounts {
 		pricePerDestToken[destToken] = destTokenPrices[i]
 	}
 

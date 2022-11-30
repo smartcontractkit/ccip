@@ -21,6 +21,8 @@ contract EVM2EVMGEOffRamp is EVM2EVMGEOffRampInterface, BaseOffRamp, TypeAndVers
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "EVM2EVMGEOffRamp 1.0.0";
 
+  bytes32 internal immutable i_metadataHash;
+
   mapping(address => uint256) internal s_nopBalance;
   mapping(address => uint64) internal s_senderNonce;
 
@@ -52,6 +54,7 @@ contract EVM2EVMGEOffRamp is EVM2EVMGEOffRampInterface, BaseOffRamp, TypeAndVers
     )
   {
     s_config = offRampConfig;
+    i_metadataHash = _metadataHash(CCIP.EVM_2_EVM_GE_MESSAGE_HASH);
   }
 
   /// @inheritdoc BaseOffRamp
@@ -59,75 +62,85 @@ contract EVM2EVMGEOffRamp is EVM2EVMGEOffRampInterface, BaseOffRamp, TypeAndVers
     _execute(report, true);
   }
 
+  /// @inheritdoc EVM2EVMGEOffRampInterface
+  function getSenderNonce(address sender) public view returns (uint256 nonce) {
+    return s_senderNonce[sender];
+  }
+
+  /// @inheritdoc EVM2EVMGEOffRampInterface
+  function getNopBalance(address nop) public view returns (uint256 balance) {
+    return s_nopBalance[nop];
+  }
+
   function _executeMessages(CCIP.ExecutionReport memory report, bool manualExecution) internal {
-    uint256 numMsgs = report.encodedMessages.length;
-
     // Report may have only price updates, so we only process messages if there are some.
-    if (numMsgs > 0) {
-      bytes32[] memory hashedLeaves = new bytes32[](numMsgs);
-      bytes32 metadataHash = _metadataHash(CCIP.EVM_2_EVM_GE_MESSAGE_HASH);
-      CCIP.EVM2EVMGEMessage[] memory decodedMessages = new CCIP.EVM2EVMGEMessage[](numMsgs);
+    uint256 numMsgs = report.encodedMessages.length;
+    if (numMsgs == 0) {
+      return;
+    }
 
-      for (uint256 i = 0; i < numMsgs; ++i) {
-        CCIP.EVM2EVMGEMessage memory decodedMessage = abi.decode(report.encodedMessages[i], (CCIP.EVM2EVMGEMessage));
-        // We do this hash here instead of in _verifyMessages to avoid two separate loops
-        // over the same data, which increases gas cost
-        hashedLeaves[i] = decodedMessage._hash(metadataHash);
-        decodedMessages[i] = decodedMessage;
+    bytes32[] memory hashedLeaves = new bytes32[](numMsgs);
+    CCIP.EVM2EVMGEMessage[] memory decodedMessages = new CCIP.EVM2EVMGEMessage[](numMsgs);
+
+    for (uint256 i = 0; i < numMsgs; ++i) {
+      CCIP.EVM2EVMGEMessage memory decodedMessage = abi.decode(report.encodedMessages[i], (CCIP.EVM2EVMGEMessage));
+      // We do this hash here instead of in _verifyMessages to avoid two separate loops
+      // over the same data, which increases gas cost
+      hashedLeaves[i] = decodedMessage._hash(i_metadataHash);
+      decodedMessages[i] = decodedMessage;
+    }
+
+    (uint256 timestampCommitted, ) = _verifyMessages(
+      hashedLeaves,
+      report.innerProofs,
+      report.innerProofFlagBits,
+      report.outerProofs,
+      report.outerProofFlagBits
+    );
+    bool isOldCommitReport = (block.timestamp - timestampCommitted) > s_config.permissionLessExecutionThresholdSeconds;
+
+    // Execute messages
+    for (uint256 i = 0; i < numMsgs; ++i) {
+      CCIP.EVM2EVMGEMessage memory message = decodedMessages[i];
+      CCIP.MessageExecutionState originalState = getExecutionState(message.sequenceNumber);
+      if (originalState == CCIP.MessageExecutionState.SUCCESS) revert AlreadyExecuted(message.sequenceNumber);
+
+      // Two valid cases here, we either have never touched this message before, or we tried to execute and failed
+      if (manualExecution) {
+        // Manually execution is fine if we previously failed or if the commit report is just too old
+        if (!(isOldCommitReport || originalState == CCIP.MessageExecutionState.FAILURE))
+          revert ManualExecutionNotYetEnabled();
+      } else {
+        // DON can only execute a message once
+        if (originalState != CCIP.MessageExecutionState.UNTOUCHED) revert AlreadyAttempted(message.sequenceNumber);
       }
 
-      (uint256 timestampCommitted, ) = _verifyMessages(
-        hashedLeaves,
-        report.innerProofs,
-        report.innerProofFlagBits,
-        report.outerProofs,
-        report.outerProofFlagBits
-      );
-      bool isOldCommitReport = (block.timestamp - timestampCommitted) >
-        s_config.permissionLessExecutionThresholdSeconds;
+      _isWellFormed(message);
 
-      // Execute messages
-      for (uint256 i = 0; i < numMsgs; ++i) {
-        CCIP.EVM2EVMGEMessage memory message = decodedMessages[i];
-        CCIP.MessageExecutionState originalState = getExecutionState(message.sequenceNumber);
-        if (originalState == CCIP.MessageExecutionState.SUCCESS) revert AlreadyExecuted(message.sequenceNumber);
+      // If this is the first time executing this message we take the fee
+      if (originalState == CCIP.MessageExecutionState.UNTOUCHED) {
+        if (s_senderNonce[message.sender] + 1 != message.nonce) revert IncorrectNonce(message.nonce);
 
-        // Two valid cases here, we either have never touched this message before, or we tried to execute and failed
-        if (manualExecution) {
-          // Manually execution is fine if we previously failed or if the commit report is just too old
-          if (!(isOldCommitReport || originalState == CCIP.MessageExecutionState.FAILURE))
-            revert ManualExecutionNotYetEnabled();
-        } else {
-          // DON can only execute a message once
-          if (originalState != CCIP.MessageExecutionState.UNTOUCHED) revert AlreadyAttempted(message.sequenceNumber);
-        }
-
-        _isWellFormed(message);
-
-        // If this is the first time executing this message we take the fee
-        if (originalState == CCIP.MessageExecutionState.UNTOUCHED) {
-          if (s_senderNonce[message.sender] + 1 != message.nonce) revert IncorrectNonce(message.nonce);
-
-          // Take the fee charged to this contract.
-          // _releaseOrMintToken converts the message.feeToken to the proper destination token
-          _releaseOrMintToken(_getPool(IERC20(message.feeToken)), message.feeTokenAmount, address(this));
-        }
-
-        s_executedMessages[message.sequenceNumber] = CCIP.MessageExecutionState.IN_PROGRESS;
-        CCIP.MessageExecutionState newState = _trialExecute(_toAny2EVMMessageFromSender(message));
-        s_executedMessages[message.sequenceNumber] = newState;
-
-        if (!(message.strict && newState == CCIP.MessageExecutionState.FAILURE)) {
-          s_senderNonce[message.sender]++;
-        }
-
-        emit ExecutionStateChanged(message.sequenceNumber, newState);
+        // Take the fee charged to this contract.
+        // _releaseOrMintToken converts the message.feeToken to the proper destination token
+        _releaseOrMintToken(_getPool(IERC20(message.feeToken)), message.feeTokenAmount, address(this));
       }
+
+      s_executedMessages[message.sequenceNumber] = CCIP.MessageExecutionState.IN_PROGRESS;
+      CCIP.MessageExecutionState newState = _trialExecute(_toAny2EVMMessageFromSender(message));
+      s_executedMessages[message.sequenceNumber] = newState;
+
+      if (!(message.strict && newState == CCIP.MessageExecutionState.FAILURE)) {
+        s_senderNonce[message.sender]++;
+      }
+
+      emit ExecutionStateChanged(message.sequenceNumber, newState);
     }
   }
 
   /**
-   * @notice Execute a series of one or more messages using a merkle proof
+   * @notice Execute a series of one or more messages using a merkle proof and update one or more
+   * gasFeeCache prices.
    * @param report ExecutionReport
    * @param manualExecution Whether the DON auto executes or it is manually initiated
    */
@@ -135,13 +148,15 @@ contract EVM2EVMGEOffRamp is EVM2EVMGEOffRampInterface, BaseOffRamp, TypeAndVers
     uint256 gasStart = gasleft();
 
     if (address(s_router) == address(0)) revert RouterNotSet();
-    uint256 feeUpdates = report.feeUpdates.length;
-    if (manualExecution && feeUpdates != 0) revert UnauthorizedGasPriceUpdate();
 
-    _executeMessages(report, manualExecution);
-    if (feeUpdates > 0) {
+    // Fee updates
+    if (report.feeUpdates.length != 0) {
+      if (manualExecution) revert UnauthorizedGasPriceUpdate();
       s_config.gasFeeCache.updateFees(report.feeUpdates);
     }
+
+    // Message execution
+    _executeMessages(report, manualExecution);
 
     // Update NOP balances
     if (!manualExecution) {
