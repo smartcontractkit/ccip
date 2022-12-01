@@ -173,7 +173,7 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry, 
   /// @inheritdoc BaseOffRampInterface
   function setRouter(Any2EVMOffRampRouterInterface router) external onlyOwner {
     s_router = router;
-    emit OffRampRouterSet(address(router));
+    emit OffRampRouterSet(address(router), i_sourceChainId, i_onRampAddress);
   }
 
   /// @inheritdoc BaseOffRampInterface

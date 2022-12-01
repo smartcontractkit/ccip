@@ -36,7 +36,7 @@ contract EVM2EVMTollOffRamp_constructor is EVM2EVMTollOffRampSetup {
 contract EVM2EVMTollOffRamp_setRouter is EVM2EVMTollOffRampSetup {
   Any2EVMOffRampRouterInterface public s_router;
 
-  event OffRampRouterSet(address indexed router);
+  event OffRampRouterSet(address indexed router, uint256 sourceChainId, address onRampAddress);
 
   function setUp() public virtual override {
     EVM2EVMTollOffRampSetup.setUp();
@@ -58,7 +58,7 @@ contract EVM2EVMTollOffRamp_setRouter is EVM2EVMTollOffRampSetup {
 
   function _testSuccess(Any2EVMOffRampRouterInterface newRouter) private {
     vm.expectEmit(true, false, false, true);
-    emit OffRampRouterSet(address(newRouter));
+    emit OffRampRouterSet(address(newRouter), SOURCE_CHAIN_ID, ON_RAMP_ADDRESS);
 
     s_offRamp.setRouter(newRouter);
 
