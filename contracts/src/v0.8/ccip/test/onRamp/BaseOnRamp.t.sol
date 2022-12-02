@@ -60,10 +60,30 @@ contract BaseOnramp_constructor is BaseOnrampSetup {
 contract BaseOnramp_getTokenPool is BaseOnrampSetup {
   // Success
   function testSuccess() public {
-    assertEq(s_sourcePools[0], address(s_onRamp.getPool(IERC20(s_sourceTokens[0]))));
-    assertEq(s_sourcePools[1], address(s_onRamp.getPool(IERC20(s_sourceTokens[1]))));
+    assertEq(s_sourcePools[0], address(s_onRamp.getPoolBySourceToken(IERC20(s_sourceTokens[0]))));
+    assertEq(s_sourcePools[1], address(s_onRamp.getPoolBySourceToken(IERC20(s_sourceTokens[1]))));
 
-    assertEq(address(0), address(s_onRamp.getPool(IERC20(s_destTokens[0]))));
+    vm.expectRevert(abi.encodeWithSelector(BaseOnRampInterface.UnsupportedToken.selector, IERC20(s_destTokens[0])));
+    s_onRamp.getPoolBySourceToken(IERC20(s_destTokens[0]));
+  }
+}
+
+// #getPoolTokens
+contract BaseOnramp_getPoolTokens is BaseOnrampSetup {
+  // Success
+  function testGetPoolTokensSuccess() public {
+    IERC20[] memory supportedTokens = s_onRamp.getPoolTokens();
+
+    assertEq(address(s_sourceTokens[0]), address(supportedTokens[0]));
+    assertEq(address(s_sourceTokens[1]), address(supportedTokens[1]));
+    assertEq(s_sourceTokens.length, supportedTokens.length);
+
+    s_onRamp.removePool(IERC20(s_sourceTokens[0]), PoolInterface(s_sourcePools[0]));
+
+    supportedTokens = s_onRamp.getPoolTokens();
+
+    assertEq(address(s_sourceTokens[1]), address(supportedTokens[0]));
+    assertEq(s_sourceTokens.length - 1, supportedTokens.length);
   }
 }
 

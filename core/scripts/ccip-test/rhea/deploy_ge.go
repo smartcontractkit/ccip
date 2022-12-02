@@ -75,12 +75,12 @@ func deploySourceContracts(t *testing.T, source *EvmDeploymentConfig, destChainI
 	source.Logger.Infof("%s contracts fully deployed as source chain", helpers.ChainName(source.ChainConfig.ChainId.Int64()))
 }
 
-func deployDestinationContracts(t *testing.T, client *EvmDeploymentConfig, sourceChainId *big.Int, onRamp common.Address, supportedTokens map[common.Address]EVMBridgedToken) {
+func deployDestinationContracts(t *testing.T, client *EvmDeploymentConfig, sourceChainId *big.Int, onRamp common.Address, supportedTokens map[Token]EVMBridgedToken) {
 	// Updates destClient.LaneConfig.CommitStore if any new contracts are deployed
 	deployCommitStore(t, client, sourceChainId, onRamp)
 
 	// Updates destClient.LaneConfig.OffRamp if any new contracts are deployed
-	deployOffRamp(t, client, sourceChainId, getKeysFromMap(supportedTokens), onRamp)
+	deployOffRamp(t, client, sourceChainId, supportedTokens, onRamp)
 
 	setOffRampOnRouter(t, client)
 	setGasFeeCacheUpdater(t, client)
@@ -107,8 +107,8 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId *big.In
 	}
 
 	var bridgeTokens, tokenPools []common.Address
-	for token, tokenConfig := range client.ChainConfig.SupportedTokens {
-		bridgeTokens = append(bridgeTokens, token)
+	for _, tokenConfig := range client.ChainConfig.SupportedTokens {
+		bridgeTokens = append(bridgeTokens, tokenConfig.Token)
 		tokenPools = append(tokenPools, tokenConfig.Pool)
 	}
 
@@ -161,12 +161,24 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId *big.In
 	return onRamp
 }
 
-func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainId *big.Int, sourceTokens []common.Address, onRamp common.Address) *evm_2_evm_ge_offramp.EVM2EVMGEOffRamp {
+func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainId *big.Int, sourceTokens map[Token]EVMBridgedToken, onRamp common.Address) *evm_2_evm_ge_offramp.EVM2EVMGEOffRamp {
 	if !client.DeploySettings.DeployRamp {
 		client.Logger.Infof("Skipping OffRamp deployment, using offRamp on %s", client.LaneConfig.OnRamp)
 		offRamp, err := evm_2_evm_ge_offramp.NewEVM2EVMGEOffRamp(client.LaneConfig.OffRamp, client.Client)
 		require.NoError(t, err)
 		return offRamp
+	}
+
+	var syncedSourceTokens []common.Address
+	var syncedDestPools []common.Address
+
+	for tokenName, tokenConfig := range sourceTokens {
+		if _, ok := client.ChainConfig.SupportedTokens[tokenName]; ok {
+			syncedSourceTokens = append(syncedSourceTokens, tokenConfig.Token)
+			syncedDestPools = append(syncedDestPools, client.ChainConfig.SupportedTokens[tokenName].Pool)
+		} else {
+			client.Logger.Warnf("Token %s not supported by destination chain", tokenName)
+		}
 	}
 
 	client.Logger.Infof("Deploying OffRamp")
@@ -176,7 +188,6 @@ func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainId *big
 		sourceChainId,
 		client.ChainConfig.ChainId,
 		evm_2_evm_ge_offramp.EVM2EVMGEOffRampInterfaceGEOffRampConfig{
-			FeeTokenDest:                            client.ChainConfig.LinkToken,
 			GasOverhead:                             big.NewInt(0),
 			GasFeeCache:                             client.ChainConfig.GasFeeCache,
 			ExecutionDelaySeconds:                   60,
@@ -187,13 +198,15 @@ func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainId *big
 		onRamp,
 		client.LaneConfig.CommitStore,
 		client.ChainConfig.Afn,
-		sourceTokens,
-		getKeysFromMap(client.ChainConfig.SupportedTokens),
+		syncedSourceTokens,
+		syncedDestPools,
 		evm_2_evm_ge_offramp.AggregateRateLimiterInterfaceRateLimiterConfig{
 			Capacity: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 			Rate:     new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
 		},
-		client.Owner.From)
+		client.Owner.From,
+		client.ChainConfig.SupportedTokens[LINK].Token,
+	)
 	require.NoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 
@@ -354,11 +367,4 @@ func deployGovernanceDapps(t *testing.T, sourceClient *EvmDeploymentConfig, dest
 		shared.WaitForMined(t, sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
 		sourceClient.Logger.Infof("GovernanceDapp configured in tx: %s", helpers.ExplorerLink(sourceClient.ChainConfig.ChainId.Int64(), tx.Hash()))
 	}
-}
-
-func getKeysFromMap[K comparable, V any](mapping map[K]V) (keys []K) {
-	for k := range mapping {
-		keys = append(keys, k)
-	}
-	return keys
 }

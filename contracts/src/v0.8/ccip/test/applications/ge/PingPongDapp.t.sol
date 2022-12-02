@@ -38,6 +38,7 @@ contract PingPongDappSetup is EVM2EVMGEOnRampSetup {
 /// @notice #startPingPong
 contract PingPong_startPingPong is PingPongDappSetup {
   using CCIP for CCIP.EVMExtraArgsV1;
+  using CCIP for CCIP.EVM2EVMGEMessage;
 
   event ConfigPropagated(uint256 chainId, address contractAddress);
 
@@ -67,8 +68,10 @@ contract PingPong_startPingPong is PingPongDappSetup {
       tokensAndAmounts: sentMessage.tokensAndAmounts,
       gasLimit: 2e5,
       feeToken: sentMessage.feeToken,
-      strict: false
+      strict: false,
+      messageId: ""
     });
+    message.messageId = message._hash(s_metadataHash);
 
     vm.expectEmit(false, false, false, true);
     emit Ping(pingPongNumber);

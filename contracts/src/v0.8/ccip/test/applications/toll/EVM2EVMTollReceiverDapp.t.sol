@@ -14,7 +14,7 @@ contract ReceiverDappSetup is TokenSetup {
   function setUp() public virtual override {
     TokenSetup.setUp();
 
-    s_feeToken = IERC20(s_destTokens[0]);
+    s_feeToken = IERC20(s_destFeeToken);
 
     s_mockRouter = new MockTollOffRampRouter();
     s_receiverDapp = new ReceiverDapp(s_mockRouter);

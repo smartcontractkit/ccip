@@ -2,15 +2,21 @@
 pragma solidity ^0.8.0;
 
 import {GasFeeCacheInterface} from "../dynamicFeeCalculator/GasFeeCacheInterfaceInterface.sol";
+import {CCIP} from "../../models/Models.sol";
 
 interface EVM2EVMGEOffRampInterface {
   error UnauthorizedGasPriceUpdate();
   error AlreadyAttempted(uint64 seqNum);
 
   event GEOffRampConfigChanged(GEOffRampConfig);
+  event SkippedIncorrectNonce(uint64 indexed nonce, address indexed sender);
+  event ExecutionStateChanged(
+    uint64 indexed sequenceNumber,
+    bytes32 indexed messageId,
+    CCIP.MessageExecutionState state
+  );
 
   struct GEOffRampConfig {
-    address feeTokenDest;
     uint256 gasOverhead;
     GasFeeCacheInterface gasFeeCache;
     // The waiting time before manual execution is enabled

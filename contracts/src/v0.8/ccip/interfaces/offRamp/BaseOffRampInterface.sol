@@ -23,9 +23,7 @@ interface BaseOffRampInterface {
   error ReceiverError();
   error MissingFeeCoinPrice(address feeCoin);
   error InsufficientFeeAmount(uint256 sequenceNumber, uint256 expectedFeeTokens, uint256 feeTokenAmount);
-  error IncorrectNonce(uint64 nonce);
 
-  event ExecutionStateChanged(uint64 indexed sequenceNumber, CCIP.MessageExecutionState state);
   event OffRampRouterSet(address indexed router, uint256 sourceChainId, address onRampAddress);
   event OffRampConfigSet(OffRampConfig config);
 

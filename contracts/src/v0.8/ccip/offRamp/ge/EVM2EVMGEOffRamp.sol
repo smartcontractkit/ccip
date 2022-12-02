@@ -22,6 +22,7 @@ contract EVM2EVMGEOffRamp is EVM2EVMGEOffRampInterface, BaseOffRamp, TypeAndVers
   string public constant override typeAndVersion = "EVM2EVMGEOffRamp 1.0.0";
 
   bytes32 internal immutable i_metadataHash;
+  IERC20 internal immutable i_feeToken;
 
   mapping(address => uint256) internal s_nopBalance;
   mapping(address => uint64) internal s_senderNonce;
@@ -38,7 +39,8 @@ contract EVM2EVMGEOffRamp is EVM2EVMGEOffRampInterface, BaseOffRamp, TypeAndVers
     IERC20[] memory sourceTokens,
     PoolInterface[] memory pools,
     RateLimiterConfig memory rateLimiterConfig,
-    address tokenLimitsAdmin
+    address tokenLimitsAdmin,
+    IERC20 feeToken
   )
     OCR2Base(true)
     BaseOffRamp(
@@ -55,6 +57,7 @@ contract EVM2EVMGEOffRamp is EVM2EVMGEOffRampInterface, BaseOffRamp, TypeAndVers
   {
     s_config = offRampConfig;
     i_metadataHash = _metadataHash(CCIP.EVM_2_EVM_GE_MESSAGE_HASH);
+    i_feeToken = feeToken;
   }
 
   /// @inheritdoc BaseOffRamp
@@ -99,6 +102,8 @@ contract EVM2EVMGEOffRamp is EVM2EVMGEOffRampInterface, BaseOffRamp, TypeAndVers
     );
     bool isOldCommitReport = (block.timestamp - timestampCommitted) > s_config.permissionLessExecutionThresholdSeconds;
 
+    uint256 totalFeesAccrued = 0;
+
     // Execute messages
     for (uint256 i = 0; i < numMsgs; ++i) {
       CCIP.EVM2EVMGEMessage memory message = decodedMessages[i];
@@ -115,16 +120,17 @@ contract EVM2EVMGEOffRamp is EVM2EVMGEOffRampInterface, BaseOffRamp, TypeAndVers
         if (originalState != CCIP.MessageExecutionState.UNTOUCHED) revert AlreadyAttempted(message.sequenceNumber);
       }
 
-      _isWellFormed(message);
-
       // If this is the first time executing this message we take the fee
       if (originalState == CCIP.MessageExecutionState.UNTOUCHED) {
-        if (s_senderNonce[message.sender] + 1 != message.nonce) revert IncorrectNonce(message.nonce);
-
-        // Take the fee charged to this contract.
-        // _releaseOrMintToken converts the message.feeToken to the proper destination token
-        _releaseOrMintToken(_getPool(IERC20(message.feeToken)), message.feeTokenAmount, address(this));
+        if (s_senderNonce[message.sender] + 1 != message.nonce) {
+          // We skip the message if the nonce is incorrect
+          emit SkippedIncorrectNonce(message.nonce, message.sender);
+          continue;
+        }
+        totalFeesAccrued += message.feeTokenAmount;
       }
+
+      _isWellFormed(message);
 
       s_executedMessages[message.sequenceNumber] = CCIP.MessageExecutionState.IN_PROGRESS;
       CCIP.MessageExecutionState newState = _trialExecute(_toAny2EVMMessageFromSender(message));
@@ -134,8 +140,11 @@ contract EVM2EVMGEOffRamp is EVM2EVMGEOffRampInterface, BaseOffRamp, TypeAndVers
         s_senderNonce[message.sender]++;
       }
 
-      emit ExecutionStateChanged(message.sequenceNumber, newState);
+      emit ExecutionStateChanged(message.sequenceNumber, message.messageId, newState);
     }
+
+    // Take the fee charged to this contract.
+    _releaseOrMintToken(getPoolByDestToken(i_feeToken), totalFeesAccrued, address(this));
   }
 
   /**

@@ -98,7 +98,7 @@ func NewCommitServices(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet ev
 		return nil, errors.Wrap(err, "failed loading the commitStore")
 	}
 	onRampSeqParsers := make(map[common.Address]func(log logpoller.Log) (uint64, error))
-	onRampToReqEventSig := make(map[common.Address]common.Hash)
+	onRampToReqEventSig := make(map[common.Address]EventSignatures)
 	var onRamps []common.Address
 	var onRampToHasher = make(map[common.Address]LeafHasher[[32]byte])
 	hashingCtx := hasher.NewKeccakCtx()
@@ -117,7 +117,7 @@ func NewCommitServices(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet ev
 			if err3 != nil {
 				return nil, errors.Wrap(err3, "failed creating a new onramp")
 			}
-			onRampSeqParsers[common.HexToAddress(onRampID)] = func(log logpoller.Log) (uint64, error) {
+			onRampSeqParsers[addr] = func(log logpoller.Log) (uint64, error) {
 				req, err4 := onRamp.ParseCCIPSendRequested(types.Log{Data: log.Data, Topics: log.GetTopics()})
 				if err4 != nil {
 					lggr.Warnf("failed to parse log: %+v", log)
@@ -125,19 +125,14 @@ func NewCommitServices(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet ev
 				}
 				return req.Message.SequenceNumber, nil
 			}
-			// Subscribe to all relevant commit logs.
-			_, err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{CCIPTollSendRequested}, Addresses: []common.Address{onRamp.Address()}})
-			if err != nil {
-				return nil, err
-			}
-			onRampToReqEventSig[onRamp.Address()] = CCIPTollSendRequested
-			onRampToHasher[onRamp.Address()] = NewTollLeafHasher(sourceChainId, destChainId, onRamp.Address(), hashingCtx)
+			onRampToReqEventSig[addr] = GetTollEventSignatures()
+			onRampToHasher[addr] = NewTollLeafHasher(sourceChainId, destChainId, addr, hashingCtx)
 		case EVM2EVMGEOnRamp:
 			onRamp, err3 := evm_2_evm_ge_onramp.NewEVM2EVMGEOnRamp(addr, sourceChain.Client())
 			if err3 != nil {
 				return nil, errors.Wrap(err3, "failed creating a new onramp")
 			}
-			onRampSeqParsers[common.HexToAddress(onRampID)] = func(log logpoller.Log) (uint64, error) {
+			onRampSeqParsers[addr] = func(log logpoller.Log) (uint64, error) {
 				req, err4 := onRamp.ParseCCIPSendRequested(types.Log{Data: log.Data, Topics: log.GetTopics()})
 				if err4 != nil {
 					lggr.Warnf("failed to parse log: %+v", log)
@@ -145,15 +140,15 @@ func NewCommitServices(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet ev
 				}
 				return req.Message.SequenceNumber, nil
 			}
-			// Subscribe to all relevant commit logs.
-			_, err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{CCIPGESendRequested}, Addresses: []common.Address{onRamp.Address()}})
-			if err != nil {
-				return nil, err
-			}
-			onRampToReqEventSig[onRamp.Address()] = CCIPGESendRequested
-			onRampToHasher[onRamp.Address()] = NewGELeafHasher(sourceChainId, destChainId, onRamp.Address(), hashingCtx)
+			onRampToReqEventSig[addr] = GetGEEventSignatures()
+			onRampToHasher[addr] = NewGELeafHasher(sourceChainId, destChainId, addr, hashingCtx)
 		default:
 			return nil, errors.Errorf("unrecognized onramp %v", onRampID)
+		}
+		// Subscribe to all relevant commit logs.
+		_, err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{onRampToReqEventSig[addr].SendRequested}, Addresses: []common.Address{addr}})
+		if err != nil {
+			return nil, err
 		}
 	}
 	argsNoPlugin.ReportingPluginFactory = NewCommitReportingPluginFactory(lggr, sourceChain.LogPoller(), commitStore, onRampSeqParsers, onRampToReqEventSig, onRamps, onRampToHasher, inflightCacheExpiry)

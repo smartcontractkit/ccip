@@ -61,7 +61,7 @@ contract BaseOffRamp_constructor is BaseOffRampSetup {
 
   // Revert
   function testTokenConfigMismatchReverts() public {
-    vm.expectRevert(TokenPoolRegistry.InvalidTokenPoolConfig.selector);
+    vm.expectRevert(OffRampTokenPoolRegistry.InvalidTokenPoolConfig.selector);
 
     PoolInterface[] memory pools = new PoolInterface[](1);
 
@@ -220,7 +220,7 @@ contract BaseOffRamp__getPool is BaseOffRampSetup {
   // Success
   function testSuccess() public {
     address expectedPoolAddress = address(s_destPools[0]);
-    address actualPoolAddress = address(s_offRamp.getPool(IERC20(s_sourceTokens[0])));
+    address actualPoolAddress = address(s_offRamp.getPoolBySourceToken(IERC20(s_sourceTokens[0])));
     assertEq(expectedPoolAddress, actualPoolAddress);
   }
 

@@ -56,25 +56,25 @@ type ExecutionBatchBuilder struct {
 	srcLogPoller, dstLogPoller logpoller.LogPoller
 	config                     OffchainConfig
 	snoozedRoots               map[[32]byte]time.Time
-	reqEventSig                common.Hash
+	eventSignatures            EventSignatures
 	lggr                       logger.Logger
 }
 
-func NewExecutionBatchBuilder(gasLimit uint64, snoozeTime time.Duration, commitStore *commit_store.CommitStore, onRamp, offRampAddr common.Address, srcLogPoller, dstLogPoller logpoller.LogPoller, builder BatchBuilder, config OffchainConfig, offRamp OffRamp, reqEventSig common.Hash, lggr logger.Logger) *ExecutionBatchBuilder {
+func NewExecutionBatchBuilder(gasLimit uint64, snoozeTime time.Duration, commitStore *commit_store.CommitStore, onRamp, offRampAddr common.Address, srcLogPoller, dstLogPoller logpoller.LogPoller, builder BatchBuilder, config OffchainConfig, offRamp OffRamp, eventSignatures EventSignatures, lggr logger.Logger) *ExecutionBatchBuilder {
 	return &ExecutionBatchBuilder{
-		gasLimit:     gasLimit,
-		snoozeTime:   snoozeTime,
-		builder:      builder,
-		commitStore:  commitStore,
-		dstLogPoller: dstLogPoller,
-		srcLogPoller: srcLogPoller,
-		offRamp:      offRamp,
-		onRamp:       onRamp,
-		offRampAddr:  offRampAddr,
-		config:       config,
-		snoozedRoots: make(map[[32]byte]time.Time),
-		reqEventSig:  reqEventSig,
-		lggr:         lggr,
+		gasLimit:        gasLimit,
+		snoozeTime:      snoozeTime,
+		builder:         builder,
+		commitStore:     commitStore,
+		dstLogPoller:    dstLogPoller,
+		srcLogPoller:    srcLogPoller,
+		offRamp:         offRamp,
+		onRamp:          onRamp,
+		offRampAddr:     offRampAddr,
+		config:          config,
+		snoozedRoots:    make(map[[32]byte]time.Time),
+		eventSignatures: eventSignatures,
+		lggr:            lggr,
 	}
 }
 
@@ -134,7 +134,7 @@ func (eb *ExecutionBatchBuilder) getUnexpiredCommitReports() ([]commit_store.CCI
 
 func (eb *ExecutionBatchBuilder) getExecutedSeqNrsInRange(min, max uint64) (map[uint64]struct{}, error) {
 	// Should be able to keep this log constant across msg types.
-	executedLogs, err := eb.dstLogPoller.IndexedLogsTopicRange(ExecutionStateChanged, eb.offRampAddr, CrossChainMessageExecutedSequenceNumberIndex, logpoller.EvmWord(min), logpoller.EvmWord(max), int(eb.config.DestIncomingConfirmations))
+	executedLogs, err := eb.dstLogPoller.IndexedLogsTopicRange(eb.eventSignatures.ExecutionStateChanged, eb.offRampAddr, eb.eventSignatures.ExecutionStateChangedSequenceNumberIndex, logpoller.EvmWord(min), logpoller.EvmWord(max), int(eb.config.DestIncomingConfirmations))
 	if err != nil {
 		return nil, err
 	}
@@ -226,7 +226,7 @@ func (eb *ExecutionBatchBuilder) getExecutableSeqNrs(
 			continue
 		}
 		// Check this root for executable messages
-		srcLogs, err := eb.srcLogPoller.LogsDataWordRange(eb.reqEventSig, eb.onRamp, SendRequestedSequenceNumberIndex, logpoller.EvmWord(unexpiredReport.Intervals[idx].Min), logpoller.EvmWord(unexpiredReport.Intervals[idx].Max), int(eb.config.SourceIncomingConfirmations))
+		srcLogs, err := eb.srcLogPoller.LogsDataWordRange(eb.eventSignatures.SendRequested, eb.onRamp, eb.eventSignatures.SendRequestedSequenceNumberIndex, logpoller.EvmWord(unexpiredReport.Intervals[idx].Min), logpoller.EvmWord(unexpiredReport.Intervals[idx].Max), int(eb.config.SourceIncomingConfirmations))
 		if err != nil {
 			return nil, err
 		}

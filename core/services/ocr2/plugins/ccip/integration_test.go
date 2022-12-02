@@ -66,6 +66,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		gasLimit := big.NewInt(200_003)      // prime number
 		gasPrice := big.NewInt(1e9)          // 1 gwei
 
+		eventSignatures := ccip.GetGEEventSignatures()
 		extraArgs, err := testhelpers.GetEVMExtraArgsV1(gasLimit, false)
 		require.NoError(t, err)
 
@@ -104,10 +105,10 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		ccipContracts.SourceChain.Commit()
 		testhelpers.SendGERequest(t, ccipContracts, msg)
 		// Should eventually see this executed.
-		testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, ccip.CCIPGESendRequested, ccipContracts.GEOnRamp.Address(), nodes, geCurrentSeqNum)
+		testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.GEOnRamp.Address(), nodes, geCurrentSeqNum)
 		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.GEOnRamp.Address(), geCurrentSeqNum, geCurrentSeqNum)
 
-		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, ccipContracts.GEOffRamp.Address(), nodes, geCurrentSeqNum, geCurrentSeqNum)
+		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.GEOffRamp.Address(), nodes, geCurrentSeqNum, geCurrentSeqNum)
 		assert.Len(t, executionLogs, 1)
 		testhelpers.AssertGEExecSuccess(t, ccipContracts, executionLogs[0])
 
@@ -166,6 +167,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		gasLimit := big.NewInt(250_000)
 		gasPrice := big.NewInt(1e9) // 1 gwei
 
+		eventSignatures := ccip.GetGEEventSignatures()
 		var txs []*gethtypes.Transaction
 		// Enough to require batched executions as gasLimit per tx is 250k -> 500k -> 750k ....
 		// The actual gas usage of executing 15 messages is higher than the gas limit for
@@ -205,12 +207,12 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		// All nodes should have all 3.
 		var reqs []logpoller.Log
 		for i := 0; i < n; i++ {
-			reqs = append(reqs, testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, ccip.CCIPGESendRequested, ccipContracts.GEOnRamp.Address(), nodes, geCurrentSeqNum+i))
+			reqs = append(reqs, testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.GEOnRamp.Address(), nodes, geCurrentSeqNum+i))
 		}
 		// Should see a report with the full range
 		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.GEOnRamp.Address(), geCurrentSeqNum, geCurrentSeqNum+n-1)
 		// Should all be executed
-		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, ccipContracts.GEOffRamp.Address(), nodes, geCurrentSeqNum, geCurrentSeqNum+n-1)
+		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.GEOffRamp.Address(), nodes, geCurrentSeqNum, geCurrentSeqNum+n-1)
 		for _, execLog := range executionLogs {
 			testhelpers.AssertGEExecSuccess(t, ccipContracts, execLog)
 		}
@@ -219,6 +221,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 	})
 
 	t.Run("single auto-execute toll", func(t *testing.T) {
+		eventSignatures := ccip.GetTollEventSignatures()
 		// Approve router to take source token.
 		tokenAmount := big.NewInt(100)
 		// Example sending a msg with 100k callback execution on eth mainnet.
@@ -254,9 +257,9 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 			},
 			big.NewInt(100_000),
 			ccipContracts.Receivers[0].Receiver.Address())
-		testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, ccip.CCIPTollSendRequested, ccipContracts.TollOnRamp.Address(), nodes, tollCurrentSeqNum)
+		testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.TollOnRamp.Address(), nodes, tollCurrentSeqNum)
 		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.TollOnRamp.Address(), tollCurrentSeqNum, tollCurrentSeqNum)
-		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, ccipContracts.TollOffRamp.Address(), nodes, tollCurrentSeqNum, tollCurrentSeqNum)
+		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.TollOffRamp.Address(), nodes, tollCurrentSeqNum, tollCurrentSeqNum)
 		assert.Len(t, executionLogs, 1)
 		testhelpers.AssertTollExecSuccess(t, ccipContracts, executionLogs[0])
 
@@ -305,6 +308,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 	})
 
 	t.Run("batch auto-execute toll", func(t *testing.T) {
+		eventSignatures := ccip.GetTollEventSignatures()
 		sourceBalances, err := testhelpers.GetBalances([]testhelpers.BalanceReq{
 			{Name: testhelpers.SourcePool, Addr: ccipContracts.SourcePool.Address(), Getter: ccipContracts.GetSourceLinkBalance},
 			{Name: testhelpers.TollOnRampRouter, Addr: ccipContracts.TollOnRampRouter.Address(), Getter: ccipContracts.GetSourceLinkBalance},
@@ -337,12 +341,12 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		// All nodes should have all 3.
 		var reqs []logpoller.Log
 		for i := 0; i < n; i++ {
-			reqs = append(reqs, testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, ccip.CCIPTollSendRequested, ccipContracts.TollOnRamp.Address(), nodes, tollCurrentSeqNum+i))
+			reqs = append(reqs, testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.TollOnRamp.Address(), nodes, tollCurrentSeqNum+i))
 		}
 		// Should see a report with the full range
 		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.TollOnRamp.Address(), tollCurrentSeqNum, tollCurrentSeqNum+n-1)
 		// Should all be executed
-		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, ccipContracts.TollOffRamp.Address(), nodes, tollCurrentSeqNum, tollCurrentSeqNum+n-1)
+		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.TollOffRamp.Address(), nodes, tollCurrentSeqNum, tollCurrentSeqNum+n-1)
 		for _, execLog := range executionLogs {
 			testhelpers.AssertTollExecSuccess(t, ccipContracts, execLog)
 		}
@@ -387,6 +391,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 	})
 
 	t.Run("upgrade contracts while transactions are pending", func(t *testing.T) {
+		eventSignatures := ccip.GetTollEventSignatures()
 		ccipContracts.DeployNewTollOnRamp()
 		ccipContracts.DeployNewTollOffRamp()
 		newConfigBlock := ccipContracts.DestChain.Blockchain().CurrentBlock().Number().Int64()
@@ -457,11 +462,9 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		endSeqNum := int(currentSeqNum.Load())
 		for i := startSeq; i < endSeqNum; i++ {
 			t.Logf("verifying seqnum %d", i)
-			testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, ccip.CCIPTollSendRequested,
-				ccipContracts.TollOnRamp.Address(), nodes, i)
+			testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.TollOnRamp.Address(), nodes, i)
 			testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.TollOnRamp.Address(), i, i)
-			executionLog := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts,
-				ccipContracts.TollOffRamp.Address(), nodes, i, i)
+			executionLog := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.TollOffRamp.Address(), nodes, i, i)
 			testhelpers.AssertTollExecSuccess(t, ccipContracts, executionLog[0])
 		}
 		tollCurrentSeqNum = endSeqNum

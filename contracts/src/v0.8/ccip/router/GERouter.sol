@@ -23,7 +23,7 @@ contract GERouter is GERouterInterface, BaseOffRampRouter, TypeAndVersionInterfa
   constructor(BaseOffRampInterface[] memory offRamps) BaseOffRampRouter(offRamps) {}
 
   /// @inheritdoc GERouterInterface
-  function ccipSend(uint256 destinationChainId, CCIP.EVM2AnyGEMessage memory message) external returns (uint64) {
+  function ccipSend(uint256 destinationChainId, CCIP.EVM2AnyGEMessage memory message) external returns (bytes32) {
     // Find and put the correct onRamp on the stack.
     EVM2EVMGEOnRampInterface onRamp = s_onRamps[destinationChainId];
     // getFee checks if the onRamp is valid
@@ -35,7 +35,7 @@ contract GERouter is GERouterInterface, BaseOffRampRouter, TypeAndVersionInterfa
     // Transfer the tokensAndAmounts to the token pools.
     for (uint256 i = 0; i < combinedTokensAndAmounts.length; ++i) {
       IERC20 token = IERC20(combinedTokensAndAmounts[i].token);
-      PoolInterface pool = onRamp.getTokenPool(token);
+      PoolInterface pool = onRamp.getPoolBySourceToken(token);
       if (address(pool) == address(0)) revert BaseOnRampInterface.UnsupportedToken(token);
       token.safeTransferFrom(msg.sender, address(pool), combinedTokensAndAmounts[i].amount);
     }

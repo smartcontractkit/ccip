@@ -14,12 +14,14 @@ var Alpha_AvaxFuji = rhea.EVMChainConfig{
 		EIP1559: false,
 	},
 	LinkToken: gethcommon.HexToAddress("0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846"),
-	SupportedTokens: map[gethcommon.Address]rhea.EVMBridgedToken{
-		gethcommon.HexToAddress("0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846"): {
+	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
+		rhea.LINK: {
+			Token: gethcommon.HexToAddress("0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846"),
 			Pool:  gethcommon.HexToAddress("0xb6f1Fe2CDE891eFd5Efd2A563C4C2F2549163718"),
 			Price: big.NewInt(1),
 		},
-		gethcommon.HexToAddress("0x3C3de1Dd82eA10B664C693C9a3c19645Ab9635EB"): {
+		rhea.SNX: {
+			Token: gethcommon.HexToAddress("0x3C3de1Dd82eA10B664C693C9a3c19645Ab9635EB"),
 			Pool:  gethcommon.HexToAddress("0x43A2A4C2ECB74FF45Eca704a14111d8f2B1c0fA0"),
 			Price: big.NewInt(1),
 		},
@@ -34,12 +36,14 @@ var Alpha_OptimismGoerli = rhea.EVMChainConfig{
 		EIP1559: false,
 	},
 	LinkToken: gethcommon.HexToAddress("0xdc2CC710e42857672E7907CF474a69B63B93089f"),
-	SupportedTokens: map[gethcommon.Address]rhea.EVMBridgedToken{
-		gethcommon.HexToAddress("0xdc2CC710e42857672E7907CF474a69B63B93089f"): {
+	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
+		rhea.LINK: {
+			Token: gethcommon.HexToAddress("0xdc2CC710e42857672E7907CF474a69B63B93089f"),
 			Pool:  gethcommon.HexToAddress("0xE4aB69C077896252FAFBD49EFD26B5D171A32410"),
 			Price: big.NewInt(1),
 		},
-		gethcommon.HexToAddress("0xfe628556155F681dd897e3FD029e5ED699a9248E"): {
+		rhea.SNX: {
+			Token: gethcommon.HexToAddress("0xfe628556155F681dd897e3FD029e5ED699a9248E"),
 			Pool:  gethcommon.HexToAddress("0xc5CCb84C3d8eAD52C081dDB24e7Add615c0c9Daf"),
 			Price: big.NewInt(1),
 		},

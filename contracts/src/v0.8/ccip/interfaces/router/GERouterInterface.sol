@@ -17,7 +17,7 @@ interface GERouterInterface is BaseOnRampRouterInterface, Any2EVMOffRampRouterIn
    * @param message The message payload
    * @return The sequence number assigned to message
    */
-  function ccipSend(uint256 destinationChainId, CCIP.EVM2AnyGEMessage calldata message) external returns (uint64);
+  function ccipSend(uint256 destinationChainId, CCIP.EVM2AnyGEMessage calldata message) external returns (bytes32);
 
   function getFee(uint256 destinationChainId, CCIP.EVM2AnyGEMessage memory message) external view returns (uint256 fee);
 

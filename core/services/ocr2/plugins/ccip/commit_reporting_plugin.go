@@ -96,7 +96,7 @@ type CommitReportingPluginFactory struct {
 	lggr                logger.Logger
 	source              logpoller.LogPoller
 	onRampSeqParsers    map[common.Address]func(log logpoller.Log) (uint64, error)
-	onRampToReqEventSig map[common.Address]common.Hash
+	onRampToReqEventSig map[common.Address]EventSignatures
 	onRamps             []common.Address
 	commitStore         *commit_store.CommitStore
 	onRampToHasher      map[common.Address]LeafHasher[[32]byte]
@@ -109,7 +109,7 @@ func NewCommitReportingPluginFactory(
 	source logpoller.LogPoller,
 	commitStore *commit_store.CommitStore,
 	onRampSeqParsers map[common.Address]func(log logpoller.Log) (uint64, error),
-	onRampToReqEventSig map[common.Address]common.Hash,
+	onRampToReqEventSig map[common.Address]EventSignatures,
 	onRamps []common.Address,
 	onRampToHasher map[common.Address]LeafHasher[[32]byte],
 	inflightCacheExpiry time.Duration,
@@ -152,7 +152,7 @@ type CommitReportingPlugin struct {
 	F                   int
 	source              logpoller.LogPoller
 	onRamps             []common.Address
-	onRampToReqEventSig map[common.Address]common.Hash
+	onRampToReqEventSig map[common.Address]EventSignatures
 	onRampSeqParsers    map[common.Address]func(log logpoller.Log) (uint64, error)
 	commitStore         *commit_store.CommitStore
 	// We need to synchronize access to the inflight structure
@@ -215,8 +215,8 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, timestamp types
 			return nil, err
 		}
 		// All available messages that have not been committed yet and have sufficient confirmations.
-		lggr.Infof("Looking for requests with sig %s and nextMin %d on onRamp %s", r.onRampToReqEventSig[onRamp].Hex(), nextMin, onRamp.Hex())
-		reqs, err := r.source.LogsDataWordGreaterThan(r.onRampToReqEventSig[onRamp], onRamp, SendRequestedSequenceNumberIndex, EvmWord(nextMin), int(r.offchainConfig.SourceIncomingConfirmations))
+		lggr.Infof("Looking for requests with sig %s and nextMin %d on onRamp %s", r.onRampToReqEventSig[onRamp].SendRequested.Hex(), nextMin, onRamp.Hex())
+		reqs, err := r.source.LogsDataWordGreaterThan(r.onRampToReqEventSig[onRamp].SendRequested, onRamp, r.onRampToReqEventSig[onRamp].SendRequestedSequenceNumberIndex, EvmWord(nextMin), int(r.offchainConfig.SourceIncomingConfirmations))
 		if err != nil {
 			return nil, err
 		}

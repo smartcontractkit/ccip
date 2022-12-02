@@ -59,7 +59,7 @@ contract MockOnRamp is EVM2EVMTollOnRampInterface {
     return 1;
   }
 
-  function getTokenPool(IERC20) external view returns (PoolInterface) {
+  function getPoolBySourceToken(IERC20) external view returns (PoolInterface) {
     return i_pool;
   }
 
@@ -88,4 +88,8 @@ contract MockOnRamp is EVM2EVMTollOnRampInterface {
   }
 
   function setFeeConfig(FeeConfig calldata feeConfig) external override {}
+
+  function getPoolTokens() public view returns (IERC20[] memory) {
+    return new IERC20[](0);
+  }
 }

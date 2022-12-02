@@ -58,14 +58,14 @@ type Node struct {
 	KeyBundle   ocr2key.KeyBundle
 }
 
-func (node *Node) EventuallyHasReqSeqNum(t *testing.T, ccipContracts CCIPContracts, eventSig common.Hash, onRamp common.Address, seqNum int) logpoller.Log {
+func (node *Node) EventuallyHasReqSeqNum(t *testing.T, ccipContracts CCIPContracts, eventSignatures ccip.EventSignatures, onRamp common.Address, seqNum int) logpoller.Log {
 	c, err := node.App.GetChains().EVM.Get(ccipContracts.SourceChainID)
 	require.NoError(t, err)
 	var log logpoller.Log
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
 		ccipContracts.SourceChain.Commit()
 		ccipContracts.DestChain.Commit()
-		lgs, err := c.LogPoller().LogsDataWordRange(eventSig, onRamp, ccip.SendRequestedSequenceNumberIndex, ccip.EvmWord(uint64(seqNum)), ccip.EvmWord(uint64(seqNum)), 1)
+		lgs, err := c.LogPoller().LogsDataWordRange(eventSignatures.SendRequested, onRamp, eventSignatures.SendRequestedSequenceNumberIndex, ccip.EvmWord(uint64(seqNum)), ccip.EvmWord(uint64(seqNum)), 1)
 		require.NoError(t, err)
 		t.Log("Send requested", len(lgs))
 		if len(lgs) == 1 {
@@ -77,7 +77,7 @@ func (node *Node) EventuallyHasReqSeqNum(t *testing.T, ccipContracts CCIPContrac
 	return log
 }
 
-func (node *Node) EventuallyHasExecutedSeqNums(t *testing.T, ccipContracts CCIPContracts, offRamp common.Address, minSeqNum int, maxSeqNum int) []logpoller.Log {
+func (node *Node) EventuallyHasExecutedSeqNums(t *testing.T, ccipContracts CCIPContracts, eventSignatures ccip.EventSignatures, offRamp common.Address, minSeqNum int, maxSeqNum int) []logpoller.Log {
 	c, err := node.App.GetChains().EVM.Get(ccipContracts.DestChainID)
 	require.NoError(t, err)
 	var logs []logpoller.Log
@@ -85,9 +85,9 @@ func (node *Node) EventuallyHasExecutedSeqNums(t *testing.T, ccipContracts CCIPC
 		ccipContracts.SourceChain.Commit()
 		ccipContracts.DestChain.Commit()
 		lgs, err := c.LogPoller().IndexedLogsTopicRange(
-			ccip.ExecutionStateChanged,
+			eventSignatures.ExecutionStateChanged,
 			offRamp,
-			ccip.CrossChainMessageExecutedSequenceNumberIndex,
+			eventSignatures.ExecutionStateChangedSequenceNumberIndex,
 			ccip.EvmWord(uint64(minSeqNum)),
 			ccip.EvmWord(uint64(maxSeqNum)),
 			1)
@@ -103,7 +103,7 @@ func (node *Node) EventuallyHasExecutedSeqNums(t *testing.T, ccipContracts CCIPC
 	return logs
 }
 
-func (node *Node) ConsistentlySeqNumHasNotBeenExecuted(t *testing.T, ccipContracts CCIPContracts, offRamp common.Address, seqNum int) logpoller.Log {
+func (node *Node) ConsistentlySeqNumHasNotBeenExecuted(t *testing.T, ccipContracts CCIPContracts, eventSignatures ccip.EventSignatures, offRamp common.Address, seqNum int) logpoller.Log {
 	c, err := node.App.GetChains().EVM.Get(ccipContracts.DestChainID)
 	require.NoError(t, err)
 	var log logpoller.Log
@@ -111,9 +111,9 @@ func (node *Node) ConsistentlySeqNumHasNotBeenExecuted(t *testing.T, ccipContrac
 		ccipContracts.SourceChain.Commit()
 		ccipContracts.DestChain.Commit()
 		lgs, err := c.LogPoller().IndexedLogsTopicRange(
-			ccip.ExecutionStateChanged,
+			eventSignatures.ExecutionStateChanged,
 			offRamp,
-			ccip.CrossChainMessageExecutedSequenceNumberIndex,
+			eventSignatures.ExecutionStateChangedSequenceNumberIndex,
 			ccip.EvmWord(uint64(seqNum)),
 			ccip.EvmWord(uint64(seqNum)),
 			1)
@@ -384,26 +384,26 @@ func createConfigV2Chain(t *testing.T, chainId *big.Int) *v2.EVMConfig {
 	}
 }
 
-func AllNodesHaveReqSeqNum(t *testing.T, ccipContracts CCIPContracts, eventSig common.Hash, onRamp common.Address, nodes []Node, seqNum int) logpoller.Log {
+func AllNodesHaveReqSeqNum(t *testing.T, ccipContracts CCIPContracts, eventSignatures ccip.EventSignatures, onRamp common.Address, nodes []Node, seqNum int) logpoller.Log {
 	var log logpoller.Log
 	for _, node := range nodes {
-		log = node.EventuallyHasReqSeqNum(t, ccipContracts, eventSig, onRamp, seqNum)
+		log = node.EventuallyHasReqSeqNum(t, ccipContracts, eventSignatures, onRamp, seqNum)
 	}
 	return log
 }
 
-func AllNodesHaveExecutedSeqNums(t *testing.T, ccipContracts CCIPContracts, offRamp common.Address, nodes []Node, minSeqNum int, maxSeqNum int) []logpoller.Log {
+func AllNodesHaveExecutedSeqNums(t *testing.T, ccipContracts CCIPContracts, eventSignatures ccip.EventSignatures, offRamp common.Address, nodes []Node, minSeqNum int, maxSeqNum int) []logpoller.Log {
 	var logs []logpoller.Log
 	for _, node := range nodes {
-		logs = node.EventuallyHasExecutedSeqNums(t, ccipContracts, offRamp, minSeqNum, maxSeqNum)
+		logs = node.EventuallyHasExecutedSeqNums(t, ccipContracts, eventSignatures, offRamp, minSeqNum, maxSeqNum)
 	}
 	return logs
 }
 
-func NoNodesHaveExecutedSeqNum(t *testing.T, ccipContracts CCIPContracts, offRamp common.Address, nodes []Node, seqNum int) logpoller.Log {
+func NoNodesHaveExecutedSeqNum(t *testing.T, ccipContracts CCIPContracts, eventSignatures ccip.EventSignatures, offRamp common.Address, nodes []Node, seqNum int) logpoller.Log {
 	var log logpoller.Log
 	for _, node := range nodes {
-		log = node.ConsistentlySeqNumHasNotBeenExecuted(t, ccipContracts, offRamp, seqNum)
+		log = node.ConsistentlySeqNumHasNotBeenExecuted(t, ccipContracts, eventSignatures, offRamp, seqNum)
 	}
 	return log
 }

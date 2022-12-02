@@ -12,8 +12,18 @@ interface BaseOnRampInterface is AllowListInterface {
   error MustBeCalledByRouter();
   error RouterMustSetOriginalSender();
   error RouterNotSet();
+  // Token pools
+  error InvalidTokenPoolConfig();
+  error PoolAlreadyAdded();
+  error PoolDoesNotExist(IERC20 token);
+  error TokenPoolMismatch();
+
   event RouterSet(address router);
   event OnRampConfigSet(OnRampConfig config);
+
+  // Token pools
+  event PoolAdded(IERC20 token, PoolInterface pool);
+  event PoolRemoved(IERC20 token, PoolInterface pool);
 
   struct OnRampConfig {
     // Fee for sending message taken in this contract
@@ -26,12 +36,23 @@ interface BaseOnRampInterface is AllowListInterface {
     uint64 maxGasLimit;
   }
 
+  struct PoolConfig {
+    PoolInterface pool;
+    bool enabled;
+  }
+
   /**
    * @notice Get the pool for a specific token
-   * @param token token to get the pool for
+   * @param sourceToken The source chain token to get the pool for
    * @return pool PoolInterface
    */
-  function getTokenPool(IERC20 token) external returns (PoolInterface);
+  function getPoolBySourceToken(IERC20 sourceToken) external returns (PoolInterface);
+
+  /**
+   * @notice Get all configured source tokens
+   * @return Array of configured source tokens
+   */
+  function getPoolTokens() external view returns (IERC20[] memory);
 
   /**
    * @notice Gets the next sequence number to be used in the onRamp

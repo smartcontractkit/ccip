@@ -63,7 +63,7 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
     address[] memory destPools = new address[](numberOfTokens);
 
     for (uint256 i = 0; i < numberOfTokens; ++i) {
-      PoolInterface pool = s_offRamp.getPool(IERC20(original.tokensAndAmounts[i].token));
+      PoolInterface pool = s_offRamp.getPoolBySourceToken(IERC20(original.tokensAndAmounts[i].token));
       destPools[i] = address(pool);
       destTokensAndAmounts[i].token = address(pool.getToken());
       destTokensAndAmounts[i].amount = original.tokensAndAmounts[i].amount;

@@ -17,12 +17,14 @@ var Beta_Goerli = rhea.EVMChainConfig{
 		GasTipCap: rhea.DefaultGasTipFee,
 	},
 	LinkToken: gethcommon.HexToAddress("0x326C977E6efc84E512bB9C30f76E30c160eD06FB"),
-	SupportedTokens: map[gethcommon.Address]rhea.EVMBridgedToken{
-		gethcommon.HexToAddress("0x326C977E6efc84E512bB9C30f76E30c160eD06FB"): {
+	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
+		rhea.LINK: {
+			Token: gethcommon.HexToAddress("0x326C977E6efc84E512bB9C30f76E30c160eD06FB"),
 			Pool:  gethcommon.HexToAddress("0x8742E2aC5a5f9c8aAC465Bd8b6Ce1BD54F4d85a4"),
 			Price: big.NewInt(1),
 		},
-		gethcommon.HexToAddress("0x419A4c8C9bA74Bd1fdfb355f7b02848f758DD9Ce"): {
+		rhea.Custom: {
+			Token: gethcommon.HexToAddress("0x419A4c8C9bA74Bd1fdfb355f7b02848f758DD9Ce"),
 			Pool:  gethcommon.HexToAddress("0xea50De1CA43f136aF11fb06F2393E47E68B47A8E"),
 			Price: big.NewInt(1),
 		},
@@ -36,12 +38,14 @@ var Beta_AvaxFuji = rhea.EVMChainConfig{
 	GasSettings: rhea.EVMGasSettings{
 		EIP1559: false,
 	},
-	SupportedTokens: map[gethcommon.Address]rhea.EVMBridgedToken{
-		gethcommon.HexToAddress("0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846"): {
+	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
+		rhea.LINK: {
+			Token: gethcommon.HexToAddress("0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846"),
 			Pool:  gethcommon.HexToAddress("0x866faB92E04bAE5EDa238A9cbFf1e56E09508Ade"),
 			Price: big.NewInt(1),
 		},
-		gethcommon.HexToAddress("0x1D22f1dd850980D738A4dBD71588f07eECa10dfE"): {
+		rhea.Custom: {
+			Token: gethcommon.HexToAddress("0x1D22f1dd850980D738A4dBD71588f07eECa10dfE"),
 			Pool:  gethcommon.HexToAddress("0x0924011a856483E47565d54BBC65cA9E21E8EE42"),
 			Price: big.NewInt(1),
 		},

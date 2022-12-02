@@ -63,15 +63,17 @@ func maxTollCharge(gasPrice *big.Int, subTokenPerFeeCoin *big.Int, totalGasLimit
 }
 
 type TollBatchBuilder struct {
-	tollABI abi.ABI
-	lggr    logger.Logger
+	tollABI         abi.ABI
+	eventSignatures EventSignatures
+	lggr            logger.Logger
 }
 
-func NewTollBatchBuilder(lggr logger.Logger) *TollBatchBuilder {
+func NewTollBatchBuilder(lggr logger.Logger, eventSignatures EventSignatures) *TollBatchBuilder {
 	tollABI, _ := abi.JSON(strings.NewReader(evm_2_evm_toll_onramp.EVM2EVMTollOnRampABI))
 	return &TollBatchBuilder{
-		tollABI: tollABI,
-		lggr:    lggr,
+		tollABI:         tollABI,
+		eventSignatures: eventSignatures,
+		lggr:            lggr,
 	}
 }
 
@@ -176,7 +178,7 @@ func (tb *TollBatchBuilder) inflight(
 		for _, encMsg := range rep.report.EncodedMessages {
 			msg, err := tb.parseLog(types.Log{
 				// Note this needs to change if we start indexing things.
-				Topics: []common.Hash{CCIPTollSendRequested},
+				Topics: []common.Hash{tb.eventSignatures.SendRequested},
 				Data:   encMsg,
 			})
 			if err != nil {

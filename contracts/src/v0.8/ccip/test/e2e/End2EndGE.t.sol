@@ -77,13 +77,13 @@ contract E2E_GE is EVM2EVMGEOnRampSetup, CommitStoreSetup, EVM2EVMGEOffRampSetup
     vm.warp(BLOCK_TIME + 2000);
 
     vm.expectEmit(false, false, false, true);
-    emit ExecutionStateChanged(messages[0].sequenceNumber, CCIP.MessageExecutionState.SUCCESS);
+    emit ExecutionStateChanged(messages[0].sequenceNumber, messages[0].messageId, CCIP.MessageExecutionState.SUCCESS);
 
     vm.expectEmit(false, false, false, true);
-    emit ExecutionStateChanged(messages[1].sequenceNumber, CCIP.MessageExecutionState.SUCCESS);
+    emit ExecutionStateChanged(messages[1].sequenceNumber, messages[1].messageId, CCIP.MessageExecutionState.SUCCESS);
 
     vm.expectEmit(false, false, false, true);
-    emit ExecutionStateChanged(messages[2].sequenceNumber, CCIP.MessageExecutionState.SUCCESS);
+    emit ExecutionStateChanged(messages[2].sequenceNumber, messages[2].messageId, CCIP.MessageExecutionState.SUCCESS);
 
     s_offRamp.execute(_generateReportFromMessages(messages), false);
   }

@@ -74,7 +74,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 		return nil, err
 	}
 	var onRampSeqParser func(log logpoller.Log) (uint64, error)
-	var reqEventSig common.Hash
+	var eventSignatures EventSignatures
 	var onRampToHasher = make(map[common.Address]LeafHasher[[32]byte])
 	hashingCtx := hasher.NewKeccakCtx()
 
@@ -91,12 +91,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 			}
 			return req.Message.SequenceNumber, nil
 		}
-		// Subscribe to all relevant commit logs.
-		_, err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{CCIPTollSendRequested}, Addresses: []common.Address{onRampAddr}})
-		if err != nil {
-			return nil, err
-		}
-		reqEventSig = CCIPTollSendRequested
+		eventSignatures = GetTollEventSignatures()
 		onRampToHasher[onRampAddr] = NewTollLeafHasher(sourceChainId, destChainId, onRampAddr, hashingCtx)
 	case EVM2EVMGEOnRamp:
 		onRamp, err2 := evm_2_evm_ge_onramp.NewEVM2EVMGEOnRamp(onRampAddr, sourceChain.Client())
@@ -110,15 +105,15 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 			}
 			return req.Message.SequenceNumber, nil
 		}
-		// Subscribe to all relevant commit logs.
-		_, err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{CCIPGESendRequested}, Addresses: []common.Address{onRampAddr}})
-		if err != nil {
-			return nil, err
-		}
-		reqEventSig = CCIPGESendRequested
+		eventSignatures = GetGEEventSignatures()
 		onRampToHasher[onRampAddr] = NewGELeafHasher(sourceChainId, destChainId, onRampAddr, hashingCtx)
 	default:
 		return nil, errors.Errorf("unrecognized onramp, is %v the correct onramp address?", onRampAddr)
+	}
+	// Subscribe to all relevant commit logs.
+	_, err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{eventSignatures.SendRequested}, Addresses: []common.Address{onRampAddr}})
+	if err != nil {
+		return nil, err
 	}
 	_, err = destChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{ReportAccepted}, Addresses: []common.Address{verifier.Address()}})
 	if err != nil {
@@ -135,10 +130,10 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	)
 	switch offRampType {
 	case EVM2EVMTollOffRamp:
-		batchBuilder = NewTollBatchBuilder(lggr)
+		batchBuilder = NewTollBatchBuilder(lggr, eventSignatures)
 		offRamp, err2 = NewTollOffRamp(common.HexToAddress(spec.ContractID), destChain)
 	case EVM2EVMGEOffRamp:
-		batchBuilder = NewGEBatchBuilder(lggr)
+		batchBuilder = NewGEBatchBuilder(lggr, eventSignatures)
 		offRamp, err2 = NewGEOffRamp(common.HexToAddress(spec.ContractID), destChain)
 	default:
 		return nil, errors.Errorf("unrecognized offramp, is %v the correct offramp address?", spec.ContractID)
@@ -146,7 +141,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	if err2 != nil {
 		return nil, err
 	}
-	_, err = destChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{ExecutionStateChanged}, Addresses: []common.Address{offRamp.Address()}})
+	_, err = destChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{eventSignatures.ExecutionStateChanged}, Addresses: []common.Address{offRamp.Address()}})
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +160,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 		offRamp,
 		batchBuilder,
 		onRampSeqParser,
-		reqEventSig,
+		eventSignatures,
 		priceGetterObject,
 		onRampToHasher,
 		rootSnoozeTime,
@@ -194,9 +189,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 
 type OffRamp interface {
 	GetPoolTokens(opts *bind.CallOpts) ([]common.Address, error)
-	GetDestinationTokens(opts *bind.CallOpts) ([]common.Address, error)
 	GetDestinationToken(opts *bind.CallOpts, sourceToken common.Address) (common.Address, error)
-	GetPool(opts *bind.CallOpts, sourceToken common.Address) (common.Address, error)
 	GetExecutionState(opts *bind.CallOpts, arg0 uint64) (uint8, error)
 	ParseSeqNumFromExecutionStateChanged(log types.Log) (uint64, error)
 	Address() common.Address

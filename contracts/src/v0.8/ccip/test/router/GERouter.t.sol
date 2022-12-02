@@ -45,19 +45,15 @@ contract GERouter_ccipSend is EVM2EVMGEOnRampSetup {
     vm.expectEmit(false, false, false, true);
     emit Burned(address(s_onRamp), message.tokensAndAmounts[0].amount);
 
-    vm.expectEmit(false, false, false, true);
-    emit CCIPSendRequested(_messageToEvent(message, 1, 1, expectedFee));
+    CCIP.EVM2EVMGEMessage memory msgEvent = _messageToEvent(message, 1, 1, expectedFee);
 
-    assertEq(1, s_sourceRouter.ccipSend(DEST_CHAIN_ID, message));
+    vm.expectEmit(false, false, false, true);
+    emit CCIPSendRequested(msgEvent);
+
+    assertEq(msgEvent.messageId, s_sourceRouter.ccipSend(DEST_CHAIN_ID, message));
     // Assert the user balance is lowered by the tokensAndAmounts sent and the fee amount
     uint256 expectedBalance = balanceBefore - (message.tokensAndAmounts[0].amount);
     assertEq(expectedBalance, sourceToken1.balanceOf(OWNER));
-  }
-
-  function testShouldIncrementSeqNumSuccess() public {
-    assertEq(1, s_sourceRouter.ccipSend(DEST_CHAIN_ID, _generateEmptyMessage()));
-    assertEq(2, s_sourceRouter.ccipSend(DEST_CHAIN_ID, _generateEmptyMessage()));
-    assertEq(3, s_sourceRouter.ccipSend(DEST_CHAIN_ID, _generateEmptyMessage()));
   }
 
   function testCCIPSendMinimal_gas() public {

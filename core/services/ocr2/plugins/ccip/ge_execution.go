@@ -16,8 +16,9 @@ import (
 )
 
 type GEBatchBuilder struct {
-	geABI abi.ABI
-	lggr  logger.Logger
+	geABI           abi.ABI
+	eventSignatures EventSignatures
+	lggr            logger.Logger
 }
 
 const (
@@ -65,11 +66,12 @@ func maxGasOverHeadGasGE(numMsgs int, geMsg evm_2_evm_ge_onramp.CCIPEVM2EVMGEMes
 	return overheadGasGE(merkleGasShare, geMsg)
 }
 
-func NewGEBatchBuilder(lggr logger.Logger) *GEBatchBuilder {
+func NewGEBatchBuilder(lggr logger.Logger, eventSignatures EventSignatures) *GEBatchBuilder {
 	geABI, _ := abi.JSON(strings.NewReader(evm_2_evm_ge_onramp.EVM2EVMGEOnRampABI))
 	return &GEBatchBuilder{
-		geABI: geABI,
-		lggr:  lggr,
+		geABI:           geABI,
+		eventSignatures: eventSignatures,
+		lggr:            lggr,
 	}
 }
 
@@ -173,7 +175,7 @@ func (tb *GEBatchBuilder) inflight(
 		for _, encMsg := range rep.report.EncodedMessages {
 			msg, err := tb.parseLog(types.Log{
 				// Note this needs to change if we start indexing things.
-				Topics: []common.Hash{CCIPGESendRequested},
+				Topics: []common.Hash{tb.eventSignatures.SendRequested},
 				Data:   encMsg,
 			})
 			if err != nil {

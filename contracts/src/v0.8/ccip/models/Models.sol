@@ -175,6 +175,7 @@ library CCIP {
     bytes data;
     EVMTokenAndAmount[] tokensAndAmounts;
     address feeToken;
+    bytes32 messageId;
   }
 
   bytes32 internal constant EVM_2_EVM_GE_MESSAGE_HASH = keccak256("EVM2EVMGEMessageEvent");

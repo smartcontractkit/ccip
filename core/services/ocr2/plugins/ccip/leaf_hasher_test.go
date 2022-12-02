@@ -65,7 +65,7 @@ func generateTollLog(t *testing.T, message evm_2_evm_toll_onramp.CCIPEVM2EVMToll
 	require.NoError(t, err)
 
 	return types.Log{
-		Topics: []common.Hash{CCIPTollSendRequested},
+		Topics: []common.Hash{GetTollEventSignatures().SendRequested},
 		Data:   pack,
 	}
 }

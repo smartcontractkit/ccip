@@ -110,7 +110,7 @@ contract EVM2EVMGEOffRamp_execute is EVM2EVMGEOffRampSetup {
     CCIP.EVM2EVMGEMessage[] memory messages = _generateBasicMessages();
 
     vm.expectEmit(false, false, false, true);
-    emit ExecutionStateChanged(messages[0].sequenceNumber, CCIP.MessageExecutionState.SUCCESS);
+    emit ExecutionStateChanged(messages[0].sequenceNumber, messages[0].messageId, CCIP.MessageExecutionState.SUCCESS);
 
     s_offRamp.execute(_generateReportFromMessages(messages), false);
 
@@ -118,7 +118,32 @@ contract EVM2EVMGEOffRamp_execute is EVM2EVMGEOffRampSetup {
     messages[0].sequenceNumber++;
 
     vm.expectEmit(false, false, false, true);
-    emit ExecutionStateChanged(messages[0].sequenceNumber, CCIP.MessageExecutionState.SUCCESS);
+    emit ExecutionStateChanged(messages[0].sequenceNumber, messages[0].messageId, CCIP.MessageExecutionState.SUCCESS);
+
+    s_offRamp.execute(_generateReportFromMessages(messages), false);
+  }
+
+  function testSkippedIncorrectNonceSuccess() public {
+    CCIP.EVM2EVMGEMessage[] memory messages = _generateBasicMessages();
+
+    messages[0].nonce++;
+
+    vm.expectEmit(false, false, false, true);
+    emit SkippedIncorrectNonce(messages[0].nonce, messages[0].sender);
+
+    s_offRamp.execute(_generateReportFromMessages(messages), false);
+  }
+
+  function testSkippedIncorrectNonceStillExecutesSuccess() public {
+    CCIP.EVM2EVMGEMessage[] memory messages = _generateMessagesWithTokens();
+
+    messages[1].nonce++;
+
+    vm.expectEmit(false, false, false, true);
+    emit ExecutionStateChanged(messages[0].sequenceNumber, messages[0].messageId, CCIP.MessageExecutionState.SUCCESS);
+
+    vm.expectEmit(false, false, false, true);
+    emit SkippedIncorrectNonce(messages[1].nonce, messages[1].sender);
 
     s_offRamp.execute(_generateReportFromMessages(messages), false);
   }
@@ -131,7 +156,7 @@ contract EVM2EVMGEOffRamp_execute is EVM2EVMGEOffRampSetup {
     messages[0].receiver = address(newReceiver);
 
     vm.expectEmit(false, false, false, true);
-    emit ExecutionStateChanged(messages[0].sequenceNumber, CCIP.MessageExecutionState.FAILURE);
+    emit ExecutionStateChanged(messages[0].sequenceNumber, messages[0].messageId, CCIP.MessageExecutionState.FAILURE);
 
     s_offRamp.execute(_generateReportFromMessages(messages), false);
   }
@@ -142,10 +167,10 @@ contract EVM2EVMGEOffRamp_execute is EVM2EVMGEOffRampSetup {
     messages[1].receiver = address(s_secondary_receiver);
 
     vm.expectEmit(false, false, false, true);
-    emit ExecutionStateChanged(messages[0].sequenceNumber, CCIP.MessageExecutionState.SUCCESS);
+    emit ExecutionStateChanged(messages[0].sequenceNumber, messages[0].messageId, CCIP.MessageExecutionState.SUCCESS);
 
     vm.expectEmit(false, false, false, true);
-    emit ExecutionStateChanged(messages[1].sequenceNumber, CCIP.MessageExecutionState.SUCCESS);
+    emit ExecutionStateChanged(messages[1].sequenceNumber, messages[1].messageId, CCIP.MessageExecutionState.SUCCESS);
 
     s_offRamp.execute(_generateReportFromMessages(messages), false);
   }
@@ -156,10 +181,10 @@ contract EVM2EVMGEOffRamp_execute is EVM2EVMGEOffRampSetup {
     messages[1].receiver = address(s_secondary_receiver);
 
     vm.expectEmit(false, false, false, true);
-    emit ExecutionStateChanged(messages[0].sequenceNumber, CCIP.MessageExecutionState.SUCCESS);
+    emit ExecutionStateChanged(messages[0].sequenceNumber, messages[0].messageId, CCIP.MessageExecutionState.SUCCESS);
 
     vm.expectEmit(false, false, false, true);
-    emit ExecutionStateChanged(messages[1].sequenceNumber, CCIP.MessageExecutionState.SUCCESS);
+    emit ExecutionStateChanged(messages[0].sequenceNumber, messages[1].messageId, CCIP.MessageExecutionState.SUCCESS);
 
     s_offRamp.execute(_generateReportFromMessages(messages), true);
   }
@@ -335,7 +360,7 @@ contract EVM2EVMGEOffRamp__report is EVM2EVMGEOffRampSetup {
     CCIP.ExecutionReport memory report = _generateReportFromMessages(messages);
 
     vm.expectEmit(true, true, false, false);
-    emit ExecutionStateChanged(messages[0].sequenceNumber, CCIP.MessageExecutionState.SUCCESS);
+    emit ExecutionStateChanged(messages[0].sequenceNumber, messages[0].messageId, CCIP.MessageExecutionState.SUCCESS);
 
     s_offRamp.report(abi.encode(report));
   }

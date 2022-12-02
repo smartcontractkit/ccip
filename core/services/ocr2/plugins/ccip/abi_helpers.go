@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
@@ -16,23 +17,9 @@ import (
 )
 
 var (
-	// offset || sourceChainID || seqNum || ...
-	CCIPTollSendRequested common.Hash
-	// offset || sourceChainID || seqNum || ...
-	CCIPGESendRequested common.Hash
 	// merkleRoot || minSeqNum || maxSeqNum
 	ReportAccepted common.Hash
-	// sig || SeqNum || ...
-	ExecutionStateChanged common.Hash
-	ConfigSet             common.Hash
-)
-
-// Zero indexed
-const (
-	SendRequestedSequenceNumberIndex             = 2 // Valid for toll
-	ReportAcceptedMinSequenceNumberIndex         = 1
-	ReportAcceptedMaxSequenceNumberIndex         = 2
-	CrossChainMessageExecutedSequenceNumberIndex = 1
+	ConfigSet      common.Hash
 )
 
 // MessageExecutionState defines the execution states of CCIP messages.
@@ -45,35 +32,67 @@ const (
 	Failure
 )
 
+func getIDOrPanic(name string, abi2 abi.ABI) common.Hash {
+	event, ok := abi2.Events[name]
+	if !ok {
+		panic(fmt.Sprintf("missing event %s", name))
+	}
+	return event.ID
+}
+
 func init() {
-	getIDOrPanic := func(name string, abi2 abi.ABI) common.Hash {
-		event, ok := abi2.Events[name]
-		if !ok {
-			panic(fmt.Sprintf("missing event %s", name))
-		}
-		return event.ID
-	}
-	tollOnRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_toll_onramp.EVM2EVMTollOnRampABI))
-	if err != nil {
-		panic(err)
-	}
-	geOnRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_ge_onramp.EVM2EVMGEOnRampABI))
-	if err != nil {
-		panic(err)
-	}
-	offRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_toll_offramp.EVM2EVMTollOffRampABI))
-	if err != nil {
-		panic(err)
-	}
 	commitStoreABI, err := abi.JSON(strings.NewReader(commit_store.CommitStoreABI))
 	if err != nil {
 		panic(err)
 	}
-	CCIPTollSendRequested = getIDOrPanic("CCIPSendRequested", tollOnRampABI)
-	CCIPGESendRequested = getIDOrPanic("CCIPSendRequested", geOnRampABI)
 	ReportAccepted = getIDOrPanic("ReportAccepted", commitStoreABI)
-	ExecutionStateChanged = getIDOrPanic("ExecutionStateChanged", offRampABI)
 	ConfigSet = getIDOrPanic("ConfigSet", commitStoreABI)
+}
+
+func GetTollEventSignatures() EventSignatures {
+	tollOnRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_toll_onramp.EVM2EVMTollOnRampABI))
+	if err != nil {
+		panic(err)
+	}
+	CCIPSendRequested := getIDOrPanic("CCIPSendRequested", tollOnRampABI)
+
+	tollOffRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_toll_offramp.EVM2EVMTollOffRampABI))
+	if err != nil {
+		panic(err)
+	}
+	ExecutionStateChanged := getIDOrPanic("ExecutionStateChanged", tollOffRampABI)
+
+	return EventSignatures{
+		// offset || sourceChainID || seqNum || ...
+		SendRequested:                    CCIPSendRequested,
+		SendRequestedSequenceNumberIndex: 2,
+		// sig || seqNum || ...
+		ExecutionStateChanged:                    ExecutionStateChanged,
+		ExecutionStateChangedSequenceNumberIndex: 1,
+	}
+}
+
+func GetGEEventSignatures() EventSignatures {
+	geOnRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_ge_onramp.EVM2EVMGEOnRampABI))
+	if err != nil {
+		panic(err)
+	}
+	CCIPSendRequested := getIDOrPanic("CCIPSendRequested", geOnRampABI)
+
+	offRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_ge_offramp.EVM2EVMGEOffRampABI))
+	if err != nil {
+		panic(err)
+	}
+	ExecutionStateChanged := getIDOrPanic("ExecutionStateChanged", offRampABI)
+
+	return EventSignatures{
+		// offset || sourceChainID || seqNum || ...
+		SendRequested:                    CCIPSendRequested,
+		SendRequestedSequenceNumberIndex: 2,
+		// sig || seqNum || messageId || ...
+		ExecutionStateChanged:                    ExecutionStateChanged,
+		ExecutionStateChangedSequenceNumberIndex: 1,
+	}
 }
 
 // DecodeCCIPMessage decodes the bytecode message into a commit_store.CCIPAny2EVMTollMessage

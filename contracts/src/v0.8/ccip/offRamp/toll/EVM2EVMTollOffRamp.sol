@@ -16,6 +16,8 @@ import {PoolInterface} from "../../interfaces/pools/PoolInterface.sol";
  * in an OffRamp in a single transaction.
  */
 contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
+  event ExecutionStateChanged(uint64 indexed sequenceNumber, CCIP.MessageExecutionState state);
+
   using CCIP for CCIP.EVM2EVMTollMessage;
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "EVM2EVMTollOffRamp 1.0.0";

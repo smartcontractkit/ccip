@@ -11,12 +11,15 @@ import {GESRouterSetup} from "../../router/GERouterSetup.t.sol";
 
 contract EVM2EVMGEOnRampSetup is TokenSetup, GESRouterSetup {
   using CCIP for CCIP.EVMExtraArgsV1;
+  using CCIP for CCIP.EVM2EVMGEMessage;
 
   // Duplicate event of the CCIPSendRequested in the GEOnRampInterface
   event CCIPSendRequested(CCIP.EVM2EVMGEMessage message);
 
   uint256 internal immutable i_tokenAmount0 = 9;
   uint256 internal immutable i_tokenAmount1 = 7;
+
+  bytes32 internal s_metadataHash;
 
   address[] internal s_allowList;
 
@@ -44,6 +47,11 @@ contract EVM2EVMGEOnRampSetup is TokenSetup, GESRouterSetup {
       s_sourceRouter,
       dynamicFeeCalculatorConfig(address(gasFeeCache))
     );
+
+    s_metadataHash = keccak256(
+      abi.encode(CCIP.EVM_2_EVM_GE_MESSAGE_HASH, SOURCE_CHAIN_ID, DEST_CHAIN_ID, address(s_onRamp))
+    );
+
     s_onRamp.setPrices(getCastedSourceTokens(), getTokenPrices());
 
     NativeTokenPool(address(s_sourcePools[0])).setOnRamp(s_onRamp, true);
@@ -88,20 +96,23 @@ contract EVM2EVMGEOnRampSetup is TokenSetup, GESRouterSetup {
     uint256 feeTokenAmount
   ) public view returns (CCIP.EVM2EVMGEMessage memory) {
     CCIP.EVMExtraArgsV1 memory extraArgs = this.fromBytesHelper(message.extraArgs);
-    return
-      CCIP.EVM2EVMGEMessage({
-        sequenceNumber: seqNum,
-        feeTokenAmount: feeTokenAmount,
-        sender: OWNER,
-        nonce: nonce,
-        gasLimit: extraArgs.gasLimit,
-        strict: extraArgs.strict,
-        sourceChainId: SOURCE_CHAIN_ID,
-        receiver: abi.decode(message.receiver, (address)),
-        data: message.data,
-        tokensAndAmounts: message.tokensAndAmounts,
-        feeToken: message.feeToken
-      });
+    CCIP.EVM2EVMGEMessage memory messageEvent = CCIP.EVM2EVMGEMessage({
+      sequenceNumber: seqNum,
+      feeTokenAmount: feeTokenAmount,
+      sender: OWNER,
+      nonce: nonce,
+      gasLimit: extraArgs.gasLimit,
+      strict: extraArgs.strict,
+      sourceChainId: SOURCE_CHAIN_ID,
+      receiver: abi.decode(message.receiver, (address)),
+      data: message.data,
+      tokensAndAmounts: message.tokensAndAmounts,
+      feeToken: message.feeToken,
+      messageId: ""
+    });
+
+    messageEvent.messageId = messageEvent._hash(s_metadataHash);
+    return messageEvent;
   }
 
   // DynamicFeeCalculator

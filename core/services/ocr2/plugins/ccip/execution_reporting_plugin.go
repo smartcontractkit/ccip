@@ -150,6 +150,15 @@ func aggregateTokenValue(tokenLimitPrices map[common.Address]*big.Int, srcToDst 
 	return sum, nil
 }
 
+// EventSignatures contain pluginType specific signatures and indexes.
+// Indexes are zero indexed
+type EventSignatures struct {
+	SendRequested                            common.Hash
+	SendRequestedSequenceNumberIndex         int
+	ExecutionStateChanged                    common.Hash
+	ExecutionStateChangedSequenceNumberIndex int
+}
+
 type ExecutionReportingPluginFactory struct {
 	lggr                                 logger.Logger
 	source, dest                         logpoller.LogPoller
@@ -158,7 +167,7 @@ type ExecutionReportingPluginFactory struct {
 	commitStore                          *commit_store.CommitStore
 	builder                              BatchBuilder
 	onRampSeqParser                      func(log logpoller.Log) (uint64, error)
-	reqEventSig                          common.Hash
+	eventSignatures                      EventSignatures
 	priceGetter                          PriceGetter
 	onRampToHasher                       map[common.Address]LeafHasher[[32]byte]
 	rootSnoozeTime                       time.Duration
@@ -176,7 +185,7 @@ func NewExecutionReportingPluginFactory(
 	offRamp OffRamp,
 	builder BatchBuilder,
 	onRampSeqParser func(log logpoller.Log) (uint64, error),
-	reqEventSig common.Hash,
+	eventSignatures EventSignatures,
 	priceGetter PriceGetter,
 	onRampToHasher map[common.Address]LeafHasher[[32]byte],
 	rootSnoozeTime time.Duration,
@@ -185,7 +194,7 @@ func NewExecutionReportingPluginFactory(
 	sourceChainID *big.Int,
 ) types.ReportingPluginFactory {
 	return &ExecutionReportingPluginFactory{lggr: lggr, onRamp: onRamp, commitStore: commitStore, offRamp: offRamp, source: source, dest: dest, offRampAddr: offRampAddr, builder: builder,
-		onRampSeqParser: onRampSeqParser, reqEventSig: reqEventSig, priceGetter: priceGetter, onRampToHasher: onRampToHasher, rootSnoozeTime: rootSnoozeTime, inflightCacheExpiry: inflightCacheExpiry,
+		onRampSeqParser: onRampSeqParser, eventSignatures: eventSignatures, priceGetter: priceGetter, onRampToHasher: onRampToHasher, rootSnoozeTime: rootSnoozeTime, inflightCacheExpiry: inflightCacheExpiry,
 		sourceGasEstimator: sourceGasEstimator, destGasEstimator: destGasEstimator, sourceChainID: sourceChainID}
 }
 
@@ -215,10 +224,10 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 				rf.builder,
 				offchainConfig,
 				rf.offRamp,
-				rf.reqEventSig,
+				rf.eventSignatures,
 				rf.lggr),
 			onRampSeqParser:     rf.onRampSeqParser,
-			reqEventSig:         rf.reqEventSig,
+			eventSignatures:     rf.eventSignatures,
 			priceGetter:         rf.priceGetter,
 			onRampToHasher:      rf.onRampToHasher,
 			inflightCacheExpiry: rf.inflightCacheExpiry,
@@ -253,7 +262,7 @@ type ExecutionReportingPlugin struct {
 	offchainConfig                       OffchainConfig
 	builder                              *ExecutionBatchBuilder
 	onRampSeqParser                      func(log logpoller.Log) (uint64, error)
-	reqEventSig                          common.Hash
+	eventSignatures                      EventSignatures
 	priceGetter                          PriceGetter
 	onRampToHasher                       map[common.Address]LeafHasher[[32]byte]
 	sourceGasEstimator, destGasEstimator gas.Estimator
@@ -337,7 +346,7 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 	if err != nil {
 		return nil, err
 	}
-	lggr.Infof("executable seq nums %v %x", executableSequenceNumbers, r.reqEventSig)
+	lggr.Infof("executable seq nums %v %x", executableSequenceNumbers, r.eventSignatures.SendRequested)
 	followerTokensPerFeeCoin, err := r.tokenPrices(big.NewInt(TokenPriceBufferPercent))
 	if err != nil {
 		return nil, err
@@ -365,12 +374,18 @@ func contiguousReqs(lggr logger.Logger, min, max uint64, seqNrs []uint64) bool {
 	return true
 }
 
-func leafsFromIntervals(lggr logger.Logger, onRampToEventSig map[common.Address]common.Hash, seqParsers map[common.Address]func(logpoller.Log) (uint64, error), intervalByOnRamp map[common.Address]commit_store.CCIPInterval, srcLogPoller logpoller.LogPoller, onRampToHasher map[common.Address]LeafHasher[[32]byte], confs int) (map[common.Address][][32]byte, error) {
+func leafsFromIntervals(lggr logger.Logger, onRampToEventSig map[common.Address]EventSignatures, seqParsers map[common.Address]func(logpoller.Log) (uint64, error), intervalByOnRamp map[common.Address]commit_store.CCIPInterval, srcLogPoller logpoller.LogPoller, onRampToHasher map[common.Address]LeafHasher[[32]byte], confs int) (map[common.Address][][32]byte, error) {
 	leafsByOnRamp := make(map[common.Address][][32]byte)
 	for onRamp, interval := range intervalByOnRamp {
 		// Logs are guaranteed to be in order of seq num, since these are finalized logs only
 		// and the contract's seq num is auto-incrementing.
-		logs, err := srcLogPoller.LogsDataWordRange(onRampToEventSig[onRamp], onRamp, SendRequestedSequenceNumberIndex, logpoller.EvmWord(interval.Min), logpoller.EvmWord(interval.Max), confs)
+		logs, err := srcLogPoller.LogsDataWordRange(
+			onRampToEventSig[onRamp].SendRequested,
+			onRamp,
+			onRampToEventSig[onRamp].SendRequestedSequenceNumberIndex,
+			logpoller.EvmWord(interval.Min),
+			logpoller.EvmWord(interval.Max),
+			confs)
 		if err != nil {
 			return nil, err
 		}
@@ -459,7 +474,7 @@ func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNums 
 	if interval.Max == 0 {
 		return nil, errors.New("interval not found for ramp " + r.onRamp.Hex())
 	}
-	msgsInRoot, err := r.source.LogsDataWordRange(r.reqEventSig, r.onRamp, SendRequestedSequenceNumberIndex, EvmWord(interval.Min), EvmWord(interval.Max), int(r.offchainConfig.SourceIncomingConfirmations))
+	msgsInRoot, err := r.source.LogsDataWordRange(r.eventSignatures.SendRequested, r.onRamp, r.eventSignatures.SendRequestedSequenceNumberIndex, EvmWord(interval.Min), EvmWord(interval.Max), int(r.offchainConfig.SourceIncomingConfirmations))
 	if err != nil {
 		return nil, err
 	}
@@ -468,7 +483,7 @@ func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNums 
 	}
 	leafsByOnRamp, err := leafsFromIntervals(
 		lggr,
-		map[common.Address]common.Hash{r.onRamp: r.reqEventSig},
+		map[common.Address]EventSignatures{r.onRamp: r.eventSignatures},
 		map[common.Address]func(log logpoller.Log) (uint64, error){r.onRamp: r.onRampSeqParser},
 		map[common.Address]commit_store.CCIPInterval{r.onRamp: interval},
 		r.source,
@@ -693,7 +708,7 @@ func (r *ExecutionReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Cont
 		return false, nil
 	}
 	// If report is not stale we transmit.
-	// When the executeTransmitter enqueues the tx for bptxm,
+	// When the executeTransmitter enqueues the tx for tx manager,
 	// we mark it as execution_sent, removing it from the set of inflight messages.
 	if len(parsedReport.SequenceNumbers) > 0 {
 		stale, err := r.isStaleReport(parsedReport.SequenceNumbers[0])

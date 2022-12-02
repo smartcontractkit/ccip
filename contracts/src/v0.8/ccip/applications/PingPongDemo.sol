@@ -18,7 +18,7 @@ interface CCIPRouterInterface {
     bytes extraArgs;
   }
 
-  function ccipSend(uint256 destinationChainId, Message memory message) external returns (uint64);
+  function ccipSend(uint256 destinationChainId, Message memory message) external returns (bytes32);
 }
 
 interface CCIPReceiverInterface {

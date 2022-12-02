@@ -44,17 +44,17 @@ func deployAFN(t *testing.T, client *EvmDeploymentConfig) {
 }
 
 func deployNativeTokenPool(t *testing.T, client *EvmDeploymentConfig) {
-	for token, tokenConfig := range client.ChainConfig.SupportedTokens {
+	for tokenName, tokenConfig := range client.ChainConfig.SupportedTokens {
 		if client.DeploySettings.DeployTokenPools {
-			client.Logger.Infof("Deploying token pool for token %s", token.Hex())
-			tokenPoolAddress, tx, _, err := native_token_pool.DeployNativeTokenPool(client.Owner, client.Client, token)
+			client.Logger.Infof("Deploying token pool for %s token", tokenName)
+			tokenPoolAddress, tx, _, err := native_token_pool.DeployNativeTokenPool(client.Owner, client.Client, tokenConfig.Token)
 			require.NoError(t, err)
 			shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 			client.Logger.Infof("Native token pool deployed on %s in tx %s", tokenPoolAddress, helpers.ExplorerLink(client.ChainConfig.ChainId.Int64(), tx.Hash()))
 			pool, err := native_token_pool.NewNativeTokenPool(tokenPoolAddress, client.Client)
 			require.NoError(t, err)
 			fillPoolWithTokens(t, client, pool)
-			client.ChainConfig.SupportedTokens[token] = EVMBridgedToken{
+			client.ChainConfig.SupportedTokens[tokenName] = EVMBridgedToken{
 				Pool:  tokenPoolAddress,
 				Price: big.NewInt(1),
 			}

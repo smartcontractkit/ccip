@@ -19,5 +19,5 @@ interface EVM2EVMGEOnRampInterface is BaseOnRampInterface, DynamicFeeCalculatorI
     CCIP.EVM2AnyGEMessage memory message,
     uint256 feeTokenAmount,
     address originalSender
-  ) external returns (uint64);
+  ) external returns (bytes32);
 }

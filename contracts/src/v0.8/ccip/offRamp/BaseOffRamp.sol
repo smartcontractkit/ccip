@@ -3,7 +3,7 @@ pragma solidity 0.8.15;
 
 import {Address} from "../../vendor/Address.sol";
 import {HealthChecker, AFNInterface} from "../health/HealthChecker.sol";
-import {TokenPoolRegistry} from "../pools/TokenPoolRegistry.sol";
+import {OffRampTokenPoolRegistry} from "../pools/OffRampTokenPoolRegistry.sol";
 import {AggregateRateLimiter} from "../rateLimiter/AggregateRateLimiter.sol";
 import {BaseOffRampInterface, Any2EVMOffRampRouterInterface, CommitStoreInterface} from "../interfaces/offRamp/BaseOffRampInterface.sol";
 import {CCIP} from "../models/Models.sol";
@@ -13,7 +13,7 @@ import {PoolInterface} from "../interfaces/pools/PoolInterface.sol";
 /**
  * @notice A base OffRamp contract that every OffRamp should expand on
  */
-contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry, AggregateRateLimiter {
+contract BaseOffRamp is BaseOffRampInterface, HealthChecker, OffRampTokenPoolRegistry, AggregateRateLimiter {
   using Address for address;
 
   // Chain ID of the source chain
@@ -58,11 +58,11 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry, 
     address tokenLimitsAdmin
   )
     HealthChecker(afn)
-    TokenPoolRegistry(sourceTokens, pools)
+    OffRampTokenPoolRegistry(sourceTokens, pools)
     AggregateRateLimiter(rateLimiterConfig, tokenLimitsAdmin)
   {
     if (onRampAddress == address(0)) revert ZeroAddressNotAllowed();
-    // TokenPoolRegistry does a check on tokensAndAmounts.length != pools.length
+    // OffRampTokenPoolRegistry does a check on tokensAndAmounts.length != pools.length
     i_sourceChainId = sourceChainId;
     i_chainId = chainId;
     i_onRampAddress = onRampAddress;
@@ -205,7 +205,7 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, TokenPoolRegistry, 
    * @notice Returns the pool for a given source chain token.
    */
   function _getPool(IERC20 token) internal view returns (PoolInterface pool) {
-    pool = getPool(token);
+    pool = getPoolBySourceToken(token);
     if (address(pool) == address(0)) revert UnsupportedToken(token);
   }
 

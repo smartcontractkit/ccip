@@ -27,7 +27,7 @@ contract PoolCollector is OwnerIsCreator {
     uint256 feeTokenAmount
   ) internal returns (uint256 fee) {
     // Ensure fee token is valid.
-    PoolInterface feeTokenPool = onRamp.getTokenPool(feeToken);
+    PoolInterface feeTokenPool = onRamp.getPoolBySourceToken(feeToken);
     if (address(feeTokenPool) == address(0)) revert BaseOnRampInterface.UnsupportedToken(feeToken);
     fee = onRamp.getRequiredFee(feeToken);
     address sender = msg.sender;
@@ -52,7 +52,7 @@ contract PoolCollector is OwnerIsCreator {
     // Send the tokens to the pools
     for (uint256 i = 0; i < tokensAndAmounts.length; ++i) {
       IERC20 token = IERC20(tokensAndAmounts[i].token);
-      PoolInterface pool = onRamp.getTokenPool(token);
+      PoolInterface pool = onRamp.getPoolBySourceToken(token);
       if (address(pool) == address(0)) revert BaseOnRampInterface.UnsupportedToken(token);
       token.safeTransferFrom(msg.sender, address(pool), tokensAndAmounts[i].amount);
     }

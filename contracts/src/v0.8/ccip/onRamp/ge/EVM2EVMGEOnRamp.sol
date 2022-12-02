@@ -12,13 +12,13 @@ import {DynamicFeeCalculator} from "../../dynamicFeeCalculator/DynamicFeeCalcula
 
 contract EVM2EVMGEOnRamp is EVM2EVMGEOnRampInterface, BaseOnRamp, DynamicFeeCalculator, TypeAndVersionInterface {
   using CCIP for bytes;
+  using CCIP for CCIP.EVM2EVMGEMessage;
 
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "EVM2EVMGEOnRamp 1.0.0";
 
-  // Fees per token.
-  IERC20[] internal s_feeTokens;
-  mapping(IERC20 => uint256) internal s_feesByToken;
+  bytes32 internal immutable i_metadataHash;
+
   mapping(address => uint64) internal s_nonceBySender;
 
   constructor(
@@ -47,14 +47,16 @@ contract EVM2EVMGEOnRamp is EVM2EVMGEOnRampInterface, BaseOnRamp, DynamicFeeCalc
       address(router)
     )
     DynamicFeeCalculator(chainId, feeConfig)
-  {}
+  {
+    i_metadataHash = keccak256(abi.encode(CCIP.EVM_2_EVM_GE_MESSAGE_HASH, chainId, destinationChainId, address(this)));
+  }
 
   /// @inheritdoc EVM2EVMGEOnRampInterface
   function forwardFromRouter(
     CCIP.EVM2AnyGEMessage calldata message,
     uint256 feeTokenAmount,
     address originalSender
-  ) external override whenNotPaused whenHealthy returns (uint64) {
+  ) external override whenNotPaused whenHealthy returns (bytes32) {
     if (msg.sender != address(s_router)) revert MustBeCalledByRouter();
 
     CCIP.EVMExtraArgsV1 memory extraArgs = message.extraArgs._fromBytes();
@@ -73,9 +75,11 @@ contract EVM2EVMGEOnRamp is EVM2EVMGEOnRampInterface, BaseOnRamp, DynamicFeeCalc
       receiver: abi.decode(message.receiver, (address)),
       data: message.data,
       tokensAndAmounts: message.tokensAndAmounts,
-      feeToken: message.feeToken
+      feeToken: message.feeToken,
+      messageId: ""
     });
+    GEMsg.messageId = GEMsg._hash(i_metadataHash);
     emit CCIPSendRequested(GEMsg);
-    return GEMsg.sequenceNumber;
+    return GEMsg.messageId;
   }
 }

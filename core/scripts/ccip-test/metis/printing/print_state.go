@@ -137,9 +137,12 @@ func PrintTxStatuses(source *rhea.EvmDeploymentConfig, destination *rhea.EvmDepl
 	offRamp, err := evm_2_evm_ge_offramp.NewEVM2EVMGEOffRamp(destination.LaneConfig.OffRamp, destination.Client)
 	helpers.PanicErr(err)
 
-	stateChanges, err := offRamp.FilterExecutionStateChanged(&bind.FilterOpts{
-		Start: block - 9990,
-	}, seqNums)
+	stateChanges, err := offRamp.FilterExecutionStateChanged(
+		&bind.FilterOpts{
+			Start: block - 9990,
+		},
+		seqNums,
+		[][32]byte{})
 	helpers.PanicErr(err)
 
 	for stateChanges.Next() {
@@ -406,7 +409,7 @@ func printPoolBalances(chain *rhea.EvmDeploymentConfig) {
 	onRamp, err := evm_2_evm_ge_onramp.NewEVM2EVMGEOnRamp(chain.LaneConfig.OnRamp, chain.Client)
 	helpers.PanicErr(err)
 
-	for token, tokenConfig := range chain.ChainConfig.SupportedTokens {
+	for tokenName, tokenConfig := range chain.ChainConfig.SupportedTokens {
 		tokenPool, err := native_token_pool.NewNativeTokenPool(tokenConfig.Pool, chain.Client)
 		helpers.PanicErr(err)
 
@@ -431,10 +434,10 @@ func printPoolBalances(chain *rhea.EvmDeploymentConfig) {
 		isAllowedOffRamp, err := tokenPool.IsOffRamp(&bind.CallOpts{}, chain.LaneConfig.OffRamp)
 		helpers.PanicErr(err)
 
-		if tokenAddress != token {
-			sb.WriteString(fmt.Sprintf("| %-32s | TOKEN CONFIG MISMATCH ❌ | expected %s | pool token %s |\n", name, token.Hex(), tokenAddress.Hex()))
+		if tokenAddress != tokenConfig.Token {
+			sb.WriteString(fmt.Sprintf("| %-32s | TOKEN CONFIG MISMATCH ❌ | expected %s | pool token %s |\n", name, tokenConfig.Token.Hex(), tokenAddress.Hex()))
 		} else {
-			sb.WriteString(fmt.Sprintf("| %-32s | %s | %20d | %9s | %9s | %10s |\n", name, tokenConfig.Pool.Hex(), balance, printBool(isAllowedOnRamp), printBool(isAllowedOffRamp), price[0].String()))
+			sb.WriteString(fmt.Sprintf("| %-32s | %s | %20d | %9s | %9s | %10s |\n", name, tokenName, balance, printBool(isAllowedOnRamp), printBool(isAllowedOffRamp), price[0].String()))
 		}
 	}
 

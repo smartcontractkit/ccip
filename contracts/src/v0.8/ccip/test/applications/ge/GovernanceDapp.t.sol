@@ -46,6 +46,8 @@ contract GovernanceDapp_constructor is GovernanceDappSetup {
 
 /// @notice #voteForNewFeeConfig
 contract GovernanceDapp_voteForNewFeeConfig is GovernanceDappSetup {
+  using CCIP for CCIP.EVM2EVMGEMessage;
+
   event ConfigPropagated(uint256 chainId, address contractAddress);
 
   // Success
@@ -63,8 +65,10 @@ contract GovernanceDapp_voteForNewFeeConfig is GovernanceDappSetup {
       gasLimit: 3e5,
       strict: false,
       feeToken: s_sourceFeeToken,
-      feeTokenAmount: 32400109 // todo
+      feeTokenAmount: 32400109, // todo
+      messageId: ""
     });
+    message.messageId = message._hash(s_metadataHash);
 
     vm.expectEmit(false, false, false, true);
     emit CCIPSendRequested(message);

@@ -39,18 +39,27 @@ type DeploySettings struct {
 	DeployedAt           uint64
 }
 
+type Token string
+
+const (
+	LINK   Token = "Link"
+	SNX    Token = "SNX"
+	Custom Token = "custom"
+)
+
 type EVMChainConfig struct {
 	ChainId     *big.Int
 	GasSettings EVMGasSettings
 	LinkToken   gethcommon.Address
 
-	SupportedTokens map[gethcommon.Address]EVMBridgedToken
+	SupportedTokens map[Token]EVMBridgedToken
 	Router          gethcommon.Address
 	Afn             gethcommon.Address
 	GasFeeCache     gethcommon.Address
 }
 
 type EVMBridgedToken struct {
+	Token gethcommon.Address
 	Pool  gethcommon.Address
 	Price *big.Int
 }

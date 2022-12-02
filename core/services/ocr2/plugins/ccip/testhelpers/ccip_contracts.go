@@ -649,7 +649,6 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 		sourceChainID,
 		destChainID,
 		evm_2_evm_ge_offramp.EVM2EVMGEOffRampInterfaceGEOffRampConfig{
-			FeeTokenDest:                            destLinkTokenAddress,
 			GasOverhead:                             big.NewInt(0),
 			GasFeeCache:                             destGasFeeCacheAddress,
 			PermissionLessExecutionThresholdSeconds: 1,
@@ -667,6 +666,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 			Rate:     big.NewInt(1e18),
 		},
 		sourceUser.From,
+		destLinkTokenAddress,
 	)
 	require.NoError(t, err)
 	geOffRamp, err := evm_2_evm_ge_offramp.NewEVM2EVMGEOffRamp(geOffRampAddress, destChain)

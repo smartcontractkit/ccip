@@ -100,7 +100,7 @@ type Client struct {
 	ChainId          *big.Int
 	LinkToken        *link_token_interface.LinkToken
 	LinkTokenAddress common.Address
-	SupportedTokens  map[common.Address]EVMBridgedToken
+	SupportedTokens  map[rhea.Token]EVMBridgedToken
 	GovernanceDapp   *governance_dapp.GovernanceDapp
 	PingPongDapp     *ping_pong_demo.PingPongDemo
 	Afn              *afn_contract.AFNContract
@@ -110,6 +110,7 @@ type Client struct {
 }
 
 type EVMBridgedToken struct {
+	Token common.Address
 	Pool  *native_token_pool.NativeTokenPool
 	Price *big.Int
 }
@@ -124,11 +125,12 @@ func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient
 	LinkToken, err := link_token_interface.NewLinkToken(config.ChainConfig.LinkToken, config.Client)
 	require.NoError(t, err)
 
-	supportedTokens := map[common.Address]EVMBridgedToken{}
+	supportedTokens := map[rhea.Token]EVMBridgedToken{}
 	for token, tokenConfig := range config.ChainConfig.SupportedTokens {
 		tokenPool, err2 := native_token_pool.NewNativeTokenPool(tokenConfig.Pool, config.Client)
 		require.NoError(t, err2)
 		supportedTokens[token] = EVMBridgedToken{
+			Token: tokenConfig.Token,
 			Pool:  tokenPool,
 			Price: tokenConfig.Price,
 		}
@@ -178,11 +180,12 @@ func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestCli
 	LinkToken, err := link_token_interface.NewLinkToken(config.ChainConfig.LinkToken, config.Client)
 	require.NoError(t, err)
 
-	supportedTokens := map[common.Address]EVMBridgedToken{}
+	supportedTokens := map[rhea.Token]EVMBridgedToken{}
 	for token, tokenConfig := range config.ChainConfig.SupportedTokens {
 		tokenPool, err2 := native_token_pool.NewNativeTokenPool(tokenConfig.Pool, config.Client)
 		require.NoError(t, err2)
 		supportedTokens[token] = EVMBridgedToken{
+			Token: tokenConfig.Token,
 			Pool:  tokenPool,
 			Price: tokenConfig.Price,
 		}
@@ -382,7 +385,8 @@ func (client *CCIPClient) WaitForExecution(t *testing.T, DestBlockNum uint64, se
 			Start:   &DestBlockNum,
 		},
 		events,
-		[]uint64{sequenceNumber})
+		[]uint64{sequenceNumber},
+		[][32]byte{})
 	require.NoError(t, err)
 	defer sub.Unsubscribe()
 
@@ -1035,7 +1039,7 @@ func (client *CCIPClient) AcceptOwnership(t *testing.T) {
 type tokenPoolRegistry interface {
 	Address() common.Address
 	GetPoolTokens(opts *bind.CallOpts) ([]common.Address, error)
-	GetPool(opts *bind.CallOpts, token common.Address) (common.Address, error)
+	GetPoolBySourceToken(opts *bind.CallOpts, token common.Address) (common.Address, error)
 	RemovePool(opts *bind.TransactOpts, token common.Address, pool common.Address) (*types.Transaction, error)
 	AddPool(opts *bind.TransactOpts, token common.Address, pool common.Address) (*types.Transaction, error)
 }
@@ -1046,15 +1050,22 @@ type aggregateRateLimiter interface {
 	SetPrices(opts *bind.TransactOpts, tokens []common.Address, prices []*big.Int) (*types.Transaction, error)
 }
 
-func syncPools(client *Client, registry tokenPoolRegistry, bridgeTokens map[common.Address]EVMBridgedToken, txOpts *bind.TransactOpts) []*types.Transaction {
+func syncPools(client *Client, registry tokenPoolRegistry, bridgeTokens map[rhea.Token]EVMBridgedToken, txOpts *bind.TransactOpts) []*types.Transaction {
 	registeredTokens, err := registry.GetPoolTokens(&bind.CallOpts{})
 	require.NoError(client.t, err)
 
 	pendingTxs := make([]*types.Transaction, 0)
 	// remove registered tokenPools not present in config
 	for _, token := range registeredTokens {
-		if _, ok := bridgeTokens[token]; !ok {
-			pool, err := registry.GetPool(&bind.CallOpts{}, token)
+		found := false
+		for _, bridgedToken := range bridgeTokens {
+			if bridgedToken.Token == token {
+				found = true
+				break
+			}
+		}
+		if !found {
+			pool, err := registry.GetPoolBySourceToken(&bind.CallOpts{}, token)
 			require.NoError(client.t, err)
 			tx, err := registry.RemovePool(txOpts, token, pool)
 			require.NoError(client.t, err)
@@ -1064,13 +1075,13 @@ func syncPools(client *Client, registry tokenPoolRegistry, bridgeTokens map[comm
 		}
 	}
 	// add tokenPools present in config and not yet registered
-	for token, tokenConfig := range bridgeTokens {
+	for _, tokenConfig := range bridgeTokens {
 		// remove tokenPools not present in config
-		if !slices.Contains(registeredTokens, token) {
+		if !slices.Contains(registeredTokens, tokenConfig.Token) {
 			pool := tokenConfig.Pool.Address()
-			tx, err := registry.AddPool(txOpts, token, pool)
+			tx, err := registry.AddPool(txOpts, tokenConfig.Token, pool)
 			require.NoError(client.t, err)
-			client.logger.Infof("addPool(token=%s, pool=%s) from registry=%s: tx=%s", token, pool, registry.Address(), tx.Hash())
+			client.logger.Infof("addPool(token=%s, pool=%s) from registry=%s: tx=%s", tokenConfig.Token, pool, registry.Address(), tx.Hash())
 			pendingTxs = append(pendingTxs, tx)           // queue txs for wait
 			txOpts.Nonce.Add(txOpts.Nonce, big.NewInt(1)) // increment nonce
 		}
@@ -1086,8 +1097,8 @@ func syncPrices(client *Client, limiter aggregateRateLimiter, txOpts *bind.Trans
 
 	var tokens []common.Address
 	var prices []*big.Int
-	for token, tokenConfig := range client.SupportedTokens {
-		tokens = append(tokens, token)
+	for _, tokenConfig := range client.SupportedTokens {
+		tokens = append(tokens, tokenConfig.Token)
 		prices = append(prices, tokenConfig.Price)
 	}
 

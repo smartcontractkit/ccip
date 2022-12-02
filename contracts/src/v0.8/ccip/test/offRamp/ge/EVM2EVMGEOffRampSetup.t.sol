@@ -10,6 +10,8 @@ import {GasFeeCacheInterface} from "../../../dynamicFeeCalculator/GasFeeCache.so
 import {EVM2EVMGEOffRampHelper} from "../../helpers/ramps/EVM2EVMGEOffRampHelper.sol";
 
 contract EVM2EVMGEOffRampSetup is TokenSetup, GasFeeCacheSetup {
+  using CCIP for CCIP.EVM2EVMGEMessage;
+
   CommitStoreInterface internal s_mockCommitStore;
   Any2EVMMessageReceiverInterface internal s_receiver;
   Any2EVMMessageReceiverInterface internal s_secondary_receiver;
@@ -18,7 +20,12 @@ contract EVM2EVMGEOffRampSetup is TokenSetup, GasFeeCacheSetup {
 
   uint256 internal constant EXECUTION_FEE_AMOUNT = 1e18;
 
-  event ExecutionStateChanged(uint64 indexed sequenceNumber, CCIP.MessageExecutionState state);
+  event ExecutionStateChanged(
+    uint64 indexed sequenceNumber,
+    bytes32 indexed messageId,
+    CCIP.MessageExecutionState state
+  );
+  event SkippedIncorrectNonce(uint64 indexed nonce, address indexed sender);
 
   function setUp() public virtual override(TokenSetup, GasFeeCacheSetup) {
     TokenSetup.setUp();
@@ -42,7 +49,8 @@ contract EVM2EVMGEOffRampSetup is TokenSetup, GasFeeCacheSetup {
       getCastedSourceTokens(),
       getCastedDestinationPools(),
       rateLimiterConfig(),
-      TOKEN_LIMIT_ADMIN
+      TOKEN_LIMIT_ADMIN,
+      IERC20(s_destFeeToken)
     );
 
     s_offRamp.setPrices(getCastedDestinationTokens(), getTokenPrices());
@@ -54,12 +62,11 @@ contract EVM2EVMGEOffRampSetup is TokenSetup, GasFeeCacheSetup {
 
   function _generateGEOffRampConfig(GasFeeCacheInterface gasFeeCache)
     public
-    view
+    pure
     returns (EVM2EVMGEOffRampInterface.GEOffRampConfig memory)
   {
     return
       EVM2EVMGEOffRampInterface.GEOffRampConfig({
-        feeTokenDest: s_destTokens[0],
         gasOverhead: 5e5,
         gasFeeCache: gasFeeCache,
         executionDelaySeconds: EXECUTION_DELAY_SECONDS,
@@ -79,7 +86,7 @@ contract EVM2EVMGEOffRampSetup is TokenSetup, GasFeeCacheSetup {
     address[] memory destPools = new address[](numberOfTokens);
 
     for (uint256 i = 0; i < numberOfTokens; ++i) {
-      PoolInterface pool = s_offRamp.getPool(IERC20(original.tokensAndAmounts[i].token));
+      PoolInterface pool = s_offRamp.getPoolBySourceToken(IERC20(original.tokensAndAmounts[i].token));
       destPools[i] = address(pool);
       destTokensAndAmounts[i].token = address(pool.getToken());
       destTokensAndAmounts[i].amount = original.tokensAndAmounts[i].amount;
@@ -123,20 +130,26 @@ contract EVM2EVMGEOffRampSetup is TokenSetup, GasFeeCacheSetup {
     returns (CCIP.EVM2EVMGEMessage memory)
   {
     bytes memory data = abi.encode(0);
-    return
-      CCIP.EVM2EVMGEMessage({
-        sequenceNumber: sequenceNumber,
-        feeTokenAmount: EXECUTION_FEE_AMOUNT,
-        sender: OWNER,
-        nonce: sequenceNumber,
-        gasLimit: GAS_LIMIT,
-        strict: false,
-        sourceChainId: SOURCE_CHAIN_ID,
-        receiver: address(s_receiver),
-        data: data,
-        tokensAndAmounts: tokensAndAmounts,
-        feeToken: tokensAndAmounts[0].token
-      });
+    CCIP.EVM2EVMGEMessage memory message = CCIP.EVM2EVMGEMessage({
+      sequenceNumber: sequenceNumber,
+      feeTokenAmount: EXECUTION_FEE_AMOUNT,
+      sender: OWNER,
+      nonce: sequenceNumber,
+      gasLimit: GAS_LIMIT,
+      strict: false,
+      sourceChainId: SOURCE_CHAIN_ID,
+      receiver: address(s_receiver),
+      data: data,
+      tokensAndAmounts: tokensAndAmounts,
+      feeToken: tokensAndAmounts[0].token,
+      messageId: ""
+    });
+
+    message.messageId = message._hash(
+      keccak256(abi.encode(CCIP.EVM_2_EVM_GE_MESSAGE_HASH, SOURCE_CHAIN_ID, DEST_CHAIN_ID, ON_RAMP_ADDRESS))
+    );
+
+    return message;
   }
 
   function _generateBasicMessages() internal view returns (CCIP.EVM2EVMGEMessage[] memory) {
