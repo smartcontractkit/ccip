@@ -30,6 +30,7 @@ const (
 )
 
 type DRListener struct {
+	utils.StartStopOnce
 	oracle            *ocr2dr_oracle.OCR2DROracle
 	job               job.Job
 	pipelineRunner    pipeline.Runner
@@ -43,10 +44,10 @@ type DRListener struct {
 	pluginORM         ORM
 	pluginConfig      config.PluginConfig
 	logger            logger.Logger
-	utils.StartStopOnce
+	mailMon           *utils.MailboxMonitor
 }
 
-func NewDRListener(oracle *ocr2dr_oracle.OCR2DROracle, jb job.Job, runner pipeline.Runner, jobORM job.ORM, pluginORM ORM, pluginConfig config.PluginConfig, logBroadcaster log.Broadcaster, lggr logger.Logger) *DRListener {
+func NewDRListener(oracle *ocr2dr_oracle.OCR2DROracle, jb job.Job, runner pipeline.Runner, jobORM job.ORM, pluginORM ORM, pluginConfig config.PluginConfig, logBroadcaster log.Broadcaster, lggr logger.Logger, mailMon *utils.MailboxMonitor) *DRListener {
 	return &DRListener{
 		oracle:         oracle,
 		job:            jb,
@@ -58,6 +59,7 @@ func NewDRListener(oracle *ocr2dr_oracle.OCR2DROracle, jb job.Job, runner pipeli
 		pluginORM:      pluginORM,
 		pluginConfig:   pluginConfig,
 		logger:         lggr,
+		mailMon:        mailMon,
 	}
 }
 
@@ -82,6 +84,8 @@ func (l *DRListener) Start(context.Context) error {
 			l.shutdownWaitGroup.Done()
 		}()
 
+		l.mailMon.Monitor(l.mbOracleEvents, "DirectRequestListener", "OracleEvents", fmt.Sprint(l.job.ID))
+
 		return nil
 	})
 }
@@ -93,11 +97,11 @@ func (l *DRListener) Close() error {
 		close(l.chStop)
 		l.shutdownWaitGroup.Wait()
 
-		return nil
+		return l.mbOracleEvents.Close()
 	})
 }
 
-// HandleLog() complies with log.Listener
+// HandleLog implements log.Listener
 func (l *DRListener) HandleLog(lb log.Broadcast) {
 	log := lb.DecodedLog()
 	if log == nil || reflect.ValueOf(log).IsNil() {
@@ -122,13 +126,18 @@ func (l *DRListener) JobID() int32 {
 }
 
 func (l *DRListener) processOracleEvents() {
+	defer l.shutdownWaitGroup.Done()
 	for {
 		select {
 		case <-l.chStop:
-			l.shutdownWaitGroup.Done()
 			return
 		case <-l.mbOracleEvents.Notify():
 			for {
+				select {
+				case <-l.chStop:
+					return
+				default:
+				}
 				lb, exists := l.mbOracleEvents.Retrieve()
 				if !exists {
 					break
@@ -136,15 +145,15 @@ func (l *DRListener) processOracleEvents() {
 				was, err := l.logBroadcaster.WasAlreadyConsumed(lb)
 				if err != nil {
 					l.logger.Errorw("Could not determine if log was already consumed", "error", err)
-					break
+					continue
 				} else if was {
-					break
+					continue
 				}
 
 				log := lb.DecodedLog()
 				if log == nil || reflect.ValueOf(log).IsNil() {
 					l.logger.Error("processOracleEvents: ignoring nil value")
-					break
+					continue
 				}
 
 				switch log := log.(type) {

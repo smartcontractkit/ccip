@@ -30,6 +30,7 @@ MinReconnectInterval = '1m0s'
 FallbackPollInterval = '2m0s'
 
 [Database.Lock]
+Enabled = true
 LeaseDuration = '10s'
 LeaseRefreshInterval = '1s'
 
@@ -158,7 +159,6 @@ GasTipCapBufferPercent = 20
 BaseFeeBufferPercent = 20
 MaxGracePeriod = 100
 TurnLookBack = 1000
-TurnFlagEnabled = false
 UpkeepCheckGasPriceEnabled = false
 
 [Keeper.Registry]
@@ -254,6 +254,7 @@ SamplingInterval = '1s'
 PollFailureThreshold = 5
 PollInterval = '10s'
 SelectionMode = 'HighestHead'
+SyncThreshold = 5
 
 [EVM.OCR]
 ContractConfirmations = 4
@@ -336,6 +337,7 @@ SamplingInterval = '1s'
 PollFailureThreshold = 5
 PollInterval = '10s'
 SelectionMode = 'HighestHead'
+SyncThreshold = 5
 
 [EVM.OCR]
 ContractConfirmations = 4
@@ -412,6 +414,7 @@ SamplingInterval = '1s'
 PollFailureThreshold = 5
 PollInterval = '10s'
 SelectionMode = 'HighestHead'
+SyncThreshold = 10
 
 [EVM.OCR]
 ContractConfirmations = 4

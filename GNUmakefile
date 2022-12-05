@@ -153,6 +153,10 @@ test_soak_forwarder_ocr: test_need_operator_assets ## Run the Forwarder OCR soak
 test_soak_keeper: test_need_operator_assets ## Run the OCR soak test
 	cd ./integration-tests && go test -v -run ^TestKeeperSoak$$ ./soak -count=1 && cd ..
 
+.PHONY: test_benchmark_automation
+test_benchmark_automation: test_need_operator_assets ## Run the OCR soak test
+	cd ./integration-tests && go test -v -run ^TestAutomationBenchmark$$ ./benchmark -count=1 && cd ..
+
 .PHONY: test_load_ccip
 test_load_ccip: test_need_operator_assets ## Run the CCIP load test
 	SELECTED_NETWORKS="SIMULATED,SIMULATED_1,SIMULATED_2" ginkgo -v -r --junit-report=tests-load-report.xml \

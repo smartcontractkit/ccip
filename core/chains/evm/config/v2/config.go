@@ -708,6 +708,7 @@ type NodePool struct {
 	PollFailureThreshold *uint32
 	PollInterval         *models.Duration
 	SelectionMode        *string
+	SyncThreshold        *uint32
 }
 
 func (p *NodePool) setFrom(f *NodePool) {
@@ -719,6 +720,9 @@ func (p *NodePool) setFrom(f *NodePool) {
 	}
 	if v := f.SelectionMode; v != nil {
 		p.SelectionMode = v
+	}
+	if v := f.SyncThreshold; v != nil {
+		p.SyncThreshold = v
 	}
 }
 
@@ -936,11 +940,11 @@ func (n *Node) ValidateConfig() (err error) {
 		sendOnly = *n.SendOnly
 	}
 	if n.WSURL == nil {
-		if sendOnly {
+		if !sendOnly {
 			err = multierr.Append(err, v2.ErrMissing{Name: "WSURL", Msg: "required for primary nodes"})
 		}
 	} else if n.WSURL.IsZero() {
-		if sendOnly {
+		if !sendOnly {
 			err = multierr.Append(err, v2.ErrEmpty{Name: "WSURL", Msg: "required for primary nodes"})
 		}
 	} else {

@@ -42,9 +42,10 @@ multiwordconsumer_wrapper: ../../contracts/solc/v0.7/MultiWordConsumer.abi ../..
 native_token_pool: ../../contracts/solc/v0.8.15/NativeTokenPool.abi ../../contracts/solc/v0.8.15/NativeTokenPool.bin adfe4a772e4634f5ef7229858c1671e4270de7cf0aa09ba79200b072d202be2d
 nocancel_vrf_coordinator_v2: ../../contracts/solc/v0.8.6/NoCancelVRFCoordinatorV2.abi ../../contracts/solc/v0.8.6/NoCancelVRFCoordinatorV2.bin 6672e34b4b10526b338d1876790c396fd619bd2103e5cbff580687264b3e78ca
 ocr2dr: ../../contracts/solc/v0.8.6/OCR2DR.abi ../../contracts/solc/v0.8.6/OCR2DR.bin 3801bef7cad71068072098dabeab8d3f3f95d36fa8644ff8c617ccdc0b09ede0
-ocr2dr_client: ../../contracts/solc/v0.8.6/OCR2DRClient.abi ../../contracts/solc/v0.8.6/OCR2DRClient.bin 175fb730d18bb015d5931f3da902859b5634f4c1839b0d1b65ba54c1de8bce5b
-ocr2dr_client_example: ../../contracts/solc/v0.8.6/OCR2DRClientExample.abi ../../contracts/solc/v0.8.6/OCR2DRClientExample.bin 22860e75c817350cda3935c9a5b9273f800688dfb7d0326a6bd9fb200a6614f0
-ocr2dr_oracle: ../../contracts/solc/v0.8.6/OCR2DROracle.abi ../../contracts/solc/v0.8.6/OCR2DROracle.bin 5c3295274015b912aa5d501c86afdf839a4f345f480cf63b6b775f40dfe8b263
+ocr2dr_client: ../../contracts/solc/v0.8.6/OCR2DRClient.abi ../../contracts/solc/v0.8.6/OCR2DRClient.bin b3c501193c74aaa45007b40ecc0bcfd672dbe74b802a808368a61b38a9084a90
+ocr2dr_client_example: ../../contracts/solc/v0.8.6/OCR2DRClientExample.abi ../../contracts/solc/v0.8.6/OCR2DRClientExample.bin 175a377331e782d1957aed6c98576cd5087db99b50823556473a16c70731d15a
+ocr2dr_oracle: ../../contracts/solc/v0.8.6/OCR2DROracle.abi ../../contracts/solc/v0.8.6/OCR2DROracle.bin 7d56cfb8a50065e3a4031fb7d172a28da69561735f71575617f6707af2f1c42e
+ocr2dr_registry: ../../contracts/solc/v0.8.6/OCR2DRRegistry.abi ../../contracts/solc/v0.8.6/OCR2DRRegistry.bin e1ade37bd4d355f7790acd45ee3055a90f9b6705a529913dba4eee3ed590df5f
 offchain_aggregator_wrapper: OffchainAggregator/OffchainAggregator.abi - 5f97dc197fd4e2b999856b9b3fa7c2aaf0c700c71d7009d7d017d233bc855877
 operator_factory: ../../contracts/solc/v0.7/OperatorFactory.abi ../../contracts/solc/v0.7/OperatorFactory.bin e78e7231bbaceabe20a266ea596ff14e8c12bf7ec6c69e1e8fe984556d2b7df9
 operator_wrapper: ../../contracts/solc/v0.7/Operator.abi ../../contracts/solc/v0.7/Operator.bin 97dcb51158733881bfbe414d0318a57c3bba7b32bdc7aa5961db2f0ea5e993cb
