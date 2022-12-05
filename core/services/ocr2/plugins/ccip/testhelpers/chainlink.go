@@ -178,8 +178,10 @@ func (node *Node) AddJobsWithSpec(t *testing.T, jobSpec *ctfClient.OCR2TaskJobSp
 }
 
 func SetupNodeCCIP(
-	t *testing.T, owner *bind.TransactOpts,
-	port int64, dbName string,
+	t *testing.T,
+	owner *bind.TransactOpts,
+	port int64,
+	dbName string,
 	sourceChain *backends.SimulatedBackend, destChain *backends.SimulatedBackend,
 	sourceChainID *big.Int, destChainID *big.Int,
 	bootstrapPeerID string,
@@ -243,6 +245,9 @@ func SetupNodeCCIP(
 		destLp logpoller.LogPoller = logpoller.NewLogPoller(logpoller.NewORM(destChainID, db, lggr, config), destClient,
 			lggr, 500*time.Millisecond, 10, 2, 2, int64(evmCfg.EvmLogKeepBlocksDepth()))
 	)
+
+	mailMon := utils.NewMailboxMonitor("CCIP")
+
 	evmChain, err := evm.LoadChainSet(context.Background(), evm.ChainSetOpts{
 		Config:           config,
 		Logger:           lggr,
@@ -261,10 +266,12 @@ func SetupNodeCCIP(
 		GenHeadTracker: func(chainID *big.Int, hb types2.HeadBroadcaster) types2.HeadTracker {
 			if chainID.String() == sourceChainID.String() {
 				return headtracker.NewHeadTracker(
-					lggr, sourceClient,
+					lggr,
+					sourceClient,
 					evmtest.NewChainScopedConfig(t, config),
 					hb,
 					headtracker.NewHeadSaver(lggr, headtracker.NewORM(db, lggr, pgtest.NewQConfig(falseRef), *sourceClient.ChainID()), evmCfg),
+					mailMon,
 				)
 			} else if chainID.String() == destChainID.String() {
 				return headtracker.NewHeadTracker(
@@ -273,6 +280,7 @@ func SetupNodeCCIP(
 					evmtest.NewChainScopedConfig(t, config),
 					hb,
 					headtracker.NewHeadSaver(lggr, headtracker.NewORM(db, lggr, pgtest.NewQConfig(falseRef), *destClient.ChainID()), evmCfg),
+					mailMon,
 				)
 			}
 			t.Fatalf("invalid chain ID %v", chainID.String())
@@ -291,11 +299,20 @@ func SetupNodeCCIP(
 		GenLogBroadcaster: func(chainID *big.Int) log.Broadcaster {
 			if chainID.String() == sourceChainID.String() {
 				t.Log("Generating log broadcaster source")
-				return log.NewBroadcaster(log.NewORM(db, lggr, config, *sourceChainID), sourceClient,
-					evmtest.NewChainScopedConfig(t, config), lggr, nil)
+				return log.NewBroadcaster(
+					log.NewORM(db, lggr, config, *sourceChainID),
+					sourceClient,
+					evmtest.NewChainScopedConfig(t, config),
+					lggr,
+					nil, mailMon)
 			} else if chainID.String() == destChainID.String() {
-				return log.NewBroadcaster(log.NewORM(db, lggr, config, *destChainID), destClient,
-					evmtest.NewChainScopedConfig(t, config), lggr, nil)
+				return log.NewBroadcaster(
+					log.NewORM(db, lggr, config, *destChainID),
+					destClient,
+					evmtest.NewChainScopedConfig(t, config),
+					lggr,
+					nil,
+					mailMon)
 			}
 			t.Fatalf("invalid chain ID %v", chainID.String())
 			return nil
@@ -309,6 +326,7 @@ func SetupNodeCCIP(
 			t.Fatalf("invalid chain ID %v", chainID.String())
 			return nil
 		},
+		MailMon: mailMon,
 	})
 	if err != nil {
 		lggr.Fatal(err)
@@ -330,6 +348,7 @@ func SetupNodeCCIP(
 		UnrestrictedHTTPClient: &http.Client{},
 		RestrictedHTTPClient:   &http.Client{},
 		AuditLogger:            audit.NoopLogger,
+		MailMon:                mailMon,
 	})
 	require.NoError(t, err)
 	require.NoError(t, app.GetKeyStore().Unlock("password"))

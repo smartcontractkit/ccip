@@ -416,7 +416,7 @@ func (c *ccipRelayer) NewCCIPRelayProvider(rargs relaytypes.RelayArgs, transmitt
 	if err != nil {
 		return nil, err
 	}
-	contractTransmitter, err := newContractTransmitter(c.lggr, rargs, transmitterID, configWatcher)
+	contractTransmitter, err := newContractTransmitter(c.lggr, rargs, transmitterID, configWatcher, c.ethKeystore)
 	if err != nil {
 		return nil, err
 	}
@@ -442,7 +442,7 @@ func (c *ccipRelayer) NewCCIPExecutionProvider(rargs relaytypes.RelayArgs, trans
 	if err != nil {
 		return nil, err
 	}
-	contractTransmitter, err := newContractTransmitter(c.lggr, rargs, transmitterID, configWatcher)
+	contractTransmitter, err := newContractTransmitter(c.lggr, rargs, transmitterID, configWatcher, c.ethKeystore)
 	if err != nil {
 		return nil, err
 	}
