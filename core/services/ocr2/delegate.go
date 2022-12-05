@@ -19,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-relay/pkg/types"
 
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/dkg/persistence"
+	"github.com/smartcontractkit/chainlink/core/utils"
 
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2/types"
 
@@ -63,6 +64,7 @@ type Delegate struct {
 	ethKs                 keystore.Eth
 	relayers              map[relay.Network]types.Relayer
 	isNewlyCreatedJob     bool // Set to true if this is a new job freshly added, false if job was present already on node boot.
+	mailMon               *utils.MailboxMonitor
 }
 
 var _ job.Delegate = (*Delegate)(nil)
@@ -81,6 +83,7 @@ func NewDelegate(
 	dkgEncryptKs keystore.DKGEncrypt,
 	ethKs keystore.Eth,
 	relayers map[relay.Network]types.Relayer,
+	mailMon *utils.MailboxMonitor,
 ) *Delegate {
 	return &Delegate{
 		db,
@@ -97,6 +100,7 @@ func NewDelegate(
 		ethKs,
 		relayers,
 		false,
+		mailMon,
 	}
 }
 
@@ -145,17 +149,7 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 			return nil, errors.Wrap(err2, "get chainset")
 		}
 
-		var sendingKeys []string
-		ethSendingKeys, err2 := d.ethKs.GetAll()
-		if err2 != nil {
-			return nil, errors.Wrap(err2, "get eth sending keys")
-		}
-
-		// Automatically provide the node's local sending keys to the job spec.
-		for _, s := range ethSendingKeys {
-			sendingKeys = append(sendingKeys, s.Address.String())
-		}
-		spec.RelayConfig["sendingKeys"] = sendingKeys
+		spec.RelayConfig["sendingKeys"] = []string{spec.TransmitterID.String}
 
 		// effectiveTransmitterAddress is the transmitter address registered on the ocr contract. This is by default the EOA account on the node.
 		// In the case of forwarding, the transmitter address is the forwarder contract deployed onchain between EOA and OCR contract.
@@ -256,7 +250,7 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 		if err2 != nil {
 			return nil, errors.Wrap(err2, "get chainset")
 		}
-		ocr2vrfRelayer := evmrelay.NewOCR2VRFRelayer(d.db, chain, lggr.Named("OCR2VRFRelayer"))
+		ocr2vrfRelayer := evmrelay.NewOCR2VRFRelayer(d.db, chain, lggr.Named("OCR2VRFRelayer"), d.ethKs)
 		dkgProvider, err2 := ocr2vrfRelayer.NewDKGProvider(
 			types.RelayArgs{
 				ExternalJobID: jb.ExternalJobID,
@@ -299,6 +293,17 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 			spec.Relay,
 		)
 	case job.OCR2VRF:
+		// Automatically provide the node's local sending keys to the job spec for OCR2VRF.
+		var sendingKeys []string
+		ethSendingKeys, err2 := d.ethKs.GetAll()
+		if err2 != nil {
+			return nil, errors.Wrap(err2, "get eth sending keys")
+		}
+		for _, s := range ethSendingKeys {
+			sendingKeys = append(sendingKeys, s.Address.String())
+		}
+		spec.RelayConfig["sendingKeys"] = sendingKeys
+
 		chainIDInterface, ok := jb.OCR2OracleSpec.RelayConfig["chainID"]
 		if !ok {
 			return nil, errors.New("chainID must be provided in relay config")
@@ -307,6 +312,10 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 		chain, err2 := d.chainSet.Get(big.NewInt(chainID))
 		if err2 != nil {
 			return nil, errors.Wrap(err2, "get chainset")
+		}
+
+		if jb.ForwardingAllowed != chain.Config().EvmUseForwarders() {
+			return nil, errors.New("transaction forwarding settings must be consistent for ocr2vrf")
 		}
 
 		var cfg ocr2vrfconfig.PluginConfig
@@ -320,7 +329,7 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 			return nil, errors.Wrap(err2, "validate ocr2vrf plugin config")
 		}
 
-		ocr2vrfRelayer := evmrelay.NewOCR2VRFRelayer(d.db, chain, lggr.Named("OCR2VRFRelayer"))
+		ocr2vrfRelayer := evmrelay.NewOCR2VRFRelayer(d.db, chain, lggr.Named("OCR2VRFRelayer"), d.ethKs)
 
 		vrfProvider, err2 := ocr2vrfRelayer.NewOCR2VRFProvider(
 			types.RelayArgs{
@@ -526,6 +535,7 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 				PluginConfig:  spec.PluginConfig.Bytes(),
 			},
 			lggr.Named("OCR2DRRelayer"),
+			d.ethKs,
 		)
 		if err2 != nil {
 			return nil, err2
@@ -541,9 +551,8 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 		if err2 != nil {
 			return nil, err2
 		}
-		// TODO replace with a DB: https://app.shortcut.com/chainlinklabs/story/54049/database-table-in-core-node
-		pluginORM := drocr_service.NewInMemoryORM()
-		pluginOracle, _ = directrequestocr.NewDROracle(jb, d.pipelineRunner, d.jobORM, pluginORM, chain, lggr, ocrLogger)
+		pluginORM := drocr_service.NewORM(d.db, d.lggr, d.cfg, common.HexToAddress(spec.ContractID))
+		pluginOracle, _ = directrequestocr.NewDROracle(jb, d.pipelineRunner, d.jobORM, pluginORM, chain, lggr, ocrLogger, d.mailMon)
 	case job.CCIPCommit:
 		if spec.Relay != relay.EVM {
 			return nil, errors.New("Non evm chains are not supported for CCIP commit")
