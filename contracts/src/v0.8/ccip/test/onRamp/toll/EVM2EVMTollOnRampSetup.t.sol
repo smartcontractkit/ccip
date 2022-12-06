@@ -5,13 +5,13 @@ import "../../TokenSetup.t.sol";
 import "../../../interfaces/onRamp/EVM2EVMTollOnRampInterface.sol";
 import "../../../onRamp/toll/EVM2EVMTollOnRamp.sol";
 import "../../../onRamp/toll/EVM2AnyTollOnRampRouter.sol";
-import "../../models/ExtraArgs.t.sol";
+import "../../../models/Toll.sol";
+import "../../../models/TollConsumer.sol";
+import "../../../models/Common.sol";
 
 contract EVM2EVMTollOnRampSetup is TokenSetup {
-  using CCIP for CCIP.EVMExtraArgsV1;
-
   // Duplicate event of the CCIPSendRequested in the TollOnRampInterface
-  event CCIPSendRequested(CCIP.EVM2EVMTollMessage message);
+  event CCIPSendRequested(Toll.EVM2EVMTollMessage message);
 
   uint256 internal immutable i_tokenAmount0 = 9;
   uint256 internal immutable i_tokenAmount1 = 7;
@@ -56,49 +56,49 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
     IERC20(s_sourceTokens[0]).approve(address(s_onRampRouter), 2**128);
   }
 
-  function _generateTokenMessage() public view returns (CCIP.EVM2AnyTollMessage memory) {
-    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts = getCastedSourceEVMTokenAndAmountsWithZeroAmounts();
+  function _generateTokenMessage() public view returns (TollConsumer.EVM2AnyTollMessage memory) {
+    Common.EVMTokenAndAmount[] memory tokensAndAmounts = getCastedSourceEVMTokenAndAmountsWithZeroAmounts();
     tokensAndAmounts[0].amount = i_tokenAmount0;
     tokensAndAmounts[1].amount = i_tokenAmount1;
-    CCIP.EVMTokenAndAmount memory feeTokenAndAmount = CCIP.EVMTokenAndAmount({
+    Common.EVMTokenAndAmount memory feeTokenAndAmount = Common.EVMTokenAndAmount({
       token: tokensAndAmounts[0].token,
       amount: COMMIT_FEE_JUELS
     });
     return
-      CCIP.EVM2AnyTollMessage({
+      TollConsumer.EVM2AnyTollMessage({
         receiver: abi.encode(OWNER),
         data: "",
         tokensAndAmounts: tokensAndAmounts,
         feeTokenAndAmount: feeTokenAndAmount,
-        extraArgs: CCIP.EVMExtraArgsV1({gasLimit: GAS_LIMIT, strict: false})._toBytes()
+        extraArgs: TollConsumer._argsToBytes(TollConsumer.EVMExtraArgsV1({gasLimit: GAS_LIMIT, strict: false}))
       });
   }
 
-  function _generateEmptyMessage() public view returns (CCIP.EVM2AnyTollMessage memory) {
-    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts = new CCIP.EVMTokenAndAmount[](0);
-    CCIP.EVMTokenAndAmount memory feeTokenAndAmount = getCastedSourceEVMTokenAndAmountsWithZeroAmounts()[0];
+  function _generateEmptyMessage() public view returns (TollConsumer.EVM2AnyTollMessage memory) {
+    Common.EVMTokenAndAmount[] memory tokensAndAmounts = new Common.EVMTokenAndAmount[](0);
+    Common.EVMTokenAndAmount memory feeTokenAndAmount = getCastedSourceEVMTokenAndAmountsWithZeroAmounts()[0];
     feeTokenAndAmount.amount = COMMIT_FEE_JUELS;
     return
-      CCIP.EVM2AnyTollMessage({
+      TollConsumer.EVM2AnyTollMessage({
         receiver: abi.encode(OWNER),
         data: "",
         tokensAndAmounts: tokensAndAmounts,
         feeTokenAndAmount: feeTokenAndAmount,
-        extraArgs: CCIP.EVMExtraArgsV1({gasLimit: GAS_LIMIT, strict: false})._toBytes()
+        extraArgs: TollConsumer._argsToBytes(TollConsumer.EVMExtraArgsV1({gasLimit: GAS_LIMIT, strict: false}))
       });
   }
 
-  function _messageToEvent(CCIP.EVM2AnyTollMessage memory message, uint64 seqNum)
+  function _messageToEvent(TollConsumer.EVM2AnyTollMessage memory message, uint64 seqNum)
     public
-    view
-    returns (CCIP.EVM2EVMTollMessage memory)
+    pure
+    returns (Toll.EVM2EVMTollMessage memory)
   {
-    CCIP.EVMTokenAndAmount memory feeTokenAndAmount = CCIP.EVMTokenAndAmount({
+    Common.EVMTokenAndAmount memory feeTokenAndAmount = Common.EVMTokenAndAmount({
       token: message.feeTokenAndAmount.token,
       amount: message.feeTokenAndAmount.amount - COMMIT_FEE_JUELS
     });
     return
-      CCIP.EVM2EVMTollMessage({
+      Toll.EVM2EVMTollMessage({
         sequenceNumber: seqNum,
         sourceChainId: SOURCE_CHAIN_ID,
         sender: OWNER,
@@ -106,17 +106,17 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
         data: message.data,
         tokensAndAmounts: message.tokensAndAmounts,
         feeTokenAndAmount: feeTokenAndAmount,
-        gasLimit: this.fromBytesHelper(message.extraArgs).gasLimit
+        gasLimit: GAS_LIMIT
       });
   }
 
-  function _messageToEventNoFee(CCIP.EVM2AnyTollMessage memory message, uint64 seqNum)
+  function _messageToEventNoFee(TollConsumer.EVM2AnyTollMessage memory message, uint64 seqNum)
     public
-    view
-    returns (CCIP.EVM2EVMTollMessage memory)
+    pure
+    returns (Toll.EVM2EVMTollMessage memory)
   {
     return
-      CCIP.EVM2EVMTollMessage({
+      Toll.EVM2EVMTollMessage({
         sequenceNumber: seqNum,
         sourceChainId: SOURCE_CHAIN_ID,
         sender: OWNER,
@@ -124,7 +124,7 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
         data: message.data,
         tokensAndAmounts: message.tokensAndAmounts,
         feeTokenAndAmount: message.feeTokenAndAmount,
-        gasLimit: this.fromBytesHelper(message.extraArgs).gasLimit
+        gasLimit: GAS_LIMIT
       });
   }
 }

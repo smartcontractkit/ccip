@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {CCIP} from "../models/Models.sol";
+import {Internal} from "../models/Internal.sol";
 
 interface CommitStoreInterface {
   error UnsupportedOnRamp(address onRamp);
-  error InvalidInterval(CCIP.Interval interval, address onRamp);
-  error InvalidCommitReport(CCIP.CommitReport report);
+  error InvalidInterval(Internal.Interval interval, address onRamp);
+  error InvalidCommitReport(Internal.CommitReport report);
   error InvalidConfiguration();
   error InvalidProof();
 
-  event ReportAccepted(CCIP.CommitReport report);
+  event ReportAccepted(Internal.CommitReport report);
   event CommitStoreConfigSet(CommitStoreConfig config);
 
   struct CommitStoreConfig {

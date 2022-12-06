@@ -160,7 +160,7 @@ contract CommitStore_resetUnblessedRoots is CommitStoreSetup {
 
 /// @notice #report
 contract CommitStore_report is CommitStoreSetup {
-  event ReportAccepted(CCIP.CommitReport report);
+  event ReportAccepted(Internal.CommitReport report);
 
   // Success
 
@@ -168,16 +168,16 @@ contract CommitStore_report is CommitStoreSetup {
     uint64 max1 = 931;
     uint64 max2 = 2;
     uint64 max3 = 15;
-    CCIP.Interval[] memory intervals = new CCIP.Interval[](3);
-    intervals[0] = CCIP.Interval(1, max1);
-    intervals[1] = CCIP.Interval(1, max2);
-    intervals[2] = CCIP.Interval(1, max3);
+    Internal.Interval[] memory intervals = new Internal.Interval[](3);
+    intervals[0] = Internal.Interval(1, max1);
+    intervals[1] = Internal.Interval(1, max2);
+    intervals[2] = Internal.Interval(1, max3);
     bytes32[] memory merkleRoots = new bytes32[](3);
     merkleRoots[0] = "test #1";
     merkleRoots[1] = "test #2";
     merkleRoots[2] = "test #3";
     CommitStoreInterface.CommitStoreConfig memory config = commitStoreConfig();
-    CCIP.CommitReport memory report = CCIP.CommitReport({
+    Internal.CommitReport memory report = Internal.CommitReport({
       onRamps: config.onRamps,
       intervals: intervals,
       merkleRoots: merkleRoots,
@@ -211,9 +211,9 @@ contract CommitStore_report is CommitStoreSetup {
   }
 
   function testInvalidCommitReportRootLengthReverts() public {
-    CCIP.Interval[] memory intervals = new CCIP.Interval[](3);
+    Internal.Interval[] memory intervals = new Internal.Interval[](3);
     bytes32[] memory merkleRoots = new bytes32[](2);
-    CCIP.CommitReport memory report = CCIP.CommitReport({
+    Internal.CommitReport memory report = Internal.CommitReport({
       onRamps: commitStoreConfig().onRamps,
       intervals: intervals,
       merkleRoots: merkleRoots,
@@ -226,9 +226,9 @@ contract CommitStore_report is CommitStoreSetup {
   }
 
   function testInvalidCommitReportIntervalLengthReverts() public {
-    CCIP.Interval[] memory intervals = new CCIP.Interval[](2);
+    Internal.Interval[] memory intervals = new Internal.Interval[](2);
     bytes32[] memory merkleRoots = new bytes32[](3);
-    CCIP.CommitReport memory report = CCIP.CommitReport({
+    Internal.CommitReport memory report = Internal.CommitReport({
       onRamps: commitStoreConfig().onRamps,
       intervals: intervals,
       merkleRoots: merkleRoots,
@@ -241,10 +241,10 @@ contract CommitStore_report is CommitStoreSetup {
   }
 
   function testUnsupportedOnRampReverts() public {
-    CCIP.Interval[] memory intervals = new CCIP.Interval[](1);
+    Internal.Interval[] memory intervals = new Internal.Interval[](1);
     address[] memory onRamps = new address[](1);
     bytes32[] memory merkleRoots = new bytes32[](1);
-    CCIP.CommitReport memory report = CCIP.CommitReport({
+    Internal.CommitReport memory report = Internal.CommitReport({
       onRamps: onRamps,
       intervals: intervals,
       merkleRoots: merkleRoots,
@@ -257,12 +257,12 @@ contract CommitStore_report is CommitStoreSetup {
   }
 
   function testInvalidIntervalReverts() public {
-    CCIP.Interval[] memory intervals = new CCIP.Interval[](1);
-    intervals[0] = CCIP.Interval(2, 2);
+    Internal.Interval[] memory intervals = new Internal.Interval[](1);
+    intervals[0] = Internal.Interval(2, 2);
     address[] memory onRamps = new address[](1);
     onRamps[0] = commitStoreConfig().onRamps[0];
     bytes32[] memory merkleRoots = new bytes32[](1);
-    CCIP.CommitReport memory report = CCIP.CommitReport({
+    Internal.CommitReport memory report = Internal.CommitReport({
       onRamps: onRamps,
       intervals: intervals,
       merkleRoots: merkleRoots,
@@ -275,12 +275,12 @@ contract CommitStore_report is CommitStoreSetup {
   }
 
   function testInvalidIntervalMinLargerThanMaxReverts() public {
-    CCIP.Interval[] memory intervals = new CCIP.Interval[](1);
-    intervals[0] = CCIP.Interval(1, 0);
+    Internal.Interval[] memory intervals = new Internal.Interval[](1);
+    intervals[0] = Internal.Interval(1, 0);
     address[] memory onRamps = new address[](1);
     onRamps[0] = commitStoreConfig().onRamps[0];
     bytes32[] memory merkleRoots = new bytes32[](1);
-    CCIP.CommitReport memory report = CCIP.CommitReport({
+    Internal.CommitReport memory report = Internal.CommitReport({
       onRamps: onRamps,
       intervals: intervals,
       merkleRoots: merkleRoots,
@@ -296,15 +296,15 @@ contract CommitStore_report is CommitStoreSetup {
 /// @notice #verify
 contract CommitStore_verify is CommitStoreRealAFNSetup {
   function testNotBlessedSuccess() public {
-    CCIP.Interval[] memory intervals = new CCIP.Interval[](1);
-    intervals[0] = CCIP.Interval(1, 2);
+    Internal.Interval[] memory intervals = new Internal.Interval[](1);
+    intervals[0] = Internal.Interval(1, 2);
     bytes32[] memory merkleRoots = new bytes32[](1);
     merkleRoots[0] = "rootAndAlsoRootOfRoots";
     address[] memory onRamps = new address[](1);
     onRamps[0] = commitStoreConfig().onRamps[0];
     s_commitStore.report(
       abi.encode(
-        CCIP.CommitReport({
+        Internal.CommitReport({
           onRamps: onRamps,
           intervals: intervals,
           merkleRoots: merkleRoots,
@@ -319,15 +319,15 @@ contract CommitStore_verify is CommitStoreRealAFNSetup {
   }
 
   function testBlessedSuccess() public {
-    CCIP.Interval[] memory intervals = new CCIP.Interval[](1);
-    intervals[0] = CCIP.Interval(1, 2);
+    Internal.Interval[] memory intervals = new Internal.Interval[](1);
+    intervals[0] = Internal.Interval(1, 2);
     bytes32[] memory merkleRoots = new bytes32[](1);
     merkleRoots[0] = "rootAndAlsoRootOfRoots";
     address[] memory onRamps = new address[](1);
     onRamps[0] = commitStoreConfig().onRamps[0];
     s_commitStore.report(
       abi.encode(
-        CCIP.CommitReport({
+        Internal.CommitReport({
           onRamps: onRamps,
           intervals: intervals,
           merkleRoots: merkleRoots,

@@ -7,16 +7,17 @@ import {TypeAndVersionInterface} from "../../../interfaces/TypeAndVersionInterfa
 import {IERC20, PoolInterface} from "../../interfaces/pools/PoolInterface.sol";
 import {AFNInterface} from "../../interfaces/health/AFNInterface.sol";
 import {BaseOnRamp} from "../BaseOnRamp.sol";
-import {CCIP} from "../../models/Models.sol";
+import {Common} from "../../models/Common.sol";
+import {Toll} from "../../models/Toll.sol";
+import {TollConsumer} from "../../models/TollConsumer.sol";
 
 /**
  * @notice An implementation of a toll OnRamp.
  */
 contract EVM2EVMTollOnRamp is EVM2EVMTollOnRampInterface, BaseOnRamp, TypeAndVersionInterface {
-  using CCIP for bytes;
-
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "EVM2EVMTollOnRamp 1.0.0";
+  uint256 private constant EVM_DEFAULT_GAS_LIMIT = 200_000;
 
   // Fees per token.
   IERC20[] internal s_feeTokens;
@@ -48,8 +49,17 @@ contract EVM2EVMTollOnRamp is EVM2EVMTollOnRampInterface, BaseOnRamp, TypeAndVer
     )
   {}
 
+  function _fromBytes(bytes calldata extraArgs) internal pure returns (TollConsumer.EVMExtraArgsV1 memory) {
+    if (extraArgs.length == 0) {
+      return TollConsumer.EVMExtraArgsV1({gasLimit: EVM_DEFAULT_GAS_LIMIT, strict: false});
+    }
+    if (bytes4(extraArgs[:4]) != TollConsumer.EVM_EXTRA_ARGS_V1_TAG)
+      revert InvalidExtraArgsTag(TollConsumer.EVM_EXTRA_ARGS_V1_TAG, bytes4(extraArgs[:4]));
+    return TollConsumer.EVMExtraArgsV1({gasLimit: abi.decode(extraArgs[4:36], (uint256)), strict: false});
+  }
+
   /// @inheritdoc EVM2EVMTollOnRampInterface
-  function forwardFromRouter(CCIP.EVM2AnyTollMessage calldata message, address originalSender)
+  function forwardFromRouter(TollConsumer.EVM2AnyTollMessage calldata message, address originalSender)
     external
     override
     whenNotPaused
@@ -57,12 +67,12 @@ contract EVM2EVMTollOnRamp is EVM2EVMTollOnRampInterface, BaseOnRamp, TypeAndVer
     returns (uint64)
   {
     if (msg.sender != address(s_router)) revert MustBeCalledByRouter();
-    uint256 gasLimit = message.extraArgs._fromBytes().gasLimit;
+    uint256 gasLimit = _fromBytes(message.extraArgs).gasLimit;
     _handleForwardFromRouter(message.data.length, gasLimit, message.tokensAndAmounts, originalSender);
 
     // Emit message request
     // we need the next available sequence number so we increment before we use the value
-    CCIP.EVM2EVMTollMessage memory tollMsg = CCIP.EVM2EVMTollMessage({
+    Toll.EVM2EVMTollMessage memory tollMsg = Toll.EVM2EVMTollMessage({
       sourceChainId: i_chainId,
       sequenceNumber: ++s_sequenceNumber,
       sender: originalSender,

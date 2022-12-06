@@ -10,7 +10,7 @@ import (
 func TestOverheadGasGE(t *testing.T) {
 	type test struct {
 		merkleGasShare uint64
-		geMsg          evm_2_evm_ge_onramp.CCIPEVM2EVMGEMessage
+		geMsg          evm_2_evm_ge_onramp.GEEVM2EVMGEMessage
 		want           uint64
 	}
 
@@ -19,17 +19,17 @@ func TestOverheadGasGE(t *testing.T) {
 	tests := []test{
 		{
 			merkleGasShare: 0,
-			geMsg: evm_2_evm_ge_onramp.CCIPEVM2EVMGEMessage{
+			geMsg: evm_2_evm_ge_onramp.GEEVM2EVMGEMessage{
 				Data:             []byte{},
-				TokensAndAmounts: []evm_2_evm_ge_onramp.CCIPEVMTokenAndAmount{},
+				TokensAndAmounts: []evm_2_evm_ge_onramp.CommonEVMTokenAndAmount{},
 			},
 			want: 63260,
 		},
 		{
 			merkleGasShare: 4_000,
-			geMsg: evm_2_evm_ge_onramp.CCIPEVM2EVMGEMessage{
+			geMsg: evm_2_evm_ge_onramp.GEEVM2EVMGEMessage{
 				Data: []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
-				TokensAndAmounts: []evm_2_evm_ge_onramp.CCIPEVMTokenAndAmount{
+				TokensAndAmounts: []evm_2_evm_ge_onramp.CommonEVMTokenAndAmount{
 					{},
 				},
 			},
@@ -48,7 +48,7 @@ func TestOverheadGasGE(t *testing.T) {
 func TestMaxGasOverHeadGasGE(t *testing.T) {
 	type test struct {
 		numMsgs int
-		geMsg   evm_2_evm_ge_onramp.CCIPEVM2EVMGEMessage
+		geMsg   evm_2_evm_ge_onramp.GEEVM2EVMGEMessage
 		want    uint64
 	}
 
@@ -57,17 +57,17 @@ func TestMaxGasOverHeadGasGE(t *testing.T) {
 	tests := []test{
 		{
 			numMsgs: 6,
-			geMsg: evm_2_evm_ge_onramp.CCIPEVM2EVMGEMessage{
+			geMsg: evm_2_evm_ge_onramp.GEEVM2EVMGEMessage{
 				Data:             []byte{},
-				TokensAndAmounts: []evm_2_evm_ge_onramp.CCIPEVMTokenAndAmount{},
+				TokensAndAmounts: []evm_2_evm_ge_onramp.CommonEVMTokenAndAmount{},
 			},
 			want: 67356,
 		},
 		{
 			numMsgs: 3,
-			geMsg: evm_2_evm_ge_onramp.CCIPEVM2EVMGEMessage{
+			geMsg: evm_2_evm_ge_onramp.GEEVM2EVMGEMessage{
 				Data: []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
-				TokensAndAmounts: []evm_2_evm_ge_onramp.CCIPEVMTokenAndAmount{
+				TokensAndAmounts: []evm_2_evm_ge_onramp.CommonEVMTokenAndAmount{
 					{},
 				},
 			},

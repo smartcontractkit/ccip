@@ -27,7 +27,7 @@ contract BaseOffRampHelper is BaseOffRamp {
     )
   {}
 
-  function setExecutionState(uint64 sequenceNumber, CCIP.MessageExecutionState state) public {
+  function setExecutionState(uint64 sequenceNumber, Internal.MessageExecutionState state) public {
     s_executedMessages[sequenceNumber] = state;
   }
 
@@ -41,7 +41,7 @@ contract BaseOffRampHelper is BaseOffRamp {
 
   function releaseOrMintTokens(
     address[] memory pools,
-    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts,
+    Common.EVMTokenAndAmount[] memory tokensAndAmounts,
     address receiver
   ) external {
     _releaseOrMintTokens(pools, tokensAndAmounts, receiver);

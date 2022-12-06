@@ -6,7 +6,9 @@ import {BaseOffRampInterface} from "../../interfaces/offRamp/BaseOffRampInterfac
 import {CommitStoreInterface} from "../../interfaces/CommitStoreInterface.sol";
 import {OCR2Base} from "../../ocr/OCR2Base.sol";
 import {BaseOffRamp} from "../BaseOffRamp.sol";
-import {CCIP} from "../../models/Models.sol";
+import {Toll} from "../../models/Toll.sol";
+import {Internal} from "../../models/Internal.sol";
+import {Common} from "../../models/Common.sol";
 import {IERC20} from "../../../vendor/IERC20.sol";
 import {AFNInterface} from "../../interfaces/health/AFNInterface.sol";
 import {PoolInterface} from "../../interfaces/pools/PoolInterface.sol";
@@ -16,9 +18,8 @@ import {PoolInterface} from "../../interfaces/pools/PoolInterface.sol";
  * in an OffRamp in a single transaction.
  */
 contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
-  event ExecutionStateChanged(uint64 indexed sequenceNumber, CCIP.MessageExecutionState state);
+  event ExecutionStateChanged(uint64 indexed sequenceNumber, Internal.MessageExecutionState state);
 
-  using CCIP for CCIP.EVM2EVMTollMessage;
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "EVM2EVMTollOffRamp 1.0.0";
   uint256 private constant TOLL_CONSTANT_MESSAGE_PART_BYTES = (20 + // receiver
@@ -31,6 +32,18 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
   uint256 private constant TOLL_EXECUTION_STATE_PROCESSING_OVERHEAD_GAS = (2_100 + // COLD_SLOAD_COST for first reading the state
     20_000 + // SSTORE_SET_GAS for writing from 0 (untouched) to non-zero (in-progress)
     100); // SLOAD_GAS = WARM_STORAGE_READ_COST for rewriting from non-zero (in-progress) to non-zero (success/failure)
+  uint256 internal constant EXTERNAL_CALL_OVERHEAD_GAS = 2600;
+  uint256 internal constant RATE_LIMITER_OVERHEAD_GAS = (2_100 + 5_000); // COLD_SLOAD_COST for accessing token bucket // SSTORE_RESET_GAS for updating & decreasing token bucket
+  uint256 internal constant EVM_ADDRESS_LENGTH_BYTES = 20;
+  uint256 internal constant EVM_WORD_BYTES = 32;
+  uint256 internal constant CALLDATA_GAS_PER_BYTE = 16;
+  uint256 internal constant PER_TOKEN_OVERHEAD_GAS = (2_100 + // COLD_SLOAD_COST for first reading the pool
+    2_100 + // COLD_SLOAD_COST for pool to ensure allowed offramp calls it
+    2_100 + // COLD_SLOAD_COST for accessing pool balance slot
+    5_000 + // SSTORE_RESET_GAS for decreasing pool balance from non-zero to non-zero
+    2_100 + // COLD_SLOAD_COST for accessing receiver balance
+    20_000 + // SSTORE_SET_GAS for increasing receiver balance from zero to non-zero
+    2_100); // COLD_SLOAD_COST for obtanining price of token to use for aggregate token bucket
 
   mapping(uint256 => uint256) public feeTaken;
 
@@ -69,7 +82,7 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
    * @notice Compute the overhead gas for a given message given its share of the merkle root verification costs.
    * We need to compute this to bill the user upfront so we can let them know how much of a refund they get.
    */
-  function overheadGasToll(uint256 merkleGasShare, CCIP.EVM2EVMTollMessage memory message)
+  function overheadGasToll(uint256 merkleGasShare, Toll.EVM2EVMTollMessage memory message)
     public
     pure
     returns (uint256)
@@ -94,8 +107,8 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
    */
   function _computeFee(
     uint256 merkleGasShare,
-    CCIP.ExecutionReport memory report,
-    CCIP.EVM2EVMTollMessage memory message
+    Toll.ExecutionReport memory report,
+    Toll.EVM2EVMTollMessage memory message
   ) internal view returns (uint256) {
     // Charge the gas share & gas limit of the message multiplied by the token per fee coin for
     // the given message.
@@ -128,8 +141,7 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
     return feeTokenCharged;
   }
 
-  /// @inheritdoc BaseOffRamp
-  function manuallyExecute(CCIP.ExecutionReport memory report) external override {
+  function manuallyExecute(Toll.ExecutionReport memory report) external {
     _execute(report, true);
   }
 
@@ -148,19 +160,19 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
    * @param report ExecutionReport
    * @param manualExecution Whether the DON auto executes or it is manually initiated
    */
-  function _execute(CCIP.ExecutionReport memory report, bool manualExecution) internal whenNotPaused whenHealthy {
+  function _execute(Toll.ExecutionReport memory report, bool manualExecution) internal whenNotPaused whenHealthy {
     if (address(s_router) == address(0)) revert RouterNotSet();
     uint256 numMsgs = report.encodedMessages.length;
     if (numMsgs == 0) revert NoMessagesToExecute();
 
-    CCIP.EVM2EVMTollMessage[] memory decodedMessages = new CCIP.EVM2EVMTollMessage[](numMsgs);
+    Toll.EVM2EVMTollMessage[] memory decodedMessages = new Toll.EVM2EVMTollMessage[](numMsgs);
     bytes32[] memory hashedLeaves = new bytes32[](numMsgs);
-    bytes32 metadataHash = _metadataHash(CCIP.EVM_2_EVM_TOLL_MESSAGE_HASH);
+    bytes32 metadataHash = _metadataHash(Toll.EVM_2_EVM_TOLL_MESSAGE_HASH);
     for (uint256 i = 0; i < numMsgs; ++i) {
-      CCIP.EVM2EVMTollMessage memory decodedMessage = abi.decode(report.encodedMessages[i], (CCIP.EVM2EVMTollMessage));
+      Toll.EVM2EVMTollMessage memory decodedMessage = abi.decode(report.encodedMessages[i], (Toll.EVM2EVMTollMessage));
       // We do this hash here instead of in _verifyMessages to avoid two separate loops
       // over the same data, which increases gas cost
-      hashedLeaves[i] = decodedMessage._hash(metadataHash);
+      hashedLeaves[i] = Toll._hash(decodedMessage, metadataHash);
       decodedMessages[i] = decodedMessage;
     }
 
@@ -174,19 +186,19 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
     bool isOldCommitReport = (block.timestamp - timestampCommitted) > s_config.permissionLessExecutionThresholdSeconds;
 
     for (uint256 i = 0; i < numMsgs; ++i) {
-      CCIP.EVM2EVMTollMessage memory message = decodedMessages[i];
-      CCIP.MessageExecutionState originalState = getExecutionState(message.sequenceNumber);
-      if (originalState == CCIP.MessageExecutionState.SUCCESS) revert AlreadyExecuted(message.sequenceNumber);
+      Toll.EVM2EVMTollMessage memory message = decodedMessages[i];
+      Internal.MessageExecutionState originalState = getExecutionState(message.sequenceNumber);
+      if (originalState == Internal.MessageExecutionState.SUCCESS) revert AlreadyExecuted(message.sequenceNumber);
 
       // Manually execution is fine if we previously failed or if the commit report is just too old
-      if (!(!manualExecution || isOldCommitReport || originalState == CCIP.MessageExecutionState.FAILURE))
+      if (!(!manualExecution || isOldCommitReport || originalState == Internal.MessageExecutionState.FAILURE))
         revert ManualExecutionNotYetEnabled();
 
       _isWellFormed(message);
 
       uint256 feeTokenCharged;
       // If it's the first DON execution attempt, charge the fee.
-      if (originalState == CCIP.MessageExecutionState.UNTOUCHED && !manualExecution) {
+      if (originalState == Internal.MessageExecutionState.UNTOUCHED && !manualExecution) {
         feeTokenCharged = _computeFee(gasUsedByMerkle / decodedMessages.length, report, message);
         // Take the fee charged to this contract.
         // _releaseOrMintToken converts the message.feeTokenAndAmount to the proper destination token
@@ -196,18 +208,20 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
         message.feeTokenAndAmount.amount -= feeTokenCharged;
       }
 
-      if (originalState != CCIP.MessageExecutionState.UNTOUCHED) {
+      if (originalState != Internal.MessageExecutionState.UNTOUCHED) {
         // We have taken a fee already, remove from message to avoid
         // double-minting.
         message.feeTokenAndAmount.amount -= feeTaken[message.sequenceNumber];
       }
 
-      s_executedMessages[message.sequenceNumber] = CCIP.MessageExecutionState.IN_PROGRESS;
+      s_executedMessages[message.sequenceNumber] = Internal.MessageExecutionState.IN_PROGRESS;
       // NOTE: toAny2EVMMessageFromSender merges the fee token into the token set.
-      CCIP.MessageExecutionState newState = _trialExecute(_toAny2EVMMessageFromSender(message));
+      Internal.MessageExecutionState newState = _trialExecute(_toAny2EVMMessageFromSender(message));
       s_executedMessages[message.sequenceNumber] = newState;
 
-      if (originalState == CCIP.MessageExecutionState.UNTOUCHED && newState == CCIP.MessageExecutionState.FAILURE) {
+      if (
+        originalState == Internal.MessageExecutionState.UNTOUCHED && newState == Internal.MessageExecutionState.FAILURE
+      ) {
         feeTaken[message.sequenceNumber] = feeTokenCharged;
       }
 
@@ -216,29 +230,29 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
   }
 
   // @notice IMPORTANT: Merges the fee token into the set of (tokens, amounts)
-  function _toAny2EVMMessageFromSender(CCIP.EVM2EVMTollMessage memory original)
+  function _toAny2EVMMessageFromSender(Toll.EVM2EVMTollMessage memory original)
     internal
     view
-    returns (CCIP.Any2EVMMessageFromSender memory message)
+    returns (Internal.Any2EVMMessageFromSender memory message)
   {
-    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts = CCIP._addToTokensAmounts(
+    Common.EVMTokenAndAmount[] memory tokensAndAmounts = Internal._addToTokensAmounts(
       original.tokensAndAmounts,
       original.feeTokenAndAmount
     );
     uint256 numberOfTokens = tokensAndAmounts.length;
-    CCIP.EVMTokenAndAmount[] memory destTokensAndAmounts = new CCIP.EVMTokenAndAmount[](numberOfTokens);
+    Common.EVMTokenAndAmount[] memory destTokensAndAmounts = new Common.EVMTokenAndAmount[](numberOfTokens);
     address[] memory destPools = new address[](numberOfTokens);
 
     for (uint256 i = 0; i < numberOfTokens; ++i) {
       PoolInterface pool = _getPool(IERC20(tokensAndAmounts[i].token));
       destPools[i] = address(pool);
-      destTokensAndAmounts[i] = CCIP.EVMTokenAndAmount({
+      destTokensAndAmounts[i] = Common.EVMTokenAndAmount({
         token: address(pool.getToken()),
         amount: tokensAndAmounts[i].amount
       });
     }
 
-    message = CCIP.Any2EVMMessageFromSender({
+    message = Internal.Any2EVMMessageFromSender({
       sourceChainId: original.sourceChainId,
       sender: abi.encode(original.sender),
       receiver: original.receiver,
@@ -249,7 +263,7 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
     });
   }
 
-  function _isWellFormed(CCIP.EVM2EVMTollMessage memory message) private view {
+  function _isWellFormed(Toll.EVM2EVMTollMessage memory message) private view {
     if (message.sourceChainId != i_sourceChainId) revert InvalidSourceChain(message.sourceChainId);
     if (message.tokensAndAmounts.length > uint256(s_config.maxTokensLength))
       revert UnsupportedNumberOfTokens(message.sequenceNumber);
@@ -267,7 +281,7 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
     uint40, /*epochAndRound*/
     bytes memory report
   ) internal override {
-    _execute(abi.decode(report, (CCIP.ExecutionReport)), false);
+    _execute(abi.decode(report, (Toll.ExecutionReport)), false);
   }
 
   function _beforeSetConfig(uint8 _threshold, bytes memory _onchainConfig) internal override {}

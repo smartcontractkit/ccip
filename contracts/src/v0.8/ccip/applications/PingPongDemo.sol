@@ -3,40 +3,16 @@ pragma solidity 0.8.15;
 
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
 import {IERC20} from "../../vendor/IERC20.sol";
+import {GEConsumer} from "../models/GEConsumer.sol";
+import {Common} from "../models/Common.sol";
+import {GERouterInterface} from "../interfaces/router/GERouterInterface.sol";
+import {Any2EVMMessageReceiverInterface} from "../interfaces/applications/Any2EVMMessageReceiverInterface.sol";
 
-struct EVMTokenAndAmount {
-  address token;
-  uint256 amount;
-}
-
-interface CCIPRouterInterface {
-  struct Message {
-    bytes receiver;
-    bytes data;
-    EVMTokenAndAmount[] tokensAndAmounts;
-    address feeToken;
-    bytes extraArgs;
-  }
-
-  function ccipSend(uint256 destinationChainId, Message memory message) external returns (bytes32);
-}
-
-interface CCIPReceiverInterface {
-  struct ReceivedMessage {
-    uint256 sourceChainId;
-    bytes sender;
-    bytes data;
-    EVMTokenAndAmount[] tokensAndAmounts;
-  }
-
-  function ccipReceive(ReceivedMessage memory message) external;
-}
-
-contract PingPongDemo is CCIPReceiverInterface, OwnerIsCreator {
+contract PingPongDemo is Any2EVMMessageReceiverInterface, OwnerIsCreator {
   event Ping(uint256 pingPongCount);
   event Pong(uint256 pingPongCount);
 
-  CCIPRouterInterface internal s_router;
+  GERouterInterface internal s_router;
 
   // The chain ID of the counterpart ping pong contract
   uint256 public s_counterpartChainId;
@@ -49,7 +25,7 @@ contract PingPongDemo is CCIPReceiverInterface, OwnerIsCreator {
   // The fee token for CCIP billing
   address internal immutable i_feeToken;
 
-  constructor(CCIPRouterInterface router, address feeToken) {
+  constructor(GERouterInterface router, address feeToken) {
     s_router = router;
     s_isPaused = false;
     i_feeToken = feeToken;
@@ -73,17 +49,17 @@ contract PingPongDemo is CCIPReceiverInterface, OwnerIsCreator {
     }
 
     bytes memory data = abi.encode(pingPongCount);
-    CCIPRouterInterface.Message memory message = CCIPRouterInterface.Message({
+    GEConsumer.EVM2AnyGEMessage memory message = GEConsumer.EVM2AnyGEMessage({
       receiver: abi.encode(s_counterpartAddress),
       data: data,
-      tokensAndAmounts: new EVMTokenAndAmount[](0),
-      extraArgs: _toBytes(EVMExtraArgsV1({gasLimit: 200_000})),
+      tokensAndAmounts: new Common.EVMTokenAndAmount[](0),
+      extraArgs: GEConsumer._argsToBytes(GEConsumer.EVMExtraArgsV1({gasLimit: 200_000, strict: false})),
       feeToken: i_feeToken
     });
     s_router.ccipSend(s_counterpartChainId, message);
   }
 
-  function ccipReceive(ReceivedMessage memory message) external override onlyRouter {
+  function ccipReceive(Common.Any2EVMMessage memory message) external override onlyRouter {
     uint256 pingPongCount = abi.decode(message.data, (uint256));
     if (!s_isPaused) {
       _respond(pingPongCount + 1);
@@ -93,22 +69,11 @@ contract PingPongDemo is CCIPReceiverInterface, OwnerIsCreator {
   /////////////////////////////////////////////////////////////////////
   // Plumbing
   /////////////////////////////////////////////////////////////////////
-
-  struct EVMExtraArgsV1 {
-    uint256 gasLimit;
-  }
-
-  bytes4 public constant EVM_EXTRA_ARGS_V1_TAG = 0x97a657c9;
-
-  function _toBytes(EVMExtraArgsV1 memory extraArgs) internal pure returns (bytes memory bts) {
-    return bytes.concat(EVM_EXTRA_ARGS_V1_TAG, abi.encode(extraArgs.gasLimit));
-  }
-
-  function setRouter(CCIPRouterInterface router) external onlyOwner {
+  function setRouter(GERouterInterface router) external onlyOwner {
     s_router = router;
   }
 
-  function getRouter() external view returns (CCIPRouterInterface) {
+  function getRouter() external view returns (GERouterInterface) {
     return s_router;
   }
 

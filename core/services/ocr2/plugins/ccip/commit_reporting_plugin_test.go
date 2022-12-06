@@ -33,7 +33,7 @@ func TestCommitReportSize(t *testing.T) {
 	p.Property("bounded commit report size", prop.ForAll(func(root []byte, min, max uint64) bool {
 		var root32 [32]byte
 		copy(root32[:], root)
-		rep, err := EncodeCommitReport(&commit_store.CCIPCommitReport{MerkleRoots: [][32]byte{root32}, Intervals: []commit_store.CCIPInterval{{Min: min, Max: max}}})
+		rep, err := EncodeCommitReport(&commit_store.InternalCommitReport{MerkleRoots: [][32]byte{root32}, Intervals: []commit_store.InternalInterval{{Min: min, Max: max}}})
 		require.NoError(t, err)
 		return len(rep) <= MaxCommitReportLength
 	}, gen.SliceOfN(32, gen.UInt8()), gen.UInt64(), gen.UInt64()))
@@ -96,10 +96,10 @@ func TestCommitReportEncoding(t *testing.T) {
 	tree, err := merklemulti.NewTree(mctx, [][32]byte{mctx.Hash([]byte{0xaa})})
 	require.NoError(t, err)
 	root := tree.Root()
-	report := commit_store.CCIPCommitReport{
+	report := commit_store.InternalCommitReport{
 		OnRamps:     []common.Address{onRampAddress},
 		MerkleRoots: [][32]byte{root},
-		Intervals:   []commit_store.CCIPInterval{{Min: 1, Max: 10}},
+		Intervals:   []commit_store.InternalInterval{{Min: 1, Max: 10}},
 		RootOfRoots: root,
 	}
 	out, err := EncodeCommitReport(&report)

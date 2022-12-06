@@ -96,7 +96,7 @@ func deployGasFeeCache(t *testing.T, client *EvmDeploymentConfig) {
 	gasFeeCache, tx, _, err := gas_fee_cache.DeployGasFeeCache(
 		client.Owner,
 		client.Client,
-		[]gas_fee_cache.CCIPFeeUpdate{},
+		[]gas_fee_cache.GEFeeUpdate{},
 		[]common.Address{},
 	)
 	require.NoError(t, err)

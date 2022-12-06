@@ -3,6 +3,7 @@ pragma solidity 0.8.15;
 
 import "../../../applications/PingPongDemo.sol";
 import "../../onRamp/ge/EVM2EVMGEOnRampSetup.t.sol";
+import "../../../models/Common.sol";
 
 // setup
 contract PingPongDappSetup is EVM2EVMGEOnRampSetup {
@@ -18,7 +19,7 @@ contract PingPongDappSetup is EVM2EVMGEOnRampSetup {
     EVM2EVMGEOnRampSetup.setUp();
 
     s_feeToken = IERC20(s_sourceTokens[0]);
-    s_pingPong = new PingPongDemo(CCIPRouterInterface(address(s_sourceRouter)), s_sourceFeeToken);
+    s_pingPong = new PingPongDemo(GERouterInterface(address(s_sourceRouter)), s_sourceFeeToken);
     s_pingPong.setCounterpart(DEST_CHAIN_ID, i_pongContract);
 
     uint256 fundingAmount = 1e18;
@@ -37,9 +38,6 @@ contract PingPongDappSetup is EVM2EVMGEOnRampSetup {
 
 /// @notice #startPingPong
 contract PingPong_startPingPong is PingPongDappSetup {
-  using CCIP for CCIP.EVMExtraArgsV1;
-  using CCIP for CCIP.EVM2EVMGEMessage;
-
   event ConfigPropagated(uint256 chainId, address contractAddress);
 
   // Success
@@ -47,17 +45,17 @@ contract PingPong_startPingPong is PingPongDappSetup {
     uint256 pingPongNumber = 1;
     bytes memory data = abi.encode(pingPongNumber);
 
-    CCIP.EVM2AnyGEMessage memory sentMessage = CCIP.EVM2AnyGEMessage({
+    GEConsumer.EVM2AnyGEMessage memory sentMessage = GEConsumer.EVM2AnyGEMessage({
       receiver: abi.encode(i_pongContract),
       data: data,
-      tokensAndAmounts: new CCIP.EVMTokenAndAmount[](0),
+      tokensAndAmounts: new Common.EVMTokenAndAmount[](0),
       feeToken: s_sourceFeeToken,
-      extraArgs: CCIP.EVMExtraArgsV1({gasLimit: 2e5, strict: false})._toBytes()
+      extraArgs: GEConsumer._argsToBytes(GEConsumer.EVMExtraArgsV1({gasLimit: 2e5, strict: false}))
     });
 
     uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_ID, sentMessage);
 
-    CCIP.EVM2EVMGEMessage memory message = CCIP.EVM2EVMGEMessage({
+    GE.EVM2EVMGEMessage memory message = GE.EVM2EVMGEMessage({
       sequenceNumber: 1,
       feeTokenAmount: expectedFee,
       sourceChainId: SOURCE_CHAIN_ID,
@@ -71,7 +69,7 @@ contract PingPong_startPingPong is PingPongDappSetup {
       strict: false,
       messageId: ""
     });
-    message.messageId = message._hash(s_metadataHash);
+    message.messageId = GE._hash(message, s_metadataHash);
 
     vm.expectEmit(false, false, false, true);
     emit Ping(pingPongNumber);
@@ -88,15 +86,15 @@ contract PingPong_ccipReceive is PingPongDappSetup {
   // Success
 
   function testSuccess() public {
-    EVMTokenAndAmount[] memory tokensAndAmounts = new EVMTokenAndAmount[](0);
+    Common.EVMTokenAndAmount[] memory tokensAndAmounts = new Common.EVMTokenAndAmount[](0);
 
     uint256 pingPongNumber = 5;
 
-    CCIPReceiverInterface.ReceivedMessage memory message = CCIPReceiverInterface.ReceivedMessage({
+    Common.Any2EVMMessage memory message = Common.Any2EVMMessage({
       sourceChainId: DEST_CHAIN_ID,
       sender: abi.encode(i_pongContract),
       data: abi.encode(pingPongNumber),
-      tokensAndAmounts: tokensAndAmounts
+      destTokensAndAmounts: tokensAndAmounts
     });
 
     changePrank(address(s_sourceRouter));

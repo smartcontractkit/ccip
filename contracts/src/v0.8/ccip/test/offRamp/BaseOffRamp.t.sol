@@ -109,15 +109,15 @@ contract BaseOffRamp_getExecutionState is BaseOffRampSetup {
   function testSuccess() public {
     // setting the execution state is done with a helper function. This
     // is normally not exposed.
-    s_offRamp.setExecutionState(1, CCIP.MessageExecutionState.FAILURE);
-    s_offRamp.setExecutionState(10, CCIP.MessageExecutionState.IN_PROGRESS);
-    s_offRamp.setExecutionState(33, CCIP.MessageExecutionState.UNTOUCHED);
-    s_offRamp.setExecutionState(50, CCIP.MessageExecutionState.SUCCESS);
+    s_offRamp.setExecutionState(1, Internal.MessageExecutionState.FAILURE);
+    s_offRamp.setExecutionState(10, Internal.MessageExecutionState.IN_PROGRESS);
+    s_offRamp.setExecutionState(33, Internal.MessageExecutionState.UNTOUCHED);
+    s_offRamp.setExecutionState(50, Internal.MessageExecutionState.SUCCESS);
 
-    assertEq(uint256(CCIP.MessageExecutionState.FAILURE), uint256(s_offRamp.getExecutionState(1)));
-    assertEq(uint256(CCIP.MessageExecutionState.IN_PROGRESS), uint256(s_offRamp.getExecutionState(10)));
-    assertEq(uint256(CCIP.MessageExecutionState.UNTOUCHED), uint256(s_offRamp.getExecutionState(33)));
-    assertEq(uint256(CCIP.MessageExecutionState.SUCCESS), uint256(s_offRamp.getExecutionState(50)));
+    assertEq(uint256(Internal.MessageExecutionState.FAILURE), uint256(s_offRamp.getExecutionState(1)));
+    assertEq(uint256(Internal.MessageExecutionState.IN_PROGRESS), uint256(s_offRamp.getExecutionState(10)));
+    assertEq(uint256(Internal.MessageExecutionState.UNTOUCHED), uint256(s_offRamp.getExecutionState(33)));
+    assertEq(uint256(Internal.MessageExecutionState.SUCCESS), uint256(s_offRamp.getExecutionState(50)));
   }
 }
 
@@ -176,7 +176,7 @@ contract BaseOffRamp__releaseOrMintToken is BaseOffRampSetup {
 contract BaseOffRamp__releaseOrMintTokens is BaseOffRampSetup {
   // Success
   function testSuccess() public {
-    CCIP.EVMTokenAndAmount[] memory destTokensAndAmounts = getCastedDestinationEVMTokenAndAmountsWithZeroAmounts();
+    Common.EVMTokenAndAmount[] memory destTokensAndAmounts = getCastedDestinationEVMTokenAndAmountsWithZeroAmounts();
     IERC20 destToken1 = IERC20(destTokensAndAmounts[1].token);
     uint256 startingBalance = destToken1.balanceOf(OWNER);
 
@@ -197,7 +197,7 @@ contract BaseOffRamp__releaseOrMintTokens is BaseOffRampSetup {
   // Revert
 
   function testTokenAndAmountMisMatchReverts() public {
-    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts = new CCIP.EVMTokenAndAmount[](1);
+    Common.EVMTokenAndAmount[] memory tokensAndAmounts = new Common.EVMTokenAndAmount[](1);
 
     vm.expectRevert(BaseOffRampInterface.TokenAndAmountMisMatch.selector);
     s_offRamp.releaseOrMintTokens(s_destPools, tokensAndAmounts, OWNER);

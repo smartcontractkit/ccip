@@ -30,7 +30,7 @@ const (
 
 // Onchain: we bill deterministically for tolls so that we can notify clients how much of a refund they get.
 // Offchain: we compute the max overhead gas to determine msg executability.
-func overheadGasToll(merkleGasShare uint64, tollMsg evm_2_evm_toll_onramp.CCIPEVM2EVMTollMessage) uint64 {
+func overheadGasToll(merkleGasShare uint64, tollMsg evm_2_evm_toll_onramp.TollEVM2EVMTollMessage) uint64 {
 	messageBytes := TOLL_CONSTANT_MESSAGE_PART_BYTES +
 		(EVM_ADDRESS_LENGTH_BYTES+EVM_WORD_BYTES)*len(tollMsg.TokensAndAmounts) + // token address (address) + token amount (uint256)
 		len(tollMsg.Data)
@@ -51,7 +51,7 @@ func overheadGasToll(merkleGasShare uint64, tollMsg evm_2_evm_toll_onramp.CCIPEV
 		EXTERNAL_CALL_OVERHEAD_GAS
 }
 
-func maxGasOverHeadGasToll(numMsgs int, tollMsg evm_2_evm_toll_onramp.CCIPEVM2EVMTollMessage) uint64 {
+func maxGasOverHeadGasToll(numMsgs int, tollMsg evm_2_evm_toll_onramp.TollEVM2EVMTollMessage) uint64 {
 	merkleProofBytes := (math.Ceil(math.Log2(float64(numMsgs)))+2)*32 +
 		(1+2)*32 // only ever one outer root hash
 	merkleGasShare := uint64(merkleProofBytes * CALLDATA_GAS_PER_BYTE)
@@ -172,10 +172,10 @@ func (tb *TollBatchBuilder) inflight(
 	inflightSeqNrs := make(map[uint64]struct{})
 	inflightAggregateValue := big.NewInt(0)
 	for _, rep := range inflight {
-		for _, seqNr := range rep.report.SequenceNumbers {
+		for _, seqNr := range rep.seqNrs {
 			inflightSeqNrs[seqNr] = struct{}{}
 		}
-		for _, encMsg := range rep.report.EncodedMessages {
+		for _, encMsg := range rep.encMessages {
 			msg, err := tb.parseLog(types.Log{
 				// Note this needs to change if we start indexing things.
 				Topics: []common.Hash{tb.eventSignatures.SendRequested},

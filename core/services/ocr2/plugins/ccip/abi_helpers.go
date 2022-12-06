@@ -98,7 +98,7 @@ func GetGEEventSignatures() EventSignatures {
 // DecodeCCIPMessage decodes the bytecode message into a commit_store.CCIPAny2EVMTollMessage
 // This function returns an error if there is no message in the bytecode or
 // when the payload is malformed.
-func DecodeCCIPMessage(b []byte) (*evm_2_evm_toll_onramp.CCIPEVM2EVMTollMessage, error) {
+func DecodeCCIPMessage(b []byte) (*evm_2_evm_toll_onramp.TollEVM2EVMTollMessage, error) {
 	unpacked, err := MakeTollCCIPMsgArgs().Unpack(b)
 	if err != nil {
 		return nil, err
@@ -127,23 +127,23 @@ func DecodeCCIPMessage(b []byte) (*evm_2_evm_toll_onramp.CCIPEVM2EVMTollMessage,
 		return nil, fmt.Errorf("invalid format have %T want %T", unpacked[0], receivedCp)
 	}
 
-	var tokensAndAmounts []evm_2_evm_toll_onramp.CCIPEVMTokenAndAmount
+	var tokensAndAmounts []evm_2_evm_toll_onramp.CommonEVMTokenAndAmount
 
 	for _, tokenAndAmount := range receivedCp.TokensAndAmounts {
-		tokensAndAmounts = append(tokensAndAmounts, evm_2_evm_toll_onramp.CCIPEVMTokenAndAmount{
+		tokensAndAmounts = append(tokensAndAmounts, evm_2_evm_toll_onramp.CommonEVMTokenAndAmount{
 			Token:  tokenAndAmount.Token,
 			Amount: tokenAndAmount.Amount,
 		})
 	}
 
-	return &evm_2_evm_toll_onramp.CCIPEVM2EVMTollMessage{
+	return &evm_2_evm_toll_onramp.TollEVM2EVMTollMessage{
 		SourceChainId:    receivedCp.SourceChainId,
 		SequenceNumber:   receivedCp.SequenceNumber,
 		Sender:           receivedCp.Sender,
 		Receiver:         receivedCp.Receiver,
 		Data:             receivedCp.Data,
 		TokensAndAmounts: tokensAndAmounts,
-		FeeTokenAndAmount: evm_2_evm_toll_onramp.CCIPEVMTokenAndAmount{
+		FeeTokenAndAmount: evm_2_evm_toll_onramp.CommonEVMTokenAndAmount{
 			Token:  receivedCp.FeeTokenAndAmount.Token,
 			Amount: receivedCp.FeeTokenAndAmount.Amount,
 		},
@@ -225,6 +225,48 @@ func ProofFlagsToBits(proofFlags []bool) *big.Int {
 		}
 	}
 	return big.NewInt(a)
+}
+
+func makeTollExecutionReportArgs() abi.Arguments {
+	return []abi.Argument{
+		{
+			Name: "ExecutionReport",
+			Type: utils.MustAbiType("tuple", []abi.ArgumentMarshaling{
+				{
+					Name: "sequenceNumbers",
+					Type: "uint64[]",
+				},
+				{
+					Name: "tokenPerFeeCoinAddresses",
+					Type: "address[]",
+				},
+				{
+					Name: "tokenPerFeeCoin",
+					Type: "uint256[]",
+				},
+				{
+					Name: "encodedMessages",
+					Type: "bytes[]",
+				},
+				{
+					Name: "innerProofs",
+					Type: "bytes32[]",
+				},
+				{
+					Name: "innerProofFlagBits",
+					Type: "uint256",
+				},
+				{
+					Name: "outerProofs",
+					Type: "bytes32[]",
+				},
+				{
+					Name: "outerProofFlagBits",
+					Type: "uint256",
+				},
+			}),
+		},
+	}
 }
 
 func makeExecutionReportArgs() abi.Arguments {

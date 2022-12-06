@@ -2,7 +2,6 @@
   "getCommitStore()": "b66f0efb",
   "getExecutionState(uint64)": "142a98fc",
   "getRouter()": "b0f479a1",
-  "manuallyExecute((uint64[],address[],uint256[],(uint256,uint256)[],bytes[],bytes32[],uint256,bytes32[],uint256))": "a8e91321",
   "setCommitStore(address)": "c9033284",
   "setRouter(address)": "c0d78655"
 }

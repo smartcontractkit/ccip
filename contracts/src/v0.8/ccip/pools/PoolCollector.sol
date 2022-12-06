@@ -5,7 +5,7 @@ import {EVM2EVMTollOnRampInterface, BaseOnRampInterface} from "../interfaces/onR
 import {SafeERC20, IERC20} from "../../vendor/SafeERC20.sol";
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
 import {PoolInterface} from "../interfaces/pools/PoolInterface.sol";
-import {CCIP} from "../models/Models.sol";
+import {Common} from "../models/Common.sol";
 
 contract PoolCollector is OwnerIsCreator {
   using SafeERC20 for IERC20;
@@ -48,7 +48,7 @@ contract PoolCollector is OwnerIsCreator {
    * @param onRamp OnRamp to get the fee and pools from
    * @param tokensAndAmounts the tokensAndAmounts to be collected
    */
-  function _collectTokens(BaseOnRampInterface onRamp, CCIP.EVMTokenAndAmount[] memory tokensAndAmounts) internal {
+  function _collectTokens(BaseOnRampInterface onRamp, Common.EVMTokenAndAmount[] memory tokensAndAmounts) internal {
     // Send the tokens to the pools
     for (uint256 i = 0; i < tokensAndAmounts.length; ++i) {
       IERC20 token = IERC20(tokensAndAmounts[i].token);

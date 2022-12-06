@@ -28,11 +28,11 @@ contract GERouter_ccipSend is EVM2EVMGEOnRampSetup {
   function testCCIPSendSuccess() public {
     address sourceToken1Address = s_sourceTokens[1];
     IERC20 sourceToken1 = IERC20(sourceToken1Address);
-    CCIP.EVM2AnyGEMessage memory message = _generateEmptyMessage();
+    GEConsumer.EVM2AnyGEMessage memory message = _generateEmptyMessage();
 
     sourceToken1.approve(address(s_sourceRouter), 2**64);
 
-    message.tokensAndAmounts = new CCIP.EVMTokenAndAmount[](1);
+    message.tokensAndAmounts = new Common.EVMTokenAndAmount[](1);
     message.tokensAndAmounts[0].amount = 2**64;
     message.tokensAndAmounts[0].token = sourceToken1Address;
     message.feeToken = s_sourceTokens[0];
@@ -45,7 +45,7 @@ contract GERouter_ccipSend is EVM2EVMGEOnRampSetup {
     vm.expectEmit(false, false, false, true);
     emit Burned(address(s_onRamp), message.tokensAndAmounts[0].amount);
 
-    CCIP.EVM2EVMGEMessage memory msgEvent = _messageToEvent(message, 1, 1, expectedFee);
+    GE.EVM2EVMGEMessage memory msgEvent = _messageToEvent(message, 1, 1, expectedFee);
 
     vm.expectEmit(false, false, false, true);
     emit CCIPSendRequested(msgEvent);
@@ -59,10 +59,10 @@ contract GERouter_ccipSend is EVM2EVMGEOnRampSetup {
   function testCCIPSendMinimal_gas() public {
     s_sourceRouter.ccipSend(
       DEST_CHAIN_ID,
-      CCIP.EVM2AnyGEMessage({
+      GEConsumer.EVM2AnyGEMessage({
         receiver: abi.encode(OWNER),
         data: "",
-        tokensAndAmounts: new CCIP.EVMTokenAndAmount[](0),
+        tokensAndAmounts: new Common.EVMTokenAndAmount[](0),
         feeToken: s_sourceFeeToken,
         extraArgs: ""
       })
@@ -72,7 +72,7 @@ contract GERouter_ccipSend is EVM2EVMGEOnRampSetup {
   // Reverts
 
   function testUnsupportedDestinationChainReverts() public {
-    CCIP.EVM2AnyGEMessage memory message = _generateEmptyMessage();
+    GEConsumer.EVM2AnyGEMessage memory message = _generateEmptyMessage();
     uint256 wrongChain = DEST_CHAIN_ID + 1;
 
     vm.expectRevert(abi.encodeWithSelector(BaseOnRampRouterInterface.UnsupportedDestinationChain.selector, wrongChain));
@@ -81,23 +81,19 @@ contract GERouter_ccipSend is EVM2EVMGEOnRampSetup {
   }
 
   function testUnsupportedFeeTokenReverts() public {
-    CCIP.EVM2AnyGEMessage memory message = _generateEmptyMessage();
+    GEConsumer.EVM2AnyGEMessage memory message = _generateEmptyMessage();
     address wrongFeeToken = address(1);
     message.feeToken = wrongFeeToken;
 
     vm.expectRevert(
-      abi.encodeWithSelector(
-        DynamicFeeCalculatorInterface.MismatchedFeeToken.selector,
-        s_sourceTokens[0],
-        wrongFeeToken
-      )
+      abi.encodeWithSelector(EVM2EVMGEOnRampInterface.MismatchedFeeToken.selector, s_sourceTokens[0], wrongFeeToken)
     );
 
     s_sourceRouter.ccipSend(DEST_CHAIN_ID, message);
   }
 
   function testFeeTokenAmountTooLowReverts() public {
-    CCIP.EVM2AnyGEMessage memory message = _generateEmptyMessage();
+    GEConsumer.EVM2AnyGEMessage memory message = _generateEmptyMessage();
     IERC20(s_sourceTokens[0]).approve(address(s_sourceRouter), 0);
 
     vm.expectRevert("ERC20: transfer amount exceeds allowance");

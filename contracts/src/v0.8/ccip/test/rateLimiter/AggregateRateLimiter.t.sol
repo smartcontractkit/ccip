@@ -293,7 +293,7 @@ contract AggregateTokenLimiter__removeTokens is AggregateTokenLimiterSetup {
     uint256 numberOfTokens = 15;
     uint256 value = numberOfTokens * TOKEN_PRICE;
 
-    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts = new CCIP.EVMTokenAndAmount[](1);
+    Common.EVMTokenAndAmount[] memory tokensAndAmounts = new Common.EVMTokenAndAmount[](1);
     tokensAndAmounts[0].token = address(TOKEN);
     tokensAndAmounts[0].amount = numberOfTokens;
 
@@ -329,13 +329,13 @@ contract AggregateTokenLimiter__removeTokens is AggregateTokenLimiterSetup {
 
   function testUnknownTokenReverts() public {
     vm.expectRevert(abi.encodeWithSelector(AggregateRateLimiterInterface.PriceNotFoundForToken.selector, address(0)));
-    s_rateLimiter.removeTokens(new CCIP.EVMTokenAndAmount[](1));
+    s_rateLimiter.removeTokens(new Common.EVMTokenAndAmount[](1));
   }
 
   function testValueExceedsCapacityReverts() public {
     AggregateRateLimiterInterface.TokenBucket memory bucket = s_rateLimiter.calculateCurrentTokenBucketState();
 
-    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts = new CCIP.EVMTokenAndAmount[](1);
+    Common.EVMTokenAndAmount[] memory tokensAndAmounts = new Common.EVMTokenAndAmount[](1);
     tokensAndAmounts[0].token = address(TOKEN);
     tokensAndAmounts[0].amount = 100;
 

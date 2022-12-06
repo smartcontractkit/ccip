@@ -152,7 +152,7 @@ func (router *TollOnRampRouter) SetOnRamp(chainID *big.Int, onRamp common.Addres
 	return router.client.ProcessTransaction(tx)
 }
 
-func (router *TollOnRampRouter) CCIPSend(destChainId *big.Int, msg evm_2_any_toll_onramp_router.CCIPEVM2AnyTollMessage) (*types.Transaction, error) {
+func (router *TollOnRampRouter) CCIPSend(destChainId *big.Int, msg evm_2_any_toll_onramp_router.TollConsumerEVM2AnyTollMessage) (*types.Transaction, error) {
 	opts, err := router.client.TransactionOpts(router.client.DefaultWallet)
 	if err != nil {
 		return nil, err
@@ -390,7 +390,7 @@ func (sender *TollSender) Address() string {
 
 func (sender *TollSender) SendTokens(
 	receiverAddr common.Address,
-	tokens []toll_sender_dapp.CCIPEVMTokenAndAmount,
+	tokens []toll_sender_dapp.CommonEVMTokenAndAmount,
 ) (*types.Transaction, error) {
 	opts, err := sender.client.TransactionOpts(sender.client.GetDefaultWallet())
 	if err != nil {

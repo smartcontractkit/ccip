@@ -24,7 +24,7 @@ func EvmWord(i uint64) common.Hash {
 }
 
 type CommitObservation struct {
-	IntervalsByOnRamp map[common.Address]commit_store.CCIPInterval `json:"intervalsByOnRamp"`
+	IntervalsByOnRamp map[common.Address]commit_store.InternalInterval `json:"intervalsByOnRamp"`
 }
 
 func (o CommitObservation) Marshal() ([]byte, error) {

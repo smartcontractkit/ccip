@@ -35,7 +35,7 @@ func setGasFeeCachePrices(t *testing.T, client *EvmDeploymentConfig, destChainId
 	gasFeeCache, err := gas_fee_cache.NewGasFeeCache(client.ChainConfig.GasFeeCache, client.Client)
 	require.NoError(t, err)
 
-	tx, err := gasFeeCache.UpdateFees(client.Owner, []gas_fee_cache.CCIPFeeUpdate{
+	tx, err := gasFeeCache.UpdateFees(client.Owner, []gas_fee_cache.GEFeeUpdate{
 		{
 			ChainId:        destChainId,
 			LinkPerUnitGas: big.NewInt(1e18),

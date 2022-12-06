@@ -3,6 +3,8 @@ pragma solidity 0.8.15;
 
 import "../../interfaces/onRamp/EVM2EVMTollOnRampInterface.sol";
 import "../../interfaces/pools/PoolInterface.sol";
+import "../../models/Common.sol";
+import "../../models/TollConsumer.sol";
 
 contract MockOnRamp is EVM2EVMTollOnRampInterface {
   uint256 public immutable i_chainId;
@@ -29,7 +31,11 @@ contract MockOnRamp is EVM2EVMTollOnRampInterface {
     i_fee = fee;
   }
 
-  function forwardFromRouter(CCIP.EVM2AnyTollMessage memory message, address) external override returns (uint64) {
+  function forwardFromRouter(TollConsumer.EVM2AnyTollMessage memory message, address)
+    external
+    override
+    returns (uint64)
+  {
     messageReceiver = message.receiver;
     messageData = message.data;
     messageTokens = abi.encode(message.tokensAndAmounts);
@@ -42,12 +48,12 @@ contract MockOnRamp is EVM2EVMTollOnRampInterface {
     returns (
       bytes memory receiver,
       bytes memory data,
-      CCIP.EVMTokenAndAmount[] memory tokensAndAmounts
+      Common.EVMTokenAndAmount[] memory tokensAndAmounts
     )
   {
     receiver = messageReceiver;
     data = messageData;
-    tokensAndAmounts = abi.decode(messageTokens, (CCIP.EVMTokenAndAmount[]));
+    tokensAndAmounts = abi.decode(messageTokens, (Common.EVMTokenAndAmount[]));
   }
 
   function getRequiredFee(IERC20 token) external override returns (uint256) {
@@ -89,7 +95,7 @@ contract MockOnRamp is EVM2EVMTollOnRampInterface {
 
   function setFeeConfig(FeeConfig calldata feeConfig) external override {}
 
-  function getPoolTokens() public view returns (IERC20[] memory) {
+  function getPoolTokens() public pure returns (IERC20[] memory) {
     return new IERC20[](0);
   }
 }

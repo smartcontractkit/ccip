@@ -155,21 +155,21 @@ type messageBatch struct {
 	msgs        []Message
 	allMsgBytes [][]byte
 	seqNums     []uint64
-	helperMsgs  []evm_2_evm_toll_onramp.CCIPEVM2EVMTollMessage
+	helperMsgs  []evm_2_evm_toll_onramp.TollEVM2EVMTollMessage
 	proof       merklemulti.Proof[[32]byte]
 	root        [32]byte
 }
 
 // Message contains the data from a cross chain message
 type Message struct {
-	SourceChainId     *big.Int                                      `json:"sourceChainId"`
-	SequenceNumber    uint64                                        `json:"sequenceNumber"`
-	Sender            common.Address                                `json:"sender"`
-	Receiver          common.Address                                `json:"receiver"`
-	Data              []uint8                                       `json:"data"`
-	TokensAndAmounts  []evm_2_evm_toll_onramp.CCIPEVMTokenAndAmount `json:"tokensAndAmounts"`
-	FeeTokenAndAmount evm_2_evm_toll_onramp.CCIPEVMTokenAndAmount   `json:"feeTokenAndAmount"`
-	GasLimit          *big.Int                                      `json:"gasLimit"`
+	SourceChainId     *big.Int                                        `json:"sourceChainId"`
+	SequenceNumber    uint64                                          `json:"sequenceNumber"`
+	Sender            common.Address                                  `json:"sender"`
+	Receiver          common.Address                                  `json:"receiver"`
+	Data              []uint8                                         `json:"data"`
+	TokensAndAmounts  []evm_2_evm_toll_onramp.CommonEVMTokenAndAmount `json:"tokensAndAmounts"`
+	FeeTokenAndAmount evm_2_evm_toll_onramp.CommonEVMTokenAndAmount   `json:"feeTokenAndAmount"`
+	GasLimit          *big.Int                                        `json:"gasLimit"`
 }
 
 func (e ExecutionContracts) generateMessageBatch(t *testing.T, payloadSize int, nMessages int, nTokensPerMessage int) messageBatch {
@@ -185,10 +185,10 @@ func (e ExecutionContracts) generateMessageBatch(t *testing.T, payloadSize int, 
 	var leafHashes [][32]byte
 	var msgs []Message
 	var indices []int
-	var tokens []evm_2_evm_toll_onramp.CCIPEVMTokenAndAmount
-	var helperMsgs []evm_2_evm_toll_onramp.CCIPEVM2EVMTollMessage
+	var tokens []evm_2_evm_toll_onramp.CommonEVMTokenAndAmount
+	var helperMsgs []evm_2_evm_toll_onramp.TollEVM2EVMTollMessage
 	for i := 0; i < nTokensPerMessage; i++ {
-		tokens = append(tokens, evm_2_evm_toll_onramp.CCIPEVMTokenAndAmount{
+		tokens = append(tokens, evm_2_evm_toll_onramp.CommonEVMTokenAndAmount{
 			Token:  e.linkTokenAddress,
 			Amount: big.NewInt(1),
 		})
@@ -209,7 +209,7 @@ func (e ExecutionContracts) generateMessageBatch(t *testing.T, payloadSize int, 
 		}
 
 		// Unfortunately have to do this to use the helper's gethwrappers.
-		helperMsgs = append(helperMsgs, evm_2_evm_toll_onramp.CCIPEVM2EVMTollMessage{
+		helperMsgs = append(helperMsgs, evm_2_evm_toll_onramp.TollEVM2EVMTollMessage{
 			SequenceNumber:    message.SequenceNumber,
 			SourceChainId:     message.SourceChainId,
 			Sender:            message.Sender,
@@ -244,7 +244,7 @@ func TestMaxExecutionReportSize(t *testing.T) {
 	require.NoError(t, err)
 	outerProof := outerTree.Prove([]int{0})
 	// Ensure execution report size is valid
-	executorReport, err := ccip.EncodeExecutionReport(
+	executorReport, err := ccip.EncodeGEExecutionReport(
 		mb.seqNums,
 		map[common.Address]*big.Int{},
 		mb.allMsgBytes,
@@ -288,20 +288,20 @@ func TestExecutionReportEncoding(t *testing.T) {
 	outerTree, err := merklemulti.NewTree(ctx, [][32]byte{mb.root})
 	require.NoError(t, err)
 	outerProof := outerTree.Prove([]int{0})
-	report := evm_2_evm_ge_offramp.CCIPExecutionReport{
+	report := evm_2_evm_ge_offramp.GEExecutionReport{
 		SequenceNumbers:          mb.seqNums,
 		TokenPerFeeCoin:          []*big.Int{},
 		TokenPerFeeCoinAddresses: []common.Address{},
-		FeeUpdates:               []evm_2_evm_ge_offramp.CCIPFeeUpdate{},
+		FeeUpdates:               []evm_2_evm_ge_offramp.GEFeeUpdate{},
 		EncodedMessages:          mb.allMsgBytes,
 		InnerProofs:              mb.proof.Hashes,
 		InnerProofFlagBits:       ccip.ProofFlagsToBits(mb.proof.SourceFlags),
 		OuterProofs:              outerProof.Hashes,
 		OuterProofFlagBits:       ccip.ProofFlagsToBits(outerProof.SourceFlags),
 	}
-	encodeCommitReport, err := ccip.EncodeExecutionReport(report.SequenceNumbers, map[common.Address]*big.Int{}, report.EncodedMessages, report.InnerProofs, mb.proof.SourceFlags, report.OuterProofs, outerProof.SourceFlags, nil)
+	encodeCommitReport, err := ccip.EncodeGEExecutionReport(report.SequenceNumbers, map[common.Address]*big.Int{}, report.EncodedMessages, report.InnerProofs, mb.proof.SourceFlags, report.OuterProofs, outerProof.SourceFlags, nil)
 	require.NoError(t, err)
-	decodeCommitReport, err := ccip.DecodeExecutionReport(encodeCommitReport)
+	decodeCommitReport, err := ccip.DecodeGEExecutionReport(encodeCommitReport)
 	require.NoError(t, err)
 	require.Equal(t, &report, decodeCommitReport)
 }

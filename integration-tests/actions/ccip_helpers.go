@@ -321,7 +321,7 @@ func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(model BillingMo
 	return seqNum
 }
 
-func (sourceCCIP *SourceCCIPModule) SendTollRequest(receiver common.Address, tokenAndAmounts []evm_2_any_toll_onramp_router.CCIPEVMTokenAndAmount, data string, feeToken evm_2_any_toll_onramp_router.CCIPEVMTokenAndAmount) string {
+func (sourceCCIP *SourceCCIPModule) SendTollRequest(receiver common.Address, tokenAndAmounts []evm_2_any_toll_onramp_router.CommonEVMTokenAndAmount, data string, feeToken evm_2_any_toll_onramp_router.CommonEVMTokenAndAmount) string {
 	receiverAddr, err := utils.ABIEncode(`[{"type":"address"}]`, receiver)
 	Expect(err).ShouldNot(HaveOccurred(), "Failed encoding the receiver address")
 
@@ -329,7 +329,7 @@ func (sourceCCIP *SourceCCIPModule) SendTollRequest(receiver common.Address, tok
 	Expect(err).ShouldNot(HaveOccurred(), "Failed encoding the options field")
 
 	// form the message for transfer
-	msg := evm_2_any_toll_onramp_router.CCIPEVM2AnyTollMessage{
+	msg := evm_2_any_toll_onramp_router.TollConsumerEVM2AnyTollMessage{
 		Receiver:          receiverAddr,
 		Data:              []byte(data),
 		TokensAndAmounts:  tokenAndAmounts,
@@ -568,9 +568,9 @@ type CCIPTest struct {
 
 func (c *CCIPTest) SendTollRequests(noOfRequests int) {
 	c.NumberOfTollReq = noOfRequests
-	var tokenAndAmounts []evm_2_any_toll_onramp_router.CCIPEVMTokenAndAmount
+	var tokenAndAmounts []evm_2_any_toll_onramp_router.CommonEVMTokenAndAmount
 	for i, token := range c.Source.Common.BridgeTokens {
-		tokenAndAmounts = append(tokenAndAmounts, evm_2_any_toll_onramp_router.CCIPEVMTokenAndAmount{
+		tokenAndAmounts = append(tokenAndAmounts, evm_2_any_toll_onramp_router.CommonEVMTokenAndAmount{
 			Token: common.HexToAddress(token.Address()), Amount: c.Source.TransferAmount[i],
 		})
 		// approve the onramp router so that it can initiate transferring the token
@@ -602,7 +602,7 @@ func (c *CCIPTest) SendTollRequests(noOfRequests int) {
 			c.Dest.ReceiverDapp.EthAddress,
 			tokenAndAmounts,
 			fmt.Sprintf("msg %d", i),
-			evm_2_any_toll_onramp_router.CCIPEVMTokenAndAmount{
+			evm_2_any_toll_onramp_router.CommonEVMTokenAndAmount{
 				Token: common.HexToAddress(c.Source.Common.FeeToken.Address()), Amount: c.Source.TollFeeAmount,
 			},
 		)

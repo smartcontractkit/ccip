@@ -5,7 +5,7 @@ import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.
 import {CommitStoreInterface} from "../interfaces/CommitStoreInterface.sol";
 import {HealthChecker, AFNInterface} from "../health/HealthChecker.sol";
 import {OCR2Base} from "../ocr/OCR2Base.sol";
-import {CCIP} from "../models/Models.sol";
+import {Internal} from "../models/Internal.sol";
 
 contract CommitStore is CommitStoreInterface, TypeAndVersionInterface, HealthChecker, OCR2Base {
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
@@ -164,7 +164,7 @@ contract CommitStore is CommitStoreInterface, TypeAndVersionInterface, HealthChe
     uint40, /*epochAndRound*/
     bytes memory encodedReport
   ) internal override whenNotPaused whenHealthy {
-    CCIP.CommitReport memory report = abi.decode(encodedReport, (CCIP.CommitReport));
+    Internal.CommitReport memory report = abi.decode(encodedReport, (Internal.CommitReport));
     uint256 reportLength = report.onRamps.length;
     if (reportLength != report.intervals.length || reportLength != report.merkleRoots.length)
       revert InvalidCommitReport(report);
@@ -172,7 +172,7 @@ contract CommitStore is CommitStoreInterface, TypeAndVersionInterface, HealthChe
       address onRamp = report.onRamps[i];
       uint64 expectedMinSeqNum = s_expectedNextMinByOnRamp[onRamp];
       if (expectedMinSeqNum == 0) revert UnsupportedOnRamp(onRamp);
-      CCIP.Interval memory repInterval = report.intervals[i];
+      Internal.Interval memory repInterval = report.intervals[i];
 
       if (expectedMinSeqNum != repInterval.min || repInterval.min > repInterval.max)
         revert InvalidInterval(repInterval, onRamp);
@@ -195,7 +195,7 @@ contract CommitStore is CommitStoreInterface, TypeAndVersionInterface, HealthChe
    *          INTERNAL_DOMAIN_SEPARATOR.
    */
   function _hashInternalNode(bytes32 left, bytes32 right) private pure returns (bytes32 hash) {
-    return keccak256(abi.encode(CCIP.INTERNAL_DOMAIN_SEPARATOR, left, right));
+    return keccak256(abi.encode(Internal.INTERNAL_DOMAIN_SEPARATOR, left, right));
   }
 
   function _beforeSetConfig(uint8 _threshold, bytes memory _onchainConfig) internal override {}

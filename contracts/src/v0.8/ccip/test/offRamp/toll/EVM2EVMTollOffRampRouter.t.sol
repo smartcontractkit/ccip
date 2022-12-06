@@ -20,11 +20,11 @@ contract EVM2EVMTollOffRampRouterSetup is BaseTest {
     s_router = new Any2EVMTollOffRampRouter(s_offRamps);
   }
 
-  function _generateMockMessage(address receiver) internal pure returns (CCIP.Any2EVMMessageFromSender memory) {
-    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts = new CCIP.EVMTokenAndAmount[](0);
+  function _generateMockMessage(address receiver) internal pure returns (Internal.Any2EVMMessageFromSender memory) {
+    Common.EVMTokenAndAmount[] memory tokensAndAmounts = new Common.EVMTokenAndAmount[](0);
     address[] memory pools = new address[](0);
     return (
-      CCIP.Any2EVMMessageFromSender({
+      Internal.Any2EVMMessageFromSender({
         sourceChainId: SOURCE_CHAIN_ID,
         sender: abi.encode(STRANGER),
         receiver: receiver,
@@ -74,7 +74,7 @@ contract EVM2EVMTollOffRampRouter_routeMessage is EVM2EVMTollOffRampRouterSetup 
   // Success
 
   function testSuccess() public {
-    CCIP.Any2EVMMessageFromSender memory message = _generateMockMessage(address(s_receiver));
+    Internal.Any2EVMMessageFromSender memory message = _generateMockMessage(address(s_receiver));
     changePrank(address(s_offRamps[0]));
     vm.expectEmit(false, false, false, true);
     emit MessageReceived();
@@ -83,13 +83,13 @@ contract EVM2EVMTollOffRampRouter_routeMessage is EVM2EVMTollOffRampRouterSetup 
   }
 
   function testMessageFailureReturnsFalseSuccess() public {
-    CCIP.Any2EVMMessageFromSender memory message = _generateMockMessage(address(s_revertingReceiver));
+    Internal.Any2EVMMessageFromSender memory message = _generateMockMessage(address(s_revertingReceiver));
     changePrank(address(s_offRamps[0]));
     assertFalse(s_router.routeMessage(message));
   }
 
   function testNotEnoughMessageGasLimitReturnsFalseSuccess() public {
-    CCIP.Any2EVMMessageFromSender memory message = _generateMockMessage(address(s_receiver));
+    Internal.Any2EVMMessageFromSender memory message = _generateMockMessage(address(s_receiver));
     message.gasLimit = 1;
     changePrank(address(s_offRamps[0]));
     assertFalse(s_router.routeMessage(message));
@@ -98,7 +98,7 @@ contract EVM2EVMTollOffRampRouter_routeMessage is EVM2EVMTollOffRampRouterSetup 
   // Reverts
 
   function testMustCallFromOffRampReverts() public {
-    CCIP.Any2EVMMessageFromSender memory message = _generateMockMessage(STRANGER);
+    Internal.Any2EVMMessageFromSender memory message = _generateMockMessage(STRANGER);
     vm.expectRevert(
       abi.encodeWithSelector(Any2EVMOffRampRouterInterface.MustCallFromOffRamp.selector, BaseOffRampInterface(OWNER))
     );
@@ -106,7 +106,7 @@ contract EVM2EVMTollOffRampRouter_routeMessage is EVM2EVMTollOffRampRouterSetup 
   }
 
   function testZeroAddressReceiverReverts() public {
-    CCIP.Any2EVMMessageFromSender memory message = _generateMockMessage(address(0));
+    Internal.Any2EVMMessageFromSender memory message = _generateMockMessage(address(0));
     changePrank(address(s_offRamps[0]));
     vm.expectRevert();
     s_router.routeMessage(message);

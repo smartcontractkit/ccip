@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {CCIP} from "../../models/Models.sol";
+import {GEConsumer} from "../../models/GEConsumer.sol";
 import {BaseOnRampRouterInterface} from "../onRamp/BaseOnRampRouterInterface.sol";
 import {EVM2EVMGEOnRampInterface} from "../onRamp/EVM2EVMGEOnRampInterface.sol";
 import {Any2EVMOffRampRouterInterface} from "../offRamp/Any2EVMOffRampRouterInterface.sol";
@@ -17,9 +17,14 @@ interface GERouterInterface is BaseOnRampRouterInterface, Any2EVMOffRampRouterIn
    * @param message The message payload
    * @return The sequence number assigned to message
    */
-  function ccipSend(uint256 destinationChainId, CCIP.EVM2AnyGEMessage calldata message) external returns (bytes32);
+  function ccipSend(uint256 destinationChainId, GEConsumer.EVM2AnyGEMessage calldata message)
+    external
+    returns (bytes32);
 
-  function getFee(uint256 destinationChainId, CCIP.EVM2AnyGEMessage memory message) external view returns (uint256 fee);
+  function getFee(uint256 destinationChainId, GEConsumer.EVM2AnyGEMessage memory message)
+    external
+    view
+    returns (uint256 fee);
 
   /**
    * @notice Set chainId => onRamp mapping

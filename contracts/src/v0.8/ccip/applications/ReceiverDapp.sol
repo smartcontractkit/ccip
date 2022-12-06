@@ -4,7 +4,8 @@ pragma solidity 0.8.15;
 import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
 import {Any2EVMMessageReceiverInterface} from "../interfaces/applications/Any2EVMMessageReceiverInterface.sol";
 import {Any2EVMOffRampRouterInterface} from "../interfaces/offRamp/Any2EVMOffRampRouterInterface.sol";
-import {CCIP} from "../models/Models.sol";
+import {GEConsumer} from "../models/GEConsumer.sol";
+import {Common} from "../models/Common.sol";
 import {IERC20} from "../../vendor/IERC20.sol";
 
 /**
@@ -34,11 +35,11 @@ contract ReceiverDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterfac
    * the tokens sent with it to the designated EOA
    * @param message CCIP Message
    */
-  function ccipReceive(CCIP.Any2EVMMessage calldata message) external override onlyRouter {
+  function ccipReceive(Common.Any2EVMMessage calldata message) external override onlyRouter {
     _handleMessage(message.data, message.destTokensAndAmounts);
   }
 
-  function _handleMessage(bytes memory data, CCIP.EVMTokenAndAmount[] memory tokensAndAmounts) internal {
+  function _handleMessage(bytes memory data, Common.EVMTokenAndAmount[] memory tokensAndAmounts) internal {
     (
       ,
       /* address originalSender */

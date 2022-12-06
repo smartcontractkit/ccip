@@ -78,10 +78,10 @@ func NewExecutionBatchBuilder(gasLimit uint64, snoozeTime time.Duration, commitS
 	}
 }
 
-func (eb *ExecutionBatchBuilder) commitReport(seqNr uint64) (commit_store.CCIPCommitReport, error) {
+func (eb *ExecutionBatchBuilder) commitReport(seqNr uint64) (commit_store.InternalCommitReport, error) {
 	latest, err := eb.dstLogPoller.LatestBlock()
 	if err != nil {
-		return commit_store.CCIPCommitReport{}, err
+		return commit_store.InternalCommitReport{}, err
 	}
 	// Since the report accepted logs now contain intervals per onramp, we don't have a simple way of looking
 	// up the committed report for a given sequence number from the chain.
@@ -89,10 +89,10 @@ func (eb *ExecutionBatchBuilder) commitReport(seqNr uint64) (commit_store.CCIPCo
 	// One option is to emit a log per onramp (i.e. ReportAccepted(root, onRamp, min, max)) so we could easily search for the relevant log?
 	logs, err := eb.dstLogPoller.Logs(1, latest, ReportAccepted, eb.commitStore.Address())
 	if err != nil {
-		return commit_store.CCIPCommitReport{}, err
+		return commit_store.InternalCommitReport{}, err
 	}
 	if len(logs) == 0 {
-		return commit_store.CCIPCommitReport{}, errors.Errorf("seq number not committed, nothing committed")
+		return commit_store.InternalCommitReport{}, errors.Errorf("seq number not committed, nothing committed")
 	}
 	for _, log := range logs {
 		reportAccepted, err := eb.commitStore.ParseReportAccepted(types.Log{
@@ -100,7 +100,7 @@ func (eb *ExecutionBatchBuilder) commitReport(seqNr uint64) (commit_store.CCIPCo
 			Data:   log.Data,
 		})
 		if err != nil {
-			return commit_store.CCIPCommitReport{}, err
+			return commit_store.InternalCommitReport{}, err
 		}
 		for i, onRamp := range reportAccepted.Report.OnRamps {
 			if onRamp == eb.onRamp {
@@ -110,15 +110,15 @@ func (eb *ExecutionBatchBuilder) commitReport(seqNr uint64) (commit_store.CCIPCo
 			}
 		}
 	}
-	return commit_store.CCIPCommitReport{}, errors.Errorf("seq number not committed")
+	return commit_store.InternalCommitReport{}, errors.Errorf("seq number not committed")
 }
 
-func (eb *ExecutionBatchBuilder) getUnexpiredCommitReports() ([]commit_store.CCIPCommitReport, error) {
+func (eb *ExecutionBatchBuilder) getUnexpiredCommitReports() ([]commit_store.InternalCommitReport, error) {
 	logs, err := eb.dstLogPoller.LogsCreatedAfter(ReportAccepted, eb.commitStore.Address(), time.Now().Add(-PERMISSIONLESS_EXECUTION_THRESHOLD))
 	if err != nil {
 		return nil, err
 	}
-	var reports []commit_store.CCIPCommitReport
+	var reports []commit_store.InternalCommitReport
 	for _, log := range logs {
 		reportAccepted, err := eb.commitStore.ParseReportAccepted(types.Log{
 			Topics: log.GetTopics(),

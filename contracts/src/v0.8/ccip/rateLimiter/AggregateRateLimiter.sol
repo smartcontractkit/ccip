@@ -4,7 +4,7 @@ pragma solidity 0.8.15;
 import {AggregateRateLimiterInterface} from "../interfaces/rateLimiter/AggregateRateLimiterInterface.sol";
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
 import {IERC20} from "../../vendor/IERC20.sol";
-import {CCIP} from "../models/Models.sol";
+import {Common} from "../models/Common.sol";
 
 contract AggregateRateLimiter is AggregateRateLimiterInterface, OwnerIsCreator {
   // The address of the token limit admin that has the same permissions as
@@ -119,7 +119,7 @@ contract AggregateRateLimiter is AggregateRateLimiterInterface, OwnerIsCreator {
    *          amount allowed in the bucket.
    * @dev Will only remove and therefore emit removal of value if the value is > 0.
    */
-  function _removeTokens(CCIP.EVMTokenAndAmount[] memory tokensAndAmounts) internal {
+  function _removeTokens(Common.EVMTokenAndAmount[] memory tokensAndAmounts) internal {
     uint256 value = 0;
     for (uint256 i = 0; i < tokensAndAmounts.length; ++i) {
       uint256 pricePerToken = s_priceByToken[IERC20(tokensAndAmounts[i].token)];

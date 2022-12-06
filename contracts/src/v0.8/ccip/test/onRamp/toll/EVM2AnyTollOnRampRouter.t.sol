@@ -23,9 +23,9 @@ contract EVM2AnyTollOnRampRouter_ccipSend is EVM2EVMTollOnRampSetup {
   function testSuccess() public {
     address sourceToken0Address = s_sourceTokens[0];
     IERC20 sourceToken0 = IERC20(sourceToken0Address);
-    CCIP.EVM2AnyTollMessage memory message = _generateEmptyMessage();
+    TollConsumer.EVM2AnyTollMessage memory message = _generateEmptyMessage();
 
-    message.tokensAndAmounts = new CCIP.EVMTokenAndAmount[](1);
+    message.tokensAndAmounts = new Common.EVMTokenAndAmount[](1);
     message.tokensAndAmounts[0].amount = 2**64;
     message.tokensAndAmounts[0].token = sourceToken0Address;
     message.feeTokenAndAmount.token = sourceToken0Address;
@@ -49,8 +49,8 @@ contract EVM2AnyTollOnRampRouter_ccipSend is EVM2EVMTollOnRampSetup {
   function testExactApproveSuccess() public {
     address sourceToken0Address = s_sourceTokens[0];
     IERC20 sourceToken0 = IERC20(sourceToken0Address);
-    CCIP.EVM2AnyTollMessage memory message = _generateEmptyMessage();
-    message.tokensAndAmounts = new CCIP.EVMTokenAndAmount[](1);
+    TollConsumer.EVM2AnyTollMessage memory message = _generateEmptyMessage();
+    message.tokensAndAmounts = new Common.EVMTokenAndAmount[](1);
     // since the fee token is the same we should reduce the amount sent
     // when we want an exact approve.
     message.tokensAndAmounts[0].amount = 2**64 - COMMIT_FEE_JUELS;
@@ -76,7 +76,7 @@ contract EVM2AnyTollOnRampRouter_ccipSend is EVM2EVMTollOnRampSetup {
   // Reverts
 
   function testUnsupportedDestinationChainReverts() public {
-    CCIP.EVM2AnyTollMessage memory message = _generateEmptyMessage();
+    TollConsumer.EVM2AnyTollMessage memory message = _generateEmptyMessage();
     uint256 wrongChain = DEST_CHAIN_ID + 1;
 
     vm.expectRevert(abi.encodeWithSelector(BaseOnRampRouterInterface.UnsupportedDestinationChain.selector, wrongChain));
@@ -85,9 +85,9 @@ contract EVM2AnyTollOnRampRouter_ccipSend is EVM2EVMTollOnRampSetup {
   }
 
   function testUnsupportedFeeTokenReverts() public {
-    CCIP.EVM2AnyTollMessage memory message = _generateEmptyMessage();
+    TollConsumer.EVM2AnyTollMessage memory message = _generateEmptyMessage();
     address wrongFeeToken = address(1);
-    message.feeTokenAndAmount = CCIP.EVMTokenAndAmount({token: wrongFeeToken, amount: 0});
+    message.feeTokenAndAmount = Common.EVMTokenAndAmount({token: wrongFeeToken, amount: 0});
 
     vm.expectRevert(abi.encodeWithSelector(BaseOnRampInterface.UnsupportedToken.selector, wrongFeeToken));
 
@@ -95,7 +95,7 @@ contract EVM2AnyTollOnRampRouter_ccipSend is EVM2EVMTollOnRampSetup {
   }
 
   function testFeeTokenAmountTooLowReverts() public {
-    CCIP.EVM2AnyTollMessage memory message = _generateEmptyMessage();
+    TollConsumer.EVM2AnyTollMessage memory message = _generateEmptyMessage();
     message.feeTokenAndAmount.amount = 0;
 
     vm.expectRevert(PoolCollector.FeeTokenAmountTooLow.selector);

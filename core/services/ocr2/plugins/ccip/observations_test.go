@@ -17,8 +17,8 @@ import (
 
 func TestObservationFilter(t *testing.T) {
 	lggr := logger.TestLogger(t)
-	obs1 := CommitObservation{IntervalsByOnRamp: map[common.Address]commit_store.CCIPInterval{
-		common.HexToAddress("0x5431F5F973781809D18643b87B44921b11355d81"): commit_store.CCIPInterval{Min: 1, Max: 10},
+	obs1 := CommitObservation{IntervalsByOnRamp: map[common.Address]commit_store.InternalInterval{
+		common.HexToAddress("0x5431F5F973781809D18643b87B44921b11355d81"): commit_store.InternalInterval{Min: 1, Max: 10},
 	}}
 	b1, err := obs1.Marshal()
 	require.NoError(t, err)

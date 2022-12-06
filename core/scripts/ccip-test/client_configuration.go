@@ -317,17 +317,17 @@ func (client *CCIPClient) SendMessage(t *testing.T) {
 	bts, err := hex.DecodeString("00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000005626c616e6b000000000000000000000000000000000000000000000000000000")
 	require.NoError(t, err)
 
-	token := ge_router.CCIPEVMTokenAndAmount{
+	token := ge_router.CommonEVMTokenAndAmount{
 		Token:  client.Source.LinkTokenAddress,
 		Amount: big.NewInt(1),
 	}
 	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(3e5), false)
 	require.NoError(t, err)
 
-	msg := ge_router.CCIPEVM2AnyGEMessage{
+	msg := ge_router.GEConsumerEVM2AnyGEMessage{
 		Receiver:         testhelpers.MustEncodeAddress(t, client.Dest.MessageReceiver.Address()),
 		Data:             bts,
-		TokensAndAmounts: []ge_router.CCIPEVMTokenAndAmount{token},
+		TokensAndAmounts: []ge_router.CommonEVMTokenAndAmount{token},
 		ExtraArgs:        extraArgsV1,
 		FeeToken:         client.Source.LinkTokenAddress,
 	}
@@ -411,7 +411,7 @@ func (client *CCIPClient) ExecuteManually(seqNr uint64) error {
 		return err
 	}
 	var onRampIdx int
-	var report *commit_store.CCIPCommitReport
+	var report *commit_store.InternalCommitReport
 	for reportIterator.Next() {
 		for i, onRamp := range reportIterator.Event.Report.OnRamps {
 			if onRamp == client.Source.OnRamp.Address() {
@@ -479,7 +479,7 @@ func (client *CCIPClient) ExecuteManually(seqNr uint64) error {
 		return errors.New("outer root doesn't match")
 	}
 	outerProof := outerTree.Prove([]int{onRampIdx})
-	executionReport := evm_2_evm_ge_offramp.CCIPExecutionReport{
+	executionReport := evm_2_evm_ge_offramp.GEExecutionReport{
 		SequenceNumbers:          []uint64{seqNr},
 		TokenPerFeeCoinAddresses: []common.Address{client.Dest.LinkTokenAddress},
 		TokenPerFeeCoin:          []*big.Int{big.NewInt(1)},
@@ -592,7 +592,7 @@ func (client *CCIPClient) ScalingAndBatching(t *testing.T) {
 //func (client CCIPClient) GetCrossChainSendRequestsForRange(
 //	ctx context.Context,
 //	t *testing.T,
-//	report commit_store.CCIPCommitReport,
+//	report commit_store.InternalCommitReport,
 //	onrampBlockNumber uint64) []*evm_2_evm_toll_onramp.EVM2EVMTollOnRampCCIPSendRequested {
 //	// Get the other transactions in the proof, we look 1000 blocks back for transaction
 //	// should be fine? Needs fine-tuning after improved batching strategies are developed
@@ -626,12 +626,12 @@ func (client *CCIPClient) ScalingAndBatching(t *testing.T) {
 //	return requests
 //}
 
-//// GetReportForSequenceNumber return the offramp.CCIPCommitReport for a given ccip requests sequence number.
-//func (client CCIPClient) GetReportForSequenceNumber(ctx context.Context, sequenceNumber uint64, minBlockNumber uint64) (commit_store.CCIPCommitReport, error) {
+//// GetReportForSequenceNumber return the offramp.InternalCommitReport for a given ccip requests sequence number.
+//func (client CCIPClient) GetReportForSequenceNumber(ctx context.Context, sequenceNumber uint64, minBlockNumber uint64) (commit_store.InternalCommitReport, error) {
 //	client.Dest.logger.Infof("Looking for sequenceNumber %d", sequenceNumber)
 //	report, err := client.Dest.OffRamp.GetLastReport(&bind.CallOpts{Context: ctx, Pending: false})
 //	if err != nil {
-//		return commit_store.CCIPCommitReport{}, err
+//		return commit_store.InternalCommitReport{}, err
 //	}
 //
 //	client.Dest.logger.Infof("Last report found for range %d-%d", report.MinSequenceNumber, report.MaxSequenceNumber)
@@ -645,7 +645,7 @@ func (client *CCIPClient) ScalingAndBatching(t *testing.T) {
 //		for i := 0; i < int(maxIterations); i++ {
 //			report, err = client.Dest.CommitStore.GetLastReport(&bind.CallOpts{Context: ctx, Pending: false})
 //			if err != nil {
-//				return commit_store.CCIPCommitReport{}, err
+//				return commit_store.InternalCommitReport{}, err
 //			}
 //			client.Dest.logger.Infof("Last report found for range %d-%d", report.MinSequenceNumber, report.MaxSequenceNumber)
 //			if sequenceNumber >= report.MinSequenceNumber && sequenceNumber <= report.MaxSequenceNumber {
@@ -653,7 +653,7 @@ func (client *CCIPClient) ScalingAndBatching(t *testing.T) {
 //			}
 //			time.Sleep(RetryTiming)
 //		}
-//		return commit_store.CCIPCommitReport{}, errors.New("No report found within the given timeout")
+//		return commit_store.InternalCommitReport{}, errors.New("No report found within the given timeout")
 //	}
 //
 //	// it is in a past report, start looking at the earliest block number possible, the one
@@ -664,7 +664,7 @@ func (client *CCIPClient) ScalingAndBatching(t *testing.T) {
 //		Context: ctx,
 //	})
 //	if err != nil {
-//		return commit_store.CCIPCommitReport{}, err
+//		return commit_store.InternalCommitReport{}, err
 //	}
 //
 //	for reports.Next() {
@@ -676,7 +676,7 @@ func (client *CCIPClient) ScalingAndBatching(t *testing.T) {
 //
 //	// Somehow the transaction was not included in any report within blocks produced after
 //	// the transaction was initialized but the sequence number is lower than we are currently at
-//	return commit_store.CCIPCommitReport{}, errors.New("No report found for given sequence number")
+//	return commit_store.InternalCommitReport{}, errors.New("No report found for given sequence number")
 //}
 
 func (client *CCIPClient) SetCommitStoreConfig(t *testing.T) {
@@ -699,7 +699,7 @@ func (client *CCIPClient) ValidateMerkleRoot(
 	t *testing.T,
 	request *evm_2_evm_ge_onramp.EVM2EVMGEOnRampCCIPSendRequested,
 	reportRequests []*evm_2_evm_ge_onramp.EVM2EVMGEOnRampCCIPSendRequested,
-	report commit_store.CCIPCommitReport,
+	report commit_store.InternalCommitReport,
 ) merklemulti.Proof[[32]byte] {
 	mctx := hasher.NewKeccakCtx()
 	var leafHashes [][32]byte
@@ -762,8 +762,8 @@ func (client *CCIPClient) SendToOnrampWithExecution(t *testing.T, source SourceC
 	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(3e5), false)
 	helpers.PanicErr(err)
 
-	payload := ge_router.CCIPEVM2AnyGEMessage{
-		TokensAndAmounts: []ge_router.CCIPEVMTokenAndAmount{},
+	payload := ge_router.GEConsumerEVM2AnyGEMessage{
+		TokensAndAmounts: []ge_router.CommonEVMTokenAndAmount{},
 		Receiver:         testhelpers.MustEncodeAddress(t, toAddress),
 		Data:             senderAndReceiver,
 		ExtraArgs:        extraArgsV1,

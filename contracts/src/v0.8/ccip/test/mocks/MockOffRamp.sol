@@ -4,11 +4,15 @@ pragma solidity 0.8.15;
 import "../../interfaces/offRamp/BaseOffRampInterface.sol";
 import "../../interfaces/applications/Any2EVMMessageReceiverInterface.sol";
 import "../../interfaces/CommitStoreInterface.sol";
+import "../../models/Toll.sol";
+import "../../models/TollConsumer.sol";
 
 contract MockOffRamp is BaseOffRampInterface {
   IERC20 public s_token;
 
-  function deliverMessageTo(Any2EVMMessageReceiverInterface recipient, CCIP.Any2EVMMessage calldata message) external {
+  function deliverMessageTo(Any2EVMMessageReceiverInterface recipient, Common.Any2EVMMessage calldata message)
+    external
+  {
     recipient.ccipReceive(message);
   }
 
@@ -22,21 +26,15 @@ contract MockOffRamp is BaseOffRampInterface {
     return Any2EVMOffRampRouterInterface(address(0));
   }
 
-  /// @inheritdoc BaseOffRampInterface
-  function manuallyExecute(CCIP.ExecutionReport memory) external virtual override {
-    // solhint-disable-next-line reason-string
-    revert();
-  }
-
   /**
    * @notice ccipReceive implements the receive function to create a
    * collision if some other method happens to hash to the same signature/
    */
-  function ccipReceive(CCIP.Any2EVMMessageFromSender calldata) external pure {
+  function ccipReceive(Internal.Any2EVMMessageFromSender calldata) external pure {
     revert();
   }
 
-  function executeSingleMessage(CCIP.EVM2EVMTollMessage memory message) external {}
+  function executeSingleMessage(Toll.EVM2EVMTollMessage memory message) external {}
 
   function setToken(IERC20 token) external {
     s_token = token;
@@ -47,8 +45,8 @@ contract MockOffRamp is BaseOffRampInterface {
   }
 
   /// @inheritdoc BaseOffRampInterface
-  function getExecutionState(uint64) public pure returns (CCIP.MessageExecutionState) {
-    return CCIP.MessageExecutionState.SUCCESS;
+  function getExecutionState(uint64) public pure returns (Internal.MessageExecutionState) {
+    return Internal.MessageExecutionState.SUCCESS;
   }
 
   /// @inheritdoc BaseOffRampInterface

@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {CCIP} from "../../models/Models.sol";
 import {IERC20} from "../../../vendor/IERC20.sol";
 import {BaseOnRampInterface} from "./BaseOnRampInterface.sol";
+import {TollConsumer} from "../../models/TollConsumer.sol";
+import {Toll} from "../../models/Toll.sol";
 
 interface EVM2EVMTollOnRampInterface is BaseOnRampInterface {
   error InvalidFeeConfig();
+  error InvalidExtraArgsTag(bytes4 expected, bytes4 got);
 
-  event CCIPSendRequested(CCIP.EVM2EVMTollMessage message);
+  event CCIPSendRequested(Toll.EVM2EVMTollMessage message);
 
   /**
    * @notice Send a message to the remote chain
@@ -17,7 +19,9 @@ interface EVM2EVMTollOnRampInterface is BaseOnRampInterface {
    * @param message Message struct to send
    * @param originalSender The original initiator of the CCIP request
    */
-  function forwardFromRouter(CCIP.EVM2AnyTollMessage memory message, address originalSender) external returns (uint64);
+  function forwardFromRouter(TollConsumer.EVM2AnyTollMessage memory message, address originalSender)
+    external
+    returns (uint64);
 
   struct FeeConfig {
     // Fees per fee token

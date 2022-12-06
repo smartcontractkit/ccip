@@ -32,7 +32,7 @@ contract EVM2EVMTollOnRamp_constructor is EVM2EVMTollOnRampSetup {
 
 /// @notice #forwardFromRouter
 contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
-  using CCIP for CCIP.EVMExtraArgsV1;
+  using TollConsumer for TollConsumer.EVMExtraArgsV1;
 
   function setUp() public virtual override {
     EVM2EVMTollOnRampSetup.setUp();
@@ -46,7 +46,7 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
   // Success
 
   function testSuccess() public {
-    CCIP.EVM2AnyTollMessage memory message = _generateEmptyMessage();
+    TollConsumer.EVM2AnyTollMessage memory message = _generateEmptyMessage();
 
     vm.expectEmit(false, false, false, true);
     emit CCIPSendRequested(_messageToEventNoFee(message, 1));
@@ -55,7 +55,7 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
   }
 
   function testShouldIncrementSeqNumSuccess() public {
-    CCIP.EVM2AnyTollMessage memory message = _generateEmptyMessage();
+    TollConsumer.EVM2AnyTollMessage memory message = _generateEmptyMessage();
 
     vm.expectEmit(false, false, false, true);
     emit CCIPSendRequested(_messageToEventNoFee(message, 1));
@@ -100,7 +100,7 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
   }
 
   function testMessageTooLargeReverts() public {
-    CCIP.EVM2AnyTollMessage memory message = _generateEmptyMessage();
+    TollConsumer.EVM2AnyTollMessage memory message = _generateEmptyMessage();
     message.data = new bytes(onRampConfig().maxDataSize + 1);
     vm.expectRevert(
       abi.encodeWithSelector(
@@ -115,9 +115,9 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
 
   function testTooManyTokensReverts() public {
     assertEq(MAX_TOKENS_LENGTH, s_onRamp.getConfig().maxTokensLength);
-    CCIP.EVM2AnyTollMessage memory message = _generateEmptyMessage();
+    TollConsumer.EVM2AnyTollMessage memory message = _generateEmptyMessage();
     uint256 tooMany = MAX_TOKENS_LENGTH + 1;
-    message.tokensAndAmounts = new CCIP.EVMTokenAndAmount[](tooMany);
+    message.tokensAndAmounts = new Common.EVMTokenAndAmount[](tooMany);
     vm.expectRevert(BaseOnRampInterface.UnsupportedNumberOfTokens.selector);
     s_onRamp.forwardFromRouter(message, STRANGER);
   }
@@ -134,8 +134,8 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
   function testUnsupportedTokenReverts() public {
     address wrongToken = address(1);
 
-    CCIP.EVM2AnyTollMessage memory message = _generateEmptyMessage();
-    message.tokensAndAmounts = new CCIP.EVMTokenAndAmount[](1);
+    TollConsumer.EVM2AnyTollMessage memory message = _generateEmptyMessage();
+    message.tokensAndAmounts = new Common.EVMTokenAndAmount[](1);
     message.tokensAndAmounts[0].token = wrongToken;
     message.tokensAndAmounts[0].amount = 1;
 
@@ -154,8 +154,8 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
   }
 
   function testValueExceedsCapacityReverts() public {
-    CCIP.EVM2AnyTollMessage memory message = _generateEmptyMessage();
-    message.tokensAndAmounts = new CCIP.EVMTokenAndAmount[](1);
+    TollConsumer.EVM2AnyTollMessage memory message = _generateEmptyMessage();
+    message.tokensAndAmounts = new Common.EVMTokenAndAmount[](1);
     message.tokensAndAmounts[0].amount = 2**128;
     message.tokensAndAmounts[0].token = s_sourceTokens[0];
 
@@ -173,10 +173,10 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
   }
 
   function testPriceNotFoundForTokenReverts() public {
-    CCIP.EVM2AnyTollMessage memory message = _generateEmptyMessage();
+    TollConsumer.EVM2AnyTollMessage memory message = _generateEmptyMessage();
 
     address fakeToken = address(1);
-    message.tokensAndAmounts = new CCIP.EVMTokenAndAmount[](1);
+    message.tokensAndAmounts = new Common.EVMTokenAndAmount[](1);
     message.tokensAndAmounts[0].token = fakeToken;
 
     vm.expectRevert(abi.encodeWithSelector(AggregateRateLimiterInterface.PriceNotFoundForToken.selector, fakeToken));
@@ -186,8 +186,10 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
 
   // Asserts gasLimit must be <=maxGasLimit
   function testMessageGasLimitTooHighReverts() public {
-    CCIP.EVM2AnyTollMessage memory message = _generateEmptyMessage();
-    message.extraArgs = CCIP.EVMExtraArgsV1({gasLimit: MAX_GAS_LIMIT + 1, strict: false})._toBytes();
+    TollConsumer.EVM2AnyTollMessage memory message = _generateEmptyMessage();
+    message.extraArgs = TollConsumer._argsToBytes(
+      TollConsumer.EVMExtraArgsV1({gasLimit: MAX_GAS_LIMIT + 1, strict: false})
+    );
     vm.expectRevert(abi.encodeWithSelector(BaseOnRampInterface.MessageGasLimitTooHigh.selector));
     s_onRamp.forwardFromRouter(message, OWNER);
   }

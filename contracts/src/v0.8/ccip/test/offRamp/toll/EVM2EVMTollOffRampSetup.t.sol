@@ -4,6 +4,8 @@ pragma solidity 0.8.15;
 import "../../mocks/MockCommitStore.sol";
 import "../../mocks/MockTollOffRampRouter.sol";
 import "../../helpers/ramps/EVM2EVMTollOffRampHelper.sol";
+import "../../../models/Toll.sol";
+import "../../../models/Common.sol";
 import "../../helpers/receivers/SimpleMessageReceiver.sol";
 import "../../TokenSetup.t.sol";
 
@@ -16,7 +18,7 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
 
   uint256 internal constant EXECUTION_FEE_AMOUNT = 1e18;
 
-  event ExecutionStateChanged(uint64 indexed sequenceNumber, CCIP.MessageExecutionState state);
+  event ExecutionStateChanged(uint64 indexed sequenceNumber, Internal.MessageExecutionState state);
 
   function setUp() public virtual override {
     TokenSetup.setUp();
@@ -53,13 +55,13 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
     assertTrue(address(newRouter) != address(s_offRamp.getRouter()));
   }
 
-  function _convertTollToGeneralMessage(CCIP.EVM2EVMTollMessage memory original)
+  function _convertTollToGeneralMessage(Toll.EVM2EVMTollMessage memory original)
     internal
     view
-    returns (CCIP.Any2EVMMessageFromSender memory message)
+    returns (Internal.Any2EVMMessageFromSender memory message)
   {
     uint256 numberOfTokens = original.tokensAndAmounts.length;
-    CCIP.EVMTokenAndAmount[] memory destTokensAndAmounts = new CCIP.EVMTokenAndAmount[](numberOfTokens);
+    Common.EVMTokenAndAmount[] memory destTokensAndAmounts = new Common.EVMTokenAndAmount[](numberOfTokens);
     address[] memory destPools = new address[](numberOfTokens);
 
     for (uint256 i = 0; i < numberOfTokens; ++i) {
@@ -70,7 +72,7 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
     }
 
     return
-      CCIP.Any2EVMMessageFromSender({
+      Internal.Any2EVMMessageFromSender({
         sourceChainId: original.sourceChainId,
         sender: abi.encode(original.sender),
         receiver: original.receiver,
@@ -84,7 +86,7 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
   function _generateAny2EVMTollMessageNoTokens(uint64 sequenceNumber)
     internal
     view
-    returns (CCIP.EVM2EVMTollMessage memory)
+    returns (Toll.EVM2EVMTollMessage memory)
   {
     return _generateAny2EVMTollMessage(sequenceNumber, getCastedSourceEVMTokenAndAmountsWithZeroAmounts());
   }
@@ -92,27 +94,27 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
   function _generateAny2EVMTollMessageWithTokens(uint64 sequenceNumber, uint256[] memory amounts)
     internal
     view
-    returns (CCIP.EVM2EVMTollMessage memory)
+    returns (Toll.EVM2EVMTollMessage memory)
   {
-    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts = getCastedSourceEVMTokenAndAmountsWithZeroAmounts();
+    Common.EVMTokenAndAmount[] memory tokensAndAmounts = getCastedSourceEVMTokenAndAmountsWithZeroAmounts();
     for (uint256 i = 0; i < tokensAndAmounts.length; ++i) {
       tokensAndAmounts[i].amount = amounts[i];
     }
     return _generateAny2EVMTollMessage(sequenceNumber, tokensAndAmounts);
   }
 
-  function _generateAny2EVMTollMessage(uint64 sequenceNumber, CCIP.EVMTokenAndAmount[] memory tokensAndAmounts)
+  function _generateAny2EVMTollMessage(uint64 sequenceNumber, Common.EVMTokenAndAmount[] memory tokensAndAmounts)
     internal
     view
-    returns (CCIP.EVM2EVMTollMessage memory)
+    returns (Toll.EVM2EVMTollMessage memory)
   {
     bytes memory data = abi.encode(0);
-    CCIP.EVMTokenAndAmount memory feeToken = CCIP.EVMTokenAndAmount({
+    Common.EVMTokenAndAmount memory feeToken = Common.EVMTokenAndAmount({
       token: tokensAndAmounts[0].token,
       amount: EXECUTION_FEE_AMOUNT
     });
     return
-      CCIP.EVM2EVMTollMessage(
+      Toll.EVM2EVMTollMessage(
         SOURCE_CHAIN_ID,
         sequenceNumber,
         OWNER,
@@ -124,16 +126,16 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
       );
   }
 
-  function _generateBasicMessages() internal view returns (CCIP.EVM2EVMTollMessage[] memory) {
-    CCIP.EVM2EVMTollMessage[] memory messages = new CCIP.EVM2EVMTollMessage[](1);
+  function _generateBasicMessages() internal view returns (Toll.EVM2EVMTollMessage[] memory) {
+    Toll.EVM2EVMTollMessage[] memory messages = new Toll.EVM2EVMTollMessage[](1);
     messages[0] = _generateAny2EVMTollMessageNoTokens(1);
     return messages;
   }
 
-  function _generateMessagesWithTokens() internal view returns (CCIP.EVM2EVMTollMessage[] memory) {
-    CCIP.EVM2EVMTollMessage[] memory messages = new CCIP.EVM2EVMTollMessage[](2);
-    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts = getCastedSourceEVMTokenAndAmountsWithZeroAmounts();
-    CCIP.EVMTokenAndAmount memory feeToken = tokensAndAmounts[0];
+  function _generateMessagesWithTokens() internal view returns (Toll.EVM2EVMTollMessage[] memory) {
+    Toll.EVM2EVMTollMessage[] memory messages = new Toll.EVM2EVMTollMessage[](2);
+    Common.EVMTokenAndAmount[] memory tokensAndAmounts = getCastedSourceEVMTokenAndAmountsWithZeroAmounts();
+    Common.EVMTokenAndAmount memory feeToken = tokensAndAmounts[0];
     feeToken.amount = EXECUTION_FEE_AMOUNT;
     tokensAndAmounts[0].amount = 1e18;
     tokensAndAmounts[1].amount = 5e18;
@@ -144,10 +146,10 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
     return messages;
   }
 
-  function _generateReportFromMessages(CCIP.EVM2EVMTollMessage[] memory messages)
+  function _generateReportFromMessages(Toll.EVM2EVMTollMessage[] memory messages)
     internal
     view
-    returns (CCIP.ExecutionReport memory)
+    returns (Toll.ExecutionReport memory)
   {
     bytes[] memory encodedMessages = new bytes[](messages.length);
     uint64[] memory sequenceNumbers = new uint64[](messages.length);
@@ -164,10 +166,8 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
     uint256[] memory tokenPerFeeCoin = new uint256[](1);
     tokenPerFeeCoin[0] = TOKENS_PER_FEE_COIN;
 
-    CCIP.FeeUpdate[] memory feeUpdates = new CCIP.FeeUpdate[](0);
-
     return
-      CCIP.ExecutionReport({
+      Toll.ExecutionReport({
         sequenceNumbers: sequenceNumbers,
         innerProofs: innerProofs,
         innerProofFlagBits: 2**256 - 1,
@@ -175,8 +175,7 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
         outerProofFlagBits: 2**256 - 1,
         encodedMessages: encodedMessages,
         tokenPerFeeCoinAddresses: tokenPerFeeCoinAddresses,
-        tokenPerFeeCoin: tokenPerFeeCoin,
-        feeUpdates: feeUpdates
+        tokenPerFeeCoin: tokenPerFeeCoin
       });
   }
 }

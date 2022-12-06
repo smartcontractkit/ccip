@@ -4,10 +4,11 @@ pragma solidity 0.8.15;
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
 import {Any2EVMOffRampRouterInterface, BaseOffRampInterface} from "../interfaces/offRamp/Any2EVMOffRampRouterInterface.sol";
 import {Any2EVMMessageReceiverInterface} from "../interfaces/applications/Any2EVMMessageReceiverInterface.sol";
-import {CCIP} from "../models/Models.sol";
+import {Internal} from "../models/Internal.sol";
+import {Common} from "../models/Common.sol";
 
 abstract contract BaseOffRampRouter is Any2EVMOffRampRouterInterface, OwnerIsCreator {
-  using CCIP for CCIP.Any2EVMMessageFromSender;
+  using Internal for Internal.Any2EVMMessageFromSender;
 
   uint256 private constant GAS_FOR_CALL_EXACT_CHECK = 5_000;
 
@@ -24,13 +25,15 @@ abstract contract BaseOffRampRouter is Any2EVMOffRampRouterInterface, OwnerIsCre
   }
 
   /// @inheritdoc Any2EVMOffRampRouterInterface
-  function routeMessage(CCIP.Any2EVMMessageFromSender calldata message)
+  function routeMessage(Internal.Any2EVMMessageFromSender calldata message)
     external
     override
     onlyOffRamp
     returns (bool success)
   {
-    CCIP.Any2EVMMessage memory minMessage = message._toAny2EVMMessage();
+    // TODO: Maybe push this down into GEOffRamp? Do we really want/need to support multiple billing models
+    // calling the same receiver?
+    Common.Any2EVMMessage memory minMessage = message._toAny2EVMMessage();
 
     bytes memory callData = abi.encodeWithSelector(Any2EVMMessageReceiverInterface.ccipReceive.selector, minMessage);
     return _callWithExactGas(message.gasLimit, message.receiver, 0, callData);

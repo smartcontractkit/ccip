@@ -17,7 +17,6 @@
   "getRouter()": "b0f479a1",
   "getTokenLimitAdmin()": "599f6431",
   "isAFNHealthy()": "147809b3",
-  "manuallyExecute((uint64[],address[],uint256[],(uint256,uint256)[],bytes[],bytes32[],uint256,bytes32[],uint256))": "a8e91321",
   "owner()": "8da5cb5b",
   "pause()": "8456cb59",
   "paused()": "5c975abb",

@@ -83,10 +83,10 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		})
 		require.NoError(t, err)
 
-		msg := ge_router.CCIPEVM2AnyGEMessage{
+		msg := ge_router.GEConsumerEVM2AnyGEMessage{
 			Receiver: testhelpers.MustEncodeAddress(t, ccipContracts.Receivers[0].Receiver.Address()),
 			Data:     []byte("hello"),
-			TokensAndAmounts: []ge_router.CCIPEVMTokenAndAmount{
+			TokensAndAmounts: []ge_router.CommonEVMTokenAndAmount{
 				{
 					Token:  ccipContracts.SourceLinkToken.Address(),
 					Amount: tokenAmount,
@@ -178,10 +178,10 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 			txGasLimit := new(big.Int).Mul(gasLimit, big.NewInt(int64(i+1)))
 			extraArgs, err := testhelpers.GetEVMExtraArgsV1(txGasLimit, false)
 			require.NoError(t, err)
-			msg := ge_router.CCIPEVM2AnyGEMessage{
+			msg := ge_router.GEConsumerEVM2AnyGEMessage{
 				Receiver: testhelpers.MustEncodeAddress(t, ccipContracts.Receivers[0].Receiver.Address()),
 				Data:     []byte("hello"),
-				TokensAndAmounts: []ge_router.CCIPEVMTokenAndAmount{
+				TokensAndAmounts: []ge_router.CommonEVMTokenAndAmount{
 					{
 						Token:  ccipContracts.SourceLinkToken.Address(),
 						Amount: tokenAmount,
@@ -247,11 +247,11 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		require.NoError(t, err)
 
 		testhelpers.SendTollRequest(t, ccipContracts, "hey DON, execute for me",
-			[]evm_2_any_toll_onramp_router.CCIPEVMTokenAndAmount{{
+			[]evm_2_any_toll_onramp_router.CommonEVMTokenAndAmount{{
 				Token:  ccipContracts.SourceLinkToken.Address(),
 				Amount: tokenAmount,
 			}},
-			evm_2_any_toll_onramp_router.CCIPEVMTokenAndAmount{
+			evm_2_any_toll_onramp_router.CommonEVMTokenAndAmount{
 				Token:  ccipContracts.SourceLinkToken.Address(),
 				Amount: feeTokenAmount,
 			},
@@ -328,10 +328,10 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		for i := 0; i < n; i++ {
 			_, err = ccipContracts.SourceLinkToken.Approve(ccipContracts.SourceUser, ccipContracts.TollOnRampRouter.Address(), new(big.Int).Add(tokenAmount, feeTokenAmount))
 			require.NoError(t, err)
-			txs = append(txs, testhelpers.QueueTollRequest(t, ccipContracts, fmt.Sprintf("batch request %d", tollCurrentSeqNum+i), []evm_2_any_toll_onramp_router.CCIPEVMTokenAndAmount{{
+			txs = append(txs, testhelpers.QueueTollRequest(t, ccipContracts, fmt.Sprintf("batch request %d", tollCurrentSeqNum+i), []evm_2_any_toll_onramp_router.CommonEVMTokenAndAmount{{
 				Token:  ccipContracts.SourceLinkToken.Address(),
 				Amount: tokenAmount,
-			}}, evm_2_any_toll_onramp_router.CCIPEVMTokenAndAmount{
+			}}, evm_2_any_toll_onramp_router.CommonEVMTokenAndAmount{
 				Token:  ccipContracts.SourceLinkToken.Address(),
 				Amount: feeTokenAmount,
 			}, big.NewInt(100_000), ccipContracts.Receivers[0].Receiver.Address()))
@@ -435,11 +435,11 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 					currentSeqNum.Inc()
 					testhelpers.SendTollRequest(t, ccipContracts,
 						"hey DON, execute for me",
-						[]evm_2_any_toll_onramp_router.CCIPEVMTokenAndAmount{{
+						[]evm_2_any_toll_onramp_router.CommonEVMTokenAndAmount{{
 							Token:  ccipContracts.SourceLinkToken.Address(),
 							Amount: tokenAmount,
 						}},
-						evm_2_any_toll_onramp_router.CCIPEVMTokenAndAmount{
+						evm_2_any_toll_onramp_router.CommonEVMTokenAndAmount{
 							Token:  ccipContracts.SourceLinkToken.Address(),
 							Amount: feeTokenAmount,
 						},

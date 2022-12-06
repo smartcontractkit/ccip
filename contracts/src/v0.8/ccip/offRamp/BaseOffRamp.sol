@@ -6,8 +6,9 @@ import {HealthChecker, AFNInterface} from "../health/HealthChecker.sol";
 import {OffRampTokenPoolRegistry} from "../pools/OffRampTokenPoolRegistry.sol";
 import {AggregateRateLimiter} from "../rateLimiter/AggregateRateLimiter.sol";
 import {BaseOffRampInterface, Any2EVMOffRampRouterInterface, CommitStoreInterface} from "../interfaces/offRamp/BaseOffRampInterface.sol";
-import {CCIP} from "../models/Models.sol";
 import {IERC20} from "../../vendor/IERC20.sol";
+import {Internal} from "../models/Internal.sol";
+import {Common} from "../models/Common.sol";
 import {PoolInterface} from "../interfaces/pools/PoolInterface.sol";
 
 /**
@@ -29,22 +30,9 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, OffRampTokenPoolReg
   // The commitStore contract
   CommitStoreInterface internal s_commitStore;
 
-  uint256 internal constant EXTERNAL_CALL_OVERHEAD_GAS = 2600;
-  uint256 internal constant RATE_LIMITER_OVERHEAD_GAS = (2_100 + 5_000); // COLD_SLOAD_COST for accessing token bucket // SSTORE_RESET_GAS for updating & decreasing token bucket
-  uint256 internal constant EVM_ADDRESS_LENGTH_BYTES = 20;
-  uint256 internal constant EVM_WORD_BYTES = 32;
-  uint256 internal constant CALLDATA_GAS_PER_BYTE = 16;
-  uint256 internal constant PER_TOKEN_OVERHEAD_GAS = (2_100 + // COLD_SLOAD_COST for first reading the pool
-    2_100 + // COLD_SLOAD_COST for pool to ensure allowed offramp calls it
-    2_100 + // COLD_SLOAD_COST for accessing pool balance slot
-    5_000 + // SSTORE_RESET_GAS for decreasing pool balance from non-zero to non-zero
-    2_100 + // COLD_SLOAD_COST for accessing receiver balance
-    20_000 + // SSTORE_SET_GAS for increasing receiver balance from zero to non-zero
-    2_100); // COLD_SLOAD_COST for obtanining price of token to use for aggregate token bucket
-
   // A mapping of sequence numbers to execution state.
   // This makes sure we never execute a message twice.
-  mapping(uint64 => CCIP.MessageExecutionState) internal s_executedMessages;
+  mapping(uint64 => Internal.MessageExecutionState) internal s_executedMessages;
 
   constructor(
     uint256 sourceChainId,
@@ -87,7 +75,7 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, OffRampTokenPoolReg
    */
   function _releaseOrMintTokens(
     address[] memory pools,
-    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts,
+    Common.EVMTokenAndAmount[] memory tokensAndAmounts,
     address receiver
   ) internal {
     if (pools.length != tokensAndAmounts.length) revert TokenAndAmountMisMatch();
@@ -121,18 +109,21 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, OffRampTokenPoolReg
 
   /**
    * @notice Try executing a message
-   * @param message CCIP.Any2EVMMessageFromSender memory message
-   * @return CCIP.ExecutionState
+   * @param message Internal.Any2EVMMessageFromSender memory message
+   * @return Internal.ExecutionState
    */
-  function _trialExecute(CCIP.Any2EVMMessageFromSender memory message) internal returns (CCIP.MessageExecutionState) {
+  function _trialExecute(Internal.Any2EVMMessageFromSender memory message)
+    internal
+    returns (Internal.MessageExecutionState)
+  {
     try this.executeSingleMessage(message) {} catch (bytes memory err) {
       if (BaseOffRampInterface.ReceiverError.selector == bytes4(err)) {
-        return CCIP.MessageExecutionState.FAILURE;
+        return Internal.MessageExecutionState.FAILURE;
       } else {
         revert ExecutionError(err);
       }
     }
-    return CCIP.MessageExecutionState.SUCCESS;
+    return Internal.MessageExecutionState.SUCCESS;
   }
 
   /**
@@ -141,7 +132,7 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, OffRampTokenPoolReg
    * @dev this can only be called by the contract itself. It is part of
    * the Execute call, as we can only try/catch on external calls.
    */
-  function executeSingleMessage(CCIP.Any2EVMMessageFromSender memory message) external {
+  function executeSingleMessage(Internal.Any2EVMMessageFromSender memory message) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
     if (message.destTokensAndAmounts.length > 0) {
       _removeTokens(message.destTokensAndAmounts);
@@ -151,7 +142,7 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, OffRampTokenPoolReg
     _callReceiver(message);
   }
 
-  function _callReceiver(CCIP.Any2EVMMessageFromSender memory message) internal {
+  function _callReceiver(Internal.Any2EVMMessageFromSender memory message) internal {
     if (!message.receiver.isContract()) return;
     if (!s_router.routeMessage(message)) revert ReceiverError();
   }
@@ -159,13 +150,8 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, OffRampTokenPoolReg
   /**
    * @notice Reverts as this contract should not access CCIP messages
    */
-  function ccipReceive(CCIP.Any2EVMMessageFromSender calldata) external pure {
-    // solhint-disable-next-line reason-string
-    revert();
-  }
-
-  /// @inheritdoc BaseOffRampInterface
-  function manuallyExecute(CCIP.ExecutionReport memory) external virtual override {
+  // TODO: Should be Any2EVMMessage ??
+  function ccipReceive(Internal.Any2EVMMessageFromSender calldata) external pure {
     // solhint-disable-next-line reason-string
     revert();
   }
@@ -182,7 +168,7 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, OffRampTokenPoolReg
   }
 
   /// @inheritdoc BaseOffRampInterface
-  function getExecutionState(uint64 sequenceNumber) public view returns (CCIP.MessageExecutionState) {
+  function getExecutionState(uint64 sequenceNumber) public view returns (Internal.MessageExecutionState) {
     return s_executedMessages[sequenceNumber];
   }
 

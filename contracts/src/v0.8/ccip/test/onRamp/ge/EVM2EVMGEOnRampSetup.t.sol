@@ -4,17 +4,16 @@ pragma solidity 0.8.15;
 import "../../TokenSetup.t.sol";
 import {EVM2EVMGEOnRampInterface} from "../../../interfaces/onRamp/EVM2EVMGEOnRampInterface.sol";
 import {EVM2EVMGEOnRamp} from "../../../onRamp/ge/EVM2EVMGEOnRamp.sol";
-import {DynamicFeeCalculatorInterface} from "../../../interfaces/dynamicFeeCalculator/DynamicFeeCalculatorInterface.sol";
-import {GasFeeCache, GasFeeCacheInterface} from "../../../dynamicFeeCalculator/GasFeeCache.sol";
+import {GasFeeCache, GasFeeCacheInterface} from "../../../gasFeeCache/GasFeeCache.sol";
 import {GERouter} from "../../../router/GERouter.sol";
 import {GESRouterSetup} from "../../router/GERouterSetup.t.sol";
+import {GE} from "../../../models/GE.sol";
+import {GEConsumer} from "../../../models/GEConsumer.sol";
+import "../../../offRamp/ge/EVM2EVMGEOffRamp.sol";
 
 contract EVM2EVMGEOnRampSetup is TokenSetup, GESRouterSetup {
-  using CCIP for CCIP.EVMExtraArgsV1;
-  using CCIP for CCIP.EVM2EVMGEMessage;
-
   // Duplicate event of the CCIPSendRequested in the GEOnRampInterface
-  event CCIPSendRequested(CCIP.EVM2EVMGEMessage message);
+  event CCIPSendRequested(GE.EVM2EVMGEMessage message);
 
   uint256 internal immutable i_tokenAmount0 = 9;
   uint256 internal immutable i_tokenAmount1 = 7;
@@ -29,8 +28,8 @@ contract EVM2EVMGEOnRampSetup is TokenSetup, GESRouterSetup {
     TokenSetup.setUp();
     GESRouterSetup.setUp();
 
-    CCIP.FeeUpdate[] memory fees = new CCIP.FeeUpdate[](1);
-    fees[0] = CCIP.FeeUpdate({chainId: DEST_CHAIN_ID, linkPerUnitGas: 100});
+    GE.FeeUpdate[] memory fees = new GE.FeeUpdate[](1);
+    fees[0] = GE.FeeUpdate({chainId: DEST_CHAIN_ID, linkPerUnitGas: 100});
     address[] memory feeUpdaters = new address[](0);
     GasFeeCacheInterface gasFeeCache = new GasFeeCache(fees, feeUpdaters);
 
@@ -45,11 +44,11 @@ contract EVM2EVMGEOnRampSetup is TokenSetup, GESRouterSetup {
       rateLimiterConfig(),
       TOKEN_LIMIT_ADMIN,
       s_sourceRouter,
-      dynamicFeeCalculatorConfig(address(gasFeeCache))
+      gasFeeCacheConfig(address(gasFeeCache))
     );
 
     s_metadataHash = keccak256(
-      abi.encode(CCIP.EVM_2_EVM_GE_MESSAGE_HASH, SOURCE_CHAIN_ID, DEST_CHAIN_ID, address(s_onRamp))
+      abi.encode(GE.EVM_2_EVM_GE_MESSAGE_HASH, SOURCE_CHAIN_ID, DEST_CHAIN_ID, address(s_onRamp))
     );
 
     s_onRamp.setPrices(getCastedSourceTokens(), getTokenPrices());
@@ -64,45 +63,44 @@ contract EVM2EVMGEOnRampSetup is TokenSetup, GESRouterSetup {
     IERC20(s_sourceTokens[0]).approve(address(s_sourceRouter), 2**128);
   }
 
-  function _generateTokenMessage() public view returns (CCIP.EVM2AnyGEMessage memory) {
-    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts = getCastedSourceEVMTokenAndAmountsWithZeroAmounts();
+  function _generateTokenMessage() public view returns (GEConsumer.EVM2AnyGEMessage memory) {
+    Common.EVMTokenAndAmount[] memory tokensAndAmounts = getCastedSourceEVMTokenAndAmountsWithZeroAmounts();
     tokensAndAmounts[0].amount = i_tokenAmount0;
     tokensAndAmounts[1].amount = i_tokenAmount1;
     return
-      CCIP.EVM2AnyGEMessage({
+      GEConsumer.EVM2AnyGEMessage({
         receiver: abi.encode(OWNER),
         data: "",
         tokensAndAmounts: tokensAndAmounts,
         feeToken: s_sourceFeeToken,
-        extraArgs: CCIP.EVMExtraArgsV1({gasLimit: GAS_LIMIT, strict: false})._toBytes()
+        extraArgs: GEConsumer._argsToBytes(GEConsumer.EVMExtraArgsV1({gasLimit: GAS_LIMIT, strict: false}))
       });
   }
 
-  function _generateEmptyMessage() public view returns (CCIP.EVM2AnyGEMessage memory) {
+  function _generateEmptyMessage() public view returns (GEConsumer.EVM2AnyGEMessage memory) {
     return
-      CCIP.EVM2AnyGEMessage({
+      GEConsumer.EVM2AnyGEMessage({
         receiver: abi.encode(OWNER),
         data: "",
-        tokensAndAmounts: new CCIP.EVMTokenAndAmount[](0),
+        tokensAndAmounts: new Common.EVMTokenAndAmount[](0),
         feeToken: s_sourceFeeToken,
-        extraArgs: CCIP.EVMExtraArgsV1({gasLimit: GAS_LIMIT, strict: false})._toBytes()
+        extraArgs: GEConsumer._argsToBytes(GEConsumer.EVMExtraArgsV1({gasLimit: GAS_LIMIT, strict: false}))
       });
   }
 
   function _messageToEvent(
-    CCIP.EVM2AnyGEMessage memory message,
+    GEConsumer.EVM2AnyGEMessage memory message,
     uint64 seqNum,
     uint64 nonce,
     uint256 feeTokenAmount
-  ) public view returns (CCIP.EVM2EVMGEMessage memory) {
-    CCIP.EVMExtraArgsV1 memory extraArgs = this.fromBytesHelper(message.extraArgs);
-    CCIP.EVM2EVMGEMessage memory messageEvent = CCIP.EVM2EVMGEMessage({
+  ) public view returns (GE.EVM2EVMGEMessage memory) {
+    GE.EVM2EVMGEMessage memory messageEvent = GE.EVM2EVMGEMessage({
       sequenceNumber: seqNum,
       feeTokenAmount: feeTokenAmount,
       sender: OWNER,
       nonce: nonce,
-      gasLimit: extraArgs.gasLimit,
-      strict: extraArgs.strict,
+      gasLimit: GAS_LIMIT,
+      strict: false,
       sourceChainId: SOURCE_CHAIN_ID,
       receiver: abi.decode(message.receiver, (address)),
       data: message.data,
@@ -111,18 +109,17 @@ contract EVM2EVMGEOnRampSetup is TokenSetup, GESRouterSetup {
       messageId: ""
     });
 
-    messageEvent.messageId = messageEvent._hash(s_metadataHash);
+    messageEvent.messageId = GE._hash(messageEvent, s_metadataHash);
     return messageEvent;
   }
 
-  // DynamicFeeCalculator
-  function dynamicFeeCalculatorConfig(address gasFeeCacheAddress)
+  function gasFeeCacheConfig(address gasFeeCacheAddress)
     internal
     view
-    returns (DynamicFeeCalculatorInterface.DynamicFeeConfig memory feeConfig)
+    returns (EVM2EVMGEOnRampInterface.DynamicFeeConfig memory feeConfig)
   {
     return
-      DynamicFeeCalculatorInterface.DynamicFeeConfig({
+      EVM2EVMGEOnRampInterface.DynamicFeeConfig({
         feeToken: s_sourceTokens[0],
         feeAmount: 1,
         destGasOverhead: 1,

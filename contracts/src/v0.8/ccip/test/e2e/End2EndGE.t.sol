@@ -6,7 +6,7 @@ import "../onRamp/ge/EVM2EVMGEOnRampSetup.t.sol";
 import "../offRamp/ge/EVM2EVMGEOffRampSetup.t.sol";
 
 contract E2E_GE is EVM2EVMGEOnRampSetup, CommitStoreSetup, EVM2EVMGEOffRampSetup {
-  using CCIP for CCIP.EVM2EVMGEMessage;
+  using GE for GE.EVM2EVMGEMessage;
 
   Any2EVMOffRampRouterInterface public s_router;
 
@@ -33,7 +33,7 @@ contract E2E_GE is EVM2EVMGEOnRampSetup, CommitStoreSetup, EVM2EVMGEOffRampSetup
     uint256 balance0Pre = token0.balanceOf(OWNER);
     uint256 balance1Pre = token1.balanceOf(OWNER);
 
-    CCIP.EVM2EVMGEMessage[] memory messages = new CCIP.EVM2EVMGEMessage[](3);
+    GE.EVM2EVMGEMessage[] memory messages = new GE.EVM2EVMGEMessage[](3);
     messages[0] = sendRequest(1);
     messages[1] = sendRequest(2);
     messages[2] = sendRequest(3);
@@ -50,8 +50,8 @@ contract E2E_GE is EVM2EVMGEOnRampSetup, CommitStoreSetup, EVM2EVMGEOffRampSetup
     hashedMessages[1] = messages[1]._hash(metaDataHash);
     hashedMessages[2] = messages[2]._hash(metaDataHash);
 
-    CCIP.Interval[] memory intervals = new CCIP.Interval[](1);
-    intervals[0] = CCIP.Interval(messages[0].sequenceNumber, messages[2].sequenceNumber);
+    Internal.Interval[] memory intervals = new Internal.Interval[](1);
+    intervals[0] = Internal.Interval(messages[0].sequenceNumber, messages[2].sequenceNumber);
 
     bytes32[] memory merkleRoots = new bytes32[](1);
     merkleRoots[0] = s_merkleHelper.getMerkleRoot(hashedMessages);
@@ -59,7 +59,7 @@ contract E2E_GE is EVM2EVMGEOnRampSetup, CommitStoreSetup, EVM2EVMGEOffRampSetup
     address[] memory onRamps = new address[](1);
     onRamps[0] = commitStoreConfig().onRamps[0];
 
-    CCIP.CommitReport memory report = CCIP.CommitReport({
+    Internal.CommitReport memory report = Internal.CommitReport({
       onRamps: onRamps,
       intervals: intervals,
       merkleRoots: merkleRoots,
@@ -77,26 +77,38 @@ contract E2E_GE is EVM2EVMGEOnRampSetup, CommitStoreSetup, EVM2EVMGEOffRampSetup
     vm.warp(BLOCK_TIME + 2000);
 
     vm.expectEmit(false, false, false, true);
-    emit ExecutionStateChanged(messages[0].sequenceNumber, messages[0].messageId, CCIP.MessageExecutionState.SUCCESS);
+    emit ExecutionStateChanged(
+      messages[0].sequenceNumber,
+      messages[0].messageId,
+      Internal.MessageExecutionState.SUCCESS
+    );
 
     vm.expectEmit(false, false, false, true);
-    emit ExecutionStateChanged(messages[1].sequenceNumber, messages[1].messageId, CCIP.MessageExecutionState.SUCCESS);
+    emit ExecutionStateChanged(
+      messages[1].sequenceNumber,
+      messages[1].messageId,
+      Internal.MessageExecutionState.SUCCESS
+    );
 
     vm.expectEmit(false, false, false, true);
-    emit ExecutionStateChanged(messages[2].sequenceNumber, messages[2].messageId, CCIP.MessageExecutionState.SUCCESS);
+    emit ExecutionStateChanged(
+      messages[2].sequenceNumber,
+      messages[2].messageId,
+      Internal.MessageExecutionState.SUCCESS
+    );
 
     s_offRamp.execute(_generateReportFromMessages(messages), false);
   }
 
-  function sendRequest(uint64 expectedSeqNum) public returns (CCIP.EVM2EVMGEMessage memory) {
-    CCIP.EVM2AnyGEMessage memory message = _generateTokenMessage();
+  function sendRequest(uint64 expectedSeqNum) public returns (GE.EVM2EVMGEMessage memory) {
+    GEConsumer.EVM2AnyGEMessage memory message = _generateTokenMessage();
     uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_ID, message);
 
     IERC20(s_sourceTokens[0]).approve(address(s_sourceRouter), i_tokenAmount0 + expectedFee);
     IERC20(s_sourceTokens[1]).approve(address(s_sourceRouter), i_tokenAmount1);
 
     message.receiver = abi.encode(address(s_receiver));
-    CCIP.EVM2EVMGEMessage memory geEvent = _messageToEvent(message, expectedSeqNum, expectedSeqNum, expectedFee);
+    GE.EVM2EVMGEMessage memory geEvent = _messageToEvent(message, expectedSeqNum, expectedSeqNum, expectedFee);
 
     vm.expectEmit(false, false, false, true);
     emit CCIPSendRequested(geEvent);

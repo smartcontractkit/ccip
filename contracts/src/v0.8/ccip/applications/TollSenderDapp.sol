@@ -4,7 +4,8 @@ pragma solidity 0.8.15;
 import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
 import {SafeERC20, IERC20} from "../../vendor/SafeERC20.sol";
 import {EVM2AnyTollOnRampRouterInterface} from "../interfaces/onRamp/EVM2AnyTollOnRampRouterInterface.sol";
-import {CCIP} from "../models/Models.sol";
+import {TollConsumer} from "../models/TollConsumer.sol";
+import {Common} from "../models/Common.sol";
 
 /**
  * @notice This contract enables EOAs to send a single asset across to the chain
@@ -12,7 +13,6 @@ import {CCIP} from "../models/Models.sol";
  * underlying protocol.
  */
 contract TollSenderDapp is TypeAndVersionInterface {
-  using CCIP for CCIP.EVMExtraArgsV1;
   using SafeERC20 for IERC20;
 
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
@@ -42,7 +42,7 @@ contract TollSenderDapp is TypeAndVersionInterface {
    * @notice Send tokensAndAmounts to the destination chain.
    * @dev msg.sender must first call TOKEN.approve for this contract to spend the tokensAndAmounts.
    */
-  function sendTokens(address destinationAddress, CCIP.EVMTokenAndAmount[] memory tokensAndAmounts)
+  function sendTokens(address destinationAddress, Common.EVMTokenAndAmount[] memory tokensAndAmounts)
     external
     returns (uint64 sequenceNumber)
   {
@@ -56,12 +56,12 @@ contract TollSenderDapp is TypeAndVersionInterface {
     //  - EOA destination address
     sequenceNumber = i_onRampRouter.ccipSend(
       i_destinationChainId,
-      CCIP.EVM2AnyTollMessage({
+      TollConsumer.EVM2AnyTollMessage({
         receiver: abi.encode(i_destinationContract),
         data: abi.encode(msg.sender, destinationAddress),
         tokensAndAmounts: tokensAndAmounts,
         feeTokenAndAmount: tokensAndAmounts[0],
-        extraArgs: CCIP.EVMExtraArgsV1({gasLimit: 3e5, strict: false})._toBytes()
+        extraArgs: TollConsumer._argsToBytes(TollConsumer.EVMExtraArgsV1({gasLimit: 3e5, strict: false}))
       })
     );
   }

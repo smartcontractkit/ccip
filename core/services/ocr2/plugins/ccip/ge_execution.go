@@ -37,7 +37,7 @@ const (
 )
 
 // Offchain: we compute the max overhead gas to determine msg executability.
-func overheadGasGE(merkleGasShare uint64, geMsg evm_2_evm_ge_onramp.CCIPEVM2EVMGEMessage) uint64 {
+func overheadGasGE(merkleGasShare uint64, geMsg evm_2_evm_ge_onramp.GEEVM2EVMGEMessage) uint64 {
 	messageBytes := GE_CONSTANT_MESSAGE_PART_BYTES +
 		(EVM_ADDRESS_LENGTH_BYTES+EVM_WORD_BYTES)*len(geMsg.TokensAndAmounts) + // token address (address) + token amount (uint256)
 		len(geMsg.Data)
@@ -59,7 +59,7 @@ func overheadGasGE(merkleGasShare uint64, geMsg evm_2_evm_ge_onramp.CCIPEVM2EVMG
 		EXTERNAL_CALL_OVERHEAD_GAS
 }
 
-func maxGasOverHeadGasGE(numMsgs int, geMsg evm_2_evm_ge_onramp.CCIPEVM2EVMGEMessage) uint64 {
+func maxGasOverHeadGasGE(numMsgs int, geMsg evm_2_evm_ge_onramp.GEEVM2EVMGEMessage) uint64 {
 	merkleProofBytes := (math.Ceil(math.Log2(float64(numMsgs)))+2)*32 + (1+2)*32 // only ever one outer root hash
 	merkleGasShare := uint64(merkleProofBytes * CALLDATA_GAS_PER_BYTE)
 
@@ -169,10 +169,10 @@ func (tb *GEBatchBuilder) inflight(
 	inflightSeqNrs := make(map[uint64]struct{})
 	inflightAggregateValue := big.NewInt(0)
 	for _, rep := range inflight {
-		for _, seqNr := range rep.report.SequenceNumbers {
+		for _, seqNr := range rep.seqNrs {
 			inflightSeqNrs[seqNr] = struct{}{}
 		}
-		for _, encMsg := range rep.report.EncodedMessages {
+		for _, encMsg := range rep.encMessages {
 			msg, err := tb.parseLog(types.Log{
 				// Note this needs to change if we start indexing things.
 				Topics: []common.Hash{tb.eventSignatures.SendRequested},

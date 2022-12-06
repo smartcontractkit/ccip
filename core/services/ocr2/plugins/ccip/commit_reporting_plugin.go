@@ -25,8 +25,8 @@ var (
 	_ types.ReportingPlugin        = &CommitReportingPlugin{}
 )
 
-// EncodeCommitReport abi encodes an offramp.CCIPCommitReport.
-func EncodeCommitReport(commitReport *commit_store.CCIPCommitReport) (types.Report, error) {
+// EncodeCommitReport abi encodes an offramp.InternalCommitReport.
+func EncodeCommitReport(commitReport *commit_store.InternalCommitReport) (types.Report, error) {
 	report, err := makeCommitReportArgs().PackValues([]interface{}{
 		commitReport,
 	})
@@ -36,8 +36,8 @@ func EncodeCommitReport(commitReport *commit_store.CCIPCommitReport) (types.Repo
 	return report, nil
 }
 
-// DecodeCommitReport abi decodes a types.Report to an offramp.CCIPCommitReport
-func DecodeCommitReport(report types.Report) (*commit_store.CCIPCommitReport, error) {
+// DecodeCommitReport abi decodes a types.Report to an offramp.InternalCommitReport
+func DecodeCommitReport(report types.Report) (*commit_store.InternalCommitReport, error) {
 	unpacked, err := makeCommitReportArgs().Unpack(report)
 	if err != nil {
 		return nil, err
@@ -57,14 +57,14 @@ func DecodeCommitReport(report types.Report) (*commit_store.CCIPCommitReport, er
 	if !ok {
 		return nil, errors.Errorf("invalid commit report got %T", unpacked[0])
 	}
-	var intervalsF []commit_store.CCIPInterval
+	var intervalsF []commit_store.InternalInterval
 	for i := range commitReport.Intervals {
-		intervalsF = append(intervalsF, commit_store.CCIPInterval{
+		intervalsF = append(intervalsF, commit_store.InternalInterval{
 			Min: commitReport.Intervals[i].Min,
 			Max: commitReport.Intervals[i].Max,
 		})
 	}
-	return &commit_store.CCIPCommitReport{
+	return &commit_store.InternalCommitReport{
 		OnRamps:     commitReport.OnRamps,
 		Intervals:   intervalsF,
 		MerkleRoots: commitReport.MerkleRoots,
@@ -88,7 +88,7 @@ func isCommitStoreDownNow(lggr logger.Logger, commitStore *commit_store.CommitSt
 }
 
 type InflightReport struct {
-	report    *commit_store.CCIPCommitReport
+	report    *commit_store.InternalCommitReport
 	createdAt time.Time
 }
 
@@ -208,7 +208,7 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, timestamp types
 		return nil, ErrCommitStoreIsDown
 	}
 	r.expireInflight(lggr)
-	intervalsByOnRamp := make(map[common.Address]commit_store.CCIPInterval)
+	intervalsByOnRamp := make(map[common.Address]commit_store.InternalInterval)
 	for _, onRamp := range r.onRamps {
 		nextMin, err := r.nextMinSeqNum(onRamp)
 		if err != nil {
@@ -239,7 +239,7 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, timestamp types
 		if !contiguousReqs(lggr, min, max, seqNrs) {
 			return nil, errors.New("unexpected gap in seq nums")
 		}
-		intervalsByOnRamp[onRamp] = commit_store.CCIPInterval{
+		intervalsByOnRamp[onRamp] = commit_store.InternalInterval{
 			Min: min,
 			Max: max,
 		}
@@ -255,7 +255,7 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, timestamp types
 }
 
 // buildReport assumes there is at least one message in reqs.
-func (r *CommitReportingPlugin) buildReport(intervalByOnRamp map[common.Address]commit_store.CCIPInterval) (*commit_store.CCIPCommitReport, error) {
+func (r *CommitReportingPlugin) buildReport(intervalByOnRamp map[common.Address]commit_store.InternalInterval) (*commit_store.InternalCommitReport, error) {
 	lggr := r.lggr.Named("BuildReport")
 	leafsByOnRamp, err := leafsFromIntervals(lggr, r.onRampToReqEventSig, r.onRampSeqParsers, intervalByOnRamp, r.source, r.onRampToHasher, int(r.offchainConfig.SourceIncomingConfirmations))
 	if err != nil {
@@ -265,7 +265,7 @@ func (r *CommitReportingPlugin) buildReport(intervalByOnRamp map[common.Address]
 	var (
 		onRamps   []common.Address
 		roots     [][32]byte
-		intervals []commit_store.CCIPInterval
+		intervals []commit_store.InternalInterval
 	)
 	mctx := hasher.NewKeccakCtx()
 	for onRamp, leaves := range leafsByOnRamp {
@@ -280,21 +280,21 @@ func (r *CommitReportingPlugin) buildReport(intervalByOnRamp map[common.Address]
 		roots = append(roots, tree.Root())
 		onRamps = append(onRamps, onRamp)
 		interval := intervalByOnRamp[onRamp]
-		intervals = append(intervals, commit_store.CCIPInterval{
+		intervals = append(intervals, commit_store.InternalInterval{
 			Min: interval.Min,
 			Max: interval.Max,
 		})
 	}
 	if len(roots) == 0 {
 		lggr.Warn("No valid roots found")
-		return &commit_store.CCIPCommitReport{}, errors.New("No valid roots found")
+		return &commit_store.InternalCommitReport{}, errors.New("No valid roots found")
 	}
 	// Make a root of roots
 	outerTree, err := merklemulti.NewTree(mctx, roots)
 	if err != nil {
 		return nil, err
 	}
-	return &commit_store.CCIPCommitReport{
+	return &commit_store.InternalCommitReport{
 		MerkleRoots: roots,
 		Intervals:   intervals,
 		OnRamps:     onRamps,
@@ -314,13 +314,13 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, timestamp types.Repo
 		return false, nil, nil
 	}
 	// Group intervals by onramp.
-	intervalsByOnRamp := make(map[common.Address][]commit_store.CCIPInterval)
+	intervalsByOnRamp := make(map[common.Address][]commit_store.InternalInterval)
 	for _, obs := range nonEmptyObservations {
 		for onRamp, interval := range obs.IntervalsByOnRamp {
 			intervalsByOnRamp[onRamp] = append(intervalsByOnRamp[onRamp], interval)
 		}
 	}
-	intervalByOnRamp := make(map[common.Address]commit_store.CCIPInterval)
+	intervalByOnRamp := make(map[common.Address]commit_store.InternalInterval)
 	for onRamp, intervals := range intervalsByOnRamp {
 		if len(intervals) <= r.F {
 			lggr.Debugf("Observations for OnRamp %s 1 < #obs <= F, need at least F+1 to continue", onRamp.Hex())
@@ -352,7 +352,7 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, timestamp types.Repo
 		if nextMin > minSeqNum {
 			return false, nil, errors.Errorf("invalid min seq number got %v want %v", minSeqNum, nextMin)
 		}
-		intervalByOnRamp[onRamp] = commit_store.CCIPInterval{
+		intervalByOnRamp[onRamp] = commit_store.InternalInterval{
 			Min: minSeqNum,
 			Max: maxSeqNum,
 		}
@@ -383,7 +383,7 @@ func (r *CommitReportingPlugin) expireInflight(lggr logger.Logger) {
 	}
 }
 
-func (r *CommitReportingPlugin) addToInflight(lggr logger.Logger, report *commit_store.CCIPCommitReport) {
+func (r *CommitReportingPlugin) addToInflight(lggr logger.Logger, report *commit_store.InternalCommitReport) {
 	r.inFlightMu.Lock()
 	defer r.inFlightMu.Unlock()
 	// Set new inflight ones as pending
@@ -421,7 +421,7 @@ func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context
 	return !r.isStaleReport(parsedReport), nil
 }
 
-func (r *CommitReportingPlugin) isStaleReport(report *commit_store.CCIPCommitReport) bool {
+func (r *CommitReportingPlugin) isStaleReport(report *commit_store.InternalCommitReport) bool {
 	if isCommitStoreDownNow(r.lggr, r.commitStore) {
 		return true
 	}

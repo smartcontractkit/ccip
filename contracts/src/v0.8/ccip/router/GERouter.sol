@@ -5,13 +5,14 @@ import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.
 import {SafeERC20, IERC20} from "../../vendor/SafeERC20.sol";
 import {PoolInterface} from "../interfaces/pools/PoolInterface.sol";
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
-import {CCIP} from "../models/Models.sol";
+import {Common} from "../models/Common.sol";
 import {GERouterInterface, BaseOnRampRouterInterface} from "../interfaces/router/GERouterInterface.sol";
 import {EVM2EVMGEOnRampInterface, BaseOnRampInterface} from "../interfaces/onRamp/EVM2EVMGEOnRampInterface.sol";
 import {BaseOffRampRouter, BaseOffRampInterface, Any2EVMOffRampRouterInterface} from "../offRamp/BaseOffRampRouter.sol";
+import {GEConsumer} from "../models/GEConsumer.sol";
+import {Internal} from "../models/Internal.sol";
 
 contract GERouter is GERouterInterface, BaseOffRampRouter, TypeAndVersionInterface {
-  using CCIP for CCIP.EVMTokenAndAmount[];
   using SafeERC20 for IERC20;
 
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
@@ -23,16 +24,18 @@ contract GERouter is GERouterInterface, BaseOffRampRouter, TypeAndVersionInterfa
   constructor(BaseOffRampInterface[] memory offRamps) BaseOffRampRouter(offRamps) {}
 
   /// @inheritdoc GERouterInterface
-  function ccipSend(uint256 destinationChainId, CCIP.EVM2AnyGEMessage memory message) external returns (bytes32) {
+  function ccipSend(uint256 destinationChainId, GEConsumer.EVM2AnyGEMessage memory message) external returns (bytes32) {
     // Find and put the correct onRamp on the stack.
     EVM2EVMGEOnRampInterface onRamp = s_onRamps[destinationChainId];
     // getFee checks if the onRamp is valid
     uint256 feeTokenAmount = getFee(destinationChainId, message);
 
-    CCIP.EVMTokenAndAmount[] memory combinedTokensAndAmounts = message.tokensAndAmounts._addToTokensAmounts(
-      CCIP.EVMTokenAndAmount({token: message.feeToken, amount: feeTokenAmount})
+    Common.EVMTokenAndAmount[] memory combinedTokensAndAmounts = Internal._addToTokensAmounts(
+      message.tokensAndAmounts,
+      Common.EVMTokenAndAmount({token: message.feeToken, amount: feeTokenAmount})
     );
     // Transfer the tokensAndAmounts to the token pools.
+    // TODO: Check the pool for how to take action
     for (uint256 i = 0; i < combinedTokensAndAmounts.length; ++i) {
       IERC20 token = IERC20(combinedTokensAndAmounts[i].token);
       PoolInterface pool = onRamp.getPoolBySourceToken(token);
@@ -45,7 +48,11 @@ contract GERouter is GERouterInterface, BaseOffRampRouter, TypeAndVersionInterfa
 
   /// @inheritdoc GERouterInterface
   // @dev returns 0 fee on invalid message.
-  function getFee(uint256 destinationChainId, CCIP.EVM2AnyGEMessage memory message) public view returns (uint256 fee) {
+  function getFee(uint256 destinationChainId, GEConsumer.EVM2AnyGEMessage memory message)
+    public
+    view
+    returns (uint256 fee)
+  {
     // Find and put the correct onRamp on the stack.
     EVM2EVMGEOnRampInterface onRamp = s_onRamps[destinationChainId];
     // Check if the onRamp is a zero address, meaning the chain is not supported.

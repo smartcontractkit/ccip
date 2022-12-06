@@ -36,11 +36,11 @@ contract EVM2EVMGEOffRampHelper is EVM2EVMGEOffRamp {
     _report(bytes32(0), 0, executableMessages);
   }
 
-  function execute(CCIP.ExecutionReport memory rep, bool manualExecution) external {
+  function execute(GE.ExecutionReport memory rep, bool manualExecution) external {
     _execute(rep, manualExecution);
   }
 
   function metadataHash() external view returns (bytes32) {
-    return _metadataHash(CCIP.EVM_2_EVM_GE_MESSAGE_HASH);
+    return _metadataHash(GE.EVM_2_EVM_GE_MESSAGE_HASH);
   }
 }

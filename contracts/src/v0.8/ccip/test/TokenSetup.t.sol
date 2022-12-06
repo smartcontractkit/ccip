@@ -9,6 +9,7 @@ import "../pools/BurnMintTokenPool.sol";
 import "../pools/NativeTokenPool.sol";
 import "../health/HealthChecker.sol";
 import "../pools/OffRampTokenPoolRegistry.sol";
+import "../models/Common.sol";
 
 contract TokenSetup is BaseTest {
   address[] internal s_sourceTokens;
@@ -62,9 +63,9 @@ contract TokenSetup is BaseTest {
   function getCastedSourceEVMTokenAndAmountsWithZeroAmounts()
     internal
     view
-    returns (CCIP.EVMTokenAndAmount[] memory tokensAndAmounts)
+    returns (Common.EVMTokenAndAmount[] memory tokensAndAmounts)
   {
-    tokensAndAmounts = new CCIP.EVMTokenAndAmount[](s_sourceTokens.length);
+    tokensAndAmounts = new Common.EVMTokenAndAmount[](s_sourceTokens.length);
     for (uint256 i = 0; i < tokensAndAmounts.length; i++) {
       tokensAndAmounts[i].token = s_sourceTokens[i];
     }
@@ -73,9 +74,9 @@ contract TokenSetup is BaseTest {
   function getCastedDestinationEVMTokenAndAmountsWithZeroAmounts()
     internal
     view
-    returns (CCIP.EVMTokenAndAmount[] memory tokensAndAmounts)
+    returns (Common.EVMTokenAndAmount[] memory tokensAndAmounts)
   {
-    tokensAndAmounts = new CCIP.EVMTokenAndAmount[](s_destTokens.length);
+    tokensAndAmounts = new Common.EVMTokenAndAmount[](s_destTokens.length);
     for (uint256 i = 0; i < tokensAndAmounts.length; i++) {
       tokensAndAmounts[i].token = s_destTokens[i];
     }

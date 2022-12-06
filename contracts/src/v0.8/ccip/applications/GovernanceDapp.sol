@@ -6,14 +6,15 @@ import {Any2EVMMessageReceiverInterface} from "../interfaces/applications/Any2EV
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
 import {Any2EVMOffRampRouterInterface} from "../interfaces/offRamp/Any2EVMOffRampRouterInterface.sol";
 import {GERouterInterface} from "../interfaces/router/GERouterInterface.sol";
-import {CCIP} from "../models/Models.sol";
+import {Common} from "../models/Common.sol";
+import {GEConsumer} from "../models/GEConsumer.sol";
 import {IERC20} from "../../vendor/IERC20.sol";
 
 contract GovernanceDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterface, OwnerIsCreator {
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "GovernanceDapp 1.0.0";
 
-  using CCIP for CCIP.EVMExtraArgsV1;
+  using GEConsumer for GEConsumer.EVMExtraArgsV1;
 
   error InvalidDeliverer(address deliverer);
   event ConfigPropagated(uint256 chainId, address contractAddress);
@@ -63,12 +64,12 @@ contract GovernanceDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterf
     for (uint256 i = 0; i < numberOfClones; ++i) {
       CrossChainClone memory clone = s_crossChainClones[i];
 
-      CCIP.EVM2AnyGEMessage memory message = CCIP.EVM2AnyGEMessage({
+      GEConsumer.EVM2AnyGEMessage memory message = GEConsumer.EVM2AnyGEMessage({
         receiver: abi.encode(clone.contractAddress),
         data: data,
-        tokensAndAmounts: new CCIP.EVMTokenAndAmount[](0),
+        tokensAndAmounts: new Common.EVMTokenAndAmount[](0),
         feeToken: i_feeToken,
-        extraArgs: CCIP.EVMExtraArgsV1({gasLimit: 3e5, strict: false})._toBytes()
+        extraArgs: GEConsumer._argsToBytes(GEConsumer.EVMExtraArgsV1({gasLimit: 3e5, strict: false}))
       });
       s_router.ccipSend(clone.chainId, message);
       emit ConfigPropagated(clone.chainId, clone.contractAddress);
@@ -80,7 +81,7 @@ contract GovernanceDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterf
    * the tokens sent with it to the designated EOA
    * @param message CCIP Message
    */
-  function ccipReceive(CCIP.Any2EVMMessage memory message) external override onlyRouter {
+  function ccipReceive(Common.Any2EVMMessage memory message) external override onlyRouter {
     FeeConfig memory newFeeConfig = abi.decode(message.data, (FeeConfig));
 
     s_feeConfig = newFeeConfig;

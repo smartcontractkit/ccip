@@ -6,7 +6,7 @@ import {EVM2AnyTollOnRampRouterInterface, EVM2EVMTollOnRampInterface, BaseOnRamp
 import {BaseOnRampInterface} from "../../interfaces/onRamp/BaseOnRampInterface.sol";
 import {PoolCollector} from "../../pools/PoolCollector.sol";
 import {OwnerIsCreator} from "../../access/OwnerIsCreator.sol";
-import {CCIP} from "../../models/Models.sol";
+import {TollConsumer} from "../../models/TollConsumer.sol";
 import {IERC20} from "../../../vendor/IERC20.sol";
 
 contract EVM2AnyTollOnRampRouter is
@@ -22,7 +22,10 @@ contract EVM2AnyTollOnRampRouter is
   mapping(uint256 => EVM2EVMTollOnRampInterface) private s_onRamps;
 
   /// @inheritdoc EVM2AnyTollOnRampRouterInterface
-  function ccipSend(uint256 destinationChainId, CCIP.EVM2AnyTollMessage memory message) external returns (uint64) {
+  function ccipSend(uint256 destinationChainId, TollConsumer.EVM2AnyTollMessage memory message)
+    external
+    returns (uint64)
+  {
     // Find and put the correct onRamp on the stack.
     EVM2EVMTollOnRampInterface onRamp = s_onRamps[destinationChainId];
     // Check if the onRamp is a zero address, meaning the chain is not supported.

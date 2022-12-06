@@ -6,7 +6,10 @@ import {BaseOffRampInterface} from "../../interfaces/offRamp/BaseOffRampInterfac
 import {CommitStoreInterface} from "../../interfaces/CommitStoreInterface.sol";
 import {OCR2Base} from "../../ocr/OCR2Base.sol";
 import {BaseOffRamp} from "../BaseOffRamp.sol";
-import {CCIP} from "../../models/Models.sol";
+import {GE} from "../../models/GE.sol";
+import {GEConsumer} from "../../models/GEConsumer.sol";
+import {Common} from "../../models/Common.sol";
+import {Internal} from "../../models/Internal.sol";
 import {IERC20} from "../../../vendor/IERC20.sol";
 import {AFNInterface} from "../../interfaces/health/AFNInterface.sol";
 import {PoolInterface} from "../../interfaces/pools/PoolInterface.sol";
@@ -17,7 +20,6 @@ import {EVM2EVMGEOffRampInterface} from "../../interfaces/offRamp/EVM2EVMGEOffRa
  * in an OffRamp in a single transaction.
  */
 contract EVM2EVMGEOffRamp is EVM2EVMGEOffRampInterface, BaseOffRamp, TypeAndVersionInterface, OCR2Base {
-  using CCIP for CCIP.EVM2EVMGEMessage;
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "EVM2EVMGEOffRamp 1.0.0";
 
@@ -56,12 +58,11 @@ contract EVM2EVMGEOffRamp is EVM2EVMGEOffRampInterface, BaseOffRamp, TypeAndVers
     )
   {
     s_config = offRampConfig;
-    i_metadataHash = _metadataHash(CCIP.EVM_2_EVM_GE_MESSAGE_HASH);
+    i_metadataHash = _metadataHash(GE.EVM_2_EVM_GE_MESSAGE_HASH);
     i_feeToken = feeToken;
   }
 
-  /// @inheritdoc BaseOffRamp
-  function manuallyExecute(CCIP.ExecutionReport memory report) external override {
+  function manuallyExecute(GE.ExecutionReport memory report) external {
     _execute(report, true);
   }
 
@@ -75,7 +76,7 @@ contract EVM2EVMGEOffRamp is EVM2EVMGEOffRampInterface, BaseOffRamp, TypeAndVers
     return s_nopBalance[nop];
   }
 
-  function _executeMessages(CCIP.ExecutionReport memory report, bool manualExecution) internal {
+  function _executeMessages(GE.ExecutionReport memory report, bool manualExecution) internal {
     // Report may have only price updates, so we only process messages if there are some.
     uint256 numMsgs = report.encodedMessages.length;
     if (numMsgs == 0) {
@@ -83,13 +84,13 @@ contract EVM2EVMGEOffRamp is EVM2EVMGEOffRampInterface, BaseOffRamp, TypeAndVers
     }
 
     bytes32[] memory hashedLeaves = new bytes32[](numMsgs);
-    CCIP.EVM2EVMGEMessage[] memory decodedMessages = new CCIP.EVM2EVMGEMessage[](numMsgs);
+    GE.EVM2EVMGEMessage[] memory decodedMessages = new GE.EVM2EVMGEMessage[](numMsgs);
 
     for (uint256 i = 0; i < numMsgs; ++i) {
-      CCIP.EVM2EVMGEMessage memory decodedMessage = abi.decode(report.encodedMessages[i], (CCIP.EVM2EVMGEMessage));
+      GE.EVM2EVMGEMessage memory decodedMessage = abi.decode(report.encodedMessages[i], (GE.EVM2EVMGEMessage));
       // We do this hash here instead of in _verifyMessages to avoid two separate loops
       // over the same data, which increases gas cost
-      hashedLeaves[i] = decodedMessage._hash(i_metadataHash);
+      hashedLeaves[i] = GE._hash(decodedMessage, i_metadataHash);
       decodedMessages[i] = decodedMessage;
     }
 
@@ -106,22 +107,22 @@ contract EVM2EVMGEOffRamp is EVM2EVMGEOffRampInterface, BaseOffRamp, TypeAndVers
 
     // Execute messages
     for (uint256 i = 0; i < numMsgs; ++i) {
-      CCIP.EVM2EVMGEMessage memory message = decodedMessages[i];
-      CCIP.MessageExecutionState originalState = getExecutionState(message.sequenceNumber);
-      if (originalState == CCIP.MessageExecutionState.SUCCESS) revert AlreadyExecuted(message.sequenceNumber);
+      GE.EVM2EVMGEMessage memory message = decodedMessages[i];
+      Internal.MessageExecutionState originalState = getExecutionState(message.sequenceNumber);
+      if (originalState == Internal.MessageExecutionState.SUCCESS) revert AlreadyExecuted(message.sequenceNumber);
 
       // Two valid cases here, we either have never touched this message before, or we tried to execute and failed
       if (manualExecution) {
         // Manually execution is fine if we previously failed or if the commit report is just too old
-        if (!(isOldCommitReport || originalState == CCIP.MessageExecutionState.FAILURE))
+        if (!(isOldCommitReport || originalState == Internal.MessageExecutionState.FAILURE))
           revert ManualExecutionNotYetEnabled();
       } else {
         // DON can only execute a message once
-        if (originalState != CCIP.MessageExecutionState.UNTOUCHED) revert AlreadyAttempted(message.sequenceNumber);
+        if (originalState != Internal.MessageExecutionState.UNTOUCHED) revert AlreadyAttempted(message.sequenceNumber);
       }
 
       // If this is the first time executing this message we take the fee
-      if (originalState == CCIP.MessageExecutionState.UNTOUCHED) {
+      if (originalState == Internal.MessageExecutionState.UNTOUCHED) {
         if (s_senderNonce[message.sender] + 1 != message.nonce) {
           // We skip the message if the nonce is incorrect
           emit SkippedIncorrectNonce(message.nonce, message.sender);
@@ -132,11 +133,11 @@ contract EVM2EVMGEOffRamp is EVM2EVMGEOffRampInterface, BaseOffRamp, TypeAndVers
 
       _isWellFormed(message);
 
-      s_executedMessages[message.sequenceNumber] = CCIP.MessageExecutionState.IN_PROGRESS;
-      CCIP.MessageExecutionState newState = _trialExecute(_toAny2EVMMessageFromSender(message));
+      s_executedMessages[message.sequenceNumber] = Internal.MessageExecutionState.IN_PROGRESS;
+      Internal.MessageExecutionState newState = _trialExecute(_toAny2EVMMessageFromSender(message));
       s_executedMessages[message.sequenceNumber] = newState;
 
-      if (!(message.strict && newState == CCIP.MessageExecutionState.FAILURE)) {
+      if (!(message.strict && newState == Internal.MessageExecutionState.FAILURE)) {
         s_senderNonce[message.sender]++;
       }
 
@@ -153,7 +154,7 @@ contract EVM2EVMGEOffRamp is EVM2EVMGEOffRampInterface, BaseOffRamp, TypeAndVers
    * @param report ExecutionReport
    * @param manualExecution Whether the DON auto executes or it is manually initiated
    */
-  function _execute(CCIP.ExecutionReport memory report, bool manualExecution) internal whenNotPaused whenHealthy {
+  function _execute(GE.ExecutionReport memory report, bool manualExecution) internal whenNotPaused whenHealthy {
     uint256 gasStart = gasleft();
 
     if (address(s_router) == address(0)) revert RouterNotSet();
@@ -175,26 +176,26 @@ contract EVM2EVMGEOffRamp is EVM2EVMGEOffRampInterface, BaseOffRamp, TypeAndVers
     }
   }
 
-  function _toAny2EVMMessageFromSender(CCIP.EVM2EVMGEMessage memory original)
+  function _toAny2EVMMessageFromSender(GE.EVM2EVMGEMessage memory original)
     internal
     view
-    returns (CCIP.Any2EVMMessageFromSender memory)
+    returns (Internal.Any2EVMMessageFromSender memory)
   {
     uint256 numberOfTokens = original.tokensAndAmounts.length;
-    CCIP.EVMTokenAndAmount[] memory destTokensAndAmounts = new CCIP.EVMTokenAndAmount[](numberOfTokens);
+    Common.EVMTokenAndAmount[] memory destTokensAndAmounts = new Common.EVMTokenAndAmount[](numberOfTokens);
     address[] memory destPools = new address[](numberOfTokens);
 
     for (uint256 i = 0; i < numberOfTokens; ++i) {
       PoolInterface pool = _getPool(IERC20(original.tokensAndAmounts[i].token));
       destPools[i] = address(pool);
-      destTokensAndAmounts[i] = CCIP.EVMTokenAndAmount({
+      destTokensAndAmounts[i] = Common.EVMTokenAndAmount({
         token: address(pool.getToken()),
         amount: original.tokensAndAmounts[i].amount
       });
     }
 
     return
-      CCIP.Any2EVMMessageFromSender({
+      Internal.Any2EVMMessageFromSender({
         sourceChainId: original.sourceChainId,
         sender: abi.encode(original.sender),
         receiver: original.receiver,
@@ -205,7 +206,7 @@ contract EVM2EVMGEOffRamp is EVM2EVMGEOffRampInterface, BaseOffRamp, TypeAndVers
       });
   }
 
-  function _isWellFormed(CCIP.EVM2EVMGEMessage memory message) private view {
+  function _isWellFormed(GE.EVM2EVMGEMessage memory message) private view {
     if (message.sourceChainId != i_sourceChainId) revert InvalidSourceChain(message.sourceChainId);
     if (message.tokensAndAmounts.length > uint256(s_config.maxTokensLength))
       revert UnsupportedNumberOfTokens(message.sequenceNumber);
@@ -235,7 +236,7 @@ contract EVM2EVMGEOffRamp is EVM2EVMGEOffRampInterface, BaseOffRamp, TypeAndVers
     uint40, /*epochAndRound*/
     bytes memory report
   ) internal override {
-    _execute(abi.decode(report, (CCIP.ExecutionReport)), false);
+    _execute(abi.decode(report, (GE.ExecutionReport)), false);
   }
 
   function _beforeSetConfig(uint8 _threshold, bytes memory _onchainConfig) internal override {}

@@ -522,7 +522,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 	sourceChain.Commit()
 
 	// Deploy and configure GE onramp
-	sourceGasFeeCacheAddress, _, _, err := gas_fee_cache.DeployGasFeeCache(sourceUser, sourceChain, []gas_fee_cache.CCIPFeeUpdate{
+	sourceGasFeeCacheAddress, _, _, err := gas_fee_cache.DeployGasFeeCache(sourceUser, sourceChain, []gas_fee_cache.GEFeeUpdate{
 		{
 			ChainId:        destChainID,
 			LinkPerUnitGas: big.NewInt(1e9), // 1 gwei
@@ -550,7 +550,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 		},
 		sourceUser.From,
 		sourceGERouterAddress,
-		evm_2_evm_ge_onramp.DynamicFeeCalculatorInterfaceDynamicFeeConfig{
+		evm_2_evm_ge_onramp.EVM2EVMGEOnRampInterfaceDynamicFeeConfig{
 			FeeToken:        sourceLinkTokenAddress,
 			FeeAmount:       big.NewInt(0),
 			DestGasOverhead: big.NewInt(0),
@@ -636,7 +636,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 	require.NoError(t, err)
 
 	// Deploy and configure ge offramp.
-	destGasFeeCacheAddress, _, _, err := gas_fee_cache.DeployGasFeeCache(destUser, destChain, []gas_fee_cache.CCIPFeeUpdate{{
+	destGasFeeCacheAddress, _, _, err := gas_fee_cache.DeployGasFeeCache(destUser, destChain, []gas_fee_cache.GEFeeUpdate{{
 		ChainId:        sourceChainID,
 		LinkPerUnitGas: big.NewInt(200e9), // (2e20 juels/eth) * (1 gwei / gas) / (1 eth/1e18)
 	}}, nil)
@@ -740,7 +740,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPC
 	}
 }
 
-func SendGERequest(t *testing.T, ccipContracts CCIPContracts, msg ge_router.CCIPEVM2AnyGEMessage) {
+func SendGERequest(t *testing.T, ccipContracts CCIPContracts, msg ge_router.GEConsumerEVM2AnyGEMessage) {
 	tx, err := ccipContracts.SourceGERouter.CcipSend(ccipContracts.SourceUser, ccipContracts.DestChainID, msg)
 	require.NoError(t, err)
 	ConfirmTxs(t, []*types.Transaction{tx}, ccipContracts.SourceChain)
@@ -759,14 +759,14 @@ func QueueTollRequest(
 	t *testing.T,
 	ccipContracts CCIPContracts,
 	msgPayload string,
-	tokens []evm_2_any_toll_onramp_router.CCIPEVMTokenAndAmount,
-	feeToken evm_2_any_toll_onramp_router.CCIPEVMTokenAndAmount,
+	tokens []evm_2_any_toll_onramp_router.CommonEVMTokenAndAmount,
+	feeToken evm_2_any_toll_onramp_router.CommonEVMTokenAndAmount,
 	gasLimit *big.Int,
 	receiver common.Address,
 ) *types.Transaction {
 	extraArgs, err := GetEVMExtraArgsV1(gasLimit, false)
 	require.NoError(t, err)
-	msg := evm_2_any_toll_onramp_router.CCIPEVM2AnyTollMessage{
+	msg := evm_2_any_toll_onramp_router.TollConsumerEVM2AnyTollMessage{
 		Receiver:          MustEncodeAddress(t, receiver),
 		Data:              []byte(msgPayload),
 		TokensAndAmounts:  tokens,
@@ -778,7 +778,7 @@ func QueueTollRequest(
 	return tx
 }
 
-func SendTollRequest(t *testing.T, ccipContracts CCIPContracts, msgPayload string, tokens []evm_2_any_toll_onramp_router.CCIPEVMTokenAndAmount, feeToken evm_2_any_toll_onramp_router.CCIPEVMTokenAndAmount, gasLimit *big.Int, receiver common.Address) {
+func SendTollRequest(t *testing.T, ccipContracts CCIPContracts, msgPayload string, tokens []evm_2_any_toll_onramp_router.CommonEVMTokenAndAmount, feeToken evm_2_any_toll_onramp_router.CommonEVMTokenAndAmount, gasLimit *big.Int, receiver common.Address) {
 	tx := QueueTollRequest(t, ccipContracts, msgPayload, tokens, feeToken, gasLimit, receiver)
 	ConfirmTxs(t, []*types.Transaction{tx}, ccipContracts.SourceChain)
 }

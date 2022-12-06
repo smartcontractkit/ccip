@@ -2,16 +2,16 @@
 pragma solidity 0.8.15;
 
 import "../../TokenSetup.t.sol";
-import {GasFeeCacheSetup} from "../../dynamicFeeCalculator/GasFeeCache.t.sol";
+import {GasFeeCacheSetup} from "../../gasFeeCache/GasFeeCache.t.sol";
 import {MockCommitStore, CommitStoreInterface} from "../../mocks/MockCommitStore.sol";
 import {SimpleMessageReceiver, Any2EVMMessageReceiverInterface} from "../../helpers/receivers/SimpleMessageReceiver.sol";
 import {EVM2EVMGEOffRampInterface} from "../../../interfaces/offRamp/EVM2EVMGEOffRampInterface.sol";
-import {GasFeeCacheInterface} from "../../../dynamicFeeCalculator/GasFeeCache.sol";
+import {GE} from "../../../models/GE.sol";
+import {Common} from "../../../models/Common.sol";
+import {GasFeeCacheInterface} from "../../../gasFeeCache/GasFeeCache.sol";
 import {EVM2EVMGEOffRampHelper} from "../../helpers/ramps/EVM2EVMGEOffRampHelper.sol";
 
 contract EVM2EVMGEOffRampSetup is TokenSetup, GasFeeCacheSetup {
-  using CCIP for CCIP.EVM2EVMGEMessage;
-
   CommitStoreInterface internal s_mockCommitStore;
   Any2EVMMessageReceiverInterface internal s_receiver;
   Any2EVMMessageReceiverInterface internal s_secondary_receiver;
@@ -23,7 +23,7 @@ contract EVM2EVMGEOffRampSetup is TokenSetup, GasFeeCacheSetup {
   event ExecutionStateChanged(
     uint64 indexed sequenceNumber,
     bytes32 indexed messageId,
-    CCIP.MessageExecutionState state
+    Internal.MessageExecutionState state
   );
   event SkippedIncorrectNonce(uint64 indexed nonce, address indexed sender);
 
@@ -76,13 +76,13 @@ contract EVM2EVMGEOffRampSetup is TokenSetup, GasFeeCacheSetup {
       });
   }
 
-  function _convertGEToGeneralMessage(CCIP.EVM2EVMGEMessage memory original)
+  function _convertGEToGeneralMessage(GE.EVM2EVMGEMessage memory original)
     internal
     view
-    returns (CCIP.Any2EVMMessageFromSender memory message)
+    returns (Internal.Any2EVMMessageFromSender memory message)
   {
     uint256 numberOfTokens = original.tokensAndAmounts.length;
-    CCIP.EVMTokenAndAmount[] memory destTokensAndAmounts = new CCIP.EVMTokenAndAmount[](numberOfTokens);
+    Common.EVMTokenAndAmount[] memory destTokensAndAmounts = new Common.EVMTokenAndAmount[](numberOfTokens);
     address[] memory destPools = new address[](numberOfTokens);
 
     for (uint256 i = 0; i < numberOfTokens; ++i) {
@@ -93,7 +93,7 @@ contract EVM2EVMGEOffRampSetup is TokenSetup, GasFeeCacheSetup {
     }
 
     return
-      CCIP.Any2EVMMessageFromSender({
+      Internal.Any2EVMMessageFromSender({
         sourceChainId: original.sourceChainId,
         sender: abi.encode(original.sender),
         receiver: original.receiver,
@@ -104,33 +104,29 @@ contract EVM2EVMGEOffRampSetup is TokenSetup, GasFeeCacheSetup {
       });
   }
 
-  function _generateAny2EVMGEMessageNoTokens(uint64 sequenceNumber)
-    internal
-    view
-    returns (CCIP.EVM2EVMGEMessage memory)
-  {
+  function _generateAny2EVMGEMessageNoTokens(uint64 sequenceNumber) internal view returns (GE.EVM2EVMGEMessage memory) {
     return _generateAny2EVMGEMessage(sequenceNumber, getCastedSourceEVMTokenAndAmountsWithZeroAmounts());
   }
 
   function _generateAny2EVMGEMessageWithTokens(uint64 sequenceNumber, uint256[] memory amounts)
     internal
     view
-    returns (CCIP.EVM2EVMGEMessage memory)
+    returns (GE.EVM2EVMGEMessage memory)
   {
-    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts = getCastedSourceEVMTokenAndAmountsWithZeroAmounts();
+    Common.EVMTokenAndAmount[] memory tokensAndAmounts = getCastedSourceEVMTokenAndAmountsWithZeroAmounts();
     for (uint256 i = 0; i < tokensAndAmounts.length; ++i) {
       tokensAndAmounts[i].amount = amounts[i];
     }
     return _generateAny2EVMGEMessage(sequenceNumber, tokensAndAmounts);
   }
 
-  function _generateAny2EVMGEMessage(uint64 sequenceNumber, CCIP.EVMTokenAndAmount[] memory tokensAndAmounts)
+  function _generateAny2EVMGEMessage(uint64 sequenceNumber, Common.EVMTokenAndAmount[] memory tokensAndAmounts)
     internal
     view
-    returns (CCIP.EVM2EVMGEMessage memory)
+    returns (GE.EVM2EVMGEMessage memory)
   {
     bytes memory data = abi.encode(0);
-    CCIP.EVM2EVMGEMessage memory message = CCIP.EVM2EVMGEMessage({
+    GE.EVM2EVMGEMessage memory message = GE.EVM2EVMGEMessage({
       sequenceNumber: sequenceNumber,
       feeTokenAmount: EXECUTION_FEE_AMOUNT,
       sender: OWNER,
@@ -144,23 +140,23 @@ contract EVM2EVMGEOffRampSetup is TokenSetup, GasFeeCacheSetup {
       feeToken: tokensAndAmounts[0].token,
       messageId: ""
     });
-
-    message.messageId = message._hash(
-      keccak256(abi.encode(CCIP.EVM_2_EVM_GE_MESSAGE_HASH, SOURCE_CHAIN_ID, DEST_CHAIN_ID, ON_RAMP_ADDRESS))
+    message.messageId = GE._hash(
+      message,
+      keccak256(abi.encode(GE.EVM_2_EVM_GE_MESSAGE_HASH, SOURCE_CHAIN_ID, DEST_CHAIN_ID, ON_RAMP_ADDRESS))
     );
 
     return message;
   }
 
-  function _generateBasicMessages() internal view returns (CCIP.EVM2EVMGEMessage[] memory) {
-    CCIP.EVM2EVMGEMessage[] memory messages = new CCIP.EVM2EVMGEMessage[](1);
+  function _generateBasicMessages() internal view returns (GE.EVM2EVMGEMessage[] memory) {
+    GE.EVM2EVMGEMessage[] memory messages = new GE.EVM2EVMGEMessage[](1);
     messages[0] = _generateAny2EVMGEMessageNoTokens(1);
     return messages;
   }
 
-  function _generateMessagesWithTokens() internal view returns (CCIP.EVM2EVMGEMessage[] memory) {
-    CCIP.EVM2EVMGEMessage[] memory messages = new CCIP.EVM2EVMGEMessage[](2);
-    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts = getCastedSourceEVMTokenAndAmountsWithZeroAmounts();
+  function _generateMessagesWithTokens() internal view returns (GE.EVM2EVMGEMessage[] memory) {
+    GE.EVM2EVMGEMessage[] memory messages = new GE.EVM2EVMGEMessage[](2);
+    Common.EVMTokenAndAmount[] memory tokensAndAmounts = getCastedSourceEVMTokenAndAmountsWithZeroAmounts();
     tokensAndAmounts[0].amount = 1e18;
     tokensAndAmounts[1].amount = 5e18;
     messages[0] = _generateAny2EVMGEMessage(1, tokensAndAmounts);
@@ -170,10 +166,10 @@ contract EVM2EVMGEOffRampSetup is TokenSetup, GasFeeCacheSetup {
     return messages;
   }
 
-  function _generateReportFromMessages(CCIP.EVM2EVMGEMessage[] memory messages)
+  function _generateReportFromMessages(GE.EVM2EVMGEMessage[] memory messages)
     internal
     view
-    returns (CCIP.ExecutionReport memory)
+    returns (GE.ExecutionReport memory)
   {
     bytes[] memory encodedMessages = new bytes[](messages.length);
     uint64[] memory sequenceNumbers = new uint64[](messages.length);
@@ -190,10 +186,10 @@ contract EVM2EVMGEOffRampSetup is TokenSetup, GasFeeCacheSetup {
     uint256[] memory tokenPerFeeCoin = new uint256[](1);
     tokenPerFeeCoin[0] = TOKENS_PER_FEE_COIN;
 
-    CCIP.FeeUpdate[] memory feeUpdates = new CCIP.FeeUpdate[](0);
+    GE.FeeUpdate[] memory feeUpdates = new GE.FeeUpdate[](0);
 
     return
-      CCIP.ExecutionReport({
+      GE.ExecutionReport({
         sequenceNumbers: sequenceNumbers,
         innerProofs: innerProofs,
         innerProofFlagBits: 2**256 - 1,

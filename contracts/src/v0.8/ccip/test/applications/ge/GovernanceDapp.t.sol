@@ -46,29 +46,27 @@ contract GovernanceDapp_constructor is GovernanceDappSetup {
 
 /// @notice #voteForNewFeeConfig
 contract GovernanceDapp_voteForNewFeeConfig is GovernanceDappSetup {
-  using CCIP for CCIP.EVM2EVMGEMessage;
-
   event ConfigPropagated(uint256 chainId, address contractAddress);
 
   // Success
   function testSuccess() public {
     GovernanceDapp.FeeConfig memory feeConfig = GovernanceDapp.FeeConfig({feeAmount: 10000, changedAtBlock: 100});
     bytes memory data = abi.encode(feeConfig);
-    CCIP.EVM2EVMGEMessage memory message = CCIP.EVM2EVMGEMessage({
+    GE.EVM2EVMGEMessage memory message = GE.EVM2EVMGEMessage({
       sequenceNumber: 1,
       sourceChainId: SOURCE_CHAIN_ID,
       sender: address(s_governanceDapp),
       receiver: s_crossChainClone.contractAddress,
       nonce: 1,
       data: data,
-      tokensAndAmounts: new CCIP.EVMTokenAndAmount[](0),
+      tokensAndAmounts: new Common.EVMTokenAndAmount[](0),
       gasLimit: 3e5,
       strict: false,
       feeToken: s_sourceFeeToken,
       feeTokenAmount: 32400109, // todo
       messageId: ""
     });
-    message.messageId = message._hash(s_metadataHash);
+    message.messageId = GE._hash(message, s_metadataHash);
 
     vm.expectEmit(false, false, false, true);
     emit CCIPSendRequested(message);
@@ -87,11 +85,11 @@ contract GovernanceDapp_ccipReceive is GovernanceDappSetup {
   function testSuccess() public {
     GovernanceDapp.FeeConfig memory feeConfig = GovernanceDapp.FeeConfig({feeAmount: 10000, changedAtBlock: 100});
 
-    CCIP.Any2EVMMessage memory message = CCIP.Any2EVMMessage({
+    Common.Any2EVMMessage memory message = Common.Any2EVMMessage({
       sourceChainId: SOURCE_CHAIN_ID,
       sender: abi.encode(OWNER),
       data: abi.encode(feeConfig),
-      destTokensAndAmounts: new CCIP.EVMTokenAndAmount[](0)
+      destTokensAndAmounts: new Common.EVMTokenAndAmount[](0)
     });
 
     changePrank(address(s_sourceRouter));

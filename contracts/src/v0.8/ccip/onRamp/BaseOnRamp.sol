@@ -6,7 +6,7 @@ import {IERC20} from "../pools/PoolCollector.sol";
 import {AllowList} from "../access/AllowList.sol";
 import {AggregateRateLimiter} from "../rateLimiter/AggregateRateLimiter.sol";
 import {BaseOnRampInterface, PoolInterface} from "../interfaces/onRamp/BaseOnRampInterface.sol";
-import {CCIP} from "../models/Models.sol";
+import {Common} from "../models/Common.sol";
 
 contract BaseOnRamp is BaseOnRampInterface, HealthChecker, AllowList, AggregateRateLimiter {
   // Chain ID of the source chain (where this contract is deployed)
@@ -147,7 +147,7 @@ contract BaseOnRamp is BaseOnRampInterface, HealthChecker, AllowList, AggregateR
   function _handleForwardFromRouter(
     uint256 dataLength,
     uint256 gasLimit,
-    CCIP.EVMTokenAndAmount[] memory tokensAndAmounts,
+    Common.EVMTokenAndAmount[] memory tokensAndAmounts,
     address originalSender
   ) internal {
     if (s_router == address(0)) revert RouterNotSet();
@@ -164,7 +164,7 @@ contract BaseOnRamp is BaseOnRampInterface, HealthChecker, AllowList, AggregateR
 
     // Lock all tokens in their corresponding pools
     for (uint256 i = 0; i < tokenLength; ++i) {
-      CCIP.EVMTokenAndAmount memory ta = tokensAndAmounts[i];
+      Common.EVMTokenAndAmount memory ta = tokensAndAmounts[i];
       IERC20 token = IERC20(ta.token);
       PoolInterface pool = getPoolBySourceToken(token);
       if (address(pool) == address(0)) revert UnsupportedToken(token);

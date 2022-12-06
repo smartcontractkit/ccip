@@ -38,7 +38,7 @@ contract EVM2EVMTollReceiverDapp_ccipReceive is ReceiverDappSetup {
   // Success
 
   function testSuccess() public {
-    CCIP.Any2EVMMessage memory message;
+    Common.Any2EVMMessage memory message;
     uint256 transferAmount = 5000;
     message.destTokensAndAmounts = getCastedDestinationEVMTokenAndAmountsWithZeroAmounts();
     message.destTokensAndAmounts[0].amount = transferAmount;
@@ -59,7 +59,7 @@ contract EVM2EVMTollReceiverDapp_ccipReceive is ReceiverDappSetup {
 
   function testInvalidDelivererReverts() public {
     vm.expectRevert(abi.encodeWithSelector(ReceiverDapp.InvalidDeliverer.selector, OWNER));
-    CCIP.Any2EVMMessage memory message;
+    Common.Any2EVMMessage memory message;
 
     s_receiverDapp.ccipReceive(message);
   }

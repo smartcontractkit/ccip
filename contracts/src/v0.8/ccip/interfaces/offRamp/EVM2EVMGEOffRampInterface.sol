@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {GasFeeCacheInterface} from "../dynamicFeeCalculator/GasFeeCacheInterfaceInterface.sol";
-import {CCIP} from "../../models/Models.sol";
+import {GasFeeCacheInterface} from "../gasFeeCache/GasFeeCacheInterface.sol";
+import {GE} from "../../models/GE.sol";
+import {Internal} from "../../models/Internal.sol";
 
 interface EVM2EVMGEOffRampInterface {
   error UnauthorizedGasPriceUpdate();
@@ -13,7 +14,7 @@ interface EVM2EVMGEOffRampInterface {
   event ExecutionStateChanged(
     uint64 indexed sequenceNumber,
     bytes32 indexed messageId,
-    CCIP.MessageExecutionState state
+    Internal.MessageExecutionState state
   );
 
   struct GEOffRampConfig {
@@ -48,4 +49,10 @@ interface EVM2EVMGEOffRampInterface {
    * @notice Sets a new config.
    */
   function setGEConfig(GEOffRampConfig memory config) external;
+
+  /**
+   * @notice Manually execute a message
+   * @param report GE.ExecutionReport
+   */
+  function manuallyExecute(GE.ExecutionReport memory report) external;
 }

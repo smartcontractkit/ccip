@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {CCIP} from "../../models/Models.sol";
+import {Toll} from "../../models/Toll.sol";
+import {TollConsumer} from "../../models/TollConsumer.sol";
 import {EVM2EVMTollOnRampInterface} from "./EVM2EVMTollOnRampInterface.sol";
 import {BaseOnRampRouterInterface} from "./BaseOnRampRouterInterface.sol";
 
@@ -16,7 +17,9 @@ interface EVM2AnyTollOnRampRouterInterface is BaseOnRampRouterInterface {
    * @param message The message payload
    * @return The sequence number assigned to message
    */
-  function ccipSend(uint256 destinationChainId, CCIP.EVM2AnyTollMessage calldata message) external returns (uint64);
+  function ccipSend(uint256 destinationChainId, TollConsumer.EVM2AnyTollMessage calldata message)
+    external
+    returns (uint64);
 
   /**
    * @notice Set chainId => onRamp mapping

@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {Any2EVMOffRampRouterInterface} from "./Any2EVMOffRampRouterInterface.sol";
 import {CommitStoreInterface} from "../CommitStoreInterface.sol";
-import {CCIP} from "../../models/Models.sol";
+import {Internal} from "../../models/Internal.sol";
 import {IERC20} from "../../../vendor/IERC20.sol";
 
 interface BaseOffRampInterface {
@@ -52,16 +52,10 @@ interface BaseOffRampInterface {
   function getRouter() external view returns (Any2EVMOffRampRouterInterface);
 
   /**
-   * @notice Mannually execute a message
-   * @param report CCIP.ExecutionReport
-   */
-  function manuallyExecute(CCIP.ExecutionReport memory report) external;
-
-  /**
    * @notice Returns the current execution state of a message based on its
    *          sequenceNumber.
    */
-  function getExecutionState(uint64 sequenceNumber) external view returns (CCIP.MessageExecutionState);
+  function getExecutionState(uint64 sequenceNumber) external view returns (Internal.MessageExecutionState);
 
   /**
    * @notice Returns the current commitStore.

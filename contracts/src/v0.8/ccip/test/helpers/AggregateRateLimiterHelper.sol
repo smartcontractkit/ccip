@@ -8,7 +8,7 @@ contract AggregateRateLimiterHelper is AggregateRateLimiter {
     AggregateRateLimiter(config, tokenLimitsAdmin)
   {}
 
-  function removeTokens(CCIP.EVMTokenAndAmount[] memory tokensAndAmounts) public {
+  function removeTokens(Common.EVMTokenAndAmount[] memory tokensAndAmounts) public {
     _removeTokens(tokensAndAmounts);
   }
 }

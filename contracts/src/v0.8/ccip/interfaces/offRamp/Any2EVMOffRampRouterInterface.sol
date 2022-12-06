@@ -2,7 +2,8 @@
 pragma solidity ^0.8.0;
 
 import {BaseOffRampInterface} from "./BaseOffRampInterface.sol";
-import {CCIP} from "../../models/Models.sol";
+import {Common} from "../../models/Common.sol";
+import {Internal} from "../../models/Internal.sol";
 
 interface Any2EVMOffRampRouterInterface {
   error NoOffRampsConfigured();
@@ -49,7 +50,7 @@ interface Any2EVMOffRampRouterInterface {
 
   /**
    * @notice Route the message to its intended receiver contract
-   * @param message CCIP.Any2EVMMessageFromSender struct
+   * @param message Internal.Any2EVMMessageFromSender struct
    */
-  function routeMessage(CCIP.Any2EVMMessageFromSender calldata message) external returns (bool success);
+  function routeMessage(Internal.Any2EVMMessageFromSender calldata message) external returns (bool success);
 }

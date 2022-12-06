@@ -32,8 +32,6 @@ contract EVM2EVMGEOnRamp_constructor is EVM2EVMGEOnRampSetup {
 
 /// @notice #forwardFromRouter
 contract EVM2EVMGEOnRamp_forwardFromRouter is EVM2EVMGEOnRampSetup {
-  using CCIP for CCIP.EVMExtraArgsV1;
-
   function setUp() public virtual override {
     EVM2EVMGEOnRampSetup.setUp();
 
@@ -46,7 +44,7 @@ contract EVM2EVMGEOnRamp_forwardFromRouter is EVM2EVMGEOnRampSetup {
   // Success
 
   function testSuccess() public {
-    CCIP.EVM2AnyGEMessage memory message = _generateEmptyMessage();
+    GEConsumer.EVM2AnyGEMessage memory message = _generateEmptyMessage();
 
     vm.expectEmit(false, false, false, true);
     emit CCIPSendRequested(_messageToEvent(message, 1, 1, 0));
@@ -55,7 +53,7 @@ contract EVM2EVMGEOnRamp_forwardFromRouter is EVM2EVMGEOnRampSetup {
   }
 
   function testShouldIncrementSeqNumSuccess() public {
-    CCIP.EVM2AnyGEMessage memory message = _generateEmptyMessage();
+    GEConsumer.EVM2AnyGEMessage memory message = _generateEmptyMessage();
 
     vm.expectEmit(false, false, false, true);
     emit CCIPSendRequested(_messageToEvent(message, 1, 1, 50));
@@ -100,7 +98,7 @@ contract EVM2EVMGEOnRamp_forwardFromRouter is EVM2EVMGEOnRampSetup {
   }
 
   function testMessageTooLargeReverts() public {
-    CCIP.EVM2AnyGEMessage memory message = _generateEmptyMessage();
+    GEConsumer.EVM2AnyGEMessage memory message = _generateEmptyMessage();
     message.data = new bytes(onRampConfig().maxDataSize + 1);
     vm.expectRevert(
       abi.encodeWithSelector(
@@ -115,9 +113,9 @@ contract EVM2EVMGEOnRamp_forwardFromRouter is EVM2EVMGEOnRampSetup {
 
   function testTooManyTokensReverts() public {
     assertEq(MAX_TOKENS_LENGTH, s_onRamp.getConfig().maxTokensLength);
-    CCIP.EVM2AnyGEMessage memory message = _generateEmptyMessage();
+    GEConsumer.EVM2AnyGEMessage memory message = _generateEmptyMessage();
     uint256 tooMany = MAX_TOKENS_LENGTH + 1;
-    message.tokensAndAmounts = new CCIP.EVMTokenAndAmount[](tooMany);
+    message.tokensAndAmounts = new Common.EVMTokenAndAmount[](tooMany);
     vm.expectRevert(BaseOnRampInterface.UnsupportedNumberOfTokens.selector);
     s_onRamp.forwardFromRouter(message, 0, STRANGER);
   }
@@ -134,8 +132,8 @@ contract EVM2EVMGEOnRamp_forwardFromRouter is EVM2EVMGEOnRampSetup {
   function testUnsupportedTokenReverts() public {
     address wrongToken = address(1);
 
-    CCIP.EVM2AnyGEMessage memory message = _generateEmptyMessage();
-    message.tokensAndAmounts = new CCIP.EVMTokenAndAmount[](1);
+    GEConsumer.EVM2AnyGEMessage memory message = _generateEmptyMessage();
+    message.tokensAndAmounts = new Common.EVMTokenAndAmount[](1);
     message.tokensAndAmounts[0].token = wrongToken;
     message.tokensAndAmounts[0].amount = 1;
 
@@ -154,8 +152,8 @@ contract EVM2EVMGEOnRamp_forwardFromRouter is EVM2EVMGEOnRampSetup {
   }
 
   function testValueExceedsCapacityReverts() public {
-    CCIP.EVM2AnyGEMessage memory message = _generateEmptyMessage();
-    message.tokensAndAmounts = new CCIP.EVMTokenAndAmount[](1);
+    GEConsumer.EVM2AnyGEMessage memory message = _generateEmptyMessage();
+    message.tokensAndAmounts = new Common.EVMTokenAndAmount[](1);
     message.tokensAndAmounts[0].amount = 2**128;
     message.tokensAndAmounts[0].token = s_sourceTokens[0];
 
@@ -173,10 +171,10 @@ contract EVM2EVMGEOnRamp_forwardFromRouter is EVM2EVMGEOnRampSetup {
   }
 
   function testPriceNotFoundForTokenReverts() public {
-    CCIP.EVM2AnyGEMessage memory message = _generateEmptyMessage();
+    GEConsumer.EVM2AnyGEMessage memory message = _generateEmptyMessage();
 
     address fakeToken = address(1);
-    message.tokensAndAmounts = new CCIP.EVMTokenAndAmount[](1);
+    message.tokensAndAmounts = new Common.EVMTokenAndAmount[](1);
     message.tokensAndAmounts[0].token = fakeToken;
 
     vm.expectRevert(abi.encodeWithSelector(AggregateRateLimiterInterface.PriceNotFoundForToken.selector, fakeToken));
@@ -186,8 +184,10 @@ contract EVM2EVMGEOnRamp_forwardFromRouter is EVM2EVMGEOnRampSetup {
 
   // Asserts gasLimit must be <=maxGasLimit
   function testMessageGasLimitTooHighReverts() public {
-    CCIP.EVM2AnyGEMessage memory message = _generateEmptyMessage();
-    message.extraArgs = CCIP.EVMExtraArgsV1({gasLimit: MAX_GAS_LIMIT + 1, strict: false})._toBytes();
+    GEConsumer.EVM2AnyGEMessage memory message = _generateEmptyMessage();
+    message.extraArgs = GEConsumer._argsToBytes(
+      GEConsumer.EVMExtraArgsV1({gasLimit: MAX_GAS_LIMIT + 1, strict: false})
+    );
     vm.expectRevert(abi.encodeWithSelector(BaseOnRampInterface.MessageGasLimitTooHigh.selector));
     s_onRamp.forwardFromRouter(message, 0, OWNER);
   }

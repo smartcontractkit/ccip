@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {CCIP} from "../../models/Models.sol";
+import {GE} from "../../models/GE.sol";
 import {TokenSetup} from "../TokenSetup.t.sol";
-import {GasFeeCache} from "../../dynamicFeeCalculator/GasFeeCache.sol";
+import {GasFeeCache} from "../../gasFeeCache/GasFeeCache.sol";
 
 contract GasFeeCacheSetup is TokenSetup {
   GasFeeCache s_gasFeeCache;
 
   function setUp() public virtual override {
     TokenSetup.setUp();
-    CCIP.FeeUpdate[] memory fees = new CCIP.FeeUpdate[](1);
-    fees[0] = CCIP.FeeUpdate({chainId: DEST_CHAIN_ID, linkPerUnitGas: 100});
+    GE.FeeUpdate[] memory fees = new GE.FeeUpdate[](1);
+    fees[0] = GE.FeeUpdate({chainId: DEST_CHAIN_ID, linkPerUnitGas: 100});
     address[] memory feeUpdaters = new address[](0);
 
     s_gasFeeCache = new GasFeeCache(fees, feeUpdaters);

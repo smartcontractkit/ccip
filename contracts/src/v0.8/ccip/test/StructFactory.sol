@@ -116,10 +116,4 @@ contract StructFactory {
     prices[1] = 8;
     return prices;
   }
-
-  using CCIP for bytes;
-
-  function fromBytesHelper(bytes calldata bts) external pure returns (CCIP.EVMExtraArgsV1 memory) {
-    return bts._fromBytes();
-  }
 }

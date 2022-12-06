@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {CCIP} from "../models/Models.sol";
+import {Common} from "../models/Common.sol";
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
-import {GasFeeCacheInterface} from "../interfaces/dynamicFeeCalculator/GasFeeCacheInterfaceInterface.sol";
+import {GasFeeCacheInterface} from "../interfaces/gasFeeCache/GasFeeCacheInterface.sol";
+import {GE} from "../models/GE.sol";
 
 contract GasFeeCache is GasFeeCacheInterface, OwnerIsCreator {
   mapping(uint256 => uint256) internal s_linkPerUnitGasByDestChainId;
   mapping(address => bool) internal s_feeUpdaters;
 
-  constructor(CCIP.FeeUpdate[] memory feeUpdates, address[] memory feeUpdaters) {
+  constructor(GE.FeeUpdate[] memory feeUpdates, address[] memory feeUpdaters) {
     for (uint256 i = 0; i < feeUpdates.length; ++i) {
       s_linkPerUnitGasByDestChainId[feeUpdates[i].chainId] = feeUpdates[i].linkPerUnitGas;
     }
@@ -32,7 +33,7 @@ contract GasFeeCache is GasFeeCacheInterface, OwnerIsCreator {
     emit FeeUpdaterRemoved(feeUpdater);
   }
 
-  function updateFees(CCIP.FeeUpdate[] memory feeUpdates) external requireUpdaterOrOwner {
+  function updateFees(GE.FeeUpdate[] memory feeUpdates) external requireUpdaterOrOwner {
     if (!s_feeUpdaters[msg.sender]) revert FeeUpdaterNotAllowed(msg.sender);
 
     uint256 numberOfFeeUpdates = feeUpdates.length;

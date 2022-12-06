@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_offramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
@@ -49,14 +50,13 @@ var (
 	ErrCommitStoreIsDown                              = errors.New("commitStore is down")
 )
 
-func EncodeExecutionReport(seqNums []uint64,
+func EncodeTollExecutionReport(seqNums []uint64,
 	tokensPerFeeCoin map[common.Address]*big.Int,
 	msgs [][]byte,
 	innerProofs [][32]byte,
 	innerProofSourceFlags []bool,
 	outerProofs [][32]byte,
 	outerProofSourceFlags []bool,
-	feeUpdates []evm_2_evm_ge_offramp.CCIPFeeUpdate,
 ) (types.Report, error) {
 	var tokensPerFeeCoinAddresses []common.Address
 	var tokensPerFeeCoinValues []*big.Int
@@ -70,7 +70,44 @@ func EncodeExecutionReport(seqNums []uint64,
 	for _, addr := range tokensPerFeeCoinAddresses {
 		tokensPerFeeCoinValues = append(tokensPerFeeCoinValues, tokensPerFeeCoin[addr])
 	}
-	report, err := makeExecutionReportArgs().PackValues([]interface{}{&evm_2_evm_ge_offramp.CCIPExecutionReport{
+	report, err := makeTollExecutionReportArgs().PackValues([]interface{}{&evm_2_evm_toll_offramp.TollExecutionReport{
+		SequenceNumbers:          seqNums,
+		EncodedMessages:          msgs,
+		TokenPerFeeCoinAddresses: tokensPerFeeCoinAddresses,
+		TokenPerFeeCoin:          tokensPerFeeCoinValues,
+		InnerProofs:              innerProofs,
+		InnerProofFlagBits:       ProofFlagsToBits(innerProofSourceFlags),
+		OuterProofs:              outerProofs,
+		OuterProofFlagBits:       ProofFlagsToBits(outerProofSourceFlags),
+	}})
+	if err != nil {
+		return nil, err
+	}
+	return report, nil
+}
+
+func EncodeGEExecutionReport(seqNums []uint64,
+	tokensPerFeeCoin map[common.Address]*big.Int,
+	msgs [][]byte,
+	innerProofs [][32]byte,
+	innerProofSourceFlags []bool,
+	outerProofs [][32]byte,
+	outerProofSourceFlags []bool,
+	feeUpdates []evm_2_evm_ge_offramp.GEFeeUpdate,
+) (types.Report, error) {
+	var tokensPerFeeCoinAddresses []common.Address
+	var tokensPerFeeCoinValues []*big.Int
+	for addr := range tokensPerFeeCoin {
+		tokensPerFeeCoinAddresses = append(tokensPerFeeCoinAddresses, addr)
+	}
+	// Sort the addresses for determinism.
+	sort.Slice(tokensPerFeeCoinAddresses, func(i, j int) bool {
+		return bytes.Compare(tokensPerFeeCoinAddresses[i].Bytes(), tokensPerFeeCoinAddresses[j].Bytes()) < 0
+	})
+	for _, addr := range tokensPerFeeCoinAddresses {
+		tokensPerFeeCoinValues = append(tokensPerFeeCoinValues, tokensPerFeeCoin[addr])
+	}
+	report, err := makeExecutionReportArgs().PackValues([]interface{}{&evm_2_evm_ge_offramp.GEExecutionReport{
 		SequenceNumbers:          seqNums,
 		FeeUpdates:               feeUpdates,
 		EncodedMessages:          msgs,
@@ -87,7 +124,23 @@ func EncodeExecutionReport(seqNums []uint64,
 	return report, nil
 }
 
-func DecodeExecutionReport(report types.Report) (*evm_2_evm_ge_offramp.CCIPExecutionReport, error) {
+func MessagesFromTollExecutionReport(report types.Report) ([]uint64, [][]byte, error) {
+	tollReport, err := DecodeTollExecutionReport(report)
+	if err != nil {
+		return nil, nil, err
+	}
+	return tollReport.SequenceNumbers, tollReport.EncodedMessages, nil
+}
+
+func MessagesFromGEExecutionReport(report types.Report) ([]uint64, [][]byte, error) {
+	geReport, err := DecodeGEExecutionReport(report)
+	if err != nil {
+		return nil, nil, err
+	}
+	return geReport.SequenceNumbers, geReport.EncodedMessages, nil
+}
+
+func DecodeGEExecutionReport(report types.Report) (*evm_2_evm_ge_offramp.GEExecutionReport, error) {
 	unpacked, err := makeExecutionReportArgs().Unpack(report)
 	if err != nil {
 		return nil, err
@@ -114,20 +167,57 @@ func DecodeExecutionReport(report types.Report) (*evm_2_evm_ge_offramp.CCIPExecu
 	if !ok {
 		return nil, fmt.Errorf("got %T", unpacked[0])
 	}
-	var er evm_2_evm_ge_offramp.CCIPExecutionReport
+	var er evm_2_evm_ge_offramp.GEExecutionReport
 	er.EncodedMessages = append(er.EncodedMessages, erStruct.EncodedMessages...)
 	er.InnerProofs = append(er.InnerProofs, erStruct.InnerProofs...)
 	er.OuterProofs = append(er.OuterProofs, erStruct.OuterProofs...)
 
-	er.FeeUpdates = []evm_2_evm_ge_offramp.CCIPFeeUpdate{}
+	er.FeeUpdates = []evm_2_evm_ge_offramp.GEFeeUpdate{}
 
 	for _, feeUpdate := range erStruct.FeeUpdates {
-		er.FeeUpdates = append(er.FeeUpdates, evm_2_evm_ge_offramp.CCIPFeeUpdate{
+		er.FeeUpdates = append(er.FeeUpdates, evm_2_evm_ge_offramp.GEFeeUpdate{
 			ChainId:        feeUpdate.ChainId,
 			LinkPerUnitGas: feeUpdate.LinkPerUnitGas,
 		})
 	}
 
+	er.SequenceNumbers = erStruct.SequenceNumbers
+	// Unpack will populate with big.Int{false, <allocated empty nat>} for 0 values,
+	// which is different from the expected big.NewInt(0). Rebuild to the expected value for this case.
+	er.InnerProofFlagBits = big.NewInt(erStruct.InnerProofFlagBits.Int64())
+	er.OuterProofFlagBits = big.NewInt(erStruct.OuterProofFlagBits.Int64())
+	er.TokenPerFeeCoinAddresses = erStruct.TokenPerFeeCoinAddresses
+	er.TokenPerFeeCoin = erStruct.TokenPerFeeCoin
+	return &er, nil
+}
+
+func DecodeTollExecutionReport(report types.Report) (*evm_2_evm_toll_offramp.TollExecutionReport, error) {
+	unpacked, err := makeTollExecutionReportArgs().Unpack(report)
+	if err != nil {
+		return nil, err
+	}
+	if len(unpacked) == 0 {
+		return nil, errors.New("assumptionViolation: expected at least one element")
+	}
+
+	// Must be anonymous struct here
+	erStruct, ok := unpacked[0].(struct {
+		SequenceNumbers          []uint64         `json:"sequenceNumbers"`
+		TokenPerFeeCoinAddresses []common.Address `json:"tokenPerFeeCoinAddresses"`
+		TokenPerFeeCoin          []*big.Int       `json:"tokenPerFeeCoin"`
+		EncodedMessages          [][]byte         `json:"encodedMessages"`
+		InnerProofs              [][32]uint8      `json:"innerProofs"`
+		InnerProofFlagBits       *big.Int         `json:"innerProofFlagBits"`
+		OuterProofs              [][32]uint8      `json:"outerProofs"`
+		OuterProofFlagBits       *big.Int         `json:"outerProofFlagBits"`
+	})
+	if !ok {
+		return nil, fmt.Errorf("got %T", unpacked[0])
+	}
+	var er evm_2_evm_toll_offramp.TollExecutionReport
+	er.EncodedMessages = append(er.EncodedMessages, erStruct.EncodedMessages...)
+	er.InnerProofs = append(er.InnerProofs, erStruct.InnerProofs...)
+	er.OuterProofs = append(er.OuterProofs, erStruct.OuterProofs...)
 	er.SequenceNumbers = erStruct.SequenceNumbers
 	// Unpack will populate with big.Int{false, <allocated empty nat>} for 0 values,
 	// which is different from the expected big.NewInt(0). Rebuild to the expected value for this case.
@@ -270,8 +360,9 @@ type ExecutionReportingPlugin struct {
 }
 
 type InflightExecutionReport struct {
-	createdAt time.Time
-	report    evm_2_evm_ge_offramp.CCIPExecutionReport
+	createdAt   time.Time
+	seqNrs      []uint64
+	encMessages [][]byte
 }
 
 type Query struct {
@@ -342,9 +433,13 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 	// IMPORTANT: We build executable set based on the leaders token prices, ensuring consistency across followers.
 	executableSequenceNumbers, err := r.builder.getExecutableSeqNrs(q.DestGasPrice, q.TokenPrices, inFlight)
 	lggr.Infof("Batch building took %d ms", time.Since(batchBuilderStart).Milliseconds())
-
 	if err != nil {
 		return nil, err
+	}
+	// Toll requires seqnrs
+	_, isToll := r.offRamp.(*tollOffRamp)
+	if isToll && len(executableSequenceNumbers) == 0 {
+		return nil, errors.New("No observations")
 	}
 	lggr.Infof("executable seq nums %v %x", executableSequenceNumbers, r.eventSignatures.SendRequested)
 	followerTokensPerFeeCoin, err := r.tokenPrices(big.NewInt(TokenPriceBufferPercent))
@@ -374,7 +469,7 @@ func contiguousReqs(lggr logger.Logger, min, max uint64, seqNrs []uint64) bool {
 	return true
 }
 
-func leafsFromIntervals(lggr logger.Logger, onRampToEventSig map[common.Address]EventSignatures, seqParsers map[common.Address]func(logpoller.Log) (uint64, error), intervalByOnRamp map[common.Address]commit_store.CCIPInterval, srcLogPoller logpoller.LogPoller, onRampToHasher map[common.Address]LeafHasher[[32]byte], confs int) (map[common.Address][][32]byte, error) {
+func leafsFromIntervals(lggr logger.Logger, onRampToEventSig map[common.Address]EventSignatures, seqParsers map[common.Address]func(logpoller.Log) (uint64, error), intervalByOnRamp map[common.Address]commit_store.InternalInterval, srcLogPoller logpoller.LogPoller, onRampToHasher map[common.Address]LeafHasher[[32]byte], confs int) (map[common.Address][][32]byte, error) {
 	leafsByOnRamp := make(map[common.Address][][32]byte)
 	for onRamp, interval := range intervalByOnRamp {
 		// Logs are guaranteed to be in order of seq num, since these are finalized logs only
@@ -413,10 +508,10 @@ func leafsFromIntervals(lggr logger.Logger, onRampToEventSig map[common.Address]
 	return leafsByOnRamp, nil
 }
 
-func (r *ExecutionReportingPlugin) generateFeeUpdate(sourceGasPrice *big.Int, juelsPerFeeCoin *big.Int) []evm_2_evm_ge_offramp.CCIPFeeUpdate {
+func (r *ExecutionReportingPlugin) generateFeeUpdate(sourceGasPrice *big.Int, juelsPerFeeCoin *big.Int) []evm_2_evm_ge_offramp.GEFeeUpdate {
 	// TODO: Check gas fee updated logs
 	linkPerUnitGas := big.NewInt(0).Div(big.NewInt(0).Mul(sourceGasPrice, juelsPerFeeCoin), big.NewInt(1e18))
-	return []evm_2_evm_ge_offramp.CCIPFeeUpdate{
+	return []evm_2_evm_ge_offramp.GEFeeUpdate{
 		{
 			ChainId: r.sourceChainID,
 			// (juels/eth) * (wei / gas) / (1 eth / 1e18 wei) = juels/gas
@@ -424,6 +519,14 @@ func (r *ExecutionReportingPlugin) generateFeeUpdate(sourceGasPrice *big.Int, ju
 			LinkPerUnitGas: linkPerUnitGas,
 		},
 	}
+}
+
+type MessageExecution struct {
+	encMsgs               [][]byte
+	innerProofs           [][32]byte
+	innerProofSourceFlags []bool
+	outerProofs           [][32]byte
+	outerProofSourceFlags []bool
 }
 
 // Assumes non-empty report. Messages to execute can span more than one report, but are assumed to be in order of increasing
@@ -434,111 +537,125 @@ func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNums 
 		return nil, err
 	}
 	// TODO: Hack assume link is the first token
+	_, isGE := r.offRamp.(*geOffRamp)
 	linkToken := execTokens[0]
-	gasFeeUpdates := r.generateFeeUpdate(sourceGasPrice, tokensPerFeeCoin[linkToken])
-	if len(gasFeeUpdates) > 0 && len(finalSeqNums) == 0 {
-		lggr.Infow("Building execution report fee update only", "feeUpdates", gasFeeUpdates)
-		return EncodeExecutionReport(finalSeqNums,
-			tokensPerFeeCoin,
-			nil,
-			nil,
-			nil,
-			nil,
-			nil,
-			gasFeeUpdates,
-		)
-	}
-	nextMin, err := r.commitStore.GetExpectedNextSequenceNumber(nil, r.onRamp)
-	if err != nil {
-		return nil, err
-	}
-	if mathutil.Max(finalSeqNums[0], finalSeqNums[1:]...) >= nextMin {
-		return nil, errors.Errorf("Cannot execute uncommitted seq num. nextMin %v, seqNums %v", nextMin, finalSeqNums)
-	}
-	rep, err := r.builder.commitReport(finalSeqNums[0])
-	if err != nil {
-		return nil, err
-	}
-	lggr.Infow("Building execution report", "finalSeqNums", finalSeqNums, "rootOfRoots", hexutil.Encode(rep.RootOfRoots[:]), "report", rep)
-	// Otherwise we have messages to include as well.
-	var interval commit_store.CCIPInterval
-	var onRampIdx int
-	var outerTreeLeafs [][32]byte
-	for i, onRamp := range rep.OnRamps {
-		if onRamp == r.onRamp {
-			interval = rep.Intervals[i]
-			onRampIdx = i
+	var me *MessageExecution
+	if len(finalSeqNums) > 0 {
+		nextMin, err := r.commitStore.GetExpectedNextSequenceNumber(nil, r.onRamp)
+		if err != nil {
+			return nil, err
 		}
-		outerTreeLeafs = append(outerTreeLeafs, rep.MerkleRoots[i])
-	}
-	if interval.Max == 0 {
-		return nil, errors.New("interval not found for ramp " + r.onRamp.Hex())
-	}
-	msgsInRoot, err := r.source.LogsDataWordRange(r.eventSignatures.SendRequested, r.onRamp, r.eventSignatures.SendRequestedSequenceNumberIndex, EvmWord(interval.Min), EvmWord(interval.Max), int(r.offchainConfig.SourceIncomingConfirmations))
-	if err != nil {
-		return nil, err
-	}
-	if len(msgsInRoot) != int(interval.Max-interval.Min+1) {
-		return nil, errors.Errorf("unexpected missing msgs in committed root %x have %d want %d", rep.MerkleRoots[onRampIdx], len(msgsInRoot), int(interval.Max-interval.Min+1))
-	}
-	leafsByOnRamp, err := leafsFromIntervals(
-		lggr,
-		map[common.Address]EventSignatures{r.onRamp: r.eventSignatures},
-		map[common.Address]func(log logpoller.Log) (uint64, error){r.onRamp: r.onRampSeqParser},
-		map[common.Address]commit_store.CCIPInterval{r.onRamp: interval},
-		r.source,
-		r.onRampToHasher, int(r.offchainConfig.SourceIncomingConfirmations))
-	if err != nil {
-		return nil, err
-	}
-	ctx := hasher.NewKeccakCtx()
-	outerTree, err := merklemulti.NewTree[[32]byte](ctx, outerTreeLeafs)
-	if err != nil {
-		return nil, err
-	}
-	outerProof := outerTree.Prove([]int{onRampIdx})
-	innerTree, err := merklemulti.NewTree[[32]byte](ctx, leafsByOnRamp[r.onRamp])
-	if err != nil {
-		return nil, err
-	}
+		if mathutil.Max(finalSeqNums[0], finalSeqNums[1:]...) >= nextMin {
+			return nil, errors.Errorf("Cannot execute uncommitted seq num. nextMin %v, seqNums %v", nextMin, finalSeqNums)
+		}
+		rep, err := r.builder.commitReport(finalSeqNums[0])
+		if err != nil {
+			return nil, err
+		}
+		lggr.Infow("Building execution report", "finalSeqNums", finalSeqNums, "rootOfRoots", hexutil.Encode(rep.RootOfRoots[:]), "report", rep)
+		// Otherwise we have messages to include as well.
+		var interval commit_store.InternalInterval
+		var onRampIdx int
+		var outerTreeLeafs [][32]byte
+		for i, onRamp := range rep.OnRamps {
+			if onRamp == r.onRamp {
+				interval = rep.Intervals[i]
+				onRampIdx = i
+			}
+			outerTreeLeafs = append(outerTreeLeafs, rep.MerkleRoots[i])
+		}
+		if interval.Max == 0 {
+			return nil, errors.New("interval not found for ramp " + r.onRamp.Hex())
+		}
+		msgsInRoot, err := r.source.LogsDataWordRange(r.eventSignatures.SendRequested, r.onRamp, r.eventSignatures.SendRequestedSequenceNumberIndex, EvmWord(interval.Min), EvmWord(interval.Max), int(r.offchainConfig.SourceIncomingConfirmations))
+		if err != nil {
+			return nil, err
+		}
+		if len(msgsInRoot) != int(interval.Max-interval.Min+1) {
+			return nil, errors.Errorf("unexpected missing msgs in committed root %x have %d want %d", rep.MerkleRoots[onRampIdx], len(msgsInRoot), int(interval.Max-interval.Min+1))
+		}
+		leafsByOnRamp, err := leafsFromIntervals(
+			lggr,
+			map[common.Address]EventSignatures{r.onRamp: r.eventSignatures},
+			map[common.Address]func(log logpoller.Log) (uint64, error){r.onRamp: r.onRampSeqParser},
+			map[common.Address]commit_store.InternalInterval{r.onRamp: interval},
+			r.source,
+			r.onRampToHasher, int(r.offchainConfig.SourceIncomingConfirmations))
+		if err != nil {
+			return nil, err
+		}
+		ctx := hasher.NewKeccakCtx()
+		outerTree, err := merklemulti.NewTree[[32]byte](ctx, outerTreeLeafs)
+		if err != nil {
+			return nil, err
+		}
+		outerProof := outerTree.Prove([]int{onRampIdx})
+		innerTree, err := merklemulti.NewTree[[32]byte](ctx, leafsByOnRamp[r.onRamp])
+		if err != nil {
+			return nil, err
+		}
 
-	var innerIdxs []int
-	var encMsgs [][]byte
-	var hashes [][32]byte
-	for _, seqNum := range finalSeqNums {
-		if seqNum < interval.Min || seqNum > interval.Max {
-			// We only return messages from a single root (the root of the first message).
-			continue
+		var innerIdxs []int
+		var encMsgs [][]byte
+		var hashes [][32]byte
+		for _, seqNum := range finalSeqNums {
+			if seqNum < interval.Min || seqNum > interval.Max {
+				// We only return messages from a single root (the root of the first message).
+				continue
+			}
+			innerIdx := int(seqNum - interval.Min)
+			innerIdxs = append(innerIdxs, innerIdx)
+			encMsgs = append(encMsgs, msgsInRoot[innerIdx].Data)
+			hash, err2 := r.onRampToHasher[r.onRamp].HashLeaf(LogPollerLogToEthLog(msgsInRoot[innerIdx]))
+			if err2 != nil {
+				return nil, err2
+			}
+			hashes = append(hashes, hash)
 		}
-		innerIdx := int(seqNum - interval.Min)
-		innerIdxs = append(innerIdxs, innerIdx)
-		encMsgs = append(encMsgs, msgsInRoot[innerIdx].Data)
-		hash, err2 := r.onRampToHasher[r.onRamp].HashLeaf(LogPollerLogToEthLog(msgsInRoot[innerIdx]))
-		if err2 != nil {
-			return nil, err2
+		innerProof := innerTree.Prove(innerIdxs)
+		// Double check this verifies before sending.
+		res, err := r.commitStore.Verify(nil, hashes, innerProof.Hashes, ProofFlagsToBits(innerProof.SourceFlags), outerProof.Hashes, ProofFlagsToBits(outerProof.SourceFlags))
+		if err != nil {
+			lggr.Errorw("Unable to call verify", "seqNums", finalSeqNums, "indices", innerIdxs, "root", rep.RootOfRoots[:], "seqRange", rep.Intervals[onRampIdx], "onRampReport", rep.OnRamps[onRampIdx].Hex(), "onRampHave", r.onRamp.Hex(), "err", err)
+			return nil, err
 		}
-		hashes = append(hashes, hash)
+		// No timestamp, means failed to verify root.
+		if res.Cmp(big.NewInt(0)) == 0 {
+			ir := innerTree.Root()
+			or := outerTree.Root()
+			lggr.Errorf("Root does not verify for messages: %v (indices %v) our inner root %x our outer root %x contract outer root %x",
+				finalSeqNums, innerIdxs, ir[:], or[:], rep.RootOfRoots[:])
+			return nil, errors.New("root does not verify")
+		}
+		me = &MessageExecution{
+			encMsgs:               encMsgs,
+			innerProofs:           innerProof.Hashes,
+			innerProofSourceFlags: innerProof.SourceFlags,
+			outerProofs:           outerProof.Hashes,
+			outerProofSourceFlags: outerProof.SourceFlags,
+		}
 	}
-	innerProof := innerTree.Prove(innerIdxs)
-	// Double check this verifies before sending.
-	res, err := r.commitStore.Verify(nil, hashes, innerProof.Hashes, ProofFlagsToBits(innerProof.SourceFlags), outerProof.Hashes, ProofFlagsToBits(outerProof.SourceFlags))
-	if err != nil {
-		lggr.Errorw("Unable to call verify", "seqNums", finalSeqNums, "indices", innerIdxs, "root", rep.RootOfRoots[:], "seqRange", rep.Intervals[onRampIdx], "onRampReport", rep.OnRamps[onRampIdx].Hex(), "onRampHave", r.onRamp.Hex(), "err", err)
-		return nil, err
+	if isGE {
+		gasFeeUpdates := r.generateFeeUpdate(sourceGasPrice, tokensPerFeeCoin[linkToken])
+		if len(gasFeeUpdates) == 0 && len(finalSeqNums) == 0 {
+			return nil, errors.New("No report needed")
+		}
+		if len(finalSeqNums) != 0 {
+			return EncodeGEExecutionReport(finalSeqNums,
+				tokensPerFeeCoin,
+				me.encMsgs,
+				me.innerProofs,
+				me.innerProofSourceFlags,
+				me.outerProofs,
+				me.outerProofSourceFlags,
+				gasFeeUpdates,
+			)
+		}
+		lggr.Infow("Building execution report fee update only", "feeUpdates", gasFeeUpdates)
+		return EncodeGEExecutionReport(finalSeqNums, tokensPerFeeCoin, nil, nil, nil, nil, nil, gasFeeUpdates)
 	}
-	// No timestamp, means failed to verify root.
-	if res.Cmp(big.NewInt(0)) == 0 {
-		ir := innerTree.Root()
-		or := outerTree.Root()
-		lggr.Errorf("Root does not verify for messages: %v (indices %v) our inner root %x our outer root %x contract outer root %x",
-			finalSeqNums, innerIdxs, ir[:], or[:], rep.RootOfRoots[:])
-		return nil, errors.New("root does not verify")
-	}
-	er, err := EncodeExecutionReport(finalSeqNums, tokensPerFeeCoin, encMsgs, innerProof.Hashes, innerProof.SourceFlags, outerProof.Hashes, outerProof.SourceFlags, gasFeeUpdates)
-	if err != nil {
-		return nil, err
-	}
-	return er, nil
+	return EncodeTollExecutionReport(finalSeqNums, tokensPerFeeCoin, me.encMsgs,
+		me.innerProofs, me.innerProofSourceFlags, me.outerProofs, me.outerProofSourceFlags)
 }
 
 func median(vals []*big.Int) *big.Int {
@@ -650,7 +767,7 @@ func (r *ExecutionReportingPlugin) expireInflight(lggr logger.Logger) {
 		if time.Since(report.createdAt) > r.inflightCacheExpiry {
 			// Happy path: inflight report was successfully transmitted onchain, we remove it from inflight and onchain state reflects inflight.
 			// Sad path: inflight report reverts onchain, we remove it from inflight, onchain state does not reflect the chains so we retry.
-			lggr.Infow("Inflight report expired", "seqNums", report.report.SequenceNumbers)
+			lggr.Infow("Inflight report expired", "seqNums", report.seqNrs)
 		} else {
 			stillInFlight = append(stillInFlight, report)
 		}
@@ -658,36 +775,37 @@ func (r *ExecutionReportingPlugin) expireInflight(lggr logger.Logger) {
 	r.inFlight = stillInFlight
 }
 
-func (r *ExecutionReportingPlugin) addToInflight(lggr logger.Logger, er evm_2_evm_ge_offramp.CCIPExecutionReport) error {
+func (r *ExecutionReportingPlugin) addToInflight(lggr logger.Logger, seqNrs []uint64, encMsgs [][]byte) error {
 	r.inFlightMu.Lock()
 	defer r.inFlightMu.Unlock()
 	for _, report := range r.inFlight {
 		// TODO: Think about if this fails in reorgs
-		if (len(report.report.SequenceNumbers) > 0 && len(er.SequenceNumbers) > 0) && (report.report.SequenceNumbers[0] == er.SequenceNumbers[0]) {
+		if (len(report.seqNrs) > 0 && len(seqNrs) > 0) && (report.seqNrs[0] == seqNrs[0]) {
 			return errors.Errorf("report is already in flight")
 		}
 	}
 	// Otherwise not already in flight, add it.
 	lggr.Infow("Added report to inflight",
-		"seqNums", er.SequenceNumbers, "feeUpdates", er.FeeUpdates)
+		"seqNums", seqNrs)
 	r.inFlight = append(r.inFlight, InflightExecutionReport{
-		createdAt: time.Now(),
-		report:    er,
+		createdAt:   time.Now(),
+		seqNrs:      seqNrs,
+		encMessages: encMsgs,
 	})
 	return nil
 }
 
 func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context, timestamp types.ReportTimestamp, report types.Report) (bool, error) {
 	lggr := r.lggr.Named("ShouldAcceptFinalizedReport")
-	er, err := DecodeExecutionReport(report)
+	seqNrs, encMsgs, err := r.parseReport(report)
 	if err != nil {
 		lggr.Errorw("unable to decode report", "err", err)
 		return false, nil
 	}
-	if len(er.SequenceNumbers) > 0 {
-		lggr.Infof("Seq nums %v", er.SequenceNumbers)
+	if len(seqNrs) > 0 {
+		lggr.Infof("Seq nums %v", seqNrs)
 		// If the first message is executed already, this execution report is stale, and we do not accept it.
-		stale, err2 := r.isStaleReport(er.SequenceNumbers[0])
+		stale, err2 := r.isStaleReport(seqNrs[0])
 		if err2 != nil {
 			return !stale, err2
 		}
@@ -696,22 +814,31 @@ func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Conte
 		}
 	}
 	// Else just assume in flight
-	if err = r.addToInflight(lggr, *er); err != nil {
+	if err = r.addToInflight(lggr, seqNrs, encMsgs); err != nil {
 		return false, err
 	}
 	return true, nil
 }
 
+func (r *ExecutionReportingPlugin) parseReport(report []byte) ([]uint64, [][]byte, error) {
+	// TODO: Cleaner to separate these plugins?
+	_, isGE := r.offRamp.(*geOffRamp)
+	if isGE {
+		return MessagesFromGEExecutionReport(report)
+	}
+	return MessagesFromTollExecutionReport(report)
+}
+
 func (r *ExecutionReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context, timestamp types.ReportTimestamp, report types.Report) (bool, error) {
-	parsedReport, err := DecodeExecutionReport(report)
+	seqNrs, _, err := r.parseReport(report)
 	if err != nil {
 		return false, nil
 	}
 	// If report is not stale we transmit.
 	// When the executeTransmitter enqueues the tx for tx manager,
 	// we mark it as execution_sent, removing it from the set of inflight messages.
-	if len(parsedReport.SequenceNumbers) > 0 {
-		stale, err := r.isStaleReport(parsedReport.SequenceNumbers[0])
+	if len(seqNrs) > 0 {
+		stale, err := r.isStaleReport(seqNrs[0])
 		return !stale, err
 	}
 	// TODO: how to check for staleness on a purely fee update report?

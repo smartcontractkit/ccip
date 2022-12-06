@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {CCIP} from "../../models/Models.sol";
+import {Common} from "../../models/Common.sol";
+import {GE} from "../../models/GE.sol";
 
 interface GasFeeCacheInterface {
   error ChainNotSupported(uint256 chain);
@@ -16,7 +17,7 @@ interface GasFeeCacheInterface {
 
   function removeFeeUpdater(address feeUpdater) external;
 
-  function updateFees(CCIP.FeeUpdate[] memory feeUpdates) external;
+  function updateFees(GE.FeeUpdate[] memory feeUpdates) external;
 
   function getFee(uint256 destChainId) external view returns (uint256 fee);
 }
