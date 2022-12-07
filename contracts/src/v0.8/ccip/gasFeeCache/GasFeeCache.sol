@@ -43,7 +43,7 @@ contract GasFeeCache is GasFeeCacheInterface, OwnerIsCreator {
     }
   }
 
-  function getFee(uint256 destChainId) external view returns (uint256 fee) {
+  function getFee(uint64 destChainId) external view returns (uint256 fee) {
     fee = s_linkPerUnitGasByDestChainId[destChainId];
     // Must have an initial price.
     if (fee == 0) revert ChainNotSupported(destChainId);

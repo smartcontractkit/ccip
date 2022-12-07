@@ -9,7 +9,7 @@ import (
 )
 
 var Alpha_AvaxFuji = rhea.EVMChainConfig{
-	ChainId: big.NewInt(43113),
+	ChainId: 43113,
 	GasSettings: rhea.EVMGasSettings{
 		EIP1559: false,
 	},
@@ -31,7 +31,7 @@ var Alpha_AvaxFuji = rhea.EVMChainConfig{
 }
 
 var Alpha_OptimismGoerli = rhea.EVMChainConfig{
-	ChainId: big.NewInt(420),
+	ChainId: 420,
 	GasSettings: rhea.EVMGasSettings{
 		EIP1559: false,
 	},

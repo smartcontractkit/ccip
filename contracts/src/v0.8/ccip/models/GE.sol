@@ -7,7 +7,7 @@ import {Internal} from "./Internal.sol";
 // GE message type specific structs.
 library GE {
   struct FeeUpdate {
-    uint256 chainId;
+    uint64 chainId;
     uint256 linkPerUnitGas;
   }
 
@@ -25,7 +25,7 @@ library GE {
 
   // @notice The cross chain message that gets committed to EVM GE chains
   struct EVM2EVMGEMessage {
-    uint256 sourceChainId;
+    uint64 sourceChainId;
     uint64 sequenceNumber;
     uint256 feeTokenAmount;
     address sender;

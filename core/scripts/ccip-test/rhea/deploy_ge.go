@@ -64,7 +64,7 @@ func prettyPrint(i interface{}) string {
 	return "\n" + string(s)
 }
 
-func deploySourceContracts(t *testing.T, source *EvmDeploymentConfig, destChainId *big.Int) {
+func deploySourceContracts(t *testing.T, source *EvmDeploymentConfig, destChainId uint64) {
 	// Updates source.OnRamp if any new contracts are deployed
 	deployOnRamp(t, source, destChainId)
 
@@ -72,10 +72,10 @@ func deploySourceContracts(t *testing.T, source *EvmDeploymentConfig, destChainI
 	if source.DeploySettings.DeployRamp || source.DeploySettings.DeployTokenPools {
 		setOnRampOnTokenPools(t, source)
 	}
-	source.Logger.Infof("%s contracts fully deployed as source chain", helpers.ChainName(source.ChainConfig.ChainId.Int64()))
+	source.Logger.Infof("%s contracts fully deployed as source chain", helpers.ChainName(int64(source.ChainConfig.ChainId)))
 }
 
-func deployDestinationContracts(t *testing.T, client *EvmDeploymentConfig, sourceChainId *big.Int, onRamp common.Address, supportedTokens map[Token]EVMBridgedToken) {
+func deployDestinationContracts(t *testing.T, client *EvmDeploymentConfig, sourceChainId uint64, onRamp common.Address, supportedTokens map[Token]EVMBridgedToken) {
 	// Updates destClient.LaneConfig.CommitStore if any new contracts are deployed
 	deployCommitStore(t, client, sourceChainId, onRamp)
 
@@ -95,10 +95,10 @@ func deployDestinationContracts(t *testing.T, client *EvmDeploymentConfig, sourc
 
 	// Updates destClient.ReceiverDapp if any new contracts are deployed
 	deployReceiverDapp(t, client)
-	client.Logger.Infof("%s contracts fully deployed as destination chain", helpers.ChainName(client.ChainConfig.ChainId.Int64()))
+	client.Logger.Infof("%s contracts fully deployed as destination chain", helpers.ChainName(int64(client.ChainConfig.ChainId)))
 }
 
-func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId *big.Int) *evm_2_evm_ge_onramp.EVM2EVMGEOnRamp {
+func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId uint64) *evm_2_evm_ge_onramp.EVM2EVMGEOnRamp {
 	if !client.DeploySettings.DeployRamp {
 		client.Logger.Infof("Skipping OnRamp deployment, using onRamp on %s", client.LaneConfig.OnRamp)
 		onRamp, err := evm_2_evm_ge_onramp.NewEVM2EVMGEOnRamp(client.LaneConfig.OnRamp, client.Client)
@@ -148,7 +148,7 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId *big.In
 
 	onRamp, err := evm_2_evm_ge_onramp.NewEVM2EVMGEOnRamp(onRampAddress, client.Client)
 	require.NoError(t, err)
-	client.Logger.Infof(fmt.Sprintf("Onramp deployed on %s in tx %s", onRampAddress.String(), helpers.ExplorerLink(client.ChainConfig.ChainId.Int64(), tx.Hash())))
+	client.Logger.Infof(fmt.Sprintf("Onramp deployed on %s in tx %s", onRampAddress.String(), helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash())))
 	client.LaneConfig.OnRamp = onRampAddress
 
 	setOnRampOnRouter(t, client, destChainId)
@@ -161,7 +161,7 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId *big.In
 	return onRamp
 }
 
-func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainId *big.Int, sourceTokens map[Token]EVMBridgedToken, onRamp common.Address) *evm_2_evm_ge_offramp.EVM2EVMGEOffRamp {
+func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainId uint64, sourceTokens map[Token]EVMBridgedToken, onRamp common.Address) *evm_2_evm_ge_offramp.EVM2EVMGEOffRamp {
 	if !client.DeploySettings.DeployRamp {
 		client.Logger.Infof("Skipping OffRamp deployment, using offRamp on %s", client.LaneConfig.OnRamp)
 		offRamp, err := evm_2_evm_ge_offramp.NewEVM2EVMGEOffRamp(client.LaneConfig.OffRamp, client.Client)
@@ -210,7 +210,7 @@ func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainId *big
 	require.NoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 
-	client.Logger.Infof("OffRamp contract deployed on %s in tx: %s", offRampAddress.Hex(), helpers.ExplorerLink(client.ChainConfig.ChainId.Int64(), tx.Hash()))
+	client.Logger.Infof("OffRamp contract deployed on %s in tx: %s", offRampAddress.Hex(), helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash()))
 	client.LaneConfig.OffRamp = offRampAddress
 	offRamp, err := evm_2_evm_ge_offramp.NewEVM2EVMGEOffRamp(client.LaneConfig.OffRamp, client.Client)
 	require.NoError(t, err)
@@ -220,12 +220,12 @@ func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainId *big
 	require.NoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 
-	client.Logger.Infof(fmt.Sprintf("Offramp configured for alraedy deployed router  in tx %s", helpers.ExplorerLink(client.ChainConfig.ChainId.Int64(), tx.Hash())))
+	client.Logger.Infof(fmt.Sprintf("Offramp configured for alraedy deployed router  in tx %s", helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash())))
 
 	return offRamp
 }
 
-func deployCommitStore(t *testing.T, client *EvmDeploymentConfig, sourceChainId *big.Int, onRamp common.Address) *commit_store.CommitStore {
+func deployCommitStore(t *testing.T, client *EvmDeploymentConfig, sourceChainId uint64, onRamp common.Address) *commit_store.CommitStore {
 	if !client.DeploySettings.DeployCommitStore {
 		client.Logger.Infof("Skipping CommitStore deployment, using CommitStore on %s", client.LaneConfig.CommitStore)
 		commitStore, err := commit_store.NewCommitStore(client.LaneConfig.CommitStore, client.Client)
@@ -247,7 +247,7 @@ func deployCommitStore(t *testing.T, client *EvmDeploymentConfig, sourceChainId 
 	)
 	require.NoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
-	client.Logger.Infof("CommitStore deployed on %s in tx: %s", commitStoreAddress.Hex(), helpers.ExplorerLink(client.ChainConfig.ChainId.Int64(), tx.Hash()))
+	client.Logger.Infof("CommitStore deployed on %s in tx: %s", commitStoreAddress.Hex(), helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash()))
 	client.LaneConfig.CommitStore = commitStoreAddress
 
 	commitStore, err := commit_store.NewCommitStore(commitStoreAddress, client.Client)
@@ -260,7 +260,7 @@ func deployReceiverDapp(t *testing.T, client *EvmDeploymentConfig) *receiver_dap
 	receiverDappAddress, tx, _, err := receiver_dapp.DeployReceiverDapp(client.Owner, client.Client, client.ChainConfig.Router)
 	require.NoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
-	client.Logger.Infof("Offramp receiver dapp deployed on %s in tx: %s", receiverDappAddress.Hex(), helpers.ExplorerLink(client.ChainConfig.ChainId.Int64(), tx.Hash()))
+	client.Logger.Infof("Offramp receiver dapp deployed on %s in tx: %s", receiverDappAddress.Hex(), helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash()))
 	client.LaneConfig.ReceiverDapp = receiverDappAddress
 
 	receiverDapp, err := receiver_dapp.NewReceiverDapp(receiverDappAddress, client.Client)
@@ -277,7 +277,7 @@ func DeployPingPongDapps(t *testing.T, sourceClient *EvmDeploymentConfig, destCl
 		require.NoError(t, err)
 
 		shared.WaitForMined(t, sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
-		sourceClient.Logger.Infof("Ping pong deployed on %s in tx: %s", pingPongDappAddress.Hex(), helpers.ExplorerLink(sourceClient.ChainConfig.ChainId.Int64(), tx.Hash()))
+		sourceClient.Logger.Infof("Ping pong deployed on %s in tx: %s", pingPongDappAddress.Hex(), helpers.ExplorerLink(int64(sourceClient.ChainConfig.ChainId), tx.Hash()))
 
 		sourceClient.LaneConfig.PingPongDapp = pingPongDappAddress
 	}
@@ -289,7 +289,7 @@ func DeployPingPongDapps(t *testing.T, sourceClient *EvmDeploymentConfig, destCl
 		require.NoError(t, err)
 
 		shared.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
-		destClient.Logger.Infof("Ping pong deployed on %s in tx: %s", pingPongDappAddress.Hex(), helpers.ExplorerLink(destClient.ChainConfig.ChainId.Int64(), tx.Hash()))
+		destClient.Logger.Infof("Ping pong deployed on %s in tx: %s", pingPongDappAddress.Hex(), helpers.ExplorerLink(int64(destClient.ChainConfig.ChainId), tx.Hash()))
 
 		destClient.LaneConfig.PingPongDapp = pingPongDappAddress
 	}
@@ -301,7 +301,7 @@ func DeployPingPongDapps(t *testing.T, sourceClient *EvmDeploymentConfig, destCl
 		tx, err := pingDapp.SetCounterpart(sourceClient.Owner, destClient.ChainConfig.ChainId, destClient.LaneConfig.PingPongDapp)
 		require.NoError(t, err)
 		shared.WaitForMined(t, sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
-		sourceClient.Logger.Infof("Ping pong dapp configured in tx: %s", helpers.ExplorerLink(sourceClient.ChainConfig.ChainId.Int64(), tx.Hash()))
+		sourceClient.Logger.Infof("Ping pong dapp configured in tx: %s", helpers.ExplorerLink(int64(sourceClient.ChainConfig.ChainId), tx.Hash()))
 
 		pongDapp, err := ping_pong_demo.NewPingPongDemo(destClient.LaneConfig.PingPongDapp, destClient.Client)
 		require.NoError(t, err)
@@ -309,7 +309,7 @@ func DeployPingPongDapps(t *testing.T, sourceClient *EvmDeploymentConfig, destCl
 		tx, err = pongDapp.SetCounterpart(destClient.Owner, sourceClient.ChainConfig.ChainId, sourceClient.LaneConfig.PingPongDapp)
 		require.NoError(t, err)
 		shared.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
-		sourceClient.Logger.Infof("Ping pong dapp configured in tx: %s", helpers.ExplorerLink(sourceClient.ChainConfig.ChainId.Int64(), tx.Hash()))
+		sourceClient.Logger.Infof("Ping pong dapp configured in tx: %s", helpers.ExplorerLink(int64(sourceClient.ChainConfig.ChainId), tx.Hash()))
 	} else {
 		sourceClient.Logger.Infof("Skipping ping pong deployment")
 	}
@@ -332,7 +332,7 @@ func deployGovernanceDapps(t *testing.T, sourceClient *EvmDeploymentConfig, dest
 		require.NoError(t, err)
 
 		shared.WaitForMined(t, sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
-		sourceClient.Logger.Infof("GovernanceDapp deployed on %s in tx: %s", governanceDappAddress.Hex(), helpers.ExplorerLink(sourceClient.ChainConfig.ChainId.Int64(), tx.Hash()))
+		sourceClient.Logger.Infof("GovernanceDapp deployed on %s in tx: %s", governanceDappAddress.Hex(), helpers.ExplorerLink(int64(sourceClient.ChainConfig.ChainId), tx.Hash()))
 
 		sourceClient.LaneConfig.GovernanceDapp = governanceDappAddress
 	}
@@ -348,7 +348,7 @@ func deployGovernanceDapps(t *testing.T, sourceClient *EvmDeploymentConfig, dest
 		require.NoError(t, err)
 
 		shared.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
-		destClient.Logger.Infof("GovernanceDapp deployed on %s in tx: %s", governanceDappAddress.Hex(), helpers.ExplorerLink(destClient.ChainConfig.ChainId.Int64(), tx.Hash()))
+		destClient.Logger.Infof("GovernanceDapp deployed on %s in tx: %s", governanceDappAddress.Hex(), helpers.ExplorerLink(int64(destClient.ChainConfig.ChainId), tx.Hash()))
 
 		destClient.LaneConfig.GovernanceDapp = governanceDappAddress
 	}
@@ -365,6 +365,6 @@ func deployGovernanceDapps(t *testing.T, sourceClient *EvmDeploymentConfig, dest
 		tx, err := governanceDapp.AddClone(sourceClient.Owner, governanceClone)
 		require.NoError(t, err)
 		shared.WaitForMined(t, sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
-		sourceClient.Logger.Infof("GovernanceDapp configured in tx: %s", helpers.ExplorerLink(sourceClient.ChainConfig.ChainId.Int64(), tx.Hash()))
+		sourceClient.Logger.Infof("GovernanceDapp configured in tx: %s", helpers.ExplorerLink(int64(sourceClient.ChainConfig.ChainId), tx.Hash()))
 	}
 }

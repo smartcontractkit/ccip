@@ -7,9 +7,9 @@ import {EVM2EVMGEOnRampInterface} from "../onRamp/EVM2EVMGEOnRampInterface.sol";
 import {Any2EVMOffRampRouterInterface} from "../offRamp/Any2EVMOffRampRouterInterface.sol";
 
 interface GERouterInterface is BaseOnRampRouterInterface, Any2EVMOffRampRouterInterface {
-  error OnRampAlreadySet(uint256 chainId, EVM2EVMGEOnRampInterface onRamp);
+  error OnRampAlreadySet(uint64 chainId, EVM2EVMGEOnRampInterface onRamp);
 
-  event OnRampSet(uint256 indexed chainId, EVM2EVMGEOnRampInterface indexed onRamp);
+  event OnRampSet(uint64 indexed chainId, EVM2EVMGEOnRampInterface indexed onRamp);
 
   /**
    * @notice Request a message to be sent to the destination chain
@@ -17,11 +17,9 @@ interface GERouterInterface is BaseOnRampRouterInterface, Any2EVMOffRampRouterIn
    * @param message The message payload
    * @return The sequence number assigned to message
    */
-  function ccipSend(uint256 destinationChainId, GEConsumer.EVM2AnyGEMessage calldata message)
-    external
-    returns (bytes32);
+  function ccipSend(uint64 destinationChainId, GEConsumer.EVM2AnyGEMessage calldata message) external returns (bytes32);
 
-  function getFee(uint256 destinationChainId, GEConsumer.EVM2AnyGEMessage memory message)
+  function getFee(uint64 destinationChainId, GEConsumer.EVM2AnyGEMessage memory message)
     external
     view
     returns (uint256 fee);
@@ -32,12 +30,12 @@ interface GERouterInterface is BaseOnRampRouterInterface, Any2EVMOffRampRouterIn
    * @param chainId destination chain ID
    * @param onRamp OnRamp to use for that destination chain
    */
-  function setOnRamp(uint256 chainId, EVM2EVMGEOnRampInterface onRamp) external;
+  function setOnRamp(uint64 chainId, EVM2EVMGEOnRampInterface onRamp) external;
 
   /**
    * @notice Gets the current OnRamp for the specified chain ID
    * @param chainId Chain ID to get ramp details for
    * @return onRamp
    */
-  function getOnRamp(uint256 chainId) external view returns (EVM2EVMGEOnRampInterface);
+  function getOnRamp(uint64 chainId) external view returns (EVM2EVMGEOnRampInterface);
 }

@@ -6,7 +6,7 @@ import {Internal} from "./Internal.sol";
 library Toll {
   // @notice The cross chain message that gets committed to EVM toll chains
   struct EVM2EVMTollMessage {
-    uint256 sourceChainId;
+    uint64 sourceChainId;
     uint64 sequenceNumber;
     address sender;
     address receiver;

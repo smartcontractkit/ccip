@@ -108,7 +108,7 @@ func DecodeCCIPMessage(b []byte) (*evm_2_evm_toll_onramp.TollEVM2EVMTollMessage,
 	}
 	// Note must use unnamed type here
 	receivedCp, ok := unpacked[0].(struct {
-		SourceChainId    *big.Int       `json:"sourceChainId"`
+		SourceChainId    uint64         `json:"sourceChainId"`
 		SequenceNumber   uint64         `json:"sequenceNumber"`
 		Sender           common.Address `json:"sender"`
 		Receiver         common.Address `json:"receiver"`
@@ -157,7 +157,7 @@ func MakeTollCCIPMsgArgs() abi.Arguments {
 	var tuples = []abi.ArgumentMarshaling{
 		{
 			Name: "sourceChainId",
-			Type: "uint256",
+			Type: "uint64",
 		},
 		{
 			Name: "sequenceNumber",
@@ -292,7 +292,7 @@ func makeExecutionReportArgs() abi.Arguments {
 					Components: []abi.ArgumentMarshaling{
 						{
 							Name: "chainId",
-							Type: "uint256",
+							Type: "uint64",
 						},
 						{
 							Name: "linkPerUnitGas",

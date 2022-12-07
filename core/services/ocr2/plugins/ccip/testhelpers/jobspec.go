@@ -2,7 +2,6 @@ package testhelpers
 
 import (
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -35,8 +34,8 @@ type CCIPJobSpecParams struct {
 	CommitStore              common.Address
 	SourceChainName          string
 	DestChainName            string
-	SourceChainId            *big.Int
-	DestChainId              *big.Int
+	SourceChainId            uint64
+	DestChainId              uint64
 	TokensPerFeeCoinPipeline string
 	PollPeriod               time.Duration
 	SourceStartBlock         uint64
@@ -51,10 +50,10 @@ func (params CCIPJobSpecParams) Validate() error {
 	if params.CommitStore == common.HexToAddress("0x0") {
 		return fmt.Errorf("must set commit store address")
 	}
-	if params.SourceChainId.Cmp(big.NewInt(0)) <= 0 {
+	if params.SourceChainId == 0 {
 		return fmt.Errorf("invalid source chain id")
 	}
-	if params.DestChainId.Cmp(big.NewInt(0)) <= 0 {
+	if params.DestChainId == 0 {
 		return fmt.Errorf("invalid destination chain id")
 	}
 	return nil

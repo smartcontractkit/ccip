@@ -10,9 +10,9 @@ import {Common} from "../models/Common.sol";
 
 contract BaseOnRamp is BaseOnRampInterface, HealthChecker, AllowList, AggregateRateLimiter {
   // Chain ID of the source chain (where this contract is deployed)
-  uint256 public immutable i_chainId;
+  uint64 public immutable i_chainId;
   // Chain ID of the destination chain (where this contract sends messages)
-  uint256 public immutable i_destinationChainId;
+  uint64 public immutable i_destinationChainId;
 
   // The last used sequence number. This is zero in the case where no
   // messages has been sent yet. 0 is not a valid sequence number for any
@@ -29,8 +29,8 @@ contract BaseOnRamp is BaseOnRampInterface, HealthChecker, AllowList, AggregateR
   IERC20[] private s_sourceTokenList;
 
   constructor(
-    uint256 chainId,
-    uint256 destinationChainId,
+    uint64 chainId,
+    uint64 destinationChainId,
     IERC20[] memory tokens,
     PoolInterface[] memory pools,
     address[] memory allowlist,

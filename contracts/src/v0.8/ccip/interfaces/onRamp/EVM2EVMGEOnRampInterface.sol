@@ -32,7 +32,7 @@ interface EVM2EVMGEOnRampInterface is BaseOnRampInterface {
     // Gas fee cache contract
     address gasFeeCache;
     // Destination chain ID
-    uint256 destChainId;
+    uint64 destChainId;
   }
 
   /**

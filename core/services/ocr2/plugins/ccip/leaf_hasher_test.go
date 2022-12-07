@@ -14,7 +14,7 @@ import (
 )
 
 func TestTollHasher(t *testing.T) {
-	sourceChainId, destChainId := big.NewInt(1), big.NewInt(4)
+	sourceChainId, destChainId := uint64(1), uint64(4)
 	onRampAddress := common.HexToAddress("0x5550000000000000000000000000000000000001")
 
 	hashingCtx := hasher.NewKeccakCtx()
@@ -71,7 +71,7 @@ func generateTollLog(t *testing.T, message evm_2_evm_toll_onramp.TollEVM2EVMToll
 }
 
 func TestMetaDataHash(t *testing.T) {
-	sourceChainId, destChainId := big.NewInt(1), big.NewInt(4)
+	sourceChainId, destChainId := uint64(1), uint64(4)
 	onRampAddress := common.HexToAddress("0x5550000000000000000000000000000000000001")
 	ctx := hasher.NewKeccakCtx()
 	hash := getMetaDataHash(ctx, ctx.Hash([]byte("EVM2EVMSubscriptionMessagePlus")), sourceChainId, onRampAddress, destChainId)

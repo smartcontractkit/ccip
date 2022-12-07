@@ -160,7 +160,7 @@ type SourceCCIPModule struct {
 	Sender             common.Address
 	TransferAmount     []*big.Int
 	TollFeeAmount      *big.Int
-	DestinationChainId *big.Int
+	DestinationChainId uint64
 	TollOnRampRouter   *ccip.TollOnRampRouter
 	TollOnRamp         *ccip.TollOnRamp
 	TollSender         *ccip.TollSender
@@ -173,7 +173,7 @@ func (sourceCCIP *SourceCCIPModule) DeploySenderApp(destCCIP DestCCIPModule) {
 	sourceCCIP.TollSender, err = sourceCCIP.Common.Deployer.DeployTollSenderDapp(
 		sourceCCIP.TollOnRampRouter.EthAddress,
 		destCCIP.ReceiverDapp.EthAddress,
-		destCCIP.Common.ChainClient.GetChainID())
+		destCCIP.Common.ChainClient.GetChainID().Uint64())
 	Expect(err).ShouldNot(HaveOccurred(), "Toll Sender contract should be deployed successfully")
 	err = sourceCCIP.Common.ChainClient.WaitForEvents()
 	Expect(err).ShouldNot(HaveOccurred(), "Error waiting for deployments")
@@ -210,7 +210,7 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts() {
 
 	// onRamp
 	sourceCCIP.TollOnRamp, err = contractDeployer.DeployTollOnRamp(
-		sourceCCIP.Common.ChainClient.GetChainID(), sourceCCIP.DestinationChainId,
+		sourceCCIP.Common.ChainClient.GetChainID().Uint64(), sourceCCIP.DestinationChainId,
 		tokens, pools, []common.Address{}, sourceCCIP.Common.AFN.EthAddress,
 		sourceCCIP.TollOnRampRouter.EthAddress, sourceCCIP.Common.RateLimiterConfig)
 	Expect(err).ShouldNot(HaveOccurred(), "Error on OnRamp deployment")
@@ -347,7 +347,7 @@ func (sourceCCIP *SourceCCIPModule) SendTollRequest(receiver common.Address, tok
 	return sendTx.Hash().Hex()
 }
 
-func DefaultSourceCCIPModule(chainClient blockchain.EVMClient, destChain *big.Int, transferamount []*big.Int) *SourceCCIPModule {
+func DefaultSourceCCIPModule(chainClient blockchain.EVMClient, destChain uint64, transferamount []*big.Int) *SourceCCIPModule {
 	return &SourceCCIPModule{
 		Common:             DefaultCCIPModule(chainClient),
 		TransferAmount:     transferamount,
@@ -375,8 +375,8 @@ func (destCCIP *DestCCIPModule) DeployContracts(sourceCCIP SourceCCIPModule) {
 
 	// commitStore responsible for validating the transfer message
 	destCCIP.CommitStore, err = contractDeployer.DeployCommitStore(
-		destCCIP.SourceChainId,
-		destCCIP.Common.ChainClient.GetChainID(),
+		destCCIP.SourceChainId.Uint64(),
+		destCCIP.Common.ChainClient.GetChainID().Uint64(),
 		destCCIP.Common.AFN.EthAddress,
 		commit_store.CommitStoreInterfaceCommitStoreConfig{
 			OnRamps:          []common.Address{sourceCCIP.TollOnRamp.EthAddress},
@@ -409,7 +409,7 @@ func (destCCIP *DestCCIPModule) DeployContracts(sourceCCIP SourceCCIPModule) {
 
 	// Toll
 	// offRamp
-	destCCIP.TollOffRamp, err = contractDeployer.DeployTollOffRamp(destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID(),
+	destCCIP.TollOffRamp, err = contractDeployer.DeployTollOffRamp(destCCIP.SourceChainId.Uint64(), destCCIP.Common.ChainClient.GetChainID().Uint64(),
 		destCCIP.CommitStore.EthAddress, sourceCCIP.TollOnRamp.EthAddress, destCCIP.Common.AFN.EthAddress,
 		sourceTokens, pools, destCCIP.Common.RateLimiterConfig)
 	Expect(err).ShouldNot(HaveOccurred(), "Deploying TollOffRamp shouldn't fail")
@@ -694,8 +694,8 @@ func CreateOCRJobsForCCIP(
 		CommitStore:        commitStore,
 		SourceChainName:    sourceChainClient.GetNetworkName(),
 		DestChainName:      destChainClient.GetNetworkName(),
-		SourceChainId:      sourceChainClient.GetChainID(),
-		DestChainId:        destChainClient.GetChainID(),
+		SourceChainId:      sourceChainClient.GetChainID().Uint64(),
+		DestChainId:        destChainClient.GetChainID().Uint64(),
 		PollPeriod:         time.Second,
 		SourceStartBlock:   currentBlockOnSource,
 		DestStartBlock:     currentBlockOnDest,
@@ -1016,7 +1016,7 @@ func CCIPDefaultTestSetUp(
 	transferAmounts := []*big.Int{big.NewInt(1e8)}
 
 	// deploy all source contracts
-	sourceCCIP := DefaultSourceCCIPModule(sourceChainClient, destChainClient.GetChainID(), transferAmounts)
+	sourceCCIP := DefaultSourceCCIPModule(sourceChainClient, destChainClient.GetChainID().Uint64(), transferAmounts)
 	sourceCCIP.DeployContracts()
 
 	// deploy all destination contracts

@@ -18,9 +18,9 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, OffRampTokenPoolReg
   using Address for address;
 
   // Chain ID of the source chain
-  uint256 internal immutable i_sourceChainId;
+  uint64 internal immutable i_sourceChainId;
   // Chain ID of this chain
-  uint256 internal immutable i_chainId;
+  uint64 internal immutable i_chainId;
   // OnRamp address on the source chain
   address internal immutable i_onRampAddress;
 
@@ -35,8 +35,8 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, OffRampTokenPoolReg
   mapping(uint64 => Internal.MessageExecutionState) internal s_executedMessages;
 
   constructor(
-    uint256 sourceChainId,
-    uint256 chainId,
+    uint64 sourceChainId,
+    uint64 chainId,
     address onRampAddress,
     CommitStoreInterface commitStore,
     AFNInterface afn,
@@ -182,7 +182,7 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, OffRampTokenPoolReg
     s_commitStore = commitStore;
   }
 
-  function getChainIDs() external view returns (uint256 sourceChainId, uint256 chainId) {
+  function getChainIDs() external view returns (uint64 sourceChainId, uint64 chainId) {
     sourceChainId = i_sourceChainId;
     chainId = i_chainId;
   }

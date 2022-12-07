@@ -38,7 +38,7 @@ contract PingPongDappSetup is EVM2EVMGEOnRampSetup {
 
 /// @notice #startPingPong
 contract PingPong_startPingPong is PingPongDappSetup {
-  event ConfigPropagated(uint256 chainId, address contractAddress);
+  event ConfigPropagated(uint64 chainId, address contractAddress);
 
   // Success
   function testSuccess() public {

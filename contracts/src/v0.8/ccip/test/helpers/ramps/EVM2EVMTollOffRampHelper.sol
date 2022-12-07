@@ -5,8 +5,8 @@ import "../../../offRamp/toll/EVM2EVMTollOffRamp.sol";
 
 contract EVM2EVMTollOffRampHelper is EVM2EVMTollOffRamp {
   constructor(
-    uint256 sourceChainId,
-    uint256 chainId,
+    uint64 sourceChainId,
+    uint64 chainId,
     OffRampConfig memory offRampConfig,
     address onRampAddress,
     CommitStoreInterface commitStore,

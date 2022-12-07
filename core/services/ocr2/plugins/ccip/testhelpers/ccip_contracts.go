@@ -65,7 +65,7 @@ type MaybeRevertReceiver struct {
 
 type CCIPContracts struct {
 	t                                  *testing.T
-	SourceChainID, DestChainID         *big.Int
+	SourceChainID, DestChainID         uint64
 	SourceUser, DestUser               *bind.TransactOpts
 	SourceChain, DestChain             *backends.SimulatedBackend
 	SourcePool, DestPool               *native_token_pool.NativeTokenPool
@@ -402,7 +402,7 @@ func MustEncodeAddress(t *testing.T, address common.Address) []byte {
 	return bts
 }
 
-func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID *big.Int) CCIPContracts {
+func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPContracts {
 	sourceChain, sourceUser := SetupChain(t)
 	destChain, destUser := SetupChain(t)
 

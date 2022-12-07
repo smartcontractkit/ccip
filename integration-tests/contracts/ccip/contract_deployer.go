@@ -4,7 +4,6 @@ import (
 	"crypto/ed25519"
 	"encoding/hex"
 	"fmt"
-	"math/big"
 	"strings"
 	"time"
 
@@ -90,7 +89,7 @@ func (e *CCIPContractsDeployer) DeployAFNContract() (*AFN, error) {
 }
 
 func (e *CCIPContractsDeployer) DeployCommitStore(
-	sourceChainId, destChainId *big.Int,
+	sourceChainId, destChainId uint64,
 	afn common.Address,
 	bConfig commit_store.CommitStoreInterfaceCommitStoreConfig,
 ) (
@@ -128,7 +127,7 @@ func (e *CCIPContractsDeployer) DeploySimpleMessageReceiver() (
 }
 
 func (e *CCIPContractsDeployer) DeployTollOffRamp(
-	sourceChainId, destChainId *big.Int,
+	sourceChainId, destChainId uint64,
 	commitStore, onRamp, afn common.Address,
 	sourceToken, pools []common.Address,
 	opts RateLimiterConfig) (
@@ -202,7 +201,7 @@ func (e *CCIPContractsDeployer) DeployReceiverDapp(toRevert bool) (
 
 func (e *CCIPContractsDeployer) DeployTollSenderDapp(
 	onRampRouter, receiver common.Address,
-	destChainId *big.Int,
+	destChainId uint64,
 ) (
 	*TollSender,
 	error,
@@ -241,7 +240,7 @@ func (e *CCIPContractsDeployer) DeployTollOnRampRouter() (
 }
 
 func (e *CCIPContractsDeployer) DeployTollOnRamp(
-	chainId, destChainId *big.Int,
+	chainId, destChainId uint64,
 	tokens, pools, allowList []common.Address,
 	afn, router common.Address,
 	opts RateLimiterConfig,

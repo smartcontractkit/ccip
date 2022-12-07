@@ -52,8 +52,8 @@ contract StructFactory {
   uint256 internal constant WEIGHT_40 = 40;
 
   // message info
-  uint256 internal constant SOURCE_CHAIN_ID = 1;
-  uint256 internal constant DEST_CHAIN_ID = 2;
+  uint64 internal constant SOURCE_CHAIN_ID = 1;
+  uint64 internal constant DEST_CHAIN_ID = 2;
   uint256 internal constant GAS_LIMIT = 100_000;
 
   // timing

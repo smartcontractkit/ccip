@@ -9,7 +9,7 @@ library Common {
   // always map to the same receiving interface? I'm not so sure... refund details for example
   // might be different
   struct Any2EVMMessage {
-    uint256 sourceChainId;
+    uint64 sourceChainId;
     bytes sender;
     bytes data;
     Common.EVMTokenAndAmount[] destTokensAndAmounts;

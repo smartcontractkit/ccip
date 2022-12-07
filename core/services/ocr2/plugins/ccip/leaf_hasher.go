@@ -33,7 +33,7 @@ type TollLeafHasher struct {
 
 var _ LeafHasher[[32]byte] = &TollLeafHasher{}
 
-func NewTollLeafHasher(sourceChainId *big.Int, destChainId *big.Int, onRampId common.Address, ctx hasher.Ctx[[32]byte]) *TollLeafHasher {
+func NewTollLeafHasher(sourceChainId uint64, destChainId uint64, onRampId common.Address, ctx hasher.Ctx[[32]byte]) *TollLeafHasher {
 	tollABI, _ := abi.JSON(strings.NewReader(evm_2_evm_toll_onramp.EVM2EVMTollOnRampABI))
 	return &TollLeafHasher{
 		tollABI:      tollABI,
@@ -86,9 +86,9 @@ func (t *TollLeafHasher) ParseEVM2EVMTollLog(log types.Log) (*evm_2_evm_toll_onr
 	return event, err
 }
 
-func getMetaDataHash[H hasher.Hash](ctx hasher.Ctx[H], prefix [32]byte, sourceChainId *big.Int, onRampId common.Address, destChainId *big.Int) H {
+func getMetaDataHash[H hasher.Hash](ctx hasher.Ctx[H], prefix [32]byte, sourceChainId uint64, onRampId common.Address, destChainId uint64) H {
 	paddedOnRamp := onRampId.Hash()
-	return ctx.Hash(utils.ConcatBytes(prefix[:], math.U256Bytes(sourceChainId), math.U256Bytes(destChainId), paddedOnRamp[:]))
+	return ctx.Hash(utils.ConcatBytes(prefix[:], math.U256Bytes(big.NewInt(0).SetUint64(sourceChainId)), math.U256Bytes(big.NewInt(0).SetUint64(destChainId)), paddedOnRamp[:]))
 }
 
 func LogPollerLogToEthLog(log logpoller.Log) types.Log {
@@ -104,7 +104,7 @@ type GELeafHasher struct {
 	ctx          hasher.Ctx[[32]byte]
 }
 
-func NewGELeafHasher(sourceChainId *big.Int, destChainId *big.Int, onRampId common.Address, ctx hasher.Ctx[[32]byte]) *GELeafHasher {
+func NewGELeafHasher(sourceChainId uint64, destChainId uint64, onRampId common.Address, ctx hasher.Ctx[[32]byte]) *GELeafHasher {
 	geABI, _ := abi.JSON(strings.NewReader(evm_2_evm_ge_onramp.EVM2EVMGEOnRampABI))
 	return &GELeafHasher{
 		geABI:        geABI,

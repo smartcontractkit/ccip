@@ -5,8 +5,8 @@ import "../../../offRamp/ge/EVM2EVMGEOffRamp.sol";
 
 contract EVM2EVMGEOffRampHelper is EVM2EVMGEOffRamp {
   constructor(
-    uint256 sourceChainId,
-    uint256 chainId,
+    uint64 sourceChainId,
+    uint64 chainId,
     GEOffRampConfig memory offRampConfig,
     address onRampAddress,
     CommitStoreInterface commitStore,

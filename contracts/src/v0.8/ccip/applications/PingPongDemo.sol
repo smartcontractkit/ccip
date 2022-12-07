@@ -15,7 +15,7 @@ contract PingPongDemo is Any2EVMMessageReceiverInterface, OwnerIsCreator {
   GERouterInterface internal s_router;
 
   // The chain ID of the counterpart ping pong contract
-  uint256 public s_counterpartChainId;
+  uint64 public s_counterpartChainId;
   // The contract address of the counterpart ping pong contract
   address public s_counterpartAddress;
 
@@ -31,7 +31,7 @@ contract PingPongDemo is Any2EVMMessageReceiverInterface, OwnerIsCreator {
     i_feeToken = feeToken;
   }
 
-  function setCounterpart(uint256 counterpartChainId, address counterpartAddress) external onlyOwner {
+  function setCounterpart(uint64 counterpartChainId, address counterpartAddress) external onlyOwner {
     s_counterpartChainId = counterpartChainId;
     s_counterpartAddress = counterpartAddress;
   }

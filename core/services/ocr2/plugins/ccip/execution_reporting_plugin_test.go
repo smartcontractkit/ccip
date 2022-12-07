@@ -39,16 +39,16 @@ type ExecutionContracts struct {
 	commitStore                *commit_store_helper.CommitStoreHelper
 	receiver                   *simple_message_receiver.SimpleMessageReceiver
 	linkTokenAddress           common.Address
-	destChainID, sourceChainID *big.Int
+	destChainID, sourceChainID uint64
 	destChain                  *backends.SimulatedBackend
 }
 
 func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	key, err := crypto.GenerateKey()
 	require.NoError(t, err)
-	destChainID := big.NewInt(1337)
-	sourceChainID := big.NewInt(1338)
-	destUser, err := bind.NewKeyedTransactorWithChainID(key, destChainID)
+	destChainID := uint64(1337)
+	sourceChainID := uint64(1338)
+	destUser, err := bind.NewKeyedTransactorWithChainID(key, big.NewInt(0).SetUint64(destChainID))
 	destChain := backends.NewSimulatedBackend(core.GenesisAlloc{
 		destUser.From: {Balance: big.NewInt(0).Mul(big.NewInt(100), big.NewInt(1000000000000000000))}},
 		10*ethconfig.Defaults.Miner.GasCeil) // 80M gas
@@ -88,11 +88,11 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	onRampAddress := common.HexToAddress("0x01BE23585060835E02B77ef475b0Cc51aA1e0709")
 	linkTokenSourceAddress := common.HexToAddress("0x01BE23585060835E02B77ef475b0Cc51aA1e0709")
 	commitStoreAddress, _, _, err := commit_store_helper.DeployCommitStoreHelper(
-		destUser,         // user
-		destChain,        // client
-		big.NewInt(1338), // dest chain id
-		big.NewInt(1337), // source chain id
-		afnAddress,       // AFN address
+		destUser,   // user
+		destChain,  // client
+		1338,       // dest chain id
+		1337,       // source chain id
+		afnAddress, // AFN address
 		commit_store_helper.CommitStoreInterfaceCommitStoreConfig{
 			OnRamps:          []common.Address{onRampAddress},
 			MinSeqNrByOnRamp: []uint64{1},
@@ -162,7 +162,7 @@ type messageBatch struct {
 
 // Message contains the data from a cross chain message
 type Message struct {
-	SourceChainId     *big.Int                                        `json:"sourceChainId"`
+	SourceChainId     uint64                                          `json:"sourceChainId"`
 	SequenceNumber    uint64                                          `json:"sequenceNumber"`
 	Sender            common.Address                                  `json:"sender"`
 	Receiver          common.Address                                  `json:"receiver"`

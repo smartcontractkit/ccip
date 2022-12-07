@@ -17,7 +17,7 @@ contract GovernanceDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterf
   using GEConsumer for GEConsumer.EVMExtraArgsV1;
 
   error InvalidDeliverer(address deliverer);
-  event ConfigPropagated(uint256 chainId, address contractAddress);
+  event ConfigPropagated(uint64 chainId, address contractAddress);
   event ReceivedConfig(uint256 feeAmount, uint256 changedAtBlock);
 
   struct FeeConfig {
@@ -26,7 +26,7 @@ contract GovernanceDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterf
   }
 
   struct CrossChainClone {
-    uint256 chainId;
+    uint64 chainId;
     address contractAddress;
   }
 

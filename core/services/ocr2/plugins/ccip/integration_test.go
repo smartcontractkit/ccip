@@ -23,8 +23,8 @@ import (
 )
 
 var (
-	sourceChainID = big.NewInt(1000)
-	destChainID   = big.NewInt(1337)
+	sourceChainID = uint64(1000)
+	destChainID   = uint64(1337)
 )
 
 func TestIntegration_CCIP(t *testing.T) {
@@ -52,7 +52,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 	testhelpers.AddAllJobs(t, jobParams, ccipContracts, nodes)
 
 	// Replay for bootstrap.
-	bc, err := bootstrapNode.App.GetChains().EVM.Get(destChainID)
+	bc, err := bootstrapNode.App.GetChains().EVM.Get(big.NewInt(0).SetUint64(destChainID))
 	require.NoError(t, err)
 	require.NoError(t, bc.LogPoller().Replay(context.Background(), configBlock))
 

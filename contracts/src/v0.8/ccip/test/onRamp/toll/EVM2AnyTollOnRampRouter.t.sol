@@ -77,7 +77,7 @@ contract EVM2AnyTollOnRampRouter_ccipSend is EVM2EVMTollOnRampSetup {
 
   function testUnsupportedDestinationChainReverts() public {
     TollConsumer.EVM2AnyTollMessage memory message = _generateEmptyMessage();
-    uint256 wrongChain = DEST_CHAIN_ID + 1;
+    uint64 wrongChain = DEST_CHAIN_ID + 1;
 
     vm.expectRevert(abi.encodeWithSelector(BaseOnRampRouterInterface.UnsupportedDestinationChain.selector, wrongChain));
 
@@ -106,7 +106,7 @@ contract EVM2AnyTollOnRampRouter_ccipSend is EVM2EVMTollOnRampSetup {
 
 /// @notice #setOnRamp
 contract EVM2AnyTollOnRampRouter_setOnRamp is EVM2EVMTollOnRampSetup {
-  event OnRampSet(uint256 indexed chainId, EVM2EVMTollOnRampInterface indexed onRamp);
+  event OnRampSet(uint64 indexed chainId, EVM2EVMTollOnRampInterface indexed onRamp);
 
   // Success
 
@@ -114,7 +114,7 @@ contract EVM2AnyTollOnRampRouter_setOnRamp is EVM2EVMTollOnRampSetup {
   // and isChainSupported.
   function testSuccess() public {
     EVM2EVMTollOnRampInterface onramp = EVM2EVMTollOnRampInterface(address(1));
-    uint256 chainId = 1337;
+    uint64 chainId = 1337;
     EVM2EVMTollOnRampInterface before = s_onRampRouter.getOnRamp(chainId);
     assertEq(address(0), address(before));
     assertFalse(s_onRampRouter.isChainSupported(chainId));

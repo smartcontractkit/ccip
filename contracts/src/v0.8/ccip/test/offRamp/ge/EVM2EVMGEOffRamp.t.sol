@@ -18,7 +18,7 @@ contract EVM2EVMGEOffRamp_constructor is EVM2EVMGEOffRampSetup {
     assertEq(OWNER, s_offRamp.owner());
 
     // OffRamp config
-    (uint256 source, uint256 dest) = s_offRamp.getChainIDs();
+    (uint64 source, uint64 dest) = s_offRamp.getChainIDs();
     assertEq(SOURCE_CHAIN_ID, source);
     assertEq(DEST_CHAIN_ID, dest);
     assertEq(address(s_afn), address(s_offRamp.getAFN()));
@@ -36,7 +36,7 @@ contract EVM2EVMGEOffRamp_constructor is EVM2EVMGEOffRampSetup {
 contract EVM2EVMGEOffRamp_setRouter is EVM2EVMGEOffRampSetup {
   Any2EVMOffRampRouterInterface public s_router;
 
-  event OffRampRouterSet(address indexed router, uint256 sourceChainId, address onRampAddress);
+  event OffRampRouterSet(address indexed router, uint64 sourceChainId, address onRampAddress);
 
   function setUp() public virtual override {
     EVM2EVMGEOffRampSetup.setUp();

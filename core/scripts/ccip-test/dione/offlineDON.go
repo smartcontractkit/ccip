@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"math/big"
+	"strconv"
 	"strings"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -35,7 +36,7 @@ func NewOfflineDON(env Environment, lggr logger.Logger) OfflineDON {
 	}
 }
 
-func (don *OfflineDON) GenerateOracleIdentities(chain string) []confighelper2.OracleIdentityExtra {
+func (don *OfflineDON) GenerateOracleIdentities(chain uint64) []confighelper2.OracleIdentityExtra {
 	var oracles []confighelper2.OracleIdentityExtra
 
 	for _, node := range don.Config.Nodes {
@@ -44,7 +45,7 @@ func (don *OfflineDON) GenerateOracleIdentities(chain string) []confighelper2.Or
 		oracles = append(oracles,
 			confighelper2.OracleIdentityExtra{
 				OracleIdentity: confighelper2.OracleIdentity{
-					TransmitAccount:   ocr2types.Account(node.EthKeys[chain]),
+					TransmitAccount:   ocr2types.Account(node.EthKeys[strconv.FormatUint(chain, 10)]),
 					OnchainPublicKey:  gethcommon.HexToAddress(strings.TrimPrefix(evmKeys.Attributes.OnChainPublicKey, "ocr2on_evm_")).Bytes(),
 					OffchainPublicKey: common.ToOffchainPublicKey("0x" + strings.TrimPrefix(evmKeys.Attributes.OffChainPublicKey, "ocr2off_evm_")),
 					PeerID:            node.PeerID,
@@ -55,9 +56,9 @@ func (don *OfflineDON) GenerateOracleIdentities(chain string) []confighelper2.Or
 	return oracles
 }
 
-func (don *OfflineDON) GetSendingKeys(chain *big.Int) (keys []gethcommon.Address) {
+func (don *OfflineDON) GetSendingKeys(chain uint64) (keys []gethcommon.Address) {
 	for _, node := range don.Config.Nodes {
-		keys = append(keys, gethcommon.HexToAddress(node.EthKeys[chain.String()]))
+		keys = append(keys, gethcommon.HexToAddress(node.EthKeys[strconv.FormatUint(chain, 10)]))
 	}
 	return
 }
@@ -76,7 +77,7 @@ func (don *OfflineDON) FundNodeKeys(chainConfig rhea.EvmDeploymentConfig, ownerP
 	helpers.PanicErr(err)
 
 	for i, node := range don.Config.Nodes {
-		to := gethcommon.HexToAddress(node.EthKeys[chainConfig.ChainConfig.ChainId.String()])
+		to := gethcommon.HexToAddress(node.EthKeys[strconv.FormatUint(chainConfig.ChainConfig.ChainId, 10)])
 		if to == gethcommon.HexToAddress("0x") {
 			don.lggr.Warnf("Node %2d has no sending key configured. Skipping funding")
 			continue
@@ -118,7 +119,7 @@ func sendEth(to gethcommon.Address, chainConfig rhea.EvmDeploymentConfig, nonce 
 		},
 	)
 
-	signedTx, err := types.SignTx(tx, types.NewLondonSigner(chainConfig.ChainConfig.ChainId), ownerKey)
+	signedTx, err := types.SignTx(tx, types.NewLondonSigner(big.NewInt(0).SetUint64(chainConfig.ChainConfig.ChainId)), ownerKey)
 	helpers.PanicErr(err)
 	err = chainConfig.Client.SendTransaction(context.Background(), signedTx)
 	helpers.PanicErr(err)
@@ -127,7 +128,7 @@ func sendEth(to gethcommon.Address, chainConfig rhea.EvmDeploymentConfig, nonce 
 func sendEthEIP1559(to gethcommon.Address, chainConfig rhea.EvmDeploymentConfig, nonce uint64, gasTipCap *big.Int, ownerKey *ecdsa.PrivateKey, amount *big.Int) {
 	tx := types.NewTx(
 		&types.DynamicFeeTx{
-			ChainID:    chainConfig.ChainConfig.ChainId,
+			ChainID:    big.NewInt(0).SetUint64(chainConfig.ChainConfig.ChainId),
 			Nonce:      nonce,
 			GasTipCap:  gasTipCap,
 			GasFeeCap:  big.NewInt(2e9),
@@ -139,7 +140,7 @@ func sendEthEIP1559(to gethcommon.Address, chainConfig rhea.EvmDeploymentConfig,
 		},
 	)
 
-	signedTx, err := types.SignTx(tx, types.NewLondonSigner(chainConfig.ChainConfig.ChainId), ownerKey)
+	signedTx, err := types.SignTx(tx, types.NewLondonSigner(big.NewInt(0).SetUint64(chainConfig.ChainConfig.ChainId)), ownerKey)
 	helpers.PanicErr(err)
 	err = chainConfig.Client.SendTransaction(context.Background(), signedTx)
 	helpers.PanicErr(err)

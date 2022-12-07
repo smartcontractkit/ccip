@@ -11,7 +11,7 @@ import (
 // Chains
 
 var Beta_Goerli = rhea.EVMChainConfig{
-	ChainId: big.NewInt(5),
+	ChainId: 5,
 	GasSettings: rhea.EVMGasSettings{
 		EIP1559:   true,
 		GasTipCap: rhea.DefaultGasTipFee,
@@ -34,7 +34,7 @@ var Beta_Goerli = rhea.EVMChainConfig{
 }
 
 var Beta_AvaxFuji = rhea.EVMChainConfig{
-	ChainId: big.NewInt(43113),
+	ChainId: 43113,
 	GasSettings: rhea.EVMGasSettings{
 		EIP1559: false,
 	},

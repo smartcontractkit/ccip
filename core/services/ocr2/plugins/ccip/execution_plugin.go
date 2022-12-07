@@ -42,12 +42,12 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 		return nil, err
 	}
 	lggr.Infof("CCIP execution plugin initialized with offchainConfig: %+v", pluginConfig)
-	sourceChainId, destChainId := big.NewInt(0).SetUint64(pluginConfig.SourceChainID), big.NewInt(0).SetUint64(pluginConfig.DestChainID)
-	sourceChain, err := chainSet.Get(sourceChainId)
+
+	sourceChain, err := chainSet.Get(big.NewInt(0).SetUint64(pluginConfig.SourceChainID))
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to open source chain")
 	}
-	destChain, err := chainSet.Get(destChainId)
+	destChain, err := chainSet.Get(big.NewInt(0).SetUint64(pluginConfig.DestChainID))
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to open destination chain")
 	}
@@ -92,7 +92,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 			return req.Message.SequenceNumber, nil
 		}
 		eventSignatures = GetTollEventSignatures()
-		onRampToHasher[onRampAddr] = NewTollLeafHasher(sourceChainId, destChainId, onRampAddr, hashingCtx)
+		onRampToHasher[onRampAddr] = NewTollLeafHasher(pluginConfig.SourceChainID, pluginConfig.DestChainID, onRampAddr, hashingCtx)
 	case EVM2EVMGEOnRamp:
 		onRamp, err2 := evm_2_evm_ge_onramp.NewEVM2EVMGEOnRamp(onRampAddr, sourceChain.Client())
 		if err2 != nil {
@@ -106,7 +106,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 			return req.Message.SequenceNumber, nil
 		}
 		eventSignatures = GetGEEventSignatures()
-		onRampToHasher[onRampAddr] = NewGELeafHasher(sourceChainId, destChainId, onRampAddr, hashingCtx)
+		onRampToHasher[onRampAddr] = NewGELeafHasher(pluginConfig.SourceChainID, pluginConfig.DestChainID, onRampAddr, hashingCtx)
 	default:
 		return nil, errors.Errorf("unrecognized onramp, is %v the correct onramp address?", onRampAddr)
 	}
@@ -167,7 +167,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 		inflightCacheExpiry,
 		sourceChain.TxManager().GetGasEstimator(),
 		destChain.TxManager().GetGasEstimator(),
-		sourceChainId,
+		pluginConfig.SourceChainID,
 	)
 	oracle, err := libocr2.NewOracle(argsNoPlugin)
 	if err != nil {

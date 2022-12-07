@@ -59,7 +59,7 @@ type Node struct {
 }
 
 func (node *Node) EventuallyHasReqSeqNum(t *testing.T, ccipContracts CCIPContracts, eventSignatures ccip.EventSignatures, onRamp common.Address, seqNum int) logpoller.Log {
-	c, err := node.App.GetChains().EVM.Get(ccipContracts.SourceChainID)
+	c, err := node.App.GetChains().EVM.Get(big.NewInt(0).SetUint64(ccipContracts.SourceChainID))
 	require.NoError(t, err)
 	var log logpoller.Log
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
@@ -78,7 +78,7 @@ func (node *Node) EventuallyHasReqSeqNum(t *testing.T, ccipContracts CCIPContrac
 }
 
 func (node *Node) EventuallyHasExecutedSeqNums(t *testing.T, ccipContracts CCIPContracts, eventSignatures ccip.EventSignatures, offRamp common.Address, minSeqNum int, maxSeqNum int) []logpoller.Log {
-	c, err := node.App.GetChains().EVM.Get(ccipContracts.DestChainID)
+	c, err := node.App.GetChains().EVM.Get(big.NewInt(0).SetUint64(ccipContracts.DestChainID))
 	require.NoError(t, err)
 	var logs []logpoller.Log
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
@@ -104,7 +104,7 @@ func (node *Node) EventuallyHasExecutedSeqNums(t *testing.T, ccipContracts CCIPC
 }
 
 func (node *Node) ConsistentlySeqNumHasNotBeenExecuted(t *testing.T, ccipContracts CCIPContracts, eventSignatures ccip.EventSignatures, offRamp common.Address, seqNum int) logpoller.Log {
-	c, err := node.App.GetChains().EVM.Get(ccipContracts.DestChainID)
+	c, err := node.App.GetChains().EVM.Get(big.NewInt(0).SetUint64(ccipContracts.DestChainID))
 	require.NoError(t, err)
 	var log logpoller.Log
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
@@ -428,7 +428,7 @@ func NoNodesHaveExecutedSeqNum(t *testing.T, ccipContracts CCIPContracts, eventS
 }
 
 func SetupAndStartNodes(ctx context.Context, t *testing.T, ccipContracts *CCIPContracts, bootstrapNodePort int64) (Node, []Node, int64) {
-	appBootstrap, bootstrapPeerID, bootstrapTransmitter, bootstrapKb := SetupNodeCCIP(t, ccipContracts.DestUser, bootstrapNodePort, "bootstrap_ccip", ccipContracts.SourceChain, ccipContracts.DestChain, ccipContracts.SourceChainID, ccipContracts.DestChainID, "", 0)
+	appBootstrap, bootstrapPeerID, bootstrapTransmitter, bootstrapKb := SetupNodeCCIP(t, ccipContracts.DestUser, bootstrapNodePort, "bootstrap_ccip", ccipContracts.SourceChain, ccipContracts.DestChain, big.NewInt(0).SetUint64(ccipContracts.SourceChainID), big.NewInt(0).SetUint64(ccipContracts.DestChainID), "", 0)
 	var (
 		oracles []confighelper.OracleIdentityExtra
 		nodes   []Node
@@ -443,7 +443,7 @@ func SetupAndStartNodes(ctx context.Context, t *testing.T, ccipContracts *CCIPCo
 	}
 	// Set up the minimum 4 oracles all funded with destination ETH
 	for i := int64(0); i < 4; i++ {
-		app, peerID, transmitter, kb := SetupNodeCCIP(t, ccipContracts.DestUser, bootstrapNodePort+1+i, fmt.Sprintf("oracle_ccip%d", i), ccipContracts.SourceChain, ccipContracts.DestChain, ccipContracts.SourceChainID, ccipContracts.DestChainID, bootstrapPeerID, bootstrapNodePort)
+		app, peerID, transmitter, kb := SetupNodeCCIP(t, ccipContracts.DestUser, bootstrapNodePort+1+i, fmt.Sprintf("oracle_ccip%d", i), ccipContracts.SourceChain, ccipContracts.DestChain, big.NewInt(0).SetUint64(ccipContracts.SourceChainID), big.NewInt(0).SetUint64(ccipContracts.DestChainID), bootstrapPeerID, bootstrapNodePort)
 		nodes = append(nodes, Node{app, transmitter, kb})
 		offchainPublicKey, _ := hex.DecodeString(strings.TrimPrefix(kb.OnChainPublicKey(), "0x"))
 		oracles = append(oracles, confighelper.OracleIdentityExtra{

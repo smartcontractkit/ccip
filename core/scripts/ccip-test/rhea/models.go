@@ -48,7 +48,7 @@ const (
 )
 
 type EVMChainConfig struct {
-	ChainId     *big.Int
+	ChainId     uint64
 	GasSettings EVMGasSettings
 	LinkToken   gethcommon.Address
 
@@ -89,7 +89,7 @@ type EvmDeploymentConfig struct {
 func (chain *EvmDeploymentConfig) SetupChain(t *testing.T, ownerPrivateKey string) {
 	chain.Owner = GetOwner(t, ownerPrivateKey, chain.ChainConfig.ChainId, chain.ChainConfig.GasSettings)
 	chain.Client = GetClient(t, secrets.GetRPC(chain.ChainConfig.ChainId))
-	chain.Logger = logger.TestLogger(t).Named(helpers.ChainName(chain.ChainConfig.ChainId.Int64()))
+	chain.Logger = logger.TestLogger(t).Named(helpers.ChainName(int64(chain.ChainConfig.ChainId)))
 	chain.Logger.Info("Completed chain setup")
 }
 
@@ -105,10 +105,10 @@ func (chain *EvmDeploymentConfig) SetupReadOnlyChain(lggr logger.Logger) error {
 }
 
 // GetOwner sets the owner user credentials and ensures a GasTipCap is set for the resulting user.
-func GetOwner(t *testing.T, ownerPrivateKey string, chainId *big.Int, gasSettings EVMGasSettings) *bind.TransactOpts {
+func GetOwner(t *testing.T, ownerPrivateKey string, chainId uint64, gasSettings EVMGasSettings) *bind.TransactOpts {
 	ownerKey, err := crypto.HexToECDSA(ownerPrivateKey)
 	require.NoError(t, err)
-	user, err := bind.NewKeyedTransactorWithChainID(ownerKey, chainId)
+	user, err := bind.NewKeyedTransactorWithChainID(ownerKey, big.NewInt(int64(chainId)))
 	require.NoError(t, err)
 	fmt.Println("--- Owner address ")
 	fmt.Println(user.From.Hex())

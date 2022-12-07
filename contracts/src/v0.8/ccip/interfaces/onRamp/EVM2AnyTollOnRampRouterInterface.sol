@@ -7,9 +7,9 @@ import {EVM2EVMTollOnRampInterface} from "./EVM2EVMTollOnRampInterface.sol";
 import {BaseOnRampRouterInterface} from "./BaseOnRampRouterInterface.sol";
 
 interface EVM2AnyTollOnRampRouterInterface is BaseOnRampRouterInterface {
-  error OnRampAlreadySet(uint256 chainId, EVM2EVMTollOnRampInterface onRamp);
+  error OnRampAlreadySet(uint64 chainId, EVM2EVMTollOnRampInterface onRamp);
 
-  event OnRampSet(uint256 indexed chainId, EVM2EVMTollOnRampInterface indexed onRamp);
+  event OnRampSet(uint64 indexed chainId, EVM2EVMTollOnRampInterface indexed onRamp);
 
   /**
    * @notice Request a message to be sent to the destination chain
@@ -17,7 +17,7 @@ interface EVM2AnyTollOnRampRouterInterface is BaseOnRampRouterInterface {
    * @param message The message payload
    * @return The sequence number assigned to message
    */
-  function ccipSend(uint256 destinationChainId, TollConsumer.EVM2AnyTollMessage calldata message)
+  function ccipSend(uint64 destinationChainId, TollConsumer.EVM2AnyTollMessage calldata message)
     external
     returns (uint64);
 
@@ -27,12 +27,12 @@ interface EVM2AnyTollOnRampRouterInterface is BaseOnRampRouterInterface {
    * @param chainId destination chain ID
    * @param onRamp OnRamp to use for that destination chain
    */
-  function setOnRamp(uint256 chainId, EVM2EVMTollOnRampInterface onRamp) external;
+  function setOnRamp(uint64 chainId, EVM2EVMTollOnRampInterface onRamp) external;
 
   /**
    * @notice Gets the current OnRamp for the specified chain ID
    * @param chainId Chain ID to get ramp details for
    * @return onRamp
    */
-  function getOnRamp(uint256 chainId) external view returns (EVM2EVMTollOnRampInterface);
+  function getOnRamp(uint64 chainId) external view returns (EVM2EVMTollOnRampInterface);
 }

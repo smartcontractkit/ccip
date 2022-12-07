@@ -5,6 +5,6 @@
   "isOffRamp(address)": "1d7a74a0",
   "owner()": "8da5cb5b",
   "removeOffRamp(address)": "991f6543",
-  "routeMessage((uint256,bytes,address,bytes,address[],(address,uint256)[],uint256))": "da52b4c4",
+  "routeMessage((uint64,bytes,address,bytes,address[],(address,uint256)[],uint256))": "382ab03a",
   "transferOwnership(address)": "f2fde38b"
 }

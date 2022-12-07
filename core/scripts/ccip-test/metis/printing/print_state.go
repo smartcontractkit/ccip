@@ -186,7 +186,7 @@ func PrintTxStatuses(source *rhea.EvmDeploymentConfig, destination *rhea.EvmDepl
 				ExecutionStatus(tx.execStatus.State),
 				tx.execStatus.Raw.BlockNumber,
 				tx.message.Message.Nonce,
-				helpers.ExplorerLink(destination.ChainConfig.ChainId.Int64(), tx.execStatus.Raw.TxHash)))
+				helpers.ExplorerLink(int64(destination.ChainConfig.ChainId), tx.execStatus.Raw.TxHash)))
 		} else {
 			sb.WriteString(fmt.Sprintf("| %18d | %18s | %20v | %18s | %18d | %s \n",
 				tx.message.Message.SequenceNumber,
@@ -205,7 +205,7 @@ func PrintTxStatuses(source *rhea.EvmDeploymentConfig, destination *rhea.EvmDepl
 func printDappSanityCheck(source *rhea.EvmDeploymentConfig) {
 	var sb strings.Builder
 	sb.WriteString("\n")
-	sb.WriteString(fmt.Sprintf("Dapp sanity checks for %s\n", helpers.ChainName(source.ChainConfig.ChainId.Int64())))
+	sb.WriteString(fmt.Sprintf("Dapp sanity checks for %s\n", helpers.ChainName(int64(source.ChainConfig.ChainId))))
 
 	tableHeaders := []string{"Dapp", "Router Set"}
 	headerLengths := []int{30, 14}
@@ -240,7 +240,7 @@ func printDappSanityCheck(source *rhea.EvmDeploymentConfig) {
 func printRampSanityCheck(chain *rhea.EvmDeploymentConfig, sourceOnRamp common.Address) {
 	var sb strings.Builder
 	sb.WriteString("\n")
-	sb.WriteString(fmt.Sprintf("Ramp checks for %s\n", helpers.ChainName(chain.ChainConfig.ChainId.Int64())))
+	sb.WriteString(fmt.Sprintf("Ramp checks for %s\n", helpers.ChainName(int64(chain.ChainConfig.ChainId))))
 
 	tableHeaders := []string{"Contract", "Config correct"}
 	headerLengths := []int{30, 14}
@@ -306,7 +306,7 @@ func printRampSanityCheck(chain *rhea.EvmDeploymentConfig, sourceOnRamp common.A
 func printRateLimitingStatus(chain *rhea.EvmDeploymentConfig) {
 	var sb strings.Builder
 	sb.WriteString("\n")
-	sb.WriteString(fmt.Sprintf("Rate limits for %s\n", helpers.ChainName(chain.ChainConfig.ChainId.Int64())))
+	sb.WriteString(fmt.Sprintf("Rate limits for %s\n", helpers.ChainName(int64(chain.ChainConfig.ChainId))))
 
 	tableHeaders := []string{"Contract", "Tokens"}
 	headerLengths := []int{25, 42}
@@ -334,7 +334,7 @@ func printRateLimitingStatus(chain *rhea.EvmDeploymentConfig) {
 func printPaused(chain *rhea.EvmDeploymentConfig) {
 	var sb strings.Builder
 	sb.WriteString("\n")
-	sb.WriteString(fmt.Sprintf("Paused addresses for %s\n", helpers.ChainName(chain.ChainConfig.ChainId.Int64())))
+	sb.WriteString(fmt.Sprintf("Paused addresses for %s\n", helpers.ChainName(int64(chain.ChainConfig.ChainId))))
 
 	tableHeaders := []string{"Contract", "Address", "Running"}
 	headerLengths := []int{25, 42, 14}
@@ -378,7 +378,7 @@ func printPaused(chain *rhea.EvmDeploymentConfig) {
 func PrintNodeBalances(chain *rhea.EvmDeploymentConfig, addresses []common.Address) {
 	var sb strings.Builder
 	sb.WriteString("\n")
-	sb.WriteString(fmt.Sprintf("Node balances for %s\n", helpers.ChainName(chain.ChainConfig.ChainId.Int64())))
+	sb.WriteString(fmt.Sprintf("Node balances for %s\n", helpers.ChainName(int64(chain.ChainConfig.ChainId))))
 
 	tableHeaders := []string{"Sender", "Balance"}
 	headerLengths := []int{42, 18}
@@ -399,7 +399,7 @@ func PrintNodeBalances(chain *rhea.EvmDeploymentConfig, addresses []common.Addre
 func printPoolBalances(chain *rhea.EvmDeploymentConfig) {
 	var sb strings.Builder
 	sb.WriteString("\n")
-	sb.WriteString(fmt.Sprintf("Pool balances for %s\n", helpers.ChainName(chain.ChainConfig.ChainId.Int64())))
+	sb.WriteString(fmt.Sprintf("Pool balances for %s\n", helpers.ChainName(int64(chain.ChainConfig.ChainId))))
 
 	tableHeaders := []string{"Token", "Pool", "Balance", "Onramp", "OffRamp", "Price"}
 	headerLengths := []int{32, 42, 20, 9, 9, 10}

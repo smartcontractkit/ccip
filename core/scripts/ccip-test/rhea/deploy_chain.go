@@ -39,7 +39,7 @@ func deployAFN(t *testing.T, client *EvmDeploymentConfig) {
 	address, tx, _, err := mock_afn_contract.DeployMockAFNContract(client.Owner, client.Client)
 	require.NoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
-	client.Logger.Infof("AFN deployed on %s in tx: %s", address.Hex(), helpers.ExplorerLink(client.ChainConfig.ChainId.Int64(), tx.Hash()))
+	client.Logger.Infof("AFN deployed on %s in tx: %s", address.Hex(), helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash()))
 	client.ChainConfig.Afn = address
 }
 
@@ -50,7 +50,7 @@ func deployNativeTokenPool(t *testing.T, client *EvmDeploymentConfig) {
 			tokenPoolAddress, tx, _, err := native_token_pool.DeployNativeTokenPool(client.Owner, client.Client, tokenConfig.Token)
 			require.NoError(t, err)
 			shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
-			client.Logger.Infof("Native token pool deployed on %s in tx %s", tokenPoolAddress, helpers.ExplorerLink(client.ChainConfig.ChainId.Int64(), tx.Hash()))
+			client.Logger.Infof("Native token pool deployed on %s in tx %s", tokenPoolAddress, helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash()))
 			pool, err := native_token_pool.NewNativeTokenPool(tokenPoolAddress, client.Client)
 			require.NoError(t, err)
 			fillPoolWithTokens(t, client, pool)
@@ -82,7 +82,7 @@ func deployRouter(t *testing.T, client *EvmDeploymentConfig) {
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 	client.ChainConfig.Router = routerAddress
 
-	client.Logger.Infof(fmt.Sprintf("Router deployed on %s in tx %s", routerAddress.String(), helpers.ExplorerLink(client.ChainConfig.ChainId.Int64(), tx.Hash())))
+	client.Logger.Infof(fmt.Sprintf("Router deployed on %s in tx %s", routerAddress.String(), helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash())))
 }
 
 // deployGasFeeCache GasFeeCache is deployed without any feeUpdaters
@@ -103,5 +103,5 @@ func deployGasFeeCache(t *testing.T, client *EvmDeploymentConfig) {
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 	client.ChainConfig.GasFeeCache = gasFeeCache
 
-	client.Logger.Infof(fmt.Sprintf("GasFeeCache deployed on %s in tx %s", gasFeeCache.String(), helpers.ExplorerLink(client.ChainConfig.ChainId.Int64(), tx.Hash())))
+	client.Logger.Infof(fmt.Sprintf("GasFeeCache deployed on %s in tx %s", gasFeeCache.String(), helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash())))
 }

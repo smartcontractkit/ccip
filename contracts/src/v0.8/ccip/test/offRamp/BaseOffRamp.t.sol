@@ -54,7 +54,7 @@ contract BaseOffRamp_constructor is BaseOffRampSetup {
 
     assertEq(address(s_mockCommitStore), address(s_offRamp.getCommitStore()));
 
-    (uint256 source, uint256 dest) = s_offRamp.getChainIDs();
+    (uint64 source, uint64 dest) = s_offRamp.getChainIDs();
     assertEq(SOURCE_CHAIN_ID, source);
     assertEq(DEST_CHAIN_ID, dest);
   }

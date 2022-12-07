@@ -37,8 +37,8 @@ contract CommitStore is CommitStoreInterface, TypeAndVersionInterface, HealthChe
    * minSeqNrByOnRamp: the new values when overwriting the s_expectedNextMinByOnRamp mapping
    */
   constructor(
-    uint256 chainId,
-    uint256 sourceChainId,
+    uint64 chainId,
+    uint64 sourceChainId,
     AFNInterface afn,
     CommitStoreConfig memory config
   ) OCR2Base(true) HealthChecker(afn) {

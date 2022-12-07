@@ -58,7 +58,7 @@ var _ = Describe("CCIP interactions test @ccip", func() {
 		transferAmounts := []*big.Int{big.NewInt(5e17), big.NewInt(5e17)}
 
 		// deploy all source contracts
-		sourceCCIP = actions.DefaultSourceCCIPModule(sourceChainClient, destChainClient.GetChainID(), transferAmounts)
+		sourceCCIP = actions.DefaultSourceCCIPModule(sourceChainClient, destChainClient.GetChainID().Uint64(), transferAmounts)
 		By("Deploying source contracts")
 		sourceCCIP.DeployContracts()
 

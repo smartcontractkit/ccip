@@ -43,7 +43,7 @@ library Internal {
   /// @notice Bridge struct between message type specific struct and Any2EVMMessage for the end user.
   // TODO: Maybe not even needed? Just have separate arguments + an Any2EVMMessage to simplify?
   struct Any2EVMMessageFromSender {
-    uint256 sourceChainId;
+    uint64 sourceChainId;
     bytes sender;
     address receiver;
     bytes data;

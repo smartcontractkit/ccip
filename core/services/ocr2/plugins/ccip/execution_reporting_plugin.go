@@ -155,7 +155,7 @@ func DecodeGEExecutionReport(report types.Report) (*evm_2_evm_ge_offramp.GEExecu
 		TokenPerFeeCoinAddresses []common.Address `json:"tokenPerFeeCoinAddresses"`
 		TokenPerFeeCoin          []*big.Int       `json:"tokenPerFeeCoin"`
 		FeeUpdates               []struct {
-			ChainId        *big.Int `json:"chainId"`
+			ChainId        uint64   `json:"chainId"`
 			LinkPerUnitGas *big.Int `json:"linkPerUnitGas"`
 		} `json:"feeUpdates"`
 		EncodedMessages    [][]byte    `json:"encodedMessages"`
@@ -263,7 +263,7 @@ type ExecutionReportingPluginFactory struct {
 	rootSnoozeTime                       time.Duration
 	inflightCacheExpiry                  time.Duration
 	sourceGasEstimator, destGasEstimator gas.Estimator
-	sourceChainID                        *big.Int
+	sourceChainID                        uint64
 }
 
 func NewExecutionReportingPluginFactory(
@@ -281,7 +281,7 @@ func NewExecutionReportingPluginFactory(
 	rootSnoozeTime time.Duration,
 	inflightCacheExpiry time.Duration,
 	sourceGasEstimator, destGasEstimator gas.Estimator,
-	sourceChainID *big.Int,
+	sourceChainID uint64,
 ) types.ReportingPluginFactory {
 	return &ExecutionReportingPluginFactory{lggr: lggr, onRamp: onRamp, commitStore: commitStore, offRamp: offRamp, source: source, dest: dest, offRampAddr: offRampAddr, builder: builder,
 		onRampSeqParser: onRampSeqParser, eventSignatures: eventSignatures, priceGetter: priceGetter, onRampToHasher: onRampToHasher, rootSnoozeTime: rootSnoozeTime, inflightCacheExpiry: inflightCacheExpiry,
@@ -356,7 +356,7 @@ type ExecutionReportingPlugin struct {
 	priceGetter                          PriceGetter
 	onRampToHasher                       map[common.Address]LeafHasher[[32]byte]
 	sourceGasEstimator, destGasEstimator gas.Estimator
-	sourceChainID                        *big.Int
+	sourceChainID                        uint64
 }
 
 type InflightExecutionReport struct {

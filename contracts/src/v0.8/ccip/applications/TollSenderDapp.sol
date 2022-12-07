@@ -20,7 +20,7 @@ contract TollSenderDapp is TypeAndVersionInterface {
 
   // On ramp contract responsible for interacting with the DON.
   EVM2AnyTollOnRampRouterInterface public immutable i_onRampRouter;
-  uint256 public immutable i_destinationChainId;
+  uint64 public immutable i_destinationChainId;
   // Corresponding contract on the destination chain responsible for receiving the message
   // and enabling the EOA on the destination chain to access the tokens that are sent.
   // For this scenario, it would be the address of a deployed EOASingleTokenReceiver.
@@ -30,7 +30,7 @@ contract TollSenderDapp is TypeAndVersionInterface {
 
   constructor(
     EVM2AnyTollOnRampRouterInterface onRampRouter,
-    uint256 destinationChainId,
+    uint64 destinationChainId,
     address destinationContract
   ) {
     i_onRampRouter = onRampRouter;

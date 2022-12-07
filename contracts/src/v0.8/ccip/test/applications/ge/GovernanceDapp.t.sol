@@ -46,7 +46,7 @@ contract GovernanceDapp_constructor is GovernanceDappSetup {
 
 /// @notice #voteForNewFeeConfig
 contract GovernanceDapp_voteForNewFeeConfig is GovernanceDappSetup {
-  event ConfigPropagated(uint256 chainId, address contractAddress);
+  event ConfigPropagated(uint64 chainId, address contractAddress);
 
   // Success
   function testSuccess() public {

@@ -32,8 +32,8 @@ contract EVM2EVMGEOffRamp is EVM2EVMGEOffRampInterface, BaseOffRamp, TypeAndVers
   GEOffRampConfig internal s_config;
 
   constructor(
-    uint256 sourceChainId,
-    uint256 chainId,
+    uint64 sourceChainId,
+    uint64 chainId,
     GEOffRampConfig memory offRampConfig,
     address onRampAddress,
     CommitStoreInterface commitStore,

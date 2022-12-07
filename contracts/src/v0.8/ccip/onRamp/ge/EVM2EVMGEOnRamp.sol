@@ -24,8 +24,8 @@ contract EVM2EVMGEOnRamp is EVM2EVMGEOnRampInterface, BaseOnRamp, TypeAndVersion
   address internal s_feeAdmin;
 
   constructor(
-    uint256 chainId,
-    uint256 destinationChainId,
+    uint64 chainId,
+    uint64 destinationChainId,
     IERC20[] memory tokens,
     PoolInterface[] memory pools,
     address[] memory allowlist,

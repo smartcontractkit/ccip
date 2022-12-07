@@ -7,9 +7,9 @@ import "../../models/Common.sol";
 import "../../models/TollConsumer.sol";
 
 contract MockOnRamp is EVM2EVMTollOnRampInterface {
-  uint256 public immutable i_chainId;
+  uint64 public immutable i_chainId;
   PoolInterface public immutable i_pool;
-  uint256 public immutable i_destinationChainId;
+  uint64 public immutable i_destinationChainId;
   uint256 public immutable i_fee;
 
   bytes public messageReceiver;
@@ -20,9 +20,9 @@ contract MockOnRamp is EVM2EVMTollOnRampInterface {
   event GetTokenPool(IERC20 token);
 
   constructor(
-    uint256 chainId,
+    uint64 chainId,
     PoolInterface pool,
-    uint256 destinationChainId,
+    uint64 destinationChainId,
     uint256 fee
   ) {
     i_chainId = chainId;

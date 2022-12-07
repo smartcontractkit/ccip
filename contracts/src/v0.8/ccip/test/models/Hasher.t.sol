@@ -10,8 +10,8 @@ contract Models__hash is TokenSetup {
     tokensAndAmounts[0].token = address(0x4440000000000000000000000000000000000001);
     tokensAndAmounts[0].amount = 12345678900;
 
-    uint256 sourceChain = 1;
-    uint256 destChain = 4;
+    uint64 sourceChain = 1;
+    uint64 destChain = 4;
 
     Toll.EVM2EVMTollMessage memory message = Toll.EVM2EVMTollMessage({
       sourceChainId: sourceChain,
@@ -48,8 +48,8 @@ contract Models__hash is TokenSetup {
     tokensAndAmounts[0].amount = 12345678900;
     tokensAndAmounts[1].amount = 4204242;
 
-    uint256 sourceChain = 1;
-    uint256 destChain = 4;
+    uint64 sourceChain = 1;
+    uint64 destChain = 4;
 
     Toll.EVM2EVMTollMessage memory message = Toll.EVM2EVMTollMessage({
       sourceChainId: sourceChain,

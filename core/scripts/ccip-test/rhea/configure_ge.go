@@ -27,11 +27,11 @@ func setOffRampOnTokenPools(t *testing.T, destClient *EvmDeploymentConfig) {
 		tx, err := pool.SetOffRamp(destClient.Owner, destClient.LaneConfig.OffRamp, true)
 		require.NoError(t, err)
 		shared.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
-		destClient.Logger.Infof("Offramp pool configured with offramp address: %s", helpers.ExplorerLink(destClient.ChainConfig.ChainId.Int64(), tx.Hash()))
+		destClient.Logger.Infof("Offramp pool configured with offramp address: %s", helpers.ExplorerLink(int64(destClient.ChainConfig.ChainId), tx.Hash()))
 	}
 }
 
-func setGasFeeCachePrices(t *testing.T, client *EvmDeploymentConfig, destChainId *big.Int) {
+func setGasFeeCachePrices(t *testing.T, client *EvmDeploymentConfig, destChainId uint64) {
 	gasFeeCache, err := gas_fee_cache.NewGasFeeCache(client.ChainConfig.GasFeeCache, client.Client)
 	require.NoError(t, err)
 
@@ -45,7 +45,7 @@ func setGasFeeCachePrices(t *testing.T, client *EvmDeploymentConfig, destChainId
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 }
 
-func setOnRampOnRouter(t *testing.T, sourceClient *EvmDeploymentConfig, destChainId *big.Int) {
+func setOnRampOnRouter(t *testing.T, sourceClient *EvmDeploymentConfig, destChainId uint64) {
 	sourceClient.Logger.Infof("Setting the onRamp on the Router")
 	router, err := ge_router.NewGERouter(sourceClient.ChainConfig.Router, sourceClient.Client)
 	require.NoError(t, err)
@@ -64,7 +64,7 @@ func setOnRampOnTokenPools(t *testing.T, sourceClient *EvmDeploymentConfig) {
 		tx, err := pool.SetOnRamp(sourceClient.Owner, sourceClient.LaneConfig.OnRamp, true)
 		require.NoError(t, err)
 		shared.WaitForMined(t, sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
-		sourceClient.Logger.Infof("Onramp pool configured with offramp address: %s", helpers.ExplorerLink(sourceClient.ChainConfig.ChainId.Int64(), tx.Hash()))
+		sourceClient.Logger.Infof("Onramp pool configured with offramp address: %s", helpers.ExplorerLink(int64(sourceClient.ChainConfig.ChainId), tx.Hash()))
 	}
 }
 
@@ -80,7 +80,7 @@ func setOnRampOnCommitStore(t *testing.T, sourceClient *EvmDeploymentConfig, des
 
 	tx, err := commitStore.SetConfig(destClient.Owner, config)
 	require.NoError(t, err)
-	destClient.Logger.Infof(fmt.Sprintf("Adding new onRamp to commitStore in tx %s", helpers.ExplorerLink(destClient.ChainConfig.ChainId.Int64(), tx.Hash())))
+	destClient.Logger.Infof(fmt.Sprintf("Adding new onRamp to commitStore in tx %s", helpers.ExplorerLink(int64(destClient.ChainConfig.ChainId), tx.Hash())))
 	shared.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
 }
 
@@ -90,7 +90,7 @@ func setRouterOnOffRamp(t *testing.T, destClient *EvmDeploymentConfig) {
 	tx, err := offRamp.SetRouter(destClient.Owner, destClient.ChainConfig.Router)
 	require.NoError(t, err)
 	shared.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
-	destClient.Logger.Infof(fmt.Sprintf("Router set on offRamp in tx %s", helpers.ExplorerLink(destClient.ChainConfig.ChainId.Int64(), tx.Hash())))
+	destClient.Logger.Infof(fmt.Sprintf("Router set on offRamp in tx %s", helpers.ExplorerLink(int64(destClient.ChainConfig.ChainId), tx.Hash())))
 }
 
 func setOffRampOnRouter(t *testing.T, client *EvmDeploymentConfig) {
@@ -138,12 +138,12 @@ func fillPoolWithTokens(t *testing.T, client *EvmDeploymentConfig, pool *native_
 	amount := big.NewInt(5e17)
 	tx, err := destLinkToken.Transfer(client.Owner, pool.Address(), amount)
 	require.NoError(t, err)
-	client.Logger.Infof("Transferring token to token pool: %s", helpers.ExplorerLink(client.ChainConfig.ChainId.Int64(), tx.Hash()))
+	client.Logger.Infof("Transferring token to token pool: %s", helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash()))
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 
 	client.Logger.Infof("Locking tokens in pool")
 	tx, err = pool.LockOrBurn(client.Owner, amount)
 	require.NoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
-	client.Logger.Infof("Pool filled with tokens: %s", helpers.ExplorerLink(client.ChainConfig.ChainId.Int64(), tx.Hash()))
+	client.Logger.Infof("Pool filled with tokens: %s", helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash()))
 }

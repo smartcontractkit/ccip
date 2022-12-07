@@ -24,7 +24,7 @@ contract GERouter is GERouterInterface, BaseOffRampRouter, TypeAndVersionInterfa
   constructor(BaseOffRampInterface[] memory offRamps) BaseOffRampRouter(offRamps) {}
 
   /// @inheritdoc GERouterInterface
-  function ccipSend(uint256 destinationChainId, GEConsumer.EVM2AnyGEMessage memory message) external returns (bytes32) {
+  function ccipSend(uint64 destinationChainId, GEConsumer.EVM2AnyGEMessage memory message) external returns (bytes32) {
     // Find and put the correct onRamp on the stack.
     EVM2EVMGEOnRampInterface onRamp = s_onRamps[destinationChainId];
     // getFee checks if the onRamp is valid
@@ -48,7 +48,7 @@ contract GERouter is GERouterInterface, BaseOffRampRouter, TypeAndVersionInterfa
 
   /// @inheritdoc GERouterInterface
   // @dev returns 0 fee on invalid message.
-  function getFee(uint256 destinationChainId, GEConsumer.EVM2AnyGEMessage memory message)
+  function getFee(uint64 destinationChainId, GEConsumer.EVM2AnyGEMessage memory message)
     public
     view
     returns (uint256 fee)
@@ -61,19 +61,19 @@ contract GERouter is GERouterInterface, BaseOffRampRouter, TypeAndVersionInterfa
   }
 
   /// @inheritdoc GERouterInterface
-  function setOnRamp(uint256 chainId, EVM2EVMGEOnRampInterface onRamp) external onlyOwner {
+  function setOnRamp(uint64 chainId, EVM2EVMGEOnRampInterface onRamp) external onlyOwner {
     if (address(s_onRamps[chainId]) == address(onRamp)) revert OnRampAlreadySet(chainId, onRamp);
     s_onRamps[chainId] = onRamp;
     emit OnRampSet(chainId, onRamp);
   }
 
   /// @inheritdoc GERouterInterface
-  function getOnRamp(uint256 chainId) external view returns (EVM2EVMGEOnRampInterface) {
+  function getOnRamp(uint64 chainId) external view returns (EVM2EVMGEOnRampInterface) {
     return s_onRamps[chainId];
   }
 
   /// @inheritdoc BaseOnRampRouterInterface
-  function isChainSupported(uint256 chainId) external view returns (bool supported) {
+  function isChainSupported(uint64 chainId) external view returns (bool supported) {
     return address(s_onRamps[chainId]) != address(0);
   }
 }

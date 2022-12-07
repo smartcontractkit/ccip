@@ -97,7 +97,7 @@ type Client struct {
 	Owner            *bind.TransactOpts
 	Users            []*bind.TransactOpts
 	Client           *ethclient.Client
-	ChainId          *big.Int
+	ChainId          uint64
 	LinkToken        *link_token_interface.LinkToken
 	LinkTokenAddress common.Address
 	SupportedTokens  map[rhea.Token]EVMBridgedToken
@@ -267,7 +267,7 @@ func (client *Client) SetOwnerAndUsers(t *testing.T, ownerPrivateKey string, see
 		require.NoError(t, err)
 		key, err := crypto.HexToECDSA(strconv.Itoa(i) + seedKeyWithoutFirstChar)
 		require.NoError(t, err)
-		user, err := bind.NewKeyedTransactorWithChainID(key, client.ChainId)
+		user, err := bind.NewKeyedTransactorWithChainID(key, big.NewInt(0).SetUint64(client.ChainId))
 		require.NoError(t, err)
 		rhea.SetGasFees(user, gasSettings)
 		users = append(users, user)
@@ -288,7 +288,7 @@ func (client *Client) ApproveLinkFrom(t *testing.T, user *bind.TransactOpts, app
 	require.NoError(t, err)
 
 	shared.WaitForMined(client.t, client.logger, client.Client, tx.Hash(), true)
-	client.logger.Warnf("Link approved %s", helpers.ExplorerLink(client.ChainId.Int64(), tx.Hash()))
+	client.logger.Warnf("Link approved %s", helpers.ExplorerLink(int64(client.ChainId), tx.Hash()))
 }
 
 func (client *Client) ApproveLink(t *testing.T, approvedFor common.Address, amount *big.Int) {
@@ -368,7 +368,7 @@ func (client *CCIPClient) WaitForCommit(t *testing.T, DestBlockNum uint64) {
 
 	select {
 	case event := <-commitEvent:
-		client.Dest.logger.Infof("Commit in tx %s", helpers.ExplorerLink(client.Dest.ChainId.Int64(), event.Raw.TxHash))
+		client.Dest.logger.Infof("Commit in tx %s", helpers.ExplorerLink(int64(client.Dest.ChainId), event.Raw.TxHash))
 		return
 	case err = <-sub.Err():
 		panic(err)
@@ -392,7 +392,7 @@ func (client *CCIPClient) WaitForExecution(t *testing.T, DestBlockNum uint64, se
 
 	select {
 	case event := <-events:
-		client.Dest.logger.Infof("Execution in tx %s", helpers.ExplorerLink(client.Dest.ChainId.Int64(), event.Raw.TxHash))
+		client.Dest.logger.Infof("Execution in tx %s", helpers.ExplorerLink(int64(client.Dest.ChainId), event.Raw.TxHash))
 		return
 	case err = <-sub.Err():
 		panic(err)
@@ -747,7 +747,7 @@ func (client *CCIPClient) SendToDappWithExecution(t *testing.T, source SourceCli
 		ExtraArgs:        extraArgsV1,
 	})
 	helpers.PanicErr(err)
-	source.logger.Infof("Send tokens tx %s", helpers.ExplorerLink(source.ChainId.Int64(), tx.Hash()))
+	source.logger.Infof("Send tokens tx %s", helpers.ExplorerLink(int64(source.ChainId), tx.Hash()))
 
 	return WaitForCrossChainSendRequest(source, SourceBlockNumber, tx.Hash())
 }
@@ -777,7 +777,7 @@ func (client *CCIPClient) SendToOnrampWithExecution(t *testing.T, source SourceC
 		printRevertReason(err, ge_router.GERouterABI)
 	}
 	helpers.PanicErr(err)
-	source.logger.Infof("Send tokens tx %s", helpers.ExplorerLink(source.ChainId.Int64(), tx.Hash()))
+	source.logger.Infof("Send tokens tx %s", helpers.ExplorerLink(int64(source.ChainId), tx.Hash()))
 	return WaitForCrossChainSendRequest(source, SourceBlockNumber, tx.Hash())
 }
 
@@ -809,7 +809,7 @@ func WaitForCrossChainSendRequest(source SourceClient, fromBlockNum uint64, txha
 		helpers.PanicErr(err)
 		for iterator.Next() {
 			if iterator.Event.Raw.TxHash.Hex() == txhash.Hex() {
-				source.logger.Infof("Cross chain send event found in tx: %s ", helpers.ExplorerLink(source.ChainId.Int64(), txhash))
+				source.logger.Infof("Cross chain send event found in tx: %s ", helpers.ExplorerLink(int64(source.ChainId), txhash))
 				return iterator.Event
 			}
 		}
@@ -982,7 +982,7 @@ func (client *CCIPClient) SetOCRConfig(env dione.Environment) {
 		40*time.Second, // deltaStage
 		3,
 		[]int{1, 1, 2, 3}, // Transmission schedule: 1 oracle in first deltaStage, 2 in the second and so on.
-		don.GenerateOracleIdentities(client.Dest.ChainId.String()),
+		don.GenerateOracleIdentities(client.Dest.ChainId),
 		ccipConfig,
 		5*time.Second,
 		32*time.Second,
@@ -1010,7 +1010,7 @@ func (client *CCIPClient) SetOCRConfig(env dione.Environment) {
 	)
 	helpers.PanicErr(err)
 	shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
-	client.Dest.logger.Infof("Config set on commitStore %s", helpers.ExplorerLink(client.Dest.ChainId.Int64(), tx.Hash()))
+	client.Dest.logger.Infof("Config set on commitStore %s", helpers.ExplorerLink(int64(client.Dest.ChainId), tx.Hash()))
 
 	tx, err = client.Dest.OffRamp.SetConfig(
 		client.Dest.Owner,
@@ -1023,7 +1023,7 @@ func (client *CCIPClient) SetOCRConfig(env dione.Environment) {
 	)
 	helpers.PanicErr(err)
 	shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
-	client.Dest.logger.Infof("Config set on offramp %s", helpers.ExplorerLink(client.Dest.ChainId.Int64(), tx.Hash()))
+	client.Dest.logger.Infof("Config set on offramp %s", helpers.ExplorerLink(int64(client.Dest.ChainId), tx.Hash()))
 }
 
 func (client *CCIPClient) AcceptOwnership(t *testing.T) {

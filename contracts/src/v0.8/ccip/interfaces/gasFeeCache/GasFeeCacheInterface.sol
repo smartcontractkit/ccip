@@ -5,13 +5,13 @@ import {Common} from "../../models/Common.sol";
 import {GE} from "../../models/GE.sol";
 
 interface GasFeeCacheInterface {
-  error ChainNotSupported(uint256 chain);
+  error ChainNotSupported(uint64 chain);
   error FeeUpdaterNotAllowed(address feeUpdater);
   error OnlyCallableByUpdaterOrOwner();
 
   event FeeUpdaterSet(address feeUpdater);
   event FeeUpdaterRemoved(address feeUpdater);
-  event GasFeeUpdated(uint256 destChain, uint256 linkPerUnitGas);
+  event GasFeeUpdated(uint64 destChain, uint256 linkPerUnitGas);
 
   function setFeeUpdater(address feeUpdater) external;
 
@@ -19,5 +19,5 @@ interface GasFeeCacheInterface {
 
   function updateFees(GE.FeeUpdate[] memory feeUpdates) external;
 
-  function getFee(uint256 destChainId) external view returns (uint256 fee);
+  function getFee(uint64 destChainId) external view returns (uint256 fee);
 }

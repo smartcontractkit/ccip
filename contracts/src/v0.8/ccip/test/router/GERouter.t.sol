@@ -73,7 +73,7 @@ contract GERouter_ccipSend is EVM2EVMGEOnRampSetup {
 
   function testUnsupportedDestinationChainReverts() public {
     GEConsumer.EVM2AnyGEMessage memory message = _generateEmptyMessage();
-    uint256 wrongChain = DEST_CHAIN_ID + 1;
+    uint64 wrongChain = DEST_CHAIN_ID + 1;
 
     vm.expectRevert(abi.encodeWithSelector(BaseOnRampRouterInterface.UnsupportedDestinationChain.selector, wrongChain));
 
@@ -104,7 +104,7 @@ contract GERouter_ccipSend is EVM2EVMGEOnRampSetup {
 
 /// @notice #setOnRamp
 contract GERouter_setOnRamp is EVM2EVMGEOnRampSetup {
-  event OnRampSet(uint256 indexed chainId, EVM2EVMGEOnRampInterface indexed onRamp);
+  event OnRampSet(uint64 indexed chainId, EVM2EVMGEOnRampInterface indexed onRamp);
 
   // Success
 
@@ -112,7 +112,7 @@ contract GERouter_setOnRamp is EVM2EVMGEOnRampSetup {
   // and isChainSupported.
   function testSuccess() public {
     EVM2EVMGEOnRampInterface onramp = EVM2EVMGEOnRampInterface(address(1));
-    uint256 chainId = 1337;
+    uint64 chainId = 1337;
     EVM2EVMGEOnRampInterface before = s_sourceRouter.getOnRamp(chainId);
     assertEq(address(0), address(before));
     assertFalse(s_sourceRouter.isChainSupported(chainId));

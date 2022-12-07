@@ -22,7 +22,7 @@ contract EVM2AnyTollOnRampRouter is
   mapping(uint256 => EVM2EVMTollOnRampInterface) private s_onRamps;
 
   /// @inheritdoc EVM2AnyTollOnRampRouterInterface
-  function ccipSend(uint256 destinationChainId, TollConsumer.EVM2AnyTollMessage memory message)
+  function ccipSend(uint64 destinationChainId, TollConsumer.EVM2AnyTollMessage memory message)
     external
     returns (uint64)
   {
@@ -45,19 +45,19 @@ contract EVM2AnyTollOnRampRouter is
   }
 
   /// @inheritdoc EVM2AnyTollOnRampRouterInterface
-  function setOnRamp(uint256 chainId, EVM2EVMTollOnRampInterface onRamp) external onlyOwner {
+  function setOnRamp(uint64 chainId, EVM2EVMTollOnRampInterface onRamp) external onlyOwner {
     if (address(s_onRamps[chainId]) == address(onRamp)) revert OnRampAlreadySet(chainId, onRamp);
     s_onRamps[chainId] = onRamp;
     emit OnRampSet(chainId, onRamp);
   }
 
   /// @inheritdoc EVM2AnyTollOnRampRouterInterface
-  function getOnRamp(uint256 chainId) external view returns (EVM2EVMTollOnRampInterface) {
+  function getOnRamp(uint64 chainId) external view returns (EVM2EVMTollOnRampInterface) {
     return s_onRamps[chainId];
   }
 
   /// @inheritdoc BaseOnRampRouterInterface
-  function isChainSupported(uint256 chainId) external view returns (bool supported) {
+  function isChainSupported(uint64 chainId) external view returns (bool supported) {
     return address(s_onRamps[chainId]) != address(0);
   }
 }

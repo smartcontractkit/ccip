@@ -1,12 +1,12 @@
 package secrets
 
-import "math/big"
+import "strconv"
 
-var chainIdToRPC = map[string]string{}
+var chainIdToRPC = map[uint64]string{}
 
-func GetRPC(chainID *big.Int) string {
-	if rpc, ok := chainIdToRPC[chainID.String()]; ok {
+func GetRPC(chainID uint64) string {
+	if rpc, ok := chainIdToRPC[chainID]; ok {
 		return rpc
 	}
-	panic("RPC not found. Please check secrets.go for chainID " + chainID.String())
+	panic("RPC not found. Please check secrets.go for chainID " + strconv.FormatUint(chainID, 10))
 }

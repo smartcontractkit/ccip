@@ -51,8 +51,8 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
   OffRampConfig internal s_config;
 
   constructor(
-    uint256 sourceChainId,
-    uint256 chainId,
+    uint64 sourceChainId,
+    uint64 chainId,
     OffRampConfig memory offRampConfig,
     address onRampAddress,
     CommitStoreInterface commitStore,

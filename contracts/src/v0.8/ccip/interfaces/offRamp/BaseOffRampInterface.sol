@@ -10,7 +10,7 @@ interface BaseOffRampInterface {
   error ZeroAddressNotAllowed();
   error AlreadyExecuted(uint64 sequenceNumber);
   error ExecutionError(bytes error);
-  error InvalidSourceChain(uint256 sourceChainId);
+  error InvalidSourceChain(uint64 sourceChainId);
   error NoMessagesToExecute();
   error ManualExecutionNotYetEnabled();
   error MessageTooLarge(uint256 maxSize, uint256 actualSize);
@@ -22,9 +22,9 @@ interface BaseOffRampInterface {
   error CanOnlySelfCall();
   error ReceiverError();
   error MissingFeeCoinPrice(address feeCoin);
-  error InsufficientFeeAmount(uint256 sequenceNumber, uint256 expectedFeeTokens, uint256 feeTokenAmount);
+  error InsufficientFeeAmount(uint64 sequenceNumber, uint256 expectedFeeTokens, uint256 feeTokenAmount);
 
-  event OffRampRouterSet(address indexed router, uint256 sourceChainId, address onRampAddress);
+  event OffRampRouterSet(address indexed router, uint64 sourceChainId, address onRampAddress);
   event OffRampConfigSet(OffRampConfig config);
 
   struct OffRampConfig {

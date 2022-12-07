@@ -11,7 +11,7 @@ import (
 // Chains
 
 var Prod_Goerli = rhea.EVMChainConfig{
-	ChainId: big.NewInt(5),
+	ChainId: 5,
 	GasSettings: rhea.EVMGasSettings{
 		EIP1559:   true,
 		GasTipCap: rhea.DefaultGasTipFee,
@@ -34,7 +34,7 @@ var Prod_Goerli = rhea.EVMChainConfig{
 }
 
 var Prod_OptimismGoerli = rhea.EVMChainConfig{
-	ChainId: big.NewInt(420),
+	ChainId: 420,
 	GasSettings: rhea.EVMGasSettings{
 		EIP1559: false,
 	},
@@ -56,7 +56,7 @@ var Prod_OptimismGoerli = rhea.EVMChainConfig{
 }
 
 var Prod_AvaxFuji = rhea.EVMChainConfig{
-	ChainId: big.NewInt(43113),
+	ChainId: 43113,
 	GasSettings: rhea.EVMGasSettings{
 		EIP1559: false,
 	},

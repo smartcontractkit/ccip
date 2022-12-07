@@ -24,8 +24,8 @@ contract EVM2EVMTollOnRamp is EVM2EVMTollOnRampInterface, BaseOnRamp, TypeAndVer
   mapping(IERC20 => uint256) internal s_feesByToken;
 
   constructor(
-    uint256 chainId,
-    uint256 destinationChainId,
+    uint64 chainId,
+    uint64 destinationChainId,
     IERC20[] memory tokens,
     PoolInterface[] memory pools,
     address[] memory allowlist,

@@ -5,7 +5,7 @@ import "testing"
 func UpgradeLane(t *testing.T, sourceClient *EvmDeploymentConfig, destClient *EvmDeploymentConfig) {
 	if !sourceClient.DeploySettings.DeployRamp || !destClient.DeploySettings.DeployRamp {
 		sourceClient.Logger.Errorf("Please set \"DeployRamp\" to true for the given EvmChainConfigs and make sure "+
-			"the right ones are set. Source: %d, Dest %d", sourceClient.ChainConfig.ChainId.Int64(), destClient.ChainConfig.ChainId.Int64())
+			"the right ones are set. Source: %d, Dest %d", sourceClient.ChainConfig.ChainId, destClient.ChainConfig.ChainId)
 		return
 	}
 

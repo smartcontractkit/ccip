@@ -134,7 +134,7 @@ func (router *TollOnRampRouter) Address() string {
 	return router.EthAddress.Hex()
 }
 
-func (router *TollOnRampRouter) SetOnRamp(chainID *big.Int, onRamp common.Address) error {
+func (router *TollOnRampRouter) SetOnRamp(chainID uint64, onRamp common.Address) error {
 	opts, err := router.client.TransactionOpts(router.client.DefaultWallet)
 	if err != nil {
 		return err
@@ -152,7 +152,7 @@ func (router *TollOnRampRouter) SetOnRamp(chainID *big.Int, onRamp common.Addres
 	return router.client.ProcessTransaction(tx)
 }
 
-func (router *TollOnRampRouter) CCIPSend(destChainId *big.Int, msg evm_2_any_toll_onramp_router.TollConsumerEVM2AnyTollMessage) (*types.Transaction, error) {
+func (router *TollOnRampRouter) CCIPSend(destChainId uint64, msg evm_2_any_toll_onramp_router.TollConsumerEVM2AnyTollMessage) (*types.Transaction, error) {
 	opts, err := router.client.TransactionOpts(router.client.DefaultWallet)
 	if err != nil {
 		return nil, err

@@ -4,8 +4,8 @@ import "../../../offRamp/BaseOffRamp.sol";
 
 contract BaseOffRampHelper is BaseOffRamp {
   constructor(
-    uint256 sourceChainId,
-    uint256 chainId,
+    uint64 sourceChainId,
+    uint64 chainId,
     address onRampAddress,
     CommitStoreInterface commitStore,
     AFNInterface afn,
