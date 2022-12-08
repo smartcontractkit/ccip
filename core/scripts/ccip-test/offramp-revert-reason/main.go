@@ -17,8 +17,11 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_toll_onramp_router"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_offramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ge_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/native_token_pool"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/secrets"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
@@ -122,6 +125,8 @@ func getABIForContract(client *ethclient.Client, contractAddress common.Address)
 		// SHARED
 	case ccip.CommitStore:
 		return []string{commit_store.CommitStoreABI}
+	case ccip.EVM2EVMGEOffRamp:
+		return append(always, evm_2_evm_ge_offramp.EVM2EVMGEOffRampABI, ge_router.GERouterABI, commit_store.CommitStoreABI)
 	}
 	panic("Contract not found")
 }
@@ -131,6 +136,7 @@ func getAllABIs() []string {
 		// toll
 		evm_2_evm_toll_onramp.EVM2EVMTollOnRampABI, evm_2_evm_toll_offramp.EVM2EVMTollOffRampABI,
 		evm_2_any_toll_onramp_router.EVM2AnyTollOnRampRouterABI, any_2_evm_toll_offramp_router.Any2EVMTollOffRampRouterABI,
+		evm_2_evm_ge_offramp.EVM2EVMGEOffRampABI, ge_router.GERouterABI, evm_2_evm_ge_onramp.EVM2EVMGEOnRampABI,
 	}
 }
 

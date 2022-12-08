@@ -25,12 +25,11 @@ var _ = Describe("CCIP interactions test @ccip", func() {
 
 	AfterEach(func() {
 		By("Tearing down the environment")
-		sourceChainClient.GasStats().PrintStats()
 		err := actions.TeardownSuite(testEnvironment, ctfUtils.ProjectRoot, chainlinkNodes, nil, destChainClient, sourceChainClient)
 		Expect(err).ShouldNot(HaveOccurred(), "Environment teardown shouldn't fail")
 	})
 
-	It("Deliver message with token in toll based model", func() {
+	It("Deliver message with token", func() {
 		var (
 			sourceCCIP *actions.SourceCCIPModule
 			destCCIP   *actions.DestCCIPModule
@@ -63,7 +62,7 @@ var _ = Describe("CCIP interactions test @ccip", func() {
 		sourceCCIP.DeployContracts()
 
 		// deploy all destination contracts
-		destCCIP = actions.DefaultDestinationCCIPModule(destChainClient, sourceChainClient.GetChainID())
+		destCCIP = actions.DefaultDestinationCCIPModule(destChainClient, sourceChainClient.GetChainID().Uint64())
 		By("Deploying destination contracts")
 		destCCIP.DeployContracts(*sourceCCIP)
 
@@ -77,8 +76,10 @@ var _ = Describe("CCIP interactions test @ccip", func() {
 		actions.CreateOCRJobsForCCIP(
 			clNodes[0], nil, clNodes[1:], nil,
 			sourceCCIP.TollOnRamp.EthAddress,
+			sourceCCIP.GEOnRamp.EthAddress,
 			destCCIP.CommitStore.EthAddress,
 			destCCIP.TollOffRamp.EthAddress,
+			destCCIP.GEOffRamp.EthAddress,
 			sourceChainClient, destChainClient,
 			tokenAddr,
 			mockServer,
@@ -89,6 +90,12 @@ var _ = Describe("CCIP interactions test @ccip", func() {
 		actions.SetOCRConfigs(clNodes[1:], nil, *destCCIP) // first node is the bootstrapper
 
 		ccipTest := actions.NewCCIPTest(sourceCCIP, destCCIP, time.Minute)
+
+		// initiate transfer with GE and verify
+		By("Multiple Token transfer with GE, watch for updated sequence numbers and events logs, " +
+			"verify balance in receiving and sending account pre and post transfer")
+		ccipTest.SendGERequests(1)
+		ccipTest.ValidateGERequests()
 
 		// initiate transfer with toll and verify
 		By("Multiple Token transfer with toll, watch for updated sequence numbers and events logs, " +

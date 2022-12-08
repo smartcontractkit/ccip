@@ -12,8 +12,12 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_toll_onramp_router"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_offramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/gas_fee_cache"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ge_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/mock_afn_contract"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/native_token_pool"
@@ -405,4 +409,204 @@ func (sender *TollSender) SendTokens(
 		return nil, err
 	}
 	return tx, sender.client.ProcessTransaction(tx)
+}
+
+type GasFeeCache struct {
+	client     *blockchain.EthereumClient
+	instance   *gas_fee_cache.GasFeeCache
+	EthAddress common.Address
+}
+
+func (c *GasFeeCache) Address() string {
+	return c.EthAddress.Hex()
+}
+
+func (c *GasFeeCache) SetFeeUpdater(addr common.Address) error {
+	opts, err := c.client.TransactionOpts(c.client.DefaultWallet)
+	if err != nil {
+		return err
+	}
+	tx, err := c.instance.SetFeeUpdater(opts, addr)
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Str("updater", addr.Hex()).
+		Msg("GasFeeCache updater set")
+	return c.client.ProcessTransaction(tx)
+}
+
+type GERouter struct {
+	client     *blockchain.EthereumClient
+	instance   *ge_router.GERouter
+	EthAddress common.Address
+}
+
+func (router *GERouter) Address() string {
+	return router.EthAddress.Hex()
+}
+
+func (router *GERouter) SetOnRamp(chainID uint64, onRamp common.Address) error {
+	opts, err := router.client.TransactionOpts(router.client.DefaultWallet)
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Str("GE Router", router.Address()).
+		Msg("Setting on ramp for GE router")
+	tx, err := router.instance.SetOnRamp(opts, chainID, onRamp)
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Str("onRamp", onRamp.Hex()).
+		Msg("GE Router is configured")
+	return router.client.ProcessTransaction(tx)
+}
+
+func (router *GERouter) CCIPSend(destChainId uint64, msg ge_router.GEConsumerEVM2AnyGEMessage) (*types.Transaction, error) {
+	opts, err := router.client.TransactionOpts(router.client.DefaultWallet)
+	if err != nil {
+		return nil, err
+	}
+	tx, err := router.instance.CcipSend(opts, destChainId, msg)
+	if err != nil {
+		return nil, err
+	}
+	return tx, router.client.ProcessTransaction(tx)
+}
+
+func (router *GERouter) AddOffRamp(offRamp common.Address) (*types.Transaction, error) {
+	opts, err := router.client.TransactionOpts(router.client.DefaultWallet)
+	if err != nil {
+		return nil, err
+	}
+	tx, err := router.instance.AddOffRamp(opts, offRamp)
+	if err != nil {
+		return nil, err
+	}
+	log.Info().
+		Str("offRamp", offRamp.Hex()).
+		Msg("offRamp is added to GE Router")
+	return tx, router.client.ProcessTransaction(tx)
+}
+
+func (router *GERouter) GetFee(destinationChainId uint64, message ge_router.GEConsumerEVM2AnyGEMessage) (*big.Int, error) {
+	return router.instance.GetFee(nil, destinationChainId, message)
+}
+
+type GEOnRamp struct {
+	client     *blockchain.EthereumClient
+	instance   *evm_2_evm_ge_onramp.EVM2EVMGEOnRamp
+	EthAddress common.Address
+}
+
+func (onRamp *GEOnRamp) Address() string {
+	return onRamp.EthAddress.Hex()
+}
+
+func (onRamp *GEOnRamp) FilterCCIPSendRequested(
+	currentBlock uint64,
+) (*evm_2_evm_ge_onramp.EVM2EVMGEOnRampCCIPSendRequestedIterator, error) {
+	filter := bind.FilterOpts{Start: currentBlock}
+	return onRamp.instance.FilterCCIPSendRequested(&filter)
+}
+
+func (onRamp *GEOnRamp) SetTokenPrices(tokens []common.Address, prices []*big.Int) error {
+	opts, err := onRamp.client.TransactionOpts(onRamp.client.DefaultWallet)
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Str("GEOnRamp", onRamp.Address()).
+		Msg("Setting GEOnRamp token prices")
+	tx, err := onRamp.instance.SetPrices(opts, tokens, prices)
+	if err != nil {
+		return err
+	}
+	return onRamp.client.ProcessTransaction(tx)
+}
+
+type GEOffRamp struct {
+	client     *blockchain.EthereumClient
+	instance   *evm_2_evm_ge_offramp.EVM2EVMGEOffRamp
+	EthAddress common.Address
+}
+
+func (offRamp *GEOffRamp) Address() string {
+	return offRamp.EthAddress.Hex()
+}
+
+// SetConfig sets the offchain reporting protocol configuration
+func (offRamp *GEOffRamp) SetConfig(
+	signers []common.Address,
+	transmitters []common.Address,
+	f uint8,
+	onchainConfig []byte,
+	offchainConfigVersion uint64,
+	offchainConfig []byte,
+) error {
+	log.Info().Str("Contract Address", offRamp.Address()).Msg("Configuring GEOffRamp Contract")
+	// Set Config
+	opts, err := offRamp.client.TransactionOpts(offRamp.client.GetDefaultWallet())
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Interface("signerAddresses", signers).
+		Interface("transmitterAddresses", transmitters).
+		Msg("Configuring GEOffRamp")
+	tx, err := offRamp.instance.SetConfig(
+		opts,
+		signers,
+		transmitters,
+		f,
+		onchainConfig,
+		offchainConfigVersion,
+		offchainConfig,
+	)
+
+	if err != nil {
+		return err
+	}
+	return offRamp.client.ProcessTransaction(tx)
+}
+
+func (offRamp *GEOffRamp) SetRouter(offRampRouterAddress common.Address) error {
+	opts, err := offRamp.client.TransactionOpts(offRamp.client.DefaultWallet)
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Str("GEOffRamp", offRamp.Address()).
+		Msg("Setting router for offramp")
+	tx, err := offRamp.instance.SetRouter(opts, offRampRouterAddress)
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Str("offRampRouterAddress", offRampRouterAddress.Hex()).
+		Msg("GEOffRamp router is configured")
+	return offRamp.client.ProcessTransaction(tx)
+}
+
+func (offRamp *GEOffRamp) FilterExecutionStateChanged(seqNumber []uint64, messageId [][32]byte, currentBlockOnDest uint64) (
+	*evm_2_evm_ge_offramp.EVM2EVMGEOffRampExecutionStateChangedIterator, error,
+) {
+	return offRamp.instance.FilterExecutionStateChanged(&bind.FilterOpts{Start: currentBlockOnDest}, seqNumber, messageId)
+}
+
+func (offRamp *GEOffRamp) SetTokenPrices(tokens []common.Address, prices []*big.Int) error {
+	opts, err := offRamp.client.TransactionOpts(offRamp.client.DefaultWallet)
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Str("GEOffRamp", offRamp.Address()).
+		Msg("Setting TollOffRamp token prices")
+	tx, err := offRamp.instance.SetPrices(opts, tokens, prices)
+	if err != nil {
+		return err
+	}
+	return offRamp.client.ProcessTransaction(tx)
 }

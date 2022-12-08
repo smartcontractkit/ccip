@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"encoding/hex"
 	"fmt"
+	"math/big"
 	"strings"
 	"time"
 
@@ -17,7 +18,11 @@ import (
 	"golang.org/x/crypto/curve25519"
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_offramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_offramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/gas_fee_cache"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ge_router"
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_toll_onramp_router"
@@ -274,6 +279,129 @@ func (e *CCIPContractsDeployer) DeployTollOnRamp(
 	return &TollOnRamp{
 		client:     e.evmClient,
 		instance:   instance.(*evm_2_evm_toll_onramp.EVM2EVMTollOnRamp),
+		EthAddress: *address,
+	}, err
+}
+
+func (e *CCIPContractsDeployer) DeployGERouter(
+	offRamps []common.Address,
+) (
+	*GERouter,
+	error,
+) {
+	address, _, instance, err := e.evmClient.DeployContract("GERouter", func(
+		auth *bind.TransactOpts,
+		backend bind.ContractBackend,
+	) (common.Address, *types.Transaction, interface{}, error) {
+		return ge_router.DeployGERouter(auth, backend, offRamps)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &GERouter{
+		client:     e.evmClient,
+		instance:   instance.(*ge_router.GERouter),
+		EthAddress: *address,
+	}, err
+}
+
+func (e *CCIPContractsDeployer) DeployGasFeeCache(
+	feeUpdates []gas_fee_cache.GEFeeUpdate,
+) (
+	*GasFeeCache,
+	error,
+) {
+	address, _, instance, err := e.evmClient.DeployContract("GasFeeCache", func(
+		auth *bind.TransactOpts,
+		backend bind.ContractBackend,
+	) (common.Address, *types.Transaction, interface{}, error) {
+		return gas_fee_cache.DeployGasFeeCache(auth, backend, feeUpdates, nil)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &GasFeeCache{
+		client:     e.evmClient,
+		instance:   instance.(*gas_fee_cache.GasFeeCache),
+		EthAddress: *address,
+	}, err
+}
+
+func (e *CCIPContractsDeployer) DeployGEOnRamp(
+	sourceChainId, destChainId uint64,
+	tokens, pools, allowList []common.Address,
+	afn, router common.Address,
+	opts RateLimiterConfig,
+	feeConfig evm_2_evm_ge_onramp.EVM2EVMGEOnRampInterfaceDynamicFeeConfig,
+) (
+	*GEOnRamp,
+	error,
+) {
+	address, _, instance, err := e.evmClient.DeployContract("GEOnRamp", func(
+		auth *bind.TransactOpts,
+		backend bind.ContractBackend,
+	) (common.Address, *types.Transaction, interface{}, error) {
+		return evm_2_evm_ge_onramp.DeployEVM2EVMGEOnRamp(auth, backend, sourceChainId, destChainId, tokens, pools, allowList, afn,
+			evm_2_evm_ge_onramp.BaseOnRampInterfaceOnRampConfig{
+				CommitFeeJuels:  0,
+				MaxDataSize:     1e12,
+				MaxTokensLength: 5,
+				MaxGasLimit:     ccip.GasLimitPerTx,
+			},
+			evm_2_evm_ge_onramp.AggregateRateLimiterInterfaceRateLimiterConfig{
+				Capacity: opts.Capacity,
+				Rate:     opts.Rate,
+			},
+			auth.From,
+			router,
+			feeConfig)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &GEOnRamp{
+		client:     e.evmClient,
+		instance:   instance.(*evm_2_evm_ge_onramp.EVM2EVMGEOnRamp),
+		EthAddress: *address,
+	}, err
+}
+
+func (e *CCIPContractsDeployer) DeployGEOffRamp(
+	sourceChainId, destChainId uint64,
+	commitStore, onRamp, afn, feetoken, destGasFeeCacheAddress common.Address,
+	sourceToken, pools []common.Address,
+	opts RateLimiterConfig, gasOverhead *big.Int) (
+	*GEOffRamp,
+	error,
+) {
+	address, _, instance, err := e.evmClient.DeployContract("GEOffRamp Contract", func(
+		auth *bind.TransactOpts,
+		backend bind.ContractBackend,
+	) (common.Address, *types.Transaction, interface{}, error) {
+		return evm_2_evm_ge_offramp.DeployEVM2EVMGEOffRamp(
+			auth, backend, sourceChainId, destChainId,
+			evm_2_evm_ge_offramp.EVM2EVMGEOffRampInterfaceGEOffRampConfig{
+				GasOverhead:                             gasOverhead,
+				GasFeeCache:                             destGasFeeCacheAddress,
+				PermissionLessExecutionThresholdSeconds: 0,
+				ExecutionDelaySeconds:                   0,
+				MaxDataSize:                             1e12,
+				MaxTokensLength:                         15,
+			},
+			onRamp,
+			commitStore,
+			afn,
+			sourceToken,
+			pools,
+			evm_2_evm_ge_offramp.AggregateRateLimiterInterfaceRateLimiterConfig{
+				Rate:     opts.Rate,
+				Capacity: opts.Capacity,
+			},
+			auth.From, feetoken)
+	})
+	return &GEOffRamp{
+		client:     e.evmClient,
+		instance:   instance.(*evm_2_evm_ge_offramp.EVM2EVMGEOffRamp),
 		EthAddress: *address,
 	}, err
 }
