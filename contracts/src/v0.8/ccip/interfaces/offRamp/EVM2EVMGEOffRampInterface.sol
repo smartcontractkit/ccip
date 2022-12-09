@@ -33,7 +33,7 @@ interface EVM2EVMGEOffRampInterface {
   /**
    * @notice Returns the the current nonce for a receiver.
    */
-  function getSenderNonce(address sender) external view returns (uint256 nonce);
+  function getSenderNonce(address sender) external view returns (uint64 nonce);
 
   /**
    * @notice Returns the current balance for a given NOP.

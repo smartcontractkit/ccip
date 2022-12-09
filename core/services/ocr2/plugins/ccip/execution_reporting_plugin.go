@@ -766,7 +766,7 @@ func (r *ExecutionReportingPlugin) expireInflight(lggr logger.Logger) {
 	for _, report := range r.inFlight {
 		if time.Since(report.createdAt) > r.inflightCacheExpiry {
 			// Happy path: inflight report was successfully transmitted onchain, we remove it from inflight and onchain state reflects inflight.
-			// Sad path: inflight report reverts onchain, we remove it from inflight, onchain state does not reflect the chains so we retry.
+			// Sad path: inflight report reverts onchain, we remove it from inflight, onchain state does not reflect the change so we retry.
 			lggr.Infow("Inflight report expired", "seqNums", report.seqNrs)
 		} else {
 			stillInFlight = append(stillInFlight, report)

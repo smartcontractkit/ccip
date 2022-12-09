@@ -47,6 +47,10 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 	jobParams := ccipContracts.NewCCIPJobSpecParams(tokensPerFeeCoinPipeline, configBlock)
 	defer linkEth.Close()
 
+	jobParams.RelayInflight = 2 * time.Second
+	jobParams.ExecInflight = 2 * time.Second
+	jobParams.RootSnooze = 1 * time.Second
+
 	// Add the bootstrap job
 	bootstrapNode.AddBootstrapJob(t, jobParams.BootstrapJob(ccipContracts.CommitStore.Address().Hex()))
 	testhelpers.AddAllJobs(t, jobParams, ccipContracts, nodes)
@@ -110,7 +114,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 
 		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.GEOffRamp.Address(), nodes, geCurrentSeqNum, geCurrentSeqNum)
 		assert.Len(t, executionLogs, 1)
-		testhelpers.AssertGEExecSuccess(t, ccipContracts, executionLogs[0])
+		testhelpers.AssertGEExecState(t, ccipContracts, executionLogs[0], ccip.Success)
 
 		// Asserts
 		// 1) The total pool input == total pool output
@@ -204,7 +208,6 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 
 		// Send a batch of requests in a single block
 		testhelpers.ConfirmTxs(t, txs, ccipContracts.SourceChain)
-		// All nodes should have all 3.
 		var reqs []logpoller.Log
 		for i := 0; i < n; i++ {
 			reqs = append(reqs, testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.GEOnRamp.Address(), nodes, geCurrentSeqNum+i))
@@ -214,7 +217,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		// Should all be executed
 		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.GEOffRamp.Address(), nodes, geCurrentSeqNum, geCurrentSeqNum+n-1)
 		for _, execLog := range executionLogs {
-			testhelpers.AssertGEExecSuccess(t, ccipContracts, execLog)
+			testhelpers.AssertGEExecState(t, ccipContracts, execLog, ccip.Success)
 		}
 
 		geCurrentSeqNum += n
@@ -388,6 +391,78 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 			}, // +/- 1 link
 		})
 		tollCurrentSeqNum += n
+	})
+
+	t.Run("ge strict sequencing", func(t *testing.T) {
+		// approve the total amount to be sent
+		// set revert to true so that the execution gets reverted
+		_, err = ccipContracts.Receivers[1].Receiver.SetRevert(ccipContracts.DestUser, true)
+		require.NoError(t, err, "setting revert to true on the receiver")
+		ccipContracts.DestChain.Commit()
+		currentBlockNumber := ccipContracts.DestChain.Blockchain().CurrentBlock().Number().Uint64()
+
+		// Test sequence:
+		// Send msg1: strict reverts
+		// Send msg2, msg3: blocked on manual exec
+		// Execute msg1 manually.
+		// msg2 and msg2 should go through.
+		totalMsgs := 2
+		extraArgs, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(200_000), true)
+		require.NoError(t, err)
+		msg := ge_router.GEConsumerEVM2AnyGEMessage{
+			Receiver:         testhelpers.MustEncodeAddress(t, ccipContracts.Receivers[1].Receiver.Address()),
+			Data:             []byte("hello"),
+			TokensAndAmounts: []ge_router.CommonEVMTokenAndAmount{},
+			FeeToken:         ccipContracts.SourceLinkToken.Address(),
+			ExtraArgs:        extraArgs,
+		}
+		fee, err := ccipContracts.SourceGERouter.GetFee(nil, destChainID, msg)
+		require.NoError(t, err)
+		// Approve the fee amount
+		_, err = ccipContracts.SourceLinkToken.Approve(ccipContracts.SourceUser, ccipContracts.SourceGERouter.Address(), big.NewInt(0).Mul(big.NewInt(int64(totalMsgs)), fee))
+		require.NoError(t, err)
+		ccipContracts.SourceChain.Commit()
+		eventSignatures := ccip.GetGEEventSignatures()
+		testhelpers.SendGERequest(t, ccipContracts, msg)
+		failedReqLog := testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.GEOnRamp.Address(), nodes, geCurrentSeqNum)
+		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.GEOnRamp.Address(), geCurrentSeqNum, geCurrentSeqNum)
+		reportForFailedReq := testhelpers.EventuallyCommitReportAccepted(t, ccipContracts, currentBlockNumber)
+
+		// execution status should be failed
+		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.GEOffRamp.Address(), nodes, geCurrentSeqNum, geCurrentSeqNum)
+		assert.Len(t, executionLogs, 1)
+		testhelpers.AssertGEExecState(t, ccipContracts, executionLogs[0], ccip.Failure)
+		geCurrentSeqNum++
+
+		// subsequent requests which should not be executed.
+		var pendingReqNumbers []int
+		for i := 1; i < totalMsgs; i++ {
+			testhelpers.SendGERequest(t, ccipContracts, msg)
+			testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.GEOnRamp.Address(), nodes, geCurrentSeqNum)
+			testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.GEOnRamp.Address(), geCurrentSeqNum, geCurrentSeqNum)
+			executionLog := testhelpers.NoNodesHaveExecutedSeqNum(t, ccipContracts, eventSignatures, ccipContracts.GEOffRamp.Address(), nodes, geCurrentSeqNum)
+			require.Empty(t, executionLog)
+			pendingReqNumbers = append(pendingReqNumbers, geCurrentSeqNum)
+			geCurrentSeqNum++
+		}
+
+		// flip the revert settings on receiver
+		_, err = ccipContracts.Receivers[1].Receiver.SetRevert(ccipContracts.DestUser, false)
+		require.NoError(t, err, "setting revert to false on the receiver")
+		ccipContracts.DestChain.Commit()
+		ccipContracts.SourceChain.Commit()
+
+		// manually execute the failed request
+		currentBlockNumber = ccipContracts.DestChain.Blockchain().CurrentBlock().Number().Uint64()
+		require.NoError(t, err)
+		failedSeqNum := testhelpers.ExecuteGEMessage(t, ccipContracts, failedReqLog, []logpoller.Log{failedReqLog}, reportForFailedReq)
+		testhelpers.EventuallyExecutionStateChangedToSuccess(t, ccipContracts, []uint64{failedSeqNum}, currentBlockNumber)
+
+		// verify all the pending requests should be successfully executed now
+		for _, seqNo := range pendingReqNumbers {
+			t.Logf("Verify execution for pending seqNum %d", seqNo)
+			testhelpers.EventuallyExecutionStateChangedToSuccess(t, ccipContracts, []uint64{uint64(seqNo)}, 1)
+		}
 	})
 
 	t.Run("upgrade contracts while transactions are pending", func(t *testing.T) {

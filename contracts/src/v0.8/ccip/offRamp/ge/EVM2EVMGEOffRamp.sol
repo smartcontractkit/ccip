@@ -67,7 +67,7 @@ contract EVM2EVMGEOffRamp is EVM2EVMGEOffRampInterface, BaseOffRamp, TypeAndVers
   }
 
   /// @inheritdoc EVM2EVMGEOffRampInterface
-  function getSenderNonce(address sender) public view returns (uint256 nonce) {
+  function getSenderNonce(address sender) public view returns (uint64 nonce) {
     return s_senderNonce[sender];
   }
 
@@ -114,15 +114,18 @@ contract EVM2EVMGEOffRamp is EVM2EVMGEOffRampInterface, BaseOffRamp, TypeAndVers
       // Two valid cases here, we either have never touched this message before, or we tried to execute and failed
       if (manualExecution) {
         // Manually execution is fine if we previously failed or if the commit report is just too old
+        // Acceptable state transitions: FAILURE->SUCCESS, UNTOUCHED->SUCCESS, FAILURE->FAILURE
         if (!(isOldCommitReport || originalState == Internal.MessageExecutionState.FAILURE))
           revert ManualExecutionNotYetEnabled();
       } else {
         // DON can only execute a message once
+        // Acceptable state transitions: UNTOUCHED->SUCCESS, UNTOUCHED->FAILURE
         if (originalState != Internal.MessageExecutionState.UNTOUCHED) revert AlreadyAttempted(message.sequenceNumber);
       }
 
       // If this is the first time executing this message we take the fee
       if (originalState == Internal.MessageExecutionState.UNTOUCHED) {
+        // UNTOUCHED messages MUST be executed in order always.
         if (s_senderNonce[message.sender] + 1 != message.nonce) {
           // We skip the message if the nonce is incorrect
           emit SkippedIncorrectNonce(message.nonce, message.sender);
@@ -137,8 +140,22 @@ contract EVM2EVMGEOffRamp is EVM2EVMGEOffRampInterface, BaseOffRamp, TypeAndVers
       Internal.MessageExecutionState newState = _trialExecute(_toAny2EVMMessageFromSender(message));
       s_executedMessages[message.sequenceNumber] = newState;
 
-      if (!(message.strict && newState == Internal.MessageExecutionState.FAILURE)) {
-        s_senderNonce[message.sender]++;
+      if (manualExecution) {
+        // Nonce changes per state transition:
+        // FAILURE->SUCCESS: no nonce bump unless strict
+        // UNTOUCHED->SUCCESS: nonce bump
+        // FAILURE->FAILURE: no nonce bump
+        if ((message.strict && originalState == Internal.MessageExecutionState.FAILURE && newState == Internal.MessageExecutionState.SUCCESS) ||
+          (originalState == Internal.MessageExecutionState.UNTOUCHED && newState == Internal.MessageExecutionState.SUCCESS)) {
+          s_senderNonce[message.sender]++;
+        }
+      } else {
+        // Nonce changes per state transition:
+        // UNTOUCHED->SUCCESS: nonce bump
+        // UNTOUCHED->FAILURE: nonce bump unless strict
+        if (!(message.strict && newState == Internal.MessageExecutionState.FAILURE)) {
+          s_senderNonce[message.sender]++;
+        }
       }
 
       emit ExecutionStateChanged(message.sequenceNumber, message.messageId, newState);

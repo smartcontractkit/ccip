@@ -566,7 +566,7 @@ func (client *CCIPClient) ScalingAndBatching(t *testing.T) {
 }
 
 //func (client CCIPClient) ExecuteOffRampTransaction(t *testing.T, proof merklemulti.Proof[[32]byte], encodedMessage []byte) (*types.Transaction, error) {
-//	decodedMsg, err := ccip.DecodeCCIPMessage(encodedMessage)
+//	decodedMsg, err := ccip.DecodeTollMessage(encodedMessage)
 //	require.NoError(t, err)
 //	_, err = ccip.MakeTollCCIPMsgArgs().PackValues([]interface{}{*decodedMsg})
 //	require.NoError(t, err)

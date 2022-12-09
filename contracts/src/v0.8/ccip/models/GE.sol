@@ -15,7 +15,7 @@ library GE {
     uint64[] sequenceNumbers;
     address[] tokenPerFeeCoinAddresses;
     uint256[] tokenPerFeeCoin;
-    FeeUpdate[] feeUpdates; // TODO: Only relevant for GE, separate report for toll?
+    FeeUpdate[] feeUpdates;
     bytes[] encodedMessages;
     bytes32[] innerProofs;
     uint256 innerProofFlagBits;

@@ -233,6 +233,8 @@ func (eb *ExecutionBatchBuilder) getExecutableSeqNrs(
 		if len(srcLogs) != int(unexpiredReport.Intervals[idx].Max-unexpiredReport.Intervals[idx].Min+1) {
 			return nil, errors.Errorf("unexpected missing msgs in committed root %x have %d want %d", unexpiredReport.MerkleRoots[idx], len(srcLogs), int(unexpiredReport.Intervals[idx].Max-unexpiredReport.Intervals[idx].Min+1))
 		}
+		// TODO: Reorg risk here? I.e. 1 message in a batch, we see its executed so we snooze forever,
+		// then it gets reorged out and we'll never retry.
 		executedMp, err := eb.getExecutedSeqNrsInRange(unexpiredReport.Intervals[idx].Min, unexpiredReport.Intervals[idx].Max)
 		if err != nil {
 			return nil, err
@@ -242,7 +244,7 @@ func (eb *ExecutionBatchBuilder) getExecutableSeqNrs(
 		// If all messages are already executed, snooze the root for the PERMISSIONLESS_EXECUTION_THRESHOLD_SECONDS,
 		// so it will never be considered again.
 		if allMessagesExecuted {
-			eb.lggr.Infof("Snoozing root %s forever since there are no executable txs anymore", hex.EncodeToString(unexpiredReport.MerkleRoots[idx][:]))
+			eb.lggr.Infof("Snoozing root %s forever since there are no executable txs anymore %v", hex.EncodeToString(unexpiredReport.MerkleRoots[idx][:]), executedMp)
 			eb.snoozedRoots[unexpiredReport.MerkleRoots[idx]] = time.Now().Add(PERMISSIONLESS_EXECUTION_THRESHOLD)
 			continue
 		}

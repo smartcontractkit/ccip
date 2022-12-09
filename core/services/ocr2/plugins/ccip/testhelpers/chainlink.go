@@ -34,6 +34,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/types"
 	configv2 "github.com/smartcontractkit/chainlink/core/config/v2"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/internal/cltest/heavyweight"
 	"github.com/smartcontractkit/chainlink/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/core/internal/testutils/evmtest"
@@ -92,7 +93,7 @@ func (node *Node) EventuallyHasExecutedSeqNums(t *testing.T, ccipContracts CCIPC
 			ccip.EvmWord(uint64(maxSeqNum)),
 			1)
 		require.NoError(t, err)
-		t.Log("Executed logs", len(lgs), lgs)
+		t.Logf("Have executed logs %d want %d", len(lgs), maxSeqNum-minSeqNum+1)
 		if len(lgs) == maxSeqNum-minSeqNum+1 {
 			logs = lgs
 			t.Logf("Seq Num %d-%d executed", minSeqNum, maxSeqNum)
@@ -425,6 +426,23 @@ func NoNodesHaveExecutedSeqNum(t *testing.T, ccipContracts CCIPContracts, eventS
 		log = node.ConsistentlySeqNumHasNotBeenExecuted(t, ccipContracts, eventSignatures, offRamp, seqNum)
 	}
 	return log
+}
+
+func EventuallyCommitReportAccepted(t *testing.T, ccipContracts CCIPContracts, currentBlock uint64) commit_store.InternalCommitReport {
+	g := gomega.NewGomegaWithT(t)
+	var report commit_store.InternalCommitReport
+	g.Eventually(func() []common.Address {
+		it, err := ccipContracts.CommitStore.FilterReportAccepted(&bind.FilterOpts{Start: currentBlock})
+		g.Expect(err).NotTo(gomega.HaveOccurred(), "Error filtering ReportAccepted event")
+		g.Expect(it.Next()).To(gomega.BeTrue(), "No ReportAccepted event found")
+		report = it.Event.Report
+		if len(report.OnRamps) > 0 {
+			t.Log("Report Accepted by commitStore")
+		}
+		return report.OnRamps
+	}, testutils.WaitTimeout(t), 1*time.Second).
+		Should(gomega.ContainElement(ccipContracts.GEOnRamp.Address()), "report has not been committed")
+	return report
 }
 
 func SetupAndStartNodes(ctx context.Context, t *testing.T, ccipContracts *CCIPContracts, bootstrapNodePort int64) (Node, []Node, int64) {

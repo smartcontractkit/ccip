@@ -133,8 +133,10 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 		batchBuilder = NewTollBatchBuilder(lggr, eventSignatures)
 		offRamp, err2 = NewTollOffRamp(common.HexToAddress(spec.ContractID), destChain)
 	case EVM2EVMGEOffRamp:
-		batchBuilder = NewGEBatchBuilder(lggr, eventSignatures)
-		offRamp, err2 = NewGEOffRamp(common.HexToAddress(spec.ContractID), destChain)
+		var geOffRamp *evm_2_evm_ge_offramp.EVM2EVMGEOffRamp
+		geOffRamp, err2 = evm_2_evm_ge_offramp.NewEVM2EVMGEOffRamp(common.HexToAddress(spec.ContractID), destChain.Client())
+		offRamp = NewGEOffRamp(geOffRamp)
+		batchBuilder = NewGEBatchBuilder(lggr, eventSignatures, geOffRamp)
 	default:
 		return nil, errors.Errorf("unrecognized offramp, is %v the correct offramp address?", spec.ContractID)
 	}
@@ -234,16 +236,20 @@ func NewTollOffRamp(addr common.Address, destChain evm.Chain) (OffRamp, error) {
 	return &tollOffRamp{offRamp}, nil
 }
 
-func NewGEOffRamp(addr common.Address, destChain evm.Chain) (OffRamp, error) {
-	offRamp, err := evm_2_evm_ge_offramp.NewEVM2EVMGEOffRamp(addr, destChain.Client())
-	if err != nil {
-		return nil, err
-	}
-	return &geOffRamp{offRamp}, nil
+func NewGEOffRamp(ramp *evm_2_evm_ge_offramp.EVM2EVMGEOffRamp) OffRamp {
+	return &geOffRamp{ramp}
 }
 
 type geOffRamp struct {
 	*evm_2_evm_ge_offramp.EVM2EVMGEOffRamp
+}
+
+func (s geOffRamp) GetSenderNonce(sender common.Address) (uint64, error) {
+	nonce, err := s.EVM2EVMGEOffRamp.GetSenderNonce(nil, sender)
+	if err != nil {
+		return 0, err
+	}
+	return nonce, nil
 }
 
 func (s geOffRamp) ParseSeqNumFromExecutionStateChanged(log types.Log) (uint64, error) {

@@ -34,6 +34,8 @@ import (
 	"github.com/smartcontractkit/chainlink/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
 	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
 	"github.com/smartcontractkit/chainlink/core/utils"
 )
@@ -746,13 +748,29 @@ func SendGERequest(t *testing.T, ccipContracts CCIPContracts, msg ge_router.GECo
 	ConfirmTxs(t, []*types.Transaction{tx}, ccipContracts.SourceChain)
 }
 
-func AssertGEExecSuccess(t *testing.T, ccipContracts CCIPContracts, log logpoller.Log) {
+func AssertGEExecState(t *testing.T, ccipContracts CCIPContracts, log logpoller.Log, state ccip.MessageExecutionState) {
 	executionStateChanged, err := ccipContracts.GEOffRamp.ParseExecutionStateChanged(log.GetGethLog())
 	require.NoError(t, err)
-	if ccip.MessageExecutionState(executionStateChanged.State) != ccip.Success {
+	if ccip.MessageExecutionState(executionStateChanged.State) != state {
 		t.Log("Execution failed")
 		t.Fail()
 	}
+}
+
+func EventuallyExecutionStateChangedToSuccess(t *testing.T, ccipContracts CCIPContracts, seqNum []uint64, blockNum uint64) {
+	gomega.NewGomegaWithT(t).Eventually(func() bool {
+		it, err := ccipContracts.GEOffRamp.FilterExecutionStateChanged(&bind.FilterOpts{Start: blockNum}, seqNum, [][32]byte{})
+		require.NoError(t, err)
+		for it.Next() {
+			if ccip.MessageExecutionState(it.Event.State) == ccip.Success {
+				return true
+			}
+		}
+		ccipContracts.SourceChain.Commit()
+		ccipContracts.DestChain.Commit()
+		return false
+	}, 1*time.Minute, time.Second).
+		Should(gomega.BeTrue(), "ExecutionStateChanged Event")
 }
 
 func QueueTollRequest(
@@ -812,4 +830,72 @@ func GetEVMExtraArgsV1(gasLimit *big.Int, strict bool) ([]byte, error) {
 	}
 
 	return append(EVMV1Tag, encodedArgs...), nil
+}
+
+func ExecuteGEMessage(
+	t *testing.T,
+	ccipContracts CCIPContracts,
+	req logpoller.Log,
+	allReqs []logpoller.Log,
+	report commit_store.InternalCommitReport,
+) uint64 {
+	t.Log("Executing request manually")
+	// Build full tree for report
+	mctx := hasher.NewKeccakCtx()
+	leafHasher := ccip.NewGELeafHasher(ccipContracts.SourceChainID, ccipContracts.DestChainID, ccipContracts.GEOnRamp.Address(), mctx)
+
+	var leafHashes [][32]byte
+	for _, otherReq := range allReqs {
+		hash, err := leafHasher.HashLeaf(otherReq.GetGethLog())
+		require.NoError(t, err)
+		leafHashes = append(leafHashes, hash)
+	}
+	intervalsByOnRamp := make(map[common.Address]commit_store.InternalInterval)
+	merkleRootsByOnRamp := make(map[common.Address][32]byte)
+	for i, onRamp := range report.OnRamps {
+		intervalsByOnRamp[onRamp] = report.Intervals[i]
+		merkleRootsByOnRamp[onRamp] = report.MerkleRoots[i]
+	}
+	interval := intervalsByOnRamp[ccipContracts.GEOnRamp.Address()]
+	decodedMsg, err := ccip.DecodeGEMessage(req.Data)
+	require.NoError(t, err)
+	innerIdx := int(decodedMsg.SequenceNumber - interval.Min)
+	innerTree, err := merklemulti.NewTree(mctx, leafHashes)
+	require.NoError(t, err)
+	innerProof := innerTree.Prove([]int{innerIdx})
+	var onRampIdx int
+	var outerTreeLeafs [][32]byte
+	for i, onRamp := range report.OnRamps {
+		if onRamp == ccipContracts.GEOnRamp.Address() {
+			onRampIdx = i
+		}
+		outerTreeLeafs = append(outerTreeLeafs, merkleRootsByOnRamp[onRamp])
+	}
+	outerTree, err := merklemulti.NewTree(mctx, outerTreeLeafs)
+	require.NoError(t, err)
+	require.Equal(t, outerTree.Root(), report.RootOfRoots, "Roots donot match")
+
+	outerProof := outerTree.Prove([]int{onRampIdx})
+
+	offRampProof := evm_2_evm_ge_offramp.GEExecutionReport{
+		SequenceNumbers:          []uint64{decodedMsg.SequenceNumber},
+		TokenPerFeeCoinAddresses: []common.Address{ccipContracts.SourceLinkToken.Address()},
+		TokenPerFeeCoin:          []*big.Int{big.NewInt(1)},
+		EncodedMessages:          [][]byte{req.Data},
+		InnerProofs:              innerProof.Hashes,
+		InnerProofFlagBits:       ccip.ProofFlagsToBits(innerProof.SourceFlags),
+		OuterProofs:              outerProof.Hashes,
+		OuterProofFlagBits:       ccip.ProofFlagsToBits(outerProof.SourceFlags),
+	}
+
+	// Execute.
+	tx, err := ccipContracts.GEOffRamp.ManuallyExecute(ccipContracts.DestUser, offRampProof)
+	require.NoError(t, err, "Executing manually")
+	ccipContracts.DestChain.Commit()
+	ccipContracts.SourceChain.Commit()
+	rec, err := ccipContracts.DestChain.TransactionReceipt(context.Background(), tx.Hash())
+	require.NoError(t, err)
+	require.Equal(t, uint64(1), rec.Status, "manual execution failed")
+	t.Logf("Manual Execution completed for seqNum %d", decodedMsg.SequenceNumber)
+	return decodedMsg.SequenceNumber
 }
