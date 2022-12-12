@@ -19,20 +19,14 @@ contract PingPongDappSetup is EVM2EVMGEOnRampSetup {
     EVM2EVMGEOnRampSetup.setUp();
 
     s_feeToken = IERC20(s_sourceTokens[0]);
-    s_pingPong = new PingPongDemo(GERouterInterface(address(s_sourceRouter)), s_sourceFeeToken);
+    s_pingPong = new PingPongDemo(address(s_sourceRouter), s_sourceFeeToken);
     s_pingPong.setCounterpart(DEST_CHAIN_ID, i_pongContract);
 
     uint256 fundingAmount = 1e18;
 
     // Fund the contract with LINK tokens
-    IERC20(s_sourceFeeToken).transfer(address(s_pingPong), fundingAmount);
-
-    // Approve the link tokens from the dapp
-    changePrank(address(s_pingPong));
-    IERC20(s_sourceFeeToken).approve(address(s_sourceRouter), fundingAmount);
-
-    // Change back to te deployer of the contracts
-    changePrank(OWNER);
+    IERC20(s_sourceFeeToken).approve(address(s_pingPong), fundingAmount);
+    s_pingPong.fund(fundingAmount);
   }
 }
 

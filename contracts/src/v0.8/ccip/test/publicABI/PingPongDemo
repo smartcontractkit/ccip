@@ -1,14 +1,17 @@
 {
   "acceptOwnership()": "79ba5097",
   "ccipReceive((uint64,bytes,bytes,(address,uint256)[]))": "3015b91c",
+  "fund(uint256)": "ca1d209d",
+  "getCounterpartAddress()": "2b6e5d63",
+  "getCounterpartChainId()": "093685f3",
+  "getFeeToken()": "ca709a25",
   "getRouter()": "b0f479a1",
+  "isPaused()": "b187bd26",
   "owner()": "8da5cb5b",
-  "s_counterpartAddress()": "1a92c7a2",
-  "s_counterpartChainId()": "9f575b94",
-  "s_isPaused()": "5b3030a8",
   "setCounterpart(uint64,address)": "b5a11011",
+  "setCounterpartAddress(address)": "9d2aede5",
+  "setCounterpartChainId(uint64)": "14634776",
   "setPaused(bool)": "16c38b3c",
-  "setRouter(address)": "c0d78655",
   "startPingPong()": "2874d8bf",
   "transferOwnership(address)": "f2fde38b"
 }

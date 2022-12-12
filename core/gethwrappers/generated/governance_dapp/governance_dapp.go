@@ -52,15 +52,15 @@ type GovernanceDappFeeConfig struct {
 }
 
 var GovernanceDappMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"internalType\":\"contractGERouterInterface\",\"name\":\"sendingRouter\",\"type\":\"address\"},{\"components\":[{\"internalType\":\"uint256\",\"name\":\"feeAmount\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"changedAtBlock\",\"type\":\"uint256\"}],\"internalType\":\"structGovernanceDapp.FeeConfig\",\"name\":\"feeConfig\",\"type\":\"tuple\"},{\"internalType\":\"address\",\"name\":\"feeToken\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"deliverer\",\"type\":\"address\"}],\"name\":\"InvalidDeliverer\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"chainId\",\"type\":\"uint64\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"contractAddress\",\"type\":\"address\"}],\"name\":\"ConfigPropagated\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"OwnershipTransferRequested\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"feeAmount\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"changedAtBlock\",\"type\":\"uint256\"}],\"name\":\"ReceivedConfig\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"acceptOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"uint64\",\"name\":\"chainId\",\"type\":\"uint64\"},{\"internalType\":\"address\",\"name\":\"contractAddress\",\"type\":\"address\"}],\"internalType\":\"structGovernanceDapp.CrossChainClone\",\"name\":\"clone\",\"type\":\"tuple\"}],\"name\":\"addClone\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"uint64\",\"name\":\"sourceChainId\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"sender\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"},{\"components\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"internalType\":\"structCommon.EVMTokenAndAmount[]\",\"name\":\"destTokensAndAmounts\",\"type\":\"tuple[]\"}],\"internalType\":\"structCommon.Any2EVMMessage\",\"name\":\"message\",\"type\":\"tuple\"}],\"name\":\"ccipReceive\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getFeeConfig\",\"outputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"feeAmount\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"changedAtBlock\",\"type\":\"uint256\"}],\"internalType\":\"structGovernanceDapp.FeeConfig\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"contractGERouterInterface\",\"name\":\"router\",\"type\":\"address\"}],\"name\":\"setRouters\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"typeAndVersion\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"feeAmount\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"changedAtBlock\",\"type\":\"uint256\"}],\"internalType\":\"structGovernanceDapp.FeeConfig\",\"name\":\"feeConfig\",\"type\":\"tuple\"}],\"name\":\"voteForNewFeeConfig\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
-	Bin: "0x60a06040523480156200001157600080fd5b5060405162001143380380620011438339810160408190526200003491620001b9565b33806000816200008b5760405162461bcd60e51b815260206004820152601860248201527f43616e6e6f7420736574206f776e657220746f207a65726f000000000000000060448201526064015b60405180910390fd5b600080546001600160a01b0319166001600160a01b0384811691909117909155811615620000be57620000be81620000f5565b5050600580546001600160a01b0319166001600160a01b039586161790555081516002556020909101516003551660805262000259565b336001600160a01b038216036200014f5760405162461bcd60e51b815260206004820152601760248201527f43616e6e6f74207472616e7366657220746f2073656c66000000000000000000604482015260640162000082565b600180546001600160a01b0319166001600160a01b0383811691821790925560008054604051929316917fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae12789190a350565b6001600160a01b0381168114620001b657600080fd5b50565b60008060008385036080811215620001d057600080fd5b8451620001dd81620001a0565b93506040601f1982011215620001f257600080fd5b50604080519081016001600160401b03811182821017156200022457634e487b7160e01b600052604160045260246000fd5b806040525060208501518152604085015160208201528092505060608401516200024e81620001a0565b809150509250925092565b608051610ece62000275600039600061065d0152610ece6000f3fe608060405234801561001057600080fd5b50600436106100a35760003560e01c806379ba5097116100765780638da5cb5b1161005b5780638da5cb5b1461017b578063f2fde38b146101a3578063f84f82bb146101b657600080fd5b806379ba5097146101605780638157c96c1461016857600080fd5b8063181f5a77146100a8578063262a7b63146100fa5780633015b91c1461010f5780635fbbc0d214610122575b600080fd5b6100e46040518060400160405280601481526020017f476f7665726e616e63654461707020312e302e3000000000000000000000000081525081565b6040516100f19190610993565b60405180910390f35b61010d610108366004610a98565b61020b565b005b61010d61011d366004610b47565b6102ae565b6040805180820182526000808252602091820152815180830183526002548082526003549183019182528351908152905191810191909152016100f1565b61010d61036f565b61010d610176366004610ca1565b61046c565b60005460405173ffffffffffffffffffffffffffffffffffffffff90911681526020016100f1565b61010d6101b1366004610cb9565b6104a9565b61010d6101c4366004610cb9565b600580547fffffffffffffffffffffffff00000000000000000000000000000000000000001673ffffffffffffffffffffffffffffffffffffffff92909216919091179055565b6102136104bd565b6004805460018101825560009190915281517f8a35acfbc15ff81a39ae7d344fd709f28e8600b4aa8c65c6b64bfe7fe36bd19b909101805460209093015173ffffffffffffffffffffffffffffffffffffffff1668010000000000000000027fffffffff0000000000000000000000000000000000000000000000000000000090931667ffffffffffffffff90921691909117919091179055565b60055473ffffffffffffffffffffffffffffffffffffffff163314610306576040517f0af9f1b60000000000000000000000000000000000000000000000000000000081523360048201526024015b60405180910390fd5b600081604001518060200190518101906103209190610cd6565b80516002819055602080830151600381905560408051938452918301529192507f583bd9682201bddaa3ee0ed61c39b397de860af4d62cfc5a62ecd30ca7342deb910160405180910390a15050565b60015473ffffffffffffffffffffffffffffffffffffffff1633146103f0576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601660248201527f4d7573742062652070726f706f736564206f776e65720000000000000000000060448201526064016102fd565b60008054337fffffffffffffffffffffffff00000000000000000000000000000000000000008083168217845560018054909116905560405173ffffffffffffffffffffffffffffffffffffffff90921692909183917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e091a350565b6104746104bd565b60055473ffffffffffffffffffffffffffffffffffffffff161561049b5761049b81610540565b803560025560200135600355565b6104b16104bd565b6104ba81610851565b50565b60005473ffffffffffffffffffffffffffffffffffffffff16331461053e576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601660248201527f4f6e6c792063616c6c61626c65206279206f776e65720000000000000000000060448201526064016102fd565b565b6000816040516020016105659190813581526020918201359181019190915260400190565b60408051601f1981840301815291905260045490915060005b8181101561084b5760006004828154811061059b5761059b610d08565b60009182526020808320604080518082018252939091015467ffffffffffffffff8116845273ffffffffffffffffffffffffffffffffffffffff680100000000000000009091048116848401908152825160a081018452905190911660c0808301919091528251808303909101815260e08201835281528083018990528151858152928301825292945082019083610655565b604080518082019091526000808252602082015281526020019060019003908161062e5790505b5081526020017f000000000000000000000000000000000000000000000000000000000000000073ffffffffffffffffffffffffffffffffffffffff16815260200161072d6040518060400160405280620493e08152602001600015158152506040805182516024820152602092830151151560448083019190915282518083039091018152606490910190915290810180517bffffffffffffffffffffffffffffffffffffffffffffffffffffffff167f97a657c90000000000000000000000000000000000000000000000000000000017905290565b905260055483516040517f96f4e9f900000000000000000000000000000000000000000000000000000000815292935073ffffffffffffffffffffffffffffffffffffffff909116916396f4e9f99161078a918590600401610d37565b6020604051808303816000875af11580156107a9573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906107cd9190610e49565b50815160208301516040517f5c49f05c94a889457073501ff9101fe42cbe2255c2ee91c5e4008d09cf4cb2a49261083092909167ffffffffffffffff92909216825273ffffffffffffffffffffffffffffffffffffffff16602082015260400190565b60405180910390a150508061084490610e62565b905061057e565b50505050565b3373ffffffffffffffffffffffffffffffffffffffff8216036108d0576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601760248201527f43616e6e6f74207472616e7366657220746f2073656c6600000000000000000060448201526064016102fd565b600180547fffffffffffffffffffffffff00000000000000000000000000000000000000001673ffffffffffffffffffffffffffffffffffffffff83811691821790925560008054604051929316917fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae12789190a350565b6000815180845260005b8181101561096c57602081850181015186830182015201610950565b8181111561097e576000602083870101525b50601f01601f19169290920160200192915050565b6020815260006109a66020830184610946565b9392505050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b6040805190810167ffffffffffffffff811182821017156109ff576109ff6109ad565b60405290565b6040516080810167ffffffffffffffff811182821017156109ff576109ff6109ad565b604051601f8201601f1916810167ffffffffffffffff81118282101715610a5157610a516109ad565b604052919050565b803567ffffffffffffffff81168114610a7157600080fd5b919050565b73ffffffffffffffffffffffffffffffffffffffff811681146104ba57600080fd5b600060408284031215610aaa57600080fd5b610ab26109dc565b610abb83610a59565b81526020830135610acb81610a76565b60208201529392505050565b600082601f830112610ae857600080fd5b813567ffffffffffffffff811115610b0257610b026109ad565b610b156020601f19601f84011601610a28565b818152846020838601011115610b2a57600080fd5b816020850160208301376000918101602001919091529392505050565b60006020808385031215610b5a57600080fd5b823567ffffffffffffffff80821115610b7257600080fd5b9084019060808287031215610b8657600080fd5b610b8e610a05565b610b9783610a59565b81528383013582811115610baa57600080fd5b610bb688828601610ad7565b858301525060408084013583811115610bce57600080fd5b610bda89828701610ad7565b8284015250606084013583811115610bf157600080fd5b80850194505087601f850112610c0657600080fd5b833583811115610c1857610c186109ad565b610c26868260051b01610a28565b818152868101945060069190911b850186019089821115610c4657600080fd5b948601945b81861015610c8f5782868b031215610c635760008081fd5b610c6b6109dc565b8635610c7681610a76565b8152868801358882015285529482019493860193610c4b565b60608401525090979650505050505050565b600060408284031215610cb357600080fd5b50919050565b600060208284031215610ccb57600080fd5b81356109a681610a76565b600060408284031215610ce857600080fd5b610cf06109dc565b82518152602083015160208201528091505092915050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603260045260246000fd5b6000604067ffffffffffffffff8516835260208181850152845160a083860152610d6460e0860182610946565b9050818601517fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc080878403016060880152610d9f8383610946565b88860151888203830160808a01528051808352908601945060009350908501905b80841015610dff578451805173ffffffffffffffffffffffffffffffffffffffff16835286015186830152938501936001939093019290860190610dc0565b50606089015173ffffffffffffffffffffffffffffffffffffffff1660a08901526080890151888203830160c08a01529550610e3b8187610946565b9a9950505050505050505050565b600060208284031215610e5b57600080fd5b5051919050565b60007fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8203610eba577f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b506001019056fea164736f6c634300080f000a",
+	ABI: "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"router\",\"type\":\"address\"},{\"components\":[{\"internalType\":\"uint256\",\"name\":\"feeAmount\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"changedAtBlock\",\"type\":\"uint256\"}],\"internalType\":\"structGovernanceDapp.FeeConfig\",\"name\":\"feeConfig\",\"type\":\"tuple\"},{\"internalType\":\"address\",\"name\":\"feeToken\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"deliverer\",\"type\":\"address\"}],\"name\":\"InvalidDeliverer\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"router\",\"type\":\"address\"}],\"name\":\"InvalidRouter\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"chainId\",\"type\":\"uint64\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"contractAddress\",\"type\":\"address\"}],\"name\":\"ConfigPropagated\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"feeToken\",\"type\":\"address\"}],\"name\":\"FeeTokenSet\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"OwnershipTransferRequested\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"feeAmount\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"changedAtBlock\",\"type\":\"uint256\"}],\"name\":\"ReceivedConfig\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"acceptOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"uint64\",\"name\":\"chainId\",\"type\":\"uint64\"},{\"internalType\":\"address\",\"name\":\"contractAddress\",\"type\":\"address\"}],\"internalType\":\"structGovernanceDapp.CrossChainClone\",\"name\":\"clone\",\"type\":\"tuple\"}],\"name\":\"addClone\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"uint64\",\"name\":\"sourceChainId\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"sender\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"},{\"components\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"internalType\":\"structCommon.EVMTokenAndAmount[]\",\"name\":\"destTokensAndAmounts\",\"type\":\"tuple[]\"}],\"internalType\":\"structCommon.Any2EVMMessage\",\"name\":\"message\",\"type\":\"tuple\"}],\"name\":\"ccipReceive\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"fund\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getFeeConfig\",\"outputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"feeAmount\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"changedAtBlock\",\"type\":\"uint256\"}],\"internalType\":\"structGovernanceDapp.FeeConfig\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getFeeToken\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getRouter\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"typeAndVersion\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"feeAmount\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"changedAtBlock\",\"type\":\"uint256\"}],\"internalType\":\"structGovernanceDapp.FeeConfig\",\"name\":\"feeConfig\",\"type\":\"tuple\"}],\"name\":\"voteForNewFeeConfig\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+	Bin: "0x60a06040523480156200001157600080fd5b50604051620014863803806200148683398101604081905262000034916200020b565b6001600160a01b0383166080523380600085846200005281620000fa565b50506001600160a01b038216620000b05760405162461bcd60e51b815260206004820152601860248201527f43616e6e6f7420736574206f776e657220746f207a65726f000000000000000060448201526064015b60405180910390fd5b600180546001600160a01b0319166001600160a01b0384811691909117909155811615620000e357620000e38162000142565b5050825160035550506020015160045550620002a2565b600080546001600160a01b0319166001600160a01b038316908117825560405190917f722ff84c1234b2482061def5c82c6b5080c117b3cbb69d686844a051e4b8e7f391a250565b336001600160a01b038216036200019c5760405162461bcd60e51b815260206004820152601760248201527f43616e6e6f74207472616e7366657220746f2073656c660000000000000000006044820152606401620000a7565b600280546001600160a01b0319166001600160a01b03838116918217909255600154604051919216907fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae127890600090a350565b80516001600160a01b03811681146200020657600080fd5b919050565b600080600083850360808112156200022257600080fd5b6200022d85620001ee565b93506040601f19820112156200024257600080fd5b50604080519081016001600160401b03811182821017156200027457634e487b7160e01b600052604160045260246000fd5b60409081526020868101518352908601519082015291506200029960608501620001ee565b90509250925092565b6080516111a5620002e1600039600081816101e20152818161030501528181610497015281816105b901528181610aac0152610b5701526111a56000f3fe608060405234801561001057600080fd5b50600436106100c95760003560e01c80638157c96c11610081578063ca1d209d1161005b578063ca1d209d14610206578063ca709a2514610219578063f2fde38b1461023757600080fd5b80638157c96c1461018e5780638da5cb5b146101a1578063b0f479a1146101e057600080fd5b80633015b91c116100b25780633015b91c146101355780635fbbc0d21461014857806379ba50971461018657600080fd5b8063181f5a77146100ce578063262a7b6314610120575b600080fd5b61010a6040518060400160405280601481526020017f476f7665726e616e63654461707020312e302e3000000000000000000000000081525081565b6040516101179190610c25565b60405180910390f35b61013361012e366004610d25565b61024a565b005b610133610143366004610d62565b6102ed565b604080518082018252600080825260209182015281518083018352600354808252600454918301918252835190815290519181019190915201610117565b610133610377565b61013361019c366004610d9d565b610478565b60015473ffffffffffffffffffffffffffffffffffffffff165b60405173ffffffffffffffffffffffffffffffffffffffff9091168152602001610117565b7f00000000000000000000000000000000000000000000000000000000000000006101bb565b610133610214366004610db5565b6104d8565b60005473ffffffffffffffffffffffffffffffffffffffff166101bb565b610133610245366004610dce565b610635565b610252610646565b6005805460018101825560009190915281517f036b6384b5eca791c62761152d0c79bb0604c104a5fb6f4eb0703f3154bb3db0909101805460209093015173ffffffffffffffffffffffffffffffffffffffff1668010000000000000000027fffffffff0000000000000000000000000000000000000000000000000000000090931667ffffffffffffffff90921691909117919091179055565b3373ffffffffffffffffffffffffffffffffffffffff7f00000000000000000000000000000000000000000000000000000000000000001614610363576040517fd7f733340000000000000000000000000000000000000000000000000000000081523360048201526024015b60405180910390fd5b61037461036f82610e59565b6106c9565b50565b60025473ffffffffffffffffffffffffffffffffffffffff1633146103f8576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601660248201527f4d7573742062652070726f706f736564206f776e657200000000000000000000604482015260640161035a565b600180547fffffffffffffffffffffffff00000000000000000000000000000000000000008082163390811790935560028054909116905560405173ffffffffffffffffffffffffffffffffffffffff909116919082907f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e090600090a350565b610480610646565b73ffffffffffffffffffffffffffffffffffffffff7f000000000000000000000000000000000000000000000000000000000000000016156104c5576104c581610732565b803560035560200135600455565b505050565b6000546040517f23b872dd0000000000000000000000000000000000000000000000000000000081523360048201523060248201526044810183905273ffffffffffffffffffffffffffffffffffffffff9091169081906323b872dd906064016020604051808303816000875af1158015610557573d6000803e3d6000fd5b505050506040513d601f19601f8201168201806040525081019061057b9190610f8b565b506040517f095ea7b300000000000000000000000000000000000000000000000000000000815273ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000811660048301526024820184905282169063095ea7b3906044016020604051808303816000875af1158015610611573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906104d39190610f8b565b61063d610646565b610374816109b2565b60015473ffffffffffffffffffffffffffffffffffffffff1633146106c7576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601660248201527f4f6e6c792063616c6c61626c65206279206f776e657200000000000000000000604482015260640161035a565b565b600081604001518060200190518101906106e39190610fad565b80516003819055602080830151600481905560408051938452918301529192507f583bd9682201bddaa3ee0ed61c39b397de860af4d62cfc5a62ecd30ca7342deb910160405180910390a15050565b6000816040516020016107579190813581526020918201359181019190915260400190565b60408051601f1981840301815291905260055490915060005b818110156109ac5760006005828154811061078d5761078d610fdf565b60009182526020808320604080518082018252939091015467ffffffffffffffff8116845273ffffffffffffffffffffffffffffffffffffffff680100000000000000009091048116848401908152825160a081018452905190911660c0808301919091528251808303909101815260e08201835281528083018990528151858152928301825292945082019083610847565b60408051808201909152600080825260208201528152602001906001900390816108205790505b50815260200161086c60005473ffffffffffffffffffffffffffffffffffffffff1690565b73ffffffffffffffffffffffffffffffffffffffff16815260200161091d6040518060400160405280620493e08152602001600015158152506040805182516024820152602092830151151560448083019190915282518083039091018152606490910190915290810180517bffffffffffffffffffffffffffffffffffffffffffffffffffffffff167f97a657c90000000000000000000000000000000000000000000000000000000017905290565b9052825190915061092e9082610aa8565b50815160208301516040517f5c49f05c94a889457073501ff9101fe42cbe2255c2ee91c5e4008d09cf4cb2a49261099192909167ffffffffffffffff92909216825273ffffffffffffffffffffffffffffffffffffffff16602082015260400190565b60405180910390a15050806109a59061100e565b9050610770565b50505050565b3373ffffffffffffffffffffffffffffffffffffffff821603610a31576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601760248201527f43616e6e6f74207472616e7366657220746f2073656c66000000000000000000604482015260640161035a565b600280547fffffffffffffffffffffffff00000000000000000000000000000000000000001673ffffffffffffffffffffffffffffffffffffffff838116918217909255600154604051919216907fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae127890600090a350565b60007f000000000000000000000000000000000000000000000000000000000000000073ffffffffffffffffffffffffffffffffffffffff16610b1a576040517fd7f733340000000000000000000000000000000000000000000000000000000081526000600482015260240161035a565b6040517f96f4e9f900000000000000000000000000000000000000000000000000000000815273ffffffffffffffffffffffffffffffffffffffff7f000000000000000000000000000000000000000000000000000000000000000016906396f4e9f990610b8e908690869060040161106d565b6020604051808303816000875af1158015610bad573d6000803e3d6000fd5b505050506040513d601f19601f82011682018060405250810190610bd1919061117f565b9392505050565b6000815180845260005b81811015610bfe57602081850181015186830182015201610be2565b81811115610c10576000602083870101525b50601f01601f19169290920160200192915050565b602081526000610bd16020830184610bd8565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b6040805190810167ffffffffffffffff81118282101715610c8a57610c8a610c38565b60405290565b6040516080810167ffffffffffffffff81118282101715610c8a57610c8a610c38565b604051601f8201601f1916810167ffffffffffffffff81118282101715610cdc57610cdc610c38565b604052919050565b803567ffffffffffffffff81168114610cfc57600080fd5b919050565b803573ffffffffffffffffffffffffffffffffffffffff81168114610cfc57600080fd5b600060408284031215610d3757600080fd5b610d3f610c67565b610d4883610ce4565b8152610d5660208401610d01565b60208201529392505050565b600060208284031215610d7457600080fd5b813567ffffffffffffffff811115610d8b57600080fd5b820160808185031215610bd157600080fd5b600060408284031215610daf57600080fd5b50919050565b600060208284031215610dc757600080fd5b5035919050565b600060208284031215610de057600080fd5b610bd182610d01565b600082601f830112610dfa57600080fd5b813567ffffffffffffffff811115610e1457610e14610c38565b610e276020601f19601f84011601610cb3565b818152846020838601011115610e3c57600080fd5b816020850160208301376000918101602001919091529392505050565b600060808236031215610e6b57600080fd5b610e73610c90565b610e7c83610ce4565b815260208084013567ffffffffffffffff80821115610e9a57600080fd5b610ea636838801610de9565b83850152604091508186013581811115610ebf57600080fd5b610ecb36828901610de9565b8386015250606086013581811115610ee257600080fd5b860136601f820112610ef357600080fd5b803582811115610f0557610f05610c38565b610f13858260051b01610cb3565b818152858101935060069190911b820185019036821115610f3357600080fd5b918501915b81831015610f7a57848336031215610f505760008081fd5b610f58610c67565b610f6184610d01565b8152838701358782015284529285019291840191610f38565b606087015250939695505050505050565b600060208284031215610f9d57600080fd5b81518015158114610bd157600080fd5b600060408284031215610fbf57600080fd5b610fc7610c67565b82518152602083015160208201528091505092915050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603260045260246000fd5b60007fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8203611066577f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b5060010190565b6000604067ffffffffffffffff8516835260208181850152845160a08386015261109a60e0860182610bd8565b9050818601517fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc0808784030160608801526110d58383610bd8565b88860151888203830160808a01528051808352908601945060009350908501905b80841015611135578451805173ffffffffffffffffffffffffffffffffffffffff168352860151868301529385019360019390930192908601906110f6565b50606089015173ffffffffffffffffffffffffffffffffffffffff1660a08901526080890151888203830160c08a015295506111718187610bd8565b9a9950505050505050505050565b60006020828403121561119157600080fd5b505191905056fea164736f6c634300080f000a",
 }
 
 var GovernanceDappABI = GovernanceDappMetaData.ABI
 
 var GovernanceDappBin = GovernanceDappMetaData.Bin
 
-func DeployGovernanceDapp(auth *bind.TransactOpts, backend bind.ContractBackend, sendingRouter common.Address, feeConfig GovernanceDappFeeConfig, feeToken common.Address) (common.Address, *types.Transaction, *GovernanceDapp, error) {
+func DeployGovernanceDapp(auth *bind.TransactOpts, backend bind.ContractBackend, router common.Address, feeConfig GovernanceDappFeeConfig, feeToken common.Address) (common.Address, *types.Transaction, *GovernanceDapp, error) {
 	parsed, err := GovernanceDappMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -69,7 +69,7 @@ func DeployGovernanceDapp(auth *bind.TransactOpts, backend bind.ContractBackend,
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
 
-	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(GovernanceDappBin), backend, sendingRouter, feeConfig, feeToken)
+	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(GovernanceDappBin), backend, router, feeConfig, feeToken)
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
@@ -214,6 +214,50 @@ func (_GovernanceDapp *GovernanceDappCallerSession) GetFeeConfig() (GovernanceDa
 	return _GovernanceDapp.Contract.GetFeeConfig(&_GovernanceDapp.CallOpts)
 }
 
+func (_GovernanceDapp *GovernanceDappCaller) GetFeeToken(opts *bind.CallOpts) (common.Address, error) {
+	var out []interface{}
+	err := _GovernanceDapp.contract.Call(opts, &out, "getFeeToken")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
+}
+
+func (_GovernanceDapp *GovernanceDappSession) GetFeeToken() (common.Address, error) {
+	return _GovernanceDapp.Contract.GetFeeToken(&_GovernanceDapp.CallOpts)
+}
+
+func (_GovernanceDapp *GovernanceDappCallerSession) GetFeeToken() (common.Address, error) {
+	return _GovernanceDapp.Contract.GetFeeToken(&_GovernanceDapp.CallOpts)
+}
+
+func (_GovernanceDapp *GovernanceDappCaller) GetRouter(opts *bind.CallOpts) (common.Address, error) {
+	var out []interface{}
+	err := _GovernanceDapp.contract.Call(opts, &out, "getRouter")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
+}
+
+func (_GovernanceDapp *GovernanceDappSession) GetRouter() (common.Address, error) {
+	return _GovernanceDapp.Contract.GetRouter(&_GovernanceDapp.CallOpts)
+}
+
+func (_GovernanceDapp *GovernanceDappCallerSession) GetRouter() (common.Address, error) {
+	return _GovernanceDapp.Contract.GetRouter(&_GovernanceDapp.CallOpts)
+}
+
 func (_GovernanceDapp *GovernanceDappCaller) Owner(opts *bind.CallOpts) (common.Address, error) {
 	var out []interface{}
 	err := _GovernanceDapp.contract.Call(opts, &out, "owner")
@@ -294,16 +338,16 @@ func (_GovernanceDapp *GovernanceDappTransactorSession) CcipReceive(message Comm
 	return _GovernanceDapp.Contract.CcipReceive(&_GovernanceDapp.TransactOpts, message)
 }
 
-func (_GovernanceDapp *GovernanceDappTransactor) SetRouters(opts *bind.TransactOpts, router common.Address) (*types.Transaction, error) {
-	return _GovernanceDapp.contract.Transact(opts, "setRouters", router)
+func (_GovernanceDapp *GovernanceDappTransactor) Fund(opts *bind.TransactOpts, amount *big.Int) (*types.Transaction, error) {
+	return _GovernanceDapp.contract.Transact(opts, "fund", amount)
 }
 
-func (_GovernanceDapp *GovernanceDappSession) SetRouters(router common.Address) (*types.Transaction, error) {
-	return _GovernanceDapp.Contract.SetRouters(&_GovernanceDapp.TransactOpts, router)
+func (_GovernanceDapp *GovernanceDappSession) Fund(amount *big.Int) (*types.Transaction, error) {
+	return _GovernanceDapp.Contract.Fund(&_GovernanceDapp.TransactOpts, amount)
 }
 
-func (_GovernanceDapp *GovernanceDappTransactorSession) SetRouters(router common.Address) (*types.Transaction, error) {
-	return _GovernanceDapp.Contract.SetRouters(&_GovernanceDapp.TransactOpts, router)
+func (_GovernanceDapp *GovernanceDappTransactorSession) Fund(amount *big.Int) (*types.Transaction, error) {
+	return _GovernanceDapp.Contract.Fund(&_GovernanceDapp.TransactOpts, amount)
 }
 
 func (_GovernanceDapp *GovernanceDappTransactor) TransferOwnership(opts *bind.TransactOpts, to common.Address) (*types.Transaction, error) {
@@ -442,6 +486,133 @@ func (_GovernanceDapp *GovernanceDappFilterer) WatchConfigPropagated(opts *bind.
 func (_GovernanceDapp *GovernanceDappFilterer) ParseConfigPropagated(log types.Log) (*GovernanceDappConfigPropagated, error) {
 	event := new(GovernanceDappConfigPropagated)
 	if err := _GovernanceDapp.contract.UnpackLog(event, "ConfigPropagated", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type GovernanceDappFeeTokenSetIterator struct {
+	Event *GovernanceDappFeeTokenSet
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *GovernanceDappFeeTokenSetIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(GovernanceDappFeeTokenSet)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(GovernanceDappFeeTokenSet)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *GovernanceDappFeeTokenSetIterator) Error() error {
+	return it.fail
+}
+
+func (it *GovernanceDappFeeTokenSetIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type GovernanceDappFeeTokenSet struct {
+	FeeToken common.Address
+	Raw      types.Log
+}
+
+func (_GovernanceDapp *GovernanceDappFilterer) FilterFeeTokenSet(opts *bind.FilterOpts, feeToken []common.Address) (*GovernanceDappFeeTokenSetIterator, error) {
+
+	var feeTokenRule []interface{}
+	for _, feeTokenItem := range feeToken {
+		feeTokenRule = append(feeTokenRule, feeTokenItem)
+	}
+
+	logs, sub, err := _GovernanceDapp.contract.FilterLogs(opts, "FeeTokenSet", feeTokenRule)
+	if err != nil {
+		return nil, err
+	}
+	return &GovernanceDappFeeTokenSetIterator{contract: _GovernanceDapp.contract, event: "FeeTokenSet", logs: logs, sub: sub}, nil
+}
+
+func (_GovernanceDapp *GovernanceDappFilterer) WatchFeeTokenSet(opts *bind.WatchOpts, sink chan<- *GovernanceDappFeeTokenSet, feeToken []common.Address) (event.Subscription, error) {
+
+	var feeTokenRule []interface{}
+	for _, feeTokenItem := range feeToken {
+		feeTokenRule = append(feeTokenRule, feeTokenItem)
+	}
+
+	logs, sub, err := _GovernanceDapp.contract.WatchLogs(opts, "FeeTokenSet", feeTokenRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(GovernanceDappFeeTokenSet)
+				if err := _GovernanceDapp.contract.UnpackLog(event, "FeeTokenSet", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_GovernanceDapp *GovernanceDappFilterer) ParseFeeTokenSet(log types.Log) (*GovernanceDappFeeTokenSet, error) {
+	event := new(GovernanceDappFeeTokenSet)
+	if err := _GovernanceDapp.contract.UnpackLog(event, "FeeTokenSet", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
@@ -842,6 +1013,8 @@ func (_GovernanceDapp *GovernanceDapp) ParseLog(log types.Log) (generated.Abigen
 	switch log.Topics[0] {
 	case _GovernanceDapp.abi.Events["ConfigPropagated"].ID:
 		return _GovernanceDapp.ParseConfigPropagated(log)
+	case _GovernanceDapp.abi.Events["FeeTokenSet"].ID:
+		return _GovernanceDapp.ParseFeeTokenSet(log)
 	case _GovernanceDapp.abi.Events["OwnershipTransferRequested"].ID:
 		return _GovernanceDapp.ParseOwnershipTransferRequested(log)
 	case _GovernanceDapp.abi.Events["OwnershipTransferred"].ID:
@@ -856,6 +1029,10 @@ func (_GovernanceDapp *GovernanceDapp) ParseLog(log types.Log) (generated.Abigen
 
 func (GovernanceDappConfigPropagated) Topic() common.Hash {
 	return common.HexToHash("0x5c49f05c94a889457073501ff9101fe42cbe2255c2ee91c5e4008d09cf4cb2a4")
+}
+
+func (GovernanceDappFeeTokenSet) Topic() common.Hash {
+	return common.HexToHash("0x722ff84c1234b2482061def5c82c6b5080c117b3cbb69d686844a051e4b8e7f3")
 }
 
 func (GovernanceDappOwnershipTransferRequested) Topic() common.Hash {
@@ -877,6 +1054,10 @@ func (_GovernanceDapp *GovernanceDapp) Address() common.Address {
 type GovernanceDappInterface interface {
 	GetFeeConfig(opts *bind.CallOpts) (GovernanceDappFeeConfig, error)
 
+	GetFeeToken(opts *bind.CallOpts) (common.Address, error)
+
+	GetRouter(opts *bind.CallOpts) (common.Address, error)
+
 	Owner(opts *bind.CallOpts) (common.Address, error)
 
 	TypeAndVersion(opts *bind.CallOpts) (string, error)
@@ -887,7 +1068,7 @@ type GovernanceDappInterface interface {
 
 	CcipReceive(opts *bind.TransactOpts, message CommonAny2EVMMessage) (*types.Transaction, error)
 
-	SetRouters(opts *bind.TransactOpts, router common.Address) (*types.Transaction, error)
+	Fund(opts *bind.TransactOpts, amount *big.Int) (*types.Transaction, error)
 
 	TransferOwnership(opts *bind.TransactOpts, to common.Address) (*types.Transaction, error)
 
@@ -898,6 +1079,12 @@ type GovernanceDappInterface interface {
 	WatchConfigPropagated(opts *bind.WatchOpts, sink chan<- *GovernanceDappConfigPropagated) (event.Subscription, error)
 
 	ParseConfigPropagated(log types.Log) (*GovernanceDappConfigPropagated, error)
+
+	FilterFeeTokenSet(opts *bind.FilterOpts, feeToken []common.Address) (*GovernanceDappFeeTokenSetIterator, error)
+
+	WatchFeeTokenSet(opts *bind.WatchOpts, sink chan<- *GovernanceDappFeeTokenSet, feeToken []common.Address) (event.Subscription, error)
+
+	ParseFeeTokenSet(log types.Log) (*GovernanceDappFeeTokenSet, error)
 
 	FilterOwnershipTransferRequested(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*GovernanceDappOwnershipTransferRequestedIterator, error)
 

@@ -2,15 +2,12 @@
 pragma solidity 0.8.15;
 
 import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
-import {Any2EVMMessageReceiverInterface} from "../interfaces/applications/Any2EVMMessageReceiverInterface.sol";
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
-import {Any2EVMOffRampRouterInterface} from "../interfaces/offRamp/Any2EVMOffRampRouterInterface.sol";
-import {GERouterInterface} from "../interfaces/router/GERouterInterface.sol";
-import {Common} from "../models/Common.sol";
-import {GEConsumer} from "../models/GEConsumer.sol";
 import {IERC20} from "../../vendor/IERC20.sol";
+// solhint-disable-next-line chainlink-solidity/explicit-imports
+import "./CCIPConsumer.sol";
 
-contract GovernanceDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterface, OwnerIsCreator {
+contract GovernanceDapp is CCIPConsumer, TypeAndVersionInterface, OwnerIsCreator {
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "GovernanceDapp 1.0.0";
 
@@ -33,26 +30,21 @@ contract GovernanceDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterf
   FeeConfig internal s_feeConfig;
   CrossChainClone[] internal s_crossChainClones;
 
-  GERouterInterface internal s_router;
-
-  // The fee token for CCIP billing
-  address internal immutable i_feeToken;
-
   constructor(
-    GERouterInterface sendingRouter,
+    address router,
     FeeConfig memory feeConfig,
     address feeToken
-  ) {
-    s_router = sendingRouter;
+  )
+    CCIPConsumer(router, feeToken)
+  {
     s_feeConfig = feeConfig;
-    i_feeToken = feeToken;
   }
 
   function voteForNewFeeConfig(FeeConfig calldata feeConfig) public onlyOwner {
     // Call for new fee config
     // Count if votes >= threshold
     // if votes passes
-    if (s_router != GERouterInterface(address(0))) {
+    if (getRouter() != address(0)) {
       _propagateFeeConfigChange(feeConfig);
     }
     s_feeConfig = feeConfig;
@@ -68,10 +60,10 @@ contract GovernanceDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterf
         receiver: abi.encode(clone.contractAddress),
         data: data,
         tokensAndAmounts: new Common.EVMTokenAndAmount[](0),
-        feeToken: i_feeToken,
+        feeToken: getFeeToken(),
         extraArgs: GEConsumer._argsToBytes(GEConsumer.EVMExtraArgsV1({gasLimit: 3e5, strict: false}))
       });
-      s_router.ccipSend(clone.chainId, message);
+      _ccipSend(clone.chainId, message);
       emit ConfigPropagated(clone.chainId, clone.contractAddress);
     }
   }
@@ -81,7 +73,7 @@ contract GovernanceDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterf
    * the tokens sent with it to the designated EOA
    * @param message CCIP Message
    */
-  function ccipReceive(Common.Any2EVMMessage memory message) external override onlyRouter {
+  function _ccipReceive(Common.Any2EVMMessage memory message) internal override {
     FeeConfig memory newFeeConfig = abi.decode(message.data, (FeeConfig));
 
     s_feeConfig = newFeeConfig;
@@ -92,19 +84,7 @@ contract GovernanceDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterf
     s_crossChainClones.push(clone);
   }
 
-  function setRouters(GERouterInterface router) public {
-    s_router = router;
-  }
-
   function getFeeConfig() external view returns (FeeConfig memory) {
     return s_feeConfig;
-  }
-
-  /**
-   * @dev only calls from the set router are accepted.
-   */
-  modifier onlyRouter() {
-    if (msg.sender != address(s_router)) revert InvalidDeliverer(msg.sender);
-    _;
   }
 }

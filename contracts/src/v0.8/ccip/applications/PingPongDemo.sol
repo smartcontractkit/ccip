@@ -3,32 +3,25 @@ pragma solidity 0.8.15;
 
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
 import {IERC20} from "../../vendor/IERC20.sol";
-import {GEConsumer} from "../models/GEConsumer.sol";
-import {Common} from "../models/Common.sol";
-import {GERouterInterface} from "../interfaces/router/GERouterInterface.sol";
-import {Any2EVMMessageReceiverInterface} from "../interfaces/applications/Any2EVMMessageReceiverInterface.sol";
+// solhint-disable-next-line chainlink-solidity/explicit-imports
+import "./CCIPConsumer.sol";
 
-contract PingPongDemo is Any2EVMMessageReceiverInterface, OwnerIsCreator {
+contract PingPongDemo is CCIPConsumer, OwnerIsCreator {
   event Ping(uint256 pingPongCount);
   event Pong(uint256 pingPongCount);
 
-  GERouterInterface internal s_router;
-
   // The chain ID of the counterpart ping pong contract
-  uint64 public s_counterpartChainId;
+  uint64 private s_counterpartChainId;
   // The contract address of the counterpart ping pong contract
-  address public s_counterpartAddress;
+  address private s_counterpartAddress;
 
   // Pause ping-ponging
-  bool public s_isPaused;
+  bool private s_isPaused;
 
-  // The fee token for CCIP billing
-  address internal immutable i_feeToken;
-
-  constructor(GERouterInterface router, address feeToken) {
-    s_router = router;
+  constructor(address router, address feeToken)
+    CCIPConsumer(router, feeToken)
+  {
     s_isPaused = false;
-    i_feeToken = feeToken;
   }
 
   function setCounterpart(uint64 counterpartChainId, address counterpartAddress) external onlyOwner {
@@ -54,12 +47,12 @@ contract PingPongDemo is Any2EVMMessageReceiverInterface, OwnerIsCreator {
       data: data,
       tokensAndAmounts: new Common.EVMTokenAndAmount[](0),
       extraArgs: GEConsumer._argsToBytes(GEConsumer.EVMExtraArgsV1({gasLimit: 200_000, strict: false})),
-      feeToken: i_feeToken
+      feeToken: getFeeToken()
     });
-    s_router.ccipSend(s_counterpartChainId, message);
+    _ccipSend(s_counterpartChainId, message);
   }
 
-  function ccipReceive(Common.Any2EVMMessage memory message) external override onlyRouter {
+  function _ccipReceive(Common.Any2EVMMessage memory message) internal override {
     uint256 pingPongCount = abi.decode(message.data, (uint256));
     if (!s_isPaused) {
       _respond(pingPongCount + 1);
@@ -69,25 +62,28 @@ contract PingPongDemo is Any2EVMMessageReceiverInterface, OwnerIsCreator {
   /////////////////////////////////////////////////////////////////////
   // Plumbing
   /////////////////////////////////////////////////////////////////////
-  function setRouter(GERouterInterface router) external onlyOwner {
-    s_router = router;
+
+  function getCounterpartChainId() external view returns (uint64) {
+    return s_counterpartChainId;
   }
 
-  function getRouter() external view returns (GERouterInterface) {
-    return s_router;
+  function setCounterpartChainId(uint64 chainId) external onlyOwner {
+    s_counterpartChainId = chainId;
   }
 
-  function setPaused(bool isPaused) external onlyOwner {
-    s_isPaused = isPaused;
+  function getCounterpartAddress() external view returns (address) {
+    return s_counterpartAddress;
   }
 
-  error InvalidRouter(address router);
+  function setCounterpartAddress(address addr) external onlyOwner {
+    s_counterpartAddress = addr;
+  }
 
-  /**
-   * @dev only calls from the set router are accepted.
-   */
-  modifier onlyRouter() {
-    if (msg.sender != address(s_router)) revert InvalidRouter(msg.sender);
-    _;
+  function isPaused() external view returns (bool) {
+    return s_isPaused;
+  }
+
+  function setPaused(bool pause) external onlyOwner {
+    s_isPaused = pause;
   }
 }
