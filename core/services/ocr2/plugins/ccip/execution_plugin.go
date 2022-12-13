@@ -5,11 +5,10 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2"
+	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2/types"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
@@ -73,104 +72,94 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	if err != nil {
 		return nil, err
 	}
-	var onRampSeqParser func(log logpoller.Log) (uint64, error)
+	offRampAddr := common.HexToAddress(spec.ContractID)
+	offRampType, _, err := TypeAndVersion(offRampAddr, destChain.Client())
+	if err != nil {
+		return nil, err
+	}
+	priceGetterObject, err := NewPriceGetter(pluginConfig.TokensPerFeeCoinPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
+	if err != nil {
+		return nil, err
+	}
 	var eventSignatures EventSignatures
-	var onRampToHasher = make(map[common.Address]LeafHasher[[32]byte])
+	var pluginFactory ocrtypes.ReportingPluginFactory
 	hashingCtx := hasher.NewKeccakCtx()
-
 	switch onRampType {
 	case EVM2EVMTollOnRamp:
+		if offRampType != EVM2EVMTollOffRamp {
+			return nil, errors.Errorf("invalid ramp combination %v and %v", onRampType, offRampType)
+		}
 		onRamp, err2 := evm_2_evm_toll_onramp.NewEVM2EVMTollOnRamp(onRampAddr, sourceChain.Client())
 		if err2 != nil {
 			return nil, err2
 		}
-		onRampSeqParser = func(log logpoller.Log) (uint64, error) {
-			req, err3 := onRamp.ParseCCIPSendRequested(types.Log{Data: log.Data, Topics: log.GetTopics()})
-			if err3 != nil {
-				return 0, err3
-			}
-			return req.Message.SequenceNumber, nil
+		offRamp, err2 := evm_2_evm_toll_offramp.NewEVM2EVMTollOffRamp(offRampAddr, destChain.Client())
+		if err2 != nil {
+			return nil, err2
 		}
 		eventSignatures = GetTollEventSignatures()
-		onRampToHasher[onRampAddr] = NewTollLeafHasher(pluginConfig.SourceChainID, pluginConfig.DestChainID, onRampAddr, hashingCtx)
+		pluginFactory = NewTollExecutionReportingPluginFactory(
+			TollExecutionPluginConfig{
+				lggr:                lggr,
+				source:              sourceChain.LogPoller(),
+				dest:                destChain.LogPoller(),
+				offRamp:             offRamp,
+				onRamp:              onRamp,
+				commitStore:         verifier,
+				builder:             NewTollBatchBuilder(lggr, eventSignatures),
+				eventSignatures:     eventSignatures,
+				priceGetter:         priceGetterObject,
+				leafHasher:          NewTollLeafHasher(pluginConfig.SourceChainID, pluginConfig.DestChainID, onRampAddr, hashingCtx),
+				rootSnoozeTime:      rootSnoozeTime,
+				inflightCacheExpiry: inflightCacheExpiry,
+				sourceChainID:       pluginConfig.SourceChainID,
+				gasLimit:            BatchGasLimit,
+			})
 	case EVM2EVMGEOnRamp:
+		if offRampType != EVM2EVMGEOffRamp {
+			return nil, errors.Errorf("invalid ramp combination %v and %v", onRampType, offRampType)
+		}
 		onRamp, err2 := evm_2_evm_ge_onramp.NewEVM2EVMGEOnRamp(onRampAddr, sourceChain.Client())
 		if err2 != nil {
 			return nil, err2
 		}
-		onRampSeqParser = func(log logpoller.Log) (uint64, error) {
-			req, err3 := onRamp.ParseCCIPSendRequested(types.Log{Data: log.Data, Topics: log.GetTopics()})
-			if err3 != nil {
-				return 0, err3
-			}
-			return req.Message.SequenceNumber, nil
+		offRamp, err2 := evm_2_evm_ge_offramp.NewEVM2EVMGEOffRamp(offRampAddr, destChain.Client())
+		if err2 != nil {
+			return nil, err2
 		}
 		eventSignatures = GetGEEventSignatures()
-		onRampToHasher[onRampAddr] = NewGELeafHasher(pluginConfig.SourceChainID, pluginConfig.DestChainID, onRampAddr, hashingCtx)
+		pluginFactory = NewGEExecutionReportingPluginFactory(
+			GEExecutionPluginConfig{
+				lggr:                lggr,
+				source:              sourceChain.LogPoller(),
+				dest:                destChain.LogPoller(),
+				offRamp:             offRamp,
+				onRamp:              onRamp,
+				commitStore:         verifier,
+				builder:             NewGEBatchBuilder(lggr, eventSignatures, offRamp),
+				eventSignatures:     eventSignatures,
+				priceGetter:         priceGetterObject,
+				leafHasher:          NewGELeafHasher(pluginConfig.SourceChainID, pluginConfig.DestChainID, onRampAddr, hashingCtx),
+				snoozeTime:          rootSnoozeTime,
+				inflightCacheExpiry: inflightCacheExpiry,
+				sourceChainID:       pluginConfig.SourceChainID,
+				gasLimit:            BatchGasLimit,
+				destGasEstimator:    destChain.TxManager().GetGasEstimator(),
+				sourceGasEstimator:  sourceChain.TxManager().GetGasEstimator(),
+			})
 	default:
 		return nil, errors.Errorf("unrecognized onramp, is %v the correct onramp address?", onRampAddr)
 	}
 	// Subscribe to all relevant commit logs.
-	_, err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{eventSignatures.SendRequested}, Addresses: []common.Address{onRampAddr}})
-	if err != nil {
-		return nil, err
-	}
 	_, err = destChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{ReportAccepted}, Addresses: []common.Address{verifier.Address()}})
 	if err != nil {
 		return nil, err
 	}
-	offRampType, _, err := TypeAndVersion(common.HexToAddress(spec.ContractID), destChain.Client())
+	_, err = destChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{eventSignatures.ExecutionStateChanged}, Addresses: []common.Address{offRampAddr}})
 	if err != nil {
 		return nil, err
 	}
-	var (
-		batchBuilder BatchBuilder
-		offRamp      OffRamp
-		err2         error
-	)
-	switch offRampType {
-	case EVM2EVMTollOffRamp:
-		batchBuilder = NewTollBatchBuilder(lggr, eventSignatures)
-		offRamp, err2 = NewTollOffRamp(common.HexToAddress(spec.ContractID), destChain)
-	case EVM2EVMGEOffRamp:
-		var geOffRamp *evm_2_evm_ge_offramp.EVM2EVMGEOffRamp
-		geOffRamp, err2 = evm_2_evm_ge_offramp.NewEVM2EVMGEOffRamp(common.HexToAddress(spec.ContractID), destChain.Client())
-		offRamp = NewGEOffRamp(geOffRamp)
-		batchBuilder = NewGEBatchBuilder(lggr, eventSignatures, geOffRamp)
-	default:
-		return nil, errors.Errorf("unrecognized offramp, is %v the correct offramp address?", spec.ContractID)
-	}
-	if err2 != nil {
-		return nil, err
-	}
-	_, err = destChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{eventSignatures.ExecutionStateChanged}, Addresses: []common.Address{offRamp.Address()}})
-	if err != nil {
-		return nil, err
-	}
-	// TODO: Can also check the on/offramp pair is compatible
-	priceGetterObject, err := NewPriceGetter(pluginConfig.TokensPerFeeCoinPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
-	if err2 != nil {
-		return nil, err
-	}
-
-	argsNoPlugin.ReportingPluginFactory = NewExecutionReportingPluginFactory(
-		lggr,
-		onRampAddr,
-		verifier,
-		sourceChain.LogPoller(), destChain.LogPoller(),
-		common.HexToAddress(spec.ContractID),
-		offRamp,
-		batchBuilder,
-		onRampSeqParser,
-		eventSignatures,
-		priceGetterObject,
-		onRampToHasher,
-		rootSnoozeTime,
-		inflightCacheExpiry,
-		sourceChain.TxManager().GetGasEstimator(),
-		destChain.TxManager().GetGasEstimator(),
-		pluginConfig.SourceChainID,
-	)
+	argsNoPlugin.ReportingPluginFactory = pluginFactory
 	oracle, err := libocr2.NewOracle(argsNoPlugin)
 	if err != nil {
 		return nil, err
@@ -187,89 +176,4 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 		}, nil
 	}
 	return []job.ServiceCtx{job.NewServiceAdapter(oracle)}, nil
-}
-
-type OffRamp interface {
-	GetPoolTokens(opts *bind.CallOpts) ([]common.Address, error)
-	GetDestinationToken(opts *bind.CallOpts, sourceToken common.Address) (common.Address, error)
-	GetExecutionState(opts *bind.CallOpts, arg0 uint64) (uint8, error)
-	ParseSeqNumFromExecutionStateChanged(log types.Log) (uint64, error)
-	Address() common.Address
-	// Destination chain addresses.
-	// Toll: dest pool addresses
-	GetSupportedTokensForExecutionFee() ([]common.Address, error)
-	GetAllowedTokensAmount(opts *bind.CallOpts) (*big.Int, error)
-	GetPricesForTokens(opts *bind.CallOpts, tokens []common.Address) ([]*big.Int, error)
-}
-
-type tollOffRamp struct {
-	*evm_2_evm_toll_offramp.EVM2EVMTollOffRamp
-}
-
-func (s tollOffRamp) ParseSeqNumFromExecutionStateChanged(log types.Log) (uint64, error) {
-	ec, err := s.ParseExecutionStateChanged(log)
-	if err != nil {
-		return 0, err
-	}
-	return ec.SequenceNumber, nil
-}
-
-func (s tollOffRamp) GetSupportedTokensForExecutionFee() ([]common.Address, error) {
-	// TODO: Toll offramp contract is missing ExecConfig?
-	// for now support all source tokens as fee tokens
-	return s.EVM2EVMTollOffRamp.GetDestinationTokens(nil)
-}
-
-func (s tollOffRamp) GetAllowedTokensAmount(opts *bind.CallOpts) (*big.Int, error) {
-	bucket, err := s.EVM2EVMTollOffRamp.CalculateCurrentTokenBucketState(opts)
-	if err != nil {
-		return nil, err
-	}
-	return bucket.Tokens, nil
-}
-
-func NewTollOffRamp(addr common.Address, destChain evm.Chain) (OffRamp, error) {
-	offRamp, err := evm_2_evm_toll_offramp.NewEVM2EVMTollOffRamp(addr, destChain.Client())
-	if err != nil {
-		return nil, err
-	}
-	return &tollOffRamp{offRamp}, nil
-}
-
-func NewGEOffRamp(ramp *evm_2_evm_ge_offramp.EVM2EVMGEOffRamp) OffRamp {
-	return &geOffRamp{ramp}
-}
-
-type geOffRamp struct {
-	*evm_2_evm_ge_offramp.EVM2EVMGEOffRamp
-}
-
-func (s geOffRamp) GetSenderNonce(sender common.Address) (uint64, error) {
-	nonce, err := s.EVM2EVMGEOffRamp.GetSenderNonce(nil, sender)
-	if err != nil {
-		return 0, err
-	}
-	return nonce, nil
-}
-
-func (s geOffRamp) ParseSeqNumFromExecutionStateChanged(log types.Log) (uint64, error) {
-	ec, err := s.ParseExecutionStateChanged(log)
-	if err != nil {
-		return 0, err
-	}
-	return ec.SequenceNumber, nil
-}
-
-func (s geOffRamp) GetSupportedTokensForExecutionFee() ([]common.Address, error) {
-	// TODO: Toll offramp contract is missing ExecConfig?
-	// for now support all source tokens as fee tokens
-	return s.EVM2EVMGEOffRamp.GetDestinationTokens(nil)
-}
-
-func (s geOffRamp) GetAllowedTokensAmount(opts *bind.CallOpts) (*big.Int, error) {
-	bucket, err := s.EVM2EVMGEOffRamp.CalculateCurrentTokenBucketState(opts)
-	if err != nil {
-		return nil, err
-	}
-	return bucket.Tokens, nil
 }

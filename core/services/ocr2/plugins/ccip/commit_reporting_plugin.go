@@ -215,14 +215,14 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, timestamp types
 			return nil, err
 		}
 		// All available messages that have not been committed yet and have sufficient confirmations.
-		lggr.Infof("Looking for requests with sig %s and nextMin %d on onRamp %s", r.onRampToReqEventSig[onRamp].SendRequested.Hex(), nextMin, onRamp.Hex())
+		lggr.Infof("Looking for requests with sig %s and nextMin %d on onRampAddr %s", r.onRampToReqEventSig[onRamp].SendRequested.Hex(), nextMin, onRamp.Hex())
 		reqs, err := r.source.LogsDataWordGreaterThan(r.onRampToReqEventSig[onRamp].SendRequested, onRamp, r.onRampToReqEventSig[onRamp].SendRequestedSequenceNumberIndex, EvmWord(nextMin), int(r.offchainConfig.SourceIncomingConfirmations))
 		if err != nil {
 			return nil, err
 		}
-		lggr.Infof("%d requests found for onRamp %s", len(reqs), onRamp.Hex())
+		lggr.Infof("%d requests found for onRampAddr %s", len(reqs), onRamp.Hex())
 		if len(reqs) == 0 {
-			lggr.Infow("no requests", "onRamp", onRamp)
+			lggr.Infow("no requests", "onRampAddr", onRamp)
 			continue
 		}
 		var seqNrs []uint64
@@ -270,7 +270,7 @@ func (r *CommitReportingPlugin) buildReport(intervalByOnRamp map[common.Address]
 	mctx := hasher.NewKeccakCtx()
 	for onRamp, leaves := range leafsByOnRamp {
 		if len(leaves) == 0 {
-			lggr.Warnf("Tried building a tree without leaves for onRamp %s. %+v", onRamp.Hex(), leafsByOnRamp)
+			lggr.Warnf("Tried building a tree without leaves for onRampAddr %s. %+v", onRamp.Hex(), leafsByOnRamp)
 			continue
 		}
 		tree, err2 := merklemulti.NewTree(mctx, leaves)

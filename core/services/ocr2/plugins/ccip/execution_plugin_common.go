@@ -1,0 +1,372 @@
+package ccip
+
+import (
+	"math/big"
+	"sort"
+	"time"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/pkg/errors"
+
+	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
+	"github.com/smartcontractkit/chainlink/core/logger"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
+	"github.com/smartcontractkit/chainlink/core/utils/mathutil"
+)
+
+const (
+	PERMISSIONLESS_EXECUTION_THRESHOLD = 7 * 24 * time.Hour
+	EVM_ADDRESS_LENGTH_BYTES           = 20
+	EVM_WORD_BYTES                     = 32
+	CALLDATA_GAS_PER_BYTE              = 16
+	PER_TOKEN_OVERHEAD_GAS             = 2_100 + // COLD_SLOAD_COST for first reading the pool
+		2_100 + // COLD_SLOAD_COST for pool to ensure allowed offramp calls it
+		2_100 + // COLD_SLOAD_COST for accessing pool balance slot
+		5_000 + // SSTORE_RESET_GAS for decreasing pool balance from non-zero to non-zero
+		2_100 + // COLD_SLOAD_COST for accessing receiver balance
+		20_000 + // SSTORE_SET_GAS for increasing receiver balance from zero to non-zero
+		2_100 // COLD_SLOAD_COST for obtanining price of token to use for aggregate token bucket
+	RATE_LIMITER_OVERHEAD_GAS = 2_100 + // COLD_SLOAD_COST for accessing token bucket
+		5_000 // SSTORE_RESET_GAS for updating & decreasing token bucket
+	EXTERNAL_CALL_OVERHEAD_GAS = 2600 // because the receiver will be untouched initially
+)
+
+type BatchBuilder interface {
+	BuildBatch(
+		srcToDst map[common.Address]common.Address,
+		msgs []logpoller.Log,
+		executed map[uint64]struct{},
+		gasLimit uint64,
+		gasPrice *big.Int,
+		tokensPerFeeCoin map[common.Address]*big.Int,
+		inflight []InflightExecutionReport,
+		aggregateTokenLimit *big.Int,
+		tokenLimitPrices map[common.Address]*big.Int) ([]uint64, bool)
+}
+
+const (
+	MessageStateUntouched = iota
+	MessageStateInProgress
+	MessageStateSuccess
+	MessageStateFailure
+)
+
+const (
+	BatchGasLimit            = 5_000_000                 // TODO: think if a good value for this
+	GasLimitPerTx            = BatchGasLimit - 1_000_000 // Leave a buffer for overhead.
+	MaxPayloadLength         = 1000
+	MaxTokensPerMessage      = 5
+	MaxExecutionReportLength = 150_000 // TODO
+	MaxGasPrice              = 200e9   // 200 gwei. TODO: probably want this to be some dynamic value, a multiplier of the current gas price.
+	TokenPriceBufferPercent  = 10      // Amount that the leader adds as a token price buffer in GEQuery.
+)
+
+var (
+	ErrCommitStoreIsDown = errors.New("commitStore is down")
+)
+
+func median(vals []*big.Int) *big.Int {
+	valsCopy := make([]*big.Int, len(vals))
+	copy(valsCopy[:], vals[:])
+	sort.Slice(valsCopy, func(i, j int) bool {
+		return valsCopy[i].Cmp(valsCopy[j]) == -1
+	})
+	return valsCopy[len(valsCopy)/2]
+}
+
+type InflightExecutionReport struct {
+	createdAt   time.Time
+	seqNrs      []uint64
+	encMessages [][]byte
+}
+
+type MessageExecution struct {
+	encMsgs               [][]byte
+	innerProofs           [][32]byte
+	innerProofSourceFlags []bool
+	outerProofs           [][32]byte
+	outerProofSourceFlags []bool
+}
+
+func contiguousReqs(lggr logger.Logger, min, max uint64, seqNrs []uint64) bool {
+	for i, j := min, 0; i < max && j < len(seqNrs); i, j = i+1, j+1 {
+		if seqNrs[j] != i {
+			lggr.Errorw("unexpected gap in seq nums", "seq", i)
+			return false
+		}
+	}
+	return true
+}
+
+func leafsFromIntervals(lggr logger.Logger, onRampToEventSig map[common.Address]EventSignatures, seqParsers map[common.Address]func(logpoller.Log) (uint64, error), intervalByOnRamp map[common.Address]commit_store.InternalInterval, srcLogPoller logpoller.LogPoller, onRampToHasher map[common.Address]LeafHasher[[32]byte], confs int) (map[common.Address][][32]byte, error) {
+	leafsByOnRamp := make(map[common.Address][][32]byte)
+	for onRamp, interval := range intervalByOnRamp {
+		// Logs are guaranteed to be in order of seq num, since these are finalized logs only
+		// and the contract's seq num is auto-incrementing.
+		logs, err := srcLogPoller.LogsDataWordRange(
+			onRampToEventSig[onRamp].SendRequested,
+			onRamp,
+			onRampToEventSig[onRamp].SendRequestedSequenceNumberIndex,
+			logpoller.EvmWord(interval.Min),
+			logpoller.EvmWord(interval.Max),
+			confs)
+		if err != nil {
+			return nil, err
+		}
+		var seqNrs []uint64
+		for _, log := range logs {
+			seqNr, err2 := seqParsers[onRamp](log)
+			if err2 != nil {
+				return nil, err2
+			}
+			seqNrs = append(seqNrs, seqNr)
+		}
+		if !contiguousReqs(lggr, interval.Min, interval.Max, seqNrs) {
+			return nil, errors.Errorf("do not have full range [%v, %v] have %v", interval.Min, interval.Max, seqNrs)
+		}
+		var leafs [][32]byte
+		for _, log := range logs {
+			hash, err2 := onRampToHasher[onRamp].HashLeaf(LogPollerLogToEthLog(log))
+			if err2 != nil {
+				return nil, err2
+			}
+			leafs = append(leafs, hash)
+		}
+		leafsByOnRamp[onRamp] = leafs
+	}
+	return leafsByOnRamp, nil
+}
+
+func aggregateTokenValue(tokenLimitPrices map[common.Address]*big.Int, srcToDst map[common.Address]common.Address, tokens []common.Address, amounts []*big.Int) (*big.Int, error) {
+	sum := big.NewInt(0)
+	for i := 0; i < len(tokens); i++ {
+		price, ok := tokenLimitPrices[srcToDst[tokens[i]]]
+		if !ok {
+			return nil, errors.Errorf("do not have price for src token %x", tokens[i])
+		}
+		sum.Add(sum, new(big.Int).Mul(price, amounts[i]))
+	}
+	return sum, nil
+}
+
+// EventSignatures contain pluginType specific signatures and indexes.
+// Indexes are zero indexed
+type EventSignatures struct {
+	SendRequested                            common.Hash
+	SendRequestedSequenceNumberIndex         int
+	ExecutionStateChanged                    common.Hash
+	ExecutionStateChangedSequenceNumberIndex int
+}
+
+func commitReport(dstLogPoller logpoller.LogPoller, onRamp common.Address, commitStore *commit_store.CommitStore, seqNr uint64) (commit_store.InternalCommitReport, error) {
+	latest, err := dstLogPoller.LatestBlock()
+	if err != nil {
+		return commit_store.InternalCommitReport{}, err
+	}
+	// Since the report accepted logs now contain intervals per onramp, we don't have a simple way of looking
+	// up the committed report for a given sequence number from the chain.
+	// TODO(https://app.shortcut.com/chainlinklabs/story/51129/efficient-report-from-seq-num-lookup): Follow up with a more efficient way, ideally we use the chain only to obtain natural reorg self-healing.
+	// One option is to emit a log per onramp (i.e. ReportAccepted(root, onRampAddr, min, max)) so we could easily search for the relevant log?
+	logs, err := dstLogPoller.Logs(1, latest, ReportAccepted, commitStore.Address())
+	if err != nil {
+		return commit_store.InternalCommitReport{}, err
+	}
+	if len(logs) == 0 {
+		return commit_store.InternalCommitReport{}, errors.Errorf("seq number not committed, nothing committed")
+	}
+	for _, log := range logs {
+		reportAccepted, err := commitStore.ParseReportAccepted(types.Log{
+			Topics: log.GetTopics(),
+			Data:   log.Data,
+		})
+		if err != nil {
+			return commit_store.InternalCommitReport{}, err
+		}
+		for i, onRampInReport := range reportAccepted.Report.OnRamps {
+			if onRampInReport == onRamp {
+				if reportAccepted.Report.Intervals[i].Min <= seqNr && seqNr <= reportAccepted.Report.Intervals[i].Max {
+					return reportAccepted.Report, nil
+				}
+			}
+		}
+	}
+	return commit_store.InternalCommitReport{}, errors.Errorf("seq number not committed")
+}
+
+func getUnexpiredCommitReports(dstLogPoller logpoller.LogPoller, commitStore *commit_store.CommitStore) ([]commit_store.InternalCommitReport, error) {
+	logs, err := dstLogPoller.LogsCreatedAfter(ReportAccepted, commitStore.Address(), time.Now().Add(-PERMISSIONLESS_EXECUTION_THRESHOLD))
+	if err != nil {
+		return nil, err
+	}
+	var reports []commit_store.InternalCommitReport
+	for _, log := range logs {
+		reportAccepted, err := commitStore.ParseReportAccepted(types.Log{
+			Topics: log.GetTopics(),
+			Data:   log.Data,
+		})
+		if err != nil {
+			return nil, err
+		}
+		reports = append(reports, reportAccepted.Report)
+	}
+	return reports, nil
+}
+
+func leafsFromInterval(lggr logger.Logger,
+	source logpoller.LogPoller,
+	onRamp common.Address,
+	eventSigs EventSignatures,
+	interval commit_store.InternalInterval,
+	confs int,
+	seqNumFromLog func(log types.Log) (uint64, error),
+	hashLeaf func(log types.Log) ([32]byte, error),
+) ([][32]byte, error) {
+	logs, err := source.LogsDataWordRange(
+		eventSigs.SendRequested,
+		onRamp,
+		eventSigs.SendRequestedSequenceNumberIndex,
+		logpoller.EvmWord(interval.Min),
+		logpoller.EvmWord(interval.Max),
+		confs)
+	if err != nil {
+		return nil, err
+	}
+	var seqNrs []uint64
+	for _, log := range logs {
+		sn, err2 := seqNumFromLog(LogPollerLogToEthLog(log))
+		if err2 != nil {
+			return nil, err2
+		}
+		seqNrs = append(seqNrs, sn)
+	}
+	if !contiguousReqs(lggr, interval.Min, interval.Max, seqNrs) {
+		return nil, errors.Errorf("do not have full range [%v, %v] have %v", interval.Min, interval.Max, seqNrs)
+	}
+	var leafs [][32]byte
+	for _, log := range logs {
+		hash, err2 := hashLeaf(LogPollerLogToEthLog(log))
+		if err2 != nil {
+			return nil, err2
+		}
+		leafs = append(leafs, hash)
+	}
+	return leafs, nil
+}
+
+func buildExecution(
+	lggr logger.Logger,
+	source,
+	dest logpoller.LogPoller,
+	onRampAddress common.Address,
+	finalSeqNums []uint64,
+	commitStore *commit_store.CommitStore,
+	confs int,
+	eventSignatures EventSignatures,
+	seqNumFromLog func(log types.Log) (uint64, error),
+	hashLeaf func(log types.Log) ([32]byte, error),
+) (*MessageExecution, error) {
+	nextMin, err := commitStore.GetExpectedNextSequenceNumber(nil, onRampAddress)
+	if err != nil {
+		return nil, err
+	}
+	if mathutil.Max(finalSeqNums[0], finalSeqNums[1:]...) >= nextMin {
+		return nil, errors.Errorf("Cannot execute uncommitted seq num. nextMin %v, seqNums %v", nextMin, finalSeqNums)
+	}
+	rep, err := commitReport(dest, onRampAddress, commitStore, finalSeqNums[0])
+	if err != nil {
+		return nil, err
+	}
+	lggr.Infow("Building execution report", "finalSeqNums", finalSeqNums, "rootOfRoots", hexutil.Encode(rep.RootOfRoots[:]), "report", rep)
+	// Otherwise we have messages to include as well.
+	var interval commit_store.InternalInterval
+	var onRampIdx int
+	var outerTreeLeafs [][32]byte
+	for i, onRamp := range rep.OnRamps {
+		if onRamp == onRampAddress {
+			interval = rep.Intervals[i]
+			onRampIdx = i
+		}
+		outerTreeLeafs = append(outerTreeLeafs, rep.MerkleRoots[i])
+	}
+	if interval.Max == 0 {
+		return nil, errors.New("interval not found for ramp " + onRampAddress.Hex())
+	}
+	msgsInRoot, err := source.LogsDataWordRange(
+		eventSignatures.SendRequested,
+		onRampAddress,
+		eventSignatures.SendRequestedSequenceNumberIndex,
+		EvmWord(interval.Min), EvmWord(interval.Max), confs)
+	if err != nil {
+		return nil, err
+	}
+	if len(msgsInRoot) != int(interval.Max-interval.Min+1) {
+		return nil, errors.Errorf("unexpected missing msgs in committed root %x have %d want %d", rep.MerkleRoots[onRampIdx], len(msgsInRoot), int(interval.Max-interval.Min+1))
+	}
+	leaves, err := leafsFromInterval(
+		lggr,
+		source,
+		onRampAddress,
+		eventSignatures,
+		interval,
+		confs,
+		seqNumFromLog,
+		hashLeaf,
+	)
+	if err != nil {
+		return nil, err
+	}
+	ctx := hasher.NewKeccakCtx()
+	outerTree, err := merklemulti.NewTree[[32]byte](ctx, outerTreeLeafs)
+	if err != nil {
+		return nil, err
+	}
+	outerProof := outerTree.Prove([]int{onRampIdx})
+	innerTree, err := merklemulti.NewTree[[32]byte](ctx, leaves)
+	if err != nil {
+		return nil, err
+	}
+
+	var innerIdxs []int
+	var encMsgs [][]byte
+	var hashes [][32]byte
+	for _, seqNum := range finalSeqNums {
+		if seqNum < interval.Min || seqNum > interval.Max {
+			// We only return messages from a single root (the root of the first message).
+			continue
+		}
+		innerIdx := int(seqNum - interval.Min)
+		innerIdxs = append(innerIdxs, innerIdx)
+		encMsgs = append(encMsgs, msgsInRoot[innerIdx].Data)
+		hash, err2 := hashLeaf(LogPollerLogToEthLog(msgsInRoot[innerIdx]))
+		if err2 != nil {
+			return nil, err2
+		}
+		hashes = append(hashes, hash)
+	}
+	innerProof := innerTree.Prove(innerIdxs)
+	// Double check this verifies before sending.
+	res, err := commitStore.Verify(nil, hashes, innerProof.Hashes, ProofFlagsToBits(innerProof.SourceFlags), outerProof.Hashes, ProofFlagsToBits(outerProof.SourceFlags))
+	if err != nil {
+		lggr.Errorw("Unable to call verify", "seqNums", finalSeqNums, "indices", innerIdxs, "root", rep.RootOfRoots[:], "seqRange", rep.Intervals[onRampIdx], "onRampReport", rep.OnRamps[onRampIdx].Hex(), "onRampHave", onRampAddress, "err", err)
+		return nil, err
+	}
+	// No timestamp, means failed to verify root.
+	if res.Cmp(big.NewInt(0)) == 0 {
+		ir := innerTree.Root()
+		or := outerTree.Root()
+		lggr.Errorf("Root does not verify for messages: %v (indices %v) our inner root %x our outer root %x contract outer root %x",
+			finalSeqNums, innerIdxs, ir[:], or[:], rep.RootOfRoots[:])
+		return nil, errors.New("root does not verify")
+	}
+	return &MessageExecution{
+		encMsgs:               encMsgs,
+		innerProofs:           innerProof.Hashes,
+		innerProofSourceFlags: innerProof.SourceFlags,
+		outerProofs:           outerProof.Hashes,
+		outerProofSourceFlags: outerProof.SourceFlags,
+	}, nil
+}
