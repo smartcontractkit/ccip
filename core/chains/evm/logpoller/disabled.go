@@ -2,6 +2,7 @@ package logpoller
 
 import (
 	"context"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
@@ -15,6 +16,10 @@ var (
 )
 
 type disabled struct{}
+
+func (d disabled) LogsCreatedAfter(eventSig common.Hash, address common.Address, time time.Time, qopts ...pg.QOpt) ([]Log, error) {
+	return nil, ErrDisabled
+}
 
 func (disabled) Start(ctx context.Context) error { return ErrDisabled }
 
