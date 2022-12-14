@@ -92,6 +92,7 @@ KeyPath = ''
 [JobPipeline]
 ExternalInitiatorsEnabled = false
 MaxRunDuration = '10m0s'
+MaxSuccessfulRuns = 10000
 ReaperInterval = '1h0m0s'
 ReaperThreshold = '24h0m0s'
 ResultWriteQueueDepth = 100
@@ -159,7 +160,6 @@ GasTipCapBufferPercent = 20
 BaseFeeBufferPercent = 20
 MaxGracePeriod = 100
 TurnLookBack = 1000
-UpkeepCheckGasPriceEnabled = false
 
 [Keeper.Registry]
 CheckGasOverhead = 200000

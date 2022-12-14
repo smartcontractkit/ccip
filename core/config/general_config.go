@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"math/big"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -13,7 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gin-gonic/contrib/sessions"
+	"github.com/gin-contrib/sessions"
+
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
@@ -56,7 +58,6 @@ type FeatureFlags interface {
 	AutoPprofEnabled() bool
 	EVMEnabled() bool
 	EVMRPCEnabled() bool
-	KeeperCheckUpkeepGasPriceFeatureEnabled() bool
 	P2PEnabled() bool
 	SolanaEnabled() bool
 	TerraEnabled() bool
@@ -130,6 +131,7 @@ type BasicConfig interface {
 	InsecureFastScrypt() bool
 	JSONConsole() bool
 	JobPipelineMaxRunDuration() time.Duration
+	JobPipelineMaxSuccessfulRuns() uint64
 	JobPipelineReaperInterval() time.Duration
 	JobPipelineReaperThreshold() time.Duration
 	JobPipelineResultWriteQueueDepth() uint64
@@ -908,6 +910,10 @@ func (c *generalConfig) JobPipelineResultWriteQueueDepth() uint64 {
 	return getEnvWithFallback(c, envvar.JobPipelineResultWriteQueueDepth)
 }
 
+func (c *generalConfig) JobPipelineMaxSuccessfulRuns() uint64 {
+	return getEnvWithFallback(c, envvar.JobPipelineMaxSuccessfulRuns)
+}
+
 func (c *generalConfig) JobPipelineReaperInterval() time.Duration {
 	return getEnvWithFallback(c, envvar.JobPipelineReaperInterval)
 }
@@ -974,11 +980,6 @@ func (c *generalConfig) KeeperMaximumGracePeriod() int64 {
 // KeeperRegistrySyncUpkeepQueueSize represents the maximum number of upkeeps that can be synced in parallel
 func (c *generalConfig) KeeperRegistrySyncUpkeepQueueSize() uint32 {
 	return getEnvWithFallback(c, envvar.KeeperRegistrySyncUpkeepQueueSize)
-}
-
-// KeeperCheckUpkeepGasPriceFeatureEnabled enables keepers to include a gas price when running checkUpkeep
-func (c *generalConfig) KeeperCheckUpkeepGasPriceFeatureEnabled() bool {
-	return getEnvWithFallback(c, envvar.NewBool("KeeperCheckUpkeepGasPriceFeatureEnabled"))
 }
 
 // KeeperTurnLookBack represents the number of blocks in the past to loo back when getting block for turn
@@ -1280,6 +1281,7 @@ func (c *generalConfig) SessionOptions() sessions.Options {
 		Secure:   c.SecureCookies(),
 		HttpOnly: true,
 		MaxAge:   86400 * 30,
+		SameSite: http.SameSiteStrictMode,
 	}
 }
 

@@ -129,11 +129,11 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 		return nil, errors.Errorf("%s relay does not exist is it enabled?", spec.Relay)
 	}
 
-	lggr := d.lggr.Named("OCR").With(
+	lggr := logger.Sugared(d.lggr.Named("OCR").With(
 		"contractID", spec.ContractID,
 		"jobName", jb.Name.ValueOrZero(),
 		"jobID", jb.ID,
-	)
+	))
 
 	if spec.Relay == relay.EVM {
 		chainIDInterface, ok := spec.RelayConfig["chainID"]
@@ -165,7 +165,7 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 		spec.RelayConfig["effectiveTransmitterAddress"] = effectiveTransmitterAddress
 	}
 
-	ocrDB := NewDB(d.db, spec.ID, d.lggr, d.cfg)
+	ocrDB := NewDB(d.db, spec.ID, lggr, d.cfg)
 	peerWrapper := d.peerWrapper
 	if peerWrapper == nil {
 		return nil, errors.New("cannot setup OCR2 job service, libp2p peer was missing")
@@ -174,14 +174,14 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 	}
 
 	ocrLogger := logger.NewOCRWrapper(lggr, true, func(msg string) {
-		d.lggr.ErrorIf(d.jobORM.RecordError(jb.ID, msg), "unable to record error")
+		lggr.ErrorIf(d.jobORM.RecordError(jb.ID, msg), "unable to record error")
 	})
 
 	lc := validate.ToLocalConfig(d.cfg, *spec)
 	if err := libocr2.SanityCheckLocalConfig(lc); err != nil {
 		return nil, err
 	}
-	d.lggr.Infow("OCR2 job using local config",
+	lggr.Infow("OCR2 job using local config",
 		"BlockchainTimeout", lc.BlockchainTimeout,
 		"ContractConfigConfirmations", lc.ContractConfigConfirmations,
 		"ContractConfigTrackerPollInterval", lc.ContractConfigTrackerPollInterval,
@@ -193,7 +193,7 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 	if err != nil {
 		return nil, err
 	}
-	d.lggr.Debugw("Using bootstrap peers", "peers", bootstrapPeers)
+	lggr.Debugw("Using bootstrap peers", "peers", bootstrapPeers)
 	// Fetch the specified OCR2 key bundle
 	var kbID string
 	if spec.OCRKeyBundleID.Valid {
@@ -239,7 +239,7 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 			OffchainKeyring:              kb,
 			OnchainKeyring:               kb,
 		}
-		return median.NewMedianServices(jb, medianProvider, d.pipelineRunner, runResults, lggr, ocrLogger, oracleArgsNoPlugin)
+		return median.NewMedianServices(jb, medianProvider, d.pipelineRunner, runResults, lggr, ocrLogger, oracleArgsNoPlugin, d.cfg)
 	case job.DKG:
 		chainIDInterface, ok := jb.OCR2OracleSpec.RelayConfig["chainID"]
 		if !ok {
@@ -281,7 +281,7 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 		return dkg.NewDKGServices(
 			jb,
 			dkgProvider,
-			d.lggr,
+			lggr,
 			ocrLogger,
 			d.dkgSignKs,
 			d.dkgEncryptKs,
@@ -392,17 +392,17 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 		if err2 != nil {
 			return nil, errors.Wrap(err2, "create ocr2vrf coordinator")
 		}
-		l := d.lggr.Named("OCR2VRF").With(
+		l := lggr.Named("OCR2VRF").With(
 			"jobName", jb.Name.ValueOrZero(),
 			"jobID", jb.ID,
 		)
 		vrfLogger := logger.NewOCRWrapper(l.With(
 			"vrfContractID", spec.ContractID), true, func(msg string) {
-			d.lggr.ErrorIf(d.jobORM.RecordError(jb.ID, msg), "unable to record error")
+			lggr.ErrorIf(d.jobORM.RecordError(jb.ID, msg), "unable to record error")
 		})
 		dkgLogger := logger.NewOCRWrapper(l.With(
 			"dkgContractID", cfg.DKGContractAddress), true, func(msg string) {
-			d.lggr.ErrorIf(d.jobORM.RecordError(jb.ID, msg), "unable to record error")
+			lggr.ErrorIf(d.jobORM.RecordError(jb.ID, msg), "unable to record error")
 		})
 		dkgReportingPluginFactoryDecorator := func(wrapped ocr2types.ReportingPluginFactory) ocr2types.ReportingPluginFactory {
 			return promwrapper.NewPromFactory(wrapped, "DKG", string(relay.EVM), chain.ID())
@@ -430,7 +430,7 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 			DKGDatabase:                        ocrDB,
 			DKGLocalConfig:                     lc,
 			DKGMonitoringEndpoint:              d.monitoringEndpointGen.GenMonitoringEndpoint(cfg.DKGContractAddress),
-			Blockhashes:                        blockhashes.NewFixedBlockhashProvider(chain.LogPoller(), d.lggr, 256),
+			Blockhashes:                        blockhashes.NewFixedBlockhashProvider(chain.LogPoller(), lggr, 256),
 			Serializer:                         reportserializer.NewReportSerializer(&altbn_128.G1{}),
 			JulesPerFeeCoin:                    juelsPerFeeCoin,
 			Coordinator:                        coordinator,
@@ -439,7 +439,7 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 			KeyID:                              keyID,
 			DKGReportingPluginFactoryDecorator: dkgReportingPluginFactoryDecorator,
 			VRFReportingPluginFactoryDecorator: vrfReportingPluginFactoryDecorator,
-			DKGSharePersistence:                persistence.NewShareDB(d.db, d.lggr.Named("DKGShareDB"), d.cfg, big.NewInt(chainID), spec.Relay),
+			DKGSharePersistence:                persistence.NewShareDB(d.db, lggr.Named("DKGShareDB"), d.cfg, big.NewInt(chainID), spec.Relay),
 		})
 		if err2 != nil {
 			return nil, errors.Wrap(err2, "new ocr2vrf")
@@ -453,6 +453,7 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 			d.pipelineRunner,
 			make(chan struct{}),
 			lggr,
+			d.cfg.JobPipelineMaxSuccessfulRuns(),
 		)
 
 		// NOTE: we return from here with the services because the OCR2VRF oracles are defined
@@ -510,6 +511,7 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 			d.pipelineRunner,
 			make(chan struct{}),
 			lggr,
+			d.cfg.JobPipelineMaxSuccessfulRuns(),
 		)
 
 		return []job.ServiceCtx{
@@ -551,7 +553,7 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 		if err2 != nil {
 			return nil, err2
 		}
-		pluginORM := drocr_service.NewORM(d.db, d.lggr, d.cfg, common.HexToAddress(spec.ContractID))
+		pluginORM := drocr_service.NewORM(d.db, lggr, d.cfg, common.HexToAddress(spec.ContractID))
 		pluginOracle, _ = directrequestocr.NewDROracle(jb, d.pipelineRunner, d.jobORM, pluginORM, chain, lggr, ocrLogger, d.mailMon)
 	case job.CCIPCommit:
 		if spec.Relay != relay.EVM {
@@ -651,7 +653,9 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 		runResults,
 		d.pipelineRunner,
 		make(chan struct{}),
-		lggr)
+		lggr,
+		d.cfg.JobPipelineMaxSuccessfulRuns(),
+	)
 
 	oracleCtx := job.NewServiceAdapter(oracle)
 	return append([]job.ServiceCtx{runResultSaver, ocr2Provider, oracleCtx}, pluginServices...), nil
