@@ -8,7 +8,6 @@ import {Any2EVMOffRampRouterInterface} from "../interfaces/offRamp/Any2EVMOffRam
 import {GERouterInterface} from "../interfaces/router/GERouterInterface.sol";
 
 abstract contract CCIPConsumer is Any2EVMMessageReceiverInterface {
-
   GERouterInterface private immutable i_router;
   address private s_feeToken;
 
@@ -19,7 +18,7 @@ abstract contract CCIPConsumer is Any2EVMMessageReceiverInterface {
   }
 
   /// @inheritdoc Any2EVMMessageReceiverInterface
-  function ccipReceive(Common.Any2EVMMessage calldata message) external override onlyRouter(){
+  function ccipReceive(Common.Any2EVMMessage calldata message) external override onlyRouter {
     _ccipReceive(message);
   }
 
@@ -38,10 +37,11 @@ abstract contract CCIPConsumer is Any2EVMMessageReceiverInterface {
    */
   function _ccipSend(uint64 destinationChainId, GEConsumer.EVM2AnyGEMessage memory message)
     internal
-    routerIsSet()
-    returns (bytes32 messageId) {
-      return i_router.ccipSend(destinationChainId, message);
-    }
+    routerIsSet
+    returns (bytes32 messageId)
+  {
+    return i_router.ccipSend(destinationChainId, message);
+  }
 
   /////////////////////////////////////////////////////////////////////
   // Plumbing

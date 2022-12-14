@@ -18,9 +18,7 @@ contract PingPongDemo is CCIPConsumer, OwnerIsCreator {
   // Pause ping-ponging
   bool private s_isPaused;
 
-  constructor(address router, address feeToken)
-    CCIPConsumer(router, feeToken)
-  {
+  constructor(address router, address feeToken) CCIPConsumer(router, feeToken) {
     s_isPaused = false;
   }
 

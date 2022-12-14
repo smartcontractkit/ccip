@@ -34,9 +34,7 @@ contract GovernanceDapp is CCIPConsumer, TypeAndVersionInterface, OwnerIsCreator
     address router,
     FeeConfig memory feeConfig,
     address feeToken
-  )
-    CCIPConsumer(router, feeToken)
-  {
+  ) CCIPConsumer(router, feeToken) {
     s_feeConfig = feeConfig;
   }
 

@@ -4,7 +4,7 @@
   "calculateCurrentTokenBucketState()": "90c2339b",
   "ccipReceive((uint64,bytes,address,bytes,address[],(address,uint256)[],uint256))": "ea03d1b5",
   "execute((uint64[],address[],uint256[],bytes[],bytes32[],uint256,bytes32[],uint256),bool)": "be9b03f1",
-  "executeSingleMessage((uint64,bytes,address,bytes,address[],(address,uint256)[],uint256))": "6c51aba0",
+  "executeSingleMessage((uint64,bytes,address,bytes,address[],(address,uint256)[],uint256),bool)": "7f738dc8",
   "feeTaken(uint256)": "a8b640c1",
   "getAFN()": "2222dd42",
   "getChainIDs()": "087ae6df",
