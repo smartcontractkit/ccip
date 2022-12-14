@@ -6,7 +6,6 @@ import {Common} from "../models/Common.sol";
 import {Any2EVMMessageReceiverInterface} from "../interfaces/applications/Any2EVMMessageReceiverInterface.sol";
 import {Any2EVMOffRampRouterInterface} from "../interfaces/offRamp/Any2EVMOffRampRouterInterface.sol";
 import {GERouterInterface} from "../interfaces/router/GERouterInterface.sol";
-import {IERC20} from "../../vendor/IERC20.sol";
 
 abstract contract CCIPConsumer is Any2EVMMessageReceiverInterface {
 
@@ -17,17 +16,6 @@ abstract contract CCIPConsumer is Any2EVMMessageReceiverInterface {
     i_router = GERouterInterface(router);
 
     _setFeeToken(feeToken);
-  }
-
-  /**
-   * @notice Fund this contract with configured feeToken and approve tokens to the router
-   * @dev Requires prior approval from the msg.sender
-   * @param amount The amount of feeToken to be funded
-   */
-  function fund(uint256 amount) external {
-    IERC20 token = IERC20(s_feeToken);
-    token.transferFrom(msg.sender, address(this), amount);
-    token.approve(address(i_router), amount);
   }
 
   /// @inheritdoc Any2EVMMessageReceiverInterface

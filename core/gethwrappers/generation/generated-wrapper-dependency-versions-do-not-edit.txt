@@ -27,7 +27,7 @@ flux_aggregator_wrapper: ../../contracts/solc/v0.6/FluxAggregator.abi ../../cont
 gas_fee_cache: ../../contracts/solc/v0.8.15/GasFeeCache.abi ../../contracts/solc/v0.8.15/GasFeeCache.bin b6d1ce45fb4d886c949b53f112488b006782194863bbdff3f0146e6b278af197
 gas_wrapper: ../../contracts/solc/v0.8.6/KeeperRegistryCheckUpkeepGasUsageWrapper1_2.abi ../../contracts/solc/v0.8.6/KeeperRegistryCheckUpkeepGasUsageWrapper1_2.bin 4a5dcdac486d18fcd58e3488c15c1710ae76b977556a3f3191bd269a4bc75723
 ge_router: ../../contracts/solc/v0.8.15/GERouter.abi ../../contracts/solc/v0.8.15/GERouter.bin b5a033a539de8380436d6cc9636c337212576a1ff92b6ac9039c0808fa9a6981
-governance_dapp: ../../contracts/solc/v0.8.15/GovernanceDapp.abi ../../contracts/solc/v0.8.15/GovernanceDapp.bin b724d40588cb1484b83567de78791245ee0716bdbccc28c1c87aa5d5d8870b63
+governance_dapp: ../../contracts/solc/v0.8.15/GovernanceDapp.abi ../../contracts/solc/v0.8.15/GovernanceDapp.bin 42ea4d5273cdfb30a22487029fc4cee4ff0cc5da782a6cc91975a978f7ef3a5d
 keeper_registry_logic1_3: ../../contracts/solc/v0.8.6/KeeperRegistryLogic1_3.abi ../../contracts/solc/v0.8.6/KeeperRegistryLogic1_3.bin e1bee66ce7cd0085469f923c46f0eddb58fd45dec207def1bb383b37e413a6ca
 keeper_registry_logic2_0: ../../contracts/solc/v0.8.6/KeeperRegistryLogic2_0.abi ../../contracts/solc/v0.8.6/KeeperRegistryLogic2_0.bin d090ab9fcb92e390599fd8dd2bca3ea7518c86cbb795e9b725723337e1e3cf06
 keeper_registry_wrapper1_1: ../../contracts/solc/v0.7/KeeperRegistry1_1.abi ../../contracts/solc/v0.7/KeeperRegistry1_1.bin 6ce079f2738f015f7374673a2816e8e9787143d00b780ea7652c8aa9ad9e1e20
@@ -50,7 +50,7 @@ offchain_aggregator_wrapper: OffchainAggregator/OffchainAggregator.abi - 5f97dc1
 operator_factory: ../../contracts/solc/v0.7/OperatorFactory.abi ../../contracts/solc/v0.7/OperatorFactory.bin e78e7231bbaceabe20a266ea596ff14e8c12bf7ec6c69e1e8fe984556d2b7df9
 operator_wrapper: ../../contracts/solc/v0.7/Operator.abi ../../contracts/solc/v0.7/Operator.bin 97dcb51158733881bfbe414d0318a57c3bba7b32bdc7aa5961db2f0ea5e993cb
 oracle_wrapper: ../../contracts/solc/v0.6/Oracle.abi ../../contracts/solc/v0.6/Oracle.bin 7af2fbac22a6e8c2847e8e685a5400cac5101d72ddf5365213beb79e4dede43a
-ping_pong_demo: ../../contracts/solc/v0.8.15/PingPongDemo.abi ../../contracts/solc/v0.8.15/PingPongDemo.bin 8a3b8b1ecb791e612b0861898e79273cb863ec70b26cb39834a6e832a70a8290
+ping_pong_demo: ../../contracts/solc/v0.8.15/PingPongDemo.abi ../../contracts/solc/v0.8.15/PingPongDemo.bin 04f6a71051ad685cde608d37941ce8ad2d8a193a12131f58a2c10e3165fe0565
 receiver_dapp: ../../contracts/solc/v0.8.15/ReceiverDapp.abi ../../contracts/solc/v0.8.15/ReceiverDapp.bin 6ee601d1688f3b45d1602982144d13846a87254f0b1c1007bd0fb4bc3c90d979
 simple_message_receiver: ../../contracts/solc/v0.8.15/SimpleMessageReceiver.abi ../../contracts/solc/v0.8.15/SimpleMessageReceiver.bin 7c43d49e3d65e518ade7a13cc6e140477ef858c3110770043247b1a684f06d10
 solidity_vrf_consumer_interface: ../../contracts/solc/v0.6/VRFConsumer.abi ../../contracts/solc/v0.6/VRFConsumer.bin a79da241ca9525f6a96adc5f55651b1f91e1579b85fec7b02a51d06bd6018ee3
