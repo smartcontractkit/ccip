@@ -315,7 +315,7 @@ func (e *CCIPContractsDeployer) DeployGasFeeCache(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return gas_fee_cache.DeployGasFeeCache(auth, backend, feeUpdates, nil)
+		return gas_fee_cache.DeployGasFeeCache(auth, backend, feeUpdates, nil, big.NewInt(1e18))
 	})
 	if err != nil {
 		return nil, err

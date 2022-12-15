@@ -31,7 +31,7 @@ contract EVM2EVMGEOnRampSetup is TokenSetup, GESRouterSetup {
     GE.FeeUpdate[] memory fees = new GE.FeeUpdate[](1);
     fees[0] = GE.FeeUpdate({chainId: DEST_CHAIN_ID, linkPerUnitGas: 100});
     address[] memory feeUpdaters = new address[](0);
-    GasFeeCacheInterface gasFeeCache = new GasFeeCache(fees, feeUpdaters);
+    GasFeeCacheInterface gasFeeCache = new GasFeeCache(fees, feeUpdaters, uint128(TWELVE_HOURS));
 
     s_onRamp = new EVM2EVMGEOnRamp(
       SOURCE_CHAIN_ID,

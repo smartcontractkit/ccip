@@ -9,7 +9,7 @@ import {Internal} from "./Internal.sol";
 library GE {
   struct FeeUpdate {
     uint64 chainId;
-    uint256 linkPerUnitGas;
+    uint128 linkPerUnitGas;
   }
 
   struct ExecutionReport {

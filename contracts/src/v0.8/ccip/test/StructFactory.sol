@@ -58,6 +58,7 @@ contract StructFactory {
 
   // timing
   uint256 internal constant BLOCK_TIME = 1234567890;
+  uint256 internal constant TWELVE_HOURS = 60 * 60 * 12;
 
   // offRamp
   uint256 internal constant POOL_BALANCE = 1e25;

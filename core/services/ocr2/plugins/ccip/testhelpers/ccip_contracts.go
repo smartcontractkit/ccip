@@ -529,7 +529,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			ChainId:        destChainID,
 			LinkPerUnitGas: big.NewInt(1e9), // 1 gwei
 		},
-	}, nil)
+	}, nil, big.NewInt(1e18))
 	require.NoError(t, err)
 	geOnRampAddress, _, _, err := evm_2_evm_ge_onramp.DeployEVM2EVMGEOnRamp(
 		sourceUser,                               // user
@@ -641,7 +641,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	destGasFeeCacheAddress, _, _, err := gas_fee_cache.DeployGasFeeCache(destUser, destChain, []gas_fee_cache.GEFeeUpdate{{
 		ChainId:        sourceChainID,
 		LinkPerUnitGas: big.NewInt(200e9), // (2e20 juels/eth) * (1 gwei / gas) / (1 eth/1e18)
-	}}, nil)
+	}}, nil, big.NewInt(1e18))
 	require.NoError(t, err)
 	destGasFeeCache, err := gas_fee_cache.NewGasFeeCache(destGasFeeCacheAddress, destChain)
 	require.NoError(t, err)

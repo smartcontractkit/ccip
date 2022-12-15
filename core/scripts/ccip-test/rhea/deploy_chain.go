@@ -98,6 +98,7 @@ func deployGasFeeCache(t *testing.T, client *EvmDeploymentConfig) {
 		client.Client,
 		[]gas_fee_cache.GEFeeUpdate{},
 		[]common.Address{},
+		big.NewInt(1e18),
 	)
 	require.NoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)

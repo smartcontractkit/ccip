@@ -8,10 +8,16 @@ interface GasFeeCacheInterface {
   error ChainNotSupported(uint64 chain);
   error FeeUpdaterNotAllowed(address feeUpdater);
   error OnlyCallableByUpdaterOrOwner();
+  error StaleFee(uint256 threshold, uint256 timePassed);
 
   event FeeUpdaterSet(address feeUpdater);
   event FeeUpdaterRemoved(address feeUpdater);
-  event GasFeeUpdated(uint64 destChain, uint256 linkPerUnitGas);
+  event GasFeeUpdated(uint64 destChain, uint128 linkPerUnitGas, uint128 timestamp);
+
+  struct TimestampedFeeUpdate{
+    uint128 linkPerUnitGas;
+    uint128 timestamp;
+  }
 
   function setFeeUpdater(address feeUpdater) external;
 
@@ -19,5 +25,5 @@ interface GasFeeCacheInterface {
 
   function updateFees(GE.FeeUpdate[] memory feeUpdates) external;
 
-  function getFee(uint64 destChainId) external view returns (uint256 fee);
+  function getFee(uint64 destChainId) external view returns (uint128 fee);
 }
