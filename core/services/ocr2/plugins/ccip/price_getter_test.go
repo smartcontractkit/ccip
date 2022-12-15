@@ -1,4 +1,4 @@
-package ccip
+package ccip_test
 
 import (
 	"context"
@@ -15,8 +15,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/core/bridges"
+	config "github.com/smartcontractkit/chainlink/core/internal/testutils/configtest/v2"
 	"github.com/smartcontractkit/chainlink/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/core/logger"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/core/services/pipeline"
 	pipelinemocks "github.com/smartcontractkit/chainlink/core/services/pipeline/mocks"
 	"github.com/smartcontractkit/chainlink/core/store/models"
@@ -52,9 +54,9 @@ func TestDataSource(t *testing.T) {
 	cfg.On("DefaultHTTPTimeout").Return(models.MakeDuration(time.Second))
 	cfg.On("DefaultHTTPLimit").Return(int64(1024 * 10))
 	db := pgtest.NewSqlxDB(t)
-	bridgeORM := bridges.NewORM(db, lggr, nil)
-	runner := pipeline.NewRunner(pipeline.NewORM(db, lggr, nil), bridgeORM, cfg, nil, nil, nil, lggr, &http.Client{}, &http.Client{})
-	ds, err := NewPriceGetter(source, runner, 1, uuid.NewV1(), "test", lggr)
+	bridgeORM := bridges.NewORM(db, lggr, config.NewTestGeneralConfig(t))
+	runner := pipeline.NewRunner(pipeline.NewORM(db, lggr, config.NewTestGeneralConfig(t)), bridgeORM, cfg, nil, nil, nil, lggr, &http.Client{}, &http.Client{})
+	ds, err := ccip.NewPriceGetter(source, runner, 1, uuid.NewV1(), "test", lggr)
 	require.NoError(t, err)
 
 	// Ask for all prices present in spec.
