@@ -6,10 +6,8 @@ import {Common} from "../models/Common.sol";
 import {Any2EVMMessageReceiverInterface} from "../interfaces/applications/Any2EVMMessageReceiverInterface.sol";
 import {Any2EVMOffRampRouterInterface} from "../interfaces/offRamp/Any2EVMOffRampRouterInterface.sol";
 import {GERouterInterface} from "../interfaces/router/GERouterInterface.sol";
-import {IERC20} from "../../vendor/IERC20.sol";
 
 abstract contract CCIPConsumer is Any2EVMMessageReceiverInterface {
-
   GERouterInterface private immutable i_router;
   address private s_feeToken;
 
@@ -19,19 +17,8 @@ abstract contract CCIPConsumer is Any2EVMMessageReceiverInterface {
     _setFeeToken(feeToken);
   }
 
-  /**
-   * @notice Fund this contract with configured feeToken and approve tokens to the router
-   * @dev Requires prior approval from the msg.sender
-   * @param amount The amount of feeToken to be funded
-   */
-  function fund(uint256 amount) external {
-    IERC20 token = IERC20(s_feeToken);
-    token.transferFrom(msg.sender, address(this), amount);
-    token.approve(address(i_router), amount);
-  }
-
   /// @inheritdoc Any2EVMMessageReceiverInterface
-  function ccipReceive(Common.Any2EVMMessage calldata message) external override onlyRouter(){
+  function ccipReceive(Common.Any2EVMMessage calldata message) external override onlyRouter {
     _ccipReceive(message);
   }
 
@@ -50,10 +37,11 @@ abstract contract CCIPConsumer is Any2EVMMessageReceiverInterface {
    */
   function _ccipSend(uint64 destinationChainId, GEConsumer.EVM2AnyGEMessage memory message)
     internal
-    routerIsSet()
-    returns (bytes32 messageId) {
-      return i_router.ccipSend(destinationChainId, message);
-    }
+    routerIsSet
+    returns (bytes32 messageId)
+  {
+    return i_router.ccipSend(destinationChainId, message);
+  }
 
   /////////////////////////////////////////////////////////////////////
   // Plumbing

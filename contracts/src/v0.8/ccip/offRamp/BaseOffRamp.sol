@@ -110,13 +110,14 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, OffRampTokenPoolReg
   /**
    * @notice Try executing a message
    * @param message Internal.Any2EVMMessageFromSender memory message
+   * @param manualExecution bool to indicate manual instead of DON execution
    * @return Internal.ExecutionState
    */
-  function _trialExecute(Internal.Any2EVMMessageFromSender memory message)
+  function _trialExecute(Internal.Any2EVMMessageFromSender memory message, bool manualExecution)
     internal
     returns (Internal.MessageExecutionState)
   {
-    try this.executeSingleMessage(message) {} catch (bytes memory err) {
+    try this.executeSingleMessage(message, manualExecution) {} catch (bytes memory err) {
       if (BaseOffRampInterface.ReceiverError.selector == bytes4(err)) {
         return Internal.MessageExecutionState.FAILURE;
       } else {
@@ -129,22 +130,23 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, OffRampTokenPoolReg
   /**
    * @notice Execute a single message
    * @param message The Any2EVMMessageFromSender message that will be executed
+   * @param manualExecution bool to indicate manual instead of DON execution
    * @dev this can only be called by the contract itself. It is part of
    * the Execute call, as we can only try/catch on external calls.
    */
-  function executeSingleMessage(Internal.Any2EVMMessageFromSender memory message) external {
+  function executeSingleMessage(Internal.Any2EVMMessageFromSender memory message, bool manualExecution) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
     if (message.destTokensAndAmounts.length > 0) {
       _removeTokens(message.destTokensAndAmounts);
       _releaseOrMintTokens(message.destPools, message.destTokensAndAmounts, message.receiver);
     }
 
-    _callReceiver(message);
+    _callReceiver(message, manualExecution);
   }
 
-  function _callReceiver(Internal.Any2EVMMessageFromSender memory message) internal {
+  function _callReceiver(Internal.Any2EVMMessageFromSender memory message, bool manualExecution) internal {
     if (!message.receiver.isContract()) return;
-    if (!s_router.routeMessage(message)) revert ReceiverError();
+    if (!s_router.routeMessage(message, manualExecution)) revert ReceiverError();
   }
 
   /**

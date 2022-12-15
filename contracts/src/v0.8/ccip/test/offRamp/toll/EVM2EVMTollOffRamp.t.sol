@@ -277,11 +277,11 @@ contract EVM2EVMTollOffRamp_executeSingleMessage is EVM2EVMTollOffRampSetup {
   // Success
 
   function testNoTokensSuccess() public {
-    s_offRamp.executeSingleMessage(_convertTollToGeneralMessage(_generateAny2EVMTollMessageNoTokens(1)));
+    s_offRamp.executeSingleMessage(_convertTollToGeneralMessage(_generateAny2EVMTollMessageNoTokens(1)), false);
   }
 
   function testTokensSuccess() public {
-    s_offRamp.executeSingleMessage(_convertTollToGeneralMessage(_generateMessagesWithTokens()[0]));
+    s_offRamp.executeSingleMessage(_convertTollToGeneralMessage(_generateMessagesWithTokens()[0]), false);
   }
 
   function testNonContractSuccess() public {
@@ -289,7 +289,7 @@ contract EVM2EVMTollOffRamp_executeSingleMessage is EVM2EVMTollOffRampSetup {
       _generateAny2EVMTollMessageNoTokens(1)
     );
     message.receiver = STRANGER;
-    s_offRamp.executeSingleMessage(message);
+    s_offRamp.executeSingleMessage(message, false);
   }
 
   event Released(address indexed sender, address indexed recipient, uint256 amount);
@@ -307,7 +307,7 @@ contract EVM2EVMTollOffRamp_executeSingleMessage is EVM2EVMTollOffRampSetup {
       _generateAny2EVMTollMessageWithTokens(1, amounts)
     );
     message.receiver = STRANGER;
-    s_offRamp.executeSingleMessage(message);
+    s_offRamp.executeSingleMessage(message, false);
   }
 
   // Reverts
@@ -318,7 +318,7 @@ contract EVM2EVMTollOffRamp_executeSingleMessage is EVM2EVMTollOffRampSetup {
       _generateAny2EVMTollMessageNoTokens(1)
     );
     vm.expectRevert(BaseOffRampInterface.CanOnlySelfCall.selector);
-    s_offRamp.executeSingleMessage(message);
+    s_offRamp.executeSingleMessage(message, false);
   }
 }
 

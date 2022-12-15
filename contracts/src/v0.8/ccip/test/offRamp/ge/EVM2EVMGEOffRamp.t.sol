@@ -333,17 +333,29 @@ contract EVM2EVMGEOffRamp_executeSingleMessage is EVM2EVMGEOffRampSetup {
   // Success
 
   function testNoTokensSuccess() public {
-    s_offRamp.executeSingleMessage(_convertGEToGeneralMessage(_generateAny2EVMGEMessageNoTokens(1)));
+    s_offRamp.executeSingleMessage(_convertGEToGeneralMessage(_generateAny2EVMGEMessageNoTokens(1)), false);
   }
 
   function testTokensSuccess() public {
-    s_offRamp.executeSingleMessage(_convertGEToGeneralMessage(_generateMessagesWithTokens()[0]));
+    s_offRamp.executeSingleMessage(_convertGEToGeneralMessage(_generateMessagesWithTokens()[0]), false);
   }
 
   function testNonContractSuccess() public {
     Internal.Any2EVMMessageFromSender memory message = _convertGEToGeneralMessage(_generateAny2EVMGEMessageNoTokens(1));
     message.receiver = STRANGER;
-    s_offRamp.executeSingleMessage(message);
+    s_offRamp.executeSingleMessage(message, false);
+  }
+
+  event MessageReceived();
+
+  function testLowGasLimitManualExecutionSuccess() public {
+    Internal.Any2EVMMessageFromSender memory message = _convertGEToGeneralMessage(_generateAny2EVMGEMessageNoTokens(1));
+    message.gasLimit = 1;
+    vm.expectRevert(BaseOffRampInterface.ReceiverError.selector);
+    s_offRamp.executeSingleMessage(message, false);
+    vm.expectEmit(false, false, false, false);
+    emit MessageReceived();
+    s_offRamp.executeSingleMessage(message, true);
   }
 
   event Released(address indexed sender, address indexed recipient, uint256 amount);
@@ -361,7 +373,7 @@ contract EVM2EVMGEOffRamp_executeSingleMessage is EVM2EVMGEOffRampSetup {
       _generateAny2EVMGEMessageWithTokens(1, amounts)
     );
     message.receiver = STRANGER;
-    s_offRamp.executeSingleMessage(message);
+    s_offRamp.executeSingleMessage(message, false);
   }
 
   // Reverts
@@ -370,7 +382,7 @@ contract EVM2EVMGEOffRamp_executeSingleMessage is EVM2EVMGEOffRampSetup {
     vm.stopPrank();
     Internal.Any2EVMMessageFromSender memory message = _convertGEToGeneralMessage(_generateAny2EVMGEMessageNoTokens(1));
     vm.expectRevert(BaseOffRampInterface.CanOnlySelfCall.selector);
-    s_offRamp.executeSingleMessage(message);
+    s_offRamp.executeSingleMessage(message, false);
   }
 }
 

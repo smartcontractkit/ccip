@@ -25,7 +25,7 @@ abstract contract BaseOffRampRouter is Any2EVMOffRampRouterInterface, OwnerIsCre
   }
 
   /// @inheritdoc Any2EVMOffRampRouterInterface
-  function routeMessage(Internal.Any2EVMMessageFromSender calldata message)
+  function routeMessage(Internal.Any2EVMMessageFromSender calldata message, bool manualExecution)
     external
     override
     onlyOffRamp
@@ -34,9 +34,13 @@ abstract contract BaseOffRampRouter is Any2EVMOffRampRouterInterface, OwnerIsCre
     // TODO: Maybe push this down into GEOffRamp? Do we really want/need to support multiple billing models
     // calling the same receiver?
     Common.Any2EVMMessage memory minMessage = message._toAny2EVMMessage();
-
     bytes memory callData = abi.encodeWithSelector(Any2EVMMessageReceiverInterface.ccipReceive.selector, minMessage);
-    return _callWithExactGas(message.gasLimit, message.receiver, 0, callData);
+    if (!manualExecution) {
+      success = _callWithExactGas(message.gasLimit, message.receiver, 0, callData);
+    } else {
+      // solhint-disable-next-line avoid-low-level-calls
+      (success, ) = message.receiver.call(callData);
+    }
   }
 
   /**

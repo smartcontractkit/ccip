@@ -137,7 +137,7 @@ contract EVM2EVMGEOffRamp is EVM2EVMGEOffRampInterface, BaseOffRamp, TypeAndVers
       _isWellFormed(message);
 
       s_executedMessages[message.sequenceNumber] = Internal.MessageExecutionState.IN_PROGRESS;
-      Internal.MessageExecutionState newState = _trialExecute(_toAny2EVMMessageFromSender(message));
+      Internal.MessageExecutionState newState = _trialExecute(_toAny2EVMMessageFromSender(message), manualExecution);
       s_executedMessages[message.sequenceNumber] = newState;
 
       if (manualExecution) {
@@ -145,8 +145,13 @@ contract EVM2EVMGEOffRamp is EVM2EVMGEOffRampInterface, BaseOffRamp, TypeAndVers
         // FAILURE->SUCCESS: no nonce bump unless strict
         // UNTOUCHED->SUCCESS: nonce bump
         // FAILURE->FAILURE: no nonce bump
-        if ((message.strict && originalState == Internal.MessageExecutionState.FAILURE && newState == Internal.MessageExecutionState.SUCCESS) ||
-          (originalState == Internal.MessageExecutionState.UNTOUCHED && newState == Internal.MessageExecutionState.SUCCESS)) {
+        if (
+          (message.strict &&
+            originalState == Internal.MessageExecutionState.FAILURE &&
+            newState == Internal.MessageExecutionState.SUCCESS) ||
+          (originalState == Internal.MessageExecutionState.UNTOUCHED &&
+            newState == Internal.MessageExecutionState.SUCCESS)
+        ) {
           s_senderNonce[message.sender]++;
         }
       } else {

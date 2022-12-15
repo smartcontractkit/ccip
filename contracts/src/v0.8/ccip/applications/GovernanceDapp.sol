@@ -34,9 +34,7 @@ contract GovernanceDapp is CCIPConsumer, TypeAndVersionInterface, OwnerIsCreator
     address router,
     FeeConfig memory feeConfig,
     address feeToken
-  )
-    CCIPConsumer(router, feeToken)
-  {
+  ) CCIPConsumer(router, feeToken) {
     s_feeConfig = feeConfig;
   }
 
@@ -78,6 +76,17 @@ contract GovernanceDapp is CCIPConsumer, TypeAndVersionInterface, OwnerIsCreator
 
     s_feeConfig = newFeeConfig;
     emit ReceivedConfig(newFeeConfig.feeAmount, newFeeConfig.changedAtBlock);
+  }
+
+  /**
+   * @notice Fund this contract with configured feeToken and approve tokens to the router
+   * @dev Requires prior approval from the msg.sender
+   * @param amount The amount of feeToken to be funded
+   */
+  function fund(uint256 amount) external {
+    IERC20 token = IERC20(getFeeToken());
+    token.transferFrom(msg.sender, address(this), amount);
+    token.approve(address(getRouter()), amount);
   }
 
   function addClone(CrossChainClone memory clone) public onlyOwner {

@@ -79,20 +79,20 @@ contract EVM2EVMTollOffRampRouter_routeMessage is EVM2EVMTollOffRampRouterSetup 
     vm.expectEmit(false, false, false, true);
     emit MessageReceived();
 
-    s_router.routeMessage(message);
+    s_router.routeMessage(message, false);
   }
 
   function testMessageFailureReturnsFalseSuccess() public {
     Internal.Any2EVMMessageFromSender memory message = _generateMockMessage(address(s_revertingReceiver));
     changePrank(address(s_offRamps[0]));
-    assertFalse(s_router.routeMessage(message));
+    assertFalse(s_router.routeMessage(message, false));
   }
 
   function testNotEnoughMessageGasLimitReturnsFalseSuccess() public {
     Internal.Any2EVMMessageFromSender memory message = _generateMockMessage(address(s_receiver));
     message.gasLimit = 1;
     changePrank(address(s_offRamps[0]));
-    assertFalse(s_router.routeMessage(message));
+    assertFalse(s_router.routeMessage(message, false));
   }
 
   // Reverts
@@ -102,13 +102,13 @@ contract EVM2EVMTollOffRampRouter_routeMessage is EVM2EVMTollOffRampRouterSetup 
     vm.expectRevert(
       abi.encodeWithSelector(Any2EVMOffRampRouterInterface.MustCallFromOffRamp.selector, BaseOffRampInterface(OWNER))
     );
-    s_router.routeMessage(message);
+    s_router.routeMessage(message, false);
   }
 
   function testZeroAddressReceiverReverts() public {
     Internal.Any2EVMMessageFromSender memory message = _generateMockMessage(address(0));
     changePrank(address(s_offRamps[0]));
     vm.expectRevert();
-    s_router.routeMessage(message);
+    s_router.routeMessage(message, false);
   }
 }

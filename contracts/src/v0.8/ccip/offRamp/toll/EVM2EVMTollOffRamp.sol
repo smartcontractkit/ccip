@@ -216,7 +216,7 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
 
       s_executedMessages[message.sequenceNumber] = Internal.MessageExecutionState.IN_PROGRESS;
       // NOTE: toAny2EVMMessageFromSender merges the fee token into the token set.
-      Internal.MessageExecutionState newState = _trialExecute(_toAny2EVMMessageFromSender(message));
+      Internal.MessageExecutionState newState = _trialExecute(_toAny2EVMMessageFromSender(message), manualExecution);
       s_executedMessages[message.sequenceNumber] = newState;
 
       if (

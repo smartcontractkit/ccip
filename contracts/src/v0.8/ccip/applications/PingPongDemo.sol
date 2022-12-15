@@ -18,9 +18,7 @@ contract PingPongDemo is CCIPConsumer, OwnerIsCreator {
   // Pause ping-ponging
   bool private s_isPaused;
 
-  constructor(address router, address feeToken)
-    CCIPConsumer(router, feeToken)
-  {
+  constructor(address router, address feeToken) CCIPConsumer(router, feeToken) {
     s_isPaused = false;
   }
 
@@ -62,6 +60,17 @@ contract PingPongDemo is CCIPConsumer, OwnerIsCreator {
   /////////////////////////////////////////////////////////////////////
   // Plumbing
   /////////////////////////////////////////////////////////////////////
+
+  /**
+   * @notice Fund this contract with configured feeToken and approve tokens to the router
+   * @dev Requires prior approval from the msg.sender
+   * @param amount The amount of feeToken to be funded
+   */
+  function fund(uint256 amount) external {
+    IERC20 token = IERC20(getFeeToken());
+    token.transferFrom(msg.sender, address(this), amount);
+    token.approve(address(getRouter()), amount);
+  }
 
   function getCounterpartChainId() external view returns (uint64) {
     return s_counterpartChainId;
