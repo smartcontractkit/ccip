@@ -8,6 +8,11 @@ import (
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
 )
 
+var Alpha_ChainConfigs = []rhea.EvmDeploymentConfig{
+	{ChainConfig: Alpha_AvaxFuji},
+	{ChainConfig: Alpha_OptimismGoerli},
+}
+
 var Alpha_AvaxFuji = rhea.EVMChainConfig{
 	ChainId: 43113,
 	GasSettings: rhea.EVMGasSettings{

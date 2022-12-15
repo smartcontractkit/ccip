@@ -9,6 +9,11 @@ import (
 )
 
 // Chains
+var Prod_ChainConfigs = []rhea.EvmDeploymentConfig{
+	{ChainConfig: Prod_Goerli},
+	{ChainConfig: Prod_AvaxFuji},
+	{ChainConfig: Prod_OptimismGoerli},
+}
 
 var Prod_Goerli = rhea.EVMChainConfig{
 	ChainId: 5,

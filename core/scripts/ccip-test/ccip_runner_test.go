@@ -18,6 +18,12 @@ var (
 	ENV         = dione.StagingBeta
 )
 
+var envToChainConfigs = map[dione.Environment][]rhea.EvmDeploymentConfig{
+	dione.StagingAlpha: deployments.Alpha_ChainConfigs,
+	dione.StagingBeta:  deployments.Beta_ChainConfigs,
+	dione.Production:   deployments.Prod_ChainConfigs,
+}
+
 // These functions can be run as a test (prefix with Test) with the following config
 // DATABASE_URL
 // Use "-v" as a Go tool argument for streaming log output.
@@ -131,17 +137,47 @@ func TestFundNodes(t *testing.T) {
 	key := checkOwnerKeyAndSetupChain(t)
 
 	don := dione.NewOfflineDON(ENV, logger.TestLogger(t))
-	don.FundNodeKeys(SOURCE, key, big.NewInt(4e18))
+	don.FundNodeKeys(&SOURCE, key, big.NewInt(4e18), big.NewInt(4e18))
+}
+
+// TestPrintAllNodeBalancesPerEnv can be run as a test with the following config
+// OWNER_KEY  private key used to deploy all contracts and is used as default in all single user tests.
+// It will print the node balances for all chains where the given `env` is deployed
+func TestPrintAllNodeBalancesPerEnv(t *testing.T) {
+	ownerKey := checkOwnerKey(t)
+	for _, source := range envToChainConfigs[ENV] {
+		source.SetupChain(t, ownerKey)
+		don := dione.NewOfflineDON(ENV, logger.TestLogger(t))
+		printing.PrintNodeBalances(&source, don.GetSendingKeys(source.ChainConfig.ChainId))
+	}
+}
+
+// TestFundAllNodesPerEnv can be run as a test with the following config
+// OWNER_KEY  private key used to deploy all contracts and is used as default in all single user tests.
+// It will fund the node balances for all chains where the given `env` is deployed
+func TestFundAllNodesPerEnv(t *testing.T) {
+	ownerKey := checkOwnerKey(t)
+	for _, source := range envToChainConfigs[ENV] {
+		source.SetupChain(t, ownerKey)
+		don := dione.NewOfflineDON(ENV, logger.TestLogger(t))
+		don.FundNodeKeys(&source, ownerKey, big.NewInt(1e18), big.NewInt(4e18))
+	}
 }
 
 func checkOwnerKeyAndSetupChain(t *testing.T) string {
+	ownerKey := checkOwnerKey(t)
+	SOURCE.SetupChain(t, ownerKey)
+	DESTINATION.SetupChain(t, ownerKey)
+
+	return ownerKey
+}
+
+func checkOwnerKey(t *testing.T) string {
 	ownerKey := os.Getenv("OWNER_KEY")
 	if ownerKey == "" {
 		t.Log("No key given, this test will be skipped. This is intended behaviour for automated testing.")
 		t.SkipNow()
 	}
-	SOURCE.SetupChain(t, ownerKey)
-	DESTINATION.SetupChain(t, ownerKey)
 
 	return ownerKey
 }

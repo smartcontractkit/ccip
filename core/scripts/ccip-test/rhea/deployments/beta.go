@@ -10,6 +10,11 @@ import (
 
 // Chains
 
+var Beta_ChainConfigs = []rhea.EvmDeploymentConfig{
+	{ChainConfig: Beta_Goerli},
+	{ChainConfig: Beta_AvaxFuji},
+}
+
 var Beta_Goerli = rhea.EVMChainConfig{
 	ChainId: 5,
 	GasSettings: rhea.EVMGasSettings{

@@ -62,8 +62,9 @@ func (don *OfflineDON) GetSendingKeys(chain uint64) (keys []gethcommon.Address) 
 	}
 	return
 }
-func (don *OfflineDON) FundNodeKeys(chainConfig rhea.EvmDeploymentConfig, ownerPrivKey string, amount *big.Int) {
-	nonce, err := chainConfig.Client.PendingNonceAt(context.Background(), chainConfig.Owner.From)
+
+func (don *OfflineDON) FundNodeKeys(chainConfig *rhea.EvmDeploymentConfig, ownerPrivKey string, amount *big.Int, fundingThreshold *big.Int) {
+	currentNonce, err := chainConfig.Client.PendingNonceAt(context.Background(), chainConfig.Owner.From)
 	helpers.PanicErr(err)
 	var gasTipCap *big.Int
 	if chainConfig.ChainConfig.GasSettings.EIP1559 {
@@ -76,19 +77,36 @@ func (don *OfflineDON) FundNodeKeys(chainConfig rhea.EvmDeploymentConfig, ownerP
 	ownerKey, err := crypto.HexToECDSA(ownerPrivKey)
 	helpers.PanicErr(err)
 
+	don.lggr.Infof("Chain id %d", chainConfig.ChainConfig.ChainId)
+
+	nonceIncrement := 0
 	for i, node := range don.Config.Nodes {
-		to := gethcommon.HexToAddress(node.EthKeys[strconv.FormatUint(chainConfig.ChainConfig.ChainId, 10)])
-		if to == gethcommon.HexToAddress("0x") {
-			don.lggr.Warnf("Node %2d has no sending key configured. Skipping funding")
+		eoa := gethcommon.HexToAddress(node.EthKeys[strconv.FormatUint(chainConfig.ChainConfig.ChainId, 10)])
+		if eoa == gethcommon.HexToAddress("0x") {
+			don.lggr.Warnf("Node %2d has no sending key configured. Skipping funding", i)
 			continue
 		}
-		if chainConfig.ChainConfig.GasSettings.EIP1559 {
-			sendEthEIP1559(to, chainConfig, nonce+uint64(i), gasTipCap, ownerKey, amount)
+		balanceAt, err := chainConfig.Client.BalanceAt(context.Background(), eoa, nil)
+		helpers.PanicErr(err)
+
+		if balanceAt.Cmp(fundingThreshold) == -1 {
+			don.lggr.Infof("❌ Node %2d has a balance of %s eth, which is lower than the set minimum. Funding...", i, EthBalanceToString(balanceAt))
+
+			if chainConfig.ChainConfig.GasSettings.EIP1559 {
+				sendEthEIP1559(eoa, *chainConfig, currentNonce+uint64(nonceIncrement), gasTipCap, ownerKey, amount)
+			} else {
+				sendEth(eoa, *chainConfig, currentNonce+uint64(nonceIncrement), gasPrice, ownerKey, amount)
+			}
+			nonceIncrement++
+			don.lggr.Infof("Sent %s eth to %s", EthBalanceToString(amount), eoa.Hex())
 		} else {
-			sendEth(to, chainConfig, nonce+uint64(i), gasPrice, ownerKey, amount)
+			don.lggr.Infof("✅ Node %2d has a balance of %s eth ", i, EthBalanceToString(balanceAt))
 		}
-		don.lggr.Infof("Sent %s wei to %s", amount.String(), to.Hex())
 	}
+}
+
+func EthBalanceToString(balance *big.Int) string {
+	return new(big.Float).Quo(new(big.Float).SetInt(balance), big.NewFloat(1e18)).String()
 }
 
 func (don *OfflineDON) WriteToFile() error {
