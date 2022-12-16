@@ -23,8 +23,9 @@ func NewCCIPJobSpecParams(sourceClient rhea.EvmDeploymentConfig, destClient rhea
 		DestChainName:      helpers.ChainName(int64(destClient.ChainConfig.ChainId)),
 		SourceChainId:      sourceClient.ChainConfig.ChainId,
 		DestChainId:        destClient.ChainConfig.ChainId,
-		TokensPerFeeCoinPipeline: fmt.Sprintf(`merge [type=merge left="{}" right="{\\\"%s\\\":\\\"1000000000000000000\\\"}"];`,
-			destClient.ChainConfig.LinkToken.Hex()),
+		TokensPerFeeCoinPipeline: fmt.Sprintf(
+			`merge [type=merge left="{}" right="{\\\"%s\\\":\\\"1000000000000000000\\\",\\\"%s\\\":\\\"1000000000000000000\\\"}"];`,
+			destClient.ChainConfig.SupportedTokens[rhea.LINK].Token.Hex(), destClient.ChainConfig.SupportedTokens[rhea.SNX].Token.Hex()),
 		PollPeriod:         PollPeriod,
 		SourceStartBlock:   sourceClient.DeploySettings.DeployedAt,
 		DestStartBlock:     destClient.DeploySettings.DeployedAt,

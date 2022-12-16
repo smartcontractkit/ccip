@@ -32,7 +32,6 @@ contract GasFeeCache is GasFeeCacheInterface, OwnerIsCreator {
   }
 
   function updateFees(GE.FeeUpdate[] memory feeUpdates) external requireUpdaterOrOwner {
-    if (!s_feeUpdaters[msg.sender]) revert FeeUpdaterNotAllowed(msg.sender);
     uint128 timestamp = uint128(block.timestamp);
 
     for (uint256 i = 0; i < feeUpdates.length; ++i) {
@@ -53,7 +52,7 @@ contract GasFeeCache is GasFeeCacheInterface, OwnerIsCreator {
 
   function getStalenessThreshold() external view returns (uint128) {
     return i_stalenessThreshold;
-  } 
+  }
 
   /////////////////////////////////////////////////////////////////////
   // Plumbing

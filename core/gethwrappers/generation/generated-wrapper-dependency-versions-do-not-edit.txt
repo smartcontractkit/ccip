@@ -24,7 +24,7 @@ evm_2_evm_toll_offramp: ../../contracts/solc/v0.8.15/EVM2EVMTollOffRamp.abi ../.
 evm_2_evm_toll_onramp: ../../contracts/solc/v0.8.15/EVM2EVMTollOnRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMTollOnRamp.bin d10ae4f9148f9cdf3a9f2048ae34588f369e732f6203d18f0cf5b0b0814aae78
 flags_wrapper: ../../contracts/solc/v0.6/Flags.abi ../../contracts/solc/v0.6/Flags.bin 2034d1b562ca37a63068851915e3703980276e8d5f7db6db8a3351a49d69fc4a
 flux_aggregator_wrapper: ../../contracts/solc/v0.6/FluxAggregator.abi ../../contracts/solc/v0.6/FluxAggregator.bin a3b0a6396c4aa3b5ee39b3c4bd45efc89789d4859379a8a92caca3a0496c5794
-gas_fee_cache: ../../contracts/solc/v0.8.15/GasFeeCache.abi ../../contracts/solc/v0.8.15/GasFeeCache.bin 2c3d0458ae52514773e9a3de5283cc448721a0d5f6659006923fe0010c3e8c8a
+gas_fee_cache: ../../contracts/solc/v0.8.15/GasFeeCache.abi ../../contracts/solc/v0.8.15/GasFeeCache.bin c16da9452ee82e68889a7b12127593f7bed56a07e307e5d91ff22d5099c5fdbb
 gas_wrapper: ../../contracts/solc/v0.8.6/KeeperRegistryCheckUpkeepGasUsageWrapper1_2.abi ../../contracts/solc/v0.8.6/KeeperRegistryCheckUpkeepGasUsageWrapper1_2.bin 4a5dcdac486d18fcd58e3488c15c1710ae76b977556a3f3191bd269a4bc75723
 ge_router: ../../contracts/solc/v0.8.15/GERouter.abi ../../contracts/solc/v0.8.15/GERouter.bin ae769471c67a60d05415703e61237aa7e68f490669da2b1f95c62477ba6ba6ee
 governance_dapp: ../../contracts/solc/v0.8.15/GovernanceDapp.abi ../../contracts/solc/v0.8.15/GovernanceDapp.bin 42ea4d5273cdfb30a22487029fc4cee4ff0cc5da782a6cc91975a978f7ef3a5d

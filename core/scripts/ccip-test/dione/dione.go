@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/url"
+	"strconv"
 	"time"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
@@ -248,7 +249,7 @@ func (don *DON) AddTwoWaySpecs(chainA rhea.EvmDeploymentConfig, chainB rhea.EvmD
 }
 
 func (don *DON) AddJobSpec(spec *client.OCR2TaskJobSpec) {
-	chainID := spec.OCR2OracleSpec.RelayConfig["chainID"].(*big.Int)
+	chainID := spec.OCR2OracleSpec.RelayConfig["chainID"].(uint64)
 
 	for i, node := range don.Nodes {
 		evmKeyBundle := GetOCRkeysForChainType(don.Config.Nodes[i].OCRKeys, "evm")
@@ -256,7 +257,7 @@ func (don *DON) AddJobSpec(spec *client.OCR2TaskJobSpec) {
 
 		// set node specific values
 		spec.OCR2OracleSpec.OCRKeyBundleID.SetValid(evmKeyBundle.ID)
-		spec.OCR2OracleSpec.TransmitterID.SetValid(transmitterIDs[chainID.String()])
+		spec.OCR2OracleSpec.TransmitterID.SetValid(transmitterIDs[strconv.FormatUint(chainID, 10)])
 
 		specString, err := spec.String()
 		common.PanicErr(err)

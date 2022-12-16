@@ -33,6 +33,7 @@ func deployAFN(t *testing.T, client *EvmDeploymentConfig) {
 			t.Error("deploy new afn set to false but no afn given in config")
 		}
 		client.Logger.Infof("Skipping AFN deployment, using AFN on %s", client.ChainConfig.Afn)
+		return
 	}
 
 	client.Logger.Infof("Deploying AFN")
@@ -55,6 +56,7 @@ func deployNativeTokenPool(t *testing.T, client *EvmDeploymentConfig) {
 			require.NoError(t, err)
 			fillPoolWithTokens(t, client, pool)
 			client.ChainConfig.SupportedTokens[tokenName] = EVMBridgedToken{
+				Token: tokenConfig.Token,
 				Pool:  tokenPoolAddress,
 				Price: big.NewInt(1),
 			}

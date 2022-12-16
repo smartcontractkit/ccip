@@ -28,9 +28,9 @@ var envToChainConfigs = map[dione.Environment][]rhea.EvmDeploymentConfig{
 // DATABASE_URL
 // Use "-v" as a Go tool argument for streaming log output.
 
-// TestDeploySubscription can be run as a test with the following config
+// TestDeploy can be run as a test with the following config
 // OWNER_KEY  private key used to deploy all contracts and is used as default in all single user tests.
-func TestRheaDeploySubscription(t *testing.T) {
+func TestRheaDeploy(t *testing.T) {
 	checkOwnerKeyAndSetupChain(t)
 
 	rhea.DeployGELanes(t, &SOURCE, &DESTINATION)
@@ -86,12 +86,15 @@ func TestCCIP(t *testing.T) {
 	case "stopPingPong":
 		client.setPingPongPaused(t, true)
 	case "fundPingPong":
-		client.fundPingPong(t)
+		client.fundPingPong(t, &SOURCE, &DESTINATION)
 	case "printSpecs":
 		printing.PrintJobSpecs(ENV, SOURCE, DESTINATION)
 	case "setConfig":
 		// Set the config to the commitStore and the offramp
 		client.SetOCRConfig(ENV)
+	case "setOnRampFeeConfig":
+		client.setOnRampFeeConfig(t)
+		// Set the config to the onRamp fee
 	case "upgradeLane":
 		rhea.UpgradeLane(t, &SOURCE, &DESTINATION)
 	case "dapp":

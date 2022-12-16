@@ -19,8 +19,6 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/native_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ping_pong_demo"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/receiver_dapp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/subscription_sender_dapp"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/dione"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
@@ -212,17 +210,17 @@ func printDappSanityCheck(source *rhea.EvmDeploymentConfig) {
 
 	sb.WriteString(generateHeader(tableHeaders, headerLengths))
 
-	senderDapp, err := subscription_sender_dapp.NewSubscriptionSenderDapp(source.LaneConfig.TokenSender, source.Client)
-	helpers.PanicErr(err)
-	router, err := senderDapp.IOnRampRouter(&bind.CallOpts{})
-	helpers.PanicErr(err)
-	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "Sender dapp", printBool(router == source.ChainConfig.Router)))
+	//senderDapp, err := subscription_sender_dapp.NewSubscriptionSenderDapp(source.LaneConfig.TokenSender, source.Client)
+	//helpers.PanicErr(err)
+	//router, err := senderDapp.IOnRampRouter(&bind.CallOpts{})
+	//helpers.PanicErr(err)
+	//sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "Sender dapp", printBool(router == source.ChainConfig.Router)))
 
-	receiverDap, err := receiver_dapp.NewReceiverDapp(source.LaneConfig.ReceiverDapp, source.Client)
-	helpers.PanicErr(err)
-	router, err = receiverDap.SRouter(&bind.CallOpts{})
-	helpers.PanicErr(err)
-	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "Receiver dapp", printBool(router == source.ChainConfig.Router)))
+	//receiverDap, err := receiver_dapp.NewReceiverDapp(source.LaneConfig.ReceiverDapp, source.Client)
+	//helpers.PanicErr(err)
+	//router, err = receiverDap.SRouter(&bind.CallOpts{})
+	//helpers.PanicErr(err)
+	//sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "Receiver dapp", printBool(router == source.ChainConfig.Router)))
 
 	if source.LaneConfig.PingPongDapp != common.HexToAddress("") {
 		pingDapp, err := ping_pong_demo.NewPingPongDemo(source.LaneConfig.PingPongDapp, source.Client)
@@ -419,9 +417,6 @@ func printPoolBalances(chain *rhea.EvmDeploymentConfig) {
 		tokenInstance, err := link_token_interface.NewLinkToken(tokenAddress, chain.Client)
 		helpers.PanicErr(err)
 
-		name, err := tokenInstance.Name(&bind.CallOpts{})
-		helpers.PanicErr(err)
-
 		price, err := onRamp.GetPricesForTokens(&bind.CallOpts{}, []common.Address{tokenAddress})
 		helpers.PanicErr(err)
 
@@ -435,9 +430,9 @@ func printPoolBalances(chain *rhea.EvmDeploymentConfig) {
 		helpers.PanicErr(err)
 
 		if tokenAddress != tokenConfig.Token {
-			sb.WriteString(fmt.Sprintf("| %-32s | TOKEN CONFIG MISMATCH ❌ | expected %s | pool token %s |\n", name, tokenConfig.Token.Hex(), tokenAddress.Hex()))
+			sb.WriteString(fmt.Sprintf("| %-32s | TOKEN CONFIG MISMATCH ❌ | expected %s | pool token %s |\n", tokenName, tokenConfig.Token.Hex(), tokenAddress.Hex()))
 		} else {
-			sb.WriteString(fmt.Sprintf("| %-32s | %s | %20d | %9s | %9s | %10s |\n", name, tokenName, balance, printBool(isAllowedOnRamp), printBool(isAllowedOffRamp), price[0].String()))
+			sb.WriteString(fmt.Sprintf("| %-32s | %s | %20d | %9s | %9s | %10s |\n", tokenName, tokenConfig.Pool, balance, printBool(isAllowedOnRamp), printBool(isAllowedOffRamp), price[0].String()))
 		}
 	}
 
@@ -482,10 +477,10 @@ func PrintJobSpecs(env dione.Environment, sourceClient rhea.EvmDeploymentConfig,
 
 	commitJobSpec, err := jobParams.CommitJobSpec()
 	helpers.PanicErr(err)
-	committingChainID := commitJobSpec.OCR2OracleSpec.RelayConfig["chainID"].(*big.Int)
+	committingChainID := commitJobSpec.OCR2OracleSpec.RelayConfig["chainID"].(uint64)
 	executionSpec, err := jobParams.ExecutionJobSpec()
 	helpers.PanicErr(err)
-	execChainID := executionSpec.OCR2OracleSpec.RelayConfig["chainID"].(*big.Int)
+	execChainID := executionSpec.OCR2OracleSpec.RelayConfig["chainID"].(uint64)
 	for i, oracle := range don.Config.Nodes {
 		jobs += fmt.Sprintf("\n// [Node %d]\n", i)
 		evmKeyBundle := dione.GetOCRkeysForChainType(oracle.OCRKeys, "evm")
@@ -493,14 +488,14 @@ func PrintJobSpecs(env dione.Environment, sourceClient rhea.EvmDeploymentConfig,
 
 		// set node specific values
 		commitJobSpec.OCR2OracleSpec.OCRKeyBundleID.SetValid(evmKeyBundle.ID)
-		commitJobSpec.OCR2OracleSpec.TransmitterID.SetValid(transmitterIDs[committingChainID.String()])
+		commitJobSpec.OCR2OracleSpec.TransmitterID.SetValid(transmitterIDs[fmt.Sprintf("%v", committingChainID)])
 		specString, err := commitJobSpec.String()
 		helpers.PanicErr(err)
 		jobs += fmt.Sprintf("\n# CCIP commit spec%s", specString)
 
 		// set node specific values
 		executionSpec.OCR2OracleSpec.OCRKeyBundleID.SetValid(evmKeyBundle.ID)
-		executionSpec.OCR2OracleSpec.TransmitterID.SetValid(transmitterIDs[execChainID.String()])
+		executionSpec.OCR2OracleSpec.TransmitterID.SetValid(transmitterIDs[fmt.Sprintf("%v", execChainID)])
 		specString, err = executionSpec.String()
 		helpers.PanicErr(err)
 		jobs += fmt.Sprintf("\n# CCIP execution spec%s", specString)

@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/governance_dapp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ping_pong_demo"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/receiver_dapp"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/shared"
@@ -35,6 +36,7 @@ func DeployGELanes(t *testing.T, source *EvmDeploymentConfig, destination *EvmDe
 	deploySourceContracts(t, destination, sourceChainId)
 
 	// Deploy commitStores and offRamps on both chains
+	prettyPrintLanes(source, destination)
 	deployDestinationContracts(t, destination, sourceChainId, source.LaneConfig.OnRamp, source.ChainConfig.SupportedTokens)
 	deployDestinationContracts(t, source, destChainId, destination.LaneConfig.OnRamp, destination.ChainConfig.SupportedTokens)
 
@@ -72,7 +74,7 @@ func deploySourceContracts(t *testing.T, source *EvmDeploymentConfig, destChainI
 	if source.DeploySettings.DeployRamp || source.DeploySettings.DeployTokenPools {
 		setOnRampOnTokenPools(t, source)
 	}
-	source.Logger.Infof("%s contracts fully deployed as source chain", helpers.ChainName(int64(source.ChainConfig.ChainId)))
+	source.Logger.Infof("%s contracts deployed as source chain", helpers.ChainName(int64(source.ChainConfig.ChainId)))
 }
 
 func deployDestinationContracts(t *testing.T, client *EvmDeploymentConfig, sourceChainId uint64, onRamp common.Address, supportedTokens map[Token]EVMBridgedToken) {
@@ -135,7 +137,7 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId uint64)
 		client.Owner.From,
 		client.ChainConfig.Router,
 		evm_2_evm_ge_onramp.EVM2EVMGEOnRampInterfaceDynamicFeeConfig{
-			FeeToken:        common.Address{},
+			FeeToken:        client.ChainConfig.LinkToken,
 			FeeAmount:       big.NewInt(100),
 			DestGasOverhead: big.NewInt(0),
 			Multiplier:      big.NewInt(1),
@@ -270,28 +272,42 @@ func deployReceiverDapp(t *testing.T, client *EvmDeploymentConfig) *receiver_dap
 }
 
 func DeployPingPongDapps(t *testing.T, sourceClient *EvmDeploymentConfig, destClient *EvmDeploymentConfig) {
+	fundingAmount := big.NewInt(1e18)
+
 	if sourceClient.DeploySettings.DeployPingPongDapp {
 		sourceClient.Logger.Infof("Deploying source chain ping pong dapp")
 
-		pingPongDappAddress, tx, _, err := ping_pong_demo.DeployPingPongDemo(sourceClient.Owner, sourceClient.Client, sourceClient.ChainConfig.Router, sourceClient.ChainConfig.Router)
+		pingPongDappAddress, tx, _, err := ping_pong_demo.DeployPingPongDemo(
+			sourceClient.Owner,
+			sourceClient.Client,
+			sourceClient.ChainConfig.Router,
+			sourceClient.ChainConfig.LinkToken,
+		)
 		require.NoError(t, err)
 
 		shared.WaitForMined(t, sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
 		sourceClient.Logger.Infof("Ping pong deployed on %s in tx: %s", pingPongDappAddress.Hex(), helpers.ExplorerLink(int64(sourceClient.ChainConfig.ChainId), tx.Hash()))
 
 		sourceClient.LaneConfig.PingPongDapp = pingPongDappAddress
+		FundPingPong(t, sourceClient, fundingAmount)
 	}
 
 	if destClient.DeploySettings.DeployPingPongDapp {
 		destClient.Logger.Infof("Deploying destination chain ping pong dapp")
 
-		pingPongDappAddress, tx, _, err := ping_pong_demo.DeployPingPongDemo(destClient.Owner, destClient.Client, destClient.ChainConfig.Router, destClient.ChainConfig.Router)
+		pingPongDappAddress, tx, _, err := ping_pong_demo.DeployPingPongDemo(
+			destClient.Owner,
+			destClient.Client,
+			destClient.ChainConfig.Router,
+			destClient.ChainConfig.LinkToken,
+		)
 		require.NoError(t, err)
 
 		shared.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
 		destClient.Logger.Infof("Ping pong deployed on %s in tx: %s", pingPongDappAddress.Hex(), helpers.ExplorerLink(int64(destClient.ChainConfig.ChainId), tx.Hash()))
 
 		destClient.LaneConfig.PingPongDapp = pingPongDappAddress
+		FundPingPong(t, destClient, fundingAmount)
 	}
 
 	if sourceClient.DeploySettings.DeployPingPongDapp || destClient.DeploySettings.DeployPingPongDapp {
@@ -313,6 +329,23 @@ func DeployPingPongDapps(t *testing.T, sourceClient *EvmDeploymentConfig, destCl
 	} else {
 		sourceClient.Logger.Infof("Skipping ping pong deployment")
 	}
+}
+
+func FundPingPong(t *testing.T, client *EvmDeploymentConfig, fundingAmount *big.Int) {
+	pingDapp, err := ping_pong_demo.NewPingPongDemo(client.LaneConfig.PingPongDapp, client.Client)
+	require.NoError(t, err)
+
+	linkToken, err := link_token_interface.NewLinkToken(client.ChainConfig.LinkToken, client.Client)
+	require.NoError(t, err)
+
+	tx, err := linkToken.Approve(client.Owner, client.LaneConfig.PingPongDapp, fundingAmount)
+	require.NoError(t, err)
+	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
+
+	tx, err = pingDapp.Fund(client.Owner, fundingAmount)
+	require.NoError(t, err)
+	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
+	client.Logger.Infof("Ping pong funded with %s in tx: %s", fundingAmount.String(), helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash()))
 }
 
 func deployGovernanceDapps(t *testing.T, sourceClient *EvmDeploymentConfig, destClient *EvmDeploymentConfig) {

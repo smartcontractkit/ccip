@@ -29,6 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_onramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/gas_fee_cache"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ge_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/governance_dapp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
@@ -51,6 +52,19 @@ import (
 )
 
 func (client *CCIPClient) wip(t *testing.T, sourceClient *rhea.EvmDeploymentConfig, destClient *rhea.EvmDeploymentConfig) {
+}
+
+func (client *CCIPClient) setOnRampFeeConfig(t *testing.T) {
+	tx, err := client.Source.OnRamp.SetFeeConfig(client.Source.Owner, evm_2_evm_ge_onramp.EVM2EVMGEOnRampInterfaceDynamicFeeConfig{
+		FeeToken:        client.Source.LinkTokenAddress,
+		FeeAmount:       big.NewInt(100),
+		DestGasOverhead: big.NewInt(0),
+		Multiplier:      big.NewInt(1),
+		GasFeeCache:     client.Source.GasFeeCache.Address(),
+		DestChainId:     client.Dest.ChainId,
+	})
+	require.NoError(t, err)
+	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 }
 
 func (client *CCIPClient) setRateLimiterConfig(t *testing.T) {
@@ -81,16 +95,9 @@ func (client *CCIPClient) setPingPongPaused(t *testing.T, paused bool) {
 	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 }
 
-func (client *CCIPClient) fundPingPong(t *testing.T) {
-	// TODO fund with ge:
-	// send tokens, approve them from dapp
-
-	//fundingAmount := big.NewInt(1e18)
-	//client.Dest.ApproveLinkFrom(t, client.Dest.Owner, client.Dest.OffRampRouter.Address(), fundingAmount)
-	//tx, err := client.Dest.OffRampRouter.FundSubscription(client.Dest.Owner, client.Dest.PingPongDapp.Address(), fundingAmount)
-	//require.NoError(t, err)
-	//shared.WaitForMined(t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
-	//client.Dest.logger.Infof(fmt.Sprintf("Ping pong funded %s", helpers.ExplorerLink(client.Dest.ChainId.Int64(), tx.Hash())))
+func (client *CCIPClient) fundPingPong(t *testing.T, sourceClient *rhea.EvmDeploymentConfig, destClient *rhea.EvmDeploymentConfig) {
+	rhea.FundPingPong(t, sourceClient, big.NewInt(1e18))
+	rhea.FundPingPong(t, destClient, big.NewInt(1e18))
 }
 
 type Client struct {
@@ -104,6 +111,7 @@ type Client struct {
 	GovernanceDapp   *governance_dapp.GovernanceDapp
 	PingPongDapp     *ping_pong_demo.PingPongDemo
 	Afn              *afn_contract.AFNContract
+	GasFeeCache      *gas_fee_cache.GasFeeCache
 	Router           *ge_router.GERouter
 	logger           logger.Logger
 	t                *testing.T
@@ -148,6 +156,8 @@ func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient
 	require.NoError(t, err)
 	pingPongDapp, err := ping_pong_demo.NewPingPongDemo(config.LaneConfig.PingPongDapp, config.Client)
 	require.NoError(t, err)
+	gasFeeCache, err := gas_fee_cache.NewGasFeeCache(config.ChainConfig.GasFeeCache, config.Client)
+	require.NoError(t, err)
 
 	return SourceClient{
 		Client: Client{
@@ -156,6 +166,7 @@ func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient
 			LinkTokenAddress: config.ChainConfig.LinkToken,
 			LinkToken:        LinkToken,
 			Afn:              afn,
+			GasFeeCache:      gasFeeCache,
 			SupportedTokens:  supportedTokens,
 			GovernanceDapp:   governanceDapp,
 			PingPongDapp:     pingPongDapp,
@@ -207,6 +218,8 @@ func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestCli
 	require.NoError(t, err)
 	pingPongDapp, err := ping_pong_demo.NewPingPongDemo(config.LaneConfig.PingPongDapp, config.Client)
 	require.NoError(t, err)
+	gasFeeCache, err := gas_fee_cache.NewGasFeeCache(config.ChainConfig.GasFeeCache, config.Client)
+	require.NoError(t, err)
 
 	return DestClient{
 		Client: Client{
@@ -218,6 +231,7 @@ func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestCli
 			GovernanceDapp:   governanceDapp,
 			PingPongDapp:     pingPongDapp,
 			Afn:              afn,
+			GasFeeCache:      gasFeeCache,
 			logger:           config.Logger,
 			Router:           router,
 			t:                t,

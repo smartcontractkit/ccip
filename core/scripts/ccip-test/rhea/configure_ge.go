@@ -98,6 +98,13 @@ func setOffRampOnRouter(t *testing.T, client *EvmDeploymentConfig) {
 	router, err := ge_router.NewGERouter(client.ChainConfig.Router, client.Client)
 	require.NoError(t, err)
 
+	isOffRamp, err := router.IsOffRamp(&bind.CallOpts{}, client.LaneConfig.OffRamp)
+	require.NoError(t, err)
+	if isOffRamp {
+		client.Logger.Infof("OffRamp already configured on router. Skipping")
+		return
+	}
+
 	tx, err := router.AddOffRamp(client.Owner, client.LaneConfig.OffRamp)
 	require.NoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)

@@ -22,17 +22,18 @@ var Alpha_AvaxFuji = rhea.EVMChainConfig{
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 		rhea.LINK: {
 			Token: gethcommon.HexToAddress("0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846"),
-			Pool:  gethcommon.HexToAddress("0xb6f1Fe2CDE891eFd5Efd2A563C4C2F2549163718"),
+			Pool:  gethcommon.HexToAddress("0x9af4a72eab994338cae5deb1f2cdaf49e3c4f11e"),
 			Price: big.NewInt(1),
 		},
 		rhea.SNX: {
 			Token: gethcommon.HexToAddress("0x3C3de1Dd82eA10B664C693C9a3c19645Ab9635EB"),
-			Pool:  gethcommon.HexToAddress("0x43A2A4C2ECB74FF45Eca704a14111d8f2B1c0fA0"),
+			Pool:  gethcommon.HexToAddress("0xd2c0b212f2366ca5f02fcd91407d64dedca58422"),
 			Price: big.NewInt(1),
 		},
 	},
-	Router: gethcommon.HexToAddress("0xc0A2c03115d1B48BAA59f676c108EfE5Ba3ee062"),
-	Afn:    gethcommon.HexToAddress("0xb2958D1Bd07448865E555FeeFf32b58D254ffB4C"),
+	Router:      gethcommon.HexToAddress("0x6486906bb2d85a6c0ccef2a2831c11a2059ebfea"),
+	Afn:         gethcommon.HexToAddress("0x1f350718e015eb20e5065c09f4a7a3f66888aeed"),
+	GasFeeCache: gethcommon.HexToAddress("0xfa41f1986e0443e6e2780ee9fdcf09697a2e3517"),
 }
 
 var Alpha_OptimismGoerli = rhea.EVMChainConfig{
@@ -44,64 +45,69 @@ var Alpha_OptimismGoerli = rhea.EVMChainConfig{
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 		rhea.LINK: {
 			Token: gethcommon.HexToAddress("0xdc2CC710e42857672E7907CF474a69B63B93089f"),
-			Pool:  gethcommon.HexToAddress("0xE4aB69C077896252FAFBD49EFD26B5D171A32410"),
+			Pool:  gethcommon.HexToAddress("0x3cc9364260d80f09ccac1ee6b07366db598900e6"),
 			Price: big.NewInt(1),
 		},
 		rhea.SNX: {
 			Token: gethcommon.HexToAddress("0xfe628556155F681dd897e3FD029e5ED699a9248E"),
-			Pool:  gethcommon.HexToAddress("0xc5CCb84C3d8eAD52C081dDB24e7Add615c0c9Daf"),
+			Pool:  gethcommon.HexToAddress("0x3382b044d5a3ff656ffb62daaced78084c209e71"),
 			Price: big.NewInt(1),
 		},
 	},
-	Router: gethcommon.HexToAddress("0xE591bf0A0CF924A0674d7792db046B23CEbF5f34"),
-	Afn:    gethcommon.HexToAddress("0x4c10d67E4B8e18a67A7606DEFDCe42CCc281D39B"),
+	Router:      gethcommon.HexToAddress("0x114a20a10b43d4115e5aeef7345a1a71d2a60c57"),
+	Afn:         gethcommon.HexToAddress("0x8af4204e30565df93352fe8e1de78925f6664da7"),
+	GasFeeCache: gethcommon.HexToAddress("0xe25db981c1bc20fb3ed93774d095bb9aa4792234"),
 }
 
 var Staging_Alpha_OptimismGoerlitoAvaxFuji = rhea.EvmDeploymentConfig{
 	ChainConfig: Alpha_OptimismGoerli,
 	LaneConfig: rhea.EVMLaneConfig{
-		CommitStore:     gethcommon.HexToAddress("0xf9B7595D64a380fFa605A1d11BFf5cd629FB7189"),
-		OnRamp:          gethcommon.HexToAddress("0x4a827De1b7bB0F56c8Cd046dc8eA72C9f412f22c"),
-		TokenSender:     gethcommon.HexToAddress("0x0cA18254C9DFB652F0d6A3b6C88aBAc3793EDdf5"),
-		OffRamp:         gethcommon.HexToAddress("0xbAcf5cb76B2AbC6b754bCffAe8209C76bAE731aA"),
-		MessageReceiver: gethcommon.HexToAddress("0xeB59fefaFbE89EC09a546172eddE3300c9889B14"),
-		ReceiverDapp:    gethcommon.HexToAddress("0x86000BFF3465C579dbA5703B2DBA6117ce022576"),
-		GovernanceDapp:  gethcommon.HexToAddress(""),
-		PingPongDapp:    gethcommon.HexToAddress("0xdf19B70440051A6497aB48B86E291746cdFeF89A"),
+		CommitStore:     gethcommon.HexToAddress("0xb50e48d32bb3ae0afbf97630d7e495e1a2d2ebe3"),
+		OnRamp:          gethcommon.HexToAddress("0x260af9b83e0d2bb6c9015fc9f0bff8858a0cce68"),
+		TokenSender:     gethcommon.HexToAddress(""),
+		OffRamp:         gethcommon.HexToAddress("0xd3b06cebf099ce7da4accf578aaebfdbd6e88a93"),
+		MessageReceiver: gethcommon.HexToAddress(""),
+		ReceiverDapp:    gethcommon.HexToAddress("0xaee2dac4cecceb4c51f1191b9481c87b27c283dc"),
+		GovernanceDapp:  gethcommon.HexToAddress("0x6b38cc6fa938d5ab09bdf0cfe580e226fdd793ce"),
+		PingPongDapp:    gethcommon.HexToAddress("0xd2C0b212F2366CA5f02FCd91407D64DedcA58422"),
 	},
 	DeploySettings: rhea.DeploySettings{
-		DeployAFN:            false,
-		DeployTokenPools:     false,
+		DeployAFN:         false,
+		DeployTokenPools:  false,
+		DeployRouter:      false,
+		DeployGasFeeCache: false,
+
 		DeployCommitStore:    false,
 		DeployRamp:           false,
-		DeployRouter:         false,
 		DeployGovernanceDapp: false,
 		DeployPingPongDapp:   false,
-		DeployedAt:           2297721,
+		DeployedAt:           3258713,
 	},
 }
 
 var Staging_Alpha_AvaxFujitoOptimismGoerli = rhea.EvmDeploymentConfig{
 	ChainConfig: Alpha_AvaxFuji,
 	LaneConfig: rhea.EVMLaneConfig{
-		CommitStore:     gethcommon.HexToAddress("0x84B7B012c95f8A152B44Ab3e952f2dEE424fA8e1"),
-		OnRamp:          gethcommon.HexToAddress("0x65120aF1C7Ecaa90294758AafbB87226D2b3B798"),
-		TokenSender:     gethcommon.HexToAddress("0x7854E73C73e7F9bb5b0D5B4861E997f4C6E8dcC6"),
-		OffRamp:         gethcommon.HexToAddress("0x832c8f2666adBeA842ef30C90DeB59225Bcd67aa"),
-		MessageReceiver: gethcommon.HexToAddress("0x75d642e8050d075C225ca3ED818C39ba7A6D6B76"),
-		ReceiverDapp:    gethcommon.HexToAddress("0x6154b0a8Ada0Da450E4226bf8772b3A1B756A152"),
-		GovernanceDapp:  gethcommon.HexToAddress(""),
-		PingPongDapp:    gethcommon.HexToAddress("0x35a926bc94654627443e436Bb3D197D62821cF05"),
+		CommitStore:     gethcommon.HexToAddress("0x552a6D7131F3425e48f313003aA2fd08596d9663"),
+		OnRamp:          gethcommon.HexToAddress("0xfa95612b6d1d98c983ef3880ea9ee53fa8cde48c"),
+		TokenSender:     gethcommon.HexToAddress(""),
+		OffRamp:         gethcommon.HexToAddress("0xf8ba25c2bf50233602b280f180a21d99b89f173c"),
+		MessageReceiver: gethcommon.HexToAddress(""),
+		ReceiverDapp:    gethcommon.HexToAddress("0x40cac95c005572c2fb43835334d1f3f020ed6dc7"),
+		GovernanceDapp:  gethcommon.HexToAddress("0x6eb91dc6d5263d2551e3360abfaabbe08ac29be1"),
+		PingPongDapp:    gethcommon.HexToAddress("0x37687BB2a0582Ddf05C1a289876835ca9c44114b"),
 	},
 
 	DeploySettings: rhea.DeploySettings{
-		DeployAFN:            false,
-		DeployTokenPools:     false,
+		DeployAFN:         false,
+		DeployTokenPools:  false,
+		DeployRouter:      false,
+		DeployGasFeeCache: false,
+
 		DeployCommitStore:    false,
 		DeployRamp:           false,
-		DeployRouter:         false,
 		DeployGovernanceDapp: false,
 		DeployPingPongDapp:   false,
-		DeployedAt:           15036940,
+		DeployedAt:           16656664,
 	},
 }
