@@ -436,10 +436,33 @@ func (c *GasFeeCache) SetFeeUpdater(addr common.Address) error {
 	return c.client.ProcessTransaction(tx)
 }
 
+func (c *GasFeeCache) UpdateFees(feeUpdates []gas_fee_cache.GEFeeUpdate) error {
+	opts, err := c.client.TransactionOpts(c.client.DefaultWallet)
+	if err != nil {
+		return err
+	}
+	tx, err := c.instance.UpdateFees(opts, feeUpdates)
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Msg("GasFeeCache fee updated")
+	return c.client.ProcessTransaction(tx)
+}
+
 type GERouter struct {
 	client     *blockchain.EthereumClient
-	instance   *ge_router.GERouter
+	Instance   *ge_router.GERouter
 	EthAddress common.Address
+}
+
+func (router *GERouter) Copy() *GERouter {
+	r := *router.Instance
+	return &GERouter{
+		client:     router.client,
+		Instance:   &r,
+		EthAddress: router.EthAddress,
+	}
 }
 
 func (router *GERouter) Address() string {
@@ -454,7 +477,7 @@ func (router *GERouter) SetOnRamp(chainID uint64, onRamp common.Address) error {
 	log.Info().
 		Str("GE Router", router.Address()).
 		Msg("Setting on ramp for GE router")
-	tx, err := router.instance.SetOnRamp(opts, chainID, onRamp)
+	tx, err := router.Instance.SetOnRamp(opts, chainID, onRamp)
 	if err != nil {
 		return err
 	}
@@ -469,7 +492,7 @@ func (router *GERouter) CCIPSend(destChainId uint64, msg ge_router.GEConsumerEVM
 	if err != nil {
 		return nil, err
 	}
-	tx, err := router.instance.CcipSend(opts, destChainId, msg)
+	tx, err := router.Instance.CcipSend(opts, destChainId, msg)
 	if err != nil {
 		return nil, err
 	}
@@ -481,7 +504,7 @@ func (router *GERouter) AddOffRamp(offRamp common.Address) (*types.Transaction, 
 	if err != nil {
 		return nil, err
 	}
-	tx, err := router.instance.AddOffRamp(opts, offRamp)
+	tx, err := router.Instance.AddOffRamp(opts, offRamp)
 	if err != nil {
 		return nil, err
 	}
@@ -492,7 +515,7 @@ func (router *GERouter) AddOffRamp(offRamp common.Address) (*types.Transaction, 
 }
 
 func (router *GERouter) GetFee(destinationChainId uint64, message ge_router.GEConsumerEVM2AnyGEMessage) (*big.Int, error) {
-	return router.instance.GetFee(nil, destinationChainId, message)
+	return router.Instance.GetFee(nil, destinationChainId, message)
 }
 
 type GEOnRamp struct {

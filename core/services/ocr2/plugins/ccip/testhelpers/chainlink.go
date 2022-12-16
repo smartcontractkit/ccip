@@ -60,12 +60,12 @@ type Node struct {
 }
 
 func (node *Node) EventuallyHasReqSeqNum(t *testing.T, ccipContracts CCIPContracts, eventSignatures ccip.EventSignatures, onRamp common.Address, seqNum int) logpoller.Log {
-	c, err := node.App.GetChains().EVM.Get(big.NewInt(0).SetUint64(ccipContracts.SourceChainID))
+	c, err := node.App.GetChains().EVM.Get(big.NewInt(0).SetUint64(ccipContracts.Source.ChainID))
 	require.NoError(t, err)
 	var log logpoller.Log
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
-		ccipContracts.SourceChain.Commit()
-		ccipContracts.DestChain.Commit()
+		ccipContracts.Source.Chain.Commit()
+		ccipContracts.Dest.Chain.Commit()
 		lgs, err := c.LogPoller().LogsDataWordRange(eventSignatures.SendRequested, onRamp, eventSignatures.SendRequestedSequenceNumberIndex, ccip.EvmWord(uint64(seqNum)), ccip.EvmWord(uint64(seqNum)), 1)
 		require.NoError(t, err)
 		t.Log("Send requested", len(lgs))
@@ -79,12 +79,12 @@ func (node *Node) EventuallyHasReqSeqNum(t *testing.T, ccipContracts CCIPContrac
 }
 
 func (node *Node) EventuallyHasExecutedSeqNums(t *testing.T, ccipContracts CCIPContracts, eventSignatures ccip.EventSignatures, offRamp common.Address, minSeqNum int, maxSeqNum int) []logpoller.Log {
-	c, err := node.App.GetChains().EVM.Get(big.NewInt(0).SetUint64(ccipContracts.DestChainID))
+	c, err := node.App.GetChains().EVM.Get(big.NewInt(0).SetUint64(ccipContracts.Dest.ChainID))
 	require.NoError(t, err)
 	var logs []logpoller.Log
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
-		ccipContracts.SourceChain.Commit()
-		ccipContracts.DestChain.Commit()
+		ccipContracts.Source.Chain.Commit()
+		ccipContracts.Dest.Chain.Commit()
 		lgs, err := c.LogPoller().IndexedLogsTopicRange(
 			eventSignatures.ExecutionStateChanged,
 			offRamp,
@@ -105,12 +105,12 @@ func (node *Node) EventuallyHasExecutedSeqNums(t *testing.T, ccipContracts CCIPC
 }
 
 func (node *Node) ConsistentlySeqNumHasNotBeenExecuted(t *testing.T, ccipContracts CCIPContracts, eventSignatures ccip.EventSignatures, offRamp common.Address, seqNum int) logpoller.Log {
-	c, err := node.App.GetChains().EVM.Get(big.NewInt(0).SetUint64(ccipContracts.DestChainID))
+	c, err := node.App.GetChains().EVM.Get(big.NewInt(0).SetUint64(ccipContracts.Dest.ChainID))
 	require.NoError(t, err)
 	var log logpoller.Log
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
-		ccipContracts.SourceChain.Commit()
-		ccipContracts.DestChain.Commit()
+		ccipContracts.Source.Chain.Commit()
+		ccipContracts.Dest.Chain.Commit()
 		lgs, err := c.LogPoller().IndexedLogsTopicRange(
 			eventSignatures.ExecutionStateChanged,
 			offRamp,
@@ -150,13 +150,13 @@ func (node *Node) AddBootstrapJob(t *testing.T, spec *ctfClient.OCR2TaskJobSpec)
 func AddAllJobs(t *testing.T, jobParams CCIPJobSpecParams, ccipContracts CCIPContracts, nodes []Node) {
 	commitSpec, err := jobParams.CommitJobSpec()
 	require.NoError(t, err)
-	jobParams.OnRampForExecution = ccipContracts.TollOnRamp.Address()
-	jobParams.OffRamp = ccipContracts.TollOffRamp.Address()
+	jobParams.OnRampForExecution = ccipContracts.Source.TollOnRamp.Address()
+	jobParams.OffRamp = ccipContracts.Dest.TollOffRamp.Address()
 	tollExecutionSpec, err := jobParams.ExecutionJobSpec()
 	require.NoError(t, err)
 
-	jobParams.OnRampForExecution = ccipContracts.GEOnRamp.Address()
-	jobParams.OffRamp = ccipContracts.GEOffRamp.Address()
+	jobParams.OnRampForExecution = ccipContracts.Source.GEOnRamp.Address()
+	jobParams.OffRamp = ccipContracts.Dest.GEOffRamp.Address()
 	geExecutionSpec, err := jobParams.ExecutionJobSpec()
 	require.NoError(t, err)
 
@@ -432,7 +432,7 @@ func EventuallyCommitReportAccepted(t *testing.T, ccipContracts CCIPContracts, c
 	g := gomega.NewGomegaWithT(t)
 	var report commit_store.InternalCommitReport
 	g.Eventually(func() []common.Address {
-		it, err := ccipContracts.CommitStore.FilterReportAccepted(&bind.FilterOpts{Start: currentBlock})
+		it, err := ccipContracts.Dest.CommitStore.FilterReportAccepted(&bind.FilterOpts{Start: currentBlock})
 		g.Expect(err).NotTo(gomega.HaveOccurred(), "Error filtering ReportAccepted event")
 		g.Expect(it.Next()).To(gomega.BeTrue(), "No ReportAccepted event found")
 		report = it.Event.Report
@@ -441,12 +441,14 @@ func EventuallyCommitReportAccepted(t *testing.T, ccipContracts CCIPContracts, c
 		}
 		return report.OnRamps
 	}, testutils.WaitTimeout(t), 1*time.Second).
-		Should(gomega.ContainElement(ccipContracts.GEOnRamp.Address()), "report has not been committed")
+		Should(gomega.ContainElement(ccipContracts.Source.GEOnRamp.Address()), "report has not been committed")
 	return report
 }
 
 func SetupAndStartNodes(ctx context.Context, t *testing.T, ccipContracts *CCIPContracts, bootstrapNodePort int64) (Node, []Node, int64) {
-	appBootstrap, bootstrapPeerID, bootstrapTransmitter, bootstrapKb := SetupNodeCCIP(t, ccipContracts.DestUser, bootstrapNodePort, "bootstrap_ccip", ccipContracts.SourceChain, ccipContracts.DestChain, big.NewInt(0).SetUint64(ccipContracts.SourceChainID), big.NewInt(0).SetUint64(ccipContracts.DestChainID), "", 0)
+	appBootstrap, bootstrapPeerID, bootstrapTransmitter, bootstrapKb := SetupNodeCCIP(t, ccipContracts.Dest.User, bootstrapNodePort,
+		"bootstrap_ccip", ccipContracts.Source.Chain, ccipContracts.Dest.Chain, big.NewInt(0).SetUint64(ccipContracts.Source.ChainID),
+		big.NewInt(0).SetUint64(ccipContracts.Dest.ChainID), "", 0)
 	var (
 		oracles []confighelper.OracleIdentityExtra
 		nodes   []Node
@@ -461,7 +463,10 @@ func SetupAndStartNodes(ctx context.Context, t *testing.T, ccipContracts *CCIPCo
 	}
 	// Set up the minimum 4 oracles all funded with destination ETH
 	for i := int64(0); i < 4; i++ {
-		app, peerID, transmitter, kb := SetupNodeCCIP(t, ccipContracts.DestUser, bootstrapNodePort+1+i, fmt.Sprintf("oracle_ccip%d", i), ccipContracts.SourceChain, ccipContracts.DestChain, big.NewInt(0).SetUint64(ccipContracts.SourceChainID), big.NewInt(0).SetUint64(ccipContracts.DestChainID), bootstrapPeerID, bootstrapNodePort)
+		app, peerID, transmitter, kb := SetupNodeCCIP(t, ccipContracts.Dest.User, bootstrapNodePort+1+i,
+			fmt.Sprintf("oracle_ccip%d", i), ccipContracts.Source.Chain, ccipContracts.Dest.Chain,
+			big.NewInt(0).SetUint64(ccipContracts.Source.ChainID), big.NewInt(0).SetUint64(ccipContracts.Dest.ChainID),
+			bootstrapPeerID, bootstrapNodePort)
 		nodes = append(nodes, Node{app, transmitter, kb})
 		offchainPublicKey, _ := hex.DecodeString(strings.TrimPrefix(kb.OnChainPublicKey(), "0x"))
 		oracles = append(oracles, confighelper.OracleIdentityExtra{

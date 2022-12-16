@@ -9,7 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/types"
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/stretchr/testify/require"
@@ -32,7 +32,7 @@ type EthKeyStoreSim struct {
 	keystore.Eth
 }
 
-func (ks EthKeyStoreSim) SignTx(address common.Address, tx *types.Transaction, chainID *big.Int) (*types.Transaction, error) {
+func (ks EthKeyStoreSim) SignTx(address common.Address, tx *ethtypes.Transaction, chainID *big.Int) (*ethtypes.Transaction, error) {
 	if chainID.String() == "1000" {
 		// A terrible hack, just for the multichain test. All simulation clients run on chainID 1337.
 		// We let the DestChain actually use 1337 to make sure the offchainConfig digests are properly generated.
@@ -43,7 +43,7 @@ func (ks EthKeyStoreSim) SignTx(address common.Address, tx *types.Transaction, c
 
 var _ keystore.Eth = EthKeyStoreSim{}
 
-func ConfirmTxs(t *testing.T, txs []*types.Transaction, chain *backends.SimulatedBackend) {
+func ConfirmTxs(t *testing.T, txs []*ethtypes.Transaction, chain *backends.SimulatedBackend) {
 	chain.Commit()
 	for _, tx := range txs {
 		rec, err := chain.TransactionReceipt(context.Background(), tx.Hash())

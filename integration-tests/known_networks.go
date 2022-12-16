@@ -31,15 +31,15 @@ var (
 
 	// SimulatedevmNonDev1 represents a simulated network which can be used to deploy a non-dev geth node
 	SimulatedEVMNonDev1 = blockchain.EVMNetwork{
-		Name:                 "source-chain",
+		Name:                 "simulated-non-dev1",
 		Simulated:            true,
 		ClientImplementation: blockchain.EthereumClientImplementation,
 		ChainID:              1337,
 		PrivateKeys: []string{
 			"ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
 		},
-		URLs:                      []string{"ws://source-chain-ethereum-geth:8546"},
-		HTTPURLs:                  []string{"http://source-chain-ethereum-geth:8544"},
+		URLs:                      []string{"ws://simulated-non-dev1-ethereum-geth:8546"},
+		HTTPURLs:                  []string{"http://simulated-non-dev1-ethereum-geth:8544"},
 		ChainlinkTransactionLimit: 500000,
 		Timeout:                   2 * time.Minute,
 		MinimumConfirmations:      1,
@@ -48,15 +48,15 @@ var (
 
 	// SimulatedEVM_NON_DEV_2 represents a simulated network with chain id 2337 which can be used to deploy a non-dev geth node
 	SimulatedEVMNonDev2 = blockchain.EVMNetwork{
-		Name:                 "dest-chain",
+		Name:                 "simulated-non-dev2",
 		Simulated:            true,
 		ClientImplementation: blockchain.EthereumClientImplementation,
 		ChainID:              2337,
 		PrivateKeys: []string{
 			"ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
 		},
-		URLs:                      []string{"ws://dest-chain-ethereum-geth:8546"},
-		HTTPURLs:                  []string{"http://dest-chain-ethereum-geth:8544"},
+		URLs:                      []string{"ws://simulated-non-dev2-ethereum-geth:8546"},
+		HTTPURLs:                  []string{"http://simulated-non-dev2-ethereum-geth:8544"},
 		ChainlinkTransactionLimit: 500000,
 		Timeout:                   2 * time.Minute,
 		MinimumConfirmations:      1,

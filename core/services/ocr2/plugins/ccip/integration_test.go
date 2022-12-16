@@ -43,7 +43,7 @@ link [type=http method=GET url="%s"];
 link_parse [type=jsonparse path="JuelsPerETH"];
 link->link_parse;
 merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
-		linkEth.URL, ccipContracts.DestLinkToken.Address())
+		linkEth.URL, ccipContracts.Dest.LinkToken.Address())
 	jobParams := ccipContracts.NewCCIPJobSpecParams(tokensPerFeeCoinPipeline, configBlock)
 	defer linkEth.Close()
 
@@ -52,7 +52,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 	jobParams.RootSnooze = 1 * time.Second
 
 	// Add the bootstrap job
-	bootstrapNode.AddBootstrapJob(t, jobParams.BootstrapJob(ccipContracts.CommitStore.Address().Hex()))
+	bootstrapNode.AddBootstrapJob(t, jobParams.BootstrapJob(ccipContracts.Dest.CommitStore.Address().Hex()))
 	testhelpers.AddAllJobs(t, jobParams, ccipContracts, nodes)
 
 	// Replay for bootstrap.
@@ -63,7 +63,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 	tollCurrentSeqNum := 1
 	geCurrentSeqNum := 1
 
-	ccipContracts.DestChain.Commit()
+	ccipContracts.Dest.Chain.Commit()
 
 	t.Run("single ge", func(t *testing.T) {
 		tokenAmount := big.NewInt(500000003) // prime number
@@ -75,44 +75,44 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		require.NoError(t, err)
 
 		sourceBalances, err := testhelpers.GetBalances([]testhelpers.BalanceReq{
-			{Name: testhelpers.SourcePool, Addr: ccipContracts.SourcePool.Address(), Getter: ccipContracts.GetSourceLinkBalance},
-			{Name: testhelpers.GEOnRamp, Addr: ccipContracts.GEOnRamp.Address(), Getter: ccipContracts.GetSourceLinkBalance},
-			{Name: testhelpers.SourceGERouter, Addr: ccipContracts.SourceGERouter.Address(), Getter: ccipContracts.GetSourceLinkBalance},
+			{Name: testhelpers.SourcePool, Addr: ccipContracts.Source.Pool.Address(), Getter: ccipContracts.GetSourceLinkBalance},
+			{Name: testhelpers.GEOnRamp, Addr: ccipContracts.Source.GEOnRamp.Address(), Getter: ccipContracts.GetSourceLinkBalance},
+			{Name: testhelpers.SourceGERouter, Addr: ccipContracts.Source.GERouter.Address(), Getter: ccipContracts.GetSourceLinkBalance},
 		})
 		require.NoError(t, err)
 		destBalances, err := testhelpers.GetBalances([]testhelpers.BalanceReq{
-			{Name: testhelpers.Receiver, Addr: ccipContracts.Receivers[0].Receiver.Address(), Getter: ccipContracts.GetDestLinkBalance},
-			{Name: testhelpers.DestPool, Addr: ccipContracts.DestPool.Address(), Getter: ccipContracts.GetDestLinkBalance},
-			{Name: testhelpers.GEOffRamp, Addr: ccipContracts.GEOffRamp.Address(), Getter: ccipContracts.GetDestLinkBalance},
+			{Name: testhelpers.Receiver, Addr: ccipContracts.Dest.Receivers[0].Receiver.Address(), Getter: ccipContracts.GetDestLinkBalance},
+			{Name: testhelpers.DestPool, Addr: ccipContracts.Dest.Pool.Address(), Getter: ccipContracts.GetDestLinkBalance},
+			{Name: testhelpers.GEOffRamp, Addr: ccipContracts.Dest.GEOffRamp.Address(), Getter: ccipContracts.GetDestLinkBalance},
 		})
 		require.NoError(t, err)
 
 		msg := ge_router.GEConsumerEVM2AnyGEMessage{
-			Receiver: testhelpers.MustEncodeAddress(t, ccipContracts.Receivers[0].Receiver.Address()),
+			Receiver: testhelpers.MustEncodeAddress(t, ccipContracts.Dest.Receivers[0].Receiver.Address()),
 			Data:     []byte("hello"),
 			TokensAndAmounts: []ge_router.CommonEVMTokenAndAmount{
 				{
-					Token:  ccipContracts.SourceLinkToken.Address(),
+					Token:  ccipContracts.Source.LinkToken.Address(),
 					Amount: tokenAmount,
 				},
 			},
-			FeeToken:  ccipContracts.SourceLinkToken.Address(),
+			FeeToken:  ccipContracts.Source.LinkToken.Address(),
 			ExtraArgs: extraArgs,
 		}
-		fee, err := ccipContracts.SourceGERouter.GetFee(nil, destChainID, msg)
+		fee, err := ccipContracts.Source.GERouter.GetFee(nil, destChainID, msg)
 		require.NoError(t, err)
 		// Currently no overhead and 1gwei dest gas price. So fee is simply gasLimit * gasPrice.
 		require.Equal(t, new(big.Int).Mul(gasLimit, gasPrice).String(), fee.String())
 		// Approve the fee amount + the token amount
-		_, err = ccipContracts.SourceLinkToken.Approve(ccipContracts.SourceUser, ccipContracts.SourceGERouter.Address(), new(big.Int).Add(fee, tokenAmount))
+		_, err = ccipContracts.Source.LinkToken.Approve(ccipContracts.Source.User, ccipContracts.Source.GERouter.Address(), new(big.Int).Add(fee, tokenAmount))
 		require.NoError(t, err)
-		ccipContracts.SourceChain.Commit()
+		ccipContracts.Source.Chain.Commit()
 		testhelpers.SendGERequest(t, ccipContracts, msg)
 		// Should eventually see this executed.
-		testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.GEOnRamp.Address(), nodes, geCurrentSeqNum)
-		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.GEOnRamp.Address(), geCurrentSeqNum, geCurrentSeqNum)
+		testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.Source.GEOnRamp.Address(), nodes, geCurrentSeqNum)
+		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.Source.GEOnRamp.Address(), geCurrentSeqNum, geCurrentSeqNum)
 
-		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.GEOffRamp.Address(), nodes, geCurrentSeqNum, geCurrentSeqNum)
+		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.Dest.GEOffRamp.Address(), nodes, geCurrentSeqNum, geCurrentSeqNum)
 		assert.Len(t, executionLogs, 1)
 		testhelpers.AssertGEExecState(t, ccipContracts, executionLogs[0], ccip.Success)
 
@@ -126,19 +126,19 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		ccipContracts.AssertBalances([]testhelpers.BalanceAssertion{
 			{
 				Name:     testhelpers.SourcePool,
-				Address:  ccipContracts.SourcePool.Address(),
+				Address:  ccipContracts.Source.Pool.Address(),
 				Expected: testhelpers.MustAddBigInt(sourceBalances[testhelpers.SourcePool], poolInOutFlow).String(), // Tokens & fee both locked in the pool
 				Getter:   ccipContracts.GetSourceLinkBalance,
 			},
 			{
 				Name:     testhelpers.GEOnRamp,
-				Address:  ccipContracts.GEOnRamp.Address(),
+				Address:  ccipContracts.Source.GEOnRamp.Address(),
 				Expected: sourceBalances[testhelpers.GEOnRamp].String(),
 				Getter:   ccipContracts.GetSourceLinkBalance,
 			},
 			{
 				Name:     testhelpers.SourceGERouter,
-				Address:  ccipContracts.SourceGERouter.Address(),
+				Address:  ccipContracts.Source.GERouter.Address(),
 				Expected: sourceBalances[testhelpers.SourceGERouter].String(),
 				Getter:   ccipContracts.GetSourceLinkBalance,
 			},
@@ -146,19 +146,19 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		ccipContracts.AssertBalances([]testhelpers.BalanceAssertion{
 			{
 				Name:     testhelpers.Receiver,
-				Address:  ccipContracts.Receivers[0].Receiver.Address(),
+				Address:  ccipContracts.Dest.Receivers[0].Receiver.Address(),
 				Expected: testhelpers.MustAddBigInt(destBalances[testhelpers.Receiver], tokenAmount.String()).String(),
 				Getter:   ccipContracts.GetDestLinkBalance,
 			},
 			{
 				Name:     testhelpers.DestPool,
-				Address:  ccipContracts.DestPool.Address(),
+				Address:  ccipContracts.Dest.Pool.Address(),
 				Expected: testhelpers.MustSubBigInt(destBalances[testhelpers.DestPool], poolInOutFlow).String(),
 				Getter:   ccipContracts.GetDestLinkBalance,
 			},
 			{
 				Name:     testhelpers.GEOffRamp,
-				Address:  ccipContracts.GEOffRamp.Address(),
+				Address:  ccipContracts.Dest.GEOffRamp.Address(),
 				Expected: testhelpers.MustAddBigInt(destBalances[testhelpers.GEOffRamp], fee.String()).String(),
 				Getter:   ccipContracts.GetDestLinkBalance,
 			},
@@ -183,39 +183,39 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 			extraArgs, err := testhelpers.GetEVMExtraArgsV1(txGasLimit, false)
 			require.NoError(t, err)
 			msg := ge_router.GEConsumerEVM2AnyGEMessage{
-				Receiver: testhelpers.MustEncodeAddress(t, ccipContracts.Receivers[0].Receiver.Address()),
+				Receiver: testhelpers.MustEncodeAddress(t, ccipContracts.Dest.Receivers[0].Receiver.Address()),
 				Data:     []byte("hello"),
 				TokensAndAmounts: []ge_router.CommonEVMTokenAndAmount{
 					{
-						Token:  ccipContracts.SourceLinkToken.Address(),
+						Token:  ccipContracts.Source.LinkToken.Address(),
 						Amount: tokenAmount,
 					},
 				},
-				FeeToken:  ccipContracts.SourceLinkToken.Address(),
+				FeeToken:  ccipContracts.Source.LinkToken.Address(),
 				ExtraArgs: extraArgs,
 			}
-			fee, err := ccipContracts.SourceGERouter.GetFee(nil, destChainID, msg)
+			fee, err := ccipContracts.Source.GERouter.GetFee(nil, destChainID, msg)
 			require.NoError(t, err)
 			// Currently no overhead and 1gwei dest gas price. So fee is simply gasLimit * gasPrice.
 			require.Equal(t, new(big.Int).Mul(txGasLimit, gasPrice).String(), fee.String())
 			// Approve the fee amount + the token amount
-			_, err = ccipContracts.SourceLinkToken.Approve(ccipContracts.SourceUser, ccipContracts.SourceGERouter.Address(), new(big.Int).Add(fee, tokenAmount))
+			_, err = ccipContracts.Source.LinkToken.Approve(ccipContracts.Source.User, ccipContracts.Source.GERouter.Address(), new(big.Int).Add(fee, tokenAmount))
 			require.NoError(t, err)
-			tx, err := ccipContracts.SourceGERouter.CcipSend(ccipContracts.SourceUser, ccipContracts.DestChainID, msg)
+			tx, err := ccipContracts.Source.GERouter.CcipSend(ccipContracts.Source.User, ccipContracts.Dest.ChainID, msg)
 			require.NoError(t, err)
 			txs = append(txs, tx)
 		}
 
 		// Send a batch of requests in a single block
-		testhelpers.ConfirmTxs(t, txs, ccipContracts.SourceChain)
+		testhelpers.ConfirmTxs(t, txs, ccipContracts.Source.Chain)
 		var reqs []logpoller.Log
 		for i := 0; i < n; i++ {
-			reqs = append(reqs, testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.GEOnRamp.Address(), nodes, geCurrentSeqNum+i))
+			reqs = append(reqs, testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.Source.GEOnRamp.Address(), nodes, geCurrentSeqNum+i))
 		}
 		// Should see a report with the full range
-		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.GEOnRamp.Address(), geCurrentSeqNum, geCurrentSeqNum+n-1)
+		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.Source.GEOnRamp.Address(), geCurrentSeqNum, geCurrentSeqNum+n-1)
 		// Should all be executed
-		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.GEOffRamp.Address(), nodes, geCurrentSeqNum, geCurrentSeqNum+n-1)
+		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.Dest.GEOffRamp.Address(), nodes, geCurrentSeqNum, geCurrentSeqNum+n-1)
 		for _, execLog := range executionLogs {
 			testhelpers.AssertGEExecState(t, ccipContracts, execLog, ccip.Success)
 		}
@@ -232,56 +232,56 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		// 4e18 juels = 4 link, which does not include gas used outside the callback.
 		// Gas outside the callback for 1 token is ~100k in the worst case.
 		feeTokenAmount := new(big.Int).Mul(big.NewInt(10), big.NewInt(1e18))
-		_, err = ccipContracts.SourceLinkToken.Approve(ccipContracts.SourceUser, ccipContracts.TollOnRampRouter.Address(), new(big.Int).Add(tokenAmount, feeTokenAmount))
+		_, err = ccipContracts.Source.LinkToken.Approve(ccipContracts.Source.User, ccipContracts.Source.TollOnRampRouter.Address(), new(big.Int).Add(tokenAmount, feeTokenAmount))
 		require.NoError(t, err)
-		ccipContracts.SourceChain.Commit()
+		ccipContracts.Source.Chain.Commit()
 
 		sourceBalances, err := testhelpers.GetBalances([]testhelpers.BalanceReq{
-			{Name: testhelpers.SourcePool, Addr: ccipContracts.SourcePool.Address(), Getter: ccipContracts.GetSourceLinkBalance},
-			{Name: testhelpers.TollOnRamp, Addr: ccipContracts.TollOnRamp.Address(), Getter: ccipContracts.GetSourceLinkBalance},
-			{Name: testhelpers.TollOnRampRouter, Addr: ccipContracts.TollOnRampRouter.Address(), Getter: ccipContracts.GetSourceLinkBalance},
+			{Name: testhelpers.SourcePool, Addr: ccipContracts.Source.Pool.Address(), Getter: ccipContracts.GetSourceLinkBalance},
+			{Name: testhelpers.TollOnRamp, Addr: ccipContracts.Source.TollOnRamp.Address(), Getter: ccipContracts.GetSourceLinkBalance},
+			{Name: testhelpers.TollOnRampRouter, Addr: ccipContracts.Source.TollOnRampRouter.Address(), Getter: ccipContracts.GetSourceLinkBalance},
 		})
 		require.NoError(t, err)
 		destBalances, err := testhelpers.GetBalances([]testhelpers.BalanceReq{
-			{Name: testhelpers.Receiver, Addr: ccipContracts.Receivers[0].Receiver.Address(), Getter: ccipContracts.GetDestLinkBalance},
-			{Name: testhelpers.DestPool, Addr: ccipContracts.DestPool.Address(), Getter: ccipContracts.GetDestLinkBalance},
-			{Name: testhelpers.TollOffRamp, Addr: ccipContracts.TollOffRamp.Address(), Getter: ccipContracts.GetDestLinkBalance},
+			{Name: testhelpers.Receiver, Addr: ccipContracts.Dest.Receivers[0].Receiver.Address(), Getter: ccipContracts.GetDestLinkBalance},
+			{Name: testhelpers.DestPool, Addr: ccipContracts.Dest.Pool.Address(), Getter: ccipContracts.GetDestLinkBalance},
+			{Name: testhelpers.TollOffRamp, Addr: ccipContracts.Dest.TollOffRamp.Address(), Getter: ccipContracts.GetDestLinkBalance},
 		})
 		require.NoError(t, err)
 
 		testhelpers.SendTollRequest(t, ccipContracts, "hey DON, execute for me",
 			[]evm_2_any_toll_onramp_router.CommonEVMTokenAndAmount{{
-				Token:  ccipContracts.SourceLinkToken.Address(),
+				Token:  ccipContracts.Source.LinkToken.Address(),
 				Amount: tokenAmount,
 			}},
 			evm_2_any_toll_onramp_router.CommonEVMTokenAndAmount{
-				Token:  ccipContracts.SourceLinkToken.Address(),
+				Token:  ccipContracts.Source.LinkToken.Address(),
 				Amount: feeTokenAmount,
 			},
 			big.NewInt(100_000),
-			ccipContracts.Receivers[0].Receiver.Address())
-		testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.TollOnRamp.Address(), nodes, tollCurrentSeqNum)
-		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.TollOnRamp.Address(), tollCurrentSeqNum, tollCurrentSeqNum)
-		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.TollOffRamp.Address(), nodes, tollCurrentSeqNum, tollCurrentSeqNum)
+			ccipContracts.Dest.Receivers[0].Receiver.Address())
+		testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.Source.TollOnRamp.Address(), nodes, tollCurrentSeqNum)
+		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.Source.TollOnRamp.Address(), tollCurrentSeqNum, tollCurrentSeqNum)
+		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.Dest.TollOffRamp.Address(), nodes, tollCurrentSeqNum, tollCurrentSeqNum)
 		assert.Len(t, executionLogs, 1)
 		testhelpers.AssertTollExecSuccess(t, ccipContracts, executionLogs[0])
 
 		ccipContracts.AssertBalances([]testhelpers.BalanceAssertion{
 			{
 				Name:     testhelpers.SourcePool,
-				Address:  ccipContracts.SourcePool.Address(),
+				Address:  ccipContracts.Source.Pool.Address(),
 				Expected: testhelpers.MustAddBigInt(sourceBalances[testhelpers.SourcePool], "10000000000000000099").String(), // 10e18 + 100 transfer - 1 fee
 				Getter:   ccipContracts.GetSourceLinkBalance,
 			},
 			{
 				Name:     testhelpers.TollOnRamp,
-				Address:  ccipContracts.TollOnRamp.Address(),
+				Address:  ccipContracts.Source.TollOnRamp.Address(),
 				Expected: sourceBalances[testhelpers.TollOnRamp].String(),
 				Getter:   ccipContracts.GetSourceLinkBalance,
 			},
 			{
 				Name:     testhelpers.TollOnRampRouter,
-				Address:  ccipContracts.TollOnRampRouter.Address(),
+				Address:  ccipContracts.Source.TollOnRampRouter.Address(),
 				Expected: testhelpers.MustAddBigInt(sourceBalances[testhelpers.TollOnRampRouter], "1").String(),
 				Getter:   ccipContracts.GetSourceLinkBalance,
 			},
@@ -289,19 +289,19 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		ccipContracts.AssertBalances([]testhelpers.BalanceAssertion{
 			{
 				Name:     testhelpers.Receiver,
-				Address:  ccipContracts.Receivers[0].Receiver.Address(),
+				Address:  ccipContracts.Dest.Receivers[0].Receiver.Address(),
 				Expected: testhelpers.MustAddBigInt(destBalances[testhelpers.Receiver], "9049107200000000099").String(),
 				Getter:   ccipContracts.GetDestLinkBalance,
 				Within:   "1000000000000000000"}, // Roughly 200k gas * 200e9 wei/gas * (2e20 link/eth / 1e18wei/eth)
 			{
 				Name:     testhelpers.DestPool,
-				Address:  ccipContracts.DestPool.Address(),
+				Address:  ccipContracts.Dest.Pool.Address(),
 				Expected: testhelpers.MustSubBigInt(destBalances[testhelpers.DestPool], "10000000000000000099").String(),
 				Getter:   ccipContracts.GetDestLinkBalance,
 			}, // We lose 10 link from the pool
 			{
 				Name:     testhelpers.TollOffRamp,
-				Address:  ccipContracts.TollOffRamp.Address(),
+				Address:  ccipContracts.Dest.TollOffRamp.Address(),
 				Expected: testhelpers.MustAddBigInt(destBalances[testhelpers.TollOffRamp], "965804400000000000").String(),
 				Getter:   ccipContracts.GetDestLinkBalance,
 				Within:   "100000000000000", // To account for change in the number of contract optimizations
@@ -313,14 +313,14 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 	t.Run("batch auto-execute toll", func(t *testing.T) {
 		eventSignatures := ccip.GetTollEventSignatures()
 		sourceBalances, err := testhelpers.GetBalances([]testhelpers.BalanceReq{
-			{Name: testhelpers.SourcePool, Addr: ccipContracts.SourcePool.Address(), Getter: ccipContracts.GetSourceLinkBalance},
-			{Name: testhelpers.TollOnRampRouter, Addr: ccipContracts.TollOnRampRouter.Address(), Getter: ccipContracts.GetSourceLinkBalance},
+			{Name: testhelpers.SourcePool, Addr: ccipContracts.Source.Pool.Address(), Getter: ccipContracts.GetSourceLinkBalance},
+			{Name: testhelpers.TollOnRampRouter, Addr: ccipContracts.Source.TollOnRampRouter.Address(), Getter: ccipContracts.GetSourceLinkBalance},
 		})
 		require.NoError(t, err, "fetching source balance")
 		destBalances, err := testhelpers.GetBalances([]testhelpers.BalanceReq{
-			{Name: testhelpers.Receiver, Addr: ccipContracts.Receivers[0].Receiver.Address(), Getter: ccipContracts.GetDestLinkBalance},
-			{Name: testhelpers.DestPool, Addr: ccipContracts.DestPool.Address(), Getter: ccipContracts.GetDestLinkBalance},
-			{Name: testhelpers.TollOffRampRouter, Addr: ccipContracts.TollOffRampRouter.Address(), Getter: ccipContracts.GetDestLinkBalance},
+			{Name: testhelpers.Receiver, Addr: ccipContracts.Dest.Receivers[0].Receiver.Address(), Getter: ccipContracts.GetDestLinkBalance},
+			{Name: testhelpers.DestPool, Addr: ccipContracts.Dest.Pool.Address(), Getter: ccipContracts.GetDestLinkBalance},
+			{Name: testhelpers.TollOffRampRouter, Addr: ccipContracts.Dest.TollOffRampRouter.Address(), Getter: ccipContracts.GetDestLinkBalance},
 		})
 		require.NoError(t, err, "fetching dest balance")
 
@@ -329,27 +329,27 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		var txs []*gethtypes.Transaction
 		n := 3
 		for i := 0; i < n; i++ {
-			_, err = ccipContracts.SourceLinkToken.Approve(ccipContracts.SourceUser, ccipContracts.TollOnRampRouter.Address(), new(big.Int).Add(tokenAmount, feeTokenAmount))
+			_, err = ccipContracts.Source.LinkToken.Approve(ccipContracts.Source.User, ccipContracts.Source.TollOnRampRouter.Address(), new(big.Int).Add(tokenAmount, feeTokenAmount))
 			require.NoError(t, err)
 			txs = append(txs, testhelpers.QueueTollRequest(t, ccipContracts, fmt.Sprintf("batch request %d", tollCurrentSeqNum+i), []evm_2_any_toll_onramp_router.CommonEVMTokenAndAmount{{
-				Token:  ccipContracts.SourceLinkToken.Address(),
+				Token:  ccipContracts.Source.LinkToken.Address(),
 				Amount: tokenAmount,
 			}}, evm_2_any_toll_onramp_router.CommonEVMTokenAndAmount{
-				Token:  ccipContracts.SourceLinkToken.Address(),
+				Token:  ccipContracts.Source.LinkToken.Address(),
 				Amount: feeTokenAmount,
-			}, big.NewInt(100_000), ccipContracts.Receivers[0].Receiver.Address()))
+			}, big.NewInt(100_000), ccipContracts.Dest.Receivers[0].Receiver.Address()))
 		}
 		// Send a batch of requests in a single block
-		testhelpers.ConfirmTxs(t, txs, ccipContracts.SourceChain)
+		testhelpers.ConfirmTxs(t, txs, ccipContracts.Source.Chain)
 		// All nodes should have all 3.
 		var reqs []logpoller.Log
 		for i := 0; i < n; i++ {
-			reqs = append(reqs, testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.TollOnRamp.Address(), nodes, tollCurrentSeqNum+i))
+			reqs = append(reqs, testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.Source.TollOnRamp.Address(), nodes, tollCurrentSeqNum+i))
 		}
 		// Should see a report with the full range
-		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.TollOnRamp.Address(), tollCurrentSeqNum, tollCurrentSeqNum+n-1)
+		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.Source.TollOnRamp.Address(), tollCurrentSeqNum, tollCurrentSeqNum+n-1)
 		// Should all be executed
-		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.TollOffRamp.Address(), nodes, tollCurrentSeqNum, tollCurrentSeqNum+n-1)
+		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.Dest.TollOffRamp.Address(), nodes, tollCurrentSeqNum, tollCurrentSeqNum+n-1)
 		for _, execLog := range executionLogs {
 			testhelpers.AssertTollExecSuccess(t, ccipContracts, execLog)
 		}
@@ -357,13 +357,13 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		ccipContracts.AssertBalances([]testhelpers.BalanceAssertion{
 			{
 				Name:     testhelpers.SourcePool,
-				Address:  ccipContracts.SourcePool.Address(),
+				Address:  ccipContracts.Source.Pool.Address(),
 				Expected: testhelpers.MustAddBigInt(sourceBalances[testhelpers.SourcePool], "30000000000000000297").String(),
 				Getter:   ccipContracts.GetSourceLinkBalance,
 			}, // (10e18 + 100 - 1)*3
 			{
 				Name:     testhelpers.TollOnRampRouter,
-				Address:  ccipContracts.TollOnRampRouter.Address(),
+				Address:  ccipContracts.Source.TollOnRampRouter.Address(),
 				Expected: testhelpers.MustAddBigInt(sourceBalances[testhelpers.TollOnRampRouter], "3").String(),
 				Getter:   ccipContracts.GetSourceLinkBalance,
 			},
@@ -371,20 +371,20 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		ccipContracts.AssertBalances([]testhelpers.BalanceAssertion{
 			{
 				Name:     testhelpers.Receiver,
-				Address:  ccipContracts.Receivers[0].Receiver.Address(),
+				Address:  ccipContracts.Dest.Receivers[0].Receiver.Address(),
 				Expected: testhelpers.MustAddBigInt(destBalances[testhelpers.Receiver], "27225848400000000297").String(),
 				Getter:   ccipContracts.GetDestLinkBalance,
 				Within:   "1000000000000000000",
 			}, // 3 toll fees +/- 1 link
 			{
 				Name:     testhelpers.DestPool,
-				Address:  ccipContracts.DestPool.Address(),
+				Address:  ccipContracts.Dest.Pool.Address(),
 				Expected: testhelpers.MustSubBigInt(destBalances[testhelpers.DestPool], "30000000000000000297").String(),
 				Getter:   ccipContracts.GetDestLinkBalance,
 			},
 			{
 				Name:     testhelpers.TollOffRampRouter,
-				Address:  ccipContracts.TollOffRamp.Address(),
+				Address:  ccipContracts.Dest.TollOffRamp.Address(),
 				Expected: testhelpers.MustAddBigInt(destBalances[testhelpers.TollOffRampRouter], "2852678400000000000").String(),
 				Getter:   ccipContracts.GetDestLinkBalance,
 				Within:   "1000000000000000000",
@@ -396,10 +396,10 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 	t.Run("ge strict sequencing", func(t *testing.T) {
 		// approve the total amount to be sent
 		// set revert to true so that the execution gets reverted
-		_, err = ccipContracts.Receivers[1].Receiver.SetRevert(ccipContracts.DestUser, true)
+		_, err = ccipContracts.Dest.Receivers[1].Receiver.SetRevert(ccipContracts.Dest.User, true)
 		require.NoError(t, err, "setting revert to true on the receiver")
-		ccipContracts.DestChain.Commit()
-		currentBlockNumber := ccipContracts.DestChain.Blockchain().CurrentBlock().Number().Uint64()
+		ccipContracts.Dest.Chain.Commit()
+		currentBlockNumber := ccipContracts.Dest.Chain.Blockchain().CurrentBlock().Number().Uint64()
 
 		// Test sequence:
 		// Send msg1: strict reverts
@@ -410,26 +410,26 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		extraArgs, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(200_000), true)
 		require.NoError(t, err)
 		msg := ge_router.GEConsumerEVM2AnyGEMessage{
-			Receiver:         testhelpers.MustEncodeAddress(t, ccipContracts.Receivers[1].Receiver.Address()),
+			Receiver:         testhelpers.MustEncodeAddress(t, ccipContracts.Dest.Receivers[1].Receiver.Address()),
 			Data:             []byte("hello"),
 			TokensAndAmounts: []ge_router.CommonEVMTokenAndAmount{},
-			FeeToken:         ccipContracts.SourceLinkToken.Address(),
+			FeeToken:         ccipContracts.Source.LinkToken.Address(),
 			ExtraArgs:        extraArgs,
 		}
-		fee, err := ccipContracts.SourceGERouter.GetFee(nil, destChainID, msg)
+		fee, err := ccipContracts.Source.GERouter.GetFee(nil, destChainID, msg)
 		require.NoError(t, err)
 		// Approve the fee amount
-		_, err = ccipContracts.SourceLinkToken.Approve(ccipContracts.SourceUser, ccipContracts.SourceGERouter.Address(), big.NewInt(0).Mul(big.NewInt(int64(totalMsgs)), fee))
+		_, err = ccipContracts.Source.LinkToken.Approve(ccipContracts.Source.User, ccipContracts.Source.GERouter.Address(), big.NewInt(0).Mul(big.NewInt(int64(totalMsgs)), fee))
 		require.NoError(t, err)
-		ccipContracts.SourceChain.Commit()
+		ccipContracts.Source.Chain.Commit()
 		eventSignatures := ccip.GetGEEventSignatures()
 		testhelpers.SendGERequest(t, ccipContracts, msg)
-		failedReqLog := testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.GEOnRamp.Address(), nodes, geCurrentSeqNum)
-		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.GEOnRamp.Address(), geCurrentSeqNum, geCurrentSeqNum)
+		failedReqLog := testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.Source.GEOnRamp.Address(), nodes, geCurrentSeqNum)
+		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.Source.GEOnRamp.Address(), geCurrentSeqNum, geCurrentSeqNum)
 		reportForFailedReq := testhelpers.EventuallyCommitReportAccepted(t, ccipContracts, currentBlockNumber)
 
 		// execution status should be failed
-		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.GEOffRamp.Address(), nodes, geCurrentSeqNum, geCurrentSeqNum)
+		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.Dest.GEOffRamp.Address(), nodes, geCurrentSeqNum, geCurrentSeqNum)
 		assert.Len(t, executionLogs, 1)
 		testhelpers.AssertGEExecState(t, ccipContracts, executionLogs[0], ccip.Failure)
 		geCurrentSeqNum++
@@ -438,22 +438,22 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		var pendingReqNumbers []int
 		for i := 1; i < totalMsgs; i++ {
 			testhelpers.SendGERequest(t, ccipContracts, msg)
-			testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.GEOnRamp.Address(), nodes, geCurrentSeqNum)
-			testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.GEOnRamp.Address(), geCurrentSeqNum, geCurrentSeqNum)
-			executionLog := testhelpers.NoNodesHaveExecutedSeqNum(t, ccipContracts, eventSignatures, ccipContracts.GEOffRamp.Address(), nodes, geCurrentSeqNum)
+			testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.Source.GEOnRamp.Address(), nodes, geCurrentSeqNum)
+			testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.Source.GEOnRamp.Address(), geCurrentSeqNum, geCurrentSeqNum)
+			executionLog := testhelpers.NoNodesHaveExecutedSeqNum(t, ccipContracts, eventSignatures, ccipContracts.Dest.GEOffRamp.Address(), nodes, geCurrentSeqNum)
 			require.Empty(t, executionLog)
 			pendingReqNumbers = append(pendingReqNumbers, geCurrentSeqNum)
 			geCurrentSeqNum++
 		}
 
 		// flip the revert settings on receiver
-		_, err = ccipContracts.Receivers[1].Receiver.SetRevert(ccipContracts.DestUser, false)
+		_, err = ccipContracts.Dest.Receivers[1].Receiver.SetRevert(ccipContracts.Dest.User, false)
 		require.NoError(t, err, "setting revert to false on the receiver")
-		ccipContracts.DestChain.Commit()
-		ccipContracts.SourceChain.Commit()
+		ccipContracts.Dest.Chain.Commit()
+		ccipContracts.Source.Chain.Commit()
 
 		// manually execute the failed request
-		currentBlockNumber = ccipContracts.DestChain.Blockchain().CurrentBlock().Number().Uint64()
+		currentBlockNumber = ccipContracts.Dest.Chain.Blockchain().CurrentBlock().Number().Uint64()
 		require.NoError(t, err)
 		failedSeqNum := testhelpers.ExecuteGEMessage(t, ccipContracts, failedReqLog, []logpoller.Log{failedReqLog}, reportForFailedReq)
 		testhelpers.EventuallyExecutionStateChangedToSuccess(t, ccipContracts, []uint64{failedSeqNum}, currentBlockNumber)
@@ -469,7 +469,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		eventSignatures := ccip.GetTollEventSignatures()
 		ccipContracts.DeployNewTollOnRamp()
 		ccipContracts.DeployNewTollOffRamp()
-		newConfigBlock := ccipContracts.DestChain.Blockchain().CurrentBlock().Number().Int64()
+		newConfigBlock := ccipContracts.Dest.Chain.Blockchain().CurrentBlock().Number().Int64()
 
 		// delete previous jobs, 1 commit and a toll exec & GE exec
 		for _, node := range nodes {
@@ -500,9 +500,9 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 					// Approve router to take source token.
 					tokenAmount := big.NewInt(100)
 					feeTokenAmount := new(big.Int).Mul(big.NewInt(20), big.NewInt(1e18))
-					_, err = ccipContracts.SourceLinkToken.Approve(
-						ccipContracts.SourceUser,
-						ccipContracts.TollOnRampRouter.Address(),
+					_, err = ccipContracts.Source.LinkToken.Approve(
+						ccipContracts.Source.User,
+						ccipContracts.Source.TollOnRampRouter.Address(),
 						new(big.Int).Add(tokenAmount, feeTokenAmount))
 					require.NoError(t, err)
 
@@ -511,17 +511,17 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 					testhelpers.SendTollRequest(t, ccipContracts,
 						"hey DON, execute for me",
 						[]evm_2_any_toll_onramp_router.CommonEVMTokenAndAmount{{
-							Token:  ccipContracts.SourceLinkToken.Address(),
+							Token:  ccipContracts.Source.LinkToken.Address(),
 							Amount: tokenAmount,
 						}},
 						evm_2_any_toll_onramp_router.CommonEVMTokenAndAmount{
-							Token:  ccipContracts.SourceLinkToken.Address(),
+							Token:  ccipContracts.Source.LinkToken.Address(),
 							Amount: feeTokenAmount,
 						},
 						big.NewInt(300_000),
-						ccipContracts.Receivers[0].Receiver.Address())
-					ccipContracts.SourceChain.Commit()
-					ccipContracts.DestChain.Commit()
+						ccipContracts.Dest.Receivers[0].Receiver.Address())
+					ccipContracts.Source.Chain.Commit()
+					ccipContracts.Dest.Chain.Commit()
 				case <-ctx.Done():
 					return
 				}
@@ -537,9 +537,9 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		endSeqNum := int(currentSeqNum.Load())
 		for i := startSeq; i < endSeqNum; i++ {
 			t.Logf("verifying seqnum %d", i)
-			testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.TollOnRamp.Address(), nodes, i)
-			testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.TollOnRamp.Address(), i, i)
-			executionLog := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.TollOffRamp.Address(), nodes, i, i)
+			testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.Source.TollOnRamp.Address(), nodes, i)
+			testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.Source.TollOnRamp.Address(), i, i)
+			executionLog := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.Dest.TollOffRamp.Address(), nodes, i, i)
 			testhelpers.AssertTollExecSuccess(t, ccipContracts, executionLog[0])
 		}
 		tollCurrentSeqNum = endSeqNum

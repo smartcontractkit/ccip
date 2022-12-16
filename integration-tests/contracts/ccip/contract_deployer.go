@@ -17,16 +17,15 @@ import (
 	ocrtypes2 "github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"golang.org/x/crypto/curve25519"
 
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_toll_onramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_offramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/gas_fee_cache"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ge_router"
-
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp_router"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_toll_onramp_router"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/mock_afn_contract"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/native_token_pool"
@@ -54,6 +53,31 @@ func NewCCIPContractsDeployer(bcClient blockchain.EVMClient) (*CCIPContractsDepl
 
 func (e *CCIPContractsDeployer) DeployLinkTokenContract() (contracts.LinkToken, error) {
 	return e.EthDeployer.DeployLinkTokenContract()
+}
+
+func (e *CCIPContractsDeployer) NewLinkTokenContract(addr common.Address) (contracts.LinkToken, error) {
+	return e.EthDeployer.NewLinkTokenContract(addr)
+}
+
+func (e *CCIPContractsDeployer) NewNativeTokenPoolContract(addr common.Address) (
+	*NativeTokenPool,
+	error,
+) {
+	pool, err := native_token_pool.NewNativeTokenPool(addr, e.evmClient.Client)
+	if err != nil {
+		return nil, err
+	}
+	log.Info().
+		Str("Contract Address", addr.Hex()).
+		Str("Contract Name", "Native Token Pool").
+		Str("From", e.evmClient.GetDefaultWallet().Address()).
+		Str("Network Name", e.evmClient.GetNetworkConfig().Name).
+		Msg("New contract")
+	return &NativeTokenPool{
+		client:     e.evmClient,
+		instance:   pool,
+		EthAddress: addr,
+	}, err
 }
 
 func (e *CCIPContractsDeployer) DeployNativeTokenPoolContract(linkAddr string) (
@@ -86,10 +110,26 @@ func (e *CCIPContractsDeployer) DeployAFNContract() (*AFN, error) {
 	) (common.Address, *types.Transaction, interface{}, error) {
 		return mock_afn_contract.DeployMockAFNContract(auth, backend)
 	})
+
 	return &AFN{
 		client:     e.evmClient,
 		instance:   instance.(*mock_afn_contract.MockAFNContract),
 		EthAddress: *address,
+	}, err
+}
+
+func (e *CCIPContractsDeployer) NewAFNContract(addr common.Address) (*AFN, error) {
+	afn, err := mock_afn_contract.NewMockAFNContract(addr, e.evmClient.Client)
+	log.Info().
+		Str("Contract Address", addr.Hex()).
+		Str("Contract Name", "Mock AFN Contract").
+		Str("From", e.evmClient.GetDefaultWallet().Address()).
+		Str("Network Name", e.evmClient.GetNetworkConfig().Name).
+		Msg("New contract")
+	return &AFN{
+		client:     e.evmClient,
+		instance:   afn,
+		EthAddress: addr,
 	}, err
 }
 
@@ -300,8 +340,26 @@ func (e *CCIPContractsDeployer) DeployGERouter(
 	}
 	return &GERouter{
 		client:     e.evmClient,
-		instance:   instance.(*ge_router.GERouter),
+		Instance:   instance.(*ge_router.GERouter),
 		EthAddress: *address,
+	}, err
+}
+
+func (e *CCIPContractsDeployer) NewGERouter(addr common.Address) (
+	*GERouter,
+	error,
+) {
+	r, err := ge_router.NewGERouter(addr, e.evmClient.Client)
+	log.Info().
+		Str("Contract Address", addr.Hex()).
+		Str("Contract Name", "GERouter").
+		Str("From", e.evmClient.GetDefaultWallet().Address()).
+		Str("Network Name", e.evmClient.GetNetworkConfig().Name).
+		Msg("New contract")
+	return &GERouter{
+		client:     e.evmClient,
+		Instance:   r,
+		EthAddress: addr,
 	}, err
 }
 
