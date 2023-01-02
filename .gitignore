@@ -63,6 +63,11 @@ tests-*.xml
 tmp-manifest-*.yaml
 ztarrepo.tar.gz
 
+# goreleaser builds
+cosign.*
+dist/
+MacOSX*
+
 cache
 core/services/ocr2/plugins/ccip/transactions.rlp
 lcov.info
