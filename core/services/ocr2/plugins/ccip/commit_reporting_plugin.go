@@ -236,6 +236,11 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, timestamp types
 		}
 		min := seqNrs[0]
 		max := seqNrs[len(seqNrs)-1]
+		if min != nextMin {
+			// Still report the observation as even partial reports have value e.g. all nodes are
+			// missing a single, different log each, they would still be able to produce a valid report.
+			lggr.Warnf("Missing sequence number range [%d-%d] for onRamp %s", nextMin, min, onRamp.Hex())
+		}
 		if !contiguousReqs(lggr, min, max, seqNrs) {
 			return nil, errors.New("unexpected gap in seq nums")
 		}
@@ -398,12 +403,27 @@ func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context,
 	lggr := r.lggr.Named("ShouldAcceptFinalizedReport")
 	parsedReport, err := DecodeCommitReport(report)
 	if err != nil {
-		return false, nil
+		return false, err
 	}
 	// Note it's ok to leave the unstarted requests behind, since the
 	// 'Observe' is always based on the last reports onchain min seq num.
 	if r.isStaleReport(parsedReport) {
 		return false, nil
+	}
+	for i, onRamp := range parsedReport.OnRamps {
+		nextInflightMin, err := r.nextMinSeqNum(onRamp)
+		if err != nil {
+			return false, err
+		}
+		if nextInflightMin != parsedReport.Intervals[i].Min {
+			// There are sequence numbers missing between the commitStore/inflight txs and the proposed report.
+			// The report will fail onchain unless the inflight cache is in an incorrect state. A state like this
+			// could happen for various reasons, e.g. a reboot of the node emptying the caches, and should be self-healing.
+			// We do not submit a tx and wait for the protocol to self-heal by updating the caches or invalidating
+			// inflight caches over time.
+			r.lggr.Errorw("Next inflight min is not equal to the proposed min of the report", "nextInflightMin", nextInflightMin, "proposed min", parsedReport.Intervals[i].Min, "onRamp", onRamp.Hex())
+			return false, errors.New("Next inflight min is not equal to the proposed min of the report")
+		}
 	}
 	r.addToInflight(lggr, parsedReport)
 	lggr.Infow("Accepting finalized report", "rootOfRoots", hexutil.Encode(parsedReport.RootOfRoots[:]))
@@ -413,7 +433,7 @@ func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context,
 func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context, timestamp types.ReportTimestamp, report types.Report) (bool, error) {
 	parsedReport, err := DecodeCommitReport(report)
 	if err != nil {
-		return false, nil
+		return false, err
 	}
 	// If report is not stale we transmit.
 	// When the commitTransmitter enqueues the tx for bptxm,
