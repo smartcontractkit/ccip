@@ -151,6 +151,10 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 		return nil, errors.Errorf("unrecognized onramp, is %v the correct onramp address?", onRampAddr)
 	}
 	// Subscribe to all relevant commit logs.
+	_, err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{eventSignatures.SendRequested}, Addresses: []common.Address{onRampAddr}})
+	if err != nil {
+		return nil, err
+	}
 	_, err = destChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{ReportAccepted}, Addresses: []common.Address{verifier.Address()}})
 	if err != nil {
 		return nil, err
