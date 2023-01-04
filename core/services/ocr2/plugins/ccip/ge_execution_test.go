@@ -18,27 +18,25 @@ func TestOverheadGasGE(t *testing.T) {
 	// And only the length is used so the contents doesn't matter.
 	tests := []test{
 		{
-			merkleGasShare: 0,
 			geMsg: evm_2_evm_ge_onramp.GEEVM2EVMGEMessage{
 				Data:             []byte{},
 				TokensAndAmounts: []evm_2_evm_ge_onramp.CommonEVMTokenAndAmount{},
 			},
-			want: 63260,
+			want: 27760,
 		},
 		{
-			merkleGasShare: 4_000,
 			geMsg: evm_2_evm_ge_onramp.GEEVM2EVMGEMessage{
 				Data: []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 				TokensAndAmounts: []evm_2_evm_ge_onramp.CommonEVMTokenAndAmount{
 					{},
 				},
 			},
-			want: 110788,
+			want: 71288,
 		},
 	}
 
 	for _, tc := range tests {
-		got := overheadGasGE(tc.merkleGasShare, tc.geMsg)
+		got := overheadGasGE(tc.geMsg)
 		if !reflect.DeepEqual(tc.want, got) {
 			t.Fatalf("expected: %v, got: %v", tc.want, got)
 		}
@@ -61,7 +59,7 @@ func TestMaxGasOverHeadGasGE(t *testing.T) {
 				Data:             []byte{},
 				TokensAndAmounts: []evm_2_evm_ge_onramp.CommonEVMTokenAndAmount{},
 			},
-			want: 67356,
+			want: 37772,
 		},
 		{
 			numMsgs: 3,
@@ -71,7 +69,7 @@ func TestMaxGasOverHeadGasGE(t *testing.T) {
 					{},
 				},
 			},
-			want: 110372,
+			want: 86705,
 		},
 	}
 

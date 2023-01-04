@@ -39,7 +39,7 @@ const (
 )
 
 // Offchain: we compute the max overhead gas to determine msg executability.
-func overheadGasGE(merkleGasShare uint64, geMsg evm_2_evm_ge_onramp.GEEVM2EVMGEMessage) uint64 {
+func overheadGasGE(geMsg evm_2_evm_ge_onramp.GEEVM2EVMGEMessage) uint64 {
 	messageBytes := GE_CONSTANT_MESSAGE_PART_BYTES +
 		(EVM_ADDRESS_LENGTH_BYTES+EVM_WORD_BYTES)*len(geMsg.TokensAndAmounts) + // token address (address) + token amount (uint256)
 		len(geMsg.Data)
@@ -53,10 +53,8 @@ func overheadGasGE(merkleGasShare uint64, geMsg evm_2_evm_ge_onramp.GEEVM2EVMGEM
 	}
 
 	return messageCallDataGas +
-		merkleGasShare +
 		GE_EXECUTION_STATE_PROCESSING_OVERHEAD_GAS +
-		// TODO: can be reduced if fee token is only sent once per batch
-		PER_TOKEN_OVERHEAD_GAS*uint64(len(geMsg.TokensAndAmounts)+1) + // All tokens plus fee token
+		PER_TOKEN_OVERHEAD_GAS*uint64(len(geMsg.TokensAndAmounts)) +
 		rateLimiterOverhead +
 		EXTERNAL_CALL_OVERHEAD_GAS
 }
@@ -64,8 +62,9 @@ func overheadGasGE(merkleGasShare uint64, geMsg evm_2_evm_ge_onramp.GEEVM2EVMGEM
 func maxGasOverHeadGasGE(numMsgs int, geMsg evm_2_evm_ge_onramp.GEEVM2EVMGEMessage) uint64 {
 	merkleProofBytes := (math.Ceil(math.Log2(float64(numMsgs)))+2)*32 + (1+2)*32 // only ever one outer root hash
 	merkleGasShare := uint64(merkleProofBytes * CALLDATA_GAS_PER_BYTE)
+	gasFeeShare := uint64(PER_TOKEN_OVERHEAD_GAS / numMsgs)
 
-	return overheadGasGE(merkleGasShare, geMsg)
+	return overheadGasGE(geMsg) + merkleGasShare + gasFeeShare
 }
 
 func NewGEBatchBuilder(lggr logger.Logger, eventSignatures EventSignatures, ramp *evm_2_evm_ge_offramp.EVM2EVMGEOffRamp) *GEBatchBuilder {
