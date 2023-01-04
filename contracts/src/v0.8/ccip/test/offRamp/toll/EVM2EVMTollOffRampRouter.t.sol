@@ -11,7 +11,7 @@ contract EVM2EVMTollOffRampRouterSetup is BaseTest {
   event MessageReceived();
 
   Any2EVMTollOffRampRouter internal s_router;
-  BaseOffRampInterface[] internal s_offRamps;
+  IBaseOffRamp[] internal s_offRamps;
 
   function setUp() public virtual override {
     BaseTest.setUp();
@@ -49,10 +49,10 @@ contract EVM2EVMTollOffRampRouter_constructor is EVM2EVMTollOffRampRouterSetup {
     assertEq(OWNER, s_router.owner());
 
     // router config
-    BaseOffRampInterface[] memory configuredOffRamps = s_router.getOffRamps();
+    IBaseOffRamp[] memory configuredOffRamps = s_router.getOffRamps();
     assertEq(s_offRamps.length, configuredOffRamps.length);
     for (uint256 i = 0; i < s_offRamps.length; ++i) {
-      BaseOffRampInterface testOffRamp = s_offRamps[i];
+      IBaseOffRamp testOffRamp = s_offRamps[i];
       assertEq(address(testOffRamp), address(configuredOffRamps[i]));
       assertTrue(s_router.isOffRamp(testOffRamp));
     }
@@ -62,7 +62,7 @@ contract EVM2EVMTollOffRampRouter_constructor is EVM2EVMTollOffRampRouterSetup {
 /// @notice #routeMessage
 contract EVM2EVMTollOffRampRouter_routeMessage is EVM2EVMTollOffRampRouterSetup {
   MaybeRevertMessageReceiver internal s_revertingReceiver;
-  Any2EVMMessageReceiverInterface internal s_receiver;
+  IAny2EVMMessageReceiver internal s_receiver;
 
   function setUp() public virtual override {
     EVM2EVMTollOffRampRouterSetup.setUp();
@@ -99,9 +99,7 @@ contract EVM2EVMTollOffRampRouter_routeMessage is EVM2EVMTollOffRampRouterSetup 
 
   function testMustCallFromOffRampReverts() public {
     Internal.Any2EVMMessageFromSender memory message = _generateMockMessage(STRANGER);
-    vm.expectRevert(
-      abi.encodeWithSelector(Any2EVMOffRampRouterInterface.MustCallFromOffRamp.selector, BaseOffRampInterface(OWNER))
-    );
+    vm.expectRevert(abi.encodeWithSelector(IAny2EVMOffRampRouter.MustCallFromOffRamp.selector, IBaseOffRamp(OWNER)));
     s_router.routeMessage(message, false);
   }
 

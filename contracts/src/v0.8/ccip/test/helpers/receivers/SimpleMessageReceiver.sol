@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../../interfaces/applications/Any2EVMMessageReceiverInterface.sol";
+import "../../../interfaces/applications/IAny2EVMMessageReceiver.sol";
 
-contract SimpleMessageReceiver is Any2EVMMessageReceiverInterface {
+contract SimpleMessageReceiver is IAny2EVMMessageReceiver {
   event MessageReceived();
 
   address private immutable i_manager;

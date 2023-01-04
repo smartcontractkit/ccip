@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../interfaces/CommitStoreInterface.sol";
-import "../interfaces/offRamp/BaseOffRampInterface.sol";
-import "../interfaces/onRamp/BaseOnRampInterface.sol";
-import "../interfaces/rateLimiter/AggregateRateLimiterInterface.sol";
+import "../interfaces/ICommitStore.sol";
+import "../interfaces/offRamp/IBaseOffRamp.sol";
+import "../interfaces/onRamp/IBaseOnRamp.sol";
+import "../interfaces/rateLimiter/IAggregateRateLimiter.sol";
 
 contract StructFactory {
   // addresses
@@ -68,9 +68,9 @@ contract StructFactory {
   uint32 internal constant PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS = 500;
   uint64 internal constant MAX_GAS_LIMIT = 4_000_000;
 
-  function offRampConfig() internal pure returns (BaseOffRampInterface.OffRampConfig memory) {
+  function offRampConfig() internal pure returns (IBaseOffRamp.OffRampConfig memory) {
     return
-      BaseOffRampInterface.OffRampConfig({
+      IBaseOffRamp.OffRampConfig({
         executionDelaySeconds: EXECUTION_DELAY_SECONDS,
         maxDataSize: MAX_DATA_SIZE,
         maxTokensLength: MAX_TOKENS_LENGTH,
@@ -81,9 +81,9 @@ contract StructFactory {
   // onRamp
   uint64 internal constant COMMIT_FEE_JUELS = 1e18;
 
-  function onRampConfig() internal pure returns (BaseOnRampInterface.OnRampConfig memory) {
+  function onRampConfig() internal pure returns (IBaseOnRamp.OnRampConfig memory) {
     return
-      BaseOnRampInterface.OnRampConfig({
+      IBaseOnRamp.OnRampConfig({
         commitFeeJuels: COMMIT_FEE_JUELS,
         maxDataSize: MAX_DATA_SIZE,
         maxTokensLength: MAX_TOKENS_LENGTH,
@@ -92,7 +92,7 @@ contract StructFactory {
   }
 
   // commitStore
-  function commitStoreConfig() internal pure returns (CommitStoreInterface.CommitStoreConfig memory) {
+  function commitStoreConfig() internal pure returns (ICommitStore.CommitStoreConfig memory) {
     address[] memory onRamps = new address[](3);
     onRamps[0] = ON_RAMP_ADDRESS;
     onRamps[1] = 0x2C44CDDdB6a900Fa2B585dd299E03D12Fa4293Bc;
@@ -101,14 +101,14 @@ contract StructFactory {
     minSequenceNumbers[0] = 1;
     minSequenceNumbers[1] = 1;
     minSequenceNumbers[2] = 1;
-    return CommitStoreInterface.CommitStoreConfig({onRamps: onRamps, minSeqNrByOnRamp: minSequenceNumbers});
+    return ICommitStore.CommitStoreConfig({onRamps: onRamps, minSeqNrByOnRamp: minSequenceNumbers});
   }
 
   // Rate limiter
   address constant TOKEN_LIMIT_ADMIN = 0x11118e64e1FB0c487f25dD6D3601FF6aF8d32E4e;
 
-  function rateLimiterConfig() internal pure returns (AggregateRateLimiterInterface.RateLimiterConfig memory) {
-    return AggregateRateLimiterInterface.RateLimiterConfig({capacity: 100e28, rate: 1e15});
+  function rateLimiterConfig() internal pure returns (IAggregateRateLimiter.RateLimiterConfig memory) {
+    return IAggregateRateLimiter.RateLimiterConfig({capacity: 100e28, rate: 1e15});
   }
 
   function getTokenPrices() internal pure returns (uint256[] memory prices) {

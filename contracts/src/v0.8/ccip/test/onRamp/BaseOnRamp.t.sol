@@ -6,7 +6,7 @@ import "../../onRamp/BaseOnRamp.sol";
 
 contract BaseOnrampSetup is TokenSetup {
   event RouterSet(address router);
-  event OnRampConfigSet(BaseOnRampInterface.OnRampConfig config);
+  event OnRampConfigSet(IBaseOnRamp.OnRampConfig config);
 
   address[] public s_allowList;
 
@@ -63,7 +63,7 @@ contract BaseOnramp_getTokenPool is BaseOnrampSetup {
     assertEq(s_sourcePools[0], address(s_onRamp.getPoolBySourceToken(IERC20(s_sourceTokens[0]))));
     assertEq(s_sourcePools[1], address(s_onRamp.getPoolBySourceToken(IERC20(s_sourceTokens[1]))));
 
-    vm.expectRevert(abi.encodeWithSelector(BaseOnRampInterface.UnsupportedToken.selector, IERC20(s_destTokens[0])));
+    vm.expectRevert(abi.encodeWithSelector(IBaseOnRamp.UnsupportedToken.selector, IERC20(s_destTokens[0])));
     s_onRamp.getPoolBySourceToken(IERC20(s_destTokens[0]));
   }
 }
@@ -78,7 +78,7 @@ contract BaseOnramp_getPoolTokens is BaseOnrampSetup {
     assertEq(address(s_sourceTokens[1]), address(supportedTokens[1]));
     assertEq(s_sourceTokens.length, supportedTokens.length);
 
-    s_onRamp.removePool(IERC20(s_sourceTokens[0]), PoolInterface(s_sourcePools[0]));
+    s_onRamp.removePool(IERC20(s_sourceTokens[0]), IPool(s_sourcePools[0]));
 
     supportedTokens = s_onRamp.getPoolTokens();
 
@@ -129,7 +129,7 @@ contract BaseOnramp_getRouter is BaseOnrampSetup {
 contract BaseOnramp_setConfig is BaseOnrampSetup {
   // Success
   function testSuccess() public {
-    BaseOnRampInterface.OnRampConfig memory newConfig = BaseOnRampInterface.OnRampConfig({
+    IBaseOnRamp.OnRampConfig memory newConfig = IBaseOnRamp.OnRampConfig({
       commitFeeJuels: 2400,
       maxDataSize: 400,
       maxTokensLength: 14,

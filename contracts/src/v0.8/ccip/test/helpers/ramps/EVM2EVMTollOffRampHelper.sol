@@ -9,10 +9,10 @@ contract EVM2EVMTollOffRampHelper is EVM2EVMTollOffRamp {
     uint64 chainId,
     OffRampConfig memory offRampConfig,
     address onRampAddress,
-    CommitStoreInterface commitStore,
-    AFNInterface afn,
+    ICommitStore commitStore,
+    IAFN afn,
     IERC20[] memory sourceTokens,
-    PoolInterface[] memory pools,
+    IPool[] memory pools,
     RateLimiterConfig memory rateLimiterConfig,
     address tokenLimitsAdmin
   )

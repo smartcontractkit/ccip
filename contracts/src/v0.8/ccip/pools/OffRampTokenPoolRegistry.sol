@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {PoolInterface, IERC20} from "../interfaces/pools/PoolInterface.sol";
+import {IPool, IERC20} from "../interfaces/pools/IPool.sol";
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
 
 contract OffRampTokenPoolRegistry is OwnerIsCreator {
@@ -11,18 +11,18 @@ contract OffRampTokenPoolRegistry is OwnerIsCreator {
   error PoolDoesNotExist();
   error TokenPoolMismatch();
 
-  event PoolAdded(IERC20 token, PoolInterface pool);
-  event PoolRemoved(IERC20 token, PoolInterface pool);
+  event PoolAdded(IERC20 token, IPool pool);
+  event PoolRemoved(IERC20 token, IPool pool);
 
   struct PoolConfig {
-    PoolInterface pool;
+    IPool pool;
     uint96 listIndex;
   }
 
   // source token => token pool
   mapping(IERC20 => PoolConfig) private s_poolsBySourceToken;
   // dest token => token pool
-  mapping(IERC20 => PoolInterface) private s_poolsByDestToken;
+  mapping(IERC20 => IPool) private s_poolsByDestToken;
   // List of tokens
   IERC20[] private s_sourceTokenList;
 
@@ -33,7 +33,7 @@ contract OffRampTokenPoolRegistry is OwnerIsCreator {
    * `pools` destinations chain pools. When being deployed as an inheriting OnRamp, `tokens` and `pools`
    * should both be source chain.
    */
-  constructor(IERC20[] memory tokens, PoolInterface[] memory pools) {
+  constructor(IERC20[] memory tokens, IPool[] memory pools) {
     if (tokens.length != pools.length) revert InvalidTokenPoolConfig();
 
     // Set new tokens and pools
@@ -45,7 +45,7 @@ contract OffRampTokenPoolRegistry is OwnerIsCreator {
     }
   }
 
-  function addPool(IERC20 token, PoolInterface pool) public onlyOwner {
+  function addPool(IERC20 token, IPool pool) public onlyOwner {
     if (address(token) == address(0) || address(pool) == address(0)) revert InvalidTokenPoolConfig();
     PoolConfig memory config = s_poolsBySourceToken[token];
     // Check if the pool is already set
@@ -63,7 +63,7 @@ contract OffRampTokenPoolRegistry is OwnerIsCreator {
     emit PoolAdded(token, pool);
   }
 
-  function removePool(IERC20 token, PoolInterface pool) public onlyOwner {
+  function removePool(IERC20 token, IPool pool) public onlyOwner {
     // Check that there are any pools to remove
     uint256 listLength = s_sourceTokenList.length;
     if (listLength == 0) revert NoPools();
@@ -96,7 +96,7 @@ contract OffRampTokenPoolRegistry is OwnerIsCreator {
    * @param sourceToken token
    * @return Token Pool
    */
-  function getPoolBySourceToken(IERC20 sourceToken) public view returns (PoolInterface) {
+  function getPoolBySourceToken(IERC20 sourceToken) public view returns (IPool) {
     return s_poolsBySourceToken[sourceToken].pool;
   }
 
@@ -105,7 +105,7 @@ contract OffRampTokenPoolRegistry is OwnerIsCreator {
    * @param destToken token
    * @return Token Pool
    */
-  function getPoolByDestToken(IERC20 destToken) public view returns (PoolInterface) {
+  function getPoolByDestToken(IERC20 destToken) public view returns (IPool) {
     return s_poolsByDestToken[destToken];
   }
 
@@ -123,7 +123,7 @@ contract OffRampTokenPoolRegistry is OwnerIsCreator {
    * @return the destination token
    */
   function getDestinationToken(IERC20 sourceToken) public view returns (IERC20) {
-    PoolInterface pool = s_poolsBySourceToken[sourceToken].pool;
+    IPool pool = s_poolsBySourceToken[sourceToken].pool;
     if (address(pool) == address(0)) revert PoolDoesNotExist();
     return s_poolsBySourceToken[sourceToken].pool.getToken();
   }

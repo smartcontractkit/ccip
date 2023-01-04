@@ -2,9 +2,9 @@
 pragma solidity 0.8.15;
 
 import "../../TokenSetup.t.sol";
-import {EVM2EVMGEOnRampInterface} from "../../../interfaces/onRamp/EVM2EVMGEOnRampInterface.sol";
+import {IEVM2EVMGEOnRamp} from "../../../interfaces/onRamp/IEVM2EVMGEOnRamp.sol";
 import {EVM2EVMGEOnRamp} from "../../../onRamp/ge/EVM2EVMGEOnRamp.sol";
-import {GasFeeCache, GasFeeCacheInterface} from "../../../gasFeeCache/GasFeeCache.sol";
+import {GasFeeCache, IGasFeeCache} from "../../../gasFeeCache/GasFeeCache.sol";
 import {GERouter} from "../../../router/GERouter.sol";
 import {GESRouterSetup} from "../../router/GERouterSetup.t.sol";
 import {GE} from "../../../models/GE.sol";
@@ -12,7 +12,7 @@ import {GEConsumer} from "../../../models/GEConsumer.sol";
 import "../../../offRamp/ge/EVM2EVMGEOffRamp.sol";
 
 contract EVM2EVMGEOnRampSetup is TokenSetup, GESRouterSetup {
-  // Duplicate event of the CCIPSendRequested in the GEOnRampInterface
+  // Duplicate event of the CCIPSendRequested in the IGEOnRamp
   event CCIPSendRequested(GE.EVM2EVMGEMessage message);
 
   uint256 internal immutable i_tokenAmount0 = 9;
@@ -31,7 +31,7 @@ contract EVM2EVMGEOnRampSetup is TokenSetup, GESRouterSetup {
     GE.FeeUpdate[] memory fees = new GE.FeeUpdate[](1);
     fees[0] = GE.FeeUpdate({chainId: DEST_CHAIN_ID, linkPerUnitGas: 100});
     address[] memory feeUpdaters = new address[](0);
-    GasFeeCacheInterface gasFeeCache = new GasFeeCache(fees, feeUpdaters, uint128(TWELVE_HOURS));
+    IGasFeeCache gasFeeCache = new GasFeeCache(fees, feeUpdaters, uint128(TWELVE_HOURS));
 
     s_onRamp = new EVM2EVMGEOnRamp(
       SOURCE_CHAIN_ID,
@@ -116,10 +116,10 @@ contract EVM2EVMGEOnRampSetup is TokenSetup, GESRouterSetup {
   function gasFeeCacheConfig(address gasFeeCacheAddress)
     internal
     view
-    returns (EVM2EVMGEOnRampInterface.DynamicFeeConfig memory feeConfig)
+    returns (IEVM2EVMGEOnRamp.DynamicFeeConfig memory feeConfig)
   {
     return
-      EVM2EVMGEOnRampInterface.DynamicFeeConfig({
+      IEVM2EVMGEOnRamp.DynamicFeeConfig({
         feeToken: s_sourceTokens[0],
         feeAmount: 1,
         destGasOverhead: 1,

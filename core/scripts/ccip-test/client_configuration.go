@@ -55,7 +55,7 @@ func (client *CCIPClient) wip(t *testing.T, sourceClient *rhea.EvmDeploymentConf
 }
 
 func (client *CCIPClient) setOnRampFeeConfig(t *testing.T) {
-	tx, err := client.Source.OnRamp.SetFeeConfig(client.Source.Owner, evm_2_evm_ge_onramp.EVM2EVMGEOnRampInterfaceDynamicFeeConfig{
+	tx, err := client.Source.OnRamp.SetFeeConfig(client.Source.Owner, evm_2_evm_ge_onramp.IEVM2EVMGEOnRampDynamicFeeConfig{
 		FeeToken:        client.Source.LinkTokenAddress,
 		FeeAmount:       big.NewInt(100),
 		DestGasOverhead: big.NewInt(0),
@@ -68,14 +68,14 @@ func (client *CCIPClient) setOnRampFeeConfig(t *testing.T) {
 }
 
 func (client *CCIPClient) setRateLimiterConfig(t *testing.T) {
-	tx, err := client.Source.OnRamp.SetRateLimiterConfig(client.Source.Owner, evm_2_evm_ge_onramp.AggregateRateLimiterInterfaceRateLimiterConfig{
+	tx, err := client.Source.OnRamp.SetRateLimiterConfig(client.Source.Owner, evm_2_evm_ge_onramp.IAggregateRateLimiterRateLimiterConfig{
 		Rate:     new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
 		Capacity: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 	})
 	require.NoError(t, err)
 	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 
-	tx, err = client.Dest.OffRamp.SetRateLimiterConfig(client.Dest.Owner, evm_2_evm_ge_offramp.AggregateRateLimiterInterfaceRateLimiterConfig{
+	tx, err = client.Dest.OffRamp.SetRateLimiterConfig(client.Dest.Owner, evm_2_evm_ge_offramp.IAggregateRateLimiterRateLimiterConfig{
 		Rate:     new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
 		Capacity: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 	})
@@ -694,7 +694,7 @@ func (client *CCIPClient) ScalingAndBatching(t *testing.T) {
 //}
 
 func (client *CCIPClient) SetCommitStoreConfig(t *testing.T) {
-	config := commit_store.CommitStoreInterfaceCommitStoreConfig{
+	config := commit_store.ICommitStoreCommitStoreConfig{
 		OnRamps:          []common.Address{client.Source.OnRamp.Address()},
 		MinSeqNrByOnRamp: []uint64{3},
 	}

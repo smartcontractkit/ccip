@@ -1,24 +1,24 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../interfaces/CommitStoreInterface.sol";
+import "../../interfaces/ICommitStore.sol";
 
-contract MockCommitStore is CommitStoreInterface {
-  /// @inheritdoc CommitStoreInterface
+contract MockCommitStore is ICommitStore {
+  /// @inheritdoc ICommitStore
   function getConfig() external pure returns (CommitStoreConfig memory) {
     CommitStoreConfig memory config;
     return config;
   }
 
-  /// @inheritdoc CommitStoreInterface
+  /// @inheritdoc ICommitStore
   function setConfig(CommitStoreConfig calldata config) external {}
 
-  /// @inheritdoc CommitStoreInterface
+  /// @inheritdoc ICommitStore
   function getExpectedNextSequenceNumber(address) external pure returns (uint64) {
     return 1;
   }
 
-  /// @inheritdoc CommitStoreInterface
+  /// @inheritdoc ICommitStore
   function verify(
     bytes32[] calldata,
     bytes32[] calldata,
@@ -29,7 +29,7 @@ contract MockCommitStore is CommitStoreInterface {
     return 1;
   }
 
-  /// @inheritdoc CommitStoreInterface
+  /// @inheritdoc ICommitStore
   function merkleRoot(
     bytes32[] memory leaves,
     bytes32[] memory,
@@ -38,7 +38,7 @@ contract MockCommitStore is CommitStoreInterface {
     return leaves[0];
   }
 
-  /// @inheritdoc CommitStoreInterface
+  /// @inheritdoc ICommitStore
   function getMerkleRoot(bytes32) external pure returns (uint256) {
     return 1;
   }

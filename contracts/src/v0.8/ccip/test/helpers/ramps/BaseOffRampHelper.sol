@@ -7,10 +7,10 @@ contract BaseOffRampHelper is BaseOffRamp {
     uint64 sourceChainId,
     uint64 chainId,
     address onRampAddress,
-    CommitStoreInterface commitStore,
-    AFNInterface afn,
+    ICommitStore commitStore,
+    IAFN afn,
     IERC20[] memory sourceTokens,
-    PoolInterface[] memory pools,
+    IPool[] memory pools,
     RateLimiterConfig memory rateLimiterConfig,
     address tokenLimitsAdmin
   )
@@ -32,7 +32,7 @@ contract BaseOffRampHelper is BaseOffRamp {
   }
 
   function releaseOrMintToken(
-    PoolInterface pool,
+    IPool pool,
     uint256 amount,
     address receiver
   ) external {
@@ -57,7 +57,7 @@ contract BaseOffRampHelper is BaseOffRamp {
     return _verifyMessages(hashedLeaves, innerProofs, innerProofFlagBits, outerProofs, outerProofFlagBits);
   }
 
-  function getPool_helper(IERC20 token) external view returns (PoolInterface pool) {
+  function getPool_helper(IERC20 token) external view returns (IPool pool) {
     return _getPool(token);
   }
 }

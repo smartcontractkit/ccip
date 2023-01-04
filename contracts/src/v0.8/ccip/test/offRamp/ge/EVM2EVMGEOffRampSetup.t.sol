@@ -3,18 +3,18 @@ pragma solidity 0.8.15;
 
 import "../../TokenSetup.t.sol";
 import {GasFeeCacheSetup} from "../../gasFeeCache/GasFeeCache.t.sol";
-import {MockCommitStore, CommitStoreInterface} from "../../mocks/MockCommitStore.sol";
-import {SimpleMessageReceiver, Any2EVMMessageReceiverInterface} from "../../helpers/receivers/SimpleMessageReceiver.sol";
-import {EVM2EVMGEOffRampInterface} from "../../../interfaces/offRamp/EVM2EVMGEOffRampInterface.sol";
+import {MockCommitStore, ICommitStore} from "../../mocks/MockCommitStore.sol";
+import {SimpleMessageReceiver, IAny2EVMMessageReceiver} from "../../helpers/receivers/SimpleMessageReceiver.sol";
+import {IEVM2EVMGEOffRamp} from "../../../interfaces/offRamp/IEVM2EVMGEOffRamp.sol";
 import {GE} from "../../../models/GE.sol";
 import {Common} from "../../../models/Common.sol";
-import {GasFeeCacheInterface} from "../../../gasFeeCache/GasFeeCache.sol";
+import {IGasFeeCache} from "../../../gasFeeCache/GasFeeCache.sol";
 import {EVM2EVMGEOffRampHelper} from "../../helpers/ramps/EVM2EVMGEOffRampHelper.sol";
 
 contract EVM2EVMGEOffRampSetup is TokenSetup, GasFeeCacheSetup {
-  CommitStoreInterface internal s_mockCommitStore;
-  Any2EVMMessageReceiverInterface internal s_receiver;
-  Any2EVMMessageReceiverInterface internal s_secondary_receiver;
+  ICommitStore internal s_mockCommitStore;
+  IAny2EVMMessageReceiver internal s_receiver;
+  IAny2EVMMessageReceiver internal s_secondary_receiver;
 
   EVM2EVMGEOffRampHelper internal s_offRamp;
 
@@ -38,7 +38,7 @@ contract EVM2EVMGEOffRampSetup is TokenSetup, GasFeeCacheSetup {
     deployOffRamp(s_mockCommitStore, s_gasFeeCache);
   }
 
-  function deployOffRamp(CommitStoreInterface commitStore, GasFeeCacheInterface gasFeeCache) internal {
+  function deployOffRamp(ICommitStore commitStore, IGasFeeCache gasFeeCache) internal {
     s_offRamp = new EVM2EVMGEOffRampHelper(
       SOURCE_CHAIN_ID,
       DEST_CHAIN_ID,
@@ -56,17 +56,17 @@ contract EVM2EVMGEOffRampSetup is TokenSetup, GasFeeCacheSetup {
     s_offRamp.setPrices(getCastedDestinationTokens(), getTokenPrices());
     s_gasFeeCache.setFeeUpdater(address(s_offRamp));
 
-    NativeTokenPool(address(s_destPools[0])).setOffRamp(BaseOffRampInterface(address(s_offRamp)), true);
-    NativeTokenPool(address(s_destPools[1])).setOffRamp(BaseOffRampInterface(address(s_offRamp)), true);
+    NativeTokenPool(address(s_destPools[0])).setOffRamp(IBaseOffRamp(address(s_offRamp)), true);
+    NativeTokenPool(address(s_destPools[1])).setOffRamp(IBaseOffRamp(address(s_offRamp)), true);
   }
 
-  function _generateGEOffRampConfig(GasFeeCacheInterface gasFeeCache)
+  function _generateGEOffRampConfig(IGasFeeCache gasFeeCache)
     public
     pure
-    returns (EVM2EVMGEOffRampInterface.GEOffRampConfig memory)
+    returns (IEVM2EVMGEOffRamp.GEOffRampConfig memory)
   {
     return
-      EVM2EVMGEOffRampInterface.GEOffRampConfig({
+      IEVM2EVMGEOffRamp.GEOffRampConfig({
         gasOverhead: 5e5,
         gasFeeCache: gasFeeCache,
         executionDelaySeconds: EXECUTION_DELAY_SECONDS,
@@ -86,7 +86,7 @@ contract EVM2EVMGEOffRampSetup is TokenSetup, GasFeeCacheSetup {
     address[] memory destPools = new address[](numberOfTokens);
 
     for (uint256 i = 0; i < numberOfTokens; ++i) {
-      PoolInterface pool = s_offRamp.getPoolBySourceToken(IERC20(original.tokensAndAmounts[i].token));
+      IPool pool = s_offRamp.getPoolBySourceToken(IERC20(original.tokensAndAmounts[i].token));
       destPools[i] = address(pool);
       destTokensAndAmounts[i].token = address(pool.getToken());
       destTokensAndAmounts[i].amount = original.tokensAndAmounts[i].amount;

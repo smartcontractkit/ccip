@@ -2,16 +2,16 @@
 pragma solidity 0.8.15;
 
 import {TypeAndVersionInterface} from "../../../interfaces/TypeAndVersionInterface.sol";
-import {BaseOffRampInterface} from "../../interfaces/offRamp/BaseOffRampInterface.sol";
-import {CommitStoreInterface} from "../../interfaces/CommitStoreInterface.sol";
+import {IBaseOffRamp} from "../../interfaces/offRamp/IBaseOffRamp.sol";
+import {ICommitStore} from "../../interfaces/ICommitStore.sol";
 import {OCR2Base} from "../../ocr/OCR2Base.sol";
 import {BaseOffRamp} from "../BaseOffRamp.sol";
 import {Toll} from "../../models/Toll.sol";
 import {Internal} from "../../models/Internal.sol";
 import {Common} from "../../models/Common.sol";
 import {IERC20} from "../../../vendor/IERC20.sol";
-import {AFNInterface} from "../../interfaces/health/AFNInterface.sol";
-import {PoolInterface} from "../../interfaces/pools/PoolInterface.sol";
+import {IAFN} from "../../interfaces/health/IAFN.sol";
+import {IPool} from "../../interfaces/pools/IPool.sol";
 
 /**
  * @notice EVM2EVMTollOffRamp enables OCR networks to execute multiple messages
@@ -55,10 +55,10 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
     uint64 chainId,
     OffRampConfig memory offRampConfig,
     address onRampAddress,
-    CommitStoreInterface commitStore,
-    AFNInterface afn,
+    ICommitStore commitStore,
+    IAFN afn,
     IERC20[] memory sourceTokens,
-    PoolInterface[] memory pools,
+    IPool[] memory pools,
     RateLimiterConfig memory rateLimiterConfig,
     address tokenLimitsAdmin
   )
@@ -202,7 +202,7 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
         feeTokenCharged = _computeFee(gasUsedByMerkle / decodedMessages.length, report, message);
         // Take the fee charged to this contract.
         // _releaseOrMintToken converts the message.feeTokenAndAmount to the proper destination token
-        PoolInterface feeTokenPool = _getPool(IERC20(message.feeTokenAndAmount.token));
+        IPool feeTokenPool = _getPool(IERC20(message.feeTokenAndAmount.token));
         _releaseOrMintToken(feeTokenPool, feeTokenCharged, address(this));
         // Forward the refund amount to the user so they know how much they were refunded.
         message.feeTokenAndAmount.amount -= feeTokenCharged;
@@ -244,7 +244,7 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
     address[] memory destPools = new address[](numberOfTokens);
 
     for (uint256 i = 0; i < numberOfTokens; ++i) {
-      PoolInterface pool = _getPool(IERC20(tokensAndAmounts[i].token));
+      IPool pool = _getPool(IERC20(tokensAndAmounts[i].token));
       destPools[i] = address(pool);
       destTokensAndAmounts[i] = Common.EVMTokenAndAmount({
         token: address(pool.getToken()),

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../interfaces/health/AFNInterface.sol";
+import "../../interfaces/health/IAFN.sol";
 
-contract MockAFN is AFNInterface {
+contract MockAFN is IAFN {
   bool public s_badSignal;
 
   function badSignalReceived() external view override returns (bool) {

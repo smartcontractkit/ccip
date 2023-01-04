@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {EVM2EVMTollOnRampInterface, BaseOnRampInterface} from "../interfaces/onRamp/EVM2EVMTollOnRampInterface.sol";
+import {IEVM2EVMTollOnRamp, IBaseOnRamp} from "../interfaces/onRamp/IEVM2EVMTollOnRamp.sol";
 import {SafeERC20, IERC20} from "../../vendor/SafeERC20.sol";
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
-import {PoolInterface} from "../interfaces/pools/PoolInterface.sol";
+import {IPool} from "../interfaces/pools/IPool.sol";
 import {Common} from "../models/Common.sol";
 
 contract PoolCollector is OwnerIsCreator {
@@ -22,13 +22,13 @@ contract PoolCollector is OwnerIsCreator {
    * @param feeTokenAmount the amount of feeToken that is available
    */
   function _chargeFee(
-    EVM2EVMTollOnRampInterface onRamp,
+    IEVM2EVMTollOnRamp onRamp,
     IERC20 feeToken,
     uint256 feeTokenAmount
   ) internal returns (uint256 fee) {
     // Ensure fee token is valid.
-    PoolInterface feeTokenPool = onRamp.getPoolBySourceToken(feeToken);
-    if (address(feeTokenPool) == address(0)) revert BaseOnRampInterface.UnsupportedToken(feeToken);
+    IPool feeTokenPool = onRamp.getPoolBySourceToken(feeToken);
+    if (address(feeTokenPool) == address(0)) revert IBaseOnRamp.UnsupportedToken(feeToken);
     fee = onRamp.getRequiredFee(feeToken);
     address sender = msg.sender;
     if (fee > 0) {
@@ -48,12 +48,12 @@ contract PoolCollector is OwnerIsCreator {
    * @param onRamp OnRamp to get the fee and pools from
    * @param tokensAndAmounts the tokensAndAmounts to be collected
    */
-  function _collectTokens(BaseOnRampInterface onRamp, Common.EVMTokenAndAmount[] memory tokensAndAmounts) internal {
+  function _collectTokens(IBaseOnRamp onRamp, Common.EVMTokenAndAmount[] memory tokensAndAmounts) internal {
     // Send the tokens to the pools
     for (uint256 i = 0; i < tokensAndAmounts.length; ++i) {
       IERC20 token = IERC20(tokensAndAmounts[i].token);
-      PoolInterface pool = onRamp.getPoolBySourceToken(token);
-      if (address(pool) == address(0)) revert BaseOnRampInterface.UnsupportedToken(token);
+      IPool pool = onRamp.getPoolBySourceToken(token);
+      if (address(pool) == address(0)) revert IBaseOnRamp.UnsupportedToken(token);
       token.safeTransferFrom(msg.sender, address(pool), tokensAndAmounts[i].amount);
     }
   }

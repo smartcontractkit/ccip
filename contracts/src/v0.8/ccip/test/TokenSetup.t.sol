@@ -21,7 +21,7 @@ contract TokenSetup is BaseTest {
   address internal s_sourceFeeToken;
   address internal s_destFeeToken;
 
-  PoolInterface internal s_destFeeTokenPool;
+  IPool internal s_destFeeTokenPool;
 
   uint256 internal constant TOKENS_PER_FEE_COIN = 2e20;
 
@@ -57,7 +57,7 @@ contract TokenSetup is BaseTest {
     }
 
     s_destFeeToken = s_destTokens[0];
-    s_destFeeTokenPool = PoolInterface(s_destPools[0]);
+    s_destFeeTokenPool = IPool(s_destPools[0]);
   }
 
   function getCastedSourceEVMTokenAndAmountsWithZeroAmounts()
@@ -92,13 +92,13 @@ contract TokenSetup is BaseTest {
     destTokens = abi.decode(abi.encode(s_destTokens), (IERC20[]));
   }
 
-  function getCastedSourcePools() internal view returns (PoolInterface[] memory sourcePools) {
-    // Convert address array into PoolInterface array in one line
-    sourcePools = abi.decode(abi.encode(s_sourcePools), (PoolInterface[]));
+  function getCastedSourcePools() internal view returns (IPool[] memory sourcePools) {
+    // Convert address array into IPool array in one line
+    sourcePools = abi.decode(abi.encode(s_sourcePools), (IPool[]));
   }
 
-  function getCastedDestinationPools() internal view returns (PoolInterface[] memory destPools) {
-    // Convert address array into PoolInterface array in one line
-    destPools = abi.decode(abi.encode(s_destPools), (PoolInterface[]));
+  function getCastedDestinationPools() internal view returns (IPool[] memory destPools) {
+    // Convert address array into IPool array in one line
+    destPools = abi.decode(abi.encode(s_destPools), (IPool[]));
   }
 }

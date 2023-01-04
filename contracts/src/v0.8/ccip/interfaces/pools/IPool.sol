@@ -5,7 +5,7 @@ import {IERC20} from "../../../vendor/IERC20.sol";
 
 // Shared public interface for multiple pool types.
 // Each pool type handles a different child token model (lock/unlock, mint/burn.)
-interface PoolInterface {
+interface IPool {
   error ExceedsTokenLimit(uint256 currentLimit, uint256 requested);
   error PermissionsError();
 

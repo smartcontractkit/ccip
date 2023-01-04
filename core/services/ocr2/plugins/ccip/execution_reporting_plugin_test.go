@@ -93,7 +93,7 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 		1338,       // dest chain id
 		1337,       // source chain id
 		afnAddress, // AFN address
-		commit_store_helper.CommitStoreInterfaceCommitStoreConfig{
+		commit_store_helper.ICommitStoreCommitStoreConfig{
 			OnRamps:          []common.Address{onRampAddress},
 			MinSeqNrByOnRamp: []uint64{1},
 		},
@@ -107,7 +107,7 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 		destChain,
 		sourceChainID,
 		destChainID,
-		evm_2_evm_toll_offramp.BaseOffRampInterfaceOffRampConfig{
+		evm_2_evm_toll_offramp.IBaseOffRampOffRampConfig{
 			ExecutionDelaySeconds: 0,
 			MaxDataSize:           1e12,
 			MaxTokensLength:       5,
@@ -117,7 +117,7 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 		afnAddress,
 		[]common.Address{linkTokenSourceAddress},
 		[]common.Address{destPoolAddress},
-		evm_2_evm_toll_offramp.AggregateRateLimiterInterfaceRateLimiterConfig{
+		evm_2_evm_toll_offramp.IAggregateRateLimiterRateLimiterConfig{
 			Capacity: big.NewInt(1e18),
 			Rate:     big.NewInt(1e18),
 		},

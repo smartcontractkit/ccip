@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-interface BaseOnRampRouterInterface {
+interface IBaseOnRampRouter {
   error UnsupportedDestinationChain(uint64 destinationChainId);
 
   /**

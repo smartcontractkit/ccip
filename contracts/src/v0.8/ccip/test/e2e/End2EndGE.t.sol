@@ -8,7 +8,7 @@ import "../offRamp/ge/EVM2EVMGEOffRampSetup.t.sol";
 contract E2E_GE is EVM2EVMGEOnRampSetup, CommitStoreSetup, EVM2EVMGEOffRampSetup {
   using GE for GE.EVM2EVMGEMessage;
 
-  Any2EVMOffRampRouterInterface public s_router;
+  IAny2EVMOffRampRouter public s_router;
 
   MerkleHelper public s_merkleHelper;
 
@@ -21,7 +21,7 @@ contract E2E_GE is EVM2EVMGEOnRampSetup, CommitStoreSetup, EVM2EVMGEOffRampSetup
 
     s_merkleHelper = new MerkleHelper();
 
-    BaseOffRampInterface[] memory offRamps = new BaseOffRampInterface[](1);
+    IBaseOffRamp[] memory offRamps = new IBaseOffRamp[](1);
     offRamps[0] = s_offRamp;
     s_router = new GERouter(offRamps);
     s_offRamp.setRouter(s_router);

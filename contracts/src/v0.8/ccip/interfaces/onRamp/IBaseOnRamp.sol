@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {AllowListInterface} from "../access/AllowListInterface.sol";
-import {PoolInterface, IERC20} from "../pools/PoolInterface.sol";
+import {IAllowList} from "../access/IAllowList.sol";
+import {IPool, IERC20} from "../pools/IPool.sol";
 
-interface BaseOnRampInterface is AllowListInterface {
+interface IBaseOnRamp is IAllowList {
   error MessageTooLarge(uint256 maxSize, uint256 actualSize);
   error MessageGasLimitTooHigh();
   error UnsupportedNumberOfTokens();
@@ -22,8 +22,8 @@ interface BaseOnRampInterface is AllowListInterface {
   event OnRampConfigSet(OnRampConfig config);
 
   // Token pools
-  event PoolAdded(IERC20 token, PoolInterface pool);
-  event PoolRemoved(IERC20 token, PoolInterface pool);
+  event PoolAdded(IERC20 token, IPool pool);
+  event PoolRemoved(IERC20 token, IPool pool);
 
   struct OnRampConfig {
     // Fee for sending message taken in this contract
@@ -37,16 +37,15 @@ interface BaseOnRampInterface is AllowListInterface {
   }
 
   struct PoolConfig {
-    PoolInterface pool;
+    IPool pool;
     bool enabled;
   }
 
   /**
    * @notice Get the pool for a specific token
    * @param sourceToken The source chain token to get the pool for
-   * @return pool PoolInterface
-   */
-  function getPoolBySourceToken(IERC20 sourceToken) external returns (PoolInterface);
+   * @return pool IPool    */
+  function getPoolBySourceToken(IERC20 sourceToken) external returns (IPool);
 
   /**
    * @notice Get all configured source tokens

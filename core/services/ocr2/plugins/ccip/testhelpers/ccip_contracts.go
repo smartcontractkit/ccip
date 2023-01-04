@@ -168,7 +168,7 @@ func (c *CCIPContracts) DeployNewTollOffRamp() {
 		c.Dest.Chain,
 		c.Source.ChainID,
 		c.Dest.ChainID,
-		evm_2_evm_toll_offramp.BaseOffRampInterfaceOffRampConfig{
+		evm_2_evm_toll_offramp.IBaseOffRampOffRampConfig{
 			ExecutionDelaySeconds:                   60,
 			MaxDataSize:                             1e5,
 			MaxTokensLength:                         15,
@@ -179,7 +179,7 @@ func (c *CCIPContracts) DeployNewTollOffRamp() {
 		c.Dest.AFN.Address(),
 		[]common.Address{c.Source.LinkToken.Address()},
 		[]common.Address{c.Dest.Pool.Address()},
-		evm_2_evm_toll_offramp.AggregateRateLimiterInterfaceRateLimiterConfig{
+		evm_2_evm_toll_offramp.IAggregateRateLimiterRateLimiterConfig{
 			Capacity: HundredLink,
 			Rate:     big.NewInt(1e18),
 		},
@@ -227,21 +227,21 @@ func (c *CCIPContracts) EnableTollOffRamp() {
 func (c *CCIPContracts) DeployNewTollOnRamp() {
 	c.t.Log("Deploying new toll onRamp")
 	onRampAddress, _, _, err := evm_2_evm_toll_onramp.DeployEVM2EVMTollOnRamp(
-		c.Source.User,    // user
-		c.Source.Chain,   // client
-		c.Source.ChainID, // source chain id
-		c.Dest.ChainID,   // destinationChainIds
+		c.Source.User,                                  // user
+		c.Source.Chain,                                 // client
+		c.Source.ChainID,                               // source chain id
+		c.Dest.ChainID,                                 // destinationChainIds
 		[]common.Address{c.Source.LinkToken.Address()}, // tokens
 		[]common.Address{c.Source.Pool.Address()},      // pools
 		[]common.Address{},                             // allow list
 		c.Source.AFN.Address(),                         // AFN
-		evm_2_evm_toll_onramp.BaseOnRampInterfaceOnRampConfig{
+		evm_2_evm_toll_onramp.IBaseOnRampOnRampConfig{
 			CommitFeeJuels:  0,
 			MaxDataSize:     1e12,
 			MaxTokensLength: 5,
 			MaxGasLimit:     ccip.GasLimitPerTx,
 		},
-		evm_2_evm_toll_onramp.AggregateRateLimiterInterfaceRateLimiterConfig{
+		evm_2_evm_toll_onramp.IAggregateRateLimiterRateLimiterConfig{
 			Capacity: HundredLink,
 			Rate:     big.NewInt(1e18),
 		},
@@ -253,7 +253,7 @@ func (c *CCIPContracts) DeployNewTollOnRamp() {
 	require.NoError(c.t, err)
 	c.Source.Chain.Commit()
 
-	_, err = c.Source.TollOnRamp.SetFeeConfig(c.Source.User, evm_2_evm_toll_onramp.EVM2EVMTollOnRampInterfaceFeeConfig{
+	_, err = c.Source.TollOnRamp.SetFeeConfig(c.Source.User, evm_2_evm_toll_onramp.IEVM2EVMTollOnRampFeeConfig{
 		Fees:      []*big.Int{big.NewInt(1)},
 		FeeTokens: []common.Address{c.Source.LinkToken.Address()},
 	})
@@ -506,13 +506,13 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		[]common.Address{sourcePoolAddress},      // pools
 		[]common.Address{},                       // allow list
 		afnSourceAddress,                         // AFN
-		evm_2_evm_toll_onramp.BaseOnRampInterfaceOnRampConfig{
+		evm_2_evm_toll_onramp.IBaseOnRampOnRampConfig{
 			CommitFeeJuels:  0,
 			MaxDataSize:     1e12,
 			MaxTokensLength: 5,
 			MaxGasLimit:     ccip.GasLimitPerTx,
 		},
-		evm_2_evm_toll_onramp.AggregateRateLimiterInterfaceRateLimiterConfig{
+		evm_2_evm_toll_onramp.IAggregateRateLimiterRateLimiterConfig{
 			Capacity: HundredLink,
 			Rate:     big.NewInt(1e18),
 		},
@@ -525,7 +525,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	tollOnRampFees := map[common.Address]*big.Int{
 		sourceLinkTokenAddress: big.NewInt(1), // 1 juel commit fee.
 	}
-	_, err = tollOnRamp.SetFeeConfig(sourceUser, evm_2_evm_toll_onramp.EVM2EVMTollOnRampInterfaceFeeConfig{
+	_, err = tollOnRamp.SetFeeConfig(sourceUser, evm_2_evm_toll_onramp.IEVM2EVMTollOnRampFeeConfig{
 		Fees:      []*big.Int{tollOnRampFees[sourceLinkTokenAddress]},
 		FeeTokens: []common.Address{sourceLinkTokenAddress},
 	})
@@ -558,19 +558,19 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		[]common.Address{sourcePoolAddress},      // pools
 		[]common.Address{},                       // allow list
 		afnSourceAddress,                         // AFN
-		evm_2_evm_ge_onramp.BaseOnRampInterfaceOnRampConfig{
+		evm_2_evm_ge_onramp.IBaseOnRampOnRampConfig{
 			CommitFeeJuels:  0,
 			MaxDataSize:     1e12,
 			MaxTokensLength: 5,
 			MaxGasLimit:     ccip.GasLimitPerTx,
 		},
-		evm_2_evm_ge_onramp.AggregateRateLimiterInterfaceRateLimiterConfig{
+		evm_2_evm_ge_onramp.IAggregateRateLimiterRateLimiterConfig{
 			Capacity: HundredLink,
 			Rate:     big.NewInt(1e18),
 		},
 		sourceUser.From,
 		sourceGERouterAddress,
-		evm_2_evm_ge_onramp.EVM2EVMGEOnRampInterfaceDynamicFeeConfig{
+		evm_2_evm_ge_onramp.IEVM2EVMGEOnRampDynamicFeeConfig{
 			FeeToken:        sourceLinkTokenAddress,
 			FeeAmount:       big.NewInt(0),
 			DestGasOverhead: big.NewInt(0),
@@ -607,7 +607,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		destChainID, // dest chain id
 		sourceChainID,
 		afnDestAddress, // AFN address
-		commit_store.CommitStoreInterfaceCommitStoreConfig{
+		commit_store.ICommitStoreCommitStoreConfig{
 			OnRamps:          []common.Address{tollOnRamp.Address(), geOnRamp.Address()},
 			MinSeqNrByOnRamp: []uint64{1, 1},
 		},
@@ -623,7 +623,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		destChain,
 		sourceChainID,
 		destChainID,
-		evm_2_evm_toll_offramp.BaseOffRampInterfaceOffRampConfig{
+		evm_2_evm_toll_offramp.IBaseOffRampOffRampConfig{
 			ExecutionDelaySeconds: 0,
 			MaxDataSize:           1e12,
 			MaxTokensLength:       5,
@@ -633,7 +633,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		afnDestAddress,
 		[]common.Address{sourceLinkTokenAddress},
 		[]common.Address{destPoolAddress},
-		evm_2_evm_toll_offramp.AggregateRateLimiterInterfaceRateLimiterConfig{
+		evm_2_evm_toll_offramp.IAggregateRateLimiterRateLimiterConfig{
 			Capacity: HundredLink,
 			Rate:     big.NewInt(1e18),
 		},
@@ -668,7 +668,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		destChain,
 		sourceChainID,
 		destChainID,
-		evm_2_evm_ge_offramp.EVM2EVMGEOffRampInterfaceGEOffRampConfig{
+		evm_2_evm_ge_offramp.IEVM2EVMGEOffRampGEOffRampConfig{
 			GasOverhead:                             big.NewInt(0),
 			GasFeeCache:                             destGasFeeCacheAddress,
 			PermissionLessExecutionThresholdSeconds: 1,
@@ -681,7 +681,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		afnDestAddress,
 		[]common.Address{sourceLinkTokenAddress},
 		[]common.Address{destPoolAddress},
-		evm_2_evm_ge_offramp.AggregateRateLimiterInterfaceRateLimiterConfig{
+		evm_2_evm_ge_offramp.IAggregateRateLimiterRateLimiterConfig{
 			Capacity: HundredLink,
 			Rate:     big.NewInt(1e18),
 		},

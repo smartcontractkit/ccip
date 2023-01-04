@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {AllowListInterface} from "../interfaces/access/AllowListInterface.sol";
+import {IAllowList} from "../interfaces/access/IAllowList.sol";
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
 
-contract AllowList is AllowListInterface, OwnerIsCreator {
+contract AllowList is IAllowList, OwnerIsCreator {
   // Whether the allowlist is enabled
   bool internal s_allowlistEnabled;
   // List of allowed addresses
@@ -22,18 +22,18 @@ contract AllowList is AllowListInterface, OwnerIsCreator {
     }
   }
 
-  /// @inheritdoc AllowListInterface
+  /// @inheritdoc IAllowList
   function setAllowlistEnabled(bool enabled) external onlyOwner {
     s_allowlistEnabled = enabled;
     emit AllowListEnabledSet(enabled);
   }
 
-  /// @inheritdoc AllowListInterface
+  /// @inheritdoc IAllowList
   function getAllowlistEnabled() external view returns (bool) {
     return s_allowlistEnabled;
   }
 
-  /// @inheritdoc AllowListInterface
+  /// @inheritdoc IAllowList
   function setAllowlist(address[] calldata allowlist) external onlyOwner {
     // Remove existing allowlist
     address[] memory existingList = s_allowList;
@@ -49,7 +49,7 @@ contract AllowList is AllowListInterface, OwnerIsCreator {
     emit AllowListSet(allowlist);
   }
 
-  /// @inheritdoc AllowListInterface
+  /// @inheritdoc IAllowList
   function getAllowlist() external view returns (address[] memory) {
     return s_allowList;
   }

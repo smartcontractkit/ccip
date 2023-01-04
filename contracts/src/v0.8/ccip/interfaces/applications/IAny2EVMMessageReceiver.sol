@@ -7,7 +7,7 @@ import {Common} from "../../models/Common.sol";
  * @notice Application contracts that intend to receive messages from
  * the OffRampRouter should implement this interface.
  */
-interface Any2EVMMessageReceiverInterface {
+interface IAny2EVMMessageReceiver {
   /**
    * @notice Called by the OffRampRouter to deliver a message
    * @param message CCIP Message

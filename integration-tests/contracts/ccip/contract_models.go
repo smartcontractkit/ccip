@@ -193,7 +193,7 @@ func (onRamp *TollOnRamp) SetFeeConfig(tokens []common.Address, fees []*big.Int)
 	log.Info().
 		Str("TollOnRamp", onRamp.Address()).
 		Msg("Setting Fee config TollOnRamp")
-	tx, err := onRamp.instance.SetFeeConfig(opts, evm_2_evm_toll_onramp.EVM2EVMTollOnRampInterfaceFeeConfig{
+	tx, err := onRamp.instance.SetFeeConfig(opts, evm_2_evm_toll_onramp.IEVM2EVMTollOnRampFeeConfig{
 		Fees:      fees,
 		FeeTokens: tokens,
 	})

@@ -1,24 +1,24 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../interfaces/offRamp/Any2EVMOffRampRouterInterface.sol";
+import "../../interfaces/offRamp/IAny2EVMOffRampRouter.sol";
 
-contract MockTollOffRampRouter is Any2EVMOffRampRouterInterface {
+contract MockTollOffRampRouter is IAny2EVMOffRampRouter {
   function routeMessage(Internal.Any2EVMMessageFromSender calldata message, bool manualExecution)
     external
     override
     returns (bool success)
   {}
 
-  function addOffRamp(BaseOffRampInterface) external {}
+  function addOffRamp(IBaseOffRamp) external {}
 
-  function removeOffRamp(BaseOffRampInterface) external {}
+  function removeOffRamp(IBaseOffRamp) external {}
 
-  function getOffRamps() external pure returns (BaseOffRampInterface[] memory) {
-    return new BaseOffRampInterface[](0);
+  function getOffRamps() external pure returns (IBaseOffRamp[] memory) {
+    return new IBaseOffRamp[](0);
   }
 
-  function isOffRamp(BaseOffRampInterface) external pure returns (bool allowed) {
+  function isOffRamp(IBaseOffRamp) external pure returns (bool allowed) {
     return true;
   }
 }

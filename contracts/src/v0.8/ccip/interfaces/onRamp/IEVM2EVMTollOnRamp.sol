@@ -2,11 +2,11 @@
 pragma solidity ^0.8.0;
 
 import {IERC20} from "../../../vendor/IERC20.sol";
-import {BaseOnRampInterface} from "./BaseOnRampInterface.sol";
+import {IBaseOnRamp} from "./IBaseOnRamp.sol";
 import {TollConsumer} from "../../models/TollConsumer.sol";
 import {Toll} from "../../models/Toll.sol";
 
-interface EVM2EVMTollOnRampInterface is BaseOnRampInterface {
+interface IEVM2EVMTollOnRamp is IBaseOnRamp {
   error InvalidFeeConfig();
   error InvalidExtraArgsTag(bytes4 expected, bytes4 got);
 

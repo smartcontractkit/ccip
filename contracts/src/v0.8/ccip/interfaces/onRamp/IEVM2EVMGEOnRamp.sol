@@ -4,9 +4,9 @@ pragma solidity ^0.8.0;
 import {Common} from "../../models/Common.sol";
 import {GE} from "../../models/GE.sol";
 import {GEConsumer} from "../../models/GEConsumer.sol";
-import {BaseOnRampInterface} from "./BaseOnRampInterface.sol";
+import {IBaseOnRamp} from "./IBaseOnRamp.sol";
 
-interface EVM2EVMGEOnRampInterface is BaseOnRampInterface {
+interface IEVM2EVMGEOnRamp is IBaseOnRamp {
   error MismatchedFeeToken(address expected, address got);
   error InvalidExtraArgsTag(bytes4 expected, bytes4 got);
 

@@ -2,8 +2,8 @@
 pragma solidity 0.8.15;
 
 import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
-import {Any2EVMMessageReceiverInterface} from "../interfaces/applications/Any2EVMMessageReceiverInterface.sol";
-import {Any2EVMOffRampRouterInterface} from "../interfaces/offRamp/Any2EVMOffRampRouterInterface.sol";
+import {IAny2EVMMessageReceiver} from "../interfaces/applications/IAny2EVMMessageReceiver.sol";
+import {IAny2EVMOffRampRouter} from "../interfaces/offRamp/IAny2EVMOffRampRouter.sol";
 import {GEConsumer} from "../models/GEConsumer.sol";
 import {Common} from "../models/Common.sol";
 import {IERC20} from "../../vendor/IERC20.sol";
@@ -11,22 +11,22 @@ import {IERC20} from "../../vendor/IERC20.sol";
 /**
  * @notice Application contract for receiving messages from the OffRamp on behalf of an EOA
  */
-contract ReceiverDapp is Any2EVMMessageReceiverInterface, TypeAndVersionInterface {
+contract ReceiverDapp is IAny2EVMMessageReceiver, TypeAndVersionInterface {
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "ReceiverDapp 1.0.0";
 
-  Any2EVMOffRampRouterInterface public s_router;
+  IAny2EVMOffRampRouter public s_router;
 
   address internal s_manager;
 
   error InvalidDeliverer(address deliverer);
 
-  constructor(Any2EVMOffRampRouterInterface router) {
+  constructor(IAny2EVMOffRampRouter router) {
     s_router = router;
     s_manager = msg.sender;
   }
 
-  function setRouter(Any2EVMOffRampRouterInterface router) public {
+  function setRouter(IAny2EVMOffRampRouter router) public {
     s_router = router;
   }
 

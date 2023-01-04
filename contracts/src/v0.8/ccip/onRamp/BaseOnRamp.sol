@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {HealthChecker, AFNInterface} from "../health/HealthChecker.sol";
+import {HealthChecker, IAFN} from "../health/HealthChecker.sol";
 import {IERC20} from "../pools/PoolCollector.sol";
 import {AllowList} from "../access/AllowList.sol";
 import {AggregateRateLimiter} from "../rateLimiter/AggregateRateLimiter.sol";
-import {BaseOnRampInterface, PoolInterface} from "../interfaces/onRamp/BaseOnRampInterface.sol";
+import {IBaseOnRamp, IPool} from "../interfaces/onRamp/IBaseOnRamp.sol";
 import {Common} from "../models/Common.sol";
 
-contract BaseOnRamp is BaseOnRampInterface, HealthChecker, AllowList, AggregateRateLimiter {
+contract BaseOnRamp is IBaseOnRamp, HealthChecker, AllowList, AggregateRateLimiter {
   // Chain ID of the source chain (where this contract is deployed)
   uint64 public immutable i_chainId;
   // Chain ID of the destination chain (where this contract sends messages)
@@ -32,9 +32,9 @@ contract BaseOnRamp is BaseOnRampInterface, HealthChecker, AllowList, AggregateR
     uint64 chainId,
     uint64 destinationChainId,
     IERC20[] memory tokens,
-    PoolInterface[] memory pools,
+    IPool[] memory pools,
     address[] memory allowlist,
-    AFNInterface afn,
+    IAFN afn,
     OnRampConfig memory config,
     RateLimiterConfig memory rateLimiterConfig,
     address tokenLimitsAdmin,
@@ -54,8 +54,8 @@ contract BaseOnRamp is BaseOnRampInterface, HealthChecker, AllowList, AggregateR
     }
   }
 
-  /// @inheritdoc BaseOnRampInterface
-  function getPoolBySourceToken(IERC20 sourceToken) public view override returns (PoolInterface) {
+  /// @inheritdoc IBaseOnRamp
+  function getPoolBySourceToken(IERC20 sourceToken) public view override returns (IPool) {
     PoolConfig memory poolConfig = s_poolsBySourceToken[sourceToken];
     if (poolConfig.enabled) {
       return s_poolsBySourceToken[sourceToken].pool;
@@ -63,34 +63,34 @@ contract BaseOnRamp is BaseOnRampInterface, HealthChecker, AllowList, AggregateR
     revert UnsupportedToken(sourceToken);
   }
 
-  /// @inheritdoc BaseOnRampInterface
+  /// @inheritdoc IBaseOnRamp
   function getExpectedNextSequenceNumber() external view returns (uint64) {
     return s_sequenceNumber + 1;
   }
 
-  /// @inheritdoc BaseOnRampInterface
+  /// @inheritdoc IBaseOnRamp
   function setRouter(address router) public onlyOwner {
     s_router = router;
     emit RouterSet(router);
   }
 
-  /// @inheritdoc BaseOnRampInterface
+  /// @inheritdoc IBaseOnRamp
   function getRouter() external view returns (address router) {
     return s_router;
   }
 
-  /// @inheritdoc BaseOnRampInterface
+  /// @inheritdoc IBaseOnRamp
   function setConfig(OnRampConfig calldata config) external onlyOwner {
     s_config = config;
     emit OnRampConfigSet(config);
   }
 
-  /// @inheritdoc BaseOnRampInterface
+  /// @inheritdoc IBaseOnRamp
   function getConfig() external view returns (OnRampConfig memory config) {
     return s_config;
   }
 
-  function addPool(IERC20 token, PoolInterface pool) public onlyOwner {
+  function addPool(IERC20 token, IPool pool) public onlyOwner {
     if (address(token) == address(0) || address(pool) == address(0)) revert InvalidTokenPoolConfig();
     if (s_poolsBySourceToken[token].enabled) revert PoolAlreadyAdded();
 
@@ -100,7 +100,7 @@ contract BaseOnRamp is BaseOnRampInterface, HealthChecker, AllowList, AggregateR
     emit PoolAdded(token, pool);
   }
 
-  function removePool(IERC20 token, PoolInterface pool) public onlyOwner {
+  function removePool(IERC20 token, IPool pool) public onlyOwner {
     PoolConfig memory oldConfig = s_poolsBySourceToken[token];
     // Check if the pool exists
     if (address(oldConfig.pool) == address(0)) revert PoolDoesNotExist(token);
@@ -166,7 +166,7 @@ contract BaseOnRamp is BaseOnRampInterface, HealthChecker, AllowList, AggregateR
     for (uint256 i = 0; i < tokenLength; ++i) {
       Common.EVMTokenAndAmount memory ta = tokensAndAmounts[i];
       IERC20 token = IERC20(ta.token);
-      PoolInterface pool = getPoolBySourceToken(token);
+      IPool pool = getPoolBySourceToken(token);
       if (address(pool) == address(0)) revert UnsupportedToken(token);
       pool.lockOrBurn(ta.amount);
     }

@@ -2,7 +2,7 @@
 pragma solidity 0.8.15;
 
 import "../../TokenSetup.t.sol";
-import "../../../interfaces/onRamp/EVM2EVMTollOnRampInterface.sol";
+import "../../../interfaces/onRamp/IEVM2EVMTollOnRamp.sol";
 import "../../../onRamp/toll/EVM2EVMTollOnRamp.sol";
 import "../../../onRamp/toll/EVM2AnyTollOnRampRouter.sol";
 import "../../../models/Toll.sol";
@@ -10,7 +10,7 @@ import "../../../models/TollConsumer.sol";
 import "../../../models/Common.sol";
 
 contract EVM2EVMTollOnRampSetup is TokenSetup {
-  // Duplicate event of the CCIPSendRequested in the TollOnRampInterface
+  // Duplicate event of the CCIPSendRequested in the ITollOnRamp
   event CCIPSendRequested(Toll.EVM2EVMTollMessage message);
 
   uint256 internal immutable i_tokenAmount0 = 9;
@@ -42,7 +42,7 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
     fees[0] = uint256(COMMIT_FEE_JUELS);
     IERC20[] memory feeTokens = new IERC20[](1);
     feeTokens[0] = IERC20(s_sourceTokens[0]);
-    s_onRamp.setFeeConfig(EVM2EVMTollOnRampInterface.FeeConfig({feeTokens: feeTokens, fees: fees}));
+    s_onRamp.setFeeConfig(IEVM2EVMTollOnRamp.FeeConfig({feeTokens: feeTokens, fees: fees}));
 
     s_onRamp.setPrices(getCastedSourceTokens(), getTokenPrices());
 

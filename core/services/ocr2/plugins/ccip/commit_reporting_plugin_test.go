@@ -81,7 +81,7 @@ func TestCommitReportEncoding(t *testing.T) {
 		1338,      // dest chain id
 		1337,
 		afnAddress, // AFN address
-		commit_store_helper.CommitStoreInterfaceCommitStoreConfig{
+		commit_store_helper.ICommitStoreCommitStoreConfig{
 			OnRamps:          []common.Address{onRampAddress},
 			MinSeqNrByOnRamp: []uint64{1},
 		},

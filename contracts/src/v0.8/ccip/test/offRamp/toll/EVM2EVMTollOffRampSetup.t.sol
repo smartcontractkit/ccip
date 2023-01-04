@@ -10,9 +10,9 @@ import "../../helpers/receivers/SimpleMessageReceiver.sol";
 import "../../TokenSetup.t.sol";
 
 contract EVM2EVMTollOffRampSetup is TokenSetup {
-  CommitStoreInterface internal s_mockCommitStore;
-  Any2EVMMessageReceiverInterface internal s_receiver;
-  Any2EVMMessageReceiverInterface internal s_secondary_receiver;
+  ICommitStore internal s_mockCommitStore;
+  IAny2EVMMessageReceiver internal s_receiver;
+  IAny2EVMMessageReceiver internal s_secondary_receiver;
 
   EVM2EVMTollOffRampHelper internal s_offRamp;
 
@@ -30,7 +30,7 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
     deployOffRamp(s_mockCommitStore);
   }
 
-  function deployOffRamp(CommitStoreInterface commitStore) internal {
+  function deployOffRamp(ICommitStore commitStore) internal {
     s_offRamp = new EVM2EVMTollOffRampHelper(
       SOURCE_CHAIN_ID,
       DEST_CHAIN_ID,
@@ -46,11 +46,11 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
 
     s_offRamp.setPrices(getCastedDestinationTokens(), getTokenPrices());
 
-    NativeTokenPool(address(s_destPools[0])).setOffRamp(BaseOffRampInterface(address(s_offRamp)), true);
-    NativeTokenPool(address(s_destPools[1])).setOffRamp(BaseOffRampInterface(address(s_offRamp)), true);
+    NativeTokenPool(address(s_destPools[0])).setOffRamp(IBaseOffRamp(address(s_offRamp)), true);
+    NativeTokenPool(address(s_destPools[1])).setOffRamp(IBaseOffRamp(address(s_offRamp)), true);
   }
 
-  function _generateNewRouter() internal returns (Any2EVMOffRampRouterInterface newRouter) {
+  function _generateNewRouter() internal returns (IAny2EVMOffRampRouter newRouter) {
     newRouter = new MockTollOffRampRouter();
     assertTrue(address(newRouter) != address(s_offRamp.getRouter()));
   }
@@ -65,7 +65,7 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
     address[] memory destPools = new address[](numberOfTokens);
 
     for (uint256 i = 0; i < numberOfTokens; ++i) {
-      PoolInterface pool = s_offRamp.getPoolBySourceToken(IERC20(original.tokensAndAmounts[i].token));
+      IPool pool = s_offRamp.getPoolBySourceToken(IERC20(original.tokensAndAmounts[i].token));
       destPools[i] = address(pool);
       destTokensAndAmounts[i].token = address(pool.getToken());
       destTokensAndAmounts[i].amount = original.tokensAndAmounts[i].amount;

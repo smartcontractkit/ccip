@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-interface AFNInterface {
+interface IAFN {
   event RootBlessed(bytes32 indexed root, uint256 votes);
   event VoteToBless(address indexed voter, bytes32 indexed root, uint256 weight);
   event VoteBad(address indexed voter, uint256 weight);

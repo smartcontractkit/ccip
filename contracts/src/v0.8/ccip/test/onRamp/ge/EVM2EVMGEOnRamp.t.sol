@@ -13,7 +13,7 @@ contract EVM2EVMGEOnRamp_constructor is EVM2EVMGEOnRampSetup {
     assertEq(OWNER, s_onRamp.owner());
 
     // baseOnRamp
-    BaseOnRampInterface.OnRampConfig memory onRampConfig = onRampConfig();
+    IBaseOnRamp.OnRampConfig memory onRampConfig = onRampConfig();
     assertEq(onRampConfig.commitFeeJuels, s_onRamp.getConfig().commitFeeJuels);
     assertEq(onRampConfig.maxDataSize, s_onRamp.getConfig().maxDataSize);
     assertEq(onRampConfig.maxTokensLength, s_onRamp.getConfig().maxTokensLength);
@@ -88,12 +88,12 @@ contract EVM2EVMGEOnRamp_forwardFromRouter is EVM2EVMGEOnRampSetup {
 
   function testPermissionsReverts() public {
     changePrank(OWNER);
-    vm.expectRevert(BaseOnRampInterface.MustBeCalledByRouter.selector);
+    vm.expectRevert(IBaseOnRamp.MustBeCalledByRouter.selector);
     s_onRamp.forwardFromRouter(_generateEmptyMessage(), 0, OWNER);
   }
 
   function testOriginalSenderReverts() public {
-    vm.expectRevert(BaseOnRampInterface.RouterMustSetOriginalSender.selector);
+    vm.expectRevert(IBaseOnRamp.RouterMustSetOriginalSender.selector);
     s_onRamp.forwardFromRouter(_generateEmptyMessage(), 0, address(0));
   }
 
@@ -101,11 +101,7 @@ contract EVM2EVMGEOnRamp_forwardFromRouter is EVM2EVMGEOnRampSetup {
     GEConsumer.EVM2AnyGEMessage memory message = _generateEmptyMessage();
     message.data = new bytes(onRampConfig().maxDataSize + 1);
     vm.expectRevert(
-      abi.encodeWithSelector(
-        BaseOnRampInterface.MessageTooLarge.selector,
-        onRampConfig().maxDataSize,
-        message.data.length
-      )
+      abi.encodeWithSelector(IBaseOnRamp.MessageTooLarge.selector, onRampConfig().maxDataSize, message.data.length)
     );
 
     s_onRamp.forwardFromRouter(message, 0, STRANGER);
@@ -116,7 +112,7 @@ contract EVM2EVMGEOnRamp_forwardFromRouter is EVM2EVMGEOnRampSetup {
     GEConsumer.EVM2AnyGEMessage memory message = _generateEmptyMessage();
     uint256 tooMany = MAX_TOKENS_LENGTH + 1;
     message.tokensAndAmounts = new Common.EVMTokenAndAmount[](tooMany);
-    vm.expectRevert(BaseOnRampInterface.UnsupportedNumberOfTokens.selector);
+    vm.expectRevert(IBaseOnRamp.UnsupportedNumberOfTokens.selector);
     s_onRamp.forwardFromRouter(message, 0, STRANGER);
   }
 
@@ -124,7 +120,7 @@ contract EVM2EVMGEOnRamp_forwardFromRouter is EVM2EVMGEOnRampSetup {
     changePrank(OWNER);
     s_onRamp.setAllowlistEnabled(true);
 
-    vm.expectRevert(abi.encodeWithSelector(AllowListInterface.SenderNotAllowed.selector, STRANGER));
+    vm.expectRevert(abi.encodeWithSelector(IAllowList.SenderNotAllowed.selector, STRANGER));
     changePrank(address(s_sourceRouter));
     s_onRamp.forwardFromRouter(_generateEmptyMessage(), 0, STRANGER);
   }
@@ -146,7 +142,7 @@ contract EVM2EVMGEOnRamp_forwardFromRouter is EVM2EVMGEOnRampSetup {
 
     // Change back to the router
     changePrank(address(s_sourceRouter));
-    vm.expectRevert(abi.encodeWithSelector(BaseOnRampInterface.UnsupportedToken.selector, wrongToken));
+    vm.expectRevert(abi.encodeWithSelector(IBaseOnRamp.UnsupportedToken.selector, wrongToken));
 
     s_onRamp.forwardFromRouter(message, 0, OWNER);
   }
@@ -161,7 +157,7 @@ contract EVM2EVMGEOnRamp_forwardFromRouter is EVM2EVMGEOnRampSetup {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        AggregateRateLimiterInterface.ValueExceedsCapacity.selector,
+        IAggregateRateLimiter.ValueExceedsCapacity.selector,
         rateLimiterConfig().capacity,
         message.tokensAndAmounts[0].amount * getTokenPrices()[0]
       )
@@ -177,7 +173,7 @@ contract EVM2EVMGEOnRamp_forwardFromRouter is EVM2EVMGEOnRampSetup {
     message.tokensAndAmounts = new Common.EVMTokenAndAmount[](1);
     message.tokensAndAmounts[0].token = fakeToken;
 
-    vm.expectRevert(abi.encodeWithSelector(AggregateRateLimiterInterface.PriceNotFoundForToken.selector, fakeToken));
+    vm.expectRevert(abi.encodeWithSelector(IAggregateRateLimiter.PriceNotFoundForToken.selector, fakeToken));
 
     s_onRamp.forwardFromRouter(message, 0, OWNER);
   }
@@ -188,7 +184,7 @@ contract EVM2EVMGEOnRamp_forwardFromRouter is EVM2EVMGEOnRampSetup {
     message.extraArgs = GEConsumer._argsToBytes(
       GEConsumer.EVMExtraArgsV1({gasLimit: MAX_GAS_LIMIT + 1, strict: false})
     );
-    vm.expectRevert(abi.encodeWithSelector(BaseOnRampInterface.MessageGasLimitTooHigh.selector));
+    vm.expectRevert(abi.encodeWithSelector(IBaseOnRamp.MessageGasLimitTooHigh.selector));
     s_onRamp.forwardFromRouter(message, 0, OWNER);
   }
 }

@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../interfaces/onRamp/EVM2EVMTollOnRampInterface.sol";
-import "../../interfaces/pools/PoolInterface.sol";
+import "../../interfaces/onRamp/IEVM2EVMTollOnRamp.sol";
+import "../../interfaces/pools/IPool.sol";
 import "../../models/Common.sol";
 import "../../models/TollConsumer.sol";
 
-contract MockOnRamp is EVM2EVMTollOnRampInterface {
+contract MockOnRamp is IEVM2EVMTollOnRamp {
   uint64 public immutable i_chainId;
-  PoolInterface public immutable i_pool;
+  IPool public immutable i_pool;
   uint64 public immutable i_destinationChainId;
   uint256 public immutable i_fee;
 
@@ -21,7 +21,7 @@ contract MockOnRamp is EVM2EVMTollOnRampInterface {
 
   constructor(
     uint64 chainId,
-    PoolInterface pool,
+    IPool pool,
     uint64 destinationChainId,
     uint256 fee
   ) {
@@ -65,7 +65,7 @@ contract MockOnRamp is EVM2EVMTollOnRampInterface {
     return 1;
   }
 
-  function getPoolBySourceToken(IERC20) external view returns (PoolInterface) {
+  function getPoolBySourceToken(IERC20) external view returns (IPool) {
     return i_pool;
   }
 

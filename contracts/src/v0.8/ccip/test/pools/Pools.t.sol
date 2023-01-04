@@ -14,12 +14,12 @@ contract OffRampTokenPoolRegistrySetup is TokenSetup {
 
 contract OffRampTokenPoolRegistry_getDestinationToken is OffRampTokenPoolRegistrySetup {
   function testSuccess() public {
-    address expectedToken = address(PoolInterface(s_destPools[0]).getToken());
+    address expectedToken = address(IPool(s_destPools[0]).getToken());
     address actualToken = address(tokenPoolRegistry.getDestinationToken(IERC20(s_sourceTokens[0])));
 
     assertEq(expectedToken, actualToken);
 
-    expectedToken = address(PoolInterface(s_destPools[1]).getToken());
+    expectedToken = address(IPool(s_destPools[1]).getToken());
     actualToken = address(tokenPoolRegistry.getDestinationToken(IERC20(s_sourceTokens[1])));
 
     assertEq(expectedToken, actualToken);

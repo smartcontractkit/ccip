@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {BaseOffRampInterface} from "./BaseOffRampInterface.sol";
+import {IBaseOffRamp} from "./IBaseOffRamp.sol";
 import {Common} from "../../models/Common.sol";
 import {Internal} from "../../models/Internal.sol";
 
-interface Any2EVMOffRampRouterInterface {
+interface IAny2EVMOffRampRouter {
   error NoOffRampsConfigured();
   error MustCallFromOffRamp(address sender);
   error SenderNotAllowed(address sender);
   error InvalidAddress();
-  error OffRampNotAllowed(BaseOffRampInterface offRamp);
-  error AlreadyConfigured(BaseOffRampInterface offRamp);
+  error OffRampNotAllowed(IBaseOffRamp offRamp);
+  error AlreadyConfigured(IBaseOffRamp offRamp);
 
-  event OffRampAdded(BaseOffRampInterface indexed offRamp);
-  event OffRampRemoved(BaseOffRampInterface indexed offRamp);
+  event OffRampAdded(IBaseOffRamp indexed offRamp);
+  event OffRampRemoved(IBaseOffRamp indexed offRamp);
 
   struct OffRampDetails {
     uint96 listIndex;
@@ -26,27 +26,27 @@ interface Any2EVMOffRampRouterInterface {
    * @dev Only callable by the owner
    * @param offRamp The offRamp to add
    */
-  function addOffRamp(BaseOffRampInterface offRamp) external;
+  function addOffRamp(IBaseOffRamp offRamp) external;
 
   /**
    * @notice Owner can remove a specific offRamp from the allowlist
    * @dev Only callable by the owner
    * @param offRamp The offRamp to remove
    */
-  function removeOffRamp(BaseOffRampInterface offRamp) external;
+  function removeOffRamp(IBaseOffRamp offRamp) external;
 
   /**
    * @notice Gets all configured offRamps.
    * @return offRamps The offRamp that are configured.
    */
-  function getOffRamps() external view returns (BaseOffRampInterface[] memory offRamps);
+  function getOffRamps() external view returns (IBaseOffRamp[] memory offRamps);
 
   /**
    * @notice Returns whether the given offRamp is set to be allowed
    * @param offRamp The offRamp to check.
    * @return allowed True if the offRamp is allowed, false if not.
    */
-  function isOffRamp(BaseOffRampInterface offRamp) external view returns (bool allowed);
+  function isOffRamp(IBaseOffRamp offRamp) external view returns (bool allowed);
 
   /**
    * @notice Route the message to its intended receiver contract

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {AFNInterface} from "../interfaces/health/AFNInterface.sol";
+import {IAFN} from "../interfaces/health/IAFN.sol";
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
 import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
 
-contract AFN is AFNInterface, OwnerIsCreator, TypeAndVersionInterface {
+contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "AFN 1.0.0";
 
@@ -50,7 +50,7 @@ contract AFN is AFNInterface, OwnerIsCreator, TypeAndVersionInterface {
     _setAFNConfig(participants, weights, weightThresholdForBlessing, weightThresholdForBadSignal, 1);
   }
 
-  /// @inheritdoc AFNInterface
+  /// @inheritdoc IAFN
   function voteToBlessRoots(bytes32[] calldata rootsWithOrigin) external override hasNotReceivedBadSignal {
     address sender = msg.sender;
     uint256 senderWeight = s_weightByParticipant[sender];
@@ -77,7 +77,7 @@ contract AFN is AFNInterface, OwnerIsCreator, TypeAndVersionInterface {
     }
   }
 
-  /// @inheritdoc AFNInterface
+  /// @inheritdoc IAFN
   function voteBad() external override hasNotReceivedBadSignal {
     address sender = msg.sender;
     uint256 senderWeight = s_weightByParticipant[sender];
@@ -95,14 +95,14 @@ contract AFN is AFNInterface, OwnerIsCreator, TypeAndVersionInterface {
     }
   }
 
-  /// @inheritdoc AFNInterface
+  /// @inheritdoc IAFN
   function recoverFromBadSignal() external override onlyOwner {
     if (!badSignalReceived()) revert RecoveryNotNecessary();
     _clearBadVotes();
     emit RecoveredFromBadSignal();
   }
 
-  /// @inheritdoc AFNInterface
+  /// @inheritdoc IAFN
   function setAFNConfig(
     address[] memory participants,
     uint256[] memory weights,
@@ -112,52 +112,52 @@ contract AFN is AFNInterface, OwnerIsCreator, TypeAndVersionInterface {
     _setAFNConfig(participants, weights, weightThresholdForBlessing, weightThresholdForBadSignal, s_configVersion + 1);
   }
 
-  /// @inheritdoc AFNInterface
+  /// @inheritdoc IAFN
   function isBlessed(bytes32 rootWithOrigin) public view override returns (bool) {
     return s_blessedRoots[rootWithOrigin];
   }
 
-  /// @inheritdoc AFNInterface
+  /// @inheritdoc IAFN
   function getVotesToBlessRoot(bytes32 root) public view override returns (uint256) {
     return s_votesToBlessRoots[root];
   }
 
-  /// @inheritdoc AFNInterface
+  /// @inheritdoc IAFN
   function hasVotedToBlessRoot(address participant, bytes32 root) public view override returns (bool) {
     return s_rootsVotedToBlessByParticipant[root][participant];
   }
 
-  /// @inheritdoc AFNInterface
+  /// @inheritdoc IAFN
   function badSignalReceived() public view override returns (bool) {
     return (s_totalBadVotes >= s_weightThresholdForBadSignal);
   }
 
-  /// @inheritdoc AFNInterface
+  /// @inheritdoc IAFN
   function getWeightThresholds() external view override returns (uint256 blessing, uint256 badSignal) {
     return (s_weightThresholdForBlessing, s_weightThresholdForBadSignal);
   }
 
-  /// @inheritdoc AFNInterface
+  /// @inheritdoc IAFN
   function getParticipants() external view override returns (address[] memory) {
     return s_participantList;
   }
 
-  /// @inheritdoc AFNInterface
+  /// @inheritdoc IAFN
   function getWeightByParticipant(address participant) external view override returns (uint256) {
     return s_weightByParticipant[participant];
   }
 
-  /// @inheritdoc AFNInterface
+  /// @inheritdoc IAFN
   function getConfigVersion() external view override returns (uint256) {
     return s_configVersion;
   }
 
-  /// @inheritdoc AFNInterface
+  /// @inheritdoc IAFN
   function getBadVotersAndVotes() external view override returns (address[] memory voters, uint256 votes) {
     return (s_badVoters, s_totalBadVotes);
   }
 
-  /// @inheritdoc AFNInterface
+  /// @inheritdoc IAFN
   function hasVotedBad(address participant) external view override returns (bool) {
     return s_hasVotedBad[participant];
   }

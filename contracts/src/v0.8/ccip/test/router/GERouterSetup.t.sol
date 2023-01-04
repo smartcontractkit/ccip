@@ -10,7 +10,7 @@ contract GESRouterSetup is BaseTest {
   function setUp() public virtual override {
     BaseTest.setUp();
 
-    BaseOffRampInterface[] memory offRamps = new BaseOffRampInterface[](0);
+    IBaseOffRamp[] memory offRamps = new IBaseOffRamp[](0);
     s_sourceRouter = new GERouter(offRamps);
   }
 }

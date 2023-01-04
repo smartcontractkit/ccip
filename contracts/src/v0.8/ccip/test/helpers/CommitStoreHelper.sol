@@ -7,7 +7,7 @@ contract CommitStoreHelper is CommitStore {
   constructor(
     uint64 chainId,
     uint64 sourceChainId,
-    AFNInterface afn,
+    IAFN afn,
     CommitStoreConfig memory config
   ) CommitStore(chainId, sourceChainId, afn, config) {}
 

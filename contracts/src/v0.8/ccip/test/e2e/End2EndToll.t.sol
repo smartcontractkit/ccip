@@ -9,7 +9,7 @@ import "../commitStore/CommitStore.t.sol";
 contract E2E_toll is EVM2EVMTollOnRampSetup, CommitStoreSetup, EVM2EVMTollOffRampSetup {
   using Toll for Toll.EVM2EVMTollMessage;
 
-  Any2EVMOffRampRouterInterface public s_router;
+  IAny2EVMOffRampRouter public s_router;
 
   MerkleHelper public s_merkleHelper;
 
@@ -22,7 +22,7 @@ contract E2E_toll is EVM2EVMTollOnRampSetup, CommitStoreSetup, EVM2EVMTollOffRam
 
     s_merkleHelper = new MerkleHelper();
 
-    BaseOffRampInterface[] memory offRamps = new BaseOffRampInterface[](1);
+    IBaseOffRamp[] memory offRamps = new IBaseOffRamp[](1);
     offRamps[0] = s_offRamp;
     s_router = new Any2EVMTollOffRampRouter(offRamps);
     s_offRamp.setRouter(s_router);

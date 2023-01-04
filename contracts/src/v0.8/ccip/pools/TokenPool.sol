@@ -4,16 +4,16 @@ pragma solidity 0.8.15;
 import {SafeERC20} from "../../vendor/SafeERC20.sol";
 import {Pausable} from "../../vendor/Pausable.sol";
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
-import {BaseOnRamp, BaseOnRampInterface, PoolInterface, IERC20} from "../onRamp/BaseOnRamp.sol";
-import {BaseOffRampInterface} from "../interfaces/offRamp/BaseOffRampInterface.sol";
+import {BaseOnRamp, IBaseOnRamp, IPool, IERC20} from "../onRamp/BaseOnRamp.sol";
+import {IBaseOffRamp} from "../interfaces/offRamp/IBaseOffRamp.sol";
 
 /**
  * @notice Base abstract class with common functions for all token pools
  */
-abstract contract TokenPool is PoolInterface, OwnerIsCreator, Pausable {
+abstract contract TokenPool is IPool, OwnerIsCreator, Pausable {
   IERC20 internal immutable i_token;
-  mapping(BaseOnRampInterface => bool) internal s_onRamps;
-  mapping(BaseOffRampInterface => bool) internal s_offRamps;
+  mapping(IBaseOnRamp => bool) internal s_onRamps;
+  mapping(IBaseOffRamp => bool) internal s_offRamps;
 
   constructor(IERC20 token) {
     i_token = token;
@@ -41,7 +41,7 @@ abstract contract TokenPool is PoolInterface, OwnerIsCreator, Pausable {
    * @param onRamp The onRamp
    * @param permission Whether or not the onRamp has onRamp permissions on this contract
    */
-  function setOnRamp(BaseOnRampInterface onRamp, bool permission) public onlyOwner {
+  function setOnRamp(IBaseOnRamp onRamp, bool permission) public onlyOwner {
     s_onRamps[onRamp] = permission;
   }
 
@@ -51,7 +51,7 @@ abstract contract TokenPool is PoolInterface, OwnerIsCreator, Pausable {
    * @param offRamp The offRamp
    * @param permission Whether or not the offRamp has offRamp permissions on this contract
    */
-  function setOffRamp(BaseOffRampInterface offRamp, bool permission) public onlyOwner {
+  function setOffRamp(IBaseOffRamp offRamp, bool permission) public onlyOwner {
     s_offRamps[offRamp] = permission;
   }
 
@@ -59,7 +59,7 @@ abstract contract TokenPool is PoolInterface, OwnerIsCreator, Pausable {
    * @notice Checks whether something is a permissioned onRamp on this contract
    * @return boolean
    */
-  function isOnRamp(BaseOnRampInterface onRamp) public view returns (bool) {
+  function isOnRamp(IBaseOnRamp onRamp) public view returns (bool) {
     return s_onRamps[onRamp];
   }
 
@@ -67,7 +67,7 @@ abstract contract TokenPool is PoolInterface, OwnerIsCreator, Pausable {
    * @notice Checks whether something is a permissioned offRamp on this contract
    * @return boolean
    */
-  function isOffRamp(BaseOffRampInterface offRamp) public view returns (bool) {
+  function isOffRamp(IBaseOffRamp offRamp) public view returns (bool) {
     return s_offRamps[offRamp];
   }
 
@@ -84,7 +84,7 @@ abstract contract TokenPool is PoolInterface, OwnerIsCreator, Pausable {
    * @dev Reverts with a PermissionsError if check fails
    */
   function _validateOwnerOrOnRamp() internal view {
-    if (msg.sender != owner() && !isOnRamp(BaseOnRampInterface(msg.sender))) revert PermissionsError();
+    if (msg.sender != owner() && !isOnRamp(IBaseOnRamp(msg.sender))) revert PermissionsError();
   }
 
   /**
@@ -92,7 +92,7 @@ abstract contract TokenPool is PoolInterface, OwnerIsCreator, Pausable {
    * @dev Reverts with a PermissionsError if check fails
    */
   function _validateOwnerOrOffRamp() internal view {
-    if (msg.sender != owner() && !isOffRamp(BaseOffRampInterface(msg.sender))) revert PermissionsError();
+    if (msg.sender != owner() && !isOffRamp(IBaseOffRamp(msg.sender))) revert PermissionsError();
   }
 
   /**

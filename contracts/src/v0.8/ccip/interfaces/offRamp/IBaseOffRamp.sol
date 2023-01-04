@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Any2EVMOffRampRouterInterface} from "./Any2EVMOffRampRouterInterface.sol";
-import {CommitStoreInterface} from "../CommitStoreInterface.sol";
+import {IAny2EVMOffRampRouter} from "./IAny2EVMOffRampRouter.sol";
+import {ICommitStore} from "../ICommitStore.sol";
 import {Internal} from "../../models/Internal.sol";
 import {IERC20} from "../../../vendor/IERC20.sol";
 
-interface BaseOffRampInterface {
+interface IBaseOffRamp {
   error ZeroAddressNotAllowed();
   error AlreadyExecuted(uint64 sequenceNumber);
   error ExecutionError(bytes error);
@@ -43,13 +43,12 @@ interface BaseOffRampInterface {
    * @param router the new Router
    * @dev only the owner should be able to call this function
    */
-  function setRouter(Any2EVMOffRampRouterInterface router) external;
+  function setRouter(IAny2EVMOffRampRouter router) external;
 
   /**
    * @notice get the current router
-   * @return Any2EVMOffRampRouterInterface
-   */
-  function getRouter() external view returns (Any2EVMOffRampRouterInterface);
+   * @return IAny2EVMOffRampRouter    */
+  function getRouter() external view returns (IAny2EVMOffRampRouter);
 
   /**
    * @notice Returns the current execution state of a message based on its
@@ -60,11 +59,11 @@ interface BaseOffRampInterface {
   /**
    * @notice Returns the current commitStore.
    */
-  function getCommitStore() external view returns (CommitStoreInterface);
+  function getCommitStore() external view returns (ICommitStore);
 
   /**
    * @notice Updates the commitStore.
    * @param commitStore The new commitStore
    */
-  function setCommitStore(CommitStoreInterface commitStore) external;
+  function setCommitStore(ICommitStore commitStore) external;
 }

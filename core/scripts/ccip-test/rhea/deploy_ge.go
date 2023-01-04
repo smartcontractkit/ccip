@@ -124,19 +124,19 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId uint64)
 		tokenPools,                 // pools
 		[]common.Address{},         // allow list
 		client.ChainConfig.Afn,     // AFN
-		evm_2_evm_ge_onramp.BaseOnRampInterfaceOnRampConfig{
+		evm_2_evm_ge_onramp.IBaseOnRampOnRampConfig{
 			CommitFeeJuels:  0,
 			MaxDataSize:     1e6,
 			MaxTokensLength: 5,
 			MaxGasLimit:     ccip.GasLimitPerTx,
 		},
-		evm_2_evm_ge_onramp.AggregateRateLimiterInterfaceRateLimiterConfig{
+		evm_2_evm_ge_onramp.IAggregateRateLimiterRateLimiterConfig{
 			Capacity: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 			Rate:     new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
 		},
 		client.Owner.From,
 		client.ChainConfig.Router,
-		evm_2_evm_ge_onramp.EVM2EVMGEOnRampInterfaceDynamicFeeConfig{
+		evm_2_evm_ge_onramp.IEVM2EVMGEOnRampDynamicFeeConfig{
 			FeeToken:        client.ChainConfig.LinkToken,
 			FeeAmount:       big.NewInt(100),
 			DestGasOverhead: big.NewInt(0),
@@ -189,7 +189,7 @@ func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainId uint
 		client.Client,
 		sourceChainId,
 		client.ChainConfig.ChainId,
-		evm_2_evm_ge_offramp.EVM2EVMGEOffRampInterfaceGEOffRampConfig{
+		evm_2_evm_ge_offramp.IEVM2EVMGEOffRampGEOffRampConfig{
 			GasOverhead:                             big.NewInt(0),
 			GasFeeCache:                             client.ChainConfig.GasFeeCache,
 			ExecutionDelaySeconds:                   60,
@@ -202,7 +202,7 @@ func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainId uint
 		client.ChainConfig.Afn,
 		syncedSourceTokens,
 		syncedDestPools,
-		evm_2_evm_ge_offramp.AggregateRateLimiterInterfaceRateLimiterConfig{
+		evm_2_evm_ge_offramp.IAggregateRateLimiterRateLimiterConfig{
 			Capacity: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 			Rate:     new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
 		},
@@ -242,7 +242,7 @@ func deployCommitStore(t *testing.T, client *EvmDeploymentConfig, sourceChainId 
 		client.ChainConfig.ChainId, // dest chain id
 		sourceChainId,              // source chain id
 		client.ChainConfig.Afn,     // AFN address
-		commit_store.CommitStoreInterfaceCommitStoreConfig{
+		commit_store.ICommitStoreCommitStoreConfig{
 			OnRamps:          []common.Address{onRamp},
 			MinSeqNrByOnRamp: []uint64{1},
 		},

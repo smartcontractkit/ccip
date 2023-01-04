@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-interface AllowListInterface {
+interface IAllowList {
   error SenderNotAllowed(address sender);
 
   event AllowListSet(address[] allowlist);

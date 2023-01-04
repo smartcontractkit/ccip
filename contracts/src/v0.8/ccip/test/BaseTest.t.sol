@@ -6,7 +6,7 @@ import "./mocks/MockAFN.sol";
 import "./StructFactory.sol";
 
 contract BaseTest is Test, StructFactory {
-  AFNInterface internal s_afn;
+  IAFN internal s_afn;
 
   function setUp() public virtual {
     // Set the sender to OWNER permanently

@@ -193,7 +193,7 @@ contract AFN_voteToBlessRoots is AFNSetup {
       s_afn.voteBad();
     }
 
-    vm.expectRevert(AFNInterface.MustRecoverFromBadSignal.selector);
+    vm.expectRevert(IAFN.MustRecoverFromBadSignal.selector);
     s_afn.voteToBlessRoots(roots);
   }
 
@@ -202,7 +202,7 @@ contract AFN_voteToBlessRoots is AFNSetup {
     roots[0] = ROOT_1;
 
     changePrank(STRANGER);
-    vm.expectRevert(abi.encodeWithSelector(AFNInterface.InvalidVoter.selector, STRANGER));
+    vm.expectRevert(abi.encodeWithSelector(IAFN.InvalidVoter.selector, STRANGER));
     s_afn.voteToBlessRoots(roots);
   }
 }
@@ -256,14 +256,14 @@ contract AFN_voteBad is AFNSetup {
       s_afn.voteBad();
     }
 
-    vm.expectRevert(AFNInterface.MustRecoverFromBadSignal.selector);
+    vm.expectRevert(IAFN.MustRecoverFromBadSignal.selector);
     s_afn.voteBad();
   }
 
   function testInvalidVoterReverts() public {
     changePrank(STRANGER);
 
-    vm.expectRevert(abi.encodeWithSelector(AFNInterface.InvalidVoter.selector, STRANGER));
+    vm.expectRevert(abi.encodeWithSelector(IAFN.InvalidVoter.selector, STRANGER));
     s_afn.voteBad();
   }
 
@@ -272,7 +272,7 @@ contract AFN_voteBad is AFNSetup {
     changePrank(participants[0]);
     s_afn.voteBad();
 
-    vm.expectRevert(AFNInterface.AlreadyVoted.selector);
+    vm.expectRevert(IAFN.AlreadyVoted.selector);
     s_afn.voteBad();
   }
 }
@@ -321,7 +321,7 @@ contract AFN_recover is AFNSetup {
     changePrank(OWNER);
     s_afn.recoverFromBadSignal();
 
-    vm.expectRevert(AFNInterface.RecoveryNotNecessary.selector);
+    vm.expectRevert(IAFN.RecoveryNotNecessary.selector);
     s_afn.recoverFromBadSignal();
   }
 }
@@ -431,7 +431,7 @@ contract AFN_setAFNConfig is AFNSetup {
     address[] memory participants = new address[](0);
 
     changePrank(OWNER);
-    vm.expectRevert(AFNInterface.InvalidConfig.selector);
+    vm.expectRevert(IAFN.InvalidConfig.selector);
     s_afn.setAFNConfig(participants, weights, blessingThreshold, badSignalThreshold);
   }
 
@@ -444,9 +444,9 @@ contract AFN_setAFNConfig is AFNSetup {
     ) = getDifferentConfigArgs();
 
     changePrank(OWNER);
-    vm.expectRevert(AFNInterface.InvalidConfig.selector);
+    vm.expectRevert(IAFN.InvalidConfig.selector);
     s_afn.setAFNConfig(participants, weights, ZERO, badSignalThreshold);
-    vm.expectRevert(AFNInterface.InvalidConfig.selector);
+    vm.expectRevert(IAFN.InvalidConfig.selector);
     s_afn.setAFNConfig(participants, weights, blessingThreshold, ZERO);
   }
 
@@ -460,7 +460,7 @@ contract AFN_setAFNConfig is AFNSetup {
 
     changePrank(OWNER);
     participants[0] = ZERO_ADDRESS;
-    vm.expectRevert(AFNInterface.InvalidConfig.selector);
+    vm.expectRevert(IAFN.InvalidConfig.selector);
     s_afn.setAFNConfig(participants, weights, blessingThreshold, badSignalThreshold);
   }
 
@@ -474,7 +474,7 @@ contract AFN_setAFNConfig is AFNSetup {
 
     changePrank(OWNER);
     weights[0] = ZERO;
-    vm.expectRevert(AFNInterface.InvalidWeight.selector);
+    vm.expectRevert(IAFN.InvalidWeight.selector);
     s_afn.setAFNConfig(participants, weights, blessingThreshold, badSignalThreshold);
   }
 
@@ -487,9 +487,9 @@ contract AFN_setAFNConfig is AFNSetup {
     ) = getDifferentConfigArgs();
 
     changePrank(OWNER);
-    vm.expectRevert(AFNInterface.InvalidConfig.selector);
+    vm.expectRevert(IAFN.InvalidConfig.selector);
     s_afn.setAFNConfig(participants, weights, WEIGHT_40, badSignalThreshold);
-    vm.expectRevert(AFNInterface.InvalidConfig.selector);
+    vm.expectRevert(IAFN.InvalidConfig.selector);
     s_afn.setAFNConfig(participants, weights, blessingThreshold, WEIGHT_40);
   }
 }

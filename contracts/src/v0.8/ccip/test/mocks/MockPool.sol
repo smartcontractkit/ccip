@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../interfaces/pools/PoolInterface.sol";
+import "../../interfaces/pools/IPool.sol";
 
-contract MockPool is PoolInterface {
+contract MockPool is IPool {
   // Unique ID used in tests
   uint256 public s_uid;
 

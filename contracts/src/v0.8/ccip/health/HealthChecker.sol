@@ -2,22 +2,22 @@
 pragma solidity 0.8.15;
 
 import {Pausable} from "../../vendor/Pausable.sol";
-import {AFNInterface} from "../interfaces/health/AFNInterface.sol";
+import {IAFN} from "../interfaces/health/IAFN.sol";
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
 
 contract HealthChecker is Pausable, OwnerIsCreator {
   // AFN contract to check health of the system
-  AFNInterface internal s_afn;
+  IAFN internal s_afn;
 
   error BadAFNSignal();
   error BadHealthConfig();
 
-  event AFNSet(AFNInterface oldAFN, AFNInterface newAFN);
+  event AFNSet(IAFN oldAFN, IAFN newAFN);
 
   /**
    * @param afn The AFN contract to check health
    */
-  constructor(AFNInterface afn) {
+  constructor(IAFN afn) {
     if (address(afn) == address(0)) revert BadHealthConfig();
     s_afn = afn;
   }
@@ -43,9 +43,9 @@ contract HealthChecker is Pausable, OwnerIsCreator {
    * @dev only callable by the owner
    * @param afn new AFN contract
    */
-  function setAFN(AFNInterface afn) external onlyOwner {
+  function setAFN(IAFN afn) external onlyOwner {
     if (address(afn) == address(0)) revert BadHealthConfig();
-    AFNInterface old = s_afn;
+    IAFN old = s_afn;
     s_afn = afn;
     emit AFNSet(old, afn);
   }
@@ -54,7 +54,7 @@ contract HealthChecker is Pausable, OwnerIsCreator {
    * @notice Get the current AFN contract
    * @return Current AFN
    */
-  function getAFN() external view returns (AFNInterface) {
+  function getAFN() external view returns (IAFN) {
     return s_afn;
   }
 

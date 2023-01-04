@@ -3,15 +3,19 @@ pragma solidity ^0.8.0;
 
 import {Common} from "../models/Common.sol";
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
-import {GasFeeCacheInterface} from "../interfaces/gasFeeCache/GasFeeCacheInterface.sol";
+import {IGasFeeCache} from "../interfaces/gasFeeCache/IGasFeeCache.sol";
 import {GE} from "../models/GE.sol";
 
-contract GasFeeCache is GasFeeCacheInterface, OwnerIsCreator {
+contract GasFeeCache is IGasFeeCache, OwnerIsCreator {
   mapping(uint64 => TimestampedFeeUpdate) private s_linkPerUnitGasByDestChainId;
   mapping(address => bool) private s_feeUpdaters;
   uint128 private immutable i_stalenessThreshold;
 
-  constructor(GE.FeeUpdate[] memory feeUpdates, address[] memory feeUpdaters, uint128 stalenessThreshold) {
+  constructor(
+    GE.FeeUpdate[] memory feeUpdates,
+    address[] memory feeUpdaters,
+    uint128 stalenessThreshold
+  ) {
     for (uint256 i = 0; i < feeUpdates.length; ++i) {
       _updateFee(feeUpdates[i].chainId, feeUpdates[i].linkPerUnitGas, uint128(block.timestamp));
     }
@@ -70,7 +74,11 @@ contract GasFeeCache is GasFeeCacheInterface, OwnerIsCreator {
     emit FeeUpdaterRemoved(feeUpdater);
   }
 
-  function _updateFee(uint64 chainId, uint128 linkPerUnitGas, uint128 timestamp) private {
+  function _updateFee(
+    uint64 chainId,
+    uint128 linkPerUnitGas,
+    uint128 timestamp
+  ) private {
     s_linkPerUnitGasByDestChainId[chainId] = TimestampedFeeUpdate({
       linkPerUnitGas: linkPerUnitGas,
       timestamp: timestamp

@@ -3,21 +3,22 @@ pragma solidity 0.8.15;
 
 import {GEConsumer} from "../models/GEConsumer.sol";
 import {Common} from "../models/Common.sol";
-import {Any2EVMMessageReceiverInterface} from "../interfaces/applications/Any2EVMMessageReceiverInterface.sol";
-import {Any2EVMOffRampRouterInterface} from "../interfaces/offRamp/Any2EVMOffRampRouterInterface.sol";
-import {GERouterInterface} from "../interfaces/router/GERouterInterface.sol";
+import {IAny2EVMMessageReceiver} from "../interfaces/applications/IAny2EVMMessageReceiver.sol";
+import {IAny2EVMOffRampRouter} from "../interfaces/offRamp/IAny2EVMOffRampRouter.sol";
+import {IGERouter} from "../interfaces/router/IGERouter.sol";
+import {IAny2EVMMessageReceiver} from "../interfaces/applications/IAny2EVMMessageReceiver.sol";
 
-abstract contract CCIPConsumer is Any2EVMMessageReceiverInterface {
-  GERouterInterface private immutable i_router;
+abstract contract CCIPConsumer is IAny2EVMMessageReceiver {
+  IGERouter private immutable i_router;
   address private s_feeToken;
 
   constructor(address router, address feeToken) {
-    i_router = GERouterInterface(router);
+    i_router = IGERouter(router);
 
     _setFeeToken(feeToken);
   }
 
-  /// @inheritdoc Any2EVMMessageReceiverInterface
+  /// @inheritdoc IAny2EVMMessageReceiver
   function ccipReceive(Common.Any2EVMMessage calldata message) external override onlyRouter {
     _ccipReceive(message);
   }

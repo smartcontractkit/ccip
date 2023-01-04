@@ -4,11 +4,11 @@ pragma solidity 0.8.15;
 import "../mocks/MockERC20.sol";
 import "../BaseTest.t.sol";
 import "../helpers/AggregateRateLimiterHelper.sol";
-import "../../interfaces/rateLimiter/AggregateRateLimiterInterface.sol";
+import "../../interfaces/rateLimiter/IAggregateRateLimiter.sol";
 
 contract AggregateTokenLimiterSetup is BaseTest {
   AggregateRateLimiterHelper s_rateLimiter;
-  AggregateRateLimiterInterface.RateLimiterConfig s_config;
+  IAggregateRateLimiter.RateLimiterConfig s_config;
 
   IERC20 constant TOKEN = ERC20(0x21118E64E1fB0c487F25Dd6d3601FF6af8D32E4e);
   uint256 constant TOKEN_PRICE = 4;
@@ -16,7 +16,7 @@ contract AggregateTokenLimiterSetup is BaseTest {
   function setUp() public virtual override {
     BaseTest.setUp();
 
-    s_config = AggregateRateLimiterInterface.RateLimiterConfig({rate: 5, capacity: 100});
+    s_config = IAggregateRateLimiter.RateLimiterConfig({rate: 5, capacity: 100});
     s_rateLimiter = new AggregateRateLimiterHelper(s_config, TOKEN_LIMIT_ADMIN);
     IERC20[] memory tokens = new IERC20[](1);
     tokens[0] = TOKEN;
@@ -33,7 +33,7 @@ contract AggregateTokenLimiter_constructor is AggregateTokenLimiterSetup {
     assertEq(TOKEN_LIMIT_ADMIN, s_rateLimiter.getTokenLimitAdmin());
     assertEq(OWNER, s_rateLimiter.owner());
 
-    AggregateRateLimiterInterface.TokenBucket memory tokenBucket = s_rateLimiter.calculateCurrentTokenBucketState();
+    IAggregateRateLimiter.TokenBucket memory tokenBucket = s_rateLimiter.calculateCurrentTokenBucketState();
     assertEq(s_config.rate, tokenBucket.rate);
     assertEq(s_config.capacity, tokenBucket.capacity);
     assertEq(s_config.capacity, tokenBucket.tokens);
@@ -72,7 +72,7 @@ contract AggregateTokenLimiter_setTokenLimitAdmin is AggregateTokenLimiterSetup 
 contract AggregateTokenLimiter_getTokenBucket is AggregateTokenLimiterSetup {
   // Success
   function testSuccess() public {
-    AggregateRateLimiterInterface.TokenBucket memory tokenBucket = s_rateLimiter.calculateCurrentTokenBucketState();
+    IAggregateRateLimiter.TokenBucket memory tokenBucket = s_rateLimiter.calculateCurrentTokenBucketState();
     assertEq(s_config.rate, tokenBucket.rate);
     assertEq(s_config.capacity, tokenBucket.capacity);
     assertEq(s_config.capacity, tokenBucket.tokens);
@@ -83,7 +83,7 @@ contract AggregateTokenLimiter_getTokenBucket is AggregateTokenLimiterSetup {
     s_config.capacity = s_config.capacity * 2;
     s_rateLimiter.setRateLimiterConfig(s_config);
 
-    AggregateRateLimiterInterface.TokenBucket memory tokenBucket = s_rateLimiter.calculateCurrentTokenBucketState();
+    IAggregateRateLimiter.TokenBucket memory tokenBucket = s_rateLimiter.calculateCurrentTokenBucketState();
 
     assertEq(s_config.rate, tokenBucket.rate);
     assertEq(s_config.capacity, tokenBucket.capacity);
@@ -132,11 +132,11 @@ contract AggregateTokenLimiter_setRateLimiterConfig is AggregateTokenLimiterSetu
   }
 
   function setConfig() private {
-    AggregateRateLimiterInterface.TokenBucket memory tokenBucket = s_rateLimiter.calculateCurrentTokenBucketState();
+    IAggregateRateLimiter.TokenBucket memory tokenBucket = s_rateLimiter.calculateCurrentTokenBucketState();
     assertEq(s_config.rate, tokenBucket.rate);
     assertEq(s_config.capacity, tokenBucket.capacity);
 
-    s_config = AggregateRateLimiterInterface.RateLimiterConfig({
+    s_config = IAggregateRateLimiter.RateLimiterConfig({
       rate: tokenBucket.rate * 2,
       capacity: tokenBucket.capacity * 8
     });
@@ -156,18 +156,18 @@ contract AggregateTokenLimiter_setRateLimiterConfig is AggregateTokenLimiterSetu
   function testOnlyOnlyCallableByAdminOrOwnerReverts() public {
     changePrank(STRANGER);
 
-    vm.expectRevert(AggregateRateLimiterInterface.OnlyCallableByAdminOrOwner.selector);
+    vm.expectRevert(IAggregateRateLimiter.OnlyCallableByAdminOrOwner.selector);
 
     s_rateLimiter.setRateLimiterConfig(s_config);
   }
 
   function testRefillRateTooHighReverts() public {
-    AggregateRateLimiterInterface.RateLimiterConfig memory config = AggregateRateLimiterInterface.RateLimiterConfig({
+    IAggregateRateLimiter.RateLimiterConfig memory config = IAggregateRateLimiter.RateLimiterConfig({
       rate: 2**208,
       capacity: 100
     });
 
-    vm.expectRevert(AggregateRateLimiterInterface.RefillRateTooHigh.selector);
+    vm.expectRevert(IAggregateRateLimiter.RefillRateTooHigh.selector);
 
     s_rateLimiter.setRateLimiterConfig(config);
   }
@@ -263,7 +263,7 @@ contract AggregateTokenLimiter_setPrices is AggregateTokenLimiterSetup {
   // Reverts
 
   function testAddressCannotBeZeroReverts() public {
-    vm.expectRevert(AggregateRateLimiterInterface.AddressCannotBeZero.selector);
+    vm.expectRevert(IAggregateRateLimiter.AddressCannotBeZero.selector);
 
     s_rateLimiter.setPrices(new IERC20[](1), new uint256[](1));
   }
@@ -271,13 +271,13 @@ contract AggregateTokenLimiter_setPrices is AggregateTokenLimiterSetup {
   function testOnlyOnlyCallableByAdminOrOwnerReverts() public {
     changePrank(STRANGER);
 
-    vm.expectRevert(AggregateRateLimiterInterface.OnlyCallableByAdminOrOwner.selector);
+    vm.expectRevert(IAggregateRateLimiter.OnlyCallableByAdminOrOwner.selector);
 
     s_rateLimiter.setPrices(new IERC20[](1), new uint256[](1));
   }
 
   function testTokensAndPriceLengthMismatchReverts() public {
-    vm.expectRevert(AggregateRateLimiterInterface.TokensAndPriceLengthMismatch.selector);
+    vm.expectRevert(IAggregateRateLimiter.TokensAndPriceLengthMismatch.selector);
 
     s_rateLimiter.setPrices(new IERC20[](2), new uint256[](1));
   }
@@ -304,16 +304,14 @@ contract AggregateTokenLimiter__removeTokens is AggregateTokenLimiterSetup {
     s_rateLimiter.removeTokens(tokensAndAmounts);
 
     // Get the updated bucket status
-    AggregateRateLimiterInterface.TokenBucket memory bucket = s_rateLimiter.calculateCurrentTokenBucketState();
+    IAggregateRateLimiter.TokenBucket memory bucket = s_rateLimiter.calculateCurrentTokenBucketState();
     // Assert the proper value has been taken out of the bucket
     assertEq(bucket.capacity - value, bucket.tokens);
 
     // Since value * 2 > bucket.capacity we cannot take it out twice.
     // Expect a revert when we try, with a wait time.
     uint256 waitTime = 4;
-    vm.expectRevert(
-      abi.encodeWithSelector(AggregateRateLimiterInterface.ValueExceedsAllowedThreshold.selector, waitTime)
-    );
+    vm.expectRevert(abi.encodeWithSelector(IAggregateRateLimiter.ValueExceedsAllowedThreshold.selector, waitTime));
     s_rateLimiter.removeTokens(tokensAndAmounts);
 
     // Move the block time forward by 10 so the bucket refills by 10 * rate
@@ -328,12 +326,12 @@ contract AggregateTokenLimiter__removeTokens is AggregateTokenLimiterSetup {
   // Reverts
 
   function testUnknownTokenReverts() public {
-    vm.expectRevert(abi.encodeWithSelector(AggregateRateLimiterInterface.PriceNotFoundForToken.selector, address(0)));
+    vm.expectRevert(abi.encodeWithSelector(IAggregateRateLimiter.PriceNotFoundForToken.selector, address(0)));
     s_rateLimiter.removeTokens(new Common.EVMTokenAndAmount[](1));
   }
 
   function testValueExceedsCapacityReverts() public {
-    AggregateRateLimiterInterface.TokenBucket memory bucket = s_rateLimiter.calculateCurrentTokenBucketState();
+    IAggregateRateLimiter.TokenBucket memory bucket = s_rateLimiter.calculateCurrentTokenBucketState();
 
     Common.EVMTokenAndAmount[] memory tokensAndAmounts = new Common.EVMTokenAndAmount[](1);
     tokensAndAmounts[0].token = address(TOKEN);
@@ -341,7 +339,7 @@ contract AggregateTokenLimiter__removeTokens is AggregateTokenLimiterSetup {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        AggregateRateLimiterInterface.ValueExceedsCapacity.selector,
+        IAggregateRateLimiter.ValueExceedsCapacity.selector,
         bucket.capacity,
         tokensAndAmounts[0].amount * TOKEN_PRICE
       )

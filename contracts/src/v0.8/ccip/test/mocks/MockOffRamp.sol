@@ -1,18 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../interfaces/offRamp/BaseOffRampInterface.sol";
-import "../../interfaces/applications/Any2EVMMessageReceiverInterface.sol";
-import "../../interfaces/CommitStoreInterface.sol";
+import "../../interfaces/offRamp/IBaseOffRamp.sol";
+import "../../interfaces/applications/IAny2EVMMessageReceiver.sol";
+import "../../interfaces/ICommitStore.sol";
 import "../../models/Toll.sol";
 import "../../models/TollConsumer.sol";
 
-contract MockOffRamp is BaseOffRampInterface {
+contract MockOffRamp is IBaseOffRamp {
   IERC20 public s_token;
 
-  function deliverMessageTo(Any2EVMMessageReceiverInterface recipient, Common.Any2EVMMessage calldata message)
-    external
-  {
+  function deliverMessageTo(IAny2EVMMessageReceiver recipient, Common.Any2EVMMessage calldata message) external {
     recipient.ccipReceive(message);
   }
 
@@ -20,10 +18,10 @@ contract MockOffRamp is BaseOffRampInterface {
 
   function i_chainId() external view returns (uint256) {}
 
-  function setRouter(Any2EVMOffRampRouterInterface router) external {}
+  function setRouter(IAny2EVMOffRampRouter router) external {}
 
-  function getRouter() external pure override returns (Any2EVMOffRampRouterInterface) {
-    return Any2EVMOffRampRouterInterface(address(0));
+  function getRouter() external pure override returns (IAny2EVMOffRampRouter) {
+    return IAny2EVMOffRampRouter(address(0));
   }
 
   /**
@@ -44,18 +42,18 @@ contract MockOffRamp is BaseOffRampInterface {
     return s_token;
   }
 
-  /// @inheritdoc BaseOffRampInterface
+  /// @inheritdoc IBaseOffRamp
   function getExecutionState(uint64) public pure returns (Internal.MessageExecutionState) {
     return Internal.MessageExecutionState.SUCCESS;
   }
 
-  /// @inheritdoc BaseOffRampInterface
-  function getCommitStore() public pure returns (CommitStoreInterface) {
-    return CommitStoreInterface(address(1));
+  /// @inheritdoc IBaseOffRamp
+  function getCommitStore() public pure returns (ICommitStore) {
+    return ICommitStore(address(1));
   }
 
-  /// @inheritdoc BaseOffRampInterface
-  function setCommitStore(CommitStoreInterface commitStore) public pure {}
+  /// @inheritdoc IBaseOffRamp
+  function setCommitStore(ICommitStore commitStore) public pure {}
 
   function getConfig() public pure returns (OffRampConfig memory config) {}
 

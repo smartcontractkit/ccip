@@ -2,17 +2,17 @@
 pragma solidity 0.8.15;
 
 import {TypeAndVersionInterface} from "../../../interfaces/TypeAndVersionInterface.sol";
-import {IERC20, PoolInterface} from "../../interfaces/pools/PoolInterface.sol";
-import {AFNInterface} from "../../interfaces/health/AFNInterface.sol";
+import {IERC20, IPool} from "../../interfaces/pools/IPool.sol";
+import {IAFN} from "../../interfaces/health/IAFN.sol";
 import {BaseOnRamp} from "../BaseOnRamp.sol";
 import {Common} from "../../models/Common.sol";
 import {GEConsumer} from "../../models/GEConsumer.sol";
 import {GE} from "../../models/GE.sol";
-import {EVM2EVMGEOnRampInterface} from "../../interfaces/onRamp/EVM2EVMGEOnRampInterface.sol";
-import {GERouterInterface} from "../../interfaces/router/GERouterInterface.sol";
-import {GasFeeCacheInterface} from "../../interfaces/gasFeeCache/GasFeeCacheInterface.sol";
+import {IEVM2EVMGEOnRamp} from "../../interfaces/onRamp/IEVM2EVMGEOnRamp.sol";
+import {IGERouter} from "../../interfaces/router/IGERouter.sol";
+import {IGasFeeCache} from "../../interfaces/gasFeeCache/IGasFeeCache.sol";
 
-contract EVM2EVMGEOnRamp is EVM2EVMGEOnRampInterface, BaseOnRamp, TypeAndVersionInterface {
+contract EVM2EVMGEOnRamp is IEVM2EVMGEOnRamp, BaseOnRamp, TypeAndVersionInterface {
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "EVM2EVMGEOnRamp 1.0.0";
   uint256 private constant EVM_DEFAULT_GAS_LIMIT = 200_000;
@@ -27,13 +27,13 @@ contract EVM2EVMGEOnRamp is EVM2EVMGEOnRampInterface, BaseOnRamp, TypeAndVersion
     uint64 chainId,
     uint64 destinationChainId,
     IERC20[] memory tokens,
-    PoolInterface[] memory pools,
+    IPool[] memory pools,
     address[] memory allowlist,
-    AFNInterface afn,
+    IAFN afn,
     OnRampConfig memory config,
     RateLimiterConfig memory rateLimiterConfig,
     address tokenLimitsAdmin,
-    GERouterInterface router,
+    IGERouter router,
     DynamicFeeConfig memory feeConfig
   )
     BaseOnRamp(
@@ -63,7 +63,7 @@ contract EVM2EVMGEOnRamp is EVM2EVMGEOnRampInterface, BaseOnRamp, TypeAndVersion
     return GEConsumer.EVMExtraArgsV1({gasLimit: abi.decode(extraArgs[4:36], (uint256)), strict: false});
   }
 
-  /// @inheritdoc EVM2EVMGEOnRampInterface
+  /// @inheritdoc IEVM2EVMGEOnRamp
   function forwardFromRouter(
     GEConsumer.EVM2AnyGEMessage calldata message,
     uint256 feeTokenAmount,
@@ -98,7 +98,7 @@ contract EVM2EVMGEOnRamp is EVM2EVMGEOnRampInterface, BaseOnRamp, TypeAndVersion
   function getFee(GEConsumer.EVM2AnyGEMessage calldata message) public view returns (uint256 fee) {
     if (s_feeConfig.feeToken != message.feeToken) revert MismatchedFeeToken(s_feeConfig.feeToken, message.feeToken);
     uint256 gasLimit = _fromBytes(message.extraArgs).gasLimit;
-    uint256 linkPerUnitGas = GasFeeCacheInterface(s_feeConfig.gasFeeCache).getFee(s_feeConfig.destChainId);
+    uint256 linkPerUnitGas = IGasFeeCache(s_feeConfig.gasFeeCache).getFee(s_feeConfig.destChainId);
 
     return
       s_feeConfig.feeAmount + // Flat fee

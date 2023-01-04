@@ -2,8 +2,8 @@
 pragma solidity 0.8.15;
 
 import {PoolCollector} from "../../pools/PoolCollector.sol";
-import {BaseOnRampRouterInterface} from "../../interfaces/onRamp/BaseOnRampRouterInterface.sol";
-import {GERouterInterface} from "../../interfaces/router/GERouterInterface.sol";
+import {IBaseOnRampRouter} from "../../interfaces/onRamp/IBaseOnRampRouter.sol";
+import {IGERouter} from "../../interfaces/router/IGERouter.sol";
 import "../onRamp/ge/EVM2EVMGEOnRampSetup.t.sol";
 
 /// @notice #constructor
@@ -75,7 +75,7 @@ contract GERouter_ccipSend is EVM2EVMGEOnRampSetup {
     GEConsumer.EVM2AnyGEMessage memory message = _generateEmptyMessage();
     uint64 wrongChain = DEST_CHAIN_ID + 1;
 
-    vm.expectRevert(abi.encodeWithSelector(BaseOnRampRouterInterface.UnsupportedDestinationChain.selector, wrongChain));
+    vm.expectRevert(abi.encodeWithSelector(IBaseOnRampRouter.UnsupportedDestinationChain.selector, wrongChain));
 
     s_sourceRouter.ccipSend(wrongChain, message);
   }
@@ -86,7 +86,7 @@ contract GERouter_ccipSend is EVM2EVMGEOnRampSetup {
     message.feeToken = wrongFeeToken;
 
     vm.expectRevert(
-      abi.encodeWithSelector(EVM2EVMGEOnRampInterface.MismatchedFeeToken.selector, s_sourceTokens[0], wrongFeeToken)
+      abi.encodeWithSelector(IEVM2EVMGEOnRamp.MismatchedFeeToken.selector, s_sourceTokens[0], wrongFeeToken)
     );
 
     s_sourceRouter.ccipSend(DEST_CHAIN_ID, message);
@@ -104,16 +104,16 @@ contract GERouter_ccipSend is EVM2EVMGEOnRampSetup {
 
 /// @notice #setOnRamp
 contract GERouter_setOnRamp is EVM2EVMGEOnRampSetup {
-  event OnRampSet(uint64 indexed chainId, EVM2EVMGEOnRampInterface indexed onRamp);
+  event OnRampSet(uint64 indexed chainId, IEVM2EVMGEOnRamp indexed onRamp);
 
   // Success
 
   // Asserts that setOnRamp changes the configured onramp. Also tests getOnRamp
   // and isChainSupported.
   function testSuccess() public {
-    EVM2EVMGEOnRampInterface onramp = EVM2EVMGEOnRampInterface(address(1));
+    IEVM2EVMGEOnRamp onramp = IEVM2EVMGEOnRamp(address(1));
     uint64 chainId = 1337;
-    EVM2EVMGEOnRampInterface before = s_sourceRouter.getOnRamp(chainId);
+    IEVM2EVMGEOnRamp before = s_sourceRouter.getOnRamp(chainId);
     assertEq(address(0), address(before));
     assertFalse(s_sourceRouter.isChainSupported(chainId));
 
@@ -121,7 +121,7 @@ contract GERouter_setOnRamp is EVM2EVMGEOnRampSetup {
     emit OnRampSet(chainId, onramp);
 
     s_sourceRouter.setOnRamp(chainId, onramp);
-    EVM2EVMGEOnRampInterface afterSet = s_sourceRouter.getOnRamp(chainId);
+    IEVM2EVMGEOnRamp afterSet = s_sourceRouter.getOnRamp(chainId);
     assertEq(address(onramp), address(afterSet));
     assertTrue(s_sourceRouter.isChainSupported(chainId));
   }
@@ -131,7 +131,7 @@ contract GERouter_setOnRamp is EVM2EVMGEOnRampSetup {
   // Asserts that setOnRamp reverts when the config was already set to
   // the same onRamp.
   function testAlreadySetReverts() public {
-    vm.expectRevert(abi.encodeWithSelector(GERouterInterface.OnRampAlreadySet.selector, DEST_CHAIN_ID, s_onRamp));
+    vm.expectRevert(abi.encodeWithSelector(IGERouter.OnRampAlreadySet.selector, DEST_CHAIN_ID, s_onRamp));
     s_sourceRouter.setOnRamp(DEST_CHAIN_ID, s_onRamp);
   }
 
@@ -139,7 +139,7 @@ contract GERouter_setOnRamp is EVM2EVMGEOnRampSetup {
   function testOnlyOwnerReverts() public {
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
-    s_sourceRouter.setOnRamp(1337, EVM2EVMGEOnRampInterface(address(1)));
+    s_sourceRouter.setOnRamp(1337, IEVM2EVMGEOnRamp(address(1)));
   }
 }
 

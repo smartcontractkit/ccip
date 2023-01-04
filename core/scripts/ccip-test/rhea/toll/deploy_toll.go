@@ -145,13 +145,13 @@ package toll
 //		client.ChainConfig.TokenPools,   // pools
 //		[]common.Address{},  // allow list
 //		client.ChainConfig.Afn,          // AFN
-//		evm_2_evm_toll_onramp.BaseOnRampInterfaceOnRampConfig{
+//		evm_2_evm_toll_onramp.IBaseOnRampOnRampConfig{
 //			CommitFeeJuels: 0,
 //			MaxDataSize:      1e6,
 //			MaxTokensLength:  5,
 //			MaxGasLimit:      ccip.BatchGasLimit,
 //		},
-//		evm_2_evm_toll_onramp.AggregateRateLimiterInterfaceRateLimiterConfig{
+//		evm_2_evm_toll_onramp.IAggregateRateLimiterRateLimiterConfig{
 //			Capacity: big.NewInt(1e18),
 //			Rate:     big.NewInt(1e18),
 //		},
@@ -192,7 +192,7 @@ package toll
 //		destClient.Client,
 //		sourceClient.ChainConfig.ChainId,
 //		destClient.ChainConfig.ChainId,
-//		any_2_evm_toll_offramp.BaseOffRampInterfaceOffRampConfig{
+//		any_2_evm_toll_offramp.IBaseOffRampOffRampConfig{
 //			OnRampAddress:                           sourceClient.LaneConfig.OnRamp,
 //			ExecutionDelaySeconds:                   60,
 //			MaxDataSize:                             1e5,
@@ -203,7 +203,7 @@ package toll
 //		destClient.ChainConfig.Afn,
 //		sourceclient.ChainConfig.BridgeTokens,
 //		destclient.ChainConfig.TokenPools,
-//		any_2_evm_toll_offramp.AggregateRateLimiterInterfaceRateLimiterConfig{
+//		any_2_evm_toll_offramp.IAggregateRateLimiterRateLimiterConfig{
 //			Capacity: big.NewInt(1e18),
 //			Rate:     big.NewInt(1e18),
 //		},
@@ -268,7 +268,7 @@ package toll
 //		destClient.ChainConfig.ChainId,   // dest chain id
 //		sourceClient.ChainConfig.ChainId, // source chain id
 //		destClient.ChainConfig.Afn,       // AFN address
-//		commit_store.CommitStoreInterfaceCommitStoreConfig{
+//		commit_store.ICommitStoreCommitStoreConfig{
 //			OnRamps:          []common.Address{sourceClient.LaneConfig.OnRamp},
 //			MinSeqNrByOnRamp: []uint64{1},
 //		},

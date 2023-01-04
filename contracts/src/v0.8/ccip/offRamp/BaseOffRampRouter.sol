@@ -2,29 +2,30 @@
 pragma solidity 0.8.15;
 
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
-import {Any2EVMOffRampRouterInterface, BaseOffRampInterface} from "../interfaces/offRamp/Any2EVMOffRampRouterInterface.sol";
-import {Any2EVMMessageReceiverInterface} from "../interfaces/applications/Any2EVMMessageReceiverInterface.sol";
+import {IAny2EVMOffRampRouter, IBaseOffRamp} from "../interfaces/offRamp/IAny2EVMOffRampRouter.sol";
+import {IAny2EVMMessageReceiver} from "../interfaces/applications/IAny2EVMMessageReceiver.sol";
 import {Internal} from "../models/Internal.sol";
 import {Common} from "../models/Common.sol";
+import {IBaseOffRamp} from "../interfaces/offRamp/IBaseOffRamp.sol";
 
-abstract contract BaseOffRampRouter is Any2EVMOffRampRouterInterface, OwnerIsCreator {
+abstract contract BaseOffRampRouter is IAny2EVMOffRampRouter, OwnerIsCreator {
   using Internal for Internal.Any2EVMMessageFromSender;
 
   uint256 private constant GAS_FOR_CALL_EXACT_CHECK = 5_000;
 
   // Mapping from offRamp to allowed status
-  mapping(BaseOffRampInterface => OffRampDetails) internal s_offRamps;
+  mapping(IBaseOffRamp => OffRampDetails) internal s_offRamps;
   // List of all offRamps that have  OffRampDetails
-  BaseOffRampInterface[] internal s_offRampsList;
+  IBaseOffRamp[] internal s_offRampsList;
 
-  constructor(BaseOffRampInterface[] memory offRamps) {
+  constructor(IBaseOffRamp[] memory offRamps) {
     s_offRampsList = offRamps;
     for (uint256 i = 0; i < offRamps.length; ++i) {
       s_offRamps[offRamps[i]] = OffRampDetails({listIndex: uint96(i), allowed: true});
     }
   }
 
-  /// @inheritdoc Any2EVMOffRampRouterInterface
+  /// @inheritdoc IAny2EVMOffRampRouter
   function routeMessage(Internal.Any2EVMMessageFromSender calldata message, bool manualExecution)
     external
     override
@@ -34,7 +35,7 @@ abstract contract BaseOffRampRouter is Any2EVMOffRampRouterInterface, OwnerIsCre
     // TODO: Maybe push this down into GEOffRamp? Do we really want/need to support multiple billing models
     // calling the same receiver?
     Common.Any2EVMMessage memory minMessage = message._toAny2EVMMessage();
-    bytes memory callData = abi.encodeWithSelector(Any2EVMMessageReceiverInterface.ccipReceive.selector, minMessage);
+    bytes memory callData = abi.encodeWithSelector(IAny2EVMMessageReceiver.ccipReceive.selector, minMessage);
     if (!manualExecution) {
       success = _callWithExactGas(message.gasLimit, message.receiver, 0, callData);
     } else {
@@ -85,8 +86,8 @@ abstract contract BaseOffRampRouter is Any2EVMOffRampRouterInterface, OwnerIsCre
     return (success);
   }
 
-  /// @inheritdoc Any2EVMOffRampRouterInterface
-  function addOffRamp(BaseOffRampInterface offRamp) external onlyOwner {
+  /// @inheritdoc IAny2EVMOffRampRouter
+  function addOffRamp(IBaseOffRamp offRamp) external onlyOwner {
     if (address(offRamp) == address(0)) revert InvalidAddress();
     OffRampDetails memory details = s_offRamps[offRamp];
     // Check if the offramp is already allowed
@@ -103,8 +104,8 @@ abstract contract BaseOffRampRouter is Any2EVMOffRampRouterInterface, OwnerIsCre
     emit OffRampAdded(offRamp);
   }
 
-  /// @inheritdoc Any2EVMOffRampRouterInterface
-  function removeOffRamp(BaseOffRampInterface offRamp) external onlyOwner {
+  /// @inheritdoc IAny2EVMOffRampRouter
+  function removeOffRamp(IBaseOffRamp offRamp) external onlyOwner {
     // Check that there are any feeds to remove
     uint256 listLength = s_offRampsList.length;
     if (listLength == 0) revert NoOffRampsConfigured();
@@ -116,7 +117,7 @@ abstract contract BaseOffRampRouter is Any2EVMOffRampRouterInterface, OwnerIsCre
     // Swap the last item in the s_offRampsList with the item being removed,
     // update the index of the item moved from the end of the list to its new place,
     // then pop from the end of the list to remove.
-    BaseOffRampInterface lastItem = s_offRampsList[listLength - 1];
+    IBaseOffRamp lastItem = s_offRampsList[listLength - 1];
     // Perform swap
     s_offRampsList[listLength - 1] = s_offRampsList[oldDetails.listIndex];
     s_offRampsList[oldDetails.listIndex] = lastItem;
@@ -129,19 +130,19 @@ abstract contract BaseOffRampRouter is Any2EVMOffRampRouterInterface, OwnerIsCre
     emit OffRampRemoved(offRamp);
   }
 
-  /// @inheritdoc Any2EVMOffRampRouterInterface
-  function getOffRamps() external view returns (BaseOffRampInterface[] memory offRamps) {
+  /// @inheritdoc IAny2EVMOffRampRouter
+  function getOffRamps() external view returns (IBaseOffRamp[] memory offRamps) {
     offRamps = s_offRampsList;
   }
 
-  /// @inheritdoc Any2EVMOffRampRouterInterface
-  function isOffRamp(BaseOffRampInterface offRamp) external view returns (bool allowed) {
+  /// @inheritdoc IAny2EVMOffRampRouter
+  function isOffRamp(IBaseOffRamp offRamp) external view returns (bool allowed) {
     return s_offRamps[offRamp].allowed;
   }
 
   // @notice only lets allowed offRamps execute
   modifier onlyOffRamp() {
-    BaseOffRampInterface offRamp = BaseOffRampInterface(msg.sender);
+    IBaseOffRamp offRamp = IBaseOffRamp(msg.sender);
     if (!s_offRamps[offRamp].allowed) revert MustCallFromOffRamp(msg.sender);
     _;
   }

@@ -2,12 +2,12 @@
 pragma solidity 0.8.15;
 
 import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
-import {CommitStoreInterface} from "../interfaces/CommitStoreInterface.sol";
-import {HealthChecker, AFNInterface} from "../health/HealthChecker.sol";
+import {ICommitStore} from "../interfaces/ICommitStore.sol";
+import {HealthChecker, IAFN} from "../health/HealthChecker.sol";
 import {OCR2Base} from "../ocr/OCR2Base.sol";
 import {Internal} from "../models/Internal.sol";
 
-contract CommitStore is CommitStoreInterface, TypeAndVersionInterface, HealthChecker, OCR2Base {
+contract CommitStore is ICommitStore, TypeAndVersionInterface, HealthChecker, OCR2Base {
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "CommitStore 1.0.0";
 
@@ -39,7 +39,7 @@ contract CommitStore is CommitStoreInterface, TypeAndVersionInterface, HealthChe
   constructor(
     uint64 chainId,
     uint64 sourceChainId,
-    AFNInterface afn,
+    IAFN afn,
     CommitStoreConfig memory config
   ) OCR2Base(true) HealthChecker(afn) {
     i_chainId = chainId;
@@ -51,7 +51,7 @@ contract CommitStore is CommitStoreInterface, TypeAndVersionInterface, HealthChe
     }
   }
 
-  /// @inheritdoc CommitStoreInterface
+  /// @inheritdoc ICommitStore
   function setConfig(CommitStoreConfig calldata config) external onlyOwner {
     uint256 newRampLength = config.onRamps.length;
     if (newRampLength != config.minSeqNrByOnRamp.length || newRampLength == 0) revert InvalidConfiguration();
@@ -68,12 +68,12 @@ contract CommitStore is CommitStoreInterface, TypeAndVersionInterface, HealthChe
     emit CommitStoreConfigSet(config);
   }
 
-  /// @inheritdoc CommitStoreInterface
+  /// @inheritdoc ICommitStore
   function getConfig() external view returns (CommitStoreConfig memory) {
     return s_config;
   }
 
-  /// @inheritdoc CommitStoreInterface
+  /// @inheritdoc ICommitStore
   function getExpectedNextSequenceNumber(address onRamp) public view returns (uint64) {
     return s_expectedNextMinByOnRamp[onRamp];
   }
@@ -97,7 +97,7 @@ contract CommitStore is CommitStoreInterface, TypeAndVersionInterface, HealthChe
     return s_afn.isBlessed(_hashCommitStoreWithRoot(root));
   }
 
-  /// @inheritdoc CommitStoreInterface
+  /// @inheritdoc ICommitStore
   function verify(
     bytes32[] calldata hashedLeaves,
     bytes32[] calldata innerProofs,
@@ -116,7 +116,7 @@ contract CommitStore is CommitStoreInterface, TypeAndVersionInterface, HealthChe
     return s_roots[outerRoot];
   }
 
-  /// @inheritdoc CommitStoreInterface
+  /// @inheritdoc ICommitStore
   function merkleRoot(
     bytes32[] memory leaves,
     bytes32[] memory proofs,
@@ -153,7 +153,7 @@ contract CommitStore is CommitStoreInterface, TypeAndVersionInterface, HealthChe
     }
   }
 
-  /// @inheritdoc CommitStoreInterface
+  /// @inheritdoc ICommitStore
   function getMerkleRoot(bytes32 root) external view returns (uint256) {
     return s_roots[root];
   }

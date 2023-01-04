@@ -7,7 +7,7 @@ import "../BaseTest.t.sol";
 import "../../health/AFN.sol";
 
 contract CommitStoreSetup is BaseTest {
-  event CommitStoreConfigSet(CommitStoreInterface.CommitStoreConfig config);
+  event CommitStoreConfigSet(ICommitStore.CommitStoreConfig config);
 
   CommitStoreHelper s_commitStore;
 
@@ -43,7 +43,7 @@ contract CommitStore_constructor is BaseTest {
     minSequenceNumbers[0] = 1;
     minSequenceNumbers[1] = 2;
     minSequenceNumbers[2] = 4;
-    CommitStoreInterface.CommitStoreConfig memory config = CommitStoreInterface.CommitStoreConfig({
+    ICommitStore.CommitStoreConfig memory config = ICommitStore.CommitStoreConfig({
       onRamps: onRamps,
       minSeqNrByOnRamp: minSequenceNumbers
     });
@@ -54,7 +54,7 @@ contract CommitStore_constructor is BaseTest {
     assertEq(minSequenceNumbers[1], commitStore.getExpectedNextSequenceNumber(onRamps[1]));
     assertEq(minSequenceNumbers[2], commitStore.getExpectedNextSequenceNumber(onRamps[2]));
 
-    CommitStoreInterface.CommitStoreConfig memory contractConfig = commitStore.getConfig();
+    ICommitStore.CommitStoreConfig memory contractConfig = commitStore.getConfig();
     assertEq(keccak256(abi.encode(config.minSeqNrByOnRamp)), keccak256(abi.encode(contractConfig.minSeqNrByOnRamp)));
     assertEq(config.onRamps, contractConfig.onRamps);
 
@@ -72,13 +72,13 @@ contract CommitStore_constructor is BaseTest {
     address[] memory onRamps = new address[](3);
     uint64[] memory minSequenceNumbers = new uint64[](2);
 
-    vm.expectRevert(CommitStoreInterface.InvalidConfiguration.selector);
+    vm.expectRevert(ICommitStore.InvalidConfiguration.selector);
 
     new CommitStore(
       DEST_CHAIN_ID,
       SOURCE_CHAIN_ID,
       s_afn,
-      CommitStoreInterface.CommitStoreConfig({onRamps: onRamps, minSeqNrByOnRamp: minSequenceNumbers})
+      ICommitStore.CommitStoreConfig({onRamps: onRamps, minSeqNrByOnRamp: minSequenceNumbers})
     );
   }
 }
@@ -92,7 +92,7 @@ contract CommitStore_setConfig is CommitStoreSetup {
     onRamps[0] = address(1);
     uint64[] memory minSeqNrByOnRamp = new uint64[](1);
     minSeqNrByOnRamp[0] = 200;
-    CommitStoreInterface.CommitStoreConfig memory newConfig = CommitStoreInterface.CommitStoreConfig({
+    ICommitStore.CommitStoreConfig memory newConfig = ICommitStore.CommitStoreConfig({
       onRamps: onRamps,
       minSeqNrByOnRamp: minSeqNrByOnRamp
     });
@@ -116,18 +116,18 @@ contract CommitStore_setConfig is CommitStoreSetup {
   function testOnlyOwnerReverts() public {
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
-    CommitStoreInterface.CommitStoreConfig memory newConfig;
+    ICommitStore.CommitStoreConfig memory newConfig;
     s_commitStore.setConfig(newConfig);
   }
 
   function testInvalidConfigurationLengthMismatchReverts() public {
     address[] memory onRamps = new address[](2);
     uint64[] memory minSeqNrByOnRamp = new uint64[](1);
-    CommitStoreInterface.CommitStoreConfig memory newConfig = CommitStoreInterface.CommitStoreConfig({
+    ICommitStore.CommitStoreConfig memory newConfig = ICommitStore.CommitStoreConfig({
       onRamps: onRamps,
       minSeqNrByOnRamp: minSeqNrByOnRamp
     });
-    vm.expectRevert(CommitStoreInterface.InvalidConfiguration.selector);
+    vm.expectRevert(ICommitStore.InvalidConfiguration.selector);
 
     s_commitStore.setConfig(newConfig);
   }
@@ -135,11 +135,11 @@ contract CommitStore_setConfig is CommitStoreSetup {
   function testInvalidConfigurationZeroRampsReverts() public {
     address[] memory onRamps = new address[](0);
     uint64[] memory minSeqNrByOnRamp = new uint64[](0);
-    CommitStoreInterface.CommitStoreConfig memory newConfig = CommitStoreInterface.CommitStoreConfig({
+    ICommitStore.CommitStoreConfig memory newConfig = ICommitStore.CommitStoreConfig({
       onRamps: onRamps,
       minSeqNrByOnRamp: minSeqNrByOnRamp
     });
-    vm.expectRevert(CommitStoreInterface.InvalidConfiguration.selector);
+    vm.expectRevert(ICommitStore.InvalidConfiguration.selector);
 
     s_commitStore.setConfig(newConfig);
   }
@@ -176,7 +176,7 @@ contract CommitStore_report is CommitStoreSetup {
     merkleRoots[0] = "test #1";
     merkleRoots[1] = "test #2";
     merkleRoots[2] = "test #3";
-    CommitStoreInterface.CommitStoreConfig memory config = commitStoreConfig();
+    ICommitStore.CommitStoreConfig memory config = commitStoreConfig();
     Internal.CommitReport memory report = Internal.CommitReport({
       onRamps: config.onRamps,
       intervals: intervals,
@@ -220,7 +220,7 @@ contract CommitStore_report is CommitStoreSetup {
       rootOfRoots: "root"
     });
 
-    vm.expectRevert(abi.encodeWithSelector(CommitStoreInterface.InvalidCommitReport.selector, report));
+    vm.expectRevert(abi.encodeWithSelector(ICommitStore.InvalidCommitReport.selector, report));
 
     s_commitStore.report(abi.encode(report));
   }
@@ -235,7 +235,7 @@ contract CommitStore_report is CommitStoreSetup {
       rootOfRoots: "root"
     });
 
-    vm.expectRevert(abi.encodeWithSelector(CommitStoreInterface.InvalidCommitReport.selector, report));
+    vm.expectRevert(abi.encodeWithSelector(ICommitStore.InvalidCommitReport.selector, report));
 
     s_commitStore.report(abi.encode(report));
   }
@@ -251,7 +251,7 @@ contract CommitStore_report is CommitStoreSetup {
       rootOfRoots: "root"
     });
 
-    vm.expectRevert(abi.encodeWithSelector(CommitStoreInterface.UnsupportedOnRamp.selector, onRamps[0]));
+    vm.expectRevert(abi.encodeWithSelector(ICommitStore.UnsupportedOnRamp.selector, onRamps[0]));
 
     s_commitStore.report(abi.encode(report));
   }
@@ -269,7 +269,7 @@ contract CommitStore_report is CommitStoreSetup {
       rootOfRoots: "root"
     });
 
-    vm.expectRevert(abi.encodeWithSelector(CommitStoreInterface.InvalidInterval.selector, intervals[0], onRamps[0]));
+    vm.expectRevert(abi.encodeWithSelector(ICommitStore.InvalidInterval.selector, intervals[0], onRamps[0]));
 
     s_commitStore.report(abi.encode(report));
   }
@@ -287,7 +287,7 @@ contract CommitStore_report is CommitStoreSetup {
       rootOfRoots: "root"
     });
 
-    vm.expectRevert(abi.encodeWithSelector(CommitStoreInterface.InvalidInterval.selector, intervals[0], onRamps[0]));
+    vm.expectRevert(abi.encodeWithSelector(ICommitStore.InvalidInterval.selector, intervals[0], onRamps[0]));
 
     s_commitStore.report(abi.encode(report));
   }
@@ -350,7 +350,7 @@ contract CommitStore_verify is CommitStoreRealAFNSetup {
     bytes32[] memory merkleRoots = new bytes32[](258);
     bytes32[] memory proofs = new bytes32[](0);
 
-    vm.expectRevert(CommitStoreInterface.InvalidProof.selector);
+    vm.expectRevert(ICommitStore.InvalidProof.selector);
 
     s_commitStore.verify(merkleRoots, proofs, 0, proofs, 0);
   }

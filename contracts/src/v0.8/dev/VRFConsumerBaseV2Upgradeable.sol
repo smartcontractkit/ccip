@@ -103,7 +103,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
  * @dev (see https://docs.openzeppelin.com/upgrades-plugins/1.x/writing-upgradeable).
  * @dev It's semantics are identical to VRFConsumerBaseV2 and can be inherited from
  * @dev to create an upgradeable VRF consumer contract.
-*/
+ */
 abstract contract VRFConsumerBaseV2Upgradeable is Initializable {
   error OnlyCoordinatorCanFulfill(address have, address want);
   address private vrfCoordinator;

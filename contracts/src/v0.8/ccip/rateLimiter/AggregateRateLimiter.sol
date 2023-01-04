@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {AggregateRateLimiterInterface} from "../interfaces/rateLimiter/AggregateRateLimiterInterface.sol";
+import {IAggregateRateLimiter} from "../interfaces/rateLimiter/IAggregateRateLimiter.sol";
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
 import {IERC20} from "../../vendor/IERC20.sol";
 import {Common} from "../models/Common.sol";
 
-contract AggregateRateLimiter is AggregateRateLimiterInterface, OwnerIsCreator {
+contract AggregateRateLimiter is IAggregateRateLimiter, OwnerIsCreator {
   // The address of the token limit admin that has the same permissions as
   // the owner.
   address private s_tokenLimitAdmin;
@@ -34,17 +34,17 @@ contract AggregateRateLimiter is AggregateRateLimiterInterface, OwnerIsCreator {
     });
   }
 
-  /// @inheritdoc AggregateRateLimiterInterface
+  /// @inheritdoc IAggregateRateLimiter
   function getTokenLimitAdmin() public view returns (address) {
     return s_tokenLimitAdmin;
   }
 
-  /// @inheritdoc AggregateRateLimiterInterface
+  /// @inheritdoc IAggregateRateLimiter
   function setTokenLimitAdmin(address newAdmin) public onlyOwner {
     s_tokenLimitAdmin = newAdmin;
   }
 
-  /// @inheritdoc AggregateRateLimiterInterface
+  /// @inheritdoc IAggregateRateLimiter
   function calculateCurrentTokenBucketState() public view returns (TokenBucket memory) {
     TokenBucket memory bucket = s_tokenBucket;
 
@@ -61,7 +61,7 @@ contract AggregateRateLimiter is AggregateRateLimiterInterface, OwnerIsCreator {
     return bucket;
   }
 
-  /// @inheritdoc AggregateRateLimiterInterface
+  /// @inheritdoc IAggregateRateLimiter
   function setRateLimiterConfig(RateLimiterConfig memory config) public requireAdminOrOwner {
     // We only allow a refill rate of uint208 so we don't have to deal with any
     // overflows for the next ~9 million years. Any sensible rate is way below this value.
@@ -88,7 +88,7 @@ contract AggregateRateLimiter is AggregateRateLimiterInterface, OwnerIsCreator {
     return prices;
   }
 
-  /// @inheritdoc AggregateRateLimiterInterface
+  /// @inheritdoc IAggregateRateLimiter
   function setPrices(IERC20[] memory tokens, uint256[] memory prices) public requireAdminOrOwner {
     uint256 newTokenLength = tokens.length;
     if (newTokenLength != prices.length) revert TokensAndPriceLengthMismatch();

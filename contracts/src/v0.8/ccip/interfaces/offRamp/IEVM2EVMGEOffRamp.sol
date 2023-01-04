@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {GasFeeCacheInterface} from "../gasFeeCache/GasFeeCacheInterface.sol";
+import {IGasFeeCache} from "../gasFeeCache/IGasFeeCache.sol";
 import {GE} from "../../models/GE.sol";
 import {Internal} from "../../models/Internal.sol";
 
-interface EVM2EVMGEOffRampInterface {
+interface IEVM2EVMGEOffRamp {
   error UnauthorizedGasPriceUpdate();
   error AlreadyAttempted(uint64 seqNum);
 
@@ -19,7 +19,7 @@ interface EVM2EVMGEOffRampInterface {
 
   struct GEOffRampConfig {
     uint256 gasOverhead;
-    GasFeeCacheInterface gasFeeCache;
+    IGasFeeCache gasFeeCache;
     // The waiting time before manual execution is enabled
     uint32 permissionLessExecutionThresholdSeconds;
     // execution delay in seconds

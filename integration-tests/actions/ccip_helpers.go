@@ -306,7 +306,7 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(t *testing.T) {
 		sourceCCIP.Common.ChainClient.GetChainID().Uint64(), sourceCCIP.DestinationChainId,
 		tokens, pools, []common.Address{}, sourceCCIP.Common.AFN.EthAddress,
 		sourceCCIP.Common.GERouter.EthAddress, sourceCCIP.Common.RateLimiterConfig,
-		evm_2_evm_ge_onramp.EVM2EVMGEOnRampInterfaceDynamicFeeConfig{
+		evm_2_evm_ge_onramp.IEVM2EVMGEOnRampDynamicFeeConfig{
 			FeeToken:        common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
 			FeeAmount:       big.NewInt(0),
 			DestGasOverhead: big.NewInt(0),
@@ -591,7 +591,7 @@ func (destCCIP *DestCCIPModule) DeployContracts(t *testing.T, sourceCCIP SourceC
 		destCCIP.SourceChainId,
 		destCCIP.Common.ChainClient.GetChainID().Uint64(),
 		destCCIP.Common.AFN.EthAddress,
-		commit_store.CommitStoreInterfaceCommitStoreConfig{
+		commit_store.ICommitStoreCommitStoreConfig{
 			OnRamps:          []common.Address{sourceCCIP.TollOnRamp.EthAddress, sourceCCIP.GEOnRamp.EthAddress},
 			MinSeqNrByOnRamp: []uint64{1, 1},
 		})

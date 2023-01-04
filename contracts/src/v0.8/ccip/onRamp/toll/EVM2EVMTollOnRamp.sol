@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {EVM2AnyTollOnRampRouterInterface} from "../../interfaces/onRamp/EVM2AnyTollOnRampRouterInterface.sol";
-import {EVM2EVMTollOnRampInterface} from "../../interfaces/onRamp/EVM2EVMTollOnRampInterface.sol";
+import {IEVM2AnyTollOnRampRouter} from "../../interfaces/onRamp/IEVM2AnyTollOnRampRouter.sol";
+import {IEVM2EVMTollOnRamp} from "../../interfaces/onRamp/IEVM2EVMTollOnRamp.sol";
 import {TypeAndVersionInterface} from "../../../interfaces/TypeAndVersionInterface.sol";
-import {IERC20, PoolInterface} from "../../interfaces/pools/PoolInterface.sol";
-import {AFNInterface} from "../../interfaces/health/AFNInterface.sol";
+import {IERC20, IPool} from "../../interfaces/pools/IPool.sol";
+import {IAFN} from "../../interfaces/health/IAFN.sol";
 import {BaseOnRamp} from "../BaseOnRamp.sol";
 import {Common} from "../../models/Common.sol";
 import {Toll} from "../../models/Toll.sol";
@@ -14,7 +14,7 @@ import {TollConsumer} from "../../models/TollConsumer.sol";
 /**
  * @notice An implementation of a toll OnRamp.
  */
-contract EVM2EVMTollOnRamp is EVM2EVMTollOnRampInterface, BaseOnRamp, TypeAndVersionInterface {
+contract EVM2EVMTollOnRamp is IEVM2EVMTollOnRamp, BaseOnRamp, TypeAndVersionInterface {
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "EVM2EVMTollOnRamp 1.0.0";
   uint256 private constant EVM_DEFAULT_GAS_LIMIT = 200_000;
@@ -27,13 +27,13 @@ contract EVM2EVMTollOnRamp is EVM2EVMTollOnRampInterface, BaseOnRamp, TypeAndVer
     uint64 chainId,
     uint64 destinationChainId,
     IERC20[] memory tokens,
-    PoolInterface[] memory pools,
+    IPool[] memory pools,
     address[] memory allowlist,
-    AFNInterface afn,
+    IAFN afn,
     OnRampConfig memory config,
     RateLimiterConfig memory rateLimiterConfig,
     address tokenLimitsAdmin,
-    EVM2AnyTollOnRampRouterInterface router
+    IEVM2AnyTollOnRampRouter router
   )
     BaseOnRamp(
       chainId,
@@ -58,7 +58,7 @@ contract EVM2EVMTollOnRamp is EVM2EVMTollOnRampInterface, BaseOnRamp, TypeAndVer
     return TollConsumer.EVMExtraArgsV1({gasLimit: abi.decode(extraArgs[4:36], (uint256)), strict: false});
   }
 
-  /// @inheritdoc EVM2EVMTollOnRampInterface
+  /// @inheritdoc IEVM2EVMTollOnRamp
   function forwardFromRouter(TollConsumer.EVM2AnyTollMessage calldata message, address originalSender)
     external
     override
@@ -86,7 +86,7 @@ contract EVM2EVMTollOnRamp is EVM2EVMTollOnRampInterface, BaseOnRamp, TypeAndVer
     return tollMsg.sequenceNumber;
   }
 
-  /// @inheritdoc EVM2EVMTollOnRampInterface
+  /// @inheritdoc IEVM2EVMTollOnRamp
   // If the fee is not explicitly set, we use the solidity default of zero.
   // The set of tokens in the pool registry defines the whitelist of fee tokens.
   function setFeeConfig(FeeConfig memory feeConfig) external override onlyOwner {
@@ -103,7 +103,7 @@ contract EVM2EVMTollOnRamp is EVM2EVMTollOnRampInterface, BaseOnRamp, TypeAndVer
     s_feeTokens = feeConfig.feeTokens;
   }
 
-  /// @inheritdoc EVM2EVMTollOnRampInterface
+  /// @inheritdoc IEVM2EVMTollOnRamp
   // NOTE: Assumes fee token is valid.
   function getRequiredFee(IERC20 feeToken) external view override returns (uint256) {
     return s_feesByToken[feeToken];

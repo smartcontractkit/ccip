@@ -4,10 +4,10 @@ pragma solidity 0.8.15;
 import "../mocks/MockCommitStore.sol";
 import "../helpers/ramps/BaseOffRampHelper.sol";
 import "../TokenSetup.t.sol";
-import "../../interfaces/rateLimiter/AggregateRateLimiterInterface.sol";
+import "../../interfaces/rateLimiter/IAggregateRateLimiter.sol";
 
 contract BaseOffRampSetup is TokenSetup {
-  event OffRampConfigSet(BaseOffRampInterface.OffRampConfig config);
+  event OffRampConfigSet(IBaseOffRamp.OffRampConfig config);
 
   BaseOffRampHelper s_offRamp;
   MockCommitStore s_mockCommitStore;
@@ -35,9 +35,7 @@ contract BaseOffRampSetup is TokenSetup {
     TokenPool(address(s_destPools[1])).setOffRamp(s_offRamp, true);
   }
 
-  function assertSameConfig(BaseOffRampInterface.OffRampConfig memory a, BaseOffRampInterface.OffRampConfig memory b)
-    public
-  {
+  function assertSameConfig(IBaseOffRamp.OffRampConfig memory a, IBaseOffRamp.OffRampConfig memory b) public {
     assertEq(a.executionDelaySeconds, b.executionDelaySeconds);
     assertEq(a.maxDataSize, b.maxDataSize);
     assertEq(a.maxTokensLength, b.maxTokensLength);
@@ -63,7 +61,7 @@ contract BaseOffRamp_constructor is BaseOffRampSetup {
   function testTokenConfigMismatchReverts() public {
     vm.expectRevert(OffRampTokenPoolRegistry.InvalidTokenPoolConfig.selector);
 
-    PoolInterface[] memory pools = new PoolInterface[](1);
+    IPool[] memory pools = new IPool[](1);
 
     IERC20[] memory wrongTokens = new IERC20[](5);
     s_offRamp = new BaseOffRampHelper(
@@ -80,14 +78,16 @@ contract BaseOffRamp_constructor is BaseOffRampSetup {
   }
 
   function testZeroOnRampAddressReverts() public {
-    PoolInterface[] memory pools = new PoolInterface[](2);
-    pools[0] = PoolInterface(s_sourcePools[0]);
+    IPool[] memory pools = new IPool[](2);
+    pools[0] = IPool(s_sourcePools[0]);
     pools[1] = new NativeTokenPool(IERC20(s_sourceTokens[1]));
 
-    vm.expectRevert(BaseOffRampInterface.ZeroAddressNotAllowed.selector);
+    vm.expectRevert(IBaseOffRamp.ZeroAddressNotAllowed.selector);
 
-    AggregateRateLimiterInterface.RateLimiterConfig memory rateLimiterConfig = AggregateRateLimiterInterface
-      .RateLimiterConfig({rate: 1e20, capacity: 1e20});
+    IAggregateRateLimiter.RateLimiterConfig memory rateLimiterConfig = IAggregateRateLimiter.RateLimiterConfig({
+      rate: 1e20,
+      capacity: 1e20
+    });
 
     s_offRamp = new BaseOffRampHelper(
       SOURCE_CHAIN_ID,
@@ -149,7 +149,7 @@ contract BaseOffRamp__releaseOrMintToken is BaseOffRampSetup {
     IERC20 destToken0 = IERC20(s_destTokens[0]);
     uint256 startingBalance = destToken0.balanceOf(OWNER);
     uint256 amount = POOL_BALANCE / 2;
-    s_offRamp.releaseOrMintToken(PoolInterface(s_destPools[0]), amount, OWNER);
+    s_offRamp.releaseOrMintToken(IPool(s_destPools[0]), amount, OWNER);
     assertEq(startingBalance + amount, destToken0.balanceOf(OWNER));
   }
 
@@ -159,7 +159,7 @@ contract BaseOffRamp__releaseOrMintToken is BaseOffRampSetup {
     uint256 startingBalance = destToken1.balanceOf(OWNER);
     uint256 amount = POOL_BALANCE * 2; // amount bigger than balance
     uint256 startingPoolBalance = destToken1.balanceOf(s_destPools[1]);
-    s_offRamp.releaseOrMintToken(PoolInterface(s_destPools[1]), amount, OWNER);
+    s_offRamp.releaseOrMintToken(IPool(s_destPools[1]), amount, OWNER);
     assertEq(startingBalance + amount, destToken1.balanceOf(OWNER));
     // pool balance doesn't change, because tokens were minted
     assertEq(startingPoolBalance, destToken1.balanceOf(s_destPools[1]));
@@ -168,7 +168,7 @@ contract BaseOffRamp__releaseOrMintToken is BaseOffRampSetup {
   // Revert
   function testExceedsPoolReverts() public {
     vm.expectRevert("ERC20: transfer amount exceeds balance");
-    s_offRamp.releaseOrMintToken(PoolInterface(s_destPools[0]), POOL_BALANCE * 2, OWNER);
+    s_offRamp.releaseOrMintToken(IPool(s_destPools[0]), POOL_BALANCE * 2, OWNER);
   }
 }
 
@@ -199,7 +199,7 @@ contract BaseOffRamp__releaseOrMintTokens is BaseOffRampSetup {
   function testTokenAndAmountMisMatchReverts() public {
     Common.EVMTokenAndAmount[] memory tokensAndAmounts = new Common.EVMTokenAndAmount[](1);
 
-    vm.expectRevert(BaseOffRampInterface.TokenAndAmountMisMatch.selector);
+    vm.expectRevert(IBaseOffRamp.TokenAndAmountMisMatch.selector);
     s_offRamp.releaseOrMintTokens(s_destPools, tokensAndAmounts, OWNER);
   }
 }
@@ -228,7 +228,7 @@ contract BaseOffRamp__getPool is BaseOffRampSetup {
   function testUnsupportedTokenReverts() public {
     IERC20 wrongToken = IERC20(address(1));
 
-    vm.expectRevert(abi.encodeWithSelector(BaseOffRampInterface.UnsupportedToken.selector, wrongToken));
+    vm.expectRevert(abi.encodeWithSelector(IBaseOffRamp.UnsupportedToken.selector, wrongToken));
     s_offRamp.getPool_helper(wrongToken);
   }
 }

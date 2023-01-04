@@ -2,19 +2,19 @@
 pragma solidity 0.8.15;
 
 import {Address} from "../../vendor/Address.sol";
-import {HealthChecker, AFNInterface} from "../health/HealthChecker.sol";
+import {HealthChecker, IAFN} from "../health/HealthChecker.sol";
 import {OffRampTokenPoolRegistry} from "../pools/OffRampTokenPoolRegistry.sol";
 import {AggregateRateLimiter} from "../rateLimiter/AggregateRateLimiter.sol";
-import {BaseOffRampInterface, Any2EVMOffRampRouterInterface, CommitStoreInterface} from "../interfaces/offRamp/BaseOffRampInterface.sol";
+import {IBaseOffRamp, IAny2EVMOffRampRouter, ICommitStore} from "../interfaces/offRamp/IBaseOffRamp.sol";
 import {IERC20} from "../../vendor/IERC20.sol";
 import {Internal} from "../models/Internal.sol";
 import {Common} from "../models/Common.sol";
-import {PoolInterface} from "../interfaces/pools/PoolInterface.sol";
+import {IPool} from "../interfaces/pools/IPool.sol";
 
 /**
  * @notice A base OffRamp contract that every OffRamp should expand on
  */
-contract BaseOffRamp is BaseOffRampInterface, HealthChecker, OffRampTokenPoolRegistry, AggregateRateLimiter {
+contract BaseOffRamp is IBaseOffRamp, HealthChecker, OffRampTokenPoolRegistry, AggregateRateLimiter {
   using Address for address;
 
   // Chain ID of the source chain
@@ -25,10 +25,10 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, OffRampTokenPoolReg
   address internal immutable i_onRampAddress;
 
   // The router through which all transactions will be executed
-  Any2EVMOffRampRouterInterface internal s_router;
+  IAny2EVMOffRampRouter internal s_router;
 
   // The commitStore contract
-  CommitStoreInterface internal s_commitStore;
+  ICommitStore internal s_commitStore;
 
   // A mapping of sequence numbers to execution state.
   // This makes sure we never execute a message twice.
@@ -38,10 +38,10 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, OffRampTokenPoolReg
     uint64 sourceChainId,
     uint64 chainId,
     address onRampAddress,
-    CommitStoreInterface commitStore,
-    AFNInterface afn,
+    ICommitStore commitStore,
+    IAFN afn,
     IERC20[] memory sourceTokens,
-    PoolInterface[] memory pools,
+    IPool[] memory pools,
     RateLimiterConfig memory rateLimiterConfig,
     address tokenLimitsAdmin
   )
@@ -62,7 +62,7 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, OffRampTokenPoolReg
    *          the given `receiver` address.
    */
   function _releaseOrMintToken(
-    PoolInterface pool,
+    IPool pool,
     uint256 amount,
     address receiver
   ) internal {
@@ -80,7 +80,7 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, OffRampTokenPoolReg
   ) internal {
     if (pools.length != tokensAndAmounts.length) revert TokenAndAmountMisMatch();
     for (uint256 i = 0; i < pools.length; ++i) {
-      _releaseOrMintToken(PoolInterface(pools[i]), tokensAndAmounts[i].amount, receiver);
+      _releaseOrMintToken(IPool(pools[i]), tokensAndAmounts[i].amount, receiver);
     }
   }
 
@@ -118,7 +118,7 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, OffRampTokenPoolReg
     returns (Internal.MessageExecutionState)
   {
     try this.executeSingleMessage(message, manualExecution) {} catch (bytes memory err) {
-      if (BaseOffRampInterface.ReceiverError.selector == bytes4(err)) {
+      if (IBaseOffRamp.ReceiverError.selector == bytes4(err)) {
         return Internal.MessageExecutionState.FAILURE;
       } else {
         revert ExecutionError(err);
@@ -158,29 +158,29 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, OffRampTokenPoolReg
     revert();
   }
 
-  /// @inheritdoc BaseOffRampInterface
-  function setRouter(Any2EVMOffRampRouterInterface router) external onlyOwner {
+  /// @inheritdoc IBaseOffRamp
+  function setRouter(IAny2EVMOffRampRouter router) external onlyOwner {
     s_router = router;
     emit OffRampRouterSet(address(router), i_sourceChainId, i_onRampAddress);
   }
 
-  /// @inheritdoc BaseOffRampInterface
-  function getRouter() external view override returns (Any2EVMOffRampRouterInterface) {
+  /// @inheritdoc IBaseOffRamp
+  function getRouter() external view override returns (IAny2EVMOffRampRouter) {
     return s_router;
   }
 
-  /// @inheritdoc BaseOffRampInterface
+  /// @inheritdoc IBaseOffRamp
   function getExecutionState(uint64 sequenceNumber) public view returns (Internal.MessageExecutionState) {
     return s_executedMessages[sequenceNumber];
   }
 
-  /// @inheritdoc BaseOffRampInterface
-  function getCommitStore() external view returns (CommitStoreInterface) {
+  /// @inheritdoc IBaseOffRamp
+  function getCommitStore() external view returns (ICommitStore) {
     return s_commitStore;
   }
 
-  /// @inheritdoc BaseOffRampInterface
-  function setCommitStore(CommitStoreInterface commitStore) external onlyOwner {
+  /// @inheritdoc IBaseOffRamp
+  function setCommitStore(ICommitStore commitStore) external onlyOwner {
     s_commitStore = commitStore;
   }
 
@@ -192,7 +192,7 @@ contract BaseOffRamp is BaseOffRampInterface, HealthChecker, OffRampTokenPoolReg
   /**
    * @notice Returns the pool for a given source chain token.
    */
-  function _getPool(IERC20 token) internal view returns (PoolInterface pool) {
+  function _getPool(IERC20 token) internal view returns (IPool pool) {
     pool = getPoolBySourceToken(token);
     if (address(pool) == address(0)) revert UnsupportedToken(token);
   }

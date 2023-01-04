@@ -25,7 +25,7 @@ contract HealthChecker_constructor is HealthCheckerSetup {
 
   function testBadConfigReverts() public {
     vm.expectRevert(HealthChecker.BadHealthConfig.selector);
-    s_healthChecker = new HealthCheckerHelper(AFNInterface(address(0)));
+    s_healthChecker = new HealthCheckerHelper(IAFN(address(0)));
   }
 }
 
@@ -89,9 +89,9 @@ contract HealthChecker_unpause is HealthCheckerSetup {
 }
 
 contract HealthChecker_setAFN is HealthCheckerSetup {
-  event AFNSet(AFNInterface oldAFN, AFNInterface newAFN);
+  event AFNSet(IAFN oldAFN, IAFN newAFN);
 
-  AFNInterface internal constant NEW_AFN = AFNInterface(DUMMY_CONTRACT_ADDRESS);
+  IAFN internal constant NEW_AFN = IAFN(DUMMY_CONTRACT_ADDRESS);
 
   // Success
 
@@ -113,7 +113,7 @@ contract HealthChecker_setAFN is HealthCheckerSetup {
 
   function testBadConfigReverts() public {
     vm.expectRevert(HealthChecker.BadHealthConfig.selector);
-    s_healthChecker.setAFN(AFNInterface(ZERO_ADDRESS));
+    s_healthChecker.setAFN(IAFN(ZERO_ADDRESS));
   }
 }
 

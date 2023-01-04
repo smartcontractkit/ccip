@@ -13,7 +13,7 @@ contract EVM2EVMTollOnRamp_constructor is EVM2EVMTollOnRampSetup {
     assertEq(OWNER, s_onRamp.owner());
 
     // baseOnRamp
-    BaseOnRampInterface.OnRampConfig memory onRampConfig = onRampConfig();
+    IBaseOnRamp.OnRampConfig memory onRampConfig = onRampConfig();
     assertEq(onRampConfig.commitFeeJuels, s_onRamp.getConfig().commitFeeJuels);
     assertEq(onRampConfig.maxDataSize, s_onRamp.getConfig().maxDataSize);
     assertEq(onRampConfig.maxTokensLength, s_onRamp.getConfig().maxTokensLength);
@@ -90,12 +90,12 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
 
   function testPermissionsReverts() public {
     changePrank(OWNER);
-    vm.expectRevert(BaseOnRampInterface.MustBeCalledByRouter.selector);
+    vm.expectRevert(IBaseOnRamp.MustBeCalledByRouter.selector);
     s_onRamp.forwardFromRouter(_generateEmptyMessage(), OWNER);
   }
 
   function testOriginalSenderReverts() public {
-    vm.expectRevert(BaseOnRampInterface.RouterMustSetOriginalSender.selector);
+    vm.expectRevert(IBaseOnRamp.RouterMustSetOriginalSender.selector);
     s_onRamp.forwardFromRouter(_generateEmptyMessage(), address(0));
   }
 
@@ -103,11 +103,7 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
     TollConsumer.EVM2AnyTollMessage memory message = _generateEmptyMessage();
     message.data = new bytes(onRampConfig().maxDataSize + 1);
     vm.expectRevert(
-      abi.encodeWithSelector(
-        BaseOnRampInterface.MessageTooLarge.selector,
-        onRampConfig().maxDataSize,
-        message.data.length
-      )
+      abi.encodeWithSelector(IBaseOnRamp.MessageTooLarge.selector, onRampConfig().maxDataSize, message.data.length)
     );
 
     s_onRamp.forwardFromRouter(message, STRANGER);
@@ -118,7 +114,7 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
     TollConsumer.EVM2AnyTollMessage memory message = _generateEmptyMessage();
     uint256 tooMany = MAX_TOKENS_LENGTH + 1;
     message.tokensAndAmounts = new Common.EVMTokenAndAmount[](tooMany);
-    vm.expectRevert(BaseOnRampInterface.UnsupportedNumberOfTokens.selector);
+    vm.expectRevert(IBaseOnRamp.UnsupportedNumberOfTokens.selector);
     s_onRamp.forwardFromRouter(message, STRANGER);
   }
 
@@ -126,7 +122,7 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
     changePrank(OWNER);
     s_onRamp.setAllowlistEnabled(true);
 
-    vm.expectRevert(abi.encodeWithSelector(AllowListInterface.SenderNotAllowed.selector, STRANGER));
+    vm.expectRevert(abi.encodeWithSelector(IAllowList.SenderNotAllowed.selector, STRANGER));
     changePrank(address(s_onRampRouter));
     s_onRamp.forwardFromRouter(_generateEmptyMessage(), STRANGER);
   }
@@ -148,7 +144,7 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
 
     // Change back to the router
     changePrank(address(s_onRampRouter));
-    vm.expectRevert(abi.encodeWithSelector(BaseOnRampInterface.UnsupportedToken.selector, wrongToken));
+    vm.expectRevert(abi.encodeWithSelector(IBaseOnRamp.UnsupportedToken.selector, wrongToken));
 
     s_onRamp.forwardFromRouter(message, OWNER);
   }
@@ -163,7 +159,7 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        AggregateRateLimiterInterface.ValueExceedsCapacity.selector,
+        IAggregateRateLimiter.ValueExceedsCapacity.selector,
         rateLimiterConfig().capacity,
         message.tokensAndAmounts[0].amount * getTokenPrices()[0]
       )
@@ -179,7 +175,7 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
     message.tokensAndAmounts = new Common.EVMTokenAndAmount[](1);
     message.tokensAndAmounts[0].token = fakeToken;
 
-    vm.expectRevert(abi.encodeWithSelector(AggregateRateLimiterInterface.PriceNotFoundForToken.selector, fakeToken));
+    vm.expectRevert(abi.encodeWithSelector(IAggregateRateLimiter.PriceNotFoundForToken.selector, fakeToken));
 
     s_onRamp.forwardFromRouter(message, OWNER);
   }
@@ -190,7 +186,7 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
     message.extraArgs = TollConsumer._argsToBytes(
       TollConsumer.EVMExtraArgsV1({gasLimit: MAX_GAS_LIMIT + 1, strict: false})
     );
-    vm.expectRevert(abi.encodeWithSelector(BaseOnRampInterface.MessageGasLimitTooHigh.selector));
+    vm.expectRevert(abi.encodeWithSelector(IBaseOnRamp.MessageGasLimitTooHigh.selector));
     s_onRamp.forwardFromRouter(message, OWNER);
   }
 }
@@ -209,8 +205,8 @@ contract EVM2EVMTollOnRamp_getRequiredFee is EVM2EVMTollOnRampSetup {
 
 /// @notice #setFeeConfig
 contract EVM2EVMTollOnRamp_setFeeConfig is EVM2EVMTollOnRampSetup {
-  EVM2EVMTollOnRampInterface.FeeConfig s_feeConfig1;
-  EVM2EVMTollOnRampInterface.FeeConfig s_feeConfig2;
+  IEVM2EVMTollOnRamp.FeeConfig s_feeConfig1;
+  IEVM2EVMTollOnRamp.FeeConfig s_feeConfig2;
   uint256 constant FEE = 1;
 
   function setUp() public virtual override {
@@ -223,8 +219,8 @@ contract EVM2EVMTollOnRamp_setFeeConfig is EVM2EVMTollOnRampSetup {
     feeTokens2[0] = IERC20(s_sourceTokens[1]);
     uint256[] memory fees = new uint256[](1);
     fees[0] = FEE;
-    s_feeConfig1 = EVM2EVMTollOnRampInterface.FeeConfig({feeTokens: feeTokens1, fees: fees});
-    s_feeConfig2 = EVM2EVMTollOnRampInterface.FeeConfig({feeTokens: feeTokens2, fees: fees});
+    s_feeConfig1 = IEVM2EVMTollOnRamp.FeeConfig({feeTokens: feeTokens1, fees: fees});
+    s_feeConfig2 = IEVM2EVMTollOnRamp.FeeConfig({feeTokens: feeTokens2, fees: fees});
   }
 
   // Success

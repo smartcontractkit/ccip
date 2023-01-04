@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import {Common} from "../../models/Common.sol";
 import {GE} from "../../models/GE.sol";
 
-interface GasFeeCacheInterface {
+interface IGasFeeCache {
   error ChainNotSupported(uint64 chain);
   error FeeUpdaterNotAllowed(address feeUpdater);
   error OnlyCallableByUpdaterOrOwner();
@@ -14,7 +14,7 @@ interface GasFeeCacheInterface {
   event FeeUpdaterRemoved(address feeUpdater);
   event GasFeeUpdated(uint64 destChain, uint128 linkPerUnitGas, uint128 timestamp);
 
-  struct TimestampedFeeUpdate{
+  struct TimestampedFeeUpdate {
     uint128 linkPerUnitGas;
     uint128 timestamp;
   }

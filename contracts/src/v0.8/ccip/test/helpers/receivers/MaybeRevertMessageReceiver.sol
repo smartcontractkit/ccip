@@ -1,8 +1,8 @@
 pragma solidity 0.8.15;
 
-import "../../../interfaces/applications/Any2EVMMessageReceiverInterface.sol";
+import "../../../interfaces/applications/IAny2EVMMessageReceiver.sol";
 
-contract MaybeRevertMessageReceiver is Any2EVMMessageReceiverInterface {
+contract MaybeRevertMessageReceiver is IAny2EVMMessageReceiver {
   address private s_manager;
   bool public s_toRevert;
   event MessageReceived();

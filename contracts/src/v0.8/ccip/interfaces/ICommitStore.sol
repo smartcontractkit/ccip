@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {Internal} from "../models/Internal.sol";
 
-interface CommitStoreInterface {
+interface ICommitStore {
   error UnsupportedOnRamp(address onRamp);
   error InvalidInterval(Internal.Interval interval, address onRamp);
   error InvalidCommitReport(Internal.CommitReport report);

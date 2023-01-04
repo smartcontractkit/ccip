@@ -7,14 +7,14 @@ import "../TokenSetup.t.sol";
 
 contract BaseOffRampRouterSetup is TokenSetup {
   BaseOffRampRouterHelper s_router;
-  BaseOffRampInterface[] s_offRamps;
+  IBaseOffRamp[] s_offRamps;
 
   function setUp() public virtual override {
     TokenSetup.setUp();
 
-    s_offRamps = new BaseOffRampInterface[](2);
-    s_offRamps[0] = BaseOffRampInterface(address(10));
-    s_offRamps[1] = BaseOffRampInterface(address(11));
+    s_offRamps = new IBaseOffRamp[](2);
+    s_offRamps[0] = IBaseOffRamp(address(10));
+    s_offRamps[1] = IBaseOffRamp(address(11));
     s_router = new BaseOffRampRouterHelper(s_offRamps);
   }
 }
@@ -23,9 +23,9 @@ contract BaseOffRampRouterSetup is TokenSetup {
 
 /// @notice #addOffRamp
 contract BaseOffRampRouter_addOffRamp is BaseOffRampRouterSetup {
-  BaseOffRampInterface internal s_newOffRamp;
+  IBaseOffRamp internal s_newOffRamp;
 
-  event OffRampAdded(BaseOffRampInterface indexed offRamp);
+  event OffRampAdded(IBaseOffRamp indexed offRamp);
 
   function setUp() public virtual override {
     BaseOffRampRouterSetup.setUp();
@@ -56,20 +56,20 @@ contract BaseOffRampRouter_addOffRamp is BaseOffRampRouterSetup {
   }
 
   function testAlreadyConfiguredReverts() public {
-    BaseOffRampInterface existingOffRamp = s_offRamps[0];
-    vm.expectRevert(abi.encodeWithSelector(Any2EVMOffRampRouterInterface.AlreadyConfigured.selector, existingOffRamp));
+    IBaseOffRamp existingOffRamp = s_offRamps[0];
+    vm.expectRevert(abi.encodeWithSelector(IAny2EVMOffRampRouter.AlreadyConfigured.selector, existingOffRamp));
     s_router.addOffRamp(existingOffRamp);
   }
 
   function testZeroAddressReverts() public {
-    vm.expectRevert(Any2EVMOffRampRouterInterface.InvalidAddress.selector);
-    s_router.addOffRamp(BaseOffRampInterface(address(0)));
+    vm.expectRevert(IAny2EVMOffRampRouter.InvalidAddress.selector);
+    s_router.addOffRamp(IBaseOffRamp(address(0)));
   }
 }
 
 /// @notice #removeOffRamp
 contract BaseOffRampRouter_removeOffRamp is BaseOffRampRouterSetup {
-  event OffRampRemoved(BaseOffRampInterface indexed offRamp);
+  event OffRampRemoved(IBaseOffRamp indexed offRamp);
 
   // Success
 
@@ -98,13 +98,13 @@ contract BaseOffRampRouter_removeOffRamp is BaseOffRampRouterSetup {
 
     assertEq(0, s_router.getOffRamps().length);
 
-    vm.expectRevert(Any2EVMOffRampRouterInterface.NoOffRampsConfigured.selector);
+    vm.expectRevert(IAny2EVMOffRampRouter.NoOffRampsConfigured.selector);
     s_router.removeOffRamp(s_offRamps[0]);
   }
 
   function testOffRampNotAllowedReverts() public {
-    BaseOffRampInterface newRamp = new MockOffRamp();
-    vm.expectRevert(abi.encodeWithSelector(Any2EVMOffRampRouterInterface.OffRampNotAllowed.selector, newRamp));
+    IBaseOffRamp newRamp = new MockOffRamp();
+    vm.expectRevert(abi.encodeWithSelector(IAny2EVMOffRampRouter.OffRampNotAllowed.selector, newRamp));
     s_router.removeOffRamp(newRamp);
   }
 }
@@ -113,7 +113,7 @@ contract BaseOffRampRouter_removeOffRamp is BaseOffRampRouterSetup {
 contract BaseOffRampRouter_getOffRamps is BaseOffRampRouterSetup {
   // Success
   function testSuccess() public {
-    BaseOffRampInterface[] memory offRamps = s_router.getOffRamps();
+    IBaseOffRamp[] memory offRamps = s_router.getOffRamps();
     assertEq(2, offRamps.length);
     assertEq(address(s_offRamps[0]), address(offRamps[0]));
     assertEq(address(s_offRamps[1]), address(offRamps[1]));
@@ -126,6 +126,6 @@ contract BaseOffRampRouter_isOffRamp is BaseOffRampRouterSetup {
   function testSuccess() public {
     assertTrue(s_router.isOffRamp(s_offRamps[0]));
     assertTrue(s_router.isOffRamp(s_offRamps[1]));
-    assertFalse(s_router.isOffRamp(BaseOffRampInterface(address(1))));
+    assertFalse(s_router.isOffRamp(IBaseOffRamp(address(1))));
   }
 }

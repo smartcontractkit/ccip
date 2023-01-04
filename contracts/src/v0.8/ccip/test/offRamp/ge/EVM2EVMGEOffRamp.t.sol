@@ -34,20 +34,20 @@ contract EVM2EVMGEOffRamp_constructor is EVM2EVMGEOffRampSetup {
 
 /// @notice #setRouter
 contract EVM2EVMGEOffRamp_setRouter is EVM2EVMGEOffRampSetup {
-  Any2EVMOffRampRouterInterface public s_router;
+  IAny2EVMOffRampRouter public s_router;
 
   event OffRampRouterSet(address indexed router, uint64 sourceChainId, address onRampAddress);
 
   function setUp() public virtual override {
     EVM2EVMGEOffRampSetup.setUp();
-    BaseOffRampInterface[] memory offRamps = new BaseOffRampInterface[](1);
+    IBaseOffRamp[] memory offRamps = new IBaseOffRamp[](1);
     offRamps[0] = s_offRamp;
     s_router = new GERouter(offRamps);
     s_offRamp.setRouter(s_router);
   }
 
   function _generateNewRouter() internal returns (GERouter newRouter) {
-    BaseOffRampInterface[] memory offRamps = new BaseOffRampInterface[](0);
+    IBaseOffRamp[] memory offRamps = new IBaseOffRamp[](0);
     newRouter = new GERouter(offRamps);
   }
 
@@ -58,10 +58,10 @@ contract EVM2EVMGEOffRamp_setRouter is EVM2EVMGEOffRampSetup {
   }
 
   function testSuccessZeroAddress() public {
-    _testSuccess(Any2EVMOffRampRouterInterface(address(0)));
+    _testSuccess(IAny2EVMOffRampRouter(address(0)));
   }
 
-  function _testSuccess(Any2EVMOffRampRouterInterface newRouter) private {
+  function _testSuccess(IAny2EVMOffRampRouter newRouter) private {
     vm.expectEmit(true, false, false, true);
     emit OffRampRouterSet(address(newRouter), SOURCE_CHAIN_ID, ON_RAMP_ADDRESS);
 
@@ -73,7 +73,7 @@ contract EVM2EVMGEOffRamp_setRouter is EVM2EVMGEOffRampSetup {
   // Reverts
 
   function testOwnerReverts() public {
-    Any2EVMOffRampRouterInterface newRouter = _generateNewRouter();
+    IAny2EVMOffRampRouter newRouter = _generateNewRouter();
 
     changePrank(STRANGER);
     vm.expectRevert("Only callable by owner");
@@ -94,11 +94,11 @@ contract EVM2EVMGEOffRamp_ccipReceive is EVM2EVMGEOffRampSetup {
 
 /// @notice #execute
 contract EVM2EVMGEOffRamp_execute is EVM2EVMGEOffRampSetup {
-  Any2EVMOffRampRouterInterface s_router;
+  IAny2EVMOffRampRouter s_router;
 
   function setUp() public virtual override {
     EVM2EVMGEOffRampSetup.setUp();
-    BaseOffRampInterface[] memory offRamps = new BaseOffRampInterface[](1);
+    IBaseOffRamp[] memory offRamps = new IBaseOffRamp[](1);
     offRamps[0] = s_offRamp;
     s_router = new GERouter(offRamps);
     s_offRamp.setRouter(s_router);
@@ -236,19 +236,15 @@ contract EVM2EVMGEOffRamp_execute is EVM2EVMGEOffRampSetup {
   }
 
   function testRouterNotSetReverts() public {
-    Any2EVMOffRampRouterInterface newRouter = GERouter(address(0));
+    IAny2EVMOffRampRouter newRouter = GERouter(address(0));
     s_offRamp.setRouter(newRouter);
-    vm.expectRevert(BaseOffRampInterface.RouterNotSet.selector);
+    vm.expectRevert(IBaseOffRamp.RouterNotSet.selector);
     s_offRamp.execute(_generateReportFromMessages(_generateBasicMessages()), false);
   }
 
   function testRootNotCommittedReverts() public {
-    vm.mockCall(
-      address(s_mockCommitStore),
-      abi.encodeWithSelector(CommitStoreInterface.verify.selector),
-      abi.encode(0)
-    );
-    vm.expectRevert(BaseOffRampInterface.RootNotCommitted.selector);
+    vm.mockCall(address(s_mockCommitStore), abi.encodeWithSelector(ICommitStore.verify.selector), abi.encode(0));
+    vm.expectRevert(IBaseOffRamp.RootNotCommitted.selector);
 
     s_offRamp.execute(_generateReportFromMessages(_generateBasicMessages()), true);
     vm.clearMockedCalls();
@@ -257,10 +253,10 @@ contract EVM2EVMGEOffRamp_execute is EVM2EVMGEOffRampSetup {
   function testManualExecutionNotYetEnabledReverts() public {
     vm.mockCall(
       address(s_mockCommitStore),
-      abi.encodeWithSelector(CommitStoreInterface.verify.selector),
+      abi.encodeWithSelector(ICommitStore.verify.selector),
       abi.encode(BLOCK_TIME)
     );
-    vm.expectRevert(BaseOffRampInterface.ManualExecutionNotYetEnabled.selector);
+    vm.expectRevert(IBaseOffRamp.ManualExecutionNotYetEnabled.selector);
 
     s_offRamp.execute(_generateReportFromMessages(_generateBasicMessages()), true);
     vm.clearMockedCalls();
@@ -269,9 +265,7 @@ contract EVM2EVMGEOffRamp_execute is EVM2EVMGEOffRampSetup {
   function testAlreadyExecutedReverts() public {
     GE.ExecutionReport memory executionReport = _generateReportFromMessages(_generateBasicMessages());
     s_offRamp.execute(executionReport, false);
-    vm.expectRevert(
-      abi.encodeWithSelector(BaseOffRampInterface.AlreadyExecuted.selector, executionReport.sequenceNumbers[0])
-    );
+    vm.expectRevert(abi.encodeWithSelector(IBaseOffRamp.AlreadyExecuted.selector, executionReport.sequenceNumbers[0]));
     s_offRamp.execute(executionReport, false);
   }
 
@@ -279,7 +273,7 @@ contract EVM2EVMGEOffRamp_execute is EVM2EVMGEOffRampSetup {
     GE.EVM2EVMGEMessage[] memory messages = _generateBasicMessages();
     messages[0].sourceChainId = SOURCE_CHAIN_ID + 1;
 
-    vm.expectRevert(abi.encodeWithSelector(BaseOffRampInterface.InvalidSourceChain.selector, SOURCE_CHAIN_ID + 1));
+    vm.expectRevert(abi.encodeWithSelector(IBaseOffRamp.InvalidSourceChain.selector, SOURCE_CHAIN_ID + 1));
     s_offRamp.execute(_generateReportFromMessages(messages), false);
   }
 
@@ -290,7 +284,7 @@ contract EVM2EVMGEOffRamp_execute is EVM2EVMGEOffRampSetup {
     GE.ExecutionReport memory report = _generateReportFromMessages(messages);
 
     vm.expectRevert(
-      abi.encodeWithSelector(BaseOffRampInterface.UnsupportedNumberOfTokens.selector, messages[0].sequenceNumber)
+      abi.encodeWithSelector(IBaseOffRamp.UnsupportedNumberOfTokens.selector, messages[0].sequenceNumber)
     );
     s_offRamp.execute(report, false);
   }
@@ -302,7 +296,7 @@ contract EVM2EVMGEOffRamp_execute is EVM2EVMGEOffRampSetup {
 
     GE.ExecutionReport memory executionReport = _generateReportFromMessages(messages);
     vm.expectRevert(
-      abi.encodeWithSelector(BaseOffRampInterface.MessageTooLarge.selector, MAX_DATA_SIZE, messages[0].data.length)
+      abi.encodeWithSelector(IBaseOffRamp.MessageTooLarge.selector, MAX_DATA_SIZE, messages[0].data.length)
     );
     s_offRamp.execute(executionReport, false);
   }
@@ -312,18 +306,18 @@ contract EVM2EVMGEOffRamp_execute is EVM2EVMGEOffRampSetup {
     messages[0].tokensAndAmounts[0] = getCastedDestinationEVMTokenAndAmountsWithZeroAmounts()[0];
     messages[0].feeToken = messages[0].tokensAndAmounts[0].token;
     messages[0].feeTokenAmount = COMMIT_FEE_JUELS;
-    vm.expectRevert(abi.encodeWithSelector(BaseOffRampInterface.UnsupportedToken.selector, s_destTokens[0]));
+    vm.expectRevert(abi.encodeWithSelector(IBaseOffRamp.UnsupportedToken.selector, s_destTokens[0]));
     s_offRamp.execute(_generateReportFromMessages(messages), false);
   }
 }
 
 /// @notice #executeSingleMessage
 contract EVM2EVMGEOffRamp_executeSingleMessage is EVM2EVMGEOffRampSetup {
-  Any2EVMOffRampRouterInterface public s_router;
+  IAny2EVMOffRampRouter public s_router;
 
   function setUp() public virtual override {
     EVM2EVMGEOffRampSetup.setUp();
-    BaseOffRampInterface[] memory offRamps = new BaseOffRampInterface[](1);
+    IBaseOffRamp[] memory offRamps = new IBaseOffRamp[](1);
     offRamps[0] = s_offRamp;
     s_router = new GERouter(offRamps);
     s_offRamp.setRouter(s_router);
@@ -351,7 +345,7 @@ contract EVM2EVMGEOffRamp_executeSingleMessage is EVM2EVMGEOffRampSetup {
   function testLowGasLimitManualExecutionSuccess() public {
     Internal.Any2EVMMessageFromSender memory message = _convertGEToGeneralMessage(_generateAny2EVMGEMessageNoTokens(1));
     message.gasLimit = 1;
-    vm.expectRevert(BaseOffRampInterface.ReceiverError.selector);
+    vm.expectRevert(IBaseOffRamp.ReceiverError.selector);
     s_offRamp.executeSingleMessage(message, false);
     vm.expectEmit(false, false, false, false);
     emit MessageReceived();
@@ -381,18 +375,18 @@ contract EVM2EVMGEOffRamp_executeSingleMessage is EVM2EVMGEOffRampSetup {
   function testMessageSenderReverts() public {
     vm.stopPrank();
     Internal.Any2EVMMessageFromSender memory message = _convertGEToGeneralMessage(_generateAny2EVMGEMessageNoTokens(1));
-    vm.expectRevert(BaseOffRampInterface.CanOnlySelfCall.selector);
+    vm.expectRevert(IBaseOffRamp.CanOnlySelfCall.selector);
     s_offRamp.executeSingleMessage(message, false);
   }
 }
 
 /// @notice #_report
 contract EVM2EVMGEOffRamp__report is EVM2EVMGEOffRampSetup {
-  Any2EVMOffRampRouterInterface s_router;
+  IAny2EVMOffRampRouter s_router;
 
   function setUp() public virtual override {
     EVM2EVMGEOffRampSetup.setUp();
-    BaseOffRampInterface[] memory offRamps = new BaseOffRampInterface[](1);
+    IBaseOffRamp[] memory offRamps = new IBaseOffRamp[](1);
     offRamps[0] = s_offRamp;
     s_router = new GERouter(offRamps);
     s_offRamp.setRouter(s_router);

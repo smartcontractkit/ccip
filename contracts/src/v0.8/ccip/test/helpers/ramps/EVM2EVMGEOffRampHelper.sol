@@ -9,10 +9,10 @@ contract EVM2EVMGEOffRampHelper is EVM2EVMGEOffRamp {
     uint64 chainId,
     GEOffRampConfig memory offRampConfig,
     address onRampAddress,
-    CommitStoreInterface commitStore,
-    AFNInterface afn,
+    ICommitStore commitStore,
+    IAFN afn,
     IERC20[] memory sourceTokens,
-    PoolInterface[] memory pools,
+    IPool[] memory pools,
     RateLimiterConfig memory rateLimiterConfig,
     address tokenLimitsAdmin,
     IERC20 feeToken

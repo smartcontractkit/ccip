@@ -79,7 +79,7 @@ contract EVM2AnyTollOnRampRouter_ccipSend is EVM2EVMTollOnRampSetup {
     TollConsumer.EVM2AnyTollMessage memory message = _generateEmptyMessage();
     uint64 wrongChain = DEST_CHAIN_ID + 1;
 
-    vm.expectRevert(abi.encodeWithSelector(BaseOnRampRouterInterface.UnsupportedDestinationChain.selector, wrongChain));
+    vm.expectRevert(abi.encodeWithSelector(IBaseOnRampRouter.UnsupportedDestinationChain.selector, wrongChain));
 
     s_onRampRouter.ccipSend(wrongChain, message);
   }
@@ -89,7 +89,7 @@ contract EVM2AnyTollOnRampRouter_ccipSend is EVM2EVMTollOnRampSetup {
     address wrongFeeToken = address(1);
     message.feeTokenAndAmount = Common.EVMTokenAndAmount({token: wrongFeeToken, amount: 0});
 
-    vm.expectRevert(abi.encodeWithSelector(BaseOnRampInterface.UnsupportedToken.selector, wrongFeeToken));
+    vm.expectRevert(abi.encodeWithSelector(IBaseOnRamp.UnsupportedToken.selector, wrongFeeToken));
 
     s_onRampRouter.ccipSend(DEST_CHAIN_ID, message);
   }
@@ -106,16 +106,16 @@ contract EVM2AnyTollOnRampRouter_ccipSend is EVM2EVMTollOnRampSetup {
 
 /// @notice #setOnRamp
 contract EVM2AnyTollOnRampRouter_setOnRamp is EVM2EVMTollOnRampSetup {
-  event OnRampSet(uint64 indexed chainId, EVM2EVMTollOnRampInterface indexed onRamp);
+  event OnRampSet(uint64 indexed chainId, IEVM2EVMTollOnRamp indexed onRamp);
 
   // Success
 
   // Asserts that setOnRamp changes the configured onramp. Also tests getOnRamp
   // and isChainSupported.
   function testSuccess() public {
-    EVM2EVMTollOnRampInterface onramp = EVM2EVMTollOnRampInterface(address(1));
+    IEVM2EVMTollOnRamp onramp = IEVM2EVMTollOnRamp(address(1));
     uint64 chainId = 1337;
-    EVM2EVMTollOnRampInterface before = s_onRampRouter.getOnRamp(chainId);
+    IEVM2EVMTollOnRamp before = s_onRampRouter.getOnRamp(chainId);
     assertEq(address(0), address(before));
     assertFalse(s_onRampRouter.isChainSupported(chainId));
 
@@ -123,7 +123,7 @@ contract EVM2AnyTollOnRampRouter_setOnRamp is EVM2EVMTollOnRampSetup {
     emit OnRampSet(chainId, onramp);
 
     s_onRampRouter.setOnRamp(chainId, onramp);
-    EVM2EVMTollOnRampInterface afterSet = s_onRampRouter.getOnRamp(chainId);
+    IEVM2EVMTollOnRamp afterSet = s_onRampRouter.getOnRamp(chainId);
     assertEq(address(onramp), address(afterSet));
     assertTrue(s_onRampRouter.isChainSupported(chainId));
   }
@@ -134,7 +134,7 @@ contract EVM2AnyTollOnRampRouter_setOnRamp is EVM2EVMTollOnRampSetup {
   // the same onRamp.
   function testAlreadySetReverts() public {
     vm.expectRevert(
-      abi.encodeWithSelector(EVM2AnyTollOnRampRouterInterface.OnRampAlreadySet.selector, DEST_CHAIN_ID, s_onRamp)
+      abi.encodeWithSelector(IEVM2AnyTollOnRampRouter.OnRampAlreadySet.selector, DEST_CHAIN_ID, s_onRamp)
     );
     s_onRampRouter.setOnRamp(DEST_CHAIN_ID, s_onRamp);
   }
@@ -143,7 +143,7 @@ contract EVM2AnyTollOnRampRouter_setOnRamp is EVM2EVMTollOnRampSetup {
   function testOnlyOwnerReverts() public {
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
-    s_onRampRouter.setOnRamp(1337, EVM2EVMTollOnRampInterface(address(1)));
+    s_onRampRouter.setOnRamp(1337, IEVM2EVMTollOnRamp(address(1)));
   }
 }
 

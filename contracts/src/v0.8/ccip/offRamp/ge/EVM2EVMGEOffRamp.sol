@@ -2,8 +2,8 @@
 pragma solidity 0.8.15;
 
 import {TypeAndVersionInterface} from "../../../interfaces/TypeAndVersionInterface.sol";
-import {BaseOffRampInterface} from "../../interfaces/offRamp/BaseOffRampInterface.sol";
-import {CommitStoreInterface} from "../../interfaces/CommitStoreInterface.sol";
+import {IBaseOffRamp} from "../../interfaces/offRamp/IBaseOffRamp.sol";
+import {ICommitStore} from "../../interfaces/ICommitStore.sol";
 import {OCR2Base} from "../../ocr/OCR2Base.sol";
 import {BaseOffRamp} from "../BaseOffRamp.sol";
 import {GE} from "../../models/GE.sol";
@@ -11,15 +11,15 @@ import {GEConsumer} from "../../models/GEConsumer.sol";
 import {Common} from "../../models/Common.sol";
 import {Internal} from "../../models/Internal.sol";
 import {IERC20} from "../../../vendor/IERC20.sol";
-import {AFNInterface} from "../../interfaces/health/AFNInterface.sol";
-import {PoolInterface} from "../../interfaces/pools/PoolInterface.sol";
-import {EVM2EVMGEOffRampInterface} from "../../interfaces/offRamp/EVM2EVMGEOffRampInterface.sol";
+import {IAFN} from "../../interfaces/health/IAFN.sol";
+import {IPool} from "../../interfaces/pools/IPool.sol";
+import {IEVM2EVMGEOffRamp} from "../../interfaces/offRamp/IEVM2EVMGEOffRamp.sol";
 
 /**
  * @notice EVM2EVMGEOffRamp enables OCR networks to execute multiple messages
  * in an OffRamp in a single transaction.
  */
-contract EVM2EVMGEOffRamp is EVM2EVMGEOffRampInterface, BaseOffRamp, TypeAndVersionInterface, OCR2Base {
+contract EVM2EVMGEOffRamp is IEVM2EVMGEOffRamp, BaseOffRamp, TypeAndVersionInterface, OCR2Base {
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "EVM2EVMGEOffRamp 1.0.0";
 
@@ -36,10 +36,10 @@ contract EVM2EVMGEOffRamp is EVM2EVMGEOffRampInterface, BaseOffRamp, TypeAndVers
     uint64 chainId,
     GEOffRampConfig memory offRampConfig,
     address onRampAddress,
-    CommitStoreInterface commitStore,
-    AFNInterface afn,
+    ICommitStore commitStore,
+    IAFN afn,
     IERC20[] memory sourceTokens,
-    PoolInterface[] memory pools,
+    IPool[] memory pools,
     RateLimiterConfig memory rateLimiterConfig,
     address tokenLimitsAdmin,
     IERC20 feeToken
@@ -66,12 +66,12 @@ contract EVM2EVMGEOffRamp is EVM2EVMGEOffRampInterface, BaseOffRamp, TypeAndVers
     _execute(report, true);
   }
 
-  /// @inheritdoc EVM2EVMGEOffRampInterface
+  /// @inheritdoc IEVM2EVMGEOffRamp
   function getSenderNonce(address sender) public view returns (uint64 nonce) {
     return s_senderNonce[sender];
   }
 
-  /// @inheritdoc EVM2EVMGEOffRampInterface
+  /// @inheritdoc IEVM2EVMGEOffRamp
   function getNopBalance(address nop) public view returns (uint256 balance) {
     return s_nopBalance[nop];
   }
@@ -208,7 +208,7 @@ contract EVM2EVMGEOffRamp is EVM2EVMGEOffRampInterface, BaseOffRamp, TypeAndVers
     address[] memory destPools = new address[](numberOfTokens);
 
     for (uint256 i = 0; i < numberOfTokens; ++i) {
-      PoolInterface pool = _getPool(IERC20(original.tokensAndAmounts[i].token));
+      IPool pool = _getPool(IERC20(original.tokensAndAmounts[i].token));
       destPools[i] = address(pool);
       destTokensAndAmounts[i] = Common.EVMTokenAndAmount({
         token: address(pool.getToken()),
@@ -236,12 +236,12 @@ contract EVM2EVMGEOffRamp is EVM2EVMGEOffRampInterface, BaseOffRamp, TypeAndVers
       revert MessageTooLarge(uint256(s_config.maxDataSize), message.data.length);
   }
 
-  /// @inheritdoc EVM2EVMGEOffRampInterface
+  /// @inheritdoc IEVM2EVMGEOffRamp
   function getGEConfig() external view returns (GEOffRampConfig memory) {
     return s_config;
   }
 
-  /// @inheritdoc EVM2EVMGEOffRampInterface
+  /// @inheritdoc IEVM2EVMGEOffRamp
   function setGEConfig(GEOffRampConfig memory config) external onlyOwner {
     s_config = config;
 
