@@ -8,6 +8,10 @@ on:
 
 jobs:
   build-and-publish:
+    environment: publish
+    permissions:
+      id-token: write
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - name: Collect Metrics
@@ -26,11 +30,15 @@ jobs:
         uses: docker/setup-buildx-action@94ab11c41e45d028884a99163086648e898eed25 # v1.6.0
         with:
           version: latest
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@67fbcbb121271f7775d2e7715933280b06314838 # v1.7.0
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_IAM_ROLE_PROD_PUBLISH_ARN }}
+          role-duration-seconds: ${{ secrets.AWS_ROLE_DURATION_SECONDS }}
+          aws-region: ${{ secrets.AWS_REGION }}
       - name: Login to ECR
         uses: docker/login-action@42d299face0c5c43a0487c477f595ac9cf22f1a7 #v1.12.0
         with:
-          username: "${{ secrets.AWS_ACCESS_KEY }}"
-          password: "${{ secrets.AWS_SECRET_KEY }}"
           registry: ${{ secrets.AWS_ECR_REPO_URL }}
       - name: Docker meta
         id: docker_meta
