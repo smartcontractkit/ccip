@@ -8,6 +8,13 @@ import (
 )
 
 func TestProofFlagToBits(t *testing.T) {
+	genFlags := func(indexesSet []int, size int) []bool {
+		bools := make([]bool, size)
+		for _, indexSet := range indexesSet {
+			bools[indexSet] = true
+		}
+		return bools
+	}
 	var tt = []struct {
 		flags    []bool
 		expected *big.Int
@@ -31,6 +38,10 @@ func TestProofFlagToBits(t *testing.T) {
 		{
 			[]bool{true, true, true},
 			big.NewInt(7),
+		},
+		{
+			genFlags([]int{266}, 300),
+			big.NewInt(0).SetBit(big.NewInt(0), 266, 1),
 		},
 	}
 	for _, tc := range tt {

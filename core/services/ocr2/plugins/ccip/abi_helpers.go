@@ -338,15 +338,17 @@ func MakeGEMsgArgs() abi.Arguments {
 		},
 	}
 }
+
+// ProofFlagsToBits transforms a list of boolean proof flags to a *big.Int
+// encoded number.
 func ProofFlagsToBits(proofFlags []bool) *big.Int {
-	// TODO: Support larger than int64
-	var a int64
+	encodedFlags := big.NewInt(0)
 	for i := 0; i < len(proofFlags); i++ {
 		if proofFlags[i] {
-			a |= 1 << i
+			encodedFlags.SetBit(encodedFlags, i, 1)
 		}
 	}
-	return big.NewInt(a)
+	return encodedFlags
 }
 
 func makeTollExecutionReportArgs() abi.Arguments {
