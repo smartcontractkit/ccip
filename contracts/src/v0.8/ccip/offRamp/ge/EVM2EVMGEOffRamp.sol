@@ -4,16 +4,18 @@ pragma solidity 0.8.15;
 import {TypeAndVersionInterface} from "../../../interfaces/TypeAndVersionInterface.sol";
 import {IBaseOffRamp} from "../../interfaces/offRamp/IBaseOffRamp.sol";
 import {ICommitStore} from "../../interfaces/ICommitStore.sol";
-import {OCR2Base} from "../../ocr/OCR2Base.sol";
-import {BaseOffRamp} from "../BaseOffRamp.sol";
-import {GE} from "../../models/GE.sol";
-import {GEConsumer} from "../../models/GEConsumer.sol";
-import {Common} from "../../models/Common.sol";
-import {Internal} from "../../models/Internal.sol";
-import {IERC20} from "../../../vendor/IERC20.sol";
 import {IAFN} from "../../interfaces/health/IAFN.sol";
 import {IPool} from "../../interfaces/pools/IPool.sol";
 import {IEVM2EVMGEOffRamp} from "../../interfaces/offRamp/IEVM2EVMGEOffRamp.sol";
+
+import {GE} from "../../models/GE.sol";
+import {Common} from "../../models/Common.sol";
+import {GEConsumer} from "../../models/GEConsumer.sol";
+import {Internal} from "../../models/Internal.sol";
+import {OCR2Base} from "../../ocr/OCR2Base.sol";
+import {BaseOffRamp} from "../BaseOffRamp.sol";
+
+import {IERC20} from "../../../vendor/IERC20.sol";
 
 /**
  * @notice EVM2EVMGEOffRamp enables OCR networks to execute multiple messages

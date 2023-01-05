@@ -2,6 +2,7 @@
 pragma solidity 0.8.15;
 
 import {IAllowList} from "../interfaces/access/IAllowList.sol";
+
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
 
 contract AllowList is IAllowList, OwnerIsCreator {

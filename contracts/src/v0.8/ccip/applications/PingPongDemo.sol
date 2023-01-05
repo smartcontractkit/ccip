@@ -2,9 +2,10 @@
 pragma solidity 0.8.15;
 
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
-import {IERC20} from "../../vendor/IERC20.sol";
 // solhint-disable-next-line chainlink-solidity/explicit-imports
 import "./CCIPConsumer.sol";
+
+import {IERC20} from "../../vendor/IERC20.sol";
 
 contract PingPongDemo is CCIPConsumer, OwnerIsCreator {
   event Ping(uint256 pingPongCount);

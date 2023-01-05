@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {HealthChecker, IAFN} from "../health/HealthChecker.sol";
-import {IERC20} from "../pools/PoolCollector.sol";
+import {IAFN} from "../interfaces/health/IAFN.sol";
+import {IBaseOnRamp} from "../interfaces/onRamp/IBaseOnRamp.sol";
+import {IPool} from "../interfaces/pools/IPool.sol";
+
+import {HealthChecker} from "../health/HealthChecker.sol";
 import {AllowList} from "../access/AllowList.sol";
 import {AggregateRateLimiter} from "../rateLimiter/AggregateRateLimiter.sol";
-import {IBaseOnRamp, IPool} from "../interfaces/onRamp/IBaseOnRamp.sol";
 import {Common} from "../models/Common.sol";
+
+import {IERC20} from "../../vendor/IERC20.sol";
 
 contract BaseOnRamp is IBaseOnRamp, HealthChecker, AllowList, AggregateRateLimiter {
   // Chain ID of the source chain (where this contract is deployed)

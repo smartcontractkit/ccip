@@ -2,7 +2,9 @@
 pragma solidity ^0.8.0;
 
 import {IAllowList} from "../access/IAllowList.sol";
-import {IPool, IERC20} from "../pools/IPool.sol";
+import {IPool} from "../pools/IPool.sol";
+
+import {IERC20} from "../../../vendor/IERC20.sol";
 
 interface IBaseOnRamp is IAllowList {
   error MessageTooLarge(uint256 maxSize, uint256 actualSize);

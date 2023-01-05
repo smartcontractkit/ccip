@@ -2,15 +2,20 @@
 pragma solidity 0.8.15;
 
 import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
-import {SafeERC20, IERC20} from "../../vendor/SafeERC20.sol";
 import {IPool} from "../interfaces/pools/IPool.sol";
-import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
-import {Common} from "../models/Common.sol";
-import {IGERouter, IBaseOnRampRouter} from "../interfaces/router/IGERouter.sol";
-import {IEVM2EVMGEOnRamp, IBaseOnRamp} from "../interfaces/onRamp/IEVM2EVMGEOnRamp.sol";
-import {BaseOffRampRouter, IBaseOffRamp, IAny2EVMOffRampRouter} from "../offRamp/BaseOffRampRouter.sol";
+import {IGERouter} from "../interfaces/router/IGERouter.sol";
+import {IBaseOnRampRouter} from "../interfaces/onRamp/IBaseOnRampRouter.sol";
+import {IBaseOnRamp} from "../interfaces/onRamp/IBaseOnRamp.sol";
+import {IEVM2EVMGEOnRamp} from "../interfaces/onRamp/IEVM2EVMGEOnRamp.sol";
+import {IBaseOffRamp} from "../interfaces/offRamp/IBaseOffRamp.sol";
+
+import {BaseOffRampRouter} from "../offRamp/BaseOffRampRouter.sol";
 import {GEConsumer} from "../models/GEConsumer.sol";
 import {Internal} from "../models/Internal.sol";
+import {Common} from "../models/Common.sol";
+
+import {SafeERC20} from "../../vendor/SafeERC20.sol";
+import {IERC20} from "../../vendor/IERC20.sol";
 
 contract GERouter is IGERouter, BaseOffRampRouter, TypeAndVersionInterface {
   using SafeERC20 for IERC20;

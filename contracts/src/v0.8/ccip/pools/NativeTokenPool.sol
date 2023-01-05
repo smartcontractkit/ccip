@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {TokenPool, SafeERC20, IERC20} from "./TokenPool.sol";
+import {TokenPool} from "./TokenPool.sol";
+
+import {IERC20} from "../../vendor/IERC20.sol";
+import {SafeERC20} from "../../vendor/SafeERC20.sol";
 
 /**
  * @notice Token pool used for tokens on their native chain. This uses a lock and release mechanism.

@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {GEConsumer} from "../../models/GEConsumer.sol";
 import {IBaseOnRampRouter} from "../onRamp/IBaseOnRampRouter.sol";
 import {IEVM2EVMGEOnRamp} from "../onRamp/IEVM2EVMGEOnRamp.sol";
 import {IAny2EVMOffRampRouter} from "../offRamp/IAny2EVMOffRampRouter.sol";
 import {IBaseOnRampRouter} from "../onRamp/IBaseOnRampRouter.sol";
+
+import {GEConsumer} from "../../models/GEConsumer.sol";
 
 interface IGERouter is IBaseOnRampRouter, IAny2EVMOffRampRouter {
   error OnRampAlreadySet(uint64 chainId, IEVM2EVMGEOnRamp onRamp);

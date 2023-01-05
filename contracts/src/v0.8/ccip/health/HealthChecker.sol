@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {Pausable} from "../../vendor/Pausable.sol";
 import {IAFN} from "../interfaces/health/IAFN.sol";
+
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
+
+import {Pausable} from "../../vendor/Pausable.sol";
 
 contract HealthChecker is Pausable, OwnerIsCreator {
   // AFN contract to check health of the system

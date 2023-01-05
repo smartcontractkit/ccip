@@ -2,10 +2,13 @@
 pragma solidity 0.8.15;
 
 import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
-import {SafeERC20, IERC20} from "../../vendor/SafeERC20.sol";
 import {IEVM2AnyTollOnRampRouter} from "../interfaces/onRamp/IEVM2AnyTollOnRampRouter.sol";
+
 import {TollConsumer} from "../models/TollConsumer.sol";
 import {Common} from "../models/Common.sol";
+
+import {IERC20} from "../../vendor/IERC20.sol";
+import {SafeERC20} from "../../vendor/SafeERC20.sol";
 
 /**
  * @notice This contract enables EOAs to send a single asset across to the chain
