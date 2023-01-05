@@ -971,6 +971,7 @@ func (c *CCIPLane) SendGERequests(noOfRequests int) {
 	c.StartBlockOnDestination, err = c.Dest.Common.ChainClient.LatestBlockNumber(context.Background())
 	require.NoError(t, err, "Getting current block should be successful in dest chain")
 	c.TotalGEFee = big.NewInt(0)
+	c.SentGEReqHashes = []string{}
 	for i := 1; i <= c.NumberOfGEReq; i++ {
 		txHash, fee := c.Source.SendGERequest(
 			t, c.Dest.ReceiverDapp.EthAddress,
@@ -1016,8 +1017,9 @@ func SetOCRConfigs(t *testing.T, commitNodes, execNodes []*client.CLNodesWithKey
 	if len(execNodes) > 0 {
 		signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err =
 			ccip.NewOffChainAggregatorV2Config(execNodes)
+		require.NoError(t, err, "Shouldn't fail while getting the config values for ocr2 type contract")
 	}
-	require.NoError(t, err, "Shouldn't fail while getting the config values for ocr2 type contract")
+
 	err = destCCIP.TollOffRamp.SetConfig(signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig)
 	require.NoError(t, err, "Shouldn't fail while setting TollOffRamp config")
 	err = destCCIP.GEOffRamp.SetConfig(signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig)
