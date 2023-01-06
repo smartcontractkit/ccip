@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import {IGasFeeCache} from "../../interfaces/gasFeeCache/IGasFeeCache.sol";
+
 import {GE} from "../../models/GE.sol";
 import {TokenSetup} from "../TokenSetup.t.sol";
-import {GasFeeCache, IGasFeeCache} from "../../gasFeeCache/GasFeeCache.sol";
+import {GasFeeCache} from "../../gasFeeCache/GasFeeCache.sol";
 
 contract GasFeeCacheSetup is TokenSetup {
   GasFeeCache s_gasFeeCache;

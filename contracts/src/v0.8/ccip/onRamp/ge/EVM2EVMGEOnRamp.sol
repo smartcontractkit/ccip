@@ -2,15 +2,18 @@
 pragma solidity 0.8.15;
 
 import {TypeAndVersionInterface} from "../../../interfaces/TypeAndVersionInterface.sol";
-import {IERC20, IPool} from "../../interfaces/pools/IPool.sol";
+import {IPool} from "../../interfaces/pools/IPool.sol";
 import {IAFN} from "../../interfaces/health/IAFN.sol";
+import {IEVM2EVMGEOnRamp} from "../../interfaces/onRamp/IEVM2EVMGEOnRamp.sol";
+import {IGERouter} from "../../interfaces/router/IGERouter.sol";
+import {IGasFeeCache} from "../../interfaces/gasFeeCache/IGasFeeCache.sol";
+
 import {BaseOnRamp} from "../BaseOnRamp.sol";
 import {Common} from "../../models/Common.sol";
 import {GEConsumer} from "../../models/GEConsumer.sol";
 import {GE} from "../../models/GE.sol";
-import {IEVM2EVMGEOnRamp} from "../../interfaces/onRamp/IEVM2EVMGEOnRamp.sol";
-import {IGERouter} from "../../interfaces/router/IGERouter.sol";
-import {IGasFeeCache} from "../../interfaces/gasFeeCache/IGasFeeCache.sol";
+
+import {IERC20} from "../../../vendor/IERC20.sol";
 
 contract EVM2EVMGEOnRamp is IEVM2EVMGEOnRamp, BaseOnRamp, TypeAndVersionInterface {
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables

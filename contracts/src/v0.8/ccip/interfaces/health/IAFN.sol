@@ -106,7 +106,7 @@ interface IAFN {
    * @param participants participants allowed to vote
    * @param weights weights of each participant's vote
    * @param weightThresholdForBlessing threshold to emit a blessing
-   * @param weightThresholdForBadSignal threashold to emit a bad signal
+   * @param weightThresholdForBadSignal threshold to emit a bad signal
    */
   function setAFNConfig(
     address[] memory participants,

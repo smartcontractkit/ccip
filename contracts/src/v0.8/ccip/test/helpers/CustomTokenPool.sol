@@ -1,9 +1,9 @@
 pragma solidity ^0.8.0;
 
-import {TokenPool, SafeERC20, IERC20} from "../../pools/TokenPool.sol";
+import {TokenPool} from "../../pools/TokenPool.sol";
+import {IERC20} from "../../../vendor/IERC20.sol";
 
 contract CustomTokenPool is TokenPool {
-  using SafeERC20 for IERC20;
   event SynthBurned(uint256 amount);
   event SynthMinted(uint256 amount);
 

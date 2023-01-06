@@ -2,10 +2,12 @@
 pragma solidity 0.8.15;
 
 import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
+
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
-import {IERC20} from "../../vendor/IERC20.sol";
 // solhint-disable-next-line chainlink-solidity/explicit-imports
 import "./CCIPConsumer.sol";
+
+import {IERC20} from "../../vendor/IERC20.sol";
 
 contract GovernanceDapp is CCIPConsumer, TypeAndVersionInterface, OwnerIsCreator {
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables

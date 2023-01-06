@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {IAFN} from "../interfaces/health/IAFN.sol";
-import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
 import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
+import {IAFN} from "../interfaces/health/IAFN.sol";
+
+import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
 
 contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables

@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Common} from "../models/Common.sol";
-import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
 import {IGasFeeCache} from "../interfaces/gasFeeCache/IGasFeeCache.sol";
+
+import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
+import {Common} from "../models/Common.sol";
 import {GE} from "../models/GE.sol";
 
 contract GasFeeCache is IGasFeeCache, OwnerIsCreator {

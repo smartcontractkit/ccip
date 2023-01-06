@@ -35,7 +35,7 @@ snapshot:
 ccip-precommit: export FOUNDRY_PROFILE=ccip
 .PHONY: ccip-precommit
 ccip-precommit:
-	forge snapshot
+	forge test
 	prettier '**/*' --check --ignore-unknown --write
 	pnpm lint:ccip
 	make ccip-abi-fix

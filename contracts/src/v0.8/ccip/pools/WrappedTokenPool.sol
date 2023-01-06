@@ -2,7 +2,9 @@
 pragma solidity 0.8.15;
 
 import {TokenPool} from "./TokenPool.sol";
-import {IERC20, ERC20} from "../../vendor/ERC20.sol";
+
+import {ERC20} from "../../vendor/ERC20.sol";
+import {IERC20} from "../../vendor/IERC20.sol";
 
 /**
  * @notice This pool mints and burns its own tokens, representing a wrapped form of the native token

@@ -1,15 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../TokenSetup.t.sol";
-import {GasFeeCacheSetup} from "../../gasFeeCache/GasFeeCache.t.sol";
-import {MockCommitStore, ICommitStore} from "../../mocks/MockCommitStore.sol";
-import {SimpleMessageReceiver, IAny2EVMMessageReceiver} from "../../helpers/receivers/SimpleMessageReceiver.sol";
+import {ICommitStore} from "../../../interfaces/ICommitStore.sol";
+import {IAny2EVMMessageReceiver} from "../../../interfaces/applications/IAny2EVMMessageReceiver.sol";
 import {IEVM2EVMGEOffRamp} from "../../../interfaces/offRamp/IEVM2EVMGEOffRamp.sol";
+import {IGasFeeCache} from "../../../interfaces/gasFeeCache/IGasFeeCache.sol";
+
 import {GE} from "../../../models/GE.sol";
 import {Common} from "../../../models/Common.sol";
-import {IGasFeeCache} from "../../../gasFeeCache/GasFeeCache.sol";
+import {GasFeeCacheSetup} from "../../gasFeeCache/GasFeeCache.t.sol";
+import {MockCommitStore} from "../../mocks/MockCommitStore.sol";
+import {SimpleMessageReceiver} from "../../helpers/receivers/SimpleMessageReceiver.sol";
 import {EVM2EVMGEOffRampHelper} from "../../helpers/ramps/EVM2EVMGEOffRampHelper.sol";
+import "../../TokenSetup.t.sol";
 
 contract EVM2EVMGEOffRampSetup is TokenSetup, GasFeeCacheSetup {
   ICommitStore internal s_mockCommitStore;

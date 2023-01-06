@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IERC20} from "../../../vendor/IERC20.sol";
 import {IBaseOnRamp} from "./IBaseOnRamp.sol";
+
 import {TollConsumer} from "../../models/TollConsumer.sol";
 import {Toll} from "../../models/Toll.sol";
+
+import {IERC20} from "../../../vendor/IERC20.sol";
 
 interface IEVM2EVMTollOnRamp is IBaseOnRamp {
   error InvalidFeeConfig();

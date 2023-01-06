@@ -1,15 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../TokenSetup.t.sol";
+import {IGasFeeCache} from "../../../interfaces/gasFeeCache/IGasFeeCache.sol";
 import {IEVM2EVMGEOnRamp} from "../../../interfaces/onRamp/IEVM2EVMGEOnRamp.sol";
+
 import {EVM2EVMGEOnRamp} from "../../../onRamp/ge/EVM2EVMGEOnRamp.sol";
-import {GasFeeCache, IGasFeeCache} from "../../../gasFeeCache/GasFeeCache.sol";
+import {GasFeeCache} from "../../../gasFeeCache/GasFeeCache.sol";
 import {GERouter} from "../../../router/GERouter.sol";
 import {GESRouterSetup} from "../../router/GERouterSetup.t.sol";
 import {GE} from "../../../models/GE.sol";
 import {GEConsumer} from "../../../models/GEConsumer.sol";
 import "../../../offRamp/ge/EVM2EVMGEOffRamp.sol";
+import "../../TokenSetup.t.sol";
 
 contract EVM2EVMGEOnRampSetup is TokenSetup, GESRouterSetup {
   // Duplicate event of the CCIPSendRequested in the IGEOnRamp

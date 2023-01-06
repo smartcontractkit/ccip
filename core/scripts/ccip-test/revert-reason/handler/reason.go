@@ -1,4 +1,4 @@
-package main
+package handler
 
 import (
 	"bytes"
@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/afn_contract"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp_router"
@@ -24,44 +25,39 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/gas_fee_cache"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ge_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/native_token_pool"
-	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/secrets"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 )
 
-func panicErr(err error) {
-	if err != nil {
-		panic(err)
-	}
+// RevertReasonFromErrorCodeString attempts to decode an error code string
+func (h *BaseHandler) RevertReasonFromErrorCodeString(errorCodeString string) string {
+	errorCodeString = strings.TrimPrefix(errorCodeString, "0x")
+	return decodeErrorStringFromABI(errorCodeString, getAllABIs())
 }
 
-// You can either add an error string (like "0x4e487b710000000000000000000000000000000000000000000000000000000000000032")
-// or you can specify an ethURL, txHash and requester.
-func main() {
-	errorCodeString := ""
-
-	if errorCodeString == "" {
-		// Need a node URL
-		// NOTE: this node needs to run in archive mode
-		ethUrl := secrets.GetRPC(5)
-		txHash := "0x97be8559164442595aba46b5f849c23257905b78e72ee43d9b998b28eee78b84"
-		requester := "0xe88ff73814fb891bb0e149f5578796fa41f20242"
-
-		ec, ethErr := ethclient.Dial(ethUrl)
-		panicErr(ethErr)
-		errorString, contractAddress := getErrorForTx(ec, txHash, requester)
-		// Some nodes prepend "Reverted " and we also remove the 0x
-		trimmed := strings.TrimPrefix(errorString, "Reverted ")[2:]
-
-		contractABIs := getABIForContract(ec, contractAddress)
-
-		decodeErrorStringFromABI(trimmed, contractABIs)
-	} else {
-		errorCodeString = strings.TrimPrefix(errorCodeString, "0x")
-		decodeErrorStringFromABI(errorCodeString, getAllABIs())
+// RevertReasonFromTx attempts to fetch more info on failed TX
+func (h *BaseHandler) RevertReasonFromTx(txHash string) string {
+	// Need a node URL
+	// NOTE: this node needs to run in archive mode
+	ethUrl := h.cfg.NodeURL
+	if ethUrl == "" {
+		panicErr(errors.New("You must define ETH_NODE env variable"))
 	}
+	requester := h.cfg.FromAddress
+
+	ec, ethErr := ethclient.Dial(ethUrl)
+	panicErr(ethErr)
+	errorString, contractAddress := getErrorForTx(ec, txHash, requester)
+	// Some nodes prepend "Reverted " and we also remove the 0x
+	trimmed := strings.TrimPrefix(errorString, "Reverted ")[2:]
+
+	contractABIs := getABIForContract(ec, contractAddress)
+
+	return decodeErrorStringFromABI(trimmed, contractABIs)
 }
 
-func decodeErrorStringFromABI(errorString string, contractABIs []string) {
+func decodeErrorStringFromABI(errorString string, contractABIs []string) string {
+	builder := strings.Builder{}
+
 	data, err := hex.DecodeString(errorString)
 	panicErr(err)
 
@@ -74,39 +70,40 @@ func decodeErrorStringFromABI(errorString string, contractABIs []string) {
 				// Found a matching error
 				v, err3 := abiError.Unpack(data)
 				panicErr(err3)
-				fmt.Printf("Error is \"%v\" args %v\n", k, v)
-				return
+				builder.WriteString(fmt.Sprintf("Error is \"%v\" args %v\n", k, v))
+				return builder.String()
 			}
 		}
 	}
 
 	if len(errorString) > 8 && errorString[:8] == "4e487b71" {
-		fmt.Println("Assertion failure")
+		builder.WriteString("Decoded error: Assertion failure\n")
 		indicator := errorString[len(errorString)-2:]
 		switch indicator {
 		case "01":
-			fmt.Printf("If you call assert with an argument that evaluates to false.")
+			builder.WriteString("If you call assert with an argument that evaluates to false.\n")
 		case "11":
-			fmt.Printf("If an arithmetic operation results in underflow or overflow outside of an unchecked { ... } block.")
+			builder.WriteString("If an arithmetic operation results in underflow or overflow outside of an unchecked { ... } block.\n")
 		case "12":
-			fmt.Printf("If you divide or modulo by zero (e.g. 5 / 0 or 23 modulo 0).")
+			builder.WriteString("If you divide or modulo by zero (e.g. 5 / 0 or 23 modulo 0).\n")
 		case "21":
-			fmt.Printf("If you convert a value that is too big or negative into an enum type.")
+			builder.WriteString("If you convert a value that is too big or negative into an enum type.\n")
 		case "31":
-			fmt.Printf("If you call .pop() on an empty array.")
+			builder.WriteString("If you call .pop() on an empty array.\n")
 		case "32":
-			fmt.Printf("If you access an array, bytesN or an array slice at an out-of-bounds or negative index (i.e. x[i] where i >= x.length or i < 0).")
+			builder.WriteString("If you access an array, bytesN or an array slice at an out-of-bounds or negative index (i.e. x[i] where i >= x.length or i < 0).\n")
 		case "41":
-			fmt.Printf("If you allocate too much memory or create an array that is too large.")
+			builder.WriteString("If you allocate too much memory or create an array that is too large.\n")
 		case "51":
-			fmt.Printf("If you call a zero-initialized variable of internal function type.")
+			builder.WriteString("If you call a zero-initialized variable of internal function type.\n")
 		default:
-			fmt.Printf("This is a revert produced by an assertion failure. Exact code not found \"%s\"", indicator)
+			builder.WriteString(fmt.Sprintf("This is a revert produced by an assertion failure. Exact code not found \"%s\"\n", indicator))
 		}
-		return
+		return builder.String()
 	}
 
-	fmt.Printf("Cannot match error with contract ABI. Error code \"%v\"\n", "trimmed")
+	builder.WriteString(fmt.Sprintf("Cannot match error with contract ABI. Error code \"%v\"\n", "trimmed"))
+	return builder.String()
 }
 
 // getABIForContract. Since contracts interact with other contracts we return all ABIs we expect the given
@@ -115,21 +112,19 @@ func getABIForContract(client *ethclient.Client, contractAddress common.Address)
 	contractType, _, err := ccip.TypeAndVersion(contractAddress, client)
 	panicErr(err)
 
-	always := []string{afn_contract.AFNContractABI, native_token_pool.NativeTokenPoolABI}
-
 	switch contractType {
-	// TOLL
 	case ccip.EVM2EVMTollOnRamp:
-		return append(always, evm_2_evm_toll_onramp.EVM2EVMTollOnRampABI)
 	case ccip.EVM2EVMTollOffRamp:
-		return append(always, evm_2_evm_toll_offramp.EVM2EVMTollOffRampABI, any_2_evm_toll_offramp_router.Any2EVMTollOffRampRouterABI, commit_store.CommitStoreABI)
-		// SHARED
-	case ccip.CommitStore:
-		return []string{commit_store.CommitStoreABI}
+	case ccip.EVM2EVMGEOnRamp:
 	case ccip.EVM2EVMGEOffRamp:
-		return append(always, evm_2_evm_ge_offramp.EVM2EVMGEOffRampABI, ge_router.GERouterABI, commit_store.CommitStoreABI)
+	case ccip.CommitStore:
+	case ccip.GERouter:
+
+	default:
+		panic("Contract not found " + contractType)
 	}
-	panic("Contract not found")
+
+	return getAllABIs()
 }
 
 func getAllABIs() []string {
@@ -183,4 +178,10 @@ func parseError(txError error) string {
 		panic("Use an archive node")
 	}
 	return callErr.Data
+}
+
+func panicErr(err error) {
+	if err != nil {
+		panic(err)
+	}
 }

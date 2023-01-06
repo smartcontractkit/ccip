@@ -106,6 +106,11 @@ func TestChaosCCIP(t *testing.T) {
 				log.Info().Msg("proceeding without waiting for chaos recovery")
 			}
 			lane.ValidateGERequests()
+			t.Cleanup(func() {
+				if chaosId != "" {
+					testEnvironment.Chaos.Stop(chaosId)
+				}
+			})
 		})
 	}
 }

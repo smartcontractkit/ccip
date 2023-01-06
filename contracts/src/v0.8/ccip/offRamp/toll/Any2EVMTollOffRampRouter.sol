@@ -2,7 +2,9 @@
 pragma solidity 0.8.15;
 
 import {TypeAndVersionInterface} from "../../../interfaces/TypeAndVersionInterface.sol";
-import {BaseOffRampRouter, IBaseOffRamp} from "../BaseOffRampRouter.sol";
+import {IBaseOffRamp} from "../../interfaces/offRamp/IBaseOffRamp.sol";
+
+import {BaseOffRampRouter} from "../BaseOffRampRouter.sol";
 
 contract Any2EVMTollOffRampRouter is BaseOffRampRouter, TypeAndVersionInterface {
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables

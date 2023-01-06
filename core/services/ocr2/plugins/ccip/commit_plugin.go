@@ -32,6 +32,7 @@ var (
 	EVM2EVMGEOnRamp    ContractType = "EVM2EVMGEOnRamp"
 	EVM2EVMGEOffRamp   ContractType = "EVM2EVMGEOffRamp"
 	CommitStore        ContractType = "CommitStore"
+	GERouter           ContractType = "GERouter"
 	ContractTypes                   = map[ContractType]struct{}{
 		EVM2EVMTollOnRamp:  {},
 		EVM2EVMTollOffRamp: {},

@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {TokenPool} from "./TokenPool.sol";
 import {IBurnMintERC20} from "./IBurnMintERC20.sol";
+
+import {TokenPool} from "./TokenPool.sol";
 
 /**
  * @notice This pool mints and burns a 3rd-party token.

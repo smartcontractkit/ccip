@@ -3,7 +3,9 @@ pragma solidity 0.8.15;
 
 import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
 import {ICommitStore} from "../interfaces/ICommitStore.sol";
-import {HealthChecker, IAFN} from "../health/HealthChecker.sol";
+import {IAFN} from "../interfaces/health/IAFN.sol";
+
+import {HealthChecker} from "../health/HealthChecker.sol";
 import {OCR2Base} from "../ocr/OCR2Base.sol";
 import {Internal} from "../models/Internal.sol";
 

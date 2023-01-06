@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import {IBaseOnRamp} from "./IBaseOnRamp.sol";
+
 import {Common} from "../../models/Common.sol";
 import {GE} from "../../models/GE.sol";
 import {GEConsumer} from "../../models/GEConsumer.sol";
-import {IBaseOnRamp} from "./IBaseOnRamp.sol";
 
 interface IEVM2EVMGEOnRamp is IBaseOnRamp {
   error MismatchedFeeToken(address expected, address got);
