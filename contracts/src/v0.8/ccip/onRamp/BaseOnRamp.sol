@@ -59,7 +59,7 @@ contract BaseOnRamp is IBaseOnRamp, HealthChecker, AllowList, AggregateRateLimit
   }
 
   /// @inheritdoc IBaseOnRamp
-  function getPoolBySourceToken(IERC20 sourceToken) public view override returns (IPool) {
+  function getPoolBySourceToken(IERC20 sourceToken) public view virtual override returns (IPool) {
     PoolConfig memory poolConfig = s_poolsBySourceToken[sourceToken];
     if (poolConfig.enabled) {
       return s_poolsBySourceToken[sourceToken].pool;

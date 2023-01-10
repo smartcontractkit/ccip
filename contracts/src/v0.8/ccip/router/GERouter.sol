@@ -6,7 +6,7 @@ import {IPool} from "../interfaces/pools/IPool.sol";
 import {IGERouter} from "../interfaces/router/IGERouter.sol";
 import {IBaseOnRampRouter} from "../interfaces/onRamp/IBaseOnRampRouter.sol";
 import {IBaseOnRamp} from "../interfaces/onRamp/IBaseOnRamp.sol";
-import {IEVM2EVMGEOnRamp} from "../interfaces/onRamp/IEVM2EVMGEOnRamp.sol";
+import {IEVM2AnyGEOnRamp} from "../interfaces/onRamp/IEVM2AnyGEOnRamp.sol";
 import {IBaseOffRamp} from "../interfaces/offRamp/IBaseOffRamp.sol";
 
 import {BaseOffRampRouter} from "../offRamp/BaseOffRampRouter.sol";
@@ -24,14 +24,14 @@ contract GERouter is IGERouter, BaseOffRampRouter, TypeAndVersionInterface {
   string public constant override typeAndVersion = "GERouter 1.0.0";
 
   // destination chain id => IOnRamp
-  mapping(uint256 => IEVM2EVMGEOnRamp) private s_onRamps;
+  mapping(uint256 => IEVM2AnyGEOnRamp) private s_onRamps;
 
   constructor(IBaseOffRamp[] memory offRamps) BaseOffRampRouter(offRamps) {}
 
   /// @inheritdoc IGERouter
   function ccipSend(uint64 destinationChainId, GEConsumer.EVM2AnyGEMessage memory message) external returns (bytes32) {
     // Find and put the correct onRamp on the stack.
-    IEVM2EVMGEOnRamp onRamp = s_onRamps[destinationChainId];
+    IEVM2AnyGEOnRamp onRamp = s_onRamps[destinationChainId];
     // getFee checks if the onRamp is valid
     uint256 feeTokenAmount = getFee(destinationChainId, message);
 
@@ -59,21 +59,21 @@ contract GERouter is IGERouter, BaseOffRampRouter, TypeAndVersionInterface {
     returns (uint256 fee)
   {
     // Find and put the correct onRamp on the stack.
-    IEVM2EVMGEOnRamp onRamp = s_onRamps[destinationChainId];
+    IEVM2AnyGEOnRamp onRamp = s_onRamps[destinationChainId];
     // Check if the onRamp is a zero address, meaning the chain is not supported.
     if (address(onRamp) == address(0)) revert UnsupportedDestinationChain(destinationChainId);
     return onRamp.getFee(message);
   }
 
   /// @inheritdoc IGERouter
-  function setOnRamp(uint64 chainId, IEVM2EVMGEOnRamp onRamp) external onlyOwner {
+  function setOnRamp(uint64 chainId, IEVM2AnyGEOnRamp onRamp) external onlyOwner {
     if (address(s_onRamps[chainId]) == address(onRamp)) revert OnRampAlreadySet(chainId, onRamp);
     s_onRamps[chainId] = onRamp;
     emit OnRampSet(chainId, onRamp);
   }
 
   /// @inheritdoc IGERouter
-  function getOnRamp(uint64 chainId) external view returns (IEVM2EVMGEOnRamp) {
+  function getOnRamp(uint64 chainId) external view returns (IEVM2AnyGEOnRamp) {
     return s_onRamps[chainId];
   }
 

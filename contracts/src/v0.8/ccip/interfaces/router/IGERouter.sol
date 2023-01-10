@@ -2,16 +2,16 @@
 pragma solidity ^0.8.0;
 
 import {IBaseOnRampRouter} from "../onRamp/IBaseOnRampRouter.sol";
-import {IEVM2EVMGEOnRamp} from "../onRamp/IEVM2EVMGEOnRamp.sol";
+import {IEVM2AnyGEOnRamp} from "../onRamp/IEVM2AnyGEOnRamp.sol";
 import {IAny2EVMOffRampRouter} from "../offRamp/IAny2EVMOffRampRouter.sol";
 import {IBaseOnRampRouter} from "../onRamp/IBaseOnRampRouter.sol";
 
 import {GEConsumer} from "../../models/GEConsumer.sol";
 
 interface IGERouter is IBaseOnRampRouter, IAny2EVMOffRampRouter {
-  error OnRampAlreadySet(uint64 chainId, IEVM2EVMGEOnRamp onRamp);
+  error OnRampAlreadySet(uint64 chainId, IEVM2AnyGEOnRamp onRamp);
 
-  event OnRampSet(uint64 indexed chainId, IEVM2EVMGEOnRamp indexed onRamp);
+  event OnRampSet(uint64 indexed chainId, IEVM2AnyGEOnRamp indexed onRamp);
 
   /**
    * @notice Request a message to be sent to the destination chain
@@ -32,12 +32,12 @@ interface IGERouter is IBaseOnRampRouter, IAny2EVMOffRampRouter {
    * @param chainId destination chain ID
    * @param onRamp OnRamp to use for that destination chain
    */
-  function setOnRamp(uint64 chainId, IEVM2EVMGEOnRamp onRamp) external;
+  function setOnRamp(uint64 chainId, IEVM2AnyGEOnRamp onRamp) external;
 
   /**
    * @notice Gets the current OnRamp for the specified chain ID
    * @param chainId Chain ID to get ramp details for
    * @return onRamp
    */
-  function getOnRamp(uint64 chainId) external view returns (IEVM2EVMGEOnRamp);
+  function getOnRamp(uint64 chainId) external view returns (IEVM2AnyGEOnRamp);
 }

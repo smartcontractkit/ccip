@@ -4,6 +4,7 @@ pragma solidity 0.8.15;
 import {TypeAndVersionInterface} from "../../../interfaces/TypeAndVersionInterface.sol";
 import {IPool} from "../../interfaces/pools/IPool.sol";
 import {IAFN} from "../../interfaces/health/IAFN.sol";
+import {IEVM2AnyGEOnRamp} from "../../interfaces/onRamp/IEVM2AnyGEOnRamp.sol";
 import {IEVM2EVMGEOnRamp} from "../../interfaces/onRamp/IEVM2EVMGEOnRamp.sol";
 import {IGERouter} from "../../interfaces/router/IGERouter.sol";
 import {IGasFeeCache} from "../../interfaces/gasFeeCache/IGasFeeCache.sol";
@@ -66,7 +67,18 @@ contract EVM2EVMGEOnRamp is IEVM2EVMGEOnRamp, BaseOnRamp, TypeAndVersionInterfac
     return GEConsumer.EVMExtraArgsV1({gasLimit: abi.decode(extraArgs[4:36], (uint256)), strict: false});
   }
 
-  /// @inheritdoc IEVM2EVMGEOnRamp
+  /// @inheritdoc IEVM2AnyGEOnRamp
+  function getPoolBySourceToken(IERC20 sourceToken)
+    public
+    view
+    virtual
+    override(BaseOnRamp, IEVM2AnyGEOnRamp)
+    returns (IPool)
+  {
+    return BaseOnRamp.getPoolBySourceToken(sourceToken);
+  }
+
+  /// @inheritdoc IEVM2AnyGEOnRamp
   function forwardFromRouter(
     GEConsumer.EVM2AnyGEMessage calldata message,
     uint256 feeTokenAmount,
