@@ -228,8 +228,8 @@ func (bv *CommitStore) Address() string {
 	return bv.EthAddress.Hex()
 }
 
-// SetOCRConfig sets the offchain reporting protocol configuration
-func (b *CommitStore) SetOCRConfig(
+// SetOCR2Config sets the offchain reporting protocol configuration
+func (b *CommitStore) SetOCR2Config(
 	signers []common.Address,
 	transmitters []common.Address,
 	f uint8,
@@ -248,7 +248,7 @@ func (b *CommitStore) SetOCRConfig(
 		Interface("signerAddresses", signers).
 		Interface("transmitterAddresses", transmitters).
 		Msg("Configuring CommitStore")
-	tx, err := b.instance.SetConfig0(
+	tx, err := b.instance.SetOCR2Config(
 		opts,
 		signers,
 		transmitters,
@@ -288,8 +288,8 @@ func (offRamp *TollOffRamp) Address() string {
 	return offRamp.EthAddress.Hex()
 }
 
-// SetConfig sets the offchain reporting protocol configuration
-func (offRamp *TollOffRamp) SetConfig(
+// SetOCR2Config sets the offchain reporting protocol configuration
+func (offRamp *TollOffRamp) SetOCR2Config(
 	signers []common.Address,
 	transmitters []common.Address,
 	f uint8,
@@ -307,7 +307,7 @@ func (offRamp *TollOffRamp) SetConfig(
 		Interface("signerAddresses", signers).
 		Interface("transmitterAddresses", transmitters).
 		Msg("Configuring TollOffRamp")
-	tx, err := offRamp.instance.SetConfig0(
+	tx, err := offRamp.instance.SetOCR2Config(
 		opts,
 		signers,
 		transmitters,
@@ -560,8 +560,8 @@ func (offRamp *GEOffRamp) Address() string {
 	return offRamp.EthAddress.Hex()
 }
 
-// SetConfig sets the offchain reporting protocol configuration
-func (offRamp *GEOffRamp) SetConfig(
+// SetOCR2Config sets the offchain reporting protocol configuration
+func (offRamp *GEOffRamp) SetOCR2Config(
 	signers []common.Address,
 	transmitters []common.Address,
 	f uint8,
@@ -579,7 +579,7 @@ func (offRamp *GEOffRamp) SetConfig(
 		Interface("signerAddresses", signers).
 		Interface("transmitterAddresses", transmitters).
 		Msg("Configuring GEOffRamp")
-	tx, err := offRamp.instance.SetConfig(
+	tx, err := offRamp.instance.SetOCR2Config(
 		opts,
 		signers,
 		transmitters,

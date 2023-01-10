@@ -91,7 +91,7 @@ func TestCCIP(t *testing.T) {
 		printing.PrintJobSpecs(ENV, SOURCE, DESTINATION)
 	case "setConfig":
 		// Set the config to the commitStore and the offramp
-		client.SetOCRConfig(ENV)
+		client.SetOCR2Config(ENV)
 	case "setOnRampFeeConfig":
 		client.setOnRampFeeConfig(t)
 		// Set the config to the onRamp fee

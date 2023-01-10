@@ -286,9 +286,9 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
     _execute(abi.decode(report, (Toll.ExecutionReport)), false);
   }
 
-  function _beforeSetConfig(uint8 _threshold, bytes memory _onchainConfig) internal override {}
+  function _beforeSetOCR2Config(uint8 _threshold, bytes memory _onchainConfig) internal override {}
 
-  function _afterSetConfig(
+  function _afterSetOCR2Config(
     uint8, /* f */
     bytes memory /* onchainConfig */
   ) internal override {}

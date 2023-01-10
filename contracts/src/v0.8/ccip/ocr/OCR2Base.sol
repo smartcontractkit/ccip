@@ -121,7 +121,7 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
    * @param _offchainConfigVersion version number for offchainEncoding schema
    * @param _offchainConfig encoded off-chain oracle configuration
    */
-  function setConfig(
+  function setOCR2Config(
     address[] memory _signers,
     address[] memory _transmitters,
     uint8 _f,
@@ -138,7 +138,7 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
       offchainConfig: _offchainConfig
     });
 
-    _beforeSetConfig(args.f, args.onchainConfig);
+    _beforeSetOCR2Config(args.f, args.onchainConfig);
 
     while (s_signers.length != 0) {
       // remove any old signer/transmitter addresses
@@ -191,7 +191,7 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
       args.offchainConfig
     );
 
-    _afterSetConfig(args.f, args.onchainConfig);
+    _afterSetOCR2Config(args.f, args.onchainConfig);
   }
 
   /**
@@ -221,9 +221,9 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
     return s_transmitters;
   }
 
-  function _beforeSetConfig(uint8 _f, bytes memory _onchainConfig) internal virtual;
+  function _beforeSetOCR2Config(uint8 _f, bytes memory _onchainConfig) internal virtual;
 
-  function _afterSetConfig(uint8 _f, bytes memory _onchainConfig) internal virtual;
+  function _afterSetOCR2Config(uint8 _f, bytes memory _onchainConfig) internal virtual;
 
   function _report(
     bytes32 configDigest,

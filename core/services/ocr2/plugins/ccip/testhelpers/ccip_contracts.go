@@ -210,7 +210,7 @@ func (c *CCIPContracts) EnableTollOffRamp() {
 	require.NoError(c.t, err)
 	c.Dest.Chain.Commit()
 
-	_, err = c.Dest.TollOffRamp.SetConfig0(
+	_, err = c.Dest.TollOffRamp.SetOCR2Config(
 		c.Dest.User,
 		c.OCRConfig.Signers,
 		c.OCRConfig.Transmitters,
@@ -227,10 +227,10 @@ func (c *CCIPContracts) EnableTollOffRamp() {
 func (c *CCIPContracts) DeployNewTollOnRamp() {
 	c.t.Log("Deploying new toll onRamp")
 	onRampAddress, _, _, err := evm_2_evm_toll_onramp.DeployEVM2EVMTollOnRamp(
-		c.Source.User,                                  // user
-		c.Source.Chain,                                 // client
-		c.Source.ChainID,                               // source chain id
-		c.Dest.ChainID,                                 // destinationChainIds
+		c.Source.User,    // user
+		c.Source.Chain,   // client
+		c.Source.ChainID, // source chain id
+		c.Dest.ChainID,   // destinationChainIds
 		[]common.Address{c.Source.LinkToken.Address()}, // tokens
 		[]common.Address{c.Source.Pool.Address()},      // pools
 		[]common.Address{},                             // allow list
@@ -341,7 +341,7 @@ func (c *CCIPContracts) SetupOnchainConfig(oracles []confighelper.OracleIdentity
 	blockBeforeConfig, err := c.Dest.Chain.BlockByNumber(context.Background(), nil)
 	require.NoError(c.t, err)
 	// Set the DON on the offramp
-	_, err = c.Dest.CommitStore.SetConfig0(
+	_, err = c.Dest.CommitStore.SetOCR2Config(
 		c.Dest.User,
 		c.OCRConfig.Signers,
 		c.OCRConfig.Transmitters,
@@ -354,7 +354,7 @@ func (c *CCIPContracts) SetupOnchainConfig(oracles []confighelper.OracleIdentity
 	c.Dest.Chain.Commit()
 
 	// Same DON on the toll offramp
-	_, err = c.Dest.TollOffRamp.SetConfig0(
+	_, err = c.Dest.TollOffRamp.SetOCR2Config(
 		c.Dest.User,
 		c.OCRConfig.Signers,
 		c.OCRConfig.Transmitters,
@@ -366,7 +366,7 @@ func (c *CCIPContracts) SetupOnchainConfig(oracles []confighelper.OracleIdentity
 	require.NoError(c.t, err)
 	c.Dest.Chain.Commit()
 	// Same DON on the GE offramp
-	_, err = c.Dest.GEOffRamp.SetConfig(
+	_, err = c.Dest.GEOffRamp.SetOCR2Config(
 		c.Dest.User,
 		c.OCRConfig.Signers,
 		c.OCRConfig.Transmitters,

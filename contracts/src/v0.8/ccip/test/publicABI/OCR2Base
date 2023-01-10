@@ -3,7 +3,7 @@
   "latestConfigDetails()": "81ff7048",
   "latestConfigDigestAndEpoch()": "afcb95d7",
   "owner()": "8da5cb5b",
-  "setConfig(address[],address[],uint8,bytes,uint64,bytes)": "e3d0e712",
+  "setOCR2Config(address[],address[],uint8,bytes,uint64,bytes)": "1ef38174",
   "transferOwnership(address)": "f2fde38b",
   "transmit(bytes32[3],bytes,bytes32[],bytes32[],bytes32)": "b1dc65a4",
   "transmitters()": "81411834",

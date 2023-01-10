@@ -964,7 +964,7 @@ func (client *CCIPClient) UnpauseAll() {
 	wg.Wait()
 }
 
-func (client *CCIPClient) SetOCRConfig(env dione.Environment) {
+func (client *CCIPClient) SetOCR2Config(env dione.Environment) {
 	verifierOCRConfig, err := client.Dest.CommitStore.LatestConfigDetails(&bind.CallOpts{})
 	helpers.PanicErr(err)
 	if verifierOCRConfig.BlockNumber != 0 {
@@ -1013,7 +1013,7 @@ func (client *CCIPClient) SetOCRConfig(env dione.Environment) {
 	transmitterAddresses, err := ocrcommon.AccountToAddress(transmitters)
 	helpers.PanicErr(err)
 
-	tx, err := client.Dest.CommitStore.SetConfig0(
+	tx, err := client.Dest.CommitStore.SetOCR2Config(
 		client.Dest.Owner,
 		signerAddresses,
 		transmitterAddresses,
@@ -1026,7 +1026,7 @@ func (client *CCIPClient) SetOCRConfig(env dione.Environment) {
 	shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 	client.Dest.logger.Infof("Config set on commitStore %s", helpers.ExplorerLink(int64(client.Dest.ChainId), tx.Hash()))
 
-	tx, err = client.Dest.OffRamp.SetConfig(
+	tx, err = client.Dest.OffRamp.SetOCR2Config(
 		client.Dest.Owner,
 		signerAddresses,
 		transmitterAddresses,

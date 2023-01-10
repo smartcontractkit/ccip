@@ -1005,13 +1005,13 @@ func (c *CCIPLane) ValidateGERequests() {
 	AssertBalances(t, c.Dest.BalanceAssertions(t, GE, c.DestBalances, c.Source.TransferAmount, UnusedFee, int64(c.NumberOfGEReq), c.TotalGEFee))
 }
 
-// SetOCRConfigs sets the oracle config in ocr2 contracts
+// SetOCR2Configs sets the oracle config in ocr2 contracts
 // nil value in execNodes denotes commit and execution jobs are to be set up in same DON
-func SetOCRConfigs(t *testing.T, commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP DestCCIPModule) {
+func SetOCR2Configs(t *testing.T, commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP DestCCIPModule) {
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err :=
 		ccip.NewOffChainAggregatorV2Config(commitNodes)
 	require.NoError(t, err, "Shouldn't fail while getting the config values for ocr2 type contract")
-	err = destCCIP.CommitStore.SetOCRConfig(signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig)
+	err = destCCIP.CommitStore.SetOCR2Config(signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig)
 	require.NoError(t, err, "Shouldn't fail while setting commitStore config")
 	// if commit and exec job is set up in different DON
 	if len(execNodes) > 0 {
@@ -1020,9 +1020,9 @@ func SetOCRConfigs(t *testing.T, commitNodes, execNodes []*client.CLNodesWithKey
 		require.NoError(t, err, "Shouldn't fail while getting the config values for ocr2 type contract")
 	}
 
-	err = destCCIP.TollOffRamp.SetConfig(signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig)
+	err = destCCIP.TollOffRamp.SetOCR2Config(signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig)
 	require.NoError(t, err, "Shouldn't fail while setting TollOffRamp config")
-	err = destCCIP.GEOffRamp.SetConfig(signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig)
+	err = destCCIP.GEOffRamp.SetOCR2Config(signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig)
 	require.NoError(t, err, "Shouldn't fail while setting GEOffRamp config")
 	err = destCCIP.Common.ChainClient.WaitForEvents()
 	require.NoError(t, err, "Shouldn't fail while waiting for events on setting ocr2 config")
@@ -1588,7 +1588,7 @@ func (lane *CCIPLane) NewCCIPLane(
 	)
 
 	// set up ocr2 config
-	SetOCRConfigs(t, commitNodes, execNodes, *lane.Dest)
+	SetOCR2Configs(t, commitNodes, execNodes, *lane.Dest)
 	lane.Ready <- struct{}{}
 }
 

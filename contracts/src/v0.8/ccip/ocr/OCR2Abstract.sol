@@ -40,7 +40,7 @@ abstract contract OCR2Abstract is TypeAndVersionInterface {
    * @param offchainConfigVersion version number for offchainEncoding schema
    * @param offchainConfig serialized configuration used by the oracles exclusively and only passed through the contract
    */
-  function setConfig(
+  function setOCR2Config(
     address[] memory signers,
     address[] memory transmitters,
     uint8 f,

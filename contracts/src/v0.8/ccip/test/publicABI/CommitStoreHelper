@@ -18,7 +18,7 @@
   "resetUnblessedRoots(bytes32[])": "f47a8690",
   "setAFN(address)": "108ee5fc",
   "setConfig((address[],uint64[]))": "83ec5cf6",
-  "setConfig(address[],address[],uint8,bytes,uint64,bytes)": "e3d0e712",
+  "setOCR2Config(address[],address[],uint8,bytes,uint64,bytes)": "1ef38174",
   "transferOwnership(address)": "f2fde38b",
   "transmit(bytes32[3],bytes,bytes32[],bytes32[],bytes32)": "b1dc65a4",
   "transmitters()": "81411834",
