@@ -46,7 +46,8 @@ interface IBaseOnRamp is IAllowList {
   /**
    * @notice Get the pool for a specific token
    * @param sourceToken The source chain token to get the pool for
-   * @return pool IPool    */
+   * @return pool IPool
+   */
   function getPoolBySourceToken(IERC20 sourceToken) external returns (IPool);
 
   /**

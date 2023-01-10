@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {PoolCollector} from "../../pools/PoolCollector.sol";
+import {IEVM2AnyGEOnRamp} from "../../interfaces/onRamp/IEVM2AnyGEOnRamp.sol";
 import {IBaseOnRampRouter} from "../../interfaces/onRamp/IBaseOnRampRouter.sol";
 import {IGERouter} from "../../interfaces/router/IGERouter.sol";
+
+import {PoolCollector} from "../../pools/PoolCollector.sol";
 import "../onRamp/ge/EVM2EVMGEOnRampSetup.t.sol";
 
 /// @notice #constructor
@@ -104,16 +106,16 @@ contract GERouter_ccipSend is EVM2EVMGEOnRampSetup {
 
 /// @notice #setOnRamp
 contract GERouter_setOnRamp is EVM2EVMGEOnRampSetup {
-  event OnRampSet(uint64 indexed chainId, IEVM2EVMGEOnRamp indexed onRamp);
+  event OnRampSet(uint64 indexed chainId, IEVM2AnyGEOnRamp indexed onRamp);
 
   // Success
 
   // Asserts that setOnRamp changes the configured onramp. Also tests getOnRamp
   // and isChainSupported.
   function testSuccess() public {
-    IEVM2EVMGEOnRamp onramp = IEVM2EVMGEOnRamp(address(1));
+    IEVM2AnyGEOnRamp onramp = IEVM2AnyGEOnRamp(address(1));
     uint64 chainId = 1337;
-    IEVM2EVMGEOnRamp before = s_sourceRouter.getOnRamp(chainId);
+    IEVM2AnyGEOnRamp before = s_sourceRouter.getOnRamp(chainId);
     assertEq(address(0), address(before));
     assertFalse(s_sourceRouter.isChainSupported(chainId));
 
@@ -121,7 +123,7 @@ contract GERouter_setOnRamp is EVM2EVMGEOnRampSetup {
     emit OnRampSet(chainId, onramp);
 
     s_sourceRouter.setOnRamp(chainId, onramp);
-    IEVM2EVMGEOnRamp afterSet = s_sourceRouter.getOnRamp(chainId);
+    IEVM2AnyGEOnRamp afterSet = s_sourceRouter.getOnRamp(chainId);
     assertEq(address(onramp), address(afterSet));
     assertTrue(s_sourceRouter.isChainSupported(chainId));
   }
@@ -139,7 +141,7 @@ contract GERouter_setOnRamp is EVM2EVMGEOnRampSetup {
   function testOnlyOwnerReverts() public {
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
-    s_sourceRouter.setOnRamp(1337, IEVM2EVMGEOnRamp(address(1)));
+    s_sourceRouter.setOnRamp(1337, IEVM2AnyGEOnRamp(address(1)));
   }
 }
 
