@@ -64,7 +64,7 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
     RateLimiterConfig memory rateLimiterConfig,
     address tokenLimitsAdmin
   )
-    OCR2Base(true)
+    OCR2Base()
     BaseOffRamp(
       sourceChainId,
       chainId,
@@ -278,20 +278,11 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
    * @notice Entry point for execution, called by the OCR network
    * @dev Expects an encoded ExecutionReport
    */
-  function _report(
-    bytes32, /*configDigest*/
-    uint40, /*epochAndRound*/
-    bytes memory report
-  ) internal override {
+  function _report(bytes memory report) internal override {
     _execute(abi.decode(report, (Toll.ExecutionReport)), false);
   }
 
-  function _beforeSetOCR2Config(uint8 _threshold, bytes memory _onchainConfig) internal override {}
+  function _payTransmitter(uint256 initialGas, address transmitter) internal override {}
 
-  function _afterSetOCR2Config(
-    uint8, /* f */
-    bytes memory /* onchainConfig */
-  ) internal override {}
-
-  function _payTransmitter(uint32 initialGas, address transmitter) internal override {}
+  function _beforeSetOCR2Config(uint8 f, bytes memory onchainConfig) internal override {}
 }

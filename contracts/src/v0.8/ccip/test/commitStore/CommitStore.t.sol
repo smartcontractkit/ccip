@@ -34,7 +34,7 @@ contract CommitStoreRealAFNSetup is BaseTest {
 
 /// @notice #constructor
 contract CommitStore_constructor is BaseTest {
-  function testSuccess() public {
+  function testConstructorSuccess() public {
     address[] memory onRamps = new address[](3);
     onRamps[0] = ON_RAMP_ADDRESS;
     onRamps[1] = 0x2C44CDDdB6a900Fa2B585dd299E03D12Fa4293Bc;
@@ -87,7 +87,7 @@ contract CommitStore_constructor is BaseTest {
 contract CommitStore_setConfig is CommitStoreSetup {
   // Success
 
-  function testSuccess() public {
+  function testSetConfigSuccess() public {
     address[] memory onRamps = new address[](1);
     onRamps[0] = address(1);
     uint64[] memory minSeqNrByOnRamp = new uint64[](1);
@@ -164,7 +164,7 @@ contract CommitStore_report is CommitStoreSetup {
 
   // Success
 
-  function testSuccess() public {
+  function testReportSuccess() public {
     uint64 max1 = 931;
     uint64 max2 = 2;
     uint64 max3 = 15;

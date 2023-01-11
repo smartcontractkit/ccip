@@ -33,7 +33,7 @@ contract EVM2EVMGEOffRampHelper is EVM2EVMGEOffRamp {
   {}
 
   function report(bytes memory executableMessages) external {
-    _report(bytes32(0), 0, executableMessages);
+    _report(executableMessages);
   }
 
   function execute(GE.ExecutionReport memory rep, bool manualExecution) external {

@@ -1,3 +1,5 @@
+OCR2Base_setOCR2Config:testSetMultipleConfigSuccess_gas() (gas: 154821)
+OCR2Base_transmit:testTransmitSuccess_gas() (gas: 60491)
 GERouter_ccipSend:testCCIPSendMinimal_gas() (gas: 151621)
 OCR2DROracle_setDONPublicKey:testSetDONPublicKey_gas() (gas: 97476)
 OCR2DROracle_setRegistry:testSetRegistry_gas() (gas: 31978)

@@ -43,7 +43,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, HealthChecker, OC
     uint64 sourceChainId,
     IAFN afn,
     CommitStoreConfig memory config
-  ) OCR2Base(true) HealthChecker(afn) {
+  ) OCR2Base() HealthChecker(afn) {
     i_chainId = chainId;
     i_sourceChainId = sourceChainId;
     s_config = config;
@@ -161,11 +161,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, HealthChecker, OC
   }
 
   /// @inheritdoc OCR2Base
-  function _report(
-    bytes32, /*configDigest*/
-    uint40, /*epochAndRound*/
-    bytes memory encodedReport
-  ) internal override whenNotPaused whenHealthy {
+  function _report(bytes memory encodedReport) internal override whenNotPaused whenHealthy {
     Internal.CommitReport memory report = abi.decode(encodedReport, (Internal.CommitReport));
     uint256 reportLength = report.onRamps.length;
     if (reportLength != report.intervals.length || reportLength != report.merkleRoots.length)
@@ -200,12 +196,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, HealthChecker, OC
     return keccak256(abi.encode(Internal.INTERNAL_DOMAIN_SEPARATOR, left, right));
   }
 
-  function _beforeSetOCR2Config(uint8 _threshold, bytes memory _onchainConfig) internal override {}
+  function _payTransmitter(uint256 initialGas, address transmitter) internal override {}
 
-  function _afterSetOCR2Config(
-    uint8, /* f */
-    bytes memory /* onchainConfig */
-  ) internal override {}
-
-  function _payTransmitter(uint32 initialGas, address transmitter) internal override {}
+  function _beforeSetOCR2Config(uint8 f, bytes memory onchainConfig) internal override {}
 }

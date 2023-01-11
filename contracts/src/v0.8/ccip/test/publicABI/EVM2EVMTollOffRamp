@@ -18,6 +18,7 @@
   "getPricesForTokens(address[])": "4741062e",
   "getRouter()": "b0f479a1",
   "getTokenLimitAdmin()": "599f6431",
+  "getTransmitters()": "666cab8d",
   "isAFNHealthy()": "147809b3",
   "latestConfigDetails()": "81ff7048",
   "latestConfigDigestAndEpoch()": "afcb95d7",
@@ -37,7 +38,6 @@
   "setTokenLimitAdmin(address)": "39aa9264",
   "transferOwnership(address)": "f2fde38b",
   "transmit(bytes32[3],bytes,bytes32[],bytes32[],bytes32)": "b1dc65a4",
-  "transmitters()": "81411834",
   "typeAndVersion()": "181f5a77",
   "unpause()": "3f4ba83a"
 }

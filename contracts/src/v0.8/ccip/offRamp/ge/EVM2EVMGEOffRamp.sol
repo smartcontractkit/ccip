@@ -46,7 +46,7 @@ contract EVM2EVMGEOffRamp is IEVM2EVMGEOffRamp, BaseOffRamp, TypeAndVersionInter
     address tokenLimitsAdmin,
     IERC20 feeToken
   )
-    OCR2Base(true)
+    OCR2Base()
     BaseOffRamp(
       sourceChainId,
       chainId,
@@ -255,20 +255,11 @@ contract EVM2EVMGEOffRamp is IEVM2EVMGEOffRamp, BaseOffRamp, TypeAndVersionInter
    * @notice Entry point for execution, called by the OCR network
    * @dev Expects an encoded ExecutionReport
    */
-  function _report(
-    bytes32, /*configDigest*/
-    uint40, /*epochAndRound*/
-    bytes memory report
-  ) internal override {
+  function _report(bytes memory report) internal override {
     _execute(abi.decode(report, (GE.ExecutionReport)), false);
   }
 
-  function _beforeSetOCR2Config(uint8 _threshold, bytes memory _onchainConfig) internal override {}
+  function _payTransmitter(uint256 initialGas, address transmitter) internal override {}
 
-  function _afterSetOCR2Config(
-    uint8, /* f */
-    bytes memory /* onchainConfig */
-  ) internal override {}
-
-  function _payTransmitter(uint32 initialGas, address transmitter) internal override {}
+  function _beforeSetOCR2Config(uint8 f, bytes memory onchainConfig) internal override {}
 }

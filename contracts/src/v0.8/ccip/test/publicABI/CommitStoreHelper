@@ -4,6 +4,7 @@
   "getConfig()": "c3f909d4",
   "getExpectedNextSequenceNumber(address)": "c1131d8e",
   "getMerkleRoot(bytes32)": "a7206cd6",
+  "getTransmitters()": "666cab8d",
   "i_chainId()": "28094b59",
   "i_sourceChainId()": "0f733bca",
   "isAFNHealthy()": "147809b3",
@@ -21,7 +22,6 @@
   "setOCR2Config(address[],address[],uint8,bytes,uint64,bytes)": "1ef38174",
   "transferOwnership(address)": "f2fde38b",
   "transmit(bytes32[3],bytes,bytes32[],bytes32[],bytes32)": "b1dc65a4",
-  "transmitters()": "81411834",
   "typeAndVersion()": "181f5a77",
   "unpause()": "3f4ba83a",
   "verify(bytes32[],bytes32[],uint256,bytes32[],uint256)": "e71e65ce"
