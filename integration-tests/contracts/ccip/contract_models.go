@@ -411,17 +411,17 @@ func (sender *TollSender) SendTokens(
 	return tx, sender.client.ProcessTransaction(tx)
 }
 
-type GasFeeCache struct {
+type FeeManager struct {
 	client     *blockchain.EthereumClient
-	instance   *gas_fee_cache.GasFeeCache
+	instance   *gas_fee_cache.FeeManager
 	EthAddress common.Address
 }
 
-func (c *GasFeeCache) Address() string {
+func (c *FeeManager) Address() string {
 	return c.EthAddress.Hex()
 }
 
-func (c *GasFeeCache) SetFeeUpdater(addr common.Address) error {
+func (c *FeeManager) SetFeeUpdater(addr common.Address) error {
 	opts, err := c.client.TransactionOpts(c.client.DefaultWallet)
 	if err != nil {
 		return err
@@ -432,11 +432,11 @@ func (c *GasFeeCache) SetFeeUpdater(addr common.Address) error {
 	}
 	log.Info().
 		Str("updater", addr.Hex()).
-		Msg("GasFeeCache updater set")
+		Msg("FeeManager updater set")
 	return c.client.ProcessTransaction(tx)
 }
 
-func (c *GasFeeCache) UpdateFees(feeUpdates []gas_fee_cache.GEFeeUpdate) error {
+func (c *FeeManager) UpdateFees(feeUpdates []gas_fee_cache.GEFeeUpdate) error {
 	opts, err := c.client.TransactionOpts(c.client.DefaultWallet)
 	if err != nil {
 		return err
@@ -446,7 +446,7 @@ func (c *GasFeeCache) UpdateFees(feeUpdates []gas_fee_cache.GEFeeUpdate) error {
 		return err
 	}
 	log.Info().
-		Msg("GasFeeCache fee updated")
+		Msg("FeeManager fee updated")
 	return c.client.ProcessTransaction(tx)
 }
 

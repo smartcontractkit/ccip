@@ -542,7 +542,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	sourceChain.Commit()
 
 	// Deploy and configure GE onramp
-	sourceGasFeeCacheAddress, _, _, err := gas_fee_cache.DeployGasFeeCache(sourceUser, sourceChain, []gas_fee_cache.GEFeeUpdate{
+	sourceFeeManagerAddress, _, _, err := gas_fee_cache.DeployFeeManager(sourceUser, sourceChain, []gas_fee_cache.GEFeeUpdate{
 		{
 			ChainId:        destChainID,
 			LinkPerUnitGas: big.NewInt(1e9), // 1 gwei
@@ -575,7 +575,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			FeeAmount:       big.NewInt(0),
 			DestGasOverhead: big.NewInt(0),
 			Multiplier:      big.NewInt(1e18),
-			GasFeeCache:     sourceGasFeeCacheAddress,
+			FeeManager:      sourceFeeManagerAddress,
 			DestChainId:     destChainID,
 		},
 	)
@@ -656,12 +656,12 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	require.NoError(t, err)
 
 	// Deploy and configure ge offramp.
-	destGasFeeCacheAddress, _, _, err := gas_fee_cache.DeployGasFeeCache(destUser, destChain, []gas_fee_cache.GEFeeUpdate{{
+	destFeeManagerAddress, _, _, err := gas_fee_cache.DeployFeeManager(destUser, destChain, []gas_fee_cache.GEFeeUpdate{{
 		ChainId:        sourceChainID,
 		LinkPerUnitGas: big.NewInt(200e9), // (2e20 juels/eth) * (1 gwei / gas) / (1 eth/1e18)
 	}}, nil, big.NewInt(1e18))
 	require.NoError(t, err)
-	destGasFeeCache, err := gas_fee_cache.NewGasFeeCache(destGasFeeCacheAddress, destChain)
+	destFeeManager, err := gas_fee_cache.NewFeeManager(destFeeManagerAddress, destChain)
 	require.NoError(t, err)
 	geOffRampAddress, _, _, err := evm_2_evm_ge_offramp.DeployEVM2EVMGEOffRamp(
 		destUser,
@@ -670,7 +670,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		destChainID,
 		evm_2_evm_ge_offramp.IEVM2EVMGEOffRampGEOffRampConfig{
 			GasOverhead:                             big.NewInt(0),
-			GasFeeCache:                             destGasFeeCacheAddress,
+			FeeManager:                              destFeeManagerAddress,
 			PermissionLessExecutionThresholdSeconds: 1,
 			ExecutionDelaySeconds:                   0,
 			MaxDataSize:                             1e12,
@@ -695,7 +695,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	require.NoError(t, err)
 	destChain.Commit()
 	// OffRamp can update
-	_, err = destGasFeeCache.SetFeeUpdater(destUser, geOffRampAddress)
+	_, err = destFeeManager.SetFeeUpdater(destUser, geOffRampAddress)
 	require.NoError(t, err)
 
 	// Create dest ge router

@@ -127,7 +127,7 @@ $SCRIPTPATH/native_solc8_15_compile_ccip ccip/applications/TollSenderDapp.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/onRamp/ge/EVM2EVMGEOnRamp.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/offRamp/ge/EVM2EVMGEOffRamp.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/router/GERouter.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/gasFeeCache/GasFeeCache.sol
+$SCRIPTPATH/native_solc8_15_compile_ccip ccip/fees/FeeManager.sol
 
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/applications/GovernanceDapp.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/applications/PingPongDemo.sol

@@ -40,8 +40,8 @@ func DeployGELanes(t *testing.T, source *EvmDeploymentConfig, destination *EvmDe
 	deployDestinationContracts(t, destination, sourceChainId, source.LaneConfig.OnRamp, source.ChainConfig.SupportedTokens)
 	deployDestinationContracts(t, source, destChainId, destination.LaneConfig.OnRamp, destination.ChainConfig.SupportedTokens)
 
-	setGasFeeCachePrices(t, source, destChainId)
-	setGasFeeCachePrices(t, destination, sourceChainId)
+	setFeeManagerPrices(t, source, destChainId)
+	setFeeManagerPrices(t, destination, sourceChainId)
 
 	// Deploy onramp sender dapp
 	//deploySenderDapp(t, source, destination)
@@ -85,7 +85,7 @@ func deployDestinationContracts(t *testing.T, client *EvmDeploymentConfig, sourc
 	deployOffRamp(t, client, sourceChainId, supportedTokens, onRamp)
 
 	setOffRampOnRouter(t, client)
-	setGasFeeCacheUpdater(t, client)
+	setFeeManagerUpdater(t, client)
 
 	if client.DeploySettings.DeployRamp || client.DeploySettings.DeployRouter {
 		setRouterOnOffRamp(t, client)
@@ -141,7 +141,7 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId uint64)
 			FeeAmount:       big.NewInt(100),
 			DestGasOverhead: big.NewInt(0),
 			Multiplier:      big.NewInt(1),
-			GasFeeCache:     client.ChainConfig.GasFeeCache,
+			FeeManager:      client.ChainConfig.FeeManager,
 			DestChainId:     destChainId,
 		},
 	)
@@ -191,7 +191,7 @@ func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainId uint
 		client.ChainConfig.ChainId,
 		evm_2_evm_ge_offramp.IEVM2EVMGEOffRampGEOffRampConfig{
 			GasOverhead:                             big.NewInt(0),
-			GasFeeCache:                             client.ChainConfig.GasFeeCache,
+			FeeManager:                              client.ChainConfig.FeeManager,
 			ExecutionDelaySeconds:                   60,
 			MaxDataSize:                             1e5,
 			MaxTokensLength:                         15,

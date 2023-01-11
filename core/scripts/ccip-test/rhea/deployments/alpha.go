@@ -28,9 +28,9 @@ var Alpha_Sepolia = rhea.EVMChainConfig{
 			Price: big.NewInt(1),
 		},
 	},
-	Router:      gethcommon.HexToAddress("0x7B9e7A97ca47B7a5501c8EB07aBF78Fb37bB4738"),
-	Afn:         gethcommon.HexToAddress("0x521c7694c158d2d3D2FC79a93d2aDa5673d8226a"),
-	GasFeeCache: gethcommon.HexToAddress("0x43a75aDEb32A06C5489d32a946dD8F2cC18Db9E8"),
+	Router:     gethcommon.HexToAddress("0x7B9e7A97ca47B7a5501c8EB07aBF78Fb37bB4738"),
+	Afn:        gethcommon.HexToAddress("0x521c7694c158d2d3D2FC79a93d2aDa5673d8226a"),
+	FeeManager: gethcommon.HexToAddress("0x43a75aDEb32A06C5489d32a946dD8F2cC18Db9E8"),
 }
 
 var Alpha_AvaxFuji = rhea.EVMChainConfig{
@@ -46,9 +46,9 @@ var Alpha_AvaxFuji = rhea.EVMChainConfig{
 			Price: big.NewInt(1),
 		},
 	},
-	Router:      gethcommon.HexToAddress("0x64A16E59AECF0d85843B85e2ecca217fCef1f2eA"),
-	Afn:         gethcommon.HexToAddress("0xa70fe070090C4748924B0E5368388059270b73ce"),
-	GasFeeCache: gethcommon.HexToAddress("0xF037523a2a9BEAFAD74e77446DEB75d4635853F6"),
+	Router:     gethcommon.HexToAddress("0x64A16E59AECF0d85843B85e2ecca217fCef1f2eA"),
+	Afn:        gethcommon.HexToAddress("0xa70fe070090C4748924B0E5368388059270b73ce"),
+	FeeManager: gethcommon.HexToAddress("0xF037523a2a9BEAFAD74e77446DEB75d4635853F6"),
 }
 
 var Alpha_OptimismGoerli = rhea.EVMChainConfig{
@@ -64,9 +64,9 @@ var Alpha_OptimismGoerli = rhea.EVMChainConfig{
 			Price: big.NewInt(1),
 		},
 	},
-	Router:      gethcommon.HexToAddress("0x11BEe8AD23bA3Fd56fcbD88467D5C76375fD03ef"),
-	Afn:         gethcommon.HexToAddress("0x2aE6d5495fc20226F433be50e37D59c05D186AaA"),
-	GasFeeCache: gethcommon.HexToAddress("0xD84E2f21D0bBbe0be697cB4A400AF367b39FbCD4"),
+	Router:     gethcommon.HexToAddress("0x11BEe8AD23bA3Fd56fcbD88467D5C76375fD03ef"),
+	Afn:        gethcommon.HexToAddress("0x2aE6d5495fc20226F433be50e37D59c05D186AaA"),
+	FeeManager: gethcommon.HexToAddress("0xD84E2f21D0bBbe0be697cB4A400AF367b39FbCD4"),
 }
 
 var Alpha_OptimismGoerliToAvaxFuji = rhea.EvmDeploymentConfig{
@@ -79,10 +79,10 @@ var Alpha_OptimismGoerliToAvaxFuji = rhea.EvmDeploymentConfig{
 		PingPongDapp: gethcommon.HexToAddress("0x33BBb9c3Ee0f80F1777E973D3814f52740019A86"),
 	},
 	DeploySettings: rhea.DeploySettings{
-		DeployAFN:         false,
-		DeployTokenPools:  false,
-		DeployRouter:      false,
-		DeployGasFeeCache: false,
+		DeployAFN:        false,
+		DeployTokenPools: false,
+		DeployRouter:     false,
+		DeployFeeManager: false,
 
 		DeployCommitStore:    false,
 		DeployRamp:           false,
@@ -103,10 +103,10 @@ var Alpha_AvaxFujiToOptimismGoerli = rhea.EvmDeploymentConfig{
 	},
 
 	DeploySettings: rhea.DeploySettings{
-		DeployAFN:         false,
-		DeployTokenPools:  false,
-		DeployRouter:      false,
-		DeployGasFeeCache: false,
+		DeployAFN:        false,
+		DeployTokenPools: false,
+		DeployRouter:     false,
+		DeployFeeManager: false,
 
 		DeployCommitStore:    false,
 		DeployRamp:           false,
@@ -127,10 +127,10 @@ var Alpha_SepoliaToAvaxFuji = rhea.EvmDeploymentConfig{
 	},
 
 	DeploySettings: rhea.DeploySettings{
-		DeployAFN:         false,
-		DeployTokenPools:  false,
-		DeployRouter:      false,
-		DeployGasFeeCache: false,
+		DeployAFN:        false,
+		DeployTokenPools: false,
+		DeployRouter:     false,
+		DeployFeeManager: false,
 
 		DeployCommitStore:    false,
 		DeployRamp:           false,
@@ -151,10 +151,10 @@ var Alpha_AvaxFujiToSepolia = rhea.EvmDeploymentConfig{
 	},
 
 	DeploySettings: rhea.DeploySettings{
-		DeployAFN:         false,
-		DeployTokenPools:  false,
-		DeployRouter:      false,
-		DeployGasFeeCache: false,
+		DeployAFN:        false,
+		DeployTokenPools: false,
+		DeployRouter:     false,
+		DeployFeeManager: false,
 
 		DeployCommitStore:    false,
 		DeployRamp:           false,
@@ -175,10 +175,10 @@ var Alpha_OptimismGoerliToSepolia = rhea.EvmDeploymentConfig{
 	},
 
 	DeploySettings: rhea.DeploySettings{
-		DeployAFN:         false,
-		DeployTokenPools:  false,
-		DeployRouter:      false,
-		DeployGasFeeCache: false,
+		DeployAFN:        false,
+		DeployTokenPools: false,
+		DeployRouter:     false,
+		DeployFeeManager: false,
 
 		DeployCommitStore:    false,
 		DeployRamp:           false,
@@ -199,10 +199,10 @@ var Alpha_SepoliaToOptimismGoerli = rhea.EvmDeploymentConfig{
 	},
 
 	DeploySettings: rhea.DeploySettings{
-		DeployAFN:         false,
-		DeployTokenPools:  false,
-		DeployRouter:      false,
-		DeployGasFeeCache: false,
+		DeployAFN:        false,
+		DeployTokenPools: false,
+		DeployRouter:     false,
+		DeployFeeManager: false,
 
 		DeployCommitStore:    false,
 		DeployRamp:           false,

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IGasFeeCache} from "../gasFeeCache/IGasFeeCache.sol";
+import {IFeeManager} from "../fees/IFeeManager.sol";
 
 import {GE} from "../../models/GE.sol";
 import {Internal} from "../../models/Internal.sol";
@@ -20,7 +20,7 @@ interface IEVM2EVMGEOffRamp {
 
   struct GEOffRampConfig {
     uint256 gasOverhead;
-    IGasFeeCache gasFeeCache;
+    IFeeManager feeManager;
     // The waiting time before manual execution is enabled
     uint32 permissionLessExecutionThresholdSeconds;
     // execution delay in seconds

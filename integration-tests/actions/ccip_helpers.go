@@ -293,13 +293,13 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(t *testing.T) {
 	require.NoError(t, err, "setting OnRamp Fee config")
 
 	// GE Set up
-	sourceGasFeeCache, err := contractDeployer.DeployGasFeeCache([]gas_fee_cache.GEFeeUpdate{
+	sourceFeeManager, err := contractDeployer.DeployFeeManager([]gas_fee_cache.GEFeeUpdate{
 		{
 			ChainId:        sourceCCIP.DestinationChainId,
 			LinkPerUnitGas: big.NewInt(1e9), // 1 gwei
 		},
 	})
-	require.NoError(t, err, "Error on GasFeeCache deployment")
+	require.NoError(t, err, "Error on FeeManager deployment")
 
 	err = sourceCCIP.Common.ChainClient.WaitForEvents()
 	require.NoError(t, err, "Error waiting for events")
@@ -312,7 +312,7 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(t *testing.T) {
 			FeeAmount:       big.NewInt(0),
 			DestGasOverhead: big.NewInt(0),
 			Multiplier:      big.NewInt(1e18),
-			GasFeeCache:     sourceGasFeeCache.EthAddress,
+			FeeManager:      sourceFeeManager.EthAddress,
 			DestChainId:     sourceCCIP.DestinationChainId,
 		})
 
@@ -642,13 +642,13 @@ func (destCCIP *DestCCIPModule) DeployContracts(t *testing.T, sourceCCIP SourceC
 	require.NoError(t, err, "Error setting router on the offramp")
 
 	// GE
-	destGasFeeCache, err := contractDeployer.DeployGasFeeCache([]gas_fee_cache.GEFeeUpdate{
+	destFeeManager, err := contractDeployer.DeployFeeManager([]gas_fee_cache.GEFeeUpdate{
 		{
 			ChainId:        destCCIP.SourceChainId,
 			LinkPerUnitGas: big.NewInt(200e9), // (2e20 juels/eth) * (1 gwei / gas) / (1 eth/1e18)
 		},
 	})
-	require.NoError(t, err, "Error on GasFeeCache deployment")
+	require.NoError(t, err, "Error on FeeManager deployment")
 
 	err = destCCIP.Common.ChainClient.WaitForEvents()
 	require.NoError(t, err, "Error waiting for events on destination contract deployments")
@@ -656,13 +656,13 @@ func (destCCIP *DestCCIPModule) DeployContracts(t *testing.T, sourceCCIP SourceC
 	destCCIP.GEOffRamp, err = contractDeployer.DeployGEOffRamp(destCCIP.SourceChainId, sourceCCIP.DestinationChainId,
 		destCCIP.CommitStore.EthAddress, sourceCCIP.GEOnRamp.EthAddress,
 		destCCIP.Common.AFN.EthAddress, common.HexToAddress(destCCIP.Common.FeeToken.Address()),
-		destGasFeeCache.EthAddress, sourceTokens, pools, destCCIP.Common.RateLimiterConfig, big.NewInt(0))
+		destFeeManager.EthAddress, sourceTokens, pools, destCCIP.Common.RateLimiterConfig, big.NewInt(0))
 	require.NoError(t, err, "Deploying GEOffRamp shouldn't fail")
 	err = destCCIP.Common.ChainClient.WaitForEvents()
 	require.NoError(t, err, "Error waiting for deploying GEOffRamp")
 
 	// OffRamp can update
-	err = destGasFeeCache.SetFeeUpdater(destCCIP.GEOffRamp.EthAddress)
+	err = destFeeManager.SetFeeUpdater(destCCIP.GEOffRamp.EthAddress)
 	require.NoError(t, err, "setting GEOffRamp as fee updater shouldn't fail")
 
 	_, err = destCCIP.Common.GERouter.AddOffRamp(destCCIP.GEOffRamp.EthAddress)

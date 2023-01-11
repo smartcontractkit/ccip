@@ -23,8 +23,8 @@ func DeployToNewChain(t *testing.T, client *EvmDeploymentConfig) {
 	deployNativeTokenPool(t, client)
 	// Updates client.ChainConfig.Router if any new contracts are deployed
 	deployRouter(t, client)
-	// Update client.GasFeeCache if any new contracts are deployed
-	deployGasFeeCache(t, client)
+	// Update client.FeeManager if any new contracts are deployed
+	deployFeeManager(t, client)
 }
 
 func deployAFN(t *testing.T, client *EvmDeploymentConfig) {
@@ -87,15 +87,15 @@ func deployRouter(t *testing.T, client *EvmDeploymentConfig) {
 	client.Logger.Infof(fmt.Sprintf("Router deployed on %s in tx %s", routerAddress.String(), helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash())))
 }
 
-// deployGasFeeCache GasFeeCache is deployed without any feeUpdaters
-func deployGasFeeCache(t *testing.T, client *EvmDeploymentConfig) {
-	if !client.DeploySettings.DeployGasFeeCache {
-		client.Logger.Infof("Skipping GasFeeCache deployment, using GasFeeCache on %s", client.ChainConfig.GasFeeCache)
+// deployFeeManager FeeManager is deployed without any feeUpdaters
+func deployFeeManager(t *testing.T, client *EvmDeploymentConfig) {
+	if !client.DeploySettings.DeployFeeManager {
+		client.Logger.Infof("Skipping FeeManager deployment, using FeeManager on %s", client.ChainConfig.FeeManager)
 		return
 	}
 
-	client.Logger.Infof("Deploying GasFeeCache")
-	gasFeeCache, tx, _, err := gas_fee_cache.DeployGasFeeCache(
+	client.Logger.Infof("Deploying FeeManager")
+	feeManager, tx, _, err := gas_fee_cache.DeployFeeManager(
 		client.Owner,
 		client.Client,
 		[]gas_fee_cache.GEFeeUpdate{},
@@ -104,7 +104,7 @@ func deployGasFeeCache(t *testing.T, client *EvmDeploymentConfig) {
 	)
 	require.NoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
-	client.ChainConfig.GasFeeCache = gasFeeCache
+	client.ChainConfig.FeeManager = feeManager
 
-	client.Logger.Infof(fmt.Sprintf("GasFeeCache deployed on %s in tx %s", gasFeeCache.String(), helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash())))
+	client.Logger.Infof(fmt.Sprintf("FeeManager deployed on %s in tx %s", feeManager.String(), helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash())))
 }

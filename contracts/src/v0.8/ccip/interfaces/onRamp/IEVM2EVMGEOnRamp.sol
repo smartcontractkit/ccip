@@ -25,8 +25,8 @@ interface IEVM2EVMGEOnRamp is IEVM2AnyGEOnRamp {
     uint256 destGasOverhead;
     // Price multiplier for gas costs
     uint256 multiplier;
-    // Gas fee cache contract
-    address gasFeeCache;
+    // Fee manager contract
+    address feeManager;
     // Destination chain ID
     uint64 destChainId;
   }

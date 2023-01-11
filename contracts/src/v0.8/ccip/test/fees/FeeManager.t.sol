@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IGasFeeCache} from "../../interfaces/gasFeeCache/IGasFeeCache.sol";
+import {IFeeManager} from "../../interfaces/fees/IFeeManager.sol";
 
 import {GE} from "../../models/GE.sol";
 import {TokenSetup} from "../TokenSetup.t.sol";
-import {GasFeeCache} from "../../gasFeeCache/GasFeeCache.sol";
+import {FeeManager} from "../../fees/FeeManager.sol";
 
-contract GasFeeCacheSetup is TokenSetup {
-  GasFeeCache s_gasFeeCache;
+contract FeeManagerSetup is TokenSetup {
+  FeeManager s_feeManager;
 
   function setUp() public virtual override {
     TokenSetup.setUp();
@@ -16,19 +16,19 @@ contract GasFeeCacheSetup is TokenSetup {
     fees[0] = GE.FeeUpdate({chainId: DEST_CHAIN_ID, linkPerUnitGas: 100});
     address[] memory feeUpdaters = new address[](0);
 
-    s_gasFeeCache = new GasFeeCache(fees, feeUpdaters, uint128(TWELVE_HOURS));
+    s_feeManager = new FeeManager(fees, feeUpdaters, uint128(TWELVE_HOURS));
   }
 }
 
-contract GasFeeCache_getFee is GasFeeCacheSetup {
+contract FeeManager_getFee is FeeManagerSetup {
   function testGetFeeSuccess() public {
-    assertEq(100, s_gasFeeCache.getFee(DEST_CHAIN_ID));
+    assertEq(100, s_feeManager.getFee(DEST_CHAIN_ID));
   }
 
   function testGetFeeStaleReverts() public {
     uint256 diff = TWELVE_HOURS + 1;
     vm.warp(block.timestamp + diff);
-    vm.expectRevert(abi.encodeWithSelector(IGasFeeCache.StaleFee.selector, TWELVE_HOURS, diff));
-    s_gasFeeCache.getFee(DEST_CHAIN_ID);
+    vm.expectRevert(abi.encodeWithSelector(IFeeManager.StaleFee.selector, TWELVE_HOURS, diff));
+    s_feeManager.getFee(DEST_CHAIN_ID);
   }
 }

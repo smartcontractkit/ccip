@@ -60,7 +60,7 @@ func (client *CCIPClient) setOnRampFeeConfig(t *testing.T) {
 		FeeAmount:       big.NewInt(100),
 		DestGasOverhead: big.NewInt(0),
 		Multiplier:      big.NewInt(1),
-		GasFeeCache:     client.Source.GasFeeCache.Address(),
+		FeeManager:      client.Source.FeeManager.Address(),
 		DestChainId:     client.Dest.ChainId,
 	})
 	require.NoError(t, err)
@@ -111,7 +111,7 @@ type Client struct {
 	GovernanceDapp   *governance_dapp.GovernanceDapp
 	PingPongDapp     *ping_pong_demo.PingPongDemo
 	Afn              *afn_contract.AFNContract
-	GasFeeCache      *gas_fee_cache.GasFeeCache
+	FeeManager       *gas_fee_cache.FeeManager
 	Router           *ge_router.GERouter
 	logger           logger.Logger
 	t                *testing.T
@@ -156,7 +156,7 @@ func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient
 	require.NoError(t, err)
 	pingPongDapp, err := ping_pong_demo.NewPingPongDemo(config.LaneConfig.PingPongDapp, config.Client)
 	require.NoError(t, err)
-	gasFeeCache, err := gas_fee_cache.NewGasFeeCache(config.ChainConfig.GasFeeCache, config.Client)
+	feeManager, err := gas_fee_cache.NewFeeManager(config.ChainConfig.FeeManager, config.Client)
 	require.NoError(t, err)
 
 	return SourceClient{
@@ -166,7 +166,7 @@ func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient
 			LinkTokenAddress: config.ChainConfig.LinkToken,
 			LinkToken:        LinkToken,
 			Afn:              afn,
-			GasFeeCache:      gasFeeCache,
+			FeeManager:       feeManager,
 			SupportedTokens:  supportedTokens,
 			GovernanceDapp:   governanceDapp,
 			PingPongDapp:     pingPongDapp,
@@ -218,7 +218,7 @@ func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestCli
 	require.NoError(t, err)
 	pingPongDapp, err := ping_pong_demo.NewPingPongDemo(config.LaneConfig.PingPongDapp, config.Client)
 	require.NoError(t, err)
-	gasFeeCache, err := gas_fee_cache.NewGasFeeCache(config.ChainConfig.GasFeeCache, config.Client)
+	feeManager, err := gas_fee_cache.NewFeeManager(config.ChainConfig.FeeManager, config.Client)
 	require.NoError(t, err)
 
 	return DestClient{
@@ -231,7 +231,7 @@ func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestCli
 			GovernanceDapp:   governanceDapp,
 			PingPongDapp:     pingPongDapp,
 			Afn:              afn,
-			GasFeeCache:      gasFeeCache,
+			FeeManager:       feeManager,
 			logger:           config.Logger,
 			Router:           router,
 			t:                t,

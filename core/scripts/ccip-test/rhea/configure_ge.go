@@ -31,11 +31,11 @@ func setOffRampOnTokenPools(t *testing.T, destClient *EvmDeploymentConfig) {
 	}
 }
 
-func setGasFeeCachePrices(t *testing.T, client *EvmDeploymentConfig, destChainId uint64) {
-	gasFeeCache, err := gas_fee_cache.NewGasFeeCache(client.ChainConfig.GasFeeCache, client.Client)
+func setFeeManagerPrices(t *testing.T, client *EvmDeploymentConfig, destChainId uint64) {
+	feeManager, err := gas_fee_cache.NewFeeManager(client.ChainConfig.FeeManager, client.Client)
 	require.NoError(t, err)
 
-	tx, err := gasFeeCache.UpdateFees(client.Owner, []gas_fee_cache.GEFeeUpdate{
+	tx, err := feeManager.UpdateFees(client.Owner, []gas_fee_cache.GEFeeUpdate{
 		{
 			ChainId:        destChainId,
 			LinkPerUnitGas: big.NewInt(1e18),
@@ -110,11 +110,11 @@ func setOffRampOnRouter(t *testing.T, client *EvmDeploymentConfig) {
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 }
 
-func setGasFeeCacheUpdater(t *testing.T, client *EvmDeploymentConfig) {
-	gasFeeCache, err := gas_fee_cache.NewGasFeeCache(client.ChainConfig.GasFeeCache, client.Client)
+func setFeeManagerUpdater(t *testing.T, client *EvmDeploymentConfig) {
+	feeManager, err := gas_fee_cache.NewFeeManager(client.ChainConfig.FeeManager, client.Client)
 	require.NoError(t, err)
 
-	tx, err := gasFeeCache.SetFeeUpdater(client.Owner, client.LaneConfig.OffRamp)
+	tx, err := feeManager.SetFeeUpdater(client.Owner, client.LaneConfig.OffRamp)
 	require.NoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 }

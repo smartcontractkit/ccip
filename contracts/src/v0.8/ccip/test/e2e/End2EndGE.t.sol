@@ -17,7 +17,7 @@ contract E2E_GE is EVM2EVMGEOnRampSetup, CommitStoreSetup, EVM2EVMGEOffRampSetup
     CommitStoreSetup.setUp();
     EVM2EVMGEOffRampSetup.setUp();
 
-    deployOffRamp(s_commitStore, s_gasFeeCache);
+    deployOffRamp(s_commitStore, s_feeManager);
 
     s_merkleHelper = new MerkleHelper();
 

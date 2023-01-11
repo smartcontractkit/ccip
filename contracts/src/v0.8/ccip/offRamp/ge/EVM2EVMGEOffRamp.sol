@@ -174,7 +174,7 @@ contract EVM2EVMGEOffRamp is IEVM2EVMGEOffRamp, BaseOffRamp, TypeAndVersionInter
 
   /**
    * @notice Execute a series of one or more messages using a merkle proof and update one or more
-   * gasFeeCache prices.
+   * feeManager prices.
    * @param report ExecutionReport
    * @param manualExecution Whether the DON auto executes or it is manually initiated
    */
@@ -186,7 +186,7 @@ contract EVM2EVMGEOffRamp is IEVM2EVMGEOffRamp, BaseOffRamp, TypeAndVersionInter
     // Fee updates
     if (report.feeUpdates.length != 0) {
       if (manualExecution) revert UnauthorizedGasPriceUpdate();
-      s_config.gasFeeCache.updateFees(report.feeUpdates);
+      s_config.feeManager.updateFees(report.feeUpdates);
     }
 
     // Message execution

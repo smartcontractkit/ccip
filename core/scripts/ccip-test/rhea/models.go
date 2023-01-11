@@ -27,10 +27,10 @@ type EVMGasSettings struct {
 }
 
 type DeploySettings struct {
-	DeployAFN         bool
-	DeployTokenPools  bool
-	DeployRouter      bool
-	DeployGasFeeCache bool
+	DeployAFN        bool
+	DeployTokenPools bool
+	DeployRouter     bool
+	DeployFeeManager bool
 
 	DeployRamp           bool
 	DeployCommitStore    bool
@@ -55,7 +55,7 @@ type EVMChainConfig struct {
 	SupportedTokens map[Token]EVMBridgedToken
 	Router          gethcommon.Address
 	Afn             gethcommon.Address
-	GasFeeCache     gethcommon.Address
+	FeeManager      gethcommon.Address
 }
 
 type EVMBridgedToken struct {

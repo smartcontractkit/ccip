@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import {Common} from "../../models/Common.sol";
 import {GE} from "../../models/GE.sol";
 
-interface IGasFeeCache {
+interface IFeeManager {
   error ChainNotSupported(uint64 chain);
   error FeeUpdaterNotAllowed(address feeUpdater);
   error OnlyCallableByUpdaterOrOwner();

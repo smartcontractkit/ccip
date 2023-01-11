@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IGasFeeCache} from "../interfaces/gasFeeCache/IGasFeeCache.sol";
+import {IFeeManager} from "../interfaces/fees/IFeeManager.sol";
 
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
 import {Common} from "../models/Common.sol";
 import {GE} from "../models/GE.sol";
 
-contract GasFeeCache is IGasFeeCache, OwnerIsCreator {
+contract FeeManager is IFeeManager, OwnerIsCreator {
   mapping(uint64 => TimestampedFeeUpdate) private s_linkPerUnitGasByDestChainId;
   mapping(address => bool) private s_feeUpdaters;
   uint128 private immutable i_stalenessThreshold;

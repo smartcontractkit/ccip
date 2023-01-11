@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {IGasFeeCache} from "../../../interfaces/gasFeeCache/IGasFeeCache.sol";
+import {IFeeManager} from "../../../interfaces/fees/IFeeManager.sol";
 import {IEVM2EVMGEOnRamp} from "../../../interfaces/onRamp/IEVM2EVMGEOnRamp.sol";
 
 import {EVM2EVMGEOnRamp} from "../../../onRamp/ge/EVM2EVMGEOnRamp.sol";
-import {GasFeeCache} from "../../../gasFeeCache/GasFeeCache.sol";
+import {FeeManager} from "../../../fees/FeeManager.sol";
 import {GERouter} from "../../../router/GERouter.sol";
 import {GESRouterSetup} from "../../router/GERouterSetup.t.sol";
 import {GE} from "../../../models/GE.sol";
@@ -33,7 +33,7 @@ contract EVM2EVMGEOnRampSetup is TokenSetup, GESRouterSetup {
     GE.FeeUpdate[] memory fees = new GE.FeeUpdate[](1);
     fees[0] = GE.FeeUpdate({chainId: DEST_CHAIN_ID, linkPerUnitGas: 100});
     address[] memory feeUpdaters = new address[](0);
-    IGasFeeCache gasFeeCache = new GasFeeCache(fees, feeUpdaters, uint128(TWELVE_HOURS));
+    IFeeManager feeManager = new FeeManager(fees, feeUpdaters, uint128(TWELVE_HOURS));
 
     s_onRamp = new EVM2EVMGEOnRamp(
       SOURCE_CHAIN_ID,
@@ -46,7 +46,7 @@ contract EVM2EVMGEOnRampSetup is TokenSetup, GESRouterSetup {
       rateLimiterConfig(),
       TOKEN_LIMIT_ADMIN,
       s_sourceRouter,
-      gasFeeCacheConfig(address(gasFeeCache))
+      feeManagerConfig(address(feeManager))
     );
 
     s_metadataHash = keccak256(
@@ -115,7 +115,7 @@ contract EVM2EVMGEOnRampSetup is TokenSetup, GESRouterSetup {
     return messageEvent;
   }
 
-  function gasFeeCacheConfig(address gasFeeCacheAddress)
+  function feeManagerConfig(address feeManagerAddress)
     internal
     view
     returns (IEVM2EVMGEOnRamp.DynamicFeeConfig memory feeConfig)
@@ -126,7 +126,7 @@ contract EVM2EVMGEOnRampSetup is TokenSetup, GESRouterSetup {
         feeAmount: 1,
         destGasOverhead: 1,
         multiplier: 108e16,
-        gasFeeCache: gasFeeCacheAddress,
+        feeManager: feeManagerAddress,
         destChainId: DEST_CHAIN_ID
       });
   }

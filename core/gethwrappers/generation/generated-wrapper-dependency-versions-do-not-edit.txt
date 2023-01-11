@@ -18,13 +18,13 @@ cron_upkeep_wrapper: ../../contracts/solc/v0.8.6/CronUpkeep.abi - b1257293e0016a
 custom_token_pool: ../../contracts/solc/v0.8.15/CustomTokenPool.abi ../../contracts/solc/v0.8.15/CustomTokenPool.bin 6703923837c8acbbf4db120d2895f1e09abd3cffc202be40575656559b29b887
 derived_price_feed_wrapper: ../../contracts/solc/v0.8.6/DerivedPriceFeed.abi ../../contracts/solc/v0.8.6/DerivedPriceFeed.bin c8542e6c850c2d0fffb79a7f7213dc927ec64e6ddd54e1224cb2fb4a13aabdd0
 evm_2_any_toll_onramp_router: ../../contracts/solc/v0.8.15/EVM2AnyTollOnRampRouter.abi ../../contracts/solc/v0.8.15/EVM2AnyTollOnRampRouter.bin 29a19adb047787efa95fc86f52c87f38997b633bbccd91fcc66f9cc5e99b2103
-evm_2_evm_ge_offramp: ../../contracts/solc/v0.8.15/EVM2EVMGEOffRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMGEOffRamp.bin 062bc04bf8df2600709ed530159451711309fcdcd709f2dd00b4ae613f0e0122
-evm_2_evm_ge_onramp: ../../contracts/solc/v0.8.15/EVM2EVMGEOnRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMGEOnRamp.bin f046e13b47ea812d7359e742ec92f97cdb39a24285b33cb288081307ecefbd09
+evm_2_evm_ge_offramp: ../../contracts/solc/v0.8.15/EVM2EVMGEOffRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMGEOffRamp.bin a8df323e2413ab43a3a7ed20d5eb01e5b63c4401d77ec1dadc4038f5cd5cdf39
+evm_2_evm_ge_onramp: ../../contracts/solc/v0.8.15/EVM2EVMGEOnRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMGEOnRamp.bin 5bdc17aab80a821da27701637c6824876f0e79d6765d67d67a972fd1832206c5
 evm_2_evm_toll_offramp: ../../contracts/solc/v0.8.15/EVM2EVMTollOffRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMTollOffRamp.bin 2f426703d88600d17e6023adbcfe4dc3539e2abce8fdd5c6ebf87639747368a4
 evm_2_evm_toll_onramp: ../../contracts/solc/v0.8.15/EVM2EVMTollOnRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMTollOnRamp.bin ef5fcb2bffc26651cca6f02b437ce739e80fce36cceca00b85c3eb4ca592a22a
 flags_wrapper: ../../contracts/solc/v0.6/Flags.abi ../../contracts/solc/v0.6/Flags.bin 2034d1b562ca37a63068851915e3703980276e8d5f7db6db8a3351a49d69fc4a
 flux_aggregator_wrapper: ../../contracts/solc/v0.6/FluxAggregator.abi ../../contracts/solc/v0.6/FluxAggregator.bin a3b0a6396c4aa3b5ee39b3c4bd45efc89789d4859379a8a92caca3a0496c5794
-gas_fee_cache: ../../contracts/solc/v0.8.15/GasFeeCache.abi ../../contracts/solc/v0.8.15/GasFeeCache.bin c16da9452ee82e68889a7b12127593f7bed56a07e307e5d91ff22d5099c5fdbb
+gas_fee_cache: ../../contracts/solc/v0.8.15/FeeManager.abi ../../contracts/solc/v0.8.15/FeeManager.bin c16da9452ee82e68889a7b12127593f7bed56a07e307e5d91ff22d5099c5fdbb
 gas_wrapper: ../../contracts/solc/v0.8.6/KeeperRegistryCheckUpkeepGasUsageWrapper1_2.abi ../../contracts/solc/v0.8.6/KeeperRegistryCheckUpkeepGasUsageWrapper1_2.bin 4a5dcdac486d18fcd58e3488c15c1710ae76b977556a3f3191bd269a4bc75723
 ge_router: ../../contracts/solc/v0.8.15/GERouter.abi ../../contracts/solc/v0.8.15/GERouter.bin 644b8126e21f3d70d5418ff25ced2d7da67b98cd33121e19b9d0fcc8a3d99112
 governance_dapp: ../../contracts/solc/v0.8.15/GovernanceDapp.abi ../../contracts/solc/v0.8.15/GovernanceDapp.bin 42ea4d5273cdfb30a22487029fc4cee4ff0cc5da782a6cc91975a978f7ef3a5d
