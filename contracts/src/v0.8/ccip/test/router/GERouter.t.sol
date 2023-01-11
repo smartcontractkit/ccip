@@ -27,7 +27,8 @@ contract GERouter_ccipSend is EVM2EVMGEOnRampSetup {
 
   // Success
 
-  function testCCIPSendSuccess() public {
+  function testCCIPSendOneTokenSuccess_gas() public {
+    vm.pauseGasMetering();
     address sourceToken1Address = s_sourceTokens[1];
     IERC20 sourceToken1 = IERC20(sourceToken1Address);
     GEConsumer.EVM2AnyGEMessage memory message = _generateEmptyMessage();
@@ -52,23 +53,15 @@ contract GERouter_ccipSend is EVM2EVMGEOnRampSetup {
     vm.expectEmit(false, false, false, true);
     emit CCIPSendRequested(msgEvent);
 
-    assertEq(msgEvent.messageId, s_sourceRouter.ccipSend(DEST_CHAIN_ID, message));
+    vm.resumeGasMetering();
+    bytes32 messageId = s_sourceRouter.ccipSend(DEST_CHAIN_ID, message);
+    vm.pauseGasMetering();
+
+    assertEq(msgEvent.messageId, messageId);
     // Assert the user balance is lowered by the tokensAndAmounts sent and the fee amount
     uint256 expectedBalance = balanceBefore - (message.tokensAndAmounts[0].amount);
     assertEq(expectedBalance, sourceToken1.balanceOf(OWNER));
-  }
-
-  function testCCIPSendMinimal_gas() public {
-    s_sourceRouter.ccipSend(
-      DEST_CHAIN_ID,
-      GEConsumer.EVM2AnyGEMessage({
-        receiver: abi.encode(OWNER),
-        data: "",
-        tokensAndAmounts: new Common.EVMTokenAndAmount[](0),
-        feeToken: s_sourceFeeToken,
-        extraArgs: ""
-      })
-    );
+    vm.resumeGasMetering();
   }
 
   // Reverts

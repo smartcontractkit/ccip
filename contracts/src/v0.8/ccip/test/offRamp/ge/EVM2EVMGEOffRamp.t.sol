@@ -177,7 +177,8 @@ contract EVM2EVMGEOffRamp_execute is EVM2EVMGEOffRampSetup {
     s_offRamp.execute(_generateReportFromMessages(messages), false);
   }
 
-  function testTwoMessagesWithTokensSuccess() public {
+  function testTwoMessagesWithTokensSuccess_gas() public {
+    vm.pauseGasMetering();
     GE.EVM2EVMGEMessage[] memory messages = _generateMessagesWithTokens();
     // Set message 1 to use another receiver to simulate more fair gas costs
     messages[1].receiver = address(s_secondary_receiver);
@@ -196,6 +197,7 @@ contract EVM2EVMGEOffRamp_execute is EVM2EVMGEOffRampSetup {
       Internal.MessageExecutionState.SUCCESS
     );
 
+    vm.resumeGasMetering();
     s_offRamp.execute(_generateReportFromMessages(messages), false);
   }
 
@@ -403,7 +405,6 @@ contract EVM2EVMGEOffRamp__report is EVM2EVMGEOffRampSetup {
       messages[0].messageId,
       Internal.MessageExecutionState.SUCCESS
     );
-
     s_offRamp.report(abi.encode(report));
   }
 }
