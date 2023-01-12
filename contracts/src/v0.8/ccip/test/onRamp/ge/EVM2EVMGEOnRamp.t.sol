@@ -43,27 +43,30 @@ contract EVM2EVMGEOnRamp_forwardFromRouter is EVM2EVMGEOnRampSetup {
 
   // Success
 
-  function testSuccess() public {
+  function testForwardFromRouterSuccess() public {
     GEConsumer.EVM2AnyGEMessage memory message = _generateEmptyMessage();
 
-    vm.expectEmit(false, false, false, true);
-    emit CCIPSendRequested(_messageToEvent(message, 1, 1, 0));
+    uint256 feeAmount = 1234567890;
+    IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
 
-    s_onRamp.forwardFromRouter(message, 0, OWNER);
+    vm.expectEmit(false, false, false, true);
+    emit CCIPSendRequested(_messageToEvent(message, 1, 1, feeAmount));
+
+    s_onRamp.forwardFromRouter(message, feeAmount, OWNER);
   }
 
   function testShouldIncrementSeqNumSuccess() public {
     GEConsumer.EVM2AnyGEMessage memory message = _generateEmptyMessage();
 
     vm.expectEmit(false, false, false, true);
-    emit CCIPSendRequested(_messageToEvent(message, 1, 1, 50));
+    emit CCIPSendRequested(_messageToEvent(message, 1, 1, 0));
 
-    s_onRamp.forwardFromRouter(message, 50, OWNER);
+    s_onRamp.forwardFromRouter(message, 0, OWNER);
 
     vm.expectEmit(false, false, false, true);
-    emit CCIPSendRequested(_messageToEvent(message, 2, 2, 4e15));
+    emit CCIPSendRequested(_messageToEvent(message, 2, 2, 0));
 
-    s_onRamp.forwardFromRouter(message, 4e15, OWNER);
+    s_onRamp.forwardFromRouter(message, 0, OWNER);
 
     vm.expectEmit(false, false, false, true);
     emit CCIPSendRequested(_messageToEvent(message, 3, 3, 0));

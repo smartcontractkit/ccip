@@ -30,22 +30,18 @@ contract GERouter is IGERouter, BaseOffRampRouter, TypeAndVersionInterface {
 
   /// @inheritdoc IGERouter
   function ccipSend(uint64 destinationChainId, GEConsumer.EVM2AnyGEMessage memory message) external returns (bytes32) {
-    // Find and put the correct onRamp on the stack.
     IEVM2AnyGEOnRamp onRamp = s_onRamps[destinationChainId];
     // getFee checks if the onRamp is valid
     uint256 feeTokenAmount = getFee(destinationChainId, message);
+    IERC20(message.feeToken).safeTransferFrom(msg.sender, address(onRamp), feeTokenAmount);
 
-    Common.EVMTokenAndAmount[] memory combinedTokensAndAmounts = Internal._addToTokensAmounts(
-      message.tokensAndAmounts,
-      Common.EVMTokenAndAmount({token: message.feeToken, amount: feeTokenAmount})
-    );
-    // Transfer the tokensAndAmounts to the token pools.
+    // Transfer the tokens to the token pools.
     // TODO: Check the pool for how to take action
-    for (uint256 i = 0; i < combinedTokensAndAmounts.length; ++i) {
-      IERC20 token = IERC20(combinedTokensAndAmounts[i].token);
+    for (uint256 i = 0; i < message.tokensAndAmounts.length; ++i) {
+      IERC20 token = IERC20(message.tokensAndAmounts[i].token);
       IPool pool = onRamp.getPoolBySourceToken(token);
       if (address(pool) == address(0)) revert IBaseOnRamp.UnsupportedToken(token);
-      token.safeTransferFrom(msg.sender, address(pool), combinedTokensAndAmounts[i].amount);
+      token.safeTransferFrom(msg.sender, address(pool), message.tokensAndAmounts[i].amount);
     }
 
     return onRamp.forwardFromRouter(message, feeTokenAmount, msg.sender);

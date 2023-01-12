@@ -64,6 +64,19 @@ contract GERouter_ccipSend is EVM2EVMGEOnRampSetup {
     vm.resumeGasMetering();
   }
 
+  function testNonLinkFeeTokenSuccess() public {
+    GE.FeeUpdate[] memory feeUpdates = new GE.FeeUpdate[](1);
+    feeUpdates[0] = GE.FeeUpdate({token: s_sourceTokens[1], chainId: DEST_CHAIN_ID, linkPerUnitGas: 1000});
+    s_IFeeManager.updateFees(feeUpdates);
+
+    GEConsumer.EVM2AnyGEMessage memory message = _generateEmptyMessage();
+    message.feeToken = s_sourceTokens[1];
+
+    IERC20(s_sourceTokens[1]).approve(address(s_sourceRouter), 2**64);
+
+    s_sourceRouter.ccipSend(DEST_CHAIN_ID, message);
+  }
+
   // Reverts
 
   function testUnsupportedDestinationChainReverts() public {
@@ -81,7 +94,7 @@ contract GERouter_ccipSend is EVM2EVMGEOnRampSetup {
     message.feeToken = wrongFeeToken;
 
     vm.expectRevert(
-      abi.encodeWithSelector(IEVM2EVMGEOnRamp.MismatchedFeeToken.selector, s_sourceTokens[0], wrongFeeToken)
+      abi.encodeWithSelector(IFeeManager.TokenOrChainNotSupported.selector, wrongFeeToken, DEST_CHAIN_ID)
     );
 
     s_sourceRouter.ccipSend(DEST_CHAIN_ID, message);

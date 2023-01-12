@@ -56,7 +56,7 @@ func (client *CCIPClient) wip(t *testing.T, sourceClient *rhea.EvmDeploymentConf
 
 func (client *CCIPClient) setOnRampFeeConfig(t *testing.T) {
 	tx, err := client.Source.OnRamp.SetFeeConfig(client.Source.Owner, evm_2_evm_ge_onramp.IEVM2EVMGEOnRampDynamicFeeConfig{
-		FeeToken:        client.Source.LinkTokenAddress,
+		LinkToken:       client.Source.LinkTokenAddress,
 		FeeAmount:       big.NewInt(100),
 		DestGasOverhead: big.NewInt(0),
 		Multiplier:      big.NewInt(1),

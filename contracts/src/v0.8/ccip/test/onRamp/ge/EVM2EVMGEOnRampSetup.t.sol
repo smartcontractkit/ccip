@@ -25,15 +25,18 @@ contract EVM2EVMGEOnRampSetup is TokenSetup, GERouterSetup {
   address[] internal s_allowList;
 
   EVM2EVMGEOnRamp internal s_onRamp;
+  // Naming chosen to not collide with s_feeManager in the offRampSetup since both
+  // are imported into the e2e test.
+  IFeeManager internal s_IFeeManager;
 
   function setUp() public virtual override(TokenSetup, GERouterSetup) {
     TokenSetup.setUp();
     GERouterSetup.setUp();
 
-    GE.FeeUpdate[] memory fees = new GE.FeeUpdate[](1);
-    fees[0] = GE.FeeUpdate({token: s_sourceTokens[0], chainId: DEST_CHAIN_ID, linkPerUnitGas: 100});
+    GE.FeeUpdate[] memory feeUpdates = new GE.FeeUpdate[](1);
+    feeUpdates[0] = GE.FeeUpdate({token: s_sourceTokens[0], chainId: DEST_CHAIN_ID, linkPerUnitGas: 100});
     address[] memory feeUpdaters = new address[](0);
-    IFeeManager feeManager = new FeeManager(fees, feeUpdaters, uint128(TWELVE_HOURS));
+    s_IFeeManager = new FeeManager(feeUpdates, feeUpdaters, uint128(TWELVE_HOURS));
 
     s_onRamp = new EVM2EVMGEOnRamp(
       SOURCE_CHAIN_ID,
@@ -46,7 +49,7 @@ contract EVM2EVMGEOnRampSetup is TokenSetup, GERouterSetup {
       rateLimiterConfig(),
       TOKEN_LIMIT_ADMIN,
       s_sourceRouter,
-      feeManagerConfig(address(feeManager))
+      feeManagerConfig(address(s_IFeeManager))
     );
 
     s_metadataHash = keccak256(
@@ -122,7 +125,7 @@ contract EVM2EVMGEOnRampSetup is TokenSetup, GERouterSetup {
   {
     return
       IEVM2EVMGEOnRamp.DynamicFeeConfig({
-        feeToken: s_sourceTokens[0],
+        linkToken: s_sourceTokens[0],
         feeAmount: 1,
         destGasOverhead: 1,
         multiplier: 108e16,

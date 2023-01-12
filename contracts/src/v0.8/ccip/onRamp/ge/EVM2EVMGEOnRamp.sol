@@ -14,9 +14,12 @@ import {Common} from "../../models/Common.sol";
 import {GEConsumer} from "../../models/GEConsumer.sol";
 import {GE} from "../../models/GE.sol";
 
+import {SafeERC20} from "../../../vendor/SafeERC20.sol";
 import {IERC20} from "../../../vendor/IERC20.sol";
 
 contract EVM2EVMGEOnRamp is IEVM2EVMGEOnRamp, BaseOnRamp, TypeAndVersionInterface {
+  using SafeERC20 for IERC20;
+
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "EVM2EVMGEOnRamp 1.0.0";
   uint256 private constant EVM_DEFAULT_GAS_LIMIT = 200_000;
@@ -86,6 +89,17 @@ contract EVM2EVMGEOnRamp is IEVM2EVMGEOnRamp, BaseOnRamp, TypeAndVersionInterfac
   ) external override whenNotPaused whenHealthy returns (bytes32) {
     if (msg.sender != address(s_router)) revert MustBeCalledByRouter();
 
+    // If link is used as fee token send it to the link pool
+    // If a non-link token is used send it to the feeManager contract to
+    // convert it to link.
+    if (message.feeToken == s_feeConfig.linkToken) {
+      address pool = address(getPoolBySourceToken(IERC20(message.feeToken)));
+      if (pool == address(0)) revert UnsupportedToken(IERC20(message.feeToken));
+      IERC20(message.feeToken).safeTransfer(pool, feeTokenAmount);
+    } else {
+      IERC20(message.feeToken).safeTransfer(address(s_feeConfig.feeManager), feeTokenAmount);
+    }
+
     GEConsumer.EVMExtraArgsV1 memory extraArgs = _fromBytes(message.extraArgs);
     _handleForwardFromRouter(message.data.length, extraArgs.gasLimit, message.tokensAndAmounts, originalSender);
 
@@ -110,10 +124,11 @@ contract EVM2EVMGEOnRamp is IEVM2EVMGEOnRamp, BaseOnRamp, TypeAndVersionInterfac
     return GEMsg.messageId;
   }
 
+  /// @inheritdoc IEVM2AnyGEOnRamp
   function getFee(GEConsumer.EVM2AnyGEMessage calldata message) public view returns (uint256 fee) {
-    if (s_feeConfig.feeToken != message.feeToken) revert MismatchedFeeToken(s_feeConfig.feeToken, message.feeToken);
     uint256 gasLimit = _fromBytes(message.extraArgs).gasLimit;
-    uint256 linkPerUnitGas = IFeeManager(s_feeConfig.feeManager).getFee(s_feeConfig.feeToken, s_feeConfig.destChainId);
+    uint256 linkPerUnitGas = IFeeManager(s_feeConfig.feeManager).getFee(message.feeToken, s_feeConfig.destChainId);
+    if (linkPerUnitGas == 0) revert IFeeManager.TokenOrChainNotSupported(message.feeToken, s_feeConfig.destChainId);
 
     return
       s_feeConfig.feeAmount + // Flat fee
@@ -121,11 +136,13 @@ contract EVM2EVMGEOnRamp is IEVM2EVMGEOnRamp, BaseOnRamp, TypeAndVersionInterfac
       1 ether; // latest gas reported gas fee with a safety margin
   }
 
+  /// @inheritdoc IEVM2EVMGEOnRamp
   function setFeeAdmin(address feeAdmin) external onlyOwner {
     s_feeAdmin = feeAdmin;
     emit FeeAdminSet(feeAdmin);
   }
 
+  /// @inheritdoc IEVM2EVMGEOnRamp
   function setFeeConfig(DynamicFeeConfig calldata feeConfig) external onlyOwner {
     s_feeConfig = feeConfig;
     emit FeeConfigSet(feeConfig);

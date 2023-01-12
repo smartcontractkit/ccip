@@ -137,7 +137,7 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId uint64)
 		client.Owner.From,
 		client.ChainConfig.Router,
 		evm_2_evm_ge_onramp.IEVM2EVMGEOnRampDynamicFeeConfig{
-			FeeToken:        client.ChainConfig.LinkToken,
+			LinkToken:       client.ChainConfig.LinkToken,
 			FeeAmount:       big.NewInt(100),
 			DestGasOverhead: big.NewInt(0),
 			Multiplier:      big.NewInt(1),
