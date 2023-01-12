@@ -415,6 +415,10 @@ func makeExecutionReportArgs() abi.Arguments {
 					Type: "tuple[]",
 					Components: []abi.ArgumentMarshaling{
 						{
+							Name: "token",
+							Type: "address",
+						},
+						{
 							Name: "chainId",
 							Type: "uint64",
 						},

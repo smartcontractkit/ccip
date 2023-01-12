@@ -49,8 +49,9 @@ func DecodeGEExecutionReport(report types.Report) (*evm_2_evm_ge_offramp.GEExecu
 		TokenPerFeeCoinAddresses []common.Address `json:"tokenPerFeeCoinAddresses"`
 		TokenPerFeeCoin          []*big.Int       `json:"tokenPerFeeCoin"`
 		FeeUpdates               []struct {
-			ChainId        uint64   `json:"chainId"`
-			LinkPerUnitGas *big.Int `json:"linkPerUnitGas"`
+			Token          common.Address `json:"token"`
+			ChainId        uint64         `json:"chainId"`
+			LinkPerUnitGas *big.Int       `json:"linkPerUnitGas"`
 		} `json:"feeUpdates"`
 		EncodedMessages    [][]byte    `json:"encodedMessages"`
 		InnerProofs        [][32]uint8 `json:"innerProofs"`
@@ -70,6 +71,7 @@ func DecodeGEExecutionReport(report types.Report) (*evm_2_evm_ge_offramp.GEExecu
 
 	for _, feeUpdate := range erStruct.FeeUpdates {
 		er.FeeUpdates = append(er.FeeUpdates, evm_2_evm_ge_offramp.GEFeeUpdate{
+			Token:          feeUpdate.Token,
 			ChainId:        feeUpdate.ChainId,
 			LinkPerUnitGas: feeUpdate.LinkPerUnitGas,
 		})
@@ -280,11 +282,12 @@ func (r *GEExecutionReportingPlugin) Observation(ctx context.Context, timestamp 
 	}.Marshal()
 }
 
-func (r *GEExecutionReportingPlugin) generateFeeUpdate(sourceGasPrice *big.Int, juelsPerFeeCoin *big.Int) []evm_2_evm_ge_offramp.GEFeeUpdate {
+func (r *GEExecutionReportingPlugin) generateFeeUpdate(token common.Address, sourceGasPrice *big.Int, juelsPerFeeCoin *big.Int) []evm_2_evm_ge_offramp.GEFeeUpdate {
 	// TODO: Check gas fee updated logs
 	linkPerUnitGas := big.NewInt(0).Div(big.NewInt(0).Mul(sourceGasPrice, juelsPerFeeCoin), big.NewInt(1e18))
 	return []evm_2_evm_ge_offramp.GEFeeUpdate{
 		{
+			Token:   token,
 			ChainId: r.config.sourceChainID,
 			// (juels/eth) * (wei / gas) / (1 eth / 1e18 wei) = juels/gas
 			// TODO: Think more about this offchain/onchain computation split
@@ -453,7 +456,7 @@ func (r *GEExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNum
 			return nil, err
 		}
 	}
-	gasFeeUpdates := r.generateFeeUpdate(sourceGasPrice, tokensPerFeeCoin[linkToken])
+	gasFeeUpdates := r.generateFeeUpdate(linkToken, sourceGasPrice, tokensPerFeeCoin[linkToken])
 	if len(gasFeeUpdates) == 0 && len(finalSeqNums) == 0 {
 		return nil, errors.New("No report needed")
 	}

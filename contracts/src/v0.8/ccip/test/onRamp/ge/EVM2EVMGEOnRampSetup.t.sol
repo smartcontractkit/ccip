@@ -7,13 +7,13 @@ import {IEVM2EVMGEOnRamp} from "../../../interfaces/onRamp/IEVM2EVMGEOnRamp.sol"
 import {EVM2EVMGEOnRamp} from "../../../onRamp/ge/EVM2EVMGEOnRamp.sol";
 import {FeeManager} from "../../../fees/FeeManager.sol";
 import {GERouter} from "../../../router/GERouter.sol";
-import {GESRouterSetup} from "../../router/GERouterSetup.t.sol";
+import {GERouterSetup} from "../../router/GERouterSetup.t.sol";
 import {GE} from "../../../models/GE.sol";
 import {GEConsumer} from "../../../models/GEConsumer.sol";
 import "../../../offRamp/ge/EVM2EVMGEOffRamp.sol";
 import "../../TokenSetup.t.sol";
 
-contract EVM2EVMGEOnRampSetup is TokenSetup, GESRouterSetup {
+contract EVM2EVMGEOnRampSetup is TokenSetup, GERouterSetup {
   // Duplicate event of the CCIPSendRequested in the IGEOnRamp
   event CCIPSendRequested(GE.EVM2EVMGEMessage message);
 
@@ -26,12 +26,12 @@ contract EVM2EVMGEOnRampSetup is TokenSetup, GESRouterSetup {
 
   EVM2EVMGEOnRamp internal s_onRamp;
 
-  function setUp() public virtual override(TokenSetup, GESRouterSetup) {
+  function setUp() public virtual override(TokenSetup, GERouterSetup) {
     TokenSetup.setUp();
-    GESRouterSetup.setUp();
+    GERouterSetup.setUp();
 
     GE.FeeUpdate[] memory fees = new GE.FeeUpdate[](1);
-    fees[0] = GE.FeeUpdate({chainId: DEST_CHAIN_ID, linkPerUnitGas: 100});
+    fees[0] = GE.FeeUpdate({token: s_sourceTokens[0], chainId: DEST_CHAIN_ID, linkPerUnitGas: 100});
     address[] memory feeUpdaters = new address[](0);
     IFeeManager feeManager = new FeeManager(fees, feeUpdaters, uint128(TWELVE_HOURS));
 

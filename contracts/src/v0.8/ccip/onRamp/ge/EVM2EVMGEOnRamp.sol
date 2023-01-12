@@ -113,7 +113,7 @@ contract EVM2EVMGEOnRamp is IEVM2EVMGEOnRamp, BaseOnRamp, TypeAndVersionInterfac
   function getFee(GEConsumer.EVM2AnyGEMessage calldata message) public view returns (uint256 fee) {
     if (s_feeConfig.feeToken != message.feeToken) revert MismatchedFeeToken(s_feeConfig.feeToken, message.feeToken);
     uint256 gasLimit = _fromBytes(message.extraArgs).gasLimit;
-    uint256 linkPerUnitGas = IFeeManager(s_feeConfig.feeManager).getFee(s_feeConfig.destChainId);
+    uint256 linkPerUnitGas = IFeeManager(s_feeConfig.feeManager).getFee(s_feeConfig.feeToken, s_feeConfig.destChainId);
 
     return
       s_feeConfig.feeAmount + // Flat fee
