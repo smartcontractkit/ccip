@@ -75,9 +75,9 @@ contract MockOnRamp is IEVM2EVMTollOnRamp {
     return address(0);
   }
 
-  function setConfig(OnRampConfig calldata) external override {}
+  function setOnRampConfig(OnRampConfig calldata) external override {}
 
-  function getConfig() external pure override returns (OnRampConfig memory config) {
+  function getOnRampConfig() external pure override returns (OnRampConfig memory config) {
     config = OnRampConfig({commitFeeJuels: 0, maxDataSize: 0, maxTokensLength: 0, maxGasLimit: 0});
   }
 
@@ -97,5 +97,13 @@ contract MockOnRamp is IEVM2EVMTollOnRamp {
 
   function getPoolTokens() public pure returns (IERC20[] memory) {
     return new IERC20[](0);
+  }
+
+  function getChainId() external view override returns (uint64) {
+    return i_chainId;
+  }
+
+  function getDestinationChainId() external view override returns (uint64) {
+    return i_destinationChainId;
   }
 }

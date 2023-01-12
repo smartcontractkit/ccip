@@ -75,14 +75,26 @@ interface IBaseOnRamp is IAllowList {
   function getRouter() external view returns (address);
 
   /**
+   * @notice Gets the chain ID of the chain this contract is deployed on
+   * @return chainID
+   */
+  function getChainId() external view returns (uint64);
+
+  /**
+   * @notice Get the destination chain ID
+   * @return destinationChainID
+   */
+  function getDestinationChainId() external view returns (uint64);
+
+  /**
    * @notice Sets the onRamp config to the given OnRampConfig object
    * @param config The new OnRampConfig
    */
-  function setConfig(OnRampConfig calldata config) external;
+  function setOnRampConfig(OnRampConfig calldata config) external;
 
   /**
    * @notice Gets the current onRamp configuration
    * @return config The current configuration
    */
-  function getConfig() external view returns (OnRampConfig memory config);
+  function getOnRampConfig() external view returns (OnRampConfig memory config);
 }
