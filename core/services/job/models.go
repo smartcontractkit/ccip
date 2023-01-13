@@ -289,7 +289,8 @@ const (
 	// TODO: sc-55296 to rename ocr2keeper to ocr2automation in code
 	OCR2Keeper OCR2PluginType = "ocr2automation"
 
-	OCR2DirectRequest OCR2PluginType = "directrequest"
+	OCR2Functions OCR2PluginType = "functions"
+
 	// CCIPCommit refers to the ccip.CCIPCommit plugin
 	CCIPCommit OCR2PluginType = "ccip-commit"
 	// CCIPExecution refers to the ccip.CCIPExecution plugin

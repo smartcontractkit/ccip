@@ -572,6 +572,9 @@ func (j *JobPipeline) setFrom(f *JobPipeline) {
 	if v := f.MaxRunDuration; v != nil {
 		j.MaxRunDuration = v
 	}
+	if v := f.MaxSuccessfulRuns; v != nil {
+		j.MaxSuccessfulRuns = v
+	}
 	if v := f.ReaperInterval; v != nil {
 		j.ReaperInterval = v
 	}
@@ -580,9 +583,6 @@ func (j *JobPipeline) setFrom(f *JobPipeline) {
 	}
 	if v := f.ResultWriteQueueDepth; v != nil {
 		j.ResultWriteQueueDepth = v
-	}
-	if v := f.MaxSuccessfulRuns; v != nil {
-		j.MaxSuccessfulRuns = v
 	}
 	j.HTTPRequest.setFrom(&f.HTTPRequest)
 
