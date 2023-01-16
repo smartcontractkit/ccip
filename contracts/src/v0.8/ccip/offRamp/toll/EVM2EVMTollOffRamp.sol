@@ -14,12 +14,15 @@ import {OCR2Base} from "../../ocr/OCR2Base.sol";
 import {BaseOffRamp} from "../BaseOffRamp.sol";
 
 import {IERC20} from "../../../vendor/IERC20.sol";
+import {Address} from "../../../vendor/Address.sol";
 
 /**
  * @notice EVM2EVMTollOffRamp enables OCR networks to execute multiple messages
  * in an OffRamp in a single transaction.
  */
 contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
+  using Address for address;
+
   event ExecutionStateChanged(uint64 indexed sequenceNumber, Internal.MessageExecutionState state);
 
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
@@ -157,6 +160,40 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
     emit OffRampConfigSet(config);
   }
 
+  function _trialExecute(Toll.EVM2EVMTollMessage memory message, bool manualExecution)
+    internal
+    returns (Internal.MessageExecutionState)
+  {
+    try this.executeSingleMessage(message, manualExecution) {} catch (bytes memory err) {
+      if (IBaseOffRamp.ReceiverError.selector == bytes4(err)) {
+        return Internal.MessageExecutionState.FAILURE;
+      } else {
+        revert ExecutionError(err);
+      }
+    }
+    return Internal.MessageExecutionState.SUCCESS;
+  }
+
+  function executeSingleMessage(Toll.EVM2EVMTollMessage memory message, bool manualExecution) external {
+    if (msg.sender != address(this)) revert CanOnlySelfCall();
+    Common.EVMTokenAndAmount[] memory destTokensAndAmounts = new Common.EVMTokenAndAmount[](0);
+    if (message.tokensAndAmounts.length > 0) {
+      destTokensAndAmounts = _releaseOrMintTokens(
+        Internal._addToTokensAmounts(message.tokensAndAmounts, message.feeTokenAndAmount),
+        message.receiver
+      );
+    }
+    if (!message.receiver.isContract()) return;
+    if (
+      !s_router.routeMessage(
+        Toll._toAny2EVMMessage(message, destTokensAndAmounts),
+        manualExecution,
+        message.gasLimit,
+        message.receiver
+      )
+    ) revert ReceiverError();
+  }
+
   /**
    * @notice Execute a series of one or more messages using a merkle proof
    * @param report ExecutionReport
@@ -217,8 +254,7 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
       }
 
       s_executedMessages[message.sequenceNumber] = Internal.MessageExecutionState.IN_PROGRESS;
-      // NOTE: toAny2EVMMessageFromSender merges the fee token into the token set.
-      Internal.MessageExecutionState newState = _trialExecute(_toAny2EVMMessageFromSender(message), manualExecution);
+      Internal.MessageExecutionState newState = _trialExecute(message, manualExecution);
       s_executedMessages[message.sequenceNumber] = newState;
 
       if (
@@ -229,40 +265,6 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
 
       emit ExecutionStateChanged(message.sequenceNumber, newState);
     }
-  }
-
-  // @notice IMPORTANT: Merges the fee token into the set of (tokens, amounts)
-  function _toAny2EVMMessageFromSender(Toll.EVM2EVMTollMessage memory original)
-    internal
-    view
-    returns (Internal.Any2EVMMessageFromSender memory message)
-  {
-    Common.EVMTokenAndAmount[] memory tokensAndAmounts = Internal._addToTokensAmounts(
-      original.tokensAndAmounts,
-      original.feeTokenAndAmount
-    );
-    uint256 numberOfTokens = tokensAndAmounts.length;
-    Common.EVMTokenAndAmount[] memory destTokensAndAmounts = new Common.EVMTokenAndAmount[](numberOfTokens);
-    address[] memory destPools = new address[](numberOfTokens);
-
-    for (uint256 i = 0; i < numberOfTokens; ++i) {
-      IPool pool = _getPool(IERC20(tokensAndAmounts[i].token));
-      destPools[i] = address(pool);
-      destTokensAndAmounts[i] = Common.EVMTokenAndAmount({
-        token: address(pool.getToken()),
-        amount: tokensAndAmounts[i].amount
-      });
-    }
-
-    message = Internal.Any2EVMMessageFromSender({
-      sourceChainId: original.sourceChainId,
-      sender: abi.encode(original.sender),
-      receiver: original.receiver,
-      data: original.data,
-      destTokensAndAmounts: destTokensAndAmounts,
-      destPools: destPools,
-      gasLimit: original.gasLimit
-    });
   }
 
   function _isWellFormed(Toll.EVM2EVMTollMessage memory message) private view {

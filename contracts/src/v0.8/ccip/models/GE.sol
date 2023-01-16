@@ -42,6 +42,19 @@ library GE {
     bytes32 messageId;
   }
 
+  function _toAny2EVMMessage(EVM2EVMGEMessage memory original, Common.EVMTokenAndAmount[] memory destTokensAndAmounts)
+    internal
+    pure
+    returns (Common.Any2EVMMessage memory message)
+  {
+    message = Common.Any2EVMMessage({
+      sourceChainId: original.sourceChainId,
+      sender: abi.encode(original.sender),
+      data: original.data,
+      destTokensAndAmounts: destTokensAndAmounts
+    });
+  }
+
   bytes32 internal constant EVM_2_EVM_GE_MESSAGE_HASH = keccak256("EVM2EVMGEMessageEvent");
 
   function _hash(GE.EVM2EVMGEMessage memory original, bytes32 metadataHash) internal pure returns (bytes32) {

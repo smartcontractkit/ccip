@@ -17,6 +17,19 @@ library Toll {
     uint256 gasLimit;
   }
 
+  function _toAny2EVMMessage(EVM2EVMTollMessage memory original, Common.EVMTokenAndAmount[] memory destTokensAndAmounts)
+    internal
+    pure
+    returns (Common.Any2EVMMessage memory message)
+  {
+    message = Common.Any2EVMMessage({
+      sourceChainId: original.sourceChainId,
+      sender: abi.encode(original.sender),
+      data: original.data,
+      destTokensAndAmounts: destTokensAndAmounts
+    });
+  }
+
   bytes32 internal constant EVM_2_EVM_TOLL_MESSAGE_HASH = keccak256("EVM2EVMTollMessageEvent");
 
   function _hash(Toll.EVM2EVMTollMessage memory original, bytes32 metadataHash) internal pure returns (bytes32) {

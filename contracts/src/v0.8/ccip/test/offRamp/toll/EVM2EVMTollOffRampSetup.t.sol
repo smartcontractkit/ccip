@@ -58,28 +58,23 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
   function _convertTollToGeneralMessage(Toll.EVM2EVMTollMessage memory original)
     internal
     view
-    returns (Internal.Any2EVMMessageFromSender memory message)
+    returns (Common.Any2EVMMessage memory message)
   {
     uint256 numberOfTokens = original.tokensAndAmounts.length;
     Common.EVMTokenAndAmount[] memory destTokensAndAmounts = new Common.EVMTokenAndAmount[](numberOfTokens);
-    address[] memory destPools = new address[](numberOfTokens);
 
     for (uint256 i = 0; i < numberOfTokens; ++i) {
       IPool pool = s_offRamp.getPoolBySourceToken(IERC20(original.tokensAndAmounts[i].token));
-      destPools[i] = address(pool);
       destTokensAndAmounts[i].token = address(pool.getToken());
       destTokensAndAmounts[i].amount = original.tokensAndAmounts[i].amount;
     }
 
     return
-      Internal.Any2EVMMessageFromSender({
+      Common.Any2EVMMessage({
         sourceChainId: original.sourceChainId,
         sender: abi.encode(original.sender),
-        receiver: original.receiver,
         data: original.data,
-        destTokensAndAmounts: destTokensAndAmounts,
-        destPools: destPools,
-        gasLimit: original.gasLimit
+        destTokensAndAmounts: destTokensAndAmounts
       });
   }
 

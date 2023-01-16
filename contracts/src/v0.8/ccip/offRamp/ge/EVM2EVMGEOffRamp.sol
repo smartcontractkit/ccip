@@ -16,12 +16,14 @@ import {OCR2Base} from "../../ocr/OCR2Base.sol";
 import {BaseOffRamp} from "../BaseOffRamp.sol";
 
 import {IERC20} from "../../../vendor/IERC20.sol";
+import {Address} from "../../../vendor/Address.sol";
 
 /**
  * @notice EVM2EVMGEOffRamp enables OCR networks to execute multiple messages
  * in an OffRamp in a single transaction.
  */
 contract EVM2EVMGEOffRamp is IEVM2EVMGEOffRamp, BaseOffRamp, TypeAndVersionInterface, OCR2Base {
+  using Address for address;
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "EVM2EVMGEOffRamp 1.0.0";
 
@@ -76,6 +78,50 @@ contract EVM2EVMGEOffRamp is IEVM2EVMGEOffRamp, BaseOffRamp, TypeAndVersionInter
   /// @inheritdoc IEVM2EVMGEOffRamp
   function getNopBalance(address nop) public view returns (uint256 balance) {
     return s_nopBalance[nop];
+  }
+
+  /**
+   * @notice Try executing a message
+   * @param message Common.Any2EVMMessage memory message
+   * @param manualExecution bool to indicate manual instead of DON execution
+   * @return Internal.ExecutionState
+   */
+  function _trialExecute(GE.EVM2EVMGEMessage memory message, bool manualExecution)
+    internal
+    returns (Internal.MessageExecutionState)
+  {
+    try this.executeSingleMessage(message, manualExecution) {} catch (bytes memory err) {
+      if (IBaseOffRamp.ReceiverError.selector == bytes4(err)) {
+        return Internal.MessageExecutionState.FAILURE;
+      } else {
+        revert ExecutionError(err);
+      }
+    }
+    return Internal.MessageExecutionState.SUCCESS;
+  }
+
+  /**
+   * @notice Execute a single message
+   * @param message The Any2EVMMessageFromSender message that will be executed
+   * @param manualExecution bool to indicate manual instead of DON execution
+   * @dev this can only be called by the contract itself. It is part of
+   * the Execute call, as we can only try/catch on external calls.
+   */
+  function executeSingleMessage(GE.EVM2EVMGEMessage memory message, bool manualExecution) external {
+    if (msg.sender != address(this)) revert CanOnlySelfCall();
+    Common.EVMTokenAndAmount[] memory destTokensAndAmounts = new Common.EVMTokenAndAmount[](0);
+    if (message.tokensAndAmounts.length > 0) {
+      destTokensAndAmounts = _releaseOrMintTokens(message.tokensAndAmounts, message.receiver);
+    }
+    if (!message.receiver.isContract()) return;
+    if (
+      !s_router.routeMessage(
+        GE._toAny2EVMMessage(message, destTokensAndAmounts),
+        manualExecution,
+        message.gasLimit,
+        message.receiver
+      )
+    ) revert ReceiverError();
   }
 
   function _executeMessages(GE.ExecutionReport memory report, bool manualExecution) internal {
@@ -139,7 +185,7 @@ contract EVM2EVMGEOffRamp is IEVM2EVMGEOffRamp, BaseOffRamp, TypeAndVersionInter
       _isWellFormed(message);
 
       s_executedMessages[message.sequenceNumber] = Internal.MessageExecutionState.IN_PROGRESS;
-      Internal.MessageExecutionState newState = _trialExecute(_toAny2EVMMessageFromSender(message), manualExecution);
+      Internal.MessageExecutionState newState = _trialExecute(message, manualExecution);
       s_executedMessages[message.sequenceNumber] = newState;
 
       if (manualExecution) {
@@ -198,36 +244,6 @@ contract EVM2EVMGEOffRamp is IEVM2EVMGEOffRamp, BaseOffRamp, TypeAndVersionInter
         ((gasStart - gasleft() + s_config.gasOverhead) * tx.gasprice * report.tokenPerFeeCoin[0]) /
         1 ether;
     }
-  }
-
-  function _toAny2EVMMessageFromSender(GE.EVM2EVMGEMessage memory original)
-    internal
-    view
-    returns (Internal.Any2EVMMessageFromSender memory)
-  {
-    uint256 numberOfTokens = original.tokensAndAmounts.length;
-    Common.EVMTokenAndAmount[] memory destTokensAndAmounts = new Common.EVMTokenAndAmount[](numberOfTokens);
-    address[] memory destPools = new address[](numberOfTokens);
-
-    for (uint256 i = 0; i < numberOfTokens; ++i) {
-      IPool pool = _getPool(IERC20(original.tokensAndAmounts[i].token));
-      destPools[i] = address(pool);
-      destTokensAndAmounts[i] = Common.EVMTokenAndAmount({
-        token: address(pool.getToken()),
-        amount: original.tokensAndAmounts[i].amount
-      });
-    }
-
-    return
-      Internal.Any2EVMMessageFromSender({
-        sourceChainId: original.sourceChainId,
-        sender: abi.encode(original.sender),
-        receiver: original.receiver,
-        data: original.data,
-        destTokensAndAmounts: destTokensAndAmounts,
-        destPools: destPools,
-        gasLimit: original.gasLimit
-      });
   }
 
   function _isWellFormed(GE.EVM2EVMGEMessage memory message) private view {

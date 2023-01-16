@@ -51,10 +51,13 @@ interface IAny2EVMOffRampRouter {
 
   /**
    * @notice Route the message to its intended receiver contract
-   * @param message Internal.Any2EVMMessageFromSender struct
+   * @param message Common.Any2EVMMessage struct
    * @param manualExecution bool to indicate manual instead of DON execution
    */
-  function routeMessage(Internal.Any2EVMMessageFromSender calldata message, bool manualExecution)
-    external
-    returns (bool success);
+  function routeMessage(
+    Common.Any2EVMMessage calldata message,
+    bool manualExecution,
+    uint256 gasLimit,
+    address receiver
+  ) external returns (bool success);
 }

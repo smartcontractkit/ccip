@@ -39,12 +39,11 @@ contract BaseOffRampHelper is BaseOffRamp {
     _releaseOrMintToken(pool, amount, receiver);
   }
 
-  function releaseOrMintTokens(
-    address[] memory pools,
-    Common.EVMTokenAndAmount[] memory tokensAndAmounts,
-    address receiver
-  ) external {
-    _releaseOrMintTokens(pools, tokensAndAmounts, receiver);
+  function releaseOrMintTokens(Common.EVMTokenAndAmount[] memory sourceTokensAndAmounts, address receiver)
+    external
+    returns (Common.EVMTokenAndAmount[] memory)
+  {
+    return _releaseOrMintTokens(sourceTokensAndAmounts, receiver);
   }
 
   function verifyMessages(

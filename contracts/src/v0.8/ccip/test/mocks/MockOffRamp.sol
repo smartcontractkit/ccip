@@ -28,7 +28,7 @@ contract MockOffRamp is IBaseOffRamp {
    * @notice ccipReceive implements the receive function to create a
    * collision if some other method happens to hash to the same signature/
    */
-  function ccipReceive(Internal.Any2EVMMessageFromSender calldata) external pure {
+  function ccipReceive(Common.Any2EVMMessage calldata) external pure {
     revert();
   }
 

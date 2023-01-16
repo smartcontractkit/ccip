@@ -4,11 +4,12 @@ pragma solidity 0.8.15;
 import "../../interfaces/offRamp/IAny2EVMOffRampRouter.sol";
 
 contract MockTollOffRampRouter is IAny2EVMOffRampRouter {
-  function routeMessage(Internal.Any2EVMMessageFromSender calldata message, bool manualExecution)
-    external
-    override
-    returns (bool success)
-  {}
+  function routeMessage(
+    Common.Any2EVMMessage calldata message,
+    bool manualExecution,
+    uint256 gasLimit,
+    address receiver
+  ) external override returns (bool success) {}
 
   function addOffRamp(IBaseOffRamp) external {}
 

@@ -81,9 +81,7 @@ contract EVM2EVMTollOffRamp_ccipReceive is EVM2EVMTollOffRampSetup {
   // Reverts
 
   function testReverts() public {
-    Internal.Any2EVMMessageFromSender memory message = _convertTollToGeneralMessage(
-      _generateAny2EVMTollMessageNoTokens(1)
-    );
+    Common.Any2EVMMessage memory message = _convertTollToGeneralMessage(_generateAny2EVMTollMessageNoTokens(1));
     vm.expectRevert();
     s_offRamp.ccipReceive(message);
   }
@@ -271,17 +269,15 @@ contract EVM2EVMTollOffRamp_executeSingleMessage is EVM2EVMTollOffRampSetup {
   // Success
 
   function testNoTokensSuccess() public {
-    s_offRamp.executeSingleMessage(_convertTollToGeneralMessage(_generateAny2EVMTollMessageNoTokens(1)), false);
+    s_offRamp.executeSingleMessage(_generateAny2EVMTollMessageNoTokens(1), false);
   }
 
   function testTokensSuccess() public {
-    s_offRamp.executeSingleMessage(_convertTollToGeneralMessage(_generateMessagesWithTokens()[0]), false);
+    s_offRamp.executeSingleMessage(_generateMessagesWithTokens()[0], false);
   }
 
   function testNonContractSuccess() public {
-    Internal.Any2EVMMessageFromSender memory message = _convertTollToGeneralMessage(
-      _generateAny2EVMTollMessageNoTokens(1)
-    );
+    Toll.EVM2EVMTollMessage memory message = _generateAny2EVMTollMessageNoTokens(1);
     message.receiver = STRANGER;
     s_offRamp.executeSingleMessage(message, false);
   }
@@ -294,12 +290,10 @@ contract EVM2EVMTollOffRamp_executeSingleMessage is EVM2EVMTollOffRampSetup {
     amounts[0] = 1000;
     amounts[1] = 50;
     vm.expectEmit(true, true, false, true);
-    emit Released(address(s_offRamp), STRANGER, amounts[0]);
+    emit Released(address(s_offRamp), STRANGER, amounts[0] + EXECUTION_FEE_AMOUNT);
     vm.expectEmit(true, true, false, true);
     emit Minted(address(s_offRamp), STRANGER, amounts[1]);
-    Internal.Any2EVMMessageFromSender memory message = _convertTollToGeneralMessage(
-      _generateAny2EVMTollMessageWithTokens(1, amounts)
-    );
+    Toll.EVM2EVMTollMessage memory message = _generateAny2EVMTollMessageWithTokens(1, amounts);
     message.receiver = STRANGER;
     s_offRamp.executeSingleMessage(message, false);
   }
@@ -308,9 +302,7 @@ contract EVM2EVMTollOffRamp_executeSingleMessage is EVM2EVMTollOffRampSetup {
 
   function testMessageSenderReverts() public {
     vm.stopPrank();
-    Internal.Any2EVMMessageFromSender memory message = _convertTollToGeneralMessage(
-      _generateAny2EVMTollMessageNoTokens(1)
-    );
+    Toll.EVM2EVMTollMessage memory message = _generateAny2EVMTollMessageNoTokens(1);
     vm.expectRevert(IBaseOffRamp.CanOnlySelfCall.selector);
     s_offRamp.executeSingleMessage(message, false);
   }
