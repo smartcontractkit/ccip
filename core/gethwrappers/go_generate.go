@@ -107,7 +107,7 @@ package gethwrappers
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2EVMGEOnRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMGEOnRamp.bin EVM2EVMGEOnRamp evm_2_evm_ge_onramp
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2EVMGEOffRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMGEOffRamp.bin EVM2EVMGEOffRamp evm_2_evm_ge_offramp
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/GERouter.abi ../../contracts/solc/v0.8.15/GERouter.bin GERouter ge_router
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/FeeManager.abi ../../contracts/solc/v0.8.15/FeeManager.bin FeeManager gas_fee_cache
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/FeeManager.abi ../../contracts/solc/v0.8.15/FeeManager.bin FeeManager fee_manager
 
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/GovernanceDapp.abi ../../contracts/solc/v0.8.15/GovernanceDapp.bin GovernanceDapp governance_dapp
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/PingPongDemo.abi ../../contracts/solc/v0.8.15/PingPongDemo.bin PingPongDemo ping_pong_demo

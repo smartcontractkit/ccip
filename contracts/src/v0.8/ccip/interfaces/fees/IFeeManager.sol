@@ -10,6 +10,7 @@ interface IFeeManager {
   error OnlyCallableByUpdaterOrOwner();
   error StaleFee(uint256 threshold, uint256 timePassed);
   error InvalidWithdrawalAddress();
+  error NullAddressNotAllowed();
 
   event FeeUpdaterSet(address indexed feeUpdater);
   event FeeUpdaterRemoved(address indexed feeUpdater);

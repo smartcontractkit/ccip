@@ -8,7 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/gas_fee_cache"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ge_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/mock_afn_contract"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/native_token_pool"
@@ -95,10 +95,10 @@ func deployFeeManager(t *testing.T, client *EvmDeploymentConfig) {
 	}
 
 	client.Logger.Infof("Deploying FeeManager")
-	feeManager, tx, _, err := gas_fee_cache.DeployFeeManager(
+	feeManager, tx, _, err := fee_manager.DeployFeeManager(
 		client.Owner,
 		client.Client,
-		[]gas_fee_cache.GEFeeUpdate{},
+		[]fee_manager.GEFeeUpdate{},
 		[]common.Address{},
 		big.NewInt(1e18),
 	)

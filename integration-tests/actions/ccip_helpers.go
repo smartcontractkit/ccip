@@ -31,7 +31,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_toll_onramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_onramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/gas_fee_cache"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ge_router"
 	ccipPlugin "github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/testhelpers"
@@ -298,7 +298,7 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(t *testing.T) {
 	require.NoError(t, err, "setting OnRamp Fee config")
 
 	// GE Set up
-	sourceFeeManager, err := contractDeployer.DeployFeeManager([]gas_fee_cache.GEFeeUpdate{
+	sourceFeeManager, err := contractDeployer.DeployFeeManager([]fee_manager.GEFeeUpdate{
 		{
 			Token:          common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
 			ChainId:        sourceCCIP.DestinationChainId,
@@ -653,8 +653,9 @@ func (destCCIP *DestCCIPModule) DeployContracts(t *testing.T, sourceCCIP SourceC
 	require.NoError(t, err, "Error setting router on the offramp")
 
 	// GE
-	destFeeManager, err := contractDeployer.DeployFeeManager([]gas_fee_cache.GEFeeUpdate{
+	destFeeManager, err := contractDeployer.DeployFeeManager([]fee_manager.GEFeeUpdate{
 		{
+			Token:          common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
 			ChainId:        destCCIP.SourceChainId,
 			LinkPerUnitGas: big.NewInt(200e9), // (2e20 juels/eth) * (1 gwei / gas) / (1 eth/1e18)
 		},

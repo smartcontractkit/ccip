@@ -116,6 +116,8 @@ contract FeeManager is IFeeManager, OwnerIsCreator {
     uint128 linkPerUnitGas,
     uint128 timestamp
   ) private {
+    if (token == address(0)) revert NullAddressNotAllowed();
+
     s_tokenPerUnitGasByDestChainId[token][chainId] = TimestampedFeeUpdate({
       linkPerUnitGas: linkPerUnitGas,
       timestamp: timestamp

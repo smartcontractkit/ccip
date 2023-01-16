@@ -21,7 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/gas_fee_cache"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ge_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/native_token_pool"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/secrets"
@@ -136,7 +136,7 @@ func getAllABIs() []string {
 	return []string{
 		// Generic
 		afn_contract.AFNContractABI, native_token_pool.NativeTokenPoolABI, commit_store.CommitStoreABI,
-		gas_fee_cache.FeeManagerABI,
+		fee_manager.FeeManagerABI,
 
 		// Toll
 		evm_2_evm_toll_onramp.EVM2EVMTollOnRampABI, evm_2_evm_toll_offramp.EVM2EVMTollOffRampABI,

@@ -24,7 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/gas_fee_cache"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ge_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/mock_afn_contract"
@@ -364,7 +364,7 @@ func (e *CCIPContractsDeployer) NewGERouter(addr common.Address) (
 }
 
 func (e *CCIPContractsDeployer) DeployFeeManager(
-	feeUpdates []gas_fee_cache.GEFeeUpdate,
+	feeUpdates []fee_manager.GEFeeUpdate,
 ) (
 	*FeeManager,
 	error,
@@ -373,14 +373,14 @@ func (e *CCIPContractsDeployer) DeployFeeManager(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return gas_fee_cache.DeployFeeManager(auth, backend, feeUpdates, nil, big.NewInt(1e18))
+		return fee_manager.DeployFeeManager(auth, backend, feeUpdates, nil, big.NewInt(1e18))
 	})
 	if err != nil {
 		return nil, err
 	}
 	return &FeeManager{
 		client:     e.evmClient,
-		instance:   instance.(*gas_fee_cache.FeeManager),
+		instance:   instance.(*fee_manager.FeeManager),
 		EthAddress: *address,
 	}, err
 }

@@ -25,7 +25,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/gas_fee_cache"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ge_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/maybe_revert_message_receiver"
@@ -542,7 +542,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	sourceChain.Commit()
 
 	// Deploy and configure GE onramp
-	sourceFeeManagerAddress, _, _, err := gas_fee_cache.DeployFeeManager(sourceUser, sourceChain, []gas_fee_cache.GEFeeUpdate{
+	sourceFeeManagerAddress, _, _, err := fee_manager.DeployFeeManager(sourceUser, sourceChain, []fee_manager.GEFeeUpdate{
 		{
 			Token:          sourceLinkTokenAddress,
 			ChainId:        destChainID,
@@ -657,13 +657,13 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	require.NoError(t, err)
 
 	// Deploy and configure ge offramp.
-	destFeeManagerAddress, _, _, err := gas_fee_cache.DeployFeeManager(destUser, destChain, []gas_fee_cache.GEFeeUpdate{{
+	destFeeManagerAddress, _, _, err := fee_manager.DeployFeeManager(destUser, destChain, []fee_manager.GEFeeUpdate{{
 		Token:          destLinkTokenAddress,
 		ChainId:        sourceChainID,
 		LinkPerUnitGas: big.NewInt(200e9), // (2e20 juels/eth) * (1 gwei / gas) / (1 eth/1e18)
 	}}, nil, big.NewInt(1e18))
 	require.NoError(t, err)
-	destFeeManager, err := gas_fee_cache.NewFeeManager(destFeeManagerAddress, destChain)
+	destFeeManager, err := fee_manager.NewFeeManager(destFeeManagerAddress, destChain)
 	require.NoError(t, err)
 	geOffRampAddress, _, _, err := evm_2_evm_ge_offramp.DeployEVM2EVMGEOffRamp(
 		destUser,

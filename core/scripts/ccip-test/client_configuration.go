@@ -29,7 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_onramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/gas_fee_cache"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ge_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/governance_dapp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
@@ -111,7 +111,7 @@ type Client struct {
 	GovernanceDapp   *governance_dapp.GovernanceDapp
 	PingPongDapp     *ping_pong_demo.PingPongDemo
 	Afn              *afn_contract.AFNContract
-	FeeManager       *gas_fee_cache.FeeManager
+	FeeManager       *fee_manager.FeeManager
 	Router           *ge_router.GERouter
 	logger           logger.Logger
 	t                *testing.T
@@ -156,7 +156,7 @@ func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient
 	require.NoError(t, err)
 	pingPongDapp, err := ping_pong_demo.NewPingPongDemo(config.LaneConfig.PingPongDapp, config.Client)
 	require.NoError(t, err)
-	feeManager, err := gas_fee_cache.NewFeeManager(config.ChainConfig.FeeManager, config.Client)
+	feeManager, err := fee_manager.NewFeeManager(config.ChainConfig.FeeManager, config.Client)
 	require.NoError(t, err)
 
 	return SourceClient{
@@ -218,7 +218,7 @@ func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestCli
 	require.NoError(t, err)
 	pingPongDapp, err := ping_pong_demo.NewPingPongDemo(config.LaneConfig.PingPongDapp, config.Client)
 	require.NoError(t, err)
-	feeManager, err := gas_fee_cache.NewFeeManager(config.ChainConfig.FeeManager, config.Client)
+	feeManager, err := fee_manager.NewFeeManager(config.ChainConfig.FeeManager, config.Client)
 	require.NoError(t, err)
 
 	return DestClient{

@@ -16,7 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/gas_fee_cache"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ge_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/mock_afn_contract"
@@ -413,7 +413,7 @@ func (sender *TollSender) SendTokens(
 
 type FeeManager struct {
 	client     *blockchain.EthereumClient
-	instance   *gas_fee_cache.FeeManager
+	instance   *fee_manager.FeeManager
 	EthAddress common.Address
 }
 
@@ -436,7 +436,7 @@ func (c *FeeManager) SetFeeUpdater(addr common.Address) error {
 	return c.client.ProcessTransaction(tx)
 }
 
-func (c *FeeManager) UpdateFees(feeUpdates []gas_fee_cache.GEFeeUpdate) error {
+func (c *FeeManager) UpdateFees(feeUpdates []fee_manager.GEFeeUpdate) error {
 	opts, err := c.client.TransactionOpts(c.client.DefaultWallet)
 	if err != nil {
 		return err
