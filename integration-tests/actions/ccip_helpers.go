@@ -594,9 +594,6 @@ func (destCCIP *DestCCIPModule) DeployContracts(t *testing.T, sourceCCIP SourceC
 
 	<-destCCIP.Common.deployed
 
-	if wg != nil {
-		wg.Done()
-	}
 	// commitStore responsible for validating the transfer message
 	destCCIP.CommitStore, err = contractDeployer.DeployCommitStore(
 		destCCIP.SourceChainId,
@@ -609,6 +606,11 @@ func (destCCIP *DestCCIPModule) DeployContracts(t *testing.T, sourceCCIP SourceC
 	require.NoError(t, err, "Deploying CommitStore shouldn't fail")
 	err = destCCIP.Common.ChainClient.WaitForEvents()
 	require.NoError(t, err, "Error waiting for setting destination contracts")
+
+	// notify that all common contracts and commit store has been deployed so that the set-up in reverse lane can be triggered.
+	if wg != nil {
+		wg.Done()
+	}
 
 	var sourceTokens, destTokens, pools []common.Address
 	for _, token := range sourceCCIP.Common.BridgeTokens {
