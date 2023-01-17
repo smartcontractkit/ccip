@@ -21,14 +21,12 @@ contract EVM2EVMTollOffRampRouterSetup is BaseTest {
   }
 
   function _generateMockMessage() internal pure returns (Common.Any2EVMMessage memory) {
-    Common.EVMTokenAndAmount[] memory tokensAndAmounts = new Common.EVMTokenAndAmount[](0);
-    address[] memory pools = new address[](0);
     return (
       Common.Any2EVMMessage({
         sourceChainId: SOURCE_CHAIN_ID,
         sender: abi.encode(STRANGER),
         data: abi.encode(0),
-        destTokensAndAmounts: tokensAndAmounts
+        destTokensAndAmounts: new Common.EVMTokenAndAmount[](0)
       })
     );
   }
