@@ -15,7 +15,6 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/chainlink-env/environment"
-	"github.com/smartcontractkit/chainlink-env/pkg/cdk8s/blockscout"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/chainlink"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver"
 	mockservercfg "github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver-cfg"
@@ -1306,17 +1305,19 @@ func DeployEnvironments(
 		}))
 	// skip adding blockscout for simplified deployments
 	// uncomment the following to debug on-chain transactions
+	/*
+		testEnvironment.AddChart(blockscout.New(&blockscout.Props{
+			Name:    "dest-blockscout",
+			WsURL:   networkB.URLs[0],
+			HttpURL: networkB.HTTPURLs[0],
+		}))
+		testEnvironment.AddChart(blockscout.New(&blockscout.Props{
+			Name:    "source-blockscout",
+			WsURL:   networkA.URLs[0],
+			HttpURL: networkA.HTTPURLs[0],
+		}))
 
-	testEnvironment.AddChart(blockscout.New(&blockscout.Props{
-		Name:    "dest-blockscout",
-		WsURL:   networkB.URLs[0],
-		HttpURL: networkB.HTTPURLs[0],
-	}))
-	testEnvironment.AddChart(blockscout.New(&blockscout.Props{
-		Name:    "source-blockscout",
-		WsURL:   networkA.URLs[0],
-		HttpURL: networkA.HTTPURLs[0],
-	}))
+	*/
 
 	err := testEnvironment.Run()
 	require.NoError(t, err)
