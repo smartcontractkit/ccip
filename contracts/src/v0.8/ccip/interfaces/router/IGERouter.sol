@@ -8,6 +8,8 @@ import {IBaseOnRampRouter} from "../onRamp/IBaseOnRampRouter.sol";
 
 import {GEConsumer} from "../../models/GEConsumer.sol";
 
+import {IERC20} from "../../../vendor/IERC20.sol";
+
 interface IGERouter is IBaseOnRampRouter, IAny2EVMOffRampRouter {
   error OnRampAlreadySet(uint64 chainId, IEVM2AnyGEOnRamp onRamp);
 
@@ -40,4 +42,12 @@ interface IGERouter is IBaseOnRampRouter, IAny2EVMOffRampRouter {
    * @return onRamp
    */
   function getOnRamp(uint64 chainId) external view returns (IEVM2AnyGEOnRamp);
+
+  /**
+   * @notice Gets a list of all supported source chain tokens for a given
+   *  destination chain.
+   * @param destChainId The destination chain Id
+   * @return tokens The addresses of all tokens that are supported.
+   */
+  function getSupportedTokens(uint64 destChainId) external view returns (address[] memory tokens);
 }

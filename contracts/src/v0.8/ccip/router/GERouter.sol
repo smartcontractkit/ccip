@@ -74,7 +74,15 @@ contract GERouter is IGERouter, BaseOffRampRouter, TypeAndVersionInterface {
   }
 
   /// @inheritdoc IBaseOnRampRouter
-  function isChainSupported(uint64 chainId) external view returns (bool supported) {
+  function isChainSupported(uint64 chainId) public view returns (bool supported) {
     return address(s_onRamps[chainId]) != address(0);
+  }
+
+  /// @inheritdoc IGERouter
+  function getSupportedTokens(uint64 destChainId) external view returns (address[] memory) {
+    if (!isChainSupported(destChainId)) {
+      return new address[](0);
+    }
+    return s_onRamps[uint256(destChainId)].getSupportedTokens();
   }
 }

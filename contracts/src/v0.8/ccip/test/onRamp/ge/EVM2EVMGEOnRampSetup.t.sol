@@ -41,7 +41,7 @@ contract EVM2EVMGEOnRampSetup is TokenSetup, GERouterSetup {
     s_onRamp = new EVM2EVMGEOnRamp(
       SOURCE_CHAIN_ID,
       DEST_CHAIN_ID,
-      getCastedSourceTokens(),
+      s_sourceTokens,
       getCastedSourcePools(),
       s_allowList,
       s_afn,

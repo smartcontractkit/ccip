@@ -29,7 +29,7 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
     s_onRamp = new EVM2EVMTollOnRamp(
       SOURCE_CHAIN_ID,
       DEST_CHAIN_ID,
-      getCastedSourceTokens(),
+      s_sourceTokens,
       getCastedSourcePools(),
       s_allowList,
       s_afn,

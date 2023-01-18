@@ -29,7 +29,7 @@ contract EVM2EVMTollOnRamp is IEVM2EVMTollOnRamp, BaseOnRamp, TypeAndVersionInte
   constructor(
     uint64 chainId,
     uint64 destinationChainId,
-    IERC20[] memory tokens,
+    address[] memory tokens,
     IPool[] memory pools,
     address[] memory allowlist,
     IAFN afn,

@@ -110,7 +110,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		testhelpers.SendGERequest(t, ccipContracts, msg)
 		// Should eventually see this executed.
 		testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.Source.GEOnRamp.Address(), nodes, geCurrentSeqNum)
-		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.Source.GEOnRamp.Address(), geCurrentSeqNum, geCurrentSeqNum)
+		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.Source.GEOnRamp.Address(), geCurrentSeqNum)
 
 		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.Dest.GEOffRamp.Address(), nodes, geCurrentSeqNum, geCurrentSeqNum)
 		assert.Len(t, executionLogs, 1)
@@ -213,7 +213,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 			reqs = append(reqs, testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.Source.GEOnRamp.Address(), nodes, geCurrentSeqNum+i))
 		}
 		// Should see a report with the full range
-		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.Source.GEOnRamp.Address(), geCurrentSeqNum, geCurrentSeqNum+n-1)
+		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.Source.GEOnRamp.Address(), geCurrentSeqNum+n-1)
 		// Should all be executed
 		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.Dest.GEOffRamp.Address(), nodes, geCurrentSeqNum, geCurrentSeqNum+n-1)
 		for _, execLog := range executionLogs {
@@ -261,7 +261,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 			big.NewInt(100_000),
 			ccipContracts.Dest.Receivers[0].Receiver.Address())
 		testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.Source.TollOnRamp.Address(), nodes, tollCurrentSeqNum)
-		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.Source.TollOnRamp.Address(), tollCurrentSeqNum, tollCurrentSeqNum)
+		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.Source.TollOnRamp.Address(), tollCurrentSeqNum)
 		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.Dest.TollOffRamp.Address(), nodes, tollCurrentSeqNum, tollCurrentSeqNum)
 		assert.Len(t, executionLogs, 1)
 		testhelpers.AssertTollExecSuccess(t, ccipContracts, executionLogs[0])
@@ -347,7 +347,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 			reqs = append(reqs, testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.Source.TollOnRamp.Address(), nodes, tollCurrentSeqNum+i))
 		}
 		// Should see a report with the full range
-		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.Source.TollOnRamp.Address(), tollCurrentSeqNum, tollCurrentSeqNum+n-1)
+		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.Source.TollOnRamp.Address(), tollCurrentSeqNum+n-1)
 		// Should all be executed
 		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.Dest.TollOffRamp.Address(), nodes, tollCurrentSeqNum, tollCurrentSeqNum+n-1)
 		for _, execLog := range executionLogs {
@@ -425,7 +425,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		eventSignatures := ccip.GetGEEventSignatures()
 		testhelpers.SendGERequest(t, ccipContracts, msg)
 		failedReqLog := testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.Source.GEOnRamp.Address(), nodes, geCurrentSeqNum)
-		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.Source.GEOnRamp.Address(), geCurrentSeqNum, geCurrentSeqNum)
+		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.Source.GEOnRamp.Address(), geCurrentSeqNum)
 		reportForFailedReq := testhelpers.EventuallyCommitReportAccepted(t, ccipContracts, currentBlockNumber)
 
 		// execution status should be failed
@@ -439,7 +439,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		for i := 1; i < totalMsgs; i++ {
 			testhelpers.SendGERequest(t, ccipContracts, msg)
 			testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.Source.GEOnRamp.Address(), nodes, geCurrentSeqNum)
-			testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.Source.GEOnRamp.Address(), geCurrentSeqNum, geCurrentSeqNum)
+			testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.Source.GEOnRamp.Address(), geCurrentSeqNum)
 			executionLog := testhelpers.NoNodesHaveExecutedSeqNum(t, ccipContracts, eventSignatures, ccipContracts.Dest.GEOffRamp.Address(), nodes, geCurrentSeqNum)
 			require.Empty(t, executionLog)
 			pendingReqNumbers = append(pendingReqNumbers, geCurrentSeqNum)
@@ -538,7 +538,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		for i := startSeq; i < endSeqNum; i++ {
 			t.Logf("verifying seqnum %d", i)
 			testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.Source.TollOnRamp.Address(), nodes, i)
-			testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.Source.TollOnRamp.Address(), i, i)
+			testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.Source.TollOnRamp.Address(), i)
 			executionLog := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.Dest.TollOffRamp.Address(), nodes, i, i)
 			testhelpers.AssertTollExecSuccess(t, ccipContracts, executionLog[0])
 		}

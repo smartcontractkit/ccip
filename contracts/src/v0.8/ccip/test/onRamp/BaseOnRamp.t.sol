@@ -20,7 +20,7 @@ contract BaseOnrampSetup is TokenSetup {
     s_onRamp = new BaseOnRamp(
       SOURCE_CHAIN_ID,
       DEST_CHAIN_ID,
-      getCastedSourceTokens(),
+      s_sourceTokens,
       getCastedSourcePools(),
       s_allowList,
       s_afn,
@@ -68,21 +68,19 @@ contract BaseOnramp_getTokenPool is BaseOnrampSetup {
   }
 }
 
-// #getPoolTokens
-contract BaseOnramp_getPoolTokens is BaseOnrampSetup {
+// #getSupportedTokens
+contract BaseOnramp_getSupportedTokens is BaseOnrampSetup {
   // Success
-  function testGetPoolTokensSuccess() public {
-    IERC20[] memory supportedTokens = s_onRamp.getPoolTokens();
+  function testGetSupportedTokensSuccess() public {
+    address[] memory supportedTokens = s_onRamp.getSupportedTokens();
 
-    assertEq(address(s_sourceTokens[0]), address(supportedTokens[0]));
-    assertEq(address(s_sourceTokens[1]), address(supportedTokens[1]));
-    assertEq(s_sourceTokens.length, supportedTokens.length);
+    assertEq(s_sourceTokens, supportedTokens);
 
     s_onRamp.removePool(IERC20(s_sourceTokens[0]), IPool(s_sourcePools[0]));
 
-    supportedTokens = s_onRamp.getPoolTokens();
+    supportedTokens = s_onRamp.getSupportedTokens();
 
-    assertEq(address(s_sourceTokens[1]), address(supportedTokens[0]));
+    assertEq(address(s_sourceTokens[1]), supportedTokens[0]);
     assertEq(s_sourceTokens.length - 1, supportedTokens.length);
   }
 }

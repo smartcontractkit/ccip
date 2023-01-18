@@ -95,8 +95,8 @@ contract MockOnRamp is IEVM2EVMTollOnRamp {
 
   function setFeeConfig(FeeConfig calldata feeConfig) external override {}
 
-  function getPoolTokens() public pure returns (IERC20[] memory) {
-    return new IERC20[](0);
+  function getSupportedTokens() public pure returns (address[] memory) {
+    return new address[](0);
   }
 
   function getChainId() external view override returns (uint64) {

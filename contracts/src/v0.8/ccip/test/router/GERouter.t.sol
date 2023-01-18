@@ -160,3 +160,17 @@ contract GERouter_isChainSupported is EVM2EVMGEOnRampSetup {
     assertFalse(s_sourceRouter.isChainSupported(0));
   }
 }
+
+/// @notice #getSupportedTokens
+contract GERouter_getSupportedTokens is EVM2EVMGEOnRampSetup {
+  // Success
+
+  function testGetSupportedTokensSuccess() public {
+    assertEq(s_sourceTokens, s_sourceRouter.getSupportedTokens(DEST_CHAIN_ID));
+  }
+
+  function testUnknownChainSuccess() public {
+    address[] memory supportedTokens = s_sourceRouter.getSupportedTokens(DEST_CHAIN_ID + 10);
+    assertEq(0, supportedTokens.length);
+  }
+}

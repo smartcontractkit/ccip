@@ -23,6 +23,12 @@ interface IEVM2AnyGEOnRamp {
   function getPoolBySourceToken(IERC20 sourceToken) external view returns (IPool);
 
   /**
+   * @notice Gets a list of all supported source chain tokens.
+   * @return tokens The ERC20 interface of all tokens that this onRamp supports.
+   */
+  function getSupportedTokens() external view returns (address[] memory tokens);
+
+  /**
    * @notice Send a message to the remote chain
    * @dev approve() must have already been called on the token using the this ramp address as the spender.
    * @dev if the contract is paused, this function will revert.

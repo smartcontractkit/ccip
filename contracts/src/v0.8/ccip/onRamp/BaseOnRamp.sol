@@ -30,12 +30,12 @@ contract BaseOnRamp is IBaseOnRamp, HealthChecker, AllowList, AggregateRateLimit
 
   // source token => token pool
   mapping(IERC20 => PoolConfig) private s_poolsBySourceToken;
-  IERC20[] private s_sourceTokenList;
+  address[] private s_sourceTokenList;
 
   constructor(
     uint64 chainId,
     uint64 destinationChainId,
-    IERC20[] memory tokens,
+    address[] memory tokens,
     IPool[] memory pools,
     address[] memory allowlist,
     IAFN afn,
@@ -54,7 +54,7 @@ contract BaseOnRamp is IBaseOnRamp, HealthChecker, AllowList, AggregateRateLimit
     s_sourceTokenList = tokens;
     // Set new tokens and pools
     for (uint256 i = 0; i < tokens.length; ++i) {
-      s_poolsBySourceToken[tokens[i]] = PoolConfig({pool: pools[i], enabled: true});
+      s_poolsBySourceToken[IERC20(tokens[i])] = PoolConfig({pool: pools[i], enabled: true});
     }
   }
 
@@ -115,7 +115,7 @@ contract BaseOnRamp is IBaseOnRamp, HealthChecker, AllowList, AggregateRateLimit
     if (s_poolsBySourceToken[token].enabled) revert PoolAlreadyAdded();
 
     s_poolsBySourceToken[token] = PoolConfig({pool: pool, enabled: true});
-    s_sourceTokenList.push(token);
+    s_sourceTokenList.push(address(token));
 
     emit PoolAdded(token, pool);
   }
@@ -138,24 +138,19 @@ contract BaseOnRamp is IBaseOnRamp, HealthChecker, AllowList, AggregateRateLimit
     emit PoolRemoved(token, pool);
   }
 
-  /**
-   * @notice Get all configured source tokens
-   * @return Array of configured source tokens
-   * @dev this is not very efficient but this method only exists for
-   * offchain use so gas does not matter.
-   */
-  function getPoolTokens() external view returns (IERC20[] memory) {
+  /// @inheritdoc IBaseOnRamp
+  function getSupportedTokens() public view virtual returns (address[] memory) {
     uint256 numberOfSupportedTokens = 0;
     for (uint256 i = 0; i < s_sourceTokenList.length; ++i) {
-      if (s_poolsBySourceToken[s_sourceTokenList[i]].enabled) {
+      if (s_poolsBySourceToken[IERC20(s_sourceTokenList[i])].enabled) {
         numberOfSupportedTokens++;
       }
     }
 
-    IERC20[] memory sourceTokens = new IERC20[](numberOfSupportedTokens);
+    address[] memory sourceTokens = new address[](numberOfSupportedTokens);
     uint256 j = 0;
     for (uint256 i = 0; i < s_sourceTokenList.length; ++i) {
-      if (s_poolsBySourceToken[s_sourceTokenList[i]].enabled) {
+      if (s_poolsBySourceToken[IERC20(s_sourceTokenList[i])].enabled) {
         sourceTokens[j++] = s_sourceTokenList[i];
       }
     }

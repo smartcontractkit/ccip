@@ -25,6 +25,8 @@ contract EVM2EVMGEOnRamp_constructor is EVM2EVMGEOnRampSetup {
     assertEq(address(s_sourceRouter), s_onRamp.getRouter());
     assertEq(1, s_onRamp.getExpectedNextSequenceNumber());
 
+    assertEq(s_sourceTokens, s_onRamp.getSupportedTokens());
+
     // HealthChecker
     assertEq(address(s_afn), address(s_onRamp.getAFN()));
   }

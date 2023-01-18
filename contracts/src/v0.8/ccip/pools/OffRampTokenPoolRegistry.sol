@@ -113,10 +113,10 @@ contract OffRampTokenPoolRegistry is OwnerIsCreator {
   }
 
   /**
-   * @notice Get all configured source tokens
-   * @return Array of configured source tokens
+   * @notice Get all supported source tokens
+   * @return Array of supported source tokens
    */
-  function getPoolTokens() public view returns (IERC20[] memory) {
+  function getSupportedTokens() public view returns (IERC20[] memory) {
     return s_sourceTokenList;
   }
 

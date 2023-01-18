@@ -22,7 +22,7 @@ contract EVM2EVMTollOffRamp_constructor is EVM2EVMTollOffRampSetup {
     assertEq(SOURCE_CHAIN_ID, source);
     assertEq(DEST_CHAIN_ID, dest);
     assertEq(address(s_afn), address(s_offRamp.getAFN()));
-    IERC20[] memory pools = s_offRamp.getPoolTokens();
+    IERC20[] memory pools = s_offRamp.getSupportedTokens();
     assertEq(pools.length, s_sourceTokens.length);
     assertTrue(address(pools[0]) == address(s_sourceTokens[0]));
     assertTrue(address(pools[1]) == address(s_sourceTokens[1]));

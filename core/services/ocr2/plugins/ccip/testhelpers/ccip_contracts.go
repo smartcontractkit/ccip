@@ -13,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/onsi/gomega"
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
@@ -150,14 +149,14 @@ func (c *CCIPContracts) AssertBalances(bas []BalanceAssertion) {
 		actual := b.Getter(b.Address)
 		require.NotNil(c.t, actual, "%v getter return nil", b.Name)
 		if b.Within == "" {
-			assert.Equal(c.t, b.Expected, actual.String(), "wrong balance for %s got %s want %s", b.Name, actual, b.Expected)
+			require.Equal(c.t, b.Expected, actual.String(), "wrong balance for %s got %s want %s", b.Name, actual, b.Expected)
 		} else {
 			bi, _ := big.NewInt(0).SetString(b.Expected, 10)
 			withinI, _ := big.NewInt(0).SetString(b.Within, 10)
 			high := big.NewInt(0).Add(bi, withinI)
 			low := big.NewInt(0).Sub(bi, withinI)
-			assert.Equal(c.t, -1, actual.Cmp(high), "wrong balance for %s got %s outside expected range [%s, %s]", b.Name, actual, low, high)
-			assert.Equal(c.t, 1, actual.Cmp(low), "wrong balance for %s got %s outside expected range [%s, %s]", b.Name, actual, low, high)
+			require.Equal(c.t, -1, actual.Cmp(high), "wrong balance for %s got %s outside expected range [%s, %s]", b.Name, actual, low, high)
+			require.Equal(c.t, 1, actual.Cmp(low), "wrong balance for %s got %s outside expected range [%s, %s]", b.Name, actual, low, high)
 		}
 	}
 }
@@ -462,14 +461,14 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	destChain.Commit()
 
 	// Deploy custom token pool source
-	sourceCustomTokenAddress, _, _, err := link_token_interface.DeployLinkToken(sourceUser, sourceChain) // Just re-use this, its an ERC20.
+	sourceCustomTokenAddress, _, _, err := link_token_interface.DeployLinkToken(sourceUser, sourceChain) // Just re-use this, it's an ERC20.
 	require.NoError(t, err)
 	sourceCustomToken, err := link_token_interface.NewLinkToken(sourceCustomTokenAddress, sourceChain)
 	require.NoError(t, err)
 	destChain.Commit()
 
 	// Deploy custom token pool dest
-	destCustomTokenAddress, _, _, err := link_token_interface.DeployLinkToken(destUser, destChain) // Just re-use this, its an ERC20.
+	destCustomTokenAddress, _, _, err := link_token_interface.DeployLinkToken(destUser, destChain) // Just re-use this, it's an ERC20.
 	require.NoError(t, err)
 	destCustomToken, err := link_token_interface.NewLinkToken(destCustomTokenAddress, destChain)
 	require.NoError(t, err)
@@ -839,7 +838,7 @@ func AssertTollExecSuccess(t *testing.T, ccipContracts CCIPContracts, log logpol
 	}
 }
 
-func EventuallyReportCommitted(t *testing.T, ccipContracts CCIPContracts, onRamp common.Address, min, max int) {
+func EventuallyReportCommitted(t *testing.T, ccipContracts CCIPContracts, onRamp common.Address, max int) {
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
 		minSeqNum, err := ccipContracts.Dest.CommitStore.GetExpectedNextSequenceNumber(nil, onRamp)
 		require.NoError(t, err)
