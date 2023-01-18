@@ -4,17 +4,17 @@ pragma solidity 0.8.15;
 import {ICommitStore} from "../../../interfaces/ICommitStore.sol";
 import {IAny2EVMMessageReceiver} from "../../../interfaces/applications/IAny2EVMMessageReceiver.sol";
 import {IEVM2EVMGEOffRamp} from "../../../interfaces/offRamp/IEVM2EVMGEOffRamp.sol";
-import {IGasFeeCache} from "../../../interfaces/gasFeeCache/IGasFeeCache.sol";
+import {IFeeManager} from "../../../interfaces/fees/IFeeManager.sol";
 
 import {GE} from "../../../models/GE.sol";
 import {Common} from "../../../models/Common.sol";
-import {GasFeeCacheSetup} from "../../gasFeeCache/GasFeeCache.t.sol";
+import {FeeManagerSetup} from "../../fees/FeeManager.t.sol";
 import {MockCommitStore} from "../../mocks/MockCommitStore.sol";
 import {SimpleMessageReceiver} from "../../helpers/receivers/SimpleMessageReceiver.sol";
 import {EVM2EVMGEOffRampHelper} from "../../helpers/ramps/EVM2EVMGEOffRampHelper.sol";
 import "../../TokenSetup.t.sol";
 
-contract EVM2EVMGEOffRampSetup is TokenSetup, GasFeeCacheSetup {
+contract EVM2EVMGEOffRampSetup is TokenSetup, FeeManagerSetup {
   ICommitStore internal s_mockCommitStore;
   IAny2EVMMessageReceiver internal s_receiver;
   IAny2EVMMessageReceiver internal s_secondary_receiver;
@@ -30,22 +30,22 @@ contract EVM2EVMGEOffRampSetup is TokenSetup, GasFeeCacheSetup {
   );
   event SkippedIncorrectNonce(uint64 indexed nonce, address indexed sender);
 
-  function setUp() public virtual override(TokenSetup, GasFeeCacheSetup) {
+  function setUp() public virtual override(TokenSetup, FeeManagerSetup) {
     TokenSetup.setUp();
-    GasFeeCacheSetup.setUp();
+    FeeManagerSetup.setUp();
 
     s_mockCommitStore = new MockCommitStore();
     s_receiver = new SimpleMessageReceiver();
     s_secondary_receiver = new SimpleMessageReceiver();
 
-    deployOffRamp(s_mockCommitStore, s_gasFeeCache);
+    deployOffRamp(s_mockCommitStore, s_feeManager);
   }
 
-  function deployOffRamp(ICommitStore commitStore, IGasFeeCache gasFeeCache) internal {
+  function deployOffRamp(ICommitStore commitStore, IFeeManager feeManager) internal {
     s_offRamp = new EVM2EVMGEOffRampHelper(
       SOURCE_CHAIN_ID,
       DEST_CHAIN_ID,
-      _generateGEOffRampConfig(gasFeeCache),
+      _generateGEOffRampConfig(feeManager),
       ON_RAMP_ADDRESS,
       commitStore,
       s_afn,
@@ -57,13 +57,13 @@ contract EVM2EVMGEOffRampSetup is TokenSetup, GasFeeCacheSetup {
     );
 
     s_offRamp.setPrices(getCastedDestinationTokens(), getTokenPrices());
-    s_gasFeeCache.setFeeUpdater(address(s_offRamp));
+    s_feeManager.setFeeUpdater(address(s_offRamp));
 
     NativeTokenPool(address(s_destPools[0])).setOffRamp(IBaseOffRamp(address(s_offRamp)), true);
     NativeTokenPool(address(s_destPools[1])).setOffRamp(IBaseOffRamp(address(s_offRamp)), true);
   }
 
-  function _generateGEOffRampConfig(IGasFeeCache gasFeeCache)
+  function _generateGEOffRampConfig(IFeeManager feeManager)
     public
     pure
     returns (IEVM2EVMGEOffRamp.GEOffRampConfig memory)
@@ -71,7 +71,7 @@ contract EVM2EVMGEOffRampSetup is TokenSetup, GasFeeCacheSetup {
     return
       IEVM2EVMGEOffRamp.GEOffRampConfig({
         gasOverhead: 5e5,
-        gasFeeCache: gasFeeCache,
+        feeManager: feeManager,
         executionDelaySeconds: EXECUTION_DELAY_SECONDS,
         maxDataSize: MAX_DATA_SIZE,
         maxTokensLength: MAX_TOKENS_LENGTH,
@@ -82,28 +82,23 @@ contract EVM2EVMGEOffRampSetup is TokenSetup, GasFeeCacheSetup {
   function _convertGEToGeneralMessage(GE.EVM2EVMGEMessage memory original)
     internal
     view
-    returns (Internal.Any2EVMMessageFromSender memory message)
+    returns (Common.Any2EVMMessage memory message)
   {
     uint256 numberOfTokens = original.tokensAndAmounts.length;
     Common.EVMTokenAndAmount[] memory destTokensAndAmounts = new Common.EVMTokenAndAmount[](numberOfTokens);
-    address[] memory destPools = new address[](numberOfTokens);
 
     for (uint256 i = 0; i < numberOfTokens; ++i) {
       IPool pool = s_offRamp.getPoolBySourceToken(IERC20(original.tokensAndAmounts[i].token));
-      destPools[i] = address(pool);
       destTokensAndAmounts[i].token = address(pool.getToken());
       destTokensAndAmounts[i].amount = original.tokensAndAmounts[i].amount;
     }
 
     return
-      Internal.Any2EVMMessageFromSender({
+      Common.Any2EVMMessage({
         sourceChainId: original.sourceChainId,
         sender: abi.encode(original.sender),
-        receiver: original.receiver,
         data: original.data,
-        destTokensAndAmounts: destTokensAndAmounts,
-        destPools: destPools,
-        gasLimit: original.gasLimit
+        destTokensAndAmounts: destTokensAndAmounts
       });
   }
 

@@ -14,9 +14,9 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, HealthChecker, OC
   string public constant override typeAndVersion = "CommitStore 1.0.0";
 
   // Chain ID of this chain
-  uint256 public immutable i_chainId;
+  uint256 internal immutable i_chainId;
   // Chain ID of the source chain
-  uint256 public immutable i_sourceChainId;
+  uint256 internal immutable i_sourceChainId;
 
   // merkleRoot => timestamp when received
   mapping(bytes32 => uint256) private s_roots;
@@ -43,7 +43,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, HealthChecker, OC
     uint64 sourceChainId,
     IAFN afn,
     CommitStoreConfig memory config
-  ) OCR2Base(true) HealthChecker(afn) {
+  ) OCR2Base() HealthChecker(afn) {
     i_chainId = chainId;
     i_sourceChainId = sourceChainId;
     s_config = config;
@@ -54,7 +54,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, HealthChecker, OC
   }
 
   /// @inheritdoc ICommitStore
-  function setConfig(CommitStoreConfig calldata config) external onlyOwner {
+  function setCommitStoreConfig(CommitStoreConfig calldata config) external onlyOwner {
     uint256 newRampLength = config.onRamps.length;
     if (newRampLength != config.minSeqNrByOnRamp.length || newRampLength == 0) revert InvalidConfiguration();
     uint256 onRampLength = s_config.onRamps.length;
@@ -71,7 +71,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, HealthChecker, OC
   }
 
   /// @inheritdoc ICommitStore
-  function getConfig() external view returns (CommitStoreConfig memory) {
+  function getCommitStoreConfig() external view returns (CommitStoreConfig memory) {
     return s_config;
   }
 
@@ -100,13 +100,23 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, HealthChecker, OC
   }
 
   /// @inheritdoc ICommitStore
+  function getChainId() external view override returns (uint256) {
+    return i_chainId;
+  }
+
+  /// @inheritdoc ICommitStore
+  function getSourceChainId() external view override returns (uint256) {
+    return i_sourceChainId;
+  }
+
+  /// @inheritdoc ICommitStore
   function verify(
     bytes32[] calldata hashedLeaves,
     bytes32[] calldata innerProofs,
     uint256 innerProofFlagBits,
     bytes32[] calldata outerProofs,
     uint256 outerProofFlagBits
-  ) external view returns (uint256 timestamp) {
+  ) external view override returns (uint256 timestamp) {
     bytes32[] memory outerLeaves = new bytes32[](1);
     // Use the result of the inner merkle proof as the single leaf of the outer merkle tree.
     outerLeaves[0] = merkleRoot(hashedLeaves, innerProofs, innerProofFlagBits);
@@ -123,7 +133,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, HealthChecker, OC
     bytes32[] memory leaves,
     bytes32[] memory proofs,
     uint256 proofFlagBits
-  ) public pure returns (bytes32) {
+  ) public pure override returns (bytes32) {
     unchecked {
       uint256 leavesLen = leaves.length;
       // As of Solidity 0.6.5, overflow is not possible here because in-memory arrays are limited to
@@ -156,16 +166,12 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, HealthChecker, OC
   }
 
   /// @inheritdoc ICommitStore
-  function getMerkleRoot(bytes32 root) external view returns (uint256) {
+  function getMerkleRoot(bytes32 root) external view override returns (uint256) {
     return s_roots[root];
   }
 
   /// @inheritdoc OCR2Base
-  function _report(
-    bytes32, /*configDigest*/
-    uint40, /*epochAndRound*/
-    bytes memory encodedReport
-  ) internal override whenNotPaused whenHealthy {
+  function _report(bytes memory encodedReport) internal override whenNotPaused whenHealthy {
     Internal.CommitReport memory report = abi.decode(encodedReport, (Internal.CommitReport));
     uint256 reportLength = report.onRamps.length;
     if (reportLength != report.intervals.length || reportLength != report.merkleRoots.length)
@@ -200,12 +206,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, HealthChecker, OC
     return keccak256(abi.encode(Internal.INTERNAL_DOMAIN_SEPARATOR, left, right));
   }
 
-  function _beforeSetOCR2Config(uint8 _threshold, bytes memory _onchainConfig) internal override {}
+  function _payTransmitter(uint256 initialGas, address transmitter) internal override {}
 
-  function _afterSetOCR2Config(
-    uint8, /* f */
-    bytes memory /* onchainConfig */
-  ) internal override {}
-
-  function _payTransmitter(uint32 initialGas, address transmitter) internal override {}
+  function _beforeSetOCR2Config(uint8 f, bytes memory onchainConfig) internal override {}
 }

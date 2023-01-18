@@ -86,7 +86,7 @@ contract EVM2EVMGEOffRamp_ccipReceive is EVM2EVMGEOffRampSetup {
   // Reverts
 
   function testReverts() public {
-    Internal.Any2EVMMessageFromSender memory message = _convertGEToGeneralMessage(_generateAny2EVMGEMessageNoTokens(1));
+    Common.Any2EVMMessage memory message = _convertGEToGeneralMessage(_generateAny2EVMGEMessageNoTokens(1));
     vm.expectRevert();
     s_offRamp.ccipReceive(message);
   }
@@ -177,7 +177,8 @@ contract EVM2EVMGEOffRamp_execute is EVM2EVMGEOffRampSetup {
     s_offRamp.execute(_generateReportFromMessages(messages), false);
   }
 
-  function testTwoMessagesWithTokensSuccess() public {
+  function testTwoMessagesWithTokensSuccess_gas() public {
+    vm.pauseGasMetering();
     GE.EVM2EVMGEMessage[] memory messages = _generateMessagesWithTokens();
     // Set message 1 to use another receiver to simulate more fair gas costs
     messages[1].receiver = address(s_secondary_receiver);
@@ -196,6 +197,7 @@ contract EVM2EVMGEOffRamp_execute is EVM2EVMGEOffRampSetup {
       Internal.MessageExecutionState.SUCCESS
     );
 
+    vm.resumeGasMetering();
     s_offRamp.execute(_generateReportFromMessages(messages), false);
   }
 
@@ -306,7 +308,12 @@ contract EVM2EVMGEOffRamp_execute is EVM2EVMGEOffRampSetup {
     messages[0].tokensAndAmounts[0] = getCastedDestinationEVMTokenAndAmountsWithZeroAmounts()[0];
     messages[0].feeToken = messages[0].tokensAndAmounts[0].token;
     messages[0].feeTokenAmount = COMMIT_FEE_JUELS;
-    vm.expectRevert(abi.encodeWithSelector(IBaseOffRamp.UnsupportedToken.selector, s_destTokens[0]));
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        IBaseOffRamp.ExecutionError.selector,
+        abi.encodeWithSelector(IBaseOffRamp.UnsupportedToken.selector, s_destTokens[0])
+      )
+    );
     s_offRamp.execute(_generateReportFromMessages(messages), false);
   }
 }
@@ -327,15 +334,15 @@ contract EVM2EVMGEOffRamp_executeSingleMessage is EVM2EVMGEOffRampSetup {
   // Success
 
   function testNoTokensSuccess() public {
-    s_offRamp.executeSingleMessage(_convertGEToGeneralMessage(_generateAny2EVMGEMessageNoTokens(1)), false);
+    s_offRamp.executeSingleMessage(_generateAny2EVMGEMessageNoTokens(1), false);
   }
 
   function testTokensSuccess() public {
-    s_offRamp.executeSingleMessage(_convertGEToGeneralMessage(_generateMessagesWithTokens()[0]), false);
+    s_offRamp.executeSingleMessage(_generateMessagesWithTokens()[0], false);
   }
 
   function testNonContractSuccess() public {
-    Internal.Any2EVMMessageFromSender memory message = _convertGEToGeneralMessage(_generateAny2EVMGEMessageNoTokens(1));
+    GE.EVM2EVMGEMessage memory message = _generateAny2EVMGEMessageNoTokens(1);
     message.receiver = STRANGER;
     s_offRamp.executeSingleMessage(message, false);
   }
@@ -343,7 +350,7 @@ contract EVM2EVMGEOffRamp_executeSingleMessage is EVM2EVMGEOffRampSetup {
   event MessageReceived();
 
   function testLowGasLimitManualExecutionSuccess() public {
-    Internal.Any2EVMMessageFromSender memory message = _convertGEToGeneralMessage(_generateAny2EVMGEMessageNoTokens(1));
+    GE.EVM2EVMGEMessage memory message = _generateAny2EVMGEMessageNoTokens(1);
     message.gasLimit = 1;
     vm.expectRevert(IBaseOffRamp.ReceiverError.selector);
     s_offRamp.executeSingleMessage(message, false);
@@ -363,9 +370,7 @@ contract EVM2EVMGEOffRamp_executeSingleMessage is EVM2EVMGEOffRampSetup {
     emit Released(address(s_offRamp), STRANGER, amounts[0]);
     vm.expectEmit(true, true, false, true);
     emit Minted(address(s_offRamp), STRANGER, amounts[1]);
-    Internal.Any2EVMMessageFromSender memory message = _convertGEToGeneralMessage(
-      _generateAny2EVMGEMessageWithTokens(1, amounts)
-    );
+    GE.EVM2EVMGEMessage memory message = _generateAny2EVMGEMessageWithTokens(1, amounts);
     message.receiver = STRANGER;
     s_offRamp.executeSingleMessage(message, false);
   }
@@ -374,7 +379,7 @@ contract EVM2EVMGEOffRamp_executeSingleMessage is EVM2EVMGEOffRampSetup {
 
   function testMessageSenderReverts() public {
     vm.stopPrank();
-    Internal.Any2EVMMessageFromSender memory message = _convertGEToGeneralMessage(_generateAny2EVMGEMessageNoTokens(1));
+    GE.EVM2EVMGEMessage memory message = _generateAny2EVMGEMessageNoTokens(1);
     vm.expectRevert(IBaseOffRamp.CanOnlySelfCall.selector);
     s_offRamp.executeSingleMessage(message, false);
   }
@@ -403,7 +408,6 @@ contract EVM2EVMGEOffRamp__report is EVM2EVMGEOffRampSetup {
       messages[0].messageId,
       Internal.MessageExecutionState.SUCCESS
     );
-
     s_offRamp.report(abi.encode(report));
   }
 }

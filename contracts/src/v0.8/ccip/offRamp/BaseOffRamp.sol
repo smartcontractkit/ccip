@@ -78,15 +78,21 @@ contract BaseOffRamp is IBaseOffRamp, HealthChecker, OffRampTokenPoolRegistry, A
    * @notice Uses pools to release or mint a number of different tokens
    *           and send them to the given `receiver` address.
    */
-  function _releaseOrMintTokens(
-    address[] memory pools,
-    Common.EVMTokenAndAmount[] memory tokensAndAmounts,
-    address receiver
-  ) internal {
-    if (pools.length != tokensAndAmounts.length) revert TokenAndAmountMisMatch();
-    for (uint256 i = 0; i < pools.length; ++i) {
-      _releaseOrMintToken(IPool(pools[i]), tokensAndAmounts[i].amount, receiver);
+  function _releaseOrMintTokens(Common.EVMTokenAndAmount[] memory sourceTokensAndAmounts, address receiver)
+    internal
+    returns (Common.EVMTokenAndAmount[] memory)
+  {
+    Common.EVMTokenAndAmount[] memory destTokensAndAmounts = new Common.EVMTokenAndAmount[](
+      sourceTokensAndAmounts.length
+    );
+    for (uint256 i = 0; i < sourceTokensAndAmounts.length; ++i) {
+      IPool pool = _getPool(IERC20(sourceTokensAndAmounts[i].token));
+      _releaseOrMintToken(pool, sourceTokensAndAmounts[i].amount, receiver);
+      destTokensAndAmounts[i].token = address(pool.getToken());
+      destTokensAndAmounts[i].amount = sourceTokensAndAmounts[i].amount;
     }
+    _removeTokens(destTokensAndAmounts);
+    return destTokensAndAmounts;
   }
 
   /**
@@ -113,52 +119,9 @@ contract BaseOffRamp is IBaseOffRamp, HealthChecker, OffRampTokenPoolRegistry, A
   }
 
   /**
-   * @notice Try executing a message
-   * @param message Internal.Any2EVMMessageFromSender memory message
-   * @param manualExecution bool to indicate manual instead of DON execution
-   * @return Internal.ExecutionState
-   */
-  function _trialExecute(Internal.Any2EVMMessageFromSender memory message, bool manualExecution)
-    internal
-    returns (Internal.MessageExecutionState)
-  {
-    try this.executeSingleMessage(message, manualExecution) {} catch (bytes memory err) {
-      if (IBaseOffRamp.ReceiverError.selector == bytes4(err)) {
-        return Internal.MessageExecutionState.FAILURE;
-      } else {
-        revert ExecutionError(err);
-      }
-    }
-    return Internal.MessageExecutionState.SUCCESS;
-  }
-
-  /**
-   * @notice Execute a single message
-   * @param message The Any2EVMMessageFromSender message that will be executed
-   * @param manualExecution bool to indicate manual instead of DON execution
-   * @dev this can only be called by the contract itself. It is part of
-   * the Execute call, as we can only try/catch on external calls.
-   */
-  function executeSingleMessage(Internal.Any2EVMMessageFromSender memory message, bool manualExecution) external {
-    if (msg.sender != address(this)) revert CanOnlySelfCall();
-    if (message.destTokensAndAmounts.length > 0) {
-      _removeTokens(message.destTokensAndAmounts);
-      _releaseOrMintTokens(message.destPools, message.destTokensAndAmounts, message.receiver);
-    }
-
-    _callReceiver(message, manualExecution);
-  }
-
-  function _callReceiver(Internal.Any2EVMMessageFromSender memory message, bool manualExecution) internal {
-    if (!message.receiver.isContract()) return;
-    if (!s_router.routeMessage(message, manualExecution)) revert ReceiverError();
-  }
-
-  /**
    * @notice Reverts as this contract should not access CCIP messages
    */
-  // TODO: Should be Any2EVMMessage ??
-  function ccipReceive(Internal.Any2EVMMessageFromSender calldata) external pure {
+  function ccipReceive(Common.Any2EVMMessage calldata) external pure {
     // solhint-disable-next-line reason-string
     revert();
   }

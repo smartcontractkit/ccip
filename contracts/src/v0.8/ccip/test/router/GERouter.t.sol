@@ -27,7 +27,8 @@ contract GERouter_ccipSend is EVM2EVMGEOnRampSetup {
 
   // Success
 
-  function testCCIPSendSuccess() public {
+  function testCCIPSendOneTokenSuccess_gas() public {
+    vm.pauseGasMetering();
     address sourceToken1Address = s_sourceTokens[1];
     IERC20 sourceToken1 = IERC20(sourceToken1Address);
     GEConsumer.EVM2AnyGEMessage memory message = _generateEmptyMessage();
@@ -52,23 +53,28 @@ contract GERouter_ccipSend is EVM2EVMGEOnRampSetup {
     vm.expectEmit(false, false, false, true);
     emit CCIPSendRequested(msgEvent);
 
-    assertEq(msgEvent.messageId, s_sourceRouter.ccipSend(DEST_CHAIN_ID, message));
+    vm.resumeGasMetering();
+    bytes32 messageId = s_sourceRouter.ccipSend(DEST_CHAIN_ID, message);
+    vm.pauseGasMetering();
+
+    assertEq(msgEvent.messageId, messageId);
     // Assert the user balance is lowered by the tokensAndAmounts sent and the fee amount
     uint256 expectedBalance = balanceBefore - (message.tokensAndAmounts[0].amount);
     assertEq(expectedBalance, sourceToken1.balanceOf(OWNER));
+    vm.resumeGasMetering();
   }
 
-  function testCCIPSendMinimal_gas() public {
-    s_sourceRouter.ccipSend(
-      DEST_CHAIN_ID,
-      GEConsumer.EVM2AnyGEMessage({
-        receiver: abi.encode(OWNER),
-        data: "",
-        tokensAndAmounts: new Common.EVMTokenAndAmount[](0),
-        feeToken: s_sourceFeeToken,
-        extraArgs: ""
-      })
-    );
+  function testNonLinkFeeTokenSuccess() public {
+    GE.FeeUpdate[] memory feeUpdates = new GE.FeeUpdate[](1);
+    feeUpdates[0] = GE.FeeUpdate({sourceFeeToken: s_sourceTokens[1], destChainId: DEST_CHAIN_ID, linkPerUnitGas: 1000});
+    s_IFeeManager.updateFees(feeUpdates);
+
+    GEConsumer.EVM2AnyGEMessage memory message = _generateEmptyMessage();
+    message.feeToken = s_sourceTokens[1];
+
+    IERC20(s_sourceTokens[1]).approve(address(s_sourceRouter), 2**64);
+
+    s_sourceRouter.ccipSend(DEST_CHAIN_ID, message);
   }
 
   // Reverts
@@ -88,7 +94,7 @@ contract GERouter_ccipSend is EVM2EVMGEOnRampSetup {
     message.feeToken = wrongFeeToken;
 
     vm.expectRevert(
-      abi.encodeWithSelector(IEVM2EVMGEOnRamp.MismatchedFeeToken.selector, s_sourceTokens[0], wrongFeeToken)
+      abi.encodeWithSelector(IFeeManager.TokenOrChainNotSupported.selector, wrongFeeToken, DEST_CHAIN_ID)
     );
 
     s_sourceRouter.ccipSend(DEST_CHAIN_ID, message);

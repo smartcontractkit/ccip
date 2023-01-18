@@ -75,11 +75,11 @@ package gethwrappers
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.6/LogEmitter.abi ../../contracts/solc/v0.8.6/LogEmitter.bin LogEmitter log_emitter
 
 // Direct Request OCR
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.6/OCR2DR.abi ../../contracts/solc/v0.8.6/OCR2DR.bin OCR2DR ocr2dr
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.6/OCR2DRClient.abi ../../contracts/solc/v0.8.6/OCR2DRClient.bin OCR2DRClient ocr2dr_client
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.6/OCR2DRClientExample.abi ../../contracts/solc/v0.8.6/OCR2DRClientExample.bin OCR2DRClientExample ocr2dr_client_example
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.6/OCR2DROracle.abi ../../contracts/solc/v0.8.6/OCR2DROracle.bin OCR2DROracle ocr2dr_oracle
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.6/OCR2DRRegistry.abi ../../contracts/solc/v0.8.6/OCR2DRRegistry.bin OCR2DRRegistry ocr2dr_registry
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.6/Functions.abi ../../contracts/solc/v0.8.6/Functions.bin OCR2DR ocr2dr
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.6/FunctionsClient.abi ../../contracts/solc/v0.8.6/FunctionsClient.bin OCR2DRClient ocr2dr_client
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.6/FunctionsClientExample.abi ../../contracts/solc/v0.8.6/FunctionsClientExample.bin OCR2DRClientExample ocr2dr_client_example
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.6/FunctionsOracle.abi ../../contracts/solc/v0.8.6/FunctionsOracle.bin OCR2DROracle ocr2dr_oracle
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.6/FunctionsBillingRegistry.abi ../../contracts/solc/v0.8.6/FunctionsBillingRegistry.bin OCR2DRRegistry ocr2dr_registry
 
 // CCIP
 // Generic
@@ -107,7 +107,7 @@ package gethwrappers
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2EVMGEOnRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMGEOnRamp.bin EVM2EVMGEOnRamp evm_2_evm_ge_onramp
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2EVMGEOffRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMGEOffRamp.bin EVM2EVMGEOffRamp evm_2_evm_ge_offramp
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/GERouter.abi ../../contracts/solc/v0.8.15/GERouter.bin GERouter ge_router
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/GasFeeCache.abi ../../contracts/solc/v0.8.15/GasFeeCache.bin GasFeeCache gas_fee_cache
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/FeeManager.abi ../../contracts/solc/v0.8.15/FeeManager.bin FeeManager fee_manager
 
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/GovernanceDapp.abi ../../contracts/solc/v0.8.15/GovernanceDapp.bin GovernanceDapp governance_dapp
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/PingPongDemo.abi ../../contracts/solc/v0.8.15/PingPongDemo.bin PingPongDemo ping_pong_demo

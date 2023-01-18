@@ -8,23 +8,16 @@ import {OCR2Abstract} from "./OCR2Abstract.sol";
  * @notice Onchain verification of reports from the offchain reporting protocol
  * @dev For details on its operation, see the offchain reporting protocol design
  * doc, which refers to this contract as simply the "contract".
- * @dev This contract is meant to aid rapid development of new applications based on OCR2.
- * However, for actual production contracts, it is expected that most of the logic of this contract
- * will be folded directly into the application contract. Inheritance prevents us from doing lots
- * of juicy storage layout optimizations, leading to a substantial increase in gas cost.
- * @dev THIS CONTRACT HAS NOT GONE THROUGH ANY SECURITY REVIEW. DO NOT USE IN PROD
  */
 abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
   error InvalidConfig(string message);
   error WrongMessageLength(uint256 expected, uint256 actual);
-
-  bool internal immutable i_uniqueReports;
-
-  constructor(bool uniqueReports) {
-    i_uniqueReports = uniqueReports;
-  }
-
-  uint256 private constant MAX_UINT32 = (1 << 32) - 1;
+  error ConfigDigestMismatch(bytes32 expected, bytes32 actual);
+  error WrongNumberOfSignatures();
+  error SignaturesOutOfRegistration();
+  error UnauthorizedTransmitter();
+  error UnauthorizedSigner();
+  error NonUniqueSignatures();
 
   // Storing these fields used on the hot path in a ConfigInfo variable reduces the
   // retrieval of all of them to a single SLOAD. If any further fields are
@@ -34,13 +27,6 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
     uint8 f; // TODO: could be optimized by squeezing into one slot
     uint8 n;
   }
-  ConfigInfo internal s_configInfo;
-
-  // incremented each time a new config is posted. This count is incorporated
-  // into the config digest, to prevent replay attacks.
-  uint32 internal s_configCount;
-  uint32 internal s_latestConfigBlockNumber; // makes it easier for offchain systems
-  // to extract config from logs.
 
   // Used for s_oracles[a].role, where a is an address, to track the purpose
   // of the address, or to indicate that the address is unset.
@@ -61,8 +47,17 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
     Role role; // Role of the address which mapped to this struct
   }
 
-  mapping(address => Oracle) /* signer OR transmitter address */
-    internal s_oracles;
+  // The current config
+  ConfigInfo internal s_configInfo;
+
+  // incremented each time a new config is posted. This count is incorporated
+  // into the config digest, to prevent replay attacks.
+  uint32 internal s_configCount;
+  // makes it easier for offchain systems to extract config from logs.
+  uint32 internal s_latestConfigBlockNumber;
+
+  // signer OR transmitter address
+  mapping(address => Oracle) internal s_oracles;
 
   // s_signers contains the signing address of each oracle
   address[] internal s_signers;
@@ -71,127 +66,177 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
   // i.e. the address the oracle actually sends transactions to the contract from
   address[] internal s_transmitters;
 
-  /*
-   * Config logic
-   */
+  // The constant-length components of the msg.data sent to transmit.
+  // See the "If we wanted to call sam" example on for example reasoning
+  // https://solidity.readthedocs.io/en/v0.7.2/abi-spec.html
+  uint16 private constant TRANSMIT_MSGDATA_CONSTANT_LENGTH_COMPONENT =
+    4 + // function selector
+      32 *
+      3 + // 3 words containing reportContext
+      32 + // word containing start location of abiencoded report value
+      32 + // word containing location start of abiencoded rs value
+      32 + // word containing start location of abiencoded ss value
+      32 + // rawVs value
+      32 + // word containing length of report
+      32 + // word containing length rs
+      32; // word containing length of ss
 
   // Reverts transaction if config args are invalid
   modifier checkConfigValid(
-    uint256 _numSigners,
-    uint256 _numTransmitters,
-    uint256 _f
+    uint256 numSigners,
+    uint256 numTransmitters,
+    uint256 f
   ) {
-    if (_numSigners > MAX_NUM_ORACLES) revert InvalidConfig("too many signers");
-    if (_f == 0) revert InvalidConfig("f must be positive");
-    if (_numSigners != _numTransmitters) revert InvalidConfig("oracle addresses out of registration");
-    if (_numSigners <= 3 * _f) revert InvalidConfig("faulty-oracle f too high");
+    if (numSigners > MAX_NUM_ORACLES) revert InvalidConfig("too many signers");
+    if (f == 0) revert InvalidConfig("f must be positive");
+    if (numSigners != numTransmitters) revert InvalidConfig("oracle addresses out of registration");
+    if (numSigners <= 3 * f) revert InvalidConfig("faulty-oracle f too high");
     _;
-  }
-
-  struct SetConfigArgs {
-    address[] signers;
-    address[] transmitters;
-    uint8 f;
-    bytes onchainConfig;
-    uint64 offchainConfigVersion;
-    bytes offchainConfig;
-  }
-
-  /// @inheritdoc OCR2Abstract
-  function latestConfigDigestAndEpoch()
-    external
-    view
-    virtual
-    override
-    returns (
-      bool scanLogs,
-      bytes32 configDigest,
-      uint32 epoch
-    )
-  {
-    return (true, bytes32(0), uint32(0));
   }
 
   /**
    * @notice sets offchain reporting protocol configuration incl. participating oracles
-   * @param _signers addresses with which oracles sign the reports
-   * @param _transmitters addresses oracles use to transmit the reports
-   * @param _f number of faulty oracles the system can tolerate
-   * @param _onchainConfig encoded on-chain contract configuration
-   * @param _offchainConfigVersion version number for offchainEncoding schema
-   * @param _offchainConfig encoded off-chain oracle configuration
+   * @param signers addresses with which oracles sign the reports
+   * @param transmitters addresses oracles use to transmit the reports
+   * @param f number of faulty oracles the system can tolerate
+   * @param onchainConfig encoded on-chain contract configuration
+   * @param offchainConfigVersion version number for offchainEncoding schema
+   * @param offchainConfig encoded off-chain oracle configuration
    */
   function setOCR2Config(
-    address[] memory _signers,
-    address[] memory _transmitters,
-    uint8 _f,
-    bytes memory _onchainConfig,
-    uint64 _offchainConfigVersion,
-    bytes memory _offchainConfig
-  ) external override checkConfigValid(_signers.length, _transmitters.length, _f) onlyOwner {
-    SetConfigArgs memory args = SetConfigArgs({
-      signers: _signers,
-      transmitters: _transmitters,
-      f: _f,
-      onchainConfig: _onchainConfig,
-      offchainConfigVersion: _offchainConfigVersion,
-      offchainConfig: _offchainConfig
-    });
-
-    _beforeSetOCR2Config(args.f, args.onchainConfig);
-
-    while (s_signers.length != 0) {
-      // remove any old signer/transmitter addresses
-      uint256 lastIdx = s_signers.length - 1;
-      address signer = s_signers[lastIdx];
-      address transmitter = s_transmitters[lastIdx];
-      delete s_oracles[signer];
-      delete s_oracles[transmitter];
-      s_signers.pop();
-      s_transmitters.pop();
+    address[] memory signers,
+    address[] memory transmitters,
+    uint8 f,
+    bytes memory onchainConfig,
+    uint64 offchainConfigVersion,
+    bytes memory offchainConfig
+  ) external override checkConfigValid(signers.length, transmitters.length, f) onlyOwner {
+    uint256 oldSignerLength = s_signers.length;
+    for (uint256 i = 0; i < oldSignerLength; ++i) {
+      delete s_oracles[s_signers[i]];
+      delete s_oracles[s_transmitters[i]];
     }
 
-    for (uint256 i = 0; i < args.signers.length; ++i) {
+    uint256 newSignersLength = signers.length;
+    for (uint256 i = 0; i < newSignersLength; ++i) {
       // add new signer/transmitter addresses
-      if (s_oracles[args.signers[i]].role != Role.Unset) revert InvalidConfig("repeated signer address");
-      s_oracles[args.signers[i]] = Oracle(uint8(i), Role.Signer);
-      if (s_oracles[args.transmitters[i]].role != Role.Unset) revert InvalidConfig("repeated transmitter address");
-      s_oracles[args.transmitters[i]] = Oracle(uint8(i), Role.Transmitter);
-      s_signers.push(args.signers[i]);
-      s_transmitters.push(args.transmitters[i]);
+      address signer = signers[i];
+      if (s_oracles[signer].role != Role.Unset) revert InvalidConfig("repeated signer address");
+      s_oracles[signer] = Oracle(uint8(i), Role.Signer);
+
+      address transmitter = transmitters[i];
+      if (s_oracles[transmitter].role != Role.Unset) revert InvalidConfig("repeated transmitter address");
+      s_oracles[transmitter] = Oracle(uint8(i), Role.Transmitter);
     }
-    s_configInfo.f = args.f;
+
+    s_signers = signers;
+    s_transmitters = transmitters;
+
+    s_configInfo.f = f;
+    s_configInfo.n = uint8(newSignersLength);
+    s_configInfo.latestConfigDigest = _configDigestFromConfigData(
+      block.chainid,
+      address(this),
+      ++s_configCount,
+      signers,
+      transmitters,
+      f,
+      onchainConfig,
+      offchainConfigVersion,
+      offchainConfig
+    );
+
     uint32 previousConfigBlockNumber = s_latestConfigBlockNumber;
     s_latestConfigBlockNumber = uint32(block.number);
-    s_configCount += 1;
-    {
-      s_configInfo.latestConfigDigest = _configDigestFromConfigData(
-        block.chainid,
-        address(this),
-        s_configCount,
-        args.signers,
-        args.transmitters,
-        args.f,
-        args.onchainConfig,
-        args.offchainConfigVersion,
-        args.offchainConfig
-      );
-    }
-    s_configInfo.n = uint8(args.signers.length);
 
     emit ConfigSet(
       previousConfigBlockNumber,
       s_configInfo.latestConfigDigest,
       s_configCount,
-      args.signers,
-      args.transmitters,
-      args.f,
-      args.onchainConfig,
-      args.offchainConfigVersion,
-      args.offchainConfig
+      signers,
+      transmitters,
+      f,
+      onchainConfig,
+      offchainConfigVersion,
+      offchainConfig
     );
+  }
 
-    _afterSetOCR2Config(args.f, args.onchainConfig);
+  /**
+   * @return list of addresses permitted to transmit reports to this contract
+   * @dev The list will match the order used to specify the transmitter during setConfig
+   */
+  function getTransmitters() external view returns (address[] memory) {
+    return s_transmitters;
+  }
+
+  /**
+   * @notice transmit is called to post a new report to the contract
+   * @param report serialized report, which the signatures are signing.
+   * @param rs ith element is the R components of the ith signature on report. Must have at most MAX_NUM_ORACLES entries
+   * @param ss ith element is the S components of the ith signature on report. Must have at most MAX_NUM_ORACLES entries
+   * @param rawVs ith element is the the V component of the ith signature
+   */
+  function transmit(
+    // NOTE: If these parameters are changed, expectedMsgDataLength and/or
+    // TRANSMIT_MSGDATA_CONSTANT_LENGTH_COMPONENT need to be changed accordingly
+    bytes32[3] calldata reportContext,
+    bytes calldata report,
+    bytes32[] calldata rs,
+    bytes32[] calldata ss,
+    bytes32 rawVs // signatures
+  ) external override {
+    uint256 initialGas = gasleft(); // This line must come first
+
+    _report(report);
+
+    // reportContext consists of:
+    // reportContext[0]: ConfigDigest
+    // reportContext[1]: 27 byte padding, 4-byte epoch and 1-byte round
+    // reportContext[2]: ExtraHash
+    bytes32 configDigest = reportContext[0];
+    ConfigInfo memory configInfo = s_configInfo;
+
+    if (configInfo.latestConfigDigest != configDigest)
+      revert ConfigDigestMismatch(configInfo.latestConfigDigest, configDigest);
+
+    emit Transmitted(configDigest, uint32(uint256(reportContext[1]) >> 8));
+
+    if (rs.length != (configInfo.n + configInfo.f) / 2 + 1) revert WrongNumberOfSignatures();
+    if (rs.length != ss.length) revert SignaturesOutOfRegistration();
+
+    // Scoping this reduces stack pressure and gas usage
+    {
+      Oracle memory transmitter = s_oracles[msg.sender];
+      // Check that sender is authorized to report
+      if (!(transmitter.role == Role.Transmitter && msg.sender == s_transmitters[transmitter.index]))
+        revert UnauthorizedTransmitter();
+    }
+    // Scoping this reduces stack pressure and gas usage
+    {
+      uint256 expectedDataLength = uint256(TRANSMIT_MSGDATA_CONSTANT_LENGTH_COMPONENT) +
+        report.length + // one byte pure entry in _report
+        rs.length *
+        32 + // 32 bytes per entry in _rs
+        ss.length *
+        32; // 32 bytes per entry in _ss)
+      if (msg.data.length != expectedDataLength) revert WrongMessageLength(expectedDataLength, msg.data.length);
+    }
+
+    // Verify signatures attached to report
+    bytes32 h = keccak256(abi.encodePacked(keccak256(report), reportContext));
+    bool[MAX_NUM_ORACLES] memory signed;
+
+    uint256 numberOfSignatures = rs.length;
+    for (uint256 i = 0; i < numberOfSignatures; ++i) {
+      address signer = ecrecover(h, uint8(rawVs[i]) + 27, rs[i], ss[i]);
+      Oracle memory oracle = s_oracles[signer];
+      if (oracle.role != Role.Signer) revert UnauthorizedSigner();
+      if (signed[oracle.index]) revert NonUniqueSignatures();
+      signed[oracle.index] = true;
+    }
+
+    _payTransmitter(initialGas, msg.sender);
   }
 
   /**
@@ -213,126 +258,24 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
     return (s_configCount, s_latestConfigBlockNumber, s_configInfo.latestConfigDigest);
   }
 
-  /**
-   * @return list of addresses permitted to transmit reports to this contract
-   * @dev The list will match the order used to specify the transmitter during setConfig
-   */
-  function transmitters() external view returns (address[] memory) {
-    return s_transmitters;
+  /// @inheritdoc OCR2Abstract
+  function latestConfigDigestAndEpoch()
+    external
+    view
+    virtual
+    override
+    returns (
+      bool scanLogs,
+      bytes32 configDigest,
+      uint32 epoch
+    )
+  {
+    return (true, bytes32(0), uint32(0));
   }
 
-  function _beforeSetOCR2Config(uint8 _f, bytes memory _onchainConfig) internal virtual;
+  function _report(bytes memory report) internal virtual;
 
-  function _afterSetOCR2Config(uint8 _f, bytes memory _onchainConfig) internal virtual;
+  function _payTransmitter(uint256 initialGas, address transmitter) internal virtual;
 
-  function _report(
-    bytes32 configDigest,
-    uint40 epochAndRound,
-    bytes memory report
-  ) internal virtual;
-
-  function _payTransmitter(uint32 initialGas, address transmitter) internal virtual;
-
-  // The constant-length components of the msg.data sent to transmit.
-  // See the "If we wanted to call sam" example on for example reasoning
-  // https://solidity.readthedocs.io/en/v0.7.2/abi-spec.html
-  uint16 private constant TRANSMIT_MSGDATA_CONSTANT_LENGTH_COMPONENT =
-    4 + // function selector
-      32 *
-      3 + // 3 words containing reportContext
-      32 + // word containing start location of abiencoded report value
-      32 + // word containing location start of abiencoded rs value
-      32 + // word containing start location of abiencoded ss value
-      32 + // rawVs value
-      32 + // word containing length of report
-      32 + // word containing length rs
-      32 + // word containing length of ss
-      0; // placeholder
-
-  function _requireExpectedMsgDataLength(
-    bytes calldata report,
-    bytes32[] calldata rs,
-    bytes32[] calldata ss
-  ) private pure {
-    // calldata will never be big enough to make this overflow
-    uint256 expected = uint256(TRANSMIT_MSGDATA_CONSTANT_LENGTH_COMPONENT) +
-      report.length + // one byte pure entry in _report
-      rs.length *
-      32 + // 32 bytes per entry in _rs
-      ss.length *
-      32 + // 32 bytes per entry in _ss
-      0; // placeholder
-    if (msg.data.length != expected) revert WrongMessageLength(expected, msg.data.length);
-  }
-
-  /**
-   * @notice transmit is called to post a new report to the contract
-   * @param report serialized report, which the signatures are signing.
-   * @param rs ith element is the R components of the ith signature on report. Must have at most MAX_NUM_ORACLES entries
-   * @param ss ith element is the S components of the ith signature on report. Must have at most MAX_NUM_ORACLES entries
-   * @param rawVs ith element is the the V component of the ith signature
-   */
-  function transmit(
-    // NOTE: If these parameters are changed, expectedMsgDataLength and/or
-    // TRANSMIT_MSGDATA_CONSTANT_LENGTH_COMPONENT need to be changed accordingly
-    bytes32[3] calldata reportContext,
-    bytes calldata report,
-    bytes32[] calldata rs,
-    bytes32[] calldata ss,
-    bytes32 rawVs // signatures
-  ) external override {
-    uint256 initialGas = gasleft(); // This line must come first
-
-    {
-      // reportContext consists of:
-      // reportContext[0]: ConfigDigest
-      // reportContext[1]: 27 byte padding, 4-byte epoch and 1-byte round
-      // reportContext[2]: ExtraHash
-      bytes32 configDigest = reportContext[0];
-      uint32 epochAndRound = uint32(uint256(reportContext[1]));
-
-      _report(configDigest, epochAndRound, report);
-
-      emit Transmitted(configDigest, uint32(epochAndRound >> 8));
-
-      ConfigInfo memory configInfo = s_configInfo;
-      require(configInfo.latestConfigDigest == configDigest, "configDigest mismatch");
-
-      _requireExpectedMsgDataLength(report, rs, ss);
-
-      uint256 expectedNumSignatures;
-      if (i_uniqueReports) {
-        expectedNumSignatures = (configInfo.n + configInfo.f) / 2 + 1;
-      } else {
-        expectedNumSignatures = configInfo.f + 1;
-      }
-
-      require(rs.length == expectedNumSignatures, "wrong number of signatures");
-      require(rs.length == ss.length, "signatures out of registration");
-
-      Oracle memory transmitter = s_oracles[msg.sender];
-      require( // Check that sender is authorized to report
-        transmitter.role == Role.Transmitter && msg.sender == s_transmitters[transmitter.index],
-        "unauthorized transmitter"
-      );
-    }
-
-    {
-      // Verify signatures attached to report
-      bytes32 h = keccak256(abi.encodePacked(keccak256(report), reportContext));
-      bool[MAX_NUM_ORACLES] memory signed;
-
-      Oracle memory o;
-      for (uint256 i = 0; i < rs.length; ++i) {
-        address signer = ecrecover(h, uint8(rawVs[i]) + 27, rs[i], ss[i]);
-        o = s_oracles[signer];
-        require(o.role == Role.Signer, "address not authorized to sign");
-        require(!signed[o.index], "non-unique signature");
-        signed[o.index] = true;
-      }
-    }
-
-    assert(initialGas < MAX_UINT32);
-    _payTransmitter(uint32(initialGas), msg.sender);
-  }
+  function _beforeSetOCR2Config(uint8 f, bytes memory onchainConfig) internal virtual;
 }

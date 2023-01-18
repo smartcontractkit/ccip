@@ -176,31 +176,23 @@ contract BaseOffRamp__releaseOrMintToken is BaseOffRampSetup {
 contract BaseOffRamp__releaseOrMintTokens is BaseOffRampSetup {
   // Success
   function testSuccess() public {
-    Common.EVMTokenAndAmount[] memory destTokensAndAmounts = getCastedDestinationEVMTokenAndAmountsWithZeroAmounts();
-    IERC20 destToken1 = IERC20(destTokensAndAmounts[1].token);
-    uint256 startingBalance = destToken1.balanceOf(OWNER);
-
-    address[] memory pools = new address[](2);
-    pools[0] = s_destPools[1];
-    pools[1] = s_destPools[1];
-
+    Common.EVMTokenAndAmount[] memory srcTokensAndAmounts = getCastedSourceEVMTokenAndAmountsWithZeroAmounts();
+    IERC20 dstToken1 = IERC20(s_destTokens[0]);
+    uint256 startingBalance = dstToken1.balanceOf(OWNER);
     uint256 amount1 = 100;
-    uint256 amount2 = 50;
+    srcTokensAndAmounts[0].amount = 100;
 
-    destTokensAndAmounts[0].amount = 100;
-    destTokensAndAmounts[1].amount = 50;
-
-    s_offRamp.releaseOrMintTokens(pools, destTokensAndAmounts, OWNER);
-    assertEq(startingBalance + amount1 + amount2, destToken1.balanceOf(OWNER));
+    s_offRamp.releaseOrMintTokens(srcTokensAndAmounts, OWNER);
+    assertEq(startingBalance + amount1, dstToken1.balanceOf(OWNER));
   }
 
   // Revert
 
-  function testTokenAndAmountMisMatchReverts() public {
+  function testUnsupportedTokenReverts() public {
     Common.EVMTokenAndAmount[] memory tokensAndAmounts = new Common.EVMTokenAndAmount[](1);
 
-    vm.expectRevert(IBaseOffRamp.TokenAndAmountMisMatch.selector);
-    s_offRamp.releaseOrMintTokens(s_destPools, tokensAndAmounts, OWNER);
+    vm.expectRevert(abi.encodeWithSelector(IBaseOffRamp.UnsupportedToken.selector, address(0)));
+    s_offRamp.releaseOrMintTokens(tokensAndAmounts, OWNER);
   }
 }
 

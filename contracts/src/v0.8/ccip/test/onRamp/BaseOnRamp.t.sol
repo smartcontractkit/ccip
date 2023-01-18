@@ -48,11 +48,11 @@ contract BaseOnrampSetup is TokenSetup {
 contract BaseOnramp_constructor is BaseOnrampSetup {
   // Success
   function testSuccess() public {
-    assertEq(SOURCE_CHAIN_ID, s_onRamp.i_chainId());
-    assertEq(DEST_CHAIN_ID, s_onRamp.i_destinationChainId());
+    assertEq(SOURCE_CHAIN_ID, s_onRamp.getChainId());
+    assertEq(DEST_CHAIN_ID, s_onRamp.getDestinationChainId());
     assertEq(s_onRampRouter, s_onRamp.getRouter());
     assertEq(1, s_onRamp.getExpectedNextSequenceNumber());
-    assertSameConfig(onRampConfig(), s_onRamp.getConfig());
+    assertSameConfig(onRampConfig(), s_onRamp.getOnRampConfig());
   }
 }
 
@@ -125,8 +125,8 @@ contract BaseOnramp_getRouter is BaseOnrampSetup {
   }
 }
 
-// #setConfig
-contract BaseOnramp_setConfig is BaseOnrampSetup {
+// #setOnRampConfig
+contract BaseOnramp_setOnRampConfig is BaseOnrampSetup {
   // Success
   function testSuccess() public {
     IBaseOnRamp.OnRampConfig memory newConfig = IBaseOnRamp.OnRampConfig({
@@ -139,16 +139,16 @@ contract BaseOnramp_setConfig is BaseOnrampSetup {
     vm.expectEmit(false, false, false, true);
     emit OnRampConfigSet(newConfig);
 
-    s_onRamp.setConfig(newConfig);
+    s_onRamp.setOnRampConfig(newConfig);
 
-    assertSameConfig(newConfig, s_onRamp.getConfig());
+    assertSameConfig(newConfig, s_onRamp.getOnRampConfig());
   }
 
   // Reverts
   function testSetConfigOnlyOwnerReverts() public {
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
-    s_onRamp.setConfig(onRampConfig());
+    s_onRamp.setOnRampConfig(onRampConfig());
   }
 }
 
@@ -156,6 +156,6 @@ contract BaseOnramp_setConfig is BaseOnrampSetup {
 contract BaseOnramp_getConfig is BaseOnrampSetup {
   // Success
   function testSuccess() public {
-    assertSameConfig(onRampConfig(), s_onRamp.getConfig());
+    assertSameConfig(onRampConfig(), s_onRamp.getOnRampConfig());
   }
 }

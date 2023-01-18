@@ -5,7 +5,6 @@ import {IEVM2AnyGEOnRamp} from "./IEVM2AnyGEOnRamp.sol";
 import {GE} from "../../models/GE.sol";
 
 interface IEVM2EVMGEOnRamp is IEVM2AnyGEOnRamp {
-  error MismatchedFeeToken(address expected, address got);
   error InvalidExtraArgsTag(bytes4 expected, bytes4 got);
 
   event FeeAdminSet(address feeAdmin);
@@ -18,15 +17,15 @@ interface IEVM2EVMGEOnRamp is IEVM2AnyGEOnRamp {
 
   struct DynamicFeeConfig {
     // LINK
-    address feeToken;
+    address linkToken;
     // Flat fee in LINK
     uint256 feeAmount;
     // Extra gas charged on top of the gasLimit
     uint256 destGasOverhead;
     // Price multiplier for gas costs
     uint256 multiplier;
-    // Gas fee cache contract
-    address gasFeeCache;
+    // Fee manager contract
+    address feeManager;
     // Destination chain ID
     uint64 destChainId;
   }

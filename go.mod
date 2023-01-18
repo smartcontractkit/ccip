@@ -48,7 +48,7 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/onsi/gomega v1.24.1
 	github.com/pelletier/go-toml v1.9.5
-	github.com/pelletier/go-toml/v2 v2.0.5
+	github.com/pelletier/go-toml/v2 v2.0.6
 	github.com/pkg/errors v0.9.1
 	github.com/pressly/goose/v3 v3.5.3
 	github.com/prometheus/client_golang v1.14.0
@@ -57,13 +57,13 @@ require (
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/satori/go.uuid v1.2.0
 	github.com/scylladb/go-reflectx v1.0.1
-	github.com/shirou/gopsutil/v3 v3.22.10
+	github.com/shirou/gopsutil/v3 v3.22.12
 	github.com/shopspring/decimal v1.3.1
 	github.com/smartcontractkit/chainlink-relay v0.1.6-0.20221025223751-9b407cff57eb
 	github.com/smartcontractkit/chainlink-solana v1.0.2-0.20220930034647-edd5a863b876
 	github.com/smartcontractkit/chainlink-starknet/relayer v0.0.0-20220930034704-572ac07611cb
 	github.com/smartcontractkit/chainlink-terra v0.1.4-0.20220930034731-ef9eb53de886
-	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20221216172121-a6f4844da4dc
+	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20230111115550-5568cd2735d7
 	github.com/smartcontractkit/libocr v0.0.0-20221209172631-568a30f68407
 	github.com/smartcontractkit/ocr2keepers v0.4.8
 	github.com/smartcontractkit/ocr2vrf v0.0.0-20221206151523-7ae0ec615c0e
@@ -77,7 +77,7 @@ require (
 	github.com/terra-money/core v0.5.20
 	github.com/test-go/testify v1.1.4
 	github.com/theodesp/go-heaps v0.0.0-20190520121037-88e35354fe0a
-	github.com/tidwall/gjson v1.14.3
+	github.com/tidwall/gjson v1.14.4
 	github.com/ulule/limiter v0.0.0-20190417201358-7873d115fc4e
 	github.com/umbracle/ethgo v0.1.3
 	github.com/unrolled/secure v0.0.0-20190624173513-716474489ad3
@@ -86,13 +86,13 @@ require (
 	go.dedis.ch/kyber/v3 v3.0.14
 	go.uber.org/atomic v1.9.0
 	go.uber.org/multierr v1.8.0
-	go.uber.org/zap v1.23.0
-	golang.org/x/crypto v0.1.0
+	go.uber.org/zap v1.24.0
+	golang.org/x/crypto v0.5.0
 	golang.org/x/exp v0.0.0-20220608143224-64259d1afd70
 	golang.org/x/sync v0.1.0
-	golang.org/x/term v0.3.0
-	golang.org/x/text v0.5.0
-	golang.org/x/tools v0.3.0
+	golang.org/x/term v0.4.0
+	golang.org/x/text v0.6.0
+	golang.org/x/tools v0.5.0
 	gonum.org/v1/gonum v0.11.0
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/guregu/null.v2 v2.1.2
@@ -336,7 +336,7 @@ require (
 	github.com/sasha-s/go-deadlock v0.2.1-0.20190427202633-1595213edefa // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/sirupsen/logrus v1.9.0 // indirect
-	github.com/smartcontractkit/chainlink-env v0.2.57 // indirect
+	github.com/smartcontractkit/chainlink-env v0.2.58 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework v1.9.0 // indirect
 	github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
@@ -354,8 +354,8 @@ require (
 	github.com/teris-io/shortid v0.0.0-20201117134242-e59966efd125 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
-	github.com/tklauser/go-sysconf v0.3.10 // indirect
-	github.com/tklauser/numcpus v0.5.0 // indirect
+	github.com/tklauser/go-sysconf v0.3.11 // indirect
+	github.com/tklauser/numcpus v0.6.0 // indirect
 	github.com/ugorji/go/codec v1.2.7 // indirect
 	github.com/umbracle/fastrlp v0.0.0-20220527094140-59d5dd30e722 // indirect
 	github.com/urfave/cli/v2 v2.10.2 // indirect
@@ -375,9 +375,9 @@ require (
 	go.uber.org/ratelimit v0.2.0 // indirect
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
 	golang.org/x/mod v0.7.0 // indirect
-	golang.org/x/net v0.4.0 // indirect
+	golang.org/x/net v0.5.0 // indirect
 	golang.org/x/oauth2 v0.1.0 // indirect
-	golang.org/x/sys v0.3.0 // indirect
+	golang.org/x/sys v0.4.0 // indirect
 	golang.org/x/time v0.1.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.2.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect

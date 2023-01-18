@@ -25,7 +25,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/gas_fee_cache"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ge_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/maybe_revert_message_receiver"
@@ -278,13 +278,13 @@ func (c *CCIPContracts) EnableTollOnRamp() {
 	c.Source.Chain.Commit()
 
 	c.t.Log("Enabling toll onRamp on commitStore")
-	config, err := c.Dest.CommitStore.GetConfig(&bind.CallOpts{})
+	config, err := c.Dest.CommitStore.GetCommitStoreConfig(&bind.CallOpts{})
 	require.NoError(c.t, err)
 
 	config.OnRamps = append(config.OnRamps, c.Source.TollOnRamp.Address())
 	config.MinSeqNrByOnRamp = append(config.MinSeqNrByOnRamp, 1)
 
-	_, err = c.Dest.CommitStore.SetConfig(c.Dest.User, config)
+	_, err = c.Dest.CommitStore.SetCommitStoreConfig(c.Dest.User, config)
 	require.NoError(c.t, err)
 
 	c.Source.Chain.Commit()
@@ -542,9 +542,10 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	sourceChain.Commit()
 
 	// Deploy and configure GE onramp
-	sourceGasFeeCacheAddress, _, _, err := gas_fee_cache.DeployGasFeeCache(sourceUser, sourceChain, []gas_fee_cache.GEFeeUpdate{
+	sourceFeeManagerAddress, _, _, err := fee_manager.DeployFeeManager(sourceUser, sourceChain, []fee_manager.GEFeeUpdate{
 		{
-			ChainId:        destChainID,
+			SourceFeeToken: sourceLinkTokenAddress,
+			DestChainId:    destChainID,
 			LinkPerUnitGas: big.NewInt(1e9), // 1 gwei
 		},
 	}, nil, big.NewInt(1e18))
@@ -571,11 +572,11 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		sourceUser.From,
 		sourceGERouterAddress,
 		evm_2_evm_ge_onramp.IEVM2EVMGEOnRampDynamicFeeConfig{
-			FeeToken:        sourceLinkTokenAddress,
+			LinkToken:       sourceLinkTokenAddress,
 			FeeAmount:       big.NewInt(0),
 			DestGasOverhead: big.NewInt(0),
 			Multiplier:      big.NewInt(1e18),
-			GasFeeCache:     sourceGasFeeCacheAddress,
+			FeeManager:      sourceFeeManagerAddress,
 			DestChainId:     destChainID,
 		},
 	)
@@ -656,12 +657,13 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	require.NoError(t, err)
 
 	// Deploy and configure ge offramp.
-	destGasFeeCacheAddress, _, _, err := gas_fee_cache.DeployGasFeeCache(destUser, destChain, []gas_fee_cache.GEFeeUpdate{{
-		ChainId:        sourceChainID,
+	destFeeManagerAddress, _, _, err := fee_manager.DeployFeeManager(destUser, destChain, []fee_manager.GEFeeUpdate{{
+		SourceFeeToken: destLinkTokenAddress,
+		DestChainId:    sourceChainID,
 		LinkPerUnitGas: big.NewInt(200e9), // (2e20 juels/eth) * (1 gwei / gas) / (1 eth/1e18)
 	}}, nil, big.NewInt(1e18))
 	require.NoError(t, err)
-	destGasFeeCache, err := gas_fee_cache.NewGasFeeCache(destGasFeeCacheAddress, destChain)
+	destFeeManager, err := fee_manager.NewFeeManager(destFeeManagerAddress, destChain)
 	require.NoError(t, err)
 	geOffRampAddress, _, _, err := evm_2_evm_ge_offramp.DeployEVM2EVMGEOffRamp(
 		destUser,
@@ -670,7 +672,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		destChainID,
 		evm_2_evm_ge_offramp.IEVM2EVMGEOffRampGEOffRampConfig{
 			GasOverhead:                             big.NewInt(0),
-			GasFeeCache:                             destGasFeeCacheAddress,
+			FeeManager:                              destFeeManagerAddress,
 			PermissionLessExecutionThresholdSeconds: 1,
 			ExecutionDelaySeconds:                   0,
 			MaxDataSize:                             1e12,
@@ -695,7 +697,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	require.NoError(t, err)
 	destChain.Commit()
 	// OffRamp can update
-	_, err = destGasFeeCache.SetFeeUpdater(destUser, geOffRampAddress)
+	_, err = destFeeManager.SetFeeUpdater(destUser, geOffRampAddress)
 	require.NoError(t, err)
 
 	// Create dest ge router

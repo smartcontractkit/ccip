@@ -24,7 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/gas_fee_cache"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ge_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/mock_afn_contract"
@@ -363,24 +363,24 @@ func (e *CCIPContractsDeployer) NewGERouter(addr common.Address) (
 	}, err
 }
 
-func (e *CCIPContractsDeployer) DeployGasFeeCache(
-	feeUpdates []gas_fee_cache.GEFeeUpdate,
+func (e *CCIPContractsDeployer) DeployFeeManager(
+	feeUpdates []fee_manager.GEFeeUpdate,
 ) (
-	*GasFeeCache,
+	*FeeManager,
 	error,
 ) {
-	address, _, instance, err := e.evmClient.DeployContract("GasFeeCache", func(
+	address, _, instance, err := e.evmClient.DeployContract("FeeManager", func(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return gas_fee_cache.DeployGasFeeCache(auth, backend, feeUpdates, nil, big.NewInt(1e18))
+		return fee_manager.DeployFeeManager(auth, backend, feeUpdates, nil, big.NewInt(1e18))
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &GasFeeCache{
+	return &FeeManager{
 		client:     e.evmClient,
-		instance:   instance.(*gas_fee_cache.GasFeeCache),
+		instance:   instance.(*fee_manager.FeeManager),
 		EthAddress: *address,
 	}, err
 }
@@ -426,7 +426,7 @@ func (e *CCIPContractsDeployer) DeployGEOnRamp(
 
 func (e *CCIPContractsDeployer) DeployGEOffRamp(
 	sourceChainId, destChainId uint64,
-	commitStore, onRamp, afn, feetoken, destGasFeeCacheAddress common.Address,
+	commitStore, onRamp, afn, feetoken, destFeeManagerAddress common.Address,
 	sourceToken, pools []common.Address,
 	opts RateLimiterConfig, gasOverhead *big.Int) (
 	*GEOffRamp,
@@ -440,7 +440,7 @@ func (e *CCIPContractsDeployer) DeployGEOffRamp(
 			auth, backend, sourceChainId, destChainId,
 			evm_2_evm_ge_offramp.IEVM2EVMGEOffRampGEOffRampConfig{
 				GasOverhead:                             gasOverhead,
-				GasFeeCache:                             destGasFeeCacheAddress,
+				FeeManager:                              destFeeManagerAddress,
 				PermissionLessExecutionThresholdSeconds: 0,
 				ExecutionDelaySeconds:                   0,
 				MaxDataSize:                             1e12,

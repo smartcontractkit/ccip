@@ -34,7 +34,7 @@ contract CommitStoreRealAFNSetup is BaseTest {
 
 /// @notice #constructor
 contract CommitStore_constructor is BaseTest {
-  function testSuccess() public {
+  function testConstructorSuccess() public {
     address[] memory onRamps = new address[](3);
     onRamps[0] = ON_RAMP_ADDRESS;
     onRamps[1] = 0x2C44CDDdB6a900Fa2B585dd299E03D12Fa4293Bc;
@@ -54,7 +54,7 @@ contract CommitStore_constructor is BaseTest {
     assertEq(minSequenceNumbers[1], commitStore.getExpectedNextSequenceNumber(onRamps[1]));
     assertEq(minSequenceNumbers[2], commitStore.getExpectedNextSequenceNumber(onRamps[2]));
 
-    ICommitStore.CommitStoreConfig memory contractConfig = commitStore.getConfig();
+    ICommitStore.CommitStoreConfig memory contractConfig = commitStore.getCommitStoreConfig();
     assertEq(keccak256(abi.encode(config.minSeqNrByOnRamp)), keccak256(abi.encode(contractConfig.minSeqNrByOnRamp)));
     assertEq(config.onRamps, contractConfig.onRamps);
 
@@ -83,11 +83,11 @@ contract CommitStore_constructor is BaseTest {
   }
 }
 
-/// @notice #setConfig
-contract CommitStore_setConfig is CommitStoreSetup {
+/// @notice #setCommitStoreConfig
+contract CommitStore_setCommitStoreConfig is CommitStoreSetup {
   // Success
 
-  function testSuccess() public {
+  function testSetConfigSuccess() public {
     address[] memory onRamps = new address[](1);
     onRamps[0] = address(1);
     uint64[] memory minSeqNrByOnRamp = new uint64[](1);
@@ -102,7 +102,7 @@ contract CommitStore_setConfig is CommitStoreSetup {
     vm.expectEmit(false, false, false, false);
     emit CommitStoreConfigSet(newConfig);
 
-    s_commitStore.setConfig(newConfig);
+    s_commitStore.setCommitStoreConfig(newConfig);
 
     // Checks whether the new onramp is properly set to the given value
     assertEq(minSeqNrByOnRamp[0], s_commitStore.getExpectedNextSequenceNumber(onRamps[0]));
@@ -111,13 +111,18 @@ contract CommitStore_setConfig is CommitStoreSetup {
     assertEq(0, s_commitStore.getExpectedNextSequenceNumber(ON_RAMP_ADDRESS));
   }
 
+  function testChainIds() public {
+    assertEq(DEST_CHAIN_ID, s_commitStore.getChainId());
+    assertEq(SOURCE_CHAIN_ID, s_commitStore.getSourceChainId());
+  }
+
   // Reverts
 
   function testOnlyOwnerReverts() public {
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
     ICommitStore.CommitStoreConfig memory newConfig;
-    s_commitStore.setConfig(newConfig);
+    s_commitStore.setCommitStoreConfig(newConfig);
   }
 
   function testInvalidConfigurationLengthMismatchReverts() public {
@@ -129,7 +134,7 @@ contract CommitStore_setConfig is CommitStoreSetup {
     });
     vm.expectRevert(ICommitStore.InvalidConfiguration.selector);
 
-    s_commitStore.setConfig(newConfig);
+    s_commitStore.setCommitStoreConfig(newConfig);
   }
 
   function testInvalidConfigurationZeroRampsReverts() public {
@@ -141,7 +146,7 @@ contract CommitStore_setConfig is CommitStoreSetup {
     });
     vm.expectRevert(ICommitStore.InvalidConfiguration.selector);
 
-    s_commitStore.setConfig(newConfig);
+    s_commitStore.setCommitStoreConfig(newConfig);
   }
 }
 
@@ -164,7 +169,7 @@ contract CommitStore_report is CommitStoreSetup {
 
   // Success
 
-  function testSuccess() public {
+  function testReportSuccess() public {
     uint64 max1 = 931;
     uint64 max2 = 2;
     uint64 max3 = 15;

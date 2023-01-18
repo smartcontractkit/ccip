@@ -10,7 +10,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_offramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/gas_fee_cache"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ge_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/native_token_pool"
@@ -31,13 +31,14 @@ func setOffRampOnTokenPools(t *testing.T, destClient *EvmDeploymentConfig) {
 	}
 }
 
-func setGasFeeCachePrices(t *testing.T, client *EvmDeploymentConfig, destChainId uint64) {
-	gasFeeCache, err := gas_fee_cache.NewGasFeeCache(client.ChainConfig.GasFeeCache, client.Client)
+func setFeeManagerPrices(t *testing.T, client *EvmDeploymentConfig, destChainId uint64) {
+	feeManager, err := fee_manager.NewFeeManager(client.ChainConfig.FeeManager, client.Client)
 	require.NoError(t, err)
 
-	tx, err := gasFeeCache.UpdateFees(client.Owner, []gas_fee_cache.GEFeeUpdate{
+	tx, err := feeManager.UpdateFees(client.Owner, []fee_manager.GEFeeUpdate{
 		{
-			ChainId:        destChainId,
+			SourceFeeToken: client.ChainConfig.LinkToken,
+			DestChainId:    destChainId,
 			LinkPerUnitGas: big.NewInt(1e18),
 		},
 	})
@@ -72,13 +73,13 @@ func setOnRampOnCommitStore(t *testing.T, sourceClient *EvmDeploymentConfig, des
 	commitStore, err := commit_store.NewCommitStore(destClient.LaneConfig.CommitStore, destClient.Client)
 	require.NoError(t, err)
 
-	config, err := commitStore.GetConfig(&bind.CallOpts{})
+	config, err := commitStore.GetCommitStoreConfig(&bind.CallOpts{})
 	require.NoError(t, err)
 
 	config.OnRamps = append(config.OnRamps, sourceClient.LaneConfig.OnRamp)
 	config.MinSeqNrByOnRamp = append(config.MinSeqNrByOnRamp, 1)
 
-	tx, err := commitStore.SetConfig(destClient.Owner, config)
+	tx, err := commitStore.SetCommitStoreConfig(destClient.Owner, config)
 	require.NoError(t, err)
 	destClient.Logger.Infof(fmt.Sprintf("Adding new onRamp to commitStore in tx %s", helpers.ExplorerLink(int64(destClient.ChainConfig.ChainId), tx.Hash())))
 	shared.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
@@ -110,11 +111,11 @@ func setOffRampOnRouter(t *testing.T, client *EvmDeploymentConfig) {
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 }
 
-func setGasFeeCacheUpdater(t *testing.T, client *EvmDeploymentConfig) {
-	gasFeeCache, err := gas_fee_cache.NewGasFeeCache(client.ChainConfig.GasFeeCache, client.Client)
+func setFeeManagerUpdater(t *testing.T, client *EvmDeploymentConfig) {
+	feeManager, err := fee_manager.NewFeeManager(client.ChainConfig.FeeManager, client.Client)
 	require.NoError(t, err)
 
-	tx, err := gasFeeCache.SetFeeUpdater(client.Owner, client.LaneConfig.OffRamp)
+	tx, err := feeManager.SetFeeUpdater(client.Owner, client.LaneConfig.OffRamp)
 	require.NoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 }

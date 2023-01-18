@@ -29,7 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_onramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/gas_fee_cache"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ge_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/governance_dapp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
@@ -56,11 +56,11 @@ func (client *CCIPClient) wip(t *testing.T, sourceClient *rhea.EvmDeploymentConf
 
 func (client *CCIPClient) setOnRampFeeConfig(t *testing.T) {
 	tx, err := client.Source.OnRamp.SetFeeConfig(client.Source.Owner, evm_2_evm_ge_onramp.IEVM2EVMGEOnRampDynamicFeeConfig{
-		FeeToken:        client.Source.LinkTokenAddress,
+		LinkToken:       client.Source.LinkTokenAddress,
 		FeeAmount:       big.NewInt(100),
 		DestGasOverhead: big.NewInt(0),
 		Multiplier:      big.NewInt(1),
-		GasFeeCache:     client.Source.GasFeeCache.Address(),
+		FeeManager:      client.Source.FeeManager.Address(),
 		DestChainId:     client.Dest.ChainId,
 	})
 	require.NoError(t, err)
@@ -111,7 +111,7 @@ type Client struct {
 	GovernanceDapp   *governance_dapp.GovernanceDapp
 	PingPongDapp     *ping_pong_demo.PingPongDemo
 	Afn              *afn_contract.AFNContract
-	GasFeeCache      *gas_fee_cache.GasFeeCache
+	FeeManager       *fee_manager.FeeManager
 	Router           *ge_router.GERouter
 	logger           logger.Logger
 	t                *testing.T
@@ -156,7 +156,7 @@ func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient
 	require.NoError(t, err)
 	pingPongDapp, err := ping_pong_demo.NewPingPongDemo(config.LaneConfig.PingPongDapp, config.Client)
 	require.NoError(t, err)
-	gasFeeCache, err := gas_fee_cache.NewGasFeeCache(config.ChainConfig.GasFeeCache, config.Client)
+	feeManager, err := fee_manager.NewFeeManager(config.ChainConfig.FeeManager, config.Client)
 	require.NoError(t, err)
 
 	return SourceClient{
@@ -166,7 +166,7 @@ func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient
 			LinkTokenAddress: config.ChainConfig.LinkToken,
 			LinkToken:        LinkToken,
 			Afn:              afn,
-			GasFeeCache:      gasFeeCache,
+			FeeManager:       feeManager,
 			SupportedTokens:  supportedTokens,
 			GovernanceDapp:   governanceDapp,
 			PingPongDapp:     pingPongDapp,
@@ -218,7 +218,7 @@ func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestCli
 	require.NoError(t, err)
 	pingPongDapp, err := ping_pong_demo.NewPingPongDemo(config.LaneConfig.PingPongDapp, config.Client)
 	require.NoError(t, err)
-	gasFeeCache, err := gas_fee_cache.NewGasFeeCache(config.ChainConfig.GasFeeCache, config.Client)
+	feeManager, err := fee_manager.NewFeeManager(config.ChainConfig.FeeManager, config.Client)
 	require.NoError(t, err)
 
 	return DestClient{
@@ -231,7 +231,7 @@ func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestCli
 			GovernanceDapp:   governanceDapp,
 			PingPongDapp:     pingPongDapp,
 			Afn:              afn,
-			GasFeeCache:      gasFeeCache,
+			FeeManager:       feeManager,
 			logger:           config.Logger,
 			Router:           router,
 			t:                t,
@@ -698,7 +698,7 @@ func (client *CCIPClient) SetCommitStoreConfig(t *testing.T) {
 		OnRamps:          []common.Address{client.Source.OnRamp.Address()},
 		MinSeqNrByOnRamp: []uint64{3},
 	}
-	tx, err := client.Dest.CommitStore.SetConfig(client.Dest.Owner, config)
+	tx, err := client.Dest.CommitStore.SetCommitStoreConfig(client.Dest.Owner, config)
 	require.NoError(t, err)
 	shared.WaitForMined(t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 }

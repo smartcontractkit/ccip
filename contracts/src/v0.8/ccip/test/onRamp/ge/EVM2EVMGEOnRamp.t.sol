@@ -14,13 +14,13 @@ contract EVM2EVMGEOnRamp_constructor is EVM2EVMGEOnRampSetup {
 
     // baseOnRamp
     IBaseOnRamp.OnRampConfig memory onRampConfig = onRampConfig();
-    assertEq(onRampConfig.commitFeeJuels, s_onRamp.getConfig().commitFeeJuels);
-    assertEq(onRampConfig.maxDataSize, s_onRamp.getConfig().maxDataSize);
-    assertEq(onRampConfig.maxTokensLength, s_onRamp.getConfig().maxTokensLength);
-    assertEq(onRampConfig.maxGasLimit, s_onRamp.getConfig().maxGasLimit);
+    assertEq(onRampConfig.commitFeeJuels, s_onRamp.getOnRampConfig().commitFeeJuels);
+    assertEq(onRampConfig.maxDataSize, s_onRamp.getOnRampConfig().maxDataSize);
+    assertEq(onRampConfig.maxTokensLength, s_onRamp.getOnRampConfig().maxTokensLength);
+    assertEq(onRampConfig.maxGasLimit, s_onRamp.getOnRampConfig().maxGasLimit);
 
-    assertEq(SOURCE_CHAIN_ID, s_onRamp.i_chainId());
-    assertEq(DEST_CHAIN_ID, s_onRamp.i_destinationChainId());
+    assertEq(SOURCE_CHAIN_ID, s_onRamp.getChainId());
+    assertEq(DEST_CHAIN_ID, s_onRamp.getDestinationChainId());
 
     assertEq(address(s_sourceRouter), s_onRamp.getRouter());
     assertEq(1, s_onRamp.getExpectedNextSequenceNumber());
@@ -43,27 +43,30 @@ contract EVM2EVMGEOnRamp_forwardFromRouter is EVM2EVMGEOnRampSetup {
 
   // Success
 
-  function testSuccess() public {
+  function testForwardFromRouterSuccess() public {
     GEConsumer.EVM2AnyGEMessage memory message = _generateEmptyMessage();
 
-    vm.expectEmit(false, false, false, true);
-    emit CCIPSendRequested(_messageToEvent(message, 1, 1, 0));
+    uint256 feeAmount = 1234567890;
+    IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
 
-    s_onRamp.forwardFromRouter(message, 0, OWNER);
+    vm.expectEmit(false, false, false, true);
+    emit CCIPSendRequested(_messageToEvent(message, 1, 1, feeAmount));
+
+    s_onRamp.forwardFromRouter(message, feeAmount, OWNER);
   }
 
   function testShouldIncrementSeqNumSuccess() public {
     GEConsumer.EVM2AnyGEMessage memory message = _generateEmptyMessage();
 
     vm.expectEmit(false, false, false, true);
-    emit CCIPSendRequested(_messageToEvent(message, 1, 1, 50));
+    emit CCIPSendRequested(_messageToEvent(message, 1, 1, 0));
 
-    s_onRamp.forwardFromRouter(message, 50, OWNER);
+    s_onRamp.forwardFromRouter(message, 0, OWNER);
 
     vm.expectEmit(false, false, false, true);
-    emit CCIPSendRequested(_messageToEvent(message, 2, 2, 4e15));
+    emit CCIPSendRequested(_messageToEvent(message, 2, 2, 0));
 
-    s_onRamp.forwardFromRouter(message, 4e15, OWNER);
+    s_onRamp.forwardFromRouter(message, 0, OWNER);
 
     vm.expectEmit(false, false, false, true);
     emit CCIPSendRequested(_messageToEvent(message, 3, 3, 0));
@@ -108,7 +111,7 @@ contract EVM2EVMGEOnRamp_forwardFromRouter is EVM2EVMGEOnRampSetup {
   }
 
   function testTooManyTokensReverts() public {
-    assertEq(MAX_TOKENS_LENGTH, s_onRamp.getConfig().maxTokensLength);
+    assertEq(MAX_TOKENS_LENGTH, s_onRamp.getOnRampConfig().maxTokensLength);
     GEConsumer.EVM2AnyGEMessage memory message = _generateEmptyMessage();
     uint256 tooMany = MAX_TOKENS_LENGTH + 1;
     message.tokensAndAmounts = new Common.EVMTokenAndAmount[](tooMany);

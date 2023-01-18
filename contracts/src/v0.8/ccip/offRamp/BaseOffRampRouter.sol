@@ -5,13 +5,10 @@ import {IAny2EVMOffRampRouter} from "../interfaces/offRamp/IAny2EVMOffRampRouter
 import {IBaseOffRamp} from "../interfaces/offRamp/IBaseOffRamp.sol";
 import {IAny2EVMMessageReceiver} from "../interfaces/applications/IAny2EVMMessageReceiver.sol";
 
-import {Internal} from "../models/Internal.sol";
 import {Common} from "../models/Common.sol";
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
 
 abstract contract BaseOffRampRouter is IAny2EVMOffRampRouter, OwnerIsCreator {
-  using Internal for Internal.Any2EVMMessageFromSender;
-
   uint256 private constant GAS_FOR_CALL_EXACT_CHECK = 5_000;
 
   // Mapping from offRamp to allowed status
@@ -27,21 +24,18 @@ abstract contract BaseOffRampRouter is IAny2EVMOffRampRouter, OwnerIsCreator {
   }
 
   /// @inheritdoc IAny2EVMOffRampRouter
-  function routeMessage(Internal.Any2EVMMessageFromSender calldata message, bool manualExecution)
-    external
-    override
-    onlyOffRamp
-    returns (bool success)
-  {
-    // TODO: Maybe push this down into GEOffRamp? Do we really want/need to support multiple billing models
-    // calling the same receiver?
-    Common.Any2EVMMessage memory minMessage = message._toAny2EVMMessage();
-    bytes memory callData = abi.encodeWithSelector(IAny2EVMMessageReceiver.ccipReceive.selector, minMessage);
+  function routeMessage(
+    Common.Any2EVMMessage calldata message,
+    bool manualExecution,
+    uint256 gasLimit,
+    address receiver
+  ) external override onlyOffRamp returns (bool success) {
+    bytes memory callData = abi.encodeWithSelector(IAny2EVMMessageReceiver.ccipReceive.selector, message);
     if (!manualExecution) {
-      success = _callWithExactGas(message.gasLimit, message.receiver, 0, callData);
+      success = _callWithExactGas(gasLimit, receiver, 0, callData);
     } else {
       // solhint-disable-next-line avoid-low-level-calls
-      (success, ) = message.receiver.call(callData);
+      (success, ) = receiver.call(callData);
     }
   }
 

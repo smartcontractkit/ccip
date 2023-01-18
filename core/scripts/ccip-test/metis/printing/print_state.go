@@ -272,7 +272,7 @@ func printRampSanityCheck(chain *rhea.EvmDeploymentConfig, sourceOnRamp common.A
 	commitStore, err := commit_store.NewCommitStore(chain.LaneConfig.CommitStore, chain.Client)
 	helpers.PanicErr(err)
 
-	config, err := commitStore.GetConfig(&bind.CallOpts{})
+	config, err := commitStore.GetCommitStoreConfig(&bind.CallOpts{})
 	helpers.PanicErr(err)
 
 	rampSet := false

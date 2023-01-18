@@ -14,9 +14,9 @@ import {IERC20} from "../../vendor/IERC20.sol";
 
 contract BaseOnRamp is IBaseOnRamp, HealthChecker, AllowList, AggregateRateLimiter {
   // Chain ID of the source chain (where this contract is deployed)
-  uint64 public immutable i_chainId;
+  uint64 internal immutable i_chainId;
   // Chain ID of the destination chain (where this contract sends messages)
-  uint64 public immutable i_destinationChainId;
+  uint64 internal immutable i_destinationChainId;
 
   // The last used sequence number. This is zero in the case where no
   // messages has been sent yet. 0 is not a valid sequence number for any
@@ -68,32 +68,48 @@ contract BaseOnRamp is IBaseOnRamp, HealthChecker, AllowList, AggregateRateLimit
   }
 
   /// @inheritdoc IBaseOnRamp
-  function getExpectedNextSequenceNumber() external view returns (uint64) {
+  function getExpectedNextSequenceNumber() external view override returns (uint64) {
     return s_sequenceNumber + 1;
   }
 
   /// @inheritdoc IBaseOnRamp
-  function setRouter(address router) public onlyOwner {
+  function setRouter(address router) public override onlyOwner {
     s_router = router;
     emit RouterSet(router);
   }
 
   /// @inheritdoc IBaseOnRamp
-  function getRouter() external view returns (address router) {
+  function getRouter() external view override returns (address router) {
     return s_router;
   }
 
   /// @inheritdoc IBaseOnRamp
-  function setConfig(OnRampConfig calldata config) external onlyOwner {
+  function setOnRampConfig(OnRampConfig calldata config) external override onlyOwner {
     s_config = config;
     emit OnRampConfigSet(config);
   }
 
   /// @inheritdoc IBaseOnRamp
-  function getConfig() external view returns (OnRampConfig memory config) {
+  function getOnRampConfig() external view override returns (OnRampConfig memory config) {
     return s_config;
   }
 
+  /// @inheritdoc IBaseOnRamp
+  function getChainId() external view override returns (uint64) {
+    return i_chainId;
+  }
+
+  /// @inheritdoc IBaseOnRamp
+  function getDestinationChainId() external view override returns (uint64) {
+    return i_destinationChainId;
+  }
+
+  /**
+   * @notice Add a new token pool
+   * @param token The source token
+   * @param pool The pool that will be used
+   * @dev This method can only be called by the owner of the contract.
+   */
   function addPool(IERC20 token, IPool pool) public onlyOwner {
     if (address(token) == address(0) || address(pool) == address(0)) revert InvalidTokenPoolConfig();
     if (s_poolsBySourceToken[token].enabled) revert PoolAlreadyAdded();
@@ -104,6 +120,12 @@ contract BaseOnRamp is IBaseOnRamp, HealthChecker, AllowList, AggregateRateLimit
     emit PoolAdded(token, pool);
   }
 
+  /**
+   * @notice Remove a token pool
+   * @param token The source token
+   * @param pool The pool that will be removed
+   * @dev This method can only be called by the owner of the contract.
+   */
   function removePool(IERC20 token, IPool pool) public onlyOwner {
     PoolConfig memory oldConfig = s_poolsBySourceToken[token];
     // Check if the pool exists

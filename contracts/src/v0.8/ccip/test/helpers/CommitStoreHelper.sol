@@ -14,7 +14,7 @@ contract CommitStoreHelper is CommitStore {
   /**
    * @dev Expose _report for tests
    */
-  function report(bytes memory rp) external {
-    _report(bytes32(0), 0, rp);
+  function report(bytes memory commitReport) external {
+    _report(commitReport);
   }
 }

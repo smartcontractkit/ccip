@@ -8,7 +8,8 @@ import {Internal} from "./Internal.sol";
 // GE message type specific structs.
 library GE {
   struct FeeUpdate {
-    uint64 chainId;
+    address sourceFeeToken;
+    uint64 destChainId;
     uint128 linkPerUnitGas;
   }
 
@@ -39,6 +40,19 @@ library GE {
     Common.EVMTokenAndAmount[] tokensAndAmounts;
     address feeToken;
     bytes32 messageId;
+  }
+
+  function _toAny2EVMMessage(EVM2EVMGEMessage memory original, Common.EVMTokenAndAmount[] memory destTokensAndAmounts)
+    internal
+    pure
+    returns (Common.Any2EVMMessage memory message)
+  {
+    message = Common.Any2EVMMessage({
+      sourceChainId: original.sourceChainId,
+      sender: abi.encode(original.sender),
+      data: original.data,
+      destTokensAndAmounts: destTokensAndAmounts
+    });
   }
 
   bytes32 internal constant EVM_2_EVM_GE_MESSAGE_HASH = keccak256("EVM2EVMGEMessageEvent");

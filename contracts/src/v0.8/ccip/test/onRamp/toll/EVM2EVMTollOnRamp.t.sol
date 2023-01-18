@@ -14,13 +14,13 @@ contract EVM2EVMTollOnRamp_constructor is EVM2EVMTollOnRampSetup {
 
     // baseOnRamp
     IBaseOnRamp.OnRampConfig memory onRampConfig = onRampConfig();
-    assertEq(onRampConfig.commitFeeJuels, s_onRamp.getConfig().commitFeeJuels);
-    assertEq(onRampConfig.maxDataSize, s_onRamp.getConfig().maxDataSize);
-    assertEq(onRampConfig.maxTokensLength, s_onRamp.getConfig().maxTokensLength);
-    assertEq(onRampConfig.maxGasLimit, s_onRamp.getConfig().maxGasLimit);
+    assertEq(onRampConfig.commitFeeJuels, s_onRamp.getOnRampConfig().commitFeeJuels);
+    assertEq(onRampConfig.maxDataSize, s_onRamp.getOnRampConfig().maxDataSize);
+    assertEq(onRampConfig.maxTokensLength, s_onRamp.getOnRampConfig().maxTokensLength);
+    assertEq(onRampConfig.maxGasLimit, s_onRamp.getOnRampConfig().maxGasLimit);
 
-    assertEq(SOURCE_CHAIN_ID, s_onRamp.i_chainId());
-    assertEq(DEST_CHAIN_ID, s_onRamp.i_destinationChainId());
+    assertEq(SOURCE_CHAIN_ID, s_onRamp.getChainId());
+    assertEq(DEST_CHAIN_ID, s_onRamp.getDestinationChainId());
 
     assertEq(address(s_onRampRouter), s_onRamp.getRouter());
     assertEq(1, s_onRamp.getExpectedNextSequenceNumber());
@@ -110,7 +110,7 @@ contract EVM2EVMTollOnRamp_forwardFromRouter is EVM2EVMTollOnRampSetup {
   }
 
   function testTooManyTokensReverts() public {
-    assertEq(MAX_TOKENS_LENGTH, s_onRamp.getConfig().maxTokensLength);
+    assertEq(MAX_TOKENS_LENGTH, s_onRamp.getOnRampConfig().maxTokensLength);
     TollConsumer.EVM2AnyTollMessage memory message = _generateEmptyMessage();
     uint256 tooMany = MAX_TOKENS_LENGTH + 1;
     message.tokensAndAmounts = new Common.EVMTokenAndAmount[](tooMany);

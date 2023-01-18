@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {IGasFeeCache} from "../../../interfaces/gasFeeCache/IGasFeeCache.sol";
+import {IFeeManager} from "../../../interfaces/fees/IFeeManager.sol";
 import {IEVM2EVMGEOnRamp} from "../../../interfaces/onRamp/IEVM2EVMGEOnRamp.sol";
 
 import {EVM2EVMGEOnRamp} from "../../../onRamp/ge/EVM2EVMGEOnRamp.sol";
-import {GasFeeCache} from "../../../gasFeeCache/GasFeeCache.sol";
+import {FeeManager} from "../../../fees/FeeManager.sol";
 import {GERouter} from "../../../router/GERouter.sol";
-import {GESRouterSetup} from "../../router/GERouterSetup.t.sol";
+import {GERouterSetup} from "../../router/GERouterSetup.t.sol";
 import {GE} from "../../../models/GE.sol";
 import {GEConsumer} from "../../../models/GEConsumer.sol";
 import "../../../offRamp/ge/EVM2EVMGEOffRamp.sol";
 import "../../TokenSetup.t.sol";
 
-contract EVM2EVMGEOnRampSetup is TokenSetup, GESRouterSetup {
+contract EVM2EVMGEOnRampSetup is TokenSetup, GERouterSetup {
   // Duplicate event of the CCIPSendRequested in the IGEOnRamp
   event CCIPSendRequested(GE.EVM2EVMGEMessage message);
 
@@ -25,15 +25,18 @@ contract EVM2EVMGEOnRampSetup is TokenSetup, GESRouterSetup {
   address[] internal s_allowList;
 
   EVM2EVMGEOnRamp internal s_onRamp;
+  // Naming chosen to not collide with s_feeManager in the offRampSetup since both
+  // are imported into the e2e test.
+  IFeeManager internal s_IFeeManager;
 
-  function setUp() public virtual override(TokenSetup, GESRouterSetup) {
+  function setUp() public virtual override(TokenSetup, GERouterSetup) {
     TokenSetup.setUp();
-    GESRouterSetup.setUp();
+    GERouterSetup.setUp();
 
-    GE.FeeUpdate[] memory fees = new GE.FeeUpdate[](1);
-    fees[0] = GE.FeeUpdate({chainId: DEST_CHAIN_ID, linkPerUnitGas: 100});
+    GE.FeeUpdate[] memory feeUpdates = new GE.FeeUpdate[](1);
+    feeUpdates[0] = GE.FeeUpdate({sourceFeeToken: s_sourceTokens[0], destChainId: DEST_CHAIN_ID, linkPerUnitGas: 100});
     address[] memory feeUpdaters = new address[](0);
-    IGasFeeCache gasFeeCache = new GasFeeCache(fees, feeUpdaters, uint128(TWELVE_HOURS));
+    s_IFeeManager = new FeeManager(feeUpdates, feeUpdaters, uint128(TWELVE_HOURS));
 
     s_onRamp = new EVM2EVMGEOnRamp(
       SOURCE_CHAIN_ID,
@@ -46,7 +49,7 @@ contract EVM2EVMGEOnRampSetup is TokenSetup, GESRouterSetup {
       rateLimiterConfig(),
       TOKEN_LIMIT_ADMIN,
       s_sourceRouter,
-      gasFeeCacheConfig(address(gasFeeCache))
+      feeManagerConfig(address(s_IFeeManager))
     );
 
     s_metadataHash = keccak256(
@@ -115,18 +118,18 @@ contract EVM2EVMGEOnRampSetup is TokenSetup, GESRouterSetup {
     return messageEvent;
   }
 
-  function gasFeeCacheConfig(address gasFeeCacheAddress)
+  function feeManagerConfig(address feeManagerAddress)
     internal
     view
     returns (IEVM2EVMGEOnRamp.DynamicFeeConfig memory feeConfig)
   {
     return
       IEVM2EVMGEOnRamp.DynamicFeeConfig({
-        feeToken: s_sourceTokens[0],
+        linkToken: s_sourceTokens[0],
         feeAmount: 1,
         destGasOverhead: 1,
         multiplier: 108e16,
-        gasFeeCache: gasFeeCacheAddress,
+        feeManager: feeManagerAddress,
         destChainId: DEST_CHAIN_ID
       });
   }

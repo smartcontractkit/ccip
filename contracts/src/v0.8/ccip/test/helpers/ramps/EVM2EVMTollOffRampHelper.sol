@@ -31,7 +31,7 @@ contract EVM2EVMTollOffRampHelper is EVM2EVMTollOffRamp {
   {}
 
   function report(bytes memory executableMessages) external {
-    _report(bytes32(0), 0, executableMessages);
+    _report(executableMessages);
   }
 
   function execute(Toll.ExecutionReport memory rep, bool manualExecution) external {

@@ -20,18 +20,13 @@ contract EVM2EVMTollOffRampRouterSetup is BaseTest {
     s_router = new Any2EVMTollOffRampRouter(s_offRamps);
   }
 
-  function _generateMockMessage(address receiver) internal pure returns (Internal.Any2EVMMessageFromSender memory) {
-    Common.EVMTokenAndAmount[] memory tokensAndAmounts = new Common.EVMTokenAndAmount[](0);
-    address[] memory pools = new address[](0);
+  function _generateMockMessage() internal pure returns (Common.Any2EVMMessage memory) {
     return (
-      Internal.Any2EVMMessageFromSender({
+      Common.Any2EVMMessage({
         sourceChainId: SOURCE_CHAIN_ID,
         sender: abi.encode(STRANGER),
-        receiver: receiver,
         data: abi.encode(0),
-        destTokensAndAmounts: tokensAndAmounts,
-        destPools: pools,
-        gasLimit: GAS_LIMIT
+        destTokensAndAmounts: new Common.EVMTokenAndAmount[](0)
       })
     );
   }
@@ -74,39 +69,38 @@ contract EVM2EVMTollOffRampRouter_routeMessage is EVM2EVMTollOffRampRouterSetup 
   // Success
 
   function testSuccess() public {
-    Internal.Any2EVMMessageFromSender memory message = _generateMockMessage(address(s_receiver));
+    Common.Any2EVMMessage memory message = _generateMockMessage();
     changePrank(address(s_offRamps[0]));
     vm.expectEmit(false, false, false, true);
     emit MessageReceived();
 
-    s_router.routeMessage(message, false);
+    s_router.routeMessage(message, false, GAS_LIMIT, address(s_receiver));
   }
 
   function testMessageFailureReturnsFalseSuccess() public {
-    Internal.Any2EVMMessageFromSender memory message = _generateMockMessage(address(s_revertingReceiver));
+    Common.Any2EVMMessage memory message = _generateMockMessage();
     changePrank(address(s_offRamps[0]));
-    assertFalse(s_router.routeMessage(message, false));
+    assertFalse(s_router.routeMessage(message, false, GAS_LIMIT, address(s_revertingReceiver)));
   }
 
   function testNotEnoughMessageGasLimitReturnsFalseSuccess() public {
-    Internal.Any2EVMMessageFromSender memory message = _generateMockMessage(address(s_receiver));
-    message.gasLimit = 1;
+    Common.Any2EVMMessage memory message = _generateMockMessage();
     changePrank(address(s_offRamps[0]));
-    assertFalse(s_router.routeMessage(message, false));
+    assertFalse(s_router.routeMessage(message, false, 1, address(s_receiver)));
   }
 
   // Reverts
 
   function testMustCallFromOffRampReverts() public {
-    Internal.Any2EVMMessageFromSender memory message = _generateMockMessage(STRANGER);
+    Common.Any2EVMMessage memory message = _generateMockMessage();
     vm.expectRevert(abi.encodeWithSelector(IAny2EVMOffRampRouter.MustCallFromOffRamp.selector, IBaseOffRamp(OWNER)));
-    s_router.routeMessage(message, false);
+    s_router.routeMessage(message, false, GAS_LIMIT, STRANGER);
   }
 
   function testZeroAddressReceiverReverts() public {
-    Internal.Any2EVMMessageFromSender memory message = _generateMockMessage(address(0));
+    Common.Any2EVMMessage memory message = _generateMockMessage();
     changePrank(address(s_offRamps[0]));
     vm.expectRevert();
-    s_router.routeMessage(message, false);
+    s_router.routeMessage(message, false, GAS_LIMIT, address(0));
   }
 }

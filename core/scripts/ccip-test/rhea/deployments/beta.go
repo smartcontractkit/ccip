@@ -34,9 +34,9 @@ var Beta_Goerli = rhea.EVMChainConfig{
 			Price: big.NewInt(1),
 		},
 	},
-	Router:      gethcommon.HexToAddress("0x14d66e53299174b8ef117d33285e1c814ed652de"),
-	Afn:         gethcommon.HexToAddress("0xb1cc4adbbfa4216541d9ccc7ba2240d129986efb"),
-	GasFeeCache: gethcommon.HexToAddress("0x8aed531563568dde9ff437d86c65b637535a5da3"),
+	Router:     gethcommon.HexToAddress("0x14d66e53299174b8ef117d33285e1c814ed652de"),
+	Afn:        gethcommon.HexToAddress("0xb1cc4adbbfa4216541d9ccc7ba2240d129986efb"),
+	FeeManager: gethcommon.HexToAddress("0x8aed531563568dde9ff437d86c65b637535a5da3"),
 }
 
 var Beta_AvaxFuji = rhea.EVMChainConfig{
@@ -56,10 +56,10 @@ var Beta_AvaxFuji = rhea.EVMChainConfig{
 			Price: big.NewInt(1),
 		},
 	},
-	LinkToken:   gethcommon.HexToAddress("0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846"),
-	Router:      gethcommon.HexToAddress("0x9213967a47fc3f15a16a0b813208e8ccb63dbba6"),
-	Afn:         gethcommon.HexToAddress("0xb5fb34580ff11fd2ab6cb4b1182aa2cd589b9234"),
-	GasFeeCache: gethcommon.HexToAddress("0x6f5b9393032cb06dabb09d8b08b7b08e045413fa"),
+	LinkToken:  gethcommon.HexToAddress("0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846"),
+	Router:     gethcommon.HexToAddress("0x9213967a47fc3f15a16a0b813208e8ccb63dbba6"),
+	Afn:        gethcommon.HexToAddress("0xb5fb34580ff11fd2ab6cb4b1182aa2cd589b9234"),
+	FeeManager: gethcommon.HexToAddress("0x6f5b9393032cb06dabb09d8b08b7b08e045413fa"),
 }
 
 // Lanes
@@ -83,7 +83,7 @@ var Beta_GoerliToAvaxFuji = rhea.EvmDeploymentConfig{
 		DeployRamp:           false,
 		DeployRouter:         false,
 		DeployGovernanceDapp: false,
-		DeployGasFeeCache:    false,
+		DeployFeeManager:     false,
 		DeployPingPongDapp:   false,
 		DeployedAt:           8092017,
 	},
@@ -108,7 +108,7 @@ var Beta_AvaxFujiToGoerli = rhea.EvmDeploymentConfig{
 		DeployRamp:           false,
 		DeployRouter:         false,
 		DeployGovernanceDapp: false,
-		DeployGasFeeCache:    false,
+		DeployFeeManager:     false,
 		DeployPingPongDapp:   false,
 		DeployedAt:           16658457,
 	},
