@@ -8,8 +8,8 @@ import {Internal} from "./Internal.sol";
 // GE message type specific structs.
 library GE {
   struct FeeUpdate {
-    address token;
-    uint64 chainId;
+    address sourceFeeToken;
+    uint64 destChainId;
     uint128 linkPerUnitGas;
   }
 

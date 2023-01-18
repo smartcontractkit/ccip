@@ -30,7 +30,7 @@ contract FeeManager is IFeeManager, OwnerIsCreator {
     uint128 stalenessThreshold
   ) {
     for (uint256 i = 0; i < feeUpdates.length; ++i) {
-      _updateFee(feeUpdates[i].token, feeUpdates[i].chainId, feeUpdates[i].linkPerUnitGas, uint128(block.timestamp));
+      _updateFee(feeUpdates[i].sourceFeeToken, feeUpdates[i].destChainId, feeUpdates[i].linkPerUnitGas);
     }
 
     for (uint256 i = 0; i < feeUpdaters.length; ++i) {
@@ -52,10 +52,8 @@ contract FeeManager is IFeeManager, OwnerIsCreator {
 
   // @inheritdoc IFeeManager
   function updateFees(GE.FeeUpdate[] memory feeUpdates) external override requireUpdaterOrOwner {
-    uint128 timestamp = uint128(block.timestamp);
-
     for (uint256 i = 0; i < feeUpdates.length; ++i) {
-      _updateFee(feeUpdates[i].token, feeUpdates[i].chainId, feeUpdates[i].linkPerUnitGas, timestamp);
+      _updateFee(feeUpdates[i].sourceFeeToken, feeUpdates[i].destChainId, feeUpdates[i].linkPerUnitGas);
     }
   }
 
@@ -85,12 +83,10 @@ contract FeeManager is IFeeManager, OwnerIsCreator {
     IERC20(token).safeTransfer(to, amount);
   }
 
-  /////////////////////////////////////////////////////////////////////
-  // Plumbing
-  /////////////////////////////////////////////////////////////////////
-
   /**
    * @notice Set a new fee updater.
+   * @param feeUpdater The address of the feeUpdater that is now allowed
+   * to send fee updates.
    */
   function _setFeedUpdater(address feeUpdater) private {
     if (feeUpdater != address(0)) {
@@ -101,6 +97,8 @@ contract FeeManager is IFeeManager, OwnerIsCreator {
 
   /**
    * @notice Remove a fee updater.
+   * @param feeUpdater The address of the feeUpdater that is no longer allowed
+   * to send fee updates.
    */
   function _removeFeeUpdater(address feeUpdater) private {
     delete s_feeUpdaters[feeUpdater];
@@ -108,21 +106,22 @@ contract FeeManager is IFeeManager, OwnerIsCreator {
   }
 
   /**
-   * @notice Update the fee for a given token and destination chain.
+   * @notice Update the fee for a given fee token and destination chain.
+   * @param token The source chain token that is used for payments.
+   * @param destinationChainId The destination chain id.
+   * @param linkPerUnitGas The cost of destination chain gas in Link tokens.
    */
   function _updateFee(
     address token,
-    uint64 chainId,
-    uint128 linkPerUnitGas,
-    uint128 timestamp
+    uint64 destinationChainId,
+    uint128 linkPerUnitGas
   ) private {
     if (token == address(0)) revert NullAddressNotAllowed();
-
-    s_tokenPerUnitGasByDestChainId[token][chainId] = TimestampedFeeUpdate({
+    s_tokenPerUnitGasByDestChainId[token][destinationChainId] = TimestampedFeeUpdate({
       linkPerUnitGas: linkPerUnitGas,
-      timestamp: timestamp
+      timestamp: uint128(block.timestamp)
     });
-    emit GasFeeUpdated(token, chainId, linkPerUnitGas, timestamp);
+    emit GasFeeUpdated(token, destinationChainId, linkPerUnitGas, uint128(block.timestamp));
   }
 
   /**

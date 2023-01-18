@@ -544,8 +544,8 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	// Deploy and configure GE onramp
 	sourceFeeManagerAddress, _, _, err := fee_manager.DeployFeeManager(sourceUser, sourceChain, []fee_manager.GEFeeUpdate{
 		{
-			Token:          sourceLinkTokenAddress,
-			ChainId:        destChainID,
+			SourceFeeToken: sourceLinkTokenAddress,
+			DestChainId:    destChainID,
 			LinkPerUnitGas: big.NewInt(1e9), // 1 gwei
 		},
 	}, nil, big.NewInt(1e18))
@@ -658,8 +658,8 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 
 	// Deploy and configure ge offramp.
 	destFeeManagerAddress, _, _, err := fee_manager.DeployFeeManager(destUser, destChain, []fee_manager.GEFeeUpdate{{
-		Token:          destLinkTokenAddress,
-		ChainId:        sourceChainID,
+		SourceFeeToken: destLinkTokenAddress,
+		DestChainId:    sourceChainID,
 		LinkPerUnitGas: big.NewInt(200e9), // (2e20 juels/eth) * (1 gwei / gas) / (1 eth/1e18)
 	}}, nil, big.NewInt(1e18))
 	require.NoError(t, err)

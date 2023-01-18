@@ -15,7 +15,7 @@ contract FeeManagerSetup is TokenSetup {
   function setUp() public virtual override {
     TokenSetup.setUp();
     GE.FeeUpdate[] memory fees = new GE.FeeUpdate[](1);
-    fees[0] = GE.FeeUpdate({token: s_sourceTokens[0], chainId: DEST_CHAIN_ID, linkPerUnitGas: 100});
+    fees[0] = GE.FeeUpdate({sourceFeeToken: s_sourceTokens[0], destChainId: DEST_CHAIN_ID, linkPerUnitGas: 100});
     address[] memory feeUpdaters = new address[](0);
 
     s_feeManager = new FeeManager(fees, feeUpdaters, uint128(TWELVE_HOURS));

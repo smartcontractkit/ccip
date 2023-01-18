@@ -25,7 +25,6 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ge_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/native_token_pool"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/secrets"
-	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 )
 
 func panicErr(err error) {
@@ -48,11 +47,11 @@ func main() {
 
 		ec, ethErr := ethclient.Dial(ethUrl)
 		panicErr(ethErr)
-		errorString, contractAddress := getErrorForTx(ec, txHash, requester)
+		errorString, _ := getErrorForTx(ec, txHash, requester)
 		// Some nodes prepend "Reverted " and we also remove the 0x
 		trimmed := strings.TrimPrefix(errorString, "Reverted ")[2:]
 
-		contractABIs := getABIForContract(ec, contractAddress)
+		contractABIs := getAllABIs()
 
 		decodeErrorStringFromABI(trimmed, contractABIs)
 	} else {
@@ -107,29 +106,6 @@ func decodeErrorStringFromABI(errorString string, contractABIs []string) {
 	}
 
 	fmt.Printf("Cannot match error with contract ABI. Error code \"%v\"\n", "trimmed")
-}
-
-// getABIForContract. Since contracts interact with other contracts we return all ABIs we expect the given
-// contract to interact with
-func getABIForContract(client *ethclient.Client, contractAddress common.Address) []string {
-	contractType, _, err := ccip.TypeAndVersion(contractAddress, client)
-	panicErr(err)
-
-	always := []string{afn_contract.AFNContractABI, native_token_pool.NativeTokenPoolABI}
-
-	switch contractType {
-	// TOLL
-	case ccip.EVM2EVMTollOnRamp:
-		return append(always, evm_2_evm_toll_onramp.EVM2EVMTollOnRampABI)
-	case ccip.EVM2EVMTollOffRamp:
-		return append(always, evm_2_evm_toll_offramp.EVM2EVMTollOffRampABI, any_2_evm_toll_offramp_router.Any2EVMTollOffRampRouterABI, commit_store.CommitStoreABI)
-		// SHARED
-	case ccip.CommitStore:
-		return []string{commit_store.CommitStoreABI}
-	case ccip.EVM2EVMGEOffRamp:
-		return append(always, evm_2_evm_ge_offramp.EVM2EVMGEOffRampABI, ge_router.GERouterABI, commit_store.CommitStoreABI)
-	}
-	panic("Contract not found")
 }
 
 func getAllABIs() []string {

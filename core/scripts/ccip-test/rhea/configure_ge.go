@@ -37,8 +37,8 @@ func setFeeManagerPrices(t *testing.T, client *EvmDeploymentConfig, destChainId 
 
 	tx, err := feeManager.UpdateFees(client.Owner, []fee_manager.GEFeeUpdate{
 		{
-			Token:          client.ChainConfig.LinkToken,
-			ChainId:        destChainId,
+			SourceFeeToken: client.ChainConfig.LinkToken,
+			DestChainId:    destChainId,
 			LinkPerUnitGas: big.NewInt(1e18),
 		},
 	})

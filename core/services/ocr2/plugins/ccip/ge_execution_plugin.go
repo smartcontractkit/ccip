@@ -49,8 +49,8 @@ func DecodeGEExecutionReport(report types.Report) (*evm_2_evm_ge_offramp.GEExecu
 		TokenPerFeeCoinAddresses []common.Address `json:"tokenPerFeeCoinAddresses"`
 		TokenPerFeeCoin          []*big.Int       `json:"tokenPerFeeCoin"`
 		FeeUpdates               []struct {
-			Token          common.Address `json:"token"`
-			ChainId        uint64         `json:"chainId"`
+			SourceFeeToken common.Address `json:"sourceFeeToken"`
+			DestChainId    uint64         `json:"destChainId"`
 			LinkPerUnitGas *big.Int       `json:"linkPerUnitGas"`
 		} `json:"feeUpdates"`
 		EncodedMessages    [][]byte    `json:"encodedMessages"`
@@ -71,8 +71,8 @@ func DecodeGEExecutionReport(report types.Report) (*evm_2_evm_ge_offramp.GEExecu
 
 	for _, feeUpdate := range erStruct.FeeUpdates {
 		er.FeeUpdates = append(er.FeeUpdates, evm_2_evm_ge_offramp.GEFeeUpdate{
-			Token:          feeUpdate.Token,
-			ChainId:        feeUpdate.ChainId,
+			SourceFeeToken: feeUpdate.SourceFeeToken,
+			DestChainId:    feeUpdate.DestChainId,
 			LinkPerUnitGas: feeUpdate.LinkPerUnitGas,
 		})
 	}
@@ -287,8 +287,10 @@ func (r *GEExecutionReportingPlugin) generateFeeUpdate(token common.Address, sou
 	linkPerUnitGas := big.NewInt(0).Div(big.NewInt(0).Mul(sourceGasPrice, juelsPerFeeCoin), big.NewInt(1e18))
 	return []evm_2_evm_ge_offramp.GEFeeUpdate{
 		{
-			Token:   token,
-			ChainId: r.config.sourceChainID,
+			SourceFeeToken: token,
+			// Since this gas fee update will be sent to the destination chain, this plugins
+			// source chain will be the feeUpdaters destination chain.
+			DestChainId: r.config.sourceChainID,
 			// (juels/eth) * (wei / gas) / (1 eth / 1e18 wei) = juels/gas
 			// TODO: Think more about this offchain/onchain computation split
 			LinkPerUnitGas: linkPerUnitGas,
