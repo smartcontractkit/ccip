@@ -342,7 +342,7 @@ func (r *GEExecutionReportingPlugin) getExecutableSeqNrs(
 
 	// TODO don't build on every batch builder call but only change on changing configuration
 	srcToDst := make(map[common.Address]common.Address)
-	sourceTokens, err := r.config.offRamp.GetPoolTokens(nil)
+	sourceTokens, err := r.config.offRamp.GetSupportedTokens(nil)
 	if err != nil {
 		return nil, err
 	}

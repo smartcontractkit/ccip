@@ -1052,7 +1052,7 @@ func (client *CCIPClient) AcceptOwnership(t *testing.T) {
 
 type tokenPoolRegistry interface {
 	Address() common.Address
-	GetPoolTokens(opts *bind.CallOpts) ([]common.Address, error)
+	GetSupportedTokens(opts *bind.CallOpts) ([]common.Address, error)
 	GetPoolBySourceToken(opts *bind.CallOpts, token common.Address) (common.Address, error)
 	RemovePool(opts *bind.TransactOpts, token common.Address, pool common.Address) (*types.Transaction, error)
 	AddPool(opts *bind.TransactOpts, token common.Address, pool common.Address) (*types.Transaction, error)
@@ -1065,7 +1065,7 @@ type aggregateRateLimiter interface {
 }
 
 func syncPools(client *Client, registry tokenPoolRegistry, bridgeTokens map[rhea.Token]EVMBridgedToken, txOpts *bind.TransactOpts) []*types.Transaction {
-	registeredTokens, err := registry.GetPoolTokens(&bind.CallOpts{})
+	registeredTokens, err := registry.GetSupportedTokens(&bind.CallOpts{})
 	require.NoError(client.t, err)
 
 	pendingTxs := make([]*types.Transaction, 0)

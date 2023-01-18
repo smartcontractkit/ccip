@@ -33,7 +33,7 @@ contract EVM2EVMGEOnRamp is IEVM2EVMGEOnRamp, BaseOnRamp, TypeAndVersionInterfac
   constructor(
     uint64 chainId,
     uint64 destinationChainId,
-    IERC20[] memory tokens,
+    address[] memory tokens,
     IPool[] memory pools,
     address[] memory allowlist,
     IAFN afn,
@@ -79,6 +79,17 @@ contract EVM2EVMGEOnRamp is IEVM2EVMGEOnRamp, BaseOnRamp, TypeAndVersionInterfac
     returns (IPool)
   {
     return BaseOnRamp.getPoolBySourceToken(sourceToken);
+  }
+
+  /// @inheritdoc IEVM2AnyGEOnRamp
+  function getSupportedTokens()
+    public
+    view
+    virtual
+    override(BaseOnRamp, IEVM2AnyGEOnRamp)
+    returns (address[] memory tokens)
+  {
+    return BaseOnRamp.getSupportedTokens();
   }
 
   /// @inheritdoc IEVM2AnyGEOnRamp

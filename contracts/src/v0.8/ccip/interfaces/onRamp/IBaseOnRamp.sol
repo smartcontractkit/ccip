@@ -51,10 +51,10 @@ interface IBaseOnRamp is IAllowList {
   function getPoolBySourceToken(IERC20 sourceToken) external returns (IPool);
 
   /**
-   * @notice Get all configured source tokens
-   * @return Array of configured source tokens
+   * @notice Get all supported source tokens
+   * @return Array of supported source tokens
    */
-  function getPoolTokens() external view returns (IERC20[] memory);
+  function getSupportedTokens() external view returns (address[] memory);
 
   /**
    * @notice Gets the next sequence number to be used in the onRamp
