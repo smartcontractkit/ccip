@@ -73,13 +73,13 @@ func setOnRampOnCommitStore(t *testing.T, sourceClient *EvmDeploymentConfig, des
 	commitStore, err := commit_store.NewCommitStore(destClient.LaneConfig.CommitStore, destClient.Client)
 	require.NoError(t, err)
 
-	config, err := commitStore.GetConfig(&bind.CallOpts{})
+	config, err := commitStore.GetCommitStoreConfig(&bind.CallOpts{})
 	require.NoError(t, err)
 
 	config.OnRamps = append(config.OnRamps, sourceClient.LaneConfig.OnRamp)
 	config.MinSeqNrByOnRamp = append(config.MinSeqNrByOnRamp, 1)
 
-	tx, err := commitStore.SetConfig(destClient.Owner, config)
+	tx, err := commitStore.SetCommitStoreConfig(destClient.Owner, config)
 	require.NoError(t, err)
 	destClient.Logger.Infof(fmt.Sprintf("Adding new onRamp to commitStore in tx %s", helpers.ExplorerLink(int64(destClient.ChainConfig.ChainId), tx.Hash())))
 	shared.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)

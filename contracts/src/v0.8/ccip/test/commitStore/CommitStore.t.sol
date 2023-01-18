@@ -54,7 +54,7 @@ contract CommitStore_constructor is BaseTest {
     assertEq(minSequenceNumbers[1], commitStore.getExpectedNextSequenceNumber(onRamps[1]));
     assertEq(minSequenceNumbers[2], commitStore.getExpectedNextSequenceNumber(onRamps[2]));
 
-    ICommitStore.CommitStoreConfig memory contractConfig = commitStore.getConfig();
+    ICommitStore.CommitStoreConfig memory contractConfig = commitStore.getCommitStoreConfig();
     assertEq(keccak256(abi.encode(config.minSeqNrByOnRamp)), keccak256(abi.encode(contractConfig.minSeqNrByOnRamp)));
     assertEq(config.onRamps, contractConfig.onRamps);
 
@@ -83,8 +83,8 @@ contract CommitStore_constructor is BaseTest {
   }
 }
 
-/// @notice #setConfig
-contract CommitStore_setConfig is CommitStoreSetup {
+/// @notice #setCommitStoreConfig
+contract CommitStore_setCommitStoreConfig is CommitStoreSetup {
   // Success
 
   function testSetConfigSuccess() public {
@@ -102,7 +102,7 @@ contract CommitStore_setConfig is CommitStoreSetup {
     vm.expectEmit(false, false, false, false);
     emit CommitStoreConfigSet(newConfig);
 
-    s_commitStore.setConfig(newConfig);
+    s_commitStore.setCommitStoreConfig(newConfig);
 
     // Checks whether the new onramp is properly set to the given value
     assertEq(minSeqNrByOnRamp[0], s_commitStore.getExpectedNextSequenceNumber(onRamps[0]));
@@ -111,13 +111,18 @@ contract CommitStore_setConfig is CommitStoreSetup {
     assertEq(0, s_commitStore.getExpectedNextSequenceNumber(ON_RAMP_ADDRESS));
   }
 
+  function testChainIds() public {
+    assertEq(DEST_CHAIN_ID, s_commitStore.getChainId());
+    assertEq(SOURCE_CHAIN_ID, s_commitStore.getSourceChainId());
+  }
+
   // Reverts
 
   function testOnlyOwnerReverts() public {
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
     ICommitStore.CommitStoreConfig memory newConfig;
-    s_commitStore.setConfig(newConfig);
+    s_commitStore.setCommitStoreConfig(newConfig);
   }
 
   function testInvalidConfigurationLengthMismatchReverts() public {
@@ -129,7 +134,7 @@ contract CommitStore_setConfig is CommitStoreSetup {
     });
     vm.expectRevert(ICommitStore.InvalidConfiguration.selector);
 
-    s_commitStore.setConfig(newConfig);
+    s_commitStore.setCommitStoreConfig(newConfig);
   }
 
   function testInvalidConfigurationZeroRampsReverts() public {
@@ -141,7 +146,7 @@ contract CommitStore_setConfig is CommitStoreSetup {
     });
     vm.expectRevert(ICommitStore.InvalidConfiguration.selector);
 
-    s_commitStore.setConfig(newConfig);
+    s_commitStore.setCommitStoreConfig(newConfig);
   }
 }
 

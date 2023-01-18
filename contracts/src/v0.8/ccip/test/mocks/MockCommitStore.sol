@@ -5,17 +5,25 @@ import "../../interfaces/ICommitStore.sol";
 
 contract MockCommitStore is ICommitStore {
   /// @inheritdoc ICommitStore
-  function getConfig() external pure returns (CommitStoreConfig memory) {
+  function getCommitStoreConfig() external pure returns (CommitStoreConfig memory) {
     CommitStoreConfig memory config;
     return config;
   }
 
   /// @inheritdoc ICommitStore
-  function setConfig(CommitStoreConfig calldata config) external {}
+  function setCommitStoreConfig(CommitStoreConfig calldata config) external {}
 
   /// @inheritdoc ICommitStore
   function getExpectedNextSequenceNumber(address) external pure returns (uint64) {
     return 1;
+  }
+
+  function getChainId() external pure returns (uint256) {
+    return 1;
+  }
+
+  function getSourceChainId() external pure returns (uint256) {
+    return 2;
   }
 
   /// @inheritdoc ICommitStore

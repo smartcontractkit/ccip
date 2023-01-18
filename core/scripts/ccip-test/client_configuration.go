@@ -698,7 +698,7 @@ func (client *CCIPClient) SetCommitStoreConfig(t *testing.T) {
 		OnRamps:          []common.Address{client.Source.OnRamp.Address()},
 		MinSeqNrByOnRamp: []uint64{3},
 	}
-	tx, err := client.Dest.CommitStore.SetConfig(client.Dest.Owner, config)
+	tx, err := client.Dest.CommitStore.SetCommitStoreConfig(client.Dest.Owner, config)
 	require.NoError(t, err)
 	shared.WaitForMined(t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 }

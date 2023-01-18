@@ -22,7 +22,7 @@ interface ICommitStore {
    * @notice Gets the current configuration.
    * @return the currently configured CommitStoreConfig.
    */
-  function getConfig() external view returns (CommitStoreConfig memory);
+  function getCommitStoreConfig() external view returns (CommitStoreConfig memory);
 
   /**
    * @notice Sets the new CommitStoreConfig and updates the s_expectedNextMinByOnRamp
@@ -31,7 +31,7 @@ interface ICommitStore {
    *      will be unsupported afterwards.
    * @param config The new configuration.
    */
-  function setConfig(CommitStoreConfig calldata config) external;
+  function setCommitStoreConfig(CommitStoreConfig calldata config) external;
 
   /**
    * @notice Returns the next expected sequence number for a given onRamp.
@@ -105,4 +105,16 @@ interface ICommitStore {
    * @return whether the root is blessed or not.
    */
   function isBlessed(bytes32 root) external view returns (bool);
+
+  /**
+   * @notice Returns this chainId.
+   * @return this chainId.
+   */
+  function getChainId() external view returns (uint256);
+
+  /**
+   * @notice Returns the chainId of the source chain.
+   * @return the chainId of the source chain.
+   */
+  function getSourceChainId() external view returns (uint256);
 }

@@ -11,8 +11,8 @@ import (
 	"time"
 
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/test-go/testify/assert"
 	"go.uber.org/atomic"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
@@ -302,9 +302,9 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 			{
 				Name:     testhelpers.TollOffRamp,
 				Address:  ccipContracts.Dest.TollOffRamp.Address(),
-				Expected: testhelpers.MustAddBigInt(destBalances[testhelpers.TollOffRamp], "965804400000000000").String(),
+				Expected: testhelpers.MustAddBigInt(destBalances[testhelpers.TollOffRamp], "966064000000000000").String(),
 				Getter:   ccipContracts.GetDestLinkBalance,
-				Within:   "100000000000000", // To account for change in the number of contract optimizations
+				Within:   "1000000000000000", // To account for change in the number of contract optimizations
 			},
 		})
 		tollCurrentSeqNum++

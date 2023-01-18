@@ -278,13 +278,13 @@ func (c *CCIPContracts) EnableTollOnRamp() {
 	c.Source.Chain.Commit()
 
 	c.t.Log("Enabling toll onRamp on commitStore")
-	config, err := c.Dest.CommitStore.GetConfig(&bind.CallOpts{})
+	config, err := c.Dest.CommitStore.GetCommitStoreConfig(&bind.CallOpts{})
 	require.NoError(c.t, err)
 
 	config.OnRamps = append(config.OnRamps, c.Source.TollOnRamp.Address())
 	config.MinSeqNrByOnRamp = append(config.MinSeqNrByOnRamp, 1)
 
-	_, err = c.Dest.CommitStore.SetConfig(c.Dest.User, config)
+	_, err = c.Dest.CommitStore.SetCommitStoreConfig(c.Dest.User, config)
 	require.NoError(c.t, err)
 
 	c.Source.Chain.Commit()
