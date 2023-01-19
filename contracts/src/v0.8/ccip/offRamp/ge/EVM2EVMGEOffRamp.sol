@@ -66,17 +66,18 @@ contract EVM2EVMGEOffRamp is IEVM2EVMGEOffRamp, BaseOffRamp, TypeAndVersionInter
     i_feeToken = feeToken;
   }
 
-  function manuallyExecute(GE.ExecutionReport memory report) external {
+  /// @inheritdoc IEVM2EVMGEOffRamp
+  function manuallyExecute(GE.ExecutionReport memory report) external override {
     _execute(report, true);
   }
 
   /// @inheritdoc IEVM2EVMGEOffRamp
-  function getSenderNonce(address sender) public view returns (uint64 nonce) {
+  function getSenderNonce(address sender) public view override returns (uint64 nonce) {
     return s_senderNonce[sender];
   }
 
   /// @inheritdoc IEVM2EVMGEOffRamp
-  function getNopBalance(address nop) public view returns (uint256 balance) {
+  function getNopBalance(address nop) public view override returns (uint256 balance) {
     return s_nopBalance[nop];
   }
 
@@ -255,12 +256,12 @@ contract EVM2EVMGEOffRamp is IEVM2EVMGEOffRamp, BaseOffRamp, TypeAndVersionInter
   }
 
   /// @inheritdoc IEVM2EVMGEOffRamp
-  function getGEConfig() external view returns (GEOffRampConfig memory) {
+  function getGEConfig() external view override returns (GEOffRampConfig memory) {
     return s_config;
   }
 
   /// @inheritdoc IEVM2EVMGEOffRamp
-  function setGEConfig(GEOffRampConfig memory config) external onlyOwner {
+  function setGEConfig(GEOffRampConfig memory config) external override onlyOwner {
     s_config = config;
 
     emit GEOffRampConfigChanged(config);

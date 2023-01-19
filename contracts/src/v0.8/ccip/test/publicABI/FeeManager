@@ -1,0 +1,11 @@
+{
+  "acceptOwnership()": "79ba5097",
+  "getFee(address,uint64)": "8e160ef4",
+  "getStalenessThreshold()": "a6c94a73",
+  "owner()": "8da5cb5b",
+  "removeFeeUpdater(address)": "ae7fca18",
+  "setFeeUpdater(address)": "604782e6",
+  "transferOwnership(address)": "f2fde38b",
+  "updateFees((address,uint64,uint128)[])": "9086658e",
+  "withdrawToken(address,address,uint256)": "01e33667"
+}

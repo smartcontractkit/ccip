@@ -26,7 +26,7 @@ contract EVM2EVMGEOnRamp is IEVM2EVMGEOnRamp, BaseOnRamp, TypeAndVersionInterfac
 
   bytes32 internal immutable i_metadataHash;
 
-  mapping(address => uint64) internal s_nonceBySender;
+  mapping(address => uint64) internal s_senderNonce;
   DynamicFeeConfig internal s_feeConfig;
   address internal s_feeAdmin;
 
@@ -121,7 +121,7 @@ contract EVM2EVMGEOnRamp is IEVM2EVMGEOnRamp, BaseOnRamp, TypeAndVersionInterfac
       sequenceNumber: ++s_sequenceNumber,
       feeTokenAmount: feeTokenAmount,
       sender: originalSender,
-      nonce: ++s_nonceBySender[originalSender],
+      nonce: ++s_senderNonce[originalSender],
       gasLimit: extraArgs.gasLimit,
       strict: extraArgs.strict,
       receiver: abi.decode(message.receiver, (address)),
@@ -136,7 +136,7 @@ contract EVM2EVMGEOnRamp is IEVM2EVMGEOnRamp, BaseOnRamp, TypeAndVersionInterfac
   }
 
   /// @inheritdoc IEVM2AnyGEOnRamp
-  function getFee(GEConsumer.EVM2AnyGEMessage calldata message) public view returns (uint256 fee) {
+  function getFee(GEConsumer.EVM2AnyGEMessage calldata message) public view override returns (uint256 fee) {
     uint256 gasLimit = _fromBytes(message.extraArgs).gasLimit;
     uint256 linkPerUnitGas = IFeeManager(s_feeConfig.feeManager).getFee(message.feeToken, s_feeConfig.destChainId);
     if (linkPerUnitGas == 0) revert IFeeManager.TokenOrChainNotSupported(message.feeToken, s_feeConfig.destChainId);
@@ -147,14 +147,19 @@ contract EVM2EVMGEOnRamp is IEVM2EVMGEOnRamp, BaseOnRamp, TypeAndVersionInterfac
       1 ether; // latest gas reported gas fee with a safety margin
   }
 
+  /// @inheritdoc IEVM2AnyGEOnRamp
+  function getSenderNonce(address sender) external view override returns (uint64) {
+    return s_senderNonce[sender];
+  }
+
   /// @inheritdoc IEVM2EVMGEOnRamp
-  function setFeeAdmin(address feeAdmin) external onlyOwner {
+  function setFeeAdmin(address feeAdmin) external override onlyOwner {
     s_feeAdmin = feeAdmin;
     emit FeeAdminSet(feeAdmin);
   }
 
   /// @inheritdoc IEVM2EVMGEOnRamp
-  function setFeeConfig(DynamicFeeConfig calldata feeConfig) external onlyOwner {
+  function setFeeConfig(DynamicFeeConfig calldata feeConfig) external override onlyOwner {
     s_feeConfig = feeConfig;
     emit FeeConfigSet(feeConfig);
   }

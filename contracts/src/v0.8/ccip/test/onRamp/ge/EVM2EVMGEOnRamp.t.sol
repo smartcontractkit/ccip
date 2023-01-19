@@ -57,23 +57,20 @@ contract EVM2EVMGEOnRamp_forwardFromRouter is EVM2EVMGEOnRampSetup {
     s_onRamp.forwardFromRouter(message, feeAmount, OWNER);
   }
 
-  function testShouldIncrementSeqNumSuccess() public {
+  function testShouldIncrementSeqNumAndNonceSuccess() public {
     GEConsumer.EVM2AnyGEMessage memory message = _generateEmptyMessage();
 
-    vm.expectEmit(false, false, false, true);
-    emit CCIPSendRequested(_messageToEvent(message, 1, 1, 0));
+    for (uint64 i = 1; i < 4; i++) {
+      uint64 nonceBefore = s_onRamp.getSenderNonce(OWNER);
 
-    s_onRamp.forwardFromRouter(message, 0, OWNER);
+      vm.expectEmit(false, false, false, true);
+      emit CCIPSendRequested(_messageToEvent(message, i, i, 0));
 
-    vm.expectEmit(false, false, false, true);
-    emit CCIPSendRequested(_messageToEvent(message, 2, 2, 0));
+      s_onRamp.forwardFromRouter(message, 0, OWNER);
 
-    s_onRamp.forwardFromRouter(message, 0, OWNER);
-
-    vm.expectEmit(false, false, false, true);
-    emit CCIPSendRequested(_messageToEvent(message, 3, 3, 0));
-
-    s_onRamp.forwardFromRouter(message, 0, OWNER);
+      uint64 nonceAfter = s_onRamp.getSenderNonce(OWNER);
+      assertEq(nonceAfter, nonceBefore + 1);
+    }
   }
 
   // Reverts
