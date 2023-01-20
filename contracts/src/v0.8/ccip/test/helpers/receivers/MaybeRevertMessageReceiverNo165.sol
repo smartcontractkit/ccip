@@ -1,9 +1,8 @@
 pragma solidity 0.8.15;
 
-import "../../../../vendor/IERC165.sol";
 import "../../../interfaces/applications/IAny2EVMMessageReceiver.sol";
 
-contract MaybeRevertMessageReceiver is IAny2EVMMessageReceiver, IERC165 {
+contract MaybeRevertMessageReceiverNo165 is IAny2EVMMessageReceiver {
   address private s_manager;
   bool public s_toRevert;
   event MessageReceived();
@@ -15,15 +14,6 @@ contract MaybeRevertMessageReceiver is IAny2EVMMessageReceiver, IERC165 {
 
   function setRevert(bool toRevert) external {
     s_toRevert = toRevert;
-  }
-
-  /**
-   * @notice IERC165 supports an interfaceId
-   * @param interfaceId The interfaceId to check
-   * @return true if the interfaceId is supported
-   */
-  function supportsInterface(bytes4 interfaceId) public pure override returns (bool) {
-    return interfaceId == type(IAny2EVMMessageReceiver).interfaceId || interfaceId == type(IERC165).interfaceId;
   }
 
   function ccipReceive(Common.Any2EVMMessage calldata) external override {

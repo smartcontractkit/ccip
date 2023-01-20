@@ -2,14 +2,24 @@
 pragma solidity 0.8.15;
 
 import "../../../interfaces/applications/IAny2EVMMessageReceiver.sol";
+import "../../../../vendor/IERC165.sol";
 
-contract SimpleMessageReceiver is IAny2EVMMessageReceiver {
+contract SimpleMessageReceiver is IAny2EVMMessageReceiver, IERC165 {
   event MessageReceived();
 
   address private immutable i_manager;
 
   constructor() {
     i_manager = msg.sender;
+  }
+
+  /**
+   * @notice IERC165 supports an interfaceId
+   * @param interfaceId The interfaceId to check
+   * @return true if the interfaceId is supported
+   */
+  function supportsInterface(bytes4 interfaceId) public pure override returns (bool) {
+    return interfaceId == type(IAny2EVMMessageReceiver).interfaceId || interfaceId == type(IERC165).interfaceId;
   }
 
   function ccipReceive(Common.Any2EVMMessage calldata) external override {

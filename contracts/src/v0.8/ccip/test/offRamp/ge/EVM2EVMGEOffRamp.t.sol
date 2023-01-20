@@ -5,6 +5,8 @@ import "../../helpers/receivers/MaybeRevertMessageReceiver.sol";
 import "../../../health/HealthChecker.sol";
 import "./EVM2EVMGEOffRampSetup.t.sol";
 import "../../../router/GERouter.sol";
+import "../../helpers/receivers/ConformingReceiver.sol";
+import "../../helpers/receivers/MaybeRevertMessageReceiverNo165.sol";
 
 /// @notice #constructor
 contract EVM2EVMGEOffRamp_constructor is EVM2EVMGEOffRampSetup {
@@ -160,18 +162,18 @@ contract EVM2EVMGEOffRamp_execute is EVM2EVMGEOffRampSetup {
     s_offRamp.execute(_generateReportFromMessages(messages), false);
   }
 
-  // Asserts that a message execution fails, but it does
-  // not disrupt the overall execution of the batch
-  function testSingleMessageFailureSuccess() public {
+  // Send a message to a contract that does not implement the CCIPReceiver interface
+  // This should execute successfully.
+  function testSingleMessageToNonCCIPReceiverSuccess() public {
     GE.EVM2EVMGEMessage[] memory messages = _generateBasicMessages();
-    MaybeRevertMessageReceiver newReceiver = new MaybeRevertMessageReceiver(true);
+    MaybeRevertMessageReceiverNo165 newReceiver = new MaybeRevertMessageReceiverNo165(true);
     messages[0].receiver = address(newReceiver);
 
     vm.expectEmit(false, false, false, true);
     emit ExecutionStateChanged(
       messages[0].sequenceNumber,
       messages[0].messageId,
-      Internal.MessageExecutionState.FAILURE
+      Internal.MessageExecutionState.SUCCESS
     );
 
     s_offRamp.execute(_generateReportFromMessages(messages), false);
@@ -352,6 +354,7 @@ contract EVM2EVMGEOffRamp_executeSingleMessage is EVM2EVMGEOffRampSetup {
   function testLowGasLimitManualExecutionSuccess() public {
     GE.EVM2EVMGEMessage memory message = _generateAny2EVMGEMessageNoTokens(1);
     message.gasLimit = 1;
+    message.receiver = address(new ConformingReceiver(address(s_router), s_destFeeToken));
     vm.expectRevert(IBaseOffRamp.ReceiverError.selector);
     s_offRamp.executeSingleMessage(message, false);
     vm.expectEmit(false, false, false, false);

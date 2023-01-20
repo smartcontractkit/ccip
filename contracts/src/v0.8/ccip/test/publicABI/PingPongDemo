@@ -13,5 +13,6 @@
   "setCounterpartChainId(uint64)": "14634776",
   "setPaused(bool)": "16c38b3c",
   "startPingPong()": "2874d8bf",
+  "supportsInterface(bytes4)": "01ffc9a7",
   "transferOwnership(address)": "f2fde38b"
 }

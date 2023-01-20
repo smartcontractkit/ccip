@@ -5,10 +5,16 @@ set -e
 lcov --remove $1 -o $2 \
   '*/ccip/test/*' \
   'src/v0.8/ccip/ocr/OCR2Abstract.sol' \
+  'src/v0.8/ccip/applications/TollSenderDapp.sol' \
+  'src/v0.8/ccip/models/Toll.sol' \
+  'src/v0.8/ccip/models/TollConsumer.sol' \
+  'src/v0.8/ccip/offRamp/toll/*' \
+  'src/v0.8/ccip/onRamp/toll/*' \
   'src/v0.8/ConfirmedOwnerWithProposal.sol' \
   'src/v0.8/tests/MockV3Aggregator.sol' \
   'src/v0.8/vendor/Address.sol' \
   'src/v0.8/vendor/Context.sol' \
   'src/v0.8/vendor/ERC20.sol' \
   'src/v0.8/vendor/Pausable.sol' \
-  'src/v0.8/vendor/SafeERC20.sol'
+  'src/v0.8/vendor/SafeERC20.sol' \
+  'src/v0.8/vendor/ERC165Checker.sol' \

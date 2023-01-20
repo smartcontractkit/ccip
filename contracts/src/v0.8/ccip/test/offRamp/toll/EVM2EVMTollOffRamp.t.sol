@@ -5,6 +5,7 @@ import "./EVM2EVMTollOffRampSetup.t.sol";
 import "../../../offRamp/toll/Any2EVMTollOffRampRouter.sol";
 import "../../helpers/receivers/MaybeRevertMessageReceiver.sol";
 import "../../../health/HealthChecker.sol";
+import "../../helpers/receivers/MaybeRevertMessageReceiverNo165.sol";
 
 /// @notice #constructor
 contract EVM2EVMTollOffRamp_constructor is EVM2EVMTollOffRampSetup {
@@ -113,20 +114,17 @@ contract EVM2EVMTollOffRamp_execute is EVM2EVMTollOffRampSetup {
     assertEq(0, s_offRamp.feeTaken(messages[0].sequenceNumber));
   }
 
-  // Asserts that a message execution fails, but it does
-  // not disrupt the overall execution of the batch
-  function testSingleMessageFailureSuccess() public {
+  // Send a message to a contract that does not implement the CCIPReceiver interface
+  // This should execute successfully.
+  function testSingleMessageToNonCCIPReceiverSuccess() public {
     Toll.EVM2EVMTollMessage[] memory messages = _generateBasicMessages();
-    MaybeRevertMessageReceiver newReceiver = new MaybeRevertMessageReceiver(true);
+    MaybeRevertMessageReceiverNo165 newReceiver = new MaybeRevertMessageReceiverNo165(true);
     messages[0].receiver = address(newReceiver);
 
     vm.expectEmit(false, false, false, true);
-    emit ExecutionStateChanged(messages[0].sequenceNumber, Internal.MessageExecutionState.FAILURE);
+    emit ExecutionStateChanged(messages[0].sequenceNumber, Internal.MessageExecutionState.SUCCESS);
 
     s_offRamp.execute(_generateReportFromMessages(messages), false);
-
-    // Assert fee taken on failure.
-    assertGt(s_offRamp.feeTaken(messages[0].sequenceNumber), 0);
   }
 
   function testTwoMessagesWithTokensSuccess() public {

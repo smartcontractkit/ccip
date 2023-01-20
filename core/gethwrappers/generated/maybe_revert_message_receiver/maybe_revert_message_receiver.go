@@ -42,8 +42,8 @@ type CommonEVMTokenAndAmount struct {
 }
 
 var MaybeRevertMessageReceiverMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"toRevert\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"MessageReceived\",\"type\":\"event\"},{\"inputs\":[{\"components\":[{\"internalType\":\"uint64\",\"name\":\"sourceChainId\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"sender\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"},{\"components\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"internalType\":\"structCommon.EVMTokenAndAmount[]\",\"name\":\"destTokensAndAmounts\",\"type\":\"tuple[]\"}],\"internalType\":\"structCommon.Any2EVMMessage\",\"name\":\"\",\"type\":\"tuple\"}],\"name\":\"ccipReceive\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"s_toRevert\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"toRevert\",\"type\":\"bool\"}],\"name\":\"setRevert\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
-	Bin: "0x608060405234801561001057600080fd5b5060405161024638038061024683398101604081905261002f9161005d565b600080546001600160a81b0319163360ff60a01b191617600160a01b92151592909202919091179055610086565b60006020828403121561006f57600080fd5b8151801515811461007f57600080fd5b9392505050565b6101b1806100956000396000f3fe608060405234801561001057600080fd5b50600436106100415760003560e01c80633015b91c146100465780635100fc211461005b5780638fb5f17114610094575b600080fd5b610059610054366004610140565b6100ec565b005b6000546100809074010000000000000000000000000000000000000000900460ff1681565b604051901515815260200160405180910390f35b6100596100a2366004610182565b6000805491151574010000000000000000000000000000000000000000027fffffffffffffffffffffff00ffffffffffffffffffffffffffffffffffffffff909216919091179055565b60005474010000000000000000000000000000000000000000900460ff161561011457600080fd5b6040517fd82ce31e3523f6eeb2d24317b2b4133001e8472729657f663b68624c45f8f3e890600090a150565b60006020828403121561015257600080fd5b813567ffffffffffffffff81111561016957600080fd5b82016080818503121561017b57600080fd5b9392505050565b60006020828403121561019457600080fd5b8135801515811461017b57600080fdfea164736f6c634300080f000a",
+	ABI: "[{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"toRevert\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"MessageReceived\",\"type\":\"event\"},{\"inputs\":[{\"components\":[{\"internalType\":\"uint64\",\"name\":\"sourceChainId\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"sender\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"},{\"components\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"internalType\":\"structCommon.EVMTokenAndAmount[]\",\"name\":\"destTokensAndAmounts\",\"type\":\"tuple[]\"}],\"internalType\":\"structCommon.Any2EVMMessage\",\"name\":\"\",\"type\":\"tuple\"}],\"name\":\"ccipReceive\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"s_toRevert\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"toRevert\",\"type\":\"bool\"}],\"name\":\"setRevert\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"interfaceId\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"pure\",\"type\":\"function\"}]",
+	Bin: "0x608060405234801561001057600080fd5b5060405161033f38038061033f83398101604081905261002f9161005d565b600080546001600160a81b0319163360ff60a01b191617600160a01b92151592909202919091179055610086565b60006020828403121561006f57600080fd5b8151801515811461007f57600080fd5b9392505050565b6102aa806100956000396000f3fe608060405234801561001057600080fd5b506004361061004c5760003560e01c806301ffc9a7146100515780633015b91c146100785780635100fc211461008d5780638fb5f171146100b2575b600080fd5b61006461005f3660046101f7565b61010a565b604051901515815260200160405180910390f35b61008b610086366004610240565b6101a3565b005b6000546100649074010000000000000000000000000000000000000000900460ff1681565b61008b6100c036600461027b565b6000805491151574010000000000000000000000000000000000000000027fffffffffffffffffffffff00ffffffffffffffffffffffffffffffffffffffff909216919091179055565b60007fffffffff0000000000000000000000000000000000000000000000000000000082167f3015b91c00000000000000000000000000000000000000000000000000000000148061019d57507fffffffff0000000000000000000000000000000000000000000000000000000082167f01ffc9a700000000000000000000000000000000000000000000000000000000145b92915050565b60005474010000000000000000000000000000000000000000900460ff16156101cb57600080fd5b6040517fd82ce31e3523f6eeb2d24317b2b4133001e8472729657f663b68624c45f8f3e890600090a150565b60006020828403121561020957600080fd5b81357fffffffff000000000000000000000000000000000000000000000000000000008116811461023957600080fd5b9392505050565b60006020828403121561025257600080fd5b813567ffffffffffffffff81111561026957600080fd5b82016080818503121561023957600080fd5b60006020828403121561028d57600080fd5b8135801515811461023957600080fdfea164736f6c634300080f000a",
 }
 
 var MaybeRevertMessageReceiverABI = MaybeRevertMessageReceiverMetaData.ABI
@@ -202,6 +202,28 @@ func (_MaybeRevertMessageReceiver *MaybeRevertMessageReceiverSession) SToRevert(
 
 func (_MaybeRevertMessageReceiver *MaybeRevertMessageReceiverCallerSession) SToRevert() (bool, error) {
 	return _MaybeRevertMessageReceiver.Contract.SToRevert(&_MaybeRevertMessageReceiver.CallOpts)
+}
+
+func (_MaybeRevertMessageReceiver *MaybeRevertMessageReceiverCaller) SupportsInterface(opts *bind.CallOpts, interfaceId [4]byte) (bool, error) {
+	var out []interface{}
+	err := _MaybeRevertMessageReceiver.contract.Call(opts, &out, "supportsInterface", interfaceId)
+
+	if err != nil {
+		return *new(bool), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
+
+	return out0, err
+
+}
+
+func (_MaybeRevertMessageReceiver *MaybeRevertMessageReceiverSession) SupportsInterface(interfaceId [4]byte) (bool, error) {
+	return _MaybeRevertMessageReceiver.Contract.SupportsInterface(&_MaybeRevertMessageReceiver.CallOpts, interfaceId)
+}
+
+func (_MaybeRevertMessageReceiver *MaybeRevertMessageReceiverCallerSession) SupportsInterface(interfaceId [4]byte) (bool, error) {
+	return _MaybeRevertMessageReceiver.Contract.SupportsInterface(&_MaybeRevertMessageReceiver.CallOpts, interfaceId)
 }
 
 func (_MaybeRevertMessageReceiver *MaybeRevertMessageReceiverTransactor) CcipReceive(opts *bind.TransactOpts, arg0 CommonAny2EVMMessage) (*types.Transaction, error) {
@@ -364,6 +386,8 @@ func (_MaybeRevertMessageReceiver *MaybeRevertMessageReceiver) Address() common.
 
 type MaybeRevertMessageReceiverInterface interface {
 	SToRevert(opts *bind.CallOpts) (bool, error)
+
+	SupportsInterface(opts *bind.CallOpts, interfaceId [4]byte) (bool, error)
 
 	CcipReceive(opts *bind.TransactOpts, arg0 CommonAny2EVMMessage) (*types.Transaction, error)
 

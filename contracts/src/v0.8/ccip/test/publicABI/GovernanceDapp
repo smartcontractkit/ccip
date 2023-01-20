@@ -7,6 +7,7 @@
   "getFeeToken()": "ca709a25",
   "getRouter()": "b0f479a1",
   "owner()": "8da5cb5b",
+  "supportsInterface(bytes4)": "01ffc9a7",
   "transferOwnership(address)": "f2fde38b",
   "typeAndVersion()": "181f5a77",
   "voteForNewFeeConfig((uint256,uint256))": "8157c96c"

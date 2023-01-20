@@ -7,6 +7,7 @@ import {ICommitStore} from "../../interfaces/ICommitStore.sol";
 import {IAFN} from "../../interfaces/health/IAFN.sol";
 import {IPool} from "../../interfaces/pools/IPool.sol";
 import {IEVM2EVMGEOffRamp} from "../../interfaces/offRamp/IEVM2EVMGEOffRamp.sol";
+import {IAny2EVMMessageReceiver} from "../../interfaces/applications/IAny2EVMMessageReceiver.sol";
 
 import {GE} from "../../models/GE.sol";
 import {Common} from "../../models/Common.sol";
@@ -17,6 +18,7 @@ import {BaseOffRamp} from "../BaseOffRamp.sol";
 
 import {IERC20} from "../../../vendor/IERC20.sol";
 import {Address} from "../../../vendor/Address.sol";
+import {ERC165Checker} from "../../../vendor/ERC165Checker.sol";
 
 /**
  * @notice EVM2EVMGEOffRamp enables OCR networks to execute multiple messages
@@ -24,6 +26,8 @@ import {Address} from "../../../vendor/Address.sol";
  */
 contract EVM2EVMGEOffRamp is IEVM2EVMGEOffRamp, BaseOffRamp, TypeAndVersionInterface, OCR2Base {
   using Address for address;
+  using ERC165Checker for address;
+
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "EVM2EVMGEOffRamp 1.0.0";
 
@@ -114,7 +118,9 @@ contract EVM2EVMGEOffRamp is IEVM2EVMGEOffRamp, BaseOffRamp, TypeAndVersionInter
     if (message.tokensAndAmounts.length > 0) {
       destTokensAndAmounts = _releaseOrMintTokens(message.tokensAndAmounts, message.receiver);
     }
-    if (!message.receiver.isContract()) return;
+    if (
+      !message.receiver.isContract() || !message.receiver.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId)
+    ) return;
     if (
       !s_router.routeMessage(
         GE._toAny2EVMMessage(message, destTokensAndAmounts),

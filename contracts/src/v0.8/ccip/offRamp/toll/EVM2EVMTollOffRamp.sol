@@ -6,6 +6,7 @@ import {IBaseOffRamp} from "../../interfaces/offRamp/IBaseOffRamp.sol";
 import {ICommitStore} from "../../interfaces/ICommitStore.sol";
 import {IAFN} from "../../interfaces/health/IAFN.sol";
 import {IPool} from "../../interfaces/pools/IPool.sol";
+import {IAny2EVMMessageReceiver} from "../../interfaces/applications/IAny2EVMMessageReceiver.sol";
 
 import {Toll} from "../../models/Toll.sol";
 import {Internal} from "../../models/Internal.sol";
@@ -15,6 +16,7 @@ import {BaseOffRamp} from "../BaseOffRamp.sol";
 
 import {IERC20} from "../../../vendor/IERC20.sol";
 import {Address} from "../../../vendor/Address.sol";
+import {ERC165Checker} from "../../../vendor/ERC165Checker.sol";
 
 /**
  * @notice EVM2EVMTollOffRamp enables OCR networks to execute multiple messages
@@ -22,6 +24,7 @@ import {Address} from "../../../vendor/Address.sol";
  */
 contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
   using Address for address;
+  using ERC165Checker for address;
 
   event ExecutionStateChanged(uint64 indexed sequenceNumber, Internal.MessageExecutionState state);
 
@@ -183,7 +186,9 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
         message.receiver
       );
     }
-    if (!message.receiver.isContract()) return;
+    if (
+      !message.receiver.isContract() || !message.receiver.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId)
+    ) return;
     if (
       !s_router.routeMessage(
         Toll._toAny2EVMMessage(message, destTokensAndAmounts),
