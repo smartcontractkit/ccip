@@ -109,7 +109,7 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 		destChainID,
 		evm_2_evm_toll_offramp.IBaseOffRampOffRampConfig{
 			ExecutionDelaySeconds: 0,
-			MaxDataSize:           1e12,
+			MaxDataSize:           1e5,
 			MaxTokensLength:       5,
 		},
 		onRampAddress,

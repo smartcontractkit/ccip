@@ -62,9 +62,9 @@ contract StructFactory {
 
   // offRamp
   uint256 internal constant POOL_BALANCE = 1e25;
-  uint64 internal constant EXECUTION_DELAY_SECONDS = 0;
-  uint64 internal constant MAX_DATA_SIZE = 500;
-  uint64 internal constant MAX_TOKENS_LENGTH = 5;
+  uint32 internal constant EXECUTION_DELAY_SECONDS = 0;
+  uint32 internal constant MAX_DATA_SIZE = 500;
+  uint16 internal constant MAX_TOKENS_LENGTH = 5;
   uint32 internal constant PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS = 500;
   uint64 internal constant MAX_GAS_LIMIT = 4_000_000;
 

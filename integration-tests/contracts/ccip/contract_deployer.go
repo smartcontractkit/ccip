@@ -188,7 +188,7 @@ func (e *CCIPContractsDeployer) DeployTollOffRamp(
 			evm_2_evm_toll_offramp.IBaseOffRampOffRampConfig{
 				PermissionLessExecutionThresholdSeconds: 0,
 				ExecutionDelaySeconds:                   0,
-				MaxDataSize:                             1e12,
+				MaxDataSize:                             1e5,
 				MaxTokensLength:                         15,
 			},
 			onRamp,
@@ -402,7 +402,7 @@ func (e *CCIPContractsDeployer) DeployGEOnRamp(
 		return evm_2_evm_ge_onramp.DeployEVM2EVMGEOnRamp(auth, backend, sourceChainId, destChainId, tokens, pools, allowList, afn,
 			evm_2_evm_ge_onramp.IBaseOnRampOnRampConfig{
 				CommitFeeJuels:  0,
-				MaxDataSize:     1e12,
+				MaxDataSize:     1e5,
 				MaxTokensLength: 5,
 				MaxGasLimit:     ccip.GasLimitPerTx,
 			},
@@ -443,7 +443,7 @@ func (e *CCIPContractsDeployer) DeployGEOffRamp(
 				FeeManager:                              destFeeManagerAddress,
 				PermissionLessExecutionThresholdSeconds: 0,
 				ExecutionDelaySeconds:                   0,
-				MaxDataSize:                             1e12,
+				MaxDataSize:                             1e5,
 				MaxTokensLength:                         15,
 			},
 			onRamp,

@@ -25,6 +25,7 @@ contract EVM2EVMGEOnRampSetup is TokenSetup, GERouterSetup {
   address[] internal s_allowList;
 
   EVM2EVMGEOnRamp internal s_onRamp;
+  address[] s_offRamps;
   // Naming chosen to not collide with s_feeManager in the offRampSetup since both
   // are imported into the e2e test.
   IFeeManager internal s_IFeeManager;
@@ -62,6 +63,12 @@ contract EVM2EVMGEOnRampSetup is TokenSetup, GERouterSetup {
     NativeTokenPool(address(s_sourcePools[1])).setOnRamp(s_onRamp, true);
 
     s_sourceRouter.setOnRamp(DEST_CHAIN_ID, s_onRamp);
+
+    s_offRamps = new address[](2);
+    s_offRamps[0] = address(10);
+    s_offRamps[1] = address(11);
+    s_sourceRouter.addOffRamp(s_offRamps[0]);
+    s_sourceRouter.addOffRamp(s_offRamps[1]);
 
     // Pre approve the first token so the gas estimates of the tests
     // only cover actual gas usage from the ramps

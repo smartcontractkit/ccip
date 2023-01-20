@@ -33,11 +33,11 @@ interface IBaseOffRamp {
     // The waiting time before manual execution is enabled
     uint32 permissionLessExecutionThresholdSeconds;
     // execution delay in seconds
-    uint64 executionDelaySeconds;
+    uint32 executionDelaySeconds;
     // maximum payload data size
-    uint64 maxDataSize;
+    uint32 maxDataSize;
     // Maximum number of distinct ERC20 tokens that can be sent in a message
-    uint64 maxTokensLength;
+    uint16 maxTokensLength;
   }
 
   /**

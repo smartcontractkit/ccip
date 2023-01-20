@@ -236,7 +236,7 @@ func (c *CCIPContracts) DeployNewTollOnRamp() {
 		c.Source.AFN.Address(),                         // AFN
 		evm_2_evm_toll_onramp.IBaseOnRampOnRampConfig{
 			CommitFeeJuels:  0,
-			MaxDataSize:     1e12,
+			MaxDataSize:     1e5,
 			MaxTokensLength: 5,
 			MaxGasLimit:     ccip.GasLimitPerTx,
 		},
@@ -507,7 +507,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		afnSourceAddress,                         // AFN
 		evm_2_evm_toll_onramp.IBaseOnRampOnRampConfig{
 			CommitFeeJuels:  0,
-			MaxDataSize:     1e12,
+			MaxDataSize:     1e5,
 			MaxTokensLength: 5,
 			MaxGasLimit:     ccip.GasLimitPerTx,
 		},
@@ -560,7 +560,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		afnSourceAddress,                         // AFN
 		evm_2_evm_ge_onramp.IBaseOnRampOnRampConfig{
 			CommitFeeJuels:  0,
-			MaxDataSize:     1e12,
+			MaxDataSize:     1e5,
 			MaxTokensLength: 5,
 			MaxGasLimit:     ccip.GasLimitPerTx,
 		},
@@ -625,7 +625,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		destChainID,
 		evm_2_evm_toll_offramp.IBaseOffRampOffRampConfig{
 			ExecutionDelaySeconds: 0,
-			MaxDataSize:           1e12,
+			MaxDataSize:           1e5,
 			MaxTokensLength:       5,
 		},
 		onRampAddress,
@@ -674,7 +674,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			FeeManager:                              destFeeManagerAddress,
 			PermissionLessExecutionThresholdSeconds: 1,
 			ExecutionDelaySeconds:                   0,
-			MaxDataSize:                             1e12,
+			MaxDataSize:                             1e5,
 			MaxTokensLength:                         5,
 		},
 		geOnRampAddress,

@@ -17,9 +17,9 @@ import {Address} from "../../vendor/Address.sol";
 import {IERC20} from "../../vendor/IERC20.sol";
 
 /**
- * @notice A base OffRamp contract that every OffRamp should expand on
+ * @notice An Any2EVM base OffRamp contract that every OffRamp should expand on
  */
-contract BaseOffRamp is IBaseOffRamp, HealthChecker, OffRampTokenPoolRegistry, AggregateRateLimiter {
+contract Any2EVMBaseOffRamp is IBaseOffRamp, HealthChecker, OffRampTokenPoolRegistry, AggregateRateLimiter {
   using Address for address;
 
   // Chain ID of the source chain

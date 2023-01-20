@@ -14,7 +14,7 @@ import {Common} from "../../models/Common.sol";
 import {GEConsumer} from "../../models/GEConsumer.sol";
 import {Internal} from "../../models/Internal.sol";
 import {OCR2Base} from "../../ocr/OCR2Base.sol";
-import {BaseOffRamp} from "../BaseOffRamp.sol";
+import {Any2EVMBaseOffRamp} from "../Any2EVMBaseOffRamp.sol";
 
 import {IERC20} from "../../../vendor/IERC20.sol";
 import {Address} from "../../../vendor/Address.sol";
@@ -24,7 +24,7 @@ import {ERC165Checker} from "../../../vendor/ERC165Checker.sol";
  * @notice EVM2EVMGEOffRamp enables OCR networks to execute multiple messages
  * in an OffRamp in a single transaction.
  */
-contract EVM2EVMGEOffRamp is IEVM2EVMGEOffRamp, BaseOffRamp, TypeAndVersionInterface, OCR2Base {
+contract EVM2EVMGEOffRamp is IEVM2EVMGEOffRamp, Any2EVMBaseOffRamp, TypeAndVersionInterface, OCR2Base {
   using Address for address;
   using ERC165Checker for address;
 
@@ -53,7 +53,7 @@ contract EVM2EVMGEOffRamp is IEVM2EVMGEOffRamp, BaseOffRamp, TypeAndVersionInter
     IERC20 feeToken
   )
     OCR2Base()
-    BaseOffRamp(
+    Any2EVMBaseOffRamp(
       sourceChainId,
       chainId,
       onRampAddress,

@@ -42,14 +42,14 @@ contract EVM2EVMGEOffRamp_setRouter is EVM2EVMGEOffRampSetup {
 
   function setUp() public virtual override {
     EVM2EVMGEOffRampSetup.setUp();
-    IBaseOffRamp[] memory offRamps = new IBaseOffRamp[](1);
-    offRamps[0] = s_offRamp;
+    address[] memory offRamps = new address[](1);
+    offRamps[0] = address(s_offRamp);
     s_router = new GERouter(offRamps);
     s_offRamp.setRouter(s_router);
   }
 
   function _generateNewRouter() internal returns (GERouter newRouter) {
-    IBaseOffRamp[] memory offRamps = new IBaseOffRamp[](0);
+    address[] memory offRamps = new address[](0);
     newRouter = new GERouter(offRamps);
   }
 
@@ -100,8 +100,8 @@ contract EVM2EVMGEOffRamp_execute is EVM2EVMGEOffRampSetup {
 
   function setUp() public virtual override {
     EVM2EVMGEOffRampSetup.setUp();
-    IBaseOffRamp[] memory offRamps = new IBaseOffRamp[](1);
-    offRamps[0] = s_offRamp;
+    address[] memory offRamps = new address[](1);
+    offRamps[0] = address(s_offRamp);
     s_router = new GERouter(offRamps);
     s_offRamp.setRouter(s_router);
   }
@@ -326,8 +326,8 @@ contract EVM2EVMGEOffRamp_executeSingleMessage is EVM2EVMGEOffRampSetup {
 
   function setUp() public virtual override {
     EVM2EVMGEOffRampSetup.setUp();
-    IBaseOffRamp[] memory offRamps = new IBaseOffRamp[](1);
-    offRamps[0] = s_offRamp;
+    address[] memory offRamps = new address[](1);
+    offRamps[0] = address(s_offRamp);
     s_router = new GERouter(offRamps);
     s_offRamp.setRouter(s_router);
     changePrank(address(s_offRamp));
@@ -394,8 +394,8 @@ contract EVM2EVMGEOffRamp__report is EVM2EVMGEOffRampSetup {
 
   function setUp() public virtual override {
     EVM2EVMGEOffRampSetup.setUp();
-    IBaseOffRamp[] memory offRamps = new IBaseOffRamp[](1);
-    offRamps[0] = s_offRamp;
+    address[] memory offRamps = new address[](1);
+    offRamps[0] = address(s_offRamp);
     s_router = new GERouter(offRamps);
     s_offRamp.setRouter(s_router);
   }

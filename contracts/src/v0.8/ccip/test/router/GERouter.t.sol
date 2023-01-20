@@ -6,6 +6,7 @@ import {IBaseOnRampRouter} from "../../interfaces/onRamp/IBaseOnRampRouter.sol";
 import {IGERouter} from "../../interfaces/router/IGERouter.sol";
 
 import {PoolCollector} from "../../pools/PoolCollector.sol";
+import {MockOffRamp} from "../mocks/MockOffRamp.sol";
 import "../onRamp/ge/EVM2EVMGEOnRampSetup.t.sol";
 
 /// @notice #constructor
@@ -172,5 +173,114 @@ contract GERouter_getSupportedTokens is EVM2EVMGEOnRampSetup {
   function testUnknownChainSuccess() public {
     address[] memory supportedTokens = s_sourceRouter.getSupportedTokens(DEST_CHAIN_ID + 10);
     assertEq(0, supportedTokens.length);
+  }
+}
+
+/// @notice #addOffRamp
+contract GERouter_addOffRamp is EVM2EVMGEOnRampSetup {
+  address internal s_newOffRamp;
+
+  event OffRampAdded(address indexed offRamp);
+
+  function setUp() public virtual override {
+    EVM2EVMGEOnRampSetup.setUp();
+
+    s_newOffRamp = address(new MockOffRamp());
+  }
+
+  // Success
+
+  function testSuccess() public {
+    assertFalse(s_sourceRouter.isOffRamp(s_newOffRamp));
+    uint256 lengthBefore = s_sourceRouter.getOffRamps().length;
+
+    vm.expectEmit(true, false, false, true);
+    emit OffRampAdded(s_newOffRamp);
+    s_sourceRouter.addOffRamp(s_newOffRamp);
+
+    assertTrue(s_sourceRouter.isOffRamp(s_newOffRamp));
+    assertEq(lengthBefore + 1, s_sourceRouter.getOffRamps().length);
+  }
+
+  // Reverts
+
+  function testOwnerReverts() public {
+    changePrank(STRANGER);
+    vm.expectRevert("Only callable by owner");
+    s_sourceRouter.addOffRamp(s_newOffRamp);
+  }
+
+  function testAlreadyConfiguredReverts() public {
+    address existingOffRamp = s_offRamps[0];
+    vm.expectRevert(abi.encodeWithSelector(IAny2EVMOffRampRouter.AlreadyConfigured.selector, existingOffRamp));
+    s_sourceRouter.addOffRamp(existingOffRamp);
+  }
+
+  function testZeroAddressReverts() public {
+    vm.expectRevert(IAny2EVMOffRampRouter.InvalidAddress.selector);
+    s_sourceRouter.addOffRamp(address(0));
+  }
+}
+
+/// @notice #removeOffRamp
+contract GERouter_removeOffRamp is EVM2EVMGEOnRampSetup {
+  event OffRampRemoved(address indexed offRamp);
+
+  // Success
+
+  function testSuccess() public {
+    uint256 lengthBefore = s_sourceRouter.getOffRamps().length;
+
+    vm.expectEmit(true, false, false, true);
+    emit OffRampRemoved(s_offRamps[0]);
+    s_sourceRouter.removeOffRamp(s_offRamps[0]);
+
+    assertFalse(s_sourceRouter.isOffRamp(s_offRamps[0]));
+    assertEq(lengthBefore - 1, s_sourceRouter.getOffRamps().length);
+  }
+
+  // Reverts
+
+  function testOwnerReverts() public {
+    changePrank(STRANGER);
+    vm.expectRevert("Only callable by owner");
+    s_sourceRouter.removeOffRamp(s_offRamps[0]);
+  }
+
+  function testNoOffRampsReverts() public {
+    s_sourceRouter.removeOffRamp(s_offRamps[0]);
+    s_sourceRouter.removeOffRamp(s_offRamps[1]);
+
+    assertEq(0, s_sourceRouter.getOffRamps().length);
+
+    vm.expectRevert(IAny2EVMOffRampRouter.NoOffRampsConfigured.selector);
+    s_sourceRouter.removeOffRamp(s_offRamps[0]);
+  }
+
+  function testOffRampNotAllowedReverts() public {
+    address newRamp = address(1234678);
+    vm.expectRevert(abi.encodeWithSelector(IAny2EVMOffRampRouter.OffRampNotAllowed.selector, newRamp));
+    s_sourceRouter.removeOffRamp(newRamp);
+  }
+}
+
+/// @notice #getOffRamps
+contract GERouter_getOffRamps is EVM2EVMGEOnRampSetup {
+  // Success
+  function testGetOffRampsSuccess() public {
+    address[] memory offRamps = s_sourceRouter.getOffRamps();
+    assertEq(2, offRamps.length);
+    assertEq(address(s_offRamps[0]), address(offRamps[0]));
+    assertEq(address(s_offRamps[1]), address(offRamps[1]));
+  }
+}
+
+/// @notice #isOffRamp
+contract GERouter_isOffRamp is EVM2EVMGEOnRampSetup {
+  // Success
+  function testIsOffRampSuccess() public {
+    assertTrue(s_sourceRouter.isOffRamp(s_offRamps[0]));
+    assertTrue(s_sourceRouter.isOffRamp(s_offRamps[1]));
+    assertFalse(s_sourceRouter.isOffRamp(address(1)));
   }
 }

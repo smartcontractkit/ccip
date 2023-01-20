@@ -21,8 +21,8 @@ contract E2E_GE is EVM2EVMGEOnRampSetup, CommitStoreSetup, EVM2EVMGEOffRampSetup
 
     s_merkleHelper = new MerkleHelper();
 
-    IBaseOffRamp[] memory offRamps = new IBaseOffRamp[](1);
-    offRamps[0] = s_offRamp;
+    address[] memory offRamps = new address[](1);
+    offRamps[0] = address(s_offRamp);
     s_router = new GERouter(offRamps);
     s_offRamp.setRouter(s_router);
   }

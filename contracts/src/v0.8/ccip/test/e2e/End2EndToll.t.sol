@@ -22,8 +22,8 @@ contract E2E_toll is EVM2EVMTollOnRampSetup, CommitStoreSetup, EVM2EVMTollOffRam
 
     s_merkleHelper = new MerkleHelper();
 
-    IBaseOffRamp[] memory offRamps = new IBaseOffRamp[](1);
-    offRamps[0] = s_offRamp;
+    address[] memory offRamps = new address[](1);
+    offRamps[0] = address(s_offRamp);
     s_router = new Any2EVMTollOffRampRouter(offRamps);
     s_offRamp.setRouter(s_router);
   }

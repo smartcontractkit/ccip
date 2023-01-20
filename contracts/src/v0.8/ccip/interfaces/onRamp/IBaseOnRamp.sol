@@ -31,9 +31,9 @@ interface IBaseOnRamp is IAllowList {
     // Fee for sending message taken in this contract
     uint64 commitFeeJuels;
     // maximum payload data size
-    uint64 maxDataSize;
+    uint32 maxDataSize;
     // Maximum number of distinct ERC20 tokens that can be sent in a message
-    uint64 maxTokensLength;
+    uint16 maxTokensLength;
     // Maximum gasLimit for messages targeting EVMs
     uint64 maxGasLimit;
   }

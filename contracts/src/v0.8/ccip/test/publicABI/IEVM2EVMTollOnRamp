@@ -13,6 +13,6 @@
   "setAllowlist(address[])": "552b818b",
   "setAllowlistEnabled(bool)": "d7644ba2",
   "setFeeConfig((uint256[],address[]))": "f3fae9fa",
-  "setOnRampConfig((uint64,uint64,uint64,uint64))": "105f7d93",
+  "setOnRampConfig((uint64,uint32,uint16,uint64))": "dcd210f1",
   "setRouter(address)": "c0d78655"
 }

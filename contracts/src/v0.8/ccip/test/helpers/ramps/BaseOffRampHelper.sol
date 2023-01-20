@@ -1,8 +1,8 @@
 pragma solidity ^0.8.0;
 
-import "../../../offRamp/BaseOffRamp.sol";
+import "../../../offRamp/Any2EVMBaseOffRamp.sol";
 
-contract BaseOffRampHelper is BaseOffRamp {
+contract BaseOffRampHelper is Any2EVMBaseOffRamp {
   constructor(
     uint64 sourceChainId,
     uint64 chainId,
@@ -14,7 +14,7 @@ contract BaseOffRampHelper is BaseOffRamp {
     RateLimiterConfig memory rateLimiterConfig,
     address tokenLimitsAdmin
   )
-    BaseOffRamp(
+    Any2EVMBaseOffRamp(
       sourceChainId,
       chainId,
       onRampAddress,

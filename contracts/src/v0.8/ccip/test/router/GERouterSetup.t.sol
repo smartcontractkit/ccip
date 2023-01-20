@@ -10,7 +10,7 @@ contract GERouterSetup is BaseTest {
   function setUp() public virtual override {
     BaseTest.setUp();
 
-    IBaseOffRamp[] memory offRamps = new IBaseOffRamp[](0);
+    address[] memory offRamps = new address[](0);
     s_sourceRouter = new GERouter(offRamps);
   }
 }

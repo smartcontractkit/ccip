@@ -41,8 +41,8 @@ contract EVM2EVMTollOffRamp_setRouter is EVM2EVMTollOffRampSetup {
 
   function setUp() public virtual override {
     EVM2EVMTollOffRampSetup.setUp();
-    IBaseOffRamp[] memory offRamps = new IBaseOffRamp[](1);
-    offRamps[0] = s_offRamp;
+    address[] memory offRamps = new address[](1);
+    offRamps[0] = address(s_offRamp);
     s_router = new Any2EVMTollOffRampRouter(offRamps);
     s_offRamp.setRouter(s_router);
   }
@@ -94,8 +94,8 @@ contract EVM2EVMTollOffRamp_execute is EVM2EVMTollOffRampSetup {
 
   function setUp() public virtual override {
     EVM2EVMTollOffRampSetup.setUp();
-    IBaseOffRamp[] memory offRamps = new IBaseOffRamp[](1);
-    offRamps[0] = s_offRamp;
+    address[] memory offRamps = new address[](1);
+    offRamps[0] = address(s_offRamp);
     s_router = new Any2EVMTollOffRampRouter(offRamps);
     s_offRamp.setRouter(s_router);
   }
@@ -257,8 +257,8 @@ contract EVM2EVMTollOffRamp_executeSingleMessage is EVM2EVMTollOffRampSetup {
 
   function setUp() public virtual override {
     EVM2EVMTollOffRampSetup.setUp();
-    IBaseOffRamp[] memory offRamps = new IBaseOffRamp[](1);
-    offRamps[0] = s_offRamp;
+    address[] memory offRamps = new address[](1);
+    offRamps[0] = address(s_offRamp);
     s_router = new Any2EVMTollOffRampRouter(offRamps);
     s_offRamp.setRouter(s_router);
     changePrank(address(s_offRamp));
@@ -312,8 +312,8 @@ contract EVM2EVMTollOffRamp__report is EVM2EVMTollOffRampSetup {
 
   function setUp() public virtual override {
     EVM2EVMTollOffRampSetup.setUp();
-    IBaseOffRamp[] memory offRamps = new IBaseOffRamp[](1);
-    offRamps[0] = s_offRamp;
+    address[] memory offRamps = new address[](1);
+    offRamps[0] = address(s_offRamp);
     s_router = new Any2EVMTollOffRampRouter(offRamps);
     s_offRamp.setRouter(s_router);
   }

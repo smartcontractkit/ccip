@@ -33,7 +33,7 @@
   "report(bytes)": "b5767166",
   "setAFN(address)": "108ee5fc",
   "setCommitStore(address)": "c9033284",
-  "setConfig((uint32,uint64,uint64,uint64))": "bc29705a",
+  "setConfig((uint32,uint32,uint32,uint16))": "e4381140",
   "setOCR2Config(address[],address[],uint8,bytes,uint64,bytes)": "1ef38174",
   "setPrices(address[],uint256[])": "4352fa9f",
   "setRateLimiterConfig((uint256,uint256))": "91872543",

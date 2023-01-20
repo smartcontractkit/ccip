@@ -11,15 +11,15 @@ contract MockTollOffRampRouter is IAny2EVMOffRampRouter {
     address receiver
   ) external override returns (bool success) {}
 
-  function addOffRamp(IBaseOffRamp) external {}
+  function addOffRamp(address) external {}
 
-  function removeOffRamp(IBaseOffRamp) external {}
+  function removeOffRamp(address) external {}
 
-  function getOffRamps() external pure returns (IBaseOffRamp[] memory) {
-    return new IBaseOffRamp[](0);
+  function getOffRamps() external pure returns (address[] memory) {
+    return new address[](0);
   }
 
-  function isOffRamp(IBaseOffRamp) external pure returns (bool allowed) {
+  function isOffRamp(address) external pure returns (bool allowed) {
     return true;
   }
 }

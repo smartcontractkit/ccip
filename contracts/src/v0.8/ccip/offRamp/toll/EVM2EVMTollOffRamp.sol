@@ -12,7 +12,7 @@ import {Toll} from "../../models/Toll.sol";
 import {Internal} from "../../models/Internal.sol";
 import {Common} from "../../models/Common.sol";
 import {OCR2Base} from "../../ocr/OCR2Base.sol";
-import {BaseOffRamp} from "../BaseOffRamp.sol";
+import {Any2EVMBaseOffRamp} from "../Any2EVMBaseOffRamp.sol";
 
 import {IERC20} from "../../../vendor/IERC20.sol";
 import {Address} from "../../../vendor/Address.sol";
@@ -22,7 +22,7 @@ import {ERC165Checker} from "../../../vendor/ERC165Checker.sol";
  * @notice EVM2EVMTollOffRamp enables OCR networks to execute multiple messages
  * in an OffRamp in a single transaction.
  */
-contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
+contract EVM2EVMTollOffRamp is Any2EVMBaseOffRamp, TypeAndVersionInterface, OCR2Base {
   using Address for address;
   using ERC165Checker for address;
 
@@ -71,7 +71,7 @@ contract EVM2EVMTollOffRamp is BaseOffRamp, TypeAndVersionInterface, OCR2Base {
     address tokenLimitsAdmin
   )
     OCR2Base()
-    BaseOffRamp(
+    Any2EVMBaseOffRamp(
       sourceChainId,
       chainId,
       onRampAddress,
