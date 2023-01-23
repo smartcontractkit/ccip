@@ -22,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/job"
 	ccipconfig "github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/promwrapper"
 )
 
 type ContractType string
@@ -150,7 +151,18 @@ func NewCommitServices(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet ev
 			return nil, err
 		}
 	}
-	argsNoPlugin.ReportingPluginFactory = NewCommitReportingPluginFactory(lggr, sourceChain.LogPoller(), commitStore, onRampSeqParsers, onRampToReqEventSig, onRamps, onRampToHasher, inflightCacheExpiry)
+	chainIDInterface, ok := spec.RelayConfig["chainID"]
+	if !ok {
+		return nil, errors.New("chainID must be provided in relay config")
+	}
+	chainID := int64(chainIDInterface.(float64))
+
+	chain, err2 := chainSet.Get(big.NewInt(chainID))
+	if err2 != nil {
+		return nil, errors.Wrap(err2, "get chainset")
+	}
+	wrapped := NewCommitReportingPluginFactory(lggr, sourceChain.LogPoller(), commitStore, onRampSeqParsers, onRampToReqEventSig, onRamps, onRampToHasher, inflightCacheExpiry)
+	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrapped, "CCIPCommit", string(spec.Relay), chain.ID())
 	oracle, err := libocr2.NewOracle(argsNoPlugin)
 	if err != nil {
 		return nil, err
@@ -168,3 +180,4 @@ func NewCommitServices(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet ev
 	}
 	return []job.ServiceCtx{job.NewServiceAdapter(oracle)}, nil
 }
+
