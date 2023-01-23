@@ -18,6 +18,10 @@ import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
 import {SafeERC20} from "../../vendor/SafeERC20.sol";
 import {IERC20} from "../../vendor/IERC20.sol";
 
+/// @title Guaranteed Execution Router
+/// @notice This is the entry point for the end user wishing to send a cross
+/// chain message.
+/// @dev This contract is used as a router for both on-ramps and off-ramps
 contract GERouter is IGERouter, TypeAndVersionInterface, OwnerIsCreator {
   using SafeERC20 for IERC20;
 
