@@ -12,13 +12,15 @@ require (
 	github.com/satori/go.uuid v1.2.0
 	github.com/slack-go/slack v0.11.4
 	github.com/smartcontractkit/chainlink v1.10.0
-	github.com/smartcontractkit/chainlink-env v0.2.58
+	github.com/smartcontractkit/chainlink-env v0.2.60
 	github.com/smartcontractkit/chainlink-testing-framework v1.9.1
 	github.com/smartcontractkit/libocr v0.0.0-20221209172631-568a30f68407
-	github.com/smartcontractkit/ocr2keepers v0.4.8
+	github.com/smartcontractkit/ocr2keepers v0.6.6
+	github.com/smartcontractkit/ocr2vrf v0.0.0-20230117141905-c3a5c0467fd4
 	github.com/stretchr/testify v1.8.1
 	github.com/tendermint/go-amino v0.16.0
 	github.com/umbracle/ethgo v0.1.3
+	go.dedis.ch/kyber/v3 v3.0.14
 	go.uber.org/atomic v1.9.0
 	golang.org/x/crypto v0.5.0
 	golang.org/x/exp v0.0.0-20220608143224-64259d1afd70
@@ -306,7 +308,6 @@ require (
 	github.com/smartcontractkit/chainlink-solana v1.0.2-0.20220930034647-edd5a863b876 // indirect
 	github.com/smartcontractkit/chainlink-starknet/relayer v0.0.0-20220930034704-572ac07611cb // indirect
 	github.com/smartcontractkit/chainlink-terra v0.1.4-0.20220930034731-ef9eb53de886 // indirect
-	github.com/smartcontractkit/ocr2vrf v0.0.0-20221206151523-7ae0ec615c0e // indirect
 	github.com/smartcontractkit/sqlx v1.3.5-0.20210805004948-4be295aacbeb // indirect
 	github.com/smartcontractkit/terra.go v1.0.3-0.20220108002221-62b39252ee16 // indirect
 	github.com/smartcontractkit/wsrpc v0.3.10-0.20220317191700-8c8ecdcaed4a // indirect
@@ -349,7 +350,6 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	github.com/zondax/hid v0.9.0 // indirect
 	go.dedis.ch/fixbuf v1.0.3 // indirect
-	go.dedis.ch/kyber/v3 v3.0.14 // indirect
 	go.etcd.io/bbolt v1.3.6 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	go.starlark.net v0.0.0-20220817180228-f738f5508c12 // indirect
@@ -366,7 +366,7 @@ require (
 	golang.org/x/time v0.1.0 // indirect
 	golang.org/x/tools v0.5.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.2.0 // indirect
-	gonum.org/v1/gonum v0.11.0 // indirect
+	gonum.org/v1/gonum v0.12.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20220712132514-bdd2acd4974d // indirect
 	google.golang.org/grpc v1.49.0 // indirect

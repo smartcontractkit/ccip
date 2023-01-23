@@ -38,6 +38,7 @@ import (
 	ocr2vrfconfig "github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ocr2vrf/config"
 	ocr2coordinator "github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ocr2vrf/coordinator"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ocr2vrf/juelsfeecoin"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ocr2vrf/reasonablegasprice"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ocr2vrf/reportserializer"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/promwrapper"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/validate"
@@ -365,11 +366,19 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 			return nil, errors.Wrap(err2, "new onchain dkg client")
 		}
 
+		timeout := 1 * time.Second
 		juelsPerFeeCoin, err2 := juelsfeecoin.NewLinkEthPriceProvider(
-			common.HexToAddress(cfg.LinkEthFeedAddress), chain.Client(), 1*time.Second)
+			common.HexToAddress(cfg.LinkEthFeedAddress), chain.Client(), timeout)
 		if err2 != nil {
 			return nil, errors.Wrap(err2, "new link eth price provider")
 		}
+
+		reasonableGasPrice := reasonablegasprice.NewReasonableGasPriceProvider(
+			chain.TxManager().GetGasEstimator(),
+			timeout,
+			chain.Config().EvmMaxGasPriceWei(),
+			chain.Config().EvmEIP1559DynamicFees(),
+		)
 
 		// No need to error check here, we check these keys exist when validating
 		// the configuration.
@@ -433,6 +442,7 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 			Blockhashes:                        blockhashes.NewFixedBlockhashProvider(chain.LogPoller(), lggr, 256),
 			Serializer:                         reportserializer.NewReportSerializer(&altbn_128.G1{}),
 			JulesPerFeeCoin:                    juelsPerFeeCoin,
+			ReasonableGasPrice:                 reasonableGasPrice,
 			Coordinator:                        coordinator,
 			Esk:                                encryptionSecretKey.KyberScalar(),
 			Ssk:                                signingSecretKey.KyberScalar(),
@@ -490,6 +500,7 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 			OffchainConfigDigester:       keeperProvider.OffchainConfigDigester(),
 			OffchainKeyring:              kb,
 			OnchainKeyring:               kb,
+			HeadSubscriber:               rgstry,
 			Registry:                     rgstry,
 			ReportEncoder:                encoder,
 			PerformLogProvider:           logProvider,
@@ -517,6 +528,7 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 		return []job.ServiceCtx{
 			runResultSaver,
 			keeperProvider,
+			rgstry,
 			pluginService,
 		}, nil
 	case job.OCR2Functions:

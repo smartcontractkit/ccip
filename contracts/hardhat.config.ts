@@ -82,6 +82,7 @@ export default {
     disambiguatePaths: false,
   },
   mocha: {
-    timeout: 900000,
+    timeout: 100000,
+    forbidOnly: Boolean(process.env.CI),
   },
 }
