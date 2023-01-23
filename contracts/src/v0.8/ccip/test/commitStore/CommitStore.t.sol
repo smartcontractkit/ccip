@@ -245,6 +245,94 @@ contract CommitStore_report is CommitStoreSetup {
     s_commitStore.report(abi.encode(report));
   }
 
+  function testZeroRootOfRootsRevert() public {
+    uint64 max1 = 931;
+    uint64 max2 = 2;
+    uint64 max3 = 15;
+    Internal.Interval[] memory intervals = new Internal.Interval[](3);
+    intervals[0] = Internal.Interval(1, max1);
+    intervals[1] = Internal.Interval(1, max2);
+    intervals[2] = Internal.Interval(1, max3);
+    bytes32[] memory merkleRoots = new bytes32[](3);
+    merkleRoots[0] = "test #1";
+    merkleRoots[1] = "test #2";
+    merkleRoots[2] = "test #3";
+    ICommitStore.CommitStoreConfig memory config = commitStoreConfig();
+    Internal.CommitReport memory report = Internal.CommitReport({
+      onRamps: config.onRamps,
+      intervals: intervals,
+      merkleRoots: merkleRoots,
+      rootOfRoots: bytes32(0)
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(ICommitStore.InvalidCommitReport.selector, report));
+    s_commitStore.report(abi.encode(report));
+  }
+
+  function testZeroLengthReportReverts() public {
+    Internal.Interval[] memory intervals = new Internal.Interval[](0);
+    address[] memory onRamps = new address[](0);
+    bytes32[] memory merkleRoots = new bytes32[](0);
+    Internal.CommitReport memory report = Internal.CommitReport({
+      onRamps: onRamps,
+      intervals: intervals,
+      merkleRoots: merkleRoots,
+      rootOfRoots: "root"
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(ICommitStore.InvalidCommitReport.selector, report));
+
+    s_commitStore.report(abi.encode(report));
+  }
+
+  function testZeroLengthIntervalsReverts() public {
+    Internal.Interval[] memory intervals = new Internal.Interval[](0);
+    address[] memory onRamps = new address[](1);
+    bytes32[] memory merkleRoots = new bytes32[](1);
+    Internal.CommitReport memory report = Internal.CommitReport({
+      onRamps: onRamps,
+      intervals: intervals,
+      merkleRoots: merkleRoots,
+      rootOfRoots: "root"
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(ICommitStore.InvalidCommitReport.selector, report));
+
+    s_commitStore.report(abi.encode(report));
+  }
+
+  function testZeroLengthMerkleRootsReverts() public {
+    Internal.Interval[] memory intervals = new Internal.Interval[](1);
+    address[] memory onRamps = new address[](1);
+    bytes32[] memory merkleRoots = new bytes32[](0);
+    Internal.CommitReport memory report = Internal.CommitReport({
+      onRamps: onRamps,
+      intervals: intervals,
+      merkleRoots: merkleRoots,
+      rootOfRoots: "root"
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(ICommitStore.InvalidCommitReport.selector, report));
+
+    s_commitStore.report(abi.encode(report));
+  }
+
+  function testZeroLengthOnRampsReverts() public {
+    Internal.Interval[] memory intervals = new Internal.Interval[](1);
+    address[] memory onRamps = new address[](0);
+    bytes32[] memory merkleRoots = new bytes32[](1);
+    Internal.CommitReport memory report = Internal.CommitReport({
+      onRamps: onRamps,
+      intervals: intervals,
+      merkleRoots: merkleRoots,
+      rootOfRoots: "root"
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(ICommitStore.InvalidCommitReport.selector, report));
+
+    s_commitStore.report(abi.encode(report));
+  }
+
   function testUnsupportedOnRampReverts() public {
     Internal.Interval[] memory intervals = new Internal.Interval[](1);
     address[] memory onRamps = new address[](1);

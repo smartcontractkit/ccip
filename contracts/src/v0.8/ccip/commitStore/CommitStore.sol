@@ -174,8 +174,12 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, HealthChecker, OC
   function _report(bytes memory encodedReport) internal override whenNotPaused whenHealthy {
     Internal.CommitReport memory report = abi.decode(encodedReport, (Internal.CommitReport));
     uint256 reportLength = report.onRamps.length;
-    if (reportLength != report.intervals.length || reportLength != report.merkleRoots.length)
-      revert InvalidCommitReport(report);
+    if (
+      report.rootOfRoots == bytes32(0) ||
+      reportLength == 0 ||
+      reportLength != report.intervals.length ||
+      reportLength != report.merkleRoots.length
+    ) revert InvalidCommitReport(report);
     for (uint256 i = 0; i < reportLength; ++i) {
       address onRamp = report.onRamps[i];
       uint64 expectedMinSeqNum = s_expectedNextMinByOnRamp[onRamp];
