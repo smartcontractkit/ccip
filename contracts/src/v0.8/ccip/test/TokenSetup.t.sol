@@ -6,7 +6,7 @@ import "./mocks/MockERC20.sol";
 import "./mocks/MockPool.sol";
 import "../../tests/MockV3Aggregator.sol";
 import "../pools/BurnMintTokenPool.sol";
-import "../pools/NativeTokenPool.sol";
+import "../pools/LockReleaseTokenPool.sol";
 import "../health/HealthChecker.sol";
 import "../pools/OffRampTokenPoolRegistry.sol";
 import "../models/Common.sol";
@@ -35,7 +35,7 @@ contract TokenSetup is BaseTest {
     }
 
     if (s_sourcePools.length == 0) {
-      s_sourcePools.push(address(new NativeTokenPool(IERC20(s_sourceTokens[0]))));
+      s_sourcePools.push(address(new LockReleaseTokenPool(IERC20(s_sourceTokens[0]))));
       s_sourcePools.push(address(new BurnMintTokenPool(IBurnMintERC20(s_sourceTokens[1]))));
     }
 
@@ -48,7 +48,7 @@ contract TokenSetup is BaseTest {
     }
 
     if (s_destPools.length == 0) {
-      s_destPools.push(address(new NativeTokenPool(IERC20(s_destTokens[0]))));
+      s_destPools.push(address(new LockReleaseTokenPool(IERC20(s_destTokens[0]))));
       s_destPools.push(address(new BurnMintTokenPool(IBurnMintERC20(s_destTokens[1]))));
 
       // Float the pools with funds

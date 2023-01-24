@@ -96,10 +96,10 @@ type CCIPCommon struct {
 	ChainClient       blockchain.EVMClient
 	Deployer          *ccip.CCIPContractsDeployer
 	FeeToken          contracts.LinkToken
-	FeeTokenPool      *ccip.NativeTokenPool
+	FeeTokenPool      *ccip.LockReleaseTokenPool
 	BridgeTokens      []contracts.LinkToken // as of now considering the bridge token is same as link token
 	TokenPrices       []*big.Int
-	BridgeTokenPools  []*ccip.NativeTokenPool
+	BridgeTokenPools  []*ccip.LockReleaseTokenPool
 	RateLimiterConfig ccip.RateLimiterConfig
 	AFNConfig         ccip.AFNConfig
 	AFN               *ccip.AFN
@@ -138,13 +138,13 @@ func (ccipModule *CCIPCommon) DeployContracts(t *testing.T, noOfTokens int) {
 		ccipModule.FeeToken = token
 
 		// token pool for fee token
-		ccipModule.FeeTokenPool, err = cd.DeployNativeTokenPoolContract(ccipModule.FeeToken.Address())
+		ccipModule.FeeTokenPool, err = cd.DeployLockReleaseTokenPoolContract(ccipModule.FeeToken.Address())
 		require.NoError(t, err, "Deploying Native TokenPool Contract shouldn't fail")
 	} else {
 		token, err := cd.NewLinkTokenContract(common.HexToAddress(ccipModule.FeeToken.Address()))
 		require.NoError(t, err, "Instantiating Link Token Contract shouldn't fail")
 		ccipModule.FeeToken = token
-		pool, err := cd.NewNativeTokenPoolContract(ccipModule.FeeTokenPool.EthAddress)
+		pool, err := cd.NewLockReleaseTokenPoolContract(ccipModule.FeeTokenPool.EthAddress)
 		require.NoError(t, err, "Instantiating Native TokenPool Contract shouldn't fail")
 		ccipModule.FeeTokenPool = pool
 	}
@@ -159,7 +159,7 @@ func (ccipModule *CCIPCommon) DeployContracts(t *testing.T, noOfTokens int) {
 		require.NoError(t, ccipModule.ChainClient.WaitForEvents(), "Error waiting for Link Token deployments")
 		// deploy native token pool
 		for _, token := range ccipModule.BridgeTokens {
-			ntp, err := cd.DeployNativeTokenPoolContract(token.Address())
+			ntp, err := cd.DeployLockReleaseTokenPoolContract(token.Address())
 			require.NoError(t, err, "Deploying Native TokenPool Contract shouldn't fail")
 			ccipModule.BridgeTokenPools = append(ccipModule.BridgeTokenPools, ntp)
 		}
@@ -171,9 +171,9 @@ func (ccipModule *CCIPCommon) DeployContracts(t *testing.T, noOfTokens int) {
 			tokens = append(tokens, newToken)
 		}
 		ccipModule.BridgeTokens = tokens
-		var pools []*ccip.NativeTokenPool
+		var pools []*ccip.LockReleaseTokenPool
 		for _, pool := range ccipModule.BridgeTokenPools {
-			newPool, err := cd.NewNativeTokenPoolContract(pool.EthAddress)
+			newPool, err := cd.NewLockReleaseTokenPoolContract(pool.EthAddress)
 			require.NoError(t, err, "Instantiating Native TokenPool Contract shouldn't fail")
 			pools = append(pools, newPool)
 		}

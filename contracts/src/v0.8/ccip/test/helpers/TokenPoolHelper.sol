@@ -17,12 +17,4 @@ contract TokenPoolHelper is TokenPool {
   function releaseOrMint(address recipient, uint256 amount) external override {
     emit ReleaseOrMint(recipient, amount);
   }
-
-  function assertLockOrBurnModifier(uint256) external assertLockOrBurn {
-    emit AssertionPassed();
-  }
-
-  function assertMintOrReleaseModifier(uint256) external assertMintOrRelease {
-    emit AssertionPassed();
-  }
 }

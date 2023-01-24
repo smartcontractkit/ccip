@@ -26,9 +26,9 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ge_router"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/mock_afn_contract"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/native_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/simple_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/toll_sender_dapp"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
@@ -59,11 +59,11 @@ func (e *CCIPContractsDeployer) NewLinkTokenContract(addr common.Address) (contr
 	return e.EthDeployer.NewLinkTokenContract(addr)
 }
 
-func (e *CCIPContractsDeployer) NewNativeTokenPoolContract(addr common.Address) (
-	*NativeTokenPool,
+func (e *CCIPContractsDeployer) NewLockReleaseTokenPoolContract(addr common.Address) (
+	*LockReleaseTokenPool,
 	error,
 ) {
-	pool, err := native_token_pool.NewNativeTokenPool(addr, e.evmClient.Client)
+	pool, err := lock_release_token_pool.NewLockReleaseTokenPool(addr, e.evmClient.Client)
 	if err != nil {
 		return nil, err
 	}
@@ -73,15 +73,15 @@ func (e *CCIPContractsDeployer) NewNativeTokenPoolContract(addr common.Address) 
 		Str("From", e.evmClient.GetDefaultWallet().Address()).
 		Str("Network Name", e.evmClient.GetNetworkConfig().Name).
 		Msg("New contract")
-	return &NativeTokenPool{
+	return &LockReleaseTokenPool{
 		client:     e.evmClient,
 		instance:   pool,
 		EthAddress: addr,
 	}, err
 }
 
-func (e *CCIPContractsDeployer) DeployNativeTokenPoolContract(linkAddr string) (
-	*NativeTokenPool,
+func (e *CCIPContractsDeployer) DeployLockReleaseTokenPoolContract(linkAddr string) (
+	*LockReleaseTokenPool,
 	error,
 ) {
 	log.Debug().Str("token", linkAddr).Msg("Deploying native token pool")
@@ -90,15 +90,15 @@ func (e *CCIPContractsDeployer) DeployNativeTokenPoolContract(linkAddr string) (
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return native_token_pool.DeployNativeTokenPool(auth, backend, token)
+		return lock_release_token_pool.DeployLockReleaseTokenPool(auth, backend, token)
 	})
 
 	if err != nil {
 		return nil, err
 	}
-	return &NativeTokenPool{
+	return &LockReleaseTokenPool{
 		client:     e.evmClient,
-		instance:   instance.(*native_token_pool.NativeTokenPool),
+		instance:   instance.(*lock_release_token_pool.LockReleaseTokenPool),
 		EthAddress: *address,
 	}, err
 }

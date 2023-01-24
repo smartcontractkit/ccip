@@ -13,14 +13,14 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ge_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/native_token_pool"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/shared"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
 )
 
 func setOffRampOnTokenPools(t *testing.T, destClient *EvmDeploymentConfig) {
 	for _, tokenConfig := range destClient.ChainConfig.SupportedTokens {
-		pool, err := native_token_pool.NewNativeTokenPool(tokenConfig.Pool, destClient.Client)
+		pool, err := lock_release_token_pool.NewLockReleaseTokenPool(tokenConfig.Pool, destClient.Client)
 		require.NoError(t, err)
 
 		// Configure offramp address on pool
@@ -58,7 +58,7 @@ func setOnRampOnRouter(t *testing.T, sourceClient *EvmDeploymentConfig, destChai
 
 func setOnRampOnTokenPools(t *testing.T, sourceClient *EvmDeploymentConfig) {
 	for _, tokenConfig := range sourceClient.ChainConfig.SupportedTokens {
-		pool, err := native_token_pool.NewNativeTokenPool(tokenConfig.Pool, sourceClient.Client)
+		pool, err := lock_release_token_pool.NewLockReleaseTokenPool(tokenConfig.Pool, sourceClient.Client)
 		require.NoError(t, err)
 
 		// Configure offramp address on pool
@@ -138,20 +138,21 @@ func revokeOffRampOnTokenPools(t *testing.T, destClient *EvmDeploymentConfig, of
 }
 */
 
-func fillPoolWithTokens(t *testing.T, client *EvmDeploymentConfig, pool *native_token_pool.NativeTokenPool) {
+func fillPoolWithTokens(t *testing.T, client *EvmDeploymentConfig, pool *lock_release_token_pool.LockReleaseTokenPool) {
 	destLinkToken, err := link_token_interface.NewLinkToken(client.ChainConfig.LinkToken, client.Client)
 	require.NoError(t, err)
 
 	// fill offramp token pool with 0.5 LINK
 	amount := big.NewInt(5e17)
-	tx, err := destLinkToken.Transfer(client.Owner, pool.Address(), amount)
+	tx, err := destLinkToken.Approve(client.Owner, pool.Address(), amount)
 	require.NoError(t, err)
-	client.Logger.Infof("Transferring token to token pool: %s", helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash()))
+	client.Logger.Infof("Approving token to the token pool: %s", helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash()))
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 
-	client.Logger.Infof("Locking tokens in pool")
-	tx, err = pool.LockOrBurn(client.Owner, amount)
+	tx, err = pool.AddLiquidity(client.Owner, amount)
 	require.NoError(t, err)
+	client.Logger.Infof("Adding liquidity to the token pool: %s", helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash()))
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
+
 	client.Logger.Infof("Pool filled with tokens: %s", helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash()))
 }

@@ -46,8 +46,8 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
 
     s_offRamp.setPrices(getCastedDestinationTokens(), getTokenPrices());
 
-    NativeTokenPool(address(s_destPools[0])).setOffRamp(IBaseOffRamp(address(s_offRamp)), true);
-    NativeTokenPool(address(s_destPools[1])).setOffRamp(IBaseOffRamp(address(s_offRamp)), true);
+    LockReleaseTokenPool(address(s_destPools[0])).setOffRamp(IBaseOffRamp(address(s_offRamp)), true);
+    LockReleaseTokenPool(address(s_destPools[1])).setOffRamp(IBaseOffRamp(address(s_offRamp)), true);
   }
 
   function _generateNewRouter() internal returns (IAny2EVMOffRampRouter newRouter) {

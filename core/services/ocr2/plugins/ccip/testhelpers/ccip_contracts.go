@@ -27,9 +27,9 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ge_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/mock_afn_contract"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/native_token_pool"
 	"github.com/smartcontractkit/chainlink/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
@@ -76,7 +76,7 @@ type Common struct {
 	User        *bind.TransactOpts
 	Chain       *backends.SimulatedBackend
 	LinkToken   *link_token_interface.LinkToken
-	Pool        *native_token_pool.NativeTokenPool
+	Pool        *lock_release_token_pool.LockReleaseTokenPool
 	CustomPool  *custom_token_pool.CustomTokenPool
 	CustomToken *link_token_interface.LinkToken
 	AFN         *mock_afn_contract.MockAFNContract
@@ -431,12 +431,12 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	sourceChain.Commit()
 	sourceLinkToken, err := link_token_interface.NewLinkToken(sourceLinkTokenAddress, sourceChain)
 	require.NoError(t, err)
-	sourcePoolAddress, _, _, err := native_token_pool.DeployNativeTokenPool(sourceUser,
+	sourcePoolAddress, _, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(sourceUser,
 		sourceChain,
 		sourceLinkTokenAddress)
 	require.NoError(t, err)
 	sourceChain.Commit()
-	sourcePool, err := native_token_pool.NewNativeTokenPool(sourcePoolAddress, sourceChain)
+	sourcePool, err := lock_release_token_pool.NewLockReleaseTokenPool(sourcePoolAddress, sourceChain)
 	require.NoError(t, err)
 
 	// Deploy link token and pool on destination chain
@@ -445,10 +445,10 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	destChain.Commit()
 	destLinkToken, err := link_token_interface.NewLinkToken(destLinkTokenAddress, destChain)
 	require.NoError(t, err)
-	destPoolAddress, _, _, err := native_token_pool.DeployNativeTokenPool(destUser, destChain, destLinkTokenAddress)
+	destPoolAddress, _, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(destUser, destChain, destLinkTokenAddress)
 	require.NoError(t, err)
 	destChain.Commit()
-	destPool, err := native_token_pool.NewNativeTokenPool(destPoolAddress, destChain)
+	destPool, err := lock_release_token_pool.NewLockReleaseTokenPool(destPoolAddress, destChain)
 	require.NoError(t, err)
 	destChain.Commit()
 
@@ -456,7 +456,9 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	o, err := destPool.Owner(nil)
 	require.NoError(t, err)
 	require.Equal(t, destUser.From.String(), o.String())
-	_, err = destLinkToken.Transfer(destUser, destPoolAddress, Link(200))
+	_, err = destLinkToken.Approve(destUser, destPoolAddress, Link(200))
+	require.NoError(t, err)
+	_, err = destPool.AddLiquidity(destUser, Link(200))
 	require.NoError(t, err)
 	destChain.Commit()
 

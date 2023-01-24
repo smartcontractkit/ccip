@@ -10,8 +10,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ge_router"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/mock_afn_contract"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/native_token_pool"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/shared"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
 )
@@ -20,7 +20,7 @@ func DeployToNewChain(t *testing.T, client *EvmDeploymentConfig) {
 	// Updates client.AFN if any new contracts are deployed
 	deployAFN(t, client)
 	// Updates client.TokenPools if any new contracts are deployed
-	deployNativeTokenPool(t, client)
+	deployLockReleaseTokenPool(t, client)
 	// Updates client.ChainConfig.Router if any new contracts are deployed
 	deployRouter(t, client)
 	// Update client.FeeManager if any new contracts are deployed
@@ -44,15 +44,15 @@ func deployAFN(t *testing.T, client *EvmDeploymentConfig) {
 	client.ChainConfig.Afn = address
 }
 
-func deployNativeTokenPool(t *testing.T, client *EvmDeploymentConfig) {
+func deployLockReleaseTokenPool(t *testing.T, client *EvmDeploymentConfig) {
 	for tokenName, tokenConfig := range client.ChainConfig.SupportedTokens {
 		if client.DeploySettings.DeployTokenPools {
 			client.Logger.Infof("Deploying token pool for %s token", tokenName)
-			tokenPoolAddress, tx, _, err := native_token_pool.DeployNativeTokenPool(client.Owner, client.Client, tokenConfig.Token)
+			tokenPoolAddress, tx, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(client.Owner, client.Client, tokenConfig.Token)
 			require.NoError(t, err)
 			shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 			client.Logger.Infof("Native token pool deployed on %s in tx %s", tokenPoolAddress, helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash()))
-			pool, err := native_token_pool.NewNativeTokenPool(tokenPoolAddress, client.Client)
+			pool, err := lock_release_token_pool.NewLockReleaseTokenPool(tokenPoolAddress, client.Client)
 			require.NoError(t, err)
 			fillPoolWithTokens(t, client, pool)
 			client.ChainConfig.SupportedTokens[tokenName] = EVMBridgedToken{
@@ -64,7 +64,7 @@ func deployNativeTokenPool(t *testing.T, client *EvmDeploymentConfig) {
 			if tokenConfig.Pool.Hex() == "0x0000000000000000000000000000000000000000" {
 				t.Error("deploy new lock unlock pool set to false but no lock unlock pool given in config")
 			}
-			pool, err := native_token_pool.NewNativeTokenPool(tokenConfig.Pool, client.Client)
+			pool, err := lock_release_token_pool.NewLockReleaseTokenPool(tokenConfig.Pool, client.Client)
 			require.NoError(t, err)
 			client.Logger.Infof("Skipping Pool deployment, using Pool on %s", pool.Address().Hex())
 		}

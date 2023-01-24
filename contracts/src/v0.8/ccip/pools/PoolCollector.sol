@@ -19,12 +19,10 @@ contract PoolCollector is OwnerIsCreator {
 
   error FeeTokenAmountTooLow();
 
-  /**
-   * @notice Collect the fee
-   * @param onRamp OnRamp to get the fee and pools from
-   * @param feeToken the feeToken to be collected
-   * @param feeTokenAmount the amount of feeToken that is available
-   */
+  /// @notice Collect the fee
+  /// @param onRamp OnRamp to get the fee and pools from
+  /// @param feeToken the feeToken to be collected
+  /// @param feeTokenAmount the amount of feeToken that is available
   function _chargeFee(
     IEVM2EVMTollOnRamp onRamp,
     IERC20 feeToken,
@@ -47,11 +45,9 @@ contract PoolCollector is OwnerIsCreator {
     emit FeeCharged(sender, address(this), fee);
   }
 
-  /**
-   * @notice Collect tokens and send them to the pools
-   * @param onRamp OnRamp to get the fee and pools from
-   * @param tokensAndAmounts the tokensAndAmounts to be collected
-   */
+  /// @notice Collect tokens and send them to the pools
+  /// @param onRamp OnRamp to get the fee and pools from
+  /// @param tokensAndAmounts the tokensAndAmounts to be collected
   function _collectTokens(IBaseOnRamp onRamp, Common.EVMTokenAndAmount[] memory tokensAndAmounts) internal {
     // Send the tokens to the pools
     for (uint256 i = 0; i < tokensAndAmounts.length; ++i) {
@@ -62,10 +58,8 @@ contract PoolCollector is OwnerIsCreator {
     }
   }
 
-  /**
-   * @notice Withdraw the fee tokens accumulated in this contract
-   * @dev only callable by owner
-   */
+  /// @notice Withdraw the fee tokens accumulated in this contract
+  /// @dev only callable by owner
   function withdrawAccumulatedFees(
     IERC20 feeToken,
     address recipient,

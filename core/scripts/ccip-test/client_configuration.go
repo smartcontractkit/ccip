@@ -33,7 +33,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ge_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/governance_dapp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/native_token_pool"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ping_pong_demo"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/receiver_dapp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/simple_message_receiver"
@@ -119,7 +119,7 @@ type Client struct {
 
 type EVMBridgedToken struct {
 	Token common.Address
-	Pool  *native_token_pool.NativeTokenPool
+	Pool  *lock_release_token_pool.LockReleaseTokenPool
 	Price *big.Int
 }
 
@@ -135,7 +135,7 @@ func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient
 
 	supportedTokens := map[rhea.Token]EVMBridgedToken{}
 	for token, tokenConfig := range config.ChainConfig.SupportedTokens {
-		tokenPool, err2 := native_token_pool.NewNativeTokenPool(tokenConfig.Pool, config.Client)
+		tokenPool, err2 := lock_release_token_pool.NewLockReleaseTokenPool(tokenConfig.Pool, config.Client)
 		require.NoError(t, err2)
 		supportedTokens[token] = EVMBridgedToken{
 			Token: tokenConfig.Token,
@@ -193,7 +193,7 @@ func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestCli
 
 	supportedTokens := map[rhea.Token]EVMBridgedToken{}
 	for token, tokenConfig := range config.ChainConfig.SupportedTokens {
-		tokenPool, err2 := native_token_pool.NewNativeTokenPool(tokenConfig.Pool, config.Client)
+		tokenPool, err2 := lock_release_token_pool.NewLockReleaseTokenPool(tokenConfig.Pool, config.Client)
 		require.NoError(t, err2)
 		supportedTokens[token] = EVMBridgedToken{
 			Token: tokenConfig.Token,

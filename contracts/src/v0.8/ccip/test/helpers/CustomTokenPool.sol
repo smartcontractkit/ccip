@@ -13,7 +13,7 @@ contract CustomTokenPool is TokenPool {
    * @notice Locks the token in the pool
    * @param amount Amount to lock
    */
-  function lockOrBurn(uint256 amount) external override whenNotPaused assertLockOrBurn {
+  function lockOrBurn(uint256 amount) external override whenNotPaused validateOwnerOrOnRamp {
     emit SynthBurned(amount);
   }
 
@@ -21,7 +21,7 @@ contract CustomTokenPool is TokenPool {
    * @notice Release tokens from the pool to the recipient
    * @param amount Amount to release
    */
-  function releaseOrMint(address, uint256 amount) external override whenNotPaused assertMintOrRelease {
+  function releaseOrMint(address, uint256 amount) external override whenNotPaused validateOwnerOrOffRamp {
     emit SynthMinted(amount);
   }
 }

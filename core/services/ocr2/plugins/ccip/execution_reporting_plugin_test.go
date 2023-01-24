@@ -25,7 +25,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/native_token_pool"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/simple_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
@@ -60,17 +60,18 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	require.NoError(t, err)
 
 	// Deploy destination pool
-	destPoolAddress, _, _, err := native_token_pool.DeployNativeTokenPool(destUser, destChain, destLinkTokenAddress)
+	destPoolAddress, _, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(destUser, destChain, destLinkTokenAddress)
 	require.NoError(t, err)
 	destChain.Commit()
-	destPool, err := native_token_pool.NewNativeTokenPool(destPoolAddress, destChain)
+	destPool, err := lock_release_token_pool.NewLockReleaseTokenPool(destPoolAddress, destChain)
 	require.NoError(t, err)
 
 	// Fund dest pool
-	_, err = destLinkToken.Transfer(destUser, destPoolAddress, big.NewInt(1000000))
+	liquidityAmount := big.NewInt(1000000)
+	_, err = destLinkToken.Approve(destUser, destPoolAddress, liquidityAmount)
 	require.NoError(t, err)
 	destChain.Commit()
-	_, err = destPool.LockOrBurn(destUser, big.NewInt(1000000))
+	_, err = destPool.AddLiquidity(destUser, liquidityAmount)
 	require.NoError(t, err)
 	destChain.Commit()
 
