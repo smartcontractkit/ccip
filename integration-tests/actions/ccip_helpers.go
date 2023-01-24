@@ -68,7 +68,7 @@ var (
 
 	//go:embed clconfig/ccip-default.txt
 	CLConfig           string
-	networkA, networkB = func() (blockchain.EVMNetwork, blockchain.EVMNetwork) {
+	NetworkA, NetworkB = func() (blockchain.EVMNetwork, blockchain.EVMNetwork) {
 		if len(networks.SelectedNetworks) < 3 {
 			log.Fatal().
 				Interface("SELECTED_NETWORKS", networks.SelectedNetworks).
@@ -84,7 +84,7 @@ var (
 	DefaultCCIPCLNodeEnv = func(t *testing.T) string {
 		ccipTOML, err := client.MarshallTemplate(
 			CCIPTOMLEnv{
-				Networks: []blockchain.EVMNetwork{networkA, networkB},
+				Networks: []blockchain.EVMNetwork{NetworkA, NetworkB},
 			},
 			"ccip env toml", CLConfig)
 		require.NoError(t, err)
@@ -1262,15 +1262,13 @@ func DeployEnvironments(
 ) *environment.Environment {
 	testEnvironment := environment.New(envconfig)
 	testEnvironment.
-		AddHelm(mockservercfg.New(nil)).
-		AddHelm(mockserver.New(nil)).
 		AddHelm(reorg.New(&reorg.Props{
-			NetworkName: networkA.Name,
+			NetworkName: NetworkA.Name,
 			NetworkType: "simulated-geth-non-dev",
 			Values: map[string]interface{}{
 				"geth": map[string]interface{}{
 					"genesis": map[string]interface{}{
-						"networkId": fmt.Sprint(networkA.ChainID),
+						"networkId": fmt.Sprint(NetworkA.ChainID),
 					},
 					"tx": map[string]interface{}{
 						"replicas": "1",
@@ -1285,12 +1283,12 @@ func DeployEnvironments(
 			},
 		})).
 		AddHelm(reorg.New(&reorg.Props{
-			NetworkName: networkB.Name,
+			NetworkName: NetworkB.Name,
 			NetworkType: "simulated-geth-non-dev",
 			Values: map[string]interface{}{
 				"geth": map[string]interface{}{
 					"genesis": map[string]interface{}{
-						"networkId": fmt.Sprint(networkB.ChainID),
+						"networkId": fmt.Sprint(NetworkB.ChainID),
 					},
 					"tx": map[string]interface{}{
 						"replicas": "1",
@@ -1303,31 +1301,35 @@ func DeployEnvironments(
 					"replicas": "1",
 				},
 			},
-		}))
+		})).
+		AddHelm(mockservercfg.New(nil)).
+		AddHelm(mockserver.New(nil))
 	// skip adding blockscout for simplified deployments
 	// uncomment the following to debug on-chain transactions
 	/*
 		testEnvironment.AddChart(blockscout.New(&blockscout.Props{
 			Name:    "dest-blockscout",
-			WsURL:   networkB.URLs[0],
-			HttpURL: networkB.HTTPURLs[0],
+			WsURL:   NetworkB.URLs[0],
+			HttpURL: NetworkB.HTTPURLs[0],
 		}))
 		testEnvironment.AddChart(blockscout.New(&blockscout.Props{
 			Name:    "source-blockscout",
-			WsURL:   networkA.URLs[0],
-			HttpURL: networkA.HTTPURLs[0],
+			WsURL:   NetworkA.URLs[0],
+			HttpURL: NetworkA.HTTPURLs[0],
 		}))
 
 	*/
 
 	err := testEnvironment.Run()
 	require.NoError(t, err)
-	// related https://app.shortcut.com/chainlinklabs/story/38295/creating-an-evm-chain-via-cli-or-api-immediately-polling-the-nodes-and-returning-an-error
-	// node must work and reconnect even if network is not working
-	time.Sleep(10 * time.Second)
+
+	if testEnvironment.WillUseRemoteRunner() {
+		return testEnvironment
+	}
 
 	err = testEnvironment.AddHelm(chainlink.New(0, clProps)).Run()
 	require.NoError(t, err)
+
 	return testEnvironment
 }
 
@@ -1338,11 +1340,11 @@ func SetUpNodesAndKeys(
 ) CCIPTestEnv {
 	log.Info().Msg("Connecting to launched resources")
 
-	sourceChainClient, err := blockchain.NewEVMClient(networkA, testEnvironment)
+	sourceChainClient, err := blockchain.NewEVMClient(NetworkA, testEnvironment)
 	require.NoError(t, err, "Connecting to blockchain nodes shouldn't fail")
 	sourceChainClient.ParallelTransactions(true)
 
-	destChainClient, err := blockchain.NewEVMClient(networkB, testEnvironment)
+	destChainClient, err := blockchain.NewEVMClient(NetworkB, testEnvironment)
 	require.NoError(t, err, "Connecting to blockchain nodes shouldn't fail")
 	destChainClient.ParallelTransactions(true)
 
@@ -1363,7 +1365,7 @@ func SetUpNodesAndKeys(
 		require.NoError(t, err)
 		require.Greater(t, len(clNodes), 0, "No CL node with keys found")
 		mu.Lock()
-		mu.Unlock()
+		defer mu.Unlock()
 		nodesWithKeys[chain.GetChainID().String()] = clNodes
 	}
 
@@ -1455,16 +1457,19 @@ func CCIPDefaultTestSetUp(
 		t,
 		&environment.Config{
 			NamespacePrefix: envName,
-			TTL:             24 * time.Hour,
+			Test:            t,
 		}, clProps)
 
+	if testEnvironment.WillUseRemoteRunner() {
+		return nil, nil, nil
+	}
 	testSetUpA2B := SetUpNodesAndKeys(t, testEnvironment, big.NewFloat(10))
 
-	sourceChainClient, err := blockchain.ConcurrentEVMClient(networkB, testEnvironment, testSetUpA2B.DestChainClient)
+	sourceChainClient, err := blockchain.ConcurrentEVMClient(NetworkB, testEnvironment, testSetUpA2B.DestChainClient)
 	require.NoError(t, err, "Connecting to blockchain nodes shouldn't fail")
 	sourceChainClient.ParallelTransactions(true)
 
-	destChainClient, err := blockchain.ConcurrentEVMClient(networkA, testEnvironment, testSetUpA2B.SourceChainClient)
+	destChainClient, err := blockchain.ConcurrentEVMClient(NetworkA, testEnvironment, testSetUpA2B.SourceChainClient)
 	require.NoError(t, err, "Connecting to blockchain nodes shouldn't fail")
 	destChainClient.ParallelTransactions(true)
 

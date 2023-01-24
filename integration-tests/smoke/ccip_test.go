@@ -2,6 +2,7 @@ package smoke
 
 //revive:disable:dot-imports
 import (
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -20,20 +21,24 @@ func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
 	)
 
 	t.Cleanup(func() {
-		log.Info().Msg("Tearing down the environment")
-		tearDown()
+		if tearDown != nil {
+			log.Info().Msg("Tearing down the environment")
+			tearDown()
+		}
 	})
 
 	transferAmounts := []*big.Int{big.NewInt(5e17), big.NewInt(5e17)}
-	laneA, laneB, tearDown = actions.CCIPDefaultTestSetUp(t, "smoke-ccip", map[string]interface{}{
-		"replicas": "6",
-		"toml":     actions.DefaultCCIPCLNodeEnv(t),
-		"env": map[string]interface{}{
-			"CL_DEV": "true",
-		},
-	}, transferAmounts, 5, true, bidirectional)
+	laneA, laneB, tearDown = actions.CCIPDefaultTestSetUp(t, fmt.Sprintf("smoke-ccip-%s-%s", actions.NetworkA.Name, actions.NetworkB.Name),
+		map[string]interface{}{
+			"replicas": "6",
+			"toml":     actions.DefaultCCIPCLNodeEnv(t),
+		}, transferAmounts, 5, true, bidirectional)
 
-	t.Run("CCIP message transfer from laneA to laneB", func(t *testing.T) {
+	if laneA == nil {
+		return
+	}
+
+	t.Run("CCIP message transfer in bi-directional lane", func(t *testing.T) {
 		// initiate transfer with GE and verify
 		log.Info().Msg("Multiple Token transfer with GE from laneA to laneB")
 		require.NoError(t, laneA.IsLaneDeployed())
@@ -44,11 +49,10 @@ func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
 		log.Info().Msg("Multiple Token transfer with toll from laneA to laneB")
 		laneA.SendTollRequests(1)
 		laneA.ValidateTollRequests()
-	})
 
-	t.Run("CCIP message transfer from laneB to laneA", func(t *testing.T) {
 		if !bidirectional {
-			t.Skip("Skipping validating reverse lane")
+			log.Info().Msg("Skipping validating reverse lane")
+			return
 		}
 
 		// initiate transfer with GE and verify
