@@ -24,7 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ge_router"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/native_token_pool"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 )
 
@@ -130,7 +130,7 @@ func getABIForContract(client *ethclient.Client, contractAddress common.Address)
 func getAllABIs() []string {
 	return []string{
 		// Generic
-		afn_contract.AFNContractABI, native_token_pool.NativeTokenPoolABI, commit_store.CommitStoreABI,
+		afn_contract.AFNContractABI, lock_release_token_pool.LockReleaseTokenPoolABI, commit_store.CommitStoreABI,
 		fee_manager.FeeManagerABI,
 
 		// Toll

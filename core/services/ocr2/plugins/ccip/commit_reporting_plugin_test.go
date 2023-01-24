@@ -21,7 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store_helper"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/native_token_pool"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
 )
@@ -57,10 +57,10 @@ func TestCommitReportEncoding(t *testing.T) {
 	require.NoError(t, err)
 
 	// Deploy link token pool.
-	destPoolAddress, _, _, err := native_token_pool.DeployNativeTokenPool(destUser, destChain, destLinkTokenAddress)
+	destPoolAddress, _, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(destUser, destChain, destLinkTokenAddress)
 	require.NoError(t, err)
 	destChain.Commit()
-	_, err = native_token_pool.NewNativeTokenPool(destPoolAddress, destChain)
+	_, err = lock_release_token_pool.NewLockReleaseTokenPool(destPoolAddress, destChain)
 	require.NoError(t, err)
 
 	// Deploy AFN.

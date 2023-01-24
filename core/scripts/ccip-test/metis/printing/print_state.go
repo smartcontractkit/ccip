@@ -14,10 +14,10 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ge_router"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/afn_contract"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/native_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ping_pong_demo"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/dione"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
@@ -340,7 +340,7 @@ func printPaused(chain *rhea.EvmDeploymentConfig) {
 	sb.WriteString(generateHeader(tableHeaders, headerLengths))
 
 	for _, tokenConfig := range chain.ChainConfig.SupportedTokens {
-		tokenPool, err := native_token_pool.NewNativeTokenPool(tokenConfig.Pool, chain.Client)
+		tokenPool, err := lock_release_token_pool.NewLockReleaseTokenPool(tokenConfig.Pool, chain.Client)
 		helpers.PanicErr(err)
 		paused, err := tokenPool.Paused(&bind.CallOpts{})
 		helpers.PanicErr(err)
@@ -408,7 +408,7 @@ func printPoolBalances(chain *rhea.EvmDeploymentConfig) {
 	helpers.PanicErr(err)
 
 	for tokenName, tokenConfig := range chain.ChainConfig.SupportedTokens {
-		tokenPool, err := native_token_pool.NewNativeTokenPool(tokenConfig.Pool, chain.Client)
+		tokenPool, err := lock_release_token_pool.NewLockReleaseTokenPool(tokenConfig.Pool, chain.Client)
 		helpers.PanicErr(err)
 
 		tokenAddress, err := tokenPool.GetToken(&bind.CallOpts{})

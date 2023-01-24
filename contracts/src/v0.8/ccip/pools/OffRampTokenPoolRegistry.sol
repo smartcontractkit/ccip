@@ -29,13 +29,11 @@ contract OffRampTokenPoolRegistry is OwnerIsCreator {
   // List of tokens
   IERC20[] private s_sourceTokenList;
 
-  /**
-   * @notice The `tokens` and `pools` passed to this constructor depend on which chain this contract
-   * is being deployed to. Mappings of source token => destination pool is maintained on the destination
-   * chain. Therefore, when being deployed as an inheriting OffRamp, `tokens` should represent source chain tokens,
-   * `pools` destinations chain pools. When being deployed as an inheriting OnRamp, `tokens` and `pools`
-   * should both be source chain.
-   */
+  /// @notice The `tokens` and `pools` passed to this constructor depend on which chain this contract
+  /// is being deployed to. Mappings of source token => destination pool is maintained on the destination
+  /// chain. Therefore, when being deployed as an inheriting OffRamp, `tokens` should represent source chain tokens,
+  /// `pools` destinations chain pools. When being deployed as an inheriting OnRamp, `tokens` and `pools`
+  /// should both be source chain.
   constructor(IERC20[] memory tokens, IPool[] memory pools) {
     if (tokens.length != pools.length) revert InvalidTokenPoolConfig();
 
@@ -94,47 +92,37 @@ contract OffRampTokenPoolRegistry is OwnerIsCreator {
     emit PoolRemoved(token, pool);
   }
 
-  /**
-   * @notice Get a token pool by its source token
-   * @param sourceToken token
-   * @return Token Pool
-   */
+  /// @notice Get a token pool by its source token
+  /// @param sourceToken token
+  /// @return Token Pool
   function getPoolBySourceToken(IERC20 sourceToken) public view returns (IPool) {
     return s_poolsBySourceToken[sourceToken].pool;
   }
 
-  /**
-   * @notice Get a token pool by its dest token
-   * @param destToken token
-   * @return Token Pool
-   */
+  /// @notice Get a token pool by its dest token
+  /// @param destToken token
+  /// @return Token Pool
   function getPoolByDestToken(IERC20 destToken) public view returns (IPool) {
     return s_poolsByDestToken[destToken];
   }
 
-  /**
-   * @notice Get all supported source tokens
-   * @return Array of supported source tokens
-   */
+  /// @notice Get all supported source tokens
+  /// @return Array of supported source tokens
   function getSupportedTokens() public view returns (IERC20[] memory) {
     return s_sourceTokenList;
   }
 
-  /**
-   * @notice Get the destination token from the pool based on a given source token.
-   * @param sourceToken The source token
-   * @return the destination token
-   */
+  /// @notice Get the destination token from the pool based on a given source token.
+  /// @param sourceToken The source token
+  /// @return the destination token
   function getDestinationToken(IERC20 sourceToken) public view returns (IERC20) {
     IPool pool = s_poolsBySourceToken[sourceToken].pool;
     if (address(pool) == address(0)) revert PoolDoesNotExist();
     return s_poolsBySourceToken[sourceToken].pool.getToken();
   }
 
-  /**
-   * @notice Get all configured destination tokens
-   * @return tokens Array of configured destination tokens
-   */
+  /// @notice Get all configured destination tokens
+  ///  @return tokens Array of configured destination tokens
   function getDestinationTokens() external view returns (IERC20[] memory tokens) {
     tokens = new IERC20[](s_sourceTokenList.length);
     for (uint256 i = 0; i < s_sourceTokenList.length; ++i) {

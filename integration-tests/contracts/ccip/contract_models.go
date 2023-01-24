@@ -18,9 +18,9 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ge_router"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/mock_afn_contract"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/native_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/simple_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/toll_sender_dapp"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
@@ -39,18 +39,18 @@ type AFNConfig struct {
 	ThresholdForBadSignal    *big.Int
 }
 
-// NativeTokenPool represents a NativeTokenPool address
-type NativeTokenPool struct {
+// LockReleaseTokenPool represents a LockReleaseTokenPool address
+type LockReleaseTokenPool struct {
 	client     *blockchain.EthereumClient
-	instance   *native_token_pool.NativeTokenPool
+	instance   *lock_release_token_pool.LockReleaseTokenPool
 	EthAddress common.Address
 }
 
-func (pool *NativeTokenPool) Address() string {
+func (pool *LockReleaseTokenPool) Address() string {
 	return pool.EthAddress.Hex()
 }
 
-func (pool *NativeTokenPool) LockOrBurnToken(linkToken contracts.LinkToken, amount *big.Int) error {
+func (pool *LockReleaseTokenPool) LockOrBurnToken(linkToken contracts.LinkToken, amount *big.Int) error {
 	log.Info().
 		Str("Link Token", linkToken.Address()).
 		Str("Token Pool", pool.Address()).
@@ -80,7 +80,7 @@ func (pool *NativeTokenPool) LockOrBurnToken(linkToken contracts.LinkToken, amou
 	return pool.client.ProcessTransaction(tx)
 }
 
-func (pool *NativeTokenPool) SetOnRamp(onRamp common.Address) error {
+func (pool *LockReleaseTokenPool) SetOnRamp(onRamp common.Address) error {
 	opts, err := pool.client.TransactionOpts(pool.client.DefaultWallet)
 	if err != nil {
 		return err
@@ -99,7 +99,7 @@ func (pool *NativeTokenPool) SetOnRamp(onRamp common.Address) error {
 	return pool.client.ProcessTransaction(tx)
 }
 
-func (pool *NativeTokenPool) SetOffRamp(offRamp common.Address) error {
+func (pool *LockReleaseTokenPool) SetOffRamp(offRamp common.Address) error {
 	opts, err := pool.client.TransactionOpts(pool.client.DefaultWallet)
 	if err != nil {
 		return err

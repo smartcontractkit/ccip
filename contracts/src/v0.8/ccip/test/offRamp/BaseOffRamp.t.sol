@@ -80,7 +80,7 @@ contract BaseOffRamp_constructor is BaseOffRampSetup {
   function testZeroOnRampAddressReverts() public {
     IPool[] memory pools = new IPool[](2);
     pools[0] = IPool(s_sourcePools[0]);
-    pools[1] = new NativeTokenPool(IERC20(s_sourceTokens[1]));
+    pools[1] = new LockReleaseTokenPool(IERC20(s_sourceTokens[1]));
 
     vm.expectRevert(IBaseOffRamp.ZeroAddressNotAllowed.selector);
 

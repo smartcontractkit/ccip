@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {IERC20} from "../../vendor/ERC20.sol";
+import {IERC20} from "../../../vendor/IERC20.sol";
 
 interface IBurnMintERC20 is IERC20 {
   /**

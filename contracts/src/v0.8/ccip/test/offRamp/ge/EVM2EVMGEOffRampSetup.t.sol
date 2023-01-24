@@ -59,8 +59,8 @@ contract EVM2EVMGEOffRampSetup is TokenSetup, FeeManagerSetup {
     s_offRamp.setPrices(getCastedDestinationTokens(), getTokenPrices());
     s_feeManager.setFeeUpdater(address(s_offRamp));
 
-    NativeTokenPool(address(s_destPools[0])).setOffRamp(IBaseOffRamp(address(s_offRamp)), true);
-    NativeTokenPool(address(s_destPools[1])).setOffRamp(IBaseOffRamp(address(s_offRamp)), true);
+    LockReleaseTokenPool(address(s_destPools[0])).setOffRamp(IBaseOffRamp(address(s_offRamp)), true);
+    LockReleaseTokenPool(address(s_destPools[1])).setOffRamp(IBaseOffRamp(address(s_offRamp)), true);
   }
 
   function _generateGEOffRampConfig(IFeeManager feeManager)

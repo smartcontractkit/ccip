@@ -105,7 +105,7 @@ $SCRIPTPATH/native_solc8_6_compile dev/functions/FunctionsBillingRegistry.sol
 # CCIP
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/commitStore/CommitStore.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/test/helpers/CommitStoreHelper.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/pools/NativeTokenPool.sol
+$SCRIPTPATH/native_solc8_15_compile_ccip ccip/pools/LockReleaseTokenPool.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/pools/BurnMintTokenPool.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/test/helpers/CustomTokenPool.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/health/AFN.sol

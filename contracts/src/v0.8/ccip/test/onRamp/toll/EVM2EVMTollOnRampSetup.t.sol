@@ -46,8 +46,8 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
 
     s_onRamp.setPrices(getCastedSourceTokens(), getTokenPrices());
 
-    NativeTokenPool(address(s_sourcePools[0])).setOnRamp(s_onRamp, true);
-    NativeTokenPool(address(s_sourcePools[1])).setOnRamp(s_onRamp, true);
+    LockReleaseTokenPool(address(s_sourcePools[0])).setOnRamp(s_onRamp, true);
+    LockReleaseTokenPool(address(s_sourcePools[1])).setOnRamp(s_onRamp, true);
 
     s_onRampRouter.setOnRamp(DEST_CHAIN_ID, s_onRamp);
 
