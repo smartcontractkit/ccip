@@ -121,7 +121,6 @@ $SCRIPTPATH/native_solc8_15_compile_ccip ccip/onRamp/toll/EVM2EVMTollOnRamp.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/offRamp/toll/EVM2EVMTollOffRamp.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/offRamp/toll/Any2EVMTollOffRampRouter.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/test/helpers/ramps/EVM2EVMTollOffRampHelper.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/applications/TollSenderDapp.sol
 
 #GE
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/onRamp/ge/EVM2EVMGEOnRamp.sol

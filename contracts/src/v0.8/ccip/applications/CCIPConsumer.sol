@@ -9,11 +9,13 @@ import {IERC165} from "../../vendor/IERC165.sol";
 import {GEConsumer} from "../models/GEConsumer.sol";
 import {Common} from "../models/Common.sol";
 
+/// @title CCIPConsumer - Base contract for CCIP applications that can both send and receive messages.
 abstract contract CCIPConsumer is IAny2EVMMessageReceiver, IERC165 {
   IGERouter private immutable i_router;
   address private s_feeToken;
 
   constructor(address router, address feeToken) {
+    if (router == address(0)) revert InvalidRouter(address(0));
     i_router = IGERouter(router);
 
     _setFeeToken(feeToken);
@@ -48,7 +50,6 @@ abstract contract CCIPConsumer is IAny2EVMMessageReceiver, IERC165 {
    */
   function _ccipSend(uint64 destinationChainId, GEConsumer.EVM2AnyGEMessage memory message)
     internal
-    routerIsSet
     returns (bytes32 messageId)
   {
     return i_router.ccipSend(destinationChainId, message);
@@ -92,14 +93,6 @@ abstract contract CCIPConsumer is IAny2EVMMessageReceiver, IERC165 {
    */
   modifier onlyRouter() {
     if (msg.sender != address(i_router)) revert InvalidRouter(msg.sender);
-    _;
-  }
-
-  /**
-   * @dev reverts if the router is set to the zero address
-   */
-  modifier routerIsSet() {
-    if (address(i_router) == address(0)) revert InvalidRouter(address(0));
     _;
   }
 }

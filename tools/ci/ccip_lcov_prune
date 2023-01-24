@@ -5,7 +5,6 @@ set -e
 lcov --remove $1 -o $2 \
   '*/ccip/test/*' \
   'src/v0.8/ccip/ocr/OCR2Abstract.sol' \
-  'src/v0.8/ccip/applications/TollSenderDapp.sol' \
   'src/v0.8/ccip/models/Toll.sol' \
   'src/v0.8/ccip/models/TollConsumer.sol' \
   'src/v0.8/ccip/offRamp/toll/*' \

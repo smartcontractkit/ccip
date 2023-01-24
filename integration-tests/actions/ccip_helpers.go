@@ -234,7 +234,6 @@ type SourceCCIPModule struct {
 	// toll
 	TollOnRampRouter *ccip.TollOnRampRouter
 	TollOnRamp       *ccip.TollOnRamp
-	TollSender       *ccip.TollSender
 
 	// GE
 	GEOnRamp *ccip.GEOnRamp

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../TokenSetup.t.sol";
-import "../../../applications/ReceiverDapp.sol";
-import "../../mocks/MockTollOffRampRouter.sol";
+import "../TokenSetup.t.sol";
+import "../../applications/ReceiverDapp.sol";
+import "../mocks/MockTollOffRampRouter.sol";
 
 // setup
 contract ReceiverDappSetup is TokenSetup {
@@ -17,7 +17,7 @@ contract ReceiverDappSetup is TokenSetup {
     s_feeToken = IERC20(s_destFeeToken);
 
     s_mockRouter = new MockTollOffRampRouter();
-    s_receiverDapp = new ReceiverDapp(s_mockRouter);
+    s_receiverDapp = new ReceiverDapp(address(s_mockRouter));
 
     IERC20(s_destTokens[0]).transfer(address(s_receiverDapp), 2**64);
     IERC20(s_destTokens[1]).transfer(address(s_receiverDapp), 2**64);
@@ -25,16 +25,16 @@ contract ReceiverDappSetup is TokenSetup {
 }
 
 /// @notice #constructor
-contract EVM2EVMTollReceiverDapp_constructor is ReceiverDappSetup {
+contract ReceiverDapp_constructor is ReceiverDappSetup {
   // Success
   function testSuccess() public {
     // typeAndVersion
-    assertEq("ReceiverDapp 1.0.0", s_receiverDapp.typeAndVersion());
+    assertEq("ReceiverDapp 2.0.0", s_receiverDapp.typeAndVersion());
   }
 }
 
 /// @notice #ccipReceive
-contract EVM2EVMTollReceiverDapp_ccipReceive is ReceiverDappSetup {
+contract ReceiverDapp_ccipReceive is ReceiverDappSetup {
   // Success
 
   function testSuccess() public {
@@ -53,14 +53,5 @@ contract EVM2EVMTollReceiverDapp_ccipReceive is ReceiverDappSetup {
 
     assertEq(transferAmount, s_feeToken.balanceOf(OWNER) - startingBalanceOwner);
     assertEq(transferAmount, startingBalanceContract - s_feeToken.balanceOf(address(s_receiverDapp)));
-  }
-
-  // Revert
-
-  function testInvalidDelivererReverts() public {
-    vm.expectRevert(abi.encodeWithSelector(ReceiverDapp.InvalidDeliverer.selector, OWNER));
-    Common.Any2EVMMessage memory message;
-
-    s_receiverDapp.ccipReceive(message);
   }
 }

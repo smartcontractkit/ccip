@@ -1,7 +1,0 @@
-{
-  "i_destinationChainId()": "a7217195",
-  "i_destinationContract()": "5c1b583a",
-  "i_onRampRouter()": "89f9ad2a",
-  "sendTokens(address,(address,uint256)[])": "f9913125",
-  "typeAndVersion()": "181f5a77"
-}

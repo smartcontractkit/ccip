@@ -30,7 +30,6 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/mock_afn_contract"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/simple_message_receiver"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/toll_sender_dapp"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
@@ -240,26 +239,6 @@ func (e *CCIPContractsDeployer) DeployReceiverDapp(toRevert bool) (
 	return &ReceiverDapp{
 		client:     e.evmClient,
 		instance:   instance.(*maybe_revert_message_receiver.MaybeRevertMessageReceiver),
-		EthAddress: *address,
-	}, err
-}
-
-func (e *CCIPContractsDeployer) DeployTollSenderDapp(
-	onRampRouter, receiver common.Address,
-	destChainId uint64,
-) (
-	*TollSender,
-	error,
-) {
-	address, _, instance, err := e.evmClient.DeployContract("TollSenderDapp", func(
-		auth *bind.TransactOpts,
-		backend bind.ContractBackend,
-	) (common.Address, *types.Transaction, interface{}, error) {
-		return toll_sender_dapp.DeployTollSenderDapp(auth, backend, onRampRouter, destChainId, receiver)
-	})
-	return &TollSender{
-		client:     e.evmClient,
-		instance:   instance.(*toll_sender_dapp.TollSenderDapp),
 		EthAddress: *address,
 	}, err
 }

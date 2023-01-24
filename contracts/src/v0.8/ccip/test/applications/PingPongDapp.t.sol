@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../../applications/PingPongDemo.sol";
-import "../../onRamp/ge/EVM2EVMGEOnRampSetup.t.sol";
-import "../../../models/Common.sol";
+import "../../applications/PingPongDemo.sol";
+import "../onRamp/ge/EVM2EVMGEOnRampSetup.t.sol";
+import "../../models/Common.sol";
 
 // setup
 contract PingPongDappSetup is EVM2EVMGEOnRampSetup {

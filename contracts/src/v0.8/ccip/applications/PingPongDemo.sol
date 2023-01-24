@@ -7,6 +7,7 @@ import "./CCIPConsumer.sol";
 
 import {IERC20} from "../../vendor/IERC20.sol";
 
+/// @title PingPongDemo - A simple ping-pong contract for demonstrating cross-chain communication
 contract PingPongDemo is CCIPConsumer, OwnerIsCreator {
   event Ping(uint256 pingPongCount);
   event Pong(uint256 pingPongCount);

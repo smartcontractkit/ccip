@@ -9,6 +9,7 @@ import "./CCIPConsumer.sol";
 
 import {IERC20} from "../../vendor/IERC20.sol";
 
+/// @title GovernanceDapp - Example of a Governance Dapp using CCIPConsumer
 contract GovernanceDapp is CCIPConsumer, TypeAndVersionInterface, OwnerIsCreator {
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "GovernanceDapp 1.0.0";

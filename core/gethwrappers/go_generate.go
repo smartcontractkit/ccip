@@ -101,7 +101,6 @@ package gethwrappers
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2EVMTollOffRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMTollOffRamp.bin EVM2EVMTollOffRamp evm_2_evm_toll_offramp
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/Any2EVMTollOffRampRouter.abi ../../contracts/solc/v0.8.15/Any2EVMTollOffRampRouter.bin Any2EVMTollOffRampRouter any_2_evm_toll_offramp_router
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2EVMTollOffRampHelper.abi ../../contracts/solc/v0.8.15/EVM2EVMTollOffRampHelper.bin EVM2EVMTollOffRampHelper any_2_evm_toll_offramp_helper
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/TollSenderDapp.abi ../../contracts/solc/v0.8.15/TollSenderDapp.bin TollSenderDapp toll_sender_dapp
 
 // GE
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2EVMGEOnRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMGEOnRamp.bin EVM2EVMGEOnRamp evm_2_evm_ge_onramp

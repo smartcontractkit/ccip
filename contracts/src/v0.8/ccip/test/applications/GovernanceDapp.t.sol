@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../../applications/GovernanceDapp.sol";
-import "../../onRamp/ge/EVM2EVMGEOnRampSetup.t.sol";
+import "../../applications/GovernanceDapp.sol";
+import "../onRamp/ge/EVM2EVMGEOnRampSetup.t.sol";
 
 // setup
 contract GovernanceDappSetup is EVM2EVMGEOnRampSetup {

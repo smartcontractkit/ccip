@@ -22,7 +22,6 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/mock_afn_contract"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/simple_message_receiver"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/toll_sender_dapp"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
 )
 
@@ -380,35 +379,6 @@ type ReceiverDapp struct {
 
 func (rDapp *ReceiverDapp) Address() string {
 	return rDapp.EthAddress.Hex()
-}
-
-type TollSender struct {
-	client     *blockchain.EthereumClient
-	instance   *toll_sender_dapp.TollSenderDapp
-	EthAddress common.Address
-}
-
-func (sender *TollSender) Address() string {
-	return sender.EthAddress.Hex()
-}
-
-func (sender *TollSender) SendTokens(
-	receiverAddr common.Address,
-	tokens []toll_sender_dapp.CommonEVMTokenAndAmount,
-) (*types.Transaction, error) {
-	opts, err := sender.client.TransactionOpts(sender.client.GetDefaultWallet())
-	if err != nil {
-		return nil, err
-	}
-	log.Info().
-		Str("Receiver Address", receiverAddr.String()).
-		Interface("Tokens", tokens).
-		Msg("Sending tokens")
-	tx, err := sender.instance.SendTokens(opts, receiverAddr, tokens)
-	if err != nil {
-		return nil, err
-	}
-	return tx, sender.client.ProcessTransaction(tx)
 }
 
 type FeeManager struct {
