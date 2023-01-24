@@ -83,7 +83,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 		return nil, err
 	}
 	var eventSignatures EventSignatures
-	var wrapped ocrtypes.ReportingPluginFactory
+	var wrappedPluginFactory ocrtypes.ReportingPluginFactory
 	hashingCtx := hasher.NewKeccakCtx()
 	switch onRampType {
 	case EVM2EVMTollOnRamp:
@@ -99,7 +99,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 			return nil, err2
 		}
 		eventSignatures = GetTollEventSignatures()
-		wrapped = NewTollExecutionReportingPluginFactory(
+		wrappedPluginFactory = NewTollExecutionReportingPluginFactory(
 			TollExecutionPluginConfig{
 				lggr:                lggr,
 				source:              sourceChain.LogPoller(),
@@ -129,7 +129,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 			return nil, err2
 		}
 		eventSignatures = GetGEEventSignatures()
-		wrapped = NewGEExecutionReportingPluginFactory(
+		wrappedPluginFactory = NewGEExecutionReportingPluginFactory(
 			GEExecutionPluginConfig{
 				lggr:                lggr,
 				source:              sourceChain.LogPoller(),
@@ -174,7 +174,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	if err2 != nil {
 		return nil, errors.Wrap(err2, "get chainset")
 	}
-	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrapped, "CCIPExecution", string(spec.Relay), chain.ID())
+	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPExecution", string(spec.Relay), chain.ID())
 	oracle, err := libocr2.NewOracle(argsNoPlugin)
 	if err != nil {
 		return nil, err
@@ -192,4 +192,3 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	}
 	return []job.ServiceCtx{job.NewServiceAdapter(oracle)}, nil
 }
-

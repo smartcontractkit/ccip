@@ -161,8 +161,8 @@ func NewCommitServices(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet ev
 	if err2 != nil {
 		return nil, errors.Wrap(err2, "get chainset")
 	}
-	wrapped := NewCommitReportingPluginFactory(lggr, sourceChain.LogPoller(), commitStore, onRampSeqParsers, onRampToReqEventSig, onRamps, onRampToHasher, inflightCacheExpiry)
-	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrapped, "CCIPCommit", string(spec.Relay), chain.ID())
+	wrappedPluginFactory := NewCommitReportingPluginFactory(lggr, sourceChain.LogPoller(), commitStore, onRampSeqParsers, onRampToReqEventSig, onRamps, onRampToHasher, inflightCacheExpiry)
+	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPCommit", string(spec.Relay), chain.ID())
 	oracle, err := libocr2.NewOracle(argsNoPlugin)
 	if err != nil {
 		return nil, err
@@ -180,4 +180,3 @@ func NewCommitServices(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet ev
 	}
 	return []job.ServiceCtx{job.NewServiceAdapter(oracle)}, nil
 }
-
