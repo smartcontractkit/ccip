@@ -10,7 +10,6 @@ import {IERC20} from "../../vendor/IERC20.sol";
 contract OffRampTokenPoolRegistry is OwnerIsCreator {
   error InvalidTokenPoolConfig();
   error PoolAlreadyAdded();
-  error NoPools();
   error PoolDoesNotExist();
   error TokenPoolMismatch();
 
@@ -65,10 +64,6 @@ contract OffRampTokenPoolRegistry is OwnerIsCreator {
   }
 
   function removePool(IERC20 token, IPool pool) public onlyOwner {
-    // Check that there are any pools to remove
-    uint256 listLength = s_sourceTokenList.length;
-    if (listLength == 0) revert NoPools();
-
     PoolConfig memory oldConfig = s_poolsBySourceToken[token];
     // Check if the pool exists
     if (address(oldConfig.pool) == address(0)) revert PoolDoesNotExist();
@@ -78,6 +73,7 @@ contract OffRampTokenPoolRegistry is OwnerIsCreator {
     // In the list, swap the pool token in question with the last item,
     // Update the index of the item swapped, then pop from the list to remove.
 
+    uint256 listLength = s_sourceTokenList.length;
     IERC20 lastItem = s_sourceTokenList[listLength - 1];
     // Perform swap
     s_sourceTokenList[listLength - 1] = s_sourceTokenList[oldConfig.listIndex];
