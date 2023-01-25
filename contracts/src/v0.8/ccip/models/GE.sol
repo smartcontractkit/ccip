@@ -10,7 +10,7 @@ library GE {
   struct FeeUpdate {
     address sourceFeeToken;
     uint64 destChainId;
-    uint128 linkPerUnitGas;
+    uint128 feeTokenBaseUnitsPerUnitGas;
   }
 
   struct ExecutionReport {

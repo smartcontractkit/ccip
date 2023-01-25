@@ -49,9 +49,9 @@ func DecodeGEExecutionReport(report types.Report) (*evm_2_evm_ge_offramp.GEExecu
 		TokenPerFeeCoinAddresses []common.Address `json:"tokenPerFeeCoinAddresses"`
 		TokenPerFeeCoin          []*big.Int       `json:"tokenPerFeeCoin"`
 		FeeUpdates               []struct {
-			SourceFeeToken common.Address `json:"sourceFeeToken"`
-			DestChainId    uint64         `json:"destChainId"`
-			LinkPerUnitGas *big.Int       `json:"linkPerUnitGas"`
+			SourceFeeToken              common.Address `json:"sourceFeeToken"`
+			DestChainId                 uint64         `json:"destChainId"`
+			FeeTokenBaseUnitsPerUnitGas *big.Int       `json:"feeTokenBaseUnitsPerUnitGas"`
 		} `json:"feeUpdates"`
 		EncodedMessages    [][]byte    `json:"encodedMessages"`
 		InnerProofs        [][32]uint8 `json:"innerProofs"`
@@ -71,9 +71,9 @@ func DecodeGEExecutionReport(report types.Report) (*evm_2_evm_ge_offramp.GEExecu
 
 	for _, feeUpdate := range erStruct.FeeUpdates {
 		er.FeeUpdates = append(er.FeeUpdates, evm_2_evm_ge_offramp.GEFeeUpdate{
-			SourceFeeToken: feeUpdate.SourceFeeToken,
-			DestChainId:    feeUpdate.DestChainId,
-			LinkPerUnitGas: feeUpdate.LinkPerUnitGas,
+			SourceFeeToken:              feeUpdate.SourceFeeToken,
+			DestChainId:                 feeUpdate.DestChainId,
+			FeeTokenBaseUnitsPerUnitGas: feeUpdate.FeeTokenBaseUnitsPerUnitGas,
 		})
 	}
 
@@ -284,7 +284,7 @@ func (r *GEExecutionReportingPlugin) Observation(ctx context.Context, timestamp 
 
 func (r *GEExecutionReportingPlugin) generateFeeUpdate(token common.Address, sourceGasPrice *big.Int, juelsPerFeeCoin *big.Int) []evm_2_evm_ge_offramp.GEFeeUpdate {
 	// TODO: Check gas fee updated logs
-	linkPerUnitGas := big.NewInt(0).Div(big.NewInt(0).Mul(sourceGasPrice, juelsPerFeeCoin), big.NewInt(1e18))
+	feeTokenBaseUnitsPerUnitGas := big.NewInt(0).Div(big.NewInt(0).Mul(sourceGasPrice, juelsPerFeeCoin), big.NewInt(1e18))
 	return []evm_2_evm_ge_offramp.GEFeeUpdate{
 		{
 			SourceFeeToken: token,
@@ -293,7 +293,7 @@ func (r *GEExecutionReportingPlugin) generateFeeUpdate(token common.Address, sou
 			DestChainId: r.config.sourceChainID,
 			// (juels/eth) * (wei / gas) / (1 eth / 1e18 wei) = juels/gas
 			// TODO: Think more about this offchain/onchain computation split
-			LinkPerUnitGas: linkPerUnitGas,
+			FeeTokenBaseUnitsPerUnitGas: feeTokenBaseUnitsPerUnitGas,
 		},
 	}
 }

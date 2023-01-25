@@ -423,7 +423,7 @@ func makeExecutionReportArgs() abi.Arguments {
 							Type: "uint64",
 						},
 						{
-							Name: "linkPerUnitGas",
+							Name: "feeTokenBaseUnitsPerUnitGas",
 							Type: "uint256",
 						},
 					},

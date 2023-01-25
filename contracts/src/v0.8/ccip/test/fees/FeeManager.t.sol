@@ -15,37 +15,41 @@ contract FeeManagerSetup is TokenSetup {
   function setUp() public virtual override {
     TokenSetup.setUp();
     GE.FeeUpdate[] memory fees = new GE.FeeUpdate[](1);
-    fees[0] = GE.FeeUpdate({sourceFeeToken: s_sourceTokens[0], destChainId: DEST_CHAIN_ID, linkPerUnitGas: 100});
+    fees[0] = GE.FeeUpdate({
+      sourceFeeToken: s_sourceTokens[0],
+      destChainId: DEST_CHAIN_ID,
+      feeTokenBaseUnitsPerUnitGas: 100
+    });
     address[] memory feeUpdaters = new address[](0);
 
     s_feeManager = new FeeManager(fees, feeUpdaters, uint128(TWELVE_HOURS));
   }
 }
 
-contract FeeManager_getFee is FeeManagerSetup {
+contract FeeManager_getFeeTokenBaseUnitsPerUnitGas is FeeManagerSetup {
   function testGetFeeSuccess() public {
-    assertEq(100, s_feeManager.getFee(s_sourceTokens[0], DEST_CHAIN_ID));
+    assertEq(100, s_feeManager.getFeeTokenBaseUnitsPerUnitGas(s_sourceTokens[0], DEST_CHAIN_ID));
   }
 
   function testUnsupportedTokenReverts() public {
     vm.expectRevert(
       abi.encodeWithSelector(IFeeManager.TokenOrChainNotSupported.selector, s_sourceTokens[1], DEST_CHAIN_ID)
     );
-    s_feeManager.getFee(s_sourceTokens[1], DEST_CHAIN_ID);
+    s_feeManager.getFeeTokenBaseUnitsPerUnitGas(s_sourceTokens[1], DEST_CHAIN_ID);
   }
 
   function testUnsupportedChainReverts() public {
     vm.expectRevert(
       abi.encodeWithSelector(IFeeManager.TokenOrChainNotSupported.selector, s_sourceTokens[0], DEST_CHAIN_ID + 1)
     );
-    s_feeManager.getFee(s_sourceTokens[0], DEST_CHAIN_ID + 1);
+    s_feeManager.getFeeTokenBaseUnitsPerUnitGas(s_sourceTokens[0], DEST_CHAIN_ID + 1);
   }
 
   function testGetFeeStaleReverts() public {
     uint256 diff = TWELVE_HOURS + 1;
     vm.warp(block.timestamp + diff);
     vm.expectRevert(abi.encodeWithSelector(IFeeManager.StaleFee.selector, TWELVE_HOURS, diff));
-    s_feeManager.getFee(s_sourceTokens[0], DEST_CHAIN_ID);
+    s_feeManager.getFeeTokenBaseUnitsPerUnitGas(s_sourceTokens[0], DEST_CHAIN_ID);
   }
 }
 

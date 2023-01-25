@@ -35,7 +35,11 @@ contract EVM2EVMGEOnRampSetup is TokenSetup, GERouterSetup {
     GERouterSetup.setUp();
 
     GE.FeeUpdate[] memory feeUpdates = new GE.FeeUpdate[](1);
-    feeUpdates[0] = GE.FeeUpdate({sourceFeeToken: s_sourceTokens[0], destChainId: DEST_CHAIN_ID, linkPerUnitGas: 100});
+    feeUpdates[0] = GE.FeeUpdate({
+      sourceFeeToken: s_sourceTokens[0],
+      destChainId: DEST_CHAIN_ID,
+      feeTokenBaseUnitsPerUnitGas: 100
+    });
     address[] memory feeUpdaters = new address[](0);
     s_IFeeManager = new FeeManager(feeUpdates, feeUpdaters, uint128(TWELVE_HOURS));
 

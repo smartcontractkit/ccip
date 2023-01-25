@@ -138,12 +138,16 @@ contract EVM2EVMGEOnRamp is IEVM2EVMGEOnRamp, BaseOnRamp, TypeAndVersionInterfac
   /// @inheritdoc IEVM2AnyGEOnRamp
   function getFee(GEConsumer.EVM2AnyGEMessage calldata message) public view override returns (uint256 fee) {
     uint256 gasLimit = _fromBytes(message.extraArgs).gasLimit;
-    uint256 linkPerUnitGas = IFeeManager(s_feeConfig.feeManager).getFee(message.feeToken, s_feeConfig.destChainId);
-    if (linkPerUnitGas == 0) revert IFeeManager.TokenOrChainNotSupported(message.feeToken, s_feeConfig.destChainId);
+    uint256 feeTokenBaseUnitsPerUnitGas = IFeeManager(s_feeConfig.feeManager).getFeeTokenBaseUnitsPerUnitGas(
+      message.feeToken,
+      s_feeConfig.destChainId
+    );
+    if (feeTokenBaseUnitsPerUnitGas == 0)
+      revert IFeeManager.TokenOrChainNotSupported(message.feeToken, s_feeConfig.destChainId);
 
     return
       s_feeConfig.feeAmount + // Flat fee
-      ((gasLimit + s_feeConfig.destGasOverhead) * linkPerUnitGas * s_feeConfig.multiplier) / // Total gas reserved for tx
+      ((gasLimit + s_feeConfig.destGasOverhead) * feeTokenBaseUnitsPerUnitGas * s_feeConfig.multiplier) / // Total gas reserved for tx
       1 ether; // latest gas reported gas fee with a safety margin
   }
 

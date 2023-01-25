@@ -298,9 +298,9 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(t *testing.T) {
 	// GE Set up
 	sourceFeeManager, err := contractDeployer.DeployFeeManager([]fee_manager.GEFeeUpdate{
 		{
-			SourceFeeToken: common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
-			DestChainId:    sourceCCIP.DestinationChainId,
-			LinkPerUnitGas: big.NewInt(1e9), // 1 gwei
+			SourceFeeToken:              common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
+			DestChainId:                 sourceCCIP.DestinationChainId,
+			FeeTokenBaseUnitsPerUnitGas: big.NewInt(1e9), // 1 gwei
 		},
 	})
 	require.NoError(t, err, "Error on FeeManager deployment")
@@ -655,9 +655,9 @@ func (destCCIP *DestCCIPModule) DeployContracts(t *testing.T, sourceCCIP SourceC
 	// GE
 	destFeeManager, err := contractDeployer.DeployFeeManager([]fee_manager.GEFeeUpdate{
 		{
-			SourceFeeToken: common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
-			DestChainId:    destCCIP.SourceChainId,
-			LinkPerUnitGas: big.NewInt(200e9), // (2e20 juels/eth) * (1 gwei / gas) / (1 eth/1e18)
+			SourceFeeToken:              common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
+			DestChainId:                 destCCIP.SourceChainId,
+			FeeTokenBaseUnitsPerUnitGas: big.NewInt(200e9), // (2e20 juels/eth) * (1 gwei / gas) / (1 eth/1e18)
 		},
 	})
 	require.NoError(t, err, "Error on FeeManager deployment")

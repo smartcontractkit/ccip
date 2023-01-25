@@ -67,7 +67,11 @@ contract GERouter_ccipSend is EVM2EVMGEOnRampSetup {
 
   function testNonLinkFeeTokenSuccess() public {
     GE.FeeUpdate[] memory feeUpdates = new GE.FeeUpdate[](1);
-    feeUpdates[0] = GE.FeeUpdate({sourceFeeToken: s_sourceTokens[1], destChainId: DEST_CHAIN_ID, linkPerUnitGas: 1000});
+    feeUpdates[0] = GE.FeeUpdate({
+      sourceFeeToken: s_sourceTokens[1],
+      destChainId: DEST_CHAIN_ID,
+      feeTokenBaseUnitsPerUnitGas: 1000
+    });
     s_IFeeManager.updateFees(feeUpdates);
 
     GEConsumer.EVM2AnyGEMessage memory message = _generateEmptyMessage();
