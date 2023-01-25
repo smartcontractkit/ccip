@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/job"
 	ccipconfig "github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/promwrapper"
 	"github.com/smartcontractkit/chainlink/core/services/pipeline"
 )
 
@@ -82,7 +83,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 		return nil, err
 	}
 	var eventSignatures EventSignatures
-	var pluginFactory ocrtypes.ReportingPluginFactory
+	var wrappedPluginFactory ocrtypes.ReportingPluginFactory
 	hashingCtx := hasher.NewKeccakCtx()
 	switch onRampType {
 	case EVM2EVMTollOnRamp:
@@ -98,7 +99,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 			return nil, err2
 		}
 		eventSignatures = GetTollEventSignatures()
-		pluginFactory = NewTollExecutionReportingPluginFactory(
+		wrappedPluginFactory = NewTollExecutionReportingPluginFactory(
 			TollExecutionPluginConfig{
 				lggr:                lggr,
 				source:              sourceChain.LogPoller(),
@@ -128,7 +129,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 			return nil, err2
 		}
 		eventSignatures = GetGEEventSignatures()
-		pluginFactory = NewGEExecutionReportingPluginFactory(
+		wrappedPluginFactory = NewGEExecutionReportingPluginFactory(
 			GEExecutionPluginConfig{
 				lggr:                lggr,
 				source:              sourceChain.LogPoller(),
@@ -163,7 +164,17 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	if err != nil {
 		return nil, err
 	}
-	argsNoPlugin.ReportingPluginFactory = pluginFactory
+	chainIDInterface, ok := spec.RelayConfig["chainID"]
+	if !ok {
+		return nil, errors.New("chainID must be provided in relay config")
+	}
+	chainID := int64(chainIDInterface.(float64))
+
+	chain, err2 := chainSet.Get(big.NewInt(chainID))
+	if err2 != nil {
+		return nil, errors.Wrap(err2, "get chainset")
+	}
+	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPExecution", string(spec.Relay), chain.ID())
 	oracle, err := libocr2.NewOracle(argsNoPlugin)
 	if err != nil {
 		return nil, err
