@@ -2,11 +2,16 @@
 
 set -e
 
+# src/v0.8/ccip/models/Internal.sol
+# excluded because Foundry marks it as 0% but is actually at 100%
+
+
 lcov --remove $1 -o $2 \
   '*/ccip/test/*' \
   'src/v0.8/ccip/ocr/OCR2Abstract.sol' \
   'src/v0.8/ccip/models/Toll.sol' \
   'src/v0.8/ccip/models/TollConsumer.sol' \
+  'src/v0.8/ccip/models/Internal.sol' \
   'src/v0.8/ccip/offRamp/toll/*' \
   'src/v0.8/ccip/onRamp/toll/*' \
   'src/v0.8/ConfirmedOwnerWithProposal.sol' \
