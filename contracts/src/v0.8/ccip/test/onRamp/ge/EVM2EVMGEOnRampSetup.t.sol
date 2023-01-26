@@ -138,10 +138,9 @@ contract EVM2EVMGEOnRampSetup is TokenSetup, GERouterSetup {
       IEVM2EVMGEOnRamp.DynamicFeeConfig({
         linkToken: s_sourceTokens[0],
         feeAmount: 1,
-        destGasOverhead: 1,
         multiplier: 108e16,
-        feeManager: feeManagerAddress,
-        destChainId: DEST_CHAIN_ID
+        destGasOverhead: 1,
+        feeManager: feeManagerAddress
       });
   }
 }

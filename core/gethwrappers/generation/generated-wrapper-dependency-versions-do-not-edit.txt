@@ -19,7 +19,7 @@ custom_token_pool: ../../contracts/solc/v0.8.15/CustomTokenPool.abi ../../contra
 derived_price_feed_wrapper: ../../contracts/solc/v0.8.6/DerivedPriceFeed.abi ../../contracts/solc/v0.8.6/DerivedPriceFeed.bin c8542e6c850c2d0fffb79a7f7213dc927ec64e6ddd54e1224cb2fb4a13aabdd0
 evm_2_any_toll_onramp_router: ../../contracts/solc/v0.8.15/EVM2AnyTollOnRampRouter.abi ../../contracts/solc/v0.8.15/EVM2AnyTollOnRampRouter.bin 29a19adb047787efa95fc86f52c87f38997b633bbccd91fcc66f9cc5e99b2103
 evm_2_evm_ge_offramp: ../../contracts/solc/v0.8.15/EVM2EVMGEOffRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMGEOffRamp.bin 35083b526728354c11b680f33ac69f59753893c546faf8f318048490145efd58
-evm_2_evm_ge_onramp: ../../contracts/solc/v0.8.15/EVM2EVMGEOnRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMGEOnRamp.bin 3d152ba4689c32beb508a4dfaf8d32ef5d92c7cfe9fb27ca89c20c35e75e501b
+evm_2_evm_ge_onramp: ../../contracts/solc/v0.8.15/EVM2EVMGEOnRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMGEOnRamp.bin fab7f443e7c1b1e40e5fa2b2cd5ef57a3416c2609830037f20071da15e2ec966
 evm_2_evm_toll_offramp: ../../contracts/solc/v0.8.15/EVM2EVMTollOffRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMTollOffRamp.bin 3cf8e101941f387a73c658953f3f6a7bebba06d03a86ca7315cbd168fdb9adb9
 evm_2_evm_toll_onramp: ../../contracts/solc/v0.8.15/EVM2EVMTollOnRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMTollOnRamp.bin ffb7828991c494b6e3c88ba5c4216a35f3885357030ccae817cff838ed62d0ed
 fee_manager: ../../contracts/solc/v0.8.15/FeeManager.abi ../../contracts/solc/v0.8.15/FeeManager.bin 622920656308fb84b1e160f20ab74472f0fb196eaa3d9b153e4bf95b4df5093b

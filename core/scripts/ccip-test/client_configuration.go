@@ -58,10 +58,9 @@ func (client *CCIPClient) setOnRampFeeConfig(t *testing.T) {
 	tx, err := client.Source.OnRamp.SetFeeConfig(client.Source.Owner, evm_2_evm_ge_onramp.IEVM2EVMGEOnRampDynamicFeeConfig{
 		LinkToken:       client.Source.LinkTokenAddress,
 		FeeAmount:       big.NewInt(100),
-		DestGasOverhead: big.NewInt(0),
-		Multiplier:      big.NewInt(1),
+		DestGasOverhead: 0,
+		Multiplier:      1e18,
 		FeeManager:      client.Source.FeeManager.Address(),
-		DestChainId:     client.Dest.ChainId,
 	})
 	require.NoError(t, err)
 	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)

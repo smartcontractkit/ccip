@@ -6,6 +6,7 @@ import {GE} from "../../models/GE.sol";
 
 interface IEVM2EVMGEOnRamp is IEVM2AnyGEOnRamp {
   error InvalidExtraArgsTag(bytes4 expected, bytes4 got);
+  error OnlyCallableByOwnerOrFeeAdmin();
 
   event FeeAdminSet(address feeAdmin);
   event FeeConfigSet(DynamicFeeConfig feeConfig);
@@ -16,17 +17,10 @@ interface IEVM2EVMGEOnRamp is IEVM2AnyGEOnRamp {
   function setFeeConfig(DynamicFeeConfig calldata feeConfig) external;
 
   struct DynamicFeeConfig {
-    // LINK
-    address linkToken;
-    // Flat fee in LINK
-    uint256 feeAmount;
-    // Extra gas charged on top of the gasLimit
-    uint256 destGasOverhead;
-    // Price multiplier for gas costs
-    uint256 multiplier;
-    // Fee manager contract
-    address feeManager;
-    // Destination chain ID
-    uint64 destChainId;
+    address linkToken; // -----┐    LINK token address
+    uint96 feeAmount; // ------┘    Flat fee in LINK
+    uint64 multiplier; // -----┐    Price multiplier for gas costs
+    uint32 destGasOverhead; // |    Extra gas charged on top of the gasLimit
+    address feeManager; // ----┘    Fee manager contract
   }
 }

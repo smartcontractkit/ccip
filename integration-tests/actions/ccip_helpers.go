@@ -319,10 +319,9 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(t *testing.T) {
 		evm_2_evm_ge_onramp.IEVM2EVMGEOnRampDynamicFeeConfig{
 			LinkToken:       common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
 			FeeAmount:       big.NewInt(0),
-			DestGasOverhead: big.NewInt(0),
-			Multiplier:      big.NewInt(1e18),
+			DestGasOverhead: 0,
+			Multiplier:      1e18,
 			FeeManager:      sourceFeeManager.EthAddress,
-			DestChainId:     sourceCCIP.DestinationChainId,
 		})
 
 	require.NoError(t, err, "Error on GEOnRamp deployment")

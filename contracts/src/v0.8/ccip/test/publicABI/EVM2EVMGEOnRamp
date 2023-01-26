@@ -26,7 +26,7 @@
   "setAllowlist(address[])": "552b818b",
   "setAllowlistEnabled(bool)": "d7644ba2",
   "setFeeAdmin(address)": "6eb2d031",
-  "setFeeConfig((address,uint256,uint256,uint256,address,uint64))": "a11855be",
+  "setFeeConfig((address,uint96,uint64,uint32,address))": "c15c7f8e",
   "setOnRampConfig((uint64,uint32,uint16,uint64))": "dcd210f1",
   "setPrices(address[],uint256[])": "4352fa9f",
   "setRateLimiterConfig((uint256,uint256))": "91872543",

@@ -5,7 +5,7 @@ import "./EVM2EVMGEOnRampSetup.t.sol";
 
 /// @notice #constructor
 contract EVM2EVMGEOnRamp_constructor is EVM2EVMGEOnRampSetup {
-  function testSuccess() public {
+  function testConstructorSuccess() public {
     // typeAndVersion
     assertEq("EVM2EVMGEOnRamp 1.0.0", s_onRamp.typeAndVersion());
 
@@ -188,5 +188,69 @@ contract EVM2EVMGEOnRamp_forwardFromRouter is EVM2EVMGEOnRampSetup {
     );
     vm.expectRevert(abi.encodeWithSelector(IBaseOnRamp.MessageGasLimitTooHigh.selector));
     s_onRamp.forwardFromRouter(message, 0, OWNER);
+  }
+}
+
+/// @notice #setFeeAdmin
+contract EVM2EVMGEOnRamp_setFeeAdmin is EVM2EVMGEOnRampSetup {
+  event FeeAdminSet(address feeAdmin);
+
+  function testOwnerSetFeeAdminSuccess() public {
+    address newAdmin = address(13371337);
+
+    vm.expectEmit(false, false, false, true);
+    emit FeeAdminSet(newAdmin);
+
+    s_onRamp.setFeeAdmin(newAdmin);
+  }
+
+  // Reverts
+
+  function testOnlyCallableByOwnerReverts() public {
+    address newAdmin = address(13371337);
+    changePrank(STRANGER);
+
+    vm.expectRevert("Only callable by owner");
+
+    s_onRamp.setFeeAdmin(newAdmin);
+  }
+}
+
+/// @notice #setFeeConfig
+contract EVM2EVMGEOnRamp_setFeeConfig is EVM2EVMGEOnRampSetup {
+  event FeeConfigSet(IEVM2EVMGEOnRamp.DynamicFeeConfig feeConfig);
+
+  function testSetFeeConfigSuccess() public {
+    IEVM2EVMGEOnRamp.DynamicFeeConfig memory feeConfig;
+
+    vm.expectEmit(false, false, false, true);
+    emit FeeConfigSet(feeConfig);
+
+    s_onRamp.setFeeConfig(feeConfig);
+  }
+
+  function testSetFeeConfigByFeeAdminSuccess() public {
+    address newAdmin = address(13371337);
+    s_onRamp.setFeeAdmin(newAdmin);
+
+    IEVM2EVMGEOnRamp.DynamicFeeConfig memory feeConfig;
+
+    changePrank(newAdmin);
+
+    vm.expectEmit(false, false, false, true);
+    emit FeeConfigSet(feeConfig);
+
+    s_onRamp.setFeeConfig(feeConfig);
+  }
+
+  // Reverts
+
+  function testOnlyCallableByOwnerOrFeeAdminReverts() public {
+    IEVM2EVMGEOnRamp.DynamicFeeConfig memory feeConfig;
+    changePrank(STRANGER);
+
+    vm.expectRevert(IEVM2EVMGEOnRamp.OnlyCallableByOwnerOrFeeAdmin.selector);
+
+    s_onRamp.setFeeConfig(feeConfig);
   }
 }

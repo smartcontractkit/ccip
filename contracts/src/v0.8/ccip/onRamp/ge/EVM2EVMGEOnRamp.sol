@@ -140,10 +140,10 @@ contract EVM2EVMGEOnRamp is IEVM2EVMGEOnRamp, BaseOnRamp, TypeAndVersionInterfac
     uint256 gasLimit = _fromBytes(message.extraArgs).gasLimit;
     uint256 feeTokenBaseUnitsPerUnitGas = IFeeManager(s_feeConfig.feeManager).getFeeTokenBaseUnitsPerUnitGas(
       message.feeToken,
-      s_feeConfig.destChainId
+      i_destinationChainId
     );
     if (feeTokenBaseUnitsPerUnitGas == 0)
-      revert IFeeManager.TokenOrChainNotSupported(message.feeToken, s_feeConfig.destChainId);
+      revert IFeeManager.TokenOrChainNotSupported(message.feeToken, i_destinationChainId);
 
     return
       s_feeConfig.feeAmount + // Flat fee
@@ -163,8 +163,13 @@ contract EVM2EVMGEOnRamp is IEVM2EVMGEOnRamp, BaseOnRamp, TypeAndVersionInterfac
   }
 
   /// @inheritdoc IEVM2EVMGEOnRamp
-  function setFeeConfig(DynamicFeeConfig calldata feeConfig) external override onlyOwner {
+  function setFeeConfig(DynamicFeeConfig calldata feeConfig) external override onlyOwnerOrFeeAdmin {
     s_feeConfig = feeConfig;
     emit FeeConfigSet(feeConfig);
+  }
+
+  modifier onlyOwnerOrFeeAdmin() {
+    if (msg.sender != owner() && msg.sender != s_feeAdmin) revert OnlyCallableByOwnerOrFeeAdmin();
+    _;
   }
 }

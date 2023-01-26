@@ -575,10 +575,9 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		evm_2_evm_ge_onramp.IEVM2EVMGEOnRampDynamicFeeConfig{
 			LinkToken:       sourceLinkTokenAddress,
 			FeeAmount:       big.NewInt(0),
-			DestGasOverhead: big.NewInt(0),
-			Multiplier:      big.NewInt(1e18),
+			DestGasOverhead: 0,
+			Multiplier:      1e18,
 			FeeManager:      sourceFeeManagerAddress,
-			DestChainId:     destChainID,
 		},
 	)
 	require.NoError(t, err)
