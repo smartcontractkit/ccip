@@ -38,14 +38,14 @@ import (
 
 // CCIPContractsDeployer provides the implementations for deploying CCIP ETH contracts
 type CCIPContractsDeployer struct {
-	evmClient   *blockchain.EthereumClient
+	evmClient   blockchain.EVMClient
 	EthDeployer *contracts.EthereumContractDeployer
 }
 
 // NewCCIPContractsDeployer returns an instance of a contract deployer for CCIP
 func NewCCIPContractsDeployer(bcClient blockchain.EVMClient) (*CCIPContractsDeployer, error) {
 	return &CCIPContractsDeployer{
-		evmClient:   bcClient.Get().(*blockchain.EthereumClient),
+		evmClient:   bcClient,
 		EthDeployer: contracts.NewEthereumContractDeployer(bcClient),
 	}, nil
 }
@@ -62,7 +62,9 @@ func (e *CCIPContractsDeployer) NewLockReleaseTokenPoolContract(addr common.Addr
 	*LockReleaseTokenPool,
 	error,
 ) {
-	pool, err := lock_release_token_pool.NewLockReleaseTokenPool(addr, e.evmClient.Client)
+
+	pool, err := lock_release_token_pool.NewLockReleaseTokenPool(addr, e.evmClient.Backend())
+
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +120,7 @@ func (e *CCIPContractsDeployer) DeployAFNContract() (*AFN, error) {
 }
 
 func (e *CCIPContractsDeployer) NewAFNContract(addr common.Address) (*AFN, error) {
-	afn, err := mock_afn_contract.NewMockAFNContract(addr, e.evmClient.Client)
+	afn, err := mock_afn_contract.NewMockAFNContract(addr, e.evmClient.Backend())
 	log.Info().
 		Str("Contract Address", addr.Hex()).
 		Str("Contract Name", "Mock AFN Contract").
@@ -328,7 +330,7 @@ func (e *CCIPContractsDeployer) NewGERouter(addr common.Address) (
 	*GERouter,
 	error,
 ) {
-	r, err := ge_router.NewGERouter(addr, e.evmClient.Client)
+	r, err := ge_router.NewGERouter(addr, e.evmClient.Backend())
 	log.Info().
 		Str("Contract Address", addr.Hex()).
 		Str("Contract Name", "GERouter").

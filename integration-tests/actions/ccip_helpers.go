@@ -88,8 +88,12 @@ var (
 			},
 			"ccip env toml", CLConfig)
 		require.NoError(t, err)
+		fmt.Println("Configuration", ccipTOML)
 		return ccipTOML
 	}
+
+	networkAName = strings.ReplaceAll(strings.ToLower(NetworkA.Name), " ", "-")
+	networkBName = strings.ReplaceAll(strings.ToLower(NetworkB.Name), " ", "-")
 )
 
 type CCIPCommon struct {
@@ -240,15 +244,11 @@ type SourceCCIPModule struct {
 }
 
 // DeployContracts deploys all CCIP contracts specific to the source chain
-func (sourceCCIP *SourceCCIPModule) DeployContracts(t *testing.T) {
+func (sourceCCIP *SourceCCIPModule) DeployContracts(t *testing.T, model BillingModel) {
 	var err error
 	contractDeployer := sourceCCIP.Common.Deployer
 	log.Info().Msg("Deploying source chain specific contracts")
 	<-sourceCCIP.Common.deployed
-
-	// deploy on ramp router
-	sourceCCIP.TollOnRampRouter, err = contractDeployer.DeployTollOnRampRouter()
-	require.NoError(t, err, "Deploying onramp router shouldn't fail")
 
 	var tokens, pools, bridgeTokens []common.Address
 	for _, token := range sourceCCIP.Common.BridgeTokens {
@@ -264,96 +264,112 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(t *testing.T) {
 
 	err = sourceCCIP.Common.ChainClient.WaitForEvents()
 	require.NoError(t, err, "Error waiting for OnRamp deployment")
+	switch model {
+	case TOLL:
+		// deploy on ramp router
+		sourceCCIP.TollOnRampRouter, err = contractDeployer.DeployTollOnRampRouter()
+		require.NoError(t, err, "Deploying onramp router shouldn't fail")
 
-	// onRamp
-	sourceCCIP.TollOnRamp, err = contractDeployer.DeployTollOnRamp(
-		sourceCCIP.Common.ChainClient.GetChainID().Uint64(),
-		sourceCCIP.DestinationChainId,
-		tokens,
-		pools,
-		[]common.Address{},
-		sourceCCIP.Common.AFN.EthAddress,
-		sourceCCIP.TollOnRampRouter.EthAddress,
-		sourceCCIP.Common.RateLimiterConfig)
-	require.NoError(t, err, "Error on OnRamp deployment")
+		// onRamp
+		sourceCCIP.TollOnRamp, err = contractDeployer.DeployTollOnRamp(
+			sourceCCIP.Common.ChainClient.GetChainID().Uint64(),
+			sourceCCIP.DestinationChainId,
+			tokens,
+			pools,
+			[]common.Address{},
+			sourceCCIP.Common.AFN.EthAddress,
+			sourceCCIP.TollOnRampRouter.EthAddress,
+			sourceCCIP.Common.RateLimiterConfig)
+		require.NoError(t, err, "Error on OnRamp deployment")
 
-	err = sourceCCIP.Common.ChainClient.WaitForEvents()
-	require.NoError(t, err, "Error waiting for OnRamp deployment")
+		err = sourceCCIP.Common.ChainClient.WaitForEvents()
+		require.NoError(t, err, "Error waiting for OnRamp deployment")
 
-	// Set bridge token prices on the onRamp
-	err = sourceCCIP.TollOnRamp.SetTokenPrices(bridgeTokens, sourceCCIP.Common.TokenPrices)
-	require.NoError(t, err, "Setting prices shouldn't fail")
+		// Set bridge token prices on the onRamp
+		err = sourceCCIP.TollOnRamp.SetTokenPrices(bridgeTokens, sourceCCIP.Common.TokenPrices)
+		require.NoError(t, err, "Setting prices shouldn't fail")
 
-	// update onRampRouter with OnRamp address
-	err = sourceCCIP.TollOnRampRouter.SetOnRamp(sourceCCIP.DestinationChainId, sourceCCIP.TollOnRamp.EthAddress)
-	require.NoError(t, err, "Error setting onramp on the router")
+		// update onRampRouter with OnRamp address
+		err = sourceCCIP.TollOnRampRouter.SetOnRamp(sourceCCIP.DestinationChainId, sourceCCIP.TollOnRamp.EthAddress)
+		require.NoError(t, err, "Error setting onramp on the router")
 
-	// The Fee token to be used in on+off ramp
-	sourceCCIP.TollFeeAmount = TollFee
+		// The Fee token to be used in on+off ramp
+		sourceCCIP.TollFeeAmount = TollFee
 
-	// set a part of sourceCCIP.TollFeeAmount as onRamp fee rest would be used as offramp
-	err = sourceCCIP.TollOnRamp.SetFeeConfig([]common.Address{common.HexToAddress(sourceCCIP.Common.FeeToken.Address())}, []*big.Int{big.NewInt(1)})
-	require.NoError(t, err, "setting OnRamp Fee config")
+		// set a part of sourceCCIP.TollFeeAmount as onRamp fee rest would be used as offramp
+		err = sourceCCIP.TollOnRamp.SetFeeConfig([]common.Address{common.HexToAddress(sourceCCIP.Common.FeeToken.Address())}, []*big.Int{big.NewInt(1)})
+		require.NoError(t, err, "setting OnRamp Fee config")
 
-	// GE Set up
-	sourceFeeManager, err := contractDeployer.DeployFeeManager([]fee_manager.GEFeeUpdate{
-		{
-			SourceFeeToken:              common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
-			DestChainId:                 sourceCCIP.DestinationChainId,
-			FeeTokenBaseUnitsPerUnitGas: big.NewInt(1e9), // 1 gwei
-		},
-	})
-	require.NoError(t, err, "Error on FeeManager deployment")
-
-	err = sourceCCIP.Common.ChainClient.WaitForEvents()
-	require.NoError(t, err, "Error waiting for events")
-	sourceCCIP.GEOnRamp, err = contractDeployer.DeployGEOnRamp(
-		sourceCCIP.Common.ChainClient.GetChainID().Uint64(),
-		sourceCCIP.DestinationChainId,
-		tokens,
-		pools,
-		[]common.Address{},
-		sourceCCIP.Common.AFN.EthAddress,
-		sourceCCIP.Common.GERouter.EthAddress,
-		sourceCCIP.Common.RateLimiterConfig,
-		evm_2_evm_ge_onramp.IEVM2EVMGEOnRampDynamicFeeConfig{
-			LinkToken:       common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
-			FeeAmount:       big.NewInt(0),
-			DestGasOverhead: 0,
-			Multiplier:      1e18,
-			FeeManager:      sourceFeeManager.EthAddress,
+	case GE:
+		// GE Set up
+		sourceFeeManager, err := contractDeployer.DeployFeeManager([]fee_manager.GEFeeUpdate{
+			{
+				SourceFeeToken:              common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
+				DestChainId:                 sourceCCIP.DestinationChainId,
+				FeeTokenBaseUnitsPerUnitGas: big.NewInt(1e9), // 1 gwei
+			},
 		})
+		require.NoError(t, err, "Error on FeeManager deployment")
 
-	require.NoError(t, err, "Error on GEOnRamp deployment")
+		err = sourceCCIP.Common.ChainClient.WaitForEvents()
+		require.NoError(t, err, "Error waiting for events")
+		sourceCCIP.GEOnRamp, err = contractDeployer.DeployGEOnRamp(
+			sourceCCIP.Common.ChainClient.GetChainID().Uint64(),
+			sourceCCIP.DestinationChainId,
+			tokens,
+			pools,
+			[]common.Address{},
+			sourceCCIP.Common.AFN.EthAddress,
+			sourceCCIP.Common.GERouter.EthAddress,
+			sourceCCIP.Common.RateLimiterConfig,
+			evm_2_evm_ge_onramp.IEVM2EVMGEOnRampDynamicFeeConfig{
+				LinkToken:       common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
+				FeeAmount:       big.NewInt(0),
+				DestGasOverhead: 0,
+				Multiplier:      1e18,
+				FeeManager:      sourceFeeManager.EthAddress,
+			})
 
-	err = sourceCCIP.Common.ChainClient.WaitForEvents()
-	require.NoError(t, err, "Error waiting for events")
+		require.NoError(t, err, "Error on GEOnRamp deployment")
 
-	// Set bridge token prices on the onRamp
-	err = sourceCCIP.GEOnRamp.SetTokenPrices(bridgeTokens, sourceCCIP.Common.TokenPrices)
-	require.NoError(t, err, "Setting prices shouldn't fail")
+		err = sourceCCIP.Common.ChainClient.WaitForEvents()
+		require.NoError(t, err, "Error waiting for events")
 
-	// update onRampRouter with OnRamp address
-	err = sourceCCIP.Common.GERouter.SetOnRamp(sourceCCIP.DestinationChainId, sourceCCIP.GEOnRamp.EthAddress)
-	require.NoError(t, err, "Error setting onramp on the router")
+		// Set bridge token prices on the onRamp
+		err = sourceCCIP.GEOnRamp.SetTokenPrices(bridgeTokens, sourceCCIP.Common.TokenPrices)
+		require.NoError(t, err, "Setting prices shouldn't fail")
 
-	err = sourceCCIP.Common.ChainClient.WaitForEvents()
-	require.NoError(t, err, "Error waiting for events")
+		// update onRampRouter with OnRamp address
+		err = sourceCCIP.Common.GERouter.SetOnRamp(sourceCCIP.DestinationChainId, sourceCCIP.GEOnRamp.EthAddress)
+		require.NoError(t, err, "Error setting onramp on the router")
+
+		err = sourceCCIP.Common.ChainClient.WaitForEvents()
+		require.NoError(t, err, "Error waiting for events")
+	}
 
 	// update native pool with onRamp address
 	for _, pool := range sourceCCIP.Common.BridgeTokenPools {
-		err = pool.SetOnRamp(sourceCCIP.TollOnRamp.EthAddress)
-		require.NoError(t, err, "Error setting tollOnramp on the token pool %s", pool.Address())
-		err = pool.SetOnRamp(sourceCCIP.GEOnRamp.EthAddress)
-		require.NoError(t, err, "Error setting GEOnRamp on the token pool %s", pool.Address())
+		if model == TOLL {
+			err = pool.SetOnRamp(sourceCCIP.TollOnRamp.EthAddress)
+			require.NoError(t, err, "Error setting tollOnramp on the token pool %s", pool.Address())
+		}
+		if model == GE {
+			err = pool.SetOnRamp(sourceCCIP.GEOnRamp.EthAddress)
+			require.NoError(t, err, "Error setting GEOnRamp on the token pool %s", pool.Address())
+		}
 	}
-	err = sourceCCIP.Common.FeeTokenPool.SetOnRamp(sourceCCIP.TollOnRamp.EthAddress)
-	require.NoError(t, err, "Error setting TollOnRamp on the token pool %s", sourceCCIP.Common.FeeTokenPool.Address())
-	err = sourceCCIP.Common.FeeTokenPool.SetOnRamp(sourceCCIP.GEOnRamp.EthAddress)
-	require.NoError(t, err, "Error setting GEOnRamp on the token pool %s", sourceCCIP.Common.FeeTokenPool.Address())
+	if model == TOLL {
+		err = sourceCCIP.Common.FeeTokenPool.SetOnRamp(sourceCCIP.TollOnRamp.EthAddress)
+		require.NoError(t, err, "Error setting TollOnRamp on the token pool %s", sourceCCIP.Common.FeeTokenPool.Address())
+	}
+	if model == GE {
+		err = sourceCCIP.Common.FeeTokenPool.SetOnRamp(sourceCCIP.GEOnRamp.EthAddress)
+		require.NoError(t, err, "Error setting GEOnRamp on the token pool %s", sourceCCIP.Common.FeeTokenPool.Address())
+	}
 
 	err = sourceCCIP.Common.ChainClient.WaitForEvents()
 	require.NoError(t, err, "Error waiting for events")
+
 }
 
 func (sourceCCIP *SourceCCIPModule) CollectBalanceRequirements(t *testing.T, model BillingModel) []testhelpers.BalanceReq {
@@ -509,7 +525,7 @@ func (sourceCCIP *SourceCCIPModule) SendTollRequest(t *testing.T, receiver commo
 		FeeTokenAndAmount: feeToken,
 		ExtraArgs:         extraArgsV1,
 	}
-	log.Info().Interface("msg details", msg).Msg("ccip message to be sent")
+	log.Info().Interface("toll msg details", msg).Msg("ccip message to be sent")
 
 	// initiate the transfer
 	sendTx, err := sourceCCIP.TollOnRampRouter.CCIPSend(sourceCCIP.DestinationChainId, msg)
@@ -541,7 +557,7 @@ func (sourceCCIP *SourceCCIPModule) SendGERequest(
 		FeeToken:         feeToken,
 		ExtraArgs:        extraArgsV1,
 	}
-	log.Info().Interface("msg details", msg).Msg("ccip message to be sent")
+	log.Info().Interface("ge msg details", msg).Msg("ccip message to be sent")
 	fee, err := sourceCCIP.Common.GERouter.GetFee(sourceCCIP.DestinationChainId, msg)
 	require.NoError(t, err, "calculating fee")
 	log.Info().Int64("fee", fee.Int64()).Msg("calculated fee")
@@ -585,21 +601,31 @@ type DestCCIPModule struct {
 }
 
 // DeployContracts deploys all CCIP contracts specific to the destination chain
-func (destCCIP *DestCCIPModule) DeployContracts(t *testing.T, sourceCCIP SourceCCIPModule, wg *sync.WaitGroup) {
+func (destCCIP *DestCCIPModule) DeployContracts(t *testing.T, sourceCCIP SourceCCIPModule, wg *sync.WaitGroup, model BillingModel) {
 	var err error
 	contractDeployer := destCCIP.Common.Deployer
 	log.Info().Msg("Deploying destination chain specific contracts")
 
 	<-destCCIP.Common.deployed
+	var onramps []common.Address
+	var MinSeqNrByOnRamp []uint64
 
+	if model == TOLL {
+		onramps = append(onramps, sourceCCIP.TollOnRamp.EthAddress)
+		MinSeqNrByOnRamp = append(MinSeqNrByOnRamp, 1)
+	}
+	if model == GE {
+		onramps = append(onramps, sourceCCIP.GEOnRamp.EthAddress)
+		MinSeqNrByOnRamp = append(MinSeqNrByOnRamp, 1)
+	}
 	// commitStore responsible for validating the transfer message
 	destCCIP.CommitStore, err = contractDeployer.DeployCommitStore(
 		destCCIP.SourceChainId,
 		destCCIP.Common.ChainClient.GetChainID().Uint64(),
 		destCCIP.Common.AFN.EthAddress,
 		commit_store.ICommitStoreCommitStoreConfig{
-			OnRamps:          []common.Address{sourceCCIP.TollOnRamp.EthAddress, sourceCCIP.GEOnRamp.EthAddress},
-			MinSeqNrByOnRamp: []uint64{1, 1},
+			OnRamps:          onramps,
+			MinSeqNrByOnRamp: MinSeqNrByOnRamp,
 		})
 	require.NoError(t, err, "Deploying CommitStore shouldn't fail")
 	err = destCCIP.Common.ChainClient.WaitForEvents()
@@ -630,61 +656,63 @@ func (destCCIP *DestCCIPModule) DeployContracts(t *testing.T, sourceCCIP SourceC
 	pools = append(pools, destCCIP.Common.FeeTokenPool.EthAddress)
 	err = destCCIP.Common.FeeToken.Transfer(destCCIP.Common.FeeTokenPool.Address(), testhelpers.Link(1000))
 	require.NoError(t, err)
+	switch model {
+	case TOLL:
+		// Toll
+		// offRamp
+		destCCIP.TollOffRamp, err = contractDeployer.DeployTollOffRamp(destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID().Uint64(),
+			destCCIP.CommitStore.EthAddress, sourceCCIP.TollOnRamp.EthAddress, destCCIP.Common.AFN.EthAddress,
+			sourceTokens, pools, destCCIP.Common.RateLimiterConfig)
+		require.NoError(t, err, "Deploying TollOffRamp shouldn't fail")
+		err = destCCIP.Common.ChainClient.WaitForEvents()
+		require.NoError(t, err, "Error waiting for deploying offramp")
+		// Set token prices on the offRamp
+		err = destCCIP.TollOffRamp.SetTokenPrices(destTokens, destCCIP.Common.TokenPrices)
+		require.NoError(t, err, "Setting prices shouldn't fail")
 
-	// Toll
-	// offRamp
-	destCCIP.TollOffRamp, err = contractDeployer.DeployTollOffRamp(destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID().Uint64(),
-		destCCIP.CommitStore.EthAddress, sourceCCIP.TollOnRamp.EthAddress, destCCIP.Common.AFN.EthAddress,
-		sourceTokens, pools, destCCIP.Common.RateLimiterConfig)
-	require.NoError(t, err, "Deploying TollOffRamp shouldn't fail")
-	err = destCCIP.Common.ChainClient.WaitForEvents()
-	require.NoError(t, err, "Error waiting for deploying offramp")
-	// Set token prices on the offRamp
-	err = destCCIP.TollOffRamp.SetTokenPrices(destTokens, destCCIP.Common.TokenPrices)
-	require.NoError(t, err, "Setting prices shouldn't fail")
+		// OffRampRouter
+		destCCIP.TollOffRampRouter, err = contractDeployer.DeployTollOffRampRouter([]common.Address{destCCIP.TollOffRamp.EthAddress})
+		require.NoError(t, err, "Deploying TollOffRampRouter shouldn't fail")
+		err = destCCIP.Common.ChainClient.WaitForEvents()
+		require.NoError(t, err, "Error waiting for deploying OffRampRouter")
+		err = destCCIP.TollOffRamp.SetRouter(destCCIP.TollOffRampRouter.EthAddress)
+		require.NoError(t, err, "Error setting router on the offramp")
+	case GE:
+		// GE
+		destFeeManager, err := contractDeployer.DeployFeeManager([]fee_manager.GEFeeUpdate{
+			{
+				SourceFeeToken:              common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
+				DestChainId:                 destCCIP.SourceChainId,
+				FeeTokenBaseUnitsPerUnitGas: big.NewInt(200e9), // (2e20 juels/eth) * (1 gwei / gas) / (1 eth/1e18)
+			},
+		})
+		require.NoError(t, err, "Error on FeeManager deployment")
 
-	// OffRampRouter
-	destCCIP.TollOffRampRouter, err = contractDeployer.DeployTollOffRampRouter([]common.Address{destCCIP.TollOffRamp.EthAddress})
-	require.NoError(t, err, "Deploying TollOffRampRouter shouldn't fail")
-	err = destCCIP.Common.ChainClient.WaitForEvents()
-	require.NoError(t, err, "Error waiting for deploying OffRampRouter")
-	err = destCCIP.TollOffRamp.SetRouter(destCCIP.TollOffRampRouter.EthAddress)
-	require.NoError(t, err, "Error setting router on the offramp")
+		err = destCCIP.Common.ChainClient.WaitForEvents()
+		require.NoError(t, err, "Error waiting for events on destination contract deployments")
 
-	// GE
-	destFeeManager, err := contractDeployer.DeployFeeManager([]fee_manager.GEFeeUpdate{
-		{
-			SourceFeeToken:              common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
-			DestChainId:                 destCCIP.SourceChainId,
-			FeeTokenBaseUnitsPerUnitGas: big.NewInt(200e9), // (2e20 juels/eth) * (1 gwei / gas) / (1 eth/1e18)
-		},
-	})
-	require.NoError(t, err, "Error on FeeManager deployment")
+		destCCIP.GEOffRamp, err = contractDeployer.DeployGEOffRamp(destCCIP.SourceChainId, sourceCCIP.DestinationChainId,
+			destCCIP.CommitStore.EthAddress, sourceCCIP.GEOnRamp.EthAddress,
+			destCCIP.Common.AFN.EthAddress, common.HexToAddress(destCCIP.Common.FeeToken.Address()),
+			destFeeManager.EthAddress, sourceTokens, pools, destCCIP.Common.RateLimiterConfig, big.NewInt(0))
+		require.NoError(t, err, "Deploying GEOffRamp shouldn't fail")
+		err = destCCIP.Common.ChainClient.WaitForEvents()
+		require.NoError(t, err, "Error waiting for deploying GEOffRamp")
 
-	err = destCCIP.Common.ChainClient.WaitForEvents()
-	require.NoError(t, err, "Error waiting for events on destination contract deployments")
+		// OffRamp can update
+		err = destFeeManager.SetFeeUpdater(destCCIP.GEOffRamp.EthAddress)
+		require.NoError(t, err, "setting GEOffRamp as fee updater shouldn't fail")
 
-	destCCIP.GEOffRamp, err = contractDeployer.DeployGEOffRamp(destCCIP.SourceChainId, sourceCCIP.DestinationChainId,
-		destCCIP.CommitStore.EthAddress, sourceCCIP.GEOnRamp.EthAddress,
-		destCCIP.Common.AFN.EthAddress, common.HexToAddress(destCCIP.Common.FeeToken.Address()),
-		destFeeManager.EthAddress, sourceTokens, pools, destCCIP.Common.RateLimiterConfig, big.NewInt(0))
-	require.NoError(t, err, "Deploying GEOffRamp shouldn't fail")
-	err = destCCIP.Common.ChainClient.WaitForEvents()
-	require.NoError(t, err, "Error waiting for deploying GEOffRamp")
+		_, err = destCCIP.Common.GERouter.AddOffRamp(destCCIP.GEOffRamp.EthAddress)
+		require.NoError(t, err, "setting GEOffRamp as fee updater shouldn't fail")
+		err = destCCIP.Common.ChainClient.WaitForEvents()
+		require.NoError(t, err, "Error waiting for events on destination contract deployments")
+		err = destCCIP.GEOffRamp.SetRouter(destCCIP.Common.GERouter.EthAddress)
+		require.NoError(t, err, "Error setting router on the offramp")
 
-	// OffRamp can update
-	err = destFeeManager.SetFeeUpdater(destCCIP.GEOffRamp.EthAddress)
-	require.NoError(t, err, "setting GEOffRamp as fee updater shouldn't fail")
-
-	_, err = destCCIP.Common.GERouter.AddOffRamp(destCCIP.GEOffRamp.EthAddress)
-	require.NoError(t, err, "setting GEOffRamp as fee updater shouldn't fail")
-	err = destCCIP.Common.ChainClient.WaitForEvents()
-	require.NoError(t, err, "Error waiting for events on destination contract deployments")
-	err = destCCIP.GEOffRamp.SetRouter(destCCIP.Common.GERouter.EthAddress)
-	require.NoError(t, err, "Error setting router on the offramp")
-
-	err = destCCIP.GEOffRamp.SetTokenPrices(destTokens, destCCIP.Common.TokenPrices)
-	require.NoError(t, err, "Setting prices shouldn't fail")
+		err = destCCIP.GEOffRamp.SetTokenPrices(destTokens, destCCIP.Common.TokenPrices)
+		require.NoError(t, err, "Setting prices shouldn't fail")
+	}
 
 	// ReceiverDapp
 	destCCIP.ReceiverDapp, err = contractDeployer.DeployReceiverDapp(false)
@@ -692,17 +720,23 @@ func (destCCIP *DestCCIPModule) DeployContracts(t *testing.T, sourceCCIP SourceC
 
 	// update pools with offRamp id
 	for _, pool := range destCCIP.Common.BridgeTokenPools {
-		err = pool.SetOffRamp(destCCIP.TollOffRamp.EthAddress)
-		require.NoError(t, err, "Error setting TollOffRamp on the token pool %s", pool.Address())
-		err = pool.SetOffRamp(destCCIP.GEOffRamp.EthAddress)
-		require.NoError(t, err, "Error setting GEOffRamp on the token pool %s", pool.Address())
+		if model == TOLL {
+			err = pool.SetOffRamp(destCCIP.TollOffRamp.EthAddress)
+			require.NoError(t, err, "Error setting TollOffRamp on the token pool %s", pool.Address())
+		}
+		if model == GE {
+			err = pool.SetOffRamp(destCCIP.GEOffRamp.EthAddress)
+			require.NoError(t, err, "Error setting GEOffRamp on the token pool %s", pool.Address())
+		}
 	}
-	err = destCCIP.Common.FeeTokenPool.SetOffRamp(destCCIP.TollOffRamp.EthAddress)
-	require.NoError(t, err, "Error setting TollOffRamp on the token pool %s", destCCIP.Common.FeeTokenPool.Address())
-
-	err = destCCIP.Common.FeeTokenPool.SetOffRamp(destCCIP.GEOffRamp.EthAddress)
-	require.NoError(t, err, "Error setting GEOffRamp on the token pool %s", destCCIP.Common.FeeTokenPool.Address())
-
+	if model == TOLL {
+		err = destCCIP.Common.FeeTokenPool.SetOffRamp(destCCIP.TollOffRamp.EthAddress)
+		require.NoError(t, err, "Error setting TollOffRamp on the token pool %s", destCCIP.Common.FeeTokenPool.Address())
+	}
+	if model == GE {
+		err = destCCIP.Common.FeeTokenPool.SetOffRamp(destCCIP.GEOffRamp.EthAddress)
+		require.NoError(t, err, "Error setting GEOffRamp on the token pool %s", destCCIP.Common.FeeTokenPool.Address())
+	}
 	err = destCCIP.Common.ChainClient.WaitForEvents()
 	require.NoError(t, err, "Error waiting for events on destination contract deployments")
 }
@@ -869,6 +903,8 @@ func DefaultDestinationCCIPModule(t *testing.T, chainClient blockchain.EVMClient
 
 type CCIPLane struct {
 	t                       *testing.T
+	SourceNetworkName       string
+	DestNetworkName         string
 	Source                  *SourceCCIPModule
 	Dest                    *DestCCIPModule
 	TestEnv                 *CCIPTestEnv
@@ -886,39 +922,55 @@ type CCIPLane struct {
 	ValidationTimeout       time.Duration
 }
 
+func (lane *CCIPLane) IsLaneDeployed() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	for {
+		select {
+		case <-lane.Ready:
+			return nil
+		case <-ctx.Done():
+			return fmt.Errorf("waited too long for the lane set up")
+		}
+	}
+}
+
+func (lane *CCIPLane) RecordStateBeforeTollTransfer() {
+	var err error
+	// collect the balance requirement to verify balances after transfer
+	lane.SourceBalances, err = testhelpers.GetBalances(lane.Source.CollectBalanceRequirements(lane.t, TOLL))
+	require.NoError(lane.t, err, "fetching source balance")
+	lane.DestBalances, err = testhelpers.GetBalances(lane.Dest.CollectBalanceRequirements(lane.t, TOLL))
+	require.NoError(lane.t, err, "fetching dest balance")
+
+	// save the current block numbers to use in various filter log requests
+	lane.StartBlockOnSource, err = lane.Source.Common.ChainClient.LatestBlockNumber(context.Background())
+	require.NoError(lane.t, err, "Getting current block should be successful in source chain")
+	lane.StartBlockOnDestination, err = lane.Dest.Common.ChainClient.LatestBlockNumber(context.Background())
+	require.NoError(lane.t, err, "Getting current block should be successful in dest chain")
+}
+
 func (lane *CCIPLane) SendTollRequests(noOfRequests int) {
 	t := lane.t
-	lane.NumberOfTollReq = noOfRequests
+	lane.NumberOfTollReq += noOfRequests
 	var tokenAndAmounts []evm_2_any_toll_onramp_router.CommonEVMTokenAndAmount
 	for i, token := range lane.Source.Common.BridgeTokens {
 		tokenAndAmounts = append(tokenAndAmounts, evm_2_any_toll_onramp_router.CommonEVMTokenAndAmount{
 			Token: common.HexToAddress(token.Address()), Amount: lane.Source.TransferAmount[i],
 		})
 		// approve the onramp router so that it can initiate transferring the token
-		err := token.Approve(lane.Source.TollOnRampRouter.Address(), bigmath.Mul(lane.Source.TransferAmount[i], big.NewInt(int64(lane.NumberOfTollReq))))
+		err := token.Approve(lane.Source.TollOnRampRouter.Address(), bigmath.Mul(lane.Source.TransferAmount[i], big.NewInt(int64(noOfRequests))))
 		require.NoError(t, err, "Could not approve permissions for the onRamp router "+
 			"on the source link token contract")
 	}
 	// approve onramp router to use the fee token
-	err := lane.Source.Common.FeeToken.Approve(lane.Source.TollOnRampRouter.Address(), bigmath.Mul(lane.Source.TollFeeAmount, big.NewInt(int64(lane.NumberOfTollReq))))
+	err := lane.Source.Common.FeeToken.Approve(lane.Source.TollOnRampRouter.Address(), bigmath.Mul(lane.Source.TollFeeAmount, big.NewInt(int64(noOfRequests))))
 	require.NoError(t, err, "Could not approve permissions for the onRamp router "+
 		"on the source link token contract")
 	err = lane.Source.Common.ChainClient.WaitForEvents()
 	require.NoError(t, err, "Failed to wait for events")
 
-	// collect the balance requirement to verify balances after transfer
-	lane.SourceBalances, err = testhelpers.GetBalances(lane.Source.CollectBalanceRequirements(t, TOLL))
-	require.NoError(t, err, "fetching source balance")
-	lane.DestBalances, err = testhelpers.GetBalances(lane.Dest.CollectBalanceRequirements(t, TOLL))
-	require.NoError(t, err, "fetching dest balance")
-
-	// save the current block numbers to use in various filter log requests
-	lane.StartBlockOnSource, err = lane.Source.Common.ChainClient.LatestBlockNumber(context.Background())
-	require.NoError(t, err, "Getting current block should be successful in source chain")
-	lane.StartBlockOnDestination, err = lane.Dest.Common.ChainClient.LatestBlockNumber(context.Background())
-	require.NoError(t, err, "Getting current block should be successful in dest chain")
-
-	for i := 1; i <= lane.NumberOfTollReq; i++ {
+	for i := 1; i <= noOfRequests; i++ {
 		txHash := lane.Source.SendTollRequest(
 			t, lane.Dest.ReceiverDapp.EthAddress,
 			tokenAndAmounts,
@@ -948,13 +1000,29 @@ func (lane *CCIPLane) ValidateTollRequests() {
 	}
 	// verify the fee amount is deducted from sender, added to receiver token balances and
 	// unused fee is returned to receiver fee token account
-	AssertBalances(t, lane.Source.BalanceAssertions(t, TOLL, lane.SourceBalances, int64(lane.NumberOfTollReq), lane.TotalGEFee))
-	AssertBalances(t, lane.Dest.BalanceAssertions(t, TOLL, lane.DestBalances, lane.Source.TransferAmount, UnusedFee, int64(lane.NumberOfTollReq), lane.TotalGEFee))
+	AssertBalances(lane.t, lane.Source.BalanceAssertions(lane.t, TOLL, lane.SourceBalances, int64(lane.NumberOfTollReq), lane.TotalGEFee))
+	AssertBalances(lane.t, lane.Dest.BalanceAssertions(lane.t, TOLL, lane.DestBalances, lane.Source.TransferAmount, UnusedFee, int64(lane.NumberOfTollReq), lane.TotalGEFee))
+
 }
 
-func (lane *CCIPLane) SendGERequests(noOfRequests int) {
+func (lane *CCIPLane) RecordStateBeforeGETransfer() {
+	var err error
+	// collect the balance requirement to verify balances after transfer
+	lane.SourceBalances, err = testhelpers.GetBalances(lane.Source.CollectBalanceRequirements(lane.t, GE))
+	require.NoError(lane.t, err, "fetching source balance")
+	lane.DestBalances, err = testhelpers.GetBalances(lane.Dest.CollectBalanceRequirements(lane.t, GE))
+	require.NoError(lane.t, err, "fetching dest balance")
+
+	// save the current block numbers to use in various filter log requests
+	lane.StartBlockOnSource, err = lane.Source.Common.ChainClient.LatestBlockNumber(context.Background())
+	require.NoError(lane.t, err, "Getting current block should be successful in source chain")
+	lane.StartBlockOnDestination, err = lane.Dest.Common.ChainClient.LatestBlockNumber(context.Background())
+	require.NoError(lane.t, err, "Getting current block should be successful in dest chain")
+}
+
+func (lane *CCIPLane) SendGERequests(noOfRequests int) []string {
 	t := lane.t
-	lane.NumberOfGEReq = noOfRequests
+	lane.NumberOfGEReq += noOfRequests
 	var tokenAndAmounts []ge_router.CommonEVMTokenAndAmount
 	for i, token := range lane.Source.Common.BridgeTokens {
 		tokenAndAmounts = append(tokenAndAmounts, ge_router.CommonEVMTokenAndAmount{
@@ -962,28 +1030,15 @@ func (lane *CCIPLane) SendGERequests(noOfRequests int) {
 		})
 		// approve the onramp router so that it can initiate transferring the token
 
-		err := token.Approve(lane.Source.Common.GERouter.Address(), bigmath.Mul(lane.Source.TransferAmount[i], big.NewInt(int64(lane.NumberOfGEReq))))
+		err := token.Approve(lane.Source.Common.GERouter.Address(), bigmath.Mul(lane.Source.TransferAmount[i], big.NewInt(int64(noOfRequests))))
 		require.NoError(t, err, "Could not approve permissions for the onRamp router "+
 			"on the source link token contract")
 	}
 
 	err := lane.Source.Common.ChainClient.WaitForEvents()
 	require.NoError(t, err, "Failed to wait for events")
-
-	// collect the balance requirement to verify balances after transfer
-	lane.SourceBalances, err = testhelpers.GetBalances(lane.Source.CollectBalanceRequirements(t, GE))
-	require.NoError(t, err, "fetching source balance")
-	lane.DestBalances, err = testhelpers.GetBalances(lane.Dest.CollectBalanceRequirements(t, GE))
-	require.NoError(t, err, "fetching dest balance")
-
-	// save the current block numbers to use in various filter log requests
-	lane.StartBlockOnSource, err = lane.Source.Common.ChainClient.LatestBlockNumber(context.Background())
-	require.NoError(t, err, "Getting current block should be successful in source chain")
-	lane.StartBlockOnDestination, err = lane.Dest.Common.ChainClient.LatestBlockNumber(context.Background())
-	require.NoError(t, err, "Getting current block should be successful in dest chain")
-	lane.TotalGEFee = big.NewInt(0)
-	lane.SentGEReqHashes = []string{}
-	for i := 1; i <= lane.NumberOfGEReq; i++ {
+	var txs []string
+	for i := 1; i <= noOfRequests; i++ {
 		txHash, fee := lane.Source.SendGERequest(
 			t, lane.Dest.ReceiverDapp.EthAddress,
 			tokenAndAmounts,
@@ -991,29 +1046,71 @@ func (lane *CCIPLane) SendGERequests(noOfRequests int) {
 			common.HexToAddress(lane.Source.Common.FeeToken.Address()),
 		)
 		lane.SentGEReqHashes = append(lane.SentGEReqHashes, txHash)
+		txs = append(txs, txHash)
 		lane.TotalGEFee = bigmath.Add(lane.TotalGEFee, fee)
 	}
+	return txs
 }
 
 func (lane *CCIPLane) ValidateGERequests() {
-	t := lane.t
 	for _, txHash := range lane.SentGEReqHashes {
-		// Verify if
-		// - CCIPSendRequested Event log generated,
-		// - NextSeqNumber from commitStore got increased
-		seqNumber, msgId := lane.Source.AssertEventCCIPSendRequested(t, GE, txHash, lane.StartBlockOnSource, lane.ValidationTimeout)
-		lane.Dest.AssertSeqNumberExecuted(t, lane.Source.GEOnRamp.EthAddress, seqNumber, lane.ValidationTimeout)
-
-		// Verify whether commitStore has accepted the report
-		lane.Dest.AssertEventReportAccepted(t, lane.Source.GEOnRamp.EthAddress, seqNumber, lane.StartBlockOnDestination, lane.ValidationTimeout)
-
-		// Verify whether the execution state is changed and the transfer is successful
-		lane.Dest.AssertEventExecutionStateChanged(t, GE, seqNumber, msgId, lane.StartBlockOnDestination, lane.ValidationTimeout)
+		lane.ValidateGERequestByTxHash(txHash)
 	}
 	// verify the fee amount is deducted from sender, added to receiver token balances and
 	// unused fee is returned to receiver fee token account
-	AssertBalances(t, lane.Source.BalanceAssertions(t, GE, lane.SourceBalances, int64(lane.NumberOfGEReq), lane.TotalGEFee))
-	AssertBalances(t, lane.Dest.BalanceAssertions(t, GE, lane.DestBalances, lane.Source.TransferAmount, UnusedFee, int64(lane.NumberOfGEReq), lane.TotalGEFee))
+	AssertBalances(lane.t, lane.Source.BalanceAssertions(lane.t, GE, lane.SourceBalances, int64(lane.NumberOfGEReq), lane.TotalGEFee))
+	AssertBalances(lane.t, lane.Dest.BalanceAssertions(lane.t, GE, lane.DestBalances, lane.Source.TransferAmount, UnusedFee, int64(lane.NumberOfGEReq), lane.TotalGEFee))
+
+}
+
+func (lane *CCIPLane) ValidateGERequestByTxHash(txHash string) {
+	t := lane.t
+	// Verify if
+	// - CCIPSendRequested Event log generated,
+	// - NextSeqNumber from commitStore got increased
+	seqNumber, msgId := lane.Source.AssertEventCCIPSendRequested(t, GE, txHash, lane.StartBlockOnSource, lane.ValidationTimeout)
+	lane.Dest.AssertSeqNumberExecuted(t, lane.Source.GEOnRamp.EthAddress, seqNumber, lane.ValidationTimeout)
+
+	// Verify whether commitStore has accepted the report
+	lane.Dest.AssertEventReportAccepted(t, lane.Source.GEOnRamp.EthAddress, seqNumber, lane.StartBlockOnDestination, lane.ValidationTimeout)
+
+	// Verify whether the execution state is changed and the transfer is successful
+	lane.Dest.AssertEventExecutionStateChanged(t, GE, seqNumber, msgId, lane.StartBlockOnDestination, lane.ValidationTimeout)
+}
+
+func (lane *CCIPLane) SoakRun(interval, duration time.Duration) (int, int) {
+	t := lane.t
+	ctx, cancel := context.WithTimeout(context.Background(), duration)
+	defer cancel()
+	ticker := time.NewTicker(interval)
+	numOfReq := 0
+	reqSuccess := 0
+	wg := &sync.WaitGroup{}
+	timeout := false
+	lane.RecordStateBeforeGETransfer()
+	for {
+		select {
+		case <-ticker.C:
+			if timeout {
+				break
+			}
+			numOfReq++
+			wg.Add(1)
+			log.Info().Int("Req No", numOfReq).Msgf("Token transfer with GE for lane %s --> %s", lane.SourceNetworkName, lane.DestNetworkName)
+			txs := lane.SendGERequests(1)
+			require.NotEmpty(t, txs)
+			go func(txHash string) {
+				defer wg.Done()
+				lane.ValidateGERequestByTxHash(txHash)
+				reqSuccess++
+			}(txs[0])
+		case <-ctx.Done():
+			log.Warn().Msgf("Soak Test duration completed for lane %s --> %s. Completing validation for triggered requests", lane.SourceNetworkName, lane.DestNetworkName)
+			timeout = true
+			wg.Wait()
+			return numOfReq, reqSuccess
+		}
+	}
 }
 
 // SetOCR2Configs sets the oracle config in ocr2 contracts
@@ -1030,11 +1127,14 @@ func SetOCR2Configs(t *testing.T, commitNodes, execNodes []*client.CLNodesWithKe
 			ccip.NewOffChainAggregatorV2Config(execNodes)
 		require.NoError(t, err, "Shouldn't fail while getting the config values for ocr2 type contract")
 	}
-
-	err = destCCIP.TollOffRamp.SetOCR2Config(signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig)
-	require.NoError(t, err, "Shouldn't fail while setting TollOffRamp config")
-	err = destCCIP.GEOffRamp.SetOCR2Config(signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig)
-	require.NoError(t, err, "Shouldn't fail while setting GEOffRamp config")
+	if destCCIP.TollOffRamp != nil {
+		err = destCCIP.TollOffRamp.SetOCR2Config(signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig)
+		require.NoError(t, err, "Shouldn't fail while setting TollOffRamp config")
+	}
+	if destCCIP.GEOffRamp != nil {
+		err = destCCIP.GEOffRamp.SetOCR2Config(signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig)
+		require.NoError(t, err, "Shouldn't fail while setting GEOffRamp config")
+	}
 	err = destCCIP.Common.ChainClient.WaitForEvents()
 	require.NoError(t, err, "Shouldn't fail while waiting for events on setting ocr2 config")
 }
@@ -1079,9 +1179,15 @@ func CreateOCRJobsForCCIP(
 	require.NoError(t, err, "Getting current block should be successful in source chain")
 	currentBlockOnDest, err := destChainClient.LatestBlockNumber(context.Background())
 	require.NoError(t, err, "Getting current block should be successful in dest chain")
-
+	var onRamps []common.Address
+	if tollOnRamp != common.HexToAddress("0x0") {
+		onRamps = append(onRamps, tollOnRamp)
+	}
+	if geOnRamp != common.HexToAddress("0x0") {
+		onRamps = append(onRamps, geOnRamp)
+	}
 	jobParams := testhelpers.CCIPJobSpecParams{
-		OnRampsOnCommit:    []common.Address{tollOnRamp, geOnRamp},
+		OnRampsOnCommit:    onRamps,
 		CommitStore:        commitStore,
 		SourceChainName:    sourceChainClient.GetNetworkName(),
 		DestChainName:      destChainClient.GetNetworkName(),
@@ -1100,7 +1206,7 @@ func CreateOCRJobsForCCIP(
 		_, err = bootstrapCommit.Node.MustCreateJob(jobParams.BootstrapJob(commitStore.Hex()))
 		require.NoError(t, err, "Shouldn't fail creating bootstrap job on bootstrap node")
 		if bootstrapExec != nil && len(execNodes) > 0 {
-			_, err := bootstrapExec.Node.MustCreateJob(jobParams.BootstrapJob(tollOffRamp.Hex()))
+			_, err := bootstrapExec.Node.MustCreateJob(jobParams.BootstrapJob(geOffRamp.Hex()))
 			require.NoError(t, err, "Shouldn't fail creating bootstrap job on bootstrap node")
 		}
 	}
@@ -1117,17 +1223,24 @@ func CreateOCRJobsForCCIP(
 
 	ocr2SpecCommit, err := jobParams.CommitJobSpec()
 	require.NoError(t, err)
-	jobParams.OffRamp = tollOffRamp
-	jobParams.OnRampForExecution = tollOnRamp
-	jobParams.P2PV2Bootstrappers = []string{p2pBootstrappersExec.P2PV2Bootstrapper()}
-	ocr2SpecExecForToll, err := jobParams.ExecutionJobSpec()
-	require.NoError(t, err)
-	ocr2SpecExecForToll.Name = fmt.Sprintf("%s-toll", ocr2SpecExecForToll.Name)
-	jobParams.OffRamp = geOffRamp
-	jobParams.OnRampForExecution = geOnRamp
-	ocr2SpecExecForGE, err := jobParams.ExecutionJobSpec()
-	require.NoError(t, err)
-	ocr2SpecExecForGE.Name = fmt.Sprintf("%s-ge", ocr2SpecExecForGE.Name)
+	var ocr2SpecExecForToll, ocr2SpecExecForGE *client.OCR2TaskJobSpec
+	if tollOffRamp != common.HexToAddress("0x0") {
+		jobParams.OffRamp = tollOffRamp
+		jobParams.OnRampForExecution = tollOnRamp
+		jobParams.P2PV2Bootstrappers = []string{p2pBootstrappersExec.P2PV2Bootstrapper()}
+		ocr2SpecExecForToll, err = jobParams.ExecutionJobSpec()
+		require.NoError(t, err)
+		ocr2SpecExecForToll.Name = fmt.Sprintf("%s-toll", ocr2SpecExecForToll.Name)
+	}
+
+	if geOffRamp != common.HexToAddress("0x0") {
+		jobParams.OffRamp = geOffRamp
+		jobParams.OnRampForExecution = geOnRamp
+		jobParams.P2PV2Bootstrappers = []string{p2pBootstrappersExec.P2PV2Bootstrapper()}
+		ocr2SpecExecForGE, err = jobParams.ExecutionJobSpec()
+		require.NoError(t, err)
+		ocr2SpecExecForGE.Name = fmt.Sprintf("%s-ge", ocr2SpecExecForGE.Name)
+	}
 
 	for nodeIndex := 0; nodeIndex < len(commitNodes); nodeIndex++ {
 		nodeTransmitterAddress := commitNodes[nodeIndex].KeysBundle.EthAddress
@@ -1146,25 +1259,29 @@ func CreateOCRJobsForCCIP(
 		nodeTransmitterAddress := execNodes[nodeIndex].KeysBundle.EthAddress
 		nodeOCR2Key := execNodes[nodeIndex].KeysBundle.OCR2Key
 		nodeOCR2KeyId := nodeOCR2Key.Data.ID
-		ocr2SpecExecForToll.OCR2OracleSpec.PluginConfig["tokensPerFeeCoinPipeline"] = fmt.Sprintf(`"""
+		if ocr2SpecExecForToll != nil {
+			ocr2SpecExecForToll.OCR2OracleSpec.PluginConfig["tokensPerFeeCoinPipeline"] = fmt.Sprintf(`"""
 %s
 """`, tokensPerFeeCoinPipeline)
-		ocr2SpecExecForToll.OCR2OracleSpec.OCRKeyBundleID.SetValid(nodeOCR2KeyId)
-		ocr2SpecExecForToll.OCR2OracleSpec.TransmitterID.SetValid(nodeTransmitterAddress)
+			ocr2SpecExecForToll.OCR2OracleSpec.OCRKeyBundleID.SetValid(nodeOCR2KeyId)
+			ocr2SpecExecForToll.OCR2OracleSpec.TransmitterID.SetValid(nodeTransmitterAddress)
 
-		_, err = execNodes[nodeIndex].Node.MustCreateJob(ocr2SpecExecForToll)
-		require.NoError(t, err, "Shouldn't fail creating CCIP-Exec-toll OCR Task job on OCR node %d job name %s",
-			nodeIndex+1, ocr2SpecCommit.Name)
+			_, err = execNodes[nodeIndex].Node.MustCreateJob(ocr2SpecExecForToll)
+			require.NoError(t, err, "Shouldn't fail creating CCIP-Exec-toll OCR Task job on OCR node %d job name %s",
+				nodeIndex+1, ocr2SpecExecForToll.Name)
+		}
 
-		ocr2SpecExecForGE.OCR2OracleSpec.PluginConfig["tokensPerFeeCoinPipeline"] = fmt.Sprintf(`"""
+		if ocr2SpecExecForGE != nil {
+			ocr2SpecExecForGE.OCR2OracleSpec.PluginConfig["tokensPerFeeCoinPipeline"] = fmt.Sprintf(`"""
 %s
 """`, tokensPerFeeCoinPipeline)
-		ocr2SpecExecForGE.OCR2OracleSpec.OCRKeyBundleID.SetValid(nodeOCR2KeyId)
-		ocr2SpecExecForGE.OCR2OracleSpec.TransmitterID.SetValid(nodeTransmitterAddress)
+			ocr2SpecExecForGE.OCR2OracleSpec.OCRKeyBundleID.SetValid(nodeOCR2KeyId)
+			ocr2SpecExecForGE.OCR2OracleSpec.TransmitterID.SetValid(nodeTransmitterAddress)
 
-		_, err = execNodes[nodeIndex].Node.MustCreateJob(ocr2SpecExecForGE)
-		require.NoError(t, err, "Shouldn't fail creating CCIP-Exec-ge OCR Task job on OCR node %d job name %s",
-			nodeIndex+1, ocr2SpecCommit.Name)
+			_, err = execNodes[nodeIndex].Node.MustCreateJob(ocr2SpecExecForGE)
+			require.NoError(t, err, "Shouldn't fail creating CCIP-Exec-ge OCR Task job on OCR node %d job name %s",
+				nodeIndex+1, ocr2SpecExecForGE.Name)
+		}
 	}
 }
 
@@ -1260,49 +1377,57 @@ func DeployEnvironments(
 	clProps map[string]interface{},
 ) *environment.Environment {
 	testEnvironment := environment.New(envconfig)
+
+	if NetworkA.Simulated {
+		if !NetworkB.Simulated {
+			t.Fatalf("both the networks should be simulated")
+		}
+		testEnvironment.
+			AddHelm(reorg.New(&reorg.Props{
+				NetworkName: NetworkA.Name,
+				NetworkType: "simulated-geth-non-dev",
+				Values: map[string]interface{}{
+					"geth": map[string]interface{}{
+						"genesis": map[string]interface{}{
+							"networkId": fmt.Sprint(NetworkA.ChainID),
+						},
+						"tx": map[string]interface{}{
+							"replicas": "1",
+						},
+						"miner": map[string]interface{}{
+							"replicas": "0",
+						},
+					},
+					"bootnode": map[string]interface{}{
+						"replicas": "1",
+					},
+				},
+			})).
+			AddHelm(reorg.New(&reorg.Props{
+				NetworkName: NetworkB.Name,
+				NetworkType: "simulated-geth-non-dev",
+				Values: map[string]interface{}{
+					"geth": map[string]interface{}{
+						"genesis": map[string]interface{}{
+							"networkId": fmt.Sprint(NetworkB.ChainID),
+						},
+						"tx": map[string]interface{}{
+							"replicas": "1",
+						},
+						"miner": map[string]interface{}{
+							"replicas": "0",
+						},
+					},
+					"bootnode": map[string]interface{}{
+						"replicas": "1",
+					},
+				},
+			}))
+	}
 	testEnvironment.
-		AddHelm(reorg.New(&reorg.Props{
-			NetworkName: NetworkA.Name,
-			NetworkType: "simulated-geth-non-dev",
-			Values: map[string]interface{}{
-				"geth": map[string]interface{}{
-					"genesis": map[string]interface{}{
-						"networkId": fmt.Sprint(NetworkA.ChainID),
-					},
-					"tx": map[string]interface{}{
-						"replicas": "1",
-					},
-					"miner": map[string]interface{}{
-						"replicas": "0",
-					},
-				},
-				"bootnode": map[string]interface{}{
-					"replicas": "1",
-				},
-			},
-		})).
-		AddHelm(reorg.New(&reorg.Props{
-			NetworkName: NetworkB.Name,
-			NetworkType: "simulated-geth-non-dev",
-			Values: map[string]interface{}{
-				"geth": map[string]interface{}{
-					"genesis": map[string]interface{}{
-						"networkId": fmt.Sprint(NetworkB.ChainID),
-					},
-					"tx": map[string]interface{}{
-						"replicas": "1",
-					},
-					"miner": map[string]interface{}{
-						"replicas": "0",
-					},
-				},
-				"bootnode": map[string]interface{}{
-					"replicas": "1",
-				},
-			},
-		})).
 		AddHelm(mockservercfg.New(nil)).
 		AddHelm(mockserver.New(nil))
+
 	// skip adding blockscout for simplified deployments
 	// uncomment the following to debug on-chain transactions
 	/*
@@ -1311,12 +1436,12 @@ func DeployEnvironments(
 			WsURL:   NetworkB.URLs[0],
 			HttpURL: NetworkB.HTTPURLs[0],
 		}))
-		testEnvironment.AddChart(blockscout.New(&blockscout.Props{
-			Name:    "source-blockscout",
-			WsURL:   NetworkA.URLs[0],
-			HttpURL: NetworkA.HTTPURLs[0],
-		}))
 
+			testEnvironment.AddChart(blockscout.New(&blockscout.Props{
+				Name:    "source-blockscout",
+				WsURL:   NetworkA.URLs[0],
+				HttpURL: NetworkA.HTTPURLs[0],
+			}))
 	*/
 
 	err := testEnvironment.Run()
@@ -1378,7 +1503,7 @@ func SetUpNodesAndKeys(
 
 	fund := func(chain blockchain.EVMClient) {
 		defer wg.Done()
-		err = FundChainlinkNodesAddresses(chainlinkNodes, chain, nodeFund)
+		err = FundChainlinkNodesAddresses(chainlinkNodes[1:], chain, nodeFund)
 		require.NoError(t, err)
 	}
 
@@ -1451,18 +1576,19 @@ func CCIPDefaultTestSetUp(
 	numOfCommitNodes int,
 	commitAndExecOnSameDON bool,
 	bidirectional bool,
+	model BillingModel,
 ) (*CCIPLane, *CCIPLane, func()) {
 	testEnvironment := DeployEnvironments(
 		t,
 		&environment.Config{
-			NamespacePrefix: envName,
+			NamespacePrefix: strings.ToLower(fmt.Sprintf("%s-%s-%s-%s", envName, model, networkAName, networkBName)),
 			Test:            t,
 		}, clProps)
 
 	if testEnvironment.WillUseRemoteRunner() {
 		return nil, nil, nil
 	}
-	testSetUpA2B := SetUpNodesAndKeys(t, testEnvironment, big.NewFloat(10))
+	testSetUpA2B := SetUpNodesAndKeys(t, testEnvironment, big.NewFloat(1))
 
 	sourceChainClient, err := blockchain.ConcurrentEVMClient(NetworkB, testEnvironment, testSetUpA2B.DestChainClient)
 	require.NoError(t, err, "Connecting to blockchain nodes shouldn't fail")
@@ -1484,17 +1610,29 @@ func CCIPDefaultTestSetUp(
 	ccipLaneA2B := &CCIPLane{
 		t:                       t,
 		TestEnv:                 &testSetUpA2B,
+		SourceNetworkName:       networkAName,
+		DestNetworkName:         networkBName,
 		ValidationTimeout:       time.Minute,
 		Ready:                   make(chan struct{}, 1),
 		commonContractsDeployed: make(chan struct{}, 1),
+		SentGEReqHashes:         []string{},
+		SentTollReqHashes:       []string{},
+		TotalGEFee:              big.NewInt(0),
 	}
 
 	ccipLaneB2A := &CCIPLane{
 		t:                       t,
 		TestEnv:                 &testSetUpB2A,
+		SourceNetworkName:       networkBName,
+		DestNetworkName:         networkAName,
 		ValidationTimeout:       time.Minute,
 		Ready:                   make(chan struct{}, 1),
 		commonContractsDeployed: make(chan struct{}, 1),
+		SourceBalances:          make(map[string]*big.Int),
+		DestBalances:            make(map[string]*big.Int),
+		SentGEReqHashes:         []string{},
+		SentTollReqHashes:       []string{},
+		TotalGEFee:              big.NewInt(0),
 	}
 	// This WaitGroup is for waiting on the deployment of common contracts for lane A to B
 	// so that these contracts can be reused for lane B to A
@@ -1504,8 +1642,8 @@ func CCIPDefaultTestSetUp(
 
 	go func() {
 		log.Info().Msg("Setting up lane A to B")
-		ccipLaneA2B.NewCCIPLane(numOfCommitNodes, commitAndExecOnSameDON, nil, nil,
-			transferAmounts, true, wg)
+		ccipLaneA2B.DeployNewCCIPLane(numOfCommitNodes, commitAndExecOnSameDON, nil, nil,
+			transferAmounts, true, wg, model)
 	}()
 
 	wg.Wait()
@@ -1514,7 +1652,8 @@ func CCIPDefaultTestSetUp(
 			srcCommon := ccipLaneA2B.Dest.Common.New(testSetUpB2A.SourceChainClient)
 			destCommon := ccipLaneA2B.Source.Common.New(testSetUpB2A.DestChainClient)
 			log.Info().Msg("Setting up lane B to A")
-			ccipLaneB2A.NewCCIPLane(numOfCommitNodes, commitAndExecOnSameDON, srcCommon, destCommon, transferAmounts, false, nil)
+			ccipLaneB2A.DeployNewCCIPLane(numOfCommitNodes, commitAndExecOnSameDON, srcCommon, destCommon,
+				transferAmounts, false, nil, model)
 		}
 	}()
 
@@ -1527,7 +1666,7 @@ func CCIPDefaultTestSetUp(
 	return ccipLaneA2B, ccipLaneB2A, tearDown
 }
 
-func (lane *CCIPLane) NewCCIPLane(
+func (lane *CCIPLane) DeployNewCCIPLane(
 	numOfCommitNodes int,
 	commitAndExecOnSameDON bool,
 	sourceCommon *CCIPCommon,
@@ -1535,6 +1674,7 @@ func (lane *CCIPLane) NewCCIPLane(
 	transferAmounts []*big.Int,
 	newBootstrap bool,
 	wg *sync.WaitGroup,
+	model BillingModel,
 ) {
 	env := lane.TestEnv
 	sourceChainClient := env.SourceChainClient
@@ -1562,10 +1702,10 @@ func (lane *CCIPLane) NewCCIPLane(
 	}()
 
 	// deploy all source contracts
-	lane.Source.DeployContracts(t)
+	lane.Source.DeployContracts(t, model)
 
 	// deploy all destination contracts
-	lane.Dest.DeployContracts(t, *lane.Source, wg)
+	lane.Dest.DeployContracts(t, *lane.Source, wg, model)
 
 	// set up ocr2 jobs
 	var tokenAddr []string
@@ -1592,33 +1732,36 @@ func (lane *CCIPLane) NewCCIPLane(
 		env.commitNodeStartIndex = 2
 		env.execNodeStartIndex = 7
 	}
-	CreateOCRJobsForCCIP(
-		t,
-		bootstrapCommit, bootstrapExec, commitNodes, execNodes,
-		lane.Source.TollOnRamp.EthAddress,
-		lane.Source.GEOnRamp.EthAddress,
-		lane.Dest.CommitStore.EthAddress,
-		lane.Dest.TollOffRamp.EthAddress,
-		lane.Dest.GEOffRamp.EthAddress,
-		sourceChainClient, destChainClient,
-		tokenAddr,
-		mockServer, newBootstrap,
-	)
+	if model == TOLL {
+		CreateOCRJobsForCCIP(
+			t,
+			bootstrapCommit, bootstrapExec, commitNodes, execNodes,
+			lane.Source.TollOnRamp.EthAddress,
+			common.HexToAddress("0x0"),
+			lane.Dest.CommitStore.EthAddress,
+			lane.Dest.TollOffRamp.EthAddress,
+			common.HexToAddress("0x0"),
+			sourceChainClient, destChainClient,
+			tokenAddr,
+			mockServer, newBootstrap,
+		)
+	}
+	if model == GE {
+		CreateOCRJobsForCCIP(
+			t,
+			bootstrapCommit, bootstrapExec, commitNodes, execNodes,
+			common.HexToAddress("0x0"),
+			lane.Source.GEOnRamp.EthAddress,
+			lane.Dest.CommitStore.EthAddress,
+			common.HexToAddress("0x0"),
+			lane.Dest.GEOffRamp.EthAddress,
+			sourceChainClient, destChainClient,
+			tokenAddr,
+			mockServer, newBootstrap,
+		)
+	}
 
 	// set up ocr2 config
 	SetOCR2Configs(t, commitNodes, execNodes, *lane.Dest)
 	lane.Ready <- struct{}{}
-}
-
-func (lane *CCIPLane) IsLaneDeployed() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer cancel()
-	for {
-		select {
-		case <-lane.Ready:
-			return nil
-		case <-ctx.Done():
-			return fmt.Errorf("waited too long for the lane set up")
-		}
-	}
 }

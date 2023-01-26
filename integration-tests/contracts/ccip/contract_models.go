@@ -40,7 +40,7 @@ type AFNConfig struct {
 
 // LockReleaseTokenPool represents a LockReleaseTokenPool address
 type LockReleaseTokenPool struct {
-	client     *blockchain.EthereumClient
+	client     blockchain.EVMClient
 	instance   *lock_release_token_pool.LockReleaseTokenPool
 	EthAddress common.Address
 }
@@ -62,7 +62,7 @@ func (pool *LockReleaseTokenPool) LockOrBurnToken(linkToken contracts.LinkToken,
 	if err != nil {
 		return err
 	}
-	opts, err := pool.client.TransactionOpts(pool.client.DefaultWallet)
+	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
 	if err != nil {
 		return err
 	}
@@ -80,7 +80,7 @@ func (pool *LockReleaseTokenPool) LockOrBurnToken(linkToken contracts.LinkToken,
 }
 
 func (pool *LockReleaseTokenPool) SetOnRamp(onRamp common.Address) error {
-	opts, err := pool.client.TransactionOpts(pool.client.DefaultWallet)
+	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
 	if err != nil {
 		return err
 	}
@@ -99,7 +99,7 @@ func (pool *LockReleaseTokenPool) SetOnRamp(onRamp common.Address) error {
 }
 
 func (pool *LockReleaseTokenPool) SetOffRamp(offRamp common.Address) error {
-	opts, err := pool.client.TransactionOpts(pool.client.DefaultWallet)
+	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
 	if err != nil {
 		return err
 	}
@@ -118,7 +118,7 @@ func (pool *LockReleaseTokenPool) SetOffRamp(offRamp common.Address) error {
 }
 
 type AFN struct {
-	client     *blockchain.EthereumClient
+	client     blockchain.EVMClient
 	instance   *mock_afn_contract.MockAFNContract
 	EthAddress common.Address
 }
@@ -128,7 +128,7 @@ func (afn *AFN) Address() string {
 }
 
 type TollOnRampRouter struct {
-	client     *blockchain.EthereumClient
+	client     blockchain.EVMClient
 	instance   *evm_2_any_toll_onramp_router.EVM2AnyTollOnRampRouter
 	EthAddress common.Address
 }
@@ -138,7 +138,7 @@ func (router *TollOnRampRouter) Address() string {
 }
 
 func (router *TollOnRampRouter) SetOnRamp(chainID uint64, onRamp common.Address) error {
-	opts, err := router.client.TransactionOpts(router.client.DefaultWallet)
+	opts, err := router.client.TransactionOpts(router.client.GetDefaultWallet())
 	if err != nil {
 		return err
 	}
@@ -156,7 +156,7 @@ func (router *TollOnRampRouter) SetOnRamp(chainID uint64, onRamp common.Address)
 }
 
 func (router *TollOnRampRouter) CCIPSend(destChainId uint64, msg evm_2_any_toll_onramp_router.TollConsumerEVM2AnyTollMessage) (*types.Transaction, error) {
-	opts, err := router.client.TransactionOpts(router.client.DefaultWallet)
+	opts, err := router.client.TransactionOpts(router.client.GetDefaultWallet())
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +168,7 @@ func (router *TollOnRampRouter) CCIPSend(destChainId uint64, msg evm_2_any_toll_
 }
 
 type TollOnRamp struct {
-	client     *blockchain.EthereumClient
+	client     blockchain.EVMClient
 	instance   *evm_2_evm_toll_onramp.EVM2EVMTollOnRamp
 	EthAddress common.Address
 }
@@ -185,7 +185,7 @@ func (onRamp *TollOnRamp) FilterCCIPSendRequested(
 }
 
 func (onRamp *TollOnRamp) SetFeeConfig(tokens []common.Address, fees []*big.Int) error {
-	opts, err := onRamp.client.TransactionOpts(onRamp.client.DefaultWallet)
+	opts, err := onRamp.client.TransactionOpts(onRamp.client.GetDefaultWallet())
 	if err != nil {
 		return err
 	}
@@ -203,7 +203,7 @@ func (onRamp *TollOnRamp) SetFeeConfig(tokens []common.Address, fees []*big.Int)
 }
 
 func (onRamp *TollOnRamp) SetTokenPrices(tokens []common.Address, prices []*big.Int) error {
-	opts, err := onRamp.client.TransactionOpts(onRamp.client.DefaultWallet)
+	opts, err := onRamp.client.TransactionOpts(onRamp.client.GetDefaultWallet())
 	if err != nil {
 		return err
 	}
@@ -218,7 +218,7 @@ func (onRamp *TollOnRamp) SetTokenPrices(tokens []common.Address, prices []*big.
 }
 
 type CommitStore struct {
-	client     *blockchain.EthereumClient
+	client     blockchain.EVMClient
 	instance   *commit_store.CommitStore
 	EthAddress common.Address
 }
@@ -272,13 +272,13 @@ func (b *CommitStore) GetNextSeqNumber(onRamp common.Address) (uint64, error) {
 }
 
 type MessageReceiver struct {
-	client     *blockchain.EthereumClient
+	client     blockchain.EVMClient
 	instance   *simple_message_receiver.SimpleMessageReceiver
 	EthAddress common.Address
 }
 
 type TollOffRamp struct {
-	client     *blockchain.EthereumClient
+	client     blockchain.EVMClient
 	instance   *evm_2_evm_toll_offramp.EVM2EVMTollOffRamp
 	EthAddress common.Address
 }
@@ -323,7 +323,7 @@ func (offRamp *TollOffRamp) SetOCR2Config(
 }
 
 func (offRamp *TollOffRamp) SetRouter(offRampRouterAddress common.Address) error {
-	opts, err := offRamp.client.TransactionOpts(offRamp.client.DefaultWallet)
+	opts, err := offRamp.client.TransactionOpts(offRamp.client.GetDefaultWallet())
 	if err != nil {
 		return err
 	}
@@ -347,7 +347,7 @@ func (offRamp *TollOffRamp) FilterExecutionStateChanged(seqNumber []uint64, curr
 }
 
 func (offRamp *TollOffRamp) SetTokenPrices(tokens []common.Address, prices []*big.Int) error {
-	opts, err := offRamp.client.TransactionOpts(offRamp.client.DefaultWallet)
+	opts, err := offRamp.client.TransactionOpts(offRamp.client.GetDefaultWallet())
 	if err != nil {
 		return err
 	}
@@ -362,7 +362,7 @@ func (offRamp *TollOffRamp) SetTokenPrices(tokens []common.Address, prices []*bi
 }
 
 type TollOffRampRouter struct {
-	client     *blockchain.EthereumClient
+	client     blockchain.EVMClient
 	instance   *any_2_evm_toll_offramp_router.Any2EVMTollOffRampRouter
 	EthAddress common.Address
 }
@@ -372,7 +372,7 @@ func (orr *TollOffRampRouter) Address() string {
 }
 
 type ReceiverDapp struct {
-	client     *blockchain.EthereumClient
+	client     blockchain.EVMClient
 	instance   *maybe_revert_message_receiver.MaybeRevertMessageReceiver
 	EthAddress common.Address
 }
@@ -382,7 +382,7 @@ func (rDapp *ReceiverDapp) Address() string {
 }
 
 type FeeManager struct {
-	client     *blockchain.EthereumClient
+	client     blockchain.EVMClient
 	instance   *fee_manager.FeeManager
 	EthAddress common.Address
 }
@@ -392,7 +392,7 @@ func (c *FeeManager) Address() string {
 }
 
 func (c *FeeManager) SetFeeUpdater(addr common.Address) error {
-	opts, err := c.client.TransactionOpts(c.client.DefaultWallet)
+	opts, err := c.client.TransactionOpts(c.client.GetDefaultWallet())
 	if err != nil {
 		return err
 	}
@@ -407,7 +407,7 @@ func (c *FeeManager) SetFeeUpdater(addr common.Address) error {
 }
 
 func (c *FeeManager) UpdateFees(feeUpdates []fee_manager.GEFeeUpdate) error {
-	opts, err := c.client.TransactionOpts(c.client.DefaultWallet)
+	opts, err := c.client.TransactionOpts(c.client.GetDefaultWallet())
 	if err != nil {
 		return err
 	}
@@ -421,7 +421,7 @@ func (c *FeeManager) UpdateFees(feeUpdates []fee_manager.GEFeeUpdate) error {
 }
 
 type GERouter struct {
-	client     *blockchain.EthereumClient
+	client     blockchain.EVMClient
 	Instance   *ge_router.GERouter
 	EthAddress common.Address
 }
@@ -440,7 +440,7 @@ func (router *GERouter) Address() string {
 }
 
 func (router *GERouter) SetOnRamp(chainID uint64, onRamp common.Address) error {
-	opts, err := router.client.TransactionOpts(router.client.DefaultWallet)
+	opts, err := router.client.TransactionOpts(router.client.GetDefaultWallet())
 	if err != nil {
 		return err
 	}
@@ -458,7 +458,7 @@ func (router *GERouter) SetOnRamp(chainID uint64, onRamp common.Address) error {
 }
 
 func (router *GERouter) CCIPSend(destChainId uint64, msg ge_router.GEConsumerEVM2AnyGEMessage) (*types.Transaction, error) {
-	opts, err := router.client.TransactionOpts(router.client.DefaultWallet)
+	opts, err := router.client.TransactionOpts(router.client.GetDefaultWallet())
 	if err != nil {
 		return nil, err
 	}
@@ -470,7 +470,7 @@ func (router *GERouter) CCIPSend(destChainId uint64, msg ge_router.GEConsumerEVM
 }
 
 func (router *GERouter) AddOffRamp(offRamp common.Address) (*types.Transaction, error) {
-	opts, err := router.client.TransactionOpts(router.client.DefaultWallet)
+	opts, err := router.client.TransactionOpts(router.client.GetDefaultWallet())
 	if err != nil {
 		return nil, err
 	}
@@ -489,7 +489,7 @@ func (router *GERouter) GetFee(destinationChainId uint64, message ge_router.GECo
 }
 
 type GEOnRamp struct {
-	client     *blockchain.EthereumClient
+	client     blockchain.EVMClient
 	instance   *evm_2_evm_ge_onramp.EVM2EVMGEOnRamp
 	EthAddress common.Address
 }
@@ -506,7 +506,7 @@ func (onRamp *GEOnRamp) FilterCCIPSendRequested(
 }
 
 func (onRamp *GEOnRamp) SetTokenPrices(tokens []common.Address, prices []*big.Int) error {
-	opts, err := onRamp.client.TransactionOpts(onRamp.client.DefaultWallet)
+	opts, err := onRamp.client.TransactionOpts(onRamp.client.GetDefaultWallet())
 	if err != nil {
 		return err
 	}
@@ -521,7 +521,7 @@ func (onRamp *GEOnRamp) SetTokenPrices(tokens []common.Address, prices []*big.In
 }
 
 type GEOffRamp struct {
-	client     *blockchain.EthereumClient
+	client     blockchain.EVMClient
 	instance   *evm_2_evm_ge_offramp.EVM2EVMGEOffRamp
 	EthAddress common.Address
 }
@@ -566,7 +566,7 @@ func (offRamp *GEOffRamp) SetOCR2Config(
 }
 
 func (offRamp *GEOffRamp) SetRouter(offRampRouterAddress common.Address) error {
-	opts, err := offRamp.client.TransactionOpts(offRamp.client.DefaultWallet)
+	opts, err := offRamp.client.TransactionOpts(offRamp.client.GetDefaultWallet())
 	if err != nil {
 		return err
 	}
@@ -590,7 +590,7 @@ func (offRamp *GEOffRamp) FilterExecutionStateChanged(seqNumber []uint64, messag
 }
 
 func (offRamp *GEOffRamp) SetTokenPrices(tokens []common.Address, prices []*big.Int) error {
-	opts, err := offRamp.client.TransactionOpts(offRamp.client.DefaultWallet)
+	opts, err := offRamp.client.TransactionOpts(offRamp.client.GetDefaultWallet())
 	if err != nil {
 		return err
 	}

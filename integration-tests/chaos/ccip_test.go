@@ -47,7 +47,7 @@ func TestChaosCCIP(t *testing.T) {
 					},
 				},
 			},
-		}, []*big.Int{big.NewInt(1e8)}, numOfCommitNodes, false, false)
+		}, []*big.Int{big.NewInt(1e8)}, numOfCommitNodes, false, false, actions.GE)
 	require.NoError(t, lane.IsLaneDeployed())
 	testEnvironment = lane.TestEnv.K8Env
 	testSetup = *lane.TestEnv

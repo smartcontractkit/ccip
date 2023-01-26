@@ -11,8 +11,9 @@ import (
 	a "github.com/smartcontractkit/chainlink-env/pkg/alias"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/chainlink"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/ethereum"
-	"github.com/smartcontractkit/chainlink/integration-tests/config"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink/integration-tests/config"
 
 	"github.com/onsi/gomega"
 	"github.com/smartcontractkit/chainlink-env/chaos"

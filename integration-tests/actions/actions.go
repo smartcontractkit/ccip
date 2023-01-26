@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
 	"github.com/smartcontractkit/chainlink-testing-framework/testreporters"
+
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
 )
@@ -290,7 +291,7 @@ func returnFunds(chainlinkNodes []*client.Chainlink, blockchainClient blockchain
 	}
 
 	for _, chainlinkNode := range chainlinkNodes {
-		fundedKeys, err := chainlinkNode.ExportEVMKeys()
+		fundedKeys, err := chainlinkNode.ExportEVMKeysForChain(blockchainClient.GetChainID().String())
 		if err != nil {
 			return err
 		}

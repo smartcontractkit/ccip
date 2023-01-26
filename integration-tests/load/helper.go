@@ -75,7 +75,7 @@ func (loadArgs *loadArgs) Setup() {
 			"env": map[string]interface{}{
 				"CL_DEV": "true",
 			},
-		}, transferAmounts, 5, true, false)
+		}, transferAmounts, 5, true, false, actions.GE)
 	loadArgs.envTear = tearDown
 	source := forwardLane.Source
 	dest := forwardLane.Dest

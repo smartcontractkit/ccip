@@ -27,9 +27,11 @@ LogPollInterval = '1s'
 [EVM.HeadTracker]
 HistoryDepth = 100
 
+{{if .Simulated}}
 [EVM.GasEstimator]
 Mode = 'FixedPrice'
 LimitDefault = 5_000_000
+{{end}}
 
 {{range $i,$url := .URLs }}
 [[EVM.Nodes]]
