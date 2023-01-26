@@ -7,6 +7,7 @@ import "./EVM2EVMGEOffRampSetup.t.sol";
 import "../../../router/GERouter.sol";
 import "../../helpers/receivers/ConformingReceiver.sol";
 import "../../helpers/receivers/MaybeRevertMessageReceiverNo165.sol";
+import "../../helpers/receivers/ReentrancyAbuser.sol";
 
 /// @notice #constructor
 contract EVM2EVMGEOffRamp_constructor is EVM2EVMGEOffRampSetup {
@@ -412,5 +413,56 @@ contract EVM2EVMGEOffRamp__report is EVM2EVMGEOffRampSetup {
       Internal.MessageExecutionState.SUCCESS
     );
     s_offRamp.report(abi.encode(report));
+  }
+}
+
+/// @notice #manuallyExecute
+contract EVM2EVMGEOffRamp_manuallyExecute is EVM2EVMGEOffRampSetup {
+  event ReentrancySucceeded();
+
+  IAny2EVMOffRampRouter s_router;
+
+  function setUp() public virtual override {
+    EVM2EVMGEOffRampSetup.setUp();
+    address[] memory offRamps = new address[](1);
+    offRamps[0] = address(s_offRamp);
+    s_router = new GERouter(offRamps);
+    s_offRamp.setRouter(s_router);
+  }
+
+  function testReentrancyManualExecuteFAILS() public {
+    uint256 tokenAmount = 1e9;
+    IERC20 tokenToAbuse = IERC20(s_destFeeToken);
+
+    // This needs to be deployed before the source chain message is sent
+    // because we need the address for the receiver.
+    ReentrancyAbuser receiver = new ReentrancyAbuser(address(s_router), s_destFeeToken, s_offRamp);
+    uint256 balancePre = tokenToAbuse.balanceOf(address(receiver));
+
+    // For this test any message will be flagged as correct by the
+    // commitStore. In a real scenario the abuser would have to actually
+    // send the message that they want to replay.
+    GE.EVM2EVMGEMessage[] memory messages = _generateBasicMessages();
+    messages[0].tokensAndAmounts = new Common.EVMTokenAndAmount[](1);
+    messages[0].tokensAndAmounts[0] = Common.EVMTokenAndAmount({token: s_sourceFeeToken, amount: tokenAmount});
+    messages[0].receiver = address(receiver);
+
+    GE.ExecutionReport memory report = _generateReportFromMessages(messages);
+
+    // sets the report to be repeated on the ReentrancyAbuser to be able to replay
+    receiver.setPayload(report);
+
+    s_offRamp.manuallyExecute(report);
+
+    // The first entry should be fine and triggers the second entry. This one fails
+    // but since it's an inner tx of the first one it is caught in the cry-catch.
+    // This failure of the inner tx flags the outer tx as failed.
+    assertEq(
+      uint256(s_offRamp.getExecutionState(messages[0].sequenceNumber)),
+      uint256(Internal.MessageExecutionState.FAILURE)
+    );
+
+    // Since the tx failed we don't release the tokens
+    assertEq(tokenToAbuse.balanceOf(address(receiver)), balancePre);
   }
 }

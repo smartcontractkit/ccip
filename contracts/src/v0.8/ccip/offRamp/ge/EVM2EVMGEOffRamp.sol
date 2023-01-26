@@ -164,9 +164,14 @@ contract EVM2EVMGEOffRamp is IEVM2EVMGEOffRamp, Any2EVMBaseOffRamp, TypeAndVersi
     for (uint256 i = 0; i < numMsgs; ++i) {
       GE.EVM2EVMGEMessage memory message = decodedMessages[i];
       Internal.MessageExecutionState originalState = getExecutionState(message.sequenceNumber);
-      if (originalState == Internal.MessageExecutionState.SUCCESS) revert AlreadyExecuted(message.sequenceNumber);
+      // Two valid cases here, we either have never touched this message before, or we tried to execute
+      // and failed. This check protects against reentry and re-execution because the other states are
+      // IN_PROGRESS and SUCCESS, both should not be allowed to execute.
+      if (
+        !(originalState == Internal.MessageExecutionState.UNTOUCHED ||
+          originalState == Internal.MessageExecutionState.FAILURE)
+      ) revert AlreadyExecuted(message.sequenceNumber);
 
-      // Two valid cases here, we either have never touched this message before, or we tried to execute and failed
       if (manualExecution) {
         // Manually execution is fine if we previously failed or if the commit report is just too old
         // Acceptable state transitions: FAILURE->SUCCESS, UNTOUCHED->SUCCESS, FAILURE->FAILURE
