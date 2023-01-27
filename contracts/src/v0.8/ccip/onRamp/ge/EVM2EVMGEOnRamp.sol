@@ -98,7 +98,9 @@ contract EVM2EVMGEOnRamp is IEVM2EVMGEOnRamp, BaseOnRamp, TypeAndVersionInterfac
     uint256 feeTokenAmount,
     address originalSender
   ) external override whenNotPaused whenHealthy returns (bytes32) {
-    if (msg.sender != address(s_router)) revert MustBeCalledByRouter();
+    GEConsumer.EVMExtraArgsV1 memory extraArgs = _fromBytes(message.extraArgs);
+    // Validate the message with various checks
+    _validateMessage(message.data.length, extraArgs.gasLimit, message.tokensAndAmounts, originalSender);
 
     // If link is used as fee token send it to the link pool
     // If a non-link token is used send it to the feeManager contract to
@@ -111,8 +113,13 @@ contract EVM2EVMGEOnRamp is IEVM2EVMGEOnRamp, BaseOnRamp, TypeAndVersionInterfac
       IERC20(message.feeToken).safeTransfer(address(s_feeConfig.feeManager), feeTokenAmount);
     }
 
-    GEConsumer.EVMExtraArgsV1 memory extraArgs = _fromBytes(message.extraArgs);
-    _handleForwardFromRouter(message.data.length, extraArgs.gasLimit, message.tokensAndAmounts, originalSender);
+    for (uint256 i = 0; i < message.tokensAndAmounts.length; ++i) {
+      Common.EVMTokenAndAmount memory tokenAndAmount = message.tokensAndAmounts[i];
+      IERC20 token = IERC20(tokenAndAmount.token);
+      IPool pool = getPoolBySourceToken(token);
+      if (address(pool) == address(0)) revert UnsupportedToken(token);
+      pool.lockOrBurn(tokenAndAmount.amount);
+    }
 
     // Emit message request
     // we need the next available sequence number so we increment before we use the value

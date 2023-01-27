@@ -157,39 +157,25 @@ contract BaseOnRamp is IBaseOnRamp, HealthChecker, AllowList, AggregateRateLimit
     return sourceTokens;
   }
 
-  /**
-   * @notice Handles common checks and token locking for forwardFromRouter calls.
-   * @dev this function is generic over message types, thereby reducing code duplication.
-   * @param dataLength The length of the data field of the message
-   * @param gasLimit The gasLimit set in message for destination execution
-   * @param tokensAndAmounts The token payload to be sent. They will be locked into pools by this function.
-   * @param originalSender The original sender of the message on the router.
-   */
-  function _handleForwardFromRouter(
+  /// @notice Validate the forwarded message with various checks.
+  /// @param dataLength The length of the data field of the message
+  /// @param gasLimit The gasLimit set in message for destination execution
+  /// @param tokensAndAmounts The token payload to be sent. They will be locked into pools by this function.
+  /// @param originalSender The original sender of the message on the router.
+  function _validateMessage(
     uint256 dataLength,
     uint256 gasLimit,
     Common.EVMTokenAndAmount[] memory tokensAndAmounts,
     address originalSender
   ) internal {
-    if (s_router == address(0)) revert RouterNotSet();
+    if (msg.sender != address(s_router)) revert MustBeCalledByRouter();
     if (originalSender == address(0)) revert RouterMustSetOriginalSender();
     // Check that payload is formed correctly
     if (dataLength > uint256(s_config.maxDataSize)) revert MessageTooLarge(uint256(s_config.maxDataSize), dataLength);
     if (gasLimit > uint256(s_config.maxGasLimit)) revert MessageGasLimitTooHigh();
-    uint256 tokenLength = tokensAndAmounts.length;
-    if (tokenLength > uint256(s_config.maxTokensLength)) revert UnsupportedNumberOfTokens();
-
+    if (tokensAndAmounts.length > uint256(s_config.maxTokensLength)) revert UnsupportedNumberOfTokens();
     if (s_allowlistEnabled && !s_allowed[originalSender]) revert SenderNotAllowed(originalSender);
 
     _removeTokens(tokensAndAmounts);
-
-    // Lock all tokens in their corresponding pools
-    for (uint256 i = 0; i < tokenLength; ++i) {
-      Common.EVMTokenAndAmount memory ta = tokensAndAmounts[i];
-      IERC20 token = IERC20(ta.token);
-      IPool pool = getPoolBySourceToken(token);
-      if (address(pool) == address(0)) revert UnsupportedToken(token);
-      pool.lockOrBurn(ta.amount);
-    }
   }
 }
