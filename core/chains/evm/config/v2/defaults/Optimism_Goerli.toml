@@ -8,6 +8,7 @@ Transactions.ResendAfterThreshold = '30s'
 
 [GasEstimator]
 EIP1559DynamicFees = true
+PriceMin = '1 wei'
 
 [GasEstimator.BlockHistory]
 BlockHistorySize = 24

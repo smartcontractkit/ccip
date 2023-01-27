@@ -163,15 +163,14 @@ contract FunctionsOracle is FunctionsOracleInterface, OCR2Base, AuthorizedOrigin
   function sendRequest(
     uint64 subscriptionId,
     bytes calldata data,
-    uint32 gasLimit,
-    uint256 gasPrice
+    uint32 gasLimit
   ) external override registryIsSet validateAuthorizedSender returns (bytes32) {
     if (data.length == 0) {
       revert EmptyRequestData();
     }
     bytes32 requestId = s_registry.startBilling(
       data,
-      FunctionsBillingRegistryInterface.RequestBilling(subscriptionId, msg.sender, gasLimit, gasPrice)
+      FunctionsBillingRegistryInterface.RequestBilling(subscriptionId, msg.sender, gasLimit, tx.gasprice)
     );
     emit OracleRequest(
       requestId,
