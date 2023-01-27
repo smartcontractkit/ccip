@@ -18,7 +18,6 @@ require (
 	github.com/smartcontractkit/ocr2keepers v0.6.6
 	github.com/smartcontractkit/ocr2vrf v0.0.0-20230117145849-09a91a822ee2
 	github.com/stretchr/testify v1.8.1
-	github.com/tendermint/go-amino v0.16.0
 	github.com/umbracle/ethgo v0.1.3
 	go.dedis.ch/kyber/v3 v3.0.14
 	go.uber.org/atomic v1.9.0
@@ -324,6 +323,7 @@ require (
 	github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a // indirect
 	github.com/tendermint/btcd v0.1.1 // indirect
 	github.com/tendermint/crypto v0.0.0-20191022145703-50d29ede1e15 // indirect
+	github.com/tendermint/go-amino v0.16.0 // indirect
 	github.com/tendermint/tendermint v0.34.15 // indirect
 	github.com/tendermint/tm-db v0.6.7 // indirect
 	github.com/teris-io/shortid v0.0.0-20201117134242-e59966efd125 // indirect

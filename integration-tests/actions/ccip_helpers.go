@@ -24,7 +24,6 @@ import (
 	ctfUtils "github.com/smartcontractkit/chainlink-testing-framework/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/tendermint/go-amino"
 	"golang.org/x/exp/slices"
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
@@ -111,23 +110,41 @@ type CCIPCommon struct {
 	deployed          chan struct{}
 }
 
-func (ccipModule *CCIPCommon) New(chainClient blockchain.EVMClient) *CCIPCommon {
-	newCommon := amino.DeepCopy(ccipModule).(*CCIPCommon)
-	newCommon.FeeToken = ccipModule.FeeToken
-	newCommon.ChainClient = chainClient
-	newCommon.AFNConfig = ccip.AFNConfig{
-		AFNWeightsByParticipants: map[string]*big.Int{
-			chainClient.GetDefaultWallet().Address(): big.NewInt(1),
+func (ccipModule *CCIPCommon) CopyAddresses(chainClient blockchain.EVMClient) *CCIPCommon {
+	var pools []*ccip.LockReleaseTokenPool
+	for _, pool := range ccipModule.BridgeTokenPools {
+		pools = append(pools, &ccip.LockReleaseTokenPool{EthAddress: pool.EthAddress})
+	}
+	var tokens []contracts.LinkToken
+	for _, token := range ccipModule.BridgeTokens {
+		tokens = append(tokens, token)
+	}
+	return &CCIPCommon{
+		ChainClient: chainClient,
+		Deployer:    nil,
+		FeeToken:    ccipModule.FeeToken,
+		FeeTokenPool: &ccip.LockReleaseTokenPool{
+			EthAddress: ccipModule.FeeTokenPool.EthAddress,
 		},
-		ThresholdForBlessing:  big.NewInt(1),
-		ThresholdForBadSignal: big.NewInt(1),
+		BridgeTokens:      tokens,
+		TokenPrices:       ccipModule.TokenPrices,
+		BridgeTokenPools:  pools,
+		RateLimiterConfig: ccipModule.RateLimiterConfig,
+		AFNConfig: ccip.AFNConfig{
+			AFNWeightsByParticipants: map[string]*big.Int{
+				chainClient.GetDefaultWallet().Address(): big.NewInt(1),
+			},
+			ThresholdForBlessing:  big.NewInt(1),
+			ThresholdForBadSignal: big.NewInt(1),
+		},
+		AFN: &ccip.AFN{
+			EthAddress: ccipModule.AFN.EthAddress,
+		},
+		GERouter: &ccip.GERouter{
+			EthAddress: ccipModule.GERouter.EthAddress,
+		},
+		deployed: make(chan struct{}, 1),
 	}
-	newCommon.deployed = make(chan struct{}, 1)
-	newCommon.RateLimiterConfig = ccip.RateLimiterConfig{
-		Rate:     ccip.HundredCoins,
-		Capacity: ccip.HundredCoins,
-	}
-	return newCommon
 }
 
 // DeployContracts deploys the contracts which are necessary in both source and dest chain
@@ -140,7 +157,7 @@ func (ccipModule *CCIPCommon) DeployContracts(t *testing.T, noOfTokens int) {
 		token, err := cd.DeployLinkTokenContract()
 		require.NoError(t, err, "Deploying Link Token Contract shouldn't fail")
 		ccipModule.FeeToken = token
-
+		require.NoError(t, ccipModule.ChainClient.WaitForEvents(), "error in waiting for feetoken deployment")
 		// token pool for fee token
 		ccipModule.FeeTokenPool, err = cd.DeployLockReleaseTokenPoolContract(ccipModule.FeeToken.Address())
 		require.NoError(t, err, "Deploying Native TokenPool Contract shouldn't fail")
@@ -369,7 +386,6 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(t *testing.T, model BillingM
 
 	err = sourceCCIP.Common.ChainClient.WaitForEvents()
 	require.NoError(t, err, "Error waiting for events")
-
 }
 
 func (sourceCCIP *SourceCCIPModule) CollectBalanceRequirements(t *testing.T, model BillingModel) []testhelpers.BalanceReq {
@@ -1612,7 +1628,7 @@ func CCIPDefaultTestSetUp(
 		TestEnv:                 &testSetUpA2B,
 		SourceNetworkName:       networkAName,
 		DestNetworkName:         networkBName,
-		ValidationTimeout:       time.Minute,
+		ValidationTimeout:       2 * time.Minute,
 		Ready:                   make(chan struct{}, 1),
 		commonContractsDeployed: make(chan struct{}, 1),
 		SentGEReqHashes:         []string{},
@@ -1625,7 +1641,7 @@ func CCIPDefaultTestSetUp(
 		TestEnv:                 &testSetUpB2A,
 		SourceNetworkName:       networkBName,
 		DestNetworkName:         networkAName,
-		ValidationTimeout:       time.Minute,
+		ValidationTimeout:       2 * time.Minute,
 		Ready:                   make(chan struct{}, 1),
 		commonContractsDeployed: make(chan struct{}, 1),
 		SourceBalances:          make(map[string]*big.Int),
@@ -1649,8 +1665,8 @@ func CCIPDefaultTestSetUp(
 	wg.Wait()
 	go func() {
 		if bidirectional {
-			srcCommon := ccipLaneA2B.Dest.Common.New(testSetUpB2A.SourceChainClient)
-			destCommon := ccipLaneA2B.Source.Common.New(testSetUpB2A.DestChainClient)
+			srcCommon := ccipLaneA2B.Dest.Common.CopyAddresses(testSetUpB2A.SourceChainClient)
+			destCommon := ccipLaneA2B.Source.Common.CopyAddresses(testSetUpB2A.DestChainClient)
 			log.Info().Msg("Setting up lane B to A")
 			ccipLaneB2A.DeployNewCCIPLane(numOfCommitNodes, commitAndExecOnSameDON, srcCommon, destCommon,
 				transferAmounts, false, nil, model)
