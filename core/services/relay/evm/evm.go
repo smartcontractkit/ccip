@@ -32,7 +32,6 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/relay/evm/mercury"
 	"github.com/smartcontractkit/chainlink/core/services/relay/evm/mercury/wsrpc"
 	"github.com/smartcontractkit/chainlink/core/services/relay/evm/types"
-	types "github.com/smartcontractkit/chainlink/core/services/relay/evm/types"
 	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
@@ -440,7 +439,7 @@ func NewCCIPRelayer(relayer interface{}) relay.CCIPRelayer {
 
 type ccipRelayProvider struct {
 	*configWatcher
-	contractTransmitter *ContractTransmitter
+	contractTransmitter *contractTransmitter
 }
 
 var _ relay.CCIPRelayProvider = (*ccipRelayProvider)(nil)
@@ -450,7 +449,7 @@ func (c *ccipRelayer) NewCCIPRelayProvider(rargs relaytypes.RelayArgs, transmitt
 	if err != nil {
 		return nil, err
 	}
-	contractTransmitter, err := newContractTransmitter(c.lggr, rargs, transmitterID, configWatcher, c.ethKeystore)
+	contractTransmitter, err := newContractTransmitter(c.lggr, rargs, transmitterID, configWatcher, c.ks.Eth())
 	if err != nil {
 		return nil, err
 	}
@@ -466,7 +465,7 @@ func (c *ccipRelayProvider) ContractTransmitter() ocrtypes.ContractTransmitter {
 
 type ccipExecutionProvider struct {
 	*configWatcher
-	contractTransmitter *ContractTransmitter
+	contractTransmitter *contractTransmitter
 }
 
 var _ relay.CCIPExecutionProvider = (*ccipExecutionProvider)(nil)
@@ -476,7 +475,7 @@ func (c *ccipRelayer) NewCCIPExecutionProvider(rargs relaytypes.RelayArgs, trans
 	if err != nil {
 		return nil, err
 	}
-	contractTransmitter, err := newContractTransmitter(c.lggr, rargs, transmitterID, configWatcher, c.ethKeystore)
+	contractTransmitter, err := newContractTransmitter(c.lggr, rargs, transmitterID, configWatcher, c.ks.Eth())
 	if err != nil {
 		return nil, err
 	}
