@@ -52,8 +52,8 @@ contract EVM2EVMGEOnRampSetup is TokenSetup, GERouterSetup {
       s_afn,
       onRampConfig(),
       rateLimiterConfig(),
-      TOKEN_LIMIT_ADMIN,
       s_sourceRouter,
+      address(s_IFeeManager),
       feeManagerConfig(address(s_IFeeManager))
     );
 
@@ -132,15 +132,18 @@ contract EVM2EVMGEOnRampSetup is TokenSetup, GERouterSetup {
   function feeManagerConfig(address feeManagerAddress)
     internal
     view
-    returns (IEVM2EVMGEOnRamp.DynamicFeeConfig memory feeConfig)
+    returns (IEVM2EVMGEOnRamp.FeeTokenConfigArgs[] memory feeConfig)
   {
-    return
-      IEVM2EVMGEOnRamp.DynamicFeeConfig({
-        linkToken: s_sourceTokens[0],
+    IEVM2EVMGEOnRamp.FeeTokenConfigArgs[] memory FeeTokenConfigArgss = new IEVM2EVMGEOnRamp.FeeTokenConfigArgs[](2);
+    for (uint256 i = 0; i < FeeTokenConfigArgss.length; i++) {
+      FeeTokenConfigArgss[i] = IEVM2EVMGEOnRamp.FeeTokenConfigArgs({
+        token: s_sourceTokens[i],
         feeAmount: 1,
         multiplier: 108e16,
-        destGasOverhead: 1,
-        feeManager: feeManagerAddress
+        destGasOverhead: 1
       });
+    }
+
+    return FeeTokenConfigArgss;
   }
 }

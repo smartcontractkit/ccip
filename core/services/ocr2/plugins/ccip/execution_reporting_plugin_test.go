@@ -121,8 +121,8 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 		evm_2_evm_toll_offramp.IAggregateRateLimiterRateLimiterConfig{
 			Capacity: big.NewInt(1e18),
 			Rate:     big.NewInt(1e18),
+			Admin:    destUser.From,
 		},
-		destUser.From,
 	)
 	require.NoError(t, err)
 	offRamp, err := evm_2_evm_toll_offramp.NewEVM2EVMTollOffRamp(offRampAddress, destChain)

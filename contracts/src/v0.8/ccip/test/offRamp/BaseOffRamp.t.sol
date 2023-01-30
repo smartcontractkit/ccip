@@ -25,8 +25,7 @@ contract BaseOffRampSetup is TokenSetup {
       s_afn,
       getCastedSourceTokens(),
       getCastedDestinationPools(),
-      rateLimiterConfig(),
-      TOKEN_LIMIT_ADMIN
+      rateLimiterConfig()
     );
 
     s_offRamp.setPrices(getCastedDestinationTokens(), getTokenPrices());
@@ -72,8 +71,7 @@ contract BaseOffRamp_constructor is BaseOffRampSetup {
       s_afn,
       wrongTokens,
       pools,
-      rateLimiterConfig(),
-      TOKEN_LIMIT_ADMIN
+      rateLimiterConfig()
     );
   }
 
@@ -86,7 +84,8 @@ contract BaseOffRamp_constructor is BaseOffRampSetup {
 
     IAggregateRateLimiter.RateLimiterConfig memory rateLimiterConfig = IAggregateRateLimiter.RateLimiterConfig({
       rate: 1e20,
-      capacity: 1e20
+      capacity: 1e20,
+      admin: TOKEN_LIMIT_ADMIN
     });
 
     s_offRamp = new BaseOffRampHelper(
@@ -97,8 +96,7 @@ contract BaseOffRamp_constructor is BaseOffRampSetup {
       s_afn,
       getCastedSourceTokens(),
       pools,
-      rateLimiterConfig,
-      OWNER
+      rateLimiterConfig
     );
   }
 }

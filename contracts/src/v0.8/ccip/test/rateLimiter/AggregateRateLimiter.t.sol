@@ -16,8 +16,8 @@ contract AggregateTokenLimiterSetup is BaseTest {
   function setUp() public virtual override {
     BaseTest.setUp();
 
-    s_config = IAggregateRateLimiter.RateLimiterConfig({rate: 5, capacity: 100});
-    s_rateLimiter = new AggregateRateLimiterHelper(s_config, TOKEN_LIMIT_ADMIN);
+    s_config = IAggregateRateLimiter.RateLimiterConfig({rate: 5, capacity: 100, admin: TOKEN_LIMIT_ADMIN});
+    s_rateLimiter = new AggregateRateLimiterHelper(s_config);
     IERC20[] memory tokens = new IERC20[](1);
     tokens[0] = TOKEN;
     uint256[] memory prices = new uint256[](1);
@@ -138,7 +138,8 @@ contract AggregateTokenLimiter_setRateLimiterConfig is AggregateTokenLimiterSetu
 
     s_config = IAggregateRateLimiter.RateLimiterConfig({
       rate: tokenBucket.rate * 2,
-      capacity: tokenBucket.capacity * 8
+      capacity: tokenBucket.capacity * 8,
+      admin: TOKEN_LIMIT_ADMIN
     });
 
     vm.expectEmit(false, false, false, true);
@@ -164,7 +165,8 @@ contract AggregateTokenLimiter_setRateLimiterConfig is AggregateTokenLimiterSetu
   function testRefillRateTooHighReverts() public {
     IAggregateRateLimiter.RateLimiterConfig memory config = IAggregateRateLimiter.RateLimiterConfig({
       rate: 2**208,
-      capacity: 100
+      capacity: 100,
+      admin: TOKEN_LIMIT_ADMIN
     });
 
     vm.expectRevert(IAggregateRateLimiter.RefillRateTooHigh.selector);

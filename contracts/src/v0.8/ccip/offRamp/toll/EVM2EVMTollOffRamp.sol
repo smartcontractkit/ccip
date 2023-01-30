@@ -67,21 +67,10 @@ contract EVM2EVMTollOffRamp is Any2EVMBaseOffRamp, TypeAndVersionInterface, OCR2
     IAFN afn,
     IERC20[] memory sourceTokens,
     IPool[] memory pools,
-    RateLimiterConfig memory rateLimiterConfig,
-    address tokenLimitsAdmin
+    RateLimiterConfig memory rateLimiterConfig
   )
     OCR2Base()
-    Any2EVMBaseOffRamp(
-      sourceChainId,
-      chainId,
-      onRampAddress,
-      commitStore,
-      afn,
-      sourceTokens,
-      pools,
-      rateLimiterConfig,
-      tokenLimitsAdmin
-    )
+    Any2EVMBaseOffRamp(sourceChainId, chainId, onRampAddress, commitStore, afn, sourceTokens, pools, rateLimiterConfig)
   {
     s_config = offRampConfig;
   }

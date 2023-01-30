@@ -42,6 +42,7 @@ import (
 var (
 	// Source
 	SourcePool       = "source pool"
+	SourceFeeManager = "source fee manager"
 	TollOnRampRouter = "toll onramp router"
 	TollOnRamp       = "toll onramp"
 	GEOnRamp         = "ge onramp"
@@ -53,10 +54,11 @@ var (
 	GEOffRamp         = "ge offramp"
 	DestGERouter      = "dest ge router"
 	DestPool          = "dest pool"
-	Receiver          = "receiver"
-	Sender            = "sender"
-	Link              = func(amount int64) *big.Int { return new(big.Int).Mul(big.NewInt(1e18), big.NewInt(amount)) }
-	HundredLink       = Link(100)
+
+	Receiver    = "receiver"
+	Sender      = "sender"
+	Link        = func(amount int64) *big.Int { return new(big.Int).Mul(big.NewInt(1e18), big.NewInt(amount)) }
+	HundredLink = Link(100)
 )
 
 type MaybeRevertReceiver struct {
@@ -80,6 +82,7 @@ type Common struct {
 	CustomPool  *custom_token_pool.CustomTokenPool
 	CustomToken *link_token_interface.LinkToken
 	AFN         *mock_afn_contract.MockAFNContract
+	FeeManager  *fee_manager.FeeManager
 }
 
 type SourceChain struct {
@@ -181,8 +184,8 @@ func (c *CCIPContracts) DeployNewTollOffRamp() {
 		evm_2_evm_toll_offramp.IAggregateRateLimiterRateLimiterConfig{
 			Capacity: HundredLink,
 			Rate:     big.NewInt(1e18),
+			Admin:    c.Dest.User.From,
 		},
-		c.Dest.User.From,
 	)
 	require.NoError(c.t, err)
 	c.Dest.Chain.Commit()
@@ -243,8 +246,8 @@ func (c *CCIPContracts) DeployNewTollOnRamp() {
 		evm_2_evm_toll_onramp.IAggregateRateLimiterRateLimiterConfig{
 			Capacity: HundredLink,
 			Rate:     big.NewInt(1e18),
+			Admin:    c.Source.User.From,
 		},
-		c.Source.User.From,
 		c.Source.TollOnRampRouter.Address(),
 	)
 	require.NoError(c.t, err)
@@ -516,8 +519,8 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		evm_2_evm_toll_onramp.IAggregateRateLimiterRateLimiterConfig{
 			Capacity: HundredLink,
 			Rate:     big.NewInt(1e18),
+			Admin:    sourceUser.From,
 		},
-		sourceUser.From,
 		onRampRouterAddress,
 	)
 	require.NoError(t, err)
@@ -543,14 +546,24 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	sourceChain.Commit()
 
 	// Deploy and configure GE onramp
-	sourceFeeManagerAddress, _, _, err := fee_manager.DeployFeeManager(sourceUser, sourceChain, []fee_manager.GEFeeUpdate{
-		{
-			SourceFeeToken:              sourceLinkTokenAddress,
-			DestChainId:                 destChainID,
-			FeeTokenBaseUnitsPerUnitGas: big.NewInt(1e9), // 1 gwei
+	sourceFeeManagerAddress, _, _, err := fee_manager.DeployFeeManager(
+		sourceUser,
+		sourceChain,
+		[]fee_manager.GEFeeUpdate{
+			{
+				SourceFeeToken:              sourceLinkTokenAddress,
+				DestChainId:                 destChainID,
+				FeeTokenBaseUnitsPerUnitGas: big.NewInt(1e9), // 1 gwei
+			},
 		},
-	}, nil, big.NewInt(1e18))
+		nil,
+		big.NewInt(1e18),
+	)
 	require.NoError(t, err)
+
+	sourceFeeManger, err := fee_manager.NewFeeManager(sourceFeeManagerAddress, sourceChain)
+	require.NoError(t, err)
+
 	geOnRampAddress, _, _, err := evm_2_evm_ge_onramp.DeployEVM2EVMGEOnRamp(
 		sourceUser,                               // user
 		sourceChain,                              // client
@@ -569,15 +582,17 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		evm_2_evm_ge_onramp.IAggregateRateLimiterRateLimiterConfig{
 			Capacity: HundredLink,
 			Rate:     big.NewInt(1e18),
+			Admin:    sourceUser.From,
 		},
-		sourceUser.From,
 		sourceGERouterAddress,
-		evm_2_evm_ge_onramp.IEVM2EVMGEOnRampDynamicFeeConfig{
-			LinkToken:       sourceLinkTokenAddress,
-			FeeAmount:       big.NewInt(0),
-			DestGasOverhead: 0,
-			Multiplier:      1e18,
-			FeeManager:      sourceFeeManagerAddress,
+		sourceFeeManagerAddress,
+		[]evm_2_evm_ge_onramp.IEVM2EVMGEOnRampFeeTokenConfigArgs{
+			{
+				Token:           sourceLinkTokenAddress,
+				Multiplier:      1e18,
+				FeeAmount:       big.NewInt(0),
+				DestGasOverhead: 0,
+			},
 		},
 	)
 	require.NoError(t, err)
@@ -637,8 +652,8 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		evm_2_evm_toll_offramp.IAggregateRateLimiterRateLimiterConfig{
 			Capacity: HundredLink,
 			Rate:     big.NewInt(1e18),
+			Admin:    sourceUser.From,
 		},
-		sourceUser.From,
 	)
 	require.NoError(t, err)
 	tollOffRamp, err := evm_2_evm_toll_offramp.NewEVM2EVMTollOffRamp(tollOffRampAddress, destChain)
@@ -657,11 +672,16 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	require.NoError(t, err)
 
 	// Deploy and configure ge offramp.
-	destFeeManagerAddress, _, _, err := fee_manager.DeployFeeManager(destUser, destChain, []fee_manager.GEFeeUpdate{{
-		SourceFeeToken:              destLinkTokenAddress,
-		DestChainId:                 sourceChainID,
-		FeeTokenBaseUnitsPerUnitGas: big.NewInt(200e9), // (2e20 juels/eth) * (1 gwei / gas) / (1 eth/1e18)
-	}}, nil, big.NewInt(1e18))
+	destFeeManagerAddress, _, _, err := fee_manager.DeployFeeManager(
+		destUser,
+		destChain, []fee_manager.GEFeeUpdate{{
+			SourceFeeToken:              destLinkTokenAddress,
+			DestChainId:                 sourceChainID,
+			FeeTokenBaseUnitsPerUnitGas: big.NewInt(200e9), // (2e20 juels/eth) * (1 gwei / gas) / (1 eth/1e18)
+		}},
+		nil,
+		big.NewInt(1e18),
+	)
 	require.NoError(t, err)
 	destFeeManager, err := fee_manager.NewFeeManager(destFeeManagerAddress, destChain)
 	require.NoError(t, err)
@@ -686,9 +706,8 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		evm_2_evm_ge_offramp.IAggregateRateLimiterRateLimiterConfig{
 			Capacity: HundredLink,
 			Rate:     big.NewInt(1e18),
+			Admin:    sourceUser.From,
 		},
-		sourceUser.From,
-		destLinkTokenAddress,
 	)
 	require.NoError(t, err)
 	geOffRamp, err := evm_2_evm_ge_offramp.NewEVM2EVMGEOffRamp(geOffRampAddress, destChain)
@@ -738,6 +757,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			CustomPool:  nil,
 			CustomToken: sourceCustomToken,
 			AFN:         sourceAFN,
+			FeeManager:  sourceFeeManger,
 		},
 		TollOnRampFees:   tollOnRampFees,
 		TollOnRampRouter: tollOnRampRouter,
@@ -755,6 +775,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			CustomPool:  nil,
 			CustomToken: destCustomToken,
 			AFN:         destAFN,
+			FeeManager:  destFeeManager,
 		},
 		CommitStore:       commitStore,
 		TollOffRampRouter: tollOffRampRouter,

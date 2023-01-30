@@ -11,20 +11,9 @@ contract BaseOffRampHelper is Any2EVMBaseOffRamp {
     IAFN afn,
     IERC20[] memory sourceTokens,
     IPool[] memory pools,
-    RateLimiterConfig memory rateLimiterConfig,
-    address tokenLimitsAdmin
+    RateLimiterConfig memory rateLimiterConfig
   )
-    Any2EVMBaseOffRamp(
-      sourceChainId,
-      chainId,
-      onRampAddress,
-      commitStore,
-      afn,
-      sourceTokens,
-      pools,
-      rateLimiterConfig,
-      tokenLimitsAdmin
-    )
+    Any2EVMBaseOffRamp(sourceChainId, chainId, onRampAddress, commitStore, afn, sourceTokens, pools, rateLimiterConfig)
   {}
 
   function setExecutionState(uint64 sequenceNumber, Internal.MessageExecutionState state) public {

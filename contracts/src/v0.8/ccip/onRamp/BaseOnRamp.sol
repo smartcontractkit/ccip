@@ -41,9 +41,8 @@ contract BaseOnRamp is IBaseOnRamp, HealthChecker, AllowList, AggregateRateLimit
     IAFN afn,
     OnRampConfig memory config,
     RateLimiterConfig memory rateLimiterConfig,
-    address tokenLimitsAdmin,
     address router
-  ) HealthChecker(afn) AllowList(allowlist) AggregateRateLimiter(rateLimiterConfig, tokenLimitsAdmin) {
+  ) HealthChecker(afn) AllowList(allowlist) AggregateRateLimiter(rateLimiterConfig) {
     i_chainId = chainId;
     i_destinationChainId = destinationChainId;
     s_config = config;

@@ -47,13 +47,8 @@ contract Any2EVMBaseOffRamp is IBaseOffRamp, HealthChecker, OffRampTokenPoolRegi
     IAFN afn,
     IERC20[] memory sourceTokens,
     IPool[] memory pools,
-    RateLimiterConfig memory rateLimiterConfig,
-    address tokenLimitsAdmin
-  )
-    HealthChecker(afn)
-    OffRampTokenPoolRegistry(sourceTokens, pools)
-    AggregateRateLimiter(rateLimiterConfig, tokenLimitsAdmin)
-  {
+    RateLimiterConfig memory rateLimiterConfig
+  ) HealthChecker(afn) OffRampTokenPoolRegistry(sourceTokens, pools) AggregateRateLimiter(rateLimiterConfig) {
     if (onRampAddress == address(0)) revert ZeroAddressNotAllowed();
     // OffRampTokenPoolRegistry does a check on tokensAndAmounts.length != pools.length
     i_sourceChainId = sourceChainId;

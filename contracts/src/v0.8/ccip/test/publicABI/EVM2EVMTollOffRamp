@@ -33,7 +33,7 @@
   "setConfig((uint32,uint32,uint32,uint16))": "e4381140",
   "setOCR2Config(address[],address[],uint8,bytes,uint64,bytes)": "1ef38174",
   "setPrices(address[],uint256[])": "4352fa9f",
-  "setRateLimiterConfig((uint256,uint256))": "91872543",
+  "setRateLimiterConfig((address,uint256,uint256))": "17332f9b",
   "setRouter(address)": "c0d78655",
   "setTokenLimitAdmin(address)": "39aa9264",
   "transferOwnership(address)": "f2fde38b",

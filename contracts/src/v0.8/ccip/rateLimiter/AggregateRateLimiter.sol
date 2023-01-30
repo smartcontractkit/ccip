@@ -22,12 +22,10 @@ contract AggregateRateLimiter is IAggregateRateLimiter, OwnerIsCreator {
   TokenBucket private s_tokenBucket;
 
   /**
-   * @param config The RateLimiterConfig containing the capacity and refill rate of the bucket
-   * @param tokenLimitsAdmin The address that is allowed to change prices and the bucket
-   *      configuration settings.
+   * @param config The RateLimiterConfig containing the capacity and refill rate of the bucket, plus the admin address.
    */
-  constructor(RateLimiterConfig memory config, address tokenLimitsAdmin) {
-    s_tokenLimitAdmin = tokenLimitsAdmin;
+  constructor(RateLimiterConfig memory config) {
+    s_tokenLimitAdmin = config.admin;
     s_tokenBucket = TokenBucket({
       rate: config.rate,
       capacity: config.capacity,

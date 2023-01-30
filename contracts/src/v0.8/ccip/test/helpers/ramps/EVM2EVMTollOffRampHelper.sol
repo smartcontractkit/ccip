@@ -13,8 +13,7 @@ contract EVM2EVMTollOffRampHelper is EVM2EVMTollOffRamp {
     IAFN afn,
     IERC20[] memory sourceTokens,
     IPool[] memory pools,
-    RateLimiterConfig memory rateLimiterConfig,
-    address tokenLimitsAdmin
+    RateLimiterConfig memory rateLimiterConfig
   )
     EVM2EVMTollOffRamp(
       sourceChainId,
@@ -25,8 +24,7 @@ contract EVM2EVMTollOffRampHelper is EVM2EVMTollOffRamp {
       afn,
       sourceTokens,
       pools,
-      rateLimiterConfig,
-      tokenLimitsAdmin
+      rateLimiterConfig
     )
   {}
 

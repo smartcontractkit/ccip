@@ -35,21 +35,9 @@ contract EVM2EVMTollOnRamp is IEVM2EVMTollOnRamp, BaseOnRamp, TypeAndVersionInte
     IAFN afn,
     OnRampConfig memory config,
     RateLimiterConfig memory rateLimiterConfig,
-    address tokenLimitsAdmin,
     IEVM2AnyTollOnRampRouter router
   )
-    BaseOnRamp(
-      chainId,
-      destinationChainId,
-      tokens,
-      pools,
-      allowlist,
-      afn,
-      config,
-      rateLimiterConfig,
-      tokenLimitsAdmin,
-      address(router)
-    )
+    BaseOnRamp(chainId, destinationChainId, tokens, pools, allowlist, afn, config, rateLimiterConfig, address(router))
   {}
 
   function _fromBytes(bytes calldata extraArgs) internal pure returns (TollConsumer.EVMExtraArgsV1 memory) {

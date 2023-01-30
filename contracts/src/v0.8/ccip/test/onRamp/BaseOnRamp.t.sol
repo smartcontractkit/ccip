@@ -26,7 +26,6 @@ contract BaseOnrampSetup is TokenSetup {
       s_afn,
       onRampConfig(),
       rateLimiterConfig(),
-      TOKEN_LIMIT_ADMIN,
       s_onRampRouter
     );
 

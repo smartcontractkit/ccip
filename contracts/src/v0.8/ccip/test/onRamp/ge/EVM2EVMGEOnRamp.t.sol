@@ -73,6 +73,20 @@ contract EVM2EVMGEOnRamp_forwardFromRouter is EVM2EVMGEOnRampSetup {
     }
   }
 
+  event Transfer(address indexed from, address indexed to, uint256 value);
+
+  function testShouldSendFeesToTheFeeManager() public {
+    GEConsumer.EVM2AnyGEMessage memory message = _generateEmptyMessage();
+
+    uint256 feeAmount = 1234567890;
+    IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
+
+    vm.expectEmit(true, true, true, true);
+    emit Transfer(address(s_onRamp), address(s_IFeeManager), feeAmount);
+
+    s_onRamp.forwardFromRouter(message, feeAmount, OWNER);
+  }
+
   // Reverts
 
   function testPausedReverts() public {
@@ -218,10 +232,10 @@ contract EVM2EVMGEOnRamp_setFeeAdmin is EVM2EVMGEOnRampSetup {
 
 /// @notice #setFeeConfig
 contract EVM2EVMGEOnRamp_setFeeConfig is EVM2EVMGEOnRampSetup {
-  event FeeConfigSet(IEVM2EVMGEOnRamp.DynamicFeeConfig feeConfig);
+  event FeeConfigSet(IEVM2EVMGEOnRamp.FeeTokenConfigArgs[] feeConfig);
 
   function testSetFeeConfigSuccess() public {
-    IEVM2EVMGEOnRamp.DynamicFeeConfig memory feeConfig;
+    IEVM2EVMGEOnRamp.FeeTokenConfigArgs[] memory feeConfig;
 
     vm.expectEmit(false, false, false, true);
     emit FeeConfigSet(feeConfig);
@@ -233,7 +247,7 @@ contract EVM2EVMGEOnRamp_setFeeConfig is EVM2EVMGEOnRampSetup {
     address newAdmin = address(13371337);
     s_onRamp.setFeeAdmin(newAdmin);
 
-    IEVM2EVMGEOnRamp.DynamicFeeConfig memory feeConfig;
+    IEVM2EVMGEOnRamp.FeeTokenConfigArgs[] memory feeConfig;
 
     changePrank(newAdmin);
 
@@ -246,7 +260,7 @@ contract EVM2EVMGEOnRamp_setFeeConfig is EVM2EVMGEOnRampSetup {
   // Reverts
 
   function testOnlyCallableByOwnerOrFeeAdminReverts() public {
-    IEVM2EVMGEOnRamp.DynamicFeeConfig memory feeConfig;
+    IEVM2EVMGEOnRamp.FeeTokenConfigArgs[] memory feeConfig;
     changePrank(STRANGER);
 
     vm.expectRevert(IEVM2EVMGEOnRamp.OnlyCallableByOwnerOrFeeAdmin.selector);
