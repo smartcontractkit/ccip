@@ -360,8 +360,8 @@ func setChainSpecificConfigDefaultSets() {
 	optimismBedrock.finalityDepth = 200
 	optimismBedrock.headTrackerHistoryDepth = 300
 	optimismBedrock.nodeSyncThreshold = 10
-	// TODO: remove this testnet when all Optimism networks have migrated: https://app.shortcut.com/chainlinklabs/story/55389/remove-optimism-pre-bedrock-error-messages
 	optimismGoerli := optimismBedrock
+	optimismGoerli.minGasPriceWei = *assets.NewWeiI(1) // Gas prices were significantly reduced after the upgrade.
 	optimismGoerli.linkContractAddress = "0xdc2CC710e42857672E7907CF474a69B63B93089f"
 
 	// Fantom
@@ -373,6 +373,7 @@ func setChainSpecificConfigDefaultSets() {
 	fantomMainnet.logPollInterval = 1 * time.Second
 	fantomMainnet.minIncomingConfirmations = 3
 	fantomMainnet.nodeDeadAfterNoNewHeadersThreshold = 30 * time.Second
+	fantomMainnet.ocr2AutomationGasLimit = 3_800_000 // 3.5M (upkeep limit) + 300K. Fantom has a lower max gas limit than other chains
 	fantomTestnet := fantomMainnet
 	fantomTestnet.linkContractAddress = "0xfafedb041c0dd4fa2dc0d87a6b0979ee6fa7af5f"
 	fantomTestnet.blockEmissionIdleWarningThreshold = 0

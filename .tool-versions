@@ -6,3 +6,4 @@ helm 3.10.3
 github-cli 2.15.0
 zig 0.10.0
 golangci-lint 1.50.1
+shellspec 0.28.1

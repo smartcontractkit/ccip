@@ -29,6 +29,9 @@ func TestSmokeCCIPForBidirectionalLaneGE(t *testing.T) {
 	})
 
 	require.NoError(t, laneA.IsLaneDeployed())
+	if laneB != nil {
+		require.NoError(t, laneB.IsLaneDeployed())
+	}
 
 	// initiate transfer with GE and verify
 	log.Info().Msgf("Multiple Token transfer with GE for lane %s --> %s", laneA.SourceNetworkName, laneA.DestNetworkName)
@@ -40,7 +43,6 @@ func TestSmokeCCIPForBidirectionalLaneGE(t *testing.T) {
 		return
 	}
 
-	require.NoError(t, laneB.IsLaneDeployed())
 	log.Info().Msgf("Multiple Token transfer with GE for lane %s --> %s", laneB.SourceNetworkName, laneB.DestNetworkName)
 	laneB.RecordStateBeforeGETransfer()
 	laneB.SendGERequests(1)
@@ -67,6 +69,9 @@ func TestSmokeCCIPForBidirectionalLaneToll(t *testing.T) {
 	})
 
 	require.NoError(t, laneA.IsLaneDeployed())
+	if laneB != nil {
+		require.NoError(t, laneB.IsLaneDeployed())
+	}
 	// initiate transfer with toll and verify
 	log.Info().Msgf("Multiple Token transfer with toll for lane %s --> %s", laneA.SourceNetworkName, laneA.DestNetworkName)
 	laneA.RecordStateBeforeTollTransfer()
@@ -77,7 +82,6 @@ func TestSmokeCCIPForBidirectionalLaneToll(t *testing.T) {
 		return
 	}
 
-	require.NoError(t, laneB.IsLaneDeployed())
 	log.Info().Msgf("Multiple Token transfer with toll for lane %s --> %s", laneB.SourceNetworkName, laneB.DestNetworkName)
 	laneB.RecordStateBeforeTollTransfer()
 	laneB.SendTollRequests(1)
