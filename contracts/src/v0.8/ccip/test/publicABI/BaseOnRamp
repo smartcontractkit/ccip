@@ -24,7 +24,7 @@
   "setAllowlistEnabled(bool)": "d7644ba2",
   "setOnRampConfig((uint64,uint32,uint16,uint64))": "dcd210f1",
   "setPrices(address[],uint256[])": "4352fa9f",
-  "setRateLimiterConfig((uint256,uint256))": "91872543",
+  "setRateLimiterConfig((address,uint256,uint256))": "17332f9b",
   "setRouter(address)": "c0d78655",
   "setTokenLimitAdmin(address)": "39aa9264",
   "transferOwnership(address)": "f2fde38b",

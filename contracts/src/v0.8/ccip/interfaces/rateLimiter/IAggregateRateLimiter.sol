@@ -25,6 +25,7 @@ interface IAggregateRateLimiter {
   }
 
   struct RateLimiterConfig {
+    address admin;
     uint256 rate;
     uint256 capacity;
   }

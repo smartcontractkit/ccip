@@ -51,9 +51,7 @@ contract EVM2EVMGEOffRampSetup is TokenSetup, FeeManagerSetup {
       s_afn,
       getCastedSourceTokens(),
       getCastedDestinationPools(),
-      rateLimiterConfig(),
-      TOKEN_LIMIT_ADMIN,
-      IERC20(s_destFeeToken)
+      rateLimiterConfig()
     );
 
     s_offRamp.setPrices(getCastedDestinationTokens(), getTokenPrices());

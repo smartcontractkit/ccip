@@ -35,21 +35,9 @@ contract EVM2EVMTollOnRamp is IEVM2EVMTollOnRamp, BaseOnRamp, TypeAndVersionInte
     IAFN afn,
     OnRampConfig memory config,
     RateLimiterConfig memory rateLimiterConfig,
-    address tokenLimitsAdmin,
     IEVM2AnyTollOnRampRouter router
   )
-    BaseOnRamp(
-      chainId,
-      destinationChainId,
-      tokens,
-      pools,
-      allowlist,
-      afn,
-      config,
-      rateLimiterConfig,
-      tokenLimitsAdmin,
-      address(router)
-    )
+    BaseOnRamp(chainId, destinationChainId, tokens, pools, allowlist, afn, config, rateLimiterConfig, address(router))
   {}
 
   function _fromBytes(bytes calldata extraArgs) internal pure returns (TollConsumer.EVMExtraArgsV1 memory) {
@@ -69,9 +57,16 @@ contract EVM2EVMTollOnRamp is IEVM2EVMTollOnRamp, BaseOnRamp, TypeAndVersionInte
     whenHealthy
     returns (uint64)
   {
-    if (msg.sender != address(s_router)) revert MustBeCalledByRouter();
     uint256 gasLimit = _fromBytes(message.extraArgs).gasLimit;
-    _handleForwardFromRouter(message.data.length, gasLimit, message.tokensAndAmounts, originalSender);
+    _validateMessage(message.data.length, gasLimit, message.tokensAndAmounts, originalSender);
+
+    for (uint256 i = 0; i < message.tokensAndAmounts.length; ++i) {
+      Common.EVMTokenAndAmount memory tokenAndAmount = message.tokensAndAmounts[i];
+      IERC20 token = IERC20(tokenAndAmount.token);
+      IPool pool = getPoolBySourceToken(token);
+      if (address(pool) == address(0)) revert UnsupportedToken(token);
+      pool.lockOrBurn(tokenAndAmount.amount);
+    }
 
     // Emit message request
     // we need the next available sequence number so we increment before we use the value

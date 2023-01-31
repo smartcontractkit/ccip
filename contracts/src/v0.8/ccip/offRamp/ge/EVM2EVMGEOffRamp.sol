@@ -32,7 +32,6 @@ contract EVM2EVMGEOffRamp is IEVM2EVMGEOffRamp, Any2EVMBaseOffRamp, TypeAndVersi
   string public constant override typeAndVersion = "EVM2EVMGEOffRamp 1.0.0";
 
   bytes32 internal immutable i_metadataHash;
-  IERC20 internal immutable i_feeToken;
 
   mapping(address => uint256) internal s_nopBalance;
   mapping(address => uint64) internal s_senderNonce;
@@ -48,26 +47,13 @@ contract EVM2EVMGEOffRamp is IEVM2EVMGEOffRamp, Any2EVMBaseOffRamp, TypeAndVersi
     IAFN afn,
     IERC20[] memory sourceTokens,
     IPool[] memory pools,
-    RateLimiterConfig memory rateLimiterConfig,
-    address tokenLimitsAdmin,
-    IERC20 feeToken
+    RateLimiterConfig memory rateLimiterConfig
   )
     OCR2Base()
-    Any2EVMBaseOffRamp(
-      sourceChainId,
-      chainId,
-      onRampAddress,
-      commitStore,
-      afn,
-      sourceTokens,
-      pools,
-      rateLimiterConfig,
-      tokenLimitsAdmin
-    )
+    Any2EVMBaseOffRamp(sourceChainId, chainId, onRampAddress, commitStore, afn, sourceTokens, pools, rateLimiterConfig)
   {
     s_config = offRampConfig;
     i_metadataHash = _metadataHash(GE.EVM_2_EVM_GE_MESSAGE_HASH);
-    i_feeToken = feeToken;
   }
 
   /// @inheritdoc IEVM2EVMGEOffRamp
@@ -158,8 +144,6 @@ contract EVM2EVMGEOffRamp is IEVM2EVMGEOffRamp, Any2EVMBaseOffRamp, TypeAndVersi
     );
     bool isOldCommitReport = (block.timestamp - timestampCommitted) > s_config.permissionLessExecutionThresholdSeconds;
 
-    uint256 totalFeesAccrued = 0;
-
     // Execute messages
     for (uint256 i = 0; i < numMsgs; ++i) {
       GE.EVM2EVMGEMessage memory message = decodedMessages[i];
@@ -191,7 +175,6 @@ contract EVM2EVMGEOffRamp is IEVM2EVMGEOffRamp, Any2EVMBaseOffRamp, TypeAndVersi
           emit SkippedIncorrectNonce(message.nonce, message.sender);
           continue;
         }
-        totalFeesAccrued += message.feeTokenAmount;
       }
 
       _isWellFormed(message);
@@ -225,9 +208,6 @@ contract EVM2EVMGEOffRamp is IEVM2EVMGEOffRamp, Any2EVMBaseOffRamp, TypeAndVersi
 
       emit ExecutionStateChanged(message.sequenceNumber, message.messageId, newState);
     }
-
-    // Take the fee charged to this contract.
-    _releaseOrMintToken(getPoolByDestToken(i_feeToken), totalFeesAccrued, address(this));
   }
 
   /**

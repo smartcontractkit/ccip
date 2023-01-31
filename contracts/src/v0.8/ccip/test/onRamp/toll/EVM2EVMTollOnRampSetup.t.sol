@@ -35,7 +35,6 @@ contract EVM2EVMTollOnRampSetup is TokenSetup {
       s_afn,
       onRampConfig(),
       rateLimiterConfig(),
-      TOKEN_LIMIT_ADMIN,
       s_onRampRouter
     );
     uint256[] memory fees = new uint256[](1);

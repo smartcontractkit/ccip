@@ -13,9 +13,7 @@ contract EVM2EVMGEOffRampHelper is EVM2EVMGEOffRamp {
     IAFN afn,
     IERC20[] memory sourceTokens,
     IPool[] memory pools,
-    RateLimiterConfig memory rateLimiterConfig,
-    address tokenLimitsAdmin,
-    IERC20 feeToken
+    RateLimiterConfig memory rateLimiterConfig
   )
     EVM2EVMGEOffRamp(
       sourceChainId,
@@ -26,9 +24,7 @@ contract EVM2EVMGEOffRampHelper is EVM2EVMGEOffRamp {
       afn,
       sourceTokens,
       pools,
-      rateLimiterConfig,
-      tokenLimitsAdmin,
-      feeToken
+      rateLimiterConfig
     )
   {}
 

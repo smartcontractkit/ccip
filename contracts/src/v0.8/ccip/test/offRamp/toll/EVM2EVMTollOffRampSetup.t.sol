@@ -40,8 +40,7 @@ contract EVM2EVMTollOffRampSetup is TokenSetup {
       s_afn,
       getCastedSourceTokens(),
       getCastedDestinationPools(),
-      rateLimiterConfig(),
-      TOKEN_LIMIT_ADMIN
+      rateLimiterConfig()
     );
 
     s_offRamp.setPrices(getCastedDestinationTokens(), getTokenPrices());

@@ -78,6 +78,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 			{Name: testhelpers.SourcePool, Addr: ccipContracts.Source.Pool.Address(), Getter: ccipContracts.GetSourceLinkBalance},
 			{Name: testhelpers.GEOnRamp, Addr: ccipContracts.Source.GEOnRamp.Address(), Getter: ccipContracts.GetSourceLinkBalance},
 			{Name: testhelpers.SourceGERouter, Addr: ccipContracts.Source.GERouter.Address(), Getter: ccipContracts.GetSourceLinkBalance},
+			{Name: testhelpers.SourceFeeManager, Addr: ccipContracts.Source.FeeManager.Address(), Getter: ccipContracts.GetSourceLinkBalance},
 		})
 		require.NoError(t, err)
 		destBalances, err := testhelpers.GetBalances([]testhelpers.BalanceReq{
@@ -118,16 +119,20 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 
 		// Asserts
 		// 1) The total pool input == total pool output
-		// 2) Pool flow equals tokens sent + fees
+		// 2) Pool flow equals tokens sent
 		// 3) Sent tokens arrive at the receiver
-		// 4) Fees are kept in the offRamp
-		poolInOutFlow := new(big.Int).Add(tokenAmount, fee).String()
 
 		ccipContracts.AssertBalances([]testhelpers.BalanceAssertion{
 			{
 				Name:     testhelpers.SourcePool,
 				Address:  ccipContracts.Source.Pool.Address(),
-				Expected: testhelpers.MustAddBigInt(sourceBalances[testhelpers.SourcePool], poolInOutFlow).String(), // Tokens & fee both locked in the pool
+				Expected: testhelpers.MustAddBigInt(sourceBalances[testhelpers.SourcePool], tokenAmount.String()).String(),
+				Getter:   ccipContracts.GetSourceLinkBalance,
+			},
+			{
+				Name:     testhelpers.SourceFeeManager,
+				Address:  ccipContracts.Source.FeeManager.Address(),
+				Expected: testhelpers.MustAddBigInt(sourceBalances[testhelpers.SourceFeeManager], fee.String()).String(),
 				Getter:   ccipContracts.GetSourceLinkBalance,
 			},
 			{
@@ -153,13 +158,13 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 			{
 				Name:     testhelpers.DestPool,
 				Address:  ccipContracts.Dest.Pool.Address(),
-				Expected: testhelpers.MustSubBigInt(destBalances[testhelpers.DestPool], poolInOutFlow).String(),
+				Expected: testhelpers.MustSubBigInt(destBalances[testhelpers.DestPool], tokenAmount.String()).String(),
 				Getter:   ccipContracts.GetDestLinkBalance,
 			},
 			{
 				Name:     testhelpers.GEOffRamp,
 				Address:  ccipContracts.Dest.GEOffRamp.Address(),
-				Expected: testhelpers.MustAddBigInt(destBalances[testhelpers.GEOffRamp], fee.String()).String(),
+				Expected: destBalances[testhelpers.GEOffRamp].String(),
 				Getter:   ccipContracts.GetDestLinkBalance,
 			},
 		})

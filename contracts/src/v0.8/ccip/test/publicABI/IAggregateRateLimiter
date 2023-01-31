@@ -3,6 +3,6 @@
   "getPricesForTokens(address[])": "4741062e",
   "getTokenLimitAdmin()": "599f6431",
   "setPrices(address[],uint256[])": "4352fa9f",
-  "setRateLimiterConfig((uint256,uint256))": "91872543",
+  "setRateLimiterConfig((address,uint256,uint256))": "17332f9b",
   "setTokenLimitAdmin(address)": "39aa9264"
 }

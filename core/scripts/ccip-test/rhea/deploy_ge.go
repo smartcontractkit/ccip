@@ -133,15 +133,17 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId uint64)
 		evm_2_evm_ge_onramp.IAggregateRateLimiterRateLimiterConfig{
 			Capacity: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 			Rate:     new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
+			Admin:    client.Owner.From,
 		},
-		client.Owner.From,
+		client.ChainConfig.FeeManager,
 		client.ChainConfig.Router,
-		evm_2_evm_ge_onramp.IEVM2EVMGEOnRampDynamicFeeConfig{
-			LinkToken:       client.ChainConfig.LinkToken,
-			FeeAmount:       big.NewInt(100),
-			DestGasOverhead: 0,
-			Multiplier:      1,
-			FeeManager:      client.ChainConfig.FeeManager,
+		[]evm_2_evm_ge_onramp.IEVM2EVMGEOnRampFeeTokenConfigArgs{
+			{
+				Token:           client.ChainConfig.LinkToken,
+				Multiplier:      1,
+				FeeAmount:       big.NewInt(100),
+				DestGasOverhead: 0,
+			},
 		},
 	)
 	require.NoError(t, err)
@@ -204,9 +206,8 @@ func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainId uint
 		evm_2_evm_ge_offramp.IAggregateRateLimiterRateLimiterConfig{
 			Capacity: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 			Rate:     new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
+			Admin:    client.Owner.From,
 		},
-		client.Owner.From,
-		client.ChainConfig.SupportedTokens[LINK].Token,
 	)
 	require.NoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)

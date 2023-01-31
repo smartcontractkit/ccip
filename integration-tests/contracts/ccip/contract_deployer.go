@@ -200,8 +200,9 @@ func (e *CCIPContractsDeployer) DeployTollOffRamp(
 			evm_2_evm_toll_offramp.IAggregateRateLimiterRateLimiterConfig{
 				Rate:     opts.Rate,
 				Capacity: opts.Capacity,
+				Admin:    auth.From,
 			},
-			auth.From)
+		)
 	})
 	return &TollOffRamp{
 		client:     e.evmClient,
@@ -285,14 +286,20 @@ func (e *CCIPContractsDeployer) DeployTollOnRamp(
 			MaxGasLimit:     ccip.GasLimitPerTx,
 		}
 		return evm_2_evm_toll_onramp.DeployEVM2EVMTollOnRamp(
-			auth, backend, chainId, destChainId, tokens, pools,
+			auth,
+			backend,
+			chainId,
+			destChainId,
+			tokens,
+			pools,
 			allowList, afn, config,
 			evm_2_evm_toll_onramp.IAggregateRateLimiterRateLimiterConfig{
 				Rate:     opts.Rate,
 				Capacity: opts.Rate,
+				Admin:    auth.From,
 			},
-			auth.From,
-			router)
+			router,
+		)
 	})
 	if err != nil {
 		return nil, err
@@ -369,9 +376,9 @@ func (e *CCIPContractsDeployer) DeployFeeManager(
 func (e *CCIPContractsDeployer) DeployGEOnRamp(
 	sourceChainId, destChainId uint64,
 	tokens, pools, allowList []common.Address,
-	afn, router common.Address,
+	afn, router, feeManager common.Address,
 	opts RateLimiterConfig,
-	feeConfig evm_2_evm_ge_onramp.IEVM2EVMGEOnRampDynamicFeeConfig,
+	feeConfig []evm_2_evm_ge_onramp.IEVM2EVMGEOnRampFeeTokenConfigArgs,
 ) (
 	*GEOnRamp,
 	error,
@@ -380,7 +387,15 @@ func (e *CCIPContractsDeployer) DeployGEOnRamp(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return evm_2_evm_ge_onramp.DeployEVM2EVMGEOnRamp(auth, backend, sourceChainId, destChainId, tokens, pools, allowList, afn,
+		return evm_2_evm_ge_onramp.DeployEVM2EVMGEOnRamp(
+			auth,
+			backend,
+			sourceChainId,
+			destChainId,
+			tokens,
+			pools,
+			allowList,
+			afn,
 			evm_2_evm_ge_onramp.IBaseOnRampOnRampConfig{
 				CommitFeeJuels:  0,
 				MaxDataSize:     1e5,
@@ -391,8 +406,8 @@ func (e *CCIPContractsDeployer) DeployGEOnRamp(
 				Capacity: opts.Capacity,
 				Rate:     opts.Rate,
 			},
-			auth.From,
 			router,
+			feeManager,
 			feeConfig)
 	})
 	if err != nil {
@@ -418,7 +433,10 @@ func (e *CCIPContractsDeployer) DeployGEOffRamp(
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
 		return evm_2_evm_ge_offramp.DeployEVM2EVMGEOffRamp(
-			auth, backend, sourceChainId, destChainId,
+			auth,
+			backend,
+			sourceChainId,
+			destChainId,
 			evm_2_evm_ge_offramp.IEVM2EVMGEOffRampGEOffRampConfig{
 				GasOverhead:                             gasOverhead,
 				FeeManager:                              destFeeManagerAddress,
@@ -435,8 +453,9 @@ func (e *CCIPContractsDeployer) DeployGEOffRamp(
 			evm_2_evm_ge_offramp.IAggregateRateLimiterRateLimiterConfig{
 				Rate:     opts.Rate,
 				Capacity: opts.Capacity,
+				Admin:    auth.From,
 			},
-			auth.From, feetoken)
+		)
 	})
 	return &GEOffRamp{
 		client:     e.evmClient,

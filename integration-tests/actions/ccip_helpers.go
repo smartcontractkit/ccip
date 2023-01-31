@@ -338,14 +338,15 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(t *testing.T, model BillingM
 			[]common.Address{},
 			sourceCCIP.Common.AFN.EthAddress,
 			sourceCCIP.Common.GERouter.EthAddress,
+			sourceFeeManager.EthAddress,
 			sourceCCIP.Common.RateLimiterConfig,
-			evm_2_evm_ge_onramp.IEVM2EVMGEOnRampDynamicFeeConfig{
-				LinkToken:       common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
-				FeeAmount:       big.NewInt(0),
-				DestGasOverhead: 0,
-				Multiplier:      1e18,
-				FeeManager:      sourceFeeManager.EthAddress,
-			})
+			[]evm_2_evm_ge_onramp.IEVM2EVMGEOnRampFeeTokenConfigArgs{
+				{
+					Token:           common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
+					FeeAmount:       big.NewInt(0),
+					DestGasOverhead: 0,
+					Multiplier:      1e18,
+				}})
 
 		require.NoError(t, err, "Error on GEOnRamp deployment")
 
@@ -467,12 +468,13 @@ func (sourceCCIP *SourceCCIPModule) BalanceAssertions(t *testing.T, model Billin
 			Expected: bigmath.Sub(prevBalances[name], totalGEFee).String(),
 		})
 		name = fmt.Sprintf("%s-FeeTokenPool-%s", testhelpers.Sender, sourceCCIP.Common.FeeTokenPool.Address())
-		balAssertions = append(balAssertions, testhelpers.BalanceAssertion{
-			Name:     name,
-			Address:  sourceCCIP.Common.FeeTokenPool.EthAddress,
-			Getter:   GetterForLinkToken(t, sourceCCIP.Common.FeeToken, sourceCCIP.Common.FeeTokenPool.Address()),
-			Expected: bigmath.Add(prevBalances[name], totalGEFee).String(),
-		})
+		// TODO add balance assertion for fees going to the feeManager
+		//balAssertions = append(balAssertions, testhelpers.BalanceAssertion{
+		//	Name:     name,
+		//	Address:  sourceCCIP.Common.FeeTokenPool.EthAddress,
+		//	Getter:   GetterForLinkToken(t, sourceCCIP.Common.FeeToken, sourceCCIP.Common.FeeTokenPool.Address()),
+		//	Expected: bigmath.Add(prevBalances[name], totalGEFee).String(),
+		//})
 		name = fmt.Sprintf("%s-GERouter-%s", testhelpers.Sender, sourceCCIP.Common.GERouter.Address())
 		balAssertions = append(balAssertions, testhelpers.BalanceAssertion{
 			Name:     fmt.Sprintf("%s-GERouter-%s", testhelpers.Sender, sourceCCIP.Common.GERouter.Address()),
@@ -833,20 +835,21 @@ func (destCCIP *DestCCIPModule) BalanceAssertions(
 	}
 
 	if model == GE {
-		name := fmt.Sprintf("%s-GEOffRamp-%s", testhelpers.Receiver, destCCIP.GEOffRamp.Address())
-		balAssertions = append(balAssertions, testhelpers.BalanceAssertion{
-			Name:     name,
-			Address:  destCCIP.GEOffRamp.EthAddress,
-			Getter:   GetterForLinkToken(t, destCCIP.Common.FeeToken, destCCIP.GEOffRamp.Address()),
-			Expected: bigmath.Add(prevBalances[name], totalGEFee).String(),
-		})
-		name = fmt.Sprintf("%s-FeeTokenPool-%s", testhelpers.Receiver, destCCIP.Common.FeeTokenPool.Address())
-		balAssertions = append(balAssertions, testhelpers.BalanceAssertion{
-			Name:     name,
-			Address:  destCCIP.Common.FeeTokenPool.EthAddress,
-			Getter:   GetterForLinkToken(t, destCCIP.Common.FeeToken, destCCIP.Common.FeeTokenPool.Address()),
-			Expected: bigmath.Sub(prevBalances[name], totalGEFee).String(),
-		})
+		// TODO: FOR GE ALL FEES REMAIN ON SOURCE
+		//name := fmt.Sprintf("%s-GEOffRamp-%s", testhelpers.Receiver, destCCIP.GEOffRamp.Address())
+		//balAssertions = append(balAssertions, testhelpers.BalanceAssertion{
+		//	Name:     name,
+		//	Address:  destCCIP.GEOffRamp.EthAddress,
+		//	Getter:   GetterForLinkToken(t, destCCIP.Common.FeeToken, destCCIP.GEOffRamp.Address()),
+		//	Expected: bigmath.Add(prevBalances[name], totalGEFee).String(),
+		//})
+		//name = fmt.Sprintf("%s-FeeTokenPool-%s", testhelpers.Receiver, destCCIP.Common.FeeTokenPool.Address())
+		//balAssertions = append(balAssertions, testhelpers.BalanceAssertion{
+		//	Name:     name,
+		//	Address:  destCCIP.Common.FeeTokenPool.EthAddress,
+		//	Getter:   GetterForLinkToken(t, destCCIP.Common.FeeToken, destCCIP.Common.FeeTokenPool.Address()),
+		//	Expected: bigmath.Sub(prevBalances[name], totalGEFee).String(),
+		//})
 	}
 	return balAssertions
 }
