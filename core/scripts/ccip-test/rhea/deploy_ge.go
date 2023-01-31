@@ -135,8 +135,8 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId uint64)
 			Rate:     new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
 			Admin:    client.Owner.From,
 		},
-		client.ChainConfig.FeeManager,
 		client.ChainConfig.Router,
+		client.ChainConfig.FeeManager,
 		[]evm_2_evm_ge_onramp.IEVM2EVMGEOnRampFeeTokenConfigArgs{
 			{
 				Token:           client.ChainConfig.LinkToken,
