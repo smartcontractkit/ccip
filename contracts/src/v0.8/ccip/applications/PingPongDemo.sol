@@ -19,9 +19,11 @@ contract PingPongDemo is CCIPConsumer, OwnerIsCreator {
 
   // Pause ping-ponging
   bool private s_isPaused;
+  IERC20 private s_feeToken;
 
-  constructor(address router, address feeToken) CCIPConsumer(router, feeToken) {
+  constructor(address router, IERC20 feeToken) CCIPConsumer(router) {
     s_isPaused = false;
+    s_feeToken = feeToken;
   }
 
   function setCounterpart(uint64 counterpartChainId, address counterpartAddress) external onlyOwner {
@@ -47,7 +49,7 @@ contract PingPongDemo is CCIPConsumer, OwnerIsCreator {
       data: data,
       tokensAndAmounts: new Common.EVMTokenAndAmount[](0),
       extraArgs: GEConsumer._argsToBytes(GEConsumer.EVMExtraArgsV1({gasLimit: 200_000, strict: false})),
-      feeToken: getFeeToken()
+      feeToken: address(s_feeToken)
     });
     _ccipSend(s_counterpartChainId, message);
   }
@@ -69,9 +71,8 @@ contract PingPongDemo is CCIPConsumer, OwnerIsCreator {
    * @param amount The amount of feeToken to be funded
    */
   function fund(uint256 amount) external {
-    IERC20 token = IERC20(getFeeToken());
-    token.transferFrom(msg.sender, address(this), amount);
-    token.approve(address(getRouter()), amount);
+    s_feeToken.transferFrom(msg.sender, address(this), amount);
+    s_feeToken.approve(address(getRouter()), amount);
   }
 
   function getCounterpartChainId() external view returns (uint64) {

@@ -4,7 +4,6 @@
   "ccipReceive((uint64,bytes,bytes,(address,uint256)[]))": "3015b91c",
   "fund(uint256)": "ca1d209d",
   "getFeeConfig()": "5fbbc0d2",
-  "getFeeToken()": "ca709a25",
   "getRouter()": "b0f479a1",
   "owner()": "8da5cb5b",
   "supportsInterface(bytes4)": "01ffc9a7",

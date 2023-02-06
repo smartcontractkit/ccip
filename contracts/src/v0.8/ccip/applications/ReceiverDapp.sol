@@ -15,7 +15,7 @@ contract ReceiverDapp is CCIPConsumer, TypeAndVersionInterface {
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "ReceiverDapp 2.0.0";
 
-  constructor(address router) CCIPConsumer(router, address(0)) {}
+  constructor(address router) CCIPConsumer(router) {}
 
   /// @inheritdoc CCIPConsumer
   function _ccipReceive(Common.Any2EVMMessage memory message) internal override {

@@ -18,13 +18,13 @@ contract GovernanceDappSetup is EVM2EVMGEOnRampSetup {
     s_crossChainClone = GovernanceDapp.CrossChainClone({chainId: DEST_CHAIN_ID, contractAddress: address(1)});
 
     s_feeToken = IERC20(s_sourceTokens[0]);
-    s_governanceDapp = new GovernanceDapp(address(s_sourceRouter), s_feeConfig, s_sourceFeeToken);
+    s_governanceDapp = new GovernanceDapp(address(s_sourceRouter), s_feeConfig, s_feeToken);
     s_governanceDapp.addClone(s_crossChainClone);
 
     uint256 fundingAmount = 1e18;
 
     // Fund the contract with LINK tokens
-    IERC20(s_sourceFeeToken).approve(address(s_governanceDapp), fundingAmount);
+    s_feeToken.approve(address(s_governanceDapp), fundingAmount);
     s_governanceDapp.fund(fundingAmount);
   }
 }

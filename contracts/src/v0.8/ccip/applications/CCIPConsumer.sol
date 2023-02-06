@@ -2,7 +2,6 @@
 pragma solidity 0.8.15;
 
 import {IAny2EVMMessageReceiver} from "../interfaces/applications/IAny2EVMMessageReceiver.sol";
-import {IAny2EVMOffRampRouter} from "../interfaces/offRamp/IAny2EVMOffRampRouter.sol";
 import {IGERouter} from "../interfaces/router/IGERouter.sol";
 import {IERC165} from "../../vendor/IERC165.sol";
 
@@ -12,13 +11,10 @@ import {Common} from "../models/Common.sol";
 /// @title CCIPConsumer - Base contract for CCIP applications that can both send and receive messages.
 abstract contract CCIPConsumer is IAny2EVMMessageReceiver, IERC165 {
   IGERouter private immutable i_router;
-  address private s_feeToken;
 
-  constructor(address router, address feeToken) {
+  constructor(address router) {
     if (router == address(0)) revert InvalidRouter(address(0));
     i_router = IGERouter(router);
-
-    _setFeeToken(feeToken);
   }
 
   /**
@@ -65,25 +61,6 @@ abstract contract CCIPConsumer is IAny2EVMMessageReceiver, IERC165 {
    */
   function getRouter() public view returns (address) {
     return address(i_router);
-  }
-
-  event FeeTokenSet(address indexed feeToken);
-
-  /**
-   * @notice Set the feeToken
-   * @dev Internal - Accessible by inheriting contracts
-   */
-  function _setFeeToken(address feeToken) internal {
-    s_feeToken = feeToken;
-    emit FeeTokenSet(feeToken);
-  }
-
-  /**
-   * @notice Return the current feeToken address
-   * @return feeToken address
-   */
-  function getFeeToken() public view returns (address) {
-    return s_feeToken;
   }
 
   error InvalidRouter(address router);

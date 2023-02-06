@@ -1,6 +1,5 @@
 {
   "ccipReceive((uint64,bytes,bytes,(address,uint256)[]))": "3015b91c",
-  "getFeeToken()": "ca709a25",
   "getRouter()": "b0f479a1",
   "supportsInterface(bytes4)": "01ffc9a7",
   "typeAndVersion()": "181f5a77"

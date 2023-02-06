@@ -4,7 +4,6 @@
   "fund(uint256)": "ca1d209d",
   "getCounterpartAddress()": "2b6e5d63",
   "getCounterpartChainId()": "093685f3",
-  "getFeeToken()": "ca709a25",
   "getRouter()": "b0f479a1",
   "isPaused()": "b187bd26",
   "owner()": "8da5cb5b",

@@ -17,7 +17,7 @@ contract ReentrancyAbuser is CCIPConsumer {
     address router,
     address feeToken,
     EVM2EVMGEOffRamp offRamp
-  ) CCIPConsumer(router, feeToken) {
+  ) CCIPConsumer(router) {
     s_offRamp = offRamp;
   }
 

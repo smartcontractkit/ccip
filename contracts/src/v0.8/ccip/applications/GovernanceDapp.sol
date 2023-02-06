@@ -31,14 +31,16 @@ contract GovernanceDapp is CCIPConsumer, TypeAndVersionInterface, OwnerIsCreator
   }
 
   FeeConfig internal s_feeConfig;
+  IERC20 private s_feeToken;
   CrossChainClone[] internal s_crossChainClones;
 
   constructor(
     address router,
     FeeConfig memory feeConfig,
-    address feeToken
-  ) CCIPConsumer(router, feeToken) {
+    IERC20 feeToken
+  ) CCIPConsumer(router) {
     s_feeConfig = feeConfig;
+    s_feeToken = feeToken;
   }
 
   function voteForNewFeeConfig(FeeConfig calldata feeConfig) public onlyOwner {
@@ -61,7 +63,7 @@ contract GovernanceDapp is CCIPConsumer, TypeAndVersionInterface, OwnerIsCreator
         receiver: abi.encode(clone.contractAddress),
         data: data,
         tokensAndAmounts: new Common.EVMTokenAndAmount[](0),
-        feeToken: getFeeToken(),
+        feeToken: address(s_feeToken),
         extraArgs: GEConsumer._argsToBytes(GEConsumer.EVMExtraArgsV1({gasLimit: 3e5, strict: false}))
       });
       _ccipSend(clone.chainId, message);
@@ -87,9 +89,8 @@ contract GovernanceDapp is CCIPConsumer, TypeAndVersionInterface, OwnerIsCreator
    * @param amount The amount of feeToken to be funded
    */
   function fund(uint256 amount) external {
-    IERC20 token = IERC20(getFeeToken());
-    token.transferFrom(msg.sender, address(this), amount);
-    token.approve(address(getRouter()), amount);
+    s_feeToken.transferFrom(msg.sender, address(this), amount);
+    s_feeToken.approve(address(getRouter()), amount);
   }
 
   function addClone(CrossChainClone memory clone) public onlyOwner {
