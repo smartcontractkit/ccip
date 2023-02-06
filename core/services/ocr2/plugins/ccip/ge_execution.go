@@ -143,7 +143,7 @@ func (tb *GEBatchBuilder) BuildBatch(
 		}
 		// Check expected nonce is valid
 		if geMsg.Message.Nonce != expectedNonces[geMsg.Message.Sender] {
-			tb.lggr.Errorw("Skipping message invalid nonce", "have", geMsg.Message.Nonce, "want", expectedNonces[geMsg.Message.Sender])
+			tb.lggr.Warnw("Skipping message invalid nonce", "have", geMsg.Message.Nonce, "want", expectedNonces[geMsg.Message.Sender])
 			continue
 		}
 
