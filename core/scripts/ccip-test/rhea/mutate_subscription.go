@@ -15,7 +15,7 @@ func UpgradeLane(t *testing.T, sourceClient *EvmDeploymentConfig, destClient *Ev
 
 func upgradeOnRamp(t *testing.T, sourceClient *EvmDeploymentConfig, destClient *EvmDeploymentConfig) {
 	sourceClient.Logger.Infof("Upgrading onRamp")
-	deployOnRamp(t, sourceClient, destClient.ChainConfig.ChainId)
+	deployOnRamp(t, sourceClient, destClient.ChainConfig.ChainId, destClient.ChainConfig.SupportedTokens)
 	setOnRampOnTokenPools(t, sourceClient)
 	setOnRampOnCommitStore(t, sourceClient, destClient)
 

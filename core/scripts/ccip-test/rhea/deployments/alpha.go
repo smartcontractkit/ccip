@@ -20,7 +20,6 @@ var Alpha_Sepolia = rhea.EVMChainConfig{
 		EIP1559:   true,
 		GasTipCap: rhea.DefaultGasTipFee,
 	},
-	LinkToken: gethcommon.HexToAddress("0xb227f007804c16546Bd054dfED2E7A1fD5437678"),
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 		rhea.LINK: {
 			Token: gethcommon.HexToAddress("0xb227f007804c16546Bd054dfED2E7A1fD5437678"),
@@ -28,6 +27,7 @@ var Alpha_Sepolia = rhea.EVMChainConfig{
 			Price: big.NewInt(1),
 		},
 	},
+	FeeTokens:  []rhea.Token{rhea.LINK},
 	Router:     gethcommon.HexToAddress("0x7B9e7A97ca47B7a5501c8EB07aBF78Fb37bB4738"),
 	Afn:        gethcommon.HexToAddress("0x521c7694c158d2d3D2FC79a93d2aDa5673d8226a"),
 	FeeManager: gethcommon.HexToAddress("0x43a75aDEb32A06C5489d32a946dD8F2cC18Db9E8"),
@@ -38,7 +38,6 @@ var Alpha_AvaxFuji = rhea.EVMChainConfig{
 	GasSettings: rhea.EVMGasSettings{
 		EIP1559: false,
 	},
-	LinkToken: gethcommon.HexToAddress("0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846"),
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 		rhea.LINK: {
 			Token: gethcommon.HexToAddress("0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846"),
@@ -46,6 +45,7 @@ var Alpha_AvaxFuji = rhea.EVMChainConfig{
 			Price: big.NewInt(1),
 		},
 	},
+	FeeTokens:  []rhea.Token{rhea.LINK},
 	Router:     gethcommon.HexToAddress("0x0e9210C8601723d9C546298db86D8925D5884eD1"),
 	Afn:        gethcommon.HexToAddress("0xEbEB45ef02491dcF4400E26Dfe5b25f4fB1BCDf7"),
 	FeeManager: gethcommon.HexToAddress("0x6F21947b14037f541a030ba9ca801986DC0ca9E9"),
@@ -56,7 +56,6 @@ var Alpha_OptimismGoerli = rhea.EVMChainConfig{
 	GasSettings: rhea.EVMGasSettings{
 		EIP1559: true,
 	},
-	LinkToken: gethcommon.HexToAddress("0xdc2CC710e42857672E7907CF474a69B63B93089f"),
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 		rhea.LINK: {
 			Token: gethcommon.HexToAddress("0xdc2CC710e42857672E7907CF474a69B63B93089f"),
@@ -64,6 +63,7 @@ var Alpha_OptimismGoerli = rhea.EVMChainConfig{
 			Price: big.NewInt(1),
 		},
 	},
+	FeeTokens:  []rhea.Token{rhea.LINK},
 	Router:     gethcommon.HexToAddress("0x9CdA5b77eA23459eBaf2e3092c570a6B5605850A"),
 	Afn:        gethcommon.HexToAddress("0xdAe257e1ACF6665eB897BFbf8Dd1bF62825E87dD"),
 	FeeManager: gethcommon.HexToAddress("0x0D52c2472DC6f37FBeE59552b1165deafe3b9a4B"),

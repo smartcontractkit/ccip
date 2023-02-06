@@ -43,25 +43,33 @@ type Token string
 
 const (
 	LINK   Token = "Link"
-	SNX    Token = "SNX"
-	Custom Token = "custom"
+	WETH   Token = "WETH"
+	WAVAX  Token = "WAVAX"
+	Custom Token = "Custom"
 )
+
+func GetAllTokens() []Token {
+	return []Token{
+		LINK, WETH, WAVAX, Custom,
+	}
+}
 
 type EVMChainConfig struct {
 	ChainId     uint64
 	GasSettings EVMGasSettings
-	LinkToken   gethcommon.Address
 
 	SupportedTokens map[Token]EVMBridgedToken
+	FeeTokens       []Token
 	Router          gethcommon.Address
 	Afn             gethcommon.Address
 	FeeManager      gethcommon.Address
 }
 
 type EVMBridgedToken struct {
-	Token gethcommon.Address
-	Pool  gethcommon.Address
-	Price *big.Int
+	Token                gethcommon.Address
+	Pool                 gethcommon.Address
+	Price                *big.Int
+	PriceFeedsAggregator gethcommon.Address
 }
 
 type EVMLaneConfig struct {

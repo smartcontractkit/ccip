@@ -13,8 +13,8 @@ import (
 )
 
 var (
-	SOURCE      = deployments.Beta_GoerliToAvaxFuji
-	DESTINATION = deployments.Beta_AvaxFujiToGoerli
+	SOURCE      = deployments.Beta_AvaxFujiToSepolia
+	DESTINATION = deployments.Beta_SepoliaToAvaxFuji
 	ENV         = dione.StagingBeta
 )
 
@@ -42,7 +42,7 @@ func TestDione(t *testing.T) {
 	checkOwnerKeyAndSetupChain(t)
 
 	don := dione.NewDON(ENV, logger.TestLogger(t))
-	don.ClearAllJobs(dione.OptimismGoerli, dione.AvaxFuji)
+	don.ClearAllJobs(dione.AvaxFuji, dione.Sepolia)
 	don.AddTwoWaySpecs(SOURCE, DESTINATION)
 }
 
@@ -97,9 +97,6 @@ func TestCCIP(t *testing.T) {
 		// Set the config to the onRamp fee
 	case "upgradeLane":
 		rhea.UpgradeLane(t, &SOURCE, &DESTINATION)
-	case "dapp":
-		client.SendDappTx(t)
-		// Sends a new config to the governance dapp, spreading it to all configured chains
 	case "gov":
 		client.ChangeGovernanceParameters(t)
 	case "don":

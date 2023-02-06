@@ -9,6 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"golang.org/x/exp/slices"
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_offramp"
@@ -27,6 +28,8 @@ import (
 func PrintCCIPState(source *rhea.EvmDeploymentConfig, destination *rhea.EvmDeploymentConfig) {
 	printPoolBalances(source)
 	printPoolBalances(destination)
+
+	printSupportedTokensCheck(source, destination)
 
 	printDappSanityCheck(source)
 	printDappSanityCheck(destination)
@@ -76,6 +79,13 @@ func printBool(b bool) string {
 		return "✅"
 	}
 	return "❌"
+}
+
+func printBoolNeutral(b bool) string {
+	if b {
+		return "✅"
+	}
+	return "➖"
 }
 
 func PrintTxStatuses(source *rhea.EvmDeploymentConfig, destination *rhea.EvmDeploymentConfig) {
@@ -209,12 +219,6 @@ func printDappSanityCheck(source *rhea.EvmDeploymentConfig) {
 	headerLengths := []int{30, 14}
 
 	sb.WriteString(generateHeader(tableHeaders, headerLengths))
-
-	//senderDapp, err := subscription_sender_dapp.NewSubscriptionSenderDapp(source.LaneConfig.TokenSender, source.Client)
-	//helpers.PanicErr(err)
-	//router, err := senderDapp.IOnRampRouter(&bind.CallOpts{})
-	//helpers.PanicErr(err)
-	//sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "Sender dapp", printBool(router == source.ChainConfig.Router)))
 
 	//receiverDap, err := receiver_dapp.NewReceiverDapp(source.LaneConfig.ReceiverDapp, source.Client)
 	//helpers.PanicErr(err)
@@ -439,6 +443,52 @@ func printPoolBalances(chain *rhea.EvmDeploymentConfig) {
 	sb.WriteString(generateSeparator(headerLengths))
 
 	chain.Logger.Info(sb.String())
+}
+
+func printSupportedTokensCheck(source *rhea.EvmDeploymentConfig, destination *rhea.EvmDeploymentConfig) {
+	sourceRouter, err := ge_router.NewGERouter(source.ChainConfig.Router, source.Client)
+	helpers.PanicErr(err)
+
+	sourceTokens, err := sourceRouter.GetSupportedTokens(&bind.CallOpts{}, destination.ChainConfig.ChainId)
+	helpers.PanicErr(err)
+
+	destRouter, err := ge_router.NewGERouter(destination.ChainConfig.Router, destination.Client)
+	helpers.PanicErr(err)
+
+	destTokens, err := destRouter.GetSupportedTokens(&bind.CallOpts{}, source.ChainConfig.ChainId)
+	helpers.PanicErr(err)
+
+	var sb strings.Builder
+	sb.WriteString("\nToken matching\n")
+
+	tableHeaders := []string{"Token", "Source", "Pool", "Dest", "Pool"}
+	headerLengths := []int{20, 10, 10, 10, 10}
+
+	sb.WriteString(generateHeader(tableHeaders, headerLengths))
+
+	for _, token := range rhea.GetAllTokens() {
+		sourcePool := false
+		if val, ok := source.ChainConfig.SupportedTokens[token]; ok && val.Pool != common.HexToAddress("") {
+			sourcePool = true
+		}
+		destPool := false
+		if val, ok := destination.ChainConfig.SupportedTokens[token]; ok && val.Pool != common.HexToAddress("") {
+			destPool = true
+		}
+		sourceEnabled := slices.Contains(sourceTokens, source.ChainConfig.SupportedTokens[token].Token)
+		destEnabled := slices.Contains(destTokens, destination.ChainConfig.SupportedTokens[token].Token)
+
+		if sourceEnabled || destEnabled {
+			sb.WriteString(fmt.Sprintf("| %-20s | %10s | %10s | %10s | %10s |\n", token, printBool(sourceEnabled), printBool(sourcePool), printBool(destEnabled), printBool(destPool)))
+		} else {
+			sb.WriteString(fmt.Sprintf("| %-20s | %10s | %10s | %10s | %10s |\n", token, printBoolNeutral(sourceEnabled), printBoolNeutral(sourcePool), printBoolNeutral(destEnabled), printBoolNeutral(destPool)))
+		}
+
+	}
+
+	sb.WriteString(generateSeparator(headerLengths))
+
+	source.Logger.Info(sb.String())
 }
 
 func generateHeader(headers []string, headerLengths []int) string {

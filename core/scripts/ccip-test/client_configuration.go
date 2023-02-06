@@ -37,7 +37,6 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ping_pong_demo"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/receiver_dapp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/simple_message_receiver"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/subscription_sender_dapp"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/dione"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
@@ -63,7 +62,7 @@ func (client *CCIPClient) setOnRampFeeConfig(t *testing.T) {
 			Multiplier:      1e18,
 		},
 	})
-	require.NoError(t, err)
+	shared.RequireNoError(t, err)
 	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 }
 
@@ -72,32 +71,32 @@ func (client *CCIPClient) setRateLimiterConfig(t *testing.T) {
 		Rate:     new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
 		Capacity: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 	})
-	require.NoError(t, err)
+	shared.RequireNoError(t, err)
 	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 
 	tx, err = client.Dest.OffRamp.SetRateLimiterConfig(client.Dest.Owner, evm_2_evm_ge_offramp.IAggregateRateLimiterRateLimiterConfig{
 		Rate:     new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
 		Capacity: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 	})
-	require.NoError(t, err)
+	shared.RequireNoError(t, err)
 	shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 }
 
 func (client *CCIPClient) startPingPong(t *testing.T) {
 	tx, err := client.Source.PingPongDapp.StartPingPong(client.Source.Owner)
-	require.NoError(t, err)
+	shared.RequireNoError(t, err)
 	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 }
 
 func (client *CCIPClient) setPingPongPaused(t *testing.T, paused bool) {
 	tx, err := client.Source.PingPongDapp.SetPaused(client.Source.Owner, paused)
-	require.NoError(t, err)
+	shared.RequireNoError(t, err)
 	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 }
 
 func (client *CCIPClient) fundPingPong(t *testing.T, sourceClient *rhea.EvmDeploymentConfig, destClient *rhea.EvmDeploymentConfig) {
-	rhea.FundPingPong(t, sourceClient, big.NewInt(1e18))
-	rhea.FundPingPong(t, destClient, big.NewInt(1e18))
+	rhea.FundPingPong(t, sourceClient, big.NewInt(1e18), sourceClient.ChainConfig.SupportedTokens[rhea.LINK].Token)
+	rhea.FundPingPong(t, destClient, big.NewInt(1e18), destClient.ChainConfig.SupportedTokens[rhea.LINK].Token)
 }
 
 type Client struct {
@@ -118,52 +117,51 @@ type Client struct {
 }
 
 type EVMBridgedToken struct {
-	Token common.Address
-	Pool  *lock_release_token_pool.LockReleaseTokenPool
-	Price *big.Int
+	Token                common.Address
+	Pool                 *lock_release_token_pool.LockReleaseTokenPool
+	Price                *big.Int
+	PriceFeedsAggregator common.Address
 }
 
 type SourceClient struct {
 	Client
-	OnRamp     *evm_2_evm_ge_onramp.EVM2EVMGEOnRamp
-	SenderDapp *subscription_sender_dapp.SubscriptionSenderDapp
+	OnRamp *evm_2_evm_ge_onramp.EVM2EVMGEOnRamp
 }
 
 func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient {
-	LinkToken, err := link_token_interface.NewLinkToken(config.ChainConfig.LinkToken, config.Client)
-	require.NoError(t, err)
+	LinkToken, err := link_token_interface.NewLinkToken(config.ChainConfig.SupportedTokens[rhea.LINK].Token, config.Client)
+	shared.RequireNoError(t, err)
 
 	supportedTokens := map[rhea.Token]EVMBridgedToken{}
 	for token, tokenConfig := range config.ChainConfig.SupportedTokens {
 		tokenPool, err2 := lock_release_token_pool.NewLockReleaseTokenPool(tokenConfig.Pool, config.Client)
 		require.NoError(t, err2)
 		supportedTokens[token] = EVMBridgedToken{
-			Token: tokenConfig.Token,
-			Pool:  tokenPool,
-			Price: tokenConfig.Price,
+			Token:                tokenConfig.Token,
+			Pool:                 tokenPool,
+			Price:                tokenConfig.Price,
+			PriceFeedsAggregator: tokenConfig.PriceFeedsAggregator,
 		}
 	}
 
 	afn, err := afn_contract.NewAFNContract(config.ChainConfig.Afn, config.Client)
-	require.NoError(t, err)
+	shared.RequireNoError(t, err)
 	onRamp, err := evm_2_evm_ge_onramp.NewEVM2EVMGEOnRamp(config.LaneConfig.OnRamp, config.Client)
-	require.NoError(t, err)
-	senderDapp, err := subscription_sender_dapp.NewSubscriptionSenderDapp(config.LaneConfig.TokenSender, config.Client)
-	require.NoError(t, err)
+	shared.RequireNoError(t, err)
 	router, err := ge_router.NewGERouter(config.ChainConfig.Router, config.Client)
-	require.NoError(t, err)
+	shared.RequireNoError(t, err)
 	governanceDapp, err := governance_dapp.NewGovernanceDapp(config.LaneConfig.GovernanceDapp, config.Client)
-	require.NoError(t, err)
+	shared.RequireNoError(t, err)
 	pingPongDapp, err := ping_pong_demo.NewPingPongDemo(config.LaneConfig.PingPongDapp, config.Client)
-	require.NoError(t, err)
+	shared.RequireNoError(t, err)
 	feeManager, err := fee_manager.NewFeeManager(config.ChainConfig.FeeManager, config.Client)
-	require.NoError(t, err)
+	shared.RequireNoError(t, err)
 
 	return SourceClient{
 		Client: Client{
 			Client:           config.Client,
 			ChainId:          config.ChainConfig.ChainId,
-			LinkTokenAddress: config.ChainConfig.LinkToken,
+			LinkTokenAddress: config.ChainConfig.SupportedTokens[rhea.LINK].Token,
 			LinkToken:        LinkToken,
 			Afn:              afn,
 			FeeManager:       feeManager,
@@ -174,8 +172,7 @@ func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient
 			logger:           config.Logger,
 			t:                t,
 		},
-		OnRamp:     onRamp,
-		SenderDapp: senderDapp,
+		OnRamp: onRamp,
 	}
 }
 
@@ -188,44 +185,45 @@ type DestClient struct {
 }
 
 func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestClient {
-	LinkToken, err := link_token_interface.NewLinkToken(config.ChainConfig.LinkToken, config.Client)
-	require.NoError(t, err)
+	LinkToken, err := link_token_interface.NewLinkToken(config.ChainConfig.SupportedTokens[rhea.LINK].Token, config.Client)
+	shared.RequireNoError(t, err)
 
 	supportedTokens := map[rhea.Token]EVMBridgedToken{}
 	for token, tokenConfig := range config.ChainConfig.SupportedTokens {
 		tokenPool, err2 := lock_release_token_pool.NewLockReleaseTokenPool(tokenConfig.Pool, config.Client)
 		require.NoError(t, err2)
 		supportedTokens[token] = EVMBridgedToken{
-			Token: tokenConfig.Token,
-			Pool:  tokenPool,
-			Price: tokenConfig.Price,
+			Token:                tokenConfig.Token,
+			Pool:                 tokenPool,
+			Price:                tokenConfig.Price,
+			PriceFeedsAggregator: tokenConfig.PriceFeedsAggregator,
 		}
 	}
 
 	afn, err := afn_contract.NewAFNContract(config.ChainConfig.Afn, config.Client)
-	require.NoError(t, err)
+	shared.RequireNoError(t, err)
 	commitStore, err := commit_store.NewCommitStore(config.LaneConfig.CommitStore, config.Client)
-	require.NoError(t, err)
+	shared.RequireNoError(t, err)
 	offRamp, err := evm_2_evm_ge_offramp.NewEVM2EVMGEOffRamp(config.LaneConfig.OffRamp, config.Client)
-	require.NoError(t, err)
+	shared.RequireNoError(t, err)
 	messageReceiver, err := simple_message_receiver.NewSimpleMessageReceiver(config.LaneConfig.MessageReceiver, config.Client)
-	require.NoError(t, err)
+	shared.RequireNoError(t, err)
 	receiverDapp, err := receiver_dapp.NewReceiverDapp(config.LaneConfig.ReceiverDapp, config.Client)
-	require.NoError(t, err)
+	shared.RequireNoError(t, err)
 	router, err := ge_router.NewGERouter(config.ChainConfig.Router, config.Client)
-	require.NoError(t, err)
+	shared.RequireNoError(t, err)
 	governanceDapp, err := governance_dapp.NewGovernanceDapp(config.LaneConfig.GovernanceDapp, config.Client)
-	require.NoError(t, err)
+	shared.RequireNoError(t, err)
 	pingPongDapp, err := ping_pong_demo.NewPingPongDemo(config.LaneConfig.PingPongDapp, config.Client)
-	require.NoError(t, err)
+	shared.RequireNoError(t, err)
 	feeManager, err := fee_manager.NewFeeManager(config.ChainConfig.FeeManager, config.Client)
-	require.NoError(t, err)
+	shared.RequireNoError(t, err)
 
 	return DestClient{
 		Client: Client{
 			Client:           config.Client,
 			ChainId:          config.ChainConfig.ChainId,
-			LinkTokenAddress: config.ChainConfig.LinkToken,
+			LinkTokenAddress: config.ChainConfig.SupportedTokens[rhea.LINK].Token,
 			LinkToken:        LinkToken,
 			SupportedTokens:  supportedTokens,
 			GovernanceDapp:   governanceDapp,
@@ -545,16 +543,6 @@ func (client *CCIPClient) ExecuteManually(seqNr uint64) error {
 //	client.Dest.logger.Infof("Cross chain tx sent %s", helpers.ExplorerLink(client.Dest.ChainId.Int64(), tx.Hash()))
 //}
 
-func (client *CCIPClient) SendDappTx(t *testing.T) {
-	amount := big.NewInt(500)
-	destBlockNumber := GetCurrentBlockNumber(client.Dest.Client.Client)
-
-	client.Source.ApproveLink(t, client.Source.SenderDapp.Address(), amount)
-	crossChainRequest := client.SendToDappWithExecution(t, client.Source, client.Source.Owner, client.Dest.Owner.From, amount)
-	client.WaitForCommit(t, destBlockNumber)
-	client.WaitForExecution(t, destBlockNumber, crossChainRequest.Message.SequenceNumber)
-}
-
 // ScalingAndBatching should scale so that we see batching on the nodes
 func (client *CCIPClient) ScalingAndBatching(t *testing.T) {
 	amount := big.NewInt(10)
@@ -567,8 +555,8 @@ func (client *CCIPClient) ScalingAndBatching(t *testing.T) {
 		wg.Add(1)
 		go func(user *bind.TransactOpts) {
 			defer wg.Done()
-			client.Source.ApproveLinkFrom(t, user, client.Source.SenderDapp.Address(), amount)
-			crossChainRequest := client.SendToDappWithExecution(t, client.Source, user, toAddress, amount)
+			client.Source.ApproveLinkFrom(t, user, client.Source.Router.Address(), amount)
+			crossChainRequest := client.SendCrossChainMessage(t, client.Source, user, toAddress, amount)
 			client.Source.logger.Info("Don executed tx submitted with sequence number: ", crossChainRequest.Message.SequenceNumber)
 			seqNum = crossChainRequest.Message.SequenceNumber
 		}(user)
@@ -577,6 +565,28 @@ func (client *CCIPClient) ScalingAndBatching(t *testing.T) {
 	client.WaitForCommit(t, DestBlockNum)
 	client.WaitForExecution(t, DestBlockNum, seqNum)
 	client.Source.logger.Info("Sent 10 txs to onramp.")
+}
+
+func (client *CCIPClient) SendCrossChainMessage(t *testing.T, source SourceClient, from *bind.TransactOpts, toAddress common.Address, amount *big.Int) *evm_2_evm_ge_onramp.EVM2EVMGEOnRampCCIPSendRequested {
+	SourceBlockNumber := GetCurrentBlockNumber(source.Client.Client)
+	token := ge_router.CommonEVMTokenAndAmount{
+		Token:  client.Source.LinkTokenAddress,
+		Amount: amount,
+	}
+	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(100_000), false)
+	helpers.PanicErr(err)
+
+	tx, err := source.Router.CcipSend(from, client.Dest.ChainId, ge_router.GEConsumerEVM2AnyGEMessage{
+		Receiver:         toAddress.Bytes(),
+		Data:             nil,
+		TokensAndAmounts: []ge_router.CommonEVMTokenAndAmount{token},
+		FeeToken:         common.Address{},
+		ExtraArgs:        extraArgsV1,
+	})
+	helpers.PanicErr(err)
+	source.logger.Infof("Send tokens tx %s", helpers.ExplorerLink(int64(source.ChainId), tx.Hash()))
+
+	return WaitForCrossChainSendRequest(source, SourceBlockNumber, tx.Hash())
 }
 
 //func (client CCIPClient) ExecuteOffRampTransaction(t *testing.T, proof merklemulti.Proof[[32]byte], encodedMessage []byte) (*types.Transaction, error) {
@@ -743,27 +753,6 @@ func (client *CCIPClient) ValidateMerkleRoot(
 	index := request.Message.SequenceNumber - report.Intervals[rootIndex].Min
 	client.Dest.logger.Info("index is ", index)
 	return tree.Prove([]int{int(index)})
-}
-
-// SendToDappWithExecution executes a cross chain transactions using the sender dapp interface.
-func (client *CCIPClient) SendToDappWithExecution(t *testing.T, source SourceClient, from *bind.TransactOpts, toAddress common.Address, amount *big.Int) *evm_2_evm_ge_onramp.EVM2EVMGEOnRampCCIPSendRequested {
-	SourceBlockNumber := GetCurrentBlockNumber(source.Client.Client)
-	token := subscription_sender_dapp.CCIPEVMTokenAndAmount{
-		Token:  client.Source.LinkTokenAddress,
-		Amount: amount,
-	}
-	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(100_000), false)
-	helpers.PanicErr(err)
-
-	tx, err := source.SenderDapp.SendMessage(from, subscription_sender_dapp.CCIPEVM2AnySubscriptionMessage{
-		Receiver:         testhelpers.MustEncodeAddress(t, toAddress),
-		TokensAndAmounts: []subscription_sender_dapp.CCIPEVMTokenAndAmount{token},
-		ExtraArgs:        extraArgsV1,
-	})
-	helpers.PanicErr(err)
-	source.logger.Infof("Send tokens tx %s", helpers.ExplorerLink(int64(source.ChainId), tx.Hash()))
-
-	return WaitForCrossChainSendRequest(source, SourceBlockNumber, tx.Hash())
 }
 
 // SendToOnrampWithExecution executes a cross chain transactions using the onramp interface.

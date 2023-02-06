@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ge_router"
@@ -38,7 +37,7 @@ func deployAFN(t *testing.T, client *EvmDeploymentConfig) {
 
 	client.Logger.Infof("Deploying AFN")
 	address, tx, _, err := mock_afn_contract.DeployMockAFNContract(client.Owner, client.Client)
-	require.NoError(t, err)
+	shared.RequireNoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 	client.Logger.Infof("AFN deployed on %s in tx: %s", address.Hex(), helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash()))
 	client.ChainConfig.Afn = address
@@ -49,23 +48,24 @@ func deployLockReleaseTokenPool(t *testing.T, client *EvmDeploymentConfig) {
 		if client.DeploySettings.DeployTokenPools {
 			client.Logger.Infof("Deploying token pool for %s token", tokenName)
 			tokenPoolAddress, tx, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(client.Owner, client.Client, tokenConfig.Token)
-			require.NoError(t, err)
+			shared.RequireNoError(t, err)
 			shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 			client.Logger.Infof("Native token pool deployed on %s in tx %s", tokenPoolAddress, helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash()))
 			pool, err := lock_release_token_pool.NewLockReleaseTokenPool(tokenPoolAddress, client.Client)
-			require.NoError(t, err)
-			fillPoolWithTokens(t, client, pool)
+			shared.RequireNoError(t, err)
+			fillPoolWithTokens(t, client, pool, tokenConfig.Token)
 			client.ChainConfig.SupportedTokens[tokenName] = EVMBridgedToken{
-				Token: tokenConfig.Token,
-				Pool:  tokenPoolAddress,
-				Price: big.NewInt(1),
+				Token:                tokenConfig.Token,
+				Pool:                 tokenPoolAddress,
+				Price:                big.NewInt(1),
+				PriceFeedsAggregator: tokenConfig.PriceFeedsAggregator,
 			}
 		} else {
 			if tokenConfig.Pool.Hex() == "0x0000000000000000000000000000000000000000" {
 				t.Error("deploy new lock unlock pool set to false but no lock unlock pool given in config")
 			}
 			pool, err := lock_release_token_pool.NewLockReleaseTokenPool(tokenConfig.Pool, client.Client)
-			require.NoError(t, err)
+			shared.RequireNoError(t, err)
 			client.Logger.Infof("Skipping Pool deployment, using Pool on %s", pool.Address().Hex())
 		}
 	}
@@ -80,7 +80,7 @@ func deployRouter(t *testing.T, client *EvmDeploymentConfig) {
 
 	client.Logger.Infof("Deploying Router")
 	routerAddress, tx, _, err := ge_router.DeployGERouter(client.Owner, client.Client, []common.Address{})
-	require.NoError(t, err)
+	shared.RequireNoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 	client.ChainConfig.Router = routerAddress
 
@@ -102,7 +102,7 @@ func deployFeeManager(t *testing.T, client *EvmDeploymentConfig) {
 		[]common.Address{},
 		big.NewInt(1e18),
 	)
-	require.NoError(t, err)
+	shared.RequireNoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 	client.ChainConfig.FeeManager = feeManager
 

@@ -389,12 +389,16 @@ func ChainName(chainID int64) string {
 		return "BSC Testnet"
 	case 137:
 		return "Polygon"
+	case 420:
+		return "OptimismGoerli"
 	case 4002:
 		return "Fantom testnet"
 	case 43113:
 		return "Avax Fuji"
 	case 80001:
 		return "Polygon Mumbai"
+	case 11155111:
+		return "Sepolia"
 	default: // Unknown chain, return chainID as string
 		return strconv.FormatInt(chainID, 10)
 	}

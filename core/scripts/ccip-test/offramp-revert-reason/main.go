@@ -53,14 +53,14 @@ func main() {
 
 		contractABIs := getAllABIs()
 
-		decodeErrorStringFromABI(trimmed, contractABIs)
+		DecodeErrorStringFromABI(trimmed, contractABIs)
 	} else {
 		errorCodeString = strings.TrimPrefix(errorCodeString, "0x")
-		decodeErrorStringFromABI(errorCodeString, getAllABIs())
+		DecodeErrorStringFromABI(errorCodeString, getAllABIs())
 	}
 }
 
-func decodeErrorStringFromABI(errorString string, contractABIs []string) {
+func DecodeErrorStringFromABI(errorString string, contractABIs []string) {
 	data, err := hex.DecodeString(errorString)
 	panicErr(err)
 

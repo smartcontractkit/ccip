@@ -2,6 +2,7 @@ package dione
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 
@@ -15,22 +16,30 @@ import (
 // NewCCIPJobSpecParams returns set of parameters needed for setting up ccip jobs for sourceClient --> destClient
 func NewCCIPJobSpecParams(sourceClient rhea.EvmDeploymentConfig, destClient rhea.EvmDeploymentConfig) testhelpers.CCIPJobSpecParams {
 	return testhelpers.CCIPJobSpecParams{
-		OffRamp:            destClient.LaneConfig.OffRamp,
-		OnRampForExecution: sourceClient.LaneConfig.OnRamp,
-		OnRampsOnCommit:    []common.Address{sourceClient.LaneConfig.OnRamp},
-		CommitStore:        destClient.LaneConfig.CommitStore,
-		SourceChainName:    helpers.ChainName(int64(sourceClient.ChainConfig.ChainId)),
-		DestChainName:      helpers.ChainName(int64(destClient.ChainConfig.ChainId)),
-		SourceChainId:      sourceClient.ChainConfig.ChainId,
-		DestChainId:        destClient.ChainConfig.ChainId,
-		TokensPerFeeCoinPipeline: fmt.Sprintf(
-			`merge [type=merge left="{}" right="{\\\"%s\\\":\\\"1000000000000000000\\\"}"];`,
-			destClient.ChainConfig.SupportedTokens[rhea.LINK].Token.Hex()),
-		PollPeriod:         PollPeriod,
-		SourceStartBlock:   sourceClient.DeploySettings.DeployedAt,
-		DestStartBlock:     destClient.DeploySettings.DeployedAt,
-		P2PV2Bootstrappers: []string{}, // Set in env vars
+		OffRamp:                  destClient.LaneConfig.OffRamp,
+		OnRampForExecution:       sourceClient.LaneConfig.OnRamp,
+		OnRampsOnCommit:          []common.Address{sourceClient.LaneConfig.OnRamp},
+		CommitStore:              destClient.LaneConfig.CommitStore,
+		SourceChainName:          helpers.ChainName(int64(sourceClient.ChainConfig.ChainId)),
+		DestChainName:            helpers.ChainName(int64(destClient.ChainConfig.ChainId)),
+		SourceChainId:            sourceClient.ChainConfig.ChainId,
+		DestChainId:              destClient.ChainConfig.ChainId,
+		TokensPerFeeCoinPipeline: GetTokensPerFeeCoinPipeline(destClient.ChainConfig.SupportedTokens),
+		PollPeriod:               PollPeriod,
+		SourceStartBlock:         sourceClient.DeploySettings.DeployedAt,
+		DestStartBlock:           destClient.DeploySettings.DeployedAt,
+		P2PV2Bootstrappers:       []string{}, // Set in env vars
 	}
+}
+
+func GetTokensPerFeeCoinPipeline(supportedTokens map[rhea.Token]rhea.EVMBridgedToken) string {
+	tokensPerFeeCoinPipeline := "merge [type=merge left=\"{}\" right=\"{"
+	for _, token := range supportedTokens {
+		tokensPerFeeCoinPipeline += fmt.Sprintf(`\\\"%s\\\":\\\"1000000000000000000\\\",`, token.Token.Hex())
+	}
+	tokensPerFeeCoinPipeline = strings.TrimSuffix(tokensPerFeeCoinPipeline, ",")
+	tokensPerFeeCoinPipeline += "}\"];"
+	return tokensPerFeeCoinPipeline
 }
 
 func GetOCRkeysForChainType(OCRKeys client.OCR2Keys, chainType string) client.OCR2KeyData {

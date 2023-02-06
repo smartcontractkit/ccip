@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	SOURCE      = deployments.Prod_OptimismToGoerli
-	DESTINATION = deployments.Prod_GoerliToOptimism
+	SOURCE      = deployments.Beta_SepoliaToAvaxFuji
+	DESTINATION = deployments.Beta_AvaxFujiToSepolia
 )
 
 type MetisClient struct {

@@ -32,8 +32,8 @@ func DeployGELanes(t *testing.T, source *EvmDeploymentConfig, destination *EvmDe
 	DeployToNewChain(t, destination)
 
 	// Deploy onRamps on both chains
-	deploySourceContracts(t, source, destChainId)
-	deploySourceContracts(t, destination, sourceChainId)
+	deploySourceContracts(t, source, destChainId, destination.ChainConfig.SupportedTokens)
+	deploySourceContracts(t, destination, sourceChainId, source.ChainConfig.SupportedTokens)
 
 	// Deploy commitStores and offRamps on both chains
 	prettyPrintLanes(source, destination)
@@ -42,9 +42,6 @@ func DeployGELanes(t *testing.T, source *EvmDeploymentConfig, destination *EvmDe
 
 	setFeeManagerPrices(t, source, destChainId)
 	setFeeManagerPrices(t, destination, sourceChainId)
-
-	// Deploy onramp sender dapp
-	//deploySenderDapp(t, source, destination)
 
 	deployGovernanceDapps(t, source, destination)
 
@@ -66,9 +63,9 @@ func prettyPrint(i interface{}) string {
 	return "\n" + string(s)
 }
 
-func deploySourceContracts(t *testing.T, source *EvmDeploymentConfig, destChainId uint64) {
+func deploySourceContracts(t *testing.T, source *EvmDeploymentConfig, destChainId uint64, destSupportedTokens map[Token]EVMBridgedToken) {
 	// Updates source.OnRamp if any new contracts are deployed
-	deployOnRamp(t, source, destChainId)
+	deployOnRamp(t, source, destChainId, destSupportedTokens)
 
 	// Skip if we reuse both the onRamp and the token pools
 	if source.DeploySettings.DeployRamp || source.DeploySettings.DeployTokenPools {
@@ -100,16 +97,23 @@ func deployDestinationContracts(t *testing.T, client *EvmDeploymentConfig, sourc
 	client.Logger.Infof("%s contracts fully deployed as destination chain", helpers.ChainName(int64(client.ChainConfig.ChainId)))
 }
 
-func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId uint64) *evm_2_evm_ge_onramp.EVM2EVMGEOnRamp {
+func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId uint64, destSupportedTokens map[Token]EVMBridgedToken) *evm_2_evm_ge_onramp.EVM2EVMGEOnRamp {
 	if !client.DeploySettings.DeployRamp {
 		client.Logger.Infof("Skipping OnRamp deployment, using onRamp on %s", client.LaneConfig.OnRamp)
 		onRamp, err := evm_2_evm_ge_onramp.NewEVM2EVMGEOnRamp(client.LaneConfig.OnRamp, client.Client)
-		require.NoError(t, err)
+		shared.RequireNoError(t, err)
 		return onRamp
 	}
 
 	var bridgeTokens, tokenPools []common.Address
-	for _, tokenConfig := range client.ChainConfig.SupportedTokens {
+	for token, tokenConfig := range client.ChainConfig.SupportedTokens {
+		if _, ok := destSupportedTokens[token]; !ok {
+			// If the token is not supported on the destination chain we
+			// should not enable it for this ramp. If we enable the token,
+			// txs could be sent but not executed, keeping the tokens in limbo.
+			continue
+		}
+
 		bridgeTokens = append(bridgeTokens, tokenConfig.Token)
 		tokenPools = append(tokenPools, tokenConfig.Pool)
 	}
@@ -139,26 +143,26 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId uint64)
 		client.ChainConfig.FeeManager,
 		[]evm_2_evm_ge_onramp.IEVM2EVMGEOnRampFeeTokenConfigArgs{
 			{
-				Token:           client.ChainConfig.LinkToken,
+				Token:           client.ChainConfig.SupportedTokens[LINK].Token,
 				Multiplier:      1,
 				FeeAmount:       big.NewInt(100),
 				DestGasOverhead: 0,
 			},
 		},
 	)
-	require.NoError(t, err)
+	shared.RequireNoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 
 	onRamp, err := evm_2_evm_ge_onramp.NewEVM2EVMGEOnRamp(onRampAddress, client.Client)
-	require.NoError(t, err)
+	shared.RequireNoError(t, err)
 	client.Logger.Infof(fmt.Sprintf("Onramp deployed on %s in tx %s", onRampAddress.String(), helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash())))
 	client.LaneConfig.OnRamp = onRampAddress
 
 	setOnRampOnRouter(t, client, destChainId)
 
 	// Prices are used by the rate limiter and dictate what tokens are supported
-	tx, err = onRamp.SetPrices(client.Owner, []common.Address{client.ChainConfig.LinkToken}, []*big.Int{big.NewInt(10)})
-	require.NoError(t, err)
+	tx, err = onRamp.SetPrices(client.Owner, []common.Address{client.ChainConfig.SupportedTokens[LINK].Token}, []*big.Int{big.NewInt(10)})
+	shared.RequireNoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 
 	return onRamp
@@ -168,7 +172,7 @@ func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainId uint
 	if !client.DeploySettings.DeployRamp {
 		client.Logger.Infof("Skipping OffRamp deployment, using offRamp on %s", client.LaneConfig.OnRamp)
 		offRamp, err := evm_2_evm_ge_offramp.NewEVM2EVMGEOffRamp(client.LaneConfig.OffRamp, client.Client)
-		require.NoError(t, err)
+		shared.RequireNoError(t, err)
 		return offRamp
 	}
 
@@ -209,20 +213,20 @@ func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainId uint
 			Admin:    client.Owner.From,
 		},
 	)
-	require.NoError(t, err)
+	shared.RequireNoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 
 	client.Logger.Infof("OffRamp contract deployed on %s in tx: %s", offRampAddress.Hex(), helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash()))
 	client.LaneConfig.OffRamp = offRampAddress
 	offRamp, err := evm_2_evm_ge_offramp.NewEVM2EVMGEOffRamp(client.LaneConfig.OffRamp, client.Client)
-	require.NoError(t, err)
+	shared.RequireNoError(t, err)
 
 	// Prices are used by the rate limiter and dictate what tokens are supported
-	tx, err = offRamp.SetPrices(client.Owner, []common.Address{client.ChainConfig.LinkToken}, []*big.Int{big.NewInt(10)})
-	require.NoError(t, err)
+	tx, err = offRamp.SetPrices(client.Owner, []common.Address{client.ChainConfig.SupportedTokens[LINK].Token}, []*big.Int{big.NewInt(10)})
+	shared.RequireNoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 
-	client.Logger.Infof(fmt.Sprintf("Offramp configured for alraedy deployed router  in tx %s", helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash())))
+	client.Logger.Infof(fmt.Sprintf("Offramp configured for already deployed router in tx %s", helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash())))
 
 	return offRamp
 }
@@ -231,7 +235,7 @@ func deployCommitStore(t *testing.T, client *EvmDeploymentConfig, sourceChainId 
 	if !client.DeploySettings.DeployCommitStore {
 		client.Logger.Infof("Skipping CommitStore deployment, using CommitStore on %s", client.LaneConfig.CommitStore)
 		commitStore, err := commit_store.NewCommitStore(client.LaneConfig.CommitStore, client.Client)
-		require.NoError(t, err)
+		shared.RequireNoError(t, err)
 		return commitStore
 	}
 
@@ -247,26 +251,26 @@ func deployCommitStore(t *testing.T, client *EvmDeploymentConfig, sourceChainId 
 			MinSeqNrByOnRamp: []uint64{1},
 		},
 	)
-	require.NoError(t, err)
+	shared.RequireNoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 	client.Logger.Infof("CommitStore deployed on %s in tx: %s", commitStoreAddress.Hex(), helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash()))
 	client.LaneConfig.CommitStore = commitStoreAddress
 
 	commitStore, err := commit_store.NewCommitStore(commitStoreAddress, client.Client)
-	require.NoError(t, err)
+	shared.RequireNoError(t, err)
 	return commitStore
 }
 
 func deployReceiverDapp(t *testing.T, client *EvmDeploymentConfig) *receiver_dapp.ReceiverDapp {
 	client.Logger.Infof("Deploying ReceiverDapp")
 	receiverDappAddress, tx, _, err := receiver_dapp.DeployReceiverDapp(client.Owner, client.Client, client.ChainConfig.Router)
-	require.NoError(t, err)
+	shared.RequireNoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 	client.Logger.Infof("Offramp receiver dapp deployed on %s in tx: %s", receiverDappAddress.Hex(), helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash()))
 	client.LaneConfig.ReceiverDapp = receiverDappAddress
 
 	receiverDapp, err := receiver_dapp.NewReceiverDapp(receiverDappAddress, client.Client)
-	require.NoError(t, err)
+	shared.RequireNoError(t, err)
 
 	return receiverDapp
 }
@@ -275,55 +279,57 @@ func DeployPingPongDapps(t *testing.T, sourceClient *EvmDeploymentConfig, destCl
 	fundingAmount := big.NewInt(1e18)
 
 	if sourceClient.DeploySettings.DeployPingPongDapp {
+		feeToken := sourceClient.ChainConfig.SupportedTokens[WETH].Token
 		sourceClient.Logger.Infof("Deploying source chain ping pong dapp")
 
 		pingPongDappAddress, tx, _, err := ping_pong_demo.DeployPingPongDemo(
 			sourceClient.Owner,
 			sourceClient.Client,
 			sourceClient.ChainConfig.Router,
-			sourceClient.ChainConfig.LinkToken,
+			feeToken,
 		)
-		require.NoError(t, err)
+		shared.RequireNoError(t, err)
 
 		shared.WaitForMined(t, sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
 		sourceClient.Logger.Infof("Ping pong deployed on %s in tx: %s", pingPongDappAddress.Hex(), helpers.ExplorerLink(int64(sourceClient.ChainConfig.ChainId), tx.Hash()))
 
 		sourceClient.LaneConfig.PingPongDapp = pingPongDappAddress
-		FundPingPong(t, sourceClient, fundingAmount)
+		FundPingPong(t, sourceClient, fundingAmount, feeToken)
 	}
 
 	if destClient.DeploySettings.DeployPingPongDapp {
+		feeToken := destClient.ChainConfig.SupportedTokens[WAVAX].Token
 		destClient.Logger.Infof("Deploying destination chain ping pong dapp")
 
 		pingPongDappAddress, tx, _, err := ping_pong_demo.DeployPingPongDemo(
 			destClient.Owner,
 			destClient.Client,
 			destClient.ChainConfig.Router,
-			destClient.ChainConfig.LinkToken,
+			feeToken,
 		)
-		require.NoError(t, err)
+		shared.RequireNoError(t, err)
 
 		shared.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
 		destClient.Logger.Infof("Ping pong deployed on %s in tx: %s", pingPongDappAddress.Hex(), helpers.ExplorerLink(int64(destClient.ChainConfig.ChainId), tx.Hash()))
 
 		destClient.LaneConfig.PingPongDapp = pingPongDappAddress
-		FundPingPong(t, destClient, fundingAmount)
+		FundPingPong(t, destClient, fundingAmount, feeToken)
 	}
 
 	if sourceClient.DeploySettings.DeployPingPongDapp || destClient.DeploySettings.DeployPingPongDapp {
 		pingDapp, err := ping_pong_demo.NewPingPongDemo(sourceClient.LaneConfig.PingPongDapp, sourceClient.Client)
-		require.NoError(t, err)
+		shared.RequireNoError(t, err)
 
 		tx, err := pingDapp.SetCounterpart(sourceClient.Owner, destClient.ChainConfig.ChainId, destClient.LaneConfig.PingPongDapp)
-		require.NoError(t, err)
+		shared.RequireNoError(t, err)
 		shared.WaitForMined(t, sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
 		sourceClient.Logger.Infof("Ping pong dapp configured in tx: %s", helpers.ExplorerLink(int64(sourceClient.ChainConfig.ChainId), tx.Hash()))
 
 		pongDapp, err := ping_pong_demo.NewPingPongDemo(destClient.LaneConfig.PingPongDapp, destClient.Client)
-		require.NoError(t, err)
+		shared.RequireNoError(t, err)
 
 		tx, err = pongDapp.SetCounterpart(destClient.Owner, sourceClient.ChainConfig.ChainId, sourceClient.LaneConfig.PingPongDapp)
-		require.NoError(t, err)
+		shared.RequireNoError(t, err)
 		shared.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
 		sourceClient.Logger.Infof("Ping pong dapp configured in tx: %s", helpers.ExplorerLink(int64(sourceClient.ChainConfig.ChainId), tx.Hash()))
 	} else {
@@ -331,11 +337,11 @@ func DeployPingPongDapps(t *testing.T, sourceClient *EvmDeploymentConfig, destCl
 	}
 }
 
-func FundPingPong(t *testing.T, client *EvmDeploymentConfig, fundingAmount *big.Int) {
+func FundPingPong(t *testing.T, client *EvmDeploymentConfig, fundingAmount *big.Int, tokenAddress common.Address) {
 	pingDapp, err := ping_pong_demo.NewPingPongDemo(client.LaneConfig.PingPongDapp, client.Client)
 	require.NoError(t, err)
 
-	linkToken, err := link_token_interface.NewLinkToken(client.ChainConfig.LinkToken, client.Client)
+	linkToken, err := link_token_interface.NewLinkToken(tokenAddress, client.Client)
 	require.NoError(t, err)
 
 	tx, err := linkToken.Approve(client.Owner, client.LaneConfig.PingPongDapp, fundingAmount)
@@ -361,7 +367,7 @@ func deployGovernanceDapps(t *testing.T, sourceClient *EvmDeploymentConfig, dest
 			sourceClient.Client,
 			sourceClient.ChainConfig.Router,
 			feeConfig,
-			destClient.ChainConfig.LinkToken)
+			destClient.ChainConfig.SupportedTokens[LINK].Token)
 		require.NoError(t, err)
 
 		shared.WaitForMined(t, sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
@@ -377,7 +383,7 @@ func deployGovernanceDapps(t *testing.T, sourceClient *EvmDeploymentConfig, dest
 			destClient.Client,
 			destClient.ChainConfig.Router,
 			feeConfig,
-			destClient.ChainConfig.LinkToken)
+			destClient.ChainConfig.SupportedTokens[LINK].Token)
 		require.NoError(t, err)
 
 		shared.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
