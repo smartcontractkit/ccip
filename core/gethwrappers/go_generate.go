@@ -82,7 +82,6 @@ package gethwrappers
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.6/FunctionsBillingRegistry.abi ../../contracts/solc/v0.8.6/FunctionsBillingRegistry.bin OCR2DRRegistry ocr2dr_registry
 
 // CCIP
-// Generic
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/CommitStore.abi ../../contracts/solc/v0.8.15/CommitStore.bin CommitStore commit_store
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/CommitStoreHelper.abi ../../contracts/solc/v0.8.15/CommitStoreHelper.bin CommitStoreHelper commit_store_helper
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/BurnMintTokenPool.abi ../../contracts/solc/v0.8.15/BurnMintTokenPool.bin BurnMintTokenPool burn_mint_token_pool
@@ -91,23 +90,15 @@ package gethwrappers
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/AFN.abi ../../contracts/solc/v0.8.15/AFN.bin AFNContract afn_contract
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/MockAFN.abi ../../contracts/solc/v0.8.15/MockAFN.bin MockAFNContract mock_afn_contract
 
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2EVMOnRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMOnRamp.bin EVM2EVMOnRamp evm_2_evm_onramp
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2EVMOffRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMOffRamp.bin EVM2EVMOffRamp evm_2_evm_offramp
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2EVMOffRampHelper.abi ../../contracts/solc/v0.8.15/EVM2EVMOffRampHelper.bin EVM2EVMOffRampHelper evm_2_evm_offramp_helper
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/Router.abi ../../contracts/solc/v0.8.15/Router.bin Router router
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/FeeManager.abi ../../contracts/solc/v0.8.15/FeeManager.bin FeeManager fee_manager
+
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/ReceiverDapp.abi ../../contracts/solc/v0.8.15/ReceiverDapp.bin ReceiverDapp receiver_dapp
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/SimpleMessageReceiver.abi ../../contracts/solc/v0.8.15/SimpleMessageReceiver.bin SimpleMessageReceiver simple_message_receiver
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/MaybeRevertMessageReceiver.abi ../../contracts/solc/v0.8.15/MaybeRevertMessageReceiver.bin MaybeRevertMessageReceiver maybe_revert_message_receiver
-
-// Toll
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2AnyTollOnRampRouter.abi ../../contracts/solc/v0.8.15/EVM2AnyTollOnRampRouter.bin EVM2AnyTollOnRampRouter evm_2_any_toll_onramp_router
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2EVMTollOnRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMTollOnRamp.bin EVM2EVMTollOnRamp evm_2_evm_toll_onramp
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2EVMTollOffRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMTollOffRamp.bin EVM2EVMTollOffRamp evm_2_evm_toll_offramp
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/Any2EVMTollOffRampRouter.abi ../../contracts/solc/v0.8.15/Any2EVMTollOffRampRouter.bin Any2EVMTollOffRampRouter any_2_evm_toll_offramp_router
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2EVMTollOffRampHelper.abi ../../contracts/solc/v0.8.15/EVM2EVMTollOffRampHelper.bin EVM2EVMTollOffRampHelper any_2_evm_toll_offramp_helper
-
-// GE
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2EVMGEOnRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMGEOnRamp.bin EVM2EVMGEOnRamp evm_2_evm_ge_onramp
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2EVMGEOffRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMGEOffRamp.bin EVM2EVMGEOffRamp evm_2_evm_ge_offramp
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/GERouter.abi ../../contracts/solc/v0.8.15/GERouter.bin GERouter ge_router
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/FeeManager.abi ../../contracts/solc/v0.8.15/FeeManager.bin FeeManager fee_manager
-
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/GovernanceDapp.abi ../../contracts/solc/v0.8.15/GovernanceDapp.bin GovernanceDapp governance_dapp
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/PingPongDemo.abi ../../contracts/solc/v0.8.15/PingPongDemo.bin PingPongDemo ping_pong_demo
 

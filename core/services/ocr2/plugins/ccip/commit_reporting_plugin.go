@@ -99,7 +99,7 @@ type CommitReportingPluginFactory struct {
 	onRampToReqEventSig map[common.Address]EventSignatures
 	onRamps             []common.Address
 	commitStore         *commit_store.CommitStore
-	onRampToHasher      map[common.Address]LeafHasher[[32]byte]
+	onRampToHasher      map[common.Address]LeafHasherInterface[[32]byte]
 	inflightCacheExpiry time.Duration
 }
 
@@ -111,7 +111,7 @@ func NewCommitReportingPluginFactory(
 	onRampSeqParsers map[common.Address]func(log logpoller.Log) (uint64, error),
 	onRampToReqEventSig map[common.Address]EventSignatures,
 	onRamps []common.Address,
-	onRampToHasher map[common.Address]LeafHasher[[32]byte],
+	onRampToHasher map[common.Address]LeafHasherInterface[[32]byte],
 	inflightCacheExpiry time.Duration,
 ) types.ReportingPluginFactory {
 	return &CommitReportingPluginFactory{lggr: lggr, commitStore: commitStore, onRampToReqEventSig: onRampToReqEventSig, onRampSeqParsers: onRampSeqParsers, onRamps: onRamps, source: source, onRampToHasher: onRampToHasher, inflightCacheExpiry: inflightCacheExpiry}
@@ -161,7 +161,7 @@ type CommitReportingPlugin struct {
 	inFlightMu          sync.RWMutex
 	inFlight            map[[32]byte]InflightReport
 	offchainConfig      OffchainConfig
-	onRampToHasher      map[common.Address]LeafHasher[[32]byte]
+	onRampToHasher      map[common.Address]LeafHasherInterface[[32]byte]
 	inflightCacheExpiry time.Duration
 }
 

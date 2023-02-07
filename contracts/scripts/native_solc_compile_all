@@ -111,23 +111,15 @@ $SCRIPTPATH/native_solc8_15_compile_ccip ccip/test/helpers/CustomTokenPool.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/health/AFN.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/test/mocks/MockAFN.sol
 
+$SCRIPTPATH/native_solc8_15_compile_ccip ccip/onRamp/EVM2EVMOnRamp.sol
+$SCRIPTPATH/native_solc8_15_compile_ccip ccip/offRamp/EVM2EVMOffRamp.sol
+$SCRIPTPATH/native_solc8_15_compile_ccip ccip/test/helpers/ramps/EVM2EVMOffRampHelper.sol
+$SCRIPTPATH/native_solc8_15_compile_ccip ccip/router/Router.sol
+$SCRIPTPATH/native_solc8_15_compile_ccip ccip/fees/FeeManager.sol
+
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/applications/ReceiverDapp.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/test/helpers/receivers/SimpleMessageReceiver.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/test/helpers/receivers/MaybeRevertMessageReceiver.sol
-
-## Toll
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/onRamp/toll/EVM2AnyTollOnRampRouter.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/onRamp/toll/EVM2EVMTollOnRamp.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/offRamp/toll/EVM2EVMTollOffRamp.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/offRamp/toll/Any2EVMTollOffRampRouter.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/test/helpers/ramps/EVM2EVMTollOffRampHelper.sol
-
-#GE
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/onRamp/ge/EVM2EVMGEOnRamp.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/offRamp/ge/EVM2EVMGEOffRamp.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/router/GERouter.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/fees/FeeManager.sol
-
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/applications/GovernanceDapp.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/applications/PingPongDemo.sol
 

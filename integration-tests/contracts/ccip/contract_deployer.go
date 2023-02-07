@@ -17,18 +17,14 @@ import (
 	ocrtypes2 "github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"golang.org/x/crypto/curve25519"
 
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_toll_onramp_router"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_offramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_onramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_offramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ge_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/mock_afn_contract"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/simple_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
@@ -172,63 +168,6 @@ func (e *CCIPContractsDeployer) DeploySimpleMessageReceiver() (
 	}, err
 }
 
-func (e *CCIPContractsDeployer) DeployTollOffRamp(
-	sourceChainId, destChainId uint64,
-	commitStore, onRamp, afn common.Address,
-	sourceToken, pools []common.Address,
-	opts RateLimiterConfig) (
-	*TollOffRamp,
-	error,
-) {
-	address, _, instance, err := e.evmClient.DeployContract("Toll OffRamp Contract", func(
-		auth *bind.TransactOpts,
-		backend bind.ContractBackend,
-	) (common.Address, *types.Transaction, interface{}, error) {
-		return evm_2_evm_toll_offramp.DeployEVM2EVMTollOffRamp(
-			auth, backend, sourceChainId, destChainId,
-			evm_2_evm_toll_offramp.IBaseOffRampOffRampConfig{
-				PermissionLessExecutionThresholdSeconds: 0,
-				ExecutionDelaySeconds:                   0,
-				MaxDataSize:                             1e5,
-				MaxTokensLength:                         15,
-			},
-			onRamp,
-			commitStore,
-			afn,
-			sourceToken,
-			pools,
-			evm_2_evm_toll_offramp.IAggregateRateLimiterRateLimiterConfig{
-				Rate:     opts.Rate,
-				Capacity: opts.Capacity,
-				Admin:    auth.From,
-			},
-		)
-	})
-	return &TollOffRamp{
-		client:     e.evmClient,
-		instance:   instance.(*evm_2_evm_toll_offramp.EVM2EVMTollOffRamp),
-		EthAddress: *address,
-	}, err
-}
-
-func (e *CCIPContractsDeployer) DeployTollOffRampRouter(
-	offRamps []common.Address) (
-	*TollOffRampRouter,
-	error,
-) {
-	address, _, instance, err := e.evmClient.DeployContract("Toll OffRampRouter Contract", func(
-		auth *bind.TransactOpts,
-		backend bind.ContractBackend,
-	) (common.Address, *types.Transaction, interface{}, error) {
-		return any_2_evm_toll_offramp_router.DeployAny2EVMTollOffRampRouter(auth, backend, offRamps)
-	})
-	return &TollOffRampRouter{
-		client:     e.evmClient,
-		instance:   instance.(*any_2_evm_toll_offramp_router.Any2EVMTollOffRampRouter),
-		EthAddress: *address,
-	}, err
-}
-
 func (e *CCIPContractsDeployer) DeployReceiverDapp(toRevert bool) (
 	*ReceiverDapp,
 	error,
@@ -246,105 +185,40 @@ func (e *CCIPContractsDeployer) DeployReceiverDapp(toRevert bool) (
 	}, err
 }
 
-func (e *CCIPContractsDeployer) DeployTollOnRampRouter() (
-	*TollOnRampRouter,
-	error,
-) {
-	address, _, instance, err := e.evmClient.DeployContract("TollOnRampRouter", func(
-		auth *bind.TransactOpts,
-		backend bind.ContractBackend,
-	) (common.Address, *types.Transaction, interface{}, error) {
-		return evm_2_any_toll_onramp_router.DeployEVM2AnyTollOnRampRouter(auth, backend)
-	})
-	if err != nil {
-		return nil, err
-	}
-	return &TollOnRampRouter{
-		client:     e.evmClient,
-		instance:   instance.(*evm_2_any_toll_onramp_router.EVM2AnyTollOnRampRouter),
-		EthAddress: *address,
-	}, err
-}
-
-func (e *CCIPContractsDeployer) DeployTollOnRamp(
-	chainId, destChainId uint64,
-	tokens, pools, allowList []common.Address,
-	afn, router common.Address,
-	opts RateLimiterConfig,
-) (
-	*TollOnRamp,
-	error,
-) {
-	address, _, instance, err := e.evmClient.DeployContract("TollOnRamp", func(
-		auth *bind.TransactOpts,
-		backend bind.ContractBackend,
-	) (common.Address, *types.Transaction, interface{}, error) {
-		config := evm_2_evm_toll_onramp.IBaseOnRampOnRampConfig{
-			CommitFeeJuels:  0,
-			MaxDataSize:     1e6,
-			MaxTokensLength: 5,
-			MaxGasLimit:     ccip.GasLimitPerTx,
-		}
-		return evm_2_evm_toll_onramp.DeployEVM2EVMTollOnRamp(
-			auth,
-			backend,
-			chainId,
-			destChainId,
-			tokens,
-			pools,
-			allowList, afn, config,
-			evm_2_evm_toll_onramp.IAggregateRateLimiterRateLimiterConfig{
-				Rate:     opts.Rate,
-				Capacity: opts.Rate,
-				Admin:    auth.From,
-			},
-			router,
-		)
-	})
-	if err != nil {
-		return nil, err
-	}
-	return &TollOnRamp{
-		client:     e.evmClient,
-		instance:   instance.(*evm_2_evm_toll_onramp.EVM2EVMTollOnRamp),
-		EthAddress: *address,
-	}, err
-}
-
-func (e *CCIPContractsDeployer) DeployGERouter(
+func (e *CCIPContractsDeployer) DeployRouter(
 	offRamps []common.Address,
 ) (
-	*GERouter,
+	*Router,
 	error,
 ) {
-	address, _, instance, err := e.evmClient.DeployContract("GERouter", func(
+	address, _, instance, err := e.evmClient.DeployContract("Router", func(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return ge_router.DeployGERouter(auth, backend, offRamps)
+		return router.DeployRouter(auth, backend, offRamps)
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &GERouter{
+	return &Router{
 		client:     e.evmClient,
-		Instance:   instance.(*ge_router.GERouter),
+		Instance:   instance.(*router.Router),
 		EthAddress: *address,
 	}, err
 }
 
-func (e *CCIPContractsDeployer) NewGERouter(addr common.Address) (
-	*GERouter,
+func (e *CCIPContractsDeployer) NewRouter(addr common.Address) (
+	*Router,
 	error,
 ) {
-	r, err := ge_router.NewGERouter(addr, e.evmClient.Backend())
+	r, err := router.NewRouter(addr, e.evmClient.Backend())
 	log.Info().
 		Str("Contract Address", addr.Hex()).
-		Str("Contract Name", "GERouter").
+		Str("Contract Name", "Router").
 		Str("From", e.evmClient.GetDefaultWallet().Address()).
 		Str("Network Name", e.evmClient.GetNetworkConfig().Name).
 		Msg("New contract")
-	return &GERouter{
+	return &Router{
 		client:     e.evmClient,
 		Instance:   r,
 		EthAddress: addr,
@@ -352,7 +226,7 @@ func (e *CCIPContractsDeployer) NewGERouter(addr common.Address) (
 }
 
 func (e *CCIPContractsDeployer) DeployFeeManager(
-	feeUpdates []fee_manager.GEFeeUpdate,
+	feeUpdates []fee_manager.InternalFeeUpdate,
 ) (
 	*FeeManager,
 	error,
@@ -373,21 +247,21 @@ func (e *CCIPContractsDeployer) DeployFeeManager(
 	}, err
 }
 
-func (e *CCIPContractsDeployer) DeployGEOnRamp(
+func (e *CCIPContractsDeployer) DeployOnRamp(
 	sourceChainId, destChainId uint64,
 	tokens, pools, allowList []common.Address,
 	afn, router, feeManager common.Address,
 	opts RateLimiterConfig,
-	feeConfig []evm_2_evm_ge_onramp.IEVM2EVMGEOnRampFeeTokenConfigArgs,
+	feeConfig []evm_2_evm_onramp.IEVM2EVMOnRampFeeTokenConfigArgs,
 ) (
-	*GEOnRamp,
+	*OnRamp,
 	error,
 ) {
-	address, _, instance, err := e.evmClient.DeployContract("GEOnRamp", func(
+	address, _, instance, err := e.evmClient.DeployContract("OnRamp", func(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return evm_2_evm_ge_onramp.DeployEVM2EVMGEOnRamp(
+		return evm_2_evm_onramp.DeployEVM2EVMOnRamp(
 			auth,
 			backend,
 			sourceChainId,
@@ -396,13 +270,13 @@ func (e *CCIPContractsDeployer) DeployGEOnRamp(
 			pools,
 			allowList,
 			afn,
-			evm_2_evm_ge_onramp.IBaseOnRampOnRampConfig{
+			evm_2_evm_onramp.IBaseOnRampOnRampConfig{
 				CommitFeeJuels:  0,
 				MaxDataSize:     1e5,
 				MaxTokensLength: 5,
 				MaxGasLimit:     ccip.GasLimitPerTx,
 			},
-			evm_2_evm_ge_onramp.IAggregateRateLimiterRateLimiterConfig{
+			evm_2_evm_onramp.IAggregateRateLimiterRateLimiterConfig{
 				Capacity: opts.Capacity,
 				Rate:     opts.Rate,
 			},
@@ -413,31 +287,31 @@ func (e *CCIPContractsDeployer) DeployGEOnRamp(
 	if err != nil {
 		return nil, err
 	}
-	return &GEOnRamp{
+	return &OnRamp{
 		client:     e.evmClient,
-		instance:   instance.(*evm_2_evm_ge_onramp.EVM2EVMGEOnRamp),
+		instance:   instance.(*evm_2_evm_onramp.EVM2EVMOnRamp),
 		EthAddress: *address,
 	}, err
 }
 
-func (e *CCIPContractsDeployer) DeployGEOffRamp(
+func (e *CCIPContractsDeployer) DeployOffRamp(
 	sourceChainId, destChainId uint64,
 	commitStore, onRamp, afn, feetoken, destFeeManagerAddress common.Address,
 	sourceToken, pools []common.Address,
 	opts RateLimiterConfig, gasOverhead *big.Int) (
-	*GEOffRamp,
+	*OffRamp,
 	error,
 ) {
-	address, _, instance, err := e.evmClient.DeployContract("GEOffRamp Contract", func(
+	address, _, instance, err := e.evmClient.DeployContract("OffRamp Contract", func(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return evm_2_evm_ge_offramp.DeployEVM2EVMGEOffRamp(
+		return evm_2_evm_offramp.DeployEVM2EVMOffRamp(
 			auth,
 			backend,
 			sourceChainId,
 			destChainId,
-			evm_2_evm_ge_offramp.IEVM2EVMGEOffRampGEOffRampConfig{
+			evm_2_evm_offramp.IEVM2EVMOffRampOffRampConfig{
 				GasOverhead:                             gasOverhead,
 				FeeManager:                              destFeeManagerAddress,
 				PermissionLessExecutionThresholdSeconds: 0,
@@ -450,16 +324,16 @@ func (e *CCIPContractsDeployer) DeployGEOffRamp(
 			afn,
 			sourceToken,
 			pools,
-			evm_2_evm_ge_offramp.IAggregateRateLimiterRateLimiterConfig{
+			evm_2_evm_offramp.IAggregateRateLimiterRateLimiterConfig{
 				Rate:     opts.Rate,
 				Capacity: opts.Capacity,
 				Admin:    auth.From,
 			},
 		)
 	})
-	return &GEOffRamp{
+	return &OffRamp{
 		client:     e.evmClient,
-		instance:   instance.(*evm_2_evm_ge_offramp.EVM2EVMGEOffRamp),
+		instance:   instance.(*evm_2_evm_offramp.EVM2EVMOffRamp),
 		EthAddress: *address,
 	}, err
 }

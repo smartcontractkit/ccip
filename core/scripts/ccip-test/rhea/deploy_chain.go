@@ -8,9 +8,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ge_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/mock_afn_contract"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/shared"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
 )
@@ -79,7 +79,7 @@ func deployRouter(t *testing.T, client *EvmDeploymentConfig) {
 	}
 
 	client.Logger.Infof("Deploying Router")
-	routerAddress, tx, _, err := ge_router.DeployGERouter(client.Owner, client.Client, []common.Address{})
+	routerAddress, tx, _, err := router.DeployRouter(client.Owner, client.Client, []common.Address{})
 	shared.RequireNoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 	client.ChainConfig.Router = routerAddress
@@ -98,7 +98,7 @@ func deployFeeManager(t *testing.T, client *EvmDeploymentConfig) {
 	feeManager, tx, _, err := fee_manager.DeployFeeManager(
 		client.Owner,
 		client.Client,
-		[]fee_manager.GEFeeUpdate{},
+		[]fee_manager.InternalFeeUpdate{},
 		[]common.Address{},
 		big.NewInt(1e18),
 	)

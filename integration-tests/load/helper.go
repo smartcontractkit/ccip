@@ -68,18 +68,25 @@ func PopulateAndValidate(t *testing.T) *loadArgs {
 
 func (loadArgs *loadArgs) Setup() {
 	transferAmounts := []*big.Int{big.NewInt(5e17), big.NewInt(5e17)}
-	forwardLane, _, tearDown := actions.CCIPDefaultTestSetUp(loadArgs.t, "load-ccip",
+	forwardLane, _, tearDown := actions.CCIPDefaultTestSetUp(
+		loadArgs.t,
+		"load-ccip",
 		map[string]interface{}{
 			"replicas": "6",
 			"toml":     actions.DefaultCCIPCLNodeEnv(loadArgs.t),
 			"env": map[string]interface{}{
 				"CL_DEV": "true",
 			},
-		}, transferAmounts, 5, true, false, actions.GE)
+		},
+		transferAmounts,
+		5,
+		true,
+		false,
+	)
 	loadArgs.envTear = tearDown
 	source := forwardLane.Source
 	dest := forwardLane.Dest
-	ccipLoad := NewCCIPLoad(loadArgs.t, source, dest, actions.GE, loadArgs.ccipTimeout, 100000)
+	ccipLoad := NewCCIPLoad(loadArgs.t, source, dest, loadArgs.ccipTimeout, 100000)
 	require.NoError(loadArgs.t, forwardLane.IsLaneDeployed())
 	ccipLoad.BeforeAllCall()
 	loadgen, err := client.NewLoadGenerator(&client.LoadGeneratorConfig{

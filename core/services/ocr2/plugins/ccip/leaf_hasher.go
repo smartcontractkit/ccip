@@ -11,80 +11,18 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_onramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
-type LeafHasher[H hasher.Hash] interface {
+type LeafHasherInterface[H hasher.Hash] interface {
 	HashLeaf(log types.Log) (H, error)
 }
 
 var (
 	LeafDomainSeparator = [1]byte{0x00}
 )
-
-type TollLeafHasher struct {
-	tollABI      abi.ABI
-	metaDataHash [32]byte
-	ctx          hasher.Ctx[[32]byte]
-}
-
-var _ LeafHasher[[32]byte] = &TollLeafHasher{}
-
-func NewTollLeafHasher(sourceChainId uint64, destChainId uint64, onRampId common.Address, ctx hasher.Ctx[[32]byte]) *TollLeafHasher {
-	tollABI, _ := abi.JSON(strings.NewReader(evm_2_evm_toll_onramp.EVM2EVMTollOnRampABI))
-	return &TollLeafHasher{
-		tollABI:      tollABI,
-		metaDataHash: getMetaDataHash(ctx, ctx.Hash([]byte("EVM2EVMTollMessageEvent")), sourceChainId, onRampId, destChainId),
-		ctx:          ctx,
-	}
-}
-
-func (t *TollLeafHasher) HashLeaf(log types.Log) ([32]byte, error) {
-	event, err := t.ParseEVM2EVMTollLog(log)
-	if err != nil {
-		return [32]byte{}, err
-	}
-	encodedTokens, err := utils.ABIEncode(`[{"components": [{"name": "token","type": "address"}, {"name": "amount", "type": "uint256"}],"type": "tuple[]"}]`, event.Message.TokensAndAmounts)
-	if err != nil {
-		return [32]byte{}, err
-	}
-
-	packedValues, err := utils.ABIEncode(
-		`[
-{"name": "leafDomainSeparator","type":"bytes1"},
-{"name": "metadataHash","type":"bytes32"},
-{"name": "sequenceNumber","type":"uint64"},
-{"name": "sender","type":"address"},
-{"name": "receiver","type":"address"},
-{"name": "dataHash","type":"bytes32"},
-{"name": "tokenAmountsHash","type":"bytes32"},
-{"name": "gasLimit","type":"uint256"},
-{"name": "feeTokenAndAmount","components": [{"name": "token","type": "address"}, {"name": "amount", "type": "uint256"}],"type": "tuple"}]
-`,
-		LeafDomainSeparator,
-		t.metaDataHash,
-		event.Message.SequenceNumber,
-		event.Message.Sender,
-		event.Message.Receiver,
-		t.ctx.Hash(event.Message.Data),
-		t.ctx.Hash(encodedTokens),
-		event.Message.GasLimit,
-		event.Message.FeeTokenAndAmount,
-	)
-	if err != nil {
-		return [32]byte{}, err
-	}
-	return t.ctx.Hash(packedValues), nil
-}
-
-func (t *TollLeafHasher) ParseEVM2EVMTollLog(log types.Log) (*evm_2_evm_toll_onramp.EVM2EVMTollOnRampCCIPSendRequested, error) {
-	event := new(evm_2_evm_toll_onramp.EVM2EVMTollOnRampCCIPSendRequested)
-	err := bind.NewBoundContract(common.Address{}, t.tollABI, nil, nil, nil).UnpackLog(event, "CCIPSendRequested", log)
-	return event, err
-}
 
 func getMetaDataHash[H hasher.Hash](ctx hasher.Ctx[H], prefix [32]byte, sourceChainId uint64, onRampId common.Address, destChainId uint64) H {
 	paddedOnRamp := onRampId.Hash()
@@ -98,25 +36,25 @@ func LogPollerLogToEthLog(log logpoller.Log) types.Log {
 	}
 }
 
-type GELeafHasher struct {
+type LeafHasher struct {
 	geABI        abi.ABI
 	metaDataHash [32]byte
 	ctx          hasher.Ctx[[32]byte]
 }
 
-func NewGELeafHasher(sourceChainId uint64, destChainId uint64, onRampId common.Address, ctx hasher.Ctx[[32]byte]) *GELeafHasher {
-	geABI, _ := abi.JSON(strings.NewReader(evm_2_evm_ge_onramp.EVM2EVMGEOnRampABI))
-	return &GELeafHasher{
+func NewLeafHasher(sourceChainId uint64, destChainId uint64, onRampId common.Address, ctx hasher.Ctx[[32]byte]) *LeafHasher {
+	geABI, _ := abi.JSON(strings.NewReader(evm_2_evm_onramp.EVM2EVMOnRampABI))
+	return &LeafHasher{
 		geABI:        geABI,
-		metaDataHash: getMetaDataHash(ctx, ctx.Hash([]byte("EVM2EVMGEMessageEvent")), sourceChainId, onRampId, destChainId),
+		metaDataHash: getMetaDataHash(ctx, ctx.Hash([]byte("EVM2EVMMessageEvent")), sourceChainId, onRampId, destChainId),
 		ctx:          ctx,
 	}
 }
 
-var _ LeafHasher[[32]byte] = &GELeafHasher{}
+var _ LeafHasherInterface[[32]byte] = &LeafHasher{}
 
-func (t *GELeafHasher) HashLeaf(log types.Log) ([32]byte, error) {
-	event, err := t.ParseEVM2EVMGELog(log)
+func (t *LeafHasher) HashLeaf(log types.Log) ([32]byte, error) {
+	event, err := t.ParseEVM2EVMLog(log)
 	if err != nil {
 		return [32]byte{}, err
 	}
@@ -159,8 +97,8 @@ func (t *GELeafHasher) HashLeaf(log types.Log) ([32]byte, error) {
 	return t.ctx.Hash(packedValues), nil
 }
 
-func (t *GELeafHasher) ParseEVM2EVMGELog(log types.Log) (*evm_2_evm_ge_onramp.EVM2EVMGEOnRampCCIPSendRequested, error) {
-	event := new(evm_2_evm_ge_onramp.EVM2EVMGEOnRampCCIPSendRequested)
+func (t *LeafHasher) ParseEVM2EVMLog(log types.Log) (*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested, error) {
+	event := new(evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested)
 	err := bind.NewBoundContract(common.Address{}, t.geABI, nil, nil, nil).UnpackLog(event, "CCIPSendRequested", log)
 	return event, err
 }

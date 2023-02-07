@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import {Common} from "../../models/Common.sol";
-import {GE} from "../../models/GE.sol";
+import {Internal} from "../../models/Internal.sol";
 
 interface IFeeManager {
   error TokenOrChainNotSupported(address token, uint64 chain);
@@ -42,7 +42,7 @@ interface IFeeManager {
    * @notice Update the fee for a given token and destination chain.
    * @param feeUpdates The fee updates to apply.
    */
-  function updateFees(GE.FeeUpdate[] memory feeUpdates) external;
+  function updateFees(Internal.FeeUpdate[] memory feeUpdates) external;
 
   /**
    * @notice Get the `feeTokenBaseUnitsPerUnitGas` for a given source chain token and destination chain ID.

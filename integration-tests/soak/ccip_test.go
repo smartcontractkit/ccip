@@ -53,7 +53,12 @@ func TestCCIPSoak(t *testing.T) {
 		map[string]interface{}{
 			"replicas": "6",
 			"toml":     actions.DefaultCCIPCLNodeEnv(t),
-		}, transferAmounts, 5, true, true, actions.GE)
+		},
+		transferAmounts,
+		5,
+		true,
+		true,
+	)
 
 	if laneA == nil {
 		return

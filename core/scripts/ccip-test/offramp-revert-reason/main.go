@@ -14,16 +14,12 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/afn_contract"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_any_toll_onramp_router"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_offramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_onramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_offramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ge_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/secrets"
 )
 
@@ -110,16 +106,13 @@ func DecodeErrorStringFromABI(errorString string, contractABIs []string) {
 
 func getAllABIs() []string {
 	return []string{
-		// Generic
-		afn_contract.AFNContractABI, lock_release_token_pool.LockReleaseTokenPoolABI, commit_store.CommitStoreABI,
+		afn_contract.AFNContractABI,
+		lock_release_token_pool.LockReleaseTokenPoolABI,
+		commit_store.CommitStoreABI,
 		fee_manager.FeeManagerABI,
-
-		// Toll
-		evm_2_evm_toll_onramp.EVM2EVMTollOnRampABI, evm_2_evm_toll_offramp.EVM2EVMTollOffRampABI,
-		evm_2_any_toll_onramp_router.EVM2AnyTollOnRampRouterABI, any_2_evm_toll_offramp_router.Any2EVMTollOffRampRouterABI,
-
-		// GE
-		evm_2_evm_ge_onramp.EVM2EVMGEOnRampABI, evm_2_evm_ge_offramp.EVM2EVMGEOffRampABI, ge_router.GERouterABI,
+		evm_2_evm_onramp.EVM2EVMOnRampABI,
+		evm_2_evm_offramp.EVM2EVMOffRampABI,
+		router.RouterABI,
 	}
 }
 

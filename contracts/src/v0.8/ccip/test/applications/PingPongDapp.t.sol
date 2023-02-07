@@ -2,11 +2,11 @@
 pragma solidity 0.8.15;
 
 import "../../applications/PingPongDemo.sol";
-import "../onRamp/ge/EVM2EVMGEOnRampSetup.t.sol";
+import "../onRamp/EVM2EVMOnRampSetup.t.sol";
 import "../../models/Common.sol";
 
 // setup
-contract PingPongDappSetup is EVM2EVMGEOnRampSetup {
+contract PingPongDappSetup is EVM2EVMOnRampSetup {
   event Ping(uint256 pingPongs);
   event Pong(uint256 pingPongs);
 
@@ -16,7 +16,7 @@ contract PingPongDappSetup is EVM2EVMGEOnRampSetup {
   address immutable i_pongContract = address(10);
 
   function setUp() public virtual override {
-    EVM2EVMGEOnRampSetup.setUp();
+    EVM2EVMOnRampSetup.setUp();
 
     s_feeToken = IERC20(s_sourceTokens[0]);
     s_pingPong = new PingPongDemo(address(s_sourceRouter), s_feeToken);
@@ -39,17 +39,17 @@ contract PingPong_startPingPong is PingPongDappSetup {
     uint256 pingPongNumber = 1;
     bytes memory data = abi.encode(pingPongNumber);
 
-    GEConsumer.EVM2AnyGEMessage memory sentMessage = GEConsumer.EVM2AnyGEMessage({
+    Consumer.EVM2AnyMessage memory sentMessage = Consumer.EVM2AnyMessage({
       receiver: abi.encode(i_pongContract),
       data: data,
       tokensAndAmounts: new Common.EVMTokenAndAmount[](0),
       feeToken: s_sourceFeeToken,
-      extraArgs: GEConsumer._argsToBytes(GEConsumer.EVMExtraArgsV1({gasLimit: 2e5, strict: false}))
+      extraArgs: Consumer._argsToBytes(Consumer.EVMExtraArgsV1({gasLimit: 2e5, strict: false}))
     });
 
     uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_ID, sentMessage);
 
-    GE.EVM2EVMGEMessage memory message = GE.EVM2EVMGEMessage({
+    Internal.EVM2EVMMessage memory message = Internal.EVM2EVMMessage({
       sequenceNumber: 1,
       feeTokenAmount: expectedFee,
       sourceChainId: SOURCE_CHAIN_ID,
@@ -63,7 +63,7 @@ contract PingPong_startPingPong is PingPongDappSetup {
       strict: false,
       messageId: ""
     });
-    message.messageId = GE._hash(message, s_metadataHash);
+    message.messageId = Internal._hash(message, s_metadataHash);
 
     vm.expectEmit(false, false, false, true);
     emit Ping(pingPongNumber);

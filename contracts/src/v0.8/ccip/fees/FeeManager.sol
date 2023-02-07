@@ -5,7 +5,7 @@ import {IFeeManager} from "../interfaces/fees/IFeeManager.sol";
 
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
 import {Common} from "../models/Common.sol";
-import {GE} from "../models/GE.sol";
+import {Internal} from "../models/Internal.sol";
 import {IERC20} from "../../vendor/IERC20.sol";
 import {SafeERC20} from "../../vendor/SafeERC20.sol";
 
@@ -25,7 +25,7 @@ contract FeeManager is IFeeManager, OwnerIsCreator {
   uint128 private immutable i_stalenessThreshold;
 
   constructor(
-    GE.FeeUpdate[] memory feeUpdates,
+    Internal.FeeUpdate[] memory feeUpdates,
     address[] memory feeUpdaters,
     uint128 stalenessThreshold
   ) {
@@ -51,7 +51,7 @@ contract FeeManager is IFeeManager, OwnerIsCreator {
   }
 
   // @inheritdoc IFeeManager
-  function updateFees(GE.FeeUpdate[] memory feeUpdates) external override requireUpdaterOrOwner {
+  function updateFees(Internal.FeeUpdate[] memory feeUpdates) external override requireUpdaterOrOwner {
     for (uint256 i = 0; i < feeUpdates.length; ++i) {
       _updateFee(feeUpdates[i].sourceFeeToken, feeUpdates[i].destChainId, feeUpdates[i].feeTokenBaseUnitsPerUnitGas);
     }

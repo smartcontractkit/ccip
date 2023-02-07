@@ -47,7 +47,7 @@ func TestChaosCCIP(t *testing.T) {
 					},
 				},
 			},
-		}, []*big.Int{big.NewInt(1e8)}, numOfCommitNodes, false, false, actions.GE)
+		}, []*big.Int{big.NewInt(1e8)}, numOfCommitNodes, false, false)
 	require.NoError(t, lane.IsLaneDeployed())
 	testEnvironment = lane.TestEnv.K8Env
 	testSetup = *lane.TestEnv
@@ -98,14 +98,14 @@ func TestChaosCCIP(t *testing.T) {
 			chaosId, err := testEnvironment.Chaos.Run(in.chaosFunc(testEnvironment.Cfg.Namespace, in.chaosProps))
 			require.NoError(t, err)
 			// Send the ccip-request while the chaos is at play
-			lane.SendGERequests(numOfRequests)
+			lane.SendRequests(numOfRequests)
 			if in.waitForChaosRecovery {
 				// wait for chaos to be recovered before further validation
 				testEnvironment.Chaos.WaitForAllRecovered(chaosId)
 			} else {
 				log.Info().Msg("proceeding without waiting for chaos recovery")
 			}
-			lane.ValidateGERequests()
+			lane.ValidateRequests()
 			t.Cleanup(func() {
 				if chaosId != "" {
 					testEnvironment.Chaos.Stop(chaosId)

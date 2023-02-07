@@ -27,18 +27,6 @@ interface IBaseOffRamp {
   error InsufficientFeeAmount(uint64 sequenceNumber, uint256 expectedFeeTokens, uint256 feeTokenAmount);
 
   event OffRampRouterSet(address indexed router, uint64 sourceChainId, address onRampAddress);
-  event OffRampConfigSet(OffRampConfig config);
-
-  struct OffRampConfig {
-    // The waiting time before manual execution is enabled
-    uint32 permissionLessExecutionThresholdSeconds;
-    // execution delay in seconds
-    uint32 executionDelaySeconds;
-    // maximum payload data size
-    uint32 maxDataSize;
-    // Maximum number of distinct ERC20 tokens that can be sent in a message
-    uint16 maxTokensLength;
-  }
 
   /**
    * @notice setRouter sets a new router

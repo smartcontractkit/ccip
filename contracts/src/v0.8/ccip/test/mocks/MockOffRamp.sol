@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
+import "../../interfaces/offRamp/IEVM2EVMOffRamp.sol";
 import "../../interfaces/offRamp/IBaseOffRamp.sol";
 import "../../interfaces/applications/IAny2EVMMessageReceiver.sol";
 import "../../interfaces/ICommitStore.sol";
-import "../../models/Toll.sol";
-import "../../models/TollConsumer.sol";
 
 contract MockOffRamp is IBaseOffRamp {
   IERC20 public s_token;
@@ -32,8 +31,6 @@ contract MockOffRamp is IBaseOffRamp {
     revert();
   }
 
-  function executeSingleMessage(Toll.EVM2EVMTollMessage memory message) external {}
-
   function setToken(IERC20 token) external {
     s_token = token;
   }
@@ -55,7 +52,7 @@ contract MockOffRamp is IBaseOffRamp {
   /// @inheritdoc IBaseOffRamp
   function setCommitStore(ICommitStore commitStore) public pure {}
 
-  function getConfig() public pure returns (OffRampConfig memory config) {}
+  function getConfig() public pure returns (IEVM2EVMOffRamp.OffRampConfig memory config) {}
 
-  function setConfig(OffRampConfig memory config) public {}
+  function setConfig(IEVM2EVMOffRamp.OffRampConfig memory config) public {}
 }

@@ -13,10 +13,8 @@ import (
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_offramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_onramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_offramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/job"
 	ccipconfig "github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/config"
@@ -86,61 +84,31 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	var wrappedPluginFactory ocrtypes.ReportingPluginFactory
 	hashingCtx := hasher.NewKeccakCtx()
 	switch onRampType {
-	case EVM2EVMTollOnRamp:
-		if offRampType != EVM2EVMTollOffRamp {
+	case EVM2EVMOnRamp:
+		if offRampType != EVM2EVMOffRamp {
 			return nil, errors.Errorf("invalid ramp combination %v and %v", onRampType, offRampType)
 		}
-		onRamp, err2 := evm_2_evm_toll_onramp.NewEVM2EVMTollOnRamp(onRampAddr, sourceChain.Client())
+		onRamp, err2 := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddr, sourceChain.Client())
 		if err2 != nil {
 			return nil, err2
 		}
-		offRamp, err2 := evm_2_evm_toll_offramp.NewEVM2EVMTollOffRamp(offRampAddr, destChain.Client())
+		offRamp, err2 := evm_2_evm_offramp.NewEVM2EVMOffRamp(offRampAddr, destChain.Client())
 		if err2 != nil {
 			return nil, err2
 		}
-		eventSignatures = GetTollEventSignatures()
-		wrappedPluginFactory = NewTollExecutionReportingPluginFactory(
-			TollExecutionPluginConfig{
+		eventSignatures = GetEventSignatures()
+		wrappedPluginFactory = NewExecutionReportingPluginFactory(
+			ExecutionPluginConfig{
 				lggr:                lggr,
 				source:              sourceChain.LogPoller(),
 				dest:                destChain.LogPoller(),
 				offRamp:             offRamp,
 				onRamp:              onRamp,
 				commitStore:         verifier,
-				builder:             NewTollBatchBuilder(lggr, eventSignatures),
+				builder:             NewBatchBuilder(lggr, eventSignatures, offRamp),
 				eventSignatures:     eventSignatures,
 				priceGetter:         priceGetterObject,
-				leafHasher:          NewTollLeafHasher(pluginConfig.SourceChainID, pluginConfig.DestChainID, onRampAddr, hashingCtx),
-				rootSnoozeTime:      rootSnoozeTime,
-				inflightCacheExpiry: inflightCacheExpiry,
-				sourceChainID:       pluginConfig.SourceChainID,
-				gasLimit:            BatchGasLimit,
-			})
-	case EVM2EVMGEOnRamp:
-		if offRampType != EVM2EVMGEOffRamp {
-			return nil, errors.Errorf("invalid ramp combination %v and %v", onRampType, offRampType)
-		}
-		onRamp, err2 := evm_2_evm_ge_onramp.NewEVM2EVMGEOnRamp(onRampAddr, sourceChain.Client())
-		if err2 != nil {
-			return nil, err2
-		}
-		offRamp, err2 := evm_2_evm_ge_offramp.NewEVM2EVMGEOffRamp(offRampAddr, destChain.Client())
-		if err2 != nil {
-			return nil, err2
-		}
-		eventSignatures = GetGEEventSignatures()
-		wrappedPluginFactory = NewGEExecutionReportingPluginFactory(
-			GEExecutionPluginConfig{
-				lggr:                lggr,
-				source:              sourceChain.LogPoller(),
-				dest:                destChain.LogPoller(),
-				offRamp:             offRamp,
-				onRamp:              onRamp,
-				commitStore:         verifier,
-				builder:             NewGEBatchBuilder(lggr, eventSignatures, offRamp),
-				eventSignatures:     eventSignatures,
-				priceGetter:         priceGetterObject,
-				leafHasher:          NewGELeafHasher(pluginConfig.SourceChainID, pluginConfig.DestChainID, onRampAddr, hashingCtx),
+				leafHasher:          NewLeafHasher(pluginConfig.SourceChainID, pluginConfig.DestChainID, onRampAddr, hashingCtx),
 				snoozeTime:          rootSnoozeTime,
 				inflightCacheExpiry: inflightCacheExpiry,
 				sourceChainID:       pluginConfig.SourceChainID,

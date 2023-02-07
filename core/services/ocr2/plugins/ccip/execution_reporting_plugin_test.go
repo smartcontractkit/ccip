@@ -18,24 +18,25 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/afn_contract"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp_helper"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/any_2_evm_toll_offramp_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store_helper"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_offramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_offramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp_helper"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/simple_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
+	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
 type ExecutionContracts struct {
 	// Has all the link and 100ETH
 	user                       *bind.TransactOpts
-	offRamp                    *evm_2_evm_toll_offramp.EVM2EVMTollOffRamp
+	offRamp                    *evm_2_evm_offramp.EVM2EVMOffRamp
 	commitStore                *commit_store_helper.CommitStoreHelper
 	receiver                   *simple_message_receiver.SimpleMessageReceiver
 	linkTokenAddress           common.Address
@@ -102,30 +103,46 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	require.NoError(t, err)
 	commitStore, err := commit_store_helper.NewCommitStoreHelper(commitStoreAddress, destChain)
 	require.NoError(t, err)
+
+	destFeeManagerAddress, _, _, err := fee_manager.DeployFeeManager(
+		destUser,
+		destChain, []fee_manager.InternalFeeUpdate{{
+			SourceFeeToken:              destLinkTokenAddress,
+			DestChainId:                 sourceChainID,
+			FeeTokenBaseUnitsPerUnitGas: big.NewInt(200e9), // (2e20 juels/eth) * (1 gwei / gas) / (1 eth/1e18)
+		}},
+		nil,
+		big.NewInt(1e18),
+	)
+	require.NoError(t, err)
+
 	destChain.Commit()
-	offRampAddress, _, _, err := evm_2_evm_toll_offramp.DeployEVM2EVMTollOffRamp(
+	offRampAddress, _, _, err := evm_2_evm_offramp.DeployEVM2EVMOffRamp(
 		destUser,
 		destChain,
 		sourceChainID,
 		destChainID,
-		evm_2_evm_toll_offramp.IBaseOffRampOffRampConfig{
-			ExecutionDelaySeconds: 0,
-			MaxDataSize:           1e5,
-			MaxTokensLength:       5,
+		evm_2_evm_offramp.IEVM2EVMOffRampOffRampConfig{
+			GasOverhead:                             big.NewInt(0),
+			FeeManager:                              destFeeManagerAddress,
+			PermissionLessExecutionThresholdSeconds: 1,
+			ExecutionDelaySeconds:                   0,
+			MaxDataSize:                             1e5,
+			MaxTokensLength:                         5,
 		},
 		onRampAddress,
 		commitStore.Address(),
 		afnAddress,
 		[]common.Address{linkTokenSourceAddress},
 		[]common.Address{destPoolAddress},
-		evm_2_evm_toll_offramp.IAggregateRateLimiterRateLimiterConfig{
+		evm_2_evm_offramp.IAggregateRateLimiterRateLimiterConfig{
 			Capacity: big.NewInt(1e18),
 			Rate:     big.NewInt(1e18),
 			Admin:    destUser.From,
 		},
 	)
 	require.NoError(t, err)
-	offRamp, err := evm_2_evm_toll_offramp.NewEVM2EVMTollOffRamp(offRampAddress, destChain)
+	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(offRampAddress, destChain)
 	require.NoError(t, err)
 	_, err = destPool.SetOffRamp(destUser, offRampAddress, true)
 	require.NoError(t, err)
@@ -134,7 +151,7 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	receiver, err := simple_message_receiver.NewSimpleMessageReceiver(receiverAddress, destChain)
 	require.NoError(t, err)
 	destChain.Commit()
-	routerAddress, _, _, err := any_2_evm_toll_offramp_router.DeployAny2EVMTollOffRampRouter(destUser, destChain, []common.Address{offRampAddress})
+	routerAddress, _, _, err := router.DeployRouter(destUser, destChain, []common.Address{offRampAddress})
 	require.NoError(t, err)
 	destChain.Commit()
 	_, err = offRamp.SetRouter(destUser, routerAddress)
@@ -156,21 +173,25 @@ type messageBatch struct {
 	msgs        []Message
 	allMsgBytes [][]byte
 	seqNums     []uint64
-	helperMsgs  []evm_2_evm_toll_onramp.TollEVM2EVMTollMessage
+	helperMsgs  []evm_2_evm_onramp.InternalEVM2EVMMessage
 	proof       merklemulti.Proof[[32]byte]
 	root        [32]byte
 }
 
 // Message contains the data from a cross chain message
 type Message struct {
-	SourceChainId     uint64                                          `json:"sourceChainId"`
-	SequenceNumber    uint64                                          `json:"sequenceNumber"`
-	Sender            common.Address                                  `json:"sender"`
-	Receiver          common.Address                                  `json:"receiver"`
-	Data              []uint8                                         `json:"data"`
-	TokensAndAmounts  []evm_2_evm_toll_onramp.CommonEVMTokenAndAmount `json:"tokensAndAmounts"`
-	FeeTokenAndAmount evm_2_evm_toll_onramp.CommonEVMTokenAndAmount   `json:"feeTokenAndAmount"`
-	GasLimit          *big.Int                                        `json:"gasLimit"`
+	SourceChainId    uint64                                     `json:"sourceChainId"`
+	SequenceNumber   uint64                                     `json:"sequenceNumber"`
+	FeeTokenAmount   *big.Int                                   `json:"feeTokenAmount"`
+	Sender           common.Address                             `json:"sender"`
+	Nonce            uint64                                     `json:"nonce"`
+	GasLimit         *big.Int                                   `json:"gasLimit"`
+	Strict           bool                                       `json:"strict"`
+	Receiver         common.Address                             `json:"receiver"`
+	Data             []uint8                                    `json:"data"`
+	TokensAndAmounts []evm_2_evm_onramp.CommonEVMTokenAndAmount `json:"tokensAndAmounts"`
+	FeeToken         common.Address                             `json:"feeToken"`
+	MessageId        [32]byte                                   `json:"messageId"`
 }
 
 func (e ExecutionContracts) generateMessageBatch(t *testing.T, payloadSize int, nMessages int, nTokensPerMessage int) messageBatch {
@@ -186,10 +207,10 @@ func (e ExecutionContracts) generateMessageBatch(t *testing.T, payloadSize int, 
 	var leafHashes [][32]byte
 	var msgs []Message
 	var indices []int
-	var tokens []evm_2_evm_toll_onramp.CommonEVMTokenAndAmount
-	var helperMsgs []evm_2_evm_toll_onramp.TollEVM2EVMTollMessage
+	var tokens []evm_2_evm_onramp.CommonEVMTokenAndAmount
+	var helperMsgs []evm_2_evm_onramp.InternalEVM2EVMMessage
 	for i := 0; i < nTokensPerMessage; i++ {
-		tokens = append(tokens, evm_2_evm_toll_onramp.CommonEVMTokenAndAmount{
+		tokens = append(tokens, evm_2_evm_onramp.CommonEVMTokenAndAmount{
 			Token:  e.linkTokenAddress,
 			Amount: big.NewInt(1),
 		})
@@ -199,30 +220,39 @@ func (e ExecutionContracts) generateMessageBatch(t *testing.T, payloadSize int, 
 	for i := 0; i < nMessages; i++ {
 		seqNums = append(seqNums, 1+uint64(i))
 		message := Message{
-			SequenceNumber:    1 + uint64(i),
-			SourceChainId:     e.sourceChainID,
-			Sender:            e.user.From,
-			TokensAndAmounts:  tokens,
-			Receiver:          e.receiver.Address(),
-			Data:              maxPayload,
-			FeeTokenAndAmount: tokens[0],
-			GasLimit:          big.NewInt(100_000),
+			SourceChainId:    e.sourceChainID,
+			SequenceNumber:   1 + uint64(i),
+			FeeTokenAmount:   big.NewInt(1e9),
+			Sender:           e.user.From,
+			Nonce:            1 + uint64(i),
+			GasLimit:         big.NewInt(100_000),
+			Strict:           false,
+			Receiver:         e.receiver.Address(),
+			Data:             maxPayload,
+			TokensAndAmounts: tokens,
+			FeeToken:         tokens[0].Token,
+			MessageId:        utils.Keccak256Fixed([]byte(`MyError(uint256)`)),
 		}
 
 		// Unfortunately have to do this to use the helper's gethwrappers.
-		helperMsgs = append(helperMsgs, evm_2_evm_toll_onramp.TollEVM2EVMTollMessage{
-			SequenceNumber:    message.SequenceNumber,
-			SourceChainId:     message.SourceChainId,
-			Sender:            message.Sender,
-			TokensAndAmounts:  message.TokensAndAmounts,
-			Receiver:          message.Receiver,
-			Data:              message.Data,
-			FeeTokenAndAmount: message.FeeTokenAndAmount,
-			GasLimit:          message.GasLimit,
+		helperMsgs = append(helperMsgs, evm_2_evm_onramp.InternalEVM2EVMMessage{
+			SourceChainId:    message.SourceChainId,
+			SequenceNumber:   message.SequenceNumber,
+			FeeTokenAmount:   message.FeeTokenAmount,
+			Sender:           message.Sender,
+			Nonce:            message.Nonce,
+			GasLimit:         message.GasLimit,
+			Strict:           message.Strict,
+			Receiver:         message.Receiver,
+			Data:             message.Data,
+			TokensAndAmounts: message.TokensAndAmounts,
+			FeeToken:         message.FeeToken,
+			MessageId:        message.MessageId,
 		})
+
 		msgs = append(msgs, message)
 		indices = append(indices, i)
-		msgBytes, err := ccip.MakeTollCCIPMsgArgs().PackValues([]interface{}{message})
+		msgBytes, err := ccip.MakeMessageArgs().PackValues([]interface{}{message})
 		require.NoError(t, err)
 		allMsgBytes = append(allMsgBytes, msgBytes)
 		leafHashes = append(leafHashes, mctx.Hash(msgBytes))
@@ -235,7 +265,7 @@ func (e ExecutionContracts) generateMessageBatch(t *testing.T, payloadSize int, 
 	return messageBatch{allMsgBytes: allMsgBytes, seqNums: seqNums, msgs: msgs, proof: proof, root: rootLocal, helperMsgs: helperMsgs}
 }
 
-func TestMaxExecutionReportSize(t *testing.T) {
+func TestMaxInternalExecutionReportSize(t *testing.T) {
 	// Ensure that given max payload size and max num tokens,
 	// Our report size is under the tx size limit.
 	c := setupContractsForExecution(t)
@@ -245,7 +275,7 @@ func TestMaxExecutionReportSize(t *testing.T) {
 	require.NoError(t, err)
 	outerProof := outerTree.Prove([]int{0})
 	// Ensure execution report size is valid
-	executorReport, err := ccip.EncodeGEExecutionReport(
+	executorReport, err := ccip.EncodeExecutionReport(
 		mb.seqNums,
 		map[common.Address]*big.Int{},
 		mb.allMsgBytes,
@@ -261,7 +291,7 @@ func TestMaxExecutionReportSize(t *testing.T) {
 
 	// Check can get into mempool i.e. tx size limit is respected.
 	a := c.offRamp.Address()
-	bi, _ := abi.JSON(strings.NewReader(any_2_evm_toll_offramp_helper.EVM2EVMTollOffRampHelperABI))
+	bi, _ := abi.JSON(strings.NewReader(evm_2_evm_offramp_helper.EVM2EVMOffRampHelperABI))
 	b, err := bi.Pack("report", []byte(executorReport))
 	require.NoError(t, err)
 	n, err := c.destChain.NonceAt(context.Background(), c.user.From, nil)
@@ -279,7 +309,7 @@ func TestMaxExecutionReportSize(t *testing.T) {
 	require.NoError(t, pool.AddLocal(signedTx))
 }
 
-func TestExecutionReportEncoding(t *testing.T) {
+func TestInternalExecutionReportEncoding(t *testing.T) {
 	// Note could consider some fancier testing here (fuzz/property)
 	// but I think that would essentially be testing geth's abi library
 	// as our encode/decode is a thin wrapper around that.
@@ -289,20 +319,20 @@ func TestExecutionReportEncoding(t *testing.T) {
 	outerTree, err := merklemulti.NewTree(ctx, [][32]byte{mb.root})
 	require.NoError(t, err)
 	outerProof := outerTree.Prove([]int{0})
-	report := evm_2_evm_ge_offramp.GEExecutionReport{
+	report := evm_2_evm_offramp.InternalExecutionReport{
 		SequenceNumbers:          mb.seqNums,
 		TokenPerFeeCoin:          []*big.Int{},
 		TokenPerFeeCoinAddresses: []common.Address{},
-		FeeUpdates:               []evm_2_evm_ge_offramp.GEFeeUpdate{},
+		FeeUpdates:               []evm_2_evm_offramp.InternalFeeUpdate{},
 		EncodedMessages:          mb.allMsgBytes,
 		InnerProofs:              mb.proof.Hashes,
 		InnerProofFlagBits:       ccip.ProofFlagsToBits(mb.proof.SourceFlags),
 		OuterProofs:              outerProof.Hashes,
 		OuterProofFlagBits:       ccip.ProofFlagsToBits(outerProof.SourceFlags),
 	}
-	encodeCommitReport, err := ccip.EncodeGEExecutionReport(report.SequenceNumbers, map[common.Address]*big.Int{}, report.EncodedMessages, report.InnerProofs, mb.proof.SourceFlags, report.OuterProofs, outerProof.SourceFlags, nil)
+	encodeCommitReport, err := ccip.EncodeExecutionReport(report.SequenceNumbers, map[common.Address]*big.Int{}, report.EncodedMessages, report.InnerProofs, mb.proof.SourceFlags, report.OuterProofs, outerProof.SourceFlags, nil)
 	require.NoError(t, err)
-	decodeCommitReport, err := ccip.DecodeGEExecutionReport(encodeCommitReport)
+	decodeCommitReport, err := ccip.DecodeExecutionReport(encodeCommitReport)
 	require.NoError(t, err)
 	require.Equal(t, &report, decodeCommitReport)
 }

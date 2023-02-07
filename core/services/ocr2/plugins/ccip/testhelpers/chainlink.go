@@ -150,21 +150,15 @@ func (node *Node) AddBootstrapJob(t *testing.T, spec *ctfClient.OCR2TaskJobSpec)
 func AddAllJobs(t *testing.T, jobParams CCIPJobSpecParams, ccipContracts CCIPContracts, nodes []Node) {
 	commitSpec, err := jobParams.CommitJobSpec()
 	require.NoError(t, err)
-	jobParams.OnRampForExecution = ccipContracts.Source.TollOnRamp.Address()
-	jobParams.OffRamp = ccipContracts.Dest.TollOffRamp.Address()
-	tollExecutionSpec, err := jobParams.ExecutionJobSpec()
-	require.NoError(t, err)
 
-	jobParams.OnRampForExecution = ccipContracts.Source.GEOnRamp.Address()
-	jobParams.OffRamp = ccipContracts.Dest.GEOffRamp.Address()
+	jobParams.OnRampForExecution = ccipContracts.Source.OnRamp.Address()
+	jobParams.OffRamp = ccipContracts.Dest.OffRamp.Address()
 	geExecutionSpec, err := jobParams.ExecutionJobSpec()
 	require.NoError(t, err)
 
 	for i, node := range nodes {
 		commitSpec.Name = fmt.Sprintf("ccip-commit-%d", i)
 		node.AddJobsWithSpec(t, commitSpec)
-		tollExecutionSpec.Name = fmt.Sprintf("ccip-exec-toll-%d", i)
-		node.AddJobsWithSpec(t, tollExecutionSpec)
 
 		geExecutionSpec.Name = fmt.Sprintf("ccip-exec-ge-%d", i)
 		node.AddJobsWithSpec(t, geExecutionSpec)
@@ -441,7 +435,7 @@ func EventuallyCommitReportAccepted(t *testing.T, ccipContracts CCIPContracts, c
 		}
 		return report.OnRamps
 	}, testutils.WaitTimeout(t), 1*time.Second).
-		Should(gomega.ContainElement(ccipContracts.Source.GEOnRamp.Address()), "report has not been committed")
+		Should(gomega.ContainElement(ccipContracts.Source.OnRamp.Address()), "report has not been committed")
 	return report
 }
 
@@ -463,10 +457,18 @@ func SetupAndStartNodes(ctx context.Context, t *testing.T, ccipContracts *CCIPCo
 	}
 	// Set up the minimum 4 oracles all funded with destination ETH
 	for i := int64(0); i < 4; i++ {
-		app, peerID, transmitter, kb := SetupNodeCCIP(t, ccipContracts.Dest.User, bootstrapNodePort+1+i,
-			fmt.Sprintf("oracle_ccip%d", i), ccipContracts.Source.Chain, ccipContracts.Dest.Chain,
-			big.NewInt(0).SetUint64(ccipContracts.Source.ChainID), big.NewInt(0).SetUint64(ccipContracts.Dest.ChainID),
-			bootstrapPeerID, bootstrapNodePort)
+		app, peerID, transmitter, kb := SetupNodeCCIP(
+			t,
+			ccipContracts.Dest.User,
+			bootstrapNodePort+1+i,
+			fmt.Sprintf("oracle_ccip%d", i),
+			ccipContracts.Source.Chain,
+			ccipContracts.Dest.Chain,
+			big.NewInt(0).SetUint64(ccipContracts.Source.ChainID),
+			big.NewInt(0).SetUint64(ccipContracts.Dest.ChainID),
+			bootstrapPeerID,
+			bootstrapNodePort,
+		)
 		nodes = append(nodes, Node{app, transmitter, kb})
 		offchainPublicKey, _ := hex.DecodeString(strings.TrimPrefix(kb.OnChainPublicKey(), "0x"))
 		oracles = append(oracles, confighelper.OracleIdentityExtra{

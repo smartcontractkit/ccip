@@ -2,26 +2,26 @@
 pragma solidity 0.8.15;
 
 import {CCIPConsumer} from "../../../applications/CCIPConsumer.sol";
-import {EVM2EVMGEOffRamp} from "../../../offRamp/ge/EVM2EVMGEOffRamp.sol";
+import {EVM2EVMOffRamp} from "../../../offRamp/EVM2EVMOffRamp.sol";
 import {Common} from "../../../models/Common.sol";
-import {GE} from "../../../models/GE.sol";
+import {Internal} from "../../../models/Internal.sol";
 
 contract ReentrancyAbuser is CCIPConsumer {
   event ReentrancySucceeded();
 
   bool s_ReentrancyDone = false;
-  GE.ExecutionReport s_payload;
-  EVM2EVMGEOffRamp s_offRamp;
+  Internal.ExecutionReport s_payload;
+  EVM2EVMOffRamp s_offRamp;
 
   constructor(
     address router,
     address feeToken,
-    EVM2EVMGEOffRamp offRamp
+    EVM2EVMOffRamp offRamp
   ) CCIPConsumer(router) {
     s_offRamp = offRamp;
   }
 
-  function setPayload(GE.ExecutionReport calldata payload) public {
+  function setPayload(Internal.ExecutionReport calldata payload) public {
     s_payload = payload;
   }
 

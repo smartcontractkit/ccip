@@ -9,11 +9,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_offramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ge_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/shared"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
 )
@@ -36,7 +36,7 @@ func setFeeManagerPrices(t *testing.T, client *EvmDeploymentConfig, destChainId 
 	shared.RequireNoError(t, err)
 
 	for _, feeToken := range client.ChainConfig.FeeTokens {
-		tx, err := feeManager.UpdateFees(client.Owner, []fee_manager.GEFeeUpdate{
+		tx, err := feeManager.UpdateFees(client.Owner, []fee_manager.InternalFeeUpdate{
 			{
 				SourceFeeToken:              client.ChainConfig.SupportedTokens[feeToken].Token,
 				DestChainId:                 destChainId,
@@ -50,7 +50,7 @@ func setFeeManagerPrices(t *testing.T, client *EvmDeploymentConfig, destChainId 
 
 func setOnRampOnRouter(t *testing.T, sourceClient *EvmDeploymentConfig, destChainId uint64) {
 	sourceClient.Logger.Infof("Setting the onRamp on the Router")
-	router, err := ge_router.NewGERouter(sourceClient.ChainConfig.Router, sourceClient.Client)
+	router, err := router.NewRouter(sourceClient.ChainConfig.Router, sourceClient.Client)
 	shared.RequireNoError(t, err)
 	sourceClient.Logger.Infof("Registering new onRamp")
 	tx, err := router.SetOnRamp(sourceClient.Owner, destChainId, sourceClient.LaneConfig.OnRamp)
@@ -88,7 +88,7 @@ func setOnRampOnCommitStore(t *testing.T, sourceClient *EvmDeploymentConfig, des
 }
 
 func setRouterOnOffRamp(t *testing.T, destClient *EvmDeploymentConfig) {
-	offRamp, err := evm_2_evm_ge_offramp.NewEVM2EVMGEOffRamp(destClient.LaneConfig.OffRamp, destClient.Client)
+	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(destClient.LaneConfig.OffRamp, destClient.Client)
 	shared.RequireNoError(t, err)
 	tx, err := offRamp.SetRouter(destClient.Owner, destClient.ChainConfig.Router)
 	shared.RequireNoError(t, err)
@@ -98,7 +98,7 @@ func setRouterOnOffRamp(t *testing.T, destClient *EvmDeploymentConfig) {
 
 func setOffRampOnRouter(t *testing.T, client *EvmDeploymentConfig) {
 	client.Logger.Infof("Setting the offRamp on the Router")
-	router, err := ge_router.NewGERouter(client.ChainConfig.Router, client.Client)
+	router, err := router.NewRouter(client.ChainConfig.Router, client.Client)
 	shared.RequireNoError(t, err)
 
 	isOffRamp, err := router.IsOffRamp(&bind.CallOpts{}, client.LaneConfig.OffRamp)

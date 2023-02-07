@@ -2,10 +2,10 @@
 pragma solidity 0.8.15;
 
 import "../../applications/GovernanceDapp.sol";
-import "../onRamp/ge/EVM2EVMGEOnRampSetup.t.sol";
+import "../onRamp/EVM2EVMOnRampSetup.t.sol";
 
 // setup
-contract GovernanceDappSetup is EVM2EVMGEOnRampSetup {
+contract GovernanceDappSetup is EVM2EVMOnRampSetup {
   GovernanceDapp s_governanceDapp;
   IERC20 s_feeToken;
 
@@ -13,7 +13,7 @@ contract GovernanceDappSetup is EVM2EVMGEOnRampSetup {
   GovernanceDapp.CrossChainClone s_crossChainClone;
 
   function setUp() public virtual override {
-    EVM2EVMGEOnRampSetup.setUp();
+    EVM2EVMOnRampSetup.setUp();
 
     s_crossChainClone = GovernanceDapp.CrossChainClone({chainId: DEST_CHAIN_ID, contractAddress: address(1)});
 
@@ -46,7 +46,7 @@ contract GovernanceDapp_voteForNewFeeConfig is GovernanceDappSetup {
   function testSuccess() public {
     GovernanceDapp.FeeConfig memory feeConfig = GovernanceDapp.FeeConfig({feeAmount: 10000, changedAtBlock: 100});
     bytes memory data = abi.encode(feeConfig);
-    GE.EVM2EVMGEMessage memory message = GE.EVM2EVMGEMessage({
+    Internal.EVM2EVMMessage memory message = Internal.EVM2EVMMessage({
       sequenceNumber: 1,
       sourceChainId: SOURCE_CHAIN_ID,
       sender: address(s_governanceDapp),
@@ -60,7 +60,7 @@ contract GovernanceDapp_voteForNewFeeConfig is GovernanceDappSetup {
       feeTokenAmount: 32400109, // todo
       messageId: ""
     });
-    message.messageId = GE._hash(message, s_metadataHash);
+    message.messageId = Internal._hash(message, s_metadataHash);
 
     vm.expectEmit(false, false, false, true);
     emit CCIPSendRequested(message);

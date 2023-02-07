@@ -11,15 +11,14 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"golang.org/x/exp/slices"
 
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_offramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_onramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ge_router"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
-
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/afn_contract"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ping_pong_demo"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/dione"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
@@ -45,9 +44,9 @@ func PrintCCIPState(source *rhea.EvmDeploymentConfig, destination *rhea.EvmDeplo
 }
 
 type CCIPTXStatus struct {
-	message      *evm_2_evm_ge_onramp.EVM2EVMGEOnRampCCIPSendRequested
+	message      *evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested
 	commitReport *commit_store.CommitStoreReportAccepted
-	execStatus   *evm_2_evm_ge_offramp.EVM2EVMGEOffRampExecutionStateChanged
+	execStatus   *evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged
 }
 
 type ExecutionStatus uint8
@@ -89,7 +88,7 @@ func printBoolNeutral(b bool) string {
 }
 
 func PrintTxStatuses(source *rhea.EvmDeploymentConfig, destination *rhea.EvmDeploymentConfig) {
-	onRamp, err := evm_2_evm_ge_onramp.NewEVM2EVMGEOnRamp(source.LaneConfig.OnRamp, source.Client)
+	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(source.LaneConfig.OnRamp, source.Client)
 	helpers.PanicErr(err)
 
 	block, err := source.Client.BlockNumber(context.Background())
@@ -142,7 +141,7 @@ func PrintTxStatuses(source *rhea.EvmDeploymentConfig, destination *rhea.EvmDepl
 		}
 	}
 
-	offRamp, err := evm_2_evm_ge_offramp.NewEVM2EVMGEOffRamp(destination.LaneConfig.OffRamp, destination.Client)
+	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(destination.LaneConfig.OffRamp, destination.Client)
 	helpers.PanicErr(err)
 
 	stateChanges, err := offRamp.FilterExecutionStateChanged(
@@ -256,13 +255,13 @@ func printRampSanityCheck(chain *rhea.EvmDeploymentConfig, sourceOnRamp common.A
 
 	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "AFN healthy", printBool(!badSignal)))
 
-	onRamp, err := evm_2_evm_ge_onramp.NewEVM2EVMGEOnRamp(chain.LaneConfig.OnRamp, chain.Client)
+	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(chain.LaneConfig.OnRamp, chain.Client)
 	helpers.PanicErr(err)
 	routerAddress, err := onRamp.GetRouter(&bind.CallOpts{})
 	helpers.PanicErr(err)
 	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "OnRamp Router set", printBool(routerAddress == chain.ChainConfig.Router)))
 
-	offRamp, err := evm_2_evm_ge_offramp.NewEVM2EVMGEOffRamp(chain.LaneConfig.OffRamp, chain.Client)
+	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(chain.LaneConfig.OffRamp, chain.Client)
 	helpers.PanicErr(err)
 	routerAddress, err = offRamp.GetRouter(&bind.CallOpts{})
 	helpers.PanicErr(err)
@@ -292,7 +291,7 @@ func printRampSanityCheck(chain *rhea.EvmDeploymentConfig, sourceOnRamp common.A
 	helpers.PanicErr(err)
 	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "CommitStore OCR2 configured", printBool(blobConfigDetails.ConfigCount != 0)))
 
-	router, err := ge_router.NewGERouter(chain.ChainConfig.Router, chain.Client)
+	router, err := router.NewRouter(chain.ChainConfig.Router, chain.Client)
 	helpers.PanicErr(err)
 
 	isRamp, err := router.IsOffRamp(&bind.CallOpts{}, chain.LaneConfig.OffRamp)
@@ -315,14 +314,14 @@ func printRateLimitingStatus(chain *rhea.EvmDeploymentConfig) {
 
 	sb.WriteString(generateHeader(tableHeaders, headerLengths))
 
-	onRamp, err := evm_2_evm_ge_onramp.NewEVM2EVMGEOnRamp(chain.LaneConfig.OnRamp, chain.Client)
+	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(chain.LaneConfig.OnRamp, chain.Client)
 	helpers.PanicErr(err)
 	bucketState, err := onRamp.CalculateCurrentTokenBucketState(&bind.CallOpts{})
 	helpers.PanicErr(err)
 
 	sb.WriteString(fmt.Sprintf("| %-25s | %42d |\n", "onramp", bucketState.Tokens))
 
-	offRamp, err := evm_2_evm_ge_offramp.NewEVM2EVMGEOffRamp(chain.LaneConfig.OffRamp, chain.Client)
+	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(chain.LaneConfig.OffRamp, chain.Client)
 	helpers.PanicErr(err)
 	offRampBucketState, err := offRamp.CalculateCurrentTokenBucketState(&bind.CallOpts{})
 	helpers.PanicErr(err)
@@ -352,14 +351,14 @@ func printPaused(chain *rhea.EvmDeploymentConfig) {
 		sb.WriteString(fmt.Sprintf("| %-25s | %42s | %14s |\n", "token pool", tokenConfig.Pool.Hex(), printBool(!paused)))
 	}
 
-	onRamp, err := evm_2_evm_ge_onramp.NewEVM2EVMGEOnRamp(chain.LaneConfig.OnRamp, chain.Client)
+	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(chain.LaneConfig.OnRamp, chain.Client)
 	helpers.PanicErr(err)
 	paused, err := onRamp.Paused(&bind.CallOpts{})
 	helpers.PanicErr(err)
 
 	sb.WriteString(fmt.Sprintf("| %-25s | %42s | %14s |\n", "onramp", onRamp.Address(), printBool(!paused)))
 
-	offRamp, err := evm_2_evm_ge_offramp.NewEVM2EVMGEOffRamp(chain.LaneConfig.OffRamp, chain.Client)
+	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(chain.LaneConfig.OffRamp, chain.Client)
 	helpers.PanicErr(err)
 	paused, err = offRamp.Paused(&bind.CallOpts{})
 	helpers.PanicErr(err)
@@ -408,7 +407,7 @@ func printPoolBalances(chain *rhea.EvmDeploymentConfig) {
 
 	sb.WriteString(generateHeader(tableHeaders, headerLengths))
 
-	onRamp, err := evm_2_evm_ge_onramp.NewEVM2EVMGEOnRamp(chain.LaneConfig.OnRamp, chain.Client)
+	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(chain.LaneConfig.OnRamp, chain.Client)
 	helpers.PanicErr(err)
 
 	for tokenName, tokenConfig := range chain.ChainConfig.SupportedTokens {
@@ -446,13 +445,13 @@ func printPoolBalances(chain *rhea.EvmDeploymentConfig) {
 }
 
 func printSupportedTokensCheck(source *rhea.EvmDeploymentConfig, destination *rhea.EvmDeploymentConfig) {
-	sourceRouter, err := ge_router.NewGERouter(source.ChainConfig.Router, source.Client)
+	sourceRouter, err := router.NewRouter(source.ChainConfig.Router, source.Client)
 	helpers.PanicErr(err)
 
 	sourceTokens, err := sourceRouter.GetSupportedTokens(&bind.CallOpts{}, destination.ChainConfig.ChainId)
 	helpers.PanicErr(err)
 
-	destRouter, err := ge_router.NewGERouter(destination.ChainConfig.Router, destination.Client)
+	destRouter, err := router.NewRouter(destination.ChainConfig.Router, destination.Client)
 	helpers.PanicErr(err)
 
 	destTokens, err := destRouter.GetSupportedTokens(&bind.CallOpts{}, source.ChainConfig.ChainId)

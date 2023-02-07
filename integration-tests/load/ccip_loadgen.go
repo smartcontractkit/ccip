@@ -19,13 +19,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_onramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ge_router"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/testhelpers"
 	"github.com/smartcontractkit/chainlink/core/utils"
 	bigmath "github.com/smartcontractkit/chainlink/core/utils/big_math"
-
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 )
 
@@ -48,7 +47,6 @@ type CCIPE2ELoad struct {
 	t                     *testing.T
 	Source                *actions.SourceCCIPModule // all source contracts
 	Destination           *actions.DestCCIPModule   // all destination contracts
-	Model                 actions.BillingModel      // toll Or sub
 	NoOfReq               int64                     // no of Request fired - required for balance assertion at the end
 	totalGEFee            *big.Int
 	BalanceStats          BalanceStats  // balance assertion details
@@ -56,14 +54,14 @@ type CCIPE2ELoad struct {
 	InitialSourceBlockNum uint64
 	InitialDestBlockNum   uint64 // blocknumber before the first message is fired in the load sequence
 	sentMsgMu             *sync.Mutex
-	SentMsg               map[uint64]evm_2_evm_ge_onramp.GEEVM2EVMGEMessage // track the messages by seq num for debugging purpose
-	CallTimeOut           time.Duration                                     // max time to wait for various on-chain events
-	TickerDuration        time.Duration                                     // poll frequency while waiting for on-chain events
+	SentMsg               map[uint64]evm_2_evm_onramp.InternalEVM2EVMMessage // track the messages by seq num for debugging purpose
+	CallTimeOut           time.Duration                                      // max time to wait for various on-chain events
+	TickerDuration        time.Duration                                      // poll frequency while waiting for on-chain events
 	callStatsMu           *sync.Mutex
 	callStats             map[int64]map[phase]StatParams // keeps track of various phase related metrics
 	seqNumCommittedMu     *sync.Mutex
 	seqNumCommitted       map[uint64]uint64 // key : seqNumber in the ReportAccepted event, value : blocknumber for corresponding event
-	msg                   ge_router.GEConsumerEVM2AnyGEMessage
+	msg                   router.ConsumerEVM2AnyMessage
 }
 
 type StatParams struct {
@@ -108,15 +106,14 @@ type SlackStats struct {
 	FailedCCIPSendRequested         int     `json:"noOfFailedCCIPSendRequested,omitempty"`
 }
 
-func NewCCIPLoad(t *testing.T, source *actions.SourceCCIPModule, dest *actions.DestCCIPModule, model actions.BillingModel, timeout time.Duration, noOfReq int64) *CCIPE2ELoad {
+func NewCCIPLoad(t *testing.T, source *actions.SourceCCIPModule, dest *actions.DestCCIPModule, timeout time.Duration, noOfReq int64) *CCIPE2ELoad {
 	return &CCIPE2ELoad{
 		t:                  t,
 		Source:             source,
 		Destination:        dest,
-		Model:              model,
 		CurrentMsgSerialNo: atomic.NewInt64(1),
 		sentMsgMu:          &sync.Mutex{},
-		SentMsg:            make(map[uint64]evm_2_evm_ge_onramp.GEEVM2EVMGEMessage),
+		SentMsg:            make(map[uint64]evm_2_evm_onramp.InternalEVM2EVMMessage),
 		TickerDuration:     time.Second,
 		CallTimeOut:        timeout,
 		NoOfReq:            noOfReq,
@@ -133,14 +130,14 @@ func NewCCIPLoad(t *testing.T, source *actions.SourceCCIPModule, dest *actions.D
 func (c *CCIPE2ELoad) BeforeAllCall() {
 	sourceCCIP := c.Source
 	destCCIP := c.Destination
-	var tokenAndAmounts []ge_router.CommonEVMTokenAndAmount
+	var tokenAndAmounts []router.CommonEVMTokenAndAmount
 	for i, token := range sourceCCIP.Common.BridgeTokens {
-		tokenAndAmounts = append(tokenAndAmounts, ge_router.CommonEVMTokenAndAmount{
+		tokenAndAmounts = append(tokenAndAmounts, router.CommonEVMTokenAndAmount{
 			Token: common.HexToAddress(token.Address()), Amount: c.Source.TransferAmount[i],
 		})
 		// approve the onramp router so that it caninitiate transferring the token
 
-		err := token.Approve(c.Source.Common.GERouter.Address(), bigmath.Mul(c.Source.TransferAmount[i], big.NewInt(c.NoOfReq)))
+		err := token.Approve(c.Source.Common.Router.Address(), bigmath.Mul(c.Source.TransferAmount[i], big.NewInt(c.NoOfReq)))
 		require.NoError(c.t, err, "Could not approve permissions for the onRamp router "+
 			"on the source link token contract")
 	}
@@ -156,9 +153,9 @@ func (c *CCIPE2ELoad) BeforeAllCall() {
 	c.InitialDestBlockNum = currentBlockOnDest
 	c.InitialSourceBlockNum = currentBlockOnSource
 	// collect the balance requirement to verify balances after transfer
-	sourceBalances, err := testhelpers.GetBalances(sourceCCIP.CollectBalanceRequirements(c.t, c.Model))
+	sourceBalances, err := testhelpers.GetBalances(sourceCCIP.CollectBalanceRequirements(c.t))
 	require.NoError(c.t, err, "fetching source balance")
-	destBalances, err := testhelpers.GetBalances(destCCIP.CollectBalanceRequirements(c.t, c.Model))
+	destBalances, err := testhelpers.GetBalances(destCCIP.CollectBalanceRequirements(c.t))
 	require.NoError(c.t, err, "fetching dest balance")
 	c.BalanceStats = BalanceStats{
 		SourceBalanceReq: sourceBalances,
@@ -169,16 +166,16 @@ func (c *CCIPE2ELoad) BeforeAllCall() {
 
 	receiver, err := utils.ABIEncode(`[{"type":"address"}]`, destCCIP.ReceiverDapp.EthAddress)
 	require.NoError(c.t, err, "Failed encoding the receiver address")
-	c.msg = ge_router.GEConsumerEVM2AnyGEMessage{
+	c.msg = router.ConsumerEVM2AnyMessage{
 		Receiver:  receiver,
 		ExtraArgs: extraArgsV1,
 		FeeToken:  common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
 	}
 	// calculate approx fee
-	fee, err := sourceCCIP.Common.GERouter.GetFee(sourceCCIP.DestinationChainId, c.msg)
+	fee, err := sourceCCIP.Common.Router.GetFee(sourceCCIP.DestinationChainId, c.msg)
 	require.NoError(c.t, err)
 	// Approve sufficient fee amount
-	err = sourceCCIP.Common.FeeToken.Approve(sourceCCIP.Common.GERouter.Address(), bigmath.Mul(fee, big.NewInt(c.NoOfReq)))
+	err = sourceCCIP.Common.FeeToken.Approve(sourceCCIP.Common.Router.Address(), bigmath.Mul(fee, big.NewInt(c.NoOfReq)))
 	require.NoError(c.t, err)
 	err = sourceCCIP.Common.ChainClient.WaitForEvents()
 	require.NoError(c.t, err, "Failed to wait for events")
@@ -189,9 +186,14 @@ func (c *CCIPE2ELoad) BeforeAllCall() {
 
 func (c *CCIPE2ELoad) AfterAllCall() {
 	c.BalanceStats.DestBalanceAssertions = c.Destination.BalanceAssertions(
-		c.t, c.Model, c.BalanceStats.DestBalanceReq, c.Source.TransferAmount, big.NewInt(0),
-		c.NoOfReq, bigmath.Mul(big.NewInt(c.NoOfReq), big.NewInt(0.79e18)))
-	c.BalanceStats.SourceBalanceAssertions = c.Source.BalanceAssertions(c.t, c.Model, c.BalanceStats.SourceBalanceReq, c.NoOfReq, c.totalGEFee)
+		c.t,
+		c.BalanceStats.DestBalanceReq,
+		c.Source.TransferAmount,
+		big.NewInt(0),
+		c.NoOfReq,
+		bigmath.Mul(big.NewInt(c.NoOfReq), big.NewInt(0.79e18)),
+	)
+	c.BalanceStats.SourceBalanceAssertions = c.Source.BalanceAssertions(c.t, c.BalanceStats.SourceBalanceReq, c.NoOfReq, c.totalGEFee)
 	actions.AssertBalances(c.t, c.BalanceStats.DestBalanceAssertions)
 	actions.AssertBalances(c.t, c.BalanceStats.SourceBalanceAssertions)
 }
@@ -202,9 +204,9 @@ func (c *CCIPE2ELoad) Call(msgType interface{}) client.CallResult {
 	destCCIP := c.Destination
 	msgSerialNo := c.CurrentMsgSerialNo.Load()
 	c.CurrentMsgSerialNo.Inc()
-	var tokenAndAmounts []ge_router.CommonEVMTokenAndAmount
+	var tokenAndAmounts []router.CommonEVMTokenAndAmount
 	for i, token := range sourceCCIP.Common.BridgeTokens {
-		tokenAndAmounts = append(tokenAndAmounts, ge_router.CommonEVMTokenAndAmount{
+		tokenAndAmounts = append(tokenAndAmounts, router.CommonEVMTokenAndAmount{
 			Token: common.HexToAddress(token.Address()), Amount: c.Source.TransferAmount[i],
 		})
 	}
@@ -220,7 +222,7 @@ func (c *CCIPE2ELoad) Call(msgType interface{}) client.CallResult {
 	startTime := time.Now()
 	// initiate the transfer
 	log.Debug().Int("msg Number", int(msgSerialNo)).Str("triggeredAt", time.Now().GoString()).Msg("triggering transfer")
-	sendTx, err := sourceCCIP.Common.GERouter.CCIPSend(destCCIP.Common.ChainClient.GetChainID().Uint64(), c.msg)
+	sendTx, err := sourceCCIP.Common.Router.CCIPSend(destCCIP.Common.ChainClient.GetChainID().Uint64(), c.msg)
 
 	if err != nil {
 		c.updatestats(msgSerialNo, "", TX, time.Since(startTime), fail)
@@ -274,7 +276,7 @@ func (c *CCIPE2ELoad) Call(msgType interface{}) client.CallResult {
 	return res
 }
 
-func (c *CCIPE2ELoad) updateSentMsgQueue(seqNum uint64, sentMsg evm_2_evm_ge_onramp.GEEVM2EVMGEMessage) {
+func (c *CCIPE2ELoad) updateSentMsgQueue(seqNum uint64, sentMsg evm_2_evm_onramp.InternalEVM2EVMMessage) {
 	c.sentMsgMu.Lock()
 	defer c.sentMsgMu.Unlock()
 	c.SentMsg[seqNum] = sentMsg
@@ -463,7 +465,7 @@ func (c *CCIPE2ELoad) waitForExecStateChange(ticker *time.Ticker, seqNums []uint
 	for {
 		select {
 		case <-ticker.C:
-			iterator, err := c.Destination.GEOffRamp.FilterExecutionStateChanged(seqNums, messageID, currentBlockOnDest)
+			iterator, err := c.Destination.OffRamp.FilterExecutionStateChanged(seqNums, messageID, currentBlockOnDest)
 			if err != nil {
 				for _, seqNum := range seqNums {
 					c.updatestats(msgSerialNo, fmt.Sprint(seqNum), ExecStateChanged, time.Since(timeNow), fail)
@@ -500,7 +502,7 @@ func (c *CCIPE2ELoad) waitForSeqNumberIncrease(ticker *time.Ticker, seqNum uint6
 	for {
 		select {
 		case <-ticker.C:
-			seqNumberAfter, err := c.Destination.CommitStore.GetNextSeqNumber(c.Source.GEOnRamp.EthAddress)
+			seqNumberAfter, err := c.Destination.CommitStore.GetNextSeqNumber(c.Source.OnRamp.EthAddress)
 			if err != nil {
 				c.updatestats(msgSerialNo, fmt.Sprint(seqNum), SeqNumAndRepAccIncrease, time.Since(timeNow), fail)
 				return fmt.Errorf("error %v in GetNextExpectedSeqNumber by commitStore for msg ID %d", err, msgSerialNo)
@@ -561,15 +563,15 @@ func (c *CCIPE2ELoad) waitForCCIPSendRequested(
 	msgSerialNo int64,
 	txHash string,
 	timeNow time.Time,
-) (evm_2_evm_ge_onramp.GEEVM2EVMGEMessage, error) {
-	var sentmsg evm_2_evm_ge_onramp.GEEVM2EVMGEMessage
+) (evm_2_evm_onramp.InternalEVM2EVMMessage, error) {
+	var sentmsg evm_2_evm_onramp.InternalEVM2EVMMessage
 	log.Info().Int("msg Number", int(msgSerialNo)).Msg("waiting for CCIPSendRequested")
 	ctx, cancel := context.WithTimeout(context.Background(), c.CallTimeOut)
 	defer cancel()
 	for {
 		select {
 		case <-ticker.C:
-			iterator, err := c.Source.GEOnRamp.FilterCCIPSendRequested(currentBlockOnSource)
+			iterator, err := c.Source.OnRamp.FilterCCIPSendRequested(currentBlockOnSource)
 			if err != nil {
 				c.updatestats(msgSerialNo, "", CCIPSendRe, time.Since(timeNow), fail)
 				return sentmsg, fmt.Errorf("error %v in filtering CCIPSendRequested event for msg ID %d tx %s", err, msgSerialNo, txHash)

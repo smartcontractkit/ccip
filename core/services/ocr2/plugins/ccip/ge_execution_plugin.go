@@ -21,20 +21,20 @@ import (
 	"github.com/smartcontractkit/chainlink/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_offramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_onramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/core/logger"
 )
 
-func MessagesFromGEExecutionReport(report types.Report) ([]uint64, [][]byte, error) {
-	geReport, err := DecodeGEExecutionReport(report)
+func MessagesFromExecutionReport(report types.Report) ([]uint64, [][]byte, error) {
+	decodeExecutionReport, err := DecodeExecutionReport(report)
 	if err != nil {
 		return nil, nil, err
 	}
-	return geReport.SequenceNumbers, geReport.EncodedMessages, nil
+	return decodeExecutionReport.SequenceNumbers, decodeExecutionReport.EncodedMessages, nil
 }
 
-func DecodeGEExecutionReport(report types.Report) (*evm_2_evm_ge_offramp.GEExecutionReport, error) {
+func DecodeExecutionReport(report types.Report) (*evm_2_evm_offramp.InternalExecutionReport, error) {
 	unpacked, err := makeExecutionReportArgs().Unpack(report)
 	if err != nil {
 		return nil, err
@@ -62,15 +62,15 @@ func DecodeGEExecutionReport(report types.Report) (*evm_2_evm_ge_offramp.GEExecu
 	if !ok {
 		return nil, fmt.Errorf("got %T", unpacked[0])
 	}
-	var er evm_2_evm_ge_offramp.GEExecutionReport
+	var er evm_2_evm_offramp.InternalExecutionReport
 	er.EncodedMessages = append(er.EncodedMessages, erStruct.EncodedMessages...)
 	er.InnerProofs = append(er.InnerProofs, erStruct.InnerProofs...)
 	er.OuterProofs = append(er.OuterProofs, erStruct.OuterProofs...)
 
-	er.FeeUpdates = []evm_2_evm_ge_offramp.GEFeeUpdate{}
+	er.FeeUpdates = []evm_2_evm_offramp.InternalFeeUpdate{}
 
 	for _, feeUpdate := range erStruct.FeeUpdates {
-		er.FeeUpdates = append(er.FeeUpdates, evm_2_evm_ge_offramp.GEFeeUpdate{
+		er.FeeUpdates = append(er.FeeUpdates, evm_2_evm_offramp.InternalFeeUpdate{
 			SourceFeeToken:              feeUpdate.SourceFeeToken,
 			DestChainId:                 feeUpdate.DestChainId,
 			FeeTokenBaseUnitsPerUnitGas: feeUpdate.FeeTokenBaseUnitsPerUnitGas,
@@ -87,14 +87,14 @@ func DecodeGEExecutionReport(report types.Report) (*evm_2_evm_ge_offramp.GEExecu
 	return &er, nil
 }
 
-func EncodeGEExecutionReport(seqNums []uint64,
+func EncodeExecutionReport(seqNums []uint64,
 	tokensPerFeeCoin map[common.Address]*big.Int,
 	msgs [][]byte,
 	innerProofs [][32]byte,
 	innerProofSourceFlags []bool,
 	outerProofs [][32]byte,
 	outerProofSourceFlags []bool,
-	feeUpdates []evm_2_evm_ge_offramp.GEFeeUpdate,
+	feeUpdates []evm_2_evm_offramp.InternalFeeUpdate,
 ) (types.Report, error) {
 	var tokensPerFeeCoinAddresses []common.Address
 	var tokensPerFeeCoinValues []*big.Int
@@ -108,7 +108,7 @@ func EncodeGEExecutionReport(seqNums []uint64,
 	for _, addr := range tokensPerFeeCoinAddresses {
 		tokensPerFeeCoinValues = append(tokensPerFeeCoinValues, tokensPerFeeCoin[addr])
 	}
-	report, err := makeExecutionReportArgs().PackValues([]interface{}{&evm_2_evm_ge_offramp.GEExecutionReport{
+	report, err := makeExecutionReportArgs().PackValues([]interface{}{&evm_2_evm_offramp.InternalExecutionReport{
 		SequenceNumbers:          seqNums,
 		FeeUpdates:               feeUpdates,
 		EncodedMessages:          msgs,
@@ -126,13 +126,13 @@ func EncodeGEExecutionReport(seqNums []uint64,
 }
 
 var (
-	_ types.ReportingPluginFactory = &GEExecutionReportingPluginFactory{}
-	_ types.ReportingPlugin        = &GEExecutionReportingPlugin{}
+	_ types.ReportingPluginFactory = &ExecutionReportingPluginFactory{}
+	_ types.ReportingPlugin        = &ExecutionReportingPlugin{}
 )
 
-type GEExecutionPluginConfig struct {
-	onRamp                               *evm_2_evm_ge_onramp.EVM2EVMGEOnRamp
-	offRamp                              *evm_2_evm_ge_offramp.EVM2EVMGEOffRamp
+type ExecutionPluginConfig struct {
+	onRamp                               *evm_2_evm_onramp.EVM2EVMOnRamp
+	offRamp                              *evm_2_evm_offramp.EVM2EVMOffRamp
 	commitStore                          *commit_store.CommitStore
 	source, dest                         logpoller.LogPoller
 	eventSignatures                      EventSignatures
@@ -141,29 +141,29 @@ type GEExecutionPluginConfig struct {
 	inflightCacheExpiry                  time.Duration
 	sourceGasEstimator, destGasEstimator gas.Estimator
 	sourceChainID                        uint64
-	builder                              BatchBuilder
-	leafHasher                           LeafHasher[[32]byte]
+	builder                              BatchBuilderInterface
+	leafHasher                           LeafHasherInterface[[32]byte]
 	lggr                                 logger.Logger
 	gasLimit                             uint64
 }
 
-type GEExecutionReportingPluginFactory struct {
-	config GEExecutionPluginConfig
+type ExecutionReportingPluginFactory struct {
+	config ExecutionPluginConfig
 }
 
-func NewGEExecutionReportingPluginFactory(
-	config GEExecutionPluginConfig,
+func NewExecutionReportingPluginFactory(
+	config ExecutionPluginConfig,
 ) types.ReportingPluginFactory {
-	return &GEExecutionReportingPluginFactory{config: config}
+	return &ExecutionReportingPluginFactory{config: config}
 }
 
-func (rf *GEExecutionReportingPluginFactory) NewReportingPlugin(config types.ReportingPluginConfig) (types.ReportingPlugin, types.ReportingPluginInfo, error) {
+func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.ReportingPluginConfig) (types.ReportingPlugin, types.ReportingPluginInfo, error) {
 	offchainConfig, err := Decode(config.OffchainConfig)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
-	return &GEExecutionReportingPlugin{
-			lggr:           rf.config.lggr.Named("GEExecutionReportingPlugin"),
+	return &ExecutionReportingPlugin{
+			lggr:           rf.config.lggr.Named("ExecutionReportingPlugin"),
 			F:              config.F,
 			offchainConfig: offchainConfig,
 			config:         rf.config,
@@ -179,27 +179,27 @@ func (rf *GEExecutionReportingPluginFactory) NewReportingPlugin(config types.Rep
 		}, nil
 }
 
-type GEExecutionReportingPlugin struct {
+type ExecutionReportingPlugin struct {
 	lggr   logger.Logger
 	F      int
-	config GEExecutionPluginConfig
+	config ExecutionPluginConfig
 	// We need to synchronize access to the inflight structure
 	// as reporting plugin methods may be called from separate goroutines,
 	// e.g. reporting vs transmission protocol.
 	inFlightMu          sync.RWMutex
-	inFlight            []InflightExecutionReport
+	inFlight            []InflightInternalExecutionReport
 	inflightCacheExpiry time.Duration
 	offchainConfig      OffchainConfig
 	snoozedRoots        map[[32]byte]time.Time
 }
 
-type GEQuery struct {
+type Query struct {
 	TokenPrices  map[common.Address]*big.Int `json:"tokenPrices"` // TODO: We should simplify this to just link for toll as well.
 	DestGasPrice *big.Int                    `json:"destGasPrice"`
 }
 
 // expect percentMultiplier to be [0, 100]
-func (r *GEExecutionReportingPlugin) tokenPrices(percentMultiplier *big.Int) (map[common.Address]*big.Int, error) {
+func (r *ExecutionReportingPlugin) tokenPrices(percentMultiplier *big.Int) (map[common.Address]*big.Int, error) {
 	tokensPerFeeCoin := make(map[common.Address]*big.Int)
 	executionFeeTokens, err := r.config.offRamp.GetDestinationTokens(nil)
 	if err != nil {
@@ -216,14 +216,14 @@ func (r *GEExecutionReportingPlugin) tokenPrices(percentMultiplier *big.Int) (ma
 	return tokensPerFeeCoin, nil
 }
 
-func (r *GEExecutionReportingPlugin) Query(ctx context.Context, timestamp types.ReportTimestamp) (types.Query, error) {
+func (r *ExecutionReportingPlugin) Query(ctx context.Context, timestamp types.ReportTimestamp) (types.Query, error) {
 	// The leader queries an overestimated set of token prices, which are used by all the followers
 	// to compute message executability, ensuring that the set of executable messages is deterministic.
 	tokensPerFeeCoin, err := r.tokenPrices(big.NewInt(TokenPriceBufferPercent))
 	if err != nil {
 		return nil, err
 	}
-	// In the context of GE CCIP, latency is much less important than cost, so generally we'd prefer to wait vs bump at all.
+	// In the context of CCIP, latency is much less important than cost, so generally we'd prefer to wait vs bump at all.
 	// Options:
 	// - Disable bumping entirely. Execute messages up to max loss given current price and simply wait until it is included. Means that we can potentially
 	// block execution for all jobs until that tx goes though.
@@ -235,25 +235,25 @@ func (r *GEExecutionReportingPlugin) Query(ctx context.Context, timestamp types.
 	if err != nil {
 		return nil, err
 	}
-	return json.Marshal(GEQuery{TokenPrices: tokensPerFeeCoin, DestGasPrice: destGasPrice.ToInt()})
+	return json.Marshal(Query{TokenPrices: tokensPerFeeCoin, DestGasPrice: destGasPrice.ToInt()})
 }
 
-func (r *GEExecutionReportingPlugin) Observation(ctx context.Context, timestamp types.ReportTimestamp, query types.Query) (types.Observation, error) {
-	// GEQuery contains the tokenPricesPerFeeCoin
-	lggr := r.lggr.Named("GEExecutionObservation")
+func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp types.ReportTimestamp, query types.Query) (types.Observation, error) {
+	// Query contains the tokenPricesPerFeeCoin
+	lggr := r.lggr.Named("ExecutionObservation")
 	if isCommitStoreDownNow(lggr, r.config.commitStore) {
 		return nil, ErrCommitStoreIsDown
 	}
 	// Expire any inflight reports.
 	r.expireInflight(lggr)
 
-	var q GEQuery
+	var q Query
 	if err := json.Unmarshal(query, &q); err != nil {
 		return nil, err
 	}
 	// Read and make a copy for the builder.
 	r.inFlightMu.RLock()
-	inFlight := make([]InflightExecutionReport, len(r.inFlight))
+	inFlight := make([]InflightInternalExecutionReport, len(r.inFlight))
 	copy(inFlight[:], r.inFlight[:])
 	r.inFlightMu.RUnlock()
 
@@ -269,23 +269,23 @@ func (r *GEExecutionReportingPlugin) Observation(ctx context.Context, timestamp 
 	if err != nil {
 		return nil, err
 	}
-	// Observe a source chain price for GE pricing.
+	// Observe a source chain price for pricing.
 	// TODO: 1559 support
 	sourceGasPrice, _, err := r.config.sourceGasEstimator.GetLegacyGas(ctx, nil, BatchGasLimit, assets.NewWei(big.NewInt(int64(MaxGasPrice))))
 	if err != nil {
 		return nil, err
 	}
-	return GEExecutionObservation{
+	return ExecutionObservation{
 		SeqNrs:           executableSequenceNumbers, // Note can be empty
 		TokensPerFeeCoin: followerTokensPerFeeCoin,
 		SourceGasPrice:   sourceGasPrice.ToInt(),
 	}.Marshal()
 }
 
-func (r *GEExecutionReportingPlugin) generateFeeUpdate(token common.Address, sourceGasPrice *big.Int, juelsPerFeeCoin *big.Int) []evm_2_evm_ge_offramp.GEFeeUpdate {
+func (r *ExecutionReportingPlugin) generateFeeUpdate(token common.Address, sourceGasPrice *big.Int, juelsPerFeeCoin *big.Int) []evm_2_evm_offramp.InternalFeeUpdate {
 	// TODO: Check gas fee updated logs
 	feeTokenBaseUnitsPerUnitGas := big.NewInt(0).Div(big.NewInt(0).Mul(sourceGasPrice, juelsPerFeeCoin), big.NewInt(1e18))
-	return []evm_2_evm_ge_offramp.GEFeeUpdate{
+	return []evm_2_evm_offramp.InternalFeeUpdate{
 		{
 			SourceFeeToken: token,
 			// Since this gas fee update will be sent to the destination chain, this plugins
@@ -298,7 +298,7 @@ func (r *GEExecutionReportingPlugin) generateFeeUpdate(token common.Address, sou
 	}
 }
 
-func (r *GEExecutionReportingPlugin) getExecutedSeqNrsInRange(min, max uint64) (map[uint64]struct{}, error) {
+func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(min, max uint64) (map[uint64]struct{}, error) {
 	// Should be able to keep this log constant across msg types.
 	executedLogs, err := r.config.dest.IndexedLogsTopicRange(r.config.eventSignatures.ExecutionStateChanged, r.config.offRamp.Address(), r.config.eventSignatures.ExecutionStateChangedSequenceNumberIndex, logpoller.EvmWord(min), logpoller.EvmWord(max), int(r.offchainConfig.DestIncomingConfirmations))
 	if err != nil {
@@ -315,10 +315,10 @@ func (r *GEExecutionReportingPlugin) getExecutedSeqNrsInRange(min, max uint64) (
 	return executedMp, nil
 }
 
-func (r *GEExecutionReportingPlugin) getExecutableSeqNrs(
+func (r *ExecutionReportingPlugin) getExecutableSeqNrs(
 	maxGasPrice *big.Int,
 	tokensPerFeeCoin map[common.Address]*big.Int,
-	inflight []InflightExecutionReport,
+	inflight []InflightInternalExecutionReport,
 ) ([]uint64, error) {
 	unexpiredReports, err := getUnexpiredCommitReports(r.config.dest, r.config.commitStore)
 	if err != nil {
@@ -423,7 +423,7 @@ func (r *GEExecutionReportingPlugin) getExecutableSeqNrs(
 	return []uint64{}, nil
 }
 
-func (r *GEExecutionReportingPlugin) parseGESeqNr(log gethtypes.Log) (uint64, error) {
+func (r *ExecutionReportingPlugin) parseSeqNr(log gethtypes.Log) (uint64, error) {
 	s, err := r.config.onRamp.ParseCCIPSendRequested(log)
 	if err != nil {
 		return 0, err
@@ -433,7 +433,7 @@ func (r *GEExecutionReportingPlugin) parseGESeqNr(log gethtypes.Log) (uint64, er
 
 // Assumes non-empty report. Messages to execute can span more than one report, but are assumed to be in order of increasing
 // sequence number.
-func (r *GEExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNums []uint64, tokensPerFeeCoin map[common.Address]*big.Int, sourceGasPrice *big.Int) ([]byte, error) {
+func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNums []uint64, tokensPerFeeCoin map[common.Address]*big.Int, sourceGasPrice *big.Int) ([]byte, error) {
 	execTokens, err := r.config.offRamp.GetDestinationTokens(nil)
 	if err != nil {
 		return nil, err
@@ -451,7 +451,7 @@ func (r *GEExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNum
 			r.config.commitStore,
 			int(r.offchainConfig.SourceIncomingConfirmations),
 			r.config.eventSignatures,
-			r.parseGESeqNr,
+			r.parseSeqNr,
 			r.config.leafHasher.HashLeaf,
 		)
 		if err != nil {
@@ -463,7 +463,7 @@ func (r *GEExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNum
 		return nil, errors.New("No report needed")
 	}
 	if len(finalSeqNums) != 0 {
-		return EncodeGEExecutionReport(finalSeqNums,
+		return EncodeExecutionReport(finalSeqNums,
 			tokensPerFeeCoin,
 			me.encMsgs,
 			me.innerProofs,
@@ -474,16 +474,16 @@ func (r *GEExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNum
 		)
 	}
 	lggr.Infow("Building execution report fee update only", "feeUpdates", gasFeeUpdates)
-	return EncodeGEExecutionReport(finalSeqNums, tokensPerFeeCoin, nil, nil, nil, nil, nil, gasFeeUpdates)
+	return EncodeExecutionReport(finalSeqNums, tokensPerFeeCoin, nil, nil, nil, nil, nil, gasFeeUpdates)
 }
 
-func (r *GEExecutionReportingPlugin) Report(ctx context.Context, timestamp types.ReportTimestamp, query types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
+func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.ReportTimestamp, query types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
 	lggr := r.lggr.Named("Report")
 	if isCommitStoreDownNow(lggr, r.config.commitStore) {
 		return false, nil, ErrCommitStoreIsDown
 	}
-	actualMaybeObservations := getNonEmptyObservations[GEExecutionObservation](lggr, observations)
-	var actualObservations []GEExecutionObservation
+	actualMaybeObservations := getNonEmptyObservations[ExecutionObservation](lggr, observations)
+	var actualObservations []ExecutionObservation
 	tokens, err := r.config.offRamp.GetDestinationTokens(nil)
 	if err != nil {
 		return false, nil, err
@@ -523,7 +523,7 @@ func (r *GEExecutionReportingPlugin) Report(ctx context.Context, timestamp types
 	// Note we accept that this can result in the leader stalling progress,
 	// by setting an extremely high set of prices, but a malicious leader always had that ability
 	// and eventually we'll elect a new one.
-	var q GEQuery
+	var q Query
 	if err2 := json.Unmarshal(query, &q); err2 != nil {
 		return false, nil, err2
 	}
@@ -568,11 +568,11 @@ func (r *GEExecutionReportingPlugin) Report(ctx context.Context, timestamp types
 	return true, report, nil
 }
 
-func (r *GEExecutionReportingPlugin) expireInflight(lggr logger.Logger) {
+func (r *ExecutionReportingPlugin) expireInflight(lggr logger.Logger) {
 	r.inFlightMu.Lock()
 	defer r.inFlightMu.Unlock()
 	// Reap old inflight txs and check if any messages in the report are inflight.
-	var stillInFlight []InflightExecutionReport
+	var stillInFlight []InflightInternalExecutionReport
 	for _, report := range r.inFlight {
 		if time.Since(report.createdAt) > r.inflightCacheExpiry {
 			// Happy path: inflight report was successfully transmitted onchain, we remove it from inflight and onchain state reflects inflight.
@@ -585,7 +585,7 @@ func (r *GEExecutionReportingPlugin) expireInflight(lggr logger.Logger) {
 	r.inFlight = stillInFlight
 }
 
-func (r *GEExecutionReportingPlugin) addToInflight(lggr logger.Logger, seqNrs []uint64, encMsgs [][]byte) error {
+func (r *ExecutionReportingPlugin) addToInflight(lggr logger.Logger, seqNrs []uint64, encMsgs [][]byte) error {
 	r.inFlightMu.Lock()
 	defer r.inFlightMu.Unlock()
 	for _, report := range r.inFlight {
@@ -597,7 +597,7 @@ func (r *GEExecutionReportingPlugin) addToInflight(lggr logger.Logger, seqNrs []
 	// Otherwise not already in flight, add it.
 	lggr.Infow("Added report to inflight",
 		"seqNums", seqNrs)
-	r.inFlight = append(r.inFlight, InflightExecutionReport{
+	r.inFlight = append(r.inFlight, InflightInternalExecutionReport{
 		createdAt:   time.Now(),
 		seqNrs:      seqNrs,
 		encMessages: encMsgs,
@@ -605,9 +605,9 @@ func (r *GEExecutionReportingPlugin) addToInflight(lggr logger.Logger, seqNrs []
 	return nil
 }
 
-func (r *GEExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context, timestamp types.ReportTimestamp, report types.Report) (bool, error) {
+func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context, timestamp types.ReportTimestamp, report types.Report) (bool, error) {
 	lggr := r.lggr.Named("ShouldAcceptFinalizedReport")
-	seqNrs, encMsgs, err := MessagesFromGEExecutionReport(report)
+	seqNrs, encMsgs, err := MessagesFromExecutionReport(report)
 	if err != nil {
 		lggr.Errorw("unable to decode report", "err", err)
 		return false, nil
@@ -630,8 +630,8 @@ func (r *GEExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Con
 	return true, nil
 }
 
-func (r *GEExecutionReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context, timestamp types.ReportTimestamp, report types.Report) (bool, error) {
-	seqNrs, _, err := MessagesFromGEExecutionReport(report)
+func (r *ExecutionReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context, timestamp types.ReportTimestamp, report types.Report) (bool, error) {
+	seqNrs, _, err := MessagesFromExecutionReport(report)
 	if err != nil {
 		return false, nil
 	}
@@ -646,7 +646,7 @@ func (r *GEExecutionReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Co
 	return false, nil
 }
 
-func (r *GEExecutionReportingPlugin) isStaleReport(min uint64) (bool, error) {
+func (r *ExecutionReportingPlugin) isStaleReport(min uint64) (bool, error) {
 	// If the first message is executed already, this execution report is stale.
 	msgState, err := r.config.offRamp.GetExecutionState(nil, min)
 	if err != nil {
@@ -659,6 +659,6 @@ func (r *GEExecutionReportingPlugin) isStaleReport(min uint64) (bool, error) {
 	return false, nil
 }
 
-func (r *GEExecutionReportingPlugin) Close() error {
+func (r *ExecutionReportingPlugin) Close() error {
 	return nil
 }

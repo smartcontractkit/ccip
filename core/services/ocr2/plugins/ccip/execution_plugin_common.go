@@ -35,7 +35,7 @@ const (
 	EXTERNAL_CALL_OVERHEAD_GAS = 2600 // because the receiver will be untouched initially
 )
 
-type BatchBuilder interface {
+type BatchBuilderInterface interface {
 	BuildBatch(
 		srcToDst map[common.Address]common.Address,
 		msgs []logpoller.Log,
@@ -43,7 +43,7 @@ type BatchBuilder interface {
 		gasLimit uint64,
 		gasPrice *big.Int,
 		tokensPerFeeCoin map[common.Address]*big.Int,
-		inflight []InflightExecutionReport,
+		inflight []InflightInternalExecutionReport,
 		aggregateTokenLimit *big.Int,
 		tokenLimitPrices map[common.Address]*big.Int) ([]uint64, bool)
 }
@@ -62,7 +62,7 @@ const (
 	MaxTokensPerMessage      = 5
 	MaxExecutionReportLength = 150_000 // TODO
 	MaxGasPrice              = 200e9   // 200 gwei. TODO: probably want this to be some dynamic value, a multiplier of the current gas price.
-	TokenPriceBufferPercent  = 10      // Amount that the leader adds as a token price buffer in GEQuery.
+	TokenPriceBufferPercent  = 10      // Amount that the leader adds as a token price buffer in Query.
 )
 
 var (
@@ -78,7 +78,7 @@ func median(vals []*big.Int) *big.Int {
 	return valsCopy[len(valsCopy)/2]
 }
 
-type InflightExecutionReport struct {
+type InflightInternalExecutionReport struct {
 	createdAt   time.Time
 	seqNrs      []uint64
 	encMessages [][]byte
@@ -102,7 +102,7 @@ func contiguousReqs(lggr logger.Logger, min, max uint64, seqNrs []uint64) bool {
 	return true
 }
 
-func leafsFromIntervals(lggr logger.Logger, onRampToEventSig map[common.Address]EventSignatures, seqParsers map[common.Address]func(logpoller.Log) (uint64, error), intervalByOnRamp map[common.Address]commit_store.InternalInterval, srcLogPoller logpoller.LogPoller, onRampToHasher map[common.Address]LeafHasher[[32]byte], confs int) (map[common.Address][][32]byte, error) {
+func leafsFromIntervals(lggr logger.Logger, onRampToEventSig map[common.Address]EventSignatures, seqParsers map[common.Address]func(logpoller.Log) (uint64, error), intervalByOnRamp map[common.Address]commit_store.InternalInterval, srcLogPoller logpoller.LogPoller, onRampToHasher map[common.Address]LeafHasherInterface[[32]byte], confs int) (map[common.Address][][32]byte, error) {
 	leafsByOnRamp := make(map[common.Address][][32]byte)
 	for onRamp, interval := range intervalByOnRamp {
 		// Logs are guaranteed to be in order of seq num, since these are finalized logs only

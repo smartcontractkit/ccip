@@ -27,15 +27,15 @@ import (
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/afn_contract"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_offramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_onramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ge_router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/governance_dapp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ping_pong_demo"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/receiver_dapp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/simple_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/dione"
@@ -54,7 +54,7 @@ func (client *CCIPClient) wip(t *testing.T, sourceClient *rhea.EvmDeploymentConf
 }
 
 func (client *CCIPClient) setOnRampFeeConfig(t *testing.T) {
-	tx, err := client.Source.OnRamp.SetFeeConfig(client.Source.Owner, []evm_2_evm_ge_onramp.IEVM2EVMGEOnRampFeeTokenConfigArgs{
+	tx, err := client.Source.OnRamp.SetFeeConfig(client.Source.Owner, []evm_2_evm_onramp.IEVM2EVMOnRampFeeTokenConfigArgs{
 		{
 			Token:           client.Source.LinkTokenAddress,
 			FeeAmount:       big.NewInt(100),
@@ -67,14 +67,14 @@ func (client *CCIPClient) setOnRampFeeConfig(t *testing.T) {
 }
 
 func (client *CCIPClient) setRateLimiterConfig(t *testing.T) {
-	tx, err := client.Source.OnRamp.SetRateLimiterConfig(client.Source.Owner, evm_2_evm_ge_onramp.IAggregateRateLimiterRateLimiterConfig{
+	tx, err := client.Source.OnRamp.SetRateLimiterConfig(client.Source.Owner, evm_2_evm_onramp.IAggregateRateLimiterRateLimiterConfig{
 		Rate:     new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
 		Capacity: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 	})
 	shared.RequireNoError(t, err)
 	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 
-	tx, err = client.Dest.OffRamp.SetRateLimiterConfig(client.Dest.Owner, evm_2_evm_ge_offramp.IAggregateRateLimiterRateLimiterConfig{
+	tx, err = client.Dest.OffRamp.SetRateLimiterConfig(client.Dest.Owner, evm_2_evm_offramp.IAggregateRateLimiterRateLimiterConfig{
 		Rate:     new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
 		Capacity: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 	})
@@ -111,7 +111,7 @@ type Client struct {
 	PingPongDapp     *ping_pong_demo.PingPongDemo
 	Afn              *afn_contract.AFNContract
 	FeeManager       *fee_manager.FeeManager
-	Router           *ge_router.GERouter
+	Router           *router.Router
 	logger           logger.Logger
 	t                *testing.T
 }
@@ -125,7 +125,7 @@ type EVMBridgedToken struct {
 
 type SourceClient struct {
 	Client
-	OnRamp *evm_2_evm_ge_onramp.EVM2EVMGEOnRamp
+	OnRamp *evm_2_evm_onramp.EVM2EVMOnRamp
 }
 
 func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient {
@@ -146,9 +146,9 @@ func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient
 
 	afn, err := afn_contract.NewAFNContract(config.ChainConfig.Afn, config.Client)
 	shared.RequireNoError(t, err)
-	onRamp, err := evm_2_evm_ge_onramp.NewEVM2EVMGEOnRamp(config.LaneConfig.OnRamp, config.Client)
+	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(config.LaneConfig.OnRamp, config.Client)
 	shared.RequireNoError(t, err)
-	router, err := ge_router.NewGERouter(config.ChainConfig.Router, config.Client)
+	router, err := router.NewRouter(config.ChainConfig.Router, config.Client)
 	shared.RequireNoError(t, err)
 	governanceDapp, err := governance_dapp.NewGovernanceDapp(config.LaneConfig.GovernanceDapp, config.Client)
 	shared.RequireNoError(t, err)
@@ -181,7 +181,7 @@ type DestClient struct {
 	CommitStore     *commit_store.CommitStore
 	MessageReceiver *simple_message_receiver.SimpleMessageReceiver
 	ReceiverDapp    *receiver_dapp.ReceiverDapp
-	OffRamp         *evm_2_evm_ge_offramp.EVM2EVMGEOffRamp
+	OffRamp         *evm_2_evm_offramp.EVM2EVMOffRamp
 }
 
 func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestClient {
@@ -204,13 +204,13 @@ func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestCli
 	shared.RequireNoError(t, err)
 	commitStore, err := commit_store.NewCommitStore(config.LaneConfig.CommitStore, config.Client)
 	shared.RequireNoError(t, err)
-	offRamp, err := evm_2_evm_ge_offramp.NewEVM2EVMGEOffRamp(config.LaneConfig.OffRamp, config.Client)
+	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(config.LaneConfig.OffRamp, config.Client)
 	shared.RequireNoError(t, err)
 	messageReceiver, err := simple_message_receiver.NewSimpleMessageReceiver(config.LaneConfig.MessageReceiver, config.Client)
 	shared.RequireNoError(t, err)
 	receiverDapp, err := receiver_dapp.NewReceiverDapp(config.LaneConfig.ReceiverDapp, config.Client)
 	shared.RequireNoError(t, err)
-	router, err := ge_router.NewGERouter(config.ChainConfig.Router, config.Client)
+	router, err := router.NewRouter(config.ChainConfig.Router, config.Client)
 	shared.RequireNoError(t, err)
 	governanceDapp, err := governance_dapp.NewGovernanceDapp(config.LaneConfig.GovernanceDapp, config.Client)
 	shared.RequireNoError(t, err)
@@ -329,17 +329,17 @@ func (client *CCIPClient) SendMessage(t *testing.T) {
 	bts, err := hex.DecodeString("00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000005626c616e6b000000000000000000000000000000000000000000000000000000")
 	require.NoError(t, err)
 
-	token := ge_router.CommonEVMTokenAndAmount{
+	token := router.CommonEVMTokenAndAmount{
 		Token:  client.Source.LinkTokenAddress,
 		Amount: big.NewInt(1),
 	}
 	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(3e5), false)
 	require.NoError(t, err)
 
-	msg := ge_router.GEConsumerEVM2AnyGEMessage{
+	msg := router.ConsumerEVM2AnyMessage{
 		Receiver:         testhelpers.MustEncodeAddress(t, client.Dest.MessageReceiver.Address()),
 		Data:             bts,
-		TokensAndAmounts: []ge_router.CommonEVMTokenAndAmount{token},
+		TokensAndAmounts: []router.CommonEVMTokenAndAmount{token},
 		ExtraArgs:        extraArgsV1,
 		FeeToken:         client.Source.LinkTokenAddress,
 	}
@@ -390,7 +390,7 @@ func (client *CCIPClient) WaitForCommit(t *testing.T, DestBlockNum uint64) {
 func (client *CCIPClient) WaitForExecution(t *testing.T, DestBlockNum uint64, sequenceNumber uint64) {
 	client.Dest.logger.Infof("Waiting for execution...")
 
-	events := make(chan *evm_2_evm_ge_offramp.EVM2EVMGEOffRampExecutionStateChanged)
+	events := make(chan *evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged)
 	sub, err := client.Dest.OffRamp.WatchExecutionStateChanged(
 		&bind.WatchOpts{
 			Context: context.Background(),
@@ -441,7 +441,7 @@ func (client *CCIPClient) ExecuteManually(seqNr uint64) error {
 		return errors.New("unable to find seq num")
 	}
 	ctx := hasher.NewKeccakCtx()
-	leafHasher := ccip.NewGELeafHasher(client.Source.ChainId, client.Dest.ChainId, client.Source.OnRamp.Address(), ctx)
+	leafHasher := ccip.NewLeafHasher(client.Source.ChainId, client.Dest.ChainId, client.Source.OnRamp.Address(), ctx)
 	// Get all seqNrs in that range.
 	end = uint64(7651526)
 	sendRequestedIterator, err := client.Source.OnRamp.FilterCCIPSendRequested(&bind.FilterOpts{
@@ -491,7 +491,7 @@ func (client *CCIPClient) ExecuteManually(seqNr uint64) error {
 		return errors.New("outer root doesn't match")
 	}
 	outerProof := outerTree.Prove([]int{onRampIdx})
-	executionReport := evm_2_evm_ge_offramp.GEExecutionReport{
+	InternalExecutionReport := evm_2_evm_offramp.InternalExecutionReport{
 		SequenceNumbers:          []uint64{seqNr},
 		TokenPerFeeCoinAddresses: []common.Address{client.Dest.LinkTokenAddress},
 		TokenPerFeeCoin:          []*big.Int{big.NewInt(1)},
@@ -501,9 +501,9 @@ func (client *CCIPClient) ExecuteManually(seqNr uint64) error {
 		OuterProofs:              outerProof.Hashes,
 		OuterProofFlagBits:       ccip.ProofFlagsToBits(outerProof.SourceFlags),
 	}
-	tx, err := client.Dest.OffRamp.ManuallyExecute(client.Dest.Owner, executionReport)
+	tx, err := client.Dest.OffRamp.ManuallyExecute(client.Dest.Owner, InternalExecutionReport)
 	if err != nil {
-		fmt.Printf("%+v err %v\n", executionReport, err)
+		fmt.Printf("%+v err %v\n", InternalExecutionReport, err)
 		return err
 	}
 	fmt.Println(client.Dest.Owner.From, tx.Hash(), err)
@@ -567,19 +567,19 @@ func (client *CCIPClient) ScalingAndBatching(t *testing.T) {
 	client.Source.logger.Info("Sent 10 txs to onramp.")
 }
 
-func (client *CCIPClient) SendCrossChainMessage(t *testing.T, source SourceClient, from *bind.TransactOpts, toAddress common.Address, amount *big.Int) *evm_2_evm_ge_onramp.EVM2EVMGEOnRampCCIPSendRequested {
+func (client *CCIPClient) SendCrossChainMessage(t *testing.T, source SourceClient, from *bind.TransactOpts, toAddress common.Address, amount *big.Int) *evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested {
 	SourceBlockNumber := GetCurrentBlockNumber(source.Client.Client)
-	token := ge_router.CommonEVMTokenAndAmount{
+	token := router.CommonEVMTokenAndAmount{
 		Token:  client.Source.LinkTokenAddress,
 		Amount: amount,
 	}
 	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(100_000), false)
 	helpers.PanicErr(err)
 
-	tx, err := source.Router.CcipSend(from, client.Dest.ChainId, ge_router.GEConsumerEVM2AnyGEMessage{
+	tx, err := source.Router.CcipSend(from, client.Dest.ChainId, router.ConsumerEVM2AnyMessage{
 		Receiver:         toAddress.Bytes(),
 		Data:             nil,
-		TokensAndAmounts: []ge_router.CommonEVMTokenAndAmount{token},
+		TokensAndAmounts: []router.CommonEVMTokenAndAmount{token},
 		FeeToken:         common.Address{},
 		ExtraArgs:        extraArgsV1,
 	})
@@ -597,7 +597,7 @@ func (client *CCIPClient) SendCrossChainMessage(t *testing.T, source SourceClien
 //
 //	client.Dest.logger.Infof("Cross chain message %+v", decodedMsg)
 //
-//	report := any_2_evm_toll_offramp.CCIPExecutionReport{
+//	report := any_2_evm_toll_offramp.CCIPInternalExecutionReport{
 //		Messages:       []any_2_evm_toll_offramp.CCIPAny2EVMTollMessage{*decodedMsg},
 //		Proofs:         proof.Hashes,
 //		ProofFlagsBits: ccip.ProofFlagsToBits(proof.SourceFlags),
@@ -721,8 +721,8 @@ func GetCurrentBlockNumber(chain *ethclient.Client) uint64 {
 
 func (client *CCIPClient) ValidateMerkleRoot(
 	t *testing.T,
-	request *evm_2_evm_ge_onramp.EVM2EVMGEOnRampCCIPSendRequested,
-	reportRequests []*evm_2_evm_ge_onramp.EVM2EVMGEOnRampCCIPSendRequested,
+	request *evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested,
+	reportRequests []*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested,
 	report commit_store.InternalCommitReport,
 ) merklemulti.Proof[[32]byte] {
 	mctx := hasher.NewKeccakCtx()
@@ -756,7 +756,7 @@ func (client *CCIPClient) ValidateMerkleRoot(
 }
 
 // SendToOnrampWithExecution executes a cross chain transactions using the onramp interface.
-func (client *CCIPClient) SendToOnrampWithExecution(t *testing.T, source SourceClient, from *bind.TransactOpts, toAddress common.Address, amount *big.Int) *evm_2_evm_ge_onramp.EVM2EVMGEOnRampCCIPSendRequested {
+func (client *CCIPClient) SendToOnrampWithExecution(t *testing.T, source SourceClient, from *bind.TransactOpts, toAddress common.Address, amount *big.Int) *evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested {
 	SourceBlockNumber := GetCurrentBlockNumber(source.Client.Client)
 
 	senderAndReceiver, err := utils.ABIEncode(`[{"type":"address"}, {"type":"address"}]`, source.Owner.From, source.Owner.From)
@@ -765,8 +765,8 @@ func (client *CCIPClient) SendToOnrampWithExecution(t *testing.T, source SourceC
 	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(3e5), false)
 	helpers.PanicErr(err)
 
-	payload := ge_router.GEConsumerEVM2AnyGEMessage{
-		TokensAndAmounts: []ge_router.CommonEVMTokenAndAmount{},
+	payload := router.ConsumerEVM2AnyMessage{
+		TokensAndAmounts: []router.CommonEVMTokenAndAmount{},
 		Receiver:         testhelpers.MustEncodeAddress(t, toAddress),
 		Data:             senderAndReceiver,
 		ExtraArgs:        extraArgsV1,
@@ -777,7 +777,7 @@ func (client *CCIPClient) SendToOnrampWithExecution(t *testing.T, source SourceC
 	tx, err := source.Router.CcipSend(from, client.Dest.ChainId, payload)
 	if err != nil {
 		t.Log(err.Error())
-		printRevertReason(err, ge_router.GERouterABI)
+		printRevertReason(err, router.RouterABI)
 	}
 	helpers.PanicErr(err)
 	source.logger.Infof("Send tokens tx %s", helpers.ExplorerLink(int64(source.ChainId), tx.Hash()))
@@ -803,7 +803,7 @@ func printRevertReason(errorData interface{}, abiString string) {
 
 // WaitForCrossChainSendRequest checks on chain for a successful onramp send event with the given tx hash.
 // If not immediately found it will keep retrying in intervals of the globally specified RetryTiming.
-func WaitForCrossChainSendRequest(source SourceClient, fromBlockNum uint64, txhash common.Hash) *evm_2_evm_ge_onramp.EVM2EVMGEOnRampCCIPSendRequested {
+func WaitForCrossChainSendRequest(source SourceClient, fromBlockNum uint64, txhash common.Hash) *evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested {
 	filter := bind.FilterOpts{Start: fromBlockNum}
 	source.logger.Infof("Waiting for cross chain send... ")
 

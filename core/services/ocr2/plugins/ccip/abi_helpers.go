@@ -9,10 +9,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_offramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_onramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_offramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_toll_onramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
@@ -49,37 +47,14 @@ func init() {
 	ConfigSet = getIDOrPanic("ConfigSet", commitStoreABI)
 }
 
-func GetTollEventSignatures() EventSignatures {
-	tollOnRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_toll_onramp.EVM2EVMTollOnRampABI))
+func GetEventSignatures() EventSignatures {
+	onRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_onramp.EVM2EVMOnRampABI))
 	if err != nil {
 		panic(err)
 	}
-	CCIPSendRequested := getIDOrPanic("CCIPSendRequested", tollOnRampABI)
+	CCIPSendRequested := getIDOrPanic("CCIPSendRequested", onRampABI)
 
-	tollOffRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_toll_offramp.EVM2EVMTollOffRampABI))
-	if err != nil {
-		panic(err)
-	}
-	ExecutionStateChanged := getIDOrPanic("ExecutionStateChanged", tollOffRampABI)
-
-	return EventSignatures{
-		// offset || sourceChainID || seqNum || ...
-		SendRequested:                    CCIPSendRequested,
-		SendRequestedSequenceNumberIndex: 2,
-		// sig || seqNum || ...
-		ExecutionStateChanged:                    ExecutionStateChanged,
-		ExecutionStateChangedSequenceNumberIndex: 1,
-	}
-}
-
-func GetGEEventSignatures() EventSignatures {
-	geOnRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_ge_onramp.EVM2EVMGEOnRampABI))
-	if err != nil {
-		panic(err)
-	}
-	CCIPSendRequested := getIDOrPanic("CCIPSendRequested", geOnRampABI)
-
-	offRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_ge_offramp.EVM2EVMGEOffRampABI))
+	offRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_offramp.EVM2EVMOffRampABI))
 	if err != nil {
 		panic(err)
 	}
@@ -95,64 +70,8 @@ func GetGEEventSignatures() EventSignatures {
 	}
 }
 
-// DecodeTollMessage decodes the bytecode message into a commit_store.CCIPAny2EVMTollMessage
-// This function returns an error if there is no message in the bytecode or
-// when the payload is malformed.
-func DecodeTollMessage(b []byte) (*evm_2_evm_toll_onramp.TollEVM2EVMTollMessage, error) {
-	unpacked, err := MakeTollCCIPMsgArgs().Unpack(b)
-	if err != nil {
-		return nil, err
-	}
-	if len(unpacked) == 0 {
-		return nil, fmt.Errorf("no message found when unpacking")
-	}
-	// Note must use unnamed type here
-	receivedCp, ok := unpacked[0].(struct {
-		SourceChainId    uint64         `json:"sourceChainId"`
-		SequenceNumber   uint64         `json:"sequenceNumber"`
-		Sender           common.Address `json:"sender"`
-		Receiver         common.Address `json:"receiver"`
-		Data             []uint8        `json:"data"`
-		TokensAndAmounts []struct {
-			Token  common.Address `json:"token"`
-			Amount *big.Int       `json:"amount"`
-		} `json:"tokensAndAmounts"`
-		FeeTokenAndAmount struct {
-			Token  common.Address `json:"token"`
-			Amount *big.Int       `json:"amount"`
-		} `json:"feeTokenAndAmount"`
-		GasLimit *big.Int `json:"gasLimit"`
-	})
-	if !ok {
-		return nil, fmt.Errorf("invalid format have %T want %T", unpacked[0], receivedCp)
-	}
-
-	var tokensAndAmounts []evm_2_evm_toll_onramp.CommonEVMTokenAndAmount
-
-	for _, tokenAndAmount := range receivedCp.TokensAndAmounts {
-		tokensAndAmounts = append(tokensAndAmounts, evm_2_evm_toll_onramp.CommonEVMTokenAndAmount{
-			Token:  tokenAndAmount.Token,
-			Amount: tokenAndAmount.Amount,
-		})
-	}
-
-	return &evm_2_evm_toll_onramp.TollEVM2EVMTollMessage{
-		SourceChainId:    receivedCp.SourceChainId,
-		SequenceNumber:   receivedCp.SequenceNumber,
-		Sender:           receivedCp.Sender,
-		Receiver:         receivedCp.Receiver,
-		Data:             receivedCp.Data,
-		TokensAndAmounts: tokensAndAmounts,
-		FeeTokenAndAmount: evm_2_evm_toll_onramp.CommonEVMTokenAndAmount{
-			Token:  receivedCp.FeeTokenAndAmount.Token,
-			Amount: receivedCp.FeeTokenAndAmount.Amount,
-		},
-		GasLimit: receivedCp.GasLimit,
-	}, nil
-}
-
-func DecodeGEMessage(b []byte) (*evm_2_evm_ge_onramp.GEEVM2EVMGEMessage, error) {
-	unpacked, err := MakeGEMsgArgs().Unpack(b)
+func DecodeMessage(b []byte) (*evm_2_evm_onramp.InternalEVM2EVMMessage, error) {
+	unpacked, err := MakeMessageArgs().Unpack(b)
 	if err != nil {
 		return nil, err
 	}
@@ -181,15 +100,15 @@ func DecodeGEMessage(b []byte) (*evm_2_evm_ge_onramp.GEEVM2EVMGEMessage, error) 
 	if !ok {
 		return nil, fmt.Errorf("invalid format have %T want %T", unpacked[0], receivedCp)
 	}
-	var tokensAndAmounts []evm_2_evm_ge_onramp.CommonEVMTokenAndAmount
+	var tokensAndAmounts []evm_2_evm_onramp.CommonEVMTokenAndAmount
 	for _, tokenAndAmount := range receivedCp.TokensAndAmounts {
-		tokensAndAmounts = append(tokensAndAmounts, evm_2_evm_ge_onramp.CommonEVMTokenAndAmount{
+		tokensAndAmounts = append(tokensAndAmounts, evm_2_evm_onramp.CommonEVMTokenAndAmount{
 			Token:  tokenAndAmount.Token,
 			Amount: tokenAndAmount.Amount,
 		})
 	}
 
-	return &evm_2_evm_ge_onramp.GEEVM2EVMGEMessage{
+	return &evm_2_evm_onramp.InternalEVM2EVMMessage{
 		SourceChainId:    receivedCp.SourceChainId,
 		SequenceNumber:   receivedCp.SequenceNumber,
 		FeeTokenAmount:   receivedCp.FeeTokenAmount,
@@ -205,72 +124,7 @@ func DecodeGEMessage(b []byte) (*evm_2_evm_ge_onramp.GEEVM2EVMGEMessage, error) 
 	}, nil
 }
 
-// MakeTollCCIPMsgArgs is a static function that always returns the abi.Arguments
-// for a CCIP message.
-func MakeTollCCIPMsgArgs() abi.Arguments {
-	var tuples = []abi.ArgumentMarshaling{
-		{
-			Name: "sourceChainId",
-			Type: "uint64",
-		},
-		{
-			Name: "sequenceNumber",
-			Type: "uint64",
-		},
-		{
-			Name: "sender",
-			Type: "address",
-		},
-		{
-			Name: "receiver",
-			Type: "address",
-		},
-		{
-			Name: "data",
-			Type: "bytes",
-		},
-		{
-			Name: "tokensAndAmounts",
-			Type: "tuple[]",
-			Components: []abi.ArgumentMarshaling{
-				{
-					Name: "token",
-					Type: "address",
-				},
-				{
-					Name: "amount",
-					Type: "uint256",
-				},
-			},
-		},
-		{
-			Name: "feeTokenAndAmount",
-			Type: "tuple",
-			Components: []abi.ArgumentMarshaling{
-				{
-					Name: "token",
-					Type: "address",
-				},
-				{
-					Name: "amount",
-					Type: "uint256",
-				},
-			},
-		},
-		{
-			Name: "gasLimit",
-			Type: "uint256",
-		},
-	}
-	ty, _ := abi.NewType("tuple", "", tuples)
-	return abi.Arguments{
-		{
-			Type: ty,
-		},
-	}
-}
-
-func MakeGEMsgArgs() abi.Arguments {
+func MakeMessageArgs() abi.Arguments {
 	var tuples = []abi.ArgumentMarshaling{
 		{
 			Name: "sourceChainId",
@@ -349,48 +203,6 @@ func ProofFlagsToBits(proofFlags []bool) *big.Int {
 		}
 	}
 	return encodedFlags
-}
-
-func makeTollExecutionReportArgs() abi.Arguments {
-	return []abi.Argument{
-		{
-			Name: "ExecutionReport",
-			Type: utils.MustAbiType("tuple", []abi.ArgumentMarshaling{
-				{
-					Name: "sequenceNumbers",
-					Type: "uint64[]",
-				},
-				{
-					Name: "tokenPerFeeCoinAddresses",
-					Type: "address[]",
-				},
-				{
-					Name: "tokenPerFeeCoin",
-					Type: "uint256[]",
-				},
-				{
-					Name: "encodedMessages",
-					Type: "bytes[]",
-				},
-				{
-					Name: "innerProofs",
-					Type: "bytes32[]",
-				},
-				{
-					Name: "innerProofFlagBits",
-					Type: "uint256",
-				},
-				{
-					Name: "outerProofs",
-					Type: "bytes32[]",
-				},
-				{
-					Name: "outerProofFlagBits",
-					Type: "uint256",
-				},
-			}),
-		},
-	}
 }
 
 func makeExecutionReportArgs() abi.Arguments {

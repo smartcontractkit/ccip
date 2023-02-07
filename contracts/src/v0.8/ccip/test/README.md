@@ -6,7 +6,7 @@ We're using Foundry to test our CCIP smart contracts here. This enables us to te
 
 Mimic the source contract file structure as closely as possible. Example:
 
-`./offRamp/ge/SomeOffRamp.sol` should have a test contract `./test/offRamp/ge/SomeOffRamp.t.sol`.
+`./offRamp/SomeOffRamp.sol` should have a test contract `./test/offRamp/SomeOffRamp.t.sol`.
 
 ## Test File Structure
 

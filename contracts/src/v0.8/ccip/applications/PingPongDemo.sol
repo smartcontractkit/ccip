@@ -44,11 +44,11 @@ contract PingPongDemo is CCIPConsumer, OwnerIsCreator {
     }
 
     bytes memory data = abi.encode(pingPongCount);
-    GEConsumer.EVM2AnyGEMessage memory message = GEConsumer.EVM2AnyGEMessage({
+    Consumer.EVM2AnyMessage memory message = Consumer.EVM2AnyMessage({
       receiver: abi.encode(s_counterpartAddress),
       data: data,
       tokensAndAmounts: new Common.EVMTokenAndAmount[](0),
-      extraArgs: GEConsumer._argsToBytes(GEConsumer.EVMExtraArgsV1({gasLimit: 200_000, strict: false})),
+      extraArgs: Consumer._argsToBytes(Consumer.EVMExtraArgsV1({gasLimit: 200_000, strict: false})),
       feeToken: address(s_feeToken)
     });
     _ccipSend(s_counterpartChainId, message);

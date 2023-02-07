@@ -1,6 +1,0 @@
-{
-  "acceptOwnership()": "79ba5097",
-  "owner()": "8da5cb5b",
-  "transferOwnership(address)": "f2fde38b",
-  "withdrawAccumulatedFees(address,address,uint256)": "59e96b5b"
-}

@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_offramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_ge_onramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/governance_dapp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ping_pong_demo"
@@ -97,10 +97,10 @@ func deployDestinationContracts(t *testing.T, client *EvmDeploymentConfig, sourc
 	client.Logger.Infof("%s contracts fully deployed as destination chain", helpers.ChainName(int64(client.ChainConfig.ChainId)))
 }
 
-func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId uint64, destSupportedTokens map[Token]EVMBridgedToken) *evm_2_evm_ge_onramp.EVM2EVMGEOnRamp {
+func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId uint64, destSupportedTokens map[Token]EVMBridgedToken) *evm_2_evm_onramp.EVM2EVMOnRamp {
 	if !client.DeploySettings.DeployRamp {
 		client.Logger.Infof("Skipping OnRamp deployment, using onRamp on %s", client.LaneConfig.OnRamp)
-		onRamp, err := evm_2_evm_ge_onramp.NewEVM2EVMGEOnRamp(client.LaneConfig.OnRamp, client.Client)
+		onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(client.LaneConfig.OnRamp, client.Client)
 		shared.RequireNoError(t, err)
 		return onRamp
 	}
@@ -119,7 +119,7 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId uint64,
 	}
 
 	client.Logger.Infof("Deploying OnRamp: destinationChains %+v, bridgeTokens %+v, poolAddresses %+v", destChainId, bridgeTokens, tokenPools)
-	onRampAddress, tx, _, err := evm_2_evm_ge_onramp.DeployEVM2EVMGEOnRamp(
+	onRampAddress, tx, _, err := evm_2_evm_onramp.DeployEVM2EVMOnRamp(
 		client.Owner,               // user
 		client.Client,              // client
 		client.ChainConfig.ChainId, // source chain id
@@ -128,20 +128,20 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId uint64,
 		tokenPools,                 // pools
 		[]common.Address{},         // allow list
 		client.ChainConfig.Afn,     // AFN
-		evm_2_evm_ge_onramp.IBaseOnRampOnRampConfig{
+		evm_2_evm_onramp.IBaseOnRampOnRampConfig{
 			CommitFeeJuels:  0,
 			MaxDataSize:     1e6,
 			MaxTokensLength: 5,
 			MaxGasLimit:     ccip.GasLimitPerTx,
 		},
-		evm_2_evm_ge_onramp.IAggregateRateLimiterRateLimiterConfig{
+		evm_2_evm_onramp.IAggregateRateLimiterRateLimiterConfig{
 			Capacity: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 			Rate:     new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
 			Admin:    client.Owner.From,
 		},
 		client.ChainConfig.Router,
 		client.ChainConfig.FeeManager,
-		[]evm_2_evm_ge_onramp.IEVM2EVMGEOnRampFeeTokenConfigArgs{
+		[]evm_2_evm_onramp.IEVM2EVMOnRampFeeTokenConfigArgs{
 			{
 				Token:           client.ChainConfig.SupportedTokens[LINK].Token,
 				Multiplier:      1,
@@ -153,7 +153,7 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId uint64,
 	shared.RequireNoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 
-	onRamp, err := evm_2_evm_ge_onramp.NewEVM2EVMGEOnRamp(onRampAddress, client.Client)
+	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddress, client.Client)
 	shared.RequireNoError(t, err)
 	client.Logger.Infof(fmt.Sprintf("Onramp deployed on %s in tx %s", onRampAddress.String(), helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash())))
 	client.LaneConfig.OnRamp = onRampAddress
@@ -168,10 +168,10 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId uint64,
 	return onRamp
 }
 
-func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainId uint64, sourceTokens map[Token]EVMBridgedToken, onRamp common.Address) *evm_2_evm_ge_offramp.EVM2EVMGEOffRamp {
+func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainId uint64, sourceTokens map[Token]EVMBridgedToken, onRamp common.Address) *evm_2_evm_offramp.EVM2EVMOffRamp {
 	if !client.DeploySettings.DeployRamp {
 		client.Logger.Infof("Skipping OffRamp deployment, using offRamp on %s", client.LaneConfig.OnRamp)
-		offRamp, err := evm_2_evm_ge_offramp.NewEVM2EVMGEOffRamp(client.LaneConfig.OffRamp, client.Client)
+		offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(client.LaneConfig.OffRamp, client.Client)
 		shared.RequireNoError(t, err)
 		return offRamp
 	}
@@ -189,12 +189,12 @@ func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainId uint
 	}
 
 	client.Logger.Infof("Deploying OffRamp")
-	offRampAddress, tx, _, err := evm_2_evm_ge_offramp.DeployEVM2EVMGEOffRamp(
+	offRampAddress, tx, _, err := evm_2_evm_offramp.DeployEVM2EVMOffRamp(
 		client.Owner,
 		client.Client,
 		sourceChainId,
 		client.ChainConfig.ChainId,
-		evm_2_evm_ge_offramp.IEVM2EVMGEOffRampGEOffRampConfig{
+		evm_2_evm_offramp.IEVM2EVMOffRampOffRampConfig{
 			GasOverhead:                             big.NewInt(0),
 			FeeManager:                              client.ChainConfig.FeeManager,
 			ExecutionDelaySeconds:                   60,
@@ -207,7 +207,7 @@ func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainId uint
 		client.ChainConfig.Afn,
 		syncedSourceTokens,
 		syncedDestPools,
-		evm_2_evm_ge_offramp.IAggregateRateLimiterRateLimiterConfig{
+		evm_2_evm_offramp.IAggregateRateLimiterRateLimiterConfig{
 			Capacity: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 			Rate:     new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
 			Admin:    client.Owner.From,
@@ -218,7 +218,7 @@ func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainId uint
 
 	client.Logger.Infof("OffRamp contract deployed on %s in tx: %s", offRampAddress.Hex(), helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash()))
 	client.LaneConfig.OffRamp = offRampAddress
-	offRamp, err := evm_2_evm_ge_offramp.NewEVM2EVMGEOffRamp(client.LaneConfig.OffRamp, client.Client)
+	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(client.LaneConfig.OffRamp, client.Client)
 	shared.RequireNoError(t, err)
 
 	// Prices are used by the rate limiter and dictate what tokens are supported

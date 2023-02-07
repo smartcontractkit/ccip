@@ -14,7 +14,7 @@ contract GovernanceDapp is CCIPConsumer, TypeAndVersionInterface, OwnerIsCreator
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "GovernanceDapp 1.0.0";
 
-  using GEConsumer for GEConsumer.EVMExtraArgsV1;
+  using Consumer for Consumer.EVMExtraArgsV1;
 
   error InvalidDeliverer(address deliverer);
   event ConfigPropagated(uint64 chainId, address contractAddress);
@@ -59,12 +59,12 @@ contract GovernanceDapp is CCIPConsumer, TypeAndVersionInterface, OwnerIsCreator
     for (uint256 i = 0; i < numberOfClones; ++i) {
       CrossChainClone memory clone = s_crossChainClones[i];
 
-      GEConsumer.EVM2AnyGEMessage memory message = GEConsumer.EVM2AnyGEMessage({
+      Consumer.EVM2AnyMessage memory message = Consumer.EVM2AnyMessage({
         receiver: abi.encode(clone.contractAddress),
         data: data,
         tokensAndAmounts: new Common.EVMTokenAndAmount[](0),
         feeToken: address(s_feeToken),
-        extraArgs: GEConsumer._argsToBytes(GEConsumer.EVMExtraArgsV1({gasLimit: 3e5, strict: false}))
+        extraArgs: Consumer._argsToBytes(Consumer.EVMExtraArgsV1({gasLimit: 3e5, strict: false}))
       });
       _ccipSend(clone.chainId, message);
       emit ConfigPropagated(clone.chainId, clone.contractAddress);

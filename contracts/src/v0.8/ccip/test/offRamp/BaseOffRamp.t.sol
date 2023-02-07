@@ -7,7 +7,7 @@ import "../TokenSetup.t.sol";
 import "../../interfaces/rateLimiter/IAggregateRateLimiter.sol";
 
 contract BaseOffRampSetup is TokenSetup {
-  event OffRampConfigSet(IBaseOffRamp.OffRampConfig config);
+  event OffRampConfigSet(IEVM2EVMOffRamp.OffRampConfig config);
 
   BaseOffRampHelper s_offRamp;
   MockCommitStore s_mockCommitStore;
@@ -34,7 +34,9 @@ contract BaseOffRampSetup is TokenSetup {
     TokenPool(address(s_destPools[1])).setOffRamp(s_offRamp, true);
   }
 
-  function assertSameConfig(IBaseOffRamp.OffRampConfig memory a, IBaseOffRamp.OffRampConfig memory b) public {
+  function assertSameConfig(IEVM2EVMOffRamp.OffRampConfig memory a, IEVM2EVMOffRamp.OffRampConfig memory b) public {
+    assertEq(a.gasOverhead, b.gasOverhead);
+    assertEq(address(a.feeManager), address(b.feeManager));
     assertEq(a.executionDelaySeconds, b.executionDelaySeconds);
     assertEq(a.maxDataSize, b.maxDataSize);
     assertEq(a.maxTokensLength, b.maxTokensLength);

@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {IFeeManager} from "../../interfaces/fees/IFeeManager.sol";
 
-import {GE} from "../../models/GE.sol";
+import {Internal} from "../../models/Internal.sol";
 import {TokenSetup} from "../TokenSetup.t.sol";
 import {FeeManager} from "../../fees/FeeManager.sol";
 
@@ -14,8 +14,8 @@ contract FeeManagerSetup is TokenSetup {
 
   function setUp() public virtual override {
     TokenSetup.setUp();
-    GE.FeeUpdate[] memory fees = new GE.FeeUpdate[](1);
-    fees[0] = GE.FeeUpdate({
+    Internal.FeeUpdate[] memory fees = new Internal.FeeUpdate[](1);
+    fees[0] = Internal.FeeUpdate({
       sourceFeeToken: s_sourceTokens[0],
       destChainId: DEST_CHAIN_ID,
       feeTokenBaseUnitsPerUnitGas: 100
