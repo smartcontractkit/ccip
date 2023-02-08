@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"fmt"
 	"math/big"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -36,8 +37,8 @@ import (
 	bigmath "github.com/smartcontractkit/chainlink/core/utils/big_math"
 	networks "github.com/smartcontractkit/chainlink/integration-tests"
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
-	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts/ccip"
+	"github.com/smartcontractkit/chainlink/integration-tests/contracts/ccip/laneconfig"
 )
 
 const (
@@ -89,9 +90,9 @@ var (
 type CCIPCommon struct {
 	ChainClient       blockchain.EVMClient
 	Deployer          *ccip.CCIPContractsDeployer
-	FeeToken          contracts.LinkToken
+	FeeToken          *ccip.LinkToken
 	FeeTokenPool      *ccip.LockReleaseTokenPool
-	BridgeTokens      []contracts.LinkToken // as of now considering the bridge token is same as link token
+	BridgeTokens      []*ccip.LinkToken // as of now considering the bridge token is same as link token
 	TokenPrices       []*big.Int
 	BridgeTokenPools  []*ccip.LockReleaseTokenPool
 	RateLimiterConfig ccip.RateLimiterConfig
@@ -106,14 +107,18 @@ func (ccipModule *CCIPCommon) CopyAddresses(chainClient blockchain.EVMClient) *C
 	for _, pool := range ccipModule.BridgeTokenPools {
 		pools = append(pools, &ccip.LockReleaseTokenPool{EthAddress: pool.EthAddress})
 	}
-	var tokens []contracts.LinkToken
+	var tokens []*ccip.LinkToken
 	for _, token := range ccipModule.BridgeTokens {
-		tokens = append(tokens, token)
+		tokens = append(tokens, &ccip.LinkToken{
+			EthAddress: token.EthAddress,
+		})
 	}
 	return &CCIPCommon{
 		ChainClient: chainClient,
 		Deployer:    nil,
-		FeeToken:    ccipModule.FeeToken,
+		FeeToken: &ccip.LinkToken{
+			EthAddress: ccipModule.FeeToken.EthAddress,
+		},
 		FeeTokenPool: &ccip.LockReleaseTokenPool{
 			EthAddress: ccipModule.FeeTokenPool.EthAddress,
 		},
@@ -138,56 +143,128 @@ func (ccipModule *CCIPCommon) CopyAddresses(chainClient blockchain.EVMClient) *C
 	}
 }
 
+func (ccipModule *CCIPCommon) LoadContractAddresses(t *testing.T, otherNetwork string, laneConfigMu *sync.Mutex) {
+	conf, err := laneconfig.ReadLane(ccipModule.ChainClient.GetNetworkName(), otherNetwork, laneConfigMu)
+	require.NoError(t, err)
+	if conf != nil {
+		if common.IsHexAddress(conf.LaneConfig.FeeToken) {
+			ccipModule.FeeToken = &ccip.LinkToken{
+				EthAddress: common.HexToAddress(conf.LaneConfig.FeeToken),
+			}
+		}
+
+		if common.IsHexAddress(conf.LaneConfig.FeeTokenPool) {
+			ccipModule.FeeTokenPool = &ccip.LockReleaseTokenPool{
+				EthAddress: common.HexToAddress(conf.LaneConfig.FeeTokenPool),
+			}
+		}
+		if common.IsHexAddress(conf.LaneConfig.Router) {
+			ccipModule.Router = &ccip.Router{
+				EthAddress: common.HexToAddress(conf.LaneConfig.Router),
+			}
+		}
+		if common.IsHexAddress(conf.LaneConfig.AFN) {
+			ccipModule.AFN = &ccip.AFN{
+				EthAddress: common.HexToAddress(conf.LaneConfig.AFN),
+			}
+		}
+		if len(conf.LaneConfig.BridgeTokens) > 0 {
+			var tokens []*ccip.LinkToken
+			for _, token := range conf.LaneConfig.BridgeTokens {
+				if common.IsHexAddress(token) {
+					tokens = append(tokens, &ccip.LinkToken{
+						EthAddress: common.HexToAddress(token),
+					})
+				}
+			}
+			ccipModule.BridgeTokens = tokens
+		}
+		if len(conf.LaneConfig.BridgeTokenPools) > 0 {
+			var pools []*ccip.LockReleaseTokenPool
+			for _, pool := range conf.LaneConfig.BridgeTokenPools {
+				if common.IsHexAddress(pool) {
+					pools = append(pools, &ccip.LockReleaseTokenPool{
+						EthAddress: common.HexToAddress(pool),
+					})
+				}
+			}
+			ccipModule.BridgeTokenPools = pools
+		}
+	}
+}
+
 // DeployContracts deploys the contracts which are necessary in both source and dest chain
 // This reuses common contracts for bidirectional lanes
-func (ccipModule *CCIPCommon) DeployContracts(t *testing.T, noOfTokens int) {
+func (ccipModule *CCIPCommon) DeployContracts(t *testing.T, noOfTokens int, dest string, laneConfigMu *sync.Mutex) {
 	var err error
 	cd := ccipModule.Deployer
+	reuseEnv := os.Getenv("REUSE_CCIP_COMMON")
+	reuse := false
+	if reuseEnv != "" {
+		reuse, err = strconv.ParseBool(reuseEnv)
+		require.NoError(t, err)
+	}
+
+	// if REUSE_CCIP_COMMON is true use existing contract addresses instead of deploying new ones. Used for testnet deployments
+	if reuse && !ccipModule.ChainClient.NetworkSimulated() {
+		ccipModule.LoadContractAddresses(t, dest, laneConfigMu)
+	}
 	if ccipModule.FeeToken == nil {
 		// deploy link token
 		token, err := cd.DeployLinkTokenContract()
 		require.NoError(t, err, "Deploying Link Token Contract shouldn't fail")
 		ccipModule.FeeToken = token
 		require.NoError(t, ccipModule.ChainClient.WaitForEvents(), "error in waiting for feetoken deployment")
-		// token pool for fee token
-		ccipModule.FeeTokenPool, err = cd.DeployLockReleaseTokenPoolContract(ccipModule.FeeToken.Address())
-		require.NoError(t, err, "Deploying Native TokenPool Contract shouldn't fail")
 	} else {
 		token, err := cd.NewLinkTokenContract(common.HexToAddress(ccipModule.FeeToken.Address()))
 		require.NoError(t, err, "Instantiating Link Token Contract shouldn't fail")
 		ccipModule.FeeToken = token
+	}
+	if ccipModule.FeeTokenPool == nil {
+		// token pool for fee token
+		ccipModule.FeeTokenPool, err = cd.DeployLockReleaseTokenPoolContract(ccipModule.FeeToken.Address())
+		require.NoError(t, err, "Deploying Native TokenPool Contract shouldn't fail")
+	} else {
 		pool, err := cd.NewLockReleaseTokenPoolContract(ccipModule.FeeTokenPool.EthAddress)
 		require.NoError(t, err, "Instantiating Native TokenPool Contract shouldn't fail")
 		ccipModule.FeeTokenPool = pool
 	}
+	var btAddresses, btpAddresses []string
 	if len(ccipModule.BridgeTokens) != noOfTokens {
 		// deploy bridge token.
 		for i := 0; i < noOfTokens; i++ {
 			token, err := cd.DeployLinkTokenContract()
 			require.NoError(t, err, "Deploying Link Token Contract shouldn't fail")
 			ccipModule.BridgeTokens = append(ccipModule.BridgeTokens, token)
+			btAddresses = append(btAddresses, token.Address())
 		}
 
 		require.NoError(t, ccipModule.ChainClient.WaitForEvents(), "Error waiting for Link Token deployments")
+	} else {
+		var tokens []*ccip.LinkToken
+		for _, token := range ccipModule.BridgeTokens {
+			newToken, err := cd.NewLinkTokenContract(common.HexToAddress(token.Address()))
+			require.NoError(t, err, "Instantiating Link Token Contract shouldn't fail")
+			tokens = append(tokens, newToken)
+			btAddresses = append(btAddresses, token.Address())
+		}
+		ccipModule.BridgeTokens = tokens
+	}
+	if len(ccipModule.BridgeTokenPools) != noOfTokens {
 		// deploy native token pool
 		for _, token := range ccipModule.BridgeTokens {
 			ntp, err := cd.DeployLockReleaseTokenPoolContract(token.Address())
 			require.NoError(t, err, "Deploying Native TokenPool Contract shouldn't fail")
 			ccipModule.BridgeTokenPools = append(ccipModule.BridgeTokenPools, ntp)
+			btpAddresses = append(btpAddresses, ntp.Address())
 		}
 	} else {
-		var tokens []contracts.LinkToken
-		for _, token := range ccipModule.BridgeTokens {
-			newToken, err := cd.NewLinkTokenContract(common.HexToAddress(token.Address()))
-			require.NoError(t, err, "Instantiating Link Token Contract shouldn't fail")
-			tokens = append(tokens, newToken)
-		}
-		ccipModule.BridgeTokens = tokens
 		var pools []*ccip.LockReleaseTokenPool
 		for _, pool := range ccipModule.BridgeTokenPools {
 			newPool, err := cd.NewLockReleaseTokenPoolContract(pool.EthAddress)
 			require.NoError(t, err, "Instantiating Native TokenPool Contract shouldn't fail")
 			pools = append(pools, newPool)
+			btpAddresses = append(btpAddresses, newPool.Address())
 		}
 		ccipModule.BridgeTokenPools = pools
 	}
@@ -216,6 +293,21 @@ func (ccipModule *CCIPCommon) DeployContracts(t *testing.T, noOfTokens int) {
 
 	ccipModule.deployed <- struct{}{}
 	log.Info().Msg("finished deploying common contracts")
+	if !ccipModule.ChainClient.NetworkSimulated() {
+		lane := laneconfig.Lane{
+			NetworkA: ccipModule.ChainClient.GetNetworkName(),
+			LaneConfig: laneconfig.LaneConfig{
+				OtherNetwork:     dest,
+				FeeToken:         ccipModule.FeeToken.Address(),
+				FeeTokenPool:     ccipModule.FeeTokenPool.Address(),
+				BridgeTokens:     btAddresses,
+				BridgeTokenPools: btpAddresses,
+				AFN:              ccipModule.AFN.Address(),
+				Router:           ccipModule.Router.Address(),
+			},
+		}
+		require.NoError(t, laneconfig.UpdateLane(lane, laneConfigMu), "could not write contract json")
+	}
 }
 
 func DefaultCCIPModule(chainClient blockchain.EVMClient) *CCIPCommon {
@@ -242,6 +334,7 @@ type SourceCCIPModule struct {
 	TransferAmount     []*big.Int
 	DestinationChainId uint64
 	OnRamp             *ccip.OnRamp
+	FeeManager         *ccip.FeeManager
 }
 
 // DeployContracts deploys all CCIP contracts specific to the source chain
@@ -266,7 +359,7 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(t *testing.T) {
 	err = sourceCCIP.Common.ChainClient.WaitForEvents()
 	require.NoError(t, err, "Error waiting for OnRamp deployment")
 
-	sourceFeeManager, err := contractDeployer.DeployFeeManager([]fee_manager.InternalFeeUpdate{
+	sourceCCIP.FeeManager, err = contractDeployer.DeployFeeManager([]fee_manager.InternalFeeUpdate{
 		{
 			SourceFeeToken:              common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
 			DestChainId:                 sourceCCIP.DestinationChainId,
@@ -285,7 +378,7 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(t *testing.T) {
 		[]common.Address{},
 		sourceCCIP.Common.AFN.EthAddress,
 		sourceCCIP.Common.Router.EthAddress,
-		sourceFeeManager.EthAddress,
+		sourceCCIP.FeeManager.EthAddress,
 		sourceCCIP.Common.RateLimiterConfig,
 		[]evm_2_evm_onramp.IEVM2EVMOnRampFeeTokenConfigArgs{
 			{
@@ -340,10 +433,11 @@ func (sourceCCIP *SourceCCIPModule) CollectBalanceRequirements(t *testing.T) []t
 		})
 	}
 	balancesReq = append(balancesReq, testhelpers.BalanceReq{
-		Name:   fmt.Sprintf("%s-FeeToken-%s", testhelpers.Sender, sourceCCIP.Sender.Hex()),
+		Name:   fmt.Sprintf("%s-FeeToken-%s-Address-%s", testhelpers.Sender, sourceCCIP.Common.FeeToken.Address(), sourceCCIP.Sender.Hex()),
 		Addr:   sourceCCIP.Sender,
 		Getter: GetterForLinkToken(t, sourceCCIP.Common.FeeToken, sourceCCIP.Sender.Hex()),
 	})
+
 	balancesReq = append(balancesReq, testhelpers.BalanceReq{
 		Name:   fmt.Sprintf("%s-Router-%s", testhelpers.Sender, sourceCCIP.Common.Router.Address()),
 		Addr:   sourceCCIP.Common.Router.EthAddress,
@@ -355,9 +449,9 @@ func (sourceCCIP *SourceCCIPModule) CollectBalanceRequirements(t *testing.T) []t
 		Getter: GetterForLinkToken(t, sourceCCIP.Common.FeeToken, sourceCCIP.OnRamp.Address()),
 	})
 	balancesReq = append(balancesReq, testhelpers.BalanceReq{
-		Name:   fmt.Sprintf("%s-FeeTokenPool-%s", testhelpers.Sender, sourceCCIP.Common.FeeTokenPool.Address()),
-		Addr:   sourceCCIP.Common.FeeTokenPool.EthAddress,
-		Getter: GetterForLinkToken(t, sourceCCIP.Common.FeeToken, sourceCCIP.Common.FeeTokenPool.Address()),
+		Name:   fmt.Sprintf("%s-FeeManager-%s", testhelpers.Sender, sourceCCIP.FeeManager.Address()),
+		Addr:   sourceCCIP.FeeManager.EthAddress,
+		Getter: GetterForLinkToken(t, sourceCCIP.Common.FeeToken, sourceCCIP.FeeManager.Address()),
 	})
 
 	return balancesReq
@@ -383,21 +477,20 @@ func (sourceCCIP *SourceCCIPModule) BalanceAssertions(t *testing.T, prevBalances
 			Expected: bigmath.Add(prevBalances[name], bigmath.Mul(big.NewInt(noOfReq), sourceCCIP.TransferAmount[i])).String(),
 		})
 	}
-	name := fmt.Sprintf("%s-FeeToken-%s", testhelpers.Sender, sourceCCIP.Sender.Hex())
+	name := fmt.Sprintf("%s-FeeToken-%s-Address-%s", testhelpers.Sender, sourceCCIP.Common.FeeToken.Address(), sourceCCIP.Sender.Hex())
 	balAssertions = append(balAssertions, testhelpers.BalanceAssertion{
 		Name:     name,
 		Address:  sourceCCIP.Sender,
 		Getter:   GetterForLinkToken(t, sourceCCIP.Common.FeeToken, sourceCCIP.Sender.Hex()),
 		Expected: bigmath.Sub(prevBalances[name], totalFee).String(),
 	})
-	name = fmt.Sprintf("%s-FeeTokenPool-%s", testhelpers.Sender, sourceCCIP.Common.FeeTokenPool.Address())
-	// TODO add balance assertion for fees going to the feeManager
-	//balAssertions = append(balAssertions, testhelpers.BalanceAssertion{
-	//	Name:     name,
-	//	Address:  sourceCCIP.Common.FeeTokenPool.EthAddress,
-	//	Getter:   GetterForLinkToken(t, sourceCCIP.Common.FeeToken, sourceCCIP.Common.FeeTokenPool.Address()),
-	//	Expected: bigmath.Add(prevBalances[name], totalFee).String(),
-	//})
+	name = fmt.Sprintf("%s-FeeManager-%s", testhelpers.Sender, sourceCCIP.FeeManager.Address())
+	balAssertions = append(balAssertions, testhelpers.BalanceAssertion{
+		Name:     name,
+		Address:  sourceCCIP.FeeManager.EthAddress,
+		Getter:   GetterForLinkToken(t, sourceCCIP.Common.FeeToken, sourceCCIP.FeeManager.Address()),
+		Expected: bigmath.Add(prevBalances[name], totalFee).String(),
+	})
 	name = fmt.Sprintf("%s-Router-%s", testhelpers.Sender, sourceCCIP.Common.Router.Address())
 	balAssertions = append(balAssertions, testhelpers.BalanceAssertion{
 		Name:     fmt.Sprintf("%s-Router-%s", testhelpers.Sender, sourceCCIP.Common.Router.Address()),
@@ -540,7 +633,7 @@ func (destCCIP *DestCCIPModule) DeployContracts(t *testing.T, sourceCCIP SourceC
 		destTokens = append(destTokens, common.HexToAddress(token.Address()))
 		pool := destCCIP.Common.BridgeTokenPools[i]
 		pools = append(pools, pool.EthAddress)
-		err = token.Transfer(pool.Address(), testhelpers.Link(1000))
+		err = token.Transfer(pool.Address(), testhelpers.Link(100))
 		require.NoError(t, err)
 	}
 	// add the fee token and fee token price for dest
@@ -548,8 +641,6 @@ func (destCCIP *DestCCIPModule) DeployContracts(t *testing.T, sourceCCIP SourceC
 	destCCIP.Common.TokenPrices = append(destCCIP.Common.TokenPrices, big.NewInt(1))
 
 	pools = append(pools, destCCIP.Common.FeeTokenPool.EthAddress)
-	err = destCCIP.Common.FeeToken.Transfer(destCCIP.Common.FeeTokenPool.Address(), testhelpers.Link(1000))
-	require.NoError(t, err)
 	destFeeManager, err := contractDeployer.DeployFeeManager([]fee_manager.InternalFeeUpdate{
 		{
 			SourceFeeToken:              common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
@@ -618,7 +709,7 @@ func (destCCIP *DestCCIPModule) CollectBalanceRequirements(t *testing.T) []testh
 		})
 	}
 	destBalancesReq = append(destBalancesReq, testhelpers.BalanceReq{
-		Name:   fmt.Sprintf("%s-FeeToken-%s", testhelpers.Receiver, destCCIP.ReceiverDapp.Address()),
+		Name:   fmt.Sprintf("%s-FeeToken-%s-Address-%s", testhelpers.Receiver, destCCIP.Common.FeeToken.Address(), destCCIP.ReceiverDapp.Address()),
 		Addr:   destCCIP.ReceiverDapp.EthAddress,
 		Getter: GetterForLinkToken(t, destCCIP.Common.FeeToken, destCCIP.ReceiverDapp.Address()),
 	})
@@ -640,9 +731,7 @@ func (destCCIP *DestCCIPModule) BalanceAssertions(
 	t *testing.T,
 	prevBalances map[string]*big.Int,
 	transferAmount []*big.Int,
-	unusedFee *big.Int,
 	noOfReq int64,
-	totalFee *big.Int,
 ) []testhelpers.BalanceAssertion {
 	var balAssertions []testhelpers.BalanceAssertion
 	for i, token := range destCCIP.Common.BridgeTokens {
@@ -664,21 +753,27 @@ func (destCCIP *DestCCIPModule) BalanceAssertions(
 		})
 	}
 
-	// TODO: FOR ALL FEES REMAIN ON SOURCE
-	//name := fmt.Sprintf("%s-OffRamp-%s", testhelpers.Receiver, destCCIP.OffRamp.Address())
-	//balAssertions = append(balAssertions, testhelpers.BalanceAssertion{
-	//	Name:     name,
-	//	Address:  destCCIP.OffRamp.EthAddress,
-	//	Getter:   GetterForLinkToken(t, destCCIP.Common.FeeToken, destCCIP.OffRamp.Address()),
-	//	Expected: bigmath.Add(prevBalances[name], totalFee).String(),
-	//})
-	//name = fmt.Sprintf("%s-FeeTokenPool-%s", testhelpers.Receiver, destCCIP.Common.FeeTokenPool.Address())
-	//balAssertions = append(balAssertions, testhelpers.BalanceAssertion{
-	//	Name:     name,
-	//	Address:  destCCIP.Common.FeeTokenPool.EthAddress,
-	//	Getter:   GetterForLinkToken(t, destCCIP.Common.FeeToken, destCCIP.Common.FeeTokenPool.Address()),
-	//	Expected: bigmath.Sub(prevBalances[name], totalFee).String(),
-	//})
+	name := fmt.Sprintf("%s-OffRamp-%s", testhelpers.Receiver, destCCIP.OffRamp.Address())
+	balAssertions = append(balAssertions, testhelpers.BalanceAssertion{
+		Name:     name,
+		Address:  destCCIP.OffRamp.EthAddress,
+		Getter:   GetterForLinkToken(t, destCCIP.Common.FeeToken, destCCIP.OffRamp.Address()),
+		Expected: prevBalances[name].String(),
+	})
+	name = fmt.Sprintf("%s-FeeTokenPool-%s", testhelpers.Receiver, destCCIP.Common.FeeTokenPool.Address())
+	balAssertions = append(balAssertions, testhelpers.BalanceAssertion{
+		Name:     name,
+		Address:  destCCIP.Common.FeeTokenPool.EthAddress,
+		Getter:   GetterForLinkToken(t, destCCIP.Common.FeeToken, destCCIP.Common.FeeTokenPool.Address()),
+		Expected: prevBalances[name].String(),
+	})
+	name = fmt.Sprintf("%s-FeeToken-%s-Address-%s", testhelpers.Receiver, destCCIP.Common.FeeToken.Address(), destCCIP.ReceiverDapp.Address())
+	balAssertions = append(balAssertions, testhelpers.BalanceAssertion{
+		Name:     name,
+		Address:  destCCIP.ReceiverDapp.EthAddress,
+		Getter:   GetterForLinkToken(t, destCCIP.Common.FeeToken, destCCIP.ReceiverDapp.Address()),
+		Expected: prevBalances[name].String(),
+	})
 
 	return balAssertions
 }
@@ -756,6 +851,7 @@ type CCIPLane struct {
 	SentReqHashes           []string
 	TotalFee                *big.Int
 	ValidationTimeout       time.Duration
+	laneConfigMu            *sync.Mutex
 }
 
 func (lane *CCIPLane) IsLaneDeployed() error {
@@ -825,7 +921,7 @@ func (lane *CCIPLane) ValidateRequests() {
 	// verify the fee amount is deducted from sender, added to receiver token balances and
 	// unused fee is returned to receiver fee token account
 	AssertBalances(lane.t, lane.Source.BalanceAssertions(lane.t, lane.SourceBalances, int64(lane.NumberOfReq), lane.TotalFee))
-	AssertBalances(lane.t, lane.Dest.BalanceAssertions(lane.t, lane.DestBalances, lane.Source.TransferAmount, UnusedFee, int64(lane.NumberOfReq), lane.TotalFee))
+	AssertBalances(lane.t, lane.Dest.BalanceAssertions(lane.t, lane.DestBalances, lane.Source.TransferAmount, int64(lane.NumberOfReq)))
 
 }
 
@@ -879,6 +975,88 @@ func (lane *CCIPLane) SoakRun(interval, duration time.Duration) (int, int) {
 	}
 }
 
+func (lane *CCIPLane) DeployNewCCIPLane(
+	numOfCommitNodes int,
+	commitAndExecOnSameDON bool,
+	sourceCommon *CCIPCommon,
+	destCommon *CCIPCommon,
+	transferAmounts []*big.Int,
+	newBootstrap bool,
+	wg *sync.WaitGroup,
+) {
+	env := lane.TestEnv
+	sourceChainClient := env.SourceChainClient
+	destChainClient := env.DestChainClient
+	clNodesWithKeys := env.CLNodesWithKeys
+	mockServer := env.MockServer
+	t := lane.t
+	// deploy all source contracts
+	if sourceCommon == nil {
+		sourceCommon = DefaultCCIPModule(sourceChainClient)
+	}
+
+	if destCommon == nil {
+		destCommon = DefaultCCIPModule(destChainClient)
+	}
+
+	lane.Source = DefaultSourceCCIPModule(t, sourceChainClient, destChainClient.GetChainID().Uint64(), transferAmounts, sourceCommon)
+	lane.Dest = DefaultDestinationCCIPModule(t, destChainClient, sourceChainClient.GetChainID().Uint64(), destCommon)
+
+	go func() {
+		lane.Source.Common.DeployContracts(t, len(lane.Source.TransferAmount), lane.Dest.Common.ChainClient.GetNetworkName(), lane.laneConfigMu)
+	}()
+	go func() {
+		lane.Dest.Common.DeployContracts(t, len(lane.Source.TransferAmount), lane.Source.Common.ChainClient.GetNetworkName(), lane.laneConfigMu)
+	}()
+
+	// deploy all source contracts
+	lane.Source.DeployContracts(t)
+
+	// deploy all destination contracts
+	lane.Dest.DeployContracts(t, *lane.Source, wg)
+
+	// set up ocr2 jobs
+	var tokenAddr []string
+	for _, token := range lane.Dest.Common.BridgeTokens {
+		tokenAddr = append(tokenAddr, token.Address())
+	}
+	clNodes, exists := clNodesWithKeys[lane.Dest.Common.ChainClient.GetChainID().String()]
+	require.True(t, exists)
+
+	tokenAddr = append(tokenAddr, lane.Dest.Common.FeeToken.Address())
+	// first node is the bootstrapper
+	bootstrapCommit := clNodes[0]
+	var bootstrapExec *client.CLNodesWithKeys
+	var execNodes []*client.CLNodesWithKeys
+	commitNodes := clNodes[1:]
+	env.commitNodeStartIndex = 1
+	env.execNodeStartIndex = 1
+	env.numOfAllowedFaultyExec = 1
+	env.numOfAllowedFaultyCommit = 1
+	if !commitAndExecOnSameDON {
+		bootstrapExec = clNodes[1] // for a set-up of different commit and execution nodes second node is the bootstrapper for execution nodes
+		commitNodes = clNodes[2 : 2+numOfCommitNodes]
+		execNodes = clNodes[2+numOfCommitNodes:]
+		env.commitNodeStartIndex = 2
+		env.execNodeStartIndex = 7
+	}
+
+	CreateOCRJobsForCCIP(
+		t,
+		bootstrapCommit, bootstrapExec, commitNodes, execNodes,
+		lane.Source.OnRamp.EthAddress,
+		lane.Dest.CommitStore.EthAddress,
+		lane.Dest.OffRamp.EthAddress,
+		sourceChainClient, destChainClient,
+		tokenAddr,
+		mockServer, newBootstrap,
+	)
+
+	// set up ocr2 config
+	SetOCR2Configs(t, commitNodes, execNodes, *lane.Dest)
+	lane.Ready <- struct{}{}
+}
+
 // SetOCR2Configs sets the oracle config in ocr2 contracts
 // nil value in execNodes denotes commit and execution jobs are to be set up in same DON
 func SetOCR2Configs(t *testing.T, commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP DestCCIPModule) {
@@ -909,7 +1087,7 @@ func CreateOCRJobsForCCIP(
 	bootstrapCommit *client.CLNodesWithKeys,
 	bootstrapExec *client.CLNodesWithKeys,
 	commitNodes, execNodes []*client.CLNodesWithKeys,
-	geOnRamp, commitStore, geOffRamp common.Address,
+	onRamp, commitStore, offRamp common.Address,
 	sourceChainClient, destChainClient blockchain.EVMClient,
 	linkTokenAddr []string,
 	mockServer *ctfClient.MockserverClient,
@@ -942,8 +1120,8 @@ func CreateOCRJobsForCCIP(
 	currentBlockOnDest, err := destChainClient.LatestBlockNumber(context.Background())
 	require.NoError(t, err, "Getting current block should be successful in dest chain")
 	var onRamps []common.Address
-	if geOnRamp != common.HexToAddress("0x0") {
-		onRamps = append(onRamps, geOnRamp)
+	if onRamp != common.HexToAddress("0x0") {
+		onRamps = append(onRamps, onRamp)
 	}
 	jobParams := testhelpers.CCIPJobSpecParams{
 		OnRampsOnCommit:    onRamps,
@@ -965,7 +1143,7 @@ func CreateOCRJobsForCCIP(
 		_, err = bootstrapCommit.Node.MustCreateJob(jobParams.BootstrapJob(commitStore.Hex()))
 		require.NoError(t, err, "Shouldn't fail creating bootstrap job on bootstrap node")
 		if bootstrapExec != nil && len(execNodes) > 0 {
-			_, err := bootstrapExec.Node.MustCreateJob(jobParams.BootstrapJob(geOffRamp.Hex()))
+			_, err := bootstrapExec.Node.MustCreateJob(jobParams.BootstrapJob(offRamp.Hex()))
 			require.NoError(t, err, "Shouldn't fail creating bootstrap job on bootstrap node")
 		}
 	}
@@ -984,9 +1162,9 @@ func CreateOCRJobsForCCIP(
 	require.NoError(t, err)
 	var ocr2SpecExec *client.OCR2TaskJobSpec
 
-	if geOffRamp != common.HexToAddress("0x0") {
-		jobParams.OffRamp = geOffRamp
-		jobParams.OnRampForExecution = geOnRamp
+	if offRamp != common.HexToAddress("0x0") {
+		jobParams.OffRamp = offRamp
+		jobParams.OnRampForExecution = onRamp
 		jobParams.P2PV2Bootstrappers = []string{p2pBootstrappersExec.P2PV2Bootstrapper()}
 		ocr2SpecExec, err = jobParams.ExecutionJobSpec()
 		require.NoError(t, err)
@@ -1132,7 +1310,7 @@ func DeployEnvironments(
 							"networkId": fmt.Sprint(NetworkA.ChainID),
 						},
 						"tx": map[string]interface{}{
-							"replicas": "1",
+							"replicas": "2",
 						},
 						"miner": map[string]interface{}{
 							"replicas": "0",
@@ -1152,7 +1330,7 @@ func DeployEnvironments(
 							"networkId": fmt.Sprint(NetworkB.ChainID),
 						},
 						"tx": map[string]interface{}{
-							"replicas": "1",
+							"replicas": "2",
 						},
 						"miner": map[string]interface{}{
 							"replicas": "0",
@@ -1300,7 +1478,7 @@ func AssertBalances(t *testing.T, bas []testhelpers.BalanceAssertion) {
 	event.Msg("balance assertions succeeded")
 }
 
-func GetterForLinkToken(t *testing.T, token contracts.LinkToken, addr string) func(_ common.Address) *big.Int {
+func GetterForLinkToken(t *testing.T, token *ccip.LinkToken, addr string) func(_ common.Address) *big.Int {
 	return func(_ common.Address) *big.Int {
 		balance, err := token.BalanceOf(context.Background(), addr)
 		require.NoError(t, err)
@@ -1337,6 +1515,7 @@ func CCIPDefaultTestSetUp(
 	require.NoError(t, err, "Connecting to blockchain nodes shouldn't fail")
 	destChainClient.ParallelTransactions(true)
 
+	laneMu := &sync.Mutex{}
 	testSetUpB2A := CCIPTestEnv{
 		MockServer:        testSetUpA2B.MockServer,
 		CLNodesWithKeys:   testSetUpA2B.CLNodesWithKeys,
@@ -1356,20 +1535,25 @@ func CCIPDefaultTestSetUp(
 		commonContractsDeployed: make(chan struct{}, 1),
 		SentReqHashes:           []string{},
 		TotalFee:                big.NewInt(0),
+		laneConfigMu:            laneMu,
 	}
+	var ccipLaneB2A *CCIPLane
 
-	ccipLaneB2A := &CCIPLane{
-		t:                       t,
-		TestEnv:                 &testSetUpB2A,
-		SourceNetworkName:       networkBName,
-		DestNetworkName:         networkAName,
-		ValidationTimeout:       2 * time.Minute,
-		Ready:                   make(chan struct{}, 1),
-		commonContractsDeployed: make(chan struct{}, 1),
-		SourceBalances:          make(map[string]*big.Int),
-		DestBalances:            make(map[string]*big.Int),
-		SentReqHashes:           []string{},
-		TotalFee:                big.NewInt(0),
+	if bidirectional {
+		ccipLaneB2A = &CCIPLane{
+			t:                       t,
+			TestEnv:                 &testSetUpB2A,
+			SourceNetworkName:       networkBName,
+			DestNetworkName:         networkAName,
+			ValidationTimeout:       2 * time.Minute,
+			Ready:                   make(chan struct{}, 1),
+			commonContractsDeployed: make(chan struct{}, 1),
+			SourceBalances:          make(map[string]*big.Int),
+			DestBalances:            make(map[string]*big.Int),
+			SentReqHashes:           []string{},
+			TotalFee:                big.NewInt(0),
+			laneConfigMu:            laneMu,
+		}
 	}
 	// This WaitGroup is for waiting on the deployment of common contracts for lane A to B
 	// so that these contracts can be reused for lane B to A
@@ -1401,86 +1585,4 @@ func CCIPDefaultTestSetUp(
 	}
 
 	return ccipLaneA2B, ccipLaneB2A, tearDown
-}
-
-func (lane *CCIPLane) DeployNewCCIPLane(
-	numOfCommitNodes int,
-	commitAndExecOnSameDON bool,
-	sourceCommon *CCIPCommon,
-	destCommon *CCIPCommon,
-	transferAmounts []*big.Int,
-	newBootstrap bool,
-	wg *sync.WaitGroup,
-) {
-	env := lane.TestEnv
-	sourceChainClient := env.SourceChainClient
-	destChainClient := env.DestChainClient
-	clNodesWithKeys := env.CLNodesWithKeys
-	mockServer := env.MockServer
-	t := lane.t
-	// deploy all source contracts
-	if sourceCommon == nil {
-		sourceCommon = DefaultCCIPModule(sourceChainClient)
-	}
-
-	if destCommon == nil {
-		destCommon = DefaultCCIPModule(destChainClient)
-	}
-
-	lane.Source = DefaultSourceCCIPModule(t, sourceChainClient, destChainClient.GetChainID().Uint64(), transferAmounts, sourceCommon)
-	lane.Dest = DefaultDestinationCCIPModule(t, destChainClient, sourceChainClient.GetChainID().Uint64(), destCommon)
-
-	go func() {
-		lane.Source.Common.DeployContracts(t, len(lane.Source.TransferAmount))
-	}()
-	go func() {
-		lane.Dest.Common.DeployContracts(t, len(lane.Source.TransferAmount))
-	}()
-
-	// deploy all source contracts
-	lane.Source.DeployContracts(t)
-
-	// deploy all destination contracts
-	lane.Dest.DeployContracts(t, *lane.Source, wg)
-
-	// set up ocr2 jobs
-	var tokenAddr []string
-	for _, token := range lane.Dest.Common.BridgeTokens {
-		tokenAddr = append(tokenAddr, token.Address())
-	}
-	clNodes, exists := clNodesWithKeys[lane.Dest.Common.ChainClient.GetChainID().String()]
-	require.True(t, exists)
-
-	tokenAddr = append(tokenAddr, lane.Dest.Common.FeeToken.Address())
-	// first node is the bootstrapper
-	bootstrapCommit := clNodes[0]
-	var bootstrapExec *client.CLNodesWithKeys
-	var execNodes []*client.CLNodesWithKeys
-	commitNodes := clNodes[1:]
-	env.commitNodeStartIndex = 1
-	env.execNodeStartIndex = 1
-	env.numOfAllowedFaultyExec = 1
-	env.numOfAllowedFaultyCommit = 1
-	if !commitAndExecOnSameDON {
-		bootstrapExec = clNodes[1] // for a set-up of different commit and execution nodes second node is the bootstrapper for execution nodes
-		commitNodes = clNodes[2 : 2+numOfCommitNodes]
-		execNodes = clNodes[2+numOfCommitNodes:]
-		env.commitNodeStartIndex = 2
-		env.execNodeStartIndex = 7
-	}
-
-	CreateOCRJobsForCCIP(
-		t,
-		bootstrapCommit,
-		bootstrapExec,
-		commitNodes, execNodes,
-		lane.Source.OnRamp.EthAddress, lane.Dest.CommitStore.EthAddress, lane.Dest.OffRamp.EthAddress,
-		sourceChainClient, destChainClient,
-		tokenAddr,
-		mockServer, newBootstrap,
-	)
-
-	// set up ocr2 config
-	SetOCR2Configs(t, commitNodes, execNodes, *lane.Dest)
-	lane.Ready <- struct{}{}
 }

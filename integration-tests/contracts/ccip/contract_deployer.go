@@ -21,6 +21,8 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
+
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/mock_afn_contract"
@@ -46,19 +48,47 @@ func NewCCIPContractsDeployer(bcClient blockchain.EVMClient) (*CCIPContractsDepl
 	}, nil
 }
 
-func (e *CCIPContractsDeployer) DeployLinkTokenContract() (contracts.LinkToken, error) {
-	return e.EthDeployer.DeployLinkTokenContract()
+func (e *CCIPContractsDeployer) DeployLinkTokenContract() (*LinkToken, error) {
+	address, _, instance, err := e.evmClient.DeployContract("Link Token", func(
+		auth *bind.TransactOpts,
+		backend bind.ContractBackend,
+	) (common.Address, *types.Transaction, interface{}, error) {
+		return link_token_interface.DeployLinkToken(auth, backend)
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return &LinkToken{
+		client:     e.evmClient,
+		instance:   instance.(*link_token_interface.LinkToken),
+		EthAddress: *address,
+	}, err
 }
 
-func (e *CCIPContractsDeployer) NewLinkTokenContract(addr common.Address) (contracts.LinkToken, error) {
-	return e.EthDeployer.NewLinkTokenContract(addr)
+func (e *CCIPContractsDeployer) NewLinkTokenContract(addr common.Address) (*LinkToken, error) {
+	token, err := link_token_interface.NewLinkToken(addr, e.evmClient.Backend())
+
+	if err != nil {
+		return nil, err
+	}
+	log.Info().
+		Str("Contract Address", addr.Hex()).
+		Str("Contract Name", "Link Token").
+		Str("From", e.evmClient.GetDefaultWallet().Address()).
+		Str("Network Name", e.evmClient.GetNetworkConfig().Name).
+		Msg("New contract")
+	return &LinkToken{
+		client:     e.evmClient,
+		instance:   token,
+		EthAddress: addr,
+	}, err
 }
 
 func (e *CCIPContractsDeployer) NewLockReleaseTokenPoolContract(addr common.Address) (
 	*LockReleaseTokenPool,
 	error,
 ) {
-
 	pool, err := lock_release_token_pool.NewLockReleaseTokenPool(addr, e.evmClient.Backend())
 
 	if err != nil {

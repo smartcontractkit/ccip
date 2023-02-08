@@ -1,0 +1,110 @@
+[
+  {
+    "NetworkA": "Optimism Goerli",
+    "LaneConfig": {
+      "OtherNetwork": "Sepolia Testnet",
+      "FeeToken": "0x4200000000000000000000000000000000000006",
+      "FeeTokenPool": "0x414e30fdf4d9Ebee0D91AAd3278F7f1F098C62f9",
+      "BridgeTokens": [
+        "0x3B02b5E03ab4a3eDdEEe24C496cf48B32F1dBC82",
+        "0xbA73C3C2DCcBaE98a4875944d05f9122C63981dC"
+      ],
+      "BridgeTokenPools": [
+        "0x4dA06eabBBB7b42cE336044fD3Eaa8439D2eDA13",
+        "0x545AAdF841c42499AB64cAeB0685f2c13513821d"
+      ],
+      "AFN": "0xE014dc362d5eca97a586A3626C06cA263cABFae7",
+      "Router": "0x8932eFF0E8377e125bC922aF48c0c4fD8A889956"
+    }
+  },
+  {
+    "NetworkA": "Sepolia Testnet",
+    "LaneConfig": {
+      "OtherNetwork": "Optimism Goerli",
+      "FeeToken": "0x097D90c9d3E0B50Ca60e1ae45F6A81010f9FB534",
+      "FeeTokenPool": "0x166283C7840c2b15c2498699bC1fBa0B919E0C49",
+      "BridgeTokens": [
+        "0xdCc31f65D5A37d0462676d47f3AD92B85A39fD0D",
+        "0x50C9c2662fdAeBa34a92C449698585550CE67732"
+      ],
+      "BridgeTokenPools": [
+        "0x77e233E813132Df9F8C105CD5c447c51d248409C",
+        "0xDFE49dA76E1F02263076519D1787A8EBE8CC5bF1"
+      ],
+      "AFN": "0x7D1C15a1180b938c8CEA09704c4A8Ded852115F9",
+      "Router": "0xE51187FfEeC9c49553b85E35CdD6aEB4bDE62828"
+    }
+  },
+  {
+    "NetworkA": "Optimism Goerli",
+    "LaneConfig": {
+      "OtherNetwork": "Avalanche Fuji",
+      "FeeToken": "0x4200000000000000000000000000000000000006",
+      "FeeTokenPool": "0x414e30fdf4d9Ebee0D91AAd3278F7f1F098C62f9",
+      "BridgeTokens": [
+        "0x3B02b5E03ab4a3eDdEEe24C496cf48B32F1dBC82",
+        "0xbA73C3C2DCcBaE98a4875944d05f9122C63981dC"
+      ],
+      "BridgeTokenPools": [
+        "0x4dA06eabBBB7b42cE336044fD3Eaa8439D2eDA13",
+        "0x545AAdF841c42499AB64cAeB0685f2c13513821d"
+      ],
+      "AFN": "0x44ffDb89c89e2807F0B32c9846fEebF8776eEf66",
+      "Router": "0x84593a40ce0C5F3F7e4baEEeE2CAed5bECC04e18"
+    }
+  },
+  {
+    "NetworkA": "Avalanche Fuji",
+    "LaneConfig": {
+      "OtherNetwork": "Optimism Goerli",
+      "FeeToken": "0xd00ae08403B9bbb9124bB305C09058E32C39A48c",
+      "FeeTokenPool": "0x0B91Ec9286092965bB4F6e3Db29FeBA0F76Eef9B",
+      "BridgeTokens": [
+        "0xd4ac17A0F52076E5682AeBd2E381e0267F174eE2",
+        "0x15e9727AEFf95fF43Cc8dB0ea6C60d2146f56930"
+      ],
+      "BridgeTokenPools": [
+        "0x285699FfC1262B52d881a42d5a2996160a398254",
+        "0x832a8b7191874f02d4f1dF17f4e27B2EB0DFa496"
+      ],
+      "AFN": "0x41a57103e28076a3a3C9197ddfEe84674BAD58c6",
+      "Router": "0x4563BbffB703ab8219C81B2715cB7201adfd3219"
+    }
+  },
+  {
+    "NetworkA": "Avalanche Fuji",
+    "LaneConfig": {
+      "OtherNetwork": "Sepolia Testnet",
+      "FeeToken": "0xd00ae08403B9bbb9124bB305C09058E32C39A48c",
+      "FeeTokenPool": "0x0B91Ec9286092965bB4F6e3Db29FeBA0F76Eef9B",
+      "BridgeTokens": [
+        "0xd4ac17A0F52076E5682AeBd2E381e0267F174eE2",
+        "0x15e9727AEFf95fF43Cc8dB0ea6C60d2146f56930"
+      ],
+      "BridgeTokenPools": [
+        "0x285699FfC1262B52d881a42d5a2996160a398254",
+        "0x832a8b7191874f02d4f1dF17f4e27B2EB0DFa496"
+      ],
+      "AFN": "0x41a57103e28076a3a3C9197ddfEe84674BAD58c6",
+      "Router": "0x4563BbffB703ab8219C81B2715cB7201adfd3219"
+    }
+  },
+  {
+    "NetworkA": "Sepolia Testnet",
+    "LaneConfig": {
+      "OtherNetwork": "Avalanche Fuji",
+      "FeeToken": "0x097D90c9d3E0B50Ca60e1ae45F6A81010f9FB534",
+      "FeeTokenPool": "0x166283C7840c2b15c2498699bC1fBa0B919E0C49",
+      "BridgeTokens": [
+        "0xdCc31f65D5A37d0462676d47f3AD92B85A39fD0D",
+        "0x50C9c2662fdAeBa34a92C449698585550CE67732"
+      ],
+      "BridgeTokenPools": [
+        "0x77e233E813132Df9F8C105CD5c447c51d248409C",
+        "0xDFE49dA76E1F02263076519D1787A8EBE8CC5bF1"
+      ],
+      "AFN": "0x7D1C15a1180b938c8CEA09704c4A8Ded852115F9",
+      "Router": "0xE51187FfEeC9c49553b85E35CdD6aEB4bDE62828"
+    }
+  }
+]

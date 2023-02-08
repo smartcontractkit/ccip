@@ -1,6 +1,7 @@
 package ccip
 
 import (
+	"context"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -13,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/mock_afn_contract"
@@ -32,6 +34,66 @@ type AFNConfig struct {
 	AFNWeightsByParticipants map[string]*big.Int // mapping : AFN participant address => weight
 	ThresholdForBlessing     *big.Int
 	ThresholdForBadSignal    *big.Int
+}
+
+type LinkToken struct {
+	client     blockchain.EVMClient
+	instance   *link_token_interface.LinkToken
+	EthAddress common.Address
+}
+
+func (token *LinkToken) Address() string {
+	return token.EthAddress.Hex()
+}
+
+func (token *LinkToken) BalanceOf(ctx context.Context, addr string) (*big.Int, error) {
+	opts := &bind.CallOpts{
+		From:    common.HexToAddress(token.client.GetDefaultWallet().Address()),
+		Context: ctx,
+	}
+	balance, err := token.instance.BalanceOf(opts, common.HexToAddress(addr))
+	if err != nil {
+		return nil, err
+	}
+	return balance, nil
+}
+
+func (l *LinkToken) Approve(to string, amount *big.Int) error {
+	opts, err := l.client.TransactionOpts(l.client.GetDefaultWallet())
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Str("From", l.client.GetDefaultWallet().Address()).
+		Str("To", to).
+		Str("Amount", amount.String()).
+		Uint64("Nonce", opts.Nonce.Uint64()).
+		Str("Network Name", l.client.GetNetworkConfig().Name).
+		Msg("Approving LINK Transfer")
+	tx, err := l.instance.Approve(opts, common.HexToAddress(to), amount)
+	if err != nil {
+		return err
+	}
+	return l.client.ProcessTransaction(tx)
+}
+
+func (l *LinkToken) Transfer(to string, amount *big.Int) error {
+	opts, err := l.client.TransactionOpts(l.client.GetDefaultWallet())
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Str("From", l.client.GetDefaultWallet().Address()).
+		Str("To", to).
+		Str("Amount", amount.String()).
+		Uint64("Nonce", opts.Nonce.Uint64()).
+		Str("Network Name", l.client.GetNetworkConfig().Name).
+		Msg("Transferring LINK")
+	tx, err := l.instance.Transfer(opts, common.HexToAddress(to), amount)
+	if err != nil {
+		return err
+	}
+	return l.client.ProcessTransaction(tx)
 }
 
 // LockReleaseTokenPool represents a LockReleaseTokenPool address
@@ -71,6 +133,7 @@ func (pool *LockReleaseTokenPool) LockOrBurnToken(linkToken contracts.LinkToken,
 	}
 	log.Info().
 		Str("Token Pool", pool.Address()).
+		Str("Network Name", pool.client.GetNetworkConfig().Name).
 		Msg("Pool is filled with tokens")
 	return pool.client.ProcessTransaction(tx)
 }
@@ -90,6 +153,7 @@ func (pool *LockReleaseTokenPool) SetOnRamp(onRamp common.Address) error {
 	log.Info().
 		Str("Token Pool", pool.Address()).
 		Str("OnRamp", onRamp.Hex()).
+		Str("Network Name", pool.client.GetNetworkConfig().Name).
 		Msg("OnRamp is set")
 	return pool.client.ProcessTransaction(tx)
 }
@@ -109,6 +173,7 @@ func (pool *LockReleaseTokenPool) SetOffRamp(offRamp common.Address) error {
 	log.Info().
 		Str("Token Pool", pool.Address()).
 		Str("OffRamp", offRamp.Hex()).
+		Str("Network Name", pool.client.GetNetworkConfig().Name).
 		Msg("OffRamp is set")
 	return pool.client.ProcessTransaction(tx)
 }
@@ -152,6 +217,7 @@ func (b *CommitStore) SetOCR2Config(
 	log.Info().
 		Interface("signerAddresses", signers).
 		Interface("transmitterAddresses", transmitters).
+		Str("Network Name", b.client.GetNetworkConfig().Name).
 		Msg("Configuring CommitStore")
 	tx, err := b.instance.SetOCR2Config(
 		opts,
@@ -214,6 +280,7 @@ func (c *FeeManager) SetFeeUpdater(addr common.Address) error {
 	}
 	log.Info().
 		Str("updater", addr.Hex()).
+		Str("Network Name", c.client.GetNetworkConfig().Name).
 		Msg("FeeManager updater set")
 	return c.client.ProcessTransaction(tx)
 }
@@ -228,6 +295,7 @@ func (c *FeeManager) UpdateFees(feeUpdates []fee_manager.InternalFeeUpdate) erro
 		return err
 	}
 	log.Info().
+		Str("Network Name", c.client.GetNetworkConfig().Name).
 		Msg("FeeManager fee updated")
 	return c.client.ProcessTransaction(tx)
 }
@@ -265,6 +333,7 @@ func (router *Router) SetOnRamp(chainID uint64, onRamp common.Address) error {
 	}
 	log.Info().
 		Str("onRamp", onRamp.Hex()).
+		Str("Network Name", router.client.GetNetworkConfig().Name).
 		Msg("Router is configured")
 	return router.client.ProcessTransaction(tx)
 }
@@ -278,6 +347,10 @@ func (router *Router) CCIPSend(destChainId uint64, msg router.ConsumerEVM2AnyMes
 	if err != nil {
 		return nil, err
 	}
+	log.Info().
+		Str("router", router.Address()).
+		Str("Network Name", router.client.GetNetworkConfig().Name).
+		Msg("msg is sent")
 	return tx, router.client.ProcessTransaction(tx)
 }
 
@@ -292,6 +365,7 @@ func (router *Router) AddOffRamp(offRamp common.Address) (*types.Transaction, er
 	}
 	log.Info().
 		Str("offRamp", offRamp.Hex()).
+		Str("Network Name", router.client.GetNetworkConfig().Name).
 		Msg("offRamp is added to Router")
 	return tx, router.client.ProcessTransaction(tx)
 }
@@ -323,6 +397,7 @@ func (onRamp *OnRamp) SetTokenPrices(tokens []common.Address, prices []*big.Int)
 		return err
 	}
 	log.Info().
+		Str("Network Name", onRamp.client.GetNetworkConfig().Name).
 		Str("OnRamp", onRamp.Address()).
 		Msg("Setting OnRamp token prices")
 	tx, err := onRamp.instance.SetPrices(opts, tokens, prices)
@@ -360,6 +435,7 @@ func (offRamp *OffRamp) SetOCR2Config(
 	log.Info().
 		Interface("signerAddresses", signers).
 		Interface("transmitterAddresses", transmitters).
+		Str("Network Name", offRamp.client.GetNetworkConfig().Name).
 		Msg("Configuring OffRamp")
 	tx, err := offRamp.instance.SetOCR2Config(
 		opts,
@@ -391,6 +467,7 @@ func (offRamp *OffRamp) SetRouter(offRampRouterAddress common.Address) error {
 	}
 	log.Info().
 		Str("offRampRouterAddress", offRampRouterAddress.Hex()).
+		Str("Network Name", offRamp.client.GetNetworkConfig().Name).
 		Msg("OffRamp router is configured")
 	return offRamp.client.ProcessTransaction(tx)
 }
@@ -407,6 +484,7 @@ func (offRamp *OffRamp) SetTokenPrices(tokens []common.Address, prices []*big.In
 		return err
 	}
 	log.Info().
+		Str("Network Name", offRamp.client.GetNetworkConfig().Name).
 		Str("OffRamp", offRamp.Address()).
 		Msg("Setting OffRamp token prices")
 	tx, err := offRamp.instance.SetPrices(opts, tokens, prices)
