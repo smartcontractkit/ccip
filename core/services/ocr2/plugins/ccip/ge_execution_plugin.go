@@ -23,15 +23,18 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/logger"
 )
 
-func MessagesFromExecutionReport(report types.Report) ([]uint64, [][]byte, error) {
+type FeeUpdate = evm_2_evm_offramp.InternalFeeUpdate
+
+func MessagesFromExecutionReport(report types.Report) ([]uint64, [][]byte, []FeeUpdate, error) {
 	decodeExecutionReport, err := DecodeExecutionReport(report)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	return decodeExecutionReport.SequenceNumbers, decodeExecutionReport.EncodedMessages, nil
+	return decodeExecutionReport.SequenceNumbers, decodeExecutionReport.EncodedMessages, decodeExecutionReport.FeeUpdates, nil
 }
 
 func DecodeExecutionReport(report types.Report) (*evm_2_evm_offramp.InternalExecutionReport, error) {
@@ -67,10 +70,10 @@ func DecodeExecutionReport(report types.Report) (*evm_2_evm_offramp.InternalExec
 	er.InnerProofs = append(er.InnerProofs, erStruct.InnerProofs...)
 	er.OuterProofs = append(er.OuterProofs, erStruct.OuterProofs...)
 
-	er.FeeUpdates = []evm_2_evm_offramp.InternalFeeUpdate{}
+	er.FeeUpdates = []FeeUpdate{}
 
 	for _, feeUpdate := range erStruct.FeeUpdates {
-		er.FeeUpdates = append(er.FeeUpdates, evm_2_evm_offramp.InternalFeeUpdate{
+		er.FeeUpdates = append(er.FeeUpdates, FeeUpdate{
 			SourceFeeToken:              feeUpdate.SourceFeeToken,
 			DestChainId:                 feeUpdate.DestChainId,
 			FeeTokenBaseUnitsPerUnitGas: feeUpdate.FeeTokenBaseUnitsPerUnitGas,
@@ -94,7 +97,7 @@ func EncodeExecutionReport(seqNums []uint64,
 	innerProofSourceFlags []bool,
 	outerProofs [][32]byte,
 	outerProofSourceFlags []bool,
-	feeUpdates []evm_2_evm_offramp.InternalFeeUpdate,
+	feeUpdates []FeeUpdate,
 ) (types.Report, error) {
 	var tokensPerFeeCoinAddresses []common.Address
 	var tokensPerFeeCoinValues []*big.Int
@@ -134,6 +137,7 @@ type ExecutionPluginConfig struct {
 	onRamp                               *evm_2_evm_onramp.EVM2EVMOnRamp
 	offRamp                              *evm_2_evm_offramp.EVM2EVMOffRamp
 	commitStore                          *commit_store.CommitStore
+	feeManager                           *fee_manager.FeeManager
 	source, dest                         logpoller.LogPoller
 	eventSignatures                      EventSignatures
 	priceGetter                          PriceGetter
@@ -162,12 +166,21 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
+
+	execTokens, err := rf.config.offRamp.GetDestinationTokens(nil)
+	if err != nil {
+		return nil, types.ReportingPluginInfo{}, err
+	}
+	// TODO: Hack assume link is the first token
+	linkToken := execTokens[0]
+
 	return &ExecutionReportingPlugin{
 			lggr:           rf.config.lggr.Named("ExecutionReportingPlugin"),
 			F:              config.F,
 			offchainConfig: offchainConfig,
 			config:         rf.config,
 			snoozedRoots:   make(map[[32]byte]time.Time),
+			linkToken:      linkToken,
 		}, types.ReportingPluginInfo{
 			Name:          "CCIPExecution",
 			UniqueReports: true,
@@ -188,9 +201,11 @@ type ExecutionReportingPlugin struct {
 	// e.g. reporting vs transmission protocol.
 	inFlightMu          sync.RWMutex
 	inFlight            []InflightInternalExecutionReport
+	inFlightFeeUpdates  [][]FeeUpdate
 	inflightCacheExpiry time.Duration
 	offchainConfig      OffchainConfig
 	snoozedRoots        map[[32]byte]time.Time
+	linkToken           common.Address
 }
 
 type Query struct {
@@ -271,29 +286,95 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 	}
 	// Observe a source chain price for pricing.
 	// TODO: 1559 support
-	sourceGasPrice, _, err := r.config.sourceGasEstimator.GetLegacyGas(ctx, nil, BatchGasLimit, assets.NewWei(big.NewInt(int64(MaxGasPrice))))
+	sourceGasPriceWei, _, err := r.config.sourceGasEstimator.GetLegacyGas(ctx, nil, BatchGasLimit, assets.NewWei(big.NewInt(int64(MaxGasPrice))))
 	if err != nil {
 		return nil, err
 	}
+	sourceGasPrice := sourceGasPriceWei.ToInt()
+
+	if canSkip, err := r.canSkipFeeUpdate(r.calculateFeeTokenBaseUnitsPerUnitGas(sourceGasPrice, followerTokensPerFeeCoin[r.linkToken])); err != nil {
+		return nil, err
+	} else if canSkip {
+		sourceGasPrice = nil // vote skip
+	}
+
 	return ExecutionObservation{
 		SeqNrs:           executableSequenceNumbers, // Note can be empty
 		TokensPerFeeCoin: followerTokensPerFeeCoin,
-		SourceGasPrice:   sourceGasPrice.ToInt(),
+		SourceGasPrice:   sourceGasPrice,
 	}.Marshal()
 }
 
-func (r *ExecutionReportingPlugin) generateFeeUpdate(token common.Address, sourceGasPrice *big.Int, juelsPerFeeCoin *big.Int) []evm_2_evm_offramp.InternalFeeUpdate {
-	// TODO: Check gas fee updated logs
-	feeTokenBaseUnitsPerUnitGas := big.NewInt(0).Div(big.NewInt(0).Mul(sourceGasPrice, juelsPerFeeCoin), big.NewInt(1e18))
-	return []evm_2_evm_offramp.InternalFeeUpdate{
+func (r *ExecutionReportingPlugin) canSkipFeeUpdate(feeTokenBaseUnitsPerUnitGas *big.Int) (bool, error) {
+	token := r.linkToken
+	chainID := r.config.sourceChainID
+
+	var latestUpdateTimestamp time.Time
+	var latestUpdate FeeUpdate
+
+	logsWithinHeartBeat, err := r.config.dest.LogsCreatedAfter(GasFeeUpdated, r.config.feeManager.Address(), time.Now().Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()))
+	if err != nil {
+		return false, err
+	}
+	for _, log := range logsWithinHeartBeat {
+		parsed, err := r.config.feeManager.ParseGasFeeUpdated(log.GetGethLog())
+		if err != nil {
+			return false, err
+		}
+		if ts := time.Unix(parsed.Timestamp.Int64(), 0); parsed.DestChain == chainID && parsed.Token == token && !ts.Before(latestUpdateTimestamp) {
+			latestUpdateTimestamp = ts
+			latestUpdate = FeeUpdate{
+				SourceFeeToken:              token,
+				DestChainId:                 parsed.DestChain,
+				FeeTokenBaseUnitsPerUnitGas: parsed.FeeTokenBaseUnitsPerUnitGas,
+			}
+		}
+	}
+
+	r.inFlightMu.RLock()
+	for i, inflight := range r.inFlightFeeUpdates {
+		for _, update := range inflight {
+			if update.DestChainId == chainID && update.SourceFeeToken == token && !r.inFlight[i].createdAt.Before(latestUpdateTimestamp) {
+				latestUpdateTimestamp = r.inFlight[i].createdAt
+				latestUpdate = update
+			}
+		}
+	}
+	r.inFlightMu.RUnlock()
+
+	if time.Since(latestUpdateTimestamp) > r.offchainConfig.FeeUpdateHeartBeat.Duration() {
+		return false, nil
+	}
+
+	deviation := big.NewInt(0).Sub(feeTokenBaseUnitsPerUnitGas, latestUpdate.FeeTokenBaseUnitsPerUnitGas)
+	deviation.Mul(deviation, big.NewInt(1e9))
+	deviation.Div(deviation, latestUpdate.FeeTokenBaseUnitsPerUnitGas) // deviation_parts_per_billion = ((x2 - x1) / x1) * 1e9
+
+	// can skip if latest feeUpdate for this plugin's sourceChainId, linkToken, is within heartbeat and deviation
+	return deviation.CmpAbs(big.NewInt(int64(r.offchainConfig.FeeUpdateDeviationPPB))) <= 0, nil
+}
+
+func (r *ExecutionReportingPlugin) calculateFeeTokenBaseUnitsPerUnitGas(sourceGasPrice *big.Int, juelsPerFeeCoin *big.Int) (feeTokenBaseUnitsPerUnitGas *big.Int) {
+
+	// (juels/eth) * (wei / gas) / (1 eth / 1e18 wei) = juels/gas
+	// TODO: Think more about this offchain/onchain computation split
+	feeTokenBaseUnitsPerUnitGas = big.NewInt(0).Mul(sourceGasPrice, juelsPerFeeCoin)
+	return feeTokenBaseUnitsPerUnitGas.Div(feeTokenBaseUnitsPerUnitGas, big.NewInt(1e18))
+}
+
+func (r *ExecutionReportingPlugin) generateFeeUpdate(sourceGasPrice *big.Int, juelsPerFeeCoin *big.Int) []FeeUpdate {
+	// if sourceGasPrice got majority votes as nil, skip generating feeUpdate
+	if sourceGasPrice == nil {
+		return nil
+	}
+
+	return []FeeUpdate{
 		{
-			SourceFeeToken: token,
+			SourceFeeToken: r.linkToken,
 			// Since this gas fee update will be sent to the destination chain, this plugins
 			// source chain will be the feeUpdaters destination chain.
-			DestChainId: r.config.sourceChainID,
-			// (juels/eth) * (wei / gas) / (1 eth / 1e18 wei) = juels/gas
-			// TODO: Think more about this offchain/onchain computation split
-			FeeTokenBaseUnitsPerUnitGas: feeTokenBaseUnitsPerUnitGas,
+			DestChainId:                 r.config.sourceChainID,
+			FeeTokenBaseUnitsPerUnitGas: r.calculateFeeTokenBaseUnitsPerUnitGas(sourceGasPrice, juelsPerFeeCoin),
 		},
 	}
 }
@@ -434,12 +515,7 @@ func (r *ExecutionReportingPlugin) parseSeqNr(log gethtypes.Log) (uint64, error)
 // Assumes non-empty report. Messages to execute can span more than one report, but are assumed to be in order of increasing
 // sequence number.
 func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNums []uint64, tokensPerFeeCoin map[common.Address]*big.Int, sourceGasPrice *big.Int) ([]byte, error) {
-	execTokens, err := r.config.offRamp.GetDestinationTokens(nil)
-	if err != nil {
-		return nil, err
-	}
-	// TODO: Hack assume link is the first token
-	linkToken := execTokens[0]
+	var err error
 	var me *MessageExecution
 	if len(finalSeqNums) > 0 {
 		me, err = buildExecution(
@@ -458,7 +534,7 @@ func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNums 
 			return nil, err
 		}
 	}
-	gasFeeUpdates := r.generateFeeUpdate(linkToken, sourceGasPrice, tokensPerFeeCoin[linkToken])
+	gasFeeUpdates := r.generateFeeUpdate(sourceGasPrice, tokensPerFeeCoin[r.linkToken])
 	if len(gasFeeUpdates) == 0 && len(finalSeqNums) == 0 {
 		return nil, errors.New("No report needed")
 	}
@@ -490,6 +566,7 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 	}
 	priceObservations := make(map[common.Address][]*big.Int)
 	var sourceGasObservations []*big.Int
+	var sourceGasPriceNilCount int
 	for _, obs := range actualMaybeObservations {
 		hasAllPrices := true
 		for _, token := range tokens {
@@ -501,16 +578,16 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 		if !hasAllPrices {
 			continue
 		}
-		if obs.SourceGasPrice == nil {
-			lggr.Errorw("Expect source gas price to be present")
-			continue
-		}
 		// If it has all the prices, add each price to observations
 		for token, price := range obs.TokensPerFeeCoin {
 			priceObservations[token] = append(priceObservations[token], price)
 		}
-		// Add source gas price
-		sourceGasObservations = append(sourceGasObservations, obs.SourceGasPrice)
+		if obs.SourceGasPrice == nil {
+			sourceGasPriceNilCount++
+		} else {
+			// Add only non-nil source gas price
+			sourceGasObservations = append(sourceGasObservations, obs.SourceGasPrice)
+		}
 		actualObservations = append(actualObservations, obs)
 	}
 	// Need at least F+1 observations
@@ -555,9 +632,16 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 	sort.Slice(finalSequenceNumbers, func(i, j int) bool {
 		return finalSequenceNumbers[i] < finalSequenceNumbers[j]
 	})
+
+	var sourceGasPrice *big.Int
+	// skip gasPrice feeUpdate by leaving it nil if majority voted so by sending nil gasPrice observations
+	if sourceGasPriceNilCount <= len(sourceGasObservations) {
+		sourceGasPrice = median(sourceGasObservations)
+	}
+
 	// Important we actually execute based on the medianTokensPrices, which we ensure
 	// is <= than prices used to determine executability.
-	report, err := r.buildReport(lggr, finalSequenceNumbers, medianTokensPerFeeCoin, median(sourceGasObservations))
+	report, err := r.buildReport(lggr, finalSequenceNumbers, medianTokensPerFeeCoin, sourceGasPrice)
 	if err != nil {
 		return false, nil, err
 	}
@@ -573,19 +657,22 @@ func (r *ExecutionReportingPlugin) expireInflight(lggr logger.Logger) {
 	defer r.inFlightMu.Unlock()
 	// Reap old inflight txs and check if any messages in the report are inflight.
 	var stillInFlight []InflightInternalExecutionReport
-	for _, report := range r.inFlight {
+	var stillInFlightFeeUpdates [][]FeeUpdate
+	for i, report := range r.inFlight {
 		if time.Since(report.createdAt) > r.inflightCacheExpiry {
 			// Happy path: inflight report was successfully transmitted onchain, we remove it from inflight and onchain state reflects inflight.
 			// Sad path: inflight report reverts onchain, we remove it from inflight, onchain state does not reflect the change so we retry.
 			lggr.Infow("Inflight report expired", "seqNums", report.seqNrs)
 		} else {
 			stillInFlight = append(stillInFlight, report)
+			stillInFlightFeeUpdates = append(stillInFlightFeeUpdates, r.inFlightFeeUpdates[i])
 		}
 	}
 	r.inFlight = stillInFlight
+	r.inFlightFeeUpdates = stillInFlightFeeUpdates
 }
 
-func (r *ExecutionReportingPlugin) addToInflight(lggr logger.Logger, seqNrs []uint64, encMsgs [][]byte) error {
+func (r *ExecutionReportingPlugin) addToInflight(lggr logger.Logger, seqNrs []uint64, encMsgs [][]byte, feeUpdates []FeeUpdate) error {
 	r.inFlightMu.Lock()
 	defer r.inFlightMu.Unlock()
 	for _, report := range r.inFlight {
@@ -602,59 +689,65 @@ func (r *ExecutionReportingPlugin) addToInflight(lggr logger.Logger, seqNrs []ui
 		seqNrs:      seqNrs,
 		encMessages: encMsgs,
 	})
+	r.inFlightFeeUpdates = append(r.inFlightFeeUpdates, feeUpdates)
 	return nil
 }
 
 func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context, timestamp types.ReportTimestamp, report types.Report) (bool, error) {
 	lggr := r.lggr.Named("ShouldAcceptFinalizedReport")
-	seqNrs, encMsgs, err := MessagesFromExecutionReport(report)
+	seqNrs, encMsgs, feeUpdates, err := MessagesFromExecutionReport(report)
 	if err != nil {
 		lggr.Errorw("unable to decode report", "err", err)
 		return false, nil
 	}
-	if len(seqNrs) > 0 {
-		lggr.Infof("Seq nums %v", seqNrs)
-		// If the first message is executed already, this execution report is stale, and we do not accept it.
-		stale, err2 := r.isStaleReport(seqNrs[0])
-		if err2 != nil {
-			return !stale, err2
-		}
-		if stale {
-			return false, nil
-		}
+	lggr.Infof("Seq nums %v", seqNrs)
+	// If the first message is executed already, this execution report is stale, and we do not accept it.
+	stale, err2 := r.isStaleReport(seqNrs, feeUpdates)
+	if err2 != nil {
+		return !stale, err2
+	}
+	if stale {
+		return false, nil
 	}
 	// Else just assume in flight
-	if err = r.addToInflight(lggr, seqNrs, encMsgs); err != nil {
+	if err = r.addToInflight(lggr, seqNrs, encMsgs, feeUpdates); err != nil {
 		return false, err
 	}
 	return true, nil
 }
 
 func (r *ExecutionReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context, timestamp types.ReportTimestamp, report types.Report) (bool, error) {
-	seqNrs, _, err := MessagesFromExecutionReport(report)
+	seqNrs, _, feeUpdates, err := MessagesFromExecutionReport(report)
 	if err != nil {
 		return false, nil
 	}
 	// If report is not stale we transmit.
 	// When the executeTransmitter enqueues the tx for tx manager,
 	// we mark it as execution_sent, removing it from the set of inflight messages.
-	if len(seqNrs) > 0 {
-		stale, err := r.isStaleReport(seqNrs[0])
-		return !stale, err
-	}
-	// TODO: how to check for staleness on a purely fee update report?
-	return false, nil
+	stale, err := r.isStaleReport(seqNrs, feeUpdates)
+	return !stale, err
 }
 
-func (r *ExecutionReportingPlugin) isStaleReport(min uint64) (bool, error) {
+func (r *ExecutionReportingPlugin) isStaleReport(seqNrs []uint64, feeUpdates []FeeUpdate) (bool, error) {
 	// If the first message is executed already, this execution report is stale.
-	msgState, err := r.config.offRamp.GetExecutionState(nil, min)
-	if err != nil {
-		// TODO: do we need to check for not present error?
-		return true, err
-	}
-	if msgState == MessageStateFailure || msgState == MessageStateSuccess {
-		return true, nil
+	if len(seqNrs) > 0 {
+		min := seqNrs[0]
+		msgState, err := r.config.offRamp.GetExecutionState(nil, min)
+		if err != nil {
+			// TODO: do we need to check for not present error?
+			return true, err
+		}
+		if msgState == MessageStateFailure || msgState == MessageStateSuccess {
+			return true, nil
+		}
+	} else if len(feeUpdates) > 0 {
+		update := feeUpdates[0]
+		fee, err := r.config.feeManager.GetFeeTokenBaseUnitsPerUnitGas(nil, update.SourceFeeToken, update.DestChainId)
+		if err != nil {
+			return true, err
+		}
+		// for feeUpdates-only reports, if the fee is equal our report, it is stale (not needed or already executed)
+		return fee.Cmp(update.FeeTokenBaseUnitsPerUnitGas) == 0, nil
 	}
 	return false, nil
 }

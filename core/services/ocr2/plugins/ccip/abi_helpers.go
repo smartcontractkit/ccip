@@ -11,6 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
@@ -18,6 +19,8 @@ var (
 	// merkleRoot || minSeqNum || maxSeqNum
 	ReportAccepted common.Hash
 	ConfigSet      common.Hash
+	// FeeManager
+	GasFeeUpdated common.Hash
 )
 
 // MessageExecutionState defines the execution states of CCIP messages.
@@ -45,6 +48,12 @@ func init() {
 	}
 	ReportAccepted = getIDOrPanic("ReportAccepted", commitStoreABI)
 	ConfigSet = getIDOrPanic("ConfigSet", commitStoreABI)
+
+	feeManagerABI, err := abi.JSON(strings.NewReader(fee_manager.FeeManagerABI))
+	if err != nil {
+		panic(err)
+	}
+	GasFeeUpdated = getIDOrPanic("GasFeeUpdated", feeManagerABI)
 }
 
 func GetEventSignatures() EventSignatures {

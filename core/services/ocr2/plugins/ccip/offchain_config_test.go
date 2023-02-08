@@ -2,8 +2,11 @@ package ccip
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink/core/store/models"
 )
 
 func TestOffchainConfig_Encode_Decode(t *testing.T) {
@@ -15,6 +18,8 @@ func TestOffchainConfig_Encode_Decode(t *testing.T) {
 			want: OffchainConfig{
 				SourceIncomingConfirmations: 3,
 				DestIncomingConfirmations:   6,
+				FeeUpdateHeartBeat:          models.MustMakeDuration(1 * time.Hour),
+				FeeUpdateDeviationPPB:       5e7,
 			},
 		},
 		"Missing value as 0": {

@@ -47,6 +47,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/testhelpers"
 	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
+	"github.com/smartcontractkit/chainlink/core/store/models"
 	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
@@ -971,6 +972,8 @@ func (client *CCIPClient) SetOCR2Config(env dione.Environment) {
 	ccipConfig, err := ccip.OffchainConfig{
 		SourceIncomingConfirmations: 10,
 		DestIncomingConfirmations:   10,
+		FeeUpdateHeartBeat: models.MustMakeDuration(24 * time.Hour),
+		FeeUpdateDeviationPPB: 5e7,  // 5%
 	}.Encode()
 	helpers.PanicErr(err)
 

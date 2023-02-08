@@ -15,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/job"
 	ccipconfig "github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/config"
@@ -82,6 +83,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	}
 	var eventSignatures EventSignatures
 	var wrappedPluginFactory ocrtypes.ReportingPluginFactory
+	var offRampConfig evm_2_evm_offramp.IEVM2EVMOffRampOffRampConfig
 	hashingCtx := hasher.NewKeccakCtx()
 	switch onRampType {
 	case EVM2EVMOnRamp:
@@ -96,6 +98,18 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 		if err2 != nil {
 			return nil, err2
 		}
+
+		// subscribe for GasFeeUpdated logs, but FeeManager is only available as part of onchain offramp's config
+		// TODO: how to detect if OffRampConfig.FeeManager changes on-chain? Currently, we expect a plugin/job/node restart
+		offRampConfig, err2 = offRamp.GetOffRampConfig(nil)
+		if err2 != nil {
+			return nil, err2
+		}
+		feeManager, err2 := fee_manager.NewFeeManager(offRampConfig.FeeManager, destChain.Client())
+		if err2 != nil {
+			return nil, err2
+		}
+
 		eventSignatures = GetEventSignatures()
 		wrappedPluginFactory = NewExecutionReportingPluginFactory(
 			ExecutionPluginConfig{
@@ -105,6 +119,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 				offRamp:             offRamp,
 				onRamp:              onRamp,
 				commitStore:         verifier,
+				feeManager:          feeManager,
 				builder:             NewBatchBuilder(lggr, eventSignatures, offRamp),
 				eventSignatures:     eventSignatures,
 				priceGetter:         priceGetterObject,
@@ -125,6 +140,10 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 		return nil, err
 	}
 	_, err = destChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{ReportAccepted}, Addresses: []common.Address{verifier.Address()}})
+	if err != nil {
+		return nil, err
+	}
+	_, err = destChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{GasFeeUpdated}, Addresses: []common.Address{offRampConfig.FeeManager}})
 	if err != nil {
 		return nil, err
 	}
