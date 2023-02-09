@@ -376,29 +376,35 @@ func IsAvaxNetwork(chainID int64) bool {
 func ChainName(chainID int64) string {
 	switch chainID {
 	case 1:
-		return "Ethereum"
+		return "ethereum-mainnet"
 	case 4:
-		return "Rinkeby"
+		return "ethereum-testnet-rinkeby"
 	case 5:
-		return "Goerli"
+		return "ethereum-testnet-goerli"
+	case 10:
+		return "ethereum-mainnet-optimism-1"
 	case 42:
-		return "Kovan"
+		return "ethereum-testnet-kovan"
 	case 56:
-		return "BSC"
+		return "binance_smart_chain-mainnet"
 	case 97:
-		return "BSC Testnet"
+		return "binance_smart_chain-testnet"
 	case 137:
-		return "Polygon"
+		return "polygon-mainnet"
 	case 420:
-		return "OptimismGoerli"
+		return "ethereum-testnet-goerli-optimism-1"
 	case 4002:
-		return "Fantom testnet"
+		return "fantom-testnet"
+	case 42161:
+		return "ethereum-mainnet-arbitrum-1"
 	case 43113:
-		return "Avax Fuji"
+		return "avalanche-testnet-fuji"
+	case 43114:
+		return "avalanche-mainnet"
 	case 80001:
-		return "Polygon Mumbai"
+		return "polygon-testnet-mumbai"
 	case 11155111:
-		return "Sepolia"
+		return "ethereum-testnet-sepolia"
 	default: // Unknown chain, return chainID as string
 		return strconv.FormatInt(chainID, 10)
 	}
