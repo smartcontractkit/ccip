@@ -13,8 +13,6 @@ library Internal {
 
   struct ExecutionReport {
     uint64[] sequenceNumbers;
-    address[] tokenPerFeeCoinAddresses;
-    uint256[] tokenPerFeeCoin;
     FeeUpdate[] feeUpdates;
     bytes[] encodedMessages;
     bytes32[] innerProofs;

@@ -165,11 +165,6 @@ contract EVM2EVMOffRampSetup is TokenSetup, FeeManagerSetup {
 
     bytes32[] memory innerProofs = new bytes32[](0);
     bytes32[] memory outerProofs = new bytes32[](0);
-    address[] memory tokenPerFeeCoinAddresses = new address[](1);
-    // The first destination token is the fee token
-    tokenPerFeeCoinAddresses[0] = address(s_destTokens[0]);
-    uint256[] memory tokenPerFeeCoin = new uint256[](1);
-    tokenPerFeeCoin[0] = TOKENS_PER_FEE_COIN;
 
     Internal.FeeUpdate[] memory feeUpdates = new Internal.FeeUpdate[](0);
 
@@ -181,8 +176,6 @@ contract EVM2EVMOffRampSetup is TokenSetup, FeeManagerSetup {
         outerProofs: outerProofs,
         outerProofFlagBits: 2**256 - 1,
         encodedMessages: encodedMessages,
-        tokenPerFeeCoinAddresses: tokenPerFeeCoinAddresses,
-        tokenPerFeeCoin: tokenPerFeeCoin,
         feeUpdates: feeUpdates
       });
   }

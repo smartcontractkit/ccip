@@ -123,7 +123,6 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 		sourceChainID,
 		destChainID,
 		evm_2_evm_offramp.IEVM2EVMOffRampOffRampConfig{
-			GasOverhead:                             big.NewInt(0),
 			FeeManager:                              destFeeManagerAddress,
 			PermissionLessExecutionThresholdSeconds: 1,
 			ExecutionDelaySeconds:                   0,
@@ -277,7 +276,6 @@ func TestMaxInternalExecutionReportSize(t *testing.T) {
 	// Ensure execution report size is valid
 	executorReport, err := ccip.EncodeExecutionReport(
 		mb.seqNums,
-		map[common.Address]*big.Int{},
 		mb.allMsgBytes,
 		mb.proof.Hashes,
 		mb.proof.SourceFlags,
@@ -320,17 +318,15 @@ func TestInternalExecutionReportEncoding(t *testing.T) {
 	require.NoError(t, err)
 	outerProof := outerTree.Prove([]int{0})
 	report := evm_2_evm_offramp.InternalExecutionReport{
-		SequenceNumbers:          mb.seqNums,
-		TokenPerFeeCoin:          []*big.Int{},
-		TokenPerFeeCoinAddresses: []common.Address{},
-		FeeUpdates:               []evm_2_evm_offramp.InternalFeeUpdate{},
-		EncodedMessages:          mb.allMsgBytes,
-		InnerProofs:              mb.proof.Hashes,
-		InnerProofFlagBits:       ccip.ProofFlagsToBits(mb.proof.SourceFlags),
-		OuterProofs:              outerProof.Hashes,
-		OuterProofFlagBits:       ccip.ProofFlagsToBits(outerProof.SourceFlags),
+		SequenceNumbers:    mb.seqNums,
+		FeeUpdates:         []evm_2_evm_offramp.InternalFeeUpdate{},
+		EncodedMessages:    mb.allMsgBytes,
+		InnerProofs:        mb.proof.Hashes,
+		InnerProofFlagBits: ccip.ProofFlagsToBits(mb.proof.SourceFlags),
+		OuterProofs:        outerProof.Hashes,
+		OuterProofFlagBits: ccip.ProofFlagsToBits(outerProof.SourceFlags),
 	}
-	encodeCommitReport, err := ccip.EncodeExecutionReport(report.SequenceNumbers, map[common.Address]*big.Int{}, report.EncodedMessages, report.InnerProofs, mb.proof.SourceFlags, report.OuterProofs, outerProof.SourceFlags, nil)
+	encodeCommitReport, err := ccip.EncodeExecutionReport(report.SequenceNumbers, report.EncodedMessages, report.InnerProofs, mb.proof.SourceFlags, report.OuterProofs, outerProof.SourceFlags, nil)
 	require.NoError(t, err)
 	decodeCommitReport, err := ccip.DecodeExecutionReport(encodeCommitReport)
 	require.NoError(t, err)

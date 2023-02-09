@@ -210,7 +210,5 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, HealthChecker, OC
     return keccak256(abi.encode(Internal.INTERNAL_DOMAIN_SEPARATOR, left, right));
   }
 
-  function _payTransmitter(uint256 initialGas, address transmitter) internal override {}
-
   function _beforeSetOCR2Config(uint8 f, bytes memory onchainConfig) internal override {}
 }

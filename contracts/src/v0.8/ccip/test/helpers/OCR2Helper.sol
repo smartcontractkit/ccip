@@ -31,8 +31,6 @@ contract OCR2Helper is OCR2Base {
 
   function _report(bytes memory report) internal override {}
 
-  function _payTransmitter(uint256 initialGas, address transmitter) internal override {}
-
   function typeAndVersion() public pure override returns (string memory) {
     return "OCR2BaseHelper 1.0.0";
   }

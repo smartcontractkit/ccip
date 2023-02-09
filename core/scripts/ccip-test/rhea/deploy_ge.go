@@ -195,7 +195,6 @@ func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainId uint
 		sourceChainId,
 		client.ChainConfig.ChainId,
 		evm_2_evm_offramp.IEVM2EVMOffRampOffRampConfig{
-			GasOverhead:                             big.NewInt(0),
 			FeeManager:                              client.ChainConfig.FeeManager,
 			ExecutionDelaySeconds:                   60,
 			MaxDataSize:                             1e5,

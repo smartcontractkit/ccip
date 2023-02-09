@@ -33,7 +33,6 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, Any2EVMBaseOffRamp, TypeAndVersionIn
 
   bytes32 internal immutable i_metadataHash;
 
-  mapping(address => uint256) internal s_nopBalance;
   mapping(address => uint64) internal s_senderNonce;
 
   OffRampConfig internal s_config;
@@ -64,11 +63,6 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, Any2EVMBaseOffRamp, TypeAndVersionIn
   /// @inheritdoc IEVM2EVMOffRamp
   function getSenderNonce(address sender) public view override returns (uint64 nonce) {
     return s_senderNonce[sender];
-  }
-
-  /// @inheritdoc IEVM2EVMOffRamp
-  function getNopBalance(address nop) public view override returns (uint256 balance) {
-    return s_nopBalance[nop];
   }
 
   /**
@@ -217,8 +211,6 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, Any2EVMBaseOffRamp, TypeAndVersionIn
    * @param manualExecution Whether the DON auto executes or it is manually initiated
    */
   function _execute(Internal.ExecutionReport memory report, bool manualExecution) internal whenNotPaused whenHealthy {
-    uint256 gasStart = gasleft();
-
     if (address(s_router) == address(0)) revert RouterNotSet();
 
     // Fee updates
@@ -229,13 +221,6 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, Any2EVMBaseOffRamp, TypeAndVersionIn
 
     // Message execution
     _executeMessages(report, manualExecution);
-
-    // Update NOP balances
-    if (!manualExecution) {
-      s_nopBalance[msg.sender] +=
-        ((gasStart - gasleft() + s_config.gasOverhead) * tx.gasprice * report.tokenPerFeeCoin[0]) /
-        1 ether;
-    }
   }
 
   function _isWellFormed(Internal.EVM2EVMMessage memory message) private view {
@@ -266,8 +251,6 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, Any2EVMBaseOffRamp, TypeAndVersionIn
   function _report(bytes memory report) internal override {
     _execute(abi.decode(report, (Internal.ExecutionReport)), false);
   }
-
-  function _payTransmitter(uint256 initialGas, address transmitter) internal override {}
 
   function _beforeSetOCR2Config(uint8 f, bytes memory onchainConfig) internal override {}
 }

@@ -71,7 +71,6 @@ contract StructFactory {
   function offRampConfig(IFeeManager feeManager) internal pure returns (IEVM2EVMOffRamp.OffRampConfig memory) {
     return
       IEVM2EVMOffRamp.OffRampConfig({
-        gasOverhead: 5e5,
         feeManager: feeManager,
         executionDelaySeconds: EXECUTION_DELAY_SECONDS,
         maxDataSize: MAX_DATA_SIZE,

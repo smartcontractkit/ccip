@@ -493,14 +493,12 @@ func (client *CCIPClient) ExecuteManually(seqNr uint64) error {
 	}
 	outerProof := outerTree.Prove([]int{onRampIdx})
 	InternalExecutionReport := evm_2_evm_offramp.InternalExecutionReport{
-		SequenceNumbers:          []uint64{seqNr},
-		TokenPerFeeCoinAddresses: []common.Address{client.Dest.LinkTokenAddress},
-		TokenPerFeeCoin:          []*big.Int{big.NewInt(1)},
-		EncodedMessages:          [][]byte{originalMsg},
-		InnerProofs:              innerProof.Hashes,
-		InnerProofFlagBits:       ccip.ProofFlagsToBits(innerProof.SourceFlags),
-		OuterProofs:              outerProof.Hashes,
-		OuterProofFlagBits:       ccip.ProofFlagsToBits(outerProof.SourceFlags),
+		SequenceNumbers:    []uint64{seqNr},
+		EncodedMessages:    [][]byte{originalMsg},
+		InnerProofs:        innerProof.Hashes,
+		InnerProofFlagBits: ccip.ProofFlagsToBits(innerProof.SourceFlags),
+		OuterProofs:        outerProof.Hashes,
+		OuterProofFlagBits: ccip.ProofFlagsToBits(outerProof.SourceFlags),
 	}
 	tx, err := client.Dest.OffRamp.ManuallyExecute(client.Dest.Owner, InternalExecutionReport)
 	if err != nil {

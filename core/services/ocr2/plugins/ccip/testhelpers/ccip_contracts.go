@@ -442,7 +442,6 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		sourceChainID,
 		destChainID,
 		evm_2_evm_offramp.IEVM2EVMOffRampOffRampConfig{
-			GasOverhead:                             big.NewInt(0),
 			FeeManager:                              destFeeManagerAddress,
 			PermissionLessExecutionThresholdSeconds: 1,
 			ExecutionDelaySeconds:                   0,
@@ -637,14 +636,12 @@ func ExecuteMessage(
 	outerProof := outerTree.Prove([]int{onRampIdx})
 
 	offRampProof := evm_2_evm_offramp.InternalExecutionReport{
-		SequenceNumbers:          []uint64{decodedMsg.SequenceNumber},
-		TokenPerFeeCoinAddresses: []common.Address{ccipContracts.Source.LinkToken.Address()},
-		TokenPerFeeCoin:          []*big.Int{big.NewInt(1)},
-		EncodedMessages:          [][]byte{req.Data},
-		InnerProofs:              innerProof.Hashes,
-		InnerProofFlagBits:       ccip.ProofFlagsToBits(innerProof.SourceFlags),
-		OuterProofs:              outerProof.Hashes,
-		OuterProofFlagBits:       ccip.ProofFlagsToBits(outerProof.SourceFlags),
+		SequenceNumbers:    []uint64{decodedMsg.SequenceNumber},
+		EncodedMessages:    [][]byte{req.Data},
+		InnerProofs:        innerProof.Hashes,
+		InnerProofFlagBits: ccip.ProofFlagsToBits(innerProof.SourceFlags),
+		OuterProofs:        outerProof.Hashes,
+		OuterProofFlagBits: ccip.ProofFlagsToBits(outerProof.SourceFlags),
 	}
 
 	// Execute.

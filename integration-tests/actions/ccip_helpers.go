@@ -656,7 +656,7 @@ func (destCCIP *DestCCIPModule) DeployContracts(t *testing.T, sourceCCIP SourceC
 	destCCIP.OffRamp, err = contractDeployer.DeployOffRamp(destCCIP.SourceChainId, sourceCCIP.DestinationChainId,
 		destCCIP.CommitStore.EthAddress, sourceCCIP.OnRamp.EthAddress,
 		destCCIP.Common.AFN.EthAddress, common.HexToAddress(destCCIP.Common.FeeToken.Address()),
-		destFeeManager.EthAddress, sourceTokens, pools, destCCIP.Common.RateLimiterConfig, big.NewInt(0))
+		destFeeManager.EthAddress, sourceTokens, pools, destCCIP.Common.RateLimiterConfig)
 	require.NoError(t, err, "Deploying OffRamp shouldn't fail")
 	err = destCCIP.Common.ChainClient.WaitForEvents()
 	require.NoError(t, err, "Error waiting for deploying OffRamp")

@@ -1,7 +1,6 @@
 package ccip
 
 import (
-	"bytes"
 	"context"
 	"encoding/hex"
 	"encoding/json"
@@ -48,10 +47,8 @@ func DecodeExecutionReport(report types.Report) (*evm_2_evm_offramp.InternalExec
 
 	// Must be anonymous struct here
 	erStruct, ok := unpacked[0].(struct {
-		SequenceNumbers          []uint64         `json:"sequenceNumbers"`
-		TokenPerFeeCoinAddresses []common.Address `json:"tokenPerFeeCoinAddresses"`
-		TokenPerFeeCoin          []*big.Int       `json:"tokenPerFeeCoin"`
-		FeeUpdates               []struct {
+		SequenceNumbers []uint64 `json:"sequenceNumbers"`
+		FeeUpdates      []struct {
 			SourceFeeToken              common.Address `json:"sourceFeeToken"`
 			DestChainId                 uint64         `json:"destChainId"`
 			FeeTokenBaseUnitsPerUnitGas *big.Int       `json:"feeTokenBaseUnitsPerUnitGas"`
@@ -85,13 +82,10 @@ func DecodeExecutionReport(report types.Report) (*evm_2_evm_offramp.InternalExec
 	// which is different from the expected big.NewInt(0). Rebuild to the expected value for this case.
 	er.InnerProofFlagBits = big.NewInt(erStruct.InnerProofFlagBits.Int64())
 	er.OuterProofFlagBits = big.NewInt(erStruct.OuterProofFlagBits.Int64())
-	er.TokenPerFeeCoinAddresses = erStruct.TokenPerFeeCoinAddresses
-	er.TokenPerFeeCoin = erStruct.TokenPerFeeCoin
 	return &er, nil
 }
 
 func EncodeExecutionReport(seqNums []uint64,
-	tokensPerFeeCoin map[common.Address]*big.Int,
 	msgs [][]byte,
 	innerProofs [][32]byte,
 	innerProofSourceFlags []bool,
@@ -99,28 +93,14 @@ func EncodeExecutionReport(seqNums []uint64,
 	outerProofSourceFlags []bool,
 	feeUpdates []FeeUpdate,
 ) (types.Report, error) {
-	var tokensPerFeeCoinAddresses []common.Address
-	var tokensPerFeeCoinValues []*big.Int
-	for addr := range tokensPerFeeCoin {
-		tokensPerFeeCoinAddresses = append(tokensPerFeeCoinAddresses, addr)
-	}
-	// Sort the addresses for determinism.
-	sort.Slice(tokensPerFeeCoinAddresses, func(i, j int) bool {
-		return bytes.Compare(tokensPerFeeCoinAddresses[i].Bytes(), tokensPerFeeCoinAddresses[j].Bytes()) < 0
-	})
-	for _, addr := range tokensPerFeeCoinAddresses {
-		tokensPerFeeCoinValues = append(tokensPerFeeCoinValues, tokensPerFeeCoin[addr])
-	}
 	report, err := makeExecutionReportArgs().PackValues([]interface{}{&evm_2_evm_offramp.InternalExecutionReport{
-		SequenceNumbers:          seqNums,
-		FeeUpdates:               feeUpdates,
-		EncodedMessages:          msgs,
-		TokenPerFeeCoinAddresses: tokensPerFeeCoinAddresses,
-		TokenPerFeeCoin:          tokensPerFeeCoinValues,
-		InnerProofs:              innerProofs,
-		InnerProofFlagBits:       ProofFlagsToBits(innerProofSourceFlags),
-		OuterProofs:              outerProofs,
-		OuterProofFlagBits:       ProofFlagsToBits(outerProofSourceFlags),
+		SequenceNumbers:    seqNums,
+		FeeUpdates:         feeUpdates,
+		EncodedMessages:    msgs,
+		InnerProofs:        innerProofs,
+		InnerProofFlagBits: ProofFlagsToBits(innerProofSourceFlags),
+		OuterProofs:        outerProofs,
+		OuterProofFlagBits: ProofFlagsToBits(outerProofSourceFlags),
 	}})
 	if err != nil {
 		return nil, err
@@ -540,7 +520,6 @@ func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNums 
 	}
 	if len(finalSeqNums) != 0 {
 		return EncodeExecutionReport(finalSeqNums,
-			tokensPerFeeCoin,
 			me.encMsgs,
 			me.innerProofs,
 			me.innerProofSourceFlags,
@@ -550,7 +529,7 @@ func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNums 
 		)
 	}
 	lggr.Infow("Building execution report fee update only", "feeUpdates", gasFeeUpdates)
-	return EncodeExecutionReport(finalSeqNums, tokensPerFeeCoin, nil, nil, nil, nil, nil, gasFeeUpdates)
+	return EncodeExecutionReport(finalSeqNums, nil, nil, nil, nil, nil, gasFeeUpdates)
 }
 
 func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.ReportTimestamp, query types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {

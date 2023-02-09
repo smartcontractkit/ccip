@@ -35,7 +35,6 @@ contract BaseOffRampSetup is TokenSetup {
   }
 
   function assertSameConfig(IEVM2EVMOffRamp.OffRampConfig memory a, IEVM2EVMOffRamp.OffRampConfig memory b) public {
-    assertEq(a.gasOverhead, b.gasOverhead);
     assertEq(address(a.feeManager), address(b.feeManager));
     assertEq(a.executionDelaySeconds, b.executionDelaySeconds);
     assertEq(a.maxDataSize, b.maxDataSize);

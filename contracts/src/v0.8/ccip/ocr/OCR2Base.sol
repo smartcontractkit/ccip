@@ -186,8 +186,6 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
     bytes32[] calldata ss,
     bytes32 rawVs // signatures
   ) external override {
-    uint256 initialGas = gasleft(); // This line must come first
-
     _report(report);
 
     // reportContext consists of:
@@ -235,8 +233,6 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
       if (signed[oracle.index]) revert NonUniqueSignatures();
       signed[oracle.index] = true;
     }
-
-    _payTransmitter(initialGas, msg.sender);
   }
 
   /**
@@ -274,8 +270,6 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
   }
 
   function _report(bytes memory report) internal virtual;
-
-  function _payTransmitter(uint256 initialGas, address transmitter) internal virtual;
 
   function _beforeSetOCR2Config(uint8 f, bytes memory onchainConfig) internal virtual;
 }

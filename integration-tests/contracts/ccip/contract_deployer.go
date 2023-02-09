@@ -328,7 +328,7 @@ func (e *CCIPContractsDeployer) DeployOffRamp(
 	sourceChainId, destChainId uint64,
 	commitStore, onRamp, afn, feetoken, destFeeManagerAddress common.Address,
 	sourceToken, pools []common.Address,
-	opts RateLimiterConfig, gasOverhead *big.Int) (
+	opts RateLimiterConfig) (
 	*OffRamp,
 	error,
 ) {
@@ -342,7 +342,6 @@ func (e *CCIPContractsDeployer) DeployOffRamp(
 			sourceChainId,
 			destChainId,
 			evm_2_evm_offramp.IEVM2EVMOffRampOffRampConfig{
-				GasOverhead:                             gasOverhead,
 				FeeManager:                              destFeeManagerAddress,
 				PermissionLessExecutionThresholdSeconds: 0,
 				ExecutionDelaySeconds:                   0,

@@ -19,7 +19,6 @@ interface IEVM2EVMOffRamp {
   );
 
   struct OffRampConfig {
-    uint256 gasOverhead;
     IFeeManager feeManager;
     // The waiting time before manual execution is enabled
     uint32 permissionLessExecutionThresholdSeconds;
@@ -35,11 +34,6 @@ interface IEVM2EVMOffRamp {
    * @notice Returns the the current nonce for a receiver.
    */
   function getSenderNonce(address sender) external view returns (uint64 nonce);
-
-  /**
-   * @notice Returns the current balance for a given NOP.
-   */
-  function getNopBalance(address nop) external view returns (uint256 balance);
 
   /**
    * @notice Returns the current config.

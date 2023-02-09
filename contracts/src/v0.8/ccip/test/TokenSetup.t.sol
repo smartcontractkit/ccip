@@ -23,8 +23,6 @@ contract TokenSetup is BaseTest {
 
   IPool internal s_destFeeTokenPool;
 
-  uint256 internal constant TOKENS_PER_FEE_COIN = 2e20;
-
   function setUp() public virtual override {
     BaseTest.setUp();
 

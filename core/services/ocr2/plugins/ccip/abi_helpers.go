@@ -224,14 +224,6 @@ func makeExecutionReportArgs() abi.Arguments {
 					Type: "uint64[]",
 				},
 				{
-					Name: "tokenPerFeeCoinAddresses",
-					Type: "address[]",
-				},
-				{
-					Name: "tokenPerFeeCoin",
-					Type: "uint256[]",
-				},
-				{
 					Name: "feeUpdates",
 					Type: "tuple[]",
 					Components: []abi.ArgumentMarshaling{
