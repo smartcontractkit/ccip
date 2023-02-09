@@ -584,7 +584,7 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 			return nil, err2
 		}
 		var pluginConfig ccipconfig.CommitPluginConfig
-		err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
+		err = json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -629,7 +629,7 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 			return nil, err2
 		}
 		var pluginConfig ccipconfig.CommitPluginConfig
-		err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
+		err = json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
 		if err != nil {
 			return nil, err
 		}
