@@ -189,9 +189,7 @@ func (c *CCIPE2ELoad) AfterAllCall() {
 		c.t,
 		c.BalanceStats.DestBalanceReq,
 		c.Source.TransferAmount,
-		big.NewInt(0),
 		c.NoOfReq,
-		bigmath.Mul(big.NewInt(c.NoOfReq), big.NewInt(0.79e18)),
 	)
 	c.BalanceStats.SourceBalanceAssertions = c.Source.BalanceAssertions(c.t, c.BalanceStats.SourceBalanceReq, c.NoOfReq, c.totalGEFee)
 	actions.AssertBalances(c.t, c.BalanceStats.DestBalanceAssertions)

@@ -84,6 +84,9 @@ func (loadArgs *loadArgs) Setup() {
 		false,
 	)
 	loadArgs.envTear = tearDown
+	if forwardLane == nil {
+		return
+	}
 	source := forwardLane.Source
 	dest := forwardLane.Dest
 	ccipLoad := NewCCIPLoad(loadArgs.t, source, dest, loadArgs.ccipTimeout, 100000)

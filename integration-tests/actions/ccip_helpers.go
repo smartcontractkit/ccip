@@ -880,6 +880,9 @@ func (lane *CCIPLane) RecordStateBeforeTransfer() {
 	require.NoError(lane.t, err, "Getting current block should be successful in source chain")
 	lane.StartBlockOnDestination, err = lane.Dest.Common.ChainClient.LatestBlockNumber(context.Background())
 	require.NoError(lane.t, err, "Getting current block should be successful in dest chain")
+	lane.TotalFee = big.NewInt(0)
+	lane.NumberOfReq = 0
+	lane.SentReqHashes = []string{}
 }
 
 func (lane *CCIPLane) SendRequests(noOfRequests int) []string {
@@ -907,8 +910,8 @@ func (lane *CCIPLane) SendRequests(noOfRequests int) []string {
 			fmt.Sprintf("msg %d", i),
 			common.HexToAddress(lane.Source.Common.FeeToken.Address()),
 		)
-		lane.SentReqHashes = append(lane.SentReqHashes, txHash)
 		txs = append(txs, txHash)
+		lane.SentReqHashes = append(lane.SentReqHashes, txHash)
 		lane.TotalFee = bigmath.Add(lane.TotalFee, fee)
 	}
 	return txs
@@ -922,7 +925,6 @@ func (lane *CCIPLane) ValidateRequests() {
 	// unused fee is returned to receiver fee token account
 	AssertBalances(lane.t, lane.Source.BalanceAssertions(lane.t, lane.SourceBalances, int64(lane.NumberOfReq), lane.TotalFee))
 	AssertBalances(lane.t, lane.Dest.BalanceAssertions(lane.t, lane.DestBalances, lane.Source.TransferAmount, int64(lane.NumberOfReq)))
-
 }
 
 func (lane *CCIPLane) ValidateRequestByTxHash(txHash string) {
@@ -1355,11 +1357,11 @@ func DeployEnvironments(
 			HttpURL: NetworkB.HTTPURLs[0],
 		}))
 
-			testEnvironment.AddChart(blockscout.New(&blockscout.Props{
-				Name:    "source-blockscout",
-				WsURL:   NetworkA.URLs[0],
-				HttpURL: NetworkA.HTTPURLs[0],
-			}))
+		testEnvironment.AddChart(blockscout.New(&blockscout.Props{
+			Name:    "source-blockscout",
+			WsURL:   NetworkA.URLs[0],
+			HttpURL: NetworkA.HTTPURLs[0],
+		}))
 	*/
 
 	err := testEnvironment.Run()

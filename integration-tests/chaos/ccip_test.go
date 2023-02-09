@@ -22,9 +22,6 @@ func TestChaosCCIP(t *testing.T) {
 		lane             *actions.CCIPLane
 		testSetup        actions.CCIPTestEnv
 	)
-	t.Cleanup(func() {
-		tearDown()
-	})
 
 	lane, _, tearDown = actions.CCIPDefaultTestSetUp(t, "chaos-ccip",
 		map[string]interface{}{
@@ -48,16 +45,26 @@ func TestChaosCCIP(t *testing.T) {
 				},
 			},
 		}, []*big.Int{big.NewInt(1e8)}, numOfCommitNodes, false, false)
+
+	// if the test runs on remote runner
+	if lane == nil {
+		return
+	}
+	t.Cleanup(func() {
+		tearDown()
+	})
 	require.NoError(t, lane.IsLaneDeployed())
 	testEnvironment = lane.TestEnv.K8Env
 	testSetup = *lane.TestEnv
 
 	inputs := []struct {
+		testName             string
 		chaosFunc            chaos.ManifestFunc
 		chaosProps           *chaos.Props
 		waitForChaosRecovery bool
 	}{
 		{
+			testName:  "CCIP Commit works after majority of CL nodes are recovered from pod failure",
 			chaosFunc: chaos.NewFailPods,
 			chaosProps: &chaos.Props{
 				LabelsSelector: &map[string]*string{actions.ChaosGroupCommitFaultyPlus: a.Str("1")},
@@ -66,6 +73,7 @@ func TestChaosCCIP(t *testing.T) {
 			waitForChaosRecovery: true,
 		},
 		{
+			testName:  "CCIP Execution works after majority of CL nodes are recovered from pod failure",
 			chaosFunc: chaos.NewFailPods,
 			chaosProps: &chaos.Props{
 				LabelsSelector: &map[string]*string{actions.ChaosGroupExecutionFaultyPlus: a.Str("1")},
@@ -74,6 +82,7 @@ func TestChaosCCIP(t *testing.T) {
 			waitForChaosRecovery: true,
 		},
 		{
+			testName:  "CCIP Commit works while minority of CL nodes are in failed state for pod failure",
 			chaosFunc: chaos.NewFailPods,
 			chaosProps: &chaos.Props{
 				LabelsSelector: &map[string]*string{actions.ChaosGroupCommitFaulty: a.Str("1")},
@@ -82,6 +91,7 @@ func TestChaosCCIP(t *testing.T) {
 			waitForChaosRecovery: false,
 		},
 		{
+			testName:  "CCIP Execution works while minority of CL nodes are in failed state for pod failure",
 			chaosFunc: chaos.NewFailPods,
 			chaosProps: &chaos.Props{
 				LabelsSelector: &map[string]*string{actions.ChaosGroupExecutionFaulty: a.Str("1")},
@@ -91,12 +101,18 @@ func TestChaosCCIP(t *testing.T) {
 		},
 	}
 	for _, in := range inputs {
-		t.Run("", func(t *testing.T) {
+		t.Run(in.testName, func(t *testing.T) {
 			testSetup.ChaosLabel(t)
 
 			// apply chaos
 			chaosId, err := testEnvironment.Chaos.Run(in.chaosFunc(testEnvironment.Cfg.Namespace, in.chaosProps))
 			require.NoError(t, err)
+			t.Cleanup(func() {
+				if chaosId != "" {
+					testEnvironment.Chaos.Stop(chaosId)
+				}
+			})
+			lane.RecordStateBeforeTransfer()
 			// Send the ccip-request while the chaos is at play
 			lane.SendRequests(numOfRequests)
 			if in.waitForChaosRecovery {
@@ -106,11 +122,6 @@ func TestChaosCCIP(t *testing.T) {
 				log.Info().Msg("proceeding without waiting for chaos recovery")
 			}
 			lane.ValidateRequests()
-			t.Cleanup(func() {
-				if chaosId != "" {
-					testEnvironment.Chaos.Stop(chaosId)
-				}
-			})
 		})
 	}
 }

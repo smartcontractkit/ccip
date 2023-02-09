@@ -11,11 +11,15 @@ func TestLoadCCIPParallelSendSameSenderReceiver(t *testing.T) {
 		testArgs *loadArgs
 	)
 
+	testArgs = PopulateAndValidate(t)
+	testArgs.Setup()
+	// if the test runs on remote runner
+	if testArgs.ccipLoad == nil {
+		return
+	}
 	t.Cleanup(func() {
 		log.Info().Msg("Tearing down the environment")
 		testArgs.TearDown()
 	})
-	testArgs = PopulateAndValidate(t)
-	testArgs.Setup()
 	testArgs.Run()
 }
