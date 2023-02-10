@@ -70,7 +70,10 @@ func CleanupReorgTest(
 }
 
 func TestDirectRequestReorg(t *testing.T) {
-	testEnvironment := environment.New(&environment.Config{TTL: 1 * time.Hour})
+	testEnvironment := environment.New(&environment.Config{
+		TTL:  1 * time.Hour,
+		Test: t,
+	})
 	err := testEnvironment.
 		AddHelm(mockservercfg.New(nil)).
 		AddHelm(mockserver.New(nil)).
@@ -91,6 +94,9 @@ func TestDirectRequestReorg(t *testing.T) {
 		})).
 		Run()
 	require.NoError(t, err, "Error deploying test environment")
+	if testEnvironment.WillUseRemoteRunner() {
+		return
+	}
 
 	// related https://app.shortcut.com/chainlinklabs/story/38295/creating-an-evm-chain-via-cli-or-api-immediately-polling-the-nodes-and-returning-an-error
 	// node must work and reconnect even if network is not working
