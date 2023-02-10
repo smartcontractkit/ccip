@@ -54,7 +54,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, RouterSetup {
       rateLimiterConfig(),
       s_sourceRouter,
       address(s_IFeeManager),
-      feeManagerConfig(address(s_IFeeManager))
+      feeManagerConfig()
     );
 
     s_metadataHash = keccak256(
@@ -129,11 +129,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, RouterSetup {
     return messageEvent;
   }
 
-  function feeManagerConfig(address feeManagerAddress)
-    internal
-    view
-    returns (IEVM2EVMOnRamp.FeeTokenConfigArgs[] memory feeConfig)
-  {
+  function feeManagerConfig() internal view returns (IEVM2EVMOnRamp.FeeTokenConfigArgs[] memory feeConfig) {
     IEVM2EVMOnRamp.FeeTokenConfigArgs[] memory FeeTokenConfigArgss = new IEVM2EVMOnRamp.FeeTokenConfigArgs[](2);
     for (uint256 i = 0; i < FeeTokenConfigArgss.length; i++) {
       FeeTokenConfigArgss[i] = IEVM2EVMOnRamp.FeeTokenConfigArgs({

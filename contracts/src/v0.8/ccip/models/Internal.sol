@@ -15,10 +15,8 @@ library Internal {
     uint64[] sequenceNumbers;
     FeeUpdate[] feeUpdates;
     bytes[] encodedMessages;
-    bytes32[] innerProofs;
-    uint256 innerProofFlagBits;
-    bytes32[] outerProofs;
-    uint256 outerProofFlagBits;
+    bytes32[] proofs;
+    uint256 proofFlagBits;
   }
 
   // @notice The cross chain message that gets committed to EVM chains
@@ -108,20 +106,6 @@ library Internal {
   // Internal domain separator used in proofs
   bytes32 public constant INTERNAL_DOMAIN_SEPARATOR =
     0x0000000000000000000000000000000000000000000000000000000000000001;
-
-  /// @notice a sequenceNumber interval
-  struct Interval {
-    uint64 min;
-    uint64 max;
-  }
-
-  /// @notice Report that is committed by the observing DON at the committing phase
-  struct CommitReport {
-    address[] onRamps;
-    Interval[] intervals;
-    bytes32[] merkleRoots;
-    bytes32 rootOfRoots;
-  }
 
   enum MessageExecutionState {
     UNTOUCHED,

@@ -14,76 +14,46 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, HealthChecker, OC
   string public constant override typeAndVersion = "CommitStore 1.0.0";
 
   // Chain ID of this chain
-  uint256 internal immutable i_chainId;
+  uint64 internal immutable i_chainId;
   // Chain ID of the source chain
-  uint256 internal immutable i_sourceChainId;
+  uint64 internal immutable i_sourceChainId;
+  // The onRamp address on the source chain
+  address internal immutable i_onRamp;
 
   // merkleRoot => timestamp when received
   mapping(bytes32 => uint256) private s_roots;
 
-  // The CommitStore configuration values
-  CommitStoreConfig private s_config;
+  // The min sequence number expected for future messages
+  uint64 private s_minSeqNr;
 
-  // Mapping of the expected next sequence number by onRamp
-  mapping(address => uint64) private s_expectedNextMinByOnRamp;
-
-  /**
-   * @dev sourceTokens are mapped to pools, and therefore should be the same length arrays.
-   * @dev The AFN contract should be deployed already
-   * @param chainId The ID that this contract is deployed to
-   * @param afn AFN contract
-   * @param config containing:
-   * sourceChainId: the source chain ID
-   * onRamps: the addresses of the connected onRamps on the source chain for when overwriting
-   *    the s_expectedNextMinByOnRamp mapping
-   * minSeqNrByOnRamp: the new values when overwriting the s_expectedNextMinByOnRamp mapping
-   */
+  /// @dev sourceTokens are mapped to pools, and therefore should be the same length arrays.
+  /// @dev The AFN contract should be deployed already
+  /// @param config containing the source and dest chain Ids and the onRamp
+  /// @param afn AFN contract
+  /// @param minSeqNr The expected minimum sequence number
   constructor(
-    uint64 chainId,
-    uint64 sourceChainId,
+    CommitStoreConfig memory config,
     IAFN afn,
-    CommitStoreConfig memory config
+    uint64 minSeqNr
   ) OCR2Base() HealthChecker(afn) {
-    i_chainId = chainId;
-    i_sourceChainId = sourceChainId;
-    s_config = config;
-    if (s_config.onRamps.length != s_config.minSeqNrByOnRamp.length) revert InvalidConfiguration();
-    for (uint256 i = 0; i < s_config.onRamps.length; ++i) {
-      s_expectedNextMinByOnRamp[s_config.onRamps[i]] = s_config.minSeqNrByOnRamp[i];
-    }
+    i_chainId = config.chainId;
+    i_sourceChainId = config.sourceChainId;
+    i_onRamp = config.onRamp;
+    s_minSeqNr = minSeqNr;
   }
 
   /// @inheritdoc ICommitStore
-  function setCommitStoreConfig(CommitStoreConfig calldata config) external onlyOwner {
-    uint256 newRampLength = config.onRamps.length;
-    if (newRampLength != config.minSeqNrByOnRamp.length || newRampLength == 0) revert InvalidConfiguration();
-    uint256 onRampLength = s_config.onRamps.length;
-    for (uint256 i = 0; i < onRampLength; ++i) {
-      delete s_expectedNextMinByOnRamp[s_config.onRamps[i]];
-    }
-
-    s_config = config;
-    for (uint256 i = 0; i < newRampLength; ++i) {
-      s_expectedNextMinByOnRamp[config.onRamps[i]] = config.minSeqNrByOnRamp[i];
-    }
-
-    emit CommitStoreConfigSet(config);
+  function setMinSeqNr(uint64 minSeqNr) external onlyOwner {
+    s_minSeqNr = minSeqNr;
   }
 
   /// @inheritdoc ICommitStore
-  function getCommitStoreConfig() external view returns (CommitStoreConfig memory) {
-    return s_config;
+  function getExpectedNextSequenceNumber() public view returns (uint64) {
+    return s_minSeqNr;
   }
 
-  /// @inheritdoc ICommitStore
-  function getExpectedNextSequenceNumber(address onRamp) public view returns (uint64) {
-    return s_expectedNextMinByOnRamp[onRamp];
-  }
-
-  /**
-   * @notice Used by the owner in case an invalid sequence of roots has been
-   * posted and needs to be removed. The interval in the report is trusted.
-   */
+  /// @notice Used by the owner in case an invalid sequence of roots has been
+  /// posted and needs to be removed. The interval in the report is trusted.
   function resetUnblessedRoots(bytes32[] calldata rootToReset) external onlyOwner {
     for (uint256 i = 0; i < rootToReset.length; ++i) {
       // TODO: AFN check ( assert not self.afn.is_blessed(root))
@@ -100,32 +70,22 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, HealthChecker, OC
   }
 
   /// @inheritdoc ICommitStore
-  function getChainId() external view override returns (uint256) {
-    return i_chainId;
-  }
-
-  /// @inheritdoc ICommitStore
-  function getSourceChainId() external view override returns (uint256) {
-    return i_sourceChainId;
+  function getConfig() external view override returns (ICommitStore.CommitStoreConfig memory) {
+    return ICommitStore.CommitStoreConfig({chainId: i_chainId, sourceChainId: i_sourceChainId, onRamp: i_onRamp});
   }
 
   /// @inheritdoc ICommitStore
   function verify(
     bytes32[] calldata hashedLeaves,
-    bytes32[] calldata innerProofs,
-    uint256 innerProofFlagBits,
-    bytes32[] calldata outerProofs,
-    uint256 outerProofFlagBits
+    bytes32[] calldata proofs,
+    uint256 proofFlagBits
   ) external view override returns (uint256 timestamp) {
-    bytes32[] memory outerLeaves = new bytes32[](1);
-    // Use the result of the inner merkle proof as the single leaf of the outer merkle tree.
-    outerLeaves[0] = merkleRoot(hashedLeaves, innerProofs, innerProofFlagBits);
-    bytes32 outerRoot = merkleRoot(outerLeaves, outerProofs, outerProofFlagBits);
+    bytes32 root = merkleRoot(hashedLeaves, proofs, proofFlagBits);
     // Only return non-zero if present and blessed.
-    if (s_roots[outerRoot] == 0 || !isBlessed(outerRoot)) {
+    if (s_roots[root] == 0 || !isBlessed(root)) {
       return uint256(0);
     }
-    return s_roots[outerRoot];
+    return s_roots[root];
   }
 
   /// @inheritdoc ICommitStore
@@ -172,40 +132,26 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, HealthChecker, OC
 
   /// @inheritdoc OCR2Base
   function _report(bytes memory encodedReport) internal override whenNotPaused whenHealthy {
-    Internal.CommitReport memory report = abi.decode(encodedReport, (Internal.CommitReport));
-    uint256 reportLength = report.onRamps.length;
-    if (
-      report.rootOfRoots == bytes32(0) ||
-      reportLength == 0 ||
-      reportLength != report.intervals.length ||
-      reportLength != report.merkleRoots.length
-    ) revert InvalidCommitReport(report);
-    for (uint256 i = 0; i < reportLength; ++i) {
-      address onRamp = report.onRamps[i];
-      uint64 expectedMinSeqNum = s_expectedNextMinByOnRamp[onRamp];
-      if (expectedMinSeqNum == 0) revert UnsupportedOnRamp(onRamp);
-      Internal.Interval memory repInterval = report.intervals[i];
+    ICommitStore.CommitReport memory report = abi.decode(encodedReport, (ICommitStore.CommitReport));
 
-      if (expectedMinSeqNum != repInterval.min || repInterval.min > repInterval.max)
-        revert InvalidInterval(repInterval, onRamp);
-      s_expectedNextMinByOnRamp[onRamp] = repInterval.max + 1;
-    }
-    s_roots[report.rootOfRoots] = block.timestamp;
+    if (s_minSeqNr != report.interval.min || report.interval.min > report.interval.max)
+      revert InvalidInterval(report.interval);
+
+    if (report.merkleRoot == bytes32(0)) revert InvalidRoot();
+
+    s_minSeqNr = report.interval.max + 1;
+    s_roots[report.merkleRoot] = block.timestamp;
     emit ReportAccepted(report);
   }
 
-  /**
-   * @notice Hashes two bytes32 objects. The order is taken into account,
-   *          using the lower value first.
-   */
+  /// @notice Hashes two bytes32 objects. The order is taken into account,
+  /// using the lower value first.
   function _hashPair(bytes32 a, bytes32 b) private pure returns (bytes32) {
     return a < b ? _hashInternalNode(a, b) : _hashInternalNode(b, a);
   }
 
-  /**
-   * @notice Hashes two bytes32 objects in their given order, prepended by the
-   *          INTERNAL_DOMAIN_SEPARATOR.
-   */
+  /// @notice Hashes two bytes32 objects in their given order, prepended by the
+  /// INTERNAL_DOMAIN_SEPARATOR.
   function _hashInternalNode(bytes32 left, bytes32 right) private pure returns (bytes32 hash) {
     return keccak256(abi.encode(Internal.INTERNAL_DOMAIN_SEPARATOR, left, right));
   }

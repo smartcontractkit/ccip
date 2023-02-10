@@ -21,7 +21,6 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
-	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 )
 
 // RevertReasonFromErrorCodeString attempts to decode an error code string
@@ -42,11 +41,11 @@ func (h *BaseHandler) RevertReasonFromTx(txHash string) string {
 
 	ec, ethErr := ethclient.Dial(ethUrl)
 	panicErr(ethErr)
-	errorString, contractAddress := getErrorForTx(ec, txHash, requester)
+	errorString, _ := getErrorForTx(ec, txHash, requester)
 	// Some nodes prepend "Reverted " and we also remove the 0x
 	trimmed := strings.TrimPrefix(errorString, "Reverted ")[2:]
 
-	contractABIs := getABIForContract(ec, contractAddress)
+	contractABIs := getAllABIs()
 
 	return decodeErrorStringFromABI(trimmed, contractABIs)
 }
@@ -100,25 +99,6 @@ func decodeErrorStringFromABI(errorString string, contractABIs []string) string 
 
 	builder.WriteString(fmt.Sprintf("Cannot match error with contract ABI. Error code \"%v\"\n", "trimmed"))
 	return builder.String()
-}
-
-// getABIForContract. Since contracts interact with other contracts we return all ABIs we expect the given
-// contract to interact with
-func getABIForContract(client *ethclient.Client, contractAddress common.Address) []string {
-	contractType, _, err := ccip.TypeAndVersion(contractAddress, client)
-	panicErr(err)
-
-	switch contractType {
-	case ccip.EVM2EVMOnRamp:
-	case ccip.EVM2EVMOffRamp:
-	case ccip.CommitStore:
-	case ccip.Router:
-
-	default:
-		panic("Contract not found " + contractType)
-	}
-
-	return getAllABIs()
 }
 
 func getAllABIs() []string {

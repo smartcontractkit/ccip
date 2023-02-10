@@ -13,11 +13,7 @@ contract ReentrancyAbuser is CCIPConsumer {
   Internal.ExecutionReport s_payload;
   EVM2EVMOffRamp s_offRamp;
 
-  constructor(
-    address router,
-    address feeToken,
-    EVM2EVMOffRamp offRamp
-  ) CCIPConsumer(router) {
+  constructor(address router, EVM2EVMOffRamp offRamp) CCIPConsumer(router) {
     s_offRamp = offRamp;
   }
 

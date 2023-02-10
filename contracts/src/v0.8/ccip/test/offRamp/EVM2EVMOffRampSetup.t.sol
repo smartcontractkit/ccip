@@ -153,7 +153,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, FeeManagerSetup {
 
   function _generateReportFromMessages(Internal.EVM2EVMMessage[] memory messages)
     internal
-    view
+    pure
     returns (Internal.ExecutionReport memory)
   {
     bytes[] memory encodedMessages = new bytes[](messages.length);
@@ -163,18 +163,14 @@ contract EVM2EVMOffRampSetup is TokenSetup, FeeManagerSetup {
       sequenceNumbers[i] = messages[i].sequenceNumber;
     }
 
-    bytes32[] memory innerProofs = new bytes32[](0);
-    bytes32[] memory outerProofs = new bytes32[](0);
-
+    bytes32[] memory proofs = new bytes32[](0);
     Internal.FeeUpdate[] memory feeUpdates = new Internal.FeeUpdate[](0);
 
     return
       Internal.ExecutionReport({
         sequenceNumbers: sequenceNumbers,
-        innerProofs: innerProofs,
-        innerProofFlagBits: 2**256 - 1,
-        outerProofs: outerProofs,
-        outerProofFlagBits: 2**256 - 1,
+        proofs: proofs,
+        proofFlagBits: 2**256 - 1,
         encodedMessages: encodedMessages,
         feeUpdates: feeUpdates
       });

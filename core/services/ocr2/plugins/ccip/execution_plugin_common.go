@@ -85,11 +85,9 @@ type InflightInternalExecutionReport struct {
 }
 
 type MessageExecution struct {
-	encMsgs               [][]byte
-	innerProofs           [][32]byte
-	innerProofSourceFlags []bool
-	outerProofs           [][32]byte
-	outerProofSourceFlags []bool
+	encMsgs          [][]byte
+	proofs           [][32]byte
+	proofSourceFlags []bool
 }
 
 func contiguousReqs(lggr logger.Logger, min, max uint64, seqNrs []uint64) bool {
@@ -102,43 +100,48 @@ func contiguousReqs(lggr logger.Logger, min, max uint64, seqNrs []uint64) bool {
 	return true
 }
 
-func leafsFromIntervals(lggr logger.Logger, onRampToEventSig map[common.Address]EventSignatures, seqParsers map[common.Address]func(logpoller.Log) (uint64, error), intervalByOnRamp map[common.Address]commit_store.InternalInterval, srcLogPoller logpoller.LogPoller, onRampToHasher map[common.Address]LeafHasherInterface[[32]byte], confs int) (map[common.Address][][32]byte, error) {
-	leafsByOnRamp := make(map[common.Address][][32]byte)
-	for onRamp, interval := range intervalByOnRamp {
-		// Logs are guaranteed to be in order of seq num, since these are finalized logs only
-		// and the contract's seq num is auto-incrementing.
-		logs, err := srcLogPoller.LogsDataWordRange(
-			onRampToEventSig[onRamp].SendRequested,
-			onRamp,
-			onRampToEventSig[onRamp].SendRequestedSequenceNumberIndex,
-			logpoller.EvmWord(interval.Min),
-			logpoller.EvmWord(interval.Max),
-			confs)
-		if err != nil {
-			return nil, err
-		}
-		var seqNrs []uint64
-		for _, log := range logs {
-			seqNr, err2 := seqParsers[onRamp](log)
-			if err2 != nil {
-				return nil, err2
-			}
-			seqNrs = append(seqNrs, seqNr)
-		}
-		if !contiguousReqs(lggr, interval.Min, interval.Max, seqNrs) {
-			return nil, errors.Errorf("do not have full range [%v, %v] have %v", interval.Min, interval.Max, seqNrs)
-		}
-		var leafs [][32]byte
-		for _, log := range logs {
-			hash, err2 := onRampToHasher[onRamp].HashLeaf(LogPollerLogToEthLog(log))
-			if err2 != nil {
-				return nil, err2
-			}
-			leafs = append(leafs, hash)
-		}
-		leafsByOnRamp[onRamp] = leafs
+func leavesFromIntervals(
+	lggr logger.Logger,
+	onRamp common.Address,
+	eventSigs EventSignatures,
+	seqParser func(logpoller.Log) (uint64, error),
+	interval commit_store.ICommitStoreInterval,
+	srcLogPoller logpoller.LogPoller,
+	hasher LeafHasherInterface[[32]byte],
+	confs int) ([][32]byte, error) {
+	// Logs are guaranteed to be in order of seq num, since these are finalized logs only
+	// and the contract's seq num is auto-incrementing.
+	logs, err := srcLogPoller.LogsDataWordRange(
+		eventSigs.SendRequested,
+		onRamp,
+		eventSigs.SendRequestedSequenceNumberIndex,
+		logpoller.EvmWord(interval.Min),
+		logpoller.EvmWord(interval.Max),
+		confs)
+	if err != nil {
+		return nil, err
 	}
-	return leafsByOnRamp, nil
+	var seqNrs []uint64
+	for _, log := range logs {
+		seqNr, err2 := seqParser(log)
+		if err2 != nil {
+			return nil, err2
+		}
+		seqNrs = append(seqNrs, seqNr)
+	}
+	if !contiguousReqs(lggr, interval.Min, interval.Max, seqNrs) {
+		return nil, errors.Errorf("do not have full range [%v, %v] have %v", interval.Min, interval.Max, seqNrs)
+	}
+	var leaves [][32]byte
+	for _, log := range logs {
+		hash, err2 := hasher.HashLeaf(LogPollerLogToEthLog(log))
+		if err2 != nil {
+			return nil, err2
+		}
+		leaves = append(leaves, hash)
+	}
+
+	return leaves, nil
 }
 
 func aggregateTokenValue(tokenLimitPrices map[common.Address]*big.Int, srcToDst map[common.Address]common.Address, tokens []common.Address, amounts []*big.Int) (*big.Int, error) {
@@ -162,21 +165,17 @@ type EventSignatures struct {
 	ExecutionStateChangedSequenceNumberIndex int
 }
 
-func commitReport(dstLogPoller logpoller.LogPoller, onRamp common.Address, commitStore *commit_store.CommitStore, seqNr uint64) (commit_store.InternalCommitReport, error) {
+func commitReport(dstLogPoller logpoller.LogPoller, onRamp common.Address, commitStore *commit_store.CommitStore, seqNr uint64) (commit_store.ICommitStoreCommitReport, error) {
 	latest, err := dstLogPoller.LatestBlock()
 	if err != nil {
-		return commit_store.InternalCommitReport{}, err
+		return commit_store.ICommitStoreCommitReport{}, err
 	}
-	// Since the report accepted logs now contain intervals per onramp, we don't have a simple way of looking
-	// up the committed report for a given sequence number from the chain.
-	// TODO(https://app.shortcut.com/chainlinklabs/story/51129/efficient-report-from-seq-num-lookup): Follow up with a more efficient way, ideally we use the chain only to obtain natural reorg self-healing.
-	// One option is to emit a log per onramp (i.e. ReportAccepted(root, onRampAddr, min, max)) so we could easily search for the relevant log?
 	logs, err := dstLogPoller.Logs(1, latest, ReportAccepted, commitStore.Address())
 	if err != nil {
-		return commit_store.InternalCommitReport{}, err
+		return commit_store.ICommitStoreCommitReport{}, err
 	}
 	if len(logs) == 0 {
-		return commit_store.InternalCommitReport{}, errors.Errorf("seq number not committed, nothing committed")
+		return commit_store.ICommitStoreCommitReport{}, errors.Errorf("seq number not committed, nothing committed")
 	}
 	for _, log := range logs {
 		reportAccepted, err := commitStore.ParseReportAccepted(types.Log{
@@ -184,25 +183,21 @@ func commitReport(dstLogPoller logpoller.LogPoller, onRamp common.Address, commi
 			Data:   log.Data,
 		})
 		if err != nil {
-			return commit_store.InternalCommitReport{}, err
+			return commit_store.ICommitStoreCommitReport{}, err
 		}
-		for i, onRampInReport := range reportAccepted.Report.OnRamps {
-			if onRampInReport == onRamp {
-				if reportAccepted.Report.Intervals[i].Min <= seqNr && seqNr <= reportAccepted.Report.Intervals[i].Max {
-					return reportAccepted.Report, nil
-				}
-			}
+		if reportAccepted.Report.Interval.Min <= seqNr && seqNr <= reportAccepted.Report.Interval.Max {
+			return reportAccepted.Report, nil
 		}
 	}
-	return commit_store.InternalCommitReport{}, errors.Errorf("seq number not committed")
+	return commit_store.ICommitStoreCommitReport{}, errors.Errorf("seq number not committed")
 }
 
-func getUnexpiredCommitReports(dstLogPoller logpoller.LogPoller, commitStore *commit_store.CommitStore) ([]commit_store.InternalCommitReport, error) {
+func getUnexpiredCommitReports(dstLogPoller logpoller.LogPoller, commitStore *commit_store.CommitStore) ([]commit_store.ICommitStoreCommitReport, error) {
 	logs, err := dstLogPoller.LogsCreatedAfter(ReportAccepted, commitStore.Address(), time.Now().Add(-PERMISSIONLESS_EXECUTION_THRESHOLD))
 	if err != nil {
 		return nil, err
 	}
-	var reports []commit_store.InternalCommitReport
+	var reports []commit_store.ICommitStoreCommitReport
 	for _, log := range logs {
 		reportAccepted, err := commitStore.ParseReportAccepted(types.Log{
 			Topics: log.GetTopics(),
@@ -220,7 +215,7 @@ func leafsFromInterval(lggr logger.Logger,
 	source logpoller.LogPoller,
 	onRamp common.Address,
 	eventSigs EventSignatures,
-	interval commit_store.InternalInterval,
+	interval commit_store.ICommitStoreInterval,
 	confs int,
 	seqNumFromLog func(log types.Log) (uint64, error),
 	hashLeaf func(log types.Log) ([32]byte, error),
@@ -269,7 +264,7 @@ func buildExecution(
 	seqNumFromLog func(log types.Log) (uint64, error),
 	hashLeaf func(log types.Log) ([32]byte, error),
 ) (*MessageExecution, error) {
-	nextMin, err := commitStore.GetExpectedNextSequenceNumber(nil, onRampAddress)
+	nextMin, err := commitStore.GetExpectedNextSequenceNumber(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -280,52 +275,25 @@ func buildExecution(
 	if err != nil {
 		return nil, err
 	}
-	lggr.Infow("Building execution report", "finalSeqNums", finalSeqNums, "rootOfRoots", hexutil.Encode(rep.RootOfRoots[:]), "report", rep)
-	// Otherwise we have messages to include as well.
-	var interval commit_store.InternalInterval
-	var onRampIdx int
-	var outerTreeLeafs [][32]byte
-	for i, onRamp := range rep.OnRamps {
-		if onRamp == onRampAddress {
-			interval = rep.Intervals[i]
-			onRampIdx = i
-		}
-		outerTreeLeafs = append(outerTreeLeafs, rep.MerkleRoots[i])
-	}
-	if interval.Max == 0 {
-		return nil, errors.New("interval not found for ramp " + onRampAddress.Hex())
-	}
+	lggr.Infow("Building execution report", "finalSeqNums", finalSeqNums, "merkleRoot", hexutil.Encode(rep.MerkleRoot[:]), "report", rep)
+
 	msgsInRoot, err := source.LogsDataWordRange(
 		eventSignatures.SendRequested,
 		onRampAddress,
 		eventSignatures.SendRequestedSequenceNumberIndex,
-		EvmWord(interval.Min), EvmWord(interval.Max), confs)
+		EvmWord(rep.Interval.Min), EvmWord(rep.Interval.Max), confs)
 	if err != nil {
 		return nil, err
 	}
-	if len(msgsInRoot) != int(interval.Max-interval.Min+1) {
-		return nil, errors.Errorf("unexpected missing msgs in committed root %x have %d want %d", rep.MerkleRoots[onRampIdx], len(msgsInRoot), int(interval.Max-interval.Min+1))
+	if len(msgsInRoot) != int(rep.Interval.Max-rep.Interval.Min+1) {
+		return nil, errors.Errorf("unexpected missing msgs in committed root %x have %d want %d", rep.MerkleRoot, len(msgsInRoot), int(rep.Interval.Max-rep.Interval.Min+1))
 	}
-	leaves, err := leafsFromInterval(
-		lggr,
-		source,
-		onRampAddress,
-		eventSignatures,
-		interval,
-		confs,
-		seqNumFromLog,
-		hashLeaf,
-	)
+	leaves, err := leafsFromInterval(lggr, source, onRampAddress, eventSignatures, rep.Interval, confs, seqNumFromLog, hashLeaf)
 	if err != nil {
 		return nil, err
 	}
 	ctx := hasher.NewKeccakCtx()
-	outerTree, err := merklemulti.NewTree[[32]byte](ctx, outerTreeLeafs)
-	if err != nil {
-		return nil, err
-	}
-	outerProof := outerTree.Prove([]int{onRampIdx})
-	innerTree, err := merklemulti.NewTree[[32]byte](ctx, leaves)
+	tree, err := merklemulti.NewTree[[32]byte](ctx, leaves)
 	if err != nil {
 		return nil, err
 	}
@@ -334,11 +302,11 @@ func buildExecution(
 	var encMsgs [][]byte
 	var hashes [][32]byte
 	for _, seqNum := range finalSeqNums {
-		if seqNum < interval.Min || seqNum > interval.Max {
+		if seqNum < rep.Interval.Min || seqNum > rep.Interval.Max {
 			// We only return messages from a single root (the root of the first message).
 			continue
 		}
-		innerIdx := int(seqNum - interval.Min)
+		innerIdx := int(seqNum - rep.Interval.Min)
 		innerIdxs = append(innerIdxs, innerIdx)
 		encMsgs = append(encMsgs, msgsInRoot[innerIdx].Data)
 		hash, err2 := hashLeaf(LogPollerLogToEthLog(msgsInRoot[innerIdx]))
@@ -347,26 +315,23 @@ func buildExecution(
 		}
 		hashes = append(hashes, hash)
 	}
-	innerProof := innerTree.Prove(innerIdxs)
+	merkleProof := tree.Prove(innerIdxs)
 	// Double check this verifies before sending.
-	res, err := commitStore.Verify(nil, hashes, innerProof.Hashes, ProofFlagsToBits(innerProof.SourceFlags), outerProof.Hashes, ProofFlagsToBits(outerProof.SourceFlags))
+	res, err := commitStore.Verify(nil, hashes, merkleProof.Hashes, ProofFlagsToBits(merkleProof.SourceFlags))
 	if err != nil {
-		lggr.Errorw("Unable to call verify", "seqNums", finalSeqNums, "indices", innerIdxs, "root", rep.RootOfRoots[:], "seqRange", rep.Intervals[onRampIdx], "onRampReport", rep.OnRamps[onRampIdx].Hex(), "onRampHave", onRampAddress, "err", err)
+		lggr.Errorw("Unable to call verify", "seqNums", finalSeqNums, "indices", innerIdxs, "root", rep.MerkleRoot[:], "seqRange", rep.Interval, "err", err)
 		return nil, err
 	}
 	// No timestamp, means failed to verify root.
 	if res.Cmp(big.NewInt(0)) == 0 {
-		ir := innerTree.Root()
-		or := outerTree.Root()
-		lggr.Errorf("Root does not verify for messages: %v (indices %v) our inner root %x our outer root %x contract outer root %x",
-			finalSeqNums, innerIdxs, ir[:], or[:], rep.RootOfRoots[:])
+		ir := tree.Root()
+		lggr.Errorf("Root does not verify for messages: %v (indices %v) our inner root %x contract",
+			finalSeqNums, innerIdxs, ir[:])
 		return nil, errors.New("root does not verify")
 	}
 	return &MessageExecution{
-		encMsgs:               encMsgs,
-		innerProofs:           innerProof.Hashes,
-		innerProofSourceFlags: innerProof.SourceFlags,
-		outerProofs:           outerProof.Hashes,
-		outerProofSourceFlags: outerProof.SourceFlags,
+		encMsgs:          encMsgs,
+		proofs:           merkleProof.Hashes,
+		proofSourceFlags: merkleProof.SourceFlags,
 	}, nil
 }

@@ -3,9 +3,7 @@ package ccip
 import (
 	"encoding/json"
 	"math/big"
-	"strings"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -16,7 +14,6 @@ import (
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
-	type_and_version "github.com/smartcontractkit/chainlink/core/gethwrappers/generated/type_and_version_interface_wrapper"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	hlp "github.com/smartcontractkit/chainlink/core/scripts/common"
 	"github.com/smartcontractkit/chainlink/core/services/job"
@@ -25,127 +22,90 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/promwrapper"
 )
 
-type ContractType string
-
-var (
-	EVM2EVMOnRamp  ContractType = "EVM2EVMOnRamp"
-	EVM2EVMOffRamp ContractType = "EVM2EVMOffRamp"
-	CommitStore    ContractType = "CommitStore"
-	Router         ContractType = "Router"
-	ContractTypes               = map[ContractType]struct{}{
-		EVM2EVMOffRamp: {},
-		EVM2EVMOnRamp:  {},
-		CommitStore:    {},
-	}
-)
-
-func TypeAndVersion(addr common.Address, client bind.ContractBackend) (ContractType, semver.Version, error) {
-	tv, err := type_and_version.NewTypeAndVersionInterface(addr, client)
-	if err != nil {
-		return "", semver.Version{}, errors.Wrap(err, "failed creating a type and version")
-	}
-	tvStr, err := tv.TypeAndVersion(nil)
-	if err != nil {
-		return "", semver.Version{}, errors.Wrap(err, "failed to call type and version")
-	}
-	typeAndVersionValues := strings.Split(tvStr, " ")
-	contractType, version := typeAndVersionValues[0], typeAndVersionValues[1]
-	v, err := semver.NewVersion(version)
-	if err != nil {
-		return "", semver.Version{}, err
-	}
-	if _, ok := ContractTypes[ContractType(contractType)]; !ok {
-		return "", semver.Version{}, errors.Errorf("unrecognized contract type %v", contractType)
-	}
-	return ContractType(contractType), *v, nil
-}
-
-func NewCommitServices(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm.ChainSet, new bool, argsNoPlugin libocr2.OracleArgs) ([]job.ServiceCtx, error) {
-	var pluginConfig ccipconfig.CommitPluginConfig
-	err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
-	if err != nil {
-		return nil, err
-	}
-	err = pluginConfig.ValidateCommitPluginConfig()
+func NewCommitServices(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm.ChainSet, new bool, argsNoPlugin libocr2.OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
+	pluginConfig, err := ParseAndVerifyPluginConfig(spec.PluginConfig)
 	if err != nil {
 		return nil, err
 	}
 	lggr.Infof("CCIP commit plugin initialized with offchainConfig: %+v", pluginConfig)
 
+	chainIDInterface, ok := spec.RelayConfig["chainID"]
+	if !ok {
+		return nil, errors.New("chainID must be provided in relay config")
+	}
+	destChainID := int64(chainIDInterface.(float64))
+	destChain, err2 := chainSet.Get(big.NewInt(destChainID))
+	if err2 != nil {
+		return nil, errors.Wrap(err2, "get chainset")
+	}
+
 	sourceChain, err := chainSet.Get(big.NewInt(0).SetUint64(pluginConfig.SourceChainID))
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to open source chain")
 	}
-	destChain, err := chainSet.Get(big.NewInt(0).SetUint64(pluginConfig.DestChainID))
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to open destination chain")
-	}
 
-	lggr = lggr.With("srcChain", hlp.ChainName(int64(pluginConfig.SourceChainID)), "dstChain", hlp.ChainName(int64(pluginConfig.DestChainID)))
+	lggr = lggr.With("srcChain", hlp.ChainName(int64(pluginConfig.SourceChainID)), "dstChain", hlp.ChainName(destChainID))
 
 	inflightCacheExpiry := DefaultInflightCacheExpiry
 	if pluginConfig.InflightCacheExpiry.Duration() != 0 {
 		inflightCacheExpiry = pluginConfig.InflightCacheExpiry.Duration()
 	}
 
-	if !common.IsHexAddress(spec.ContractID) {
-		return nil, errors.Wrap(err, "spec.ContractID is not a valid hex address")
+	commitStoreAddress := common.HexToAddress(spec.ContractID)
+	onRampAddress := common.HexToAddress(pluginConfig.OnRampID)
+
+	err = ccipconfig.VerifyTypeAndVersion(onRampAddress, sourceChain.Client(), ccipconfig.EVM2EVMOnRamp)
+	if err != nil {
+		return nil, err
 	}
-	commitStore, err := commit_store.NewCommitStore(common.HexToAddress(spec.ContractID), destChain.Client())
+	err = ccipconfig.VerifyTypeAndVersion(commitStoreAddress, destChain.Client(), ccipconfig.CommitStore)
+	if err != nil {
+		return nil, err
+	}
+
+	commitStore, err := commit_store.NewCommitStore(commitStoreAddress, destChain.Client())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed loading the commitStore")
 	}
-	onRampSeqParsers := make(map[common.Address]func(log logpoller.Log) (uint64, error))
-	onRampToReqEventSig := make(map[common.Address]EventSignatures)
-	var onRamps []common.Address
-	var onRampToHasher = make(map[common.Address]LeafHasherInterface[[32]byte])
-	hashingCtx := hasher.NewKeccakCtx()
+	commitStoreConfig, err := commitStore.GetConfig(&bind.CallOpts{})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed getting the config from the commitStore")
+	}
+	if commitStoreConfig.OnRamp != onRampAddress {
+		return nil, errors.Errorf("Wrong onRamp got %s expected from jobspec %s", commitStoreConfig.OnRamp, onRampAddress)
+	}
+	if commitStoreConfig.SourceChainId != pluginConfig.SourceChainID {
+		return nil, errors.Errorf("Wrong source chain ID got %d expected from jobspec %d", commitStoreConfig.SourceChainId, pluginConfig.SourceChainID)
+	}
+	if commitStoreConfig.ChainId != uint64(destChainID) {
+		return nil, errors.Errorf("Wrong dest chain ID got %d expected from jobspec %d", commitStoreConfig.ChainId, destChainID)
+	}
 
-	for _, onRampID := range pluginConfig.OnRampIDs {
-		addr := common.HexToAddress(onRampID)
-		onRamps = append(onRamps, addr)
-		contractType, _, err2 := TypeAndVersion(addr, sourceChain.Client())
+	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddress, sourceChain.Client())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed loading the onRamp")
+	}
+
+	seqParsers := func(log logpoller.Log) (uint64, error) {
+		req, err2 := onRamp.ParseCCIPSendRequested(types.Log{Data: log.Data, Topics: log.GetTopics()})
 		if err2 != nil {
-			return nil, errors.Errorf("failed getting type and version %v", err2)
+			lggr.Warnf("failed to parse log: %+v", log)
+			return 0, err2
 		}
+		return req.Message.SequenceNumber, nil
+	}
 
-		switch contractType {
-		case EVM2EVMOnRamp:
-			onRamp, err3 := evm_2_evm_onramp.NewEVM2EVMOnRamp(addr, sourceChain.Client())
-			if err3 != nil {
-				return nil, errors.Wrap(err3, "failed creating a new onramp")
-			}
-			onRampSeqParsers[addr] = func(log logpoller.Log) (uint64, error) {
-				req, err4 := onRamp.ParseCCIPSendRequested(types.Log{Data: log.Data, Topics: log.GetTopics()})
-				if err4 != nil {
-					lggr.Warnf("failed to parse log: %+v", log)
-					return 0, err4
-				}
-				return req.Message.SequenceNumber, nil
-			}
-			onRampToReqEventSig[addr] = GetEventSignatures()
-			onRampToHasher[addr] = NewLeafHasher(pluginConfig.SourceChainID, pluginConfig.DestChainID, addr, hashingCtx)
-		default:
-			return nil, errors.Errorf("unrecognized onramp %v", onRampID)
-		}
-		// Subscribe to all relevant commit logs.
-		_, err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{onRampToReqEventSig[addr].SendRequested}, Addresses: []common.Address{addr}})
-		if err != nil {
-			return nil, err
-		}
+	eventSigs := GetEventSignatures()
+	_, err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{eventSigs.SendRequested}, Addresses: []common.Address{onRampAddress}})
+	if err != nil {
+		return nil, err
 	}
-	chainIDInterface, ok := spec.RelayConfig["chainID"]
-	if !ok {
-		return nil, errors.New("chainID must be provided in relay config")
-	}
-	chainID := int64(chainIDInterface.(float64))
 
-	chain, err2 := chainSet.Get(big.NewInt(chainID))
-	if err2 != nil {
-		return nil, errors.Wrap(err2, "get chainset")
-	}
-	wrappedPluginFactory := NewCommitReportingPluginFactory(lggr, sourceChain.LogPoller(), commitStore, onRampSeqParsers, onRampToReqEventSig, onRamps, onRampToHasher, inflightCacheExpiry)
-	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPCommit", string(spec.Relay), chain.ID())
+	leafHasher := NewLeafHasher(pluginConfig.SourceChainID, uint64(destChainID), onRampAddress, hasher.NewKeccakCtx())
+	wrappedPluginFactory := NewCommitReportingPluginFactory(lggr, sourceChain.LogPoller(), commitStore, seqParsers, eventSigs, onRampAddress, leafHasher, inflightCacheExpiry)
+	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPCommit", string(spec.Relay), destChain.ID())
+	argsNoPlugin.Logger = logger.NewOCRWrapper(lggr.Named("CCIPCommit").With(
+		"srcChain", hlp.ChainName(int64(pluginConfig.SourceChainID)), "dstChain", hlp.ChainName(destChainID)), true, logError)
 	oracle, err := libocr2.NewOracle(argsNoPlugin)
 	if err != nil {
 		return nil, err
@@ -162,4 +122,17 @@ func NewCommitServices(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet ev
 		}}, nil
 	}
 	return []job.ServiceCtx{job.NewServiceAdapter(oracle)}, nil
+}
+
+func ParseAndVerifyPluginConfig(jsonConfig job.JSONConfig) (ccipconfig.CommitPluginConfig, error) {
+	var pluginConfig ccipconfig.CommitPluginConfig
+	err := json.Unmarshal(jsonConfig.Bytes(), &pluginConfig)
+	if err != nil {
+		return ccipconfig.CommitPluginConfig{}, err
+	}
+	err = pluginConfig.ValidateCommitPluginConfig()
+	if err != nil {
+		return ccipconfig.CommitPluginConfig{}, err
+	}
+	return pluginConfig, nil
 }

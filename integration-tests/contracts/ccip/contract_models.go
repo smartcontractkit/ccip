@@ -239,8 +239,8 @@ func (b *CommitStore) FilterReportAccepted(currentBlock uint64) (*commit_store.C
 	return b.instance.FilterReportAccepted(&bind.FilterOpts{Start: currentBlock})
 }
 
-func (b *CommitStore) GetNextSeqNumber(onRamp common.Address) (uint64, error) {
-	return b.instance.GetExpectedNextSequenceNumber(nil, onRamp)
+func (b *CommitStore) GetNextSeqNumber() (uint64, error) {
+	return b.instance.GetExpectedNextSequenceNumber(nil)
 }
 
 type MessageReceiver struct {

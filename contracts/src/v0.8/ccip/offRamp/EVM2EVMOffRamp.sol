@@ -129,13 +129,7 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, Any2EVMBaseOffRamp, TypeAndVersionIn
       decodedMessages[i] = decodedMessage;
     }
 
-    (uint256 timestampCommitted, ) = _verifyMessages(
-      hashedLeaves,
-      report.innerProofs,
-      report.innerProofFlagBits,
-      report.outerProofs,
-      report.outerProofFlagBits
-    );
+    (uint256 timestampCommitted, ) = _verifyMessages(hashedLeaves, report.proofs, report.proofFlagBits);
     bool isOldCommitReport = (block.timestamp - timestampCommitted) > s_config.permissionLessExecutionThresholdSeconds;
 
     // Execute messages

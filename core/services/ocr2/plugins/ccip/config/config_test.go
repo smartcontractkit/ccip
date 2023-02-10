@@ -13,10 +13,9 @@ import (
 func TestCommitConfig(t *testing.T) {
 	exampleConfig := CommitPluginConfig{
 		SourceChainID:       1337,
-		DestChainID:         7331,
 		SourceStartBlock:    222,
 		DestStartBlock:      333,
-		OnRampIDs:           []string{"0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B", "0xC79b96044906550A5652BCf20a6EA02f139B9Ae5"},
+		OnRampID:            "0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B",
 		PollPeriod:          models.MustMakeDuration(5 * time.Second),
 		InflightCacheExpiry: models.MustMakeDuration(23456 * time.Second),
 	}
@@ -34,7 +33,6 @@ func TestCommitConfig(t *testing.T) {
 func TestExecutionConfig(t *testing.T) {
 	exampleConfig := ExecutionPluginConfig{
 		SourceChainID:            1337,
-		DestChainID:              7331,
 		OnRampID:                 "0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B",
 		CommitStoreID:            "0xC79b96044906550A5652BCf20a6EA02f139B9Ae5",
 		SourceStartBlock:         222,

@@ -224,7 +224,7 @@ func (c *CCIPContracts) SetupOnchainConfig(oracles []confighelper.OracleIdentity
 
 func (c *CCIPContracts) NewCCIPJobSpecParams(tokensPerFeeCoinPipeline string, configBlock int64) CCIPJobSpecParams {
 	return CCIPJobSpecParams{
-		OnRampsOnCommit:          []common.Address{c.Source.OnRamp.Address()},
+		OnRampsOnCommit:          c.Source.OnRamp.Address(),
 		CommitStore:              c.Dest.CommitStore.Address(),
 		SourceChainId:            c.Source.ChainID,
 		DestChainId:              c.Dest.ChainID,
@@ -407,15 +407,15 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 
 	// Deploy commit store.
 	commitStoreAddress, _, _, err := commit_store.DeployCommitStore(
-		destUser,    // user
-		destChain,   // client
-		destChainID, // dest chain id
-		sourceChainID,
-		afnDestAddress, // AFN address
+		destUser,  // user
+		destChain, // client
 		commit_store.ICommitStoreCommitStoreConfig{
-			OnRamps:          []common.Address{geOnRamp.Address()},
-			MinSeqNrByOnRamp: []uint64{1},
+			ChainId:       destChainID,
+			SourceChainId: sourceChainID,
+			OnRamp:        geOnRamp.Address(),
 		},
+		afnDestAddress, // AFN address
+		1,              // min seq num
 	)
 	require.NoError(t, err)
 	commitStore, err := commit_store.NewCommitStore(commitStoreAddress, destChain)
@@ -570,7 +570,7 @@ func EventuallyExecutionStateChangedToSuccess(t *testing.T, ccipContracts CCIPCo
 
 func EventuallyReportCommitted(t *testing.T, ccipContracts CCIPContracts, onRamp common.Address, max int) {
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
-		minSeqNum, err := ccipContracts.Dest.CommitStore.GetExpectedNextSequenceNumber(nil, onRamp)
+		minSeqNum, err := ccipContracts.Dest.CommitStore.GetExpectedNextSequenceNumber(nil)
 		require.NoError(t, err)
 		ccipContracts.Source.Chain.Commit()
 		ccipContracts.Dest.Chain.Commit()
@@ -595,10 +595,10 @@ func ExecuteMessage(
 	ccipContracts CCIPContracts,
 	req logpoller.Log,
 	allReqs []logpoller.Log,
-	report commit_store.InternalCommitReport,
+	report commit_store.ICommitStoreCommitReport,
 ) uint64 {
 	t.Log("Executing request manually")
-	// Build full tree for report
+	// Build a merkle tree for the report
 	mctx := hasher.NewKeccakCtx()
 	leafHasher := ccip.NewLeafHasher(ccipContracts.Source.ChainID, ccipContracts.Dest.ChainID, ccipContracts.Source.OnRamp.Address(), mctx)
 
@@ -608,40 +608,19 @@ func ExecuteMessage(
 		require.NoError(t, err)
 		leafHashes = append(leafHashes, hash)
 	}
-	intervalsByOnRamp := make(map[common.Address]commit_store.InternalInterval)
-	merkleRootsByOnRamp := make(map[common.Address][32]byte)
-	for i, onRamp := range report.OnRamps {
-		intervalsByOnRamp[onRamp] = report.Intervals[i]
-		merkleRootsByOnRamp[onRamp] = report.MerkleRoots[i]
-	}
-	interval := intervalsByOnRamp[ccipContracts.Source.OnRamp.Address()]
 	decodedMsg, err := ccip.DecodeMessage(req.Data)
 	require.NoError(t, err)
-	innerIdx := int(decodedMsg.SequenceNumber - interval.Min)
-	innerTree, err := merklemulti.NewTree(mctx, leafHashes)
+	tree, err := merklemulti.NewTree(mctx, leafHashes)
 	require.NoError(t, err)
-	innerProof := innerTree.Prove([]int{innerIdx})
-	var onRampIdx int
-	var outerTreeLeafs [][32]byte
-	for i, onRamp := range report.OnRamps {
-		if onRamp == ccipContracts.Source.OnRamp.Address() {
-			onRampIdx = i
-		}
-		outerTreeLeafs = append(outerTreeLeafs, merkleRootsByOnRamp[onRamp])
-	}
-	outerTree, err := merklemulti.NewTree(mctx, outerTreeLeafs)
-	require.NoError(t, err)
-	require.Equal(t, outerTree.Root(), report.RootOfRoots, "Roots donot match")
+	require.Equal(t, tree.Root(), report.MerkleRoot, "Roots do not match")
 
-	outerProof := outerTree.Prove([]int{onRampIdx})
-
+	idx := int(decodedMsg.SequenceNumber - report.Interval.Min)
+	proof := tree.Prove([]int{idx})
 	offRampProof := evm_2_evm_offramp.InternalExecutionReport{
-		SequenceNumbers:    []uint64{decodedMsg.SequenceNumber},
-		EncodedMessages:    [][]byte{req.Data},
-		InnerProofs:        innerProof.Hashes,
-		InnerProofFlagBits: ccip.ProofFlagsToBits(innerProof.SourceFlags),
-		OuterProofs:        outerProof.Hashes,
-		OuterProofFlagBits: ccip.ProofFlagsToBits(outerProof.SourceFlags),
+		SequenceNumbers: []uint64{decodedMsg.SequenceNumber},
+		EncodedMessages: [][]byte{req.Data},
+		Proofs:          proof.Hashes,
+		ProofFlagBits:   ccip.ProofFlagsToBits(proof.SourceFlags),
 	}
 
 	// Execute.

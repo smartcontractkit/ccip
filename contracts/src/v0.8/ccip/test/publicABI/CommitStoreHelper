@@ -1,11 +1,9 @@
 {
   "acceptOwnership()": "79ba5097",
   "getAFN()": "2222dd42",
-  "getChainId()": "3408e470",
-  "getCommitStoreConfig()": "ad4464dd",
-  "getExpectedNextSequenceNumber(address)": "c1131d8e",
+  "getConfig()": "c3f909d4",
+  "getExpectedNextSequenceNumber()": "4120fccd",
   "getMerkleRoot(bytes32)": "a7206cd6",
-  "getSourceChainId()": "fe428ed3",
   "getTransmitters()": "666cab8d",
   "isAFNHealthy()": "147809b3",
   "isBlessed(bytes32)": "ff888fb1",
@@ -18,11 +16,11 @@
   "report(bytes)": "b5767166",
   "resetUnblessedRoots(bytes32[])": "f47a8690",
   "setAFN(address)": "108ee5fc",
-  "setCommitStoreConfig((address[],uint64[]))": "b6a19211",
+  "setMinSeqNr(uint64)": "ad7a22f8",
   "setOCR2Config(address[],address[],uint8,bytes,uint64,bytes)": "1ef38174",
   "transferOwnership(address)": "f2fde38b",
   "transmit(bytes32[3],bytes,bytes32[],bytes32[],bytes32)": "b1dc65a4",
   "typeAndVersion()": "181f5a77",
   "unpause()": "3f4ba83a",
-  "verify(bytes32[],bytes32[],uint256,bytes32[],uint256)": "e71e65ce"
+  "verify(bytes32[],bytes32[],uint256)": "32048875"
 }

@@ -163,7 +163,8 @@ func (e *CCIPContractsDeployer) NewAFNContract(addr common.Address) (*AFN, error
 func (e *CCIPContractsDeployer) DeployCommitStore(
 	sourceChainId, destChainId uint64,
 	afn common.Address,
-	bConfig commit_store.ICommitStoreCommitStoreConfig,
+	onRamp common.Address,
+	minSeqNum uint64,
 ) (
 	*CommitStore,
 	error,
@@ -172,7 +173,16 @@ func (e *CCIPContractsDeployer) DeployCommitStore(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return commit_store.DeployCommitStore(auth, backend, destChainId, sourceChainId, afn, bConfig)
+		return commit_store.DeployCommitStore(
+			auth,
+			backend,
+			commit_store.ICommitStoreCommitStoreConfig{
+				ChainId:       destChainId,
+				SourceChainId: sourceChainId,
+				OnRamp:        onRamp,
+			},
+			afn,
+			minSeqNum)
 	})
 	return &CommitStore{
 		client:     e.evmClient,

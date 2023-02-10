@@ -33,7 +33,7 @@ func TestCommitReportSize(t *testing.T) {
 	p.Property("bounded commit report size", prop.ForAll(func(root []byte, min, max uint64) bool {
 		var root32 [32]byte
 		copy(root32[:], root)
-		rep, err := EncodeCommitReport(&commit_store.InternalCommitReport{MerkleRoots: [][32]byte{root32}, Intervals: []commit_store.InternalInterval{{Min: min, Max: max}}})
+		rep, err := EncodeCommitReport(&commit_store.ICommitStoreCommitReport{MerkleRoot: root32, Interval: commit_store.ICommitStoreInterval{Min: min, Max: max}})
 		require.NoError(t, err)
 		return len(rep) <= MaxCommitReportLength
 	}, gen.SliceOfN(32, gen.UInt8()), gen.UInt64(), gen.UInt64()))
@@ -78,13 +78,13 @@ func TestCommitReportEncoding(t *testing.T) {
 	commitStoreAddress, _, _, err := commit_store_helper.DeployCommitStoreHelper(
 		destUser,  // user
 		destChain, // client
-		1338,      // dest chain id
-		1337,
-		afnAddress, // AFN address
 		commit_store_helper.ICommitStoreCommitStoreConfig{
-			OnRamps:          []common.Address{onRampAddress},
-			MinSeqNrByOnRamp: []uint64{1},
+			ChainId:       1338,
+			SourceChainId: 1337,
+			OnRamp:        onRampAddress,
 		},
+		afnAddress, // AFN address
+		1,          // min seq num
 	)
 	require.NoError(t, err)
 	commitStore, err := commit_store_helper.NewCommitStoreHelper(commitStoreAddress, destChain)
@@ -95,12 +95,9 @@ func TestCommitReportEncoding(t *testing.T) {
 	mctx := hasher.NewKeccakCtx()
 	tree, err := merklemulti.NewTree(mctx, [][32]byte{mctx.Hash([]byte{0xaa})})
 	require.NoError(t, err)
-	root := tree.Root()
-	report := commit_store.InternalCommitReport{
-		OnRamps:     []common.Address{onRampAddress},
-		MerkleRoots: [][32]byte{root},
-		Intervals:   []commit_store.InternalInterval{{Min: 1, Max: 10}},
-		RootOfRoots: root,
+	report := commit_store.ICommitStoreCommitReport{
+		MerkleRoot: tree.Root(),
+		Interval:   commit_store.ICommitStoreInterval{Min: 1, Max: 10},
 	}
 	out, err := EncodeCommitReport(&report)
 	require.NoError(t, err)
@@ -116,7 +113,7 @@ func TestCommitReportEncoding(t *testing.T) {
 	assert.Equal(t, uint64(1), res.Status)
 
 	// Ensure root exists.
-	ts, err := commitStore.GetMerkleRoot(nil, root)
+	ts, err := commitStore.GetMerkleRoot(nil, tree.Root())
 	require.NoError(t, err)
 	require.NotEqual(t, ts.String(), "0")
 }

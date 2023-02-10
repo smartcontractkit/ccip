@@ -5,11 +5,10 @@ import "../../commitStore/CommitStore.sol";
 
 contract CommitStoreHelper is CommitStore {
   constructor(
-    uint64 chainId,
-    uint64 sourceChainId,
+    CommitStoreConfig memory config,
     IAFN afn,
-    CommitStoreConfig memory config
-  ) CommitStore(chainId, sourceChainId, afn, config) {}
+    uint64 minSeqNr
+  ) CommitStore(config, afn, minSeqNr) {}
 
   /**
    * @dev Expose _report for tests

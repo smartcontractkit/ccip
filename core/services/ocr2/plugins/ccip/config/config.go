@@ -11,13 +11,11 @@ import (
 // CommitPluginConfig contains the plugin specific variables for the ccip.CCIPCommit plugin.
 // We use ID here to keep it as general as possible, e.g. abstracting for chains which don't have an address concept.
 type CommitPluginConfig struct {
-	SourceChainID                    uint64 `json:"sourceChainID"`
-	DestChainID                      uint64 `json:"destChainID"`
-	SourceStartBlock, DestStartBlock int64  // Only for first time job add.
-	// We commit from multiple onramps from the same source chain. E.g. different message types.
-	OnRampIDs           []string        `json:"onRampIDs"`
-	PollPeriod          models.Duration `json:"pollPeriod"`
-	InflightCacheExpiry models.Duration `json:"inflightCacheExpiry"`
+	SourceChainID                    uint64          `json:"sourceChainID"`
+	SourceStartBlock, DestStartBlock int64           // Only for first time job add.
+	OnRampID                         string          `json:"onRampID"`
+	PollPeriod                       models.Duration `json:"pollPeriod"`
+	InflightCacheExpiry              models.Duration `json:"inflightCacheExpiry"`
 }
 
 // ValidateCommitPluginConfig validates the arguments for the CCIP commit plugin.
@@ -25,10 +23,8 @@ type CommitPluginConfig struct {
 func (rp *CommitPluginConfig) ValidateCommitPluginConfig() error {
 	// TODO: Validation based on chainID
 	// for now, all EVM.
-	for _, onRamp := range rp.OnRampIDs {
-		if !common.IsHexAddress(onRamp) {
-			return errors.Errorf("%v is not a valid EIP155 address", onRamp)
-		}
+	if !common.IsHexAddress(rp.OnRampID) {
+		return errors.Errorf("%v is not a valid EIP155 address", rp.OnRampID)
 	}
 
 	return nil
@@ -36,9 +32,7 @@ func (rp *CommitPluginConfig) ValidateCommitPluginConfig() error {
 
 // ExecutionPluginConfig contains the plugin specific variables for the ccip.CCIPExecution plugin.
 type ExecutionPluginConfig struct {
-	SourceChainID uint64 `json:"sourceChainID"`
-	DestChainID   uint64 `json:"destChainID"`
-	// We execute for a single on/offramp pair (lane) between a given source/dest chain. E.g. a single message types.
+	SourceChainID                    uint64          `json:"sourceChainID"`
 	OnRampID                         string          `json:"onRampID"`
 	CommitStoreID                    string          `json:"commitStoreID"`
 	SourceStartBlock, DestStartBlock int64           // Only for first time job add.

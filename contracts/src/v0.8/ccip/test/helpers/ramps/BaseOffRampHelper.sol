@@ -37,12 +37,10 @@ contract BaseOffRampHelper is Any2EVMBaseOffRamp {
 
   function verifyMessages(
     bytes32[] memory hashedLeaves,
-    bytes32[] memory innerProofs,
-    uint256 innerProofFlagBits,
-    bytes32[] memory outerProofs,
-    uint256 outerProofFlagBits
+    bytes32[] memory proofs,
+    uint256 proofFlagBits
   ) external returns (uint256, uint256) {
-    return _verifyMessages(hashedLeaves, innerProofs, innerProofFlagBits, outerProofs, outerProofFlagBits);
+    return _verifyMessages(hashedLeaves, proofs, proofFlagBits);
   }
 
   function getPool_helper(IERC20 token) external view returns (IPool pool) {

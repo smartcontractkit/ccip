@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
@@ -69,22 +68,6 @@ func setOnRampOnTokenPools(t *testing.T, sourceClient *EvmDeploymentConfig) {
 		shared.WaitForMined(t, sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
 		sourceClient.Logger.Infof("Onramp pool configured with offramp address: %s", helpers.ExplorerLink(int64(sourceClient.ChainConfig.ChainId), tx.Hash()))
 	}
-}
-
-func setOnRampOnCommitStore(t *testing.T, sourceClient *EvmDeploymentConfig, destClient *EvmDeploymentConfig) {
-	commitStore, err := commit_store.NewCommitStore(destClient.LaneConfig.CommitStore, destClient.Client)
-	shared.RequireNoError(t, err)
-
-	config, err := commitStore.GetCommitStoreConfig(&bind.CallOpts{})
-	shared.RequireNoError(t, err)
-
-	config.OnRamps = append(config.OnRamps, sourceClient.LaneConfig.OnRamp)
-	config.MinSeqNrByOnRamp = append(config.MinSeqNrByOnRamp, 1)
-
-	tx, err := commitStore.SetCommitStoreConfig(destClient.Owner, config)
-	shared.RequireNoError(t, err)
-	destClient.Logger.Infof(fmt.Sprintf("Adding new onRamp to commitStore in tx %s", helpers.ExplorerLink(int64(destClient.ChainConfig.ChainId), tx.Hash())))
-	shared.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
 }
 
 func setRouterOnOffRamp(t *testing.T, destClient *EvmDeploymentConfig) {

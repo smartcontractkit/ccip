@@ -17,7 +17,6 @@ func upgradeOnRamp(t *testing.T, sourceClient *EvmDeploymentConfig, destClient *
 	sourceClient.Logger.Infof("Upgrading onRamp")
 	deployOnRamp(t, sourceClient, destClient.ChainConfig.ChainId, destClient.ChainConfig.SupportedTokens)
 	setOnRampOnTokenPools(t, sourceClient)
-	setOnRampOnCommitStore(t, sourceClient, destClient)
 
 	sourceClient.Logger.Info("Please deploy new commit jobs")
 }

@@ -30,7 +30,7 @@ type CCIPJobSpecParams struct {
 	Name                     string
 	OffRamp                  common.Address
 	OnRampForExecution       common.Address
-	OnRampsOnCommit          []common.Address
+	OnRampsOnCommit          common.Address
 	CommitStore              common.Address
 	SourceChainName          string
 	DestChainName            string
@@ -64,8 +64,8 @@ func (params CCIPJobSpecParams) ValidateCommitJobSpec() error {
 	if commonErr != nil {
 		return commonErr
 	}
-	if len(params.OnRampsOnCommit) == 0 {
-		return fmt.Errorf("OnRampsOnCommit cannot be empty. The commit job needs to set onRampIDs")
+	if params.OnRampsOnCommit == common.HexToAddress("") {
+		return fmt.Errorf("OnRampOnCommit cannot be empty. The commit job needs to set onRampID")
 	}
 
 	return nil
@@ -92,15 +92,6 @@ func (params CCIPJobSpecParams) CommitJobSpec() (*client.OCR2TaskJobSpec, error)
 	if err != nil {
 		return nil, err
 	}
-	var onrampIds string
-	for _, onramp := range params.OnRampsOnCommit {
-		if onrampIds == "" {
-			onrampIds = fmt.Sprintf("[\"%s\"", onramp)
-		} else {
-			onrampIds = fmt.Sprintf("%s,\"%s\"", onrampIds, onramp)
-		}
-	}
-	onrampIds = fmt.Sprintf("%s]", onrampIds)
 	ocrSpec := job.OCR2OracleSpec{
 		Relay:                             relay.EVM,
 		PluginType:                        job.CCIPCommit,
@@ -110,8 +101,7 @@ func (params CCIPJobSpecParams) CommitJobSpec() (*client.OCR2TaskJobSpec, error)
 		P2PV2Bootstrappers:                params.P2PV2Bootstrappers,
 		PluginConfig: map[string]interface{}{
 			"sourceChainID": params.SourceChainId,
-			"destChainID":   params.DestChainId,
-			"onRampIDs":     onrampIds,
+			"onRampID":      fmt.Sprintf("\"%s\"", params.OnRampsOnCommit.Hex()),
 			"pollPeriod":    `"1s"`,
 		},
 		RelayConfig: map[string]interface{}{
@@ -153,7 +143,6 @@ func (params CCIPJobSpecParams) ExecutionJobSpec() (*client.OCR2TaskJobSpec, err
 		P2PV2Bootstrappers:                params.P2PV2Bootstrappers,
 		PluginConfig: map[string]interface{}{
 			"sourceChainID": params.SourceChainId,
-			"destChainID":   params.DestChainId,
 			"onRampID":      fmt.Sprintf("\"%s\"", params.OnRampForExecution.Hex()),
 			"commitStoreID": fmt.Sprintf("\"%s\"", params.CommitStore.Hex()),
 			"tokensPerFeeCoinPipeline": fmt.Sprintf(`"""

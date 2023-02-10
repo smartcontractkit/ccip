@@ -25,9 +25,7 @@ import (
 	ctfUtils "github.com/smartcontractkit/chainlink-testing-framework/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/exp/slices"
 
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
@@ -599,21 +597,15 @@ func (destCCIP *DestCCIPModule) DeployContracts(t *testing.T, sourceCCIP SourceC
 	log.Info().Msg("Deploying destination chain specific contracts")
 
 	<-destCCIP.Common.deployed
-	var onramps []common.Address
-	var MinSeqNrByOnRamp []uint64
-
-	onramps = append(onramps, sourceCCIP.OnRamp.EthAddress)
-	MinSeqNrByOnRamp = append(MinSeqNrByOnRamp, 1)
 
 	// commitStore responsible for validating the transfer message
 	destCCIP.CommitStore, err = contractDeployer.DeployCommitStore(
 		destCCIP.SourceChainId,
 		destCCIP.Common.ChainClient.GetChainID().Uint64(),
 		destCCIP.Common.AFN.EthAddress,
-		commit_store.ICommitStoreCommitStoreConfig{
-			OnRamps:          onramps,
-			MinSeqNrByOnRamp: MinSeqNrByOnRamp,
-		})
+		sourceCCIP.OnRamp.EthAddress,
+		1,
+	)
 	require.NoError(t, err, "Deploying CommitStore shouldn't fail")
 	err = destCCIP.Common.ChainClient.WaitForEvents()
 	require.NoError(t, err, "Error waiting for setting destination contracts")
@@ -796,12 +788,8 @@ func (destCCIP *DestCCIPModule) AssertEventReportAccepted(t *testing.T, onRamp c
 		iterator, err := destCCIP.CommitStore.FilterReportAccepted(currentBlockOnDest)
 		g.Expect(err).NotTo(HaveOccurred(), "Error filtering ReportAccepted event")
 		for iterator.Next() {
-			if slices.Contains(iterator.Event.Report.OnRamps, onRamp) {
-				for _, ints := range iterator.Event.Report.Intervals {
-					if ints.Min <= seqNum && ints.Max >= seqNum {
-						return true
-					}
-				}
+			if iterator.Event.Report.Interval.Min <= seqNum && iterator.Event.Report.Interval.Max >= seqNum {
+				return true
 			}
 		}
 		return false
@@ -812,7 +800,7 @@ func (destCCIP *DestCCIPModule) AssertSeqNumberExecuted(t *testing.T, onRamp com
 	log.Info().Int64("seqNum", int64(seqNumberBefore)).Msg("Waiting to be executed")
 	gom := NewWithT(t)
 	gom.Eventually(func(g Gomega) bool {
-		seqNumberAfter, err := destCCIP.CommitStore.GetNextSeqNumber(onRamp)
+		seqNumberAfter, err := destCCIP.CommitStore.GetNextSeqNumber()
 		if err != nil {
 			return false
 		}
@@ -1121,12 +1109,9 @@ func CreateOCRJobsForCCIP(
 	require.NoError(t, err, "Getting current block should be successful in source chain")
 	currentBlockOnDest, err := destChainClient.LatestBlockNumber(context.Background())
 	require.NoError(t, err, "Getting current block should be successful in dest chain")
-	var onRamps []common.Address
-	if onRamp != common.HexToAddress("0x0") {
-		onRamps = append(onRamps, onRamp)
-	}
+
 	jobParams := testhelpers.CCIPJobSpecParams{
-		OnRampsOnCommit:    onRamps,
+		OnRampsOnCommit:    onRamp,
 		CommitStore:        commitStore,
 		SourceChainName:    sourceChainClient.GetNetworkName(),
 		DestChainName:      destChainClient.GetNetworkName(),

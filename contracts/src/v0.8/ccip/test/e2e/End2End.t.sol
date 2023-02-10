@@ -51,25 +51,20 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
     hashedMessages[1] = messages[1]._hash(metaDataHash);
     hashedMessages[2] = messages[2]._hash(metaDataHash);
 
-    Internal.Interval[] memory intervals = new Internal.Interval[](1);
-    intervals[0] = Internal.Interval(messages[0].sequenceNumber, messages[2].sequenceNumber);
-
     bytes32[] memory merkleRoots = new bytes32[](1);
     merkleRoots[0] = s_merkleHelper.getMerkleRoot(hashedMessages);
 
     address[] memory onRamps = new address[](1);
-    onRamps[0] = commitStoreConfig().onRamps[0];
+    onRamps[0] = ON_RAMP_ADDRESS;
 
-    Internal.CommitReport memory report = Internal.CommitReport({
-      onRamps: onRamps,
-      intervals: intervals,
-      merkleRoots: merkleRoots,
-      rootOfRoots: merkleRoots[0]
+    ICommitStore.CommitReport memory report = ICommitStore.CommitReport({
+      interval: ICommitStore.Interval(messages[0].sequenceNumber, messages[2].sequenceNumber),
+      merkleRoot: merkleRoots[0]
     });
 
     s_commitStore.report(abi.encode(report));
     bytes32[] memory proofs = new bytes32[](0);
-    uint256 timestamp = s_commitStore.verify(merkleRoots, proofs, 2**2 - 1, proofs, 2**2 - 1);
+    uint256 timestamp = s_commitStore.verify(merkleRoots, proofs, 2**2 - 1);
     assertEq(BLOCK_TIME, timestamp);
 
     // We change the block time so when execute would e.g. use the current

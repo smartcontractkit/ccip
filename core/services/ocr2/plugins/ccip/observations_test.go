@@ -3,7 +3,6 @@ package ccip
 import (
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/leanovate/gopter"
 	"github.com/leanovate/gopter/gen"
 	"github.com/leanovate/gopter/prop"
@@ -17,15 +16,13 @@ import (
 
 func TestObservationFilter(t *testing.T) {
 	lggr := logger.TestLogger(t)
-	obs1 := CommitObservation{IntervalsByOnRamp: map[common.Address]commit_store.InternalInterval{
-		common.HexToAddress("0x5431F5F973781809D18643b87B44921b11355d81"): commit_store.InternalInterval{Min: 1, Max: 10},
-	}}
+	obs1 := CommitObservation{Interval: commit_store.ICommitStoreInterval{Min: 1, Max: 10}}
 	b1, err := obs1.Marshal()
 	require.NoError(t, err)
 	nonEmpty := getNonEmptyObservations[CommitObservation](lggr, []types.AttributedObservation{{Observation: b1}, {Observation: []byte{}}})
 	require.NoError(t, err)
 	require.Equal(t, 1, len(nonEmpty))
-	assert.Equal(t, nonEmpty[0].IntervalsByOnRamp, obs1.IntervalsByOnRamp)
+	assert.Equal(t, nonEmpty[0].Interval, obs1.Interval)
 }
 
 func TestObservationSize(t *testing.T) {

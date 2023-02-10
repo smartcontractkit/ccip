@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -291,10 +290,6 @@ func (client *Client) SetOwnerAndUsers(t *testing.T, ownerPrivateKey string, see
 	client.Users = users
 }
 
-func (client *Client) TypeAndVersion(addr common.Address) (ccip.ContractType, semver.Version, error) {
-	return ccip.TypeAndVersion(addr, client.Client)
-}
-
 func (client *Client) ApproveLinkFrom(t *testing.T, user *bind.TransactOpts, approvedFor common.Address, amount *big.Int) {
 	client.logger.Warnf("Approving %d link for %s", amount.Int64(), approvedFor.Hex())
 	tx, err := client.LinkToken.Approve(user, approvedFor, amount)
@@ -423,18 +418,12 @@ func (client *CCIPClient) ExecuteManually(seqNr uint64) error {
 	if err != nil {
 		return err
 	}
-	var onRampIdx int
-	var report *commit_store.InternalCommitReport
+	var report *commit_store.ICommitStoreCommitReport
 	for reportIterator.Next() {
-		for i, onRamp := range reportIterator.Event.Report.OnRamps {
-			if onRamp == client.Source.OnRamp.Address() {
-				if reportIterator.Event.Report.Intervals[i].Min <= seqNr && reportIterator.Event.Report.Intervals[i].Max >= seqNr {
-					onRampIdx = i
-					report = &reportIterator.Event.Report
-					fmt.Println("Found root")
-					break
-				}
-			}
+		if reportIterator.Event.Report.Interval.Min <= seqNr && reportIterator.Event.Report.Interval.Max >= seqNr {
+			report = &reportIterator.Event.Report
+			fmt.Println("Found root")
+			break
 		}
 	}
 	reportIterator.Close()
@@ -457,8 +446,8 @@ func (client *CCIPClient) ExecuteManually(seqNr uint64) error {
 	var originalMsg []byte
 	for sendRequestedIterator.Next() {
 		// Assume in order?
-		if sendRequestedIterator.Event.Message.SequenceNumber <= report.Intervals[onRampIdx].Max && sendRequestedIterator.Event.Message.SequenceNumber >= report.Intervals[onRampIdx].Min {
-			fmt.Println("Found seq num", sendRequestedIterator.Event.Message.SequenceNumber, report.Intervals[onRampIdx])
+		if sendRequestedIterator.Event.Message.SequenceNumber <= report.Interval.Max && sendRequestedIterator.Event.Message.SequenceNumber >= report.Interval.Min {
+			fmt.Println("Found seq num", sendRequestedIterator.Event.Message.SequenceNumber, report.Interval)
 			hash, err2 := leafHasher.HashLeaf(sendRequestedIterator.Event.Raw)
 			if err2 != nil {
 				return err2
@@ -480,25 +469,15 @@ func (client *CCIPClient) ExecuteManually(seqNr uint64) error {
 	if err != nil {
 		return err
 	}
-	innerProof := tree.Prove([]int{prove})
-	if tree.Root() != report.MerkleRoots[onRampIdx] {
+	proof := tree.Prove([]int{prove})
+	if tree.Root() != report.MerkleRoot {
 		return errors.New("inner root doesn't match")
 	}
-	outerTree, err := merklemulti.NewTree(ctx, report.MerkleRoots)
-	if err != nil {
-		return err
-	}
-	if outerTree.Root() != report.RootOfRoots {
-		return errors.New("outer root doesn't match")
-	}
-	outerProof := outerTree.Prove([]int{onRampIdx})
 	InternalExecutionReport := evm_2_evm_offramp.InternalExecutionReport{
-		SequenceNumbers:    []uint64{seqNr},
-		EncodedMessages:    [][]byte{originalMsg},
-		InnerProofs:        innerProof.Hashes,
-		InnerProofFlagBits: ccip.ProofFlagsToBits(innerProof.SourceFlags),
-		OuterProofs:        outerProof.Hashes,
-		OuterProofFlagBits: ccip.ProofFlagsToBits(outerProof.SourceFlags),
+		SequenceNumbers: []uint64{seqNr},
+		EncodedMessages: [][]byte{originalMsg},
+		Proofs:          proof.Hashes,
+		ProofFlagBits:   ccip.ProofFlagsToBits(proof.SourceFlags),
 	}
 	tx, err := client.Dest.OffRamp.ManuallyExecute(client.Dest.Owner, InternalExecutionReport)
 	if err != nil {
@@ -702,16 +681,6 @@ func (client *CCIPClient) SendCrossChainMessage(t *testing.T, source SourceClien
 //	return commit_store.InternalCommitReport{}, errors.New("No report found for given sequence number")
 //}
 
-func (client *CCIPClient) SetCommitStoreConfig(t *testing.T) {
-	config := commit_store.ICommitStoreCommitStoreConfig{
-		OnRamps:          []common.Address{client.Source.OnRamp.Address()},
-		MinSeqNrByOnRamp: []uint64{3},
-	}
-	tx, err := client.Dest.CommitStore.SetCommitStoreConfig(client.Dest.Owner, config)
-	require.NoError(t, err)
-	shared.WaitForMined(t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
-}
-
 func GetCurrentBlockNumber(chain *ethclient.Client) uint64 {
 	blockNumber, err := chain.BlockNumber(context.Background())
 	helpers.PanicErr(err)
@@ -722,7 +691,7 @@ func (client *CCIPClient) ValidateMerkleRoot(
 	t *testing.T,
 	request *evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested,
 	reportRequests []*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested,
-	report commit_store.InternalCommitReport,
+	report commit_store.ICommitStoreCommitReport,
 ) merklemulti.Proof[[32]byte] {
 	mctx := hasher.NewKeccakCtx()
 	var leafHashes [][32]byte
@@ -732,24 +701,15 @@ func (client *CCIPClient) ValidateMerkleRoot(
 
 	tree, err := merklemulti.NewTree(mctx, leafHashes)
 	require.NoError(t, err)
-	rootIndex := -1
-	for i, root := range report.MerkleRoots {
-		if tree.Root() == root {
-			rootIndex = i
-		}
 
-	}
-	if rootIndex < 0 {
-		t.Log("Merkle root does not match any root in the report")
-		t.FailNow()
-	}
+	require.Equal(t, tree.Root(), report.MerkleRoot)
 
 	exists, err := client.Dest.CommitStore.GetMerkleRoot(nil, tree.Root())
 	require.NoError(t, err)
 	if exists.Uint64() < 1 {
 		panic("Path is not present in the offramp")
 	}
-	index := request.Message.SequenceNumber - report.Intervals[rootIndex].Min
+	index := request.Message.SequenceNumber - report.Interval.Min
 	client.Dest.logger.Info("index is ", index)
 	return tree.Prove([]int{int(index)})
 }
@@ -970,8 +930,8 @@ func (client *CCIPClient) SetOCR2Config(env dione.Environment) {
 	ccipConfig, err := ccip.OffchainConfig{
 		SourceIncomingConfirmations: 10,
 		DestIncomingConfirmations:   10,
-		FeeUpdateHeartBeat: models.MustMakeDuration(24 * time.Hour),
-		FeeUpdateDeviationPPB: 5e7,  // 5%
+		FeeUpdateHeartBeat:          models.MustMakeDuration(24 * time.Hour),
+		FeeUpdateDeviationPPB:       5e7, // 5%
 	}.Encode()
 	helpers.PanicErr(err)
 

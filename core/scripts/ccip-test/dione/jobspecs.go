@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
@@ -18,7 +16,7 @@ func NewCCIPJobSpecParams(sourceClient rhea.EvmDeploymentConfig, destClient rhea
 	return testhelpers.CCIPJobSpecParams{
 		OffRamp:                  destClient.LaneConfig.OffRamp,
 		OnRampForExecution:       sourceClient.LaneConfig.OnRamp,
-		OnRampsOnCommit:          []common.Address{sourceClient.LaneConfig.OnRamp},
+		OnRampsOnCommit:          sourceClient.LaneConfig.OnRamp,
 		CommitStore:              destClient.LaneConfig.CommitStore,
 		SourceChainName:          helpers.ChainName(int64(sourceClient.ChainConfig.ChainId)),
 		DestChainName:            helpers.ChainName(int64(destClient.ChainConfig.ChainId)),

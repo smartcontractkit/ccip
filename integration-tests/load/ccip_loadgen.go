@@ -500,7 +500,7 @@ func (c *CCIPE2ELoad) waitForSeqNumberIncrease(ticker *time.Ticker, seqNum uint6
 	for {
 		select {
 		case <-ticker.C:
-			seqNumberAfter, err := c.Destination.CommitStore.GetNextSeqNumber(c.Source.OnRamp.EthAddress)
+			seqNumberAfter, err := c.Destination.CommitStore.GetNextSeqNumber()
 			if err != nil {
 				c.updatestats(msgSerialNo, fmt.Sprint(seqNum), SeqNumAndRepAccIncrease, time.Since(timeNow), fail)
 				return fmt.Errorf("error %v in GetNextExpectedSeqNumber by commitStore for msg ID %d", err, msgSerialNo)

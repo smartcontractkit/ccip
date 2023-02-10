@@ -92,19 +92,6 @@ contract StructFactory {
       });
   }
 
-  // commitStore
-  function commitStoreConfig() internal pure returns (ICommitStore.CommitStoreConfig memory) {
-    address[] memory onRamps = new address[](3);
-    onRamps[0] = ON_RAMP_ADDRESS;
-    onRamps[1] = 0x2C44CDDdB6a900Fa2B585dd299E03D12Fa4293Bc;
-    onRamps[2] = 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC;
-    uint64[] memory minSequenceNumbers = new uint64[](3);
-    minSequenceNumbers[0] = 1;
-    minSequenceNumbers[1] = 1;
-    minSequenceNumbers[2] = 1;
-    return ICommitStore.CommitStoreConfig({onRamps: onRamps, minSeqNrByOnRamp: minSequenceNumbers});
-  }
-
   // Rate limiter
   address constant TOKEN_LIMIT_ADMIN = 0x11118e64e1FB0c487f25dD6D3601FF6aF8d32E4e;
 

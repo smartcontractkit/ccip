@@ -201,7 +201,7 @@ contract BaseOffRamp__verifyMessages is BaseOffRampSetup {
   function testSuccess() public {
     bytes32[] memory mockBytes = new bytes32[](5);
     // Since we use a mock commitStore it should always return 1
-    (uint256 timestamp, ) = s_offRamp.verifyMessages(mockBytes, mockBytes, 1, mockBytes, 1);
+    (uint256 timestamp, ) = s_offRamp.verifyMessages(mockBytes, mockBytes, 1);
     assertEq(1, timestamp);
   }
 }

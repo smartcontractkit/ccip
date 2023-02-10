@@ -240,15 +240,15 @@ func deployCommitStore(t *testing.T, client *EvmDeploymentConfig, sourceChainId 
 
 	client.Logger.Infof("Deploying commitStore")
 	commitStoreAddress, tx, _, err := commit_store.DeployCommitStore(
-		client.Owner,               // user
-		client.Client,              // client
-		client.ChainConfig.ChainId, // dest chain id
-		sourceChainId,              // source chain id
-		client.ChainConfig.Afn,     // AFN address
+		client.Owner,  // user
+		client.Client, // client
 		commit_store.ICommitStoreCommitStoreConfig{
-			OnRamps:          []common.Address{onRamp},
-			MinSeqNrByOnRamp: []uint64{1},
+			ChainId:       client.ChainConfig.ChainId,
+			SourceChainId: sourceChainId,
+			OnRamp:        onRamp,
 		},
+		client.ChainConfig.Afn, // AFN address
+		1,                      // Minimum sequence number
 	)
 	shared.RequireNoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)

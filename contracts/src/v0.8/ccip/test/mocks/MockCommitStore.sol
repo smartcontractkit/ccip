@@ -5,32 +5,21 @@ import "../../interfaces/ICommitStore.sol";
 
 contract MockCommitStore is ICommitStore {
   /// @inheritdoc ICommitStore
-  function getCommitStoreConfig() external pure returns (CommitStoreConfig memory) {
-    CommitStoreConfig memory config;
-    return config;
-  }
-
-  /// @inheritdoc ICommitStore
-  function setCommitStoreConfig(CommitStoreConfig calldata config) external {}
-
-  /// @inheritdoc ICommitStore
-  function getExpectedNextSequenceNumber(address) external pure returns (uint64) {
+  function getExpectedNextSequenceNumber() external pure returns (uint64) {
     return 1;
   }
 
-  function getChainId() external pure returns (uint256) {
-    return 1;
-  }
+  /// @inheritdoc ICommitStore
+  function setMinSeqNr(uint64 minSeqNr) external {}
 
-  function getSourceChainId() external pure returns (uint256) {
-    return 2;
+  /// @inheritdoc ICommitStore
+  function getConfig() external view override returns (ICommitStore.CommitStoreConfig memory) {
+    return ICommitStore.CommitStoreConfig({chainId: 1, sourceChainId: 2, onRamp: address(1)});
   }
 
   /// @inheritdoc ICommitStore
   function verify(
     bytes32[] calldata,
-    bytes32[] calldata,
-    uint256,
     bytes32[] calldata,
     uint256
   ) external pure returns (uint256 timestamp) {
@@ -51,6 +40,7 @@ contract MockCommitStore is ICommitStore {
     return 1;
   }
 
+  /// @inheritdoc ICommitStore
   function isBlessed(bytes32) external pure returns (bool) {
     return true;
   }

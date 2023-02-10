@@ -22,7 +22,7 @@
   "isAFNHealthy()": "147809b3",
   "latestConfigDetails()": "81ff7048",
   "latestConfigDigestAndEpoch()": "afcb95d7",
-  "manuallyExecute((uint64[],(address,uint64,uint128)[],bytes[],bytes32[],uint256,bytes32[],uint256))": "bbcba144",
+  "manuallyExecute((uint64[],(address,uint64,uint128)[],bytes[],bytes32[],uint256))": "cb3c8c01",
   "owner()": "8da5cb5b",
   "pause()": "8456cb59",
   "paused()": "5c975abb",

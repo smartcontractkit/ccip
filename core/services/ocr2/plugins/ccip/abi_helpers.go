@@ -18,7 +18,6 @@ import (
 var (
 	// merkleRoot || minSeqNum || maxSeqNum
 	ReportAccepted common.Hash
-	ConfigSet      common.Hash
 	// FeeManager
 	GasFeeUpdated common.Hash
 )
@@ -47,7 +46,6 @@ func init() {
 		panic(err)
 	}
 	ReportAccepted = getIDOrPanic("ReportAccepted", commitStoreABI)
-	ConfigSet = getIDOrPanic("ConfigSet", commitStoreABI)
 
 	feeManagerABI, err := abi.JSON(strings.NewReader(fee_manager.FeeManagerABI))
 	if err != nil {
@@ -246,19 +244,11 @@ func makeExecutionReportArgs() abi.Arguments {
 					Type: "bytes[]",
 				},
 				{
-					Name: "innerProofs",
+					Name: "proofs",
 					Type: "bytes32[]",
 				},
 				{
-					Name: "innerProofFlagBits",
-					Type: "uint256",
-				},
-				{
-					Name: "outerProofs",
-					Type: "bytes32[]",
-				},
-				{
-					Name: "outerProofFlagBits",
+					Name: "proofFlagBits",
 					Type: "uint256",
 				},
 			}),
@@ -272,12 +262,8 @@ func makeCommitReportArgs() abi.Arguments {
 			Name: "CommitReport",
 			Type: utils.MustAbiType("tuple", []abi.ArgumentMarshaling{
 				{
-					Name: "onRamps",
-					Type: "address[]",
-				},
-				{
-					Name: "intervals",
-					Type: "tuple[]",
+					Name: "interval",
+					Type: "tuple",
 					Components: []abi.ArgumentMarshaling{
 						{
 							Name: "min",
@@ -290,11 +276,7 @@ func makeCommitReportArgs() abi.Arguments {
 					},
 				},
 				{
-					Name: "merkleRoots",
-					Type: "bytes32[]",
-				},
-				{
-					Name: "rootOfRoots",
+					Name: "merkleRoot",
 					Type: "bytes32",
 				},
 			}),

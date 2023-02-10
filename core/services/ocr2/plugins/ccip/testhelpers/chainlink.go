@@ -422,20 +422,20 @@ func NoNodesHaveExecutedSeqNum(t *testing.T, ccipContracts CCIPContracts, eventS
 	return log
 }
 
-func EventuallyCommitReportAccepted(t *testing.T, ccipContracts CCIPContracts, currentBlock uint64) commit_store.InternalCommitReport {
+func EventuallyCommitReportAccepted(t *testing.T, ccipContracts CCIPContracts, currentBlock uint64) commit_store.ICommitStoreCommitReport {
 	g := gomega.NewGomegaWithT(t)
-	var report commit_store.InternalCommitReport
-	g.Eventually(func() []common.Address {
+	var report commit_store.ICommitStoreCommitReport
+	g.Eventually(func() bool {
 		it, err := ccipContracts.Dest.CommitStore.FilterReportAccepted(&bind.FilterOpts{Start: currentBlock})
 		g.Expect(err).NotTo(gomega.HaveOccurred(), "Error filtering ReportAccepted event")
 		g.Expect(it.Next()).To(gomega.BeTrue(), "No ReportAccepted event found")
 		report = it.Event.Report
-		if len(report.OnRamps) > 0 {
+		if report.MerkleRoot != [32]byte{} {
 			t.Log("Report Accepted by commitStore")
+			return true
 		}
-		return report.OnRamps
-	}, testutils.WaitTimeout(t), 1*time.Second).
-		Should(gomega.ContainElement(ccipContracts.Source.OnRamp.Address()), "report has not been committed")
+		return false
+	}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue(), "report has not been committed")
 	return report
 }
 

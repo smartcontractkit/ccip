@@ -96,19 +96,11 @@ contract Any2EVMBaseOffRamp is IBaseOffRamp, HealthChecker, OffRampTokenPoolRegi
    */
   function _verifyMessages(
     bytes32[] memory hashedLeaves,
-    bytes32[] memory innerProofs,
-    uint256 innerProofFlagBits,
-    bytes32[] memory outerProofs,
-    uint256 outerProofFlagBits
+    bytes32[] memory proofs,
+    uint256 proofFlagBits
   ) internal returns (uint256, uint256) {
     uint256 gasBegin = gasleft();
-    uint256 timestampCommitted = s_commitStore.verify(
-      hashedLeaves,
-      innerProofs,
-      innerProofFlagBits,
-      outerProofs,
-      outerProofFlagBits
-    );
+    uint256 timestampCommitted = s_commitStore.verify(hashedLeaves, proofs, proofFlagBits);
     if (timestampCommitted <= 0) revert RootNotCommitted();
     return (timestampCommitted, gasBegin - gasleft());
   }

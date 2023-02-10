@@ -129,14 +129,9 @@ func PrintTxStatuses(source *rhea.EvmDeploymentConfig, destination *rhea.EvmDepl
 	helpers.PanicErr(err)
 
 	for reports.Next() {
-		for i, interval := range reports.Event.Report.Intervals {
-			if reports.Event.Report.OnRamps[i] != source.LaneConfig.OnRamp {
-				continue
-			}
-			for j := interval.Min; j <= interval.Max; j++ {
-				if _, ok := txs[j]; ok {
-					txs[j].commitReport = reports.Event
-				}
+		for j := reports.Event.Report.Interval.Min; j <= reports.Event.Report.Interval.Max; j++ {
+			if _, ok := txs[j]; ok {
+				txs[j].commitReport = reports.Event
 			}
 		}
 	}
@@ -274,18 +269,6 @@ func printRampSanityCheck(chain *rhea.EvmDeploymentConfig, sourceOnRamp common.A
 
 	commitStore, err := commit_store.NewCommitStore(chain.LaneConfig.CommitStore, chain.Client)
 	helpers.PanicErr(err)
-
-	config, err := commitStore.GetCommitStoreConfig(&bind.CallOpts{})
-	helpers.PanicErr(err)
-
-	rampSet := false
-	for _, ramp := range config.OnRamps {
-		if ramp == sourceOnRamp {
-			rampSet = true
-		}
-	}
-
-	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "CommitStore Onramp set", printBool(rampSet)))
 
 	blobConfigDetails, err := commitStore.LatestConfigDetails(&bind.CallOpts{})
 	helpers.PanicErr(err)

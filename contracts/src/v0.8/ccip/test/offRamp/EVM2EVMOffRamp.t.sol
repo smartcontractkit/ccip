@@ -436,7 +436,7 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
 
     // This needs to be deployed before the source chain message is sent
     // because we need the address for the receiver.
-    ReentrancyAbuser receiver = new ReentrancyAbuser(address(s_router), s_destFeeToken, s_offRamp);
+    ReentrancyAbuser receiver = new ReentrancyAbuser(address(s_router), s_offRamp);
     uint256 balancePre = tokenToAbuse.balanceOf(address(receiver));
 
     // For this test any message will be flagged as correct by the

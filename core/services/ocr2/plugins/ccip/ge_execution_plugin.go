@@ -53,21 +53,17 @@ func DecodeExecutionReport(report types.Report) (*evm_2_evm_offramp.InternalExec
 			DestChainId                 uint64         `json:"destChainId"`
 			FeeTokenBaseUnitsPerUnitGas *big.Int       `json:"feeTokenBaseUnitsPerUnitGas"`
 		} `json:"feeUpdates"`
-		EncodedMessages    [][]byte    `json:"encodedMessages"`
-		InnerProofs        [][32]uint8 `json:"innerProofs"`
-		InnerProofFlagBits *big.Int    `json:"innerProofFlagBits"`
-		OuterProofs        [][32]uint8 `json:"outerProofs"`
-		OuterProofFlagBits *big.Int    `json:"outerProofFlagBits"`
+		EncodedMessages [][]byte    `json:"encodedMessages"`
+		Proofs          [][32]uint8 `json:"proofs"`
+		ProofFlagBits   *big.Int    `json:"proofFlagBits"`
 	})
 	if !ok {
 		return nil, fmt.Errorf("got %T", unpacked[0])
 	}
 	var er evm_2_evm_offramp.InternalExecutionReport
 	er.EncodedMessages = append(er.EncodedMessages, erStruct.EncodedMessages...)
-	er.InnerProofs = append(er.InnerProofs, erStruct.InnerProofs...)
-	er.OuterProofs = append(er.OuterProofs, erStruct.OuterProofs...)
-
-	er.FeeUpdates = []FeeUpdate{}
+	er.Proofs = append(er.Proofs, erStruct.Proofs...)
+	er.FeeUpdates = []evm_2_evm_offramp.InternalFeeUpdate{}
 
 	for _, feeUpdate := range erStruct.FeeUpdates {
 		er.FeeUpdates = append(er.FeeUpdates, FeeUpdate{
@@ -80,27 +76,22 @@ func DecodeExecutionReport(report types.Report) (*evm_2_evm_offramp.InternalExec
 	er.SequenceNumbers = erStruct.SequenceNumbers
 	// Unpack will populate with big.Int{false, <allocated empty nat>} for 0 values,
 	// which is different from the expected big.NewInt(0). Rebuild to the expected value for this case.
-	er.InnerProofFlagBits = big.NewInt(erStruct.InnerProofFlagBits.Int64())
-	er.OuterProofFlagBits = big.NewInt(erStruct.OuterProofFlagBits.Int64())
+	er.ProofFlagBits = big.NewInt(erStruct.ProofFlagBits.Int64())
 	return &er, nil
 }
 
 func EncodeExecutionReport(seqNums []uint64,
 	msgs [][]byte,
-	innerProofs [][32]byte,
-	innerProofSourceFlags []bool,
-	outerProofs [][32]byte,
-	outerProofSourceFlags []bool,
-	feeUpdates []FeeUpdate,
+	proofs [][32]byte,
+	proofSourceFlags []bool,
+	feeUpdates []evm_2_evm_offramp.InternalFeeUpdate,
 ) (types.Report, error) {
 	report, err := makeExecutionReportArgs().PackValues([]interface{}{&evm_2_evm_offramp.InternalExecutionReport{
-		SequenceNumbers:    seqNums,
-		FeeUpdates:         feeUpdates,
-		EncodedMessages:    msgs,
-		InnerProofs:        innerProofs,
-		InnerProofFlagBits: ProofFlagsToBits(innerProofSourceFlags),
-		OuterProofs:        outerProofs,
-		OuterProofFlagBits: ProofFlagsToBits(outerProofSourceFlags),
+		SequenceNumbers: seqNums,
+		FeeUpdates:      feeUpdates,
+		EncodedMessages: msgs,
+		Proofs:          proofs,
+		ProofFlagBits:   ProofFlagsToBits(proofSourceFlags),
 	}})
 	if err != nil {
 		return nil, err
@@ -407,6 +398,7 @@ func (r *ExecutionReportingPlugin) getExecutableSeqNrs(
 	if err != nil {
 		return nil, err
 	}
+
 	for _, sourceToken := range sourceTokens {
 		dst, err2 := r.config.offRamp.GetDestinationToken(nil, sourceToken)
 		if err2 != nil {
@@ -424,46 +416,36 @@ func (r *ExecutionReportingPlugin) getExecutableSeqNrs(
 	if err != nil {
 		return nil, err
 	}
+
 	pricePerDestToken := make(map[common.Address]*big.Int)
 	for i, destToken := range supportedDestTokensAndAmounts {
 		pricePerDestToken[destToken] = destTokenPrices[i]
 	}
 
 	for _, unexpiredReport := range unexpiredReports {
-		var idx int
-		var found bool
-		for i, onRamp := range unexpiredReport.OnRamps {
-			if onRamp == r.config.onRamp.Address() {
-				idx = i
-				found = true
-			}
-		}
-		if !found {
-			continue
-		}
-		snoozeUntil, haveSnoozed := r.snoozedRoots[unexpiredReport.MerkleRoots[idx]]
+		snoozeUntil, haveSnoozed := r.snoozedRoots[unexpiredReport.MerkleRoot]
 		if haveSnoozed && time.Now().Before(snoozeUntil) {
 			continue
 		}
-		blessed, err := r.config.commitStore.IsBlessed(nil, unexpiredReport.RootOfRoots)
+		blessed, err := r.config.commitStore.IsBlessed(nil, unexpiredReport.MerkleRoot)
 		if err != nil {
 			return nil, err
 		}
 		if !blessed {
-			r.lggr.Infow("report is accepted but not blessed", "report", hexutil.Encode(unexpiredReport.RootOfRoots[:]))
+			r.lggr.Infow("report is accepted but not blessed", "report", hexutil.Encode(unexpiredReport.MerkleRoot[:]))
 			continue
 		}
 		// Check this root for executable messages
-		srcLogs, err := r.config.source.LogsDataWordRange(r.config.eventSignatures.SendRequested, r.config.onRamp.Address(), r.config.eventSignatures.SendRequestedSequenceNumberIndex, logpoller.EvmWord(unexpiredReport.Intervals[idx].Min), logpoller.EvmWord(unexpiredReport.Intervals[idx].Max), int(r.offchainConfig.SourceIncomingConfirmations))
+		srcLogs, err := r.config.source.LogsDataWordRange(r.config.eventSignatures.SendRequested, r.config.onRamp.Address(), r.config.eventSignatures.SendRequestedSequenceNumberIndex, logpoller.EvmWord(unexpiredReport.Interval.Min), logpoller.EvmWord(unexpiredReport.Interval.Max), int(r.offchainConfig.SourceIncomingConfirmations))
 		if err != nil {
 			return nil, err
 		}
-		if len(srcLogs) != int(unexpiredReport.Intervals[idx].Max-unexpiredReport.Intervals[idx].Min+1) {
-			return nil, errors.Errorf("unexpected missing msgs in committed root %x have %d want %d", unexpiredReport.MerkleRoots[idx], len(srcLogs), int(unexpiredReport.Intervals[idx].Max-unexpiredReport.Intervals[idx].Min+1))
+		if len(srcLogs) != int(unexpiredReport.Interval.Max-unexpiredReport.Interval.Min+1) {
+			return nil, errors.Errorf("unexpected missing msgs in committed root %x have %d want %d", unexpiredReport.MerkleRoot, len(srcLogs), int(unexpiredReport.Interval.Max-unexpiredReport.Interval.Min+1))
 		}
 		// TODO: Reorg risk here? I.e. 1 message in a batch, we see its executed so we snooze forever,
 		// then it gets reorged out and we'll never retry.
-		executedMp, err := r.getExecutedSeqNrsInRange(unexpiredReport.Intervals[idx].Min, unexpiredReport.Intervals[idx].Max)
+		executedMp, err := r.getExecutedSeqNrsInRange(unexpiredReport.Interval.Min, unexpiredReport.Interval.Max)
 		if err != nil {
 			return nil, err
 		}
@@ -472,14 +454,14 @@ func (r *ExecutionReportingPlugin) getExecutableSeqNrs(
 		// If all messages are already executed, snooze the root for the PERMISSIONLESS_EXECUTION_THRESHOLD_SECONDS,
 		// so it will never be considered again.
 		if allMessagesExecuted {
-			r.lggr.Infof("Snoozing root %s forever since there are no executable txs anymore %v", hex.EncodeToString(unexpiredReport.MerkleRoots[idx][:]), executedMp)
-			r.snoozedRoots[unexpiredReport.MerkleRoots[idx]] = time.Now().Add(PERMISSIONLESS_EXECUTION_THRESHOLD)
+			r.lggr.Infof("Snoozing root %s forever since there are no executable txs anymore %v", hex.EncodeToString(unexpiredReport.MerkleRoot[:]), executedMp)
+			r.snoozedRoots[unexpiredReport.MerkleRoot] = time.Now().Add(PERMISSIONLESS_EXECUTION_THRESHOLD)
 			continue
 		}
 		if len(batch) != 0 {
 			return batch, nil
 		}
-		r.snoozedRoots[unexpiredReport.MerkleRoots[idx]] = time.Now().Add(r.config.snoozeTime)
+		r.snoozedRoots[unexpiredReport.MerkleRoot] = time.Now().Add(r.config.snoozeTime)
 	}
 	return []uint64{}, nil
 }
@@ -521,15 +503,13 @@ func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNums 
 	if len(finalSeqNums) != 0 {
 		return EncodeExecutionReport(finalSeqNums,
 			me.encMsgs,
-			me.innerProofs,
-			me.innerProofSourceFlags,
-			me.outerProofs,
-			me.outerProofSourceFlags,
+			me.proofs,
+			me.proofSourceFlags,
 			gasFeeUpdates,
 		)
 	}
 	lggr.Infow("Building execution report fee update only", "feeUpdates", gasFeeUpdates)
-	return EncodeExecutionReport(finalSeqNums, nil, nil, nil, nil, nil, gasFeeUpdates)
+	return EncodeExecutionReport(finalSeqNums, nil, nil, nil, gasFeeUpdates)
 }
 
 func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.ReportTimestamp, query types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
