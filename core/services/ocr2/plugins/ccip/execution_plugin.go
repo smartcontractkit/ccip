@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/logger"
+	hlp "github.com/smartcontractkit/chainlink/core/scripts/common"
 	"github.com/smartcontractkit/chainlink/core/services/job"
 	ccipconfig "github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
@@ -50,6 +51,8 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to open destination chain")
 	}
+
+	lggr = lggr.With("srcChain", hlp.ChainName(int64(pluginConfig.SourceChainID)), "dstChain", hlp.ChainName(int64(pluginConfig.DestChainID)))
 
 	rootSnoozeTime := DefaultRootSnoozeTime
 	if pluginConfig.RootSnoozeTime.Duration() != 0 {

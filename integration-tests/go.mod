@@ -43,6 +43,7 @@ require (
 	github.com/alecthomas/units v0.0.0-20210927113745-59d0afb8317a // indirect
 	github.com/andres-erbsen/clock v0.0.0-20160526145045-9e14626cd129 // indirect
 	github.com/armon/go-metrics v0.3.10 // indirect
+	github.com/ava-labs/avalanchego v1.9.0 // indirect
 	github.com/ava-labs/coreth v0.11.0-rc.4 // indirect
 	github.com/aws/constructs-go/constructs/v10 v10.1.187 // indirect
 	github.com/aws/jsii-runtime-go v1.72.0 // indirect
@@ -130,6 +131,7 @@ require (
 	github.com/gogo/protobuf v1.3.3 // indirect
 	github.com/golang-jwt/jwt/v4 v4.3.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
+	github.com/golang/mock v1.6.0 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/btree v1.1.2 // indirect

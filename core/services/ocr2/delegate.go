@@ -25,11 +25,13 @@ import (
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/core/logger"
+	hlp "github.com/smartcontractkit/chainlink/core/scripts/common"
 	drocr_service "github.com/smartcontractkit/chainlink/core/services/directrequestocr"
 	"github.com/smartcontractkit/chainlink/core/services/job"
 	"github.com/smartcontractkit/chainlink/core/services/keystore"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
+	ccipconfig "github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/directrequestocr"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/dkg"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/median"
@@ -581,6 +583,23 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 		if err2 != nil {
 			return nil, err2
 		}
+		var pluginConfig ccipconfig.CommitPluginConfig
+		err = json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
+		if err != nil {
+			return nil, err
+		}
+		err = pluginConfig.ValidateCommitPluginConfig()
+		if err != nil {
+			return nil, err
+		}
+		l := lggr.Named("CCIPCommit").With(
+			"jobName", jb.Name.ValueOrZero(),
+			"jobID", jb.ID,
+		)
+		ccipLogger := logger.NewOCRWrapper(l.With(
+			"srcChain", hlp.ChainName(int64(pluginConfig.SourceChainID)), "dstChain", hlp.ChainName(int64((pluginConfig.DestChainID)))), true, func(msg string) {
+			lggr.ErrorIf(d.jobORM.RecordError(jb.ID, msg), "unable to record error")
+		})
 		oracleArgsNoPlugin := libocr2.OracleArgs{
 			BinaryNetworkEndpointFactory: peerWrapper.Peer2,
 			V2Bootstrappers:              bootstrapPeers,
@@ -588,7 +607,7 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 			ContractConfigTracker:        ccipProvider.ContractConfigTracker(),
 			Database:                     ocrDB,
 			LocalConfig:                  lc,
-			Logger:                       ocrLogger,
+			Logger:                       ccipLogger,
 			MonitoringEndpoint:           d.monitoringEndpointGen.GenMonitoringEndpoint(spec.ContractID),
 			OffchainConfigDigester:       ccipProvider.OffchainConfigDigester(),
 			OffchainKeyring:              kb,
@@ -609,6 +628,23 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 		if err2 != nil {
 			return nil, err2
 		}
+		var pluginConfig ccipconfig.CommitPluginConfig
+		err = json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
+		if err != nil {
+			return nil, err
+		}
+		err = pluginConfig.ValidateCommitPluginConfig()
+		if err != nil {
+			return nil, err
+		}
+		l := lggr.Named("CCIPExecution").With(
+			"jobName", jb.Name.ValueOrZero(),
+			"jobID", jb.ID,
+		)
+		ccipLogger := logger.NewOCRWrapper(l.With(
+			"srcChain", hlp.ChainName(int64(pluginConfig.SourceChainID)), "dstChain", hlp.ChainName(int64((pluginConfig.DestChainID)))), true, func(msg string) {
+			lggr.ErrorIf(d.jobORM.RecordError(jb.ID, msg), "unable to record error")
+		})
 		oracleArgsNoPlugin := libocr2.OracleArgs{
 			BinaryNetworkEndpointFactory: peerWrapper.Peer2,
 			V2Bootstrappers:              bootstrapPeers,
@@ -616,7 +652,7 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 			ContractConfigTracker:        ccipProvider.ContractConfigTracker(),
 			Database:                     ocrDB,
 			LocalConfig:                  lc,
-			Logger:                       ocrLogger,
+			Logger:                       ccipLogger,
 			MonitoringEndpoint:           d.monitoringEndpointGen.GenMonitoringEndpoint(spec.ContractID),
 			OffchainConfigDigester:       ccipProvider.OffchainConfigDigester(),
 			OffchainKeyring:              kb,
