@@ -131,7 +131,7 @@ var (
 		Simulated:                 false,
 		ChainlinkTransactionLimit: 5000,
 		Timeout:                   blockchain.JSONStrDuration{time.Minute},
-		MinimumConfirmations:      0,
+		MinimumConfirmations:      1,
 		GasEstimationBuffer:       0,
 	}
 
@@ -159,7 +159,7 @@ var (
 		GasEstimationBuffer:       1000,
 	}
 
-	Avalanche blockchain.EVMNetwork = blockchain.EVMNetwork{
+	Avalanche = blockchain.EVMNetwork{
 		Name:                      "Avalanche Fuji",
 		ClientImplementation:      blockchain.EthereumClientImplementation,
 		ChainID:                   43113,
