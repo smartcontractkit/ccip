@@ -449,7 +449,7 @@ func (c *CCIPE2ELoad) PrintStats(rps int, duration float64) {
 	i := 1
 	event = log.Info()
 	for it.Next() {
-		event.Interface(fmt.Sprintf("%d Report Intervals", i), it.Event.Report.Intervals)
+		event.Interface(fmt.Sprintf("%d Report Intervals", i), it.Event.Report.Interval)
 		i++
 	}
 	event.Msgf("CommitStore-Reports Accepted")
@@ -533,19 +533,18 @@ func (c *CCIPE2ELoad) waitForReportAccepted(ticker *time.Ticker, msgSerialNo int
 				return fmt.Errorf("error %v in filtering by ReportAccepted event for seq num %d", err, seqNum)
 			}
 			for it.Next() {
-				for _, in := range it.Event.Report.Intervals {
-					seqNums := make([]uint64, in.Max-in.Min+1)
-					var i uint64
-					for range seqNums {
-						seqNums[i] = in.Min + i
-						i++
-					}
-					// update SeqNumCommitted map for all seqNums in the emitted ReportAccepted event
-					c.updateSeqNumCommitted(seqNums, it.Event.Raw.BlockNumber)
-					if in.Max >= seqNum && in.Min <= seqNum {
-						c.updatestats(msgSerialNo, fmt.Sprint(seqNum), SeqNumAndRepAccIncrease, time.Since(timeNow), success)
-						return nil
-					}
+				in := it.Event.Report.Interval
+				seqNums := make([]uint64, in.Max-in.Min+1)
+				var i uint64
+				for range seqNums {
+					seqNums[i] = in.Min + i
+					i++
+				}
+				// update SeqNumCommitted map for all seqNums in the emitted ReportAccepted event
+				c.updateSeqNumCommitted(seqNums, it.Event.Raw.BlockNumber)
+				if in.Max >= seqNum && in.Min <= seqNum {
+					c.updatestats(msgSerialNo, fmt.Sprint(seqNum), SeqNumAndRepAccIncrease, time.Since(timeNow), success)
+					return nil
 				}
 			}
 		case <-ctx.Done():
