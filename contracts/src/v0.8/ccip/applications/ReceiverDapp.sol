@@ -3,7 +3,7 @@ pragma solidity 0.8.15;
 
 import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
 
-import {CCIPConsumer} from "./CCIPConsumer.sol";
+import {CCIPReceiver} from "./CCIPReceiver.sol";
 
 import {Common} from "../models/Common.sol";
 
@@ -11,13 +11,13 @@ import {IERC20} from "../../vendor/IERC20.sol";
 
 /// @title ReceiverDapp - Application contract for receiving messages from the OffRamp on behalf of an EOA
 /// @dev For test purposes only, not to be used as an example or production code.
-contract ReceiverDapp is CCIPConsumer, TypeAndVersionInterface {
+contract ReceiverDapp is CCIPReceiver, TypeAndVersionInterface {
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "ReceiverDapp 2.0.0";
 
-  constructor(address router) CCIPConsumer(router) {}
+  constructor(address router) CCIPReceiver(router) {}
 
-  /// @inheritdoc CCIPConsumer
+  /// @inheritdoc CCIPReceiver
   function _ccipReceive(Common.Any2EVMMessage memory message) internal override {
     _handleMessage(message.data, message.destTokensAndAmounts);
   }

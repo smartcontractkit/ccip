@@ -29,13 +29,6 @@ interface IEVM2AnyOnRamp {
   function getSupportedTokens() external view returns (address[] memory tokens);
 
   /**
-   * @notice Get the next nonce for a given sender
-   * @param sender The sender to get the nonce for
-   * @return nonce The next nonce for the sender
-   */
-  function getSenderNonce(address sender) external view returns (uint64 nonce);
-
-  /**
    * @notice Send a message to the remote chain
    * @dev approve() must have already been called on the token using the this ramp address as the spender.
    * @dev if the contract is paused, this function will revert.

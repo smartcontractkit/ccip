@@ -3,8 +3,8 @@ pragma solidity 0.8.15;
 
 import "../interfaces/ICommitStore.sol";
 import "../interfaces/offRamp/IEVM2EVMOffRamp.sol";
-import "../interfaces/onRamp/IBaseOnRamp.sol";
 import "../interfaces/rateLimiter/IAggregateRateLimiter.sol";
+import "../interfaces/onRamp/IEVM2EVMOnRamp.sol";
 
 contract StructFactory {
   // addresses
@@ -79,13 +79,9 @@ contract StructFactory {
       });
   }
 
-  // onRamp
-  uint64 internal constant COMMIT_FEE_JUELS = 1e18;
-
-  function onRampConfig() internal pure returns (IBaseOnRamp.OnRampConfig memory) {
+  function onRampConfig() internal pure returns (IEVM2EVMOnRamp.OnRampConfig memory) {
     return
-      IBaseOnRamp.OnRampConfig({
-        commitFeeJuels: COMMIT_FEE_JUELS,
+      IEVM2EVMOnRamp.OnRampConfig({
         maxDataSize: MAX_DATA_SIZE,
         maxTokensLength: MAX_TOKENS_LENGTH,
         maxGasLimit: MAX_GAS_LIMIT

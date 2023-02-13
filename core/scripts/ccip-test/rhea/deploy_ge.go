@@ -128,8 +128,7 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId uint64,
 		tokenPools,                 // pools
 		[]common.Address{},         // allow list
 		client.ChainConfig.Afn,     // AFN
-		evm_2_evm_onramp.IBaseOnRampOnRampConfig{
-			CommitFeeJuels:  0,
+		evm_2_evm_onramp.IEVM2EVMOnRampOnRampConfig{
 			MaxDataSize:     1e6,
 			MaxTokensLength: 5,
 			MaxGasLimit:     ccip.GasLimitPerTx,

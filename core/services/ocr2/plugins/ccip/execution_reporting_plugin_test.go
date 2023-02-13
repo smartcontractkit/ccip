@@ -150,7 +150,7 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	receiver, err := simple_message_receiver.NewSimpleMessageReceiver(receiverAddress, destChain)
 	require.NoError(t, err)
 	destChain.Commit()
-	routerAddress, _, _, err := router.DeployRouter(destUser, destChain, []common.Address{offRampAddress})
+	routerAddress, _, _, err := router.DeployRouter(destUser, destChain, []common.Address{offRampAddress}, common.HexToAddress("0x0"))
 	require.NoError(t, err)
 	destChain.Commit()
 	_, err = offRamp.SetRouter(destUser, routerAddress)

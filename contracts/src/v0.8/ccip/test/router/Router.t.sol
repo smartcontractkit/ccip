@@ -2,9 +2,9 @@
 pragma solidity 0.8.15;
 
 import {IEVM2AnyOnRamp} from "../../interfaces/onRamp/IEVM2AnyOnRamp.sol";
-import {IBaseOnRampRouter} from "../../interfaces/onRamp/IBaseOnRampRouter.sol";
-import {IAny2EVMOffRampRouter} from "../../interfaces/offRamp/IAny2EVMOffRampRouter.sol";
 import {IRouter} from "../../interfaces/router/IRouter.sol";
+import {IWrappedNative} from "../../interfaces/router/IWrappedNative.sol";
+import {IRouterClient} from "../../interfaces/router/IRouterClient.sol";
 
 import {MockOffRamp} from "../mocks/MockOffRamp.sol";
 import "../onRamp/EVM2EVMOnRampSetup.t.sol";
@@ -73,12 +73,50 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
       feeTokenBaseUnitsPerUnitGas: 1000
     });
     s_IFeeManager.updateFees(feeUpdates);
+    IEVM2EVMOnRamp.FeeTokenConfigArgs[] memory feeTokenConfigArgs = new IEVM2EVMOnRamp.FeeTokenConfigArgs[](1);
+    feeTokenConfigArgs[0] = IEVM2EVMOnRamp.FeeTokenConfigArgs({
+      token: s_sourceTokens[1],
+      feeAmount: 2,
+      multiplier: 108e16,
+      destGasOverhead: 2
+    });
+    s_onRamp.setFeeConfig(feeTokenConfigArgs);
 
     Consumer.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.feeToken = s_sourceTokens[1];
-
     IERC20(s_sourceTokens[1]).approve(address(s_sourceRouter), 2**64);
+    s_sourceRouter.ccipSend(DEST_CHAIN_ID, message);
+  }
 
+  function testNativeFeeTokenSuccess() public {
+    Consumer.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.feeToken = address(0); // Raw native
+    uint256 nativeQuote = s_sourceRouter.getFee(DEST_CHAIN_ID, message);
+    vm.stopPrank();
+    hoax(address(1), 100 ether);
+    s_sourceRouter.ccipSend{value: nativeQuote}(DEST_CHAIN_ID, message);
+  }
+
+  function testNativeFeeTokenOverpaySuccess() public {
+    Consumer.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.feeToken = address(0); // Raw native
+    uint256 nativeQuote = s_sourceRouter.getFee(DEST_CHAIN_ID, message);
+    vm.stopPrank();
+    hoax(address(1), 100 ether);
+    s_sourceRouter.ccipSend{value: 1e18}(DEST_CHAIN_ID, message);
+    // We expect the overpayment to be taken in full.
+    assertEq(address(1).balance, 99 ether);
+  }
+
+  function testWrappedNativeFeeTokenSuccess() public {
+    Consumer.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.feeToken = s_sourceRouter.getWrappedNative();
+    uint256 nativeQuote = s_sourceRouter.getFee(DEST_CHAIN_ID, message);
+    vm.stopPrank();
+    hoax(address(1), 100 ether);
+    // Now address(1) has nativeQuote wrapped.
+    IWrappedNative(s_sourceRouter.getWrappedNative()).deposit{value: nativeQuote}();
+    IWrappedNative(s_sourceRouter.getWrappedNative()).approve(address(s_sourceRouter), nativeQuote);
     s_sourceRouter.ccipSend(DEST_CHAIN_ID, message);
   }
 
@@ -88,7 +126,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     Consumer.EVM2AnyMessage memory message = _generateEmptyMessage();
     uint64 wrongChain = DEST_CHAIN_ID + 1;
 
-    vm.expectRevert(abi.encodeWithSelector(IBaseOnRampRouter.UnsupportedDestinationChain.selector, wrongChain));
+    vm.expectRevert(abi.encodeWithSelector(IRouterClient.UnsupportedDestinationChain.selector, wrongChain));
 
     s_sourceRouter.ccipSend(wrongChain, message);
   }
@@ -112,6 +150,33 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     vm.expectRevert("ERC20: transfer amount exceeds allowance");
 
     s_sourceRouter.ccipSend(DEST_CHAIN_ID, message);
+  }
+
+  function testInvalidMsgValue() public {
+    Consumer.EVM2AnyMessage memory message = _generateEmptyMessage();
+    // Non-empty feeToken but with msg.value should revert
+    vm.stopPrank();
+    hoax(address(1), 1);
+    vm.expectRevert(IRouterClient.InvalidMsgValue.selector);
+    s_sourceRouter.ccipSend{value: 1}(DEST_CHAIN_ID, message);
+  }
+
+  function testNativeFeeTokenZeroValue() public {
+    Consumer.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.feeToken = address(0); // Raw native
+    // Include no value, should revert
+    vm.expectRevert();
+    s_sourceRouter.ccipSend(DEST_CHAIN_ID, message);
+  }
+
+  function testNativeFeeTokenInsufficientValue() public {
+    Consumer.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.feeToken = address(0); // Raw native
+    // Include insufficient, should also revert
+    vm.stopPrank();
+    hoax(address(1), 1);
+    vm.expectRevert(IRouterClient.InsufficientFeeTokenAmount.selector);
+    s_sourceRouter.ccipSend{value: 1}(DEST_CHAIN_ID, message);
   }
 }
 
@@ -153,6 +218,21 @@ contract Router_setOnRamp is EVM2EVMOnRampSetup {
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
     s_sourceRouter.setOnRamp(1337, IEVM2AnyOnRamp(address(1)));
+  }
+}
+
+/// @notice #setWrappedNative
+contract Router_setWrappedNative is EVM2EVMOnRampSetup {
+  // Success
+  function testSuccess() public {
+    s_sourceRouter.setWrappedNative(address(1));
+  }
+
+  // Reverts
+  function testOnlyOwnerReverts() public {
+    vm.stopPrank();
+    vm.expectRevert("Only callable by owner");
+    s_sourceRouter.setWrappedNative(address(1));
   }
 }
 
@@ -216,12 +296,12 @@ contract Router_addOffRamp is EVM2EVMOnRampSetup {
 
   function testAlreadyConfiguredReverts() public {
     address existingOffRamp = s_offRamps[0];
-    vm.expectRevert(abi.encodeWithSelector(IAny2EVMOffRampRouter.AlreadyConfigured.selector, existingOffRamp));
+    vm.expectRevert(abi.encodeWithSelector(IRouter.AlreadyConfigured.selector, existingOffRamp));
     s_sourceRouter.addOffRamp(existingOffRamp);
   }
 
   function testZeroAddressReverts() public {
-    vm.expectRevert(IAny2EVMOffRampRouter.InvalidAddress.selector);
+    vm.expectRevert(IRouter.InvalidAddress.selector);
     s_sourceRouter.addOffRamp(address(0));
   }
 }
@@ -257,13 +337,13 @@ contract Router_removeOffRamp is EVM2EVMOnRampSetup {
 
     assertEq(0, s_sourceRouter.getOffRamps().length);
 
-    vm.expectRevert(IAny2EVMOffRampRouter.NoOffRampsConfigured.selector);
+    vm.expectRevert(IRouter.NoOffRampsConfigured.selector);
     s_sourceRouter.removeOffRamp(s_offRamps[0]);
   }
 
   function testOffRampNotAllowedReverts() public {
     address newRamp = address(1234678);
-    vm.expectRevert(abi.encodeWithSelector(IAny2EVMOffRampRouter.OffRampNotAllowed.selector, newRamp));
+    vm.expectRevert(abi.encodeWithSelector(IRouter.OffRampNotAllowed.selector, newRamp));
     s_sourceRouter.removeOffRamp(newRamp);
   }
 }

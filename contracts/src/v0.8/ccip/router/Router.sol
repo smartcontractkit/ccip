@@ -3,11 +3,10 @@ pragma solidity 0.8.15;
 
 import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
 import {IPool} from "../interfaces/pools/IPool.sol";
-import {IRouter} from "../interfaces/router/IRouter.sol";
-import {IBaseOnRampRouter} from "../interfaces/onRamp/IBaseOnRampRouter.sol";
-import {IBaseOnRamp} from "../interfaces/onRamp/IBaseOnRamp.sol";
+import {IRouterClient} from "../interfaces/router/IRouterClient.sol";
 import {IEVM2AnyOnRamp} from "../interfaces/onRamp/IEVM2AnyOnRamp.sol";
-import {IAny2EVMOffRampRouter} from "../interfaces/offRamp/IAny2EVMOffRampRouter.sol";
+import {IRouter} from "../interfaces/router/IRouter.sol";
+import {IWrappedNative} from "../interfaces/router/IWrappedNative.sol";
 import {IAny2EVMMessageReceiver} from "../interfaces/applications/IAny2EVMMessageReceiver.sol";
 
 import {Consumer} from "../models/Consumer.sol";
@@ -28,9 +27,15 @@ contract Router is IRouter, TypeAndVersionInterface, OwnerIsCreator {
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "Router 1.0.0";
 
-  uint256 private constant GAS_FOR_CALL_EXACT_CHECK = 5_000;
+  uint64 private constant GAS_FOR_CALL_EXACT_CHECK = 5_000;
+
+  address private s_wrappedNative;
 
   // Mapping from offRamp to allowed status
+  struct OffRampDetails {
+    uint96 listIndex;
+    bool allowed; // TODO: allowed is confusing: exists?
+  }
   mapping(address => OffRampDetails) internal s_offRamps;
   // List of all offRamps that have  OffRampDetails
   address[] internal s_offRampsList;
@@ -38,43 +43,26 @@ contract Router is IRouter, TypeAndVersionInterface, OwnerIsCreator {
   // destination chain id => IOnRamp
   mapping(uint256 => IEVM2AnyOnRamp) private s_onRamps;
 
-  constructor(address[] memory offRamps) {
+  constructor(address[] memory offRamps, address wrappedNative) {
+    // TODO: initial set of onramps as well? Maybe a struct for initial config?
     s_offRampsList = offRamps;
     for (uint256 i = 0; i < offRamps.length; ++i) {
       s_offRamps[offRamps[i]] = OffRampDetails({listIndex: uint96(i), allowed: true});
     }
+    // Zero address indicates unsupported auto-wrapping.
+    s_wrappedNative = wrappedNative;
+  }
+
+  // --------------- ADMIN ----------------- //
+  function getWrappedNative() external view returns (address) {
+    return s_wrappedNative;
+  }
+
+  function setWrappedNative(address wrappedNative) external onlyOwner {
+    s_wrappedNative = wrappedNative;
   }
 
   /// @inheritdoc IRouter
-  function ccipSend(uint64 destinationChainId, Consumer.EVM2AnyMessage memory message) external returns (bytes32) {
-    IEVM2AnyOnRamp onRamp = s_onRamps[destinationChainId];
-    // getFee checks if the onRamp is valid
-    uint256 feeTokenAmount = getFee(destinationChainId, message);
-    IERC20(message.feeToken).safeTransferFrom(msg.sender, address(onRamp), feeTokenAmount);
-
-    // Transfer the tokens to the token pools.
-    // TODO: Check the pool for how to take action
-    for (uint256 i = 0; i < message.tokensAndAmounts.length; ++i) {
-      IERC20 token = IERC20(message.tokensAndAmounts[i].token);
-      IPool pool = onRamp.getPoolBySourceToken(token);
-      if (address(pool) == address(0)) revert IBaseOnRamp.UnsupportedToken(token);
-      token.safeTransferFrom(msg.sender, address(pool), message.tokensAndAmounts[i].amount);
-    }
-
-    return onRamp.forwardFromRouter(message, feeTokenAmount, msg.sender);
-  }
-
-  /// @inheritdoc IRouter
-  /// @dev returns 0 fee on invalid message.
-  function getFee(uint64 destinationChainId, Consumer.EVM2AnyMessage memory message) public view returns (uint256 fee) {
-    // Find and put the correct onRamp on the stack.
-    IEVM2AnyOnRamp onRamp = s_onRamps[destinationChainId];
-    // Check if the onRamp is a zero address, meaning the chain is not supported.
-    if (address(onRamp) == address(0)) revert UnsupportedDestinationChain(destinationChainId);
-    return onRamp.getFee(message);
-  }
-
-  /// @inheritdoc IAny2EVMOffRampRouter
   function routeMessage(
     Common.Any2EVMMessage calldata message,
     bool manualExecution,
@@ -140,11 +128,6 @@ contract Router is IRouter, TypeAndVersionInterface, OwnerIsCreator {
   }
 
   /// @inheritdoc IRouter
-  function getOnRamp(uint64 chainId) external view returns (IEVM2AnyOnRamp) {
-    return s_onRamps[chainId];
-  }
-
-  /// @inheritdoc IAny2EVMOffRampRouter
   function addOffRamp(address offRamp) external onlyOwner {
     if (address(offRamp) == address(0)) revert InvalidAddress();
     OffRampDetails memory details = s_offRamps[offRamp];
@@ -187,22 +170,34 @@ contract Router is IRouter, TypeAndVersionInterface, OwnerIsCreator {
     emit OffRampRemoved(offRamp);
   }
 
-  /// @inheritdoc IAny2EVMOffRampRouter
+  /// @inheritdoc IRouter
   function getOffRamps() external view returns (address[] memory offRamps) {
     offRamps = s_offRampsList;
   }
 
-  /// @inheritdoc IAny2EVMOffRampRouter
+  /// @inheritdoc IRouter
   function isOffRamp(address offRamp) external view returns (bool allowed) {
     return s_offRamps[offRamp].allowed;
   }
 
-  /// @inheritdoc IBaseOnRampRouter
+  // @notice only lets allowed offRamps execute
+  modifier onlyOffRamp() {
+    if (!s_offRamps[msg.sender].allowed) revert MustCallFromOffRamp(msg.sender);
+    _;
+  }
+
+  // --------------- USER ------------------ //
+  /// @inheritdoc IRouterClient
   function isChainSupported(uint64 chainId) public view returns (bool supported) {
     return address(s_onRamps[chainId]) != address(0);
   }
 
-  /// @inheritdoc IRouter
+  /// @inheritdoc IRouterClient
+  function getOnRamp(uint64 chainId) external view returns (IEVM2AnyOnRamp) {
+    return s_onRamps[chainId];
+  }
+
+  /// @inheritdoc IRouterClient
   function getSupportedTokens(uint64 destChainId) external view returns (address[] memory) {
     if (!isChainSupported(destChainId)) {
       return new address[](0);
@@ -210,9 +205,57 @@ contract Router is IRouter, TypeAndVersionInterface, OwnerIsCreator {
     return s_onRamps[uint256(destChainId)].getSupportedTokens();
   }
 
-  // @notice only lets allowed offRamps execute
-  modifier onlyOffRamp() {
-    if (!s_offRamps[msg.sender].allowed) revert MustCallFromOffRamp(msg.sender);
-    _;
+  /// @inheritdoc IRouterClient
+  /// @dev returns 0 fee on invalid message.
+  function getFee(uint64 destinationChainId, Consumer.EVM2AnyMessage memory message)
+    external
+    view
+    returns (uint256 fee)
+  {
+    if (message.feeToken == address(0)) {
+      // For empty feeToken return native quote.
+      message.feeToken = address(s_wrappedNative);
+    }
+    IEVM2AnyOnRamp onRamp = s_onRamps[destinationChainId];
+    if (address(onRamp) == address(0)) revert UnsupportedDestinationChain(destinationChainId);
+    return onRamp.getFee(message);
+  }
+
+  /// @inheritdoc IRouterClient
+  function ccipSend(uint64 destinationChainId, Consumer.EVM2AnyMessage memory message)
+    external
+    payable
+    returns (bytes32)
+  {
+    IEVM2AnyOnRamp onRamp = s_onRamps[destinationChainId];
+    if (address(onRamp) == address(0)) revert UnsupportedDestinationChain(destinationChainId);
+    uint256 feeTokenAmount;
+    if (message.feeToken == address(0)) {
+      // Ensure sufficient native.
+      message.feeToken = s_wrappedNative;
+      feeTokenAmount = onRamp.getFee(message);
+      if (msg.value < feeTokenAmount) revert InsufficientFeeTokenAmount();
+      // Wrap and send native payment.
+      // Note we take the whole msg.value regardless if its larger.
+      feeTokenAmount = msg.value;
+      IWrappedNative(message.feeToken).deposit{value: feeTokenAmount}();
+      IERC20(message.feeToken).safeTransferFrom(address(this), address(onRamp), feeTokenAmount);
+    } else {
+      if (msg.value > 0) revert InvalidMsgValue();
+      feeTokenAmount = onRamp.getFee(message);
+      IERC20(message.feeToken).safeTransferFrom(msg.sender, address(onRamp), feeTokenAmount);
+    }
+
+    // Transfer the tokens to the token pools.
+    for (uint256 i = 0; i < message.tokensAndAmounts.length; ++i) {
+      IERC20 token = IERC20(message.tokensAndAmounts[i].token);
+      token.safeTransferFrom(
+        msg.sender,
+        address(onRamp.getPoolBySourceToken(token)),
+        message.tokensAndAmounts[i].amount
+      );
+    }
+
+    return onRamp.forwardFromRouter(message, feeTokenAmount, msg.sender);
   }
 }

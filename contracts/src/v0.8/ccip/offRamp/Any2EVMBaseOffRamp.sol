@@ -2,7 +2,7 @@
 pragma solidity 0.8.15;
 
 import {IBaseOffRamp} from "../interfaces/offRamp/IBaseOffRamp.sol";
-import {IAny2EVMOffRampRouter} from "../interfaces/offRamp/IAny2EVMOffRampRouter.sol";
+import {IRouter} from "../interfaces/router/IRouter.sol";
 import {ICommitStore} from "../interfaces/ICommitStore.sol";
 import {IPool} from "../interfaces/pools/IPool.sol";
 import {IAFN} from "../interfaces/health/IAFN.sol";
@@ -30,7 +30,7 @@ contract Any2EVMBaseOffRamp is IBaseOffRamp, HealthChecker, OffRampTokenPoolRegi
   address internal immutable i_onRampAddress;
 
   // The router through which all transactions will be executed
-  IAny2EVMOffRampRouter internal s_router;
+  IRouter internal s_router;
 
   // The commitStore contract
   ICommitStore internal s_commitStore;
@@ -114,13 +114,13 @@ contract Any2EVMBaseOffRamp is IBaseOffRamp, HealthChecker, OffRampTokenPoolRegi
   }
 
   /// @inheritdoc IBaseOffRamp
-  function setRouter(IAny2EVMOffRampRouter router) external onlyOwner {
+  function setRouter(IRouter router) external onlyOwner {
     s_router = router;
     emit OffRampRouterSet(address(router), i_sourceChainId, i_onRampAddress);
   }
 
   /// @inheritdoc IBaseOffRamp
-  function getRouter() external view override returns (IAny2EVMOffRampRouter) {
+  function getRouter() external view override returns (IRouter) {
     return s_router;
   }
 

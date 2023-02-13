@@ -4,12 +4,12 @@ pragma solidity 0.8.15;
 import "../commitStore/CommitStore.t.sol";
 import "../onRamp/EVM2EVMOnRampSetup.t.sol";
 import "../offRamp/EVM2EVMOffRampSetup.t.sol";
-import {IAny2EVMOffRampRouter} from "../../interfaces/offRamp/IAny2EVMOffRampRouter.sol";
+import {IRouter} from "../../interfaces/router/IRouter.sol";
 
 contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
   using Internal for Internal.EVM2EVMMessage;
 
-  IAny2EVMOffRampRouter public s_router;
+  IRouter public s_router;
 
   MerkleHelper public s_merkleHelper;
 
@@ -24,7 +24,7 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
 
     address[] memory offRamps = new address[](1);
     offRamps[0] = address(s_offRamp);
-    s_router = new Router(offRamps);
+    s_router = new Router(offRamps, address(1));
     s_offRamp.setRouter(s_router);
   }
 

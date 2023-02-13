@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {CCIPConsumer} from "../../../applications/CCIPConsumer.sol";
+import {CCIPReceiver} from "../../../applications/CCIPReceiver.sol";
 import {EVM2EVMOffRamp} from "../../../offRamp/EVM2EVMOffRamp.sol";
 import {Common} from "../../../models/Common.sol";
 import {Internal} from "../../../models/Internal.sol";
 
-contract ReentrancyAbuser is CCIPConsumer {
+contract ReentrancyAbuser is CCIPReceiver {
   event ReentrancySucceeded();
 
   bool s_ReentrancyDone = false;
   Internal.ExecutionReport s_payload;
   EVM2EVMOffRamp s_offRamp;
 
-  constructor(address router, EVM2EVMOffRamp offRamp) CCIPConsumer(router) {
+  constructor(address router, EVM2EVMOffRamp offRamp) CCIPReceiver(router) {
     s_offRamp = offRamp;
   }
 

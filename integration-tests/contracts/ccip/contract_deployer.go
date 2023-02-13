@@ -235,7 +235,7 @@ func (e *CCIPContractsDeployer) DeployRouter(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return router.DeployRouter(auth, backend, offRamps)
+		return router.DeployRouter(auth, backend, offRamps, common.HexToAddress("0x0"))
 	})
 	if err != nil {
 		return nil, err
@@ -310,8 +310,7 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 			pools,
 			allowList,
 			afn,
-			evm_2_evm_onramp.IBaseOnRampOnRampConfig{
-				CommitFeeJuels:  0,
+			evm_2_evm_onramp.IEVM2EVMOnRampOnRampConfig{
 				MaxDataSize:     1e5,
 				MaxTokensLength: 5,
 				MaxGasLimit:     ccip.GasLimitPerTx,

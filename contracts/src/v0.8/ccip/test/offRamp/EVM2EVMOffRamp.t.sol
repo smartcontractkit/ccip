@@ -8,6 +8,8 @@ import "../../router/Router.sol";
 import "../helpers/receivers/ConformingReceiver.sol";
 import "../helpers/receivers/MaybeRevertMessageReceiverNo165.sol";
 import "../helpers/receivers/ReentrancyAbuser.sol";
+import "../fees/WETH9.sol";
+import {IBaseOffRamp} from "../../interfaces/offRamp/IBaseOffRamp.sol";
 
 /// @notice #constructor
 contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
@@ -37,7 +39,7 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
 
 /// @notice #setRouter
 contract EVM2EVMOffRamp_setRouter is EVM2EVMOffRampSetup {
-  IAny2EVMOffRampRouter public s_router;
+  IRouter public s_router;
 
   event OffRampRouterSet(address indexed router, uint64 sourceChainId, address onRampAddress);
 
@@ -45,13 +47,15 @@ contract EVM2EVMOffRamp_setRouter is EVM2EVMOffRampSetup {
     EVM2EVMOffRampSetup.setUp();
     address[] memory offRamps = new address[](1);
     offRamps[0] = address(s_offRamp);
-    s_router = new Router(offRamps);
+    WETH9 weth = new WETH9();
+    s_router = new Router(offRamps, address(weth));
     s_offRamp.setRouter(s_router);
   }
 
   function _generateNewRouter() internal returns (Router newRouter) {
     address[] memory offRamps = new address[](0);
-    newRouter = new Router(offRamps);
+    WETH9 weth = new WETH9();
+    newRouter = new Router(offRamps, address(weth));
   }
 
   // Success
@@ -61,10 +65,10 @@ contract EVM2EVMOffRamp_setRouter is EVM2EVMOffRampSetup {
   }
 
   function testSuccessZeroAddress() public {
-    _testSuccess(IAny2EVMOffRampRouter(address(0)));
+    _testSuccess(IRouter(address(0)));
   }
 
-  function _testSuccess(IAny2EVMOffRampRouter newRouter) private {
+  function _testSuccess(IRouter newRouter) private {
     vm.expectEmit(true, false, false, true);
     emit OffRampRouterSet(address(newRouter), SOURCE_CHAIN_ID, ON_RAMP_ADDRESS);
 
@@ -76,7 +80,7 @@ contract EVM2EVMOffRamp_setRouter is EVM2EVMOffRampSetup {
   // Reverts
 
   function testOwnerReverts() public {
-    IAny2EVMOffRampRouter newRouter = _generateNewRouter();
+    IRouter newRouter = _generateNewRouter();
 
     changePrank(STRANGER);
     vm.expectRevert("Only callable by owner");
@@ -97,13 +101,14 @@ contract EVM2EVMOffRamp_ccipReceive is EVM2EVMOffRampSetup {
 
 /// @notice #execute
 contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
-  IAny2EVMOffRampRouter s_router;
+  IRouter s_router;
 
   function setUp() public virtual override {
     EVM2EVMOffRampSetup.setUp();
     address[] memory offRamps = new address[](1);
     offRamps[0] = address(s_offRamp);
-    s_router = new Router(offRamps);
+    WETH9 weth = new WETH9();
+    s_router = new Router(offRamps, address(weth));
     s_offRamp.setRouter(s_router);
   }
 
@@ -241,7 +246,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
   }
 
   function testRouterNotSetReverts() public {
-    IAny2EVMOffRampRouter newRouter = Router(address(0));
+    IRouter newRouter = Router(address(0));
     s_offRamp.setRouter(newRouter);
     vm.expectRevert(IBaseOffRamp.RouterNotSet.selector);
     s_offRamp.execute(_generateReportFromMessages(_generateBasicMessages()), false);
@@ -310,7 +315,6 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     Internal.EVM2EVMMessage[] memory messages = _generateMessagesWithTokens();
     messages[0].tokensAndAmounts[0] = getCastedDestinationEVMTokenAndAmountsWithZeroAmounts()[0];
     messages[0].feeToken = messages[0].tokensAndAmounts[0].token;
-    messages[0].feeTokenAmount = COMMIT_FEE_JUELS;
     vm.expectRevert(
       abi.encodeWithSelector(
         IBaseOffRamp.ExecutionError.selector,
@@ -323,13 +327,13 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
 
 /// @notice #executeSingleMessage
 contract EVM2EVMOffRamp_executeSingleMessage is EVM2EVMOffRampSetup {
-  IAny2EVMOffRampRouter public s_router;
+  IRouter public s_router;
 
   function setUp() public virtual override {
     EVM2EVMOffRampSetup.setUp();
     address[] memory offRamps = new address[](1);
     offRamps[0] = address(s_offRamp);
-    s_router = new Router(offRamps);
+    s_router = new Router(offRamps, address(1));
     s_offRamp.setRouter(s_router);
     changePrank(address(s_offRamp));
   }
@@ -391,13 +395,13 @@ contract EVM2EVMOffRamp_executeSingleMessage is EVM2EVMOffRampSetup {
 
 /// @notice #_report
 contract EVM2EVMOffRamp__report is EVM2EVMOffRampSetup {
-  IAny2EVMOffRampRouter s_router;
+  IRouter s_router;
 
   function setUp() public virtual override {
     EVM2EVMOffRampSetup.setUp();
     address[] memory offRamps = new address[](1);
     offRamps[0] = address(s_offRamp);
-    s_router = new Router(offRamps);
+    s_router = new Router(offRamps, address(1));
     s_offRamp.setRouter(s_router);
   }
 
@@ -420,13 +424,13 @@ contract EVM2EVMOffRamp__report is EVM2EVMOffRampSetup {
 contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
   event ReentrancySucceeded();
 
-  IAny2EVMOffRampRouter s_router;
+  IRouter s_router;
 
   function setUp() public virtual override {
     EVM2EVMOffRampSetup.setUp();
     address[] memory offRamps = new address[](1);
     offRamps[0] = address(s_offRamp);
-    s_router = new Router(offRamps);
+    s_router = new Router(offRamps, address(1));
     s_offRamp.setRouter(s_router);
   }
 

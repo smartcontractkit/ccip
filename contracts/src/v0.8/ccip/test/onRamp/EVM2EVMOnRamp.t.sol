@@ -2,6 +2,7 @@
 pragma solidity 0.8.15;
 
 import "./EVM2EVMOnRampSetup.t.sol";
+import {IEVM2EVMOnRamp} from "../../interfaces/onRamp/IEVM2EVMOnRamp.sol";
 
 /// @notice #constructor
 contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
@@ -13,8 +14,7 @@ contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
     assertEq(OWNER, s_onRamp.owner());
 
     // baseOnRamp
-    IBaseOnRamp.OnRampConfig memory onRampConfig = onRampConfig();
-    assertEq(onRampConfig.commitFeeJuels, s_onRamp.getOnRampConfig().commitFeeJuels);
+    IEVM2EVMOnRamp.OnRampConfig memory onRampConfig = onRampConfig();
     assertEq(onRampConfig.maxDataSize, s_onRamp.getOnRampConfig().maxDataSize);
     assertEq(onRampConfig.maxTokensLength, s_onRamp.getOnRampConfig().maxTokensLength);
     assertEq(onRampConfig.maxGasLimit, s_onRamp.getOnRampConfig().maxGasLimit);
@@ -26,7 +26,7 @@ contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
     assertEq(1, s_onRamp.getExpectedNextSequenceNumber());
 
     assertEq(s_sourceTokens, s_onRamp.getSupportedTokens());
-
+    assertSameConfig(onRampConfig, s_onRamp.getOnRampConfig());
     // HealthChecker
     assertEq(address(s_afn), address(s_onRamp.getAFN()));
   }
@@ -104,12 +104,12 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
 
   function testPermissionsReverts() public {
     changePrank(OWNER);
-    vm.expectRevert(IBaseOnRamp.MustBeCalledByRouter.selector);
+    vm.expectRevert(IEVM2EVMOnRamp.MustBeCalledByRouter.selector);
     s_onRamp.forwardFromRouter(_generateEmptyMessage(), 0, OWNER);
   }
 
   function testOriginalSenderReverts() public {
-    vm.expectRevert(IBaseOnRamp.RouterMustSetOriginalSender.selector);
+    vm.expectRevert(IEVM2EVMOnRamp.RouterMustSetOriginalSender.selector);
     s_onRamp.forwardFromRouter(_generateEmptyMessage(), 0, address(0));
   }
 
@@ -117,7 +117,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     Consumer.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.data = new bytes(onRampConfig().maxDataSize + 1);
     vm.expectRevert(
-      abi.encodeWithSelector(IBaseOnRamp.MessageTooLarge.selector, onRampConfig().maxDataSize, message.data.length)
+      abi.encodeWithSelector(IEVM2EVMOnRamp.MessageTooLarge.selector, onRampConfig().maxDataSize, message.data.length)
     );
 
     s_onRamp.forwardFromRouter(message, 0, STRANGER);
@@ -128,7 +128,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     Consumer.EVM2AnyMessage memory message = _generateEmptyMessage();
     uint256 tooMany = MAX_TOKENS_LENGTH + 1;
     message.tokensAndAmounts = new Common.EVMTokenAndAmount[](tooMany);
-    vm.expectRevert(IBaseOnRamp.UnsupportedNumberOfTokens.selector);
+    vm.expectRevert(IEVM2EVMOnRamp.UnsupportedNumberOfTokens.selector);
     s_onRamp.forwardFromRouter(message, 0, STRANGER);
   }
 
@@ -158,7 +158,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
 
     // Change back to the router
     changePrank(address(s_sourceRouter));
-    vm.expectRevert(abi.encodeWithSelector(IBaseOnRamp.UnsupportedToken.selector, wrongToken));
+    vm.expectRevert(abi.encodeWithSelector(IEVM2EVMOnRamp.UnsupportedToken.selector, wrongToken));
 
     s_onRamp.forwardFromRouter(message, 0, OWNER);
   }
@@ -198,7 +198,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
   function testMessageGasLimitTooHighReverts() public {
     Consumer.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.extraArgs = Consumer._argsToBytes(Consumer.EVMExtraArgsV1({gasLimit: MAX_GAS_LIMIT + 1, strict: false}));
-    vm.expectRevert(abi.encodeWithSelector(IBaseOnRamp.MessageGasLimitTooHigh.selector));
+    vm.expectRevert(abi.encodeWithSelector(IEVM2EVMOnRamp.MessageGasLimitTooHigh.selector));
     s_onRamp.forwardFromRouter(message, 0, OWNER);
   }
 }
@@ -264,5 +264,110 @@ contract EVM2EVMOnRamp_setFeeConfig is EVM2EVMOnRampSetup {
     vm.expectRevert(IEVM2EVMOnRamp.OnlyCallableByOwnerOrFeeAdmin.selector);
 
     s_onRamp.setFeeConfig(feeConfig);
+  }
+}
+
+// #getTokenPool
+contract EVM2EVMOnRamp_getTokenPool is EVM2EVMOnRampSetup {
+  // Success
+  function testSuccess() public {
+    assertEq(s_sourcePools[0], address(s_onRamp.getPoolBySourceToken(IERC20(s_sourceTokens[0]))));
+    assertEq(s_sourcePools[1], address(s_onRamp.getPoolBySourceToken(IERC20(s_sourceTokens[1]))));
+
+    vm.expectRevert(abi.encodeWithSelector(IEVM2EVMOnRamp.UnsupportedToken.selector, IERC20(s_destTokens[0])));
+    s_onRamp.getPoolBySourceToken(IERC20(s_destTokens[0]));
+  }
+}
+
+// #getSupportedTokens
+contract EVM2EVMOnRamp_getSupportedTokens is EVM2EVMOnRampSetup {
+  // Success
+  function testGetSupportedTokensSuccess() public {
+    address[] memory supportedTokens = s_onRamp.getSupportedTokens();
+
+    assertEq(s_sourceTokens, supportedTokens);
+
+    s_onRamp.removePool(IERC20(s_sourceTokens[0]), IPool(s_sourcePools[0]));
+
+    supportedTokens = s_onRamp.getSupportedTokens();
+
+    assertEq(address(s_sourceTokens[1]), supportedTokens[0]);
+    assertEq(s_sourceTokens.length - 1, supportedTokens.length);
+  }
+}
+
+// #getExpectedNextSequenceNumber
+contract EVM2EVMOnRamp_getExpectedNextSequenceNumber is EVM2EVMOnRampSetup {
+  // Success
+  function testSuccess() public {
+    assertEq(1, s_onRamp.getExpectedNextSequenceNumber());
+  }
+}
+
+// #setRouter
+contract EVM2EVMOnRamp_setRouter is EVM2EVMOnRampSetup {
+  event RouterSet(address);
+
+  // Success
+  function testSuccess() public {
+    assertEq(address(s_sourceRouter), s_onRamp.getRouter());
+    address newRouter = address(100);
+
+    vm.expectEmit(false, false, false, true);
+    emit RouterSet(newRouter);
+
+    s_onRamp.setRouter(newRouter);
+    assertEq(newRouter, s_onRamp.getRouter());
+  }
+
+  // Revert
+  function testSetRouterOnlyOwnerReverts() public {
+    vm.stopPrank();
+    vm.expectRevert("Only callable by owner");
+    s_onRamp.setRouter(address(1));
+  }
+}
+
+// #getRouter
+contract EVM2EVMOnRamp_getRouter is EVM2EVMOnRampSetup {
+  // Success
+  function testSuccess() public {
+    assertEq(address(s_sourceRouter), s_onRamp.getRouter());
+  }
+}
+
+// #setOnRampConfig
+contract EVM2EVMOnRamp_setOnRampConfig is EVM2EVMOnRampSetup {
+  event OnRampConfigSet(IEVM2EVMOnRamp.OnRampConfig);
+
+  // Success
+  function testSuccess() public {
+    IEVM2EVMOnRamp.OnRampConfig memory newConfig = IEVM2EVMOnRamp.OnRampConfig({
+      maxDataSize: 400,
+      maxTokensLength: 14,
+      maxGasLimit: MAX_GAS_LIMIT / 2
+    });
+
+    vm.expectEmit(false, false, false, true);
+    emit OnRampConfigSet(newConfig);
+
+    s_onRamp.setOnRampConfig(newConfig);
+
+    assertSameConfig(newConfig, s_onRamp.getOnRampConfig());
+  }
+
+  // Reverts
+  function testSetConfigOnlyOwnerReverts() public {
+    vm.stopPrank();
+    vm.expectRevert("Only callable by owner");
+    s_onRamp.setOnRampConfig(onRampConfig());
+  }
+}
+
+// #getConfig
+contract EVM2EVMOnRamp_getConfig is EVM2EVMOnRampSetup {
+  // Success
+  function testSuccess() public {
+    assertSameConfig(onRampConfig(), s_onRamp.getOnRampConfig());
   }
 }

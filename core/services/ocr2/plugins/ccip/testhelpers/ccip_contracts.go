@@ -328,7 +328,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	require.NoError(t, err)
 
 	// Create router
-	sourceRouterAddress, _, _, err := router.DeployRouter(sourceUser, sourceChain, []common.Address{})
+	sourceRouterAddress, _, _, err := router.DeployRouter(sourceUser, sourceChain, []common.Address{}, common.HexToAddress("0xa"))
 	require.NoError(t, err)
 	sourceRouter, err := router.NewRouter(sourceRouterAddress, sourceChain)
 	require.NoError(t, err)
@@ -362,8 +362,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		[]common.Address{sourcePoolAddress},      // pools
 		[]common.Address{},                       // allow list
 		afnSourceAddress,                         // AFN
-		evm_2_evm_onramp.IBaseOnRampOnRampConfig{
-			CommitFeeJuels:  0,
+		evm_2_evm_onramp.IEVM2EVMOnRampOnRampConfig{
 			MaxDataSize:     1e5,
 			MaxTokensLength: 5,
 			MaxGasLimit:     ccip.GasLimitPerTx,
@@ -470,7 +469,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	require.NoError(t, err)
 
 	// Create dest ge router
-	destRouterAddress, _, _, err := router.DeployRouter(destUser, destChain, []common.Address{geOffRampAddress})
+	destRouterAddress, _, _, err := router.DeployRouter(destUser, destChain, []common.Address{geOffRampAddress}, common.HexToAddress("0x0"))
 	require.NoError(t, err)
 	destChain.Commit()
 	destRouter, err := router.NewRouter(destRouterAddress, destChain)

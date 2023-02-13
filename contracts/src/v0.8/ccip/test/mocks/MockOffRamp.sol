@@ -17,10 +17,10 @@ contract MockOffRamp is IBaseOffRamp {
 
   function i_chainId() external view returns (uint256) {}
 
-  function setRouter(IAny2EVMOffRampRouter router) external {}
+  function setRouter(IRouter router) external {}
 
-  function getRouter() external pure override returns (IAny2EVMOffRampRouter) {
-    return IAny2EVMOffRampRouter(address(0));
+  function getRouter() external pure override returns (IRouter) {
+    return IRouter(address(0));
   }
 
   /**

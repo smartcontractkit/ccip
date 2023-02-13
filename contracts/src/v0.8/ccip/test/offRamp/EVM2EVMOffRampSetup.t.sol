@@ -4,7 +4,6 @@ pragma solidity 0.8.15;
 import {ICommitStore} from "../../interfaces/ICommitStore.sol";
 import {IAny2EVMMessageReceiver} from "../../interfaces/applications/IAny2EVMMessageReceiver.sol";
 import {IEVM2EVMOffRamp} from "../../interfaces/offRamp/IEVM2EVMOffRamp.sol";
-import {IBaseOffRamp} from "../../interfaces/offRamp/IBaseOffRamp.sol";
 import {IFeeManager} from "../../interfaces/fees/IFeeManager.sol";
 
 import {Internal} from "../../models/Internal.sol";
@@ -58,8 +57,8 @@ contract EVM2EVMOffRampSetup is TokenSetup, FeeManagerSetup {
     s_offRamp.setPrices(getCastedDestinationTokens(), getTokenPrices());
     s_feeManager.setFeeUpdater(address(s_offRamp));
 
-    LockReleaseTokenPool(address(s_destPools[0])).setOffRamp(IBaseOffRamp(address(s_offRamp)), true);
-    LockReleaseTokenPool(address(s_destPools[1])).setOffRamp(IBaseOffRamp(address(s_offRamp)), true);
+    LockReleaseTokenPool(address(s_destPools[0])).setOffRamp(address(s_offRamp), true);
+    LockReleaseTokenPool(address(s_destPools[1])).setOffRamp(address(s_offRamp), true);
   }
 
   function _convertToGeneralMessage(Internal.EVM2EVMMessage memory original)

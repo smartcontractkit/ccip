@@ -34,11 +34,30 @@ contract EVM2EVMOnRampSetup is TokenSetup, RouterSetup {
     TokenSetup.setUp();
     RouterSetup.setUp();
 
-    Internal.FeeUpdate[] memory feeUpdates = new Internal.FeeUpdate[](1);
+    Internal.FeeUpdate[] memory feeUpdates = new Internal.FeeUpdate[](2);
     feeUpdates[0] = Internal.FeeUpdate({
       sourceFeeToken: s_sourceTokens[0],
       destChainId: DEST_CHAIN_ID,
       feeTokenBaseUnitsPerUnitGas: 100
+    });
+    feeUpdates[1] = Internal.FeeUpdate({
+      sourceFeeToken: s_sourceRouter.getWrappedNative(),
+      destChainId: DEST_CHAIN_ID,
+      feeTokenBaseUnitsPerUnitGas: 101
+    });
+
+    IEVM2EVMOnRamp.FeeTokenConfigArgs[] memory feeTokenConfigArgs = new IEVM2EVMOnRamp.FeeTokenConfigArgs[](2);
+    feeTokenConfigArgs[0] = IEVM2EVMOnRamp.FeeTokenConfigArgs({
+      token: s_sourceTokens[0],
+      feeAmount: 1,
+      multiplier: 108e16,
+      destGasOverhead: 1
+    });
+    feeTokenConfigArgs[1] = IEVM2EVMOnRamp.FeeTokenConfigArgs({
+      token: s_sourceRouter.getWrappedNative(),
+      feeAmount: 2,
+      multiplier: 108e16,
+      destGasOverhead: 2
     });
     address[] memory feeUpdaters = new address[](0);
     s_IFeeManager = new FeeManager(feeUpdates, feeUpdaters, uint128(TWELVE_HOURS));
@@ -52,9 +71,9 @@ contract EVM2EVMOnRampSetup is TokenSetup, RouterSetup {
       s_afn,
       onRampConfig(),
       rateLimiterConfig(),
-      s_sourceRouter,
+      address(s_sourceRouter),
       address(s_IFeeManager),
-      feeManagerConfig()
+      feeTokenConfigArgs
     );
 
     s_metadataHash = keccak256(
@@ -63,8 +82,8 @@ contract EVM2EVMOnRampSetup is TokenSetup, RouterSetup {
 
     s_onRamp.setPrices(getCastedSourceTokens(), getTokenPrices());
 
-    LockReleaseTokenPool(address(s_sourcePools[0])).setOnRamp(s_onRamp, true);
-    LockReleaseTokenPool(address(s_sourcePools[1])).setOnRamp(s_onRamp, true);
+    LockReleaseTokenPool(address(s_sourcePools[0])).setOnRamp(address(s_onRamp), true);
+    LockReleaseTokenPool(address(s_sourcePools[1])).setOnRamp(address(s_onRamp), true);
 
     s_sourceRouter.setOnRamp(DEST_CHAIN_ID, s_onRamp);
 
@@ -77,6 +96,12 @@ contract EVM2EVMOnRampSetup is TokenSetup, RouterSetup {
     // Pre approve the first token so the gas estimates of the tests
     // only cover actual gas usage from the ramps
     IERC20(s_sourceTokens[0]).approve(address(s_sourceRouter), 2**128);
+  }
+
+  function assertSameConfig(IEVM2EVMOnRamp.OnRampConfig memory a, IEVM2EVMOnRamp.OnRampConfig memory b) public {
+    assertEq(a.maxDataSize, b.maxDataSize);
+    assertEq(a.maxTokensLength, b.maxTokensLength);
+    assertEq(a.maxGasLimit, b.maxGasLimit);
   }
 
   function _generateTokenMessage() public view returns (Consumer.EVM2AnyMessage memory) {
@@ -127,19 +152,5 @@ contract EVM2EVMOnRampSetup is TokenSetup, RouterSetup {
 
     messageEvent.messageId = Internal._hash(messageEvent, s_metadataHash);
     return messageEvent;
-  }
-
-  function feeManagerConfig() internal view returns (IEVM2EVMOnRamp.FeeTokenConfigArgs[] memory feeConfig) {
-    IEVM2EVMOnRamp.FeeTokenConfigArgs[] memory FeeTokenConfigArgss = new IEVM2EVMOnRamp.FeeTokenConfigArgs[](2);
-    for (uint256 i = 0; i < FeeTokenConfigArgss.length; i++) {
-      FeeTokenConfigArgss[i] = IEVM2EVMOnRamp.FeeTokenConfigArgs({
-        token: s_sourceTokens[i],
-        feeAmount: 1,
-        multiplier: 108e16,
-        destGasOverhead: 1
-      });
-    }
-
-    return FeeTokenConfigArgss;
   }
 }

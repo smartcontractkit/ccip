@@ -30,8 +30,8 @@ contract BaseOffRampSetup is TokenSetup {
 
     s_offRamp.setPrices(getCastedDestinationTokens(), getTokenPrices());
 
-    TokenPool(address(s_destPools[0])).setOffRamp(s_offRamp, true);
-    TokenPool(address(s_destPools[1])).setOffRamp(s_offRamp, true);
+    TokenPool(address(s_destPools[0])).setOffRamp(address(s_offRamp), true);
+    TokenPool(address(s_destPools[1])).setOffRamp(address(s_offRamp), true);
   }
 
   function assertSameConfig(IEVM2EVMOffRamp.OffRampConfig memory a, IEVM2EVMOffRamp.OffRampConfig memory b) public {

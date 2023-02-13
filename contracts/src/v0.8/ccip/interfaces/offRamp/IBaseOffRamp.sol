@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IAny2EVMOffRampRouter} from "./IAny2EVMOffRampRouter.sol";
+import {IRouter} from "../router/IRouter.sol";
 import {ICommitStore} from "../ICommitStore.sol";
 
 import {Internal} from "../../models/Internal.sol";
@@ -33,12 +33,12 @@ interface IBaseOffRamp {
    * @param router the new Router
    * @dev only the owner should be able to call this function
    */
-  function setRouter(IAny2EVMOffRampRouter router) external;
+  function setRouter(IRouter router) external;
 
   /**
    * @notice get the current router
-   * @return IAny2EVMOffRampRouter    */
-  function getRouter() external view returns (IAny2EVMOffRampRouter);
+   * @return IRouter    */
+  function getRouter() external view returns (IRouter);
 
   /**
    * @notice Returns the current execution state of a message based on its

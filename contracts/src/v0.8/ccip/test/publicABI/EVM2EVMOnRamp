@@ -27,7 +27,7 @@
   "setAllowlistEnabled(bool)": "d7644ba2",
   "setFeeAdmin(address)": "6eb2d031",
   "setFeeConfig((address,uint64,uint96,uint32)[])": "68d8f142",
-  "setOnRampConfig((uint64,uint32,uint16,uint64))": "dcd210f1",
+  "setOnRampConfig((uint32,uint16,uint64))": "00bdbb9b",
   "setPrices(address[],uint256[])": "4352fa9f",
   "setRateLimiterConfig((address,uint256,uint256))": "17332f9b",
   "setRouter(address)": "c0d78655",

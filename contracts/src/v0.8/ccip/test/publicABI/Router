@@ -6,12 +6,14 @@
   "getOffRamps()": "a40e69c7",
   "getOnRamp(uint64)": "a8d87a3b",
   "getSupportedTokens(uint64)": "fbca3b74",
+  "getWrappedNative()": "e861e907",
   "isChainSupported(uint64)": "a48a9058",
   "isOffRamp(address)": "1d7a74a0",
   "owner()": "8da5cb5b",
   "removeOffRamp(address)": "991f6543",
   "routeMessage((uint64,bytes,bytes,(address,uint256)[]),bool,uint256,address)": "004b61bb",
   "setOnRamp(uint64,address)": "2e36d584",
+  "setWrappedNative(address)": "52cb60ca",
   "transferOwnership(address)": "f2fde38b",
   "typeAndVersion()": "181f5a77"
 }

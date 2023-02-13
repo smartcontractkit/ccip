@@ -426,7 +426,7 @@ contract AFN_setAFNConfig is AFNSetup {
     s_afn.setAFNConfig(participants, weights, blessingThreshold, badSignalThreshold);
   }
 
-  function testParicipantsLengthIsZeroReverts() public {
+  function testParticipantsLengthIsZeroReverts() public {
     (, uint256[] memory weights, uint256 blessingThreshold, uint256 badSignalThreshold) = getDifferentConfigArgs();
     address[] memory participants = new address[](0);
 

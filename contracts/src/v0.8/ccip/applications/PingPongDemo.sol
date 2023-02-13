@@ -3,12 +3,14 @@ pragma solidity 0.8.15;
 
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
 // solhint-disable-next-line chainlink-solidity/explicit-imports
-import "./CCIPConsumer.sol";
+import "./CCIPReceiver.sol";
 
 import {IERC20} from "../../vendor/IERC20.sol";
+import {Consumer} from "../models/Consumer.sol";
+import {IRouterClient} from "../interfaces/router/IRouterClient.sol";
 
 /// @title PingPongDemo - A simple ping-pong contract for demonstrating cross-chain communication
-contract PingPongDemo is CCIPConsumer, OwnerIsCreator {
+contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
   event Ping(uint256 pingPongCount);
   event Pong(uint256 pingPongCount);
 
@@ -21,7 +23,7 @@ contract PingPongDemo is CCIPConsumer, OwnerIsCreator {
   bool private s_isPaused;
   IERC20 private s_feeToken;
 
-  constructor(address router, IERC20 feeToken) CCIPConsumer(router) {
+  constructor(address router, IERC20 feeToken) CCIPReceiver(router) {
     s_isPaused = false;
     s_feeToken = feeToken;
   }
@@ -51,7 +53,7 @@ contract PingPongDemo is CCIPConsumer, OwnerIsCreator {
       extraArgs: Consumer._argsToBytes(Consumer.EVMExtraArgsV1({gasLimit: 200_000, strict: false})),
       feeToken: address(s_feeToken)
     });
-    _ccipSend(s_counterpartChainId, message);
+    IRouterClient(getRouter()).ccipSend(s_counterpartChainId, message);
   }
 
   function _ccipReceive(Common.Any2EVMMessage memory message) internal override {

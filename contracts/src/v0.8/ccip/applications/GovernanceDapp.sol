@@ -5,12 +5,15 @@ import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.
 
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
 // solhint-disable-next-line chainlink-solidity/explicit-imports
-import "./CCIPConsumer.sol";
+import {CCIPReceiver} from "./CCIPReceiver.sol";
 
 import {IERC20} from "../../vendor/IERC20.sol";
+import {Consumer} from "../models/Consumer.sol";
+import {IRouterClient} from "../interfaces/router/IRouterClient.sol";
+import {Common} from "../models/Common.sol";
 
-/// @title GovernanceDapp - Example of a Governance Dapp using CCIPConsumer
-contract GovernanceDapp is CCIPConsumer, TypeAndVersionInterface, OwnerIsCreator {
+/// @title GovernanceDapp - Example of a Governance Dapp using CCIPReceiver
+contract GovernanceDapp is CCIPReceiver, TypeAndVersionInterface, OwnerIsCreator {
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "GovernanceDapp 1.0.0";
 
@@ -38,7 +41,7 @@ contract GovernanceDapp is CCIPConsumer, TypeAndVersionInterface, OwnerIsCreator
     address router,
     FeeConfig memory feeConfig,
     IERC20 feeToken
-  ) CCIPConsumer(router) {
+  ) CCIPReceiver(router) {
     s_feeConfig = feeConfig;
     s_feeToken = feeToken;
   }
@@ -66,7 +69,7 @@ contract GovernanceDapp is CCIPConsumer, TypeAndVersionInterface, OwnerIsCreator
         feeToken: address(s_feeToken),
         extraArgs: Consumer._argsToBytes(Consumer.EVMExtraArgsV1({gasLimit: 3e5, strict: false}))
       });
-      _ccipSend(clone.chainId, message);
+      IRouterClient(getRouter()).ccipSend(clone.chainId, message);
       emit ConfigPropagated(clone.chainId, clone.contractAddress);
     }
   }
