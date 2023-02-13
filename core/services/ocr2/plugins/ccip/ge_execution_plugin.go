@@ -126,9 +126,7 @@ type ExecutionReportingPluginFactory struct {
 	config ExecutionPluginConfig
 }
 
-func NewExecutionReportingPluginFactory(
-	config ExecutionPluginConfig,
-) types.ReportingPluginFactory {
+func NewExecutionReportingPluginFactory(config ExecutionPluginConfig) types.ReportingPluginFactory {
 	return &ExecutionReportingPluginFactory{config: config}
 }
 
@@ -170,17 +168,16 @@ type ExecutionReportingPlugin struct {
 	// We need to synchronize access to the inflight structure
 	// as reporting plugin methods may be called from separate goroutines,
 	// e.g. reporting vs transmission protocol.
-	inFlightMu          sync.RWMutex
-	inFlight            []InflightInternalExecutionReport
-	inFlightFeeUpdates  [][]FeeUpdate
-	inflightCacheExpiry time.Duration
-	offchainConfig      OffchainConfig
-	snoozedRoots        map[[32]byte]time.Time
-	linkToken           common.Address
+	inFlightMu         sync.RWMutex
+	inFlight           []InflightInternalExecutionReport
+	inFlightFeeUpdates [][]FeeUpdate
+	offchainConfig     OffchainConfig
+	snoozedRoots       map[[32]byte]time.Time
+	linkToken          common.Address
 }
 
 type Query struct {
-	TokenPrices  map[common.Address]*big.Int `json:"tokenPrices"` // TODO: We should simplify this to just link for toll as well.
+	TokenPrices  map[common.Address]*big.Int `json:"tokenPrices"`
 	DestGasPrice *big.Int                    `json:"destGasPrice"`
 }
 
@@ -326,7 +323,6 @@ func (r *ExecutionReportingPlugin) canSkipFeeUpdate(feeTokenBaseUnitsPerUnitGas 
 }
 
 func (r *ExecutionReportingPlugin) calculateFeeTokenBaseUnitsPerUnitGas(sourceGasPrice *big.Int, juelsPerFeeCoin *big.Int) (feeTokenBaseUnitsPerUnitGas *big.Int) {
-
 	// (juels/eth) * (wei / gas) / (1 eth / 1e18 wei) = juels/gas
 	// TODO: Think more about this offchain/onchain computation split
 	feeTokenBaseUnitsPerUnitGas = big.NewInt(0).Mul(sourceGasPrice, juelsPerFeeCoin)
@@ -558,10 +554,10 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 	// the leaders prices is >= the median of the followers prices.
 	// Note we accept that this can result in the leader stalling progress,
 	// by setting an extremely high set of prices, but a malicious leader always had that ability
-	// and eventually we'll elect a new one.
+	// and, eventually we'll elect a new one.
 	var q Query
-	if err2 := json.Unmarshal(query, &q); err2 != nil {
-		return false, nil, err2
+	if err = json.Unmarshal(query, &q); err != nil {
+		return false, nil, err
 	}
 	medianTokensPerFeeCoin := make(map[common.Address]*big.Int)
 	for _, token := range tokens {
@@ -618,7 +614,7 @@ func (r *ExecutionReportingPlugin) expireInflight(lggr logger.Logger) {
 	var stillInFlight []InflightInternalExecutionReport
 	var stillInFlightFeeUpdates [][]FeeUpdate
 	for i, report := range r.inFlight {
-		if time.Since(report.createdAt) > r.inflightCacheExpiry {
+		if time.Since(report.createdAt) > r.config.inflightCacheExpiry {
 			// Happy path: inflight report was successfully transmitted onchain, we remove it from inflight and onchain state reflects inflight.
 			// Sad path: inflight report reverts onchain, we remove it from inflight, onchain state does not reflect the change so we retry.
 			lggr.Infow("Inflight report expired", "seqNums", report.seqNrs)
@@ -661,9 +657,9 @@ func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Conte
 	}
 	lggr.Infof("Seq nums %v", seqNrs)
 	// If the first message is executed already, this execution report is stale, and we do not accept it.
-	stale, err2 := r.isStaleReport(seqNrs, feeUpdates)
-	if err2 != nil {
-		return !stale, err2
+	stale, err := r.isStaleReport(seqNrs, feeUpdates)
+	if err != nil {
+		return !stale, err
 	}
 	if stale {
 		return false, nil

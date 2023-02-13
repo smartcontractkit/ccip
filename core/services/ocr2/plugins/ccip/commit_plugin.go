@@ -34,9 +34,9 @@ func NewCommitServices(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet ev
 		return nil, errors.New("chainID must be provided in relay config")
 	}
 	destChainID := int64(chainIDInterface.(float64))
-	destChain, err2 := chainSet.Get(big.NewInt(destChainID))
-	if err2 != nil {
-		return nil, errors.Wrap(err2, "get chainset")
+	destChain, err := chainSet.Get(big.NewInt(destChainID))
+	if err != nil {
+		return nil, errors.Wrap(err, "get chainset")
 	}
 
 	sourceChain, err := chainSet.Get(big.NewInt(0).SetUint64(pluginConfig.SourceChainID))

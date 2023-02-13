@@ -396,7 +396,7 @@ func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context
 		return false, err
 	}
 	// If report is not stale we transmit.
-	// When the commitTransmitter enqueues the tx for bptxm,
+	// When the commitTransmitter enqueues the tx for tx manager,
 	// we mark it as fulfilled, effectively removing it from the set of inflight messages.
 	return !r.isStaleReport(parsedReport), nil
 }

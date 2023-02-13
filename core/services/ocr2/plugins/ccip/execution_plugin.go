@@ -59,11 +59,11 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	commitStoreAddr := common.HexToAddress(pluginConfig.CommitStoreID)
 	err = ccipconfig.VerifyTypeAndVersion(commitStoreAddr, destChain.Client(), ccipconfig.CommitStore)
 	if err != nil {
-		return nil, errors.Wrap(err, "Invalid onRamp contract")
+		return nil, errors.Wrap(err, "Invalid commitStore contract")
 	}
 	commitStore, err := commit_store.NewCommitStore(commitStoreAddr, destChain.Client())
 	if err != nil {
-		return nil, errors.Wrap(err, "failed creating a new onramp")
+		return nil, errors.Wrap(err, "Failed loading the commitStore")
 	}
 
 	onRampAddr := common.HexToAddress(pluginConfig.OnRampID)
@@ -73,7 +73,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	}
 	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddr, sourceChain.Client())
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "Failed loading the onRamp")
 	}
 
 	offRampAddr := common.HexToAddress(spec.ContractID)
@@ -83,7 +83,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	}
 	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(offRampAddr, destChain.Client())
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "Failed loading the offRamp")
 	}
 
 	lggr = lggr.With("srcChain", hlp.ChainName(int64(pluginConfig.SourceChainID)), "dstChain", hlp.ChainName(destChainID))
