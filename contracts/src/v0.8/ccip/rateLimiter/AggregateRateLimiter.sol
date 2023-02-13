@@ -9,8 +9,7 @@ import {Common} from "../models/Common.sol";
 import {IERC20} from "../../vendor/IERC20.sol";
 
 contract AggregateRateLimiter is IAggregateRateLimiter, OwnerIsCreator {
-  // The address of the token limit admin that has the same permissions as
-  // the owner.
+  // The address of the token limit admin that has the same permissions as the owner.
   address private s_tokenLimitAdmin;
 
   // A mapping of token => tokenPrice
@@ -21,9 +20,8 @@ contract AggregateRateLimiter is IAggregateRateLimiter, OwnerIsCreator {
   // The token bucket object that contains the bucket state.
   TokenBucket private s_tokenBucket;
 
-  /**
-   * @param config The RateLimiterConfig containing the capacity and refill rate of the bucket, plus the admin address.
-   */
+  /// @param config The RateLimiterConfig containing the capacity and refill rate
+  /// of the bucket, plus the admin address.
   constructor(RateLimiterConfig memory config) {
     s_tokenLimitAdmin = config.admin;
     s_tokenBucket = TokenBucket({
@@ -51,13 +49,12 @@ contract AggregateRateLimiter is IAggregateRateLimiter, OwnerIsCreator {
     // We update the bucket to reflect the status at the exact time of the
     // call. This means to might need to refill a part of the bucket based
     // on the time that has passed since the last update.
-    uint256 timeNow = block.timestamp;
-    uint256 difference = timeNow - bucket.lastUpdated;
+    uint256 difference = block.timestamp - bucket.lastUpdated;
 
     // Overflow doesn't happen here because bucket.rate is <= type(uint208).max
-    // leaving 48 bits for the time difference. 2 ** 48 seconds = 9e6 years.
+    // leaving 48 bits for the time difference. 2 ** 48 seconds = 9 million years.
     bucket.tokens = _min(bucket.capacity, bucket.tokens + difference * bucket.rate);
-    bucket.lastUpdated = timeNow;
+    bucket.lastUpdated = block.timestamp;
     return bucket;
   }
 
@@ -77,6 +74,7 @@ contract AggregateRateLimiter is IAggregateRateLimiter, OwnerIsCreator {
     emit ConfigChanged(config.capacity, config.rate);
   }
 
+  /// @inheritdoc IAggregateRateLimiter
   function getPricesForTokens(IERC20[] memory tokens) public view returns (uint256[] memory prices) {
     uint256 numberOfTokens = tokens.length;
     prices = new uint256[](numberOfTokens);
@@ -109,16 +107,14 @@ contract AggregateRateLimiter is IAggregateRateLimiter, OwnerIsCreator {
     s_allowedTokens = tokens;
   }
 
-  /**
-   * @notice _removeTokens removes the given token values from the pool, lowering the
-              value allowed to be transferred for subsequent calls. It will use the
-              s_priceByToken mapping to determine value in a standardised unit.
-   * @param tokensAndAmounts The tokensAndAmounts that are send across the bridge. All of the tokens need
-   *          to have a corresponding price set in s_priceByToken.
-   * @dev Reverts when a token price is not found or when the tx value exceeds the
-   *          amount allowed in the bucket.
-   * @dev Will only remove and therefore emit removal of value if the value is > 0.
-   */
+  /// @notice _removeTokens removes the given token values from the pool, lowering the
+  /// value allowed to be transferred for subsequent calls. It will use the
+  /// s_priceByToken mapping to determine value in a standardised unit.
+  /// @param tokensAndAmounts The tokensAndAmounts that are send across the bridge. All
+  /// of the tokens need to have a corresponding price set in s_priceByToken.
+  /// @dev Reverts when a token price is not found or when the tx value exceeds the
+  /// amount allowed in the bucket.
+  /// @dev Will only remove and therefore emit removal of value if the value is > 0.
   function _removeTokens(Common.EVMTokenAndAmount[] memory tokensAndAmounts) internal {
     uint256 value = 0;
     for (uint256 i = 0; i < tokensAndAmounts.length; ++i) {
@@ -146,31 +142,25 @@ contract AggregateRateLimiter is IAggregateRateLimiter, OwnerIsCreator {
   }
 
   function _update(TokenBucket storage bucket) internal {
-    uint256 timeNow = block.timestamp;
-
     // Return if there's nothing to update
-    if (bucket.tokens == bucket.capacity || bucket.lastUpdated == timeNow) return;
+    if (bucket.tokens == bucket.capacity || bucket.lastUpdated == block.timestamp) return;
     // Revert if the tokens in the bucket exceed its capacity
     if (bucket.tokens > bucket.capacity) revert BucketOverfilled();
-    uint256 difference = timeNow - bucket.lastUpdated;
+    uint256 difference = block.timestamp - bucket.lastUpdated;
     bucket.tokens = _min(bucket.capacity, bucket.tokens + difference * bucket.rate);
-    bucket.lastUpdated = timeNow;
+    bucket.lastUpdated = block.timestamp;
   }
 
-  /**
-   * @notice Return the smallest of two integers
-   * @param a first int
-   * @param b second int
-   * @return smallest
-   */
+  /// @notice Return the smallest of two integers
+  /// @param a first int
+  /// @param b second int
+  /// @return smallest
   function _min(uint256 a, uint256 b) internal pure returns (uint256) {
     return a < b ? a : b;
   }
 
-  /**
-   * @notice a modifier that allows the owner or the s_tokenLimitAdmin call the functions
-   *          it is applied to.
-   */
+  /// @notice a modifier that allows the owner or the s_tokenLimitAdmin call the functions
+  /// it is applied to.
   modifier requireAdminOrOwner() {
     if (msg.sender != owner() && msg.sender != s_tokenLimitAdmin) revert OnlyCallableByAdminOrOwner();
     _;

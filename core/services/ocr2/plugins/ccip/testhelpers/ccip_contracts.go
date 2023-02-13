@@ -346,7 +346,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			},
 		},
 		nil,
-		big.NewInt(1e18),
+		60*60*24*14, // two weeks
 	)
 	require.NoError(t, err)
 
@@ -430,7 +430,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			FeeTokenBaseUnitsPerUnitGas: big.NewInt(200e9), // (2e20 juels/eth) * (1 gwei / gas) / (1 eth/1e18)
 		}},
 		nil,
-		big.NewInt(1e18),
+		60*60*24*14, // two weeks
 	)
 	require.NoError(t, err)
 	destFeeManager, err := fee_manager.NewFeeManager(destFeeManagerAddress, destChain)

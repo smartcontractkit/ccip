@@ -289,7 +289,7 @@ func (r *ExecutionReportingPlugin) canSkipFeeUpdate(feeTokenBaseUnitsPerUnitGas 
 		if err != nil {
 			return false, err
 		}
-		if ts := time.Unix(parsed.Timestamp.Int64(), 0); parsed.DestChain == chainID && parsed.Token == token && !ts.Before(latestUpdateTimestamp) {
+		if ts := time.Unix(int64(parsed.Timestamp), 0); parsed.DestChain == chainID && parsed.Token == token && !ts.Before(latestUpdateTimestamp) {
 			latestUpdateTimestamp = ts
 			latestUpdate = FeeUpdate{
 				SourceFeeToken:              token,

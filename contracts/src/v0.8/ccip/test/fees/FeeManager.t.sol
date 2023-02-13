@@ -22,7 +22,7 @@ contract FeeManagerSetup is TokenSetup {
     });
     address[] memory feeUpdaters = new address[](0);
 
-    s_feeManager = new FeeManager(fees, feeUpdaters, uint128(TWELVE_HOURS));
+    s_feeManager = new FeeManager(fees, feeUpdaters, TWELVE_HOURS);
   }
 }
 

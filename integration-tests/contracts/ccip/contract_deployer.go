@@ -4,7 +4,6 @@ import (
 	"crypto/ed25519"
 	"encoding/hex"
 	"fmt"
-	"math/big"
 	"strings"
 	"time"
 
@@ -275,7 +274,7 @@ func (e *CCIPContractsDeployer) DeployFeeManager(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return fee_manager.DeployFeeManager(auth, backend, feeUpdates, nil, big.NewInt(1e18))
+		return fee_manager.DeployFeeManager(auth, backend, feeUpdates, nil, 60*60*24*14)
 	})
 	if err != nil {
 		return nil, err

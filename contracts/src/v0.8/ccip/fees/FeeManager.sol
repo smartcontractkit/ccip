@@ -22,12 +22,12 @@ contract FeeManager is IFeeManager, OwnerIsCreator {
   // feeUpdater => isFeeUpdater
   mapping(address => bool) private s_feeUpdaters;
   // The amount of time a fee can be stale before it is considered invalid.
-  uint128 private immutable i_stalenessThreshold;
+  uint32 private immutable i_stalenessThreshold;
 
   constructor(
     Internal.FeeUpdate[] memory feeUpdates,
     address[] memory feeUpdaters,
-    uint128 stalenessThreshold
+    uint32 stalenessThreshold
   ) {
     for (uint256 i = 0; i < feeUpdates.length; ++i) {
       _updateFee(feeUpdates[i].sourceFeeToken, feeUpdates[i].destChainId, feeUpdates[i].feeTokenBaseUnitsPerUnitGas);
@@ -67,15 +67,14 @@ contract FeeManager is IFeeManager, OwnerIsCreator {
     TimestampedFeeUpdate memory update = s_tokenPerUnitGasByDestChainId[token][destChainId];
     if (update.timestamp == 0 || update.feeTokenBaseUnitsPerUnitGas == 0)
       revert TokenOrChainNotSupported(token, destChainId);
-    uint256 stalenessThreshold = i_stalenessThreshold;
     uint256 timePassed = block.timestamp - update.timestamp;
-    if (timePassed > stalenessThreshold) revert StaleFee(stalenessThreshold, timePassed);
+    if (timePassed > i_stalenessThreshold) revert StaleFee(i_stalenessThreshold, timePassed);
 
     return update.feeTokenBaseUnitsPerUnitGas;
   }
 
   // @inheritdoc IFeeManager
-  function getStalenessThreshold() external view override returns (uint128) {
+  function getStalenessThreshold() external view override returns (uint32) {
     return i_stalenessThreshold;
   }
 
@@ -125,9 +124,9 @@ contract FeeManager is IFeeManager, OwnerIsCreator {
     if (token == address(0)) revert NullAddressNotAllowed();
     s_tokenPerUnitGasByDestChainId[token][destinationChainId] = TimestampedFeeUpdate({
       feeTokenBaseUnitsPerUnitGas: feeTokenBaseUnitsPerUnitGas,
-      timestamp: uint128(block.timestamp)
+      timestamp: uint64(block.timestamp)
     });
-    emit GasFeeUpdated(token, destinationChainId, feeTokenBaseUnitsPerUnitGas, uint128(block.timestamp));
+    emit GasFeeUpdated(token, destinationChainId, feeTokenBaseUnitsPerUnitGas, uint64(block.timestamp));
   }
 
   /**

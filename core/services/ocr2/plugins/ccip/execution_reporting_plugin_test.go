@@ -112,7 +112,7 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 			FeeTokenBaseUnitsPerUnitGas: big.NewInt(200e9), // (2e20 juels/eth) * (1 gwei / gas) / (1 eth/1e18)
 		}},
 		nil,
-		big.NewInt(1e18),
+		60*60*24*14, // two weeks
 	)
 	require.NoError(t, err)
 

@@ -8,7 +8,7 @@ interface IFeeManager {
   error TokenOrChainNotSupported(address token, uint64 chain);
   error FeeUpdaterNotAllowed(address feeUpdater);
   error OnlyCallableByUpdaterOrOwner();
-  error StaleFee(uint256 threshold, uint256 timePassed);
+  error StaleFee(uint32 threshold, uint256 timePassed);
   error InvalidWithdrawalAddress();
   error NullAddressNotAllowed();
 
@@ -18,12 +18,12 @@ interface IFeeManager {
     address indexed token,
     uint64 indexed destChain,
     uint128 feeTokenBaseUnitsPerUnitGas,
-    uint128 timestamp
+    uint64 timestamp
   );
 
   struct TimestampedFeeUpdate {
-    uint128 feeTokenBaseUnitsPerUnitGas;
-    uint128 timestamp;
+    uint128 feeTokenBaseUnitsPerUnitGas; // --┐
+    uint64 timestamp; // ---------------------┘
   }
 
   /**
@@ -63,7 +63,7 @@ interface IFeeManager {
    * @notice Get the staleness threshold.
    * @return stalenessThreshold The staleness threshold.
    */
-  function getStalenessThreshold() external view returns (uint128 stalenessThreshold);
+  function getStalenessThreshold() external view returns (uint32 stalenessThreshold);
 
   /**
    * @notice Withdraw a specified amount of any token from the contract.

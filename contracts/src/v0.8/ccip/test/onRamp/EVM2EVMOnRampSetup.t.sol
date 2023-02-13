@@ -60,7 +60,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, RouterSetup {
       destGasOverhead: 2
     });
     address[] memory feeUpdaters = new address[](0);
-    s_IFeeManager = new FeeManager(feeUpdates, feeUpdaters, uint128(TWELVE_HOURS));
+    s_IFeeManager = new FeeManager(feeUpdates, feeUpdaters, TWELVE_HOURS);
 
     s_onRamp = new EVM2EVMOnRamp(
       SOURCE_CHAIN_ID,

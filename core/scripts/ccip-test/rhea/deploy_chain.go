@@ -100,7 +100,7 @@ func deployFeeManager(t *testing.T, client *EvmDeploymentConfig) {
 		client.Client,
 		[]fee_manager.InternalFeeUpdate{},
 		[]common.Address{},
-		big.NewInt(1e18),
+		60*60*24*14, // two weeks
 	)
 	shared.RequireNoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
