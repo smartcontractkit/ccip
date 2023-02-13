@@ -334,7 +334,7 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 
 func (e *CCIPContractsDeployer) DeployOffRamp(
 	sourceChainId, destChainId uint64,
-	commitStore, onRamp, afn, feetoken, destFeeManagerAddress common.Address,
+	commitStore, onRamp, afn, feetoken, destFeeManagerAddress, destRouter common.Address,
 	sourceToken, pools []common.Address,
 	opts RateLimiterConfig) (
 	*OffRamp,
@@ -349,15 +349,16 @@ func (e *CCIPContractsDeployer) DeployOffRamp(
 			backend,
 			sourceChainId,
 			destChainId,
+			onRamp,
 			evm_2_evm_offramp.IEVM2EVMOffRampOffRampConfig{
+				Router:                                  destRouter,
+				CommitStore:                             commitStore,
 				FeeManager:                              destFeeManagerAddress,
 				PermissionLessExecutionThresholdSeconds: 0,
 				ExecutionDelaySeconds:                   0,
 				MaxDataSize:                             1e5,
 				MaxTokensLength:                         15,
 			},
-			onRamp,
-			commitStore,
 			afn,
 			sourceToken,
 			pools,

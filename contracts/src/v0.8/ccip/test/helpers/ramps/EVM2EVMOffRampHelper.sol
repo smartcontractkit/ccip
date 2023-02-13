@@ -7,26 +7,32 @@ contract EVM2EVMOffRampHelper is EVM2EVMOffRamp {
   constructor(
     uint64 sourceChainId,
     uint64 chainId,
-    OffRampConfig memory offRampConfig,
     address onRampAddress,
-    ICommitStore commitStore,
+    OffRampConfig memory offRampConfig,
     IAFN afn,
     IERC20[] memory sourceTokens,
     IPool[] memory pools,
     RateLimiterConfig memory rateLimiterConfig
-  )
-    EVM2EVMOffRamp(
-      sourceChainId,
-      chainId,
-      offRampConfig,
-      onRampAddress,
-      commitStore,
-      afn,
-      sourceTokens,
-      pools,
-      rateLimiterConfig
-    )
-  {}
+  ) EVM2EVMOffRamp(sourceChainId, chainId, onRampAddress, offRampConfig, afn, sourceTokens, pools, rateLimiterConfig) {}
+
+  function setExecutionState(uint64 sequenceNumber, Internal.MessageExecutionState state) public {
+    s_executedMessages[sequenceNumber] = state;
+  }
+
+  function releaseOrMintToken(
+    IPool pool,
+    uint256 amount,
+    address receiver
+  ) external {
+    _releaseOrMintToken(pool, amount, receiver);
+  }
+
+  function releaseOrMintTokens(Common.EVMTokenAndAmount[] memory sourceTokensAndAmounts, address receiver)
+    external
+    returns (Common.EVMTokenAndAmount[] memory)
+  {
+    return _releaseOrMintTokens(sourceTokensAndAmounts, receiver);
+  }
 
   function report(bytes memory executableMessages) external {
     _report(executableMessages);

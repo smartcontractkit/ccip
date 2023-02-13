@@ -648,7 +648,7 @@ func (destCCIP *DestCCIPModule) DeployContracts(t *testing.T, sourceCCIP SourceC
 	destCCIP.OffRamp, err = contractDeployer.DeployOffRamp(destCCIP.SourceChainId, sourceCCIP.DestinationChainId,
 		destCCIP.CommitStore.EthAddress, sourceCCIP.OnRamp.EthAddress,
 		destCCIP.Common.AFN.EthAddress, common.HexToAddress(destCCIP.Common.FeeToken.Address()),
-		destFeeManager.EthAddress, sourceTokens, pools, destCCIP.Common.RateLimiterConfig)
+		destFeeManager.EthAddress, destCCIP.Common.Router.EthAddress, sourceTokens, pools, destCCIP.Common.RateLimiterConfig)
 	require.NoError(t, err, "Deploying OffRamp shouldn't fail")
 	err = destCCIP.Common.ChainClient.WaitForEvents()
 	require.NoError(t, err, "Error waiting for deploying OffRamp")
@@ -661,8 +661,6 @@ func (destCCIP *DestCCIPModule) DeployContracts(t *testing.T, sourceCCIP SourceC
 	require.NoError(t, err, "setting OffRamp as fee updater shouldn't fail")
 	err = destCCIP.Common.ChainClient.WaitForEvents()
 	require.NoError(t, err, "Error waiting for events on destination contract deployments")
-	err = destCCIP.OffRamp.SetRouter(destCCIP.Common.Router.EthAddress)
-	require.NoError(t, err, "Error setting router on the offramp")
 
 	err = destCCIP.OffRamp.SetTokenPrices(destTokens, destCCIP.Common.TokenPrices)
 	require.NoError(t, err, "Setting prices shouldn't fail")

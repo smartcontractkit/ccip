@@ -258,10 +258,10 @@ func printRampSanityCheck(chain *rhea.EvmDeploymentConfig, sourceOnRamp common.A
 
 	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(chain.LaneConfig.OffRamp, chain.Client)
 	helpers.PanicErr(err)
-	routerAddress, err = offRamp.GetRouter(&bind.CallOpts{})
+	offRampConfig, err := offRamp.GetOffRampConfig(&bind.CallOpts{})
 	helpers.PanicErr(err)
 
-	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "OffRamp Router set", printBool(routerAddress == chain.ChainConfig.Router)))
+	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "OffRamp Router set", printBool(offRampConfig.Router == chain.ChainConfig.Router)))
 
 	configDetails, err := offRamp.LatestConfigDetails(&bind.CallOpts{})
 	helpers.PanicErr(err)

@@ -4,6 +4,7 @@ pragma solidity 0.8.15;
 import "../interfaces/ICommitStore.sol";
 import "../interfaces/offRamp/IEVM2EVMOffRamp.sol";
 import "../interfaces/rateLimiter/IAggregateRateLimiter.sol";
+import "../interfaces/router/IRouter.sol";
 import "../interfaces/onRamp/IEVM2EVMOnRamp.sol";
 
 contract StructFactory {
@@ -68,10 +69,16 @@ contract StructFactory {
   uint32 internal constant PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS = 500;
   uint64 internal constant MAX_GAS_LIMIT = 4_000_000;
 
-  function offRampConfig(IFeeManager feeManager) internal pure returns (IEVM2EVMOffRamp.OffRampConfig memory) {
+  function offRampConfig(
+    IFeeManager feeManager,
+    ICommitStore commitStore,
+    IRouter router
+  ) internal pure returns (IEVM2EVMOffRamp.OffRampConfig memory) {
     return
       IEVM2EVMOffRamp.OffRampConfig({
-        feeManager: feeManager,
+        router: address(router),
+        commitStore: address(commitStore),
+        feeManager: address(feeManager),
         executionDelaySeconds: EXECUTION_DELAY_SECONDS,
         maxDataSize: MAX_DATA_SIZE,
         maxTokensLength: MAX_TOKENS_LENGTH,

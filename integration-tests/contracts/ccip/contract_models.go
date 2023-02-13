@@ -453,25 +453,6 @@ func (offRamp *OffRamp) SetOCR2Config(
 	return offRamp.client.ProcessTransaction(tx)
 }
 
-func (offRamp *OffRamp) SetRouter(offRampRouterAddress common.Address) error {
-	opts, err := offRamp.client.TransactionOpts(offRamp.client.GetDefaultWallet())
-	if err != nil {
-		return err
-	}
-	log.Info().
-		Str("OffRamp", offRamp.Address()).
-		Msg("Setting router for offramp")
-	tx, err := offRamp.instance.SetRouter(opts, offRampRouterAddress)
-	if err != nil {
-		return err
-	}
-	log.Info().
-		Str("offRampRouterAddress", offRampRouterAddress.Hex()).
-		Str("Network Name", offRamp.client.GetNetworkConfig().Name).
-		Msg("OffRamp router is configured")
-	return offRamp.client.ProcessTransaction(tx)
-}
-
 func (offRamp *OffRamp) FilterExecutionStateChanged(seqNumber []uint64, messageId [][32]byte, currentBlockOnDest uint64) (
 	*evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChangedIterator, error,
 ) {

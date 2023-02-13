@@ -115,22 +115,26 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 		60*60*24*14, // two weeks
 	)
 	require.NoError(t, err)
+	destChain.Commit()
 
+	routerAddress, _, router, err := router.DeployRouter(destUser, destChain, []common.Address{}, common.Address{})
+	require.NoError(t, err)
 	destChain.Commit()
 	offRampAddress, _, _, err := evm_2_evm_offramp.DeployEVM2EVMOffRamp(
 		destUser,
 		destChain,
 		sourceChainID,
 		destChainID,
+		onRampAddress,
 		evm_2_evm_offramp.IEVM2EVMOffRampOffRampConfig{
+			Router:                                  routerAddress,
+			CommitStore:                             commitStore.Address(),
 			FeeManager:                              destFeeManagerAddress,
 			PermissionLessExecutionThresholdSeconds: 1,
 			ExecutionDelaySeconds:                   0,
 			MaxDataSize:                             1e5,
 			MaxTokensLength:                         5,
 		},
-		onRampAddress,
-		commitStore.Address(),
 		afnAddress,
 		[]common.Address{linkTokenSourceAddress},
 		[]common.Address{destPoolAddress},
@@ -150,10 +154,7 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	receiver, err := simple_message_receiver.NewSimpleMessageReceiver(receiverAddress, destChain)
 	require.NoError(t, err)
 	destChain.Commit()
-	routerAddress, _, _, err := router.DeployRouter(destUser, destChain, []common.Address{offRampAddress}, common.HexToAddress("0x0"))
-	require.NoError(t, err)
-	destChain.Commit()
-	_, err = offRamp.SetRouter(destUser, routerAddress)
+	_, err = router.AddOffRamp(destUser, offRampAddress)
 	require.NoError(t, err)
 	destChain.Commit()
 

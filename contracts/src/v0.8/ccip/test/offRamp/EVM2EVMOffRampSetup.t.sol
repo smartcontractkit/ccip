@@ -5,6 +5,7 @@ import {ICommitStore} from "../../interfaces/ICommitStore.sol";
 import {IAny2EVMMessageReceiver} from "../../interfaces/applications/IAny2EVMMessageReceiver.sol";
 import {IEVM2EVMOffRamp} from "../../interfaces/offRamp/IEVM2EVMOffRamp.sol";
 import {IFeeManager} from "../../interfaces/fees/IFeeManager.sol";
+import {IRouter} from "../../interfaces/router/IRouter.sol";
 
 import {Internal} from "../../models/Internal.sol";
 import {Common} from "../../models/Common.sol";
@@ -13,8 +14,9 @@ import {MockCommitStore} from "../mocks/MockCommitStore.sol";
 import {SimpleMessageReceiver} from "../helpers/receivers/SimpleMessageReceiver.sol";
 import {EVM2EVMOffRampHelper} from "../helpers/ramps/EVM2EVMOffRampHelper.sol";
 import "../TokenSetup.t.sol";
+import "../router/RouterSetup.t.sol";
 
-contract EVM2EVMOffRampSetup is TokenSetup, FeeManagerSetup {
+contract EVM2EVMOffRampSetup is TokenSetup, FeeManagerSetup, RouterSetup {
   ICommitStore internal s_mockCommitStore;
   IAny2EVMMessageReceiver internal s_receiver;
   IAny2EVMMessageReceiver internal s_secondary_receiver;
@@ -30,24 +32,28 @@ contract EVM2EVMOffRampSetup is TokenSetup, FeeManagerSetup {
   );
   event SkippedIncorrectNonce(uint64 indexed nonce, address indexed sender);
 
-  function setUp() public virtual override(TokenSetup, FeeManagerSetup) {
+  function setUp() public virtual override(TokenSetup, FeeManagerSetup, RouterSetup) {
     TokenSetup.setUp();
     FeeManagerSetup.setUp();
+    RouterSetup.setUp();
 
     s_mockCommitStore = new MockCommitStore();
     s_receiver = new SimpleMessageReceiver();
     s_secondary_receiver = new SimpleMessageReceiver();
 
-    deployOffRamp(s_mockCommitStore, s_feeManager);
+    deployOffRamp(s_mockCommitStore, s_feeManager, s_destRouter);
   }
 
-  function deployOffRamp(ICommitStore commitStore, IFeeManager feeManager) internal {
+  function deployOffRamp(
+    ICommitStore commitStore,
+    IFeeManager feeManager,
+    IRouter router
+  ) internal {
     s_offRamp = new EVM2EVMOffRampHelper(
       SOURCE_CHAIN_ID,
       DEST_CHAIN_ID,
-      offRampConfig(feeManager),
       ON_RAMP_ADDRESS,
-      commitStore,
+      offRampConfig(feeManager, commitStore, router),
       s_afn,
       getCastedSourceTokens(),
       getCastedDestinationPools(),
@@ -56,6 +62,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, FeeManagerSetup {
 
     s_offRamp.setPrices(getCastedDestinationTokens(), getTokenPrices());
     s_feeManager.setFeeUpdater(address(s_offRamp));
+    s_destRouter.addOffRamp(address(s_offRamp));
 
     LockReleaseTokenPool(address(s_destPools[0])).setOffRamp(address(s_offRamp), true);
     LockReleaseTokenPool(address(s_destPools[1])).setOffRamp(address(s_offRamp), true);

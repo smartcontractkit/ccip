@@ -2,11 +2,12 @@
 pragma solidity 0.8.15;
 
 import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
-import {IBaseOffRamp} from "../interfaces/offRamp/IBaseOffRamp.sol";
 import {ICommitStore} from "../interfaces/ICommitStore.sol";
+import {IFeeManager} from "../interfaces/fees/IFeeManager.sol";
 import {IAFN} from "../interfaces/health/IAFN.sol";
 import {IPool} from "../interfaces/pools/IPool.sol";
 import {IEVM2EVMOffRamp} from "../interfaces/offRamp/IEVM2EVMOffRamp.sol";
+import {IRouter} from "../interfaces/router/IRouter.sol";
 import {IAny2EVMMessageReceiver} from "../interfaces/applications/IAny2EVMMessageReceiver.sol";
 
 import {Internal} from "../models/Internal.sol";
@@ -14,50 +15,102 @@ import {Common} from "../models/Common.sol";
 import {Consumer} from "../models/Consumer.sol";
 import {Internal} from "../models/Internal.sol";
 import {OCR2Base} from "../ocr/OCR2Base.sol";
-import {Any2EVMBaseOffRamp} from "./Any2EVMBaseOffRamp.sol";
+import {HealthChecker} from "../health/HealthChecker.sol";
+import {OffRampTokenPoolRegistry} from "../pools/OffRampTokenPoolRegistry.sol";
+import {AggregateRateLimiter} from "../rateLimiter/AggregateRateLimiter.sol";
 
 import {IERC20} from "../../vendor/IERC20.sol";
 import {Address} from "../../vendor/Address.sol";
 import {ERC165Checker} from "../../vendor/ERC165Checker.sol";
 
-/**
- * @notice EVM2EVMOffRamp enables OCR networks to execute multiple messages
- * in an OffRamp in a single transaction.
- */
-contract EVM2EVMOffRamp is IEVM2EVMOffRamp, Any2EVMBaseOffRamp, TypeAndVersionInterface, OCR2Base {
+/// @notice EVM2EVMOffRamp enables OCR networks to execute multiple messages
+/// in an OffRamp in a single transaction.
+contract EVM2EVMOffRamp is
+  IEVM2EVMOffRamp,
+  HealthChecker,
+  OffRampTokenPoolRegistry,
+  AggregateRateLimiter,
+  TypeAndVersionInterface,
+  OCR2Base
+{
   using Address for address;
   using ERC165Checker for address;
 
+  // STATIC CONFIG
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "EVM2EVMOffRamp 1.0.0";
-
+  // Chain ID of the source chain
+  uint64 internal immutable i_sourceChainId;
+  // Chain ID of this chain
+  uint64 internal immutable i_chainId;
+  // OnRamp address on the source chain
+  address internal immutable i_onRampAddress;
+  // metadataHash is a prefix for a message hash preimage to ensure uniqueness.
   bytes32 internal immutable i_metadataHash;
 
-  mapping(address => uint64) internal s_senderNonce;
-
+  // DYNAMIC CONFIG
   OffRampConfig internal s_config;
+
+  // STATE
+  mapping(address => uint64) internal s_senderNonce;
+  // A mapping of sequence numbers to execution state.
+  // This makes sure we never execute a message twice.
+  mapping(uint64 => Internal.MessageExecutionState) internal s_executedMessages;
 
   constructor(
     uint64 sourceChainId,
     uint64 chainId,
-    OffRampConfig memory offRampConfig,
     address onRampAddress,
-    ICommitStore commitStore,
+    OffRampConfig memory offRampConfig,
     IAFN afn,
     IERC20[] memory sourceTokens,
     IPool[] memory pools,
     RateLimiterConfig memory rateLimiterConfig
   )
     OCR2Base()
-    Any2EVMBaseOffRamp(sourceChainId, chainId, onRampAddress, commitStore, afn, sourceTokens, pools, rateLimiterConfig)
+    HealthChecker(afn)
+    OffRampTokenPoolRegistry(sourceTokens, pools)
+    AggregateRateLimiter(rateLimiterConfig)
   {
-    s_config = offRampConfig;
+    if (onRampAddress == address(0)) revert ZeroAddressNotAllowed();
+    _setOffRampConfig(offRampConfig);
+
+    i_sourceChainId = sourceChainId;
+    i_chainId = chainId;
+    i_onRampAddress = onRampAddress;
     i_metadataHash = _metadataHash(Internal.EVM_2_EVM_MESSAGE_HASH);
   }
 
+  function _metadataHash(bytes32 prefix) internal view returns (bytes32) {
+    return keccak256(abi.encode(prefix, i_sourceChainId, i_chainId, i_onRampAddress));
+  }
+
   /// @inheritdoc IEVM2EVMOffRamp
-  function manuallyExecute(Internal.ExecutionReport memory report) external override {
-    _execute(report, true);
+  function getOffRampConfig() external view override returns (OffRampConfig memory) {
+    return s_config;
+  }
+
+  /// @inheritdoc IEVM2EVMOffRamp
+  function setOffRampConfig(OffRampConfig memory config) external override onlyOwner {
+    _setOffRampConfig(config);
+  }
+
+  function _setOffRampConfig(OffRampConfig memory config) private {
+    if (config.router == address(0) || config.commitStore == address(0) || config.feeManager == address(0))
+      revert InvalidOffRampConfig(config);
+
+    s_config = config;
+    emit OffRampConfigChanged(config);
+  }
+
+  /// @inheritdoc IEVM2EVMOffRamp
+  function getExecutionState(uint64 sequenceNumber) public view returns (Internal.MessageExecutionState) {
+    return s_executedMessages[sequenceNumber];
+  }
+
+  function getChainIDs() external view returns (uint64 sourceChainId, uint64 chainId) {
+    sourceChainId = i_sourceChainId;
+    chainId = i_chainId;
   }
 
   /// @inheritdoc IEVM2EVMOffRamp
@@ -65,33 +118,41 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, Any2EVMBaseOffRamp, TypeAndVersionIn
     return s_senderNonce[sender];
   }
 
-  /**
-   * @notice Try executing a message
-   * @param message Common.Any2EVMMessage memory message
-   * @param manualExecution bool to indicate manual instead of DON execution
-   * @return Internal.ExecutionState
-   */
-  function _trialExecute(Internal.EVM2EVMMessage memory message, bool manualExecution)
-    internal
-    returns (Internal.MessageExecutionState)
-  {
-    try this.executeSingleMessage(message, manualExecution) {} catch (bytes memory err) {
-      if (IBaseOffRamp.ReceiverError.selector == bytes4(err)) {
-        return Internal.MessageExecutionState.FAILURE;
-      } else {
-        revert ExecutionError(err);
-      }
-    }
-    return Internal.MessageExecutionState.SUCCESS;
+  /// @notice Uses the pool to release or mint tokens and send them to
+  ///         the given `receiver` address.
+  function _releaseOrMintToken(
+    IPool pool,
+    uint256 amount,
+    address receiver
+  ) internal {
+    pool.releaseOrMint(receiver, amount);
   }
 
-  /**
-   * @notice Execute a single message
-   * @param message The Any2EVMMessageFromSender message that will be executed
-   * @param manualExecution bool to indicate manual instead of DON execution
-   * @dev this can only be called by the contract itself. It is part of
-   * the Execute call, as we can only try/catch on external calls.
-   */
+  /// @notice Uses pools to release or mint a number of different tokens
+  ///           and send them to the given `receiver` address.
+  function _releaseOrMintTokens(Common.EVMTokenAndAmount[] memory sourceTokensAndAmounts, address receiver)
+    internal
+    returns (Common.EVMTokenAndAmount[] memory)
+  {
+    Common.EVMTokenAndAmount[] memory destTokensAndAmounts = new Common.EVMTokenAndAmount[](
+      sourceTokensAndAmounts.length
+    );
+    for (uint256 i = 0; i < sourceTokensAndAmounts.length; ++i) {
+      IPool pool = getPoolBySourceToken(IERC20(sourceTokensAndAmounts[i].token));
+      if (address(pool) == address(0)) revert UnsupportedToken(IERC20(sourceTokensAndAmounts[i].token));
+      _releaseOrMintToken(pool, sourceTokensAndAmounts[i].amount, receiver);
+      destTokensAndAmounts[i].token = address(pool.getToken());
+      destTokensAndAmounts[i].amount = sourceTokensAndAmounts[i].amount;
+    }
+    _removeTokens(destTokensAndAmounts);
+    return destTokensAndAmounts;
+  }
+
+  /// @notice Execute a single message
+  /// @param message The Any2EVMMessageFromSender message that will be executed
+  /// @param manualExecution bool to indicate manual instead of DON execution
+  /// @dev this can only be called by the contract itself. It is part of
+  /// the Execute call, as we can only try/catch on external calls.
   function executeSingleMessage(Internal.EVM2EVMMessage memory message, bool manualExecution) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
     Common.EVMTokenAndAmount[] memory destTokensAndAmounts = new Common.EVMTokenAndAmount[](0);
@@ -102,7 +163,7 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, Any2EVMBaseOffRamp, TypeAndVersionIn
       !message.receiver.isContract() || !message.receiver.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId)
     ) return;
     if (
-      !s_router.routeMessage(
+      !IRouter(s_config.router).routeMessage(
         Internal._toAny2EVMMessage(message, destTokensAndAmounts),
         manualExecution,
         message.gasLimit,
@@ -111,13 +172,35 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, Any2EVMBaseOffRamp, TypeAndVersionIn
     ) revert ReceiverError();
   }
 
+  /// @notice Try executing a message
+  /// @param message Common.Any2EVMMessage memory message
+  /// @param manualExecution bool to indicate manual instead of DON execution
+  /// @return Internal.ExecutionState
+  function _trialExecute(Internal.EVM2EVMMessage memory message, bool manualExecution)
+    internal
+    returns (Internal.MessageExecutionState)
+  {
+    try this.executeSingleMessage(message, manualExecution) {} catch (bytes memory err) {
+      if (IEVM2EVMOffRamp.ReceiverError.selector == bytes4(err)) {
+        return Internal.MessageExecutionState.FAILURE;
+      } else {
+        revert ExecutionError(err);
+      }
+    }
+    return Internal.MessageExecutionState.SUCCESS;
+  }
+
+  function _isWellFormed(Internal.EVM2EVMMessage memory message) private view {
+    if (message.sourceChainId != i_sourceChainId) revert InvalidSourceChain(message.sourceChainId);
+    if (message.tokensAndAmounts.length > uint256(s_config.maxTokensLength))
+      revert UnsupportedNumberOfTokens(message.sequenceNumber);
+    if (message.data.length > uint256(s_config.maxDataSize))
+      revert MessageTooLarge(uint256(s_config.maxDataSize), message.data.length);
+  }
+
   function _executeMessages(Internal.ExecutionReport memory report, bool manualExecution) internal {
     // Report may have only price updates, so we only process messages if there are some.
     uint256 numMsgs = report.encodedMessages.length;
-    if (numMsgs == 0) {
-      return;
-    }
-
     bytes32[] memory hashedLeaves = new bytes32[](numMsgs);
     Internal.EVM2EVMMessage[] memory decodedMessages = new Internal.EVM2EVMMessage[](numMsgs);
 
@@ -129,8 +212,13 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, Any2EVMBaseOffRamp, TypeAndVersionIn
       decodedMessages[i] = decodedMessage;
     }
 
-    (uint256 timestampCommitted, ) = _verifyMessages(hashedLeaves, report.proofs, report.proofFlagBits);
-    bool isOldCommitReport = (block.timestamp - timestampCommitted) > s_config.permissionLessExecutionThresholdSeconds;
+    // SECURITY CRITICAL CHECK
+    uint256 timestampCommitted = ICommitStore(s_config.commitStore).verify(
+      hashedLeaves,
+      report.proofs,
+      report.proofFlagBits
+    );
+    if (timestampCommitted <= 0) revert RootNotCommitted();
 
     // Execute messages
     for (uint256 i = 0; i < numMsgs; ++i) {
@@ -145,6 +233,8 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, Any2EVMBaseOffRamp, TypeAndVersionIn
       ) revert AlreadyExecuted(message.sequenceNumber);
 
       if (manualExecution) {
+        bool isOldCommitReport = (block.timestamp - timestampCommitted) >
+          s_config.permissionLessExecutionThresholdSeconds;
         // Manually execution is fine if we previously failed or if the commit report is just too old
         // Acceptable state transitions: FAILURE->SUCCESS, UNTOUCHED->SUCCESS, FAILURE->FAILURE
         if (!(isOldCommitReport || originalState == Internal.MessageExecutionState.FAILURE))
@@ -198,50 +288,39 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, Any2EVMBaseOffRamp, TypeAndVersionIn
     }
   }
 
-  /**
-   * @notice Execute a series of one or more messages using a merkle proof and update one or more
-   * feeManager prices.
-   * @param report ExecutionReport
-   * @param manualExecution Whether the DON auto executes or it is manually initiated
-   */
+  /// @notice Execute a series of one or more messages using a merkle proof and update one or more
+  /// feeManager prices.
+  /// @param report ExecutionReport
+  /// @param manualExecution Whether the DON auto executes or it is manually initiated
   function _execute(Internal.ExecutionReport memory report, bool manualExecution) internal whenNotPaused whenHealthy {
-    if (address(s_router) == address(0)) revert RouterNotSet();
-
     // Fee updates
     if (report.feeUpdates.length != 0) {
       if (manualExecution) revert UnauthorizedGasPriceUpdate();
-      s_config.feeManager.updateFees(report.feeUpdates);
+      IFeeManager(s_config.feeManager).updateFees(report.feeUpdates);
     }
 
-    // Message execution
-    _executeMessages(report, manualExecution);
-  }
-
-  function _isWellFormed(Internal.EVM2EVMMessage memory message) private view {
-    if (message.sourceChainId != i_sourceChainId) revert InvalidSourceChain(message.sourceChainId);
-    if (message.tokensAndAmounts.length > uint256(s_config.maxTokensLength))
-      revert UnsupportedNumberOfTokens(message.sequenceNumber);
-    if (message.data.length > uint256(s_config.maxDataSize))
-      revert MessageTooLarge(uint256(s_config.maxDataSize), message.data.length);
+    // Messages execution
+    if (report.encodedMessages.length != 0) {
+      _executeMessages(report, manualExecution);
+    }
   }
 
   /// @inheritdoc IEVM2EVMOffRamp
-  function getOffRampConfig() external view override returns (OffRampConfig memory) {
-    return s_config;
+  function manuallyExecute(Internal.ExecutionReport memory report) external override {
+    _execute(report, true);
   }
 
-  /// @inheritdoc IEVM2EVMOffRamp
-  function setOffRampConfig(OffRampConfig memory config) external override onlyOwner {
-    s_config = config;
-
-    emit OffRampConfigChanged(config);
+  /// @notice Reverts as this contract should not access CCIP messages
+  function ccipReceive(Common.Any2EVMMessage calldata) external pure {
+    // solhint-disable-next-line reason-string
+    revert();
   }
 
   // ******* OCR BASE ***********
-  /**
-   * @notice Entry point for execution, called by the OCR network
-   * @dev Expects an encoded ExecutionReport
-   */
+  ///
+  /// @notice Entry point for execution, called by the OCR network
+  /// @dev Expects an encoded ExecutionReport
+  ///
   function _report(bytes memory report) internal override {
     _execute(abi.decode(report, (Internal.ExecutionReport)), false);
   }

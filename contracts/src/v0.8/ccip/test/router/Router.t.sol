@@ -5,8 +5,9 @@ import {IEVM2AnyOnRamp} from "../../interfaces/onRamp/IEVM2AnyOnRamp.sol";
 import {IRouter} from "../../interfaces/router/IRouter.sol";
 import {IWrappedNative} from "../../interfaces/router/IWrappedNative.sol";
 import {IRouterClient} from "../../interfaces/router/IRouterClient.sol";
+import {IOwnable} from "../../interfaces/IOwnable.sol";
+import {ITypeAndVersion} from "../../interfaces/ITypeAndVersion.sol";
 
-import {MockOffRamp} from "../mocks/MockOffRamp.sol";
 import "../onRamp/EVM2EVMOnRampSetup.t.sol";
 
 /// @notice #constructor
@@ -14,11 +15,9 @@ contract Router_constructor is EVM2EVMOnRampSetup {
   // Success
 
   function testSuccess() public {
-    // typeAndVersion
-    assertEq("Router 1.0.0", s_sourceRouter.typeAndVersion());
-
+    assertEq("Router 1.0.0", ITypeAndVersion(address(s_sourceRouter)).typeAndVersion());
     // owner
-    assertEq(OWNER, s_sourceRouter.owner());
+    assertEq(OWNER, IOwnable(address(s_sourceRouter)).owner());
   }
 }
 
@@ -269,7 +268,7 @@ contract Router_addOffRamp is EVM2EVMOnRampSetup {
   function setUp() public virtual override {
     EVM2EVMOnRampSetup.setUp();
 
-    s_newOffRamp = address(new MockOffRamp());
+    s_newOffRamp = address(1);
   }
 
   // Success

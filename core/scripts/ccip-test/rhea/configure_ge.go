@@ -1,14 +1,12 @@
 package rhea
 
 import (
-	"fmt"
 	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
@@ -68,15 +66,6 @@ func setOnRampOnTokenPools(t *testing.T, sourceClient *EvmDeploymentConfig) {
 		shared.WaitForMined(t, sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
 		sourceClient.Logger.Infof("Onramp pool configured with offramp address: %s", helpers.ExplorerLink(int64(sourceClient.ChainConfig.ChainId), tx.Hash()))
 	}
-}
-
-func setRouterOnOffRamp(t *testing.T, destClient *EvmDeploymentConfig) {
-	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(destClient.LaneConfig.OffRamp, destClient.Client)
-	shared.RequireNoError(t, err)
-	tx, err := offRamp.SetRouter(destClient.Owner, destClient.ChainConfig.Router)
-	shared.RequireNoError(t, err)
-	shared.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
-	destClient.Logger.Infof(fmt.Sprintf("Router set on offRamp in tx %s", helpers.ExplorerLink(int64(destClient.ChainConfig.ChainId), tx.Hash())))
 }
 
 func setOffRampOnRouter(t *testing.T, client *EvmDeploymentConfig) {

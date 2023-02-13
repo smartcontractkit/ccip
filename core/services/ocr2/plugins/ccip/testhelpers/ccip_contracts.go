@@ -421,6 +421,13 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	require.NoError(t, err)
 	destChain.Commit()
 
+	// Create dest ge router
+	destRouterAddress, _, _, err := router.DeployRouter(destUser, destChain, []common.Address{}, common.Address{})
+	require.NoError(t, err)
+	destChain.Commit()
+	destRouter, err := router.NewRouter(destRouterAddress, destChain)
+	require.NoError(t, err)
+
 	// Deploy and configure ge offramp.
 	destFeeManagerAddress, _, _, err := fee_manager.DeployFeeManager(
 		destUser,
@@ -440,15 +447,16 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		destChain,
 		sourceChainID,
 		destChainID,
+		geOnRampAddress,
 		evm_2_evm_offramp.IEVM2EVMOffRampOffRampConfig{
+			Router:                                  destRouter.Address(),
+			CommitStore:                             commitStore.Address(),
 			FeeManager:                              destFeeManagerAddress,
 			PermissionLessExecutionThresholdSeconds: 1,
 			ExecutionDelaySeconds:                   0,
 			MaxDataSize:                             1e5,
 			MaxTokensLength:                         5,
 		},
-		geOnRampAddress,
-		commitStore.Address(),
 		afnDestAddress,
 		[]common.Address{sourceLinkTokenAddress},
 		[]common.Address{destPoolAddress},
@@ -467,14 +475,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	// OffRamp can update
 	_, err = destFeeManager.SetFeeUpdater(destUser, geOffRampAddress)
 	require.NoError(t, err)
-
-	// Create dest ge router
-	destRouterAddress, _, _, err := router.DeployRouter(destUser, destChain, []common.Address{geOffRampAddress}, common.HexToAddress("0x0"))
-	require.NoError(t, err)
-	destChain.Commit()
-	destRouter, err := router.NewRouter(destRouterAddress, destChain)
-	require.NoError(t, err)
-	_, err = geOffRamp.SetRouter(destUser, destRouterAddress)
+	_, err = destRouter.AddOffRamp(destUser, geOffRampAddress)
 	require.NoError(t, err)
 	_, err = geOffRamp.SetPrices(destUser, []common.Address{destLinkTokenAddress}, []*big.Int{big.NewInt(1)})
 	require.NoError(t, err)

@@ -81,12 +81,7 @@ func deployDestinationContracts(t *testing.T, client *EvmDeploymentConfig, sourc
 	// Updates destClient.LaneConfig.OffRamp if any new contracts are deployed
 	deployOffRamp(t, client, sourceChainId, supportedTokens, onRamp)
 
-	setOffRampOnRouter(t, client)
 	setFeeManagerUpdater(t, client)
-
-	if client.DeploySettings.DeployRamp || client.DeploySettings.DeployRouter {
-		setRouterOnOffRamp(t, client)
-	}
 
 	if client.DeploySettings.DeployRamp || client.DeploySettings.DeployTokenPools {
 		setOffRampOnTokenPools(t, client)
@@ -193,15 +188,16 @@ func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainId uint
 		client.Client,
 		sourceChainId,
 		client.ChainConfig.ChainId,
+		onRamp,
 		evm_2_evm_offramp.IEVM2EVMOffRampOffRampConfig{
+			Router:                                  client.ChainConfig.Router,
+			CommitStore:                             client.LaneConfig.CommitStore,
 			FeeManager:                              client.ChainConfig.FeeManager,
 			ExecutionDelaySeconds:                   60,
 			MaxDataSize:                             1e5,
 			MaxTokensLength:                         15,
 			PermissionLessExecutionThresholdSeconds: 60,
 		},
-		onRamp,
-		client.LaneConfig.CommitStore,
 		client.ChainConfig.Afn,
 		syncedSourceTokens,
 		syncedDestPools,

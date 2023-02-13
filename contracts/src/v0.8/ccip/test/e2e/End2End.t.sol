@@ -4,12 +4,9 @@ pragma solidity 0.8.15;
 import "../commitStore/CommitStore.t.sol";
 import "../onRamp/EVM2EVMOnRampSetup.t.sol";
 import "../offRamp/EVM2EVMOffRampSetup.t.sol";
-import {IRouter} from "../../interfaces/router/IRouter.sol";
 
 contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
   using Internal for Internal.EVM2EVMMessage;
-
-  IRouter public s_router;
 
   MerkleHelper public s_merkleHelper;
 
@@ -18,14 +15,8 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
     CommitStoreSetup.setUp();
     EVM2EVMOffRampSetup.setUp();
 
-    deployOffRamp(s_commitStore, s_feeManager);
-
+    deployOffRamp(s_commitStore, s_feeManager, s_destRouter);
     s_merkleHelper = new MerkleHelper();
-
-    address[] memory offRamps = new address[](1);
-    offRamps[0] = address(s_offRamp);
-    s_router = new Router(offRamps, address(1));
-    s_offRamp.setRouter(s_router);
   }
 
   function testSuccess() public {
