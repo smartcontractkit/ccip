@@ -296,83 +296,52 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		}
 	})
 
-	//t.Run("upgrade contracts while transactions are pending", func(t *testing.T) {
-	//	eventSignatures := ccip.GetTollEventSignatures()
-	//	ccipContracts.DeployNewTollOnRamp()
-	//	ccipContracts.DeployNewTollOffRamp()
-	//	newConfigBlock := ccipContracts.Dest.Chain.Blockchain().CurrentBlock().Number().Int64()
-	//
-	//	// delete previous jobs, 1 commit and exec
-	//	for _, node := range nodes {
-	//		err = node.App.DeleteJob(context.Background(), 1)
-	//		require.NoError(t, err)
-	//		err = node.App.DeleteJob(context.Background(), 2)
-	//		require.NoError(t, err)
-	//		err = node.App.DeleteJob(context.Background(), 3)
-	//		require.NoError(t, err)
-	//	}
-	//	// create updated jobs
-	//	jobParams = ccipContracts.NewCCIPJobSpecParams(tokensPerFeeCoinPipeline, newConfigBlock)
-	//	testhelpers.AddAllJobs(t, jobParams, ccipContracts, nodes)
-	//
-	//	// keep sending a number of send requests all of which would be in pending state
-	//	currentSeqNum := atomic.NewInt32(1) // start with 1 as it's a new onramp
-	//	startSeq := 1
-	//	ticker := time.NewTicker(1 * time.Second)
-	//	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
-	//	defer cancel()
-	//	wg := &sync.WaitGroup{}
-	//	wg.Add(1)
-	//	go func() {
-	//		defer wg.Done()
-	//		for {
-	//			select {
-	//			case <-ticker.C:
-	//				// Approve router to take source token.
-	//				tokenAmount := big.NewInt(100)
-	//				feeTokenAmount := new(big.Int).Mul(big.NewInt(20), big.NewInt(1e18))
-	//				_, err = ccipContracts.Source.LinkToken.Approve(
-	//					ccipContracts.Source.User,
-	//					ccipContracts.Source.TollOnRampRouter.Address(),
-	//					new(big.Int).Add(tokenAmount, feeTokenAmount))
-	//				require.NoError(t, err)
-	//
-	//				t.Logf("sending request for seqnum %d", currentSeqNum.Load())
-	//				currentSeqNum.Inc()
-	//				testhelpers.SendTollRequest(t, ccipContracts,
-	//					"hey DON, execute for me",
-	//					[]evm_2_any_toll_onramp_router.CommonEVMTokenAndAmount{{
-	//						Token:  ccipContracts.Source.LinkToken.Address(),
-	//						Amount: tokenAmount,
-	//					}},
-	//					evm_2_any_toll_onramp_router.CommonEVMTokenAndAmount{
-	//						Token:  ccipContracts.Source.LinkToken.Address(),
-	//						Amount: feeTokenAmount,
-	//					},
-	//					big.NewInt(300_000),
-	//					ccipContracts.Dest.Receivers[0].Receiver.Address())
-	//				ccipContracts.Source.Chain.Commit()
-	//				ccipContracts.Dest.Chain.Commit()
-	//			case <-ctx.Done():
-	//				return
-	//			}
-	//		}
-	//	}()
-	//
-	//	// now enable the newly deployed on/offRamp
-	//	ccipContracts.EnableTollOnRamp()
-	//	ccipContracts.EnableTollOffRamp()
-	//	// wait for all requests to get triggered
-	//	wg.Wait()
-	//	// verify if all seqNums were delivered
-	//	endSeqNum := int(currentSeqNum.Load())
-	//	for i := startSeq; i < endSeqNum; i++ {
-	//		t.Logf("verifying seqnum %d", i)
-	//		testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.Source.TollOnRamp.Address(), nodes, i)
-	//		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.Source.TollOnRamp.Address(), i)
-	//		executionLog := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.Dest.TollOffRamp.Address(), nodes, i, i)
-	//		testhelpers.AssertTollExecSuccess(t, ccipContracts, executionLog[0])
-	//	}
-	//	tollCurrentSeqNum = endSeqNum
-	//})
+	// Deploy new on ramp,Commit store,off ramp
+	// Delete previous jobs
+	// Enable new contracts
+	// Create new jobs
+	// Send a number of requests
+	// Verify all requests after the contracts are upgraded
+	t.Run("upgrade contracts and verify requests can be sent with upgraded contract", func(t *testing.T) {
+		ccipContracts.DeployNewOnRamp()
+		ccipContracts.DeployNewCommitStore()
+		ccipContracts.DeployNewOffRamp()
+		newConfigBlock := ccipContracts.Dest.Chain.Blockchain().CurrentBlock().Number().Int64()
+		// delete previous jobs, 1 commit and exec
+		for _, node := range nodes {
+			err = node.App.DeleteJob(context.Background(), 1)
+			require.NoError(t, err)
+			err = node.App.DeleteJob(context.Background(), 2)
+			require.NoError(t, err)
+		}
+
+		// enable the newly deployed contracts
+		ccipContracts.EnableOnRamp()
+		ccipContracts.EnableOffRamp()
+		ccipContracts.EnableCommitStore()
+
+		// create updated jobs
+		jobParams = ccipContracts.NewCCIPJobSpecParams(tokensPerFeeCoinPipeline, newConfigBlock)
+		testhelpers.AddAllJobs(t, jobParams, ccipContracts, nodes)
+
+		startSeq := 1
+		endSeqNum := 3
+		eventSignatures := ccip.GetEventSignatures()
+		gasLimit := big.NewInt(200_003) // prime number
+		gasPrice := big.NewInt(1e9)     // 1 gwei
+		tokenAmount := big.NewInt(100)
+		for i := startSeq; i <= endSeqNum; i++ {
+			t.Logf("sending request for seqnum %d", i)
+			testhelpers.SendMessage(gasLimit, gasPrice, tokenAmount, ccipContracts.Dest.Receivers[0].Receiver.Address(), ccipContracts)
+			ccipContracts.Source.Chain.Commit()
+			ccipContracts.Dest.Chain.Commit()
+			t.Logf("verifying seqnum %d", i)
+			testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.Source.OnRamp.Address(), nodes, i)
+			testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.Source.OnRamp.Address(), i)
+			executionLog := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.Dest.OffRamp.Address(), nodes, i, i)
+			testhelpers.AssertExecState(t, ccipContracts, executionLog[0], ccip.Success)
+		}
+
+		geCurrentSeqNum = endSeqNum + 1
+	})
 }
