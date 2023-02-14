@@ -157,7 +157,8 @@ func (c *CCIPContracts) EnableOffRamp() {
 	require.NoError(c.t, err)
 	c.Dest.Chain.Commit()
 
-	_, err = c.Dest.Router.AddOffRamp(c.Dest.User, c.Dest.OffRamp.Address())
+	_, err = c.Dest.Router.ApplyRampUpdates(c.Dest.User, nil, []router.IRouterOffRampUpdate{
+		{SourceChainId: c.Source.ChainID, OffRamps: []common.Address{c.Dest.OffRamp.Address()}}})
 	require.NoError(c.t, err)
 	c.Dest.Chain.Commit()
 
@@ -246,7 +247,7 @@ func (c *CCIPContracts) EnableOnRamp() {
 	c.Source.Chain.Commit()
 
 	c.t.Log("Setting onRamp on source router")
-	_, err = c.Source.Router.SetOnRamp(c.Source.User, c.Dest.ChainID, c.Source.OnRamp.Address())
+	_, err = c.Source.Router.ApplyRampUpdates(c.Source.User, []router.IRouterOnRampUpdate{{DestChainId: c.Dest.ChainID, OnRamp: c.Source.OnRamp.Address()}}, nil)
 	require.NoError(c.t, err)
 	c.Source.Chain.Commit()
 
@@ -399,7 +400,7 @@ func SendMessage(gasLimit, gasPrice, tokenAmount *big.Int, receiverAddr common.A
 	t := c.t
 	extraArgs, err := GetEVMExtraArgsV1(gasLimit, false)
 	require.NoError(t, err)
-	msg := router.ConsumerEVM2AnyMessage{
+	msg := router.ClientEVM2AnyMessage{
 		Receiver: MustEncodeAddress(t, receiverAddr),
 		Data:     []byte("hello"),
 		TokensAndAmounts: []router.CommonEVMTokenAndAmount{
@@ -514,7 +515,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	require.NoError(t, err)
 
 	// Create router
-	sourceRouterAddress, _, _, err := router.DeployRouter(sourceUser, sourceChain, []common.Address{}, common.HexToAddress("0xa"))
+	sourceRouterAddress, _, _, err := router.DeployRouter(sourceUser, sourceChain, common.HexToAddress("0xa"))
 	require.NoError(t, err)
 	sourceRouter, err := router.NewRouter(sourceRouterAddress, sourceChain)
 	require.NoError(t, err)
@@ -577,7 +578,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	sourceChain.Commit()
 	_, err = geOnRamp.SetPrices(sourceUser, []common.Address{sourceLinkTokenAddress}, []*big.Int{big.NewInt(1)})
 	require.NoError(t, err)
-	_, err = sourceRouter.SetOnRamp(sourceUser, destChainID, geOnRampAddress)
+	_, err = sourceRouter.ApplyRampUpdates(sourceUser, []router.IRouterOnRampUpdate{{DestChainId: destChainID, OnRamp: geOnRampAddress}}, nil)
 	require.NoError(t, err)
 	sourceChain.Commit()
 
@@ -608,7 +609,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	destChain.Commit()
 
 	// Create dest ge router
-	destRouterAddress, _, _, err := router.DeployRouter(destUser, destChain, []common.Address{}, common.Address{})
+	destRouterAddress, _, _, err := router.DeployRouter(destUser, destChain, common.Address{})
 	require.NoError(t, err)
 	destChain.Commit()
 	destRouter, err := router.NewRouter(destRouterAddress, destChain)
@@ -661,7 +662,8 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	// OffRamp can update
 	_, err = destFeeManager.SetFeeUpdater(destUser, geOffRampAddress)
 	require.NoError(t, err)
-	_, err = destRouter.AddOffRamp(destUser, geOffRampAddress)
+	_, err = destRouter.ApplyRampUpdates(destUser, nil, []router.IRouterOffRampUpdate{
+		{SourceChainId: sourceChainID, OffRamps: []common.Address{geOffRampAddress}}})
 	require.NoError(t, err)
 	_, err = geOffRamp.SetPrices(destUser, []common.Address{destLinkTokenAddress}, []*big.Int{big.NewInt(1)})
 	require.NoError(t, err)
@@ -723,7 +725,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	}
 }
 
-func SendRequest(t *testing.T, ccipContracts CCIPContracts, msg router.ConsumerEVM2AnyMessage) {
+func SendRequest(t *testing.T, ccipContracts CCIPContracts, msg router.ClientEVM2AnyMessage) {
 	tx, err := ccipContracts.Source.Router.CcipSend(ccipContracts.Source.User, ccipContracts.Dest.ChainID, msg)
 	require.NoError(t, err)
 	ConfirmTxs(t, []*types.Transaction{tx}, ccipContracts.Source.Chain)

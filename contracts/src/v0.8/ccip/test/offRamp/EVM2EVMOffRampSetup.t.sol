@@ -2,7 +2,7 @@
 pragma solidity 0.8.15;
 
 import {ICommitStore} from "../../interfaces/ICommitStore.sol";
-import {IAny2EVMMessageReceiver} from "../../interfaces/applications/IAny2EVMMessageReceiver.sol";
+import {IAny2EVMMessageReceiver} from "../../interfaces/router/IAny2EVMMessageReceiver.sol";
 import {IEVM2EVMOffRamp} from "../../interfaces/offRamp/IEVM2EVMOffRamp.sol";
 import {IFeeManager} from "../../interfaces/fees/IFeeManager.sol";
 import {IRouter} from "../../interfaces/router/IRouter.sol";
@@ -16,7 +16,7 @@ import {EVM2EVMOffRampHelper} from "../helpers/ramps/EVM2EVMOffRampHelper.sol";
 import "../TokenSetup.t.sol";
 import "../router/RouterSetup.t.sol";
 
-contract EVM2EVMOffRampSetup is TokenSetup, FeeManagerSetup, RouterSetup {
+contract EVM2EVMOffRampSetup is TokenSetup, FeeManagerSetup {
   ICommitStore internal s_mockCommitStore;
   IAny2EVMMessageReceiver internal s_receiver;
   IAny2EVMMessageReceiver internal s_secondary_receiver;
@@ -32,16 +32,15 @@ contract EVM2EVMOffRampSetup is TokenSetup, FeeManagerSetup, RouterSetup {
   );
   event SkippedIncorrectNonce(uint64 indexed nonce, address indexed sender);
 
-  function setUp() public virtual override(TokenSetup, FeeManagerSetup, RouterSetup) {
+  function setUp() public virtual override(TokenSetup, FeeManagerSetup) {
     TokenSetup.setUp();
     FeeManagerSetup.setUp();
-    RouterSetup.setUp();
 
     s_mockCommitStore = new MockCommitStore();
     s_receiver = new SimpleMessageReceiver();
     s_secondary_receiver = new SimpleMessageReceiver();
 
-    deployOffRamp(s_mockCommitStore, s_feeManager, s_destRouter);
+    deployOffRamp(s_mockCommitStore, s_destFeeManager, s_destRouter);
   }
 
   function deployOffRamp(
@@ -61,8 +60,13 @@ contract EVM2EVMOffRampSetup is TokenSetup, FeeManagerSetup, RouterSetup {
     );
 
     s_offRamp.setPrices(getCastedDestinationTokens(), getTokenPrices());
-    s_feeManager.setFeeUpdater(address(s_offRamp));
-    s_destRouter.addOffRamp(address(s_offRamp));
+    s_destFeeManager.setFeeUpdater(address(s_offRamp));
+    address[] memory s_offRamps = new address[](1);
+    s_offRamps[0] = address(s_offRamp);
+    IRouter.OnRampUpdate[] memory onRampUpdates = new IRouter.OnRampUpdate[](0);
+    IRouter.OffRampUpdate[] memory offRampUpdates = new IRouter.OffRampUpdate[](1);
+    offRampUpdates[0] = IRouter.OffRampUpdate({sourceChainId: SOURCE_CHAIN_ID, offRamps: s_offRamps});
+    s_destRouter.applyRampUpdates(onRampUpdates, offRampUpdates);
 
     LockReleaseTokenPool(address(s_destPools[0])).setOffRamp(address(s_offRamp), true);
     LockReleaseTokenPool(address(s_destPools[1])).setOffRamp(address(s_offRamp), true);
@@ -119,7 +123,6 @@ contract EVM2EVMOffRampSetup is TokenSetup, FeeManagerSetup, RouterSetup {
     bytes memory data = abi.encode(0);
     Internal.EVM2EVMMessage memory message = Internal.EVM2EVMMessage({
       sequenceNumber: sequenceNumber,
-      feeTokenAmount: EXECUTION_FEE_AMOUNT,
       sender: OWNER,
       nonce: sequenceNumber,
       gasLimit: GAS_LIMIT,
@@ -129,6 +132,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, FeeManagerSetup, RouterSetup {
       data: data,
       tokensAndAmounts: tokensAndAmounts,
       feeToken: tokensAndAmounts[0].token,
+      feeTokenAmount: uint256(0),
       messageId: ""
     });
     message.messageId = Internal._hash(
@@ -151,9 +155,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, FeeManagerSetup, RouterSetup {
     tokensAndAmounts[0].amount = 1e18;
     tokensAndAmounts[1].amount = 5e18;
     messages[0] = _generateAny2EVMMessage(1, tokensAndAmounts);
-    messages[0].feeTokenAmount = EXECUTION_FEE_AMOUNT;
     messages[1] = _generateAny2EVMMessage(2, tokensAndAmounts);
-    messages[1].feeTokenAmount = EXECUTION_FEE_AMOUNT;
     return messages;
   }
 

@@ -5,7 +5,7 @@ import {Common} from "../../models/Common.sol";
 
 /**
  * @notice Application contracts that intend to receive messages from
- * the OffRampRouter should implement this interface.
+ * the router should implement this interface.
  */
 interface IAny2EVMMessageReceiver {
   /**

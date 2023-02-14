@@ -280,7 +280,7 @@ func (ccipModule *CCIPCommon) DeployContracts(t *testing.T, noOfTokens int, dest
 		ccipModule.AFN = afn
 	}
 	if ccipModule.Router == nil {
-		ccipModule.Router, err = cd.DeployRouter([]common.Address{})
+		ccipModule.Router, err = cd.DeployRouter()
 		require.NoError(t, err, "Error on Router deployment on source chain")
 		require.NoError(t, ccipModule.ChainClient.WaitForEvents(), "Error waiting for common contract deployment")
 	} else {
@@ -542,7 +542,7 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 	require.NoError(t, err, "Failed encoding the options field")
 
 	// form the message for transfer
-	msg := router.ConsumerEVM2AnyMessage{
+	msg := router.ClientEVM2AnyMessage{
 		Receiver:         receiverAddr,
 		Data:             []byte(data),
 		TokensAndAmounts: tokenAndAmounts,
@@ -657,7 +657,7 @@ func (destCCIP *DestCCIPModule) DeployContracts(t *testing.T, sourceCCIP SourceC
 	err = destFeeManager.SetFeeUpdater(destCCIP.OffRamp.EthAddress)
 	require.NoError(t, err, "setting OffRamp as fee updater shouldn't fail")
 
-	_, err = destCCIP.Common.Router.AddOffRamp(destCCIP.OffRamp.EthAddress)
+	_, err = destCCIP.Common.Router.AddOffRamp(destCCIP.OffRamp.EthAddress, destCCIP.SourceChainId)
 	require.NoError(t, err, "setting OffRamp as fee updater shouldn't fail")
 	err = destCCIP.Common.ChainClient.WaitForEvents()
 	require.NoError(t, err, "Error waiting for events on destination contract deployments")

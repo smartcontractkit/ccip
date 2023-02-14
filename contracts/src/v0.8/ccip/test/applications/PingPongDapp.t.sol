@@ -39,12 +39,12 @@ contract PingPong_startPingPong is PingPongDappSetup {
     uint256 pingPongNumber = 1;
     bytes memory data = abi.encode(pingPongNumber);
 
-    Consumer.EVM2AnyMessage memory sentMessage = Consumer.EVM2AnyMessage({
+    Client.EVM2AnyMessage memory sentMessage = Client.EVM2AnyMessage({
       receiver: abi.encode(i_pongContract),
       data: data,
       tokensAndAmounts: new Common.EVMTokenAndAmount[](0),
       feeToken: s_sourceFeeToken,
-      extraArgs: Consumer._argsToBytes(Consumer.EVMExtraArgsV1({gasLimit: 2e5, strict: false}))
+      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 2e5, strict: false}))
     });
 
     uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_ID, sentMessage);

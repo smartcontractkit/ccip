@@ -117,7 +117,7 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	require.NoError(t, err)
 	destChain.Commit()
 
-	routerAddress, _, router, err := router.DeployRouter(destUser, destChain, []common.Address{}, common.Address{})
+	routerAddress, _, routerContract, err := router.DeployRouter(destUser, destChain, common.Address{})
 	require.NoError(t, err)
 	destChain.Commit()
 	offRampAddress, _, _, err := evm_2_evm_offramp.DeployEVM2EVMOffRamp(
@@ -154,7 +154,8 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	receiver, err := simple_message_receiver.NewSimpleMessageReceiver(receiverAddress, destChain)
 	require.NoError(t, err)
 	destChain.Commit()
-	_, err = router.AddOffRamp(destUser, offRampAddress)
+	_, err = routerContract.ApplyRampUpdates(destUser, nil, []router.IRouterOffRampUpdate{
+		{SourceChainId: sourceChainID, OffRamps: []common.Address{offRampAddress}}})
 	require.NoError(t, err)
 	destChain.Commit()
 

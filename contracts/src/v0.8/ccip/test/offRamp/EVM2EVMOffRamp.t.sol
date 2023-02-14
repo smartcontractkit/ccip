@@ -42,7 +42,11 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
     IPool[] memory pools = new IPool[](1);
 
     IERC20[] memory wrongTokens = new IERC20[](5);
-    IEVM2EVMOffRamp.OffRampConfig memory offRampConfig = offRampConfig(s_feeManager, s_mockCommitStore, s_destRouter);
+    IEVM2EVMOffRamp.OffRampConfig memory offRampConfig = offRampConfig(
+      s_sourceFeeManager,
+      s_mockCommitStore,
+      s_destRouter
+    );
     s_offRamp = new EVM2EVMOffRampHelper(
       SOURCE_CHAIN_ID,
       DEST_CHAIN_ID,
@@ -68,7 +72,11 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
       admin: TOKEN_LIMIT_ADMIN
     });
 
-    IEVM2EVMOffRamp.OffRampConfig memory offRampConfig = offRampConfig(s_feeManager, s_mockCommitStore, s_destRouter);
+    IEVM2EVMOffRamp.OffRampConfig memory offRampConfig = offRampConfig(
+      s_sourceFeeManager,
+      s_mockCommitStore,
+      s_destRouter
+    );
     s_offRamp = new EVM2EVMOffRampHelper(
       SOURCE_CHAIN_ID,
       DEST_CHAIN_ID,

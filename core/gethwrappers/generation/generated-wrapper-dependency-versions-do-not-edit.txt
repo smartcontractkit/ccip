@@ -17,7 +17,7 @@ custom_token_pool: ../../contracts/solc/v0.8.15/CustomTokenPool.abi ../../contra
 derived_price_feed_wrapper: ../../contracts/solc/v0.8.6/DerivedPriceFeed.abi ../../contracts/solc/v0.8.6/DerivedPriceFeed.bin c8542e6c850c2d0fffb79a7f7213dc927ec64e6ddd54e1224cb2fb4a13aabdd0
 evm_2_evm_offramp: ../../contracts/solc/v0.8.15/EVM2EVMOffRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMOffRamp.bin 07f5f552414074f8cd543ae5690d30f0257af1f38d1ee78f76aefda755a41e6c
 evm_2_evm_offramp_helper: ../../contracts/solc/v0.8.15/EVM2EVMOffRampHelper.abi ../../contracts/solc/v0.8.15/EVM2EVMOffRampHelper.bin cd94d188ebcf7345bb01cb91a9bc813ff8ab9101bcc8523c0d8423061ef48e03
-evm_2_evm_onramp: ../../contracts/solc/v0.8.15/EVM2EVMOnRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMOnRamp.bin 0972eecfe9aaf8009935d250ff5b7ca5c6d6e65053fc76670bdcfee2f08b7a38
+evm_2_evm_onramp: ../../contracts/solc/v0.8.15/EVM2EVMOnRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMOnRamp.bin 42854c303c8f2fcc81b3a67085f005c3b2dc63a9e61ac9f66cfd52dba26d9ef1
 fee_manager: ../../contracts/solc/v0.8.15/FeeManager.abi ../../contracts/solc/v0.8.15/FeeManager.bin b9d0a6de21ff4cc6bd397cf0ae8032ce8de103fcaf5aec74ea33edc709eac0f9
 flags_wrapper: ../../contracts/solc/v0.6/Flags.abi ../../contracts/solc/v0.6/Flags.bin 2034d1b562ca37a63068851915e3703980276e8d5f7db6db8a3351a49d69fc4a
 flux_aggregator_wrapper: ../../contracts/solc/v0.6/FluxAggregator.abi ../../contracts/solc/v0.6/FluxAggregator.bin a3b0a6396c4aa3b5ee39b3c4bd45efc89789d4859379a8a92caca3a0496c5794
@@ -47,7 +47,7 @@ operator_wrapper: ../../contracts/solc/v0.7/Operator.abi ../../contracts/solc/v0
 oracle_wrapper: ../../contracts/solc/v0.6/Oracle.abi ../../contracts/solc/v0.6/Oracle.bin 7af2fbac22a6e8c2847e8e685a5400cac5101d72ddf5365213beb79e4dede43a
 ping_pong_demo: ../../contracts/solc/v0.8.15/PingPongDemo.abi ../../contracts/solc/v0.8.15/PingPongDemo.bin dc4a8da3d52a0172d8cc218d132fdcbd2da8f8622d434a1c1bec18b5ae1226f6
 receiver_dapp: ../../contracts/solc/v0.8.15/ReceiverDapp.abi ../../contracts/solc/v0.8.15/ReceiverDapp.bin ab4e6255004b4d9715062a5bf80eafdaa7f8110196a9dd89d9140964c45d0482
-router: ../../contracts/solc/v0.8.15/Router.abi ../../contracts/solc/v0.8.15/Router.bin 15172a55fad5c8eafec084dce9aa77639c0aaaef770c4a2a98a6d5360e990d39
+router: ../../contracts/solc/v0.8.15/Router.abi ../../contracts/solc/v0.8.15/Router.bin 5244e183407a6356e972e86d1e27db359a3465667ebd49b191245d9392e754fc
 simple_message_receiver: ../../contracts/solc/v0.8.15/SimpleMessageReceiver.abi ../../contracts/solc/v0.8.15/SimpleMessageReceiver.bin 1db7d19b05591cc2210b7743cc43353e22101432aa7441b7ae2c26f4f1cad455
 solidity_vrf_consumer_interface: ../../contracts/solc/v0.6/VRFConsumer.abi ../../contracts/solc/v0.6/VRFConsumer.bin a79da241ca9525f6a96adc5f55651b1f91e1579b85fec7b02a51d06bd6018ee3
 solidity_vrf_consumer_interface_v08: ../../contracts/solc/v0.8.6/VRFConsumer.abi ../../contracts/solc/v0.8.6/VRFConsumer.bin b14f9136b15e3dc9d6154d5700f3ed4cf88ddc4f70f20c3bb57fc46050904c8f

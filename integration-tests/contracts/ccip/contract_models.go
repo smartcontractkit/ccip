@@ -306,72 +306,74 @@ type Router struct {
 	EthAddress common.Address
 }
 
-func (router *Router) Copy() *Router {
-	r := *router.Instance
+func (r *Router) Copy() *Router {
+	ri := *r.Instance
 	return &Router{
-		client:     router.client,
-		Instance:   &r,
-		EthAddress: router.EthAddress,
+		client:     r.client,
+		Instance:   &ri,
+		EthAddress: r.EthAddress,
 	}
 }
 
-func (router *Router) Address() string {
-	return router.EthAddress.Hex()
+func (r *Router) Address() string {
+	return r.EthAddress.Hex()
 }
 
-func (router *Router) SetOnRamp(chainID uint64, onRamp common.Address) error {
-	opts, err := router.client.TransactionOpts(router.client.GetDefaultWallet())
+func (r *Router) SetOnRamp(chainID uint64, onRamp common.Address) error {
+	opts, err := r.client.TransactionOpts(r.client.GetDefaultWallet())
 	if err != nil {
 		return err
 	}
 	log.Info().
-		Str("Router", router.Address()).
-		Msg("Setting on ramp for router")
-	tx, err := router.Instance.SetOnRamp(opts, chainID, onRamp)
+		Str("Router", r.Address()).
+		Msg("Setting on ramp for r")
+
+	tx, err := r.Instance.ApplyRampUpdates(opts, []router.IRouterOnRampUpdate{{DestChainId: chainID, OnRamp: onRamp}}, nil)
 	if err != nil {
 		return err
 	}
 	log.Info().
 		Str("onRamp", onRamp.Hex()).
-		Str("Network Name", router.client.GetNetworkConfig().Name).
+		Str("Network Name", r.client.GetNetworkConfig().Name).
 		Msg("Router is configured")
-	return router.client.ProcessTransaction(tx)
+	return r.client.ProcessTransaction(tx)
 }
 
-func (router *Router) CCIPSend(destChainId uint64, msg router.ConsumerEVM2AnyMessage) (*types.Transaction, error) {
-	opts, err := router.client.TransactionOpts(router.client.GetDefaultWallet())
+func (r *Router) CCIPSend(destChainId uint64, msg router.ClientEVM2AnyMessage) (*types.Transaction, error) {
+	opts, err := r.client.TransactionOpts(r.client.GetDefaultWallet())
 	if err != nil {
 		return nil, err
 	}
-	tx, err := router.Instance.CcipSend(opts, destChainId, msg)
+	tx, err := r.Instance.CcipSend(opts, destChainId, msg)
 	if err != nil {
 		return nil, err
 	}
 	log.Info().
-		Str("router", router.Address()).
-		Str("Network Name", router.client.GetNetworkConfig().Name).
+		Str("r", r.Address()).
+		Str("Network Name", r.client.GetNetworkConfig().Name).
 		Msg("msg is sent")
-	return tx, router.client.ProcessTransaction(tx)
+	return tx, r.client.ProcessTransaction(tx)
 }
 
-func (router *Router) AddOffRamp(offRamp common.Address) (*types.Transaction, error) {
-	opts, err := router.client.TransactionOpts(router.client.GetDefaultWallet())
+func (r *Router) AddOffRamp(offRamp common.Address, sourceChainId uint64) (*types.Transaction, error) {
+	opts, err := r.client.TransactionOpts(r.client.GetDefaultWallet())
 	if err != nil {
 		return nil, err
 	}
-	tx, err := router.Instance.AddOffRamp(opts, offRamp)
+	tx, err := r.Instance.ApplyRampUpdates(opts, nil, []router.IRouterOffRampUpdate{
+		{SourceChainId: sourceChainId, OffRamps: []common.Address{offRamp}}})
 	if err != nil {
 		return nil, err
 	}
 	log.Info().
 		Str("offRamp", offRamp.Hex()).
-		Str("Network Name", router.client.GetNetworkConfig().Name).
+		Str("Network Name", r.client.GetNetworkConfig().Name).
 		Msg("offRamp is added to Router")
-	return tx, router.client.ProcessTransaction(tx)
+	return tx, r.client.ProcessTransaction(tx)
 }
 
-func (router *Router) GetFee(destinationChainId uint64, message router.ConsumerEVM2AnyMessage) (*big.Int, error) {
-	return router.Instance.GetFee(nil, destinationChainId, message)
+func (r *Router) GetFee(destinationChainId uint64, message router.ClientEVM2AnyMessage) (*big.Int, error) {
+	return r.Instance.GetFee(nil, destinationChainId, message)
 }
 
 type OnRamp struct {

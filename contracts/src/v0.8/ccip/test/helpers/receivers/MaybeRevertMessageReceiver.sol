@@ -1,7 +1,7 @@
 pragma solidity 0.8.15;
 
 import "../../../../vendor/IERC165.sol";
-import "../../../interfaces/applications/IAny2EVMMessageReceiver.sol";
+import "../../../interfaces/router/IAny2EVMMessageReceiver.sol";
 
 contract MaybeRevertMessageReceiver is IAny2EVMMessageReceiver, IERC165 {
   address private s_manager;

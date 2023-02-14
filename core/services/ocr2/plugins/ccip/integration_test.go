@@ -84,7 +84,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		})
 		require.NoError(t, err)
 
-		msg := router.ConsumerEVM2AnyMessage{
+		msg := router.ClientEVM2AnyMessage{
 			Receiver: testhelpers.MustEncodeAddress(t, ccipContracts.Dest.Receivers[0].Receiver.Address()),
 			Data:     []byte("hello"),
 			TokensAndAmounts: []router.CommonEVMTokenAndAmount{
@@ -183,7 +183,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 			txGasLimit := new(big.Int).Mul(gasLimit, big.NewInt(int64(i+1)))
 			extraArgs, err := testhelpers.GetEVMExtraArgsV1(txGasLimit, false)
 			require.NoError(t, err)
-			msg := router.ConsumerEVM2AnyMessage{
+			msg := router.ClientEVM2AnyMessage{
 				Receiver: testhelpers.MustEncodeAddress(t, ccipContracts.Dest.Receivers[0].Receiver.Address()),
 				Data:     []byte("hello"),
 				TokensAndAmounts: []router.CommonEVMTokenAndAmount{
@@ -240,7 +240,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		totalMsgs := 2
 		extraArgs, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(200_000), true)
 		require.NoError(t, err)
-		msg := router.ConsumerEVM2AnyMessage{
+		msg := router.ClientEVM2AnyMessage{
 			Receiver:         testhelpers.MustEncodeAddress(t, ccipContracts.Dest.Receivers[1].Receiver.Address()),
 			Data:             []byte("hello"),
 			TokensAndAmounts: []router.CommonEVMTokenAndAmount{},

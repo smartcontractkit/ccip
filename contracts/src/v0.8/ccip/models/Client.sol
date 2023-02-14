@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import {Common} from "./Common.sol";
 
 // End consumer library.
-library Consumer {
+library Client {
   struct EVM2AnyMessage {
     bytes receiver;
     bytes data;

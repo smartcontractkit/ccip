@@ -332,7 +332,7 @@ func (client *CCIPClient) SendMessage(t *testing.T) {
 	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(3e5), false)
 	require.NoError(t, err)
 
-	msg := router.ConsumerEVM2AnyMessage{
+	msg := router.ClientEVM2AnyMessage{
 		Receiver:         testhelpers.MustEncodeAddress(t, client.Dest.MessageReceiver.Address()),
 		Data:             bts,
 		TokensAndAmounts: []router.CommonEVMTokenAndAmount{token},
@@ -554,7 +554,7 @@ func (client *CCIPClient) SendCrossChainMessage(t *testing.T, source SourceClien
 	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(100_000), false)
 	helpers.PanicErr(err)
 
-	tx, err := source.Router.CcipSend(from, client.Dest.ChainId, router.ConsumerEVM2AnyMessage{
+	tx, err := source.Router.CcipSend(from, client.Dest.ChainId, router.ClientEVM2AnyMessage{
 		Receiver:         toAddress.Bytes(),
 		Data:             nil,
 		TokensAndAmounts: []router.CommonEVMTokenAndAmount{token},
@@ -724,7 +724,7 @@ func (client *CCIPClient) SendToOnrampWithExecution(t *testing.T, source SourceC
 	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(3e5), false)
 	helpers.PanicErr(err)
 
-	payload := router.ConsumerEVM2AnyMessage{
+	payload := router.ClientEVM2AnyMessage{
 		TokensAndAmounts: []router.CommonEVMTokenAndAmount{},
 		Receiver:         testhelpers.MustEncodeAddress(t, toAddress),
 		Data:             senderAndReceiver,

@@ -46,7 +46,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
   // Success
 
   function testForwardFromRouterSuccess() public {
-    Consumer.EVM2AnyMessage memory message = _generateEmptyMessage();
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 
     uint256 feeAmount = 1234567890;
     IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
@@ -58,7 +58,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
   }
 
   function testShouldIncrementSeqNumAndNonceSuccess() public {
-    Consumer.EVM2AnyMessage memory message = _generateEmptyMessage();
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 
     for (uint64 i = 1; i < 4; i++) {
       uint64 nonceBefore = s_onRamp.getSenderNonce(OWNER);
@@ -76,13 +76,13 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
   event Transfer(address indexed from, address indexed to, uint256 value);
 
   function testShouldSendFeesToTheFeeManager() public {
-    Consumer.EVM2AnyMessage memory message = _generateEmptyMessage();
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 
     uint256 feeAmount = 1234567890;
     IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
 
     vm.expectEmit(true, true, true, true);
-    emit Transfer(address(s_onRamp), address(s_IFeeManager), feeAmount);
+    emit Transfer(address(s_onRamp), address(s_sourceFeeManager), feeAmount);
 
     s_onRamp.forwardFromRouter(message, feeAmount, OWNER);
   }
@@ -114,7 +114,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
   }
 
   function testMessageTooLargeReverts() public {
-    Consumer.EVM2AnyMessage memory message = _generateEmptyMessage();
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.data = new bytes(onRampConfig().maxDataSize + 1);
     vm.expectRevert(
       abi.encodeWithSelector(IEVM2EVMOnRamp.MessageTooLarge.selector, onRampConfig().maxDataSize, message.data.length)
@@ -125,7 +125,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
 
   function testTooManyTokensReverts() public {
     assertEq(MAX_TOKENS_LENGTH, s_onRamp.getOnRampConfig().maxTokensLength);
-    Consumer.EVM2AnyMessage memory message = _generateEmptyMessage();
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     uint256 tooMany = MAX_TOKENS_LENGTH + 1;
     message.tokensAndAmounts = new Common.EVMTokenAndAmount[](tooMany);
     vm.expectRevert(IEVM2EVMOnRamp.UnsupportedNumberOfTokens.selector);
@@ -144,7 +144,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
   function testUnsupportedTokenReverts() public {
     address wrongToken = address(1);
 
-    Consumer.EVM2AnyMessage memory message = _generateEmptyMessage();
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.tokensAndAmounts = new Common.EVMTokenAndAmount[](1);
     message.tokensAndAmounts[0].token = wrongToken;
     message.tokensAndAmounts[0].amount = 1;
@@ -164,7 +164,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
   }
 
   function testValueExceedsCapacityReverts() public {
-    Consumer.EVM2AnyMessage memory message = _generateEmptyMessage();
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.tokensAndAmounts = new Common.EVMTokenAndAmount[](1);
     message.tokensAndAmounts[0].amount = 2**128;
     message.tokensAndAmounts[0].token = s_sourceTokens[0];
@@ -183,7 +183,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
   }
 
   function testPriceNotFoundForTokenReverts() public {
-    Consumer.EVM2AnyMessage memory message = _generateEmptyMessage();
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 
     address fakeToken = address(1);
     message.tokensAndAmounts = new Common.EVMTokenAndAmount[](1);
@@ -196,8 +196,8 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
 
   // Asserts gasLimit must be <=maxGasLimit
   function testMessageGasLimitTooHighReverts() public {
-    Consumer.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.extraArgs = Consumer._argsToBytes(Consumer.EVMExtraArgsV1({gasLimit: MAX_GAS_LIMIT + 1, strict: false}));
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: MAX_GAS_LIMIT + 1, strict: false}));
     vm.expectRevert(abi.encodeWithSelector(IEVM2EVMOnRamp.MessageGasLimitTooHigh.selector));
     s_onRamp.forwardFromRouter(message, 0, OWNER);
   }

@@ -24,7 +24,7 @@ func upgradeOnRamp(t *testing.T, sourceClient *EvmDeploymentConfig, destClient *
 func upgradeOffRamp(t *testing.T, sourceClient *EvmDeploymentConfig, destClient *EvmDeploymentConfig) {
 	destClient.Logger.Infof("Upgrading offRamp")
 	deployOffRamp(t, destClient, sourceClient.ChainConfig.ChainId, sourceClient.ChainConfig.SupportedTokens, sourceClient.LaneConfig.OnRamp)
-	setOffRampOnRouter(t, destClient)
+	setOffRampOnRouter(t, sourceClient.ChainConfig.ChainId, destClient)
 	setOffRampOnTokenPools(t, destClient)
 
 	destClient.Logger.Info("Please deploy new execution jobs")

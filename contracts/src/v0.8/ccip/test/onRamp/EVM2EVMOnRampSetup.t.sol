@@ -3,17 +3,19 @@ pragma solidity 0.8.15;
 
 import {IFeeManager} from "../../interfaces/fees/IFeeManager.sol";
 import {IEVM2EVMOnRamp} from "../../interfaces/onRamp/IEVM2EVMOnRamp.sol";
+import {IRouter} from "../../interfaces/router/IRouter.sol";
 
 import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
 import {FeeManager} from "../../fees/FeeManager.sol";
 import {Router} from "../../router/Router.sol";
 import {RouterSetup} from "../router/RouterSetup.t.sol";
 import {Internal} from "../../models/Internal.sol";
-import {Consumer} from "../../models/Consumer.sol";
+import {Client} from "../../models/Client.sol";
 import "../../offRamp/EVM2EVMOffRamp.sol";
 import "../TokenSetup.t.sol";
+import "../fees/FeeManager.t.sol";
 
-contract EVM2EVMOnRampSetup is TokenSetup, RouterSetup {
+contract EVM2EVMOnRampSetup is TokenSetup, FeeManagerSetup {
   // Duplicate event of the CCIPSendRequested in the IOnRamp
   event CCIPSendRequested(Internal.EVM2EVMMessage message);
 
@@ -26,25 +28,10 @@ contract EVM2EVMOnRampSetup is TokenSetup, RouterSetup {
 
   EVM2EVMOnRamp internal s_onRamp;
   address[] s_offRamps;
-  // Naming chosen to not collide with s_feeManager in the offRampSetup since both
-  // are imported into the e2e test.
-  IFeeManager internal s_IFeeManager;
 
-  function setUp() public virtual override(TokenSetup, RouterSetup) {
+  function setUp() public virtual override(TokenSetup, FeeManagerSetup) {
     TokenSetup.setUp();
-    RouterSetup.setUp();
-
-    Internal.FeeUpdate[] memory feeUpdates = new Internal.FeeUpdate[](2);
-    feeUpdates[0] = Internal.FeeUpdate({
-      sourceFeeToken: s_sourceTokens[0],
-      destChainId: DEST_CHAIN_ID,
-      feeTokenBaseUnitsPerUnitGas: 100
-    });
-    feeUpdates[1] = Internal.FeeUpdate({
-      sourceFeeToken: s_sourceRouter.getWrappedNative(),
-      destChainId: DEST_CHAIN_ID,
-      feeTokenBaseUnitsPerUnitGas: 101
-    });
+    FeeManagerSetup.setUp();
 
     IEVM2EVMOnRamp.FeeTokenConfigArgs[] memory feeTokenConfigArgs = new IEVM2EVMOnRamp.FeeTokenConfigArgs[](2);
     feeTokenConfigArgs[0] = IEVM2EVMOnRamp.FeeTokenConfigArgs({
@@ -59,9 +46,6 @@ contract EVM2EVMOnRampSetup is TokenSetup, RouterSetup {
       multiplier: 108e16,
       destGasOverhead: 2
     });
-    address[] memory feeUpdaters = new address[](0);
-    s_IFeeManager = new FeeManager(feeUpdates, feeUpdaters, TWELVE_HOURS);
-
     s_onRamp = new EVM2EVMOnRamp(
       SOURCE_CHAIN_ID,
       DEST_CHAIN_ID,
@@ -72,7 +56,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, RouterSetup {
       onRampConfig(),
       rateLimiterConfig(),
       address(s_sourceRouter),
-      address(s_IFeeManager),
+      address(s_sourceFeeManager),
       feeTokenConfigArgs
     );
 
@@ -85,13 +69,14 @@ contract EVM2EVMOnRampSetup is TokenSetup, RouterSetup {
     LockReleaseTokenPool(address(s_sourcePools[0])).setOnRamp(address(s_onRamp), true);
     LockReleaseTokenPool(address(s_sourcePools[1])).setOnRamp(address(s_onRamp), true);
 
-    s_sourceRouter.setOnRamp(DEST_CHAIN_ID, s_onRamp);
-
     s_offRamps = new address[](2);
     s_offRamps[0] = address(10);
     s_offRamps[1] = address(11);
-    s_sourceRouter.addOffRamp(s_offRamps[0]);
-    s_sourceRouter.addOffRamp(s_offRamps[1]);
+    IRouter.OnRampUpdate[] memory onRampUpdates = new IRouter.OnRampUpdate[](1);
+    IRouter.OffRampUpdate[] memory offRampUpdates = new IRouter.OffRampUpdate[](1);
+    onRampUpdates[0] = IRouter.OnRampUpdate({destChainId: DEST_CHAIN_ID, onRamp: address(s_onRamp)});
+    offRampUpdates[0] = IRouter.OffRampUpdate({sourceChainId: SOURCE_CHAIN_ID, offRamps: s_offRamps});
+    s_sourceRouter.applyRampUpdates(onRampUpdates, offRampUpdates);
 
     // Pre approve the first token so the gas estimates of the tests
     // only cover actual gas usage from the ramps
@@ -104,33 +89,33 @@ contract EVM2EVMOnRampSetup is TokenSetup, RouterSetup {
     assertEq(a.maxGasLimit, b.maxGasLimit);
   }
 
-  function _generateTokenMessage() public view returns (Consumer.EVM2AnyMessage memory) {
+  function _generateTokenMessage() public view returns (Client.EVM2AnyMessage memory) {
     Common.EVMTokenAndAmount[] memory tokensAndAmounts = getCastedSourceEVMTokenAndAmountsWithZeroAmounts();
     tokensAndAmounts[0].amount = i_tokenAmount0;
     tokensAndAmounts[1].amount = i_tokenAmount1;
     return
-      Consumer.EVM2AnyMessage({
+      Client.EVM2AnyMessage({
         receiver: abi.encode(OWNER),
         data: "",
         tokensAndAmounts: tokensAndAmounts,
         feeToken: s_sourceFeeToken,
-        extraArgs: Consumer._argsToBytes(Consumer.EVMExtraArgsV1({gasLimit: GAS_LIMIT, strict: false}))
+        extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT, strict: false}))
       });
   }
 
-  function _generateEmptyMessage() public view returns (Consumer.EVM2AnyMessage memory) {
+  function _generateEmptyMessage() public view returns (Client.EVM2AnyMessage memory) {
     return
-      Consumer.EVM2AnyMessage({
+      Client.EVM2AnyMessage({
         receiver: abi.encode(OWNER),
         data: "",
         tokensAndAmounts: new Common.EVMTokenAndAmount[](0),
         feeToken: s_sourceFeeToken,
-        extraArgs: Consumer._argsToBytes(Consumer.EVMExtraArgsV1({gasLimit: GAS_LIMIT, strict: false}))
+        extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT, strict: false}))
       });
   }
 
   function _messageToEvent(
-    Consumer.EVM2AnyMessage memory message,
+    Client.EVM2AnyMessage memory message,
     uint64 seqNum,
     uint64 nonce,
     uint256 feeTokenAmount

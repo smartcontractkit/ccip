@@ -61,7 +61,7 @@ type CCIPE2ELoad struct {
 	callStats             map[int64]map[phase]StatParams // keeps track of various phase related metrics
 	seqNumCommittedMu     *sync.Mutex
 	seqNumCommitted       map[uint64]uint64 // key : seqNumber in the ReportAccepted event, value : blocknumber for corresponding event
-	msg                   router.ConsumerEVM2AnyMessage
+	msg                   router.ClientEVM2AnyMessage
 }
 
 type StatParams struct {
@@ -166,7 +166,7 @@ func (c *CCIPE2ELoad) BeforeAllCall() {
 
 	receiver, err := utils.ABIEncode(`[{"type":"address"}]`, destCCIP.ReceiverDapp.EthAddress)
 	require.NoError(c.t, err, "Failed encoding the receiver address")
-	c.msg = router.ConsumerEVM2AnyMessage{
+	c.msg = router.ClientEVM2AnyMessage{
 		Receiver:  receiver,
 		ExtraArgs: extraArgsV1,
 		FeeToken:  common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),

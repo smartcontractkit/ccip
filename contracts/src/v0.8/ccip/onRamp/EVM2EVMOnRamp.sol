@@ -13,7 +13,7 @@ import {HealthChecker} from "../health/HealthChecker.sol";
 import {AllowList} from "../access/AllowList.sol";
 import {AggregateRateLimiter} from "../rateLimiter/AggregateRateLimiter.sol";
 import {Common} from "../models/Common.sol";
-import {Consumer} from "../models/Consumer.sol";
+import {Client} from "../models/Client.sol";
 import {Internal} from "../models/Internal.sol";
 
 import {SafeERC20} from "../../vendor/SafeERC20.sol";
@@ -104,13 +104,13 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AllowList, AggregateRat
     revert UnsupportedToken(sourceToken);
   }
 
-  function _fromBytes(bytes calldata extraArgs) internal pure returns (Consumer.EVMExtraArgsV1 memory) {
+  function _fromBytes(bytes calldata extraArgs) internal pure returns (Client.EVMExtraArgsV1 memory) {
     if (extraArgs.length == 0) {
-      return Consumer.EVMExtraArgsV1({gasLimit: EVM_DEFAULT_GAS_LIMIT, strict: false});
+      return Client.EVMExtraArgsV1({gasLimit: EVM_DEFAULT_GAS_LIMIT, strict: false});
     }
-    if (bytes4(extraArgs[:4]) != Consumer.EVM_EXTRA_ARGS_V1_TAG)
-      revert InvalidExtraArgsTag(Consumer.EVM_EXTRA_ARGS_V1_TAG, bytes4(extraArgs[:4]));
-    return Consumer.EVMExtraArgsV1({gasLimit: abi.decode(extraArgs[4:36], (uint256)), strict: false});
+    if (bytes4(extraArgs[:4]) != Client.EVM_EXTRA_ARGS_V1_TAG)
+      revert InvalidExtraArgsTag(Client.EVM_EXTRA_ARGS_V1_TAG, bytes4(extraArgs[:4]));
+    return Client.EVMExtraArgsV1({gasLimit: abi.decode(extraArgs[4:36], (uint256)), strict: false});
   }
 
   /// @notice Validate the forwarded message with various checks.
@@ -137,11 +137,11 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AllowList, AggregateRat
 
   /// @inheritdoc  IEVM2AnyOnRamp
   function forwardFromRouter(
-    Consumer.EVM2AnyMessage calldata message,
+    Client.EVM2AnyMessage calldata message,
     uint256 feeTokenAmount,
     address originalSender
   ) external override whenNotPaused whenHealthy returns (bytes32) {
-    Consumer.EVMExtraArgsV1 memory extraArgs = _fromBytes(message.extraArgs);
+    Client.EVMExtraArgsV1 memory extraArgs = _fromBytes(message.extraArgs);
     // Validate the message with various checks
     _validateMessage(message.data.length, extraArgs.gasLimit, message.tokensAndAmounts, originalSender);
 
@@ -176,7 +176,7 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AllowList, AggregateRat
   }
 
   /// @inheritdoc IEVM2AnyOnRamp
-  function getFee(Consumer.EVM2AnyMessage calldata message) public view override returns (uint256 fee) {
+  function getFee(Client.EVM2AnyMessage calldata message) public view override returns (uint256 fee) {
     uint256 gasLimit = _fromBytes(message.extraArgs).gasLimit;
     uint256 feeTokenBaseUnitsPerUnitGas = IFeeManager(s_feeManager).getFeeTokenBaseUnitsPerUnitGas(
       message.feeToken,

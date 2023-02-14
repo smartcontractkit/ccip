@@ -79,7 +79,7 @@ func deployRouter(t *testing.T, client *EvmDeploymentConfig) {
 	}
 
 	client.Logger.Infof("Deploying Router")
-	routerAddress, tx, _, err := router.DeployRouter(client.Owner, client.Client, []common.Address{}, common.HexToAddress("0x0"))
+	routerAddress, tx, _, err := router.DeployRouter(client.Owner, client.Client, common.HexToAddress("0x0"))
 	shared.RequireNoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 	client.ChainConfig.Router = routerAddress

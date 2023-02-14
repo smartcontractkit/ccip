@@ -15,7 +15,7 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
     CommitStoreSetup.setUp();
     EVM2EVMOffRampSetup.setUp();
 
-    deployOffRamp(s_commitStore, s_feeManager, s_destRouter);
+    deployOffRamp(s_commitStore, s_sourceFeeManager, s_destRouter);
     s_merkleHelper = new MerkleHelper();
   }
 
@@ -88,7 +88,7 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
   }
 
   function sendRequest(uint64 expectedSeqNum) public returns (Internal.EVM2EVMMessage memory) {
-    Consumer.EVM2AnyMessage memory message = _generateTokenMessage();
+    Client.EVM2AnyMessage memory message = _generateTokenMessage();
     uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_ID, message);
 
     IERC20(s_sourceTokens[0]).approve(address(s_sourceRouter), i_tokenAmount0 + expectedFee);
