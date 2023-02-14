@@ -151,7 +151,7 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AllowList, AggregateRat
     for (uint256 i = 0; i < message.tokensAndAmounts.length; ++i) {
       Common.EVMTokenAndAmount memory tokenAndAmount = message.tokensAndAmounts[i];
       IPool pool = _getPoolBySourceToken(IERC20(tokenAndAmount.token));
-      pool.lockOrBurn(tokenAndAmount.amount);
+      pool.lockOrBurn(tokenAndAmount.amount, originalSender);
     }
 
     // Emit message request

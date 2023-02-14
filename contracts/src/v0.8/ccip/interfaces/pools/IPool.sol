@@ -18,7 +18,7 @@ interface IPool {
    * @notice Lock or burn the token in the pool
    * @param amount Amount to lock or burn
    */
-  function lockOrBurn(uint256 amount) external;
+  function lockOrBurn(uint256 amount, address originalSender) external;
 
   /**
    * @notice Release or mint tokens from the pool to the recipient

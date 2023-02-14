@@ -10,7 +10,7 @@ contract TokenPoolHelper is TokenPool {
 
   constructor(IERC20 token) TokenPool(token) {}
 
-  function lockOrBurn(uint256 amount) external override {
+  function lockOrBurn(uint256 amount, address) external override {
     emit LockOrBurn(amount);
   }
 

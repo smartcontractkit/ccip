@@ -127,7 +127,7 @@ func (pool *LockReleaseTokenPool) LockOrBurnToken(linkToken contracts.LinkToken,
 	log.Info().
 		Str("Token Pool", pool.Address()).
 		Msg("Initiating locking Tokens in pool")
-	tx, err := pool.instance.LockOrBurn(opts, amount)
+	tx, err := pool.instance.LockOrBurn(opts, amount, opts.From)
 	if err != nil {
 		return err
 	}

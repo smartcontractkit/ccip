@@ -121,15 +121,16 @@ func (c *CCIPContracts) DeployNewOffRamp() {
 		c.Dest.Chain,
 		c.Source.ChainID,
 		c.Dest.ChainID,
+		c.Source.OnRamp.Address(),
 		evm_2_evm_offramp.IEVM2EVMOffRampOffRampConfig{
 			FeeManager:                              c.Dest.FeeManager.Address(),
 			PermissionLessExecutionThresholdSeconds: 1,
 			ExecutionDelaySeconds:                   0,
+			Router:                                  c.Dest.Router.Address(),
 			MaxDataSize:                             1e5,
 			MaxTokensLength:                         5,
+			CommitStore:                             c.Dest.CommitStore.Address(),
 		},
-		c.Source.OnRamp.Address(),
-		c.Dest.CommitStore.Address(),
 		c.Dest.AFN.Address(),
 		[]common.Address{c.Source.LinkToken.Address()},
 		[]common.Address{c.Dest.Pool.Address()},
@@ -153,14 +154,6 @@ func (c *CCIPContracts) DeployNewOffRamp() {
 
 func (c *CCIPContracts) EnableOffRamp() {
 	_, err := c.Dest.Pool.SetOffRamp(c.Dest.User, c.Dest.OffRamp.Address(), true)
-	require.NoError(c.t, err)
-	c.Dest.Chain.Commit()
-
-	_, err = c.Dest.OffRamp.SetRouter(c.Dest.User, c.Dest.Router.Address())
-	require.NoError(c.t, err)
-	c.Dest.Chain.Commit()
-
-	_, err = c.Dest.OffRamp.SetCommitStore(c.Dest.User, c.Dest.CommitStore.Address())
 	require.NoError(c.t, err)
 	c.Dest.Chain.Commit()
 
@@ -212,8 +205,7 @@ func (c *CCIPContracts) DeployNewOnRamp() {
 		[]common.Address{c.Source.Pool.Address()},      // pools
 		[]common.Address{},                             // allow list
 		c.Source.AFN.Address(),                         // AFN
-		evm_2_evm_onramp.IBaseOnRampOnRampConfig{
-			CommitFeeJuels:  0,
+		evm_2_evm_onramp.IEVM2EVMOnRampOnRampConfig{
 			MaxDataSize:     1e5,
 			MaxTokensLength: 5,
 			MaxGasLimit:     ccip.GasLimitPerTx,
