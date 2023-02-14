@@ -82,6 +82,7 @@ type EVMLaneConfig struct {
 	ReceiverDapp    gethcommon.Address
 	GovernanceDapp  gethcommon.Address
 	PingPongDapp    gethcommon.Address
+	AllowList       []gethcommon.Address
 }
 
 type EvmDeploymentConfig struct {

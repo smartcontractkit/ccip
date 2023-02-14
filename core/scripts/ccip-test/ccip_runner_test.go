@@ -95,6 +95,9 @@ func TestCCIP(t *testing.T) {
 	case "setOnRampFeeConfig":
 		client.setOnRampFeeConfig(t)
 		// Set the config to the onRamp fee
+	case "setAllowList":
+		client.setAllowlist(t)
+		// Set the config to the onRamp AllowList
 	case "upgradeLane":
 		rhea.UpgradeLane(t, &SOURCE, &DESTINATION)
 	case "gov":

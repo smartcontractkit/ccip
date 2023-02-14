@@ -66,6 +66,24 @@ func (client *CCIPClient) setOnRampFeeConfig(t *testing.T) {
 	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 }
 
+func (client *CCIPClient) setAllowlistEnabled(t *testing.T) {
+	tx, err := client.Source.OnRamp.SetAllowlistEnabled(client.Source.Owner, true)
+	shared.RequireNoError(t, err)
+	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+}
+
+func (client *CCIPClient) setAllowlist(t *testing.T) {
+	isEnabled, err := client.Source.OnRamp.GetAllowlistEnabled(&bind.CallOpts{})
+	shared.RequireNoError(t, err)
+	if isEnabled == false {
+		client.setAllowlistEnabled(t)
+	}
+
+	tx, err := client.Source.OnRamp.SetAllowlist(client.Source.Owner, client.Source.AllowList)
+	shared.RequireNoError(t, err)
+	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+}
+
 func (client *CCIPClient) setRateLimiterConfig(t *testing.T) {
 	tx, err := client.Source.OnRamp.SetRateLimiterConfig(client.Source.Owner, evm_2_evm_onramp.IAggregateRateLimiterRateLimiterConfig{
 		Rate:     new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
@@ -112,6 +130,7 @@ type Client struct {
 	Afn              *afn_contract.AFNContract
 	FeeManager       *fee_manager.FeeManager
 	Router           *router.Router
+	AllowList        []common.Address
 	logger           logger.Logger
 	t                *testing.T
 }
@@ -169,6 +188,7 @@ func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient
 			GovernanceDapp:   governanceDapp,
 			PingPongDapp:     pingPongDapp,
 			Router:           router,
+			AllowList:        config.LaneConfig.AllowList,
 			logger:           config.Logger,
 			t:                t,
 		},
