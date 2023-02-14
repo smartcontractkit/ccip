@@ -5,7 +5,7 @@ import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.
 
 import {CCIPReceiver} from "./CCIPReceiver.sol";
 
-import {Common} from "../models/Common.sol";
+import {Client} from "../models/Client.sol";
 
 import {IERC20} from "../../vendor/IERC20.sol";
 
@@ -18,20 +18,20 @@ contract ReceiverDapp is CCIPReceiver, TypeAndVersionInterface {
   constructor(address router) CCIPReceiver(router) {}
 
   /// @inheritdoc CCIPReceiver
-  function _ccipReceive(Common.Any2EVMMessage memory message) internal override {
-    _handleMessage(message.data, message.destTokensAndAmounts);
+  function _ccipReceive(Client.Any2EVMMessage memory message) internal override {
+    _handleMessage(message.data, message.destTokenAmounts);
   }
 
-  function _handleMessage(bytes memory data, Common.EVMTokenAndAmount[] memory tokensAndAmounts) internal {
+  function _handleMessage(bytes memory data, Client.EVMTokenAmount[] memory tokenAmounts) internal {
     (
       ,
       /* address originalSender */
       address destinationAddress
     ) = abi.decode(data, (address, address));
-    for (uint256 i = 0; i < tokensAndAmounts.length; ++i) {
-      uint256 amount = tokensAndAmounts[i].amount;
+    for (uint256 i = 0; i < tokenAmounts.length; ++i) {
+      uint256 amount = tokenAmounts[i].amount;
       if (destinationAddress != address(0) && amount != 0) {
-        IERC20(tokensAndAmounts[i].token).transfer(destinationAddress, amount);
+        IERC20(tokenAmounts[i].token).transfer(destinationAddress, amount);
       }
     }
   }

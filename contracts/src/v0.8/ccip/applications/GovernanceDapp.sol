@@ -10,7 +10,7 @@ import {CCIPReceiver} from "./CCIPReceiver.sol";
 import {IERC20} from "../../vendor/IERC20.sol";
 import {Client} from "../models/Client.sol";
 import {IRouterClient} from "../interfaces/router/IRouterClient.sol";
-import {Common} from "../models/Common.sol";
+import {Client} from "../models/Client.sol";
 
 /// @title GovernanceDapp - Example of a Governance Dapp using CCIPReceiver
 contract GovernanceDapp is CCIPReceiver, TypeAndVersionInterface, OwnerIsCreator {
@@ -65,7 +65,7 @@ contract GovernanceDapp is CCIPReceiver, TypeAndVersionInterface, OwnerIsCreator
       Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
         receiver: abi.encode(clone.contractAddress),
         data: data,
-        tokensAndAmounts: new Common.EVMTokenAndAmount[](0),
+        tokenAmounts: new Client.EVMTokenAmount[](0),
         feeToken: address(s_feeToken),
         extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 3e5, strict: false}))
       });
@@ -79,7 +79,7 @@ contract GovernanceDapp is CCIPReceiver, TypeAndVersionInterface, OwnerIsCreator
    * the tokens sent with it to the designated EOA
    * @param message CCIP Message
    */
-  function _ccipReceive(Common.Any2EVMMessage memory message) internal override {
+  function _ccipReceive(Client.Any2EVMMessage memory message) internal override {
     FeeConfig memory newFeeConfig = abi.decode(message.data, (FeeConfig));
 
     s_feeConfig = newFeeConfig;

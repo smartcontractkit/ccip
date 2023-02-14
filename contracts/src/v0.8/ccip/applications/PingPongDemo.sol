@@ -49,14 +49,14 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: abi.encode(s_counterpartAddress),
       data: data,
-      tokensAndAmounts: new Common.EVMTokenAndAmount[](0),
+      tokenAmounts: new Client.EVMTokenAmount[](0),
       extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 200_000, strict: false})),
       feeToken: address(s_feeToken)
     });
     IRouterClient(getRouter()).ccipSend(s_counterpartChainId, message);
   }
 
-  function _ccipReceive(Common.Any2EVMMessage memory message) internal override {
+  function _ccipReceive(Client.Any2EVMMessage memory message) internal override {
     uint256 pingPongCount = abi.decode(message.data, (uint256));
     if (!s_isPaused) {
       _respond(pingPongCount + 1);

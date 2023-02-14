@@ -14,20 +14,20 @@ func TestOverheadGas(t *testing.T) {
 		want           uint64
 	}
 
-	// Only Data and TokensAndAmounts are used from the messages
+	// Only Data and TokenAmounts are used from the messages
 	// And only the length is used so the contents doesn't matter.
 	tests := []test{
 		{
 			geMsg: evm_2_evm_onramp.InternalEVM2EVMMessage{
-				Data:             []byte{},
-				TokensAndAmounts: []evm_2_evm_onramp.CommonEVMTokenAndAmount{},
+				Data:         []byte{},
+				TokenAmounts: []evm_2_evm_onramp.ClientEVMTokenAmount{},
 			},
 			want: 27760,
 		},
 		{
 			geMsg: evm_2_evm_onramp.InternalEVM2EVMMessage{
 				Data: []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
-				TokensAndAmounts: []evm_2_evm_onramp.CommonEVMTokenAndAmount{
+				TokenAmounts: []evm_2_evm_onramp.ClientEVMTokenAmount{
 					{},
 				},
 			},
@@ -50,14 +50,14 @@ func TestMaxGasOverHeadGas(t *testing.T) {
 		want    uint64
 	}
 
-	// Only Data and TokensAndAmounts are used from the messages
+	// Only Data and TokenAmounts are used from the messages
 	// And only the length is used so the contents doesn't matter.
 	tests := []test{
 		{
 			numMsgs: 6,
 			geMsg: evm_2_evm_onramp.InternalEVM2EVMMessage{
-				Data:             []byte{},
-				TokensAndAmounts: []evm_2_evm_onramp.CommonEVMTokenAndAmount{},
+				Data:         []byte{},
+				TokenAmounts: []evm_2_evm_onramp.ClientEVMTokenAmount{},
 			},
 			want: 37772,
 		},
@@ -65,7 +65,7 @@ func TestMaxGasOverHeadGas(t *testing.T) {
 			numMsgs: 3,
 			geMsg: evm_2_evm_onramp.InternalEVM2EVMMessage{
 				Data: []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
-				TokensAndAmounts: []evm_2_evm_onramp.CommonEVMTokenAndAmount{
+				TokenAmounts: []evm_2_evm_onramp.ClientEVMTokenAmount{
 					{},
 				},
 			},

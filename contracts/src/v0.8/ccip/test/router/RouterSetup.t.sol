@@ -24,9 +24,15 @@ contract RouterSetup is BaseTest {
     }
   }
 
-  function generateReceiverMessage(uint64 chainId) internal pure returns (Common.Any2EVMMessage memory) {
-    Common.EVMTokenAndAmount[] memory ta = new Common.EVMTokenAndAmount[](0);
+  function generateReceiverMessage(uint64 chainId) internal pure returns (Client.Any2EVMMessage memory) {
+    Client.EVMTokenAmount[] memory ta = new Client.EVMTokenAmount[](0);
     return
-      Common.Any2EVMMessage({sourceChainId: chainId, sender: bytes("a"), data: bytes("a"), destTokensAndAmounts: ta});
+      Client.Any2EVMMessage({
+        messageId: bytes32("a"),
+        sourceChainId: chainId,
+        sender: bytes("a"),
+        data: bytes("a"),
+        destTokenAmounts: ta
+      });
   }
 }

@@ -16,7 +16,7 @@ contract MaybeRevertMessageReceiverNo165 is IAny2EVMMessageReceiver {
     s_toRevert = toRevert;
   }
 
-  function ccipReceive(Common.Any2EVMMessage calldata) external override {
+  function ccipReceive(Client.Any2EVMMessage calldata) external override {
     if (s_toRevert) {
       revert();
     }

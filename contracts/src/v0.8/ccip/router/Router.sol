@@ -11,7 +11,7 @@ import {IAny2EVMMessageReceiver} from "../interfaces/router/IAny2EVMMessageRecei
 
 import {Client} from "../models/Client.sol";
 import {Internal} from "../models/Internal.sol";
-import {Common} from "../models/Common.sol";
+import {Client} from "../models/Client.sol";
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
 
 import {SafeERC20} from "../../vendor/SafeERC20.sol";
@@ -94,7 +94,7 @@ contract Router is IRouter, TypeAndVersionInterface, OwnerIsCreator {
 
   /// @inheritdoc IRouter
   function routeMessage(
-    Common.Any2EVMMessage calldata message,
+    Client.Any2EVMMessage calldata message,
     bool manualExecution,
     uint256 gasLimit,
     address receiver
@@ -208,12 +208,12 @@ contract Router is IRouter, TypeAndVersionInterface, OwnerIsCreator {
     }
 
     // Transfer the tokens to the token pools.
-    for (uint256 i = 0; i < message.tokensAndAmounts.length; ++i) {
-      IERC20 token = IERC20(message.tokensAndAmounts[i].token);
+    for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
+      IERC20 token = IERC20(message.tokenAmounts[i].token);
       token.safeTransferFrom(
         msg.sender,
         address(IEVM2AnyOnRamp(onRamp).getPoolBySourceToken(token)),
-        message.tokensAndAmounts[i].amount
+        message.tokenAmounts[i].amount
       );
     }
 

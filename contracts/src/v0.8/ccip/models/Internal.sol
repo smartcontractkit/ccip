@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Common} from "./Common.sol";
+import {Client} from "./Client.sol";
 
 // Library for CCIP internal definitions common to multiple contracts.
 library Internal {
@@ -31,21 +31,22 @@ library Internal {
     // User fields
     address receiver;
     bytes data;
-    Common.EVMTokenAndAmount[] tokensAndAmounts;
+    Client.EVMTokenAmount[] tokenAmounts;
     address feeToken;
     bytes32 messageId;
   }
 
-  function _toAny2EVMMessage(EVM2EVMMessage memory original, Common.EVMTokenAndAmount[] memory destTokensAndAmounts)
+  function _toAny2EVMMessage(EVM2EVMMessage memory original, Client.EVMTokenAmount[] memory destTokenAmounts)
     internal
     pure
-    returns (Common.Any2EVMMessage memory message)
+    returns (Client.Any2EVMMessage memory message)
   {
-    message = Common.Any2EVMMessage({
+    message = Client.Any2EVMMessage({
+      messageId: original.messageId,
       sourceChainId: original.sourceChainId,
       sender: abi.encode(original.sender),
       data: original.data,
-      destTokensAndAmounts: destTokensAndAmounts
+      destTokenAmounts: destTokenAmounts
     });
   }
 
@@ -62,7 +63,7 @@ library Internal {
           original.sender,
           original.receiver,
           keccak256(original.data),
-          keccak256(abi.encode(original.tokensAndAmounts)),
+          keccak256(abi.encode(original.tokenAmounts)),
           original.gasLimit,
           original.strict,
           original.feeToken,
@@ -71,20 +72,21 @@ library Internal {
       );
   }
 
-  function _addToTokensAmounts(
-    Common.EVMTokenAndAmount[] memory existingTokens,
-    Common.EVMTokenAndAmount memory newToken
-  ) internal pure returns (Common.EVMTokenAndAmount[] memory) {
+  function _addToTokensAmounts(Client.EVMTokenAmount[] memory existingTokens, Client.EVMTokenAmount memory newToken)
+    internal
+    pure
+    returns (Client.EVMTokenAmount[] memory)
+  {
     for (uint256 i = 0; i < existingTokens.length; ++i) {
       if (existingTokens[i].token == newToken.token) {
         // already present, we need to create a new list because simply
         // incrementing the value will also mutate the original list.
-        Common.EVMTokenAndAmount[] memory copyOfTokens = new Common.EVMTokenAndAmount[](existingTokens.length);
+        Client.EVMTokenAmount[] memory copyOfTokens = new Client.EVMTokenAmount[](existingTokens.length);
         for (uint256 j = 0; j < existingTokens.length; ++j) {
           copyOfTokens[j] = existingTokens[j];
         }
 
-        copyOfTokens[i] = Common.EVMTokenAndAmount({
+        copyOfTokens[i] = Client.EVMTokenAmount({
           token: copyOfTokens[i].token,
           amount: copyOfTokens[i].amount + newToken.amount
         });
@@ -93,7 +95,7 @@ library Internal {
     }
 
     // Token is not already present, need to reallocate.
-    Common.EVMTokenAndAmount[] memory newTokens = new Common.EVMTokenAndAmount[](existingTokens.length + 1);
+    Client.EVMTokenAmount[] memory newTokens = new Client.EVMTokenAmount[](existingTokens.length + 1);
     for (uint256 i = 0; i < existingTokens.length; ++i) {
       newTokens[i] = existingTokens[i];
     }

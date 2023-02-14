@@ -22,18 +22,18 @@ func TestHasher(t *testing.T) {
 	hasher := NewLeafHasher(sourceChainId, destChainId, onRampAddress, hashingCtx)
 
 	message := evm_2_evm_onramp.InternalEVM2EVMMessage{
-		SourceChainId:    sourceChainId,
-		SequenceNumber:   1337,
-		FeeTokenAmount:   big.NewInt(1),
-		Sender:           common.HexToAddress("0x1110000000000000000000000000000000000001"),
-		Nonce:            1337,
-		GasLimit:         big.NewInt(100),
-		Strict:           false,
-		Receiver:         common.HexToAddress("0x2220000000000000000000000000000000000001"),
-		Data:             []byte{},
-		TokensAndAmounts: []evm_2_evm_onramp.CommonEVMTokenAndAmount{{Token: common.HexToAddress("0x4440000000000000000000000000000000000001"), Amount: big.NewInt(12345678900)}},
-		FeeToken:         common.Address{},
-		MessageId:        [32]byte{},
+		SourceChainId:  sourceChainId,
+		SequenceNumber: 1337,
+		FeeTokenAmount: big.NewInt(1),
+		Sender:         common.HexToAddress("0x1110000000000000000000000000000000000001"),
+		Nonce:          1337,
+		GasLimit:       big.NewInt(100),
+		Strict:         false,
+		Receiver:       common.HexToAddress("0x2220000000000000000000000000000000000001"),
+		Data:           []byte{},
+		TokenAmounts:   []evm_2_evm_onramp.ClientEVMTokenAmount{{Token: common.HexToAddress("0x4440000000000000000000000000000000000001"), Amount: big.NewInt(12345678900)}},
+		FeeToken:       common.Address{},
+		MessageId:      [32]byte{},
 	}
 
 	hash, err := hasher.HashLeaf(generateLog(t, message))
@@ -52,7 +52,7 @@ func TestHasher(t *testing.T) {
 		Strict:         false,
 		Receiver:       common.HexToAddress("0x2220000000000000000000000000000000000001"),
 		Data:           []byte("foo bar baz"),
-		TokensAndAmounts: []evm_2_evm_onramp.CommonEVMTokenAndAmount{
+		TokenAmounts: []evm_2_evm_onramp.ClientEVMTokenAmount{
 			{Token: common.HexToAddress("0x4440000000000000000000000000000000000001"), Amount: big.NewInt(12345678900)},
 			{Token: common.HexToAddress("0x6660000000000000000000000000000000000001"), Amount: big.NewInt(4204242)},
 		},

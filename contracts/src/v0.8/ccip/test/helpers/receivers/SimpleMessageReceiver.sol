@@ -22,7 +22,7 @@ contract SimpleMessageReceiver is IAny2EVMMessageReceiver, IERC165 {
     return interfaceId == type(IAny2EVMMessageReceiver).interfaceId || interfaceId == type(IERC165).interfaceId;
   }
 
-  function ccipReceive(Common.Any2EVMMessage calldata) external override {
+  function ccipReceive(Client.Any2EVMMessage calldata) external override {
     emit MessageReceived();
   }
 
