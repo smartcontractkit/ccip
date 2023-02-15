@@ -252,6 +252,7 @@ func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestCli
 			FeeManager:       feeManager,
 			logger:           config.Logger,
 			Router:           router,
+			AllowList:        config.LaneConfig.AllowList,
 			t:                t,
 		},
 		CommitStore:     commitStore,
