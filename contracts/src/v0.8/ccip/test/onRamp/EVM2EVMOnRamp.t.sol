@@ -127,7 +127,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     assertEq(MAX_TOKENS_LENGTH, s_onRamp.getOnRampConfig().maxTokensLength);
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     uint256 tooMany = MAX_TOKENS_LENGTH + 1;
-    message.tokensAndAmounts = new Common.EVMTokenAndAmount[](tooMany);
+    message.tokenAmounts = new Client.EVMTokenAmount[](tooMany);
     vm.expectRevert(IEVM2EVMOnRamp.UnsupportedNumberOfTokens.selector);
     s_onRamp.forwardFromRouter(message, 0, STRANGER);
   }
@@ -145,16 +145,16 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     address wrongToken = address(1);
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.tokensAndAmounts = new Common.EVMTokenAndAmount[](1);
-    message.tokensAndAmounts[0].token = wrongToken;
-    message.tokensAndAmounts[0].amount = 1;
+    message.tokenAmounts = new Client.EVMTokenAmount[](1);
+    message.tokenAmounts[0].token = wrongToken;
+    message.tokenAmounts[0].amount = 1;
 
     // We need to set the price of this new token to be able to reach
     // the proper revert point. This must be called by the owner.
     changePrank(OWNER);
     uint256[] memory prices = new uint256[](1);
     prices[0] = 1;
-    s_onRamp.setPrices(abi.decode(abi.encode(message.tokensAndAmounts), (IERC20[])), prices);
+    s_onRamp.setPrices(abi.decode(abi.encode(message.tokenAmounts), (IERC20[])), prices);
 
     // Change back to the router
     changePrank(address(s_sourceRouter));
@@ -165,9 +165,9 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
 
   function testValueExceedsCapacityReverts() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.tokensAndAmounts = new Common.EVMTokenAndAmount[](1);
-    message.tokensAndAmounts[0].amount = 2**128;
-    message.tokensAndAmounts[0].token = s_sourceTokens[0];
+    message.tokenAmounts = new Client.EVMTokenAmount[](1);
+    message.tokenAmounts[0].amount = 2**128;
+    message.tokenAmounts[0].token = s_sourceTokens[0];
 
     IERC20(s_sourceTokens[0]).approve(address(s_onRamp), 2**128);
 
@@ -175,7 +175,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
       abi.encodeWithSelector(
         IAggregateRateLimiter.ValueExceedsCapacity.selector,
         rateLimiterConfig().capacity,
-        message.tokensAndAmounts[0].amount * getTokenPrices()[0]
+        message.tokenAmounts[0].amount * getTokenPrices()[0]
       )
     );
 
@@ -186,8 +186,8 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 
     address fakeToken = address(1);
-    message.tokensAndAmounts = new Common.EVMTokenAndAmount[](1);
-    message.tokensAndAmounts[0].token = fakeToken;
+    message.tokenAmounts = new Client.EVMTokenAmount[](1);
+    message.tokenAmounts[0].token = fakeToken;
 
     vm.expectRevert(abi.encodeWithSelector(IAggregateRateLimiter.PriceNotFoundForToken.selector, fakeToken));
 

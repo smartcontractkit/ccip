@@ -1,7 +1,7 @@
 {
   "acceptOwnership()": "79ba5097",
   "addClone((uint64,address))": "262a7b63",
-  "ccipReceive((uint64,bytes,bytes,(address,uint256)[]))": "3015b91c",
+  "ccipReceive((bytes32,uint64,bytes,bytes,(address,uint256)[]))": "85572ffb",
   "fund(uint256)": "ca1d209d",
   "getFeeConfig()": "5fbbc0d2",
   "getRouter()": "b0f479a1",

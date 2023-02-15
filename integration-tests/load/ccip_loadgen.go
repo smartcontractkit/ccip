@@ -130,9 +130,9 @@ func NewCCIPLoad(t *testing.T, source *actions.SourceCCIPModule, dest *actions.D
 func (c *CCIPE2ELoad) BeforeAllCall() {
 	sourceCCIP := c.Source
 	destCCIP := c.Destination
-	var tokenAndAmounts []router.CommonEVMTokenAndAmount
+	var tokenAndAmounts []router.ClientEVMTokenAmount
 	for i, token := range sourceCCIP.Common.BridgeTokens {
-		tokenAndAmounts = append(tokenAndAmounts, router.CommonEVMTokenAndAmount{
+		tokenAndAmounts = append(tokenAndAmounts, router.ClientEVMTokenAmount{
 			Token: common.HexToAddress(token.Address()), Amount: c.Source.TransferAmount[i],
 		})
 		// approve the onramp router so that it caninitiate transferring the token
@@ -202,9 +202,9 @@ func (c *CCIPE2ELoad) Call(msgType interface{}) client.CallResult {
 	destCCIP := c.Destination
 	msgSerialNo := c.CurrentMsgSerialNo.Load()
 	c.CurrentMsgSerialNo.Inc()
-	var tokenAndAmounts []router.CommonEVMTokenAndAmount
+	var tokenAndAmounts []router.ClientEVMTokenAmount
 	for i, token := range sourceCCIP.Common.BridgeTokens {
-		tokenAndAmounts = append(tokenAndAmounts, router.CommonEVMTokenAndAmount{
+		tokenAndAmounts = append(tokenAndAmounts, router.ClientEVMTokenAmount{
 			Token: common.HexToAddress(token.Address()), Amount: c.Source.TransferAmount[i],
 		})
 	}
@@ -214,7 +214,7 @@ func (c *CCIPE2ELoad) Call(msgType interface{}) client.CallResult {
 	c.msg.Data = []byte(msgStr)
 
 	if msgType == TokenTransfer {
-		c.msg.TokensAndAmounts = tokenAndAmounts
+		c.msg.TokenAmounts = tokenAndAmounts
 	}
 
 	startTime := time.Now()

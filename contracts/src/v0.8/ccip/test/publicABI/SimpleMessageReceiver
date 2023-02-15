@@ -1,5 +1,5 @@
 {
-  "ccipReceive((uint64,bytes,bytes,(address,uint256)[]))": "3015b91c",
+  "ccipReceive((bytes32,uint64,bytes,bytes,(address,uint256)[]))": "85572ffb",
   "getManager()": "d5009584",
   "supportsInterface(bytes4)": "01ffc9a7"
 }

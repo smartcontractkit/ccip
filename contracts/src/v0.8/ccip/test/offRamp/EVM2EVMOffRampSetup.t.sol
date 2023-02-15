@@ -8,7 +8,7 @@ import {IFeeManager} from "../../interfaces/fees/IFeeManager.sol";
 import {IRouter} from "../../interfaces/router/IRouter.sol";
 
 import {Internal} from "../../models/Internal.sol";
-import {Common} from "../../models/Common.sol";
+import {Client} from "../../models/Client.sol";
 import {FeeManagerSetup} from "../fees/FeeManager.t.sol";
 import {MockCommitStore} from "../mocks/MockCommitStore.sol";
 import {SimpleMessageReceiver} from "../helpers/receivers/SimpleMessageReceiver.sol";
@@ -75,23 +75,24 @@ contract EVM2EVMOffRampSetup is TokenSetup, FeeManagerSetup {
   function _convertToGeneralMessage(Internal.EVM2EVMMessage memory original)
     internal
     view
-    returns (Common.Any2EVMMessage memory message)
+    returns (Client.Any2EVMMessage memory message)
   {
-    uint256 numberOfTokens = original.tokensAndAmounts.length;
-    Common.EVMTokenAndAmount[] memory destTokensAndAmounts = new Common.EVMTokenAndAmount[](numberOfTokens);
+    uint256 numberOfTokens = original.tokenAmounts.length;
+    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](numberOfTokens);
 
     for (uint256 i = 0; i < numberOfTokens; ++i) {
-      IPool pool = s_offRamp.getPoolBySourceToken(IERC20(original.tokensAndAmounts[i].token));
-      destTokensAndAmounts[i].token = address(pool.getToken());
-      destTokensAndAmounts[i].amount = original.tokensAndAmounts[i].amount;
+      IPool pool = s_offRamp.getPoolBySourceToken(IERC20(original.tokenAmounts[i].token));
+      destTokenAmounts[i].token = address(pool.getToken());
+      destTokenAmounts[i].amount = original.tokenAmounts[i].amount;
     }
 
     return
-      Common.Any2EVMMessage({
+      Client.Any2EVMMessage({
+        messageId: original.messageId,
         sourceChainId: original.sourceChainId,
         sender: abi.encode(original.sender),
         data: original.data,
-        destTokensAndAmounts: destTokensAndAmounts
+        destTokenAmounts: destTokenAmounts
       });
   }
 
@@ -100,7 +101,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, FeeManagerSetup {
     view
     returns (Internal.EVM2EVMMessage memory)
   {
-    return _generateAny2EVMMessage(sequenceNumber, getCastedSourceEVMTokenAndAmountsWithZeroAmounts());
+    return _generateAny2EVMMessage(sequenceNumber, getCastedSourceEVMTokenAmountsWithZeroAmounts());
   }
 
   function _generateAny2EVMMessageWithTokens(uint64 sequenceNumber, uint256[] memory amounts)
@@ -108,14 +109,14 @@ contract EVM2EVMOffRampSetup is TokenSetup, FeeManagerSetup {
     view
     returns (Internal.EVM2EVMMessage memory)
   {
-    Common.EVMTokenAndAmount[] memory tokensAndAmounts = getCastedSourceEVMTokenAndAmountsWithZeroAmounts();
-    for (uint256 i = 0; i < tokensAndAmounts.length; ++i) {
-      tokensAndAmounts[i].amount = amounts[i];
+    Client.EVMTokenAmount[] memory tokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
+    for (uint256 i = 0; i < tokenAmounts.length; ++i) {
+      tokenAmounts[i].amount = amounts[i];
     }
-    return _generateAny2EVMMessage(sequenceNumber, tokensAndAmounts);
+    return _generateAny2EVMMessage(sequenceNumber, tokenAmounts);
   }
 
-  function _generateAny2EVMMessage(uint64 sequenceNumber, Common.EVMTokenAndAmount[] memory tokensAndAmounts)
+  function _generateAny2EVMMessage(uint64 sequenceNumber, Client.EVMTokenAmount[] memory tokenAmounts)
     internal
     view
     returns (Internal.EVM2EVMMessage memory)
@@ -130,8 +131,8 @@ contract EVM2EVMOffRampSetup is TokenSetup, FeeManagerSetup {
       sourceChainId: SOURCE_CHAIN_ID,
       receiver: address(s_receiver),
       data: data,
-      tokensAndAmounts: tokensAndAmounts,
-      feeToken: tokensAndAmounts[0].token,
+      tokenAmounts: tokenAmounts,
+      feeToken: tokenAmounts[0].token,
       feeTokenAmount: uint256(0),
       messageId: ""
     });
@@ -151,11 +152,11 @@ contract EVM2EVMOffRampSetup is TokenSetup, FeeManagerSetup {
 
   function _generateMessagesWithTokens() internal view returns (Internal.EVM2EVMMessage[] memory) {
     Internal.EVM2EVMMessage[] memory messages = new Internal.EVM2EVMMessage[](2);
-    Common.EVMTokenAndAmount[] memory tokensAndAmounts = getCastedSourceEVMTokenAndAmountsWithZeroAmounts();
-    tokensAndAmounts[0].amount = 1e18;
-    tokensAndAmounts[1].amount = 5e18;
-    messages[0] = _generateAny2EVMMessage(1, tokensAndAmounts);
-    messages[1] = _generateAny2EVMMessage(2, tokensAndAmounts);
+    Client.EVMTokenAmount[] memory tokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
+    tokenAmounts[0].amount = 1e18;
+    tokenAmounts[1].amount = 5e18;
+    messages[0] = _generateAny2EVMMessage(1, tokenAmounts);
+    messages[1] = _generateAny2EVMMessage(2, tokenAmounts);
     return messages;
   }
 

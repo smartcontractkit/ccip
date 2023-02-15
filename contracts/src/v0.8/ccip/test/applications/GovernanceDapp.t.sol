@@ -53,7 +53,7 @@ contract GovernanceDapp_voteForNewFeeConfig is GovernanceDappSetup {
       receiver: s_crossChainClone.contractAddress,
       nonce: 1,
       data: data,
-      tokensAndAmounts: new Common.EVMTokenAndAmount[](0),
+      tokenAmounts: new Client.EVMTokenAmount[](0),
       gasLimit: 3e5,
       strict: false,
       feeToken: s_sourceFeeToken,
@@ -79,11 +79,12 @@ contract GovernanceDapp_ccipReceive is GovernanceDappSetup {
   function testSuccess() public {
     GovernanceDapp.FeeConfig memory feeConfig = GovernanceDapp.FeeConfig({feeAmount: 10000, changedAtBlock: 100});
 
-    Common.Any2EVMMessage memory message = Common.Any2EVMMessage({
+    Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
+      messageId: bytes32("a"),
       sourceChainId: SOURCE_CHAIN_ID,
       sender: abi.encode(OWNER),
       data: abi.encode(feeConfig),
-      destTokensAndAmounts: new Common.EVMTokenAndAmount[](0)
+      destTokenAmounts: new Client.EVMTokenAmount[](0)
     });
 
     changePrank(address(s_sourceRouter));

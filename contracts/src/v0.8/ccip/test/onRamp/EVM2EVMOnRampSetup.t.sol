@@ -90,14 +90,14 @@ contract EVM2EVMOnRampSetup is TokenSetup, FeeManagerSetup {
   }
 
   function _generateTokenMessage() public view returns (Client.EVM2AnyMessage memory) {
-    Common.EVMTokenAndAmount[] memory tokensAndAmounts = getCastedSourceEVMTokenAndAmountsWithZeroAmounts();
-    tokensAndAmounts[0].amount = i_tokenAmount0;
-    tokensAndAmounts[1].amount = i_tokenAmount1;
+    Client.EVMTokenAmount[] memory tokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
+    tokenAmounts[0].amount = i_tokenAmount0;
+    tokenAmounts[1].amount = i_tokenAmount1;
     return
       Client.EVM2AnyMessage({
         receiver: abi.encode(OWNER),
         data: "",
-        tokensAndAmounts: tokensAndAmounts,
+        tokenAmounts: tokenAmounts,
         feeToken: s_sourceFeeToken,
         extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT, strict: false}))
       });
@@ -108,7 +108,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, FeeManagerSetup {
       Client.EVM2AnyMessage({
         receiver: abi.encode(OWNER),
         data: "",
-        tokensAndAmounts: new Common.EVMTokenAndAmount[](0),
+        tokenAmounts: new Client.EVMTokenAmount[](0),
         feeToken: s_sourceFeeToken,
         extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT, strict: false}))
       });
@@ -130,7 +130,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, FeeManagerSetup {
       sourceChainId: SOURCE_CHAIN_ID,
       receiver: abi.decode(message.receiver, (address)),
       data: message.data,
-      tokensAndAmounts: message.tokensAndAmounts,
+      tokenAmounts: message.tokenAmounts,
       feeToken: message.feeToken,
       messageId: ""
     });

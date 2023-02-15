@@ -87,7 +87,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		msg := router.ClientEVM2AnyMessage{
 			Receiver: testhelpers.MustEncodeAddress(t, ccipContracts.Dest.Receivers[0].Receiver.Address()),
 			Data:     []byte("hello"),
-			TokensAndAmounts: []router.CommonEVMTokenAndAmount{
+			TokenAmounts: []router.ClientEVMTokenAmount{
 				{
 					Token:  ccipContracts.Source.LinkToken.Address(),
 					Amount: tokenAmount,
@@ -186,7 +186,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 			msg := router.ClientEVM2AnyMessage{
 				Receiver: testhelpers.MustEncodeAddress(t, ccipContracts.Dest.Receivers[0].Receiver.Address()),
 				Data:     []byte("hello"),
-				TokensAndAmounts: []router.CommonEVMTokenAndAmount{
+				TokenAmounts: []router.ClientEVMTokenAmount{
 					{
 						Token:  ccipContracts.Source.LinkToken.Address(),
 						Amount: tokenAmount,
@@ -241,11 +241,11 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		extraArgs, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(200_000), true)
 		require.NoError(t, err)
 		msg := router.ClientEVM2AnyMessage{
-			Receiver:         testhelpers.MustEncodeAddress(t, ccipContracts.Dest.Receivers[1].Receiver.Address()),
-			Data:             []byte("hello"),
-			TokensAndAmounts: []router.CommonEVMTokenAndAmount{},
-			FeeToken:         ccipContracts.Source.LinkToken.Address(),
-			ExtraArgs:        extraArgs,
+			Receiver:     testhelpers.MustEncodeAddress(t, ccipContracts.Dest.Receivers[1].Receiver.Address()),
+			Data:         []byte("hello"),
+			TokenAmounts: []router.ClientEVMTokenAmount{},
+			FeeToken:     ccipContracts.Source.LinkToken.Address(),
+			ExtraArgs:    extraArgs,
 		}
 		fee, err := ccipContracts.Source.Router.GetFee(nil, destChainID, msg)
 		require.NoError(t, err)

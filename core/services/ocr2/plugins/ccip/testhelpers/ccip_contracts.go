@@ -198,10 +198,10 @@ func (c *CCIPContracts) EnableCommitStore() {
 func (c *CCIPContracts) DeployNewOnRamp() {
 	c.t.Log("Deploying new onRamp")
 	onRampAddress, _, _, err := evm_2_evm_onramp.DeployEVM2EVMOnRamp(
-		c.Source.User,    // user
-		c.Source.Chain,   // client
-		c.Source.ChainID, // source chain id
-		c.Dest.ChainID,   // destinationChainIds
+		c.Source.User,                                  // user
+		c.Source.Chain,                                 // client
+		c.Source.ChainID,                               // source chain id
+		c.Dest.ChainID,                                 // destinationChainIds
 		[]common.Address{c.Source.LinkToken.Address()}, // tokens
 		[]common.Address{c.Source.Pool.Address()},      // pools
 		[]common.Address{},                             // allow list
@@ -403,7 +403,7 @@ func SendMessage(gasLimit, gasPrice, tokenAmount *big.Int, receiverAddr common.A
 	msg := router.ClientEVM2AnyMessage{
 		Receiver: MustEncodeAddress(t, receiverAddr),
 		Data:     []byte("hello"),
-		TokensAndAmounts: []router.CommonEVMTokenAndAmount{
+		TokenAmounts: []router.ClientEVMTokenAmount{
 			{
 				Token:  c.Source.LinkToken.Address(),
 				Amount: tokenAmount,

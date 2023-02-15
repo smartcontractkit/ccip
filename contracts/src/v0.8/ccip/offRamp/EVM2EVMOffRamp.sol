@@ -11,7 +11,6 @@ import {IRouter} from "../interfaces/router/IRouter.sol";
 import {IAny2EVMMessageReceiver} from "../interfaces/router/IAny2EVMMessageReceiver.sol";
 
 import {Internal} from "../models/Internal.sol";
-import {Common} from "../models/Common.sol";
 import {Client} from "../models/Client.sol";
 import {Internal} from "../models/Internal.sol";
 import {OCR2Base} from "../ocr/OCR2Base.sol";
@@ -130,22 +129,20 @@ contract EVM2EVMOffRamp is
 
   /// @notice Uses pools to release or mint a number of different tokens
   ///           and send them to the given `receiver` address.
-  function _releaseOrMintTokens(Common.EVMTokenAndAmount[] memory sourceTokensAndAmounts, address receiver)
+  function _releaseOrMintTokens(Client.EVMTokenAmount[] memory sourceTokenAmounts, address receiver)
     internal
-    returns (Common.EVMTokenAndAmount[] memory)
+    returns (Client.EVMTokenAmount[] memory)
   {
-    Common.EVMTokenAndAmount[] memory destTokensAndAmounts = new Common.EVMTokenAndAmount[](
-      sourceTokensAndAmounts.length
-    );
-    for (uint256 i = 0; i < sourceTokensAndAmounts.length; ++i) {
-      IPool pool = getPoolBySourceToken(IERC20(sourceTokensAndAmounts[i].token));
-      if (address(pool) == address(0)) revert UnsupportedToken(IERC20(sourceTokensAndAmounts[i].token));
-      _releaseOrMintToken(pool, sourceTokensAndAmounts[i].amount, receiver);
-      destTokensAndAmounts[i].token = address(pool.getToken());
-      destTokensAndAmounts[i].amount = sourceTokensAndAmounts[i].amount;
+    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](sourceTokenAmounts.length);
+    for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
+      IPool pool = getPoolBySourceToken(IERC20(sourceTokenAmounts[i].token));
+      if (address(pool) == address(0)) revert UnsupportedToken(IERC20(sourceTokenAmounts[i].token));
+      _releaseOrMintToken(pool, sourceTokenAmounts[i].amount, receiver);
+      destTokenAmounts[i].token = address(pool.getToken());
+      destTokenAmounts[i].amount = sourceTokenAmounts[i].amount;
     }
-    _removeTokens(destTokensAndAmounts);
-    return destTokensAndAmounts;
+    _removeTokens(destTokenAmounts);
+    return destTokenAmounts;
   }
 
   /// @notice Execute a single message
@@ -155,16 +152,16 @@ contract EVM2EVMOffRamp is
   /// the Execute call, as we can only try/catch on external calls.
   function executeSingleMessage(Internal.EVM2EVMMessage memory message, bool manualExecution) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
-    Common.EVMTokenAndAmount[] memory destTokensAndAmounts = new Common.EVMTokenAndAmount[](0);
-    if (message.tokensAndAmounts.length > 0) {
-      destTokensAndAmounts = _releaseOrMintTokens(message.tokensAndAmounts, message.receiver);
+    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
+    if (message.tokenAmounts.length > 0) {
+      destTokenAmounts = _releaseOrMintTokens(message.tokenAmounts, message.receiver);
     }
     if (
       !message.receiver.isContract() || !message.receiver.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId)
     ) return;
     if (
       !IRouter(s_config.router).routeMessage(
-        Internal._toAny2EVMMessage(message, destTokensAndAmounts),
+        Internal._toAny2EVMMessage(message, destTokenAmounts),
         manualExecution,
         message.gasLimit,
         message.receiver
@@ -173,7 +170,7 @@ contract EVM2EVMOffRamp is
   }
 
   /// @notice Try executing a message
-  /// @param message Common.Any2EVMMessage memory message
+  /// @param message Client.Any2EVMMessage memory message
   /// @param manualExecution bool to indicate manual instead of DON execution
   /// @return Internal.ExecutionState
   function _trialExecute(Internal.EVM2EVMMessage memory message, bool manualExecution)
@@ -192,7 +189,7 @@ contract EVM2EVMOffRamp is
 
   function _isWellFormed(Internal.EVM2EVMMessage memory message) private view {
     if (message.sourceChainId != i_sourceChainId) revert InvalidSourceChain(message.sourceChainId);
-    if (message.tokensAndAmounts.length > uint256(s_config.maxTokensLength))
+    if (message.tokenAmounts.length > uint256(s_config.maxTokensLength))
       revert UnsupportedNumberOfTokens(message.sequenceNumber);
     if (message.data.length > uint256(s_config.maxDataSize))
       revert MessageTooLarge(uint256(s_config.maxDataSize), message.data.length);
@@ -311,7 +308,7 @@ contract EVM2EVMOffRamp is
   }
 
   /// @notice Reverts as this contract should not access CCIP messages
-  function ccipReceive(Common.Any2EVMMessage calldata) external pure {
+  function ccipReceive(Client.Any2EVMMessage calldata) external pure {
     // solhint-disable-next-line reason-string
     revert();
   }

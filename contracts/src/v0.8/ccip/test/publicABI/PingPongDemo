@@ -1,6 +1,6 @@
 {
   "acceptOwnership()": "79ba5097",
-  "ccipReceive((uint64,bytes,bytes,(address,uint256)[]))": "3015b91c",
+  "ccipReceive((bytes32,uint64,bytes,bytes,(address,uint256)[]))": "85572ffb",
   "fund(uint256)": "ca1d209d",
   "getCounterpartAddress()": "2b6e5d63",
   "getCounterpartChainId()": "093685f3",

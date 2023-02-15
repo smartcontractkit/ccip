@@ -531,7 +531,7 @@ func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(t *testing.T, t
 func (sourceCCIP *SourceCCIPModule) SendRequest(
 	t *testing.T,
 	receiver common.Address,
-	tokenAndAmounts []router.CommonEVMTokenAndAmount,
+	tokenAndAmounts []router.ClientEVMTokenAmount,
 	data string,
 	feeToken common.Address,
 ) (string, *big.Int) {
@@ -543,11 +543,11 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 
 	// form the message for transfer
 	msg := router.ClientEVM2AnyMessage{
-		Receiver:         receiverAddr,
-		Data:             []byte(data),
-		TokensAndAmounts: tokenAndAmounts,
-		FeeToken:         feeToken,
-		ExtraArgs:        extraArgsV1,
+		Receiver:     receiverAddr,
+		Data:         []byte(data),
+		TokenAmounts: tokenAndAmounts,
+		FeeToken:     feeToken,
+		ExtraArgs:    extraArgsV1,
 	}
 	log.Info().Interface("ge msg details", msg).Msg("ccip message to be sent")
 	fee, err := sourceCCIP.Common.Router.GetFee(sourceCCIP.DestinationChainId, msg)
@@ -874,9 +874,9 @@ func (lane *CCIPLane) RecordStateBeforeTransfer() {
 func (lane *CCIPLane) SendRequests(noOfRequests int) []string {
 	t := lane.t
 	lane.NumberOfReq += noOfRequests
-	var tokenAndAmounts []router.CommonEVMTokenAndAmount
+	var tokenAndAmounts []router.ClientEVMTokenAmount
 	for i, token := range lane.Source.Common.BridgeTokens {
-		tokenAndAmounts = append(tokenAndAmounts, router.CommonEVMTokenAndAmount{
+		tokenAndAmounts = append(tokenAndAmounts, router.ClientEVMTokenAmount{
 			Token: common.HexToAddress(token.Address()), Amount: lane.Source.TransferAmount[i],
 		})
 		// approve the onramp router so that it can initiate transferring the token

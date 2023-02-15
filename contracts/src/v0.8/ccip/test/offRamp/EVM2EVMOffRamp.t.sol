@@ -103,7 +103,7 @@ contract EVM2EVMOffRamp_ccipReceive is EVM2EVMOffRampSetup {
   // Reverts
 
   function testReverts() public {
-    Common.Any2EVMMessage memory message = _convertToGeneralMessage(_generateAny2EVMMessageNoTokens(1));
+    Client.Any2EVMMessage memory message = _convertToGeneralMessage(_generateAny2EVMMessageNoTokens(1));
     vm.expectRevert();
     s_offRamp.ccipReceive(message);
   }
@@ -283,8 +283,8 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
 
   function testUnsupportedNumberOfTokensReverts() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
-    Common.EVMTokenAndAmount[] memory newTokens = new Common.EVMTokenAndAmount[](MAX_TOKENS_LENGTH + 1);
-    messages[0].tokensAndAmounts = newTokens;
+    Client.EVMTokenAmount[] memory newTokens = new Client.EVMTokenAmount[](MAX_TOKENS_LENGTH + 1);
+    messages[0].tokenAmounts = newTokens;
     Internal.ExecutionReport memory report = _generateReportFromMessages(messages);
 
     vm.expectRevert(
@@ -307,8 +307,8 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
 
   function testUnsupportedTokenReverts() public {
     Internal.EVM2EVMMessage[] memory messages = _generateMessagesWithTokens();
-    messages[0].tokensAndAmounts[0] = getCastedDestinationEVMTokenAndAmountsWithZeroAmounts()[0];
-    messages[0].feeToken = messages[0].tokensAndAmounts[0].token;
+    messages[0].tokenAmounts[0] = getCastedDestinationEVMTokenAmountsWithZeroAmounts()[0];
+    messages[0].feeToken = messages[0].tokenAmounts[0].token;
     vm.expectRevert(
       abi.encodeWithSelector(
         IEVM2EVMOffRamp.ExecutionError.selector,
@@ -415,8 +415,8 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
     // commitStore. In a real scenario the abuser would have to actually
     // send the message that they want to replay.
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
-    messages[0].tokensAndAmounts = new Common.EVMTokenAndAmount[](1);
-    messages[0].tokensAndAmounts[0] = Common.EVMTokenAndAmount({token: s_sourceFeeToken, amount: tokenAmount});
+    messages[0].tokenAmounts = new Client.EVMTokenAmount[](1);
+    messages[0].tokenAmounts[0] = Client.EVMTokenAmount({token: s_sourceFeeToken, amount: tokenAmount});
     messages[0].receiver = address(receiver);
 
     Internal.ExecutionReport memory report = _generateReportFromMessages(messages);
@@ -491,22 +491,22 @@ contract EVM2EVMOffRamp__releaseOrMintToken is EVM2EVMOffRampSetup {
 contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
   // Success
   function testSuccess() public {
-    Common.EVMTokenAndAmount[] memory srcTokensAndAmounts = getCastedSourceEVMTokenAndAmountsWithZeroAmounts();
+    Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
     IERC20 dstToken1 = IERC20(s_destTokens[0]);
     uint256 startingBalance = dstToken1.balanceOf(OWNER);
     uint256 amount1 = 100;
-    srcTokensAndAmounts[0].amount = 100;
+    srcTokenAmounts[0].amount = 100;
 
-    s_offRamp.releaseOrMintTokens(srcTokensAndAmounts, OWNER);
+    s_offRamp.releaseOrMintTokens(srcTokenAmounts, OWNER);
     assertEq(startingBalance + amount1, dstToken1.balanceOf(OWNER));
   }
 
   // Revert
 
   function testUnsupportedTokenReverts() public {
-    Common.EVMTokenAndAmount[] memory tokensAndAmounts = new Common.EVMTokenAndAmount[](1);
+    Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
 
     vm.expectRevert(abi.encodeWithSelector(IEVM2EVMOffRamp.UnsupportedToken.selector, address(0)));
-    s_offRamp.releaseOrMintTokens(tokensAndAmounts, OWNER);
+    s_offRamp.releaseOrMintTokens(tokenAmounts, OWNER);
   }
 }

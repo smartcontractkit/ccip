@@ -37,9 +37,9 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
 
     sourceToken1.approve(address(s_sourceRouter), 2**64);
 
-    message.tokensAndAmounts = new Common.EVMTokenAndAmount[](1);
-    message.tokensAndAmounts[0].amount = 2**64;
-    message.tokensAndAmounts[0].token = sourceToken1Address;
+    message.tokenAmounts = new Client.EVMTokenAmount[](1);
+    message.tokenAmounts[0].amount = 2**64;
+    message.tokenAmounts[0].token = sourceToken1Address;
     message.feeToken = s_sourceTokens[0];
 
     uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_ID, message);
@@ -48,7 +48,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
 
     // Assert that the tokens are burned
     vm.expectEmit(false, false, false, true);
-    emit Burned(address(s_onRamp), message.tokensAndAmounts[0].amount);
+    emit Burned(address(s_onRamp), message.tokenAmounts[0].amount);
 
     Internal.EVM2EVMMessage memory msgEvent = _messageToEvent(message, 1, 1, expectedFee);
 
@@ -60,8 +60,8 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     vm.pauseGasMetering();
 
     assertEq(msgEvent.messageId, messageId);
-    // Assert the user balance is lowered by the tokensAndAmounts sent and the fee amount
-    uint256 expectedBalance = balanceBefore - (message.tokensAndAmounts[0].amount);
+    // Assert the user balance is lowered by the tokenAmounts sent and the fee amount
+    uint256 expectedBalance = balanceBefore - (message.tokenAmounts[0].amount);
     assertEq(expectedBalance, sourceToken1.balanceOf(OWNER));
     vm.resumeGasMetering();
   }

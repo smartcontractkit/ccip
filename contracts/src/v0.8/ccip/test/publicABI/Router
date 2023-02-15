@@ -9,7 +9,7 @@
   "getWrappedNative()": "e861e907",
   "isChainSupported(uint64)": "a48a9058",
   "owner()": "8da5cb5b",
-  "routeMessage((uint64,bytes,bytes,(address,uint256)[]),bool,uint256,address)": "004b61bb",
+  "routeMessage((bytes32,uint64,bytes,bytes,(address,uint256)[]),bool,uint256,address)": "5607b375",
   "setWrappedNative(address)": "52cb60ca",
   "transferOwnership(address)": "f2fde38b",
   "typeAndVersion()": "181f5a77"

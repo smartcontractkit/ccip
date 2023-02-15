@@ -3,7 +3,7 @@ pragma solidity 0.8.15;
 
 import {CCIPReceiver} from "../../../applications/CCIPReceiver.sol";
 import {EVM2EVMOffRamp} from "../../../offRamp/EVM2EVMOffRamp.sol";
-import {Common} from "../../../models/Common.sol";
+import {Client} from "../../../models/Client.sol";
 import {Internal} from "../../../models/Internal.sol";
 
 contract ReentrancyAbuser is CCIPReceiver {
@@ -21,7 +21,7 @@ contract ReentrancyAbuser is CCIPReceiver {
     s_payload = payload;
   }
 
-  function _ccipReceive(Common.Any2EVMMessage memory) internal override {
+  function _ccipReceive(Client.Any2EVMMessage memory) internal override {
     if (!s_ReentrancyDone) {
       // Could do more rounds but a PoC one is enough
       s_ReentrancyDone = true;

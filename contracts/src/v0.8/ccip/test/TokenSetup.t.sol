@@ -9,7 +9,7 @@ import "../pools/BurnMintTokenPool.sol";
 import "../pools/LockReleaseTokenPool.sol";
 import "../health/HealthChecker.sol";
 import "../pools/OffRampTokenPoolRegistry.sol";
-import "../models/Common.sol";
+import "../models/Client.sol";
 
 contract TokenSetup is BaseTest {
   address[] internal s_sourceTokens;
@@ -58,25 +58,25 @@ contract TokenSetup is BaseTest {
     s_destFeeTokenPool = IPool(s_destPools[0]);
   }
 
-  function getCastedSourceEVMTokenAndAmountsWithZeroAmounts()
+  function getCastedSourceEVMTokenAmountsWithZeroAmounts()
     internal
     view
-    returns (Common.EVMTokenAndAmount[] memory tokensAndAmounts)
+    returns (Client.EVMTokenAmount[] memory tokenAmounts)
   {
-    tokensAndAmounts = new Common.EVMTokenAndAmount[](s_sourceTokens.length);
-    for (uint256 i = 0; i < tokensAndAmounts.length; i++) {
-      tokensAndAmounts[i].token = s_sourceTokens[i];
+    tokenAmounts = new Client.EVMTokenAmount[](s_sourceTokens.length);
+    for (uint256 i = 0; i < tokenAmounts.length; i++) {
+      tokenAmounts[i].token = s_sourceTokens[i];
     }
   }
 
-  function getCastedDestinationEVMTokenAndAmountsWithZeroAmounts()
+  function getCastedDestinationEVMTokenAmountsWithZeroAmounts()
     internal
     view
-    returns (Common.EVMTokenAndAmount[] memory tokensAndAmounts)
+    returns (Client.EVMTokenAmount[] memory tokenAmounts)
   {
-    tokensAndAmounts = new Common.EVMTokenAndAmount[](s_destTokens.length);
-    for (uint256 i = 0; i < tokensAndAmounts.length; i++) {
-      tokensAndAmounts[i].token = s_destTokens[i];
+    tokenAmounts = new Client.EVMTokenAmount[](s_destTokens.length);
+    for (uint256 i = 0; i < tokenAmounts.length; i++) {
+      tokenAmounts[i].token = s_destTokens[i];
     }
   }
 

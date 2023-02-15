@@ -88,46 +88,46 @@ func DecodeMessage(b []byte) (*evm_2_evm_onramp.InternalEVM2EVMMessage, error) {
 
 	// Note must use unnamed type here
 	receivedCp, ok := unpacked[0].(struct {
-		SourceChainId    uint64         `json:"sourceChainId"`
-		SequenceNumber   uint64         `json:"sequenceNumber"`
-		FeeTokenAmount   *big.Int       `json:"feeTokenAmount"`
-		Sender           common.Address `json:"sender"`
-		Nonce            uint64         `json:"nonce"`
-		GasLimit         *big.Int       `json:"gasLimit"`
-		Strict           bool           `json:"strict"`
-		Receiver         common.Address `json:"receiver"`
-		Data             []uint8        `json:"data"`
-		TokensAndAmounts []struct {
+		SourceChainId  uint64         `json:"sourceChainId"`
+		SequenceNumber uint64         `json:"sequenceNumber"`
+		FeeTokenAmount *big.Int       `json:"feeTokenAmount"`
+		Sender         common.Address `json:"sender"`
+		Nonce          uint64         `json:"nonce"`
+		GasLimit       *big.Int       `json:"gasLimit"`
+		Strict         bool           `json:"strict"`
+		Receiver       common.Address `json:"receiver"`
+		Data           []uint8        `json:"data"`
+		TokenAmounts   []struct {
 			Token  common.Address `json:"token"`
 			Amount *big.Int       `json:"amount"`
-		} `json:"tokensAndAmounts"`
+		} `json:"tokenAmounts"`
 		FeeToken  common.Address `json:"feeToken"`
 		MessageId [32]byte       `json:"messageId"`
 	})
 	if !ok {
 		return nil, fmt.Errorf("invalid format have %T want %T", unpacked[0], receivedCp)
 	}
-	var tokensAndAmounts []evm_2_evm_onramp.CommonEVMTokenAndAmount
-	for _, tokenAndAmount := range receivedCp.TokensAndAmounts {
-		tokensAndAmounts = append(tokensAndAmounts, evm_2_evm_onramp.CommonEVMTokenAndAmount{
+	var tokensAndAmounts []evm_2_evm_onramp.ClientEVMTokenAmount
+	for _, tokenAndAmount := range receivedCp.TokenAmounts {
+		tokensAndAmounts = append(tokensAndAmounts, evm_2_evm_onramp.ClientEVMTokenAmount{
 			Token:  tokenAndAmount.Token,
 			Amount: tokenAndAmount.Amount,
 		})
 	}
 
 	return &evm_2_evm_onramp.InternalEVM2EVMMessage{
-		SourceChainId:    receivedCp.SourceChainId,
-		SequenceNumber:   receivedCp.SequenceNumber,
-		FeeTokenAmount:   receivedCp.FeeTokenAmount,
-		Sender:           receivedCp.Sender,
-		Nonce:            receivedCp.Nonce,
-		GasLimit:         receivedCp.GasLimit,
-		Strict:           receivedCp.Strict,
-		Receiver:         receivedCp.Receiver,
-		Data:             receivedCp.Data,
-		TokensAndAmounts: tokensAndAmounts,
-		FeeToken:         receivedCp.FeeToken,
-		MessageId:        receivedCp.MessageId,
+		SourceChainId:  receivedCp.SourceChainId,
+		SequenceNumber: receivedCp.SequenceNumber,
+		FeeTokenAmount: receivedCp.FeeTokenAmount,
+		Sender:         receivedCp.Sender,
+		Nonce:          receivedCp.Nonce,
+		GasLimit:       receivedCp.GasLimit,
+		Strict:         receivedCp.Strict,
+		Receiver:       receivedCp.Receiver,
+		Data:           receivedCp.Data,
+		TokenAmounts:   tokensAndAmounts,
+		FeeToken:       receivedCp.FeeToken,
+		MessageId:      receivedCp.MessageId,
 	}, nil
 }
 
@@ -170,7 +170,7 @@ func MakeMessageArgs() abi.Arguments {
 			Type: "bytes",
 		},
 		{
-			Name: "tokensAndAmounts",
+			Name: "tokenAmounts",
 			Type: "tuple[]",
 			Components: []abi.ArgumentMarshaling{
 				{
