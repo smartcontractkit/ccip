@@ -421,6 +421,7 @@ func (r *ExecutionReportingPlugin) getExecutableSeqNrs(
 	for _, unexpiredReport := range unexpiredReports {
 		snoozeUntil, haveSnoozed := r.snoozedRoots[unexpiredReport.MerkleRoot]
 		if haveSnoozed && time.Now().Before(snoozeUntil) {
+			incSkippedRequests(reasonSnoozed)
 			continue
 		}
 		blessed, err := r.config.commitStore.IsBlessed(nil, unexpiredReport.MerkleRoot)
@@ -429,6 +430,7 @@ func (r *ExecutionReportingPlugin) getExecutableSeqNrs(
 		}
 		if !blessed {
 			r.lggr.Infow("report is accepted but not blessed", "report", hexutil.Encode(unexpiredReport.MerkleRoot[:]))
+			incSkippedRequests(reasonNotBlessed)
 			continue
 		}
 		// Check this root for executable messages
@@ -452,6 +454,7 @@ func (r *ExecutionReportingPlugin) getExecutableSeqNrs(
 		if allMessagesExecuted {
 			r.lggr.Infof("Snoozing root %s forever since there are no executable txs anymore %v", hex.EncodeToString(unexpiredReport.MerkleRoot[:]), executedMp)
 			r.snoozedRoots[unexpiredReport.MerkleRoot] = time.Now().Add(PERMISSIONLESS_EXECUTION_THRESHOLD)
+			incSkippedRequests(reasonAllExecuted)
 			continue
 		}
 		if len(batch) != 0 {
