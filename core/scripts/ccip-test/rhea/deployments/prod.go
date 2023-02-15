@@ -99,7 +99,6 @@ var Prod_SepoliaToAvaxFuji = rhea.EvmDeploymentConfig{
 		OffRamp:      gethcommon.HexToAddress("0x95ab1853c803c740e7b095776b217f0e8cbd2e16"),
 		ReceiverDapp: gethcommon.HexToAddress("0xa98fa8a008371b9408195e52734b1768c0d1cb5c"),
 		PingPongDapp: gethcommon.HexToAddress("0x177e068bc512ad99ec73db6feb7c731d9fea0cb3"),
-		AllowList:    []gethcommon.Address{gethcommon.HexToAddress("")},
 	},
 	DeploySettings: rhea.DeploySettings{
 		DeployAFN:        false,
