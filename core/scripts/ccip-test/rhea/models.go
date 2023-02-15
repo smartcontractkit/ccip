@@ -42,15 +42,14 @@ type DeploySettings struct {
 type Token string
 
 const (
-	LINK   Token = "Link"
-	WETH   Token = "WETH"
-	WAVAX  Token = "WAVAX"
-	Custom Token = "Custom"
+	LINK  Token = "Link"
+	WETH  Token = "WETH"
+	WAVAX Token = "WAVAX"
 )
 
 func GetAllTokens() []Token {
 	return []Token{
-		LINK, WETH, WAVAX, Custom,
+		LINK, WETH, WAVAX,
 	}
 }
 
@@ -60,6 +59,7 @@ type EVMChainConfig struct {
 
 	SupportedTokens map[Token]EVMBridgedToken
 	FeeTokens       []Token
+	WrappedNative   Token
 	Router          gethcommon.Address
 	Afn             gethcommon.Address
 	FeeManager      gethcommon.Address

@@ -93,7 +93,7 @@ func TestCCIP(t *testing.T) {
 		// Set the config to the commitStore and the offramp
 		client.SetOCR2Config(ENV)
 	case "setOnRampFeeConfig":
-		client.setOnRampFeeConfig(t)
+		client.setOnRampFeeConfig(t, &SOURCE)
 		// Set the config to the onRamp fee
 	case "upgradeLane":
 		rhea.UpgradeLane(t, &SOURCE, &DESTINATION)

@@ -79,7 +79,12 @@ func deployRouter(t *testing.T, client *EvmDeploymentConfig) {
 	}
 
 	client.Logger.Infof("Deploying Router")
-	routerAddress, tx, _, err := router.DeployRouter(client.Owner, client.Client, common.HexToAddress("0x0"))
+	nativeFeeToken := common.HexToAddress("0x0")
+	if client.ChainConfig.WrappedNative != "" {
+		nativeFeeToken = client.ChainConfig.SupportedTokens[client.ChainConfig.WrappedNative].Token
+	}
+
+	routerAddress, tx, _, err := router.DeployRouter(client.Owner, client.Client, nativeFeeToken)
 	shared.RequireNoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 	client.ChainConfig.Router = routerAddress

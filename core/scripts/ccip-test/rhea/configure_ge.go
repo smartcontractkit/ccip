@@ -28,21 +28,26 @@ func setOffRampOnTokenPools(t *testing.T, destClient *EvmDeploymentConfig) {
 	}
 }
 
-func setFeeManagerPrices(t *testing.T, client *EvmDeploymentConfig, destChainId uint64) {
+func SetFeeManagerPrices(t *testing.T, client *EvmDeploymentConfig, destChainId uint64) {
 	feeManager, err := fee_manager.NewFeeManager(client.ChainConfig.FeeManager, client.Client)
 	shared.RequireNoError(t, err)
 
+	var feeUpdates []fee_manager.InternalFeeUpdate
+
 	for _, feeToken := range client.ChainConfig.FeeTokens {
-		tx, err := feeManager.UpdateFees(client.Owner, []fee_manager.InternalFeeUpdate{
-			{
-				SourceFeeToken:              client.ChainConfig.SupportedTokens[feeToken].Token,
-				DestChainId:                 destChainId,
-				FeeTokenBaseUnitsPerUnitGas: big.NewInt(1e18),
-			},
+		feeUpdates = append(feeUpdates, fee_manager.InternalFeeUpdate{
+			SourceFeeToken: client.ChainConfig.SupportedTokens[feeToken].Token,
+			DestChainId:    destChainId,
+			// set the gas price to 1gwei in fee tokens. This means 1gwei LINK/ETH/...
+			// equals 1 gas on the destination chain. This will be wrong but the DONs will set
+			// the correct price automatically.
+			FeeTokenBaseUnitsPerUnitGas: big.NewInt(1e9),
 		})
-		shared.RequireNoError(t, err)
-		shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 	}
+
+	tx, err := feeManager.UpdateFees(client.Owner, feeUpdates)
+	shared.RequireNoError(t, err)
+	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 }
 
 func setOnRampOnRouter(t *testing.T, sourceClient *EvmDeploymentConfig, destChainId uint64) {

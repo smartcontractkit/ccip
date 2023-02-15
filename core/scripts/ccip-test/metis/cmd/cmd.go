@@ -47,10 +47,19 @@ func NewMetisApp(client MetisClient) *cli.App {
 		},
 		{
 			Name:    "txs",
-			Aliases: []string{"t"},
+			Aliases: []string{"tx"},
 			Usage:   "prints recent txs",
 			Action: func(c *cli.Context) error {
 				printing.PrintTxStatuses(&SOURCE, &DESTINATION)
+				return nil
+			},
+		},
+		{
+			Name:    "tokens",
+			Aliases: []string{"t"},
+			Usage:   "prints fee tokens and token support",
+			Action: func(c *cli.Context) error {
+				printing.PrintTokenSupportAllChains(client.Logger)
 				return nil
 			},
 		},

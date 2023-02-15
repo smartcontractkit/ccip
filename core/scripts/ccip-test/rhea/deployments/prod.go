@@ -27,17 +27,17 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 			Price:                big.NewInt(10),
 			PriceFeedsAggregator: gethcommon.HexToAddress("0xc59E3633BAAC79493d908e63626716e204A45EdF"),
 		},
-		//rhea.WETH: {
-		//	Token:                gethcommon.HexToAddress(""),
-		//	Pool:                 gethcommon.HexToAddress(""),
-		//	Price:                big.NewInt(1500),
-		//	PriceFeedsAggregator: gethcommon.HexToAddress("0x694AA1769357215DE4FAC081bf1f309aDC325306"),
-		//},
+		rhea.WETH: {
+			Token: gethcommon.HexToAddress("0x097D90c9d3E0B50Ca60e1ae45F6A81010f9FB534"),
+			Pool:  gethcommon.HexToAddress(""),
+			Price: big.NewInt(1500),
+		},
 	},
-	FeeTokens:  []rhea.Token{rhea.LINK},
-	Router:     gethcommon.HexToAddress("0x428c4dc89b6bf908b82d77c9cbcea786ea8cc7d0"),
-	Afn:        gethcommon.HexToAddress("0x89d17571db7c9540eeb36760e3c749c8fb984569"),
-	FeeManager: gethcommon.HexToAddress("0x1f0e1ef0928c32fbb36c07054893dca7b1c9cd75"),
+	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WETH},
+	WrappedNative: rhea.WETH,
+	Router:        gethcommon.HexToAddress("0x428c4dc89b6bf908b82d77c9cbcea786ea8cc7d0"),
+	Afn:           gethcommon.HexToAddress("0x89d17571db7c9540eeb36760e3c749c8fb984569"),
+	FeeManager:    gethcommon.HexToAddress("0x1f0e1ef0928c32fbb36c07054893dca7b1c9cd75"),
 }
 
 var Prod_OptimismGoerli = rhea.EVMChainConfig{
@@ -47,22 +47,21 @@ var Prod_OptimismGoerli = rhea.EVMChainConfig{
 	},
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 		rhea.LINK: {
-			Token:                gethcommon.HexToAddress("0xdc2CC710e42857672E7907CF474a69B63B93089f"),
-			Pool:                 gethcommon.HexToAddress("0x6ceabcbe4f904ff5ad0d827a9346863bdcf565ce"),
-			Price:                big.NewInt(10),
-			PriceFeedsAggregator: gethcommon.HexToAddress("0x69C5297001f38cCBE30a81359da06E5256bd28B9"),
+			Token: gethcommon.HexToAddress("0xdc2CC710e42857672E7907CF474a69B63B93089f"),
+			Pool:  gethcommon.HexToAddress("0x6ceabcbe4f904ff5ad0d827a9346863bdcf565ce"),
+			Price: big.NewInt(10),
 		},
 		rhea.WETH: {
-			Token:                gethcommon.HexToAddress("0x4200000000000000000000000000000000000006"),
-			Pool:                 gethcommon.HexToAddress("0xde8d0f47a71ea3fdfbd3162271652f2847939097"),
-			Price:                big.NewInt(1500),
-			PriceFeedsAggregator: gethcommon.HexToAddress("0x69C5297001f38cCBE30a81359da06E5256bd28B9"),
+			Token: gethcommon.HexToAddress("0x4200000000000000000000000000000000000006"),
+			Pool:  gethcommon.HexToAddress("0xde8d0f47a71ea3fdfbd3162271652f2847939097"),
+			Price: big.NewInt(1500),
 		},
 	},
-	FeeTokens:  []rhea.Token{rhea.LINK, rhea.WETH},
-	Router:     gethcommon.HexToAddress("0xf01ebcd92bc2a7c4e58b5c1527d6814f47443232"),
-	Afn:        gethcommon.HexToAddress("0x6d0e94e9f06cafb6031410de7df19fe2f286566c"),
-	FeeManager: gethcommon.HexToAddress("0x583e761181801f2b43efb1a9489db1a7c78fb60f"),
+	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WETH},
+	WrappedNative: rhea.WETH,
+	Router:        gethcommon.HexToAddress("0xf01ebcd92bc2a7c4e58b5c1527d6814f47443232"),
+	Afn:           gethcommon.HexToAddress("0x6d0e94e9f06cafb6031410de7df19fe2f286566c"),
+	FeeManager:    gethcommon.HexToAddress("0x583e761181801f2b43efb1a9489db1a7c78fb60f"),
 }
 
 var Prod_AvaxFuji = rhea.EVMChainConfig{
@@ -84,10 +83,11 @@ var Prod_AvaxFuji = rhea.EVMChainConfig{
 			PriceFeedsAggregator: gethcommon.HexToAddress("0x6C2441920404835155f33d88faf0545B895871b1"),
 		},
 	},
-	FeeTokens:  []rhea.Token{rhea.LINK, rhea.WAVAX},
-	Router:     gethcommon.HexToAddress("0x3e4472e98997564378070308fce2a958a66194df"),
-	Afn:        gethcommon.HexToAddress("0x0fa77a2df96f59ab60f440af790ed74eb7d16128"),
-	FeeManager: gethcommon.HexToAddress("0x45dccaec07a3241a1492e23ea055fb8d501d07e2"),
+	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WAVAX},
+	WrappedNative: rhea.WAVAX,
+	Router:        gethcommon.HexToAddress("0x3e4472e98997564378070308fce2a958a66194df"),
+	Afn:           gethcommon.HexToAddress("0x0fa77a2df96f59ab60f440af790ed74eb7d16128"),
+	FeeManager:    gethcommon.HexToAddress("0x45dccaec07a3241a1492e23ea055fb8d501d07e2"),
 }
 
 // Lanes

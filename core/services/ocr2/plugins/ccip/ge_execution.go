@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
@@ -116,13 +117,14 @@ func (tb *BatchBuilder) BuildBatch(
 			executedAllMessages = false
 			continue
 		}
+		lggr := tb.lggr.With("messageID", hexutil.Encode(msg.Message.MessageId[:]))
 		if _, executed := executed[msg.Message.SequenceNumber]; executed {
-			tb.lggr.Infow("Skipping message already executed", "seqNr", msg.Message.SequenceNumber)
+			lggr.Infow("Skipping message already executed", "seqNr", msg.Message.SequenceNumber)
 			continue
 		}
 		executedAllMessages = false
 		if _, inflight := inflightSeqNrs[msg.Message.SequenceNumber]; inflight {
-			tb.lggr.Infow("Skipping message already inflight", "seqNr", msg.Message.SequenceNumber)
+			lggr.Infow("Skipping message already inflight", "seqNr", msg.Message.SequenceNumber)
 			continue
 		}
 		if _, ok := expectedNonces[msg.Message.Sender]; !ok {
@@ -135,15 +137,16 @@ func (tb *BatchBuilder) BuildBatch(
 				// Chain holds expected next nonce.
 				nonce, err := tb.ramp.GetSenderNonce(nil, msg.Message.Sender)
 				if err != nil {
-					tb.lggr.Errorw("unable to get sender nonce", "err", err)
+					lggr.Errorw("unable to get sender nonce", "err", err)
 					continue
 				}
 				expectedNonces[msg.Message.Sender] = nonce + 1
 			}
 		}
 		// Check expected nonce is valid
+
 		if msg.Message.Nonce != expectedNonces[msg.Message.Sender] {
-			tb.lggr.Warnw("Skipping message invalid nonce", "have", msg.Message.Nonce, "want", expectedNonces[msg.Message.Sender])
+			lggr.Warnw("Skipping message invalid nonce", "have", msg.Message.Nonce, "want", expectedNonces[msg.Message.Sender])
 			continue
 		}
 
@@ -155,7 +158,7 @@ func (tb *BatchBuilder) BuildBatch(
 		}
 		msgValue, err := aggregateTokenValue(tokenLimitPrices, srcToDst, tokens, amounts)
 		if err != nil {
-			tb.lggr.Errorw("Skipping message unable to compute aggregate value", "err", err)
+			lggr.Errorw("Skipping message unable to compute aggregate value", "err", err)
 			continue
 		}
 		// if token limit is smaller than message value skip message
@@ -166,16 +169,14 @@ func (tb *BatchBuilder) BuildBatch(
 		totalGasLimit := msg.Message.GasLimit.Uint64() + maxGasOverHeadGas(len(msgs), msg.Message)
 		// Check sufficient gas in batch
 		if batchGasLimit < totalGasLimit {
-			tb.lggr.Infow("Insufficient remaining gas in batch limit", "gasLimit", batchGasLimit, "totalGasLimit", totalGasLimit)
-			continue
-		}
-		if _, ok := srcToDst[msg.Message.FeeToken]; !ok {
-			tb.lggr.Errorw("Unknown fee token", "token", msg.Message.FeeToken, "supported", srcToDst)
+
+			lggr.Infow("Insufficient remaining gas in batch limit", "gasLimit", batchGasLimit, "totalGasLimit", totalGasLimit)
 			continue
 		}
 		batchGasLimit -= totalGasLimit
 		aggregateTokenLimit.Sub(aggregateTokenLimit, msgValue)
-		tb.lggr.Infow("Adding ge msg to batch", "seqNum", msg.Message.SequenceNumber, "nonce", msg.Message.Nonce)
+
+		lggr.Infow("Adding msg to batch", "seqNum", msg.Message.SequenceNumber, "nonce", msg.Message.Nonce)
 		executableSeqNrs = append(executableSeqNrs, msg.Message.SequenceNumber)
 		expectedNonces[msg.Message.Sender] = msg.Message.Nonce + 1
 	}

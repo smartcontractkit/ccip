@@ -3,6 +3,7 @@ package printing
 import (
 	"context"
 	"fmt"
+	"log"
 	"math/big"
 	"strconv"
 	"strings"
@@ -19,8 +20,10 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ping_pong_demo"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
+	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/dione"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
+	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea/deployments"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
 )
 
@@ -41,6 +44,37 @@ func PrintCCIPState(source *rhea.EvmDeploymentConfig, destination *rhea.EvmDeplo
 
 	printRateLimitingStatus(source)
 	printRateLimitingStatus(destination)
+}
+
+func PrintTokenSupportAllChains(logger logger.Logger) {
+	err := deployments.Prod_SepoliaToOptimismGoerli.SetupReadOnlyChain(logger.Named(helpers.ChainName(int64(deployments.Prod_SepoliaToOptimismGoerli.ChainConfig.ChainId))))
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = deployments.Prod_OptimismGoerliToSepolia.SetupReadOnlyChain(logger.Named(helpers.ChainName(int64(deployments.Prod_OptimismGoerliToSepolia.ChainConfig.ChainId))))
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = deployments.Prod_SepoliaToAvaxFuji.SetupReadOnlyChain(logger.Named(helpers.ChainName(int64(deployments.Prod_SepoliaToAvaxFuji.ChainConfig.ChainId))))
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = deployments.Prod_AvaxFujiToSepolia.SetupReadOnlyChain(logger.Named(helpers.ChainName(int64(deployments.Prod_AvaxFujiToSepolia.ChainConfig.ChainId))))
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = deployments.Prod_AvaxFujiToOptimismGoerli.SetupReadOnlyChain(logger.Named(helpers.ChainName(int64(deployments.Prod_AvaxFujiToOptimismGoerli.ChainConfig.ChainId))))
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = deployments.Prod_OptimismGoerliToAvaxFuji.SetupReadOnlyChain(logger.Named(helpers.ChainName(int64(deployments.Prod_OptimismGoerliToAvaxFuji.ChainConfig.ChainId))))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	printSupportedTokensCheck(&deployments.Prod_SepoliaToOptimismGoerli, &deployments.Prod_OptimismGoerliToSepolia)
+	printSupportedTokensCheck(&deployments.Prod_SepoliaToAvaxFuji, &deployments.Prod_AvaxFujiToSepolia)
+	printSupportedTokensCheck(&deployments.Prod_AvaxFujiToOptimismGoerli, &deployments.Prod_OptimismGoerliToAvaxFuji)
 }
 
 type CCIPTXStatus struct {
@@ -332,6 +366,10 @@ func printPaused(chain *rhea.EvmDeploymentConfig) {
 	sb.WriteString(generateHeader(tableHeaders, headerLengths))
 
 	for _, tokenConfig := range chain.ChainConfig.SupportedTokens {
+		if tokenConfig.Pool == common.HexToAddress("") {
+			continue
+		}
+
 		tokenPool, err := lock_release_token_pool.NewLockReleaseTokenPool(tokenConfig.Pool, chain.Client)
 		helpers.PanicErr(err)
 		paused, err := tokenPool.Paused(&bind.CallOpts{})
@@ -400,6 +438,11 @@ func printPoolBalances(chain *rhea.EvmDeploymentConfig) {
 	helpers.PanicErr(err)
 
 	for tokenName, tokenConfig := range chain.ChainConfig.SupportedTokens {
+		if tokenConfig.Pool == common.HexToAddress("") {
+			sb.WriteString(fmt.Sprintf("| %-32s | No pool found\n", tokenName))
+			continue
+		}
+
 		tokenPool, err := lock_release_token_pool.NewLockReleaseTokenPool(tokenConfig.Pool, chain.Client)
 		helpers.PanicErr(err)
 
@@ -449,8 +492,18 @@ func printSupportedTokensCheck(source *rhea.EvmDeploymentConfig, destination *rh
 	var sb strings.Builder
 	sb.WriteString("\nToken matching\n")
 
-	tableHeaders := []string{"Token", "Source", "Pool", "Dest", "Pool"}
-	headerLengths := []int{20, 10, 10, 10, 10}
+	tableHeaders := []string{"", "Source " + helpers.ChainName(int64(source.ChainConfig.ChainId)), "Destination " + helpers.ChainName(int64(destination.ChainConfig.ChainId))}
+	headerLengths := []int{20, 49, 49}
+
+	sb.WriteString(generateSeparator(headerLengths))
+	sb.WriteString("|")
+	for i, header := range tableHeaders {
+		sb.WriteString(fmt.Sprintf(" %-"+strconv.Itoa(headerLengths[i])+"s |", header))
+	}
+	sb.WriteString("\n")
+
+	tableHeaders = []string{"Token", "FeeToken", "FeeAmount", "Transfer", "Pool", "FeeToken", "FeeAmount", "Transfer", "Pool"}
+	headerLengths = []int{20, 9, 13, 9, 9, 9, 13, 9, 9}
 
 	sb.WriteString(generateHeader(tableHeaders, headerLengths))
 
@@ -459,19 +512,57 @@ func printSupportedTokensCheck(source *rhea.EvmDeploymentConfig, destination *rh
 		if val, ok := source.ChainConfig.SupportedTokens[token]; ok && val.Pool != common.HexToAddress("") {
 			sourcePool = true
 		}
+
+		sourceFee, err := sourceRouter.GetFee(&bind.CallOpts{}, destination.ChainConfig.ChainId, router.ClientEVM2AnyMessage{
+			Receiver:     common.HexToAddress("").Bytes(),
+			Data:         []byte{},
+			TokenAmounts: []router.ClientEVMTokenAmount{},
+			FeeToken:     destination.ChainConfig.SupportedTokens[token].Token,
+			ExtraArgs:    []byte{},
+		})
+		isSourceFeeToken := err == nil
+		sourceFeeAmount := "➖"
+
+		if isSourceFeeToken {
+			sourceFeeAmount = dione.EthBalanceToString(sourceFee)
+		}
+
 		destPool := false
 		if val, ok := destination.ChainConfig.SupportedTokens[token]; ok && val.Pool != common.HexToAddress("") {
 			destPool = true
 		}
+		destFee, err := destRouter.GetFee(&bind.CallOpts{}, source.ChainConfig.ChainId, router.ClientEVM2AnyMessage{
+			Receiver:     common.HexToAddress("").Bytes(),
+			Data:         []byte{},
+			TokenAmounts: []router.ClientEVMTokenAmount{},
+			FeeToken:     destination.ChainConfig.SupportedTokens[token].Token,
+			ExtraArgs:    []byte{},
+		})
+		isDestFeeToken := err == nil
+		destFeeAmount := "➖"
+		if isDestFeeToken {
+			destFeeAmount = dione.EthBalanceToString(destFee)
+		}
+
 		sourceEnabled := slices.Contains(sourceTokens, source.ChainConfig.SupportedTokens[token].Token)
 		destEnabled := slices.Contains(destTokens, destination.ChainConfig.SupportedTokens[token].Token)
 
+		boolParser := printBoolNeutral
 		if sourceEnabled || destEnabled {
-			sb.WriteString(fmt.Sprintf("| %-20s | %10s | %10s | %10s | %10s |\n", token, printBool(sourceEnabled), printBool(sourcePool), printBool(destEnabled), printBool(destPool)))
-		} else {
-			sb.WriteString(fmt.Sprintf("| %-20s | %10s | %10s | %10s | %10s |\n", token, printBoolNeutral(sourceEnabled), printBoolNeutral(sourcePool), printBoolNeutral(destEnabled), printBoolNeutral(destPool)))
+			boolParser = printBool
 		}
 
+		sb.WriteString(fmt.Sprintf("| %-20s | %9s | %13s | %9s | %9s | %9s | %13s | %9s | %9s |\n",
+			token,
+			printBoolNeutral(isSourceFeeToken),
+			sourceFeeAmount,
+			boolParser(sourceEnabled),
+			boolParser(sourcePool),
+			printBoolNeutral(isDestFeeToken),
+			destFeeAmount,
+			boolParser(destEnabled),
+			boolParser(destPool),
+		))
 	}
 
 	sb.WriteString(generateSeparator(headerLengths))

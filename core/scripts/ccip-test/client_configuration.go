@@ -53,15 +53,19 @@ import (
 func (client *CCIPClient) wip(t *testing.T, sourceClient *rhea.EvmDeploymentConfig, destClient *rhea.EvmDeploymentConfig) {
 }
 
-func (client *CCIPClient) setOnRampFeeConfig(t *testing.T) {
-	tx, err := client.Source.OnRamp.SetFeeConfig(client.Source.Owner, []evm_2_evm_onramp.IEVM2EVMOnRampFeeTokenConfigArgs{
-		{
-			Token:           client.Source.LinkTokenAddress,
-			FeeAmount:       big.NewInt(100),
-			DestGasOverhead: 0,
+func (client *CCIPClient) setOnRampFeeConfig(t *testing.T, sourceClient *rhea.EvmDeploymentConfig) {
+	var feeTokenConfig []evm_2_evm_onramp.IEVM2EVMOnRampFeeTokenConfigArgs
+
+	for _, feeToken := range sourceClient.ChainConfig.FeeTokens {
+		feeTokenConfig = append(feeTokenConfig, evm_2_evm_onramp.IEVM2EVMOnRampFeeTokenConfigArgs{
+			Token:           sourceClient.ChainConfig.SupportedTokens[feeToken].Token,
 			Multiplier:      1e18,
-		},
-	})
+			FeeAmount:       big.NewInt(100e9),
+			DestGasOverhead: 0,
+		})
+	}
+
+	tx, err := client.Source.OnRamp.SetFeeConfig(client.Source.Owner, feeTokenConfig)
 	shared.RequireNoError(t, err)
 	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 }

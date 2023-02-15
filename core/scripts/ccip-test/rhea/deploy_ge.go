@@ -40,8 +40,8 @@ func DeployGELanes(t *testing.T, source *EvmDeploymentConfig, destination *EvmDe
 	deployDestinationContracts(t, destination, sourceChainId, source.LaneConfig.OnRamp, source.ChainConfig.SupportedTokens)
 	deployDestinationContracts(t, source, destChainId, destination.LaneConfig.OnRamp, destination.ChainConfig.SupportedTokens)
 
-	setFeeManagerPrices(t, source, destChainId)
-	setFeeManagerPrices(t, destination, sourceChainId)
+	SetFeeManagerPrices(t, source, destChainId)
+	SetFeeManagerPrices(t, destination, sourceChainId)
 
 	deployGovernanceDapps(t, source, destination)
 
@@ -113,6 +113,17 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId uint64,
 		tokenPools = append(tokenPools, tokenConfig.Pool)
 	}
 
+	var feeTokenConfig []evm_2_evm_onramp.IEVM2EVMOnRampFeeTokenConfigArgs
+
+	for _, feeToken := range client.ChainConfig.FeeTokens {
+		feeTokenConfig = append(feeTokenConfig, evm_2_evm_onramp.IEVM2EVMOnRampFeeTokenConfigArgs{
+			Token:           client.ChainConfig.SupportedTokens[feeToken].Token,
+			Multiplier:      1e18,
+			FeeAmount:       big.NewInt(100e9),
+			DestGasOverhead: 0,
+		})
+	}
+
 	client.Logger.Infof("Deploying OnRamp: destinationChains %+v, bridgeTokens %+v, poolAddresses %+v", destChainId, bridgeTokens, tokenPools)
 	onRampAddress, tx, _, err := evm_2_evm_onramp.DeployEVM2EVMOnRamp(
 		client.Owner,               // user
@@ -135,14 +146,7 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId uint64,
 		},
 		client.ChainConfig.Router,
 		client.ChainConfig.FeeManager,
-		[]evm_2_evm_onramp.IEVM2EVMOnRampFeeTokenConfigArgs{
-			{
-				Token:           client.ChainConfig.SupportedTokens[LINK].Token,
-				Multiplier:      1,
-				FeeAmount:       big.NewInt(100),
-				DestGasOverhead: 0,
-			},
-		},
+		feeTokenConfig,
 	)
 	shared.RequireNoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
