@@ -47,10 +47,10 @@ func setFeeManagerPrices(t *testing.T, client *EvmDeploymentConfig, destChainId 
 
 func setOnRampOnRouter(t *testing.T, sourceClient *EvmDeploymentConfig, destChainId uint64) {
 	sourceClient.Logger.Infof("Setting the onRamp on the Router")
-	router, err := router.NewRouter(sourceClient.ChainConfig.Router, sourceClient.Client)
+	routerContract, err := router.NewRouter(sourceClient.ChainConfig.Router, sourceClient.Client)
 	shared.RequireNoError(t, err)
 	sourceClient.Logger.Infof("Registering new onRamp")
-	tx, err := router.SetOnRamp(sourceClient.Owner, destChainId, sourceClient.LaneConfig.OnRamp)
+	tx, err := routerContract.ApplyRampUpdates(sourceClient.Owner, []router.IRouterOnRampUpdate{{DestChainId: destChainId, OnRamp: sourceClient.LaneConfig.OnRamp}}, nil)
 	shared.RequireNoError(t, err)
 	shared.WaitForMined(t, sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
 }
@@ -68,19 +68,22 @@ func setOnRampOnTokenPools(t *testing.T, sourceClient *EvmDeploymentConfig) {
 	}
 }
 
-func setOffRampOnRouter(t *testing.T, client *EvmDeploymentConfig) {
+func setOffRampOnRouter(t *testing.T, sourceChainId uint64, client *EvmDeploymentConfig) {
 	client.Logger.Infof("Setting the offRamp on the Router")
-	router, err := router.NewRouter(client.ChainConfig.Router, client.Client)
+	routerContract, err := router.NewRouter(client.ChainConfig.Router, client.Client)
 	shared.RequireNoError(t, err)
 
-	isOffRamp, err := router.IsOffRamp(&bind.CallOpts{}, client.LaneConfig.OffRamp)
+	offRamps, err := routerContract.GetOffRamps(&bind.CallOpts{}, sourceChainId)
 	shared.RequireNoError(t, err)
-	if isOffRamp {
-		client.Logger.Infof("OffRamp already configured on router. Skipping")
-		return
+	for _, offRamp := range offRamps {
+		if offRamp == client.LaneConfig.OffRamp {
+			client.Logger.Infof("OffRamp already configured on router. Skipping")
+			return
+		}
 	}
 
-	tx, err := router.AddOffRamp(client.Owner, client.LaneConfig.OffRamp)
+	tx, err := routerContract.ApplyRampUpdates(client.Owner, nil, []router.IRouterOffRampUpdate{
+		{SourceChainId: sourceChainId, OffRamps: []common.Address{client.LaneConfig.OffRamp}}})
 	shared.RequireNoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 }

@@ -15,14 +15,24 @@ contract RouterSetup is BaseTest {
     BaseTest.setUp();
 
     if (address(s_sourceRouter) == address(0)) {
-      address[] memory offRamps = new address[](0);
       WETH9 weth = new WETH9();
-      s_sourceRouter = new Router(offRamps, address(weth));
+      s_sourceRouter = new Router(address(weth));
     }
     if (address(s_destRouter) == address(0)) {
-      address[] memory offRamps = new address[](0);
       WETH9 weth = new WETH9();
-      s_destRouter = new Router(offRamps, address(weth));
+      s_destRouter = new Router(address(weth));
     }
+  }
+
+  function generateReceiverMessage(uint64 chainId) internal pure returns (Client.Any2EVMMessage memory) {
+    Client.EVMTokenAmount[] memory ta = new Client.EVMTokenAmount[](0);
+    return
+      Client.Any2EVMMessage({
+        messageId: bytes32("a"),
+        sourceChainId: chainId,
+        sender: bytes("a"),
+        data: bytes("a"),
+        destTokenAmounts: ta
+      });
   }
 }

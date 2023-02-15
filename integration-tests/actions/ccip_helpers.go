@@ -280,7 +280,7 @@ func (ccipModule *CCIPCommon) DeployContracts(t *testing.T, noOfTokens int, dest
 		ccipModule.AFN = afn
 	}
 	if ccipModule.Router == nil {
-		ccipModule.Router, err = cd.DeployRouter([]common.Address{})
+		ccipModule.Router, err = cd.DeployRouter()
 		require.NoError(t, err, "Error on Router deployment on source chain")
 		require.NoError(t, ccipModule.ChainClient.WaitForEvents(), "Error waiting for common contract deployment")
 	} else {
@@ -531,7 +531,7 @@ func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(t *testing.T, t
 func (sourceCCIP *SourceCCIPModule) SendRequest(
 	t *testing.T,
 	receiver common.Address,
-	tokenAndAmounts []router.CommonEVMTokenAndAmount,
+	tokenAndAmounts []router.ClientEVMTokenAmount,
 	data string,
 	feeToken common.Address,
 ) (string, *big.Int) {
@@ -542,12 +542,12 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 	require.NoError(t, err, "Failed encoding the options field")
 
 	// form the message for transfer
-	msg := router.ConsumerEVM2AnyMessage{
-		Receiver:         receiverAddr,
-		Data:             []byte(data),
-		TokensAndAmounts: tokenAndAmounts,
-		FeeToken:         feeToken,
-		ExtraArgs:        extraArgsV1,
+	msg := router.ClientEVM2AnyMessage{
+		Receiver:     receiverAddr,
+		Data:         []byte(data),
+		TokenAmounts: tokenAndAmounts,
+		FeeToken:     feeToken,
+		ExtraArgs:    extraArgsV1,
 	}
 	log.Info().Interface("ge msg details", msg).Msg("ccip message to be sent")
 	fee, err := sourceCCIP.Common.Router.GetFee(sourceCCIP.DestinationChainId, msg)
@@ -657,7 +657,7 @@ func (destCCIP *DestCCIPModule) DeployContracts(t *testing.T, sourceCCIP SourceC
 	err = destFeeManager.SetFeeUpdater(destCCIP.OffRamp.EthAddress)
 	require.NoError(t, err, "setting OffRamp as fee updater shouldn't fail")
 
-	_, err = destCCIP.Common.Router.AddOffRamp(destCCIP.OffRamp.EthAddress)
+	_, err = destCCIP.Common.Router.AddOffRamp(destCCIP.OffRamp.EthAddress, destCCIP.SourceChainId)
 	require.NoError(t, err, "setting OffRamp as fee updater shouldn't fail")
 	err = destCCIP.Common.ChainClient.WaitForEvents()
 	require.NoError(t, err, "Error waiting for events on destination contract deployments")
@@ -874,9 +874,9 @@ func (lane *CCIPLane) RecordStateBeforeTransfer() {
 func (lane *CCIPLane) SendRequests(noOfRequests int) []string {
 	t := lane.t
 	lane.NumberOfReq += noOfRequests
-	var tokenAndAmounts []router.CommonEVMTokenAndAmount
+	var tokenAndAmounts []router.ClientEVMTokenAmount
 	for i, token := range lane.Source.Common.BridgeTokens {
-		tokenAndAmounts = append(tokenAndAmounts, router.CommonEVMTokenAndAmount{
+		tokenAndAmounts = append(tokenAndAmounts, router.ClientEVMTokenAmount{
 			Token: common.HexToAddress(token.Address()), Amount: lane.Source.TransferAmount[i],
 		})
 		// approve the onramp router so that it can initiate transferring the token

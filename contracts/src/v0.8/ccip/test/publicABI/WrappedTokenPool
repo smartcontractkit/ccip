@@ -9,7 +9,7 @@
   "increaseAllowance(address,uint256)": "39509351",
   "isOffRamp(address)": "1d7a74a0",
   "isOnRamp(address)": "6f32b872",
-  "lockOrBurn(uint256)": "503c2858",
+  "lockOrBurn(uint256,address)": "e2e59b3e",
   "name()": "06fdde03",
   "owner()": "8da5cb5b",
   "pause()": "8456cb59",

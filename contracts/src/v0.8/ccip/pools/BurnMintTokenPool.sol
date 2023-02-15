@@ -11,7 +11,7 @@ contract BurnMintTokenPool is TokenPool {
 
   /// @notice Burn the token in the pool
   /// @param amount Amount to burn
-  function lockOrBurn(uint256 amount) external override whenNotPaused validateOwnerOrOnRamp {
+  function lockOrBurn(uint256 amount, address) external override whenNotPaused validateOwnerOrOnRamp {
     IBurnMintERC20(address(i_token)).burn(address(this), amount);
     emit Burned(msg.sender, amount);
   }

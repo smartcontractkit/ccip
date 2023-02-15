@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Common} from "../../models/Common.sol";
+import {Client} from "../../models/Client.sol";
 import {Internal} from "../../models/Internal.sol";
 
 interface IFeeManager {

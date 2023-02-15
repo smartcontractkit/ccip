@@ -224,9 +224,7 @@ func (e *CCIPContractsDeployer) DeployReceiverDapp(toRevert bool) (
 	}, err
 }
 
-func (e *CCIPContractsDeployer) DeployRouter(
-	offRamps []common.Address,
-) (
+func (e *CCIPContractsDeployer) DeployRouter() (
 	*Router,
 	error,
 ) {
@@ -234,7 +232,7 @@ func (e *CCIPContractsDeployer) DeployRouter(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return router.DeployRouter(auth, backend, offRamps, common.HexToAddress("0x0"))
+		return router.DeployRouter(auth, backend, common.HexToAddress("0x0"))
 	})
 	if err != nil {
 		return nil, err

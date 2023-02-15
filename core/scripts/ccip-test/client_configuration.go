@@ -325,19 +325,19 @@ func (client *CCIPClient) SendMessage(t *testing.T) {
 	bts, err := hex.DecodeString("00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000005626c616e6b000000000000000000000000000000000000000000000000000000")
 	require.NoError(t, err)
 
-	token := router.CommonEVMTokenAndAmount{
+	token := router.ClientEVMTokenAmount{
 		Token:  client.Source.LinkTokenAddress,
 		Amount: big.NewInt(1),
 	}
 	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(3e5), false)
 	require.NoError(t, err)
 
-	msg := router.ConsumerEVM2AnyMessage{
-		Receiver:         testhelpers.MustEncodeAddress(t, client.Dest.MessageReceiver.Address()),
-		Data:             bts,
-		TokensAndAmounts: []router.CommonEVMTokenAndAmount{token},
-		ExtraArgs:        extraArgsV1,
-		FeeToken:         client.Source.LinkTokenAddress,
+	msg := router.ClientEVM2AnyMessage{
+		Receiver:     testhelpers.MustEncodeAddress(t, client.Dest.MessageReceiver.Address()),
+		Data:         bts,
+		TokenAmounts: []router.ClientEVMTokenAmount{token},
+		ExtraArgs:    extraArgsV1,
+		FeeToken:     client.Source.LinkTokenAddress,
 	}
 
 	tx, err := client.Source.Router.CcipSend(client.Source.Owner, client.Dest.ChainId, msg)
@@ -547,19 +547,19 @@ func (client *CCIPClient) ScalingAndBatching(t *testing.T) {
 
 func (client *CCIPClient) SendCrossChainMessage(t *testing.T, source SourceClient, from *bind.TransactOpts, toAddress common.Address, amount *big.Int) *evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested {
 	SourceBlockNumber := GetCurrentBlockNumber(source.Client.Client)
-	token := router.CommonEVMTokenAndAmount{
+	token := router.ClientEVMTokenAmount{
 		Token:  client.Source.LinkTokenAddress,
 		Amount: amount,
 	}
 	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(100_000), false)
 	helpers.PanicErr(err)
 
-	tx, err := source.Router.CcipSend(from, client.Dest.ChainId, router.ConsumerEVM2AnyMessage{
-		Receiver:         toAddress.Bytes(),
-		Data:             nil,
-		TokensAndAmounts: []router.CommonEVMTokenAndAmount{token},
-		FeeToken:         common.Address{},
-		ExtraArgs:        extraArgsV1,
+	tx, err := source.Router.CcipSend(from, client.Dest.ChainId, router.ClientEVM2AnyMessage{
+		Receiver:     toAddress.Bytes(),
+		Data:         nil,
+		TokenAmounts: []router.ClientEVMTokenAmount{token},
+		FeeToken:     common.Address{},
+		ExtraArgs:    extraArgsV1,
 	})
 	helpers.PanicErr(err)
 	source.logger.Infof("Send tokens tx %s", helpers.ExplorerLink(int64(source.ChainId), tx.Hash()))
@@ -724,12 +724,12 @@ func (client *CCIPClient) SendToOnrampWithExecution(t *testing.T, source SourceC
 	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(3e5), false)
 	helpers.PanicErr(err)
 
-	payload := router.ConsumerEVM2AnyMessage{
-		TokensAndAmounts: []router.CommonEVMTokenAndAmount{},
-		Receiver:         testhelpers.MustEncodeAddress(t, toAddress),
-		Data:             senderAndReceiver,
-		ExtraArgs:        extraArgsV1,
-		FeeToken:         client.Source.LinkTokenAddress,
+	payload := router.ClientEVM2AnyMessage{
+		TokenAmounts: []router.ClientEVMTokenAmount{},
+		Receiver:     testhelpers.MustEncodeAddress(t, toAddress),
+		Data:         senderAndReceiver,
+		ExtraArgs:    extraArgsV1,
+		FeeToken:     client.Source.LinkTokenAddress,
 	}
 	source.logger.Infof("Send tx with payload %+v", payload)
 

@@ -41,20 +41,20 @@ const (
 // Offchain: we compute the max overhead gas to determine msg executability.
 func overheadGas(geMsg evm_2_evm_onramp.InternalEVM2EVMMessage) uint64 {
 	messageBytes := CONSTANT_MESSAGE_PART_BYTES +
-		(EVM_ADDRESS_LENGTH_BYTES+EVM_WORD_BYTES)*len(geMsg.TokensAndAmounts) + // token address (address) + token amount (uint256)
+		(EVM_ADDRESS_LENGTH_BYTES+EVM_WORD_BYTES)*len(geMsg.TokenAmounts) + // token address (address) + token amount (uint256)
 		len(geMsg.Data)
 	messageCallDataGas := uint64(messageBytes * CALLDATA_GAS_PER_BYTE)
 
 	// Rate limiter only limits value in tokens. It's not called if there are no
 	// tokens in the message.
 	rateLimiterOverhead := uint64(0)
-	if len(geMsg.TokensAndAmounts) >= 1 {
+	if len(geMsg.TokenAmounts) >= 1 {
 		rateLimiterOverhead = RATE_LIMITER_OVERHEAD_GAS
 	}
 
 	return messageCallDataGas +
 		EXECUTION_STATE_PROCESSING_OVERHEAD_GAS +
-		PER_TOKEN_OVERHEAD_GAS*uint64(len(geMsg.TokensAndAmounts)) +
+		PER_TOKEN_OVERHEAD_GAS*uint64(len(geMsg.TokenAmounts)) +
 		rateLimiterOverhead +
 		EXTERNAL_CALL_OVERHEAD_GAS
 }
@@ -149,9 +149,9 @@ func (tb *BatchBuilder) BuildBatch(
 
 		var tokens []common.Address
 		var amounts []*big.Int
-		for i := 0; i < len(msg.Message.TokensAndAmounts); i++ {
-			tokens = append(tokens, msg.Message.TokensAndAmounts[i].Token)
-			amounts = append(amounts, msg.Message.TokensAndAmounts[i].Amount)
+		for i := 0; i < len(msg.Message.TokenAmounts); i++ {
+			tokens = append(tokens, msg.Message.TokenAmounts[i].Token)
+			amounts = append(amounts, msg.Message.TokenAmounts[i].Amount)
 		}
 		msgValue, err := aggregateTokenValue(tokenLimitPrices, srcToDst, tokens, amounts)
 		if err != nil {
@@ -205,9 +205,9 @@ func (tb *BatchBuilder) inflight(
 			}
 			var tokens []common.Address
 			var amounts []*big.Int
-			for i := 0; i < len(msg.Message.TokensAndAmounts); i++ {
-				tokens = append(tokens, msg.Message.TokensAndAmounts[i].Token)
-				amounts = append(amounts, msg.Message.TokensAndAmounts[i].Amount)
+			for i := 0; i < len(msg.Message.TokenAmounts); i++ {
+				tokens = append(tokens, msg.Message.TokenAmounts[i].Token)
+				amounts = append(amounts, msg.Message.TokenAmounts[i].Amount)
 			}
 			msgValue, err := aggregateTokenValue(tokenLimitPrices, srcToDst, tokens, amounts)
 			if err != nil {

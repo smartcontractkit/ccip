@@ -6,7 +6,7 @@ import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
 import "./CCIPReceiver.sol";
 
 import {IERC20} from "../../vendor/IERC20.sol";
-import {Consumer} from "../models/Consumer.sol";
+import {Client} from "../models/Client.sol";
 import {IRouterClient} from "../interfaces/router/IRouterClient.sol";
 
 /// @title PingPongDemo - A simple ping-pong contract for demonstrating cross-chain communication
@@ -46,17 +46,17 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
     }
 
     bytes memory data = abi.encode(pingPongCount);
-    Consumer.EVM2AnyMessage memory message = Consumer.EVM2AnyMessage({
+    Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: abi.encode(s_counterpartAddress),
       data: data,
-      tokensAndAmounts: new Common.EVMTokenAndAmount[](0),
-      extraArgs: Consumer._argsToBytes(Consumer.EVMExtraArgsV1({gasLimit: 200_000, strict: false})),
+      tokenAmounts: new Client.EVMTokenAmount[](0),
+      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 200_000, strict: false})),
       feeToken: address(s_feeToken)
     });
     IRouterClient(getRouter()).ccipSend(s_counterpartChainId, message);
   }
 
-  function _ccipReceive(Common.Any2EVMMessage memory message) internal override {
+  function _ccipReceive(Client.Any2EVMMessage memory message) internal override {
     uint256 pingPongCount = abi.decode(message.data, (uint256));
     if (!s_isPaused) {
       _respond(pingPongCount + 1);

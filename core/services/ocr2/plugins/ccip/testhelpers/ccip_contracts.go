@@ -58,13 +58,6 @@ type MaybeRevertReceiver struct {
 	Strict   bool
 }
 
-type CCIPContracts struct {
-	t         *testing.T
-	Source    SourceChain
-	Dest      DestinationChain
-	OCRConfig *OCR2Config
-}
-
 type Common struct {
 	ChainID     uint64
 	User        *bind.TransactOpts
@@ -113,6 +106,173 @@ type BalanceReq struct {
 	Name   string
 	Addr   common.Address
 	Getter func(addr common.Address) *big.Int
+}
+
+type CCIPContracts struct {
+	t         *testing.T
+	Source    SourceChain
+	Dest      DestinationChain
+	OCRConfig *OCR2Config
+}
+
+func (c *CCIPContracts) DeployNewOffRamp() {
+	offRampAddress, _, _, err := evm_2_evm_offramp.DeployEVM2EVMOffRamp(
+		c.Dest.User,
+		c.Dest.Chain,
+		c.Source.ChainID,
+		c.Dest.ChainID,
+		c.Source.OnRamp.Address(),
+		evm_2_evm_offramp.IEVM2EVMOffRampOffRampConfig{
+			FeeManager:                              c.Dest.FeeManager.Address(),
+			PermissionLessExecutionThresholdSeconds: 1,
+			ExecutionDelaySeconds:                   0,
+			Router:                                  c.Dest.Router.Address(),
+			MaxDataSize:                             1e5,
+			MaxTokensLength:                         5,
+			CommitStore:                             c.Dest.CommitStore.Address(),
+		},
+		c.Dest.AFN.Address(),
+		[]common.Address{c.Source.LinkToken.Address()},
+		[]common.Address{c.Dest.Pool.Address()},
+		evm_2_evm_offramp.IAggregateRateLimiterRateLimiterConfig{
+			Capacity: HundredLink,
+			Rate:     big.NewInt(1e18),
+			Admin:    c.Source.User.From,
+		},
+	)
+	require.NoError(c.t, err)
+	c.Dest.Chain.Commit()
+
+	c.Dest.OffRamp, err = evm_2_evm_offramp.NewEVM2EVMOffRamp(offRampAddress, c.Dest.Chain)
+	require.NoError(c.t, err)
+
+	_, err = c.Dest.OffRamp.SetPrices(c.Dest.User, []common.Address{c.Dest.LinkToken.Address()}, []*big.Int{big.NewInt(1)})
+	require.NoError(c.t, err)
+	c.Dest.Chain.Commit()
+	c.Source.Chain.Commit()
+}
+
+func (c *CCIPContracts) EnableOffRamp() {
+	_, err := c.Dest.Pool.SetOffRamp(c.Dest.User, c.Dest.OffRamp.Address(), true)
+	require.NoError(c.t, err)
+	c.Dest.Chain.Commit()
+
+	_, err = c.Dest.Router.ApplyRampUpdates(c.Dest.User, nil, []router.IRouterOffRampUpdate{
+		{SourceChainId: c.Source.ChainID, OffRamps: []common.Address{c.Dest.OffRamp.Address()}}})
+	require.NoError(c.t, err)
+	c.Dest.Chain.Commit()
+
+	_, err = c.Dest.FeeManager.SetFeeUpdater(c.Dest.User, c.Dest.OffRamp.Address())
+	require.NoError(c.t, err)
+	c.Dest.Chain.Commit()
+
+	_, err = c.Dest.OffRamp.SetOCR2Config(
+		c.Dest.User,
+		c.OCRConfig.Signers,
+		c.OCRConfig.Transmitters,
+		c.OCRConfig.F,
+		c.OCRConfig.OnchainConfig,
+		c.OCRConfig.OffchainConfigVersion,
+		c.OCRConfig.OffchainConfig,
+	)
+	require.NoError(c.t, err)
+	c.Source.Chain.Commit()
+	c.Dest.Chain.Commit()
+}
+
+func (c *CCIPContracts) EnableCommitStore() {
+	_, err := c.Dest.CommitStore.SetOCR2Config(
+		c.Dest.User,
+		c.OCRConfig.Signers,
+		c.OCRConfig.Transmitters,
+		c.OCRConfig.F,
+		c.OCRConfig.OnchainConfig,
+		c.OCRConfig.OffchainConfigVersion,
+		c.OCRConfig.OffchainConfig,
+	)
+	require.NoError(c.t, err)
+	c.Source.Chain.Commit()
+	c.Dest.Chain.Commit()
+}
+
+func (c *CCIPContracts) DeployNewOnRamp() {
+	c.t.Log("Deploying new onRamp")
+	onRampAddress, _, _, err := evm_2_evm_onramp.DeployEVM2EVMOnRamp(
+		c.Source.User,                                  // user
+		c.Source.Chain,                                 // client
+		c.Source.ChainID,                               // source chain id
+		c.Dest.ChainID,                                 // destinationChainIds
+		[]common.Address{c.Source.LinkToken.Address()}, // tokens
+		[]common.Address{c.Source.Pool.Address()},      // pools
+		[]common.Address{},                             // allow list
+		c.Source.AFN.Address(),                         // AFN
+		evm_2_evm_onramp.IEVM2EVMOnRampOnRampConfig{
+			MaxDataSize:     1e5,
+			MaxTokensLength: 5,
+			MaxGasLimit:     ccip.GasLimitPerTx,
+		},
+		evm_2_evm_onramp.IAggregateRateLimiterRateLimiterConfig{
+			Capacity: HundredLink,
+			Rate:     big.NewInt(1e18),
+			Admin:    c.Source.User.From,
+		},
+		c.Source.Router.Address(),
+		c.Source.FeeManager.Address(),
+		[]evm_2_evm_onramp.IEVM2EVMOnRampFeeTokenConfigArgs{
+			{
+				Token:           c.Source.LinkToken.Address(),
+				Multiplier:      1e18,
+				FeeAmount:       big.NewInt(0),
+				DestGasOverhead: 0,
+			},
+		},
+	)
+
+	require.NoError(c.t, err)
+	c.Source.OnRamp, err = evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddress, c.Source.Chain)
+	require.NoError(c.t, err)
+	c.Source.Chain.Commit()
+
+	_, err = c.Source.OnRamp.SetPrices(c.Source.User, []common.Address{c.Source.LinkToken.Address()}, []*big.Int{big.NewInt(1)})
+	require.NoError(c.t, err)
+
+	c.Source.Chain.Commit()
+	c.Dest.Chain.Commit()
+}
+
+func (c *CCIPContracts) EnableOnRamp() {
+	c.t.Log("Setting onRamp on source pool")
+	_, err := c.Source.Pool.SetOnRamp(c.Source.User, c.Source.OnRamp.Address(), true)
+	require.NoError(c.t, err)
+	c.Source.Chain.Commit()
+
+	c.t.Log("Setting onRamp on source router")
+	_, err = c.Source.Router.ApplyRampUpdates(c.Source.User, []router.IRouterOnRampUpdate{{DestChainId: c.Dest.ChainID, OnRamp: c.Source.OnRamp.Address()}}, nil)
+	require.NoError(c.t, err)
+	c.Source.Chain.Commit()
+
+	c.t.Log("Enabling onRamp on blob verifier")
+
+	c.Source.Chain.Commit()
+	c.Dest.Chain.Commit()
+}
+
+func (c *CCIPContracts) DeployNewCommitStore() {
+	commitStoreAddress, _, _, err := commit_store.DeployCommitStore(
+		c.Dest.User,  // user
+		c.Dest.Chain, // client
+		commit_store.ICommitStoreCommitStoreConfig{
+			ChainId:       c.Dest.ChainID,
+			SourceChainId: c.Source.ChainID,
+			OnRamp:        c.Source.OnRamp.Address(),
+		},
+		c.Dest.AFN.Address(), // AFN address
+		1,                    // min seq num
+	)
+	require.NoError(c.t, err)
+	c.Dest.Chain.Commit()
+	c.Dest.CommitStore, err = commit_store.NewCommitStore(commitStoreAddress, c.Dest.Chain)
+	require.NoError(c.t, err)
 }
 
 func (c *CCIPContracts) GetSourceLinkBalance(addr common.Address) *big.Int {
@@ -236,6 +396,33 @@ func (c *CCIPContracts) NewCCIPJobSpecParams(tokensPerFeeCoinPipeline string, co
 	}
 }
 
+func SendMessage(gasLimit, gasPrice, tokenAmount *big.Int, receiverAddr common.Address, c CCIPContracts) {
+	t := c.t
+	extraArgs, err := GetEVMExtraArgsV1(gasLimit, false)
+	require.NoError(t, err)
+	msg := router.ClientEVM2AnyMessage{
+		Receiver: MustEncodeAddress(t, receiverAddr),
+		Data:     []byte("hello"),
+		TokenAmounts: []router.ClientEVMTokenAmount{
+			{
+				Token:  c.Source.LinkToken.Address(),
+				Amount: tokenAmount,
+			},
+		},
+		FeeToken:  c.Source.LinkToken.Address(),
+		ExtraArgs: extraArgs,
+	}
+	fee, err := c.Source.Router.GetFee(nil, c.Dest.ChainID, msg)
+	require.NoError(t, err)
+	// Currently no overhead and 1gwei dest gas price. So fee is simply gasLimit * gasPrice.
+	require.Equal(t, new(big.Int).Mul(gasLimit, gasPrice).String(), fee.String())
+	// Approve the fee amount + the token amount
+	_, err = c.Source.LinkToken.Approve(c.Source.User, c.Source.Router.Address(), new(big.Int).Add(fee, tokenAmount))
+	require.NoError(t, err)
+	c.Source.Chain.Commit()
+	SendRequest(t, c, msg)
+}
+
 func GetBalances(brs []BalanceReq) (map[string]*big.Int, error) {
 	m := make(map[string]*big.Int)
 	for _, br := range brs {
@@ -328,7 +515,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	require.NoError(t, err)
 
 	// Create router
-	sourceRouterAddress, _, _, err := router.DeployRouter(sourceUser, sourceChain, []common.Address{}, common.HexToAddress("0xa"))
+	sourceRouterAddress, _, _, err := router.DeployRouter(sourceUser, sourceChain, common.HexToAddress("0xa"))
 	require.NoError(t, err)
 	sourceRouter, err := router.NewRouter(sourceRouterAddress, sourceChain)
 	require.NoError(t, err)
@@ -391,7 +578,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	sourceChain.Commit()
 	_, err = geOnRamp.SetPrices(sourceUser, []common.Address{sourceLinkTokenAddress}, []*big.Int{big.NewInt(1)})
 	require.NoError(t, err)
-	_, err = sourceRouter.SetOnRamp(sourceUser, destChainID, geOnRampAddress)
+	_, err = sourceRouter.ApplyRampUpdates(sourceUser, []router.IRouterOnRampUpdate{{DestChainId: destChainID, OnRamp: geOnRampAddress}}, nil)
 	require.NoError(t, err)
 	sourceChain.Commit()
 
@@ -422,7 +609,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	destChain.Commit()
 
 	// Create dest ge router
-	destRouterAddress, _, _, err := router.DeployRouter(destUser, destChain, []common.Address{}, common.Address{})
+	destRouterAddress, _, _, err := router.DeployRouter(destUser, destChain, common.Address{})
 	require.NoError(t, err)
 	destChain.Commit()
 	destRouter, err := router.NewRouter(destRouterAddress, destChain)
@@ -475,7 +662,8 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	// OffRamp can update
 	_, err = destFeeManager.SetFeeUpdater(destUser, geOffRampAddress)
 	require.NoError(t, err)
-	_, err = destRouter.AddOffRamp(destUser, geOffRampAddress)
+	_, err = destRouter.ApplyRampUpdates(destUser, nil, []router.IRouterOffRampUpdate{
+		{SourceChainId: sourceChainID, OffRamps: []common.Address{geOffRampAddress}}})
 	require.NoError(t, err)
 	_, err = geOffRamp.SetPrices(destUser, []common.Address{destLinkTokenAddress}, []*big.Int{big.NewInt(1)})
 	require.NoError(t, err)
@@ -537,7 +725,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	}
 }
 
-func SendRequest(t *testing.T, ccipContracts CCIPContracts, msg router.ConsumerEVM2AnyMessage) {
+func SendRequest(t *testing.T, ccipContracts CCIPContracts, msg router.ClientEVM2AnyMessage) {
 	tx, err := ccipContracts.Source.Router.CcipSend(ccipContracts.Source.User, ccipContracts.Dest.ChainID, msg)
 	require.NoError(t, err)
 	ConfirmTxs(t, []*types.Transaction{tx}, ccipContracts.Source.Chain)

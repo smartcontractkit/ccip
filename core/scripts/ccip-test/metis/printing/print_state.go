@@ -33,8 +33,8 @@ func PrintCCIPState(source *rhea.EvmDeploymentConfig, destination *rhea.EvmDeplo
 	printDappSanityCheck(source)
 	printDappSanityCheck(destination)
 
-	printRampSanityCheck(source, destination.LaneConfig.OnRamp)
-	printRampSanityCheck(destination, source.LaneConfig.OnRamp)
+	printRampSanityCheck(source, destination.LaneConfig.OnRamp, destination.ChainConfig.ChainId)
+	printRampSanityCheck(destination, source.LaneConfig.OnRamp, source.ChainConfig.ChainId)
 
 	printPaused(source)
 	printPaused(destination)
@@ -233,7 +233,7 @@ func printDappSanityCheck(source *rhea.EvmDeploymentConfig) {
 	source.Logger.Info(sb.String())
 }
 
-func printRampSanityCheck(chain *rhea.EvmDeploymentConfig, sourceOnRamp common.Address) {
+func printRampSanityCheck(chain *rhea.EvmDeploymentConfig, sourceOnRamp common.Address, remoteChainId uint64) {
 	var sb strings.Builder
 	sb.WriteString("\n")
 	sb.WriteString(fmt.Sprintf("Ramp checks for %s\n", helpers.ChainName(int64(chain.ChainConfig.ChainId))))
@@ -277,8 +277,14 @@ func printRampSanityCheck(chain *rhea.EvmDeploymentConfig, sourceOnRamp common.A
 	router, err := router.NewRouter(chain.ChainConfig.Router, chain.Client)
 	helpers.PanicErr(err)
 
-	isRamp, err := router.IsOffRamp(&bind.CallOpts{}, chain.LaneConfig.OffRamp)
+	offRamps, err := router.GetOffRamps(&bind.CallOpts{}, remoteChainId)
 	helpers.PanicErr(err)
+	var isRamp bool
+	for _, ramp := range offRamps {
+		if ramp == chain.LaneConfig.OffRamp {
+			isRamp = true
+		}
+	}
 
 	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "Router has offRamp Set", printBool(isRamp)))
 

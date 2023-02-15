@@ -25,7 +25,7 @@ contract LockReleaseTokenPool is TokenPool {
 
   /// @notice Locks the token in the pool
   /// @param amount Amount to lock
-  function lockOrBurn(uint256 amount) external override whenNotPaused validateOwnerOrOnRamp {
+  function lockOrBurn(uint256 amount, address) external override whenNotPaused validateOwnerOrOnRamp {
     emit Locked(msg.sender, amount);
   }
 

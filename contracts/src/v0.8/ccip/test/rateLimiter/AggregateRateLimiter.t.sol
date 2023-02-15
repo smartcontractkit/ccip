@@ -295,15 +295,15 @@ contract AggregateTokenLimiter__removeTokens is AggregateTokenLimiterSetup {
     uint256 numberOfTokens = 15;
     uint256 value = numberOfTokens * TOKEN_PRICE;
 
-    Common.EVMTokenAndAmount[] memory tokensAndAmounts = new Common.EVMTokenAndAmount[](1);
-    tokensAndAmounts[0].token = address(TOKEN);
-    tokensAndAmounts[0].amount = numberOfTokens;
+    Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+    tokenAmounts[0].token = address(TOKEN);
+    tokenAmounts[0].amount = numberOfTokens;
 
     vm.expectEmit(false, false, false, true);
     emit TokensRemovedFromBucket(value);
 
     // Remove the value from the pool
-    s_rateLimiter.removeTokens(tokensAndAmounts);
+    s_rateLimiter.removeTokens(tokenAmounts);
 
     // Get the updated bucket status
     IAggregateRateLimiter.TokenBucket memory bucket = s_rateLimiter.calculateCurrentTokenBucketState();
@@ -314,13 +314,13 @@ contract AggregateTokenLimiter__removeTokens is AggregateTokenLimiterSetup {
     // Expect a revert when we try, with a wait time.
     uint256 waitTime = 4;
     vm.expectRevert(abi.encodeWithSelector(IAggregateRateLimiter.ValueExceedsAllowedThreshold.selector, waitTime));
-    s_rateLimiter.removeTokens(tokensAndAmounts);
+    s_rateLimiter.removeTokens(tokenAmounts);
 
     // Move the block time forward by 10 so the bucket refills by 10 * rate
     vm.warp(BLOCK_TIME + waitTime);
 
     // The bucket has filled up enough so we can take out more tokens
-    s_rateLimiter.removeTokens(tokensAndAmounts);
+    s_rateLimiter.removeTokens(tokenAmounts);
     bucket = s_rateLimiter.calculateCurrentTokenBucketState();
     assertEq(bucket.capacity - value + waitTime * s_config.rate - value, bucket.tokens);
   }
@@ -329,23 +329,23 @@ contract AggregateTokenLimiter__removeTokens is AggregateTokenLimiterSetup {
 
   function testUnknownTokenReverts() public {
     vm.expectRevert(abi.encodeWithSelector(IAggregateRateLimiter.PriceNotFoundForToken.selector, address(0)));
-    s_rateLimiter.removeTokens(new Common.EVMTokenAndAmount[](1));
+    s_rateLimiter.removeTokens(new Client.EVMTokenAmount[](1));
   }
 
   function testValueExceedsCapacityReverts() public {
     IAggregateRateLimiter.TokenBucket memory bucket = s_rateLimiter.calculateCurrentTokenBucketState();
 
-    Common.EVMTokenAndAmount[] memory tokensAndAmounts = new Common.EVMTokenAndAmount[](1);
-    tokensAndAmounts[0].token = address(TOKEN);
-    tokensAndAmounts[0].amount = 100;
+    Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+    tokenAmounts[0].token = address(TOKEN);
+    tokenAmounts[0].amount = 100;
 
     vm.expectRevert(
       abi.encodeWithSelector(
         IAggregateRateLimiter.ValueExceedsCapacity.selector,
         bucket.capacity,
-        tokensAndAmounts[0].amount * TOKEN_PRICE
+        tokenAmounts[0].amount * TOKEN_PRICE
       )
     );
-    s_rateLimiter.removeTokens(tokensAndAmounts);
+    s_rateLimiter.removeTokens(tokenAmounts);
   }
 }

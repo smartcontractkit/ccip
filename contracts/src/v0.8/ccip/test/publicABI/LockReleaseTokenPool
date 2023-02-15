@@ -5,7 +5,7 @@
   "getToken()": "21df0da7",
   "isOffRamp(address)": "1d7a74a0",
   "isOnRamp(address)": "6f32b872",
-  "lockOrBurn(uint256)": "503c2858",
+  "lockOrBurn(uint256,address)": "e2e59b3e",
   "owner()": "8da5cb5b",
   "pause()": "8456cb59",
   "paused()": "5c975abb",

@@ -117,7 +117,7 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	require.NoError(t, err)
 	destChain.Commit()
 
-	routerAddress, _, router, err := router.DeployRouter(destUser, destChain, []common.Address{}, common.Address{})
+	routerAddress, _, routerContract, err := router.DeployRouter(destUser, destChain, common.Address{})
 	require.NoError(t, err)
 	destChain.Commit()
 	offRampAddress, _, _, err := evm_2_evm_offramp.DeployEVM2EVMOffRamp(
@@ -154,7 +154,8 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	receiver, err := simple_message_receiver.NewSimpleMessageReceiver(receiverAddress, destChain)
 	require.NoError(t, err)
 	destChain.Commit()
-	_, err = router.AddOffRamp(destUser, offRampAddress)
+	_, err = routerContract.ApplyRampUpdates(destUser, nil, []router.IRouterOffRampUpdate{
+		{SourceChainId: sourceChainID, OffRamps: []common.Address{offRampAddress}}})
 	require.NoError(t, err)
 	destChain.Commit()
 
@@ -180,18 +181,18 @@ type messageBatch struct {
 
 // Message contains the data from a cross chain message
 type Message struct {
-	SourceChainId    uint64                                     `json:"sourceChainId"`
-	SequenceNumber   uint64                                     `json:"sequenceNumber"`
-	FeeTokenAmount   *big.Int                                   `json:"feeTokenAmount"`
-	Sender           common.Address                             `json:"sender"`
-	Nonce            uint64                                     `json:"nonce"`
-	GasLimit         *big.Int                                   `json:"gasLimit"`
-	Strict           bool                                       `json:"strict"`
-	Receiver         common.Address                             `json:"receiver"`
-	Data             []uint8                                    `json:"data"`
-	TokensAndAmounts []evm_2_evm_onramp.CommonEVMTokenAndAmount `json:"tokensAndAmounts"`
-	FeeToken         common.Address                             `json:"feeToken"`
-	MessageId        [32]byte                                   `json:"messageId"`
+	SourceChainId  uint64                                  `json:"sourceChainId"`
+	SequenceNumber uint64                                  `json:"sequenceNumber"`
+	FeeTokenAmount *big.Int                                `json:"feeTokenAmount"`
+	Sender         common.Address                          `json:"sender"`
+	Nonce          uint64                                  `json:"nonce"`
+	GasLimit       *big.Int                                `json:"gasLimit"`
+	Strict         bool                                    `json:"strict"`
+	Receiver       common.Address                          `json:"receiver"`
+	Data           []uint8                                 `json:"data"`
+	TokenAmounts   []evm_2_evm_onramp.ClientEVMTokenAmount `json:"tokensAndAmounts"`
+	FeeToken       common.Address                          `json:"feeToken"`
+	MessageId      [32]byte                                `json:"messageId"`
 }
 
 func (e ExecutionContracts) generateMessageBatch(t *testing.T, payloadSize int, nMessages int, nTokensPerMessage int) messageBatch {
@@ -207,10 +208,10 @@ func (e ExecutionContracts) generateMessageBatch(t *testing.T, payloadSize int, 
 	var leafHashes [][32]byte
 	var msgs []Message
 	var indices []int
-	var tokens []evm_2_evm_onramp.CommonEVMTokenAndAmount
+	var tokens []evm_2_evm_onramp.ClientEVMTokenAmount
 	var helperMsgs []evm_2_evm_onramp.InternalEVM2EVMMessage
 	for i := 0; i < nTokensPerMessage; i++ {
-		tokens = append(tokens, evm_2_evm_onramp.CommonEVMTokenAndAmount{
+		tokens = append(tokens, evm_2_evm_onramp.ClientEVMTokenAmount{
 			Token:  e.linkTokenAddress,
 			Amount: big.NewInt(1),
 		})
@@ -220,34 +221,34 @@ func (e ExecutionContracts) generateMessageBatch(t *testing.T, payloadSize int, 
 	for i := 0; i < nMessages; i++ {
 		seqNums = append(seqNums, 1+uint64(i))
 		message := Message{
-			SourceChainId:    e.sourceChainID,
-			SequenceNumber:   1 + uint64(i),
-			FeeTokenAmount:   big.NewInt(1e9),
-			Sender:           e.user.From,
-			Nonce:            1 + uint64(i),
-			GasLimit:         big.NewInt(100_000),
-			Strict:           false,
-			Receiver:         e.receiver.Address(),
-			Data:             maxPayload,
-			TokensAndAmounts: tokens,
-			FeeToken:         tokens[0].Token,
-			MessageId:        utils.Keccak256Fixed([]byte(`MyError(uint256)`)),
+			SourceChainId:  e.sourceChainID,
+			SequenceNumber: 1 + uint64(i),
+			FeeTokenAmount: big.NewInt(1e9),
+			Sender:         e.user.From,
+			Nonce:          1 + uint64(i),
+			GasLimit:       big.NewInt(100_000),
+			Strict:         false,
+			Receiver:       e.receiver.Address(),
+			Data:           maxPayload,
+			TokenAmounts:   tokens,
+			FeeToken:       tokens[0].Token,
+			MessageId:      utils.Keccak256Fixed([]byte(`MyError(uint256)`)),
 		}
 
 		// Unfortunately have to do this to use the helper's gethwrappers.
 		helperMsgs = append(helperMsgs, evm_2_evm_onramp.InternalEVM2EVMMessage{
-			SourceChainId:    message.SourceChainId,
-			SequenceNumber:   message.SequenceNumber,
-			FeeTokenAmount:   message.FeeTokenAmount,
-			Sender:           message.Sender,
-			Nonce:            message.Nonce,
-			GasLimit:         message.GasLimit,
-			Strict:           message.Strict,
-			Receiver:         message.Receiver,
-			Data:             message.Data,
-			TokensAndAmounts: message.TokensAndAmounts,
-			FeeToken:         message.FeeToken,
-			MessageId:        message.MessageId,
+			SourceChainId:  message.SourceChainId,
+			SequenceNumber: message.SequenceNumber,
+			FeeTokenAmount: message.FeeTokenAmount,
+			Sender:         message.Sender,
+			Nonce:          message.Nonce,
+			GasLimit:       message.GasLimit,
+			Strict:         message.Strict,
+			Receiver:       message.Receiver,
+			Data:           message.Data,
+			TokenAmounts:   message.TokenAmounts,
+			FeeToken:       message.FeeToken,
+			MessageId:      message.MessageId,
 		})
 
 		msgs = append(msgs, message)

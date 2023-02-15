@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import {IFeeManager} from "../interfaces/fees/IFeeManager.sol";
 
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
-import {Common} from "../models/Common.sol";
+import {Client} from "../models/Client.sol";
 import {Internal} from "../models/Internal.sol";
 import {IERC20} from "../../vendor/IERC20.sol";
 import {SafeERC20} from "../../vendor/SafeERC20.sol";

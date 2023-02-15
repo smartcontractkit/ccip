@@ -3,7 +3,7 @@ pragma solidity 0.8.15;
 
 import "../../applications/PingPongDemo.sol";
 import "../onRamp/EVM2EVMOnRampSetup.t.sol";
-import "../../models/Common.sol";
+import "../../models/Client.sol";
 
 // setup
 contract PingPongDappSetup is EVM2EVMOnRampSetup {
@@ -39,12 +39,12 @@ contract PingPong_startPingPong is PingPongDappSetup {
     uint256 pingPongNumber = 1;
     bytes memory data = abi.encode(pingPongNumber);
 
-    Consumer.EVM2AnyMessage memory sentMessage = Consumer.EVM2AnyMessage({
+    Client.EVM2AnyMessage memory sentMessage = Client.EVM2AnyMessage({
       receiver: abi.encode(i_pongContract),
       data: data,
-      tokensAndAmounts: new Common.EVMTokenAndAmount[](0),
+      tokenAmounts: new Client.EVMTokenAmount[](0),
       feeToken: s_sourceFeeToken,
-      extraArgs: Consumer._argsToBytes(Consumer.EVMExtraArgsV1({gasLimit: 2e5, strict: false}))
+      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 2e5, strict: false}))
     });
 
     uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_ID, sentMessage);
@@ -57,7 +57,7 @@ contract PingPong_startPingPong is PingPongDappSetup {
       receiver: i_pongContract,
       nonce: 1,
       data: data,
-      tokensAndAmounts: sentMessage.tokensAndAmounts,
+      tokenAmounts: sentMessage.tokenAmounts,
       gasLimit: 2e5,
       feeToken: sentMessage.feeToken,
       strict: false,
@@ -80,15 +80,16 @@ contract PingPong_ccipReceive is PingPongDappSetup {
   // Success
 
   function testSuccess() public {
-    Common.EVMTokenAndAmount[] memory tokensAndAmounts = new Common.EVMTokenAndAmount[](0);
+    Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
 
     uint256 pingPongNumber = 5;
 
-    Common.Any2EVMMessage memory message = Common.Any2EVMMessage({
+    Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
+      messageId: bytes32("a"),
       sourceChainId: DEST_CHAIN_ID,
       sender: abi.encode(i_pongContract),
       data: abi.encode(pingPongNumber),
-      destTokensAndAmounts: tokensAndAmounts
+      destTokenAmounts: tokenAmounts
     });
 
     changePrank(address(s_sourceRouter));

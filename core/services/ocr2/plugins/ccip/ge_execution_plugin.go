@@ -403,18 +403,18 @@ func (r *ExecutionReportingPlugin) getExecutableSeqNrs(
 		srcToDst[sourceToken] = dst
 	}
 
-	supportedDestTokensAndAmounts := make([]common.Address, 0, len(srcToDst))
-	for _, destTokensAndAmounts := range srcToDst {
-		supportedDestTokensAndAmounts = append(supportedDestTokensAndAmounts, destTokensAndAmounts)
+	supportedDestTokenAmounts := make([]common.Address, 0, len(srcToDst))
+	for _, destTokenAmounts := range srcToDst {
+		supportedDestTokenAmounts = append(supportedDestTokenAmounts, destTokenAmounts)
 	}
 
-	destTokenPrices, err := r.config.offRamp.GetPricesForTokens(nil, supportedDestTokensAndAmounts)
+	destTokenPrices, err := r.config.offRamp.GetPricesForTokens(nil, supportedDestTokenAmounts)
 	if err != nil {
 		return nil, err
 	}
 
 	pricePerDestToken := make(map[common.Address]*big.Int)
-	for i, destToken := range supportedDestTokensAndAmounts {
+	for i, destToken := range supportedDestTokenAmounts {
 		pricePerDestToken[destToken] = destTokenPrices[i]
 	}
 

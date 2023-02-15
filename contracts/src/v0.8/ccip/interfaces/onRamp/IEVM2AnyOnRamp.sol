@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {IPool} from "../pools/IPool.sol";
 
-import {Consumer} from "../../models/Consumer.sol";
+import {Client} from "../../models/Client.sol";
 
 import {IERC20} from "../../../vendor/IERC20.sol";
 
@@ -13,7 +13,7 @@ interface IEVM2AnyOnRamp {
    * @param message The message to calculate the cost for
    * @return fee The calculated fee
    */
-  function getFee(Consumer.EVM2AnyMessage calldata message) external view returns (uint256 fee);
+  function getFee(Client.EVM2AnyMessage calldata message) external view returns (uint256 fee);
 
   /**
    * @notice Get the pool for a specific token
@@ -36,7 +36,7 @@ interface IEVM2AnyOnRamp {
    * @param originalSender The original initiator of the CCIP request
    */
   function forwardFromRouter(
-    Consumer.EVM2AnyMessage memory message,
+    Client.EVM2AnyMessage memory message,
     uint256 feeTokenAmount,
     address originalSender
   ) external returns (bytes32);

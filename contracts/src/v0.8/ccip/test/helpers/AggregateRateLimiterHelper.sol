@@ -6,7 +6,7 @@ import "../../rateLimiter/AggregateRateLimiter.sol";
 contract AggregateRateLimiterHelper is AggregateRateLimiter {
   constructor(RateLimiterConfig memory config) AggregateRateLimiter(config) {}
 
-  function removeTokens(Common.EVMTokenAndAmount[] memory tokensAndAmounts) public {
-    _removeTokens(tokensAndAmounts);
+  function removeTokens(Client.EVMTokenAmount[] memory tokenAmounts) public {
+    _removeTokens(tokenAmounts);
   }
 }

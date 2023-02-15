@@ -1,14 +1,25 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Common} from "./Common.sol";
-
 // End consumer library.
-library Consumer {
+library Client {
+  struct EVMTokenAmount {
+    address token;
+    uint256 amount;
+  }
+
+  struct Any2EVMMessage {
+    bytes32 messageId;
+    uint64 sourceChainId;
+    bytes sender;
+    bytes data;
+    EVMTokenAmount[] destTokenAmounts;
+  }
+
   struct EVM2AnyMessage {
     bytes receiver;
     bytes data;
-    Common.EVMTokenAndAmount[] tokensAndAmounts;
+    EVMTokenAmount[] tokenAmounts;
     address feeToken;
     bytes extraArgs;
   }

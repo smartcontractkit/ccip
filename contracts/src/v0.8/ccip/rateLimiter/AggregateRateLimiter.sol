@@ -4,7 +4,7 @@ pragma solidity 0.8.15;
 import {IAggregateRateLimiter} from "../interfaces/rateLimiter/IAggregateRateLimiter.sol";
 
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
-import {Common} from "../models/Common.sol";
+import {Client} from "../models/Client.sol";
 
 import {IERC20} from "../../vendor/IERC20.sol";
 
@@ -110,17 +110,17 @@ contract AggregateRateLimiter is IAggregateRateLimiter, OwnerIsCreator {
   /// @notice _removeTokens removes the given token values from the pool, lowering the
   /// value allowed to be transferred for subsequent calls. It will use the
   /// s_priceByToken mapping to determine value in a standardised unit.
-  /// @param tokensAndAmounts The tokensAndAmounts that are send across the bridge. All
+  /// @param tokenAmounts The tokenAmounts that are send across the bridge. All
   /// of the tokens need to have a corresponding price set in s_priceByToken.
   /// @dev Reverts when a token price is not found or when the tx value exceeds the
   /// amount allowed in the bucket.
   /// @dev Will only remove and therefore emit removal of value if the value is > 0.
-  function _removeTokens(Common.EVMTokenAndAmount[] memory tokensAndAmounts) internal {
+  function _removeTokens(Client.EVMTokenAmount[] memory tokenAmounts) internal {
     uint256 value = 0;
-    for (uint256 i = 0; i < tokensAndAmounts.length; ++i) {
-      uint256 pricePerToken = s_priceByToken[IERC20(tokensAndAmounts[i].token)];
-      if (pricePerToken == 0) revert PriceNotFoundForToken(tokensAndAmounts[i].token);
-      value += pricePerToken * tokensAndAmounts[i].amount;
+    for (uint256 i = 0; i < tokenAmounts.length; ++i) {
+      uint256 pricePerToken = s_priceByToken[IERC20(tokenAmounts[i].token)];
+      if (pricePerToken == 0) revert PriceNotFoundForToken(tokenAmounts[i].token);
+      value += pricePerToken * tokenAmounts[i].amount;
     }
 
     // If there is no value to remove skip this step to reduce gas usage

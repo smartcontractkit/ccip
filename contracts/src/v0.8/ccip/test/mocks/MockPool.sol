@@ -11,7 +11,7 @@ contract MockPool is IPool {
     s_uid = uid;
   }
 
-  function lockOrBurn(uint256 amount) external override {
+  function lockOrBurn(uint256 amount, address) external override {
     emit Locked(msg.sender, amount);
   }
 

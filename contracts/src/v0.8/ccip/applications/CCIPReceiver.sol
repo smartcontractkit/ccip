@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {IAny2EVMMessageReceiver} from "../interfaces/applications/IAny2EVMMessageReceiver.sol";
+import {IAny2EVMMessageReceiver} from "../interfaces/router/IAny2EVMMessageReceiver.sol";
 import {IERC165} from "../../vendor/IERC165.sol";
 
-import {Common} from "../models/Common.sol";
+import {Client} from "../models/Client.sol";
 
 /// @title CCIPReceiver - Base contract for CCIP applications that can receive messages.
 abstract contract CCIPReceiver is IAny2EVMMessageReceiver, IERC165 {
@@ -25,7 +25,7 @@ abstract contract CCIPReceiver is IAny2EVMMessageReceiver, IERC165 {
   }
 
   /// @inheritdoc IAny2EVMMessageReceiver
-  function ccipReceive(Common.Any2EVMMessage calldata message) external override onlyRouter {
+  function ccipReceive(Client.Any2EVMMessage calldata message) external override onlyRouter {
     _ccipReceive(message);
   }
 
@@ -33,7 +33,7 @@ abstract contract CCIPReceiver is IAny2EVMMessageReceiver, IERC165 {
    * @notice Override this function in your implementation.
    * @param message Any2EVMMessage
    */
-  function _ccipReceive(Common.Any2EVMMessage memory message) internal virtual;
+  function _ccipReceive(Client.Any2EVMMessage memory message) internal virtual;
 
   /////////////////////////////////////////////////////////////////////
   // Plumbing

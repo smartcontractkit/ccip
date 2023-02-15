@@ -12,8 +12,8 @@ import {IFeeManager} from "../interfaces/fees/IFeeManager.sol";
 import {HealthChecker} from "../health/HealthChecker.sol";
 import {AllowList} from "../access/AllowList.sol";
 import {AggregateRateLimiter} from "../rateLimiter/AggregateRateLimiter.sol";
-import {Common} from "../models/Common.sol";
-import {Consumer} from "../models/Consumer.sol";
+import {Client} from "../models/Client.sol";
+import {Client} from "../models/Client.sol";
 import {Internal} from "../models/Internal.sol";
 
 import {SafeERC20} from "../../vendor/SafeERC20.sol";
@@ -104,24 +104,24 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AllowList, AggregateRat
     revert UnsupportedToken(sourceToken);
   }
 
-  function _fromBytes(bytes calldata extraArgs) internal pure returns (Consumer.EVMExtraArgsV1 memory) {
+  function _fromBytes(bytes calldata extraArgs) internal pure returns (Client.EVMExtraArgsV1 memory) {
     if (extraArgs.length == 0) {
-      return Consumer.EVMExtraArgsV1({gasLimit: EVM_DEFAULT_GAS_LIMIT, strict: false});
+      return Client.EVMExtraArgsV1({gasLimit: EVM_DEFAULT_GAS_LIMIT, strict: false});
     }
-    if (bytes4(extraArgs[:4]) != Consumer.EVM_EXTRA_ARGS_V1_TAG)
-      revert InvalidExtraArgsTag(Consumer.EVM_EXTRA_ARGS_V1_TAG, bytes4(extraArgs[:4]));
-    return Consumer.EVMExtraArgsV1({gasLimit: abi.decode(extraArgs[4:36], (uint256)), strict: false});
+    if (bytes4(extraArgs[:4]) != Client.EVM_EXTRA_ARGS_V1_TAG)
+      revert InvalidExtraArgsTag(Client.EVM_EXTRA_ARGS_V1_TAG, bytes4(extraArgs[:4]));
+    return Client.EVMExtraArgsV1({gasLimit: abi.decode(extraArgs[4:36], (uint256)), strict: false});
   }
 
   /// @notice Validate the forwarded message with various checks.
   /// @param dataLength The length of the data field of the message
   /// @param gasLimit The gasLimit set in message for destination execution
-  /// @param tokensAndAmounts The token payload to be sent. They will be locked into pools by this function.
+  /// @param tokenAmounts The token payload to be sent. They will be locked into pools by this function.
   /// @param originalSender The original sender of the message on the router.
   function _validateMessage(
     uint256 dataLength,
     uint256 gasLimit,
-    Common.EVMTokenAndAmount[] memory tokensAndAmounts,
+    Client.EVMTokenAmount[] memory tokenAmounts,
     address originalSender
   ) internal {
     if (msg.sender != s_router) revert MustBeCalledByRouter();
@@ -129,29 +129,29 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AllowList, AggregateRat
     // Check that payload is formed correctly
     if (dataLength > uint256(s_config.maxDataSize)) revert MessageTooLarge(uint256(s_config.maxDataSize), dataLength);
     if (gasLimit > uint256(s_config.maxGasLimit)) revert MessageGasLimitTooHigh();
-    if (tokensAndAmounts.length > uint256(s_config.maxTokensLength)) revert UnsupportedNumberOfTokens();
+    if (tokenAmounts.length > uint256(s_config.maxTokensLength)) revert UnsupportedNumberOfTokens();
     if (s_allowlistEnabled && !s_allowed[originalSender]) revert SenderNotAllowed(originalSender);
 
-    _removeTokens(tokensAndAmounts);
+    _removeTokens(tokenAmounts);
   }
 
   /// @inheritdoc  IEVM2AnyOnRamp
   function forwardFromRouter(
-    Consumer.EVM2AnyMessage calldata message,
+    Client.EVM2AnyMessage calldata message,
     uint256 feeTokenAmount,
     address originalSender
   ) external override whenNotPaused whenHealthy returns (bytes32) {
-    Consumer.EVMExtraArgsV1 memory extraArgs = _fromBytes(message.extraArgs);
+    Client.EVMExtraArgsV1 memory extraArgs = _fromBytes(message.extraArgs);
     // Validate the message with various checks
-    _validateMessage(message.data.length, extraArgs.gasLimit, message.tokensAndAmounts, originalSender);
+    _validateMessage(message.data.length, extraArgs.gasLimit, message.tokenAmounts, originalSender);
 
     // Send feeToken directly to the Fee Manager
     IERC20(message.feeToken).safeTransfer(address(s_feeManager), feeTokenAmount);
 
-    for (uint256 i = 0; i < message.tokensAndAmounts.length; ++i) {
-      Common.EVMTokenAndAmount memory tokenAndAmount = message.tokensAndAmounts[i];
+    for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
+      Client.EVMTokenAmount memory tokenAndAmount = message.tokenAmounts[i];
       IPool pool = _getPoolBySourceToken(IERC20(tokenAndAmount.token));
-      pool.lockOrBurn(tokenAndAmount.amount);
+      pool.lockOrBurn(tokenAndAmount.amount, originalSender);
     }
 
     // Emit message request
@@ -166,7 +166,7 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AllowList, AggregateRat
       strict: extraArgs.strict,
       receiver: abi.decode(message.receiver, (address)),
       data: message.data,
-      tokensAndAmounts: message.tokensAndAmounts,
+      tokenAmounts: message.tokenAmounts,
       feeToken: message.feeToken,
       messageId: ""
     });
@@ -176,7 +176,7 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AllowList, AggregateRat
   }
 
   /// @inheritdoc IEVM2AnyOnRamp
-  function getFee(Consumer.EVM2AnyMessage calldata message) public view override returns (uint256 fee) {
+  function getFee(Client.EVM2AnyMessage calldata message) public view override returns (uint256 fee) {
     uint256 gasLimit = _fromBytes(message.extraArgs).gasLimit;
     uint256 feeTokenBaseUnitsPerUnitGas = IFeeManager(s_feeManager).getFeeTokenBaseUnitsPerUnitGas(
       message.feeToken,
