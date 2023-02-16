@@ -198,10 +198,10 @@ func (c *CCIPContracts) EnableCommitStore() {
 func (c *CCIPContracts) DeployNewOnRamp() {
 	c.t.Log("Deploying new onRamp")
 	onRampAddress, _, _, err := evm_2_evm_onramp.DeployEVM2EVMOnRamp(
-		c.Source.User,                                  // user
-		c.Source.Chain,                                 // client
-		c.Source.ChainID,                               // source chain id
-		c.Dest.ChainID,                                 // destinationChainIds
+		c.Source.User,    // user
+		c.Source.Chain,   // client
+		c.Source.ChainID, // source chain id
+		c.Dest.ChainID,   // destinationChainIds
 		[]common.Address{c.Source.LinkToken.Address()}, // tokens
 		[]common.Address{c.Source.Pool.Address()},      // pools
 		[]common.Address{},                             // allow list
@@ -540,7 +540,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	sourceFeeManger, err := fee_manager.NewFeeManager(sourceFeeManagerAddress, sourceChain)
 	require.NoError(t, err)
 
-	geOnRampAddress, _, _, err := evm_2_evm_onramp.DeployEVM2EVMOnRamp(
+	onRampAddress, _, _, err := evm_2_evm_onramp.DeployEVM2EVMOnRamp(
 		sourceUser,                               // user
 		sourceChain,                              // client
 		sourceChainID,                            // source chain id
@@ -571,14 +571,14 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		},
 	)
 	require.NoError(t, err)
-	geOnRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(geOnRampAddress, sourceChain)
+	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddress, sourceChain)
 	require.NoError(t, err)
-	_, err = sourcePool.SetOnRamp(sourceUser, geOnRampAddress, true)
+	_, err = sourcePool.SetOnRamp(sourceUser, onRampAddress, true)
 	require.NoError(t, err)
 	sourceChain.Commit()
-	_, err = geOnRamp.SetPrices(sourceUser, []common.Address{sourceLinkTokenAddress}, []*big.Int{big.NewInt(1)})
+	_, err = onRamp.SetPrices(sourceUser, []common.Address{sourceLinkTokenAddress}, []*big.Int{big.NewInt(1)})
 	require.NoError(t, err)
-	_, err = sourceRouter.ApplyRampUpdates(sourceUser, []router.IRouterOnRampUpdate{{DestChainId: destChainID, OnRamp: geOnRampAddress}}, nil)
+	_, err = sourceRouter.ApplyRampUpdates(sourceUser, []router.IRouterOnRampUpdate{{DestChainId: destChainID, OnRamp: onRampAddress}}, nil)
 	require.NoError(t, err)
 	sourceChain.Commit()
 
@@ -598,7 +598,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		commit_store.ICommitStoreCommitStoreConfig{
 			ChainId:       destChainID,
 			SourceChainId: sourceChainID,
-			OnRamp:        geOnRamp.Address(),
+			OnRamp:        onRamp.Address(),
 		},
 		afnDestAddress, // AFN address
 		1,              // min seq num
@@ -629,12 +629,12 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	require.NoError(t, err)
 	destFeeManager, err := fee_manager.NewFeeManager(destFeeManagerAddress, destChain)
 	require.NoError(t, err)
-	geOffRampAddress, _, _, err := evm_2_evm_offramp.DeployEVM2EVMOffRamp(
+	offRampAddress, _, _, err := evm_2_evm_offramp.DeployEVM2EVMOffRamp(
 		destUser,
 		destChain,
 		sourceChainID,
 		destChainID,
-		geOnRampAddress,
+		onRampAddress,
 		evm_2_evm_offramp.IEVM2EVMOffRampOffRampConfig{
 			Router:                                  destRouter.Address(),
 			CommitStore:                             commitStore.Address(),
@@ -654,18 +654,18 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		},
 	)
 	require.NoError(t, err)
-	geOffRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(geOffRampAddress, destChain)
+	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(offRampAddress, destChain)
 	require.NoError(t, err)
-	_, err = destPool.SetOffRamp(destUser, geOffRampAddress, true)
+	_, err = destPool.SetOffRamp(destUser, offRampAddress, true)
 	require.NoError(t, err)
 	destChain.Commit()
 	// OffRamp can update
-	_, err = destFeeManager.SetFeeUpdater(destUser, geOffRampAddress)
+	_, err = destFeeManager.SetFeeUpdater(destUser, offRampAddress)
 	require.NoError(t, err)
 	_, err = destRouter.ApplyRampUpdates(destUser, nil, []router.IRouterOffRampUpdate{
-		{SourceChainId: sourceChainID, OffRamps: []common.Address{geOffRampAddress}}})
+		{SourceChainId: sourceChainID, OffRamps: []common.Address{offRampAddress}}})
 	require.NoError(t, err)
-	_, err = geOffRamp.SetPrices(destUser, []common.Address{destLinkTokenAddress}, []*big.Int{big.NewInt(1)})
+	_, err = offRamp.SetPrices(destUser, []common.Address{destLinkTokenAddress}, []*big.Int{big.NewInt(1)})
 	require.NoError(t, err)
 
 	// Deploy 2 revertable (one SS one non-SS)
@@ -698,7 +698,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			FeeManager:  sourceFeeManger,
 		},
 		Router: sourceRouter,
-		OnRamp: geOnRamp,
+		OnRamp: onRamp,
 	}
 	dest := DestinationChain{
 		Common: Common{
@@ -714,7 +714,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		},
 		CommitStore: commitStore,
 		Router:      destRouter,
-		OffRamp:     geOffRamp,
+		OffRamp:     offRamp,
 		Receivers:   []MaybeRevertReceiver{{Receiver: revertingMessageReceiver1, Strict: false}, {Receiver: revertingMessageReceiver2, Strict: true}},
 	}
 

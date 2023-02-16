@@ -395,7 +395,7 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(t *testing.T) {
 	err = sourceCCIP.OnRamp.SetTokenPrices(bridgeTokens, sourceCCIP.Common.TokenPrices)
 	require.NoError(t, err, "Setting prices shouldn't fail")
 
-	// update onRampRouter with OnRamp address
+	// update source Router with OnRamp address
 	err = sourceCCIP.Common.Router.SetOnRamp(sourceCCIP.DestinationChainId, sourceCCIP.OnRamp.EthAddress)
 	require.NoError(t, err, "Error setting onramp on the router")
 

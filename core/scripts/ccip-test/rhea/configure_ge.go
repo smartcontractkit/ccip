@@ -102,24 +102,6 @@ func setFeeManagerUpdater(t *testing.T, client *EvmDeploymentConfig) {
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 }
 
-/*
-func revokeOffRampOnOffRampRouter(t *testing.T, destClient *EvmDeploymentConfig, offRamp common.Address) {
-	destClient.Logger.Infof("Revoking the offRamp on the offRampRouter")
-	offRampRouter, err := any_2_evm_subscription_offramp_router.NewAny2EVMSubscriptionOffRampRouter(destClient.ChainConfig.OffRampRouter, destClient.Client)
-	shared.RequireNoError(t, err)
-
-	tx, err := offRampRouter.RemoveOffRamp(destClient.Owner, offRamp)
-	shared.RequireNoError(t, err)
-	shared.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
-}
-*/
-
-/*
-func revokeOffRampOnTokenPools(t *testing.T, destClient *EvmDeploymentConfig, offRamp common.Address) {
-	// TODO
-}
-*/
-
 func fillPoolWithTokens(t *testing.T, client *EvmDeploymentConfig, pool *lock_release_token_pool.LockReleaseTokenPool, tokenAddress common.Address) {
 	token, err := link_token_interface.NewLinkToken(tokenAddress, client.Client)
 	shared.RequireNoError(t, err)

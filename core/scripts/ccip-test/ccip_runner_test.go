@@ -33,7 +33,7 @@ var envToChainConfigs = map[dione.Environment][]rhea.EvmDeploymentConfig{
 func TestRheaDeploy(t *testing.T) {
 	checkOwnerKeyAndSetupChain(t)
 
-	rhea.DeployGELanes(t, &SOURCE, &DESTINATION)
+	rhea.DeployLanes(t, &SOURCE, &DESTINATION)
 }
 
 // TestDione can be run as a test with the following config
@@ -76,7 +76,6 @@ func TestCCIP(t *testing.T) {
 
 	switch command {
 	// Deploys a new set of PingPong contracts, configures them to talk to each other
-	// and creates destination chain subscriptions for both.
 	case "deployPingPong":
 		rhea.DeployPingPongDapps(t, &SOURCE, &DESTINATION)
 		// Starts and unpauses the PingPong dapp that is on the `source` chain.

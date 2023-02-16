@@ -21,10 +21,10 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 )
 
-// DeployGELanes will deploy all source and Destination chain contracts using the
+// DeployLanes will deploy all source and Destination chain contracts using the
 // owner key. Only run this of the currently deployed contracts are outdated or
 // when initializing a new chain.
-func DeployGELanes(t *testing.T, source *EvmDeploymentConfig, destination *EvmDeploymentConfig) {
+func DeployLanes(t *testing.T, source *EvmDeploymentConfig, destination *EvmDeploymentConfig) {
 	sourceChainId, destChainId := source.ChainConfig.ChainId, destination.ChainConfig.ChainId
 	// After running this code please update the configuration to reflect the newly
 	// deployed contract addresses.

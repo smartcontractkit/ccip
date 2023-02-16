@@ -9,7 +9,7 @@ import {Client} from "../../models/Client.sol";
  */
 interface IAny2EVMMessageReceiver {
   /**
-   * @notice Called by the OffRampRouter to deliver a message
+   * @notice Called by the Router to deliver a message
    * @param message CCIP Message
    */
   function ccipReceive(Client.Any2EVMMessage calldata message) external;
