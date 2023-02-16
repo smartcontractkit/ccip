@@ -63,6 +63,7 @@ type EVMChainConfig struct {
 	Router          gethcommon.Address
 	Afn             gethcommon.Address
 	FeeManager      gethcommon.Address
+	AllowList       []gethcommon.Address
 }
 
 type EVMBridgedToken struct {
@@ -82,7 +83,6 @@ type EVMLaneConfig struct {
 	ReceiverDapp    gethcommon.Address
 	GovernanceDapp  gethcommon.Address
 	PingPongDapp    gethcommon.Address
-	AllowList       []gethcommon.Address
 }
 
 type EvmDeploymentConfig struct {
