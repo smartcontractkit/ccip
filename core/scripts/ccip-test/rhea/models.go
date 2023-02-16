@@ -63,6 +63,7 @@ type EVMChainConfig struct {
 	Router          gethcommon.Address
 	Afn             gethcommon.Address
 	FeeManager      gethcommon.Address
+	AllowList       []gethcommon.Address
 }
 
 type EVMBridgedToken struct {
