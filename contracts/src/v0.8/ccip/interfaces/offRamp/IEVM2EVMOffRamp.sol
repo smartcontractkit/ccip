@@ -24,7 +24,8 @@ interface IEVM2EVMOffRamp {
   error CanOnlySelfCall();
   error ReceiverError();
 
-  event OffRampConfigChanged(OffRampConfig);
+  // sourceChainId and onRamp are needed by Atlas, to track onramp <-> offramp -> router relationship
+  event OffRampConfigChanged(OffRampConfig config, uint64 sourceChainId, address onRamp);
   event SkippedIncorrectNonce(uint64 indexed nonce, address indexed sender);
   event ExecutionStateChanged(
     uint64 indexed sequenceNumber,
@@ -39,6 +40,7 @@ interface IEVM2EVMOffRamp {
   /// @notice Returns the the current nonce for a receiver.
   function getSenderNonce(address sender) external view returns (uint64 nonce);
 
+  // since OffRampConfig is part of OffRampConfigChanged event, if changing it, we should update the ABI on Atlas
   struct OffRampConfig {
     address feeManager;
     // The waiting time before manual execution is enabled

@@ -72,12 +72,13 @@ contract EVM2EVMOffRamp is
     AggregateRateLimiter(rateLimiterConfig)
   {
     if (onRampAddress == address(0)) revert ZeroAddressNotAllowed();
-    _setOffRampConfig(offRampConfig);
 
     i_sourceChainId = sourceChainId;
     i_chainId = chainId;
     i_onRampAddress = onRampAddress;
     i_metadataHash = _metadataHash(Internal.EVM_2_EVM_MESSAGE_HASH);
+
+    _setOffRampConfig(offRampConfig);
   }
 
   function _metadataHash(bytes32 prefix) internal view returns (bytes32) {
@@ -99,7 +100,7 @@ contract EVM2EVMOffRamp is
       revert InvalidOffRampConfig(config);
 
     s_config = config;
-    emit OffRampConfigChanged(config);
+    emit OffRampConfigChanged(config, i_chainId, i_onRampAddress);
   }
 
   /// @inheritdoc IEVM2EVMOffRamp
