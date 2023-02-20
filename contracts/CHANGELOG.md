@@ -2,7 +2,11 @@
 
 ## Unreleased
 
-...
+### Changed
+
+- Change Functions Client variables to internal for use when integrating Automation (#8429)
+- Make Functions Billing Registry and Functions Oracle upgradable using the transparent proxy pattern (#8371)
+- Update dependency hardhat from version 2.10.1 to 2.12.7 (#8464)
 
 ## 0.6.1 - 2023-02-06
 
