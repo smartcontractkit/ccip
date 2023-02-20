@@ -11,3 +11,5 @@ typechain
 # Foundry
 foundry-cache
 foundry-artifacts
+
+.openzeppelin
