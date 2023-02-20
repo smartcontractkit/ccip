@@ -41,8 +41,6 @@ specifiers:
   hardhat-abi-exporter: ^2.2.1
   hardhat-contract-sizer: ^2.5.1
   istanbul: ^0.4.5
-  keccak256: ^1.0.6
-  merkletreejs: ^0.2.31
   moment: ^2.29.4
   prettier: ^2.7.1
   prettier-plugin-solidity: 1.0.0-beta.18
@@ -96,8 +94,6 @@ devDependencies:
   hardhat-abi-exporter: 2.2.1_hardhat@2.12.7
   hardhat-contract-sizer: 2.5.1_hardhat@2.12.7
   istanbul: 0.4.5
-  keccak256: 1.0.6
-  merkletreejs: 0.2.32
   moment: 2.29.4
   prettier: 2.7.1
   prettier-plugin-solidity: 1.0.0-beta.18_prettier@2.7.1
@@ -3222,10 +3218,6 @@ packages:
     resolution: {integrity: sha512-E+XQCRwSbaaiChtv6k6Dwgc+bx+Bs6vuKJHHl5kox/BaKbhiXzqQOwK4cO22yElGp2OCmjwVhT3HmxgyPGnJfQ==}
     dev: true
 
-  /buffer-reverse/1.0.1:
-    resolution: {integrity: sha512-M87YIUBsZ6N924W57vDwT/aOu8hw7ZgdByz6ijksLjmHJELBASmYTTlNHRgjE+pTsT9oJXGaDSgqqwfdHotDUg==}
-    dev: true
-
   /buffer-to-arraybuffer/0.0.5:
     resolution: {integrity: sha512-3dthu5CYiVB1DEJp61FtApNnNndTckcqe4pFcLdvHtrpG+kcyekCJKg4MRiDcFW7A6AODnXB9U4dwQiCW5kzJQ==}
     dev: true
@@ -3944,10 +3936,6 @@ packages:
       public-encrypt: 4.0.3
       randombytes: 2.1.0
       randomfill: 1.0.4
-    dev: true
-
-  /crypto-js/3.3.0:
-    resolution: {integrity: sha512-DIT51nX0dCfKltpRiXV+/TVZq+Qq2NgF4644+K7Ttnla7zEzqc+kjJyiB96BHNyUTBxyjzRcZYpUdZa+QAqi6Q==}
     dev: true
 
   /css-select/5.1.0:
@@ -7023,14 +7011,6 @@ packages:
       readable-stream: 3.6.0
     dev: true
 
-  /keccak256/1.0.6:
-    resolution: {integrity: sha512-8GLiM01PkdJVGUhR1e6M/AvWnSqYS0HaERI+K/QtStGDGlSTx2B1zTqZk4Zlqu5TxHJNTxWAdP9Y+WI50OApUw==}
-    dependencies:
-      bn.js: 5.2.1
-      buffer: 6.0.3
-      keccak: 3.0.2
-    dev: true
-
   /keccakjs/0.2.3:
     resolution: {integrity: sha512-BjLkNDcfaZ6l8HBG9tH0tpmDv3sS2mA7FNQxFHpCdzP3Gb2MVruXBSuoM66SnVxKJpAr5dKGdkHD+bDokt8fTg==}
     dependencies:
@@ -10020,11 +10000,6 @@ packages:
 
   /tr46/0.0.3:
     resolution: {integrity: sha512-N3WMsuqV66lT30CrXNbEjx4GEwlow3v6rr4mCcv6prnfwhS01rkgyFdjPNBYd9br7LpXV1+Emh01fHnq2Gdgrw==}
-    dev: true
-
-  /treeify/1.1.0:
-    resolution: {integrity: sha512-1m4RA7xVAJrSGrrXGs0L3YTwyvBs2S8PbRHaLZAkFw7JR8oIFwYtysxlBZhYIa7xSyiYJKZ3iGrrk55cGA3i9A==}
-    engines: {node: '>=0.6'}
     dev: true
 
   /trim-right/1.0.1:
