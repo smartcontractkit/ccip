@@ -100,7 +100,7 @@ contract EVM2EVMOffRamp is
       revert InvalidOffRampConfig(config);
 
     s_config = config;
-    emit OffRampConfigChanged(config, i_chainId, i_onRampAddress);
+    emit OffRampConfigChanged(config, i_sourceChainId, i_onRampAddress);
   }
 
   /// @inheritdoc IEVM2EVMOffRamp
