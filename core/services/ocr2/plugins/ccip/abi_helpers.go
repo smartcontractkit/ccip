@@ -262,6 +262,24 @@ func makeCommitReportArgs() abi.Arguments {
 			Name: "CommitReport",
 			Type: utils.MustAbiType("tuple", []abi.ArgumentMarshaling{
 				{
+					Name: "feeUpdates",
+					Type: "tuple[]",
+					Components: []abi.ArgumentMarshaling{
+						{
+							Name: "sourceFeeToken",
+							Type: "address",
+						},
+						{
+							Name: "destChainId",
+							Type: "uint64",
+						},
+						{
+							Name: "feeTokenBaseUnitsPerUnitGas",
+							Type: "uint128",
+						},
+					},
+				},
+				{
 					Name: "interval",
 					Type: "tuple",
 					Components: []abi.ArgumentMarshaling{

@@ -598,14 +598,17 @@ func (destCCIP *DestCCIPModule) DeployContracts(t *testing.T, sourceCCIP SourceC
 
 	<-destCCIP.Common.deployed
 
+	destFeeManager, err := contractDeployer.DeployFeeManager([]fee_manager.InternalFeeUpdate{
+		{
+			SourceFeeToken:              common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
+			DestChainId:                 destCCIP.SourceChainId,
+			FeeTokenBaseUnitsPerUnitGas: big.NewInt(200e9), // (2e20 juels/eth) * (1 gwei / gas) / (1 eth/1e18)
+		},
+	})
+	require.NoError(t, err, "Error on FeeManager deployment")
+
 	// commitStore responsible for validating the transfer message
-	destCCIP.CommitStore, err = contractDeployer.DeployCommitStore(
-		destCCIP.SourceChainId,
-		destCCIP.Common.ChainClient.GetChainID().Uint64(),
-		destCCIP.Common.AFN.EthAddress,
-		sourceCCIP.OnRamp.EthAddress,
-		1,
-	)
+	destCCIP.CommitStore, err = contractDeployer.DeployCommitStore(destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID().Uint64(), destCCIP.Common.AFN.EthAddress, sourceCCIP.OnRamp.EthAddress, destFeeManager.EthAddress)
 	require.NoError(t, err, "Deploying CommitStore shouldn't fail")
 	err = destCCIP.Common.ChainClient.WaitForEvents()
 	require.NoError(t, err, "Error waiting for setting destination contracts")
@@ -633,14 +636,6 @@ func (destCCIP *DestCCIPModule) DeployContracts(t *testing.T, sourceCCIP SourceC
 	destCCIP.Common.TokenPrices = append(destCCIP.Common.TokenPrices, big.NewInt(1))
 
 	pools = append(pools, destCCIP.Common.FeeTokenPool.EthAddress)
-	destFeeManager, err := contractDeployer.DeployFeeManager([]fee_manager.InternalFeeUpdate{
-		{
-			SourceFeeToken:              common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
-			DestChainId:                 destCCIP.SourceChainId,
-			FeeTokenBaseUnitsPerUnitGas: big.NewInt(200e9), // (2e20 juels/eth) * (1 gwei / gas) / (1 eth/1e18)
-		},
-	})
-	require.NoError(t, err, "Error on FeeManager deployment")
 
 	err = destCCIP.Common.ChainClient.WaitForEvents()
 	require.NoError(t, err, "Error waiting for events on destination contract deployments")
@@ -656,6 +651,9 @@ func (destCCIP *DestCCIPModule) DeployContracts(t *testing.T, sourceCCIP SourceC
 	// OffRamp can update
 	err = destFeeManager.SetFeeUpdater(destCCIP.OffRamp.EthAddress)
 	require.NoError(t, err, "setting OffRamp as fee updater shouldn't fail")
+	// CommitStore can update
+	err = destFeeManager.SetFeeUpdater(destCCIP.CommitStore.EthAddress)
+	require.NoError(t, err, "setting CommitStore as fee updater shouldn't fail")
 
 	_, err = destCCIP.Common.Router.AddOffRamp(destCCIP.OffRamp.EthAddress, destCCIP.SourceChainId)
 	require.NoError(t, err, "setting OffRamp as fee updater shouldn't fail")
@@ -1081,8 +1079,7 @@ func CreateOCRJobsForCCIP(
 	mockServer *ctfClient.MockserverClient,
 	newBootStrap bool,
 ) {
-	bootstrapCommitP2PIds := bootstrapCommit.KeysBundle.P2PKeys
-	bootstrapCommitP2PId := bootstrapCommitP2PIds.Data[0].Attributes.PeerID
+	bootstrapCommitP2PId := bootstrapCommit.KeysBundle.P2PKeys.Data[0].Attributes.PeerID
 	var bootstrapExecP2PId string
 	if bootstrapExec == nil {
 		bootstrapExec = bootstrapCommit
@@ -1109,7 +1106,8 @@ func CreateOCRJobsForCCIP(
 	require.NoError(t, err, "Getting current block should be successful in dest chain")
 
 	jobParams := testhelpers.CCIPJobSpecParams{
-		OnRampsOnCommit:    onRamp,
+		OnRamp:             onRamp,
+		OffRamp:            offRamp,
 		CommitStore:        commitStore,
 		SourceChainName:    sourceChainClient.GetNetworkName(),
 		DestChainName:      destChainClient.GetNetworkName(),
@@ -1142,48 +1140,44 @@ func CreateOCRJobsForCCIP(
 		tokenFeeConv[token] = "200000000000000000000"
 	}
 	SetMockServerWithSameTokenFeeConversionValue(t, tokenFeeConv, execNodes, mockServer)
+	SetMockServerWithSameTokenFeeConversionValue(t, tokenFeeConv, commitNodes, mockServer)
 
 	ocr2SpecCommit, err := jobParams.CommitJobSpec()
 	require.NoError(t, err)
-	var ocr2SpecExec *client.OCR2TaskJobSpec
 
+	var ocr2SpecExec *client.OCR2TaskJobSpec
 	if offRamp != common.HexToAddress("0x0") {
-		jobParams.OffRamp = offRamp
-		jobParams.OnRampForExecution = onRamp
 		jobParams.P2PV2Bootstrappers = []string{p2pBootstrappersExec.P2PV2Bootstrapper()}
 		ocr2SpecExec, err = jobParams.ExecutionJobSpec()
 		require.NoError(t, err)
-		ocr2SpecExec.Name = fmt.Sprintf("%s-ge", ocr2SpecExec.Name)
+		ocr2SpecExec.Name = fmt.Sprintf("%s", ocr2SpecExec.Name)
 	}
 
-	for nodeIndex := 0; nodeIndex < len(commitNodes); nodeIndex++ {
-		nodeTransmitterAddress := commitNodes[nodeIndex].KeysBundle.EthAddress
-		nodeOCR2Key := commitNodes[nodeIndex].KeysBundle.OCR2Key
-		nodeOCR2KeyId := nodeOCR2Key.Data.ID
-		ocr2SpecCommit.OCR2OracleSpec.OCRKeyBundleID.SetValid(nodeOCR2KeyId)
-		ocr2SpecCommit.OCR2OracleSpec.TransmitterID.SetValid(nodeTransmitterAddress)
+	for i, node := range commitNodes {
+		tokensPerFeeCoinPipeline := TokenFeeForMultipleTokenAddr(node, linkTokenAddr, mockServer)
 
-		_, err = commitNodes[nodeIndex].Node.MustCreateJob(ocr2SpecCommit)
-		require.NoError(t, err, "Shouldn't fail creating CCIP-Commit OCR Task job on OCR node %d job name %s",
-			nodeIndex+1, ocr2SpecCommit.Name)
+		ocr2SpecCommit.OCR2OracleSpec.OCRKeyBundleID.SetValid(node.KeysBundle.OCR2Key.Data.ID)
+		ocr2SpecCommit.OCR2OracleSpec.TransmitterID.SetValid(node.KeysBundle.EthAddress)
+		ocr2SpecCommit.OCR2OracleSpec.PluginConfig["tokensPerFeeCoinPipeline"] = fmt.Sprintf(`"""
+%s
+"""`, tokensPerFeeCoinPipeline)
+
+		_, err = node.Node.MustCreateJob(ocr2SpecCommit)
+		require.NoError(t, err, "Shouldn't fail creating CCIP-Commit job on OCR node %d job name %s", i+1, ocr2SpecCommit.Name)
 	}
 
-	for nodeIndex := 0; nodeIndex < len(execNodes); nodeIndex++ {
-		tokensPerFeeCoinPipeline := TokenFeeForMultipleTokenAddr(execNodes[nodeIndex], linkTokenAddr, mockServer)
-		nodeTransmitterAddress := execNodes[nodeIndex].KeysBundle.EthAddress
-		nodeOCR2Key := execNodes[nodeIndex].KeysBundle.OCR2Key
-		nodeOCR2KeyId := nodeOCR2Key.Data.ID
+	if ocr2SpecExec != nil {
+		for i, node := range execNodes {
+			tokensPerFeeCoinPipeline := TokenFeeForMultipleTokenAddr(node, linkTokenAddr, mockServer)
 
-		if ocr2SpecExec != nil {
 			ocr2SpecExec.OCR2OracleSpec.PluginConfig["tokensPerFeeCoinPipeline"] = fmt.Sprintf(`"""
 %s
 """`, tokensPerFeeCoinPipeline)
-			ocr2SpecExec.OCR2OracleSpec.OCRKeyBundleID.SetValid(nodeOCR2KeyId)
-			ocr2SpecExec.OCR2OracleSpec.TransmitterID.SetValid(nodeTransmitterAddress)
+			ocr2SpecExec.OCR2OracleSpec.OCRKeyBundleID.SetValid(node.KeysBundle.OCR2Key.Data.ID)
+			ocr2SpecExec.OCR2OracleSpec.TransmitterID.SetValid(node.KeysBundle.EthAddress)
 
-			_, err = execNodes[nodeIndex].Node.MustCreateJob(ocr2SpecExec)
-			require.NoError(t, err, "Shouldn't fail creating CCIP-Exec-ge OCR Task job on OCR node %d job name %s",
-				nodeIndex+1, ocr2SpecExec.Name)
+			_, err = node.Node.MustCreateJob(ocr2SpecExec)
+			require.NoError(t, err, "Shouldn't fail creating CCIP-Exec job on OCR node %d job name %s", i+1, ocr2SpecExec.Name)
 		}
 	}
 }

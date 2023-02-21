@@ -49,6 +49,7 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
     onRamps[0] = ON_RAMP_ADDRESS;
 
     ICommitStore.CommitReport memory report = ICommitStore.CommitReport({
+      feeUpdates: new Internal.FeeUpdate[](0),
       interval: ICommitStore.Interval(messages[0].sequenceNumber, messages[2].sequenceNumber),
       merkleRoot: merkleRoots[0]
     });

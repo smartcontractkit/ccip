@@ -39,6 +39,12 @@ interface IFeeManager {
   function removeFeeUpdater(address feeUpdater) external;
 
   /**
+   * @notice Checks if the given address is registered as a fee updater.
+   * @param feeUpdater The address of the fee updater.
+   */
+  function isFeeUpdater(address feeUpdater) external returns (bool);
+
+  /**
    * @notice Update the fee for a given token and destination chain.
    * @param feeUpdates The fee updates to apply.
    */

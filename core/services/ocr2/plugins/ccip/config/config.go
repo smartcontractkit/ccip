@@ -14,8 +14,10 @@ type CommitPluginConfig struct {
 	SourceChainID                    uint64          `json:"sourceChainID"`
 	SourceStartBlock, DestStartBlock int64           // Only for first time job add.
 	OnRampID                         string          `json:"onRampID"`
+	OffRampID                        string          `json:"offRampID"`
 	PollPeriod                       models.Duration `json:"pollPeriod"`
 	InflightCacheExpiry              models.Duration `json:"inflightCacheExpiry"`
+	TokensPerFeeCoinPipeline         string          `json:"tokensPerFeeCoinPipeline"`
 }
 
 // ValidateCommitPluginConfig validates the arguments for the CCIP commit plugin.
@@ -24,7 +26,10 @@ func (rp *CommitPluginConfig) ValidateCommitPluginConfig() error {
 	// TODO: Validation based on chainID
 	// for now, all EVM.
 	if !common.IsHexAddress(rp.OnRampID) {
-		return errors.Errorf("%v is not a valid EIP155 address", rp.OnRampID)
+		return errors.Errorf("%v is not a valid onRamp EIP155 address", rp.OnRampID)
+	}
+	if !common.IsHexAddress(rp.OffRampID) {
+		return errors.Errorf("%v is not a valid offRamp EIP155 address", rp.OffRampID)
 	}
 
 	return nil

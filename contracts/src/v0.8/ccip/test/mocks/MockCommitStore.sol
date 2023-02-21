@@ -13,8 +13,8 @@ contract MockCommitStore is ICommitStore {
   function setMinSeqNr(uint64 minSeqNr) external {}
 
   /// @inheritdoc ICommitStore
-  function getConfig() external view override returns (ICommitStore.CommitStoreConfig memory) {
-    return ICommitStore.CommitStoreConfig({chainId: 1, sourceChainId: 2, onRamp: address(1)});
+  function getConfig() external pure override returns (ICommitStore.CommitStoreConfig memory) {
+    return ICommitStore.CommitStoreConfig({chainId: 1, sourceChainId: 2, onRamp: address(1), feeManager: address(10)});
   }
 
   /// @inheritdoc ICommitStore

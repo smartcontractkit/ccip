@@ -148,11 +148,11 @@ func (node *Node) AddBootstrapJob(t *testing.T, spec *ctfClient.OCR2TaskJobSpec)
 }
 
 func AddAllJobs(t *testing.T, jobParams CCIPJobSpecParams, ccipContracts CCIPContracts, nodes []Node) {
+	jobParams.OffRamp = ccipContracts.Dest.OffRamp.Address()
+	jobParams.OnRamp = ccipContracts.Source.OnRamp.Address()
+
 	commitSpec, err := jobParams.CommitJobSpec()
 	require.NoError(t, err)
-
-	jobParams.OnRampForExecution = ccipContracts.Source.OnRamp.Address()
-	jobParams.OffRamp = ccipContracts.Dest.OffRamp.Address()
 	geExecutionSpec, err := jobParams.ExecutionJobSpec()
 	require.NoError(t, err)
 

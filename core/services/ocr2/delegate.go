@@ -599,7 +599,7 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 			OffchainKeyring:              kb,
 			OnchainKeyring:               kb,
 		}
-		return ccip.NewCommitServices(lggr, spec, d.chainSet, d.isNewlyCreatedJob, oracleArgsNoPlugin, logError)
+		return ccip.NewCommitServices(lggr, jb, d.chainSet, d.isNewlyCreatedJob, d.pipelineRunner, oracleArgsNoPlugin, logError)
 	case job.CCIPExecution:
 		if spec.Relay != relay.EVM {
 			return nil, errors.New("Non evm chains are not supported for CCIP execution")

@@ -4,6 +4,7 @@ pragma solidity 0.8.15;
 import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
 import {ICommitStore} from "../interfaces/ICommitStore.sol";
 import {IAFN} from "../interfaces/health/IAFN.sol";
+import {IFeeManager} from "../interfaces/fees/IFeeManager.sol";
 
 import {HealthChecker} from "../health/HealthChecker.sol";
 import {OCR2Base} from "../ocr/OCR2Base.sol";
@@ -19,27 +20,28 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, HealthChecker, OC
   uint64 internal immutable i_sourceChainId;
   // The onRamp address on the source chain
   address internal immutable i_onRamp;
+  // The feeManager address
+  address internal s_feeManager;
 
   // merkleRoot => timestamp when received
   mapping(bytes32 => uint256) private s_roots;
 
   // The min sequence number expected for future messages
-  uint64 private s_minSeqNr;
+  uint64 private s_minSeqNr = 1;
 
   /// @dev sourceTokens are mapped to pools, and therefore should be the same length arrays.
   /// @dev The AFN contract should be deployed already
   /// @param config containing the source and dest chain Ids and the onRamp
   /// @param afn AFN contract
-  /// @param minSeqNr The expected minimum sequence number
-  constructor(
-    CommitStoreConfig memory config,
-    IAFN afn,
-    uint64 minSeqNr
-  ) OCR2Base() HealthChecker(afn) {
+  constructor(CommitStoreConfig memory config, IAFN afn) OCR2Base() HealthChecker(afn) {
+    if (
+      config.feeManager == address(0) || config.onRamp == address(0) || config.chainId == 0 || config.sourceChainId == 0
+    ) revert InvalidCommitStoreConfig();
+
     i_chainId = config.chainId;
     i_sourceChainId = config.sourceChainId;
     i_onRamp = config.onRamp;
-    s_minSeqNr = minSeqNr;
+    s_feeManager = config.feeManager;
   }
 
   /// @inheritdoc ICommitStore
@@ -71,7 +73,13 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, HealthChecker, OC
 
   /// @inheritdoc ICommitStore
   function getConfig() external view override returns (ICommitStore.CommitStoreConfig memory) {
-    return ICommitStore.CommitStoreConfig({chainId: i_chainId, sourceChainId: i_sourceChainId, onRamp: i_onRamp});
+    return
+      ICommitStore.CommitStoreConfig({
+        chainId: i_chainId,
+        sourceChainId: i_sourceChainId,
+        onRamp: i_onRamp,
+        feeManager: s_feeManager
+      });
   }
 
   /// @inheritdoc ICommitStore
@@ -134,6 +142,16 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, HealthChecker, OC
   function _report(bytes memory encodedReport) internal override whenNotPaused whenHealthy {
     ICommitStore.CommitReport memory report = abi.decode(encodedReport, (ICommitStore.CommitReport));
 
+    if (report.feeUpdates.length != 0) {
+      IFeeManager(s_feeManager).updateFees(report.feeUpdates);
+      // If there is no root, the report only contained fee updated and
+      // we return to not revert on the empty root check below.
+      if (report.merkleRoot == bytes32(0)) {
+        return;
+      }
+    }
+
+    // If we reached this code the report should also contain a valid root
     if (s_minSeqNr != report.interval.min || report.interval.min > report.interval.max)
       revert InvalidInterval(report.interval);
 

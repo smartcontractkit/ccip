@@ -162,6 +162,9 @@ func (c *CCIPContracts) EnableOffRamp() {
 	require.NoError(c.t, err)
 	c.Dest.Chain.Commit()
 
+	_, err = c.Dest.FeeManager.SetFeeUpdater(c.Dest.User, c.Dest.CommitStore.Address())
+	require.NoError(c.t, err)
+
 	_, err = c.Dest.FeeManager.SetFeeUpdater(c.Dest.User, c.Dest.OffRamp.Address())
 	require.NoError(c.t, err)
 	c.Dest.Chain.Commit()
@@ -265,9 +268,9 @@ func (c *CCIPContracts) DeployNewCommitStore() {
 			ChainId:       c.Dest.ChainID,
 			SourceChainId: c.Source.ChainID,
 			OnRamp:        c.Source.OnRamp.Address(),
+			FeeManager:    c.Dest.FeeManager.Address(),
 		},
 		c.Dest.AFN.Address(), // AFN address
-		1,                    // min seq num
 	)
 	require.NoError(c.t, err)
 	c.Dest.Chain.Commit()
@@ -384,7 +387,7 @@ func (c *CCIPContracts) SetupOnchainConfig(oracles []confighelper.OracleIdentity
 
 func (c *CCIPContracts) NewCCIPJobSpecParams(tokensPerFeeCoinPipeline string, configBlock int64) CCIPJobSpecParams {
 	return CCIPJobSpecParams{
-		OnRampsOnCommit:          c.Source.OnRamp.Address(),
+		OnRamp:                   c.Source.OnRamp.Address(),
 		CommitStore:              c.Dest.CommitStore.Address(),
 		SourceChainId:            c.Source.ChainID,
 		DestChainId:              c.Dest.ChainID,
@@ -591,30 +594,6 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	destAFN, err := mock_afn_contract.NewMockAFNContract(afnDestAddress, destChain)
 	require.NoError(t, err)
 
-	// Deploy commit store.
-	commitStoreAddress, _, _, err := commit_store.DeployCommitStore(
-		destUser,  // user
-		destChain, // client
-		commit_store.ICommitStoreCommitStoreConfig{
-			ChainId:       destChainID,
-			SourceChainId: sourceChainID,
-			OnRamp:        onRamp.Address(),
-		},
-		afnDestAddress, // AFN address
-		1,              // min seq num
-	)
-	require.NoError(t, err)
-	commitStore, err := commit_store.NewCommitStore(commitStoreAddress, destChain)
-	require.NoError(t, err)
-	destChain.Commit()
-
-	// Create dest ge router
-	destRouterAddress, _, _, err := router.DeployRouter(destUser, destChain, common.Address{})
-	require.NoError(t, err)
-	destChain.Commit()
-	destRouter, err := router.NewRouter(destRouterAddress, destChain)
-	require.NoError(t, err)
-
 	// Deploy and configure ge offramp.
 	destFeeManagerAddress, _, _, err := fee_manager.DeployFeeManager(
 		destUser,
@@ -629,6 +608,31 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	require.NoError(t, err)
 	destFeeManager, err := fee_manager.NewFeeManager(destFeeManagerAddress, destChain)
 	require.NoError(t, err)
+
+	// Deploy commit store.
+	commitStoreAddress, _, _, err := commit_store.DeployCommitStore(
+		destUser,  // user
+		destChain, // client
+		commit_store.ICommitStoreCommitStoreConfig{
+			ChainId:       destChainID,
+			SourceChainId: sourceChainID,
+			OnRamp:        onRamp.Address(),
+			FeeManager:    destFeeManagerAddress,
+		},
+		afnDestAddress, // AFN address
+	)
+	require.NoError(t, err)
+	commitStore, err := commit_store.NewCommitStore(commitStoreAddress, destChain)
+	require.NoError(t, err)
+	destChain.Commit()
+
+	// Create dest ge router
+	destRouterAddress, _, _, err := router.DeployRouter(destUser, destChain, common.Address{})
+	require.NoError(t, err)
+	destChain.Commit()
+	destRouter, err := router.NewRouter(destRouterAddress, destChain)
+	require.NoError(t, err)
+
 	offRampAddress, _, _, err := evm_2_evm_offramp.DeployEVM2EVMOffRamp(
 		destUser,
 		destChain,
@@ -661,6 +665,9 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	destChain.Commit()
 	// OffRamp can update
 	_, err = destFeeManager.SetFeeUpdater(destUser, offRampAddress)
+	require.NoError(t, err)
+	// CommitStore can update
+	_, err = destFeeManager.SetFeeUpdater(destUser, commitStoreAddress)
 	require.NoError(t, err)
 	_, err = destRouter.ApplyRampUpdates(destUser, nil, []router.IRouterOffRampUpdate{
 		{SourceChainId: sourceChainID, OffRamps: []common.Address{offRampAddress}}})

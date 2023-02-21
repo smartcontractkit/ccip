@@ -11,9 +11,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	hlp "github.com/smartcontractkit/chainlink/core/scripts/common"
@@ -56,34 +53,17 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 		return nil, errors.Wrap(err, "get chainset")
 	}
 
-	commitStoreAddr := common.HexToAddress(pluginConfig.CommitStoreID)
-	err = ccipconfig.VerifyTypeAndVersion(commitStoreAddr, destChain.Client(), ccipconfig.CommitStore)
+	commitStore, err := LoadCommitStore(common.HexToAddress(pluginConfig.CommitStoreID), destChain.Client())
 	if err != nil {
-		return nil, errors.Wrap(err, "Invalid commitStore contract")
+		return nil, errors.Wrap(err, "failed loading commitStore")
 	}
-	commitStore, err := commit_store.NewCommitStore(commitStoreAddr, destChain.Client())
+	onRamp, err := LoadOnRamp(common.HexToAddress(pluginConfig.OnRampID), sourceChain.Client())
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed loading the commitStore")
+		return nil, errors.Wrap(err, "failed loading onRamp")
 	}
-
-	onRampAddr := common.HexToAddress(pluginConfig.OnRampID)
-	err = ccipconfig.VerifyTypeAndVersion(onRampAddr, sourceChain.Client(), ccipconfig.EVM2EVMOnRamp)
+	offRamp, err := LoadOffRamp(common.HexToAddress(spec.ContractID), destChain.Client())
 	if err != nil {
-		return nil, errors.Wrap(err, "Invalid onRamp contract")
-	}
-	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddr, sourceChain.Client())
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed loading the onRamp")
-	}
-
-	offRampAddr := common.HexToAddress(spec.ContractID)
-	err = ccipconfig.VerifyTypeAndVersion(offRampAddr, destChain.Client(), ccipconfig.EVM2EVMOffRamp)
-	if err != nil {
-		return nil, errors.Wrap(err, "Invalid offRamp contract")
-	}
-	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(offRampAddr, destChain.Client())
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed loading the offRamp")
+		return nil, errors.Wrap(err, "failed loading offRamp")
 	}
 
 	lggr = lggr.With("srcChain", hlp.ChainName(int64(pluginConfig.SourceChainID)), "dstChain", hlp.ChainName(destChainID))
@@ -125,7 +105,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 			builder:             NewBatchBuilder(lggr, eventSignatures, offRamp),
 			eventSignatures:     eventSignatures,
 			priceGetter:         priceGetterObject,
-			leafHasher:          NewLeafHasher(pluginConfig.SourceChainID, uint64(destChainID), onRampAddr, hasher.NewKeccakCtx()),
+			leafHasher:          NewLeafHasher(pluginConfig.SourceChainID, uint64(destChainID), onRamp.Address(), hasher.NewKeccakCtx()),
 			snoozeTime:          rootSnoozeTime,
 			inflightCacheExpiry: inflightCacheExpiry,
 			sourceChainID:       pluginConfig.SourceChainID,
@@ -134,7 +114,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 			sourceGasEstimator:  sourceChain.TxManager().GetGasEstimator(),
 		})
 	// Subscribe to all relevant commit logs.
-	_, err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{eventSignatures.SendRequested}, Addresses: []common.Address{onRampAddr}})
+	_, err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{eventSignatures.SendRequested}, Addresses: []common.Address{onRamp.Address()}})
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +126,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	if err != nil {
 		return nil, err
 	}
-	_, err = destChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{eventSignatures.ExecutionStateChanged}, Addresses: []common.Address{offRampAddr}})
+	_, err = destChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{eventSignatures.ExecutionStateChanged}, Addresses: []common.Address{offRamp.Address()}})
 	if err != nil {
 		return nil, err
 	}

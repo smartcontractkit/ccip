@@ -245,9 +245,9 @@ func deployCommitStore(t *testing.T, client *EvmDeploymentConfig, sourceChainId 
 			ChainId:       client.ChainConfig.ChainId,
 			SourceChainId: sourceChainId,
 			OnRamp:        onRamp,
+			FeeManager:    client.ChainConfig.FeeManager,
 		},
 		client.ChainConfig.Afn, // AFN address
-		1,                      // Minimum sequence number
 	)
 	shared.RequireNoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)

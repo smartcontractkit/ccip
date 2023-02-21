@@ -3,50 +3,65 @@ pragma solidity 0.8.15;
 
 import "../helpers/MerkleHelper.sol";
 import "../helpers/CommitStoreHelper.sol";
-import "../BaseTest.t.sol";
 import "../../health/AFN.sol";
+import "../../fees/FeeManager.sol";
+import "../fees/FeeManager.t.sol";
 
-contract CommitStoreSetup is BaseTest {
+contract CommitStoreSetup is FeeManagerSetup {
   CommitStoreHelper s_commitStore;
 
   function setUp() public virtual override {
-    BaseTest.setUp();
+    FeeManagerSetup.setUp();
 
     s_commitStore = new CommitStoreHelper(
-      ICommitStore.CommitStoreConfig({chainId: DEST_CHAIN_ID, sourceChainId: SOURCE_CHAIN_ID, onRamp: ON_RAMP_ADDRESS}),
-      s_afn,
-      1
+      ICommitStore.CommitStoreConfig({
+        chainId: DEST_CHAIN_ID,
+        sourceChainId: SOURCE_CHAIN_ID,
+        onRamp: ON_RAMP_ADDRESS,
+        feeManager: address(s_destFeeManager)
+      }),
+      s_afn
     );
+
+    s_destFeeManager.setFeeUpdater(address(s_commitStore));
   }
 }
 
-contract CommitStoreRealAFNSetup is BaseTest {
+contract CommitStoreRealAFNSetup is FeeManagerSetup {
   CommitStoreHelper s_commitStore;
 
   function setUp() public virtual override {
-    BaseTest.setUp();
+    FeeManagerSetup.setUp();
     address[] memory participants = new address[](1);
     participants[0] = OWNER;
     uint256[] memory weights = new uint256[](1);
     weights[0] = 1;
     s_afn = new AFN(participants, weights, 1, 1); // Overwrite base mock afn with real.
     s_commitStore = new CommitStoreHelper(
-      ICommitStore.CommitStoreConfig({chainId: DEST_CHAIN_ID, sourceChainId: SOURCE_CHAIN_ID, onRamp: ON_RAMP_ADDRESS}),
-      s_afn,
-      1
+      ICommitStore.CommitStoreConfig({
+        chainId: DEST_CHAIN_ID,
+        sourceChainId: SOURCE_CHAIN_ID,
+        onRamp: ON_RAMP_ADDRESS,
+        feeManager: address(s_destFeeManager)
+      }),
+      s_afn
     );
   }
 }
 
 /// @notice #constructor
-contract CommitStore_constructor is BaseTest {
+contract CommitStore_constructor is FeeManagerSetup {
   function testConstructorSuccess() public {
     address onRamp = 0x2C44CDDdB6a900Fa2B585dd299E03D12Fa4293Bc;
-    uint64 minSequenceNumbers = 4;
+
     CommitStore commitStore = new CommitStore(
-      ICommitStore.CommitStoreConfig({chainId: DEST_CHAIN_ID, sourceChainId: SOURCE_CHAIN_ID, onRamp: onRamp}),
-      s_afn,
-      minSequenceNumbers
+      ICommitStore.CommitStoreConfig({
+        chainId: DEST_CHAIN_ID,
+        sourceChainId: SOURCE_CHAIN_ID,
+        onRamp: onRamp,
+        feeManager: address(s_destFeeManager)
+      }),
+      s_afn
     );
 
     ICommitStore.CommitStoreConfig memory setConfig = commitStore.getConfig();
@@ -56,7 +71,7 @@ contract CommitStore_constructor is BaseTest {
     assertEq(onRamp, setConfig.onRamp);
 
     // CommitStore config
-    assertEq(minSequenceNumbers, commitStore.getExpectedNextSequenceNumber());
+    assertEq(1, commitStore.getExpectedNextSequenceNumber());
 
     // typeAndVersion
     assertEq(commitStore.typeAndVersion(), "CommitStore 1.0.0");
@@ -95,22 +110,78 @@ contract CommitStore_resetUnblessedRoots is CommitStoreSetup {
 /// @notice #report
 contract CommitStore_report is CommitStoreSetup {
   event ReportAccepted(ICommitStore.CommitReport report);
+  event GasFeeUpdated(
+    address indexed token,
+    uint64 indexed destChain,
+    uint128 feeTokenBaseUnitsPerUnitGas,
+    uint64 timestamp
+  );
 
   // Success
 
-  function testReportSuccess() public {
+  function testReportOnlyRootSuccess() public {
     uint64 max1 = 931;
+    bytes32 root = "test #1";
     ICommitStore.CommitReport memory report = ICommitStore.CommitReport({
+      feeUpdates: new Internal.FeeUpdate[](0),
       interval: ICommitStore.Interval(1, max1),
-      merkleRoot: "test #1"
+      merkleRoot: root
     });
 
-    vm.expectEmit(true, false, false, true);
-
-    s_commitStore.report(abi.encode(report));
+    vm.expectEmit(false, false, false, true);
     emit ReportAccepted(report);
 
+    s_commitStore.report(abi.encode(report));
+
     assertEq(max1 + 1, s_commitStore.getExpectedNextSequenceNumber());
+    assertEq(block.timestamp, s_commitStore.getMerkleRoot(root));
+  }
+
+  function testReportAndFeeUpdateSuccess() public {
+    uint64 max1 = 12;
+    Internal.FeeUpdate[] memory feeUpdates = new Internal.FeeUpdate[](1);
+    feeUpdates[0] = Internal.FeeUpdate({
+      sourceFeeToken: s_sourceFeeToken,
+      destChainId: DEST_CHAIN_ID,
+      feeTokenBaseUnitsPerUnitGas: 1e5
+    });
+    ICommitStore.CommitReport memory report = ICommitStore.CommitReport({
+      feeUpdates: feeUpdates,
+      interval: ICommitStore.Interval(1, max1),
+      merkleRoot: "test #2"
+    });
+
+    vm.expectEmit(false, false, false, true);
+    emit ReportAccepted(report);
+
+    s_commitStore.report(abi.encode(report));
+
+    assertEq(max1 + 1, s_commitStore.getExpectedNextSequenceNumber());
+  }
+
+  function testOnlyFeeUpdatesSuccess() public {
+    Internal.FeeUpdate[] memory feeUpdates = new Internal.FeeUpdate[](1);
+    feeUpdates[0] = Internal.FeeUpdate({
+      sourceFeeToken: s_sourceFeeToken,
+      destChainId: DEST_CHAIN_ID,
+      feeTokenBaseUnitsPerUnitGas: 1e18
+    });
+
+    ICommitStore.CommitReport memory report = ICommitStore.CommitReport({
+      feeUpdates: feeUpdates,
+      interval: ICommitStore.Interval(0, 0),
+      merkleRoot: ""
+    });
+
+    vm.expectEmit(false, false, false, true);
+    emit GasFeeUpdated(
+      feeUpdates[0].sourceFeeToken,
+      feeUpdates[0].destChainId,
+      feeUpdates[0].feeTokenBaseUnitsPerUnitGas,
+      uint64(block.timestamp)
+    );
+
+    s_commitStore.report(abi.encode(report));
   }
 
   // Reverts
@@ -131,6 +202,7 @@ contract CommitStore_report is CommitStoreSetup {
 
   function testInvalidRootRevert() public {
     ICommitStore.CommitReport memory report = ICommitStore.CommitReport({
+      feeUpdates: new Internal.FeeUpdate[](0),
       interval: ICommitStore.Interval(1, 4),
       merkleRoot: bytes32(0)
     });
@@ -141,7 +213,11 @@ contract CommitStore_report is CommitStoreSetup {
 
   function testInvalidIntervalReverts() public {
     ICommitStore.Interval memory interval = ICommitStore.Interval(2, 2);
-    ICommitStore.CommitReport memory report = ICommitStore.CommitReport({interval: interval, merkleRoot: bytes32(0)});
+    ICommitStore.CommitReport memory report = ICommitStore.CommitReport({
+      feeUpdates: new Internal.FeeUpdate[](0),
+      interval: interval,
+      merkleRoot: bytes32(0)
+    });
 
     vm.expectRevert(abi.encodeWithSelector(ICommitStore.InvalidInterval.selector, interval));
 
@@ -150,7 +226,11 @@ contract CommitStore_report is CommitStoreSetup {
 
   function testInvalidIntervalMinLargerThanMaxReverts() public {
     ICommitStore.Interval memory interval = ICommitStore.Interval(1, 0);
-    ICommitStore.CommitReport memory report = ICommitStore.CommitReport({interval: interval, merkleRoot: bytes32(0)});
+    ICommitStore.CommitReport memory report = ICommitStore.CommitReport({
+      feeUpdates: new Internal.FeeUpdate[](0),
+      interval: interval,
+      merkleRoot: bytes32(0)
+    });
 
     vm.expectRevert(abi.encodeWithSelector(ICommitStore.InvalidInterval.selector, interval));
 
@@ -164,7 +244,13 @@ contract CommitStore_verify is CommitStoreRealAFNSetup {
     bytes32[] memory leaves = new bytes32[](1);
     leaves[0] = "rootAndAlsoRootOfRoots";
     s_commitStore.report(
-      abi.encode(ICommitStore.CommitReport({interval: ICommitStore.Interval(1, 2), merkleRoot: leaves[0]}))
+      abi.encode(
+        ICommitStore.CommitReport({
+          feeUpdates: new Internal.FeeUpdate[](0),
+          interval: ICommitStore.Interval(1, 2),
+          merkleRoot: leaves[0]
+        })
+      )
     );
     bytes32[] memory proofs = new bytes32[](0);
     // We have not blessed this root, should return 0.
@@ -176,7 +262,13 @@ contract CommitStore_verify is CommitStoreRealAFNSetup {
     bytes32[] memory leaves = new bytes32[](1);
     leaves[0] = "rootAndAlsoRootOfRoots";
     s_commitStore.report(
-      abi.encode(ICommitStore.CommitReport({interval: ICommitStore.Interval(1, 2), merkleRoot: leaves[0]}))
+      abi.encode(
+        ICommitStore.CommitReport({
+          feeUpdates: new Internal.FeeUpdate[](0),
+          interval: ICommitStore.Interval(1, 2),
+          merkleRoot: leaves[0]
+        })
+      )
     );
     // Bless that root.
     bytes32[] memory rootsWithOrigin = new bytes32[](1);

@@ -60,9 +60,8 @@ const (
 	GasLimitPerTx            = BatchGasLimit - 1_000_000 // Leave a buffer for overhead.
 	MaxPayloadLength         = 1000
 	MaxTokensPerMessage      = 5
-	MaxExecutionReportLength = 150_000 // TODO
-	MaxGasPrice              = 200e9   // 200 gwei. TODO: probably want this to be some dynamic value, a multiplier of the current gas price.
-	TokenPriceBufferPercent  = 10      // Amount that the leader adds as a token price buffer in Query.
+	MaxExecutionReportLength = 150_000      // TODO
+	MaxGasPrice              = int64(200e9) // 200 gwei. TODO: probably want this to be some dynamic value, a multiplier of the current gas price.
 )
 
 var (

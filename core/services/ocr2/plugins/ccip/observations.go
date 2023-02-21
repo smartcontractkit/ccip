@@ -24,7 +24,9 @@ func EvmWord(i uint64) common.Hash {
 }
 
 type CommitObservation struct {
-	Interval commit_store.ICommitStoreInterval `json:"interval"`
+	Interval         commit_store.ICommitStoreInterval `json:"interval"`
+	TokensPerFeeCoin map[common.Address]*big.Int       `json:"tokensPerFeeCoin"`
+	SourceGasPrice   *big.Int                          `json:"sourceGasPrice"`
 }
 
 func (o CommitObservation) Marshal() ([]byte, error) {

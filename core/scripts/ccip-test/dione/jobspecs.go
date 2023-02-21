@@ -15,8 +15,7 @@ import (
 func NewCCIPJobSpecParams(sourceClient rhea.EvmDeploymentConfig, destClient rhea.EvmDeploymentConfig) testhelpers.CCIPJobSpecParams {
 	return testhelpers.CCIPJobSpecParams{
 		OffRamp:                  destClient.LaneConfig.OffRamp,
-		OnRampForExecution:       sourceClient.LaneConfig.OnRamp,
-		OnRampsOnCommit:          sourceClient.LaneConfig.OnRamp,
+		OnRamp:                   sourceClient.LaneConfig.OnRamp,
 		CommitStore:              destClient.LaneConfig.CommitStore,
 		SourceChainName:          helpers.ChainName(int64(sourceClient.ChainConfig.ChainId)),
 		DestChainName:            helpers.ChainName(int64(destClient.ChainConfig.ChainId)),

@@ -51,6 +51,11 @@ contract FeeManager is IFeeManager, OwnerIsCreator {
   }
 
   // @inheritdoc IFeeManager
+  function isFeeUpdater(address feeUpdater) external view override returns (bool) {
+    return s_feeUpdaters[feeUpdater];
+  }
+
+  // @inheritdoc IFeeManager
   function updateFees(Internal.FeeUpdate[] memory feeUpdates) external override requireUpdaterOrOwner {
     for (uint256 i = 0; i < feeUpdates.length; ++i) {
       _updateFee(feeUpdates[i].sourceFeeToken, feeUpdates[i].destChainId, feeUpdates[i].feeTokenBaseUnitsPerUnitGas);

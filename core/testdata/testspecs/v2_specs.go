@@ -626,29 +626,3 @@ type CCIPSpec struct {
 func (c CCIPSpec) Toml() string {
 	return c.toml
 }
-
-func GenerateCCIPSpec(params CCIPSpecParams) CCIPSpec {
-	var spec CCIPSpec
-	var contract = "0x613a38AC1659769640aaE063C651F48E0250454C"
-	if params.contractID != "" {
-		contract = params.contractID
-	}
-	template := `
-type             = "offchainreporting2"
-pluginType       = "ccip-commit"
-relay            = "evm"
-schemaVersion    = 1
-contractID       = "%s"
-
-[pluginConfig]
-onRampAddress    = "%s"
-sourceEvmChainID = 1337
-destEvmChainID   = 1337
-
-[relayConfig]
-chainID          = 1337
-`
-	spec.toml = fmt.Sprintf(template, contract, contract)
-	spec.CCIPSpecParams = params
-	return spec
-}

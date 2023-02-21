@@ -100,6 +100,10 @@ func setFeeManagerUpdater(t *testing.T, client *EvmDeploymentConfig) {
 	tx, err := feeManager.SetFeeUpdater(client.Owner, client.LaneConfig.OffRamp)
 	shared.RequireNoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
+
+	tx, err = feeManager.SetFeeUpdater(client.Owner, client.LaneConfig.CommitStore)
+	shared.RequireNoError(t, err)
+	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 }
 
 func fillPoolWithTokens(t *testing.T, client *EvmDeploymentConfig, pool *lock_release_token_pool.LockReleaseTokenPool, tokenAddress common.Address) {

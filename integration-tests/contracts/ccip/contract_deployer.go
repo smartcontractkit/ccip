@@ -159,15 +159,7 @@ func (e *CCIPContractsDeployer) NewAFNContract(addr common.Address) (*AFN, error
 	}, err
 }
 
-func (e *CCIPContractsDeployer) DeployCommitStore(
-	sourceChainId, destChainId uint64,
-	afn common.Address,
-	onRamp common.Address,
-	minSeqNum uint64,
-) (
-	*CommitStore,
-	error,
-) {
+func (e *CCIPContractsDeployer) DeployCommitStore(sourceChainId, destChainId uint64, afn, onRamp, feeManager common.Address) (*CommitStore, error) {
 	address, _, instance, err := e.evmClient.DeployContract("CommitStore Contract", func(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
@@ -179,9 +171,10 @@ func (e *CCIPContractsDeployer) DeployCommitStore(
 				ChainId:       destChainId,
 				SourceChainId: sourceChainId,
 				OnRamp:        onRamp,
+				FeeManager:    feeManager,
 			},
 			afn,
-			minSeqNum)
+		)
 	})
 	return &CommitStore{
 		client:     e.evmClient,

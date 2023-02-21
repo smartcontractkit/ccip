@@ -7,6 +7,7 @@ interface ICommitStore {
   error InvalidInterval(Interval interval);
   error InvalidProof();
   error InvalidRoot();
+  error InvalidCommitStoreConfig();
 
   event ReportAccepted(CommitReport report);
 
@@ -15,6 +16,7 @@ interface ICommitStore {
     uint64 chainId;
     uint64 sourceChainId;
     address onRamp;
+    address feeManager;
   }
 
   /// @notice a sequenceNumber interval
@@ -25,6 +27,7 @@ interface ICommitStore {
 
   /// @notice Report that is committed by the observing DON at the committing phase
   struct CommitReport {
+    Internal.FeeUpdate[] feeUpdates;
     Interval interval;
     bytes32 merkleRoot;
   }

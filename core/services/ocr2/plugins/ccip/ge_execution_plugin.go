@@ -193,8 +193,8 @@ func (r *ExecutionReportingPlugin) tokenPrices(percentMultiplier *big.Int) (map[
 		return nil, err
 	}
 	for token, price := range prices {
-		buffer := big.NewInt(0).Div(price, percentMultiplier)
-		tokensPerFeeCoin[token] = big.NewInt(0).Add(price, buffer)
+		buffer := new(big.Int).Div(new(big.Int).Mul(price, percentMultiplier), big.NewInt(100))
+		tokensPerFeeCoin[token] = new(big.Int).Add(price, buffer)
 	}
 	return tokensPerFeeCoin, nil
 }
@@ -214,7 +214,7 @@ func (r *ExecutionReportingPlugin) Query(ctx context.Context, timestamp types.Re
 	// prices remain high for a long time to invoke bumping and increase our loss up to the bumped cap. Benefit is we will unblock the jobs ourselves.
 	// Should be possible to ensure the max bumped loss is incurred with some extremely low probability (something much worse than a luna type meltdown of 4hr 8k gwei spike).
 	// TODO: Switch between 1559 and non-1559 here based on chain (or wrap estimator at a higher level).
-	destGasPrice, _, err := r.config.destGasEstimator.GetLegacyGas(ctx, nil, BatchGasLimit, assets.NewWei(big.NewInt(int64(MaxGasPrice))))
+	destGasPrice, _, err := r.config.destGasEstimator.GetLegacyGas(ctx, nil, BatchGasLimit, assets.NewWei(big.NewInt(MaxGasPrice)))
 	if err != nil {
 		return nil, err
 	}
@@ -254,7 +254,7 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 	}
 	// Observe a source chain price for pricing.
 	// TODO: 1559 support
-	sourceGasPriceWei, _, err := r.config.sourceGasEstimator.GetLegacyGas(ctx, nil, BatchGasLimit, assets.NewWei(big.NewInt(int64(MaxGasPrice))))
+	sourceGasPriceWei, _, err := r.config.sourceGasEstimator.GetLegacyGas(ctx, nil, BatchGasLimit, assets.NewWei(big.NewInt(MaxGasPrice)))
 	if err != nil {
 		return nil, err
 	}

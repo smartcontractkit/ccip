@@ -87,23 +87,6 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	require.NoError(t, err)
 	destChain.Commit()
 
-	onRampAddress := common.HexToAddress("0x01BE23585060835E02B77ef475b0Cc51aA1e0709")
-	linkTokenSourceAddress := common.HexToAddress("0x01BE23585060835E02B77ef475b0Cc51aA1e0709")
-	commitStoreAddress, _, _, err := commit_store_helper.DeployCommitStoreHelper(
-		destUser,  // user
-		destChain, // client
-		commit_store_helper.ICommitStoreCommitStoreConfig{
-			ChainId:       1338,
-			SourceChainId: 1337,
-			OnRamp:        onRampAddress,
-		},
-		afnAddress, // AFN address
-		1,          // min seq num
-	)
-	require.NoError(t, err)
-	commitStore, err := commit_store_helper.NewCommitStoreHelper(commitStoreAddress, destChain)
-	require.NoError(t, err)
-
 	destFeeManagerAddress, _, _, err := fee_manager.DeployFeeManager(
 		destUser,
 		destChain, []fee_manager.InternalFeeUpdate{{
@@ -115,6 +98,24 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 		60*60*24*14, // two weeks
 	)
 	require.NoError(t, err)
+
+	onRampAddress := common.HexToAddress("0x01BE23585060835E02B77ef475b0Cc51aA1e0709")
+	linkTokenSourceAddress := common.HexToAddress("0x01BE23585060835E02B77ef475b0Cc51aA1e0709")
+	commitStoreAddress, _, _, err := commit_store_helper.DeployCommitStoreHelper(
+		destUser,  // user
+		destChain, // client
+		commit_store_helper.ICommitStoreCommitStoreConfig{
+			ChainId:       1338,
+			SourceChainId: 1337,
+			OnRamp:        onRampAddress,
+			FeeManager:    destFeeManagerAddress,
+		},
+		afnAddress, // AFN address
+	)
+	require.NoError(t, err)
+	commitStore, err := commit_store_helper.NewCommitStoreHelper(commitStoreAddress, destChain)
+	require.NoError(t, err)
+
 	destChain.Commit()
 
 	routerAddress, _, routerContract, err := router.DeployRouter(destUser, destChain, common.Address{})
