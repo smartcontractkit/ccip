@@ -130,7 +130,6 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 		evm_2_evm_offramp.IEVM2EVMOffRampOffRampConfig{
 			Router:                                  routerAddress,
 			CommitStore:                             commitStore.Address(),
-			FeeManager:                              destFeeManagerAddress,
 			PermissionLessExecutionThresholdSeconds: 1,
 			ExecutionDelaySeconds:                   0,
 			MaxDataSize:                             1e5,
@@ -278,7 +277,6 @@ func TestMaxInternalExecutionReportSize(t *testing.T) {
 		mb.allMsgBytes,
 		mb.proof.Hashes,
 		mb.proof.SourceFlags,
-		nil,
 	)
 	require.NoError(t, err)
 	t.Log("execution report length", len(executorReport), ccip.MaxExecutionReportLength)
@@ -312,12 +310,11 @@ func TestInternalExecutionReportEncoding(t *testing.T) {
 	mb := c.generateMessageBatch(t, 1, 1, 1)
 	report := evm_2_evm_offramp.InternalExecutionReport{
 		SequenceNumbers: mb.seqNums,
-		FeeUpdates:      []evm_2_evm_offramp.InternalFeeUpdate{},
 		EncodedMessages: mb.allMsgBytes,
 		Proofs:          mb.proof.Hashes,
 		ProofFlagBits:   ccip.ProofFlagsToBits(mb.proof.SourceFlags),
 	}
-	encodeCommitReport, err := ccip.EncodeExecutionReport(report.SequenceNumbers, report.EncodedMessages, report.Proofs, mb.proof.SourceFlags, nil)
+	encodeCommitReport, err := ccip.EncodeExecutionReport(report.SequenceNumbers, report.EncodedMessages, report.Proofs, mb.proof.SourceFlags)
 	require.NoError(t, err)
 	decodeCommitReport, err := ccip.DecodeExecutionReport(encodeCommitReport)
 	require.NoError(t, err)

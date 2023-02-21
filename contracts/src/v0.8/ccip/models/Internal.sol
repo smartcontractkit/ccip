@@ -13,7 +13,6 @@ library Internal {
 
   struct ExecutionReport {
     uint64[] sequenceNumbers;
-    FeeUpdate[] feeUpdates;
     bytes[] encodedMessages;
     bytes32[] proofs;
     uint256 proofFlagBits;

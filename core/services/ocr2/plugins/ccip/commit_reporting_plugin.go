@@ -24,10 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
 )
 
-const (
-	MaxCommitReportLength   = 1000
-	TokenPriceBufferPercent = 10 // Amount that the leader adds as a token price buffer in Query.
-)
+const MaxCommitReportLength = 1000
 
 var (
 	_ types.ReportingPluginFactory = &CommitReportingPluginFactory{}

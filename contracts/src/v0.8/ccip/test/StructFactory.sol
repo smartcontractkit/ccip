@@ -69,16 +69,15 @@ contract StructFactory {
   uint32 internal constant PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS = 500;
   uint64 internal constant MAX_GAS_LIMIT = 4_000_000;
 
-  function offRampConfig(
-    IFeeManager feeManager,
-    ICommitStore commitStore,
-    IRouter router
-  ) internal pure returns (IEVM2EVMOffRamp.OffRampConfig memory) {
+  function offRampConfig(ICommitStore commitStore, IRouter router)
+    internal
+    pure
+    returns (IEVM2EVMOffRamp.OffRampConfig memory)
+  {
     return
       IEVM2EVMOffRamp.OffRampConfig({
         router: address(router),
         commitStore: address(commitStore),
-        feeManager: address(feeManager),
         executionDelaySeconds: EXECUTION_DELAY_SECONDS,
         maxDataSize: MAX_DATA_SIZE,
         maxTokensLength: MAX_TOKENS_LENGTH,

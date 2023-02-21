@@ -40,9 +40,6 @@ type BatchBuilderInterface interface {
 		srcToDst map[common.Address]common.Address,
 		msgs []logpoller.Log,
 		executed map[uint64]struct{},
-		gasLimit uint64,
-		gasPrice *big.Int,
-		tokensPerFeeCoin map[common.Address]*big.Int,
 		inflight []InflightInternalExecutionReport,
 		aggregateTokenLimit *big.Int,
 		tokenLimitPrices map[common.Address]*big.Int) ([]uint64, bool)
@@ -56,12 +53,11 @@ const (
 )
 
 const (
-	BatchGasLimit            = 5_000_000                 // TODO: think if a good value for this
-	GasLimitPerTx            = BatchGasLimit - 1_000_000 // Leave a buffer for overhead.
-	MaxPayloadLength         = 1000
-	MaxTokensPerMessage      = 5
-	MaxExecutionReportLength = 150_000      // TODO
-	MaxGasPrice              = int64(200e9) // 200 gwei. TODO: probably want this to be some dynamic value, a multiplier of the current gas price.
+	BatchGasLimit       = 5_000_000                 // TODO: think if a good value for this
+	GasLimitPerTx       = BatchGasLimit - 1_000_000 // Leave a buffer for overhead.
+	MaxPayloadLength    = 1000
+	MaxTokensPerMessage = 5
+	MaxGasPrice         = int64(200e9) // 200 gwei. TODO: probably want this to be some dynamic value, a multiplier of the current gas price.
 )
 
 var (

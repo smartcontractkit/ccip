@@ -11,7 +11,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	hlp "github.com/smartcontractkit/chainlink/core/scripts/common"
 	"github.com/smartcontractkit/chainlink/core/services/job"
@@ -76,21 +75,6 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	if pluginConfig.InflightCacheExpiry.Duration() != 0 {
 		inflightCacheExpiry = pluginConfig.InflightCacheExpiry.Duration()
 	}
-	priceGetterObject, err := NewPriceGetter(pluginConfig.TokensPerFeeCoinPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
-	if err != nil {
-		return nil, err
-	}
-
-	// subscribe for GasFeeUpdated logs, but FeeManager is only available as part of onchain offramp's config
-	// TODO: how to detect if OffRampConfig.FeeManager changes on-chain? Currently, we expect a plugin/job/node restart
-	offRampConfig, err := offRamp.GetOffRampConfig(nil)
-	if err != nil {
-		return nil, err
-	}
-	feeManager, err := fee_manager.NewFeeManager(offRampConfig.FeeManager, destChain.Client())
-	if err != nil {
-		return nil, err
-	}
 
 	eventSignatures := GetEventSignatures()
 	wrappedPluginFactory := NewExecutionReportingPluginFactory(
@@ -101,17 +85,11 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 			offRamp:             offRamp,
 			onRamp:              onRamp,
 			commitStore:         commitStore,
-			feeManager:          feeManager,
-			builder:             NewBatchBuilder(lggr, eventSignatures, offRamp),
+			builder:             NewBatchBuilder(lggr, eventSignatures, offRamp, BatchGasLimit),
 			eventSignatures:     eventSignatures,
-			priceGetter:         priceGetterObject,
 			leafHasher:          NewLeafHasher(pluginConfig.SourceChainID, uint64(destChainID), onRamp.Address(), hasher.NewKeccakCtx()),
 			snoozeTime:          rootSnoozeTime,
 			inflightCacheExpiry: inflightCacheExpiry,
-			sourceChainID:       pluginConfig.SourceChainID,
-			gasLimit:            BatchGasLimit,
-			destGasEstimator:    destChain.TxManager().GetGasEstimator(),
-			sourceGasEstimator:  sourceChain.TxManager().GetGasEstimator(),
 		})
 	// Subscribe to all relevant commit logs.
 	_, err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{eventSignatures.SendRequested}, Addresses: []common.Address{onRamp.Address()}})
@@ -119,10 +97,6 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 		return nil, err
 	}
 	_, err = destChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{ReportAccepted}, Addresses: []common.Address{commitStore.Address()}})
-	if err != nil {
-		return nil, err
-	}
-	_, err = destChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{GasFeeUpdated}, Addresses: []common.Address{offRampConfig.FeeManager}})
 	if err != nil {
 		return nil, err
 	}

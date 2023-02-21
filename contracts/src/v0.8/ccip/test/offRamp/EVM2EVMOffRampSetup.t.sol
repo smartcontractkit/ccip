@@ -40,19 +40,15 @@ contract EVM2EVMOffRampSetup is TokenSetup, FeeManagerSetup {
     s_receiver = new SimpleMessageReceiver();
     s_secondary_receiver = new SimpleMessageReceiver();
 
-    deployOffRamp(s_mockCommitStore, s_destFeeManager, s_destRouter);
+    deployOffRamp(s_mockCommitStore, s_destRouter);
   }
 
-  function deployOffRamp(
-    ICommitStore commitStore,
-    IFeeManager feeManager,
-    IRouter router
-  ) internal {
+  function deployOffRamp(ICommitStore commitStore, IRouter router) internal {
     s_offRamp = new EVM2EVMOffRampHelper(
       SOURCE_CHAIN_ID,
       DEST_CHAIN_ID,
       ON_RAMP_ADDRESS,
-      offRampConfig(feeManager, commitStore, router),
+      offRampConfig(commitStore, router),
       s_afn,
       getCastedSourceTokens(),
       getCastedDestinationPools(),
@@ -172,16 +168,12 @@ contract EVM2EVMOffRampSetup is TokenSetup, FeeManagerSetup {
       sequenceNumbers[i] = messages[i].sequenceNumber;
     }
 
-    bytes32[] memory proofs = new bytes32[](0);
-    Internal.FeeUpdate[] memory feeUpdates = new Internal.FeeUpdate[](0);
-
     return
       Internal.ExecutionReport({
         sequenceNumbers: sequenceNumbers,
-        proofs: proofs,
+        proofs: new bytes32[](0),
         proofFlagBits: 2**256 - 1,
-        encodedMessages: encodedMessages,
-        feeUpdates: feeUpdates
+        encodedMessages: encodedMessages
       });
   }
 }

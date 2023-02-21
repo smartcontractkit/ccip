@@ -101,7 +101,7 @@ func DecodeErrorStringFromABI(errorString string, contractABIs []string) {
 		return
 	}
 
-	fmt.Printf("Cannot match error with contract ABI. Error code \"%v\"\n", "trimmed")
+	fmt.Printf("Cannot match error with contract ABI. Error code \"%v\"\n", errorString)
 }
 
 func getAllABIs() []string {

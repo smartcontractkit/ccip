@@ -13,8 +13,9 @@ import (
 )
 
 const (
-	MaxObservationLength = 500 // TODO: Think about what to set this too
-	MaxQueryLength       = 500 // TODO: Think about what to set this too, roughly maxTokens*maxPriceInBytesPerToken
+	MaxQueryLength           = 500     // TODO: Think about what to set this too, roughly maxTokens*maxPriceInBytesPerToken
+	MaxObservationLength     = 500     // TODO: Think about what to set this too
+	MaxExecutionReportLength = 150_000 // TODO
 )
 
 func EvmWord(i uint64) common.Hash {
@@ -34,9 +35,7 @@ func (o CommitObservation) Marshal() ([]byte, error) {
 }
 
 type ExecutionObservation struct {
-	SeqNrs           []uint64                    `json:"seqNrs"`
-	TokensPerFeeCoin map[common.Address]*big.Int `json:"tokensPerFeeCoin"`
-	SourceGasPrice   *big.Int                    `json:"sourceGasPrice"`
+	SeqNrs []uint64 `json:"seqNrs"`
 }
 
 func (o ExecutionObservation) Marshal() ([]byte, error) {

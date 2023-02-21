@@ -20,6 +20,7 @@ import (
 type BatchBuilder struct {
 	abi             abi.ABI
 	eventSignatures EventSignatures
+	batchGasLimit   uint64
 	lggr            logger.Logger
 	ramp            *evm_2_evm_offramp.EVM2EVMOffRamp
 }
@@ -63,16 +64,16 @@ func overheadGas(geMsg evm_2_evm_onramp.InternalEVM2EVMMessage) uint64 {
 func maxGasOverHeadGas(numMsgs int, geMsg evm_2_evm_onramp.InternalEVM2EVMMessage) uint64 {
 	merkleProofBytes := (math.Ceil(math.Log2(float64(numMsgs)))+2)*32 + (1+2)*32 // only ever one outer root hash
 	merkleGasShare := uint64(merkleProofBytes * CALLDATA_GAS_PER_BYTE)
-	gasFeeShare := uint64(PER_TOKEN_OVERHEAD_GAS / numMsgs)
 
-	return overheadGas(geMsg) + merkleGasShare + gasFeeShare
+	return overheadGas(geMsg) + merkleGasShare
 }
 
-func NewBatchBuilder(lggr logger.Logger, eventSignatures EventSignatures, ramp *evm_2_evm_offramp.EVM2EVMOffRamp) *BatchBuilder {
+func NewBatchBuilder(lggr logger.Logger, eventSignatures EventSignatures, ramp *evm_2_evm_offramp.EVM2EVMOffRamp, batchGasLimit uint64) *BatchBuilder {
 	geABI, _ := abi.JSON(strings.NewReader(evm_2_evm_onramp.EVM2EVMOnRampABI))
 	return &BatchBuilder{
 		abi:             geABI,
 		eventSignatures: eventSignatures,
+		batchGasLimit:   batchGasLimit,
 		lggr:            lggr,
 		ramp:            ramp,
 	}
@@ -91,9 +92,6 @@ func (tb *BatchBuilder) BuildBatch(
 	srcToDst map[common.Address]common.Address,
 	msgs []logpoller.Log,
 	executed map[uint64]struct{},
-	batchGasLimit uint64,
-	gasPrice *big.Int,
-	tokensPerFeeCoin map[common.Address]*big.Int,
 	inflight []InflightInternalExecutionReport,
 	aggregateTokenLimit *big.Int,
 	tokenLimitPrices map[common.Address]*big.Int,
@@ -103,6 +101,7 @@ func (tb *BatchBuilder) BuildBatch(
 		tb.lggr.Errorw("Unexpected error computing inflight values", "err", err)
 		return []uint64{}, false
 	}
+	availableGas := tb.batchGasLimit
 	aggregateTokenLimit.Sub(aggregateTokenLimit, inflightAggregateValue)
 	executedAllMessages = true
 	expectedNonces := make(map[common.Address]uint64)
@@ -144,7 +143,6 @@ func (tb *BatchBuilder) BuildBatch(
 			}
 		}
 		// Check expected nonce is valid
-
 		if msg.Message.Nonce != expectedNonces[msg.Message.Sender] {
 			lggr.Warnw("Skipping message invalid nonce", "have", msg.Message.Nonce, "want", expectedNonces[msg.Message.Sender])
 			continue
@@ -166,14 +164,13 @@ func (tb *BatchBuilder) BuildBatch(
 			continue
 		}
 		// TODO: fee boosting check, loss protection etc. For now we are just executing regardless
-		totalGasLimit := msg.Message.GasLimit.Uint64() + maxGasOverHeadGas(len(msgs), msg.Message)
+		messageMaxGas := msg.Message.GasLimit.Uint64() + maxGasOverHeadGas(len(msgs), msg.Message)
 		// Check sufficient gas in batch
-		if batchGasLimit < totalGasLimit {
-
-			lggr.Infow("Insufficient remaining gas in batch limit", "gasLimit", batchGasLimit, "totalGasLimit", totalGasLimit)
+		if availableGas < messageMaxGas {
+			lggr.Infow("Insufficient remaining gas in batch limit", "availableGas", availableGas, "messageMaxGas", messageMaxGas)
 			continue
 		}
-		batchGasLimit -= totalGasLimit
+		availableGas -= messageMaxGas
 		aggregateTokenLimit.Sub(aggregateTokenLimit, msgValue)
 
 		lggr.Infow("Adding msg to batch", "seqNum", msg.Message.SequenceNumber, "nonce", msg.Message.Nonce)

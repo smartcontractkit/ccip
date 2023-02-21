@@ -59,7 +59,7 @@ func TestMaxGasOverHeadGas(t *testing.T) {
 				Data:         []byte{},
 				TokenAmounts: []evm_2_evm_onramp.ClientEVMTokenAmount{},
 			},
-			want: 37772,
+			want: 31856,
 		},
 		{
 			numMsgs: 3,
@@ -69,7 +69,7 @@ func TestMaxGasOverHeadGas(t *testing.T) {
 					{},
 				},
 			},
-			want: 86705,
+			want: 74872,
 		},
 	}
 

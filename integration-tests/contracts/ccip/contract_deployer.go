@@ -323,14 +323,7 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 	}, err
 }
 
-func (e *CCIPContractsDeployer) DeployOffRamp(
-	sourceChainId, destChainId uint64,
-	commitStore, onRamp, afn, feetoken, destFeeManagerAddress, destRouter common.Address,
-	sourceToken, pools []common.Address,
-	opts RateLimiterConfig) (
-	*OffRamp,
-	error,
-) {
+func (e *CCIPContractsDeployer) DeployOffRamp(sourceChainId, destChainId uint64, commitStore, onRamp, afn, destRouter common.Address, sourceToken, pools []common.Address, opts RateLimiterConfig) (*OffRamp, error) {
 	address, _, instance, err := e.evmClient.DeployContract("OffRamp Contract", func(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
@@ -344,7 +337,6 @@ func (e *CCIPContractsDeployer) DeployOffRamp(
 			evm_2_evm_offramp.IEVM2EVMOffRampOffRampConfig{
 				Router:                                  destRouter,
 				CommitStore:                             commitStore,
-				FeeManager:                              destFeeManagerAddress,
 				PermissionLessExecutionThresholdSeconds: 0,
 				ExecutionDelaySeconds:                   0,
 				MaxDataSize:                             1e5,

@@ -3,7 +3,6 @@ pragma solidity 0.8.15;
 
 import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
 import {ICommitStore} from "../interfaces/ICommitStore.sol";
-import {IFeeManager} from "../interfaces/fees/IFeeManager.sol";
 import {IAFN} from "../interfaces/health/IAFN.sol";
 import {IPool} from "../interfaces/pools/IPool.sol";
 import {IEVM2EVMOffRamp} from "../interfaces/offRamp/IEVM2EVMOffRamp.sol";
@@ -96,8 +95,7 @@ contract EVM2EVMOffRamp is
   }
 
   function _setOffRampConfig(OffRampConfig memory config) private {
-    if (config.router == address(0) || config.commitStore == address(0) || config.feeManager == address(0))
-      revert InvalidOffRampConfig(config);
+    if (config.router == address(0) || config.commitStore == address(0)) revert InvalidOffRampConfig(config);
 
     s_config = config;
     emit OffRampConfigChanged(config, i_sourceChainId, i_onRampAddress);
@@ -196,9 +194,10 @@ contract EVM2EVMOffRamp is
       revert MessageTooLarge(uint256(s_config.maxDataSize), message.data.length);
   }
 
-  function _executeMessages(Internal.ExecutionReport memory report, bool manualExecution) internal {
-    // Report may have only price updates, so we only process messages if there are some.
+  function _execute(Internal.ExecutionReport memory report, bool manualExecution) internal whenNotPaused whenHealthy {
     uint256 numMsgs = report.encodedMessages.length;
+    if (numMsgs == 0) revert EmptyReport();
+
     bytes32[] memory hashedLeaves = new bytes32[](numMsgs);
     Internal.EVM2EVMMessage[] memory decodedMessages = new Internal.EVM2EVMMessage[](numMsgs);
 
@@ -283,23 +282,6 @@ contract EVM2EVMOffRamp is
       }
 
       emit ExecutionStateChanged(message.sequenceNumber, message.messageId, newState);
-    }
-  }
-
-  /// @notice Execute a series of one or more messages using a merkle proof and update one or more
-  /// feeManager prices.
-  /// @param report ExecutionReport
-  /// @param manualExecution Whether the DON auto executes or it is manually initiated
-  function _execute(Internal.ExecutionReport memory report, bool manualExecution) internal whenNotPaused whenHealthy {
-    // Fee updates
-    if (report.feeUpdates.length != 0) {
-      if (manualExecution) revert UnauthorizedGasPriceUpdate();
-      IFeeManager(s_config.feeManager).updateFees(report.feeUpdates);
-    }
-
-    // Messages execution
-    if (report.encodedMessages.length != 0) {
-      _executeMessages(report, manualExecution);
     }
   }
 

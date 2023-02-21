@@ -40,12 +40,11 @@ var (
 	SourcePool       = "source pool"
 	SourceFeeManager = "source fee manager"
 	OnRamp           = "onramp"
-	SourceRouter     = "source ge router"
+	SourceRouter     = "source router"
 
 	// Dest
-	OffRamp    = "offramp"
-	DestRouter = "dest ge router"
-	DestPool   = "dest pool"
+	OffRamp  = "offramp"
+	DestPool = "dest pool"
 
 	Receiver    = "receiver"
 	Sender      = "sender"
@@ -123,7 +122,6 @@ func (c *CCIPContracts) DeployNewOffRamp() {
 		c.Dest.ChainID,
 		c.Source.OnRamp.Address(),
 		evm_2_evm_offramp.IEVM2EVMOffRampOffRampConfig{
-			FeeManager:                              c.Dest.FeeManager.Address(),
 			PermissionLessExecutionThresholdSeconds: 1,
 			ExecutionDelaySeconds:                   0,
 			Router:                                  c.Dest.Router.Address(),
@@ -165,8 +163,6 @@ func (c *CCIPContracts) EnableOffRamp() {
 	_, err = c.Dest.FeeManager.SetFeeUpdater(c.Dest.User, c.Dest.CommitStore.Address())
 	require.NoError(c.t, err)
 
-	_, err = c.Dest.FeeManager.SetFeeUpdater(c.Dest.User, c.Dest.OffRamp.Address())
-	require.NoError(c.t, err)
 	c.Dest.Chain.Commit()
 
 	_, err = c.Dest.OffRamp.SetOCR2Config(
@@ -626,7 +622,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	require.NoError(t, err)
 	destChain.Commit()
 
-	// Create dest ge router
+	// Create dest router
 	destRouterAddress, _, _, err := router.DeployRouter(destUser, destChain, common.Address{})
 	require.NoError(t, err)
 	destChain.Commit()
@@ -642,7 +638,6 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		evm_2_evm_offramp.IEVM2EVMOffRampOffRampConfig{
 			Router:                                  destRouter.Address(),
 			CommitStore:                             commitStore.Address(),
-			FeeManager:                              destFeeManagerAddress,
 			PermissionLessExecutionThresholdSeconds: 1,
 			ExecutionDelaySeconds:                   0,
 			MaxDataSize:                             1e5,
@@ -663,9 +658,6 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	_, err = destPool.SetOffRamp(destUser, offRampAddress, true)
 	require.NoError(t, err)
 	destChain.Commit()
-	// OffRamp can update
-	_, err = destFeeManager.SetFeeUpdater(destUser, offRampAddress)
-	require.NoError(t, err)
 	// CommitStore can update
 	_, err = destFeeManager.SetFeeUpdater(destUser, commitStoreAddress)
 	require.NoError(t, err)
@@ -759,7 +751,7 @@ func EventuallyExecutionStateChangedToSuccess(t *testing.T, ccipContracts CCIPCo
 		ccipContracts.Source.Chain.Commit()
 		ccipContracts.Dest.Chain.Commit()
 		return false
-	}, 1*time.Minute, time.Second).
+	}, testutils.WaitTimeout(t), time.Second).
 		Should(gomega.BeTrue(), "ExecutionStateChanged Event")
 }
 
@@ -771,7 +763,7 @@ func EventuallyReportCommitted(t *testing.T, ccipContracts CCIPContracts, onRamp
 		ccipContracts.Dest.Chain.Commit()
 		t.Log("min seq num reported", minSeqNum)
 		return minSeqNum > uint64(max)
-	}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue(), "report has not been committed")
+	}, testutils.WaitTimeout(t), time.Second).Should(gomega.BeTrue(), "report has not been committed")
 }
 
 func GetEVMExtraArgsV1(gasLimit *big.Int, strict bool) ([]byte, error) {

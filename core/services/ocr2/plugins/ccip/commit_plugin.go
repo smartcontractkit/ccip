@@ -98,13 +98,17 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 	}
 
 	// subscribe for GasFeeUpdated logs, but FeeManager is only available as part of onchain commitStore's config
-	// TODO: how to detect if OffRampConfig.FeeManager changes on-chain? Currently, we expect a plugin/job/node restart
+	// TODO: how to detect if commitStoreConfig.FeeManager changes on-chain? Currently, we expect a plugin/job/node restart
 	feeManager, err := fee_manager.NewFeeManager(commitStoreConfig.FeeManager, destChain.Client())
 	if err != nil {
 		return nil, err
 	}
 
 	eventSigs := GetEventSignatures()
+	_, err = destChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{GasFeeUpdated}, Addresses: []common.Address{commitStoreConfig.FeeManager}})
+	if err != nil {
+		return nil, err
+	}
 	_, err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{eventSigs.SendRequested}, Addresses: []common.Address{onRamp.Address()}})
 	if err != nil {
 		return nil, err

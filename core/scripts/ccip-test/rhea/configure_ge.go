@@ -97,11 +97,7 @@ func setFeeManagerUpdater(t *testing.T, client *EvmDeploymentConfig) {
 	feeManager, err := fee_manager.NewFeeManager(client.ChainConfig.FeeManager, client.Client)
 	shared.RequireNoError(t, err)
 
-	tx, err := feeManager.SetFeeUpdater(client.Owner, client.LaneConfig.OffRamp)
-	shared.RequireNoError(t, err)
-	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
-
-	tx, err = feeManager.SetFeeUpdater(client.Owner, client.LaneConfig.CommitStore)
+	tx, err := feeManager.SetFeeUpdater(client.Owner, client.LaneConfig.CommitStore)
 	shared.RequireNoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 }

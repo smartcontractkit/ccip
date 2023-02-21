@@ -556,7 +556,7 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 
 	// Approve the fee amount
 	err = sourceCCIP.Common.FeeToken.Approve(sourceCCIP.Common.Router.Address(), fee)
-	require.NoError(t, err, "approving fee for ge router")
+	require.NoError(t, err, "approving fee for router")
 	require.NoError(t, sourceCCIP.Common.ChainClient.WaitForEvents(), "error waiting for events")
 
 	// initiate the transfer
@@ -640,17 +640,11 @@ func (destCCIP *DestCCIPModule) DeployContracts(t *testing.T, sourceCCIP SourceC
 	err = destCCIP.Common.ChainClient.WaitForEvents()
 	require.NoError(t, err, "Error waiting for events on destination contract deployments")
 
-	destCCIP.OffRamp, err = contractDeployer.DeployOffRamp(destCCIP.SourceChainId, sourceCCIP.DestinationChainId,
-		destCCIP.CommitStore.EthAddress, sourceCCIP.OnRamp.EthAddress,
-		destCCIP.Common.AFN.EthAddress, common.HexToAddress(destCCIP.Common.FeeToken.Address()),
-		destFeeManager.EthAddress, destCCIP.Common.Router.EthAddress, sourceTokens, pools, destCCIP.Common.RateLimiterConfig)
+	destCCIP.OffRamp, err = contractDeployer.DeployOffRamp(destCCIP.SourceChainId, sourceCCIP.DestinationChainId, destCCIP.CommitStore.EthAddress, sourceCCIP.OnRamp.EthAddress, destCCIP.Common.AFN.EthAddress, destCCIP.Common.Router.EthAddress, sourceTokens, pools, destCCIP.Common.RateLimiterConfig)
 	require.NoError(t, err, "Deploying OffRamp shouldn't fail")
 	err = destCCIP.Common.ChainClient.WaitForEvents()
 	require.NoError(t, err, "Error waiting for deploying OffRamp")
 
-	// OffRamp can update
-	err = destFeeManager.SetFeeUpdater(destCCIP.OffRamp.EthAddress)
-	require.NoError(t, err, "setting OffRamp as fee updater shouldn't fail")
 	// CommitStore can update
 	err = destFeeManager.SetFeeUpdater(destCCIP.CommitStore.EthAddress)
 	require.NoError(t, err, "setting CommitStore as fee updater shouldn't fail")

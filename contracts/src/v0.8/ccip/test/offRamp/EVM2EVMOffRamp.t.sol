@@ -42,11 +42,7 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
     IPool[] memory pools = new IPool[](1);
 
     IERC20[] memory wrongTokens = new IERC20[](5);
-    IEVM2EVMOffRamp.OffRampConfig memory offRampConfig = offRampConfig(
-      s_sourceFeeManager,
-      s_mockCommitStore,
-      s_destRouter
-    );
+    IEVM2EVMOffRamp.OffRampConfig memory offRampConfig = offRampConfig(s_mockCommitStore, s_destRouter);
     s_offRamp = new EVM2EVMOffRampHelper(
       SOURCE_CHAIN_ID,
       DEST_CHAIN_ID,
@@ -72,11 +68,7 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
       admin: TOKEN_LIMIT_ADMIN
     });
 
-    IEVM2EVMOffRamp.OffRampConfig memory offRampConfig = offRampConfig(
-      s_sourceFeeManager,
-      s_mockCommitStore,
-      s_destRouter
-    );
+    IEVM2EVMOffRamp.OffRampConfig memory offRampConfig = offRampConfig(s_mockCommitStore, s_destRouter);
     s_offRamp = new EVM2EVMOffRampHelper(
       SOURCE_CHAIN_ID,
       DEST_CHAIN_ID,
@@ -90,7 +82,6 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
   }
 
   function assertSameConfig(IEVM2EVMOffRamp.OffRampConfig memory a, IEVM2EVMOffRamp.OffRampConfig memory b) public {
-    assertEq(address(a.feeManager), address(b.feeManager));
     assertEq(a.executionDelaySeconds, b.executionDelaySeconds);
     assertEq(a.maxDataSize, b.maxDataSize);
     assertEq(a.maxTokensLength, b.maxTokensLength);
@@ -242,6 +233,19 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     s_afn.voteBad();
     vm.expectRevert(HealthChecker.BadAFNSignal.selector);
     s_offRamp.execute(_generateReportFromMessages(_generateMessagesWithTokens()), true);
+  }
+
+  function testEmptyReportReverts() public {
+    vm.expectRevert(IEVM2EVMOffRamp.EmptyReport.selector);
+    s_offRamp.execute(
+      Internal.ExecutionReport({
+        sequenceNumbers: new uint64[](0),
+        proofs: new bytes32[](0),
+        proofFlagBits: 2**256 - 1,
+        encodedMessages: new bytes[](0)
+      }),
+      true
+    );
   }
 
   function testRootNotCommittedReverts() public {

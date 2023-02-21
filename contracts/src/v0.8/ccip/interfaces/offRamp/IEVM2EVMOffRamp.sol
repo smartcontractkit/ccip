@@ -23,6 +23,7 @@ interface IEVM2EVMOffRamp {
   error UnsupportedToken(IERC20 token);
   error CanOnlySelfCall();
   error ReceiverError();
+  error EmptyReport();
 
   // sourceChainId and onRamp are needed by Atlas, to track onramp <-> offramp -> router relationship
   event OffRampConfigChanged(OffRampConfig config, uint64 sourceChainId, address onRamp);
@@ -42,7 +43,6 @@ interface IEVM2EVMOffRamp {
 
   // since OffRampConfig is part of OffRampConfigChanged event, if changing it, we should update the ABI on Atlas
   struct OffRampConfig {
-    address feeManager;
     // The waiting time before manual execution is enabled
     uint32 permissionLessExecutionThresholdSeconds;
     // execution delay in seconds
