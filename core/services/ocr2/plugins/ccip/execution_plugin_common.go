@@ -129,7 +129,7 @@ func leavesFromIntervals(
 	}
 	var leaves [][32]byte
 	for _, log := range logs {
-		hash, err2 := hasher.HashLeaf(LogPollerLogToEthLog(log))
+		hash, err2 := hasher.HashLeaf(log.ToGethLog())
 		if err2 != nil {
 			return nil, err2
 		}
@@ -206,47 +206,6 @@ func getUnexpiredCommitReports(dstLogPoller logpoller.LogPoller, commitStore *co
 	return reports, nil
 }
 
-func leafsFromInterval(lggr logger.Logger,
-	source logpoller.LogPoller,
-	onRamp common.Address,
-	eventSigs EventSignatures,
-	interval commit_store.ICommitStoreInterval,
-	confs int,
-	seqNumFromLog func(log types.Log) (uint64, error),
-	hashLeaf func(log types.Log) ([32]byte, error),
-) ([][32]byte, error) {
-	logs, err := source.LogsDataWordRange(
-		eventSigs.SendRequested,
-		onRamp,
-		eventSigs.SendRequestedSequenceNumberIndex,
-		logpoller.EvmWord(interval.Min),
-		logpoller.EvmWord(interval.Max),
-		confs)
-	if err != nil {
-		return nil, err
-	}
-	var seqNrs []uint64
-	for _, log := range logs {
-		sn, err2 := seqNumFromLog(LogPollerLogToEthLog(log))
-		if err2 != nil {
-			return nil, err2
-		}
-		seqNrs = append(seqNrs, sn)
-	}
-	if !contiguousReqs(lggr, interval.Min, interval.Max, seqNrs) {
-		return nil, errors.Errorf("do not have full range [%v, %v] have %v", interval.Min, interval.Max, seqNrs)
-	}
-	var leafs [][32]byte
-	for _, log := range logs {
-		hash, err2 := hashLeaf(LogPollerLogToEthLog(log))
-		if err2 != nil {
-			return nil, err2
-		}
-		leafs = append(leafs, hash)
-	}
-	return leafs, nil
-}
-
 func buildExecution(
 	lggr logger.Logger,
 	source,
@@ -256,8 +215,8 @@ func buildExecution(
 	commitStore *commit_store.CommitStore,
 	confs int,
 	eventSignatures EventSignatures,
-	seqNumFromLog func(log types.Log) (uint64, error),
-	hashLeaf func(log types.Log) ([32]byte, error),
+	seqNumFromLog func(log logpoller.Log) (uint64, error),
+	hashLeaf LeafHasherInterface[[32]byte],
 ) (*MessageExecution, error) {
 	nextMin, err := commitStore.GetExpectedNextSequenceNumber(nil)
 	if err != nil {
@@ -283,7 +242,7 @@ func buildExecution(
 	if len(msgsInRoot) != int(rep.Interval.Max-rep.Interval.Min+1) {
 		return nil, errors.Errorf("unexpected missing msgs in committed root %x have %d want %d", rep.MerkleRoot, len(msgsInRoot), int(rep.Interval.Max-rep.Interval.Min+1))
 	}
-	leaves, err := leafsFromInterval(lggr, source, onRampAddress, eventSignatures, rep.Interval, confs, seqNumFromLog, hashLeaf)
+	leaves, err := leavesFromIntervals(lggr, onRampAddress, eventSignatures, seqNumFromLog, rep.Interval, source, hashLeaf, confs)
 	if err != nil {
 		return nil, err
 	}
@@ -304,7 +263,7 @@ func buildExecution(
 		innerIdx := int(seqNum - rep.Interval.Min)
 		innerIdxs = append(innerIdxs, innerIdx)
 		encMsgs = append(encMsgs, msgsInRoot[innerIdx].Data)
-		hash, err2 := hashLeaf(LogPollerLogToEthLog(msgsInRoot[innerIdx]))
+		hash, err2 := hashLeaf.HashLeaf(msgsInRoot[innerIdx].ToGethLog())
 		if err2 != nil {
 			return nil, err2
 		}

@@ -119,9 +119,4 @@ library Internal {
     SUCCESS,
     FAILURE
   }
-
-  struct ExecutionResult {
-    uint64 sequenceNumber;
-    MessageExecutionState state;
-  }
 }

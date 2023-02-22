@@ -1,6 +1,7 @@
 package ccip
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"math/big"
@@ -430,7 +431,7 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, timestamp types.Repo
 		return false, nil, err
 	}
 
-	feeUpdates := r.calculateFeeUpdates(nonEmptyObservations)
+	feeUpdates := calculateFeeUpdates(r.config.sourceChainID, r.feeTokens, nonEmptyObservations)
 	// If there are no fee updates and the interval is zero there is no report to produce.
 	if len(feeUpdates.FeeTokenPriceUpdates) == 0 && feeUpdates.DestChainId == 0 && agreedInterval.Min == 0 {
 		return false, nil, nil
@@ -448,14 +449,15 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, timestamp types.Repo
 	return true, encodedReport, nil
 }
 
-func (r *CommitReportingPlugin) calculateFeeUpdates(observations []CommitObservation) commit_store.InternalPriceUpdates {
+// Note feeUpdates must be deterministic.
+func calculateFeeUpdates(destChainId uint64, feeTokens []common.Address, observations []CommitObservation) commit_store.InternalPriceUpdates {
 	priceObservations := make(map[common.Address][]*big.Int)
 	var sourceGasObservations []*big.Int
 	var sourceGasPriceNilCount int
 
 	for _, obs := range observations {
 		hasAllPrices := true
-		for _, token := range r.feeTokens {
+		for _, token := range feeTokens {
 			if _, ok := obs.TokenPricesUSD[token]; !ok {
 				hasAllPrices = false
 				break
@@ -477,26 +479,32 @@ func (r *CommitReportingPlugin) calculateFeeUpdates(observations []CommitObserva
 		}
 	}
 	var feeUpdates []commit_store.InternalFeeTokenPriceUpdate
-	for _, feeToken := range r.feeTokens {
+	for _, feeToken := range feeTokens {
 		medianPrice := median(priceObservations[feeToken])
 		feeUpdates = append(feeUpdates, commit_store.InternalFeeTokenPriceUpdate{
 			SourceFeeToken: feeToken,
 			UsdPerFeeToken: medianPrice,
 		})
 	}
+	// Determinism required.
+	sort.Slice(feeUpdates, func(i, j int) bool {
+		return bytes.Compare(feeUpdates[i].SourceFeeToken[:], feeUpdates[j].SourceFeeToken[:]) == -1
+	})
 
 	// If majority report a gas price, include it in the update
 	if sourceGasPriceNilCount < len(sourceGasObservations) {
 		return commit_store.InternalPriceUpdates{
 			FeeTokenPriceUpdates: feeUpdates,
-			DestChainId:          r.config.sourceChainID,
+			DestChainId:          destChainId,
 			UsdPerUnitGas:        median(sourceGasObservations),
 		}
 	}
+	// Otherwise leave empty values
 	return commit_store.InternalPriceUpdates{
 		FeeTokenPriceUpdates: feeUpdates,
-		DestChainId:          0,
-		UsdPerUnitGas:        big.NewInt(0),
+		// Sending zero is ok, onchain 0 is considered not supported.
+		DestChainId:   uint64(0),
+		UsdPerUnitGas: big.NewInt(0),
 	}
 }
 

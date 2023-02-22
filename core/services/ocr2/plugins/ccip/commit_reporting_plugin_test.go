@@ -148,48 +148,70 @@ func TestCommitReportEncoding(t *testing.T) {
 	ts, err := commitStore.GetMerkleRoot(nil, tree.Root())
 	require.NoError(t, err)
 	require.NotEqual(t, ts.String(), "0")
+
+	// Ensure price update went through
+	destChainGasPrice, err := prices.GetDestinationChainGasPrice(nil, destChainId)
+	require.NoError(t, err)
+	assert.Equal(t, "2000000000000", destChainGasPrice.Value.String())
+
+	linkTokenPrice, err := prices.GetFeeTokenPrice(nil, destLinkTokenAddress)
+	require.NoError(t, err)
+	assert.Equal(t, "8000000000000000000", linkTokenPrice.Value.String())
 }
 
-/*
-func TestCalculateMedianSourceGasPrice(t *testing.T) {
+func TestCalculateFeeUpdates(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name      string
-		gasPrices []int64
-		want      *big.Int
+		name               string
+		commitObservations []CommitObservation
+		wantGas            *big.Int
 	}{
-		{"basic", []int64{1, 2, 3, 4, 5, 6, 7}, big.NewInt(4)},
-		{"not enough obs", []int64{1, 2, 3, 0, 0, 0, 0}, nil},
-		{"round up", []int64{4, 6322364, 6322364, 323, 2, 722}, big.NewInt(722)},
+		{"median", []CommitObservation{
+			{SourceGasPriceUSD: big.NewInt(1)}, {SourceGasPriceUSD: big.NewInt(2)}, {SourceGasPriceUSD: big.NewInt(3)},
+			{SourceGasPriceUSD: big.NewInt(4)},
+		}, big.NewInt(3)},
+		{"insufficient", []CommitObservation{
+			{SourceGasPriceUSD: nil}, {SourceGasPriceUSD: nil}, {SourceGasPriceUSD: big.NewInt(3)},
+		}, big.NewInt(0)},
+		{"median including empties", []CommitObservation{
+			{SourceGasPriceUSD: nil}, {SourceGasPriceUSD: big.NewInt(1)}, {SourceGasPriceUSD: big.NewInt(2)},
+		}, big.NewInt(2)},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := calculateMedianSourceGasPrice(numbersToObservations(tt.gasPrices))
-			assert.Equal(t, tt.want, got)
+			got := calculateFeeUpdates(10, []common.Address{}, tt.commitObservations)
+			assert.Equal(t, tt.wantGas, got.UsdPerUnitGas)
+		})
+	}
+	feeToken1 := common.HexToAddress("0xa")
+	feeToken2 := common.HexToAddress("0xb")
+	feeTokenTests := []struct {
+		name               string
+		commitObservations []CommitObservation
+		feeTokens          []common.Address
+		feeTokenUpdates    []commit_store.InternalFeeTokenPriceUpdate
+	}{
+		{"median one token", []CommitObservation{
+			{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: big.NewInt(10)}},
+			{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: big.NewInt(12)}},
+		}, []common.Address{feeToken1}, []commit_store.InternalFeeTokenPriceUpdate{
+			{SourceFeeToken: feeToken1, UsdPerFeeToken: big.NewInt(12)}}},
+		{"median two tokens", []CommitObservation{
+			{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: big.NewInt(10), feeToken2: big.NewInt(13)}},
+			{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: big.NewInt(12), feeToken2: big.NewInt(7)}},
+		}, []common.Address{feeToken1, feeToken2}, []commit_store.InternalFeeTokenPriceUpdate{
+			{SourceFeeToken: feeToken1, UsdPerFeeToken: big.NewInt(12)},
+			{SourceFeeToken: feeToken2, UsdPerFeeToken: big.NewInt(13)}},
+		},
+	}
+	for _, tt := range feeTokenTests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := calculateFeeUpdates(10, tt.feeTokens, tt.commitObservations)
+			assert.Equal(t, tt.feeTokenUpdates, got.FeeTokenPriceUpdates)
 		})
 	}
 }
-
-func numbersToObservations(gasPrices []int64) (obs []CommitObservation) {
-	for _, gasPrice := range gasPrices {
-		if gasPrice == 0 {
-			obs = append(obs, CommitObservation{
-				commit_store.ICommitStoreInterval{},
-				make(map[common.Address]*big.Int),
-				nil,
-			})
-		} else {
-			obs = append(obs, CommitObservation{
-				commit_store.ICommitStoreInterval{},
-				make(map[common.Address]*big.Int),
-				big.NewInt(gasPrice),
-			})
-		}
-	}
-	return obs
-}
-*/
 
 func TestCalculateIntervalConsensus(t *testing.T) {
 	t.Parallel()

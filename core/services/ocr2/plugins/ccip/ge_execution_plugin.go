@@ -283,8 +283,8 @@ func (r *ExecutionReportingPlugin) getExecutableSeqNrs(inflight []InflightIntern
 	return []uint64{}, nil
 }
 
-func (r *ExecutionReportingPlugin) parseSeqNr(log gethtypes.Log) (uint64, error) {
-	s, err := r.config.onRamp.ParseCCIPSendRequested(log)
+func (r *ExecutionReportingPlugin) parseSeqNr(log logpoller.Log) (uint64, error) {
+	s, err := r.config.onRamp.ParseCCIPSendRequested(log.ToGethLog())
 	if err != nil {
 		return 0, err
 	}
@@ -304,7 +304,7 @@ func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNums 
 		int(r.offchainConfig.SourceIncomingConfirmations),
 		r.config.eventSignatures,
 		r.parseSeqNr,
-		r.config.leafHasher.HashLeaf,
+		r.config.leafHasher,
 	)
 	if err != nil {
 		return nil, err
