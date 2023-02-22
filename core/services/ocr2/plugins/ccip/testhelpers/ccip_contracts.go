@@ -116,7 +116,7 @@ type CCIPContracts struct {
 	OCRConfig *OCR2Config
 }
 
-func (c *CCIPContracts) SetUpNewMintAndBurnPool(sourceTokenAddress, destTokenAddress common.Address) {
+func (c *CCIPContracts) SetUpNewMintAndBurnPool(sourceTokenAddress, destTokenAddress common.Address) (sourcePoolAddress, destPoolAddress common.Address) {
 	sourcePoolAddress, _, sourcePool, err := burn_mint_token_pool.DeployBurnMintTokenPool(c.Source.User, c.Source.Chain, sourceTokenAddress)
 	require.NoError(c.t, err)
 	c.Source.Chain.Commit()
@@ -129,25 +129,31 @@ func (c *CCIPContracts) SetUpNewMintAndBurnPool(sourceTokenAddress, destTokenAdd
 	require.NoError(c.t, err)
 	c.Source.Chain.Commit()
 
-	_, err = c.Dest.OffRamp.AddPool(c.Dest.User, destTokenAddress, destPoolAddress)
+	_, err = c.Dest.OffRamp.AddPool(c.Dest.User, sourceTokenAddress, destPoolAddress)
 	require.NoError(c.t, err)
 	c.Dest.Chain.Commit()
 
-	c.t.Log("Setting onRamp on source pool")
 	_, err = sourcePool.SetOnRamp(c.Source.User, c.Source.OnRamp.Address(), true)
 	require.NoError(c.t, err)
 	c.Source.Chain.Commit()
 
-	c.t.Log("Setting onRamp on source router")
+	_, err = c.Source.OnRamp.SetPrices(c.Source.User, []common.Address{c.Source.LinkToken.Address(), sourceTokenAddress}, []*big.Int{big.NewInt(10), big.NewInt(10)})
+	require.NoError(c.t, err)
+	c.Source.Chain.Commit()
+
 	_, err = c.Source.Router.ApplyRampUpdates(c.Source.User, []router.IRouterOnRampUpdate{{DestChainId: c.Dest.ChainID, OnRamp: c.Source.OnRamp.Address()}}, nil)
 	require.NoError(c.t, err)
 	c.Source.Chain.Commit()
 
-	c.t.Log("Enabling onRamp on blob verifier")
-	c.Source.Chain.Commit()
+	_, err = destPool.SetOffRamp(c.Dest.User, c.Dest.OffRamp.Address(), true)
+	require.NoError(c.t, err)
 	c.Dest.Chain.Commit()
 
-	_, err = destPool.SetOffRamp(c.Dest.User, c.Dest.OffRamp.Address(), true)
+	_, err = c.Dest.OffRamp.SetPrices(c.Dest.User, []common.Address{c.Dest.LinkToken.Address(), destTokenAddress}, []*big.Int{big.NewInt(10), big.NewInt(10)})
+	require.NoError(c.t, err)
+	c.Dest.Chain.Commit()
+
+	_, err = c.Dest.FeeManager.SetFeeUpdater(c.Dest.User, c.Dest.OffRamp.Address())
 	require.NoError(c.t, err)
 	c.Dest.Chain.Commit()
 
@@ -156,23 +162,7 @@ func (c *CCIPContracts) SetUpNewMintAndBurnPool(sourceTokenAddress, destTokenAdd
 	require.NoError(c.t, err)
 	c.Dest.Chain.Commit()
 
-	_, err = c.Dest.FeeManager.SetFeeUpdater(c.Dest.User, c.Dest.OffRamp.Address())
-	require.NoError(c.t, err)
-	c.Dest.Chain.Commit()
-
-	//TODO: is below needed?
-	//_, err = c.Dest.OffRamp.SetOCR2Config(
-	//	c.Dest.User,
-	//	c.OCRConfig.Signers,
-	//	c.OCRConfig.Transmitters,
-	//	c.OCRConfig.F,
-	//	c.OCRConfig.OnchainConfig,
-	//	c.OCRConfig.OffchainConfigVersion,
-	//	c.OCRConfig.OffchainConfig,
-	//)
-	//require.NoError(c.t, err)
-	//c.Source.Chain.Commit()
-	//c.Dest.Chain.Commit()
+	return sourcePoolAddress, destPoolAddress
 }
 
 func (c *CCIPContracts) DeployNewOffRamp() {

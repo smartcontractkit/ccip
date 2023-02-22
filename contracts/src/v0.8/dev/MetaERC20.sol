@@ -8,7 +8,7 @@ import {IRouterClient} from "../ccip/interfaces/router/IRouterClient.sol";
 import {Client} from "../ccip/models/Client.sol";
 import {IBurnMintERC20} from "../ccip/interfaces/pools/IBurnMintERC20.sol";
 
-contract MetaERC20 is IERC20, CCIPReceiver, IBurnMintERC20 {
+contract MetaERC20 is CCIPReceiver, IBurnMintERC20 {
   using SafeMath for uint256;
 
   string public constant name = "BankToken";
@@ -97,6 +97,11 @@ contract MetaERC20 is IERC20, CCIPReceiver, IBurnMintERC20 {
     return true;
   }
 
+  //TODO: access control
+  function approveRouter(uint256 amount) external {
+    _approve(address(this), getRouter(), amount);
+  }
+
   /**
    * @dev Moves `amount` tokens from `from` to `to` using the
    * allowance mechanism. `amount` is then deducted from the caller's
@@ -137,18 +142,25 @@ contract MetaERC20 is IERC20, CCIPReceiver, IBurnMintERC20 {
     );
     address recoveredAddress = ecrecover(digest, v, r, s);
     require(recoveredAddress != address(0) && recoveredAddress == m.owner, 'INVALID_SIGNATURE');
-    if (m.chainId == block.chainid) {
-      _transfer(m.owner, m.to, m.amount);
-    } else {
-      Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-        receiver: abi.encode(m.to),
-        data: "", //empty   
-        tokenAmounts: new Client.EVMTokenAmount[](m.amount),
-        extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: m.gasLimit, strict: false})), //not sure what these parameters do
-        feeToken: address(s_ccipFeeToken)
-      });
-      IRouterClient(getRouter()).ccipSend(m.chainId, message);
-    }
+    Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+    tokenAmounts[0] = Client.EVMTokenAmount({
+      token: address(this),
+      amount: m.amount
+    });
+
+    // TODO: Commented out because block.chainid doesn't work as expected with integration tests
+    //if (m.chainId == block.chainid) {
+    //  _transfer(m.owner, m.to, m.amount);
+    // return
+    //}
+    Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
+      receiver: abi.encode(m.to),
+      data: "", //empty   
+      tokenAmounts: tokenAmounts,
+      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: m.gasLimit, strict: false})), //not sure what these parameters do
+      feeToken: address(s_ccipFeeToken)
+    });
+    IRouterClient(getRouter()).ccipSend(m.chainId, message);
   }
 
   /**
@@ -185,7 +197,7 @@ contract MetaERC20 is IERC20, CCIPReceiver, IBurnMintERC20 {
     emit Transfer(address(0), account, amount);
   }
 
-  function burn(address account, uint256 amount) external {
+  function burn(address account, uint256 amount) external override {
     require(account != address(0), "ERC20: burn from the zero address");
     uint256 accountBalance = balanceOf[account];
     require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
