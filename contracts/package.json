@@ -79,6 +79,7 @@
     "typescript": "^4.3.2"
   },
   "dependencies": {
+    "@chainlink/contracts": "^0.6.1",
     "@eth-optimism/contracts": "^0.5.21",
     "@openzeppelin/contracts": "~4.3.3",
     "@openzeppelin/contracts-upgradeable": "^4.7.3",

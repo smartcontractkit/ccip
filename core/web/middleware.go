@@ -22,8 +22,6 @@ import (
 // in this module's folder under the "assets" directory.
 
 // nolint
-//
-//go:embed "assets"
 var uiEmbedFs embed.FS
 
 // assetFs is the singleton file system instance that is used to serve the static
