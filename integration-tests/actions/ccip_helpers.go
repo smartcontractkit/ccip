@@ -97,6 +97,7 @@ type CCIPCommon struct {
 	AFNConfig         ccip.AFNConfig
 	AFN               *ccip.AFN
 	Router            *ccip.Router
+	WrappedNative     common.Address
 	deployed          chan struct{}
 }
 
@@ -137,7 +138,8 @@ func (ccipModule *CCIPCommon) CopyAddresses(chainClient blockchain.EVMClient) *C
 		Router: &ccip.Router{
 			EthAddress: ccipModule.Router.EthAddress,
 		},
-		deployed: make(chan struct{}, 1),
+		WrappedNative: ccipModule.WrappedNative,
+		deployed:      make(chan struct{}, 1),
 	}
 }
 
@@ -280,7 +282,13 @@ func (ccipModule *CCIPCommon) DeployContracts(t *testing.T, noOfTokens int, dest
 		ccipModule.AFN = afn
 	}
 	if ccipModule.Router == nil {
-		ccipModule.Router, err = cd.DeployRouter()
+		weth9addr, err := cd.DeployWrappedNative()
+		require.NoError(t, err, "deploying wrapped native should not fail")
+		err = ccipModule.ChainClient.WaitForEvents()
+		require.NoError(t, err, "waiting for deploying wrapped native")
+		ccipModule.WrappedNative = *weth9addr
+
+		ccipModule.Router, err = cd.DeployRouter(ccipModule.WrappedNative)
 		require.NoError(t, err, "Error on Router deployment on source chain")
 		require.NoError(t, ccipModule.ChainClient.WaitForEvents(), "Error waiting for common contract deployment")
 	} else {
@@ -365,7 +373,12 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(t *testing.T) {
 		FeeTokenPriceUpdates: []price_registry.InternalFeeTokenPriceUpdate{
 			{
 				SourceFeeToken: common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
-				UsdPerFeeToken: big.NewInt(5),
+				/// USD per full fee token, in base units 1e18.
+				/// Example:
+				///   * 1 USDC = 1.00 USD per token -> 1e18
+				///   * 1 LINK = 5.00 USD per token -> 5e18
+				///   * 1 ETH = 2,000 USD per token -> 2_000e18
+				UsdPerFeeToken: big.NewInt(5e18),
 			},
 		},
 	})
@@ -494,7 +507,7 @@ func (sourceCCIP *SourceCCIPModule) BalanceAssertions(t *testing.T, prevBalances
 		Name:     name,
 		Address:  sourceCCIP.PriceRegistry.EthAddress,
 		Getter:   GetterForLinkToken(t, sourceCCIP.Common.FeeToken, sourceCCIP.PriceRegistry.Address()),
-		Expected: bigmath.Add(prevBalances[name], totalFee).String(),
+		Expected: prevBalances[name].String(),
 	})
 	name = fmt.Sprintf("%s-Router-%s", testhelpers.Sender, sourceCCIP.Common.Router.Address())
 	balAssertions = append(balAssertions, testhelpers.BalanceAssertion{
@@ -508,7 +521,7 @@ func (sourceCCIP *SourceCCIPModule) BalanceAssertions(t *testing.T, prevBalances
 		Name:     fmt.Sprintf("%s-OnRamp-%s", testhelpers.Sender, sourceCCIP.OnRamp.Address()),
 		Address:  sourceCCIP.OnRamp.EthAddress,
 		Getter:   GetterForLinkToken(t, sourceCCIP.Common.FeeToken, sourceCCIP.OnRamp.Address()),
-		Expected: prevBalances[name].String(),
+		Expected: bigmath.Add(prevBalances[name], totalFee).String(),
 	})
 
 	return balAssertions
@@ -595,6 +608,7 @@ type DestCCIPModule struct {
 	CommitStore   *ccip.CommitStore
 	ReceiverDapp  *ccip.ReceiverDapp
 	OffRamp       *ccip.OffRamp
+	WrappedNative common.Address
 }
 
 // DeployContracts deploys all CCIP contracts specific to the destination chain
@@ -611,7 +625,12 @@ func (destCCIP *DestCCIPModule) DeployContracts(t *testing.T, sourceCCIP SourceC
 		FeeTokenPriceUpdates: []price_registry.InternalFeeTokenPriceUpdate{
 			{
 				SourceFeeToken: common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
-				UsdPerFeeToken: big.NewInt(5),
+				/// USD per full fee token, in base units 1e18.
+				/// Example:
+				///   * 1 USDC = 1.00 USD per token -> 1e18
+				///   * 1 LINK = 5.00 USD per token -> 5e18
+				///   * 1 ETH = 2,000 USD per token -> 2_000e18
+				UsdPerFeeToken: big.NewInt(5e18),
 			},
 		},
 	})
@@ -659,6 +678,7 @@ func (destCCIP *DestCCIPModule) DeployContracts(t *testing.T, sourceCCIP SourceC
 	err = destPriceRegistry.SetPriceUpdater(destCCIP.CommitStore.EthAddress)
 	require.NoError(t, err, "setting CommitStore as fee updater shouldn't fail")
 
+	// apply offramp updates
 	_, err = destCCIP.Common.Router.AddOffRamp(destCCIP.OffRamp.EthAddress, destCCIP.SourceChainId)
 	require.NoError(t, err, "setting OffRamp as fee updater shouldn't fail")
 	err = destCCIP.Common.ChainClient.WaitForEvents()
@@ -1013,7 +1033,8 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	clNodes, exists := clNodesWithKeys[lane.Dest.Common.ChainClient.GetChainID().String()]
 	require.True(t, exists)
 
-	tokenAddr = append(tokenAddr, lane.Dest.Common.FeeToken.Address())
+	tokenAddr = append(tokenAddr, lane.Dest.Common.FeeToken.Address(), lane.Source.Common.WrappedNative.Hex())
+
 	// first node is the bootstrapper
 	bootstrapCommit := clNodes[0]
 	var bootstrapExec *client.CLNodesWithKeys

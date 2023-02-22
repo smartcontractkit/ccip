@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/weth9"
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
@@ -136,7 +137,9 @@ func (e *CCIPContractsDeployer) DeployAFNContract() (*AFN, error) {
 	) (common.Address, *types.Transaction, interface{}, error) {
 		return mock_afn_contract.DeployMockAFNContract(auth, backend)
 	})
-
+	if err != nil {
+		return nil, err
+	}
 	return &AFN{
 		client:     e.evmClient,
 		instance:   instance.(*mock_afn_contract.MockAFNContract),
@@ -146,12 +149,16 @@ func (e *CCIPContractsDeployer) DeployAFNContract() (*AFN, error) {
 
 func (e *CCIPContractsDeployer) NewAFNContract(addr common.Address) (*AFN, error) {
 	afn, err := mock_afn_contract.NewMockAFNContract(addr, e.evmClient.Backend())
+	if err != nil {
+		return nil, err
+	}
 	log.Info().
 		Str("Contract Address", addr.Hex()).
 		Str("Contract Name", "Mock AFN Contract").
 		Str("From", e.evmClient.GetDefaultWallet().Address()).
 		Str("Network Name", e.evmClient.GetNetworkConfig().Name).
 		Msg("New contract")
+
 	return &AFN{
 		client:     e.evmClient,
 		instance:   afn,
@@ -176,6 +183,9 @@ func (e *CCIPContractsDeployer) DeployCommitStore(sourceChainId, destChainId uin
 			afn,
 		)
 	})
+	if err != nil {
+		return nil, err
+	}
 	return &CommitStore{
 		client:     e.evmClient,
 		instance:   instance.(*commit_store.CommitStore),
@@ -193,6 +203,9 @@ func (e *CCIPContractsDeployer) DeploySimpleMessageReceiver() (
 	) (common.Address, *types.Transaction, interface{}, error) {
 		return simple_message_receiver.DeploySimpleMessageReceiver(auth, backend)
 	})
+	if err != nil {
+		return nil, err
+	}
 	return &MessageReceiver{
 		client:     e.evmClient,
 		instance:   instance.(*simple_message_receiver.SimpleMessageReceiver),
@@ -210,6 +223,9 @@ func (e *CCIPContractsDeployer) DeployReceiverDapp(toRevert bool) (
 	) (common.Address, *types.Transaction, interface{}, error) {
 		return maybe_revert_message_receiver.DeployMaybeRevertMessageReceiver(auth, backend, toRevert)
 	})
+	if err != nil {
+		return nil, err
+	}
 	return &ReceiverDapp{
 		client:     e.evmClient,
 		instance:   instance.(*maybe_revert_message_receiver.MaybeRevertMessageReceiver),
@@ -217,7 +233,7 @@ func (e *CCIPContractsDeployer) DeployReceiverDapp(toRevert bool) (
 	}, err
 }
 
-func (e *CCIPContractsDeployer) DeployRouter() (
+func (e *CCIPContractsDeployer) DeployRouter(wrappedNative common.Address) (
 	*Router,
 	error,
 ) {
@@ -225,7 +241,7 @@ func (e *CCIPContractsDeployer) DeployRouter() (
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return router.DeployRouter(auth, backend, common.HexToAddress("0x0"))
+		return router.DeployRouter(auth, backend, wrappedNative)
 	})
 	if err != nil {
 		return nil, err
@@ -248,6 +264,9 @@ func (e *CCIPContractsDeployer) NewRouter(addr common.Address) (
 		Str("From", e.evmClient.GetDefaultWallet().Address()).
 		Str("Network Name", e.evmClient.GetNetworkConfig().Name).
 		Msg("New contract")
+	if err != nil {
+		return nil, err
+	}
 	return &Router{
 		client:     e.evmClient,
 		Instance:   r,
@@ -358,11 +377,27 @@ func (e *CCIPContractsDeployer) DeployOffRamp(sourceChainId, destChainId uint64,
 			},
 		)
 	})
+	if err != nil {
+		return nil, err
+	}
 	return &OffRamp{
 		client:     e.evmClient,
 		instance:   instance.(*evm_2_evm_offramp.EVM2EVMOffRamp),
 		EthAddress: *address,
 	}, err
+}
+
+func (e *CCIPContractsDeployer) DeployWrappedNative() (*common.Address, error) {
+	address, _, _, err := e.evmClient.DeployContract("WrappedNative", func(
+		auth *bind.TransactOpts,
+		backend bind.ContractBackend,
+	) (common.Address, *types.Transaction, interface{}, error) {
+		return weth9.DeployWETH9(auth, backend)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return address, err
 }
 
 func DefaultOffChainAggregatorV2Config(numberNodes int) contracts.OffChainAggregatorV2Config {

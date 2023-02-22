@@ -374,6 +374,23 @@ func (r *Router) AddOffRamp(offRamp common.Address, sourceChainId uint64) (*type
 	return tx, r.client.ProcessTransaction(tx)
 }
 
+func (r *Router) SetWrappedNative(wNative common.Address) (*types.Transaction, error) {
+	opts, err := r.client.TransactionOpts(r.client.GetDefaultWallet())
+	if err != nil {
+		return nil, err
+	}
+	tx, err := r.Instance.SetWrappedNative(opts, wNative)
+	if err != nil {
+		return nil, err
+	}
+	log.Info().
+		Str("wrapped native", wNative.Hex()).
+		Str("router", r.Address()).
+		Str("Network Name", r.client.GetNetworkConfig().Name).
+		Msg("wrapped native is added for Router")
+	return tx, r.client.ProcessTransaction(tx)
+}
+
 func (r *Router) GetFee(destinationChainId uint64, message router.ClientEVM2AnyMessage) (*big.Int, error) {
 	return r.Instance.GetFee(nil, destinationChainId, message)
 }
