@@ -27,10 +27,10 @@ type EVMGasSettings struct {
 }
 
 type DeploySettings struct {
-	DeployAFN        bool
-	DeployTokenPools bool
-	DeployRouter     bool
-	DeployFeeManager bool
+	DeployAFN           bool
+	DeployTokenPools    bool
+	DeployRouter        bool
+	DeployPriceRegistry bool
 
 	DeployRamp           bool
 	DeployCommitStore    bool
@@ -62,7 +62,7 @@ type EVMChainConfig struct {
 	WrappedNative   Token
 	Router          gethcommon.Address
 	Afn             gethcommon.Address
-	FeeManager      gethcommon.Address
+	PriceRegistry   gethcommon.Address
 	AllowList       []gethcommon.Address
 }
 

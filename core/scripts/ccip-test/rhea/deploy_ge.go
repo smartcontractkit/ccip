@@ -40,8 +40,8 @@ func DeployLanes(t *testing.T, source *EvmDeploymentConfig, destination *EvmDepl
 	deployDestinationContracts(t, destination, sourceChainId, source.LaneConfig.OnRamp, source.ChainConfig.SupportedTokens)
 	deployDestinationContracts(t, source, destChainId, destination.LaneConfig.OnRamp, destination.ChainConfig.SupportedTokens)
 
-	SetFeeManagerPrices(t, source, destChainId)
-	SetFeeManagerPrices(t, destination, sourceChainId)
+	SetPriceRegistryPrices(t, source, destChainId)
+	SetPriceRegistryPrices(t, destination, sourceChainId)
 
 	deployGovernanceDapps(t, source, destination)
 
@@ -81,7 +81,7 @@ func deployDestinationContracts(t *testing.T, client *EvmDeploymentConfig, sourc
 	// Updates destClient.LaneConfig.OffRamp if any new contracts are deployed
 	deployOffRamp(t, client, sourceChainId, supportedTokens, onRamp)
 
-	setFeeManagerUpdater(t, client)
+	setPriceRegistryUpdater(t, client)
 
 	if client.DeploySettings.DeployRamp || client.DeploySettings.DeployTokenPools {
 		setOffRampOnTokenPools(t, client)
@@ -100,7 +100,7 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId uint64,
 		return onRamp
 	}
 
-	var bridgeTokens, tokenPools []common.Address
+	var tokensAndPools []evm_2_evm_onramp.EVM2EVMOnRampTokenAndPool
 	for token, tokenConfig := range client.ChainConfig.SupportedTokens {
 		if _, ok := destSupportedTokens[token]; !ok {
 			// If the token is not supported on the destination chain we
@@ -109,8 +109,10 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId uint64,
 			continue
 		}
 
-		bridgeTokens = append(bridgeTokens, tokenConfig.Token)
-		tokenPools = append(tokenPools, tokenConfig.Pool)
+		tokensAndPools = append(tokensAndPools, evm_2_evm_onramp.EVM2EVMOnRampTokenAndPool{
+			Token: tokenConfig.Token,
+			Pool:  tokenConfig.Pool,
+		})
 	}
 
 	var feeTokenConfig []evm_2_evm_onramp.IEVM2EVMOnRampFeeTokenConfigArgs
@@ -124,16 +126,17 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId uint64,
 		})
 	}
 
-	client.Logger.Infof("Deploying OnRamp: destinationChains %+v, bridgeTokens %+v, poolAddresses %+v", destChainId, bridgeTokens, tokenPools)
+	client.Logger.Infof("Deploying OnRamp: destinationChains %+v, tokensAndPools %+v", destChainId, tokensAndPools)
 	onRampAddress, tx, _, err := evm_2_evm_onramp.DeployEVM2EVMOnRamp(
-		client.Owner,               // user
-		client.Client,              // client
-		client.ChainConfig.ChainId, // source chain id
-		destChainId,                // destinationChainId
-		bridgeTokens,               // tokens
-		tokenPools,                 // pools
-		[]common.Address{},         // allow list
-		client.ChainConfig.Afn,     // AFN
+		client.Owner,  // user
+		client.Client, // client
+		evm_2_evm_onramp.IEVM2EVMOnRampChains{
+			ChainId:     client.ChainConfig.ChainId, // source chain id
+			DestChainId: destChainId,                // destinationChainId
+		},
+		tokensAndPools,
+		[]common.Address{},     // allow list
+		client.ChainConfig.Afn, // AFN
 		evm_2_evm_onramp.IEVM2EVMOnRampOnRampConfig{
 			MaxDataSize:     1e6,
 			MaxTokensLength: 5,
@@ -145,8 +148,10 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId uint64,
 			Admin:    client.Owner.From,
 		},
 		client.ChainConfig.Router,
-		client.ChainConfig.FeeManager,
+		client.ChainConfig.PriceRegistry,
 		feeTokenConfig,
+		client.ChainConfig.SupportedTokens[LINK].Token,
+		[]evm_2_evm_onramp.IEVM2EVMOnRampNopAndWeight{},
 	)
 	shared.RequireNoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
@@ -244,7 +249,7 @@ func deployCommitStore(t *testing.T, client *EvmDeploymentConfig, sourceChainId 
 			ChainId:       client.ChainConfig.ChainId,
 			SourceChainId: sourceChainId,
 			OnRamp:        onRamp,
-			FeeManager:    client.ChainConfig.FeeManager,
+			PriceRegistry: client.ChainConfig.PriceRegistry,
 		},
 		client.ChainConfig.Afn, // AFN address
 	)

@@ -14,7 +14,8 @@ import (
 )
 
 type PriceGetter interface {
-	TokensPerFeeCoin(ctx context.Context, tokens []common.Address) (map[common.Address]*big.Int, error)
+	// Returns token prices in USD
+	TokenPricesUSD(ctx context.Context, tokens []common.Address) (map[common.Address]*big.Int, error)
 }
 
 var _ PriceGetter = &priceGetter{}
@@ -43,7 +44,7 @@ func NewPriceGetter(source string, runner pipeline.Runner, jobID int32, external
 	}, nil
 }
 
-func (d *priceGetter) TokensPerFeeCoin(ctx context.Context, tokens []common.Address) (map[common.Address]*big.Int, error) {
+func (d *priceGetter) TokenPricesUSD(ctx context.Context, tokens []common.Address) (map[common.Address]*big.Int, error) {
 	_, trrs, err := d.runner.ExecuteRun(ctx, pipeline.Spec{
 		ID:           d.jobID,
 		DotDagSource: d.source,
@@ -87,8 +88,8 @@ var _ PriceGetter = &fakePriceGetter{}
 
 type fakePriceGetter struct{}
 
-// TokensPerFeeCoin should fetch the price of an asset on the destination chain.
-func (d fakePriceGetter) TokensPerFeeCoin(ctx context.Context, tokens []common.Address) (map[common.Address]*big.Int, error) {
+// TokenPricesUSD should fetch the price of an asset on the destination chain.
+func (d fakePriceGetter) TokenPricesUSD(ctx context.Context, tokens []common.Address) (map[common.Address]*big.Int, error) {
 	// Just returns a juels/eth value for all tokens.
 	// As the feed is in wei/link and not juels/eth we need to transform it
 	//  0.005 eth/link or 5e15 wei/link or 2e20 juels/eth

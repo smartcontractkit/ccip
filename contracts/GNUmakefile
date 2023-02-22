@@ -40,6 +40,13 @@ ccip-precommit:
 	pnpm lint:ccip
 	make ccip-abi-fix
 
+ccip-lcov: export FOUNDRY_PROFILE=ccip
+.PHONY: ccip-lcov
+ccip-lcov:
+	forge coverage --report lcov
+	../tools/ci/ccip_lcov_prune ./lcov.info ./lcov.info.pruned
+	genhtml -o report lcov.info.pruned --branch-coverage
+
 help:
 	@echo ""
 	@echo "         .__           .__       .__  .__        __"

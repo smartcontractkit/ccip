@@ -6,8 +6,8 @@ import {MockERC20} from "../mocks/MockERC20.sol";
 import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
 
 contract LockReleaseTokenPoolSetup is BaseTest {
-  IERC20 s_token;
-  LockReleaseTokenPool s_lockReleaseTokenPool;
+  IERC20 internal s_token;
+  LockReleaseTokenPool internal s_lockReleaseTokenPool;
 
   function setUp() public virtual override {
     BaseTest.setUp();

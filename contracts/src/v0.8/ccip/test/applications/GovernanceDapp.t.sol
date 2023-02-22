@@ -57,7 +57,7 @@ contract GovernanceDapp_voteForNewFeeConfig is GovernanceDappSetup {
       gasLimit: 3e5,
       strict: false,
       feeToken: s_sourceFeeToken,
-      feeTokenAmount: 32400109, // todo
+      feeTokenAmount: 64800216001, // todo
       messageId: ""
     });
     message.messageId = Internal._hash(message, s_metadataHash);

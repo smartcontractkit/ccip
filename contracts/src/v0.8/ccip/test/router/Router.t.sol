@@ -67,13 +67,6 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
   }
 
   function testNonLinkFeeTokenSuccess() public {
-    Internal.FeeUpdate[] memory feeUpdates = new Internal.FeeUpdate[](1);
-    feeUpdates[0] = Internal.FeeUpdate({
-      sourceFeeToken: s_sourceTokens[1],
-      destChainId: DEST_CHAIN_ID,
-      feeTokenBaseUnitsPerUnitGas: 1000
-    });
-    s_sourceFeeManager.updateFees(feeUpdates);
     IEVM2EVMOnRamp.FeeTokenConfigArgs[] memory feeTokenConfigArgs = new IEVM2EVMOnRamp.FeeTokenConfigArgs[](1);
     feeTokenConfigArgs[0] = IEVM2EVMOnRamp.FeeTokenConfigArgs({
       token: s_sourceTokens[1],
@@ -138,9 +131,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     address wrongFeeToken = address(1);
     message.feeToken = wrongFeeToken;
 
-    vm.expectRevert(
-      abi.encodeWithSelector(IFeeManager.TokenOrChainNotSupported.selector, wrongFeeToken, DEST_CHAIN_ID)
-    );
+    vm.expectRevert(abi.encodeWithSelector(IPriceRegistry.TokenNotSupported.selector, wrongFeeToken));
 
     s_sourceRouter.ccipSend(DEST_CHAIN_ID, message);
   }
@@ -176,6 +167,9 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     message.feeToken = address(0); // Raw native
     // Include insufficient, should also revert
     vm.stopPrank();
+
+    s_onRamp.getFeeConfig(s_sourceRouter.getWrappedNative());
+
     hoax(address(1), 1);
     vm.expectRevert(IRouterClient.InsufficientFeeTokenAmount.selector);
     s_sourceRouter.ccipSend{value: 1}(DEST_CHAIN_ID, message);

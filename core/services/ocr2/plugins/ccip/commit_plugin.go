@@ -16,7 +16,8 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	hlp "github.com/smartcontractkit/chainlink/core/scripts/common"
 	"github.com/smartcontractkit/chainlink/core/services/job"
@@ -97,15 +98,27 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 		return nil, err
 	}
 
-	// subscribe for GasFeeUpdated logs, but FeeManager is only available as part of onchain commitStore's config
-	// TODO: how to detect if commitStoreConfig.FeeManager changes on-chain? Currently, we expect a plugin/job/node restart
-	feeManager, err := fee_manager.NewFeeManager(commitStoreConfig.FeeManager, destChain.Client())
+	// subscribe for GasFeeUpdated logs, but Prices is only available as part of onchain commitStore's config
+	// TODO: how to detect if commitStoreConfig.PriceRegistry changes on-chain? Currently, we expect a plugin/job/node restart
+	prices, err := price_registry.NewPriceRegistry(commitStoreConfig.PriceRegistry, destChain.Client())
+	if err != nil {
+		return nil, err
+	}
+	routerAddr, err := onRamp.GetRouter(nil)
+	if err != nil {
+		return nil, err
+	}
+	router, err := router.NewRouter(routerAddr, sourceChain.Client())
+	if err != nil {
+		return nil, err
+	}
+	sourceNative, err := router.GetWrappedNative(nil)
 	if err != nil {
 		return nil, err
 	}
 
 	eventSigs := GetEventSignatures()
-	_, err = destChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{GasFeeUpdated}, Addresses: []common.Address{commitStoreConfig.FeeManager}})
+	_, err = destChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{GasFeeUpdated}, Addresses: []common.Address{commitStoreConfig.PriceRegistry}})
 	if err != nil {
 		return nil, err
 	}
@@ -124,8 +137,9 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 			reqEventSig:         eventSigs,
 			onRamp:              onRamp.Address(),
 			offRamp:             offRamp,
-			feeManager:          feeManager,
+			priceRegistry:       prices,
 			priceGetter:         priceGetterObject,
+			sourceNative:        sourceNative,
 			sourceGasEstimator:  sourceChain.TxManager().GetGasEstimator(),
 			destGasEstimator:    destChain.TxManager().GetGasEstimator(),
 			sourceChainID:       pluginConfig.SourceChainID,

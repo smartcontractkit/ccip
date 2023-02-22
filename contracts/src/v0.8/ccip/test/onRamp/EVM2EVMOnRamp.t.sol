@@ -20,7 +20,7 @@ contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
     assertEq(onRampConfig.maxGasLimit, s_onRamp.getOnRampConfig().maxGasLimit);
 
     assertEq(SOURCE_CHAIN_ID, s_onRamp.getChainId());
-    assertEq(DEST_CHAIN_ID, s_onRamp.getDestinationChainId());
+    assertEq(DEST_CHAIN_ID, s_onRamp.getDestChainId());
 
     assertEq(address(s_sourceRouter), s_onRamp.getRouter());
     assertEq(1, s_onRamp.getExpectedNextSequenceNumber());
@@ -29,6 +29,98 @@ contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
     assertSameConfig(onRampConfig, s_onRamp.getOnRampConfig());
     // HealthChecker
     assertEq(address(s_afn), address(s_onRamp.getAFN()));
+  }
+}
+
+contract EVM2EVMOnRamp_payNops is EVM2EVMOnRampSetup {
+  function setUp() public virtual override {
+    EVM2EVMOnRampSetup.setUp();
+
+    // Since we'll mostly be testing for valid calls from the router we'll
+    // mock all calls to be originating from the router and re-mock in
+    // tests that require failure.
+    changePrank(address(s_sourceRouter));
+
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+
+    uint256 feeAmount = 1234567890;
+
+    // Send a bunch of messages, increasing the juels in the contract
+    for (uint256 i = 0; i < 5; i++) {
+      IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
+      s_onRamp.forwardFromRouter(message, feeAmount, OWNER);
+    }
+
+    assertGt(s_onRamp.getNopFeesJuels(), 0);
+    assertGt(IERC20(s_sourceFeeToken).balanceOf(address(s_onRamp)), 0);
+  }
+
+  function testOwnerPayNopsSuccess() public {
+    changePrank(OWNER);
+
+    uint256 totalJuels = s_onRamp.getNopFeesJuels();
+    s_onRamp.payNops();
+    (IEVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights, uint256 weightsTotal) = s_onRamp.getNops();
+    for (uint256 i = 0; i < nopsAndWeights.length; i++) {
+      uint256 expectedPayout = (nopsAndWeights[i].weight * totalJuels) / weightsTotal;
+      assertEq(IERC20(s_sourceFeeToken).balanceOf(nopsAndWeights[i].nop), expectedPayout);
+    }
+  }
+
+  function testFeeAdminPayNopsSuccess() public {
+    changePrank(OWNER);
+    s_onRamp.setFeeAdmin(STRANGER);
+    changePrank(STRANGER);
+
+    uint256 totalJuels = s_onRamp.getNopFeesJuels();
+    s_onRamp.payNops();
+    (IEVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights, uint256 weightsTotal) = s_onRamp.getNops();
+    for (uint256 i = 0; i < nopsAndWeights.length; i++) {
+      uint256 expectedPayout = (nopsAndWeights[i].weight * totalJuels) / weightsTotal;
+      assertEq(IERC20(s_sourceFeeToken).balanceOf(nopsAndWeights[i].nop), expectedPayout);
+    }
+  }
+
+  function testNopPayNopsSuccess() public {
+    changePrank(getNopsAndWeights()[0].nop);
+
+    uint256 totalJuels = s_onRamp.getNopFeesJuels();
+    s_onRamp.payNops();
+    (IEVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights, uint256 weightsTotal) = s_onRamp.getNops();
+    for (uint256 i = 0; i < nopsAndWeights.length; i++) {
+      uint256 expectedPayout = (nopsAndWeights[i].weight * totalJuels) / weightsTotal;
+      assertEq(IERC20(s_sourceFeeToken).balanceOf(nopsAndWeights[i].nop), expectedPayout);
+    }
+  }
+
+  function testInsufficientBalanceReverts() public {
+    changePrank(address(s_onRamp));
+    IERC20(s_sourceFeeToken).transfer(OWNER, IERC20(s_sourceFeeToken).balanceOf(address(s_onRamp)));
+    changePrank(OWNER);
+    vm.expectRevert(IEVM2EVMOnRamp.InsufficientBalance.selector);
+    s_onRamp.payNops();
+  }
+
+  function testWrongPermissionsReverts() public {
+    changePrank(STRANGER);
+
+    vm.expectRevert(IEVM2EVMOnRamp.OnlyCallableByOwnerOrFeeAdminOrNop.selector);
+    s_onRamp.payNops();
+  }
+
+  function testNoFeesToPayReverts() public {
+    changePrank(OWNER);
+    s_onRamp.payNops();
+    vm.expectRevert(IEVM2EVMOnRamp.NoFeesToPay.selector);
+    s_onRamp.payNops();
+  }
+
+  function testNoNopsToPayReverts() public {
+    changePrank(OWNER);
+    IEVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights = new IEVM2EVMOnRamp.NopAndWeight[](0);
+    s_onRamp.setNops(nopsAndWeights);
+    vm.expectRevert(IEVM2EVMOnRamp.NoNopsToPay.selector);
+    s_onRamp.payNops();
   }
 }
 
@@ -75,16 +167,36 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
 
   event Transfer(address indexed from, address indexed to, uint256 value);
 
-  function testShouldSendFeesToTheFeeManager() public {
+  function testShouldStoreLinkFees() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 
     uint256 feeAmount = 1234567890;
     IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
 
-    vm.expectEmit(true, true, true, true);
-    emit Transfer(address(s_onRamp), address(s_sourceFeeManager), feeAmount);
+    s_onRamp.forwardFromRouter(message, feeAmount, OWNER);
+
+    assertEq(IERC20(s_sourceFeeToken).balanceOf(address(s_onRamp)), feeAmount);
+    assertEq(s_onRamp.getNopFeesJuels(), feeAmount);
+  }
+
+  function testShouldStoreNonLinkFees() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.feeToken = s_sourceTokens[1];
+
+    uint256 feeAmount = 1234567890;
+    IERC20(s_sourceTokens[1]).transferFrom(OWNER, address(s_onRamp), feeAmount);
 
     s_onRamp.forwardFromRouter(message, feeAmount, OWNER);
+
+    assertEq(IERC20(s_sourceTokens[1]).balanceOf(address(s_onRamp)), feeAmount);
+
+    // Calculate conversion done by prices contract
+    uint256 feeTokenPrice = s_priceRegistry.getFeeTokenPrice(s_sourceTokens[1]).value;
+    uint256 linkTokenPrice = s_priceRegistry.getFeeTokenPrice(s_sourceFeeToken).value;
+    uint256 conversionRate = (feeTokenPrice * 1e18) / linkTokenPrice;
+    uint256 expectedJuels = (feeAmount * conversionRate) / 1e18;
+
+    assertEq(s_onRamp.getNopFeesJuels(), expectedJuels);
   }
 
   // Reverts
@@ -203,6 +315,45 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
   }
 }
 
+contract EVM2EVMOnRamp_setNops is EVM2EVMOnRampSetup {
+  // Used because EnumerableMap doesn't guarantee order
+  mapping(address => uint256) internal s_nopsToWeights;
+
+  function testSetNopsSuccess() public {
+    IEVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights = getNopsAndWeights();
+    nopsAndWeights[1].nop = USER_4;
+    nopsAndWeights[1].weight = 20;
+    for (uint256 i = 0; i < nopsAndWeights.length; i++) {
+      s_nopsToWeights[nopsAndWeights[i].nop] = nopsAndWeights[i].weight;
+    }
+
+    s_onRamp.setNops(nopsAndWeights);
+
+    (IEVM2EVMOnRamp.NopAndWeight[] memory actual, uint256 totalWeight) = s_onRamp.getNops();
+    for (uint256 i = 0; i < actual.length; ++i) {
+      assertEq(actual[i].weight, s_nopsToWeights[actual[i].nop]);
+    }
+    assertEq(totalWeight, 38);
+  }
+
+  function testSetNopsRemovesOldNopsCompletelySuccess() public {
+    IEVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights = new IEVM2EVMOnRamp.NopAndWeight[](0);
+    s_onRamp.setNops(nopsAndWeights);
+    (IEVM2EVMOnRamp.NopAndWeight[] memory actual, uint256 totalWeight) = s_onRamp.getNops();
+    assertEq(actual.length, 0);
+    assertEq(totalWeight, 0);
+  }
+
+  function testNonOwnerReverts() public {
+    IEVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights = getNopsAndWeights();
+    changePrank(STRANGER);
+
+    vm.expectRevert("Only callable by owner");
+
+    s_onRamp.setNops(nopsAndWeights);
+  }
+}
+
 /// @notice #setFeeAdmin
 contract EVM2EVMOnRamp_setFeeAdmin is EVM2EVMOnRampSetup {
   event FeeAdminSet(address feeAdmin);
@@ -225,6 +376,42 @@ contract EVM2EVMOnRamp_setFeeAdmin is EVM2EVMOnRampSetup {
     vm.expectRevert("Only callable by owner");
 
     s_onRamp.setFeeAdmin(newAdmin);
+  }
+}
+
+/// @notice #withdrawNonLinkFees
+contract EVM2EVMOnRamp_withdrawNonLinkFees is EVM2EVMOnRampSetup {
+  IERC20 internal s_token;
+
+  function setUp() public virtual override {
+    EVM2EVMOnRampSetup.setUp();
+    s_token = IERC20(s_sourceTokens[1]);
+    changePrank(OWNER);
+    s_token.transfer(address(s_onRamp), 100);
+  }
+
+  function testwithdrawNonLinkFeesSuccess() public {
+    IEVM2EVMOnRamp(s_onRamp).withdrawNonLinkFees(address(s_token), address(this));
+
+    assertEq(0, s_token.balanceOf(address(s_onRamp)));
+    assertEq(100, s_token.balanceOf(address(this)));
+  }
+
+  function testNonOwnerReverts() public {
+    changePrank(STRANGER);
+
+    vm.expectRevert("Only callable by owner");
+    IEVM2EVMOnRamp(s_onRamp).withdrawNonLinkFees(address(s_token), address(this));
+  }
+
+  function testInvalidWithdrawalAddressReverts() public {
+    vm.expectRevert(abi.encodeWithSelector(IEVM2EVMOnRamp.InvalidWithdrawalAddress.selector, address(0)));
+    IEVM2EVMOnRamp(s_onRamp).withdrawNonLinkFees(address(s_token), address(0));
+  }
+
+  function testInvalidTokenReverts() public {
+    vm.expectRevert(abi.encodeWithSelector(IEVM2EVMOnRamp.InvalidFeeToken.selector, s_sourceTokens[0]));
+    IEVM2EVMOnRamp(s_onRamp).withdrawNonLinkFees(s_sourceTokens[0], address(this));
   }
 }
 

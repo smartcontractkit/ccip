@@ -7,9 +7,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/mock_afn_contract"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/shared"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
@@ -22,8 +22,8 @@ func DeployToNewChain(t *testing.T, client *EvmDeploymentConfig) {
 	deployLockReleaseTokenPool(t, client)
 	// Updates client.ChainConfig.Router if any new contracts are deployed
 	deployRouter(t, client)
-	// Update client.FeeManager if any new contracts are deployed
-	deployFeeManager(t, client)
+	// Update client.PriceRegistry if any new contracts are deployed
+	deployPriceRegistry(t, client)
 }
 
 func deployAFN(t *testing.T, client *EvmDeploymentConfig) {
@@ -92,24 +92,24 @@ func deployRouter(t *testing.T, client *EvmDeploymentConfig) {
 	client.Logger.Infof(fmt.Sprintf("Router deployed on %s in tx %s", routerAddress.String(), helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash())))
 }
 
-// deployFeeManager FeeManager is deployed without any feeUpdaters
-func deployFeeManager(t *testing.T, client *EvmDeploymentConfig) {
-	if !client.DeploySettings.DeployFeeManager {
-		client.Logger.Infof("Skipping FeeManager deployment, using FeeManager on %s", client.ChainConfig.FeeManager)
+// deployPriceRegistry Prices is deployed without any feeUpdaters
+func deployPriceRegistry(t *testing.T, client *EvmDeploymentConfig) {
+	if !client.DeploySettings.DeployPriceRegistry {
+		client.Logger.Infof("Skipping Prices deployment, using Prices on %s", client.ChainConfig.PriceRegistry)
 		return
 	}
 
-	client.Logger.Infof("Deploying FeeManager")
-	feeManager, tx, _, err := fee_manager.DeployFeeManager(
+	client.Logger.Infof("Deploying Prices")
+	priceRegistry, tx, _, err := price_registry.DeployPriceRegistry(
 		client.Owner,
 		client.Client,
-		[]fee_manager.InternalFeeUpdate{},
+		price_registry.InternalPriceUpdates{},
 		[]common.Address{},
 		60*60*24*14, // two weeks
 	)
 	shared.RequireNoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
-	client.ChainConfig.FeeManager = feeManager
+	client.ChainConfig.PriceRegistry = priceRegistry
 
-	client.Logger.Infof(fmt.Sprintf("FeeManager deployed on %s in tx %s", feeManager.String(), helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash())))
+	client.Logger.Infof(fmt.Sprintf("Prices deployed on %s in tx %s", priceRegistry.String(), helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash())))
 }

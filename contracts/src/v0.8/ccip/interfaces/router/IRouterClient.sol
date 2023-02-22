@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import {Client} from "../../models/Client.sol";
 
 interface IRouterClient {
-  error UnsupportedDestinationChain(uint64 destinationChainId);
+  error UnsupportedDestinationChain(uint64 destChainId);
   error SenderNotAllowed(address sender);
   error InsufficientFeeTokenAmount();
   error InvalidMsgValue();

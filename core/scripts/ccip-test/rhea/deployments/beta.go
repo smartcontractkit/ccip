@@ -34,10 +34,10 @@ var Beta_Sepolia = rhea.EVMChainConfig{
 		//	PriceFeedsAggregator: gethcommon.HexToAddress("0x694AA1769357215DE4FAC081bf1f309aDC325306"),
 		//},
 	},
-	FeeTokens:  []rhea.Token{rhea.LINK},
-	Router:     gethcommon.HexToAddress(""),
-	Afn:        gethcommon.HexToAddress(""),
-	FeeManager: gethcommon.HexToAddress(""),
+	FeeTokens:     []rhea.Token{rhea.LINK},
+	Router:        gethcommon.HexToAddress(""),
+	Afn:           gethcommon.HexToAddress(""),
+	PriceRegistry: gethcommon.HexToAddress(""),
 }
 
 var Beta_OptimismGoerli = rhea.EVMChainConfig{
@@ -59,10 +59,10 @@ var Beta_OptimismGoerli = rhea.EVMChainConfig{
 			PriceFeedsAggregator: gethcommon.HexToAddress("0x69C5297001f38cCBE30a81359da06E5256bd28B9"),
 		},
 	},
-	FeeTokens:  []rhea.Token{rhea.LINK, rhea.WETH},
-	Router:     gethcommon.HexToAddress(""),
-	Afn:        gethcommon.HexToAddress(""),
-	FeeManager: gethcommon.HexToAddress(""),
+	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WETH},
+	Router:        gethcommon.HexToAddress(""),
+	Afn:           gethcommon.HexToAddress(""),
+	PriceRegistry: gethcommon.HexToAddress(""),
 }
 
 var Beta_AvaxFuji = rhea.EVMChainConfig{
@@ -84,10 +84,10 @@ var Beta_AvaxFuji = rhea.EVMChainConfig{
 			PriceFeedsAggregator: gethcommon.HexToAddress("0x6C2441920404835155f33d88faf0545B895871b1"),
 		},
 	},
-	FeeTokens:  []rhea.Token{rhea.LINK, rhea.WAVAX},
-	Router:     gethcommon.HexToAddress(""),
-	Afn:        gethcommon.HexToAddress(""),
-	FeeManager: gethcommon.HexToAddress(""),
+	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WAVAX},
+	Router:        gethcommon.HexToAddress(""),
+	Afn:           gethcommon.HexToAddress(""),
+	PriceRegistry: gethcommon.HexToAddress(""),
 }
 
 var Beta_SepoliaToAvaxFuji = rhea.EvmDeploymentConfig{
@@ -100,10 +100,10 @@ var Beta_SepoliaToAvaxFuji = rhea.EvmDeploymentConfig{
 		PingPongDapp: gethcommon.HexToAddress(""),
 	},
 	DeploySettings: rhea.DeploySettings{
-		DeployAFN:        false,
-		DeployTokenPools: false,
-		DeployRouter:     false,
-		DeployFeeManager: false,
+		DeployAFN:           false,
+		DeployTokenPools:    false,
+		DeployRouter:        false,
+		DeployPriceRegistry: false,
 
 		DeployCommitStore:    false,
 		DeployRamp:           false,
@@ -123,10 +123,10 @@ var Beta_AvaxFujiToSepolia = rhea.EvmDeploymentConfig{
 		PingPongDapp: gethcommon.HexToAddress(""),
 	},
 	DeploySettings: rhea.DeploySettings{
-		DeployAFN:        false,
-		DeployTokenPools: false,
-		DeployRouter:     false,
-		DeployFeeManager: false,
+		DeployAFN:           false,
+		DeployTokenPools:    false,
+		DeployRouter:        false,
+		DeployPriceRegistry: false,
 
 		DeployCommitStore:    false,
 		DeployRamp:           false,
@@ -146,10 +146,10 @@ var Beta_SepoliaToOptimismGoerli = rhea.EvmDeploymentConfig{
 		PingPongDapp: gethcommon.HexToAddress(""),
 	},
 	DeploySettings: rhea.DeploySettings{
-		DeployAFN:        false,
-		DeployTokenPools: false,
-		DeployRouter:     false,
-		DeployFeeManager: false,
+		DeployAFN:           false,
+		DeployTokenPools:    false,
+		DeployRouter:        false,
+		DeployPriceRegistry: false,
 
 		DeployCommitStore:    false,
 		DeployRamp:           false,
@@ -169,10 +169,10 @@ var Beta_OptimismGoerliToSepolia = rhea.EvmDeploymentConfig{
 		PingPongDapp: gethcommon.HexToAddress(""),
 	},
 	DeploySettings: rhea.DeploySettings{
-		DeployAFN:        false,
-		DeployTokenPools: false,
-		DeployRouter:     false,
-		DeployFeeManager: false,
+		DeployAFN:           false,
+		DeployTokenPools:    false,
+		DeployRouter:        false,
+		DeployPriceRegistry: false,
 
 		DeployCommitStore:    false,
 		DeployRamp:           false,
@@ -192,10 +192,10 @@ var Beta_OptimismGoerliToAvaxFuji = rhea.EvmDeploymentConfig{
 		PingPongDapp: gethcommon.HexToAddress(""),
 	},
 	DeploySettings: rhea.DeploySettings{
-		DeployAFN:        false,
-		DeployTokenPools: false,
-		DeployRouter:     false,
-		DeployFeeManager: false,
+		DeployAFN:           false,
+		DeployTokenPools:    false,
+		DeployRouter:        false,
+		DeployPriceRegistry: false,
 
 		DeployCommitStore:    false,
 		DeployRamp:           false,
@@ -215,10 +215,10 @@ var Beta_AvaxFujiToOptimismGoerli = rhea.EvmDeploymentConfig{
 		PingPongDapp: gethcommon.HexToAddress(""),
 	},
 	DeploySettings: rhea.DeploySettings{
-		DeployAFN:        false,
-		DeployTokenPools: false,
-		DeployRouter:     false,
-		DeployFeeManager: false,
+		DeployAFN:           false,
+		DeployTokenPools:    false,
+		DeployRouter:        false,
+		DeployPriceRegistry: false,
 
 		DeployCommitStore:    false,
 		DeployRamp:           false,

@@ -11,14 +11,14 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
 var (
 	// merkleRoot || minSeqNum || maxSeqNum
 	ReportAccepted common.Hash
-	// FeeManager
+	// Prices
 	GasFeeUpdated common.Hash
 )
 
@@ -47,11 +47,11 @@ func init() {
 	}
 	ReportAccepted = getIDOrPanic("ReportAccepted", commitStoreABI)
 
-	feeManagerABI, err := abi.JSON(strings.NewReader(fee_manager.FeeManagerABI))
+	pricesABI, err := abi.JSON(strings.NewReader(price_registry.PriceRegistryABI))
 	if err != nil {
 		panic(err)
 	}
-	GasFeeUpdated = getIDOrPanic("GasFeeUpdated", feeManagerABI)
+	GasFeeUpdated = getIDOrPanic("UsdPerUnitGasUpdated", pricesABI)
 }
 
 func GetEventSignatures() EventSignatures {
@@ -244,19 +244,29 @@ func makeCommitReportArgs() abi.Arguments {
 			Name: "CommitReport",
 			Type: utils.MustAbiType("tuple", []abi.ArgumentMarshaling{
 				{
-					Name: "feeUpdates",
-					Type: "tuple[]",
+					Name: "priceUpdates",
+					Type: "tuple",
 					Components: []abi.ArgumentMarshaling{
 						{
-							Name: "sourceFeeToken",
-							Type: "address",
+							Name: "feeTokenPriceUpdates",
+							Type: "tuple[]",
+							Components: []abi.ArgumentMarshaling{
+								{
+									Name: "sourceFeeToken",
+									Type: "address",
+								},
+								{
+									Name: "usdPerFeeToken",
+									Type: "uint128",
+								},
+							},
 						},
 						{
 							Name: "destChainId",
 							Type: "uint64",
 						},
 						{
-							Name: "feeTokenBaseUnitsPerUnitGas",
+							Name: "usdPerUnitGas",
 							Type: "uint128",
 						},
 					},

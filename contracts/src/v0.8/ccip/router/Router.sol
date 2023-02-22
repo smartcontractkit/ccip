@@ -172,6 +172,7 @@ contract Router is IRouter, TypeAndVersionInterface, OwnerIsCreator {
   }
 
   /// @inheritdoc IRouterClient
+  /// @dev returns 0 fee on invalid message.
   function getFee(uint64 destinationChainId, Client.EVM2AnyMessage memory message) external view returns (uint256 fee) {
     if (message.feeToken == address(0)) {
       // For empty feeToken return native quote.

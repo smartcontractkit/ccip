@@ -1,21 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {IFeeManager} from "../../interfaces/fees/IFeeManager.sol";
+import {IPriceRegistry} from "../../interfaces/prices/IPriceRegistry.sol";
 import {IEVM2EVMOnRamp} from "../../interfaces/onRamp/IEVM2EVMOnRamp.sol";
 import {IRouter} from "../../interfaces/router/IRouter.sol";
 
 import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
-import {FeeManager} from "../../fees/FeeManager.sol";
-import {Router} from "../../router/Router.sol";
+import {PriceRegistry} from "../../prices/PriceRegistry.sol";
 import {RouterSetup} from "../router/RouterSetup.t.sol";
+import {PriceRegistrySetup} from "../prices/PriceRegistry.t.sol";
 import {Internal} from "../../models/Internal.sol";
 import {Client} from "../../models/Client.sol";
 import "../../offRamp/EVM2EVMOffRamp.sol";
 import "../TokenSetup.t.sol";
-import "../fees/FeeManager.t.sol";
 
-contract EVM2EVMOnRampSetup is TokenSetup, FeeManagerSetup {
+contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
   // Duplicate event of the CCIPSendRequested in the IOnRamp
   event CCIPSendRequested(Internal.EVM2EVMMessage message);
 
@@ -29,9 +28,9 @@ contract EVM2EVMOnRampSetup is TokenSetup, FeeManagerSetup {
   EVM2EVMOnRamp internal s_onRamp;
   address[] s_offRamps;
 
-  function setUp() public virtual override(TokenSetup, FeeManagerSetup) {
+  function setUp() public virtual override(TokenSetup, PriceRegistrySetup) {
     TokenSetup.setUp();
-    FeeManagerSetup.setUp();
+    PriceRegistrySetup.setUp();
 
     IEVM2EVMOnRamp.FeeTokenConfigArgs[] memory feeTokenConfigArgs = new IEVM2EVMOnRamp.FeeTokenConfigArgs[](2);
     feeTokenConfigArgs[0] = IEVM2EVMOnRamp.FeeTokenConfigArgs({
@@ -47,17 +46,17 @@ contract EVM2EVMOnRampSetup is TokenSetup, FeeManagerSetup {
       destGasOverhead: 2
     });
     s_onRamp = new EVM2EVMOnRamp(
-      SOURCE_CHAIN_ID,
-      DEST_CHAIN_ID,
-      s_sourceTokens,
-      getCastedSourcePools(),
+      IEVM2EVMOnRamp.Chains({chainId: SOURCE_CHAIN_ID, destChainId: DEST_CHAIN_ID}),
+      getTokensAndPools(s_sourceTokens, getCastedSourcePools()),
       s_allowList,
       s_afn,
       onRampConfig(),
       rateLimiterConfig(),
       address(s_sourceRouter),
-      address(s_sourceFeeManager),
-      feeTokenConfigArgs
+      address(s_priceRegistry),
+      feeTokenConfigArgs,
+      s_sourceTokens[0],
+      getNopsAndWeights()
     );
 
     s_metadataHash = keccak256(
@@ -81,6 +80,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, FeeManagerSetup {
     // Pre approve the first token so the gas estimates of the tests
     // only cover actual gas usage from the ramps
     IERC20(s_sourceTokens[0]).approve(address(s_sourceRouter), 2**128);
+    IERC20(s_sourceTokens[1]).approve(address(s_sourceRouter), 2**128);
   }
 
   function assertSameConfig(IEVM2EVMOnRamp.OnRampConfig memory a, IEVM2EVMOnRamp.OnRampConfig memory b) public {

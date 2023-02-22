@@ -7,9 +7,9 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/shared"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
@@ -28,24 +28,26 @@ func setOffRampOnTokenPools(t *testing.T, destClient *EvmDeploymentConfig) {
 	}
 }
 
-func SetFeeManagerPrices(t *testing.T, client *EvmDeploymentConfig, destChainId uint64) {
-	feeManager, err := fee_manager.NewFeeManager(client.ChainConfig.FeeManager, client.Client)
+func SetPriceRegistryPrices(t *testing.T, client *EvmDeploymentConfig, destChainId uint64) {
+	priceRegistry, err := price_registry.NewPriceRegistry(client.ChainConfig.PriceRegistry, client.Client)
 	shared.RequireNoError(t, err)
 
-	var feeUpdates []fee_manager.InternalFeeUpdate
+	priceUpdates := price_registry.InternalPriceUpdates{
+		FeeTokenPriceUpdates: []price_registry.InternalFeeTokenPriceUpdate{},
+		DestChainId:          destChainId,
+		// Set 1e18 units of gas to $2k, being fairly reasonable for eth
+		// These values will get auto updated by the DON
+		UsdPerUnitGas: big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
+	}
 
 	for _, feeToken := range client.ChainConfig.FeeTokens {
-		feeUpdates = append(feeUpdates, fee_manager.InternalFeeUpdate{
+		priceUpdates.FeeTokenPriceUpdates = append(priceUpdates.FeeTokenPriceUpdates, price_registry.InternalFeeTokenPriceUpdate{
 			SourceFeeToken: client.ChainConfig.SupportedTokens[feeToken].Token,
-			DestChainId:    destChainId,
-			// set the gas price to 1gwei in fee tokens. This means 1gwei LINK/ETH/...
-			// equals 1 gas on the destination chain. This will be wrong but the DONs will set
-			// the correct price automatically.
-			FeeTokenBaseUnitsPerUnitGas: big.NewInt(1e9),
+			UsdPerFeeToken: client.ChainConfig.SupportedTokens[feeToken].Price,
 		})
 	}
 
-	tx, err := feeManager.UpdateFees(client.Owner, feeUpdates)
+	tx, err := priceRegistry.UpdatePrices(client.Owner, priceUpdates)
 	shared.RequireNoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 }
@@ -93,11 +95,11 @@ func setOffRampOnRouter(t *testing.T, sourceChainId uint64, client *EvmDeploymen
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 }
 
-func setFeeManagerUpdater(t *testing.T, client *EvmDeploymentConfig) {
-	feeManager, err := fee_manager.NewFeeManager(client.ChainConfig.FeeManager, client.Client)
+func setPriceRegistryUpdater(t *testing.T, client *EvmDeploymentConfig) {
+	priceRegistry, err := price_registry.NewPriceRegistry(client.ChainConfig.PriceRegistry, client.Client)
 	shared.RequireNoError(t, err)
 
-	tx, err := feeManager.SetFeeUpdater(client.Owner, client.LaneConfig.CommitStore)
+	tx, err := priceRegistry.AddPriceUpdaters(client.Owner, []common.Address{client.LaneConfig.CommitStore})
 	shared.RequireNoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 }

@@ -30,9 +30,16 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
     assertEq(pools.length, s_sourceTokens.length);
     assertTrue(address(pools[0]) == address(s_sourceTokens[0]));
     assertTrue(address(pools[1]) == address(s_sourceTokens[1]));
+    IEVM2EVMOffRamp.OffRampConfig memory config = s_offRamp.getOffRampConfig();
+    _assertSameConfig(offRampConfig(s_mockCommitStore, s_destRouter), config);
 
     // HealthChecker
     assertEq(address(s_afn), address(s_offRamp.getAFN()));
+
+    (uint32 configCount, uint32 blockNumber, bytes32 configDigest) = s_offRamp.latestConfigDetails();
+    assertEq(0, configCount);
+    assertEq(0, blockNumber);
+    assertEq(0, configDigest);
   }
 
   // Revert
@@ -80,12 +87,47 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
       rateLimiterConfig
     );
   }
+}
 
-  function assertSameConfig(IEVM2EVMOffRamp.OffRampConfig memory a, IEVM2EVMOffRamp.OffRampConfig memory b) public {
-    assertEq(a.executionDelaySeconds, b.executionDelaySeconds);
-    assertEq(a.maxDataSize, b.maxDataSize);
-    assertEq(a.maxTokensLength, b.maxTokensLength);
-    assertEq(a.permissionLessExecutionThresholdSeconds, b.permissionLessExecutionThresholdSeconds);
+contract EVM2EVMOffRamp_setOffRampConfig is EVM2EVMOffRampSetup {
+  event OffRampConfigChanged(IEVM2EVMOffRamp.OffRampConfig config, uint64 chainId, address onRamp);
+
+  function testSuccess() public {
+    IEVM2EVMOffRamp.OffRampConfig memory config = offRampConfig(ICommitStore(USER_2), IRouter(USER_3));
+    vm.expectEmit(true, true, true, true);
+    emit OffRampConfigChanged(config, SOURCE_CHAIN_ID, ON_RAMP_ADDRESS);
+    s_offRamp.setOffRampConfig(config);
+    IEVM2EVMOffRamp.OffRampConfig memory newConfig = s_offRamp.getOffRampConfig();
+    _assertSameConfig(config, newConfig);
+  }
+
+  function testNonOwnerReverts() public {
+    changePrank(STRANGER);
+    IEVM2EVMOffRamp.OffRampConfig memory config = offRampConfig(ICommitStore(USER_2), IRouter(USER_3));
+    vm.expectRevert("Only callable by owner");
+    s_offRamp.setOffRampConfig(config);
+  }
+
+  function testRouterZeroAddressReverts() public {
+    IEVM2EVMOffRamp.OffRampConfig memory config = offRampConfig(ICommitStore(USER_2), IRouter(ZERO_ADDRESS));
+    vm.expectRevert(abi.encodeWithSelector(IEVM2EVMOffRamp.InvalidOffRampConfig.selector, config));
+    s_offRamp.setOffRampConfig(config);
+  }
+
+  function testCommitStoreZeroAddressReverts() public {
+    IEVM2EVMOffRamp.OffRampConfig memory config = offRampConfig(ICommitStore(ZERO_ADDRESS), IRouter(USER_3));
+    vm.expectRevert(abi.encodeWithSelector(IEVM2EVMOffRamp.InvalidOffRampConfig.selector, config));
+    s_offRamp.setOffRampConfig(config);
+  }
+}
+
+contract EVM2EVMOffRamp_metadataHash is EVM2EVMOffRampSetup {
+  function testSuccess() public {
+    bytes32 h = s_offRamp.metadataHash();
+    assertEq(
+      h,
+      keccak256(abi.encode(Internal.EVM_2_EVM_MESSAGE_HASH, SOURCE_CHAIN_ID, DEST_CHAIN_ID, ON_RAMP_ADDRESS))
+    );
   }
 }
 
@@ -106,7 +148,8 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
 
   function testSingleMessageNoTokensSuccess() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
-
+    address[] memory offRamps = s_destRouter.getOffRamps(SOURCE_CHAIN_ID);
+    console.log("foframps", offRamps.length, address(offRamps[0]), address(s_offRamp));
     vm.expectEmit(false, false, false, true);
     emit ExecutionStateChanged(
       messages[0].sequenceNumber,
@@ -126,7 +169,9 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
       Internal.MessageExecutionState.SUCCESS
     );
 
+    uint64 nonceBefore = s_offRamp.getSenderNonce(messages[0].sender);
     s_offRamp.execute(_generateReportFromMessages(messages), false);
+    assertGt(s_offRamp.getSenderNonce(messages[0].sender), nonceBefore);
   }
 
   function testSkippedIncorrectNonceSuccess() public {

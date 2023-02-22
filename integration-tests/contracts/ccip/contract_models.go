@@ -2,22 +2,24 @@ package ccip
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/mock_afn_contract"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/simple_message_receiver"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
@@ -259,44 +261,44 @@ func (rDapp *ReceiverDapp) Address() string {
 	return rDapp.EthAddress.Hex()
 }
 
-type FeeManager struct {
+type PriceRegistry struct {
 	client     blockchain.EVMClient
-	instance   *fee_manager.FeeManager
+	instance   *price_registry.PriceRegistry
 	EthAddress common.Address
 }
 
-func (c *FeeManager) Address() string {
+func (c *PriceRegistry) Address() string {
 	return c.EthAddress.Hex()
 }
 
-func (c *FeeManager) SetFeeUpdater(addr common.Address) error {
+func (c *PriceRegistry) SetPriceUpdater(addr common.Address) error {
 	opts, err := c.client.TransactionOpts(c.client.GetDefaultWallet())
 	if err != nil {
 		return err
 	}
-	tx, err := c.instance.SetFeeUpdater(opts, addr)
+	tx, err := c.instance.AddPriceUpdaters(opts, []common.Address{addr})
 	if err != nil {
 		return err
 	}
 	log.Info().
-		Str("updater", addr.Hex()).
+		Str("updaters", addr.Hex()).
 		Str("Network Name", c.client.GetNetworkConfig().Name).
-		Msg("FeeManager updater set")
+		Msg("PriceRegistry updater set")
 	return c.client.ProcessTransaction(tx)
 }
 
-func (c *FeeManager) UpdateFees(feeUpdates []fee_manager.InternalFeeUpdate) error {
+func (c *PriceRegistry) UpdatePrices(priceUpdates price_registry.InternalPriceUpdates) error {
 	opts, err := c.client.TransactionOpts(c.client.GetDefaultWallet())
 	if err != nil {
 		return err
 	}
-	tx, err := c.instance.UpdateFees(opts, feeUpdates)
+	tx, err := c.instance.UpdatePrices(opts, priceUpdates)
 	if err != nil {
 		return err
 	}
 	log.Info().
 		Str("Network Name", c.client.GetNetworkConfig().Name).
-		Msg("FeeManager fee updated")
+		Msg("Prices updated")
 	return c.client.ProcessTransaction(tx)
 }
 
@@ -394,6 +396,10 @@ func (onRamp *OnRamp) FilterCCIPSendRequested(
 }
 
 func (onRamp *OnRamp) SetTokenPrices(tokens []common.Address, prices []*big.Int) error {
+	if len(tokens) != len(prices) {
+		return errors.New(fmt.Sprintf("Tokens and prices length mismatch %d != %d", len(tokens), len(prices)))
+	}
+
 	opts, err := onRamp.client.TransactionOpts(onRamp.client.GetDefaultWallet())
 	if err != nil {
 		return err

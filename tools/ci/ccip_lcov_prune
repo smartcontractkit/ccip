@@ -8,13 +8,8 @@ set -e
 
 lcov --remove $1 -o $2 \
   '*/ccip/test/*' \
+  '*/vendor/*' \
   'src/v0.8/ccip/ocr/OCR2Abstract.sol' \
   'src/v0.8/ccip/models/Internal.sol' \
   'src/v0.8/ConfirmedOwnerWithProposal.sol' \
   'src/v0.8/tests/MockV3Aggregator.sol' \
-  'src/v0.8/vendor/Address.sol' \
-  'src/v0.8/vendor/Context.sol' \
-  'src/v0.8/vendor/ERC20.sol' \
-  'src/v0.8/vendor/Pausable.sol' \
-  'src/v0.8/vendor/SafeERC20.sol' \
-  'src/v0.8/vendor/ERC165Checker.sol' \

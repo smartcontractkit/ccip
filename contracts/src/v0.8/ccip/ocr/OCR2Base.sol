@@ -270,6 +270,4 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
   }
 
   function _report(bytes memory report) internal virtual;
-
-  function _beforeSetOCR2Config(uint8 f, bytes memory onchainConfig) internal virtual;
 }

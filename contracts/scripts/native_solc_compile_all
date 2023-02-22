@@ -117,11 +117,12 @@ $SCRIPTPATH/native_solc8_15_compile_ccip ccip/onRamp/EVM2EVMOnRamp.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/offRamp/EVM2EVMOffRamp.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/test/helpers/ramps/EVM2EVMOffRampHelper.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/router/Router.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/fees/FeeManager.sol
+$SCRIPTPATH/native_solc8_15_compile_ccip ccip/prices/PriceRegistry.sol
 
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/applications/ReceiverDapp.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/test/helpers/receivers/SimpleMessageReceiver.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/test/helpers/receivers/MaybeRevertMessageReceiver.sol
+$SCRIPTPATH/native_solc8_15_compile_ccip ccip/test/WETH9.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/applications/GovernanceDapp.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/applications/PingPongDemo.sol
 

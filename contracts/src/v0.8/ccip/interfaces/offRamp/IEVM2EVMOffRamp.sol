@@ -1,15 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IFeeManager} from "../fees/IFeeManager.sol";
-import {ICommitStore} from "../ICommitStore.sol";
-
 import {Internal} from "../../models/Internal.sol";
 
 import {IERC20} from "../../../vendor/IERC20.sol";
 
 interface IEVM2EVMOffRamp {
-  error UnauthorizedGasPriceUpdate();
   error AlreadyAttempted(uint64 sequenceNumber);
   error AlreadyExecuted(uint64 sequenceNumber);
   error ZeroAddressNotAllowed();
@@ -34,8 +30,7 @@ interface IEVM2EVMOffRamp {
     Internal.MessageExecutionState state
   );
 
-  /// @notice Returns the current execution state of a message based on its
-  ///          sequenceNumber.
+  /// @notice Returns the current execution state of a message based on its sequenceNumber.
   function getExecutionState(uint64 sequenceNumber) external view returns (Internal.MessageExecutionState);
 
   /// @notice Returns the the current nonce for a receiver.
@@ -43,16 +38,12 @@ interface IEVM2EVMOffRamp {
 
   // since OffRampConfig is part of OffRampConfigChanged event, if changing it, we should update the ABI on Atlas
   struct OffRampConfig {
-    // The waiting time before manual execution is enabled
-    uint32 permissionLessExecutionThresholdSeconds;
-    // execution delay in seconds
-    uint64 executionDelaySeconds;
-    address router;
-    // maximum payload data size
-    uint64 maxDataSize;
-    address commitStore;
-    // Maximum number of distinct ERC20 tokens that can be sent in a message
-    uint64 maxTokensLength;
+    uint32 permissionLessExecutionThresholdSeconds; // -┐ Waiting time before manual execution is enabled
+    uint64 executionDelaySeconds; //                    | Execution delay in seconds
+    address router; // ---------------------------------┘ Router address
+    uint32 maxDataSize; // --------┐ Maximum payload data size
+    address commitStore; //        | CommitStore address
+    uint16 maxTokensLength; // ----┘ Maximum number of distinct ERC20 tokens that can be sent per message
   }
 
   /// @notice Returns the current config.

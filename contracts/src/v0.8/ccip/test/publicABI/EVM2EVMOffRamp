@@ -27,7 +27,7 @@
   "removePool(address,address)": "744b92e2",
   "setAFN(address)": "108ee5fc",
   "setOCR2Config(address[],address[],uint8,bytes,uint64,bytes)": "1ef38174",
-  "setOffRampConfig((uint32,uint64,address,uint64,address,uint64))": "1416b1d3",
+  "setOffRampConfig((uint32,uint64,address,uint32,address,uint16))": "167e3447",
   "setPrices(address[],uint256[])": "4352fa9f",
   "setRateLimiterConfig((address,uint256,uint256))": "17332f9b",
   "setTokenLimitAdmin(address)": "39aa9264",

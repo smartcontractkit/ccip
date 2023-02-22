@@ -304,6 +304,4 @@ contract EVM2EVMOffRamp is
   function _report(bytes memory report) internal override {
     _execute(abi.decode(report, (Internal.ExecutionReport)), false);
   }
-
-  function _beforeSetOCR2Config(uint8 f, bytes memory onchainConfig) internal override {}
 }

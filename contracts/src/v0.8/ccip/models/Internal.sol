@@ -5,10 +5,15 @@ import {Client} from "./Client.sol";
 
 // Library for CCIP internal definitions common to multiple contracts.
 library Internal {
-  struct FeeUpdate {
+  struct PriceUpdates {
+    FeeTokenPriceUpdate[] feeTokenPriceUpdates;
+    uint64 destChainId; // ------┐ Destination chain Id
+    uint128 usdPerUnitGas; // ---┘ USD per unit of destination chain gas
+  }
+
+  struct FeeTokenPriceUpdate {
     address sourceFeeToken;
-    uint64 destChainId;
-    uint128 feeTokenBaseUnitsPerUnitGas;
+    uint128 usdPerFeeToken;
   }
 
   struct ExecutionReport {

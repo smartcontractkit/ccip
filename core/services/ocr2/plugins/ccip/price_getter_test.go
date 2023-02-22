@@ -60,7 +60,7 @@ func TestDataSource(t *testing.T) {
 	require.NoError(t, err)
 
 	// Ask for all prices present in spec.
-	prices, err := ds.TokensPerFeeCoin(context.Background(), []common.Address{linkTokenAddress, usdcTokenAddress})
+	prices, err := ds.TokenPricesUSD(context.Background(), []common.Address{linkTokenAddress, usdcTokenAddress})
 	require.NoError(t, err)
 	assert.Equal(t, prices, map[common.Address]*big.Int{
 		linkTokenAddress: big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1000000000000000000)),
@@ -68,6 +68,6 @@ func TestDataSource(t *testing.T) {
 	})
 
 	// Ask a non-existent price.
-	_, err = ds.TokensPerFeeCoin(context.Background(), []common.Address{common.HexToAddress("0x1591690b8638f5fb2dbec82ac741805ac5da8b45dc5263f4875b0496fdce4e11")})
+	_, err = ds.TokenPricesUSD(context.Background(), []common.Address{common.HexToAddress("0x1591690b8638f5fb2dbec82ac741805ac5da8b45dc5263f4875b0496fdce4e11")})
 	require.Error(t, err)
 }

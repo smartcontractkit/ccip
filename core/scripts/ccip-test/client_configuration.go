@@ -28,11 +28,11 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/governance_dapp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ping_pong_demo"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/receiver_dapp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/simple_message_receiver"
@@ -132,7 +132,7 @@ type Client struct {
 	GovernanceDapp   *governance_dapp.GovernanceDapp
 	PingPongDapp     *ping_pong_demo.PingPongDemo
 	Afn              *afn_contract.AFNContract
-	FeeManager       *fee_manager.FeeManager
+	PriceRegistry    *price_registry.PriceRegistry
 	Router           *router.Router
 	AllowList        []common.Address
 	logger           logger.Logger
@@ -177,7 +177,7 @@ func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient
 	shared.RequireNoError(t, err)
 	pingPongDapp, err := ping_pong_demo.NewPingPongDemo(config.LaneConfig.PingPongDapp, config.Client)
 	shared.RequireNoError(t, err)
-	feeManager, err := fee_manager.NewFeeManager(config.ChainConfig.FeeManager, config.Client)
+	priceRegistry, err := price_registry.NewPriceRegistry(config.ChainConfig.PriceRegistry, config.Client)
 	shared.RequireNoError(t, err)
 
 	return SourceClient{
@@ -187,7 +187,7 @@ func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient
 			LinkTokenAddress: config.ChainConfig.SupportedTokens[rhea.LINK].Token,
 			LinkToken:        LinkToken,
 			Afn:              afn,
-			FeeManager:       feeManager,
+			PriceRegistry:    priceRegistry,
 			SupportedTokens:  supportedTokens,
 			GovernanceDapp:   governanceDapp,
 			PingPongDapp:     pingPongDapp,
@@ -240,7 +240,7 @@ func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestCli
 	shared.RequireNoError(t, err)
 	pingPongDapp, err := ping_pong_demo.NewPingPongDemo(config.LaneConfig.PingPongDapp, config.Client)
 	shared.RequireNoError(t, err)
-	feeManager, err := fee_manager.NewFeeManager(config.ChainConfig.FeeManager, config.Client)
+	priceRegistry, err := price_registry.NewPriceRegistry(config.ChainConfig.PriceRegistry, config.Client)
 	shared.RequireNoError(t, err)
 
 	return DestClient{
@@ -253,7 +253,7 @@ func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestCli
 			GovernanceDapp:   governanceDapp,
 			PingPongDapp:     pingPongDapp,
 			Afn:              afn,
-			FeeManager:       feeManager,
+			PriceRegistry:    priceRegistry,
 			logger:           config.Logger,
 			Router:           router,
 			AllowList:        config.ChainConfig.AllowList,

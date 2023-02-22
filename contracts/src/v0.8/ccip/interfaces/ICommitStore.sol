@@ -16,7 +16,7 @@ interface ICommitStore {
     uint64 chainId;
     uint64 sourceChainId;
     address onRamp;
-    address feeManager;
+    address priceRegistry;
   }
 
   /// @notice a sequenceNumber interval
@@ -27,7 +27,7 @@ interface ICommitStore {
 
   /// @notice Report that is committed by the observing DON at the committing phase
   struct CommitReport {
-    Internal.FeeUpdate[] feeUpdates;
+    Internal.PriceUpdates priceUpdates;
     Interval interval;
     bytes32 merkleRoot;
   }

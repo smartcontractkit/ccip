@@ -14,7 +14,8 @@ contract MockCommitStore is ICommitStore {
 
   /// @inheritdoc ICommitStore
   function getConfig() external pure override returns (ICommitStore.CommitStoreConfig memory) {
-    return ICommitStore.CommitStoreConfig({chainId: 1, sourceChainId: 2, onRamp: address(1), feeManager: address(10)});
+    return
+      ICommitStore.CommitStoreConfig({chainId: 1, sourceChainId: 2, onRamp: address(1), priceRegistry: address(10)});
   }
 
   /// @inheritdoc ICommitStore

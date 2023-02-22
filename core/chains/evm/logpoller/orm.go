@@ -337,3 +337,24 @@ func (o *ORM) SelectIndexedLogs(address common.Address, eventSig common.Hash, to
 	}
 	return logs, nil
 }
+
+func (o *ORM) SelectIndexedLogsCreatedAfter(address common.Address, eventSig common.Hash, topicIndex int, topicValues []common.Hash, after time.Time, qopts ...pg.QOpt) ([]Log, error) {
+	q := o.q.WithOpts(qopts...)
+	var logs []Log
+	var topicValuesBytes [][]byte
+	for _, topicValue := range topicValues {
+		topicValuesBytes = append(topicValuesBytes, topicValue.Bytes())
+	}
+	// Add 1 since postgresql arrays are 1-indexed.
+	err := q.Select(&logs, `
+		SELECT * FROM logs 
+			WHERE logs.evm_chain_id = $1
+			AND address = $2 AND event_sig = $3
+			AND topics[$4] = ANY($5)
+			AND created_at > $6
+			ORDER BY created_at ASC`, utils.NewBig(o.chainID), address, eventSig.Bytes(), topicIndex+1, pq.ByteaArray(topicValuesBytes), after)
+	if err != nil {
+		return nil, err
+	}
+	return logs, nil
+}

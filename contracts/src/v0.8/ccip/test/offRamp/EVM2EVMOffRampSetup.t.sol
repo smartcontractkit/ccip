@@ -4,19 +4,20 @@ pragma solidity 0.8.15;
 import {ICommitStore} from "../../interfaces/ICommitStore.sol";
 import {IAny2EVMMessageReceiver} from "../../interfaces/router/IAny2EVMMessageReceiver.sol";
 import {IEVM2EVMOffRamp} from "../../interfaces/offRamp/IEVM2EVMOffRamp.sol";
-import {IFeeManager} from "../../interfaces/fees/IFeeManager.sol";
+import {IPriceRegistry} from "../../interfaces/prices/IPriceRegistry.sol";
 import {IRouter} from "../../interfaces/router/IRouter.sol";
 
 import {Internal} from "../../models/Internal.sol";
 import {Client} from "../../models/Client.sol";
-import {FeeManagerSetup} from "../fees/FeeManager.t.sol";
+import {TokenSetup} from "../TokenSetup.t.sol";
+import {PriceRegistrySetup} from "../prices/PriceRegistry.t.sol";
 import {MockCommitStore} from "../mocks/MockCommitStore.sol";
 import {SimpleMessageReceiver} from "../helpers/receivers/SimpleMessageReceiver.sol";
 import {EVM2EVMOffRampHelper} from "../helpers/ramps/EVM2EVMOffRampHelper.sol";
 import "../TokenSetup.t.sol";
 import "../router/RouterSetup.t.sol";
 
-contract EVM2EVMOffRampSetup is TokenSetup, FeeManagerSetup {
+contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup {
   ICommitStore internal s_mockCommitStore;
   IAny2EVMMessageReceiver internal s_receiver;
   IAny2EVMMessageReceiver internal s_secondary_receiver;
@@ -32,9 +33,9 @@ contract EVM2EVMOffRampSetup is TokenSetup, FeeManagerSetup {
   );
   event SkippedIncorrectNonce(uint64 indexed nonce, address indexed sender);
 
-  function setUp() public virtual override(TokenSetup, FeeManagerSetup) {
+  function setUp() public virtual override(TokenSetup, PriceRegistrySetup) {
     TokenSetup.setUp();
-    FeeManagerSetup.setUp();
+    PriceRegistrySetup.setUp();
 
     s_mockCommitStore = new MockCommitStore();
     s_receiver = new SimpleMessageReceiver();
@@ -54,9 +55,10 @@ contract EVM2EVMOffRampSetup is TokenSetup, FeeManagerSetup {
       getCastedDestinationPools(),
       rateLimiterConfig()
     );
-
+    address[] memory updaters = new address[](1);
+    updaters[0] = address(s_offRamp);
     s_offRamp.setPrices(getCastedDestinationTokens(), getTokenPrices());
-    s_destFeeManager.setFeeUpdater(address(s_offRamp));
+
     address[] memory s_offRamps = new address[](1);
     s_offRamps[0] = address(s_offRamp);
     IRouter.OnRampUpdate[] memory onRampUpdates = new IRouter.OnRampUpdate[](0);
@@ -175,5 +177,12 @@ contract EVM2EVMOffRampSetup is TokenSetup, FeeManagerSetup {
         proofFlagBits: 2**256 - 1,
         encodedMessages: encodedMessages
       });
+  }
+
+  function _assertSameConfig(IEVM2EVMOffRamp.OffRampConfig memory a, IEVM2EVMOffRamp.OffRampConfig memory b) public {
+    assertEq(a.executionDelaySeconds, b.executionDelaySeconds);
+    assertEq(a.maxDataSize, b.maxDataSize);
+    assertEq(a.maxTokensLength, b.maxTokensLength);
+    assertEq(a.permissionLessExecutionThresholdSeconds, b.permissionLessExecutionThresholdSeconds);
   }
 }

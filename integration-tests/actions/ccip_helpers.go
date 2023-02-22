@@ -27,7 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
 	ccipPlugin "github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/testhelpers"
@@ -332,7 +332,7 @@ type SourceCCIPModule struct {
 	TransferAmount     []*big.Int
 	DestinationChainId uint64
 	OnRamp             *ccip.OnRamp
-	FeeManager         *ccip.FeeManager
+	PriceRegistry      *ccip.PriceRegistry
 }
 
 // DeployContracts deploys all CCIP contracts specific to the source chain
@@ -342,41 +342,46 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(t *testing.T) {
 	log.Info().Msg("Deploying source chain specific contracts")
 	<-sourceCCIP.Common.deployed
 
-	var tokens, pools, bridgeTokens []common.Address
-	for _, token := range sourceCCIP.Common.BridgeTokens {
-		tokens = append(tokens, common.HexToAddress(token.Address()))
+	var tokensAndPools []evm_2_evm_onramp.EVM2EVMOnRampTokenAndPool
+	var tokens []common.Address
+	for i, token := range sourceCCIP.Common.BridgeTokens {
+		tokens = append(tokens, token.EthAddress)
+		tokensAndPools = append(tokensAndPools, evm_2_evm_onramp.EVM2EVMOnRampTokenAndPool{
+			Token: token.EthAddress,
+			Pool:  sourceCCIP.Common.BridgeTokenPools[i].EthAddress,
+		})
 	}
-	bridgeTokens = tokens
-	tokens = append(tokens, common.HexToAddress(sourceCCIP.Common.FeeToken.Address()))
-
-	for _, pool := range sourceCCIP.Common.BridgeTokenPools {
-		pools = append(pools, pool.EthAddress)
-	}
-	pools = append(pools, sourceCCIP.Common.FeeTokenPool.EthAddress)
+	tokensAndPools = append(tokensAndPools, evm_2_evm_onramp.EVM2EVMOnRampTokenAndPool{
+		Token: common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
+		Pool:  sourceCCIP.Common.FeeTokenPool.EthAddress,
+	})
 
 	err = sourceCCIP.Common.ChainClient.WaitForEvents()
 	require.NoError(t, err, "Error waiting for OnRamp deployment")
 
-	sourceCCIP.FeeManager, err = contractDeployer.DeployFeeManager([]fee_manager.InternalFeeUpdate{
-		{
-			SourceFeeToken:              common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
-			DestChainId:                 sourceCCIP.DestinationChainId,
-			FeeTokenBaseUnitsPerUnitGas: big.NewInt(1e9), // 1 gwei
+	sourceCCIP.PriceRegistry, err = contractDeployer.DeployPriceRegistry(price_registry.InternalPriceUpdates{
+		DestChainId:   sourceCCIP.DestinationChainId,
+		UsdPerUnitGas: big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
+		FeeTokenPriceUpdates: []price_registry.InternalFeeTokenPriceUpdate{
+			{
+				SourceFeeToken: common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
+				UsdPerFeeToken: big.NewInt(5),
+			},
 		},
 	})
-	require.NoError(t, err, "Error on FeeManager deployment")
+
+	require.NoError(t, err, "Error on Prices deployment")
 
 	err = sourceCCIP.Common.ChainClient.WaitForEvents()
 	require.NoError(t, err, "Error waiting for events")
 	sourceCCIP.OnRamp, err = contractDeployer.DeployOnRamp(
 		sourceCCIP.Common.ChainClient.GetChainID().Uint64(),
 		sourceCCIP.DestinationChainId,
-		tokens,
-		pools,
 		[]common.Address{},
+		tokensAndPools,
 		sourceCCIP.Common.AFN.EthAddress,
 		sourceCCIP.Common.Router.EthAddress,
-		sourceCCIP.FeeManager.EthAddress,
+		sourceCCIP.PriceRegistry.EthAddress,
 		sourceCCIP.Common.RateLimiterConfig,
 		[]evm_2_evm_onramp.IEVM2EVMOnRampFeeTokenConfigArgs{
 			{
@@ -384,7 +389,9 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(t *testing.T) {
 				FeeAmount:       big.NewInt(0),
 				DestGasOverhead: 0,
 				Multiplier:      1e18,
-			}})
+			}},
+		sourceCCIP.Common.FeeToken.EthAddress,
+	)
 
 	require.NoError(t, err, "Error on OnRamp deployment")
 
@@ -392,7 +399,7 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(t *testing.T) {
 	require.NoError(t, err, "Error waiting for events")
 
 	// Set bridge token prices on the onRamp
-	err = sourceCCIP.OnRamp.SetTokenPrices(bridgeTokens, sourceCCIP.Common.TokenPrices)
+	err = sourceCCIP.OnRamp.SetTokenPrices(tokens, sourceCCIP.Common.TokenPrices)
 	require.NoError(t, err, "Setting prices shouldn't fail")
 
 	// update source Router with OnRamp address
@@ -447,9 +454,9 @@ func (sourceCCIP *SourceCCIPModule) CollectBalanceRequirements(t *testing.T) []t
 		Getter: GetterForLinkToken(t, sourceCCIP.Common.FeeToken, sourceCCIP.OnRamp.Address()),
 	})
 	balancesReq = append(balancesReq, testhelpers.BalanceReq{
-		Name:   fmt.Sprintf("%s-FeeManager-%s", testhelpers.Sender, sourceCCIP.FeeManager.Address()),
-		Addr:   sourceCCIP.FeeManager.EthAddress,
-		Getter: GetterForLinkToken(t, sourceCCIP.Common.FeeToken, sourceCCIP.FeeManager.Address()),
+		Name:   fmt.Sprintf("%s-Prices-%s", testhelpers.Sender, sourceCCIP.PriceRegistry.Address()),
+		Addr:   sourceCCIP.PriceRegistry.EthAddress,
+		Getter: GetterForLinkToken(t, sourceCCIP.Common.FeeToken, sourceCCIP.PriceRegistry.Address()),
 	})
 
 	return balancesReq
@@ -482,11 +489,11 @@ func (sourceCCIP *SourceCCIPModule) BalanceAssertions(t *testing.T, prevBalances
 		Getter:   GetterForLinkToken(t, sourceCCIP.Common.FeeToken, sourceCCIP.Sender.Hex()),
 		Expected: bigmath.Sub(prevBalances[name], totalFee).String(),
 	})
-	name = fmt.Sprintf("%s-FeeManager-%s", testhelpers.Sender, sourceCCIP.FeeManager.Address())
+	name = fmt.Sprintf("%s-Prices-%s", testhelpers.Sender, sourceCCIP.PriceRegistry.Address())
 	balAssertions = append(balAssertions, testhelpers.BalanceAssertion{
 		Name:     name,
-		Address:  sourceCCIP.FeeManager.EthAddress,
-		Getter:   GetterForLinkToken(t, sourceCCIP.Common.FeeToken, sourceCCIP.FeeManager.Address()),
+		Address:  sourceCCIP.PriceRegistry.EthAddress,
+		Getter:   GetterForLinkToken(t, sourceCCIP.Common.FeeToken, sourceCCIP.PriceRegistry.Address()),
 		Expected: bigmath.Add(prevBalances[name], totalFee).String(),
 	})
 	name = fmt.Sprintf("%s-Router-%s", testhelpers.Sender, sourceCCIP.Common.Router.Address())
@@ -598,17 +605,20 @@ func (destCCIP *DestCCIPModule) DeployContracts(t *testing.T, sourceCCIP SourceC
 
 	<-destCCIP.Common.deployed
 
-	destFeeManager, err := contractDeployer.DeployFeeManager([]fee_manager.InternalFeeUpdate{
-		{
-			SourceFeeToken:              common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
-			DestChainId:                 destCCIP.SourceChainId,
-			FeeTokenBaseUnitsPerUnitGas: big.NewInt(200e9), // (2e20 juels/eth) * (1 gwei / gas) / (1 eth/1e18)
+	destPriceRegistry, err := contractDeployer.DeployPriceRegistry(price_registry.InternalPriceUpdates{
+		DestChainId:   destCCIP.SourceChainId,
+		UsdPerUnitGas: big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
+		FeeTokenPriceUpdates: []price_registry.InternalFeeTokenPriceUpdate{
+			{
+				SourceFeeToken: common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
+				UsdPerFeeToken: big.NewInt(5),
+			},
 		},
 	})
-	require.NoError(t, err, "Error on FeeManager deployment")
+	require.NoError(t, err, "Error on Prices deployment")
 
 	// commitStore responsible for validating the transfer message
-	destCCIP.CommitStore, err = contractDeployer.DeployCommitStore(destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID().Uint64(), destCCIP.Common.AFN.EthAddress, sourceCCIP.OnRamp.EthAddress, destFeeManager.EthAddress)
+	destCCIP.CommitStore, err = contractDeployer.DeployCommitStore(destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID().Uint64(), destCCIP.Common.AFN.EthAddress, sourceCCIP.OnRamp.EthAddress, destPriceRegistry.EthAddress)
 	require.NoError(t, err, "Deploying CommitStore shouldn't fail")
 	err = destCCIP.Common.ChainClient.WaitForEvents()
 	require.NoError(t, err, "Error waiting for setting destination contracts")
@@ -646,7 +656,7 @@ func (destCCIP *DestCCIPModule) DeployContracts(t *testing.T, sourceCCIP SourceC
 	require.NoError(t, err, "Error waiting for deploying OffRamp")
 
 	// CommitStore can update
-	err = destFeeManager.SetFeeUpdater(destCCIP.CommitStore.EthAddress)
+	err = destPriceRegistry.SetPriceUpdater(destCCIP.CommitStore.EthAddress)
 	require.NoError(t, err, "setting CommitStore as fee updater shouldn't fail")
 
 	_, err = destCCIP.Common.Router.AddOffRamp(destCCIP.OffRamp.EthAddress, destCCIP.SourceChainId)

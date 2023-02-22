@@ -18,7 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
@@ -51,12 +51,16 @@ func DecodeCommitReport(report types.Report) (*commit_store.ICommitStoreCommitRe
 	if len(unpacked) != 1 {
 		return nil, errors.New("expected single struct value")
 	}
+
 	commitReport, ok := unpacked[0].(struct {
-		FeeUpdates []struct {
-			SourceFeeToken              common.Address `json:"sourceFeeToken"`
-			DestChainId                 uint64         `json:"destChainId"`
-			FeeTokenBaseUnitsPerUnitGas *big.Int       `json:"feeTokenBaseUnitsPerUnitGas"`
-		} `json:"feeUpdates"`
+		PriceUpdates struct {
+			FeeTokenPriceUpdates []struct {
+				SourceFeeToken common.Address `json:"sourceFeeToken"`
+				UsdPerFeeToken *big.Int       `json:"usdPerFeeToken"`
+			} `json:"feeTokenPriceUpdates"`
+			DestChainId   uint64   `json:"destChainId"`
+			UsdPerUnitGas *big.Int `json:"usdPerUnitGas"`
+		} `json:"priceUpdates"`
 		Interval struct {
 			Min uint64 `json:"min"`
 			Max uint64 `json:"max"`
@@ -67,17 +71,20 @@ func DecodeCommitReport(report types.Report) (*commit_store.ICommitStoreCommitRe
 		return nil, errors.Errorf("invalid commit report got %T", unpacked[0])
 	}
 
-	feeUpdates := make([]commit_store.InternalFeeUpdate, len(commitReport.FeeUpdates))
-	for i, feeUpdate := range commitReport.FeeUpdates {
-		feeUpdates[i] = commit_store.InternalFeeUpdate{
-			SourceFeeToken:              feeUpdate.SourceFeeToken,
-			DestChainId:                 feeUpdate.DestChainId,
-			FeeTokenBaseUnitsPerUnitGas: feeUpdate.FeeTokenBaseUnitsPerUnitGas,
-		}
+	var feeTokenUpdates []commit_store.InternalFeeTokenPriceUpdate
+	for _, u := range commitReport.PriceUpdates.FeeTokenPriceUpdates {
+		feeTokenUpdates = append(feeTokenUpdates, commit_store.InternalFeeTokenPriceUpdate{
+			SourceFeeToken: u.SourceFeeToken,
+			UsdPerFeeToken: u.UsdPerFeeToken,
+		})
 	}
 
 	return &commit_store.ICommitStoreCommitReport{
-		FeeUpdates: feeUpdates,
+		PriceUpdates: commit_store.InternalPriceUpdates{
+			DestChainId:          commitReport.PriceUpdates.DestChainId,
+			UsdPerUnitGas:        commitReport.PriceUpdates.UsdPerUnitGas,
+			FeeTokenPriceUpdates: feeTokenUpdates,
+		},
 		Interval: commit_store.ICommitStoreInterval{
 			Min: commitReport.Interval.Min,
 			Max: commitReport.Interval.Max,
@@ -107,8 +114,8 @@ type InflightReport struct {
 }
 
 type InflightFeeUpdate struct {
-	feeUpdates []commit_store.InternalFeeUpdate
-	createdAt  time.Time
+	priceUpdates commit_store.InternalPriceUpdates
+	createdAt    time.Time
 }
 
 type CommitPluginConfig struct {
@@ -118,8 +125,9 @@ type CommitPluginConfig struct {
 	reqEventSig                          EventSignatures
 	onRamp                               common.Address
 	offRamp                              *evm_2_evm_offramp.EVM2EVMOffRamp
-	feeManager                           *fee_manager.FeeManager
+	priceRegistry                        *price_registry.PriceRegistry
 	priceGetter                          PriceGetter
+	sourceNative                         common.Address
 	sourceGasEstimator, destGasEstimator gas.Estimator
 	sourceChainID                        uint64
 	commitStore                          *commit_store.CommitStore
@@ -210,59 +218,83 @@ func (r *CommitReportingPlugin) Query(ctx context.Context, timestamp types.Repor
 	return types.Query{}, nil
 }
 
-func calculateFeeTokenBaseUnitsPerUnitGas(sourceGasPrice *big.Int, juelsPerFeeCoin *big.Int) (feeTokenBaseUnitsPerUnitGas *big.Int) {
-	// (juels/eth) * (wei / gas) / (1 eth / 1e18 wei) = juels/gas
-	// TODO: Think more about this offchain/onchain computation split
-	feeTokenBaseUnitsPerUnitGas = big.NewInt(0).Mul(sourceGasPrice, juelsPerFeeCoin)
-	return feeTokenBaseUnitsPerUnitGas.Div(feeTokenBaseUnitsPerUnitGas, big.NewInt(1e18))
+func calculateUsdPerUnitGas(sourceGasPrice *big.Int, usdPerFeeCoin *big.Int) *big.Int {
+	// (wei / gas) * (usd / eth) * (1 eth / 1e18 wei)  = usd/gas
+	tmp := big.NewInt(0).Mul(sourceGasPrice, usdPerFeeCoin)
+	return tmp.Div(tmp, big.NewInt(1e18))
 }
 
-func (r *CommitReportingPlugin) canSkipFeeUpdate(feeTokenBaseUnitsPerUnitGas *big.Int) (bool, error) {
-	// TODO https://smartcontract-it.atlassian.net/browse/CCIP-304
-	token := r.feeTokens[0]
+// deviation_parts_per_billion = ((x2 - x1) / x1) * 1e9
+func (r *CommitReportingPlugin) deviates(x1, x2 *big.Int) bool {
+	gasPriceDeviation := big.NewInt(0).Sub(x1, x2)
+	gasPriceDeviation.Mul(gasPriceDeviation, big.NewInt(1e9))
+	gasPriceDeviation.Div(gasPriceDeviation, x1)
+	return gasPriceDeviation.CmpAbs(big.NewInt(int64(r.offchainConfig.FeeUpdateDeviationPPB))) > 0
+}
 
-	var latestUpdateTimestamp time.Time
-	var latestPrice *big.Int
-
-	logsWithinHeartBeat, err := r.config.dest.LogsCreatedAfter(GasFeeUpdated, r.config.feeManager.Address(), time.Now().Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()))
+// All prices are USD denominated.
+func (r *CommitReportingPlugin) canSkipFeeUpdate(gasPrice *big.Int, tokenPrices map[common.Address]*big.Int) (bool, error) {
+	var latestGasUpdateTimestamp time.Time
+	var latestGasPrice *big.Int
+	gasUpdatesWithinHeartBeat, err := r.config.dest.IndexedLogsCreatedAfter(GasFeeUpdated, r.config.priceRegistry.Address(), 1, []common.Hash{EvmWord(r.config.sourceChainID)}, time.Now().Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()))
 	if err != nil {
 		return false, err
 	}
-	for _, log := range logsWithinHeartBeat {
-		parsed, err := r.config.feeManager.ParseGasFeeUpdated(log.GetGethLog())
+	if len(gasUpdatesWithinHeartBeat) > 0 {
+		// Ordered by ascending timestamps
+		priceUpdate, err := r.config.priceRegistry.ParseUsdPerUnitGasUpdated(gasUpdatesWithinHeartBeat[len(gasUpdatesWithinHeartBeat)-1].GetGethLog())
 		if err != nil {
 			return false, err
 		}
-		ts := time.Unix(int64(parsed.Timestamp), 0)
-		// We use !Before to make sure we get the latest update as seen by the log poller
-		// even if they are included in the same block and have the same timestamp.
-		if parsed.DestChain == r.config.sourceChainID && parsed.Token == token && !ts.Before(latestUpdateTimestamp) {
-			latestUpdateTimestamp = ts
-			latestPrice = parsed.FeeTokenBaseUnitsPerUnitGas
-		}
+		latestGasUpdateTimestamp = time.Unix(priceUpdate.Timestamp.Int64(), 0)
+		latestGasPrice = priceUpdate.Value
 	}
-
 	r.inFlightMu.RLock()
 	for _, inflight := range r.inFlightFeeUpdates {
-		for _, update := range inflight.feeUpdates {
-			if update.DestChainId == r.config.sourceChainID && update.SourceFeeToken == token && !inflight.createdAt.Before(latestUpdateTimestamp) {
-				latestUpdateTimestamp = inflight.createdAt
-				latestPrice = update.FeeTokenBaseUnitsPerUnitGas
-			}
+		if !inflight.createdAt.Before(latestGasUpdateTimestamp) {
+			latestGasUpdateTimestamp = inflight.createdAt
+			latestGasPrice = inflight.priceUpdates.UsdPerUnitGas
 		}
 	}
 	r.inFlightMu.RUnlock()
 
-	if time.Since(latestUpdateTimestamp) > r.offchainConfig.FeeUpdateHeartBeat.Duration() {
+	if latestGasPrice == nil || time.Since(latestGasUpdateTimestamp) > r.offchainConfig.FeeUpdateHeartBeat.Duration() || r.deviates(gasPrice, latestGasPrice) {
 		return false, nil
 	}
 
-	deviation := big.NewInt(0).Sub(feeTokenBaseUnitsPerUnitGas, latestPrice)
-	deviation.Mul(deviation, big.NewInt(1e9))
-	deviation.Div(deviation, latestPrice) // deviation_parts_per_billion = ((x2 - x1) / x1) * 1e9
+	for _, feeToken := range r.feeTokens {
+		var latestFeeTokenPriceTimestamp time.Time
+		var latestFeeTokenPrice *big.Int
+		feeTokenUpdatesWithinHeartBeat, err := r.config.dest.IndexedLogsCreatedAfter(GasFeeUpdated, r.config.priceRegistry.Address(), 1, []common.Hash{feeToken.Hash()}, time.Now().Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()))
+		if err != nil {
+			return false, err
+		}
+		if len(feeTokenUpdatesWithinHeartBeat) > 0 {
+			// Ordered by ascending timestamps
+			parsed, err := r.config.priceRegistry.ParseUsdPerFeeTokenUpdated(feeTokenUpdatesWithinHeartBeat[len(gasUpdatesWithinHeartBeat)-1].GetGethLog())
+			if err != nil {
+				return false, err
+			}
+			latestFeeTokenPriceTimestamp = time.Unix(parsed.Timestamp.Int64(), 0)
+			latestFeeTokenPrice = parsed.Value
+		}
+		r.inFlightMu.RLock()
+		for _, inflight := range r.inFlightFeeUpdates {
+			for _, update := range inflight.priceUpdates.FeeTokenPriceUpdates {
+				if update.SourceFeeToken == feeToken && !inflight.createdAt.Before(latestGasUpdateTimestamp) {
+					latestGasUpdateTimestamp = inflight.createdAt
+					latestFeeTokenPrice = update.UsdPerFeeToken
+				}
+			}
+		}
+		r.inFlightMu.RUnlock()
 
-	// can skip if latest feeUpdate for this plugin's sourceChainId, linkToken, is within heartbeat and deviation
-	return deviation.CmpAbs(big.NewInt(int64(r.offchainConfig.FeeUpdateDeviationPPB))) <= 0, nil
+		if latestFeeTokenPrice == nil || time.Since(latestFeeTokenPriceTimestamp) > r.offchainConfig.FeeUpdateHeartBeat.Duration() || r.deviates(tokenPrices[feeToken], latestFeeTokenPrice) {
+			return false, nil
+		}
+	}
+	// If we make it all the way here, nothing needs updating, and we can skip.
+	return true, nil
 }
 
 func (r *CommitReportingPlugin) Observation(ctx context.Context, timestamp types.ReportTimestamp, query types.Query) (types.Observation, error) {
@@ -278,7 +310,8 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, timestamp types
 	if err != nil {
 		return nil, err
 	}
-	followerTokensPerFeeCoin, err := r.config.priceGetter.TokensPerFeeCoin(context.Background(), r.feeTokens)
+	// Include wrapped native in our token query as way to identify the source native USD price.
+	tokenPricesUSD, err := r.config.priceGetter.TokenPricesUSD(context.Background(), append(r.feeTokens, r.config.sourceNative))
 	if err != nil {
 		return nil, err
 	}
@@ -289,11 +322,11 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, timestamp types
 		return nil, err
 	}
 
-	sourceGasPrice := sourceGasPriceWei.ToInt()
-	if canSkip, err := r.canSkipFeeUpdate(calculateFeeTokenBaseUnitsPerUnitGas(sourceGasPrice, followerTokensPerFeeCoin[r.feeTokens[0]])); err != nil {
+	sourceGasPriceUSD := calculateUsdPerUnitGas(sourceGasPriceWei.ToInt(), tokenPricesUSD[r.config.sourceNative])
+	if canSkip, err := r.canSkipFeeUpdate(sourceGasPriceUSD, tokenPricesUSD); err != nil {
 		return nil, err
 	} else if canSkip {
-		sourceGasPrice = nil // vote skip
+		sourceGasPriceUSD = nil // vote skip
 	}
 
 	return CommitObservation{
@@ -301,8 +334,8 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, timestamp types
 			Min: min,
 			Max: max,
 		},
-		TokensPerFeeCoin: followerTokensPerFeeCoin,
-		SourceGasPrice:   sourceGasPrice,
+		TokenPricesUSD:    tokenPricesUSD,
+		SourceGasPriceUSD: sourceGasPriceUSD,
 	}.Marshal()
 }
 
@@ -345,15 +378,15 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(lggr logger.Logge
 }
 
 // buildReport assumes there is at least one message in reqs.
-func (r *CommitReportingPlugin) buildReport(interval commit_store.ICommitStoreInterval, feeUpdates []commit_store.InternalFeeUpdate) (*commit_store.ICommitStoreCommitReport, error) {
+func (r *CommitReportingPlugin) buildReport(interval commit_store.ICommitStoreInterval, priceUpdates commit_store.InternalPriceUpdates) (*commit_store.ICommitStoreCommitReport, error) {
 	lggr := r.config.lggr.Named("BuildReport")
 
 	// If no messages are needed only include fee updates
 	if interval.Min == 0 {
 		return &commit_store.ICommitStoreCommitReport{
-			FeeUpdates: feeUpdates,
-			MerkleRoot: [32]byte{},
-			Interval:   interval,
+			PriceUpdates: priceUpdates,
+			MerkleRoot:   [32]byte{},
+			Interval:     interval,
 		}, nil
 	}
 
@@ -371,9 +404,9 @@ func (r *CommitReportingPlugin) buildReport(interval commit_store.ICommitStoreIn
 	}
 
 	return &commit_store.ICommitStoreCommitReport{
-		FeeUpdates: feeUpdates,
-		MerkleRoot: tree.Root(),
-		Interval:   interval,
+		PriceUpdates: priceUpdates,
+		MerkleRoot:   tree.Root(),
+		Interval:     interval,
 	}, nil
 }
 
@@ -397,13 +430,9 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, timestamp types.Repo
 		return false, nil, err
 	}
 
-	var feeUpdates []commit_store.InternalFeeUpdate
-	if medianGasPrice := calculateMedianSourceGasPrice(nonEmptyObservations); medianGasPrice != nil {
-		feeUpdates = r.calculateFeeUpdates(medianGasPrice, nonEmptyObservations)
-	}
-
+	feeUpdates := r.calculateFeeUpdates(nonEmptyObservations)
 	// If there are no fee updates and the interval is zero there is no report to produce.
-	if len(feeUpdates) == 0 && agreedInterval.Min == 0 {
+	if len(feeUpdates.FeeTokenPriceUpdates) == 0 && feeUpdates.DestChainId == 0 && agreedInterval.Min == 0 {
 		return false, nil, nil
 	}
 
@@ -419,60 +448,56 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, timestamp types.Repo
 	return true, encodedReport, nil
 }
 
-func calculateMedianSourceGasPrice(observations []CommitObservation) *big.Int {
+func (r *CommitReportingPlugin) calculateFeeUpdates(observations []CommitObservation) commit_store.InternalPriceUpdates {
+	priceObservations := make(map[common.Address][]*big.Int)
 	var sourceGasObservations []*big.Int
 	var sourceGasPriceNilCount int
 
 	for _, obs := range observations {
-		if obs.SourceGasPrice == nil {
-			sourceGasPriceNilCount++
-		} else {
-			// Add only non-nil source gas price
-			sourceGasObservations = append(sourceGasObservations, obs.SourceGasPrice)
-		}
-	}
-
-	// skip gasPrice feeUpdate by leaving it nil if majority voted so by sending nil gasPrice observations
-	if sourceGasPriceNilCount >= len(sourceGasObservations) {
-		return nil
-	}
-
-	return median(sourceGasObservations)
-}
-
-func (r *CommitReportingPlugin) calculateFeeUpdates(medianSourceGasPrice *big.Int, observations []CommitObservation) []commit_store.InternalFeeUpdate {
-	priceObservations := make(map[common.Address][]*big.Int)
-	for _, obs := range observations {
 		hasAllPrices := true
 		for _, token := range r.feeTokens {
-			if _, ok := obs.TokensPerFeeCoin[token]; !ok {
+			if _, ok := obs.TokenPricesUSD[token]; !ok {
 				hasAllPrices = false
 				break
 			}
 		}
+		// Disallow partial updates
 		if !hasAllPrices {
 			continue
 		}
+		if obs.SourceGasPriceUSD == nil {
+			sourceGasPriceNilCount++
+		} else {
+			// Add only non-nil source gas price
+			sourceGasObservations = append(sourceGasObservations, obs.SourceGasPriceUSD)
+		}
 		// If it has all the prices, add each price to observations
-		for token, price := range obs.TokensPerFeeCoin {
+		for token, price := range obs.TokenPricesUSD {
 			priceObservations[token] = append(priceObservations[token], price)
 		}
 	}
-
-	var feeUpdates []commit_store.InternalFeeUpdate
+	var feeUpdates []commit_store.InternalFeeTokenPriceUpdate
 	for _, feeToken := range r.feeTokens {
 		medianPrice := median(priceObservations[feeToken])
-
-		feeUpdates = append(feeUpdates, commit_store.InternalFeeUpdate{
+		feeUpdates = append(feeUpdates, commit_store.InternalFeeTokenPriceUpdate{
 			SourceFeeToken: feeToken,
-			// Since this gas fee update will be sent to the destination chain, this plugins
-			// source chain will be the feeUpdaters destination chain.
-			DestChainId:                 r.config.sourceChainID,
-			FeeTokenBaseUnitsPerUnitGas: calculateFeeTokenBaseUnitsPerUnitGas(medianSourceGasPrice, medianPrice),
+			UsdPerFeeToken: medianPrice,
 		})
 	}
 
-	return feeUpdates
+	// If majority report a gas price, include it in the update
+	if sourceGasPriceNilCount < len(sourceGasObservations) {
+		return commit_store.InternalPriceUpdates{
+			FeeTokenPriceUpdates: feeUpdates,
+			DestChainId:          r.config.sourceChainID,
+			UsdPerUnitGas:        median(sourceGasObservations),
+		}
+	}
+	return commit_store.InternalPriceUpdates{
+		FeeTokenPriceUpdates: feeUpdates,
+		DestChainId:          0,
+		UsdPerUnitGas:        big.NewInt(0),
+	}
 }
 
 // Assumed at least f+1 valid observations
@@ -534,7 +559,7 @@ func (r *CommitReportingPlugin) expireInflight(lggr logger.Logger) {
 		if time.Since(inFlightFeeUpdate.createdAt) > r.config.inflightCacheExpiry {
 			// Happy path: inflight report was successfully transmitted onchain, we remove it from inflight and onchain state reflects inflight.
 			// Sad path: inflight report reverts onchain, we remove it from inflight, onchain state does not reflect the chains so we retry.
-			lggr.Infow("Inflight price update expired", "updates", inFlightFeeUpdate.feeUpdates)
+			lggr.Infow("Inflight price update expired", "updates", inFlightFeeUpdate.priceUpdates)
 			stillInflight = append(stillInflight, inFlightFeeUpdate)
 		}
 	}
@@ -554,11 +579,11 @@ func (r *CommitReportingPlugin) addToInflight(lggr logger.Logger, report *commit
 		}
 	}
 
-	if len(report.FeeUpdates) != 0 {
-		lggr.Infow("Adding to inflight fee updates", "feeUpdates", report.FeeUpdates)
+	if report.PriceUpdates.DestChainId != 0 || len(report.PriceUpdates.FeeTokenPriceUpdates) != 0 {
+		lggr.Infow("Adding to inflight fee updates", "priceUpdates", report.PriceUpdates)
 		r.inFlightFeeUpdates = append(r.inFlightFeeUpdates, InflightFeeUpdate{
-			feeUpdates: report.FeeUpdates,
-			createdAt:  time.Now(),
+			priceUpdates: report.PriceUpdates,
+			createdAt:    time.Now(),
 		})
 	}
 }
@@ -569,7 +594,7 @@ func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context,
 	if err != nil {
 		return false, err
 	}
-	if parsedReport.MerkleRoot == [32]byte{} && len(parsedReport.FeeUpdates) == 0 {
+	if parsedReport.MerkleRoot == [32]byte{} && parsedReport.PriceUpdates.DestChainId == 0 && len(parsedReport.PriceUpdates.FeeTokenPriceUpdates) == 0 {
 		// Empty report, should not be put on chain
 		return false, nil
 	}

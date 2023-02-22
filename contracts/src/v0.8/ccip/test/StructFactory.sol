@@ -6,6 +6,8 @@ import "../interfaces/offRamp/IEVM2EVMOffRamp.sol";
 import "../interfaces/rateLimiter/IAggregateRateLimiter.sol";
 import "../interfaces/router/IRouter.sol";
 import "../interfaces/onRamp/IEVM2EVMOnRamp.sol";
+import "../onRamp/EVM2EVMOnRamp.sol";
+import "../interfaces/rateLimiter/IAggregateRateLimiter.sol";
 
 contract StructFactory {
   // addresses
@@ -94,6 +96,26 @@ contract StructFactory {
       });
   }
 
+  function getTokensAndPools(address[] memory sourceTokens, IPool[] memory pools)
+    internal
+    pure
+    returns (EVM2EVMOnRamp.TokenAndPool[] memory)
+  {
+    EVM2EVMOnRamp.TokenAndPool[] memory tokensAndPools = new EVM2EVMOnRamp.TokenAndPool[](sourceTokens.length);
+    for (uint256 i = 0; i < sourceTokens.length; i++) {
+      tokensAndPools[i] = EVM2EVMOnRamp.TokenAndPool({token: sourceTokens[i], pool: pools[i]});
+    }
+    return tokensAndPools;
+  }
+
+  function getNopsAndWeights() internal pure returns (IEVM2EVMOnRamp.NopAndWeight[] memory) {
+    IEVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights = new IEVM2EVMOnRamp.NopAndWeight[](3);
+    nopsAndWeights[0] = IEVM2EVMOnRamp.NopAndWeight({nop: USER_1, weight: 10});
+    nopsAndWeights[1] = IEVM2EVMOnRamp.NopAndWeight({nop: USER_2, weight: 8});
+    nopsAndWeights[2] = IEVM2EVMOnRamp.NopAndWeight({nop: USER_3, weight: 8});
+    return nopsAndWeights;
+  }
+
   // Rate limiter
   address constant TOKEN_LIMIT_ADMIN = 0x11118e64e1FB0c487f25dD6D3601FF6aF8d32E4e;
 
@@ -106,5 +128,15 @@ contract StructFactory {
     prices[0] = 1;
     prices[1] = 8;
     return prices;
+  }
+
+  // OffRamp
+  function getEmptyPriceUpdates() internal pure returns (Internal.PriceUpdates memory priceUpdates) {
+    return
+      Internal.PriceUpdates({
+        feeTokenPriceUpdates: new Internal.FeeTokenPriceUpdate[](0),
+        destChainId: 0,
+        usdPerUnitGas: 0
+      });
   }
 }

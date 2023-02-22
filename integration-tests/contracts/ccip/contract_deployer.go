@@ -19,7 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
@@ -159,7 +159,7 @@ func (e *CCIPContractsDeployer) NewAFNContract(addr common.Address) (*AFN, error
 	}, err
 }
 
-func (e *CCIPContractsDeployer) DeployCommitStore(sourceChainId, destChainId uint64, afn, onRamp, feeManager common.Address) (*CommitStore, error) {
+func (e *CCIPContractsDeployer) DeployCommitStore(sourceChainId, destChainId uint64, afn, onRamp, priceRegistry common.Address) (*CommitStore, error) {
 	address, _, instance, err := e.evmClient.DeployContract("CommitStore Contract", func(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
@@ -171,7 +171,7 @@ func (e *CCIPContractsDeployer) DeployCommitStore(sourceChainId, destChainId uin
 				ChainId:       destChainId,
 				SourceChainId: sourceChainId,
 				OnRamp:        onRamp,
-				FeeManager:    feeManager,
+				PriceRegistry: priceRegistry,
 			},
 			afn,
 		)
@@ -255,34 +255,36 @@ func (e *CCIPContractsDeployer) NewRouter(addr common.Address) (
 	}, err
 }
 
-func (e *CCIPContractsDeployer) DeployFeeManager(
-	feeUpdates []fee_manager.InternalFeeUpdate,
+func (e *CCIPContractsDeployer) DeployPriceRegistry(
+	feeUpdates price_registry.InternalPriceUpdates,
 ) (
-	*FeeManager,
+	*PriceRegistry,
 	error,
 ) {
-	address, _, instance, err := e.evmClient.DeployContract("FeeManager", func(
+	address, _, instance, err := e.evmClient.DeployContract("PriceRegistry", func(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return fee_manager.DeployFeeManager(auth, backend, feeUpdates, nil, 60*60*24*14)
+		return price_registry.DeployPriceRegistry(auth, backend, feeUpdates, nil, 60*60*24*14)
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &FeeManager{
+	return &PriceRegistry{
 		client:     e.evmClient,
-		instance:   instance.(*fee_manager.FeeManager),
+		instance:   instance.(*price_registry.PriceRegistry),
 		EthAddress: *address,
 	}, err
 }
 
 func (e *CCIPContractsDeployer) DeployOnRamp(
 	sourceChainId, destChainId uint64,
-	tokens, pools, allowList []common.Address,
-	afn, router, feeManager common.Address,
+	allowList []common.Address,
+	tokensAndPools []evm_2_evm_onramp.EVM2EVMOnRampTokenAndPool,
+	afn, router, priceRegistry common.Address,
 	opts RateLimiterConfig,
 	feeConfig []evm_2_evm_onramp.IEVM2EVMOnRampFeeTokenConfigArgs,
+	linkTokenAddress common.Address,
 ) (
 	*OnRamp,
 	error,
@@ -294,10 +296,11 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 		return evm_2_evm_onramp.DeployEVM2EVMOnRamp(
 			auth,
 			backend,
-			sourceChainId,
-			destChainId,
-			tokens,
-			pools,
+			evm_2_evm_onramp.IEVM2EVMOnRampChains{
+				ChainId:     sourceChainId, // source chain id
+				DestChainId: destChainId,   // destinationChainId
+			},
+			tokensAndPools,
 			allowList,
 			afn,
 			evm_2_evm_onramp.IEVM2EVMOnRampOnRampConfig{
@@ -310,8 +313,11 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 				Rate:     opts.Rate,
 			},
 			router,
-			feeManager,
-			feeConfig)
+			priceRegistry,
+			feeConfig,
+			linkTokenAddress,
+			[]evm_2_evm_onramp.IEVM2EVMOnRampNopAndWeight{},
+		)
 	})
 	if err != nil {
 		return nil, err

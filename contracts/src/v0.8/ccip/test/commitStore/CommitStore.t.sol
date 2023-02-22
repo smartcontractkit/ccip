@@ -4,34 +4,35 @@ pragma solidity 0.8.15;
 import "../helpers/MerkleHelper.sol";
 import "../helpers/CommitStoreHelper.sol";
 import "../../health/AFN.sol";
-import "../../fees/FeeManager.sol";
-import "../fees/FeeManager.t.sol";
+import "../../prices/PriceRegistry.sol";
+import "../prices/PriceRegistry.t.sol";
 
-contract CommitStoreSetup is FeeManagerSetup {
+contract CommitStoreSetup is PriceRegistrySetup {
   CommitStoreHelper s_commitStore;
 
   function setUp() public virtual override {
-    FeeManagerSetup.setUp();
+    PriceRegistrySetup.setUp();
 
     s_commitStore = new CommitStoreHelper(
       ICommitStore.CommitStoreConfig({
         chainId: DEST_CHAIN_ID,
         sourceChainId: SOURCE_CHAIN_ID,
         onRamp: ON_RAMP_ADDRESS,
-        feeManager: address(s_destFeeManager)
+        priceRegistry: address(s_priceRegistry)
       }),
       s_afn
     );
-
-    s_destFeeManager.setFeeUpdater(address(s_commitStore));
+    address[] memory priceUpdaters = new address[](1);
+    priceUpdaters[0] = address(s_commitStore);
+    s_priceRegistry.addPriceUpdaters(priceUpdaters);
   }
 }
 
-contract CommitStoreRealAFNSetup is FeeManagerSetup {
+contract CommitStoreRealAFNSetup is PriceRegistrySetup {
   CommitStoreHelper s_commitStore;
 
   function setUp() public virtual override {
-    FeeManagerSetup.setUp();
+    PriceRegistrySetup.setUp();
     address[] memory participants = new address[](1);
     participants[0] = OWNER;
     uint256[] memory weights = new uint256[](1);
@@ -42,7 +43,7 @@ contract CommitStoreRealAFNSetup is FeeManagerSetup {
         chainId: DEST_CHAIN_ID,
         sourceChainId: SOURCE_CHAIN_ID,
         onRamp: ON_RAMP_ADDRESS,
-        feeManager: address(s_destFeeManager)
+        priceRegistry: address(s_priceRegistry)
       }),
       s_afn
     );
@@ -50,7 +51,7 @@ contract CommitStoreRealAFNSetup is FeeManagerSetup {
 }
 
 /// @notice #constructor
-contract CommitStore_constructor is FeeManagerSetup {
+contract CommitStore_constructor is PriceRegistrySetup {
   function testConstructorSuccess() public {
     address onRamp = 0x2C44CDDdB6a900Fa2B585dd299E03D12Fa4293Bc;
 
@@ -59,7 +60,7 @@ contract CommitStore_constructor is FeeManagerSetup {
         chainId: DEST_CHAIN_ID,
         sourceChainId: SOURCE_CHAIN_ID,
         onRamp: onRamp,
-        feeManager: address(s_destFeeManager)
+        priceRegistry: address(s_priceRegistry)
       }),
       s_afn
     );
@@ -110,12 +111,7 @@ contract CommitStore_resetUnblessedRoots is CommitStoreSetup {
 /// @notice #report
 contract CommitStore_report is CommitStoreSetup {
   event ReportAccepted(ICommitStore.CommitReport report);
-  event GasFeeUpdated(
-    address indexed token,
-    uint64 indexed destChain,
-    uint128 feeTokenBaseUnitsPerUnitGas,
-    uint64 timestamp
-  );
+  event UsdPerFeeTokenUpdated(address indexed feeToken, uint256 value, uint256 timestamp);
 
   // Success
 
@@ -123,7 +119,7 @@ contract CommitStore_report is CommitStoreSetup {
     uint64 max1 = 931;
     bytes32 root = "test #1";
     ICommitStore.CommitReport memory report = ICommitStore.CommitReport({
-      feeUpdates: new Internal.FeeUpdate[](0),
+      priceUpdates: getEmptyPriceUpdates(),
       interval: ICommitStore.Interval(1, max1),
       merkleRoot: root
     });
@@ -137,16 +133,18 @@ contract CommitStore_report is CommitStoreSetup {
     assertEq(block.timestamp, s_commitStore.getMerkleRoot(root));
   }
 
-  function testReportAndFeeUpdateSuccess() public {
+  function testReportAndPriceUpdateSuccess() public {
     uint64 max1 = 12;
-    Internal.FeeUpdate[] memory feeUpdates = new Internal.FeeUpdate[](1);
-    feeUpdates[0] = Internal.FeeUpdate({
-      sourceFeeToken: s_sourceFeeToken,
-      destChainId: DEST_CHAIN_ID,
-      feeTokenBaseUnitsPerUnitGas: 1e5
+    Internal.FeeTokenPriceUpdate[] memory feeTokenPriceUpdates = new Internal.FeeTokenPriceUpdate[](1);
+    feeTokenPriceUpdates[0] = Internal.FeeTokenPriceUpdate({sourceFeeToken: s_sourceFeeToken, usdPerFeeToken: 4e18});
+    Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
+      feeTokenPriceUpdates: feeTokenPriceUpdates,
+      destChainId: 0,
+      usdPerUnitGas: 0
     });
+
     ICommitStore.CommitReport memory report = ICommitStore.CommitReport({
-      feeUpdates: feeUpdates,
+      priceUpdates: priceUpdates,
       interval: ICommitStore.Interval(1, max1),
       merkleRoot: "test #2"
     });
@@ -159,27 +157,23 @@ contract CommitStore_report is CommitStoreSetup {
     assertEq(max1 + 1, s_commitStore.getExpectedNextSequenceNumber());
   }
 
-  function testOnlyFeeUpdatesSuccess() public {
-    Internal.FeeUpdate[] memory feeUpdates = new Internal.FeeUpdate[](1);
-    feeUpdates[0] = Internal.FeeUpdate({
-      sourceFeeToken: s_sourceFeeToken,
-      destChainId: DEST_CHAIN_ID,
-      feeTokenBaseUnitsPerUnitGas: 1e18
+  function testOnlyPriceUpdatesSuccess() public {
+    Internal.FeeTokenPriceUpdate[] memory feeTokenPriceUpdates = new Internal.FeeTokenPriceUpdate[](1);
+    feeTokenPriceUpdates[0] = Internal.FeeTokenPriceUpdate({sourceFeeToken: s_sourceFeeToken, usdPerFeeToken: 4e18});
+    Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
+      feeTokenPriceUpdates: feeTokenPriceUpdates,
+      destChainId: 0,
+      usdPerUnitGas: 0
     });
 
     ICommitStore.CommitReport memory report = ICommitStore.CommitReport({
-      feeUpdates: feeUpdates,
+      priceUpdates: priceUpdates,
       interval: ICommitStore.Interval(0, 0),
       merkleRoot: ""
     });
 
-    vm.expectEmit(false, false, false, true);
-    emit GasFeeUpdated(
-      feeUpdates[0].sourceFeeToken,
-      feeUpdates[0].destChainId,
-      feeUpdates[0].feeTokenBaseUnitsPerUnitGas,
-      uint64(block.timestamp)
-    );
+    vm.expectEmit(true, true, true, true);
+    emit UsdPerFeeTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
 
     s_commitStore.report(abi.encode(report));
   }
@@ -202,7 +196,7 @@ contract CommitStore_report is CommitStoreSetup {
 
   function testInvalidRootRevert() public {
     ICommitStore.CommitReport memory report = ICommitStore.CommitReport({
-      feeUpdates: new Internal.FeeUpdate[](0),
+      priceUpdates: getEmptyPriceUpdates(),
       interval: ICommitStore.Interval(1, 4),
       merkleRoot: bytes32(0)
     });
@@ -214,7 +208,7 @@ contract CommitStore_report is CommitStoreSetup {
   function testInvalidIntervalReverts() public {
     ICommitStore.Interval memory interval = ICommitStore.Interval(2, 2);
     ICommitStore.CommitReport memory report = ICommitStore.CommitReport({
-      feeUpdates: new Internal.FeeUpdate[](0),
+      priceUpdates: getEmptyPriceUpdates(),
       interval: interval,
       merkleRoot: bytes32(0)
     });
@@ -227,7 +221,7 @@ contract CommitStore_report is CommitStoreSetup {
   function testInvalidIntervalMinLargerThanMaxReverts() public {
     ICommitStore.Interval memory interval = ICommitStore.Interval(1, 0);
     ICommitStore.CommitReport memory report = ICommitStore.CommitReport({
-      feeUpdates: new Internal.FeeUpdate[](0),
+      priceUpdates: getEmptyPriceUpdates(),
       interval: interval,
       merkleRoot: bytes32(0)
     });
@@ -246,7 +240,7 @@ contract CommitStore_verify is CommitStoreRealAFNSetup {
     s_commitStore.report(
       abi.encode(
         ICommitStore.CommitReport({
-          feeUpdates: new Internal.FeeUpdate[](0),
+          priceUpdates: getEmptyPriceUpdates(),
           interval: ICommitStore.Interval(1, 2),
           merkleRoot: leaves[0]
         })
@@ -264,7 +258,7 @@ contract CommitStore_verify is CommitStoreRealAFNSetup {
     s_commitStore.report(
       abi.encode(
         ICommitStore.CommitReport({
-          feeUpdates: new Internal.FeeUpdate[](0),
+          priceUpdates: getEmptyPriceUpdates(),
           interval: ICommitStore.Interval(1, 2),
           merkleRoot: leaves[0]
         })

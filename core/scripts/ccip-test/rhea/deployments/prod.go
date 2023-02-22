@@ -37,7 +37,7 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 	WrappedNative: rhea.WETH,
 	Router:        gethcommon.HexToAddress("0x428c4dc89b6bf908b82d77c9cbcea786ea8cc7d0"),
 	Afn:           gethcommon.HexToAddress("0x89d17571db7c9540eeb36760e3c749c8fb984569"),
-	FeeManager:    gethcommon.HexToAddress("0x1f0e1ef0928c32fbb36c07054893dca7b1c9cd75"),
+	PriceRegistry: gethcommon.HexToAddress("0x1f0e1ef0928c32fbb36c07054893dca7b1c9cd75"),
 }
 
 var Prod_OptimismGoerli = rhea.EVMChainConfig{
@@ -61,7 +61,7 @@ var Prod_OptimismGoerli = rhea.EVMChainConfig{
 	WrappedNative: rhea.WETH,
 	Router:        gethcommon.HexToAddress("0xf01ebcd92bc2a7c4e58b5c1527d6814f47443232"),
 	Afn:           gethcommon.HexToAddress("0x6d0e94e9f06cafb6031410de7df19fe2f286566c"),
-	FeeManager:    gethcommon.HexToAddress("0x583e761181801f2b43efb1a9489db1a7c78fb60f"),
+	PriceRegistry: gethcommon.HexToAddress("0x583e761181801f2b43efb1a9489db1a7c78fb60f"),
 }
 
 var Prod_AvaxFuji = rhea.EVMChainConfig{
@@ -87,7 +87,7 @@ var Prod_AvaxFuji = rhea.EVMChainConfig{
 	WrappedNative: rhea.WAVAX,
 	Router:        gethcommon.HexToAddress("0x3e4472e98997564378070308fce2a958a66194df"),
 	Afn:           gethcommon.HexToAddress("0x0fa77a2df96f59ab60f440af790ed74eb7d16128"),
-	FeeManager:    gethcommon.HexToAddress("0x45dccaec07a3241a1492e23ea055fb8d501d07e2"),
+	PriceRegistry: gethcommon.HexToAddress("0x45dccaec07a3241a1492e23ea055fb8d501d07e2"),
 }
 
 // Lanes
@@ -101,10 +101,10 @@ var Prod_SepoliaToAvaxFuji = rhea.EvmDeploymentConfig{
 		PingPongDapp: gethcommon.HexToAddress("0x177e068bc512ad99ec73db6feb7c731d9fea0cb3"),
 	},
 	DeploySettings: rhea.DeploySettings{
-		DeployAFN:        false,
-		DeployTokenPools: false,
-		DeployRouter:     false,
-		DeployFeeManager: false,
+		DeployAFN:           false,
+		DeployTokenPools:    false,
+		DeployRouter:        false,
+		DeployPriceRegistry: false,
 
 		DeployCommitStore:    false,
 		DeployRamp:           false,
@@ -124,10 +124,10 @@ var Prod_AvaxFujiToSepolia = rhea.EvmDeploymentConfig{
 		PingPongDapp: gethcommon.HexToAddress("0x2dfe0cf6b49b4f3577c09fb1581ee8e1c9b088aa"),
 	},
 	DeploySettings: rhea.DeploySettings{
-		DeployAFN:        false,
-		DeployTokenPools: false,
-		DeployRouter:     false,
-		DeployFeeManager: false,
+		DeployAFN:           false,
+		DeployTokenPools:    false,
+		DeployRouter:        false,
+		DeployPriceRegistry: false,
 
 		DeployCommitStore:    false,
 		DeployRamp:           false,
@@ -147,10 +147,10 @@ var Prod_SepoliaToOptimismGoerli = rhea.EvmDeploymentConfig{
 		PingPongDapp: gethcommon.HexToAddress("0xd13a553a78c297a4dc3b4f606c289b8dde78933c"),
 	},
 	DeploySettings: rhea.DeploySettings{
-		DeployAFN:        false,
-		DeployTokenPools: false,
-		DeployRouter:     false,
-		DeployFeeManager: false,
+		DeployAFN:           false,
+		DeployTokenPools:    false,
+		DeployRouter:        false,
+		DeployPriceRegistry: false,
 
 		DeployCommitStore:    false,
 		DeployRamp:           false,
@@ -170,10 +170,10 @@ var Prod_OptimismGoerliToSepolia = rhea.EvmDeploymentConfig{
 		PingPongDapp: gethcommon.HexToAddress("0x39dd66df77c65fa0c0c9b56c715c157dac666c7a"),
 	},
 	DeploySettings: rhea.DeploySettings{
-		DeployAFN:        false,
-		DeployTokenPools: false,
-		DeployRouter:     false,
-		DeployFeeManager: false,
+		DeployAFN:           false,
+		DeployTokenPools:    false,
+		DeployRouter:        false,
+		DeployPriceRegistry: false,
 
 		DeployCommitStore:    false,
 		DeployRamp:           false,
@@ -193,10 +193,10 @@ var Prod_OptimismGoerliToAvaxFuji = rhea.EvmDeploymentConfig{
 		PingPongDapp: gethcommon.HexToAddress("0xb5Ba0846a222e8Cc1189480bde801C38F9f392b9"),
 	},
 	DeploySettings: rhea.DeploySettings{
-		DeployAFN:        false,
-		DeployTokenPools: false,
-		DeployRouter:     false,
-		DeployFeeManager: false,
+		DeployAFN:           false,
+		DeployTokenPools:    false,
+		DeployRouter:        false,
+		DeployPriceRegistry: false,
 
 		DeployCommitStore:    false,
 		DeployRamp:           false,
@@ -216,10 +216,10 @@ var Prod_AvaxFujiToOptimismGoerli = rhea.EvmDeploymentConfig{
 		PingPongDapp: gethcommon.HexToAddress("0x9BD470FC8Bea5d3e6985889C442522896b7Db650"),
 	},
 	DeploySettings: rhea.DeploySettings{
-		DeployAFN:        false,
-		DeployTokenPools: false,
-		DeployRouter:     false,
-		DeployFeeManager: false,
+		DeployAFN:           false,
+		DeployTokenPools:    false,
+		DeployRouter:        false,
+		DeployPriceRegistry: false,
 
 		DeployCommitStore:    false,
 		DeployRamp:           false,

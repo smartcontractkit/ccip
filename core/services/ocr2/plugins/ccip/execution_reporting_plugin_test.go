@@ -22,9 +22,9 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp_helper"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/simple_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
@@ -87,13 +87,19 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	require.NoError(t, err)
 	destChain.Commit()
 
-	destFeeManagerAddress, _, _, err := fee_manager.DeployFeeManager(
+	destPricesAddress, _, _, err := price_registry.DeployPriceRegistry(
 		destUser,
-		destChain, []fee_manager.InternalFeeUpdate{{
-			SourceFeeToken:              destLinkTokenAddress,
-			DestChainId:                 sourceChainID,
-			FeeTokenBaseUnitsPerUnitGas: big.NewInt(200e9), // (2e20 juels/eth) * (1 gwei / gas) / (1 eth/1e18)
-		}},
+		destChain,
+		price_registry.InternalPriceUpdates{
+			FeeTokenPriceUpdates: []price_registry.InternalFeeTokenPriceUpdate{
+				{
+					SourceFeeToken: destLinkTokenAddress,
+					UsdPerFeeToken: big.NewInt(8e18), // 8usd
+				},
+			},
+			DestChainId:   destChainID,
+			UsdPerUnitGas: big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
+		},
 		nil,
 		60*60*24*14, // two weeks
 	)
@@ -108,7 +114,7 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 			ChainId:       1338,
 			SourceChainId: 1337,
 			OnRamp:        onRampAddress,
-			FeeManager:    destFeeManagerAddress,
+			PriceRegistry: destPricesAddress,
 		},
 		afnAddress, // AFN address
 	)
