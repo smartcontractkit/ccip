@@ -11,7 +11,6 @@ interface IAggregateRateLimiter {
   error PriceNotFoundForToken(address token);
   error AddressCannotBeZero();
   error BucketOverfilled();
-  error RefillRateTooHigh();
 
   event ConfigChanged(uint256 capacity, uint256 rate);
   event TokensRemovedFromBucket(uint256 tokens);
@@ -26,7 +25,9 @@ interface IAggregateRateLimiter {
 
   struct RateLimiterConfig {
     address admin;
-    uint256 rate;
+    // We only allow a refill rate of uint208 so we don't have to deal with any
+    // overflows for the next ~9 million years. Any sensible rate is way below this value.
+    uint208 rate;
     uint256 capacity;
   }
 

@@ -60,9 +60,6 @@ contract AggregateRateLimiter is IAggregateRateLimiter, OwnerIsCreator {
 
   /// @inheritdoc IAggregateRateLimiter
   function setRateLimiterConfig(RateLimiterConfig memory config) public requireAdminOrOwner {
-    // We only allow a refill rate of uint208 so we don't have to deal with any
-    // overflows for the next ~9 million years. Any sensible rate is way below this value.
-    if (config.rate >= type(uint208).max) revert RefillRateTooHigh();
     // First update the bucket to make sure the proper rate is used for all the time
     // up until the config change.
     _update(s_tokenBucket);

@@ -1,6 +1,6 @@
-EVM2EVMOffRamp_execute:testTwoMessagesWithTokensSuccess_gas() (gas: 338794)
+EVM2EVMOffRamp_execute:testTwoMessagesWithTokensSuccess_gas() (gas: 338712)
 FunctionsOracle_setDONPublicKey:testSetDONPublicKey_gas() (gas: 97531)
 FunctionsOracle_setRegistry:testSetRegistry_gas() (gas: 31982)
 OCR2Base_setOCR2Config:testSetMultipleConfigSuccess_gas() (gas: 154821)
 OCR2Base_transmit:testTransmitSuccess_gas() (gas: 60479)
-Router_ccipSend:testCCIPSendOneTokenSuccess_gas() (gas: 194908)
+Router_ccipSend:testCCIPSendOneTokenSuccess_gas() (gas: 194971)

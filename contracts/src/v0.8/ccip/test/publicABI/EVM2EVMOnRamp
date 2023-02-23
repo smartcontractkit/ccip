@@ -34,7 +34,7 @@
   "setNops((address,uint256)[])": "1abacb7f",
   "setOnRampConfig((uint32,uint16,uint64))": "00bdbb9b",
   "setPrices(address[],uint256[])": "4352fa9f",
-  "setRateLimiterConfig((address,uint256,uint256))": "17332f9b",
+  "setRateLimiterConfig((address,uint208,uint256))": "b3a18a3e",
   "setRouter(address)": "c0d78655",
   "setTokenLimitAdmin(address)": "39aa9264",
   "transferOwnership(address)": "f2fde38b",

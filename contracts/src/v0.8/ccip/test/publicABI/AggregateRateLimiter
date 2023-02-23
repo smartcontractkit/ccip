@@ -5,7 +5,7 @@
   "getTokenLimitAdmin()": "599f6431",
   "owner()": "8da5cb5b",
   "setPrices(address[],uint256[])": "4352fa9f",
-  "setRateLimiterConfig((address,uint256,uint256))": "17332f9b",
+  "setRateLimiterConfig((address,uint208,uint256))": "b3a18a3e",
   "setTokenLimitAdmin(address)": "39aa9264",
   "transferOwnership(address)": "f2fde38b"
 }

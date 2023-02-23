@@ -137,7 +137,7 @@ contract AggregateTokenLimiter_setRateLimiterConfig is AggregateTokenLimiterSetu
     assertEq(s_config.capacity, tokenBucket.capacity);
 
     s_config = IAggregateRateLimiter.RateLimiterConfig({
-      rate: tokenBucket.rate * 2,
+      rate: uint208(tokenBucket.rate * 2),
       capacity: tokenBucket.capacity * 8,
       admin: TOKEN_LIMIT_ADMIN
     });
@@ -160,18 +160,6 @@ contract AggregateTokenLimiter_setRateLimiterConfig is AggregateTokenLimiterSetu
     vm.expectRevert(IAggregateRateLimiter.OnlyCallableByAdminOrOwner.selector);
 
     s_rateLimiter.setRateLimiterConfig(s_config);
-  }
-
-  function testRefillRateTooHighReverts() public {
-    IAggregateRateLimiter.RateLimiterConfig memory config = IAggregateRateLimiter.RateLimiterConfig({
-      rate: 2**208,
-      capacity: 100,
-      admin: TOKEN_LIMIT_ADMIN
-    });
-
-    vm.expectRevert(IAggregateRateLimiter.RefillRateTooHigh.selector);
-
-    s_rateLimiter.setRateLimiterConfig(config);
   }
 }
 

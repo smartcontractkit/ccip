@@ -29,7 +29,7 @@
   "setOCR2Config(address[],address[],uint8,bytes,uint64,bytes)": "1ef38174",
   "setOffRampConfig((uint32,uint64,address,uint32,address,uint16))": "167e3447",
   "setPrices(address[],uint256[])": "4352fa9f",
-  "setRateLimiterConfig((address,uint256,uint256))": "17332f9b",
+  "setRateLimiterConfig((address,uint208,uint256))": "b3a18a3e",
   "setTokenLimitAdmin(address)": "39aa9264",
   "transferOwnership(address)": "f2fde38b",
   "transmit(bytes32[3],bytes,bytes32[],bytes32[],bytes32)": "b1dc65a4",
