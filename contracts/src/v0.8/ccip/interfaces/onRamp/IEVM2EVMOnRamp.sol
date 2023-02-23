@@ -28,6 +28,7 @@ interface IEVM2EVMOnRamp is IEVM2AnyOnRamp, IAllowList {
   error PoolDoesNotExist(IERC20 token);
   error TokenPoolMismatch();
   error TokenOrChainNotSupported(address token, uint64 chain);
+  error NullAddressNotAllowed();
 
   event FeeAdminSet(address feeAdmin);
   event NopPaid(address indexed nop, uint256 amount);
@@ -46,16 +47,16 @@ interface IEVM2EVMOnRamp is IEVM2AnyOnRamp, IAllowList {
 
   /// @dev Struct to hold the fee configuration for a token
   struct FeeTokenConfig {
-    uint96 feeAmount; // ---------┐ Flat fee
-    uint64 multiplier; //         | Price multiplier for gas costs
-    uint32 destGasOverhead; // ---┘ Extra gas charged on top of the gasLimit
+    uint96 feeAmount; // --------┐ Flat fee
+    uint64 multiplier; //        | Price multiplier for gas costs
+    uint32 destGasOverhead; // --┘ Extra gas charged on top of the gasLimit
   }
 
   /// @dev Struct to hold the fee configuration for a token, same as the FeeTokenConfig but with
   /// token included so that an array of these can be passed in to setFeeConfig to set the mapping
   struct FeeTokenConfigArgs {
-    address token; // -------┐ Token address
-    uint64 multiplier; // ---┘ Price multiplier for gas costs
+    address token; // ---------┐ Token address
+    uint64 multiplier; // -----┘ Price multiplier for gas costs
     uint96 feeAmount; // ------┐ Flat fee in feeToken
     uint32 destGasOverhead; //-┘ Extra gas charged on top of the gasLimit
   }

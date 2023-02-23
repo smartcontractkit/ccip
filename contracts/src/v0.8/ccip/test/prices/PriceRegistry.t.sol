@@ -49,6 +49,19 @@ contract PriceRegistrySetup is TokenSetup, RouterSetup {
   }
 }
 
+contract PriceRegistry_constructor is PriceRegistrySetup {
+  function testInvalidStalenessThresholdReverts() public {
+    Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
+      feeTokenPriceUpdates: new Internal.FeeTokenPriceUpdate[](0),
+      destChainId: DEST_CHAIN_ID,
+      usdPerUnitGas: 1e6
+    });
+
+    vm.expectRevert(IPriceRegistry.InvalidStalenessThreshold.selector);
+    s_priceRegistry = new PriceRegistry(priceUpdates, new address[](0), 0);
+  }
+}
+
 contract PriceRegistry_addPriceUpdaters is PriceRegistrySetup {
   function testSuccess() public {
     address[] memory priceUpdaters = new address[](1);

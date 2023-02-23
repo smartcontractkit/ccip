@@ -16,6 +16,8 @@ abstract contract TokenPool is IPool, OwnerIsCreator, Pausable {
   mapping(address => bool) internal s_offRamps;
 
   constructor(IERC20 token) {
+    if (address(token) == address(0)) revert NullAddressNotAllowed();
+
     i_token = token;
   }
 

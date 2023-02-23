@@ -10,6 +10,7 @@ interface IPriceRegistry {
   error OnlyCallableByUpdaterOrOwner();
   error StaleGasPrice(uint64 destChainId, uint256 threshold, uint256 timePassed);
   error StaleTokenPrice(address token, uint256 threshold, uint256 timePassed);
+  error InvalidStalenessThreshold();
 
   event PriceUpdaterSet(address indexed priceUpdater);
   event PriceUpdaterRemoved(address indexed priceUpdater);

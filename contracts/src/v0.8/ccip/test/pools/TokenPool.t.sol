@@ -16,6 +16,15 @@ contract TokenPoolSetup is BaseTest {
   }
 }
 
+contract TokenPool_constructor is TokenPoolSetup {
+  // Reverts
+  function testNullAddressNotAllowedReverts() public {
+    vm.expectRevert(IPool.NullAddressNotAllowed.selector);
+
+    s_tokenPool = new TokenPoolHelper(IERC20(address(0)));
+  }
+}
+
 contract TokenPool_setOnRamp is TokenPoolSetup {
   // Success
   function testSetOnRampTrueSuccess() public {

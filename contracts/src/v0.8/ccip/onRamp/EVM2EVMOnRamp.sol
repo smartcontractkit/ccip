@@ -5,7 +5,6 @@ import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.
 import {IPool} from "../interfaces/pools/IPool.sol";
 import {IAFN} from "../interfaces/health/IAFN.sol";
 import {IEVM2EVMOnRamp} from "../interfaces/onRamp/IEVM2EVMOnRamp.sol";
-import {IRouter} from "../interfaces/router/IRouter.sol";
 import {IPriceRegistry} from "../interfaces/prices/IPriceRegistry.sol";
 import {IEVM2AnyOnRamp} from "../interfaces/onRamp/IEVM2AnyOnRamp.sol";
 import {IAggregateRateLimiter} from "../interfaces/rateLimiter/IAggregateRateLimiter.sol";
@@ -13,7 +12,6 @@ import {IAggregateRateLimiter} from "../interfaces/rateLimiter/IAggregateRateLim
 import {HealthChecker} from "../health/HealthChecker.sol";
 import {AllowList} from "../access/AllowList.sol";
 import {AggregateRateLimiter} from "../rateLimiter/AggregateRateLimiter.sol";
-import {Client} from "../models/Client.sol";
 import {Client} from "../models/Client.sol";
 import {Internal} from "../models/Internal.sol";
 
@@ -94,15 +92,17 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AllowList, AggregateRat
     address linkToken,
     NopAndWeight[] memory nopsAndWeights
   ) HealthChecker(afn) AllowList(allowlist) AggregateRateLimiter(rateLimiterConfig) {
+    if (router == address(0) || priceRegistry == address(0) || linkToken == address(0)) revert NullAddressNotAllowed();
+
     i_metadataHash = keccak256(
       abi.encode(Internal.EVM_2_EVM_MESSAGE_HASH, chainIds.chainId, chainIds.destChainId, address(this))
     );
     i_linkToken = linkToken;
     i_chainId = chainIds.chainId;
     i_destChainId = chainIds.destChainId;
-    s_priceRegistry = priceRegistry;
     s_config = config;
     s_router = router;
+    s_priceRegistry = priceRegistry;
     s_sequenceNumber = 0;
     _setFeeConfig(feeTokenConfigs);
     _setNops(nopsAndWeights);

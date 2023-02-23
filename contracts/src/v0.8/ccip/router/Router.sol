@@ -2,7 +2,6 @@
 pragma solidity 0.8.15;
 
 import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
-import {IPool} from "../interfaces/pools/IPool.sol";
 import {IRouterClient} from "../interfaces/router/IRouterClient.sol";
 import {IEVM2AnyOnRamp} from "../interfaces/onRamp/IEVM2AnyOnRamp.sol";
 import {IRouter} from "../interfaces/router/IRouter.sol";
@@ -11,7 +10,6 @@ import {IAny2EVMMessageReceiver} from "../interfaces/router/IAny2EVMMessageRecei
 
 import {Client} from "../models/Client.sol";
 import {Internal} from "../models/Internal.sol";
-import {Client} from "../models/Client.sol";
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
 
 import {SafeERC20} from "../../vendor/SafeERC20.sol";
@@ -26,6 +24,7 @@ contract Router is IRouter, TypeAndVersionInterface, OwnerIsCreator {
 
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "Router 1.0.0";
+
   uint64 private constant GAS_FOR_CALL_EXACT_CHECK = 5_000;
 
   // DYNAMIC CONFIG
@@ -35,6 +34,7 @@ contract Router is IRouter, TypeAndVersionInterface, OwnerIsCreator {
   mapping(uint256 => address) private s_onRamps;
   // Can be multiple offRamps enabled at a time for a given sourceChainId.
   mapping(uint256 => address[]) private s_offRamps;
+  // Mapping of offRamps to source chain ids
   mapping(address => uint256) private s_offRampSourceChainIds;
 
   constructor(address wrappedNative) {

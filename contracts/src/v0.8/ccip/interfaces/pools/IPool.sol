@@ -8,6 +8,7 @@ import {IERC20} from "../../../vendor/IERC20.sol";
 interface IPool {
   error ExceedsTokenLimit(uint256 currentLimit, uint256 requested);
   error PermissionsError();
+  error NullAddressNotAllowed();
 
   event Locked(address indexed sender, uint256 amount);
   event Burned(address indexed sender, uint256 amount);

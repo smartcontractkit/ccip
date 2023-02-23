@@ -9,7 +9,6 @@ import {IEVM2EVMOffRamp} from "../interfaces/offRamp/IEVM2EVMOffRamp.sol";
 import {IRouter} from "../interfaces/router/IRouter.sol";
 import {IAny2EVMMessageReceiver} from "../interfaces/router/IAny2EVMMessageReceiver.sol";
 
-import {Internal} from "../models/Internal.sol";
 import {Client} from "../models/Client.sol";
 import {Internal} from "../models/Internal.sol";
 import {OCR2Base} from "../ocr/OCR2Base.sol";

@@ -38,6 +38,8 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
   ) {
     _updatePrices(priceUpdates);
     _addPriceUpdaters(priceUpdaters);
+    if (stalenessThreshold == 0) revert InvalidStalenessThreshold();
+
     i_stalenessThreshold = stalenessThreshold;
   }
 
