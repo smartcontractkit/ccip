@@ -549,7 +549,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	)
 	require.NoError(t, err)
 
-	sourceFeeManger, err := price_registry.NewPriceRegistry(sourcePricesAddress, sourceChain)
+	srcPriceRegistry, err := price_registry.NewPriceRegistry(sourcePricesAddress, sourceChain)
 	require.NoError(t, err)
 
 	onRampAddress, _, _, err := evm_2_evm_onramp.DeployEVM2EVMOnRamp(
@@ -722,7 +722,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			CustomPool:    nil,
 			CustomToken:   sourceCustomToken,
 			AFN:           sourceAFN,
-			PriceRegistry: sourceFeeManger,
+			PriceRegistry: srcPriceRegistry,
 		},
 		Router: sourceRouter,
 		OnRamp: onRamp,

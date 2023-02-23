@@ -220,7 +220,7 @@ func (c *CCIPE2ELoad) Call(msgType interface{}) client.CallResult {
 	startTime := time.Now()
 	// initiate the transfer
 	log.Debug().Int("msg Number", int(msgSerialNo)).Str("triggeredAt", time.Now().GoString()).Msg("triggering transfer")
-	sendTx, err := sourceCCIP.Common.Router.CCIPSend(destCCIP.Common.ChainClient.GetChainID().Uint64(), c.msg)
+	sendTx, err := sourceCCIP.Common.Router.CCIPSend(destCCIP.Common.ChainClient.GetChainID().Uint64(), c.msg, nil)
 
 	if err != nil {
 		c.updatestats(msgSerialNo, "", TX, time.Since(startTime), fail)

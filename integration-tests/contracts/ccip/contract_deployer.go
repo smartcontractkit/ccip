@@ -19,15 +19,15 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/weth9"
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/mock_afn_contract"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/simple_message_receiver"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/weth9"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
@@ -166,6 +166,24 @@ func (e *CCIPContractsDeployer) NewAFNContract(addr common.Address) (*AFN, error
 	}, err
 }
 
+func (e *CCIPContractsDeployer) NewCommitStore(addr common.Address) (
+	*CommitStore,
+	error,
+) {
+	ins, err := commit_store.NewCommitStore(addr, e.evmClient.Backend())
+	log.Info().
+		Str("Contract Address", addr.Hex()).
+		Str("Contract Name", "CommitStore").
+		Str("From", e.evmClient.GetDefaultWallet().Address()).
+		Str("Network Name", e.evmClient.GetNetworkConfig().Name).
+		Msg("New contract")
+	return &CommitStore{
+		client:     e.evmClient,
+		instance:   ins,
+		EthAddress: addr,
+	}, err
+}
+
 func (e *CCIPContractsDeployer) DeployCommitStore(sourceChainId, destChainId uint64, afn, onRamp, priceRegistry common.Address) (*CommitStore, error) {
 	address, _, instance, err := e.evmClient.DeployContract("CommitStore Contract", func(
 		auth *bind.TransactOpts,
@@ -213,7 +231,7 @@ func (e *CCIPContractsDeployer) DeploySimpleMessageReceiver() (
 	}, err
 }
 
-func (e *CCIPContractsDeployer) DeployReceiverDapp(toRevert bool) (
+func (e *CCIPContractsDeployer) DeployReceiverDapp(router common.Address) (
 	*ReceiverDapp,
 	error,
 ) {
@@ -221,7 +239,7 @@ func (e *CCIPContractsDeployer) DeployReceiverDapp(toRevert bool) (
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return maybe_revert_message_receiver.DeployMaybeRevertMessageReceiver(auth, backend, toRevert)
+		return maybe_revert_message_receiver.DeployMaybeRevertMessageReceiver(auth, backend, false)
 	})
 	if err != nil {
 		return nil, err
@@ -230,6 +248,24 @@ func (e *CCIPContractsDeployer) DeployReceiverDapp(toRevert bool) (
 		client:     e.evmClient,
 		instance:   instance.(*maybe_revert_message_receiver.MaybeRevertMessageReceiver),
 		EthAddress: *address,
+	}, err
+}
+
+func (e *CCIPContractsDeployer) NewReceiverDapp(addr common.Address) (
+	*ReceiverDapp,
+	error,
+) {
+	ins, err := maybe_revert_message_receiver.NewMaybeRevertMessageReceiver(addr, e.evmClient.Backend())
+	log.Info().
+		Str("Contract Address", addr.Hex()).
+		Str("Contract Name", "ReceiverDapp").
+		Str("From", e.evmClient.GetDefaultWallet().Address()).
+		Str("Network Name", e.evmClient.GetNetworkConfig().Name).
+		Msg("New contract")
+	return &ReceiverDapp{
+		client:     e.evmClient,
+		instance:   ins,
+		EthAddress: addr,
 	}, err
 }
 
@@ -274,6 +310,24 @@ func (e *CCIPContractsDeployer) NewRouter(addr common.Address) (
 	}, err
 }
 
+func (e *CCIPContractsDeployer) NewPriceRegistry(addr common.Address) (
+	*PriceRegistry,
+	error,
+) {
+	ins, err := price_registry.NewPriceRegistry(addr, e.evmClient.Backend())
+	log.Info().
+		Str("Contract Address", addr.Hex()).
+		Str("Contract Name", "PriceRegistry").
+		Str("From", e.evmClient.GetDefaultWallet().Address()).
+		Str("Network Name", e.evmClient.GetNetworkConfig().Name).
+		Msg("New contract")
+	return &PriceRegistry{
+		client:     e.evmClient,
+		instance:   ins,
+		EthAddress: addr,
+	}, err
+}
+
 func (e *CCIPContractsDeployer) DeployPriceRegistry(
 	feeUpdates price_registry.InternalPriceUpdates,
 ) (
@@ -293,6 +347,24 @@ func (e *CCIPContractsDeployer) DeployPriceRegistry(
 		client:     e.evmClient,
 		instance:   instance.(*price_registry.PriceRegistry),
 		EthAddress: *address,
+	}, err
+}
+
+func (e *CCIPContractsDeployer) NewOnRamp(addr common.Address) (
+	*OnRamp,
+	error,
+) {
+	ins, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(addr, e.evmClient.Backend())
+	log.Info().
+		Str("Contract Address", addr.Hex()).
+		Str("Contract Name", "OnRamp").
+		Str("From", e.evmClient.GetDefaultWallet().Address()).
+		Str("Network Name", e.evmClient.GetNetworkConfig().Name).
+		Msg("New contract")
+	return &OnRamp{
+		client:     e.evmClient,
+		instance:   ins,
+		EthAddress: addr,
 	}, err
 }
 
@@ -345,6 +417,24 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 		client:     e.evmClient,
 		instance:   instance.(*evm_2_evm_onramp.EVM2EVMOnRamp),
 		EthAddress: *address,
+	}, err
+}
+
+func (e *CCIPContractsDeployer) NewOffRamp(addr common.Address) (
+	*OffRamp,
+	error,
+) {
+	ins, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(addr, e.evmClient.Backend())
+	log.Info().
+		Str("Contract Address", addr.Hex()).
+		Str("Contract Name", "OffRamp").
+		Str("From", e.evmClient.GetDefaultWallet().Address()).
+		Str("Network Name", e.evmClient.GetNetworkConfig().Name).
+		Msg("New contract")
+	return &OffRamp{
+		client:     e.evmClient,
+		instance:   ins,
+		EthAddress: addr,
 	}, err
 }
 

@@ -298,6 +298,7 @@ func (c *PriceRegistry) UpdatePrices(priceUpdates price_registry.InternalPriceUp
 	}
 	log.Info().
 		Str("Network Name", c.client.GetNetworkConfig().Name).
+		Interface("PriceUpdates", priceUpdates).
 		Msg("Prices updated")
 	return c.client.ProcessTransaction(tx)
 }
@@ -341,8 +342,11 @@ func (r *Router) SetOnRamp(chainID uint64, onRamp common.Address) error {
 	return r.client.ProcessTransaction(tx)
 }
 
-func (r *Router) CCIPSend(destChainId uint64, msg router.ClientEVM2AnyMessage) (*types.Transaction, error) {
+func (r *Router) CCIPSend(destChainId uint64, msg router.ClientEVM2AnyMessage, valueForNative *big.Int) (*types.Transaction, error) {
 	opts, err := r.client.TransactionOpts(r.client.GetDefaultWallet())
+	if valueForNative != nil {
+		opts.Value = valueForNative
+	}
 	if err != nil {
 		return nil, err
 	}

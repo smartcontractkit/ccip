@@ -339,15 +339,13 @@ func (client *CCIPClient) ChangeGovernanceParameters(t *testing.T) {
 	tx, err := client.Source.GovernanceDapp.VoteForNewFeeConfig(client.Source.Owner, feeConfig)
 	require.NoError(t, err)
 	sendRequest := WaitForCrossChainSendRequest(client.Source, sourceBlockNum, tx.Hash())
-	client.WaitForCommit(t, DestBlockNum)
-	client.WaitForExecution(t, DestBlockNum, sendRequest.Message.SequenceNumber)
+	require.NoError(t, client.WaitForCommit(DestBlockNum), "waiting for commit")
+	require.NoError(t, client.WaitForExecution(DestBlockNum, sendRequest.Message.SequenceNumber), "waiting for execution")
 }
 
-func (client *CCIPClient) SendMessage(t *testing.T) {
-	DestBlockNum := GetCurrentBlockNumber(client.Dest.Client.Client)
-
+func (client *CCIPClient) SendMessage(t *testing.T, data string) common.Hash {
 	// ABI encoded message
-	bts, err := hex.DecodeString("00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000005626c616e6b000000000000000000000000000000000000000000000000000000")
+	bts, err := hex.DecodeString(data)
 	require.NoError(t, err)
 
 	token := router.ClientEVMTokenAmount{
@@ -368,7 +366,7 @@ func (client *CCIPClient) SendMessage(t *testing.T) {
 	tx, err := client.Source.Router.CcipSend(client.Source.Owner, client.Dest.ChainId, msg)
 	require.NoError(t, err)
 	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
-	client.WaitForCommit(t, DestBlockNum)
+	return tx.Hash()
 }
 
 func (client *CCIPClient) DonExecutionHappyPath(t *testing.T) {
@@ -381,11 +379,11 @@ func (client *CCIPClient) DonExecutionHappyPath(t *testing.T) {
 	crossChainRequest := client.SendToOnrampWithExecution(t, client.Source, client.Source.Owner, client.Dest.ReceiverDapp.Address(), tokenAmount)
 	client.Source.logger.Infof("Don executed tx submitted with sequence number: %d", crossChainRequest.Message.SequenceNumber)
 
-	client.WaitForCommit(t, DestBlockNum)
-	client.WaitForExecution(t, DestBlockNum, crossChainRequest.Message.SequenceNumber)
+	require.NoError(t, client.WaitForCommit(DestBlockNum), "waiting for commit")
+	require.NoError(t, client.WaitForExecution(DestBlockNum, crossChainRequest.Message.SequenceNumber), "waiting for execution")
 }
 
-func (client *CCIPClient) WaitForCommit(t *testing.T, DestBlockNum uint64) {
+func (client *CCIPClient) WaitForCommit(DestBlockNum uint64) error {
 	client.Dest.logger.Infof("Waiting for commit")
 
 	commitEvent := make(chan *commit_store.CommitStoreReportAccepted)
@@ -396,19 +394,21 @@ func (client *CCIPClient) WaitForCommit(t *testing.T, DestBlockNum uint64) {
 		},
 		commitEvent,
 	)
-	require.NoError(t, err)
+	if err != nil {
+		return err
+	}
 	defer sub.Unsubscribe()
 
 	select {
 	case event := <-commitEvent:
 		client.Dest.logger.Infof("Commit in tx %s", helpers.ExplorerLink(int64(client.Dest.ChainId), event.Raw.TxHash))
-		return
+		return nil
 	case err = <-sub.Err():
-		panic(err)
+		return err
 	}
 }
 
-func (client *CCIPClient) WaitForExecution(t *testing.T, DestBlockNum uint64, sequenceNumber uint64) {
+func (client *CCIPClient) WaitForExecution(DestBlockNum uint64, sequenceNumber uint64) error {
 	client.Dest.logger.Infof("Waiting for execution...")
 
 	events := make(chan *evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged)
@@ -420,15 +420,17 @@ func (client *CCIPClient) WaitForExecution(t *testing.T, DestBlockNum uint64, se
 		events,
 		[]uint64{sequenceNumber},
 		[][32]byte{})
-	require.NoError(t, err)
+	if err != nil {
+		return err
+	}
 	defer sub.Unsubscribe()
 
 	select {
 	case event := <-events:
 		client.Dest.logger.Infof("Execution in tx %s", helpers.ExplorerLink(int64(client.Dest.ChainId), event.Raw.TxHash))
-		return
+		return nil
 	case err = <-sub.Err():
-		panic(err)
+		return err
 	}
 }
 
@@ -565,8 +567,8 @@ func (client *CCIPClient) ScalingAndBatching(t *testing.T) {
 		}(user)
 	}
 	wg.Wait()
-	client.WaitForCommit(t, DestBlockNum)
-	client.WaitForExecution(t, DestBlockNum, seqNum)
+	require.NoError(t, client.WaitForCommit(DestBlockNum), "waiting for commit")
+	require.NoError(t, client.WaitForExecution(DestBlockNum, seqNum), "waiting for execution")
 	client.Source.logger.Info("Sent 10 txs to onramp.")
 }
 
