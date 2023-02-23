@@ -67,17 +67,17 @@ abstract contract TokenPool is IPool, OwnerIsCreator, Pausable {
     return i_token;
   }
 
-  /// @notice Checks whether the msg.sender is either the owner, or a permissioned onRamp on this contract
+  /// @notice Checks whether the msg.sender is a permissioned onRamp on this contract
   /// @dev Reverts with a PermissionsError if check fails
-  modifier validateOwnerOrOnRamp() {
-    if (msg.sender != owner() && !isOnRamp(address(msg.sender))) revert PermissionsError();
+  modifier onlyOnRamp() {
+    if (!isOnRamp(msg.sender)) revert PermissionsError();
     _;
   }
 
-  /// @notice Checks whether the msg.sender is either the owner, or a permissioned offRamp on this contract
+  /// @notice Checks whether the msg.sender is a permissioned offRamp on this contract
   /// @dev Reverts with a PermissionsError if check fails
-  modifier validateOwnerOrOffRamp() {
-    if (msg.sender != owner() && !isOffRamp(address(msg.sender))) revert PermissionsError();
+  modifier onlyOffRamp() {
+    if (!isOffRamp(msg.sender)) revert PermissionsError();
     _;
   }
 }

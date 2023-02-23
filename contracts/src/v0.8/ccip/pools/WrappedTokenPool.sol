@@ -13,7 +13,7 @@ contract WrappedTokenPool is TokenPool, ERC20 {
 
   /// @notice Burn the token in the pool
   /// @param amount Amount to burn
-  function lockOrBurn(uint256 amount, address) external override whenNotPaused validateOwnerOrOnRamp {
+  function lockOrBurn(uint256 amount, address) external override whenNotPaused onlyOnRamp {
     _burn(address(this), amount);
     emit Burned(msg.sender, amount);
   }
@@ -21,7 +21,7 @@ contract WrappedTokenPool is TokenPool, ERC20 {
   /// @notice Mint tokens from the pool to the recipient
   /// @param recipient Recipient address
   /// @param amount Amount to mint
-  function releaseOrMint(address recipient, uint256 amount) external override whenNotPaused validateOwnerOrOffRamp {
+  function releaseOrMint(address recipient, uint256 amount) external override whenNotPaused onlyOffRamp {
     _mint(recipient, amount);
     emit Minted(msg.sender, recipient, amount);
   }
