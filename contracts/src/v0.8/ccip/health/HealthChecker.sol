@@ -22,6 +22,7 @@ contract HealthChecker is Pausable, OwnerIsCreator {
   constructor(IAFN afn) {
     if (address(afn) == address(0)) revert BadHealthConfig();
     s_afn = afn;
+    emit AFNSet(IAFN(address(0)), afn);
   }
 
   /**

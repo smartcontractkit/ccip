@@ -15,9 +15,14 @@ contract HealthCheckerSetup is BaseTest {
 }
 
 contract HealthChecker_constructor is HealthCheckerSetup {
+  event AFNSet(IAFN oldAFN, IAFN newAFN);
+
   // Success
 
   function testConfigSuccess() public {
+    vm.expectEmit(false, false, false, true);
+    emit AFNSet(IAFN(address(0)), s_healthChecker.getAFN());
+    s_healthChecker = new HealthCheckerHelper(s_afn);
     assertEq(address(s_healthChecker.getAFN()), address(s_afn));
   }
 
