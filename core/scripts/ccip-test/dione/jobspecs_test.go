@@ -11,8 +11,6 @@ import (
 )
 
 func TestGetTokensPerFeeCoinPipeline(t *testing.T) {
-	t.Skip()
-	// TODO: fix map ordering bug
 	link := common.HexToAddress("0x514910771af9ca656af840dff83e8264ecf986ca")
 	weth := common.HexToAddress("0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2")
 	var tt = []struct {
@@ -27,10 +25,10 @@ func TestGetTokensPerFeeCoinPipeline(t *testing.T) {
 		},
 		{
 			map[rhea.Token]rhea.EVMBridgedToken{
-				rhea.WETH: {Token: weth},
 				rhea.LINK: {Token: link},
+				rhea.WETH: {Token: weth},
 			},
-			fmt.Sprintf(`merge [type=merge left="{}" right="{\\\"%s\\\":\\\"1000000000000000000\\\",\\\"%s\\\":\\\"1000000000000000000\\\"}"];`, weth.Hex(), link.Hex()),
+			fmt.Sprintf(`merge [type=merge left="{}" right="{\\\"%s\\\":\\\"1000000000000000000\\\",\\\"%s\\\":\\\"1000000000000000000\\\"}"];`, link.Hex(), weth.Hex()),
 		},
 	}
 

@@ -2,6 +2,7 @@ package dione
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
@@ -30,8 +31,15 @@ func NewCCIPJobSpecParams(sourceClient rhea.EvmDeploymentConfig, destClient rhea
 }
 
 func GetTokensPerFeeCoinPipeline(supportedTokens map[rhea.Token]rhea.EVMBridgedToken) string {
+	var sortedTokensNames []string
+	for tokenName := range supportedTokens {
+		sortedTokensNames = append(sortedTokensNames, string(tokenName))
+	}
+	sort.Strings(sortedTokensNames)
+
 	tokensPerFeeCoinPipeline := "merge [type=merge left=\"{}\" right=\"{"
-	for _, token := range supportedTokens {
+	for _, tokenName := range sortedTokensNames {
+		token := supportedTokens[rhea.Token(tokenName)]
 		tokensPerFeeCoinPipeline += fmt.Sprintf(`\\\"%s\\\":\\\"1000000000000000000\\\",`, token.Token.Hex())
 	}
 	tokensPerFeeCoinPipeline = strings.TrimSuffix(tokensPerFeeCoinPipeline, ",")
