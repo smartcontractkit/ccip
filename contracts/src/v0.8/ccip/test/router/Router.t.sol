@@ -29,20 +29,19 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
 
   // Success
 
-  function testCCIPSendOneTokenSuccess_gas() public {
+  function testCCIPSendLinkFeeOneTokenSuccess_gas() public {
     vm.pauseGasMetering();
-    address sourceToken1Address = s_sourceTokens[1];
-    IERC20 sourceToken1 = IERC20(sourceToken1Address);
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 
+    IERC20 sourceToken1 = IERC20(s_sourceTokens[1]);
     sourceToken1.approve(address(s_sourceRouter), 2**64);
 
     message.tokenAmounts = new Client.EVMTokenAmount[](1);
     message.tokenAmounts[0].amount = 2**64;
-    message.tokenAmounts[0].token = sourceToken1Address;
-    message.feeToken = s_sourceTokens[0];
+    message.tokenAmounts[0].token = s_sourceTokens[1];
 
     uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_ID, message);
+    assertGt(expectedFee, 0);
 
     uint256 balanceBefore = sourceToken1.balanceOf(OWNER);
 
@@ -63,6 +62,92 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     // Assert the user balance is lowered by the tokenAmounts sent and the fee amount
     uint256 expectedBalance = balanceBefore - (message.tokenAmounts[0].amount);
     assertEq(expectedBalance, sourceToken1.balanceOf(OWNER));
+    vm.resumeGasMetering();
+  }
+
+  function testCCIPSendLinkFeeNoTokenSuccess_gas() public {
+    vm.pauseGasMetering();
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+
+    uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_ID, message);
+    assertGt(expectedFee, 0);
+
+    Internal.EVM2EVMMessage memory msgEvent = _messageToEvent(message, 1, 1, expectedFee);
+
+    vm.expectEmit(false, false, false, true);
+    emit CCIPSendRequested(msgEvent);
+
+    vm.resumeGasMetering();
+    bytes32 messageId = s_sourceRouter.ccipSend(DEST_CHAIN_ID, message);
+    vm.pauseGasMetering();
+
+    assertEq(msgEvent.messageId, messageId);
+    vm.resumeGasMetering();
+  }
+
+  function testCCIPSendNativeFeeOneTokenSuccess_gas() public {
+    vm.pauseGasMetering();
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+
+    IERC20 sourceToken1 = IERC20(s_sourceTokens[1]);
+    sourceToken1.approve(address(s_sourceRouter), 2**64);
+
+    message.tokenAmounts = new Client.EVMTokenAmount[](1);
+    message.tokenAmounts[0].amount = 2**64;
+    message.tokenAmounts[0].token = s_sourceTokens[1];
+    uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_ID, message);
+    assertGt(expectedFee, 0);
+
+    uint256 balanceBefore = sourceToken1.balanceOf(OWNER);
+
+    // Assert that the tokens are burned
+    vm.expectEmit(false, false, false, true);
+    emit Burned(address(s_onRamp), message.tokenAmounts[0].amount);
+
+    // Native fees will be wrapped so we need to calculate the event with
+    // the wrapped native feeCoin address.
+    message.feeToken = s_sourceRouter.getWrappedNative();
+    Internal.EVM2EVMMessage memory msgEvent = _messageToEvent(message, 1, 1, expectedFee);
+    // Set it to address(0) to indicate native
+    message.feeToken = address(0);
+
+    vm.expectEmit(false, false, false, true);
+    emit CCIPSendRequested(msgEvent);
+
+    vm.resumeGasMetering();
+    bytes32 messageId = s_sourceRouter.ccipSend{value: expectedFee}(DEST_CHAIN_ID, message);
+    vm.pauseGasMetering();
+
+    assertEq(msgEvent.messageId, messageId);
+    // Assert the user balance is lowered by the tokenAmounts sent and the fee amount
+    uint256 expectedBalance = balanceBefore - (message.tokenAmounts[0].amount);
+    assertEq(expectedBalance, sourceToken1.balanceOf(OWNER));
+    vm.resumeGasMetering();
+  }
+
+  function testCCIPSendNativeFeeNoTokenSuccess_gas() public {
+    vm.pauseGasMetering();
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+
+    uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_ID, message);
+    assertGt(expectedFee, 0);
+
+    // Native fees will be wrapped so we need to calculate the event with
+    // the wrapped native feeCoin address.
+    message.feeToken = s_sourceRouter.getWrappedNative();
+    Internal.EVM2EVMMessage memory msgEvent = _messageToEvent(message, 1, 1, expectedFee);
+    // Set it to address(0) to indicate native
+    message.feeToken = address(0);
+
+    vm.expectEmit(false, false, false, true);
+    emit CCIPSendRequested(msgEvent);
+
+    vm.resumeGasMetering();
+    bytes32 messageId = s_sourceRouter.ccipSend{value: expectedFee}(DEST_CHAIN_ID, message);
+    vm.pauseGasMetering();
+
+    assertEq(msgEvent.messageId, messageId);
+    // Assert the user balance is lowered by the tokenAmounts sent and the fee amount
     vm.resumeGasMetering();
   }
 

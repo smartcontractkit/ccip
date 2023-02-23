@@ -220,6 +220,23 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     s_offRamp.execute(_generateReportFromMessages(messages), false);
   }
 
+  function testSingleMessagesNoTokensSuccess_gas() public {
+    vm.pauseGasMetering();
+    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
+
+    vm.expectEmit(false, false, false, true);
+    emit ExecutionStateChanged(
+      messages[0].sequenceNumber,
+      messages[0].messageId,
+      Internal.MessageExecutionState.SUCCESS
+    );
+
+    Internal.ExecutionReport memory report = _generateReportFromMessages(messages);
+
+    vm.resumeGasMetering();
+    s_offRamp.execute(report, false);
+  }
+
   function testTwoMessagesWithTokensSuccess_gas() public {
     vm.pauseGasMetering();
     Internal.EVM2EVMMessage[] memory messages = _generateMessagesWithTokens();
@@ -240,8 +257,10 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
       Internal.MessageExecutionState.SUCCESS
     );
 
+    Internal.ExecutionReport memory report = _generateReportFromMessages(messages);
+
     vm.resumeGasMetering();
-    s_offRamp.execute(_generateReportFromMessages(messages), false);
+    s_offRamp.execute(report, false);
   }
 
   function testTwoMessagesWithTokensAndGESuccess() public {

@@ -34,7 +34,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
 
     IEVM2EVMOnRamp.FeeTokenConfigArgs[] memory feeTokenConfigArgs = new IEVM2EVMOnRamp.FeeTokenConfigArgs[](2);
     feeTokenConfigArgs[0] = IEVM2EVMOnRamp.FeeTokenConfigArgs({
-      token: s_sourceTokens[0],
+      token: s_sourceFeeToken,
       feeAmount: 1,
       multiplier: 108e16,
       destGasOverhead: 1

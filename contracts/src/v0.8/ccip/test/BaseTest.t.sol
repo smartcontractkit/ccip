@@ -11,6 +11,7 @@ contract BaseTest is Test, StructFactory {
   function setUp() public virtual {
     // Set the sender to OWNER permanently
     changePrank(OWNER);
+    deal(OWNER, 1e20);
 
     // Set the block time to a constant known value
     vm.warp(BLOCK_TIME);

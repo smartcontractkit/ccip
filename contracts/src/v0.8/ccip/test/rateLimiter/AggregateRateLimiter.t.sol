@@ -278,7 +278,8 @@ contract AggregateTokenLimiter__removeTokens is AggregateTokenLimiterSetup {
   event TokensRemovedFromBucket(uint256 tokens);
 
   // Success
-  function testSuccess() public {
+  function testRemoveTokensSuccess_gas() public {
+    vm.pauseGasMetering();
     // 15 (tokens) * 4 (price) * 2 (number of times) > 100 (capacity)
     uint256 numberOfTokens = 15;
     uint256 value = numberOfTokens * TOKEN_PRICE;
@@ -290,8 +291,9 @@ contract AggregateTokenLimiter__removeTokens is AggregateTokenLimiterSetup {
     vm.expectEmit(false, false, false, true);
     emit TokensRemovedFromBucket(value);
 
-    // Remove the value from the pool
+    vm.resumeGasMetering();
     s_rateLimiter.removeTokens(tokenAmounts);
+    vm.pauseGasMetering();
 
     // Get the updated bucket status
     IAggregateRateLimiter.TokenBucket memory bucket = s_rateLimiter.calculateCurrentTokenBucketState();
@@ -311,6 +313,7 @@ contract AggregateTokenLimiter__removeTokens is AggregateTokenLimiterSetup {
     s_rateLimiter.removeTokens(tokenAmounts);
     bucket = s_rateLimiter.calculateCurrentTokenBucketState();
     assertEq(bucket.capacity - value + waitTime * s_config.rate - value, bucket.tokens);
+    vm.resumeGasMetering();
   }
 
   // Reverts

@@ -27,7 +27,8 @@ contract AFN_voteToBlessRoots is AFNSetup {
 
   // Success
 
-  function test1RootSuccess() public {
+  function test1RootSuccess_gas() public {
+    vm.pauseGasMetering();
     (address[] memory participants, uint256[] memory weights, , ) = afnConstructorArgs();
 
     vm.expectEmit(true, true, false, true);
@@ -37,24 +38,19 @@ contract AFN_voteToBlessRoots is AFNSetup {
     roots[0] = ROOT_1;
 
     changePrank(participants[0]);
+
+    vm.resumeGasMetering();
     s_afn.voteToBlessRoots(roots);
+    vm.pauseGasMetering();
 
     assertFalse(s_afn.isBlessed(ROOT_1));
     assertEq(weights[0], s_afn.getVotesToBlessRoot(ROOT_1));
     assertTrue(s_afn.hasVotedToBlessRoot(participants[0], ROOT_1));
+    vm.resumeGasMetering();
   }
 
-  function test1RootSuccessGas() public {
-    (address[] memory participants, , , ) = afnConstructorArgs();
-
-    bytes32[] memory roots = new bytes32[](1);
-    roots[0] = ROOT_1;
-
-    changePrank(participants[0]);
-    s_afn.voteToBlessRoots(roots);
-  }
-
-  function test3RootSuccess() public {
+  function test3RootSuccess_gas() public {
+    vm.pauseGasMetering();
     (address[] memory participants, uint256[] memory weights, , ) = afnConstructorArgs();
 
     vm.expectEmit(true, true, false, true);
@@ -70,7 +66,9 @@ contract AFN_voteToBlessRoots is AFNSetup {
     roots[2] = ROOT_3;
 
     changePrank(participants[0]);
+    vm.resumeGasMetering();
     s_afn.voteToBlessRoots(roots);
+    vm.pauseGasMetering();
 
     assertFalse(s_afn.isBlessed(ROOT_1));
     assertFalse(s_afn.isBlessed(ROOT_2));
@@ -81,21 +79,11 @@ contract AFN_voteToBlessRoots is AFNSetup {
     assertTrue(s_afn.hasVotedToBlessRoot(participants[0], ROOT_1));
     assertTrue(s_afn.hasVotedToBlessRoot(participants[0], ROOT_2));
     assertTrue(s_afn.hasVotedToBlessRoot(participants[0], ROOT_3));
+    vm.resumeGasMetering();
   }
 
-  function test3RootSuccessGas() public {
-    (address[] memory participants, , , ) = afnConstructorArgs();
-
-    bytes32[] memory roots = new bytes32[](3);
-    roots[0] = ROOT_1;
-    roots[1] = ROOT_2;
-    roots[2] = ROOT_3;
-
-    changePrank(participants[0]);
-    s_afn.voteToBlessRoots(roots);
-  }
-
-  function test5RootSuccess() public {
+  function test5RootSuccess_gas() public {
+    vm.pauseGasMetering();
     (address[] memory participants, uint256[] memory weights, , ) = afnConstructorArgs();
 
     vm.expectEmit(true, true, false, true);
@@ -117,7 +105,9 @@ contract AFN_voteToBlessRoots is AFNSetup {
     roots[4] = ROOT_5;
 
     changePrank(participants[0]);
+    vm.resumeGasMetering();
     s_afn.voteToBlessRoots(roots);
+    vm.pauseGasMetering();
 
     assertFalse(s_afn.isBlessed(ROOT_1));
     assertFalse(s_afn.isBlessed(ROOT_2));
@@ -134,20 +124,7 @@ contract AFN_voteToBlessRoots is AFNSetup {
     assertTrue(s_afn.hasVotedToBlessRoot(participants[0], ROOT_3));
     assertTrue(s_afn.hasVotedToBlessRoot(participants[0], ROOT_4));
     assertTrue(s_afn.hasVotedToBlessRoot(participants[0], ROOT_5));
-  }
-
-  function test5RootSuccessGas() public {
-    (address[] memory participants, , , ) = afnConstructorArgs();
-
-    bytes32[] memory roots = new bytes32[](5);
-    roots[0] = ROOT_1;
-    roots[1] = ROOT_2;
-    roots[2] = ROOT_3;
-    roots[3] = ROOT_4;
-    roots[4] = ROOT_5;
-
-    changePrank(participants[0]);
-    s_afn.voteToBlessRoots(roots);
+    vm.resumeGasMetering();
   }
 
   function testIsAlreadyBlessedIgnoredSuccess() public {
@@ -213,24 +190,25 @@ contract AFN_voteBad is AFNSetup {
 
   // Success
 
-  function testSuccess() public {
+  function testVoteBadSuccess_gas() public {
+    vm.pauseGasMetering();
     (address[] memory participants, uint256[] memory weights, , ) = afnConstructorArgs();
     address voter = participants[0];
     uint256 weight = weights[0];
     changePrank(voter);
     vm.expectEmit(true, false, false, true);
     emit VoteBad(voter, weight);
+
+    vm.resumeGasMetering();
     s_afn.voteBad();
+    vm.pauseGasMetering();
+
     assertTrue(s_afn.hasVotedBad(voter));
     (address[] memory voters, uint256 votes) = s_afn.getBadVotersAndVotes();
     assertEq(1, voters.length);
     assertEq(voter, voters[0]);
     assertEq(weight, votes);
-  }
-
-  function testSuccessGas() public {
-    changePrank(USER_1);
-    s_afn.voteBad();
+    vm.resumeGasMetering();
   }
 
   function testEmitBadSignalSuccess() public {
@@ -291,22 +269,21 @@ contract AFN_recover is AFNSetup {
 
   // Success
 
-  function testSuccess() public {
+  function testRecoverSuccess_gas() public {
+    vm.pauseGasMetering();
     changePrank(OWNER);
     vm.expectEmit(false, false, false, false);
     emit RecoveredFromBadSignal();
 
+    vm.resumeGasMetering();
     s_afn.recoverFromBadSignal();
+    vm.pauseGasMetering();
 
     assertFalse(s_afn.badSignalReceived());
     (address[] memory voters, uint256 votes) = s_afn.getBadVotersAndVotes();
     assertEq(0, voters.length);
     assertEq(0, votes);
-  }
-
-  function testSuccessGas() public {
-    changePrank(OWNER);
-    s_afn.recoverFromBadSignal();
+    vm.resumeGasMetering();
   }
 
   // Reverts
@@ -367,7 +344,8 @@ contract AFN_setAFNConfig is AFNSetup {
 
   // Success
 
-  function testSuccess() public {
+  function testSetAFNConfigSuccess_gas() public {
+    vm.pauseGasMetering();
     (
       address[] memory participants,
       uint256[] memory weights,
@@ -380,7 +358,11 @@ contract AFN_setAFNConfig is AFNSetup {
     emit AFNConfigSet(participants, weights, blessingThreshold, badSignalThreshold);
 
     uint256 configVersionBefore = s_afn.getConfigVersion();
+
+    vm.resumeGasMetering();
     s_afn.setAFNConfig(participants, weights, blessingThreshold, badSignalThreshold);
+    vm.pauseGasMetering();
+
     // Assert Config has changed correctly
     assertEq(configVersionBefore + 1, s_afn.getConfigVersion());
     assertEq(participants, s_afn.getParticipants());
@@ -397,18 +379,7 @@ contract AFN_setAFNConfig is AFNSetup {
     assertEq(ZERO, votesToBlessRoot);
     assertFalse(s_afn.hasVotedToBlessRoot(participants[0], ROOT_1));
     assertFalse(s_afn.hasVotedToBlessRoot(participants[1], ROOT_1));
-  }
-
-  function testSuccessGas() public {
-    (
-      address[] memory participants,
-      uint256[] memory weights,
-      uint256 blessingThreshold,
-      uint256 badSignalThreshold
-    ) = getDifferentConfigArgs();
-
-    changePrank(OWNER);
-    s_afn.setAFNConfig(participants, weights, blessingThreshold, badSignalThreshold);
+    vm.resumeGasMetering();
   }
 
   // Reverts

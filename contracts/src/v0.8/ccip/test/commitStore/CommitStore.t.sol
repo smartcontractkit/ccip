@@ -115,9 +115,10 @@ contract CommitStore_report is CommitStoreSetup {
 
   // Success
 
-  function testReportOnlyRootSuccess() public {
+  function testReportOnlyRootSuccess_gas() public {
+    vm.pauseGasMetering();
     uint64 max1 = 931;
-    bytes32 root = "test #1";
+    bytes32 root = "Only a single root";
     ICommitStore.CommitReport memory report = ICommitStore.CommitReport({
       priceUpdates: getEmptyPriceUpdates(),
       interval: ICommitStore.Interval(1, max1),
@@ -127,10 +128,13 @@ contract CommitStore_report is CommitStoreSetup {
     vm.expectEmit(false, false, false, true);
     emit ReportAccepted(report);
 
+    vm.resumeGasMetering();
     s_commitStore.report(abi.encode(report));
+    vm.pauseGasMetering();
 
     assertEq(max1 + 1, s_commitStore.getExpectedNextSequenceNumber());
     assertEq(block.timestamp, s_commitStore.getMerkleRoot(root));
+    vm.resumeGasMetering();
   }
 
   function testReportAndPriceUpdateSuccess() public {
