@@ -251,6 +251,8 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		totalMsgs := 2
 		extraArgs, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(200_000), true)
 		require.NoError(t, err)
+		startNonce, err := ccipContracts.Dest.OffRamp.GetSenderNonce(nil, ccipContracts.Source.User.From)
+		require.NoError(t, err)
 		msg := router.ClientEVM2AnyMessage{
 			Receiver:     testhelpers.MustEncodeAddress(t, ccipContracts.Dest.Receivers[1].Receiver.Address()),
 			Data:         []byte("hello"),
@@ -274,6 +276,10 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.Dest.OffRamp.Address(), nodes, geCurrentSeqNum, geCurrentSeqNum)
 		assert.Len(t, executionLogs, 1)
 		testhelpers.AssertExecState(t, ccipContracts, executionLogs[0], ccip.Failure)
+		// Nonce should not have incremented
+		afterNonce, err := ccipContracts.Dest.OffRamp.GetSenderNonce(nil, ccipContracts.Source.User.From)
+		require.NoError(t, err)
+		require.Equal(t, startNonce, afterNonce)
 		geCurrentSeqNum++
 
 		// subsequent requests which should not be executed.

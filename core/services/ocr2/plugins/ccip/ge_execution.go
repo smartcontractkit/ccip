@@ -90,7 +90,7 @@ func (tb *BatchBuilder) parseLog(log types.Log) (*evm_2_evm_onramp.EVM2EVMOnRamp
 
 func (tb *BatchBuilder) BuildBatch(
 	srcToDst map[common.Address]common.Address,
-	msgs []logpoller.Log,
+	srcLogs []logpoller.Log,
 	executed map[uint64]struct{},
 	inflight []InflightInternalExecutionReport,
 	aggregateTokenLimit *big.Int,
@@ -105,10 +105,10 @@ func (tb *BatchBuilder) BuildBatch(
 	aggregateTokenLimit.Sub(aggregateTokenLimit, inflightAggregateValue)
 	executedAllMessages = true
 	expectedNonces := make(map[common.Address]uint64)
-	for _, msg := range msgs {
+	for _, srcLog := range srcLogs {
 		msg, err2 := tb.parseLog(types.Log{
-			Topics: msg.GetTopics(),
-			Data:   msg.Data,
+			Topics: srcLog.GetTopics(),
+			Data:   srcLog.Data,
 		})
 		if err2 != nil {
 			tb.lggr.Errorw("unable to parse message", "err", err2, "msg", msg)
@@ -133,7 +133,7 @@ func (tb *BatchBuilder) BuildBatch(
 				expectedNonces[msg.Message.Sender] = maxInflight + 1
 			} else {
 				// Nothing inflight take from chain.
-				// Chain holds expected next nonce.
+				// Chain holds existing nonce.
 				nonce, err := tb.ramp.GetSenderNonce(nil, msg.Message.Sender)
 				if err != nil {
 					lggr.Errorw("unable to get sender nonce", "err", err)
@@ -164,7 +164,7 @@ func (tb *BatchBuilder) BuildBatch(
 			continue
 		}
 		// TODO: fee boosting check, loss protection etc. For now we are just executing regardless
-		messageMaxGas := msg.Message.GasLimit.Uint64() + maxGasOverHeadGas(len(msgs), msg.Message)
+		messageMaxGas := msg.Message.GasLimit.Uint64() + maxGasOverHeadGas(len(srcLogs), msg.Message)
 		// Check sufficient gas in batch
 		if availableGas < messageMaxGas {
 			lggr.Infow("Insufficient remaining gas in batch limit", "availableGas", availableGas, "messageMaxGas", messageMaxGas)

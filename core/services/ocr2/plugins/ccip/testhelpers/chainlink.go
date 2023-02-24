@@ -108,7 +108,7 @@ func (node *Node) ConsistentlySeqNumHasNotBeenExecuted(t *testing.T, ccipContrac
 	c, err := node.App.GetChains().EVM.Get(big.NewInt(0).SetUint64(ccipContracts.Dest.ChainID))
 	require.NoError(t, err)
 	var log logpoller.Log
-	gomega.NewGomegaWithT(t).Eventually(func() bool {
+	gomega.NewGomegaWithT(t).Consistently(func() bool {
 		ccipContracts.Source.Chain.Commit()
 		ccipContracts.Dest.Chain.Commit()
 		lgs, err := c.LogPoller().IndexedLogsTopicRange(
@@ -125,7 +125,7 @@ func (node *Node) ConsistentlySeqNumHasNotBeenExecuted(t *testing.T, ccipContrac
 			return true
 		}
 		return false
-	}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeFalse(), "seq number got executed")
+	}, 10*time.Second, 1*time.Second).Should(gomega.BeFalse(), "seq number got executed")
 	return log
 }
 

@@ -137,6 +137,18 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
 
   // Success
 
+  function testForwardFromRouterSuccessCustomExtraArgs() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT * 2, strict: true}));
+    uint256 feeAmount = 1234567890;
+    IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
+
+    vm.expectEmit(false, false, false, true);
+    emit CCIPSendRequested(_messageToEvent(message, 1, 1, feeAmount));
+
+    s_onRamp.forwardFromRouter(message, feeAmount, OWNER);
+  }
+
   function testForwardFromRouterSuccess() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 

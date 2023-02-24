@@ -149,7 +149,6 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
   function testSingleMessageNoTokensSuccess() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
     address[] memory offRamps = s_destRouter.getOffRamps(SOURCE_CHAIN_ID);
-    console.log("foframps", offRamps.length, address(offRamps[0]), address(s_offRamp));
     vm.expectEmit(false, false, false, true);
     emit ExecutionStateChanged(
       messages[0].sequenceNumber,
@@ -172,6 +171,24 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     uint64 nonceBefore = s_offRamp.getSenderNonce(messages[0].sender);
     s_offRamp.execute(_generateReportFromMessages(messages), false);
     assertGt(s_offRamp.getSenderNonce(messages[0].sender), nonceBefore);
+  }
+
+  function testStrictFailure() public {
+    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
+
+    messages[0].strict = true;
+    messages[0].receiver = address(s_reverting_receiver);
+
+    vm.expectEmit(false, false, false, true);
+    emit ExecutionStateChanged(
+      messages[0].sequenceNumber,
+      messages[0].messageId,
+      Internal.MessageExecutionState.FAILURE
+    );
+    // Nonce should not increment on a strict revert.
+    assertEq(uint64(0), s_offRamp.getSenderNonce(address(OWNER)));
+    s_offRamp.execute(_generateReportFromMessages(messages), false);
+    assertEq(uint64(0), s_offRamp.getSenderNonce(address(OWNER)));
   }
 
   function testSkippedIncorrectNonceSuccess() public {
@@ -282,7 +299,9 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
       Internal.MessageExecutionState.SUCCESS
     );
 
+    assertEq(uint64(0), s_offRamp.getSenderNonce(OWNER));
     s_offRamp.execute(_generateReportFromMessages(messages), true);
+    assertEq(uint64(2), s_offRamp.getSenderNonce(OWNER));
   }
 
   // Reverts

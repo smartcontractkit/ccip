@@ -141,7 +141,7 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AllowList, AggregateRat
     }
     if (bytes4(extraArgs[:4]) != Client.EVM_EXTRA_ARGS_V1_TAG)
       revert InvalidExtraArgsTag(Client.EVM_EXTRA_ARGS_V1_TAG, bytes4(extraArgs[:4]));
-    return Client.EVMExtraArgsV1({gasLimit: abi.decode(extraArgs[4:36], (uint256)), strict: false});
+    return abi.decode(extraArgs[4:], (Client.EVMExtraArgsV1));
   }
 
   /// @notice Validate the forwarded message with various checks.

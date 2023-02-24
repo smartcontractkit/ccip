@@ -38,7 +38,7 @@ const (
 type BatchBuilderInterface interface {
 	BuildBatch(
 		srcToDst map[common.Address]common.Address,
-		msgs []logpoller.Log,
+		srcLogs []logpoller.Log,
 		executed map[uint64]struct{},
 		inflight []InflightInternalExecutionReport,
 		aggregateTokenLimit *big.Int,

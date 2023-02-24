@@ -16,11 +16,13 @@ import {SimpleMessageReceiver} from "../helpers/receivers/SimpleMessageReceiver.
 import {EVM2EVMOffRampHelper} from "../helpers/ramps/EVM2EVMOffRampHelper.sol";
 import "../TokenSetup.t.sol";
 import "../router/RouterSetup.t.sol";
+import "../helpers/receivers/MaybeRevertMessageReceiver.sol";
 
 contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup {
   ICommitStore internal s_mockCommitStore;
   IAny2EVMMessageReceiver internal s_receiver;
   IAny2EVMMessageReceiver internal s_secondary_receiver;
+  IAny2EVMMessageReceiver internal s_reverting_receiver;
 
   EVM2EVMOffRampHelper internal s_offRamp;
 
@@ -40,6 +42,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup {
     s_mockCommitStore = new MockCommitStore();
     s_receiver = new SimpleMessageReceiver();
     s_secondary_receiver = new SimpleMessageReceiver();
+    s_reverting_receiver = new MaybeRevertMessageReceiver(true);
 
     deployOffRamp(s_mockCommitStore, s_destRouter);
   }
