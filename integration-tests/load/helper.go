@@ -87,10 +87,10 @@ func (loadArgs *loadArgs) Setup() {
 	if forwardLane == nil {
 		return
 	}
+	require.NoError(loadArgs.t, forwardLane.IsLaneDeployed())
 	source := forwardLane.Source
 	dest := forwardLane.Dest
 	ccipLoad := NewCCIPLoad(loadArgs.t, source, dest, loadArgs.ccipTimeout, 100000)
-	require.NoError(loadArgs.t, forwardLane.IsLaneDeployed())
 	ccipLoad.BeforeAllCall()
 	loadgen, err := client.NewLoadGenerator(&client.LoadGeneratorConfig{
 		RPS:         loadArgs.rps,

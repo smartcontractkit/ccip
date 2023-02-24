@@ -135,8 +135,7 @@ func (c *CCIPE2ELoad) BeforeAllCall() {
 		tokenAndAmounts = append(tokenAndAmounts, router.ClientEVMTokenAmount{
 			Token: common.HexToAddress(token.Address()), Amount: c.Source.TransferAmount[i],
 		})
-		// approve the onramp router so that it caninitiate transferring the token
-
+		// approve the onramp router so that it can initiate transferring the token
 		err := token.Approve(c.Source.Common.Router.Address(), bigmath.Mul(c.Source.TransferAmount[i], big.NewInt(c.NoOfReq)))
 		require.NoError(c.t, err, "Could not approve permissions for the onRamp router "+
 			"on the source link token contract")
@@ -270,7 +269,9 @@ func (c *CCIPE2ELoad) Call(msgType interface{}) client.CallResult {
 	}
 	c.updatestats(msgSerialNo, fmt.Sprint(seqNum), E2E, time.Since(commitStartTime), success)
 	res.Error = nil
+	c.sentMsgMu.Lock()
 	res.Data = c.SentMsg[seqNum]
+	c.sentMsgMu.Unlock()
 	return res
 }
 
