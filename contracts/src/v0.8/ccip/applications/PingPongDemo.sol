@@ -4,9 +4,8 @@ pragma solidity 0.8.15;
 import {IRouterClient} from "../interfaces/router/IRouterClient.sol";
 
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
-// solhint-disable-next-line chainlink-solidity/explicit-imports
 import {Client} from "../models/Client.sol";
-import "./CCIPReceiver.sol";
+import {CCIPReceiver} from "./CCIPReceiver.sol";
 
 import {IERC20} from "../../vendor/IERC20.sol";
 
