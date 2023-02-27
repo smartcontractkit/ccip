@@ -49,10 +49,13 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup {
 
   function deployOffRamp(ICommitStore commitStore, IRouter router) internal {
     s_offRamp = new EVM2EVMOffRampHelper(
-      SOURCE_CHAIN_ID,
-      DEST_CHAIN_ID,
-      ON_RAMP_ADDRESS,
-      offRampConfig(commitStore, router),
+      IEVM2EVMOffRamp.StaticConfig({
+        commitStore: address(commitStore),
+        chainId: DEST_CHAIN_ID,
+        sourceChainId: SOURCE_CHAIN_ID,
+        onRamp: ON_RAMP_ADDRESS
+      }),
+      generateDynamicOffRampConfig(router),
       s_afn,
       getCastedSourceTokens(),
       getCastedDestinationPools(),
@@ -182,7 +185,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup {
       });
   }
 
-  function _assertSameConfig(IEVM2EVMOffRamp.OffRampConfig memory a, IEVM2EVMOffRamp.OffRampConfig memory b) public {
+  function _assertSameConfig(IEVM2EVMOffRamp.DynamicConfig memory a, IEVM2EVMOffRamp.DynamicConfig memory b) public {
     assertEq(a.executionDelaySeconds, b.executionDelaySeconds);
     assertEq(a.maxDataSize, b.maxDataSize);
     assertEq(a.maxTokensLength, b.maxTokensLength);

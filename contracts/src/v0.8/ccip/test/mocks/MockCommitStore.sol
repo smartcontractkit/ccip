@@ -13,10 +13,17 @@ contract MockCommitStore is ICommitStore {
   function setMinSeqNr(uint64 minSeqNr) external {}
 
   /// @inheritdoc ICommitStore
-  function getConfig() external pure override returns (ICommitStore.CommitStoreConfig memory) {
-    return
-      ICommitStore.CommitStoreConfig({chainId: 1, sourceChainId: 2, onRamp: address(1), priceRegistry: address(10)});
+  function getStaticConfig() external pure override returns (ICommitStore.StaticConfig memory) {
+    return ICommitStore.StaticConfig({chainId: 1, sourceChainId: 2, onRamp: address(1)});
   }
+
+  /// @inheritdoc ICommitStore
+  function getDynamicConfig() external pure override returns (ICommitStore.DynamicConfig memory) {
+    return ICommitStore.DynamicConfig({priceRegistry: address(10)});
+  }
+
+  /// @inheritdoc ICommitStore
+  function setDynamicConfig(DynamicConfig memory dynamicConfig) external view override {}
 
   /// @inheritdoc ICommitStore
   function verify(

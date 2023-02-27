@@ -47,8 +47,6 @@ contract WrappedTokenPool_lockOrBurn is WrappedTokenPoolSetup {
   event Burned(address indexed account, uint256 amount);
 
   function testLockOrBurnSuccess() public {
-    bool isOnRamp = s_wrappedTokenPool.isOnRamp(s_onRamp);
-
     changePrank(s_offRamp);
     s_wrappedTokenPool.releaseOrMint(s_onRamp, 1);
     assertEq(s_wrappedTokenPool.balanceOf(s_onRamp), 1);

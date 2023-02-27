@@ -130,27 +130,29 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId uint64,
 	onRampAddress, tx, _, err := evm_2_evm_onramp.DeployEVM2EVMOnRamp(
 		client.Owner,  // user
 		client.Client, // client
-		evm_2_evm_onramp.IEVM2EVMOnRampChains{
-			ChainId:     client.ChainConfig.ChainId, // source chain id
-			DestChainId: destChainId,                // destinationChainId
+		evm_2_evm_onramp.IEVM2EVMOnRampStaticConfig{
+			LinkToken:         client.ChainConfig.SupportedTokens[LINK].Token,
+			ChainId:           client.ChainConfig.ChainId, // source chain id
+			DestChainId:       destChainId,                // destinationChainId
+			DefaultTxGasLimit: 200_000,
+		},
+		evm_2_evm_onramp.IEVM2EVMOnRampDynamicConfig{
+			Router:          client.ChainConfig.Router,
+			PriceRegistry:   client.ChainConfig.PriceRegistry,
+			MaxDataSize:     1e6,
+			MaxTokensLength: 5,
+			MaxGasLimit:     ccip.GasLimitPerTx,
+			FeeAdmin:        common.Address{},
 		},
 		tokensAndPools,
 		[]common.Address{},     // allow list
 		client.ChainConfig.Afn, // AFN
-		evm_2_evm_onramp.IEVM2EVMOnRampOnRampConfig{
-			MaxDataSize:     1e6,
-			MaxTokensLength: 5,
-			MaxGasLimit:     ccip.GasLimitPerTx,
-		},
 		evm_2_evm_onramp.IAggregateRateLimiterRateLimiterConfig{
 			Capacity: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 			Rate:     new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
 			Admin:    client.Owner.From,
 		},
-		client.ChainConfig.Router,
-		client.ChainConfig.PriceRegistry,
 		feeTokenConfig,
-		client.ChainConfig.SupportedTokens[LINK].Token,
 		[]evm_2_evm_onramp.IEVM2EVMOnRampNopAndWeight{},
 	)
 	shared.RequireNoError(t, err)
@@ -195,12 +197,14 @@ func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainId uint
 	offRampAddress, tx, _, err := evm_2_evm_offramp.DeployEVM2EVMOffRamp(
 		client.Owner,
 		client.Client,
-		sourceChainId,
-		client.ChainConfig.ChainId,
-		onRamp,
-		evm_2_evm_offramp.IEVM2EVMOffRampOffRampConfig{
+		evm_2_evm_offramp.IEVM2EVMOffRampStaticConfig{
+			CommitStore:   client.LaneConfig.CommitStore,
+			ChainId:       client.ChainConfig.ChainId,
+			SourceChainId: sourceChainId,
+			OnRamp:        onRamp,
+		},
+		evm_2_evm_offramp.IEVM2EVMOffRampDynamicConfig{
 			Router:                                  client.ChainConfig.Router,
-			CommitStore:                             client.LaneConfig.CommitStore,
 			ExecutionDelaySeconds:                   60,
 			MaxDataSize:                             1e5,
 			MaxTokensLength:                         15,
@@ -245,10 +249,12 @@ func deployCommitStore(t *testing.T, client *EvmDeploymentConfig, sourceChainId 
 	commitStoreAddress, tx, _, err := commit_store.DeployCommitStore(
 		client.Owner,  // user
 		client.Client, // client
-		commit_store.ICommitStoreCommitStoreConfig{
+		commit_store.ICommitStoreStaticConfig{
 			ChainId:       client.ChainConfig.ChainId,
 			SourceChainId: sourceChainId,
 			OnRamp:        onRamp,
+		},
+		commit_store.ICommitStoreDynamicConfig{
 			PriceRegistry: client.ChainConfig.PriceRegistry,
 		},
 		client.ChainConfig.Afn, // AFN address

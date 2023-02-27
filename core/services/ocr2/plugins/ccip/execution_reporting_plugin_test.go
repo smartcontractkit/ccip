@@ -110,10 +110,12 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	commitStoreAddress, _, _, err := commit_store_helper.DeployCommitStoreHelper(
 		destUser,  // user
 		destChain, // client
-		commit_store_helper.ICommitStoreCommitStoreConfig{
+		commit_store_helper.ICommitStoreStaticConfig{
 			ChainId:       1338,
 			SourceChainId: 1337,
 			OnRamp:        onRampAddress,
+		},
+		commit_store_helper.ICommitStoreDynamicConfig{
 			PriceRegistry: destPricesAddress,
 		},
 		afnAddress, // AFN address
@@ -130,12 +132,14 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	offRampAddress, _, _, err := evm_2_evm_offramp.DeployEVM2EVMOffRamp(
 		destUser,
 		destChain,
-		sourceChainID,
-		destChainID,
-		onRampAddress,
-		evm_2_evm_offramp.IEVM2EVMOffRampOffRampConfig{
+		evm_2_evm_offramp.IEVM2EVMOffRampStaticConfig{
+			CommitStore:   commitStore.Address(),
+			ChainId:       destChainID,
+			SourceChainId: sourceChainID,
+			OnRamp:        onRampAddress,
+		},
+		evm_2_evm_offramp.IEVM2EVMOffRampDynamicConfig{
 			Router:                                  routerAddress,
-			CommitStore:                             commitStore.Address(),
 			PermissionLessExecutionThresholdSeconds: 1,
 			ExecutionDelaySeconds:                   0,
 			MaxDataSize:                             1e5,

@@ -36,17 +36,19 @@ contract EVM2EVMOffRamp is
   // STATIC CONFIG
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "EVM2EVMOffRamp 1.0.0";
+  // Commit store address on the destination chain
+  address internal immutable i_commitStore;
   // Chain ID of the source chain
   uint64 internal immutable i_sourceChainId;
   // Chain ID of this chain
   uint64 internal immutable i_chainId;
   // OnRamp address on the source chain
-  address internal immutable i_onRampAddress;
+  address internal immutable i_onRamp;
   // metadataHash is a prefix for a message hash preimage to ensure uniqueness.
   bytes32 internal immutable i_metadataHash;
 
   // DYNAMIC CONFIG
-  OffRampConfig internal s_config;
+  DynamicConfig internal s_dynamicConfig;
 
   // STATE
   mapping(address => uint64) internal s_senderNonce;
@@ -55,10 +57,8 @@ contract EVM2EVMOffRamp is
   mapping(uint64 => Internal.MessageExecutionState) internal s_executedMessages;
 
   constructor(
-    uint64 sourceChainId,
-    uint64 chainId,
-    address onRampAddress,
-    OffRampConfig memory offRampConfig,
+    StaticConfig memory staticConfig,
+    DynamicConfig memory dynamicConfig,
     IAFN afn,
     IERC20[] memory sourceTokens,
     IPool[] memory pools,
@@ -69,45 +69,54 @@ contract EVM2EVMOffRamp is
     OffRampTokenPoolRegistry(sourceTokens, pools)
     AggregateRateLimiter(rateLimiterConfig)
   {
-    if (onRampAddress == address(0)) revert ZeroAddressNotAllowed();
+    if (staticConfig.onRamp == address(0) || staticConfig.commitStore == address(0)) revert ZeroAddressNotAllowed();
 
-    i_sourceChainId = sourceChainId;
-    i_chainId = chainId;
-    i_onRampAddress = onRampAddress;
+    i_commitStore = staticConfig.commitStore;
+    i_sourceChainId = staticConfig.sourceChainId;
+    i_chainId = staticConfig.chainId;
+    i_onRamp = staticConfig.onRamp;
+    emit StaticConfigSet(staticConfig);
+
     i_metadataHash = _metadataHash(Internal.EVM_2_EVM_MESSAGE_HASH);
 
-    _setOffRampConfig(offRampConfig);
+    _setDynamicConfig(dynamicConfig);
   }
 
   function _metadataHash(bytes32 prefix) internal view returns (bytes32) {
-    return keccak256(abi.encode(prefix, i_sourceChainId, i_chainId, i_onRampAddress));
+    return keccak256(abi.encode(prefix, i_sourceChainId, i_chainId, i_onRamp));
   }
 
   /// @inheritdoc IEVM2EVMOffRamp
-  function getOffRampConfig() external view override returns (OffRampConfig memory) {
-    return s_config;
+  function getStaticConfig() external view override returns (StaticConfig memory) {
+    return
+      IEVM2EVMOffRamp.StaticConfig({
+        commitStore: i_commitStore,
+        chainId: i_chainId,
+        sourceChainId: i_sourceChainId,
+        onRamp: i_onRamp
+      });
   }
 
   /// @inheritdoc IEVM2EVMOffRamp
-  function setOffRampConfig(OffRampConfig memory config) external override onlyOwner {
-    _setOffRampConfig(config);
+  function getDynamicConfig() external view override returns (DynamicConfig memory) {
+    return s_dynamicConfig;
   }
 
-  function _setOffRampConfig(OffRampConfig memory config) private {
-    if (config.router == address(0) || config.commitStore == address(0)) revert InvalidOffRampConfig(config);
+  /// @inheritdoc IEVM2EVMOffRamp
+  function setDynamicConfig(DynamicConfig memory config) external override onlyOwner {
+    _setDynamicConfig(config);
+  }
 
-    s_config = config;
-    emit OffRampConfigChanged(config, i_sourceChainId, i_onRampAddress);
+  function _setDynamicConfig(DynamicConfig memory config) private {
+    if (config.router == address(0)) revert InvalidOffRampConfig(config);
+
+    s_dynamicConfig = config;
+    emit DynamicConfigSet(config, i_sourceChainId, i_onRamp);
   }
 
   /// @inheritdoc IEVM2EVMOffRamp
   function getExecutionState(uint64 sequenceNumber) public view returns (Internal.MessageExecutionState) {
     return s_executedMessages[sequenceNumber];
-  }
-
-  function getChainIDs() external view returns (uint64 sourceChainId, uint64 chainId) {
-    sourceChainId = i_sourceChainId;
-    chainId = i_chainId;
   }
 
   /// @inheritdoc IEVM2EVMOffRamp
@@ -158,7 +167,7 @@ contract EVM2EVMOffRamp is
       !message.receiver.isContract() || !message.receiver.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId)
     ) return;
     if (
-      !IRouter(s_config.router).routeMessage(
+      !IRouter(s_dynamicConfig.router).routeMessage(
         Internal._toAny2EVMMessage(message, destTokenAmounts),
         manualExecution,
         message.gasLimit,
@@ -187,10 +196,10 @@ contract EVM2EVMOffRamp is
 
   function _isWellFormed(Internal.EVM2EVMMessage memory message) private view {
     if (message.sourceChainId != i_sourceChainId) revert InvalidSourceChain(message.sourceChainId);
-    if (message.tokenAmounts.length > uint256(s_config.maxTokensLength))
+    if (message.tokenAmounts.length > uint256(s_dynamicConfig.maxTokensLength))
       revert UnsupportedNumberOfTokens(message.sequenceNumber);
-    if (message.data.length > uint256(s_config.maxDataSize))
-      revert MessageTooLarge(uint256(s_config.maxDataSize), message.data.length);
+    if (message.data.length > uint256(s_dynamicConfig.maxDataSize))
+      revert MessageTooLarge(uint256(s_dynamicConfig.maxDataSize), message.data.length);
   }
 
   function _execute(Internal.ExecutionReport memory report, bool manualExecution) internal whenNotPaused whenHealthy {
@@ -209,11 +218,7 @@ contract EVM2EVMOffRamp is
     }
 
     // SECURITY CRITICAL CHECK
-    uint256 timestampCommitted = ICommitStore(s_config.commitStore).verify(
-      hashedLeaves,
-      report.proofs,
-      report.proofFlagBits
-    );
+    uint256 timestampCommitted = ICommitStore(i_commitStore).verify(hashedLeaves, report.proofs, report.proofFlagBits);
     if (timestampCommitted <= 0) revert RootNotCommitted();
 
     // Execute messages
@@ -230,7 +235,7 @@ contract EVM2EVMOffRamp is
 
       if (manualExecution) {
         bool isOldCommitReport = (block.timestamp - timestampCommitted) >
-          s_config.permissionLessExecutionThresholdSeconds;
+          s_dynamicConfig.permissionLessExecutionThresholdSeconds;
         // Manually execution is fine if we previously failed or if the commit report is just too old
         // Acceptable state transitions: FAILURE->SUCCESS, UNTOUCHED->SUCCESS, FAILURE->FAILURE
         if (!(isOldCommitReport || originalState == Internal.MessageExecutionState.FAILURE))

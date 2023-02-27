@@ -15,14 +15,15 @@ interface IEVM2EVMOffRamp {
   error UnsupportedNumberOfTokens(uint64 sequenceNumber);
   error ManualExecutionNotYetEnabled();
   error RootNotCommitted();
-  error InvalidOffRampConfig(OffRampConfig config);
+  error InvalidOffRampConfig(DynamicConfig config);
   error UnsupportedToken(IERC20 token);
   error CanOnlySelfCall();
   error ReceiverError();
   error EmptyReport();
 
   // sourceChainId and onRamp are needed by Atlas, to track onramp <-> offramp -> router relationship
-  event OffRampConfigChanged(OffRampConfig config, uint64 sourceChainId, address onRamp);
+  event DynamicConfigSet(DynamicConfig config, uint64 sourceChainId, address onRamp);
+  event StaticConfigSet(StaticConfig);
   event SkippedIncorrectNonce(uint64 indexed nonce, address indexed sender);
   event ExecutionStateChanged(
     uint64 indexed sequenceNumber,
@@ -36,21 +37,32 @@ interface IEVM2EVMOffRamp {
   /// @notice Returns the the current nonce for a receiver.
   function getSenderNonce(address sender) external view returns (uint64 nonce);
 
-  // since OffRampConfig is part of OffRampConfigChanged event, if changing it, we should update the ABI on Atlas
-  struct OffRampConfig {
+  /// @notice Static offRamp config
+  struct StaticConfig {
+    address commitStore; // --┐  CommitStore address on the destination chain
+    uint64 chainId; // -------┘  Destination chain Id
+    uint64 sourceChainId; // -┐  Source chain Id
+    address onRamp; // -------┘  OnRamp address on the source chain
+  }
+
+  /// @notice Returns the current static config.
+  function getStaticConfig() external view returns (StaticConfig memory);
+
+  /// @notice Dynamic offRamp config
+  /// @dev since OffRampConfig is part of OffRampConfigChanged event, if changing it, we should update the ABI on Atlas
+  struct DynamicConfig {
     uint32 permissionLessExecutionThresholdSeconds; // -┐ Waiting time before manual execution is enabled
     uint64 executionDelaySeconds; //                    | Execution delay in seconds
     address router; // ---------------------------------┘ Router address
     uint32 maxDataSize; // --------┐ Maximum payload data size
-    address commitStore; //        | CommitStore address
     uint16 maxTokensLength; // ----┘ Maximum number of distinct ERC20 tokens that can be sent per message
   }
 
-  /// @notice Returns the current config.
-  function getOffRampConfig() external view returns (OffRampConfig memory);
+  /// @notice Returns the current dynamic config.
+  function getDynamicConfig() external view returns (DynamicConfig memory);
 
-  /// @notice Sets a new config.
-  function setOffRampConfig(OffRampConfig memory config) external;
+  /// @notice Sets a new dynamic config.
+  function setDynamicConfig(DynamicConfig memory config) external;
 
   /// @notice Manually execute a message
   /// @param report Internal.ExecutionReport

@@ -70,18 +70,22 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 		return nil, errors.Wrap(err, "failed loading offRamp")
 	}
 
-	commitStoreConfig, err := commitStore.GetConfig(&bind.CallOpts{})
+	staticConfig, err := commitStore.GetStaticConfig(&bind.CallOpts{})
 	if err != nil {
-		return nil, errors.Wrap(err, "failed getting the config from the commitStore")
+		return nil, errors.Wrap(err, "failed getting the static config from the commitStore")
 	}
-	if commitStoreConfig.OnRamp != onRamp.Address() {
-		return nil, errors.Errorf("Wrong onRamp got %s expected from jobspec %s", commitStoreConfig.OnRamp, onRamp.Address())
+	if staticConfig.OnRamp != onRamp.Address() {
+		return nil, errors.Errorf("Wrong onRamp got %s expected from jobspec %s", staticConfig.OnRamp, onRamp.Address())
 	}
-	if commitStoreConfig.SourceChainId != pluginConfig.SourceChainID {
-		return nil, errors.Errorf("Wrong source chain ID got %d expected from jobspec %d", commitStoreConfig.SourceChainId, pluginConfig.SourceChainID)
+	if staticConfig.SourceChainId != pluginConfig.SourceChainID {
+		return nil, errors.Errorf("Wrong source chain ID got %d expected from jobspec %d", staticConfig.SourceChainId, pluginConfig.SourceChainID)
 	}
-	if commitStoreConfig.ChainId != uint64(destChainID) {
-		return nil, errors.Errorf("Wrong dest chain ID got %d expected from jobspec %d", commitStoreConfig.ChainId, destChainID)
+	if staticConfig.ChainId != uint64(destChainID) {
+		return nil, errors.Errorf("Wrong dest chain ID got %d expected from jobspec %d", staticConfig.ChainId, destChainID)
+	}
+	dynamicConfig, err := commitStore.GetDynamicConfig(&bind.CallOpts{})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed getting the dynamic config from the commitStore")
 	}
 
 	seqParsers := func(log logpoller.Log) (uint64, error) {
@@ -100,15 +104,15 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 
 	// subscribe for GasFeeUpdated logs, but Prices is only available as part of onchain commitStore's config
 	// TODO: how to detect if commitStoreConfig.PriceRegistry changes on-chain? Currently, we expect a plugin/job/node restart
-	prices, err := price_registry.NewPriceRegistry(commitStoreConfig.PriceRegistry, destChain.Client())
+	prices, err := price_registry.NewPriceRegistry(dynamicConfig.PriceRegistry, destChain.Client())
 	if err != nil {
 		return nil, err
 	}
-	routerAddr, err := onRamp.GetRouter(nil)
+	dynamicOnRampConfig, err := onRamp.GetDynamicConfig(nil)
 	if err != nil {
 		return nil, err
 	}
-	router, err := router.NewRouter(routerAddr, sourceChain.Client())
+	router, err := router.NewRouter(dynamicOnRampConfig.Router, sourceChain.Client())
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +122,7 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 	}
 
 	eventSigs := GetEventSignatures()
-	_, err = destChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{GasFeeUpdated}, Addresses: []common.Address{commitStoreConfig.PriceRegistry}})
+	_, err = destChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{GasFeeUpdated}, Addresses: []common.Address{dynamicConfig.PriceRegistry}})
 	if err != nil {
 		return nil, err
 	}

@@ -20,31 +20,37 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, HealthChecker, OC
   uint64 internal immutable i_sourceChainId;
   // The onRamp address on the source chain
   address internal immutable i_onRamp;
-  // The price registry address
-  address internal s_priceRegistry;
+  // The dynamic commit store config
+  DynamicConfig internal s_dynamicConfig;
 
   // merkleRoot => timestamp when received
   mapping(bytes32 => uint256) private s_roots;
-
   // The min sequence number expected for future messages
   uint64 private s_minSeqNr = 1;
 
   /// @dev sourceTokens are mapped to pools, and therefore should be the same length arrays.
   /// @dev The AFN contract should be deployed already
-  /// @param config containing the source and dest chain Ids and the onRamp
+  /// @param staticConfig Containing the static part of the commitStore config
+  /// @param dynamicConfig Containing the dynamic part of the commitStore config
   /// @param afn AFN contract
-  constructor(CommitStoreConfig memory config, IAFN afn) OCR2Base() HealthChecker(afn) {
+  constructor(
+    StaticConfig memory staticConfig,
+    DynamicConfig memory dynamicConfig,
+    IAFN afn
+  ) OCR2Base() HealthChecker(afn) {
     if (
-      config.priceRegistry == address(0) ||
-      config.onRamp == address(0) ||
-      config.chainId == 0 ||
-      config.sourceChainId == 0
+      dynamicConfig.priceRegistry == address(0) ||
+      staticConfig.onRamp == address(0) ||
+      staticConfig.chainId == 0 ||
+      staticConfig.sourceChainId == 0
     ) revert InvalidCommitStoreConfig();
 
-    i_chainId = config.chainId;
-    i_sourceChainId = config.sourceChainId;
-    i_onRamp = config.onRamp;
-    s_priceRegistry = config.priceRegistry;
+    i_chainId = staticConfig.chainId;
+    i_sourceChainId = staticConfig.sourceChainId;
+    i_onRamp = staticConfig.onRamp;
+    emit StaticConfigSet(staticConfig);
+
+    _setDynamicConfig(dynamicConfig);
   }
 
   /// @inheritdoc ICommitStore
@@ -75,14 +81,23 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, HealthChecker, OC
   }
 
   /// @inheritdoc ICommitStore
-  function getConfig() external view override returns (ICommitStore.CommitStoreConfig memory) {
-    return
-      ICommitStore.CommitStoreConfig({
-        chainId: i_chainId,
-        sourceChainId: i_sourceChainId,
-        onRamp: i_onRamp,
-        priceRegistry: s_priceRegistry
-      });
+  function getStaticConfig() external view override returns (StaticConfig memory) {
+    return ICommitStore.StaticConfig({chainId: i_chainId, sourceChainId: i_sourceChainId, onRamp: i_onRamp});
+  }
+
+  /// @inheritdoc ICommitStore
+  function getDynamicConfig() external view override returns (DynamicConfig memory) {
+    return s_dynamicConfig;
+  }
+
+  /// @inheritdoc ICommitStore
+  function setDynamicConfig(DynamicConfig memory dynamicConfig) external override onlyOwner {
+    _setDynamicConfig(dynamicConfig);
+  }
+
+  function _setDynamicConfig(DynamicConfig memory dynamicConfig) internal {
+    s_dynamicConfig = dynamicConfig;
+    emit DynamicConfigSet(dynamicConfig);
   }
 
   /// @inheritdoc ICommitStore
@@ -146,7 +161,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, HealthChecker, OC
     ICommitStore.CommitReport memory report = abi.decode(encodedReport, (ICommitStore.CommitReport));
 
     if (report.priceUpdates.feeTokenPriceUpdates.length > 0 || report.priceUpdates.destChainId != 0) {
-      IPriceRegistry(s_priceRegistry).updatePrices(report.priceUpdates);
+      IPriceRegistry(s_dynamicConfig.priceRegistry).updatePrices(report.priceUpdates);
       // If there is no root, the report only contained fee updated and
       // we return to not revert on the empty root check below.
       if (report.merkleRoot == bytes32(0)) {

@@ -12,34 +12,63 @@ import "../../interfaces/offRamp/IEVM2EVMOffRamp.sol";
 
 /// @notice #constructor
 contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
+  event StaticConfigSet(IEVM2EVMOffRamp.StaticConfig);
+  event DynamicConfigSet(IEVM2EVMOffRamp.DynamicConfig config, uint64 sourceChainId, address onRamp);
+
   // Success
 
   function testSuccess() public {
-    // typeAndVersion
-    assertEq("EVM2EVMOffRamp 1.0.0", s_offRamp.typeAndVersion());
+    IEVM2EVMOffRamp.StaticConfig memory staticConfig = IEVM2EVMOffRamp.StaticConfig({
+      commitStore: address(s_mockCommitStore),
+      chainId: DEST_CHAIN_ID,
+      sourceChainId: SOURCE_CHAIN_ID,
+      onRamp: ON_RAMP_ADDRESS
+    });
+    IEVM2EVMOffRamp.DynamicConfig memory dynamicConfig = generateDynamicOffRampConfig(s_destRouter);
 
-    // owner
-    assertEq(OWNER, s_offRamp.owner());
+    vm.expectEmit(false, false, false, true);
+    emit StaticConfigSet(staticConfig);
 
-    // OffRamp config
-    (uint64 source, uint64 dest) = s_offRamp.getChainIDs();
-    assertEq(SOURCE_CHAIN_ID, source);
-    assertEq(DEST_CHAIN_ID, dest);
-    assertEq(address(s_afn), address(s_offRamp.getAFN()));
+    vm.expectEmit(false, false, false, true);
+    emit DynamicConfigSet(dynamicConfig, staticConfig.sourceChainId, staticConfig.onRamp);
+
+    s_offRamp = new EVM2EVMOffRampHelper(
+      staticConfig,
+      dynamicConfig,
+      s_afn,
+      getCastedSourceTokens(),
+      getCastedDestinationPools(),
+      rateLimiterConfig()
+    );
+
+    // Static config
+    IEVM2EVMOffRamp.StaticConfig memory gotStaticConfig = s_offRamp.getStaticConfig();
+    assertEq(staticConfig.commitStore, gotStaticConfig.commitStore);
+    assertEq(staticConfig.sourceChainId, gotStaticConfig.sourceChainId);
+    assertEq(staticConfig.chainId, gotStaticConfig.chainId);
+    assertEq(staticConfig.onRamp, gotStaticConfig.onRamp);
+
+    // Dynamic config
+    IEVM2EVMOffRamp.DynamicConfig memory gotDynamicConfig = s_offRamp.getDynamicConfig();
+    _assertSameConfig(dynamicConfig, gotDynamicConfig);
+
+    // Pools & tokens
     IERC20[] memory pools = s_offRamp.getSupportedTokens();
     assertEq(pools.length, s_sourceTokens.length);
     assertTrue(address(pools[0]) == address(s_sourceTokens[0]));
     assertTrue(address(pools[1]) == address(s_sourceTokens[1]));
-    IEVM2EVMOffRamp.OffRampConfig memory config = s_offRamp.getOffRampConfig();
-    _assertSameConfig(offRampConfig(s_mockCommitStore, s_destRouter), config);
-
-    // HealthChecker
-    assertEq(address(s_afn), address(s_offRamp.getAFN()));
 
     (uint32 configCount, uint32 blockNumber, bytes32 configDigest) = s_offRamp.latestConfigDetails();
     assertEq(0, configCount);
     assertEq(0, blockNumber);
     assertEq(0, configDigest);
+
+    // AFN
+    assertEq(address(s_afn), address(s_offRamp.getAFN()));
+
+    // OffRamp initial values
+    assertEq("EVM2EVMOffRamp 1.0.0", s_offRamp.typeAndVersion());
+    assertEq(OWNER, s_offRamp.owner());
   }
 
   // Revert
@@ -49,12 +78,15 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
     IPool[] memory pools = new IPool[](1);
 
     IERC20[] memory wrongTokens = new IERC20[](5);
-    IEVM2EVMOffRamp.OffRampConfig memory offRampConfig = offRampConfig(s_mockCommitStore, s_destRouter);
+    IEVM2EVMOffRamp.DynamicConfig memory dynamicConfig = generateDynamicOffRampConfig(s_destRouter);
     s_offRamp = new EVM2EVMOffRampHelper(
-      SOURCE_CHAIN_ID,
-      DEST_CHAIN_ID,
-      ON_RAMP_ADDRESS,
-      offRampConfig,
+      IEVM2EVMOffRamp.StaticConfig({
+        commitStore: address(s_mockCommitStore),
+        chainId: DEST_CHAIN_ID,
+        sourceChainId: SOURCE_CHAIN_ID,
+        onRamp: ON_RAMP_ADDRESS
+      }),
+      dynamicConfig,
       s_afn,
       wrongTokens,
       pools,
@@ -75,12 +107,14 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
       admin: TOKEN_LIMIT_ADMIN
     });
 
-    IEVM2EVMOffRamp.OffRampConfig memory offRampConfig = offRampConfig(s_mockCommitStore, s_destRouter);
     s_offRamp = new EVM2EVMOffRampHelper(
-      SOURCE_CHAIN_ID,
-      DEST_CHAIN_ID,
-      ZERO_ADDRESS,
-      offRampConfig,
+      IEVM2EVMOffRamp.StaticConfig({
+        commitStore: address(s_mockCommitStore),
+        chainId: DEST_CHAIN_ID,
+        sourceChainId: SOURCE_CHAIN_ID,
+        onRamp: ZERO_ADDRESS
+      }),
+      generateDynamicOffRampConfig(s_destRouter),
       s_afn,
       getCastedSourceTokens(),
       pools,
@@ -89,35 +123,36 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
   }
 }
 
-contract EVM2EVMOffRamp_setOffRampConfig is EVM2EVMOffRampSetup {
-  event OffRampConfigChanged(IEVM2EVMOffRamp.OffRampConfig config, uint64 chainId, address onRamp);
+contract EVM2EVMOffRamp_setDynamicConfig is EVM2EVMOffRampSetup {
+  event DynamicConfigSet(IEVM2EVMOffRamp.DynamicConfig config, uint64 chainId, address onRamp);
 
-  function testSuccess() public {
-    IEVM2EVMOffRamp.OffRampConfig memory config = offRampConfig(ICommitStore(USER_2), IRouter(USER_3));
+  function testSetDynamicConfigSuccess() public {
+    IEVM2EVMOffRamp.DynamicConfig memory config = generateDynamicOffRampConfig(IRouter(USER_3));
+
     vm.expectEmit(true, true, true, true);
-    emit OffRampConfigChanged(config, SOURCE_CHAIN_ID, ON_RAMP_ADDRESS);
-    s_offRamp.setOffRampConfig(config);
-    IEVM2EVMOffRamp.OffRampConfig memory newConfig = s_offRamp.getOffRampConfig();
+    emit DynamicConfigSet(config, SOURCE_CHAIN_ID, ON_RAMP_ADDRESS);
+
+    s_offRamp.setDynamicConfig(config);
+
+    IEVM2EVMOffRamp.DynamicConfig memory newConfig = s_offRamp.getDynamicConfig();
     _assertSameConfig(config, newConfig);
   }
 
   function testNonOwnerReverts() public {
     changePrank(STRANGER);
-    IEVM2EVMOffRamp.OffRampConfig memory config = offRampConfig(ICommitStore(USER_2), IRouter(USER_3));
+    IEVM2EVMOffRamp.DynamicConfig memory config = generateDynamicOffRampConfig(IRouter(USER_3));
+
     vm.expectRevert("Only callable by owner");
-    s_offRamp.setOffRampConfig(config);
+
+    s_offRamp.setDynamicConfig(config);
   }
 
   function testRouterZeroAddressReverts() public {
-    IEVM2EVMOffRamp.OffRampConfig memory config = offRampConfig(ICommitStore(USER_2), IRouter(ZERO_ADDRESS));
-    vm.expectRevert(abi.encodeWithSelector(IEVM2EVMOffRamp.InvalidOffRampConfig.selector, config));
-    s_offRamp.setOffRampConfig(config);
-  }
+    IEVM2EVMOffRamp.DynamicConfig memory config = generateDynamicOffRampConfig(IRouter(ZERO_ADDRESS));
 
-  function testCommitStoreZeroAddressReverts() public {
-    IEVM2EVMOffRamp.OffRampConfig memory config = offRampConfig(ICommitStore(ZERO_ADDRESS), IRouter(USER_3));
     vm.expectRevert(abi.encodeWithSelector(IEVM2EVMOffRamp.InvalidOffRampConfig.selector, config));
-    s_offRamp.setOffRampConfig(config);
+
+    s_offRamp.setDynamicConfig(config);
   }
 }
 
@@ -148,7 +183,6 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
 
   function testSingleMessageNoTokensSuccess() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
-    address[] memory offRamps = s_destRouter.getOffRamps(SOURCE_CHAIN_ID);
     vm.expectEmit(false, false, false, true);
     emit ExecutionStateChanged(
       messages[0].sequenceNumber,

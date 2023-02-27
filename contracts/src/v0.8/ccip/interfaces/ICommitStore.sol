@@ -10,19 +10,25 @@ interface ICommitStore {
   error InvalidCommitStoreConfig();
 
   event ReportAccepted(CommitReport report);
+  event StaticConfigSet(StaticConfig);
+  event DynamicConfigSet(DynamicConfig);
 
-  /// @notice commit store config
-  struct CommitStoreConfig {
-    uint64 chainId;
-    uint64 sourceChainId;
-    address onRamp;
-    address priceRegistry;
+  /// @notice Static commit store config
+  struct StaticConfig {
+    uint64 chainId; // -------┐  Destination chain Id
+    uint64 sourceChainId; // -┘  Source chain Id
+    address onRamp; //           OnRamp address on the source chain
+  }
+
+  /// @notice Dynamic commit store config
+  struct DynamicConfig {
+    address priceRegistry; // Price registry address on the destination chain
   }
 
   /// @notice a sequenceNumber interval
   struct Interval {
-    uint64 min;
-    uint64 max;
+    uint64 min; // ---┐ Minimum sequence number, inclusive
+    uint64 max; // ---┘ Maximum sequence number, inclusive
   }
 
   /// @notice Report that is committed by the observing DON at the committing phase
@@ -96,7 +102,15 @@ interface ICommitStore {
   /// @return whether the root is blessed or not.
   function isBlessed(bytes32 root) external view returns (bool);
 
-  /// @notice Returns the commit store config.
+  /// @notice Returns the static commit store config.
   /// @return the configuration.
-  function getConfig() external view returns (ICommitStore.CommitStoreConfig memory);
+  function getStaticConfig() external view returns (StaticConfig memory);
+
+  /// @notice Returns the dynamic commit store config.
+  /// @return the configuration.
+  function getDynamicConfig() external view returns (DynamicConfig memory);
+
+  /// @notice Sets the dynamic configuration.
+  /// @param dynamicConfig The configuration.
+  function setDynamicConfig(DynamicConfig memory dynamicConfig) external;
 }

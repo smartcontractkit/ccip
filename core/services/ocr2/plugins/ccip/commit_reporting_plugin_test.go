@@ -81,7 +81,7 @@ func TestCommitReportEncoding(t *testing.T) {
 		big.NewInt(1),
 	)
 
-	pricesAddress, _, _, err := price_registry.DeployPriceRegistry(destUser, destChain, price_registry.InternalPriceUpdates{
+	priceRegistry, _, _, err := price_registry.DeployPriceRegistry(destUser, destChain, price_registry.InternalPriceUpdates{
 		FeeTokenPriceUpdates: nil,
 		DestChainId:          0,
 		UsdPerUnitGas:        big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
@@ -93,11 +93,13 @@ func TestCommitReportEncoding(t *testing.T) {
 	commitStoreAddress, _, _, err := commit_store_helper.DeployCommitStoreHelper(
 		destUser,  // user
 		destChain, // client
-		commit_store_helper.ICommitStoreCommitStoreConfig{
+		commit_store_helper.ICommitStoreStaticConfig{
 			ChainId:       destChainId,
 			SourceChainId: 1337,
 			OnRamp:        onRampAddress,
-			PriceRegistry: pricesAddress,
+		},
+		commit_store_helper.ICommitStoreDynamicConfig{
+			PriceRegistry: priceRegistry,
 		},
 		afnAddress, // AFN address
 	)
@@ -106,7 +108,7 @@ func TestCommitReportEncoding(t *testing.T) {
 	require.NoError(t, err)
 	destChain.Commit()
 
-	prices, err := price_registry.NewPriceRegistry(pricesAddress, destChain)
+	prices, err := price_registry.NewPriceRegistry(priceRegistry, destChain)
 	require.NoError(t, err)
 
 	_, err = prices.AddPriceUpdaters(destUser, []common.Address{commitStoreAddress})

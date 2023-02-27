@@ -57,7 +57,7 @@ contract StructFactory {
   // message info
   uint64 internal constant SOURCE_CHAIN_ID = 1;
   uint64 internal constant DEST_CHAIN_ID = 2;
-  uint256 internal constant GAS_LIMIT = 100_000;
+  uint64 internal constant GAS_LIMIT = 200_000;
 
   // timing
   uint256 internal constant BLOCK_TIME = 1234567890;
@@ -71,15 +71,10 @@ contract StructFactory {
   uint32 internal constant PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS = 500;
   uint64 internal constant MAX_GAS_LIMIT = 4_000_000;
 
-  function offRampConfig(ICommitStore commitStore, IRouter router)
-    internal
-    pure
-    returns (IEVM2EVMOffRamp.OffRampConfig memory)
-  {
+  function generateDynamicOffRampConfig(IRouter router) internal pure returns (IEVM2EVMOffRamp.DynamicConfig memory) {
     return
-      IEVM2EVMOffRamp.OffRampConfig({
+      IEVM2EVMOffRamp.DynamicConfig({
         router: address(router),
-        commitStore: address(commitStore),
         executionDelaySeconds: EXECUTION_DELAY_SECONDS,
         maxDataSize: MAX_DATA_SIZE,
         maxTokensLength: MAX_TOKENS_LENGTH,
@@ -87,12 +82,19 @@ contract StructFactory {
       });
   }
 
-  function onRampConfig() internal pure returns (IEVM2EVMOnRamp.OnRampConfig memory) {
+  function generateDynamicOnRampConfig(
+    address router,
+    address priceRegistry,
+    address feeAdmin
+  ) internal pure returns (IEVM2EVMOnRamp.DynamicConfig memory) {
     return
-      IEVM2EVMOnRamp.OnRampConfig({
+      IEVM2EVMOnRamp.DynamicConfig({
+        router: router,
+        priceRegistry: priceRegistry,
         maxDataSize: MAX_DATA_SIZE,
         maxTokensLength: MAX_TOKENS_LENGTH,
-        maxGasLimit: MAX_GAS_LIMIT
+        maxGasLimit: MAX_GAS_LIMIT,
+        feeAdmin: feeAdmin
       });
   }
 

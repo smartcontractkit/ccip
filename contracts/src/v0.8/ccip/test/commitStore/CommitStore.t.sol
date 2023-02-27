@@ -14,14 +14,11 @@ contract CommitStoreSetup is PriceRegistrySetup {
     PriceRegistrySetup.setUp();
 
     s_commitStore = new CommitStoreHelper(
-      ICommitStore.CommitStoreConfig({
-        chainId: DEST_CHAIN_ID,
-        sourceChainId: SOURCE_CHAIN_ID,
-        onRamp: ON_RAMP_ADDRESS,
-        priceRegistry: address(s_priceRegistry)
-      }),
+      ICommitStore.StaticConfig({chainId: DEST_CHAIN_ID, sourceChainId: SOURCE_CHAIN_ID, onRamp: ON_RAMP_ADDRESS}),
+      ICommitStore.DynamicConfig({priceRegistry: address(s_priceRegistry)}),
       s_afn
     );
+
     address[] memory priceUpdaters = new address[](1);
     priceUpdaters[0] = address(s_commitStore);
     s_priceRegistry.addPriceUpdaters(priceUpdaters);
@@ -39,12 +36,8 @@ contract CommitStoreRealAFNSetup is PriceRegistrySetup {
     weights[0] = 1;
     s_afn = new AFN(participants, weights, 1, 1); // Overwrite base mock afn with real.
     s_commitStore = new CommitStoreHelper(
-      ICommitStore.CommitStoreConfig({
-        chainId: DEST_CHAIN_ID,
-        sourceChainId: SOURCE_CHAIN_ID,
-        onRamp: ON_RAMP_ADDRESS,
-        priceRegistry: address(s_priceRegistry)
-      }),
+      ICommitStore.StaticConfig({chainId: DEST_CHAIN_ID, sourceChainId: SOURCE_CHAIN_ID, onRamp: ON_RAMP_ADDRESS}),
+      ICommitStore.DynamicConfig({priceRegistry: address(s_priceRegistry)}),
       s_afn
     );
   }
@@ -52,46 +45,86 @@ contract CommitStoreRealAFNSetup is PriceRegistrySetup {
 
 /// @notice #constructor
 contract CommitStore_constructor is PriceRegistrySetup {
+  event StaticConfigSet(ICommitStore.StaticConfig);
+  event DynamicConfigSet(ICommitStore.DynamicConfig);
+
   function testConstructorSuccess() public {
-    address onRamp = 0x2C44CDDdB6a900Fa2B585dd299E03D12Fa4293Bc;
+    ICommitStore.StaticConfig memory staticConfig = ICommitStore.StaticConfig({
+      chainId: DEST_CHAIN_ID,
+      sourceChainId: SOURCE_CHAIN_ID,
+      onRamp: 0x2C44CDDdB6a900Fa2B585dd299E03D12Fa4293Bc
+    });
+    ICommitStore.DynamicConfig memory dynamicConfig = ICommitStore.DynamicConfig({
+      priceRegistry: address(s_priceRegistry)
+    });
 
-    CommitStore commitStore = new CommitStore(
-      ICommitStore.CommitStoreConfig({
-        chainId: DEST_CHAIN_ID,
-        sourceChainId: SOURCE_CHAIN_ID,
-        onRamp: onRamp,
-        priceRegistry: address(s_priceRegistry)
-      }),
-      s_afn
-    );
+    vm.expectEmit(false, false, false, true);
+    emit StaticConfigSet(staticConfig);
 
-    ICommitStore.CommitStoreConfig memory setConfig = commitStore.getConfig();
+    vm.expectEmit(false, false, false, true);
+    emit DynamicConfigSet(dynamicConfig);
 
-    assertEq(DEST_CHAIN_ID, setConfig.chainId);
-    assertEq(SOURCE_CHAIN_ID, setConfig.sourceChainId);
-    assertEq(onRamp, setConfig.onRamp);
+    CommitStore commitStore = new CommitStore(staticConfig, dynamicConfig, s_afn);
 
-    // CommitStore config
-    assertEq(1, commitStore.getExpectedNextSequenceNumber());
+    ICommitStore.StaticConfig memory gotStaticConfig = commitStore.getStaticConfig();
 
-    // typeAndVersion
-    assertEq(commitStore.typeAndVersion(), "CommitStore 1.0.0");
+    assertEq(staticConfig.chainId, gotStaticConfig.chainId);
+    assertEq(staticConfig.sourceChainId, gotStaticConfig.sourceChainId);
+    assertEq(staticConfig.onRamp, gotStaticConfig.onRamp);
 
-    // owner
-    assertEq(OWNER, commitStore.owner());
+    ICommitStore.DynamicConfig memory gotDynamicConfig = commitStore.getDynamicConfig();
 
-    // HealthChecker
+    assertEq(dynamicConfig.priceRegistry, gotDynamicConfig.priceRegistry);
+
+    // AFN
     assertEq(address(s_afn), address(commitStore.getAFN()));
+
+    // CommitStore initial values
+    assertEq(1, commitStore.getExpectedNextSequenceNumber());
+    assertEq(commitStore.typeAndVersion(), "CommitStore 1.0.0");
+    assertEq(OWNER, commitStore.owner());
   }
 }
 
 /// @notice #setMinSeqNr
 contract CommitStore_setMinSeqNr is CommitStoreSetup {
-  // Reverts
   function testSetMinSeqNrSuccess(uint64 minSeqNr) public {
     s_commitStore.setMinSeqNr(minSeqNr);
 
     assertEq(s_commitStore.getExpectedNextSequenceNumber(), minSeqNr);
+  }
+
+  // Reverts
+  function testOnlyOwnerReverts() public {
+    vm.stopPrank();
+    vm.expectRevert("Only callable by owner");
+    s_commitStore.setMinSeqNr(6723);
+  }
+}
+
+/// @notice #setDynamicConfig
+contract CommitStore_setDynamicConfig is CommitStoreSetup {
+  event DynamicConfigSet(ICommitStore.DynamicConfig);
+
+  function testSetMinSeqNrSuccess() public {
+    ICommitStore.DynamicConfig memory dynamicConfig = ICommitStore.DynamicConfig({priceRegistry: address(23784264)});
+
+    vm.expectEmit(false, false, false, true);
+    emit DynamicConfigSet(dynamicConfig);
+
+    s_commitStore.setDynamicConfig(dynamicConfig);
+
+    ICommitStore.DynamicConfig memory gotDynamicConfig = s_commitStore.getDynamicConfig();
+    assertEq(gotDynamicConfig.priceRegistry, dynamicConfig.priceRegistry);
+  }
+
+  // Reverts
+  function testOnlyOwnerReverts() public {
+    ICommitStore.DynamicConfig memory dynamicConfig = ICommitStore.DynamicConfig({priceRegistry: address(23784264)});
+
+    vm.stopPrank();
+    vm.expectRevert("Only callable by owner");
+    s_commitStore.setDynamicConfig(dynamicConfig);
   }
 }
 

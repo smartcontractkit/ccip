@@ -192,10 +192,12 @@ func (e *CCIPContractsDeployer) DeployCommitStore(sourceChainId, destChainId uin
 		return commit_store.DeployCommitStore(
 			auth,
 			backend,
-			commit_store.ICommitStoreCommitStoreConfig{
+			commit_store.ICommitStoreStaticConfig{
 				ChainId:       destChainId,
 				SourceChainId: sourceChainId,
 				OnRamp:        onRamp,
+			},
+			commit_store.ICommitStoreDynamicConfig{
 				PriceRegistry: priceRegistry,
 			},
 			afn,
@@ -387,26 +389,29 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 		return evm_2_evm_onramp.DeployEVM2EVMOnRamp(
 			auth,
 			backend,
-			evm_2_evm_onramp.IEVM2EVMOnRampChains{
-				ChainId:     sourceChainId, // source chain id
-				DestChainId: destChainId,   // destinationChainId
+
+			evm_2_evm_onramp.IEVM2EVMOnRampStaticConfig{
+				LinkToken:         linkTokenAddress,
+				ChainId:           sourceChainId, // source chain id
+				DestChainId:       destChainId,   // destinationChainId
+				DefaultTxGasLimit: 200_000,
+			},
+			evm_2_evm_onramp.IEVM2EVMOnRampDynamicConfig{
+				Router:          router,
+				PriceRegistry:   priceRegistry,
+				MaxDataSize:     1e5,
+				MaxTokensLength: 5,
+				MaxGasLimit:     ccip.GasLimitPerTx,
+				FeeAdmin:        common.Address{},
 			},
 			tokensAndPools,
 			allowList,
 			afn,
-			evm_2_evm_onramp.IEVM2EVMOnRampOnRampConfig{
-				MaxDataSize:     1e5,
-				MaxTokensLength: 5,
-				MaxGasLimit:     ccip.GasLimitPerTx,
-			},
 			evm_2_evm_onramp.IAggregateRateLimiterRateLimiterConfig{
 				Capacity: opts.Capacity,
 				Rate:     opts.Rate,
 			},
-			router,
-			priceRegistry,
 			feeConfig,
-			linkTokenAddress,
 			[]evm_2_evm_onramp.IEVM2EVMOnRampNopAndWeight{},
 		)
 	})
@@ -446,12 +451,14 @@ func (e *CCIPContractsDeployer) DeployOffRamp(sourceChainId, destChainId uint64,
 		return evm_2_evm_offramp.DeployEVM2EVMOffRamp(
 			auth,
 			backend,
-			sourceChainId,
-			destChainId,
-			onRamp,
-			evm_2_evm_offramp.IEVM2EVMOffRampOffRampConfig{
+			evm_2_evm_offramp.IEVM2EVMOffRampStaticConfig{
+				CommitStore:   commitStore,
+				ChainId:       destChainId,
+				SourceChainId: sourceChainId,
+				OnRamp:        onRamp,
+			},
+			evm_2_evm_offramp.IEVM2EVMOffRampDynamicConfig{
 				Router:                                  destRouter,
-				CommitStore:                             commitStore,
 				PermissionLessExecutionThresholdSeconds: 0,
 				ExecutionDelaySeconds:                   0,
 				MaxDataSize:                             1e5,

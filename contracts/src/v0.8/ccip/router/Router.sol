@@ -24,7 +24,7 @@ contract Router is IRouter, TypeAndVersionInterface, OwnerIsCreator {
 
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "Router 1.0.0";
-
+  // The minimum amount of gas to perform the call with exact gas
   uint64 private constant GAS_FOR_CALL_EXACT_CHECK = 5_000;
 
   // DYNAMIC CONFIG

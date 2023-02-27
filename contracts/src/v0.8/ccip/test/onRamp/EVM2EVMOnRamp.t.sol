@@ -6,29 +6,65 @@ import {IEVM2EVMOnRamp} from "../../interfaces/onRamp/IEVM2EVMOnRamp.sol";
 
 /// @notice #constructor
 contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
+  event StaticConfigSet(IEVM2EVMOnRamp.StaticConfig);
+  event DynamicConfigSet(IEVM2EVMOnRamp.DynamicConfig);
+
   function testConstructorSuccess() public {
-    // typeAndVersion
-    assertEq("EVM2EVMOnRamp 1.0.0", s_onRamp.typeAndVersion());
+    IEVM2EVMOnRamp.StaticConfig memory staticConfig = IEVM2EVMOnRamp.StaticConfig({
+      linkToken: s_sourceTokens[0],
+      chainId: SOURCE_CHAIN_ID,
+      destChainId: DEST_CHAIN_ID,
+      defaultTxGasLimit: GAS_LIMIT
+    });
+    IEVM2EVMOnRamp.DynamicConfig memory dynamicConfig = generateDynamicOnRampConfig(
+      address(s_sourceRouter),
+      address(s_priceRegistry),
+      address(0)
+    );
 
-    // owner
-    assertEq(OWNER, s_onRamp.owner());
+    vm.expectEmit(false, false, false, true);
+    emit StaticConfigSet(staticConfig);
 
-    // baseOnRamp
-    IEVM2EVMOnRamp.OnRampConfig memory onRampConfig = onRampConfig();
-    assertEq(onRampConfig.maxDataSize, s_onRamp.getOnRampConfig().maxDataSize);
-    assertEq(onRampConfig.maxTokensLength, s_onRamp.getOnRampConfig().maxTokensLength);
-    assertEq(onRampConfig.maxGasLimit, s_onRamp.getOnRampConfig().maxGasLimit);
+    vm.expectEmit(false, false, false, true);
+    emit DynamicConfigSet(dynamicConfig);
 
-    assertEq(SOURCE_CHAIN_ID, s_onRamp.getChainId());
-    assertEq(DEST_CHAIN_ID, s_onRamp.getDestChainId());
+    s_onRamp = new EVM2EVMOnRamp(
+      staticConfig,
+      dynamicConfig,
+      getTokensAndPools(s_sourceTokens, getCastedSourcePools()),
+      s_allowList,
+      s_afn,
+      rateLimiterConfig(),
+      s_feeTokenConfigArgs,
+      getNopsAndWeights()
+    );
 
-    assertEq(address(s_sourceRouter), s_onRamp.getRouter());
-    assertEq(1, s_onRamp.getExpectedNextSequenceNumber());
+    IEVM2EVMOnRamp.StaticConfig memory gotStaticConfig = s_onRamp.getStaticConfig();
 
+    assertEq(staticConfig.linkToken, gotStaticConfig.linkToken);
+    assertEq(staticConfig.chainId, gotStaticConfig.chainId);
+    assertEq(staticConfig.destChainId, gotStaticConfig.destChainId);
+    assertEq(staticConfig.defaultTxGasLimit, gotStaticConfig.defaultTxGasLimit);
+
+    IEVM2EVMOnRamp.DynamicConfig memory gotDynamicConfig = s_onRamp.getDynamicConfig();
+
+    assertEq(dynamicConfig.router, gotDynamicConfig.router);
+    assertEq(dynamicConfig.priceRegistry, gotDynamicConfig.priceRegistry);
+    assertEq(dynamicConfig.maxDataSize, gotDynamicConfig.maxDataSize);
+    assertEq(dynamicConfig.maxTokensLength, gotDynamicConfig.maxTokensLength);
+    assertEq(dynamicConfig.maxGasLimit, gotDynamicConfig.maxGasLimit);
+    assertEq(dynamicConfig.feeAdmin, gotDynamicConfig.feeAdmin);
+
+    // Tokens
     assertEq(s_sourceTokens, s_onRamp.getSupportedTokens());
-    assertSameConfig(onRampConfig, s_onRamp.getOnRampConfig());
-    // HealthChecker
+
+    // AFN
     assertEq(address(s_afn), address(s_onRamp.getAFN()));
+
+    // Initial values
+    assertEq("EVM2EVMOnRamp 1.0.0", s_onRamp.typeAndVersion());
+    assertEq(OWNER, s_onRamp.owner());
+    assertEq(1, s_onRamp.getExpectedNextSequenceNumber());
   }
 }
 
@@ -68,9 +104,7 @@ contract EVM2EVMOnRamp_payNops is EVM2EVMOnRampSetup {
   }
 
   function testFeeAdminPayNopsSuccess() public {
-    changePrank(OWNER);
-    s_onRamp.setFeeAdmin(STRANGER);
-    changePrank(STRANGER);
+    changePrank(s_feeAdmin);
 
     uint256 totalJuels = s_onRamp.getNopFeesJuels();
     s_onRamp.payNops();
@@ -239,16 +273,15 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
 
   function testMessageTooLargeReverts() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.data = new bytes(onRampConfig().maxDataSize + 1);
+    message.data = new bytes(MAX_DATA_SIZE + 1);
     vm.expectRevert(
-      abi.encodeWithSelector(IEVM2EVMOnRamp.MessageTooLarge.selector, onRampConfig().maxDataSize, message.data.length)
+      abi.encodeWithSelector(IEVM2EVMOnRamp.MessageTooLarge.selector, MAX_DATA_SIZE, message.data.length)
     );
 
     s_onRamp.forwardFromRouter(message, 0, STRANGER);
   }
 
   function testTooManyTokensReverts() public {
-    assertEq(MAX_TOKENS_LENGTH, s_onRamp.getOnRampConfig().maxTokensLength);
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     uint256 tooMany = MAX_TOKENS_LENGTH + 1;
     message.tokenAmounts = new Client.EVMTokenAmount[](tooMany);
@@ -366,31 +399,6 @@ contract EVM2EVMOnRamp_setNops is EVM2EVMOnRampSetup {
   }
 }
 
-/// @notice #setFeeAdmin
-contract EVM2EVMOnRamp_setFeeAdmin is EVM2EVMOnRampSetup {
-  event FeeAdminSet(address feeAdmin);
-
-  function testOwnerSetFeeAdminSuccess() public {
-    address newAdmin = address(13371337);
-
-    vm.expectEmit(false, false, false, true);
-    emit FeeAdminSet(newAdmin);
-
-    s_onRamp.setFeeAdmin(newAdmin);
-  }
-
-  // Reverts
-
-  function testOnlyCallableByOwnerReverts() public {
-    address newAdmin = address(13371337);
-    changePrank(STRANGER);
-
-    vm.expectRevert("Only callable by owner");
-
-    s_onRamp.setFeeAdmin(newAdmin);
-  }
-}
-
 /// @notice #withdrawNonLinkFees
 contract EVM2EVMOnRamp_withdrawNonLinkFees is EVM2EVMOnRampSetup {
   IERC20 internal s_token;
@@ -441,12 +449,9 @@ contract EVM2EVMOnRamp_setFeeConfig is EVM2EVMOnRampSetup {
   }
 
   function testSetFeeConfigByFeeAdminSuccess() public {
-    address newAdmin = address(13371337);
-    s_onRamp.setFeeAdmin(newAdmin);
-
     IEVM2EVMOnRamp.FeeTokenConfigArgs[] memory feeConfig;
 
-    changePrank(newAdmin);
+    changePrank(s_feeAdmin);
 
     vm.expectEmit(false, false, false, true);
     emit FeeConfigSet(feeConfig);
@@ -503,70 +508,39 @@ contract EVM2EVMOnRamp_getExpectedNextSequenceNumber is EVM2EVMOnRampSetup {
   }
 }
 
-// #setRouter
-contract EVM2EVMOnRamp_setRouter is EVM2EVMOnRampSetup {
-  event RouterSet(address);
+// #setDynamicConfig
+contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
+  event DynamicConfigSet(IEVM2EVMOnRamp.DynamicConfig);
 
   // Success
   function testSuccess() public {
-    assertEq(address(s_sourceRouter), s_onRamp.getRouter());
-    address newRouter = address(100);
-
-    vm.expectEmit(false, false, false, true);
-    emit RouterSet(newRouter);
-
-    s_onRamp.setRouter(newRouter);
-    assertEq(newRouter, s_onRamp.getRouter());
-  }
-
-  // Revert
-  function testSetRouterOnlyOwnerReverts() public {
-    vm.stopPrank();
-    vm.expectRevert("Only callable by owner");
-    s_onRamp.setRouter(address(1));
-  }
-}
-
-// #getRouter
-contract EVM2EVMOnRamp_getRouter is EVM2EVMOnRampSetup {
-  // Success
-  function testSuccess() public {
-    assertEq(address(s_sourceRouter), s_onRamp.getRouter());
-  }
-}
-
-// #setOnRampConfig
-contract EVM2EVMOnRamp_setOnRampConfig is EVM2EVMOnRampSetup {
-  event OnRampConfigSet(IEVM2EVMOnRamp.OnRampConfig);
-
-  // Success
-  function testSuccess() public {
-    IEVM2EVMOnRamp.OnRampConfig memory newConfig = IEVM2EVMOnRamp.OnRampConfig({
+    IEVM2EVMOnRamp.DynamicConfig memory newConfig = IEVM2EVMOnRamp.DynamicConfig({
+      router: address(2134),
+      priceRegistry: address(23423),
       maxDataSize: 400,
       maxTokensLength: 14,
-      maxGasLimit: MAX_GAS_LIMIT / 2
+      maxGasLimit: MAX_GAS_LIMIT / 2,
+      feeAdmin: address(98235)
     });
 
     vm.expectEmit(false, false, false, true);
-    emit OnRampConfigSet(newConfig);
+    emit DynamicConfigSet(newConfig);
 
-    s_onRamp.setOnRampConfig(newConfig);
+    s_onRamp.setDynamicConfig(newConfig);
 
-    assertSameConfig(newConfig, s_onRamp.getOnRampConfig());
+    IEVM2EVMOnRamp.DynamicConfig memory gotDynamicConfig = s_onRamp.getDynamicConfig();
+    assertEq(newConfig.router, gotDynamicConfig.router);
+    assertEq(newConfig.priceRegistry, gotDynamicConfig.priceRegistry);
+    assertEq(newConfig.maxDataSize, gotDynamicConfig.maxDataSize);
+    assertEq(newConfig.maxTokensLength, gotDynamicConfig.maxTokensLength);
+    assertEq(newConfig.maxGasLimit, gotDynamicConfig.maxGasLimit);
+    assertEq(newConfig.feeAdmin, gotDynamicConfig.feeAdmin);
   }
 
   // Reverts
   function testSetConfigOnlyOwnerReverts() public {
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
-    s_onRamp.setOnRampConfig(onRampConfig());
-  }
-}
-
-// #getConfig
-contract EVM2EVMOnRamp_getConfig is EVM2EVMOnRampSetup {
-  // Success
-  function testSuccess() public {
-    assertSameConfig(onRampConfig(), s_onRamp.getOnRampConfig());
+    s_onRamp.setDynamicConfig(generateDynamicOnRampConfig(address(1), address(2), address(3)));
   }
 }

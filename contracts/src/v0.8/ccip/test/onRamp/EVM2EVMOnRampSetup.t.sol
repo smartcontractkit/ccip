@@ -27,35 +27,38 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
 
   EVM2EVMOnRamp internal s_onRamp;
   address[] s_offRamps;
+  address s_feeAdmin = address(567892030);
+
+  IEVM2EVMOnRamp.FeeTokenConfigArgs[] s_feeTokenConfigArgs;
 
   function setUp() public virtual override(TokenSetup, PriceRegistrySetup) {
     TokenSetup.setUp();
     PriceRegistrySetup.setUp();
 
-    IEVM2EVMOnRamp.FeeTokenConfigArgs[] memory feeTokenConfigArgs = new IEVM2EVMOnRamp.FeeTokenConfigArgs[](2);
-    feeTokenConfigArgs[0] = IEVM2EVMOnRamp.FeeTokenConfigArgs({
-      token: s_sourceFeeToken,
-      feeAmount: 1,
-      multiplier: 108e16,
-      destGasOverhead: 1
-    });
-    feeTokenConfigArgs[1] = IEVM2EVMOnRamp.FeeTokenConfigArgs({
-      token: s_sourceRouter.getWrappedNative(),
-      feeAmount: 2,
-      multiplier: 108e16,
-      destGasOverhead: 2
-    });
+    s_feeTokenConfigArgs.push(
+      IEVM2EVMOnRamp.FeeTokenConfigArgs({token: s_sourceFeeToken, feeAmount: 1, multiplier: 108e16, destGasOverhead: 1})
+    );
+    s_feeTokenConfigArgs.push(
+      IEVM2EVMOnRamp.FeeTokenConfigArgs({
+        token: s_sourceRouter.getWrappedNative(),
+        feeAmount: 2,
+        multiplier: 108e16,
+        destGasOverhead: 2
+      })
+    );
     s_onRamp = new EVM2EVMOnRamp(
-      IEVM2EVMOnRamp.Chains({chainId: SOURCE_CHAIN_ID, destChainId: DEST_CHAIN_ID}),
+      IEVM2EVMOnRamp.StaticConfig({
+        linkToken: s_sourceTokens[0],
+        chainId: SOURCE_CHAIN_ID,
+        destChainId: DEST_CHAIN_ID,
+        defaultTxGasLimit: GAS_LIMIT
+      }),
+      generateDynamicOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), s_feeAdmin),
       getTokensAndPools(s_sourceTokens, getCastedSourcePools()),
       s_allowList,
       s_afn,
-      onRampConfig(),
       rateLimiterConfig(),
-      address(s_sourceRouter),
-      address(s_priceRegistry),
-      feeTokenConfigArgs,
-      s_sourceTokens[0],
+      s_feeTokenConfigArgs,
       getNopsAndWeights()
     );
 
@@ -81,12 +84,6 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
     // only cover actual gas usage from the ramps
     IERC20(s_sourceTokens[0]).approve(address(s_sourceRouter), 2**128);
     IERC20(s_sourceTokens[1]).approve(address(s_sourceRouter), 2**128);
-  }
-
-  function assertSameConfig(IEVM2EVMOnRamp.OnRampConfig memory a, IEVM2EVMOnRamp.OnRampConfig memory b) public {
-    assertEq(a.maxDataSize, b.maxDataSize);
-    assertEq(a.maxTokensLength, b.maxTokensLength);
-    assertEq(a.maxGasLimit, b.maxGasLimit);
   }
 
   function _generateTokenMessage() public view returns (Client.EVM2AnyMessage memory) {

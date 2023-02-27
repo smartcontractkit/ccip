@@ -33,79 +33,76 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AllowList, AggregateRat
     bool enabled;
   }
 
-  /// @dev Default gas limit for EVM transactions
-  uint256 private constant EVM_DEFAULT_GAS_LIMIT = 200_000;
+  // STATIC CONFIG
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "EVM2EVMOnRamp 1.0.0";
   /// @dev The metadata hash for this contract
   bytes32 internal immutable i_metadataHash;
+  /// @dev Default gas limit for a transactions that did not specify
+  /// a gas limit in the extraArgs.
+  uint64 internal immutable i_defaultTxGasLimit;
+  /// @dev The link token address - known to pay nops for their work
+  address internal immutable i_linkToken;
   /// @dev The chain ID of the source chain that this contract is deployed to
   uint64 internal immutable i_chainId;
   /// @dev The chain ID of the destination chain
   uint64 internal immutable i_destChainId;
 
+  // DYNAMIC CONFIG
   /// @dev The config for the onRamp
-  OnRampConfig internal s_config;
-  /// @dev The address of the router contract
-  address internal s_router;
-
-  /// @dev Special permissioned address that can set the fee for each token
-  address internal s_feeAdmin;
-  /// @dev The fee token config that can be set by the owner or fee admin
-  mapping(address => FeeTokenConfig) internal s_feeTokenConfig;
-
-  /// @dev The link token address - known to pay nops for their work
-  address internal immutable i_linkToken;
-  /// @dev The price registry address - used to get destination gas and token prices for conversions.
-  address internal s_priceRegistry;
-
-  /// @dev The amount of LINK available to pay NOPS
-  uint256 internal s_nopFeesJuels;
-  /// @dev The total weight of all NOPs weights
-  uint256 internal s_nopWeightsTotal;
+  DynamicConfig internal s_dynamicConfig;
   /// @dev (address nop => uint256 weight)
   EnumerableMap.AddressToUintMap internal s_nops;
-
-  /// @dev The current nonce per sender
-  mapping(address => uint64) internal s_senderNonce;
-
-  /// @dev The last used sequence number. This is zero in the case where no
-  /// messages has been sent yet. 0 is not a valid sequence number for any
-  /// real transaction.
-  uint64 internal s_sequenceNumber;
-
   /// @dev source token => token pool
   mapping(IERC20 => PoolConfig) private s_poolsBySourceToken;
   /// @dev The list of source tokens that are supported
   address[] private s_sourceTokenList;
 
+  // STATE
+  /// @dev The fee token config that can be set by the owner or fee admin
+  mapping(address => FeeTokenConfig) internal s_feeTokenConfig;
+  /// @dev The amount of LINK available to pay NOPS
+  uint256 internal s_nopFeesJuels;
+  /// @dev The total weight of all NOPs weights
+  uint256 internal s_nopWeightsTotal;
+  /// @dev The current nonce per sender
+  mapping(address => uint64) internal s_senderNonce;
+  /// @dev The last used sequence number. This is zero in the case where no
+  /// messages has been sent yet. 0 is not a valid sequence number for any
+  /// real transaction.
+  uint64 internal s_sequenceNumber;
+
   constructor(
-    Chains memory chainIds,
+    StaticConfig memory staticConfig,
+    DynamicConfig memory dynamicConfig,
     TokenAndPool[] memory tokensAndPools,
     address[] memory allowlist,
     IAFN afn,
-    OnRampConfig memory config,
     IAggregateRateLimiter.RateLimiterConfig memory rateLimiterConfig,
-    address router,
-    address priceRegistry,
     FeeTokenConfigArgs[] memory feeTokenConfigs,
-    address linkToken,
     NopAndWeight[] memory nopsAndWeights
   ) HealthChecker(afn) AllowList(allowlist) AggregateRateLimiter(rateLimiterConfig) {
-    if (router == address(0) || priceRegistry == address(0) || linkToken == address(0)) revert NullAddressNotAllowed();
+    if (
+      staticConfig.linkToken == address(0) ||
+      staticConfig.chainId == 0 ||
+      staticConfig.destChainId == 0 ||
+      staticConfig.defaultTxGasLimit == 0
+    ) revert InvalidConfig();
 
     i_metadataHash = keccak256(
-      abi.encode(Internal.EVM_2_EVM_MESSAGE_HASH, chainIds.chainId, chainIds.destChainId, address(this))
+      abi.encode(Internal.EVM_2_EVM_MESSAGE_HASH, staticConfig.chainId, staticConfig.destChainId, address(this))
     );
-    i_linkToken = linkToken;
-    i_chainId = chainIds.chainId;
-    i_destChainId = chainIds.destChainId;
-    s_config = config;
-    s_router = router;
-    s_priceRegistry = priceRegistry;
-    s_sequenceNumber = 0;
+    i_linkToken = staticConfig.linkToken;
+    i_chainId = staticConfig.chainId;
+    i_destChainId = staticConfig.destChainId;
+    i_defaultTxGasLimit = staticConfig.defaultTxGasLimit;
+    emit StaticConfigSet(staticConfig);
+
+    _setDynamicConfig(dynamicConfig);
     _setFeeConfig(feeTokenConfigs);
     _setNops(nopsAndWeights);
+
+    s_sequenceNumber = 0;
 
     address[] memory newTokens = new address[](tokensAndPools.length);
     // Set new tokens and pools
@@ -116,7 +113,7 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AllowList, AggregateRat
     s_sourceTokenList = newTokens;
   }
 
-  /// @inheritdoc IEVM2EVMOnRamp
+  /// @inheritdoc IEVM2AnyOnRamp
   function getPoolBySourceToken(IERC20 sourceToken) external view override returns (IPool) {
     return _getPoolBySourceToken(sourceToken);
   }
@@ -135,9 +132,9 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AllowList, AggregateRat
   /// @dev Convert the extra args bytes into a struct
   /// @param extraArgs The extra args bytes
   /// @return The extra args struct
-  function _fromBytes(bytes calldata extraArgs) internal pure returns (Client.EVMExtraArgsV1 memory) {
+  function _fromBytes(bytes calldata extraArgs) internal view returns (Client.EVMExtraArgsV1 memory) {
     if (extraArgs.length == 0) {
-      return Client.EVMExtraArgsV1({gasLimit: EVM_DEFAULT_GAS_LIMIT, strict: false});
+      return Client.EVMExtraArgsV1({gasLimit: i_defaultTxGasLimit, strict: false});
     }
     if (bytes4(extraArgs[:4]) != Client.EVM_EXTRA_ARGS_V1_TAG)
       revert InvalidExtraArgsTag(Client.EVM_EXTRA_ARGS_V1_TAG, bytes4(extraArgs[:4]));
@@ -155,12 +152,13 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AllowList, AggregateRat
     Client.EVMTokenAmount[] memory tokenAmounts,
     address originalSender
   ) internal {
-    if (msg.sender != s_router) revert MustBeCalledByRouter();
+    if (msg.sender != s_dynamicConfig.router) revert MustBeCalledByRouter();
     if (originalSender == address(0)) revert RouterMustSetOriginalSender();
     // Check that payload is formed correctly
-    if (dataLength > uint256(s_config.maxDataSize)) revert MessageTooLarge(uint256(s_config.maxDataSize), dataLength);
-    if (gasLimit > uint256(s_config.maxGasLimit)) revert MessageGasLimitTooHigh();
-    if (tokenAmounts.length > uint256(s_config.maxTokensLength)) revert UnsupportedNumberOfTokens();
+    if (dataLength > uint256(s_dynamicConfig.maxDataSize))
+      revert MessageTooLarge(uint256(s_dynamicConfig.maxDataSize), dataLength);
+    if (gasLimit > uint256(s_dynamicConfig.maxGasLimit)) revert MessageGasLimitTooHigh();
+    if (tokenAmounts.length > uint256(s_dynamicConfig.maxTokensLength)) revert UnsupportedNumberOfTokens();
     if (s_allowlistEnabled && !s_allowed[originalSender]) revert SenderNotAllowed(originalSender);
 
     _removeTokens(tokenAmounts);
@@ -180,7 +178,7 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AllowList, AggregateRat
     if (message.feeToken == i_linkToken) {
       s_nopFeesJuels += feeTokenAmount;
     } else {
-      s_nopFeesJuels += IPriceRegistry(s_priceRegistry).convertFeeTokenAmountToLinkAmount(
+      s_nopFeesJuels += IPriceRegistry(s_dynamicConfig.priceRegistry).convertFeeTokenAmountToLinkAmount(
         i_linkToken,
         message.feeToken,
         feeTokenAmount
@@ -218,7 +216,7 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AllowList, AggregateRat
   /// @inheritdoc IEVM2AnyOnRamp
   function getFee(Client.EVM2AnyMessage calldata message) public view override returns (uint256 fee) {
     uint256 gasLimit = _fromBytes(message.extraArgs).gasLimit;
-    uint256 feeTokenBaseUnitsPerUnitGas = IPriceRegistry(s_priceRegistry).getFeeTokenBaseUnitsPerUnitGas(
+    uint256 feeTokenBaseUnitsPerUnitGas = IPriceRegistry(s_dynamicConfig.priceRegistry).getFeeTokenBaseUnitsPerUnitGas(
       message.feeToken,
       i_destChainId
     );
@@ -233,41 +231,37 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AllowList, AggregateRat
       1 ether; // latest gas reported gas fee with a safety margin
   }
 
-  /// @inheritdoc IEVM2EVMOnRamp
+  /// @inheritdoc IEVM2AnyOnRamp
   function getExpectedNextSequenceNumber() external view override returns (uint64) {
     return s_sequenceNumber + 1;
   }
 
   /// @inheritdoc IEVM2EVMOnRamp
-  function setRouter(address router) public override onlyOwner {
-    s_router = router;
-    emit RouterSet(router);
+  function getStaticConfig() external view override returns (IEVM2EVMOnRamp.StaticConfig memory) {
+    return
+      IEVM2EVMOnRamp.StaticConfig({
+        linkToken: i_linkToken,
+        chainId: i_chainId,
+        destChainId: i_destChainId,
+        defaultTxGasLimit: i_defaultTxGasLimit
+      });
   }
 
   /// @inheritdoc IEVM2EVMOnRamp
-  function getRouter() external view override returns (address router) {
-    return s_router;
+  function getDynamicConfig() external view override returns (DynamicConfig memory config) {
+    return s_dynamicConfig;
   }
 
   /// @inheritdoc IEVM2EVMOnRamp
-  function setOnRampConfig(OnRampConfig calldata config) external override onlyOwner {
-    s_config = config;
-    emit OnRampConfigSet(config);
+  function setDynamicConfig(DynamicConfig memory dynamicConfig) external override onlyOwner {
+    _setDynamicConfig(dynamicConfig);
   }
 
-  /// @inheritdoc IEVM2EVMOnRamp
-  function getOnRampConfig() external view override returns (OnRampConfig memory config) {
-    return s_config;
-  }
+  function _setDynamicConfig(DynamicConfig memory dynamicConfig) internal {
+    if (dynamicConfig.router == address(0) || dynamicConfig.priceRegistry == address(0)) revert InvalidConfig();
 
-  /// @inheritdoc IEVM2EVMOnRamp
-  function getChainId() external view override returns (uint64) {
-    return i_chainId;
-  }
-
-  /// @inheritdoc IEVM2EVMOnRamp
-  function getDestChainId() external view override returns (uint64) {
-    return i_destChainId;
+    s_dynamicConfig = dynamicConfig;
+    emit DynamicConfigSet(dynamicConfig);
   }
 
   /// @inheritdoc IEVM2EVMOnRamp
@@ -305,7 +299,7 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AllowList, AggregateRat
     emit PoolRemoved(token, pool);
   }
 
-  /// @inheritdoc IEVM2EVMOnRamp
+  /// @inheritdoc IEVM2AnyOnRamp
   function getSupportedTokens() public view returns (address[] memory) {
     // TODO: We should just fully remove the pool in remove pool in the
     // same way we do for OffRamps? Seems better than keeping the full list
@@ -327,7 +321,7 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AllowList, AggregateRat
     return sourceTokens;
   }
 
-  /// @inheritdoc IEVM2EVMOnRamp
+  /// @inheritdoc IEVM2AnyOnRamp
   function getSenderNonce(address sender) external view override returns (uint64) {
     return s_senderNonce[sender];
   }
@@ -337,12 +331,6 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AllowList, AggregateRat
     if (feeToken == i_linkToken) revert InvalidFeeToken(feeToken);
     if (to == address(0)) revert InvalidWithdrawalAddress(to);
     IERC20(feeToken).safeTransfer(to, IERC20(feeToken).balanceOf(address(this)));
-  }
-
-  /// @inheritdoc IEVM2EVMOnRamp
-  function setFeeAdmin(address feeAdmin) external override onlyOwner {
-    s_feeAdmin = feeAdmin;
-    emit FeeAdminSet(feeAdmin);
   }
 
   /// @inheritdoc IEVM2EVMOnRamp
@@ -384,7 +372,7 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AllowList, AggregateRat
   }
 
   /// @inheritdoc IEVM2EVMOnRamp
-  function setFeeConfig(FeeTokenConfigArgs[] calldata feeTokenConfigs) external override onlyOwnerOrFeeAdmin {
+  function setFeeConfig(FeeTokenConfigArgs[] memory feeTokenConfigs) external override onlyOwnerOrFeeAdmin {
     _setFeeConfig(feeTokenConfigs);
   }
 
@@ -425,14 +413,14 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AllowList, AggregateRat
 
   /// @dev Require that the sender is the owner or the fee admin or a nop
   modifier onlyOwnerOrFeeAdminOrNop() {
-    if (msg.sender != owner() && msg.sender != s_feeAdmin && !s_nops.contains(msg.sender))
+    if (msg.sender != owner() && msg.sender != s_dynamicConfig.feeAdmin && !s_nops.contains(msg.sender))
       revert OnlyCallableByOwnerOrFeeAdminOrNop();
     _;
   }
 
   /// @dev Require that the sender is the owner or the fee admin
   modifier onlyOwnerOrFeeAdmin() {
-    if (msg.sender != owner() && msg.sender != s_feeAdmin) revert OnlyCallableByOwnerOrFeeAdmin();
+    if (msg.sender != owner() && msg.sender != s_dynamicConfig.feeAdmin) revert OnlyCallableByOwnerOrFeeAdmin();
     _;
   }
 }
