@@ -202,7 +202,7 @@ func (o *ORM) SelectLogsCreatedAfter(eventSig []byte, address common.Address, af
 	var logs []Log
 	q := o.q.WithOpts(qopts...)
 	err := q.Select(&logs, `
-		SELECT * FROM logs 
+		SELECT * FROM evm_logs 
 			WHERE evm_chain_id = $1 AND address = $2 AND event_sig = $3 AND created_at > $4
 			ORDER BY created_at ASC`, utils.NewBig(o.chainID), address, eventSig, after)
 	if err != nil {
@@ -392,8 +392,8 @@ func (o *ORM) SelectIndexedLogsCreatedAfter(address common.Address, eventSig com
 	}
 	// Add 1 since postgresql arrays are 1-indexed.
 	err := q.Select(&logs, `
-		SELECT * FROM logs 
-			WHERE logs.evm_chain_id = $1
+		SELECT * FROM evm_logs 
+			WHERE evm_logs.evm_chain_id = $1
 			AND address = $2 AND event_sig = $3
 			AND topics[$4] = ANY($5)
 			AND created_at > $6

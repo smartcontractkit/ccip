@@ -21,8 +21,11 @@ import (
 )
 
 const (
-	DefaultInflightCacheExpiry = 3 * time.Minute
-	DefaultRootSnoozeTime      = 10 * time.Minute
+	DefaultInflightCacheExpiry   = 3 * time.Minute
+	DefaultRootSnoozeTime        = 10 * time.Minute
+	EXEC_CCIP_SENDS              = "Exec ccip sends"
+	EXEC_REPORT_ACCEPTS          = "Exec report accepts"
+	EXEC_EXECUTION_STATE_CHANGES = "Exec execution state changes"
 )
 
 func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
@@ -92,15 +95,18 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 			inflightCacheExpiry: inflightCacheExpiry,
 		})
 	// Subscribe to all relevant commit logs.
-	err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{eventSignatures.SendRequested}, Addresses: []common.Address{onRamp.Address()}})
+	err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{Name: logpoller.FilterName(EXEC_CCIP_SENDS, onRamp.Address().String()),
+		EventSigs: []common.Hash{eventSignatures.SendRequested}, Addresses: []common.Address{onRamp.Address()}})
 	if err != nil {
 		return nil, err
 	}
-	err = destChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{ReportAccepted}, Addresses: []common.Address{commitStore.Address()}})
+	err = destChain.LogPoller().RegisterFilter(logpoller.Filter{Name: logpoller.FilterName(EXEC_REPORT_ACCEPTS, commitStore.Address().String()),
+		EventSigs: []common.Hash{ReportAccepted}, Addresses: []common.Address{commitStore.Address()}})
 	if err != nil {
 		return nil, err
 	}
-	err = destChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{eventSignatures.ExecutionStateChanged}, Addresses: []common.Address{offRamp.Address()}})
+	err = destChain.LogPoller().RegisterFilter(logpoller.Filter{Name: logpoller.FilterName(EXEC_EXECUTION_STATE_CHANGES, offRamp.Address().String()),
+		EventSigs: []common.Hash{eventSignatures.ExecutionStateChanged}, Addresses: []common.Address{offRamp.Address()}})
 	if err != nil {
 		return nil, err
 	}

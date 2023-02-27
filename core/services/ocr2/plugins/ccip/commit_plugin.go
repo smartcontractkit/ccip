@@ -27,6 +27,11 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/pipeline"
 )
 
+const (
+	COMMIT_GAS_FEE_UPDATES = "Commit gas fee updates"
+	COMMIT_CCIP_SENDS      = "Commit ccip sends"
+)
+
 func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
 	spec := jb.OCR2OracleSpec
 	pluginConfig, err := ParseAndVerifyPluginConfig(spec.PluginConfig)
@@ -122,11 +127,12 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 	}
 
 	eventSigs := GetEventSignatures()
-	err = destChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{GasFeeUpdated}, Addresses: []common.Address{dynamicConfig.PriceRegistry}})
+	err = destChain.LogPoller().RegisterFilter(logpoller.Filter{Name: logpoller.FilterName(COMMIT_GAS_FEE_UPDATES, dynamicConfig.PriceRegistry.String()),
+		EventSigs: []common.Hash{GasFeeUpdated}, Addresses: []common.Address{dynamicConfig.PriceRegistry}})
 	if err != nil {
 		return nil, err
 	}
-	err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{eventSigs.SendRequested}, Addresses: []common.Address{onRamp.Address()}})
+	err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{Name: logpoller.FilterName(COMMIT_CCIP_SENDS, onRamp.Address().String()), EventSigs: []common.Hash{eventSigs.SendRequested}, Addresses: []common.Address{onRamp.Address()}})
 	if err != nil {
 		return nil, err
 	}
