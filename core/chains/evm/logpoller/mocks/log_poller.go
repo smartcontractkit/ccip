@@ -143,6 +143,10 @@ func (_m *LogPoller) IndexedLogsCreatedAfter(eventSig common.Hash, address commo
 	ret := _m.Called(_ca...)
 
 	var r0 []logpoller.Log
+	var r1 error
+	if rf, ok := ret.Get(0).(func(common.Hash, common.Address, int, []common.Hash, time.Time, ...pg.QOpt) ([]logpoller.Log, error)); ok {
+		return rf(eventSig, address, topicIndex, topicValues, after, qopts...)
+	}
 	if rf, ok := ret.Get(0).(func(common.Hash, common.Address, int, []common.Hash, time.Time, ...pg.QOpt) []logpoller.Log); ok {
 		r0 = rf(eventSig, address, topicIndex, topicValues, after, qopts...)
 	} else {
@@ -151,7 +155,6 @@ func (_m *LogPoller) IndexedLogsCreatedAfter(eventSig common.Hash, address commo
 		}
 	}
 
-	var r1 error
 	if rf, ok := ret.Get(1).(func(common.Hash, common.Address, int, []common.Hash, time.Time, ...pg.QOpt) error); ok {
 		r1 = rf(eventSig, address, topicIndex, topicValues, after, qopts...)
 	} else {
@@ -368,6 +371,10 @@ func (_m *LogPoller) LogsCreatedAfter(eventSig common.Hash, address common.Addre
 	ret := _m.Called(_ca...)
 
 	var r0 []logpoller.Log
+	var r1 error
+	if rf, ok := ret.Get(0).(func(common.Hash, common.Address, time.Time, ...pg.QOpt) ([]logpoller.Log, error)); ok {
+		return rf(eventSig, address, _a2, qopts...)
+	}
 	if rf, ok := ret.Get(0).(func(common.Hash, common.Address, time.Time, ...pg.QOpt) []logpoller.Log); ok {
 		r0 = rf(eventSig, address, _a2, qopts...)
 	} else {
@@ -376,7 +383,6 @@ func (_m *LogPoller) LogsCreatedAfter(eventSig common.Hash, address common.Addre
 		}
 	}
 
-	var r1 error
 	if rf, ok := ret.Get(1).(func(common.Hash, common.Address, time.Time, ...pg.QOpt) error); ok {
 		r1 = rf(eventSig, address, _a2, qopts...)
 	} else {
