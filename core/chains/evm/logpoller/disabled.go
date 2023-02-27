@@ -17,6 +17,8 @@ var (
 
 type disabled struct{}
 
+func (disabled) Name() string { return "disabledLogPoller" }
+
 func (d disabled) LogsCreatedAfter(eventSig common.Hash, address common.Address, time time.Time, qopts ...pg.QOpt) ([]Log, error) {
 	return nil, ErrDisabled
 }
@@ -29,11 +31,15 @@ func (disabled) Ready() error { return ErrDisabled }
 
 func (disabled) Healthy() error { return ErrDisabled }
 
+func (disabled) HealthReport() map[string]error {
+	return map[string]error{"disabledLogPoller": ErrDisabled}
+}
+
 func (disabled) Replay(ctx context.Context, fromBlock int64) error { return ErrDisabled }
 
-func (disabled) RegisterFilter(filter Filter) (int, error) { return -1, ErrDisabled }
+func (disabled) RegisterFilter(filter Filter) error { return ErrDisabled }
 
-func (disabled) UnregisterFilter(filterID int) error { return ErrDisabled }
+func (disabled) UnregisterFilter(name string) error { return ErrDisabled }
 
 func (disabled) LatestBlock(qopts ...pg.QOpt) (int64, error) { return -1, ErrDisabled }
 

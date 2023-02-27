@@ -560,7 +560,7 @@ func (c *generalConfig) AutoPprofEnabled() bool {
 func (c *generalConfig) AutoPprofProfileRoot() string {
 	root := c.viper.GetString(envvar.Name("AutoPprofProfileRoot"))
 	if root == "" {
-		return c.RootDir()
+		return filepath.Join(c.RootDir(), "pprof")
 	}
 	return root
 }

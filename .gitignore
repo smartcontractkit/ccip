@@ -75,3 +75,8 @@ lcov.info
 core/scripts/ccip-test/secrets/secrets.go
 
 core/scripts/ccip-test/json/credentials
+
+# Test & linter reports
+*report.xml
+*report.json
+*.out
