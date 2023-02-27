@@ -2,15 +2,14 @@
 pragma solidity 0.8.15;
 
 import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
+import {IRouterClient} from "../interfaces/router/IRouterClient.sol";
 
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
 // solhint-disable-next-line chainlink-solidity/explicit-imports
 import {CCIPReceiver} from "./CCIPReceiver.sol";
+import {Client} from "../models/Client.sol";
 
 import {IERC20} from "../../vendor/IERC20.sol";
-import {Client} from "../models/Client.sol";
-import {IRouterClient} from "../interfaces/router/IRouterClient.sol";
-import {Client} from "../models/Client.sol";
 
 /// @title GovernanceDapp - Example of a Governance Dapp using CCIPReceiver
 contract GovernanceDapp is CCIPReceiver, TypeAndVersionInterface, OwnerIsCreator {
@@ -74,11 +73,9 @@ contract GovernanceDapp is CCIPReceiver, TypeAndVersionInterface, OwnerIsCreator
     }
   }
 
-  /**
-   * @notice Called by the OffRamp, this function receives a message and forwards
-   * the tokens sent with it to the designated EOA
-   * @param message CCIP Message
-   */
+  /// @notice Called by the OffRamp, this function receives a message and forwards
+  /// the tokens sent with it to the designated EOA
+  /// @param message CCIP Message
   function _ccipReceive(Client.Any2EVMMessage memory message) internal override {
     FeeConfig memory newFeeConfig = abi.decode(message.data, (FeeConfig));
 
@@ -86,11 +83,9 @@ contract GovernanceDapp is CCIPReceiver, TypeAndVersionInterface, OwnerIsCreator
     emit ReceivedConfig(newFeeConfig.feeAmount, newFeeConfig.changedAtBlock);
   }
 
-  /**
-   * @notice Fund this contract with configured feeToken and approve tokens to the router
-   * @dev Requires prior approval from the msg.sender
-   * @param amount The amount of feeToken to be funded
-   */
+  /// @notice Fund this contract with configured feeToken and approve tokens to the router
+  /// @dev Requires prior approval from the msg.sender
+  /// @param amount The amount of feeToken to be funded
   function fund(uint256 amount) external {
     s_feeToken.transferFrom(msg.sender, address(this), amount);
     s_feeToken.approve(address(getRouter()), amount);

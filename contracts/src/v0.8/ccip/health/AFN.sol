@@ -163,9 +163,7 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
     return s_hasVotedBad[participant];
   }
 
-  /**
-   * @notice Clear all bad votes and voters
-   */
+  /// @notice Clear all bad votes and voters
   function _clearBadVotes() private {
     address[] memory badVoters = s_badVoters;
     for (uint256 i = 0; i < badVoters.length; ++i) {
@@ -187,9 +185,7 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
     delete s_rootsVotedOnToBlessList;
   }
 
-  /**
-   * @notice Set detailed config storage vars
-   */
+  /// @notice Set detailed config storage vars
   function _setAFNConfig(
     address[] memory participants,
     uint256[] memory weights,

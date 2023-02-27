@@ -16,36 +16,28 @@ contract HealthChecker is Pausable, OwnerIsCreator {
 
   event AFNSet(IAFN oldAFN, IAFN newAFN);
 
-  /**
-   * @param afn The AFN contract to check health
-   */
+  /// @param afn The AFN contract to check health
   constructor(IAFN afn) {
     if (address(afn) == address(0)) revert BadHealthConfig();
     s_afn = afn;
     emit AFNSet(IAFN(address(0)), afn);
   }
 
-  /**
-   * @notice Pause the contract
-   * @dev only callable by the owner
-   */
+  /// @notice Pause the contract
+  /// @dev only callable by the owner
   function pause() external onlyOwner {
     _pause();
   }
 
-  /**
-   * @notice Unpause the contract
-   * @dev only callable by the owner
-   */
+  /// @notice Unpause the contract
+  /// @dev only callable by the owner
   function unpause() external onlyOwner {
     _unpause();
   }
 
-  /**
-   * @notice Change the afn contract to track
-   * @dev only callable by the owner
-   * @param afn new AFN contract
-   */
+  /// @notice Change the afn contract to track
+  /// @dev only callable by the owner
+  /// @param afn new AFN contract
   function setAFN(IAFN afn) external onlyOwner {
     if (address(afn) == address(0)) revert BadHealthConfig();
     IAFN old = s_afn;
@@ -53,24 +45,18 @@ contract HealthChecker is Pausable, OwnerIsCreator {
     emit AFNSet(old, afn);
   }
 
-  /**
-   * @notice Get the current AFN contract
-   * @return Current AFN
-   */
+  /// @notice Get the current AFN contract
+  /// @return Current AFN
   function getAFN() external view returns (IAFN) {
     return s_afn;
   }
 
-  /**
-   * @notice Support querying whether health checker is healthy.
-   */
+  /// @notice Support querying whether health checker is healthy.
   function isAFNHealthy() external view returns (bool) {
     return !s_afn.badSignalReceived();
   }
 
-  /**
-   * @notice Ensure that the AFN has not emitted a bad signal, and that the latest heartbeat is not stale.
-   */
+  /// @notice Ensure that the AFN has not emitted a bad signal, and that the latest heartbeat is not stale.
   modifier whenHealthy() {
     if (s_afn.badSignalReceived()) revert BadAFNSignal();
     _;

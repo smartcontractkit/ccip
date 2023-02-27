@@ -31,48 +31,36 @@ interface IAggregateRateLimiter {
     uint256 capacity;
   }
 
-  /**
-   * @notice Gets the token limit admin address
-   */
+  /// @notice Gets the token limit admin address
   function getTokenLimitAdmin() external view returns (address);
 
-  /**
-   * @notice Sets the token limit admin address
-   * @param newAdmin the address of the new admin.
-   */
+  /// @notice Sets the token limit admin address
+  /// @param newAdmin the address of the new admin.
   function setTokenLimitAdmin(address newAdmin) external;
 
-  /**
-   * @notice Gets the token bucket with it's values for the block it was
-   *          requested at.
-   * @return The token bucket.
-   */
+  /// @notice Gets the token bucket with it's values for the block it was
+  ///          requested at.
+  /// @return The token bucket.
   function calculateCurrentTokenBucketState() external view returns (TokenBucket memory);
 
-  /**
-   * @notice Sets the rate limited config.
-   * @param config The new rate limiter config.
-   * @dev should only be callable by the owner or token limit admin.
-   * @dev the max rate is uint208.max
-   */
+  /// @notice Sets the rate limited config.
+  /// @param config The new rate limiter config.
+  /// @dev should only be callable by the owner or token limit admin.
+  /// @dev the max rate is uint208.max
   function setRateLimiterConfig(RateLimiterConfig memory config) external;
 
-  /**
-   * @notice Gets the set prices for the given IERC20s.
-   * @param tokens The tokens to get the price of.
-   * @return prices The current prices of the token.
-   */
+  /// @notice Gets the set prices for the given IERC20s.
+  /// @param tokens The tokens to get the price of.
+  /// @return prices The current prices of the token.
   function getPricesForTokens(IERC20[] memory tokens) external view returns (uint256[] memory prices);
 
-  /**
-   * @notice Sets the prices of the given IERC20 tokens to the given prices.
-   * @param tokens The tokens for which the price will be set.
-   * @param prices The new prices of the given tokens.
-   * @dev if any previous prices were set for a number of given tokens, these
-   *        will be overwritten. Previously set prices for tokens that are
-   *        not present in subsequent setPrices calls will *not* be reset
-   *        to zero but will be left unchanged.
-   * @dev should only be callable by the owner or token limit admin.
-   */
+  /// @notice Sets the prices of the given IERC20 tokens to the given prices.
+  /// @param tokens The tokens for which the price will be set.
+  /// @param prices The new prices of the given tokens.
+  /// @dev if any previous prices were set for a number of given tokens, these
+  ///        will be overwritten. Previously set prices for tokens that are
+  ///        not present in subsequent setPrices calls will *not* be reset
+  ///        to zero but will be left unchanged.
+  /// @dev should only be callable by the owner or token limit admin.
   function setPrices(IERC20[] memory tokens, uint256[] memory prices) external;
 }

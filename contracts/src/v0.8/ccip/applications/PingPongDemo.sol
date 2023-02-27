@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
+import {IRouterClient} from "../interfaces/router/IRouterClient.sol";
+
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
 // solhint-disable-next-line chainlink-solidity/explicit-imports
+import {Client} from "../models/Client.sol";
 import "./CCIPReceiver.sol";
 
 import {IERC20} from "../../vendor/IERC20.sol";
-import {Client} from "../models/Client.sol";
-import {IRouterClient} from "../interfaces/router/IRouterClient.sol";
 
 /// @title PingPongDemo - A simple ping-pong contract for demonstrating cross-chain communication
 contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
@@ -67,11 +68,9 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
   // Plumbing
   /////////////////////////////////////////////////////////////////////
 
-  /**
-   * @notice Fund this contract with configured feeToken and approve tokens to the router
-   * @dev Requires prior approval from the msg.sender
-   * @param amount The amount of feeToken to be funded
-   */
+  /// @notice Fund this contract with configured feeToken and approve tokens to the router
+  /// @dev Requires prior approval from the msg.sender
+  /// @param amount The amount of feeToken to be funded
   function fund(uint256 amount) external {
     s_feeToken.transferFrom(msg.sender, address(this), amount);
     s_feeToken.approve(address(getRouter()), amount);

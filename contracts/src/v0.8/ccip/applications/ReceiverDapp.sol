@@ -4,7 +4,6 @@ pragma solidity 0.8.15;
 import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
 
 import {CCIPReceiver} from "./CCIPReceiver.sol";
-
 import {Client} from "../models/Client.sol";
 
 import {IERC20} from "../../vendor/IERC20.sol";
@@ -25,7 +24,7 @@ contract ReceiverDapp is CCIPReceiver, TypeAndVersionInterface {
   function _handleMessage(bytes memory data, Client.EVMTokenAmount[] memory tokenAmounts) internal {
     (
       ,
-      /* address originalSender */
+      // address originalSender
       address destinationAddress
     ) = abi.decode(data, (address, address));
     for (uint256 i = 0; i < tokenAmounts.length; ++i) {

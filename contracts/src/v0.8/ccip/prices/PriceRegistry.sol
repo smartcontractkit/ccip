@@ -14,16 +14,16 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
   using EnumerableSet for EnumerableSet.AddressSet;
   /// @dev The price, in USD, of 1 unit of gas for a given destination chain.
   /// @dev 1e18 is 1 USD. Examples:
-  ///   * Very Expensive:   1 unit of gas costs 1 USD                  -> 1e18
-  ///   * Expensive:        1 unit of gas costs 0.1 USD                -> 1e17
-  ///   * Cheap:            1 unit of gas costs 0.000001 USD           -> 1e12
+  ///     Very Expensive:   1 unit of gas costs 1 USD                  -> 1e18
+  ///     Expensive:        1 unit of gas costs 0.1 USD                -> 1e17
+  ///     Cheap:            1 unit of gas costs 0.000001 USD           -> 1e12
   mapping(uint64 => TimestampedUint128Value) private s_usdPerUnitGasByDestChainId;
 
   /// @dev USD per full fee token, in base units 1e18.
   /// @dev Example:
-  ///   * 1 USDC = 1.00 USD per token -> 1e18
-  ///   * 1 LINK = 5.00 USD per token -> 5e18
-  ///   * 1 ETH = 2,000 USD per token -> 2_000e18
+  ///     1 USDC = 1.00 USD per token -> 1e18
+  ///     1 LINK = 5.00 USD per token -> 5e18
+  ///     1 ETH = 2,000 USD per token -> 2_000e18
   mapping(address => TimestampedUint128Value) private s_usdPerFeeToken;
 
   // Price updaters are allowed to update the prices.

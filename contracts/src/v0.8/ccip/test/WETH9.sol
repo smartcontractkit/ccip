@@ -1,6 +1,4 @@
-/**
- *Submitted for verification at Etherscan.io on 2017-12-12
- */
+// Submitted for verification at Etherscan.io on 2017-12-12
 
 // Copyright (C) 2015, 2016, 2017 Dapphub
 

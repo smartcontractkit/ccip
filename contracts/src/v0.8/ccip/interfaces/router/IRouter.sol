@@ -5,7 +5,6 @@ import {IEVM2AnyOnRamp} from "../onRamp/IEVM2AnyOnRamp.sol";
 import {IRouterClient} from "./IRouterClient.sol";
 
 import {Client} from "../../models/Client.sol";
-import {Client} from "../../models/Client.sol";
 
 import {IERC20} from "../../../vendor/IERC20.sol";
 

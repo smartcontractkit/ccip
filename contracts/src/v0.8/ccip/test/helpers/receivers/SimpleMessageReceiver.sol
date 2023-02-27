@@ -2,6 +2,7 @@
 pragma solidity 0.8.15;
 
 import "../../../interfaces/router/IAny2EVMMessageReceiver.sol";
+
 import "../../../../vendor/IERC165.sol";
 
 contract SimpleMessageReceiver is IAny2EVMMessageReceiver, IERC165 {
@@ -13,11 +14,9 @@ contract SimpleMessageReceiver is IAny2EVMMessageReceiver, IERC165 {
     i_manager = msg.sender;
   }
 
-  /**
-   * @notice IERC165 supports an interfaceId
-   * @param interfaceId The interfaceId to check
-   * @return true if the interfaceId is supported
-   */
+  /// @notice IERC165 supports an interfaceId
+  /// @param interfaceId The interfaceId to check
+  /// @return true if the interfaceId is supported
   function supportsInterface(bytes4 interfaceId) public pure override returns (bool) {
     return interfaceId == type(IAny2EVMMessageReceiver).interfaceId || interfaceId == type(IERC165).interfaceId;
   }

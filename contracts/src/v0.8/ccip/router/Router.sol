@@ -108,13 +108,11 @@ contract Router is IRouter, TypeAndVersionInterface, OwnerIsCreator {
     }
   }
 
-  /**
-   * @dev calls target address with exactly gasAmount gas and data as calldata
-   * @param gasAmount gas limit for this call
-   * @param target target address
-   * @param value call ether value
-   * @param data calldata
-   */
+  /// @dev calls target address with exactly gasAmount gas and data as calldata
+  /// @param gasAmount gas limit for this call
+  /// @param target target address
+  /// @param value call ether value
+  /// @param data calldata
   function _callWithExactGas(
     uint256 gasAmount,
     address target,

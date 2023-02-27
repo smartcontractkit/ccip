@@ -11,7 +11,7 @@ contract MockAFN is IAFN {
   }
 
   function voteToBlessRoots(
-    bytes32[] calldata /*rootsWithOrigin*/
+    bytes32[] calldata // rootsWithOrigin
   ) external override {
     s_badSignal = false;
   }
