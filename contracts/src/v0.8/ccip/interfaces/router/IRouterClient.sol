@@ -30,7 +30,7 @@ interface IRouterClient {
   /// @notice Request a message to be sent to the destination chain
   /// @param destinationChainId The destination chain ID
   /// @param message The cross-chain CCIP message including data and/or tokens
-  /// @return The message ID
+  /// @return messageId The message ID
   /// @dev Note if msg.value is larger than the required fee (from getFee) we accept
   /// the overpayment with no refund.
   function ccipSend(uint64 destinationChainId, Client.EVM2AnyMessage calldata message)
