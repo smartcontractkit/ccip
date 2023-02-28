@@ -20,31 +20,30 @@ func TestChaosCCIP(t *testing.T) {
 		numOfRequests    = 3
 		testEnvironment  *environment.Environment
 		lane             *actions.CCIPLane
-		testSetup        actions.CCIPTestEnv
+		testSetup        *actions.CCIPTestEnv
 	)
 
-	lane, _, tearDown = actions.CCIPDefaultTestSetUp(t, "chaos-ccip",
-		map[string]interface{}{
-			"replicas": "12",
-			"toml":     actions.DefaultCCIPCLNodeEnv(t),
-			"env": map[string]interface{}{
-				"CL_DEV": "true",
-			},
-			"db": map[string]interface{}{
-				"stateful": true,
-				"capacity": "10Gi",
-				"resources": map[string]interface{}{
-					"requests": map[string]interface{}{
-						"cpu":    "250m",
-						"memory": "256Mi",
-					},
-					"limits": map[string]interface{}{
-						"cpu":    "250m",
-						"memory": "256Mi",
-					},
+	lane, _, tearDown = actions.CCIPDefaultTestSetUp(t, "chaos-ccip", map[string]interface{}{
+		"replicas": "12",
+		"toml":     actions.DefaultCCIPCLNodeEnv(t),
+		"env": map[string]interface{}{
+			"CL_DEV": "true",
+		},
+		"db": map[string]interface{}{
+			"stateful": true,
+			"capacity": "10Gi",
+			"resources": map[string]interface{}{
+				"requests": map[string]interface{}{
+					"cpu":    "250m",
+					"memory": "256Mi",
+				},
+				"limits": map[string]interface{}{
+					"cpu":    "250m",
+					"memory": "256Mi",
 				},
 			},
-		}, []*big.Int{big.NewInt(1e8)}, numOfCommitNodes, false, false)
+		},
+	}, []*big.Int{big.NewInt(1e8)}, numOfCommitNodes, false, false, true)
 
 	// if the test runs on remote runner
 	if lane == nil {
@@ -55,7 +54,7 @@ func TestChaosCCIP(t *testing.T) {
 	})
 	require.NoError(t, lane.IsLaneDeployed())
 	testEnvironment = lane.TestEnv.K8Env
-	testSetup = *lane.TestEnv
+	testSetup = lane.TestEnv
 
 	inputs := []struct {
 		testName             string

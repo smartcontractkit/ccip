@@ -68,21 +68,13 @@ func PopulateAndValidate(t *testing.T) *loadArgs {
 
 func (loadArgs *loadArgs) Setup() {
 	transferAmounts := []*big.Int{big.NewInt(5e17), big.NewInt(5e17)}
-	forwardLane, _, tearDown := actions.CCIPDefaultTestSetUp(
-		loadArgs.t,
-		"load-ccip",
-		map[string]interface{}{
-			"replicas": "6",
-			"toml":     actions.DefaultCCIPCLNodeEnv(loadArgs.t),
-			"env": map[string]interface{}{
-				"CL_DEV": "true",
-			},
+	forwardLane, _, tearDown := actions.CCIPDefaultTestSetUp(loadArgs.t, "load-ccip", map[string]interface{}{
+		"replicas": "6",
+		"toml":     actions.DefaultCCIPCLNodeEnv(loadArgs.t),
+		"env": map[string]interface{}{
+			"CL_DEV": "true",
 		},
-		transferAmounts,
-		5,
-		true,
-		false,
-	)
+	}, transferAmounts, 5, true, false, true)
 	loadArgs.envTear = tearDown
 	if forwardLane == nil {
 		return

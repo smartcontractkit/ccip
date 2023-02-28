@@ -51,14 +51,10 @@ func TestCCIPSoak(t *testing.T) {
 	})
 
 	transferAmounts := []*big.Int{big.NewInt(5e17), big.NewInt(5e17)}
-	laneA, laneB, tearDown = actions.CCIPDefaultTestSetUp(
-		t, "soak-ccip",
-		map[string]interface{}{
-			"replicas": "6",
-			"toml":     actions.DefaultCCIPCLNodeEnv(t),
-		},
-		transferAmounts, 5, true, true,
-	)
+	laneA, laneB, tearDown = actions.CCIPDefaultTestSetUp(t, "soak-ccip", map[string]interface{}{
+		"replicas": "6",
+		"toml":     actions.DefaultCCIPCLNodeEnv(t),
+	}, transferAmounts, 5, true, true, true)
 
 	if laneA == nil {
 		return
@@ -91,7 +87,7 @@ func TestCCIPSoakOnExistingDeployment(t *testing.T) {
 		reqSuccessLaneA = 0
 		reqSuccessLaneB = 0
 		interval        = 30 * time.Second
-		duration        = 1 * time.Minute
+		duration        = 5 * time.Minute
 	)
 
 	t.Cleanup(func() {
@@ -120,19 +116,16 @@ func TestCCIPSoakOnExistingDeployment(t *testing.T) {
 		return
 	}
 
-	require.NoError(t, laneA.IsLaneDeployed())
-	if laneB != nil {
-		require.NoError(t, laneB.IsLaneDeployed())
-	}
-
 	t.Run(fmt.Sprintf("CCIP message transfer from network %s to network %s for %s", laneA.SourceNetworkName, laneA.DestNetworkName, duration), func(t *testing.T) {
 		t.Parallel()
+		laneA.ValidationTimeout = 5 * time.Minute
 		totalReqLaneA, reqSuccessLaneA = laneA.SoakRun(interval, duration)
 	})
 
 	if laneB != nil {
 		t.Run(fmt.Sprintf("CCIP message transfer from network %s to network %s for %s", laneB.SourceNetworkName, laneB.DestNetworkName, duration), func(t *testing.T) {
 			t.Parallel()
+			laneB.ValidationTimeout = 5 * time.Minute
 			totalReqLaneB, reqSuccessLaneB = laneB.SoakRun(interval, duration)
 		})
 	}
