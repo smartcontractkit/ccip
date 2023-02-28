@@ -26,6 +26,7 @@ import (
 	ctfUtils "github.com/smartcontractkit/chainlink-testing-framework/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
@@ -1805,7 +1806,7 @@ func CCIPDefaultTestSetUp(
 	}()
 
 	tearDown := func() {
-		err := TeardownSuite(t, testEnvironment, ctfUtils.ProjectRoot, testSetUpA2B.CLNodes, nil,
+		err := TeardownSuite(t, testEnvironment, ctfUtils.ProjectRoot, testSetUpA2B.CLNodes, nil, zapcore.ErrorLevel,
 			testSetUpA2B.SourceChainClient, testSetUpA2B.DestChainClient)
 		require.NoError(t, err, "Environment teardown shouldn't fail")
 	}
