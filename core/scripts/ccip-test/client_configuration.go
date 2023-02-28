@@ -70,20 +70,20 @@ func (client *CCIPClient) setOnRampFeeConfig(t *testing.T, sourceClient *rhea.Ev
 	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 }
 
-func (client *CCIPClient) setAllowlistEnabled(t *testing.T) {
-	tx, err := client.Source.OnRamp.SetAllowlistEnabled(client.Source.Owner, true)
+func (client *CCIPClient) setAllowListEnabled(t *testing.T) {
+	tx, err := client.Source.OnRamp.SetAllowListEnabled(client.Source.Owner, true)
 	shared.RequireNoError(t, err)
 	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 }
 
-func (client *CCIPClient) setAllowlist(t *testing.T) {
-	isEnabled, err := client.Source.OnRamp.GetAllowlistEnabled(&bind.CallOpts{})
+func (client *CCIPClient) setAllowList(t *testing.T) {
+	isEnabled, err := client.Source.OnRamp.GetAllowListEnabled(&bind.CallOpts{})
 	shared.RequireNoError(t, err)
 	if isEnabled == false {
-		client.setAllowlistEnabled(t)
+		client.setAllowListEnabled(t)
 	}
 
-	tx, err := client.Source.OnRamp.SetAllowlist(client.Source.Owner, client.Source.AllowList)
+	tx, err := client.Source.OnRamp.ApplyAllowListUpdates(client.Source.Owner, client.Source.AllowList, nil)
 	shared.RequireNoError(t, err)
 	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 }

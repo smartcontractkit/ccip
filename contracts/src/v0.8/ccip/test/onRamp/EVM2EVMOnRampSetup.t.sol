@@ -23,8 +23,6 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
 
   bytes32 internal s_metadataHash;
 
-  address[] internal s_allowList;
-
   EVM2EVMOnRamp internal s_onRamp;
   address[] s_offRamps;
   address s_feeAdmin = address(567892030);
@@ -55,7 +53,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
       }),
       generateDynamicOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), s_feeAdmin),
       getTokensAndPools(s_sourceTokens, getCastedSourcePools()),
-      s_allowList,
+      new address[](0),
       s_afn,
       rateLimiterConfig(),
       s_feeTokenConfigArgs,

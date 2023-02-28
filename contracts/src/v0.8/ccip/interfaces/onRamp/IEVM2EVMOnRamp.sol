@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IAllowList} from "../access/IAllowList.sol";
 import {IPool} from "../pools/IPool.sol";
 
 import {Internal} from "../../models/Internal.sol";
@@ -9,7 +8,7 @@ import {IEVM2AnyOnRamp} from "./IEVM2AnyOnRamp.sol";
 
 import {IERC20} from "../../../vendor/IERC20.sol";
 
-interface IEVM2EVMOnRamp is IEVM2AnyOnRamp, IAllowList {
+interface IEVM2EVMOnRamp is IEVM2AnyOnRamp {
   error InvalidExtraArgsTag(bytes4 expected, bytes4 got);
   error OnlyCallableByOwnerOrFeeAdmin();
   error OnlyCallableByOwnerOrFeeAdminOrNop();
@@ -29,8 +28,12 @@ interface IEVM2EVMOnRamp is IEVM2AnyOnRamp, IAllowList {
   error PoolDoesNotExist(IERC20 token);
   error TokenPoolMismatch();
   error TokenOrChainNotSupported(address token, uint64 chain);
+  error SenderNotAllowed(address sender);
   error InvalidConfig();
 
+  event AllowListAdd(address sender);
+  event AllowListRemove(address sender);
+  event AllowListEnabledSet(bool enabled);
   event StaticConfigSet(StaticConfig);
   event DynamicConfigSet(DynamicConfig);
   event NopPaid(address indexed nop, uint256 amount);
@@ -121,4 +124,22 @@ interface IEVM2EVMOnRamp is IEVM2AnyOnRamp, IAllowList {
   /// @notice Sets the fee configuration for a token
   /// @param feeTokenConfigs Array of FeeTokenConfigArgs structs
   function setFeeConfig(FeeTokenConfigArgs[] calldata feeTokenConfigs) external;
+
+  /// @notice Enables or disabled the allowList functionality.
+  /// @param enabled Signals whether the allowlist should be enabled.
+  function setAllowListEnabled(bool enabled) external;
+
+  /// @notice Gets whether the allowList functionality is enabled.
+  /// @return true is enabled, false if not.
+  function getAllowListEnabled() external view returns (bool);
+
+  /// @notice Apply updates to the allow list.
+  /// @param adds The added addresses.
+  /// @param adds The removed addresses.
+  function applyAllowListUpdates(address[] calldata adds, address[] calldata removes) external;
+
+  /// @notice Gets the allowed addresses.
+  /// @return The allowed addresses.
+  /// @dev May not work if allow list gets too large. Use events in that case to compute the set.
+  function getAllowList() external view returns (address[] memory);
 }

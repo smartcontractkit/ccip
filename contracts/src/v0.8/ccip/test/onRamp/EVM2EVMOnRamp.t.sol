@@ -32,7 +32,7 @@ contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
       staticConfig,
       dynamicConfig,
       getTokensAndPools(s_sourceTokens, getCastedSourcePools()),
-      s_allowList,
+      new address[](0),
       s_afn,
       rateLimiterConfig(),
       s_feeTokenConfigArgs,
@@ -291,9 +291,9 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
 
   function testSenderNotAllowedReverts() public {
     changePrank(OWNER);
-    s_onRamp.setAllowlistEnabled(true);
+    s_onRamp.setAllowListEnabled(true);
 
-    vm.expectRevert(abi.encodeWithSelector(IAllowList.SenderNotAllowed.selector, STRANGER));
+    vm.expectRevert(abi.encodeWithSelector(IEVM2EVMOnRamp.SenderNotAllowed.selector, STRANGER));
     changePrank(address(s_sourceRouter));
     s_onRamp.forwardFromRouter(_generateEmptyMessage(), 0, STRANGER);
   }
@@ -542,5 +542,89 @@ contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
     s_onRamp.setDynamicConfig(generateDynamicOnRampConfig(address(1), address(2), address(3)));
+  }
+}
+
+contract EVM2EVMOnRampWithAllowListSetup is EVM2EVMOnRampSetup {
+  function setUp() public virtual override(EVM2EVMOnRampSetup) {
+    EVM2EVMOnRampSetup.setUp();
+    address[] memory allowedAddresses = new address[](1);
+    allowedAddresses[0] = OWNER;
+    s_onRamp.applyAllowListUpdates(allowedAddresses, new address[](0));
+    s_onRamp.setAllowListEnabled(true);
+  }
+}
+
+contract EVM2EVMOnRamp_setAllowListEnabled is EVM2EVMOnRampWithAllowListSetup {
+  // Success
+  function testSuccess() public {
+    assertTrue(s_onRamp.getAllowListEnabled());
+    s_onRamp.setAllowListEnabled(false);
+    assertFalse(s_onRamp.getAllowListEnabled());
+    s_onRamp.setAllowListEnabled(true);
+    assertTrue(s_onRamp.getAllowListEnabled());
+  }
+
+  // Reverts
+
+  function testOnlyOwnerReverts() public {
+    vm.stopPrank();
+    vm.expectRevert("Only callable by owner");
+    s_onRamp.setAllowListEnabled(true);
+  }
+}
+
+/// @notice #getAllowListEnabled
+contract EVM2EVMOnRamp_getAllowListEnabled is EVM2EVMOnRampWithAllowListSetup {
+  // Success
+  function testSuccess() public {
+    assertTrue(s_onRamp.getAllowListEnabled());
+    s_onRamp.setAllowListEnabled(false);
+    assertFalse(s_onRamp.getAllowListEnabled());
+    s_onRamp.setAllowListEnabled(true);
+    assertTrue(s_onRamp.getAllowListEnabled());
+  }
+}
+
+/// @notice #setAllowList
+contract EVM2EVMOnRamp_applyAllowListUpdates is EVM2EVMOnRampWithAllowListSetup {
+  event AllowListAdd(address sender);
+  event AllowListRemove(address sender);
+
+  // Success
+  function testSuccess() public {
+    address[] memory newAddresses = new address[](2);
+    newAddresses[0] = address(1);
+    newAddresses[1] = address(2);
+
+    for (uint256 i = 0; i < 2; ++i) {
+      vm.expectEmit(false, false, false, true);
+      emit AllowListAdd(newAddresses[i]);
+    }
+
+    s_onRamp.applyAllowListUpdates(newAddresses, new address[](0));
+    address[] memory setAddresses = s_onRamp.getAllowList();
+
+    // First address is owner.
+    assertEq(newAddresses[0], setAddresses[1]);
+    assertEq(newAddresses[1], setAddresses[2]);
+  }
+
+  // Reverts
+
+  function testOnlyOwnerReverts() public {
+    vm.stopPrank();
+    vm.expectRevert("Only callable by owner");
+    address[] memory newAddresses = new address[](2);
+    s_onRamp.applyAllowListUpdates(newAddresses, new address[](0));
+  }
+}
+
+/// @notice #getAllowList
+contract EVM2EVMOnRamp_getAllowList is EVM2EVMOnRampWithAllowListSetup {
+  // Success
+  function testSuccess() public {
+    address[] memory setAddresses = s_onRamp.getAllowList();
+    assertEq(OWNER, setAddresses[0]);
   }
 }

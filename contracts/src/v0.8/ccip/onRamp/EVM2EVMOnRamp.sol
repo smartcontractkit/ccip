@@ -10,7 +10,6 @@ import {IEVM2AnyOnRamp} from "../interfaces/onRamp/IEVM2AnyOnRamp.sol";
 import {IAggregateRateLimiter} from "../interfaces/rateLimiter/IAggregateRateLimiter.sol";
 
 import {HealthChecker} from "../health/HealthChecker.sol";
-import {AllowList} from "../access/AllowList.sol";
 import {AggregateRateLimiter} from "../rateLimiter/AggregateRateLimiter.sol";
 import {Client} from "../models/Client.sol";
 import {Internal} from "../models/Internal.sol";
@@ -18,10 +17,12 @@ import {Internal} from "../models/Internal.sol";
 import {SafeERC20} from "../../vendor/SafeERC20.sol";
 import {IERC20} from "../../vendor/IERC20.sol";
 import {EnumerableMap} from "../../vendor/openzeppelin-solidity/v4.7.3/contracts/utils/structs/EnumerableMap.sol";
+import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v4.7.3/contracts/utils/structs/EnumerableMap.sol";
 
-contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AllowList, AggregateRateLimiter, TypeAndVersionInterface {
+contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AggregateRateLimiter, TypeAndVersionInterface {
   using SafeERC20 for IERC20;
   using EnumerableMap for EnumerableMap.AddressToUintMap;
+  using EnumerableSet for EnumerableSet.AddressSet;
 
   struct TokenAndPool {
     address token;
@@ -57,10 +58,14 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AllowList, AggregateRat
   mapping(IERC20 => PoolConfig) private s_poolsBySourceToken;
   /// @dev The list of source tokens that are supported
   address[] private s_sourceTokenList;
-
-  // STATE
+  /// @dev Whether s_allowList is enabled or not.
+  bool private s_allowlistEnabled;
+  /// @dev A set of addresses which can make ccipSend calls.
+  EnumerableSet.AddressSet private s_allowList;
   /// @dev The fee token config that can be set by the owner or fee admin
   mapping(address => FeeTokenConfig) internal s_feeTokenConfig;
+
+  // STATE
   /// @dev The amount of LINK available to pay NOPS
   uint256 internal s_nopFeesJuels;
   /// @dev The total weight of all NOPs weights
@@ -81,7 +86,7 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AllowList, AggregateRat
     IAggregateRateLimiter.RateLimiterConfig memory rateLimiterConfig,
     FeeTokenConfigArgs[] memory feeTokenConfigs,
     NopAndWeight[] memory nopsAndWeights
-  ) HealthChecker(afn) AllowList(allowlist) AggregateRateLimiter(rateLimiterConfig) {
+  ) HealthChecker(afn) AggregateRateLimiter(rateLimiterConfig) {
     if (
       staticConfig.linkToken == address(0) ||
       staticConfig.chainId == 0 ||
@@ -111,6 +116,10 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AllowList, AggregateRat
       newTokens[i] = address(tokensAndPools[i].token);
     }
     s_sourceTokenList = newTokens;
+    if (allowlist.length > 0) {
+      s_allowlistEnabled = true;
+      _applyAllowListUpdates(allowlist, new address[](0));
+    }
   }
 
   /// @inheritdoc IEVM2AnyOnRamp
@@ -159,7 +168,7 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AllowList, AggregateRat
       revert MessageTooLarge(uint256(s_dynamicConfig.maxDataSize), dataLength);
     if (gasLimit > uint256(s_dynamicConfig.maxGasLimit)) revert MessageGasLimitTooHigh();
     if (tokenAmounts.length > uint256(s_dynamicConfig.maxTokensLength)) revert UnsupportedNumberOfTokens();
-    if (s_allowlistEnabled && !s_allowed[originalSender]) revert SenderNotAllowed(originalSender);
+    if (s_allowlistEnabled && !s_allowList.contains(originalSender)) revert SenderNotAllowed(originalSender);
 
     _removeTokens(tokenAmounts);
   }
@@ -376,10 +385,46 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AllowList, AggregateRat
     _setFeeConfig(feeTokenConfigs);
   }
 
+  /// @inheritdoc IEVM2EVMOnRamp
+  function applyAllowListUpdates(address[] calldata adds, address[] calldata removes) external onlyOwner {
+    _applyAllowListUpdates(adds, removes);
+  }
+
+  function _applyAllowListUpdates(address[] memory adds, address[] memory removes) internal {
+    for (uint256 i = 0; i < removes.length; ++i) {
+      s_allowList.remove(removes[i]);
+      emit AllowListRemove(removes[i]);
+    }
+    for (uint256 i = 0; i < adds.length; ++i) {
+      s_allowList.add(adds[i]);
+      emit AllowListAdd(adds[i]);
+    }
+  }
+
+  /// @inheritdoc IEVM2EVMOnRamp
+  function setAllowListEnabled(bool enabled) external onlyOwner {
+    s_allowlistEnabled = enabled;
+    emit AllowListEnabledSet(enabled);
+  }
+
+  /// @inheritdoc IEVM2EVMOnRamp
+  function getAllowListEnabled() external view returns (bool) {
+    return s_allowlistEnabled;
+  }
+
+  /// @inheritdoc IEVM2EVMOnRamp
+  function getAllowList() external view returns (address[] memory) {
+    address[] memory allowList = new address[](s_allowList.length());
+    for (uint256 i = 0; i < s_allowList.length(); ++i) {
+      allowList[i] = s_allowList.at(i);
+    }
+    return allowList;
+  }
+
   /// @dev Set the fee config
   /// @param feeTokenConfigs The fee token configs
   function _setFeeConfig(FeeTokenConfigArgs[] memory feeTokenConfigs) internal {
-    for (uint256 i = 0; i < feeTokenConfigs.length; i++) {
+    for (uint256 i = 0; i < feeTokenConfigs.length; ++i) {
       s_feeTokenConfig[feeTokenConfigs[i].token] = FeeTokenConfig({
         feeAmount: feeTokenConfigs[i].feeAmount,
         multiplier: feeTokenConfigs[i].multiplier,
@@ -401,7 +446,7 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AllowList, AggregateRat
     if (contractBalance < totalFeesToPay) revert InsufficientBalance();
 
     uint256 nopFee = (totalFeesToPay * 1e18) / weightsTotal;
-    for (uint256 i = 0; i < s_nops.length(); i++) {
+    for (uint256 i = 0; i < s_nops.length(); ++i) {
       (address nop, uint256 weight) = s_nops.at(i);
       uint256 amount = (nopFee * weight) / 1e18;
       IERC20(i_linkToken).safeTransfer(nop, amount);
