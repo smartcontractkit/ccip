@@ -5,7 +5,6 @@ import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.
 import {IRouterClient} from "../interfaces/router/IRouterClient.sol";
 
 import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
-// solhint-disable-next-line chainlink-solidity/explicit-imports
 import {CCIPReceiver} from "./CCIPReceiver.sol";
 import {Client} from "../models/Client.sol";
 

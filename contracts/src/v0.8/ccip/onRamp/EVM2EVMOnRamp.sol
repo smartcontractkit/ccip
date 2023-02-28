@@ -17,21 +17,18 @@ import {Internal} from "../models/Internal.sol";
 import {SafeERC20} from "../../vendor/SafeERC20.sol";
 import {IERC20} from "../../vendor/IERC20.sol";
 import {EnumerableMap} from "../../vendor/openzeppelin-solidity/v4.7.3/contracts/utils/structs/EnumerableMap.sol";
-import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v4.7.3/contracts/utils/structs/EnumerableMap.sol";
+import {EnumerableMapAddresses} from "../../libraries/internal/EnumerableMapAddresses.sol";
+import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v4.7.3/contracts/utils/structs/EnumerableSet.sol";
 
 contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AggregateRateLimiter, TypeAndVersionInterface {
   using SafeERC20 for IERC20;
   using EnumerableMap for EnumerableMap.AddressToUintMap;
+  using EnumerableMapAddresses for EnumerableMapAddresses.AddressToAddressMap;
   using EnumerableSet for EnumerableSet.AddressSet;
 
   struct TokenAndPool {
     address token;
-    IPool pool;
-  }
-
-  struct PoolConfig {
-    IPool pool;
-    bool enabled;
+    address pool;
   }
 
   // STATIC CONFIG
@@ -55,9 +52,7 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AggregateRateLimiter, T
   /// @dev (address nop => uint256 weight)
   EnumerableMap.AddressToUintMap internal s_nops;
   /// @dev source token => token pool
-  mapping(IERC20 => PoolConfig) private s_poolsBySourceToken;
-  /// @dev The list of source tokens that are supported
-  address[] private s_sourceTokenList;
+  EnumerableMapAddresses.AddressToAddressMap private s_poolsBySourceToken;
   /// @dev Whether s_allowList is enabled or not.
   bool private s_allowlistEnabled;
   /// @dev A set of addresses which can make ccipSend calls.
@@ -107,15 +102,13 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AggregateRateLimiter, T
     _setFeeConfig(feeTokenConfigs);
     _setNops(nopsAndWeights);
 
-    s_sequenceNumber = 0;
-
-    address[] memory newTokens = new address[](tokensAndPools.length);
     // Set new tokens and pools
     for (uint256 i = 0; i < tokensAndPools.length; ++i) {
-      s_poolsBySourceToken[IERC20(tokensAndPools[i].token)] = PoolConfig({pool: tokensAndPools[i].pool, enabled: true});
-      newTokens[i] = address(tokensAndPools[i].token);
+      if (tokensAndPools[i].token == address(0) || address(tokensAndPools[i].pool) == address(0))
+        revert InvalidConfig();
+      s_poolsBySourceToken.set(tokensAndPools[i].token, tokensAndPools[i].pool);
     }
-    s_sourceTokenList = newTokens;
+
     if (allowlist.length > 0) {
       s_allowlistEnabled = true;
       _applyAllowListUpdates(allowlist, new address[](0));
@@ -131,11 +124,8 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AggregateRateLimiter, T
   /// @param sourceToken The source token to get the pool for
   /// @return The pool for the given source token
   function _getPoolBySourceToken(IERC20 sourceToken) private view returns (IPool) {
-    PoolConfig memory poolConfig = s_poolsBySourceToken[sourceToken];
-    if (poolConfig.enabled) {
-      return s_poolsBySourceToken[sourceToken].pool;
-    }
-    revert UnsupportedToken(sourceToken);
+    if (!s_poolsBySourceToken.contains(address(sourceToken))) revert UnsupportedToken(sourceToken);
+    return IPool(s_poolsBySourceToken.get(address(sourceToken)));
   }
 
   /// @dev Convert the extra args bytes into a struct
@@ -284,10 +274,8 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AggregateRateLimiter, T
   /// @dev This method can only be called by the owner of the contract.
   function addPool(IERC20 token, IPool pool) public onlyOwner {
     if (address(token) == address(0) || address(pool) == address(0)) revert InvalidTokenPoolConfig();
-    if (s_poolsBySourceToken[token].enabled) revert PoolAlreadyAdded();
-
-    s_poolsBySourceToken[token] = PoolConfig({pool: pool, enabled: true});
-    s_sourceTokenList.push(address(token));
+    if (s_poolsBySourceToken.contains(address(token))) revert PoolAlreadyAdded();
+    s_poolsBySourceToken.set(address(token), address(pool));
 
     emit PoolAdded(token, pool);
   }
@@ -297,35 +285,18 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AggregateRateLimiter, T
   /// @param pool The pool that will be removed
   /// @dev This method can only be called by the owner of the contract.
   function removePool(IERC20 token, IPool pool) public onlyOwner {
-    PoolConfig memory oldConfig = s_poolsBySourceToken[token];
-    // Check if the pool exists
-    if (address(oldConfig.pool) == address(0)) revert PoolDoesNotExist(token);
-    // Sanity check
-    if (address(oldConfig.pool) != address(pool)) revert TokenPoolMismatch();
-
-    s_poolsBySourceToken[token].enabled = false;
+    if (!s_poolsBySourceToken.contains(address(token))) revert PoolDoesNotExist(token);
+    if (s_poolsBySourceToken.get(address(token)) != address(pool)) revert TokenPoolMismatch();
+    s_poolsBySourceToken.remove(address(token));
 
     emit PoolRemoved(token, pool);
   }
 
   /// @inheritdoc IEVM2AnyOnRamp
   function getSupportedTokens() public view returns (address[] memory) {
-    // TODO: We should just fully remove the pool in remove pool in the
-    // same way we do for OffRamps? Seems better than keeping the full list
-    // of once configured tokens then filter out disabled ones on every query
-    uint256 numberOfSupportedTokens = 0;
-    for (uint256 i = 0; i < s_sourceTokenList.length; ++i) {
-      if (s_poolsBySourceToken[IERC20(s_sourceTokenList[i])].enabled) {
-        numberOfSupportedTokens++;
-      }
-    }
-
-    address[] memory sourceTokens = new address[](numberOfSupportedTokens);
-    uint256 j = 0;
-    for (uint256 i = 0; i < s_sourceTokenList.length; ++i) {
-      if (s_poolsBySourceToken[IERC20(s_sourceTokenList[i])].enabled) {
-        sourceTokens[j++] = s_sourceTokenList[i];
-      }
+    address[] memory sourceTokens = new address[](s_poolsBySourceToken.length());
+    for (uint256 i = 0; i < sourceTokens.length; ++i) {
+      (sourceTokens[i], ) = s_poolsBySourceToken.at(i);
     }
     return sourceTokens;
   }

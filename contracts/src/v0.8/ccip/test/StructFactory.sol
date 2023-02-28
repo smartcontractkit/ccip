@@ -105,7 +105,7 @@ contract StructFactory {
   {
     EVM2EVMOnRamp.TokenAndPool[] memory tokensAndPools = new EVM2EVMOnRamp.TokenAndPool[](sourceTokens.length);
     for (uint256 i = 0; i < sourceTokens.length; i++) {
-      tokensAndPools[i] = EVM2EVMOnRamp.TokenAndPool({token: sourceTokens[i], pool: pools[i]});
+      tokensAndPools[i] = EVM2EVMOnRamp.TokenAndPool({token: sourceTokens[i], pool: address(pools[i])});
     }
     return tokensAndPools;
   }

@@ -130,7 +130,12 @@ contract CommitStore_setDynamicConfig is CommitStoreSetup {
 
 /// @notice #resetUnblessedRoots
 contract CommitStore_resetUnblessedRoots is CommitStoreSetup {
-  // TODO proper AFN blessing handling
+  function testSuccess() public {
+    bytes32[] memory rootToReset = new bytes32[](1);
+    rootToReset[0] = "Only a single root";
+    s_commitStore.resetUnblessedRoots(rootToReset);
+    // TODO proper AFN blessing handling
+  }
 
   // Reverts
   function testOnlyOwnerReverts() public {

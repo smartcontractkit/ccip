@@ -483,6 +483,39 @@ contract EVM2EVMOnRamp_getTokenPool is EVM2EVMOnRampSetup {
   }
 }
 
+contract EVM2EVMOnRamp_addPool is EVM2EVMOnRampSetup {
+  // Success
+  function testSuccess() public {
+    IPool pool = IPool(address(99));
+    IERC20 token = IERC20(address(98));
+
+    s_onRamp.addPool(token, pool);
+
+    assertEq(address(pool), address(s_onRamp.getPoolBySourceToken(token)));
+  }
+
+  // Reverts
+  function testOnlyCallableByOwnerReverts() public {
+    IPool pool = IPool(s_sourcePools[0]);
+    IERC20 token = IERC20(s_sourceTokens[0]);
+
+    changePrank(STRANGER);
+
+    vm.expectRevert("Only callable by owner");
+
+    s_onRamp.addPool(token, pool);
+  }
+
+  function testPoolAlreadyExistsReverts() public {
+    IPool pool = IPool(s_sourcePools[0]);
+    IERC20 token = IERC20(s_sourceTokens[0]);
+
+    vm.expectRevert(abi.encodeWithSelector(IEVM2EVMOnRamp.PoolAlreadyAdded.selector));
+
+    s_onRamp.addPool(token, pool);
+  }
+}
+
 // #getSupportedTokens
 contract EVM2EVMOnRamp_getSupportedTokens is EVM2EVMOnRampSetup {
   // Success

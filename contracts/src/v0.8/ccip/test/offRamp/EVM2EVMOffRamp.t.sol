@@ -57,6 +57,7 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
     assertEq(pools.length, s_sourceTokens.length);
     assertTrue(address(pools[0]) == address(s_sourceTokens[0]));
     assertTrue(address(pools[1]) == address(s_sourceTokens[1]));
+    assertEq(address(s_offRamp.getPoolByDestToken(IERC20(s_destTokens[0]))), address(s_destPools[0]));
 
     (uint32 configCount, uint32 blockNumber, bytes32 configDigest) = s_offRamp.latestConfigDetails();
     assertEq(0, configCount);
@@ -73,7 +74,7 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
 
   // Revert
   function testTokenConfigMismatchReverts() public {
-    vm.expectRevert(OffRampTokenPoolRegistry.InvalidTokenPoolConfig.selector);
+    vm.expectRevert(EVM2EVMOffRamp.InvalidTokenPoolConfig.selector);
 
     IPool[] memory pools = new IPool[](1);
 
@@ -629,5 +630,129 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
 
     vm.expectRevert(abi.encodeWithSelector(IEVM2EVMOffRamp.UnsupportedToken.selector, address(0)));
     s_offRamp.releaseOrMintTokens(tokenAmounts, OWNER);
+  }
+}
+
+contract EVM2EVMOffRamp_addPool is EVM2EVMOffRampSetup {
+  event PoolAdded(IERC20 token, IPool pool);
+
+  function testAddPoolSuccess() public {
+    IPool newPool = new LockReleaseTokenPool(IERC20(address(2)));
+    IERC20 token = IERC20(address(1));
+
+    vm.expectEmit(false, false, false, true);
+    emit PoolAdded(token, newPool);
+    s_offRamp.addPool(token, newPool);
+
+    IPool actualPool = s_offRamp.getPoolBySourceToken(token);
+
+    assertEq(address(newPool), address(actualPool));
+  }
+
+  // Reverts
+
+  function testInvalidTokenPoolConfigReverts() public {
+    address zero = address(0);
+
+    vm.expectRevert(EVM2EVMOffRamp.InvalidTokenPoolConfig.selector);
+    s_offRamp.addPool(IERC20(zero), IPool(s_destPools[0]));
+
+    vm.expectRevert(EVM2EVMOffRamp.InvalidTokenPoolConfig.selector);
+    s_offRamp.addPool(IERC20(s_destFeeToken), IPool(zero));
+  }
+
+  function testPoolAlreadyAddedReverts() public {
+    IPool newPool = new LockReleaseTokenPool(IERC20(address(2)));
+    IERC20 token = IERC20(address(1));
+    s_offRamp.addPool(token, newPool);
+
+    vm.expectRevert(EVM2EVMOffRamp.PoolAlreadyAdded.selector);
+    s_offRamp.addPool(token, newPool);
+  }
+
+  function testOnlyOwnerReverts() public {
+    IPool newPool = new LockReleaseTokenPool(IERC20(address(2)));
+    IERC20 token = IERC20(address(1));
+
+    changePrank(STRANGER);
+
+    vm.expectRevert("Only callable by owner");
+    s_offRamp.addPool(token, newPool);
+  }
+}
+
+contract EVM2EVMOffRamp_removePool is EVM2EVMOffRampSetup {
+  event PoolRemoved(IERC20 token, IPool pool);
+
+  function testRemovePoolSuccess() public {
+    IPool pool = new LockReleaseTokenPool(IERC20(address(2)));
+    IERC20 token = IERC20(address(1));
+
+    s_offRamp.addPool(token, pool);
+    IPool actualPool = s_offRamp.getPoolBySourceToken(token);
+    assertEq(address(pool), address(actualPool));
+
+    vm.expectEmit(false, false, false, true);
+    emit PoolRemoved(token, pool);
+
+    s_offRamp.removePool(token, pool);
+
+    vm.expectRevert(abi.encodeWithSelector(IEVM2EVMOffRamp.UnsupportedToken.selector, token));
+    actualPool = s_offRamp.getPoolBySourceToken(token);
+  }
+
+  // Reverts
+
+  function testTokenPoolMismatchReverts() public {
+    IPool correctPool = new LockReleaseTokenPool(IERC20(address(2)));
+    IPool wrongPool = new LockReleaseTokenPool(IERC20(address(2)));
+    IERC20 token = IERC20(address(1));
+
+    s_offRamp.addPool(token, correctPool);
+
+    vm.expectRevert(EVM2EVMOffRamp.TokenPoolMismatch.selector);
+    s_offRamp.removePool(token, wrongPool);
+  }
+
+  function testPoolDoesNotExistReverts() public {
+    IPool newPool = new LockReleaseTokenPool(IERC20(address(2)));
+    IERC20 token = IERC20(address(1));
+
+    vm.expectRevert(EVM2EVMOffRamp.PoolDoesNotExist.selector);
+    s_offRamp.removePool(token, newPool);
+  }
+
+  function testOnlyOwnerReverts() public {
+    IPool newPool = new LockReleaseTokenPool(IERC20(address(2)));
+    IERC20 token = IERC20(address(1));
+
+    changePrank(STRANGER);
+
+    vm.expectRevert("Only callable by owner");
+    s_offRamp.removePool(token, newPool);
+  }
+}
+
+contract EVM2EVMOffRamp_getDestinationToken is EVM2EVMOffRampSetup {
+  function testGetDestinationTokenSuccess() public {
+    address expectedToken = address(IPool(s_destPools[0]).getToken());
+    address actualToken = address(s_offRamp.getDestinationToken(IERC20(s_sourceTokens[0])));
+
+    assertEq(expectedToken, actualToken);
+
+    expectedToken = address(IPool(s_destPools[1]).getToken());
+    actualToken = address(s_offRamp.getDestinationToken(IERC20(s_sourceTokens[1])));
+
+    assertEq(expectedToken, actualToken);
+  }
+}
+
+contract EVM2EVMOffRamp_getDestinationTokens is EVM2EVMOffRampSetup {
+  function testGetDestinationTokensSuccess() public {
+    IERC20[] memory actualTokens = s_offRamp.getDestinationTokens();
+
+    for (uint256 i = 0; i < actualTokens.length; ++i) {
+      assertEq(address(s_destTokens[i]), address(actualTokens[i]));
+    }
   }
 }

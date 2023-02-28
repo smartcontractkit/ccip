@@ -13,25 +13,27 @@ import {Client} from "../models/Client.sol";
 import {Internal} from "../models/Internal.sol";
 import {OCR2Base} from "../ocr/OCR2Base.sol";
 import {HealthChecker} from "../health/HealthChecker.sol";
-import {OffRampTokenPoolRegistry} from "../pools/OffRampTokenPoolRegistry.sol";
 import {AggregateRateLimiter} from "../rateLimiter/AggregateRateLimiter.sol";
 
 import {IERC20} from "../../vendor/IERC20.sol";
 import {Address} from "../../vendor/Address.sol";
 import {ERC165Checker} from "../../vendor/ERC165Checker.sol";
+import {EnumerableMapAddresses} from "../../libraries/internal/EnumerableMapAddresses.sol";
 
 /// @notice EVM2EVMOffRamp enables OCR networks to execute multiple messages
 /// in an OffRamp in a single transaction.
-contract EVM2EVMOffRamp is
-  IEVM2EVMOffRamp,
-  HealthChecker,
-  OffRampTokenPoolRegistry,
-  AggregateRateLimiter,
-  TypeAndVersionInterface,
-  OCR2Base
-{
+contract EVM2EVMOffRamp is IEVM2EVMOffRamp, HealthChecker, AggregateRateLimiter, TypeAndVersionInterface, OCR2Base {
   using Address for address;
   using ERC165Checker for address;
+  using EnumerableMapAddresses for EnumerableMapAddresses.AddressToAddressMap;
+
+  error InvalidTokenPoolConfig();
+  error PoolAlreadyAdded();
+  error PoolDoesNotExist();
+  error TokenPoolMismatch();
+
+  event PoolAdded(IERC20 token, IPool pool);
+  event PoolRemoved(IERC20 token, IPool pool);
 
   // STATIC CONFIG
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
@@ -49,6 +51,10 @@ contract EVM2EVMOffRamp is
 
   // DYNAMIC CONFIG
   DynamicConfig internal s_dynamicConfig;
+  // source token => token pool
+  EnumerableMapAddresses.AddressToAddressMap private s_poolsBySourceToken;
+  // dest token => token pool
+  EnumerableMapAddresses.AddressToAddressMap private s_poolsByDestToken;
 
   // STATE
   mapping(address => uint64) internal s_senderNonce;
@@ -56,6 +62,11 @@ contract EVM2EVMOffRamp is
   // This makes sure we never execute a message twice.
   mapping(uint64 => Internal.MessageExecutionState) internal s_executedMessages;
 
+  /// @notice The `tokens` and `pools` passed to this constructor depend on which chain this contract
+  /// is being deployed to. Mappings of source token => destination pool is maintained on the destination
+  /// chain. Therefore, when being deployed as an inheriting OffRamp, `tokens` should represent source chain tokens,
+  /// `pools` destinations chain pools. When being deployed as an inheriting OnRamp, `tokens` and `pools`
+  /// should both be source chain.
   constructor(
     StaticConfig memory staticConfig,
     DynamicConfig memory dynamicConfig,
@@ -63,12 +74,8 @@ contract EVM2EVMOffRamp is
     IERC20[] memory sourceTokens,
     IPool[] memory pools,
     RateLimiterConfig memory rateLimiterConfig
-  )
-    OCR2Base()
-    HealthChecker(afn)
-    OffRampTokenPoolRegistry(sourceTokens, pools)
-    AggregateRateLimiter(rateLimiterConfig)
-  {
+  ) OCR2Base() HealthChecker(afn) AggregateRateLimiter(rateLimiterConfig) {
+    if (sourceTokens.length != pools.length) revert InvalidTokenPoolConfig();
     if (staticConfig.onRamp == address(0) || staticConfig.commitStore == address(0)) revert ZeroAddressNotAllowed();
 
     i_commitStore = staticConfig.commitStore;
@@ -78,6 +85,12 @@ contract EVM2EVMOffRamp is
     emit StaticConfigSet(staticConfig);
 
     i_metadataHash = _metadataHash(Internal.EVM_2_EVM_MESSAGE_HASH);
+
+    // Set new tokens and pools
+    for (uint256 i = 0; i < sourceTokens.length; ++i) {
+      s_poolsBySourceToken.set(address(sourceTokens[i]), address(pools[i]));
+      s_poolsByDestToken.set(address(pools[i].getToken()), address(pools[i]));
+    }
 
     _setDynamicConfig(dynamicConfig);
   }
@@ -143,7 +156,6 @@ contract EVM2EVMOffRamp is
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](sourceTokenAmounts.length);
     for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
       IPool pool = getPoolBySourceToken(IERC20(sourceTokenAmounts[i].token));
-      if (address(pool) == address(0)) revert UnsupportedToken(IERC20(sourceTokenAmounts[i].token));
       _releaseOrMintToken(pool, sourceTokenAmounts[i].amount, receiver);
       destTokenAmounts[i].token = address(pool.getToken());
       destTokenAmounts[i].amount = sourceTokenAmounts[i].amount;
@@ -298,6 +310,77 @@ contract EVM2EVMOffRamp is
   function ccipReceive(Client.Any2EVMMessage calldata) external pure {
     // solhint-disable-next-line reason-string
     revert();
+  }
+
+  function addPool(IERC20 token, IPool pool) public onlyOwner {
+    if (address(token) == address(0) || address(pool) == address(0)) revert InvalidTokenPoolConfig();
+    // Check if the pool is already set
+    if (s_poolsBySourceToken.contains(address(token))) revert PoolAlreadyAdded();
+
+    // Set the s_pools with new config values
+    s_poolsBySourceToken.set(address(token), address(pool));
+    s_poolsByDestToken.set(address(pool.getToken()), address(pool));
+
+    emit PoolAdded(token, pool);
+  }
+
+  function removePool(IERC20 token, IPool pool) public onlyOwner {
+    // Check if the pool exists
+    if (!s_poolsBySourceToken.contains(address(token))) revert PoolDoesNotExist();
+    // Sanity check
+    if (s_poolsBySourceToken.get(address(token)) != address(pool)) revert TokenPoolMismatch();
+
+    s_poolsBySourceToken.remove(address(token));
+    s_poolsByDestToken.remove(address(pool.getToken()));
+
+    emit PoolRemoved(token, pool);
+  }
+
+  /// @notice Get a token pool by its source token
+  /// @param sourceToken token
+  /// @return Token Pool
+  function getPoolBySourceToken(IERC20 sourceToken) public view returns (IPool) {
+    (bool success, address pool) = s_poolsBySourceToken.tryGet(address(sourceToken));
+    if (!success) revert UnsupportedToken(sourceToken);
+    return IPool(pool);
+  }
+
+  /// @notice Get a token pool by its dest token
+  /// @param destToken token
+  /// @return Token Pool
+  function getPoolByDestToken(IERC20 destToken) public view returns (IPool) {
+    (bool success, address pool) = s_poolsByDestToken.tryGet(address(destToken));
+    if (!success) revert UnsupportedToken(destToken);
+    return IPool(pool);
+  }
+
+  /// @notice Get all supported source tokens
+  /// @return sourceTokens of supported source tokens
+  function getSupportedTokens() public view returns (IERC20[] memory sourceTokens) {
+    sourceTokens = new IERC20[](s_poolsBySourceToken.length());
+    for (uint256 i = 0; i < sourceTokens.length; ++i) {
+      (address token, ) = s_poolsBySourceToken.at(i);
+      sourceTokens[i] = IERC20(token);
+    }
+  }
+
+  /// @notice Get the destination token from the pool based on a given source token.
+  /// @param sourceToken The source token
+  /// @return the destination token
+  function getDestinationToken(IERC20 sourceToken) public view returns (IERC20) {
+    (bool success, address pool) = s_poolsBySourceToken.tryGet(address(sourceToken));
+    if (!success) revert PoolDoesNotExist();
+    return IPool(pool).getToken();
+  }
+
+  /// @notice Get all configured destination tokens
+  /// @return destTokens Array of configured destination tokens
+  function getDestinationTokens() external view returns (IERC20[] memory destTokens) {
+    destTokens = new IERC20[](s_poolsByDestToken.length());
+    for (uint256 i = 0; i < destTokens.length; ++i) {
+      (address token, ) = s_poolsByDestToken.at(i);
+      destTokens[i] = IERC20(token);
+    }
   }
 
   // ******* OCR BASE ***********
