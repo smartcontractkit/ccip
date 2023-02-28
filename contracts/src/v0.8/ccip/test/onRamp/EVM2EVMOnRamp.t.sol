@@ -358,6 +358,24 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     vm.expectRevert(abi.encodeWithSelector(IEVM2EVMOnRamp.MessageGasLimitTooHigh.selector));
     s_onRamp.forwardFromRouter(message, 0, OWNER);
   }
+
+  function testInvalidAddressEncodePackedReverts() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.receiver = abi.encodePacked(address(234));
+
+    vm.expectRevert(abi.encodeWithSelector(IEVM2EVMOnRamp.InvalidAddress.selector, message.receiver));
+
+    s_onRamp.forwardFromRouter(message, 1, OWNER);
+  }
+
+  function testInvalidAddressReverts() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.receiver = abi.encode(type(uint208).max);
+
+    vm.expectRevert(abi.encodeWithSelector(IEVM2EVMOnRamp.InvalidAddress.selector, message.receiver));
+
+    s_onRamp.forwardFromRouter(message, 1, OWNER);
+  }
 }
 
 contract EVM2EVMOnRamp_setNops is EVM2EVMOnRampSetup {

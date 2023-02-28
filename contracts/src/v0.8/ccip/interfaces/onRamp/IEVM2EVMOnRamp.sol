@@ -30,6 +30,7 @@ interface IEVM2EVMOnRamp is IEVM2AnyOnRamp {
   error TokenOrChainNotSupported(address token, uint64 chain);
   error SenderNotAllowed(address sender);
   error InvalidConfig();
+  error InvalidAddress(bytes encodedAddress);
 
   event AllowListAdd(address sender);
   event AllowListRemove(address sender);

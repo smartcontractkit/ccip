@@ -172,6 +172,9 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AggregateRateLimiter, T
     Client.EVMExtraArgsV1 memory extraArgs = _fromBytes(message.extraArgs);
     // Validate the message with various checks
     _validateMessage(message.data.length, extraArgs.gasLimit, message.tokenAmounts, originalSender);
+    if (message.receiver.length != 32) revert InvalidAddress(message.receiver);
+    uint256 decodedReceiver = abi.decode(message.receiver, (uint256));
+    if (decodedReceiver > type(uint160).max) revert InvalidAddress(message.receiver);
 
     // Convert feeToken to link if not already in link
     if (message.feeToken == i_linkToken) {
@@ -201,7 +204,7 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AggregateRateLimiter, T
       nonce: ++s_senderNonce[originalSender],
       gasLimit: extraArgs.gasLimit,
       strict: extraArgs.strict,
-      receiver: abi.decode(message.receiver, (address)),
+      receiver: address(uint160(decodedReceiver)),
       data: message.data,
       tokenAmounts: message.tokenAmounts,
       feeToken: message.feeToken,
