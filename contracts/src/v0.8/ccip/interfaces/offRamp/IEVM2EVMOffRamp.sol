@@ -32,9 +32,13 @@ interface IEVM2EVMOffRamp {
   );
 
   /// @notice Returns the current execution state of a message based on its sequenceNumber.
+  /// @param sequenceNumber The sequence number of the message to get the execution state for
+  /// @return The current execution state of the message
   function getExecutionState(uint64 sequenceNumber) external view returns (Internal.MessageExecutionState);
 
   /// @notice Returns the the current nonce for a receiver.
+  /// @param sender The sender address
+  /// @return nonce The nonce value belonging to the sender address.
   function getSenderNonce(address sender) external view returns (uint64 nonce);
 
   /// @notice Static offRamp config
@@ -45,7 +49,8 @@ interface IEVM2EVMOffRamp {
     address onRamp; // -------┘  OnRamp address on the source chain
   }
 
-  /// @notice Returns the current static config.
+  /// @notice Returns the static config.
+  /// @dev This function will always return the same struct as the contents is static and can never change.
   function getStaticConfig() external view returns (StaticConfig memory);
 
   /// @notice Dynamic offRamp config
@@ -59,12 +64,14 @@ interface IEVM2EVMOffRamp {
   }
 
   /// @notice Returns the current dynamic config.
+  /// @return The current config.
   function getDynamicConfig() external view returns (DynamicConfig memory);
 
   /// @notice Sets a new dynamic config.
+  /// @param config The new config
   function setDynamicConfig(DynamicConfig memory config) external;
 
-  /// @notice Manually execute a message
-  /// @param report Internal.ExecutionReport
+  /// @notice Manually execute a message.
+  /// @param report Internal.ExecutionReport.
   function manuallyExecute(Internal.ExecutionReport memory report) external;
 }

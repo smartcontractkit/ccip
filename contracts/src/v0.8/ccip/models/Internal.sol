@@ -12,8 +12,8 @@ library Internal {
   }
 
   struct TokenPriceUpdate {
-    address sourceToken;
-    uint128 usdPerToken;
+    address sourceToken; // Source token
+    uint128 usdPerToken; // USD per unit of token
   }
 
   struct ExecutionReport {

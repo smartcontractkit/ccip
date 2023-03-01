@@ -4,20 +4,19 @@ pragma solidity ^0.8.0;
 // End consumer library.
 library Client {
   struct EVMTokenAmount {
-    address token; // token address on the local chain
-    uint256 amount;
+    address token; // token address on the local chain.
+    uint256 amount; // Amount of tokens.
   }
 
   struct Any2EVMMessage {
-    bytes32 messageId; // MessageId corresponding to ccipSend on source
-    uint64 sourceChainId;
-    bytes sender; // abi.decode(sender) if coming from an EVM chain
-    bytes data; // payload sent in original message
-    EVMTokenAmount[] destTokenAmounts;
+    bytes32 messageId; // MessageId corresponding to ccipSend on source.
+    uint64 sourceChainId; // Source chain Id.
+    bytes sender; // abi.decode(sender) if coming from an EVM chain.
+    bytes data; // payload sent in original message.
+    EVMTokenAmount[] destTokenAmounts; // Tokens and their amounts in their destination chain representation.
   }
 
-  // If extraArgs is empty bytes, the default is
-  // 200k gas limit and strict = false.
+  // If extraArgs is empty bytes, the default is 200k gas limit and strict = false.
   struct EVM2AnyMessage {
     bytes receiver; // abi.encode(receiver address) for dest EVM chains
     bytes data; // Data payload

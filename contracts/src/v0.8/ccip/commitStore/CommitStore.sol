@@ -11,28 +11,29 @@ import {OCR2Base} from "../ocr/OCR2Base.sol";
 import {Internal} from "../models/Internal.sol";
 
 contract CommitStore is ICommitStore, TypeAndVersionInterface, HealthChecker, OCR2Base {
+  // STATIC CONFIG
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "CommitStore 1.0.0";
-
   // Chain ID of this chain
   uint64 internal immutable i_chainId;
   // Chain ID of the source chain
   uint64 internal immutable i_sourceChainId;
   // The onRamp address on the source chain
   address internal immutable i_onRamp;
-  // The dynamic commit store config
+
+  // DYNAMIC CONFIG
+  // The dynamic commitStore config
   DynamicConfig internal s_dynamicConfig;
 
+  // STATE
   // merkleRoot => timestamp when received
   mapping(bytes32 => uint256) private s_roots;
   // The min sequence number expected for future messages
   uint64 private s_minSeqNr = 1;
 
-  /// @dev sourceTokens are mapped to pools, and therefore should be the same length arrays.
-  /// @dev The AFN contract should be deployed already
   /// @param staticConfig Containing the static part of the commitStore config
   /// @param dynamicConfig Containing the dynamic part of the commitStore config
-  /// @param afn AFN contract
+  /// @param afn AFN contract, cannot be address(0)
   constructor(
     StaticConfig memory staticConfig,
     DynamicConfig memory dynamicConfig,
@@ -72,10 +73,13 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, HealthChecker, OC
     }
   }
 
+  /// @notice returns a hash of the abi encoded address of this contract and the
+  /// supplied root.
   function _hashCommitStoreWithRoot(bytes32 root) internal view returns (bytes32) {
     return keccak256(abi.encode(address(this), root));
   }
 
+  /// @inheritdoc ICommitStore
   function isBlessed(bytes32 root) public view returns (bool) {
     return s_afn.isBlessed(_hashCommitStoreWithRoot(root));
   }
@@ -95,6 +99,8 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, HealthChecker, OC
     _setDynamicConfig(dynamicConfig);
   }
 
+  /// @notice the internal version of setDynamicConfig to allow for reuse
+  /// in the constructor. Emits DynamicConfigSet on successful config set.
   function _setDynamicConfig(DynamicConfig memory dynamicConfig) internal {
     s_dynamicConfig = dynamicConfig;
     emit DynamicConfigSet(dynamicConfig);

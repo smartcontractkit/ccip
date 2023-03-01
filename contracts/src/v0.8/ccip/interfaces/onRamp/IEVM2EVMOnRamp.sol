@@ -98,7 +98,7 @@ interface IEVM2EVMOnRamp is IEVM2AnyOnRamp {
   /// @param to The address to send the tokens to
   function withdrawNonLinkFees(address feeToken, address to) external;
 
-  /// @notice Pays the Nops
+  /// @notice Pays the Node Ops their outstanding balances.
   function payNops() external;
 
   /// @notice Get the total amount of fees to be paid to the Nops (in LINK)

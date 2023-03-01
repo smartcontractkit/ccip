@@ -5,8 +5,6 @@ import {IEVM2AnyOnRamp} from "../../interfaces/onRamp/IEVM2AnyOnRamp.sol";
 import {IRouter} from "../../interfaces/router/IRouter.sol";
 import {IWrappedNative} from "../../interfaces/router/IWrappedNative.sol";
 import {IRouterClient} from "../../interfaces/router/IRouterClient.sol";
-import {IOwnable} from "../../interfaces/IOwnable.sol";
-import {ITypeAndVersion} from "../../interfaces/ITypeAndVersion.sol";
 
 import "../onRamp/EVM2EVMOnRampSetup.t.sol";
 import "../helpers/receivers/SimpleMessageReceiver.sol";
@@ -17,9 +15,9 @@ contract Router_constructor is EVM2EVMOnRampSetup {
   // Success
 
   function testSuccess() public {
-    assertEq("Router 1.0.0", ITypeAndVersion(address(s_sourceRouter)).typeAndVersion());
+    assertEq("Router 1.0.0", s_sourceRouter.typeAndVersion());
     // owner
-    assertEq(OWNER, IOwnable(address(s_sourceRouter)).owner());
+    assertEq(OWNER, s_sourceRouter.owner());
   }
 }
 

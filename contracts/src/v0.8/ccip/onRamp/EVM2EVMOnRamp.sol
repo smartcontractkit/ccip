@@ -259,6 +259,7 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AggregateRateLimiter, T
     _setDynamicConfig(dynamicConfig);
   }
 
+  /// @notice Internal version of setDynamicConfig to allow for reuse in the constructor.
   function _setDynamicConfig(DynamicConfig memory dynamicConfig) internal {
     if (dynamicConfig.router == address(0) || dynamicConfig.priceRegistry == address(0)) revert InvalidConfig();
 
@@ -364,6 +365,7 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AggregateRateLimiter, T
     _applyAllowListUpdates(adds, removes);
   }
 
+  /// @notice Internal version of applyAllowListUpdates to allow for reuse in the constructor.
   function _applyAllowListUpdates(address[] memory adds, address[] memory removes) internal {
     for (uint256 i = 0; i < removes.length; ++i) {
       s_allowList.remove(removes[i]);

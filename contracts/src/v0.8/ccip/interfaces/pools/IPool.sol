@@ -15,18 +15,22 @@ interface IPool {
   event Released(address indexed sender, address indexed recipient, uint256 amount);
   event Minted(address indexed sender, address indexed recipient, uint256 amount);
 
-  /// @notice Lock or burn the token in the pool
-  /// @param amount Amount to lock or burn
+  /// @notice Lock or burn the token in the pool.
+  /// @param amount Amount to lock or burn.
   function lockOrBurn(uint256 amount, address originalSender) external;
 
-  /// @notice Release or mint tokens from the pool to the recipient
-  /// @param recipient Recipient address
-  /// @param amount Amount to release or mint
+  /// @notice Release or mint tokens from the pool to the recipient.
+  /// @param recipient Recipient address.
+  /// @param amount Amount to release or mint.
   function releaseOrMint(address recipient, uint256 amount) external;
 
-  function getToken() external view returns (IERC20 pool);
+  /// @notice Gets the IERC20 token that this pool can lock or burn.
+  /// @return token The IERC20 token representation.
+  function getToken() external view returns (IERC20 token);
 
+  /// @notice Pauses the token pool.
   function pause() external;
 
+  /// @notice Unpauses the token pool.
   function unpause() external;
 }

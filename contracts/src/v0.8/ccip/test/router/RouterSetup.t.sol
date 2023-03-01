@@ -1,15 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {IRouter} from "../../interfaces/router/IRouter.sol";
-
 import "../TokenSetup.t.sol";
 import {Router} from "../../router/Router.sol";
 import {WETH9} from "../WETH9.sol";
 
 contract RouterSetup is BaseTest {
-  IRouter internal s_sourceRouter;
-  IRouter internal s_destRouter;
+  Router internal s_sourceRouter;
+  Router internal s_destRouter;
 
   function setUp() public virtual override {
     BaseTest.setUp();

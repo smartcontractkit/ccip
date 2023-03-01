@@ -95,6 +95,7 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, HealthChecker, AggregateRateLimiter,
     _setDynamicConfig(dynamicConfig);
   }
 
+  /// @notice creates a unique hash to be used in message hashing.
   function _metadataHash(bytes32 prefix) internal view returns (bytes32) {
     return keccak256(abi.encode(prefix, i_sourceChainId, i_chainId, i_onRamp));
   }
@@ -120,6 +121,7 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, HealthChecker, AggregateRateLimiter,
     _setDynamicConfig(config);
   }
 
+  /// @notice Internal version of setDynamicConfig to allow for reuse in the constructor.
   function _setDynamicConfig(DynamicConfig memory config) private {
     if (config.router == address(0)) revert InvalidOffRampConfig(config);
 
@@ -137,8 +139,10 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, HealthChecker, AggregateRateLimiter,
     return s_senderNonce[sender];
   }
 
-  /// @notice Uses the pool to release or mint tokens and send them to
-  ///         the given `receiver` address.
+  /// @notice Uses the pool to release or mint tokens and send them to the given receiver address.
+  /// @param pool The pool to release/mint tokens from.
+  /// @param amount The number of tokens to release/mint.
+  /// @param receiver The address that will receive the tokens.
   function _releaseOrMintToken(
     IPool pool,
     uint256 amount,
@@ -147,8 +151,9 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, HealthChecker, AggregateRateLimiter,
     pool.releaseOrMint(receiver, amount);
   }
 
-  /// @notice Uses pools to release or mint a number of different tokens
-  ///           and send them to the given `receiver` address.
+  /// @notice Uses pools to release or mint a number of different tokens to a receiver address.
+  /// @param sourceTokenAmounts List of tokens and amount values to be released/minted.
+  /// @param receiver The address that will receive the tokens.
   function _releaseOrMintTokens(Client.EVMTokenAmount[] memory sourceTokenAmounts, address receiver)
     internal
     returns (Client.EVMTokenAmount[] memory)
@@ -164,9 +169,9 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, HealthChecker, AggregateRateLimiter,
     return destTokenAmounts;
   }
 
-  /// @notice Execute a single message
-  /// @param message The Any2EVMMessageFromSender message that will be executed
-  /// @param manualExecution bool to indicate manual instead of DON execution
+  /// @notice Execute a single message.
+  /// @param message The message that will be executed.
+  /// @param manualExecution bool to indicate manual instead of DON execution.
   /// @dev this can only be called by the contract itself. It is part of
   /// the Execute call, as we can only try/catch on external calls.
   function executeSingleMessage(Internal.EVM2EVMMessage memory message, bool manualExecution) external {
@@ -188,10 +193,10 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, HealthChecker, AggregateRateLimiter,
     ) revert ReceiverError();
   }
 
-  /// @notice Try executing a message
-  /// @param message Client.Any2EVMMessage memory message
-  /// @param manualExecution bool to indicate manual instead of DON execution
-  /// @return Internal.ExecutionState
+  /// @notice Try executing a message.
+  /// @param message Client.Any2EVMMessage memory message.
+  /// @param manualExecution bool to indicate manual instead of DON execution.
+  /// @return the new state of the message, being either SUCCESS or FAILURE.
   function _trialExecute(Internal.EVM2EVMMessage memory message, bool manualExecution)
     internal
     returns (Internal.MessageExecutionState)
@@ -206,6 +211,9 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, HealthChecker, AggregateRateLimiter,
     return Internal.MessageExecutionState.SUCCESS;
   }
 
+  /// @notice Does basic message validation. Should never fail.
+  /// @param message The message to be validated.
+  /// @dev reverts on validation failures.
   function _isWellFormed(Internal.EVM2EVMMessage memory message) private view {
     if (message.sourceChainId != i_sourceChainId) revert InvalidSourceChain(message.sourceChainId);
     if (message.tokenAmounts.length > uint256(s_dynamicConfig.maxTokensLength))
@@ -214,6 +222,10 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, HealthChecker, AggregateRateLimiter,
       revert MessageTooLarge(uint256(s_dynamicConfig.maxDataSize), message.data.length);
   }
 
+  /// @notice Executes a report, executing each message in order.
+  /// @param report The execution report containing the messages and proofs.
+  /// @param manualExecution A boolean value indication whether this function is called
+  /// from the DON (false) or manually (true).
   function _execute(Internal.ExecutionReport memory report, bool manualExecution) internal whenNotPaused whenHealthy {
     uint256 numMsgs = report.encodedMessages.length;
     if (numMsgs == 0) revert EmptyReport();
@@ -312,6 +324,9 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, HealthChecker, AggregateRateLimiter,
     revert();
   }
 
+  /// @notice Adds a pool for use by this offRamp.
+  /// @param token The IERC20 token that the pool can mint/release.
+  /// @param pool The pool instance.
   function addPool(IERC20 token, IPool pool) public onlyOwner {
     if (address(token) == address(0) || address(pool) == address(0)) revert InvalidTokenPoolConfig();
     // Check if the pool is already set
@@ -324,6 +339,9 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, HealthChecker, AggregateRateLimiter,
     emit PoolAdded(token, pool);
   }
 
+  /// @notice Removes a pool from this offRamp.
+  /// @param token The IERC20 token that the pool can mint/release.
+  /// @param pool The pool instance.
   function removePool(IERC20 token, IPool pool) public onlyOwner {
     // Check if the pool exists
     if (!s_poolsBySourceToken.contains(address(token))) revert PoolDoesNotExist();
@@ -384,10 +402,8 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, HealthChecker, AggregateRateLimiter,
   }
 
   // ******* OCR BASE ***********
-  ///
-  /// @notice Entry point for execution, called by the OCR network
+  /// @notice Entrypoint for execution, called by the OCR network
   /// @dev Expects an encoded ExecutionReport
-  ///
   function _report(bytes memory report) internal override {
     _execute(abi.decode(report, (Internal.ExecutionReport)), false);
   }

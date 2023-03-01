@@ -10,8 +10,8 @@ interface IRouterClient {
   error InvalidMsgValue();
 
   /// @notice Checks if the given chain ID is supported for sending/receiving.
-  /// @param chainId The chain to check
-  /// @return supported is true if it is supported, false if not
+  /// @param chainId The chain to check.
+  /// @return supported is true if it is supported, false if not.
   function isChainSupported(uint64 chainId) external view returns (bool supported);
 
   /// @notice Gets a list of all supported tokens which can be sent or received

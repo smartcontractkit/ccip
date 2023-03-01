@@ -43,10 +43,12 @@ contract Router is IRouter, TypeAndVersionInterface, OwnerIsCreator {
   }
 
   // --------------- ADMIN ----------------- //
+  /// @inheritdoc IRouter
   function setWrappedNative(address wrappedNative) external onlyOwner {
     s_wrappedNative = wrappedNative;
   }
 
+  /// @inheritdoc IRouter
   function getWrappedNative() external view returns (address) {
     return s_wrappedNative;
   }
