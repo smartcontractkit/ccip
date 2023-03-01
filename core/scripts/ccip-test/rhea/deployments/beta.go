@@ -38,6 +38,7 @@ var Beta_Sepolia = rhea.EVMChainConfig{
 	Router:        gethcommon.HexToAddress(""),
 	Afn:           gethcommon.HexToAddress(""),
 	PriceRegistry: gethcommon.HexToAddress(""),
+	Confirmations: 4,
 }
 
 var Beta_OptimismGoerli = rhea.EVMChainConfig{
@@ -63,6 +64,7 @@ var Beta_OptimismGoerli = rhea.EVMChainConfig{
 	Router:        gethcommon.HexToAddress(""),
 	Afn:           gethcommon.HexToAddress(""),
 	PriceRegistry: gethcommon.HexToAddress(""),
+	Confirmations: 4,
 }
 
 var Beta_AvaxFuji = rhea.EVMChainConfig{
@@ -88,6 +90,7 @@ var Beta_AvaxFuji = rhea.EVMChainConfig{
 	Router:        gethcommon.HexToAddress(""),
 	Afn:           gethcommon.HexToAddress(""),
 	PriceRegistry: gethcommon.HexToAddress(""),
+	Confirmations: 1,
 }
 
 var Beta_SepoliaToAvaxFuji = rhea.EvmDeploymentConfig{

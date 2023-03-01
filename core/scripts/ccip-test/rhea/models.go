@@ -64,6 +64,7 @@ type EVMChainConfig struct {
 	Afn             gethcommon.Address
 	PriceRegistry   gethcommon.Address
 	AllowList       []gethcommon.Address
+	Confirmations   uint32
 }
 
 type EVMBridgedToken struct {

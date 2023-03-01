@@ -38,6 +38,7 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 	Router:        gethcommon.HexToAddress("0x428c4dc89b6bf908b82d77c9cbcea786ea8cc7d0"),
 	Afn:           gethcommon.HexToAddress("0x89d17571db7c9540eeb36760e3c749c8fb984569"),
 	PriceRegistry: gethcommon.HexToAddress("0x1f0e1ef0928c32fbb36c07054893dca7b1c9cd75"),
+	Confirmations: 4,
 }
 
 var Prod_OptimismGoerli = rhea.EVMChainConfig{
@@ -62,6 +63,7 @@ var Prod_OptimismGoerli = rhea.EVMChainConfig{
 	Router:        gethcommon.HexToAddress("0xf01ebcd92bc2a7c4e58b5c1527d6814f47443232"),
 	Afn:           gethcommon.HexToAddress("0x6d0e94e9f06cafb6031410de7df19fe2f286566c"),
 	PriceRegistry: gethcommon.HexToAddress("0x583e761181801f2b43efb1a9489db1a7c78fb60f"),
+	Confirmations: 4,
 }
 
 var Prod_AvaxFuji = rhea.EVMChainConfig{
@@ -88,6 +90,7 @@ var Prod_AvaxFuji = rhea.EVMChainConfig{
 	Router:        gethcommon.HexToAddress("0x3e4472e98997564378070308fce2a958a66194df"),
 	Afn:           gethcommon.HexToAddress("0x0fa77a2df96f59ab60f440af790ed74eb7d16128"),
 	PriceRegistry: gethcommon.HexToAddress("0x45dccaec07a3241a1492e23ea055fb8d501d07e2"),
+	Confirmations: 1,
 }
 
 // Lanes

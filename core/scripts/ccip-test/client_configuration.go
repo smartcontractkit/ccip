@@ -135,6 +135,7 @@ type Client struct {
 	PriceRegistry    *price_registry.PriceRegistry
 	Router           *router.Router
 	AllowList        []common.Address
+	Confirmations    uint32
 	logger           logger.Logger
 	t                *testing.T
 }
@@ -193,6 +194,7 @@ func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient
 			PingPongDapp:     pingPongDapp,
 			Router:           router,
 			AllowList:        config.ChainConfig.AllowList,
+			Confirmations:    config.ChainConfig.Confirmations,
 			logger:           config.Logger,
 			t:                t,
 		},
@@ -257,6 +259,7 @@ func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestCli
 			logger:           config.Logger,
 			Router:           router,
 			AllowList:        config.ChainConfig.AllowList,
+			Confirmations:    config.ChainConfig.Confirmations,
 			t:                t,
 		},
 		CommitStore:     commitStore,
@@ -841,8 +844,8 @@ func (client *CCIPClient) SetOCR2Config(env dione.Environment) {
 	}
 
 	ccipConfig, err := ccip.OffchainConfig{
-		SourceIncomingConfirmations: 10,
-		DestIncomingConfirmations:   10,
+		SourceIncomingConfirmations: client.Source.Confirmations,
+		DestIncomingConfirmations:   client.Dest.Confirmations,
 		FeeUpdateHeartBeat:          models.MustMakeDuration(24 * time.Hour),
 		FeeUpdateDeviationPPB:       5e7, // 5%
 	}.Encode()
