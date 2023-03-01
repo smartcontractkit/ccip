@@ -6,6 +6,7 @@ import {Internal} from "../../models/Internal.sol";
 
 interface IPriceRegistry {
   error TokenNotSupported(address token);
+  error NotAFeeToken(address token);
   error ChainNotSupported(uint64 chain);
   error OnlyCallableByUpdaterOrOwner();
   error StaleGasPrice(uint64 destChainId, uint256 threshold, uint256 timePassed);
@@ -14,8 +15,10 @@ interface IPriceRegistry {
 
   event PriceUpdaterSet(address indexed priceUpdater);
   event PriceUpdaterRemoved(address indexed priceUpdater);
+  event FeeTokenAdded(address indexed feeToken);
+  event FeeTokenRemoved(address indexed feeToken);
   event UsdPerUnitGasUpdated(uint64 indexed destChain, uint256 value, uint256 timestamp);
-  event UsdPerFeeTokenUpdated(address indexed feeToken, uint256 value, uint256 timestamp);
+  event UsdPerTokenUpdated(address indexed token, uint256 value, uint256 timestamp);
 
   /// @notice Value with a timestamp, used for gas prices and token prices.
   struct TimestampedUint128Value {
@@ -23,27 +26,36 @@ interface IPriceRegistry {
     uint128 timestamp; // ---┘
   }
 
-  /// @notice Set a price updater.
-  /// @param priceUpdaters The addresses of the price updaters.
-  /// @dev Does not remove existing price updaters, only adds new ones.
-  function addPriceUpdaters(address[] memory priceUpdaters) external;
-
-  /// @notice Remove price updaters.
-  /// @param priceUpdaters The addresses of the price updaters.
-  function removePriceUpdaters(address[] memory priceUpdaters) external;
+  /// @notice Adds new priceUpdaters and remove existing ones.
+  /// @param priceUpdatersToAdd The addresses of the priceUpdaters that are now allowed
+  /// to send fee updates.
+  /// @param priceUpdatersToRemove The addresses of the priceUpdaters that are no longer allowed
+  /// to send fee updates.
+  function applyPriceUpdatersUpdates(address[] memory priceUpdatersToAdd, address[] memory priceUpdatersToRemove)
+    external;
 
   /// @notice Get the list of price updaters.
   /// @return priceUpdaters The price updaters.
   function getPriceUpdaters() external view returns (address[] memory priceUpdaters);
 
-  /// @notice Update the price for a given token and destination chain.
+  /// @notice Add and remove tokens from feeTokens set.
+  /// @param feeTokensToAdd The addresses of the tokens which are now considered fee tokens
+  /// and can be used to calculate fees.
+  /// @param feeTokensToRemove The addresses of the tokens which are no longer considered feeTokens.
+  function applyFeeTokensUpdates(address[] memory feeTokensToAdd, address[] memory feeTokensToRemove) external;
+
+  /// @notice Get the list of fee tokens.
+  /// @return feeTokens The tokens set as fee tokens.
+  function getFeeTokens() external view returns (address[] memory feeTokens);
+
+  /// @notice Update the price for given tokens and destination chain.
   /// @param priceUpdates The price updates to apply.
   function updatePrices(Internal.PriceUpdates memory priceUpdates) external;
 
-  /// @notice Get the `feeTokenPrice` for a given token.
+  /// @notice Get the `tokenPrice` for a given token.
   /// @param token The token to get the price for.
-  /// @return feeTokenPrice The feeTokenPrice for the given token.
-  function getFeeTokenPrice(address token) external view returns (TimestampedUint128Value memory);
+  /// @return tokenPrice The tokenPrice for the given token.
+  function getTokenPrice(address token) external view returns (TimestampedUint128Value memory);
 
   /// @notice Get the `gasPrice` for a given destination chain ID.
   /// @param destChainId The destination chain to get the price for.
@@ -51,7 +63,7 @@ interface IPriceRegistry {
   function getDestinationChainGasPrice(uint64 destChainId) external view returns (TimestampedUint128Value memory);
 
   /// @notice Get the `feeTokenBaseUnitsPerUnitGas` for a given source chain token and destination chain ID.
-  /// @param feeToken The token to get the fee for.
+  /// @param feeToken The source token to get the fee for. Must be a feeToken.
   /// @param destChainId The destination chain to get the fee for.
   /// @return feeTokenBaseUnitsPerUnitGas The feeTokenBaseUnitsPerUnitGas for the given source chain token and destination chain ID.
   /// @dev Example:

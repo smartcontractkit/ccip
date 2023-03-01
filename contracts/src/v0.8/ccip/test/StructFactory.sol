@@ -135,10 +135,6 @@ contract StructFactory {
   // OffRamp
   function getEmptyPriceUpdates() internal pure returns (Internal.PriceUpdates memory priceUpdates) {
     return
-      Internal.PriceUpdates({
-        feeTokenPriceUpdates: new Internal.FeeTokenPriceUpdate[](0),
-        destChainId: 0,
-        usdPerUnitGas: 0
-      });
+      Internal.PriceUpdates({tokenPriceUpdates: new Internal.TokenPriceUpdate[](0), destChainId: 0, usdPerUnitGas: 0});
   }
 }

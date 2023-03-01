@@ -1,14 +1,15 @@
 {
   "acceptOwnership()": "79ba5097",
-  "addPriceUpdaters(address[])": "c39e61a1",
+  "applyFeeTokensUpdates(address[],address[])": "7afac322",
+  "applyPriceUpdatersUpdates(address[],address[])": "52877af0",
   "convertFeeTokenAmountToLinkAmount(address,address,uint256)": "a5817a95",
   "getDestinationChainGasPrice(uint64)": "514e8cff",
   "getFeeTokenBaseUnitsPerUnitGas(address,uint64)": "268e5d48",
-  "getFeeTokenPrice(address)": "d9718192",
+  "getFeeTokens()": "cdc73d51",
   "getPriceUpdaters()": "bfcd4566",
   "getStalenessThreshold()": "a6c94a73",
+  "getTokenPrice(address)": "d02641a0",
   "owner()": "8da5cb5b",
-  "removePriceUpdaters(address[])": "55346ac5",
   "transferOwnership(address)": "f2fde38b",
   "updatePrices(((address,uint128)[],uint64,uint128))": "3c03ec3c"
 }

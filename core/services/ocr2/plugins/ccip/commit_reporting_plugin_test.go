@@ -36,9 +36,9 @@ func TestCommitReportSize(t *testing.T) {
 		var root32 [32]byte
 		copy(root32[:], root)
 		rep, err := EncodeCommitReport(&commit_store.ICommitStoreCommitReport{MerkleRoot: root32, Interval: commit_store.ICommitStoreInterval{Min: min, Max: max}, PriceUpdates: commit_store.InternalPriceUpdates{
-			FeeTokenPriceUpdates: []commit_store.InternalFeeTokenPriceUpdate{},
-			DestChainId:          1337,
-			UsdPerUnitGas:        big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
+			TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{},
+			DestChainId:       1337,
+			UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
 		}})
 		require.NoError(t, err)
 		return len(rep) <= MaxCommitReportLength
@@ -80,12 +80,13 @@ func TestCommitReportEncoding(t *testing.T) {
 		big.NewInt(1),
 		big.NewInt(1),
 	)
+	require.NoError(t, err)
 
 	priceRegistry, _, _, err := price_registry.DeployPriceRegistry(destUser, destChain, price_registry.InternalPriceUpdates{
-		FeeTokenPriceUpdates: nil,
-		DestChainId:          0,
-		UsdPerUnitGas:        big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
-	}, []common.Address{}, uint32(time.Hour.Seconds()))
+		TokenPriceUpdates: nil,
+		DestChainId:       0,
+		UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
+	}, []common.Address{}, []common.Address{}, uint32(time.Hour.Seconds()))
 	require.NoError(t, err)
 
 	// Deploy commitStore.
@@ -111,7 +112,7 @@ func TestCommitReportEncoding(t *testing.T) {
 	prices, err := price_registry.NewPriceRegistry(priceRegistry, destChain)
 	require.NoError(t, err)
 
-	_, err = prices.AddPriceUpdaters(destUser, []common.Address{commitStoreAddress})
+	_, err = prices.ApplyPriceUpdatersUpdates(destUser, []common.Address{commitStoreAddress}, []common.Address{})
 	require.NoError(t, err)
 	destChain.Commit()
 
@@ -121,10 +122,10 @@ func TestCommitReportEncoding(t *testing.T) {
 	require.NoError(t, err)
 	report := commit_store.ICommitStoreCommitReport{
 		PriceUpdates: commit_store.InternalPriceUpdates{
-			FeeTokenPriceUpdates: []commit_store.InternalFeeTokenPriceUpdate{
+			TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{
 				{
-					SourceFeeToken: destLinkTokenAddress,
-					UsdPerFeeToken: big.NewInt(8e18), // 8usd
+					SourceToken: destLinkTokenAddress,
+					UsdPerToken: big.NewInt(8e18), // 8usd
 				},
 			},
 			DestChainId:   destChainId,
@@ -156,12 +157,12 @@ func TestCommitReportEncoding(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "2000000000000", destChainGasPrice.Value.String())
 
-	linkTokenPrice, err := prices.GetFeeTokenPrice(nil, destLinkTokenAddress)
+	linkTokenPrice, err := prices.GetTokenPrice(nil, destLinkTokenAddress)
 	require.NoError(t, err)
 	assert.Equal(t, "8000000000000000000", linkTokenPrice.Value.String())
 }
 
-func TestCalculateFeeUpdates(t *testing.T) {
+func TestCalculatePriceUpdates(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -175,42 +176,47 @@ func TestCalculateFeeUpdates(t *testing.T) {
 		}, big.NewInt(3)},
 		{"insufficient", []CommitObservation{
 			{SourceGasPriceUSD: nil}, {SourceGasPriceUSD: nil}, {SourceGasPriceUSD: big.NewInt(3)},
-		}, big.NewInt(0)},
+		}, nil},
 		{"median including empties", []CommitObservation{
 			{SourceGasPriceUSD: nil}, {SourceGasPriceUSD: big.NewInt(1)}, {SourceGasPriceUSD: big.NewInt(2)},
 		}, big.NewInt(2)},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := calculateFeeUpdates(10, []common.Address{}, tt.commitObservations)
+			got := calculatePriceUpdates(10, tt.commitObservations)
 			assert.Equal(t, tt.wantGas, got.UsdPerUnitGas)
 		})
 	}
 	feeToken1 := common.HexToAddress("0xa")
 	feeToken2 := common.HexToAddress("0xb")
-	feeTokenTests := []struct {
+	tokenPricesTests := []struct {
 		name               string
 		commitObservations []CommitObservation
-		feeTokens          []common.Address
-		feeTokenUpdates    []commit_store.InternalFeeTokenPriceUpdate
+		tokenPricesUpdates []commit_store.InternalTokenPriceUpdate
 	}{
 		{"median one token", []CommitObservation{
 			{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: big.NewInt(10)}},
 			{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: big.NewInt(12)}},
-		}, []common.Address{feeToken1}, []commit_store.InternalFeeTokenPriceUpdate{
-			{SourceFeeToken: feeToken1, UsdPerFeeToken: big.NewInt(12)}}},
+		}, []commit_store.InternalTokenPriceUpdate{
+			{SourceToken: feeToken1, UsdPerToken: big.NewInt(12)}}},
 		{"median two tokens", []CommitObservation{
 			{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: big.NewInt(10), feeToken2: big.NewInt(13)}},
 			{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: big.NewInt(12), feeToken2: big.NewInt(7)}},
-		}, []common.Address{feeToken1, feeToken2}, []commit_store.InternalFeeTokenPriceUpdate{
-			{SourceFeeToken: feeToken1, UsdPerFeeToken: big.NewInt(12)},
-			{SourceFeeToken: feeToken2, UsdPerFeeToken: big.NewInt(13)}},
+		}, []commit_store.InternalTokenPriceUpdate{
+			{SourceToken: feeToken1, UsdPerToken: big.NewInt(12)},
+			{SourceToken: feeToken2, UsdPerToken: big.NewInt(13)}},
+		},
+		{"only one token with enough votes", []CommitObservation{
+			{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: big.NewInt(10)}},
+			{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: big.NewInt(12), feeToken2: big.NewInt(7)}},
+		}, []commit_store.InternalTokenPriceUpdate{
+			{SourceToken: feeToken1, UsdPerToken: big.NewInt(12)}},
 		},
 	}
-	for _, tt := range feeTokenTests {
+	for _, tt := range tokenPricesTests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := calculateFeeUpdates(10, tt.feeTokens, tt.commitObservations)
-			assert.Equal(t, tt.feeTokenUpdates, got.FeeTokenPriceUpdates)
+			got := calculatePriceUpdates(10, tt.commitObservations)
+			assert.Equal(t, tt.tokenPricesUpdates, got.TokenPriceUpdates)
 		})
 	}
 }

@@ -10,7 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
 )
 
-func TestGetTokensPerFeeCoinPipeline(t *testing.T) {
+func TestGetTokenPricesUSDPipeline(t *testing.T) {
 	link := common.HexToAddress("0x514910771af9ca656af840dff83e8264ecf986ca")
 	weth := common.HexToAddress("0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2")
 	var tt = []struct {
@@ -34,7 +34,7 @@ func TestGetTokensPerFeeCoinPipeline(t *testing.T) {
 
 	for _, tc := range tt {
 		tc := tc
-		a := GetTokensPerFeeCoinPipeline(tc.tokens)
+		a := GetTokenPricesUSDPipeline(tc.tokens)
 		assert.Equal(t, tc.expected, a)
 	}
 }

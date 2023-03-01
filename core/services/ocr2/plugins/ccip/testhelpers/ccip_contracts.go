@@ -163,10 +163,6 @@ func (c *CCIPContracts) EnableOffRamp() {
 	require.NoError(c.t, err)
 	c.Dest.Chain.Commit()
 
-	_, err = c.Dest.PriceRegistry.AddPriceUpdaters(c.Dest.User, []common.Address{c.Dest.CommitStore.Address()})
-	require.NoError(c.t, err)
-	c.Dest.Chain.Commit()
-
 	_, err = c.Dest.OffRamp.SetOCR2Config(
 		c.Dest.User,
 		c.OCRConfig.Signers,
@@ -192,7 +188,10 @@ func (c *CCIPContracts) EnableCommitStore() {
 		c.OCRConfig.OffchainConfig,
 	)
 	require.NoError(c.t, err)
-	c.Source.Chain.Commit()
+	c.Dest.Chain.Commit()
+
+	_, err = c.Dest.PriceRegistry.ApplyPriceUpdatersUpdates(c.Dest.User, []common.Address{c.Dest.CommitStore.Address()}, []common.Address{})
+	require.NoError(c.t, err)
 	c.Dest.Chain.Commit()
 }
 
@@ -395,17 +394,17 @@ func (c *CCIPContracts) SetupOnchainConfig(oracles []confighelper.OracleIdentity
 	return blockBeforeConfig.Number().Int64()
 }
 
-func (c *CCIPContracts) NewCCIPJobSpecParams(tokensPerFeeCoinPipeline string, configBlock int64) CCIPJobSpecParams {
+func (c *CCIPContracts) NewCCIPJobSpecParams(tokenPricesUSDPipeline string, configBlock int64) CCIPJobSpecParams {
 	return CCIPJobSpecParams{
-		OnRamp:                   c.Source.OnRamp.Address(),
-		CommitStore:              c.Dest.CommitStore.Address(),
-		SourceChainId:            c.Source.ChainID,
-		DestChainId:              c.Dest.ChainID,
-		SourceChainName:          "SimulatedSource",
-		DestChainName:            "SimulatedDest",
-		TokensPerFeeCoinPipeline: tokensPerFeeCoinPipeline,
-		PollPeriod:               time.Second,
-		DestStartBlock:           uint64(configBlock),
+		OnRamp:                 c.Source.OnRamp.Address(),
+		CommitStore:            c.Dest.CommitStore.Address(),
+		SourceChainId:          c.Source.ChainID,
+		DestChainId:            c.Dest.ChainID,
+		SourceChainName:        "SimulatedSource",
+		DestChainName:          "SimulatedDest",
+		TokenPricesUSDPipeline: tokenPricesUSDPipeline,
+		PollPeriod:             time.Second,
+		DestStartBlock:         uint64(configBlock),
 	}
 }
 
@@ -541,16 +540,17 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		sourceUser,
 		sourceChain,
 		price_registry.InternalPriceUpdates{
-			FeeTokenPriceUpdates: []price_registry.InternalFeeTokenPriceUpdate{
+			TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
 				{
-					SourceFeeToken: sourceLinkTokenAddress,
-					UsdPerFeeToken: big.NewInt(8e18), // 8usd
+					SourceToken: sourceLinkTokenAddress,
+					UsdPerToken: big.NewInt(8e18), // 8usd
 				},
 			},
 			DestChainId:   destChainID,
 			UsdPerUnitGas: big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
 		},
 		nil,
+		[]common.Address{sourceLinkTokenAddress},
 		60*60*24*14, // two weeks
 	)
 	require.NoError(t, err)
@@ -624,16 +624,17 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		destUser,
 		destChain,
 		price_registry.InternalPriceUpdates{
-			FeeTokenPriceUpdates: []price_registry.InternalFeeTokenPriceUpdate{
+			TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
 				{
-					SourceFeeToken: sourceLinkTokenAddress,
-					UsdPerFeeToken: big.NewInt(8e18), // 8usd
+					SourceToken: destLinkTokenAddress,
+					UsdPerToken: big.NewInt(8e18), // 8usd
 				},
 			},
-			DestChainId:   destChainID,
+			DestChainId:   sourceChainID,
 			UsdPerUnitGas: big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
 		},
 		nil,
+		[]common.Address{destLinkTokenAddress},
 		60*60*24*14, // two weeks
 	)
 	require.NoError(t, err)
@@ -699,7 +700,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	_, err = destPool.SetOffRamp(destUser, offRampAddress, true)
 	require.NoError(t, err)
 	destChain.Commit()
-	_, err = destPrices.AddPriceUpdaters(destUser, []common.Address{commitStoreAddress})
+	_, err = destPrices.ApplyPriceUpdatersUpdates(destUser, []common.Address{commitStoreAddress}, []common.Address{})
 	require.NoError(t, err)
 	_, err = destRouter.ApplyRampUpdates(destUser, nil, []router.IRouterOffRampUpdate{
 		{SourceChainId: sourceChainID, OffRamps: []common.Address{offRampAddress}}})

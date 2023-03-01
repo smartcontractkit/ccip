@@ -271,19 +271,35 @@ func (c *PriceRegistry) Address() string {
 	return c.EthAddress.Hex()
 }
 
-func (c *PriceRegistry) SetPriceUpdater(addr common.Address) error {
+func (c *PriceRegistry) AddPriceUpdater(addr common.Address) error {
 	opts, err := c.client.TransactionOpts(c.client.GetDefaultWallet())
 	if err != nil {
 		return err
 	}
-	tx, err := c.instance.AddPriceUpdaters(opts, []common.Address{addr})
+	tx, err := c.instance.ApplyPriceUpdatersUpdates(opts, []common.Address{addr}, []common.Address{})
 	if err != nil {
 		return err
 	}
 	log.Info().
 		Str("updaters", addr.Hex()).
 		Str("Network Name", c.client.GetNetworkConfig().Name).
-		Msg("PriceRegistry updater set")
+		Msg("PriceRegistry updater added")
+	return c.client.ProcessTransaction(tx)
+}
+
+func (c *PriceRegistry) AddFeeToken(addr common.Address) error {
+	opts, err := c.client.TransactionOpts(c.client.GetDefaultWallet())
+	if err != nil {
+		return err
+	}
+	tx, err := c.instance.ApplyFeeTokensUpdates(opts, []common.Address{addr}, []common.Address{})
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Str("feeTokens", addr.Hex()).
+		Str("Network Name", c.client.GetNetworkConfig().Name).
+		Msg("PriceRegistry feeToken set")
 	return c.client.ProcessTransaction(tx)
 }
 

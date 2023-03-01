@@ -50,6 +50,7 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	destChainID := uint64(1337)
 	sourceChainID := uint64(1338)
 	destUser, err := bind.NewKeyedTransactorWithChainID(key, big.NewInt(0).SetUint64(destChainID))
+	require.NoError(t, err)
 	destChain := backends.NewSimulatedBackend(core.GenesisAlloc{
 		destUser.From: {Balance: big.NewInt(0).Mul(big.NewInt(100), big.NewInt(1000000000000000000))}},
 		10*ethconfig.Defaults.Miner.GasCeil) // 80M gas
@@ -91,16 +92,17 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 		destUser,
 		destChain,
 		price_registry.InternalPriceUpdates{
-			FeeTokenPriceUpdates: []price_registry.InternalFeeTokenPriceUpdate{
+			TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
 				{
-					SourceFeeToken: destLinkTokenAddress,
-					UsdPerFeeToken: big.NewInt(8e18), // 8usd
+					SourceToken: destLinkTokenAddress,
+					UsdPerToken: big.NewInt(8e18), // 8usd
 				},
 			},
 			DestChainId:   destChainID,
 			UsdPerUnitGas: big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
 		},
 		nil,
+		[]common.Address{destLinkTokenAddress},
 		60*60*24*14, // two weeks
 	)
 	require.NoError(t, err)

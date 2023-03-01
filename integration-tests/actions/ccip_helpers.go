@@ -17,6 +17,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+
 	"github.com/smartcontractkit/chainlink-env/environment"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/chainlink"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver"
@@ -349,9 +350,9 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int, conf *laneconfig.L
 	if ccipModule.PriceRegistry == nil {
 		// we will update the price updates later based on source and dest PriceUpdates
 		ccipModule.PriceRegistry, err = cd.DeployPriceRegistry(price_registry.InternalPriceUpdates{
-			FeeTokenPriceUpdates: []price_registry.InternalFeeTokenPriceUpdate{},
-			DestChainId:          0,
-			UsdPerUnitGas:        big.NewInt(0),
+			TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{},
+			DestChainId:       0,
+			UsdPerUnitGas:     big.NewInt(0),
 		})
 		if err != nil {
 			return fmt.Errorf("deploying PriceRegistry shouldn't fail %+v", err)
@@ -426,19 +427,29 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(reuse bool, lane *laneconfig
 		sourceCCIP.LoadContracts(lane)
 	}
 	if sourceCCIP.Common.deployedNewPriceRegistry {
+		// ensure token is a feeToken
+		err = sourceCCIP.Common.PriceRegistry.AddFeeToken(common.HexToAddress(sourceCCIP.Common.FeeToken.Address()))
+		if err != nil {
+			return fmt.Errorf("addFeeTokens shouldn't fail %+v", err)
+		}
+		err = sourceCCIP.Common.ChainClient.WaitForEvents()
+		if err != nil {
+			return fmt.Errorf("waiting for addFeeTokens shouldn't fail %+v", err)
+		}
+
 		// update PriceRegistry
 		err = sourceCCIP.Common.PriceRegistry.UpdatePrices(price_registry.InternalPriceUpdates{
 			DestChainId:   sourceCCIP.DestinationChainId,
 			UsdPerUnitGas: big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
-			FeeTokenPriceUpdates: []price_registry.InternalFeeTokenPriceUpdate{
+			TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
 				{
-					SourceFeeToken: common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
+					SourceToken: common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
 					/// USD per full fee token, in base units 1e18.
 					/// Example:
 					///   * 1 USDC = 1.00 USD per token -> 1e18
 					///   * 1 LINK = 5.00 USD per token -> 5e18
 					///   * 1 ETH = 2,000 USD per token -> 2_000e18
-					UsdPerFeeToken: big.NewInt(5e18),
+					UsdPerToken: big.NewInt(5e18),
 				},
 			},
 		})
@@ -779,19 +790,29 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 		destCCIP.LoadContracts(lane)
 	}
 	if destCCIP.Common.deployedNewPriceRegistry {
+		// ensure token is a feeToken
+		err = destCCIP.Common.PriceRegistry.AddFeeToken(common.HexToAddress(destCCIP.Common.FeeToken.Address()))
+		if err != nil {
+			return fmt.Errorf("addFeeTokens shouldn't fail %+v", err)
+		}
+		err = destCCIP.Common.ChainClient.WaitForEvents()
+		if err != nil {
+			return fmt.Errorf("waiting for addFeeTokens shouldn't fail %+v", err)
+		}
+
 		// update PriceRegistry
 		err = destCCIP.Common.PriceRegistry.UpdatePrices(price_registry.InternalPriceUpdates{
 			DestChainId:   destCCIP.SourceChainId,
 			UsdPerUnitGas: big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
-			FeeTokenPriceUpdates: []price_registry.InternalFeeTokenPriceUpdate{
+			TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
 				{
-					SourceFeeToken: common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
+					SourceToken: common.HexToAddress(destCCIP.Common.FeeToken.Address()),
 					/// USD per full fee token, in base units 1e18.
 					/// Example:
 					///   * 1 USDC = 1.00 USD per token -> 1e18
 					///   * 1 LINK = 5.00 USD per token -> 5e18
 					///   * 1 ETH = 2,000 USD per token -> 2_000e18
-					UsdPerFeeToken: big.NewInt(5e18),
+					UsdPerToken: big.NewInt(5e18),
 				},
 			},
 		})
@@ -821,7 +842,7 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 		}
 
 		// CommitStore can update
-		err = destCCIP.Common.PriceRegistry.SetPriceUpdater(destCCIP.CommitStore.EthAddress)
+		err = destCCIP.Common.PriceRegistry.AddPriceUpdater(destCCIP.CommitStore.EthAddress)
 		if err != nil {
 			return fmt.Errorf("setting commitstore as fee updater shouldn't fail %+v", err)
 		}
@@ -1560,13 +1581,13 @@ func CreateOCRJobsForCCIP(
 	ocr2SpecExec.Name = fmt.Sprintf("%s", ocr2SpecExec.Name)
 
 	for i, node := range commitNodes {
-		tokensPerFeeCoinPipeline := TokenFeeForMultipleTokenAddr(node, linkTokenAddr, mockServer)
+		tokenPricesUSDPipeline := TokenFeeForMultipleTokenAddr(node, linkTokenAddr, mockServer)
 
 		ocr2SpecCommit.OCR2OracleSpec.OCRKeyBundleID.SetValid(node.KeysBundle.OCR2Key.Data.ID)
 		ocr2SpecCommit.OCR2OracleSpec.TransmitterID.SetValid(node.KeysBundle.EthAddress)
-		ocr2SpecCommit.OCR2OracleSpec.PluginConfig["tokensPerFeeCoinPipeline"] = fmt.Sprintf(`"""
+		ocr2SpecCommit.OCR2OracleSpec.PluginConfig["tokenPricesUSDPipeline"] = fmt.Sprintf(`"""
 %s
-"""`, tokensPerFeeCoinPipeline)
+"""`, tokenPricesUSDPipeline)
 
 		_, err = node.Node.MustCreateJob(ocr2SpecCommit)
 		if err != nil {
@@ -1576,11 +1597,11 @@ func CreateOCRJobsForCCIP(
 
 	if ocr2SpecExec != nil {
 		for i, node := range execNodes {
-			tokensPerFeeCoinPipeline := TokenFeeForMultipleTokenAddr(node, linkTokenAddr, mockServer)
+			tokenPricesUSDPipeline := TokenFeeForMultipleTokenAddr(node, linkTokenAddr, mockServer)
 
-			ocr2SpecExec.OCR2OracleSpec.PluginConfig["tokensPerFeeCoinPipeline"] = fmt.Sprintf(`"""
+			ocr2SpecExec.OCR2OracleSpec.PluginConfig["tokenPricesUSDPipeline"] = fmt.Sprintf(`"""
 %s
-"""`, tokensPerFeeCoinPipeline)
+"""`, tokenPricesUSDPipeline)
 			ocr2SpecExec.OCR2OracleSpec.OCRKeyBundleID.SetValid(node.KeysBundle.OCR2Key.Data.ID)
 			ocr2SpecExec.OCR2OracleSpec.TransmitterID.SetValid(node.KeysBundle.EthAddress)
 

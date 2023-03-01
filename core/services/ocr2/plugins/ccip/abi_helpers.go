@@ -19,7 +19,8 @@ var (
 	// merkleRoot || minSeqNum || maxSeqNum
 	ReportAccepted common.Hash
 	// Prices
-	GasFeeUpdated common.Hash
+	UsdPerUnitGasUpdated common.Hash
+	UsdPerTokenUpdated   common.Hash
 )
 
 // MessageExecutionState defines the execution states of CCIP messages.
@@ -51,7 +52,8 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	GasFeeUpdated = getIDOrPanic("UsdPerUnitGasUpdated", pricesABI)
+	UsdPerUnitGasUpdated = getIDOrPanic("UsdPerUnitGasUpdated", pricesABI)
+	UsdPerTokenUpdated = getIDOrPanic("UsdPerTokenUpdated", pricesABI)
 }
 
 func GetEventSignatures() EventSignatures {
@@ -248,15 +250,15 @@ func makeCommitReportArgs() abi.Arguments {
 					Type: "tuple",
 					Components: []abi.ArgumentMarshaling{
 						{
-							Name: "feeTokenPriceUpdates",
+							Name: "tokenPriceUpdates",
 							Type: "tuple[]",
 							Components: []abi.ArgumentMarshaling{
 								{
-									Name: "sourceFeeToken",
+									Name: "sourceToken",
 									Type: "address",
 								},
 								{
-									Name: "usdPerFeeToken",
+									Name: "usdPerToken",
 									Type: "uint128",
 								},
 							},

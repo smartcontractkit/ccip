@@ -21,7 +21,7 @@ contract CommitStoreSetup is PriceRegistrySetup {
 
     address[] memory priceUpdaters = new address[](1);
     priceUpdaters[0] = address(s_commitStore);
-    s_priceRegistry.addPriceUpdaters(priceUpdaters);
+    s_priceRegistry.applyPriceUpdatersUpdates(priceUpdaters, new address[](0));
   }
 }
 
@@ -149,7 +149,7 @@ contract CommitStore_resetUnblessedRoots is CommitStoreSetup {
 /// @notice #report
 contract CommitStore_report is CommitStoreSetup {
   event ReportAccepted(ICommitStore.CommitReport report);
-  event UsdPerFeeTokenUpdated(address indexed feeToken, uint256 value, uint256 timestamp);
+  event UsdPerTokenUpdated(address indexed feeToken, uint256 value, uint256 timestamp);
 
   // Success
 
@@ -177,10 +177,10 @@ contract CommitStore_report is CommitStoreSetup {
 
   function testReportAndPriceUpdateSuccess() public {
     uint64 max1 = 12;
-    Internal.FeeTokenPriceUpdate[] memory feeTokenPriceUpdates = new Internal.FeeTokenPriceUpdate[](1);
-    feeTokenPriceUpdates[0] = Internal.FeeTokenPriceUpdate({sourceFeeToken: s_sourceFeeToken, usdPerFeeToken: 4e18});
+    Internal.TokenPriceUpdate[] memory tokenPriceUpdates = new Internal.TokenPriceUpdate[](1);
+    tokenPriceUpdates[0] = Internal.TokenPriceUpdate({sourceToken: s_sourceFeeToken, usdPerToken: 4e18});
     Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
-      feeTokenPriceUpdates: feeTokenPriceUpdates,
+      tokenPriceUpdates: tokenPriceUpdates,
       destChainId: 0,
       usdPerUnitGas: 0
     });
@@ -200,10 +200,10 @@ contract CommitStore_report is CommitStoreSetup {
   }
 
   function testOnlyPriceUpdatesSuccess() public {
-    Internal.FeeTokenPriceUpdate[] memory feeTokenPriceUpdates = new Internal.FeeTokenPriceUpdate[](1);
-    feeTokenPriceUpdates[0] = Internal.FeeTokenPriceUpdate({sourceFeeToken: s_sourceFeeToken, usdPerFeeToken: 4e18});
+    Internal.TokenPriceUpdate[] memory tokenPriceUpdates = new Internal.TokenPriceUpdate[](1);
+    tokenPriceUpdates[0] = Internal.TokenPriceUpdate({sourceToken: s_sourceFeeToken, usdPerToken: 4e18});
     Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
-      feeTokenPriceUpdates: feeTokenPriceUpdates,
+      tokenPriceUpdates: tokenPriceUpdates,
       destChainId: 0,
       usdPerUnitGas: 0
     });
@@ -215,7 +215,7 @@ contract CommitStore_report is CommitStoreSetup {
     });
 
     vm.expectEmit(true, true, true, true);
-    emit UsdPerFeeTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
+    emit UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
 
     s_commitStore.report(abi.encode(report));
   }

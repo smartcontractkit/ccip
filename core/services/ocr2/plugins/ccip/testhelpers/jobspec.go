@@ -27,22 +27,22 @@ func JobName(jobType JobType, source string, destination string) string {
 }
 
 type CCIPJobSpecParams struct {
-	Name                     string
-	OffRamp                  common.Address
-	OnRamp                   common.Address
-	CommitStore              common.Address
-	SourceChainName          string
-	DestChainName            string
-	SourceChainId            uint64
-	DestChainId              uint64
-	TokensPerFeeCoinPipeline string
-	PollPeriod               time.Duration
-	SourceStartBlock         uint64
-	DestStartBlock           uint64
-	RelayInflight            time.Duration
-	ExecInflight             time.Duration
-	RootSnooze               time.Duration
-	P2PV2Bootstrappers       pq.StringArray
+	Name                   string
+	OffRamp                common.Address
+	OnRamp                 common.Address
+	CommitStore            common.Address
+	SourceChainName        string
+	DestChainName          string
+	SourceChainId          uint64
+	DestChainId            uint64
+	TokenPricesUSDPipeline string
+	PollPeriod             time.Duration
+	SourceStartBlock       uint64
+	DestStartBlock         uint64
+	RelayInflight          time.Duration
+	ExecInflight           time.Duration
+	RootSnooze             time.Duration
+	P2PV2Bootstrappers     pq.StringArray
 }
 
 func (params CCIPJobSpecParams) Validate() error {
@@ -106,9 +106,9 @@ func (params CCIPJobSpecParams) CommitJobSpec() (*client.OCR2TaskJobSpec, error)
 			"onRampID":      fmt.Sprintf("\"%s\"", params.OnRamp.Hex()),
 			"offRampID":     fmt.Sprintf("\"%s\"", params.OffRamp.Hex()),
 			"pollPeriod":    `"1s"`,
-			"tokensPerFeeCoinPipeline": fmt.Sprintf(`"""
+			"tokenPricesUSDPipeline": fmt.Sprintf(`"""
 %s
-"""`, params.TokensPerFeeCoinPipeline),
+"""`, params.TokenPricesUSDPipeline),
 		},
 		RelayConfig: map[string]interface{}{
 			"chainID": params.DestChainId,
@@ -151,9 +151,9 @@ func (params CCIPJobSpecParams) ExecutionJobSpec() (*client.OCR2TaskJobSpec, err
 			"sourceChainID": params.SourceChainId,
 			"onRampID":      fmt.Sprintf("\"%s\"", params.OnRamp.Hex()),
 			"commitStoreID": fmt.Sprintf("\"%s\"", params.CommitStore.Hex()),
-			"tokensPerFeeCoinPipeline": fmt.Sprintf(`"""
+			"tokenPricesUSDPipeline": fmt.Sprintf(`"""
 %s
-"""`, params.TokensPerFeeCoinPipeline),
+"""`, params.TokenPricesUSDPipeline),
 		},
 		RelayConfig: map[string]interface{}{
 			"chainID": params.DestChainId,

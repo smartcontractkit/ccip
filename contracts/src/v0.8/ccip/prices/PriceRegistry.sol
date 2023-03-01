@@ -9,7 +9,7 @@ import {Internal} from "../models/Internal.sol";
 import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v4.7.3/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice The PriceRegistry contract responsibility is to store the current gas price in USD for a given destination chain,
-/// and the price of a fee token in USD allowing the owner or priceUpdater to update this value.
+/// and the price of a token in USD allowing the owner or priceUpdater to update this value.
 contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
   using EnumerableSet for EnumerableSet.AddressSet;
   /// @dev The price, in USD, of 1 unit of gas for a given destination chain.
@@ -19,45 +19,64 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
   ///     Cheap:            1 unit of gas costs 0.000001 USD           -> 1e12
   mapping(uint64 => TimestampedUint128Value) private s_usdPerUnitGasByDestChainId;
 
-  /// @dev USD per full fee token, in base units 1e18.
+  /// @dev USD per full token, in base units 1e18.
   /// @dev Example:
   ///     1 USDC = 1.00 USD per token -> 1e18
   ///     1 LINK = 5.00 USD per token -> 5e18
   ///     1 ETH = 2,000 USD per token -> 2_000e18
-  mapping(address => TimestampedUint128Value) private s_usdPerFeeToken;
+  mapping(address => TimestampedUint128Value) private s_usdPerToken;
 
   // Price updaters are allowed to update the prices.
   EnumerableSet.AddressSet private s_priceUpdaters;
+  // Subset of tokens which prices tracked by this registry which are fee tokens.
+  EnumerableSet.AddressSet private s_feeTokens;
   // The amount of time a price can be stale before it is considered invalid.
   uint32 private immutable i_stalenessThreshold;
 
   constructor(
     Internal.PriceUpdates memory priceUpdates,
     address[] memory priceUpdaters,
+    address[] memory feeTokens,
     uint32 stalenessThreshold
   ) {
     _updatePrices(priceUpdates);
-    _addPriceUpdaters(priceUpdaters);
+    _applyPriceUpdatersUpdates(priceUpdaters, new address[](0));
+    _applyFeeTokensUpdates(feeTokens, new address[](0));
     if (stalenessThreshold == 0) revert InvalidStalenessThreshold();
-
     i_stalenessThreshold = stalenessThreshold;
   }
 
   // @inheritdoc IPriceRegistry
-  function addPriceUpdaters(address[] memory priceUpdaters) external override onlyOwner {
-    _addPriceUpdaters(priceUpdaters);
-  }
-
-  // @inheritdoc IPriceRegistry
-  function removePriceUpdaters(address[] memory priceUpdaters) external override onlyOwner {
-    _removePriceUpdaters(priceUpdaters);
+  function applyPriceUpdatersUpdates(address[] memory priceUpdatersToAdd, address[] memory priceUpdatersToRemove)
+    external
+    override
+    onlyOwner
+  {
+    _applyPriceUpdatersUpdates(priceUpdatersToAdd, priceUpdatersToRemove);
   }
 
   // @inheritdoc IPriceRegistry
   function getPriceUpdaters() external view override returns (address[] memory priceUpdaters) {
     priceUpdaters = new address[](s_priceUpdaters.length());
-    for (uint256 i = 0; i < s_priceUpdaters.length(); i++) {
+    for (uint256 i = 0; i < s_priceUpdaters.length(); ++i) {
       priceUpdaters[i] = s_priceUpdaters.at(i);
+    }
+  }
+
+  // @inheritdoc IPriceRegistry
+  function applyFeeTokensUpdates(address[] memory feeTokensToAdd, address[] memory feeTokensToRemove)
+    external
+    override
+    onlyOwner
+  {
+    _applyFeeTokensUpdates(feeTokensToAdd, feeTokensToRemove);
+  }
+
+  // @inheritdoc IPriceRegistry
+  function getFeeTokens() external view override returns (address[] memory feeTokens) {
+    feeTokens = new address[](s_feeTokens.length());
+    for (uint256 i = 0; i < s_feeTokens.length(); ++i) {
+      feeTokens[i] = s_feeTokens.at(i);
     }
   }
 
@@ -67,8 +86,8 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
   }
 
   // @inheritdoc IPriceRegistry
-  function getFeeTokenPrice(address token) external view override returns (TimestampedUint128Value memory) {
-    return s_usdPerFeeToken[token];
+  function getTokenPrice(address token) external view override returns (TimestampedUint128Value memory) {
+    return s_usdPerToken[token];
   }
 
   // @inheritdoc IPriceRegistry
@@ -82,21 +101,23 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
   }
 
   // @inheritdoc IPriceRegistry
-  function getFeeTokenBaseUnitsPerUnitGas(address token, uint64 destChainId)
+  function getFeeTokenBaseUnitsPerUnitGas(address feeToken, uint64 destChainId)
     external
     view
     override
     returns (uint256 feeTokenBaseUnitsPerUnitGas)
   {
+    if (!s_feeTokens.contains(feeToken)) revert NotAFeeToken(feeToken);
+
     TimestampedUint128Value memory gasPrice = s_usdPerUnitGasByDestChainId[destChainId];
     if (gasPrice.timestamp == 0 || gasPrice.value == 0) revert ChainNotSupported(destChainId);
     uint256 timePassed = block.timestamp - gasPrice.timestamp;
     if (timePassed > i_stalenessThreshold) revert StaleGasPrice(destChainId, i_stalenessThreshold, timePassed);
 
-    TimestampedUint128Value memory feeTokenPrice = s_usdPerFeeToken[token];
-    if (feeTokenPrice.timestamp == 0 || feeTokenPrice.value == 0) revert TokenNotSupported(token);
+    TimestampedUint128Value memory feeTokenPrice = s_usdPerToken[feeToken];
+    if (feeTokenPrice.timestamp == 0 || feeTokenPrice.value == 0) revert TokenNotSupported(feeToken);
     timePassed = block.timestamp - feeTokenPrice.timestamp;
-    if (timePassed > i_stalenessThreshold) revert StaleTokenPrice(token, i_stalenessThreshold, timePassed);
+    if (timePassed > i_stalenessThreshold) revert StaleTokenPrice(feeToken, i_stalenessThreshold, timePassed);
 
     return (uint256(gasPrice.value) * 1e18) / uint256(feeTokenPrice.value);
   }
@@ -107,13 +128,15 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
     address feeToken,
     uint256 feeTokenAmount
   ) external view override returns (uint256 linkTokenAmount) {
-    TimestampedUint128Value memory feeTokenPrice = s_usdPerFeeToken[feeToken];
+    if (!s_feeTokens.contains(feeToken)) revert NotAFeeToken(feeToken);
+
+    TimestampedUint128Value memory feeTokenPrice = s_usdPerToken[feeToken];
     if (feeTokenPrice.timestamp == 0 || feeTokenPrice.value == 0) revert TokenNotSupported(feeToken);
     uint256 feeTokenTimePassed = block.timestamp - feeTokenPrice.timestamp;
     if (feeTokenTimePassed > i_stalenessThreshold)
       revert StaleTokenPrice(feeToken, i_stalenessThreshold, feeTokenTimePassed);
 
-    TimestampedUint128Value memory linkTokenPrice = s_usdPerFeeToken[linkToken];
+    TimestampedUint128Value memory linkTokenPrice = s_usdPerToken[linkToken];
     if (linkTokenPrice.timestamp == 0 || linkTokenPrice.value == 0) revert TokenNotSupported(linkToken);
     uint256 linkTokenTimePassed = block.timestamp - linkTokenPrice.timestamp;
     if (linkTokenTimePassed > i_stalenessThreshold)
@@ -134,23 +157,39 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
     return i_stalenessThreshold;
   }
 
-  /// @notice Adds new price updaters.
-  /// @param priceUpdaters The addresses of the priceUpdaters that are now allowed
+  /// @notice Adds new priceUpdaters and remove existing ones.
+  /// @param priceUpdatersToAdd The addresses of the priceUpdaters that are now allowed
   /// to send fee updates.
-  function _addPriceUpdaters(address[] memory priceUpdaters) private {
-    for (uint256 i = 0; i < priceUpdaters.length; ++i) {
-      s_priceUpdaters.add(priceUpdaters[i]);
-      emit PriceUpdaterSet(priceUpdaters[i]);
+  /// @param priceUpdatersToRemove The addresses of the priceUpdaters that are no longer allowed
+  /// to send fee updates.
+  function _applyPriceUpdatersUpdates(address[] memory priceUpdatersToAdd, address[] memory priceUpdatersToRemove)
+    private
+  {
+    for (uint256 i = 0; i < priceUpdatersToAdd.length; ++i) {
+      if (s_priceUpdaters.add(priceUpdatersToAdd[i])) {
+        emit PriceUpdaterSet(priceUpdatersToAdd[i]);
+      }
+    }
+    for (uint256 i = 0; i < priceUpdatersToRemove.length; ++i) {
+      if (s_priceUpdaters.remove(priceUpdatersToRemove[i])) {
+        emit PriceUpdaterRemoved(priceUpdatersToRemove[i]);
+      }
     }
   }
 
-  /// @notice Removes price updaters.
-  /// @param priceUpdaters The addresses of the priceUpdaters that are no longer allowed
-  /// to send fee updates.
-  function _removePriceUpdaters(address[] memory priceUpdaters) private {
-    for (uint256 i = 0; i < priceUpdaters.length; ++i) {
-      if (s_priceUpdaters.remove(priceUpdaters[i])) {
-        emit PriceUpdaterRemoved(priceUpdaters[i]);
+  /// @notice Add and remove tokens from feeTokens set.
+  /// @param feeTokensToAdd The addresses of the tokens which are now considered fee tokens
+  /// and can be used to calculate fees.
+  /// @param feeTokensToRemove The addresses of the tokens which are no longer considered feeTokens.
+  function _applyFeeTokensUpdates(address[] memory feeTokensToAdd, address[] memory feeTokensToRemove) private {
+    for (uint256 i = 0; i < feeTokensToAdd.length; ++i) {
+      if (s_feeTokens.add(feeTokensToAdd[i])) {
+        emit FeeTokenAdded(feeTokensToAdd[i]);
+      }
+    }
+    for (uint256 i = 0; i < feeTokensToRemove.length; ++i) {
+      if (s_feeTokens.remove(feeTokensToRemove[i])) {
+        emit FeeTokenRemoved(feeTokensToRemove[i]);
       }
     }
   }
@@ -158,33 +197,22 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
   /// @notice Updates all prices in the priceUpdates struct.
   /// @param priceUpdates The struct containing all the price updates.
   function _updatePrices(Internal.PriceUpdates memory priceUpdates) private {
-    for (uint256 i = 0; i < priceUpdates.feeTokenPriceUpdates.length; ++i) {
-      _updateUsdPerFeeToken(priceUpdates.feeTokenPriceUpdates[i]);
+    for (uint256 i = 0; i < priceUpdates.tokenPriceUpdates.length; ++i) {
+      Internal.TokenPriceUpdate memory update = priceUpdates.tokenPriceUpdates[i];
+      s_usdPerToken[update.sourceToken] = TimestampedUint128Value({
+        value: update.usdPerToken,
+        timestamp: uint128(block.timestamp)
+      });
+      emit UsdPerTokenUpdated(update.sourceToken, update.usdPerToken, block.timestamp);
     }
+
     if (priceUpdates.destChainId != 0) {
-      _updateUsdPerGasUnitByDestChainId(priceUpdates.destChainId, priceUpdates.usdPerUnitGas);
+      s_usdPerUnitGasByDestChainId[priceUpdates.destChainId] = TimestampedUint128Value({
+        value: priceUpdates.usdPerUnitGas,
+        timestamp: uint128(block.timestamp)
+      });
+      emit UsdPerUnitGasUpdated(priceUpdates.destChainId, priceUpdates.usdPerUnitGas, block.timestamp);
     }
-  }
-
-  /// @notice Updates the USD per gas unit for a given destination chain.
-  /// @param destChainId The destination chain id.
-  /// @param usdPerUnitGas The gas price in USD per unit gas.
-  function _updateUsdPerGasUnitByDestChainId(uint64 destChainId, uint128 usdPerUnitGas) private {
-    s_usdPerUnitGasByDestChainId[destChainId] = TimestampedUint128Value({
-      value: usdPerUnitGas,
-      timestamp: uint128(block.timestamp)
-    });
-    emit UsdPerUnitGasUpdated(destChainId, usdPerUnitGas, block.timestamp);
-  }
-
-  /// @notice Updates the USD per fee token.
-  /// @param update The struct containing the update.
-  function _updateUsdPerFeeToken(Internal.FeeTokenPriceUpdate memory update) private {
-    s_usdPerFeeToken[update.sourceFeeToken] = TimestampedUint128Value({
-      value: update.usdPerFeeToken,
-      timestamp: uint128(block.timestamp)
-    });
-    emit UsdPerFeeTokenUpdated(update.sourceFeeToken, update.usdPerFeeToken, block.timestamp);
   }
 
   /// @notice Require that the caller is the owner or a fee updater.

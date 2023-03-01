@@ -33,17 +33,17 @@ func SetPriceRegistryPrices(t *testing.T, client *EvmDeploymentConfig, destChain
 	shared.RequireNoError(t, err)
 
 	priceUpdates := price_registry.InternalPriceUpdates{
-		FeeTokenPriceUpdates: []price_registry.InternalFeeTokenPriceUpdate{},
-		DestChainId:          destChainId,
+		TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{},
+		DestChainId:       destChainId,
 		// Set 1e18 units of gas to $2k, being fairly reasonable for eth
 		// These values will get auto updated by the DON
 		UsdPerUnitGas: big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
 	}
 
 	for _, feeToken := range client.ChainConfig.FeeTokens {
-		priceUpdates.FeeTokenPriceUpdates = append(priceUpdates.FeeTokenPriceUpdates, price_registry.InternalFeeTokenPriceUpdate{
-			SourceFeeToken: client.ChainConfig.SupportedTokens[feeToken].Token,
-			UsdPerFeeToken: client.ChainConfig.SupportedTokens[feeToken].Price,
+		priceUpdates.TokenPriceUpdates = append(priceUpdates.TokenPriceUpdates, price_registry.InternalTokenPriceUpdate{
+			SourceToken: client.ChainConfig.SupportedTokens[feeToken].Token,
+			UsdPerToken: client.ChainConfig.SupportedTokens[feeToken].Price,
 		})
 	}
 
@@ -99,7 +99,7 @@ func setPriceRegistryUpdater(t *testing.T, client *EvmDeploymentConfig) {
 	priceRegistry, err := price_registry.NewPriceRegistry(client.ChainConfig.PriceRegistry, client.Client)
 	shared.RequireNoError(t, err)
 
-	tx, err := priceRegistry.AddPriceUpdaters(client.Owner, []common.Address{client.LaneConfig.CommitStore})
+	tx, err := priceRegistry.ApplyPriceUpdatersUpdates(client.Owner, []common.Address{client.LaneConfig.CommitStore}, []common.Address{})
 	shared.RequireNoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 }

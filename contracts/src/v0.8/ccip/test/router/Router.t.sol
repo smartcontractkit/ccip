@@ -161,6 +161,10 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     });
     s_onRamp.setFeeConfig(feeTokenConfigArgs);
 
+    address[] memory feeTokens = new address[](1);
+    feeTokens[0] = s_sourceTokens[1];
+    s_priceRegistry.applyFeeTokensUpdates(feeTokens, new address[](0));
+
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.feeToken = s_sourceTokens[1];
     IERC20(s_sourceTokens[1]).approve(address(s_sourceRouter), 2**64);
@@ -216,7 +220,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     address wrongFeeToken = address(1);
     message.feeToken = wrongFeeToken;
 
-    vm.expectRevert(abi.encodeWithSelector(IPriceRegistry.TokenNotSupported.selector, wrongFeeToken));
+    vm.expectRevert(abi.encodeWithSelector(IPriceRegistry.NotAFeeToken.selector, wrongFeeToken));
 
     s_sourceRouter.ccipSend(DEST_CHAIN_ID, message);
   }

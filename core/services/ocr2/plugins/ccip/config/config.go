@@ -17,7 +17,7 @@ type CommitPluginConfig struct {
 	OffRampID                        string          `json:"offRampID"`
 	PollPeriod                       models.Duration `json:"pollPeriod"`
 	InflightCacheExpiry              models.Duration `json:"inflightCacheExpiry"`
-	TokensPerFeeCoinPipeline         string          `json:"tokensPerFeeCoinPipeline"`
+	TokenPricesUSDPipeline           string          `json:"tokenPricesUSDPipeline"`
 }
 
 // ValidateCommitPluginConfig validates the arguments for the CCIP commit plugin.
@@ -41,7 +41,7 @@ type ExecutionPluginConfig struct {
 	OnRampID                         string          `json:"onRampID"`
 	CommitStoreID                    string          `json:"commitStoreID"`
 	SourceStartBlock, DestStartBlock int64           // Only for first time job add.
-	TokensPerFeeCoinPipeline         string          `json:"tokensPerFeeCoinPipeline"`
+	TokenPricesUSDPipeline           string          `json:"tokenPricesUSDPipeline"`
 	InflightCacheExpiry              models.Duration `json:"inflightCacheExpiry"`
 	RootSnoozeTime                   models.Duration `json:"rootSnoozeTime"`
 }
@@ -56,6 +56,6 @@ func (ep *ExecutionPluginConfig) ValidateExecutionPluginConfig() error {
 	if !common.IsHexAddress(ep.CommitStoreID) {
 		return errors.Errorf("%v is not a valid EIP155 address", ep.CommitStoreID)
 	}
-	_, err := pipeline.Parse(ep.TokensPerFeeCoinPipeline)
+	_, err := pipeline.Parse(ep.TokenPricesUSDPipeline)
 	return err
 }

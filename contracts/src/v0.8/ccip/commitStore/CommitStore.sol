@@ -160,7 +160,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, HealthChecker, OC
   function _report(bytes memory encodedReport) internal override whenNotPaused whenHealthy {
     ICommitStore.CommitReport memory report = abi.decode(encodedReport, (ICommitStore.CommitReport));
 
-    if (report.priceUpdates.feeTokenPriceUpdates.length > 0 || report.priceUpdates.destChainId != 0) {
+    if (report.priceUpdates.tokenPriceUpdates.length > 0 || report.priceUpdates.destChainId != 0) {
       IPriceRegistry(s_dynamicConfig.priceRegistry).updatePrices(report.priceUpdates);
       // If there is no root, the report only contained fee updated and
       // we return to not revert on the empty root check below.

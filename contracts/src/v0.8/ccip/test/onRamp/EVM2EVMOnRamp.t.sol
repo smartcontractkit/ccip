@@ -163,6 +163,10 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
   function setUp() public virtual override {
     EVM2EVMOnRampSetup.setUp();
 
+    address[] memory feeTokens = new address[](1);
+    feeTokens[0] = s_sourceTokens[1];
+    s_priceRegistry.applyFeeTokensUpdates(feeTokens, new address[](0));
+
     // Since we'll mostly be testing for valid calls from the router we'll
     // mock all calls to be originating from the router and re-mock in
     // tests that require failure.
@@ -237,8 +241,8 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     assertEq(IERC20(s_sourceTokens[1]).balanceOf(address(s_onRamp)), feeAmount);
 
     // Calculate conversion done by prices contract
-    uint256 feeTokenPrice = s_priceRegistry.getFeeTokenPrice(s_sourceTokens[1]).value;
-    uint256 linkTokenPrice = s_priceRegistry.getFeeTokenPrice(s_sourceFeeToken).value;
+    uint256 feeTokenPrice = s_priceRegistry.getTokenPrice(s_sourceTokens[1]).value;
+    uint256 linkTokenPrice = s_priceRegistry.getTokenPrice(s_sourceFeeToken).value;
     uint256 conversionRate = (feeTokenPrice * 1e18) / linkTokenPrice;
     uint256 expectedJuels = (feeAmount * conversionRate) / 1e18;
 

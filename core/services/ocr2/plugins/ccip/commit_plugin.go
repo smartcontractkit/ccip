@@ -28,8 +28,8 @@ import (
 )
 
 const (
-	COMMIT_GAS_FEE_UPDATES = "Commit gas fee updates"
-	COMMIT_CCIP_SENDS      = "Commit ccip sends"
+	COMMIT_PRICE_UPDATES = "Commit price updates"
+	COMMIT_CCIP_SENDS    = "Commit ccip sends"
 )
 
 func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
@@ -102,7 +102,7 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 		return req.Message.SequenceNumber, nil
 	}
 
-	priceGetterObject, err := NewPriceGetter(pluginConfig.TokensPerFeeCoinPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
+	priceGetterObject, err := NewPriceGetter(pluginConfig.TokenPricesUSDPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
 	if err != nil {
 		return nil, err
 	}
@@ -127,8 +127,8 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 	}
 
 	eventSigs := GetEventSignatures()
-	err = destChain.LogPoller().RegisterFilter(logpoller.Filter{Name: logpoller.FilterName(COMMIT_GAS_FEE_UPDATES, dynamicConfig.PriceRegistry.String()),
-		EventSigs: []common.Hash{GasFeeUpdated}, Addresses: []common.Address{dynamicConfig.PriceRegistry}})
+	err = destChain.LogPoller().RegisterFilter(logpoller.Filter{Name: logpoller.FilterName(COMMIT_PRICE_UPDATES, dynamicConfig.PriceRegistry.String()),
+		EventSigs: []common.Hash{UsdPerUnitGasUpdated, UsdPerTokenUpdated}, Addresses: []common.Address{dynamicConfig.PriceRegistry}})
 	if err != nil {
 		return nil, err
 	}

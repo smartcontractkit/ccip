@@ -99,11 +99,17 @@ func deployPriceRegistry(t *testing.T, client *EvmDeploymentConfig) {
 		return
 	}
 
+	feeTokens := make([]common.Address, len(client.ChainConfig.FeeTokens))
+	for i, token := range client.ChainConfig.FeeTokens {
+		feeTokens[i] = client.ChainConfig.SupportedTokens[token].Token
+	}
+
 	client.Logger.Infof("Deploying Prices")
 	priceRegistry, tx, _, err := price_registry.DeployPriceRegistry(
 		client.Owner,
 		client.Client,
 		price_registry.InternalPriceUpdates{},
+		feeTokens,
 		[]common.Address{},
 		60*60*24*14, // two weeks
 	)

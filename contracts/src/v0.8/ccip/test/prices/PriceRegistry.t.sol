@@ -14,92 +14,131 @@ contract PriceRegistrySetup is TokenSetup, RouterSetup {
   PriceRegistry internal s_priceRegistry;
   // Cheat to store the price updates in storage since struct arrays aren't supported.
   bytes internal s_encodedInitialPriceUpdates;
+  address internal s_weth;
 
   function setUp() public virtual override(TokenSetup, RouterSetup) {
     TokenSetup.setUp();
     RouterSetup.setUp();
 
-    Internal.FeeTokenPriceUpdate[] memory feeTokenPriceUpdates = new Internal.FeeTokenPriceUpdate[](3);
+    s_weth = s_sourceRouter.getWrappedNative();
+
+    Internal.TokenPriceUpdate[] memory tokenPriceUpdates = new Internal.TokenPriceUpdate[](3);
     // Include USD prices
-    feeTokenPriceUpdates[0] = Internal.FeeTokenPriceUpdate({sourceFeeToken: s_sourceTokens[0], usdPerFeeToken: 5e18});
-    feeTokenPriceUpdates[1] = Internal.FeeTokenPriceUpdate({
-      sourceFeeToken: s_sourceTokens[1],
-      usdPerFeeToken: 2000e18
-    });
-    feeTokenPriceUpdates[2] = Internal.FeeTokenPriceUpdate({
-      sourceFeeToken: s_sourceRouter.getWrappedNative(),
-      usdPerFeeToken: 2000e18
-    });
+    tokenPriceUpdates[0] = Internal.TokenPriceUpdate({sourceToken: s_sourceTokens[0], usdPerToken: 5e18});
+    tokenPriceUpdates[1] = Internal.TokenPriceUpdate({sourceToken: s_sourceTokens[1], usdPerToken: 2000e18});
+    tokenPriceUpdates[2] = Internal.TokenPriceUpdate({sourceToken: s_weth, usdPerToken: 2000e18});
     Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
-      feeTokenPriceUpdates: feeTokenPriceUpdates,
+      tokenPriceUpdates: tokenPriceUpdates,
       destChainId: DEST_CHAIN_ID,
       usdPerUnitGas: 1e6
     });
     s_encodedInitialPriceUpdates = abi.encode(priceUpdates);
     address[] memory priceUpdaters = new address[](0);
-    s_priceRegistry = new PriceRegistry(priceUpdates, priceUpdaters, uint32(TWELVE_HOURS));
+    address[] memory feeTokens = new address[](2);
+    feeTokens[0] = s_sourceTokens[0];
+    feeTokens[1] = s_weth;
+    s_priceRegistry = new PriceRegistry(priceUpdates, priceUpdaters, feeTokens, uint32(TWELVE_HOURS));
   }
 
   function testSetupSuccess() public {
-    assertEq(s_priceRegistry.getFeeTokenPrice(s_sourceTokens[0]).value, 5e18);
-    assertEq(s_priceRegistry.getFeeTokenPrice(s_sourceTokens[1]).value, 2000e18);
+    assertEq(s_priceRegistry.getTokenPrice(s_sourceTokens[0]).value, 5e18);
+    assertEq(s_priceRegistry.getTokenPrice(s_sourceTokens[1]).value, 2000e18);
     assertEq(s_priceRegistry.getDestinationChainGasPrice(DEST_CHAIN_ID).value, 1e6);
     assertEq(s_priceRegistry.getFeeTokenBaseUnitsPerUnitGas(s_sourceTokens[0], DEST_CHAIN_ID), 2e5);
-    assertEq(s_priceRegistry.getFeeTokenBaseUnitsPerUnitGas(s_sourceTokens[1], DEST_CHAIN_ID), 500);
+    assertEq(s_priceRegistry.getFeeTokenBaseUnitsPerUnitGas(s_weth, DEST_CHAIN_ID), 500);
   }
 }
 
 contract PriceRegistry_constructor is PriceRegistrySetup {
   function testInvalidStalenessThresholdReverts() public {
     Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
-      feeTokenPriceUpdates: new Internal.FeeTokenPriceUpdate[](0),
+      tokenPriceUpdates: new Internal.TokenPriceUpdate[](0),
       destChainId: DEST_CHAIN_ID,
       usdPerUnitGas: 1e6
     });
 
     vm.expectRevert(IPriceRegistry.InvalidStalenessThreshold.selector);
-    s_priceRegistry = new PriceRegistry(priceUpdates, new address[](0), 0);
+    s_priceRegistry = new PriceRegistry(priceUpdates, new address[](0), new address[](0), 0);
   }
 }
 
-contract PriceRegistry_addPriceUpdaters is PriceRegistrySetup {
+contract PriceRegistry_applyPriceUpdatersUpdates is PriceRegistrySetup {
+  event PriceUpdaterSet(address indexed priceUpdater);
+  event PriceUpdaterRemoved(address indexed priceUpdater);
+
   function testSuccess() public {
     address[] memory priceUpdaters = new address[](1);
     priceUpdaters[0] = STRANGER;
-    s_priceRegistry.addPriceUpdaters(priceUpdaters);
+
+    vm.expectEmit(true, false, false, false);
+    emit PriceUpdaterSet(STRANGER);
+
+    s_priceRegistry.applyPriceUpdatersUpdates(priceUpdaters, new address[](0));
     assertEq(s_priceRegistry.getPriceUpdaters().length, 1);
     assertEq(s_priceRegistry.getPriceUpdaters()[0], STRANGER);
-  }
 
-  function testOnlyCallableByOwnerReverts() public {
-    address[] memory priceUpdaters = new address[](1);
-    priceUpdaters[0] = STRANGER;
-    changePrank(STRANGER);
-    vm.expectRevert("Only callable by owner");
-    s_priceRegistry.addPriceUpdaters(priceUpdaters);
-  }
-}
-
-contract PriceRegistry_removePriceUpdaters is PriceRegistrySetup {
-  function testSuccess() public {
-    address[] memory priceUpdaters = new address[](1);
-    priceUpdaters[0] = STRANGER;
-    s_priceRegistry.addPriceUpdaters(priceUpdaters);
+    // add same priceUpdater is no-op
+    s_priceRegistry.applyPriceUpdatersUpdates(priceUpdaters, new address[](0));
     assertEq(s_priceRegistry.getPriceUpdaters().length, 1);
     assertEq(s_priceRegistry.getPriceUpdaters()[0], STRANGER);
-    s_priceRegistry.removePriceUpdaters(priceUpdaters);
+
+    vm.expectEmit(true, false, false, false);
+    emit PriceUpdaterRemoved(STRANGER);
+
+    s_priceRegistry.applyPriceUpdatersUpdates(new address[](0), priceUpdaters);
+    assertEq(s_priceRegistry.getPriceUpdaters().length, 0);
+
+    // removing already removed priceUpdater is no-op
+    s_priceRegistry.applyPriceUpdatersUpdates(new address[](0), priceUpdaters);
     assertEq(s_priceRegistry.getPriceUpdaters().length, 0);
   }
 
   function testOnlyCallableByOwnerReverts() public {
     address[] memory priceUpdaters = new address[](1);
     priceUpdaters[0] = STRANGER;
-    s_priceRegistry.addPriceUpdaters(priceUpdaters);
-    assertEq(s_priceRegistry.getPriceUpdaters().length, 1);
-    assertEq(s_priceRegistry.getPriceUpdaters()[0], STRANGER);
     changePrank(STRANGER);
     vm.expectRevert("Only callable by owner");
-    s_priceRegistry.removePriceUpdaters(priceUpdaters);
+    s_priceRegistry.applyPriceUpdatersUpdates(priceUpdaters, new address[](0));
+  }
+}
+
+contract PriceRegistry_applyFeeTokensUpdates is PriceRegistrySetup {
+  event FeeTokenAdded(address indexed feeToken);
+  event FeeTokenRemoved(address indexed feeToken);
+
+  function testSuccess() public {
+    address[] memory feeTokens = new address[](1);
+    feeTokens[0] = s_sourceTokens[1];
+
+    vm.expectEmit(true, false, false, false);
+    emit FeeTokenAdded(feeTokens[0]);
+
+    s_priceRegistry.applyFeeTokensUpdates(feeTokens, new address[](0));
+    assertEq(s_priceRegistry.getFeeTokens().length, 3);
+    assertEq(s_priceRegistry.getFeeTokens()[2], feeTokens[0]);
+
+    // add same feeToken is no-op
+    s_priceRegistry.applyFeeTokensUpdates(feeTokens, new address[](0));
+    assertEq(s_priceRegistry.getFeeTokens().length, 3);
+    assertEq(s_priceRegistry.getFeeTokens()[2], feeTokens[0]);
+
+    vm.expectEmit(true, false, false, false);
+    emit FeeTokenRemoved(feeTokens[0]);
+
+    s_priceRegistry.applyFeeTokensUpdates(new address[](0), feeTokens);
+    assertEq(s_priceRegistry.getFeeTokens().length, 2);
+
+    // removing already removed feeToken is no-op
+    s_priceRegistry.applyFeeTokensUpdates(new address[](0), feeTokens);
+    assertEq(s_priceRegistry.getFeeTokens().length, 2);
+  }
+
+  function testOnlyCallableByOwnerReverts() public {
+    address[] memory feeTokens = new address[](1);
+    feeTokens[0] = STRANGER;
+    changePrank(STRANGER);
+    vm.expectRevert("Only callable by owner");
+    s_priceRegistry.applyFeeTokensUpdates(feeTokens, new address[](0));
   }
 }
 
@@ -109,14 +148,11 @@ contract PriceRegistry_updatePrices is PriceRegistrySetup {
 
   function setUp() public virtual override {
     PriceRegistrySetup.setUp();
-    Internal.FeeTokenPriceUpdate[] memory feeTokenPriceUpdates = new Internal.FeeTokenPriceUpdate[](2);
-    feeTokenPriceUpdates[0] = Internal.FeeTokenPriceUpdate({sourceFeeToken: s_sourceTokens[0], usdPerFeeToken: 4e18});
-    feeTokenPriceUpdates[1] = Internal.FeeTokenPriceUpdate({
-      sourceFeeToken: s_sourceTokens[1],
-      usdPerFeeToken: 1800e18
-    });
+    Internal.TokenPriceUpdate[] memory tokenPriceUpdates = new Internal.TokenPriceUpdate[](2);
+    tokenPriceUpdates[0] = Internal.TokenPriceUpdate({sourceToken: s_sourceTokens[0], usdPerToken: 4e18});
+    tokenPriceUpdates[1] = Internal.TokenPriceUpdate({sourceToken: s_sourceTokens[1], usdPerToken: 1800e18});
     Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
-      feeTokenPriceUpdates: feeTokenPriceUpdates,
+      tokenPriceUpdates: tokenPriceUpdates,
       destChainId: DEST_CHAIN_ID,
       usdPerUnitGas: 2e6
     });
@@ -127,14 +163,8 @@ contract PriceRegistry_updatePrices is PriceRegistrySetup {
     Internal.PriceUpdates memory priceUpdates = abi.decode(s_encodedNewPriceUpdates, (Internal.PriceUpdates));
     s_priceRegistry.updatePrices(priceUpdates);
 
-    assertEq(
-      s_priceRegistry.getFeeTokenPrice(s_sourceTokens[0]).value,
-      priceUpdates.feeTokenPriceUpdates[0].usdPerFeeToken
-    );
-    assertEq(
-      s_priceRegistry.getFeeTokenPrice(s_sourceTokens[1]).value,
-      priceUpdates.feeTokenPriceUpdates[1].usdPerFeeToken
-    );
+    assertEq(s_priceRegistry.getTokenPrice(s_sourceTokens[0]).value, priceUpdates.tokenPriceUpdates[0].usdPerToken);
+    assertEq(s_priceRegistry.getTokenPrice(s_sourceTokens[1]).value, priceUpdates.tokenPriceUpdates[1].usdPerToken);
     assertEq(s_priceRegistry.getDestinationChainGasPrice(DEST_CHAIN_ID).value, priceUpdates.usdPerUnitGas);
   }
 
@@ -153,24 +183,24 @@ contract PriceRegistry_convertFeeTokenAmountToLinkAmount is PriceRegistrySetup {
       (Internal.PriceUpdates)
     );
     uint256 amount = 3e16;
-    uint256 conversionRate = (uint256(initialPriceUpdates.feeTokenPriceUpdates[1].usdPerFeeToken) * 1e18) /
-      uint256(initialPriceUpdates.feeTokenPriceUpdates[0].usdPerFeeToken);
+    uint256 conversionRate = (uint256(initialPriceUpdates.tokenPriceUpdates[2].usdPerToken) * 1e18) /
+      uint256(initialPriceUpdates.tokenPriceUpdates[0].usdPerToken);
     uint256 expected = (amount * conversionRate) / 1e18;
-    assertEq(s_priceRegistry.convertFeeTokenAmountToLinkAmount(s_sourceTokens[0], s_sourceTokens[1], amount), expected);
+    assertEq(s_priceRegistry.convertFeeTokenAmountToLinkAmount(s_sourceTokens[0], s_weth, amount), expected);
   }
 
-  function testFeeTokenNotSupportedReverts() public {
-    vm.expectRevert(abi.encodeWithSelector(IPriceRegistry.TokenNotSupported.selector, DUMMY_CONTRACT_ADDRESS));
-    s_priceRegistry.convertFeeTokenAmountToLinkAmount(DUMMY_CONTRACT_ADDRESS, s_sourceTokens[1], 3e16);
+  function testNotAFeeTokenReverts() public {
+    vm.expectRevert(abi.encodeWithSelector(IPriceRegistry.NotAFeeToken.selector, DUMMY_CONTRACT_ADDRESS));
+    s_priceRegistry.convertFeeTokenAmountToLinkAmount(s_sourceTokens[0], DUMMY_CONTRACT_ADDRESS, 3e16);
   }
 
   function testStaleFeeTokenReverts() public {
     vm.warp(block.timestamp + TWELVE_HOURS + 1);
 
-    Internal.FeeTokenPriceUpdate[] memory feeTokenPriceUpdates = new Internal.FeeTokenPriceUpdate[](1);
-    feeTokenPriceUpdates[0] = Internal.FeeTokenPriceUpdate({sourceFeeToken: s_sourceTokens[0], usdPerFeeToken: 4e18});
+    Internal.TokenPriceUpdate[] memory tokenPriceUpdates = new Internal.TokenPriceUpdate[](1);
+    tokenPriceUpdates[0] = Internal.TokenPriceUpdate({sourceToken: s_sourceTokens[0], usdPerToken: 4e18});
     Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
-      feeTokenPriceUpdates: feeTokenPriceUpdates,
+      tokenPriceUpdates: tokenPriceUpdates,
       destChainId: 0,
       usdPerUnitGas: 0
     });
@@ -179,26 +209,26 @@ contract PriceRegistry_convertFeeTokenAmountToLinkAmount is PriceRegistrySetup {
     vm.expectRevert(
       abi.encodeWithSelector(
         IPriceRegistry.StaleTokenPrice.selector,
-        s_sourceTokens[1],
+        s_weth,
         uint128(TWELVE_HOURS),
         uint128(TWELVE_HOURS + 1)
       )
     );
-    s_priceRegistry.convertFeeTokenAmountToLinkAmount(s_sourceTokens[0], s_sourceTokens[1], 3e16);
+    s_priceRegistry.convertFeeTokenAmountToLinkAmount(s_sourceTokens[0], s_weth, 3e16);
   }
 
   function testLinkTokenNotSupportedReverts() public {
     vm.expectRevert(abi.encodeWithSelector(IPriceRegistry.TokenNotSupported.selector, DUMMY_CONTRACT_ADDRESS));
-    s_priceRegistry.convertFeeTokenAmountToLinkAmount(s_sourceTokens[0], DUMMY_CONTRACT_ADDRESS, 3e16);
+    s_priceRegistry.convertFeeTokenAmountToLinkAmount(DUMMY_CONTRACT_ADDRESS, s_sourceTokens[0], 3e16);
   }
 
   function testStaleLinkTokenReverts() public {
     vm.warp(block.timestamp + TWELVE_HOURS + 1);
 
-    Internal.FeeTokenPriceUpdate[] memory feeTokenPriceUpdates = new Internal.FeeTokenPriceUpdate[](1);
-    feeTokenPriceUpdates[0] = Internal.FeeTokenPriceUpdate({sourceFeeToken: s_sourceTokens[1], usdPerFeeToken: 18e17});
+    Internal.TokenPriceUpdate[] memory tokenPriceUpdates = new Internal.TokenPriceUpdate[](1);
+    tokenPriceUpdates[0] = Internal.TokenPriceUpdate({sourceToken: s_weth, usdPerToken: 18e17});
     Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
-      feeTokenPriceUpdates: feeTokenPriceUpdates,
+      tokenPriceUpdates: tokenPriceUpdates,
       destChainId: 0,
       usdPerUnitGas: 0
     });
@@ -212,7 +242,7 @@ contract PriceRegistry_convertFeeTokenAmountToLinkAmount is PriceRegistrySetup {
         uint128(TWELVE_HOURS + 1)
       )
     );
-    s_priceRegistry.convertFeeTokenAmountToLinkAmount(s_sourceTokens[0], s_sourceTokens[1], 3e16);
+    s_priceRegistry.convertFeeTokenAmountToLinkAmount(s_sourceTokens[0], s_weth, 3e16);
   }
 }
 
@@ -225,7 +255,7 @@ contract PriceRegistry_getFeeTokenBaseUnitsPerUnitGas is PriceRegistrySetup {
   }
 
   function testUnsupportedTokenReverts() public {
-    vm.expectRevert(abi.encodeWithSelector(IPriceRegistry.TokenNotSupported.selector, DUMMY_CONTRACT_ADDRESS));
+    vm.expectRevert(abi.encodeWithSelector(IPriceRegistry.NotAFeeToken.selector, DUMMY_CONTRACT_ADDRESS));
     s_priceRegistry.getFeeTokenBaseUnitsPerUnitGas(DUMMY_CONTRACT_ADDRESS, DEST_CHAIN_ID);
   }
 
@@ -246,7 +276,7 @@ contract PriceRegistry_getFeeTokenBaseUnitsPerUnitGas is PriceRegistrySetup {
     vm.warp(block.timestamp + diff);
 
     Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
-      feeTokenPriceUpdates: new Internal.FeeTokenPriceUpdate[](0),
+      tokenPriceUpdates: new Internal.TokenPriceUpdate[](0),
       destChainId: DEST_CHAIN_ID,
       usdPerUnitGas: 1e6
     });

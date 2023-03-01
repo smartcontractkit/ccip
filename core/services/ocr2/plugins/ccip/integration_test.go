@@ -40,7 +40,7 @@ func TestIntegration_CCIP(t *testing.T) {
 	}))
 	wrapped, err := ccipContracts.Source.Router.GetWrappedNative(nil)
 	require.NoError(t, err)
-	tokensPerFeeCoinPipeline := fmt.Sprintf(`
+	tokenPricesUSDPipeline := fmt.Sprintf(`
 // Price 1 
 link [type=http method=GET url="%s"];
 link_parse [type=jsonparse path="UsdPerLink"];
@@ -50,7 +50,7 @@ eth_parse [type=jsonparse path="UsdPerETH"];
 eth->eth_parse;
 merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_parse)}"];`,
 		linkUSD.URL, ethUSD.URL, ccipContracts.Dest.LinkToken.Address(), wrapped)
-	jobParams := ccipContracts.NewCCIPJobSpecParams(tokensPerFeeCoinPipeline, configBlock)
+	jobParams := ccipContracts.NewCCIPJobSpecParams(tokenPricesUSDPipeline, configBlock)
 	defer linkUSD.Close()
 	defer ethUSD.Close()
 
@@ -338,7 +338,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		ccipContracts.EnableCommitStore()
 
 		// create updated jobs
-		jobParams = ccipContracts.NewCCIPJobSpecParams(tokensPerFeeCoinPipeline, newConfigBlock)
+		jobParams = ccipContracts.NewCCIPJobSpecParams(tokenPricesUSDPipeline, newConfigBlock)
 		testhelpers.AddAllJobs(t, jobParams, ccipContracts, nodes)
 
 		startSeq := 1
