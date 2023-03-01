@@ -81,28 +81,6 @@ package gethwrappers
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.6/FunctionsOracleWithInit.abi ../../contracts/solc/v0.8.6/FunctionsOracleWithInit.bin OCR2DROracle ocr2dr_oracle
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.6/FunctionsBillingRegistryWithInit.abi ../../contracts/solc/v0.8.6/FunctionsBillingRegistryWithInit.bin OCR2DRRegistry ocr2dr_registry
 
-// CCIP
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/CommitStore.abi ../../contracts/solc/v0.8.15/CommitStore.bin CommitStore commit_store
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/CommitStoreHelper.abi ../../contracts/solc/v0.8.15/CommitStoreHelper.bin CommitStoreHelper commit_store_helper
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/BurnMintTokenPool.abi ../../contracts/solc/v0.8.15/BurnMintTokenPool.bin BurnMintTokenPool burn_mint_token_pool
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/LockReleaseTokenPool.abi ../../contracts/solc/v0.8.15/LockReleaseTokenPool.bin LockReleaseTokenPool lock_release_token_pool
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/CustomTokenPool.abi ../../contracts/solc/v0.8.15/CustomTokenPool.bin CustomTokenPool custom_token_pool
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/AFN.abi ../../contracts/solc/v0.8.15/AFN.bin AFNContract afn_contract
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/MockAFN.abi ../../contracts/solc/v0.8.15/MockAFN.bin MockAFNContract mock_afn_contract
-
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2EVMOnRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMOnRamp.bin EVM2EVMOnRamp evm_2_evm_onramp
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2EVMOffRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMOffRamp.bin EVM2EVMOffRamp evm_2_evm_offramp
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2EVMOffRampHelper.abi ../../contracts/solc/v0.8.15/EVM2EVMOffRampHelper.bin EVM2EVMOffRampHelper evm_2_evm_offramp_helper
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/Router.abi ../../contracts/solc/v0.8.15/Router.bin Router router
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/PriceRegistry.abi ../../contracts/solc/v0.8.15/PriceRegistry.bin PriceRegistry price_registry
-
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/ReceiverDapp.abi ../../contracts/solc/v0.8.15/ReceiverDapp.bin ReceiverDapp receiver_dapp
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/SimpleMessageReceiver.abi ../../contracts/solc/v0.8.15/SimpleMessageReceiver.bin SimpleMessageReceiver simple_message_receiver
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/MaybeRevertMessageReceiver.abi ../../contracts/solc/v0.8.15/MaybeRevertMessageReceiver.bin MaybeRevertMessageReceiver maybe_revert_message_receiver
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/GovernanceDapp.abi ../../contracts/solc/v0.8.15/GovernanceDapp.bin GovernanceDapp governance_dapp
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/PingPongDemo.abi ../../contracts/solc/v0.8.15/PingPongDemo.bin PingPongDemo ping_pong_demo
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/WETH9.abi ../../contracts/solc/v0.8.15/WETH9.bin WETH9 weth9
-
 // To run these commands, you must either install docker, or the correct version
 // of abigen. The latter can be installed with these commands, at least on linux:
 //

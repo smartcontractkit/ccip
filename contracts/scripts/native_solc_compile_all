@@ -8,7 +8,6 @@ python3 -m pip install --require-hashes -r $SCRIPTPATH/requirements.txt
 solc-select install 0.6.6
 solc-select install 0.7.6
 solc-select install 0.8.6
-solc-select install 0.8.15
 
 $SCRIPTPATH/native_solc6_compile Flags.sol
 $SCRIPTPATH/native_solc6_compile Oracle.sol
@@ -105,24 +104,5 @@ $SCRIPTPATH/native_solc8_6_compile dev/functions/FunctionsBillingRegistry.sol
 $SCRIPTPATH/native_solc8_6_compile tests/FunctionsBillingRegistryWithInit.sol
 
 # CCIP
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/commitStore/CommitStore.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/test/helpers/CommitStoreHelper.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/pools/LockReleaseTokenPool.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/pools/BurnMintTokenPool.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/test/helpers/CustomTokenPool.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/health/AFN.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/test/mocks/MockAFN.sol
-
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/onRamp/EVM2EVMOnRamp.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/offRamp/EVM2EVMOffRamp.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/test/helpers/ramps/EVM2EVMOffRampHelper.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/router/Router.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/prices/PriceRegistry.sol
-
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/applications/ReceiverDapp.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/test/helpers/receivers/SimpleMessageReceiver.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/test/helpers/receivers/MaybeRevertMessageReceiver.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/test/WETH9.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/applications/GovernanceDapp.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/applications/PingPongDemo.sol
+$SCRIPTPATH/native_solc_compile_all_ccip
 

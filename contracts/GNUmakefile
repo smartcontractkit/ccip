@@ -25,8 +25,8 @@ abigen: ## Build & install abigen.
 
 .PHONY: wrappers
 wrappers: abigen ## Recompiles solidity contracts and their go wrappers.
-	./scripts/native_solc_compile_all
-	go generate ./core/gethwrappers
+	./scripts/native_solc_compile_all_ccip
+	go generate ../core/gethwrappers/go_generate_ccip.go
 
 .PHONY: snapshot
 snapshot:
