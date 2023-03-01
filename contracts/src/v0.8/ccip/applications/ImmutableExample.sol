@@ -43,7 +43,7 @@ contract ImmutableExample is IAny2EVMMessageReceiver, IERC165 {
   constructor(IRouterClient router, IERC20 feeToken) {
     i_router = router;
     s_feeToken = feeToken;
-    s_feeToken.approve(address(i_router), 2 ^ (256 - 1));
+    s_feeToken.approve(address(i_router), 2**256 - 1);
   }
 
   // TODO: permissions on enableChain/disableChain
@@ -114,9 +114,13 @@ contract ImmutableExample is IAny2EVMMessageReceiver, IERC165 {
   function sendDataAndTokens(
     uint64 destChainId,
     bytes memory receiver,
-    bytes memory data
+    bytes memory data,
+    Client.EVMTokenAmount[] memory tokenAmounts
   ) external validChain(destChainId) {
-    Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
+    for (uint256 i = 0; i < tokenAmounts.length; i++) {
+      IERC20(tokenAmounts[i].token).transferFrom(msg.sender, address(this), tokenAmounts[i].amount);
+      IERC20(tokenAmounts[i].token).approve(address(i_router), tokenAmounts[i].amount);
+    }
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: receiver,
       data: data,
