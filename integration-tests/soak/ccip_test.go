@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 )
@@ -21,7 +20,7 @@ var (
 // TestCCIPSoak verifies that CCIP requests can be successfully delivered for mentioned duration triggered at a certain interval
 // If run on live networks it can reuse already deployed contracts if the addresses are provided in ../contracts/ccip/laneconfig/contracts.json
 // This test does a full environment set up along with deploying CL nodes in K8 cluster
-func TestCCIPSoak(t *testing.T) {
+func TestSoakCCIP(t *testing.T) {
 	var (
 		tearDown        func()
 		laneA, laneB    *actions.CCIPLane
@@ -60,9 +59,6 @@ func TestCCIPSoak(t *testing.T) {
 		return
 	}
 
-	require.NoError(t, laneA.IsLaneDeployed())
-	require.NoError(t, laneB.IsLaneDeployed())
-
 	t.Run(fmt.Sprintf("CCIP message transfer from network %s to network %s for %s", laneA.SourceNetworkName, laneA.DestNetworkName, duration), func(t *testing.T) {
 		t.Parallel()
 		totalReqLaneA, reqSuccessLaneA = laneA.SoakRun(interval, duration)
@@ -79,7 +75,7 @@ func TestCCIPSoak(t *testing.T) {
 // 2. CL nodes are set up and configured with existing contracts
 // TestCCIPSoakOnExistingDeployment reuses already deployed contracts from the addresses provided in ../contracts/ccip/laneconfig/contracts.json
 // This test verifies that CCIP Lanes are working as expected by sending a series of requests and validating their successful delivery
-func TestCCIPSoakOnExistingDeployment(t *testing.T) {
+func TestExistingDeploymentSoakCCIP(t *testing.T) {
 	var (
 		laneA, laneB    *actions.CCIPLane
 		totalReqLaneA   = 0

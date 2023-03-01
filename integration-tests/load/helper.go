@@ -7,22 +7,24 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/client"
+	"github.com/rs/zerolog"
+	"github.com/smartcontractkit/chainlink-testing-framework/loadgen"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 )
 
 type loadArgs struct {
-	t           *testing.T
-	rps         int
-	duration    time.Duration
-	ccipTimeout time.Duration
-	loadTimeOut time.Duration
-	msgType     string
-	envTear     func()
-	ccipLoad    *CCIPE2ELoad
-	loadGen     *client.LoadGenerator
+	t                  *testing.T
+	rps                int64
+	duration           time.Duration
+	ccipTimeout        time.Duration
+	loadTimeOut        time.Duration
+	msgType            string
+	envTear            func()
+	ccipLoad           *CCIPE2ELoad
+	loadRunner         *loadgen.Generator
+	ExistingDeployment bool
 }
 
 // PopulateAndValidate collects all loadArgs
@@ -40,7 +42,7 @@ func PopulateAndValidate(t *testing.T) *loadArgs {
 		msgType:     DataOnlyTransfer,
 	}
 	if inputRps != "" {
-		rps, err := strconv.Atoi(inputRps)
+		rps, err := strconv.ParseInt(inputRps, 10, 64)
 		require.NoError(t, err)
 		require.LessOrEqual(t, rps, 16, "rps too high")
 		p.rps = rps
@@ -67,40 +69,50 @@ func PopulateAndValidate(t *testing.T) *loadArgs {
 }
 
 func (loadArgs *loadArgs) Setup() {
-	transferAmounts := []*big.Int{big.NewInt(5e17), big.NewInt(5e17)}
-	forwardLane, _, tearDown := actions.CCIPDefaultTestSetUp(loadArgs.t, "load-ccip", map[string]interface{}{
-		"replicas": "6",
-		"toml":     actions.DefaultCCIPCLNodeEnv(loadArgs.t),
-		"env": map[string]interface{}{
-			"CL_DEV": "true",
-		},
-	}, transferAmounts, 5, true, false, true)
+	transferAmounts := []*big.Int{big.NewInt(5e17)}
+	var forwardLane *actions.CCIPLane
+	tearDown := func() {}
+	if !loadArgs.ExistingDeployment {
+		forwardLane, _, tearDown = actions.CCIPDefaultTestSetUp(loadArgs.t, "load-ccip", map[string]interface{}{
+			"replicas": "6",
+			"toml":     actions.DefaultCCIPCLNodeEnv(loadArgs.t),
+			"env": map[string]interface{}{
+				"CL_DEV": "true",
+			},
+		}, transferAmounts, 5, true, false, true)
+	} else {
+		forwardLane, _ = actions.CCIPLaneOnExistingDeployment(loadArgs.t, transferAmounts, false)
+	}
 	loadArgs.envTear = tearDown
 	if forwardLane == nil {
 		return
 	}
-	require.NoError(loadArgs.t, forwardLane.IsLaneDeployed())
 	source := forwardLane.Source
 	dest := forwardLane.Dest
 	ccipLoad := NewCCIPLoad(loadArgs.t, source, dest, loadArgs.ccipTimeout, 100000)
-	ccipLoad.BeforeAllCall()
-	loadgen, err := client.NewLoadGenerator(&client.LoadGeneratorConfig{
-		RPS:         loadArgs.rps,
-		Gun:         ccipLoad,
+	ccipLoad.BeforeAllCall(loadArgs.msgType)
+	loadRunner, err := loadgen.NewLoadGenerator(&loadgen.LoadGeneratorConfig{
+		T: nil,
+		Schedule: &loadgen.LoadSchedule{
+			Type:      loadgen.RPSScheduleType,
+			StartFrom: loadArgs.rps,
+		},
 		Duration:    loadArgs.duration,
 		CallTimeout: loadArgs.loadTimeOut,
+		Gun:         ccipLoad,
+		Logger:      zerolog.Logger{},
 		SharedData:  loadArgs.msgType,
 	})
 	require.NoError(loadArgs.t, err, "initiating loadgen")
 	loadArgs.ccipLoad = ccipLoad
-	loadArgs.loadGen = loadgen
+	loadArgs.loadRunner = loadRunner
 }
 
 func (loadArgs *loadArgs) Run() {
-	loadArgs.loadGen.Run()
-	_, failed := loadArgs.loadGen.Wait()
+	loadArgs.loadRunner.Run()
+	_, failed := loadArgs.loadRunner.Wait()
 	require.False(loadArgs.t, failed, "load run is failed")
-	require.Empty(loadArgs.t, loadArgs.loadGen.Errors(), "error in load sequence call")
+	require.Empty(loadArgs.t, loadArgs.loadRunner.Errors(), "error in load sequence call")
 }
 
 func (loadArgs *loadArgs) TearDown() {

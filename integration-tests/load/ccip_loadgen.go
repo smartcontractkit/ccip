@@ -13,8 +13,9 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/rs/zerolog/log"
-	"github.com/smartcontractkit/chainlink-testing-framework/client"
+	"github.com/smartcontractkit/chainlink-testing-framework/loadgen"
 	"github.com/smartcontractkit/chainlink-testing-framework/testreporters"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
@@ -62,6 +63,7 @@ type CCIPE2ELoad struct {
 	seqNumCommittedMu     *sync.Mutex
 	seqNumCommitted       map[uint64]uint64 // key : seqNumber in the ReportAccepted event, value : blocknumber for corresponding event
 	msg                   router.ClientEVM2AnyMessage
+	msgMu                 *sync.Mutex
 }
 
 type StatParams struct {
@@ -121,13 +123,14 @@ func NewCCIPLoad(t *testing.T, source *actions.SourceCCIPModule, dest *actions.D
 		callStatsMu:        &sync.Mutex{},
 		seqNumCommittedMu:  &sync.Mutex{},
 		seqNumCommitted:    make(map[uint64]uint64),
+		msgMu:              &sync.Mutex{},
 	}
 }
 
 // BeforeAllCall funds subscription, approves the token transfer amount.
 // Needs to be called before load sequence is started.
 // Needs to approve and fund for the entire sequence.
-func (c *CCIPE2ELoad) BeforeAllCall() {
+func (c *CCIPE2ELoad) BeforeAllCall(msgType string) {
 	sourceCCIP := c.Source
 	destCCIP := c.Destination
 	var tokenAndAmounts []router.ClientEVMTokenAmount
@@ -136,7 +139,7 @@ func (c *CCIPE2ELoad) BeforeAllCall() {
 			Token: common.HexToAddress(token.Address()), Amount: c.Source.TransferAmount[i],
 		})
 		// approve the onramp router so that it can initiate transferring the token
-		err := token.Approve(c.Source.Common.Router.Address(), bigmath.Mul(c.Source.TransferAmount[i], big.NewInt(c.NoOfReq)))
+		err := token.Approve(sourceCCIP.Common.Router.Address(), bigmath.Mul(sourceCCIP.TransferAmount[i], big.NewInt(c.NoOfReq)))
 		require.NoError(c.t, err, "Could not approve permissions for the onRamp router "+
 			"on the source link token contract")
 	}
@@ -169,15 +172,30 @@ func (c *CCIPE2ELoad) BeforeAllCall() {
 		Receiver:  receiver,
 		ExtraArgs: extraArgsV1,
 		FeeToken:  common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
+		Data:      []byte("message with Id 1"),
+	}
+	if msgType == TokenTransfer {
+		c.msg.TokenAmounts = tokenAndAmounts
 	}
 	// calculate approx fee
 	fee, err := sourceCCIP.Common.Router.GetFee(sourceCCIP.DestinationChainId, c.msg)
 	require.NoError(c.t, err)
-	// Approve sufficient fee amount
-	err = sourceCCIP.Common.FeeToken.Approve(sourceCCIP.Common.Router.Address(), bigmath.Mul(fee, big.NewInt(c.NoOfReq)))
-	require.NoError(c.t, err)
-	err = sourceCCIP.Common.ChainClient.WaitForEvents()
-	require.NoError(c.t, err, "Failed to wait for events")
+	feeToken := sourceCCIP.Common.FeeToken.EthAddress
+
+	// if the token address is 0x0 it will use Native as fee token no need to approve
+	if feeToken != common.HexToAddress("0x0") {
+		// if any of the bridge tokens are same as feetoken approve the token amount as well
+		// otherwise the fee amount approval of the feetoken will overwrite previous transfer amount approval for same bridge token
+		for index, bt := range sourceCCIP.Common.BridgeTokens {
+			if bt.Address() == sourceCCIP.Common.FeeToken.Address() {
+				fee = bigmath.Add(fee, sourceCCIP.TransferAmount[index])
+			}
+		}
+		// Approve the fee amount approximately for all requests
+		err = sourceCCIP.Common.FeeToken.Approve(sourceCCIP.Common.Router.Address(), bigmath.Mul(fee, big.NewInt(c.NoOfReq)))
+		require.NoError(c.t, err, "approving fee for ge router")
+		require.NoError(c.t, sourceCCIP.Common.ChainClient.WaitForEvents(), "error waiting for events")
+	}
 
 	sourceCCIP.Common.ChainClient.ParallelTransactions(false)
 	destCCIP.Common.ChainClient.ParallelTransactions(false)
@@ -195,35 +213,43 @@ func (c *CCIPE2ELoad) AfterAllCall() {
 	actions.AssertBalances(c.t, c.BalanceStats.SourceBalanceAssertions)
 }
 
-func (c *CCIPE2ELoad) Call(msgType interface{}) client.CallResult {
-	var res client.CallResult
+func (c *CCIPE2ELoad) Call(_ *loadgen.Generator) loadgen.CallResult {
+	var res loadgen.CallResult
 	sourceCCIP := c.Source
-	destCCIP := c.Destination
 	msgSerialNo := c.CurrentMsgSerialNo.Load()
 	c.CurrentMsgSerialNo.Inc()
-	var tokenAndAmounts []router.ClientEVMTokenAmount
-	for i, token := range sourceCCIP.Common.BridgeTokens {
-		tokenAndAmounts = append(tokenAndAmounts, router.ClientEVMTokenAmount{
-			Token: common.HexToAddress(token.Address()), Amount: c.Source.TransferAmount[i],
-		})
-	}
 
 	// form the message for transfer
 	msgStr := fmt.Sprintf("message with Id %d", msgSerialNo)
-	c.msg.Data = []byte(msgStr)
+	c.msgMu.Lock()
+	msg := c.msg
+	c.msgMu.Unlock()
+	msg.Data = []byte(msgStr)
 
-	if msgType == TokenTransfer {
-		c.msg.TokenAmounts = tokenAndAmounts
-	}
-
-	startTime := time.Now()
+	feeToken := sourceCCIP.Common.FeeToken.EthAddress
 	// initiate the transfer
 	log.Debug().Int("msg Number", int(msgSerialNo)).Str("triggeredAt", time.Now().GoString()).Msg("triggering transfer")
-	sendTx, err := sourceCCIP.Common.Router.CCIPSend(destCCIP.Common.ChainClient.GetChainID().Uint64(), c.msg, nil)
+	var sendTx *types.Transaction
+	var err error
+
+	// initiate the transfer
+	// if the token address is 0x0 it will use Native as fee token and the fee amount should be mentioned in bind.TransactOpts's value
+	startTime := time.Now()
+	if feeToken != common.HexToAddress("0x0") {
+		sendTx, err = sourceCCIP.Common.Router.CCIPSend(sourceCCIP.DestinationChainId, msg, nil)
+	} else {
+		fee, err := sourceCCIP.Common.Router.GetFee(sourceCCIP.DestinationChainId, msg)
+		if err != nil {
+			res.Error = err.Error()
+			return res
+		}
+		sendTx, err = sourceCCIP.Common.Router.CCIPSend(sourceCCIP.DestinationChainId, msg, fee)
+	}
 
 	if err != nil {
 		c.updatestats(msgSerialNo, "", TX, time.Since(startTime), fail)
-		res.Error = fmt.Errorf("CCIPSend request error %v for msg ID %d", err, msgSerialNo)
+		log.Err(err).Msgf("ccip-send tx error for msg ID %d", msgSerialNo)
+		res.Error = fmt.Sprintf("ccip-send tx error %+v for msg ID %d", err, msgSerialNo)
 		return res
 	}
 	c.updatestats(msgSerialNo, "", TX, time.Since(startTime), success)
@@ -234,7 +260,8 @@ func (c *CCIPE2ELoad) Call(msgType interface{}) client.CallResult {
 	defer ticker.Stop()
 	sentMsg, err := c.waitForCCIPSendRequested(ticker, c.InitialSourceBlockNum, msgSerialNo, sendTx.Hash().Hex(), time.Now())
 	if err != nil {
-		res.Error = err
+		log.Err(err).Msgf("CCIPSendRequested event error for msg ID %d", msgSerialNo)
+		res.Error = err.Error()
 		return res
 	}
 	commitStartTime := time.Now()
@@ -243,7 +270,7 @@ func (c *CCIPE2ELoad) Call(msgType interface{}) client.CallResult {
 	if bytes.Compare(sentMsg.Data, []byte(msgStr)) == 0 {
 		c.updateSentMsgQueue(seqNum, sentMsg)
 	} else {
-		res.Error = fmt.Errorf("the message byte didnot match expected %s received %s msg ID %d", msgStr, string(sentMsg.Data), msgSerialNo)
+		res.Error = fmt.Sprintf("the message byte didnot match expected %s received %s msg ID %d", msgStr, string(sentMsg.Data), msgSerialNo)
 		return res
 	}
 
@@ -251,24 +278,26 @@ func (c *CCIPE2ELoad) Call(msgType interface{}) client.CallResult {
 	// - CommitStore to increase the seq number,
 	err = c.waitForSeqNumberIncrease(ticker, seqNum, msgSerialNo, commitStartTime)
 	if err != nil {
-		res.Error = err
+		log.Err(err).Msgf("waiting for seq num increase for msg ID %d", msgSerialNo)
+		res.Error = err.Error()
 		return res
 	}
 	// wait for ReportAccepted event
 	err = c.waitForReportAccepted(ticker, msgSerialNo, seqNum, c.InitialDestBlockNum, commitStartTime)
 	if err != nil {
-		res.Error = err
+		log.Err(err).Msgf("waiting for ReportAcceptedEvent for msg ID %d", msgSerialNo)
+		res.Error = err.Error()
 		return res
 	}
 
 	// wait for ExecutionStateChanged event
 	err = c.waitForExecStateChange(ticker, []uint64{seqNum}, [][32]byte{messageID}, c.seqNumCommitted[seqNum]-2, msgSerialNo, time.Now())
 	if err != nil {
-		res.Error = err
+		log.Err(err).Msgf("waiting for ExecutionStateChangedEvent for msg ID %d", msgSerialNo)
+		res.Error = err.Error()
 		return res
 	}
 	c.updatestats(msgSerialNo, fmt.Sprint(seqNum), E2E, time.Since(commitStartTime), success)
-	res.Error = nil
 	c.sentMsgMu.Lock()
 	res.Data = c.SentMsg[seqNum]
 	c.sentMsgMu.Unlock()
@@ -320,7 +349,7 @@ func (c *CCIPE2ELoad) updatestats(msgSerialNo int64, seqNum string, step phase, 
 	}
 }
 
-func (c *CCIPE2ELoad) PrintStats(rps int, duration float64) {
+func (c *CCIPE2ELoad) PrintStats(rps int64, duration float64) {
 	if _, err := os.Stat("./logs/stats"); os.IsNotExist(err) {
 		os.MkdirAll("./logs/stats", 0700)
 	}
@@ -469,7 +498,7 @@ func (c *CCIPE2ELoad) waitForExecStateChange(ticker *time.Ticker, seqNums []uint
 				for _, seqNum := range seqNums {
 					c.updatestats(msgSerialNo, fmt.Sprint(seqNum), ExecStateChanged, time.Since(timeNow), fail)
 				}
-				return fmt.Errorf("filtering event ExecutionStateChanged returned error %v msg ID %d and seqNum %v", err, msgSerialNo, seqNums)
+				return fmt.Errorf("filtering event ExecutionStateChanged returned error %+v msg ID %d and seqNum %v", err, msgSerialNo, seqNums)
 			}
 			for iterator.Next() {
 				switch ccip.MessageExecutionState(iterator.Event.State) {
@@ -504,7 +533,7 @@ func (c *CCIPE2ELoad) waitForSeqNumberIncrease(ticker *time.Ticker, seqNum uint6
 			seqNumberAfter, err := c.Destination.CommitStore.GetNextSeqNumber()
 			if err != nil {
 				c.updatestats(msgSerialNo, fmt.Sprint(seqNum), SeqNumAndRepAccIncrease, time.Since(timeNow), fail)
-				return fmt.Errorf("error %v in GetNextExpectedSeqNumber by commitStore for msg ID %d", err, msgSerialNo)
+				return fmt.Errorf("error %+v in GetNextExpectedSeqNumber by commitStore for msg ID %d", err, msgSerialNo)
 			}
 			if seqNumberAfter > seqNum {
 				return nil
@@ -531,7 +560,7 @@ func (c *CCIPE2ELoad) waitForReportAccepted(ticker *time.Ticker, msgSerialNo int
 			it, err := c.Destination.CommitStore.FilterReportAccepted(currentBlockOnDest)
 			if err != nil {
 				c.updatestats(msgSerialNo, fmt.Sprint(seqNum), SeqNumAndRepAccIncrease, time.Since(timeNow), fail)
-				return fmt.Errorf("error %v in filtering by ReportAccepted event for seq num %d", err, seqNum)
+				return fmt.Errorf("error %+v in filtering by ReportAccepted event for seq num %d", err, seqNum)
 			}
 			for it.Next() {
 				in := it.Event.Report.Interval
@@ -572,7 +601,7 @@ func (c *CCIPE2ELoad) waitForCCIPSendRequested(
 			iterator, err := c.Source.OnRamp.FilterCCIPSendRequested(currentBlockOnSource)
 			if err != nil {
 				c.updatestats(msgSerialNo, "", CCIPSendRe, time.Since(timeNow), fail)
-				return sentmsg, fmt.Errorf("error %v in filtering CCIPSendRequested event for msg ID %d tx %s", err, msgSerialNo, txHash)
+				return sentmsg, fmt.Errorf("error %+v in filtering CCIPSendRequested event for msg ID %d tx %s", err, msgSerialNo, txHash)
 			}
 			for iterator.Next() {
 				if iterator.Event.Raw.TxHash.Hex() == txHash {
@@ -584,7 +613,8 @@ func (c *CCIPE2ELoad) waitForCCIPSendRequested(
 		case <-ctx.Done():
 			c.updatestats(msgSerialNo, "", CCIPSendRe, time.Since(timeNow), fail)
 			latest, _ := c.Source.Common.ChainClient.LatestBlockNumber(context.Background())
-			return sentmsg, fmt.Errorf("CCIPSendRequested event is not found for msg ID %d tx %s startblock %d latestblock %d", msgSerialNo, txHash, currentBlockOnSource, latest)
+			return sentmsg, fmt.Errorf("CCIPSendRequested event is not found for msg ID %d tx %s startblock %d latestblock %d",
+				msgSerialNo, txHash, currentBlockOnSource, latest)
 		}
 	}
 }

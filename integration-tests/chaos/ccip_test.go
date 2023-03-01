@@ -52,7 +52,7 @@ func TestChaosCCIP(t *testing.T) {
 	t.Cleanup(func() {
 		tearDown()
 	})
-	require.NoError(t, lane.IsLaneDeployed())
+
 	testEnvironment = lane.TestEnv.K8Env
 	testSetup = lane.TestEnv
 

@@ -1096,7 +1096,6 @@ type CCIPLane struct {
 	Source                  *SourceCCIPModule
 	Dest                    *DestCCIPModule
 	TestEnv                 *CCIPTestEnv
-	Ready                   chan struct{}
 	NumberOfReq             int
 	SourceBalances          map[string]*big.Int
 	DestBalances            map[string]*big.Int
@@ -1164,19 +1163,6 @@ func (lane *CCIPLane) WriteLaneConfig() error {
 		},
 	}
 	return laneconfig.UpdateLane(l1, l2, fmt.Sprintf("./tmp_%s.json", lane.t.Name()))
-}
-
-func (lane *CCIPLane) IsLaneDeployed() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
-	for {
-		select {
-		case <-lane.Ready:
-			return nil
-		case <-ctx.Done():
-			return fmt.Errorf("waited too long for the lane set up; check for potential failure messages")
-		}
-	}
 }
 
 func (lane *CCIPLane) RecordStateBeforeTransfer() {
@@ -1376,14 +1362,12 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	// if lane is being set up for already configured CL nodes and contracts
 	// no further action is necessary
 	if !configureCLNodes {
-		lane.Ready <- struct{}{}
 		return nil
 	}
 
 	// if lane is being set up for already configured CL nodes and contracts
 	// no further action is necessary
 	if !configureCLNodes {
-		lane.Ready <- struct{}{}
 		return nil
 	}
 
@@ -1439,7 +1423,6 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	lane.Ready <- struct{}{}
 	return nil
 }
 
@@ -2004,7 +1987,6 @@ func CCIPDefaultTestSetUp(
 		SourceNetworkName: networkAName,
 		DestNetworkName:   networkBName,
 		ValidationTimeout: 2 * time.Minute,
-		Ready:             make(chan struct{}, 1),
 		SentReqHashes:     []string{},
 		TotalFee:          big.NewInt(0),
 		SourceBalances:    make(map[string]*big.Int),
@@ -2024,7 +2006,6 @@ func CCIPDefaultTestSetUp(
 			SourceChain:       sourceChainClientB2A,
 			DestChain:         destChainClientB2A,
 			ValidationTimeout: 2 * time.Minute,
-			Ready:             make(chan struct{}, 1),
 			SourceBalances:    make(map[string]*big.Int),
 			DestBalances:      make(map[string]*big.Int),
 			SentReqHashes:     []string{},

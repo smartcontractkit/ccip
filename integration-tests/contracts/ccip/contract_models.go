@@ -344,18 +344,19 @@ func (r *Router) SetOnRamp(chainID uint64, onRamp common.Address) error {
 
 func (r *Router) CCIPSend(destChainId uint64, msg router.ClientEVM2AnyMessage, valueForNative *big.Int) (*types.Transaction, error) {
 	opts, err := r.client.TransactionOpts(r.client.GetDefaultWallet())
-	if valueForNative != nil {
-		opts.Value = valueForNative
-	}
 	if err != nil {
 		return nil, err
 	}
+	if valueForNative != nil {
+		opts.Value = valueForNative
+	}
+	opts.GasLimit = 500000
 	tx, err := r.Instance.CcipSend(opts, destChainId, msg)
 	if err != nil {
 		return nil, err
 	}
 	log.Info().
-		Str("r", r.Address()).
+		Str("router", r.Address()).
 		Str("Network Name", r.client.GetNetworkConfig().Name).
 		Msg("msg is sent")
 	return tx, r.client.ProcessTransaction(tx)
