@@ -6,11 +6,11 @@ import {ICommitStore} from "../interfaces/ICommitStore.sol";
 import {IAFN} from "../interfaces/health/IAFN.sol";
 import {IPriceRegistry} from "../interfaces/prices/IPriceRegistry.sol";
 
-import {HealthChecker} from "../health/HealthChecker.sol";
 import {OCR2Base} from "../ocr/OCR2Base.sol";
 import {Internal} from "../models/Internal.sol";
+import {Pausable} from "../../vendor/Pausable.sol";
 
-contract CommitStore is ICommitStore, TypeAndVersionInterface, HealthChecker, OCR2Base {
+contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Base {
   // STATIC CONFIG
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "CommitStore 1.0.0";
@@ -33,12 +33,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, HealthChecker, OC
 
   /// @param staticConfig Containing the static part of the commitStore config
   /// @param dynamicConfig Containing the dynamic part of the commitStore config
-  /// @param afn AFN contract, cannot be address(0)
-  constructor(
-    StaticConfig memory staticConfig,
-    DynamicConfig memory dynamicConfig,
-    IAFN afn
-  ) OCR2Base() HealthChecker(afn) {
+  constructor(StaticConfig memory staticConfig, DynamicConfig memory dynamicConfig) OCR2Base() Pausable() {
     if (
       dynamicConfig.priceRegistry == address(0) ||
       staticConfig.onRamp == address(0) ||
@@ -52,6 +47,18 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, HealthChecker, OC
     emit StaticConfigSet(staticConfig);
 
     _setDynamicConfig(dynamicConfig);
+  }
+
+  /// @notice Pause the contract
+  /// @dev only callable by the owner
+  function pause() external onlyOwner {
+    _pause();
+  }
+
+  /// @notice Unpause the contract
+  /// @dev only callable by the owner
+  function unpause() external onlyOwner {
+    _unpause();
   }
 
   /// @inheritdoc ICommitStore
@@ -81,7 +88,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, HealthChecker, OC
 
   /// @inheritdoc ICommitStore
   function isBlessed(bytes32 root) public view returns (bool) {
-    return s_afn.isBlessed(_hashCommitStoreWithRoot(root));
+    return IAFN(s_dynamicConfig.afn).isBlessed(_hashCommitStoreWithRoot(root));
   }
 
   /// @inheritdoc ICommitStore
@@ -102,6 +109,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, HealthChecker, OC
   /// @notice the internal version of setDynamicConfig to allow for reuse
   /// in the constructor. Emits DynamicConfigSet on successful config set.
   function _setDynamicConfig(DynamicConfig memory dynamicConfig) internal {
+    if (dynamicConfig.afn == address(0) || dynamicConfig.priceRegistry == address(0)) revert InvalidCommitStoreConfig();
     s_dynamicConfig = dynamicConfig;
     emit DynamicConfigSet(dynamicConfig);
   }
@@ -196,5 +204,16 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, HealthChecker, OC
   /// INTERNAL_DOMAIN_SEPARATOR.
   function _hashInternalNode(bytes32 left, bytes32 right) private pure returns (bytes32 hash) {
     return keccak256(abi.encode(Internal.INTERNAL_DOMAIN_SEPARATOR, left, right));
+  }
+
+  /// @notice Support querying whether health checker is healthy.
+  function isAFNHealthy() external view returns (bool) {
+    return !IAFN(s_dynamicConfig.afn).badSignalReceived();
+  }
+
+  /// @notice Ensure that the AFN has not emitted a bad signal, and that the latest heartbeat is not stale.
+  modifier whenHealthy() {
+    if (IAFN(s_dynamicConfig.afn).badSignalReceived()) revert BadAFNSignal();
+    _;
   }
 }

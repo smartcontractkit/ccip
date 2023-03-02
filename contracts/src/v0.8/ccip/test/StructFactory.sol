@@ -71,21 +71,27 @@ contract StructFactory {
   uint32 internal constant PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS = 500;
   uint64 internal constant MAX_GAS_LIMIT = 4_000_000;
 
-  function generateDynamicOffRampConfig(IRouter router) internal pure returns (IEVM2EVMOffRamp.DynamicConfig memory) {
+  function generateDynamicOffRampConfig(address router, address afn)
+    internal
+    pure
+    returns (IEVM2EVMOffRamp.DynamicConfig memory)
+  {
     return
       IEVM2EVMOffRamp.DynamicConfig({
-        router: address(router),
+        router: router,
         executionDelaySeconds: EXECUTION_DELAY_SECONDS,
         maxDataSize: MAX_DATA_SIZE,
         maxTokensLength: MAX_TOKENS_LENGTH,
-        permissionLessExecutionThresholdSeconds: PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS
+        permissionLessExecutionThresholdSeconds: PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS,
+        afn: afn
       });
   }
 
   function generateDynamicOnRampConfig(
     address router,
     address priceRegistry,
-    address feeAdmin
+    address feeAdmin,
+    address afn
   ) internal pure returns (IEVM2EVMOnRamp.DynamicConfig memory) {
     return
       IEVM2EVMOnRamp.DynamicConfig({
@@ -94,7 +100,8 @@ contract StructFactory {
         maxDataSize: MAX_DATA_SIZE,
         maxTokensLength: MAX_TOKENS_LENGTH,
         maxGasLimit: MAX_GAS_LIMIT,
-        feeAdmin: feeAdmin
+        feeAdmin: feeAdmin,
+        afn: afn
       });
   }
 

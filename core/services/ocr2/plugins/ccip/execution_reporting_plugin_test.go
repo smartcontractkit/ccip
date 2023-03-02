@@ -119,8 +119,8 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 		},
 		commit_store_helper.ICommitStoreDynamicConfig{
 			PriceRegistry: destPricesAddress,
+			Afn:           afnAddress, // AFN address
 		},
-		afnAddress, // AFN address
 	)
 	require.NoError(t, err)
 	commitStore, err := commit_store_helper.NewCommitStoreHelper(commitStoreAddress, destChain)
@@ -146,8 +146,8 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 			ExecutionDelaySeconds:                   0,
 			MaxDataSize:                             1e5,
 			MaxTokensLength:                         5,
+			Afn:                                     afnAddress,
 		},
-		afnAddress,
 		[]common.Address{linkTokenSourceAddress},
 		[]common.Address{destPoolAddress},
 		evm_2_evm_offramp.IAggregateRateLimiterRateLimiterConfig{

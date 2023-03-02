@@ -2,7 +2,6 @@
 pragma solidity 0.8.15;
 
 import "../helpers/receivers/MaybeRevertMessageReceiver.sol";
-import "../../health/HealthChecker.sol";
 import "./EVM2EVMOffRampSetup.t.sol";
 import "../../router/Router.sol";
 import "../helpers/receivers/ConformingReceiver.sol";
@@ -24,7 +23,10 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
       sourceChainId: SOURCE_CHAIN_ID,
       onRamp: ON_RAMP_ADDRESS
     });
-    IEVM2EVMOffRamp.DynamicConfig memory dynamicConfig = generateDynamicOffRampConfig(s_destRouter);
+    IEVM2EVMOffRamp.DynamicConfig memory dynamicConfig = generateDynamicOffRampConfig(
+      address(s_destRouter),
+      address(s_afn)
+    );
 
     vm.expectEmit(false, false, false, true);
     emit StaticConfigSet(staticConfig);
@@ -35,7 +37,6 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
     s_offRamp = new EVM2EVMOffRampHelper(
       staticConfig,
       dynamicConfig,
-      s_afn,
       getCastedSourceTokens(),
       getCastedDestinationPools(),
       rateLimiterConfig()
@@ -64,9 +65,6 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
     assertEq(0, blockNumber);
     assertEq(0, configDigest);
 
-    // AFN
-    assertEq(address(s_afn), address(s_offRamp.getAFN()));
-
     // OffRamp initial values
     assertEq("EVM2EVMOffRamp 1.0.0", s_offRamp.typeAndVersion());
     assertEq(OWNER, s_offRamp.owner());
@@ -79,7 +77,10 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
     IPool[] memory pools = new IPool[](1);
 
     IERC20[] memory wrongTokens = new IERC20[](5);
-    IEVM2EVMOffRamp.DynamicConfig memory dynamicConfig = generateDynamicOffRampConfig(s_destRouter);
+    IEVM2EVMOffRamp.DynamicConfig memory dynamicConfig = generateDynamicOffRampConfig(
+      address(s_destRouter),
+      address(s_afn)
+    );
     s_offRamp = new EVM2EVMOffRampHelper(
       IEVM2EVMOffRamp.StaticConfig({
         commitStore: address(s_mockCommitStore),
@@ -88,7 +89,6 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
         onRamp: ON_RAMP_ADDRESS
       }),
       dynamicConfig,
-      s_afn,
       wrongTokens,
       pools,
       rateLimiterConfig()
@@ -115,8 +115,7 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
         sourceChainId: SOURCE_CHAIN_ID,
         onRamp: ZERO_ADDRESS
       }),
-      generateDynamicOffRampConfig(s_destRouter),
-      s_afn,
+      generateDynamicOffRampConfig(address(s_destRouter), address(s_afn)),
       getCastedSourceTokens(),
       pools,
       rateLimiterConfig
@@ -128,7 +127,7 @@ contract EVM2EVMOffRamp_setDynamicConfig is EVM2EVMOffRampSetup {
   event DynamicConfigSet(IEVM2EVMOffRamp.DynamicConfig config, uint64 chainId, address onRamp);
 
   function testSetDynamicConfigSuccess() public {
-    IEVM2EVMOffRamp.DynamicConfig memory config = generateDynamicOffRampConfig(IRouter(USER_3));
+    IEVM2EVMOffRamp.DynamicConfig memory config = generateDynamicOffRampConfig(USER_3, address(s_afn));
 
     vm.expectEmit(true, true, true, true);
     emit DynamicConfigSet(config, SOURCE_CHAIN_ID, ON_RAMP_ADDRESS);
@@ -141,7 +140,7 @@ contract EVM2EVMOffRamp_setDynamicConfig is EVM2EVMOffRampSetup {
 
   function testNonOwnerReverts() public {
     changePrank(STRANGER);
-    IEVM2EVMOffRamp.DynamicConfig memory config = generateDynamicOffRampConfig(IRouter(USER_3));
+    IEVM2EVMOffRamp.DynamicConfig memory config = generateDynamicOffRampConfig(USER_3, address(1));
 
     vm.expectRevert("Only callable by owner");
 
@@ -149,7 +148,7 @@ contract EVM2EVMOffRamp_setDynamicConfig is EVM2EVMOffRampSetup {
   }
 
   function testRouterZeroAddressReverts() public {
-    IEVM2EVMOffRamp.DynamicConfig memory config = generateDynamicOffRampConfig(IRouter(ZERO_ADDRESS));
+    IEVM2EVMOffRamp.DynamicConfig memory config = generateDynamicOffRampConfig(ZERO_ADDRESS, address(1));
 
     vm.expectRevert(abi.encodeWithSelector(IEVM2EVMOffRamp.InvalidOffRampConfig.selector, config));
 
@@ -349,7 +348,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
 
   function testUnhealthyReverts() public {
     s_afn.voteBad();
-    vm.expectRevert(HealthChecker.BadAFNSignal.selector);
+    vm.expectRevert(IEVM2EVMOffRamp.BadAFNSignal.selector);
     s_offRamp.execute(_generateReportFromMessages(_generateMessagesWithTokens()), true);
   }
 
@@ -754,5 +753,23 @@ contract EVM2EVMOffRamp_getDestinationTokens is EVM2EVMOffRampSetup {
     for (uint256 i = 0; i < actualTokens.length; ++i) {
       assertEq(address(s_destTokens[i]), address(actualTokens[i]));
     }
+  }
+}
+
+contract EVM2EVMOffRamp_afn is EVM2EVMOffRampSetup {
+  function testAFN() public {
+    // Test pausing
+    assertEq(s_offRamp.paused(), false);
+    s_offRamp.pause();
+    assertEq(s_offRamp.paused(), true);
+    s_offRamp.unpause();
+    assertEq(s_offRamp.paused(), false);
+
+    // Test afn
+    assertEq(s_offRamp.isAFNHealthy(), true);
+    s_afn.voteBad();
+    assertEq(s_offRamp.isAFNHealthy(), false);
+    s_afn.recoverFromBadSignal();
+    assertEq(s_offRamp.isAFNHealthy(), true);
   }
 }

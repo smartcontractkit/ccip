@@ -31,6 +31,7 @@ interface IEVM2EVMOnRamp is IEVM2AnyOnRamp {
   error SenderNotAllowed(address sender);
   error InvalidConfig();
   error InvalidAddress(bytes encodedAddress);
+  error BadAFNSignal();
 
   event AllowListAdd(address sender);
   event AllowListRemove(address sender);
@@ -60,6 +61,7 @@ interface IEVM2EVMOnRamp is IEVM2AnyOnRamp {
     uint64 maxGasLimit; // -----┘ Maximum gas limit for messages targeting EVMs
     uint16 maxTokensLength; // -┐ Maximum number of distinct ERC20 tokens that can be sent per message
     address feeAdmin; // -------┘ Fee admin address
+    address afn; // AFN address
   }
 
   /// @dev Struct to hold the fee configuration for a token

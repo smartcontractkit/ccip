@@ -51,10 +51,9 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
         destChainId: DEST_CHAIN_ID,
         defaultTxGasLimit: GAS_LIMIT
       }),
-      generateDynamicOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), s_feeAdmin),
+      generateDynamicOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), s_feeAdmin, address(s_afn)),
       getTokensAndPools(s_sourceTokens, getCastedSourcePools()),
       new address[](0),
-      s_afn,
       rateLimiterConfig(),
       s_feeTokenConfigArgs,
       getNopsAndWeights()

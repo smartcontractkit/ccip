@@ -20,6 +20,7 @@ interface IEVM2EVMOffRamp {
   error CanOnlySelfCall();
   error ReceiverError();
   error EmptyReport();
+  error BadAFNSignal();
 
   // sourceChainId and onRamp are needed by Atlas, to track onramp <-> offramp -> router relationship
   event DynamicConfigSet(DynamicConfig config, uint64 sourceChainId, address onRamp);
@@ -61,6 +62,7 @@ interface IEVM2EVMOffRamp {
     address router; // ---------------------------------┘ Router address
     uint32 maxDataSize; // --------┐ Maximum payload data size
     uint16 maxTokensLength; // ----┘ Maximum number of distinct ERC20 tokens that can be sent per message
+    address afn; // AFN address
   }
 
   /// @notice Returns the current dynamic config.

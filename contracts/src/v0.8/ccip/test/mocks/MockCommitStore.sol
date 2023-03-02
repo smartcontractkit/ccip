@@ -19,7 +19,7 @@ contract MockCommitStore is ICommitStore {
 
   /// @inheritdoc ICommitStore
   function getDynamicConfig() external pure override returns (ICommitStore.DynamicConfig memory) {
-    return ICommitStore.DynamicConfig({priceRegistry: address(10)});
+    return ICommitStore.DynamicConfig({priceRegistry: address(10), afn: address(11)});
   }
 
   /// @inheritdoc ICommitStore

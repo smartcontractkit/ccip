@@ -9,7 +9,6 @@ import {IPriceRegistry} from "../interfaces/prices/IPriceRegistry.sol";
 import {IEVM2AnyOnRamp} from "../interfaces/onRamp/IEVM2AnyOnRamp.sol";
 import {IAggregateRateLimiter} from "../interfaces/rateLimiter/IAggregateRateLimiter.sol";
 
-import {HealthChecker} from "../health/HealthChecker.sol";
 import {AggregateRateLimiter} from "../rateLimiter/AggregateRateLimiter.sol";
 import {Client} from "../models/Client.sol";
 import {Internal} from "../models/Internal.sol";
@@ -19,8 +18,9 @@ import {IERC20} from "../../vendor/IERC20.sol";
 import {EnumerableMap} from "../../vendor/openzeppelin-solidity/v4.7.3/contracts/utils/structs/EnumerableMap.sol";
 import {EnumerableMapAddresses} from "../../libraries/internal/EnumerableMapAddresses.sol";
 import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v4.7.3/contracts/utils/structs/EnumerableSet.sol";
+import {Pausable} from "../../vendor/Pausable.sol";
 
-contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AggregateRateLimiter, TypeAndVersionInterface {
+contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAndVersionInterface {
   using SafeERC20 for IERC20;
   using EnumerableMap for EnumerableMap.AddressToUintMap;
   using EnumerableMapAddresses for EnumerableMapAddresses.AddressToAddressMap;
@@ -77,11 +77,10 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AggregateRateLimiter, T
     DynamicConfig memory dynamicConfig,
     TokenAndPool[] memory tokensAndPools,
     address[] memory allowlist,
-    IAFN afn,
     IAggregateRateLimiter.RateLimiterConfig memory rateLimiterConfig,
     FeeTokenConfigArgs[] memory feeTokenConfigs,
     NopAndWeight[] memory nopsAndWeights
-  ) HealthChecker(afn) AggregateRateLimiter(rateLimiterConfig) {
+  ) Pausable() AggregateRateLimiter(rateLimiterConfig) {
     if (
       staticConfig.linkToken == address(0) ||
       staticConfig.chainId == 0 ||
@@ -113,6 +112,18 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AggregateRateLimiter, T
       s_allowlistEnabled = true;
       _applyAllowListUpdates(allowlist, new address[](0));
     }
+  }
+
+  /// @notice Pause the contract
+  /// @dev only callable by the owner
+  function pause() external onlyOwner {
+    _pause();
+  }
+
+  /// @notice Unpause the contract
+  /// @dev only callable by the owner
+  function unpause() external onlyOwner {
+    _unpause();
   }
 
   /// @inheritdoc IEVM2AnyOnRamp
@@ -261,7 +272,9 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AggregateRateLimiter, T
 
   /// @notice Internal version of setDynamicConfig to allow for reuse in the constructor.
   function _setDynamicConfig(DynamicConfig memory dynamicConfig) internal {
-    if (dynamicConfig.router == address(0) || dynamicConfig.priceRegistry == address(0)) revert InvalidConfig();
+    if (
+      dynamicConfig.router == address(0) || dynamicConfig.priceRegistry == address(0) || dynamicConfig.afn == address(0)
+    ) revert InvalidConfig();
 
     s_dynamicConfig = dynamicConfig;
     emit DynamicConfigSet(dynamicConfig);
@@ -442,6 +455,17 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, HealthChecker, AggregateRateLimiter, T
   /// @dev Require that the sender is the owner or the fee admin
   modifier onlyOwnerOrFeeAdmin() {
     if (msg.sender != owner() && msg.sender != s_dynamicConfig.feeAdmin) revert OnlyCallableByOwnerOrFeeAdmin();
+    _;
+  }
+
+  /// @notice Support querying whether health checker is healthy.
+  function isAFNHealthy() external view returns (bool) {
+    return !IAFN(s_dynamicConfig.afn).badSignalReceived();
+  }
+
+  /// @notice Ensure that the AFN has not emitted a bad signal, and that the latest heartbeat is not stale.
+  modifier whenHealthy() {
+    if (IAFN(s_dynamicConfig.afn).badSignalReceived()) revert BadAFNSignal();
     _;
   }
 }

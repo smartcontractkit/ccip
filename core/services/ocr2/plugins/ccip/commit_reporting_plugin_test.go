@@ -101,8 +101,8 @@ func TestCommitReportEncoding(t *testing.T) {
 		},
 		commit_store_helper.ICommitStoreDynamicConfig{
 			PriceRegistry: priceRegistry,
+			Afn:           afnAddress, // AFN address
 		},
-		afnAddress, // AFN address
 	)
 	require.NoError(t, err)
 	commitStore, err := commit_store_helper.NewCommitStoreHelper(commitStoreAddress, destChain)

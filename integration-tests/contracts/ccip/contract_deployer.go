@@ -199,8 +199,8 @@ func (e *CCIPContractsDeployer) DeployCommitStore(sourceChainId, destChainId uin
 			},
 			commit_store.ICommitStoreDynamicConfig{
 				PriceRegistry: priceRegistry,
+				Afn:           afn,
 			},
-			afn,
 		)
 	})
 	if err != nil {
@@ -407,10 +407,10 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 				MaxTokensLength: 5,
 				MaxGasLimit:     ccip.GasLimitPerTx,
 				FeeAdmin:        common.Address{},
+				Afn:             afn,
 			},
 			tokensAndPools,
 			allowList,
-			afn,
 			evm_2_evm_onramp.IAggregateRateLimiterRateLimiterConfig{
 				Capacity: opts.Capacity,
 				Rate:     opts.Rate,
@@ -467,8 +467,8 @@ func (e *CCIPContractsDeployer) DeployOffRamp(sourceChainId, destChainId uint64,
 				ExecutionDelaySeconds:                   0,
 				MaxDataSize:                             1e5,
 				MaxTokensLength:                         15,
+				Afn:                                     afn,
 			},
-			afn,
 			sourceToken,
 			pools,
 			evm_2_evm_offramp.IAggregateRateLimiterRateLimiterConfig{

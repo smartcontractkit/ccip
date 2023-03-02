@@ -8,6 +8,7 @@ interface ICommitStore {
   error InvalidProof();
   error InvalidRoot();
   error InvalidCommitStoreConfig();
+  error BadAFNSignal();
 
   event ReportAccepted(CommitReport report);
   event StaticConfigSet(StaticConfig);
@@ -23,6 +24,7 @@ interface ICommitStore {
   /// @notice Dynamic commit store config
   struct DynamicConfig {
     address priceRegistry; // Price registry address on the destination chain
+    address afn; // AFN
   }
 
   /// @notice a sequenceNumber interval

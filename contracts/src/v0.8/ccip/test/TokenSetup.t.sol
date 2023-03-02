@@ -7,7 +7,6 @@ import "./mocks/MockPool.sol";
 import "../../tests/MockV3Aggregator.sol";
 import "../pools/BurnMintTokenPool.sol";
 import "../pools/LockReleaseTokenPool.sol";
-import "../health/HealthChecker.sol";
 import "../models/Client.sol";
 
 contract TokenSetup is BaseTest {

@@ -12,17 +12,17 @@ import {IAny2EVMMessageReceiver} from "../interfaces/router/IAny2EVMMessageRecei
 import {Client} from "../models/Client.sol";
 import {Internal} from "../models/Internal.sol";
 import {OCR2Base} from "../ocr/OCR2Base.sol";
-import {HealthChecker} from "../health/HealthChecker.sol";
 import {AggregateRateLimiter} from "../rateLimiter/AggregateRateLimiter.sol";
 
 import {IERC20} from "../../vendor/IERC20.sol";
 import {Address} from "../../vendor/Address.sol";
 import {ERC165Checker} from "../../vendor/ERC165Checker.sol";
 import {EnumerableMapAddresses} from "../../libraries/internal/EnumerableMapAddresses.sol";
+import {Pausable} from "../../vendor/Pausable.sol";
 
 /// @notice EVM2EVMOffRamp enables OCR networks to execute multiple messages
 /// in an OffRamp in a single transaction.
-contract EVM2EVMOffRamp is IEVM2EVMOffRamp, HealthChecker, AggregateRateLimiter, TypeAndVersionInterface, OCR2Base {
+contract EVM2EVMOffRamp is IEVM2EVMOffRamp, Pausable, AggregateRateLimiter, TypeAndVersionInterface, OCR2Base {
   using Address for address;
   using ERC165Checker for address;
   using EnumerableMapAddresses for EnumerableMapAddresses.AddressToAddressMap;
@@ -70,11 +70,10 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, HealthChecker, AggregateRateLimiter,
   constructor(
     StaticConfig memory staticConfig,
     DynamicConfig memory dynamicConfig,
-    IAFN afn,
     IERC20[] memory sourceTokens,
     IPool[] memory pools,
     RateLimiterConfig memory rateLimiterConfig
-  ) OCR2Base() HealthChecker(afn) AggregateRateLimiter(rateLimiterConfig) {
+  ) OCR2Base() Pausable() AggregateRateLimiter(rateLimiterConfig) {
     if (sourceTokens.length != pools.length) revert InvalidTokenPoolConfig();
     if (staticConfig.onRamp == address(0) || staticConfig.commitStore == address(0)) revert ZeroAddressNotAllowed();
 
@@ -93,6 +92,18 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, HealthChecker, AggregateRateLimiter,
     }
 
     _setDynamicConfig(dynamicConfig);
+  }
+
+  /// @notice Pause the contract
+  /// @dev only callable by the owner
+  function pause() external onlyOwner {
+    _pause();
+  }
+
+  /// @notice Unpause the contract
+  /// @dev only callable by the owner
+  function unpause() external onlyOwner {
+    _unpause();
   }
 
   /// @notice creates a unique hash to be used in message hashing.
@@ -123,7 +134,7 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, HealthChecker, AggregateRateLimiter,
 
   /// @notice Internal version of setDynamicConfig to allow for reuse in the constructor.
   function _setDynamicConfig(DynamicConfig memory config) private {
-    if (config.router == address(0)) revert InvalidOffRampConfig(config);
+    if (config.router == address(0) || config.afn == address(0)) revert InvalidOffRampConfig(config);
 
     s_dynamicConfig = config;
     emit DynamicConfigSet(config, i_sourceChainId, i_onRamp);
@@ -406,5 +417,16 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, HealthChecker, AggregateRateLimiter,
   /// @dev Expects an encoded ExecutionReport
   function _report(bytes memory report) internal override {
     _execute(abi.decode(report, (Internal.ExecutionReport)), false);
+  }
+
+  /// @notice Support querying whether health checker is healthy.
+  function isAFNHealthy() external view returns (bool) {
+    return !IAFN(s_dynamicConfig.afn).badSignalReceived();
+  }
+
+  /// @notice Ensure that the AFN has not emitted a bad signal, and that the latest heartbeat is not stale.
+  modifier whenHealthy() {
+    if (IAFN(s_dynamicConfig.afn).badSignalReceived()) revert BadAFNSignal();
+    _;
   }
 }

@@ -1,6 +1,5 @@
 {
   "acceptOwnership()": "79ba5097",
-  "getAFN()": "2222dd42",
   "getDynamicConfig()": "7437ff9f",
   "getExpectedNextSequenceNumber()": "4120fccd",
   "getMerkleRoot(bytes32)": "a7206cd6",
@@ -15,8 +14,7 @@
   "pause()": "8456cb59",
   "paused()": "5c975abb",
   "resetUnblessedRoots(bytes32[])": "f47a8690",
-  "setAFN(address)": "108ee5fc",
-  "setDynamicConfig((address))": "8f2aaea4",
+  "setDynamicConfig((address,address))": "869b7f62",
   "setMinSeqNr(uint64)": "ad7a22f8",
   "setOCR2Config(address[],address[],uint8,bytes,uint64,bytes)": "1ef38174",
   "transferOwnership(address)": "f2fde38b",

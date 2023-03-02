@@ -55,8 +55,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup {
         sourceChainId: SOURCE_CHAIN_ID,
         onRamp: ON_RAMP_ADDRESS
       }),
-      generateDynamicOffRampConfig(router),
-      s_afn,
+      generateDynamicOffRampConfig(address(router), address(s_afn)),
       getCastedSourceTokens(),
       getCastedDestinationPools(),
       rateLimiterConfig()
@@ -190,5 +189,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup {
     assertEq(a.maxDataSize, b.maxDataSize);
     assertEq(a.maxTokensLength, b.maxTokensLength);
     assertEq(a.permissionLessExecutionThresholdSeconds, b.permissionLessExecutionThresholdSeconds);
+    assertEq(a.afn, b.afn);
+    assertEq(a.router, b.router);
   }
 }

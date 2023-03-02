@@ -19,7 +19,8 @@ contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
     IEVM2EVMOnRamp.DynamicConfig memory dynamicConfig = generateDynamicOnRampConfig(
       address(s_sourceRouter),
       address(s_priceRegistry),
-      address(0)
+      address(0),
+      address(s_afn)
     );
 
     vm.expectEmit(false, false, false, true);
@@ -33,7 +34,6 @@ contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
       dynamicConfig,
       getTokensAndPools(s_sourceTokens, getCastedSourcePools()),
       new address[](0),
-      s_afn,
       rateLimiterConfig(),
       s_feeTokenConfigArgs,
       getNopsAndWeights()
@@ -54,12 +54,10 @@ contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
     assertEq(dynamicConfig.maxTokensLength, gotDynamicConfig.maxTokensLength);
     assertEq(dynamicConfig.maxGasLimit, gotDynamicConfig.maxGasLimit);
     assertEq(dynamicConfig.feeAdmin, gotDynamicConfig.feeAdmin);
+    assertEq(dynamicConfig.afn, gotDynamicConfig.afn);
 
     // Tokens
     assertEq(s_sourceTokens, s_onRamp.getSupportedTokens());
-
-    // AFN
-    assertEq(address(s_afn), address(s_onRamp.getAFN()));
 
     // Initial values
     assertEq("EVM2EVMOnRamp 1.0.0", s_onRamp.typeAndVersion());
@@ -260,7 +258,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
 
   function testUnhealthyReverts() public {
     s_afn.voteBad();
-    vm.expectRevert(HealthChecker.BadAFNSignal.selector);
+    vm.expectRevert(IEVM2EVMOnRamp.BadAFNSignal.selector);
     s_onRamp.forwardFromRouter(_generateEmptyMessage(), 0, OWNER);
   }
 
@@ -575,7 +573,8 @@ contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
       maxDataSize: 400,
       maxTokensLength: 14,
       maxGasLimit: MAX_GAS_LIMIT / 2,
-      feeAdmin: address(98235)
+      feeAdmin: address(98235),
+      afn: address(11)
     });
 
     vm.expectEmit(false, false, false, true);
@@ -596,7 +595,7 @@ contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
   function testSetConfigOnlyOwnerReverts() public {
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
-    s_onRamp.setDynamicConfig(generateDynamicOnRampConfig(address(1), address(2), address(3)));
+    s_onRamp.setDynamicConfig(generateDynamicOnRampConfig(address(1), address(2), address(3), address(4)));
   }
 }
 
@@ -681,5 +680,23 @@ contract EVM2EVMOnRamp_getAllowList is EVM2EVMOnRampWithAllowListSetup {
   function testSuccess() public {
     address[] memory setAddresses = s_onRamp.getAllowList();
     assertEq(OWNER, setAddresses[0]);
+  }
+}
+
+contract EVM2EVMOnRamp_afn is EVM2EVMOnRampSetup {
+  function testAFN() public {
+    // Test pausing
+    assertEq(s_onRamp.paused(), false);
+    s_onRamp.pause();
+    assertEq(s_onRamp.paused(), true);
+    s_onRamp.unpause();
+    assertEq(s_onRamp.paused(), false);
+
+    // Test afn
+    assertEq(s_onRamp.isAFNHealthy(), true);
+    s_afn.voteBad();
+    assertEq(s_onRamp.isAFNHealthy(), false);
+    s_afn.recoverFromBadSignal();
+    assertEq(s_onRamp.isAFNHealthy(), true);
   }
 }

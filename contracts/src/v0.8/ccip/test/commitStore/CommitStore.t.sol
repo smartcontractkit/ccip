@@ -15,8 +15,7 @@ contract CommitStoreSetup is PriceRegistrySetup {
 
     s_commitStore = new CommitStoreHelper(
       ICommitStore.StaticConfig({chainId: DEST_CHAIN_ID, sourceChainId: SOURCE_CHAIN_ID, onRamp: ON_RAMP_ADDRESS}),
-      ICommitStore.DynamicConfig({priceRegistry: address(s_priceRegistry)}),
-      s_afn
+      ICommitStore.DynamicConfig({priceRegistry: address(s_priceRegistry), afn: address(s_afn)})
     );
 
     address[] memory priceUpdaters = new address[](1);
@@ -37,8 +36,7 @@ contract CommitStoreRealAFNSetup is PriceRegistrySetup {
     s_afn = new AFN(participants, weights, 1, 1); // Overwrite base mock afn with real.
     s_commitStore = new CommitStoreHelper(
       ICommitStore.StaticConfig({chainId: DEST_CHAIN_ID, sourceChainId: SOURCE_CHAIN_ID, onRamp: ON_RAMP_ADDRESS}),
-      ICommitStore.DynamicConfig({priceRegistry: address(s_priceRegistry)}),
-      s_afn
+      ICommitStore.DynamicConfig({priceRegistry: address(s_priceRegistry), afn: address(s_afn)})
     );
   }
 }
@@ -55,7 +53,8 @@ contract CommitStore_constructor is PriceRegistrySetup {
       onRamp: 0x2C44CDDdB6a900Fa2B585dd299E03D12Fa4293Bc
     });
     ICommitStore.DynamicConfig memory dynamicConfig = ICommitStore.DynamicConfig({
-      priceRegistry: address(s_priceRegistry)
+      priceRegistry: address(s_priceRegistry),
+      afn: address(s_afn)
     });
 
     vm.expectEmit(false, false, false, true);
@@ -64,7 +63,7 @@ contract CommitStore_constructor is PriceRegistrySetup {
     vm.expectEmit(false, false, false, true);
     emit DynamicConfigSet(dynamicConfig);
 
-    CommitStore commitStore = new CommitStore(staticConfig, dynamicConfig, s_afn);
+    CommitStore commitStore = new CommitStore(staticConfig, dynamicConfig);
 
     ICommitStore.StaticConfig memory gotStaticConfig = commitStore.getStaticConfig();
 
@@ -75,9 +74,7 @@ contract CommitStore_constructor is PriceRegistrySetup {
     ICommitStore.DynamicConfig memory gotDynamicConfig = commitStore.getDynamicConfig();
 
     assertEq(dynamicConfig.priceRegistry, gotDynamicConfig.priceRegistry);
-
-    // AFN
-    assertEq(address(s_afn), address(commitStore.getAFN()));
+    assertEq(dynamicConfig.afn, gotDynamicConfig.afn);
 
     // CommitStore initial values
     assertEq(1, commitStore.getExpectedNextSequenceNumber());
@@ -107,7 +104,10 @@ contract CommitStore_setDynamicConfig is CommitStoreSetup {
   event DynamicConfigSet(ICommitStore.DynamicConfig);
 
   function testSetMinSeqNrSuccess() public {
-    ICommitStore.DynamicConfig memory dynamicConfig = ICommitStore.DynamicConfig({priceRegistry: address(23784264)});
+    ICommitStore.DynamicConfig memory dynamicConfig = ICommitStore.DynamicConfig({
+      priceRegistry: address(23784264),
+      afn: address(s_afn)
+    });
 
     vm.expectEmit(false, false, false, true);
     emit DynamicConfigSet(dynamicConfig);
@@ -120,7 +120,10 @@ contract CommitStore_setDynamicConfig is CommitStoreSetup {
 
   // Reverts
   function testOnlyOwnerReverts() public {
-    ICommitStore.DynamicConfig memory dynamicConfig = ICommitStore.DynamicConfig({priceRegistry: address(23784264)});
+    ICommitStore.DynamicConfig memory dynamicConfig = ICommitStore.DynamicConfig({
+      priceRegistry: address(23784264),
+      afn: address(s_afn)
+    });
 
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
@@ -231,7 +234,7 @@ contract CommitStore_report is CommitStoreSetup {
 
   function testUnhealthyReverts() public {
     s_afn.voteBad();
-    vm.expectRevert(HealthChecker.BadAFNSignal.selector);
+    vm.expectRevert(ICommitStore.BadAFNSignal.selector);
     bytes memory report;
     s_commitStore.report(report);
   }
@@ -324,5 +327,23 @@ contract CommitStore_verify is CommitStoreRealAFNSetup {
     vm.expectRevert(ICommitStore.InvalidProof.selector);
 
     s_commitStore.verify(leaves, proofs, 0);
+  }
+}
+
+contract CommitStore_afn is CommitStoreSetup {
+  function testAFN() public {
+    // Test pausing
+    assertEq(s_commitStore.paused(), false);
+    s_commitStore.pause();
+    assertEq(s_commitStore.paused(), true);
+    s_commitStore.unpause();
+    assertEq(s_commitStore.paused(), false);
+
+    // Test afn
+    assertEq(s_commitStore.isAFNHealthy(), true);
+    s_afn.voteBad();
+    assertEq(s_commitStore.isAFNHealthy(), false);
+    s_afn.recoverFromBadSignal();
+    assertEq(s_commitStore.isAFNHealthy(), true);
   }
 }

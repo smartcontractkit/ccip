@@ -131,8 +131,8 @@ func (c *CCIPContracts) DeployNewOffRamp() {
 			Router:                                  c.Dest.Router.Address(),
 			MaxDataSize:                             1e5,
 			MaxTokensLength:                         5,
+			Afn:                                     c.Dest.AFN.Address(),
 		},
-		c.Dest.AFN.Address(),
 		[]common.Address{c.Source.LinkToken.Address()}, // source tokens
 		[]common.Address{c.Dest.Pool.Address()},        // pools
 		evm_2_evm_offramp.IAggregateRateLimiterRateLimiterConfig{
@@ -213,6 +213,7 @@ func (c *CCIPContracts) DeployNewOnRamp() {
 			MaxTokensLength: 5,
 			MaxGasLimit:     ccip.GasLimitPerTx,
 			FeeAdmin:        common.Address{},
+			Afn:             c.Source.AFN.Address(), // AFN
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampTokenAndPool{
 			{
@@ -220,8 +221,7 @@ func (c *CCIPContracts) DeployNewOnRamp() {
 				Pool:  c.Source.Pool.Address(),
 			},
 		},
-		[]common.Address{},     // allow list
-		c.Source.AFN.Address(), // AFN
+		[]common.Address{}, // allow list
 		evm_2_evm_onramp.IAggregateRateLimiterRateLimiterConfig{
 			Capacity: HundredLink,
 			Rate:     big.NewInt(1e18),
@@ -278,8 +278,8 @@ func (c *CCIPContracts) DeployNewCommitStore() {
 		},
 		commit_store.ICommitStoreDynamicConfig{
 			PriceRegistry: c.Dest.PriceRegistry.Address(),
+			Afn:           c.Dest.AFN.Address(), // AFN address
 		},
-		c.Dest.AFN.Address(), // AFN address
 	)
 	require.NoError(c.t, err)
 	c.Dest.Chain.Commit()
@@ -574,6 +574,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			MaxTokensLength: 5,
 			MaxGasLimit:     ccip.GasLimitPerTx,
 			FeeAdmin:        common.Address{},
+			Afn:             afnSourceAddress, // AFN
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampTokenAndPool{
 			{
@@ -582,7 +583,6 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			},
 		},
 		[]common.Address{}, // allow list
-		afnSourceAddress,   // AFN
 		evm_2_evm_onramp.IAggregateRateLimiterRateLimiterConfig{
 			Capacity: HundredLink,
 			Rate:     big.NewInt(1e18),
@@ -652,8 +652,8 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		},
 		commit_store.ICommitStoreDynamicConfig{
 			PriceRegistry: destPricesAddress,
+			Afn:           afnDestAddress, // AFN address
 		},
-		afnDestAddress, // AFN address
 	)
 	require.NoError(t, err)
 	commitStore, err := commit_store.NewCommitStore(commitStoreAddress, destChain)
@@ -684,8 +684,8 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			ExecutionDelaySeconds:                   0,
 			MaxDataSize:                             1e5,
 			MaxTokensLength:                         5,
+			Afn:                                     afnDestAddress,
 		},
-		afnDestAddress,
 		[]common.Address{sourceLinkTokenAddress},
 		[]common.Address{destPoolAddress},
 		evm_2_evm_offramp.IAggregateRateLimiterRateLimiterConfig{

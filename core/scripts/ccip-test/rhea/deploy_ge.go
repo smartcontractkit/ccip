@@ -143,10 +143,10 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId uint64,
 			MaxTokensLength: 5,
 			MaxGasLimit:     ccip.GasLimitPerTx,
 			FeeAdmin:        common.Address{},
+			Afn:             client.ChainConfig.Afn, // AFN
 		},
 		tokensAndPools,
-		[]common.Address{},     // allow list
-		client.ChainConfig.Afn, // AFN
+		[]common.Address{}, // allow list
 		evm_2_evm_onramp.IAggregateRateLimiterRateLimiterConfig{
 			Capacity: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 			Rate:     new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
@@ -209,8 +209,8 @@ func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainId uint
 			MaxDataSize:                             1e5,
 			MaxTokensLength:                         15,
 			PermissionLessExecutionThresholdSeconds: 60,
+			Afn:                                     client.ChainConfig.Afn,
 		},
-		client.ChainConfig.Afn,
 		syncedSourceTokens,
 		syncedDestPools,
 		evm_2_evm_offramp.IAggregateRateLimiterRateLimiterConfig{
@@ -256,8 +256,8 @@ func deployCommitStore(t *testing.T, client *EvmDeploymentConfig, sourceChainId 
 		},
 		commit_store.ICommitStoreDynamicConfig{
 			PriceRegistry: client.ChainConfig.PriceRegistry,
+			Afn:           client.ChainConfig.Afn, // AFN address
 		},
-		client.ChainConfig.Afn, // AFN address
 	)
 	shared.RequireNoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
