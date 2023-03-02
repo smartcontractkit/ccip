@@ -46,6 +46,8 @@ import (
 )
 
 const (
+	ChaosGroupExecution           = "ExecutionNodesAll"      // all execution nodes
+	ChaosGroupCommit              = "CommitNodesAll"         // all commit nodes
 	ChaosGroupCommitFaultyPlus    = "CommitMajority"         // >f number of nodes
 	ChaosGroupCommitFaulty        = "CommitMinority"         //  f number of nodes
 	ChaosGroupExecutionFaultyPlus = "ExecutionNodesMajority" // > f number of nodes
@@ -1417,12 +1419,16 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	env.execNodeStartIndex = 1
 	env.numOfAllowedFaultyExec = 1
 	env.numOfAllowedFaultyCommit = 1
+	env.numOfCommitNodes = numOfCommitNodes
+	env.numOfExecNodes = numOfCommitNodes
 	if !commitAndExecOnSameDON {
 		bootstrapExec = clNodes[1] // for a set-up of different commit and execution nodes second node is the bootstrapper for execution nodes
 		commitNodes = clNodes[2 : 2+numOfCommitNodes]
 		execNodes = clNodes[2+numOfCommitNodes:]
 		env.commitNodeStartIndex = 2
 		env.execNodeStartIndex = 7
+		env.numOfCommitNodes = len(commitNodes)
+		env.numOfExecNodes = len(execNodes)
 	}
 
 	err = CreateOCRJobsForCCIP(
@@ -1668,6 +1674,10 @@ type CCIPTestEnv struct {
 	commitNodeStartIndex     int
 	numOfAllowedFaultyCommit int
 	numOfAllowedFaultyExec   int
+	numOfCommitNodes         int
+	numOfExecNodes           int
+	SourceChainClient        blockchain.EVMClient
+	DestChainClient          blockchain.EVMClient
 	K8Env                    *environment.Environment
 	clNodeWithKeyReady       chan struct{} // denotes if the chainlink nodes are deployed, keys are created and ready to be used for job creation
 }
@@ -1679,6 +1689,10 @@ func (c *CCIPTestEnv) ChaosLabel(t *testing.T) {
 			"instance": strconv.Itoa(i),
 		}
 		// commit node starts from index 2
+		if i >= c.commitNodeStartIndex && i < c.commitNodeStartIndex+c.numOfCommitNodes {
+			err := c.K8Env.Client.LabelChaosGroupByLabels(c.K8Env.Cfg.Namespace, labelSelector, ChaosGroupCommit)
+			require.NoError(t, err)
+		}
 		if i >= c.commitNodeStartIndex && i < c.commitNodeStartIndex+c.numOfAllowedFaultyCommit+1 {
 			err := c.K8Env.Client.LabelChaosGroupByLabels(c.K8Env.Cfg.Namespace, labelSelector, ChaosGroupCommitFaultyPlus)
 			assert.NoError(t, err)
@@ -1686,6 +1700,10 @@ func (c *CCIPTestEnv) ChaosLabel(t *testing.T) {
 		if i >= c.commitNodeStartIndex && i < c.commitNodeStartIndex+c.numOfAllowedFaultyCommit {
 			err := c.K8Env.Client.LabelChaosGroupByLabels(c.K8Env.Cfg.Namespace, labelSelector, ChaosGroupCommitFaulty)
 			assert.NoError(t, err)
+		}
+		if i >= c.execNodeStartIndex && i < c.execNodeStartIndex+c.numOfExecNodes {
+			err := c.K8Env.Client.LabelChaosGroupByLabels(c.K8Env.Cfg.Namespace, labelSelector, ChaosGroupExecution)
+			require.NoError(t, err)
 		}
 		if i >= c.execNodeStartIndex && i < c.execNodeStartIndex+c.numOfAllowedFaultyExec+1 {
 			err := c.K8Env.Client.LabelChaosGroupByLabels(c.K8Env.Cfg.Namespace, labelSelector, ChaosGroupExecutionFaultyPlus)

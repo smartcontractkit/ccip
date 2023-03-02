@@ -118,6 +118,14 @@ test_chaos_network: install_gotestfmt ## Run all smoke tests
 test_chaos_verbose: ## Run all smoke tests with verbose logging
 	go test -timeout 24h -count=1 -v $(args) ./chaos
 
+.PHONY: test_chaos_ccip_pods_raw
+test_chaos_ccip_pods_raw:
+	go test -timeout 2h -v -count=1 $(args) -p 2 -run 'TestChaosCCIP/.*pod-chaos' ./chaos
+
+.PHONY: test_chaos_ccip_network_raw
+test_chaos_ccip_network_raw:
+	go test -timeout 2h -v -count=1 $(args) -p 2 -run 'TestChaosCCIP/.*network-chaos' ./chaos
+
 # Performance
 .PHONY: test_perf
 test_perf: test_need_operator_assets ## Run core node performance tests.
