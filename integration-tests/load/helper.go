@@ -43,8 +43,9 @@ func PopulateAndValidate(t *testing.T) *loadArgs {
 	}
 	if inputRps != "" {
 		rps, err := strconv.ParseInt(inputRps, 10, 64)
+		maxRps := int64(16)
 		require.NoError(t, err)
-		require.LessOrEqual(t, rps, 16, "rps too high")
+		require.LessOrEqual(t, rps, maxRps, "rps %d is too high - maximum value is %d", rps, maxRps)
 		p.rps = rps
 	}
 	if inputTimeout != "" {

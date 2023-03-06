@@ -64,7 +64,7 @@ jobs:
       - name: Checkout the repo
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
       - name: Build Image
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@e72f0a768ac934afce498a802de893d89b12802f # v2.1.1
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@ce87f8986ca18336cc5015df75916c2ec0a7c4b3 # v2.1.2
         env:
           GH_TOKEN: ${{ github.token }}
         with:
@@ -102,7 +102,7 @@ jobs:
       - name: Checkout the repo
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
       - name: build test runner
-        uses: smartcontractkit/chainlink-github-actions/docker/build-push@e72f0a768ac934afce498a802de893d89b12802f # v2.1.1
+        uses: smartcontractkit/chainlink-github-actions/docker/build-push@ce87f8986ca18336cc5015df75916c2ec0a7c4b3 # v2.1.2
         with:
           tags: ${{ env.ENV_JOB_IMAGE }}
           file: ./integration-tests/test.Dockerfile
@@ -135,10 +135,10 @@ jobs:
       TEST_ARGS: -test.timeout 130m
       DATABASE_URL: postgresql://postgres:node@localhost:5432/chainlink_test?sslmode=disable
       GH_TOKEN: ${{ github.token }}
-      TEST_LOAD_TEST_DURATION: ${{ inputs.duration }}
-      TEST_LOAD_TEST_CALLTIMEOUT: ${{ inputs.phase_time_out }}
-      TEST_LOAD_TEST_TPS: ${{ inputs.send_request_per_second }}
-      TEST_LOAD_TEST_MSG_TYPE: ${{ inputs.type-of-transfer }}
+      LOAD_TEST_DURATION: ${{ inputs.duration }}
+      LOAD_TEST_CALLTIMEOUT: ${{ inputs.phase_time_out }}
+      LOAD_TEST_TPS: ${{ inputs.send_request_per_second }}
+      LOAD_TEST_MSG_TYPE: ${{ inputs.type-of-transfer }}
     steps:
       - name: Checkout the repo
         uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # v3.1.0
@@ -146,7 +146,7 @@ jobs:
         run: |
           echo "TEST_GH_RUN_URL=https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}" >> $GITHUB_ENV
       - name: Run Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@e72f0a768ac934afce498a802de893d89b12802f # v2.1.1
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@ce87f8986ca18336cc5015df75916c2ec0a7c4b3 # v2.1.2
         with:
           test_command_to_run: make test_need_operator_assets && cd ./integration-tests && go test -v -timeout 130m -count=1 -run ^TestLoadCCIP ./load
           test_download_vendor_packages_command: make gomod
@@ -180,7 +180,7 @@ jobs:
       ## Run Cleanup if the job succeeds
       - name: cleanup
         if: always()
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/cleanup@e72f0a768ac934afce498a802de893d89b12802f # v2.1.1
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/cleanup@ce87f8986ca18336cc5015df75916c2ec0a7c4b3 # v2.1.2
         with:
           triggered_by: ${{ env.TEST_TRIGGERED_BY }}
       - name: Collect Metrics
@@ -227,7 +227,7 @@ jobs:
       - name: Checkout the repo
         uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # v3.1.0
       - name: Run Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@e72f0a768ac934afce498a802de893d89b12802f # v2.1.1
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@ce87f8986ca18336cc5015df75916c2ec0a7c4b3 # v2.1.2
         with:
           test_command_to_run: make test_need_operator_assets && cd ./integration-tests && go test -timeout 1h -count=1 -json -test.parallel 11 -run 'TestChaosCCIP' ./chaos 2>&1 | tee /tmp/gotest.log | gotestfmt
           test_download_vendor_packages_command: make gomod
@@ -247,6 +247,6 @@ jobs:
       ## Run Cleanup if the job succeeds
       - name: cleanup
         if: always()
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/cleanup@e72f0a768ac934afce498a802de893d89b12802f # v2.1.1
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/cleanup@ce87f8986ca18336cc5015df75916c2ec0a7c4b3 # v2.1.2
         with:
           triggered_by: ${{ env.TEST_TRIGGERED_BY }}
