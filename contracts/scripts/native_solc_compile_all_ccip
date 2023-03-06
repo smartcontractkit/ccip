@@ -33,6 +33,7 @@ compileContract ccip/applications/ReceiverDapp.sol
 compileContract ccip/applications/GovernanceDapp.sol
 compileContract ccip/applications/PingPongDemo.sol
 
+# Test helpers
 compileContract ccip/test/helpers/CommitStoreHelper.sol
 compileContract ccip/test/helpers/ramps/EVM2EVMOffRampHelper.sol
 compileContract ccip/test/helpers/CustomTokenPool.sol
@@ -40,3 +41,6 @@ compileContract ccip/test/helpers/receivers/SimpleMessageReceiver.sol
 compileContract ccip/test/helpers/receivers/MaybeRevertMessageReceiver.sol
 compileContract ccip/test/mocks/MockAFN.sol
 compileContract ccip/test/WETH9.sol
+
+# Customer contracts
+compileContract ccip/pools/tokens/CACHE.gold/CacheGoldChild.sol

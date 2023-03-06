@@ -39,12 +39,18 @@ type DeploySettings struct {
 	DeployedAt           uint64
 }
 
+type CustomerSettings struct {
+	CacheGoldFeeAddress  gethcommon.Address
+	CacheGoldFeeEnforcer gethcommon.Address
+}
+
 type Token string
 
 const (
-	LINK  Token = "Link"
-	WETH  Token = "WETH"
-	WAVAX Token = "WAVAX"
+	LINK      Token = "Link"
+	WETH      Token = "WETH"
+	WAVAX     Token = "WAVAX"
+	CACHEGOLD Token = "CACHE.gold"
 )
 
 func GetAllTokens() []Token {
@@ -65,6 +71,7 @@ type EVMChainConfig struct {
 	PriceRegistry   gethcommon.Address
 	AllowList       []gethcommon.Address
 	Confirmations   uint32
+	CustomerSettings
 }
 
 type EVMBridgedToken struct {

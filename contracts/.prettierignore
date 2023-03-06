@@ -37,3 +37,6 @@ venv/
 .github/**/*.yml
 .golangci.yml
 .solhint.json
+
+# customer contracts
+src/v0.8/ccip/pools/tokens/*
