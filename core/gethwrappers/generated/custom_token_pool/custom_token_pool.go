@@ -29,9 +29,14 @@ var (
 	_ = event.NewSubscription
 )
 
+type IPoolRampUpdate struct {
+	Ramp    common.Address
+	Allowed bool
+}
+
 var CustomTokenPoolMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"internalType\":\"contractIERC20\",\"name\":\"token\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"currentLimit\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"requested\",\"type\":\"uint256\"}],\"name\":\"ExceedsTokenLimit\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"NullAddressNotAllowed\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"PermissionsError\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"Burned\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"Locked\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"recipient\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"Minted\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"OwnershipTransferRequested\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"Paused\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"recipient\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"Released\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"SynthBurned\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"SynthMinted\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"Unpaused\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"acceptOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getToken\",\"outputs\":[{\"internalType\":\"contractIERC20\",\"name\":\"token\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"offRamp\",\"type\":\"address\"}],\"name\":\"isOffRamp\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"onRamp\",\"type\":\"address\"}],\"name\":\"isOnRamp\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"lockOrBurn\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"pause\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"paused\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"releaseOrMint\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"offRamp\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"permission\",\"type\":\"bool\"}],\"name\":\"setOffRamp\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"onRamp\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"permission\",\"type\":\"bool\"}],\"name\":\"setOnRamp\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"unpause\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
-	Bin: "0x60a060405234801561001057600080fd5b50604051610be6380380610be683398101604081905261002f916101a8565b8033806000816100865760405162461bcd60e51b815260206004820152601860248201527f43616e6e6f7420736574206f776e657220746f207a65726f000000000000000060448201526064015b60405180910390fd5b600080546001600160a01b0319166001600160a01b03848116919091179091558116156100b6576100b6816100ff565b50506001805460ff60a01b19169055506001600160a01b0381166100ed57604051634655efd160e11b815260040160405180910390fd5b6001600160a01b0316608052506101d8565b336001600160a01b038216036101575760405162461bcd60e51b815260206004820152601760248201527f43616e6e6f74207472616e7366657220746f2073656c66000000000000000000604482015260640161007d565b600180546001600160a01b0319166001600160a01b0383811691821790925560008054604051929316917fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae12789190a350565b6000602082840312156101ba57600080fd5b81516001600160a01b03811681146101d157600080fd5b9392505050565b6080516109f36101f3600039600061013401526109f36000f3fe608060405234801561001057600080fd5b50600436106100df5760003560e01c806379ba50971161008c578063cc8af2e811610066578063cc8af2e814610220578063e2e59b3e14610233578063ea6192a214610246578063f2fde38b1461025957600080fd5b806379ba5097146101f25780638456cb59146101fa5780638da5cb5b1461020257600080fd5b80635c975abb116100bd5780635c975abb1461018357806369e946d4146101a65780636f32b872146101b957600080fd5b80631d7a74a0146100e457806321df0da7146101325780633f4ba83a14610179575b600080fd5b61011d6100f2366004610932565b73ffffffffffffffffffffffffffffffffffffffff1660009081526003602052604090205460ff1690565b60405190151581526020015b60405180910390f35b7f00000000000000000000000000000000000000000000000000000000000000005b60405173ffffffffffffffffffffffffffffffffffffffff9091168152602001610129565b61018161026c565b005b60015474010000000000000000000000000000000000000000900460ff1661011d565b6101816101b4366004610954565b61027e565b61011d6101c7366004610932565b73ffffffffffffffffffffffffffffffffffffffff1660009081526002602052604090205460ff1690565b6101816102dc565b6101816103c4565b60005473ffffffffffffffffffffffffffffffffffffffff16610154565b61018161022e366004610954565b6103d4565b610181610241366004610990565b610432565b6101816102543660046109bc565b61051e565b610181610267366004610932565b610602565b610274610616565b61027c61067d565b565b610286610616565b73ffffffffffffffffffffffffffffffffffffffff91909116600090815260036020526040902080547fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0016911515919091179055565b60015473ffffffffffffffffffffffffffffffffffffffff1633146103485760405162461bcd60e51b815260206004820152601660248201527f4d7573742062652070726f706f736564206f776e65720000000000000000000060448201526064015b60405180910390fd5b60008054337fffffffffffffffffffffffff00000000000000000000000000000000000000008083168217845560018054909116905560405173ffffffffffffffffffffffffffffffffffffffff90921692909183917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e091a350565b6103cc610616565b61027c61075c565b6103dc610616565b73ffffffffffffffffffffffffffffffffffffffff91909116600090815260026020526040902080547fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0016911515919091179055565b60015474010000000000000000000000000000000000000000900460ff161561049d5760405162461bcd60e51b815260206004820152601060248201527f5061757361626c653a2070617573656400000000000000000000000000000000604482015260640161033f565b3360009081526002602052604090205460ff166104e6576040517f5307f5ab00000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b6040518281527f02992093bca69a36949677658a77d359b510dc6232c68f9f118f7c0127a1b147906020015b60405180910390a15050565b60015474010000000000000000000000000000000000000000900460ff16156105895760405162461bcd60e51b815260206004820152601060248201527f5061757361626c653a2070617573656400000000000000000000000000000000604482015260640161033f565b3360009081526003602052604090205460ff166105d2576040517f5307f5ab00000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b6040518181527fbb0b72e5f44e331506684da008a30e10d50658c29d8159f6c6ab40bf1e52e60090602001610512565b61060a610616565b6106138161082e565b50565b60005473ffffffffffffffffffffffffffffffffffffffff16331461027c5760405162461bcd60e51b815260206004820152601660248201527f4f6e6c792063616c6c61626c65206279206f776e657200000000000000000000604482015260640161033f565b60015474010000000000000000000000000000000000000000900460ff166106e75760405162461bcd60e51b815260206004820152601460248201527f5061757361626c653a206e6f7420706175736564000000000000000000000000604482015260640161033f565b600180547fffffffffffffffffffffff00ffffffffffffffffffffffffffffffffffffffff1690557f5db9ee0a495bf2e6ff9c91a7834c1ba4fdd244a5e8aa4e537bd38aeae4b073aa335b60405173ffffffffffffffffffffffffffffffffffffffff909116815260200160405180910390a1565b60015474010000000000000000000000000000000000000000900460ff16156107c75760405162461bcd60e51b815260206004820152601060248201527f5061757361626c653a2070617573656400000000000000000000000000000000604482015260640161033f565b600180547fffffffffffffffffffffff00ffffffffffffffffffffffffffffffffffffffff16740100000000000000000000000000000000000000001790557f62e78cea01bee320cd4e420270b5ea74000d11b0c9f74754ebdbfc544b05a2586107323390565b3373ffffffffffffffffffffffffffffffffffffffff8216036108935760405162461bcd60e51b815260206004820152601760248201527f43616e6e6f74207472616e7366657220746f2073656c66000000000000000000604482015260640161033f565b600180547fffffffffffffffffffffffff00000000000000000000000000000000000000001673ffffffffffffffffffffffffffffffffffffffff83811691821790925560008054604051929316917fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae12789190a350565b803573ffffffffffffffffffffffffffffffffffffffff8116811461092d57600080fd5b919050565b60006020828403121561094457600080fd5b61094d82610909565b9392505050565b6000806040838503121561096757600080fd5b61097083610909565b91506020830135801515811461098557600080fd5b809150509250929050565b600080604083850312156109a357600080fd5b823591506109b360208401610909565b90509250929050565b600080604083850312156109cf57600080fd5b6109d883610909565b94602093909301359350505056fea164736f6c634300080f000a",
+	ABI: "[{\"inputs\":[{\"internalType\":\"contractIERC20\",\"name\":\"token\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"currentLimit\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"requested\",\"type\":\"uint256\"}],\"name\":\"ExceedsTokenLimit\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"NullAddressNotAllowed\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"PermissionsError\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"Burned\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"Locked\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"recipient\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"Minted\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"onRamp\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"bool\",\"name\":\"allowed\",\"type\":\"bool\"}],\"name\":\"OffRampAllowanceSet\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"onRamp\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"bool\",\"name\":\"allowed\",\"type\":\"bool\"}],\"name\":\"OnRampAllowanceSet\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"OwnershipTransferRequested\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"Paused\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"recipient\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"Released\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"SynthBurned\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"SynthMinted\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"Unpaused\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"acceptOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"ramp\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"allowed\",\"type\":\"bool\"}],\"internalType\":\"structIPool.RampUpdate[]\",\"name\":\"onRamps\",\"type\":\"tuple[]\"},{\"components\":[{\"internalType\":\"address\",\"name\":\"ramp\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"allowed\",\"type\":\"bool\"}],\"internalType\":\"structIPool.RampUpdate[]\",\"name\":\"offRamps\",\"type\":\"tuple[]\"}],\"name\":\"applyRampUpdates\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getToken\",\"outputs\":[{\"internalType\":\"contractIERC20\",\"name\":\"token\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"offRamp\",\"type\":\"address\"}],\"name\":\"isOffRamp\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"onRamp\",\"type\":\"address\"}],\"name\":\"isOnRamp\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"lockOrBurn\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"pause\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"paused\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"releaseOrMint\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"unpause\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+	Bin: "0x60a060405234801561001057600080fd5b506040516110ee3803806110ee83398101604081905261002f916101a8565b8033806000816100865760405162461bcd60e51b815260206004820152601860248201527f43616e6e6f7420736574206f776e657220746f207a65726f000000000000000060448201526064015b60405180910390fd5b600080546001600160a01b0319166001600160a01b03848116919091179091558116156100b6576100b6816100ff565b50506001805460ff60a01b19169055506001600160a01b0381166100ed57604051634655efd160e11b815260040160405180910390fd5b6001600160a01b0316608052506101d8565b336001600160a01b038216036101575760405162461bcd60e51b815260206004820152601760248201527f43616e6e6f74207472616e7366657220746f2073656c66000000000000000000604482015260640161007d565b600180546001600160a01b0319166001600160a01b0383811691821790925560008054604051929316917fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae12789190a350565b6000602082840312156101ba57600080fd5b81516001600160a01b03811681146101d157600080fd5b9392505050565b608051610efb6101f360003960006101030152610efb6000f3fe608060405234801561001057600080fd5b50600436106100d45760003560e01c80638456cb5911610081578063e2e59b3e1161005b578063e2e59b3e146101c9578063ea6192a2146101dc578063f2fde38b146101ef57600080fd5b80638456cb59146101905780638da5cb5b14610198578063af519112146101b657600080fd5b80635c975abb116100b25780635c975abb146101525780636f32b8721461017557806379ba50971461018857600080fd5b80631d7a74a0146100d957806321df0da7146101015780633f4ba83a14610148575b600080fd5b6100ec6100e7366004610bdc565b610202565b60405190151581526020015b60405180910390f35b7f00000000000000000000000000000000000000000000000000000000000000005b60405173ffffffffffffffffffffffffffffffffffffffff90911681526020016100f8565b610150610215565b005b60015474010000000000000000000000000000000000000000900460ff166100ec565b6100ec610183366004610bdc565b610227565b610150610234565b61015061031c565b60005473ffffffffffffffffffffffffffffffffffffffff16610123565b6101506101c4366004610d58565b61032c565b6101506101d7366004610dbc565b610538565b6101506101ea366004610de8565b61061a565b6101506101fd366004610bdc565b6106f4565b600061020f600483610708565b92915050565b61021d61073a565b6102256107a1565b565b600061020f600283610708565b60015473ffffffffffffffffffffffffffffffffffffffff1633146102a05760405162461bcd60e51b815260206004820152601660248201527f4d7573742062652070726f706f736564206f776e65720000000000000000000060448201526064015b60405180910390fd5b60008054337fffffffffffffffffffffffff00000000000000000000000000000000000000008083168217845560018054909116905560405173ffffffffffffffffffffffffffffffffffffffff90921692909183917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e091a350565b61032461073a565b610225610880565b61033461073a565b60005b825181101561043357600083828151811061035457610354610e12565b6020026020010151905080602001511561037c57805161037690600290610952565b5061038c565b805161038a90600290610974565b505b7fbceff8f229c6dfcbf8bdcfb18726b84b0fd249b4803deb3948ff34d9040136628483815181106103bf576103bf610e12565b6020026020010151600001518584815181106103dd576103dd610e12565b60200260200101516020015160405161041a92919073ffffffffffffffffffffffffffffffffffffffff9290921682521515602082015260400190565b60405180910390a15061042c81610e70565b9050610337565b5060005b815181101561053357600082828151811061045457610454610e12565b6020026020010151905080602001511561047c57805161047690600490610952565b5061048c565b805161048a90600490610974565b505b7fd8c3333ded377884ced3869cd0bcb9be54ea664076df1f5d39c46891203136488383815181106104bf576104bf610e12565b6020026020010151600001518484815181106104dd576104dd610e12565b60200260200101516020015160405161051a92919073ffffffffffffffffffffffffffffffffffffffff9290921682521515602082015260400190565b60405180910390a15061052c81610e70565b9050610437565b505050565b60015474010000000000000000000000000000000000000000900460ff16156105a35760405162461bcd60e51b815260206004820152601060248201527f5061757361626c653a20706175736564000000000000000000000000000000006044820152606401610297565b6105ac33610227565b6105e2576040517f5307f5ab00000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b6040518281527f02992093bca69a36949677658a77d359b510dc6232c68f9f118f7c0127a1b147906020015b60405180910390a15050565b60015474010000000000000000000000000000000000000000900460ff16156106855760405162461bcd60e51b815260206004820152601060248201527f5061757361626c653a20706175736564000000000000000000000000000000006044820152606401610297565b61068e33610202565b6106c4576040517f5307f5ab00000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b6040518181527fbb0b72e5f44e331506684da008a30e10d50658c29d8159f6c6ab40bf1e52e6009060200161060e565b6106fc61073a565b61070581610996565b50565b73ffffffffffffffffffffffffffffffffffffffff8116600090815260018301602052604081205415155b9392505050565b60005473ffffffffffffffffffffffffffffffffffffffff1633146102255760405162461bcd60e51b815260206004820152601660248201527f4f6e6c792063616c6c61626c65206279206f776e6572000000000000000000006044820152606401610297565b60015474010000000000000000000000000000000000000000900460ff1661080b5760405162461bcd60e51b815260206004820152601460248201527f5061757361626c653a206e6f74207061757365640000000000000000000000006044820152606401610297565b600180547fffffffffffffffffffffff00ffffffffffffffffffffffffffffffffffffffff1690557f5db9ee0a495bf2e6ff9c91a7834c1ba4fdd244a5e8aa4e537bd38aeae4b073aa335b60405173ffffffffffffffffffffffffffffffffffffffff909116815260200160405180910390a1565b60015474010000000000000000000000000000000000000000900460ff16156108eb5760405162461bcd60e51b815260206004820152601060248201527f5061757361626c653a20706175736564000000000000000000000000000000006044820152606401610297565b600180547fffffffffffffffffffffff00ffffffffffffffffffffffffffffffffffffffff16740100000000000000000000000000000000000000001790557f62e78cea01bee320cd4e420270b5ea74000d11b0c9f74754ebdbfc544b05a2586108563390565b60006107338373ffffffffffffffffffffffffffffffffffffffff8416610a71565b60006107338373ffffffffffffffffffffffffffffffffffffffff8416610ac0565b3373ffffffffffffffffffffffffffffffffffffffff8216036109fb5760405162461bcd60e51b815260206004820152601760248201527f43616e6e6f74207472616e7366657220746f2073656c660000000000000000006044820152606401610297565b600180547fffffffffffffffffffffffff00000000000000000000000000000000000000001673ffffffffffffffffffffffffffffffffffffffff83811691821790925560008054604051929316917fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae12789190a350565b6000818152600183016020526040812054610ab85750815460018181018455600084815260208082209093018490558454848252828601909352604090209190915561020f565b50600061020f565b60008181526001830160205260408120548015610ba9576000610ae4600183610ea8565b8554909150600090610af890600190610ea8565b9050818114610b5d576000866000018281548110610b1857610b18610e12565b9060005260206000200154905080876000018481548110610b3b57610b3b610e12565b6000918252602080832090910192909255918252600188019052604090208390555b8554869080610b6e57610b6e610ebf565b60019003818190600052602060002001600090559055856001016000868152602001908152602001600020600090556001935050505061020f565b600091505061020f565b803573ffffffffffffffffffffffffffffffffffffffff81168114610bd757600080fd5b919050565b600060208284031215610bee57600080fd5b61073382610bb3565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b6040805190810167ffffffffffffffff81118282101715610c4957610c49610bf7565b60405290565b604051601f82017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe016810167ffffffffffffffff81118282101715610c9657610c96610bf7565b604052919050565b600082601f830112610caf57600080fd5b8135602067ffffffffffffffff821115610ccb57610ccb610bf7565b610cd9818360051b01610c4f565b82815260069290921b84018101918181019086841115610cf857600080fd5b8286015b84811015610d4d5760408189031215610d155760008081fd5b610d1d610c26565b610d2682610bb3565b8152848201358015158114610d3b5760008081fd5b81860152835291830191604001610cfc565b509695505050505050565b60008060408385031215610d6b57600080fd5b823567ffffffffffffffff80821115610d8357600080fd5b610d8f86838701610c9e565b93506020850135915080821115610da557600080fd5b50610db285828601610c9e565b9150509250929050565b60008060408385031215610dcf57600080fd5b82359150610ddf60208401610bb3565b90509250929050565b60008060408385031215610dfb57600080fd5b610e0483610bb3565b946020939093013593505050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603260045260246000fd5b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b60007fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8203610ea157610ea1610e41565b5060010190565b600082821015610eba57610eba610e41565b500390565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603160045260246000fdfea164736f6c634300080f000a",
 }
 
 var CustomTokenPoolABI = CustomTokenPoolMetaData.ABI
@@ -292,6 +297,18 @@ func (_CustomTokenPool *CustomTokenPoolTransactorSession) AcceptOwnership() (*ty
 	return _CustomTokenPool.Contract.AcceptOwnership(&_CustomTokenPool.TransactOpts)
 }
 
+func (_CustomTokenPool *CustomTokenPoolTransactor) ApplyRampUpdates(opts *bind.TransactOpts, onRamps []IPoolRampUpdate, offRamps []IPoolRampUpdate) (*types.Transaction, error) {
+	return _CustomTokenPool.contract.Transact(opts, "applyRampUpdates", onRamps, offRamps)
+}
+
+func (_CustomTokenPool *CustomTokenPoolSession) ApplyRampUpdates(onRamps []IPoolRampUpdate, offRamps []IPoolRampUpdate) (*types.Transaction, error) {
+	return _CustomTokenPool.Contract.ApplyRampUpdates(&_CustomTokenPool.TransactOpts, onRamps, offRamps)
+}
+
+func (_CustomTokenPool *CustomTokenPoolTransactorSession) ApplyRampUpdates(onRamps []IPoolRampUpdate, offRamps []IPoolRampUpdate) (*types.Transaction, error) {
+	return _CustomTokenPool.Contract.ApplyRampUpdates(&_CustomTokenPool.TransactOpts, onRamps, offRamps)
+}
+
 func (_CustomTokenPool *CustomTokenPoolTransactor) LockOrBurn(opts *bind.TransactOpts, amount *big.Int, arg1 common.Address) (*types.Transaction, error) {
 	return _CustomTokenPool.contract.Transact(opts, "lockOrBurn", amount, arg1)
 }
@@ -326,30 +343,6 @@ func (_CustomTokenPool *CustomTokenPoolSession) ReleaseOrMint(arg0 common.Addres
 
 func (_CustomTokenPool *CustomTokenPoolTransactorSession) ReleaseOrMint(arg0 common.Address, amount *big.Int) (*types.Transaction, error) {
 	return _CustomTokenPool.Contract.ReleaseOrMint(&_CustomTokenPool.TransactOpts, arg0, amount)
-}
-
-func (_CustomTokenPool *CustomTokenPoolTransactor) SetOffRamp(opts *bind.TransactOpts, offRamp common.Address, permission bool) (*types.Transaction, error) {
-	return _CustomTokenPool.contract.Transact(opts, "setOffRamp", offRamp, permission)
-}
-
-func (_CustomTokenPool *CustomTokenPoolSession) SetOffRamp(offRamp common.Address, permission bool) (*types.Transaction, error) {
-	return _CustomTokenPool.Contract.SetOffRamp(&_CustomTokenPool.TransactOpts, offRamp, permission)
-}
-
-func (_CustomTokenPool *CustomTokenPoolTransactorSession) SetOffRamp(offRamp common.Address, permission bool) (*types.Transaction, error) {
-	return _CustomTokenPool.Contract.SetOffRamp(&_CustomTokenPool.TransactOpts, offRamp, permission)
-}
-
-func (_CustomTokenPool *CustomTokenPoolTransactor) SetOnRamp(opts *bind.TransactOpts, onRamp common.Address, permission bool) (*types.Transaction, error) {
-	return _CustomTokenPool.contract.Transact(opts, "setOnRamp", onRamp, permission)
-}
-
-func (_CustomTokenPool *CustomTokenPoolSession) SetOnRamp(onRamp common.Address, permission bool) (*types.Transaction, error) {
-	return _CustomTokenPool.Contract.SetOnRamp(&_CustomTokenPool.TransactOpts, onRamp, permission)
-}
-
-func (_CustomTokenPool *CustomTokenPoolTransactorSession) SetOnRamp(onRamp common.Address, permission bool) (*types.Transaction, error) {
-	return _CustomTokenPool.Contract.SetOnRamp(&_CustomTokenPool.TransactOpts, onRamp, permission)
 }
 
 func (_CustomTokenPool *CustomTokenPoolTransactor) TransferOwnership(opts *bind.TransactOpts, to common.Address) (*types.Transaction, error) {
@@ -763,6 +756,242 @@ func (_CustomTokenPool *CustomTokenPoolFilterer) WatchMinted(opts *bind.WatchOpt
 func (_CustomTokenPool *CustomTokenPoolFilterer) ParseMinted(log types.Log) (*CustomTokenPoolMinted, error) {
 	event := new(CustomTokenPoolMinted)
 	if err := _CustomTokenPool.contract.UnpackLog(event, "Minted", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type CustomTokenPoolOffRampAllowanceSetIterator struct {
+	Event *CustomTokenPoolOffRampAllowanceSet
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *CustomTokenPoolOffRampAllowanceSetIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(CustomTokenPoolOffRampAllowanceSet)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(CustomTokenPoolOffRampAllowanceSet)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *CustomTokenPoolOffRampAllowanceSetIterator) Error() error {
+	return it.fail
+}
+
+func (it *CustomTokenPoolOffRampAllowanceSetIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type CustomTokenPoolOffRampAllowanceSet struct {
+	OnRamp  common.Address
+	Allowed bool
+	Raw     types.Log
+}
+
+func (_CustomTokenPool *CustomTokenPoolFilterer) FilterOffRampAllowanceSet(opts *bind.FilterOpts) (*CustomTokenPoolOffRampAllowanceSetIterator, error) {
+
+	logs, sub, err := _CustomTokenPool.contract.FilterLogs(opts, "OffRampAllowanceSet")
+	if err != nil {
+		return nil, err
+	}
+	return &CustomTokenPoolOffRampAllowanceSetIterator{contract: _CustomTokenPool.contract, event: "OffRampAllowanceSet", logs: logs, sub: sub}, nil
+}
+
+func (_CustomTokenPool *CustomTokenPoolFilterer) WatchOffRampAllowanceSet(opts *bind.WatchOpts, sink chan<- *CustomTokenPoolOffRampAllowanceSet) (event.Subscription, error) {
+
+	logs, sub, err := _CustomTokenPool.contract.WatchLogs(opts, "OffRampAllowanceSet")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(CustomTokenPoolOffRampAllowanceSet)
+				if err := _CustomTokenPool.contract.UnpackLog(event, "OffRampAllowanceSet", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_CustomTokenPool *CustomTokenPoolFilterer) ParseOffRampAllowanceSet(log types.Log) (*CustomTokenPoolOffRampAllowanceSet, error) {
+	event := new(CustomTokenPoolOffRampAllowanceSet)
+	if err := _CustomTokenPool.contract.UnpackLog(event, "OffRampAllowanceSet", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type CustomTokenPoolOnRampAllowanceSetIterator struct {
+	Event *CustomTokenPoolOnRampAllowanceSet
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *CustomTokenPoolOnRampAllowanceSetIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(CustomTokenPoolOnRampAllowanceSet)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(CustomTokenPoolOnRampAllowanceSet)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *CustomTokenPoolOnRampAllowanceSetIterator) Error() error {
+	return it.fail
+}
+
+func (it *CustomTokenPoolOnRampAllowanceSetIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type CustomTokenPoolOnRampAllowanceSet struct {
+	OnRamp  common.Address
+	Allowed bool
+	Raw     types.Log
+}
+
+func (_CustomTokenPool *CustomTokenPoolFilterer) FilterOnRampAllowanceSet(opts *bind.FilterOpts) (*CustomTokenPoolOnRampAllowanceSetIterator, error) {
+
+	logs, sub, err := _CustomTokenPool.contract.FilterLogs(opts, "OnRampAllowanceSet")
+	if err != nil {
+		return nil, err
+	}
+	return &CustomTokenPoolOnRampAllowanceSetIterator{contract: _CustomTokenPool.contract, event: "OnRampAllowanceSet", logs: logs, sub: sub}, nil
+}
+
+func (_CustomTokenPool *CustomTokenPoolFilterer) WatchOnRampAllowanceSet(opts *bind.WatchOpts, sink chan<- *CustomTokenPoolOnRampAllowanceSet) (event.Subscription, error) {
+
+	logs, sub, err := _CustomTokenPool.contract.WatchLogs(opts, "OnRampAllowanceSet")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(CustomTokenPoolOnRampAllowanceSet)
+				if err := _CustomTokenPool.contract.UnpackLog(event, "OnRampAllowanceSet", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_CustomTokenPool *CustomTokenPoolFilterer) ParseOnRampAllowanceSet(log types.Log) (*CustomTokenPoolOnRampAllowanceSet, error) {
+	event := new(CustomTokenPoolOnRampAllowanceSet)
+	if err := _CustomTokenPool.contract.UnpackLog(event, "OnRampAllowanceSet", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
@@ -1654,6 +1883,10 @@ func (_CustomTokenPool *CustomTokenPool) ParseLog(log types.Log) (generated.Abig
 		return _CustomTokenPool.ParseLocked(log)
 	case _CustomTokenPool.abi.Events["Minted"].ID:
 		return _CustomTokenPool.ParseMinted(log)
+	case _CustomTokenPool.abi.Events["OffRampAllowanceSet"].ID:
+		return _CustomTokenPool.ParseOffRampAllowanceSet(log)
+	case _CustomTokenPool.abi.Events["OnRampAllowanceSet"].ID:
+		return _CustomTokenPool.ParseOnRampAllowanceSet(log)
 	case _CustomTokenPool.abi.Events["OwnershipTransferRequested"].ID:
 		return _CustomTokenPool.ParseOwnershipTransferRequested(log)
 	case _CustomTokenPool.abi.Events["OwnershipTransferred"].ID:
@@ -1684,6 +1917,14 @@ func (CustomTokenPoolLocked) Topic() common.Hash {
 
 func (CustomTokenPoolMinted) Topic() common.Hash {
 	return common.HexToHash("0x9d228d69b5fdb8d273a2336f8fb8612d039631024ea9bf09c424a9503aa078f0")
+}
+
+func (CustomTokenPoolOffRampAllowanceSet) Topic() common.Hash {
+	return common.HexToHash("0xd8c3333ded377884ced3869cd0bcb9be54ea664076df1f5d39c4689120313648")
+}
+
+func (CustomTokenPoolOnRampAllowanceSet) Topic() common.Hash {
+	return common.HexToHash("0xbceff8f229c6dfcbf8bdcfb18726b84b0fd249b4803deb3948ff34d904013662")
 }
 
 func (CustomTokenPoolOwnershipTransferRequested) Topic() common.Hash {
@@ -1731,15 +1972,13 @@ type CustomTokenPoolInterface interface {
 
 	AcceptOwnership(opts *bind.TransactOpts) (*types.Transaction, error)
 
+	ApplyRampUpdates(opts *bind.TransactOpts, onRamps []IPoolRampUpdate, offRamps []IPoolRampUpdate) (*types.Transaction, error)
+
 	LockOrBurn(opts *bind.TransactOpts, amount *big.Int, arg1 common.Address) (*types.Transaction, error)
 
 	Pause(opts *bind.TransactOpts) (*types.Transaction, error)
 
 	ReleaseOrMint(opts *bind.TransactOpts, arg0 common.Address, amount *big.Int) (*types.Transaction, error)
-
-	SetOffRamp(opts *bind.TransactOpts, offRamp common.Address, permission bool) (*types.Transaction, error)
-
-	SetOnRamp(opts *bind.TransactOpts, onRamp common.Address, permission bool) (*types.Transaction, error)
 
 	TransferOwnership(opts *bind.TransactOpts, to common.Address) (*types.Transaction, error)
 
@@ -1762,6 +2001,18 @@ type CustomTokenPoolInterface interface {
 	WatchMinted(opts *bind.WatchOpts, sink chan<- *CustomTokenPoolMinted, sender []common.Address, recipient []common.Address) (event.Subscription, error)
 
 	ParseMinted(log types.Log) (*CustomTokenPoolMinted, error)
+
+	FilterOffRampAllowanceSet(opts *bind.FilterOpts) (*CustomTokenPoolOffRampAllowanceSetIterator, error)
+
+	WatchOffRampAllowanceSet(opts *bind.WatchOpts, sink chan<- *CustomTokenPoolOffRampAllowanceSet) (event.Subscription, error)
+
+	ParseOffRampAllowanceSet(log types.Log) (*CustomTokenPoolOffRampAllowanceSet, error)
+
+	FilterOnRampAllowanceSet(opts *bind.FilterOpts) (*CustomTokenPoolOnRampAllowanceSetIterator, error)
+
+	WatchOnRampAllowanceSet(opts *bind.WatchOpts, sink chan<- *CustomTokenPoolOnRampAllowanceSet) (event.Subscription, error)
+
+	ParseOnRampAllowanceSet(log types.Log) (*CustomTokenPoolOnRampAllowanceSet, error)
 
 	FilterOwnershipTransferRequested(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*CustomTokenPoolOwnershipTransferRequestedIterator, error)
 

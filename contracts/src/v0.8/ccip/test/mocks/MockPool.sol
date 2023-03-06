@@ -19,6 +19,8 @@ contract MockPool is IPool {
     emit Released(msg.sender, recipient, amount);
   }
 
+  function applyRampUpdates(RampUpdate[] memory, RampUpdate[] memory) public {}
+
   function getToken() external view override returns (IERC20 pool) {}
 
   function pause() external override {}

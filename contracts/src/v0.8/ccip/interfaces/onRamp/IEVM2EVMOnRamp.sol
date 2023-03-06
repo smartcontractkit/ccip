@@ -25,7 +25,7 @@ interface IEVM2EVMOnRamp is IEVM2AnyOnRamp {
   error RouterMustSetOriginalSender();
   error InvalidTokenPoolConfig();
   error PoolAlreadyAdded();
-  error PoolDoesNotExist(IERC20 token);
+  error PoolDoesNotExist(address token);
   error TokenPoolMismatch();
   error TokenOrChainNotSupported(address token, uint64 chain);
   error SenderNotAllowed(address sender);
@@ -42,8 +42,8 @@ interface IEVM2EVMOnRamp is IEVM2AnyOnRamp {
   event FeeConfigSet(FeeTokenConfigArgs[] feeConfig);
   event CCIPSendRequested(Internal.EVM2EVMMessage message);
   event NopsSet(uint256 nopWeightsTotal, NopAndWeight[] nopsAndWeights);
-  event PoolAdded(IERC20 token, IPool pool);
-  event PoolRemoved(IERC20 token, IPool pool);
+  event PoolAdded(address token, address pool);
+  event PoolRemoved(address token, address pool);
 
   /// @dev Struct that contains the static configuration
   struct StaticConfig {

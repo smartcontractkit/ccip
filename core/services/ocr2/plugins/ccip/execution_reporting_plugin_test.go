@@ -159,7 +159,7 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	require.NoError(t, err)
 	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(offRampAddress, destChain)
 	require.NoError(t, err)
-	_, err = destPool.SetOffRamp(destUser, offRampAddress, true)
+	_, err = destPool.ApplyRampUpdates(destUser, []lock_release_token_pool.IPoolRampUpdate{}, []lock_release_token_pool.IPoolRampUpdate{{Ramp: offRampAddress, Allowed: true}})
 	require.NoError(t, err)
 	receiverAddress, _, _, err := simple_message_receiver.DeploySimpleMessageReceiver(destUser, destChain)
 	require.NoError(t, err)

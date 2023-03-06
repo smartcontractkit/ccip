@@ -503,36 +503,83 @@ contract EVM2EVMOnRamp_getTokenPool is EVM2EVMOnRampSetup {
   }
 }
 
-contract EVM2EVMOnRamp_addPool is EVM2EVMOnRampSetup {
+contract EVM2EVMOnRamp_applyPoolUpdates is EVM2EVMOnRampSetup {
+  event PoolAdded(address token, address pool);
+  event PoolRemoved(address token, address pool);
+
   // Success
-  function testSuccess() public {
-    IPool pool = IPool(address(99));
-    IERC20 token = IERC20(address(98));
+  function testApplyPoolUpdatesSuccess() public {
+    Internal.PoolUpdate[] memory adds = new Internal.PoolUpdate[](1);
+    adds[0] = Internal.PoolUpdate({token: address(1), pool: address(2)});
 
-    s_onRamp.addPool(token, pool);
+    vm.expectEmit(false, false, false, true);
+    emit PoolAdded(adds[0].token, adds[0].pool);
 
-    assertEq(address(pool), address(s_onRamp.getPoolBySourceToken(token)));
+    s_onRamp.applyPoolUpdates(adds, new Internal.PoolUpdate[](0));
+
+    assertEq(adds[0].pool, address(s_onRamp.getPoolBySourceToken(IERC20(adds[0].token))));
+
+    vm.expectEmit(false, false, false, true);
+    emit PoolRemoved(adds[0].token, adds[0].pool);
+
+    s_onRamp.applyPoolUpdates(new Internal.PoolUpdate[](0), adds);
+
+    vm.expectRevert(abi.encodeWithSelector(IEVM2EVMOnRamp.UnsupportedToken.selector, adds[0].token));
+    s_onRamp.getPoolBySourceToken(IERC20(adds[0].token));
   }
 
   // Reverts
   function testOnlyCallableByOwnerReverts() public {
-    IPool pool = IPool(s_sourcePools[0]);
-    IERC20 token = IERC20(s_sourceTokens[0]);
-
     changePrank(STRANGER);
 
     vm.expectRevert("Only callable by owner");
 
-    s_onRamp.addPool(token, pool);
+    s_onRamp.applyPoolUpdates(new Internal.PoolUpdate[](0), new Internal.PoolUpdate[](0));
   }
 
   function testPoolAlreadyExistsReverts() public {
-    IPool pool = IPool(s_sourcePools[0]);
-    IERC20 token = IERC20(s_sourceTokens[0]);
+    Internal.PoolUpdate[] memory adds = new Internal.PoolUpdate[](2);
+    adds[0] = Internal.PoolUpdate({token: address(1), pool: address(2)});
+    adds[1] = Internal.PoolUpdate({token: address(1), pool: address(2)});
 
-    vm.expectRevert(abi.encodeWithSelector(IEVM2EVMOnRamp.PoolAlreadyAdded.selector));
+    vm.expectRevert(IEVM2EVMOnRamp.PoolAlreadyAdded.selector);
 
-    s_onRamp.addPool(token, pool);
+    s_onRamp.applyPoolUpdates(adds, new Internal.PoolUpdate[](0));
+  }
+
+  function testInvalidTokenPoolConfigReverts() public {
+    Internal.PoolUpdate[] memory adds = new Internal.PoolUpdate[](1);
+    adds[0] = Internal.PoolUpdate({token: address(0), pool: address(2)});
+
+    vm.expectRevert(IEVM2EVMOnRamp.InvalidTokenPoolConfig.selector);
+
+    s_onRamp.applyPoolUpdates(adds, new Internal.PoolUpdate[](0));
+
+    adds[0] = Internal.PoolUpdate({token: address(1), pool: address(0)});
+
+    vm.expectRevert(IEVM2EVMOnRamp.InvalidTokenPoolConfig.selector);
+
+    s_onRamp.applyPoolUpdates(adds, new Internal.PoolUpdate[](0));
+  }
+
+  function testPoolDoesNotExistReverts() public {
+    Internal.PoolUpdate[] memory removes = new Internal.PoolUpdate[](1);
+    removes[0] = Internal.PoolUpdate({token: address(1), pool: address(2)});
+
+    vm.expectRevert(abi.encodeWithSelector(IEVM2EVMOnRamp.PoolDoesNotExist.selector, removes[0].token));
+
+    s_onRamp.applyPoolUpdates(new Internal.PoolUpdate[](0), removes);
+  }
+
+  function testTokenPoolMismatchReverts() public {
+    Internal.PoolUpdate[] memory adds = new Internal.PoolUpdate[](1);
+    adds[0] = Internal.PoolUpdate({token: address(1), pool: address(2)});
+    Internal.PoolUpdate[] memory removes = new Internal.PoolUpdate[](1);
+    removes[0] = Internal.PoolUpdate({token: address(1), pool: address(20)});
+
+    vm.expectRevert(IEVM2EVMOnRamp.TokenPoolMismatch.selector);
+
+    s_onRamp.applyPoolUpdates(adds, removes);
   }
 }
 
@@ -544,7 +591,10 @@ contract EVM2EVMOnRamp_getSupportedTokens is EVM2EVMOnRampSetup {
 
     assertEq(s_sourceTokens, supportedTokens);
 
-    s_onRamp.removePool(IERC20(s_sourceTokens[0]), IPool(s_sourcePools[0]));
+    Internal.PoolUpdate[] memory removes = new Internal.PoolUpdate[](1);
+    removes[0] = Internal.PoolUpdate({token: s_sourceTokens[0], pool: s_sourcePools[0]});
+
+    s_onRamp.applyPoolUpdates(new Internal.PoolUpdate[](0), removes);
 
     supportedTokens = s_onRamp.getSupportedTokens();
 

@@ -1,7 +1,7 @@
 {
   "acceptOwnership()": "79ba5097",
-  "addPool(address,address)": "eb511dd4",
   "applyAllowListUpdates(address[],address[])": "54c8a4f3",
+  "applyPoolUpdates((address,address)[],(address,address)[])": "3a87ac53",
   "calculateCurrentTokenBucketState()": "90c2339b",
   "forwardFromRouter((bytes,bytes,(address,uint256)[],address,bytes),uint256,address)": "a7d3e02f",
   "getAllowList()": "a7cd63b7",
@@ -23,7 +23,6 @@
   "pause()": "8456cb59",
   "paused()": "5c975abb",
   "payNops()": "eff7cc48",
-  "removePool(address,address)": "744b92e2",
   "setAllowListEnabled(bool)": "efeadb6d",
   "setDynamicConfig((address,address,uint32,uint64,uint16,address,address))": "cb18476d",
   "setFeeConfig((address,uint64,uint96,uint32)[])": "68d8f142",

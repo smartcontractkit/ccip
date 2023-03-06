@@ -71,8 +71,11 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup {
     offRampUpdates[0] = IRouter.OffRampUpdate({sourceChainId: SOURCE_CHAIN_ID, offRamps: s_offRamps});
     s_destRouter.applyRampUpdates(onRampUpdates, offRampUpdates);
 
-    LockReleaseTokenPool(address(s_destPools[0])).setOffRamp(address(s_offRamp), true);
-    LockReleaseTokenPool(address(s_destPools[1])).setOffRamp(address(s_offRamp), true);
+    IPool.RampUpdate[] memory offRamps = new IPool.RampUpdate[](1);
+    offRamps[0] = IPool.RampUpdate({ramp: address(s_offRamp), allowed: true});
+
+    LockReleaseTokenPool(address(s_destPools[0])).applyRampUpdates(new IPool.RampUpdate[](0), offRamps);
+    LockReleaseTokenPool(address(s_destPools[1])).applyRampUpdates(new IPool.RampUpdate[](0), offRamps);
   }
 
   function _convertToGeneralMessage(Internal.EVM2EVMMessage memory original)

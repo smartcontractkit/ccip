@@ -1,6 +1,6 @@
 {
   "acceptOwnership()": "79ba5097",
-  "addPool(address,address)": "eb511dd4",
+  "applyPoolUpdates((address,address)[],(address,address)[])": "3a87ac53",
   "calculateCurrentTokenBucketState()": "90c2339b",
   "ccipReceive((bytes32,uint64,bytes,bytes,(address,uint256)[]))": "85572ffb",
   "executeSingleMessage((uint64,uint64,uint256,address,uint64,uint256,bool,address,bytes,(address,uint256)[],address,bytes32),bool)": "abc39f1f",
@@ -23,7 +23,6 @@
   "owner()": "8da5cb5b",
   "pause()": "8456cb59",
   "paused()": "5c975abb",
-  "removePool(address,address)": "744b92e2",
   "setDynamicConfig((uint32,uint64,address,uint32,uint16,address))": "7499693a",
   "setOCR2Config(address[],address[],uint8,bytes,uint64,bytes)": "1ef38174",
   "setPrices(address[],uint256[])": "4352fa9f",

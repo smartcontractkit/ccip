@@ -16,6 +16,11 @@ library Internal {
     uint128 usdPerToken; // USD per unit of token
   }
 
+  struct PoolUpdate {
+    address token; // The IERC20 token address
+    address pool; // The token pool address
+  }
+
   struct ExecutionReport {
     uint64[] sequenceNumbers;
     bytes[] encodedMessages;

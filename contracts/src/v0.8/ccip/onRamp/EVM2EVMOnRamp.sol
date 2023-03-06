@@ -12,12 +12,12 @@ import {IAggregateRateLimiter} from "../interfaces/rateLimiter/IAggregateRateLim
 import {AggregateRateLimiter} from "../rateLimiter/AggregateRateLimiter.sol";
 import {Client} from "../models/Client.sol";
 import {Internal} from "../models/Internal.sol";
+import {EnumerableMapAddresses} from "../../libraries/internal/EnumerableMapAddresses.sol";
 
 import {SafeERC20} from "../../vendor/SafeERC20.sol";
 import {IERC20} from "../../vendor/IERC20.sol";
-import {EnumerableMap} from "../../vendor/openzeppelin-solidity/v4.7.3/contracts/utils/structs/EnumerableMap.sol";
-import {EnumerableMapAddresses} from "../../libraries/internal/EnumerableMapAddresses.sol";
 import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v4.7.3/contracts/utils/structs/EnumerableSet.sol";
+import {EnumerableMap} from "../../vendor/openzeppelin-solidity/v4.7.3/contracts/utils/structs/EnumerableMap.sol";
 import {Pausable} from "../../vendor/Pausable.sol";
 
 contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAndVersionInterface {
@@ -285,28 +285,30 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAn
     return s_nopFeesJuels;
   }
 
-  /// @notice Add a new token pool
-  /// @param token The source token
-  /// @param pool The pool that will be used
+  /// #@inheritdoc IEVM2AnyOnRamp
   /// @dev This method can only be called by the owner of the contract.
-  function addPool(IERC20 token, IPool pool) public onlyOwner {
-    if (address(token) == address(0) || address(pool) == address(0)) revert InvalidTokenPoolConfig();
-    if (s_poolsBySourceToken.contains(address(token))) revert PoolAlreadyAdded();
-    s_poolsBySourceToken.set(address(token), address(pool));
+  function applyPoolUpdates(Internal.PoolUpdate[] memory adds, Internal.PoolUpdate[] memory removes) public onlyOwner {
+    for (uint256 i = 0; i < adds.length; ++i) {
+      address token = adds[i].token;
+      address pool = adds[i].pool;
 
-    emit PoolAdded(token, pool);
-  }
+      if (token == address(0) || pool == address(0)) revert InvalidTokenPoolConfig();
+      if (s_poolsBySourceToken.contains(token)) revert PoolAlreadyAdded();
+      s_poolsBySourceToken.set(token, pool);
 
-  /// @notice Remove a token pool
-  /// @param token The source token
-  /// @param pool The pool that will be removed
-  /// @dev This method can only be called by the owner of the contract.
-  function removePool(IERC20 token, IPool pool) public onlyOwner {
-    if (!s_poolsBySourceToken.contains(address(token))) revert PoolDoesNotExist(token);
-    if (s_poolsBySourceToken.get(address(token)) != address(pool)) revert TokenPoolMismatch();
-    s_poolsBySourceToken.remove(address(token));
+      emit PoolAdded(token, pool);
+    }
 
-    emit PoolRemoved(token, pool);
+    for (uint256 i = 0; i < removes.length; ++i) {
+      address token = removes[i].token;
+      address pool = removes[i].pool;
+
+      if (!s_poolsBySourceToken.contains(token)) revert PoolDoesNotExist(token);
+      if (s_poolsBySourceToken.get(token) != pool) revert TokenPoolMismatch();
+      s_poolsBySourceToken.remove(token);
+
+      emit PoolRemoved(token, pool);
+    }
   }
 
   /// @inheritdoc IEVM2AnyOnRamp

@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 import {IPool} from "../pools/IPool.sol";
 
 import {Client} from "../../models/Client.sol";
+import {Internal} from "../../models/Internal.sol";
 
 import {IERC20} from "../../../vendor/IERC20.sol";
 
@@ -30,6 +31,11 @@ interface IEVM2AnyOnRamp {
   /// @param sender The sender to get the nonce for
   /// @return nonce The next nonce for the sender
   function getSenderNonce(address sender) external view returns (uint64 nonce);
+
+  /// @notice Adds and removed token pools.
+  /// @param adds The tokens and pools to be added.
+  /// @param removes The tokens and pools to be removed
+  function applyPoolUpdates(Internal.PoolUpdate[] memory adds, Internal.PoolUpdate[] memory removes) external;
 
   /// @notice Send a message to the remote chain
   /// @dev only callable by the Router

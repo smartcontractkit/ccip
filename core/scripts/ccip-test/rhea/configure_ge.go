@@ -20,8 +20,13 @@ func setOffRampOnTokenPools(t *testing.T, destClient *EvmDeploymentConfig) {
 		pool, err := lock_release_token_pool.NewLockReleaseTokenPool(tokenConfig.Pool, destClient.Client)
 		shared.RequireNoError(t, err)
 
+		rampUpdate := lock_release_token_pool.IPoolRampUpdate{
+			Ramp:    destClient.LaneConfig.OffRamp,
+			Allowed: true,
+		}
+
 		// Configure offramp address on pool
-		tx, err := pool.SetOffRamp(destClient.Owner, destClient.LaneConfig.OffRamp, true)
+		tx, err := pool.ApplyRampUpdates(destClient.Owner, []lock_release_token_pool.IPoolRampUpdate{}, []lock_release_token_pool.IPoolRampUpdate{rampUpdate})
 		shared.RequireNoError(t, err)
 		shared.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
 		destClient.Logger.Infof("Offramp pool configured with offramp address: %s", helpers.ExplorerLink(int64(destClient.ChainConfig.ChainId), tx.Hash()))
@@ -67,8 +72,13 @@ func setOnRampOnTokenPools(t *testing.T, sourceClient *EvmDeploymentConfig) {
 		pool, err := lock_release_token_pool.NewLockReleaseTokenPool(tokenConfig.Pool, sourceClient.Client)
 		shared.RequireNoError(t, err)
 
+		rampUpdate := lock_release_token_pool.IPoolRampUpdate{
+			Ramp:    sourceClient.LaneConfig.OnRamp,
+			Allowed: true,
+		}
+
 		// Configure offramp address on pool
-		tx, err := pool.SetOnRamp(sourceClient.Owner, sourceClient.LaneConfig.OnRamp, true)
+		tx, err := pool.ApplyRampUpdates(sourceClient.Owner, []lock_release_token_pool.IPoolRampUpdate{rampUpdate}, []lock_release_token_pool.IPoolRampUpdate{})
 		shared.RequireNoError(t, err)
 		shared.WaitForMined(t, sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
 		sourceClient.Logger.Infof("Onramp pool configured with offramp address: %s", helpers.ExplorerLink(int64(sourceClient.ChainConfig.ChainId), tx.Hash()))

@@ -65,8 +65,11 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
 
     s_onRamp.setPrices(getCastedSourceTokens(), getTokenPrices());
 
-    LockReleaseTokenPool(address(s_sourcePools[0])).setOnRamp(address(s_onRamp), true);
-    LockReleaseTokenPool(address(s_sourcePools[1])).setOnRamp(address(s_onRamp), true);
+    IPool.RampUpdate[] memory onRamps = new IPool.RampUpdate[](1);
+    onRamps[0] = IPool.RampUpdate({ramp: address(s_onRamp), allowed: true});
+
+    LockReleaseTokenPool(address(s_sourcePools[0])).applyRampUpdates(onRamps, new IPool.RampUpdate[](0));
+    LockReleaseTokenPool(address(s_sourcePools[1])).applyRampUpdates(onRamps, new IPool.RampUpdate[](0));
 
     s_offRamps = new address[](2);
     s_offRamps[0] = address(10);

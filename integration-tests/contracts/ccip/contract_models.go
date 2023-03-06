@@ -148,7 +148,8 @@ func (pool *LockReleaseTokenPool) SetOnRamp(onRamp common.Address) error {
 	log.Info().
 		Str("Token Pool", pool.Address()).
 		Msg("Setting on ramp for onramp router")
-	tx, err := pool.instance.SetOnRamp(opts, onRamp, true)
+	tx, err := pool.instance.ApplyRampUpdates(opts, []lock_release_token_pool.IPoolRampUpdate{{Ramp: onRamp, Allowed: true}}, []lock_release_token_pool.IPoolRampUpdate{})
+
 	if err != nil {
 		return err
 	}
@@ -168,7 +169,7 @@ func (pool *LockReleaseTokenPool) SetOffRamp(offRamp common.Address) error {
 	log.Info().
 		Str("Token Pool", pool.Address()).
 		Msg("Setting off ramp for Token Pool")
-	tx, err := pool.instance.SetOffRamp(opts, offRamp, true)
+	tx, err := pool.instance.ApplyRampUpdates(opts, []lock_release_token_pool.IPoolRampUpdate{}, []lock_release_token_pool.IPoolRampUpdate{{Ramp: offRamp, Allowed: true}})
 	if err != nil {
 		return err
 	}

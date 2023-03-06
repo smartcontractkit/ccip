@@ -154,7 +154,11 @@ func (c *CCIPContracts) DeployNewOffRamp() {
 }
 
 func (c *CCIPContracts) EnableOffRamp() {
-	_, err := c.Dest.Pool.SetOffRamp(c.Dest.User, c.Dest.OffRamp.Address(), true)
+	_, err := c.Dest.Pool.ApplyRampUpdates(c.Dest.User,
+		[]lock_release_token_pool.IPoolRampUpdate{},
+		[]lock_release_token_pool.IPoolRampUpdate{{Ramp: c.Dest.OffRamp.Address(), Allowed: true}},
+	)
+
 	require.NoError(c.t, err)
 	c.Dest.Chain.Commit()
 
@@ -252,7 +256,11 @@ func (c *CCIPContracts) DeployNewOnRamp() {
 
 func (c *CCIPContracts) EnableOnRamp() {
 	c.t.Log("Setting onRamp on source pool")
-	_, err := c.Source.Pool.SetOnRamp(c.Source.User, c.Source.OnRamp.Address(), true)
+	_, err := c.Source.Pool.ApplyRampUpdates(c.Source.User,
+		[]lock_release_token_pool.IPoolRampUpdate{{Ramp: c.Source.OnRamp.Address(), Allowed: true}},
+		[]lock_release_token_pool.IPoolRampUpdate{},
+	)
+
 	require.NoError(c.t, err)
 	c.Source.Chain.Commit()
 
@@ -601,7 +609,10 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	require.NoError(t, err)
 	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddress, sourceChain)
 	require.NoError(t, err)
-	_, err = sourcePool.SetOnRamp(sourceUser, onRampAddress, true)
+	_, err = sourcePool.ApplyRampUpdates(sourceUser,
+		[]lock_release_token_pool.IPoolRampUpdate{{Ramp: onRampAddress, Allowed: true}},
+		[]lock_release_token_pool.IPoolRampUpdate{},
+	)
 	require.NoError(t, err)
 	sourceChain.Commit()
 	_, err = onRamp.SetPrices(sourceUser, []common.Address{sourceLinkTokenAddress}, []*big.Int{big.NewInt(1)})
@@ -697,7 +708,10 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	require.NoError(t, err)
 	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(offRampAddress, destChain)
 	require.NoError(t, err)
-	_, err = destPool.SetOffRamp(destUser, offRampAddress, true)
+	_, err = destPool.ApplyRampUpdates(destUser,
+		[]lock_release_token_pool.IPoolRampUpdate{},
+		[]lock_release_token_pool.IPoolRampUpdate{{Ramp: offRampAddress, Allowed: true}},
+	)
 	require.NoError(t, err)
 	destChain.Commit()
 	_, err = destPrices.ApplyPriceUpdatersUpdates(destUser, []common.Address{commitStoreAddress}, []common.Address{})

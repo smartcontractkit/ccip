@@ -632,103 +632,88 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
   }
 }
 
-contract EVM2EVMOffRamp_addPool is EVM2EVMOffRampSetup {
-  event PoolAdded(IERC20 token, IPool pool);
+contract EVM2EVMOffRamp_applyPoolUpdates is EVM2EVMOffRampSetup {
+  event PoolAdded(address token, address pool);
+  event PoolRemoved(address token, address pool);
 
-  function testAddPoolSuccess() public {
-    IPool newPool = new LockReleaseTokenPool(IERC20(address(2)));
-    IERC20 token = IERC20(address(1));
+  // Success
+  function testApplyPoolUpdatesSuccess() public {
+    Internal.PoolUpdate[] memory adds = new Internal.PoolUpdate[](1);
+    adds[0] = Internal.PoolUpdate({token: address(1), pool: address(new LockReleaseTokenPool(IERC20(address(1))))});
 
     vm.expectEmit(false, false, false, true);
-    emit PoolAdded(token, newPool);
-    s_offRamp.addPool(token, newPool);
+    emit PoolAdded(adds[0].token, adds[0].pool);
 
-    IPool actualPool = s_offRamp.getPoolBySourceToken(token);
+    s_offRamp.applyPoolUpdates(new Internal.PoolUpdate[](0), adds);
 
-    assertEq(address(newPool), address(actualPool));
+    assertEq(adds[0].pool, address(s_offRamp.getPoolBySourceToken(IERC20(adds[0].token))));
+
+    vm.expectEmit(false, false, false, true);
+    emit PoolRemoved(adds[0].token, adds[0].pool);
+
+    s_offRamp.applyPoolUpdates(adds, new Internal.PoolUpdate[](0));
+
+    vm.expectRevert(abi.encodeWithSelector(IEVM2EVMOffRamp.UnsupportedToken.selector, adds[0].token));
+    s_offRamp.getPoolBySourceToken(IERC20(adds[0].token));
   }
 
   // Reverts
-
-  function testInvalidTokenPoolConfigReverts() public {
-    address zero = address(0);
-
-    vm.expectRevert(EVM2EVMOffRamp.InvalidTokenPoolConfig.selector);
-    s_offRamp.addPool(IERC20(zero), IPool(s_destPools[0]));
-
-    vm.expectRevert(EVM2EVMOffRamp.InvalidTokenPoolConfig.selector);
-    s_offRamp.addPool(IERC20(s_destFeeToken), IPool(zero));
-  }
-
-  function testPoolAlreadyAddedReverts() public {
-    IPool newPool = new LockReleaseTokenPool(IERC20(address(2)));
-    IERC20 token = IERC20(address(1));
-    s_offRamp.addPool(token, newPool);
-
-    vm.expectRevert(EVM2EVMOffRamp.PoolAlreadyAdded.selector);
-    s_offRamp.addPool(token, newPool);
-  }
-
-  function testOnlyOwnerReverts() public {
-    IPool newPool = new LockReleaseTokenPool(IERC20(address(2)));
-    IERC20 token = IERC20(address(1));
-
+  function testOnlyCallableByOwnerReverts() public {
     changePrank(STRANGER);
 
     vm.expectRevert("Only callable by owner");
-    s_offRamp.addPool(token, newPool);
-  }
-}
 
-contract EVM2EVMOffRamp_removePool is EVM2EVMOffRampSetup {
-  event PoolRemoved(IERC20 token, IPool pool);
-
-  function testRemovePoolSuccess() public {
-    IPool pool = new LockReleaseTokenPool(IERC20(address(2)));
-    IERC20 token = IERC20(address(1));
-
-    s_offRamp.addPool(token, pool);
-    IPool actualPool = s_offRamp.getPoolBySourceToken(token);
-    assertEq(address(pool), address(actualPool));
-
-    vm.expectEmit(false, false, false, true);
-    emit PoolRemoved(token, pool);
-
-    s_offRamp.removePool(token, pool);
-
-    vm.expectRevert(abi.encodeWithSelector(IEVM2EVMOffRamp.UnsupportedToken.selector, token));
-    actualPool = s_offRamp.getPoolBySourceToken(token);
+    s_offRamp.applyPoolUpdates(new Internal.PoolUpdate[](0), new Internal.PoolUpdate[](0));
   }
 
-  // Reverts
+  function testPoolAlreadyExistsReverts() public {
+    Internal.PoolUpdate[] memory adds = new Internal.PoolUpdate[](2);
+    adds[0] = Internal.PoolUpdate({token: address(1), pool: address(new LockReleaseTokenPool(IERC20(address(1))))});
+    adds[1] = Internal.PoolUpdate({token: address(1), pool: address(new LockReleaseTokenPool(IERC20(address(1))))});
 
-  function testTokenPoolMismatchReverts() public {
-    IPool correctPool = new LockReleaseTokenPool(IERC20(address(2)));
-    IPool wrongPool = new LockReleaseTokenPool(IERC20(address(2)));
-    IERC20 token = IERC20(address(1));
+    vm.expectRevert(EVM2EVMOffRamp.PoolAlreadyAdded.selector);
 
-    s_offRamp.addPool(token, correctPool);
+    s_offRamp.applyPoolUpdates(new Internal.PoolUpdate[](0), adds);
+  }
 
-    vm.expectRevert(EVM2EVMOffRamp.TokenPoolMismatch.selector);
-    s_offRamp.removePool(token, wrongPool);
+  function testInvalidTokenPoolConfigReverts() public {
+    Internal.PoolUpdate[] memory adds = new Internal.PoolUpdate[](1);
+    adds[0] = Internal.PoolUpdate({token: address(0), pool: address(2)});
+
+    vm.expectRevert(EVM2EVMOffRamp.InvalidTokenPoolConfig.selector);
+
+    s_offRamp.applyPoolUpdates(new Internal.PoolUpdate[](0), adds);
+
+    adds[0] = Internal.PoolUpdate({token: address(1), pool: address(0)});
+
+    vm.expectRevert(EVM2EVMOffRamp.InvalidTokenPoolConfig.selector);
+
+    s_offRamp.applyPoolUpdates(new Internal.PoolUpdate[](0), adds);
   }
 
   function testPoolDoesNotExistReverts() public {
-    IPool newPool = new LockReleaseTokenPool(IERC20(address(2)));
-    IERC20 token = IERC20(address(1));
+    Internal.PoolUpdate[] memory removes = new Internal.PoolUpdate[](1);
+    removes[0] = Internal.PoolUpdate({token: address(1), pool: address(new LockReleaseTokenPool(IERC20(address(1))))});
 
     vm.expectRevert(EVM2EVMOffRamp.PoolDoesNotExist.selector);
-    s_offRamp.removePool(token, newPool);
+
+    s_offRamp.applyPoolUpdates(removes, new Internal.PoolUpdate[](0));
   }
 
-  function testOnlyOwnerReverts() public {
-    IPool newPool = new LockReleaseTokenPool(IERC20(address(2)));
-    IERC20 token = IERC20(address(1));
+  function testTokenPoolMismatchReverts() public {
+    Internal.PoolUpdate[] memory adds = new Internal.PoolUpdate[](1);
+    adds[0] = Internal.PoolUpdate({token: address(1), pool: address(new LockReleaseTokenPool(IERC20(address(1))))});
+    s_offRamp.applyPoolUpdates(new Internal.PoolUpdate[](0), adds);
 
-    changePrank(STRANGER);
+    Internal.PoolUpdate[] memory removes = new Internal.PoolUpdate[](1);
+    removes[0] = Internal.PoolUpdate({
+      token: address(1),
+      pool: address(new LockReleaseTokenPool(IERC20(address(1000))))
+    });
 
-    vm.expectRevert("Only callable by owner");
-    s_offRamp.removePool(token, newPool);
+    vm.expectRevert(EVM2EVMOffRamp.TokenPoolMismatch.selector);
+
+    s_offRamp.applyPoolUpdates(removes, adds);
   }
 }
 

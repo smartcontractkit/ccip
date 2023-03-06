@@ -916,23 +916,17 @@ func (client *CCIPClient) AcceptOwnership(t *testing.T) {
 	shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 }
 
-type tokenPoolRegistry interface {
-	Address() common.Address
-	GetSupportedTokens(opts *bind.CallOpts) ([]common.Address, error)
-	GetPoolBySourceToken(opts *bind.CallOpts, token common.Address) (common.Address, error)
-	RemovePool(opts *bind.TransactOpts, token common.Address, pool common.Address) (*types.Transaction, error)
-	AddPool(opts *bind.TransactOpts, token common.Address, pool common.Address) (*types.Transaction, error)
-}
-
 type aggregateRateLimiter interface {
 	Address() common.Address
 	GetPricesForTokens(opts *bind.CallOpts, tokens []common.Address) ([]*big.Int, error)
 	SetPrices(opts *bind.TransactOpts, tokens []common.Address, prices []*big.Int) (*types.Transaction, error)
 }
 
-func syncPools(client *Client, registry tokenPoolRegistry, bridgeTokens map[rhea.Token]EVMBridgedToken, txOpts *bind.TransactOpts) []*types.Transaction {
-	registeredTokens, err := registry.GetSupportedTokens(&bind.CallOpts{})
+func syncPoolsOnOnRamp(client *Client, onRamp *evm_2_evm_onramp.EVM2EVMOnRamp, bridgeTokens map[rhea.Token]EVMBridgedToken, txOpts *bind.TransactOpts) []*types.Transaction {
+	registeredTokens, err := onRamp.GetSupportedTokens(&bind.CallOpts{})
 	require.NoError(client.t, err)
+
+	var poolsToRemove, poolsToAdd []evm_2_evm_onramp.InternalPoolUpdate
 
 	pendingTxs := make([]*types.Transaction, 0)
 	// remove registered tokenPools not present in config
@@ -945,27 +939,80 @@ func syncPools(client *Client, registry tokenPoolRegistry, bridgeTokens map[rhea
 			}
 		}
 		if !found {
-			pool, err := registry.GetPoolBySourceToken(&bind.CallOpts{}, token)
+			pool, err := onRamp.GetPoolBySourceToken(&bind.CallOpts{}, token)
 			require.NoError(client.t, err)
-			tx, err := registry.RemovePool(txOpts, token, pool)
-			require.NoError(client.t, err)
-			client.logger.Infof("removePool(token=%s, pool=%s) from registry=%s: tx=%s", token, pool, registry.Address(), tx.Hash())
-			pendingTxs = append(pendingTxs, tx)           // queue txs for wait
-			txOpts.Nonce.Add(txOpts.Nonce, big.NewInt(1)) // increment nonce
+			poolsToRemove = append(poolsToRemove, evm_2_evm_onramp.InternalPoolUpdate{
+				Token: token,
+				Pool:  pool,
+			})
 		}
 	}
 	// add tokenPools present in config and not yet registered
 	for _, tokenConfig := range bridgeTokens {
 		// remove tokenPools not present in config
 		if !slices.Contains(registeredTokens, tokenConfig.Token) {
-			pool := tokenConfig.Pool.Address()
-			tx, err := registry.AddPool(txOpts, tokenConfig.Token, pool)
-			require.NoError(client.t, err)
-			client.logger.Infof("addPool(token=%s, pool=%s) from registry=%s: tx=%s", tokenConfig.Token, pool, registry.Address(), tx.Hash())
-			pendingTxs = append(pendingTxs, tx)           // queue txs for wait
-			txOpts.Nonce.Add(txOpts.Nonce, big.NewInt(1)) // increment nonce
+			poolsToAdd = append(poolsToAdd, evm_2_evm_onramp.InternalPoolUpdate{
+				Token: tokenConfig.Token,
+				Pool:  tokenConfig.Pool.Address(),
+			})
 		}
 	}
+
+	if len(poolsToAdd) > 0 || len(poolsToRemove) > 0 {
+		tx, err := onRamp.ApplyPoolUpdates(txOpts, poolsToRemove, poolsToAdd)
+		require.NoError(client.t, err)
+		client.logger.Infof("synced(add=%s, remove=%s) from registry=%s: tx=%s", poolsToAdd, poolsToRemove, onRamp.Address(), tx.Hash())
+		pendingTxs = append(pendingTxs, tx)           // queue txs for wait
+		txOpts.Nonce.Add(txOpts.Nonce, big.NewInt(1)) // increment nonce
+	}
+
+	return pendingTxs
+}
+
+func syncPoolsOffOnRamp(client *Client, offRamp *evm_2_evm_offramp.EVM2EVMOffRamp, bridgeTokens map[rhea.Token]EVMBridgedToken, txOpts *bind.TransactOpts) []*types.Transaction {
+	registeredTokens, err := offRamp.GetSupportedTokens(&bind.CallOpts{})
+	require.NoError(client.t, err)
+
+	var poolsToRemove, poolsToAdd []evm_2_evm_offramp.InternalPoolUpdate
+
+	pendingTxs := make([]*types.Transaction, 0)
+	// remove registered tokenPools not present in config
+	for _, token := range registeredTokens {
+		found := false
+		for _, bridgedToken := range bridgeTokens {
+			if bridgedToken.Token == token {
+				found = true
+				break
+			}
+		}
+		if !found {
+			pool, err := offRamp.GetPoolBySourceToken(&bind.CallOpts{}, token)
+			require.NoError(client.t, err)
+			poolsToRemove = append(poolsToRemove, evm_2_evm_offramp.InternalPoolUpdate{
+				Token: token,
+				Pool:  pool,
+			})
+		}
+	}
+	// add tokenPools present in config and not yet registered
+	for _, tokenConfig := range bridgeTokens {
+		// remove tokenPools not present in config
+		if !slices.Contains(registeredTokens, tokenConfig.Token) {
+			poolsToAdd = append(poolsToAdd, evm_2_evm_offramp.InternalPoolUpdate{
+				Token: tokenConfig.Token,
+				Pool:  tokenConfig.Pool.Address(),
+			})
+		}
+	}
+
+	if len(poolsToAdd) > 0 || len(poolsToRemove) > 0 {
+		tx, err := offRamp.ApplyPoolUpdates(txOpts, poolsToRemove, poolsToAdd)
+		require.NoError(client.t, err)
+		client.logger.Infof("synced(add=%s, remove=%s) from registry=%s: tx=%s", poolsToAdd, poolsToRemove, offRamp.Address(), tx.Hash())
+		pendingTxs = append(pendingTxs, tx)           // queue txs for wait
+		txOpts.Nonce.Add(txOpts.Nonce, big.NewInt(1)) // increment nonce
+	}
+
 	return pendingTxs
 }
 
@@ -1016,7 +1063,7 @@ func (client *CCIPClient) SyncTokenPools(t *testing.T) {
 	sourceTxOpts.Nonce = big.NewInt(int64(sourcePendingNonce))
 
 	// onRamp maps source tokens to source pools
-	sourcePendingTxs := syncPools(&client.Source.Client, client.Source.OnRamp, client.Source.SupportedTokens, &sourceTxOpts)
+	sourcePendingTxs := syncPoolsOnOnRamp(&client.Source.Client, client.Source.OnRamp, client.Source.SupportedTokens, &sourceTxOpts)
 
 	// same as above, for offRamp
 	destTxOpts := *client.Dest.Owner
@@ -1026,7 +1073,7 @@ func (client *CCIPClient) SyncTokenPools(t *testing.T) {
 	destTxOpts.Nonce = big.NewInt(int64(destPendingNonce))
 
 	// offRamp maps *source* tokens to *dest* pools
-	destPendingTxs := syncPools(&client.Dest.Client, client.Dest.OffRamp, client.Source.SupportedTokens, &destTxOpts)
+	destPendingTxs := syncPoolsOffOnRamp(&client.Dest.Client, client.Dest.OffRamp, client.Source.SupportedTokens, &destTxOpts)
 
 	waitPendingTxs(&client.Source.Client, &sourcePendingTxs)
 	waitPendingTxs(&client.Dest.Client, &destPendingTxs)

@@ -76,4 +76,9 @@ interface IEVM2EVMOffRamp {
   /// @notice Manually execute a message.
   /// @param report Internal.ExecutionReport.
   function manuallyExecute(Internal.ExecutionReport memory report) external;
+
+  /// @notice Adds and removed token pools.
+  /// @param removes The tokens and pools to be removed
+  /// @param adds The tokens and pools to be added.
+  function applyPoolUpdates(Internal.PoolUpdate[] memory removes, Internal.PoolUpdate[] memory adds) external;
 }

@@ -25,45 +25,64 @@ contract TokenPool_constructor is TokenPoolSetup {
   }
 }
 
-contract TokenPool_setOnRamp is TokenPoolSetup {
-  // Success
-  function testSetOnRampTrueSuccess() public {
-    s_tokenPool.setOnRamp(USER_1, true);
-    assertTrue(s_tokenPool.isOnRamp(USER_1));
-  }
+contract TokenPool_applyRampUpdates is TokenPoolSetup {
+  event OnRampAllowanceSet(address onRamp, bool allowed);
+  event OffRampAllowanceSet(address onRamp, bool allowed);
 
-  function testSetOnRampFalseSuccess() public {
-    s_tokenPool.setOnRamp(USER_1, true);
-    s_tokenPool.setOnRamp(USER_1, false);
-    assertFalse(s_tokenPool.isOnRamp(USER_1));
+  // Success
+  function testApplyRampUpdatesSuccess() public {
+    IPool.RampUpdate[] memory onRamps = new IPool.RampUpdate[](2);
+    onRamps[0] = IPool.RampUpdate({ramp: address(1), allowed: true});
+    onRamps[1] = IPool.RampUpdate({ramp: address(2), allowed: true});
+    IPool.RampUpdate[] memory offRamps = new IPool.RampUpdate[](2);
+    offRamps[0] = IPool.RampUpdate({ramp: address(11), allowed: true});
+    offRamps[1] = IPool.RampUpdate({ramp: address(12), allowed: true});
+
+    vm.expectEmit(false, false, false, true);
+    emit OnRampAllowanceSet(onRamps[0].ramp, onRamps[0].allowed);
+    vm.expectEmit(false, false, false, true);
+    emit OnRampAllowanceSet(onRamps[1].ramp, onRamps[1].allowed);
+
+    vm.expectEmit(false, false, false, true);
+    emit OffRampAllowanceSet(offRamps[0].ramp, offRamps[0].allowed);
+    vm.expectEmit(false, false, false, true);
+    emit OffRampAllowanceSet(offRamps[1].ramp, offRamps[1].allowed);
+
+    s_tokenPool.applyRampUpdates(onRamps, offRamps);
+
+    assertTrue(s_tokenPool.isOnRamp(onRamps[0].ramp));
+    assertTrue(s_tokenPool.isOnRamp(onRamps[1].ramp));
+
+    assertTrue(s_tokenPool.isOffRamp(offRamps[0].ramp));
+    assertTrue(s_tokenPool.isOffRamp(offRamps[1].ramp));
+
+    onRamps[0].allowed = false;
+    offRamps[1].allowed = false;
+
+    vm.expectEmit(false, false, false, true);
+    emit OnRampAllowanceSet(onRamps[0].ramp, onRamps[0].allowed);
+    vm.expectEmit(false, false, false, true);
+    emit OnRampAllowanceSet(onRamps[1].ramp, onRamps[1].allowed);
+
+    vm.expectEmit(false, false, false, true);
+    emit OffRampAllowanceSet(offRamps[0].ramp, offRamps[0].allowed);
+    vm.expectEmit(false, false, false, true);
+    emit OffRampAllowanceSet(offRamps[1].ramp, offRamps[1].allowed);
+
+    s_tokenPool.applyRampUpdates(onRamps, offRamps);
+
+    assertFalse(s_tokenPool.isOnRamp(onRamps[0].ramp));
+    assertTrue(s_tokenPool.isOnRamp(onRamps[1].ramp));
+
+    assertTrue(s_tokenPool.isOffRamp(offRamps[0].ramp));
+    assertFalse(s_tokenPool.isOffRamp(offRamps[1].ramp));
   }
 
   // Reverts
-  function testNonOwnerReverts() public {
+  function testOnlyCallableByOwnerReverts() public {
     changePrank(STRANGER);
     vm.expectRevert("Only callable by owner");
-    s_tokenPool.setOnRamp(USER_1, true);
-  }
-}
-
-contract TokenPool_setOffRamp is TokenPoolSetup {
-  // Success
-  function testSetOffRampTrueSuccess() public {
-    s_tokenPool.setOffRamp(USER_1, true);
-    assertTrue(s_tokenPool.isOffRamp(USER_1));
-  }
-
-  function testSetOffRampFalseSuccess() public {
-    s_tokenPool.setOffRamp(USER_1, true);
-    s_tokenPool.setOffRamp(USER_1, false);
-    assertFalse(s_tokenPool.isOffRamp(USER_1));
-  }
-
-  // Reverts
-  function testNonOwnerReverts() public {
-    changePrank(STRANGER);
-    vm.expectRevert("Only callable by owner");
-    s_tokenPool.setOffRamp(USER_1, true);
+    s_tokenPool.applyRampUpdates(new IPool.RampUpdate[](0), new IPool.RampUpdate[](0));
   }
 }
 

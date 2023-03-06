@@ -12,8 +12,13 @@ contract WrappedTokenPoolSetup is BaseTest {
   function setUp() public virtual override {
     BaseTest.setUp();
     s_wrappedTokenPool = new WrappedTokenPool("Test", "TST");
-    s_wrappedTokenPool.setOnRamp(s_onRamp, true);
-    s_wrappedTokenPool.setOffRamp(s_offRamp, true);
+
+    IPool.RampUpdate[] memory onRamps = new IPool.RampUpdate[](1);
+    onRamps[0] = IPool.RampUpdate({ramp: address(s_onRamp), allowed: true});
+    IPool.RampUpdate[] memory offRamps = new IPool.RampUpdate[](1);
+    offRamps[0] = IPool.RampUpdate({ramp: address(s_offRamp), allowed: true});
+
+    s_wrappedTokenPool.applyRampUpdates(onRamps, offRamps);
   }
 }
 

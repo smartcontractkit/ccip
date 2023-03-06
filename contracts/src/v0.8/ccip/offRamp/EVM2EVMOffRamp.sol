@@ -32,8 +32,8 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, Pausable, AggregateRateLimiter, Type
   error PoolDoesNotExist();
   error TokenPoolMismatch();
 
-  event PoolAdded(IERC20 token, IPool pool);
-  event PoolRemoved(IERC20 token, IPool pool);
+  event PoolAdded(address token, address pool);
+  event PoolRemoved(address token, address pool);
 
   // STATIC CONFIG
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
@@ -335,34 +335,36 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, Pausable, AggregateRateLimiter, Type
     revert();
   }
 
-  /// @notice Adds a pool for use by this offRamp.
-  /// @param token The IERC20 token that the pool can mint/release.
-  /// @param pool The pool instance.
-  function addPool(IERC20 token, IPool pool) public onlyOwner {
-    if (address(token) == address(0) || address(pool) == address(0)) revert InvalidTokenPoolConfig();
-    // Check if the pool is already set
-    if (s_poolsBySourceToken.contains(address(token))) revert PoolAlreadyAdded();
+  function applyPoolUpdates(Internal.PoolUpdate[] memory removes, Internal.PoolUpdate[] memory adds) public onlyOwner {
+    for (uint256 i = 0; i < removes.length; ++i) {
+      address token = removes[i].token;
+      address pool = removes[i].pool;
 
-    // Set the s_pools with new config values
-    s_poolsBySourceToken.set(address(token), address(pool));
-    s_poolsByDestToken.set(address(pool.getToken()), address(pool));
+      // Check if the pool exists
+      if (!s_poolsBySourceToken.contains(token)) revert PoolDoesNotExist();
+      // Sanity check
+      if (s_poolsBySourceToken.get(token) != pool) revert TokenPoolMismatch();
 
-    emit PoolAdded(token, pool);
-  }
+      s_poolsBySourceToken.remove(token);
+      s_poolsByDestToken.remove(address(IPool(pool).getToken()));
 
-  /// @notice Removes a pool from this offRamp.
-  /// @param token The IERC20 token that the pool can mint/release.
-  /// @param pool The pool instance.
-  function removePool(IERC20 token, IPool pool) public onlyOwner {
-    // Check if the pool exists
-    if (!s_poolsBySourceToken.contains(address(token))) revert PoolDoesNotExist();
-    // Sanity check
-    if (s_poolsBySourceToken.get(address(token)) != address(pool)) revert TokenPoolMismatch();
+      emit PoolRemoved(token, pool);
+    }
 
-    s_poolsBySourceToken.remove(address(token));
-    s_poolsByDestToken.remove(address(pool.getToken()));
+    for (uint256 i = 0; i < adds.length; ++i) {
+      address token = adds[i].token;
+      address pool = adds[i].pool;
 
-    emit PoolRemoved(token, pool);
+      if (token == address(0) || pool == address(0)) revert InvalidTokenPoolConfig();
+      // Check if the pool is already set
+      if (s_poolsBySourceToken.contains(token)) revert PoolAlreadyAdded();
+
+      // Set the s_pools with new config values
+      s_poolsBySourceToken.set(token, pool);
+      s_poolsByDestToken.set(address(IPool(pool).getToken()), pool);
+
+      emit PoolAdded(token, pool);
+    }
   }
 
   /// @notice Get a token pool by its source token

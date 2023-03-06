@@ -8,12 +8,18 @@ import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
 import {SafeERC20} from "../../vendor/SafeERC20.sol";
 import {IERC20} from "../../vendor/IERC20.sol";
 import {Pausable} from "../../vendor/Pausable.sol";
+import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v4.7.3/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice Base abstract class with common functions for all token pools.
 abstract contract TokenPool is IPool, OwnerIsCreator, Pausable {
+  using EnumerableSet for EnumerableSet.AddressSet;
+
+  // The immutable token that belongs to this pool.
   IERC20 internal immutable i_token;
-  mapping(address => bool) internal s_onRamps;
-  mapping(address => bool) internal s_offRamps;
+  // A set of allowed onRamps.
+  EnumerableSet.AddressSet private s_onRamps;
+  // A set of allowed offRamps.
+  EnumerableSet.AddressSet private s_offRamps;
 
   constructor(IERC20 token) {
     if (address(token) == address(0)) revert NullAddressNotAllowed();
@@ -31,32 +37,44 @@ abstract contract TokenPool is IPool, OwnerIsCreator, Pausable {
     _unpause();
   }
 
-  /// @notice Set an onRamp's permissions.
-  /// @dev Only callable by the owner.
-  /// @param onRamp The onRamp contract address.
-  /// @param permission Whether or not the onRamp has onRamp permissions on this contract.
-  function setOnRamp(address onRamp, bool permission) public onlyOwner {
-    s_onRamps[onRamp] = permission;
-  }
+  /// @notice Sets permissions for all on and offRamps.
+  /// @dev Only callable by the owner
+  /// @param onRamps A list of onRamps and their new permission status
+  /// @param offRamps A list of offRamps and their new permission status
+  function applyRampUpdates(RampUpdate[] memory onRamps, RampUpdate[] memory offRamps) public onlyOwner {
+    for (uint256 i = 0; i < onRamps.length; ++i) {
+      RampUpdate memory update = onRamps[i];
+      if (update.allowed) {
+        s_onRamps.add(update.ramp);
+      } else {
+        s_onRamps.remove(update.ramp);
+      }
 
-  /// @notice Set an offRamp's permissions.
-  /// @dev Only callable by the owner.
-  /// @param offRamp The offRamp contract address.
-  /// @param permission Whether or not the offRamp has offRamp permissions on this contract.
-  function setOffRamp(address offRamp, bool permission) public onlyOwner {
-    s_offRamps[offRamp] = permission;
+      emit OnRampAllowanceSet(onRamps[i].ramp, onRamps[i].allowed);
+    }
+
+    for (uint256 i = 0; i < offRamps.length; ++i) {
+      RampUpdate memory update = offRamps[i];
+      if (update.allowed) {
+        s_offRamps.add(update.ramp);
+      } else {
+        s_offRamps.remove(update.ramp);
+      }
+
+      emit OffRampAllowanceSet(offRamps[i].ramp, offRamps[i].allowed);
+    }
   }
 
   /// @notice Checks whether something is a permissioned onRamp on this contract.
   /// @return true if the given address is a permissioned onRamp.
   function isOnRamp(address onRamp) public view returns (bool) {
-    return s_onRamps[onRamp];
+    return s_onRamps.contains(onRamp);
   }
 
   /// @notice Checks whether something is a permissioned offRamp on this contract.
   /// @return true is the given address is a permissioned offRamp.
   function isOffRamp(address offRamp) public view returns (bool) {
-    return s_offRamps[offRamp];
+    return s_offRamps.contains(offRamp);
   }
 
   /// @inheritdoc IPool
