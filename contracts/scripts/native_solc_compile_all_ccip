@@ -3,7 +3,7 @@
 set -e
 
 SOLC_VERSION="0.8.15"
-OPTIMIZE_RUNS=5000
+OPTIMIZE_RUNS=15000
 
 
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
