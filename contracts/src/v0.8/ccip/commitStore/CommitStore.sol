@@ -44,7 +44,6 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
     i_chainId = staticConfig.chainId;
     i_sourceChainId = staticConfig.sourceChainId;
     i_onRamp = staticConfig.onRamp;
-    emit StaticConfigSet(staticConfig);
 
     _setDynamicConfig(dynamicConfig);
   }
@@ -107,11 +106,16 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
   }
 
   /// @notice the internal version of setDynamicConfig to allow for reuse
-  /// in the constructor. Emits DynamicConfigSet on successful config set.
+  /// in the constructor. Emits ConfigSet on successful config set.
   function _setDynamicConfig(DynamicConfig memory dynamicConfig) internal {
     if (dynamicConfig.afn == address(0) || dynamicConfig.priceRegistry == address(0)) revert InvalidCommitStoreConfig();
+
     s_dynamicConfig = dynamicConfig;
-    emit DynamicConfigSet(dynamicConfig);
+
+    emit ConfigSet(
+      ICommitStore.StaticConfig({chainId: i_chainId, sourceChainId: i_sourceChainId, onRamp: i_onRamp}),
+      dynamicConfig
+    );
   }
 
   /// @inheritdoc ICommitStore

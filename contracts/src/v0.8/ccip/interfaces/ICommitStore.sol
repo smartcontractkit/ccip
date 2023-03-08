@@ -11,8 +11,7 @@ interface ICommitStore {
   error BadAFNSignal();
 
   event ReportAccepted(CommitReport report);
-  event StaticConfigSet(StaticConfig);
-  event DynamicConfigSet(DynamicConfig);
+  event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
 
   /// @notice Static commit store config
   struct StaticConfig {

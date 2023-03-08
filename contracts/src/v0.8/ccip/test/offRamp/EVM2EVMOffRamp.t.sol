@@ -11,8 +11,7 @@ import "../../interfaces/offRamp/IEVM2EVMOffRamp.sol";
 
 /// @notice #constructor
 contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
-  event StaticConfigSet(IEVM2EVMOffRamp.StaticConfig);
-  event DynamicConfigSet(IEVM2EVMOffRamp.DynamicConfig config, uint64 sourceChainId, address onRamp);
+  event ConfigSet(IEVM2EVMOffRamp.StaticConfig staticConfig, IEVM2EVMOffRamp.DynamicConfig dynamicConfig);
 
   // Success
 
@@ -29,10 +28,7 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
     );
 
     vm.expectEmit(false, false, false, true);
-    emit StaticConfigSet(staticConfig);
-
-    vm.expectEmit(false, false, false, true);
-    emit DynamicConfigSet(dynamicConfig, staticConfig.sourceChainId, staticConfig.onRamp);
+    emit ConfigSet(staticConfig, dynamicConfig);
 
     s_offRamp = new EVM2EVMOffRampHelper(
       staticConfig,
@@ -124,35 +120,36 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
 }
 
 contract EVM2EVMOffRamp_setDynamicConfig is EVM2EVMOffRampSetup {
-  event DynamicConfigSet(IEVM2EVMOffRamp.DynamicConfig config, uint64 chainId, address onRamp);
+  event ConfigSet(IEVM2EVMOffRamp.StaticConfig staticConfig, IEVM2EVMOffRamp.DynamicConfig dynamicConfig);
 
   function testSetDynamicConfigSuccess() public {
-    IEVM2EVMOffRamp.DynamicConfig memory config = generateDynamicOffRampConfig(USER_3, address(s_afn));
+    IEVM2EVMOffRamp.StaticConfig memory staticConfig = s_offRamp.getStaticConfig();
+    IEVM2EVMOffRamp.DynamicConfig memory dynamicConfig = generateDynamicOffRampConfig(USER_3, address(s_afn));
 
-    vm.expectEmit(true, true, true, true);
-    emit DynamicConfigSet(config, SOURCE_CHAIN_ID, ON_RAMP_ADDRESS);
+    vm.expectEmit(false, false, false, true);
+    emit ConfigSet(staticConfig, dynamicConfig);
 
-    s_offRamp.setDynamicConfig(config);
+    s_offRamp.setDynamicConfig(dynamicConfig);
 
     IEVM2EVMOffRamp.DynamicConfig memory newConfig = s_offRamp.getDynamicConfig();
-    _assertSameConfig(config, newConfig);
+    _assertSameConfig(dynamicConfig, newConfig);
   }
 
   function testNonOwnerReverts() public {
     changePrank(STRANGER);
-    IEVM2EVMOffRamp.DynamicConfig memory config = generateDynamicOffRampConfig(USER_3, address(1));
+    IEVM2EVMOffRamp.DynamicConfig memory dynamicConfig = generateDynamicOffRampConfig(USER_3, address(1));
 
     vm.expectRevert("Only callable by owner");
 
-    s_offRamp.setDynamicConfig(config);
+    s_offRamp.setDynamicConfig(dynamicConfig);
   }
 
   function testRouterZeroAddressReverts() public {
-    IEVM2EVMOffRamp.DynamicConfig memory config = generateDynamicOffRampConfig(ZERO_ADDRESS, address(1));
+    IEVM2EVMOffRamp.DynamicConfig memory dynamicConfig = generateDynamicOffRampConfig(ZERO_ADDRESS, address(1));
 
-    vm.expectRevert(abi.encodeWithSelector(IEVM2EVMOffRamp.InvalidOffRampConfig.selector, config));
+    vm.expectRevert(abi.encodeWithSelector(IEVM2EVMOffRamp.InvalidOffRampConfig.selector, dynamicConfig));
 
-    s_offRamp.setDynamicConfig(config);
+    s_offRamp.setDynamicConfig(dynamicConfig);
   }
 }
 

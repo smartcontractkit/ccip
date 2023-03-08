@@ -95,7 +95,6 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAn
     i_chainId = staticConfig.chainId;
     i_destChainId = staticConfig.destChainId;
     i_defaultTxGasLimit = staticConfig.defaultTxGasLimit;
-    emit StaticConfigSet(staticConfig);
 
     _setDynamicConfig(dynamicConfig);
     _setFeeConfig(feeTokenConfigs);
@@ -277,7 +276,16 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAn
     ) revert InvalidConfig();
 
     s_dynamicConfig = dynamicConfig;
-    emit DynamicConfigSet(dynamicConfig);
+
+    emit ConfigSet(
+      IEVM2EVMOnRamp.StaticConfig({
+        linkToken: i_linkToken,
+        chainId: i_chainId,
+        destChainId: i_destChainId,
+        defaultTxGasLimit: i_defaultTxGasLimit
+      }),
+      dynamicConfig
+    );
   }
 
   /// @inheritdoc IEVM2EVMOnRamp

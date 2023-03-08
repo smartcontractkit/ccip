@@ -6,8 +6,7 @@ import {IEVM2EVMOnRamp} from "../../interfaces/onRamp/IEVM2EVMOnRamp.sol";
 
 /// @notice #constructor
 contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
-  event StaticConfigSet(IEVM2EVMOnRamp.StaticConfig);
-  event DynamicConfigSet(IEVM2EVMOnRamp.DynamicConfig);
+  event ConfigSet(IEVM2EVMOnRamp.StaticConfig staticConfig, IEVM2EVMOnRamp.DynamicConfig dynamicConfig);
 
   function testConstructorSuccess() public {
     IEVM2EVMOnRamp.StaticConfig memory staticConfig = IEVM2EVMOnRamp.StaticConfig({
@@ -24,10 +23,7 @@ contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
     );
 
     vm.expectEmit(false, false, false, true);
-    emit StaticConfigSet(staticConfig);
-
-    vm.expectEmit(false, false, false, true);
-    emit DynamicConfigSet(dynamicConfig);
+    emit ConfigSet(staticConfig, dynamicConfig);
 
     s_onRamp = new EVM2EVMOnRamp(
       staticConfig,
@@ -613,10 +609,11 @@ contract EVM2EVMOnRamp_getExpectedNextSequenceNumber is EVM2EVMOnRampSetup {
 
 // #setDynamicConfig
 contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
-  event DynamicConfigSet(IEVM2EVMOnRamp.DynamicConfig);
+  event ConfigSet(IEVM2EVMOnRamp.StaticConfig staticConfig, IEVM2EVMOnRamp.DynamicConfig dynamicConfig);
 
   // Success
   function testSuccess() public {
+    IEVM2EVMOnRamp.StaticConfig memory staticConfig = s_onRamp.getStaticConfig();
     IEVM2EVMOnRamp.DynamicConfig memory newConfig = IEVM2EVMOnRamp.DynamicConfig({
       router: address(2134),
       priceRegistry: address(23423),
@@ -628,7 +625,7 @@ contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
     });
 
     vm.expectEmit(false, false, false, true);
-    emit DynamicConfigSet(newConfig);
+    emit ConfigSet(staticConfig, newConfig);
 
     s_onRamp.setDynamicConfig(newConfig);
 

@@ -81,7 +81,6 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, Pausable, AggregateRateLimiter, Type
     i_sourceChainId = staticConfig.sourceChainId;
     i_chainId = staticConfig.chainId;
     i_onRamp = staticConfig.onRamp;
-    emit StaticConfigSet(staticConfig);
 
     i_metadataHash = _metadataHash(Internal.EVM_2_EVM_MESSAGE_HASH);
 
@@ -133,11 +132,21 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, Pausable, AggregateRateLimiter, Type
   }
 
   /// @notice Internal version of setDynamicConfig to allow for reuse in the constructor.
-  function _setDynamicConfig(DynamicConfig memory config) private {
-    if (config.router == address(0) || config.afn == address(0)) revert InvalidOffRampConfig(config);
+  function _setDynamicConfig(DynamicConfig memory dynamicConfig) private {
+    if (dynamicConfig.router == address(0) || dynamicConfig.afn == address(0))
+      revert InvalidOffRampConfig(dynamicConfig);
 
-    s_dynamicConfig = config;
-    emit DynamicConfigSet(config, i_sourceChainId, i_onRamp);
+    s_dynamicConfig = dynamicConfig;
+
+    emit ConfigSet(
+      IEVM2EVMOffRamp.StaticConfig({
+        commitStore: i_commitStore,
+        chainId: i_chainId,
+        sourceChainId: i_sourceChainId,
+        onRamp: i_onRamp
+      }),
+      dynamicConfig
+    );
   }
 
   /// @inheritdoc IEVM2EVMOffRamp

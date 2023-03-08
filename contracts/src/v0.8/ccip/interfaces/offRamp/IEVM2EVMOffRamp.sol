@@ -22,9 +22,8 @@ interface IEVM2EVMOffRamp {
   error EmptyReport();
   error BadAFNSignal();
 
-  // sourceChainId and onRamp are needed by Atlas, to track onramp <-> offramp -> router relationship
-  event DynamicConfigSet(DynamicConfig config, uint64 sourceChainId, address onRamp);
-  event StaticConfigSet(StaticConfig);
+  // this event is needed for Atlas; if their structs/signature changes, we must update the ABIs there
+  event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event SkippedIncorrectNonce(uint64 indexed nonce, address indexed sender);
   event ExecutionStateChanged(
     uint64 indexed sequenceNumber,

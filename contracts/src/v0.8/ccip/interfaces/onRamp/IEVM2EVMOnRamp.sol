@@ -36,8 +36,7 @@ interface IEVM2EVMOnRamp is IEVM2AnyOnRamp {
   event AllowListAdd(address sender);
   event AllowListRemove(address sender);
   event AllowListEnabledSet(bool enabled);
-  event StaticConfigSet(StaticConfig);
-  event DynamicConfigSet(DynamicConfig);
+  event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event NopPaid(address indexed nop, uint256 amount);
   event FeeConfigSet(FeeTokenConfigArgs[] feeConfig);
   event CCIPSendRequested(Internal.EVM2EVMMessage message);

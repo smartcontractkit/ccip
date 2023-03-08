@@ -43,8 +43,7 @@ contract CommitStoreRealAFNSetup is PriceRegistrySetup {
 
 /// @notice #constructor
 contract CommitStore_constructor is PriceRegistrySetup {
-  event StaticConfigSet(ICommitStore.StaticConfig);
-  event DynamicConfigSet(ICommitStore.DynamicConfig);
+  event ConfigSet(ICommitStore.StaticConfig, ICommitStore.DynamicConfig);
 
   function testConstructorSuccess() public {
     ICommitStore.StaticConfig memory staticConfig = ICommitStore.StaticConfig({
@@ -58,10 +57,7 @@ contract CommitStore_constructor is PriceRegistrySetup {
     });
 
     vm.expectEmit(false, false, false, true);
-    emit StaticConfigSet(staticConfig);
-
-    vm.expectEmit(false, false, false, true);
-    emit DynamicConfigSet(dynamicConfig);
+    emit ConfigSet(staticConfig, dynamicConfig);
 
     CommitStore commitStore = new CommitStore(staticConfig, dynamicConfig);
 
@@ -101,16 +97,17 @@ contract CommitStore_setMinSeqNr is CommitStoreSetup {
 
 /// @notice #setDynamicConfig
 contract CommitStore_setDynamicConfig is CommitStoreSetup {
-  event DynamicConfigSet(ICommitStore.DynamicConfig);
+  event ConfigSet(ICommitStore.StaticConfig, ICommitStore.DynamicConfig);
 
   function testSetMinSeqNrSuccess() public {
+    ICommitStore.StaticConfig memory staticConfig = s_commitStore.getStaticConfig();
     ICommitStore.DynamicConfig memory dynamicConfig = ICommitStore.DynamicConfig({
       priceRegistry: address(23784264),
       afn: address(s_afn)
     });
 
     vm.expectEmit(false, false, false, true);
-    emit DynamicConfigSet(dynamicConfig);
+    emit ConfigSet(staticConfig, dynamicConfig);
 
     s_commitStore.setDynamicConfig(dynamicConfig);
 
