@@ -1853,6 +1853,8 @@ func DeployEnvironments(
 					},
 				},
 			}))
+		err := testEnvironment.Run()
+		require.NoError(t, err)
 	}
 
 	// skip adding blockscout for simplified deployments
@@ -1871,14 +1873,11 @@ func DeployEnvironments(
 		}))
 	*/
 
-	err := testEnvironment.Run()
-	require.NoError(t, err)
-
 	if testEnvironment.WillUseRemoteRunner() {
 		return c
 	}
 
-	err = testEnvironment.
+	err := testEnvironment.
 		AddHelm(mockservercfg.New(nil)).
 		AddHelm(mockserver.New(nil)).
 		AddHelm(chainlink.New(0, clProps)).

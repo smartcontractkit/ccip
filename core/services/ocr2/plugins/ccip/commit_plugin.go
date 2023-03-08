@@ -210,7 +210,7 @@ func LoadOffRamp(offRampAddress common.Address, client client.Client) (*evm_2_ev
 func LoadCommitStore(commitStoreAddress common.Address, client client.Client) (*commit_store.CommitStore, error) {
 	err := ccipconfig.VerifyTypeAndVersion(commitStoreAddress, client, ccipconfig.CommitStore)
 	if err != nil {
-		return nil, errors.Wrap(err, "Invalid onRamp contract")
+		return nil, errors.Wrap(err, "Invalid commitStore contract")
 	}
 	return commit_store.NewCommitStore(commitStoreAddress, client)
 }
