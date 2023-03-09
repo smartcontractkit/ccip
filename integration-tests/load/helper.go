@@ -76,7 +76,6 @@ func (loadArgs *loadArgs) Setup() {
 	if !loadArgs.ExistingDeployment {
 		forwardLane, _, tearDown = actions.CCIPDefaultTestSetUp(loadArgs.t, "load-ccip", map[string]interface{}{
 			"replicas": "6",
-			"toml":     actions.DefaultCCIPCLNodeEnv(loadArgs.t),
 			"env": map[string]interface{}{
 				"CL_DEV": "true",
 			},

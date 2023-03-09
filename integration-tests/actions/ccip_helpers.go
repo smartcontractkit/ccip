@@ -18,6 +18,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
+	env_client "github.com/smartcontractkit/chainlink-env/client"
+
 	"github.com/smartcontractkit/chainlink-env/environment"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/chainlink"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver"
@@ -848,6 +850,10 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 		if err != nil {
 			return fmt.Errorf("setting commitstore as fee updater shouldn't fail %+v", err)
 		}
+		err = destCCIP.Common.ChainClient.WaitForEvents()
+		if err != nil {
+			return fmt.Errorf("waiting for setting commitstore as fee updater shouldn't fail %+v", err)
+		}
 	} else {
 		destCCIP.CommitStore, err = contractDeployer.NewCommitStore(destCCIP.CommitStore.EthAddress)
 		if err != nil {
@@ -1388,12 +1394,6 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		return nil
 	}
 
-	// if lane is being set up for already configured CL nodes and contracts
-	// no further action is necessary
-	if !configureCLNodes {
-		return nil
-	}
-
 	// wait for the CL nodes to be ready before moving ahead with job creation
 	<-env.clNodeWithKeyReady
 	clNodesWithKeys := env.CLNodesWithKeys
@@ -1808,6 +1808,7 @@ func DeployEnvironments(
 	c := &CCIPTestEnv{
 		K8Env: testEnvironment,
 	}
+	numOfTxNodes := 1
 	if NetworkA.Simulated {
 		if !NetworkB.Simulated {
 			t.Fatalf("both the networks should be simulated")
@@ -1822,7 +1823,7 @@ func DeployEnvironments(
 							"networkId": fmt.Sprint(NetworkA.ChainID),
 						},
 						"tx": map[string]interface{}{
-							"replicas": "2",
+							"replicas": strconv.Itoa(numOfTxNodes),
 						},
 						"miner": map[string]interface{}{
 							"replicas": "0",
@@ -1842,7 +1843,7 @@ func DeployEnvironments(
 							"networkId": fmt.Sprint(NetworkB.ChainID),
 						},
 						"tx": map[string]interface{}{
-							"replicas": "2",
+							"replicas": strconv.Itoa(numOfTxNodes),
 						},
 						"miner": map[string]interface{}{
 							"replicas": "0",
@@ -1853,8 +1854,6 @@ func DeployEnvironments(
 					},
 				},
 			}))
-		err := testEnvironment.Run()
-		require.NoError(t, err)
 	}
 
 	// skip adding blockscout for simplified deployments
@@ -1872,17 +1871,37 @@ func DeployEnvironments(
 			HttpURL: NetworkA.HTTPURLs[0],
 		}))
 	*/
-
-	if testEnvironment.WillUseRemoteRunner() {
-		return c
-	}
-
 	err := testEnvironment.
 		AddHelm(mockservercfg.New(nil)).
 		AddHelm(mockserver.New(nil)).
+		Run()
+	require.NoError(t, err)
+	if testEnvironment.WillUseRemoteRunner() {
+		return c
+	}
+	urlFinder := func(networkName string) ([]string, []string) {
+		var internalWsURLs, internalHttpURLs []string
+		for i := 0; i < numOfTxNodes; i++ {
+			podName := fmt.Sprintf("%s-ethereum-geth:%d", networkName, i)
+			txNodeInternalWs, err := testEnvironment.Fwd.FindPort(podName, "geth", "ws-rpc").As(env_client.RemoteConnection, env_client.WS)
+			require.NoError(t, err, "Error finding WS ports")
+			internalWsURLs = append(internalWsURLs, txNodeInternalWs)
+			txNodeInternalHttp, err := testEnvironment.Fwd.FindPort(podName, "geth", "http-rpc").As(env_client.RemoteConnection, env_client.HTTP)
+			require.NoError(t, err, "Error finding HTTP ports")
+			internalHttpURLs = append(internalHttpURLs, txNodeInternalHttp)
+		}
+		return internalWsURLs, internalHttpURLs
+	}
+	if NetworkA.Simulated {
+		NetworkA.URLs, NetworkA.HTTPURLs = urlFinder(NetworkA.Name)
+	}
+	if NetworkB.Simulated {
+		NetworkB.URLs, NetworkB.HTTPURLs = urlFinder(NetworkB.Name)
+	}
+	clProps["toml"] = DefaultCCIPCLNodeEnv(t)
+	err = testEnvironment.
 		AddHelm(chainlink.New(0, clProps)).
 		Run()
-
 	require.NoError(t, err)
 	return c
 }
@@ -1980,11 +1999,9 @@ func CCIPDefaultTestSetUp(
 
 	sourceChainClientA2B, err := blockchain.NewEVMClient(NetworkA, k8Env)
 	require.NoError(t, err, "Connecting to blockchain nodes shouldn't fail")
-	sourceChainClientA2B.ParallelTransactions(true)
 
 	destChainClientA2B, err := blockchain.NewEVMClient(NetworkB, k8Env)
 	require.NoError(t, err, "Connecting to blockchain nodes shouldn't fail")
-	destChainClientA2B.ParallelTransactions(true)
 
 	// For the reverse lane another set of clients(sourceChainClient,destChainClient)
 	// are required with new header subscriptions(otherwise transactions
@@ -1993,17 +2010,16 @@ func CCIPDefaultTestSetUp(
 	// ConcurrentEVMClient is a work-around for that.
 	sourceChainClientB2A, err := blockchain.ConcurrentEVMClient(NetworkB, k8Env, destChainClientA2B)
 	require.NoError(t, err, "Connecting to blockchain nodes shouldn't fail")
-	sourceChainClientB2A.ParallelTransactions(true)
 
 	destChainClientB2A, err := blockchain.ConcurrentEVMClient(NetworkA, k8Env, sourceChainClientA2B)
 	require.NoError(t, err, "Connecting to blockchain nodes shouldn't fail")
-	destChainClientB2A.ParallelTransactions(true)
 
+	ccipEnv.clNodeWithKeyReady = make(chan struct{})
 	setUpFuncs.Go(func() error {
 		if !configureCLNode {
 			return nil
 		}
-		ccipEnv.clNodeWithKeyReady = make(chan struct{})
+
 		err = ccipEnv.SetUpNodesAndKeys(ctx, big.NewFloat(1), sourceChainClientA2B, destChainClientA2B)
 		if err != nil {
 			allErrors = multierr.Append(allErrors, fmt.Errorf("setting up nodes and keys shouldn't fail; err -  %+v", err))
@@ -2077,7 +2093,7 @@ func CCIPDefaultTestSetUp(
 			err := ccipLaneB2A.DeployNewCCIPLane(numOfCommitNodes, commitAndExecOnSameDON, srcCommon, destCommon,
 				transferAmounts, false, configureCLNode)
 			if err != nil {
-				allErrors = multierr.Append(allErrors, fmt.Errorf("deploying lane A to B; err -  %+v", err))
+				allErrors = multierr.Append(allErrors, fmt.Errorf("deploying lane B to A; err -  %+v", err))
 			}
 			return err
 		}

@@ -52,7 +52,6 @@ func TestSoakCCIP(t *testing.T) {
 	transferAmounts := []*big.Int{big.NewInt(5e17), big.NewInt(5e17)}
 	laneA, laneB, tearDown = actions.CCIPDefaultTestSetUp(t, "soak-ccip", map[string]interface{}{
 		"replicas": "6",
-		"toml":     actions.DefaultCCIPCLNodeEnv(t),
 	}, transferAmounts, 5, true, true, true)
 
 	if laneA == nil {
