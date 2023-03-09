@@ -176,7 +176,7 @@ func TestCalculatePriceUpdates(t *testing.T) {
 		}, big.NewInt(3)},
 		{"insufficient", []CommitObservation{
 			{SourceGasPriceUSD: nil}, {SourceGasPriceUSD: nil}, {SourceGasPriceUSD: big.NewInt(3)},
-		}, nil},
+		}, big.NewInt(0)},
 		{"median including empties", []CommitObservation{
 			{SourceGasPriceUSD: nil}, {SourceGasPriceUSD: big.NewInt(1)}, {SourceGasPriceUSD: big.NewInt(2)},
 		}, big.NewInt(2)},

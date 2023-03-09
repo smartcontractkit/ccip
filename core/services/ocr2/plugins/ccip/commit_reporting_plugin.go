@@ -522,7 +522,8 @@ func calculatePriceUpdates(destChainId uint64, observations []CommitObservation)
 		return bytes.Compare(priceUpdates[i].SourceToken[:], priceUpdates[j].SourceToken[:]) == -1
 	})
 
-	var usdPerUnitGas *big.Int
+	// Must never be nil
+	usdPerUnitGas := big.NewInt(0)
 	// If majority report a gas price, include it in the update
 	if len(sourceGasObservations) <= len(observations)/2 {
 		destChainId = 0
