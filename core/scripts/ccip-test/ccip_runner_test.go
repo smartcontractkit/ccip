@@ -57,49 +57,17 @@ func TestDione(t *testing.T) {
 	don := dione.NewDON(ENV, logger.TestLogger(t))
 	don.ClearAllJobs(helpers.ChainName(int64(SOURCE.ChainConfig.ChainId)), helpers.ChainName(int64(DESTINATION.ChainConfig.ChainId)))
 	don.AddTwoWaySpecs(SOURCE, DESTINATION)
-}
 
-// TestUpdateAllLanes
-// 1. updates all the available lanes with new offramp, onramp, commit store
-// 2. creates new jobs
-// 3. set ocrconfig for both
-// OWNER_KEY  private key used to deploy all contracts and is used as default in all single user tests.
-func TestUpdateAllLanes(t *testing.T) {
-	ownerKey := checkOwnerKey(t)
-	seedKey := os.Getenv("SEED_KEY")
-	if seedKey == "" {
-		t.Error("must set seed key")
-	}
-	require.Equal(t, len(SOURCES), len(DESTINATIONS), "number of sources and destinations should match")
-	don := dione.NewDON(ENV, logger.TestLogger(t))
-	for i, src := range SOURCES {
-		dest := DESTINATIONS[i]
-		src.SetupChain(t, ownerKey)
-		dest.SetupChain(t, ownerKey)
-		if !src.DeploySettings.DeployCommitStore || !src.DeploySettings.DeployRamp {
-			src.Logger.Errorf("Please set \"DeployRamp and DeployCommitStore\" to true for the given EvmChainConfigs and make sure "+
-				"the right ones are set. Source: %d, Dest %d", src.ChainConfig.ChainId, dest.ChainConfig.ChainId)
-			continue
-		}
-		if !dest.DeploySettings.DeployCommitStore || !dest.DeploySettings.DeployRamp {
-			dest.Logger.Errorf("Please set \"DeployRamp and DeployCommitStore\" to true for the given EvmChainConfigs and make sure "+
-				"the right ones are set. Source: %d, Dest %d", dest.ChainConfig.ChainId, src.ChainConfig.ChainId)
-			continue
-		}
-		rhea.UpgradeLaneTwoWay(t, src, dest)
-		don.ClearAllJobs(helpers.ChainName(int64(src.ChainConfig.ChainId)), helpers.ChainName(int64(dest.ChainConfig.ChainId)))
-		don.AddTwoWaySpecs(*src, *dest)
-		client := NewCcipClient(t, *src, *dest, ownerKey, seedKey)
-		client.SetOCR2Config(ENV)
-		client = NewCcipClient(t, *dest, *src, ownerKey, seedKey)
-		client.SetOCR2Config(ENV)
-	}
+	// Sometimes jobs don't get added correctly. This script looks for missing jobs
+	// and attempts to add them.
+	don.AddMissingSpecs(DESTINATION, SOURCE)
+	don.AddMissingSpecs(SOURCE, DESTINATION)
 }
 
 // TestCCIP can be run as a test with the following config
 // OWNER_KEY  private key used to deploy all contracts and is used as default in all single user tests.
 // SEED_KEY   private key used for multi-user tests. Not needed when using the "deploy" command.
-// COMMAND    what function to run e.g. "deploy", "setConfig", or "externalExecution".
+// COMMAND    what function to run e.g. "deploy", "setConfig", or "gas".
 func TestCCIP(t *testing.T) {
 	ownerKey := checkOwnerKeyAndSetupChain(t)
 	command := os.Getenv("COMMAND")
@@ -173,6 +141,43 @@ func TestCCIP(t *testing.T) {
 		t.SkipNow()
 	default:
 		t.Errorf("Unknown command \"%s\"", command)
+	}
+}
+
+// TestUpdateAllLanes
+// 1. updates all the available lanes with new offramp, onramp, commit store
+// 2. creates new jobs
+// 3. set ocrconfig for both
+// OWNER_KEY  private key used to deploy all contracts and is used as default in all single user tests.
+func TestUpdateAllLanes(t *testing.T) {
+	ownerKey := checkOwnerKey(t)
+	seedKey := os.Getenv("SEED_KEY")
+	if seedKey == "" {
+		t.Error("must set seed key")
+	}
+	require.Equal(t, len(SOURCES), len(DESTINATIONS), "number of sources and destinations should match")
+	don := dione.NewDON(ENV, logger.TestLogger(t))
+	for i, src := range SOURCES {
+		dest := DESTINATIONS[i]
+		src.SetupChain(t, ownerKey)
+		dest.SetupChain(t, ownerKey)
+		if !src.DeploySettings.DeployCommitStore || !src.DeploySettings.DeployRamp {
+			src.Logger.Errorf("Please set \"DeployRamp and DeployCommitStore\" to true for the given EvmChainConfigs and make sure "+
+				"the right ones are set. Source: %d, Dest %d", src.ChainConfig.ChainId, dest.ChainConfig.ChainId)
+			continue
+		}
+		if !dest.DeploySettings.DeployCommitStore || !dest.DeploySettings.DeployRamp {
+			dest.Logger.Errorf("Please set \"DeployRamp and DeployCommitStore\" to true for the given EvmChainConfigs and make sure "+
+				"the right ones are set. Source: %d, Dest %d", dest.ChainConfig.ChainId, src.ChainConfig.ChainId)
+			continue
+		}
+		rhea.UpgradeLaneTwoWay(t, src, dest)
+		don.ClearAllJobs(helpers.ChainName(int64(src.ChainConfig.ChainId)), helpers.ChainName(int64(dest.ChainConfig.ChainId)))
+		don.AddTwoWaySpecs(*src, *dest)
+		client := NewCcipClient(t, *src, *dest, ownerKey, seedKey)
+		client.SetOCR2Config(ENV)
+		client = NewCcipClient(t, *dest, *src, ownerKey, seedKey)
+		client.SetOCR2Config(ENV)
 	}
 }
 

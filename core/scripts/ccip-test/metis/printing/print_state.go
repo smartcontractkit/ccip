@@ -13,6 +13,7 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/afn_contract"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
@@ -630,4 +631,108 @@ func PrintJobSpecs(env dione.Environment, sourceClient rhea.EvmDeploymentConfig,
 		jobs += fmt.Sprintf("\n# CCIP execution spec%s", specString)
 	}
 	fmt.Println(jobs)
+}
+
+func PrintBidirectionalTokenSupportState(source *rhea.EvmDeploymentConfig, destination *rhea.EvmDeploymentConfig) {
+	printTokenSupportState(source, destination)
+	printTokenSupportState(destination, source)
+}
+
+type TokenPool interface {
+	IsOnRamp(opts *bind.CallOpts, onRamp common.Address) (bool, error)
+	IsOffRamp(opts *bind.CallOpts, offRamp common.Address) (bool, error)
+}
+
+func printTokenSupportState(source *rhea.EvmDeploymentConfig, destination *rhea.EvmDeploymentConfig) {
+	TOKEN := rhea.CACHEGOLD
+	sourceTokenConfig := source.ChainConfig.SupportedTokens[TOKEN]
+	destTokenConfig := destination.ChainConfig.SupportedTokens[TOKEN]
+
+	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(source.LaneConfig.OnRamp, source.Client)
+	helpers.PanicErr(err)
+
+	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(destination.LaneConfig.OffRamp, destination.Client)
+	helpers.PanicErr(err)
+
+	var sourcePool, destPool TokenPool
+
+	if sourceTokenConfig.TokenPoolType == rhea.BurnMint {
+		sourcePool, err = burn_mint_token_pool.NewBurnMintTokenPool(sourceTokenConfig.Pool, source.Client)
+		helpers.PanicErr(err)
+	} else {
+		sourcePool, err = lock_release_token_pool.NewLockReleaseTokenPool(sourceTokenConfig.Pool, source.Client)
+		helpers.PanicErr(err)
+	}
+
+	if destTokenConfig.TokenPoolType == rhea.BurnMint {
+		destPool, err = burn_mint_token_pool.NewBurnMintTokenPool(destTokenConfig.Pool, destination.Client)
+		helpers.PanicErr(err)
+	} else {
+		destPool, err = lock_release_token_pool.NewLockReleaseTokenPool(destTokenConfig.Pool, destination.Client)
+		helpers.PanicErr(err)
+	}
+
+	tableHeaders := []string{"onRampAllowsToken", "onRampPoolCorrect", "onRampPricesSet", "offRampAllowsToken", "offRampPoolCorrect", "offRampPricesSet", "sourcePoolAllowsOnRamp", "destPoolAllowsOffRamp"}
+	headerLengths := []int{20, 20, 20, 20, 20, 20, 20, 20}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("\nToken support for %s -> %s \n", helpers.ChainName(int64(source.ChainConfig.ChainId)), helpers.ChainName(int64(destination.ChainConfig.ChainId))))
+	sb.WriteString(generateHeader(tableHeaders, headerLengths))
+
+	// Check
+	// onRamp token pool allowed
+	// onRamp token pool is correct
+	// onRamp prices set
+	// offRamp token pool allowed
+	// offRamp token pool is correct
+	// offRamp prices set
+	// source pool onRamp allowed
+	// dest pool offRamp allowed
+	var onRampAllowsPool, onRampPoolCorrect, onRampPricesSet, offRampAllowsPool, offRampPoolCorrect, offRampPricesSet, sourcePoolAllowsOnRamp, destPoolAllowsOffRamp bool
+
+	poolBySourceToken, err := onRamp.GetPoolBySourceToken(&bind.CallOpts{}, sourceTokenConfig.Token)
+	if err == nil && poolBySourceToken != common.HexToAddress("") {
+		onRampAllowsPool = true
+	}
+	if poolBySourceToken == sourceTokenConfig.Pool {
+		onRampPoolCorrect = true
+	}
+	price, err := onRamp.GetPricesForTokens(&bind.CallOpts{}, []common.Address{sourceTokenConfig.Token})
+	helpers.PanicErr(err)
+
+	if price[0].Uint64() != 0 {
+		onRampPricesSet = true
+	}
+	destPoolBySourceToken, err := offRamp.GetPoolBySourceToken(&bind.CallOpts{}, sourceTokenConfig.Token)
+	if err == nil && destPoolBySourceToken != common.HexToAddress("") {
+		offRampAllowsPool = true
+	}
+	if destPoolBySourceToken == destTokenConfig.Pool {
+		offRampPoolCorrect = true
+	}
+	destPrices, err := offRamp.GetPricesForTokens(&bind.CallOpts{}, []common.Address{destTokenConfig.Token})
+	helpers.PanicErr(err)
+
+	if destPrices[0].Uint64() != 0 {
+		offRampPricesSet = true
+	}
+
+	sourcePoolAllowsOnRamp, err = sourcePool.IsOnRamp(&bind.CallOpts{}, onRamp.Address())
+
+	destPoolAllowsOffRamp, err = destPool.IsOffRamp(&bind.CallOpts{}, offRamp.Address())
+
+	sb.WriteString(fmt.Sprintf("| %20s | %20s | %20s | %20s | %20s | %20s | %20s | %20s |\n",
+		printBool(onRampAllowsPool),
+		printBool(onRampPoolCorrect),
+		printBool(onRampPricesSet),
+		printBool(offRampAllowsPool),
+		printBool(offRampPoolCorrect),
+		printBool(offRampPricesSet),
+		printBool(sourcePoolAllowsOnRamp),
+		printBool(destPoolAllowsOffRamp),
+	))
+
+	sb.WriteString(generateSeparator(headerLengths))
+
+	source.Logger.Info(sb.String())
 }

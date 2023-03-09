@@ -26,6 +26,7 @@ var Beta_Sepolia = rhea.EVMChainConfig{
 			Pool:                 gethcommon.HexToAddress(""),
 			Price:                big.NewInt(1),
 			PriceFeedsAggregator: gethcommon.HexToAddress("0xc59E3633BAAC79493d908e63626716e204A45EdF"),
+			TokenPoolType:        rhea.LockRelease,
 		},
 		//rhea.WETH: {
 		//	Token:                gethcommon.HexToAddress("")
@@ -52,12 +53,14 @@ var Beta_OptimismGoerli = rhea.EVMChainConfig{
 			Pool:                 gethcommon.HexToAddress(""),
 			Price:                big.NewInt(1),
 			PriceFeedsAggregator: gethcommon.HexToAddress("0x69C5297001f38cCBE30a81359da06E5256bd28B9"),
+			TokenPoolType:        rhea.LockRelease,
 		},
 		rhea.WETH: {
 			Token:                gethcommon.HexToAddress("0x4200000000000000000000000000000000000006"),
 			Pool:                 gethcommon.HexToAddress(""),
 			Price:                big.NewInt(1),
 			PriceFeedsAggregator: gethcommon.HexToAddress("0x69C5297001f38cCBE30a81359da06E5256bd28B9"),
+			TokenPoolType:        rhea.LockRelease,
 		},
 	},
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WETH},
@@ -78,12 +81,14 @@ var Beta_AvaxFuji = rhea.EVMChainConfig{
 			Pool:                 gethcommon.HexToAddress(""),
 			Price:                big.NewInt(1),
 			PriceFeedsAggregator: gethcommon.HexToAddress("0x34C4c526902d88a3Aa98DB8a9b802603EB1E3470"),
+			TokenPoolType:        rhea.LockRelease,
 		},
 		rhea.WAVAX: {
 			Token:                gethcommon.HexToAddress("0xd00ae08403B9bbb9124bB305C09058E32C39A48c"),
 			Pool:                 gethcommon.HexToAddress(""),
 			Price:                big.NewInt(1),
 			PriceFeedsAggregator: gethcommon.HexToAddress("0x6C2441920404835155f33d88faf0545B895871b1"),
+			TokenPoolType:        rhea.LockRelease,
 		},
 	},
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WAVAX},

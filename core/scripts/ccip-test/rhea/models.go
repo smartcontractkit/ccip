@@ -53,6 +53,13 @@ const (
 	CACHEGOLD Token = "CACHE.gold"
 )
 
+type TokenPoolType string
+
+const (
+	LockRelease TokenPoolType = "lockRelease"
+	BurnMint    TokenPoolType = "burnMint"
+)
+
 func GetAllTokens() []Token {
 	return []Token{
 		LINK, WETH, WAVAX,
@@ -79,6 +86,7 @@ type EVMBridgedToken struct {
 	Pool                 gethcommon.Address
 	Price                *big.Int
 	PriceFeedsAggregator gethcommon.Address
+	TokenPoolType
 }
 
 type EVMLaneConfig struct {
