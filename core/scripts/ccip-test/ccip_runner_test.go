@@ -5,17 +5,30 @@ import (
 	"os"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/dione"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/metis/printing"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea/deployments"
+	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
 )
 
 var (
 	SOURCE      = deployments.Beta_AvaxFujiToSepolia
 	DESTINATION = deployments.Beta_SepoliaToAvaxFuji
-	ENV         = dione.StagingBeta
+	SOURCES     = []*rhea.EvmDeploymentConfig{
+		&deployments.Beta_SepoliaToAvaxFuji,
+		&deployments.Beta_SepoliaToOptimismGoerli,
+		&deployments.Beta_AvaxFujiToOptimismGoerli,
+	}
+	DESTINATIONS = []*rhea.EvmDeploymentConfig{
+		&deployments.Beta_AvaxFujiToSepolia,
+		&deployments.Beta_OptimismGoerliToSepolia,
+		&deployments.Beta_OptimismGoerliToAvaxFuji,
+	}
+	ENV = dione.StagingBeta
 )
 
 var envToChainConfigs = map[dione.Environment][]rhea.EvmDeploymentConfig{
@@ -42,8 +55,45 @@ func TestDione(t *testing.T) {
 	checkOwnerKeyAndSetupChain(t)
 
 	don := dione.NewDON(ENV, logger.TestLogger(t))
-	don.ClearAllJobs(dione.AvaxFuji, dione.Sepolia)
+	don.ClearAllJobs(helpers.ChainName(int64(SOURCE.ChainConfig.ChainId)), helpers.ChainName(int64(DESTINATION.ChainConfig.ChainId)))
 	don.AddTwoWaySpecs(SOURCE, DESTINATION)
+}
+
+// TestUpdateAllLanes
+// 1. updates all the available lanes with new offramp, onramp, commit store
+// 2. creates new jobs
+// 3. set ocrconfig for both
+// OWNER_KEY  private key used to deploy all contracts and is used as default in all single user tests.
+func TestUpdateAllLanes(t *testing.T) {
+	ownerKey := checkOwnerKey(t)
+	seedKey := os.Getenv("SEED_KEY")
+	if seedKey == "" {
+		t.Error("must set seed key")
+	}
+	require.Equal(t, len(SOURCES), len(DESTINATIONS), "number of sources and destinations should match")
+	don := dione.NewDON(ENV, logger.TestLogger(t))
+	for i, src := range SOURCES {
+		dest := DESTINATIONS[i]
+		src.SetupChain(t, ownerKey)
+		dest.SetupChain(t, ownerKey)
+		if !src.DeploySettings.DeployCommitStore || !src.DeploySettings.DeployRamp {
+			src.Logger.Errorf("Please set \"DeployRamp and DeployCommitStore\" to true for the given EvmChainConfigs and make sure "+
+				"the right ones are set. Source: %d, Dest %d", src.ChainConfig.ChainId, dest.ChainConfig.ChainId)
+			continue
+		}
+		if !dest.DeploySettings.DeployCommitStore || !dest.DeploySettings.DeployRamp {
+			dest.Logger.Errorf("Please set \"DeployRamp and DeployCommitStore\" to true for the given EvmChainConfigs and make sure "+
+				"the right ones are set. Source: %d, Dest %d", dest.ChainConfig.ChainId, src.ChainConfig.ChainId)
+			continue
+		}
+		rhea.UpgradeLaneTwoWay(t, src, dest)
+		don.ClearAllJobs(helpers.ChainName(int64(src.ChainConfig.ChainId)), helpers.ChainName(int64(dest.ChainConfig.ChainId)))
+		don.AddTwoWaySpecs(*src, *dest)
+		client := NewCcipClient(t, *src, *dest, ownerKey, seedKey)
+		client.SetOCR2Config(ENV)
+		client = NewCcipClient(t, *dest, *src, ownerKey, seedKey)
+		client.SetOCR2Config(ENV)
+	}
 }
 
 // TestCCIP can be run as a test with the following config
@@ -96,7 +146,7 @@ func TestCCIP(t *testing.T) {
 		// Set the config to the onRamp fee
 	case "setAllowList":
 		client.setAllowList(t)
-		// Set the config to the onRamp AllowList
+	// Set the config to the onRamp AllowList
 	case "upgradeLane":
 		rhea.UpgradeLane(t, &SOURCE, &DESTINATION)
 	case "gov":
@@ -107,6 +157,8 @@ func TestCCIP(t *testing.T) {
 	case "batching":
 		// Submit 10 txs. This should result in the txs being batched together
 		client.ScalingAndBatching(t)
+	case "gas":
+		client.TestGasVariousTxs(t)
 	case "acceptOwnership":
 		// Should accept ownership on the destination chain OffRamp & Executor
 		client.AcceptOwnership(t)
@@ -182,4 +234,29 @@ func checkOwnerKey(t *testing.T) string {
 	}
 
 	return ownerKey
+}
+
+// This ALWAYS uses the production env
+func Test__PROD__SetAllowListAllLanes(t *testing.T) {
+	ownerKey := checkOwnerKey(t)
+
+	// Simply comment out the lanes that are not needed.
+	allProdLanes := []*rhea.EvmDeploymentConfig{
+		&deployments.Prod_SepoliaToOptimismGoerli,
+		&deployments.Prod_SepoliaToAvaxFuji,
+
+		&deployments.Prod_AvaxFujiToSepolia,
+		&deployments.Prod_AvaxFujiToOptimismGoerli,
+
+		&deployments.Prod_OptimismGoerliToAvaxFuji,
+		&deployments.Prod_OptimismGoerliToSepolia,
+	}
+
+	for _, lane := range allProdLanes {
+		lane.SetupChain(t, ownerKey)
+		client := CCIPClient{Source: NewSourceClient(t, *lane)}
+		client.Source.Owner = rhea.GetOwner(t, ownerKey, client.Source.ChainId, lane.ChainConfig.GasSettings)
+
+		client.setAllowList(t)
+	}
 }

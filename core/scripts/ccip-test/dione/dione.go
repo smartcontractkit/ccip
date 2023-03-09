@@ -170,7 +170,7 @@ func (don *DON) PopulateEthKeys() {
 	}
 }
 
-func (don *DON) ClearJobSpecs(jobType JobType, source Chain, destination Chain) {
+func (don *DON) ClearJobSpecs(jobType JobType, source string, destination string) {
 	jobToDelete := fmt.Sprintf("ccip-%s-%s-%s", jobType, source, destination)
 
 	for i, node := range don.Nodes {
@@ -216,7 +216,7 @@ func (don *DON) LoadCurrentNodeParams() {
 	don.PrintConfig()
 }
 
-func (don *DON) ClearAllJobs(chainA Chain, chainB Chain) {
+func (don *DON) ClearAllJobs(chainA string, chainB string) {
 	don.ClearJobSpecs(Commit, chainA, chainB)
 	don.ClearJobSpecs(Execution, chainA, chainB)
 	don.ClearJobSpecs(Commit, chainB, chainA)

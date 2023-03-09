@@ -87,6 +87,10 @@ func deployDestinationContracts(t *testing.T, client *EvmDeploymentConfig, sourc
 		setOffRampOnTokenPools(t, client)
 	}
 
+	if client.DeploySettings.DeployRamp || client.DeploySettings.DeployRouter {
+		setOffRampOnRouter(t, sourceChainId, client)
+	}
+
 	// Updates destClient.ReceiverDapp if any new contracts are deployed
 	deployReceiverDapp(t, client)
 	client.Logger.Infof("%s contracts fully deployed as destination chain", helpers.ChainName(int64(client.ChainConfig.ChainId)))
@@ -287,7 +291,7 @@ func DeployPingPongDapps(t *testing.T, sourceClient *EvmDeploymentConfig, destCl
 	fundingAmount := big.NewInt(1e18)
 
 	if sourceClient.DeploySettings.DeployPingPongDapp {
-		feeToken := sourceClient.ChainConfig.SupportedTokens[WETH].Token
+		feeToken := sourceClient.ChainConfig.SupportedTokens[LINK].Token
 		sourceClient.Logger.Infof("Deploying source chain ping pong dapp")
 
 		pingPongDappAddress, tx, _, err := ping_pong_demo.DeployPingPongDemo(
@@ -306,7 +310,7 @@ func DeployPingPongDapps(t *testing.T, sourceClient *EvmDeploymentConfig, destCl
 	}
 
 	if destClient.DeploySettings.DeployPingPongDapp {
-		feeToken := destClient.ChainConfig.SupportedTokens[WAVAX].Token
+		feeToken := destClient.ChainConfig.SupportedTokens[LINK].Token
 		destClient.Logger.Infof("Deploying destination chain ping pong dapp")
 
 		pingPongDappAddress, tx, _, err := ping_pong_demo.DeployPingPongDemo(

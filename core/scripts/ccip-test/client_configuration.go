@@ -128,6 +128,7 @@ type Client struct {
 	ChainId          uint64
 	LinkToken        *link_token_interface.LinkToken
 	LinkTokenAddress common.Address
+	WrappedNative    *link_token_interface.LinkToken
 	SupportedTokens  map[rhea.Token]EVMBridgedToken
 	GovernanceDapp   *governance_dapp.GovernanceDapp
 	PingPongDapp     *ping_pong_demo.PingPongDemo
@@ -154,6 +155,9 @@ type SourceClient struct {
 
 func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient {
 	LinkToken, err := link_token_interface.NewLinkToken(config.ChainConfig.SupportedTokens[rhea.LINK].Token, config.Client)
+	shared.RequireNoError(t, err)
+
+	wrappedNative, err := link_token_interface.NewLinkToken(config.ChainConfig.SupportedTokens[config.ChainConfig.WrappedNative].Token, config.Client)
 	shared.RequireNoError(t, err)
 
 	supportedTokens := map[rhea.Token]EVMBridgedToken{}
@@ -187,6 +191,7 @@ func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient
 			ChainId:          config.ChainConfig.ChainId,
 			LinkTokenAddress: config.ChainConfig.SupportedTokens[rhea.LINK].Token,
 			LinkToken:        LinkToken,
+			WrappedNative:    wrappedNative,
 			Afn:              afn,
 			PriceRegistry:    priceRegistry,
 			SupportedTokens:  supportedTokens,
@@ -211,8 +216,9 @@ type DestClient struct {
 }
 
 func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestClient {
-	LinkToken, err := link_token_interface.NewLinkToken(config.ChainConfig.SupportedTokens[rhea.LINK].Token, config.Client)
+	linkToken, err := link_token_interface.NewLinkToken(config.ChainConfig.SupportedTokens[rhea.LINK].Token, config.Client)
 	shared.RequireNoError(t, err)
+	wrappedNative, err := link_token_interface.NewLinkToken(config.ChainConfig.SupportedTokens[config.ChainConfig.WrappedNative].Token, config.Client)
 
 	supportedTokens := map[rhea.Token]EVMBridgedToken{}
 	for token, tokenConfig := range config.ChainConfig.SupportedTokens {
@@ -250,7 +256,8 @@ func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestCli
 			Client:           config.Client,
 			ChainId:          config.ChainConfig.ChainId,
 			LinkTokenAddress: config.ChainConfig.SupportedTokens[rhea.LINK].Token,
-			LinkToken:        LinkToken,
+			LinkToken:        linkToken,
+			WrappedNative:    wrappedNative,
 			SupportedTokens:  supportedTokens,
 			GovernanceDapp:   governanceDapp,
 			PingPongDapp:     pingPongDapp,
@@ -1087,4 +1094,98 @@ func (client *CCIPClient) SyncTokenPools(t *testing.T) {
 
 	waitPendingTxs(&client.Source.Client, &sourcePendingTxs)
 	waitPendingTxs(&client.Dest.Client, &destPendingTxs)
+}
+
+func (client *CCIPClient) TestGasVariousTxs(t *testing.T) {
+	client.sendLinkTx(t, client.Source.Owner, false)
+	// we wait in between txs to make sure they're not batched
+	time.Sleep(5 * time.Second)
+	client.sendWrappedNativeTx(t, client.Source.Owner, false)
+	time.Sleep(5 * time.Second)
+	client.sendNativeTx(t, client.Source.Owner, false)
+	time.Sleep(5 * time.Second)
+	client.sendLinkTx(t, client.Source.Owner, true)
+	time.Sleep(5 * time.Second)
+	client.sendWrappedNativeTx(t, client.Source.Owner, true)
+	time.Sleep(5 * time.Second)
+	client.sendNativeTx(t, client.Source.Owner, true)
+}
+
+func (client *CCIPClient) getBasicTx(t *testing.T, feeToken common.Address, includesToken bool) router.ClientEVM2AnyMessage {
+	msg := router.ClientEVM2AnyMessage{
+		Receiver:     testhelpers.MustEncodeAddress(t, client.Dest.Owner.From),
+		Data:         []byte{},
+		TokenAmounts: []router.ClientEVMTokenAmount{},
+		FeeToken:     feeToken,
+		ExtraArgs:    []byte{},
+	}
+	if includesToken {
+		msg.TokenAmounts = append(msg.TokenAmounts, router.ClientEVMTokenAmount{
+			Token:  client.Source.LinkTokenAddress,
+			Amount: big.NewInt(100),
+		})
+	}
+	return msg
+}
+
+func (client *CCIPClient) sendLinkTx(t *testing.T, from *bind.TransactOpts, token bool) *evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested {
+	msg := client.getBasicTx(t, client.Source.LinkTokenAddress, token)
+
+	fee, err := client.Source.Router.GetFee(&bind.CallOpts{}, client.Dest.ChainId, msg)
+	shared.RequireNoError(t, err)
+	if token {
+		fee.Add(fee, msg.TokenAmounts[0].Amount)
+	}
+
+	client.Source.ApproveLinkFrom(t, from, client.Source.Router.Address(), fee)
+
+	sourceBlockNumber := GetCurrentBlockNumber(client.Source.Client.Client)
+	tx, err := client.Source.Router.CcipSend(from, client.Dest.ChainId, msg)
+	shared.RequireNoError(t, err)
+	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+	client.Source.logger.Warnf("Message sent for max %d gas %s", tx.Gas(), helpers.ExplorerLink(int64(client.Source.ChainId), tx.Hash()))
+
+	return WaitForCrossChainSendRequest(client.Source, sourceBlockNumber, tx.Hash())
+}
+
+func (client *CCIPClient) sendWrappedNativeTx(t *testing.T, from *bind.TransactOpts, token bool) *evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested {
+	msg := client.getBasicTx(t, client.Source.WrappedNative.Address(), token)
+
+	fee, err := client.Source.Router.GetFee(&bind.CallOpts{}, client.Dest.ChainId, msg)
+	shared.RequireNoError(t, err)
+
+	tx, err := client.Source.WrappedNative.Approve(from, client.Source.Router.Address(), fee)
+	shared.RequireNoError(t, err)
+	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+
+	if token {
+		client.Source.ApproveLinkFrom(t, from, client.Source.Router.Address(), msg.TokenAmounts[0].Amount)
+	}
+
+	sourceBlockNumber := GetCurrentBlockNumber(client.Source.Client.Client)
+	tx, err = client.Source.Router.CcipSend(from, client.Dest.ChainId, msg)
+	shared.RequireNoError(t, err)
+	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+	client.Source.logger.Warnf("Message sent for max %d gas %s", tx.Gas(), helpers.ExplorerLink(int64(client.Source.ChainId), tx.Hash()))
+	return WaitForCrossChainSendRequest(client.Source, sourceBlockNumber, tx.Hash())
+}
+
+func (client *CCIPClient) sendNativeTx(t *testing.T, from *bind.TransactOpts, token bool) *evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested {
+	msg := client.getBasicTx(t, common.Address{}, token)
+
+	fee, err := client.Source.Router.GetFee(&bind.CallOpts{}, client.Dest.ChainId, msg)
+	shared.RequireNoError(t, err)
+
+	if token {
+		client.Source.ApproveLinkFrom(t, from, client.Source.Router.Address(), msg.TokenAmounts[0].Amount)
+	}
+	from.Value = fee
+
+	sourceBlockNumber := GetCurrentBlockNumber(client.Source.Client.Client)
+	tx, err := client.Source.Router.CcipSend(from, client.Dest.ChainId, msg)
+	shared.RequireNoError(t, err)
+	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+	from.Value = big.NewInt(0)
+	client.Source.logger.Warnf("Message sent for max %d gas %s", tx.Gas(), helpers.ExplorerLink(int64(client.Source.ChainId), tx.Hash()))
+	return WaitForCrossChainSendRequest(client.Source, sourceBlockNumber, tx.Hash())
 }
