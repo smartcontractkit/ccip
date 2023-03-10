@@ -1271,6 +1271,21 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash string) {
 
 func (lane *CCIPLane) SoakRun(interval, duration time.Duration) (int, int) {
 	t := lane.t
+	var err error
+	// if interval and duration is provided in env variable, use that
+	if intervalEnv := os.Getenv("CCIP_TEST_INTERVAL"); intervalEnv != "" {
+		interval, err = time.ParseDuration(intervalEnv)
+		if err != nil {
+			t.Fatal("invalid interval provided - ", err)
+		}
+	}
+	if durationEnv := os.Getenv("CCIP_TEST_DURATION"); durationEnv != "" {
+		duration, err = time.ParseDuration(durationEnv)
+		if err != nil {
+			t.Fatal("invalid duration provided - ", err)
+		}
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), duration)
 	defer cancel()
 	ticker := time.NewTicker(interval)
@@ -2020,10 +2035,20 @@ func CCIPDefaultTestSetUp(
 			return nil
 		}
 
-		err = ccipEnv.SetUpNodesAndKeys(ctx, big.NewFloat(1), sourceChainClientA2B, destChainClientA2B)
+		// if CCIP_CHAINLINK_NODE_FUNDING env variable is provided, use that value to fund the CL nodes
+		// else use the default value of 1 ETH
+		fundingAmount := big.NewFloat(1)
+		if fundingAmountStr := os.Getenv("CCIP_CHAINLINK_NODE_FUNDING"); fundingAmountStr != "" {
+			fundingAmount, _ = big.NewFloat(0).SetString(fundingAmountStr)
+			if fundingAmount == nil {
+				return errors.WithStack(fmt.Errorf("invalid CCIP_CHAINLINK_NODE_FUNDING env variable value: %s", fundingAmountStr))
+			}
+		}
+		err = ccipEnv.SetUpNodesAndKeys(ctx, fundingAmount, sourceChainClientA2B, destChainClientA2B)
 		if err != nil {
 			allErrors = multierr.Append(allErrors, fmt.Errorf("setting up nodes and keys shouldn't fail; err -  %+v", err))
 		} else {
+			ccipEnv.clNodeWithKeyReady = make(chan struct{})
 			// sends value in channel to denote job creation for the lanes can be started
 			ccipEnv.clNodeWithKeyReady <- struct{}{}
 			if bidirectional {

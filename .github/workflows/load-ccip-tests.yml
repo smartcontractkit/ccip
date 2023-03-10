@@ -8,7 +8,12 @@ on:
   workflow_dispatch:
     inputs:
       chaos-run:
-        description: 'Run the chaos tests'
+        description: 'Run chaos tests'
+        required: true
+        default: false
+        type: boolean
+      load-run:
+        description: 'Run load tests'
         required: true
         default: false
         type: boolean
@@ -125,6 +130,7 @@ jobs:
     name: ccip-load-tests
     runs-on: ubuntu-latest
     needs: [ build-chainlink, build-test-image ]
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'push' || inputs.load-run != false}}
     env:
       SELECTED_NETWORKS: SIMULATED,SIMULATED_1,SIMULATED_2
       CHAINLINK_COMMIT_SHA: ${{ github.sha }}
@@ -204,7 +210,7 @@ jobs:
     name: ccip-chaos-tests
     runs-on: ubuntu-latest
     needs: [ build-chainlink, build-test-image ]
-    if: ${{ github.event_name == 'schedule' || inputs.chaos-run != false}}
+    if: ${{ github.event_name == 'schedule'|| github.event_name == 'push' || inputs.chaos-run != false}}
     env:
       SELECTED_NETWORKS: SIMULATED,SIMULATED_1,SIMULATED_2
       TEST_SUITE: chaos

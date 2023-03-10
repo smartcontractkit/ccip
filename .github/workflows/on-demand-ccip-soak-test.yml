@@ -1,0 +1,168 @@
+name: On demand CCIP Bi-directional Soak Test in Testnet
+on:
+  workflow_dispatch:
+    inputs:
+      existing-deployment:
+        description: 'Run soak tests on already deployed contracts and jobs'
+        required: false
+        default: false
+        type: boolean
+      network1:
+        description: 1st Network of network pairs to run tests on
+        type: choice
+        default: "SIMULATED_1"
+        options:
+          - "SIMULATED_1"
+          - "OPTIMISM_GOERLI"
+          - "SEPOLIA"
+          - "GOERLI"
+      network2:
+        description: 2nd Network of network pairs to run tests on
+        type: choice
+        default: "SIMULATED_2"
+        options:
+          - "SIMULATED_2"
+          - "OPTIMISM_GOERLI"
+          - "SEPOLIA"
+          - "GOERLI"
+      fundingPrivateKey:
+        description: Private funding key (Skip for Simulated)
+        required: false
+        type: string
+      chainlinkImage:
+        description: Container image location for the Chainlink nodes
+        required: true
+        default: public.ecr.aws/chainlink/chainlink
+      chainlinkVersion:
+        description: Container image version for the Chainlink nodes
+        required: true
+        default: "latest"
+      chainlinkTestVersion:
+        description: Container image version for the Chainlink tests
+        required: false
+        default: ""
+      chainlinkNodeFunding:
+        description: How much to fund each Chainlink node (in ETH)
+        required: false
+        default: "0.5"
+      testDuration:
+        description: Duration of the test (time string)
+        required: false
+        default: 15m
+      testInterval:
+        description: How long to wait before triggering a new ccip request
+        required: false
+        default: 1m
+
+jobs:
+  ccip_soak_test:
+    name: CCIP Soak Test
+    environment: integration
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write
+      pull-requests: write
+      id-token: write
+      contents: read
+    env:
+      CHAINLINK_COMMIT_SHA: ${{ inputs.chainlinkVersion }}
+      CHAINLINK_ENV_USER: ${{ github.actor }}
+      SELECTED_NETWORKS: ${{ inputs.network1 }},${{ inputs.network2 }}
+      EVM_KEYS: ${{ inputs.fundingPrivateKey }}
+      TEST_CCIP_TEST_DURATION: ${{ inputs.testDuration }}
+      TEST_CCIP_CHAINLINK_NODE_FUNDING: ${{ inputs.chainlinkNodeFunding }}
+      TEST_CCIP_TEST_INTERVAL: ${{ inputs.testInterval }}
+      TEST_LOG_LEVEL: debug
+      REF_NAME: ${{ github.head_ref || github.ref_name }}
+      ENV_JOB_IMAGE_BASE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-ccip-tests
+      GOERLI_URLS: ${{ secrets.QA_GOERLI_URLS }}
+      TEST_GOERLI_URLS: ${{ secrets.QA_GOERLI_URLS }}
+      GOERLI_HTTP_URLS: ${{ secrets.QA_GOERLI_HTTP_URLS }}
+      TEST_GOERLI_HTTP_URLS: ${{ secrets.QA_GOERLI_HTTP_URLS }}
+      OPTIMISM_GOERLI_URLS: ${{ secrets.QA_OPTIMISM_GOERLI_URLS }}
+      TEST_OPTIMISM_GOERLI_URLS: ${{ secrets.QA_OPTIMISM_GOERLI_URLS }}
+      OPTIMISM_GOERLI_HTTP_URLS: ${{ secrets.QA_OPTIMISM_GOERLI_HTTP_URLS }}
+      TEST_OPTIMISM_GOERLI_HTTP_URLS: ${{ secrets.QA_OPTIMISM_GOERLI_HTTP_URLS }}
+      SEPOLIA_URLS: ${{ secrets.QA_SEPOLIA_URLS }}
+      TEST_SEPOLIA_URLS: ${{ secrets.QA_SEPOLIA_URLS }}
+      SEPOLIA_HTTP_URLS: ${{ secrets.QA_SEPOLIA_HTTP_URLS }}
+      TEST_SEPOLIA_HTTP_URLS: ${{ secrets.QA_SEPOLIA_HTTP_URLS }}
+      AVALANCHE_FUJI_URLS: ${{ secrets.QA_AVALANCHE_FUJI_URLS }}
+      TEST_AVALANCHE_FUJI_URLS: ${{ secrets.QA_AVALANCHE_FUJI_URLS }}
+      AVALANCHE_FUJI_HTTP_URLS: ${{ secrets.QA_AVALANCHE_FUJI_HTTP_URLS }}
+      TEST_AVALANCHE_FUJI_HTTP_URLS: ${{ secrets.QA_AVALANCHE_FUJI_HTTP_URLS }}
+    steps:
+      - name: Collect Metrics
+        id: collect-gha-metrics
+        uses: smartcontractkit/push-gha-metrics-action@v1
+        with:
+          basic-auth: ${{ secrets.GRAFANA_CLOUD_BASIC_AUTH }}
+          hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
+          this-job-name: ${{ inputs.network1 }} - ${{ inputs.network2 }} CCIP bi-directional Soak Test
+        continue-on-error: true
+      - name: Checkout the repo
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        with:
+          ref: ${{ env.REF_NAME }}
+      - name: Setup Push Tag
+        id: push
+        shell: bash
+        run: |
+          echo "### chainlink image used for this test run :link:" >>$GITHUB_STEP_SUMMARY
+          echo "\`${{ inputs.chainlinkVersion }}\`" >>$GITHUB_STEP_SUMMARY
+          echo "### chainlink-tests image tag for this test run :ship:" >>$GITHUB_STEP_SUMMARY
+          if [ "${{ inputs.chainlinkTestVersion }}" != "" ]; then
+             # use provided chainlink test image version if not blank
+            echo "tag=${{ env.ENV_JOB_IMAGE_BASE }}:${{ inputs.chainlinkTestVersion }}" >>$GITHUB_OUTPUT
+            echo "\`${{ inputs.chainlinkTestVersion }}\`" >>$GITHUB_STEP_SUMMARY
+          elif [ "${{ env.REF_NAME }}" != "ccip-develop" ]; then
+           # use sha if not on develop
+            echo "tag=${{ env.ENV_JOB_IMAGE_BASE }}:soak.${{ github.sha }}" >>$GITHUB_OUTPUT
+            echo "\`soak.${{ github.sha }}\`" >>$GITHUB_STEP_SUMMARY
+          else
+            # default to develop
+            echo "tag=${{ env.ENV_JOB_IMAGE_BASE }}:develop" >>$GITHUB_OUTPUT
+            echo "\`develop\`" >>$GITHUB_STEP_SUMMARY
+          fi
+      - name: build test runner
+        # build the image if the test image is not provided and the branch is not ccip-develop
+        if: ${{ inputs.chainlinkTestVersion == '' && env.REF_NAME != 'ccip-develop' }}
+        uses: smartcontractkit/chainlink-github-actions/docker/build-push@ce87f8986ca18336cc5015df75916c2ec0a7c4b3 # v2.1.2
+        with:
+          tags: ${{ steps.push.outputs.tag }}
+          file: ./integration-tests/test.Dockerfile
+          build-args: |
+            BASE_IMAGE=${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/test-base-image
+            IMAGE_VERSION=v0.3.17
+            SUITES="soak"
+          AWS_REGION: ${{ secrets.QA_AWS_REGION }}
+          AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+      - name: set test name
+        id: soaktest
+        shell: bash
+        run: |
+          if [ "${{ inputs.existing-deployment }}" != "true" ]; then
+            echo "### Running  test for existing deployment :link:" >>$GITHUB_STEP_SUMMARY
+            echo "name=TestExistingDeploymentSoakCCIP" >>$GITHUB_OUTPUT
+          else
+            echo "### Running test with contracts and jobs deployed from scratch :link:" >>$GITHUB_STEP_SUMMARY
+            echo "name=TestSoakCCIP" >>$GITHUB_OUTPUT
+          fi
+      - name: Run Tests
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@ce87f8986ca18336cc5015df75916c2ec0a7c4b3 # v2.1.2
+        env:
+          DETACH_RUNNER: true
+          TEST_SUITE: soak
+          TEST_ARGS: -test.timeout 900h -test.memprofile memprofile.out -test.cpuprofile profile.out
+          ENV_JOB_IMAGE: ${{ steps.push.outputs.tag }}
+        with:
+          test_command_to_run: cd ./integration-tests && go test -v -count=1 -run ^${{ steps.soaktest.outputs.name }}$ ./soak
+          test_download_vendor_packages_command: make gomod
+          cl_repo: ${{ inputs.chainlinkImage }}
+          cl_image_tag: ${{ inputs.chainlinkVersion }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          should_cleanup: false
+          go_mod_path: ./integration-tests/go.mod
+          QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
+          QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+          QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
