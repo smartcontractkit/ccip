@@ -107,9 +107,9 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 		return nil, err
 	}
 
-	// subscribe for GasFeeUpdated logs, but Prices is only available as part of onchain commitStore's config
+	// subscribe for GasFeeUpdated logs, but the PriceRegistry is only available as part of onchain commitStore's config
 	// TODO: how to detect if commitStoreConfig.PriceRegistry changes on-chain? Currently, we expect a plugin/job/node restart
-	prices, err := price_registry.NewPriceRegistry(dynamicConfig.PriceRegistry, destChain.Client())
+	priceRegistry, err := price_registry.NewPriceRegistry(dynamicConfig.PriceRegistry, destChain.Client())
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +147,7 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 			reqEventSig:         eventSigs,
 			onRamp:              onRamp.Address(),
 			offRamp:             offRamp,
-			priceRegistry:       prices,
+			priceRegistry:       priceRegistry,
 			priceGetter:         priceGetterObject,
 			sourceNative:        sourceNative,
 			sourceGasEstimator:  sourceChain.TxManager().GetGasEstimator(),

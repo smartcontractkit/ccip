@@ -649,7 +649,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		60*60*24*14, // two weeks
 	)
 	require.NoError(t, err)
-	destPrices, err := price_registry.NewPriceRegistry(destPricesAddress, destChain)
+	destPriceRegistry, err := price_registry.NewPriceRegistry(destPricesAddress, destChain)
 	require.NoError(t, err)
 
 	// Deploy commit store.
@@ -714,7 +714,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	)
 	require.NoError(t, err)
 	destChain.Commit()
-	_, err = destPrices.ApplyPriceUpdatersUpdates(destUser, []common.Address{commitStoreAddress}, []common.Address{})
+	_, err = destPriceRegistry.ApplyPriceUpdatersUpdates(destUser, []common.Address{commitStoreAddress}, []common.Address{})
 	require.NoError(t, err)
 	_, err = destRouter.ApplyRampUpdates(destUser, nil, []router.IRouterOffRampUpdate{
 		{SourceChainId: sourceChainID, OffRamps: []common.Address{offRampAddress}}})
@@ -764,7 +764,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			CustomPool:    nil,
 			CustomToken:   destCustomToken,
 			AFN:           destAFN,
-			PriceRegistry: destPrices,
+			PriceRegistry: destPriceRegistry,
 		},
 		CommitStore: commitStore,
 		Router:      destRouter,

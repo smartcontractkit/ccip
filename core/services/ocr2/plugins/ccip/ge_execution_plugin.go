@@ -133,15 +133,11 @@ type ExecutionReportingPlugin struct {
 	snoozedRoots   map[[32]byte]time.Time
 }
 
-type Query struct {
-	TokenPrices map[common.Address]*big.Int `json:"tokenPrices"`
-}
-
-func (r *ExecutionReportingPlugin) Query(ctx context.Context, timestamp types.ReportTimestamp) (types.Query, error) {
+func (r *ExecutionReportingPlugin) Query(context.Context, types.ReportTimestamp) (types.Query, error) {
 	return types.Query{}, nil
 }
 
-func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp types.ReportTimestamp, query types.Query) (types.Observation, error) {
+func (r *ExecutionReportingPlugin) Observation(context.Context, types.ReportTimestamp, types.Query) (types.Observation, error) {
 	lggr := r.lggr.Named("ExecutionObservation")
 	if isCommitStoreDownNow(lggr, r.config.commitStore) {
 		return nil, ErrCommitStoreIsDown
@@ -316,7 +312,7 @@ func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNums 
 	)
 }
 
-func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.ReportTimestamp, query types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
+func (r *ExecutionReportingPlugin) Report(_ context.Context, _ types.ReportTimestamp, _ types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
 	lggr := r.lggr.Named("Report")
 	if isCommitStoreDownNow(lggr, r.config.commitStore) {
 		return false, nil, ErrCommitStoreIsDown
@@ -402,7 +398,7 @@ func (r *ExecutionReportingPlugin) addToInflight(lggr logger.Logger, seqNrs []ui
 	return nil
 }
 
-func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context, timestamp types.ReportTimestamp, report types.Report) (bool, error) {
+func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(_ context.Context, _ types.ReportTimestamp, report types.Report) (bool, error) {
 	lggr := r.lggr.Named("ShouldAcceptFinalizedReport")
 	seqNrs, encMsgs, err := MessagesFromExecutionReport(report)
 	if err != nil {

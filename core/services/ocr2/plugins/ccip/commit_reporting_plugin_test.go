@@ -109,10 +109,10 @@ func TestCommitReportEncoding(t *testing.T) {
 	require.NoError(t, err)
 	destChain.Commit()
 
-	prices, err := price_registry.NewPriceRegistry(priceRegistry, destChain)
+	newPriceRegistry, err := price_registry.NewPriceRegistry(priceRegistry, destChain)
 	require.NoError(t, err)
 
-	_, err = prices.ApplyPriceUpdatersUpdates(destUser, []common.Address{commitStoreAddress}, []common.Address{})
+	_, err = newPriceRegistry.ApplyPriceUpdatersUpdates(destUser, []common.Address{commitStoreAddress}, []common.Address{})
 	require.NoError(t, err)
 	destChain.Commit()
 
@@ -153,11 +153,11 @@ func TestCommitReportEncoding(t *testing.T) {
 	require.NotEqual(t, ts.String(), "0")
 
 	// Ensure price update went through
-	destChainGasPrice, err := prices.GetDestinationChainGasPrice(nil, destChainId)
+	destChainGasPrice, err := newPriceRegistry.GetDestinationChainGasPrice(nil, destChainId)
 	require.NoError(t, err)
 	assert.Equal(t, "2000000000000", destChainGasPrice.Value.String())
 
-	linkTokenPrice, err := prices.GetTokenPrice(nil, destLinkTokenAddress)
+	linkTokenPrice, err := newPriceRegistry.GetTokenPrice(nil, destLinkTokenAddress)
 	require.NoError(t, err)
 	assert.Equal(t, "8000000000000000000", linkTokenPrice.Value.String())
 }

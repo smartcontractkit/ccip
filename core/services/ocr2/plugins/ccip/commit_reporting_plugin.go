@@ -205,7 +205,7 @@ func (r *CommitReportingPlugin) nextMinSeqNum() (uint64, error) {
 	return nextMin, nil
 }
 
-func (r *CommitReportingPlugin) Query(ctx context.Context, timestamp types.ReportTimestamp) (types.Query, error) {
+func (r *CommitReportingPlugin) Query(context.Context, types.ReportTimestamp) (types.Query, error) {
 	return types.Query{}, nil
 }
 
@@ -298,7 +298,7 @@ func (r *CommitReportingPlugin) getLatestPriceUpdates(tokens []common.Address) (
 
 // All prices are USD ($1=1e18) denominated. We only generate prices we think should be updated; otherwise, omitting values means voting to skip updating them
 func (r *CommitReportingPlugin) generatePriceUpdates(ctx context.Context) (sourceGasPriceUSD *big.Int, tokenPricesUSD map[common.Address]*big.Int, err error) {
-	// fetch feeTokens every observation, so we're automatically up to date if new feeTokens are added or removed
+	// fetch feeTokens every observation, so we're automatically up-to-date if new feeTokens are added or removed
 	feeTokens, err := r.config.priceRegistry.GetFeeTokens(nil)
 	if err != nil {
 		return nil, nil, err
@@ -347,7 +347,7 @@ func (r *CommitReportingPlugin) generatePriceUpdates(ctx context.Context) (sourc
 	return sourceGasPriceUSD, tokenPricesUSD, nil
 }
 
-func (r *CommitReportingPlugin) Observation(ctx context.Context, timestamp types.ReportTimestamp, query types.Query) (types.Observation, error) {
+func (r *CommitReportingPlugin) Observation(ctx context.Context, _ types.ReportTimestamp, _ types.Query) (types.Observation, error) {
 	lggr := r.config.lggr.Named("CommitObservation")
 	if isCommitStoreDownNow(lggr, r.config.commitStore) {
 		return nil, ErrCommitStoreIsDown
@@ -447,7 +447,7 @@ func (r *CommitReportingPlugin) buildReport(interval commit_store.ICommitStoreIn
 	}, nil
 }
 
-func (r *CommitReportingPlugin) Report(ctx context.Context, timestamp types.ReportTimestamp, query types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
+func (r *CommitReportingPlugin) Report(_ context.Context, _ types.ReportTimestamp, _ types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
 	lggr := r.config.lggr.Named("Report")
 	if isCommitStoreDownNow(lggr, r.config.commitStore) {
 		return false, nil, ErrCommitStoreIsDown
@@ -627,7 +627,7 @@ func (r *CommitReportingPlugin) addToInflight(lggr logger.Logger, report *commit
 	}
 }
 
-func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context, timestamp types.ReportTimestamp, report types.Report) (bool, error) {
+func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(_ context.Context, _ types.ReportTimestamp, report types.Report) (bool, error) {
 	lggr := r.config.lggr.Named("ShouldAcceptFinalizedReport")
 	parsedReport, err := DecodeCommitReport(report)
 	if err != nil {
@@ -665,7 +665,7 @@ func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context,
 	return true, nil
 }
 
-func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context, timestamp types.ReportTimestamp, report types.Report) (bool, error) {
+func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(_ context.Context, _ types.ReportTimestamp, report types.Report) (bool, error) {
 	parsedReport, err := DecodeCommitReport(report)
 	if err != nil {
 		return false, err

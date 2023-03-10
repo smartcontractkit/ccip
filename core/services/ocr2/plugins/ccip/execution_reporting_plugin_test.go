@@ -88,7 +88,7 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	require.NoError(t, err)
 	destChain.Commit()
 
-	destPricesAddress, _, _, err := price_registry.DeployPriceRegistry(
+	destPriceRegistryAddress, _, _, err := price_registry.DeployPriceRegistry(
 		destUser,
 		destChain,
 		price_registry.InternalPriceUpdates{
@@ -118,7 +118,7 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 			OnRamp:        onRampAddress,
 		},
 		commit_store_helper.ICommitStoreDynamicConfig{
-			PriceRegistry: destPricesAddress,
+			PriceRegistry: destPriceRegistryAddress,
 			Afn:           afnAddress, // AFN address
 		},
 	)

@@ -95,7 +95,7 @@ func deployRouter(t *testing.T, client *EvmDeploymentConfig) {
 // deployPriceRegistry Prices is deployed without any feeUpdaters
 func deployPriceRegistry(t *testing.T, client *EvmDeploymentConfig) {
 	if !client.DeploySettings.DeployPriceRegistry {
-		client.Logger.Infof("Skipping Prices deployment, using Prices on %s", client.ChainConfig.PriceRegistry)
+		client.Logger.Infof("Skipping PriceRegistry deployment, using Prices on %s", client.ChainConfig.PriceRegistry)
 		return
 	}
 
@@ -104,7 +104,7 @@ func deployPriceRegistry(t *testing.T, client *EvmDeploymentConfig) {
 		feeTokens[i] = client.ChainConfig.SupportedTokens[token].Token
 	}
 
-	client.Logger.Infof("Deploying Prices")
+	client.Logger.Infof("Deploying PriceRegistry")
 	priceRegistry, tx, _, err := price_registry.DeployPriceRegistry(
 		client.Owner,
 		client.Client,
@@ -125,5 +125,5 @@ func deployPriceRegistry(t *testing.T, client *EvmDeploymentConfig) {
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 	client.ChainConfig.PriceRegistry = priceRegistry
 
-	client.Logger.Infof(fmt.Sprintf("Prices deployed on %s in tx %s", priceRegistry.String(), helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash())))
+	client.Logger.Infof(fmt.Sprintf("PriceRegistry deployed on %s in tx %s", priceRegistry.String(), helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash())))
 }
