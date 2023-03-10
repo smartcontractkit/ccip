@@ -16,3 +16,4 @@ lcov --remove $1 -o $2 \
   'src/v0.8/ccip/applications/ImmutableExample.sol' \
   'src/v0.8/ccip/applications/ImmutableExample.sol' \
   'src/v0.8/ccip/pools/tokens/*' \
+  --rc lcov_branch_coverage=1

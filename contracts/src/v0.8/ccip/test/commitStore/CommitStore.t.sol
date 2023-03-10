@@ -56,7 +56,7 @@ contract CommitStore_constructor is PriceRegistrySetup {
       afn: address(s_afn)
     });
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit ConfigSet(staticConfig, dynamicConfig);
 
     CommitStore commitStore = new CommitStore(staticConfig, dynamicConfig);
@@ -106,7 +106,7 @@ contract CommitStore_setDynamicConfig is CommitStoreSetup {
       afn: address(s_afn)
     });
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit ConfigSet(staticConfig, dynamicConfig);
 
     s_commitStore.setDynamicConfig(dynamicConfig);
@@ -163,7 +163,7 @@ contract CommitStore_report is CommitStoreSetup {
       merkleRoot: root
     });
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit ReportAccepted(report);
 
     vm.resumeGasMetering();
@@ -191,7 +191,7 @@ contract CommitStore_report is CommitStoreSetup {
       merkleRoot: "test #2"
     });
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit ReportAccepted(report);
 
     s_commitStore.report(abi.encode(report));
@@ -214,7 +214,7 @@ contract CommitStore_report is CommitStoreSetup {
       merkleRoot: ""
     });
 
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
     emit UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
 
     s_commitStore.report(abi.encode(report));

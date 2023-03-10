@@ -189,7 +189,7 @@ contract OCR2Base_setOCR2Config is OCR2BaseSetup {
     address[] memory transmitters = s_OCR2Base.getTransmitters();
     assertEq(0, transmitters.length);
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit ConfigSet(
       0,
       configDigest,
@@ -216,7 +216,7 @@ contract OCR2Base_setOCR2Config is OCR2BaseSetup {
 
     configDigest = getBasicConfigDigest(s_f, configCount++);
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit ConfigSet(
       uint32(block.number),
       configDigest,

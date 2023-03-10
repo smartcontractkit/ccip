@@ -62,10 +62,10 @@ contract GovernanceDapp_voteForNewFeeConfig is GovernanceDappSetup {
     });
     message.messageId = Internal._hash(message, s_metadataHash);
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit CCIPSendRequested(message);
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit ConfigPropagated(s_crossChainClone.chainId, s_crossChainClone.contractAddress);
 
     s_governanceDapp.voteForNewFeeConfig(feeConfig);

@@ -27,7 +27,7 @@ contract WrappedTokenPool_releaseOrMint is WrappedTokenPoolSetup {
 
   function testReleaseOrMintSuccess() public {
     changePrank(s_offRamp);
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
     emit Minted(s_offRamp, s_offRamp, 1);
     s_wrappedTokenPool.releaseOrMint(s_offRamp, 1);
     assertEq(s_wrappedTokenPool.balanceOf(s_offRamp), 1);
@@ -59,7 +59,7 @@ contract WrappedTokenPool_lockOrBurn is WrappedTokenPoolSetup {
     changePrank(s_onRamp);
     s_wrappedTokenPool.transfer(address(s_wrappedTokenPool), 1);
 
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
     emit Burned(s_onRamp, 1);
 
     s_wrappedTokenPool.lockOrBurn(1, s_onRamp);

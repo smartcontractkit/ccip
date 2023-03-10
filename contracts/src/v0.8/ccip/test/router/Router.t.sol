@@ -44,12 +44,12 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     uint256 balanceBefore = sourceToken1.balanceOf(OWNER);
 
     // Assert that the tokens are burned
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit Burned(address(s_onRamp), message.tokenAmounts[0].amount);
 
     Internal.EVM2EVMMessage memory msgEvent = _messageToEvent(message, 1, 1, expectedFee);
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit CCIPSendRequested(msgEvent);
 
     vm.resumeGasMetering();
@@ -72,7 +72,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
 
     Internal.EVM2EVMMessage memory msgEvent = _messageToEvent(message, 1, 1, expectedFee);
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit CCIPSendRequested(msgEvent);
 
     vm.resumeGasMetering();
@@ -99,7 +99,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     uint256 balanceBefore = sourceToken1.balanceOf(OWNER);
 
     // Assert that the tokens are burned
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit Burned(address(s_onRamp), message.tokenAmounts[0].amount);
 
     // Native fees will be wrapped so we need to calculate the event with
@@ -109,7 +109,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     // Set it to address(0) to indicate native
     message.feeToken = address(0);
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit CCIPSendRequested(msgEvent);
 
     vm.resumeGasMetering();
@@ -137,7 +137,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     // Set it to address(0) to indicate native
     message.feeToken = address(0);
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit CCIPSendRequested(msgEvent);
 
     vm.resumeGasMetering();

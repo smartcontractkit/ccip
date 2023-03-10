@@ -142,7 +142,7 @@ contract AggregateTokenLimiter_setRateLimiterConfig is AggregateTokenLimiterSetu
       admin: TOKEN_LIMIT_ADMIN
     });
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit ConfigChanged(s_config.capacity, s_config.rate);
 
     s_rateLimiter.setRateLimiterConfig(s_config);
@@ -225,7 +225,7 @@ contract AggregateTokenLimiter_setPrices is AggregateTokenLimiterSetup {
     uint256[] memory prices = new uint256[](1);
     prices[0] = TOKEN_PRICE * 2;
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit TokenPriceChanged(address(TOKEN), TOKEN_PRICE * 2);
 
     s_rateLimiter.setPrices(tokens, prices);
@@ -288,7 +288,7 @@ contract AggregateTokenLimiter__removeTokens is AggregateTokenLimiterSetup {
     tokenAmounts[0].token = address(TOKEN);
     tokenAmounts[0].amount = numberOfTokens;
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit TokensRemovedFromBucket(value);
 
     vm.resumeGasMetering();

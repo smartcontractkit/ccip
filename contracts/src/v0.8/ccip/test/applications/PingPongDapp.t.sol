@@ -65,10 +65,10 @@ contract PingPong_startPingPong is PingPongDappSetup {
     });
     message.messageId = Internal._hash(message, s_metadataHash);
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit Ping(pingPongNumber);
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit CCIPSendRequested(message);
 
     s_pingPong.startPingPong();
@@ -94,7 +94,7 @@ contract PingPong_ccipReceive is PingPongDappSetup {
 
     changePrank(address(s_sourceRouter));
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit Pong(pingPongNumber + 1);
 
     s_pingPong.ccipReceive(message);

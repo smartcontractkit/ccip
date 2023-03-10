@@ -38,14 +38,14 @@ contract TokenPool_applyRampUpdates is TokenPoolSetup {
     offRamps[0] = IPool.RampUpdate({ramp: address(11), allowed: true});
     offRamps[1] = IPool.RampUpdate({ramp: address(12), allowed: true});
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit OnRampAllowanceSet(onRamps[0].ramp, onRamps[0].allowed);
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit OnRampAllowanceSet(onRamps[1].ramp, onRamps[1].allowed);
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit OffRampAllowanceSet(offRamps[0].ramp, offRamps[0].allowed);
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit OffRampAllowanceSet(offRamps[1].ramp, offRamps[1].allowed);
 
     s_tokenPool.applyRampUpdates(onRamps, offRamps);
@@ -59,14 +59,14 @@ contract TokenPool_applyRampUpdates is TokenPoolSetup {
     onRamps[0].allowed = false;
     offRamps[1].allowed = false;
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit OnRampAllowanceSet(onRamps[0].ramp, onRamps[0].allowed);
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit OnRampAllowanceSet(onRamps[1].ramp, onRamps[1].allowed);
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit OffRampAllowanceSet(offRamps[0].ramp, offRamps[0].allowed);
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit OffRampAllowanceSet(offRamps[1].ramp, offRamps[1].allowed);
 
     s_tokenPool.applyRampUpdates(onRamps, offRamps);

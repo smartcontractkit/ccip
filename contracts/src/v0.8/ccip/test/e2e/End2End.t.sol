@@ -64,21 +64,21 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
     // incorrect in the checks below.
     vm.warp(BLOCK_TIME + 2000);
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit ExecutionStateChanged(
       messages[0].sequenceNumber,
       messages[0].messageId,
       Internal.MessageExecutionState.SUCCESS
     );
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit ExecutionStateChanged(
       messages[1].sequenceNumber,
       messages[1].messageId,
       Internal.MessageExecutionState.SUCCESS
     );
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit ExecutionStateChanged(
       messages[2].sequenceNumber,
       messages[2].messageId,
@@ -98,7 +98,7 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
     message.receiver = abi.encode(address(s_receiver));
     Internal.EVM2EVMMessage memory geEvent = _messageToEvent(message, expectedSeqNum, expectedSeqNum, expectedFee);
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit CCIPSendRequested(geEvent);
 
     s_sourceRouter.ccipSend(DEST_CHAIN_ID, message);

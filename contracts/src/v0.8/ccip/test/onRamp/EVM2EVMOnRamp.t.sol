@@ -22,7 +22,7 @@ contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
       address(s_afn)
     );
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit ConfigSet(staticConfig, dynamicConfig);
 
     s_onRamp = new EVM2EVMOnRamp(
@@ -175,7 +175,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     uint256 feeAmount = 1234567890;
     IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit CCIPSendRequested(_messageToEvent(message, 1, 1, feeAmount));
 
     s_onRamp.forwardFromRouter(message, feeAmount, OWNER);
@@ -187,7 +187,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     uint256 feeAmount = 1234567890;
     IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit CCIPSendRequested(_messageToEvent(message, 1, 1, feeAmount));
 
     s_onRamp.forwardFromRouter(message, feeAmount, OWNER);
@@ -199,7 +199,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     for (uint64 i = 1; i < 4; i++) {
       uint64 nonceBefore = s_onRamp.getSenderNonce(OWNER);
 
-      vm.expectEmit(false, false, false, true);
+      vm.expectEmit();
       emit CCIPSendRequested(_messageToEvent(message, i, i, 0));
 
       s_onRamp.forwardFromRouter(message, 0, OWNER);
@@ -458,7 +458,7 @@ contract EVM2EVMOnRamp_setFeeConfig is EVM2EVMOnRampSetup {
   function testSetFeeConfigSuccess() public {
     IEVM2EVMOnRamp.FeeTokenConfigArgs[] memory feeConfig;
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit FeeConfigSet(feeConfig);
 
     s_onRamp.setFeeConfig(feeConfig);
@@ -469,7 +469,7 @@ contract EVM2EVMOnRamp_setFeeConfig is EVM2EVMOnRampSetup {
 
     changePrank(s_feeAdmin);
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit FeeConfigSet(feeConfig);
 
     s_onRamp.setFeeConfig(feeConfig);
@@ -508,14 +508,14 @@ contract EVM2EVMOnRamp_applyPoolUpdates is EVM2EVMOnRampSetup {
     Internal.PoolUpdate[] memory adds = new Internal.PoolUpdate[](1);
     adds[0] = Internal.PoolUpdate({token: address(1), pool: address(2)});
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit PoolAdded(adds[0].token, adds[0].pool);
 
     s_onRamp.applyPoolUpdates(adds, new Internal.PoolUpdate[](0));
 
     assertEq(adds[0].pool, address(s_onRamp.getPoolBySourceToken(IERC20(adds[0].token))));
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit PoolRemoved(adds[0].token, adds[0].pool);
 
     s_onRamp.applyPoolUpdates(new Internal.PoolUpdate[](0), adds);
@@ -624,7 +624,7 @@ contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
       afn: address(11)
     });
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit ConfigSet(staticConfig, newConfig);
 
     s_onRamp.setDynamicConfig(newConfig);
@@ -699,7 +699,7 @@ contract EVM2EVMOnRamp_applyAllowListUpdates is EVM2EVMOnRampWithAllowListSetup 
     newAddresses[1] = address(2);
 
     for (uint256 i = 0; i < 2; ++i) {
-      vm.expectEmit(false, false, false, true);
+      vm.expectEmit();
       emit AllowListAdd(newAddresses[i]);
     }
 

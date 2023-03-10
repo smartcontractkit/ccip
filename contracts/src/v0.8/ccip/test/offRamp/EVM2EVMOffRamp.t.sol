@@ -27,7 +27,7 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
       address(s_afn)
     );
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit ConfigSet(staticConfig, dynamicConfig);
 
     s_offRamp = new EVM2EVMOffRampHelper(
@@ -126,7 +126,7 @@ contract EVM2EVMOffRamp_setDynamicConfig is EVM2EVMOffRampSetup {
     IEVM2EVMOffRamp.StaticConfig memory staticConfig = s_offRamp.getStaticConfig();
     IEVM2EVMOffRamp.DynamicConfig memory dynamicConfig = generateDynamicOffRampConfig(USER_3, address(s_afn));
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit ConfigSet(staticConfig, dynamicConfig);
 
     s_offRamp.setDynamicConfig(dynamicConfig);
@@ -180,7 +180,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
 
   function testSingleMessageNoTokensSuccess() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit ExecutionStateChanged(
       messages[0].sequenceNumber,
       messages[0].messageId,
@@ -192,7 +192,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     messages[0].nonce++;
     messages[0].sequenceNumber++;
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit ExecutionStateChanged(
       messages[0].sequenceNumber,
       messages[0].messageId,
@@ -210,7 +210,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     messages[0].strict = true;
     messages[0].receiver = address(s_reverting_receiver);
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit ExecutionStateChanged(
       messages[0].sequenceNumber,
       messages[0].messageId,
@@ -227,7 +227,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
 
     messages[0].nonce++;
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit SkippedIncorrectNonce(messages[0].nonce, messages[0].sender);
 
     s_offRamp.execute(_generateReportFromMessages(messages), false);
@@ -238,14 +238,14 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
 
     messages[1].nonce++;
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit ExecutionStateChanged(
       messages[0].sequenceNumber,
       messages[0].messageId,
       Internal.MessageExecutionState.SUCCESS
     );
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit SkippedIncorrectNonce(messages[1].nonce, messages[1].sender);
 
     s_offRamp.execute(_generateReportFromMessages(messages), false);
@@ -258,7 +258,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     MaybeRevertMessageReceiverNo165 newReceiver = new MaybeRevertMessageReceiverNo165(true);
     messages[0].receiver = address(newReceiver);
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit ExecutionStateChanged(
       messages[0].sequenceNumber,
       messages[0].messageId,
@@ -272,7 +272,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     vm.pauseGasMetering();
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit ExecutionStateChanged(
       messages[0].sequenceNumber,
       messages[0].messageId,
@@ -291,14 +291,14 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     // Set message 1 to use another receiver to simulate more fair gas costs
     messages[1].receiver = address(s_secondary_receiver);
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit ExecutionStateChanged(
       messages[0].sequenceNumber,
       messages[0].messageId,
       Internal.MessageExecutionState.SUCCESS
     );
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit ExecutionStateChanged(
       messages[1].sequenceNumber,
       messages[1].messageId,
@@ -316,16 +316,16 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     // Set message 1 to use another receiver to simulate more fair gas costs
     messages[1].receiver = address(s_secondary_receiver);
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit ExecutionStateChanged(
       messages[0].sequenceNumber,
       messages[0].messageId,
       Internal.MessageExecutionState.SUCCESS
     );
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit ExecutionStateChanged(
-      messages[0].sequenceNumber,
+      messages[1].sequenceNumber,
       messages[1].messageId,
       Internal.MessageExecutionState.SUCCESS
     );
@@ -468,7 +468,7 @@ contract EVM2EVMOffRamp_executeSingleMessage is EVM2EVMOffRampSetup {
     message.receiver = address(new ConformingReceiver(address(s_destRouter), s_destFeeToken));
     vm.expectRevert(IEVM2EVMOffRamp.ReceiverError.selector);
     s_offRamp.executeSingleMessage(message, false);
-    vm.expectEmit(false, false, false, false);
+    vm.expectEmit();
     emit MessageReceived();
     s_offRamp.executeSingleMessage(message, true);
   }
@@ -480,9 +480,9 @@ contract EVM2EVMOffRamp_executeSingleMessage is EVM2EVMOffRampSetup {
     uint256[] memory amounts = new uint256[](2);
     amounts[0] = 1000;
     amounts[1] = 50;
-    vm.expectEmit(true, true, false, true);
+    vm.expectEmit();
     emit Released(address(s_offRamp), STRANGER, amounts[0]);
-    vm.expectEmit(true, true, false, true);
+    vm.expectEmit();
     emit Minted(address(s_offRamp), STRANGER, amounts[1]);
     Internal.EVM2EVMMessage memory message = _generateAny2EVMMessageWithTokens(1, amounts);
     message.receiver = STRANGER;
@@ -506,7 +506,7 @@ contract EVM2EVMOffRamp__report is EVM2EVMOffRampSetup {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
     Internal.ExecutionReport memory report = _generateReportFromMessages(messages);
 
-    vm.expectEmit(true, true, false, false);
+    vm.expectEmit();
     emit ExecutionStateChanged(
       messages[0].sequenceNumber,
       messages[0].messageId,
@@ -638,14 +638,14 @@ contract EVM2EVMOffRamp_applyPoolUpdates is EVM2EVMOffRampSetup {
     Internal.PoolUpdate[] memory adds = new Internal.PoolUpdate[](1);
     adds[0] = Internal.PoolUpdate({token: address(1), pool: address(new LockReleaseTokenPool(IERC20(address(1))))});
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit PoolAdded(adds[0].token, adds[0].pool);
 
     s_offRamp.applyPoolUpdates(new Internal.PoolUpdate[](0), adds);
 
     assertEq(adds[0].pool, address(s_offRamp.getPoolBySourceToken(IERC20(adds[0].token))));
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit PoolRemoved(adds[0].token, adds[0].pool);
 
     s_offRamp.applyPoolUpdates(adds, new Internal.PoolUpdate[](0));

@@ -70,7 +70,7 @@ contract PriceRegistry_applyPriceUpdatersUpdates is PriceRegistrySetup {
     address[] memory priceUpdaters = new address[](1);
     priceUpdaters[0] = STRANGER;
 
-    vm.expectEmit(true, false, false, false);
+    vm.expectEmit();
     emit PriceUpdaterSet(STRANGER);
 
     s_priceRegistry.applyPriceUpdatersUpdates(priceUpdaters, new address[](0));
@@ -82,7 +82,7 @@ contract PriceRegistry_applyPriceUpdatersUpdates is PriceRegistrySetup {
     assertEq(s_priceRegistry.getPriceUpdaters().length, 1);
     assertEq(s_priceRegistry.getPriceUpdaters()[0], STRANGER);
 
-    vm.expectEmit(true, false, false, false);
+    vm.expectEmit();
     emit PriceUpdaterRemoved(STRANGER);
 
     s_priceRegistry.applyPriceUpdatersUpdates(new address[](0), priceUpdaters);
@@ -110,7 +110,7 @@ contract PriceRegistry_applyFeeTokensUpdates is PriceRegistrySetup {
     address[] memory feeTokens = new address[](1);
     feeTokens[0] = s_sourceTokens[1];
 
-    vm.expectEmit(true, false, false, false);
+    vm.expectEmit();
     emit FeeTokenAdded(feeTokens[0]);
 
     s_priceRegistry.applyFeeTokensUpdates(feeTokens, new address[](0));
@@ -122,7 +122,7 @@ contract PriceRegistry_applyFeeTokensUpdates is PriceRegistrySetup {
     assertEq(s_priceRegistry.getFeeTokens().length, 3);
     assertEq(s_priceRegistry.getFeeTokens()[2], feeTokens[0]);
 
-    vm.expectEmit(true, false, false, false);
+    vm.expectEmit();
     emit FeeTokenRemoved(feeTokens[0]);
 
     s_priceRegistry.applyFeeTokensUpdates(new address[](0), feeTokens);

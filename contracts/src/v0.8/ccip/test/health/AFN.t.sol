@@ -31,7 +31,7 @@ contract AFN_voteToBlessRoots is AFNSetup {
     vm.pauseGasMetering();
     (address[] memory participants, uint256[] memory weights, , ) = afnConstructorArgs();
 
-    vm.expectEmit(true, true, false, true);
+    vm.expectEmit();
     emit VoteToBless(participants[0], ROOT_1, weights[0]);
 
     bytes32[] memory roots = new bytes32[](1);
@@ -53,11 +53,11 @@ contract AFN_voteToBlessRoots is AFNSetup {
     vm.pauseGasMetering();
     (address[] memory participants, uint256[] memory weights, , ) = afnConstructorArgs();
 
-    vm.expectEmit(true, true, false, true);
+    vm.expectEmit();
     emit VoteToBless(participants[0], ROOT_1, weights[0]);
-    vm.expectEmit(true, true, false, true);
+    vm.expectEmit();
     emit VoteToBless(participants[0], ROOT_2, weights[0]);
-    vm.expectEmit(true, true, false, true);
+    vm.expectEmit();
     emit VoteToBless(participants[0], ROOT_3, weights[0]);
 
     bytes32[] memory roots = new bytes32[](3);
@@ -86,15 +86,15 @@ contract AFN_voteToBlessRoots is AFNSetup {
     vm.pauseGasMetering();
     (address[] memory participants, uint256[] memory weights, , ) = afnConstructorArgs();
 
-    vm.expectEmit(true, true, false, true);
+    vm.expectEmit();
     emit VoteToBless(participants[0], ROOT_1, weights[0]);
-    vm.expectEmit(true, true, false, true);
+    vm.expectEmit();
     emit VoteToBless(participants[0], ROOT_2, weights[0]);
-    vm.expectEmit(true, true, false, true);
+    vm.expectEmit();
     emit VoteToBless(participants[0], ROOT_3, weights[0]);
-    vm.expectEmit(true, true, false, true);
+    vm.expectEmit();
     emit VoteToBless(participants[0], ROOT_4, weights[0]);
-    vm.expectEmit(true, true, false, true);
+    vm.expectEmit();
     emit VoteToBless(participants[0], ROOT_5, weights[0]);
 
     bytes32[] memory roots = new bytes32[](5);
@@ -196,7 +196,7 @@ contract AFN_voteBad is AFNSetup {
     address voter = participants[0];
     uint256 weight = weights[0];
     changePrank(voter);
-    vm.expectEmit(true, false, false, true);
+    vm.expectEmit();
     emit VoteBad(voter, weight);
 
     vm.resumeGasMetering();
@@ -218,7 +218,7 @@ contract AFN_voteBad is AFNSetup {
       s_afn.voteBad();
     }
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit AFNBadSignal(block.timestamp);
 
     changePrank(participants[participants.length - 1]);
@@ -272,7 +272,7 @@ contract AFN_recover is AFNSetup {
   function testRecoverSuccess_gas() public {
     vm.pauseGasMetering();
     changePrank(OWNER);
-    vm.expectEmit(false, false, false, false);
+    vm.expectEmit();
     emit RecoveredFromBadSignal();
 
     vm.resumeGasMetering();
@@ -354,7 +354,7 @@ contract AFN_setAFNConfig is AFNSetup {
     ) = getDifferentConfigArgs();
 
     changePrank(OWNER);
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit AFNConfigSet(participants, weights, blessingThreshold, badSignalThreshold);
 
     uint256 configVersionBefore = s_afn.getConfigVersion();
