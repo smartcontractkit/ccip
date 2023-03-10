@@ -45,12 +45,11 @@ jobs:
         uses: docker/metadata-action@e5622373a38e60fb6d795a4421e56882f2d7a681 # v3.6.2
         with:
           images: ${{ secrets.AWS_ECR_REPO_URL }} # list of Docker images to use as base name for tags
-          flavor: |
-            latest=true
           tags: |
             type=sha
             type=sha,format=long
             type=semver,pattern={{version}},value=v0.0.1
+            type=raw,value=latest,enable={{is_default_branch}}
       - name: Fetch operator-ui
         shell: bash
         env:
