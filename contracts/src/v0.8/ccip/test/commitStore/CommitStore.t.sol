@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../helpers/MerkleHelper.sol";
 import "../helpers/CommitStoreHelper.sol";
 import "../../health/AFN.sol";
 import "../../prices/PriceRegistry.sol";
@@ -382,7 +381,7 @@ contract CommitStore_verify is CommitStoreRealAFNSetup {
     bytes32[] memory leaves = new bytes32[](258);
     bytes32[] memory proofs = new bytes32[](0);
 
-    vm.expectRevert(ICommitStore.InvalidProof.selector);
+    vm.expectRevert(MerkleMultiProof.InvalidProof.selector);
 
     s_commitStore.verify(leaves, proofs, 0);
   }

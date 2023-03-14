@@ -9,7 +9,6 @@
   "isBlessed(bytes32)": "ff888fb1",
   "latestConfigDetails()": "81ff7048",
   "latestConfigDigestAndEpoch()": "afcb95d7",
-  "merkleRoot(bytes32[],bytes32[],uint256)": "07761f3d",
   "owner()": "8da5cb5b",
   "pause()": "8456cb59",
   "paused()": "5c975abb",

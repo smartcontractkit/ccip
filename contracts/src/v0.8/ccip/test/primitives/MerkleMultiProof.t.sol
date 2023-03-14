@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../helpers/MerkleHelper.sol";
-import "./CommitStore.t.sol";
+import "forge-std/Test.sol";
 
-contract CommitStore_merkleRoot is CommitStoreSetup {
+import "../helpers/MerkleHelper.sol";
+
+contract MerkleMultiProofTest is Test {
   MerkleHelper s_merkleHelper;
 
-  function setUp() public virtual override {
-    CommitStoreSetup.setUp();
+  function setUp() public {
     s_merkleHelper = new MerkleHelper();
   }
 
@@ -65,7 +65,7 @@ contract CommitStore_merkleRoot is CommitStoreSetup {
 
     uint256 flagsUint256 = 0x2f3c0000000;
 
-    bytes32 root = s_commitStore.merkleRoot(leaves, proofs, flagsUint256);
+    bytes32 root = MerkleMultiProof.merkleRoot(leaves, proofs, flagsUint256);
 
     assertEq(expectedRoot, root);
   }
@@ -77,7 +77,7 @@ contract CommitStore_merkleRoot is CommitStoreSetup {
   //    leaves[1] = keccak256("b");
   //    bytes32[] memory proofs = new bytes32[](0);
   //
-  //    bytes32 root = s_commitStore.merkleRoot(leaves, proofs, 2**100 - 1);
+  //    bytes32 root = MerkleMultiProof.merkleRoot(leaves, proofs, 2**100 - 1);
   //
   //    assertEq(root, expectedRoot);
   //  }
@@ -91,7 +91,7 @@ contract CommitStore_merkleRoot is CommitStoreSetup {
   //    leaves[3] = keccak256("d");
   //    bytes32[] memory proofs = new bytes32[](0);
   //
-  //    bytes32 root = s_commitStore.merkleRoot(leaves, proofs, 2**100 - 1);
+  //    bytes32 root = MerkleMultiProof.merkleRoot(leaves, proofs, 2**100 - 1);
   //
   //    assertEq(root, expectedRoot);
   //  }
@@ -107,7 +107,7 @@ contract CommitStore_merkleRoot is CommitStoreSetup {
   //    leaves[5] = keccak256("f");
   //    bytes32[] memory proofs = new bytes32[](0);
   //
-  //    bytes32 root = s_commitStore.merkleRoot(leaves, proofs, 2**100 - 1);
+  //    bytes32 root = MerkleMultiProof.merkleRoot(leaves, proofs, 2**100 - 1);
   //
   //    assertEq(root, expectedRoot);
   //  }
@@ -120,7 +120,7 @@ contract CommitStore_merkleRoot is CommitStoreSetup {
   //    }
   //    bytes32[] memory proofs = new bytes32[](0);
   //
-  //    bytes32 root = s_commitStore.merkleRoot(leaves, proofs, 2**256 - 1);
+  //    bytes32 root = MerkleMultiProof.merkleRoot(leaves, proofs, 2**256 - 1);
   //
   //    assertEq(root, expectedRoot);
   //  }
@@ -141,7 +141,7 @@ contract CommitStore_merkleRoot is CommitStoreSetup {
   //    // Proof flag = false
   //    result = s_merkleHelper.hashPair(result, proofs[1]);
   //
-  //    assertEq(s_commitStore.merkleRoot(leaves, proofs, 0), result);
+  //    assertEq(MerkleMultiProof.merkleRoot(leaves, proofs, 0), result);
   //  }
   //
   //
@@ -165,7 +165,7 @@ contract CommitStore_merkleRoot is CommitStoreSetup {
   //    // Proof flag = true
   //    bytes32 finalResult = s_merkleHelper.hashPair(result1, result2);
   //
-  //    assertEq(s_commitStore.merkleRoot(leaves, proofs, 4), finalResult);
+  //    assertEq(MerkleMultiProof.merkleRoot(leaves, proofs, 4), finalResult);
   //  }
   //
   //  function testMerkleMulti3of4(
@@ -188,7 +188,7 @@ contract CommitStore_merkleRoot is CommitStoreSetup {
   //    // Proof flag = true
   //    bytes32 finalResult = s_merkleHelper.hashPair(result1, result2);
   //
-  //    assertEq(s_commitStore.merkleRoot(leaves, proofs, 5), finalResult);
+  //    assertEq(MerkleMultiProof.merkleRoot(leaves, proofs, 5), finalResult);
   //  }
   //
   //  function testMerkleMulti4of4(
@@ -211,13 +211,13 @@ contract CommitStore_merkleRoot is CommitStoreSetup {
   //    // Proof flag = true
   //    bytes32 finalResult = s_merkleHelper.hashPair(result1, result2);
   //
-  //    assertEq(s_commitStore.merkleRoot(leaves, proofs, 7), finalResult);
+  //    assertEq(MerkleMultiProof.merkleRoot(leaves, proofs, 7), finalResult);
   //  }
 
   function testMerkleRootSingleLeafSuccess() public {
     bytes32[] memory leaves = new bytes32[](1);
     leaves[0] = "root";
     bytes32[] memory proofs = new bytes32[](0);
-    assertEq(s_commitStore.merkleRoot(leaves, proofs, 0), leaves[0]);
+    assertEq(MerkleMultiProof.merkleRoot(leaves, proofs, 0), leaves[0]);
   }
 }
