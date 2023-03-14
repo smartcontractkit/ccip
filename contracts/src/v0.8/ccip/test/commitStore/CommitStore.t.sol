@@ -130,14 +130,75 @@ contract CommitStore_setDynamicConfig is CommitStoreSetup {
 
 /// @notice #resetUnblessedRoots
 contract CommitStore_resetUnblessedRoots is CommitStoreSetup {
-  function testSuccess() public {
-    bytes32[] memory rootToReset = new bytes32[](1);
-    rootToReset[0] = "Only a single root";
-    s_commitStore.resetUnblessedRoots(rootToReset);
-    // TODO proper AFN blessing handling
+  event RootRemoved(bytes32 root);
+
+  function setUp() public virtual override {
+    CommitStoreSetup.setUp();
+
+    // Setup a real AFN instead of the mock one that always
+    // returns "true" for any root.
+    address[] memory participants = new address[](1);
+    participants[0] = OWNER;
+    uint256[] memory weights = new uint256[](1);
+    weights[0] = 2000;
+
+    s_afn = new AFN(participants, weights, weights[0], weights[0]);
+
+    s_commitStore.setDynamicConfig(
+      ICommitStore.DynamicConfig({priceRegistry: address(s_priceRegistry), afn: address(s_afn)})
+    );
+  }
+
+  function testResetUnblessedRootsSuccess() public {
+    bytes32[] memory rootsToReset = new bytes32[](3);
+    rootsToReset[0] = "1";
+    rootsToReset[1] = "2";
+    rootsToReset[2] = "3";
+
+    ICommitStore.CommitReport memory report = ICommitStore.CommitReport({
+      priceUpdates: getEmptyPriceUpdates(),
+      interval: ICommitStore.Interval(1, 2),
+      merkleRoot: rootsToReset[0]
+    });
+
+    s_commitStore.report(abi.encode(report));
+
+    report = ICommitStore.CommitReport({
+      priceUpdates: getEmptyPriceUpdates(),
+      interval: ICommitStore.Interval(3, 4),
+      merkleRoot: rootsToReset[1]
+    });
+
+    s_commitStore.report(abi.encode(report));
+
+    report = ICommitStore.CommitReport({
+      priceUpdates: getEmptyPriceUpdates(),
+      interval: ICommitStore.Interval(5, 5),
+      merkleRoot: rootsToReset[2]
+    });
+
+    s_commitStore.report(abi.encode(report));
+
+    bytes32[] memory blessedRoots = new bytes32[](1);
+    blessedRoots[0] = keccak256(abi.encode(address(s_commitStore), rootsToReset[1]));
+
+    s_afn.voteToBlessRoots(blessedRoots);
+
+    vm.expectEmit(false, false, false, true);
+    emit RootRemoved(rootsToReset[0]);
+
+    vm.expectEmit(false, false, false, true);
+    emit RootRemoved(rootsToReset[2]);
+
+    s_commitStore.resetUnblessedRoots(rootsToReset);
+
+    assertEq(0, s_commitStore.getMerkleRoot(rootsToReset[0]));
+    assertEq(BLOCK_TIME, s_commitStore.getMerkleRoot(rootsToReset[1]));
+    assertEq(0, s_commitStore.getMerkleRoot(rootsToReset[2]));
   }
 
   // Reverts
+
   function testOnlyOwnerReverts() public {
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");

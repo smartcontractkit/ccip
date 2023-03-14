@@ -74,8 +74,11 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
   /// posted and needs to be removed. The interval in the report is trusted.
   function resetUnblessedRoots(bytes32[] calldata rootToReset) external onlyOwner {
     for (uint256 i = 0; i < rootToReset.length; ++i) {
-      // TODO: AFN check ( assert not self.afn.is_blessed(root))
-      delete s_roots[rootToReset[i]];
+      bytes32 root = rootToReset[i];
+      if (!isBlessed(root)) {
+        delete s_roots[root];
+        emit RootRemoved(root);
+      }
     }
   }
 

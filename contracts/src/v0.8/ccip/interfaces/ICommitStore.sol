@@ -12,6 +12,7 @@ interface ICommitStore {
 
   event ReportAccepted(CommitReport report);
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
+  event RootRemoved(bytes32 root);
 
   /// @notice Static commit store config
   struct StaticConfig {
