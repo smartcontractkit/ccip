@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/big"
 	"os"
-	"sync"
 	"testing"
 	"time"
 
@@ -79,9 +78,6 @@ func TestSoakCCIP(t *testing.T) {
 					Int("Successful Requests", reqSuccessLaneB).
 					Msgf("Soak Result for lane %s --> %s", laneB.SourceNetworkName, laneB.DestNetworkName)
 			}
-			if reqSuccessLaneA != totalReqLaneA || reqSuccessLaneB != totalReqLaneB {
-				t.Fail()
-			}
 		}
 	})
 
@@ -93,22 +89,22 @@ func TestSoakCCIP(t *testing.T) {
 	if laneA == nil {
 		return
 	}
-	laneRuns := &sync.WaitGroup{}
-	laneRuns.Add(1)
-	go func() {
-		defer laneRuns.Done()
+	t.Run(fmt.Sprintf("CCIP message transfer from network %s to network %s for %s", laneA.SourceNetworkName, laneA.DestNetworkName, duration), func(t *testing.T) {
+		t.Parallel()
+		totalReqLaneA, reqSuccessLaneA = laneA.SoakRun(interval, duration)
 		log.Info().
 			Str("Test Duration", fmt.Sprintf("%s", duration)).
 			Str("Request Triggering interval", fmt.Sprintf("%s", interval)).
 			Str("Source", laneA.SourceNetworkName).
 			Str("Destination", laneA.DestNetworkName).
 			Msg("Starting lane A")
-		totalReqLaneA, reqSuccessLaneA = laneA.SoakRun(interval, duration)
-	}()
+		if totalReqLaneA != reqSuccessLaneA {
+			t.Fatalf("Failed to deliver %d requests out of %d", totalReqLaneA-reqSuccessLaneA, totalReqLaneA)
+		}
+	})
 	if laneB != nil {
-		laneRuns.Add(1)
-		go func() {
-			defer laneRuns.Done()
+		t.Run(fmt.Sprintf("CCIP message transfer from network %s to network %s for %s", laneB.SourceNetworkName, laneB.DestNetworkName, duration), func(t *testing.T) {
+			t.Parallel()
 			log.Info().
 				Str("Test Duration", fmt.Sprintf("%s", duration)).
 				Str("Request Triggering interval", fmt.Sprintf("%s", interval)).
@@ -116,9 +112,11 @@ func TestSoakCCIP(t *testing.T) {
 				Str("Destination", laneB.DestNetworkName).
 				Msg("Starting lane B")
 			totalReqLaneB, reqSuccessLaneB = laneB.SoakRun(interval, duration)
-		}()
+			if totalReqLaneB != reqSuccessLaneB {
+				t.Fatalf("Failed to deliver %d requests out of %d", totalReqLaneB-reqSuccessLaneB, totalReqLaneB)
+			}
+		})
 	}
-	laneRuns.Wait()
 }
 
 // TestCCIPSoakOnExistingDeployment assumes
@@ -158,9 +156,6 @@ func TestExistingDeploymentSoakCCIP(t *testing.T) {
 				Int("Successful Requests", reqSuccessLaneB).
 				Msgf("Soak Result for lane %s --> %s", laneB.SourceNetworkName, laneB.DestNetworkName)
 		}
-		if reqSuccessLaneA != totalReqLaneA || reqSuccessLaneB != totalReqLaneB {
-			t.Fail()
-		}
 	})
 
 	transferAmounts := []*big.Int{big.NewInt(1)}
@@ -171,32 +166,32 @@ func TestExistingDeploymentSoakCCIP(t *testing.T) {
 	if laneA == nil {
 		return
 	}
-	laneRuns := &sync.WaitGroup{}
-	laneRuns.Add(1)
-	go func() {
-		defer laneRuns.Done()
+	t.Run(fmt.Sprintf("CCIP message transfer from network %s to network %s for %s", laneA.SourceNetworkName, laneA.DestNetworkName, duration), func(t *testing.T) {
+		t.Parallel()
 		log.Info().
 			Str("Test Duration", fmt.Sprintf("%s", duration)).
 			Str("Request Triggering interval", fmt.Sprintf("%s", interval)).
 			Str("Source", laneA.SourceNetworkName).
 			Str("Destination", laneA.DestNetworkName).
 			Msg("Starting lane A")
-		laneA.ValidationTimeout = 5 * time.Minute
 		totalReqLaneA, reqSuccessLaneA = laneA.SoakRun(interval, duration)
-	}()
+		if totalReqLaneA != reqSuccessLaneA {
+			t.Fatalf("Failed to deliver %d requests out of %d", totalReqLaneA-reqSuccessLaneA, totalReqLaneA)
+		}
+	})
 	if laneB != nil {
-		laneRuns.Add(1)
-		go func() {
-			defer laneRuns.Done()
+		t.Run(fmt.Sprintf("CCIP message transfer from network %s to network %s for %s", laneB.SourceNetworkName, laneB.DestNetworkName, duration), func(t *testing.T) {
+			t.Parallel()
 			log.Info().
 				Str("Test Duration", fmt.Sprintf("%s", duration)).
 				Str("Request Triggering interval", fmt.Sprintf("%s", interval)).
 				Str("Source", laneB.SourceNetworkName).
 				Str("Destination", laneB.DestNetworkName).
 				Msg("Starting lane B")
-			laneB.ValidationTimeout = 5 * time.Minute
 			totalReqLaneB, reqSuccessLaneB = laneB.SoakRun(interval, duration)
-		}()
+			if totalReqLaneB != reqSuccessLaneB {
+				t.Fatalf("Failed to deliver %d requests out of %d", totalReqLaneB-reqSuccessLaneB, totalReqLaneB)
+			}
+		})
 	}
-	laneRuns.Wait()
 }

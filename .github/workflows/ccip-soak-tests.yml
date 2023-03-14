@@ -1,8 +1,9 @@
 name: CCIP Bi-directional Soak Test
 on:
-  push:
-    branches:
-      - ccip-develop
+  workflow_run:
+    workflows: [ CCIP Load Test ]
+    types: [ completed ]
+    branches: [ ccip-develop ]
   workflow_dispatch:
     inputs:
       existing-deployment:

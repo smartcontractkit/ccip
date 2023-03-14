@@ -1,8 +1,9 @@
 name: CCIP Chaos Tests
 on:
-  push:
-    branches:
-      - ccip-develop
+  workflow_run:
+    workflows: [ CCIP Bi-directional Soak Test ]
+    types: [ completed ]
+    branches: [ ccip-develop ]
   workflow_dispatch:
 
 

@@ -107,9 +107,6 @@ func TestChaosCCIP(t *testing.T) {
 
 			lane, _, tearDown = actions.CCIPDefaultTestSetUp(t, "chaos-ccip", map[string]interface{}{
 				"replicas": "12",
-				"env": map[string]interface{}{
-					"CL_DEV": "true",
-				},
 				"db": map[string]interface{}{
 					"stateful": true,
 					"capacity": "10Gi",

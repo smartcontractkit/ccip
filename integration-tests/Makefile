@@ -120,10 +120,12 @@ test_chaos_verbose: ## Run all smoke tests with verbose logging
 
 .PHONY: test_chaos_ccip_pods_raw
 test_chaos_ccip_pods_raw:
+	DATABASE_URL="postgresql://postgres:node@localhost:5432/chainlink_test?sslmode=disable" \
 	go test -timeout 2h -v -count=1 $(args) -p 2 -run 'TestChaosCCIP/.*pod-chaos' ./chaos
 
 .PHONY: test_chaos_ccip_network_raw
 test_chaos_ccip_network_raw:
+	DATABASE_URL="postgresql://postgres:node@localhost:5432/chainlink_test?sslmode=disable" \
 	go test -timeout 2h -v -count=1 $(args) -p 2 -run 'TestChaosCCIP/.*network-chaos' ./chaos
 
 # Performance
