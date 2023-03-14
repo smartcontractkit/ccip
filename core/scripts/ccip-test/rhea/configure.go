@@ -49,7 +49,7 @@ func SetPriceRegistryPrices(t *testing.T, client *EvmDeploymentConfig, destChain
 		priceUpdates.TokenPriceUpdates = append(priceUpdates.TokenPriceUpdates, price_registry.InternalTokenPriceUpdate{
 			SourceToken: client.ChainConfig.SupportedTokens[feeToken].Token,
 			// The USD per Token is in 1e18 format.
-			UsdPerToken: new(big.Int).Mul(client.ChainConfig.SupportedTokens[feeToken].Price, big.NewInt(1e18)),
+			UsdPerToken: big.NewInt(0).Mul(client.ChainConfig.SupportedTokens[feeToken].Price, big.NewInt(1e18)),
 		})
 	}
 

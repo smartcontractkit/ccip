@@ -111,6 +111,8 @@ func TestCCIP(t *testing.T) {
 		client.SetOCR2Config(ENV)
 	case "setOnRampFeeConfig":
 		client.setOnRampFeeConfig(t, &SOURCE)
+	case "applyFeeTokensUpdates":
+		client.applyFeeTokensUpdates(t, &SOURCE)
 		// Set the config to the onRamp fee
 	case "setAllowList":
 		client.setAllowList(t)

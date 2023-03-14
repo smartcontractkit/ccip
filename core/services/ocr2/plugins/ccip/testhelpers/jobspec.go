@@ -151,9 +151,6 @@ func (params CCIPJobSpecParams) ExecutionJobSpec() (*client.OCR2TaskJobSpec, err
 			"sourceChainID": params.SourceChainId,
 			"onRampID":      fmt.Sprintf("\"%s\"", params.OnRamp.Hex()),
 			"commitStoreID": fmt.Sprintf("\"%s\"", params.CommitStore.Hex()),
-			"tokenPricesUSDPipeline": fmt.Sprintf(`"""
-%s
-"""`, params.TokenPricesUSDPipeline),
 		},
 		RelayConfig: map[string]interface{}{
 			"chainID": params.DestChainId,

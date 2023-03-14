@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ping_pong_demo"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/dione"
@@ -40,6 +41,8 @@ func PrintCCIPState(source *rhea.EvmDeploymentConfig, destination *rhea.EvmDeplo
 	printRampSanityCheck(source, destination.LaneConfig.OnRamp, destination.ChainConfig.ChainId)
 	printRampSanityCheck(destination, source.LaneConfig.OnRamp, source.ChainConfig.ChainId)
 
+	checkPriceRegistrySet(source, destination)
+
 	printPaused(source)
 	printPaused(destination)
 
@@ -47,7 +50,19 @@ func PrintCCIPState(source *rhea.EvmDeploymentConfig, destination *rhea.EvmDeplo
 	printRateLimitingStatus(destination)
 }
 
+func SetupAllLanesReadOnly(logger logger.Logger) {
+	err := deployments.Prod_AvaxFujiToOptimismGoerli.SetupReadOnlyChain(logger.Named(helpers.ChainName(int64(deployments.Prod_AvaxFujiToOptimismGoerli.ChainConfig.ChainId))))
+	if err != nil {
+		panic(err)
+	}
+	err = deployments.Prod_OptimismGoerliToAvaxFuji.SetupReadOnlyChain(logger.Named(helpers.ChainName(int64(deployments.Prod_OptimismGoerliToAvaxFuji.ChainConfig.ChainId))))
+	if err != nil {
+		panic(err)
+	}
+}
+
 func PrintTokenSupportAllChains(logger logger.Logger) {
+	SetupAllLanesReadOnly(logger)
 	err := deployments.Prod_SepoliaToOptimismGoerli.SetupReadOnlyChain(logger.Named(helpers.ChainName(int64(deployments.Prod_SepoliaToOptimismGoerli.ChainConfig.ChainId))))
 	if err != nil {
 		log.Fatal(err)
@@ -509,44 +524,45 @@ func printSupportedTokensCheck(source *rhea.EvmDeploymentConfig, destination *rh
 	sb.WriteString(generateHeader(tableHeaders, headerLengths))
 
 	for _, token := range rhea.GetAllTokens() {
-		sourcePool := false
-		if val, ok := source.ChainConfig.SupportedTokens[token]; ok && val.Pool != common.HexToAddress("") {
-			sourcePool = true
-		}
-
-		sourceFee, err := sourceRouter.GetFee(&bind.CallOpts{}, destination.ChainConfig.ChainId, router.ClientEVM2AnyMessage{
-			Receiver:     common.HexToAddress("").Bytes(),
-			Data:         []byte{},
-			TokenAmounts: []router.ClientEVMTokenAmount{},
-			FeeToken:     destination.ChainConfig.SupportedTokens[token].Token,
-			ExtraArgs:    []byte{},
-		})
-		isSourceFeeToken := err == nil
+		var sourceEnabled, isSourcePool, isSourceFeeToken bool
 		sourceFeeAmount := "➖"
 
-		if isSourceFeeToken {
-			sourceFeeAmount = dione.EthBalanceToString(sourceFee)
+		if _, ok := source.ChainConfig.SupportedTokens[token]; ok {
+			sourceEnabled = slices.Contains(sourceTokens, source.ChainConfig.SupportedTokens[token].Token)
+			isSourcePool = source.ChainConfig.SupportedTokens[token].Pool != common.HexToAddress("")
+
+			sourceFee, err := sourceRouter.GetFee(&bind.CallOpts{}, destination.ChainConfig.ChainId, router.ClientEVM2AnyMessage{
+				Receiver:     common.HexToAddress("").Bytes(),
+				Data:         []byte{},
+				TokenAmounts: []router.ClientEVMTokenAmount{},
+				FeeToken:     source.ChainConfig.SupportedTokens[token].Token,
+				ExtraArgs:    []byte{},
+			})
+
+			if isSourceFeeToken = err == nil; isSourceFeeToken {
+				sourceFeeAmount = dione.EthBalanceToString(sourceFee)
+			}
 		}
 
-		destPool := false
-		if val, ok := destination.ChainConfig.SupportedTokens[token]; ok && val.Pool != common.HexToAddress("") {
-			destPool = true
-		}
-		destFee, err := destRouter.GetFee(&bind.CallOpts{}, source.ChainConfig.ChainId, router.ClientEVM2AnyMessage{
-			Receiver:     common.HexToAddress("").Bytes(),
-			Data:         []byte{},
-			TokenAmounts: []router.ClientEVMTokenAmount{},
-			FeeToken:     destination.ChainConfig.SupportedTokens[token].Token,
-			ExtraArgs:    []byte{},
-		})
-		isDestFeeToken := err == nil
+		var destEnabled, isDestPool, isDestFeeToken bool
 		destFeeAmount := "➖"
-		if isDestFeeToken {
-			destFeeAmount = dione.EthBalanceToString(destFee)
-		}
 
-		sourceEnabled := slices.Contains(sourceTokens, source.ChainConfig.SupportedTokens[token].Token)
-		destEnabled := slices.Contains(destTokens, destination.ChainConfig.SupportedTokens[token].Token)
+		if _, ok := destination.ChainConfig.SupportedTokens[token]; ok {
+			destEnabled = slices.Contains(destTokens, destination.ChainConfig.SupportedTokens[token].Token)
+			isDestPool = destination.ChainConfig.SupportedTokens[token].Pool != common.HexToAddress("")
+
+			destFee, err := destRouter.GetFee(&bind.CallOpts{}, source.ChainConfig.ChainId, router.ClientEVM2AnyMessage{
+				Receiver:     common.HexToAddress("").Bytes(),
+				Data:         []byte{},
+				TokenAmounts: []router.ClientEVMTokenAmount{},
+				FeeToken:     destination.ChainConfig.SupportedTokens[token].Token,
+				ExtraArgs:    []byte{},
+			})
+
+			if isDestFeeToken = err == nil; isDestFeeToken {
+				destFeeAmount = dione.EthBalanceToString(destFee)
+			}
+		}
 
 		boolParser := printBoolNeutral
 		if sourceEnabled || destEnabled {
@@ -558,12 +574,54 @@ func printSupportedTokensCheck(source *rhea.EvmDeploymentConfig, destination *rh
 			printBoolNeutral(isSourceFeeToken),
 			sourceFeeAmount,
 			boolParser(sourceEnabled),
-			boolParser(sourcePool),
+			boolParser(isSourcePool),
 			printBoolNeutral(isDestFeeToken),
 			destFeeAmount,
 			boolParser(destEnabled),
-			boolParser(destPool),
+			boolParser(isDestPool),
 		))
+	}
+
+	sb.WriteString(generateSeparator(headerLengths))
+
+	source.Logger.Info(sb.String())
+}
+
+func checkPriceRegistrySet(source *rhea.EvmDeploymentConfig, destination *rhea.EvmDeploymentConfig) {
+	var sb strings.Builder
+
+	tableHeaders := []string{"Token", "Remote ChainID", "ConfigSet"}
+	headerLengths := []int{20, 14, 9}
+
+	sb.WriteString(fmt.Sprintf("FeeManager token config for %s\n", helpers.ChainName(int64(source.ChainConfig.ChainId))))
+
+	sb.WriteString(generateHeader(tableHeaders, headerLengths))
+
+	feeManager, err := price_registry.NewPriceRegistry(source.ChainConfig.PriceRegistry, source.Client)
+	helpers.PanicErr(err)
+
+	for _, tokenName := range source.ChainConfig.FeeTokens {
+		token := source.ChainConfig.SupportedTokens[tokenName].Token
+		_, err = feeManager.GetFeeTokenBaseUnitsPerUnitGas(&bind.CallOpts{}, token, destination.ChainConfig.ChainId)
+		if err != nil {
+			sb.WriteString(fmt.Sprintf("| %-20s | %14d | %9s |\n", tokenName, destination.ChainConfig.ChainId, printBool(false)))
+		}
+		sb.WriteString(fmt.Sprintf("| %-20s | %14d | %9s |\n", tokenName, destination.ChainConfig.ChainId, printBool(true)))
+	}
+	sb.WriteString(generateSeparator(headerLengths))
+
+	sb.WriteString(fmt.Sprintf("FeeManager token config for %s\n", helpers.ChainName(int64(destination.ChainConfig.ChainId))))
+	sb.WriteString(generateHeader(tableHeaders, headerLengths))
+	feeManager, err = price_registry.NewPriceRegistry(destination.ChainConfig.PriceRegistry, destination.Client)
+	helpers.PanicErr(err)
+
+	for _, tokenName := range destination.ChainConfig.FeeTokens {
+		token := destination.ChainConfig.SupportedTokens[tokenName].Token
+		_, err = feeManager.GetFeeTokenBaseUnitsPerUnitGas(&bind.CallOpts{}, token, source.ChainConfig.ChainId)
+		if err != nil {
+			sb.WriteString(fmt.Sprintf("| %-20s | %14d | %9s |\n", tokenName, source.ChainConfig.ChainId, printBool(false)))
+		}
+		sb.WriteString(fmt.Sprintf("| %-20s | %14d | %9s |\n", tokenName, source.ChainConfig.ChainId, printBool(true)))
 	}
 
 	sb.WriteString(generateSeparator(headerLengths))
