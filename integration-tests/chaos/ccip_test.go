@@ -16,7 +16,7 @@ import (
 /* @network-chaos and @pod-chaos are split intentionally into 2 parallel groups
 we can't use chaos.NewNetworkPartition and chaos.NewFailPods in parallel
 because of jsii runtime bug, see Makefile and please use those targets to run tests
-In .github/workflows/load-ccip-tests.yml we use these tags to run these tests separately
+In .github/workflows/ccip-chaos-tests.yml we use these tags to run these tests separately
 */
 
 func TestChaosCCIP(t *testing.T) {
