@@ -13,11 +13,11 @@ import {Client} from "../models/Client.sol";
 import {Internal} from "../models/Internal.sol";
 import {OCR2Base} from "../ocr/OCR2Base.sol";
 import {AggregateRateLimiter} from "../rateLimiter/AggregateRateLimiter.sol";
+import {EnumerableMapAddresses} from "../../libraries/internal/EnumerableMapAddresses.sol";
 
 import {IERC20} from "../../vendor/IERC20.sol";
 import {Address} from "../../vendor/Address.sol";
 import {ERC165Checker} from "../../vendor/ERC165Checker.sol";
-import {EnumerableMapAddresses} from "../../libraries/internal/EnumerableMapAddresses.sol";
 import {Pausable} from "../../vendor/Pausable.sol";
 
 /// @notice EVM2EVMOffRamp enables OCR networks to execute multiple messages

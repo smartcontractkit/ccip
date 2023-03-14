@@ -96,7 +96,13 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
     IERC20(s_sourceTokens[1]).approve(address(s_sourceRouter), i_tokenAmount1);
 
     message.receiver = abi.encode(address(s_receiver));
-    Internal.EVM2EVMMessage memory geEvent = _messageToEvent(message, expectedSeqNum, expectedSeqNum, expectedFee);
+    Internal.EVM2EVMMessage memory geEvent = _messageToEvent(
+      message,
+      expectedSeqNum,
+      expectedSeqNum,
+      expectedFee,
+      OWNER
+    );
 
     vm.expectEmit();
     emit CCIPSendRequested(geEvent);

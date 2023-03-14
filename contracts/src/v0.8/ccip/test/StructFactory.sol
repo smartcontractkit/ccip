@@ -119,8 +119,8 @@ contract StructFactory {
 
   function getNopsAndWeights() internal pure returns (IEVM2EVMOnRamp.NopAndWeight[] memory) {
     IEVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights = new IEVM2EVMOnRamp.NopAndWeight[](3);
-    nopsAndWeights[0] = IEVM2EVMOnRamp.NopAndWeight({nop: USER_1, weight: 10});
-    nopsAndWeights[1] = IEVM2EVMOnRamp.NopAndWeight({nop: USER_2, weight: 8});
+    nopsAndWeights[0] = IEVM2EVMOnRamp.NopAndWeight({nop: USER_1, weight: 19284});
+    nopsAndWeights[1] = IEVM2EVMOnRamp.NopAndWeight({nop: USER_2, weight: 52935});
     nopsAndWeights[2] = IEVM2EVMOnRamp.NopAndWeight({nop: USER_3, weight: 8});
     return nopsAndWeights;
   }

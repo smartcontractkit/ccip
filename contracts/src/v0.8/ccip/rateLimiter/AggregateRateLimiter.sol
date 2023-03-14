@@ -127,11 +127,9 @@ contract AggregateRateLimiter is IAggregateRateLimiter, OwnerIsCreator {
       _update(s_tokenBucket);
 
       if (s_tokenBucket.capacity < value) revert ValueExceedsCapacity(s_tokenBucket.capacity, value);
-      if (s_tokenBucket.tokens < value) {
+      if (s_tokenBucket.tokens < value)
         // Seconds wait required until the bucket is refilled enough to accept this value
-        uint256 waitInSeconds = (value - s_tokenBucket.tokens) / s_tokenBucket.rate;
-        revert ValueExceedsAllowedThreshold(waitInSeconds);
-      }
+        revert ValueExceedsAllowedThreshold((value - s_tokenBucket.tokens) / s_tokenBucket.rate);
 
       s_tokenBucket.tokens -= value;
       emit TokensRemovedFromBucket(value);

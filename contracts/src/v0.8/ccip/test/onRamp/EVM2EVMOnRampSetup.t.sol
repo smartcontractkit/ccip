@@ -115,7 +115,8 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
     Client.EVM2AnyMessage memory message,
     uint64 seqNum,
     uint64 nonce,
-    uint256 feeTokenAmount
+    uint256 feeTokenAmount,
+    address originalSender
   ) public view returns (Internal.EVM2EVMMessage memory) {
     // Slicing is only available for calldata. So we have to build a new bytes array.
     bytes memory args = new bytes(message.extraArgs.length - 4);
@@ -126,7 +127,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
     Internal.EVM2EVMMessage memory messageEvent = Internal.EVM2EVMMessage({
       sequenceNumber: seqNum,
       feeTokenAmount: feeTokenAmount,
-      sender: OWNER,
+      sender: originalSender,
       nonce: nonce,
       gasLimit: extraArgs.gasLimit,
       strict: extraArgs.strict,

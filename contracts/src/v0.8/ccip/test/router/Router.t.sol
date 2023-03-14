@@ -47,7 +47,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     vm.expectEmit();
     emit Burned(address(s_onRamp), message.tokenAmounts[0].amount);
 
-    Internal.EVM2EVMMessage memory msgEvent = _messageToEvent(message, 1, 1, expectedFee);
+    Internal.EVM2EVMMessage memory msgEvent = _messageToEvent(message, 1, 1, expectedFee, OWNER);
 
     vm.expectEmit();
     emit CCIPSendRequested(msgEvent);
@@ -70,7 +70,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_ID, message);
     assertGt(expectedFee, 0);
 
-    Internal.EVM2EVMMessage memory msgEvent = _messageToEvent(message, 1, 1, expectedFee);
+    Internal.EVM2EVMMessage memory msgEvent = _messageToEvent(message, 1, 1, expectedFee, OWNER);
 
     vm.expectEmit();
     emit CCIPSendRequested(msgEvent);
@@ -105,7 +105,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     // Native fees will be wrapped so we need to calculate the event with
     // the wrapped native feeCoin address.
     message.feeToken = s_sourceRouter.getWrappedNative();
-    Internal.EVM2EVMMessage memory msgEvent = _messageToEvent(message, 1, 1, expectedFee);
+    Internal.EVM2EVMMessage memory msgEvent = _messageToEvent(message, 1, 1, expectedFee, OWNER);
     // Set it to address(0) to indicate native
     message.feeToken = address(0);
 
@@ -133,7 +133,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     // Native fees will be wrapped so we need to calculate the event with
     // the wrapped native feeCoin address.
     message.feeToken = s_sourceRouter.getWrappedNative();
-    Internal.EVM2EVMMessage memory msgEvent = _messageToEvent(message, 1, 1, expectedFee);
+    Internal.EVM2EVMMessage memory msgEvent = _messageToEvent(message, 1, 1, expectedFee, OWNER);
     // Set it to address(0) to indicate native
     message.feeToken = address(0);
 

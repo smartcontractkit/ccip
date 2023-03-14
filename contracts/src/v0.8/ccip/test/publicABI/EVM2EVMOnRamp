@@ -26,7 +26,7 @@
   "setAllowListEnabled(bool)": "efeadb6d",
   "setDynamicConfig((address,address,uint32,uint64,uint16,address,address))": "cb18476d",
   "setFeeConfig((address,uint64,uint96,uint32)[])": "68d8f142",
-  "setNops((address,uint256)[])": "1abacb7f",
+  "setNops((address,uint16)[])": "76f6ae76",
   "setPrices(address[],uint256[])": "4352fa9f",
   "setRateLimiterConfig((address,uint208,uint256))": "b3a18a3e",
   "setTokenLimitAdmin(address)": "39aa9264",

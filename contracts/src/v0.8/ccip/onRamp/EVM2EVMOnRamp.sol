@@ -16,9 +16,9 @@ import {EnumerableMapAddresses} from "../../libraries/internal/EnumerableMapAddr
 
 import {SafeERC20} from "../../vendor/SafeERC20.sol";
 import {IERC20} from "../../vendor/IERC20.sol";
+import {Pausable} from "../../vendor/Pausable.sol";
 import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v4.7.3/contracts/utils/structs/EnumerableSet.sol";
 import {EnumerableMap} from "../../vendor/openzeppelin-solidity/v4.7.3/contracts/utils/structs/EnumerableMap.sol";
-import {Pausable} from "../../vendor/Pausable.sol";
 
 contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAndVersionInterface {
   using SafeERC20 for IERC20;
@@ -61,12 +61,12 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAn
   mapping(address => FeeTokenConfig) internal s_feeTokenConfig;
 
   // STATE
-  /// @dev The amount of LINK available to pay NOPS
-  uint256 internal s_nopFeesJuels;
-  /// @dev The total weight of all NOPs weights
-  uint256 internal s_nopWeightsTotal;
   /// @dev The current nonce per sender
   mapping(address => uint64) internal s_senderNonce;
+  /// @dev The amount of LINK available to pay NOPS
+  uint96 internal s_nopFeesJuels;
+  /// @dev The total weight of all NOPs weights
+  uint32 internal s_nopWeightsTotal;
   /// @dev The last used sequence number. This is zero in the case where no
   /// messages has been sent yet. 0 is not a valid sequence number for any
   /// real transaction.
@@ -188,7 +188,8 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAn
 
     // Convert feeToken to link if not already in link
     if (message.feeToken == i_linkToken) {
-      s_nopFeesJuels += feeTokenAmount;
+      // Since there is only 1b link this is safe
+      s_nopFeesJuels += uint96(feeTokenAmount);
     } else {
       s_nopFeesJuels += IPriceRegistry(s_dynamicConfig.priceRegistry).convertFeeTokenAmountToLinkAmount(
         i_linkToken,
@@ -289,7 +290,7 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAn
   }
 
   /// @inheritdoc IEVM2EVMOnRamp
-  function getNopFeesJuels() external view override returns (uint256) {
+  function getNopFeesJuels() external view override returns (uint96) {
     return s_nopFeesJuels;
   }
 
@@ -352,7 +353,7 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAn
     delete s_nops;
 
     // Add new
-    uint256 nopWeightsTotal = 0;
+    uint32 nopWeightsTotal = 0;
     for (uint256 i = 0; i < nopsAndWeights.length; ++i) {
       s_nops.set(nopsAndWeights[i].nop, nopsAndWeights[i].weight);
       nopWeightsTotal += nopsAndWeights[i].weight;
@@ -367,7 +368,7 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAn
     nopsAndWeights = new NopAndWeight[](length);
     for (uint256 i = 0; i < length; ++i) {
       (address nopAddress, uint256 nopWeight) = s_nops.at(i);
-      nopsAndWeights[i] = NopAndWeight({nop: nopAddress, weight: nopWeight});
+      nopsAndWeights[i] = NopAndWeight({nop: nopAddress, weight: uint16(nopWeight)});
     }
     weightsTotal = s_nopWeightsTotal;
     return (nopsAndWeights, weightsTotal);
@@ -435,24 +436,24 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAn
 
   /// @inheritdoc IEVM2EVMOnRamp
   function payNops() external onlyOwnerOrFeeAdminOrNop {
-    uint256 weightsTotal = s_nopWeightsTotal;
+    uint32 weightsTotal = s_nopWeightsTotal;
     if (weightsTotal == 0) revert NoNopsToPay();
 
-    uint256 totalFeesToPay = s_nopFeesJuels;
-    if (totalFeesToPay == 0 || totalFeesToPay < weightsTotal) revert NoFeesToPay();
+    uint96 totalFeesToPay = s_nopFeesJuels;
+    if (totalFeesToPay < weightsTotal) revert NoFeesToPay();
+    if (IERC20(i_linkToken).balanceOf(address(this)) < totalFeesToPay) revert InsufficientBalance();
 
-    uint256 contractBalance = IERC20(i_linkToken).balanceOf(address(this));
-    if (contractBalance < totalFeesToPay) revert InsufficientBalance();
-
-    uint256 nopFee = (totalFeesToPay * 1e18) / weightsTotal;
-    for (uint256 i = 0; i < s_nops.length(); ++i) {
+    uint96 fundsLeft = totalFeesToPay;
+    uint256 numberOfNops = s_nops.length();
+    for (uint256 i = 0; i < numberOfNops; ++i) {
       (address nop, uint256 weight) = s_nops.at(i);
-      uint256 amount = (nopFee * weight) / 1e18;
+      // amount can never be higher than totalFeesToPay so the cast to uint96 is safe
+      uint96 amount = uint96((totalFeesToPay * weight) / weightsTotal);
+      fundsLeft -= amount;
       IERC20(i_linkToken).safeTransfer(nop, amount);
-      totalFeesToPay -= amount;
       emit NopPaid(nop, amount);
     }
-    s_nopFeesJuels = totalFeesToPay;
+    s_nopFeesJuels = fundsLeft;
   }
 
   /// @dev Require that the sender is the owner or the fee admin or a nop

@@ -168,6 +168,8 @@ contract PriceRegistry_updatePrices is PriceRegistrySetup {
     assertEq(s_priceRegistry.getDestinationChainGasPrice(DEST_CHAIN_ID).value, priceUpdates.usdPerUnitGas);
   }
 
+  // Reverts
+
   function testOnlyCallableByUpdaterOrOwnerReverts() public {
     Internal.PriceUpdates memory priceUpdates = abi.decode(s_encodedNewPriceUpdates, (Internal.PriceUpdates));
     changePrank(STRANGER);
@@ -177,7 +179,7 @@ contract PriceRegistry_updatePrices is PriceRegistrySetup {
 }
 
 contract PriceRegistry_convertFeeTokenAmountToLinkAmount is PriceRegistrySetup {
-  function testSuccess() public {
+  function testConvertFeeTokenAmountToLinkAmountSuccess() public {
     Internal.PriceUpdates memory initialPriceUpdates = abi.decode(
       s_encodedInitialPriceUpdates,
       (Internal.PriceUpdates)
@@ -188,6 +190,40 @@ contract PriceRegistry_convertFeeTokenAmountToLinkAmount is PriceRegistrySetup {
     uint256 expected = (amount * conversionRate) / 1e18;
     assertEq(s_priceRegistry.convertFeeTokenAmountToLinkAmount(s_sourceTokens[0], s_weth, amount), expected);
   }
+
+  function test_fuzz_ConvertFeeTokenAmountToLinkAmountSuccess(
+    uint256 feeTokenAmount,
+    uint128 usdPerFeeToken,
+    uint128 usdPerLinkToken,
+    uint128 usdPerUnitGas
+  ) public {
+    vm.assume(usdPerFeeToken > 0);
+    vm.assume(usdPerLinkToken > 0);
+    // We bound the max fees to be at most uint96.max link.
+    feeTokenAmount = bound(feeTokenAmount, 0, (uint256(type(uint96).max) * usdPerLinkToken) / usdPerFeeToken);
+
+    address feeToken = address(1);
+    address linkToken = address(2);
+    address[] memory feeTokens = new address[](1);
+    feeTokens[0] = feeToken;
+    s_priceRegistry.applyFeeTokensUpdates(feeTokens, new address[](0));
+
+    Internal.TokenPriceUpdate[] memory tokenPriceUpdates = new Internal.TokenPriceUpdate[](2);
+    tokenPriceUpdates[0] = Internal.TokenPriceUpdate({sourceToken: feeToken, usdPerToken: usdPerFeeToken});
+    tokenPriceUpdates[1] = Internal.TokenPriceUpdate({sourceToken: linkToken, usdPerToken: usdPerLinkToken});
+    Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
+      tokenPriceUpdates: tokenPriceUpdates,
+      destChainId: DEST_CHAIN_ID,
+      usdPerUnitGas: usdPerUnitGas
+    });
+
+    s_priceRegistry.updatePrices(priceUpdates);
+
+    uint256 linkFee = s_priceRegistry.convertFeeTokenAmountToLinkAmount(linkToken, feeToken, feeTokenAmount);
+    assertEq(linkFee, (feeTokenAmount * usdPerFeeToken) / usdPerLinkToken);
+  }
+
+  // Reverts
 
   function testNotAFeeTokenReverts() public {
     vm.expectRevert(abi.encodeWithSelector(IPriceRegistry.NotAFeeToken.selector, DUMMY_CONTRACT_ADDRESS));

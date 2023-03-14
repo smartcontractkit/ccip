@@ -84,7 +84,7 @@ interface IPriceRegistry {
     address linkToken,
     address feeToken,
     uint256 feeTokenAmount
-  ) external returns (uint256 linkTokenAmount);
+  ) external returns (uint96 linkTokenAmount);
 
   /// @notice Get the staleness threshold.
   /// @return stalenessThreshold The staleness threshold.

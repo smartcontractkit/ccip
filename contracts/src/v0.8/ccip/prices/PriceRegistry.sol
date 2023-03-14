@@ -122,12 +122,17 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
     return (uint256(gasPrice.value) * 1e18) / uint256(feeTokenPrice.value);
   }
 
-  // @inheritdoc IPriceRegistry
+  /// @inheritdoc IPriceRegistry
+  /// @dev this function assumed that no more than 1e72 dollar, or type(uint240).max, is
+  /// sent as payment. If more is sent, the multiplication of feeTokenAmount and feeTokenValue
+  /// will overflow. Since there isn't even close to 1e72 dollars in the world economy this is safe.
+  /// @dev the result is a uint96 which is can store more than all the link that exists and is
+  /// therefore considered safe.
   function convertFeeTokenAmountToLinkAmount(
     address linkToken,
     address feeToken,
     uint256 feeTokenAmount
-  ) external view override returns (uint256 linkTokenAmount) {
+  ) external view override returns (uint96 linkTokenAmount) {
     if (!s_feeTokens.contains(feeToken)) revert NotAFeeToken(feeToken);
 
     TimestampedUint128Value memory feeTokenPrice = s_usdPerToken[feeToken];
@@ -146,13 +151,11 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
     /// feeTokenAmount:   1e18      // 1 ETH
     /// ETH:              2_000e18
     /// LINK:             5e18
-    /// conversionRate:   (2_000e18 * 1e18) / 5e18 = 400e18
-    /// return:           (1e18 * 400e18) / 1e18 = 400e18 (400 LINK)
-    uint256 conversionRate = (uint256(feeTokenPrice.value) * 1e18) / uint256(linkTokenPrice.value);
-    return (feeTokenAmount * conversionRate) / 1e18;
+    /// return:           1e18 * 2_000e18 / 5e18 = 400e18 (400 LINK)
+    return uint96((feeTokenAmount * uint256(feeTokenPrice.value)) / uint256(linkTokenPrice.value));
   }
 
-  // @inheritdoc IPriceRegistry
+  /// @inheritdoc IPriceRegistry
   function getStalenessThreshold() external view override returns (uint128) {
     return i_stalenessThreshold;
   }
