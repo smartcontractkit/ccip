@@ -3,6 +3,7 @@ module github.com/smartcontractkit/chainlink/integration-tests
 go 1.20
 
 require (
+	github.com/ava-labs/coreth v0.11.0-rc.4
 	github.com/ethereum/go-ethereum v1.10.26
 	github.com/go-resty/resty/v2 v2.7.0
 	github.com/kelseyhightower/envconfig v1.4.0
@@ -13,12 +14,13 @@ require (
 	github.com/satori/go.uuid v1.2.1-0.20181028125025-b2ce2384e17b
 	github.com/slack-go/slack v0.12.1
 	github.com/smartcontractkit/chainlink v1.10.0
-	github.com/smartcontractkit/chainlink-env v0.3.17
-	github.com/smartcontractkit/chainlink-testing-framework v1.10.9-0.20230301123015-fa17d1a4dc61
+	github.com/smartcontractkit/chainlink-env v0.30.20
+	github.com/smartcontractkit/chainlink-relay v0.1.7-0.20230309154839-2b6a5b078888
+	github.com/smartcontractkit/chainlink-testing-framework v1.10.9
 	github.com/smartcontractkit/libocr v0.0.0-20221209172631-568a30f68407
 	github.com/smartcontractkit/ocr2keepers v0.6.14
 	github.com/smartcontractkit/ocr2vrf v0.0.0-20230221012516-b4187fdffa0c
-	github.com/stretchr/testify v1.8.1
+	github.com/stretchr/testify v1.8.2
 	github.com/umbracle/ethgo v0.1.3
 	go.dedis.ch/kyber/v3 v3.0.14
 	go.uber.org/atomic v1.10.0
@@ -42,7 +44,6 @@ require (
 	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
 	github.com/andres-erbsen/clock v0.0.0-20160526145045-9e14626cd129 // indirect
 	github.com/ava-labs/avalanchego v1.9.0 // indirect
-	github.com/ava-labs/coreth v0.11.0-rc.4 // indirect
 	github.com/aws/constructs-go/constructs/v10 v10.1.255 // indirect
 	github.com/aws/jsii-runtime-go v1.75.0 // indirect
 	github.com/aybabtme/rgbterm v0.0.0-20170906152045-cc83f3b3ce59 // indirect
@@ -50,7 +51,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/blendle/zapdriver v1.3.1 // indirect
-	github.com/btcsuite/btcd v0.23.1 // indirect
+	github.com/btcsuite/btcd v0.23.4 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2 // indirect
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.1 // indirect
 	github.com/c2h5oh/datasize v0.0.0-20200112174442-28bbd4740fee // indirect
@@ -280,8 +281,7 @@ require (
 	github.com/shirou/gopsutil/v3 v3.22.12 // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/sirupsen/logrus v1.9.0 // indirect
-	github.com/smartcontractkit/chainlink-relay v0.1.7-0.20230221200635-404a44389f85 // indirect
-	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20230221200929-d415eda78bff // indirect
+	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20230313192900-6270bc7c445f // indirect
 	github.com/smartcontractkit/chainlink-starknet/relayer v0.0.0-20230223033525-5be75fb81118 // indirect
 	github.com/smartcontractkit/sqlx v1.3.5-0.20210805004948-4be295aacbeb // indirect
 	github.com/smartcontractkit/wsrpc v0.6.1 // indirect
@@ -323,7 +323,7 @@ require (
 	go.starlark.net v0.0.0-20220817180228-f738f5508c12 // indirect
 	go.uber.org/goleak v1.2.0 // indirect
 	go.uber.org/ratelimit v0.2.0 // indirect
-	golang.org/x/exp v0.0.0-20230213192124-5e25df0256eb // indirect
+	golang.org/x/exp v0.0.0-20230224173230-c95f2b4c22f2 // indirect
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
 	golang.org/x/mod v0.7.0 // indirect
 	golang.org/x/net v0.7.0 // indirect
