@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IPriceRegistry} from "../interfaces/prices/IPriceRegistry.sol";
+import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
 
-import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
-import {Internal} from "../models/Internal.sol";
+import {OwnerIsCreator} from "./OwnerIsCreator.sol";
+import {Internal} from "./models/Internal.sol";
 
-import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v4.7.3/contracts/utils/structs/EnumerableSet.sol";
+import {EnumerableSet} from "../vendor/openzeppelin-solidity/v4.7.3/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice The PriceRegistry contract responsibility is to store the current gas price in USD for a given destination chain,
 /// and the price of a token in USD allowing the owner or priceUpdater to update this value.
@@ -46,48 +46,18 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
     i_stalenessThreshold = stalenessThreshold;
   }
 
-  // @inheritdoc IPriceRegistry
-  function applyPriceUpdatersUpdates(address[] memory priceUpdatersToAdd, address[] memory priceUpdatersToRemove)
-    external
-    override
-    onlyOwner
-  {
-    _applyPriceUpdatersUpdates(priceUpdatersToAdd, priceUpdatersToRemove);
-  }
-
-  // @inheritdoc IPriceRegistry
-  function getPriceUpdaters() external view override returns (address[] memory priceUpdaters) {
-    priceUpdaters = new address[](s_priceUpdaters.length());
-    for (uint256 i = 0; i < s_priceUpdaters.length(); ++i) {
-      priceUpdaters[i] = s_priceUpdaters.at(i);
-    }
-  }
-
-  // @inheritdoc IPriceRegistry
-  function applyFeeTokensUpdates(address[] memory feeTokensToAdd, address[] memory feeTokensToRemove)
-    external
-    override
-    onlyOwner
-  {
-    _applyFeeTokensUpdates(feeTokensToAdd, feeTokensToRemove);
-  }
-
-  // @inheritdoc IPriceRegistry
-  function getFeeTokens() external view override returns (address[] memory feeTokens) {
-    feeTokens = new address[](s_feeTokens.length());
-    for (uint256 i = 0; i < s_feeTokens.length(); ++i) {
-      feeTokens[i] = s_feeTokens.at(i);
-    }
-  }
-
-  // @inheritdoc IPriceRegistry
-  function updatePrices(Internal.PriceUpdates memory priceUpdates) external override requireUpdaterOrOwner {
-    _updatePrices(priceUpdates);
-  }
+  // ================================================================
+  // |                     Price calculations                       |
+  // ================================================================
 
   // @inheritdoc IPriceRegistry
   function getTokenPrice(address token) external view override returns (TimestampedUint128Value memory) {
     return s_usdPerToken[token];
+  }
+
+  /// @inheritdoc IPriceRegistry
+  function getStalenessThreshold() external view override returns (uint128) {
+    return i_stalenessThreshold;
   }
 
   // @inheritdoc IPriceRegistry
@@ -155,29 +125,25 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
     return uint96((feeTokenAmount * uint256(feeTokenPrice.value)) / uint256(linkTokenPrice.value));
   }
 
-  /// @inheritdoc IPriceRegistry
-  function getStalenessThreshold() external view override returns (uint128) {
-    return i_stalenessThreshold;
+  // ================================================================
+  // |                         Fee tokens                           |
+  // ================================================================
+
+  // @inheritdoc IPriceRegistry
+  function getFeeTokens() external view override returns (address[] memory feeTokens) {
+    feeTokens = new address[](s_feeTokens.length());
+    for (uint256 i = 0; i < s_feeTokens.length(); ++i) {
+      feeTokens[i] = s_feeTokens.at(i);
+    }
   }
 
-  /// @notice Adds new priceUpdaters and remove existing ones.
-  /// @param priceUpdatersToAdd The addresses of the priceUpdaters that are now allowed
-  /// to send fee updates.
-  /// @param priceUpdatersToRemove The addresses of the priceUpdaters that are no longer allowed
-  /// to send fee updates.
-  function _applyPriceUpdatersUpdates(address[] memory priceUpdatersToAdd, address[] memory priceUpdatersToRemove)
-    private
+  // @inheritdoc IPriceRegistry
+  function applyFeeTokensUpdates(address[] memory feeTokensToAdd, address[] memory feeTokensToRemove)
+    external
+    override
+    onlyOwner
   {
-    for (uint256 i = 0; i < priceUpdatersToAdd.length; ++i) {
-      if (s_priceUpdaters.add(priceUpdatersToAdd[i])) {
-        emit PriceUpdaterSet(priceUpdatersToAdd[i]);
-      }
-    }
-    for (uint256 i = 0; i < priceUpdatersToRemove.length; ++i) {
-      if (s_priceUpdaters.remove(priceUpdatersToRemove[i])) {
-        emit PriceUpdaterRemoved(priceUpdatersToRemove[i]);
-      }
-    }
+    _applyFeeTokensUpdates(feeTokensToAdd, feeTokensToRemove);
   }
 
   /// @notice Add and remove tokens from feeTokens set.
@@ -195,6 +161,15 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
         emit FeeTokenRemoved(feeTokensToRemove[i]);
       }
     }
+  }
+
+  // ================================================================
+  // |                       Price updates                          |
+  // ================================================================
+
+  // @inheritdoc IPriceRegistry
+  function updatePrices(Internal.PriceUpdates memory priceUpdates) external override requireUpdaterOrOwner {
+    _updatePrices(priceUpdates);
   }
 
   /// @notice Updates all prices in the priceUpdates struct.
@@ -215,6 +190,47 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
         timestamp: uint128(block.timestamp)
       });
       emit UsdPerUnitGasUpdated(priceUpdates.destChainId, priceUpdates.usdPerUnitGas, block.timestamp);
+    }
+  }
+
+  // ================================================================
+  // |                           Access                             |
+  // ================================================================
+
+  // @inheritdoc IPriceRegistry
+  function getPriceUpdaters() external view override returns (address[] memory priceUpdaters) {
+    priceUpdaters = new address[](s_priceUpdaters.length());
+    for (uint256 i = 0; i < s_priceUpdaters.length(); ++i) {
+      priceUpdaters[i] = s_priceUpdaters.at(i);
+    }
+  }
+
+  // @inheritdoc IPriceRegistry
+  function applyPriceUpdatersUpdates(address[] memory priceUpdatersToAdd, address[] memory priceUpdatersToRemove)
+    external
+    override
+    onlyOwner
+  {
+    _applyPriceUpdatersUpdates(priceUpdatersToAdd, priceUpdatersToRemove);
+  }
+
+  /// @notice Adds new priceUpdaters and remove existing ones.
+  /// @param priceUpdatersToAdd The addresses of the priceUpdaters that are now allowed
+  /// to send fee updates.
+  /// @param priceUpdatersToRemove The addresses of the priceUpdaters that are no longer allowed
+  /// to send fee updates.
+  function _applyPriceUpdatersUpdates(address[] memory priceUpdatersToAdd, address[] memory priceUpdatersToRemove)
+    private
+  {
+    for (uint256 i = 0; i < priceUpdatersToAdd.length; ++i) {
+      if (s_priceUpdaters.add(priceUpdatersToAdd[i])) {
+        emit PriceUpdaterSet(priceUpdatersToAdd[i]);
+      }
+    }
+    for (uint256 i = 0; i < priceUpdatersToRemove.length; ++i) {
+      if (s_priceUpdaters.remove(priceUpdatersToRemove[i])) {
+        emit PriceUpdaterRemoved(priceUpdatersToRemove[i]);
+      }
     }
   }
 

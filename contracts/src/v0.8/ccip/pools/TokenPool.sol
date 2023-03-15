@@ -3,7 +3,7 @@ pragma solidity 0.8.15;
 
 import {IPool} from "../interfaces/pools/IPool.sol";
 
-import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
+import {OwnerIsCreator} from "../OwnerIsCreator.sol";
 
 import {SafeERC20} from "../../vendor/SafeERC20.sol";
 import {IERC20} from "../../vendor/IERC20.sol";

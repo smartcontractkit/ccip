@@ -1,7 +1,7 @@
 pragma solidity ^0.8.0;
 
-import {IRouterClient} from "../interfaces/router/IRouterClient.sol";
-import {IAny2EVMMessageReceiver} from "../interfaces/router/IAny2EVMMessageReceiver.sol";
+import {IRouterClient} from "../interfaces/IRouterClient.sol";
+import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
 
 import {Client} from "../models/Client.sol";
 
@@ -117,7 +117,7 @@ contract ImmutableExample is IAny2EVMMessageReceiver, IERC165 {
     bytes memory data,
     Client.EVMTokenAmount[] memory tokenAmounts
   ) external validChain(destChainId) {
-    for (uint256 i = 0; i < tokenAmounts.length; i++) {
+    for (uint256 i = 0; i < tokenAmounts.length; ++i) {
       IERC20(tokenAmounts[i].token).transferFrom(msg.sender, address(this), tokenAmounts[i].amount);
       IERC20(tokenAmounts[i].token).approve(address(i_router), tokenAmounts[i].amount);
     }
@@ -142,7 +142,7 @@ contract ImmutableExample is IAny2EVMMessageReceiver, IERC165 {
     bytes memory receiver,
     Client.EVMTokenAmount[] memory tokenAmounts
   ) external validChain(destChainId) {
-    for (uint256 i = 0; i < tokenAmounts.length; i++) {
+    for (uint256 i = 0; i < tokenAmounts.length; ++i) {
       IERC20(tokenAmounts[i].token).transferFrom(msg.sender, address(this), tokenAmounts[i].amount);
       IERC20(tokenAmounts[i].token).approve(address(i_router), tokenAmounts[i].amount);
     }

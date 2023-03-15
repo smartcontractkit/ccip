@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {IPriceRegistry} from "../../interfaces/prices/IPriceRegistry.sol";
+import {IPriceRegistry} from "../../interfaces/IPriceRegistry.sol";
 import {IEVM2EVMOnRamp} from "../../interfaces/onRamp/IEVM2EVMOnRamp.sol";
-import {IRouter} from "../../interfaces/router/IRouter.sol";
+import {IRouter} from "../../interfaces/IRouter.sol";
 
 import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
-import {PriceRegistry} from "../../prices/PriceRegistry.sol";
+import {PriceRegistry} from "../../PriceRegistry.sol";
 import {RouterSetup} from "../router/RouterSetup.t.sol";
-import {PriceRegistrySetup} from "../prices/PriceRegistry.t.sol";
+import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
 import {Internal} from "../../models/Internal.sol";
 import {Client} from "../../models/Client.sol";
 import "../../offRamp/EVM2EVMOffRamp.sol";
@@ -120,7 +120,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
   ) public view returns (Internal.EVM2EVMMessage memory) {
     // Slicing is only available for calldata. So we have to build a new bytes array.
     bytes memory args = new bytes(message.extraArgs.length - 4);
-    for (uint256 i = 4; i < message.extraArgs.length; i++) {
+    for (uint256 i = 4; i < message.extraArgs.length; ++i) {
       args[i - 4] = message.extraArgs[i];
     }
     Client.EVMExtraArgsV1 memory extraArgs = abi.decode(args, (Client.EVMExtraArgsV1));

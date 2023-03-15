@@ -2,9 +2,9 @@
 pragma solidity 0.8.15;
 
 import {IEVM2AnyOnRamp} from "../../interfaces/onRamp/IEVM2AnyOnRamp.sol";
-import {IRouter} from "../../interfaces/router/IRouter.sol";
-import {IWrappedNative} from "../../interfaces/router/IWrappedNative.sol";
-import {IRouterClient} from "../../interfaces/router/IRouterClient.sol";
+import {IRouter} from "../../interfaces/IRouter.sol";
+import {IWrappedNative} from "../../interfaces/IWrappedNative.sol";
+import {IRouterClient} from "../../interfaces/IRouterClient.sol";
 
 import "../onRamp/EVM2EVMOnRampSetup.t.sol";
 import "../helpers/receivers/SimpleMessageReceiver.sol";
@@ -12,8 +12,6 @@ import "../offRamp/EVM2EVMOffRampSetup.t.sol";
 
 /// @notice #constructor
 contract Router_constructor is EVM2EVMOnRampSetup {
-  // Success
-
   function testSuccess() public {
     assertEq("Router 1.0.0", s_sourceRouter.typeAndVersion());
     // owner
@@ -24,8 +22,6 @@ contract Router_constructor is EVM2EVMOnRampSetup {
 /// @notice #ccipSend
 contract Router_ccipSend is EVM2EVMOnRampSetup {
   event Burned(address indexed sender, uint256 amount);
-
-  // Success
 
   function testCCIPSendLinkFeeOneTokenSuccess_gas() public {
     vm.pauseGasMetering();
@@ -304,7 +300,7 @@ contract Router_applyRampUpdates is RouterSetup {
       IRouter.OnRampUpdate[] memory onRampUpdates = new IRouter.OnRampUpdate[](nOnRampUpdates);
       IRouter.OffRampUpdate[] memory offRampUpdates = new IRouter.OffRampUpdate[](nOffRampUpdates);
       // For each application we use the same chainID range to ensure overwriting.
-      for (uint256 i = 1; i < uint256(nOnRampUpdates) + 1; i++) {
+      for (uint256 i = 1; i < uint256(nOnRampUpdates) + 1; ++i) {
         if (uint256(disableOnRamp) == i - 1) {
           // Disable this chainID
           onRampUpdates[i - 1] = IRouter.OnRampUpdate({destChainId: uint64(i), onRamp: address(uint160(0))});
@@ -312,7 +308,7 @@ contract Router_applyRampUpdates is RouterSetup {
           onRampUpdates[i - 1] = IRouter.OnRampUpdate({destChainId: uint64(i), onRamp: address(uint160(i))});
         }
       }
-      for (uint256 i = 1; i < uint256(nOffRampUpdates) + 1; i++) {
+      for (uint256 i = 1; i < uint256(nOffRampUpdates) + 1; ++i) {
         address[] memory offRamps = new address[](nOffRamps);
         // If nOffRamps = 0, we are disabling this chainID.
         for (uint256 k = 0; k < uint256(nOffRamps); k++) {
@@ -323,7 +319,7 @@ contract Router_applyRampUpdates is RouterSetup {
       s_sourceRouter.applyRampUpdates(onRampUpdates, offRampUpdates);
 
       // Assert invariants
-      for (uint256 i = 1; i < nOnRampUpdates + 1; i++) {
+      for (uint256 i = 1; i < nOnRampUpdates + 1; ++i) {
         if (disableOnRamp == i - 1) {
           assertFalse(s_sourceRouter.isChainSupported(uint64(i)));
           assertEq(address(uint160(0)), s_sourceRouter.getOnRamp(uint64(i)));
@@ -332,7 +328,7 @@ contract Router_applyRampUpdates is RouterSetup {
           assertEq(address(uint160(i)), s_sourceRouter.getOnRamp(uint64(i)));
         }
       }
-      for (uint256 i = 1; i < nOffRampUpdates + 1; i++) {
+      for (uint256 i = 1; i < nOffRampUpdates + 1; ++i) {
         // Should be able to call route message from configured offramps.
         // This ensures the second map is properly maintained.
         vm.stopPrank();
@@ -417,7 +413,6 @@ contract Router_applyRampUpdates is RouterSetup {
 
 /// @notice #setWrappedNative
 contract Router_setWrappedNative is EVM2EVMOnRampSetup {
-  // Success
   function testSuccess() public {
     s_sourceRouter.setWrappedNative(address(1));
   }
@@ -432,8 +427,6 @@ contract Router_setWrappedNative is EVM2EVMOnRampSetup {
 
 /// @notice #getSupportedTokens
 contract Router_getSupportedTokens is EVM2EVMOnRampSetup {
-  // Success
-
   function testGetSupportedTokensSuccess() public {
     assertEq(s_sourceTokens, s_sourceRouter.getSupportedTokens(DEST_CHAIN_ID));
   }

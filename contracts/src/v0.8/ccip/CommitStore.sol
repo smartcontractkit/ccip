@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
-import {ICommitStore} from "../interfaces/ICommitStore.sol";
-import {IAFN} from "../interfaces/health/IAFN.sol";
-import {IPriceRegistry} from "../interfaces/prices/IPriceRegistry.sol";
+import {TypeAndVersionInterface} from "../interfaces/TypeAndVersionInterface.sol";
+import {ICommitStore} from "./interfaces/ICommitStore.sol";
+import {IAFN} from "./interfaces/IAFN.sol";
+import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
 
-import {OCR2Base} from "../ocr/OCR2Base.sol";
-import {Internal} from "../models/Internal.sol";
-import {Pausable} from "../../vendor/Pausable.sol";
+import {OCR2Base} from "./ocr/OCR2Base.sol";
+import {Internal} from "./models/Internal.sol";
+import {Pausable} from "../vendor/Pausable.sol";
 
 contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Base {
   // STATIC CONFIG
@@ -48,16 +48,13 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
     _setDynamicConfig(dynamicConfig);
   }
 
-  /// @notice Pause the contract
-  /// @dev only callable by the owner
-  function pause() external onlyOwner {
-    _pause();
-  }
+  // ================================================================
+  // |                        Verification                          |
+  // ================================================================
 
-  /// @notice Unpause the contract
-  /// @dev only callable by the owner
-  function unpause() external onlyOwner {
-    _unpause();
+  /// @inheritdoc ICommitStore
+  function getExpectedNextSequenceNumber() public view returns (uint64) {
+    return s_minSeqNr;
   }
 
   /// @inheritdoc ICommitStore
@@ -66,8 +63,13 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
   }
 
   /// @inheritdoc ICommitStore
-  function getExpectedNextSequenceNumber() public view returns (uint64) {
-    return s_minSeqNr;
+  function getMerkleRoot(bytes32 root) external view override returns (uint256) {
+    return s_roots[root];
+  }
+
+  /// @inheritdoc ICommitStore
+  function isBlessed(bytes32 root) public view returns (bool) {
+    return IAFN(s_dynamicConfig.afn).isBlessed(_hashCommitStoreWithRoot(root));
   }
 
   /// @notice Used by the owner in case an invalid sequence of roots has been
@@ -82,16 +84,47 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
     }
   }
 
-  /// @notice returns a hash of the abi encoded address of this contract and the
-  /// supplied root.
-  function _hashCommitStoreWithRoot(bytes32 root) internal view returns (bytes32) {
-    return keccak256(abi.encode(address(this), root));
+  /// @inheritdoc ICommitStore
+  function verify(
+    bytes32[] calldata hashedLeaves,
+    bytes32[] calldata proofs,
+    uint256 proofFlagBits
+  ) external view override returns (uint256 timestamp) {
+    bytes32 root = merkleRoot(hashedLeaves, proofs, proofFlagBits);
+    // Only return non-zero if present and blessed.
+    if (s_roots[root] == 0 || !isBlessed(root)) {
+      return uint256(0);
+    }
+    return s_roots[root];
   }
 
-  /// @inheritdoc ICommitStore
-  function isBlessed(bytes32 root) public view returns (bool) {
-    return IAFN(s_dynamicConfig.afn).isBlessed(_hashCommitStoreWithRoot(root));
+  /// @inheritdoc OCR2Base
+  function _report(bytes memory encodedReport) internal override whenNotPaused whenHealthy {
+    ICommitStore.CommitReport memory report = abi.decode(encodedReport, (ICommitStore.CommitReport));
+
+    if (report.priceUpdates.tokenPriceUpdates.length > 0 || report.priceUpdates.destChainId != 0) {
+      IPriceRegistry(s_dynamicConfig.priceRegistry).updatePrices(report.priceUpdates);
+      // If there is no root, the report only contained fee updated and
+      // we return to not revert on the empty root check below.
+      if (report.merkleRoot == bytes32(0)) {
+        return;
+      }
+    }
+
+    // If we reached this code the report should also contain a valid root
+    if (s_minSeqNr != report.interval.min || report.interval.min > report.interval.max)
+      revert InvalidInterval(report.interval);
+
+    if (report.merkleRoot == bytes32(0)) revert InvalidRoot();
+
+    s_minSeqNr = report.interval.max + 1;
+    s_roots[report.merkleRoot] = block.timestamp;
+    emit ReportAccepted(report);
   }
+
+  // ================================================================
+  // |                           Config                             |
+  // ================================================================
 
   /// @inheritdoc ICommitStore
   function getStaticConfig() external view override returns (StaticConfig memory) {
@@ -121,19 +154,9 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
     );
   }
 
-  /// @inheritdoc ICommitStore
-  function verify(
-    bytes32[] calldata hashedLeaves,
-    bytes32[] calldata proofs,
-    uint256 proofFlagBits
-  ) external view override returns (uint256 timestamp) {
-    bytes32 root = merkleRoot(hashedLeaves, proofs, proofFlagBits);
-    // Only return non-zero if present and blessed.
-    if (s_roots[root] == 0 || !isBlessed(root)) {
-      return uint256(0);
-    }
-    return s_roots[root];
-  }
+  // ================================================================
+  // |                       Merkle proof                           |
+  // ================================================================
 
   /// @inheritdoc ICommitStore
   function merkleRoot(
@@ -172,33 +195,10 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
     }
   }
 
-  /// @inheritdoc ICommitStore
-  function getMerkleRoot(bytes32 root) external view override returns (uint256) {
-    return s_roots[root];
-  }
-
-  /// @inheritdoc OCR2Base
-  function _report(bytes memory encodedReport) internal override whenNotPaused whenHealthy {
-    ICommitStore.CommitReport memory report = abi.decode(encodedReport, (ICommitStore.CommitReport));
-
-    if (report.priceUpdates.tokenPriceUpdates.length > 0 || report.priceUpdates.destChainId != 0) {
-      IPriceRegistry(s_dynamicConfig.priceRegistry).updatePrices(report.priceUpdates);
-      // If there is no root, the report only contained fee updated and
-      // we return to not revert on the empty root check below.
-      if (report.merkleRoot == bytes32(0)) {
-        return;
-      }
-    }
-
-    // If we reached this code the report should also contain a valid root
-    if (s_minSeqNr != report.interval.min || report.interval.min > report.interval.max)
-      revert InvalidInterval(report.interval);
-
-    if (report.merkleRoot == bytes32(0)) revert InvalidRoot();
-
-    s_minSeqNr = report.interval.max + 1;
-    s_roots[report.merkleRoot] = block.timestamp;
-    emit ReportAccepted(report);
+  /// @notice returns a hash of the abi encoded address of this contract and the
+  /// supplied root.
+  function _hashCommitStoreWithRoot(bytes32 root) internal view returns (bytes32) {
+    return keccak256(abi.encode(address(this), root));
   }
 
   /// @notice Hashes two bytes32 objects. The order is taken into account,
@@ -213,6 +213,10 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
     return keccak256(abi.encode(Internal.INTERNAL_DOMAIN_SEPARATOR, left, right));
   }
 
+  // ================================================================
+  // |                        Access and AFN                        |
+  // ================================================================
+
   /// @notice Support querying whether health checker is healthy.
   function isAFNHealthy() external view returns (bool) {
     return !IAFN(s_dynamicConfig.afn).badSignalReceived();
@@ -222,5 +226,17 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
   modifier whenHealthy() {
     if (IAFN(s_dynamicConfig.afn).badSignalReceived()) revert BadAFNSignal();
     _;
+  }
+
+  /// @notice Pause the contract
+  /// @dev only callable by the owner
+  function pause() external onlyOwner {
+    _pause();
+  }
+
+  /// @notice Unpause the contract
+  /// @dev only callable by the owner
+  function unpause() external onlyOwner {
+    _unpause();
   }
 }

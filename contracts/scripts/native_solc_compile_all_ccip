@@ -21,12 +21,12 @@ compileContract () {
       $ROOT/contracts/src/v0.8/$1
 }
 
-compileContract ccip/router/Router.sol
+compileContract ccip/Router.sol
 compileContract ccip/onRamp/EVM2EVMOnRamp.sol
-compileContract ccip/commitStore/CommitStore.sol
+compileContract ccip/CommitStore.sol
 compileContract ccip/offRamp/EVM2EVMOffRamp.sol
-compileContract ccip/health/AFN.sol
-compileContract ccip/prices/PriceRegistry.sol
+compileContract ccip/AFN.sol
+compileContract ccip/PriceRegistry.sol
 compileContract ccip/pools/LockReleaseTokenPool.sol
 compileContract ccip/pools/BurnMintTokenPool.sol
 compileContract ccip/applications/ReceiverDapp.sol
@@ -35,7 +35,7 @@ compileContract ccip/applications/PingPongDemo.sol
 
 # Test helpers
 compileContract ccip/test/helpers/CommitStoreHelper.sol
-compileContract ccip/test/helpers/ramps/EVM2EVMOffRampHelper.sol
+compileContract ccip/test/helpers/EVM2EVMOffRampHelper.sol
 compileContract ccip/test/helpers/CustomTokenPool.sol
 compileContract ccip/test/helpers/receivers/SimpleMessageReceiver.sol
 compileContract ccip/test/helpers/receivers/MaybeRevertMessageReceiver.sol

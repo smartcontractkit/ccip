@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../../interfaces/router/IAny2EVMMessageReceiver.sol";
+import "../../../interfaces/IAny2EVMMessageReceiver.sol";
 
 import "../../../../vendor/IERC165.sol";
 

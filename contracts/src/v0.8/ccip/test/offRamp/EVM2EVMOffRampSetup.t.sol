@@ -2,21 +2,26 @@
 pragma solidity 0.8.15;
 
 import {ICommitStore} from "../../interfaces/ICommitStore.sol";
-import {IAny2EVMMessageReceiver} from "../../interfaces/router/IAny2EVMMessageReceiver.sol";
+import {IAny2EVMMessageReceiver} from "../../interfaces/IAny2EVMMessageReceiver.sol";
 import {IEVM2EVMOffRamp} from "../../interfaces/offRamp/IEVM2EVMOffRamp.sol";
-import {IPriceRegistry} from "../../interfaces/prices/IPriceRegistry.sol";
-import {IRouter} from "../../interfaces/router/IRouter.sol";
+import {IPriceRegistry} from "../../interfaces/IPriceRegistry.sol";
+import {IRouter} from "../../interfaces/IRouter.sol";
+import {IPool} from "../../interfaces/pools/IPool.sol";
+import {IAggregateRateLimiter} from "../../interfaces/IAggregateRateLimiter.sol";
 
 import {Internal} from "../../models/Internal.sol";
 import {Client} from "../../models/Client.sol";
 import {TokenSetup} from "../TokenSetup.t.sol";
-import {PriceRegistrySetup} from "../prices/PriceRegistry.t.sol";
+import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
 import {MockCommitStore} from "../mocks/MockCommitStore.sol";
 import {SimpleMessageReceiver} from "../helpers/receivers/SimpleMessageReceiver.sol";
-import {EVM2EVMOffRampHelper} from "../helpers/ramps/EVM2EVMOffRampHelper.sol";
-import "../TokenSetup.t.sol";
-import "../router/RouterSetup.t.sol";
-import "../helpers/receivers/MaybeRevertMessageReceiver.sol";
+import {EVM2EVMOffRampHelper} from "../helpers/EVM2EVMOffRampHelper.sol";
+import {TokenSetup} from "../TokenSetup.t.sol";
+import {RouterSetup} from "../router/RouterSetup.t.sol";
+import {MaybeRevertMessageReceiver} from "../helpers/receivers/MaybeRevertMessageReceiver.sol";
+import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
+
+import {IERC20} from "../../../vendor/IERC20.sol";
 
 contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup {
   ICommitStore internal s_mockCommitStore;

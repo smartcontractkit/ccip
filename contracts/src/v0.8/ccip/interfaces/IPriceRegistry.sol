@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Client} from "../../models/Client.sol";
-import {Internal} from "../../models/Internal.sol";
+import {Client} from "../models/Client.sol";
+import {Internal} from "../models/Internal.sol";
 
 interface IPriceRegistry {
   error TokenNotSupported(address token);

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../interfaces/health/IAFN.sol";
+import {IAFN} from "../../interfaces/IAFN.sol";
 
 contract MockAFN is IAFN {
   bool public s_badSignal;

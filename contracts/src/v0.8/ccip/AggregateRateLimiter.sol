@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {IAggregateRateLimiter} from "../interfaces/rateLimiter/IAggregateRateLimiter.sol";
+import {IAggregateRateLimiter} from "./interfaces/IAggregateRateLimiter.sol";
 
-import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
-import {Client} from "../models/Client.sol";
+import {OwnerIsCreator} from "./OwnerIsCreator.sol";
+import {Client} from "./models/Client.sol";
 
-import {IERC20} from "../../vendor/IERC20.sol";
+import {IERC20} from "../vendor/IERC20.sol";
 
 contract AggregateRateLimiter is IAggregateRateLimiter, OwnerIsCreator {
   // The address of the token limit admin that has the same permissions as the owner.
@@ -30,16 +30,6 @@ contract AggregateRateLimiter is IAggregateRateLimiter, OwnerIsCreator {
       tokens: config.capacity,
       lastUpdated: block.timestamp
     });
-  }
-
-  /// @inheritdoc IAggregateRateLimiter
-  function getTokenLimitAdmin() public view returns (address) {
-    return s_tokenLimitAdmin;
-  }
-
-  /// @inheritdoc IAggregateRateLimiter
-  function setTokenLimitAdmin(address newAdmin) public onlyOwner {
-    s_tokenLimitAdmin = newAdmin;
   }
 
   /// @inheritdoc IAggregateRateLimiter
@@ -152,6 +142,20 @@ contract AggregateRateLimiter is IAggregateRateLimiter, OwnerIsCreator {
   /// @return smallest
   function _min(uint256 a, uint256 b) internal pure returns (uint256) {
     return a < b ? a : b;
+  }
+
+  // ================================================================
+  // |                           Access                             |
+  // ================================================================
+
+  /// @inheritdoc IAggregateRateLimiter
+  function getTokenLimitAdmin() public view returns (address) {
+    return s_tokenLimitAdmin;
+  }
+
+  /// @inheritdoc IAggregateRateLimiter
+  function setTokenLimitAdmin(address newAdmin) public onlyOwner {
+    s_tokenLimitAdmin = newAdmin;
   }
 
   /// @notice a modifier that allows the owner or the s_tokenLimitAdmin call the functions

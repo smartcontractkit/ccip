@@ -3,9 +3,9 @@ pragma solidity 0.8.15;
 
 import "../helpers/MerkleHelper.sol";
 import "../helpers/CommitStoreHelper.sol";
-import "../../health/AFN.sol";
-import "../../prices/PriceRegistry.sol";
-import "../prices/PriceRegistry.t.sol";
+import "../../AFN.sol";
+import "../../PriceRegistry.sol";
+import "../priceRegistry/PriceRegistry.t.sol";
 
 contract CommitStoreSetup is PriceRegistrySetup {
   CommitStoreHelper s_commitStore;
@@ -211,8 +211,6 @@ contract CommitStore_resetUnblessedRoots is CommitStoreSetup {
 contract CommitStore_report is CommitStoreSetup {
   event ReportAccepted(ICommitStore.CommitReport report);
   event UsdPerTokenUpdated(address indexed feeToken, uint256 value, uint256 timestamp);
-
-  // Success
 
   function testReportOnlyRootSuccess_gas() public {
     vm.pauseGasMetering();

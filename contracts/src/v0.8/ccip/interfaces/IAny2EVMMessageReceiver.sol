@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Client} from "../../models/Client.sol";
+import {Client} from "../models/Client.sol";
 
 /// @notice Application contracts that intend to receive messages from
 /// the router should implement this interface.

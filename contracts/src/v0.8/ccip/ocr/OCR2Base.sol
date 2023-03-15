@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
+import {OwnerIsCreator} from "../OwnerIsCreator.sol";
 import {OCR2Abstract} from "./OCR2Abstract.sol";
 
 /// @notice Onchain verification of reports from the offchain reporting protocol

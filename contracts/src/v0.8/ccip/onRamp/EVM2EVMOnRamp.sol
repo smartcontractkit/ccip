@@ -3,13 +3,13 @@ pragma solidity 0.8.15;
 
 import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
 import {IPool} from "../interfaces/pools/IPool.sol";
-import {IAFN} from "../interfaces/health/IAFN.sol";
+import {IAFN} from "../interfaces/IAFN.sol";
 import {IEVM2EVMOnRamp} from "../interfaces/onRamp/IEVM2EVMOnRamp.sol";
-import {IPriceRegistry} from "../interfaces/prices/IPriceRegistry.sol";
+import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
 import {IEVM2AnyOnRamp} from "../interfaces/onRamp/IEVM2AnyOnRamp.sol";
-import {IAggregateRateLimiter} from "../interfaces/rateLimiter/IAggregateRateLimiter.sol";
+import {IAggregateRateLimiter} from "../interfaces/IAggregateRateLimiter.sol";
 
-import {AggregateRateLimiter} from "../rateLimiter/AggregateRateLimiter.sol";
+import {AggregateRateLimiter} from "../AggregateRateLimiter.sol";
 import {Client} from "../models/Client.sol";
 import {Internal} from "../models/Internal.sol";
 import {EnumerableMapAddresses} from "../../libraries/internal/EnumerableMapAddresses.sol";
@@ -113,64 +113,18 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAn
     }
   }
 
-  /// @notice Pause the contract
-  /// @dev only callable by the owner
-  function pause() external onlyOwner {
-    _pause();
-  }
+  // ================================================================
+  // |                          Messaging                           |
+  // ================================================================
 
-  /// @notice Unpause the contract
-  /// @dev only callable by the owner
-  function unpause() external onlyOwner {
-    _unpause();
+  /// @inheritdoc IEVM2AnyOnRamp
+  function getExpectedNextSequenceNumber() external view override returns (uint64) {
+    return s_sequenceNumber + 1;
   }
 
   /// @inheritdoc IEVM2AnyOnRamp
-  function getPoolBySourceToken(IERC20 sourceToken) external view override returns (IPool) {
-    return _getPoolBySourceToken(sourceToken);
-  }
-
-  /// @dev Get the pool for the given source token
-  /// @param sourceToken The source token to get the pool for
-  /// @return The pool for the given source token
-  function _getPoolBySourceToken(IERC20 sourceToken) private view returns (IPool) {
-    if (!s_poolsBySourceToken.contains(address(sourceToken))) revert UnsupportedToken(sourceToken);
-    return IPool(s_poolsBySourceToken.get(address(sourceToken)));
-  }
-
-  /// @dev Convert the extra args bytes into a struct
-  /// @param extraArgs The extra args bytes
-  /// @return The extra args struct
-  function _fromBytes(bytes calldata extraArgs) internal view returns (Client.EVMExtraArgsV1 memory) {
-    if (extraArgs.length == 0) {
-      return Client.EVMExtraArgsV1({gasLimit: i_defaultTxGasLimit, strict: false});
-    }
-    if (bytes4(extraArgs[:4]) != Client.EVM_EXTRA_ARGS_V1_TAG)
-      revert InvalidExtraArgsTag(Client.EVM_EXTRA_ARGS_V1_TAG, bytes4(extraArgs[:4]));
-    return abi.decode(extraArgs[4:], (Client.EVMExtraArgsV1));
-  }
-
-  /// @notice Validate the forwarded message with various checks.
-  /// @param dataLength The length of the data field of the message
-  /// @param gasLimit The gasLimit set in message for destination execution
-  /// @param tokenAmounts The token payload to be sent. They will be locked into pools by this function.
-  /// @param originalSender The original sender of the message on the router.
-  function _validateMessage(
-    uint256 dataLength,
-    uint256 gasLimit,
-    Client.EVMTokenAmount[] memory tokenAmounts,
-    address originalSender
-  ) internal {
-    if (msg.sender != s_dynamicConfig.router) revert MustBeCalledByRouter();
-    if (originalSender == address(0)) revert RouterMustSetOriginalSender();
-    // Check that payload is formed correctly
-    if (dataLength > uint256(s_dynamicConfig.maxDataSize))
-      revert MessageTooLarge(uint256(s_dynamicConfig.maxDataSize), dataLength);
-    if (gasLimit > uint256(s_dynamicConfig.maxGasLimit)) revert MessageGasLimitTooHigh();
-    if (tokenAmounts.length > uint256(s_dynamicConfig.maxTokensLength)) revert UnsupportedNumberOfTokens();
-    if (s_allowlistEnabled && !s_allowList.contains(originalSender)) revert SenderNotAllowed(originalSender);
-
-    _removeTokens(tokenAmounts);
+  function getSenderNonce(address sender) external view override returns (uint64) {
+    return s_senderNonce[sender];
   }
 
   /// @inheritdoc IEVM2AnyOnRamp
@@ -226,28 +180,44 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAn
     return newMessage.messageId;
   }
 
-  /// @inheritdoc IEVM2AnyOnRamp
-  function getFee(Client.EVM2AnyMessage calldata message) public view override returns (uint256 fee) {
-    uint256 gasLimit = _fromBytes(message.extraArgs).gasLimit;
-    uint256 feeTokenBaseUnitsPerUnitGas = IPriceRegistry(s_dynamicConfig.priceRegistry).getFeeTokenBaseUnitsPerUnitGas(
-      message.feeToken,
-      i_destChainId
-    );
-    if (feeTokenBaseUnitsPerUnitGas == 0) revert TokenOrChainNotSupported(message.feeToken, i_destChainId);
-
-    // NOTE: if a fee token is not configured, formula below will intentionally
-    // return zero, i.e. zeroing the fees for that feeToken.
-    FeeTokenConfig memory feeTokenConfig = s_feeTokenConfig[message.feeToken];
-    return
-      feeTokenConfig.feeAmount + // Flat fee
-      ((gasLimit + feeTokenConfig.destGasOverhead) * feeTokenBaseUnitsPerUnitGas * feeTokenConfig.multiplier) / // Total gas reserved for tx
-      1 ether; // latest gas reported gas fee with a safety margin
+  /// @dev Convert the extra args bytes into a struct
+  /// @param extraArgs The extra args bytes
+  /// @return The extra args struct
+  function _fromBytes(bytes calldata extraArgs) internal view returns (Client.EVMExtraArgsV1 memory) {
+    if (extraArgs.length == 0) {
+      return Client.EVMExtraArgsV1({gasLimit: i_defaultTxGasLimit, strict: false});
+    }
+    if (bytes4(extraArgs[:4]) != Client.EVM_EXTRA_ARGS_V1_TAG)
+      revert InvalidExtraArgsTag(Client.EVM_EXTRA_ARGS_V1_TAG, bytes4(extraArgs[:4]));
+    return abi.decode(extraArgs[4:], (Client.EVMExtraArgsV1));
   }
 
-  /// @inheritdoc IEVM2AnyOnRamp
-  function getExpectedNextSequenceNumber() external view override returns (uint64) {
-    return s_sequenceNumber + 1;
+  /// @notice Validate the forwarded message with various checks.
+  /// @param dataLength The length of the data field of the message
+  /// @param gasLimit The gasLimit set in message for destination execution
+  /// @param tokenAmounts The token payload to be sent. They will be locked into pools by this function.
+  /// @param originalSender The original sender of the message on the router.
+  function _validateMessage(
+    uint256 dataLength,
+    uint256 gasLimit,
+    Client.EVMTokenAmount[] memory tokenAmounts,
+    address originalSender
+  ) internal {
+    if (msg.sender != s_dynamicConfig.router) revert MustBeCalledByRouter();
+    if (originalSender == address(0)) revert RouterMustSetOriginalSender();
+    // Check that payload is formed correctly
+    if (dataLength > uint256(s_dynamicConfig.maxDataSize))
+      revert MessageTooLarge(uint256(s_dynamicConfig.maxDataSize), dataLength);
+    if (gasLimit > uint256(s_dynamicConfig.maxGasLimit)) revert MessageGasLimitTooHigh();
+    if (tokenAmounts.length > uint256(s_dynamicConfig.maxTokensLength)) revert UnsupportedNumberOfTokens();
+    if (s_allowlistEnabled && !s_allowList.contains(originalSender)) revert SenderNotAllowed(originalSender);
+
+    _removeTokens(tokenAmounts);
   }
+
+  // ================================================================
+  // |                           Config                             |
+  // ================================================================
 
   /// @inheritdoc IEVM2EVMOnRamp
   function getStaticConfig() external view override returns (IEVM2EVMOnRamp.StaticConfig memory) {
@@ -289,9 +259,30 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAn
     );
   }
 
-  /// @inheritdoc IEVM2EVMOnRamp
-  function getNopFeesJuels() external view override returns (uint96) {
-    return s_nopFeesJuels;
+  // ================================================================
+  // |                      Tokens and pools                        |
+  // ================================================================
+
+  /// @inheritdoc IEVM2AnyOnRamp
+  function getSupportedTokens() public view returns (address[] memory) {
+    address[] memory sourceTokens = new address[](s_poolsBySourceToken.length());
+    for (uint256 i = 0; i < sourceTokens.length; ++i) {
+      (sourceTokens[i], ) = s_poolsBySourceToken.at(i);
+    }
+    return sourceTokens;
+  }
+
+  /// @inheritdoc IEVM2AnyOnRamp
+  function getPoolBySourceToken(IERC20 sourceToken) external view override returns (IPool) {
+    return _getPoolBySourceToken(sourceToken);
+  }
+
+  /// @dev Get the pool for the given source token
+  /// @param sourceToken The source token to get the pool for
+  /// @return The pool for the given source token
+  function _getPoolBySourceToken(IERC20 sourceToken) private view returns (IPool) {
+    if (!s_poolsBySourceToken.contains(address(sourceToken))) revert UnsupportedToken(sourceToken);
+    return IPool(s_poolsBySourceToken.get(address(sourceToken)));
   }
 
   /// #@inheritdoc IEVM2AnyOnRamp
@@ -320,25 +311,70 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAn
     }
   }
 
-  /// @inheritdoc IEVM2AnyOnRamp
-  function getSupportedTokens() public view returns (address[] memory) {
-    address[] memory sourceTokens = new address[](s_poolsBySourceToken.length());
-    for (uint256 i = 0; i < sourceTokens.length; ++i) {
-      (sourceTokens[i], ) = s_poolsBySourceToken.at(i);
-    }
-    return sourceTokens;
-  }
+  // ================================================================
+  // |                             Fees                             |
+  // ================================================================
 
   /// @inheritdoc IEVM2AnyOnRamp
-  function getSenderNonce(address sender) external view override returns (uint64) {
-    return s_senderNonce[sender];
+  function getFee(Client.EVM2AnyMessage calldata message) public view override returns (uint256 fee) {
+    uint256 gasLimit = _fromBytes(message.extraArgs).gasLimit;
+    uint256 feeTokenBaseUnitsPerUnitGas = IPriceRegistry(s_dynamicConfig.priceRegistry).getFeeTokenBaseUnitsPerUnitGas(
+      message.feeToken,
+      i_destChainId
+    );
+    if (feeTokenBaseUnitsPerUnitGas == 0) revert TokenOrChainNotSupported(message.feeToken, i_destChainId);
+
+    // NOTE: if a fee token is not configured, formula below will intentionally
+    // return zero, i.e. zeroing the fees for that feeToken.
+    FeeTokenConfig memory feeTokenConfig = s_feeTokenConfig[message.feeToken];
+    return
+      feeTokenConfig.feeAmount + // Flat fee
+      ((gasLimit + feeTokenConfig.destGasOverhead) * feeTokenBaseUnitsPerUnitGas * feeTokenConfig.multiplier) / // Total gas reserved for tx
+      1 ether; // latest gas reported gas fee with a safety margin
   }
 
   /// @inheritdoc IEVM2EVMOnRamp
-  function withdrawNonLinkFees(address feeToken, address to) external override onlyOwner {
-    if (feeToken == i_linkToken) revert InvalidFeeToken(feeToken);
-    if (to == address(0)) revert InvalidWithdrawalAddress(to);
-    IERC20(feeToken).safeTransfer(to, IERC20(feeToken).balanceOf(address(this)));
+  function getFeeConfig(address token) external view override returns (FeeTokenConfig memory config) {
+    return s_feeTokenConfig[token];
+  }
+
+  /// @inheritdoc IEVM2EVMOnRamp
+  function setFeeConfig(FeeTokenConfigArgs[] memory feeTokenConfigs) external override onlyOwnerOrFeeAdmin {
+    _setFeeConfig(feeTokenConfigs);
+  }
+
+  /// @dev Set the fee config
+  /// @param feeTokenConfigs The fee token configs
+  function _setFeeConfig(FeeTokenConfigArgs[] memory feeTokenConfigs) internal {
+    for (uint256 i = 0; i < feeTokenConfigs.length; ++i) {
+      s_feeTokenConfig[feeTokenConfigs[i].token] = FeeTokenConfig({
+        feeAmount: feeTokenConfigs[i].feeAmount,
+        multiplier: feeTokenConfigs[i].multiplier,
+        destGasOverhead: feeTokenConfigs[i].destGasOverhead
+      });
+    }
+    emit FeeConfigSet(feeTokenConfigs);
+  }
+
+  // ================================================================
+  // |                         NOP payments                         |
+  // ================================================================
+
+  /// @inheritdoc IEVM2EVMOnRamp
+  function getNopFeesJuels() external view override returns (uint96) {
+    return s_nopFeesJuels;
+  }
+
+  /// @inheritdoc IEVM2EVMOnRamp
+  function getNops() external view override returns (NopAndWeight[] memory nopsAndWeights, uint256 weightsTotal) {
+    uint256 length = s_nops.length();
+    nopsAndWeights = new NopAndWeight[](length);
+    for (uint256 i = 0; i < length; ++i) {
+      (address nopAddress, uint256 nopWeight) = s_nops.at(i);
+      nopsAndWeights[i] = NopAndWeight({nop: nopAddress, weight: uint16(nopWeight)});
+    }
+    weightsTotal = s_nopWeightsTotal;
+    return (nopsAndWeights, weightsTotal);
   }
 
   /// @inheritdoc IEVM2EVMOnRamp
@@ -363,78 +399,6 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAn
   }
 
   /// @inheritdoc IEVM2EVMOnRamp
-  function getNops() external view override returns (NopAndWeight[] memory nopsAndWeights, uint256 weightsTotal) {
-    uint256 length = s_nops.length();
-    nopsAndWeights = new NopAndWeight[](length);
-    for (uint256 i = 0; i < length; ++i) {
-      (address nopAddress, uint256 nopWeight) = s_nops.at(i);
-      nopsAndWeights[i] = NopAndWeight({nop: nopAddress, weight: uint16(nopWeight)});
-    }
-    weightsTotal = s_nopWeightsTotal;
-    return (nopsAndWeights, weightsTotal);
-  }
-
-  /// @inheritdoc IEVM2EVMOnRamp
-  function getFeeConfig(address token) external view override returns (FeeTokenConfig memory config) {
-    return s_feeTokenConfig[token];
-  }
-
-  /// @inheritdoc IEVM2EVMOnRamp
-  function setFeeConfig(FeeTokenConfigArgs[] memory feeTokenConfigs) external override onlyOwnerOrFeeAdmin {
-    _setFeeConfig(feeTokenConfigs);
-  }
-
-  /// @inheritdoc IEVM2EVMOnRamp
-  function applyAllowListUpdates(address[] calldata adds, address[] calldata removes) external onlyOwner {
-    _applyAllowListUpdates(adds, removes);
-  }
-
-  /// @notice Internal version of applyAllowListUpdates to allow for reuse in the constructor.
-  function _applyAllowListUpdates(address[] memory adds, address[] memory removes) internal {
-    for (uint256 i = 0; i < removes.length; ++i) {
-      s_allowList.remove(removes[i]);
-      emit AllowListRemove(removes[i]);
-    }
-    for (uint256 i = 0; i < adds.length; ++i) {
-      s_allowList.add(adds[i]);
-      emit AllowListAdd(adds[i]);
-    }
-  }
-
-  /// @inheritdoc IEVM2EVMOnRamp
-  function setAllowListEnabled(bool enabled) external onlyOwner {
-    s_allowlistEnabled = enabled;
-    emit AllowListEnabledSet(enabled);
-  }
-
-  /// @inheritdoc IEVM2EVMOnRamp
-  function getAllowListEnabled() external view returns (bool) {
-    return s_allowlistEnabled;
-  }
-
-  /// @inheritdoc IEVM2EVMOnRamp
-  function getAllowList() external view returns (address[] memory) {
-    address[] memory allowList = new address[](s_allowList.length());
-    for (uint256 i = 0; i < s_allowList.length(); ++i) {
-      allowList[i] = s_allowList.at(i);
-    }
-    return allowList;
-  }
-
-  /// @dev Set the fee config
-  /// @param feeTokenConfigs The fee token configs
-  function _setFeeConfig(FeeTokenConfigArgs[] memory feeTokenConfigs) internal {
-    for (uint256 i = 0; i < feeTokenConfigs.length; ++i) {
-      s_feeTokenConfig[feeTokenConfigs[i].token] = FeeTokenConfig({
-        feeAmount: feeTokenConfigs[i].feeAmount,
-        multiplier: feeTokenConfigs[i].multiplier,
-        destGasOverhead: feeTokenConfigs[i].destGasOverhead
-      });
-    }
-    emit FeeConfigSet(feeTokenConfigs);
-  }
-
-  /// @inheritdoc IEVM2EVMOnRamp
   function payNops() external onlyOwnerOrFeeAdminOrNop {
     uint32 weightsTotal = s_nopWeightsTotal;
     if (weightsTotal == 0) revert NoNopsToPay();
@@ -455,6 +419,58 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAn
     }
     s_nopFeesJuels = fundsLeft;
   }
+
+  /// @inheritdoc IEVM2EVMOnRamp
+  function withdrawNonLinkFees(address feeToken, address to) external override onlyOwner {
+    if (feeToken == i_linkToken) revert InvalidFeeToken(feeToken);
+    if (to == address(0)) revert InvalidWithdrawalAddress(to);
+    IERC20(feeToken).safeTransfer(to, IERC20(feeToken).balanceOf(address(this)));
+  }
+
+  // ================================================================
+  // |                          Allowlist                           |
+  // ================================================================
+
+  /// @inheritdoc IEVM2EVMOnRamp
+  function getAllowListEnabled() external view returns (bool) {
+    return s_allowlistEnabled;
+  }
+
+  /// @inheritdoc IEVM2EVMOnRamp
+  function setAllowListEnabled(bool enabled) external onlyOwner {
+    s_allowlistEnabled = enabled;
+    emit AllowListEnabledSet(enabled);
+  }
+
+  /// @inheritdoc IEVM2EVMOnRamp
+  function getAllowList() external view returns (address[] memory) {
+    address[] memory allowList = new address[](s_allowList.length());
+    for (uint256 i = 0; i < s_allowList.length(); ++i) {
+      allowList[i] = s_allowList.at(i);
+    }
+    return allowList;
+  }
+
+  /// @inheritdoc IEVM2EVMOnRamp
+  function applyAllowListUpdates(address[] calldata adds, address[] calldata removes) external onlyOwner {
+    _applyAllowListUpdates(adds, removes);
+  }
+
+  /// @notice Internal version of applyAllowListUpdates to allow for reuse in the constructor.
+  function _applyAllowListUpdates(address[] memory adds, address[] memory removes) internal {
+    for (uint256 i = 0; i < removes.length; ++i) {
+      s_allowList.remove(removes[i]);
+      emit AllowListRemove(removes[i]);
+    }
+    for (uint256 i = 0; i < adds.length; ++i) {
+      s_allowList.add(adds[i]);
+      emit AllowListAdd(adds[i]);
+    }
+  }
+
+  // ================================================================
+  // |                        Access and AFN                        |
+  // ================================================================
 
   /// @dev Require that the sender is the owner or the fee admin or a nop
   modifier onlyOwnerOrFeeAdminOrNop() {
@@ -478,5 +494,17 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAn
   modifier whenHealthy() {
     if (IAFN(s_dynamicConfig.afn).badSignalReceived()) revert BadAFNSignal();
     _;
+  }
+
+  /// @notice Pause the contract
+  /// @dev only callable by the owner
+  function pause() external onlyOwner {
+    _pause();
+  }
+
+  /// @notice Unpause the contract
+  /// @dev only callable by the owner
+  function unpause() external onlyOwner {
+    _unpause();
   }
 }

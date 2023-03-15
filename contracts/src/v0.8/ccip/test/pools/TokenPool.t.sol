@@ -29,7 +29,6 @@ contract TokenPool_applyRampUpdates is TokenPoolSetup {
   event OnRampAllowanceSet(address onRamp, bool allowed);
   event OffRampAllowanceSet(address onRamp, bool allowed);
 
-  // Success
   function testApplyRampUpdatesSuccess() public {
     IPool.RampUpdate[] memory onRamps = new IPool.RampUpdate[](2);
     onRamps[0] = IPool.RampUpdate({ramp: address(1), allowed: true});
@@ -87,7 +86,6 @@ contract TokenPool_applyRampUpdates is TokenPoolSetup {
 }
 
 contract TokenPool_pause is TokenPoolSetup {
-  // Success
   function testPauseSuccess() public {
     s_tokenPool.pause();
     assertTrue(s_tokenPool.paused());
@@ -108,7 +106,6 @@ contract TokenPool_pause is TokenPoolSetup {
 }
 
 contract TokenPool_unpause is TokenPoolSetup {
-  // Success
   function testUnpauseSuccess() public {
     s_tokenPool.pause();
     s_tokenPool.unpause();

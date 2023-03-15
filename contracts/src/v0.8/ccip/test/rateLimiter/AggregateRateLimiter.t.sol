@@ -4,7 +4,7 @@ pragma solidity 0.8.15;
 import "../mocks/MockERC20.sol";
 import "../BaseTest.t.sol";
 import "../helpers/AggregateRateLimiterHelper.sol";
-import "../../interfaces/rateLimiter/IAggregateRateLimiter.sol";
+import "../../interfaces/IAggregateRateLimiter.sol";
 
 contract AggregateTokenLimiterSetup is BaseTest {
   AggregateRateLimiterHelper s_rateLimiter;
@@ -28,7 +28,6 @@ contract AggregateTokenLimiterSetup is BaseTest {
 
 /// @notice #constructor
 contract AggregateTokenLimiter_constructor is AggregateTokenLimiterSetup {
-  // Success
   function testSuccess() public {
     assertEq(TOKEN_LIMIT_ADMIN, s_rateLimiter.getTokenLimitAdmin());
     assertEq(OWNER, s_rateLimiter.owner());
@@ -43,7 +42,6 @@ contract AggregateTokenLimiter_constructor is AggregateTokenLimiterSetup {
 
 /// @notice #getTokenLimitAdmin
 contract AggregateTokenLimiter_getTokenLimitAdmin is AggregateTokenLimiterSetup {
-  // Success
   function testSuccess() public {
     assertEq(TOKEN_LIMIT_ADMIN, s_rateLimiter.getTokenLimitAdmin());
   }
@@ -51,7 +49,6 @@ contract AggregateTokenLimiter_getTokenLimitAdmin is AggregateTokenLimiterSetup 
 
 /// @notice #setTokenLimitAdmin
 contract AggregateTokenLimiter_setTokenLimitAdmin is AggregateTokenLimiterSetup {
-  // Success
   function testOwnerSuccess() public {
     s_rateLimiter.setTokenLimitAdmin(STRANGER);
     assertEq(STRANGER, s_rateLimiter.getTokenLimitAdmin());
@@ -70,7 +67,6 @@ contract AggregateTokenLimiter_setTokenLimitAdmin is AggregateTokenLimiterSetup 
 
 /// @notice #getTokenBucket
 contract AggregateTokenLimiter_getTokenBucket is AggregateTokenLimiterSetup {
-  // Success
   function testSuccess() public {
     IAggregateRateLimiter.TokenBucket memory tokenBucket = s_rateLimiter.calculateCurrentTokenBucketState();
     assertEq(s_config.rate, tokenBucket.rate);
@@ -121,7 +117,6 @@ contract AggregateTokenLimiter_getTokenBucket is AggregateTokenLimiterSetup {
 contract AggregateTokenLimiter_setRateLimiterConfig is AggregateTokenLimiterSetup {
   event ConfigChanged(uint256 capacity, uint256 rate);
 
-  // Success
   function testOwnerSuccess() public {
     setConfig();
   }
@@ -165,7 +160,6 @@ contract AggregateTokenLimiter_setRateLimiterConfig is AggregateTokenLimiterSetu
 
 /// @notice #getPricesForTokens
 contract AggregateTokenLimiter_getPricesForTokens is AggregateTokenLimiterSetup {
-  // Success
   function testSuccess() public {
     IERC20[] memory tokens = new IERC20[](2);
     // Unknown tokens
@@ -209,7 +203,6 @@ contract AggregateTokenLimiter_setPrices is AggregateTokenLimiterSetup {
     s_prices = prices;
   }
 
-  // Success
   function testOwnerSuccess() public {
     setPrice();
   }
@@ -277,7 +270,6 @@ contract AggregateTokenLimiter_setPrices is AggregateTokenLimiterSetup {
 contract AggregateTokenLimiter__removeTokens is AggregateTokenLimiterSetup {
   event TokensRemovedFromBucket(uint256 tokens);
 
-  // Success
   function testRemoveTokensSuccess_gas() public {
     vm.pauseGasMetering();
     // 15 (tokens) * 4 (price) * 2 (number of times) > 100 (capacity)

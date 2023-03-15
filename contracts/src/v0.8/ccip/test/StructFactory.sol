@@ -3,11 +3,10 @@ pragma solidity 0.8.15;
 
 import "../interfaces/ICommitStore.sol";
 import "../interfaces/offRamp/IEVM2EVMOffRamp.sol";
-import "../interfaces/rateLimiter/IAggregateRateLimiter.sol";
-import "../interfaces/router/IRouter.sol";
+import "../interfaces/IAggregateRateLimiter.sol";
+import "../interfaces/IRouter.sol";
 import "../interfaces/onRamp/IEVM2EVMOnRamp.sol";
 import "../onRamp/EVM2EVMOnRamp.sol";
-import "../interfaces/rateLimiter/IAggregateRateLimiter.sol";
 
 contract StructFactory {
   // addresses
@@ -111,7 +110,7 @@ contract StructFactory {
     returns (EVM2EVMOnRamp.TokenAndPool[] memory)
   {
     EVM2EVMOnRamp.TokenAndPool[] memory tokensAndPools = new EVM2EVMOnRamp.TokenAndPool[](sourceTokens.length);
-    for (uint256 i = 0; i < sourceTokens.length; i++) {
+    for (uint256 i = 0; i < sourceTokens.length; ++i) {
       tokensAndPools[i] = EVM2EVMOnRamp.TokenAndPool({token: sourceTokens[i], pool: address(pools[i])});
     }
     return tokensAndPools;

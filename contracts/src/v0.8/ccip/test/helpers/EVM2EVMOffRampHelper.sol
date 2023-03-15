@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../../offRamp/EVM2EVMOffRamp.sol";
+import "../../offRamp/EVM2EVMOffRamp.sol";
 
 contract EVM2EVMOffRampHelper is EVM2EVMOffRamp {
   constructor(

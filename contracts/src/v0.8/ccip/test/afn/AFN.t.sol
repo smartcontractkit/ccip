@@ -25,8 +25,6 @@ contract AFN_constructor is AFNSetup {
 contract AFN_voteToBlessRoots is AFNSetup {
   event VoteToBless(address indexed voter, bytes32 indexed root, uint256 weight);
 
-  // Success
-
   function test1RootSuccess_gas() public {
     vm.pauseGasMetering();
     (address[] memory participants, uint256[] memory weights, , ) = afnConstructorArgs();
@@ -133,7 +131,7 @@ contract AFN_voteToBlessRoots is AFNSetup {
     roots[0] = ROOT_1;
 
     // Participants 2,3,4 vote to bless
-    for (uint256 i = 1; i < participants.length; i++) {
+    for (uint256 i = 1; i < participants.length; ++i) {
       changePrank(participants[i]);
       s_afn.voteToBlessRoots(roots);
     }
@@ -165,7 +163,7 @@ contract AFN_voteToBlessRoots is AFNSetup {
     bytes32[] memory roots = new bytes32[](1);
     roots[0] = ROOT_1;
 
-    for (uint256 i = 0; i < participants.length; i++) {
+    for (uint256 i = 0; i < participants.length; ++i) {
       changePrank(participants[i]);
       s_afn.voteBad();
     }
@@ -187,8 +185,6 @@ contract AFN_voteToBlessRoots is AFNSetup {
 contract AFN_voteBad is AFNSetup {
   event VoteBad(address indexed voter, uint256 weight);
   event AFNBadSignal(uint256 timestamp);
-
-  // Success
 
   function testVoteBadSuccess_gas() public {
     vm.pauseGasMetering();
@@ -267,8 +263,6 @@ contract AFN_recover is AFNSetup {
     }
   }
 
-  // Success
-
   function testRecoverSuccess_gas() public {
     vm.pauseGasMetering();
     changePrank(OWNER);
@@ -341,8 +335,6 @@ contract AFN_setAFNConfig is AFNSetup {
     s_afn.voteToBlessRoots(roots);
     s_afn.voteBad();
   }
-
-  // Success
 
   function testSetAFNConfigSuccess_gas() public {
     vm.pauseGasMetering();

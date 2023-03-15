@@ -2,7 +2,7 @@
 pragma solidity 0.8.15;
 
 import "../TokenSetup.t.sol";
-import {Router} from "../../router/Router.sol";
+import {Router} from "../../Router.sol";
 import {WETH9} from "../WETH9.sol";
 
 contract RouterSetup is BaseTest {

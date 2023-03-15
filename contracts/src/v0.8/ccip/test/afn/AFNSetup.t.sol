@@ -2,7 +2,7 @@
 pragma solidity 0.8.15;
 
 import "../BaseTest.t.sol";
-import "../../health/AFN.sol";
+import "../../AFN.sol";
 
 contract AFNSetup is BaseTest {
   bytes32 internal constant ROOT_1 = bytes32("1");
