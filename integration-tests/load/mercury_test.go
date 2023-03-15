@@ -9,9 +9,10 @@ import (
 	mercuryserver "github.com/smartcontractkit/chainlink-env/pkg/helm/mercury-server"
 	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
 	"github.com/smartcontractkit/chainlink-testing-framework/loadgen"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink/integration-tests/load/tools"
 	"github.com/smartcontractkit/chainlink/integration-tests/testsetups/mercury"
-	"github.com/stretchr/testify/require"
 )
 
 var (
