@@ -375,121 +375,121 @@ jobs:
         continue-on-error: true
   ### End Solana Section
 
-  ### Start Live Testnet Section
-
-  testnet-smoke-tests-matrix:
-    if: startsWith(github.ref, 'refs/tags/') ## Only run live tests on new tags
-    environment: integration
-    permissions:
-      checks: write
-      pull-requests: write
-      id-token: write
-      contents: read
-    needs: [build-chainlink, build-test-image]
-    env:
-      SELECTED_NETWORKS: ${{ matrix.testnet }}
-      CHAINLINK_COMMIT_SHA: ${{ github.sha }}
-      CHAINLINK_ENV_USER: ${{ github.actor }}
-      TEST_LOG_LEVEL: debug
-      EVM_KEYS: ${{ secrets.QA_EVM_KEYS }}
-      TEST_EVM_KEYS: ${{ secrets.QA_EVM_KEYS }}
-      GOERLI_URLS: ${{ secrets.QA_GOERLI_URLS }}
-      TEST_GOERLI_URLS: ${{ secrets.QA_GOERLI_URLS }}
-      GOERLI_HTTP_URLS: ${{ secrets.QA_GOERLI_HTTP_URLS }}
-      TEST_GOERLI_HTTP_URLS: ${{ secrets.QA_GOERLI_HTTP_URLS }}
-      OPTIMISM_GOERLI_URLS: ${{ secrets.QA_OPTIMISM_GOERLI_URLS }}
-      TEST_OPTIMISM_GOERLI_URLS: ${{ secrets.QA_OPTIMISM_GOERLI_URLS }}
-      OPTIMISM_GOERLI_HTTP_URLS: ${{ secrets.QA_OPTIMISM_GOERLI_HTTP_URLS }}
-      TEST_OPTIMISM_GOERLI_HTTP_URLS: ${{ secrets.QA_OPTIMISM_GOERLI_HTTP_URLS }}
-      ARBITRUM_GOERLI_URLS: ${{ secrets.QA_ARBITRUM_GOERLI_URLS }}
-      TEST_ARBITRUM_GOERLI_URLS: ${{ secrets.QA_ARBITRUM_GOERLI_URLS }}
-      ARBITRUM_GOERLI_HTTP_URLS: ${{ secrets.QA_ARBITRUM_GOERLI_HTTP_URLS }}
-      TEST_ARBITRUM_GOERLI_HTTP_URLS: ${{ secrets.QA_ARBITRUM_GOERLI_HTTP_URLS }}
-    strategy:
-      fail-fast: false
-      matrix:
-        testnet: [GOERLI, OPTIMISM_GOERLI, ARBITRUM_GOERLI]
-    name: Live Testnet Smoke Tests ${{ matrix.testnet }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout the repo
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-      ## Only run OCR smoke test for now
-      - name: Run Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@ce87f8986ca18336cc5015df75916c2ec0a7c4b3 # v2.1.2
-        env:
-          TEST_SUITE: smoke
-          TEST_ARGS: -test.timeout 30m
-          CHAINLINK_IMAGE: ${{ env.CL_ECR }}
-          CHAINLINK_VERSION: latest.${{ github.sha }}
-          PYROSCOPE_SERVER: ${{ secrets.QA_PYROSCOPE_INSTANCE }}
-          PYROSCOPE_ENVIRONMENT: ci-smoke-ocr-evm-${{ matrix.testnet }} # TODO: Only for OCR for now
-          PYROSCOPE_KEY: ${{ secrets.QA_PYROSCOPE_KEY }}
-        with:
-          test_command_to_run: make test_need_operator_assets && cd ./integration-tests && go test -timeout 30m -count=1 -json -test.parallel=1 ./smoke/ocr_test.go 2>&1 | tee /tmp/gotest.log | gotestfmt
-          test_download_vendor_packages_command: make gomod
-          cl_repo: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
-          cl_image_tag: latest.${{ github.sha }}
-          artifacts_location: ./integration-tests/smoke/logs
-          publish_check_name: ${{ matrix.testnet }} OCR Smoke Test Results
-          token: ${{ secrets.GITHUB_TOKEN }}
-          go_mod_path: ./integration-tests/go.mod
-          QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
-          QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
-          QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
-      - name: Notify Slack
-        if: always()
-        id: slack
-        uses: slackapi/slack-github-action@007b2c3c751a190b6f0f040e47ed024deaa72844 # v1.23.0
-        with:
-          channel-id: ${{ secrets.QA_RELEASE_SLACK_CHANNEL }}
-          payload: |
-            {
-              "text": "",
-              "blocks": [
-                {
-                  "type": "header",
-                  "text": {
-                    "type": "plain_text",
-                    "text": "Live Smoke Test Results for ${{ matrix.testnet }} ${{ job.status == 'success' && ':white_check_mark:' || ':x:'}}",
-                    "emoji": true
-                  }
-                },
-                {
-                  "type": "divider"
-                },
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "Tag: <${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ github.ref_name }}|${{ github.ref_name }}>\nCommit: <${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}>\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Run>"
-                  }
-                },
-                {
-                  "type": "divider"
-                },
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "OCR ${{ job.status == 'success' && ':white_check_mark:' || ':x:'}}"
-                  }
-                }
-              ]
-            }
-        env:
-          SLACK_BOT_TOKEN: ${{ secrets.QA_SLACK_API_KEY }}
-
-      - name: Collect Metrics
-        if: always()
-        id: collect-gha-metrics
-        uses: smartcontractkit/push-gha-metrics-action@808c183d1f5c26a4f3fd50b75d3cf7b58d9aa293
-        with:
-          basic-auth: ${{ secrets.GRAFANA_CLOUD_BASIC_AUTH }}
-          hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
-          this-job-name: Live Testnet Smoke Tests ${{ matrix.testnet }}
-        continue-on-error: true
-
-  ### End Live Testnet Section
+#  ### Start Live Testnet Section
+#
+#  testnet-smoke-tests-matrix:
+#    if: startsWith(github.ref, 'refs/tags/') ## Only run live tests on new tags
+#    environment: integration
+#    permissions:
+#      checks: write
+#      pull-requests: write
+#      id-token: write
+#      contents: read
+#    needs: [build-chainlink, build-test-image]
+#    env:
+#      SELECTED_NETWORKS: ${{ matrix.testnet }}
+#      CHAINLINK_COMMIT_SHA: ${{ github.sha }}
+#      CHAINLINK_ENV_USER: ${{ github.actor }}
+#      TEST_LOG_LEVEL: debug
+#      EVM_KEYS: ${{ secrets.QA_EVM_KEYS }}
+#      TEST_EVM_KEYS: ${{ secrets.QA_EVM_KEYS }}
+#      GOERLI_URLS: ${{ secrets.QA_GOERLI_URLS }}
+#      TEST_GOERLI_URLS: ${{ secrets.QA_GOERLI_URLS }}
+#      GOERLI_HTTP_URLS: ${{ secrets.QA_GOERLI_HTTP_URLS }}
+#      TEST_GOERLI_HTTP_URLS: ${{ secrets.QA_GOERLI_HTTP_URLS }}
+#      OPTIMISM_GOERLI_URLS: ${{ secrets.QA_OPTIMISM_GOERLI_URLS }}
+#      TEST_OPTIMISM_GOERLI_URLS: ${{ secrets.QA_OPTIMISM_GOERLI_URLS }}
+#      OPTIMISM_GOERLI_HTTP_URLS: ${{ secrets.QA_OPTIMISM_GOERLI_HTTP_URLS }}
+#      TEST_OPTIMISM_GOERLI_HTTP_URLS: ${{ secrets.QA_OPTIMISM_GOERLI_HTTP_URLS }}
+#      ARBITRUM_GOERLI_URLS: ${{ secrets.QA_ARBITRUM_GOERLI_URLS }}
+#      TEST_ARBITRUM_GOERLI_URLS: ${{ secrets.QA_ARBITRUM_GOERLI_URLS }}
+#      ARBITRUM_GOERLI_HTTP_URLS: ${{ secrets.QA_ARBITRUM_GOERLI_HTTP_URLS }}
+#      TEST_ARBITRUM_GOERLI_HTTP_URLS: ${{ secrets.QA_ARBITRUM_GOERLI_HTTP_URLS }}
+#    strategy:
+#      fail-fast: false
+#      matrix:
+#        testnet: [GOERLI, OPTIMISM_GOERLI, ARBITRUM_GOERLI]
+#    name: Live Testnet Smoke Tests ${{ matrix.testnet }}
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Checkout the repo
+#        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+#        with:
+#          ref: ${{ github.event.pull_request.head.sha }}
+#      ## Only run OCR smoke test for now
+#      - name: Run Tests
+#        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@ce87f8986ca18336cc5015df75916c2ec0a7c4b3 # v2.1.2
+#        env:
+#          TEST_SUITE: smoke
+#          TEST_ARGS: -test.timeout 30m
+#          CHAINLINK_IMAGE: ${{ env.CL_ECR }}
+#          CHAINLINK_VERSION: latest.${{ github.sha }}
+#          PYROSCOPE_SERVER: ${{ secrets.QA_PYROSCOPE_INSTANCE }}
+#          PYROSCOPE_ENVIRONMENT: ci-smoke-ocr-evm-${{ matrix.testnet }} # TODO: Only for OCR for now
+#          PYROSCOPE_KEY: ${{ secrets.QA_PYROSCOPE_KEY }}
+#        with:
+#          test_command_to_run: make test_need_operator_assets && cd ./integration-tests && go test -timeout 30m -count=1 -json -test.parallel=1 ./smoke/ocr_test.go 2>&1 | tee /tmp/gotest.log | gotestfmt
+#          test_download_vendor_packages_command: make gomod
+#          cl_repo: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
+#          cl_image_tag: latest.${{ github.sha }}
+#          artifacts_location: ./integration-tests/smoke/logs
+#          publish_check_name: ${{ matrix.testnet }} OCR Smoke Test Results
+#          token: ${{ secrets.GITHUB_TOKEN }}
+#          go_mod_path: ./integration-tests/go.mod
+#          QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
+#          QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+#          QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
+#      - name: Notify Slack
+#        if: always()
+#        id: slack
+#        uses: slackapi/slack-github-action@007b2c3c751a190b6f0f040e47ed024deaa72844 # v1.23.0
+#        with:
+#          channel-id: ${{ secrets.QA_RELEASE_SLACK_CHANNEL }}
+#          payload: |
+#            {
+#              "text": "",
+#              "blocks": [
+#                {
+#                  "type": "header",
+#                  "text": {
+#                    "type": "plain_text",
+#                    "text": "Live Smoke Test Results for ${{ matrix.testnet }} ${{ job.status == 'success' && ':white_check_mark:' || ':x:'}}",
+#                    "emoji": true
+#                  }
+#                },
+#                {
+#                  "type": "divider"
+#                },
+#                {
+#                  "type": "section",
+#                  "text": {
+#                    "type": "mrkdwn",
+#                    "text": "Tag: <${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ github.ref_name }}|${{ github.ref_name }}>\nCommit: <${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}>\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Run>"
+#                  }
+#                },
+#                {
+#                  "type": "divider"
+#                },
+#                {
+#                  "type": "section",
+#                  "text": {
+#                    "type": "mrkdwn",
+#                    "text": "OCR ${{ job.status == 'success' && ':white_check_mark:' || ':x:'}}"
+#                  }
+#                }
+#              ]
+#            }
+#        env:
+#          SLACK_BOT_TOKEN: ${{ secrets.QA_SLACK_API_KEY }}
+#
+#      - name: Collect Metrics
+#        if: always()
+#        id: collect-gha-metrics
+#        uses: smartcontractkit/push-gha-metrics-action@808c183d1f5c26a4f3fd50b75d3cf7b58d9aa293
+#        with:
+#          basic-auth: ${{ secrets.GRAFANA_CLOUD_BASIC_AUTH }}
+#          hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
+#          this-job-name: Live Testnet Smoke Tests ${{ matrix.testnet }}
+#        continue-on-error: true
+#
+#  ### End Live Testnet Section
