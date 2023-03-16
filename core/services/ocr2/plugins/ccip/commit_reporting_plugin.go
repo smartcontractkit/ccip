@@ -14,9 +14,11 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
+	txmgrtypes "github.com/smartcontractkit/chainlink/common/txmgr/types"
 	"github.com/smartcontractkit/chainlink/core/assets"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
+	evmtypes "github.com/smartcontractkit/chainlink/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
@@ -120,20 +122,20 @@ type InflightPriceUpdate struct {
 }
 
 type CommitPluginConfig struct {
-	lggr                                 logger.Logger
-	source, dest                         logpoller.LogPoller
-	seqParsers                           func(log logpoller.Log) (uint64, error)
-	reqEventSig                          EventSignatures
-	onRamp                               common.Address
-	offRamp                              *evm_2_evm_offramp.EVM2EVMOffRamp
-	priceRegistry                        *price_registry.PriceRegistry
-	priceGetter                          PriceGetter
-	sourceNative                         common.Address
-	sourceGasEstimator, destGasEstimator gas.Estimator
-	sourceChainID                        uint64
-	commitStore                          *commit_store.CommitStore
-	hasher                               LeafHasherInterface[[32]byte]
-	inflightCacheExpiry                  time.Duration
+	lggr                logger.Logger
+	source, dest        logpoller.LogPoller
+	seqParsers          func(log logpoller.Log) (uint64, error)
+	reqEventSig         EventSignatures
+	onRamp              common.Address
+	offRamp             *evm_2_evm_offramp.EVM2EVMOffRamp
+	priceRegistry       *price_registry.PriceRegistry
+	priceGetter         PriceGetter
+	sourceNative        common.Address
+	sourceFeeEstimator  txmgrtypes.FeeEstimator[*evmtypes.Head, gas.EvmFee, *assets.Wei, common.Hash]
+	sourceChainID       uint64
+	commitStore         *commit_store.CommitStore
+	hasher              LeafHasherInterface[[32]byte]
+	inflightCacheExpiry time.Duration
 }
 
 type CommitReportingPluginFactory struct {
@@ -312,19 +314,26 @@ func (r *CommitReportingPlugin) generatePriceUpdates(ctx context.Context) (sourc
 	}
 
 	sourceNativePriceUSD, ok := tokenPricesUSD[r.config.sourceNative]
-	if !ok {
+	if !ok || sourceNativePriceUSD == nil {
 		return nil, nil, errors.New("could not get source native price")
 	}
 	delete(tokenPricesUSD, r.config.sourceNative)
 
 	// Observe a source chain price for pricing.
-	// TODO: 1559 support https://smartcontract-it.atlassian.net/browse/CCIP-316
-	sourceGasPriceWei, _, err := r.config.sourceGasEstimator.GetLegacyGas(ctx, nil, BatchGasLimit, assets.NewWei(big.NewInt(MaxGasPrice)))
+	sourceGasPriceWei, _, err := r.config.sourceFeeEstimator.GetFee(ctx, nil, BatchGasLimit, assets.NewWei(big.NewInt(MaxGasPrice)))
 	if err != nil {
 		return nil, nil, err
 	}
+	// Use legacy if no dynamic is available.
+	gasPrice := sourceGasPriceWei.Legacy.ToInt()
+	if sourceGasPriceWei.Dynamic != nil && sourceGasPriceWei.Dynamic.FeeCap != nil {
+		gasPrice = sourceGasPriceWei.Dynamic.FeeCap.ToInt()
+	}
+	if gasPrice == nil {
+		return nil, nil, fmt.Errorf("missing gas price %+v", sourceGasPriceWei)
+	}
 
-	sourceGasPriceUSD = calculateUsdPerUnitGas(sourceGasPriceWei.ToInt(), sourceNativePriceUSD)
+	sourceGasPriceUSD = calculateUsdPerUnitGas(gasPrice, sourceNativePriceUSD)
 
 	latestUpdates, err := r.getLatestPriceUpdates(feeTokens)
 	if err != nil {

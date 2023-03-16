@@ -31,7 +31,6 @@ contract GovernanceDappSetup is EVM2EVMOnRampSetup {
 
 /// @notice #constructor
 contract GovernanceDapp_constructor is GovernanceDappSetup {
-  // Success
   function testSuccess() public {
     // typeAndVersion
     assertEq("GovernanceDapp 1.0.0", s_governanceDapp.typeAndVersion());
@@ -42,7 +41,6 @@ contract GovernanceDapp_constructor is GovernanceDappSetup {
 contract GovernanceDapp_voteForNewFeeConfig is GovernanceDappSetup {
   event ConfigPropagated(uint64 chainId, address contractAddress);
 
-  // Success
   function testSuccess() public {
     GovernanceDapp.FeeConfig memory feeConfig = GovernanceDapp.FeeConfig({feeAmount: 10000, changedAtBlock: 100});
     bytes memory data = abi.encode(feeConfig);
@@ -74,8 +72,6 @@ contract GovernanceDapp_voteForNewFeeConfig is GovernanceDappSetup {
 
 /// @notice #ccipReceive
 contract GovernanceDapp_ccipReceive is GovernanceDappSetup {
-  // Success
-
   function testSuccess() public {
     GovernanceDapp.FeeConfig memory feeConfig = GovernanceDapp.FeeConfig({feeAmount: 10000, changedAtBlock: 100});
 

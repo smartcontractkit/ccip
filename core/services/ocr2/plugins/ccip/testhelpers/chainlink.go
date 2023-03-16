@@ -32,7 +32,6 @@ import (
 	"github.com/smartcontractkit/chainlink/core/chains/evm/log"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/txmgr"
-	"github.com/smartcontractkit/chainlink/core/chains/evm/types"
 	configv2 "github.com/smartcontractkit/chainlink/core/config/v2"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/internal/cltest/heavyweight"
@@ -221,9 +220,7 @@ func SetupNodeCCIP(
 
 	// We fake different chainIDs using the wrapped sim cltest.SimulatedBackend
 	chainORM := evm.NewORM(db, lggr, config)
-	_, err := chainORM.CreateChain(*utils.NewBig(sourceChainID), &types.ChainCfg{})
-	require.NoError(t, err)
-	_, err = chainORM.CreateChain(*utils.NewBig(destChainID), &types.ChainCfg{})
+	err := chainORM.EnsureChains([]utils.Big{*utils.NewBig(sourceChainID), *utils.NewBig(destChainID)})
 	require.NoError(t, err)
 	sourceClient := client.NewSimulatedBackendClient(t, sourceChain, sourceChainID)
 	destClient := client.NewSimulatedBackendClient(t, destChain, destChainID)
@@ -243,7 +240,7 @@ func SetupNodeCCIP(
 
 	mailMon := utils.NewMailboxMonitor("CCIP")
 
-	evmChain, err := evm.LoadChainSet(context.Background(), evm.ChainSetOpts{
+	evmChain, err := evm.NewTOMLChainSet(context.Background(), evm.ChainSetOpts{
 		Config:           config,
 		Logger:           lggr,
 		DB:               db,

@@ -16,9 +16,9 @@ cron_upkeep_factory_wrapper: ../../contracts/solc/v0.8.6/CronUpkeepFactory.abi -
 cron_upkeep_wrapper: ../../contracts/solc/v0.8.6/CronUpkeep.abi - b1257293e0016a6d32f6febec5ff4cd8d7276d228c12228e6b6e143111f0c5ed
 custom_token_pool: ../../contracts/solc/v0.8.15/CustomTokenPool.abi ../../contracts/solc/v0.8.15/CustomTokenPool.bin f6f21e28ba48a10f32c76a522489e79a3a8657c1f8bac7da7d20713bd9721250
 derived_price_feed_wrapper: ../../contracts/solc/v0.8.6/DerivedPriceFeed.abi ../../contracts/solc/v0.8.6/DerivedPriceFeed.bin c8542e6c850c2d0fffb79a7f7213dc927ec64e6ddd54e1224cb2fb4a13aabdd0
-evm_2_evm_offramp: ../../contracts/solc/v0.8.15/EVM2EVMOffRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMOffRamp.bin 60465e8cdfae7f7ad555de4cef0d12792c23d22cb06e081974baf375448fa8c7
-evm_2_evm_offramp_helper: ../../contracts/solc/v0.8.15/EVM2EVMOffRampHelper.abi ../../contracts/solc/v0.8.15/EVM2EVMOffRampHelper.bin 8a82d7c4c27f5b3fd51a99603858ad86bcd51bd782d68f695a1a8daec16f7bb5
-evm_2_evm_onramp: ../../contracts/solc/v0.8.15/EVM2EVMOnRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMOnRamp.bin 58b349c21f6d78d461fde9ffa6088470cef32b40a2703d8f3558781e90197b86
+evm_2_evm_offramp: ../../contracts/solc/v0.8.15/EVM2EVMOffRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMOffRamp.bin f6322b17921c15b2b0a97223b3db59afe1430e1133c9f1e461b45918d36149d7
+evm_2_evm_offramp_helper: ../../contracts/solc/v0.8.15/EVM2EVMOffRampHelper.abi ../../contracts/solc/v0.8.15/EVM2EVMOffRampHelper.bin 7d2bc9cb868e7f9eb68d7c4854adc854ce4c06f61756b16f34cdfddae5a76d06
+evm_2_evm_onramp: ../../contracts/solc/v0.8.15/EVM2EVMOnRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMOnRamp.bin 0d49d02e8617c8a283dade589c7754045a901b43b0032a6b788f5cbff76f201c
 flags_wrapper: ../../contracts/solc/v0.6/Flags.abi ../../contracts/solc/v0.6/Flags.bin 2034d1b562ca37a63068851915e3703980276e8d5f7db6db8a3351a49d69fc4a
 flux_aggregator_wrapper: ../../contracts/solc/v0.6/FluxAggregator.abi ../../contracts/solc/v0.6/FluxAggregator.bin a3b0a6396c4aa3b5ee39b3c4bd45efc89789d4859379a8a92caca3a0496c5794
 gas_wrapper: ../../contracts/solc/v0.8.6/KeeperRegistryCheckUpkeepGasUsageWrapper1_2.abi ../../contracts/solc/v0.8.6/KeeperRegistryCheckUpkeepGasUsageWrapper1_2.bin 4a5dcdac486d18fcd58e3488c15c1710ae76b977556a3f3191bd269a4bc75723
@@ -45,7 +45,7 @@ operator_factory: ../../contracts/solc/v0.7/OperatorFactory.abi ../../contracts/
 operator_wrapper: ../../contracts/solc/v0.7/Operator.abi ../../contracts/solc/v0.7/Operator.bin 97dcb51158733881bfbe414d0318a57c3bba7b32bdc7aa5961db2f0ea5e993cb
 oracle_wrapper: ../../contracts/solc/v0.6/Oracle.abi ../../contracts/solc/v0.6/Oracle.bin 7af2fbac22a6e8c2847e8e685a5400cac5101d72ddf5365213beb79e4dede43a
 ping_pong_demo: ../../contracts/solc/v0.8.15/PingPongDemo.abi ../../contracts/solc/v0.8.15/PingPongDemo.bin 5d71f6d3354945a322ba420f786578584a26fbe532cb72c397fd770ee70eca4c
-price_registry: ../../contracts/solc/v0.8.15/PriceRegistry.abi ../../contracts/solc/v0.8.15/PriceRegistry.bin c0cc1c6cb8bfa3e1b07498da2d63bf4ea99a66a4ac3902ceb117082ce75bfc04
+price_registry: ../../contracts/solc/v0.8.15/PriceRegistry.abi ../../contracts/solc/v0.8.15/PriceRegistry.bin 40de25f0ccc705405e3b0cb93583926aea7c48415748db384e8016d6a4fdc68c
 receiver_dapp: ../../contracts/solc/v0.8.15/ReceiverDapp.abi ../../contracts/solc/v0.8.15/ReceiverDapp.bin d82f911d1bfef73f51e366a497f1e140ea50b8691cf2e7a4c08045d13ad51239
 router: ../../contracts/solc/v0.8.15/Router.abi ../../contracts/solc/v0.8.15/Router.bin 1dfebff91c59736ef2e6ad8050b63afd2cb370f8f1e3947200ab2594768c7c6a
 simple_message_receiver: ../../contracts/solc/v0.8.15/SimpleMessageReceiver.abi ../../contracts/solc/v0.8.15/SimpleMessageReceiver.bin cd3f864fdf1b55fdad193a2b71cea4dc6e193c1a440355da0ecf89256342b90f

@@ -62,6 +62,28 @@ contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
   }
 }
 
+contract EVM2EVMOnRamp_payNops_fuzz is EVM2EVMOnRampSetup {
+  function test_fuzz_NopPayNopsSuccess(uint96 nopFeesJuels) public {
+    (IEVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights, uint256 weightsTotal) = s_onRamp.getNops();
+    // To avoid NoFeesToPay
+    vm.assume(nopFeesJuels > weightsTotal);
+
+    // Set Nop fee juels
+    deal(s_sourceFeeToken, address(s_onRamp), nopFeesJuels);
+    changePrank(address(s_sourceRouter));
+    s_onRamp.forwardFromRouter(_generateEmptyMessage(), nopFeesJuels, OWNER);
+
+    changePrank(OWNER);
+
+    uint256 totalJuels = s_onRamp.getNopFeesJuels();
+    s_onRamp.payNops();
+    for (uint256 i = 0; i < nopsAndWeights.length; ++i) {
+      uint256 expectedPayout = (totalJuels * nopsAndWeights[i].weight) / weightsTotal;
+      assertEq(IERC20(s_sourceFeeToken).balanceOf(nopsAndWeights[i].nop), expectedPayout);
+    }
+  }
+}
+
 contract EVM2EVMOnRamp_payNops is EVM2EVMOnRampSetup {
   function setUp() public virtual override {
     EVM2EVMOnRampSetup.setUp();
@@ -71,18 +93,17 @@ contract EVM2EVMOnRamp_payNops is EVM2EVMOnRampSetup {
     // tests that require failure.
     changePrank(address(s_sourceRouter));
 
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-
     uint256 feeAmount = 1234567890;
+    uint256 numberOfMessages = 5;
 
     // Send a bunch of messages, increasing the juels in the contract
-    for (uint256 i = 0; i < 5; i++) {
+    for (uint256 i = 0; i < numberOfMessages; ++i) {
       IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
-      s_onRamp.forwardFromRouter(message, feeAmount, OWNER);
+      s_onRamp.forwardFromRouter(_generateEmptyMessage(), feeAmount, OWNER);
     }
 
-    assertGt(s_onRamp.getNopFeesJuels(), 0);
-    assertGt(IERC20(s_sourceFeeToken).balanceOf(address(s_onRamp)), 0);
+    assertEq(s_onRamp.getNopFeesJuels(), feeAmount * numberOfMessages);
+    assertEq(IERC20(s_sourceFeeToken).balanceOf(address(s_onRamp)), feeAmount * numberOfMessages);
   }
 
   function testOwnerPayNopsSuccess() public {
@@ -91,7 +112,7 @@ contract EVM2EVMOnRamp_payNops is EVM2EVMOnRampSetup {
     uint256 totalJuels = s_onRamp.getNopFeesJuels();
     s_onRamp.payNops();
     (IEVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights, uint256 weightsTotal) = s_onRamp.getNops();
-    for (uint256 i = 0; i < nopsAndWeights.length; i++) {
+    for (uint256 i = 0; i < nopsAndWeights.length; ++i) {
       uint256 expectedPayout = (nopsAndWeights[i].weight * totalJuels) / weightsTotal;
       assertEq(IERC20(s_sourceFeeToken).balanceOf(nopsAndWeights[i].nop), expectedPayout);
     }
@@ -103,7 +124,7 @@ contract EVM2EVMOnRamp_payNops is EVM2EVMOnRampSetup {
     uint256 totalJuels = s_onRamp.getNopFeesJuels();
     s_onRamp.payNops();
     (IEVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights, uint256 weightsTotal) = s_onRamp.getNops();
-    for (uint256 i = 0; i < nopsAndWeights.length; i++) {
+    for (uint256 i = 0; i < nopsAndWeights.length; ++i) {
       uint256 expectedPayout = (nopsAndWeights[i].weight * totalJuels) / weightsTotal;
       assertEq(IERC20(s_sourceFeeToken).balanceOf(nopsAndWeights[i].nop), expectedPayout);
     }
@@ -115,11 +136,13 @@ contract EVM2EVMOnRamp_payNops is EVM2EVMOnRampSetup {
     uint256 totalJuels = s_onRamp.getNopFeesJuels();
     s_onRamp.payNops();
     (IEVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights, uint256 weightsTotal) = s_onRamp.getNops();
-    for (uint256 i = 0; i < nopsAndWeights.length; i++) {
+    for (uint256 i = 0; i < nopsAndWeights.length; ++i) {
       uint256 expectedPayout = (nopsAndWeights[i].weight * totalJuels) / weightsTotal;
       assertEq(IERC20(s_sourceFeeToken).balanceOf(nopsAndWeights[i].nop), expectedPayout);
     }
   }
+
+  // Reverts
 
   function testInsufficientBalanceReverts() public {
     changePrank(address(s_onRamp));
@@ -167,8 +190,6 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     changePrank(address(s_sourceRouter));
   }
 
-  // Success
-
   function testForwardFromRouterSuccessCustomExtraArgs() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT * 2, strict: true}));
@@ -176,7 +197,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
 
     vm.expectEmit();
-    emit CCIPSendRequested(_messageToEvent(message, 1, 1, feeAmount));
+    emit CCIPSendRequested(_messageToEvent(message, 1, 1, feeAmount, OWNER));
 
     s_onRamp.forwardFromRouter(message, feeAmount, OWNER);
   }
@@ -188,7 +209,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
 
     vm.expectEmit();
-    emit CCIPSendRequested(_messageToEvent(message, 1, 1, feeAmount));
+    emit CCIPSendRequested(_messageToEvent(message, 1, 1, feeAmount, OWNER));
 
     s_onRamp.forwardFromRouter(message, feeAmount, OWNER);
   }
@@ -196,11 +217,11 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
   function testShouldIncrementSeqNumAndNonceSuccess() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 
-    for (uint64 i = 1; i < 4; i++) {
+    for (uint64 i = 1; i < 4; ++i) {
       uint64 nonceBefore = s_onRamp.getSenderNonce(OWNER);
 
       vm.expectEmit();
-      emit CCIPSendRequested(_messageToEvent(message, i, i, 0));
+      emit CCIPSendRequested(_messageToEvent(message, i, i, 0, OWNER));
 
       s_onRamp.forwardFromRouter(message, 0, OWNER);
 
@@ -241,6 +262,32 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     uint256 expectedJuels = (feeAmount * conversionRate) / 1e18;
 
     assertEq(s_onRamp.getNopFeesJuels(), expectedJuels);
+  }
+
+  // Make sure any valid sender, receiver and feeAmount can be handled.
+  function test_fuzz_ForwardFromRouterSuccess(
+    address originalSender,
+    address receiver,
+    uint96 feeTokenAmount
+  ) public {
+    // To avoid RouterMustSetOriginalSender
+    vm.assume(originalSender != address(0));
+
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.receiver = abi.encode(receiver);
+
+    // Make sure the tokens are in the contract
+    deal(s_sourceFeeToken, address(s_onRamp), feeTokenAmount);
+
+    Internal.EVM2EVMMessage memory expectedEvent = _messageToEvent(message, 1, 1, feeTokenAmount, originalSender);
+
+    vm.expectEmit(false, false, false, true);
+    emit CCIPSendRequested(expectedEvent);
+
+    // Assert the message Id is correct
+    assertEq(expectedEvent.messageId, s_onRamp.forwardFromRouter(message, feeTokenAmount, originalSender));
+    // Assert the fee token amount is correctly assigned to the nop fee pool
+    assertEq(feeTokenAmount, s_onRamp.getNopFeesJuels());
   }
 
   // Reverts
@@ -384,17 +431,16 @@ contract EVM2EVMOnRamp_setNops is EVM2EVMOnRampSetup {
     IEVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights = getNopsAndWeights();
     nopsAndWeights[1].nop = USER_4;
     nopsAndWeights[1].weight = 20;
-    for (uint256 i = 0; i < nopsAndWeights.length; i++) {
+    for (uint256 i = 0; i < nopsAndWeights.length; ++i) {
       s_nopsToWeights[nopsAndWeights[i].nop] = nopsAndWeights[i].weight;
     }
 
     s_onRamp.setNops(nopsAndWeights);
 
-    (IEVM2EVMOnRamp.NopAndWeight[] memory actual, uint256 totalWeight) = s_onRamp.getNops();
+    (IEVM2EVMOnRamp.NopAndWeight[] memory actual, ) = s_onRamp.getNops();
     for (uint256 i = 0; i < actual.length; ++i) {
       assertEq(actual[i].weight, s_nopsToWeights[actual[i].nop]);
     }
-    assertEq(totalWeight, 38);
   }
 
   function testSetNopsRemovesOldNopsCompletelySuccess() public {
@@ -489,7 +535,6 @@ contract EVM2EVMOnRamp_setFeeConfig is EVM2EVMOnRampSetup {
 
 // #getTokenPool
 contract EVM2EVMOnRamp_getTokenPool is EVM2EVMOnRampSetup {
-  // Success
   function testSuccess() public {
     assertEq(s_sourcePools[0], address(s_onRamp.getPoolBySourceToken(IERC20(s_sourceTokens[0]))));
     assertEq(s_sourcePools[1], address(s_onRamp.getPoolBySourceToken(IERC20(s_sourceTokens[1]))));
@@ -503,7 +548,6 @@ contract EVM2EVMOnRamp_applyPoolUpdates is EVM2EVMOnRampSetup {
   event PoolAdded(address token, address pool);
   event PoolRemoved(address token, address pool);
 
-  // Success
   function testApplyPoolUpdatesSuccess() public {
     Internal.PoolUpdate[] memory adds = new Internal.PoolUpdate[](1);
     adds[0] = Internal.PoolUpdate({token: address(1), pool: address(2)});
@@ -581,7 +625,6 @@ contract EVM2EVMOnRamp_applyPoolUpdates is EVM2EVMOnRampSetup {
 
 // #getSupportedTokens
 contract EVM2EVMOnRamp_getSupportedTokens is EVM2EVMOnRampSetup {
-  // Success
   function testGetSupportedTokensSuccess() public {
     address[] memory supportedTokens = s_onRamp.getSupportedTokens();
 
@@ -601,7 +644,6 @@ contract EVM2EVMOnRamp_getSupportedTokens is EVM2EVMOnRampSetup {
 
 // #getExpectedNextSequenceNumber
 contract EVM2EVMOnRamp_getExpectedNextSequenceNumber is EVM2EVMOnRampSetup {
-  // Success
   function testSuccess() public {
     assertEq(1, s_onRamp.getExpectedNextSequenceNumber());
   }
@@ -611,7 +653,6 @@ contract EVM2EVMOnRamp_getExpectedNextSequenceNumber is EVM2EVMOnRampSetup {
 contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
   event ConfigSet(IEVM2EVMOnRamp.StaticConfig staticConfig, IEVM2EVMOnRamp.DynamicConfig dynamicConfig);
 
-  // Success
   function testSuccess() public {
     IEVM2EVMOnRamp.StaticConfig memory staticConfig = s_onRamp.getStaticConfig();
     IEVM2EVMOnRamp.DynamicConfig memory newConfig = IEVM2EVMOnRamp.DynamicConfig({
@@ -657,7 +698,6 @@ contract EVM2EVMOnRampWithAllowListSetup is EVM2EVMOnRampSetup {
 }
 
 contract EVM2EVMOnRamp_setAllowListEnabled is EVM2EVMOnRampWithAllowListSetup {
-  // Success
   function testSuccess() public {
     assertTrue(s_onRamp.getAllowListEnabled());
     s_onRamp.setAllowListEnabled(false);
@@ -677,7 +717,6 @@ contract EVM2EVMOnRamp_setAllowListEnabled is EVM2EVMOnRampWithAllowListSetup {
 
 /// @notice #getAllowListEnabled
 contract EVM2EVMOnRamp_getAllowListEnabled is EVM2EVMOnRampWithAllowListSetup {
-  // Success
   function testSuccess() public {
     assertTrue(s_onRamp.getAllowListEnabled());
     s_onRamp.setAllowListEnabled(false);
@@ -692,7 +731,6 @@ contract EVM2EVMOnRamp_applyAllowListUpdates is EVM2EVMOnRampWithAllowListSetup 
   event AllowListAdd(address sender);
   event AllowListRemove(address sender);
 
-  // Success
   function testSuccess() public {
     address[] memory newAddresses = new address[](2);
     newAddresses[0] = address(1);
@@ -723,7 +761,6 @@ contract EVM2EVMOnRamp_applyAllowListUpdates is EVM2EVMOnRampWithAllowListSetup 
 
 /// @notice #getAllowList
 contract EVM2EVMOnRamp_getAllowList is EVM2EVMOnRampWithAllowListSetup {
-  // Success
   function testSuccess() public {
     address[] memory setAddresses = s_onRamp.getAllowList();
     assertEq(OWNER, setAddresses[0]);

@@ -1,20 +1,41 @@
 package soak
 
-//revive:disable:dot-imports
 import (
 	"fmt"
 	"math/big"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 )
 
 var (
-	interval = 10 * time.Second
-	duration = 2 * time.Minute
+	getTestInterval = func() (time.Duration, error) {
+		if intervalEnv := os.Getenv("CCIP_TEST_INTERVAL"); intervalEnv != "" {
+			interval, err := time.ParseDuration(intervalEnv)
+			if err != nil {
+				return 0, err
+			}
+			return interval, nil
+		} else {
+			return 30 * time.Second, nil
+		}
+	}
+	getTestDuration = func() (time.Duration, error) {
+		if durationEnv := os.Getenv("CCIP_TEST_DURATION"); durationEnv != "" {
+			duration, err := time.ParseDuration(durationEnv)
+			if err != nil {
+				return 0, err
+			}
+			return duration, nil
+		} else {
+			return 2 * time.Minute, nil
+		}
+	}
 )
 
 // TestCCIPSoak verifies that CCIP requests can be successfully delivered for mentioned duration triggered at a certain interval
@@ -29,23 +50,34 @@ func TestSoakCCIP(t *testing.T) {
 		reqSuccessLaneA = 0
 		reqSuccessLaneB = 0
 	)
+	var err error
+
+	// if interval and duration is provided in env variable, use that
+	interval, err := getTestInterval()
+	require.NoError(t, err, "invalid interval provided")
+	duration, err := getTestDuration()
+	require.NoError(t, err, "invalid duration provided")
 
 	t.Cleanup(func() {
 		if tearDown != nil {
 			log.Info().Msg("Tearing down the environment")
 			tearDown()
-			log.Info().
-				Str("total duration", fmt.Sprint(duration)).
-				Str("req interval", fmt.Sprint(interval)).
-				Int("Total Requests", totalReqLaneA).
-				Int("Successful Requests", reqSuccessLaneA).
-				Msgf("Soak Result for lane %s --> %s", laneA.SourceNetworkName, laneA.DestNetworkName)
-			log.Info().
-				Str("total duration", fmt.Sprint(duration)).
-				Str("req interval", fmt.Sprint(interval)).
-				Int("Total Requests", totalReqLaneB).
-				Int("Successful Requests", reqSuccessLaneB).
-				Msgf("Soak Result for lane %s --> %s", laneB.SourceNetworkName, laneB.DestNetworkName)
+			if laneA != nil {
+				log.Info().
+					Str("total duration", fmt.Sprint(duration)).
+					Str("req interval", fmt.Sprint(interval)).
+					Int("Total Requests", totalReqLaneA).
+					Int("Successful Requests", reqSuccessLaneA).
+					Msgf("Soak Result for lane %s --> %s", laneA.SourceNetworkName, laneA.DestNetworkName)
+			}
+			if laneB != nil {
+				log.Info().
+					Str("total duration", fmt.Sprint(duration)).
+					Str("req interval", fmt.Sprint(interval)).
+					Int("Total Requests", totalReqLaneB).
+					Int("Successful Requests", reqSuccessLaneB).
+					Msgf("Soak Result for lane %s --> %s", laneB.SourceNetworkName, laneB.DestNetworkName)
+			}
 		}
 	})
 
@@ -57,16 +89,34 @@ func TestSoakCCIP(t *testing.T) {
 	if laneA == nil {
 		return
 	}
-
 	t.Run(fmt.Sprintf("CCIP message transfer from network %s to network %s for %s", laneA.SourceNetworkName, laneA.DestNetworkName, duration), func(t *testing.T) {
 		t.Parallel()
 		totalReqLaneA, reqSuccessLaneA = laneA.SoakRun(interval, duration)
+		log.Info().
+			Str("Test Duration", fmt.Sprintf("%s", duration)).
+			Str("Request Triggering interval", fmt.Sprintf("%s", interval)).
+			Str("Source", laneA.SourceNetworkName).
+			Str("Destination", laneA.DestNetworkName).
+			Msg("Starting lane A")
+		if totalReqLaneA != reqSuccessLaneA {
+			t.Fatalf("Failed to deliver %d requests out of %d", totalReqLaneA-reqSuccessLaneA, totalReqLaneA)
+		}
 	})
-
-	t.Run(fmt.Sprintf("CCIP message transfer from network %s to network %s for %s", laneB.SourceNetworkName, laneB.DestNetworkName, duration), func(t *testing.T) {
-		t.Parallel()
-		totalReqLaneB, reqSuccessLaneB = laneB.SoakRun(interval, duration)
-	})
+	if laneB != nil {
+		t.Run(fmt.Sprintf("CCIP message transfer from network %s to network %s for %s", laneB.SourceNetworkName, laneB.DestNetworkName, duration), func(t *testing.T) {
+			t.Parallel()
+			log.Info().
+				Str("Test Duration", fmt.Sprintf("%s", duration)).
+				Str("Request Triggering interval", fmt.Sprintf("%s", interval)).
+				Str("Source", laneB.SourceNetworkName).
+				Str("Destination", laneB.DestNetworkName).
+				Msg("Starting lane B")
+			totalReqLaneB, reqSuccessLaneB = laneB.SoakRun(interval, duration)
+			if totalReqLaneB != reqSuccessLaneB {
+				t.Fatalf("Failed to deliver %d requests out of %d", totalReqLaneB-reqSuccessLaneB, totalReqLaneB)
+			}
+		})
+	}
 }
 
 // TestCCIPSoakOnExistingDeployment assumes
@@ -81,17 +131,23 @@ func TestExistingDeploymentSoakCCIP(t *testing.T) {
 		totalReqLaneB   = 0
 		reqSuccessLaneA = 0
 		reqSuccessLaneB = 0
-		interval        = 30 * time.Second
-		duration        = 5 * time.Minute
 	)
 
+	// if interval and duration is provided in env variable, use that
+	interval, err := getTestInterval()
+	require.NoError(t, err, "invalid interval provided")
+	duration, err := getTestDuration()
+	require.NoError(t, err, "invalid duration provided")
+
 	t.Cleanup(func() {
-		log.Info().
-			Str("total duration", fmt.Sprint(duration)).
-			Str("req interval", fmt.Sprint(interval)).
-			Int("Total Requests", totalReqLaneA).
-			Int("Successful Requests", reqSuccessLaneA).
-			Msgf("Soak Result for lane %s --> %s", laneA.SourceNetworkName, laneA.DestNetworkName)
+		if laneA != nil {
+			log.Info().
+				Str("total duration", fmt.Sprint(duration)).
+				Str("req interval", fmt.Sprint(interval)).
+				Int("Total Requests", totalReqLaneA).
+				Int("Successful Requests", reqSuccessLaneA).
+				Msgf("Soak Result for lane %s --> %s", laneA.SourceNetworkName, laneA.DestNetworkName)
+		}
 		if laneB != nil {
 			log.Info().
 				Str("total duration", fmt.Sprint(duration)).
@@ -110,18 +166,32 @@ func TestExistingDeploymentSoakCCIP(t *testing.T) {
 	if laneA == nil {
 		return
 	}
-
 	t.Run(fmt.Sprintf("CCIP message transfer from network %s to network %s for %s", laneA.SourceNetworkName, laneA.DestNetworkName, duration), func(t *testing.T) {
 		t.Parallel()
-		laneA.ValidationTimeout = 5 * time.Minute
+		log.Info().
+			Str("Test Duration", fmt.Sprintf("%s", duration)).
+			Str("Request Triggering interval", fmt.Sprintf("%s", interval)).
+			Str("Source", laneA.SourceNetworkName).
+			Str("Destination", laneA.DestNetworkName).
+			Msg("Starting lane A")
 		totalReqLaneA, reqSuccessLaneA = laneA.SoakRun(interval, duration)
+		if totalReqLaneA != reqSuccessLaneA {
+			t.Fatalf("Failed to deliver %d requests out of %d", totalReqLaneA-reqSuccessLaneA, totalReqLaneA)
+		}
 	})
-
 	if laneB != nil {
 		t.Run(fmt.Sprintf("CCIP message transfer from network %s to network %s for %s", laneB.SourceNetworkName, laneB.DestNetworkName, duration), func(t *testing.T) {
 			t.Parallel()
-			laneB.ValidationTimeout = 5 * time.Minute
+			log.Info().
+				Str("Test Duration", fmt.Sprintf("%s", duration)).
+				Str("Request Triggering interval", fmt.Sprintf("%s", interval)).
+				Str("Source", laneB.SourceNetworkName).
+				Str("Destination", laneB.DestNetworkName).
+				Msg("Starting lane B")
 			totalReqLaneB, reqSuccessLaneB = laneB.SoakRun(interval, duration)
+			if totalReqLaneB != reqSuccessLaneB {
+				t.Fatalf("Failed to deliver %d requests out of %d", totalReqLaneB-reqSuccessLaneB, totalReqLaneB)
+			}
 		})
 	}
 }

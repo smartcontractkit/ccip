@@ -16,7 +16,7 @@ import (
 /* @network-chaos and @pod-chaos are split intentionally into 2 parallel groups
 we can't use chaos.NewNetworkPartition and chaos.NewFailPods in parallel
 because of jsii runtime bug, see Makefile and please use those targets to run tests
-In .github/workflows/load-ccip-tests.yml we use these tags to run these tests separately
+In .github/workflows/ccip-chaos-tests.yml we use these tags to run these tests separately
 */
 
 func TestChaosCCIP(t *testing.T) {
@@ -27,30 +27,31 @@ func TestChaosCCIP(t *testing.T) {
 		waitForChaosRecovery bool
 	}{
 		{
-			testName:  "CCIP works after rpc is down for Execution cll nodes @network-chaos",
+			testName:  "CCIP works after rpc is down for NetworkA @network-chaos",
 			chaosFunc: chaos.NewNetworkPartition,
 			chaosProps: &chaos.Props{
-				FromLabels:  &map[string]*string{"app": a.Str("geth")},
-				ToLabels:    &map[string]*string{actions.ChaosGroupExecution: a.Str("1")},
+				FromLabels: &map[string]*string{"app": a.Str(actions.GethLabelNetworkA)},
+				// chainlink-0 is default label set for all cll nodes
+				ToLabels:    &map[string]*string{"app": a.Str("chainlink-0")},
 				DurationStr: "1m",
 			},
 			waitForChaosRecovery: true,
 		},
 		{
-			testName:  "CCIP works after rpc is down for Commit cll nodes @network-chaos",
+			testName:  "CCIP works after rpc is down for NetworkB @network-chaos",
 			chaosFunc: chaos.NewNetworkPartition,
 			chaosProps: &chaos.Props{
-				FromLabels:  &map[string]*string{"app": a.Str("geth")},
-				ToLabels:    &map[string]*string{actions.ChaosGroupCommit: a.Str("1")},
+				FromLabels:  &map[string]*string{"app": a.Str(actions.GethLabelNetworkB)},
+				ToLabels:    &map[string]*string{"app": a.Str("chainlink-0")},
 				DurationStr: "1m",
 			},
 			waitForChaosRecovery: true,
 		},
 		{
-			testName:  "CCIP Execution & Commit works after rpc's are down for all cll nodes @network-chaos",
+			testName:  "CCIP works after 2 rpc's are down for all cll nodes @network-chaos",
 			chaosFunc: chaos.NewNetworkPartition,
 			chaosProps: &chaos.Props{
-				FromLabels:  &map[string]*string{"app": a.Str("geth")},
+				FromLabels:  &map[string]*string{"geth": a.Str(actions.ChaosGroupCCIPGeth)},
 				ToLabels:    &map[string]*string{"app": a.Str("chainlink-0")},
 				DurationStr: "1m",
 			},
@@ -107,9 +108,6 @@ func TestChaosCCIP(t *testing.T) {
 
 			lane, _, tearDown = actions.CCIPDefaultTestSetUp(t, "chaos-ccip", map[string]interface{}{
 				"replicas": "12",
-				"env": map[string]interface{}{
-					"CL_DEV": "true",
-				},
 				"db": map[string]interface{}{
 					"stateful": true,
 					"capacity": "10Gi",

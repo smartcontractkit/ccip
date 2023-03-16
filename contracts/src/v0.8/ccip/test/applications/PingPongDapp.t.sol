@@ -34,7 +34,6 @@ contract PingPongDappSetup is EVM2EVMOnRampSetup {
 contract PingPong_startPingPong is PingPongDappSetup {
   event ConfigPropagated(uint64 chainId, address contractAddress);
 
-  // Success
   function testSuccess() public {
     uint256 pingPongNumber = 1;
     bytes memory data = abi.encode(pingPongNumber);
@@ -77,8 +76,6 @@ contract PingPong_startPingPong is PingPongDappSetup {
 
 /// @notice #ccipReceive
 contract PingPong_ccipReceive is PingPongDappSetup {
-  // Success
-
   function testSuccess() public {
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
 

@@ -5,8 +5,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/dione"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/metis/printing"
@@ -16,25 +14,26 @@ import (
 )
 
 var (
-	SOURCE      = deployments.Beta_AvaxFujiToSepolia
-	DESTINATION = deployments.Beta_SepoliaToAvaxFuji
-	SOURCES     = []*rhea.EvmDeploymentConfig{
-		&deployments.Beta_SepoliaToAvaxFuji,
-		&deployments.Beta_SepoliaToOptimismGoerli,
-		&deployments.Beta_AvaxFujiToOptimismGoerli,
-	}
-	DESTINATIONS = []*rhea.EvmDeploymentConfig{
-		&deployments.Beta_AvaxFujiToSepolia,
-		&deployments.Beta_OptimismGoerliToSepolia,
-		&deployments.Beta_OptimismGoerliToAvaxFuji,
-	}
-	ENV = dione.StagingBeta
+	// Change these values
+	sourceChain = rhea.AvaxFuji
+	destChain   = rhea.Sepolia
+	ENV         = dione.StagingBeta
+
+	// These will automatically populate or error if the lane doesn't exist
+	SOURCE      = laneMapping[ENV][sourceChain][destChain]
+	DESTINATION = laneMapping[ENV][destChain][sourceChain]
 )
 
-var envToChainConfigs = map[dione.Environment][]rhea.EvmDeploymentConfig{
-	dione.StagingAlpha: deployments.Alpha_ChainConfigs,
-	dione.StagingBeta:  deployments.Beta_ChainConfigs,
-	dione.Production:   deployments.Prod_ChainConfigs,
+var laneMapping = map[dione.Environment]map[rhea.Chain]map[rhea.Chain]rhea.EvmDeploymentConfig{
+	dione.StagingAlpha: deployments.AlphaChainMapping,
+	dione.StagingBeta:  deployments.BetaChainMapping,
+	dione.Production:   deployments.ProdChainMapping,
+}
+
+var chainMapping = map[dione.Environment]map[rhea.Chain]rhea.EvmDeploymentConfig{
+	dione.StagingAlpha: deployments.AlphaChains,
+	dione.StagingBeta:  deployments.BetaChains,
+	dione.Production:   deployments.ProdChains,
 }
 
 // These functions can be run as a test (prefix with Test) with the following config
@@ -149,37 +148,41 @@ func TestCCIP(t *testing.T) {
 // TestUpdateAllLanes
 // 1. updates all the available lanes with new offramp, onramp, commit store
 // 2. creates new jobs
-// 3. set ocrconfig for both
+// 3. set ocrConfig for both
 // OWNER_KEY  private key used to deploy all contracts and is used as default in all single user tests.
 func TestUpdateAllLanes(t *testing.T) {
 	ownerKey := checkOwnerKey(t)
-	seedKey := os.Getenv("SEED_KEY")
-	if seedKey == "" {
-		t.Error("must set seed key")
-	}
-	require.Equal(t, len(SOURCES), len(DESTINATIONS), "number of sources and destinations should match")
 	don := dione.NewDON(ENV, logger.TestLogger(t))
-	for i, src := range SOURCES {
-		dest := DESTINATIONS[i]
-		src.SetupChain(t, ownerKey)
-		dest.SetupChain(t, ownerKey)
-		if !src.DeploySettings.DeployCommitStore || !src.DeploySettings.DeployRamp {
-			src.Logger.Errorf("Please set \"DeployRamp and DeployCommitStore\" to true for the given EvmChainConfigs and make sure "+
-				"the right ones are set. Source: %d, Dest %d", src.ChainConfig.ChainId, dest.ChainConfig.ChainId)
-			continue
+
+	if _, ok := laneMapping[ENV]; !ok {
+		t.Error("set environment not supported")
+	}
+
+	for sourceChain, sourceMap := range laneMapping[ENV] {
+		for destChain, _ := range sourceMap {
+			source := laneMapping[ENV][sourceChain][destChain]
+			dest := laneMapping[ENV][destChain][sourceChain]
+
+			source.SetupChain(t, ownerKey)
+			dest.SetupChain(t, ownerKey)
+			if !source.DeploySettings.DeployCommitStore || !source.DeploySettings.DeployRamp {
+				source.Logger.Errorf("Please set \"DeployRamp and DeployCommitStore\" to true for the given EvmChainConfigs and make sure "+
+					"the right ones are set. Source: %d, Dest %d", source.ChainConfig.ChainId, dest.ChainConfig.ChainId)
+				continue
+			}
+			if !dest.DeploySettings.DeployCommitStore || !dest.DeploySettings.DeployRamp {
+				dest.Logger.Errorf("Please set \"DeployRamp and DeployCommitStore\" to true for the given EvmChainConfigs and make sure "+
+					"the right ones are set. Source: %d, Dest %d", dest.ChainConfig.ChainId, source.ChainConfig.ChainId)
+				continue
+			}
+			rhea.UpgradeLaneTwoWay(t, &source, &dest)
+			don.ClearAllJobs(helpers.ChainName(int64(source.ChainConfig.ChainId)), helpers.ChainName(int64(dest.ChainConfig.ChainId)))
+			don.AddTwoWaySpecs(source, dest)
+			client := NewCcipClient(t, source, dest, ownerKey, ownerKey)
+			client.SetOCR2Config(ENV)
+			client = NewCcipClient(t, dest, source, ownerKey, ownerKey)
+			client.SetOCR2Config(ENV)
 		}
-		if !dest.DeploySettings.DeployCommitStore || !dest.DeploySettings.DeployRamp {
-			dest.Logger.Errorf("Please set \"DeployRamp and DeployCommitStore\" to true for the given EvmChainConfigs and make sure "+
-				"the right ones are set. Source: %d, Dest %d", dest.ChainConfig.ChainId, src.ChainConfig.ChainId)
-			continue
-		}
-		rhea.UpgradeLaneTwoWay(t, src, dest)
-		don.ClearAllJobs(helpers.ChainName(int64(src.ChainConfig.ChainId)), helpers.ChainName(int64(dest.ChainConfig.ChainId)))
-		don.AddTwoWaySpecs(*src, *dest)
-		client := NewCcipClient(t, *src, *dest, ownerKey, seedKey)
-		client.SetOCR2Config(ENV)
-		client = NewCcipClient(t, *dest, *src, ownerKey, seedKey)
-		client.SetOCR2Config(ENV)
 	}
 }
 
@@ -206,7 +209,8 @@ func TestFundNodes(t *testing.T) {
 // It will print the node balances for all chains where the given `env` is deployed
 func TestPrintAllNodeBalancesPerEnv(t *testing.T) {
 	ownerKey := checkOwnerKey(t)
-	for _, source := range envToChainConfigs[ENV] {
+
+	for _, source := range chainMapping[ENV] {
 		source.SetupChain(t, ownerKey)
 		don := dione.NewOfflineDON(ENV, logger.TestLogger(t))
 		printing.PrintNodeBalances(&source, don.GetSendingKeys(source.ChainConfig.ChainId))
@@ -218,7 +222,7 @@ func TestPrintAllNodeBalancesPerEnv(t *testing.T) {
 // It will fund the node balances for all chains where the given `env` is deployed
 func TestFundAllNodesPerEnv(t *testing.T) {
 	ownerKey := checkOwnerKey(t)
-	for _, source := range envToChainConfigs[ENV] {
+	for _, source := range chainMapping[ENV] {
 		source.SetupChain(t, ownerKey)
 		don := dione.NewOfflineDON(ENV, logger.TestLogger(t))
 		don.FundNodeKeys(&source, ownerKey, big.NewInt(1e18), big.NewInt(4e18))

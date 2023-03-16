@@ -3,21 +3,21 @@ pragma solidity 0.8.15;
 
 import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
 import {ICommitStore} from "../interfaces/ICommitStore.sol";
-import {IAFN} from "../interfaces/health/IAFN.sol";
+import {IAFN} from "../interfaces/IAFN.sol";
 import {IPool} from "../interfaces/pools/IPool.sol";
 import {IEVM2EVMOffRamp} from "../interfaces/offRamp/IEVM2EVMOffRamp.sol";
-import {IRouter} from "../interfaces/router/IRouter.sol";
-import {IAny2EVMMessageReceiver} from "../interfaces/router/IAny2EVMMessageReceiver.sol";
+import {IRouter} from "../interfaces/IRouter.sol";
+import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
 
 import {Client} from "../models/Client.sol";
 import {Internal} from "../models/Internal.sol";
 import {OCR2Base} from "../ocr/OCR2Base.sol";
-import {AggregateRateLimiter} from "../rateLimiter/AggregateRateLimiter.sol";
+import {AggregateRateLimiter} from "../AggregateRateLimiter.sol";
+import {EnumerableMapAddresses} from "../../libraries/internal/EnumerableMapAddresses.sol";
 
 import {IERC20} from "../../vendor/IERC20.sol";
 import {Address} from "../../vendor/Address.sol";
 import {ERC165Checker} from "../../vendor/ERC165Checker.sol";
-import {EnumerableMapAddresses} from "../../libraries/internal/EnumerableMapAddresses.sol";
 import {Pausable} from "../../vendor/Pausable.sol";
 
 /// @notice EVM2EVMOffRamp enables OCR networks to execute multiple messages
@@ -93,61 +93,9 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, Pausable, AggregateRateLimiter, Type
     _setDynamicConfig(dynamicConfig);
   }
 
-  /// @notice Pause the contract
-  /// @dev only callable by the owner
-  function pause() external onlyOwner {
-    _pause();
-  }
-
-  /// @notice Unpause the contract
-  /// @dev only callable by the owner
-  function unpause() external onlyOwner {
-    _unpause();
-  }
-
-  /// @notice creates a unique hash to be used in message hashing.
-  function _metadataHash(bytes32 prefix) internal view returns (bytes32) {
-    return keccak256(abi.encode(prefix, i_sourceChainId, i_chainId, i_onRamp));
-  }
-
-  /// @inheritdoc IEVM2EVMOffRamp
-  function getStaticConfig() external view override returns (StaticConfig memory) {
-    return
-      IEVM2EVMOffRamp.StaticConfig({
-        commitStore: i_commitStore,
-        chainId: i_chainId,
-        sourceChainId: i_sourceChainId,
-        onRamp: i_onRamp
-      });
-  }
-
-  /// @inheritdoc IEVM2EVMOffRamp
-  function getDynamicConfig() external view override returns (DynamicConfig memory) {
-    return s_dynamicConfig;
-  }
-
-  /// @inheritdoc IEVM2EVMOffRamp
-  function setDynamicConfig(DynamicConfig memory config) external override onlyOwner {
-    _setDynamicConfig(config);
-  }
-
-  /// @notice Internal version of setDynamicConfig to allow for reuse in the constructor.
-  function _setDynamicConfig(DynamicConfig memory dynamicConfig) private {
-    if (dynamicConfig.router == address(0) || dynamicConfig.afn == address(0))
-      revert InvalidOffRampConfig(dynamicConfig);
-
-    s_dynamicConfig = dynamicConfig;
-
-    emit ConfigSet(
-      IEVM2EVMOffRamp.StaticConfig({
-        commitStore: i_commitStore,
-        chainId: i_chainId,
-        sourceChainId: i_sourceChainId,
-        onRamp: i_onRamp
-      }),
-      dynamicConfig
-    );
-  }
+  // ================================================================
+  // |                          Messaging                           |
+  // ================================================================
 
   /// @inheritdoc IEVM2EVMOffRamp
   function getExecutionState(uint64 sequenceNumber) public view returns (Internal.MessageExecutionState) {
@@ -159,87 +107,15 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, Pausable, AggregateRateLimiter, Type
     return s_senderNonce[sender];
   }
 
-  /// @notice Uses the pool to release or mint tokens and send them to the given receiver address.
-  /// @param pool The pool to release/mint tokens from.
-  /// @param amount The number of tokens to release/mint.
-  /// @param receiver The address that will receive the tokens.
-  function _releaseOrMintToken(
-    IPool pool,
-    uint256 amount,
-    address receiver
-  ) internal {
-    pool.releaseOrMint(receiver, amount);
+  /// @inheritdoc IEVM2EVMOffRamp
+  function manuallyExecute(Internal.ExecutionReport memory report) external override {
+    _execute(report, true);
   }
 
-  /// @notice Uses pools to release or mint a number of different tokens to a receiver address.
-  /// @param sourceTokenAmounts List of tokens and amount values to be released/minted.
-  /// @param receiver The address that will receive the tokens.
-  function _releaseOrMintTokens(Client.EVMTokenAmount[] memory sourceTokenAmounts, address receiver)
-    internal
-    returns (Client.EVMTokenAmount[] memory)
-  {
-    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](sourceTokenAmounts.length);
-    for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
-      IPool pool = getPoolBySourceToken(IERC20(sourceTokenAmounts[i].token));
-      _releaseOrMintToken(pool, sourceTokenAmounts[i].amount, receiver);
-      destTokenAmounts[i].token = address(pool.getToken());
-      destTokenAmounts[i].amount = sourceTokenAmounts[i].amount;
-    }
-    _removeTokens(destTokenAmounts);
-    return destTokenAmounts;
-  }
-
-  /// @notice Execute a single message.
-  /// @param message The message that will be executed.
-  /// @param manualExecution bool to indicate manual instead of DON execution.
-  /// @dev this can only be called by the contract itself. It is part of
-  /// the Execute call, as we can only try/catch on external calls.
-  function executeSingleMessage(Internal.EVM2EVMMessage memory message, bool manualExecution) external {
-    if (msg.sender != address(this)) revert CanOnlySelfCall();
-    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
-    if (message.tokenAmounts.length > 0) {
-      destTokenAmounts = _releaseOrMintTokens(message.tokenAmounts, message.receiver);
-    }
-    if (
-      !message.receiver.isContract() || !message.receiver.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId)
-    ) return;
-    if (
-      !IRouter(s_dynamicConfig.router).routeMessage(
-        Internal._toAny2EVMMessage(message, destTokenAmounts),
-        manualExecution,
-        message.gasLimit,
-        message.receiver
-      )
-    ) revert ReceiverError();
-  }
-
-  /// @notice Try executing a message.
-  /// @param message Client.Any2EVMMessage memory message.
-  /// @param manualExecution bool to indicate manual instead of DON execution.
-  /// @return the new state of the message, being either SUCCESS or FAILURE.
-  function _trialExecute(Internal.EVM2EVMMessage memory message, bool manualExecution)
-    internal
-    returns (Internal.MessageExecutionState)
-  {
-    try this.executeSingleMessage(message, manualExecution) {} catch (bytes memory err) {
-      if (IEVM2EVMOffRamp.ReceiverError.selector == bytes4(err)) {
-        return Internal.MessageExecutionState.FAILURE;
-      } else {
-        revert ExecutionError(err);
-      }
-    }
-    return Internal.MessageExecutionState.SUCCESS;
-  }
-
-  /// @notice Does basic message validation. Should never fail.
-  /// @param message The message to be validated.
-  /// @dev reverts on validation failures.
-  function _isWellFormed(Internal.EVM2EVMMessage memory message) private view {
-    if (message.sourceChainId != i_sourceChainId) revert InvalidSourceChain(message.sourceChainId);
-    if (message.tokenAmounts.length > uint256(s_dynamicConfig.maxTokensLength))
-      revert UnsupportedNumberOfTokens(message.sequenceNumber);
-    if (message.data.length > uint256(s_dynamicConfig.maxDataSize))
-      revert MessageTooLarge(uint256(s_dynamicConfig.maxDataSize), message.data.length);
+  /// @notice Entrypoint for execution, called by the OCR network
+  /// @dev Expects an encoded ExecutionReport
+  function _report(bytes memory report) internal override {
+    _execute(abi.decode(report, (Internal.ExecutionReport)), false);
   }
 
   /// @notice Executes a report, executing each message in order.
@@ -333,15 +209,156 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, Pausable, AggregateRateLimiter, Type
     }
   }
 
-  /// @inheritdoc IEVM2EVMOffRamp
-  function manuallyExecute(Internal.ExecutionReport memory report) external override {
-    _execute(report, true);
+  /// @notice Does basic message validation. Should never fail.
+  /// @param message The message to be validated.
+  /// @dev reverts on validation failures.
+  function _isWellFormed(Internal.EVM2EVMMessage memory message) private view {
+    if (message.sourceChainId != i_sourceChainId) revert InvalidSourceChain(message.sourceChainId);
+    if (message.tokenAmounts.length > uint256(s_dynamicConfig.maxTokensLength))
+      revert UnsupportedNumberOfTokens(message.sequenceNumber);
+    if (message.data.length > uint256(s_dynamicConfig.maxDataSize))
+      revert MessageTooLarge(uint256(s_dynamicConfig.maxDataSize), message.data.length);
   }
 
-  /// @notice Reverts as this contract should not access CCIP messages
-  function ccipReceive(Client.Any2EVMMessage calldata) external pure {
-    // solhint-disable-next-line reason-string
-    revert();
+  /// @notice Try executing a message.
+  /// @param message Client.Any2EVMMessage memory message.
+  /// @param manualExecution bool to indicate manual instead of DON execution.
+  /// @return the new state of the message, being either SUCCESS or FAILURE.
+  function _trialExecute(Internal.EVM2EVMMessage memory message, bool manualExecution)
+    internal
+    returns (Internal.MessageExecutionState)
+  {
+    try this.executeSingleMessage(message, manualExecution) {} catch (bytes memory err) {
+      if (IEVM2EVMOffRamp.ReceiverError.selector == bytes4(err)) {
+        return Internal.MessageExecutionState.FAILURE;
+      } else {
+        revert ExecutionError(err);
+      }
+    }
+    return Internal.MessageExecutionState.SUCCESS;
+  }
+
+  /// @notice Execute a single message.
+  /// @param message The message that will be executed.
+  /// @param manualExecution bool to indicate manual instead of DON execution.
+  /// @dev this can only be called by the contract itself. It is part of
+  /// the Execute call, as we can only try/catch on external calls.
+  function executeSingleMessage(Internal.EVM2EVMMessage memory message, bool manualExecution) external {
+    if (msg.sender != address(this)) revert CanOnlySelfCall();
+    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
+    if (message.tokenAmounts.length > 0) {
+      destTokenAmounts = _releaseOrMintTokens(message.tokenAmounts, message.receiver);
+    }
+    if (
+      !message.receiver.isContract() || !message.receiver.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId)
+    ) return;
+    if (
+      !IRouter(s_dynamicConfig.router).routeMessage(
+        Internal._toAny2EVMMessage(message, destTokenAmounts),
+        manualExecution,
+        message.gasLimit,
+        message.receiver
+      )
+    ) revert ReceiverError();
+  }
+
+  /// @notice creates a unique hash to be used in message hashing.
+  function _metadataHash(bytes32 prefix) internal view returns (bytes32) {
+    return keccak256(abi.encode(prefix, i_sourceChainId, i_chainId, i_onRamp));
+  }
+
+  // ================================================================
+  // |                           Config                             |
+  // ================================================================
+
+  /// @inheritdoc IEVM2EVMOffRamp
+  function getStaticConfig() external view override returns (StaticConfig memory) {
+    return
+      IEVM2EVMOffRamp.StaticConfig({
+        commitStore: i_commitStore,
+        chainId: i_chainId,
+        sourceChainId: i_sourceChainId,
+        onRamp: i_onRamp
+      });
+  }
+
+  /// @inheritdoc IEVM2EVMOffRamp
+  function getDynamicConfig() external view override returns (DynamicConfig memory) {
+    return s_dynamicConfig;
+  }
+
+  /// @inheritdoc IEVM2EVMOffRamp
+  function setDynamicConfig(DynamicConfig memory config) external override onlyOwner {
+    _setDynamicConfig(config);
+  }
+
+  /// @notice Internal version of setDynamicConfig to allow for reuse in the constructor.
+  function _setDynamicConfig(DynamicConfig memory dynamicConfig) private {
+    if (dynamicConfig.router == address(0) || dynamicConfig.afn == address(0))
+      revert InvalidOffRampConfig(dynamicConfig);
+
+    s_dynamicConfig = dynamicConfig;
+
+    emit ConfigSet(
+      IEVM2EVMOffRamp.StaticConfig({
+        commitStore: i_commitStore,
+        chainId: i_chainId,
+        sourceChainId: i_sourceChainId,
+        onRamp: i_onRamp
+      }),
+      dynamicConfig
+    );
+  }
+
+  // ================================================================
+  // |                      Tokens and pools                        |
+  // ================================================================
+
+  /// @notice Get all supported source tokens
+  /// @return sourceTokens of supported source tokens
+  function getSupportedTokens() public view returns (IERC20[] memory sourceTokens) {
+    sourceTokens = new IERC20[](s_poolsBySourceToken.length());
+    for (uint256 i = 0; i < sourceTokens.length; ++i) {
+      (address token, ) = s_poolsBySourceToken.at(i);
+      sourceTokens[i] = IERC20(token);
+    }
+  }
+
+  /// @notice Get a token pool by its source token
+  /// @param sourceToken token
+  /// @return Token Pool
+  function getPoolBySourceToken(IERC20 sourceToken) public view returns (IPool) {
+    (bool success, address pool) = s_poolsBySourceToken.tryGet(address(sourceToken));
+    if (!success) revert UnsupportedToken(sourceToken);
+    return IPool(pool);
+  }
+
+  /// @notice Get the destination token from the pool based on a given source token.
+  /// @param sourceToken The source token
+  /// @return the destination token
+  function getDestinationToken(IERC20 sourceToken) public view returns (IERC20) {
+    (bool success, address pool) = s_poolsBySourceToken.tryGet(address(sourceToken));
+    if (!success) revert PoolDoesNotExist();
+    return IPool(pool).getToken();
+  }
+
+  /// @notice Get a token pool by its dest token
+  /// @param destToken token
+  /// @return Token Pool
+  function getPoolByDestToken(IERC20 destToken) public view returns (IPool) {
+    (bool success, address pool) = s_poolsByDestToken.tryGet(address(destToken));
+    if (!success) revert UnsupportedToken(destToken);
+    return IPool(pool);
+  }
+
+  /// @notice Get all configured destination tokens
+  /// @return destTokens Array of configured destination tokens
+  function getDestinationTokens() external view returns (IERC20[] memory destTokens) {
+    destTokens = new IERC20[](s_poolsByDestToken.length());
+    for (uint256 i = 0; i < destTokens.length; ++i) {
+      (address token, ) = s_poolsByDestToken.at(i);
+      destTokens[i] = IERC20(token);
+    }
   }
 
   function applyPoolUpdates(Internal.PoolUpdate[] memory removes, Internal.PoolUpdate[] memory adds) public onlyOwner {
@@ -376,58 +393,44 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, Pausable, AggregateRateLimiter, Type
     }
   }
 
-  /// @notice Get a token pool by its source token
-  /// @param sourceToken token
-  /// @return Token Pool
-  function getPoolBySourceToken(IERC20 sourceToken) public view returns (IPool) {
-    (bool success, address pool) = s_poolsBySourceToken.tryGet(address(sourceToken));
-    if (!success) revert UnsupportedToken(sourceToken);
-    return IPool(pool);
+  /// @notice Uses the pool to release or mint tokens and send them to the given receiver address.
+  /// @param pool The pool to release/mint tokens from.
+  /// @param amount The number of tokens to release/mint.
+  /// @param receiver The address that will receive the tokens.
+  function _releaseOrMintToken(
+    IPool pool,
+    uint256 amount,
+    address receiver
+  ) internal {
+    pool.releaseOrMint(receiver, amount);
   }
 
-  /// @notice Get a token pool by its dest token
-  /// @param destToken token
-  /// @return Token Pool
-  function getPoolByDestToken(IERC20 destToken) public view returns (IPool) {
-    (bool success, address pool) = s_poolsByDestToken.tryGet(address(destToken));
-    if (!success) revert UnsupportedToken(destToken);
-    return IPool(pool);
-  }
-
-  /// @notice Get all supported source tokens
-  /// @return sourceTokens of supported source tokens
-  function getSupportedTokens() public view returns (IERC20[] memory sourceTokens) {
-    sourceTokens = new IERC20[](s_poolsBySourceToken.length());
-    for (uint256 i = 0; i < sourceTokens.length; ++i) {
-      (address token, ) = s_poolsBySourceToken.at(i);
-      sourceTokens[i] = IERC20(token);
+  /// @notice Uses pools to release or mint a number of different tokens to a receiver address.
+  /// @param sourceTokenAmounts List of tokens and amount values to be released/minted.
+  /// @param receiver The address that will receive the tokens.
+  function _releaseOrMintTokens(Client.EVMTokenAmount[] memory sourceTokenAmounts, address receiver)
+    internal
+    returns (Client.EVMTokenAmount[] memory)
+  {
+    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](sourceTokenAmounts.length);
+    for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
+      IPool pool = getPoolBySourceToken(IERC20(sourceTokenAmounts[i].token));
+      _releaseOrMintToken(pool, sourceTokenAmounts[i].amount, receiver);
+      destTokenAmounts[i].token = address(pool.getToken());
+      destTokenAmounts[i].amount = sourceTokenAmounts[i].amount;
     }
+    _removeTokens(destTokenAmounts);
+    return destTokenAmounts;
   }
 
-  /// @notice Get the destination token from the pool based on a given source token.
-  /// @param sourceToken The source token
-  /// @return the destination token
-  function getDestinationToken(IERC20 sourceToken) public view returns (IERC20) {
-    (bool success, address pool) = s_poolsBySourceToken.tryGet(address(sourceToken));
-    if (!success) revert PoolDoesNotExist();
-    return IPool(pool).getToken();
-  }
+  // ================================================================
+  // |                        Access and AFN                        |
+  // ================================================================
 
-  /// @notice Get all configured destination tokens
-  /// @return destTokens Array of configured destination tokens
-  function getDestinationTokens() external view returns (IERC20[] memory destTokens) {
-    destTokens = new IERC20[](s_poolsByDestToken.length());
-    for (uint256 i = 0; i < destTokens.length; ++i) {
-      (address token, ) = s_poolsByDestToken.at(i);
-      destTokens[i] = IERC20(token);
-    }
-  }
-
-  // ******* OCR BASE ***********
-  /// @notice Entrypoint for execution, called by the OCR network
-  /// @dev Expects an encoded ExecutionReport
-  function _report(bytes memory report) internal override {
-    _execute(abi.decode(report, (Internal.ExecutionReport)), false);
+  /// @notice Reverts as this contract should not access CCIP messages
+  function ccipReceive(Client.Any2EVMMessage calldata) external pure {
+    // solhint-disable-next-line reason-string
+    revert();
   }
 
   /// @notice Support querying whether health checker is healthy.
@@ -439,5 +442,17 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, Pausable, AggregateRateLimiter, Type
   modifier whenHealthy() {
     if (IAFN(s_dynamicConfig.afn).badSignalReceived()) revert BadAFNSignal();
     _;
+  }
+
+  /// @notice Pause the contract
+  /// @dev only callable by the owner
+  function pause() external onlyOwner {
+    _pause();
+  }
+
+  /// @notice Unpause the contract
+  /// @dev only callable by the owner
+  function unpause() external onlyOwner {
+    _unpause();
   }
 }

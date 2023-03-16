@@ -17,7 +17,6 @@ contract LockReleaseTokenPoolSetup is BaseTest {
 }
 
 contract LockReleaseTokenPool_getProvidedLiquidity is LockReleaseTokenPoolSetup {
-  // Success
   function testGetProvidedLiquiditySuccess(uint256 amount) public {
     s_token.approve(address(s_lockReleaseTokenPool), amount);
 
@@ -28,7 +27,6 @@ contract LockReleaseTokenPool_getProvidedLiquidity is LockReleaseTokenPoolSetup 
 }
 
 contract LockReleaseTokenPool_addLiquidity is LockReleaseTokenPoolSetup {
-  // Success
   function testAddLiquiditySuccess(uint256 amount) public {
     uint256 balancePre = s_token.balanceOf(OWNER);
     s_token.approve(address(s_lockReleaseTokenPool), amount);
@@ -49,7 +47,6 @@ contract LockReleaseTokenPool_addLiquidity is LockReleaseTokenPoolSetup {
 }
 
 contract LockReleaseTokenPool_removeLiquidity is LockReleaseTokenPoolSetup {
-  // Success
   function testRemoveLiquiditySuccess(uint256 amount) public {
     uint256 balancePre = s_token.balanceOf(OWNER);
     s_token.approve(address(s_lockReleaseTokenPool), amount);

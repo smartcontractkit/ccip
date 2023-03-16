@@ -81,8 +81,8 @@ interface IEVM2EVMOnRamp is IEVM2AnyOnRamp {
 
   /// @dev Nop address and weight, used to set the nops and their weights
   struct NopAndWeight {
-    address nop;
-    uint256 weight;
+    address nop; // ---┐ Address of the node operator
+    uint16 weight; // --┘ Weight for nop rewards
   }
 
   /// @notice Gets the Nops and their weights
@@ -104,7 +104,7 @@ interface IEVM2EVMOnRamp is IEVM2AnyOnRamp {
 
   /// @notice Get the total amount of fees to be paid to the Nops (in LINK)
   /// @return totalNopFees
-  function getNopFeesJuels() external view returns (uint256);
+  function getNopFeesJuels() external view returns (uint96);
 
   /// @notice Returns the static onRamp config.
   /// @return the configuration.

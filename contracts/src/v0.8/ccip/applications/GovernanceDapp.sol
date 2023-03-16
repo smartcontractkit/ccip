@@ -2,9 +2,9 @@
 pragma solidity 0.8.15;
 
 import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
-import {IRouterClient} from "../interfaces/router/IRouterClient.sol";
+import {IRouterClient} from "../interfaces/IRouterClient.sol";
 
-import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
+import {OwnerIsCreator} from "../OwnerIsCreator.sol";
 import {CCIPReceiver} from "./CCIPReceiver.sol";
 import {Client} from "../models/Client.sol";
 

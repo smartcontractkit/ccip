@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {IRouterClient} from "../interfaces/router/IRouterClient.sol";
+import {IRouterClient} from "../interfaces/IRouterClient.sol";
 
-import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
+import {OwnerIsCreator} from "../OwnerIsCreator.sol";
 import {Client} from "../models/Client.sol";
 import {CCIPReceiver} from "./CCIPReceiver.sol";
 

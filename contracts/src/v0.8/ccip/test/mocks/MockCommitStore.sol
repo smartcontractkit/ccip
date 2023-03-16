@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../interfaces/ICommitStore.sol";
+import {ICommitStore} from "../../interfaces/ICommitStore.sol";
 
 contract MockCommitStore is ICommitStore {
   /// @inheritdoc ICommitStore

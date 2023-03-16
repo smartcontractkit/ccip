@@ -60,8 +60,8 @@ interface IEVM2EVMOffRamp {
     uint64 executionDelaySeconds; //                    | Execution delay in seconds
     address router; // ---------------------------------┘ Router address
     uint32 maxDataSize; // --------┐ Maximum payload data size
-    uint16 maxTokensLength; // ----┘ Maximum number of distinct ERC20 tokens that can be sent per message
-    address afn; // AFN address
+    uint16 maxTokensLength; //     | Maximum number of distinct ERC20 tokens that can be sent per message
+    address afn; // ---------------┘ AFN address
   }
 
   /// @notice Returns the current dynamic config.

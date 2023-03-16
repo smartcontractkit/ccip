@@ -3,7 +3,7 @@ pragma solidity 0.8.15;
 
 import "../helpers/receivers/MaybeRevertMessageReceiver.sol";
 import "./EVM2EVMOffRampSetup.t.sol";
-import "../../router/Router.sol";
+import "../../Router.sol";
 import "../helpers/receivers/ConformingReceiver.sol";
 import "../helpers/receivers/MaybeRevertMessageReceiverNo165.sol";
 import "../helpers/receivers/ReentrancyAbuser.sol";
@@ -12,8 +12,6 @@ import "../../interfaces/offRamp/IEVM2EVMOffRamp.sol";
 /// @notice #constructor
 contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
   event ConfigSet(IEVM2EVMOffRamp.StaticConfig staticConfig, IEVM2EVMOffRamp.DynamicConfig dynamicConfig);
-
-  // Success
 
   function testSuccess() public {
     IEVM2EVMOffRamp.StaticConfig memory staticConfig = IEVM2EVMOffRamp.StaticConfig({
@@ -176,8 +174,6 @@ contract EVM2EVMOffRamp_ccipReceive is EVM2EVMOffRampSetup {
 
 /// @notice #execute
 contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
-  // Success
-
   function testSingleMessageNoTokensSuccess() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
     vm.expectEmit();
@@ -444,8 +440,6 @@ contract EVM2EVMOffRamp_executeSingleMessage is EVM2EVMOffRampSetup {
     changePrank(address(s_offRamp));
   }
 
-  // Success
-
   function testNoTokensSuccess() public {
     s_offRamp.executeSingleMessage(_generateAny2EVMMessageNoTokens(1), false);
   }
@@ -559,7 +553,6 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
 
 /// @notice #getExecutionState
 contract EVM2EVMOffRamp_getExecutionState is EVM2EVMOffRampSetup {
-  // Success
   function testSuccess() public {
     // setting the execution state is done with a helper function. This
     // is normally not exposed.
@@ -577,7 +570,6 @@ contract EVM2EVMOffRamp_getExecutionState is EVM2EVMOffRampSetup {
 
 /// @notice #_releaseOrMintToken internal function
 contract EVM2EVMOffRamp__releaseOrMintToken is EVM2EVMOffRampSetup {
-  // Success
   function testSuccess() public {
     IERC20 destToken0 = IERC20(s_destTokens[0]);
     uint256 startingBalance = destToken0.balanceOf(OWNER);
@@ -586,7 +578,6 @@ contract EVM2EVMOffRamp__releaseOrMintToken is EVM2EVMOffRampSetup {
     assertEq(startingBalance + amount, destToken0.balanceOf(OWNER));
   }
 
-  // Success on BurnMintTokenPool
   function testMintSuccess() public {
     IERC20 destToken1 = IERC20(s_destTokens[1]);
     uint256 startingBalance = destToken1.balanceOf(OWNER);
@@ -607,7 +598,6 @@ contract EVM2EVMOffRamp__releaseOrMintToken is EVM2EVMOffRampSetup {
 
 /// @notice #_releaseOrMintTokens
 contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
-  // Success
   function testSuccess() public {
     Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
     IERC20 dstToken1 = IERC20(s_destTokens[0]);
@@ -633,7 +623,6 @@ contract EVM2EVMOffRamp_applyPoolUpdates is EVM2EVMOffRampSetup {
   event PoolAdded(address token, address pool);
   event PoolRemoved(address token, address pool);
 
-  // Success
   function testApplyPoolUpdatesSuccess() public {
     Internal.PoolUpdate[] memory adds = new Internal.PoolUpdate[](1);
     adds[0] = Internal.PoolUpdate({token: address(1), pool: address(new LockReleaseTokenPool(IERC20(address(1))))});

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../../commitStore/CommitStore.sol";
+import "../../CommitStore.sol";
 
 contract CommitStoreHelper is CommitStore {
   constructor(StaticConfig memory staticConfig, DynamicConfig memory dynamicConfig)

@@ -15,7 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/governance_dapp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ping_pong_demo"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/receiver_dapp"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/shared"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
@@ -42,8 +41,6 @@ func DeployLanes(t *testing.T, source *EvmDeploymentConfig, destination *EvmDepl
 
 	SetPriceRegistryPrices(t, source, destChainId)
 	SetPriceRegistryPrices(t, destination, sourceChainId)
-
-	deployGovernanceDapps(t, source, destination)
 
 	DeployPingPongDapps(t, source, destination)
 
@@ -91,8 +88,6 @@ func deployDestinationContracts(t *testing.T, client *EvmDeploymentConfig, sourc
 		setOffRampOnRouter(t, sourceChainId, client)
 	}
 
-	// Updates destClient.ReceiverDapp if any new contracts are deployed
-	deployReceiverDapp(t, client)
 	client.Logger.Infof("%s contracts fully deployed as destination chain", helpers.ChainName(int64(client.ChainConfig.ChainId)))
 }
 
@@ -273,20 +268,6 @@ func deployCommitStore(t *testing.T, client *EvmDeploymentConfig, sourceChainId 
 	return commitStore
 }
 
-func deployReceiverDapp(t *testing.T, client *EvmDeploymentConfig) *receiver_dapp.ReceiverDapp {
-	client.Logger.Infof("Deploying ReceiverDapp")
-	receiverDappAddress, tx, _, err := receiver_dapp.DeployReceiverDapp(client.Owner, client.Client, client.ChainConfig.Router)
-	shared.RequireNoError(t, err)
-	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
-	client.Logger.Infof("Offramp receiver dapp deployed on %s in tx: %s", receiverDappAddress.Hex(), helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash()))
-	client.LaneConfig.ReceiverDapp = receiverDappAddress
-
-	receiverDapp, err := receiver_dapp.NewReceiverDapp(receiverDappAddress, client.Client)
-	shared.RequireNoError(t, err)
-
-	return receiverDapp
-}
-
 func DeployPingPongDapps(t *testing.T, sourceClient *EvmDeploymentConfig, destClient *EvmDeploymentConfig) {
 	fundingAmount := big.NewInt(1e18)
 
@@ -372,50 +353,44 @@ func deployGovernanceDapps(t *testing.T, sourceClient *EvmDeploymentConfig, dest
 		ChangedAtBlock: big.NewInt(0),
 	}
 
-	if sourceClient.DeploySettings.DeployGovernanceDapp {
-		sourceClient.Logger.Infof("Deploying source chain governance dapp")
-		governanceDappAddress, tx, _, err := governance_dapp.DeployGovernanceDapp(
-			sourceClient.Owner,
-			sourceClient.Client,
-			sourceClient.ChainConfig.Router,
-			feeConfig,
-			destClient.ChainConfig.SupportedTokens[LINK].Token)
-		require.NoError(t, err)
+	sourceClient.Logger.Infof("Deploying source chain governance dapp")
+	governanceDappAddress, tx, _, err := governance_dapp.DeployGovernanceDapp(
+		sourceClient.Owner,
+		sourceClient.Client,
+		sourceClient.ChainConfig.Router,
+		feeConfig,
+		destClient.ChainConfig.SupportedTokens[LINK].Token)
+	require.NoError(t, err)
 
-		shared.WaitForMined(t, sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
-		sourceClient.Logger.Infof("GovernanceDapp deployed on %s in tx: %s", governanceDappAddress.Hex(), helpers.ExplorerLink(int64(sourceClient.ChainConfig.ChainId), tx.Hash()))
+	shared.WaitForMined(t, sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
+	sourceClient.Logger.Infof("GovernanceDapp deployed on %s in tx: %s", governanceDappAddress.Hex(), helpers.ExplorerLink(int64(sourceClient.ChainConfig.ChainId), tx.Hash()))
 
-		sourceClient.LaneConfig.GovernanceDapp = governanceDappAddress
+	sourceClient.LaneConfig.GovernanceDapp = governanceDappAddress
+
+	destClient.Logger.Infof("Deploying destination chain governance dapp")
+	governanceDappAddress, tx, _, err = governance_dapp.DeployGovernanceDapp(
+		destClient.Owner,
+		destClient.Client,
+		destClient.ChainConfig.Router,
+		feeConfig,
+		destClient.ChainConfig.SupportedTokens[LINK].Token)
+	require.NoError(t, err)
+
+	shared.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
+	destClient.Logger.Infof("GovernanceDapp deployed on %s in tx: %s", governanceDappAddress.Hex(), helpers.ExplorerLink(int64(destClient.ChainConfig.ChainId), tx.Hash()))
+
+	destClient.LaneConfig.GovernanceDapp = governanceDappAddress
+
+	governanceDapp, err := governance_dapp.NewGovernanceDapp(sourceClient.LaneConfig.GovernanceDapp, sourceClient.Client)
+	require.NoError(t, err)
+
+	governanceClone := governance_dapp.GovernanceDappCrossChainClone{
+		ChainId:         destClient.ChainConfig.ChainId,
+		ContractAddress: destClient.LaneConfig.GovernanceDapp,
 	}
 
-	if destClient.DeploySettings.DeployGovernanceDapp {
-		destClient.Logger.Infof("Deploying destination chain governance dapp")
-		governanceDappAddress, tx, _, err := governance_dapp.DeployGovernanceDapp(
-			destClient.Owner,
-			destClient.Client,
-			destClient.ChainConfig.Router,
-			feeConfig,
-			destClient.ChainConfig.SupportedTokens[LINK].Token)
-		require.NoError(t, err)
-
-		shared.WaitForMined(t, destClient.Logger, destClient.Client, tx.Hash(), true)
-		destClient.Logger.Infof("GovernanceDapp deployed on %s in tx: %s", governanceDappAddress.Hex(), helpers.ExplorerLink(int64(destClient.ChainConfig.ChainId), tx.Hash()))
-
-		destClient.LaneConfig.GovernanceDapp = governanceDappAddress
-	}
-
-	if sourceClient.DeploySettings.DeployGovernanceDapp || destClient.DeploySettings.DeployGovernanceDapp {
-		governanceDapp, err := governance_dapp.NewGovernanceDapp(sourceClient.LaneConfig.GovernanceDapp, sourceClient.Client)
-		require.NoError(t, err)
-
-		governanceClone := governance_dapp.GovernanceDappCrossChainClone{
-			ChainId:         destClient.ChainConfig.ChainId,
-			ContractAddress: destClient.LaneConfig.GovernanceDapp,
-		}
-
-		tx, err := governanceDapp.AddClone(sourceClient.Owner, governanceClone)
-		require.NoError(t, err)
-		shared.WaitForMined(t, sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
-		sourceClient.Logger.Infof("GovernanceDapp configured in tx: %s", helpers.ExplorerLink(int64(sourceClient.ChainConfig.ChainId), tx.Hash()))
-	}
+	tx, err = governanceDapp.AddClone(sourceClient.Owner, governanceClone)
+	require.NoError(t, err)
+	shared.WaitForMined(t, sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
+	sourceClient.Logger.Infof("GovernanceDapp configured in tx: %s", helpers.ExplorerLink(int64(sourceClient.ChainConfig.ChainId), tx.Hash()))
 }

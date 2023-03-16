@@ -91,13 +91,10 @@ func (loadArgs *loadArgs) Setup() {
 	dest := forwardLane.Dest
 	ccipLoad := NewCCIPLoad(loadArgs.t, source, dest, loadArgs.ccipTimeout, 100000)
 	ccipLoad.BeforeAllCall(loadArgs.msgType)
-	loadRunner, err := loadgen.NewLoadGenerator(&loadgen.LoadGeneratorConfig{
-		T: nil,
-		Schedule: &loadgen.LoadSchedule{
-			Type:      loadgen.RPSScheduleType,
-			StartFrom: loadArgs.rps,
-		},
-		Duration:    loadArgs.duration,
+	loadRunner, err := loadgen.NewLoadGenerator(&loadgen.Config{
+		T:           nil,
+		Schedule:    loadgen.Plain(loadArgs.rps, loadArgs.duration),
+		LoadType:    loadgen.RPSScheduleType,
 		CallTimeout: loadArgs.loadTimeOut,
 		Gun:         ccipLoad,
 		Logger:      zerolog.Logger{},
