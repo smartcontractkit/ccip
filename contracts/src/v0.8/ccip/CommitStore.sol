@@ -123,6 +123,12 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
     emit ReportAccepted(report);
   }
 
+  /// @notice returns a hash of the abi encoded address of this contract and the
+  /// supplied root.
+  function _hashCommitStoreWithRoot(bytes32 root) internal view returns (bytes32) {
+    return keccak256(abi.encode(address(this), root));
+  }
+
   // ================================================================
   // |                           Config                             |
   // ================================================================
@@ -153,12 +159,6 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
       ICommitStore.StaticConfig({chainId: i_chainId, sourceChainId: i_sourceChainId, onRamp: i_onRamp}),
       dynamicConfig
     );
-  }
-
-  /// @notice returns a hash of the abi encoded address of this contract and the
-  /// supplied root.
-  function _hashCommitStoreWithRoot(bytes32 root) internal view returns (bytes32) {
-    return keccak256(abi.encode(address(this), root));
   }
 
   // ================================================================

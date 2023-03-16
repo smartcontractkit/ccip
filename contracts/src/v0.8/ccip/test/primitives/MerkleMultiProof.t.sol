@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "forge-std/Test.sol";
+import "../BaseTest.t.sol";
 
 import "../helpers/MerkleHelper.sol";
 
-contract MerkleMultiProofTest is Test {
+contract MerkleMultiProofTest is BaseTest {
   MerkleHelper s_merkleHelper;
 
-  function setUp() public {
+  function setUp() public override {
+    BaseTest.setUp();
+
     s_merkleHelper = new MerkleHelper();
   }
 
