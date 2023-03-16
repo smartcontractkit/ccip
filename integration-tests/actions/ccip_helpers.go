@@ -53,6 +53,7 @@ const (
 	ChaosGroupCommitFaulty        = "CommitMinority"         //  f number of nodes
 	ChaosGroupExecutionFaultyPlus = "ExecutionNodesMajority" // > f number of nodes
 	ChaosGroupExecutionFaulty     = "ExecutionNodesMinority" //  f number of nodes
+	ChaosGroupCCIPGeth            = "CCIPGeth"               // both source and destination simulated geth networks
 	RootSnoozeTime                = 10 * time.Second
 	InflightExpiry                = 10 * time.Second
 )
@@ -90,8 +91,10 @@ var (
 		return ccipTOML
 	}
 
-	networkAName = strings.ReplaceAll(strings.ToLower(NetworkA.Name), " ", "-")
-	networkBName = strings.ReplaceAll(strings.ToLower(NetworkB.Name), " ", "-")
+	networkAName      = strings.ReplaceAll(strings.ToLower(NetworkA.Name), " ", "-")
+	networkBName      = strings.ReplaceAll(strings.ToLower(NetworkB.Name), " ", "-")
+	GethLabelNetworkA = fmt.Sprintf("%s-ethereum-geth", networkAName)
+	GethLabelNetworkB = fmt.Sprintf("%s-ethereum-geth", networkBName)
 )
 
 type CCIPCommon struct {
@@ -1783,6 +1786,13 @@ func (c *CCIPTestEnv) ChaosLabel(t *testing.T) {
 			err := c.K8Env.Client.LabelChaosGroupByLabels(c.K8Env.Cfg.Namespace, labelSelector, ChaosGroupExecutionFaulty)
 			assert.NoError(t, err)
 		}
+	}
+	gethNetworksLabels := []string{GethLabelNetworkA, GethLabelNetworkB}
+	for _, gethNetworkLabel := range gethNetworksLabels {
+		err := c.K8Env.Client.AddLabel(c.K8Env.Cfg.Namespace,
+			fmt.Sprintf("app=%s", gethNetworkLabel),
+			fmt.Sprintf("geth=%s", ChaosGroupCCIPGeth))
+		require.NoError(t, err)
 	}
 }
 

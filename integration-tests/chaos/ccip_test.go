@@ -27,30 +27,31 @@ func TestChaosCCIP(t *testing.T) {
 		waitForChaosRecovery bool
 	}{
 		{
-			testName:  "CCIP works after rpc is down for Execution cll nodes @network-chaos",
+			testName:  "CCIP works after rpc is down for NetworkA @network-chaos",
 			chaosFunc: chaos.NewNetworkPartition,
 			chaosProps: &chaos.Props{
-				FromLabels:  &map[string]*string{"app": a.Str("geth")},
-				ToLabels:    &map[string]*string{actions.ChaosGroupExecution: a.Str("1")},
+				FromLabels: &map[string]*string{"app": a.Str(actions.GethLabelNetworkA)},
+				// chainlink-0 is default label set for all cll nodes
+				ToLabels:    &map[string]*string{"app": a.Str("chainlink-0")},
 				DurationStr: "1m",
 			},
 			waitForChaosRecovery: true,
 		},
 		{
-			testName:  "CCIP works after rpc is down for Commit cll nodes @network-chaos",
+			testName:  "CCIP works after rpc is down for NetworkB @network-chaos",
 			chaosFunc: chaos.NewNetworkPartition,
 			chaosProps: &chaos.Props{
-				FromLabels:  &map[string]*string{"app": a.Str("geth")},
-				ToLabels:    &map[string]*string{actions.ChaosGroupCommit: a.Str("1")},
+				FromLabels:  &map[string]*string{"app": a.Str(actions.GethLabelNetworkB)},
+				ToLabels:    &map[string]*string{"app": a.Str("chainlink-0")},
 				DurationStr: "1m",
 			},
 			waitForChaosRecovery: true,
 		},
 		{
-			testName:  "CCIP Execution & Commit works after rpc's are down for all cll nodes @network-chaos",
+			testName:  "CCIP works after 2 rpc's are down for all cll nodes @network-chaos",
 			chaosFunc: chaos.NewNetworkPartition,
 			chaosProps: &chaos.Props{
-				FromLabels:  &map[string]*string{"app": a.Str("geth")},
+				FromLabels:  &map[string]*string{"geth": a.Str(actions.ChaosGroupCCIPGeth)},
 				ToLabels:    &map[string]*string{"app": a.Str("chainlink-0")},
 				DurationStr: "1m",
 			},
