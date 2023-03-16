@@ -314,7 +314,7 @@ func (r *CommitReportingPlugin) generatePriceUpdates(ctx context.Context) (sourc
 	}
 
 	sourceNativePriceUSD, ok := tokenPricesUSD[r.config.sourceNative]
-	if !ok {
+	if !ok || sourceNativePriceUSD == nil {
 		return nil, nil, errors.New("could not get source native price")
 	}
 	delete(tokenPricesUSD, r.config.sourceNative)
@@ -326,8 +326,11 @@ func (r *CommitReportingPlugin) generatePriceUpdates(ctx context.Context) (sourc
 	}
 	// Use legacy if no dynamic is available.
 	gasPrice := sourceGasPriceWei.Legacy.ToInt()
-	if sourceGasPriceWei.Dynamic != nil {
+	if sourceGasPriceWei.Dynamic != nil && sourceGasPriceWei.Dynamic.FeeCap != nil {
 		gasPrice = sourceGasPriceWei.Dynamic.FeeCap.ToInt()
+	}
+	if gasPrice == nil {
+		return nil, nil, fmt.Errorf("missing gas price %+v", sourceGasPriceWei)
 	}
 
 	sourceGasPriceUSD = calculateUsdPerUnitGas(gasPrice, sourceNativePriceUSD)
