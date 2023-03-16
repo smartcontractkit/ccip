@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../BaseTest.t.sol";
+import "./BaseTest.t.sol";
 
-import "../helpers/MerkleHelper.sol";
+import "./helpers/MerkleHelper.sol";
 
 contract MerkleMultiProofTest is BaseTest {
   MerkleHelper s_merkleHelper;

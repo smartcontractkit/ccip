@@ -9,7 +9,7 @@ import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
 import {OCR2Base} from "./ocr/OCR2Base.sol";
 import {Internal} from "./models/Internal.sol";
 import {Pausable} from "../vendor/Pausable.sol";
-import {MerkleMultiProof} from "./primitives/MerkleMultiProof.sol";
+import {MerkleMultiProof} from "./MerkleMultiProof.sol";
 
 contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Base {
   // STATIC CONFIG

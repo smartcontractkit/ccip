@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {MerkleMultiProof} from "../../primitives/MerkleMultiProof.sol";
+import {MerkleMultiProof} from "../../MerkleMultiProof.sol";
 
 contract MerkleHelper {
   /// @notice Generate a Merkle Root from a full set of leaves. When a tree is unbalanced
