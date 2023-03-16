@@ -2,9 +2,9 @@ pragma solidity ^0.8.0;
 
 library MerkleMultiProof {
   /// @notice Leaf domain separator, should be used as the first 32 bytes of a leaf's preimage.
-  bytes32 public constant LEAF_DOMAIN_SEPARATOR = 0x0000000000000000000000000000000000000000000000000000000000000000;
+  bytes32 internal constant LEAF_DOMAIN_SEPARATOR = 0x0000000000000000000000000000000000000000000000000000000000000000;
   /// @notice Internal domain separator, should be used as the first 32 bytes of an internal node's preiimage.
-  bytes32 public constant INTERNAL_DOMAIN_SEPARATOR =
+  bytes32 internal constant INTERNAL_DOMAIN_SEPARATOR =
     0x0000000000000000000000000000000000000000000000000000000000000001;
 
   error InvalidProof();
@@ -40,11 +40,14 @@ library MerkleMultiProof {
   ///
   ///    i = 3 and no longer < totalHashes. The algorithm is done
   ///    return hashes[totalHashes - 1] = hashes[2]; the last hash we computed.
+  // We mark this function as internal to force it to be inlined in contracts
+  // that use it, but semantically it is public.
+  // solhint-disable-next-line chainlink-solidity/prefix-internal-functions-with-underscore
   function merkleRoot(
     bytes32[] memory leaves,
     bytes32[] memory proofs,
     uint256 proofFlagBits
-  ) public pure returns (bytes32) {
+  ) internal pure returns (bytes32) {
     unchecked {
       uint256 leavesLen = leaves.length;
       // As of Solidity 0.6.5, overflow is not possible here because in-memory arrays are limited to
