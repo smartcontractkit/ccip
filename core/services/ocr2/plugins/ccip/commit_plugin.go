@@ -11,11 +11,7 @@ import (
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
-	"github.com/smartcontractkit/chainlink/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/core/logger"
@@ -188,28 +184,4 @@ func ParseAndVerifyPluginConfig(jsonConfig job.JSONConfig) (ccipconfig.CommitPlu
 		return ccipconfig.CommitPluginConfig{}, err
 	}
 	return pluginConfig, nil
-}
-
-func LoadOnRamp(onRampAddress common.Address, client client.Client) (*evm_2_evm_onramp.EVM2EVMOnRamp, error) {
-	err := ccipconfig.VerifyTypeAndVersion(onRampAddress, client, ccipconfig.EVM2EVMOnRamp)
-	if err != nil {
-		return nil, errors.Wrap(err, "Invalid onRamp contract")
-	}
-	return evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddress, client)
-}
-
-func LoadOffRamp(offRampAddress common.Address, client client.Client) (*evm_2_evm_offramp.EVM2EVMOffRamp, error) {
-	err := ccipconfig.VerifyTypeAndVersion(offRampAddress, client, ccipconfig.EVM2EVMOffRamp)
-	if err != nil {
-		return nil, errors.Wrap(err, "Invalid offRamp contract")
-	}
-	return evm_2_evm_offramp.NewEVM2EVMOffRamp(offRampAddress, client)
-}
-
-func LoadCommitStore(commitStoreAddress common.Address, client client.Client) (*commit_store.CommitStore, error) {
-	err := ccipconfig.VerifyTypeAndVersion(commitStoreAddress, client, ccipconfig.CommitStore)
-	if err != nil {
-		return nil, errors.Wrap(err, "Invalid commitStore contract")
-	}
-	return commit_store.NewCommitStore(commitStoreAddress, client)
 }

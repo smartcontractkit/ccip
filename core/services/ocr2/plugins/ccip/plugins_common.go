@@ -3,47 +3,23 @@ package ccip
 import (
 	"math/big"
 	"sort"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
 
+	"github.com/smartcontractkit/chainlink/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/core/logger"
+	ccipconfig "github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
 	"github.com/smartcontractkit/chainlink/core/utils/mathutil"
 )
-
-const (
-	PERMISSIONLESS_EXECUTION_THRESHOLD = 7 * 24 * time.Hour
-	EVM_ADDRESS_LENGTH_BYTES           = 20
-	EVM_WORD_BYTES                     = 32
-	CALLDATA_GAS_PER_BYTE              = 16
-	PER_TOKEN_OVERHEAD_GAS             = 2_100 + // COLD_SLOAD_COST for first reading the pool
-		2_100 + // COLD_SLOAD_COST for pool to ensure allowed offramp calls it
-		2_100 + // COLD_SLOAD_COST for accessing pool balance slot
-		5_000 + // SSTORE_RESET_GAS for decreasing pool balance from non-zero to non-zero
-		2_100 + // COLD_SLOAD_COST for accessing receiver balance
-		20_000 + // SSTORE_SET_GAS for increasing receiver balance from zero to non-zero
-		2_100 // COLD_SLOAD_COST for obtanining price of token to use for aggregate token bucket
-	RATE_LIMITER_OVERHEAD_GAS = 2_100 + // COLD_SLOAD_COST for accessing token bucket
-		5_000 // SSTORE_RESET_GAS for updating & decreasing token bucket
-	EXTERNAL_CALL_OVERHEAD_GAS = 2600 // because the receiver will be untouched initially
-)
-
-type BatchBuilderInterface interface {
-	BuildBatch(
-		srcToDst map[common.Address]common.Address,
-		srcLogs []logpoller.Log,
-		executed map[uint64]struct{},
-		inflight []InflightInternalExecutionReport,
-		aggregateTokenLimit *big.Int,
-		tokenLimitPrices map[common.Address]*big.Int) ([]uint64, bool)
-}
 
 const (
 	MessageStateUntouched = iota
@@ -53,16 +29,38 @@ const (
 )
 
 const (
-	BatchGasLimit       = 5_000_000                 // TODO: think if a good value for this
-	GasLimitPerTx       = BatchGasLimit - 1_000_000 // Leave a buffer for overhead.
-	MaxPayloadLength    = 1000
-	MaxTokensPerMessage = 5
-	MaxGasPrice         = int64(200e9) // 200 gwei. TODO: probably want this to be some dynamic value, a multiplier of the current gas price.
+	BatchGasLimit = 5_000_000                 // TODO: think if a good value for this
+	GasLimitPerTx = BatchGasLimit - 1_000_000 // Leave a buffer for overhead.
+	MaxGasPrice   = int64(200e9)              // 200 gwei. TODO: probably want this to be some dynamic value, a multiplier of the current gas price.
 )
 
 var (
 	ErrCommitStoreIsDown = errors.New("commitStore is down")
 )
+
+func LoadOnRamp(onRampAddress common.Address, client client.Client) (*evm_2_evm_onramp.EVM2EVMOnRamp, error) {
+	err := ccipconfig.VerifyTypeAndVersion(onRampAddress, client, ccipconfig.EVM2EVMOnRamp)
+	if err != nil {
+		return nil, errors.Wrap(err, "Invalid onRamp contract")
+	}
+	return evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddress, client)
+}
+
+func LoadOffRamp(offRampAddress common.Address, client client.Client) (*evm_2_evm_offramp.EVM2EVMOffRamp, error) {
+	err := ccipconfig.VerifyTypeAndVersion(offRampAddress, client, ccipconfig.EVM2EVMOffRamp)
+	if err != nil {
+		return nil, errors.Wrap(err, "Invalid offRamp contract")
+	}
+	return evm_2_evm_offramp.NewEVM2EVMOffRamp(offRampAddress, client)
+}
+
+func LoadCommitStore(commitStoreAddress common.Address, client client.Client) (*commit_store.CommitStore, error) {
+	err := ccipconfig.VerifyTypeAndVersion(commitStoreAddress, client, ccipconfig.CommitStore)
+	if err != nil {
+		return nil, errors.Wrap(err, "Invalid commitStore contract")
+	}
+	return commit_store.NewCommitStore(commitStoreAddress, client)
+}
 
 func median(vals []*big.Int) *big.Int {
 	valsCopy := make([]*big.Int, len(vals))
@@ -71,12 +69,6 @@ func median(vals []*big.Int) *big.Int {
 		return valsCopy[i].Cmp(valsCopy[j]) == -1
 	})
 	return valsCopy[len(valsCopy)/2]
-}
-
-type InflightInternalExecutionReport struct {
-	createdAt   time.Time
-	seqNrs      []uint64
-	encMessages [][]byte
 }
 
 type MessageExecution struct {
@@ -185,25 +177,6 @@ func commitReport(dstLogPoller logpoller.LogPoller, onRamp common.Address, commi
 		}
 	}
 	return commit_store.ICommitStoreCommitReport{}, errors.Errorf("seq number not committed")
-}
-
-func getUnexpiredCommitReports(dstLogPoller logpoller.LogPoller, commitStore *commit_store.CommitStore) ([]commit_store.ICommitStoreCommitReport, error) {
-	logs, err := dstLogPoller.LogsCreatedAfter(ReportAccepted, commitStore.Address(), time.Now().Add(-PERMISSIONLESS_EXECUTION_THRESHOLD))
-	if err != nil {
-		return nil, err
-	}
-	var reports []commit_store.ICommitStoreCommitReport
-	for _, log := range logs {
-		reportAccepted, err := commitStore.ParseReportAccepted(types.Log{
-			Topics: log.GetTopics(),
-			Data:   log.Data,
-		})
-		if err != nil {
-			return nil, err
-		}
-		reports = append(reports, reportAccepted.Report)
-	}
-	return reports, nil
 }
 
 func buildExecution(
