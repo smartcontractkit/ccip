@@ -32,16 +32,30 @@ type DeploySettings struct {
 	DeployRouter        bool
 	DeployPriceRegistry bool
 
-	DeployRamp           bool
-	DeployCommitStore    bool
-	DeployGovernanceDapp bool
-	DeployPingPongDapp   bool
-	DeployedAt           uint64
+	DeployRamp         bool
+	DeployCommitStore  bool
+	DeployPingPongDapp bool
+	DeployedAt         uint64
 }
 
 type CustomerSettings struct {
 	CacheGoldFeeAddress  gethcommon.Address
 	CacheGoldFeeEnforcer gethcommon.Address
+}
+
+type Chain string
+
+const (
+	Sepolia        Chain = "ethereum-testnet-sepolia"
+	AvaxFuji       Chain = "avalanche-testnet-fuji"
+	OptimismGoerli Chain = "ethereum-testnet-goerli-optimism-1"
+	Goerli         Chain = "ethereum-testnet-goerli"
+)
+
+func GetAllChains() []Chain {
+	return []Chain{
+		Sepolia, AvaxFuji, OptimismGoerli, Goerli,
+	}
 }
 
 type Token string
@@ -53,18 +67,18 @@ const (
 	CACHEGOLD Token = "CACHE.gold"
 )
 
+func GetAllTokens() []Token {
+	return []Token{
+		LINK, WETH, WAVAX,
+	}
+}
+
 type TokenPoolType string
 
 const (
 	LockRelease TokenPoolType = "lockRelease"
 	BurnMint    TokenPoolType = "burnMint"
 )
-
-func GetAllTokens() []Token {
-	return []Token{
-		LINK, WETH, WAVAX,
-	}
-}
 
 type EVMChainConfig struct {
 	ChainId     uint64

@@ -8,11 +8,25 @@ import (
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
 )
 
-// Chains
-var Alpha_ChainConfigs = []rhea.EvmDeploymentConfig{
-	{ChainConfig: Alpha_AvaxFuji},
-	{ChainConfig: Alpha_OptimismGoerli},
-	{ChainConfig: Alpha_Sepolia},
+var AlphaChains = map[rhea.Chain]rhea.EvmDeploymentConfig{
+	rhea.AvaxFuji:       {ChainConfig: Alpha_AvaxFuji},
+	rhea.OptimismGoerli: {ChainConfig: Alpha_OptimismGoerli},
+	rhea.Sepolia:        {ChainConfig: Alpha_Sepolia},
+}
+
+var AlphaChainMapping = map[rhea.Chain]map[rhea.Chain]rhea.EvmDeploymentConfig{
+	rhea.Sepolia: {
+		rhea.AvaxFuji:       Alpha_SepoliaToAvaxFuji,
+		rhea.OptimismGoerli: Alpha_SepoliaToOptimismGoerli,
+	},
+	rhea.AvaxFuji: {
+		rhea.Sepolia:        Alpha_AvaxFujiToSepolia,
+		rhea.OptimismGoerli: Alpha_AvaxFujiToOptimismGoerli,
+	},
+	rhea.OptimismGoerli: {
+		rhea.Sepolia:  Alpha_OptimismGoerliToSepolia,
+		rhea.AvaxFuji: Alpha_OptimismGoerliToAvaxFuji,
+	},
 }
 
 var Alpha_OptimismGoerli = rhea.EVMChainConfig{
@@ -118,11 +132,10 @@ var Alpha_OptimismGoerliToAvaxFuji = rhea.EvmDeploymentConfig{
 		DeployRouter:        false,
 		DeployPriceRegistry: false,
 
-		DeployCommitStore:    false,
-		DeployRamp:           false,
-		DeployPingPongDapp:   false,
-		DeployGovernanceDapp: false,
-		DeployedAt:           6473732,
+		DeployCommitStore:  false,
+		DeployRamp:         false,
+		DeployPingPongDapp: false,
+		DeployedAt:         6473732,
 	},
 }
 
@@ -141,11 +154,10 @@ var Alpha_AvaxFujiToOptimismGoerli = rhea.EvmDeploymentConfig{
 		DeployRouter:        false,
 		DeployPriceRegistry: false,
 
-		DeployCommitStore:    false,
-		DeployRamp:           false,
-		DeployPingPongDapp:   false,
-		DeployGovernanceDapp: false,
-		DeployedAt:           19676473,
+		DeployCommitStore:  false,
+		DeployRamp:         false,
+		DeployPingPongDapp: false,
+		DeployedAt:         19676473,
 	},
 }
 
@@ -164,11 +176,10 @@ var Alpha_SepoliaToOptimismGoerli = rhea.EvmDeploymentConfig{
 		DeployRouter:        false,
 		DeployPriceRegistry: false,
 
-		DeployCommitStore:    false,
-		DeployRamp:           false,
-		DeployPingPongDapp:   false,
-		DeployGovernanceDapp: false,
-		DeployedAt:           3060752,
+		DeployCommitStore:  false,
+		DeployRamp:         false,
+		DeployPingPongDapp: false,
+		DeployedAt:         3060752,
 	},
 }
 
@@ -187,11 +198,10 @@ var Alpha_OptimismGoerliToSepolia = rhea.EvmDeploymentConfig{
 		DeployRouter:        false,
 		DeployPriceRegistry: false,
 
-		DeployCommitStore:    false,
-		DeployRamp:           false,
-		DeployPingPongDapp:   false,
-		DeployGovernanceDapp: false,
-		DeployedAt:           6510308,
+		DeployCommitStore:  false,
+		DeployRamp:         false,
+		DeployPingPongDapp: false,
+		DeployedAt:         6510308,
 	},
 }
 
@@ -210,11 +220,10 @@ var Alpha_SepoliaToAvaxFuji = rhea.EvmDeploymentConfig{
 		DeployRouter:        false,
 		DeployPriceRegistry: false,
 
-		DeployCommitStore:    false,
-		DeployRamp:           false,
-		DeployPingPongDapp:   false,
-		DeployGovernanceDapp: false,
-		DeployedAt:           3060823,
+		DeployCommitStore:  false,
+		DeployRamp:         false,
+		DeployPingPongDapp: false,
+		DeployedAt:         3060823,
 	},
 }
 
@@ -233,10 +242,9 @@ var Alpha_AvaxFujiToSepolia = rhea.EvmDeploymentConfig{
 		DeployRouter:        false,
 		DeployPriceRegistry: false,
 
-		DeployCommitStore:    false,
-		DeployRamp:           false,
-		DeployPingPongDapp:   false,
-		DeployGovernanceDapp: false,
-		DeployedAt:           19704118,
+		DeployCommitStore:  false,
+		DeployRamp:         false,
+		DeployPingPongDapp: false,
+		DeployedAt:         19704118,
 	},
 }
