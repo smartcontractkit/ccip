@@ -9,6 +9,7 @@ import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
 import {OCR2Base} from "./ocr/OCR2Base.sol";
 import {Internal} from "./models/Internal.sol";
 import {Pausable} from "../vendor/Pausable.sol";
+import {MerkleMultiProof} from "./MerkleMultiProof.sol";
 
 contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Base {
   // STATIC CONFIG
@@ -90,7 +91,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
     bytes32[] calldata proofs,
     uint256 proofFlagBits
   ) external view override returns (uint256 timestamp) {
-    bytes32 root = merkleRoot(hashedLeaves, proofs, proofFlagBits);
+    bytes32 root = MerkleMultiProof.merkleRoot(hashedLeaves, proofs, proofFlagBits);
     // Only return non-zero if present and blessed.
     if (s_roots[root] == 0 || !isBlessed(root)) {
       return uint256(0);
@@ -120,6 +121,12 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
     s_minSeqNr = report.interval.max + 1;
     s_roots[report.merkleRoot] = block.timestamp;
     emit ReportAccepted(report);
+  }
+
+  /// @notice returns a hash of the abi encoded address of this contract and the
+  /// supplied root.
+  function _hashCommitStoreWithRoot(bytes32 root) internal view returns (bytes32) {
+    return keccak256(abi.encode(address(this), root));
   }
 
   // ================================================================
@@ -152,65 +159,6 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
       ICommitStore.StaticConfig({chainId: i_chainId, sourceChainId: i_sourceChainId, onRamp: i_onRamp}),
       dynamicConfig
     );
-  }
-
-  // ================================================================
-  // |                       Merkle proof                           |
-  // ================================================================
-
-  /// @inheritdoc ICommitStore
-  function merkleRoot(
-    bytes32[] memory leaves,
-    bytes32[] memory proofs,
-    uint256 proofFlagBits
-  ) public pure override returns (bytes32) {
-    unchecked {
-      uint256 leavesLen = leaves.length;
-      // As of Solidity 0.6.5, overflow is not possible here because in-memory arrays are limited to
-      // a max length of 2**64-1. Two uint64 values will not overflow a uint256.
-      // See: https://blog.soliditylang.org/2020/04/06/memory-creation-overflow-bug/
-      // Underflow is possible if leaves and proofs are empty, resulting in totalHashes = 2**256-1
-      // This will be caught in the `require(totalHashes <= 256)` statement.
-      uint256 totalHashes = leavesLen + proofs.length - 1;
-      if (totalHashes == 0) {
-        return leaves[0];
-      }
-      if (totalHashes > 256) revert InvalidProof();
-      bytes32[] memory hashes = new bytes32[](totalHashes);
-      (uint256 leafPos, uint256 hashPos, uint256 proofPos) = (0, 0, 0);
-
-      for (uint256 i = 0; i < totalHashes; ++i) {
-        hashes[i] = _hashPair(
-          // Checks if the bit flag signals the use of a supplied proof or a leaf/previous hash.
-          ((proofFlagBits >> i) & uint256(1)) == 1
-            ? (leafPos < leavesLen ? leaves[leafPos++] : hashes[hashPos++]) // Use a leaf or a previously computed hash
-            : proofs[proofPos++], // Use a supplied proof.
-          // The second part of the hashed pair is never a proof as hashing two proofs would result in a
-          // hash that can already be computed offchain.
-          leafPos < leavesLen ? leaves[leafPos++] : hashes[hashPos++]
-        );
-      }
-      // Return the last hash.
-      return hashes[totalHashes - 1];
-    }
-  }
-
-  /// @notice returns a hash of the abi encoded address of this contract and the
-  /// supplied root.
-  function _hashCommitStoreWithRoot(bytes32 root) internal view returns (bytes32) {
-    return keccak256(abi.encode(address(this), root));
-  }
-
-  /// @notice Hashes two bytes32 objects. The order is taken into account,
-  /// using the lower value first.
-  function _hashPair(bytes32 a, bytes32 b) private pure returns (bytes32) {
-    return a < b ? _hashInternalNode(a, b) : _hashInternalNode(b, a);
-  }
-
-  /// @notice Hashes two bytes32 objects in their given order, prepended by the
-  /// INTERNAL_DOMAIN_SEPARATOR.
-  function _hashInternalNode(bytes32 left, bytes32 right) private pure returns (bytes32 hash) {
-    return keccak256(abi.encode(Internal.INTERNAL_DOMAIN_SEPARATOR, left, right));
   }
 
   // ================================================================

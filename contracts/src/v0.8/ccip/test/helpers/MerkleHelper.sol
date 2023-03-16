@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {Internal} from "../../models/Internal.sol";
+import {MerkleMultiProof} from "../../MerkleMultiProof.sol";
 
 contract MerkleHelper {
   /// @notice Generate a Merkle Root from a full set of leaves. When a tree is unbalanced
@@ -47,6 +47,6 @@ contract MerkleHelper {
   }
 
   function _hashInternalNode(bytes32 left, bytes32 right) private pure returns (bytes32 hash) {
-    return keccak256(abi.encode(Internal.INTERNAL_DOMAIN_SEPARATOR, left, right));
+    return keccak256(abi.encode(MerkleMultiProof.INTERNAL_DOMAIN_SEPARATOR, left, right));
   }
 }

@@ -35,15 +35,6 @@ contract MockCommitStore is ICommitStore {
   }
 
   /// @inheritdoc ICommitStore
-  function merkleRoot(
-    bytes32[] memory leaves,
-    bytes32[] memory,
-    uint256
-  ) public pure returns (bytes32) {
-    return leaves[0];
-  }
-
-  /// @inheritdoc ICommitStore
   function getMerkleRoot(bytes32) external pure returns (uint256) {
     return 1;
   }

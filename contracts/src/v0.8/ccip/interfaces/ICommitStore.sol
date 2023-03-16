@@ -5,7 +5,6 @@ import {Internal} from "../models/Internal.sol";
 
 interface ICommitStore {
   error InvalidInterval(Interval interval);
-  error InvalidProof();
   error InvalidRoot();
   error InvalidCommitStoreConfig();
   error BadAFNSignal();
@@ -57,40 +56,6 @@ interface ICommitStore {
     bytes32[] calldata proofs,
     uint256 proofFlagBits
   ) external returns (uint256 timestamp);
-
-  /// @notice Generates a Merkle Root based on the given leaves, proofs and proofFlagBits.
-  ///  This method can proof multiple leaves at the same time.
-  /// @param leaves The leaf hashes of the merkle tree.
-  /// @param proofs The hashes to be used instead of a leaf hash when the proofFlagBits
-  ///  indicates a proof should be used.
-  /// @param proofFlagBits A single uint256 of which each bit indicates whether a leaf or
-  ///  a proof needs to be used in a hash operation.
-  /// @dev the maximum number of hash operations it set to 256. Any input that would require
-  ///  more than 256 hashes to get to a root will revert.
-  /// @dev For given input `leaves` = [a,b,c] `proofs` = [D] and `proofFlagBits` = 5
-  ///     totalHashes = 3 + 1 - 1 = 3
-  ///  ** round 1 **
-  ///    proofFlagBits = (5 >> 0) & 1 = true
-  ///    hashes[0] = hashPair(a, b)
-  ///    (leafPos, hashPos, proofPos) = (2, 0, 0);
-  ///
-  ///  ** round 2 **
-  ///    proofFlagBits = (5 >> 1) & 1 = false
-  ///    hashes[1] = hashPair(D, c)
-  ///    (leafPos, hashPos, proofPos) = (3, 0, 1);
-  ///
-  ///  ** round 3 **
-  ///    proofFlagBits = (5 >> 2) & 1 = true
-  ///    hashes[2] = hashPair(hashed[0], hashes[1])
-  ///    (leafPos, hashPos, proofPos) = (3, 2, 1);
-  ///
-  ///    i = 3 and no longer < totalHashes. The algorithm is done
-  ///    return hashes[totalHashes - 1] = hashes[2]; the last hash we computed.
-  function merkleRoot(
-    bytes32[] memory leaves,
-    bytes32[] memory proofs,
-    uint256 proofFlagBits
-  ) external pure returns (bytes32);
 
   /// @notice Returns the timestamp of a potentially previously committed merkle root.
   /// If the root was never committed 0 will be returned.
