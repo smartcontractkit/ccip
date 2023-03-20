@@ -93,7 +93,7 @@ go-solidity-wrappers-ocr2vrf: pnpmdep abigen ## Recompiles solidity contracts an
 	sed -i '' 's/go:generate/go:generate_disabled/g' core/gethwrappers/ocr2vrf/go_generate.go
 
 .PHONY: generate
-generate: abigen ## Execute all go:generate commands.
+generate: abigen codecgen mockery ## Execute all go:generate commands.
 	go generate -x ./...
 
 .PHONY: testdb
@@ -113,7 +113,7 @@ presubmit: ## Format go files and imports.
 
 .PHONY: mockery
 mockery: $(mockery) ## Install mockery.
-	go install github.com/vektra/mockery/v2@v2.20.0
+	go install github.com/vektra/mockery/v2@v2.22.1
 
 .PHONY: codecgen
 codecgen: $(codecgen) ## Install codecgen

@@ -1,5 +1,5 @@
 golang 1.20.1
-mockery 2.20.0
+mockery 2.22.1
 nodejs 16.13.2
 postgres 13.3
 helm 3.10.3
@@ -7,4 +7,3 @@ github-cli 2.15.0
 zig 0.10.1
 golangci-lint 1.51.2
 shellspec 0.28.1
-codecgen 1.2.10

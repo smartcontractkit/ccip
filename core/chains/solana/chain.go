@@ -12,14 +12,13 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/pkg/errors"
 	"go.uber.org/multierr"
+	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana"
 	solanaclient "github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
 	soltxm "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
-
-	v2 "github.com/smartcontractkit/chainlink/core/config/v2"
 
 	"github.com/smartcontractkit/chainlink/core/chains/solana/monitor"
 	"github.com/smartcontractkit/chainlink/core/logger"
@@ -203,14 +202,6 @@ func (c *chain) Config() config.Config {
 	return c.cfg
 }
 
-func (c *chain) UpdateConfig(cfg *db.ChainCfg) {
-	if c.cfgImmutable {
-		c.lggr.Criticalw("TOML configuration cannot be updated", "err", v2.ErrUnsupported)
-		return
-	}
-	c.cfg.Update(*cfg)
-}
-
 func (c *chain) TxManager() solana.TxManager {
 	return c.txm
 }
@@ -316,13 +307,8 @@ func (c *chain) Ready() error {
 	)
 }
 
-func (c *chain) Healthy() error {
-	return multierr.Combine(
-		c.StartStopOnce.Healthy(),
-		c.txm.Healthy(),
-	)
-}
-
 func (c *chain) HealthReport() map[string]error {
-	return map[string]error{c.Name(): c.Healthy()}
+	report := map[string]error{c.Name(): c.StartStopOnce.Healthy()}
+	maps.Copy(report, c.txm.HealthReport())
+	return report
 }
