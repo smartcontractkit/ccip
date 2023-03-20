@@ -367,7 +367,7 @@ func (r *Router) CCIPSend(destChainId uint64, msg router.ClientEVM2AnyMessage, v
 	if valueForNative != nil {
 		opts.Value = valueForNative
 	}
-	opts.GasLimit = 50000000
+	opts.GasLimit = 500000
 	tx, err := r.Instance.CcipSend(opts, destChainId, msg)
 	if err != nil {
 		return nil, err

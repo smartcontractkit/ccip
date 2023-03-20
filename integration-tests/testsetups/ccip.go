@@ -364,7 +364,7 @@ func CCIPDefaultTestSetUp(
 		DestBalances:      make(map[string]*big.Int),
 		Context:           ctx,
 		CommonContractsWg: &sync.WaitGroup{},
-		Reports:           setUpArgs.Reporter.AddNewLane(fmt.Sprintf("%d->%ds", actions.NetworkA.ChainID, actions.NetworkB.ChainID)),
+		Reports:           setUpArgs.Reporter.AddNewLane(fmt.Sprintf("%d To %d", actions.NetworkA.ChainID, actions.NetworkB.ChainID)),
 	}
 	bidirectionalLane.ForwardLane = ccipLaneA2B
 
@@ -385,7 +385,7 @@ func CCIPDefaultTestSetUp(
 			TotalFee:          big.NewInt(0),
 			Context:           ctx,
 			CommonContractsWg: &sync.WaitGroup{},
-			Reports:           setUpArgs.Reporter.AddNewLane(fmt.Sprintf("%d->%d", actions.NetworkB.ChainID, actions.NetworkA.ChainID)),
+			Reports:           setUpArgs.Reporter.AddNewLane(fmt.Sprintf("%d To %d", actions.NetworkB.ChainID, actions.NetworkA.ChainID)),
 		}
 		bidirectionalLane.ReverseLane = ccipLaneB2A
 	}

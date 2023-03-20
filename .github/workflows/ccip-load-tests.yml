@@ -56,6 +56,11 @@ on:
         required: true
         default: 15
         type: number
+      slackMemberID:
+        description: Slack Member ID (Not your @)
+        required: true
+        default: U01A2B2C3D4
+        type: string
 
 # Only run 1 of this workflow at a time per PR
 concurrency:
@@ -145,6 +150,9 @@ jobs:
     env:
       CHAINLINK_COMMIT_SHA: ${{ inputs.chainlinkVersion }}
       CHAINLINK_ENV_USER: ${{ github.actor }}
+      SLACK_USER: ${{ inputs.slackMemberID }}
+      SLACK_API_KEY: ${{ secrets.QA_SLACK_API_KEY }}
+      SLACK_CHANNEL: ${{ secrets.QA_SLACK_CHANNEL }}
       SELECTED_NETWORKS: SIMULATED,${{ inputs.network1 }},${{ inputs.network2 }}
       EVM_KEYS: ${{ secrets.QA_EVM_KEYS }} # replace it with input parameter once debug log is updated to not print the key
       CCIP_TEST_DURATION: ${{ inputs.testDuration }}
