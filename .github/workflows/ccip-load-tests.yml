@@ -147,11 +147,12 @@ jobs:
       CHAINLINK_ENV_USER: ${{ github.actor }}
       SELECTED_NETWORKS: SIMULATED,${{ inputs.network1 }},${{ inputs.network2 }}
       EVM_KEYS: ${{ secrets.QA_EVM_KEYS }} # replace it with input parameter once debug log is updated to not print the key
-      LOAD_TEST_DURATION: ${{ inputs.testDuration }}
-      LOAD_TEST_CALLTIMEOUT: ${{ inputs.phase_time_out }}
-      LOAD_TEST_TPS: ${{ inputs.send_request_per_second }}
-      LOAD_TEST_MSG_TYPE: WithoutToken
-      TEST_CCIP_CHAINLINK_NODE_FUNDING: 1
+      CCIP_TEST_DURATION: ${{ inputs.testDuration }}
+      CCIP_PHASE_VALIDATION_TIMEOUT: ${{ inputs.phase_time_out }}
+      CCIP_LOAD_TEST_RPS: ${{ inputs.send_request_per_second }}
+      CCIP_MSG_TYPE: WithoutToken
+      CCIP_CHAINLINK_NODE_FUNDING: 1
+      CCIP_TESTS_ON_EXISTING_DEPLOYMENT: ${{ inputs.existing-deployment }}
       TEST_LOG_LEVEL: info
       REF_NAME: ${{ github.head_ref || github.ref_name }}
       ENV_JOB_IMAGE_BASE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-ccip-tests
@@ -199,7 +200,6 @@ jobs:
           fi
       - name: step summary
         shell: bash
-        id: loadtest
         env:
           EXISTING_DEPLOYMENT: ${{ inputs.existing-deployment }}
         run: |
@@ -208,15 +208,6 @@ jobs:
           echo "\`${{ env.INPUT_CHAINLINK_VERSION }}\`" >>$GITHUB_STEP_SUMMARY
           echo "### chainlink-tests image tag for this test run :ship:" >>$GITHUB_STEP_SUMMARY
           echo "\`${{ env.INPUT_CHAINLINK_TEST_VERSION }}\`" >>$GITHUB_STEP_SUMMARY
-          if [[ "${EXISTING_DEPLOYMENT}" == "true" ]]; then
-            echo "### Running  test for existing deployment :link:" >>$GITHUB_STEP_SUMMARY
-            echo "name=TestExistingDeploymentLoadCCIPParallelSendSameSenderReceiver" >>$GITHUB_OUTPUT
-            echo "TestExistingDeploymentLoadCCIPParallelSendSameSenderReceiver" >>$GITHUB_STEP_SUMMARY
-          else
-            echo "### Running test with contracts and jobs deployed from scratch :link:" >>$GITHUB_STEP_SUMMARY
-            echo "name=TestLoadCCIPParallelSendSameSenderReceiver" >>$GITHUB_OUTPUT
-            echo "TestLoadCCIPParallelSendSameSenderReceiver" >>$GITHUB_STEP_SUMMARY
-          fi
       - name: Run Tests
         uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@ce87f8986ca18336cc5015df75916c2ec0a7c4b3 # v2.1.2
         env:
@@ -226,7 +217,7 @@ jobs:
           TEST_KEEP_ENV_TTL: 5h
           TEST_REUSE_CCIP_CONTRACTS: ${{ inputs.existing-deployment }}
         with:
-          test_command_to_run: make test_need_operator_assets && cd ./integration-tests && go test -v -timeout 900h -count=1 -run ^${{ steps.loadtest.outputs.name }}$ ./load
+          test_command_to_run: make test_need_operator_assets && cd ./integration-tests && go test -v -timeout 900h -count=1 -run ^TestLoadCCIPParallelSendSameSenderReceiver$ ./load
           test_download_vendor_packages_command: make gomod
           cl_repo: ${{ env.INPUT_CHAINLINK_IMAGE }}
           cl_image_tag: ${{ env.INPUT_CHAINLINK_VERSION }}

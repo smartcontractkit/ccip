@@ -16,21 +16,17 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	envclient "github.com/smartcontractkit/chainlink-env/client"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver"
 	mockservercfg "github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver-cfg"
-
-	env_client "github.com/smartcontractkit/chainlink-env/client"
 
 	"github.com/smartcontractkit/chainlink-env/environment"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/chainlink"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/reorg"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
-	ctfUtils "github.com/smartcontractkit/chainlink-testing-framework/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/multierr"
-	"go.uber.org/zap/zapcore"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
@@ -44,6 +40,7 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts/ccip"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts/ccip/laneconfig"
+	"github.com/smartcontractkit/chainlink/integration-tests/testreporters"
 )
 
 const (
@@ -63,8 +60,6 @@ type CCIPTOMLEnv struct {
 }
 
 var (
-	UnusedFee = big.NewInt(0).Mul(big.NewInt(11), big.NewInt(1e18)) // for a msg with two tokens
-
 	//go:embed clconfig/ccip-default.txt
 	CLConfig           string
 	NetworkA, NetworkB = func() (blockchain.EVMNetwork, blockchain.EVMNetwork) {
@@ -91,10 +86,10 @@ var (
 		return ccipTOML
 	}
 
-	networkAName      = strings.ReplaceAll(strings.ToLower(NetworkA.Name), " ", "-")
-	networkBName      = strings.ReplaceAll(strings.ToLower(NetworkB.Name), " ", "-")
-	GethLabelNetworkA = fmt.Sprintf("%s-ethereum-geth", networkAName)
-	GethLabelNetworkB = fmt.Sprintf("%s-ethereum-geth", networkBName)
+	NetworkAName      = strings.ReplaceAll(strings.ToLower(NetworkA.Name), " ", "-")
+	NetworkBName      = strings.ReplaceAll(strings.ToLower(NetworkB.Name), " ", "-")
+	GethLabelNetworkA = fmt.Sprintf("%s-ethereum-geth", NetworkA.Name)
+	GethLabelNetworkB = fmt.Sprintf("%s-ethereum-geth", NetworkB.Name)
 )
 
 type CCIPCommon struct {
@@ -347,11 +342,11 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int, conf *laneconfig.L
 			return fmt.Errorf("error in waiting for router deployment %+v", err)
 		}
 	} else {
-		router, err := cd.NewRouter(ccipModule.Router.EthAddress)
+		r, err := cd.NewRouter(ccipModule.Router.EthAddress)
 		if err != nil {
 			return fmt.Errorf("getting new router contract shouldn't fail %+v", err)
 		}
-		ccipModule.Router = router
+		ccipModule.Router = r
 	}
 	if ccipModule.PriceRegistry == nil {
 		// we will update the price updates later based on source and dest PriceUpdates
@@ -649,7 +644,14 @@ func (sourceCCIP *SourceCCIPModule) BalanceAssertions(t *testing.T, prevBalances
 	return balAssertions
 }
 
-func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(txHash string, currentBlockOnSource uint64, timeout time.Duration) (uint64, [32]byte, error) {
+func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(
+	reqNo int64,
+	txHash string,
+	currentBlockOnSource uint64,
+	timeout time.Duration,
+	timeNow time.Time,
+	reports *testreporters.CCIPLaneStats,
+) (uint64, [32]byte, error) {
 	log.Info().Msg("Waiting for CCIPSendRequested event")
 	var seqNum uint64
 	var msgId [32]byte
@@ -658,11 +660,13 @@ func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(txHash string, 
 	defer ticker.Stop()
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
+
 	for {
 		select {
 		case <-ticker.C:
 			iterator, err := sourceCCIP.OnRamp.FilterCCIPSendRequested(currentBlockOnSource)
 			if err != nil {
+				reports.UpdatePhaseStats(reqNo, 0, testreporters.CCIPSendRe, time.Since(timeNow), testreporters.Failure)
 				return seqNum, msgId, fmt.Errorf("error %+v in filtering CCIPSendRequested event for tx %s", err, txHash)
 			}
 			for iterator.Next() {
@@ -670,10 +674,12 @@ func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(txHash string, 
 					sentmsg = iterator.Event.Message
 					seqNum = sentmsg.SequenceNumber
 					msgId = sentmsg.MessageId
+					reports.UpdatePhaseStats(reqNo, seqNum, testreporters.CCIPSendRe, time.Since(timeNow), testreporters.Success)
 					return seqNum, msgId, nil
 				}
 			}
 		case <-ctx.Done():
+			reports.UpdatePhaseStats(reqNo, 0, testreporters.CCIPSendRe, time.Since(timeNow), testreporters.Failure)
 			return seqNum, msgId, fmt.Errorf("CCIPSendRequested event is not found for tx %s", txHash)
 		}
 	}
@@ -684,15 +690,16 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 	tokenAndAmounts []router.ClientEVMTokenAmount,
 	data string,
 	feeToken common.Address,
-) (string, *big.Int, error) {
+) (string, time.Duration, *big.Int, error) {
 	receiverAddr, err := utils.ABIEncode(`[{"type":"address"}]`, receiver)
+	var d time.Duration
 	if err != nil {
-		return "", nil, fmt.Errorf("failed encoding the receiver address: %+v", err)
+		return "", d, nil, fmt.Errorf("failed encoding the receiver address: %+v", err)
 	}
 
 	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(100_000), false)
 	if err != nil {
-		return "", nil, fmt.Errorf("failed encoding the options field: %+v", err)
+		return "", d, nil, fmt.Errorf("failed encoding the options field: %+v", err)
 	}
 
 	// form the message for transfer
@@ -706,7 +713,7 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 	log.Info().Interface("ge msg details", msg).Msg("ccip message to be sent")
 	fee, err := sourceCCIP.Common.Router.GetFee(sourceCCIP.DestinationChainId, msg)
 	if err != nil {
-		return "", nil, fmt.Errorf("failed getting the fee: %+v", err)
+		return "", d, nil, fmt.Errorf("failed getting the fee: %+v", err)
 	}
 	log.Info().Int64("fee", fee.Int64()).Msg("calculated fee")
 
@@ -722,35 +729,36 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 		// Approve the fee amount
 		err = sourceCCIP.Common.FeeToken.Approve(sourceCCIP.Common.Router.Address(), fee)
 		if err != nil {
-			return "", nil, fmt.Errorf("failed approving the fee amount for ge router: %+v", err)
+			return "", d, nil, fmt.Errorf("failed approving the fee amount for ge router: %+v", err)
 		}
 		err = sourceCCIP.Common.ChainClient.WaitForEvents()
 		if err != nil {
-			return "", nil, fmt.Errorf("failed waiting for events: %+v", err)
+			return "", d, nil, fmt.Errorf("failed waiting for events: %+v", err)
 		}
 	}
 
 	var sendTx *types.Transaction
+	timeNow := time.Now()
 	// initiate the transfer
 	// if the token address is 0x0 it will use Native as fee token and the fee amount should be mentioned in bind.TransactOpts's value
 	if feeToken != common.HexToAddress("0x0") {
 		sendTx, err = sourceCCIP.Common.Router.CCIPSend(sourceCCIP.DestinationChainId, msg, nil)
 		if err != nil {
-			return "", nil, fmt.Errorf("failed initiating the transfer ccip-send: %+v", err)
+			return "", time.Since(timeNow), nil, fmt.Errorf("failed initiating the transfer ccip-send: %+v", err)
 		}
 	} else {
 		sendTx, err = sourceCCIP.Common.Router.CCIPSend(sourceCCIP.DestinationChainId, msg, fee)
 		if err != nil {
-			return "", nil, fmt.Errorf("failed initiating the transfer ccip-send: %+v", err)
+			return "", time.Since(timeNow), nil, fmt.Errorf("failed initiating the transfer ccip-send: %+v", err)
 		}
 	}
 
 	log.Info().Str("Send token transaction", sendTx.Hash().String()).Msg("Sending token")
 	err = sourceCCIP.Common.ChainClient.WaitForEvents()
 	if err != nil {
-		return "", nil, fmt.Errorf("failed waiting for events: %+v", err)
+		return "", time.Since(timeNow), nil, fmt.Errorf("failed waiting for events: %+v", err)
 	}
-	return sendTx.Hash().Hex(), fee, nil
+	return sendTx.Hash().Hex(), time.Since(timeNow), fee, nil
 }
 
 func DefaultSourceCCIPModule(chainClient blockchain.EVMClient, destChain uint64, transferAmount []*big.Int, ccipCommon *CCIPCommon) (*SourceCCIPModule, error) {
@@ -1075,7 +1083,15 @@ func (destCCIP *DestCCIPModule) BalanceAssertions(
 	return balAssertions
 }
 
-func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(seqNum uint64, msgID [32]byte, currentBlockOnDest uint64, timeout time.Duration) error {
+func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(
+	reqNo int64,
+	seqNum uint64,
+	msgID [32]byte,
+	currentBlockOnDest uint64,
+	timeout time.Duration,
+	timeNow time.Time,
+	reports *testreporters.CCIPLaneStats,
+) error {
 	log.Info().Int64("seqNum", int64(seqNum)).
 		Msgf("Waiting for ExecutionStateChanged event for lane %d-->%d",
 			destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
@@ -1087,26 +1103,36 @@ func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(seqNum uint64, 
 		case <-ticker.C:
 			iterator, err := destCCIP.OffRamp.FilterExecutionStateChanged([]uint64{seqNum}, [][32]byte{msgID}, currentBlockOnDest)
 			if err != nil {
+				reports.UpdatePhaseStats(reqNo, seqNum, testreporters.ExecStateChanged, time.Since(timeNow), testreporters.Failure)
 				return fmt.Errorf("filtering event ExecutionStateChanged returned error %+v seqNum %v for lane %d-->%d",
 					err, seqNum, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
 			}
 			for iterator.Next() {
 				switch ccipPlugin.MessageExecutionState(iterator.Event.State) {
 				case ccipPlugin.Success:
+					reports.UpdatePhaseStats(reqNo, seqNum, testreporters.ExecStateChanged, time.Since(timeNow), testreporters.Success)
 					return nil
 				default:
+					reports.UpdatePhaseStats(reqNo, seqNum, testreporters.ExecStateChanged, time.Since(timeNow), testreporters.Failure)
 					return fmt.Errorf("ExecutionStateChanged event returned failure for seq num %v for lane %d-->%d",
 						seqNum, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
 				}
 			}
 		case <-ctx.Done():
+			reports.UpdatePhaseStats(reqNo, seqNum, testreporters.ExecStateChanged, time.Since(timeNow), testreporters.Failure)
 			return fmt.Errorf("ExecutionStateChanged event not found for seq num %v for lane %d-->%d",
 				seqNum, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
 		}
 	}
 }
 
-func (destCCIP *DestCCIPModule) AssertEventReportAccepted(seqNum, currentBlockOnDest uint64, timeout time.Duration) error {
+func (destCCIP *DestCCIPModule) AssertEventReportAccepted(
+	reqNo int64,
+	seqNum, currentBlockOnDest uint64,
+	timeout time.Duration,
+	timeNow time.Time,
+	reports *testreporters.CCIPLaneStats,
+) error {
 	log.Info().Int64("seqNum", int64(seqNum)).Msgf("Waiting for ReportAccepted event lane %d-->%d", destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -1116,23 +1142,32 @@ func (destCCIP *DestCCIPModule) AssertEventReportAccepted(seqNum, currentBlockOn
 		case <-ticker.C:
 			it, err := destCCIP.CommitStore.FilterReportAccepted(currentBlockOnDest)
 			if err != nil {
+				reports.UpdatePhaseStats(reqNo, seqNum, testreporters.Commit, time.Since(timeNow), testreporters.Failure)
 				return fmt.Errorf("error %+v in filtering by ReportAccepted event for seq num %d lane %d-->%d",
 					err, seqNum, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
 			}
 			for it.Next() {
 				in := it.Event.Report.Interval
 				if in.Max >= seqNum && in.Min <= seqNum {
+					reports.UpdatePhaseStats(reqNo, seqNum, testreporters.Commit, time.Since(timeNow), testreporters.Success)
 					return nil
 				}
 			}
 		case <-ctx.Done():
+			reports.UpdatePhaseStats(reqNo, seqNum, testreporters.Commit, time.Since(timeNow), testreporters.Failure)
 			return fmt.Errorf("ReportAccepted is not found for seq num %d lane %d-->%d",
 				seqNum, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
 		}
 	}
 }
 
-func (destCCIP *DestCCIPModule) AssertSeqNumberExecuted(seqNumberBefore uint64, timeout time.Duration) error {
+func (destCCIP *DestCCIPModule) AssertSeqNumberExecuted(
+	reqNo int64,
+	seqNumberBefore uint64,
+	timeout time.Duration,
+	timeNow time.Time,
+	reports *testreporters.CCIPLaneStats,
+) error {
 	log.Info().Int64("seqNum", int64(seqNumberBefore)).
 		Msgf("Waiting to be executed lane %d-->%d", destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -1143,13 +1178,16 @@ func (destCCIP *DestCCIPModule) AssertSeqNumberExecuted(seqNumberBefore uint64, 
 		case <-ticker.C:
 			seqNumberAfter, err := destCCIP.CommitStore.GetNextSeqNumber()
 			if err != nil {
+				reports.UpdatePhaseStats(reqNo, seqNumberBefore, testreporters.InCreaseSeq, time.Since(timeNow), testreporters.Failure)
 				return fmt.Errorf("error %+v in GetNextExpectedSeqNumber by commitStore for seqNum %d lane %d-->%d",
 					err, seqNumberBefore+1, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
 			}
 			if seqNumberAfter > seqNumberBefore {
+				reports.UpdatePhaseStats(reqNo, seqNumberBefore, testreporters.InCreaseSeq, time.Since(timeNow), testreporters.Success)
 				return nil
 			}
 		case <-ctx.Done():
+			reports.UpdatePhaseStats(reqNo, seqNumberBefore, testreporters.InCreaseSeq, time.Since(timeNow), testreporters.Failure)
 			return fmt.Errorf("sequence number is not increased for seq num %d lane %d-->%d",
 				seqNumberBefore, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
 		}
@@ -1169,8 +1207,14 @@ func DefaultDestinationCCIPModule(chainClient blockchain.EVMClient, sourceChain 
 	return destCCIP, nil
 }
 
+type CCIPRequest struct {
+	reqNo                   int64
+	txHash                  string
+	txConfirmationTimestamp time.Time
+}
+
 type CCIPLane struct {
-	t                       *testing.T
+	Test                    *testing.T
 	SourceNetworkName       string
 	DestNetworkName         string
 	SourceChain             blockchain.EVMClient
@@ -1179,15 +1223,16 @@ type CCIPLane struct {
 	Dest                    *DestCCIPModule
 	TestEnv                 *CCIPTestEnv
 	NumberOfReq             int
+	Reports                 *testreporters.CCIPLaneStats
 	SourceBalances          map[string]*big.Int
 	DestBalances            map[string]*big.Int
 	StartBlockOnSource      uint64
 	StartBlockOnDestination uint64
-	SentReqHashes           []string
+	SentReqs                map[int64]CCIPRequest
 	TotalFee                *big.Int // total fee for all the requests. Used for balance validation.
 	ValidationTimeout       time.Duration
-	context                 context.Context
-	commonContractsWg       *sync.WaitGroup
+	Context                 context.Context
+	CommonContractsWg       *sync.WaitGroup
 }
 
 func (lane *CCIPLane) WriteLaneConfig() error {
@@ -1244,29 +1289,28 @@ func (lane *CCIPLane) WriteLaneConfig() error {
 			},
 		},
 	}
-	return laneconfig.UpdateLane(l1, l2, fmt.Sprintf("./tmp_%s.json", lane.t.Name()))
+	return laneconfig.UpdateLane(l1, l2, fmt.Sprintf("./tmp_%s.json", lane.Test.Name()))
 }
 
 func (lane *CCIPLane) RecordStateBeforeTransfer() {
 	var err error
 	// collect the balance assert.ment to verify balances after transfer
-	lane.SourceBalances, err = testhelpers.GetBalances(lane.Source.CollectBalanceRequirements(lane.t))
-	require.NoError(lane.t, err, "fetching source balance")
-	lane.DestBalances, err = testhelpers.GetBalances(lane.Dest.CollectBalanceRequirements(lane.t))
-	require.NoError(lane.t, err, "fetching dest balance")
+	lane.SourceBalances, err = testhelpers.GetBalances(lane.Source.CollectBalanceRequirements(lane.Test))
+	require.NoError(lane.Test, err, "fetching source balance")
+	lane.DestBalances, err = testhelpers.GetBalances(lane.Dest.CollectBalanceRequirements(lane.Test))
+	require.NoError(lane.Test, err, "fetching dest balance")
 
 	// save the current block numbers to use in various filter log requests
 	lane.StartBlockOnSource, err = lane.Source.Common.ChainClient.LatestBlockNumber(context.Background())
-	require.NoError(lane.t, err, "Getting current block should be successful in source chain")
+	require.NoError(lane.Test, err, "Getting current block should be successful in source chain")
 	lane.StartBlockOnDestination, err = lane.Dest.Common.ChainClient.LatestBlockNumber(context.Background())
-	require.NoError(lane.t, err, "Getting current block should be successful in dest chain")
+	require.NoError(lane.Test, err, "Getting current block should be successful in dest chain")
 	lane.TotalFee = big.NewInt(0)
 	lane.NumberOfReq = 0
-	lane.SentReqHashes = []string{}
+	lane.SentReqs = make(map[int64]CCIPRequest)
 }
 
-func (lane *CCIPLane) SendRequests(noOfRequests int) ([]string, error) {
-	lane.NumberOfReq += noOfRequests
+func (lane *CCIPLane) SendRequests(noOfRequests int) (map[int64]CCIPRequest, error) {
 	var tokenAndAmounts []router.ClientEVMTokenAmount
 	for i, token := range lane.Source.Common.BridgeTokens {
 		tokenAndAmounts = append(tokenAndAmounts, router.ClientEVMTokenAmount{
@@ -1286,55 +1330,67 @@ func (lane *CCIPLane) SendRequests(noOfRequests int) ([]string, error) {
 		return nil, fmt.Errorf("could not wait for events: %+v", err)
 	}
 
-	var txs []string
+	txMap := make(map[int64]CCIPRequest)
 	for i := 1; i <= noOfRequests; i++ {
-		txHash, fee, err := lane.Source.SendRequest(
+		txHash, txConfirmationDur, fee, err := lane.Source.SendRequest(
 			lane.Dest.ReceiverDapp.EthAddress,
 			tokenAndAmounts,
 			fmt.Sprintf("msg %d", i),
 			common.HexToAddress(lane.Source.Common.FeeToken.Address()),
 		)
 		if err != nil {
+			lane.Reports.UpdatePhaseStats(int64(lane.NumberOfReq+i), 0,
+				testreporters.TX, txConfirmationDur, testreporters.Failure)
 			return nil, fmt.Errorf("could not send request: %+v", err)
 		}
-		txs = append(txs, txHash)
-		lane.SentReqHashes = append(lane.SentReqHashes, txHash)
+		txMap[int64(lane.NumberOfReq+i)] = CCIPRequest{
+			txHash:                  txHash,
+			txConfirmationTimestamp: time.Now(),
+		}
+		lane.SentReqs[int64(lane.NumberOfReq+i)] = txMap[int64(lane.NumberOfReq+i)]
+		lane.Reports.UpdatePhaseStats(int64(lane.NumberOfReq+i), 0,
+			testreporters.TX, txConfirmationDur, testreporters.Success)
 		lane.TotalFee = bigmath.Add(lane.TotalFee, fee)
 	}
-	return txs, nil
+	lane.NumberOfReq += noOfRequests
+
+	return txMap, nil
 }
 
 func (lane *CCIPLane) ValidateRequests() {
-	for _, txHash := range lane.SentReqHashes {
-		require.NoError(lane.t, lane.ValidateRequestByTxHash(txHash), "validating request events by tx hash")
+	for i, tx := range lane.SentReqs {
+		require.NoError(lane.Test, lane.ValidateRequestByTxHash(tx.txHash, tx.txConfirmationTimestamp, int64(i)),
+			"validating request events by tx hash")
 	}
 	// verify the fee amount is deducted from sender, added to receiver token balances and
 	// unused fee is returned to receiver fee token account
-	AssertBalances(lane.t, lane.Source.BalanceAssertions(lane.t, lane.SourceBalances, int64(lane.NumberOfReq), lane.TotalFee))
-	AssertBalances(lane.t, lane.Dest.BalanceAssertions(lane.t, lane.DestBalances, lane.Source.TransferAmount, int64(lane.NumberOfReq)))
+	AssertBalances(lane.Test, lane.Source.BalanceAssertions(lane.Test, lane.SourceBalances, int64(lane.NumberOfReq), lane.TotalFee))
+	AssertBalances(lane.Test, lane.Dest.BalanceAssertions(lane.Test, lane.DestBalances, lane.Source.TransferAmount, int64(lane.NumberOfReq)))
 }
 
-func (lane *CCIPLane) ValidateRequestByTxHash(txHash string) error {
+func (lane *CCIPLane) ValidateRequestByTxHash(txHash string, txConfirmattion time.Time, reqNo int64) error {
 	// Verify if
 	// - CCIPSendRequested Event log generated,
 	// - NextSeqNumber from commitStore got increased
-	seqNumber, msgId, err := lane.Source.AssertEventCCIPSendRequested(txHash, lane.StartBlockOnSource, lane.ValidationTimeout)
+	seqNumber, msgId, err := lane.Source.AssertEventCCIPSendRequested(
+		reqNo, txHash, lane.StartBlockOnSource, lane.ValidationTimeout, txConfirmattion, lane.Reports)
 	if err != nil {
 		return fmt.Errorf("could not validate CCIPSendRequested event: %+v", err)
 	}
-	err = lane.Dest.AssertSeqNumberExecuted(seqNumber, lane.ValidationTimeout)
+
+	err = lane.Dest.AssertSeqNumberExecuted(reqNo, seqNumber, lane.ValidationTimeout, time.Now(), lane.Reports)
 	if err != nil {
 		return fmt.Errorf("could not validate seq number increase at commit store: %+v", err)
 	}
 
 	// Verify whether commitStore has accepted the report
-	err = lane.Dest.AssertEventReportAccepted(seqNumber, lane.StartBlockOnDestination, lane.ValidationTimeout)
+	err = lane.Dest.AssertEventReportAccepted(reqNo, seqNumber, lane.StartBlockOnDestination, lane.ValidationTimeout, time.Now(), lane.Reports)
 	if err != nil {
 		return fmt.Errorf("could not validate ReportAccepted event: %+v", err)
 	}
 
 	// Verify whether the execution state is changed and the transfer is successful
-	err = lane.Dest.AssertEventExecutionStateChanged(seqNumber, msgId, lane.StartBlockOnDestination, lane.ValidationTimeout)
+	err = lane.Dest.AssertEventExecutionStateChanged(reqNo, seqNumber, msgId, lane.StartBlockOnDestination, lane.ValidationTimeout, time.Now(), lane.Reports)
 	if err != nil {
 		return fmt.Errorf("could not validate ExecutionStateChanged event: %+v", err)
 	}
@@ -1362,13 +1418,15 @@ func (lane *CCIPLane) SoakRun(interval, duration time.Duration) (int, int) {
 				Msgf("Token transfer with for lane %s --> %s", lane.SourceNetworkName, lane.DestNetworkName)
 			txs, err := lane.SendRequests(1)
 			if err == nil {
-				wg.Add(1)
-				go func(txHash string) {
-					defer wg.Done()
-					if lane.ValidateRequestByTxHash(txHash) == nil {
-						reqSuccess++
-					}
-				}(txs[0])
+				for reqNo, req := range txs {
+					wg.Add(1)
+					go func(txHash string, reqNo int64, txConfirmationTime time.Time) {
+						defer wg.Done()
+						if lane.ValidateRequestByTxHash(txHash, txConfirmationTime, reqNo) == nil {
+							reqSuccess++
+						}
+					}(req.txHash, reqNo, req.txConfirmationTimestamp)
+				}
 			}
 		case <-ctx.Done():
 			log.Warn().
@@ -1398,11 +1456,11 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	destChainClient := lane.DestChain
 
 	if sourceCommon == nil {
-		sourceCommon = DefaultCCIPModule(lane.context, sourceChainClient)
+		sourceCommon = DefaultCCIPModule(lane.Context, sourceChainClient)
 	}
 
 	if destCommon == nil {
-		destCommon = DefaultCCIPModule(lane.context, destChainClient)
+		destCommon = DefaultCCIPModule(lane.Context, destChainClient)
 	}
 
 	lane.Source, err = DefaultSourceCCIPModule(sourceChainClient, destChainClient.GetChainID().Uint64(), transferAmounts, sourceCommon)
@@ -1452,7 +1510,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		return errors.WithStack(err)
 	}
 	// deploy all destination contracts
-	err = lane.Dest.DeployContracts(*lane.Source, lane.commonContractsWg, destConf, reuse)
+	err = lane.Dest.DeployContracts(*lane.Source, lane.CommonContractsWg, destConf, reuse)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -1468,7 +1526,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	}
 
 	// wait for the CL nodes to be ready before moving ahead with job creation
-	<-env.clNodeWithKeyReady
+	<-env.CLNodeWithKeyReady
 	clNodesWithKeys := env.CLNodesWithKeys
 	mockServer := env.MockServer
 	// set up ocr2 jobs
@@ -1505,7 +1563,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	}
 
 	err = CreateOCRJobsForCCIP(
-		lane.context,
+		lane.Context,
 		bootstrapCommit, bootstrapExec, commitNodes, execNodes,
 		lane.Source.OnRamp.EthAddress,
 		lane.Dest.CommitStore.EthAddress,
@@ -1752,7 +1810,7 @@ type CCIPTestEnv struct {
 	SourceChainClient        blockchain.EVMClient
 	DestChainClient          blockchain.EVMClient
 	K8Env                    *environment.Environment
-	clNodeWithKeyReady       chan struct{} // denotes if the chainlink nodes are deployed, keys are created and ready to be used for job creation
+	CLNodeWithKeyReady       chan struct{} // denotes if the chainlink nodes are deployed, keys are created and ready to be used for job creation
 }
 
 func (c *CCIPTestEnv) ChaosLabel(t *testing.T) {
@@ -1876,9 +1934,6 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 // 1. two simulated geth network in non-dev mode
 // 2. mockserver ( to set mock price feed details)
 // 3. chainlink nodes
-// The deployment of chainlink nodes and mockserver are done in a go routine and the corresponding
-// WaitGroup is returned. To proceed forward with the tests you need to wait for the WaitGroup returned.
-// For Example refer to CCIPDefaultTestSetUp function
 func DeployEnvironments(
 	t *testing.T,
 	envconfig *environment.Config,
@@ -1963,10 +2018,10 @@ func DeployEnvironments(
 		var internalWsURLs, internalHttpURLs []string
 		for i := 0; i < numOfTxNodes; i++ {
 			podName := fmt.Sprintf("%s-ethereum-geth:%d", networkName, i)
-			txNodeInternalWs, err := testEnvironment.Fwd.FindPort(podName, "geth", "ws-rpc").As(env_client.RemoteConnection, env_client.WS)
+			txNodeInternalWs, err := testEnvironment.Fwd.FindPort(podName, "geth", "ws-rpc").As(envclient.RemoteConnection, envclient.WS)
 			require.NoError(t, err, "Error finding WS ports")
 			internalWsURLs = append(internalWsURLs, txNodeInternalWs)
-			txNodeInternalHttp, err := testEnvironment.Fwd.FindPort(podName, "geth", "http-rpc").As(env_client.RemoteConnection, env_client.HTTP)
+			txNodeInternalHttp, err := testEnvironment.Fwd.FindPort(podName, "geth", "http-rpc").As(envclient.RemoteConnection, envclient.HTTP)
 			require.NoError(t, err, "Error finding HTTP ports")
 			internalHttpURLs = append(internalHttpURLs, txNodeInternalHttp)
 		}
@@ -2027,241 +2082,4 @@ func GetterForLinkToken(t *testing.T, token *ccip.LinkToken, addr string) func(_
 		assert.NoError(t, err)
 		return balance
 	}
-}
-
-// CCIPDefaultTestSetUp sets up CCIP Lanes as a pre-condition for ccip tests.
-// if configureCLNode is set as true, it :
-// 1. Deploys K8 env with CL nodes (and simulated geth if NetworkA and NetworkB are simulated).
-// 2. Deploys (Reuses) all CCIP contracts for source and destination.
-// 3. Creates CCIP jobs on CL node.
-// 4. Configures CCIP OCR2 contracts.
-//
-// if configureCLNode is set as false, it assumes:
-// 1. contracts are already deployed on live networks
-// 2. CL nodes are set up and configured with existing contracts
-// 3. No k8 env deployment is needed
-// It reuses already deployed contracts from the addresses provided in ../contracts/ccip/laneconfig/contracts.json
-//
-// If bidirectional is true it sets up two-way lanes between NetworkA and NetworkB. Same CL nodes are used for both the lanes.
-// If bidirectional is false only one way lane is set up.
-//
-// Returns -
-// 1. CCIPLane for NetworkA --> NetworkB
-// 2. If bidirectional is true, CCIPLane for NetworkB --> NetworkA
-// 3. If configureCLNode is true, the tearDown func to call when environment needs to be destroyed
-func CCIPDefaultTestSetUp(
-	t *testing.T,
-	envName string,
-	clProps map[string]interface{},
-	transferAmounts []*big.Int,
-	numOfCommitNodes int,
-	commitAndExecOnSameDON, bidirectional, configureCLNode bool,
-) (*CCIPLane, *CCIPLane, func()) {
-	parent, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	var allErrors, err error
-	setUpFuncs, ctx := errgroup.WithContext(parent)
-	var ccipEnv *CCIPTestEnv
-	var k8Env *environment.Environment
-	// read the TTL duration value from env var
-	ttlDuration := os.Getenv("KEEP_ENV_TTL")
-	keepEnvFor := time.Minute * 20
-	if ttlDuration != "" {
-		keepEnvFor, err = time.ParseDuration(ttlDuration)
-		require.NoError(t, err, "error parsing KEEP_ENV_TTL")
-	}
-	namespace := strings.ToLower(fmt.Sprintf("%s-%s-%s", envName, networkAName, networkBName))
-	if configureCLNode {
-		// deploy the env if configureCLNode is true
-		ccipEnv = DeployEnvironments(
-			t,
-			&environment.Config{
-				TTL:             keepEnvFor,
-				NamespacePrefix: namespace,
-				Test:            t,
-			}, clProps)
-		k8Env = ccipEnv.K8Env
-		if ccipEnv.K8Env.WillUseRemoteRunner() {
-			return nil, nil, nil
-		}
-	} else {
-		// if configureCLNode is false, use a placeholder env to create remote runner
-		k8Env = environment.New(
-			&environment.Config{
-				TTL:             keepEnvFor,
-				NamespacePrefix: namespace,
-				Test:            t,
-			})
-		err = k8Env.Run()
-		require.NoErrorf(t, err, "error creating environment remote runner %s", k8Env.Cfg.Namespace)
-		if k8Env.WillUseRemoteRunner() {
-			return nil, nil, nil
-		}
-	}
-
-	sourceChainClientA2B, err := blockchain.NewEVMClient(NetworkA, k8Env)
-	require.NoError(t, err, "Connecting to blockchain nodes shouldn't fail")
-
-	destChainClientA2B, err := blockchain.NewEVMClient(NetworkB, k8Env)
-	require.NoError(t, err, "Connecting to blockchain nodes shouldn't fail")
-
-	// For the reverse lane another set of clients(sourceChainClient,destChainClient)
-	// are required with new header subscriptions(otherwise transactions
-	// on one lane will keep on waiting for transactions on other lane for the same network)
-	// Currently for simulated network clients(from same network) created with NewEVMClient does not sync nonce
-	// ConcurrentEVMClient is a work-around for that.
-	sourceChainClientB2A, err := blockchain.ConcurrentEVMClient(NetworkB, k8Env, destChainClientA2B)
-	require.NoError(t, err, "Connecting to blockchain nodes shouldn't fail")
-
-	destChainClientB2A, err := blockchain.ConcurrentEVMClient(NetworkA, k8Env, sourceChainClientA2B)
-	require.NoError(t, err, "Connecting to blockchain nodes shouldn't fail")
-
-	setUpFuncs.Go(func() error {
-		if !configureCLNode {
-			return nil
-		}
-
-		// if CCIP_CHAINLINK_NODE_FUNDING env variable is provided, use that value to fund the CL nodes
-		// else use the default value of 1 ETH
-		fundingAmount := big.NewFloat(1)
-		if fundingAmountStr := os.Getenv("CCIP_CHAINLINK_NODE_FUNDING"); fundingAmountStr != "" {
-			fundingAmount, _ = big.NewFloat(0).SetString(fundingAmountStr)
-			if fundingAmount == nil {
-				return errors.WithStack(fmt.Errorf("invalid CCIP_CHAINLINK_NODE_FUNDING env variable value: %s", fundingAmountStr))
-			}
-		}
-		err = ccipEnv.SetUpNodesAndKeys(ctx, fundingAmount, sourceChainClientA2B, destChainClientA2B)
-		if err != nil {
-			allErrors = multierr.Append(allErrors, fmt.Errorf("setting up nodes and keys shouldn't fail; err -  %+v", err))
-		} else {
-			// creates the channel to denote job creation for the lanes can be started
-			ccipEnv.clNodeWithKeyReady = make(chan struct{})
-			// sends two values to the channel if bidirectional is true
-			ccipEnv.clNodeWithKeyReady <- struct{}{}
-			if bidirectional {
-				ccipEnv.clNodeWithKeyReady <- struct{}{}
-			}
-		}
-		return err
-	})
-
-	ccipLaneA2B := &CCIPLane{
-		t:                 t,
-		TestEnv:           ccipEnv,
-		SourceChain:       sourceChainClientA2B,
-		DestChain:         destChainClientA2B,
-		SourceNetworkName: networkAName,
-		DestNetworkName:   networkBName,
-		ValidationTimeout: 2 * time.Minute,
-		SentReqHashes:     []string{},
-		TotalFee:          big.NewInt(0),
-		SourceBalances:    make(map[string]*big.Int),
-		DestBalances:      make(map[string]*big.Int),
-		context:           ctx,
-		commonContractsWg: &sync.WaitGroup{},
-	}
-
-	var ccipLaneB2A *CCIPLane
-
-	if bidirectional {
-		ccipLaneB2A = &CCIPLane{
-			t:                 t,
-			TestEnv:           ccipEnv,
-			SourceNetworkName: networkBName,
-			DestNetworkName:   networkAName,
-			SourceChain:       sourceChainClientB2A,
-			DestChain:         destChainClientB2A,
-			ValidationTimeout: 2 * time.Minute,
-			SourceBalances:    make(map[string]*big.Int),
-			DestBalances:      make(map[string]*big.Int),
-			SentReqHashes:     []string{},
-			TotalFee:          big.NewInt(0),
-			context:           ctx,
-			commonContractsWg: &sync.WaitGroup{},
-		}
-	}
-
-	ccipLaneA2B.commonContractsWg.Add(1)
-	setUpFuncs.Go(func() error {
-		log.Info().Msg("Setting up lane A to B")
-		err := ccipLaneA2B.DeployNewCCIPLane(numOfCommitNodes, commitAndExecOnSameDON, nil, nil,
-			transferAmounts, true, configureCLNode)
-		if err != nil {
-			allErrors = multierr.Append(allErrors, fmt.Errorf("deploying lane A to B; err - %+v", err))
-		}
-		return err
-	})
-
-	if ccipLaneB2A != nil {
-		ccipLaneB2A.commonContractsWg.Add(1)
-	}
-
-	setUpFuncs.Go(func() error {
-		if bidirectional {
-			ccipLaneA2B.commonContractsWg.Wait()
-			srcCommon := ccipLaneA2B.Dest.Common.CopyAddresses(ccipLaneB2A.context, ccipLaneB2A.SourceChain)
-			destCommon := ccipLaneA2B.Source.Common.CopyAddresses(ccipLaneB2A.context, ccipLaneB2A.DestChain)
-			log.Info().Msg("Setting up lane B to A")
-			err := ccipLaneB2A.DeployNewCCIPLane(numOfCommitNodes, commitAndExecOnSameDON, srcCommon, destCommon,
-				transferAmounts, false, configureCLNode)
-			if err != nil {
-				allErrors = multierr.Append(allErrors, fmt.Errorf("deploying lane B to A; err -  %+v", err))
-			}
-			return err
-		}
-		return nil
-	})
-
-	tearDown := func() {
-		if configureCLNode {
-			err := TeardownSuite(t, ccipEnv.K8Env, ctfUtils.ProjectRoot, ccipEnv.CLNodes, nil,
-				zapcore.ErrorLevel, ccipLaneA2B.SourceChain, ccipLaneA2B.DestChain)
-			require.NoError(t, err, "Environment teardown shouldn't fail")
-		}
-	}
-
-	errs := make(chan error, 1)
-	go func() {
-		errs <- setUpFuncs.Wait()
-	}()
-
-	// wait for either context to get cancelled or all the error-groups to finish execution
-	for {
-		select {
-		case <-ctx.Done():
-			// if the context is cancelled it means there has been some error
-			// allErrors helps to print a stacktrace
-			require.NoError(t, allErrors)
-			return ccipLaneA2B, ccipLaneB2A, tearDown
-		case err := <-errs:
-			// check if there has been any error while waiting for the error groups
-			// to finish execution
-			require.NoError(t, err)
-			return ccipLaneA2B, ccipLaneB2A, tearDown
-		}
-	}
-}
-
-// CCIPLaneOnExistingDeployment is same as CCIPDefaultTestSetUp
-// except it's called when
-// 1. contracts are already deployed on live networks
-// 2. CL nodes are set up and configured with existing contracts
-// 3. No k8 env deployment is needed
-// It reuses already deployed contracts from the addresses provided in ../contracts/ccip/laneconfig/contracts.json
-// Returns -
-// CCIPLane for NetworkA --> NetworkB
-// CCIPLane for NetworkB --> NetworkA
-func CCIPLaneOnExistingDeployment(
-	t *testing.T,
-	transferAmounts []*big.Int,
-	bidirectional bool,
-) (*CCIPLane, *CCIPLane) {
-	if NetworkA.Simulated || NetworkB.Simulated {
-		t.Fatalf("test cannot run in simulated env")
-	}
-	ccipLaneA2B, ccipLaneB2A, _ := CCIPDefaultTestSetUp(
-		t, "runner", nil, transferAmounts,
-		0, false, bidirectional, false)
-
-	return ccipLaneA2B, ccipLaneB2A
 }

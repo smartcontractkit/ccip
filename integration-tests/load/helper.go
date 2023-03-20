@@ -2,117 +2,75 @@ package load
 
 import (
 	"math/big"
-	"os"
-	"strconv"
 	"testing"
-	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/smartcontractkit/chainlink-testing-framework/loadgen"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
+	"github.com/smartcontractkit/chainlink/integration-tests/testsetups"
 )
 
 type loadArgs struct {
-	t                  *testing.T
-	rps                int64
-	duration           time.Duration
-	ccipTimeout        time.Duration
-	loadTimeOut        time.Duration
-	msgType            string
-	envTear            func()
-	ccipLoad           *CCIPE2ELoad
-	loadRunner         *loadgen.Generator
-	ExistingDeployment bool
+	t             *testing.T
+	ccipLoad      *CCIPE2ELoad
+	loadRunner    *loadgen.Generator
+	TestCfg       *testsetups.CCIPTestConfig
+	TestSetupArgs *testsetups.CCIPTestSetUpOutputs
 }
 
-// PopulateAndValidate collects all loadArgs
-func PopulateAndValidate(t *testing.T) *loadArgs {
-	inputRps := os.Getenv("LOAD_TEST_TPS")
-	inputTimeout := os.Getenv("LOAD_TEST_CALLTIMEOUT")
-	inputDuration := os.Getenv("LOAD_TEST_DURATION")
-	inputMsgType := os.Getenv("LOAD_TEST_MSG_TYPE")
-	p := &loadArgs{
-		t:           t,
-		rps:         3,
-		duration:    4 * time.Minute,
-		ccipTimeout: 15 * time.Minute,
-		loadTimeOut: 25 * time.Minute,
-		msgType:     DataOnlyTransfer,
-	}
-	if inputRps != "" {
-		rps, err := strconv.ParseInt(inputRps, 10, 64)
-		maxRps := int64(16)
-		require.NoError(t, err)
-		require.LessOrEqual(t, rps, maxRps, "rps %d is too high - maximum value is %d", rps, maxRps)
-		p.rps = rps
-	}
-	if inputTimeout != "" {
-		d, err := strconv.Atoi(inputTimeout)
-		require.NoError(t, err)
-		require.Greater(t, d, 1, "invalid timeout")
-		require.LessOrEqual(t, d, 20, "invalid timeout")
-		p.ccipTimeout = time.Duration(d) * time.Minute
-		p.loadTimeOut = time.Duration(d*3) * time.Minute
-	}
-	if inputDuration != "" {
-		d, err := strconv.Atoi(inputDuration)
-		require.NoError(t, err)
-		require.LessOrEqual(t, d, 90, "invalid duration")
-		p.duration = time.Duration(d) * time.Minute
-	}
-	if inputMsgType != "" {
-		require.Containsf(t, []string{DataOnlyTransfer, TokenTransfer}, inputMsgType, "invalid msg type")
-		p.msgType = inputMsgType
-	}
-	return p
-}
-
-func (loadArgs *loadArgs) Setup() {
-	transferAmounts := []*big.Int{big.NewInt(5e17)}
+func (l *loadArgs) Setup() {
+	transferAmounts := []*big.Int{big.NewInt(10)}
 	var forwardLane *actions.CCIPLane
-	tearDown := func() {}
-	if !loadArgs.ExistingDeployment {
-		forwardLane, _, tearDown = actions.CCIPDefaultTestSetUp(loadArgs.t, "load-ccip", map[string]interface{}{
+	var setUpArgs *testsetups.CCIPTestSetUpOutputs
+	if !l.TestCfg.ExistingDeployment {
+		setUpArgs = testsetups.CCIPDefaultTestSetUp(l.TestCfg.Test, "load-ccip", map[string]interface{}{
 			"replicas": "6",
 			"env": map[string]interface{}{
 				"CL_DEV": "true",
 			},
-		}, transferAmounts, 5, true, false, true)
+		}, transferAmounts, 5, true, false, l.TestCfg)
 	} else {
-		forwardLane, _ = actions.CCIPLaneOnExistingDeployment(loadArgs.t, transferAmounts, false)
+		setUpArgs = testsetups.CCIPExistingDeploymentTestSetUp(l.TestCfg.Test, transferAmounts, false, l.TestCfg)
 	}
-	loadArgs.envTear = tearDown
+	require.Greater(l.TestCfg.Test, len(setUpArgs.Lanes), 0, "error in default set up")
+	l.TestSetupArgs = setUpArgs
+	forwardLane = setUpArgs.Lanes[0].ForwardLane
 	if forwardLane == nil {
 		return
 	}
 	source := forwardLane.Source
 	dest := forwardLane.Dest
-	ccipLoad := NewCCIPLoad(loadArgs.t, source, dest, loadArgs.ccipTimeout, 100000)
-	ccipLoad.BeforeAllCall(loadArgs.msgType)
+
+	ccipLoad := NewCCIPLoad(l.TestCfg.Test, source, dest, l.TestCfg.PhaseTimeout, 100000, forwardLane.Reports)
+	ccipLoad.BeforeAllCall(l.TestCfg.MsgType)
 	loadRunner, err := loadgen.NewLoadGenerator(&loadgen.Config{
 		T:           nil,
-		Schedule:    loadgen.Plain(loadArgs.rps, loadArgs.duration),
+		Schedule:    loadgen.Plain(l.TestCfg.Load.LoadRPS, l.TestCfg.TestDuration),
 		LoadType:    loadgen.RPSScheduleType,
-		CallTimeout: loadArgs.loadTimeOut,
+		CallTimeout: l.TestCfg.Load.LoadTimeOut,
 		Gun:         ccipLoad,
 		Logger:      zerolog.Logger{},
-		SharedData:  loadArgs.msgType,
+		SharedData:  l.TestCfg.MsgType,
 	})
-	require.NoError(loadArgs.t, err, "initiating loadgen")
-	loadArgs.ccipLoad = ccipLoad
-	loadArgs.loadRunner = loadRunner
+	require.NoError(l.TestCfg.Test, err, "initiating loadgen")
+	l.ccipLoad = ccipLoad
+	l.loadRunner = loadRunner
+	l.TestSetupArgs.Reporter.SetDuration(l.TestCfg.TestDuration)
+	l.TestSetupArgs.Reporter.SetRPS(l.TestCfg.Load.LoadRPS)
 }
 
-func (loadArgs *loadArgs) Run() {
-	loadArgs.loadRunner.Run()
-	_, failed := loadArgs.loadRunner.Wait()
-	require.False(loadArgs.t, failed, "load run is failed")
-	require.Empty(loadArgs.t, loadArgs.loadRunner.Errors(), "error in load sequence call")
+func (l *loadArgs) Run() {
+	l.loadRunner.Run()
+	_, failed := l.loadRunner.Wait()
+	require.False(l.t, failed, "load run is failed")
+	require.Empty(l.t, l.loadRunner.Errors(), "error in load sequence call")
 }
 
-func (loadArgs *loadArgs) TearDown() {
-	defer loadArgs.envTear()
-	loadArgs.ccipLoad.PrintStats(loadArgs.rps, loadArgs.duration.Minutes())
+func (l *loadArgs) TearDown() {
+	if l.TestSetupArgs.TearDown != nil {
+		l.ccipLoad.ReportAcceptedLog()
+		l.TestSetupArgs.TearDown()
+	}
 }

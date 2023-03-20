@@ -147,9 +147,11 @@ jobs:
       CHAINLINK_ENV_USER: ${{ github.actor }}
       SELECTED_NETWORKS: SIMULATED,${{ inputs.network1 }},${{ inputs.network2 }}
       EVM_KEYS: ${{ secrets.QA_EVM_KEYS }} # replace it with input parameter once debug log is updated to not print the key
-      TEST_CCIP_TEST_DURATION: ${{ inputs.testDuration }}
-      TEST_CCIP_CHAINLINK_NODE_FUNDING: ${{ inputs.chainlinkNodeFunding }}
-      TEST_CCIP_TEST_INTERVAL: ${{ inputs.testInterval }}
+      CCIP_TEST_DURATION: ${{ inputs.testDuration }}
+      CCIP_CHAINLINK_NODE_FUNDING: ${{ inputs.chainlinkNodeFunding }}
+      CCIP_SOAK_TEST_REQ_INTERVAL: ${{ inputs.testInterval }}
+      CCIP_PHASE_VALIDATION_TIMEOUT: 6m
+      CCIP_TESTS_ON_EXISTING_DEPLOYMENT: ${{ inputs.existing-deployment }}
       TEST_LOG_LEVEL: info
       REF_NAME: ${{ github.head_ref || github.ref_name }}
       GOERLI_URLS: ${{ secrets.QA_GOERLI_URLS }}
@@ -196,22 +198,12 @@ jobs:
           fi
       - name: step summary
         shell: bash
-        id: soaktest
-        env:
-          EXISTING_DEPLOYMENT: ${{ inputs.existing-deployment }}
         run: |
           echo "ENV_JOB_IMAGE=${{ env.ENV_JOB_IMAGE_BASE }}:${{ env.INPUT_CHAINLINK_TEST_VERSION }}" >> $GITHUB_ENV
           echo "### chainlink image used for this test run :link:" >>$GITHUB_STEP_SUMMARY
           echo "\`${{ env.INPUT_CHAINLINK_VERSION }}\`" >>$GITHUB_STEP_SUMMARY
           echo "### chainlink-tests image tag for this test run :ship:" >>$GITHUB_STEP_SUMMARY
           echo "\`${{ env.INPUT_CHAINLINK_TEST_VERSION }}\`" >>$GITHUB_STEP_SUMMARY
-          if [[ "${EXISTING_DEPLOYMENT}" == "true" ]]; then
-             echo "### Running  test for existing deployment :link:" >>$GITHUB_STEP_SUMMARY
-             echo "name=TestExistingDeploymentSoakCCIP" >>$GITHUB_OUTPUT
-          else
-             echo "### Running test with contracts and jobs deployed from scratch :link:" >>$GITHUB_STEP_SUMMARY
-             echo "name=TestSoakCCIP" >>$GITHUB_OUTPUT
-          fi
       - name: Run Tests
         uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@ce87f8986ca18336cc5015df75916c2ec0a7c4b3 # v2.1.2
         env:
@@ -221,7 +213,7 @@ jobs:
           TEST_KEEP_ENV_TTL: 5h
           TEST_REUSE_CCIP_CONTRACTS: ${{ inputs.existing-deployment }}
         with:
-          test_command_to_run: make test_need_operator_assets && cd ./integration-tests && go test -v -timeout 900h -count=1 -run ^${{ steps.soaktest.outputs.name }}$ ./soak
+          test_command_to_run: make test_need_operator_assets && cd ./integration-tests && go test -v -timeout 900h -count=1 -run ^TestSoakCCIP$ ./soak
           test_download_vendor_packages_command: make gomod
           cl_repo: ${{ env.INPUT_CHAINLINK_IMAGE }}
           cl_image_tag: ${{ env.INPUT_CHAINLINK_VERSION }}

@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
+	"github.com/smartcontractkit/chainlink/integration-tests/testsetups"
 )
 
 /* @network-chaos and @pod-chaos are split intentionally into 2 parallel groups
@@ -94,6 +95,7 @@ func TestChaosCCIP(t *testing.T) {
 			waitForChaosRecovery: false,
 		},
 	}
+	testCfg := testsetups.NewCCIPTestConfig(t, testsetups.Chaos)
 	for _, in := range inputs {
 		t.Run(in.testName, func(t *testing.T) {
 			t.Parallel()
@@ -106,7 +108,7 @@ func TestChaosCCIP(t *testing.T) {
 				testSetup        *actions.CCIPTestEnv
 			)
 
-			lane, _, tearDown = actions.CCIPDefaultTestSetUp(t, "chaos-ccip", map[string]interface{}{
+			setUpArgs := testsetups.CCIPDefaultTestSetUp(t, "chaos-ccip", map[string]interface{}{
 				"replicas": "12",
 				"db": map[string]interface{}{
 					"stateful": true,
@@ -122,12 +124,17 @@ func TestChaosCCIP(t *testing.T) {
 						},
 					},
 				},
-			}, []*big.Int{big.NewInt(1e8)}, numOfCommitNodes, false, false, true)
+			}, []*big.Int{big.NewInt(1e8)}, numOfCommitNodes, false, false, testCfg)
+
+			require.Greater(t, len(setUpArgs.Lanes), 0, "error in default set up")
+
+			lane = setUpArgs.Lanes[0].ForwardLane
 
 			// if the test runs on remote runner
 			if lane == nil {
 				return
 			}
+			tearDown = setUpArgs.TearDown
 			t.Cleanup(func() {
 				tearDown()
 			})
