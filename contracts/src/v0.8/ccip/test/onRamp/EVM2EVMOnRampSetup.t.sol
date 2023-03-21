@@ -25,7 +25,6 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
 
   EVM2EVMOnRamp internal s_onRamp;
   address[] s_offRamps;
-  address s_feeAdmin = address(567892030);
 
   IEVM2EVMOnRamp.FeeTokenConfigArgs[] s_feeTokenConfigArgs;
 
@@ -51,7 +50,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
         destChainId: DEST_CHAIN_ID,
         defaultTxGasLimit: GAS_LIMIT
       }),
-      generateDynamicOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), s_feeAdmin, address(s_afn)),
+      generateDynamicOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), address(s_afn)),
       getTokensAndPools(s_sourceTokens, getCastedSourcePools()),
       new address[](0),
       rateLimiterConfig(),

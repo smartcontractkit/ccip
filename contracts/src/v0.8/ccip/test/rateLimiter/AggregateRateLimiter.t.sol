@@ -16,7 +16,7 @@ contract AggregateTokenLimiterSetup is BaseTest {
   function setUp() public virtual override {
     BaseTest.setUp();
 
-    s_config = IAggregateRateLimiter.RateLimiterConfig({rate: 5, capacity: 100, admin: TOKEN_LIMIT_ADMIN});
+    s_config = IAggregateRateLimiter.RateLimiterConfig({rate: 5, capacity: 100, admin: ADMIN});
     s_rateLimiter = new AggregateRateLimiterHelper(s_config);
     IERC20[] memory tokens = new IERC20[](1);
     tokens[0] = TOKEN;
@@ -29,7 +29,7 @@ contract AggregateTokenLimiterSetup is BaseTest {
 /// @notice #constructor
 contract AggregateTokenLimiter_constructor is AggregateTokenLimiterSetup {
   function testSuccess() public {
-    assertEq(TOKEN_LIMIT_ADMIN, s_rateLimiter.getTokenLimitAdmin());
+    assertEq(ADMIN, s_rateLimiter.getTokenLimitAdmin());
     assertEq(OWNER, s_rateLimiter.owner());
 
     IAggregateRateLimiter.TokenBucket memory tokenBucket = s_rateLimiter.calculateCurrentTokenBucketState();
@@ -43,7 +43,7 @@ contract AggregateTokenLimiter_constructor is AggregateTokenLimiterSetup {
 /// @notice #getTokenLimitAdmin
 contract AggregateTokenLimiter_getTokenLimitAdmin is AggregateTokenLimiterSetup {
   function testSuccess() public {
-    assertEq(TOKEN_LIMIT_ADMIN, s_rateLimiter.getTokenLimitAdmin());
+    assertEq(ADMIN, s_rateLimiter.getTokenLimitAdmin());
   }
 }
 
@@ -122,7 +122,7 @@ contract AggregateTokenLimiter_setRateLimiterConfig is AggregateTokenLimiterSetu
   }
 
   function testTokenLimitAdminSuccess() public {
-    changePrank(TOKEN_LIMIT_ADMIN);
+    changePrank(ADMIN);
     setConfig();
   }
 
@@ -134,7 +134,7 @@ contract AggregateTokenLimiter_setRateLimiterConfig is AggregateTokenLimiterSetu
     s_config = IAggregateRateLimiter.RateLimiterConfig({
       rate: uint208(tokenBucket.rate * 2),
       capacity: tokenBucket.capacity * 8,
-      admin: TOKEN_LIMIT_ADMIN
+      admin: ADMIN
     });
 
     vm.expectEmit();
@@ -208,7 +208,7 @@ contract AggregateTokenLimiter_setPrices is AggregateTokenLimiterSetup {
   }
 
   function testTokenLimitAdminSuccess() public {
-    changePrank(TOKEN_LIMIT_ADMIN);
+    changePrank(ADMIN);
     setPrice();
   }
 

@@ -216,7 +216,6 @@ func (c *CCIPContracts) DeployNewOnRamp() {
 			MaxDataSize:     1e5,
 			MaxTokensLength: 5,
 			MaxGasLimit:     ccip.GasLimitPerTx,
-			FeeAdmin:        common.Address{},
 			Afn:             c.Source.AFN.Address(), // AFN
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampTokenAndPool{
@@ -581,7 +580,6 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			MaxDataSize:     1e5,
 			MaxTokensLength: 5,
 			MaxGasLimit:     ccip.GasLimitPerTx,
-			FeeAdmin:        common.Address{},
 			Afn:             afnSourceAddress, // AFN
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampTokenAndPool{

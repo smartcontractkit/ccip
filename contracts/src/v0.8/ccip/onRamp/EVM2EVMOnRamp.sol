@@ -339,7 +339,7 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAn
   }
 
   /// @inheritdoc IEVM2EVMOnRamp
-  function setFeeConfig(FeeTokenConfigArgs[] memory feeTokenConfigs) external override onlyOwnerOrFeeAdmin {
+  function setFeeConfig(FeeTokenConfigArgs[] memory feeTokenConfigs) external override onlyOwnerOrAdmin {
     _setFeeConfig(feeTokenConfigs);
   }
 
@@ -399,7 +399,7 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAn
   }
 
   /// @inheritdoc IEVM2EVMOnRamp
-  function payNops() external onlyOwnerOrFeeAdminOrNop {
+  function payNops() external onlyOwnerOrAdminOrNop {
     uint32 weightsTotal = s_nopWeightsTotal;
     if (weightsTotal == 0) revert NoNopsToPay();
 
@@ -473,15 +473,15 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAn
   // ================================================================
 
   /// @dev Require that the sender is the owner or the fee admin or a nop
-  modifier onlyOwnerOrFeeAdminOrNop() {
-    if (msg.sender != owner() && msg.sender != s_dynamicConfig.feeAdmin && !s_nops.contains(msg.sender))
+  modifier onlyOwnerOrAdminOrNop() {
+    if (msg.sender != owner() && msg.sender != s_admin && !s_nops.contains(msg.sender))
       revert OnlyCallableByOwnerOrFeeAdminOrNop();
     _;
   }
 
   /// @dev Require that the sender is the owner or the fee admin
-  modifier onlyOwnerOrFeeAdmin() {
-    if (msg.sender != owner() && msg.sender != s_dynamicConfig.feeAdmin) revert OnlyCallableByOwnerOrFeeAdmin();
+  modifier onlyOwnerOrAdmin() {
+    if (msg.sender != owner() && msg.sender != s_admin) revert OnlyCallableByOwnerOrFeeAdmin();
     _;
   }
 

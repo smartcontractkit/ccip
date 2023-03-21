@@ -18,7 +18,6 @@ contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
     IEVM2EVMOnRamp.DynamicConfig memory dynamicConfig = generateDynamicOnRampConfig(
       address(s_sourceRouter),
       address(s_priceRegistry),
-      address(0),
       address(s_afn)
     );
 
@@ -49,7 +48,6 @@ contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
     assertEq(dynamicConfig.maxDataSize, gotDynamicConfig.maxDataSize);
     assertEq(dynamicConfig.maxTokensLength, gotDynamicConfig.maxTokensLength);
     assertEq(dynamicConfig.maxGasLimit, gotDynamicConfig.maxGasLimit);
-    assertEq(dynamicConfig.feeAdmin, gotDynamicConfig.feeAdmin);
     assertEq(dynamicConfig.afn, gotDynamicConfig.afn);
 
     // Tokens
@@ -119,7 +117,7 @@ contract EVM2EVMOnRamp_payNops is EVM2EVMOnRampSetup {
   }
 
   function testFeeAdminPayNopsSuccess() public {
-    changePrank(s_feeAdmin);
+    changePrank(ADMIN);
 
     uint256 totalJuels = s_onRamp.getNopFeesJuels();
     s_onRamp.payNops();
@@ -513,7 +511,7 @@ contract EVM2EVMOnRamp_setFeeConfig is EVM2EVMOnRampSetup {
   function testSetFeeConfigByFeeAdminSuccess() public {
     IEVM2EVMOnRamp.FeeTokenConfigArgs[] memory feeConfig;
 
-    changePrank(s_feeAdmin);
+    changePrank(ADMIN);
 
     vm.expectEmit();
     emit FeeConfigSet(feeConfig);
@@ -661,7 +659,6 @@ contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
       maxDataSize: 400,
       maxTokensLength: 14,
       maxGasLimit: MAX_GAS_LIMIT / 2,
-      feeAdmin: address(98235),
       afn: address(11)
     });
 
@@ -676,14 +673,13 @@ contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
     assertEq(newConfig.maxDataSize, gotDynamicConfig.maxDataSize);
     assertEq(newConfig.maxTokensLength, gotDynamicConfig.maxTokensLength);
     assertEq(newConfig.maxGasLimit, gotDynamicConfig.maxGasLimit);
-    assertEq(newConfig.feeAdmin, gotDynamicConfig.feeAdmin);
   }
 
   // Reverts
   function testSetConfigOnlyOwnerReverts() public {
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
-    s_onRamp.setDynamicConfig(generateDynamicOnRampConfig(address(1), address(2), address(3), address(4)));
+    s_onRamp.setDynamicConfig(generateDynamicOnRampConfig(address(1), address(2), address(4)));
   }
 }
 

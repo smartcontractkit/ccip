@@ -406,7 +406,6 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 				MaxDataSize:     1e5,
 				MaxTokensLength: 5,
 				MaxGasLimit:     ccip.GasLimitPerTx,
-				FeeAdmin:        common.Address{},
 				Afn:             afn,
 			},
 			tokensAndPools,

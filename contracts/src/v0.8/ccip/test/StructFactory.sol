@@ -89,7 +89,6 @@ contract StructFactory {
   function generateDynamicOnRampConfig(
     address router,
     address priceRegistry,
-    address feeAdmin,
     address afn
   ) internal pure returns (IEVM2EVMOnRamp.DynamicConfig memory) {
     return
@@ -99,7 +98,6 @@ contract StructFactory {
         maxDataSize: MAX_DATA_SIZE,
         maxTokensLength: MAX_TOKENS_LENGTH,
         maxGasLimit: MAX_GAS_LIMIT,
-        feeAdmin: feeAdmin,
         afn: afn
       });
   }
@@ -125,10 +123,10 @@ contract StructFactory {
   }
 
   // Rate limiter
-  address constant TOKEN_LIMIT_ADMIN = 0x11118e64e1FB0c487f25dD6D3601FF6aF8d32E4e;
+  address constant ADMIN = 0x11118e64e1FB0c487f25dD6D3601FF6aF8d32E4e;
 
   function rateLimiterConfig() internal pure returns (IAggregateRateLimiter.RateLimiterConfig memory) {
-    return IAggregateRateLimiter.RateLimiterConfig({capacity: 100e28, rate: 1e15, admin: TOKEN_LIMIT_ADMIN});
+    return IAggregateRateLimiter.RateLimiterConfig({capacity: 100e28, rate: 1e15, admin: ADMIN});
   }
 
   function getTokenPrices() internal pure returns (uint256[] memory prices) {

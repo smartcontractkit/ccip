@@ -99,7 +99,7 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
     IAggregateRateLimiter.RateLimiterConfig memory rateLimiterConfig = IAggregateRateLimiter.RateLimiterConfig({
       rate: 1e20,
       capacity: 1e20,
-      admin: TOKEN_LIMIT_ADMIN
+      admin: ADMIN
     });
 
     s_offRamp = new EVM2EVMOffRampHelper(

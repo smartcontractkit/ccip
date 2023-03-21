@@ -10,7 +10,7 @@ import {IERC20} from "../vendor/IERC20.sol";
 
 contract AggregateRateLimiter is IAggregateRateLimiter, OwnerIsCreator {
   // The address of the token limit admin that has the same permissions as the owner.
-  address private s_tokenLimitAdmin;
+  address internal s_admin;
 
   // A mapping of token => tokenPrice
   mapping(IERC20 => uint256) private s_priceByToken;
@@ -23,7 +23,7 @@ contract AggregateRateLimiter is IAggregateRateLimiter, OwnerIsCreator {
   /// @param config The RateLimiterConfig containing the capacity and refill rate
   /// of the bucket, plus the admin address.
   constructor(RateLimiterConfig memory config) {
-    s_tokenLimitAdmin = config.admin;
+    s_admin = config.admin;
     s_tokenBucket = TokenBucket({
       rate: config.rate,
       capacity: config.capacity,
@@ -150,18 +150,18 @@ contract AggregateRateLimiter is IAggregateRateLimiter, OwnerIsCreator {
 
   /// @inheritdoc IAggregateRateLimiter
   function getTokenLimitAdmin() public view returns (address) {
-    return s_tokenLimitAdmin;
+    return s_admin;
   }
 
   /// @inheritdoc IAggregateRateLimiter
   function setTokenLimitAdmin(address newAdmin) public onlyOwner {
-    s_tokenLimitAdmin = newAdmin;
+    s_admin = newAdmin;
   }
 
   /// @notice a modifier that allows the owner or the s_tokenLimitAdmin call the functions
   /// it is applied to.
   modifier requireAdminOrOwner() {
-    if (msg.sender != owner() && msg.sender != s_tokenLimitAdmin) revert OnlyCallableByAdminOrOwner();
+    if (msg.sender != owner() && msg.sender != s_admin) revert OnlyCallableByAdminOrOwner();
     _;
   }
 }
