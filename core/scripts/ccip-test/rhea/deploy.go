@@ -102,7 +102,7 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId uint64,
 		})
 	}
 
-	var feeTokenConfig []evm_2_evm_onramp.IEVM2EVMOnRampFeeTokenConfigArgs
+	var feeTokenConfig []evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs
 
 	for _, feeToken := range client.ChainConfig.FeeTokens {
 		tokenConfig := client.ChainConfig.SupportedTokens[feeToken]
@@ -112,7 +112,7 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId uint64,
 			multiplier = 1e17
 		}
 
-		feeTokenConfig = append(feeTokenConfig, evm_2_evm_onramp.IEVM2EVMOnRampFeeTokenConfigArgs{
+		feeTokenConfig = append(feeTokenConfig, evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs{
 			Token:           tokenConfig.Token,
 			Multiplier:      multiplier,
 			FeeAmount:       big.NewInt(100e9),
@@ -124,13 +124,13 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId uint64,
 	onRampAddress, tx, _, err := evm_2_evm_onramp.DeployEVM2EVMOnRamp(
 		client.Owner,  // user
 		client.Client, // client
-		evm_2_evm_onramp.IEVM2EVMOnRampStaticConfig{
+		evm_2_evm_onramp.EVM2EVMOnRampStaticConfig{
 			LinkToken:         client.ChainConfig.SupportedTokens[LINK].Token,
 			ChainId:           client.ChainConfig.ChainId,
 			DestChainId:       destChainId,
 			DefaultTxGasLimit: 200_000,
 		},
-		evm_2_evm_onramp.IEVM2EVMOnRampDynamicConfig{
+		evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
 			Router:          client.ChainConfig.Router,
 			PriceRegistry:   client.ChainConfig.PriceRegistry,
 			MaxDataSize:     1e6,
@@ -140,13 +140,13 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId uint64,
 		},
 		tokensAndPools,
 		[]common.Address{}, // allow list
-		evm_2_evm_onramp.IAggregateRateLimiterRateLimiterConfig{
+		evm_2_evm_onramp.AggregateRateLimiterRateLimiterConfig{
 			Capacity: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 			Rate:     new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
 			Admin:    client.Owner.From,
 		},
 		feeTokenConfig,
-		[]evm_2_evm_onramp.IEVM2EVMOnRampNopAndWeight{},
+		[]evm_2_evm_onramp.EVM2EVMOnRampNopAndWeight{},
 	)
 	shared.RequireNoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
@@ -177,13 +177,13 @@ func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainId uint
 	offRampAddress, tx, _, err := evm_2_evm_offramp.DeployEVM2EVMOffRamp(
 		client.Owner,
 		client.Client,
-		evm_2_evm_offramp.IEVM2EVMOffRampStaticConfig{
+		evm_2_evm_offramp.EVM2EVMOffRampStaticConfig{
 			CommitStore:   client.LaneConfig.CommitStore,
 			ChainId:       client.ChainConfig.ChainId,
 			SourceChainId: sourceChainId,
 			OnRamp:        onRamp,
 		},
-		evm_2_evm_offramp.IEVM2EVMOffRampDynamicConfig{
+		evm_2_evm_offramp.EVM2EVMOffRampDynamicConfig{
 			Router:                                  client.ChainConfig.Router,
 			ExecutionDelaySeconds:                   60,
 			MaxDataSize:                             1e5,
@@ -193,7 +193,7 @@ func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainId uint
 		},
 		syncedSourceTokens,
 		syncedDestPools,
-		evm_2_evm_offramp.IAggregateRateLimiterRateLimiterConfig{
+		evm_2_evm_offramp.AggregateRateLimiterRateLimiterConfig{
 			Capacity: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 			Rate:     new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
 			Admin:    client.Owner.From,
@@ -225,12 +225,12 @@ func deployCommitStore(t *testing.T, client *EvmDeploymentConfig, sourceChainId 
 	commitStoreAddress, tx, _, err := commit_store.DeployCommitStore(
 		client.Owner,  // user
 		client.Client, // client
-		commit_store.ICommitStoreStaticConfig{
+		commit_store.CommitStoreStaticConfig{
 			ChainId:       client.ChainConfig.ChainId,
 			SourceChainId: sourceChainId,
 			OnRamp:        onRamp,
 		},
-		commit_store.ICommitStoreDynamicConfig{
+		commit_store.CommitStoreDynamicConfig{
 			PriceRegistry: client.ChainConfig.PriceRegistry,
 			Afn:           client.ChainConfig.Afn,
 		},

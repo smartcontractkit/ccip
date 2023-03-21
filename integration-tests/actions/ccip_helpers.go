@@ -487,7 +487,7 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(reuse bool, lane *laneconfig
 			sourceCCIP.Common.Router.EthAddress,
 			sourceCCIP.Common.PriceRegistry.EthAddress,
 			sourceCCIP.Common.RateLimiterConfig,
-			[]evm_2_evm_onramp.IEVM2EVMOnRampFeeTokenConfigArgs{
+			[]evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs{
 				{
 					Token:           common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
 					FeeAmount:       big.NewInt(0),

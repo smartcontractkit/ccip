@@ -3,8 +3,8 @@ pragma solidity 0.8.15;
 
 import {TypeAndVersionInterface} from "../interfaces/TypeAndVersionInterface.sol";
 import {IRouterClient} from "./interfaces/IRouterClient.sol";
-import {IEVM2AnyOnRamp} from "./interfaces/onRamp/IEVM2AnyOnRamp.sol";
 import {IRouter} from "./interfaces/IRouter.sol";
+import {IEVM2AnyOnRamp} from "./interfaces/IEVM2AnyOnRamp.sol";
 import {IWrappedNative} from "./interfaces/IWrappedNative.sol";
 import {IAny2EVMMessageReceiver} from "./interfaces/IAny2EVMMessageReceiver.sol";
 
@@ -19,8 +19,21 @@ import {IERC20} from "../vendor/IERC20.sol";
 /// @notice This is the entry point for the end user wishing to send a cross
 /// chain message.
 /// @dev This contract is used as a router for both on-ramps and off-ramps
-contract Router is IRouter, TypeAndVersionInterface, OwnerIsCreator {
+contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreator {
   using SafeERC20 for IERC20;
+
+  event OnRampSet(uint64 indexed destChainId, address onRamp);
+  event OffRampAdded(uint64 indexed sourceChainId, address offRamp);
+  event OffRampRemoved(uint64 indexed sourceChainId, address offRamp);
+
+  struct OnRampUpdate {
+    uint64 destChainId; // --┐  Destination chain Id.
+    address onRamp; // ------┘  OnRamp address that is allowed to use this router.
+  }
+  struct OffRampUpdate {
+    uint64 sourceChainId; //    Source chain Id.
+    address[] offRamps; //      List of offRamps that are allowed to use this router.
+  }
 
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "Router 1.0.0";
@@ -173,30 +186,34 @@ contract Router is IRouter, TypeAndVersionInterface, OwnerIsCreator {
   // |                           Config                             |
   // ================================================================
 
-  /// @inheritdoc IRouter
+  /// @notice Gets the wrapped representation of the native fee coin.
+  /// @return The address of the ERC20 wrapped native.
   function getWrappedNative() external view returns (address) {
     return s_wrappedNative;
   }
 
-  /// @inheritdoc IRouter
+  /// @notice Sets a new wrapped native token.
+  /// @param wrappedNative The address of the new wrapped native ERC20 token.
   function setWrappedNative(address wrappedNative) external onlyOwner {
     s_wrappedNative = wrappedNative;
   }
 
-  /// @inheritdoc IRouter
+  /// @notice Get the onramp for a destination chain.
+  /// @param destChainId The destination chain Id to get the onRamp for.
+  /// @return The address of the onRamp.
   function getOnRamp(uint64 destChainId) external view returns (address) {
     return s_onRamps[destChainId];
   }
 
-  /// @inheritdoc IRouter
+  /// @notice Get a list of offRamps for a source chain.
   function getOffRamps(uint64 sourceChainId) external view returns (address[] memory) {
     return s_offRamps[sourceChainId];
   }
 
-  /// @inheritdoc IRouter
+  /// @notice Set applies a set of ingress and egress config updates.
+  /// @dev only callable by owner.
   function applyRampUpdates(OnRampUpdate[] memory onRampUpdates, OffRampUpdate[] memory offRampUpdates)
     external
-    override
     onlyOwner
   {
     // Apply egress updates.

@@ -121,13 +121,13 @@ func (c *CCIPContracts) DeployNewOffRamp() {
 	offRampAddress, _, _, err := evm_2_evm_offramp.DeployEVM2EVMOffRamp(
 		c.Dest.User,
 		c.Dest.Chain,
-		evm_2_evm_offramp.IEVM2EVMOffRampStaticConfig{
+		evm_2_evm_offramp.EVM2EVMOffRampStaticConfig{
 			CommitStore:   c.Dest.CommitStore.Address(),
 			ChainId:       c.Dest.ChainID,
 			SourceChainId: c.Source.ChainID,
 			OnRamp:        c.Source.OnRamp.Address(),
 		},
-		evm_2_evm_offramp.IEVM2EVMOffRampDynamicConfig{
+		evm_2_evm_offramp.EVM2EVMOffRampDynamicConfig{
 			PermissionLessExecutionThresholdSeconds: 1,
 			ExecutionDelaySeconds:                   0,
 			Router:                                  c.Dest.Router.Address(),
@@ -137,7 +137,7 @@ func (c *CCIPContracts) DeployNewOffRamp() {
 		},
 		[]common.Address{c.Source.LinkToken.Address()}, // source tokens
 		[]common.Address{c.Dest.Pool.Address()},        // pools
-		evm_2_evm_offramp.IAggregateRateLimiterRateLimiterConfig{
+		evm_2_evm_offramp.AggregateRateLimiterRateLimiterConfig{
 			Capacity: HundredLink,
 			Rate:     big.NewInt(1e18),
 			Admin:    c.Source.User.From,
@@ -164,7 +164,7 @@ func (c *CCIPContracts) EnableOffRamp() {
 	require.NoError(c.t, err)
 	c.Dest.Chain.Commit()
 
-	_, err = c.Dest.Router.ApplyRampUpdates(c.Dest.User, nil, []router.IRouterOffRampUpdate{
+	_, err = c.Dest.Router.ApplyRampUpdates(c.Dest.User, nil, []router.RouterOffRampUpdate{
 		{SourceChainId: c.Source.ChainID, OffRamps: []common.Address{c.Dest.OffRamp.Address()}}})
 	require.NoError(c.t, err)
 	c.Dest.Chain.Commit()
@@ -206,13 +206,13 @@ func (c *CCIPContracts) DeployNewOnRamp() {
 	onRampAddress, _, _, err := evm_2_evm_onramp.DeployEVM2EVMOnRamp(
 		c.Source.User,  // user
 		c.Source.Chain, // client
-		evm_2_evm_onramp.IEVM2EVMOnRampStaticConfig{
+		evm_2_evm_onramp.EVM2EVMOnRampStaticConfig{
 			LinkToken:         c.Source.LinkToken.Address(),
 			ChainId:           c.Source.ChainID,
 			DestChainId:       c.Dest.ChainID,
 			DefaultTxGasLimit: 200_000,
 		},
-		evm_2_evm_onramp.IEVM2EVMOnRampDynamicConfig{
+		evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
 			Router:          c.Source.Router.Address(),
 			PriceRegistry:   c.Source.PriceRegistry.Address(),
 			MaxDataSize:     1e5,
@@ -227,12 +227,12 @@ func (c *CCIPContracts) DeployNewOnRamp() {
 			},
 		},
 		[]common.Address{}, // allow list
-		evm_2_evm_onramp.IAggregateRateLimiterRateLimiterConfig{
+		evm_2_evm_onramp.AggregateRateLimiterRateLimiterConfig{
 			Capacity: HundredLink,
 			Rate:     big.NewInt(1e18),
 			Admin:    c.Source.User.From,
 		},
-		[]evm_2_evm_onramp.IEVM2EVMOnRampFeeTokenConfigArgs{
+		[]evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs{
 			{
 				Token:           c.Source.LinkToken.Address(),
 				Multiplier:      1e18,
@@ -240,7 +240,7 @@ func (c *CCIPContracts) DeployNewOnRamp() {
 				DestGasOverhead: 0,
 			},
 		},
-		[]evm_2_evm_onramp.IEVM2EVMOnRampNopAndWeight{},
+		[]evm_2_evm_onramp.EVM2EVMOnRampNopAndWeight{},
 	)
 
 	require.NoError(c.t, err)
@@ -266,7 +266,7 @@ func (c *CCIPContracts) EnableOnRamp() {
 	c.Source.Chain.Commit()
 
 	c.t.Log("Setting onRamp on source router")
-	_, err = c.Source.Router.ApplyRampUpdates(c.Source.User, []router.IRouterOnRampUpdate{{DestChainId: c.Dest.ChainID, OnRamp: c.Source.OnRamp.Address()}}, nil)
+	_, err = c.Source.Router.ApplyRampUpdates(c.Source.User, []router.RouterOnRampUpdate{{DestChainId: c.Dest.ChainID, OnRamp: c.Source.OnRamp.Address()}}, nil)
 	require.NoError(c.t, err)
 	c.Source.Chain.Commit()
 
@@ -280,12 +280,12 @@ func (c *CCIPContracts) DeployNewCommitStore() {
 	commitStoreAddress, _, _, err := commit_store.DeployCommitStore(
 		c.Dest.User,  // user
 		c.Dest.Chain, // client
-		commit_store.ICommitStoreStaticConfig{
+		commit_store.CommitStoreStaticConfig{
 			ChainId:       c.Dest.ChainID,
 			SourceChainId: c.Source.ChainID,
 			OnRamp:        c.Source.OnRamp.Address(),
 		},
-		commit_store.ICommitStoreDynamicConfig{
+		commit_store.CommitStoreDynamicConfig{
 			PriceRegistry: c.Dest.PriceRegistry.Address(),
 			Afn:           c.Dest.AFN.Address(), // AFN address
 		},
@@ -570,13 +570,13 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	onRampAddress, _, _, err := evm_2_evm_onramp.DeployEVM2EVMOnRamp(
 		sourceUser,  // user
 		sourceChain, // client
-		evm_2_evm_onramp.IEVM2EVMOnRampStaticConfig{
+		evm_2_evm_onramp.EVM2EVMOnRampStaticConfig{
 			LinkToken:         sourceLinkTokenAddress,
 			ChainId:           sourceChainID, // source chain id
 			DestChainId:       destChainID,   // destinationChainIds
 			DefaultTxGasLimit: 200_000,
 		},
-		evm_2_evm_onramp.IEVM2EVMOnRampDynamicConfig{
+		evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
 			Router:          sourceRouterAddress,
 			PriceRegistry:   sourcePricesAddress,
 			MaxDataSize:     1e5,
@@ -591,12 +591,12 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			},
 		},
 		[]common.Address{}, // allow list
-		evm_2_evm_onramp.IAggregateRateLimiterRateLimiterConfig{
+		evm_2_evm_onramp.AggregateRateLimiterRateLimiterConfig{
 			Capacity: HundredLink,
 			Rate:     big.NewInt(1e18),
 			Admin:    sourceUser.From,
 		},
-		[]evm_2_evm_onramp.IEVM2EVMOnRampFeeTokenConfigArgs{
+		[]evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs{
 			{
 				Token:           sourceLinkTokenAddress,
 				Multiplier:      1e18,
@@ -604,7 +604,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 				DestGasOverhead: 0,
 			},
 		},
-		[]evm_2_evm_onramp.IEVM2EVMOnRampNopAndWeight{},
+		[]evm_2_evm_onramp.EVM2EVMOnRampNopAndWeight{},
 	)
 	require.NoError(t, err)
 	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddress, sourceChain)
@@ -617,7 +617,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	sourceChain.Commit()
 	_, err = onRamp.SetPrices(sourceUser, []common.Address{sourceLinkTokenAddress}, []*big.Int{big.NewInt(1)})
 	require.NoError(t, err)
-	_, err = sourceRouter.ApplyRampUpdates(sourceUser, []router.IRouterOnRampUpdate{{DestChainId: destChainID, OnRamp: onRampAddress}}, nil)
+	_, err = sourceRouter.ApplyRampUpdates(sourceUser, []router.RouterOnRampUpdate{{DestChainId: destChainID, OnRamp: onRampAddress}}, nil)
 	require.NoError(t, err)
 	sourceChain.Commit()
 
@@ -656,12 +656,12 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	commitStoreAddress, _, _, err := commit_store.DeployCommitStore(
 		destUser,  // user
 		destChain, // client
-		commit_store.ICommitStoreStaticConfig{
+		commit_store.CommitStoreStaticConfig{
 			ChainId:       destChainID,
 			SourceChainId: sourceChainID,
 			OnRamp:        onRamp.Address(),
 		},
-		commit_store.ICommitStoreDynamicConfig{
+		commit_store.CommitStoreDynamicConfig{
 			PriceRegistry: destPricesAddress,
 			Afn:           afnDestAddress, // AFN address
 		},
@@ -683,13 +683,13 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	offRampAddress, _, _, err := evm_2_evm_offramp.DeployEVM2EVMOffRamp(
 		destUser,
 		destChain,
-		evm_2_evm_offramp.IEVM2EVMOffRampStaticConfig{
+		evm_2_evm_offramp.EVM2EVMOffRampStaticConfig{
 			CommitStore:   commitStore.Address(),
 			ChainId:       destChainID,
 			SourceChainId: sourceChainID,
 			OnRamp:        onRampAddress,
 		},
-		evm_2_evm_offramp.IEVM2EVMOffRampDynamicConfig{
+		evm_2_evm_offramp.EVM2EVMOffRampDynamicConfig{
 			Router:                                  destRouter.Address(),
 			PermissionLessExecutionThresholdSeconds: 1,
 			ExecutionDelaySeconds:                   0,
@@ -699,7 +699,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		},
 		[]common.Address{sourceLinkTokenAddress},
 		[]common.Address{destPoolAddress},
-		evm_2_evm_offramp.IAggregateRateLimiterRateLimiterConfig{
+		evm_2_evm_offramp.AggregateRateLimiterRateLimiterConfig{
 			Capacity: HundredLink,
 			Rate:     big.NewInt(1e18),
 			Admin:    sourceUser.From,
@@ -716,7 +716,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	destChain.Commit()
 	_, err = destPriceRegistry.ApplyPriceUpdatersUpdates(destUser, []common.Address{commitStoreAddress}, []common.Address{})
 	require.NoError(t, err)
-	_, err = destRouter.ApplyRampUpdates(destUser, nil, []router.IRouterOffRampUpdate{
+	_, err = destRouter.ApplyRampUpdates(destUser, nil, []router.RouterOffRampUpdate{
 		{SourceChainId: sourceChainID, OffRamps: []common.Address{offRampAddress}}})
 	require.NoError(t, err)
 	_, err = offRamp.SetPrices(destUser, []common.Address{destLinkTokenAddress}, []*big.Int{big.NewInt(1)})
@@ -977,7 +977,7 @@ func (args *ManualExecArgs) ExecuteManually() (*types.Transaction, error) {
 		return nil, err
 	}
 
-	var commitReport *commit_store.ICommitStoreCommitReport
+	var commitReport *commit_store.CommitStoreCommitReport
 	for iterator.Next() {
 		if iterator.Event.Report.Interval.Min <= seqNr && iterator.Event.Report.Interval.Max >= seqNr {
 			commitReport = &iterator.Event.Report
@@ -992,7 +992,7 @@ func (args *ManualExecArgs) ExecuteManually() (*types.Transaction, error) {
 	return args.execute(commitReport)
 }
 
-func (args *ManualExecArgs) execute(report *commit_store.ICommitStoreCommitReport) (*types.Transaction, error) {
+func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport) (*types.Transaction, error) {
 	log.Info().Msg("Executing request manually")
 	seqNr := args.seqNr
 	// Build a merkle tree for the report

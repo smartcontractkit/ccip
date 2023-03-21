@@ -67,10 +67,10 @@ func (client *CCIPClient) applyFeeTokensUpdates(t *testing.T, sourceClient *rhea
 }
 
 func (client *CCIPClient) setOnRampFeeConfig(t *testing.T, sourceClient *rhea.EvmDeploymentConfig) {
-	var feeTokenConfig []evm_2_evm_onramp.IEVM2EVMOnRampFeeTokenConfigArgs
+	var feeTokenConfig []evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs
 
 	for _, feeToken := range sourceClient.ChainConfig.FeeTokens {
-		feeTokenConfig = append(feeTokenConfig, evm_2_evm_onramp.IEVM2EVMOnRampFeeTokenConfigArgs{
+		feeTokenConfig = append(feeTokenConfig, evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs{
 			Token:           sourceClient.ChainConfig.SupportedTokens[feeToken].Token,
 			Multiplier:      1e18,
 			FeeAmount:       big.NewInt(100e9),
@@ -102,14 +102,14 @@ func (client *CCIPClient) setAllowList(t *testing.T) {
 }
 
 func (client *CCIPClient) setRateLimiterConfig(t *testing.T) {
-	tx, err := client.Source.OnRamp.SetRateLimiterConfig(client.Source.Owner, evm_2_evm_onramp.IAggregateRateLimiterRateLimiterConfig{
+	tx, err := client.Source.OnRamp.SetRateLimiterConfig(client.Source.Owner, evm_2_evm_onramp.AggregateRateLimiterRateLimiterConfig{
 		Rate:     new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
 		Capacity: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 	})
 	shared.RequireNoError(t, err)
 	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 
-	tx, err = client.Dest.OffRamp.SetRateLimiterConfig(client.Dest.Owner, evm_2_evm_offramp.IAggregateRateLimiterRateLimiterConfig{
+	tx, err = client.Dest.OffRamp.SetRateLimiterConfig(client.Dest.Owner, evm_2_evm_offramp.AggregateRateLimiterRateLimiterConfig{
 		Rate:     new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
 		Capacity: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 	})
@@ -550,7 +550,7 @@ func (client *CCIPClient) ValidateMerkleRoot(
 	t *testing.T,
 	request *evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested,
 	reportRequests []*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested,
-	report commit_store.ICommitStoreCommitReport,
+	report commit_store.CommitStoreCommitReport,
 ) merklemulti.Proof[[32]byte] {
 	mctx := hasher.NewKeccakCtx()
 	var leafHashes [][32]byte

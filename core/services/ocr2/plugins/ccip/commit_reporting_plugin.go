@@ -35,7 +35,7 @@ var (
 )
 
 // EncodeCommitReport abi encodes an offramp.InternalCommitReport.
-func EncodeCommitReport(commitReport *commit_store.ICommitStoreCommitReport) (types.Report, error) {
+func EncodeCommitReport(commitReport *commit_store.CommitStoreCommitReport) (types.Report, error) {
 	report, err := makeCommitReportArgs().PackValues([]interface{}{
 		commitReport,
 	})
@@ -45,8 +45,8 @@ func EncodeCommitReport(commitReport *commit_store.ICommitStoreCommitReport) (ty
 	return report, nil
 }
 
-// DecodeCommitReport abi decodes a types.Report to an ICommitStoreCommitReport
-func DecodeCommitReport(report types.Report) (*commit_store.ICommitStoreCommitReport, error) {
+// DecodeCommitReport abi decodes a types.Report to an CommitStoreCommitReport
+func DecodeCommitReport(report types.Report) (*commit_store.CommitStoreCommitReport, error) {
 	unpacked, err := makeCommitReportArgs().Unpack(report)
 	if err != nil {
 		return nil, err
@@ -82,13 +82,13 @@ func DecodeCommitReport(report types.Report) (*commit_store.ICommitStoreCommitRe
 		})
 	}
 
-	return &commit_store.ICommitStoreCommitReport{
+	return &commit_store.CommitStoreCommitReport{
 		PriceUpdates: commit_store.InternalPriceUpdates{
 			DestChainId:       commitReport.PriceUpdates.DestChainId,
 			UsdPerUnitGas:     commitReport.PriceUpdates.UsdPerUnitGas,
 			TokenPriceUpdates: tokenPriceUpdates,
 		},
-		Interval: commit_store.ICommitStoreInterval{
+		Interval: commit_store.CommitStoreInterval{
 			Min: commitReport.Interval.Min,
 			Max: commitReport.Interval.Max,
 		},
@@ -112,7 +112,7 @@ func isCommitStoreDownNow(lggr logger.Logger, commitStore *commit_store.CommitSt
 }
 
 type InflightReport struct {
-	report    *commit_store.ICommitStoreCommitReport
+	report    *commit_store.CommitStoreCommitReport
 	createdAt time.Time
 }
 
@@ -376,7 +376,7 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, _ types.ReportT
 	}
 
 	return CommitObservation{
-		Interval: commit_store.ICommitStoreInterval{
+		Interval: commit_store.CommitStoreInterval{
 			Min: min,
 			Max: max,
 		},
@@ -424,12 +424,12 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(lggr logger.Logge
 }
 
 // buildReport assumes there is at least one message in reqs.
-func (r *CommitReportingPlugin) buildReport(interval commit_store.ICommitStoreInterval, priceUpdates commit_store.InternalPriceUpdates) (*commit_store.ICommitStoreCommitReport, error) {
+func (r *CommitReportingPlugin) buildReport(interval commit_store.CommitStoreInterval, priceUpdates commit_store.InternalPriceUpdates) (*commit_store.CommitStoreCommitReport, error) {
 	lggr := r.config.lggr.Named("BuildReport")
 
 	// If no messages are needed only include fee updates
 	if interval.Min == 0 {
-		return &commit_store.ICommitStoreCommitReport{
+		return &commit_store.CommitStoreCommitReport{
 			PriceUpdates: priceUpdates,
 			MerkleRoot:   [32]byte{},
 			Interval:     interval,
@@ -449,7 +449,7 @@ func (r *CommitReportingPlugin) buildReport(interval commit_store.ICommitStoreIn
 		return nil, err
 	}
 
-	return &commit_store.ICommitStoreCommitReport{
+	return &commit_store.CommitStoreCommitReport{
 		PriceUpdates: priceUpdates,
 		MerkleRoot:   tree.Root(),
 		Interval:     interval,
@@ -462,7 +462,7 @@ func (r *CommitReportingPlugin) Report(_ context.Context, _ types.ReportTimestam
 		return false, nil, ErrCommitStoreIsDown
 	}
 	nonEmptyObservations := getNonEmptyObservations[CommitObservation](lggr, observations)
-	var intervals []commit_store.ICommitStoreInterval
+	var intervals []commit_store.CommitStoreInterval
 	for _, obs := range nonEmptyObservations {
 		intervals = append(intervals, obs.Interval)
 	}
@@ -549,9 +549,9 @@ func calculatePriceUpdates(destChainId uint64, observations []CommitObservation)
 }
 
 // Assumed at least f+1 valid observations
-func calculateIntervalConsensus(intervals []commit_store.ICommitStoreInterval, f int, nextMinSeqNumForOffRamp func() (uint64, error)) (commit_store.ICommitStoreInterval, error) {
+func calculateIntervalConsensus(intervals []commit_store.CommitStoreInterval, f int, nextMinSeqNumForOffRamp func() (uint64, error)) (commit_store.CommitStoreInterval, error) {
 	if len(intervals) <= f {
-		return commit_store.ICommitStoreInterval{}, errors.Errorf("Not enough intervals to form consensus intervals %d, f %d", len(intervals), f)
+		return commit_store.CommitStoreInterval{}, errors.Errorf("Not enough intervals to form consensus intervals %d, f %d", len(intervals), f)
 	}
 	// Extract the min and max
 	sort.Slice(intervals, func(i, j int) bool {
@@ -562,7 +562,7 @@ func calculateIntervalConsensus(intervals []commit_store.ICommitStoreInterval, f
 	// The only way a report could have a minSeqNum of 0 is when there are no messages to report
 	// and the report is potentially still valid for gas fee updates.
 	if minSeqNum == 0 {
-		return commit_store.ICommitStoreInterval{Min: 0, Max: 0}, nil
+		return commit_store.CommitStoreInterval{Min: 0, Max: 0}, nil
 	}
 
 	sort.Slice(intervals, func(i, j int) bool {
@@ -573,18 +573,18 @@ func calculateIntervalConsensus(intervals []commit_store.ICommitStoreInterval, f
 	maxSeqNum := intervals[f].Max
 	// TODO: Do we for sure want to fail everything here?
 	if maxSeqNum < minSeqNum {
-		return commit_store.ICommitStoreInterval{}, errors.New("max seq num smaller than min")
+		return commit_store.CommitStoreInterval{}, errors.New("max seq num smaller than min")
 	}
 	nextMin, err := nextMinSeqNumForOffRamp()
 	if err != nil {
-		return commit_store.ICommitStoreInterval{}, err
+		return commit_store.CommitStoreInterval{}, err
 	}
 	// Contract would revert
 	if nextMin > minSeqNum {
-		return commit_store.ICommitStoreInterval{}, errors.Errorf("invalid min seq number got %v want %v", minSeqNum, nextMin)
+		return commit_store.CommitStoreInterval{}, errors.Errorf("invalid min seq number got %v want %v", minSeqNum, nextMin)
 	}
 
-	return commit_store.ICommitStoreInterval{
+	return commit_store.CommitStoreInterval{
 		Min: minSeqNum,
 		Max: maxSeqNum,
 	}, nil
@@ -614,7 +614,7 @@ func (r *CommitReportingPlugin) expireInflight(lggr logger.Logger) {
 	r.inFlightPriceUpdates = stillInflight
 }
 
-func (r *CommitReportingPlugin) addToInflight(lggr logger.Logger, report *commit_store.ICommitStoreCommitReport) {
+func (r *CommitReportingPlugin) addToInflight(lggr logger.Logger, report *commit_store.CommitStoreCommitReport) {
 	r.inFlightMu.Lock()
 	defer r.inFlightMu.Unlock()
 
@@ -685,7 +685,7 @@ func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(_ context.Context, 
 	return !r.isStaleReport(parsedReport), nil
 }
 
-func (r *CommitReportingPlugin) isStaleReport(report *commit_store.ICommitStoreCommitReport) bool {
+func (r *CommitReportingPlugin) isStaleReport(report *commit_store.CommitStoreCommitReport) bool {
 	if isCommitStoreDownNow(r.config.lggr, r.config.commitStore) {
 		return true
 	}

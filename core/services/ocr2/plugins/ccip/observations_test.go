@@ -16,7 +16,7 @@ import (
 
 func TestObservationFilter(t *testing.T) {
 	lggr := logger.TestLogger(t)
-	obs1 := CommitObservation{Interval: commit_store.ICommitStoreInterval{Min: 1, Max: 10}}
+	obs1 := CommitObservation{Interval: commit_store.CommitStoreInterval{Min: 1, Max: 10}}
 	b1, err := obs1.Marshal()
 	require.NoError(t, err)
 	nonEmpty := getNonEmptyObservations[CommitObservation](lggr, []types.AttributedObservation{{Observation: b1}, {Observation: []byte{}}})

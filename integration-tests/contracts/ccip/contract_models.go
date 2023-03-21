@@ -366,7 +366,7 @@ func (r *Router) SetOnRamp(chainID uint64, onRamp common.Address) error {
 		Str("Router", r.Address()).
 		Msg("Setting on ramp for r")
 
-	tx, err := r.Instance.ApplyRampUpdates(opts, []router.IRouterOnRampUpdate{{DestChainId: chainID, OnRamp: onRamp}}, nil)
+	tx, err := r.Instance.ApplyRampUpdates(opts, []router.RouterOnRampUpdate{{DestChainId: chainID, OnRamp: onRamp}}, nil)
 	if err != nil {
 		return err
 	}
@@ -403,7 +403,7 @@ func (r *Router) AddOffRamp(offRamp common.Address, sourceChainId uint64) (*type
 	if err != nil {
 		return nil, err
 	}
-	tx, err := r.Instance.ApplyRampUpdates(opts, nil, []router.IRouterOffRampUpdate{
+	tx, err := r.Instance.ApplyRampUpdates(opts, nil, []router.RouterOffRampUpdate{
 		{SourceChainId: sourceChainId, OffRamps: []common.Address{offRamp}}})
 	if err != nil {
 		return nil, err

@@ -3,18 +3,18 @@ pragma solidity 0.8.15;
 
 import {ICommitStore} from "../../interfaces/ICommitStore.sol";
 import {IAny2EVMMessageReceiver} from "../../interfaces/IAny2EVMMessageReceiver.sol";
-import {IEVM2EVMOffRamp} from "../../interfaces/offRamp/IEVM2EVMOffRamp.sol";
 import {IPriceRegistry} from "../../interfaces/IPriceRegistry.sol";
-import {IRouter} from "../../interfaces/IRouter.sol";
 import {IPool} from "../../interfaces/pools/IPool.sol";
-import {IAggregateRateLimiter} from "../../interfaces/IAggregateRateLimiter.sol";
 
 import {Internal} from "../../models/Internal.sol";
 import {Client} from "../../models/Client.sol";
 import {TokenSetup} from "../TokenSetup.t.sol";
 import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
 import {MockCommitStore} from "../mocks/MockCommitStore.sol";
+import {Router} from "../../Router.sol";
+import {EVM2EVMOffRamp} from "../../offRamp/EVM2EVMOffRamp.sol";
 import {SimpleMessageReceiver} from "../helpers/receivers/SimpleMessageReceiver.sol";
+import {AggregateRateLimiter} from "../../AggregateRateLimiter.sol";
 import {EVM2EVMOffRampHelper} from "../helpers/EVM2EVMOffRampHelper.sol";
 import {TokenSetup} from "../TokenSetup.t.sol";
 import {RouterSetup} from "../router/RouterSetup.t.sol";
@@ -52,9 +52,9 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup {
     deployOffRamp(s_mockCommitStore, s_destRouter);
   }
 
-  function deployOffRamp(ICommitStore commitStore, IRouter router) internal {
+  function deployOffRamp(ICommitStore commitStore, Router router) internal {
     s_offRamp = new EVM2EVMOffRampHelper(
-      IEVM2EVMOffRamp.StaticConfig({
+      EVM2EVMOffRamp.StaticConfig({
         commitStore: address(commitStore),
         chainId: DEST_CHAIN_ID,
         sourceChainId: SOURCE_CHAIN_ID,
@@ -71,9 +71,9 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup {
 
     address[] memory s_offRamps = new address[](1);
     s_offRamps[0] = address(s_offRamp);
-    IRouter.OnRampUpdate[] memory onRampUpdates = new IRouter.OnRampUpdate[](0);
-    IRouter.OffRampUpdate[] memory offRampUpdates = new IRouter.OffRampUpdate[](1);
-    offRampUpdates[0] = IRouter.OffRampUpdate({sourceChainId: SOURCE_CHAIN_ID, offRamps: s_offRamps});
+    Router.OnRampUpdate[] memory onRampUpdates = new Router.OnRampUpdate[](0);
+    Router.OffRampUpdate[] memory offRampUpdates = new Router.OffRampUpdate[](1);
+    offRampUpdates[0] = Router.OffRampUpdate({sourceChainId: SOURCE_CHAIN_ID, offRamps: s_offRamps});
     s_destRouter.applyRampUpdates(onRampUpdates, offRampUpdates);
 
     IPool.RampUpdate[] memory offRamps = new IPool.RampUpdate[](1);
@@ -192,7 +192,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup {
       });
   }
 
-  function _assertSameConfig(IEVM2EVMOffRamp.DynamicConfig memory a, IEVM2EVMOffRamp.DynamicConfig memory b) public {
+  function _assertSameConfig(EVM2EVMOffRamp.DynamicConfig memory a, EVM2EVMOffRamp.DynamicConfig memory b) public {
     assertEq(a.executionDelaySeconds, b.executionDelaySeconds);
     assertEq(a.maxDataSize, b.maxDataSize);
     assertEq(a.maxTokensLength, b.maxTokensLength);

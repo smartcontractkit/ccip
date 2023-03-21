@@ -419,9 +419,9 @@ func NoNodesHaveExecutedSeqNum(t *testing.T, ccipContracts CCIPContracts, eventS
 	return log
 }
 
-func EventuallyCommitReportAccepted(t *testing.T, ccipContracts CCIPContracts, currentBlock uint64) commit_store.ICommitStoreCommitReport {
+func EventuallyCommitReportAccepted(t *testing.T, ccipContracts CCIPContracts, currentBlock uint64) commit_store.CommitStoreCommitReport {
 	g := gomega.NewGomegaWithT(t)
-	var report commit_store.ICommitStoreCommitReport
+	var report commit_store.CommitStoreCommitReport
 	g.Eventually(func() bool {
 		it, err := ccipContracts.Dest.CommitStore.FilterReportAccepted(&bind.FilterOpts{Start: currentBlock})
 		g.Expect(err).NotTo(gomega.HaveOccurred(), "Error filtering ReportAccepted event")

@@ -35,7 +35,7 @@ func TestCommitReportSize(t *testing.T) {
 	p.Property("bounded commit report size", prop.ForAll(func(root []byte, min, max uint64) bool {
 		var root32 [32]byte
 		copy(root32[:], root)
-		rep, err := EncodeCommitReport(&commit_store.ICommitStoreCommitReport{MerkleRoot: root32, Interval: commit_store.ICommitStoreInterval{Min: min, Max: max}, PriceUpdates: commit_store.InternalPriceUpdates{
+		rep, err := EncodeCommitReport(&commit_store.CommitStoreCommitReport{MerkleRoot: root32, Interval: commit_store.CommitStoreInterval{Min: min, Max: max}, PriceUpdates: commit_store.InternalPriceUpdates{
 			TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{},
 			DestChainId:       1337,
 			UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
@@ -94,12 +94,12 @@ func TestCommitReportEncoding(t *testing.T) {
 	commitStoreAddress, _, _, err := commit_store_helper.DeployCommitStoreHelper(
 		destUser,  // user
 		destChain, // client
-		commit_store_helper.ICommitStoreStaticConfig{
+		commit_store_helper.CommitStoreStaticConfig{
 			ChainId:       destChainId,
 			SourceChainId: 1337,
 			OnRamp:        onRampAddress,
 		},
-		commit_store_helper.ICommitStoreDynamicConfig{
+		commit_store_helper.CommitStoreDynamicConfig{
 			PriceRegistry: priceRegistry,
 			Afn:           afnAddress, // AFN address
 		},
@@ -120,7 +120,7 @@ func TestCommitReportEncoding(t *testing.T) {
 	mctx := hasher.NewKeccakCtx()
 	tree, err := merklemulti.NewTree(mctx, [][32]byte{mctx.Hash([]byte{0xaa})})
 	require.NoError(t, err)
-	report := commit_store.ICommitStoreCommitReport{
+	report := commit_store.CommitStoreCommitReport{
 		PriceUpdates: commit_store.InternalPriceUpdates{
 			TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{
 				{
@@ -132,7 +132,7 @@ func TestCommitReportEncoding(t *testing.T) {
 			UsdPerUnitGas: big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
 		},
 		MerkleRoot: tree.Root(),
-		Interval:   commit_store.ICommitStoreInterval{Min: 1, Max: 10},
+		Interval:   commit_store.CommitStoreInterval{Min: 1, Max: 10},
 	}
 	out, err := EncodeCommitReport(&report)
 	require.NoError(t, err)
@@ -226,26 +226,26 @@ func TestCalculateIntervalConsensus(t *testing.T) {
 
 	tests := []struct {
 		name                    string
-		intervals               []commit_store.ICommitStoreInterval
+		intervals               []commit_store.CommitStoreInterval
 		f                       int
 		nextMinSeqNumForOffRamp uint64
 		wantMin                 uint64
 		wantMax                 uint64
 		wantErr                 bool
 	}{
-		{"no obs", []commit_store.ICommitStoreInterval{{Min: 0, Max: 0}}, 0, 100, 0, 0, false},
-		{"basic", []commit_store.ICommitStoreInterval{
+		{"no obs", []commit_store.CommitStoreInterval{{Min: 0, Max: 0}}, 0, 100, 0, 0, false},
+		{"basic", []commit_store.CommitStoreInterval{
 			{Min: 9, Max: 14},
 			{Min: 10, Max: 12},
 			{Min: 10, Max: 14},
 		}, 1, 10, 10, 14, false},
-		{"not enough intervals", []commit_store.ICommitStoreInterval{}, 1, 0, 0, 0, true},
-		{"wrong next min", []commit_store.ICommitStoreInterval{
+		{"not enough intervals", []commit_store.CommitStoreInterval{}, 1, 0, 0, 0, true},
+		{"wrong next min", []commit_store.CommitStoreInterval{
 			{Min: 9, Max: 14},
 			{Min: 10, Max: 12},
 			{Min: 10, Max: 14},
 		}, 1, 11, 0, 0, true},
-		{"min > max", []commit_store.ICommitStoreInterval{
+		{"min > max", []commit_store.CommitStoreInterval{
 			{Min: 9, Max: 5},
 			{Min: 10, Max: 4},
 			{Min: 10, Max: 6},

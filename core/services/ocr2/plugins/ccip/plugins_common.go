@@ -92,7 +92,7 @@ func leavesFromIntervals(
 	onRamp common.Address,
 	eventSigs EventSignatures,
 	seqParser func(logpoller.Log) (uint64, error),
-	interval commit_store.ICommitStoreInterval,
+	interval commit_store.CommitStoreInterval,
 	srcLogPoller logpoller.LogPoller,
 	hasher LeafHasherInterface[[32]byte],
 	confs int) ([][32]byte, error) {
@@ -152,17 +152,17 @@ type EventSignatures struct {
 	ExecutionStateChangedSequenceNumberIndex int
 }
 
-func commitReport(dstLogPoller logpoller.LogPoller, onRamp common.Address, commitStore *commit_store.CommitStore, seqNr uint64) (commit_store.ICommitStoreCommitReport, error) {
+func commitReport(dstLogPoller logpoller.LogPoller, onRamp common.Address, commitStore *commit_store.CommitStore, seqNr uint64) (commit_store.CommitStoreCommitReport, error) {
 	latest, err := dstLogPoller.LatestBlock()
 	if err != nil {
-		return commit_store.ICommitStoreCommitReport{}, err
+		return commit_store.CommitStoreCommitReport{}, err
 	}
 	logs, err := dstLogPoller.Logs(1, latest, ReportAccepted, commitStore.Address())
 	if err != nil {
-		return commit_store.ICommitStoreCommitReport{}, err
+		return commit_store.CommitStoreCommitReport{}, err
 	}
 	if len(logs) == 0 {
-		return commit_store.ICommitStoreCommitReport{}, errors.Errorf("seq number not committed, nothing committed")
+		return commit_store.CommitStoreCommitReport{}, errors.Errorf("seq number not committed, nothing committed")
 	}
 	for _, log := range logs {
 		reportAccepted, err := commitStore.ParseReportAccepted(types.Log{
@@ -170,13 +170,13 @@ func commitReport(dstLogPoller logpoller.LogPoller, onRamp common.Address, commi
 			Data:   log.Data,
 		})
 		if err != nil {
-			return commit_store.ICommitStoreCommitReport{}, err
+			return commit_store.CommitStoreCommitReport{}, err
 		}
 		if reportAccepted.Report.Interval.Min <= seqNr && seqNr <= reportAccepted.Report.Interval.Max {
 			return reportAccepted.Report, nil
 		}
 	}
-	return commit_store.ICommitStoreCommitReport{}, errors.Errorf("seq number not committed")
+	return commit_store.CommitStoreCommitReport{}, errors.Errorf("seq number not committed")
 }
 
 func buildExecution(

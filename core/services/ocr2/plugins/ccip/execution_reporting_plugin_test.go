@@ -112,12 +112,12 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	commitStoreAddress, _, _, err := commit_store_helper.DeployCommitStoreHelper(
 		destUser,  // user
 		destChain, // client
-		commit_store_helper.ICommitStoreStaticConfig{
+		commit_store_helper.CommitStoreStaticConfig{
 			ChainId:       1338,
 			SourceChainId: 1337,
 			OnRamp:        onRampAddress,
 		},
-		commit_store_helper.ICommitStoreDynamicConfig{
+		commit_store_helper.CommitStoreDynamicConfig{
 			PriceRegistry: destPriceRegistryAddress,
 			Afn:           afnAddress, // AFN address
 		},
@@ -134,13 +134,13 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	offRampAddress, _, _, err := evm_2_evm_offramp.DeployEVM2EVMOffRamp(
 		destUser,
 		destChain,
-		evm_2_evm_offramp.IEVM2EVMOffRampStaticConfig{
+		evm_2_evm_offramp.EVM2EVMOffRampStaticConfig{
 			CommitStore:   commitStore.Address(),
 			ChainId:       destChainID,
 			SourceChainId: sourceChainID,
 			OnRamp:        onRampAddress,
 		},
-		evm_2_evm_offramp.IEVM2EVMOffRampDynamicConfig{
+		evm_2_evm_offramp.EVM2EVMOffRampDynamicConfig{
 			Router:                                  routerAddress,
 			PermissionLessExecutionThresholdSeconds: 1,
 			ExecutionDelaySeconds:                   0,
@@ -150,7 +150,7 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 		},
 		[]common.Address{linkTokenSourceAddress},
 		[]common.Address{destPoolAddress},
-		evm_2_evm_offramp.IAggregateRateLimiterRateLimiterConfig{
+		evm_2_evm_offramp.AggregateRateLimiterRateLimiterConfig{
 			Capacity: big.NewInt(1e18),
 			Rate:     big.NewInt(1e18),
 			Admin:    destUser.From,
@@ -166,7 +166,7 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	receiver, err := simple_message_receiver.NewSimpleMessageReceiver(receiverAddress, destChain)
 	require.NoError(t, err)
 	destChain.Commit()
-	_, err = routerContract.ApplyRampUpdates(destUser, nil, []router.IRouterOffRampUpdate{
+	_, err = routerContract.ApplyRampUpdates(destUser, nil, []router.RouterOffRampUpdate{
 		{SourceChainId: sourceChainID, OffRamps: []common.Address{offRampAddress}}})
 	require.NoError(t, err)
 	destChain.Commit()

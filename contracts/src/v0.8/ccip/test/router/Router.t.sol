@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {IEVM2AnyOnRamp} from "../../interfaces/onRamp/IEVM2AnyOnRamp.sol";
+import {IEVM2AnyOnRamp} from "../../interfaces/IEVM2AnyOnRamp.sol";
 import {IRouter} from "../../interfaces/IRouter.sol";
 import {IWrappedNative} from "../../interfaces/IWrappedNative.sol";
 import {IRouterClient} from "../../interfaces/IRouterClient.sol";
@@ -146,8 +146,8 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
   }
 
   function testNonLinkFeeTokenSuccess() public {
-    IEVM2EVMOnRamp.FeeTokenConfigArgs[] memory feeTokenConfigArgs = new IEVM2EVMOnRamp.FeeTokenConfigArgs[](1);
-    feeTokenConfigArgs[0] = IEVM2EVMOnRamp.FeeTokenConfigArgs({
+    EVM2EVMOnRamp.FeeTokenConfigArgs[] memory feeTokenConfigArgs = new EVM2EVMOnRamp.FeeTokenConfigArgs[](1);
+    feeTokenConfigArgs[0] = EVM2EVMOnRamp.FeeTokenConfigArgs({
       token: s_sourceTokens[1],
       feeAmount: 2,
       multiplier: 108e16,
@@ -214,7 +214,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     address wrongFeeToken = address(1);
     message.feeToken = wrongFeeToken;
 
-    vm.expectRevert(abi.encodeWithSelector(IPriceRegistry.NotAFeeToken.selector, wrongFeeToken));
+    vm.expectRevert(abi.encodeWithSelector(PriceRegistry.NotAFeeToken.selector, wrongFeeToken));
 
     s_sourceRouter.ccipSend(DEST_CHAIN_ID, message);
   }
@@ -270,16 +270,16 @@ contract Router_applyRampUpdates is RouterSetup {
   function generateSingleOffRampUpdate(uint64 sourceChainId, address offRamp)
     private
     pure
-    returns (IRouter.OffRampUpdate memory)
+    returns (Router.OffRampUpdate memory)
   {
     address[] memory offRamps = new address[](1);
     offRamps[0] = offRamp;
-    return IRouter.OffRampUpdate({sourceChainId: sourceChainId, offRamps: offRamps});
+    return Router.OffRampUpdate({sourceChainId: sourceChainId, offRamps: offRamps});
   }
 
-  function generateDisableOffRampUpdate(uint64 sourceChainId) private pure returns (IRouter.OffRampUpdate memory) {
+  function generateDisableOffRampUpdate(uint64 sourceChainId) private pure returns (Router.OffRampUpdate memory) {
     address[] memory offRamps = new address[](0);
-    return IRouter.OffRampUpdate({sourceChainId: sourceChainId, offRamps: offRamps});
+    return Router.OffRampUpdate({sourceChainId: sourceChainId, offRamps: offRamps});
   }
 
   function testRampUpdates(uint16 config) public {
@@ -297,15 +297,15 @@ contract Router_applyRampUpdates is RouterSetup {
 
     // Apply series of updates.
     for (uint256 j = 0; j < uint256(nApply); j++) {
-      IRouter.OnRampUpdate[] memory onRampUpdates = new IRouter.OnRampUpdate[](nOnRampUpdates);
-      IRouter.OffRampUpdate[] memory offRampUpdates = new IRouter.OffRampUpdate[](nOffRampUpdates);
+      Router.OnRampUpdate[] memory onRampUpdates = new Router.OnRampUpdate[](nOnRampUpdates);
+      Router.OffRampUpdate[] memory offRampUpdates = new Router.OffRampUpdate[](nOffRampUpdates);
       // For each application we use the same chainID range to ensure overwriting.
       for (uint256 i = 1; i < uint256(nOnRampUpdates) + 1; ++i) {
         if (uint256(disableOnRamp) == i - 1) {
           // Disable this chainID
-          onRampUpdates[i - 1] = IRouter.OnRampUpdate({destChainId: uint64(i), onRamp: address(uint160(0))});
+          onRampUpdates[i - 1] = Router.OnRampUpdate({destChainId: uint64(i), onRamp: address(uint160(0))});
         } else {
-          onRampUpdates[i - 1] = IRouter.OnRampUpdate({destChainId: uint64(i), onRamp: address(uint160(i))});
+          onRampUpdates[i - 1] = Router.OnRampUpdate({destChainId: uint64(i), onRamp: address(uint160(i))});
         }
       }
       for (uint256 i = 1; i < uint256(nOffRampUpdates) + 1; ++i) {
@@ -314,7 +314,7 @@ contract Router_applyRampUpdates is RouterSetup {
         for (uint256 k = 0; k < uint256(nOffRamps); k++) {
           offRamps[k] = address(uint160(i));
         }
-        offRampUpdates[i - 1] = IRouter.OffRampUpdate({sourceChainId: uint64(i), offRamps: offRamps});
+        offRampUpdates[i - 1] = Router.OffRampUpdate({sourceChainId: uint64(i), offRamps: offRamps});
       }
       s_sourceRouter.applyRampUpdates(onRampUpdates, offRampUpdates);
 
@@ -352,8 +352,8 @@ contract Router_applyRampUpdates is RouterSetup {
 
   function testOffRampDisable() public {
     // Add ingress
-    IRouter.OnRampUpdate[] memory onRampUpdates = new IRouter.OnRampUpdate[](0);
-    IRouter.OffRampUpdate[] memory offRampUpdates = new IRouter.OffRampUpdate[](1);
+    Router.OnRampUpdate[] memory onRampUpdates = new Router.OnRampUpdate[](0);
+    Router.OffRampUpdate[] memory offRampUpdates = new Router.OffRampUpdate[](1);
     address offRamp = address(uint160(2));
     offRampUpdates[0] = generateSingleOffRampUpdate(SOURCE_CHAIN_ID, offRamp);
     s_sourceRouter.applyRampUpdates(onRampUpdates, offRampUpdates);
@@ -381,22 +381,22 @@ contract Router_applyRampUpdates is RouterSetup {
 
   function testOnRampDisable() public {
     // Add onRamp
-    IRouter.OnRampUpdate[] memory onRampUpdates = new IRouter.OnRampUpdate[](1);
-    IRouter.OffRampUpdate[] memory offRampUpdates = new IRouter.OffRampUpdate[](0);
+    Router.OnRampUpdate[] memory onRampUpdates = new Router.OnRampUpdate[](1);
+    Router.OffRampUpdate[] memory offRampUpdates = new Router.OffRampUpdate[](0);
     address onRamp = address(uint160(2));
-    onRampUpdates[0] = IRouter.OnRampUpdate({destChainId: DEST_CHAIN_ID, onRamp: onRamp});
+    onRampUpdates[0] = Router.OnRampUpdate({destChainId: DEST_CHAIN_ID, onRamp: onRamp});
     s_sourceRouter.applyRampUpdates(onRampUpdates, offRampUpdates);
     assertEq(onRamp, s_sourceRouter.getOnRamp(DEST_CHAIN_ID));
     assertTrue(s_sourceRouter.isChainSupported(DEST_CHAIN_ID));
 
     // Disable onRamp
-    onRampUpdates[0] = IRouter.OnRampUpdate({destChainId: DEST_CHAIN_ID, onRamp: address(0)});
+    onRampUpdates[0] = Router.OnRampUpdate({destChainId: DEST_CHAIN_ID, onRamp: address(0)});
     s_sourceRouter.applyRampUpdates(onRampUpdates, offRampUpdates);
     assertEq(address(0), s_sourceRouter.getOnRamp(DEST_CHAIN_ID));
     assertFalse(s_sourceRouter.isChainSupported(DEST_CHAIN_ID));
 
     // Re-enable onRamp
-    onRampUpdates[0] = IRouter.OnRampUpdate({destChainId: DEST_CHAIN_ID, onRamp: onRamp});
+    onRampUpdates[0] = Router.OnRampUpdate({destChainId: DEST_CHAIN_ID, onRamp: onRamp});
     s_sourceRouter.applyRampUpdates(onRampUpdates, offRampUpdates);
     assertEq(onRamp, s_sourceRouter.getOnRamp(DEST_CHAIN_ID));
     assertTrue(s_sourceRouter.isChainSupported(DEST_CHAIN_ID));
@@ -405,8 +405,8 @@ contract Router_applyRampUpdates is RouterSetup {
   function testOnlyOwnerReverts() public {
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
-    IRouter.OnRampUpdate[] memory onRampUpdates = new IRouter.OnRampUpdate[](0);
-    IRouter.OffRampUpdate[] memory offRampUpdates = new IRouter.OffRampUpdate[](0);
+    Router.OnRampUpdate[] memory onRampUpdates = new Router.OnRampUpdate[](0);
+    Router.OffRampUpdate[] memory offRampUpdates = new Router.OffRampUpdate[](0);
     s_sourceRouter.applyRampUpdates(onRampUpdates, offRampUpdates);
   }
 }

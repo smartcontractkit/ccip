@@ -642,12 +642,12 @@ func getFeeTokensPrices(ctx context.Context, priceRegistry *price_registry.Price
 	return prices, nil
 }
 
-func getUnexpiredCommitReports(dstLogPoller logpoller.LogPoller, commitStore *commit_store.CommitStore) ([]commit_store.ICommitStoreCommitReport, error) {
+func getUnexpiredCommitReports(dstLogPoller logpoller.LogPoller, commitStore *commit_store.CommitStore) ([]commit_store.CommitStoreCommitReport, error) {
 	logs, err := dstLogPoller.LogsCreatedAfter(ReportAccepted, commitStore.Address(), time.Now().Add(-PERMISSIONLESS_EXECUTION_THRESHOLD))
 	if err != nil {
 		return nil, err
 	}
-	var reports []commit_store.ICommitStoreCommitReport
+	var reports []commit_store.CommitStoreCommitReport
 	for _, log := range logs {
 		reportAccepted, err := commitStore.ParseReportAccepted(gethtypes.Log{
 			Topics: log.GetTopics(),

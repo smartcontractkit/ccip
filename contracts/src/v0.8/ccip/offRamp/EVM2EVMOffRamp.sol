@@ -5,7 +5,6 @@ import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.
 import {ICommitStore} from "../interfaces/ICommitStore.sol";
 import {IAFN} from "../interfaces/IAFN.sol";
 import {IPool} from "../interfaces/pools/IPool.sol";
-import {IEVM2EVMOffRamp} from "../interfaces/offRamp/IEVM2EVMOffRamp.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
 
@@ -22,11 +21,26 @@ import {Pausable} from "../../vendor/Pausable.sol";
 
 /// @notice EVM2EVMOffRamp enables OCR networks to execute multiple messages
 /// in an OffRamp in a single transaction.
-contract EVM2EVMOffRamp is IEVM2EVMOffRamp, Pausable, AggregateRateLimiter, TypeAndVersionInterface, OCR2Base {
+contract EVM2EVMOffRamp is Pausable, AggregateRateLimiter, TypeAndVersionInterface, OCR2Base {
   using Address for address;
   using ERC165Checker for address;
   using EnumerableMapAddresses for EnumerableMapAddresses.AddressToAddressMap;
 
+  error AlreadyAttempted(uint64 sequenceNumber);
+  error AlreadyExecuted(uint64 sequenceNumber);
+  error ZeroAddressNotAllowed();
+  error ExecutionError(bytes error);
+  error InvalidSourceChain(uint64 sourceChainId);
+  error MessageTooLarge(uint256 maxSize, uint256 actualSize);
+  error UnsupportedNumberOfTokens(uint64 sequenceNumber);
+  error ManualExecutionNotYetEnabled();
+  error RootNotCommitted();
+  error InvalidOffRampConfig(DynamicConfig config);
+  error UnsupportedToken(IERC20 token);
+  error CanOnlySelfCall();
+  error ReceiverError();
+  error EmptyReport();
+  error BadAFNSignal();
   error InvalidTokenPoolConfig();
   error PoolAlreadyAdded();
   error PoolDoesNotExist();
@@ -34,6 +48,33 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, Pausable, AggregateRateLimiter, Type
 
   event PoolAdded(address token, address pool);
   event PoolRemoved(address token, address pool);
+  // this event is needed for Atlas; if their structs/signature changes, we must update the ABIs there
+  event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
+  event SkippedIncorrectNonce(uint64 indexed nonce, address indexed sender);
+  event ExecutionStateChanged(
+    uint64 indexed sequenceNumber,
+    bytes32 indexed messageId,
+    Internal.MessageExecutionState state
+  );
+
+  /// @notice Static offRamp config
+  struct StaticConfig {
+    address commitStore; // --┐  CommitStore address on the destination chain
+    uint64 chainId; // -------┘  Destination chain Id
+    uint64 sourceChainId; // -┐  Source chain Id
+    address onRamp; // -------┘  OnRamp address on the source chain
+  }
+
+  /// @notice Dynamic offRamp config
+  /// @dev since OffRampConfig is part of OffRampConfigChanged event, if changing it, we should update the ABI on Atlas
+  struct DynamicConfig {
+    uint32 permissionLessExecutionThresholdSeconds; // -┐ Waiting time before manual execution is enabled
+    uint64 executionDelaySeconds; //                    | Execution delay in seconds
+    address router; // ---------------------------------┘ Router address
+    uint32 maxDataSize; // --------┐ Maximum payload data size
+    uint16 maxTokensLength; //     | Maximum number of distinct ERC20 tokens that can be sent per message
+    address afn; // ---------------┘ AFN address
+  }
 
   // STATIC CONFIG
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
@@ -97,18 +138,23 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, Pausable, AggregateRateLimiter, Type
   // |                          Messaging                           |
   // ================================================================
 
-  /// @inheritdoc IEVM2EVMOffRamp
+  /// @notice Returns the current execution state of a message based on its sequenceNumber.
+  /// @param sequenceNumber The sequence number of the message to get the execution state for
+  /// @return The current execution state of the message
   function getExecutionState(uint64 sequenceNumber) public view returns (Internal.MessageExecutionState) {
     return s_executedMessages[sequenceNumber];
   }
 
-  /// @inheritdoc IEVM2EVMOffRamp
-  function getSenderNonce(address sender) public view override returns (uint64 nonce) {
+  /// @notice Returns the the current nonce for a receiver.
+  /// @param sender The sender address
+  /// @return nonce The nonce value belonging to the sender address.
+  function getSenderNonce(address sender) public view returns (uint64 nonce) {
     return s_senderNonce[sender];
   }
 
-  /// @inheritdoc IEVM2EVMOffRamp
-  function manuallyExecute(Internal.ExecutionReport memory report) external override {
+  /// @notice Manually execute a message.
+  /// @param report Internal.ExecutionReport.
+  function manuallyExecute(Internal.ExecutionReport memory report) external {
     _execute(report, true);
   }
 
@@ -229,7 +275,7 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, Pausable, AggregateRateLimiter, Type
     returns (Internal.MessageExecutionState)
   {
     try this.executeSingleMessage(message, manualExecution) {} catch (bytes memory err) {
-      if (IEVM2EVMOffRamp.ReceiverError.selector == bytes4(err)) {
+      if (ReceiverError.selector == bytes4(err)) {
         return Internal.MessageExecutionState.FAILURE;
       } else {
         revert ExecutionError(err);
@@ -271,24 +317,22 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, Pausable, AggregateRateLimiter, Type
   // |                           Config                             |
   // ================================================================
 
-  /// @inheritdoc IEVM2EVMOffRamp
-  function getStaticConfig() external view override returns (StaticConfig memory) {
+  /// @notice Returns the static config.
+  /// @dev This function will always return the same struct as the contents is static and can never change.
+  function getStaticConfig() external view returns (StaticConfig memory) {
     return
-      IEVM2EVMOffRamp.StaticConfig({
-        commitStore: i_commitStore,
-        chainId: i_chainId,
-        sourceChainId: i_sourceChainId,
-        onRamp: i_onRamp
-      });
+      StaticConfig({commitStore: i_commitStore, chainId: i_chainId, sourceChainId: i_sourceChainId, onRamp: i_onRamp});
   }
 
-  /// @inheritdoc IEVM2EVMOffRamp
-  function getDynamicConfig() external view override returns (DynamicConfig memory) {
+  /// @notice Returns the current dynamic config.
+  /// @return The current config.
+  function getDynamicConfig() external view returns (DynamicConfig memory) {
     return s_dynamicConfig;
   }
 
-  /// @inheritdoc IEVM2EVMOffRamp
-  function setDynamicConfig(DynamicConfig memory config) external override onlyOwner {
+  /// @notice Sets a new dynamic config.
+  /// @param config The new config
+  function setDynamicConfig(DynamicConfig memory config) external onlyOwner {
     _setDynamicConfig(config);
   }
 
@@ -300,12 +344,7 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, Pausable, AggregateRateLimiter, Type
     s_dynamicConfig = dynamicConfig;
 
     emit ConfigSet(
-      IEVM2EVMOffRamp.StaticConfig({
-        commitStore: i_commitStore,
-        chainId: i_chainId,
-        sourceChainId: i_sourceChainId,
-        onRamp: i_onRamp
-      }),
+      StaticConfig({commitStore: i_commitStore, chainId: i_chainId, sourceChainId: i_sourceChainId, onRamp: i_onRamp}),
       dynamicConfig
     );
   }
@@ -361,6 +400,9 @@ contract EVM2EVMOffRamp is IEVM2EVMOffRamp, Pausable, AggregateRateLimiter, Type
     }
   }
 
+  /// @notice Adds and removed token pools.
+  /// @param removes The tokens and pools to be removed
+  /// @param adds The tokens and pools to be added.
   function applyPoolUpdates(Internal.PoolUpdate[] memory removes, Internal.PoolUpdate[] memory adds) public onlyOwner {
     for (uint256 i = 0; i < removes.length; ++i) {
       address token = removes[i].token;

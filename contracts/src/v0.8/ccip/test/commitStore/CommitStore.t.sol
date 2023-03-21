@@ -13,8 +13,8 @@ contract CommitStoreSetup is PriceRegistrySetup {
     PriceRegistrySetup.setUp();
 
     s_commitStore = new CommitStoreHelper(
-      ICommitStore.StaticConfig({chainId: DEST_CHAIN_ID, sourceChainId: SOURCE_CHAIN_ID, onRamp: ON_RAMP_ADDRESS}),
-      ICommitStore.DynamicConfig({priceRegistry: address(s_priceRegistry), afn: address(s_afn)})
+      CommitStore.StaticConfig({chainId: DEST_CHAIN_ID, sourceChainId: SOURCE_CHAIN_ID, onRamp: ON_RAMP_ADDRESS}),
+      CommitStore.DynamicConfig({priceRegistry: address(s_priceRegistry), afn: address(s_afn)})
     );
 
     address[] memory priceUpdaters = new address[](1);
@@ -34,23 +34,23 @@ contract CommitStoreRealAFNSetup is PriceRegistrySetup {
     weights[0] = 1;
     s_afn = new AFN(participants, weights, 1, 1); // Overwrite base mock afn with real.
     s_commitStore = new CommitStoreHelper(
-      ICommitStore.StaticConfig({chainId: DEST_CHAIN_ID, sourceChainId: SOURCE_CHAIN_ID, onRamp: ON_RAMP_ADDRESS}),
-      ICommitStore.DynamicConfig({priceRegistry: address(s_priceRegistry), afn: address(s_afn)})
+      CommitStore.StaticConfig({chainId: DEST_CHAIN_ID, sourceChainId: SOURCE_CHAIN_ID, onRamp: ON_RAMP_ADDRESS}),
+      CommitStore.DynamicConfig({priceRegistry: address(s_priceRegistry), afn: address(s_afn)})
     );
   }
 }
 
 /// @notice #constructor
 contract CommitStore_constructor is PriceRegistrySetup {
-  event ConfigSet(ICommitStore.StaticConfig, ICommitStore.DynamicConfig);
+  event ConfigSet(CommitStore.StaticConfig, CommitStore.DynamicConfig);
 
   function testConstructorSuccess() public {
-    ICommitStore.StaticConfig memory staticConfig = ICommitStore.StaticConfig({
+    CommitStore.StaticConfig memory staticConfig = CommitStore.StaticConfig({
       chainId: DEST_CHAIN_ID,
       sourceChainId: SOURCE_CHAIN_ID,
       onRamp: 0x2C44CDDdB6a900Fa2B585dd299E03D12Fa4293Bc
     });
-    ICommitStore.DynamicConfig memory dynamicConfig = ICommitStore.DynamicConfig({
+    CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({
       priceRegistry: address(s_priceRegistry),
       afn: address(s_afn)
     });
@@ -60,13 +60,13 @@ contract CommitStore_constructor is PriceRegistrySetup {
 
     CommitStore commitStore = new CommitStore(staticConfig, dynamicConfig);
 
-    ICommitStore.StaticConfig memory gotStaticConfig = commitStore.getStaticConfig();
+    CommitStore.StaticConfig memory gotStaticConfig = commitStore.getStaticConfig();
 
     assertEq(staticConfig.chainId, gotStaticConfig.chainId);
     assertEq(staticConfig.sourceChainId, gotStaticConfig.sourceChainId);
     assertEq(staticConfig.onRamp, gotStaticConfig.onRamp);
 
-    ICommitStore.DynamicConfig memory gotDynamicConfig = commitStore.getDynamicConfig();
+    CommitStore.DynamicConfig memory gotDynamicConfig = commitStore.getDynamicConfig();
 
     assertEq(dynamicConfig.priceRegistry, gotDynamicConfig.priceRegistry);
     assertEq(dynamicConfig.afn, gotDynamicConfig.afn);
@@ -96,11 +96,11 @@ contract CommitStore_setMinSeqNr is CommitStoreSetup {
 
 /// @notice #setDynamicConfig
 contract CommitStore_setDynamicConfig is CommitStoreSetup {
-  event ConfigSet(ICommitStore.StaticConfig, ICommitStore.DynamicConfig);
+  event ConfigSet(CommitStore.StaticConfig, CommitStore.DynamicConfig);
 
   function testSetMinSeqNrSuccess() public {
-    ICommitStore.StaticConfig memory staticConfig = s_commitStore.getStaticConfig();
-    ICommitStore.DynamicConfig memory dynamicConfig = ICommitStore.DynamicConfig({
+    CommitStore.StaticConfig memory staticConfig = s_commitStore.getStaticConfig();
+    CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({
       priceRegistry: address(23784264),
       afn: address(s_afn)
     });
@@ -110,13 +110,13 @@ contract CommitStore_setDynamicConfig is CommitStoreSetup {
 
     s_commitStore.setDynamicConfig(dynamicConfig);
 
-    ICommitStore.DynamicConfig memory gotDynamicConfig = s_commitStore.getDynamicConfig();
+    CommitStore.DynamicConfig memory gotDynamicConfig = s_commitStore.getDynamicConfig();
     assertEq(gotDynamicConfig.priceRegistry, dynamicConfig.priceRegistry);
   }
 
   // Reverts
   function testOnlyOwnerReverts() public {
-    ICommitStore.DynamicConfig memory dynamicConfig = ICommitStore.DynamicConfig({
+    CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({
       priceRegistry: address(23784264),
       afn: address(s_afn)
     });
@@ -144,7 +144,7 @@ contract CommitStore_resetUnblessedRoots is CommitStoreSetup {
     s_afn = new AFN(participants, weights, weights[0], weights[0]);
 
     s_commitStore.setDynamicConfig(
-      ICommitStore.DynamicConfig({priceRegistry: address(s_priceRegistry), afn: address(s_afn)})
+      CommitStore.DynamicConfig({priceRegistry: address(s_priceRegistry), afn: address(s_afn)})
     );
   }
 
@@ -154,25 +154,25 @@ contract CommitStore_resetUnblessedRoots is CommitStoreSetup {
     rootsToReset[1] = "2";
     rootsToReset[2] = "3";
 
-    ICommitStore.CommitReport memory report = ICommitStore.CommitReport({
+    CommitStore.CommitReport memory report = CommitStore.CommitReport({
       priceUpdates: getEmptyPriceUpdates(),
-      interval: ICommitStore.Interval(1, 2),
+      interval: CommitStore.Interval(1, 2),
       merkleRoot: rootsToReset[0]
     });
 
     s_commitStore.report(abi.encode(report));
 
-    report = ICommitStore.CommitReport({
+    report = CommitStore.CommitReport({
       priceUpdates: getEmptyPriceUpdates(),
-      interval: ICommitStore.Interval(3, 4),
+      interval: CommitStore.Interval(3, 4),
       merkleRoot: rootsToReset[1]
     });
 
     s_commitStore.report(abi.encode(report));
 
-    report = ICommitStore.CommitReport({
+    report = CommitStore.CommitReport({
       priceUpdates: getEmptyPriceUpdates(),
-      interval: ICommitStore.Interval(5, 5),
+      interval: CommitStore.Interval(5, 5),
       merkleRoot: rootsToReset[2]
     });
 
@@ -208,16 +208,16 @@ contract CommitStore_resetUnblessedRoots is CommitStoreSetup {
 
 /// @notice #report
 contract CommitStore_report is CommitStoreSetup {
-  event ReportAccepted(ICommitStore.CommitReport report);
+  event ReportAccepted(CommitStore.CommitReport report);
   event UsdPerTokenUpdated(address indexed feeToken, uint256 value, uint256 timestamp);
 
   function testReportOnlyRootSuccess_gas() public {
     vm.pauseGasMetering();
     uint64 max1 = 931;
     bytes32 root = "Only a single root";
-    ICommitStore.CommitReport memory report = ICommitStore.CommitReport({
+    CommitStore.CommitReport memory report = CommitStore.CommitReport({
       priceUpdates: getEmptyPriceUpdates(),
-      interval: ICommitStore.Interval(1, max1),
+      interval: CommitStore.Interval(1, max1),
       merkleRoot: root
     });
 
@@ -243,9 +243,9 @@ contract CommitStore_report is CommitStoreSetup {
       usdPerUnitGas: 0
     });
 
-    ICommitStore.CommitReport memory report = ICommitStore.CommitReport({
+    CommitStore.CommitReport memory report = CommitStore.CommitReport({
       priceUpdates: priceUpdates,
-      interval: ICommitStore.Interval(1, max1),
+      interval: CommitStore.Interval(1, max1),
       merkleRoot: "test #2"
     });
 
@@ -266,9 +266,9 @@ contract CommitStore_report is CommitStoreSetup {
       usdPerUnitGas: 0
     });
 
-    ICommitStore.CommitReport memory report = ICommitStore.CommitReport({
+    CommitStore.CommitReport memory report = CommitStore.CommitReport({
       priceUpdates: priceUpdates,
-      interval: ICommitStore.Interval(0, 0),
+      interval: CommitStore.Interval(0, 0),
       merkleRoot: ""
     });
 
@@ -289,44 +289,44 @@ contract CommitStore_report is CommitStoreSetup {
 
   function testUnhealthyReverts() public {
     s_afn.voteBad();
-    vm.expectRevert(ICommitStore.BadAFNSignal.selector);
+    vm.expectRevert(CommitStore.BadAFNSignal.selector);
     bytes memory report;
     s_commitStore.report(report);
   }
 
   function testInvalidRootRevert() public {
-    ICommitStore.CommitReport memory report = ICommitStore.CommitReport({
+    CommitStore.CommitReport memory report = CommitStore.CommitReport({
       priceUpdates: getEmptyPriceUpdates(),
-      interval: ICommitStore.Interval(1, 4),
+      interval: CommitStore.Interval(1, 4),
       merkleRoot: bytes32(0)
     });
 
-    vm.expectRevert(ICommitStore.InvalidRoot.selector);
+    vm.expectRevert(CommitStore.InvalidRoot.selector);
     s_commitStore.report(abi.encode(report));
   }
 
   function testInvalidIntervalReverts() public {
-    ICommitStore.Interval memory interval = ICommitStore.Interval(2, 2);
-    ICommitStore.CommitReport memory report = ICommitStore.CommitReport({
+    CommitStore.Interval memory interval = CommitStore.Interval(2, 2);
+    CommitStore.CommitReport memory report = CommitStore.CommitReport({
       priceUpdates: getEmptyPriceUpdates(),
       interval: interval,
       merkleRoot: bytes32(0)
     });
 
-    vm.expectRevert(abi.encodeWithSelector(ICommitStore.InvalidInterval.selector, interval));
+    vm.expectRevert(abi.encodeWithSelector(CommitStore.InvalidInterval.selector, interval));
 
     s_commitStore.report(abi.encode(report));
   }
 
   function testInvalidIntervalMinLargerThanMaxReverts() public {
-    ICommitStore.Interval memory interval = ICommitStore.Interval(1, 0);
-    ICommitStore.CommitReport memory report = ICommitStore.CommitReport({
+    CommitStore.Interval memory interval = CommitStore.Interval(1, 0);
+    CommitStore.CommitReport memory report = CommitStore.CommitReport({
       priceUpdates: getEmptyPriceUpdates(),
       interval: interval,
       merkleRoot: bytes32(0)
     });
 
-    vm.expectRevert(abi.encodeWithSelector(ICommitStore.InvalidInterval.selector, interval));
+    vm.expectRevert(abi.encodeWithSelector(CommitStore.InvalidInterval.selector, interval));
 
     s_commitStore.report(abi.encode(report));
   }
@@ -339,9 +339,9 @@ contract CommitStore_verify is CommitStoreRealAFNSetup {
     leaves[0] = "rootAndAlsoRootOfRoots";
     s_commitStore.report(
       abi.encode(
-        ICommitStore.CommitReport({
+        CommitStore.CommitReport({
           priceUpdates: getEmptyPriceUpdates(),
-          interval: ICommitStore.Interval(1, 2),
+          interval: CommitStore.Interval(1, 2),
           merkleRoot: leaves[0]
         })
       )
@@ -357,9 +357,9 @@ contract CommitStore_verify is CommitStoreRealAFNSetup {
     leaves[0] = "rootAndAlsoRootOfRoots";
     s_commitStore.report(
       abi.encode(
-        ICommitStore.CommitReport({
+        CommitStore.CommitReport({
           priceUpdates: getEmptyPriceUpdates(),
-          interval: ICommitStore.Interval(1, 2),
+          interval: CommitStore.Interval(1, 2),
           merkleRoot: leaves[0]
         })
       )

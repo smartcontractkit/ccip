@@ -2,10 +2,9 @@
 pragma solidity 0.8.15;
 
 import {IPriceRegistry} from "../../interfaces/IPriceRegistry.sol";
-import {IEVM2EVMOnRamp} from "../../interfaces/onRamp/IEVM2EVMOnRamp.sol";
-import {IRouter} from "../../interfaces/IRouter.sol";
 
 import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
+import {Router} from "../../Router.sol";
 import {PriceRegistry} from "../../PriceRegistry.sol";
 import {RouterSetup} from "../router/RouterSetup.t.sol";
 import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
@@ -26,17 +25,17 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
   EVM2EVMOnRamp internal s_onRamp;
   address[] s_offRamps;
 
-  IEVM2EVMOnRamp.FeeTokenConfigArgs[] s_feeTokenConfigArgs;
+  EVM2EVMOnRamp.FeeTokenConfigArgs[] s_feeTokenConfigArgs;
 
   function setUp() public virtual override(TokenSetup, PriceRegistrySetup) {
     TokenSetup.setUp();
     PriceRegistrySetup.setUp();
 
     s_feeTokenConfigArgs.push(
-      IEVM2EVMOnRamp.FeeTokenConfigArgs({token: s_sourceFeeToken, feeAmount: 1, multiplier: 108e16, destGasOverhead: 1})
+      EVM2EVMOnRamp.FeeTokenConfigArgs({token: s_sourceFeeToken, feeAmount: 1, multiplier: 108e16, destGasOverhead: 1})
     );
     s_feeTokenConfigArgs.push(
-      IEVM2EVMOnRamp.FeeTokenConfigArgs({
+      EVM2EVMOnRamp.FeeTokenConfigArgs({
         token: s_sourceRouter.getWrappedNative(),
         feeAmount: 2,
         multiplier: 108e16,
@@ -44,7 +43,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
       })
     );
     s_onRamp = new EVM2EVMOnRamp(
-      IEVM2EVMOnRamp.StaticConfig({
+      EVM2EVMOnRamp.StaticConfig({
         linkToken: s_sourceTokens[0],
         chainId: SOURCE_CHAIN_ID,
         destChainId: DEST_CHAIN_ID,
@@ -73,10 +72,10 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
     s_offRamps = new address[](2);
     s_offRamps[0] = address(10);
     s_offRamps[1] = address(11);
-    IRouter.OnRampUpdate[] memory onRampUpdates = new IRouter.OnRampUpdate[](1);
-    IRouter.OffRampUpdate[] memory offRampUpdates = new IRouter.OffRampUpdate[](1);
-    onRampUpdates[0] = IRouter.OnRampUpdate({destChainId: DEST_CHAIN_ID, onRamp: address(s_onRamp)});
-    offRampUpdates[0] = IRouter.OffRampUpdate({sourceChainId: SOURCE_CHAIN_ID, offRamps: s_offRamps});
+    Router.OnRampUpdate[] memory onRampUpdates = new Router.OnRampUpdate[](1);
+    Router.OffRampUpdate[] memory offRampUpdates = new Router.OffRampUpdate[](1);
+    onRampUpdates[0] = Router.OnRampUpdate({destChainId: DEST_CHAIN_ID, onRamp: address(s_onRamp)});
+    offRampUpdates[0] = Router.OffRampUpdate({sourceChainId: SOURCE_CHAIN_ID, offRamps: s_offRamps});
     s_sourceRouter.applyRampUpdates(onRampUpdates, offRampUpdates);
 
     // Pre approve the first token so the gas estimates of the tests

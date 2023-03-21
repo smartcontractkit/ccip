@@ -57,7 +57,7 @@ contract PriceRegistry_constructor is PriceRegistrySetup {
       usdPerUnitGas: 1e6
     });
 
-    vm.expectRevert(IPriceRegistry.InvalidStalenessThreshold.selector);
+    vm.expectRevert(PriceRegistry.InvalidStalenessThreshold.selector);
     s_priceRegistry = new PriceRegistry(priceUpdates, new address[](0), new address[](0), 0);
   }
 }
@@ -173,7 +173,7 @@ contract PriceRegistry_updatePrices is PriceRegistrySetup {
   function testOnlyCallableByUpdaterOrOwnerReverts() public {
     Internal.PriceUpdates memory priceUpdates = abi.decode(s_encodedNewPriceUpdates, (Internal.PriceUpdates));
     changePrank(STRANGER);
-    vm.expectRevert(abi.encodeWithSelector(IPriceRegistry.OnlyCallableByUpdaterOrOwner.selector));
+    vm.expectRevert(abi.encodeWithSelector(PriceRegistry.OnlyCallableByUpdaterOrOwner.selector));
     s_priceRegistry.updatePrices(priceUpdates);
   }
 }
@@ -226,7 +226,7 @@ contract PriceRegistry_convertFeeTokenAmountToLinkAmount is PriceRegistrySetup {
   // Reverts
 
   function testNotAFeeTokenReverts() public {
-    vm.expectRevert(abi.encodeWithSelector(IPriceRegistry.NotAFeeToken.selector, DUMMY_CONTRACT_ADDRESS));
+    vm.expectRevert(abi.encodeWithSelector(PriceRegistry.NotAFeeToken.selector, DUMMY_CONTRACT_ADDRESS));
     s_priceRegistry.convertFeeTokenAmountToLinkAmount(s_sourceTokens[0], DUMMY_CONTRACT_ADDRESS, 3e16);
   }
 
@@ -244,7 +244,7 @@ contract PriceRegistry_convertFeeTokenAmountToLinkAmount is PriceRegistrySetup {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        IPriceRegistry.StaleTokenPrice.selector,
+        PriceRegistry.StaleTokenPrice.selector,
         s_weth,
         uint128(TWELVE_HOURS),
         uint128(TWELVE_HOURS + 1)
@@ -254,7 +254,7 @@ contract PriceRegistry_convertFeeTokenAmountToLinkAmount is PriceRegistrySetup {
   }
 
   function testLinkTokenNotSupportedReverts() public {
-    vm.expectRevert(abi.encodeWithSelector(IPriceRegistry.TokenNotSupported.selector, DUMMY_CONTRACT_ADDRESS));
+    vm.expectRevert(abi.encodeWithSelector(PriceRegistry.TokenNotSupported.selector, DUMMY_CONTRACT_ADDRESS));
     s_priceRegistry.convertFeeTokenAmountToLinkAmount(DUMMY_CONTRACT_ADDRESS, s_sourceTokens[0], 3e16);
   }
 
@@ -272,7 +272,7 @@ contract PriceRegistry_convertFeeTokenAmountToLinkAmount is PriceRegistrySetup {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        IPriceRegistry.StaleTokenPrice.selector,
+        PriceRegistry.StaleTokenPrice.selector,
         s_sourceTokens[0],
         uint128(TWELVE_HOURS),
         uint128(TWELVE_HOURS + 1)
@@ -291,19 +291,19 @@ contract PriceRegistry_getFeeTokenBaseUnitsPerUnitGas is PriceRegistrySetup {
   }
 
   function testUnsupportedTokenReverts() public {
-    vm.expectRevert(abi.encodeWithSelector(IPriceRegistry.NotAFeeToken.selector, DUMMY_CONTRACT_ADDRESS));
+    vm.expectRevert(abi.encodeWithSelector(PriceRegistry.NotAFeeToken.selector, DUMMY_CONTRACT_ADDRESS));
     s_priceRegistry.getFeeTokenBaseUnitsPerUnitGas(DUMMY_CONTRACT_ADDRESS, DEST_CHAIN_ID);
   }
 
   function testUnsupportedChainReverts() public {
-    vm.expectRevert(abi.encodeWithSelector(IPriceRegistry.ChainNotSupported.selector, DEST_CHAIN_ID + 1));
+    vm.expectRevert(abi.encodeWithSelector(PriceRegistry.ChainNotSupported.selector, DEST_CHAIN_ID + 1));
     s_priceRegistry.getFeeTokenBaseUnitsPerUnitGas(s_sourceTokens[0], DEST_CHAIN_ID + 1);
   }
 
   function testStaleGasPriceReverts() public {
     uint256 diff = TWELVE_HOURS + 1;
     vm.warp(block.timestamp + diff);
-    vm.expectRevert(abi.encodeWithSelector(IPriceRegistry.StaleGasPrice.selector, DEST_CHAIN_ID, TWELVE_HOURS, diff));
+    vm.expectRevert(abi.encodeWithSelector(PriceRegistry.StaleGasPrice.selector, DEST_CHAIN_ID, TWELVE_HOURS, diff));
     s_priceRegistry.getFeeTokenBaseUnitsPerUnitGas(s_sourceTokens[0], DEST_CHAIN_ID);
   }
 
@@ -319,7 +319,7 @@ contract PriceRegistry_getFeeTokenBaseUnitsPerUnitGas is PriceRegistrySetup {
     s_priceRegistry.updatePrices(priceUpdates);
 
     vm.expectRevert(
-      abi.encodeWithSelector(IPriceRegistry.StaleTokenPrice.selector, s_sourceTokens[0], TWELVE_HOURS, diff)
+      abi.encodeWithSelector(PriceRegistry.StaleTokenPrice.selector, s_sourceTokens[0], TWELVE_HOURS, diff)
     );
     s_priceRegistry.getFeeTokenBaseUnitsPerUnitGas(s_sourceTokens[0], DEST_CHAIN_ID);
   }

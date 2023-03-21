@@ -105,7 +105,7 @@ func setOnRampOnRouter(t *testing.T, sourceClient *EvmDeploymentConfig, destChai
 	routerContract, err := router.NewRouter(sourceClient.ChainConfig.Router, sourceClient.Client)
 	shared.RequireNoError(t, err)
 	sourceClient.Logger.Infof("Registering new onRamp")
-	tx, err := routerContract.ApplyRampUpdates(sourceClient.Owner, []router.IRouterOnRampUpdate{{DestChainId: destChainId, OnRamp: sourceClient.LaneConfig.OnRamp}}, nil)
+	tx, err := routerContract.ApplyRampUpdates(sourceClient.Owner, []router.RouterOnRampUpdate{{DestChainId: destChainId, OnRamp: sourceClient.LaneConfig.OnRamp}}, nil)
 	shared.RequireNoError(t, err)
 	shared.WaitForMined(t, sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
 }
@@ -142,7 +142,7 @@ func setOffRampOnRouter(t *testing.T, sourceChainId uint64, client *EvmDeploymen
 		}
 	}
 
-	tx, err := routerContract.ApplyRampUpdates(client.Owner, nil, []router.IRouterOffRampUpdate{
+	tx, err := routerContract.ApplyRampUpdates(client.Owner, nil, []router.RouterOffRampUpdate{
 		{SourceChainId: sourceChainId, OffRamps: []common.Address{client.LaneConfig.OffRamp}}})
 	shared.RequireNoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)

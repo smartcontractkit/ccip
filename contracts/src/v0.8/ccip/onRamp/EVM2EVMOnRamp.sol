@@ -4,10 +4,8 @@ pragma solidity 0.8.15;
 import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
 import {IPool} from "../interfaces/pools/IPool.sol";
 import {IAFN} from "../interfaces/IAFN.sol";
-import {IEVM2EVMOnRamp} from "../interfaces/onRamp/IEVM2EVMOnRamp.sol";
 import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
-import {IEVM2AnyOnRamp} from "../interfaces/onRamp/IEVM2AnyOnRamp.sol";
-import {IAggregateRateLimiter} from "../interfaces/IAggregateRateLimiter.sol";
+import {IEVM2AnyOnRamp} from "../interfaces/IEVM2AnyOnRamp.sol";
 
 import {AggregateRateLimiter} from "../AggregateRateLimiter.sol";
 import {Client} from "../models/Client.sol";
@@ -20,11 +18,86 @@ import {Pausable} from "../../vendor/Pausable.sol";
 import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v4.7.3/contracts/utils/structs/EnumerableSet.sol";
 import {EnumerableMap} from "../../vendor/openzeppelin-solidity/v4.7.3/contracts/utils/structs/EnumerableMap.sol";
 
-contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAndVersionInterface {
+contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAndVersionInterface {
   using SafeERC20 for IERC20;
   using EnumerableMap for EnumerableMap.AddressToUintMap;
   using EnumerableMapAddresses for EnumerableMapAddresses.AddressToAddressMap;
   using EnumerableSet for EnumerableSet.AddressSet;
+
+  error InvalidExtraArgsTag(bytes4 expected, bytes4 got);
+  error OnlyCallableByOwnerOrFeeAdmin();
+  error OnlyCallableByOwnerOrFeeAdminOrNop();
+  error InvalidWithdrawalAddress(address addr);
+  error InvalidFeeToken(address token);
+  error NoFeesToPay();
+  error NoNopsToPay();
+  error InsufficientBalance();
+  error MessageTooLarge(uint256 maxSize, uint256 actualSize);
+  error MessageGasLimitTooHigh();
+  error UnsupportedNumberOfTokens();
+  error UnsupportedToken(IERC20 token);
+  error MustBeCalledByRouter();
+  error RouterMustSetOriginalSender();
+  error InvalidTokenPoolConfig();
+  error PoolAlreadyAdded();
+  error PoolDoesNotExist(address token);
+  error TokenPoolMismatch();
+  error TokenOrChainNotSupported(address token, uint64 chain);
+  error SenderNotAllowed(address sender);
+  error InvalidConfig();
+  error InvalidAddress(bytes encodedAddress);
+  error BadAFNSignal();
+
+  event AllowListAdd(address sender);
+  event AllowListRemove(address sender);
+  event AllowListEnabledSet(bool enabled);
+  event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
+  event NopPaid(address indexed nop, uint256 amount);
+  event FeeConfigSet(FeeTokenConfigArgs[] feeConfig);
+  event CCIPSendRequested(Internal.EVM2EVMMessage message);
+  event NopsSet(uint256 nopWeightsTotal, NopAndWeight[] nopsAndWeights);
+  event PoolAdded(address token, address pool);
+  event PoolRemoved(address token, address pool);
+
+  /// @dev Struct that contains the static configuration
+  struct StaticConfig {
+    address linkToken; // --------┐ Link token address
+    uint64 chainId; // -----------┘ Source chain Id
+    uint64 destChainId; // -------┐ Destination chain Id
+    uint64 defaultTxGasLimit; // -┘ Default gas limit for a tx
+  }
+
+  /// @dev Struct to contains the dynamic configuration
+  struct DynamicConfig {
+    address router; //            Router address
+    address priceRegistry; // --┐ Price registry address
+    uint32 maxDataSize; //      | Maximum payload data size
+    uint64 maxGasLimit; // -----┘ Maximum gas limit for messages targeting EVMs
+    uint16 maxTokensLength; // -┐ Maximum number of distinct ERC20 tokens that can be sent per message
+    address afn; // ------------┘ AFN address
+  }
+
+  /// @dev Struct to hold the fee configuration for a token
+  struct FeeTokenConfig {
+    uint96 feeAmount; // --------┐ Flat fee
+    uint64 multiplier; //        | Price multiplier for gas costs
+    uint32 destGasOverhead; // --┘ Extra gas charged on top of the gasLimit
+  }
+
+  /// @dev Struct to hold the fee configuration for a token, same as the FeeTokenConfig but with
+  /// token included so that an array of these can be passed in to setFeeConfig to set the mapping
+  struct FeeTokenConfigArgs {
+    address token; // ---------┐ Token address
+    uint64 multiplier; // -----┘ Price multiplier for gas costs
+    uint96 feeAmount; // ------┐ Flat fee in feeToken
+    uint32 destGasOverhead; //-┘ Extra gas charged on top of the gasLimit
+  }
+
+  /// @dev Nop address and weight, used to set the nops and their weights
+  struct NopAndWeight {
+    address nop; // ---┐ Address of the node operator
+    uint16 weight; // --┘ Weight for nop rewards
+  }
 
   struct TokenAndPool {
     address token;
@@ -77,7 +150,7 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAn
     DynamicConfig memory dynamicConfig,
     TokenAndPool[] memory tokensAndPools,
     address[] memory allowlist,
-    IAggregateRateLimiter.RateLimiterConfig memory rateLimiterConfig,
+    AggregateRateLimiter.RateLimiterConfig memory rateLimiterConfig,
     FeeTokenConfigArgs[] memory feeTokenConfigs,
     NopAndWeight[] memory nopsAndWeights
   ) Pausable() AggregateRateLimiter(rateLimiterConfig) {
@@ -118,12 +191,12 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAn
   // ================================================================
 
   /// @inheritdoc IEVM2AnyOnRamp
-  function getExpectedNextSequenceNumber() external view override returns (uint64) {
+  function getExpectedNextSequenceNumber() external view returns (uint64) {
     return s_sequenceNumber + 1;
   }
 
   /// @inheritdoc IEVM2AnyOnRamp
-  function getSenderNonce(address sender) external view override returns (uint64) {
+  function getSenderNonce(address sender) external view returns (uint64) {
     return s_senderNonce[sender];
   }
 
@@ -132,7 +205,7 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAn
     Client.EVM2AnyMessage calldata message,
     uint256 feeTokenAmount,
     address originalSender
-  ) external override whenNotPaused whenHealthy returns (bytes32) {
+  ) external whenNotPaused whenHealthy returns (bytes32) {
     Client.EVMExtraArgsV1 memory extraArgs = _fromBytes(message.extraArgs);
     // Validate the message with various checks
     _validateMessage(message.data.length, extraArgs.gasLimit, message.tokenAmounts, originalSender);
@@ -219,10 +292,11 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAn
   // |                           Config                             |
   // ================================================================
 
-  /// @inheritdoc IEVM2EVMOnRamp
-  function getStaticConfig() external view override returns (IEVM2EVMOnRamp.StaticConfig memory) {
+  /// @notice Returns the static onRamp config.
+  /// @return the configuration.
+  function getStaticConfig() external view returns (StaticConfig memory) {
     return
-      IEVM2EVMOnRamp.StaticConfig({
+      StaticConfig({
         linkToken: i_linkToken,
         chainId: i_chainId,
         destChainId: i_destChainId,
@@ -230,13 +304,15 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAn
       });
   }
 
-  /// @inheritdoc IEVM2EVMOnRamp
-  function getDynamicConfig() external view override returns (DynamicConfig memory config) {
+  /// @notice Returns the dynamic onRamp config.
+  /// @return dynamicConfig the configuration.
+  function getDynamicConfig() external view returns (DynamicConfig memory dynamicConfig) {
     return s_dynamicConfig;
   }
 
-  /// @inheritdoc IEVM2EVMOnRamp
-  function setDynamicConfig(DynamicConfig memory dynamicConfig) external override onlyOwner {
+  /// @notice Sets the dynamic configuration.
+  /// @param dynamicConfig The configuration.
+  function setDynamicConfig(DynamicConfig memory dynamicConfig) external onlyOwner {
     _setDynamicConfig(dynamicConfig);
   }
 
@@ -249,7 +325,7 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAn
     s_dynamicConfig = dynamicConfig;
 
     emit ConfigSet(
-      IEVM2EVMOnRamp.StaticConfig({
+      StaticConfig({
         linkToken: i_linkToken,
         chainId: i_chainId,
         destChainId: i_destChainId,
@@ -273,7 +349,7 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAn
   }
 
   /// @inheritdoc IEVM2AnyOnRamp
-  function getPoolBySourceToken(IERC20 sourceToken) external view override returns (IPool) {
+  function getPoolBySourceToken(IERC20 sourceToken) external view returns (IPool) {
     return _getPoolBySourceToken(sourceToken);
   }
 
@@ -316,7 +392,7 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAn
   // ================================================================
 
   /// @inheritdoc IEVM2AnyOnRamp
-  function getFee(Client.EVM2AnyMessage calldata message) public view override returns (uint256 fee) {
+  function getFee(Client.EVM2AnyMessage calldata message) public view returns (uint256 fee) {
     uint256 gasLimit = _fromBytes(message.extraArgs).gasLimit;
     uint256 feeTokenBaseUnitsPerUnitGas = IPriceRegistry(s_dynamicConfig.priceRegistry).getFeeTokenBaseUnitsPerUnitGas(
       message.feeToken,
@@ -333,13 +409,16 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAn
       1 ether; // latest gas reported gas fee with a safety margin
   }
 
-  /// @inheritdoc IEVM2EVMOnRamp
-  function getFeeConfig(address token) external view override returns (FeeTokenConfig memory config) {
+  /// @notice Gets the fee configuration for a token
+  /// @param token The token to get the fee configuration for
+  /// @return feeTokenConfig FeeTokenConfig struct
+  function getFeeConfig(address token) external view returns (FeeTokenConfig memory feeTokenConfig) {
     return s_feeTokenConfig[token];
   }
 
-  /// @inheritdoc IEVM2EVMOnRamp
-  function setFeeConfig(FeeTokenConfigArgs[] memory feeTokenConfigs) external override onlyOwnerOrAdmin {
+  /// @notice Sets the fee configuration for a token
+  /// @param feeTokenConfigs Array of FeeTokenConfigArgs structs
+  function setFeeConfig(FeeTokenConfigArgs[] memory feeTokenConfigs) external onlyOwnerOrAdmin {
     _setFeeConfig(feeTokenConfigs);
   }
 
@@ -360,13 +439,16 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAn
   // |                         NOP payments                         |
   // ================================================================
 
-  /// @inheritdoc IEVM2EVMOnRamp
-  function getNopFeesJuels() external view override returns (uint96) {
+  /// @notice Get the total amount of fees to be paid to the Nops (in LINK)
+  /// @return totalNopFees
+  function getNopFeesJuels() external view returns (uint96) {
     return s_nopFeesJuels;
   }
 
-  /// @inheritdoc IEVM2EVMOnRamp
-  function getNops() external view override returns (NopAndWeight[] memory nopsAndWeights, uint256 weightsTotal) {
+  /// @notice Gets the Nops and their weights
+  /// @return nopsAndWeights Array of NopAndWeight structs
+  /// @return weightsTotal The sum weight of all Nops
+  function getNops() external view returns (NopAndWeight[] memory nopsAndWeights, uint256 weightsTotal) {
     uint256 length = s_nops.length();
     nopsAndWeights = new NopAndWeight[](length);
     for (uint256 i = 0; i < length; ++i) {
@@ -377,7 +459,8 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAn
     return (nopsAndWeights, weightsTotal);
   }
 
-  /// @inheritdoc IEVM2EVMOnRamp
+  /// @notice Sets the Nops and their weights
+  /// @param nopsAndWeights Array of NopAndWeight structs
   function setNops(NopAndWeight[] calldata nopsAndWeights) external onlyOwner {
     _setNops(nopsAndWeights);
   }
@@ -398,7 +481,7 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAn
     emit NopsSet(nopWeightsTotal, nopsAndWeights);
   }
 
-  /// @inheritdoc IEVM2EVMOnRamp
+  /// @notice Pays the Node Ops their outstanding balances.
   function payNops() external onlyOwnerOrAdminOrNop {
     uint32 weightsTotal = s_nopWeightsTotal;
     if (weightsTotal == 0) revert NoNopsToPay();
@@ -420,8 +503,10 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAn
     s_nopFeesJuels = fundsLeft;
   }
 
-  /// @inheritdoc IEVM2EVMOnRamp
-  function withdrawNonLinkFees(address feeToken, address to) external override onlyOwner {
+  /// @notice Allows the owner to withdraw any ERC20 token that is not the fee token
+  /// @param feeToken The token to withdraw
+  /// @param to The address to send the tokens to
+  function withdrawNonLinkFees(address feeToken, address to) external onlyOwner {
     if (feeToken == i_linkToken) revert InvalidFeeToken(feeToken);
     if (to == address(0)) revert InvalidWithdrawalAddress(to);
     IERC20(feeToken).safeTransfer(to, IERC20(feeToken).balanceOf(address(this)));
@@ -431,18 +516,22 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAn
   // |                          Allowlist                           |
   // ================================================================
 
-  /// @inheritdoc IEVM2EVMOnRamp
+  /// @notice Gets whether the allowList functionality is enabled.
+  /// @return true is enabled, false if not.
   function getAllowListEnabled() external view returns (bool) {
     return s_allowlistEnabled;
   }
 
-  /// @inheritdoc IEVM2EVMOnRamp
+  /// @notice Enables or disabled the allowList functionality.
+  /// @param enabled Signals whether the allowlist should be enabled.
   function setAllowListEnabled(bool enabled) external onlyOwner {
     s_allowlistEnabled = enabled;
     emit AllowListEnabledSet(enabled);
   }
 
-  /// @inheritdoc IEVM2EVMOnRamp
+  /// @notice Gets the allowed addresses.
+  /// @return The allowed addresses.
+  /// @dev May not work if allow list gets too large. Use events in that case to compute the set.
   function getAllowList() external view returns (address[] memory) {
     address[] memory allowList = new address[](s_allowList.length());
     for (uint256 i = 0; i < s_allowList.length(); ++i) {
@@ -451,7 +540,9 @@ contract EVM2EVMOnRamp is IEVM2EVMOnRamp, Pausable, AggregateRateLimiter, TypeAn
     return allowList;
   }
 
-  /// @inheritdoc IEVM2EVMOnRamp
+  /// @notice Apply updates to the allow list.
+  /// @param adds The added addresses.
+  /// @param adds The removed addresses.
   function applyAllowListUpdates(address[] calldata adds, address[] calldata removes) external onlyOwner {
     _applyAllowListUpdates(adds, removes);
   }

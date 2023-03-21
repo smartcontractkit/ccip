@@ -1,12 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../interfaces/ICommitStore.sol";
-import "../interfaces/offRamp/IEVM2EVMOffRamp.sol";
-import "../interfaces/IAggregateRateLimiter.sol";
-import "../interfaces/IRouter.sol";
-import "../interfaces/onRamp/IEVM2EVMOnRamp.sol";
+import "../offRamp/EVM2EVMOffRamp.sol";
 import "../onRamp/EVM2EVMOnRamp.sol";
+import "../AggregateRateLimiter.sol";
 
 contract StructFactory {
   // addresses
@@ -73,10 +70,10 @@ contract StructFactory {
   function generateDynamicOffRampConfig(address router, address afn)
     internal
     pure
-    returns (IEVM2EVMOffRamp.DynamicConfig memory)
+    returns (EVM2EVMOffRamp.DynamicConfig memory)
   {
     return
-      IEVM2EVMOffRamp.DynamicConfig({
+      EVM2EVMOffRamp.DynamicConfig({
         router: router,
         executionDelaySeconds: EXECUTION_DELAY_SECONDS,
         maxDataSize: MAX_DATA_SIZE,
@@ -90,9 +87,9 @@ contract StructFactory {
     address router,
     address priceRegistry,
     address afn
-  ) internal pure returns (IEVM2EVMOnRamp.DynamicConfig memory) {
+  ) internal pure returns (EVM2EVMOnRamp.DynamicConfig memory) {
     return
-      IEVM2EVMOnRamp.DynamicConfig({
+      EVM2EVMOnRamp.DynamicConfig({
         router: router,
         priceRegistry: priceRegistry,
         maxDataSize: MAX_DATA_SIZE,
@@ -114,19 +111,19 @@ contract StructFactory {
     return tokensAndPools;
   }
 
-  function getNopsAndWeights() internal pure returns (IEVM2EVMOnRamp.NopAndWeight[] memory) {
-    IEVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights = new IEVM2EVMOnRamp.NopAndWeight[](3);
-    nopsAndWeights[0] = IEVM2EVMOnRamp.NopAndWeight({nop: USER_1, weight: 19284});
-    nopsAndWeights[1] = IEVM2EVMOnRamp.NopAndWeight({nop: USER_2, weight: 52935});
-    nopsAndWeights[2] = IEVM2EVMOnRamp.NopAndWeight({nop: USER_3, weight: 8});
+  function getNopsAndWeights() internal pure returns (EVM2EVMOnRamp.NopAndWeight[] memory) {
+    EVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights = new EVM2EVMOnRamp.NopAndWeight[](3);
+    nopsAndWeights[0] = EVM2EVMOnRamp.NopAndWeight({nop: USER_1, weight: 19284});
+    nopsAndWeights[1] = EVM2EVMOnRamp.NopAndWeight({nop: USER_2, weight: 52935});
+    nopsAndWeights[2] = EVM2EVMOnRamp.NopAndWeight({nop: USER_3, weight: 8});
     return nopsAndWeights;
   }
 
   // Rate limiter
   address constant ADMIN = 0x11118e64e1FB0c487f25dD6D3601FF6aF8d32E4e;
 
-  function rateLimiterConfig() internal pure returns (IAggregateRateLimiter.RateLimiterConfig memory) {
-    return IAggregateRateLimiter.RateLimiterConfig({capacity: 100e28, rate: 1e15, admin: ADMIN});
+  function rateLimiterConfig() internal pure returns (AggregateRateLimiter.RateLimiterConfig memory) {
+    return AggregateRateLimiter.RateLimiterConfig({capacity: 100e28, rate: 1e15, admin: ADMIN});
   }
 
   function getTokenPrices() internal pure returns (uint256[] memory prices) {

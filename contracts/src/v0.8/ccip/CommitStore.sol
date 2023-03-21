@@ -12,6 +12,41 @@ import {Pausable} from "../vendor/Pausable.sol";
 import {MerkleMultiProof} from "./MerkleMultiProof.sol";
 
 contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Base {
+  error InvalidInterval(Interval interval);
+  error InvalidRoot();
+  error InvalidCommitStoreConfig();
+  error BadAFNSignal();
+
+  event ReportAccepted(CommitReport report);
+  event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
+  event RootRemoved(bytes32 root);
+
+  /// @notice Static commit store config
+  struct StaticConfig {
+    uint64 chainId; // -------┐  Destination chain Id
+    uint64 sourceChainId; // -┘  Source chain Id
+    address onRamp; //           OnRamp address on the source chain
+  }
+
+  /// @notice Dynamic commit store config
+  struct DynamicConfig {
+    address priceRegistry; // Price registry address on the destination chain
+    address afn; // AFN
+  }
+
+  /// @notice a sequenceNumber interval
+  struct Interval {
+    uint64 min; // ---┐ Minimum sequence number, inclusive
+    uint64 max; // ---┘ Maximum sequence number, inclusive
+  }
+
+  /// @notice Report that is committed by the observing DON at the committing phase
+  struct CommitReport {
+    Internal.PriceUpdates priceUpdates;
+    Interval interval;
+    bytes32 merkleRoot;
+  }
+
   // STATIC CONFIG
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "CommitStore 1.0.0";
@@ -53,22 +88,30 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
   // |                        Verification                          |
   // ================================================================
 
-  /// @inheritdoc ICommitStore
+  /// @notice Returns the next expected sequence number.
+  /// @return the next expected sequenceNumber.
   function getExpectedNextSequenceNumber() public view returns (uint64) {
     return s_minSeqNr;
   }
 
-  /// @inheritdoc ICommitStore
+  /// @notice Sets the minimum sequence number.
+  /// @param minSeqNr The new minimum sequence number
   function setMinSeqNr(uint64 minSeqNr) external onlyOwner {
     s_minSeqNr = minSeqNr;
   }
 
-  /// @inheritdoc ICommitStore
-  function getMerkleRoot(bytes32 root) external view override returns (uint256) {
+  /// @notice Returns the timestamp of a potentially previously committed merkle root.
+  /// If the root was never committed 0 will be returned.
+  /// @param root The merkle root to check the commit status for.
+  /// @return the timestamp of the committed root or zero in the case that it was never
+  /// committed.
+  function getMerkleRoot(bytes32 root) external view returns (uint256) {
     return s_roots[root];
   }
 
-  /// @inheritdoc ICommitStore
+  /// @notice Returns if a root is blessed or not.
+  /// @param root The merkle root to check the blessing status for.
+  /// @return whether the root is blessed or not.
   function isBlessed(bytes32 root) public view returns (bool) {
     return IAFN(s_dynamicConfig.afn).isBlessed(_hashCommitStoreWithRoot(root));
   }
@@ -101,7 +144,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
 
   /// @inheritdoc OCR2Base
   function _report(bytes memory encodedReport) internal override whenNotPaused whenHealthy {
-    ICommitStore.CommitReport memory report = abi.decode(encodedReport, (ICommitStore.CommitReport));
+    CommitReport memory report = abi.decode(encodedReport, (CommitReport));
 
     if (report.priceUpdates.tokenPriceUpdates.length > 0 || report.priceUpdates.destChainId != 0) {
       IPriceRegistry(s_dynamicConfig.priceRegistry).updatePrices(report.priceUpdates);
@@ -133,18 +176,21 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
   // |                           Config                             |
   // ================================================================
 
-  /// @inheritdoc ICommitStore
-  function getStaticConfig() external view override returns (StaticConfig memory) {
-    return ICommitStore.StaticConfig({chainId: i_chainId, sourceChainId: i_sourceChainId, onRamp: i_onRamp});
+  /// @notice Returns the static commit store config.
+  /// @return the configuration.
+  function getStaticConfig() external view returns (StaticConfig memory) {
+    return StaticConfig({chainId: i_chainId, sourceChainId: i_sourceChainId, onRamp: i_onRamp});
   }
 
-  /// @inheritdoc ICommitStore
-  function getDynamicConfig() external view override returns (DynamicConfig memory) {
+  /// @notice Returns the dynamic commit store config.
+  /// @return the configuration.
+  function getDynamicConfig() external view returns (DynamicConfig memory) {
     return s_dynamicConfig;
   }
 
-  /// @inheritdoc ICommitStore
-  function setDynamicConfig(DynamicConfig memory dynamicConfig) external override onlyOwner {
+  /// @notice Sets the dynamic configuration.
+  /// @param dynamicConfig The configuration.
+  function setDynamicConfig(DynamicConfig memory dynamicConfig) external onlyOwner {
     _setDynamicConfig(dynamicConfig);
   }
 
@@ -155,10 +201,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
 
     s_dynamicConfig = dynamicConfig;
 
-    emit ConfigSet(
-      ICommitStore.StaticConfig({chainId: i_chainId, sourceChainId: i_sourceChainId, onRamp: i_onRamp}),
-      dynamicConfig
-    );
+    emit ConfigSet(StaticConfig({chainId: i_chainId, sourceChainId: i_sourceChainId, onRamp: i_onRamp}), dynamicConfig);
   }
 
   // ================================================================

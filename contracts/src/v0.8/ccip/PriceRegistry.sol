@@ -12,6 +12,22 @@ import {EnumerableSet} from "../vendor/openzeppelin-solidity/v4.7.3/contracts/ut
 /// and the price of a token in USD allowing the owner or priceUpdater to update this value.
 contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
   using EnumerableSet for EnumerableSet.AddressSet;
+
+  error TokenNotSupported(address token);
+  error NotAFeeToken(address token);
+  error ChainNotSupported(uint64 chain);
+  error OnlyCallableByUpdaterOrOwner();
+  error StaleGasPrice(uint64 destChainId, uint256 threshold, uint256 timePassed);
+  error StaleTokenPrice(address token, uint256 threshold, uint256 timePassed);
+  error InvalidStalenessThreshold();
+
+  event PriceUpdaterSet(address indexed priceUpdater);
+  event PriceUpdaterRemoved(address indexed priceUpdater);
+  event FeeTokenAdded(address indexed feeToken);
+  event FeeTokenRemoved(address indexed feeToken);
+  event UsdPerUnitGasUpdated(uint64 indexed destChain, uint256 value, uint256 timestamp);
+  event UsdPerTokenUpdated(address indexed token, uint256 value, uint256 timestamp);
+
   /// @dev The price, in USD, of 1 unit of gas for a given destination chain.
   /// @dev 1e18 is 1 USD. Examples:
   ///     Very Expensive:   1 unit of gas costs 1 USD                  -> 1e18
@@ -55,8 +71,9 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
     return s_usdPerToken[token];
   }
 
-  /// @inheritdoc IPriceRegistry
-  function getStalenessThreshold() external view override returns (uint128) {
+  /// @notice Get the staleness threshold.
+  /// @return stalenessThreshold The staleness threshold.
+  function getStalenessThreshold() external view returns (uint128) {
     return i_stalenessThreshold;
   }
 
@@ -129,18 +146,21 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
   // |                         Fee tokens                           |
   // ================================================================
 
-  // @inheritdoc IPriceRegistry
-  function getFeeTokens() external view override returns (address[] memory feeTokens) {
+  /// @notice Get the list of fee tokens.
+  /// @return feeTokens The tokens set as fee tokens.
+  function getFeeTokens() external view returns (address[] memory feeTokens) {
     feeTokens = new address[](s_feeTokens.length());
     for (uint256 i = 0; i < s_feeTokens.length(); ++i) {
       feeTokens[i] = s_feeTokens.at(i);
     }
   }
 
-  // @inheritdoc IPriceRegistry
+  /// @notice Add and remove tokens from feeTokens set.
+  /// @param feeTokensToAdd The addresses of the tokens which are now considered fee tokens
+  /// and can be used to calculate fees.
+  /// @param feeTokensToRemove The addresses of the tokens which are no longer considered feeTokens.
   function applyFeeTokensUpdates(address[] memory feeTokensToAdd, address[] memory feeTokensToRemove)
     external
-    override
     onlyOwner
   {
     _applyFeeTokensUpdates(feeTokensToAdd, feeTokensToRemove);
@@ -197,18 +217,22 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
   // |                           Access                             |
   // ================================================================
 
-  // @inheritdoc IPriceRegistry
-  function getPriceUpdaters() external view override returns (address[] memory priceUpdaters) {
+  /// @notice Get the list of price updaters.
+  /// @return priceUpdaters The price updaters.
+  function getPriceUpdaters() external view returns (address[] memory priceUpdaters) {
     priceUpdaters = new address[](s_priceUpdaters.length());
     for (uint256 i = 0; i < s_priceUpdaters.length(); ++i) {
       priceUpdaters[i] = s_priceUpdaters.at(i);
     }
   }
 
-  // @inheritdoc IPriceRegistry
+  /// @notice Adds new priceUpdaters and remove existing ones.
+  /// @param priceUpdatersToAdd The addresses of the priceUpdaters that are now allowed
+  /// to send fee updates.
+  /// @param priceUpdatersToRemove The addresses of the priceUpdaters that are no longer allowed
+  /// to send fee updates.
   function applyPriceUpdatersUpdates(address[] memory priceUpdatersToAdd, address[] memory priceUpdatersToRemove)
     external
-    override
     onlyOwner
   {
     _applyPriceUpdatersUpdates(priceUpdatersToAdd, priceUpdatersToRemove);
