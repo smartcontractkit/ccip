@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/sqlx"
 	"go.uber.org/multierr"
+	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink/core/chains"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/client"
@@ -31,13 +32,11 @@ var ErrNoChains = errors.New("no EVM chains loaded")
 
 var _ ChainSet = &chainSet{}
 
-type ChainConfigUpdater func(*types.ChainCfg) error
-
 //go:generate mockery --quiet --name ChainSet --output ./mocks/ --case=underscore
 type ChainSet interface {
 	services.ServiceCtx
-	chains.DBChainSet[utils.Big, *types.ChainCfg]
-	chains.DBNodeSet[utils.Big, types.Node]
+	chains.Chains[utils.Big, *types.ChainCfg]
+	chains.Nodes[utils.Big, types.Node]
 
 	Get(id *big.Int) (Chain, error)
 
@@ -92,19 +91,17 @@ func (cll *chainSet) Close() (err error) {
 	}
 	return
 }
-func (cll *chainSet) Healthy() (err error) {
-	for _, c := range cll.Chains() {
-		err = multierr.Combine(err, c.Healthy())
-	}
-	return
-}
 
 func (cll *chainSet) Name() string {
 	return cll.logger.Name()
 }
 
 func (cll *chainSet) HealthReport() map[string]error {
-	return map[string]error{cll.Name(): cll.Healthy()}
+	report := map[string]error{}
+	for _, c := range cll.Chains() {
+		maps.Copy(report, c.HealthReport())
+	}
+	return report
 }
 
 func (cll *chainSet) Ready() (err error) {
@@ -132,11 +129,11 @@ func (cll *chainSet) Get(id *big.Int) (Chain, error) {
 	return nil, errors.Errorf("chain not found with id %v", id.String())
 }
 
-func (cll *chainSet) Show(id utils.Big) (types.DBChain, error) {
+func (cll *chainSet) Show(id utils.Big) (types.ChainConfig, error) {
 	return cll.opts.ORM.Chain(id)
 }
 
-func (cll *chainSet) Index(offset, limit int) ([]types.DBChain, int, error) {
+func (cll *chainSet) Index(offset, limit int) ([]types.ChainConfig, int, error) {
 	return cll.opts.ORM.Chains(offset, limit)
 }
 

@@ -4,7 +4,6 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"math/big"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -21,14 +20,8 @@ import (
 )
 
 type ORM interface {
-	Chain(id utils.Big, qopts ...pg.QOpt) (chain DBChain, err error)
-	Chains(offset, limit int, qopts ...pg.QOpt) ([]DBChain, int, error)
-	GetChainsByIDs(ids []utils.Big) (chains []DBChain, err error)
-
-	GetNodesByChainIDs(chainIDs []utils.Big, qopts ...pg.QOpt) (nodes []Node, err error)
-	NodeNamed(string, ...pg.QOpt) (Node, error)
-	Nodes(offset, limit int, qopts ...pg.QOpt) ([]Node, int, error)
-	NodesForChain(chainID utils.Big, offset, limit int, qopts ...pg.QOpt) ([]Node, int, error)
+	chains.ChainConfigs[utils.Big, *ChainCfg, ChainConfig]
+	chains.NodeConfigs[utils.Big, Node]
 
 	EnsureChains([]utils.Big, ...pg.QOpt) error
 }
@@ -92,9 +85,8 @@ func (c *ChainCfg) Value() (driver.Value, error) {
 	return json.Marshal(c)
 }
 
-type DBChain = chains.DBChain[utils.Big, *ChainCfg]
+type ChainConfig = chains.ChainConfig[utils.Big, *ChainCfg]
 
-// TODO: https://app.shortcut.com/chainlinklabs/story/33622/remove-legacy-config
 type Node struct {
 	ID         int32
 	Name       string
@@ -102,8 +94,6 @@ type Node struct {
 	WSURL      null.String `db:"ws_url"`
 	HTTPURL    null.String `db:"http_url"`
 	SendOnly   bool
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
 	// State doesn't exist in the DB, it's used to hold an in-memory state for
 	// rendering
 	State string `db:"-"`

@@ -308,6 +308,8 @@ const (
 	CCIPCommit OCR2PluginType = "ccip-commit"
 	// CCIPExecution refers to the ccip.CCIPExecution plugin
 	CCIPExecution OCR2PluginType = "ccip-execution"
+
+	Mercury OCR2PluginType = "mercury"
 )
 
 // OCR2OracleSpec defines the job spec for OCR2 jobs.
@@ -315,9 +317,9 @@ const (
 type OCR2OracleSpec struct {
 	ID                                int32           `toml:"-"`
 	ContractID                        string          `toml:"contractID"`
+	FeedID                            common.Hash     `toml:"feedID"`
 	Relay                             relay.Network   `toml:"relay"`
 	RelayConfig                       JSONConfig      `toml:"relayConfig"`
-	RelayConfigMercuryConfig          JSONConfig      `toml:"relayConfigMercuryConfig"`
 	P2PV2Bootstrappers                pq.StringArray  `toml:"p2pv2Bootstrappers"`
 	OCRKeyBundleID                    null.String     `toml:"ocrKeyBundleID"`
 	MonitoringEndpoint                null.String     `toml:"monitoringEndpoint"`
@@ -531,6 +533,7 @@ type BlockhashStoreSpec struct {
 type BootstrapSpec struct {
 	ID                                int32         `toml:"-"`
 	ContractID                        string        `toml:"contractID"`
+	FeedID                            *common.Hash  `toml:"feedID"`
 	Relay                             relay.Network `toml:"relay"`
 	RelayConfig                       JSONConfig
 	MonitoringEndpoint                null.String     `toml:"monitoringEndpoint"`
