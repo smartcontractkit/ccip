@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -19,7 +20,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/pkg/errors"
 	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/slices"
@@ -429,85 +429,36 @@ func (client *CCIPClient) WaitForExecution(DestBlockNum uint64, sequenceNumber u
 	}
 }
 
-func (client *CCIPClient) ExecuteManually(seqNr uint64) error {
-	// Find the seq num
-	// Find the corresponding commit report
-	end := uint64(11436244)
-	reportIterator, err := client.Dest.CommitStore.FilterReportAccepted(&bind.FilterOpts{
-		Start: end - 10000,
-		End:   &end,
-	})
-	if err != nil {
-		return err
+func (client *CCIPClient) ExecuteManually(t *testing.T, destDeploySettings *rhea.EvmDeploymentConfig) {
+	txHash := os.Getenv("CCIP_SEND_TX")
+	require.NotEmpty(t, txHash, "must set txhash for which manual execution is needed")
+	require.NotEmpty(t, os.Getenv("LOG_INDEX"), "must set log index of CCIPSendRequested event emitted by onRamp contract")
+	logIndex, err := strconv.ParseUint(os.Getenv("LOG_INDEX"), 10, 64)
+	require.NoError(t, err, "log index of CCIPSendRequested event must be an int")
+	require.NotEmpty(t, os.Getenv("SOURCE_START_BLOCK"), "must set the block number of source chain prior to ccip-send tx")
+
+	sendReqReceipt, err := client.Source.Client.Client.TransactionReceipt(context.Background(), common.HexToHash(txHash))
+	require.NoErrorf(t, err, "fetching receipt for ccip-send tx - ", txHash)
+	destLatestBlock, err := client.Dest.Client.Client.BlockNumber(context.Background())
+	require.NoError(t, err, "fetching latest block number in destination chain")
+	args := testhelpers.ManualExecArgs{
+		SourceChainID:      client.Source.ChainId,
+		DestChainID:        client.Dest.ChainId,
+		DestUser:           client.Dest.Owner,
+		SourceChain:        client.Source.Client.Client,
+		DestChain:          client.Dest.Client.Client,
+		SourceStartBlock:   sendReqReceipt.BlockNumber,
+		DestLatestBlockNum: destLatestBlock,
+		DestDeployedAt:     destDeploySettings.LaneConfig.DeploySettings.DeployedAtBlock,
+		SendReqLogIndex:    uint(logIndex),
+		SendReqTxHash:      txHash,
+		CommitStore:        client.Dest.CommitStore.Address().String(),
+		OnRamp:             client.Source.OnRamp.Address().String(),
+		OffRamp:            client.Dest.OffRamp.Address().String(),
 	}
-	var report *commit_store.ICommitStoreCommitReport
-	for reportIterator.Next() {
-		if reportIterator.Event.Report.Interval.Min <= seqNr && reportIterator.Event.Report.Interval.Max >= seqNr {
-			report = &reportIterator.Event.Report
-			fmt.Println("Found root")
-			break
-		}
-	}
-	reportIterator.Close()
-	if report == nil {
-		return errors.New("unable to find seq num")
-	}
-	ctx := hasher.NewKeccakCtx()
-	leafHasher := ccip.NewLeafHasher(client.Source.ChainId, client.Dest.ChainId, client.Source.OnRamp.Address(), ctx)
-	// Get all seqNrs in that range.
-	end = uint64(7651526)
-	sendRequestedIterator, err := client.Source.OnRamp.FilterCCIPSendRequested(&bind.FilterOpts{
-		Start: end - 10000,
-		End:   &end,
-	})
-	if err != nil {
-		return err
-	}
-	var leaves [][32]byte
-	var curr, prove int
-	var originalMsg []byte
-	for sendRequestedIterator.Next() {
-		// Assume in order?
-		if sendRequestedIterator.Event.Message.SequenceNumber <= report.Interval.Max && sendRequestedIterator.Event.Message.SequenceNumber >= report.Interval.Min {
-			fmt.Println("Found seq num", sendRequestedIterator.Event.Message.SequenceNumber, report.Interval)
-			hash, err2 := leafHasher.HashLeaf(sendRequestedIterator.Event.Raw)
-			if err2 != nil {
-				return err2
-			}
-			leaves = append(leaves, hash)
-			if sendRequestedIterator.Event.Message.SequenceNumber == seqNr {
-				fmt.Printf("Found proving %d %+v\n", curr, sendRequestedIterator.Event.Message)
-				originalMsg = sendRequestedIterator.Event.Raw.Data
-				prove = curr
-			}
-			curr++
-		}
-	}
-	sendRequestedIterator.Close()
-	if originalMsg == nil {
-		return errors.New("unable to find")
-	}
-	tree, err := merklemulti.NewTree(ctx, leaves)
-	if err != nil {
-		return err
-	}
-	proof := tree.Prove([]int{prove})
-	if tree.Root() != report.MerkleRoot {
-		return errors.New("inner root doesn't match")
-	}
-	InternalExecutionReport := evm_2_evm_offramp.InternalExecutionReport{
-		SequenceNumbers: []uint64{seqNr},
-		EncodedMessages: [][]byte{originalMsg},
-		Proofs:          proof.Hashes,
-		ProofFlagBits:   ccip.ProofFlagsToBits(proof.SourceFlags),
-	}
-	tx, err := client.Dest.OffRamp.ManuallyExecute(client.Dest.Owner, InternalExecutionReport)
-	if err != nil {
-		fmt.Printf("%+v err %v\n", InternalExecutionReport, err)
-		return err
-	}
-	fmt.Println(client.Dest.Owner.From, tx.Hash(), err)
-	return nil
+	tx, err := args.ExecuteManually()
+	require.NoErrorf(t, err, "executing manually for tx %s in source chain", txHash)
+	fmt.Println("Manual execution successful", client.Dest.Owner.From, tx.Hash(), err)
 }
 
 //func (client CCIPClient) ExternalExecutionHappyPath(t *testing.T) {

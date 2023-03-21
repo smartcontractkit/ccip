@@ -267,10 +267,10 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		require.NoError(t, err)
 		ccipContracts.Source.Chain.Commit()
 		eventSignatures := ccip.GetEventSignatures()
-		testhelpers.SendRequest(t, ccipContracts, msg)
+		txForFailedReq := testhelpers.SendRequest(t, ccipContracts, msg)
 		failedReqLog := testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.Source.OnRamp.Address(), nodes, geCurrentSeqNum)
 		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.Source.OnRamp.Address(), geCurrentSeqNum)
-		reportForFailedReq := testhelpers.EventuallyCommitReportAccepted(t, ccipContracts, currentBlockNumber)
+		testhelpers.EventuallyCommitReportAccepted(t, ccipContracts, currentBlockNumber)
 
 		// execution status should be failed
 		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.Dest.OffRamp.Address(), nodes, geCurrentSeqNum, geCurrentSeqNum)
@@ -281,6 +281,12 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		require.NoError(t, err)
 		require.Equal(t, startNonce, afterNonce)
 		geCurrentSeqNum++
+
+		// flip the revert settings on receiver
+		_, err = ccipContracts.Dest.Receivers[1].Receiver.SetRevert(ccipContracts.Dest.User, false)
+		require.NoError(t, err, "setting revert to false on the receiver")
+		ccipContracts.Dest.Chain.Commit()
+		ccipContracts.Source.Chain.Commit()
 
 		// subsequent requests which should not be executed.
 		var pendingReqNumbers []int
@@ -294,16 +300,9 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 			geCurrentSeqNum++
 		}
 
-		// flip the revert settings on receiver
-		_, err = ccipContracts.Dest.Receivers[1].Receiver.SetRevert(ccipContracts.Dest.User, false)
-		require.NoError(t, err, "setting revert to false on the receiver")
-		ccipContracts.Dest.Chain.Commit()
-		ccipContracts.Source.Chain.Commit()
-
 		// manually execute the failed request
+		failedSeqNum := testhelpers.ExecuteMessage(t, ccipContracts, failedReqLog, txForFailedReq.Hash(), currentBlockNumber)
 		currentBlockNumber = ccipContracts.Dest.Chain.Blockchain().CurrentBlock().Number().Uint64()
-		require.NoError(t, err)
-		failedSeqNum := testhelpers.ExecuteMessage(t, ccipContracts, failedReqLog, []logpoller.Log{failedReqLog}, reportForFailedReq)
 		testhelpers.EventuallyExecutionStateChangedToSuccess(t, ccipContracts, []uint64{failedSeqNum}, currentBlockNumber)
 
 		// verify all the pending requests should be successfully executed now

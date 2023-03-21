@@ -262,6 +262,24 @@ func (rDapp *ReceiverDapp) Address() string {
 	return rDapp.EthAddress.Hex()
 }
 
+func (rDapp *ReceiverDapp) ToggleRevert(revert bool) error {
+	opts, err := rDapp.client.TransactionOpts(rDapp.client.GetDefaultWallet())
+	if err != nil {
+		return err
+	}
+	tx, err := rDapp.instance.SetRevert(opts, revert)
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Bool("revert", revert).
+		Str("tx", tx.Hash().String()).
+		Str("ReceiverDapp", rDapp.Address()).
+		Str("Network Name", rDapp.client.GetNetworkConfig().Name).
+		Msg("ReceiverDapp revert set")
+	return rDapp.client.ProcessTransaction(tx)
+}
+
 type PriceRegistry struct {
 	client     blockchain.EVMClient
 	instance   *price_registry.PriceRegistry

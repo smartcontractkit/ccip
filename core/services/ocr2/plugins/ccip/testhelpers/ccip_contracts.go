@@ -3,6 +3,7 @@ package testhelpers
 import (
 	"context"
 	"fmt"
+	"math"
 	"math/big"
 	"testing"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/onsi/gomega"
+	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	"github.com/stretchr/testify/require"
 
@@ -777,10 +779,11 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	}
 }
 
-func SendRequest(t *testing.T, ccipContracts CCIPContracts, msg router.ClientEVM2AnyMessage) {
+func SendRequest(t *testing.T, ccipContracts CCIPContracts, msg router.ClientEVM2AnyMessage) *types.Transaction {
 	tx, err := ccipContracts.Source.Router.CcipSend(ccipContracts.Source.User, ccipContracts.Dest.ChainID, msg)
 	require.NoError(t, err)
 	ConfirmTxs(t, []*types.Transaction{tx}, ccipContracts.Source.Chain)
+	return tx
 }
 
 func AssertExecState(t *testing.T, ccipContracts CCIPContracts, log logpoller.Log, state ccip.MessageExecutionState) {
@@ -830,47 +833,260 @@ func GetEVMExtraArgsV1(gasLimit *big.Int, strict bool) ([]byte, error) {
 	return append(EVMV1Tag, encodedArgs...), nil
 }
 
-func ExecuteMessage(
-	t *testing.T,
-	ccipContracts CCIPContracts,
-	req logpoller.Log,
-	allReqs []logpoller.Log,
-	report commit_store.ICommitStoreCommitReport,
-) uint64 {
-	t.Log("Executing request manually")
+type ManualExecArgs struct {
+	SourceChainID, DestChainID uint64
+	DestUser                   *bind.TransactOpts
+	SourceChain, DestChain     bind.ContractBackend
+	SourceStartBlock           *big.Int // the block in/after which failed ccip-send transaction was triggered
+	destStartBlock             uint64   // the start block for filtering ReportAccepted event (including the failed seq num)
+	// in destination chain. if not provided to be derived by ApproxDestStartBlock method
+	DestLatestBlockNum uint64 // current block number in destination
+	DestDeployedAt     uint64 // destination block number for the initial destination contract deployment.
+	// Can be any number before the tx was reverted in destination chain. Preferably this needs to be set up with
+	// a value greater than zero to avoid performance issue in locating approximate destination block
+	SendReqLogIndex uint   // log index of the CCIPSendRequested log in source chain
+	SendReqTxHash   string // tx hash of the ccip-send transaction for which execution was reverted
+	CommitStore     string
+	OnRamp          string
+	OffRamp         string
+	seqNr           uint64
+}
+
+// ApproxDestStartBlock attempts to locate a block in destination chain with timestamp closest to the timestamp of the block
+// in source chain in which ccip-send transaction was included
+// it uses binary search to locate the block with the closest timestamp
+// if the block located has a timestamp greater than the timestamp of mentioned source block
+// it just returns the first block found with lesser timestamp of the source block
+// providing a value of args.DestDeployedAt ensures better performance by reducing the range of block numbers to be traversed
+func (args *ManualExecArgs) ApproxDestStartBlock() error {
+	sourceBlockHdr, err := args.SourceChain.HeaderByNumber(context.Background(), args.SourceStartBlock)
+	if err != nil {
+		return err
+	}
+	sendTxTime := sourceBlockHdr.Time
+	maxBlockNum := args.DestLatestBlockNum
+	// setting this to an approx value of 1000 considering destination chain would have at least 1000 blocks before the transaction started
+	minBlockNum := args.DestDeployedAt
+	closestBlockNum := uint64(math.Floor((float64(maxBlockNum) + float64(minBlockNum)) / 2))
+	var closestBlockHdr *types.Header
+	closestBlockHdr, err = args.DestChain.HeaderByNumber(context.Background(), big.NewInt(int64(closestBlockNum)))
+	if err != nil {
+		return err
+	}
+	// to reduce the number of RPC calls increase the value of blockOffset
+	blockOffset := uint64(10)
+	for {
+		blockNum := closestBlockHdr.Number.Uint64()
+		if minBlockNum > maxBlockNum {
+			break
+		}
+		timeDiff := math.Abs(float64(closestBlockHdr.Time - sendTxTime))
+		// break if the difference in timestamp is lesser than 1 minute
+		if timeDiff < 60 {
+			break
+		} else if closestBlockHdr.Time > sendTxTime {
+			maxBlockNum = blockNum - 1
+		} else {
+			minBlockNum = blockNum + 1
+		}
+		closestBlockNum = uint64(math.Floor((float64(maxBlockNum) + float64(minBlockNum)) / 2))
+		closestBlockHdr, err = args.DestChain.HeaderByNumber(context.Background(), big.NewInt(int64(closestBlockNum)))
+		if err != nil {
+			return err
+		}
+	}
+
+	for {
+		if closestBlockHdr.Time <= sendTxTime {
+			break
+		}
+		closestBlockNum = closestBlockNum - blockOffset
+		if closestBlockNum <= 0 {
+			return fmt.Errorf("approx destination blocknumber not found")
+		}
+		closestBlockHdr, err = args.DestChain.HeaderByNumber(context.Background(), big.NewInt(int64(closestBlockNum)))
+		if err != nil {
+			return err
+		}
+	}
+	args.destStartBlock = closestBlockHdr.Number.Uint64()
+	fmt.Println("using approx destination start block number", args.destStartBlock)
+	return nil
+}
+
+func (args *ManualExecArgs) FindSeqNrFromCCIPSendRequested() (uint64, error) {
+	var seqNr uint64
+	onRampContract, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(common.HexToAddress(args.OnRamp), args.SourceChain)
+	if err != nil {
+		return seqNr, err
+	}
+	iterator, err := onRampContract.FilterCCIPSendRequested(&bind.FilterOpts{
+		Start: args.SourceStartBlock.Uint64(),
+	})
+	if err != nil {
+		return seqNr, err
+	}
+	for iterator.Next() {
+		if iterator.Event.Raw.Index == args.SendReqLogIndex &&
+			iterator.Event.Raw.TxHash.Hex() == args.SendReqTxHash {
+			seqNr = iterator.Event.Message.SequenceNumber
+			break
+		}
+	}
+	if seqNr == 0 {
+		return seqNr,
+			fmt.Errorf("no CCIPSendRequested logs found for logIndex %d starting from block number %d", args.SendReqLogIndex, args.SourceStartBlock)
+	}
+	return seqNr, nil
+}
+
+func (args *ManualExecArgs) ExecuteManually() (*types.Transaction, error) {
+	if args.SourceChainID == 0 ||
+		args.DestChainID == 0 ||
+		args.DestUser == nil {
+		return nil, fmt.Errorf("chain ids and owners are mandatory for source and dest chain")
+	}
+	if !common.IsHexAddress(args.CommitStore) ||
+		!common.IsHexAddress(args.OffRamp) ||
+		!common.IsHexAddress(args.OnRamp) {
+		return nil, fmt.Errorf("contract addresses must be valid hex address")
+	}
+	if args.SendReqTxHash == "" || args.SendReqLogIndex < 1 {
+		return nil, fmt.Errorf("log index for CCIPSendRequested event and tx hash of ccip-send request are required")
+	}
+	if args.SourceStartBlock == nil {
+		return nil, fmt.Errorf("must provide the value of source block in/after which ccip-send tx was included")
+	}
+	// locate seq nr from CCIPSendRequested log
+	seqNr, err := args.FindSeqNrFromCCIPSendRequested()
+	if err != nil {
+		return nil, err
+	}
+	commitStore, err := commit_store.NewCommitStore(common.HexToAddress(args.CommitStore), args.DestChain)
+	if err != nil {
+		return nil, err
+	}
+	if args.destStartBlock < 1 {
+		err = args.ApproxDestStartBlock()
+		if err != nil {
+			return nil, err
+		}
+	}
+	iterator, err := commitStore.FilterReportAccepted(&bind.FilterOpts{Start: args.destStartBlock})
+	if err != nil {
+		return nil, err
+	}
+
+	var commitReport *commit_store.ICommitStoreCommitReport
+	for iterator.Next() {
+		if iterator.Event.Report.Interval.Min <= seqNr && iterator.Event.Report.Interval.Max >= seqNr {
+			commitReport = &iterator.Event.Report
+			fmt.Println("Found root")
+			break
+		}
+	}
+	if commitReport == nil {
+		return nil, fmt.Errorf("unable to find seq num %d in commit report", seqNr)
+	}
+	args.seqNr = seqNr
+	return args.execute(commitReport)
+}
+
+func (args *ManualExecArgs) execute(report *commit_store.ICommitStoreCommitReport) (*types.Transaction, error) {
+	log.Info().Msg("Executing request manually")
+	seqNr := args.seqNr
 	// Build a merkle tree for the report
 	mctx := hasher.NewKeccakCtx()
-	leafHasher := ccip.NewLeafHasher(ccipContracts.Source.ChainID, ccipContracts.Dest.ChainID, ccipContracts.Source.OnRamp.Address(), mctx)
-
-	var leafHashes [][32]byte
-	for _, otherReq := range allReqs {
-		hash, err := leafHasher.HashLeaf(otherReq.GetGethLog())
-		require.NoError(t, err)
-		leafHashes = append(leafHashes, hash)
+	leafHasher := ccip.NewLeafHasher(args.SourceChainID, args.DestChainID, common.HexToAddress(args.OnRamp), mctx)
+	onRampContract, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(common.HexToAddress(args.OnRamp), args.SourceChain)
+	if err != nil {
+		return nil, err
 	}
-	decodedMsg, err := ccip.DecodeMessage(req.Data)
-	require.NoError(t, err)
-	tree, err := merklemulti.NewTree(mctx, leafHashes)
-	require.NoError(t, err)
-	require.Equal(t, tree.Root(), report.MerkleRoot, "Roots do not match")
+	var leaves [][32]byte
+	var curr, prove int
+	var encodedMsg []byte
+	sendRequestedIterator, err := onRampContract.FilterCCIPSendRequested(&bind.FilterOpts{
+		Start: args.SourceStartBlock.Uint64(),
+	})
+	if err != nil {
+		return nil, err
+	}
+	for sendRequestedIterator.Next() {
+		if sendRequestedIterator.Event.Message.SequenceNumber <= report.Interval.Max &&
+			sendRequestedIterator.Event.Message.SequenceNumber >= report.Interval.Min {
+			fmt.Println("Found seq num", sendRequestedIterator.Event.Message.SequenceNumber, report.Interval)
+			hash, err := leafHasher.HashLeaf(sendRequestedIterator.Event.Raw)
+			if err != nil {
+				return nil, err
+			}
+			leaves = append(leaves, hash)
+			if sendRequestedIterator.Event.Message.SequenceNumber == seqNr {
+				fmt.Printf("Found proving %d %+v\n", curr, sendRequestedIterator.Event.Message)
+				encodedMsg = sendRequestedIterator.Event.Raw.Data
+				prove = curr
+			}
+			curr++
+		}
+	}
+	sendRequestedIterator.Close()
+	if encodedMsg == nil {
+		return nil, fmt.Errorf("unable to find msg with seqNr %d", seqNr)
+	}
+	tree, err := merklemulti.NewTree(mctx, leaves)
+	if err != nil {
+		return nil, err
+	}
+	if tree.Root() != report.MerkleRoot {
+		return nil, fmt.Errorf("root doesn't match")
+	}
 
-	idx := int(decodedMsg.SequenceNumber - report.Interval.Min)
-	proof := tree.Prove([]int{idx})
+	proof := tree.Prove([]int{prove})
 	offRampProof := evm_2_evm_offramp.InternalExecutionReport{
-		SequenceNumbers: []uint64{decodedMsg.SequenceNumber},
-		EncodedMessages: [][]byte{req.Data},
+		SequenceNumbers: []uint64{seqNr},
+		EncodedMessages: [][]byte{encodedMsg},
 		Proofs:          proof.Hashes,
 		ProofFlagBits:   ccip.ProofFlagsToBits(proof.SourceFlags),
 	}
-
+	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(common.HexToAddress(args.OffRamp), args.DestChain)
+	if err != nil {
+		return nil, err
+	}
 	// Execute.
-	tx, err := ccipContracts.Dest.OffRamp.ManuallyExecute(ccipContracts.Dest.User, offRampProof)
-	require.NoError(t, err, "Executing manually")
-	ccipContracts.Dest.Chain.Commit()
-	ccipContracts.Source.Chain.Commit()
-	rec, err := ccipContracts.Dest.Chain.TransactionReceipt(context.Background(), tx.Hash())
+	return offRamp.ManuallyExecute(args.DestUser, offRampProof)
+}
+
+func ExecuteMessage(
+	t *testing.T,
+	c CCIPContracts,
+	req logpoller.Log,
+	txHash common.Hash,
+	destStartBlock uint64,
+) uint64 {
+	t.Log("Executing request manually")
+	sendReqReceipt, err := c.Source.Chain.TransactionReceipt(context.Background(), txHash)
+	require.NoError(t, err)
+	args := ManualExecArgs{
+		SourceChainID:      c.Source.ChainID,
+		DestChainID:        c.Dest.ChainID,
+		DestUser:           c.Dest.User,
+		SourceChain:        c.Source.Chain,
+		DestChain:          c.Dest.Chain,
+		SourceStartBlock:   sendReqReceipt.BlockNumber,
+		destStartBlock:     destStartBlock,
+		DestLatestBlockNum: c.Dest.Chain.Blockchain().CurrentBlock().Number().Uint64(),
+		SendReqLogIndex:    uint(req.LogIndex),
+		SendReqTxHash:      txHash.String(),
+		CommitStore:        c.Dest.CommitStore.Address().String(),
+		OnRamp:             c.Source.OnRamp.Address().String(),
+		OffRamp:            c.Dest.OffRamp.Address().String(),
+	}
+	tx, err := args.ExecuteManually()
+	require.NoError(t, err)
+	c.Dest.Chain.Commit()
+	c.Source.Chain.Commit()
+	rec, err := c.Dest.Chain.TransactionReceipt(context.Background(), tx.Hash())
 	require.NoError(t, err)
 	require.Equal(t, uint64(1), rec.Status, "manual execution failed")
-	t.Logf("Manual Execution completed for seqNum %d", decodedMsg.SequenceNumber)
-	return decodedMsg.SequenceNumber
+	t.Logf("Manual Execution completed for seqNum %d", args.seqNr)
+	return args.seqNr
 }

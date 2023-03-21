@@ -2000,11 +2000,11 @@ func DeployEnvironments(
 			HttpURL: NetworkB.HTTPURLs[0],
 		}))
 
-		testEnvironment.AddChart(blockscout.New(&blockscout.Props{
-			Name:    "source-blockscout",
-			WsURL:   NetworkA.URLs[0],
-			HttpURL: NetworkA.HTTPURLs[0],
-		}))
+			testEnvironment.AddChart(blockscout.New(&blockscout.Props{
+				Name:    "source-blockscout",
+				WsURL:   NetworkA.URLs[0],
+				HttpURL: NetworkA.HTTPURLs[0],
+			}))
 	*/
 	err := testEnvironment.
 		AddHelm(mockservercfg.New(nil)).
