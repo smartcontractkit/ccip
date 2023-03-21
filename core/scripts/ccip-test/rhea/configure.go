@@ -1,14 +1,20 @@
 package rhea
 
 import (
+	"context"
+	"fmt"
 	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ping_pong_demo"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/shared"
@@ -48,14 +54,50 @@ func SetPriceRegistryPrices(t *testing.T, client *EvmDeploymentConfig, destChain
 	for _, feeToken := range client.ChainConfig.FeeTokens {
 		priceUpdates.TokenPriceUpdates = append(priceUpdates.TokenPriceUpdates, price_registry.InternalTokenPriceUpdate{
 			SourceToken: client.ChainConfig.SupportedTokens[feeToken].Token,
-			// The USD per Token is in 1e18 format.
-			UsdPerToken: big.NewInt(0).Mul(client.ChainConfig.SupportedTokens[feeToken].Price, big.NewInt(1e18)),
+			// USD per wei.
+			UsdPerToken: client.ChainConfig.SupportedTokens[feeToken].Price,
 		})
 	}
 
 	tx, err := priceRegistry.UpdatePrices(client.Owner, priceUpdates)
 	shared.RequireNoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
+}
+
+func setOnRampPrices(t *testing.T, client *EvmDeploymentConfig) {
+	var tokens []common.Address
+	var prices []*big.Int
+	for _, tokenConfig := range client.ChainConfig.SupportedTokens {
+		tokens = append(tokens, tokenConfig.Token)
+		prices = append(prices, tokenConfig.Price)
+	}
+
+	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(client.LaneConfig.OnRamp, client.Client)
+	shared.RequireNoError(t, err)
+
+	// Prices are used by the rate limiter and dictate what tokens are supported
+	tx, err := onRamp.SetPrices(client.Owner, tokens, prices)
+	shared.RequireNoError(t, err)
+	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
+	client.Logger.Infof(fmt.Sprintf("OnRamp prices set on %s in tx %s", client.LaneConfig.OnRamp.String(), helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash())))
+}
+
+func setOffRampPrices(t *testing.T, client *EvmDeploymentConfig) {
+	var tokens []common.Address
+	var prices []*big.Int
+	for _, tokenConfig := range client.ChainConfig.SupportedTokens {
+		tokens = append(tokens, tokenConfig.Token)
+		prices = append(prices, tokenConfig.Price)
+	}
+
+	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(client.LaneConfig.OffRamp, client.Client)
+	shared.RequireNoError(t, err)
+
+	// Prices are used by the rate limiter and dictate what tokens are supported
+	tx, err := offRamp.SetPrices(client.Owner, tokens, prices)
+	shared.RequireNoError(t, err)
+	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
+	client.Logger.Infof(fmt.Sprintf("OffRamp prices set on %s in tx %s", client.LaneConfig.OnRamp.String(), helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash())))
 }
 
 func setOnRampOnRouter(t *testing.T, sourceClient *EvmDeploymentConfig, destChainId uint64) {
@@ -132,4 +174,35 @@ func fillPoolWithTokens(t *testing.T, client *EvmDeploymentConfig, pool *lock_re
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 
 	client.Logger.Infof("Pool filled with tokens: %s", helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash()))
+}
+
+func FundPingPong(t *testing.T, client *EvmDeploymentConfig, fundingAmount *big.Int, tokenAddress common.Address) {
+	pingDapp, err := ping_pong_demo.NewPingPongDemo(client.LaneConfig.PingPongDapp, client.Client)
+	require.NoError(t, err)
+
+	linkToken, err := link_token_interface.NewLinkToken(tokenAddress, client.Client)
+	require.NoError(t, err)
+
+	tx, err := linkToken.Approve(client.Owner, client.LaneConfig.PingPongDapp, fundingAmount)
+	require.NoError(t, err)
+	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
+
+	tx, err = pingDapp.Fund(client.Owner, fundingAmount)
+	require.NoError(t, err)
+	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
+	client.Logger.Infof("Ping pong funded with %s in tx: %s", fundingAmount.String(), helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash()))
+}
+
+func UpdateDeployedAt(t *testing.T, source *EvmDeploymentConfig, dest *EvmDeploymentConfig) {
+	sourceBlock, err := source.Client.BlockNumber(context.Background())
+	require.NoError(t, err)
+
+	source.ChainConfig.DeploySettings.DeployedAtBlock = sourceBlock
+	source.LaneConfig.DeploySettings.DeployedAtBlock = sourceBlock
+
+	destBlock, err := dest.Client.BlockNumber(context.Background())
+	require.NoError(t, err)
+
+	dest.ChainConfig.DeploySettings.DeployedAtBlock = destBlock
+	dest.LaneConfig.DeploySettings.DeployedAtBlock = destBlock
 }

@@ -9,14 +9,15 @@ import (
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/dione"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/metis/printing"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
+	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea/deployment_io"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea/deployments"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
 )
 
 var (
 	// Change these values
-	sourceChain = rhea.AvaxFuji
-	destChain   = rhea.Sepolia
+	sourceChain = rhea.OptimismGoerli
+	destChain   = rhea.AvaxFuji
 	ENV         = dione.StagingBeta
 
 	// These will automatically populate or error if the lane doesn't exist
@@ -44,8 +45,10 @@ var chainMapping = map[dione.Environment]map[rhea.Chain]rhea.EvmDeploymentConfig
 // OWNER_KEY  private key used to deploy all contracts and is used as default in all single user tests.
 func TestRheaDeploy(t *testing.T) {
 	checkOwnerKeyAndSetupChain(t)
-
+	rhea.DeployToNewChain(t, &SOURCE)
+	rhea.DeployToNewChain(t, &DESTINATION)
 	rhea.DeployLanes(t, &SOURCE, &DESTINATION)
+	deployment_io.PrettyPrintLanes(ENV, &SOURCE, &DESTINATION)
 }
 
 // TestDione can be run as a test with the following config
@@ -84,12 +87,7 @@ func TestCCIP(t *testing.T) {
 	// Configures a client to run tests with using the network defaults and given keys.
 	// After updating any contracts be sure to update the network defaults to reflect
 	// those changes.
-	client := NewCcipClient(t,
-		SOURCE,
-		DESTINATION,
-		ownerKey,
-		seedKey,
-	)
+	client := NewCcipClient(t, SOURCE, DESTINATION, ownerKey, seedKey)
 
 	switch command {
 	// Deploys a new set of PingPong contracts, configures them to talk to each other
@@ -112,29 +110,11 @@ func TestCCIP(t *testing.T) {
 		client.setOnRampFeeConfig(t, &SOURCE)
 	case "applyFeeTokensUpdates":
 		client.applyFeeTokensUpdates(t, &SOURCE)
-		// Set the config to the onRamp fee
-	case "setAllowList":
-		client.setAllowList(t)
-	// Set the config to the onRamp AllowList
-	case "upgradeLane":
-		rhea.UpgradeLane(t, &SOURCE, &DESTINATION)
-	case "gov":
-		client.ChangeGovernanceParameters(t)
-	case "don":
-		// Cross chain request with DON execution
-		client.DonExecutionHappyPath(t)
 	case "batching":
 		// Submit 10 txs. This should result in the txs being batched together
 		client.ScalingAndBatching(t)
 	case "gas":
 		client.TestGasVariousTxs(t)
-	case "acceptOwnership":
-		// Should accept ownership on the destination chain OffRamp & Executor
-		client.AcceptOwnership(t)
-		// work in progress call, use for any custom scripting
-	case "syncTokenPools":
-		// Sync EvmChainConfig tokenPools to on-chain on/offRamp: remove deleted, add new BridgeTokens+TokenPools
-		client.SyncTokenPools(t)
 	case "wip":
 		client.wip(t, &SOURCE, &DESTINATION)
 	case "":
@@ -152,36 +132,106 @@ func TestCCIP(t *testing.T) {
 // OWNER_KEY  private key used to deploy all contracts and is used as default in all single user tests.
 func TestUpdateAllLanes(t *testing.T) {
 	ownerKey := checkOwnerKey(t)
-	don := dione.NewDON(ENV, logger.TestLogger(t))
-
 	if _, ok := laneMapping[ENV]; !ok {
 		t.Error("set environment not supported")
 	}
 
+	don := dione.NewDON(ENV, logger.TestLogger(t))
+
+	// Potential todo: remove old deployment artifact permissions
+	// Optimizations:
+	// 		Concurrent chain contracts deployment before any lange deployment
+	// 		Concurrent lane contract deployment for non-intersecting lanes
+	// 		Concurrent lane contract deployment within a bidirectional deploy
+	// 		Not waiting for mining, self incrementing the nonce
+
+	// 		Downsides: less control and worse retry experience
+	// 			As failures should be very rare this is probably worth it
+	upgradeLane := func(source, dest rhea.EvmDeploymentConfig) {
+		if !source.LaneConfig.DeploySettings.DeployCommitStore || !source.LaneConfig.DeploySettings.DeployRamp {
+			source.Logger.Warnf("Please set \"DeployRamp and DeployCommitStore\" to true for the given EvmChainConfigs and make sure "+
+				"the right ones are set. Source: %d, Dest %d", source.ChainConfig.ChainId, dest.ChainConfig.ChainId)
+			return
+		}
+		if !dest.LaneConfig.DeploySettings.DeployCommitStore || !dest.LaneConfig.DeploySettings.DeployRamp {
+			dest.Logger.Warnf("Please set \"DeployRamp and DeployCommitStore\" to true for the given EvmChainConfigs and make sure "+
+				"the right ones are set. Source: %d, Dest %d", dest.ChainConfig.ChainId, source.ChainConfig.ChainId)
+			return
+		}
+		if source.ChainConfig.DeploySettings.DeployRouter || dest.ChainConfig.DeploySettings.DeployRouter {
+			dest.Logger.Warnf("Routers should never be set to true Source: %d, Dest %d", dest.ChainConfig.ChainId, source.ChainConfig.ChainId)
+			return
+		}
+		// Removes any old job specs
+		don.ClearAllJobs(helpers.ChainName(int64(source.ChainConfig.ChainId)), helpers.ChainName(int64(dest.ChainConfig.ChainId)))
+		// Deploys the new contracts and updates `source` and `dest`
+		rhea.DeployLanes(t, &source, &dest)
+		// Prints the new config and writes them to file
+		deployment_io.PrettyPrintLanes(ENV, &source, &dest)
+		// Add new job specs
+		don.AddTwoWaySpecs(source, dest)
+		// Set the OCR2 config on the source contracts
+		client := NewCcipClient(t, source, dest, ownerKey, ownerKey)
+		client.SetOCR2Config(ENV)
+		// Set the OCR2 config on the destination contracts
+		client = NewCcipClient(t, dest, source, ownerKey, ownerKey)
+		client.SetOCR2Config(ENV)
+		// Starts the ping pong dapp
+		client.startPingPong(t)
+	}
+
+	// This script only deploys new lane contracts. Please deploy any new chain contracts
+	// and update the config before running this.
+
+	DoForEachBidirectionalLane(t, ownerKey, upgradeLane)
+}
+
+func DoForEachLane(t *testing.T, ownerKey string, f func(source rhea.EvmDeploymentConfig, destination rhea.EvmDeploymentConfig)) {
 	for sourceChain, sourceMap := range laneMapping[ENV] {
 		for destChain, _ := range sourceMap {
+			t.Logf("Running function for lane %s -> %s", sourceChain, destChain)
+
 			source := laneMapping[ENV][sourceChain][destChain]
 			dest := laneMapping[ENV][destChain][sourceChain]
 
 			source.SetupChain(t, ownerKey)
 			dest.SetupChain(t, ownerKey)
-			if !source.DeploySettings.DeployCommitStore || !source.DeploySettings.DeployRamp {
-				source.Logger.Errorf("Please set \"DeployRamp and DeployCommitStore\" to true for the given EvmChainConfigs and make sure "+
-					"the right ones are set. Source: %d, Dest %d", source.ChainConfig.ChainId, dest.ChainConfig.ChainId)
-				continue
+
+			f(source, dest)
+		}
+	}
+}
+
+func DoForEachBidirectionalLane(t *testing.T, ownerKey string, f func(source rhea.EvmDeploymentConfig, destination rhea.EvmDeploymentConfig)) {
+	completed := make(map[rhea.Chain]map[rhea.Chain]interface{})
+
+	for sourceChain, sourceMap := range laneMapping[ENV] {
+		for destChain, _ := range sourceMap {
+			// Skip if we already processed the lane from the other side
+			if destMap, ok := completed[destChain]; ok {
+				if _, ok := destMap[sourceChain]; ok {
+					continue
+				}
 			}
-			if !dest.DeploySettings.DeployCommitStore || !dest.DeploySettings.DeployRamp {
-				dest.Logger.Errorf("Please set \"DeployRamp and DeployCommitStore\" to true for the given EvmChainConfigs and make sure "+
-					"the right ones are set. Source: %d, Dest %d", dest.ChainConfig.ChainId, source.ChainConfig.ChainId)
-				continue
+
+			t.Logf("Running function for lane %s <-> %s", sourceChain, destChain)
+
+			source := laneMapping[ENV][sourceChain][destChain]
+			dest := laneMapping[ENV][destChain][sourceChain]
+
+			source.SetupChain(t, ownerKey)
+			dest.SetupChain(t, ownerKey)
+
+			f(source, dest)
+
+			if _, ok := completed[sourceChain]; !ok {
+				completed[sourceChain] = make(map[rhea.Chain]interface{})
 			}
-			rhea.UpgradeLaneTwoWay(t, &source, &dest)
-			don.ClearAllJobs(helpers.ChainName(int64(source.ChainConfig.ChainId)), helpers.ChainName(int64(dest.ChainConfig.ChainId)))
-			don.AddTwoWaySpecs(source, dest)
-			client := NewCcipClient(t, source, dest, ownerKey, ownerKey)
-			client.SetOCR2Config(ENV)
-			client = NewCcipClient(t, dest, source, ownerKey, ownerKey)
-			client.SetOCR2Config(ENV)
+			if _, ok := completed[destChain]; !ok {
+				completed[destChain] = make(map[rhea.Chain]interface{})
+			}
+			completed[sourceChain][destChain] = true
+			completed[destChain][sourceChain] = true
 		}
 	}
 }

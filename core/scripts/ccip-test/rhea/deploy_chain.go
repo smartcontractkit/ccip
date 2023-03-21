@@ -27,7 +27,7 @@ func DeployToNewChain(t *testing.T, client *EvmDeploymentConfig) {
 }
 
 func deployAFN(t *testing.T, client *EvmDeploymentConfig) {
-	if !client.DeploySettings.DeployAFN {
+	if !client.ChainConfig.DeploySettings.DeployAFN {
 		if client.ChainConfig.Afn.Hex() == "0x0000000000000000000000000000000000000000" {
 			t.Error("deploy new afn set to false but no afn given in config")
 		}
@@ -45,20 +45,25 @@ func deployAFN(t *testing.T, client *EvmDeploymentConfig) {
 
 func deployLockReleaseTokenPool(t *testing.T, client *EvmDeploymentConfig) {
 	for tokenName, tokenConfig := range client.ChainConfig.SupportedTokens {
-		if client.DeploySettings.DeployTokenPools {
+		if tokenConfig.TokenPoolType != LockRelease {
+			client.Logger.Infof("Pool for token %s is not LockRelease, skipping", tokenName)
+			continue
+		}
+
+		if client.ChainConfig.DeploySettings.DeployTokenPools {
 			client.Logger.Infof("Deploying token pool for %s token", tokenName)
 			tokenPoolAddress, tx, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(client.Owner, client.Client, tokenConfig.Token)
 			shared.RequireNoError(t, err)
 			shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
-			client.Logger.Infof("Native token pool deployed on %s in tx %s", tokenPoolAddress, helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash()))
+			client.Logger.Infof("Token pool for %s deployed on %s in tx %s", tokenName, tokenPoolAddress, helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash()))
 			pool, err := lock_release_token_pool.NewLockReleaseTokenPool(tokenPoolAddress, client.Client)
 			shared.RequireNoError(t, err)
 			fillPoolWithTokens(t, client, pool, tokenConfig.Token)
 			client.ChainConfig.SupportedTokens[tokenName] = EVMBridgedToken{
-				Token:                tokenConfig.Token,
-				Pool:                 tokenPoolAddress,
-				Price:                big.NewInt(1),
-				PriceFeedsAggregator: tokenConfig.PriceFeedsAggregator,
+				Token:         tokenConfig.Token,
+				Pool:          tokenPoolAddress,
+				Price:         tokenConfig.Price,
+				TokenPoolType: tokenConfig.TokenPoolType,
 			}
 		} else {
 			if tokenConfig.Pool.Hex() == "0x0000000000000000000000000000000000000000" {
@@ -73,7 +78,7 @@ func deployLockReleaseTokenPool(t *testing.T, client *EvmDeploymentConfig) {
 
 // deployRouter always uses an empty list of offRamps. Ramps should be set in the offRamp deployment step.
 func deployRouter(t *testing.T, client *EvmDeploymentConfig) {
-	if !client.DeploySettings.DeployRouter {
+	if !client.ChainConfig.DeploySettings.DeployRouter {
 		client.Logger.Infof("Skipping Router deployment, using Router on %s", client.ChainConfig.Router)
 		return
 	}
@@ -94,8 +99,8 @@ func deployRouter(t *testing.T, client *EvmDeploymentConfig) {
 
 // deployPriceRegistry Prices is deployed without any feeUpdaters
 func deployPriceRegistry(t *testing.T, client *EvmDeploymentConfig) {
-	if !client.DeploySettings.DeployPriceRegistry {
-		client.Logger.Infof("Skipping PriceRegistry deployment, using Prices on %s", client.ChainConfig.PriceRegistry)
+	if !client.ChainConfig.DeploySettings.DeployPriceRegistry {
+		client.Logger.Infof("Skipping PriceRegistry deployment, using PriceRegistry on %s", client.ChainConfig.PriceRegistry)
 		return
 	}
 

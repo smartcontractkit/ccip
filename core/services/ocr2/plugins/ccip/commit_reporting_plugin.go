@@ -308,7 +308,7 @@ func (r *CommitReportingPlugin) generatePriceUpdates(ctx context.Context) (sourc
 
 	// Include wrapped native in our token query as way to identify the source native USD price.
 	// notice USD is in 1e18 scale, i.e. $1 = 1e18
-	tokenPricesUSD, err = r.config.priceGetter.TokenPricesUSD(context.Background(), append(feeTokens, r.config.sourceNative))
+	tokenPricesUSD, err = r.config.priceGetter.TokenPricesUSD(ctx, append(feeTokens, r.config.sourceNative))
 	if err != nil {
 		return nil, nil, err
 	}

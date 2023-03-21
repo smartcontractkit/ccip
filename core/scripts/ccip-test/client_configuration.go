@@ -35,7 +35,6 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/receiver_dapp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/simple_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/dione"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
@@ -122,6 +121,7 @@ func (client *CCIPClient) startPingPong(t *testing.T) {
 	tx, err := client.Source.PingPongDapp.StartPingPong(client.Source.Owner)
 	shared.RequireNoError(t, err)
 	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+	client.Source.logger.Infof("Ping pong started in tx %s", helpers.ExplorerLink(int64(client.Source.ChainId), tx.Hash()))
 }
 
 func (client *CCIPClient) setPingPongPaused(t *testing.T, paused bool) {
@@ -160,6 +160,7 @@ type EVMBridgedToken struct {
 	Pool                 *lock_release_token_pool.LockReleaseTokenPool
 	Price                *big.Int
 	PriceFeedsAggregator common.Address
+	rhea.TokenPoolType
 }
 
 type SourceClient struct {
@@ -179,10 +180,10 @@ func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient
 		tokenPool, err2 := lock_release_token_pool.NewLockReleaseTokenPool(tokenConfig.Pool, config.Client)
 		require.NoError(t, err2)
 		supportedTokens[token] = EVMBridgedToken{
-			Token:                tokenConfig.Token,
-			Pool:                 tokenPool,
-			Price:                tokenConfig.Price,
-			PriceFeedsAggregator: tokenConfig.PriceFeedsAggregator,
+			Token:         tokenConfig.Token,
+			Pool:          tokenPool,
+			Price:         tokenConfig.Price,
+			TokenPoolType: tokenConfig.TokenPoolType,
 		}
 	}
 
@@ -223,10 +224,9 @@ func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient
 
 type DestClient struct {
 	Client
-	CommitStore     *commit_store.CommitStore
-	MessageReceiver *simple_message_receiver.SimpleMessageReceiver
-	ReceiverDapp    *receiver_dapp.ReceiverDapp
-	OffRamp         *evm_2_evm_offramp.EVM2EVMOffRamp
+	CommitStore  *commit_store.CommitStore
+	ReceiverDapp *receiver_dapp.ReceiverDapp
+	OffRamp      *evm_2_evm_offramp.EVM2EVMOffRamp
 }
 
 func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestClient {
@@ -239,10 +239,10 @@ func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestCli
 		tokenPool, err2 := lock_release_token_pool.NewLockReleaseTokenPool(tokenConfig.Pool, config.Client)
 		require.NoError(t, err2)
 		supportedTokens[token] = EVMBridgedToken{
-			Token:                tokenConfig.Token,
-			Pool:                 tokenPool,
-			Price:                tokenConfig.Price,
-			PriceFeedsAggregator: tokenConfig.PriceFeedsAggregator,
+			Token:         tokenConfig.Token,
+			Pool:          tokenPool,
+			Price:         tokenConfig.Price,
+			TokenPoolType: tokenConfig.TokenPoolType,
 		}
 	}
 
@@ -251,8 +251,6 @@ func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestCli
 	commitStore, err := commit_store.NewCommitStore(config.LaneConfig.CommitStore, config.Client)
 	shared.RequireNoError(t, err)
 	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(config.LaneConfig.OffRamp, config.Client)
-	shared.RequireNoError(t, err)
-	messageReceiver, err := simple_message_receiver.NewSimpleMessageReceiver(config.LaneConfig.MessageReceiver, config.Client)
 	shared.RequireNoError(t, err)
 	receiverDapp, err := receiver_dapp.NewReceiverDapp(config.LaneConfig.ReceiverDapp, config.Client)
 	shared.RequireNoError(t, err)
@@ -283,10 +281,9 @@ func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestCli
 			Confirmations:    config.ChainConfig.Confirmations,
 			t:                t,
 		},
-		CommitStore:     commitStore,
-		MessageReceiver: messageReceiver,
-		ReceiverDapp:    receiverDapp,
-		OffRamp:         offRamp,
+		CommitStore:  commitStore,
+		ReceiverDapp: receiverDapp,
+		OffRamp:      offRamp,
 	}
 }
 
@@ -365,32 +362,6 @@ func (client *CCIPClient) ChangeGovernanceParameters(t *testing.T) {
 	sendRequest := WaitForCrossChainSendRequest(client.Source, sourceBlockNum, tx.Hash())
 	require.NoError(t, client.WaitForCommit(DestBlockNum), "waiting for commit")
 	require.NoError(t, client.WaitForExecution(DestBlockNum, sendRequest.Message.SequenceNumber), "waiting for execution")
-}
-
-func (client *CCIPClient) SendMessage(t *testing.T, data string) common.Hash {
-	// ABI encoded message
-	bts, err := hex.DecodeString(data)
-	require.NoError(t, err)
-
-	token := router.ClientEVMTokenAmount{
-		Token:  client.Source.LinkTokenAddress,
-		Amount: big.NewInt(1),
-	}
-	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(3e5), false)
-	require.NoError(t, err)
-
-	msg := router.ClientEVM2AnyMessage{
-		Receiver:     testhelpers.MustEncodeAddress(t, client.Dest.MessageReceiver.Address()),
-		Data:         bts,
-		TokenAmounts: []router.ClientEVMTokenAmount{token},
-		ExtraArgs:    extraArgsV1,
-		FeeToken:     client.Source.LinkTokenAddress,
-	}
-
-	tx, err := client.Source.Router.CcipSend(client.Source.Owner, client.Dest.ChainId, msg)
-	require.NoError(t, err)
-	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
-	return tx.Hash()
 }
 
 func (client *CCIPClient) DonExecutionHappyPath(t *testing.T) {

@@ -2,7 +2,6 @@ package dione
 
 import (
 	"fmt"
-	"math/big"
 	"strings"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
@@ -31,8 +30,8 @@ func NewCCIPJobSpecParams(sourceClient rhea.EvmDeploymentConfig, destClient rhea
 		DestChainId:            destClient.ChainConfig.ChainId,
 		TokenPricesUSDPipeline: GetTokenPricesUSDPipeline(pipelineTokens),
 		PollPeriod:             PollPeriod,
-		SourceStartBlock:       sourceClient.DeploySettings.DeployedAt,
-		DestStartBlock:         destClient.DeploySettings.DeployedAt,
+		SourceStartBlock:       sourceClient.LaneConfig.DeploySettings.DeployedAtBlock,
+		DestStartBlock:         destClient.LaneConfig.DeploySettings.DeployedAtBlock,
 		P2PV2Bootstrappers:     []string{}, // Set in env vars
 	}
 }
@@ -40,8 +39,7 @@ func NewCCIPJobSpecParams(sourceClient rhea.EvmDeploymentConfig, destClient rhea
 func GetTokenPricesUSDPipeline(pipelineTokens []rhea.EVMBridgedToken) string {
 	tokenPricesUSDPipeline := "merge [type=merge left=\"{}\" right=\"{"
 	for _, token := range pipelineTokens {
-		price := new(big.Int).Mul(token.Price, big.NewInt(1e18))
-		tokenPricesUSDPipeline += fmt.Sprintf(`\\\"%s\\\":\\\"%s\\\",`, token.Token.Hex(), price)
+		tokenPricesUSDPipeline += fmt.Sprintf(`\\\"%s\\\":\\\"%s\\\",`, token.Token.Hex(), token.Price)
 	}
 	tokenPricesUSDPipeline = strings.TrimSuffix(tokenPricesUSDPipeline, ",")
 	tokenPricesUSDPipeline += "}\"];"

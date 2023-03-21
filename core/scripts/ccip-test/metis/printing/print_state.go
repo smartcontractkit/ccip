@@ -702,7 +702,7 @@ type TokenPool interface {
 }
 
 func printTokenSupportState(source *rhea.EvmDeploymentConfig, destination *rhea.EvmDeploymentConfig) {
-	TOKEN := rhea.CACHEGOLD
+	TOKEN := rhea.LINK
 	sourceTokenConfig := source.ChainConfig.SupportedTokens[TOKEN]
 	destTokenConfig := destination.ChainConfig.SupportedTokens[TOKEN]
 

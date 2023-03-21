@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
@@ -174,25 +175,58 @@ func (don *DON) PopulateEthKeys() {
 func (don *DON) ClearJobSpecs(jobType JobType, source string, destination string) {
 	jobToDelete := fmt.Sprintf("ccip-%s-%s-%s", jobType, source, destination)
 
-	for i, node := range don.Nodes {
-		jobs, _, err := node.ReadJobs()
-		common.PanicErr(err)
+	var wg sync.WaitGroup
+	for i, n := range don.Nodes {
+		wg.Add(1)
 
-		for _, maps := range jobs.Data {
-			jb := maps["attributes"].(map[string]interface{})
-			jobName := jb["name"].(string)
-			id := maps["id"].(string)
+		go func(node *client.Chainlink, index int) {
+			jobs, _, err := node.ReadJobs()
+			common.PanicErr(err)
 
-			don.lggr.Infof("Node [%2d]: Job %s: %s", i, id, jobName)
+			for _, maps := range jobs.Data {
+				jb := maps["attributes"].(map[string]interface{})
+				jobName := jb["name"].(string)
+				id := maps["id"].(string)
 
-			if jobToDelete == jobName {
-				don.lggr.Infof("Node [%2d]:Deleting job %s: %s", i, id, jobName)
-				s, err := node.DeleteJob(id)
-				common.PanicErr(err)
-				don.lggr.Infof(s.Status)
+				if jobToDelete == jobName {
+					don.lggr.Infof("Node [%2d]:Deleting job %s: %s", index, id, jobName)
+					_, err := node.DeleteJob(id)
+					common.PanicErr(err)
+				}
+				wg.Done()
 			}
-		}
+		}(n, i)
 	}
+	wg.Wait()
+}
+
+// NukeEverything deletes all jobs on all the lanes. Everything will be wiped.
+func (don *DON) NukeEverything() {
+	var wg sync.WaitGroup
+
+	for i, n := range don.Nodes {
+		nde := n
+		wg.Add(1)
+		go func(node *client.Chainlink, index int) {
+			jobs, http, err := node.ReadJobs()
+			common.PanicErr(err)
+			if http.StatusCode != 200 {
+				don.lggr.Infof("Node [%2d] status %d", index, http.StatusCode)
+			}
+
+			for _, maps := range jobs.Data {
+				jb := maps["attributes"].(map[string]interface{})
+				jobName := jb["name"].(string)
+				id := maps["id"].(string)
+
+				don.lggr.Infof("Node [%2d]:Deleting job %s: %s", index, id, jobName)
+				_, err := node.DeleteJob(id)
+				common.PanicErr(err)
+			}
+			wg.Done()
+		}(nde, i)
+	}
+	wg.Wait()
 }
 
 func (don *DON) ListJobSpecs() {
@@ -208,6 +242,11 @@ func (don *DON) ListJobSpecs() {
 			don.lggr.Infof("Node [%2d]: Job %3s: %-28s %+v", i, id, jobName, jb)
 		}
 	}
+}
+
+func (don *DON) ClearAndRepopulateTwoWaySpecs(chainA rhea.EvmDeploymentConfig, chainB rhea.EvmDeploymentConfig) {
+	don.ClearAllJobs(helpers.ChainName(int64(chainA.ChainConfig.ChainId)), helpers.ChainName(int64(chainB.ChainConfig.ChainId)))
+	don.AddTwoWaySpecs(chainA, chainB)
 }
 
 func (don *DON) LoadCurrentNodeParams() {
@@ -231,29 +270,41 @@ func (don *DON) AddTwoWaySpecs(chainA rhea.EvmDeploymentConfig, chainB rhea.EvmD
 		don.lggr.Errorf("commit jobspec error %v", err)
 	}
 	don.AddJobSpec(relaySpecAB)
+	// We sleep to give the nodes some time to start the new job
+	time.Sleep(time.Second * 5)
 	executionSpecAB, err := jobParamsAB.ExecutionJobSpec()
 	if err != nil {
 		don.lggr.Errorf("exec jobspec error %v", err)
 	}
 	don.AddJobSpec(executionSpecAB)
+	time.Sleep(time.Second * 5)
 	jobParamsBA := NewCCIPJobSpecParams(chainB, chainA)
 	relaySpecBA, err := jobParamsBA.CommitJobSpec()
 	if err != nil {
 		don.lggr.Errorf("commit jobspec error %v", err)
 	}
 	don.AddJobSpec(relaySpecBA)
+	time.Sleep(time.Second * 5)
 	executionSpecBA, err := jobParamsBA.ExecutionJobSpec()
 	if err != nil {
 		don.lggr.Errorf("exec jobspec error %v", err)
 	}
 	don.AddJobSpec(executionSpecBA)
+
+	// Sometimes jobs don't get added correctly. This script looks for missing jobs
+	// and attempts to add them.
+	don.AddMissingSpecs(chainB, chainA)
+	don.AddMissingSpecs(chainA, chainB)
 }
 
 func (don *DON) AddMissingSpecs(chainA rhea.EvmDeploymentConfig, chainB rhea.EvmDeploymentConfig) {
 	jobsAdded := 0
 	for i, node := range don.Nodes {
-		jobs, _, err := node.ReadJobs()
+		jobs, http, err := node.ReadJobs()
 		common.PanicErr(err)
+		if http.StatusCode != 200 {
+			don.lggr.Infof("Node [%2d] status %d", i, http.StatusCode)
+		}
 
 		lookingForCommit := fmt.Sprintf("ccip-%s-%s-%s", Commit, helpers.ChainName(int64(chainA.ChainConfig.ChainId)), helpers.ChainName(int64(chainB.ChainConfig.ChainId)))
 		lookingForExec := fmt.Sprintf("ccip-%s-%s-%s", Execution, helpers.ChainName(int64(chainA.ChainConfig.ChainId)), helpers.ChainName(int64(chainB.ChainConfig.ChainId)))
@@ -299,9 +350,16 @@ func (don *DON) AddMissingSpecs(chainA rhea.EvmDeploymentConfig, chainB rhea.Evm
 }
 
 func (don *DON) AddJobSpec(spec *client.OCR2TaskJobSpec) {
-	for i, node := range don.Nodes {
-		don.AddSingleJob(node, spec, i)
+	var wg sync.WaitGroup
+	for i, n := range don.Nodes {
+		nde := n
+		wg.Add(1)
+		go func(node *client.Chainlink, index int) {
+			don.AddSingleJob(node, spec, index)
+			wg.Done()
+		}(nde, i)
 	}
+	wg.Wait()
 }
 
 func (don *DON) AddSingleJob(node *client.Chainlink, spec *client.OCR2TaskJobSpec, nodeIndex int) {
@@ -316,9 +374,8 @@ func (don *DON) AddSingleJob(node *client.Chainlink, spec *client.OCR2TaskJobSpe
 	specString, err := spec.String()
 	common.PanicErr(err)
 
-	don.lggr.Infof(specString)
 	jb, tx, err := node.CreateJobRaw(specString)
 	common.PanicErr(err)
 
-	don.lggr.Infof("Created job %3s. Status code %s", jb.Data.ID, tx.Status)
+	don.lggr.Infof("Created job %3s on node [%2d] status code %s", jb.Data.ID, nodeIndex, tx.Status)
 }

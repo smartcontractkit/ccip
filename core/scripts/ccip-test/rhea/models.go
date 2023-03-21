@@ -26,16 +26,19 @@ type EVMGasSettings struct {
 	GasTipCap *big.Int
 }
 
-type DeploySettings struct {
+type ChainDeploySettings struct {
 	DeployAFN           bool
 	DeployTokenPools    bool
 	DeployRouter        bool
 	DeployPriceRegistry bool
+	DeployedAtBlock     uint64
+}
 
+type LaneDeploySettings struct {
 	DeployRamp         bool
 	DeployCommitStore  bool
 	DeployPingPongDapp bool
-	DeployedAt         uint64
+	DeployedAtBlock    uint64
 }
 
 type CustomerSettings struct {
@@ -92,14 +95,14 @@ type EVMChainConfig struct {
 	PriceRegistry   gethcommon.Address
 	AllowList       []gethcommon.Address
 	Confirmations   uint32
+	DeploySettings  ChainDeploySettings
 	CustomerSettings
 }
 
 type EVMBridgedToken struct {
-	Token                gethcommon.Address
-	Pool                 gethcommon.Address
-	Price                *big.Int
-	PriceFeedsAggregator gethcommon.Address
+	Token gethcommon.Address
+	Pool  gethcommon.Address
+	Price *big.Int
 	TokenPoolType
 }
 
@@ -108,18 +111,16 @@ type EVMLaneConfig struct {
 	OffRamp     gethcommon.Address
 	CommitStore gethcommon.Address
 
-	TokenSender     gethcommon.Address
-	MessageReceiver gethcommon.Address
-	ReceiverDapp    gethcommon.Address
-	GovernanceDapp  gethcommon.Address
-	PingPongDapp    gethcommon.Address
+	ReceiverDapp   gethcommon.Address
+	GovernanceDapp gethcommon.Address
+	PingPongDapp   gethcommon.Address
+	DeploySettings LaneDeploySettings
 }
 
 type EvmDeploymentConfig struct {
-	Owner          *bind.TransactOpts
-	Client         *ethclient.Client
-	Logger         logger.Logger
-	DeploySettings DeploySettings
+	Owner  *bind.TransactOpts
+	Client *ethclient.Client
+	Logger logger.Logger
 
 	ChainConfig EVMChainConfig
 	LaneConfig  EVMLaneConfig

@@ -14,15 +14,15 @@ import (
 func TestGetTokenPricesUSDPipeline(t *testing.T) {
 	srcWeth := rhea.EVMBridgedToken{
 		Token: common.HexToAddress("0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"),
-		Price: big.NewInt(1500),
+		Price: new(big.Int).Mul(big.NewInt(1500), big.NewInt(1e18)),
 	}
 	dstLink := rhea.EVMBridgedToken{
 		Token: common.HexToAddress("0x514910771af9ca656af840dff83e8264ecf986ca"),
-		Price: big.NewInt(10),
+		Price: new(big.Int).Mul(big.NewInt(10), big.NewInt(1e18)),
 	}
 	dstWeth := rhea.EVMBridgedToken{
 		Token: common.HexToAddress("0x4200000000000000000000000000000000000006"),
-		Price: big.NewInt(1500),
+		Price: new(big.Int).Mul(big.NewInt(1500), big.NewInt(1e18)),
 	}
 	var tt = []struct {
 		pipelineTokens []rhea.EVMBridgedToken
