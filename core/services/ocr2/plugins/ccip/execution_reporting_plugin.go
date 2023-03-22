@@ -159,7 +159,7 @@ func (r *ExecutionReportingPlugin) Query(context.Context, types.ReportTimestamp)
 
 func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp types.ReportTimestamp, query types.Query) (types.Observation, error) {
 	lggr := r.lggr.Named("ExecutionObservation")
-	if isCommitStoreDownNow(lggr, r.config.commitStore) {
+	if isCommitStoreDownNow(ctx, lggr, r.config.commitStore) {
 		return nil, ErrCommitStoreIsDown
 	}
 	// Expire any inflight reports.
@@ -211,7 +211,7 @@ func (r *ExecutionReportingPlugin) getExecutableSeqNrs(ctx context.Context, infl
 	// Since this will only increase over time, the highest observed value will
 	// always be the lower bound of what would be available on chain
 	// since we already account for inflight txs.
-	bucket, err := r.config.offRamp.CalculateCurrentTokenBucketState(nil)
+	bucket, err := r.config.offRamp.CalculateCurrentTokenBucketState(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return nil, err
 	}
@@ -225,7 +225,7 @@ func (r *ExecutionReportingPlugin) getExecutableSeqNrs(ctx context.Context, infl
 	}
 
 	for _, sourceToken := range sourceTokens {
-		dst, err2 := r.config.offRamp.GetDestinationToken(nil, sourceToken)
+		dst, err2 := r.config.offRamp.GetDestinationToken(&bind.CallOpts{Context: ctx}, sourceToken)
 		if err2 != nil {
 			return nil, err2
 		}
@@ -237,7 +237,7 @@ func (r *ExecutionReportingPlugin) getExecutableSeqNrs(ctx context.Context, infl
 		supportedDestTokens = append(supportedDestTokens, destToken)
 	}
 
-	destTokenPrices, err := r.config.offRamp.GetPricesForTokens(nil, supportedDestTokens)
+	destTokenPrices, err := r.config.offRamp.GetPricesForTokens(&bind.CallOpts{Context: ctx}, supportedDestTokens)
 	if err != nil {
 		return nil, err
 	}
@@ -277,7 +277,7 @@ func (r *ExecutionReportingPlugin) getExecutableSeqNrs(ctx context.Context, infl
 			incSkippedRequests(reasonSnoozed)
 			continue
 		}
-		blessed, err := r.config.commitStore.IsBlessed(nil, unexpiredReport.MerkleRoot)
+		blessed, err := r.config.commitStore.IsBlessed(&bind.CallOpts{Context: ctx}, unexpiredReport.MerkleRoot)
 		if err != nil {
 			return nil, err
 		}
@@ -439,8 +439,9 @@ func (r *ExecutionReportingPlugin) parseSeqNr(log logpoller.Log) (uint64, error)
 
 // Assumes non-empty report. Messages to execute can span more than one report, but are assumed to be in order of increasing
 // sequence number.
-func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNums []uint64) ([]byte, error) {
+func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.Logger, finalSeqNums []uint64) ([]byte, error) {
 	me, err := buildExecution(
+		ctx,
 		lggr,
 		r.config.source,
 		r.config.dest,
@@ -464,7 +465,7 @@ func (r *ExecutionReportingPlugin) buildReport(lggr logger.Logger, finalSeqNums 
 
 func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.ReportTimestamp, query types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
 	lggr := r.lggr.Named("Report")
-	if isCommitStoreDownNow(lggr, r.config.commitStore) {
+	if isCommitStoreDownNow(ctx, lggr, r.config.commitStore) {
 		return false, nil, ErrCommitStoreIsDown
 	}
 	nonEmptyObservations := getNonEmptyObservations[ExecutionObservation](lggr, observations)
@@ -479,7 +480,7 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 		return false, nil, nil
 	}
 
-	report, err := r.buildReport(lggr, finalSequenceNumbers)
+	report, err := r.buildReport(ctx, lggr, finalSequenceNumbers)
 	if err != nil {
 		return false, nil, err
 	}
