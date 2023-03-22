@@ -21,6 +21,7 @@ evm_2_evm_onramp: ../../contracts/solc/v0.8.15/EVM2EVMOnRamp.abi ../../contracts
 fee_manager: ../../contracts/solc/v0.8.15/FeeManager.abi ../../contracts/solc/v0.8.15/FeeManager.bin b9d0a6de21ff4cc6bd397cf0ae8032ce8de103fcaf5aec74ea33edc709eac0f9
 flags_wrapper: ../../contracts/solc/v0.6/Flags.abi ../../contracts/solc/v0.6/Flags.bin 2034d1b562ca37a63068851915e3703980276e8d5f7db6db8a3351a49d69fc4a
 flux_aggregator_wrapper: ../../contracts/solc/v0.6/FluxAggregator.abi ../../contracts/solc/v0.6/FluxAggregator.bin a3b0a6396c4aa3b5ee39b3c4bd45efc89789d4859379a8a92caca3a0496c5794
+forwarder: ../../contracts/solc/v0.8.15/Forwarder.abi ../../contracts/solc/v0.8.15/Forwarder.bin e72db4c4c4193e771c87cf19e97d5da8e7508ccca0108976c2c817922196174b
 gas_wrapper: ../../contracts/solc/v0.8.6/KeeperRegistryCheckUpkeepGasUsageWrapper1_2.abi ../../contracts/solc/v0.8.6/KeeperRegistryCheckUpkeepGasUsageWrapper1_2.bin 4a5dcdac486d18fcd58e3488c15c1710ae76b977556a3f3191bd269a4bc75723
 governance_dapp: ../../contracts/solc/v0.8.15/GovernanceDapp.abi ../../contracts/solc/v0.8.15/GovernanceDapp.bin a72a08e0272d29d84851717f35f2121a11268c9cc1bd8900762133317fb0a7f1
 keeper_registry_logic1_3: ../../contracts/solc/v0.8.6/KeeperRegistryLogic1_3.abi ../../contracts/solc/v0.8.6/KeeperRegistryLogic1_3.bin e1bee66ce7cd0085469f923c46f0eddb58fd45dec207def1bb383b37e413a6ca
@@ -33,7 +34,7 @@ keepers_vrf_consumer: ../../contracts/solc/v0.8.6/KeepersVRFConsumer.abi ../../c
 lock_release_token_pool: ../../contracts/solc/v0.8.15/LockReleaseTokenPool.abi ../../contracts/solc/v0.8.15/LockReleaseTokenPool.bin fcfc2ef69319679f3face73ff21f7895189d2490c6e475f40aa1a5edd53d3986
 log_emitter: ../../contracts/solc/v0.8.6/LogEmitter.abi ../../contracts/solc/v0.8.6/LogEmitter.bin 375488d19b6ee1c180d42048be10abea9146e2a58347fd180358850d435cb854
 maybe_revert_message_receiver: ../../contracts/solc/v0.8.15/MaybeRevertMessageReceiver.abi ../../contracts/solc/v0.8.15/MaybeRevertMessageReceiver.bin bdb26735255d204a4c933c00b06ae8bd6d3cc974424fc1a53321922b023ad0a5
-meta_erc20: ../../contracts/solc/v0.8.15/MetaERC20.abi ../../contracts/solc/v0.8.15/MetaERC20.bin 812a8181f22aa33faef312e46fc5342ee841dd90b0ba0a1eb3f55c70e98929f0
+meta_erc20: ../../contracts/solc/v0.8.15/MetaERC20.abi ../../contracts/solc/v0.8.15/MetaERC20.bin 2d88e004a1651e86040fd94814f912d848bd1d0c8984e3dc88f95af865ba18cd
 mock_afn_contract: ../../contracts/solc/v0.8.15/MockAFN.abi ../../contracts/solc/v0.8.15/MockAFN.bin cccc63cb452f4bbd7c6a7a28e83ed9cb1cf76708d6e7c97e427c91c9b2246f47
 multiwordconsumer_wrapper: ../../contracts/solc/v0.7/MultiWordConsumer.abi ../../contracts/solc/v0.7/MultiWordConsumer.bin 6e68abdf614e3ed0f5066c1b5f9d7c1199f1e7c5c5251fe8a471344a59afc6ba
 nocancel_vrf_coordinator_v2: ../../contracts/solc/v0.8.6/NoCancelVRFCoordinatorV2.abi ../../contracts/solc/v0.8.6/NoCancelVRFCoordinatorV2.bin 6672e34b4b10526b338d1876790c396fd619bd2103e5cbff580687264b3e78ca

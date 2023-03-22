@@ -102,6 +102,7 @@ package gethwrappers
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/GovernanceDapp.abi ../../contracts/solc/v0.8.15/GovernanceDapp.bin GovernanceDapp governance_dapp
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/PingPongDemo.abi ../../contracts/solc/v0.8.15/PingPongDemo.bin PingPongDemo ping_pong_demo
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/MetaERC20.abi ../../contracts/solc/v0.8.15/MetaERC20.bin MetaERC20 meta_erc20
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/Forwarder.abi ../../contracts/solc/v0.8.15/Forwarder.bin Forwarder forwarder
 
 // To run these commands, you must either install docker, or the correct version
 // of abigen. The latter can be installed with these commands, at least on linux:

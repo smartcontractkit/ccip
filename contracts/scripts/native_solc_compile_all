@@ -122,5 +122,6 @@ $SCRIPTPATH/native_solc8_15_compile_ccip ccip/test/helpers/receivers/SimpleMessa
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/test/helpers/receivers/MaybeRevertMessageReceiver.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/applications/GovernanceDapp.sol
 $SCRIPTPATH/native_solc8_15_compile_ccip ccip/applications/PingPongDemo.sol
-$SCRIPTPATH/native_solc8_15_compile dev/MetaERC20.sol
+$SCRIPTPATH/native_solc8_15_compile metatx/MetaERC20.sol
+$SCRIPTPATH/native_solc8_15_compile metatx/Forwarder.sol
 
