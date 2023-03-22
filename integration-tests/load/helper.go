@@ -2,9 +2,11 @@ package load
 
 import (
 	"math/big"
+	"os"
 	"testing"
 
 	"github.com/rs/zerolog"
+	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
 	"github.com/smartcontractkit/chainlink-testing-framework/loadgen"
 	"github.com/stretchr/testify/require"
 
@@ -30,6 +32,7 @@ func (l *loadArgs) Setup() {
 			"env": map[string]interface{}{
 				"CL_DEV": "true",
 			},
+			"prometheus": "true",
 		}, transferAmounts, 5, true, false, l.TestCfg)
 	} else {
 		setUpArgs = testsetups.CCIPExistingDeploymentTestSetUp(l.TestCfg.Test, transferAmounts, false, l.TestCfg)
@@ -46,13 +49,24 @@ func (l *loadArgs) Setup() {
 	ccipLoad := NewCCIPLoad(l.TestCfg.Test, source, dest, l.TestCfg.PhaseTimeout, 100000, forwardLane.Reports)
 	ccipLoad.BeforeAllCall(l.TestCfg.MsgType)
 	loadRunner, err := loadgen.NewLoadGenerator(&loadgen.Config{
-		T:           nil,
+		T:           l.TestCfg.Test,
 		Schedule:    loadgen.Plain(l.TestCfg.Load.LoadRPS, l.TestCfg.TestDuration),
 		LoadType:    loadgen.RPSScheduleType,
 		CallTimeout: l.TestCfg.Load.LoadTimeOut,
 		Gun:         ccipLoad,
 		Logger:      zerolog.Logger{},
 		SharedData:  l.TestCfg.MsgType,
+		LokiConfig: ctfClient.NewDefaultLokiConfig(
+			os.Getenv("LOKI_URL"),
+			os.Getenv("LOKI_TOKEN")),
+		Labels: map[string]string{
+			"test_group":   "load",
+			"cluster":      "sdlc",
+			"namespace":    forwardLane.TestEnv.K8Env.Cfg.Namespace,
+			"test_id":      "ccip",
+			"source_chain": forwardLane.SourceNetworkName,
+			"dest_chain":   forwardLane.DestNetworkName,
+		},
 	})
 	require.NoError(l.TestCfg.Test, err, "initiating loadgen")
 	l.ccipLoad = ccipLoad

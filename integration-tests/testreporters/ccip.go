@@ -23,7 +23,6 @@ const (
 	E2E              Phase  = "CommitAndExecute"
 	TX               Phase  = "CCIP-Send Transaction"
 	CCIPSendRe       Phase  = "CCIPSendRequested"
-	InCreaseSeq      Phase  = "Commit-InCreaseSeq"
 	Commit           Phase  = "Commit-ReportAccepted"
 	ExecStateChanged Phase  = "ExecutionStateChanged"
 	Success          Status = "✅"
@@ -55,7 +54,7 @@ type CCIPLaneStats struct {
 	mu                      *sync.Mutex
 }
 
-func (testStats *CCIPLaneStats) GetPhaseStateForRequest(reqNo int64) map[Phase]PhaseStat {
+func (testStats *CCIPLaneStats) GetPhaseStatsForRequest(reqNo int64) map[Phase]PhaseStat {
 	testStats.mu.Lock()
 	defer testStats.mu.Unlock()
 	return testStats.StatusByPhaseByRequests[reqNo]
@@ -95,7 +94,7 @@ func (testStats *CCIPLaneStats) UpdatePhaseStats(reqNo int64, seqNum uint64, ste
 		event.Str(fmt.Sprint(step), fmt.Sprintf("%s", Success)).Msgf("reqNo %d", reqNo)
 		testStats.SuccessCountsByPhase[step]++
 		testStats.consolidateDuration(step, durationInSec)
-		if step == InCreaseSeq || step == Commit || step == ExecStateChanged {
+		if step == Commit || step == ExecStateChanged {
 			testStats.StatusByPhaseByRequests[reqNo][E2E] = PhaseStat{
 				SeqNum:   seqNum,
 				Status:   state,
@@ -137,7 +136,7 @@ func (testStats *CCIPLaneStats) consolidateDuration(phase Phase, durationInSec f
 func (testStats *CCIPLaneStats) Finalize(lane string) {
 	testStats.mu.Lock()
 	defer testStats.mu.Unlock()
-	phases := []Phase{E2E, TX, CCIPSendRe, InCreaseSeq, Commit, ExecStateChanged}
+	phases := []Phase{E2E, TX, CCIPSendRe, Commit, ExecStateChanged}
 	events := make(map[Phase]*zerolog.Event)
 	for reqNo, _ := range testStats.StatusByPhaseByRequests {
 		if reqNo > testStats.TotalRequests {

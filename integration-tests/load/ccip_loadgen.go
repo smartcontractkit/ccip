@@ -194,6 +194,7 @@ func (c *CCIPE2ELoad) Call(_ *loadgen.Generator) loadgen.CallResult {
 		c.reports.UpdatePhaseStats(msgSerialNo, 0, testreporters.TX, time.Since(startTime), testreporters.Failure)
 		log.Err(err).Msgf("ccip-send tx error for msg ID %d", msgSerialNo)
 		res.Error = fmt.Sprintf("ccip-send tx error %+v for msg ID %d", err, msgSerialNo)
+		res.Data = c.reports.GetPhaseStatsForRequest(msgSerialNo)
 		return res
 	}
 	c.reports.UpdatePhaseStats(msgSerialNo, 0, testreporters.TX, time.Since(startTime), testreporters.Success)
@@ -206,6 +207,7 @@ func (c *CCIPE2ELoad) Call(_ *loadgen.Generator) loadgen.CallResult {
 	if err != nil {
 		log.Err(err).Msgf("CCIPSendRequested event error for msg ID %d", msgSerialNo)
 		res.Error = err.Error()
+		res.Data = c.reports.GetPhaseStatsForRequest(msgSerialNo)
 		return res
 	}
 	commitStartTime := time.Now()
@@ -213,6 +215,7 @@ func (c *CCIPE2ELoad) Call(_ *loadgen.Generator) loadgen.CallResult {
 	messageID := sentMsg.MessageId
 	if bytes.Compare(sentMsg.Data, []byte(msgStr)) != 0 {
 		res.Error = fmt.Sprintf("the message byte didnot match expected %s received %s msg ID %d", msgStr, string(sentMsg.Data), msgSerialNo)
+		res.Data = c.reports.GetPhaseStatsForRequest(msgSerialNo)
 		return res
 	}
 
@@ -222,6 +225,7 @@ func (c *CCIPE2ELoad) Call(_ *loadgen.Generator) loadgen.CallResult {
 	if err != nil {
 		log.Err(err).Msgf("waiting for seq num increase for msg ID %d", msgSerialNo)
 		res.Error = err.Error()
+		res.Data = c.reports.GetPhaseStatsForRequest(msgSerialNo)
 		return res
 	}
 	// wait for ReportAccepted event
@@ -229,6 +233,7 @@ func (c *CCIPE2ELoad) Call(_ *loadgen.Generator) loadgen.CallResult {
 	if err != nil {
 		log.Err(err).Msgf("waiting for ReportAcceptedEvent for msg ID %d", msgSerialNo)
 		res.Error = err.Error()
+		res.Data = c.reports.GetPhaseStatsForRequest(msgSerialNo)
 		return res
 	}
 
@@ -237,10 +242,11 @@ func (c *CCIPE2ELoad) Call(_ *loadgen.Generator) loadgen.CallResult {
 	if err != nil {
 		log.Err(err).Msgf("waiting for ExecutionStateChangedEvent for msg ID %d", msgSerialNo)
 		res.Error = err.Error()
+		res.Data = c.reports.GetPhaseStatsForRequest(msgSerialNo)
 		return res
 	}
 
-	res.Data = c.reports.GetPhaseStateForRequest(msgSerialNo)
+	res.Data = c.reports.GetPhaseStatsForRequest(msgSerialNo)
 	return res
 }
 
@@ -302,15 +308,14 @@ func (c *CCIPE2ELoad) waitForSeqNumberIncrease(ticker *time.Ticker, seqNum uint6
 		case <-ticker.C:
 			seqNumberAfter, err := c.Destination.CommitStore.GetNextSeqNumber()
 			if err != nil {
-				c.reports.UpdatePhaseStats(msgSerialNo, seqNum, testreporters.InCreaseSeq, time.Since(timeNow), testreporters.Failure)
+				c.reports.UpdatePhaseStats(msgSerialNo, seqNum, testreporters.Commit, time.Since(timeNow), testreporters.Failure)
 				return fmt.Errorf("error %+v in GetNextExpectedSeqNumber by commitStore for msg ID %d", err, msgSerialNo)
 			}
 			if seqNumberAfter > seqNum {
-				c.reports.UpdatePhaseStats(msgSerialNo, seqNum, testreporters.InCreaseSeq, time.Since(timeNow), testreporters.Success)
 				return nil
 			}
 		case <-ctx.Done():
-			c.reports.UpdatePhaseStats(msgSerialNo, seqNum, testreporters.InCreaseSeq, time.Since(timeNow), testreporters.Failure)
+			c.reports.UpdatePhaseStats(msgSerialNo, seqNum, testreporters.Commit, time.Since(timeNow), testreporters.Failure)
 			return fmt.Errorf("sequence number is not increased for seq num %d msg ID %d", seqNum, msgSerialNo)
 		}
 	}

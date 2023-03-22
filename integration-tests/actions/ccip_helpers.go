@@ -1178,16 +1178,15 @@ func (destCCIP *DestCCIPModule) AssertSeqNumberExecuted(
 		case <-ticker.C:
 			seqNumberAfter, err := destCCIP.CommitStore.GetNextSeqNumber()
 			if err != nil {
-				reports.UpdatePhaseStats(reqNo, seqNumberBefore, testreporters.InCreaseSeq, time.Since(timeNow), testreporters.Failure)
+				reports.UpdatePhaseStats(reqNo, seqNumberBefore, testreporters.Commit, time.Since(timeNow), testreporters.Failure)
 				return fmt.Errorf("error %+v in GetNextExpectedSeqNumber by commitStore for seqNum %d lane %d-->%d",
 					err, seqNumberBefore+1, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
 			}
 			if seqNumberAfter > seqNumberBefore {
-				reports.UpdatePhaseStats(reqNo, seqNumberBefore, testreporters.InCreaseSeq, time.Since(timeNow), testreporters.Success)
 				return nil
 			}
 		case <-ctx.Done():
-			reports.UpdatePhaseStats(reqNo, seqNumberBefore, testreporters.InCreaseSeq, time.Since(timeNow), testreporters.Failure)
+			reports.UpdatePhaseStats(reqNo, seqNumberBefore, testreporters.Commit, time.Since(timeNow), testreporters.Failure)
 			return fmt.Errorf("sequence number is not increased for seq num %d lane %d-->%d",
 				seqNumberBefore, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
 		}
