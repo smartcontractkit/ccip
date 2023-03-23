@@ -49,7 +49,7 @@ offchain_aggregator_wrapper: OffchainAggregator/OffchainAggregator.abi - 5f97dc1
 operator_factory: ../../contracts/solc/v0.7/OperatorFactory.abi ../../contracts/solc/v0.7/OperatorFactory.bin 4803feddb5dadea2f228978d81fd30ad1bea3f88d973a8539a91445b0cea60e2
 operator_wrapper: ../../contracts/solc/v0.7/Operator.abi ../../contracts/solc/v0.7/Operator.bin 97dcb51158733881bfbe414d0318a57c3bba7b32bdc7aa5961db2f0ea5e993cb
 oracle_wrapper: ../../contracts/solc/v0.6/Oracle.abi ../../contracts/solc/v0.6/Oracle.bin 7af2fbac22a6e8c2847e8e685a5400cac5101d72ddf5365213beb79e4dede43a
-ping_pong_demo: ../../contracts/solc/v0.8.15/PingPongDemo.abi ../../contracts/solc/v0.8.15/PingPongDemo.bin 5d71f6d3354945a322ba420f786578584a26fbe532cb72c397fd770ee70eca4c
+ping_pong_demo: ../../contracts/solc/v0.8.15/PingPongDemo.abi ../../contracts/solc/v0.8.15/PingPongDemo.bin 91160c03413606de1db1e446137671cd5ff0e3df382ed66823bb4ab1fab2d953
 price_registry: ../../contracts/solc/v0.8.15/PriceRegistry.abi ../../contracts/solc/v0.8.15/PriceRegistry.bin 40de25f0ccc705405e3b0cb93583926aea7c48415748db384e8016d6a4fdc68c
 receiver_dapp: ../../contracts/solc/v0.8.15/ReceiverDapp.abi ../../contracts/solc/v0.8.15/ReceiverDapp.bin d82f911d1bfef73f51e366a497f1e140ea50b8691cf2e7a4c08045d13ad51239
 router: ../../contracts/solc/v0.8.15/Router.abi ../../contracts/solc/v0.8.15/Router.bin abbdab44a364c9e8ad885c30b1cf799126b77357507abc4ac48f2295e2ed0ba9

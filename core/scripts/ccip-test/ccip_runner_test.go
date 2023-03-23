@@ -99,8 +99,6 @@ func TestCCIP(t *testing.T) {
 		// Stops the PingPong dapp by pausing the source chain dapp.
 	case "stopPingPong":
 		client.setPingPongPaused(t, true)
-	case "fundPingPong":
-		client.fundPingPong(t, &SOURCE, &DESTINATION)
 	case "printSpecs":
 		printing.PrintJobSpecs(ENV, SOURCE, DESTINATION)
 	case "setConfig":

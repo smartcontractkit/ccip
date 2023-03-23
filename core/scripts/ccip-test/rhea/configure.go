@@ -14,7 +14,6 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ping_pong_demo"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/shared"
@@ -177,17 +176,10 @@ func fillPoolWithTokens(t *testing.T, client *EvmDeploymentConfig, pool *lock_re
 }
 
 func FundPingPong(t *testing.T, client *EvmDeploymentConfig, fundingAmount *big.Int, tokenAddress common.Address) {
-	pingDapp, err := ping_pong_demo.NewPingPongDemo(client.LaneConfig.PingPongDapp, client.Client)
-	require.NoError(t, err)
-
 	linkToken, err := link_token_interface.NewLinkToken(tokenAddress, client.Client)
 	require.NoError(t, err)
 
-	tx, err := linkToken.Approve(client.Owner, client.LaneConfig.PingPongDapp, fundingAmount)
-	require.NoError(t, err)
-	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
-
-	tx, err = pingDapp.Fund(client.Owner, fundingAmount)
+	tx, err := linkToken.Transfer(client.Owner, client.LaneConfig.PingPongDapp, fundingAmount)
 	require.NoError(t, err)
 	shared.WaitForMined(t, client.Logger, client.Client, tx.Hash(), true)
 	client.Logger.Infof("Ping pong funded with %s in tx: %s", fundingAmount.String(), helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash()))

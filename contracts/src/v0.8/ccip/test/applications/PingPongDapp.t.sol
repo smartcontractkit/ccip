@@ -25,8 +25,7 @@ contract PingPongDappSetup is EVM2EVMOnRampSetup {
     uint256 fundingAmount = 1e18;
 
     // Fund the contract with LINK tokens
-    s_feeToken.approve(address(s_pingPong), fundingAmount);
-    s_pingPong.fund(fundingAmount);
+    s_feeToken.transfer(address(s_pingPong), fundingAmount);
   }
 }
 

@@ -130,11 +130,6 @@ func (client *CCIPClient) setPingPongPaused(t *testing.T, paused bool) {
 	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 }
 
-func (client *CCIPClient) fundPingPong(t *testing.T, sourceClient *rhea.EvmDeploymentConfig, destClient *rhea.EvmDeploymentConfig) {
-	rhea.FundPingPong(t, sourceClient, big.NewInt(1e18), sourceClient.ChainConfig.SupportedTokens[rhea.LINK].Token)
-	rhea.FundPingPong(t, destClient, big.NewInt(1e18), destClient.ChainConfig.SupportedTokens[rhea.LINK].Token)
-}
-
 type Client struct {
 	Owner            *bind.TransactOpts
 	Users            []*bind.TransactOpts
