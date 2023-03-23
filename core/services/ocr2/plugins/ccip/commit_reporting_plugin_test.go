@@ -16,16 +16,28 @@ import (
 	"github.com/leanovate/gopter/gen"
 	"github.com/leanovate/gopter/prop"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink/common/txmgr/types/mocks"
+	"github.com/smartcontractkit/chainlink/core/assets"
+	evmclient "github.com/smartcontractkit/chainlink/core/chains/evm/client"
+	"github.com/smartcontractkit/chainlink/core/chains/evm/gas"
+	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
+	evmtypes "github.com/smartcontractkit/chainlink/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/afn_contract"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store_helper"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
+	"github.com/smartcontractkit/chainlink/core/internal/testutils"
+	"github.com/smartcontractkit/chainlink/core/internal/testutils/pgtest"
+	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
+	"github.com/smartcontractkit/chainlink/core/store/models"
+	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
 func TestCommitReportSize(t *testing.T) {
@@ -261,6 +273,187 @@ func TestCalculateIntervalConsensus(t *testing.T) {
 			}
 			assert.Equal(t, tt.wantMin, got.Min)
 			assert.Equal(t, tt.wantMax, got.Max)
+		})
+	}
+}
+
+type testPluginHarness = struct {
+	plugin           *CommitReportingPlugin
+	client           *backends.SimulatedBackend
+	owner            *bind.TransactOpts
+	lggr             logger.Logger
+	logPoller        logpoller.LogPollerTest
+	mockFeeEstimator *mocks.FeeEstimator[*evmtypes.Head, gas.EvmFee, *assets.Wei, common.Hash]
+	feeToken         common.Address
+	flushLogs        func()
+}
+
+func setupTestPlugin(t *testing.T) testPluginHarness {
+	chainID := testutils.NewRandomEVMChainID()
+	lggr := logger.TestLogger(t)
+	owner := testutils.MustNewSimTransactor(t)
+	db := pgtest.NewSqlxDB(t)
+	require.NoError(t, utils.JustError(db.Exec(`SET CONSTRAINTS evm_log_poller_blocks_evm_chain_id_fkey DEFERRED`)))
+	require.NoError(t, utils.JustError(db.Exec(`SET CONSTRAINTS evm_log_poller_filters_evm_chain_id_fkey DEFERRED`)))
+	require.NoError(t, utils.JustError(db.Exec(`SET CONSTRAINTS evm_logs_evm_chain_id_fkey DEFERRED`)))
+	orm := logpoller.NewORM(chainID, db, lggr, pgtest.NewQConfig(true))
+	client := backends.NewSimulatedBackend(map[common.Address]core.GenesisAccount{
+		owner.From: {
+			Balance: big.NewInt(0).Mul(big.NewInt(10), big.NewInt(1e18)),
+		},
+	}, 10e6)
+	var logPoller logpoller.LogPollerTest = logpoller.NewLogPoller(orm, evmclient.NewSimulatedBackendClient(t, client, chainID), lggr, 1*time.Hour, 2, 3, 2, 1000)
+
+	prevStart := int64(1)
+	flushLogs := func() {
+		client.Commit()
+		logPoller.PollAndSaveLogs(testutils.Context(t), prevStart)
+		latestBlock, err := orm.SelectLatestBlock()
+		require.NoError(t, err)
+		prevStart = latestBlock.BlockNumber + 1
+	}
+
+	sourceChainId := testutils.NewRandomEVMChainID().Uint64()
+
+	// Deploy link token.
+	feeToken, _, _, err := link_token_interface.DeployLinkToken(owner, client)
+	require.NoError(t, err)
+	flushLogs()
+
+	// Deploy native
+	sourceNative := utils.RandomAddress()
+
+	priceRegistryAddress, _, _, err := price_registry.DeployPriceRegistry(owner, client, price_registry.InternalPriceUpdates{
+		TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
+			{SourceToken: feeToken, UsdPerToken: big.NewInt(2)},
+		},
+		DestChainId:   sourceChainId,
+		UsdPerUnitGas: big.NewInt(1),
+	}, []common.Address{}, []common.Address{feeToken}, uint32(time.Hour.Seconds()))
+	require.NoError(t, err)
+	flushLogs()
+
+	priceRegistry, err := price_registry.NewPriceRegistry(priceRegistryAddress, client)
+	require.NoError(t, err)
+
+	err = logPoller.RegisterFilter(logpoller.Filter{Name: logpoller.FilterName(COMMIT_PRICE_UPDATES, priceRegistryAddress),
+		EventSigs: []common.Hash{UsdPerUnitGasUpdated, UsdPerTokenUpdated}, Addresses: []common.Address{priceRegistryAddress}})
+	require.NoError(t, err)
+
+	sourceFeeEstimator := mocks.NewFeeEstimator[*evmtypes.Head, gas.EvmFee, *assets.Wei, common.Hash](t)
+
+	plugin := CommitReportingPlugin{
+		config: CommitPluginConfig{
+			dest:               logPoller,
+			priceRegistry:      priceRegistry,
+			priceGetter:        fakePriceGetter{},
+			sourceNative:       sourceNative,
+			sourceFeeEstimator: sourceFeeEstimator,
+			sourceChainID:      sourceChainId,
+		},
+		offchainConfig: OffchainConfig{
+			FeeUpdateHeartBeat: models.MustMakeDuration(12 * time.Hour),
+		},
+	}
+	return testPluginHarness{
+		plugin:           &plugin,
+		client:           client,
+		owner:            owner,
+		lggr:             lggr,
+		logPoller:        logPoller,
+		mockFeeEstimator: sourceFeeEstimator,
+		feeToken:         feeToken,
+		flushLogs:        flushLogs,
+	}
+}
+
+func TestGeneratePriceUpdates(t *testing.T) {
+	th := setupTestPlugin(t)
+
+	gasPrice := big.NewInt(3e9)
+	mockedGetFee := th.mockFeeEstimator.On(
+		"GetFee",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+	).Return(gas.EvmFee{Legacy: assets.NewWei(gasPrice)}, uint32(150e3), nil)
+
+	fakePrices, err := th.plugin.config.priceGetter.TokenPricesUSD(testutils.Context(t), []common.Address{th.feeToken}) // 2e20 hardcoded in fakePriceGetter
+	require.NoError(t, err)
+	fakePrice := fakePrices[th.feeToken]
+
+	expectedGasPrice := big.NewInt(0).Mul(fakePrice, gasPrice)
+	expectedGasPrice.Div(expectedGasPrice, big.NewInt(1e18))
+
+	newGasPrice := big.NewInt(106) // +6%, just outside the default deviation margin of ±5%
+	newGasPrice.Mul(newGasPrice, fakePrice)
+	newGasPrice.Div(newGasPrice, big.NewInt(100))
+
+	newExpectedGasPriceUSD := big.NewInt(0).Mul(newGasPrice, fakePrice)
+	newExpectedGasPriceUSD.Div(newExpectedGasPriceUSD, big.NewInt(1e18))
+
+	tests := []struct {
+		name                   string
+		updateTokenPricesUSD   map[common.Address]*big.Int
+		updateGasPriceUSD      *big.Int
+		updateGasPrice         *big.Int
+		expectedGasPriceUSD    *big.Int
+		expectedTokenPricesUSD map[common.Address]*big.Int
+	}{
+		{
+			name:                   "first update",
+			expectedGasPriceUSD:    expectedGasPrice,
+			expectedTokenPricesUSD: map[common.Address]*big.Int{th.feeToken: fakePrice},
+		},
+		{
+			name:                   "gasPrice up-to-date",
+			updateGasPriceUSD:      expectedGasPrice,
+			expectedGasPriceUSD:    nil,
+			expectedTokenPricesUSD: map[common.Address]*big.Int{th.feeToken: fakePrice},
+		},
+		{
+			name:                   "tokenPrice up-to-date, gasPrice deviated",
+			updateTokenPricesUSD:   map[common.Address]*big.Int{th.feeToken: fakePrice},
+			updateGasPrice:         newGasPrice,
+			expectedGasPriceUSD:    newExpectedGasPriceUSD,
+			expectedTokenPricesUSD: map[common.Address]*big.Int{},
+		},
+	}
+
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if len(tt.updateTokenPricesUSD) > 0 || tt.updateGasPriceUSD != nil {
+				destChainId := uint64(0)
+				if tt.updateGasPriceUSD != nil {
+					destChainId = th.plugin.config.sourceChainID
+				} else {
+					tt.updateGasPriceUSD = big.NewInt(0)
+				}
+				tokenPriceUpdates := []price_registry.InternalTokenPriceUpdate{}
+				if len(tt.updateTokenPricesUSD) > 0 {
+					for token, value := range tt.updateTokenPricesUSD {
+						tokenPriceUpdates = append(tokenPriceUpdates, price_registry.InternalTokenPriceUpdate{SourceToken: token, UsdPerToken: value})
+					}
+				}
+				// update gasPrice in priceRegistry
+				_, err = th.plugin.config.priceRegistry.UpdatePrices(th.owner, price_registry.InternalPriceUpdates{
+					TokenPriceUpdates: tokenPriceUpdates,
+					DestChainId:       destChainId,
+					UsdPerUnitGas:     tt.updateGasPriceUSD,
+				})
+				require.NoError(t, err)
+				th.flushLogs()
+			}
+			if tt.updateGasPrice != nil {
+				mockedGetFee = mockedGetFee.Return(gas.EvmFee{Legacy: assets.NewWei(tt.updateGasPrice)}, uint32(200e3), nil)
+			}
+
+			gotGasPriceUSD, gotTokenPricesUSD, err := th.plugin.generatePriceUpdates(testutils.Context(t), time.Unix(int64((i+1)*10), 0))
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectedGasPriceUSD, gotGasPriceUSD)
+			assert.Equal(t, tt.expectedTokenPricesUSD, gotTokenPricesUSD)
 		})
 	}
 }
