@@ -123,9 +123,9 @@ contract MetaERC20 is CCIPReceiver, IERC20, ERC2771Recipient, OwnerIsCreator {
    * @param destinationTokenAddress ERC20 token address in destination chain
    * @param recipientAddress token recipient address in destination chain
    * @param amount token amount to transfer in wei or equivalent
-   * @param chainId destination chain ID
+   * @param destinationChainId destination chain ID
    */
-  function crossChainMetaTransfer(address destinationTokenAddress, address recipientAddress, uint256 amount, uint64 chainId) external validateTrustedForwarder {
+  function metaTransfer(address destinationTokenAddress, address recipientAddress, uint256 amount, uint64 destinationChainId) external validateTrustedForwarder {
     Client.EVMTokenAmount[] memory tokenAmounts;
 
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
@@ -136,17 +136,7 @@ contract MetaERC20 is CCIPReceiver, IERC20, ERC2771Recipient, OwnerIsCreator {
       feeToken: address(s_ccipFeeToken)
     });
     _burn(_msgSender(), amount);
-    IRouterClient(getRouter()).ccipSend(chainId, message);
-  }
-
-  /**
-   * @dev Moves amount of this token to recipient address.
-   * 
-   * @param recipientAddress token recipient address
-   * @param amount token amount to transfer in wei or equivalent
-   */
-  function metaTransfer(address recipientAddress, uint256 amount) external validateTrustedForwarder {
-    _transfer(_msgSender(), recipientAddress, amount);
+    IRouterClient(getRouter()).ccipSend(destinationChainId, message);
   }
   
   function _ccipReceive(Client.Any2EVMMessage memory message) internal override {

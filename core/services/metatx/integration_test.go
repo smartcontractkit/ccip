@@ -277,7 +277,7 @@ func generateMetaTransferCalldata(t *testing.T, destTokenAddress, destReceiverAd
 				"type": "uint256"
 			}, {
 				"internalType": "uint64",
-				"name": "chainId",
+				"name": "destinationChainId",
 				"type": "uint64"
 			}],
 			"name": "metaTransfer",
