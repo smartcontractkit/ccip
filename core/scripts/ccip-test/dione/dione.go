@@ -14,7 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
 	"github.com/smartcontractkit/chainlink/core/scripts/common"
-	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 )
 
 const (
@@ -245,7 +245,7 @@ func (don *DON) ListJobSpecs() {
 }
 
 func (don *DON) ClearAndRepopulateTwoWaySpecs(chainA rhea.EvmDeploymentConfig, chainB rhea.EvmDeploymentConfig) {
-	don.ClearAllJobs(helpers.ChainName(int64(chainA.ChainConfig.ChainId)), helpers.ChainName(int64(chainB.ChainConfig.ChainId)))
+	don.ClearAllJobs(ccip.ChainName(int64(chainA.ChainConfig.ChainId)), ccip.ChainName(int64(chainB.ChainConfig.ChainId)))
 	don.AddTwoWaySpecs(chainA, chainB)
 }
 
@@ -306,8 +306,8 @@ func (don *DON) AddMissingSpecs(chainA rhea.EvmDeploymentConfig, chainB rhea.Evm
 			don.lggr.Infof("Node [%2d] status %d", i, http.StatusCode)
 		}
 
-		lookingForCommit := fmt.Sprintf("ccip-%s-%s-%s", Commit, helpers.ChainName(int64(chainA.ChainConfig.ChainId)), helpers.ChainName(int64(chainB.ChainConfig.ChainId)))
-		lookingForExec := fmt.Sprintf("ccip-%s-%s-%s", Execution, helpers.ChainName(int64(chainA.ChainConfig.ChainId)), helpers.ChainName(int64(chainB.ChainConfig.ChainId)))
+		lookingForCommit := fmt.Sprintf("ccip-%s-%s-%s", Commit, ccip.ChainName(int64(chainA.ChainConfig.ChainId)), ccip.ChainName(int64(chainB.ChainConfig.ChainId)))
+		lookingForExec := fmt.Sprintf("ccip-%s-%s-%s", Execution, ccip.ChainName(int64(chainA.ChainConfig.ChainId)), ccip.ChainName(int64(chainB.ChainConfig.ChainId)))
 		don.lggr.Infof("Checking node #%d for [%s] and ", i, lookingForCommit)
 
 		commitFound, execFound := false, false

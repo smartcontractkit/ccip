@@ -10,7 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/recovery"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/metis/printing"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea/deployments"
-	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 )
 
 var (
@@ -54,11 +54,11 @@ func NewMetisApp(client MetisClient) *cli.App {
 	app.Name = "Metis"
 	app.Usage = "CCIP sanity checker"
 
-	err := SOURCE.SetupReadOnlyChain(client.Logger.Named(helpers.ChainName(int64(SOURCE.ChainConfig.ChainId))))
+	err := SOURCE.SetupReadOnlyChain(client.Logger.Named(ccip.ChainName(int64(SOURCE.ChainConfig.ChainId))))
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = DESTINATION.SetupReadOnlyChain(client.Logger.Named(helpers.ChainName(int64(DESTINATION.ChainConfig.ChainId))))
+	err = DESTINATION.SetupReadOnlyChain(client.Logger.Named(ccip.ChainName(int64(DESTINATION.ChainConfig.ChainId))))
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -27,6 +27,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/client"
 	v2 "github.com/smartcontractkit/chainlink/core/chains/evm/config/v2"
+	"github.com/smartcontractkit/chainlink/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/headtracker"
 	types2 "github.com/smartcontractkit/chainlink/core/chains/evm/headtracker/types"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/log"
@@ -260,7 +261,7 @@ func SetupNodeCCIP(
 				return headtracker.NewHeadTracker(
 					lggr,
 					sourceClient,
-					evmtest.NewChainScopedConfig(t, config),
+					evmCfg,
 					hb,
 					headtracker.NewHeadSaver(lggr, headtracker.NewORM(db, lggr, pgtest.NewQConfig(falseRef), *sourceClient.ChainID()), evmCfg),
 					mailMon,
@@ -269,7 +270,7 @@ func SetupNodeCCIP(
 				return headtracker.NewHeadTracker(
 					lggr,
 					destClient,
-					evmtest.NewChainScopedConfig(t, config),
+					evmCfg,
 					hb,
 					headtracker.NewHeadSaver(lggr, headtracker.NewORM(db, lggr, pgtest.NewQConfig(falseRef), *destClient.ChainID()), evmCfg),
 					mailMon,
@@ -294,14 +295,14 @@ func SetupNodeCCIP(
 				return log.NewBroadcaster(
 					log.NewORM(db, lggr, config, *sourceChainID),
 					sourceClient,
-					evmtest.NewChainScopedConfig(t, config),
+					evmCfg,
 					lggr,
 					nil, mailMon)
 			} else if chainID.String() == destChainID.String() {
 				return log.NewBroadcaster(
 					log.NewORM(db, lggr, config, *destChainID),
 					destClient,
-					evmtest.NewChainScopedConfig(t, config),
+					evmCfg,
 					lggr,
 					nil,
 					mailMon)
@@ -311,9 +312,9 @@ func SetupNodeCCIP(
 		},
 		GenTxManager: func(chainID *big.Int) txmgr.TxManager {
 			if chainID.String() == sourceChainID.String() {
-				return txmgr.NewTxm(db, sourceClient, evmtest.NewChainScopedConfig(t, config), simEthKeyStore, eventBroadcaster, lggr, &txmgr.CheckerFactory{Client: sourceClient}, sourceLp)
+				return txmgr.NewTxm(db, sourceClient, evmCfg, simEthKeyStore, eventBroadcaster, lggr, &txmgr.CheckerFactory{Client: sourceClient}, gas.NewEstimator(lggr, sourceClient, evmCfg), nil)
 			} else if chainID.String() == destChainID.String() {
-				return txmgr.NewTxm(db, destClient, evmtest.NewChainScopedConfig(t, config), simEthKeyStore, eventBroadcaster, lggr, &txmgr.CheckerFactory{Client: destClient}, destLp)
+				return txmgr.NewTxm(db, destClient, evmCfg, simEthKeyStore, eventBroadcaster, lggr, &txmgr.CheckerFactory{Client: destClient}, gas.NewEstimator(lggr, destClient, evmCfg), nil)
 			}
 			t.Fatalf("invalid chain ID %v", chainID.String())
 			return nil

@@ -13,7 +13,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/secrets"
-	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 )
 
 // DefaultGasTipFee is the default gas tip fee of 1 gwei.
@@ -187,7 +187,7 @@ type EvmDeploymentConfig struct {
 func (chain *EvmDeploymentConfig) SetupChain(t *testing.T, ownerPrivateKey string) {
 	chain.Owner = GetOwner(t, ownerPrivateKey, chain.ChainConfig.ChainId, chain.ChainConfig.GasSettings)
 	chain.Client = GetClient(t, secrets.GetRPC(chain.ChainConfig.ChainId))
-	chain.Logger = logger.TestLogger(t).Named(helpers.ChainName(int64(chain.ChainConfig.ChainId)))
+	chain.Logger = logger.TestLogger(t).Named(ccip.ChainName(int64(chain.ChainConfig.ChainId)))
 	chain.Logger.Info("Completed chain setup")
 }
 

@@ -12,7 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea/deployment_io"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea/deployments"
-	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 )
 
 var (
@@ -125,7 +125,7 @@ func TestDione(t *testing.T) {
 	checkOwnerKeyAndSetupChain(t)
 
 	don := dione.NewDON(ENV, logger.TestLogger(t))
-	don.ClearAllJobs(helpers.ChainName(int64(SOURCE.ChainConfig.ChainId)), helpers.ChainName(int64(DESTINATION.ChainConfig.ChainId)))
+	don.ClearAllJobs(ccip.ChainName(int64(SOURCE.ChainConfig.ChainId)), ccip.ChainName(int64(DESTINATION.ChainConfig.ChainId)))
 	don.AddTwoWaySpecs(SOURCE, DESTINATION)
 
 	// Sometimes jobs don't get added correctly. This script looks for missing jobs
@@ -172,7 +172,7 @@ func TestUpdateAllLanes(t *testing.T) {
 			return
 		}
 		// Removes any old job specs
-		don.ClearAllJobs(helpers.ChainName(int64(source.ChainConfig.ChainId)), helpers.ChainName(int64(dest.ChainConfig.ChainId)))
+		don.ClearAllJobs(ccip.ChainName(int64(source.ChainConfig.ChainId)), ccip.ChainName(int64(dest.ChainConfig.ChainId)))
 		// Deploys the new contracts and updates `source` and `dest`
 		rhea.DeployLanes(t, &source, &dest)
 		// Prints the new config and writes them to file
