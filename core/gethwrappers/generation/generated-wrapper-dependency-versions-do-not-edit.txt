@@ -18,7 +18,7 @@ custom_token_pool: ../../contracts/solc/v0.8.15/CustomTokenPool.abi ../../contra
 derived_price_feed_wrapper: ../../contracts/solc/v0.8.6/DerivedPriceFeed.abi ../../contracts/solc/v0.8.6/DerivedPriceFeed.bin c8542e6c850c2d0fffb79a7f7213dc927ec64e6ddd54e1224cb2fb4a13aabdd0
 evm_2_evm_offramp: ../../contracts/solc/v0.8.15/EVM2EVMOffRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMOffRamp.bin f26d556b33f783a892eb6f3a9bf66c73a44127a7f5269724042b454b15ef7dd0
 evm_2_evm_offramp_helper: ../../contracts/solc/v0.8.15/EVM2EVMOffRampHelper.abi ../../contracts/solc/v0.8.15/EVM2EVMOffRampHelper.bin 98146b12c5daa40975233469f61abf4570f3d3a58685ed3528e1ca35776439ad
-evm_2_evm_onramp: ../../contracts/solc/v0.8.15/EVM2EVMOnRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMOnRamp.bin 9b5c10121bf2180d4296a825c78334108493c5fbb18eed5faf49b88bde655867
+evm_2_evm_onramp: ../../contracts/solc/v0.8.15/EVM2EVMOnRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMOnRamp.bin 9d1a3baaecea9b2a6aa0f04b592364b4dbd666642548c3587ae88149bdebf83e
 flags_wrapper: ../../contracts/solc/v0.6/Flags.abi ../../contracts/solc/v0.6/Flags.bin 2034d1b562ca37a63068851915e3703980276e8d5f7db6db8a3351a49d69fc4a
 flux_aggregator_wrapper: ../../contracts/solc/v0.6/FluxAggregator.abi ../../contracts/solc/v0.6/FluxAggregator.bin a3b0a6396c4aa3b5ee39b3c4bd45efc89789d4859379a8a92caca3a0496c5794
 gas_wrapper: ../../contracts/solc/v0.8.6/KeeperRegistryCheckUpkeepGasUsageWrapper1_2.abi ../../contracts/solc/v0.8.6/KeeperRegistryCheckUpkeepGasUsageWrapper1_2.bin 4a5dcdac486d18fcd58e3488c15c1710ae76b977556a3f3191bd269a4bc75723
@@ -81,3 +81,4 @@ vrfv2_wrapper: ../../contracts/solc/v0.8.6/VRFV2Wrapper.abi ../../contracts/solc
 vrfv2_wrapper_consumer_example: ../../contracts/solc/v0.8.6/VRFV2WrapperConsumerExample.abi ../../contracts/solc/v0.8.6/VRFV2WrapperConsumerExample.bin 8c62ac8da7086c185162e66ec0c382c620cfa79319b621bcede828faac1d7954
 vrfv2_wrapper_interface: ../../contracts/solc/v0.8.6/VRFV2WrapperInterface.abi ../../contracts/solc/v0.8.6/VRFV2WrapperInterface.bin ff8560169de171a68b360b7438d13863682d07040d984fd0fb096b2379421003
 weth9: ../../contracts/solc/v0.8.15/WETH9.abi ../../contracts/solc/v0.8.15/WETH9.bin c95adb666fdebf1657dc44b2803536072c6742ba9164473696bdec39fd8175b2
+wrapped_token_pool: ../../contracts/solc/v0.8.15/WrappedTokenPool.abi ../../contracts/solc/v0.8.15/WrappedTokenPool.bin 2f9e82e9803e1d4503648f7532ac2ae778281bf7ed0344575d7b25cd205a5643

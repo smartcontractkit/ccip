@@ -363,7 +363,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
 
   /// #@inheritdoc IEVM2AnyOnRamp
   /// @dev This method can only be called by the owner of the contract.
-  function applyPoolUpdates(Internal.PoolUpdate[] memory adds, Internal.PoolUpdate[] memory removes) public onlyOwner {
+  function applyPoolUpdates(Internal.PoolUpdate[] memory removes, Internal.PoolUpdate[] memory adds) public onlyOwner {
     for (uint256 i = 0; i < adds.length; ++i) {
       address token = adds[i].token;
       address pool = adds[i].pool;

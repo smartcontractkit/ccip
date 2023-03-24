@@ -1,8 +1,6 @@
 package deployments
 
 import (
-	"math/big"
-
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
@@ -34,23 +32,12 @@ var ProdChainMapping = map[rhea.Chain]map[rhea.Chain]rhea.EvmDeploymentConfig{
 	},
 }
 
-// TokenPrices is a mapping from Token to dollar price per wei
-// This means a coin that costs $2000 and has 18 decimals precision
-// will have a value of 2000e18
-var TokenPrices = map[rhea.Token]*big.Int{
-	rhea.LINK:      new(big.Int).Mul(big.NewInt(10), big.NewInt(1e18)),
-	rhea.WETH:      new(big.Int).Mul(big.NewInt(1500), big.NewInt(1e18)),
-	rhea.WAVAX:     new(big.Int).Mul(big.NewInt(25), big.NewInt(1e18)),
-	rhea.CACHEGOLD: new(big.Int).Mul(big.NewInt(60), big.NewInt(1e18)),
-}
-
 var Prod_Goerli = rhea.EVMChainConfig{
 	ChainId: 5,
 	GasSettings: rhea.EVMGasSettings{
 		EIP1559:   true,
 		GasTipCap: rhea.DefaultGasTipFee,
 	},
-
 	AllowList: []gethcommon.Address{
 		// ==============  INTERNAL ==============
 		gethcommon.HexToAddress("0xda9e8e71bb750a996af33ebb8abb18cd9eb9dc75"), // deployer key
@@ -64,13 +51,13 @@ var Prod_Goerli = rhea.EVMChainConfig{
 		rhea.LINK: {
 			Token:         gethcommon.HexToAddress("0x326C977E6efc84E512bB9C30f76E30c160eD06FB"),
 			Pool:          gethcommon.HexToAddress("0x9Ef131613079733Da157D7EB8FFB41f1D7CA869F"),
-			Price:         TokenPrices[rhea.LINK],
+			Price:         rhea.LINK.Price(),
 			TokenPoolType: rhea.LockRelease,
 		},
 		rhea.WETH: {
 			Token:         gethcommon.HexToAddress("0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6"),
 			Pool:          gethcommon.HexToAddress("0xCc4fa89b93E3203C96B3e4137153bBE13e7f9255"),
-			Price:         TokenPrices[rhea.WETH],
+			Price:         rhea.WETH.Price(),
 			TokenPoolType: rhea.LockRelease,
 		},
 	},
@@ -93,7 +80,6 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 	GasSettings: rhea.EVMGasSettings{
 		EIP1559: false,
 	},
-
 	AllowList: []gethcommon.Address{
 		// ==============  INTERNAL ==============
 		gethcommon.HexToAddress("0xda9e8e71bb750a996af33ebb8abb18cd9eb9dc75"), // deployer key
@@ -128,21 +114,33 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 		rhea.LINK: {
 			Token:         gethcommon.HexToAddress("0x779877A7B0D9E8603169DdbD7836e478b4624789"),
 			Pool:          gethcommon.HexToAddress("0x401dA48dB998Fa1A1ba108eDFe06334aB271F501"),
-			Price:         TokenPrices[rhea.LINK],
+			Price:         rhea.LINK.Price(),
 			TokenPoolType: rhea.LockRelease,
 		},
 		rhea.WETH: {
 			Token:         gethcommon.HexToAddress("0x097D90c9d3E0B50Ca60e1ae45F6A81010f9FB534"),
 			Pool:          gethcommon.HexToAddress("0x5e7AdeF4C8fe5145d813b1EE5c55233A3EeCa0B4"),
-			Price:         TokenPrices[rhea.WETH],
+			Price:         rhea.WETH.Price(),
 			TokenPoolType: rhea.LockRelease,
 		},
-		//rhea.CACHEGOLD: {
-		//	Token:         gethcommon.HexToAddress("0x997BCCAE553112CD023592691d41687a3f1EfA7C"),
-		//	Pool:          gethcommon.HexToAddress("0x07BFa2C37050d35825804a95cB698b80c7528c54"),
-		//	Price:         big.NewInt(60),
-		//	TokenPoolType: rhea.LockRelease,
-		//},
+		rhea.CACHEGOLD: {
+			Token:         gethcommon.HexToAddress("0x997BCCAE553112CD023592691d41687a3f1EfA7C"),
+			Pool:          gethcommon.HexToAddress("0x7500A909CeBEc7F211ae021FaF4720dE3ca13d18"),
+			Price:         rhea.CACHEGOLD.Price(),
+			TokenPoolType: rhea.LockRelease,
+		},
+		rhea.ANZ: {
+			Token:         gethcommon.HexToAddress("0x92eA346B7a2AaB84e6AaB03b80E2421eeFB04685"),
+			Pool:          gethcommon.HexToAddress("0xB70cdf1876eB92A99FD7c24205D87693877Aed3E"),
+			Price:         rhea.ANZ.Price(),
+			TokenPoolType: rhea.LockRelease,
+		},
+		rhea.InsurAce: {
+			Token:         gethcommon.HexToAddress("0xb7c8bCA891143221a34DB60A26639785C4839040"),
+			Pool:          gethcommon.HexToAddress("0xEC6d1eC94D518be47DA1cb35F5d43286558d8B62"),
+			Price:         rhea.InsurAce.Price(),
+			TokenPoolType: rhea.LockRelease,
+		},
 	},
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WETH},
 	WrappedNative: rhea.WETH,
@@ -150,6 +148,66 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 	Afn:           gethcommon.HexToAddress("0xDB81c131193263314762CfCE59B9A057ae7dbB41"),
 	PriceRegistry: gethcommon.HexToAddress("0xd824DA3583F02183FaC25669315B004E977780FD"),
 	Confirmations: 4,
+	DeploySettings: rhea.ChainDeploySettings{
+		DeployAFN:           false,
+		DeployTokenPools:    false,
+		DeployRouter:        false,
+		DeployPriceRegistry: false,
+		DeployedAtBlock:     0,
+	},
+}
+
+var Prod_OptimismGoerli = rhea.EVMChainConfig{
+	ChainId: 420,
+	GasSettings: rhea.EVMGasSettings{
+		EIP1559: true,
+	},
+	AllowList: []gethcommon.Address{
+		// ==============  INTERNAL ==============
+		gethcommon.HexToAddress("0xda9e8e71bb750a996af33ebb8abb18cd9eb9dc75"), // deployer key
+		// Ping pong
+		gethcommon.HexToAddress("0xdf07fb6663caee468589a9d05ed5ddd640058fbb"), // OptimismGoerliToAvaxFuji.PingPongDapp
+		gethcommon.HexToAddress("0x3fa8796d568e743ce8c90ec4723a198d8bcd706c"), // OptimismGoerliToSepolia.PingPongDapp,
+		gethcommon.HexToAddress("0x9ef131613079733da157d7eb8ffb41f1d7ca869f"), // OptimismGoerliToGoerli.PingPongDapp,
+		// Personal
+		gethcommon.HexToAddress("0xEa94AA1318796b5C01a9A37faCBc65423fb2c520"), // Anindita Ghosh
+
+		// ==============  EXTERNAL ==============
+		gethcommon.HexToAddress("0x3FcFF7d9f88C64905e2cD9960c7452b5E6690E13"), // BetaUser - AAVE
+		gethcommon.HexToAddress("0x1b5D803Be089e43110Faf54c6b4eC40409Cc7450"), // BetaUser - Multimedia
+		gethcommon.HexToAddress("0x244d07fe4DFa30b4EE376751FDC793aE844c5dE6"), // BetaUser - CACHE.gold
+		gethcommon.HexToAddress("0x8264AcEE321ac02549aff7fA05A4Ae7a2e92A6f1"), // BetaUser - CACHE.gold
+	},
+	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
+		rhea.LINK: {
+			Token:         gethcommon.HexToAddress("0xdc2CC710e42857672E7907CF474a69B63B93089f"),
+			Pool:          gethcommon.HexToAddress("0x4Dca657257f6392922e1834183A27daEaD2c8D62"),
+			Price:         rhea.LINK.Price(),
+			TokenPoolType: rhea.LockRelease,
+		},
+		rhea.WETH: {
+			Token:         gethcommon.HexToAddress("0x4200000000000000000000000000000000000006"),
+			Pool:          gethcommon.HexToAddress("0x26dA7Ab49296c31D0AcD3BB93Ed80fEF6943d488"),
+			Price:         rhea.WETH.Price(),
+			TokenPoolType: rhea.LockRelease,
+		},
+		rhea.CACHEGOLD: {
+			Token:         gethcommon.HexToAddress("0xa6446C6f492f31A33bC68249ae59F8871123a777"),
+			Pool:          gethcommon.HexToAddress("0xe05e9822466b6fda15b03f02fb47cabe7943ca45"),
+			Price:         rhea.CACHEGOLD.Price(),
+			TokenPoolType: rhea.BurnMint,
+		},
+	},
+	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WETH},
+	WrappedNative: rhea.WETH,
+	Router:        gethcommon.HexToAddress("0xec6d1ec94d518be47da1cb35f5d43286558d8b62"),
+	Afn:           gethcommon.HexToAddress("0x8E8cD3608AFce92b902B74F577B1429Ce7BcCa96"),
+	PriceRegistry: gethcommon.HexToAddress("0x737bbAEb317993e4450fD19E844bDC145aef5adA"),
+	Confirmations: 4,
+	CustomerSettings: rhea.CustomerSettings{
+		CacheGoldFeeAddress:  gethcommon.HexToAddress("0x8264AcEE321ac02549aff7fA05A4Ae7a2e92A6f1"),
+		CacheGoldFeeEnforcer: gethcommon.HexToAddress("0x194E7a932663f11AC0790bfC44dBdd8339f0ED65"),
+	},
 	DeploySettings: rhea.ChainDeploySettings{
 		DeployAFN:           false,
 		DeployTokenPools:    false,
@@ -192,21 +250,33 @@ var Prod_AvaxFuji = rhea.EVMChainConfig{
 		rhea.LINK: {
 			Token:         gethcommon.HexToAddress("0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846"),
 			Pool:          gethcommon.HexToAddress("0x4A78C7d84f1E58A532fE569a53f3B14F7e2Cce2d"),
-			Price:         TokenPrices[rhea.LINK],
+			Price:         rhea.LINK.Price(),
 			TokenPoolType: rhea.LockRelease,
 		},
 		rhea.WAVAX: {
 			Token:         gethcommon.HexToAddress("0xd00ae08403B9bbb9124bB305C09058E32C39A48c"),
 			Pool:          gethcommon.HexToAddress("0x153494a5e36072C2769E2eF49674C313cb3596A3"),
-			Price:         TokenPrices[rhea.WAVAX],
+			Price:         rhea.WAVAX.Price(),
 			TokenPoolType: rhea.LockRelease,
 		},
-		//rhea.CACHEGOLD: {
-		//	Token:         gethcommon.HexToAddress("0xD16eD805F3eCe986d9541afaD3E59De2F3732517"),
-		//	Pool:          gethcommon.HexToAddress("0x896d7b64F1039a057414786D9E772304aE6aAf9D"),
-		//	Price:         big.NewInt(60),
-		//	TokenPoolType: rhea.BurnMint,
-		//},
+		rhea.CACHEGOLD: {
+			Token:         gethcommon.HexToAddress("0xD16eD805F3eCe986d9541afaD3E59De2F3732517"),
+			Pool:          gethcommon.HexToAddress("0xd48b9213583074f518d8f4336fdf35370d450132"),
+			Price:         rhea.CACHEGOLD.Price(),
+			TokenPoolType: rhea.BurnMint,
+		},
+		rhea.ANZ: {
+			Token:         gethcommon.HexToAddress("0x169d58fd58d598dd7106082b0a43d430d2fec75f"),
+			Pool:          gethcommon.HexToAddress("0x169d58fd58d598dd7106082b0a43d430d2fec75f"),
+			Price:         rhea.ANZ.Price(),
+			TokenPoolType: rhea.Wrapped,
+		},
+		rhea.InsurAce: {
+			Token:         gethcommon.HexToAddress("0xa5f97bc69bf06e7c37b93265c5457420a92c5f4b"),
+			Pool:          gethcommon.HexToAddress("0xa5f97bc69bf06e7c37b93265c5457420a92c5f4b"),
+			Price:         rhea.InsurAce.Price(),
+			TokenPoolType: rhea.Wrapped,
+		},
 	},
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WAVAX},
 	WrappedNative: rhea.WAVAX,
@@ -214,66 +284,6 @@ var Prod_AvaxFuji = rhea.EVMChainConfig{
 	Afn:           gethcommon.HexToAddress("0x5fCC6941D1685C7115e257CDcBda258aF85F0C83"),
 	PriceRegistry: gethcommon.HexToAddress("0x8D8cEE7D59D967b12A40330AE9F6CC15578073bb"),
 	Confirmations: 1,
-	CustomerSettings: rhea.CustomerSettings{
-		CacheGoldFeeAddress:  gethcommon.HexToAddress("0x8264AcEE321ac02549aff7fA05A4Ae7a2e92A6f1"),
-		CacheGoldFeeEnforcer: gethcommon.HexToAddress("0x194E7a932663f11AC0790bfC44dBdd8339f0ED65"),
-	},
-	DeploySettings: rhea.ChainDeploySettings{
-		DeployAFN:           false,
-		DeployTokenPools:    false,
-		DeployRouter:        false,
-		DeployPriceRegistry: false,
-		DeployedAtBlock:     0,
-	},
-}
-
-var Prod_OptimismGoerli = rhea.EVMChainConfig{
-	ChainId: 420,
-	GasSettings: rhea.EVMGasSettings{
-		EIP1559: true,
-	},
-	AllowList: []gethcommon.Address{
-		// ==============  INTERNAL ==============
-		gethcommon.HexToAddress("0xda9e8e71bb750a996af33ebb8abb18cd9eb9dc75"), // deployer key
-		// Ping pong
-		gethcommon.HexToAddress("0xdf07fb6663caee468589a9d05ed5ddd640058fbb"), // OptimismGoerliToAvaxFuji.PingPongDapp
-		gethcommon.HexToAddress("0x3fa8796d568e743ce8c90ec4723a198d8bcd706c"), // OptimismGoerliToSepolia.PingPongDapp,
-		gethcommon.HexToAddress("0x9ef131613079733da157d7eb8ffb41f1d7ca869f"), // OptimismGoerliToGoerli.PingPongDapp,
-		// Personal
-		gethcommon.HexToAddress("0xEa94AA1318796b5C01a9A37faCBc65423fb2c520"), // Anindita Ghosh
-
-		// ==============  EXTERNAL ==============
-		gethcommon.HexToAddress("0x3FcFF7d9f88C64905e2cD9960c7452b5E6690E13"), // BetaUser - AAVE
-		gethcommon.HexToAddress("0x1b5D803Be089e43110Faf54c6b4eC40409Cc7450"), // BetaUser - Multimedia
-		gethcommon.HexToAddress("0x244d07fe4DFa30b4EE376751FDC793aE844c5dE6"), // BetaUser - CACHE.gold
-		gethcommon.HexToAddress("0x8264AcEE321ac02549aff7fA05A4Ae7a2e92A6f1"), // BetaUser - CACHE.gold
-	},
-	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
-		rhea.LINK: {
-			Token:         gethcommon.HexToAddress("0xdc2CC710e42857672E7907CF474a69B63B93089f"),
-			Pool:          gethcommon.HexToAddress("0x4Dca657257f6392922e1834183A27daEaD2c8D62"),
-			Price:         TokenPrices[rhea.LINK],
-			TokenPoolType: rhea.LockRelease,
-		},
-		rhea.WETH: {
-			Token:         gethcommon.HexToAddress("0x4200000000000000000000000000000000000006"),
-			Pool:          gethcommon.HexToAddress("0x26dA7Ab49296c31D0AcD3BB93Ed80fEF6943d488"),
-			Price:         TokenPrices[rhea.WETH],
-			TokenPoolType: rhea.LockRelease,
-		},
-		//rhea.CACHEGOLD: {
-		//	Token:         gethcommon.HexToAddress("0xa6446C6f492f31A33bC68249ae59F8871123a777"),
-		//	Pool:          gethcommon.HexToAddress("0x85fC1bFd60ea5EC7378DA0Ce4a63D66DC924A029"),
-		//	Price:         big.NewInt(60),
-		//	TokenPoolType: rhea.BurnMint,
-		//},
-	},
-	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WETH},
-	WrappedNative: rhea.WETH,
-	Router:        gethcommon.HexToAddress("0xec6d1ec94d518be47da1cb35f5d43286558d8b62"),
-	Afn:           gethcommon.HexToAddress("0x8E8cD3608AFce92b902B74F577B1429Ce7BcCa96"),
-	PriceRegistry: gethcommon.HexToAddress("0x737bbAEb317993e4450fD19E844bDC145aef5adA"),
-	Confirmations: 4,
 	CustomerSettings: rhea.CustomerSettings{
 		CacheGoldFeeAddress:  gethcommon.HexToAddress("0x8264AcEE321ac02549aff7fA05A4Ae7a2e92A6f1"),
 		CacheGoldFeeEnforcer: gethcommon.HexToAddress("0x194E7a932663f11AC0790bfC44dBdd8339f0ED65"),

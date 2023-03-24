@@ -20,6 +20,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/pkg/errors"
 	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/slices"
@@ -61,8 +62,8 @@ func (client *CCIPClient) applyFeeTokensUpdates(t *testing.T, sourceClient *rhea
 
 	tx, err := client.Source.PriceRegistry.ApplyFeeTokensUpdates(client.Source.Owner, feeTokens, []common.Address{})
 	shared.RequireNoError(t, err)
-	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
-
+	err = shared.WaitForMined(client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+	shared.RequireNoError(t, err)
 	client.Source.logger.Infof("Added feeTokens: %v to PriceRegistry: %s", feeTokens, client.Source.PriceRegistry.Address().Hex())
 }
 
@@ -80,25 +81,28 @@ func (client *CCIPClient) setOnRampFeeConfig(t *testing.T, sourceClient *rhea.Ev
 
 	tx, err := client.Source.OnRamp.SetFeeConfig(client.Source.Owner, feeTokenConfig)
 	shared.RequireNoError(t, err)
-	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+	err = shared.WaitForMined(client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+	shared.RequireNoError(t, err)
 }
 
 func (client *CCIPClient) setAllowListEnabled(t *testing.T) {
 	tx, err := client.Source.OnRamp.SetAllowListEnabled(client.Source.Owner, true)
 	shared.RequireNoError(t, err)
-	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+	err = shared.WaitForMined(client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+	shared.RequireNoError(t, err)
 }
 
 func (client *CCIPClient) setAllowList(t *testing.T) {
 	isEnabled, err := client.Source.OnRamp.GetAllowListEnabled(&bind.CallOpts{})
 	shared.RequireNoError(t, err)
-	if isEnabled == false {
+	if !isEnabled {
 		client.setAllowListEnabled(t)
 	}
 
 	tx, err := client.Source.OnRamp.ApplyAllowListUpdates(client.Source.Owner, client.Source.AllowList, nil)
 	shared.RequireNoError(t, err)
-	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+	err = shared.WaitForMined(client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+	shared.RequireNoError(t, err)
 }
 
 func (client *CCIPClient) setRateLimiterConfig(t *testing.T) {
@@ -107,27 +111,31 @@ func (client *CCIPClient) setRateLimiterConfig(t *testing.T) {
 		Capacity: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 	})
 	shared.RequireNoError(t, err)
-	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+	err = shared.WaitForMined(client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+	shared.RequireNoError(t, err)
 
 	tx, err = client.Dest.OffRamp.SetRateLimiterConfig(client.Dest.Owner, evm_2_evm_offramp.AggregateRateLimiterRateLimiterConfig{
 		Rate:     new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
 		Capacity: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 	})
 	shared.RequireNoError(t, err)
-	shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
+	err = shared.WaitForMined(client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
+	shared.RequireNoError(t, err)
 }
 
 func (client *CCIPClient) startPingPong(t *testing.T) {
 	tx, err := client.Source.PingPongDapp.StartPingPong(client.Source.Owner)
 	shared.RequireNoError(t, err)
-	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+	err = shared.WaitForMined(client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+	shared.RequireNoError(t, err)
 	client.Source.logger.Infof("Ping pong started in tx %s", helpers.ExplorerLink(int64(client.Source.ChainId), tx.Hash()))
 }
 
 func (client *CCIPClient) setPingPongPaused(t *testing.T, paused bool) {
 	tx, err := client.Source.PingPongDapp.SetPaused(client.Source.Owner, paused)
 	shared.RequireNoError(t, err)
-	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+	err = shared.WaitForMined(client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+	shared.RequireNoError(t, err)
 }
 
 type Client struct {
@@ -228,6 +236,7 @@ func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestCli
 	linkToken, err := link_token_interface.NewLinkToken(config.ChainConfig.SupportedTokens[rhea.LINK].Token, config.Client)
 	shared.RequireNoError(t, err)
 	wrappedNative, err := link_token_interface.NewLinkToken(config.ChainConfig.SupportedTokens[config.ChainConfig.WrappedNative].Token, config.Client)
+	shared.RequireNoError(t, err)
 
 	supportedTokens := map[rhea.Token]EVMBridgedToken{}
 	for token, tokenConfig := range config.ChainConfig.SupportedTokens {
@@ -336,7 +345,8 @@ func (client *Client) ApproveLinkFrom(t *testing.T, user *bind.TransactOpts, app
 	tx, err := client.LinkToken.Approve(user, approvedFor, amount)
 	require.NoError(t, err)
 
-	shared.WaitForMined(client.t, client.logger, client.Client, tx.Hash(), true)
+	err = shared.WaitForMined(client.logger, client.Client, tx.Hash(), true)
+	require.NoError(t, err)
 	client.logger.Warnf("Link approved %s", helpers.ExplorerLink(int64(client.ChainId), tx.Hash()))
 }
 
@@ -357,20 +367,6 @@ func (client *CCIPClient) ChangeGovernanceParameters(t *testing.T) {
 	sendRequest := WaitForCrossChainSendRequest(client.Source, sourceBlockNum, tx.Hash())
 	require.NoError(t, client.WaitForCommit(DestBlockNum), "waiting for commit")
 	require.NoError(t, client.WaitForExecution(DestBlockNum, sendRequest.Message.SequenceNumber), "waiting for execution")
-}
-
-func (client *CCIPClient) DonExecutionHappyPath(t *testing.T) {
-	client.Source.logger.Infof("Starting cross chain tx with DON execution")
-
-	tokenAmount := big.NewInt(500)
-	client.Source.ApproveLink(t, client.Source.Router.Address(), tokenAmount)
-
-	DestBlockNum := GetCurrentBlockNumber(client.Dest.Client.Client)
-	crossChainRequest := client.SendToOnrampWithExecution(t, client.Source, client.Source.Owner, client.Dest.ReceiverDapp.Address(), tokenAmount)
-	client.Source.logger.Infof("Don executed tx submitted with sequence number: %d", crossChainRequest.Message.SequenceNumber)
-
-	require.NoError(t, client.WaitForCommit(DestBlockNum), "waiting for commit")
-	require.NoError(t, client.WaitForExecution(DestBlockNum, crossChainRequest.Message.SequenceNumber), "waiting for execution")
 }
 
 func (client *CCIPClient) WaitForCommit(DestBlockNum uint64) error {
@@ -502,7 +498,7 @@ func (client *CCIPClient) ScalingAndBatching(t *testing.T) {
 		go func(user *bind.TransactOpts) {
 			defer wg.Done()
 			client.Source.ApproveLinkFrom(t, user, client.Source.Router.Address(), amount)
-			crossChainRequest := client.SendCrossChainMessage(t, client.Source, user, toAddress, amount)
+			crossChainRequest := client.SendCrossChainMessage(client.Source, user, toAddress, amount)
 			client.Source.logger.Info("Don executed tx submitted with sequence number: ", crossChainRequest.Message.SequenceNumber)
 			seqNum = crossChainRequest.Message.SequenceNumber
 		}(user)
@@ -513,7 +509,7 @@ func (client *CCIPClient) ScalingAndBatching(t *testing.T) {
 	client.Source.logger.Info("Sent 10 txs to onramp.")
 }
 
-func (client *CCIPClient) SendCrossChainMessage(t *testing.T, source SourceClient, from *bind.TransactOpts, toAddress common.Address, amount *big.Int) *evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested {
+func (client *CCIPClient) SendCrossChainMessage(source SourceClient, from *bind.TransactOpts, toAddress common.Address, amount *big.Int) *evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested {
 	SourceBlockNumber := GetCurrentBlockNumber(source.Client.Client)
 	token := router.ClientEVMTokenAmount{
 		Token:  client.Source.LinkTokenAddress,
@@ -633,139 +629,6 @@ func WaitForCrossChainSendRequest(source SourceClient, fromBlockNum uint64, txha
 	}
 }
 
-func (client *CCIPClient) PauseOfframpPool() {
-	for _, tokenConfig := range client.Dest.SupportedTokens {
-		paused, err := tokenConfig.Pool.Paused(nil)
-		helpers.PanicErr(err)
-		if paused {
-			return
-		}
-		client.Dest.logger.Info("pausing offramp pool...")
-		tx, err := tokenConfig.Pool.Pause(client.Dest.Owner)
-		helpers.PanicErr(err)
-		client.Dest.logger.Info("Offramp pool paused, tx hash: %s", tx.Hash())
-		shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
-	}
-}
-func (client *CCIPClient) PauseOnrampPool() {
-	for _, tokenConfig := range client.Source.SupportedTokens {
-		paused, err := tokenConfig.Pool.Paused(nil)
-		helpers.PanicErr(err)
-		if paused {
-			return
-		}
-		client.Source.logger.Info("pausing onramp pool...")
-		tx, err := tokenConfig.Pool.Pause(client.Source.Owner)
-		helpers.PanicErr(err)
-		client.Source.logger.Info("Onramp pool paused, tx hash: %s", tx.Hash())
-		shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
-	}
-}
-
-func (client *CCIPClient) UnpauseOfframpPool() {
-	for _, tokenConfig := range client.Dest.SupportedTokens {
-		paused, err := tokenConfig.Pool.Paused(nil)
-		helpers.PanicErr(err)
-		if !paused {
-			return
-		}
-		client.Dest.logger.Info("unpausing offramp pool...")
-		tx, err := tokenConfig.Pool.Unpause(client.Dest.Owner)
-		helpers.PanicErr(err)
-		client.Dest.logger.Info("Offramp pool unpaused, tx hash: %s", tx.Hash())
-		shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
-	}
-}
-
-func (client *CCIPClient) UnpauseOnrampPool() {
-	for _, tokenConfig := range client.Source.SupportedTokens {
-		paused, err := tokenConfig.Pool.Paused(nil)
-		helpers.PanicErr(err)
-		if !paused {
-			return
-		}
-		client.Source.logger.Info("unpausing onramp pool...")
-		tx, err := tokenConfig.Pool.Unpause(client.Source.Owner)
-		helpers.PanicErr(err)
-		client.Source.logger.Info("Onramp pool unpaused, tx hash: %s", tx.Hash())
-		shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
-	}
-}
-
-func (client *CCIPClient) PauseOnramp() {
-	paused, err := client.Source.OnRamp.Paused(nil)
-	helpers.PanicErr(err)
-	if paused {
-		return
-	}
-	client.Source.logger.Info("pausing onramp...")
-	tx, err := client.Source.OnRamp.Pause(client.Source.Owner)
-	helpers.PanicErr(err)
-	client.Source.logger.Info("Onramp paused, tx hash: %s", tx.Hash())
-	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
-}
-
-func (client *CCIPClient) PauseCommitStore() {
-	paused, err := client.Dest.CommitStore.Paused(nil)
-	helpers.PanicErr(err)
-	if paused {
-		return
-	}
-	client.Dest.logger.Info("pausing offramp...")
-	tx, err := client.Dest.CommitStore.Pause(client.Dest.Owner)
-	helpers.PanicErr(err)
-	client.Dest.logger.Info("Offramp paused, tx hash: %s", tx.Hash())
-	shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
-}
-
-func (client *CCIPClient) UnpauseOnramp() {
-	paused, err := client.Source.OnRamp.Paused(nil)
-	helpers.PanicErr(err)
-	if !paused {
-		return
-	}
-	client.Source.logger.Info("unpausing onramp...")
-	tx, err := client.Source.OnRamp.Unpause(client.Source.Owner)
-	helpers.PanicErr(err)
-	client.Source.logger.Info("Onramp unpaused, tx hash: %s", tx.Hash())
-	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
-}
-
-func (client *CCIPClient) UnpauseCommitStore() {
-	paused, err := client.Dest.CommitStore.Paused(nil)
-	helpers.PanicErr(err)
-	if !paused {
-		return
-	}
-	client.Dest.logger.Info("unpausing offramp...")
-	tx, err := client.Dest.CommitStore.Unpause(client.Dest.Owner)
-	helpers.PanicErr(err)
-	client.Dest.logger.Info("Offramp unpaused, tx hash: %s", tx.Hash())
-	shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
-}
-
-func (client *CCIPClient) UnpauseAll() {
-	wg := sync.WaitGroup{}
-	wg.Add(4)
-	go func() {
-		defer wg.Done()
-		client.UnpauseOnramp()
-	}()
-	go func() {
-		defer wg.Done()
-		client.UnpauseCommitStore()
-	}()
-	go func() {
-		defer wg.Done()
-		client.UnpauseOnrampPool()
-	}()
-	go func() {
-		defer wg.Done()
-		client.UnpauseOfframpPool()
-	}()
-	wg.Wait()
-}
-
 func (client *CCIPClient) SetOCR2Config(env dione.Environment) {
 	verifierOCRConfig, err := client.Dest.CommitStore.LatestConfigDetails(&bind.CallOpts{})
 	helpers.PanicErr(err)
@@ -827,7 +690,8 @@ func (client *CCIPClient) SetOCR2Config(env dione.Environment) {
 		offchainConfig,
 	)
 	helpers.PanicErr(err)
-	shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
+	err = shared.WaitForMined(client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
+	helpers.PanicErr(err)
 	client.Dest.logger.Infof("Config set on commitStore %s", helpers.ExplorerLink(int64(client.Dest.ChainId), tx.Hash()))
 
 	tx, err = client.Dest.OffRamp.SetOCR2Config(
@@ -840,18 +704,21 @@ func (client *CCIPClient) SetOCR2Config(env dione.Environment) {
 		offchainConfig,
 	)
 	helpers.PanicErr(err)
-	shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
+	err = shared.WaitForMined(client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
+	helpers.PanicErr(err)
 	client.Dest.logger.Infof("Config set on offramp %s", helpers.ExplorerLink(int64(client.Dest.ChainId), tx.Hash()))
 }
 
 func (client *CCIPClient) AcceptOwnership(t *testing.T) {
 	tx, err := client.Dest.CommitStore.AcceptOwnership(client.Dest.Owner)
 	require.NoError(t, err)
-	shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
+	err = shared.WaitForMined(client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
+	helpers.PanicErr(err)
 
 	tx, err = client.Dest.OffRamp.AcceptOwnership(client.Dest.Owner)
 	require.NoError(t, err)
-	shared.WaitForMined(client.Dest.t, client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
+	err = shared.WaitForMined(client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
+	helpers.PanicErr(err)
 }
 
 type aggregateRateLimiter interface {
@@ -860,72 +727,85 @@ type aggregateRateLimiter interface {
 	SetPrices(opts *bind.TransactOpts, tokens []common.Address, prices []*big.Int) (*types.Transaction, error)
 }
 
-func syncPoolsOnOnRamp(client *Client, onRamp *evm_2_evm_onramp.EVM2EVMOnRamp, bridgeTokens map[rhea.Token]EVMBridgedToken, txOpts *bind.TransactOpts) []*types.Transaction {
-	registeredTokens, err := onRamp.GetSupportedTokens(&bind.CallOpts{})
-	require.NoError(client.t, err)
+func (client *CCIPClient) syncPoolsOnOnRamp() {
+	registeredTokens, err := client.Source.OnRamp.GetSupportedTokens(&bind.CallOpts{})
+	require.NoError(client.Source.t, err)
+
+	// We only want to add tokens that are supported on both chains.
+	var wantedSourceTokens []common.Address
+	var wantedSourceTokenConfig []EVMBridgedToken
+
+	for _, token := range rhea.GetAllTokens() {
+		if sourceConfig, ok := client.Source.SupportedTokens[token]; ok {
+			if _, ok := client.Dest.SupportedTokens[token]; ok {
+				wantedSourceTokens = append(wantedSourceTokens, sourceConfig.Token)
+				wantedSourceTokenConfig = append(wantedSourceTokenConfig, sourceConfig)
+				client.Source.logger.Infof("Wanted token: %s", token)
+			}
+		}
+	}
 
 	var poolsToRemove, poolsToAdd []evm_2_evm_onramp.InternalPoolUpdate
 
-	pendingTxs := make([]*types.Transaction, 0)
 	// remove registered tokenPools not present in config
 	for _, token := range registeredTokens {
-		found := false
-		for _, bridgedToken := range bridgeTokens {
-			if bridgedToken.Token == token {
-				found = true
-				break
-			}
-		}
-		if !found {
-			pool, err := onRamp.GetPoolBySourceToken(&bind.CallOpts{}, token)
-			require.NoError(client.t, err)
+		if !slices.Contains(wantedSourceTokens, token) {
+			pool, err := client.Source.OnRamp.GetPoolBySourceToken(&bind.CallOpts{}, token)
+			require.NoError(client.Source.t, err)
 			poolsToRemove = append(poolsToRemove, evm_2_evm_onramp.InternalPoolUpdate{
 				Token: token,
 				Pool:  pool,
 			})
 		}
 	}
-	// add tokenPools present in config and not yet registered
-	for _, tokenConfig := range bridgeTokens {
-		// remove tokenPools not present in config
-		if !slices.Contains(registeredTokens, tokenConfig.Token) {
+	// add tokenPools present in config and not in the ramp
+	for i, wantedSourceToken := range wantedSourceTokens {
+		if !slices.Contains(registeredTokens, wantedSourceToken) {
 			poolsToAdd = append(poolsToAdd, evm_2_evm_onramp.InternalPoolUpdate{
-				Token: tokenConfig.Token,
-				Pool:  tokenConfig.Pool.Address(),
+				Token: wantedSourceToken,
+				Pool:  wantedSourceTokenConfig[i].Pool.Address(),
 			})
 		}
 	}
 
 	if len(poolsToAdd) > 0 || len(poolsToRemove) > 0 {
-		tx, err := onRamp.ApplyPoolUpdates(txOpts, poolsToRemove, poolsToAdd)
-		require.NoError(client.t, err)
-		client.logger.Infof("synced(add=%s, remove=%s) from registry=%s: tx=%s", poolsToAdd, poolsToRemove, onRamp.Address(), tx.Hash())
-		pendingTxs = append(pendingTxs, tx)           // queue txs for wait
-		txOpts.Nonce.Add(txOpts.Nonce, big.NewInt(1)) // increment nonce
+		// Pools to add should be the SECOND argument and poolsToRemove the first
+		// Since our deployments are still based on a swapped order, until we deploy new onRamps
+		// this order needs to be maintained to be compatible with the deployed code.
+		// TODO swap after new deployments
+		tx, err := client.Source.OnRamp.ApplyPoolUpdates(client.Source.Owner, poolsToAdd, poolsToRemove)
+		require.NoError(client.Source.t, err)
+		err = shared.WaitForMined(client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+		require.NoError(client.Source.t, err)
+		client.Source.logger.Infof("synced(add=%s, remove=%s) from onRamp=%s: tx=%s", poolsToAdd, poolsToRemove, client.Source.OnRamp.Address(), tx.Hash())
 	}
-
-	return pendingTxs
 }
 
-func syncPoolsOffOnRamp(client *Client, offRamp *evm_2_evm_offramp.EVM2EVMOffRamp, bridgeTokens map[rhea.Token]EVMBridgedToken, txOpts *bind.TransactOpts) []*types.Transaction {
-	registeredTokens, err := offRamp.GetSupportedTokens(&bind.CallOpts{})
-	require.NoError(client.t, err)
+func (client *CCIPClient) syncPoolsOffOnRamp() {
+	registeredTokens, err := client.Dest.OffRamp.GetSupportedTokens(&bind.CallOpts{})
+	require.NoError(client.Dest.t, err)
+
+	// We only want to add tokens that are supported on both chains.
+	var wantedSourceTokens []common.Address
+	var wantedDestTokenConfig []EVMBridgedToken
+
+	for _, token := range rhea.GetAllTokens() {
+		if sourceConfig, ok := client.Source.SupportedTokens[token]; ok {
+			if destConfig, ok := client.Dest.SupportedTokens[token]; ok {
+				wantedSourceTokens = append(wantedSourceTokens, sourceConfig.Token)
+				wantedDestTokenConfig = append(wantedDestTokenConfig, destConfig)
+				client.Dest.logger.Infof("Wanted token: %s", token)
+			}
+		}
+	}
 
 	var poolsToRemove, poolsToAdd []evm_2_evm_offramp.InternalPoolUpdate
 
-	pendingTxs := make([]*types.Transaction, 0)
 	// remove registered tokenPools not present in config
 	for _, token := range registeredTokens {
-		found := false
-		for _, bridgedToken := range bridgeTokens {
-			if bridgedToken.Token == token {
-				found = true
-				break
-			}
-		}
-		if !found {
-			pool, err := offRamp.GetPoolBySourceToken(&bind.CallOpts{}, token)
-			require.NoError(client.t, err)
+		if !slices.Contains(wantedSourceTokens, token) {
+			pool, err := client.Dest.OffRamp.GetPoolBySourceToken(&bind.CallOpts{}, token)
+			require.NoError(client.Dest.t, err)
 			poolsToRemove = append(poolsToRemove, evm_2_evm_offramp.InternalPoolUpdate{
 				Token: token,
 				Pool:  pool,
@@ -933,98 +813,204 @@ func syncPoolsOffOnRamp(client *Client, offRamp *evm_2_evm_offramp.EVM2EVMOffRam
 		}
 	}
 	// add tokenPools present in config and not yet registered
-	for _, tokenConfig := range bridgeTokens {
-		// remove tokenPools not present in config
-		if !slices.Contains(registeredTokens, tokenConfig.Token) {
+	for i, wantedSourceToken := range wantedSourceTokens {
+		if !slices.Contains(registeredTokens, wantedSourceToken) {
 			poolsToAdd = append(poolsToAdd, evm_2_evm_offramp.InternalPoolUpdate{
-				Token: tokenConfig.Token,
-				Pool:  tokenConfig.Pool.Address(),
+				Token: wantedSourceToken,
+				Pool:  wantedDestTokenConfig[i].Pool.Address(),
 			})
 		}
 	}
 
 	if len(poolsToAdd) > 0 || len(poolsToRemove) > 0 {
-		tx, err := offRamp.ApplyPoolUpdates(txOpts, poolsToRemove, poolsToAdd)
-		require.NoError(client.t, err)
-		client.logger.Infof("synced(add=%s, remove=%s) from registry=%s: tx=%s", poolsToAdd, poolsToRemove, offRamp.Address(), tx.Hash())
-		pendingTxs = append(pendingTxs, tx)           // queue txs for wait
-		txOpts.Nonce.Add(txOpts.Nonce, big.NewInt(1)) // increment nonce
+		tx, err := client.Dest.OffRamp.ApplyPoolUpdates(client.Dest.Owner, poolsToRemove, poolsToAdd)
+		require.NoError(client.Dest.t, err)
+		err = shared.WaitForMined(client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
+		require.NoError(client.Dest.t, err)
+		client.Dest.logger.Infof("synced(add=%s, remove=%s) from offRamp=%s: tx=%s", poolsToAdd, poolsToRemove, client.Dest.OffRamp.Address(), tx.Hash())
 	}
-
-	return pendingTxs
 }
 
-func syncPrices(client *Client, limiter aggregateRateLimiter, txOpts *bind.TransactOpts) *types.Transaction {
-	// sync tokenPrices if needed
-	if len(client.SupportedTokens) == 0 {
-		return nil
-	}
-
-	var tokens []common.Address
+func syncPrices(client *Client, limiter aggregateRateLimiter, otherChainTokens map[rhea.Token]EVMBridgedToken) {
+	// We only want to add token prices that are supported on both chains.
+	var wantedTokens []common.Address
 	var prices []*big.Int
-	for _, tokenConfig := range client.SupportedTokens {
-		tokens = append(tokens, tokenConfig.Token)
-		prices = append(prices, tokenConfig.Price)
+
+	for _, token := range rhea.GetAllTokens() {
+		if sourceConfig, ok := client.SupportedTokens[token]; ok {
+			if _, ok := otherChainTokens[token]; ok {
+				wantedTokens = append(wantedTokens, sourceConfig.Token)
+				prices = append(prices, sourceConfig.Price)
+				client.logger.Infof("Wanted token: %s", token)
+			}
+		}
 	}
 
-	limiterTokenPrices, err := limiter.GetPricesForTokens(&bind.CallOpts{}, tokens)
+	if len(wantedTokens) == 0 {
+		client.logger.Info("No tokens found for this lane")
+		return
+	}
+
+	limiterTokenPrices, err := limiter.GetPricesForTokens(&bind.CallOpts{}, wantedTokens)
 	require.NoError(client.t, err)
-	i := 0
-	for _, tokenConfig := range client.SupportedTokens {
-		// on first difference, setPrices then return
-		if tokenConfig.Price.Cmp(limiterTokenPrices[i]) != 0 {
-			tx, err2 := limiter.SetPrices(txOpts, tokens, prices)
+	for i, price := range prices {
+		// If a price difference is found update all prices and return
+		if price.Cmp(limiterTokenPrices[i]) != 0 {
+			tx, err2 := limiter.SetPrices(client.Owner, wantedTokens, prices)
 			require.NoError(client.t, err2)
-			client.logger.Infof("setPrices(tokens=%s, prices=%s) for limiter=%s: tx=%s", tokens, prices, limiter.Address(), tx.Hash())
-			txOpts.Nonce.Add(txOpts.Nonce, big.NewInt(1)) // increment nonce
-			return tx
+			err2 = shared.WaitForMined(client.logger, client.Client, tx.Hash(), true)
+			require.NoError(client.t, err2)
+			client.logger.Infof("setPrices(tokens=%s, prices=%s) for limiter=%s: tx=%s", wantedTokens, prices, limiter.Address(), tx.Hash())
+			return
 		}
-		i++
+	}
+	client.logger.Info("Prices already set correctly")
+}
+
+func (client *CCIPClient) syncOnRampOnPools() error {
+	for tokenName, tokenConfig := range client.Source.SupportedTokens {
+		// Only add tokens that are supported on both chains
+		if _, ok := client.Dest.SupportedTokens[tokenName]; !ok {
+			continue
+		}
+
+		isOnRamp, err := tokenConfig.Pool.IsOnRamp(&bind.CallOpts{}, client.Source.OnRamp.Address())
+		if err != nil {
+			return errors.Wrapf(err, "failed loading onRamp data for token %s", tokenName)
+		}
+
+		if !isOnRamp {
+			rampUpdate := lock_release_token_pool.IPoolRampUpdate{
+				Ramp:    client.Source.OnRamp.Address(),
+				Allowed: true,
+			}
+
+			tx, err := tokenConfig.Pool.ApplyRampUpdates(client.Source.Owner, []lock_release_token_pool.IPoolRampUpdate{rampUpdate}, []lock_release_token_pool.IPoolRampUpdate{})
+			if err != nil {
+				return errors.Wrapf(err, "failed to apply ramp update for token %s", tokenName)
+			}
+			err = shared.WaitForMined(client.Source.Client.logger, client.Source.Client.Client, tx.Hash(), true)
+			if err != nil {
+				return errors.Wrapf(err, "failed to apply ramp update for token %s", tokenName)
+			}
+			client.Source.logger.Infof("Setting onRamp for token %s", tokenName)
+		} else {
+			client.Source.logger.Infof("OnRamp already set for token %s", tokenName)
+		}
+	}
+	return nil
+}
+func (client *CCIPClient) syncOffRampOnPools() error {
+	for tokenName, tokenConfig := range client.Dest.SupportedTokens {
+		// Only add tokens that are supported on both chains
+		if _, ok := client.Source.SupportedTokens[tokenName]; !ok {
+			continue
+		}
+		isOffRamp, err := tokenConfig.Pool.IsOffRamp(&bind.CallOpts{}, client.Dest.OffRamp.Address())
+		if err != nil {
+			return errors.Wrapf(err, "failed loading offRamp data for token %s", tokenName)
+		}
+
+		if !isOffRamp {
+			rampUpdate := lock_release_token_pool.IPoolRampUpdate{
+				Ramp:    client.Dest.OffRamp.Address(),
+				Allowed: true,
+			}
+
+			tx, err := tokenConfig.Pool.ApplyRampUpdates(client.Dest.Owner, []lock_release_token_pool.IPoolRampUpdate{}, []lock_release_token_pool.IPoolRampUpdate{rampUpdate})
+			if err != nil {
+				return errors.Wrapf(err, "failed to apply ramp update for token %s", tokenName)
+			}
+			err = shared.WaitForMined(client.Dest.Client.logger, client.Dest.Client.Client, tx.Hash(), true)
+			if err != nil {
+				return errors.Wrapf(err, "failed to apply ramp update for token %s", tokenName)
+			}
+			client.Dest.logger.Infof("Setting offRamp for token %s", tokenName)
+		} else {
+			client.Dest.logger.Infof("OnRamp already set for token %s", tokenName)
+		}
 	}
 	return nil
 }
 
-func waitPendingTxs(client *Client, pendingTxs *[]*types.Transaction) {
-	// wait for all queued txs
-	for _, tx := range *pendingTxs {
-		shared.WaitForMined(client.t, client.logger, client.Client, tx.Hash(), true)
-	}
-	*pendingTxs = (*pendingTxs)[:0] // clear pending txs
-}
-
-func (client *CCIPClient) SyncTokenPools(t *testing.T) {
-	// use local txOpts, so we can cache/increment nonce manually before waiting on all txs
-	sourceTxOpts := *client.Source.Owner
-	sourceTxOpts.GasLimit = 120_000 // hardcode gasLimit (enough for each tx here), to avoid race from mis-estimating
-	sourcePendingNonce, err := client.Source.Client.Client.PendingNonceAt(context.Background(), client.Source.Owner.From)
-	require.NoError(t, err)
-	sourceTxOpts.Nonce = big.NewInt(int64(sourcePendingNonce))
-
+func (client *CCIPClient) SyncTokenPools() {
 	// onRamp maps source tokens to source pools
-	sourcePendingTxs := syncPoolsOnOnRamp(&client.Source.Client, client.Source.OnRamp, client.Source.SupportedTokens, &sourceTxOpts)
-
-	// same as above, for offRamp
-	destTxOpts := *client.Dest.Owner
-	destTxOpts.GasLimit = 120_000 // hardcode gasLimit (enough for each tx here), to avoid race from mis-estimating
-	destPendingNonce, err := client.Dest.Client.Client.PendingNonceAt(context.Background(), client.Dest.Owner.From)
-	require.NoError(t, err)
-	destTxOpts.Nonce = big.NewInt(int64(destPendingNonce))
+	client.syncPoolsOnOnRamp()
+	syncPrices(&client.Source.Client, client.Source.OnRamp, client.Dest.SupportedTokens)
+	err := client.syncOnRampOnPools()
+	require.NoError(client.Source.t, err)
 
 	// offRamp maps *source* tokens to *dest* pools
-	destPendingTxs := syncPoolsOffOnRamp(&client.Dest.Client, client.Dest.OffRamp, client.Source.SupportedTokens, &destTxOpts)
+	client.syncPoolsOffOnRamp()
+	syncPrices(&client.Dest.Client, client.Dest.OffRamp, client.Source.SupportedTokens)
+	err = client.syncOffRampOnPools()
+	require.NoError(client.Dest.t, err)
+}
 
-	waitPendingTxs(&client.Source.Client, &sourcePendingTxs)
-	waitPendingTxs(&client.Dest.Client, &destPendingTxs)
+func (client *CCIPClient) ccipSendBasicTx(t *testing.T) {
+	msg := client.getBasicTx(t, client.Source.LinkTokenAddress, false)
 
-	if tx := syncPrices(&client.Source.Client, client.Source.OnRamp, &sourceTxOpts); tx != nil {
-		sourcePendingTxs = append(sourcePendingTxs, tx)
+	/////////////////////////////////
+	// ADD TOKENS AND/OR DATA HERE //
+	/////////////////////////////////
+
+	DATA := []byte("")
+	TOKENS := []rhea.Token{rhea.LINK}
+	AMOUNTS := []*big.Int{big.NewInt(100)}
+
+	/////////////////////////////////
+	// END TOKENS AND/OR DATA HERE //
+	/////////////////////////////////
+
+	if len(TOKENS) != len(AMOUNTS) {
+		t.Error("Tokens and amounts need to be the same length")
+		t.FailNow()
 	}
-	if tx := syncPrices(&client.Dest.Client, client.Dest.OffRamp, &destTxOpts); tx != nil {
-		destPendingTxs = append(destPendingTxs, tx)
+
+	addToFeeApprove := big.NewInt(0)
+
+	for i, token := range TOKENS {
+		msg.TokenAmounts = append(msg.TokenAmounts, router.ClientEVMTokenAmount{
+			Token:  client.Source.SupportedTokens[token].Token,
+			Amount: AMOUNTS[i],
+		})
+
+		if token == rhea.LINK {
+			addToFeeApprove = AMOUNTS[i]
+			continue
+		}
+
+		client.Source.logger.Infof("Approving %d %s", AMOUNTS[i], token)
+
+		ERC20, err := link_token_interface.NewLinkToken(client.Source.SupportedTokens[token].Token, client.Source.Client.Client)
+		require.NoError(t, err)
+
+		tx, err := ERC20.Approve(client.Source.Owner, client.Source.Router.Address(), AMOUNTS[i])
+		require.NoError(t, err)
+		err = shared.WaitForMined(client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+		shared.RequireNoError(t, err)
 	}
 
-	waitPendingTxs(&client.Source.Client, &sourcePendingTxs)
-	waitPendingTxs(&client.Dest.Client, &destPendingTxs)
+	msg.Data = DATA
+
+	fee, err := client.Source.Router.GetFee(&bind.CallOpts{}, client.Dest.ChainId, msg)
+	shared.RequireNoError(t, err)
+
+	// If link was sent, add it to the fee for the approval
+	fee = new(big.Int).Add(fee, addToFeeApprove)
+
+	client.Source.ApproveLinkFrom(t, client.Source.Owner, client.Source.Router.Address(), fee)
+
+	sourceBlockNumber := GetCurrentBlockNumber(client.Source.Client.Client)
+	DestBlockNum := GetCurrentBlockNumber(client.Dest.Client.Client)
+
+	tx, err := client.Source.Router.CcipSend(client.Source.Owner, client.Dest.ChainId, msg)
+	shared.RequireNoError(t, err)
+	client.Source.logger.Warnf("Message sent for max %d gas %s", tx.Gas(), helpers.ExplorerLink(int64(client.Source.ChainId), tx.Hash()))
+
+	sendRequested := WaitForCrossChainSendRequest(client.Source, sourceBlockNumber, tx.Hash())
+	require.NoError(t, client.WaitForCommit(DestBlockNum), "waiting for commit")
+	require.NoError(t, client.WaitForExecution(DestBlockNum, sendRequested.Message.SequenceNumber), "waiting for execution")
 }
 
 func (client *CCIPClient) TestGasVariousTxs(t *testing.T) {
@@ -1073,7 +1059,6 @@ func (client *CCIPClient) sendLinkTx(t *testing.T, from *bind.TransactOpts, toke
 	sourceBlockNumber := GetCurrentBlockNumber(client.Source.Client.Client)
 	tx, err := client.Source.Router.CcipSend(from, client.Dest.ChainId, msg)
 	shared.RequireNoError(t, err)
-	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 	client.Source.logger.Warnf("Message sent for max %d gas %s", tx.Gas(), helpers.ExplorerLink(int64(client.Source.ChainId), tx.Hash()))
 
 	return WaitForCrossChainSendRequest(client.Source, sourceBlockNumber, tx.Hash())
@@ -1087,8 +1072,8 @@ func (client *CCIPClient) sendWrappedNativeTx(t *testing.T, from *bind.TransactO
 
 	tx, err := client.Source.WrappedNative.Approve(from, client.Source.Router.Address(), fee)
 	shared.RequireNoError(t, err)
-	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
-
+	err = shared.WaitForMined(client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+	shared.RequireNoError(t, err)
 	if token {
 		client.Source.ApproveLinkFrom(t, from, client.Source.Router.Address(), msg.TokenAmounts[0].Amount)
 	}
@@ -1096,7 +1081,6 @@ func (client *CCIPClient) sendWrappedNativeTx(t *testing.T, from *bind.TransactO
 	sourceBlockNumber := GetCurrentBlockNumber(client.Source.Client.Client)
 	tx, err = client.Source.Router.CcipSend(from, client.Dest.ChainId, msg)
 	shared.RequireNoError(t, err)
-	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 	client.Source.logger.Warnf("Message sent for max %d gas %s", tx.Gas(), helpers.ExplorerLink(int64(client.Source.ChainId), tx.Hash()))
 	return WaitForCrossChainSendRequest(client.Source, sourceBlockNumber, tx.Hash())
 }
@@ -1115,7 +1099,6 @@ func (client *CCIPClient) sendNativeTx(t *testing.T, from *bind.TransactOpts, to
 	sourceBlockNumber := GetCurrentBlockNumber(client.Source.Client.Client)
 	tx, err := client.Source.Router.CcipSend(from, client.Dest.ChainId, msg)
 	shared.RequireNoError(t, err)
-	shared.WaitForMined(client.Source.t, client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 	from.Value = big.NewInt(0)
 	client.Source.logger.Warnf("Message sent for max %d gas %s", tx.Gas(), helpers.ExplorerLink(int64(client.Source.ChainId), tx.Hash()))
 	return WaitForCrossChainSendRequest(client.Source, sourceBlockNumber, tx.Hash())

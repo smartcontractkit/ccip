@@ -36,13 +36,13 @@ var Alpha_OptimismGoerli = rhea.EVMChainConfig{
 		rhea.LINK: {
 			Token:         gethcommon.HexToAddress("0xdc2CC710e42857672E7907CF474a69B63B93089f"),
 			Pool:          gethcommon.HexToAddress("0x0dc2038243ac2dbf5c68277673ee221f8e616743"),
-			Price:         TokenPrices[rhea.LINK],
+			Price:         rhea.LINK.Price(),
 			TokenPoolType: rhea.LockRelease,
 		},
 		rhea.WETH: {
 			Token:         gethcommon.HexToAddress("0x4200000000000000000000000000000000000006"),
 			Pool:          gethcommon.HexToAddress("0x363c3a63ab17affcfbb4ed88d08bde29672ef59b"),
-			Price:         TokenPrices[rhea.WETH],
+			Price:         rhea.WETH.Price(),
 			TokenPoolType: rhea.LockRelease,
 		},
 	},
@@ -70,13 +70,13 @@ var Alpha_Sepolia = rhea.EVMChainConfig{
 		rhea.LINK: {
 			Token:         gethcommon.HexToAddress("0x779877A7B0D9E8603169DdbD7836e478b4624789"),
 			Pool:          gethcommon.HexToAddress("0xf8667be9b0f2d71d14f67d2eea4e5cc07998a4cc"),
-			Price:         TokenPrices[rhea.LINK],
+			Price:         rhea.LINK.Price(),
 			TokenPoolType: rhea.LockRelease,
 		},
 		rhea.WETH: {
 			Token:         gethcommon.HexToAddress("0x097D90c9d3E0B50Ca60e1ae45F6A81010f9FB534"),
 			Pool:          gethcommon.HexToAddress("0x31cd40c8b194be175365190b0e03069c6d912237"),
-			Price:         TokenPrices[rhea.WETH],
+			Price:         rhea.WETH.Price(),
 			TokenPoolType: rhea.LockRelease,
 		},
 	},
@@ -104,13 +104,13 @@ var Alpha_AvaxFuji = rhea.EVMChainConfig{
 		rhea.LINK: {
 			Token:         gethcommon.HexToAddress("0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846"),
 			Pool:          gethcommon.HexToAddress("0xfe01bbad74159b184f5a7351cdd3faddc68ceb89"),
-			Price:         TokenPrices[rhea.LINK],
+			Price:         rhea.LINK.Price(),
 			TokenPoolType: rhea.LockRelease,
 		},
 		rhea.WAVAX: {
 			Token:         gethcommon.HexToAddress("0xd00ae08403B9bbb9124bB305C09058E32C39A48c"),
 			Pool:          gethcommon.HexToAddress("0xdffa0515ec7b58fa75b4dc7b3de29cb71ff72656"),
-			Price:         TokenPrices[rhea.WAVAX],
+			Price:         rhea.WAVAX.Price(),
 			TokenPoolType: rhea.LockRelease,
 		},
 	},

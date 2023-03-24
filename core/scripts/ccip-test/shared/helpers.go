@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 
 	evmclient "github.com/smartcontractkit/chainlink/core/chains/evm/client"
@@ -19,7 +20,7 @@ const TxInclusionTimout = 3 * time.Minute
 
 // WaitForMined wait for a tx to be included on chain. It will panic when
 // the tx is reverted/successful based on the shouldSucceed parameter.
-func WaitForMined(t *testing.T, lggr logger.Logger, client ethereum.TransactionReader, hash common.Hash, shouldSucceed bool) {
+func WaitForMined(lggr logger.Logger, client ethereum.TransactionReader, hash common.Hash, shouldSucceed bool) error {
 	maxIterations := TxInclusionTimout / RetryTiming
 	for i := 0; i < int(maxIterations); i++ {
 		lggr.Info("[MINING] waiting for tx to be mined...")
@@ -34,12 +35,12 @@ func WaitForMined(t *testing.T, lggr logger.Logger, client ethereum.TransactionR
 				panic(receipt)
 			}
 			lggr.Infof("[MINING] tx mined %s successful %t", hash.Hex(), shouldSucceed)
-			return
+			return nil
 		}
 
 		time.Sleep(RetryTiming)
 	}
-	t.Error("No tx found within the given timeout")
+	return errors.New("No tx found within the given timeout")
 }
 
 func RequireNoError(t *testing.T, err error) {

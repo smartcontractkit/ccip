@@ -776,8 +776,9 @@ func printTokenSupportState(source *rhea.EvmDeploymentConfig, destination *rhea.
 	}
 
 	sourcePoolAllowsOnRamp, err = sourcePool.IsOnRamp(&bind.CallOpts{}, onRamp.Address())
-
+	helpers.PanicErr(err)
 	destPoolAllowsOffRamp, err = destPool.IsOffRamp(&bind.CallOpts{}, offRamp.Address())
+	helpers.PanicErr(err)
 
 	sb.WriteString(fmt.Sprintf("| %20s | %20s | %20s | %20s | %20s | %20s | %20s | %20s |\n",
 		printBool(onRampAllowsPool),

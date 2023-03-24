@@ -551,14 +551,14 @@ contract EVM2EVMOnRamp_applyPoolUpdates is EVM2EVMOnRampSetup {
     vm.expectEmit();
     emit PoolAdded(adds[0].token, adds[0].pool);
 
-    s_onRamp.applyPoolUpdates(adds, new Internal.PoolUpdate[](0));
+    s_onRamp.applyPoolUpdates(new Internal.PoolUpdate[](0), adds);
 
     assertEq(adds[0].pool, address(s_onRamp.getPoolBySourceToken(IERC20(adds[0].token))));
 
     vm.expectEmit();
     emit PoolRemoved(adds[0].token, adds[0].pool);
 
-    s_onRamp.applyPoolUpdates(new Internal.PoolUpdate[](0), adds);
+    s_onRamp.applyPoolUpdates(adds, new Internal.PoolUpdate[](0));
 
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.UnsupportedToken.selector, adds[0].token));
     s_onRamp.getPoolBySourceToken(IERC20(adds[0].token));
@@ -580,7 +580,7 @@ contract EVM2EVMOnRamp_applyPoolUpdates is EVM2EVMOnRampSetup {
 
     vm.expectRevert(EVM2EVMOnRamp.PoolAlreadyAdded.selector);
 
-    s_onRamp.applyPoolUpdates(adds, new Internal.PoolUpdate[](0));
+    s_onRamp.applyPoolUpdates(new Internal.PoolUpdate[](0), adds);
   }
 
   function testInvalidTokenPoolConfigReverts() public {
@@ -589,13 +589,13 @@ contract EVM2EVMOnRamp_applyPoolUpdates is EVM2EVMOnRampSetup {
 
     vm.expectRevert(EVM2EVMOnRamp.InvalidTokenPoolConfig.selector);
 
-    s_onRamp.applyPoolUpdates(adds, new Internal.PoolUpdate[](0));
+    s_onRamp.applyPoolUpdates(new Internal.PoolUpdate[](0), adds);
 
     adds[0] = Internal.PoolUpdate({token: address(1), pool: address(0)});
 
     vm.expectRevert(EVM2EVMOnRamp.InvalidTokenPoolConfig.selector);
 
-    s_onRamp.applyPoolUpdates(adds, new Internal.PoolUpdate[](0));
+    s_onRamp.applyPoolUpdates(new Internal.PoolUpdate[](0), adds);
   }
 
   function testPoolDoesNotExistReverts() public {
@@ -604,7 +604,7 @@ contract EVM2EVMOnRamp_applyPoolUpdates is EVM2EVMOnRampSetup {
 
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.PoolDoesNotExist.selector, removes[0].token));
 
-    s_onRamp.applyPoolUpdates(new Internal.PoolUpdate[](0), removes);
+    s_onRamp.applyPoolUpdates(removes, new Internal.PoolUpdate[](0));
   }
 
   function testTokenPoolMismatchReverts() public {
@@ -615,7 +615,7 @@ contract EVM2EVMOnRamp_applyPoolUpdates is EVM2EVMOnRampSetup {
 
     vm.expectRevert(EVM2EVMOnRamp.TokenPoolMismatch.selector);
 
-    s_onRamp.applyPoolUpdates(adds, removes);
+    s_onRamp.applyPoolUpdates(removes, adds);
   }
 }
 
@@ -629,7 +629,7 @@ contract EVM2EVMOnRamp_getSupportedTokens is EVM2EVMOnRampSetup {
     Internal.PoolUpdate[] memory removes = new Internal.PoolUpdate[](1);
     removes[0] = Internal.PoolUpdate({token: s_sourceTokens[0], pool: s_sourcePools[0]});
 
-    s_onRamp.applyPoolUpdates(new Internal.PoolUpdate[](0), removes);
+    s_onRamp.applyPoolUpdates(removes, new Internal.PoolUpdate[](0));
 
     supportedTokens = s_onRamp.getSupportedTokens();
 

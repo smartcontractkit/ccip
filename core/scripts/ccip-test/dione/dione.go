@@ -180,6 +180,7 @@ func (don *DON) ClearJobSpecs(jobType JobType, source string, destination string
 		wg.Add(1)
 
 		go func(node *client.Chainlink, index int) {
+			defer wg.Done()
 			jobs, _, err := node.ReadJobs()
 			common.PanicErr(err)
 
@@ -193,7 +194,6 @@ func (don *DON) ClearJobSpecs(jobType JobType, source string, destination string
 					_, err := node.DeleteJob(id)
 					common.PanicErr(err)
 				}
-				wg.Done()
 			}
 		}(n, i)
 	}
@@ -208,6 +208,7 @@ func (don *DON) NukeEverything() {
 		nde := n
 		wg.Add(1)
 		go func(node *client.Chainlink, index int) {
+			defer wg.Done()
 			jobs, http, err := node.ReadJobs()
 			common.PanicErr(err)
 			if http.StatusCode != 200 {
@@ -223,7 +224,6 @@ func (don *DON) NukeEverything() {
 				_, err := node.DeleteJob(id)
 				common.PanicErr(err)
 			}
-			wg.Done()
 		}(nde, i)
 	}
 	wg.Wait()
@@ -355,8 +355,8 @@ func (don *DON) AddJobSpec(spec *client.OCR2TaskJobSpec) {
 		nde := n
 		wg.Add(1)
 		go func(node *client.Chainlink, index int) {
+			defer wg.Done()
 			don.AddSingleJob(node, spec, index)
-			wg.Done()
 		}(nde, i)
 	}
 	wg.Wait()

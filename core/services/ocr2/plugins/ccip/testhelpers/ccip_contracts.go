@@ -1015,9 +1015,9 @@ func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport
 		if sendRequestedIterator.Event.Message.SequenceNumber <= report.Interval.Max &&
 			sendRequestedIterator.Event.Message.SequenceNumber >= report.Interval.Min {
 			fmt.Println("Found seq num", sendRequestedIterator.Event.Message.SequenceNumber, report.Interval)
-			hash, err := leafHasher.HashLeaf(sendRequestedIterator.Event.Raw)
-			if err != nil {
-				return nil, err
+			hash, err2 := leafHasher.HashLeaf(sendRequestedIterator.Event.Raw)
+			if err2 != nil {
+				return nil, err2
 			}
 			leaves = append(leaves, hash)
 			if sendRequestedIterator.Event.Message.SequenceNumber == seqNr {

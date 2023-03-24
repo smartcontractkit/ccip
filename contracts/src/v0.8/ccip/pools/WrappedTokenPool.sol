@@ -3,13 +3,17 @@ pragma solidity 0.8.15;
 
 import {TokenPool} from "./TokenPool.sol";
 
-import {ERC20} from "../../vendor/ERC20.sol";
+import {FlexibleDecimalERC20} from "./tokens/FlexibleDecimalERC20.sol";
 import {IERC20} from "../../vendor/IERC20.sol";
 
 /// @notice This pool mints and burns its own tokens, representing a wrapped form of the native token
 /// on a source chain - similar to WBTC.
-contract WrappedTokenPool is TokenPool, ERC20 {
-  constructor(string memory name, string memory symbol) TokenPool(IERC20(address(this))) ERC20(name, symbol) {}
+contract WrappedTokenPool is TokenPool, FlexibleDecimalERC20 {
+  constructor(
+    string memory name,
+    string memory symbol,
+    uint8 decimals
+  ) TokenPool(IERC20(address(this))) FlexibleDecimalERC20(name, symbol, decimals) {}
 
   /// @notice Burn the token in the pool
   /// @param amount Amount to burn

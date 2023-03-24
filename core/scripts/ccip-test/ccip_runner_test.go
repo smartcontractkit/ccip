@@ -3,6 +3,7 @@ package main
 import (
 	"math/big"
 	"os"
+	"sync"
 	"testing"
 
 	"github.com/smartcontractkit/chainlink/core/logger"
@@ -41,31 +42,6 @@ var chainMapping = map[dione.Environment]map[rhea.Chain]rhea.EvmDeploymentConfig
 // DATABASE_URL
 // Use "-v" as a Go tool argument for streaming log output.
 
-// TestDeploy can be run as a test with the following config
-// OWNER_KEY  private key used to deploy all contracts and is used as default in all single user tests.
-func TestRheaDeploy(t *testing.T) {
-	checkOwnerKeyAndSetupChain(t)
-	rhea.DeployToNewChain(t, &SOURCE)
-	rhea.DeployToNewChain(t, &DESTINATION)
-	rhea.DeployLanes(t, &SOURCE, &DESTINATION)
-	deployment_io.PrettyPrintLanes(ENV, &SOURCE, &DESTINATION)
-}
-
-// TestDione can be run as a test with the following config
-// OWNER_KEY  private key used to deploy all contracts and is used as default in all single user tests.
-func TestDione(t *testing.T) {
-	checkOwnerKeyAndSetupChain(t)
-
-	don := dione.NewDON(ENV, logger.TestLogger(t))
-	don.ClearAllJobs(helpers.ChainName(int64(SOURCE.ChainConfig.ChainId)), helpers.ChainName(int64(DESTINATION.ChainConfig.ChainId)))
-	don.AddTwoWaySpecs(SOURCE, DESTINATION)
-
-	// Sometimes jobs don't get added correctly. This script looks for missing jobs
-	// and attempts to add them.
-	don.AddMissingSpecs(DESTINATION, SOURCE)
-	don.AddMissingSpecs(SOURCE, DESTINATION)
-}
-
 // TestCCIP can be run as a test with the following config
 // OWNER_KEY  private key used to deploy all contracts and is used as default in all single user tests.
 // SEED_KEY   private key used for multi-user tests. Not needed when using the "deploy" command.
@@ -90,26 +66,23 @@ func TestCCIP(t *testing.T) {
 	client := NewCcipClient(t, SOURCE, DESTINATION, ownerKey, seedKey)
 
 	switch command {
-	// Deploys a new set of PingPong contracts, configures them to talk to each other
+	case "ccipSend": // Sends a basic tx with customizable contents
+		client.ccipSendBasicTx(t)
 	case "deployPingPong":
 		rhea.DeployPingPongDapps(t, &SOURCE, &DESTINATION)
-		// Starts and unpauses the PingPong dapp that is on the `source` chain.
-	case "startPingPong":
+	case "startPingPong": // Starts and unpauses the PingPong dapp that is on the source chain.
 		client.startPingPong(t)
-		// Stops the PingPong dapp by pausing the source chain dapp.
-	case "stopPingPong":
+	case "stopPingPong": // Stops the PingPong dapp by pausing the source chain dapp.
 		client.setPingPongPaused(t, true)
 	case "printSpecs":
 		printing.PrintJobSpecs(ENV, SOURCE, DESTINATION)
-	case "setConfig":
-		// Set the config to the commitStore and the offramp
+	case "setConfig": // Set the config to the commitStore and the offramp
 		client.SetOCR2Config(ENV)
 	case "setOnRampFeeConfig":
 		client.setOnRampFeeConfig(t, &SOURCE)
 	case "applyFeeTokensUpdates":
 		client.applyFeeTokensUpdates(t, &SOURCE)
-	case "batching":
-		// Submit 10 txs. This should result in the txs being batched together
+	case "batching": // Submit 10 txs. This should result in the txs being batched together
 		client.ScalingAndBatching(t)
 	case "gas":
 		client.TestGasVariousTxs(t)
@@ -123,6 +96,42 @@ func TestCCIP(t *testing.T) {
 	default:
 		t.Errorf("Unknown command \"%s\"", command)
 	}
+}
+
+// TestDeployChain can be run as a test with the following config
+// NOTE: deploy chain always runs for all chains
+// OWNER_KEY  private key used to deploy all contracts and is used as default in all single user tests.
+func TestRheaDeployChains(t *testing.T) {
+	DoForEachChain(t, func(chain rhea.EvmDeploymentConfig) {
+		err := rhea.DeployToNewChain(&chain)
+		if err != nil {
+			t.Error(err)
+		}
+		deployment_io.WriteChainConfigToFile(ENV, &chain)
+	})
+}
+
+// TestDeployLane can be run as a test with the following config
+// OWNER_KEY  private key used to deploy all contracts and is used as default in all single user tests.
+func TestRheaDeployLane(t *testing.T) {
+	checkOwnerKeyAndSetupChain(t)
+	rhea.DeployLanes(t, &SOURCE, &DESTINATION)
+	deployment_io.PrettyPrintLanes(ENV, &SOURCE, &DESTINATION)
+}
+
+// TestDione can be run as a test with the following config
+// OWNER_KEY  private key used to deploy all contracts and is used as default in all single user tests.
+func TestDione(t *testing.T) {
+	checkOwnerKeyAndSetupChain(t)
+
+	don := dione.NewDON(ENV, logger.TestLogger(t))
+	don.ClearAllJobs(helpers.ChainName(int64(SOURCE.ChainConfig.ChainId)), helpers.ChainName(int64(DESTINATION.ChainConfig.ChainId)))
+	don.AddTwoWaySpecs(SOURCE, DESTINATION)
+
+	// Sometimes jobs don't get added correctly. This script looks for missing jobs
+	// and attempts to add them.
+	don.AddMissingSpecs(DESTINATION, SOURCE)
+	don.AddMissingSpecs(SOURCE, DESTINATION)
 }
 
 // TestUpdateAllLanes
@@ -183,10 +192,35 @@ func TestUpdateAllLanes(t *testing.T) {
 	// This script only deploys new lane contracts. Please deploy any new chain contracts
 	// and update the config before running this.
 
-	DoForEachBidirectionalLane(t, ownerKey, upgradeLane)
+	DoForEachBidirectionalLane(t, upgradeLane)
 }
 
-func DoForEachLane(t *testing.T, ownerKey string, f func(source rhea.EvmDeploymentConfig, destination rhea.EvmDeploymentConfig)) {
+func TestSyncTokens(t *testing.T) {
+	ownerKey := checkOwnerKey(t)
+	DoForEachLane(t, func(source rhea.EvmDeploymentConfig, destination rhea.EvmDeploymentConfig) {
+		client := NewCcipClient(t, source, destination, ownerKey, ownerKey)
+		client.SyncTokenPools()
+	})
+}
+
+// DoForEachChain can be run concurrently as all calls target a single chain
+func DoForEachChain(t *testing.T, f func(chain rhea.EvmDeploymentConfig)) {
+	ownerKey := checkOwnerKey(t)
+	var wg sync.WaitGroup
+	for chnName, chn := range chainMapping[ENV] {
+		wg.Add(1)
+		go func(chainName rhea.Chain, chain rhea.EvmDeploymentConfig) {
+			defer wg.Done()
+			t.Logf("Running function for chain %s", chainName)
+			chain.SetupChain(t, ownerKey)
+			f(chain)
+		}(chnName, chn)
+	}
+	wg.Wait()
+}
+
+func DoForEachLane(t *testing.T, f func(source rhea.EvmDeploymentConfig, destination rhea.EvmDeploymentConfig)) {
+	ownerKey := checkOwnerKey(t)
 	for sourceChain, sourceMap := range laneMapping[ENV] {
 		for destChain, _ := range sourceMap {
 			t.Logf("Running function for lane %s -> %s", sourceChain, destChain)
@@ -202,7 +236,8 @@ func DoForEachLane(t *testing.T, ownerKey string, f func(source rhea.EvmDeployme
 	}
 }
 
-func DoForEachBidirectionalLane(t *testing.T, ownerKey string, f func(source rhea.EvmDeploymentConfig, destination rhea.EvmDeploymentConfig)) {
+func DoForEachBidirectionalLane(t *testing.T, f func(source rhea.EvmDeploymentConfig, destination rhea.EvmDeploymentConfig)) {
+	ownerKey := checkOwnerKey(t)
 	completed := make(map[rhea.Chain]map[rhea.Chain]interface{})
 
 	for sourceChain, sourceMap := range laneMapping[ENV] {
