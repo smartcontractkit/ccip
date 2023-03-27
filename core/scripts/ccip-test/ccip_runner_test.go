@@ -195,6 +195,19 @@ func TestUpdateAllLanes(t *testing.T) {
 	DoForEachBidirectionalLane(t, upgradeLane)
 }
 
+// How to add tokens in 3 steps
+// Add token to config
+// **	If the token is new add it to `models.go` and set its symbol, decimals and price
+// **	Add it to the chain config in e.g. prod.go
+// **	Leave the pool address empty
+// ** 	Depending on the pool type fill in the token address or not (wrapped doesn't have a token so leave it empty)
+//
+// Run `TestRheaDeployChains` to deploy the new pools
+// ** 	Run output should be written to console & ./json/deployments/env/chain/....
+// ** 	Modify the chain config to include the new info
+//
+// Run TestSyncTokens
+// ** 	This should set the correct config on each ramp and token pool based on previous steps
 func TestSyncTokens(t *testing.T) {
 	ownerKey := checkOwnerKey(t)
 	DoForEachLane(t, func(source rhea.EvmDeploymentConfig, destination rhea.EvmDeploymentConfig) {
