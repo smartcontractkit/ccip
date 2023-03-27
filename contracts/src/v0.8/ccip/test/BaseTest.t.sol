@@ -6,7 +6,7 @@ import "./mocks/MockAFN.sol";
 import "./StructFactory.sol";
 
 contract BaseTest is Test, StructFactory {
-  IAFN internal s_afn;
+  MockAFN internal s_mockAFN;
 
   function setUp() public virtual {
     // Set the sender to OWNER permanently
@@ -16,6 +16,6 @@ contract BaseTest is Test, StructFactory {
     // Set the block time to a constant known value
     vm.warp(BLOCK_TIME);
 
-    s_afn = new MockAFN();
+    s_mockAFN = new MockAFN();
   }
 }

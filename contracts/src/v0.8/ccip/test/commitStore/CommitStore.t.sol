@@ -14,7 +14,7 @@ contract CommitStoreSetup is PriceRegistrySetup {
 
     s_commitStore = new CommitStoreHelper(
       CommitStore.StaticConfig({chainId: DEST_CHAIN_ID, sourceChainId: SOURCE_CHAIN_ID, onRamp: ON_RAMP_ADDRESS}),
-      CommitStore.DynamicConfig({priceRegistry: address(s_priceRegistry), afn: address(s_afn)})
+      CommitStore.DynamicConfig({priceRegistry: address(s_priceRegistry), afn: address(s_mockAFN)})
     );
 
     address[] memory priceUpdaters = new address[](1);
@@ -26,13 +26,19 @@ contract CommitStoreSetup is PriceRegistrySetup {
 contract CommitStoreRealAFNSetup is PriceRegistrySetup {
   CommitStoreHelper s_commitStore;
 
+  AFN internal s_afn;
+
   function setUp() public virtual override {
     PriceRegistrySetup.setUp();
-    address[] memory participants = new address[](1);
-    participants[0] = OWNER;
-    uint256[] memory weights = new uint256[](1);
-    weights[0] = 1;
-    s_afn = new AFN(participants, weights, 1, 1); // Overwrite base mock afn with real.
+    AFN.Voter[] memory voters = new AFN.Voter[](1);
+    voters[0] = AFN.Voter({
+      blessVoteAddr: OWNER,
+      curseVoteAddr: address(9999),
+      curseUnvoteAddr: address(19999),
+      blessWeight: 1,
+      curseWeight: 1
+    });
+    s_afn = new AFN(AFN.Config({voters: voters, blessWeightThreshold: 1, curseWeightThreshold: 1})); // Overwrite base mock afn with real.
     s_commitStore = new CommitStoreHelper(
       CommitStore.StaticConfig({chainId: DEST_CHAIN_ID, sourceChainId: SOURCE_CHAIN_ID, onRamp: ON_RAMP_ADDRESS}),
       CommitStore.DynamicConfig({priceRegistry: address(s_priceRegistry), afn: address(s_afn)})
@@ -52,7 +58,7 @@ contract CommitStore_constructor is PriceRegistrySetup {
     });
     CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({
       priceRegistry: address(s_priceRegistry),
-      afn: address(s_afn)
+      afn: address(s_mockAFN)
     });
 
     vm.expectEmit();
@@ -102,7 +108,7 @@ contract CommitStore_setDynamicConfig is CommitStoreSetup {
     CommitStore.StaticConfig memory staticConfig = s_commitStore.getStaticConfig();
     CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({
       priceRegistry: address(23784264),
-      afn: address(s_afn)
+      afn: address(s_mockAFN)
     });
 
     vm.expectEmit();
@@ -118,7 +124,7 @@ contract CommitStore_setDynamicConfig is CommitStoreSetup {
   function testOnlyOwnerReverts() public {
     CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({
       priceRegistry: address(23784264),
-      afn: address(s_afn)
+      afn: address(s_mockAFN)
     });
 
     vm.stopPrank();
@@ -128,25 +134,8 @@ contract CommitStore_setDynamicConfig is CommitStoreSetup {
 }
 
 /// @notice #resetUnblessedRoots
-contract CommitStore_resetUnblessedRoots is CommitStoreSetup {
+contract CommitStore_resetUnblessedRoots is CommitStoreRealAFNSetup {
   event RootRemoved(bytes32 root);
-
-  function setUp() public virtual override {
-    CommitStoreSetup.setUp();
-
-    // Setup a real AFN instead of the mock one that always
-    // returns "true" for any root.
-    address[] memory participants = new address[](1);
-    participants[0] = OWNER;
-    uint256[] memory weights = new uint256[](1);
-    weights[0] = 2000;
-
-    s_afn = new AFN(participants, weights, weights[0], weights[0]);
-
-    s_commitStore.setDynamicConfig(
-      CommitStore.DynamicConfig({priceRegistry: address(s_priceRegistry), afn: address(s_afn)})
-    );
-  }
 
   function testResetUnblessedRootsSuccess() public {
     bytes32[] memory rootsToReset = new bytes32[](3);
@@ -178,10 +167,10 @@ contract CommitStore_resetUnblessedRoots is CommitStoreSetup {
 
     s_commitStore.report(abi.encode(report));
 
-    bytes32[] memory blessedRoots = new bytes32[](1);
-    blessedRoots[0] = keccak256(abi.encode(address(s_commitStore), rootsToReset[1]));
+    AFN.TaggedRoot[] memory blessedTaggedRoots = new AFN.TaggedRoot[](1);
+    blessedTaggedRoots[0] = AFN.TaggedRoot({commitStore: address(s_commitStore), root: rootsToReset[1]});
 
-    s_afn.voteToBlessRoots(blessedRoots);
+    s_afn.voteToBless(blessedTaggedRoots);
 
     vm.expectEmit(false, false, false, true);
     emit RootRemoved(rootsToReset[0]);
@@ -288,7 +277,7 @@ contract CommitStore_report is CommitStoreSetup {
   }
 
   function testUnhealthyReverts() public {
-    s_afn.voteBad();
+    s_mockAFN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
     vm.expectRevert(CommitStore.BadAFNSignal.selector);
     bytes memory report;
     s_commitStore.report(report);
@@ -365,9 +354,9 @@ contract CommitStore_verify is CommitStoreRealAFNSetup {
       )
     );
     // Bless that root.
-    bytes32[] memory rootsWithOrigin = new bytes32[](1);
-    rootsWithOrigin[0] = keccak256(abi.encode(address(s_commitStore), leaves[0]));
-    s_afn.voteToBlessRoots(rootsWithOrigin);
+    AFN.TaggedRoot[] memory taggedRoots = new AFN.TaggedRoot[](1);
+    taggedRoots[0] = AFN.TaggedRoot({commitStore: address(s_commitStore), root: leaves[0]});
+    s_afn.voteToBless(taggedRoots);
     bytes32[] memory proofs = new bytes32[](0);
     uint256 timestamp = s_commitStore.verify(leaves, proofs, 2**1);
     assertEq(BLOCK_TIME, timestamp);
@@ -396,9 +385,11 @@ contract CommitStore_afn is CommitStoreSetup {
 
     // Test afn
     assertEq(s_commitStore.isAFNHealthy(), true);
-    s_afn.voteBad();
+    s_mockAFN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
     assertEq(s_commitStore.isAFNHealthy(), false);
-    s_afn.recoverFromBadSignal();
+    AFN.UnvoteToCurseRecord[] memory records = new AFN.UnvoteToCurseRecord[](1);
+    records[0] = AFN.UnvoteToCurseRecord({curseVoteAddr: OWNER, cursesHash: bytes32(uint256(0)), forceUnvote: true});
+    s_mockAFN.ownerUnvoteToCurse(records);
     assertEq(s_commitStore.isAFNHealthy(), true);
   }
 }

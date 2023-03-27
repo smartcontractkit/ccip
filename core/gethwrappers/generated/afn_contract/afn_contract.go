@@ -29,16 +29,41 @@ var (
 	_ = event.NewSubscription
 )
 
+type AFNConfig struct {
+	Voters               []AFNVoter
+	BlessWeightThreshold uint16
+	CurseWeightThreshold uint16
+}
+
+type AFNTaggedRoot struct {
+	CommitStore common.Address
+	Root        [32]byte
+}
+
+type AFNUnvoteToCurseRecord struct {
+	CurseVoteAddr common.Address
+	CursesHash    [32]byte
+	ForceUnvote   bool
+}
+
+type AFNVoter struct {
+	BlessVoteAddr   common.Address
+	CurseVoteAddr   common.Address
+	CurseUnvoteAddr common.Address
+	BlessWeight     uint8
+	CurseWeight     uint8
+}
+
 var AFNContractMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"participants\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"weights\",\"type\":\"uint256[]\"},{\"internalType\":\"uint256\",\"name\":\"weightThresholdForBlessing\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"weightThresholdForBadSignal\",\"type\":\"uint256\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[],\"name\":\"AlreadyVoted\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidConfig\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"voter\",\"type\":\"address\"}],\"name\":\"InvalidVoter\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidWeight\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"MustRecoverFromBadSignal\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"RecoveryNotNecessary\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"timestamp\",\"type\":\"uint256\"}],\"name\":\"AFNBadSignal\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address[]\",\"name\":\"parties\",\"type\":\"address[]\"},{\"indexed\":false,\"internalType\":\"uint256[]\",\"name\":\"weights\",\"type\":\"uint256[]\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"goodQuorum\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"badQuorum\",\"type\":\"uint256\"}],\"name\":\"AFNConfigSet\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"OwnershipTransferRequested\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"RecoveredFromBadSignal\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"root\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"votes\",\"type\":\"uint256\"}],\"name\":\"RootBlessed\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"voter\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"weight\",\"type\":\"uint256\"}],\"name\":\"VoteBad\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"voter\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"root\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"weight\",\"type\":\"uint256\"}],\"name\":\"VoteToBless\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"acceptOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"badSignalReceived\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getBadVotersAndVotes\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"voters\",\"type\":\"address[]\"},{\"internalType\":\"uint256\",\"name\":\"votes\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getConfigVersion\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getParticipants\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"\",\"type\":\"address[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"root\",\"type\":\"bytes32\"}],\"name\":\"getVotesToBlessRoot\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"participant\",\"type\":\"address\"}],\"name\":\"getWeightByParticipant\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getWeightThresholds\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"blessing\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"badSignal\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"participant\",\"type\":\"address\"}],\"name\":\"hasVotedBad\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"participant\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"root\",\"type\":\"bytes32\"}],\"name\":\"hasVotedToBlessRoot\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"rootWithOrigin\",\"type\":\"bytes32\"}],\"name\":\"isBlessed\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"recoverFromBadSignal\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"participants\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"weights\",\"type\":\"uint256[]\"},{\"internalType\":\"uint256\",\"name\":\"weightThresholdForBlessing\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"weightThresholdForBadSignal\",\"type\":\"uint256\"}],\"name\":\"setAFNConfig\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"typeAndVersion\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"voteBad\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32[]\",\"name\":\"rootsWithOrigin\",\"type\":\"bytes32[]\"}],\"name\":\"voteToBlessRoots\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
-	Bin: "0x60806040523480156200001157600080fd5b506040516200226e3803806200226e83398101604081905262000034916200082d565b33806000816200008b5760405162461bcd60e51b815260206004820152601860248201527f43616e6e6f7420736574206f776e657220746f207a65726f000000000000000060448201526064015b60405180910390fd5b600080546001600160a01b0319166001600160a01b0384811691909117909155811615620000be57620000be81620000e1565b505050620000d78484848460016200018c60201b60201c565b5050505062000a10565b336001600160a01b038216036200013b5760405162461bcd60e51b815260206004820152601760248201527f43616e6e6f74207472616e7366657220746f2073656c66000000000000000000604482015260640162000082565b600180546001600160a01b0319166001600160a01b0383811691821790925560008054604051929316917fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae12789190a350565b835185511415806200019d57508451155b80620001a7575082155b80620001b1575081155b80620001bb575080155b15620001da576040516306b7c75960e31b815260040160405180910390fd5b600060038054806020026020016040519081016040528092919081815260200182805480156200023457602002820191906000526020600020905b81546001600160a01b0316815260019091019060200180831162000215575b5050505050905060005b8151811015620002a157600260008383815181106200026157620002616200091b565b60200260200101516001600160a01b03166001600160a01b031681526020019081526020016000206000905580620002999062000947565b90506200023e565b50600484905560058390556006829055620002bb62000491565b620002c6816200056d565b8551600090620002de9060039060208a0190620006a7565b5060005b87518110156200041b5760006001600160a01b03168882815181106200030c576200030c6200091b565b60200260200101516001600160a01b0316036200033c576040516306b7c75960e31b815260040160405180910390fd5b8681815181106200035157620003516200091b565b60200260200101516000036200037a5760405163585b926360e01b815260040160405180910390fd5b8681815181106200038f576200038f6200091b565b6020026020010151600260008a8481518110620003b057620003b06200091b565b60200260200101516001600160a01b03166001600160a01b0316815260200190815260200160002081905550868181518110620003f157620003f16200091b565b60200260200101518262000406919062000963565b9150620004138162000947565b9050620002e2565b50848110806200042a57508381105b1562000449576040516306b7c75960e31b815260040160405180910390fd5b7f69af5b8b5b348d6b619cb6b338b5cfd865aa9e8cedd36a4a69257a9a07ebedaa878787876040516200048094939291906200097e565b60405180910390a150505050505050565b60006007805480602002602001604051908101604052809291908181526020018280548015620004eb57602002820191906000526020600020905b81546001600160a01b03168152600190910190602001808311620004cc575b5050505050905060005b81518110156200055657600860008383815181106200051857620005186200091b565b6020908102919091018101516001600160a01b03168252810191909152604001600020805460ff191690556200054e8162000947565b9050620004f5565b50620005656007600062000711565b506000600955565b6000600c805480602002602001604051908101604052809291908181526020018280548015620005bd57602002820191906000526020600020905b815481526020019060010190808311620005a8575b5050505050905060005b815181101562000694576000828281518110620005e857620005e86200091b565b60200260200101519050600b60008281526020019081526020016000206000905560005b84518110156200067e57600d600083815260200190815260200160002060008683815181106200064057620006406200091b565b6020908102919091018101516001600160a01b03168252810191909152604001600020805460ff19169055620006768162000947565b90506200060c565b5050806200068c9062000947565b9050620005c7565b50620006a3600c600062000711565b5050565b828054828255906000526020600020908101928215620006ff579160200282015b82811115620006ff57825182546001600160a01b0319166001600160a01b03909116178255602090920191600190910190620006c8565b506200070d92915062000734565b5090565b508054600082559060005260206000209081019062000731919062000734565b50565b5b808211156200070d576000815560010162000735565b634e487b7160e01b600052604160045260246000fd5b604051601f8201601f191681016001600160401b03811182821017156200078c576200078c6200074b565b604052919050565b60006001600160401b03821115620007b057620007b06200074b565b5060051b60200190565b600082601f830112620007cc57600080fd5b81516020620007e5620007df8362000794565b62000761565b82815260059290921b840181019181810190868411156200080557600080fd5b8286015b8481101562000822578051835291830191830162000809565b509695505050505050565b600080600080608085870312156200084457600080fd5b84516001600160401b03808211156200085c57600080fd5b818701915087601f8301126200087157600080fd5b8151602062000884620007df8362000794565b82815260059290921b8401810191818101908b841115620008a457600080fd5b948201945b83861015620008db5785516001600160a01b0381168114620008cb5760008081fd5b82529482019490820190620008a9565b918a0151919850909350505080821115620008f557600080fd5b506200090487828801620007ba565b604087015160609097015195989097509350505050565b634e487b7160e01b600052603260045260246000fd5b634e487b7160e01b600052601160045260246000fd5b6000600182016200095c576200095c62000931565b5060010190565b6000821982111562000979576200097962000931565b500190565b6080808252855190820181905260009060209060a0840190828901845b82811015620009c25781516001600160a01b0316845292840192908401906001016200099b565b5050508381038285015286518082528783019183019060005b81811015620009f957835183529284019291840191600101620009db565b505060408501969096525050506060015292915050565b61184e8062000a206000396000f3fe608060405234801561001057600080fd5b50600436106101365760003560e01c806379adb16e116100b25780639dc6edc711610081578063f2fde38b11610066578063f2fde38b14610327578063f438c9c01461033a578063ff888fb11461035557600080fd5b80639dc6edc714610309578063c3453fa51461031157600080fd5b806379adb16e1461027557806379ba5097146102b95780638da5cb5b146102c15780638e1d4e61146102e957600080fd5b80633cd4f66911610109578063508ede92116100ee578063508ede9214610208578063518565651461024d5780635aa68ac01461026057600080fd5b80633cd4f669146101f357806346f8e6d7146101fb57600080fd5b8063181f5a771461013b5780632cb145d41461018d5780632ea9537114610197578063365f15ec146101e0575b600080fd5b6101776040518060400160405280600981526020017f41464e20312e302e30000000000000000000000000000000000000000000000081525081565b6040516101849190611359565b60405180910390f35b610195610378565b005b6101d06101a53660046113f5565b73ffffffffffffffffffffffffffffffffffffffff1660009081526008602052604090205460ff1690565b6040519015158152602001610184565b6101956101ee366004611417565b6105c9565b61019561089f565b60055460095410156101d0565b6101d061021636600461148c565b6000908152600d6020908152604080832073ffffffffffffffffffffffffffffffffffffffff949094168352929052205460ff1690565b61019561025b3660046115c3565b610918565b610268610941565b60405161018491906116e4565b6102ab6102833660046113f5565b73ffffffffffffffffffffffffffffffffffffffff1660009081526002602052604090205490565b604051908152602001610184565b6101956109b0565b60005460405173ffffffffffffffffffffffffffffffffffffffff9091168152602001610184565b6102ab6102f73660046116f7565b6000908152600b602052604090205490565b6006546102ab565b610319610aad565b604051610184929190611710565b6101956103353660046113f5565b610b27565b60045460055460408051928352602083019190915201610184565b6101d06103633660046116f7565b6000908152600a602052604090205460ff1690565b600554600954106103b5576040517fc28cc95000000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b336000818152600260205260408120549081900361041c576040517f669f262e00000000000000000000000000000000000000000000000000000000815273ffffffffffffffffffffffffffffffffffffffff831660048201526024015b60405180910390fd5b73ffffffffffffffffffffffffffffffffffffffff821660009081526008602052604090205460ff161561047c576040517f7c9a1cf900000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b73ffffffffffffffffffffffffffffffffffffffff8216600081815260086020526040812080547fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0016600190811790915560078054918201815582527fa66cc928b5edb82af9bd49922954155ab7b0942694bea4ce44661d9a8736c6880180547fffffffffffffffffffffffff00000000000000000000000000000000000000001690921790915560098054839290610536908490611761565b909155505060405181815273ffffffffffffffffffffffffffffffffffffffff8316907fa5889da6c2d25ef72eaae82bb0b8acf51eeebdd6bd12f1a24360de7d9b9cfa289060200160405180910390a2600554600954106105c5576040514281527f73907f5e30313a1ab6e1815608b22b40911f1a7decec69d5df18a2298002bacb9060200160405180910390a15b5050565b60055460095410610606576040517fc28cc95000000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b3360008181526002602052604081205490819003610668576040517f669f262e00000000000000000000000000000000000000000000000000000000815273ffffffffffffffffffffffffffffffffffffffff83166004820152602401610413565b60005b8381101561089857600085858381811061068757610687611779565b9050602002013590506106a9816000908152600a602052604090205460ff1690565b156106b45750610888565b6000818152600d6020908152604080832073ffffffffffffffffffffffffffffffffffffffff8816845290915290205460ff16156106f25750610888565b6000818152600d6020908152604080832073ffffffffffffffffffffffffffffffffffffffff88168452825280832080547fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00166001179055838352600b9091528120549081900361079357600c80546001810182556000919091527fdf6966c971051c3d54ec59162606531493a51404a002842f56009d7e5cf4a8c7018290555b600061079f8583611761565b6000848152600b60205260409081902082905551909150839073ffffffffffffffffffffffffffffffffffffffff8816907f262f79a5a063a0af3e27989b0b0f0ae1e2c19257d27efe01a7f0cab7b3b470a4906107ff9089815260200190565b60405180910390a36004548110610884576000838152600a60205260409081902080547fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff001660011790555183907f719fab74b843fdceffa591cc0a3445a9dddc9e1e304471baed67e8408a1405c79061087b9084815260200190565b60405180910390a25b5050505b610891816117a8565b905061066b565b5050505050565b6108a7610b3b565b60055460095410156108e5576040517fe147761200000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b6108ed610bbe565b6040517f3e48434bea67b1e259c2380d289dcb6372257ab2c37bc86f0e1acf83a7b07ac090600090a1565b610920610b3b565b61093b8484848460065460016109369190611761565b610cc7565b50505050565b606060038054806020026020016040519081016040528092919081815260200182805480156109a657602002820191906000526020600020905b815473ffffffffffffffffffffffffffffffffffffffff16815260019091019060200180831161097b575b5050505050905090565b60015473ffffffffffffffffffffffffffffffffffffffff163314610a31576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601660248201527f4d7573742062652070726f706f736564206f776e6572000000000000000000006044820152606401610413565b60008054337fffffffffffffffffffffffff00000000000000000000000000000000000000008083168217845560018054909116905560405173ffffffffffffffffffffffffffffffffffffffff90921692909183917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e091a350565b60606000600760095481805480602002602001604051908101604052809291908181526020018280548015610b1857602002820191906000526020600020905b815473ffffffffffffffffffffffffffffffffffffffff168152600190910190602001808311610aed575b50505050509150915091509091565b610b2f610b3b565b610b388161105c565b50565b60005473ffffffffffffffffffffffffffffffffffffffff163314610bbc576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601660248201527f4f6e6c792063616c6c61626c65206279206f776e6572000000000000000000006044820152606401610413565b565b60006007805480602002602001604051908101604052809291908181526020018280548015610c2357602002820191906000526020600020905b815473ffffffffffffffffffffffffffffffffffffffff168152600190910190602001808311610bf8575b5050505050905060005b8151811015610cb25760086000838381518110610c4c57610c4c611779565b60209081029190910181015173ffffffffffffffffffffffffffffffffffffffff16825281019190915260400160002080547fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00169055610cab816117a8565b9050610c2d565b50610cbf6007600061129c565b506000600955565b83518551141580610cd757508451155b80610ce0575082155b80610ce9575081155b80610cf2575080155b15610d29576040517f35be3ac800000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b60006003805480602002602001604051908101604052809291908181526020018280548015610d8e57602002820191906000526020600020905b815473ffffffffffffffffffffffffffffffffffffffff168152600190910190602001808311610d63575b5050505050905060005b8151811015610e0e5760026000838381518110610db757610db7611779565b602002602001015173ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000206000905580610e07906117a8565b9050610d98565b50600484905560058390556006829055610e26610bbe565b610e2f81611151565b8551600090610e459060039060208a01906112ba565b5060005b8751811015610fd157600073ffffffffffffffffffffffffffffffffffffffff16888281518110610e7c57610e7c611779565b602002602001015173ffffffffffffffffffffffffffffffffffffffff1603610ed1576040517f35be3ac800000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b868181518110610ee357610ee3611779565b6020026020010151600003610f24576040517f585b926300000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b868181518110610f3657610f36611779565b6020026020010151600260008a8481518110610f5457610f54611779565b602002602001015173ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002081905550868181518110610fac57610fac611779565b602002602001015182610fbf9190611761565b9150610fca816117a8565b9050610e49565b5084811080610fdf57508381105b15611016576040517f35be3ac800000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b7f69af5b8b5b348d6b619cb6b338b5cfd865aa9e8cedd36a4a69257a9a07ebedaa8787878760405161104b94939291906117e0565b60405180910390a150505050505050565b3373ffffffffffffffffffffffffffffffffffffffff8216036110db576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601760248201527f43616e6e6f74207472616e7366657220746f2073656c660000000000000000006044820152606401610413565b600180547fffffffffffffffffffffffff00000000000000000000000000000000000000001673ffffffffffffffffffffffffffffffffffffffff83811691821790925560008054604051929316917fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae12789190a350565b6000600c80548060200260200160405190810160405280929190818152602001828054801561119f57602002820191906000526020600020905b81548152602001906001019080831161118b575b5050505050905060005b81518110156112935760008282815181106111c6576111c6611779565b60200260200101519050600b60008281526020019081526020016000206000905560005b845181101561128057600d6000838152602001908152602001600020600086838151811061121a5761121a611779565b60209081029190910181015173ffffffffffffffffffffffffffffffffffffffff16825281019190915260400160002080547fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00169055611279816117a8565b90506111ea565b50508061128c906117a8565b90506111a9565b506105c5600c60005b5080546000825590600052602060002090810190610b389190611344565b828054828255906000526020600020908101928215611334579160200282015b8281111561133457825182547fffffffffffffffffffffffff00000000000000000000000000000000000000001673ffffffffffffffffffffffffffffffffffffffff9091161782556020909201916001909101906112da565b50611340929150611344565b5090565b5b808211156113405760008155600101611345565b600060208083528351808285015260005b818110156113865785810183015185820160400152820161136a565b81811115611398576000604083870101525b50601f017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe016929092016040019392505050565b803573ffffffffffffffffffffffffffffffffffffffff811681146113f057600080fd5b919050565b60006020828403121561140757600080fd5b611410826113cc565b9392505050565b6000806020838503121561142a57600080fd5b823567ffffffffffffffff8082111561144257600080fd5b818501915085601f83011261145657600080fd5b81358181111561146557600080fd5b8660208260051b850101111561147a57600080fd5b60209290920196919550909350505050565b6000806040838503121561149f57600080fd5b6114a8836113cc565b946020939093013593505050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b604051601f82017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe016810167ffffffffffffffff8111828210171561152c5761152c6114b6565b604052919050565b600067ffffffffffffffff82111561154e5761154e6114b6565b5060051b60200190565b600082601f83011261156957600080fd5b8135602061157e61157983611534565b6114e5565b82815260059290921b8401810191818101908684111561159d57600080fd5b8286015b848110156115b857803583529183019183016115a1565b509695505050505050565b600080600080608085870312156115d957600080fd5b843567ffffffffffffffff808211156115f157600080fd5b818701915087601f83011261160557600080fd5b8135602061161561157983611534565b82815260059290921b8401810191818101908b84111561163457600080fd5b948201945b838610156116595761164a866113cc565b82529482019490820190611639565b9850508801359250508082111561166f57600080fd5b5061167c87828801611558565b949794965050505060408301359260600135919050565b600081518084526020808501945080840160005b838110156116d957815173ffffffffffffffffffffffffffffffffffffffff16875295820195908201906001016116a7565b509495945050505050565b6020815260006114106020830184611693565b60006020828403121561170957600080fd5b5035919050565b6040815260006117236040830185611693565b90508260208301529392505050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b6000821982111561177457611774611732565b500190565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603260045260246000fd5b60007fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff82036117d9576117d9611732565b5060010190565b6080815260006117f36080830187611693565b82810360208481019190915286518083528782019282019060005b8181101561182a5784518352938301939183019160010161180e565b50506040850196909652505050606001529291505056fea164736f6c634300080f000a",
+	ABI: "[{\"inputs\":[{\"components\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"blessVoteAddr\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"curseVoteAddr\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"curseUnvoteAddr\",\"type\":\"address\"},{\"internalType\":\"uint8\",\"name\":\"blessWeight\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"curseWeight\",\"type\":\"uint8\"}],\"internalType\":\"structAFN.Voter[]\",\"name\":\"voters\",\"type\":\"tuple[]\"},{\"internalType\":\"uint16\",\"name\":\"blessWeightThreshold\",\"type\":\"uint16\"},{\"internalType\":\"uint16\",\"name\":\"curseWeightThreshold\",\"type\":\"uint16\"}],\"internalType\":\"structAFN.Config\",\"name\":\"config\",\"type\":\"tuple\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"voter\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"curseId\",\"type\":\"bytes32\"}],\"name\":\"AlreadyVotedToCurse\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidConfig\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"expectedCursesHash\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32\",\"name\":\"actualCursesHash\",\"type\":\"bytes32\"}],\"name\":\"InvalidCursesHash\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"voter\",\"type\":\"address\"}],\"name\":\"InvalidVoter\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"MustRecoverFromCurse\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint32\",\"name\":\"configVersion\",\"type\":\"uint32\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"voter\",\"type\":\"address\"},{\"components\":[{\"internalType\":\"address\",\"name\":\"commitStore\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"root\",\"type\":\"bytes32\"}],\"indexed\":false,\"internalType\":\"structAFN.TaggedRoot\",\"name\":\"taggedRoot\",\"type\":\"tuple\"}],\"name\":\"AlreadyBlessed\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint32\",\"name\":\"configVersion\",\"type\":\"uint32\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"voter\",\"type\":\"address\"},{\"components\":[{\"internalType\":\"address\",\"name\":\"commitStore\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"root\",\"type\":\"bytes32\"}],\"indexed\":false,\"internalType\":\"structAFN.TaggedRoot\",\"name\":\"taggedRoot\",\"type\":\"tuple\"}],\"name\":\"AlreadyVotedToBless\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint32\",\"name\":\"configVersion\",\"type\":\"uint32\"},{\"components\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"blessVoteAddr\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"curseVoteAddr\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"curseUnvoteAddr\",\"type\":\"address\"},{\"internalType\":\"uint8\",\"name\":\"blessWeight\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"curseWeight\",\"type\":\"uint8\"}],\"internalType\":\"structAFN.Voter[]\",\"name\":\"voters\",\"type\":\"tuple[]\"},{\"internalType\":\"uint16\",\"name\":\"blessWeightThreshold\",\"type\":\"uint16\"},{\"internalType\":\"uint16\",\"name\":\"curseWeightThreshold\",\"type\":\"uint16\"}],\"indexed\":false,\"internalType\":\"structAFN.Config\",\"name\":\"config\",\"type\":\"tuple\"}],\"name\":\"ConfigSet\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint32\",\"name\":\"configVersion\",\"type\":\"uint32\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"timestamp\",\"type\":\"uint256\"}],\"name\":\"Cursed\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"OwnershipTransferRequested\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"RecoveredFromCurse\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint32\",\"name\":\"configVersion\",\"type\":\"uint32\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"voter\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint8\",\"name\":\"weight\",\"type\":\"uint8\"},{\"indexed\":false,\"internalType\":\"uint32\",\"name\":\"voteCount\",\"type\":\"uint32\"},{\"indexed\":false,\"internalType\":\"bytes32\",\"name\":\"cursesHash\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"uint16\",\"name\":\"accumulatedWeight\",\"type\":\"uint16\"}],\"name\":\"ReusedVotesToCurse\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"voter\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"bytes32\",\"name\":\"expectedCursesHash\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"bytes32\",\"name\":\"actualCursesHash\",\"type\":\"bytes32\"}],\"name\":\"SkippedUnvoteToCurse\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint32\",\"name\":\"configVersion\",\"type\":\"uint32\"},{\"components\":[{\"internalType\":\"address\",\"name\":\"commitStore\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"root\",\"type\":\"bytes32\"}],\"indexed\":false,\"internalType\":\"structAFN.TaggedRoot\",\"name\":\"taggedRoot\",\"type\":\"tuple\"},{\"indexed\":false,\"internalType\":\"uint16\",\"name\":\"votes\",\"type\":\"uint16\"}],\"name\":\"TaggedRootBlessed\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint32\",\"name\":\"configVersion\",\"type\":\"uint32\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"voter\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint8\",\"name\":\"weight\",\"type\":\"uint8\"},{\"indexed\":false,\"internalType\":\"uint32\",\"name\":\"voteCount\",\"type\":\"uint32\"},{\"indexed\":false,\"internalType\":\"bytes32\",\"name\":\"cursesHash\",\"type\":\"bytes32\"}],\"name\":\"UnvoteToCurse\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint32\",\"name\":\"configVersion\",\"type\":\"uint32\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"voter\",\"type\":\"address\"},{\"components\":[{\"internalType\":\"address\",\"name\":\"commitStore\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"root\",\"type\":\"bytes32\"}],\"indexed\":false,\"internalType\":\"structAFN.TaggedRoot\",\"name\":\"taggedRoot\",\"type\":\"tuple\"},{\"indexed\":false,\"internalType\":\"uint8\",\"name\":\"weight\",\"type\":\"uint8\"}],\"name\":\"VoteToBless\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint32\",\"name\":\"configVersion\",\"type\":\"uint32\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"voter\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint8\",\"name\":\"weight\",\"type\":\"uint8\"},{\"indexed\":false,\"internalType\":\"uint32\",\"name\":\"voteCount\",\"type\":\"uint32\"},{\"indexed\":false,\"internalType\":\"bytes32\",\"name\":\"curseId\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"bytes32\",\"name\":\"cursesHash\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"uint16\",\"name\":\"accumulatedWeight\",\"type\":\"uint16\"}],\"name\":\"VoteToCurse\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"acceptOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"badSignalReceived\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"commitStore\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"root\",\"type\":\"bytes32\"}],\"internalType\":\"structAFN.TaggedRoot\",\"name\":\"taggedRoot\",\"type\":\"tuple\"}],\"name\":\"getBlessVotersAndWeight\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"blessVoteAddrs\",\"type\":\"address[]\"},{\"internalType\":\"uint16\",\"name\":\"weight\",\"type\":\"uint16\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getConfigDetails\",\"outputs\":[{\"internalType\":\"uint32\",\"name\":\"version\",\"type\":\"uint32\"},{\"internalType\":\"uint32\",\"name\":\"blockNumber\",\"type\":\"uint32\"},{\"components\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"blessVoteAddr\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"curseVoteAddr\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"curseUnvoteAddr\",\"type\":\"address\"},{\"internalType\":\"uint8\",\"name\":\"blessWeight\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"curseWeight\",\"type\":\"uint8\"}],\"internalType\":\"structAFN.Voter[]\",\"name\":\"voters\",\"type\":\"tuple[]\"},{\"internalType\":\"uint16\",\"name\":\"blessWeightThreshold\",\"type\":\"uint16\"},{\"internalType\":\"uint16\",\"name\":\"curseWeightThreshold\",\"type\":\"uint16\"}],\"internalType\":\"structAFN.Config\",\"name\":\"config\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getCurseVotersAndWeight\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"curseVoteAddrs\",\"type\":\"address[]\"},{\"internalType\":\"uint16\",\"name\":\"weight\",\"type\":\"uint16\"},{\"internalType\":\"uint32[]\",\"name\":\"voteCounts\",\"type\":\"uint32[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"taggedRootHash\",\"type\":\"bytes32\"}],\"name\":\"isBlessed\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"commitStore\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"root\",\"type\":\"bytes32\"}],\"internalType\":\"structAFN.TaggedRoot[]\",\"name\":\"taggedRoots\",\"type\":\"tuple[]\"}],\"name\":\"ownerUnbless\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"curseVoteAddr\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"cursesHash\",\"type\":\"bytes32\"},{\"internalType\":\"bool\",\"name\":\"forceUnvote\",\"type\":\"bool\"}],\"internalType\":\"structAFN.UnvoteToCurseRecord[]\",\"name\":\"records\",\"type\":\"tuple[]\"}],\"name\":\"ownerUnvoteToCurse\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"blessVoteAddr\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"curseVoteAddr\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"curseUnvoteAddr\",\"type\":\"address\"},{\"internalType\":\"uint8\",\"name\":\"blessWeight\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"curseWeight\",\"type\":\"uint8\"}],\"internalType\":\"structAFN.Voter[]\",\"name\":\"voters\",\"type\":\"tuple[]\"},{\"internalType\":\"uint16\",\"name\":\"blessWeightThreshold\",\"type\":\"uint16\"},{\"internalType\":\"uint16\",\"name\":\"curseWeightThreshold\",\"type\":\"uint16\"}],\"internalType\":\"structAFN.Config\",\"name\":\"config\",\"type\":\"tuple\"}],\"name\":\"setConfig\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"typeAndVersion\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"curseVoteAddr\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"cursesHash\",\"type\":\"bytes32\"}],\"name\":\"unvoteToCurse\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"commitStore\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"root\",\"type\":\"bytes32\"}],\"internalType\":\"structAFN.TaggedRoot[]\",\"name\":\"taggedRoots\",\"type\":\"tuple[]\"}],\"name\":\"voteToBless\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"curseId\",\"type\":\"bytes32\"}],\"name\":\"voteToCurse\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+	Bin: "0x60806040523480156200001157600080fd5b50604051620046f2380380620046f2833981016040819052620000349162000d7d565b33806000816200008b5760405162461bcd60e51b815260206004820152601860248201527f43616e6e6f7420736574206f776e657220746f207a65726f000000000000000060448201526064015b60405180910390fd5b600080546001600160a01b0319166001600160a01b0384811691909117909155811615620000be57620000be8162000118565b50506040805160808101825260008082526020820181905291810182905260608101919091529050620000f76001600160801b62000f0a565b6001600160801b03166040909101526200011181620001c3565b50620010f3565b336001600160a01b03821603620001725760405162461bcd60e51b815260206004820152601760248201527f43616e6e6f74207472616e7366657220746f2073656c66000000000000000000604482015260640162000082565b600180546001600160a01b0319166001600160a01b0383811691821790925560008054604051929316917fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae12789190a350565b620001d8600954640100000000900460ff1690565b15620001f7576040516306523e6560e51b815260040160405180910390fd5b620002028162000953565b62000220576040516306b7c75960e31b815260040160405180910390fd5b6040805160028054608060208202840181019094526060830181815260009484928491879085015b82821015620002c65760008481526020908190206040805160a0810182526003860290920180546001600160a01b0390811684526001808301548216858701526002909201549081169284019290925260ff600160a01b830481166060850152600160a81b9092049091166080830152908352909201910162000248565b505050908252506001919091015461ffff808216602080850191909152620100009283900482166040948501528601516003805494880151831690930263ffffffff1990941691161791909117905590505b6002541562000438576002805460009190620003379060019062000f0a565b815481106200034a576200034a62000f24565b600091825260208083206040805160a081018252600390940290910180546001600160a01b03908116808652600183015482168686019081526002938401548084168887015260ff600160a01b8204811660608a0152600160a81b90910416608088015290875260058552838720805465ffffffffffff19169055511685526007909252909220805460ff19169055815490925080620003ee57620003ee62000f3a565b60008281526020902060036000199092019182020180546001600160a01b03199081168255600182018054909116905560020180546001600160b01b031916905590555062000318565b60005b8251518110156200051a5782518051600291908390811062000461576200046162000f24565b602090810291909101810151825460018082018555600094855293839020825160039092020180546001600160a01b03199081166001600160a01b03938416178255938301519481018054909416948216949094179092556040810151600290930180546060830151608090930151949093166001600160a81b031990931692909217600160a01b60ff928316021760ff60a81b1916600160a81b9190931602919091179055620005128162000f50565b90506200043b565b5060048054600091908290620005369063ffffffff1662000f6c565b91906101000a81548163ffffffff021916908363ffffffff1602179055905060005b83515160ff821610156200069757600084600001518260ff168151811062000584576200058462000f24565b602090810291909101810151604080516060808201835263ffffffff80891683529084015160ff90811683870190815288821684860190815286516001600160a01b03908116600090815260058a5287812096518754945193518616650100000000000260ff60281b199487166401000000000264ffffffffff1990961691909716179390931791909116939093179093558486018051831684526007909652838320805460ff1916600117905560808501518651831684528484208054919092166101000261ff00199091161790559282015193518316815220805492909116660100000000000002600160301b600160d01b0319909216919091179055506200068f8162000f92565b905062000558565b506004805463ffffffff4381166401000000000263ffffffff60201b1990921691909117909155604051908216907f7cf8e698b191db138396ab0eae2ad5b3fe353fd014fd5956b034b86f2d605cfd90620006f490869062000fb4565b60405180910390a2604080516060810182528482015161ffff168152600060208201819052918101829052905b83515160ff82161015620008a857600084600001518260ff16815181106200074d576200074d62000f24565b6020908102919091018101518101516001600160a01b03808216600090815260078452604090819020815160a081018352815460ff80821615801580855261010084049092169884019890985263ffffffff620100008304169483019490945266010000000000009004909316606084015260010154608083015291935091620007e157506000816040015163ffffffff16115b156200089257806020015160ff168460200181815162000802919062001065565b61ffff1690525060208082015160408084015160808501519388015191516001600160a01b0387169463ffffffff8b16947fb4a70189a30e3d3b9c77d291f83699633e70ab4427fc3644a955ab4cca077b03946200088994919391929160ff94909416845263ffffffff929092166020840152604083015261ffff16606082015260800190565b60405180910390a35b505080620008a09062000f92565b905062000721565b508051602082015161ffff9182169116108015604083015262000907578163ffffffff167f6ec7e144a45fa03ed986874794df08b5b6bbbb27ed6454b4e6eaa74248b5e33342604051620008fe91815260200190565b60405180910390a25b805160098054602084015160409094015115156401000000000260ff60201b1961ffff958616620100000263ffffffff1990931695909416949094171791909116919091179055505050565b80515160009015806200096857508151516080105b806200097a5750602082015161ffff16155b806200098c5750604082015161ffff16155b156200099a57506000919050565b60008060008460000151516003620009b391906200108e565b6001600160401b03811115620009cd57620009cd62000ca2565b604051908082528060200260200182016040528015620009f7578160200160208202803683370190505b50905060005b85515181101562000bc75760008660000151828151811062000a235762000a2362000f24565b6020026020010151905060006001600160a01b031681600001516001600160a01b0316148062000a5e575060208101516001600160a01b0316155b8062000a75575060408101516001600160a01b0316155b8062000a9757508060800151816060015162000a929190620010b0565b60ff16155b1562000aaa575060009695505050505050565b80518362000aba8460036200108e565b62000ac7906000620010d8565b8151811062000ada5762000ada62000f24565b6001600160a01b039092166020928302919091018201528101518362000b028460036200108e565b62000b0f906001620010d8565b8151811062000b225762000b2262000f24565b6001600160a01b039092166020928302919091019091015260408101518362000b4d8460036200108e565b62000b5a906002620010d8565b8151811062000b6d5762000b6d62000f24565b6001600160a01b0390921660209283029190910190910152606081015162000b999060ff1686620010d8565b9450806080015160ff168462000bb09190620010d8565b9350508062000bbf9062000f50565b9050620009fd565b5060005b815181101562000c7757600062000be4826001620010d8565b90505b825181101562000c635782818151811062000c065762000c0662000f24565b60200260200101516001600160a01b031683838151811062000c2c5762000c2c62000f24565b60200260200101516001600160a01b03160362000c50575060009695505050505050565b62000c5b8162000f50565b905062000be7565b5062000c6f8162000f50565b905062000bcb565b50846020015161ffff16831015801562000c995750846040015161ffff168210155b95945050505050565b634e487b7160e01b600052604160045260246000fd5b604051606081016001600160401b038111828210171562000cdd5762000cdd62000ca2565b60405290565b60405160a081016001600160401b038111828210171562000cdd5762000cdd62000ca2565b604051601f8201601f191681016001600160401b038111828210171562000d335762000d3362000ca2565b604052919050565b80516001600160a01b038116811462000d5357600080fd5b919050565b805160ff8116811462000d5357600080fd5b805161ffff8116811462000d5357600080fd5b6000602080838503121562000d9157600080fd5b82516001600160401b038082111562000da957600080fd5b8185019150606080838803121562000dc057600080fd5b62000dca62000cb8565b83518381111562000dda57600080fd5b8401601f8101891362000dec57600080fd5b80518481111562000e015762000e0162000ca2565b62000e11878260051b0162000d08565b818152878101955060a091820283018801918b83111562000e3157600080fd5b928801925b8284101562000ebf5780848d03121562000e505760008081fd5b62000e5a62000ce3565b62000e658562000d3b565b815262000e748a860162000d3b565b8a820152604062000e8781870162000d3b565b9082015262000e9885880162000d58565b87820152608062000eab81870162000d58565b908201528752958801959283019262000e36565b5083525062000ed2905084860162000d6a565b8582015262000ee46040850162000d6a565b6040820152979650505050505050565b634e487b7160e01b600052601160045260246000fd5b60008282101562000f1f5762000f1f62000ef4565b500390565b634e487b7160e01b600052603260045260246000fd5b634e487b7160e01b600052603160045260246000fd5b60006001820162000f655762000f6562000ef4565b5060010190565b600063ffffffff80831681810362000f885762000f8862000ef4565b6001019392505050565b600060ff821660ff810362000fab5762000fab62000ef4565b60010192915050565b60006020808352608080840185516060808588015282825180855260a094508489019150868401935060005b818110156200103857845180516001600160a01b0390811685528982015181168a860152604080830151909116908501528481015160ff90811686860152908801511687840152938701939185019160010162000fe0565b50509488015161ffff8116604089015294604089015161ffff811689840152955098975050505050505050565b600061ffff80831681851680830382111562001085576200108562000ef4565b01949350505050565b6000816000190483118215151615620010ab57620010ab62000ef4565b500290565b600060ff821660ff84168060ff03821115620010d057620010d062000ef4565b019392505050565b60008219821115620010ee57620010ee62000ef4565b500190565b6135ef80620011036000396000f3fe608060405234801561001057600080fd5b50600436106100f55760003560e01c8063618af128116100975780639799861111610066578063979986111461022a578063f2fde38b1461023d578063f7bc977214610250578063ff888fb11461027157600080fd5b8063618af128146101d057806379ba5097146101e35780638976609b146101eb5780638da5cb5b1461020257600080fd5b80633f42ab73116100d35780633f42ab731461017457806346f8e6d71461018b57806347cf2b60146101aa578063488f3d81146101bd57600080fd5b8063119a3527146100fa578063181f5a771461010f57806335aea86914610161575b600080fd5b61010d610108366004612b52565b6102ae565b005b61014b6040518060400160405280600981526020017f41464e20312e302e30000000000000000000000000000000000000000000000081525081565b6040516101589190612b6b565b60405180910390f35b61010d61016f366004612c02565b6106f6565b61017c610734565b60405161015893929190612ce6565b600954640100000000900460ff165b6040519015158152602001610158565b61010d6101b8366004612e20565b61086c565b61010d6101cb366004612fc4565b610880565b61010d6101de366004613060565b610942565b61010d610a12565b6101f3610b0f565b60405161015893929190613185565b60005460405173ffffffffffffffffffffffffffffffffffffffff9091168152602001610158565b61010d6102383660046131ed565b610ed2565b61010d61024b366004613262565b61142f565b61026361025e366004613284565b611440565b60405161015892919061329c565b61019a61027f366004612b52565b600090815260066020526040902054760100000000000000000000000000000000000000000000900460ff1690565b33600090815260076020908152604091829020825160a081018452815460ff808216151580845261010083049091169483019490945263ffffffff6201000082041694820194909452660100000000000090930473ffffffffffffffffffffffffffffffffffffffff166060840152600101546080830152610363576040517f669f262e0000000000000000000000000000000000000000000000000000000081523360048201526024015b60405180910390fd5b33600090815260086020908152604080832085845290915290205460ff16156103c1576040517f9baf703d0000000000000000000000000000000000000000000000000000000081523360048201526024810183905260440161035a565b3360009081526008602090815260408083208584529091529081902080547fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0016600117905581018051610413906132f1565b63ffffffff16905260808101514661042c600143613314565b6040805160208101949094528301919091524060608201526080810183905260a001604080518083037fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe00181529181528151602092830120608084019081523360009081526007845282902084518154948601519386015160608701517fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00009096169115157fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00ff169190911761010060ff90951694909402939093177fffffffffffff000000000000000000000000000000000000000000000000ffff166201000063ffffffff9094169384027fffffffffffff0000000000000000000000000000000000000000ffffffffffff1617660100000000000073ffffffffffffffffffffffffffffffffffffffff909516949094029390931783555160019283015590036106f25760208101516009805460ff909216916002906105b890849062010000900461ffff1661332b565b82546101009290920a61ffff818102199093169183160217909155600454602084810151604080870151608080890151600954845160ff909616865263ffffffff938416968601969096529284018a905260608401929092526201000090930490941693810193909352169150339082907fe3c908d69fe71d009d3f8097489f0f498dc66a2f10622ef577a6496fe46958ba9060a00160405180910390a3600954640100000000900460ff166106f05760095461ffff8082166201000090920416106106f057600980547fffffffffffffffffffffffffffffffffffffffffffffffffffffff00ffffffff1664010000000017905560405163ffffffff8216907f6ec7e144a45fa03ed986874794df08b5b6bbbb27ed6454b4e6eaa74248b5e333906106e79042815260200190565b60405180910390a25b505b5050565b6106f2600060405180606001604052808573ffffffffffffffffffffffffffffffffffffffff1681526020018481526020016000151581525061173a565b6040805160608082018352808252600060208084018290528385018290526004548551600280549384028201608090810190985294810183815263ffffffff808416986401000000009094041696959194919385939192859285015b8282101561083c5760008481526020908190206040805160a08101825260038602909201805473ffffffffffffffffffffffffffffffffffffffff90811684526001808301548216858701526002909201549081169284019290925260ff74010000000000000000000000000000000000000000830481166060850152750100000000000000000000000000000000000000000090920490911660808301529083529092019101610790565b505050908252506001919091015461ffff8082166020840152620100009091041660409091015292939192919050565b610874611bf4565b61087d81611c77565b50565b610888611bf4565b60005b81518110156106f257600660006108fc8484815181106108ad576108ad613351565b602002602001015180516020918201516040805173ffffffffffffffffffffffffffffffffffffffff909316838501528281019190915280518083038201815260609092019052805191012090565b8152602081019190915260400160002080547fffffffffffffffffff000000000000000000000000000000000000000000000016905561093b81613380565b905061088b565b61094a611bf4565b60005b815181101561098a5761097a600183838151811061096d5761096d613351565b602002602001015161173a565b61098381613380565b905061094d565b50600954640100000000900460ff1661087d57600480546000906109b39063ffffffff166132f1565b82546101009290920a63ffffffff8181021990931691831602179091556004546040519116907f7cf8e698b191db138396ab0eae2ad5b3fe353fd014fd5956b034b86f2d605cfd90610a07906002906133b8565b60405180910390a250565b60015473ffffffffffffffffffffffffffffffffffffffff163314610a93576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601660248201527f4d7573742062652070726f706f736564206f776e657200000000000000000000604482015260640161035a565b60008054337fffffffffffffffffffffffff00000000000000000000000000000000000000008083168217845560018054909116905560405173ffffffffffffffffffffffffffffffffffffffff90921692909183917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e091a350565b600954600280546040805160208084028201810190925282815260609462010000900461ffff169385936000938493929190849084015b82821015610bf25760008481526020908190206040805160a08101825260038602909201805473ffffffffffffffffffffffffffffffffffffffff90811684526001808301548216858701526002909201549081169284019290925260ff74010000000000000000000000000000000000000000830481166060850152750100000000000000000000000000000000000000000090920490911660808301529083529092019101610b46565b50505050905060005b8151811015610ce057600060076000848481518110610c1c57610c1c613351565b60209081029190910181015181015173ffffffffffffffffffffffffffffffffffffffff9081168352828201939093526040918201600020825160a081018452815460ff80821615801580855261010084049092169584019590955263ffffffff620100008304169583019590955266010000000000009004909416606085015260010154608084015291925090610cbe57506000816040015163ffffffff16115b15610ccf57610ccc84613380565b93505b50610cd981613380565b9050610bfb565b508167ffffffffffffffff811115610cfa57610cfa612d0f565b604051908082528060200260200182016040528015610d23578160200160208202803683370190505b5094508167ffffffffffffffff811115610d3f57610d3f612d0f565b604051908082528060200260200182016040528015610d68578160200160208202803683370190505b5092506000805b8251811015610ec9576000838281518110610d8c57610d8c613351565b60209081029190910181015181015173ffffffffffffffffffffffffffffffffffffffff808216600090815260078452604090819020815160a081018352815460ff80821615801580855261010084049092169884019890985263ffffffff620100008304169483019490945266010000000000009004909316606084015260010154608083015291935091610e2c57506000816040015163ffffffff16115b15610eb65781898581518110610e4457610e44613351565b602002602001019073ffffffffffffffffffffffffffffffffffffffff16908173ffffffffffffffffffffffffffffffffffffffff16815250508060400151878581518110610e9557610e95613351565b63ffffffff90921660209283029190910190910152610eb384613380565b93505b505080610ec290613380565b9050610d6f565b50505050909192565b600954640100000000900460ff1615610f17576040517fca47cca000000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b600454336000908152600560209081526040918290208251606081018452905463ffffffff81811680845260ff64010000000084048116958501959095526501000000000090920490931693820193909352921691908214610fa7576040517f669f262e00000000000000000000000000000000000000000000000000000000815233600482015260240161035a565b60005b83811015611428576000858583818110610fc657610fc6613351565b905060400201803603810190610fdc9190613472565b90506000611052878785818110610ff557610ff5613351565b90506040020180360381019061100b9190613472565b80516020918201516040805173ffffffffffffffffffffffffffffffffffffffff909316838501528281019190915280518083038201815260609092019052805191012090565b6000818152600660209081526040918290208251608081018452905463ffffffff81168252640100000000810461ffff1692820192909252660100000000000082046fffffffffffffffffffffffffffffffff1692810192909252760100000000000000000000000000000000000000000000900460ff16158015606083015291925090611137573373ffffffffffffffffffffffffffffffffffffffff168663ffffffff167f274d6d5b916b0a53974b7ab86c844b97a2e03a60f658cd9a4b1c028b604d7bf185604051611127919061348e565b60405180910390a3505050611418565b8563ffffffff16816000015163ffffffff161461117a57506040805160808101825263ffffffff8716815260006020820181905291810182905260608101919091525b61118c81604001518660400151612677565b156111de573373ffffffffffffffffffffffffffffffffffffffff168663ffffffff167f6dfbb745226fa630aeb1b9557d17d508ddb789a04f0cb873ec16e58beb8beead85604051611127919061348e565b60408082015190860151600160ff9091161b176fffffffffffffffffffffffffffffffff166040820152602080860151908201805160ff9092169161122490839061332b565b61ffff1690525060208581015160408051865173ffffffffffffffffffffffffffffffffffffffff168152868401519381019390935260ff9091168282015251339163ffffffff8916917fe5bca7cec7a958a09a9432f1e98b5925115e419486b4768f26aa04422036622a9181900360600190a3600354602082015161ffff91821691161061132b5760016060820152602081015160405163ffffffff8816917f8257378aa73bf8e4ada848713526584a3dcee0fd3db3beed7397f7a7f5067cc991611322918791825173ffffffffffffffffffffffffffffffffffffffff1681526020928301519281019290925261ffff16604082015260600190565b60405180910390a25b6000918252600660209081526040928390208251815492840151948401516060909401511515760100000000000000000000000000000000000000000000027fffffffffffffffffff00ffffffffffffffffffffffffffffffffffffffffffff6fffffffffffffffffffffffffffffffff909516660100000000000002949094167fffffffffffffffffff0000000000000000000000000000000000ffffffffffff61ffff909616640100000000027fffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000090941663ffffffff90921691909117929092179390931617179055505b61142181613380565b9050610faa565b5050505050565b611437611bf4565b61087d8161269b565b606060008061145761100b36869003860186613472565b6000818152600660209081526040918290208251608081018452905463ffffffff808216808452640100000000830461ffff16948401859052660100000000000083046fffffffffffffffffffffffffffffffff169584019590955276010000000000000000000000000000000000000000000090910460ff161515606083015260045492965093945092161461150f5780606001516114f657600092505b5050604080516000815260208101909152939092509050565b604081015161151d81612790565b60ff1667ffffffffffffffff81111561153857611538612d0f565b604051908082528060200260200182016040528015611561578160200160208202803683370190505b506002805460408051602080840282018101909252828152939850600093929190849084015b828210156116335760008481526020908190206040805160a08101825260038602909201805473ffffffffffffffffffffffffffffffffffffffff90811684526001808301548216858701526002909201549081169284019290925260ff74010000000000000000000000000000000000000000830481166060850152750100000000000000000000000000000000000000000090920490911660808301529083529092019101611587565b5050505090506000805b825181101561172f576116a3846005600086858151811061166057611660613351565b6020908102919091018101515173ffffffffffffffffffffffffffffffffffffffff1682528101919091526040016000205465010000000000900460ff16612677565b1561171f578281815181106116ba576116ba613351565b6020026020010151600001518883806116d290613380565b9450815181106116e4576116e4613351565b602002602001019073ffffffffffffffffffffffffffffffffffffffff16908173ffffffffffffffffffffffffffffffffffffffff16815250505b61172881613380565b905061163d565b505050505050915091565b805173ffffffffffffffffffffffffffffffffffffffff908116600090815260076020908152604091829020825160a081018452815460ff808216151583526101008204169382019390935263ffffffff6201000084041693810193909352660100000000000090910490921660608201526001909101546080820152821580156117f55750806060015173ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614155b1561182e576040517f669f262e00000000000000000000000000000000000000000000000000000000815233600482015260240161035a565b821580156118465750600954640100000000900460ff165b1561187d576040517fca47cca000000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b805115806118935750604081015163ffffffff16155b1561189d57505050565b8280156118ac57508160400151155b80156118c057508160200151816080015114155b1561191e5781516080820151602080850151604080519384529183015273ffffffffffffffffffffffffffffffffffffffff909216917ff4e3b20447f3f83360469333a2578825ae355d192dd6f59c6516d832fa425a5391016106e7565b806060015173ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614801561196557508160200151816080015114155b156119af57608081015160208301516040517f79aa5c5f0000000000000000000000000000000000000000000000000000000081526004810192909252602482015260440161035a565b815160045460208381015160408086015183880151825160ff909416845263ffffffff918216948401949094529082019290925273ffffffffffffffffffffffffffffffffffffffff909316929116907f70fc9538e4890befa525c50aab95b49f97b45a1c9a99100f353efcedc3b924dc9060600160405180910390a360006040828101828152845173ffffffffffffffffffffffffffffffffffffffff908116845260076020908152929093208451815493860151925160608701517fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00009095169115157fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00ff169190911761010060ff909416938402177fffffffffffff000000000000000000000000000000000000000000000000ffff166201000063ffffffff90921682027fffffffffffff0000000000000000000000000000000000000000ffffffffffff1617660100000000000094909516939093029390931783556080840151600190930192909255600980549091600291611b559185910461ffff166134bb565b92506101000a81548161ffff021916908361ffff160217905550600960000160049054906101000a900460ff16156106f05760095461ffff808216620100009092041610156106f057600980547fffffffffffffffffffffffffffffffffffffffffffffffffffffff00ffffffff1690556040517f08c773aaf7568c6b9110dcdfc13c27177410582ee30e157d1aa306b49d603eb790600090a1505050565b60005473ffffffffffffffffffffffffffffffffffffffff163314611c75576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601660248201527f4f6e6c792063616c6c61626c65206279206f776e657200000000000000000000604482015260640161035a565b565b600954640100000000900460ff1615611cbc576040517fca47cca000000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b611cc5816127cf565b611cfb576040517f35be3ac800000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b6040805160028054608060208202840181019094526060830181815260009484928491879085015b82821015611dcf5760008481526020908190206040805160a08101825260038602909201805473ffffffffffffffffffffffffffffffffffffffff90811684526001808301548216858701526002909201549081169284019290925260ff74010000000000000000000000000000000000000000830481166060850152750100000000000000000000000000000000000000000090920490911660808301529083529092019101611d23565b505050908252506001919091015461ffff80821660208085019190915262010000928390048216604094850152860151600380549488015183169093027fffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000090941691161791909117905590505b60025415612007576002805460009190611e5890600190613314565b81548110611e6857611e68613351565b600091825260208083206040805160a0810182526003909402909101805473ffffffffffffffffffffffffffffffffffffffff908116808652600183015482168686019081526002938401548084168887015260ff740100000000000000000000000000000000000000008204811660608a015275010000000000000000000000000000000000000000009091041660808801529087526005855283872080547fffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000016905551168552600790925290922080547fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00169055815490925080611f7057611f706134de565b60008281526020902060037fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff9092019182020180547fffffffffffffffffffffffff00000000000000000000000000000000000000009081168255600182018054909116905560020180547fffffffffffffffffffff00000000000000000000000000000000000000000000169055905550611e3c565b60005b82515181101561215d5782518051600291908390811061202c5761202c613351565b602090810291909101810151825460018082018555600094855293839020825160039092020180547fffffffffffffffffffffffff000000000000000000000000000000000000000090811673ffffffffffffffffffffffffffffffffffffffff938416178255938301519481018054909416948216949094179092556040810151600290930180546060830151608090930151949093167fffffffffffffffffffffff000000000000000000000000000000000000000000909316929092177401000000000000000000000000000000000000000060ff92831602177fffffffffffffffffffff00ffffffffffffffffffffffffffffffffffffffffff167501000000000000000000000000000000000000000000919093160291909117905561215681613380565b905061200a565b50600480546000919082906121779063ffffffff166132f1565b91906101000a81548163ffffffff021916908363ffffffff1602179055905060005b83515160ff8216101561236357600084600001518260ff16815181106121c1576121c1613351565b602090810291909101810151604080516060808201835263ffffffff80891683529084015160ff908116838701908152888216848601908152865173ffffffffffffffffffffffffffffffffffffffff908116600090815260058a528781209651875494519351861665010000000000027fffffffffffffffffffffffffffffffffffffffffffffffffffff00ffffffffff948716640100000000027fffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000009096169190971617939093179190911693909317909355848601805183168452600790965283832080547fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff001660011790556080850151865183168452848420805491909216610100027fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00ff90911617905592820151935183168152208054929091166601000000000000027fffffffffffff0000000000000000000000000000000000000000ffffffffffff9092169190911790555061235c8161350d565b9050612199565b506004805463ffffffff438116640100000000027fffffffffffffffffffffffffffffffffffffffffffffffff00000000ffffffff90921691909117909155604051908216907f7cf8e698b191db138396ab0eae2ad5b3fe353fd014fd5956b034b86f2d605cfd906123d690869061352c565b60405180910390a2604080516060810182528482015161ffff168152600060208201819052918101829052905b83515160ff8216101561259857600084600001518260ff168151811061242b5761242b613351565b60209081029190910181015181015173ffffffffffffffffffffffffffffffffffffffff808216600090815260078452604090819020815160a081018352815460ff80821615801580855261010084049092169884019890985263ffffffff6201000083041694830194909452660100000000000090049093166060840152600101546080830152919350916124cb57506000816040015163ffffffff16115b1561258557806020015160ff16846020018181516124e9919061332b565b61ffff16905250602080820151604080840151608085015193880151915173ffffffffffffffffffffffffffffffffffffffff87169463ffffffff8b16947fb4a70189a30e3d3b9c77d291f83699633e70ab4427fc3644a955ab4cca077b039461257c94919391929160ff94909416845263ffffffff929092166020840152604083015261ffff16606082015260800190565b60405180910390a35b5050806125919061350d565b9050612403565b508051602082015161ffff918216911610801560408301526125f5578163ffffffff167f6ec7e144a45fa03ed986874794df08b5b6bbbb27ed6454b4e6eaa74248b5e333426040516125ec91815260200190565b60405180910390a25b80516009805460208401516040909401511515640100000000027fffffffffffffffffffffffffffffffffffffffffffffffffffffff00ffffffff61ffff95861662010000027fffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000090931695909416949094171791909116919091179055505050565b60016fffffffffffffffffffffffffffffffff831660ff83161c8116145b92915050565b3373ffffffffffffffffffffffffffffffffffffffff82160361271a576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601760248201527f43616e6e6f74207472616e7366657220746f2073656c66000000000000000000604482015260640161035a565b600180547fffffffffffffffffffffffff00000000000000000000000000000000000000001673ffffffffffffffffffffffffffffffffffffffff83811691821790925560008054604051929316917fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae12789190a350565b60005b6fffffffffffffffffffffffffffffffff8216156127ca576127b660018361353f565b909116906127c38161350d565b9050612793565b919050565b80515160009015806127e357508151516080105b806127f45750602082015161ffff16155b806128055750604082015161ffff16155b1561281257506000919050565b600080600084600001515160036128299190613568565b67ffffffffffffffff81111561284157612841612d0f565b60405190808252806020026020018201604052801561286a578160200160208202803683370190505b50905060005b855151811015612a6f5760008660000151828151811061289257612892613351565b60200260200101519050600073ffffffffffffffffffffffffffffffffffffffff16816000015173ffffffffffffffffffffffffffffffffffffffff1614806128f35750602081015173ffffffffffffffffffffffffffffffffffffffff16155b806129165750604081015173ffffffffffffffffffffffffffffffffffffffff16155b8061293557508060800151816060015161293091906135a5565b60ff16155b15612947575060009695505050505050565b805183612955846003613568565b6129609060006135ca565b8151811061297057612970613351565b73ffffffffffffffffffffffffffffffffffffffff909216602092830291909101820152810151836129a3846003613568565b6129ae9060016135ca565b815181106129be576129be613351565b73ffffffffffffffffffffffffffffffffffffffff909216602092830291909101909101526040810151836129f4846003613568565b6129ff9060026135ca565b81518110612a0f57612a0f613351565b73ffffffffffffffffffffffffffffffffffffffff909216602092830291909101909101526060810151612a469060ff16866135ca565b9450806080015160ff1684612a5b91906135ca565b93505080612a6890613380565b9050612870565b5060005b8151811015612b28576000612a898260016135ca565b90505b8251811015612b1757828181518110612aa757612aa7613351565b602002602001015173ffffffffffffffffffffffffffffffffffffffff16838381518110612ad757612ad7613351565b602002602001015173ffffffffffffffffffffffffffffffffffffffff1603612b07575060009695505050505050565b612b1081613380565b9050612a8c565b50612b2181613380565b9050612a73565b50846020015161ffff168310158015612b495750846040015161ffff168210155b95945050505050565b600060208284031215612b6457600080fd5b5035919050565b600060208083528351808285015260005b81811015612b9857858101830151858201604001528201612b7c565b81811115612baa576000604083870101525b50601f017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe016929092016040019392505050565b803573ffffffffffffffffffffffffffffffffffffffff811681146127ca57600080fd5b60008060408385031215612c1557600080fd5b612c1e83612bde565b946020939093013593505050565b8051606080845281518482018190526000926080916020918201918388019190865b82811015612cb3578451805173ffffffffffffffffffffffffffffffffffffffff908116865283820151811684870152604080830151909116908601528781015160ff908116898701529087015116868501529381019360a090930192600101612c4e565b508781015161ffff81168a8301529550505060408601519350612cdc604088018561ffff169052565b9695505050505050565b600063ffffffff808616835280851660208401525060606040830152612b496060830184612c2c565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b6040516060810167ffffffffffffffff81118282101715612d6157612d61612d0f565b60405290565b60405160a0810167ffffffffffffffff81118282101715612d6157612d61612d0f565b604051601f82017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe016810167ffffffffffffffff81118282101715612dd157612dd1612d0f565b604052919050565b600067ffffffffffffffff821115612df357612df3612d0f565b5060051b60200190565b803560ff811681146127ca57600080fd5b803561ffff811681146127ca57600080fd5b60006020808385031215612e3357600080fd5b823567ffffffffffffffff80821115612e4b57600080fd5b81850191506060808388031215612e6157600080fd5b612e69612d3e565b833583811115612e7857600080fd5b84019250601f83018813612e8b57600080fd5b8235612e9e612e9982612dd9565b612d8a565b81815260a0918202850187019187820191908b841115612ebd57600080fd5b958801955b83871015612f3c5780878d031215612eda5760008081fd5b612ee2612d67565b612eeb88612bde565b8152612ef88a8901612bde565b8a8201526040612f09818a01612bde565b90820152612f18888801612dfd565b878201526080612f29818a01612dfd565b9082015283529586019591880191612ec2565b50835250612f4d9050848601612e0e565b85820152612f5d60408501612e0e565b6040820152979650505050505050565b600060408284031215612f7f57600080fd5b6040516040810181811067ffffffffffffffff82111715612fa257612fa2612d0f565b604052905080612fb183612bde565b8152602083013560208201525092915050565b60006020808385031215612fd757600080fd5b823567ffffffffffffffff811115612fee57600080fd5b8301601f81018513612fff57600080fd5b803561300d612e9982612dd9565b81815260069190911b8201830190838101908783111561302c57600080fd5b928401925b82841015613055576130438885612f6d565b82528482019150604084019350613031565b979650505050505050565b6000602080838503121561307357600080fd5b823567ffffffffffffffff81111561308a57600080fd5b8301601f8101851361309b57600080fd5b80356130a9612e9982612dd9565b818152606091820283018401918482019190888411156130c857600080fd5b938501935b838510156131285780858a0312156130e55760008081fd5b6130ed612d3e565b6130f686612bde565b8152868601358782015260408087013580151581146131155760008081fd5b90820152835293840193918501916130cd565b50979650505050505050565b600081518084526020808501945080840160005b8381101561317a57815173ffffffffffffffffffffffffffffffffffffffff1687529582019590820190600101613148565b509495945050505050565b6060815260006131986060830186613134565b61ffff8516602084810191909152838203604085015284518083528582019282019060005b818110156131df57845163ffffffff16835293830193918301916001016131bd565b509098975050505050505050565b6000806020838503121561320057600080fd5b823567ffffffffffffffff8082111561321857600080fd5b818501915085601f83011261322c57600080fd5b81358181111561323b57600080fd5b8660208260061b850101111561325057600080fd5b60209290920196919550909350505050565b60006020828403121561327457600080fd5b61327d82612bde565b9392505050565b60006040828403121561329657600080fd5b50919050565b6040815260006132af6040830185613134565b905061ffff831660208301529392505050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b600063ffffffff80831681810361330a5761330a6132c2565b6001019392505050565b600082821015613326576133266132c2565b500390565b600061ffff808316818516808303821115613348576133486132c2565b01949350505050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603260045260246000fd5b60007fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff82036133b1576133b16132c2565b5060010190565b6000602080835260808084016060808487015281875480845260a093508388019150886000528560002060005b8281101561344a57815473ffffffffffffffffffffffffffffffffffffffff908116855260018084015482168a8701526002840154918216604087015260ff82891c81168888015260a89290921c9091168886015293860193600390920191016133e5565b505050600188015461ffff80821660408a0152601082901c8116848a01529095509350613055565b60006040828403121561348457600080fd5b61327d8383612f6d565b815173ffffffffffffffffffffffffffffffffffffffff1681526020808301519082015260408101612695565b600061ffff838116908316818110156134d6576134d66132c2565b039392505050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603160045260246000fd5b600060ff821660ff8103613523576135236132c2565b60010192915050565b60208152600061327d6020830184612c2c565b60006fffffffffffffffffffffffffffffffff838116908316818110156134d6576134d66132c2565b6000817fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff04831182151516156135a0576135a06132c2565b500290565b600060ff821660ff84168060ff038211156135c2576135c26132c2565b019392505050565b600082198211156135dd576135dd6132c2565b50019056fea164736f6c634300080f000a",
 }
 
 var AFNContractABI = AFNContractMetaData.ABI
 
 var AFNContractBin = AFNContractMetaData.Bin
 
-func DeployAFNContract(auth *bind.TransactOpts, backend bind.ContractBackend, participants []common.Address, weights []*big.Int, weightThresholdForBlessing *big.Int, weightThresholdForBadSignal *big.Int) (common.Address, *types.Transaction, *AFNContract, error) {
+func DeployAFNContract(auth *bind.TransactOpts, backend bind.ContractBackend, config AFNConfig) (common.Address, *types.Transaction, *AFNContract, error) {
 	parsed, err := AFNContractMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -47,7 +72,7 @@ func DeployAFNContract(auth *bind.TransactOpts, backend bind.ContractBackend, pa
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
 
-	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(AFNContractBin), backend, participants, weights, weightThresholdForBlessing, weightThresholdForBadSignal)
+	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(AFNContractBin), backend, config)
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
@@ -192,157 +217,101 @@ func (_AFNContract *AFNContractCallerSession) BadSignalReceived() (bool, error) 
 	return _AFNContract.Contract.BadSignalReceived(&_AFNContract.CallOpts)
 }
 
-func (_AFNContract *AFNContractCaller) GetBadVotersAndVotes(opts *bind.CallOpts) (GetBadVotersAndVotes,
+func (_AFNContract *AFNContractCaller) GetBlessVotersAndWeight(opts *bind.CallOpts, taggedRoot AFNTaggedRoot) (GetBlessVotersAndWeight,
 
 	error) {
 	var out []interface{}
-	err := _AFNContract.contract.Call(opts, &out, "getBadVotersAndVotes")
+	err := _AFNContract.contract.Call(opts, &out, "getBlessVotersAndWeight", taggedRoot)
 
-	outstruct := new(GetBadVotersAndVotes)
+	outstruct := new(GetBlessVotersAndWeight)
 	if err != nil {
 		return *outstruct, err
 	}
 
-	outstruct.Voters = *abi.ConvertType(out[0], new([]common.Address)).(*[]common.Address)
-	outstruct.Votes = *abi.ConvertType(out[1], new(*big.Int)).(**big.Int)
+	outstruct.BlessVoteAddrs = *abi.ConvertType(out[0], new([]common.Address)).(*[]common.Address)
+	outstruct.Weight = *abi.ConvertType(out[1], new(uint16)).(*uint16)
 
 	return *outstruct, err
 
 }
 
-func (_AFNContract *AFNContractSession) GetBadVotersAndVotes() (GetBadVotersAndVotes,
+func (_AFNContract *AFNContractSession) GetBlessVotersAndWeight(taggedRoot AFNTaggedRoot) (GetBlessVotersAndWeight,
 
 	error) {
-	return _AFNContract.Contract.GetBadVotersAndVotes(&_AFNContract.CallOpts)
+	return _AFNContract.Contract.GetBlessVotersAndWeight(&_AFNContract.CallOpts, taggedRoot)
 }
 
-func (_AFNContract *AFNContractCallerSession) GetBadVotersAndVotes() (GetBadVotersAndVotes,
+func (_AFNContract *AFNContractCallerSession) GetBlessVotersAndWeight(taggedRoot AFNTaggedRoot) (GetBlessVotersAndWeight,
 
 	error) {
-	return _AFNContract.Contract.GetBadVotersAndVotes(&_AFNContract.CallOpts)
+	return _AFNContract.Contract.GetBlessVotersAndWeight(&_AFNContract.CallOpts, taggedRoot)
 }
 
-func (_AFNContract *AFNContractCaller) GetConfigVersion(opts *bind.CallOpts) (*big.Int, error) {
-	var out []interface{}
-	err := _AFNContract.contract.Call(opts, &out, "getConfigVersion")
-
-	if err != nil {
-		return *new(*big.Int), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
-
-	return out0, err
-
-}
-
-func (_AFNContract *AFNContractSession) GetConfigVersion() (*big.Int, error) {
-	return _AFNContract.Contract.GetConfigVersion(&_AFNContract.CallOpts)
-}
-
-func (_AFNContract *AFNContractCallerSession) GetConfigVersion() (*big.Int, error) {
-	return _AFNContract.Contract.GetConfigVersion(&_AFNContract.CallOpts)
-}
-
-func (_AFNContract *AFNContractCaller) GetParticipants(opts *bind.CallOpts) ([]common.Address, error) {
-	var out []interface{}
-	err := _AFNContract.contract.Call(opts, &out, "getParticipants")
-
-	if err != nil {
-		return *new([]common.Address), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new([]common.Address)).(*[]common.Address)
-
-	return out0, err
-
-}
-
-func (_AFNContract *AFNContractSession) GetParticipants() ([]common.Address, error) {
-	return _AFNContract.Contract.GetParticipants(&_AFNContract.CallOpts)
-}
-
-func (_AFNContract *AFNContractCallerSession) GetParticipants() ([]common.Address, error) {
-	return _AFNContract.Contract.GetParticipants(&_AFNContract.CallOpts)
-}
-
-func (_AFNContract *AFNContractCaller) GetVotesToBlessRoot(opts *bind.CallOpts, root [32]byte) (*big.Int, error) {
-	var out []interface{}
-	err := _AFNContract.contract.Call(opts, &out, "getVotesToBlessRoot", root)
-
-	if err != nil {
-		return *new(*big.Int), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
-
-	return out0, err
-
-}
-
-func (_AFNContract *AFNContractSession) GetVotesToBlessRoot(root [32]byte) (*big.Int, error) {
-	return _AFNContract.Contract.GetVotesToBlessRoot(&_AFNContract.CallOpts, root)
-}
-
-func (_AFNContract *AFNContractCallerSession) GetVotesToBlessRoot(root [32]byte) (*big.Int, error) {
-	return _AFNContract.Contract.GetVotesToBlessRoot(&_AFNContract.CallOpts, root)
-}
-
-func (_AFNContract *AFNContractCaller) GetWeightByParticipant(opts *bind.CallOpts, participant common.Address) (*big.Int, error) {
-	var out []interface{}
-	err := _AFNContract.contract.Call(opts, &out, "getWeightByParticipant", participant)
-
-	if err != nil {
-		return *new(*big.Int), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
-
-	return out0, err
-
-}
-
-func (_AFNContract *AFNContractSession) GetWeightByParticipant(participant common.Address) (*big.Int, error) {
-	return _AFNContract.Contract.GetWeightByParticipant(&_AFNContract.CallOpts, participant)
-}
-
-func (_AFNContract *AFNContractCallerSession) GetWeightByParticipant(participant common.Address) (*big.Int, error) {
-	return _AFNContract.Contract.GetWeightByParticipant(&_AFNContract.CallOpts, participant)
-}
-
-func (_AFNContract *AFNContractCaller) GetWeightThresholds(opts *bind.CallOpts) (GetWeightThresholds,
+func (_AFNContract *AFNContractCaller) GetConfigDetails(opts *bind.CallOpts) (GetConfigDetails,
 
 	error) {
 	var out []interface{}
-	err := _AFNContract.contract.Call(opts, &out, "getWeightThresholds")
+	err := _AFNContract.contract.Call(opts, &out, "getConfigDetails")
 
-	outstruct := new(GetWeightThresholds)
+	outstruct := new(GetConfigDetails)
 	if err != nil {
 		return *outstruct, err
 	}
 
-	outstruct.Blessing = *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
-	outstruct.BadSignal = *abi.ConvertType(out[1], new(*big.Int)).(**big.Int)
+	outstruct.Version = *abi.ConvertType(out[0], new(uint32)).(*uint32)
+	outstruct.BlockNumber = *abi.ConvertType(out[1], new(uint32)).(*uint32)
+	outstruct.Config = *abi.ConvertType(out[2], new(AFNConfig)).(*AFNConfig)
 
 	return *outstruct, err
 
 }
 
-func (_AFNContract *AFNContractSession) GetWeightThresholds() (GetWeightThresholds,
+func (_AFNContract *AFNContractSession) GetConfigDetails() (GetConfigDetails,
 
 	error) {
-	return _AFNContract.Contract.GetWeightThresholds(&_AFNContract.CallOpts)
+	return _AFNContract.Contract.GetConfigDetails(&_AFNContract.CallOpts)
 }
 
-func (_AFNContract *AFNContractCallerSession) GetWeightThresholds() (GetWeightThresholds,
+func (_AFNContract *AFNContractCallerSession) GetConfigDetails() (GetConfigDetails,
 
 	error) {
-	return _AFNContract.Contract.GetWeightThresholds(&_AFNContract.CallOpts)
+	return _AFNContract.Contract.GetConfigDetails(&_AFNContract.CallOpts)
 }
 
-func (_AFNContract *AFNContractCaller) HasVotedBad(opts *bind.CallOpts, participant common.Address) (bool, error) {
+func (_AFNContract *AFNContractCaller) GetCurseVotersAndWeight(opts *bind.CallOpts) (GetCurseVotersAndWeight,
+
+	error) {
 	var out []interface{}
-	err := _AFNContract.contract.Call(opts, &out, "hasVotedBad", participant)
+	err := _AFNContract.contract.Call(opts, &out, "getCurseVotersAndWeight")
+
+	outstruct := new(GetCurseVotersAndWeight)
+	if err != nil {
+		return *outstruct, err
+	}
+
+	outstruct.CurseVoteAddrs = *abi.ConvertType(out[0], new([]common.Address)).(*[]common.Address)
+	outstruct.Weight = *abi.ConvertType(out[1], new(uint16)).(*uint16)
+	outstruct.VoteCounts = *abi.ConvertType(out[2], new([]uint32)).(*[]uint32)
+
+	return *outstruct, err
+
+}
+
+func (_AFNContract *AFNContractSession) GetCurseVotersAndWeight() (GetCurseVotersAndWeight,
+
+	error) {
+	return _AFNContract.Contract.GetCurseVotersAndWeight(&_AFNContract.CallOpts)
+}
+
+func (_AFNContract *AFNContractCallerSession) GetCurseVotersAndWeight() (GetCurseVotersAndWeight,
+
+	error) {
+	return _AFNContract.Contract.GetCurseVotersAndWeight(&_AFNContract.CallOpts)
+}
+
+func (_AFNContract *AFNContractCaller) IsBlessed(opts *bind.CallOpts, taggedRootHash [32]byte) (bool, error) {
+	var out []interface{}
+	err := _AFNContract.contract.Call(opts, &out, "isBlessed", taggedRootHash)
 
 	if err != nil {
 		return *new(bool), err
@@ -354,56 +323,12 @@ func (_AFNContract *AFNContractCaller) HasVotedBad(opts *bind.CallOpts, particip
 
 }
 
-func (_AFNContract *AFNContractSession) HasVotedBad(participant common.Address) (bool, error) {
-	return _AFNContract.Contract.HasVotedBad(&_AFNContract.CallOpts, participant)
+func (_AFNContract *AFNContractSession) IsBlessed(taggedRootHash [32]byte) (bool, error) {
+	return _AFNContract.Contract.IsBlessed(&_AFNContract.CallOpts, taggedRootHash)
 }
 
-func (_AFNContract *AFNContractCallerSession) HasVotedBad(participant common.Address) (bool, error) {
-	return _AFNContract.Contract.HasVotedBad(&_AFNContract.CallOpts, participant)
-}
-
-func (_AFNContract *AFNContractCaller) HasVotedToBlessRoot(opts *bind.CallOpts, participant common.Address, root [32]byte) (bool, error) {
-	var out []interface{}
-	err := _AFNContract.contract.Call(opts, &out, "hasVotedToBlessRoot", participant, root)
-
-	if err != nil {
-		return *new(bool), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
-
-	return out0, err
-
-}
-
-func (_AFNContract *AFNContractSession) HasVotedToBlessRoot(participant common.Address, root [32]byte) (bool, error) {
-	return _AFNContract.Contract.HasVotedToBlessRoot(&_AFNContract.CallOpts, participant, root)
-}
-
-func (_AFNContract *AFNContractCallerSession) HasVotedToBlessRoot(participant common.Address, root [32]byte) (bool, error) {
-	return _AFNContract.Contract.HasVotedToBlessRoot(&_AFNContract.CallOpts, participant, root)
-}
-
-func (_AFNContract *AFNContractCaller) IsBlessed(opts *bind.CallOpts, rootWithOrigin [32]byte) (bool, error) {
-	var out []interface{}
-	err := _AFNContract.contract.Call(opts, &out, "isBlessed", rootWithOrigin)
-
-	if err != nil {
-		return *new(bool), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
-
-	return out0, err
-
-}
-
-func (_AFNContract *AFNContractSession) IsBlessed(rootWithOrigin [32]byte) (bool, error) {
-	return _AFNContract.Contract.IsBlessed(&_AFNContract.CallOpts, rootWithOrigin)
-}
-
-func (_AFNContract *AFNContractCallerSession) IsBlessed(rootWithOrigin [32]byte) (bool, error) {
-	return _AFNContract.Contract.IsBlessed(&_AFNContract.CallOpts, rootWithOrigin)
+func (_AFNContract *AFNContractCallerSession) IsBlessed(taggedRootHash [32]byte) (bool, error) {
+	return _AFNContract.Contract.IsBlessed(&_AFNContract.CallOpts, taggedRootHash)
 }
 
 func (_AFNContract *AFNContractCaller) Owner(opts *bind.CallOpts) (common.Address, error) {
@@ -462,28 +387,40 @@ func (_AFNContract *AFNContractTransactorSession) AcceptOwnership() (*types.Tran
 	return _AFNContract.Contract.AcceptOwnership(&_AFNContract.TransactOpts)
 }
 
-func (_AFNContract *AFNContractTransactor) RecoverFromBadSignal(opts *bind.TransactOpts) (*types.Transaction, error) {
-	return _AFNContract.contract.Transact(opts, "recoverFromBadSignal")
+func (_AFNContract *AFNContractTransactor) OwnerUnbless(opts *bind.TransactOpts, taggedRoots []AFNTaggedRoot) (*types.Transaction, error) {
+	return _AFNContract.contract.Transact(opts, "ownerUnbless", taggedRoots)
 }
 
-func (_AFNContract *AFNContractSession) RecoverFromBadSignal() (*types.Transaction, error) {
-	return _AFNContract.Contract.RecoverFromBadSignal(&_AFNContract.TransactOpts)
+func (_AFNContract *AFNContractSession) OwnerUnbless(taggedRoots []AFNTaggedRoot) (*types.Transaction, error) {
+	return _AFNContract.Contract.OwnerUnbless(&_AFNContract.TransactOpts, taggedRoots)
 }
 
-func (_AFNContract *AFNContractTransactorSession) RecoverFromBadSignal() (*types.Transaction, error) {
-	return _AFNContract.Contract.RecoverFromBadSignal(&_AFNContract.TransactOpts)
+func (_AFNContract *AFNContractTransactorSession) OwnerUnbless(taggedRoots []AFNTaggedRoot) (*types.Transaction, error) {
+	return _AFNContract.Contract.OwnerUnbless(&_AFNContract.TransactOpts, taggedRoots)
 }
 
-func (_AFNContract *AFNContractTransactor) SetAFNConfig(opts *bind.TransactOpts, participants []common.Address, weights []*big.Int, weightThresholdForBlessing *big.Int, weightThresholdForBadSignal *big.Int) (*types.Transaction, error) {
-	return _AFNContract.contract.Transact(opts, "setAFNConfig", participants, weights, weightThresholdForBlessing, weightThresholdForBadSignal)
+func (_AFNContract *AFNContractTransactor) OwnerUnvoteToCurse(opts *bind.TransactOpts, records []AFNUnvoteToCurseRecord) (*types.Transaction, error) {
+	return _AFNContract.contract.Transact(opts, "ownerUnvoteToCurse", records)
 }
 
-func (_AFNContract *AFNContractSession) SetAFNConfig(participants []common.Address, weights []*big.Int, weightThresholdForBlessing *big.Int, weightThresholdForBadSignal *big.Int) (*types.Transaction, error) {
-	return _AFNContract.Contract.SetAFNConfig(&_AFNContract.TransactOpts, participants, weights, weightThresholdForBlessing, weightThresholdForBadSignal)
+func (_AFNContract *AFNContractSession) OwnerUnvoteToCurse(records []AFNUnvoteToCurseRecord) (*types.Transaction, error) {
+	return _AFNContract.Contract.OwnerUnvoteToCurse(&_AFNContract.TransactOpts, records)
 }
 
-func (_AFNContract *AFNContractTransactorSession) SetAFNConfig(participants []common.Address, weights []*big.Int, weightThresholdForBlessing *big.Int, weightThresholdForBadSignal *big.Int) (*types.Transaction, error) {
-	return _AFNContract.Contract.SetAFNConfig(&_AFNContract.TransactOpts, participants, weights, weightThresholdForBlessing, weightThresholdForBadSignal)
+func (_AFNContract *AFNContractTransactorSession) OwnerUnvoteToCurse(records []AFNUnvoteToCurseRecord) (*types.Transaction, error) {
+	return _AFNContract.Contract.OwnerUnvoteToCurse(&_AFNContract.TransactOpts, records)
+}
+
+func (_AFNContract *AFNContractTransactor) SetConfig(opts *bind.TransactOpts, config AFNConfig) (*types.Transaction, error) {
+	return _AFNContract.contract.Transact(opts, "setConfig", config)
+}
+
+func (_AFNContract *AFNContractSession) SetConfig(config AFNConfig) (*types.Transaction, error) {
+	return _AFNContract.Contract.SetConfig(&_AFNContract.TransactOpts, config)
+}
+
+func (_AFNContract *AFNContractTransactorSession) SetConfig(config AFNConfig) (*types.Transaction, error) {
+	return _AFNContract.Contract.SetConfig(&_AFNContract.TransactOpts, config)
 }
 
 func (_AFNContract *AFNContractTransactor) TransferOwnership(opts *bind.TransactOpts, to common.Address) (*types.Transaction, error) {
@@ -498,32 +435,44 @@ func (_AFNContract *AFNContractTransactorSession) TransferOwnership(to common.Ad
 	return _AFNContract.Contract.TransferOwnership(&_AFNContract.TransactOpts, to)
 }
 
-func (_AFNContract *AFNContractTransactor) VoteBad(opts *bind.TransactOpts) (*types.Transaction, error) {
-	return _AFNContract.contract.Transact(opts, "voteBad")
+func (_AFNContract *AFNContractTransactor) UnvoteToCurse(opts *bind.TransactOpts, curseVoteAddr common.Address, cursesHash [32]byte) (*types.Transaction, error) {
+	return _AFNContract.contract.Transact(opts, "unvoteToCurse", curseVoteAddr, cursesHash)
 }
 
-func (_AFNContract *AFNContractSession) VoteBad() (*types.Transaction, error) {
-	return _AFNContract.Contract.VoteBad(&_AFNContract.TransactOpts)
+func (_AFNContract *AFNContractSession) UnvoteToCurse(curseVoteAddr common.Address, cursesHash [32]byte) (*types.Transaction, error) {
+	return _AFNContract.Contract.UnvoteToCurse(&_AFNContract.TransactOpts, curseVoteAddr, cursesHash)
 }
 
-func (_AFNContract *AFNContractTransactorSession) VoteBad() (*types.Transaction, error) {
-	return _AFNContract.Contract.VoteBad(&_AFNContract.TransactOpts)
+func (_AFNContract *AFNContractTransactorSession) UnvoteToCurse(curseVoteAddr common.Address, cursesHash [32]byte) (*types.Transaction, error) {
+	return _AFNContract.Contract.UnvoteToCurse(&_AFNContract.TransactOpts, curseVoteAddr, cursesHash)
 }
 
-func (_AFNContract *AFNContractTransactor) VoteToBlessRoots(opts *bind.TransactOpts, rootsWithOrigin [][32]byte) (*types.Transaction, error) {
-	return _AFNContract.contract.Transact(opts, "voteToBlessRoots", rootsWithOrigin)
+func (_AFNContract *AFNContractTransactor) VoteToBless(opts *bind.TransactOpts, taggedRoots []AFNTaggedRoot) (*types.Transaction, error) {
+	return _AFNContract.contract.Transact(opts, "voteToBless", taggedRoots)
 }
 
-func (_AFNContract *AFNContractSession) VoteToBlessRoots(rootsWithOrigin [][32]byte) (*types.Transaction, error) {
-	return _AFNContract.Contract.VoteToBlessRoots(&_AFNContract.TransactOpts, rootsWithOrigin)
+func (_AFNContract *AFNContractSession) VoteToBless(taggedRoots []AFNTaggedRoot) (*types.Transaction, error) {
+	return _AFNContract.Contract.VoteToBless(&_AFNContract.TransactOpts, taggedRoots)
 }
 
-func (_AFNContract *AFNContractTransactorSession) VoteToBlessRoots(rootsWithOrigin [][32]byte) (*types.Transaction, error) {
-	return _AFNContract.Contract.VoteToBlessRoots(&_AFNContract.TransactOpts, rootsWithOrigin)
+func (_AFNContract *AFNContractTransactorSession) VoteToBless(taggedRoots []AFNTaggedRoot) (*types.Transaction, error) {
+	return _AFNContract.Contract.VoteToBless(&_AFNContract.TransactOpts, taggedRoots)
 }
 
-type AFNContractAFNBadSignalIterator struct {
-	Event *AFNContractAFNBadSignal
+func (_AFNContract *AFNContractTransactor) VoteToCurse(opts *bind.TransactOpts, curseId [32]byte) (*types.Transaction, error) {
+	return _AFNContract.contract.Transact(opts, "voteToCurse", curseId)
+}
+
+func (_AFNContract *AFNContractSession) VoteToCurse(curseId [32]byte) (*types.Transaction, error) {
+	return _AFNContract.Contract.VoteToCurse(&_AFNContract.TransactOpts, curseId)
+}
+
+func (_AFNContract *AFNContractTransactorSession) VoteToCurse(curseId [32]byte) (*types.Transaction, error) {
+	return _AFNContract.Contract.VoteToCurse(&_AFNContract.TransactOpts, curseId)
+}
+
+type AFNContractAlreadyBlessedIterator struct {
+	Event *AFNContractAlreadyBlessed
 
 	contract *bind.BoundContract
 	event    string
@@ -534,7 +483,7 @@ type AFNContractAFNBadSignalIterator struct {
 	fail error
 }
 
-func (it *AFNContractAFNBadSignalIterator) Next() bool {
+func (it *AFNContractAlreadyBlessedIterator) Next() bool {
 
 	if it.fail != nil {
 		return false
@@ -543,7 +492,7 @@ func (it *AFNContractAFNBadSignalIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(AFNContractAFNBadSignal)
+			it.Event = new(AFNContractAlreadyBlessed)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -558,7 +507,7 @@ func (it *AFNContractAFNBadSignalIterator) Next() bool {
 
 	select {
 	case log := <-it.logs:
-		it.Event = new(AFNContractAFNBadSignal)
+		it.Event = new(AFNContractAlreadyBlessed)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -573,32 +522,52 @@ func (it *AFNContractAFNBadSignalIterator) Next() bool {
 	}
 }
 
-func (it *AFNContractAFNBadSignalIterator) Error() error {
+func (it *AFNContractAlreadyBlessedIterator) Error() error {
 	return it.fail
 }
 
-func (it *AFNContractAFNBadSignalIterator) Close() error {
+func (it *AFNContractAlreadyBlessedIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-type AFNContractAFNBadSignal struct {
-	Timestamp *big.Int
-	Raw       types.Log
+type AFNContractAlreadyBlessed struct {
+	ConfigVersion uint32
+	Voter         common.Address
+	TaggedRoot    AFNTaggedRoot
+	Raw           types.Log
 }
 
-func (_AFNContract *AFNContractFilterer) FilterAFNBadSignal(opts *bind.FilterOpts) (*AFNContractAFNBadSignalIterator, error) {
+func (_AFNContract *AFNContractFilterer) FilterAlreadyBlessed(opts *bind.FilterOpts, configVersion []uint32, voter []common.Address) (*AFNContractAlreadyBlessedIterator, error) {
 
-	logs, sub, err := _AFNContract.contract.FilterLogs(opts, "AFNBadSignal")
+	var configVersionRule []interface{}
+	for _, configVersionItem := range configVersion {
+		configVersionRule = append(configVersionRule, configVersionItem)
+	}
+	var voterRule []interface{}
+	for _, voterItem := range voter {
+		voterRule = append(voterRule, voterItem)
+	}
+
+	logs, sub, err := _AFNContract.contract.FilterLogs(opts, "AlreadyBlessed", configVersionRule, voterRule)
 	if err != nil {
 		return nil, err
 	}
-	return &AFNContractAFNBadSignalIterator{contract: _AFNContract.contract, event: "AFNBadSignal", logs: logs, sub: sub}, nil
+	return &AFNContractAlreadyBlessedIterator{contract: _AFNContract.contract, event: "AlreadyBlessed", logs: logs, sub: sub}, nil
 }
 
-func (_AFNContract *AFNContractFilterer) WatchAFNBadSignal(opts *bind.WatchOpts, sink chan<- *AFNContractAFNBadSignal) (event.Subscription, error) {
+func (_AFNContract *AFNContractFilterer) WatchAlreadyBlessed(opts *bind.WatchOpts, sink chan<- *AFNContractAlreadyBlessed, configVersion []uint32, voter []common.Address) (event.Subscription, error) {
 
-	logs, sub, err := _AFNContract.contract.WatchLogs(opts, "AFNBadSignal")
+	var configVersionRule []interface{}
+	for _, configVersionItem := range configVersion {
+		configVersionRule = append(configVersionRule, configVersionItem)
+	}
+	var voterRule []interface{}
+	for _, voterItem := range voter {
+		voterRule = append(voterRule, voterItem)
+	}
+
+	logs, sub, err := _AFNContract.contract.WatchLogs(opts, "AlreadyBlessed", configVersionRule, voterRule)
 	if err != nil {
 		return nil, err
 	}
@@ -608,8 +577,8 @@ func (_AFNContract *AFNContractFilterer) WatchAFNBadSignal(opts *bind.WatchOpts,
 			select {
 			case log := <-logs:
 
-				event := new(AFNContractAFNBadSignal)
-				if err := _AFNContract.contract.UnpackLog(event, "AFNBadSignal", log); err != nil {
+				event := new(AFNContractAlreadyBlessed)
+				if err := _AFNContract.contract.UnpackLog(event, "AlreadyBlessed", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -630,17 +599,17 @@ func (_AFNContract *AFNContractFilterer) WatchAFNBadSignal(opts *bind.WatchOpts,
 	}), nil
 }
 
-func (_AFNContract *AFNContractFilterer) ParseAFNBadSignal(log types.Log) (*AFNContractAFNBadSignal, error) {
-	event := new(AFNContractAFNBadSignal)
-	if err := _AFNContract.contract.UnpackLog(event, "AFNBadSignal", log); err != nil {
+func (_AFNContract *AFNContractFilterer) ParseAlreadyBlessed(log types.Log) (*AFNContractAlreadyBlessed, error) {
+	event := new(AFNContractAlreadyBlessed)
+	if err := _AFNContract.contract.UnpackLog(event, "AlreadyBlessed", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
 	return event, nil
 }
 
-type AFNContractAFNConfigSetIterator struct {
-	Event *AFNContractAFNConfigSet
+type AFNContractAlreadyVotedToBlessIterator struct {
+	Event *AFNContractAlreadyVotedToBless
 
 	contract *bind.BoundContract
 	event    string
@@ -651,7 +620,7 @@ type AFNContractAFNConfigSetIterator struct {
 	fail error
 }
 
-func (it *AFNContractAFNConfigSetIterator) Next() bool {
+func (it *AFNContractAlreadyVotedToBlessIterator) Next() bool {
 
 	if it.fail != nil {
 		return false
@@ -660,7 +629,7 @@ func (it *AFNContractAFNConfigSetIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(AFNContractAFNConfigSet)
+			it.Event = new(AFNContractAlreadyVotedToBless)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -675,7 +644,7 @@ func (it *AFNContractAFNConfigSetIterator) Next() bool {
 
 	select {
 	case log := <-it.logs:
-		it.Event = new(AFNContractAFNConfigSet)
+		it.Event = new(AFNContractAlreadyVotedToBless)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -690,35 +659,52 @@ func (it *AFNContractAFNConfigSetIterator) Next() bool {
 	}
 }
 
-func (it *AFNContractAFNConfigSetIterator) Error() error {
+func (it *AFNContractAlreadyVotedToBlessIterator) Error() error {
 	return it.fail
 }
 
-func (it *AFNContractAFNConfigSetIterator) Close() error {
+func (it *AFNContractAlreadyVotedToBlessIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-type AFNContractAFNConfigSet struct {
-	Parties    []common.Address
-	Weights    []*big.Int
-	GoodQuorum *big.Int
-	BadQuorum  *big.Int
-	Raw        types.Log
+type AFNContractAlreadyVotedToBless struct {
+	ConfigVersion uint32
+	Voter         common.Address
+	TaggedRoot    AFNTaggedRoot
+	Raw           types.Log
 }
 
-func (_AFNContract *AFNContractFilterer) FilterAFNConfigSet(opts *bind.FilterOpts) (*AFNContractAFNConfigSetIterator, error) {
+func (_AFNContract *AFNContractFilterer) FilterAlreadyVotedToBless(opts *bind.FilterOpts, configVersion []uint32, voter []common.Address) (*AFNContractAlreadyVotedToBlessIterator, error) {
 
-	logs, sub, err := _AFNContract.contract.FilterLogs(opts, "AFNConfigSet")
+	var configVersionRule []interface{}
+	for _, configVersionItem := range configVersion {
+		configVersionRule = append(configVersionRule, configVersionItem)
+	}
+	var voterRule []interface{}
+	for _, voterItem := range voter {
+		voterRule = append(voterRule, voterItem)
+	}
+
+	logs, sub, err := _AFNContract.contract.FilterLogs(opts, "AlreadyVotedToBless", configVersionRule, voterRule)
 	if err != nil {
 		return nil, err
 	}
-	return &AFNContractAFNConfigSetIterator{contract: _AFNContract.contract, event: "AFNConfigSet", logs: logs, sub: sub}, nil
+	return &AFNContractAlreadyVotedToBlessIterator{contract: _AFNContract.contract, event: "AlreadyVotedToBless", logs: logs, sub: sub}, nil
 }
 
-func (_AFNContract *AFNContractFilterer) WatchAFNConfigSet(opts *bind.WatchOpts, sink chan<- *AFNContractAFNConfigSet) (event.Subscription, error) {
+func (_AFNContract *AFNContractFilterer) WatchAlreadyVotedToBless(opts *bind.WatchOpts, sink chan<- *AFNContractAlreadyVotedToBless, configVersion []uint32, voter []common.Address) (event.Subscription, error) {
 
-	logs, sub, err := _AFNContract.contract.WatchLogs(opts, "AFNConfigSet")
+	var configVersionRule []interface{}
+	for _, configVersionItem := range configVersion {
+		configVersionRule = append(configVersionRule, configVersionItem)
+	}
+	var voterRule []interface{}
+	for _, voterItem := range voter {
+		voterRule = append(voterRule, voterItem)
+	}
+
+	logs, sub, err := _AFNContract.contract.WatchLogs(opts, "AlreadyVotedToBless", configVersionRule, voterRule)
 	if err != nil {
 		return nil, err
 	}
@@ -728,8 +714,8 @@ func (_AFNContract *AFNContractFilterer) WatchAFNConfigSet(opts *bind.WatchOpts,
 			select {
 			case log := <-logs:
 
-				event := new(AFNContractAFNConfigSet)
-				if err := _AFNContract.contract.UnpackLog(event, "AFNConfigSet", log); err != nil {
+				event := new(AFNContractAlreadyVotedToBless)
+				if err := _AFNContract.contract.UnpackLog(event, "AlreadyVotedToBless", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -750,9 +736,265 @@ func (_AFNContract *AFNContractFilterer) WatchAFNConfigSet(opts *bind.WatchOpts,
 	}), nil
 }
 
-func (_AFNContract *AFNContractFilterer) ParseAFNConfigSet(log types.Log) (*AFNContractAFNConfigSet, error) {
-	event := new(AFNContractAFNConfigSet)
-	if err := _AFNContract.contract.UnpackLog(event, "AFNConfigSet", log); err != nil {
+func (_AFNContract *AFNContractFilterer) ParseAlreadyVotedToBless(log types.Log) (*AFNContractAlreadyVotedToBless, error) {
+	event := new(AFNContractAlreadyVotedToBless)
+	if err := _AFNContract.contract.UnpackLog(event, "AlreadyVotedToBless", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type AFNContractConfigSetIterator struct {
+	Event *AFNContractConfigSet
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *AFNContractConfigSetIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(AFNContractConfigSet)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(AFNContractConfigSet)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *AFNContractConfigSetIterator) Error() error {
+	return it.fail
+}
+
+func (it *AFNContractConfigSetIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type AFNContractConfigSet struct {
+	ConfigVersion uint32
+	Config        AFNConfig
+	Raw           types.Log
+}
+
+func (_AFNContract *AFNContractFilterer) FilterConfigSet(opts *bind.FilterOpts, configVersion []uint32) (*AFNContractConfigSetIterator, error) {
+
+	var configVersionRule []interface{}
+	for _, configVersionItem := range configVersion {
+		configVersionRule = append(configVersionRule, configVersionItem)
+	}
+
+	logs, sub, err := _AFNContract.contract.FilterLogs(opts, "ConfigSet", configVersionRule)
+	if err != nil {
+		return nil, err
+	}
+	return &AFNContractConfigSetIterator{contract: _AFNContract.contract, event: "ConfigSet", logs: logs, sub: sub}, nil
+}
+
+func (_AFNContract *AFNContractFilterer) WatchConfigSet(opts *bind.WatchOpts, sink chan<- *AFNContractConfigSet, configVersion []uint32) (event.Subscription, error) {
+
+	var configVersionRule []interface{}
+	for _, configVersionItem := range configVersion {
+		configVersionRule = append(configVersionRule, configVersionItem)
+	}
+
+	logs, sub, err := _AFNContract.contract.WatchLogs(opts, "ConfigSet", configVersionRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(AFNContractConfigSet)
+				if err := _AFNContract.contract.UnpackLog(event, "ConfigSet", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_AFNContract *AFNContractFilterer) ParseConfigSet(log types.Log) (*AFNContractConfigSet, error) {
+	event := new(AFNContractConfigSet)
+	if err := _AFNContract.contract.UnpackLog(event, "ConfigSet", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type AFNContractCursedIterator struct {
+	Event *AFNContractCursed
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *AFNContractCursedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(AFNContractCursed)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(AFNContractCursed)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *AFNContractCursedIterator) Error() error {
+	return it.fail
+}
+
+func (it *AFNContractCursedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type AFNContractCursed struct {
+	ConfigVersion uint32
+	Timestamp     *big.Int
+	Raw           types.Log
+}
+
+func (_AFNContract *AFNContractFilterer) FilterCursed(opts *bind.FilterOpts, configVersion []uint32) (*AFNContractCursedIterator, error) {
+
+	var configVersionRule []interface{}
+	for _, configVersionItem := range configVersion {
+		configVersionRule = append(configVersionRule, configVersionItem)
+	}
+
+	logs, sub, err := _AFNContract.contract.FilterLogs(opts, "Cursed", configVersionRule)
+	if err != nil {
+		return nil, err
+	}
+	return &AFNContractCursedIterator{contract: _AFNContract.contract, event: "Cursed", logs: logs, sub: sub}, nil
+}
+
+func (_AFNContract *AFNContractFilterer) WatchCursed(opts *bind.WatchOpts, sink chan<- *AFNContractCursed, configVersion []uint32) (event.Subscription, error) {
+
+	var configVersionRule []interface{}
+	for _, configVersionItem := range configVersion {
+		configVersionRule = append(configVersionRule, configVersionItem)
+	}
+
+	logs, sub, err := _AFNContract.contract.WatchLogs(opts, "Cursed", configVersionRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(AFNContractCursed)
+				if err := _AFNContract.contract.UnpackLog(event, "Cursed", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_AFNContract *AFNContractFilterer) ParseCursed(log types.Log) (*AFNContractCursed, error) {
+	event := new(AFNContractCursed)
+	if err := _AFNContract.contract.UnpackLog(event, "Cursed", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
@@ -1031,8 +1273,8 @@ func (_AFNContract *AFNContractFilterer) ParseOwnershipTransferred(log types.Log
 	return event, nil
 }
 
-type AFNContractRecoveredFromBadSignalIterator struct {
-	Event *AFNContractRecoveredFromBadSignal
+type AFNContractRecoveredFromCurseIterator struct {
+	Event *AFNContractRecoveredFromCurse
 
 	contract *bind.BoundContract
 	event    string
@@ -1043,7 +1285,7 @@ type AFNContractRecoveredFromBadSignalIterator struct {
 	fail error
 }
 
-func (it *AFNContractRecoveredFromBadSignalIterator) Next() bool {
+func (it *AFNContractRecoveredFromCurseIterator) Next() bool {
 
 	if it.fail != nil {
 		return false
@@ -1052,7 +1294,7 @@ func (it *AFNContractRecoveredFromBadSignalIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(AFNContractRecoveredFromBadSignal)
+			it.Event = new(AFNContractRecoveredFromCurse)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -1067,7 +1309,7 @@ func (it *AFNContractRecoveredFromBadSignalIterator) Next() bool {
 
 	select {
 	case log := <-it.logs:
-		it.Event = new(AFNContractRecoveredFromBadSignal)
+		it.Event = new(AFNContractRecoveredFromCurse)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -1082,31 +1324,31 @@ func (it *AFNContractRecoveredFromBadSignalIterator) Next() bool {
 	}
 }
 
-func (it *AFNContractRecoveredFromBadSignalIterator) Error() error {
+func (it *AFNContractRecoveredFromCurseIterator) Error() error {
 	return it.fail
 }
 
-func (it *AFNContractRecoveredFromBadSignalIterator) Close() error {
+func (it *AFNContractRecoveredFromCurseIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-type AFNContractRecoveredFromBadSignal struct {
+type AFNContractRecoveredFromCurse struct {
 	Raw types.Log
 }
 
-func (_AFNContract *AFNContractFilterer) FilterRecoveredFromBadSignal(opts *bind.FilterOpts) (*AFNContractRecoveredFromBadSignalIterator, error) {
+func (_AFNContract *AFNContractFilterer) FilterRecoveredFromCurse(opts *bind.FilterOpts) (*AFNContractRecoveredFromCurseIterator, error) {
 
-	logs, sub, err := _AFNContract.contract.FilterLogs(opts, "RecoveredFromBadSignal")
+	logs, sub, err := _AFNContract.contract.FilterLogs(opts, "RecoveredFromCurse")
 	if err != nil {
 		return nil, err
 	}
-	return &AFNContractRecoveredFromBadSignalIterator{contract: _AFNContract.contract, event: "RecoveredFromBadSignal", logs: logs, sub: sub}, nil
+	return &AFNContractRecoveredFromCurseIterator{contract: _AFNContract.contract, event: "RecoveredFromCurse", logs: logs, sub: sub}, nil
 }
 
-func (_AFNContract *AFNContractFilterer) WatchRecoveredFromBadSignal(opts *bind.WatchOpts, sink chan<- *AFNContractRecoveredFromBadSignal) (event.Subscription, error) {
+func (_AFNContract *AFNContractFilterer) WatchRecoveredFromCurse(opts *bind.WatchOpts, sink chan<- *AFNContractRecoveredFromCurse) (event.Subscription, error) {
 
-	logs, sub, err := _AFNContract.contract.WatchLogs(opts, "RecoveredFromBadSignal")
+	logs, sub, err := _AFNContract.contract.WatchLogs(opts, "RecoveredFromCurse")
 	if err != nil {
 		return nil, err
 	}
@@ -1116,8 +1358,8 @@ func (_AFNContract *AFNContractFilterer) WatchRecoveredFromBadSignal(opts *bind.
 			select {
 			case log := <-logs:
 
-				event := new(AFNContractRecoveredFromBadSignal)
-				if err := _AFNContract.contract.UnpackLog(event, "RecoveredFromBadSignal", log); err != nil {
+				event := new(AFNContractRecoveredFromCurse)
+				if err := _AFNContract.contract.UnpackLog(event, "RecoveredFromCurse", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -1138,17 +1380,17 @@ func (_AFNContract *AFNContractFilterer) WatchRecoveredFromBadSignal(opts *bind.
 	}), nil
 }
 
-func (_AFNContract *AFNContractFilterer) ParseRecoveredFromBadSignal(log types.Log) (*AFNContractRecoveredFromBadSignal, error) {
-	event := new(AFNContractRecoveredFromBadSignal)
-	if err := _AFNContract.contract.UnpackLog(event, "RecoveredFromBadSignal", log); err != nil {
+func (_AFNContract *AFNContractFilterer) ParseRecoveredFromCurse(log types.Log) (*AFNContractRecoveredFromCurse, error) {
+	event := new(AFNContractRecoveredFromCurse)
+	if err := _AFNContract.contract.UnpackLog(event, "RecoveredFromCurse", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
 	return event, nil
 }
 
-type AFNContractRootBlessedIterator struct {
-	Event *AFNContractRootBlessed
+type AFNContractReusedVotesToCurseIterator struct {
+	Event *AFNContractReusedVotesToCurse
 
 	contract *bind.BoundContract
 	event    string
@@ -1159,7 +1401,7 @@ type AFNContractRootBlessedIterator struct {
 	fail error
 }
 
-func (it *AFNContractRootBlessedIterator) Next() bool {
+func (it *AFNContractReusedVotesToCurseIterator) Next() bool {
 
 	if it.fail != nil {
 		return false
@@ -1168,7 +1410,7 @@ func (it *AFNContractRootBlessedIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(AFNContractRootBlessed)
+			it.Event = new(AFNContractReusedVotesToCurse)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -1183,7 +1425,7 @@ func (it *AFNContractRootBlessedIterator) Next() bool {
 
 	select {
 	case log := <-it.logs:
-		it.Event = new(AFNContractRootBlessed)
+		it.Event = new(AFNContractReusedVotesToCurse)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -1198,43 +1440,55 @@ func (it *AFNContractRootBlessedIterator) Next() bool {
 	}
 }
 
-func (it *AFNContractRootBlessedIterator) Error() error {
+func (it *AFNContractReusedVotesToCurseIterator) Error() error {
 	return it.fail
 }
 
-func (it *AFNContractRootBlessedIterator) Close() error {
+func (it *AFNContractReusedVotesToCurseIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-type AFNContractRootBlessed struct {
-	Root  [32]byte
-	Votes *big.Int
-	Raw   types.Log
+type AFNContractReusedVotesToCurse struct {
+	ConfigVersion     uint32
+	Voter             common.Address
+	Weight            uint8
+	VoteCount         uint32
+	CursesHash        [32]byte
+	AccumulatedWeight uint16
+	Raw               types.Log
 }
 
-func (_AFNContract *AFNContractFilterer) FilterRootBlessed(opts *bind.FilterOpts, root [][32]byte) (*AFNContractRootBlessedIterator, error) {
+func (_AFNContract *AFNContractFilterer) FilterReusedVotesToCurse(opts *bind.FilterOpts, configVersion []uint32, voter []common.Address) (*AFNContractReusedVotesToCurseIterator, error) {
 
-	var rootRule []interface{}
-	for _, rootItem := range root {
-		rootRule = append(rootRule, rootItem)
+	var configVersionRule []interface{}
+	for _, configVersionItem := range configVersion {
+		configVersionRule = append(configVersionRule, configVersionItem)
+	}
+	var voterRule []interface{}
+	for _, voterItem := range voter {
+		voterRule = append(voterRule, voterItem)
 	}
 
-	logs, sub, err := _AFNContract.contract.FilterLogs(opts, "RootBlessed", rootRule)
+	logs, sub, err := _AFNContract.contract.FilterLogs(opts, "ReusedVotesToCurse", configVersionRule, voterRule)
 	if err != nil {
 		return nil, err
 	}
-	return &AFNContractRootBlessedIterator{contract: _AFNContract.contract, event: "RootBlessed", logs: logs, sub: sub}, nil
+	return &AFNContractReusedVotesToCurseIterator{contract: _AFNContract.contract, event: "ReusedVotesToCurse", logs: logs, sub: sub}, nil
 }
 
-func (_AFNContract *AFNContractFilterer) WatchRootBlessed(opts *bind.WatchOpts, sink chan<- *AFNContractRootBlessed, root [][32]byte) (event.Subscription, error) {
+func (_AFNContract *AFNContractFilterer) WatchReusedVotesToCurse(opts *bind.WatchOpts, sink chan<- *AFNContractReusedVotesToCurse, configVersion []uint32, voter []common.Address) (event.Subscription, error) {
 
-	var rootRule []interface{}
-	for _, rootItem := range root {
-		rootRule = append(rootRule, rootItem)
+	var configVersionRule []interface{}
+	for _, configVersionItem := range configVersion {
+		configVersionRule = append(configVersionRule, configVersionItem)
+	}
+	var voterRule []interface{}
+	for _, voterItem := range voter {
+		voterRule = append(voterRule, voterItem)
 	}
 
-	logs, sub, err := _AFNContract.contract.WatchLogs(opts, "RootBlessed", rootRule)
+	logs, sub, err := _AFNContract.contract.WatchLogs(opts, "ReusedVotesToCurse", configVersionRule, voterRule)
 	if err != nil {
 		return nil, err
 	}
@@ -1244,8 +1498,8 @@ func (_AFNContract *AFNContractFilterer) WatchRootBlessed(opts *bind.WatchOpts, 
 			select {
 			case log := <-logs:
 
-				event := new(AFNContractRootBlessed)
-				if err := _AFNContract.contract.UnpackLog(event, "RootBlessed", log); err != nil {
+				event := new(AFNContractReusedVotesToCurse)
+				if err := _AFNContract.contract.UnpackLog(event, "ReusedVotesToCurse", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -1266,17 +1520,17 @@ func (_AFNContract *AFNContractFilterer) WatchRootBlessed(opts *bind.WatchOpts, 
 	}), nil
 }
 
-func (_AFNContract *AFNContractFilterer) ParseRootBlessed(log types.Log) (*AFNContractRootBlessed, error) {
-	event := new(AFNContractRootBlessed)
-	if err := _AFNContract.contract.UnpackLog(event, "RootBlessed", log); err != nil {
+func (_AFNContract *AFNContractFilterer) ParseReusedVotesToCurse(log types.Log) (*AFNContractReusedVotesToCurse, error) {
+	event := new(AFNContractReusedVotesToCurse)
+	if err := _AFNContract.contract.UnpackLog(event, "ReusedVotesToCurse", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
 	return event, nil
 }
 
-type AFNContractVoteBadIterator struct {
-	Event *AFNContractVoteBad
+type AFNContractSkippedUnvoteToCurseIterator struct {
+	Event *AFNContractSkippedUnvoteToCurse
 
 	contract *bind.BoundContract
 	event    string
@@ -1287,7 +1541,7 @@ type AFNContractVoteBadIterator struct {
 	fail error
 }
 
-func (it *AFNContractVoteBadIterator) Next() bool {
+func (it *AFNContractSkippedUnvoteToCurseIterator) Next() bool {
 
 	if it.fail != nil {
 		return false
@@ -1296,7 +1550,7 @@ func (it *AFNContractVoteBadIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(AFNContractVoteBad)
+			it.Event = new(AFNContractSkippedUnvoteToCurse)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -1311,7 +1565,7 @@ func (it *AFNContractVoteBadIterator) Next() bool {
 
 	select {
 	case log := <-it.logs:
-		it.Event = new(AFNContractVoteBad)
+		it.Event = new(AFNContractSkippedUnvoteToCurse)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -1326,43 +1580,44 @@ func (it *AFNContractVoteBadIterator) Next() bool {
 	}
 }
 
-func (it *AFNContractVoteBadIterator) Error() error {
+func (it *AFNContractSkippedUnvoteToCurseIterator) Error() error {
 	return it.fail
 }
 
-func (it *AFNContractVoteBadIterator) Close() error {
+func (it *AFNContractSkippedUnvoteToCurseIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-type AFNContractVoteBad struct {
-	Voter  common.Address
-	Weight *big.Int
-	Raw    types.Log
+type AFNContractSkippedUnvoteToCurse struct {
+	Voter              common.Address
+	ExpectedCursesHash [32]byte
+	ActualCursesHash   [32]byte
+	Raw                types.Log
 }
 
-func (_AFNContract *AFNContractFilterer) FilterVoteBad(opts *bind.FilterOpts, voter []common.Address) (*AFNContractVoteBadIterator, error) {
+func (_AFNContract *AFNContractFilterer) FilterSkippedUnvoteToCurse(opts *bind.FilterOpts, voter []common.Address) (*AFNContractSkippedUnvoteToCurseIterator, error) {
 
 	var voterRule []interface{}
 	for _, voterItem := range voter {
 		voterRule = append(voterRule, voterItem)
 	}
 
-	logs, sub, err := _AFNContract.contract.FilterLogs(opts, "VoteBad", voterRule)
+	logs, sub, err := _AFNContract.contract.FilterLogs(opts, "SkippedUnvoteToCurse", voterRule)
 	if err != nil {
 		return nil, err
 	}
-	return &AFNContractVoteBadIterator{contract: _AFNContract.contract, event: "VoteBad", logs: logs, sub: sub}, nil
+	return &AFNContractSkippedUnvoteToCurseIterator{contract: _AFNContract.contract, event: "SkippedUnvoteToCurse", logs: logs, sub: sub}, nil
 }
 
-func (_AFNContract *AFNContractFilterer) WatchVoteBad(opts *bind.WatchOpts, sink chan<- *AFNContractVoteBad, voter []common.Address) (event.Subscription, error) {
+func (_AFNContract *AFNContractFilterer) WatchSkippedUnvoteToCurse(opts *bind.WatchOpts, sink chan<- *AFNContractSkippedUnvoteToCurse, voter []common.Address) (event.Subscription, error) {
 
 	var voterRule []interface{}
 	for _, voterItem := range voter {
 		voterRule = append(voterRule, voterItem)
 	}
 
-	logs, sub, err := _AFNContract.contract.WatchLogs(opts, "VoteBad", voterRule)
+	logs, sub, err := _AFNContract.contract.WatchLogs(opts, "SkippedUnvoteToCurse", voterRule)
 	if err != nil {
 		return nil, err
 	}
@@ -1372,8 +1627,8 @@ func (_AFNContract *AFNContractFilterer) WatchVoteBad(opts *bind.WatchOpts, sink
 			select {
 			case log := <-logs:
 
-				event := new(AFNContractVoteBad)
-				if err := _AFNContract.contract.UnpackLog(event, "VoteBad", log); err != nil {
+				event := new(AFNContractSkippedUnvoteToCurse)
+				if err := _AFNContract.contract.UnpackLog(event, "SkippedUnvoteToCurse", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -1394,9 +1649,277 @@ func (_AFNContract *AFNContractFilterer) WatchVoteBad(opts *bind.WatchOpts, sink
 	}), nil
 }
 
-func (_AFNContract *AFNContractFilterer) ParseVoteBad(log types.Log) (*AFNContractVoteBad, error) {
-	event := new(AFNContractVoteBad)
-	if err := _AFNContract.contract.UnpackLog(event, "VoteBad", log); err != nil {
+func (_AFNContract *AFNContractFilterer) ParseSkippedUnvoteToCurse(log types.Log) (*AFNContractSkippedUnvoteToCurse, error) {
+	event := new(AFNContractSkippedUnvoteToCurse)
+	if err := _AFNContract.contract.UnpackLog(event, "SkippedUnvoteToCurse", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type AFNContractTaggedRootBlessedIterator struct {
+	Event *AFNContractTaggedRootBlessed
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *AFNContractTaggedRootBlessedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(AFNContractTaggedRootBlessed)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(AFNContractTaggedRootBlessed)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *AFNContractTaggedRootBlessedIterator) Error() error {
+	return it.fail
+}
+
+func (it *AFNContractTaggedRootBlessedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type AFNContractTaggedRootBlessed struct {
+	ConfigVersion uint32
+	TaggedRoot    AFNTaggedRoot
+	Votes         uint16
+	Raw           types.Log
+}
+
+func (_AFNContract *AFNContractFilterer) FilterTaggedRootBlessed(opts *bind.FilterOpts, configVersion []uint32) (*AFNContractTaggedRootBlessedIterator, error) {
+
+	var configVersionRule []interface{}
+	for _, configVersionItem := range configVersion {
+		configVersionRule = append(configVersionRule, configVersionItem)
+	}
+
+	logs, sub, err := _AFNContract.contract.FilterLogs(opts, "TaggedRootBlessed", configVersionRule)
+	if err != nil {
+		return nil, err
+	}
+	return &AFNContractTaggedRootBlessedIterator{contract: _AFNContract.contract, event: "TaggedRootBlessed", logs: logs, sub: sub}, nil
+}
+
+func (_AFNContract *AFNContractFilterer) WatchTaggedRootBlessed(opts *bind.WatchOpts, sink chan<- *AFNContractTaggedRootBlessed, configVersion []uint32) (event.Subscription, error) {
+
+	var configVersionRule []interface{}
+	for _, configVersionItem := range configVersion {
+		configVersionRule = append(configVersionRule, configVersionItem)
+	}
+
+	logs, sub, err := _AFNContract.contract.WatchLogs(opts, "TaggedRootBlessed", configVersionRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(AFNContractTaggedRootBlessed)
+				if err := _AFNContract.contract.UnpackLog(event, "TaggedRootBlessed", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_AFNContract *AFNContractFilterer) ParseTaggedRootBlessed(log types.Log) (*AFNContractTaggedRootBlessed, error) {
+	event := new(AFNContractTaggedRootBlessed)
+	if err := _AFNContract.contract.UnpackLog(event, "TaggedRootBlessed", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type AFNContractUnvoteToCurseIterator struct {
+	Event *AFNContractUnvoteToCurse
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *AFNContractUnvoteToCurseIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(AFNContractUnvoteToCurse)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(AFNContractUnvoteToCurse)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *AFNContractUnvoteToCurseIterator) Error() error {
+	return it.fail
+}
+
+func (it *AFNContractUnvoteToCurseIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type AFNContractUnvoteToCurse struct {
+	ConfigVersion uint32
+	Voter         common.Address
+	Weight        uint8
+	VoteCount     uint32
+	CursesHash    [32]byte
+	Raw           types.Log
+}
+
+func (_AFNContract *AFNContractFilterer) FilterUnvoteToCurse(opts *bind.FilterOpts, configVersion []uint32, voter []common.Address) (*AFNContractUnvoteToCurseIterator, error) {
+
+	var configVersionRule []interface{}
+	for _, configVersionItem := range configVersion {
+		configVersionRule = append(configVersionRule, configVersionItem)
+	}
+	var voterRule []interface{}
+	for _, voterItem := range voter {
+		voterRule = append(voterRule, voterItem)
+	}
+
+	logs, sub, err := _AFNContract.contract.FilterLogs(opts, "UnvoteToCurse", configVersionRule, voterRule)
+	if err != nil {
+		return nil, err
+	}
+	return &AFNContractUnvoteToCurseIterator{contract: _AFNContract.contract, event: "UnvoteToCurse", logs: logs, sub: sub}, nil
+}
+
+func (_AFNContract *AFNContractFilterer) WatchUnvoteToCurse(opts *bind.WatchOpts, sink chan<- *AFNContractUnvoteToCurse, configVersion []uint32, voter []common.Address) (event.Subscription, error) {
+
+	var configVersionRule []interface{}
+	for _, configVersionItem := range configVersion {
+		configVersionRule = append(configVersionRule, configVersionItem)
+	}
+	var voterRule []interface{}
+	for _, voterItem := range voter {
+		voterRule = append(voterRule, voterItem)
+	}
+
+	logs, sub, err := _AFNContract.contract.WatchLogs(opts, "UnvoteToCurse", configVersionRule, voterRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(AFNContractUnvoteToCurse)
+				if err := _AFNContract.contract.UnpackLog(event, "UnvoteToCurse", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_AFNContract *AFNContractFilterer) ParseUnvoteToCurse(log types.Log) (*AFNContractUnvoteToCurse, error) {
+	event := new(AFNContractUnvoteToCurse)
+	if err := _AFNContract.contract.UnpackLog(event, "UnvoteToCurse", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
@@ -1464,42 +1987,43 @@ func (it *AFNContractVoteToBlessIterator) Close() error {
 }
 
 type AFNContractVoteToBless struct {
-	Voter  common.Address
-	Root   [32]byte
-	Weight *big.Int
-	Raw    types.Log
+	ConfigVersion uint32
+	Voter         common.Address
+	TaggedRoot    AFNTaggedRoot
+	Weight        uint8
+	Raw           types.Log
 }
 
-func (_AFNContract *AFNContractFilterer) FilterVoteToBless(opts *bind.FilterOpts, voter []common.Address, root [][32]byte) (*AFNContractVoteToBlessIterator, error) {
+func (_AFNContract *AFNContractFilterer) FilterVoteToBless(opts *bind.FilterOpts, configVersion []uint32, voter []common.Address) (*AFNContractVoteToBlessIterator, error) {
 
+	var configVersionRule []interface{}
+	for _, configVersionItem := range configVersion {
+		configVersionRule = append(configVersionRule, configVersionItem)
+	}
 	var voterRule []interface{}
 	for _, voterItem := range voter {
 		voterRule = append(voterRule, voterItem)
 	}
-	var rootRule []interface{}
-	for _, rootItem := range root {
-		rootRule = append(rootRule, rootItem)
-	}
 
-	logs, sub, err := _AFNContract.contract.FilterLogs(opts, "VoteToBless", voterRule, rootRule)
+	logs, sub, err := _AFNContract.contract.FilterLogs(opts, "VoteToBless", configVersionRule, voterRule)
 	if err != nil {
 		return nil, err
 	}
 	return &AFNContractVoteToBlessIterator{contract: _AFNContract.contract, event: "VoteToBless", logs: logs, sub: sub}, nil
 }
 
-func (_AFNContract *AFNContractFilterer) WatchVoteToBless(opts *bind.WatchOpts, sink chan<- *AFNContractVoteToBless, voter []common.Address, root [][32]byte) (event.Subscription, error) {
+func (_AFNContract *AFNContractFilterer) WatchVoteToBless(opts *bind.WatchOpts, sink chan<- *AFNContractVoteToBless, configVersion []uint32, voter []common.Address) (event.Subscription, error) {
 
+	var configVersionRule []interface{}
+	for _, configVersionItem := range configVersion {
+		configVersionRule = append(configVersionRule, configVersionItem)
+	}
 	var voterRule []interface{}
 	for _, voterItem := range voter {
 		voterRule = append(voterRule, voterItem)
 	}
-	var rootRule []interface{}
-	for _, rootItem := range root {
-		rootRule = append(rootRule, rootItem)
-	}
 
-	logs, sub, err := _AFNContract.contract.WatchLogs(opts, "VoteToBless", voterRule, rootRule)
+	logs, sub, err := _AFNContract.contract.WatchLogs(opts, "VoteToBless", configVersionRule, voterRule)
 	if err != nil {
 		return nil, err
 	}
@@ -1540,45 +2064,210 @@ func (_AFNContract *AFNContractFilterer) ParseVoteToBless(log types.Log) (*AFNCo
 	return event, nil
 }
 
-type GetBadVotersAndVotes struct {
-	Voters []common.Address
-	Votes  *big.Int
+type AFNContractVoteToCurseIterator struct {
+	Event *AFNContractVoteToCurse
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
 }
-type GetWeightThresholds struct {
-	Blessing  *big.Int
-	BadSignal *big.Int
+
+func (it *AFNContractVoteToCurseIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(AFNContractVoteToCurse)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(AFNContractVoteToCurse)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *AFNContractVoteToCurseIterator) Error() error {
+	return it.fail
+}
+
+func (it *AFNContractVoteToCurseIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type AFNContractVoteToCurse struct {
+	ConfigVersion     uint32
+	Voter             common.Address
+	Weight            uint8
+	VoteCount         uint32
+	CurseId           [32]byte
+	CursesHash        [32]byte
+	AccumulatedWeight uint16
+	Raw               types.Log
+}
+
+func (_AFNContract *AFNContractFilterer) FilterVoteToCurse(opts *bind.FilterOpts, configVersion []uint32, voter []common.Address) (*AFNContractVoteToCurseIterator, error) {
+
+	var configVersionRule []interface{}
+	for _, configVersionItem := range configVersion {
+		configVersionRule = append(configVersionRule, configVersionItem)
+	}
+	var voterRule []interface{}
+	for _, voterItem := range voter {
+		voterRule = append(voterRule, voterItem)
+	}
+
+	logs, sub, err := _AFNContract.contract.FilterLogs(opts, "VoteToCurse", configVersionRule, voterRule)
+	if err != nil {
+		return nil, err
+	}
+	return &AFNContractVoteToCurseIterator{contract: _AFNContract.contract, event: "VoteToCurse", logs: logs, sub: sub}, nil
+}
+
+func (_AFNContract *AFNContractFilterer) WatchVoteToCurse(opts *bind.WatchOpts, sink chan<- *AFNContractVoteToCurse, configVersion []uint32, voter []common.Address) (event.Subscription, error) {
+
+	var configVersionRule []interface{}
+	for _, configVersionItem := range configVersion {
+		configVersionRule = append(configVersionRule, configVersionItem)
+	}
+	var voterRule []interface{}
+	for _, voterItem := range voter {
+		voterRule = append(voterRule, voterItem)
+	}
+
+	logs, sub, err := _AFNContract.contract.WatchLogs(opts, "VoteToCurse", configVersionRule, voterRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(AFNContractVoteToCurse)
+				if err := _AFNContract.contract.UnpackLog(event, "VoteToCurse", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_AFNContract *AFNContractFilterer) ParseVoteToCurse(log types.Log) (*AFNContractVoteToCurse, error) {
+	event := new(AFNContractVoteToCurse)
+	if err := _AFNContract.contract.UnpackLog(event, "VoteToCurse", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type GetBlessVotersAndWeight struct {
+	BlessVoteAddrs []common.Address
+	Weight         uint16
+}
+type GetConfigDetails struct {
+	Version     uint32
+	BlockNumber uint32
+	Config      AFNConfig
+}
+type GetCurseVotersAndWeight struct {
+	CurseVoteAddrs []common.Address
+	Weight         uint16
+	VoteCounts     []uint32
 }
 
 func (_AFNContract *AFNContract) ParseLog(log types.Log) (generated.AbigenLog, error) {
 	switch log.Topics[0] {
-	case _AFNContract.abi.Events["AFNBadSignal"].ID:
-		return _AFNContract.ParseAFNBadSignal(log)
-	case _AFNContract.abi.Events["AFNConfigSet"].ID:
-		return _AFNContract.ParseAFNConfigSet(log)
+	case _AFNContract.abi.Events["AlreadyBlessed"].ID:
+		return _AFNContract.ParseAlreadyBlessed(log)
+	case _AFNContract.abi.Events["AlreadyVotedToBless"].ID:
+		return _AFNContract.ParseAlreadyVotedToBless(log)
+	case _AFNContract.abi.Events["ConfigSet"].ID:
+		return _AFNContract.ParseConfigSet(log)
+	case _AFNContract.abi.Events["Cursed"].ID:
+		return _AFNContract.ParseCursed(log)
 	case _AFNContract.abi.Events["OwnershipTransferRequested"].ID:
 		return _AFNContract.ParseOwnershipTransferRequested(log)
 	case _AFNContract.abi.Events["OwnershipTransferred"].ID:
 		return _AFNContract.ParseOwnershipTransferred(log)
-	case _AFNContract.abi.Events["RecoveredFromBadSignal"].ID:
-		return _AFNContract.ParseRecoveredFromBadSignal(log)
-	case _AFNContract.abi.Events["RootBlessed"].ID:
-		return _AFNContract.ParseRootBlessed(log)
-	case _AFNContract.abi.Events["VoteBad"].ID:
-		return _AFNContract.ParseVoteBad(log)
+	case _AFNContract.abi.Events["RecoveredFromCurse"].ID:
+		return _AFNContract.ParseRecoveredFromCurse(log)
+	case _AFNContract.abi.Events["ReusedVotesToCurse"].ID:
+		return _AFNContract.ParseReusedVotesToCurse(log)
+	case _AFNContract.abi.Events["SkippedUnvoteToCurse"].ID:
+		return _AFNContract.ParseSkippedUnvoteToCurse(log)
+	case _AFNContract.abi.Events["TaggedRootBlessed"].ID:
+		return _AFNContract.ParseTaggedRootBlessed(log)
+	case _AFNContract.abi.Events["UnvoteToCurse"].ID:
+		return _AFNContract.ParseUnvoteToCurse(log)
 	case _AFNContract.abi.Events["VoteToBless"].ID:
 		return _AFNContract.ParseVoteToBless(log)
+	case _AFNContract.abi.Events["VoteToCurse"].ID:
+		return _AFNContract.ParseVoteToCurse(log)
 
 	default:
 		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
 	}
 }
 
-func (AFNContractAFNBadSignal) Topic() common.Hash {
-	return common.HexToHash("0x73907f5e30313a1ab6e1815608b22b40911f1a7decec69d5df18a2298002bacb")
+func (AFNContractAlreadyBlessed) Topic() common.Hash {
+	return common.HexToHash("0x274d6d5b916b0a53974b7ab86c844b97a2e03a60f658cd9a4b1c028b604d7bf1")
 }
 
-func (AFNContractAFNConfigSet) Topic() common.Hash {
-	return common.HexToHash("0x69af5b8b5b348d6b619cb6b338b5cfd865aa9e8cedd36a4a69257a9a07ebedaa")
+func (AFNContractAlreadyVotedToBless) Topic() common.Hash {
+	return common.HexToHash("0x6dfbb745226fa630aeb1b9557d17d508ddb789a04f0cb873ec16e58beb8beead")
+}
+
+func (AFNContractConfigSet) Topic() common.Hash {
+	return common.HexToHash("0x7cf8e698b191db138396ab0eae2ad5b3fe353fd014fd5956b034b86f2d605cfd")
+}
+
+func (AFNContractCursed) Topic() common.Hash {
+	return common.HexToHash("0x6ec7e144a45fa03ed986874794df08b5b6bbbb27ed6454b4e6eaa74248b5e333")
 }
 
 func (AFNContractOwnershipTransferRequested) Topic() common.Hash {
@@ -1589,20 +2278,32 @@ func (AFNContractOwnershipTransferred) Topic() common.Hash {
 	return common.HexToHash("0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0")
 }
 
-func (AFNContractRecoveredFromBadSignal) Topic() common.Hash {
-	return common.HexToHash("0x3e48434bea67b1e259c2380d289dcb6372257ab2c37bc86f0e1acf83a7b07ac0")
+func (AFNContractRecoveredFromCurse) Topic() common.Hash {
+	return common.HexToHash("0x08c773aaf7568c6b9110dcdfc13c27177410582ee30e157d1aa306b49d603eb7")
 }
 
-func (AFNContractRootBlessed) Topic() common.Hash {
-	return common.HexToHash("0x719fab74b843fdceffa591cc0a3445a9dddc9e1e304471baed67e8408a1405c7")
+func (AFNContractReusedVotesToCurse) Topic() common.Hash {
+	return common.HexToHash("0xb4a70189a30e3d3b9c77d291f83699633e70ab4427fc3644a955ab4cca077b03")
 }
 
-func (AFNContractVoteBad) Topic() common.Hash {
-	return common.HexToHash("0xa5889da6c2d25ef72eaae82bb0b8acf51eeebdd6bd12f1a24360de7d9b9cfa28")
+func (AFNContractSkippedUnvoteToCurse) Topic() common.Hash {
+	return common.HexToHash("0xf4e3b20447f3f83360469333a2578825ae355d192dd6f59c6516d832fa425a53")
+}
+
+func (AFNContractTaggedRootBlessed) Topic() common.Hash {
+	return common.HexToHash("0x8257378aa73bf8e4ada848713526584a3dcee0fd3db3beed7397f7a7f5067cc9")
+}
+
+func (AFNContractUnvoteToCurse) Topic() common.Hash {
+	return common.HexToHash("0x70fc9538e4890befa525c50aab95b49f97b45a1c9a99100f353efcedc3b924dc")
 }
 
 func (AFNContractVoteToBless) Topic() common.Hash {
-	return common.HexToHash("0x262f79a5a063a0af3e27989b0b0f0ae1e2c19257d27efe01a7f0cab7b3b470a4")
+	return common.HexToHash("0xe5bca7cec7a958a09a9432f1e98b5925115e419486b4768f26aa04422036622a")
+}
+
+func (AFNContractVoteToCurse) Topic() common.Hash {
+	return common.HexToHash("0xe3c908d69fe71d009d3f8097489f0f498dc66a2f10622ef577a6496fe46958ba")
 }
 
 func (_AFNContract *AFNContract) Address() common.Address {
@@ -1612,27 +2313,19 @@ func (_AFNContract *AFNContract) Address() common.Address {
 type AFNContractInterface interface {
 	BadSignalReceived(opts *bind.CallOpts) (bool, error)
 
-	GetBadVotersAndVotes(opts *bind.CallOpts) (GetBadVotersAndVotes,
+	GetBlessVotersAndWeight(opts *bind.CallOpts, taggedRoot AFNTaggedRoot) (GetBlessVotersAndWeight,
 
 		error)
 
-	GetConfigVersion(opts *bind.CallOpts) (*big.Int, error)
-
-	GetParticipants(opts *bind.CallOpts) ([]common.Address, error)
-
-	GetVotesToBlessRoot(opts *bind.CallOpts, root [32]byte) (*big.Int, error)
-
-	GetWeightByParticipant(opts *bind.CallOpts, participant common.Address) (*big.Int, error)
-
-	GetWeightThresholds(opts *bind.CallOpts) (GetWeightThresholds,
+	GetConfigDetails(opts *bind.CallOpts) (GetConfigDetails,
 
 		error)
 
-	HasVotedBad(opts *bind.CallOpts, participant common.Address) (bool, error)
+	GetCurseVotersAndWeight(opts *bind.CallOpts) (GetCurseVotersAndWeight,
 
-	HasVotedToBlessRoot(opts *bind.CallOpts, participant common.Address, root [32]byte) (bool, error)
+		error)
 
-	IsBlessed(opts *bind.CallOpts, rootWithOrigin [32]byte) (bool, error)
+	IsBlessed(opts *bind.CallOpts, taggedRootHash [32]byte) (bool, error)
 
 	Owner(opts *bind.CallOpts) (common.Address, error)
 
@@ -1640,27 +2333,43 @@ type AFNContractInterface interface {
 
 	AcceptOwnership(opts *bind.TransactOpts) (*types.Transaction, error)
 
-	RecoverFromBadSignal(opts *bind.TransactOpts) (*types.Transaction, error)
+	OwnerUnbless(opts *bind.TransactOpts, taggedRoots []AFNTaggedRoot) (*types.Transaction, error)
 
-	SetAFNConfig(opts *bind.TransactOpts, participants []common.Address, weights []*big.Int, weightThresholdForBlessing *big.Int, weightThresholdForBadSignal *big.Int) (*types.Transaction, error)
+	OwnerUnvoteToCurse(opts *bind.TransactOpts, records []AFNUnvoteToCurseRecord) (*types.Transaction, error)
+
+	SetConfig(opts *bind.TransactOpts, config AFNConfig) (*types.Transaction, error)
 
 	TransferOwnership(opts *bind.TransactOpts, to common.Address) (*types.Transaction, error)
 
-	VoteBad(opts *bind.TransactOpts) (*types.Transaction, error)
+	UnvoteToCurse(opts *bind.TransactOpts, curseVoteAddr common.Address, cursesHash [32]byte) (*types.Transaction, error)
 
-	VoteToBlessRoots(opts *bind.TransactOpts, rootsWithOrigin [][32]byte) (*types.Transaction, error)
+	VoteToBless(opts *bind.TransactOpts, taggedRoots []AFNTaggedRoot) (*types.Transaction, error)
 
-	FilterAFNBadSignal(opts *bind.FilterOpts) (*AFNContractAFNBadSignalIterator, error)
+	VoteToCurse(opts *bind.TransactOpts, curseId [32]byte) (*types.Transaction, error)
 
-	WatchAFNBadSignal(opts *bind.WatchOpts, sink chan<- *AFNContractAFNBadSignal) (event.Subscription, error)
+	FilterAlreadyBlessed(opts *bind.FilterOpts, configVersion []uint32, voter []common.Address) (*AFNContractAlreadyBlessedIterator, error)
 
-	ParseAFNBadSignal(log types.Log) (*AFNContractAFNBadSignal, error)
+	WatchAlreadyBlessed(opts *bind.WatchOpts, sink chan<- *AFNContractAlreadyBlessed, configVersion []uint32, voter []common.Address) (event.Subscription, error)
 
-	FilterAFNConfigSet(opts *bind.FilterOpts) (*AFNContractAFNConfigSetIterator, error)
+	ParseAlreadyBlessed(log types.Log) (*AFNContractAlreadyBlessed, error)
 
-	WatchAFNConfigSet(opts *bind.WatchOpts, sink chan<- *AFNContractAFNConfigSet) (event.Subscription, error)
+	FilterAlreadyVotedToBless(opts *bind.FilterOpts, configVersion []uint32, voter []common.Address) (*AFNContractAlreadyVotedToBlessIterator, error)
 
-	ParseAFNConfigSet(log types.Log) (*AFNContractAFNConfigSet, error)
+	WatchAlreadyVotedToBless(opts *bind.WatchOpts, sink chan<- *AFNContractAlreadyVotedToBless, configVersion []uint32, voter []common.Address) (event.Subscription, error)
+
+	ParseAlreadyVotedToBless(log types.Log) (*AFNContractAlreadyVotedToBless, error)
+
+	FilterConfigSet(opts *bind.FilterOpts, configVersion []uint32) (*AFNContractConfigSetIterator, error)
+
+	WatchConfigSet(opts *bind.WatchOpts, sink chan<- *AFNContractConfigSet, configVersion []uint32) (event.Subscription, error)
+
+	ParseConfigSet(log types.Log) (*AFNContractConfigSet, error)
+
+	FilterCursed(opts *bind.FilterOpts, configVersion []uint32) (*AFNContractCursedIterator, error)
+
+	WatchCursed(opts *bind.WatchOpts, sink chan<- *AFNContractCursed, configVersion []uint32) (event.Subscription, error)
+
+	ParseCursed(log types.Log) (*AFNContractCursed, error)
 
 	FilterOwnershipTransferRequested(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*AFNContractOwnershipTransferRequestedIterator, error)
 
@@ -1674,29 +2383,47 @@ type AFNContractInterface interface {
 
 	ParseOwnershipTransferred(log types.Log) (*AFNContractOwnershipTransferred, error)
 
-	FilterRecoveredFromBadSignal(opts *bind.FilterOpts) (*AFNContractRecoveredFromBadSignalIterator, error)
+	FilterRecoveredFromCurse(opts *bind.FilterOpts) (*AFNContractRecoveredFromCurseIterator, error)
 
-	WatchRecoveredFromBadSignal(opts *bind.WatchOpts, sink chan<- *AFNContractRecoveredFromBadSignal) (event.Subscription, error)
+	WatchRecoveredFromCurse(opts *bind.WatchOpts, sink chan<- *AFNContractRecoveredFromCurse) (event.Subscription, error)
 
-	ParseRecoveredFromBadSignal(log types.Log) (*AFNContractRecoveredFromBadSignal, error)
+	ParseRecoveredFromCurse(log types.Log) (*AFNContractRecoveredFromCurse, error)
 
-	FilterRootBlessed(opts *bind.FilterOpts, root [][32]byte) (*AFNContractRootBlessedIterator, error)
+	FilterReusedVotesToCurse(opts *bind.FilterOpts, configVersion []uint32, voter []common.Address) (*AFNContractReusedVotesToCurseIterator, error)
 
-	WatchRootBlessed(opts *bind.WatchOpts, sink chan<- *AFNContractRootBlessed, root [][32]byte) (event.Subscription, error)
+	WatchReusedVotesToCurse(opts *bind.WatchOpts, sink chan<- *AFNContractReusedVotesToCurse, configVersion []uint32, voter []common.Address) (event.Subscription, error)
 
-	ParseRootBlessed(log types.Log) (*AFNContractRootBlessed, error)
+	ParseReusedVotesToCurse(log types.Log) (*AFNContractReusedVotesToCurse, error)
 
-	FilterVoteBad(opts *bind.FilterOpts, voter []common.Address) (*AFNContractVoteBadIterator, error)
+	FilterSkippedUnvoteToCurse(opts *bind.FilterOpts, voter []common.Address) (*AFNContractSkippedUnvoteToCurseIterator, error)
 
-	WatchVoteBad(opts *bind.WatchOpts, sink chan<- *AFNContractVoteBad, voter []common.Address) (event.Subscription, error)
+	WatchSkippedUnvoteToCurse(opts *bind.WatchOpts, sink chan<- *AFNContractSkippedUnvoteToCurse, voter []common.Address) (event.Subscription, error)
 
-	ParseVoteBad(log types.Log) (*AFNContractVoteBad, error)
+	ParseSkippedUnvoteToCurse(log types.Log) (*AFNContractSkippedUnvoteToCurse, error)
 
-	FilterVoteToBless(opts *bind.FilterOpts, voter []common.Address, root [][32]byte) (*AFNContractVoteToBlessIterator, error)
+	FilterTaggedRootBlessed(opts *bind.FilterOpts, configVersion []uint32) (*AFNContractTaggedRootBlessedIterator, error)
 
-	WatchVoteToBless(opts *bind.WatchOpts, sink chan<- *AFNContractVoteToBless, voter []common.Address, root [][32]byte) (event.Subscription, error)
+	WatchTaggedRootBlessed(opts *bind.WatchOpts, sink chan<- *AFNContractTaggedRootBlessed, configVersion []uint32) (event.Subscription, error)
+
+	ParseTaggedRootBlessed(log types.Log) (*AFNContractTaggedRootBlessed, error)
+
+	FilterUnvoteToCurse(opts *bind.FilterOpts, configVersion []uint32, voter []common.Address) (*AFNContractUnvoteToCurseIterator, error)
+
+	WatchUnvoteToCurse(opts *bind.WatchOpts, sink chan<- *AFNContractUnvoteToCurse, configVersion []uint32, voter []common.Address) (event.Subscription, error)
+
+	ParseUnvoteToCurse(log types.Log) (*AFNContractUnvoteToCurse, error)
+
+	FilterVoteToBless(opts *bind.FilterOpts, configVersion []uint32, voter []common.Address) (*AFNContractVoteToBlessIterator, error)
+
+	WatchVoteToBless(opts *bind.WatchOpts, sink chan<- *AFNContractVoteToBless, configVersion []uint32, voter []common.Address) (event.Subscription, error)
 
 	ParseVoteToBless(log types.Log) (*AFNContractVoteToBless, error)
+
+	FilterVoteToCurse(opts *bind.FilterOpts, configVersion []uint32, voter []common.Address) (*AFNContractVoteToCurseIterator, error)
+
+	WatchVoteToCurse(opts *bind.WatchOpts, sink chan<- *AFNContractVoteToCurse, configVersion []uint32, voter []common.Address) (event.Subscription, error)
+
+	ParseVoteToCurse(log types.Log) (*AFNContractVoteToCurse, error)
 
 	ParseLog(log types.Log) (generated.AbigenLog, error)
 

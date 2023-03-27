@@ -17,13 +17,13 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/afn_contract"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store_helper"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp_helper"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/mock_afn_contract"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/simple_message_receiver"
@@ -77,13 +77,9 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	require.NoError(t, err)
 	destChain.Commit()
 
-	afnAddress, _, _, err := afn_contract.DeployAFNContract(
+	afnAddress, _, _, err := mock_afn_contract.DeployMockAFNContract(
 		destUser,
 		destChain,
-		[]common.Address{destUser.From},
-		[]*big.Int{big.NewInt(1)},
-		big.NewInt(1),
-		big.NewInt(1),
 	)
 	require.NoError(t, err)
 	destChain.Commit()

@@ -60,7 +60,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup {
         sourceChainId: SOURCE_CHAIN_ID,
         onRamp: ON_RAMP_ADDRESS
       }),
-      generateDynamicOffRampConfig(address(router), address(s_afn)),
+      generateDynamicOffRampConfig(address(router), address(s_mockAFN)),
       getCastedSourceTokens(),
       getCastedDestinationPools(),
       rateLimiterConfig()

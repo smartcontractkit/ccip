@@ -6,6 +6,7 @@ FILES="./src/v0.8/ccip/test/publicABI/*"
 
 for f in $FILES
 do
+  (
   expectedAbi=$( cat $f | tr -d " \t\n\r" )
 
   fileName=$( echo "$f" | sed "s/.*\///" )
@@ -18,7 +19,9 @@ do
     make ccip-abi-generate c=$fileName
     printf "Fixed.\n"
   fi
-
+  ) &
 done
+
+wait
 
 echo "ABI fix successful, don't forget to commit!"
