@@ -274,7 +274,6 @@ func (r *ExecutionReportingPlugin) getExecutableSeqNrs(ctx context.Context, infl
 		}
 		snoozeUntil, haveSnoozed := r.snoozedRoots[unexpiredReport.MerkleRoot]
 		if haveSnoozed && time.Now().Before(snoozeUntil) {
-			incSkippedRequests(reasonSnoozed)
 			continue
 		}
 		blessed, err := r.config.commitStore.IsBlessed(&bind.CallOpts{Context: ctx}, unexpiredReport.MerkleRoot)
