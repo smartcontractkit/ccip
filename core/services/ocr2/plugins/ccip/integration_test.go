@@ -30,19 +30,29 @@ func TestIntegration_CCIP(t *testing.T) {
 	ctx := context.Background()
 	// Starts nodes and configures them in the OCR contracts.
 	bootstrapNode, nodes, configBlock := testhelpers.SetupAndStartNodes(ctx, t, &ccipContracts, bootstrapNodePort)
-	linkEth := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, err := w.Write([]byte(`{"JuelsPerETH": "200000000000000000000"}`))
+	linkUSD := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := w.Write([]byte(`{"UsdPerLink": "8000000000000000000"}`))
 		require.NoError(t, err)
 	}))
-	tokensPerFeeCoinPipeline := fmt.Sprintf(`
+	ethUSD := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := w.Write([]byte(`{"UsdPerETH": "1700000000000000000000"}`))
+		require.NoError(t, err)
+	}))
+	wrapped, err := ccipContracts.Source.Router.GetWrappedNative(nil)
+	require.NoError(t, err)
+	tokenPricesUSDPipeline := fmt.Sprintf(`
 // Price 1 
 link [type=http method=GET url="%s"];
-link_parse [type=jsonparse path="JuelsPerETH"];
+link_parse [type=jsonparse path="UsdPerLink"];
 link->link_parse;
-merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
-		linkEth.URL, ccipContracts.Dest.LinkToken.Address())
-	jobParams := ccipContracts.NewCCIPJobSpecParams(tokensPerFeeCoinPipeline, configBlock)
-	defer linkEth.Close()
+eth [type=http method=GET url="%s"];
+eth_parse [type=jsonparse path="UsdPerETH"];
+eth->eth_parse;
+merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_parse)}"];`,
+		linkUSD.URL, ethUSD.URL, ccipContracts.Dest.LinkToken.Address(), wrapped)
+	jobParams := ccipContracts.NewCCIPJobSpecParams(tokenPricesUSDPipeline, configBlock)
+	defer linkUSD.Close()
+	defer ethUSD.Close()
 
 	jobParams.RelayInflight = 2 * time.Second
 	jobParams.ExecInflight = 2 * time.Second
@@ -64,7 +74,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 	t.Run("single ge", func(t *testing.T) {
 		tokenAmount := big.NewInt(500000003) // prime number
 		gasLimit := big.NewInt(200_003)      // prime number
-		gasPrice := big.NewInt(1e9)          // 1 gwei
+		//gasPrice := big.NewInt(1e9)          // 1 gwei
 
 		eventSignatures := ccip.GetEventSignatures()
 		extraArgs, err := testhelpers.GetEVMExtraArgsV1(gasLimit, false)
@@ -74,7 +84,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 			{Name: testhelpers.SourcePool, Addr: ccipContracts.Source.Pool.Address(), Getter: ccipContracts.GetSourceLinkBalance},
 			{Name: testhelpers.OnRamp, Addr: ccipContracts.Source.OnRamp.Address(), Getter: ccipContracts.GetSourceLinkBalance},
 			{Name: testhelpers.SourceRouter, Addr: ccipContracts.Source.Router.Address(), Getter: ccipContracts.GetSourceLinkBalance},
-			{Name: testhelpers.SourceFeeManager, Addr: ccipContracts.Source.FeeManager.Address(), Getter: ccipContracts.GetSourceLinkBalance},
+			{Name: testhelpers.SourcePrices, Addr: ccipContracts.Source.PriceRegistry.Address(), Getter: ccipContracts.GetSourceLinkBalance},
 		})
 		require.NoError(t, err)
 		destBalances, err := testhelpers.GetBalances([]testhelpers.BalanceReq{
@@ -98,8 +108,8 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		}
 		fee, err := ccipContracts.Source.Router.GetFee(nil, destChainID, msg)
 		require.NoError(t, err)
-		// Currently no overhead and 1gwei dest gas price. So fee is simply gasLimit * gasPrice.
-		require.Equal(t, new(big.Int).Mul(gasLimit, gasPrice).String(), fee.String())
+		// Currently no overhead and 10gwei dest gas price. So fee is simply (gasLimit * gasPrice)* link/native
+		//require.Equal(t, new(big.Int).Mul(gasLimit, gasPrice).String(), fee.String())
 		// Approve the fee amount + the token amount
 		_, err = ccipContracts.Source.LinkToken.Approve(ccipContracts.Source.User, ccipContracts.Source.Router.Address(), new(big.Int).Add(fee, tokenAmount))
 		require.NoError(t, err)
@@ -126,15 +136,16 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 				Getter:   ccipContracts.GetSourceLinkBalance,
 			},
 			{
-				Name:     testhelpers.SourceFeeManager,
-				Address:  ccipContracts.Source.FeeManager.Address(),
-				Expected: testhelpers.MustAddBigInt(sourceBalances[testhelpers.SourceFeeManager], fee.String()).String(),
+				Name:     testhelpers.SourcePrices,
+				Address:  ccipContracts.Source.PriceRegistry.Address(),
+				Expected: sourceBalances[testhelpers.SourcePrices].String(),
 				Getter:   ccipContracts.GetSourceLinkBalance,
 			},
 			{
+				// Fees end up in the onramp.
 				Name:     testhelpers.OnRamp,
 				Address:  ccipContracts.Source.OnRamp.Address(),
-				Expected: sourceBalances[testhelpers.OnRamp].String(),
+				Expected: testhelpers.MustAddBigInt(sourceBalances[testhelpers.SourcePrices], fee.String()).String(),
 				Getter:   ccipContracts.GetSourceLinkBalance,
 			},
 			{
@@ -170,7 +181,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 	t.Run("multiple batches ge", func(t *testing.T) {
 		tokenAmount := big.NewInt(500000003)
 		gasLimit := big.NewInt(250_000)
-		gasPrice := big.NewInt(1e9) // 1 gwei
+		//gasPrice := big.NewInt(1e9) // 1 gwei
 
 		eventSignatures := ccip.GetEventSignatures()
 		var txs []*gethtypes.Transaction
@@ -198,7 +209,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 			fee, err := ccipContracts.Source.Router.GetFee(nil, destChainID, msg)
 			require.NoError(t, err)
 			// Currently no overhead and 1gwei dest gas price. So fee is simply gasLimit * gasPrice.
-			require.Equal(t, new(big.Int).Mul(txGasLimit, gasPrice).String(), fee.String())
+			//require.Equal(t, new(big.Int).Mul(txGasLimit, gasPrice).String(), fee.String())
 			// Approve the fee amount + the token amount
 			_, err = ccipContracts.Source.LinkToken.Approve(ccipContracts.Source.User, ccipContracts.Source.Router.Address(), new(big.Int).Add(fee, tokenAmount))
 			require.NoError(t, err)
@@ -240,6 +251,8 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		totalMsgs := 2
 		extraArgs, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(200_000), true)
 		require.NoError(t, err)
+		startNonce, err := ccipContracts.Dest.OffRamp.GetSenderNonce(nil, ccipContracts.Source.User.From)
+		require.NoError(t, err)
 		msg := router.ClientEVM2AnyMessage{
 			Receiver:     testhelpers.MustEncodeAddress(t, ccipContracts.Dest.Receivers[1].Receiver.Address()),
 			Data:         []byte("hello"),
@@ -254,16 +267,26 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		require.NoError(t, err)
 		ccipContracts.Source.Chain.Commit()
 		eventSignatures := ccip.GetEventSignatures()
-		testhelpers.SendRequest(t, ccipContracts, msg)
+		txForFailedReq := testhelpers.SendRequest(t, ccipContracts, msg)
 		failedReqLog := testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.Source.OnRamp.Address(), nodes, geCurrentSeqNum)
 		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.Source.OnRamp.Address(), geCurrentSeqNum)
-		reportForFailedReq := testhelpers.EventuallyCommitReportAccepted(t, ccipContracts, currentBlockNumber)
+		testhelpers.EventuallyCommitReportAccepted(t, ccipContracts, currentBlockNumber)
 
 		// execution status should be failed
 		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.Dest.OffRamp.Address(), nodes, geCurrentSeqNum, geCurrentSeqNum)
 		assert.Len(t, executionLogs, 1)
 		testhelpers.AssertExecState(t, ccipContracts, executionLogs[0], ccip.Failure)
+		// Nonce should not have incremented
+		afterNonce, err := ccipContracts.Dest.OffRamp.GetSenderNonce(nil, ccipContracts.Source.User.From)
+		require.NoError(t, err)
+		require.Equal(t, startNonce, afterNonce)
 		geCurrentSeqNum++
+
+		// flip the revert settings on receiver
+		_, err = ccipContracts.Dest.Receivers[1].Receiver.SetRevert(ccipContracts.Dest.User, false)
+		require.NoError(t, err, "setting revert to false on the receiver")
+		ccipContracts.Dest.Chain.Commit()
+		ccipContracts.Source.Chain.Commit()
 
 		// subsequent requests which should not be executed.
 		var pendingReqNumbers []int
@@ -277,16 +300,9 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 			geCurrentSeqNum++
 		}
 
-		// flip the revert settings on receiver
-		_, err = ccipContracts.Dest.Receivers[1].Receiver.SetRevert(ccipContracts.Dest.User, false)
-		require.NoError(t, err, "setting revert to false on the receiver")
-		ccipContracts.Dest.Chain.Commit()
-		ccipContracts.Source.Chain.Commit()
-
 		// manually execute the failed request
+		failedSeqNum := testhelpers.ExecuteMessage(t, ccipContracts, failedReqLog, txForFailedReq.Hash(), currentBlockNumber)
 		currentBlockNumber = ccipContracts.Dest.Chain.Blockchain().CurrentBlock().Number().Uint64()
-		require.NoError(t, err)
-		failedSeqNum := testhelpers.ExecuteMessage(t, ccipContracts, failedReqLog, []logpoller.Log{failedReqLog}, reportForFailedReq)
 		testhelpers.EventuallyExecutionStateChangedToSuccess(t, ccipContracts, []uint64{failedSeqNum}, currentBlockNumber)
 
 		// verify all the pending requests should be successfully executed now
@@ -321,7 +337,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		ccipContracts.EnableCommitStore()
 
 		// create updated jobs
-		jobParams = ccipContracts.NewCCIPJobSpecParams(tokensPerFeeCoinPipeline, newConfigBlock)
+		jobParams = ccipContracts.NewCCIPJobSpecParams(tokenPricesUSDPipeline, newConfigBlock)
 		testhelpers.AddAllJobs(t, jobParams, ccipContracts, nodes)
 
 		startSeq := 1

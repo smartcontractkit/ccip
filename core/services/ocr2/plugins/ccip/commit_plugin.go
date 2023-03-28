@@ -12,17 +12,24 @@ import (
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	hlp "github.com/smartcontractkit/chainlink/core/scripts/common"
 	"github.com/smartcontractkit/chainlink/core/services/job"
 	ccipconfig "github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/promwrapper"
+	"github.com/smartcontractkit/chainlink/core/services/pipeline"
 )
 
-func NewCommitServices(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm.ChainSet, new bool, argsNoPlugin libocr2.OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
+const (
+	COMMIT_PRICE_UPDATES = "Commit price updates"
+	COMMIT_CCIP_SENDS    = "Commit ccip sends"
+)
+
+func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
+	spec := jb.OCR2OracleSpec
 	pluginConfig, err := ParseAndVerifyPluginConfig(spec.PluginConfig)
 	if err != nil {
 		return nil, err
@@ -51,39 +58,35 @@ func NewCommitServices(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet ev
 		inflightCacheExpiry = pluginConfig.InflightCacheExpiry.Duration()
 	}
 
-	commitStoreAddress := common.HexToAddress(spec.ContractID)
-	onRampAddress := common.HexToAddress(pluginConfig.OnRampID)
-
-	err = ccipconfig.VerifyTypeAndVersion(onRampAddress, sourceChain.Client(), ccipconfig.EVM2EVMOnRamp)
+	commitStore, err := LoadCommitStore(common.HexToAddress(spec.ContractID), destChain.Client())
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed loading commitStore")
 	}
-	err = ccipconfig.VerifyTypeAndVersion(commitStoreAddress, destChain.Client(), ccipconfig.CommitStore)
+	onRamp, err := LoadOnRamp(common.HexToAddress(pluginConfig.OnRampID), sourceChain.Client())
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed loading onRamp")
 	}
-
-	commitStore, err := commit_store.NewCommitStore(commitStoreAddress, destChain.Client())
+	offRamp, err := LoadOffRamp(common.HexToAddress(pluginConfig.OffRampID), destChain.Client())
 	if err != nil {
-		return nil, errors.Wrap(err, "failed loading the commitStore")
-	}
-	commitStoreConfig, err := commitStore.GetConfig(&bind.CallOpts{})
-	if err != nil {
-		return nil, errors.Wrap(err, "failed getting the config from the commitStore")
-	}
-	if commitStoreConfig.OnRamp != onRampAddress {
-		return nil, errors.Errorf("Wrong onRamp got %s expected from jobspec %s", commitStoreConfig.OnRamp, onRampAddress)
-	}
-	if commitStoreConfig.SourceChainId != pluginConfig.SourceChainID {
-		return nil, errors.Errorf("Wrong source chain ID got %d expected from jobspec %d", commitStoreConfig.SourceChainId, pluginConfig.SourceChainID)
-	}
-	if commitStoreConfig.ChainId != uint64(destChainID) {
-		return nil, errors.Errorf("Wrong dest chain ID got %d expected from jobspec %d", commitStoreConfig.ChainId, destChainID)
+		return nil, errors.Wrap(err, "failed loading offRamp")
 	}
 
-	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddress, sourceChain.Client())
+	staticConfig, err := commitStore.GetStaticConfig(&bind.CallOpts{})
 	if err != nil {
-		return nil, errors.Wrap(err, "failed loading the onRamp")
+		return nil, errors.Wrap(err, "failed getting the static config from the commitStore")
+	}
+	if staticConfig.OnRamp != onRamp.Address() {
+		return nil, errors.Errorf("Wrong onRamp got %s expected from jobspec %s", staticConfig.OnRamp, onRamp.Address())
+	}
+	if staticConfig.SourceChainId != pluginConfig.SourceChainID {
+		return nil, errors.Errorf("Wrong source chain ID got %d expected from jobspec %d", staticConfig.SourceChainId, pluginConfig.SourceChainID)
+	}
+	if staticConfig.ChainId != uint64(destChainID) {
+		return nil, errors.Errorf("Wrong dest chain ID got %d expected from jobspec %d", staticConfig.ChainId, destChainID)
+	}
+	dynamicConfig, err := commitStore.GetDynamicConfig(&bind.CallOpts{})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed getting the dynamic config from the commitStore")
 	}
 
 	seqParsers := func(log logpoller.Log) (uint64, error) {
@@ -95,14 +98,60 @@ func NewCommitServices(lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet ev
 		return req.Message.SequenceNumber, nil
 	}
 
-	eventSigs := GetEventSignatures()
-	_, err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{eventSigs.SendRequested}, Addresses: []common.Address{onRampAddress}})
+	priceGetterObject, err := NewPriceGetter(pluginConfig.TokenPricesUSDPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
 	if err != nil {
 		return nil, err
 	}
 
-	leafHasher := NewLeafHasher(pluginConfig.SourceChainID, uint64(destChainID), onRampAddress, hasher.NewKeccakCtx())
-	wrappedPluginFactory := NewCommitReportingPluginFactory(lggr, sourceChain.LogPoller(), commitStore, seqParsers, eventSigs, onRampAddress, leafHasher, inflightCacheExpiry)
+	// subscribe for GasFeeUpdated logs, but the PriceRegistry is only available as part of onchain commitStore's config
+	// TODO: how to detect if commitStoreConfig.PriceRegistry changes on-chain? Currently, we expect a plugin/job/node restart
+	priceRegistry, err := price_registry.NewPriceRegistry(dynamicConfig.PriceRegistry, destChain.Client())
+	if err != nil {
+		return nil, err
+	}
+	dynamicOnRampConfig, err := onRamp.GetDynamicConfig(nil)
+	if err != nil {
+		return nil, err
+	}
+	router, err := router.NewRouter(dynamicOnRampConfig.Router, sourceChain.Client())
+	if err != nil {
+		return nil, err
+	}
+	sourceNative, err := router.GetWrappedNative(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	eventSigs := GetEventSignatures()
+	err = destChain.LogPoller().RegisterFilter(logpoller.Filter{Name: logpoller.FilterName(COMMIT_PRICE_UPDATES, dynamicConfig.PriceRegistry.String()),
+		EventSigs: []common.Hash{UsdPerUnitGasUpdated, UsdPerTokenUpdated}, Addresses: []common.Address{dynamicConfig.PriceRegistry}})
+	if err != nil {
+		return nil, err
+	}
+	err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{Name: logpoller.FilterName(COMMIT_CCIP_SENDS, onRamp.Address().String()), EventSigs: []common.Hash{eventSigs.SendRequested}, Addresses: []common.Address{onRamp.Address()}})
+	if err != nil {
+		return nil, err
+	}
+
+	leafHasher := NewLeafHasher(pluginConfig.SourceChainID, uint64(destChainID), onRamp.Address(), hasher.NewKeccakCtx())
+	wrappedPluginFactory := NewCommitReportingPluginFactory(
+		CommitPluginConfig{
+			lggr:                lggr,
+			source:              sourceChain.LogPoller(),
+			dest:                destChain.LogPoller(),
+			seqParsers:          seqParsers,
+			reqEventSig:         eventSigs,
+			onRamp:              onRamp.Address(),
+			offRamp:             offRamp,
+			priceRegistry:       priceRegistry,
+			priceGetter:         priceGetterObject,
+			sourceNative:        sourceNative,
+			sourceFeeEstimator:  sourceChain.TxManager().GetGasEstimator(),
+			sourceChainID:       pluginConfig.SourceChainID,
+			commitStore:         commitStore,
+			hasher:              leafHasher,
+			inflightCacheExpiry: inflightCacheExpiry,
+		})
 	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPCommit", string(spec.Relay), destChain.ID())
 	argsNoPlugin.Logger = logger.NewOCRWrapper(lggr.Named("CCIPCommit").With(
 		"srcChain", hlp.ChainName(int64(pluginConfig.SourceChainID)), "dstChain", hlp.ChainName(destChainID)), true, logError)

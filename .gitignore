@@ -58,11 +58,12 @@ core/web/assets
 
 # Integration Tests
 integration-tests/**/logs/
-integration-tests/**/tmpcontracts.json
+integration-tests/**/tmp_*.json
 tests-*.xml
 *.test
 tmp-manifest-*.yaml
 ztarrepo.tar.gz
+**/test-ledger/*
 
 # goreleaser builds
 cosign.*
@@ -75,3 +76,9 @@ lcov.info
 core/scripts/ccip-test/secrets/secrets.go
 
 core/scripts/ccip-test/json/credentials
+core/scripts/ccip-test/json/deployments
+
+# Test & linter reports
+*report.xml
+*report.json
+*.out

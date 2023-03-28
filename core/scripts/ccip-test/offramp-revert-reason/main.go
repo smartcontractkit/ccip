@@ -17,8 +17,8 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/secrets"
 )
@@ -101,7 +101,7 @@ func DecodeErrorStringFromABI(errorString string, contractABIs []string) {
 		return
 	}
 
-	fmt.Printf("Cannot match error with contract ABI. Error code \"%v\"\n", "trimmed")
+	fmt.Printf("Cannot match error with contract ABI. Error code \"%v\"\n", errorString)
 }
 
 func getAllABIs() []string {
@@ -109,7 +109,7 @@ func getAllABIs() []string {
 		afn_contract.AFNContractABI,
 		lock_release_token_pool.LockReleaseTokenPoolABI,
 		commit_store.CommitStoreABI,
-		fee_manager.FeeManagerABI,
+		price_registry.PriceRegistryABI,
 		evm_2_evm_onramp.EVM2EVMOnRampABI,
 		evm_2_evm_offramp.EVM2EVMOffRampABI,
 		router.RouterABI,

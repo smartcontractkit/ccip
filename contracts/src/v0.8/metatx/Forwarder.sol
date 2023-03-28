@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 
 import "./IForwarder.sol";
-import {OwnerIsCreator} from "../ccip/access/OwnerIsCreator.sol";
+import {OwnerIsCreator} from "../ccip/OwnerIsCreator.sol";
 
 /**
  * @title The Forwarder Implementation

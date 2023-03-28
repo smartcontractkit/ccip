@@ -89,7 +89,7 @@ contract OCR2Base_transmit is OCR2BaseSetup {
     );
   }
 
-  function testTransmitSuccess_gas() public {
+  function testTransmit3SignersSuccess_gas() public {
     vm.pauseGasMetering();
     bytes32[3] memory reportContext = [s_configDigest, s_configDigest, s_configDigest];
     bytes memory report = abi.encode("testReport");
@@ -179,7 +179,7 @@ contract OCR2Base_setOCR2Config is OCR2BaseSetup {
     bytes offchainConfig
   );
 
-  function testSetMultipleConfigSuccess_gas() public {
+  function testSetConfigSuccess_gas() public {
     vm.pauseGasMetering();
     bytes memory configBytes = abi.encode("");
     uint32 configCount = 0;
@@ -189,7 +189,7 @@ contract OCR2Base_setOCR2Config is OCR2BaseSetup {
     address[] memory transmitters = s_OCR2Base.getTransmitters();
     assertEq(0, transmitters.length);
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit ConfigSet(
       0,
       configDigest,
@@ -216,7 +216,7 @@ contract OCR2Base_setOCR2Config is OCR2BaseSetup {
 
     configDigest = getBasicConfigDigest(s_f, configCount++);
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit ConfigSet(
       uint32(block.number),
       configDigest,

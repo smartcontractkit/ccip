@@ -4,7 +4,7 @@ We're using Foundry to test our CCIP smart contracts here. This enables us to te
 
 ## Directory Structure
 
-Mimic the source contract file structure as closely as possible. Example:
+The test directory structure mimics the source contract file structure as closely as possible. Example:
 
 `./offRamp/SomeOffRamp.sol` should have a test contract `./test/offRamp/SomeOffRamp.t.sol`.
 
@@ -51,19 +51,16 @@ contract SomeOffRamp_theNextFunction {
 }
 
 contract SomeOffRamp_anInternalFunction {
-  // This function will require a helper contract
-  // to expose it.
+  // This function will require a helper contract to expose it.
 }
 ```
 
 ## Test Structure
 
-Inside each test contract (described above), group tests into `Success` and `Reverts` with inline comments:
+Inside each test contract, group tests into `Success` and `Reverts` by starting with all the success cases and then adding a `// Reverts` comments to indicate the failure cases below.
 
 ```
 contract SomeOffRamp_firstFunction {
-  // Success
-
   function testZeroValueSuccess() public {
     ...
   }
@@ -83,9 +80,9 @@ contract SomeOffRamp_firstFunction {
 }
 ```
 
-Function naming should follow this structure:
+Function naming should follow this structure, where the `_fuzz_` section denotes whether it's a fuzz test. Do not write tests that are named `testSuccess`, always include the description of the test, even if it's just the name of the function that is being called. 
 
-`test{description of test}[Success|Reverts]`
+`test{_fuzz_}{description of test}[Success|Reverts]`
 
 Try to cover all the code paths present in each function being tested. In most cases, this will result in many more failure tests than success tests.
 

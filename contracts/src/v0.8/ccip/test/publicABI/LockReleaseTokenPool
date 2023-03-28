@@ -1,6 +1,7 @@
 {
   "acceptOwnership()": "79ba5097",
   "addLiquidity(uint256)": "51c6590a",
+  "applyRampUpdates((address,bool)[],(address,bool)[])": "af519112",
   "getProvidedLiquidity(address)": "56dd1e81",
   "getToken()": "21df0da7",
   "isOffRamp(address)": "1d7a74a0",
@@ -11,8 +12,6 @@
   "paused()": "5c975abb",
   "releaseOrMint(address,uint256)": "ea6192a2",
   "removeLiquidity(uint256)": "9c8f9f23",
-  "setOffRamp(address,bool)": "69e946d4",
-  "setOnRamp(address,bool)": "cc8af2e8",
   "transferOwnership(address)": "f2fde38b",
   "unpause()": "3f4ba83a"
 }

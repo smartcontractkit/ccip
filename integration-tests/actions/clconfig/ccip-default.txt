@@ -35,7 +35,7 @@ LimitDefault = 5_000_000
 
 {{range $i,$url := .URLs }}
 [[EVM.Nodes]]
-Name = 'node-{{$networkIndex}}'
+Name = 'node-{{$networkIndex}}-{{$i}}'
 WSURL = '{{$url}}'
 HTTPURL = '{{ index (index $.Networks $networkIndex).HTTPURLs $i}}'
 {{end}}

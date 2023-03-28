@@ -5,16 +5,15 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/pkg/errors"
-	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2"
 
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	hlp "github.com/smartcontractkit/chainlink/core/scripts/common"
 	"github.com/smartcontractkit/chainlink/core/services/job"
@@ -22,11 +21,16 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/promwrapper"
 	"github.com/smartcontractkit/chainlink/core/services/pipeline"
+
+	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2"
 )
 
 const (
-	DefaultInflightCacheExpiry = 3 * time.Minute
-	DefaultRootSnoozeTime      = 10 * time.Minute
+	DefaultInflightCacheExpiry   = 3 * time.Minute
+	DefaultRootSnoozeTime        = 10 * time.Minute
+	EXEC_CCIP_SENDS              = "Exec ccip sends"
+	EXEC_REPORT_ACCEPTS          = "Exec report accepts"
+	EXEC_EXECUTION_STATE_CHANGES = "Exec execution state changes"
 )
 
 func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
@@ -56,34 +60,57 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 		return nil, errors.Wrap(err, "get chainset")
 	}
 
-	commitStoreAddr := common.HexToAddress(pluginConfig.CommitStoreID)
-	err = ccipconfig.VerifyTypeAndVersion(commitStoreAddr, destChain.Client(), ccipconfig.CommitStore)
+	commitStore, err := LoadCommitStore(common.HexToAddress(pluginConfig.CommitStoreID), destChain.Client())
 	if err != nil {
-		return nil, errors.Wrap(err, "Invalid commitStore contract")
-	}
-	commitStore, err := commit_store.NewCommitStore(commitStoreAddr, destChain.Client())
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed loading the commitStore")
+		return nil, errors.Wrap(err, "failed loading commitStore")
 	}
 
-	onRampAddr := common.HexToAddress(pluginConfig.OnRampID)
-	err = ccipconfig.VerifyTypeAndVersion(onRampAddr, sourceChain.Client(), ccipconfig.EVM2EVMOnRamp)
+	onRamp, err := LoadOnRamp(common.HexToAddress(pluginConfig.OnRampID), sourceChain.Client())
 	if err != nil {
-		return nil, errors.Wrap(err, "Invalid onRamp contract")
+		return nil, errors.Wrap(err, "failed loading onRamp")
 	}
-	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddr, sourceChain.Client())
+	dynamicOnRampConfig, err := onRamp.GetDynamicConfig(&bind.CallOpts{})
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed loading the onRamp")
+		return nil, errors.Wrap(err, "failed loading onRamp config")
+	}
+	srcRouter, err := router.NewRouter(dynamicOnRampConfig.Router, sourceChain.Client())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed loading source router")
+	}
+	sourceWrappedNative, err := srcRouter.GetWrappedNative(&bind.CallOpts{})
+	if err != nil {
+		return nil, errors.Wrap(err, "could not get source native token")
 	}
 
-	offRampAddr := common.HexToAddress(spec.ContractID)
-	err = ccipconfig.VerifyTypeAndVersion(offRampAddr, destChain.Client(), ccipconfig.EVM2EVMOffRamp)
+	offRamp, err := LoadOffRamp(common.HexToAddress(spec.ContractID), destChain.Client())
 	if err != nil {
-		return nil, errors.Wrap(err, "Invalid offRamp contract")
+		return nil, errors.Wrap(err, "failed loading offRamp")
 	}
-	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(offRampAddr, destChain.Client())
+	dynamicOffRampConfig, err := offRamp.GetDynamicConfig(&bind.CallOpts{})
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed loading the offRamp")
+		return nil, errors.Wrap(err, "failed loading offRamp config")
+	}
+	destRouter, err := router.NewRouter(dynamicOffRampConfig.Router, destChain.Client())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed loading dest router")
+	}
+	destWrappedNative, err := destRouter.GetWrappedNative(&bind.CallOpts{})
+	if err != nil {
+		return nil, errors.Wrap(err, "could not get destination token")
+	}
+
+	dynamicConfig, err := commitStore.GetDynamicConfig(&bind.CallOpts{})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed getting the dynamic config from the commitStore")
+	}
+	destPriceRegistry, err := price_registry.NewPriceRegistry(dynamicConfig.PriceRegistry, destChain.Client())
+	if err != nil {
+		return nil, errors.Wrap(err, "could not create dest price registry")
+	}
+
+	srcPriceRegistry, err := price_registry.NewPriceRegistry(dynamicOnRampConfig.PriceRegistry, sourceChain.Client())
+	if err != nil {
+		return nil, errors.Wrap(err, "could not create source price registry")
 	}
 
 	lggr = lggr.With("srcChain", hlp.ChainName(int64(pluginConfig.SourceChainID)), "dstChain", hlp.ChainName(destChainID))
@@ -96,57 +123,40 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	if pluginConfig.InflightCacheExpiry.Duration() != 0 {
 		inflightCacheExpiry = pluginConfig.InflightCacheExpiry.Duration()
 	}
-	priceGetterObject, err := NewPriceGetter(pluginConfig.TokensPerFeeCoinPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
-	if err != nil {
-		return nil, err
-	}
-
-	// subscribe for GasFeeUpdated logs, but FeeManager is only available as part of onchain offramp's config
-	// TODO: how to detect if OffRampConfig.FeeManager changes on-chain? Currently, we expect a plugin/job/node restart
-	offRampConfig, err := offRamp.GetOffRampConfig(nil)
-	if err != nil {
-		return nil, err
-	}
-	feeManager, err := fee_manager.NewFeeManager(offRampConfig.FeeManager, destChain.Client())
-	if err != nil {
-		return nil, err
-	}
 
 	eventSignatures := GetEventSignatures()
 	wrappedPluginFactory := NewExecutionReportingPluginFactory(
 		ExecutionPluginConfig{
-			lggr:                lggr,
-			source:              sourceChain.LogPoller(),
-			dest:                destChain.LogPoller(),
-			offRamp:             offRamp,
-			onRamp:              onRamp,
-			commitStore:         commitStore,
-			feeManager:          feeManager,
-			builder:             NewBatchBuilder(lggr, eventSignatures, offRamp),
-			eventSignatures:     eventSignatures,
-			priceGetter:         priceGetterObject,
-			leafHasher:          NewLeafHasher(pluginConfig.SourceChainID, uint64(destChainID), onRampAddr, hasher.NewKeccakCtx()),
-			snoozeTime:          rootSnoozeTime,
-			inflightCacheExpiry: inflightCacheExpiry,
-			sourceChainID:       pluginConfig.SourceChainID,
-			gasLimit:            BatchGasLimit,
-			destGasEstimator:    destChain.TxManager().GetGasEstimator(),
-			sourceGasEstimator:  sourceChain.TxManager().GetGasEstimator(),
+			lggr:                   lggr,
+			source:                 sourceChain.LogPoller(),
+			dest:                   destChain.LogPoller(),
+			offRamp:                offRamp,
+			onRamp:                 onRamp,
+			commitStore:            commitStore,
+			eventSignatures:        eventSignatures,
+			leafHasher:             NewLeafHasher(pluginConfig.SourceChainID, uint64(destChainID), onRamp.Address(), hasher.NewKeccakCtx()),
+			snoozeTime:             rootSnoozeTime,
+			inflightCacheExpiry:    inflightCacheExpiry,
+			destPriceRegistry:      destPriceRegistry,
+			srcPriceRegistry:       srcPriceRegistry,
+			destGasEstimator:       destChain.TxManager().GetGasEstimator(),
+			destWrappedNativeToken: destWrappedNative,
+			srcWrappedNativeToken:  sourceWrappedNative,
 		})
+
 	// Subscribe to all relevant commit logs.
-	_, err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{eventSignatures.SendRequested}, Addresses: []common.Address{onRampAddr}})
+	err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{Name: logpoller.FilterName(EXEC_CCIP_SENDS, onRamp.Address().String()),
+		EventSigs: []common.Hash{eventSignatures.SendRequested}, Addresses: []common.Address{onRamp.Address()}})
 	if err != nil {
 		return nil, err
 	}
-	_, err = destChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{ReportAccepted}, Addresses: []common.Address{commitStore.Address()}})
+	err = destChain.LogPoller().RegisterFilter(logpoller.Filter{Name: logpoller.FilterName(EXEC_REPORT_ACCEPTS, commitStore.Address().String()),
+		EventSigs: []common.Hash{ReportAccepted}, Addresses: []common.Address{commitStore.Address()}})
 	if err != nil {
 		return nil, err
 	}
-	_, err = destChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{GasFeeUpdated}, Addresses: []common.Address{offRampConfig.FeeManager}})
-	if err != nil {
-		return nil, err
-	}
-	_, err = destChain.LogPoller().RegisterFilter(logpoller.Filter{EventSigs: []common.Hash{eventSignatures.ExecutionStateChanged}, Addresses: []common.Address{offRampAddr}})
+	err = destChain.LogPoller().RegisterFilter(logpoller.Filter{Name: logpoller.FilterName(EXEC_EXECUTION_STATE_CHANGES, offRamp.Address().String()),
+		EventSigs: []common.Hash{eventSignatures.ExecutionStateChanged}, Addresses: []common.Address{offRamp.Address()}})
 	if err != nil {
 		return nil, err
 	}

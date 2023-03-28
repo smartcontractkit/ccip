@@ -2,22 +2,24 @@ package ccip
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/mock_afn_contract"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/simple_message_receiver"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
@@ -146,7 +148,8 @@ func (pool *LockReleaseTokenPool) SetOnRamp(onRamp common.Address) error {
 	log.Info().
 		Str("Token Pool", pool.Address()).
 		Msg("Setting on ramp for onramp router")
-	tx, err := pool.instance.SetOnRamp(opts, onRamp, true)
+	tx, err := pool.instance.ApplyRampUpdates(opts, []lock_release_token_pool.IPoolRampUpdate{{Ramp: onRamp, Allowed: true}}, []lock_release_token_pool.IPoolRampUpdate{})
+
 	if err != nil {
 		return err
 	}
@@ -166,7 +169,7 @@ func (pool *LockReleaseTokenPool) SetOffRamp(offRamp common.Address) error {
 	log.Info().
 		Str("Token Pool", pool.Address()).
 		Msg("Setting off ramp for Token Pool")
-	tx, err := pool.instance.SetOffRamp(opts, offRamp, true)
+	tx, err := pool.instance.ApplyRampUpdates(opts, []lock_release_token_pool.IPoolRampUpdate{}, []lock_release_token_pool.IPoolRampUpdate{{Ramp: offRamp, Allowed: true}})
 	if err != nil {
 		return err
 	}
@@ -259,44 +262,79 @@ func (rDapp *ReceiverDapp) Address() string {
 	return rDapp.EthAddress.Hex()
 }
 
-type FeeManager struct {
+func (rDapp *ReceiverDapp) ToggleRevert(revert bool) error {
+	opts, err := rDapp.client.TransactionOpts(rDapp.client.GetDefaultWallet())
+	if err != nil {
+		return err
+	}
+	tx, err := rDapp.instance.SetRevert(opts, revert)
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Bool("revert", revert).
+		Str("tx", tx.Hash().String()).
+		Str("ReceiverDapp", rDapp.Address()).
+		Str("Network Name", rDapp.client.GetNetworkConfig().Name).
+		Msg("ReceiverDapp revert set")
+	return rDapp.client.ProcessTransaction(tx)
+}
+
+type PriceRegistry struct {
 	client     blockchain.EVMClient
-	instance   *fee_manager.FeeManager
+	instance   *price_registry.PriceRegistry
 	EthAddress common.Address
 }
 
-func (c *FeeManager) Address() string {
+func (c *PriceRegistry) Address() string {
 	return c.EthAddress.Hex()
 }
 
-func (c *FeeManager) SetFeeUpdater(addr common.Address) error {
+func (c *PriceRegistry) AddPriceUpdater(addr common.Address) error {
 	opts, err := c.client.TransactionOpts(c.client.GetDefaultWallet())
 	if err != nil {
 		return err
 	}
-	tx, err := c.instance.SetFeeUpdater(opts, addr)
+	tx, err := c.instance.ApplyPriceUpdatersUpdates(opts, []common.Address{addr}, []common.Address{})
 	if err != nil {
 		return err
 	}
 	log.Info().
-		Str("updater", addr.Hex()).
+		Str("updaters", addr.Hex()).
 		Str("Network Name", c.client.GetNetworkConfig().Name).
-		Msg("FeeManager updater set")
+		Msg("PriceRegistry updater added")
 	return c.client.ProcessTransaction(tx)
 }
 
-func (c *FeeManager) UpdateFees(feeUpdates []fee_manager.InternalFeeUpdate) error {
+func (c *PriceRegistry) AddFeeToken(addr common.Address) error {
 	opts, err := c.client.TransactionOpts(c.client.GetDefaultWallet())
 	if err != nil {
 		return err
 	}
-	tx, err := c.instance.UpdateFees(opts, feeUpdates)
+	tx, err := c.instance.ApplyFeeTokensUpdates(opts, []common.Address{addr}, []common.Address{})
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Str("feeTokens", addr.Hex()).
+		Str("Network Name", c.client.GetNetworkConfig().Name).
+		Msg("PriceRegistry feeToken set")
+	return c.client.ProcessTransaction(tx)
+}
+
+func (c *PriceRegistry) UpdatePrices(priceUpdates price_registry.InternalPriceUpdates) error {
+	opts, err := c.client.TransactionOpts(c.client.GetDefaultWallet())
+	if err != nil {
+		return err
+	}
+	tx, err := c.instance.UpdatePrices(opts, priceUpdates)
 	if err != nil {
 		return err
 	}
 	log.Info().
 		Str("Network Name", c.client.GetNetworkConfig().Name).
-		Msg("FeeManager fee updated")
+		Interface("PriceUpdates", priceUpdates).
+		Msg("Prices updated")
 	return c.client.ProcessTransaction(tx)
 }
 
@@ -328,7 +366,7 @@ func (r *Router) SetOnRamp(chainID uint64, onRamp common.Address) error {
 		Str("Router", r.Address()).
 		Msg("Setting on ramp for r")
 
-	tx, err := r.Instance.ApplyRampUpdates(opts, []router.IRouterOnRampUpdate{{DestChainId: chainID, OnRamp: onRamp}}, nil)
+	tx, err := r.Instance.ApplyRampUpdates(opts, []router.RouterOnRampUpdate{{DestChainId: chainID, OnRamp: onRamp}}, nil)
 	if err != nil {
 		return err
 	}
@@ -339,17 +377,22 @@ func (r *Router) SetOnRamp(chainID uint64, onRamp common.Address) error {
 	return r.client.ProcessTransaction(tx)
 }
 
-func (r *Router) CCIPSend(destChainId uint64, msg router.ClientEVM2AnyMessage) (*types.Transaction, error) {
+func (r *Router) CCIPSend(destChainId uint64, msg router.ClientEVM2AnyMessage, valueForNative *big.Int) (*types.Transaction, error) {
 	opts, err := r.client.TransactionOpts(r.client.GetDefaultWallet())
 	if err != nil {
 		return nil, err
 	}
+	if valueForNative != nil {
+		opts.Value = valueForNative
+	}
+	opts.GasLimit = 500000
 	tx, err := r.Instance.CcipSend(opts, destChainId, msg)
 	if err != nil {
 		return nil, err
 	}
 	log.Info().
-		Str("r", r.Address()).
+		Str("router", r.Address()).
+		Str("txHash", tx.Hash().Hex()).
 		Str("Network Name", r.client.GetNetworkConfig().Name).
 		Msg("msg is sent")
 	return tx, r.client.ProcessTransaction(tx)
@@ -360,7 +403,7 @@ func (r *Router) AddOffRamp(offRamp common.Address, sourceChainId uint64) (*type
 	if err != nil {
 		return nil, err
 	}
-	tx, err := r.Instance.ApplyRampUpdates(opts, nil, []router.IRouterOffRampUpdate{
+	tx, err := r.Instance.ApplyRampUpdates(opts, nil, []router.RouterOffRampUpdate{
 		{SourceChainId: sourceChainId, OffRamps: []common.Address{offRamp}}})
 	if err != nil {
 		return nil, err
@@ -369,6 +412,23 @@ func (r *Router) AddOffRamp(offRamp common.Address, sourceChainId uint64) (*type
 		Str("offRamp", offRamp.Hex()).
 		Str("Network Name", r.client.GetNetworkConfig().Name).
 		Msg("offRamp is added to Router")
+	return tx, r.client.ProcessTransaction(tx)
+}
+
+func (r *Router) SetWrappedNative(wNative common.Address) (*types.Transaction, error) {
+	opts, err := r.client.TransactionOpts(r.client.GetDefaultWallet())
+	if err != nil {
+		return nil, err
+	}
+	tx, err := r.Instance.SetWrappedNative(opts, wNative)
+	if err != nil {
+		return nil, err
+	}
+	log.Info().
+		Str("wrapped native", wNative.Hex()).
+		Str("router", r.Address()).
+		Str("Network Name", r.client.GetNetworkConfig().Name).
+		Msg("wrapped native is added for Router")
 	return tx, r.client.ProcessTransaction(tx)
 }
 
@@ -394,6 +454,10 @@ func (onRamp *OnRamp) FilterCCIPSendRequested(
 }
 
 func (onRamp *OnRamp) SetTokenPrices(tokens []common.Address, prices []*big.Int) error {
+	if len(tokens) != len(prices) {
+		return errors.New(fmt.Sprintf("Tokens and prices length mismatch %d != %d", len(tokens), len(prices)))
+	}
+
 	opts, err := onRamp.client.TransactionOpts(onRamp.client.GetDefaultWallet())
 	if err != nil {
 		return err

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
+import "../helpers/MerkleHelper.sol";
 import "../commitStore/CommitStore.t.sol";
 import "../onRamp/EVM2EVMOnRampSetup.t.sol";
 import "../offRamp/EVM2EVMOffRampSetup.t.sol";
@@ -15,7 +16,7 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
     CommitStoreSetup.setUp();
     EVM2EVMOffRampSetup.setUp();
 
-    deployOffRamp(s_commitStore, s_sourceFeeManager, s_destRouter);
+    deployOffRamp(s_commitStore, s_destRouter);
     s_merkleHelper = new MerkleHelper();
   }
 
@@ -48,8 +49,9 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
     address[] memory onRamps = new address[](1);
     onRamps[0] = ON_RAMP_ADDRESS;
 
-    ICommitStore.CommitReport memory report = ICommitStore.CommitReport({
-      interval: ICommitStore.Interval(messages[0].sequenceNumber, messages[2].sequenceNumber),
+    CommitStore.CommitReport memory report = CommitStore.CommitReport({
+      priceUpdates: getEmptyPriceUpdates(),
+      interval: CommitStore.Interval(messages[0].sequenceNumber, messages[2].sequenceNumber),
       merkleRoot: merkleRoots[0]
     });
 
@@ -63,21 +65,21 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
     // incorrect in the checks below.
     vm.warp(BLOCK_TIME + 2000);
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit ExecutionStateChanged(
       messages[0].sequenceNumber,
       messages[0].messageId,
       Internal.MessageExecutionState.SUCCESS
     );
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit ExecutionStateChanged(
       messages[1].sequenceNumber,
       messages[1].messageId,
       Internal.MessageExecutionState.SUCCESS
     );
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit ExecutionStateChanged(
       messages[2].sequenceNumber,
       messages[2].messageId,
@@ -95,9 +97,15 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
     IERC20(s_sourceTokens[1]).approve(address(s_sourceRouter), i_tokenAmount1);
 
     message.receiver = abi.encode(address(s_receiver));
-    Internal.EVM2EVMMessage memory geEvent = _messageToEvent(message, expectedSeqNum, expectedSeqNum, expectedFee);
+    Internal.EVM2EVMMessage memory geEvent = _messageToEvent(
+      message,
+      expectedSeqNum,
+      expectedSeqNum,
+      expectedFee,
+      OWNER
+    );
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit CCIPSendRequested(geEvent);
 
     s_sourceRouter.ccipSend(DEST_CHAIN_ID, message);

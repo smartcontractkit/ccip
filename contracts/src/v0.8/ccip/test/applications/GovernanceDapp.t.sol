@@ -31,7 +31,6 @@ contract GovernanceDappSetup is EVM2EVMOnRampSetup {
 
 /// @notice #constructor
 contract GovernanceDapp_constructor is GovernanceDappSetup {
-  // Success
   function testSuccess() public {
     // typeAndVersion
     assertEq("GovernanceDapp 1.0.0", s_governanceDapp.typeAndVersion());
@@ -42,7 +41,6 @@ contract GovernanceDapp_constructor is GovernanceDappSetup {
 contract GovernanceDapp_voteForNewFeeConfig is GovernanceDappSetup {
   event ConfigPropagated(uint64 chainId, address contractAddress);
 
-  // Success
   function testSuccess() public {
     GovernanceDapp.FeeConfig memory feeConfig = GovernanceDapp.FeeConfig({feeAmount: 10000, changedAtBlock: 100});
     bytes memory data = abi.encode(feeConfig);
@@ -57,15 +55,15 @@ contract GovernanceDapp_voteForNewFeeConfig is GovernanceDappSetup {
       gasLimit: 3e5,
       strict: false,
       feeToken: s_sourceFeeToken,
-      feeTokenAmount: 32400109, // todo
+      feeTokenAmount: 64800216001, // todo
       messageId: ""
     });
     message.messageId = Internal._hash(message, s_metadataHash);
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit CCIPSendRequested(message);
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit ConfigPropagated(s_crossChainClone.chainId, s_crossChainClone.contractAddress);
 
     s_governanceDapp.voteForNewFeeConfig(feeConfig);
@@ -74,8 +72,6 @@ contract GovernanceDapp_voteForNewFeeConfig is GovernanceDappSetup {
 
 /// @notice #ccipReceive
 contract GovernanceDapp_ccipReceive is GovernanceDappSetup {
-  // Success
-
   function testSuccess() public {
     GovernanceDapp.FeeConfig memory feeConfig = GovernanceDapp.FeeConfig({feeAmount: 10000, changedAtBlock: 100});
 

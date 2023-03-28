@@ -1,6 +1,7 @@
 {
   "acceptOwnership()": "79ba5097",
   "allowance(address,address)": "dd62ed3e",
+  "applyRampUpdates((address,bool)[],(address,bool)[])": "af519112",
   "approve(address,uint256)": "095ea7b3",
   "balanceOf(address)": "70a08231",
   "decimals()": "313ce567",
@@ -15,8 +16,6 @@
   "pause()": "8456cb59",
   "paused()": "5c975abb",
   "releaseOrMint(address,uint256)": "ea6192a2",
-  "setOffRamp(address,bool)": "69e946d4",
-  "setOnRamp(address,bool)": "cc8af2e8",
   "symbol()": "95d89b41",
   "totalSupply()": "18160ddd",
   "transfer(address,uint256)": "a9059cbb",

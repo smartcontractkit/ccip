@@ -71,6 +71,10 @@ func NewFwdMgr(db *sqlx.DB, client evmclient.Client, logpoller evmlogpoller.LogP
 	return &fwdMgr
 }
 
+func (f *FwdMgr) Name() string {
+	return f.logger.Name()
+}
+
 // Start starts Forwarder Manager.
 func (f *FwdMgr) Start(ctx context.Context) error {
 	return f.StartOnce("EVMForwarderManager", func() error {
@@ -103,6 +107,10 @@ func (f *FwdMgr) Start(ctx context.Context) error {
 	})
 }
 
+func (f *FwdMgr) filterName(addr common.Address) string {
+	return evmlogpoller.FilterName("ForwarderManager AuthorizedSendersChanged", addr.String())
+}
+
 func (f *FwdMgr) GetForwarderForEOA(addr common.Address) (forwarder common.Address, err error) {
 	// Gets forwarders for current chain.
 	fwdrs, err := f.ORM.FindForwardersByChain(utils.Big(*f.evmClient.ChainID()))
@@ -131,6 +139,7 @@ func (f *FwdMgr) GetForwardedPayload(dest common.Address, origPayload []byte) ([
 		if err != nil {
 			f.logger.AssumptionViolationw("Forwarder encoding failed, this should never happen",
 				"err", err, "to", dest, "payload", origPayload)
+			f.SvcErrBuffer.Append(err)
 		}
 	}
 	return databytes, nil
@@ -200,8 +209,10 @@ func (f *FwdMgr) subscribeSendersChangedLogs(addr common.Address) error {
 		f.logger.Warnw("Unable to subscribe to AuthorizedSendersChanged logs", "forwarder", addr, "err", err)
 		return nil
 	}
-	_, err := f.logpoller.RegisterFilter(
+
+	err := f.logpoller.RegisterFilter(
 		evmlogpoller.Filter{
+			Name:      f.filterName(addr),
 			EventSigs: []common.Hash{authChangedTopic},
 			Addresses: []common.Address{addr},
 		})
@@ -308,4 +319,8 @@ func (f *FwdMgr) Close() error {
 		f.wg.Wait()
 		return nil
 	})
+}
+
+func (f *FwdMgr) HealthReport() map[string]error {
+	return map[string]error{f.Name(): f.StartStopOnce.Healthy()}
 }

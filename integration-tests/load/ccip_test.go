@@ -4,14 +4,15 @@ import (
 	"testing"
 
 	"github.com/rs/zerolog/log"
+
+	"github.com/smartcontractkit/chainlink/integration-tests/testsetups"
 )
 
 func TestLoadCCIPParallelSendSameSenderReceiver(t *testing.T) {
-	var (
-		testArgs *loadArgs
-	)
-
-	testArgs = PopulateAndValidate(t)
+	testArgs := &loadArgs{
+		t:       t,
+		TestCfg: testsetups.NewCCIPTestConfig(t, testsetups.Load),
+	}
 	testArgs.Setup()
 	// if the test runs on remote runner
 	if testArgs.ccipLoad == nil {
@@ -19,7 +20,7 @@ func TestLoadCCIPParallelSendSameSenderReceiver(t *testing.T) {
 	}
 	t.Cleanup(func() {
 		log.Info().Msg("Tearing down the environment")
-		testArgs.TearDown()
+		testArgs.TestSetupArgs.TearDown()
 	})
 	testArgs.Run()
 }

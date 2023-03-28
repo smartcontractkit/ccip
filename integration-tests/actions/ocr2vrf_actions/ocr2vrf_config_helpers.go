@@ -11,7 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/lib/pq"
-	"github.com/rs/zerolog/log"
+	"github.com/smartcontractkit/chainlink-testing-framework/utils"
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"github.com/smartcontractkit/ocr2vrf/altbn_128"
@@ -38,14 +38,21 @@ func CreateOCR2VRFJobs(
 	chainID int64,
 	keyIndex int,
 ) {
+	l := utils.GetTestLogger(t)
 	p2pV2Bootstrapper := createBootstrapJob(t, bootstrapNode, OCR2VRFPluginConfig.DKGConfig.DKGContractAddress, chainID)
 
 	createNonBootstrapJobs(t, nonBootstrapNodes, OCR2VRFPluginConfig, chainID, keyIndex, p2pV2Bootstrapper)
-	log.Info().Msg("Done creating OCR automation jobs")
+	l.Info().Msg("Done creating OCR automation jobs")
 }
 
-func createNonBootstrapJobs(t *testing.T, nonBootstrapNodes []*client.Chainlink, OCR2VRFPluginConfig *OCR2VRFPluginConfig, chainID int64, keyIndex int, P2Pv2Bootstrapper string) {
-
+func createNonBootstrapJobs(
+	t *testing.T,
+	nonBootstrapNodes []*client.Chainlink,
+	OCR2VRFPluginConfig *OCR2VRFPluginConfig,
+	chainID int64,
+	keyIndex int,
+	P2Pv2Bootstrapper string,
+) {
 	for index, nonBootstrapNode := range nonBootstrapNodes {
 		nodeTransmitterAddress, err := nonBootstrapNode.EthAddresses()
 		require.NoError(t, err, "Shouldn't fail getting primary ETH address from OCR node %d", index)
@@ -112,7 +119,7 @@ func BuildOCR2DKGConfigVars(
 	t *testing.T,
 	ocr2VRFPluginConfig *OCR2VRFPluginConfig,
 ) contracts.OCRConfig {
-
+	l := utils.GetTestLogger(t)
 	var onchainPublicKeys []common.Address
 	for _, onchainPublicKey := range ocr2VRFPluginConfig.OCR2Config.OnchainPublicKeys {
 		onchainPublicKeys = append(onchainPublicKeys, common.HexToAddress(onchainPublicKey))
@@ -154,6 +161,7 @@ func BuildOCR2DKGConfigVars(
 	}
 
 	keyIDBytes, err := DecodeHexTo32ByteArray(ocr2VRFPluginConfig.DKGConfig.DKGKeyID)
+	require.NoError(t, err, "Shouldn't fail decoding DKG key ID")
 
 	offchainConfig, err := dkg.OffchainConfig(encryptionKeys, signingKeys, &altbn_128.G1{}, &ocr2vrftypes.PairingTranslation{
 		Suite: &altbn_128.PairingSuite{},
@@ -181,8 +189,9 @@ func BuildOCR2DKGConfigVars(
 			1,                   // f int,
 			onchainConfig,       // onchainConfig []byte,
 		)
+	require.NoError(t, err, "Shouldn't fail building OCR config")
 
-	log.Info().Msg("Done building DKG OCR config")
+	l.Info().Msg("Done building DKG OCR config")
 	return contracts.OCRConfig{
 		Signers:               onchainPublicKeys,
 		Transmitters:          transmitters,
@@ -256,7 +265,7 @@ func BuildOCR2VRFConfigVars(
 	t *testing.T,
 	ocr2VRFPluginConfig *OCR2VRFPluginConfig,
 ) contracts.OCRConfig {
-
+	l := utils.GetTestLogger(t)
 	var onchainPublicKeys []common.Address
 	for _, onchainPublicKey := range ocr2VRFPluginConfig.OCR2Config.OnchainPublicKeys {
 		onchainPublicKeys = append(onchainPublicKeys, common.HexToAddress(onchainPublicKey))
@@ -307,7 +316,7 @@ func BuildOCR2VRFConfigVars(
 		)
 	require.NoError(t, err)
 
-	log.Info().Msg("Done building VRF OCR config")
+	l.Info().Msg("Done building VRF OCR config")
 	return contracts.OCRConfig{
 		Signers:               onchainPublicKeys,
 		Transmitters:          transmitters,

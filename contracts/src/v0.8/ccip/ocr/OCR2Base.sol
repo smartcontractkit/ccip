@@ -1,14 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {OwnerIsCreator} from "../access/OwnerIsCreator.sol";
+import {OwnerIsCreator} from "../OwnerIsCreator.sol";
 import {OCR2Abstract} from "./OCR2Abstract.sol";
 
-/**
- * @notice Onchain verification of reports from the offchain reporting protocol
- * @dev For details on its operation, see the offchain reporting protocol design
- * doc, which refers to this contract as simply the "contract".
- */
+/// @notice Onchain verification of reports from the offchain reporting protocol
+/// @dev For details on its operation, see the offchain reporting protocol design
+/// doc, which refers to this contract as simply the "contract".
 abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
   error InvalidConfig(string message);
   error WrongMessageLength(uint256 expected, uint256 actual);
@@ -94,15 +92,13 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
     _;
   }
 
-  /**
-   * @notice sets offchain reporting protocol configuration incl. participating oracles
-   * @param signers addresses with which oracles sign the reports
-   * @param transmitters addresses oracles use to transmit the reports
-   * @param f number of faulty oracles the system can tolerate
-   * @param onchainConfig encoded on-chain contract configuration
-   * @param offchainConfigVersion version number for offchainEncoding schema
-   * @param offchainConfig encoded off-chain oracle configuration
-   */
+  /// @notice sets offchain reporting protocol configuration incl. participating oracles
+  /// @param signers addresses with which oracles sign the reports
+  /// @param transmitters addresses oracles use to transmit the reports
+  /// @param f number of faulty oracles the system can tolerate
+  /// @param onchainConfig encoded on-chain contract configuration
+  /// @param offchainConfigVersion version number for offchainEncoding schema
+  /// @param offchainConfig encoded off-chain oracle configuration
   function setOCR2Config(
     address[] memory signers,
     address[] memory transmitters,
@@ -162,21 +158,17 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
     );
   }
 
-  /**
-   * @return list of addresses permitted to transmit reports to this contract
-   * @dev The list will match the order used to specify the transmitter during setConfig
-   */
+  /// @return list of addresses permitted to transmit reports to this contract
+  /// @dev The list will match the order used to specify the transmitter during setConfig
   function getTransmitters() external view returns (address[] memory) {
     return s_transmitters;
   }
 
-  /**
-   * @notice transmit is called to post a new report to the contract
-   * @param report serialized report, which the signatures are signing.
-   * @param rs ith element is the R components of the ith signature on report. Must have at most MAX_NUM_ORACLES entries
-   * @param ss ith element is the S components of the ith signature on report. Must have at most MAX_NUM_ORACLES entries
-   * @param rawVs ith element is the the V component of the ith signature
-   */
+  /// @notice transmit is called to post a new report to the contract
+  /// @param report serialized report, which the signatures are signing.
+  /// @param rs ith element is the R components of the ith signature on report. Must have at most MAX_NUM_ORACLES entries
+  /// @param ss ith element is the S components of the ith signature on report. Must have at most MAX_NUM_ORACLES entries
+  /// @param rawVs ith element is the the V component of the ith signature
   function transmit(
     // NOTE: If these parameters are changed, expectedMsgDataLength and/or
     // TRANSMIT_MSGDATA_CONSTANT_LENGTH_COMPONENT need to be changed accordingly
@@ -235,12 +227,10 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
     }
   }
 
-  /**
-   * @notice information about current offchain reporting protocol configuration
-   * @return configCount ordinal number of current config, out of all configs applied to this contract so far
-   * @return blockNumber block at which this config was set
-   * @return configDigest domain-separation tag for current config (see _configDigestFromConfigData)
-   */
+  /// @notice information about current offchain reporting protocol configuration
+  /// @return configCount ordinal number of current config, out of all configs applied to this contract so far
+  /// @return blockNumber block at which this config was set
+  /// @return configDigest domain-separation tag for current config (see _configDigestFromConfigData)
   function latestConfigDetails()
     external
     view
@@ -270,6 +260,4 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
   }
 
   function _report(bytes memory report) internal virtual;
-
-  function _beforeSetOCR2Config(uint8 f, bytes memory onchainConfig) internal virtual;
 }

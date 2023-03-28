@@ -1,6 +1,5 @@
 package smoke
 
-//revive:disable:dot-imports
 import (
 	"math/big"
 	"testing"
@@ -8,35 +7,28 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink/integration-tests/actions"
+	"github.com/smartcontractkit/chainlink/integration-tests/testsetups"
 )
 
 func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
 	t.Parallel()
+
+	TestCfg := testsetups.NewCCIPTestConfig(t, testsetups.Smoke)
 	transferAmounts := []*big.Int{big.NewInt(5e17), big.NewInt(5e17)}
-	laneA, laneB, tearDown := actions.CCIPDefaultTestSetUp(
-		t, "smoke-ccip",
-		map[string]interface{}{
-			"replicas": "6",
-			"toml":     actions.DefaultCCIPCLNodeEnv(t),
-		},
-		transferAmounts,
-		5,
-		true,
-		true,
-	)
+	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, "smoke-ccip", map[string]interface{}{
+		"replicas": "6",
+	}, transferAmounts, 5, true, true, TestCfg)
+
+	require.Greater(t, len(setUpOutput.Lanes), 0, "error in default set up")
+	laneA := setUpOutput.Lanes[0].ForwardLane
+	laneB := setUpOutput.Lanes[0].ReverseLane
 	if laneA == nil {
 		return
 	}
 	t.Cleanup(func() {
 		log.Info().Msg("Tearing down the environment")
-		tearDown()
+		setUpOutput.TearDown()
 	})
-
-	require.NoError(t, laneA.IsLaneDeployed())
-	if laneB != nil {
-		require.NoError(t, laneB.IsLaneDeployed())
-	}
 
 	// initiate transfer and verify
 	log.Info().Msgf("Multiple Token transfer for lane %s --> %s", laneA.SourceNetworkName, laneA.DestNetworkName)

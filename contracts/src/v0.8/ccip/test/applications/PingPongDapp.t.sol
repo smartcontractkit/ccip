@@ -25,8 +25,7 @@ contract PingPongDappSetup is EVM2EVMOnRampSetup {
     uint256 fundingAmount = 1e18;
 
     // Fund the contract with LINK tokens
-    s_feeToken.approve(address(s_pingPong), fundingAmount);
-    s_pingPong.fund(fundingAmount);
+    s_feeToken.transfer(address(s_pingPong), fundingAmount);
   }
 }
 
@@ -34,7 +33,6 @@ contract PingPongDappSetup is EVM2EVMOnRampSetup {
 contract PingPong_startPingPong is PingPongDappSetup {
   event ConfigPropagated(uint64 chainId, address contractAddress);
 
-  // Success
   function testSuccess() public {
     uint256 pingPongNumber = 1;
     bytes memory data = abi.encode(pingPongNumber);
@@ -65,10 +63,10 @@ contract PingPong_startPingPong is PingPongDappSetup {
     });
     message.messageId = Internal._hash(message, s_metadataHash);
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit Ping(pingPongNumber);
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit CCIPSendRequested(message);
 
     s_pingPong.startPingPong();
@@ -77,8 +75,6 @@ contract PingPong_startPingPong is PingPongDappSetup {
 
 /// @notice #ccipReceive
 contract PingPong_ccipReceive is PingPongDappSetup {
-  // Success
-
   function testSuccess() public {
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
 
@@ -94,7 +90,7 @@ contract PingPong_ccipReceive is PingPongDappSetup {
 
     changePrank(address(s_sourceRouter));
 
-    vm.expectEmit(false, false, false, true);
+    vm.expectEmit();
     emit Pong(pingPongNumber + 1);
 
     s_pingPong.ccipReceive(message);

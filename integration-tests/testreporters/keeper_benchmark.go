@@ -15,6 +15,7 @@ import (
 	"github.com/slack-go/slack"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/testreporters"
+
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 )
 
@@ -249,7 +250,7 @@ func (k *KeeperBenchmarkTestReporter) SendSlackNotification(t *testing.T, slackC
 		headerText = ":x: Automation Benchmark Test FAILED :x:"
 	}
 	messageBlocks := testreporters.CommonSlackNotificationBlocks(
-		t, slackClient, headerText, k.namespace, k.keeperReportFile, testreporters.SlackUserID, testFailed,
+		headerText, k.namespace, k.keeperReportFile,
 	)
 	ts, err := testreporters.SendSlackMessage(slackClient, slack.MsgOptionBlocks(messageBlocks...))
 	if err != nil {

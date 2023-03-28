@@ -17,14 +17,14 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/afn_contract"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store_helper"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp_helper"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/mock_afn_contract"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/simple_message_receiver"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
@@ -50,6 +50,7 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	destChainID := uint64(1337)
 	sourceChainID := uint64(1338)
 	destUser, err := bind.NewKeyedTransactorWithChainID(key, big.NewInt(0).SetUint64(destChainID))
+	require.NoError(t, err)
 	destChain := backends.NewSimulatedBackend(core.GenesisAlloc{
 		destUser.From: {Balance: big.NewInt(0).Mul(big.NewInt(100), big.NewInt(1000000000000000000))}},
 		10*ethconfig.Defaults.Miner.GasCeil) // 80M gas
@@ -76,45 +77,51 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	require.NoError(t, err)
 	destChain.Commit()
 
-	afnAddress, _, _, err := afn_contract.DeployAFNContract(
+	afnAddress, _, _, err := mock_afn_contract.DeployMockAFNContract(
 		destUser,
 		destChain,
-		[]common.Address{destUser.From},
-		[]*big.Int{big.NewInt(1)},
-		big.NewInt(1),
-		big.NewInt(1),
 	)
 	require.NoError(t, err)
 	destChain.Commit()
+
+	destPriceRegistryAddress, _, _, err := price_registry.DeployPriceRegistry(
+		destUser,
+		destChain,
+		price_registry.InternalPriceUpdates{
+			TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
+				{
+					SourceToken: destLinkTokenAddress,
+					UsdPerToken: big.NewInt(8e18), // 8usd
+				},
+			},
+			DestChainId:   destChainID,
+			UsdPerUnitGas: big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
+		},
+		nil,
+		[]common.Address{destLinkTokenAddress},
+		60*60*24*14, // two weeks
+	)
+	require.NoError(t, err)
 
 	onRampAddress := common.HexToAddress("0x01BE23585060835E02B77ef475b0Cc51aA1e0709")
 	linkTokenSourceAddress := common.HexToAddress("0x01BE23585060835E02B77ef475b0Cc51aA1e0709")
 	commitStoreAddress, _, _, err := commit_store_helper.DeployCommitStoreHelper(
 		destUser,  // user
 		destChain, // client
-		commit_store_helper.ICommitStoreCommitStoreConfig{
+		commit_store_helper.CommitStoreStaticConfig{
 			ChainId:       1338,
 			SourceChainId: 1337,
 			OnRamp:        onRampAddress,
 		},
-		afnAddress, // AFN address
-		1,          // min seq num
+		commit_store_helper.CommitStoreDynamicConfig{
+			PriceRegistry: destPriceRegistryAddress,
+			Afn:           afnAddress, // AFN address
+		},
 	)
 	require.NoError(t, err)
 	commitStore, err := commit_store_helper.NewCommitStoreHelper(commitStoreAddress, destChain)
 	require.NoError(t, err)
 
-	destFeeManagerAddress, _, _, err := fee_manager.DeployFeeManager(
-		destUser,
-		destChain, []fee_manager.InternalFeeUpdate{{
-			SourceFeeToken:              destLinkTokenAddress,
-			DestChainId:                 sourceChainID,
-			FeeTokenBaseUnitsPerUnitGas: big.NewInt(200e9), // (2e20 juels/eth) * (1 gwei / gas) / (1 eth/1e18)
-		}},
-		nil,
-		60*60*24*14, // two weeks
-	)
-	require.NoError(t, err)
 	destChain.Commit()
 
 	routerAddress, _, routerContract, err := router.DeployRouter(destUser, destChain, common.Address{})
@@ -123,22 +130,23 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	offRampAddress, _, _, err := evm_2_evm_offramp.DeployEVM2EVMOffRamp(
 		destUser,
 		destChain,
-		sourceChainID,
-		destChainID,
-		onRampAddress,
-		evm_2_evm_offramp.IEVM2EVMOffRampOffRampConfig{
+		evm_2_evm_offramp.EVM2EVMOffRampStaticConfig{
+			CommitStore:   commitStore.Address(),
+			ChainId:       destChainID,
+			SourceChainId: sourceChainID,
+			OnRamp:        onRampAddress,
+		},
+		evm_2_evm_offramp.EVM2EVMOffRampDynamicConfig{
 			Router:                                  routerAddress,
-			CommitStore:                             commitStore.Address(),
-			FeeManager:                              destFeeManagerAddress,
 			PermissionLessExecutionThresholdSeconds: 1,
 			ExecutionDelaySeconds:                   0,
 			MaxDataSize:                             1e5,
 			MaxTokensLength:                         5,
+			Afn:                                     afnAddress,
 		},
-		afnAddress,
 		[]common.Address{linkTokenSourceAddress},
 		[]common.Address{destPoolAddress},
-		evm_2_evm_offramp.IAggregateRateLimiterRateLimiterConfig{
+		evm_2_evm_offramp.AggregateRateLimiterRateLimiterConfig{
 			Capacity: big.NewInt(1e18),
 			Rate:     big.NewInt(1e18),
 			Admin:    destUser.From,
@@ -147,14 +155,14 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	require.NoError(t, err)
 	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(offRampAddress, destChain)
 	require.NoError(t, err)
-	_, err = destPool.SetOffRamp(destUser, offRampAddress, true)
+	_, err = destPool.ApplyRampUpdates(destUser, []lock_release_token_pool.IPoolRampUpdate{}, []lock_release_token_pool.IPoolRampUpdate{{Ramp: offRampAddress, Allowed: true}})
 	require.NoError(t, err)
 	receiverAddress, _, _, err := simple_message_receiver.DeploySimpleMessageReceiver(destUser, destChain)
 	require.NoError(t, err)
 	receiver, err := simple_message_receiver.NewSimpleMessageReceiver(receiverAddress, destChain)
 	require.NoError(t, err)
 	destChain.Commit()
-	_, err = routerContract.ApplyRampUpdates(destUser, nil, []router.IRouterOffRampUpdate{
+	_, err = routerContract.ApplyRampUpdates(destUser, nil, []router.RouterOffRampUpdate{
 		{SourceChainId: sourceChainID, OffRamps: []common.Address{offRampAddress}}})
 	require.NoError(t, err)
 	destChain.Commit()
@@ -277,7 +285,6 @@ func TestMaxInternalExecutionReportSize(t *testing.T) {
 		mb.allMsgBytes,
 		mb.proof.Hashes,
 		mb.proof.SourceFlags,
-		nil,
 	)
 	require.NoError(t, err)
 	t.Log("execution report length", len(executorReport), ccip.MaxExecutionReportLength)
@@ -311,12 +318,11 @@ func TestInternalExecutionReportEncoding(t *testing.T) {
 	mb := c.generateMessageBatch(t, 1, 1, 1)
 	report := evm_2_evm_offramp.InternalExecutionReport{
 		SequenceNumbers: mb.seqNums,
-		FeeUpdates:      []evm_2_evm_offramp.InternalFeeUpdate{},
 		EncodedMessages: mb.allMsgBytes,
 		Proofs:          mb.proof.Hashes,
 		ProofFlagBits:   ccip.ProofFlagsToBits(mb.proof.SourceFlags),
 	}
-	encodeCommitReport, err := ccip.EncodeExecutionReport(report.SequenceNumbers, report.EncodedMessages, report.Proofs, mb.proof.SourceFlags, nil)
+	encodeCommitReport, err := ccip.EncodeExecutionReport(report.SequenceNumbers, report.EncodedMessages, report.Proofs, mb.proof.SourceFlags)
 	require.NoError(t, err)
 	decodeCommitReport, err := ccip.DecodeExecutionReport(encodeCommitReport)
 	require.NoError(t, err)

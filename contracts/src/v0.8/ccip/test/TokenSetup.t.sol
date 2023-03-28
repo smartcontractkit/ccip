@@ -3,12 +3,9 @@ pragma solidity 0.8.15;
 
 import "./BaseTest.t.sol";
 import "./mocks/MockERC20.sol";
-import "./mocks/MockPool.sol";
 import "../../tests/MockV3Aggregator.sol";
 import "../pools/BurnMintTokenPool.sol";
 import "../pools/LockReleaseTokenPool.sol";
-import "../health/HealthChecker.sol";
-import "../pools/OffRampTokenPoolRegistry.sol";
 import "../models/Client.sol";
 
 contract TokenSetup is BaseTest {
@@ -64,7 +61,7 @@ contract TokenSetup is BaseTest {
     returns (Client.EVMTokenAmount[] memory tokenAmounts)
   {
     tokenAmounts = new Client.EVMTokenAmount[](s_sourceTokens.length);
-    for (uint256 i = 0; i < tokenAmounts.length; i++) {
+    for (uint256 i = 0; i < tokenAmounts.length; ++i) {
       tokenAmounts[i].token = s_sourceTokens[i];
     }
   }
@@ -75,7 +72,7 @@ contract TokenSetup is BaseTest {
     returns (Client.EVMTokenAmount[] memory tokenAmounts)
   {
     tokenAmounts = new Client.EVMTokenAmount[](s_destTokens.length);
-    for (uint256 i = 0; i < tokenAmounts.length; i++) {
+    for (uint256 i = 0; i < tokenAmounts.length; ++i) {
       tokenAmounts[i].token = s_destTokens[i];
     }
   }

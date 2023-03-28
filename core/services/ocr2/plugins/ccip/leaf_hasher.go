@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/core/utils"
@@ -27,13 +26,6 @@ var (
 func getMetaDataHash[H hasher.Hash](ctx hasher.Ctx[H], prefix [32]byte, sourceChainId uint64, onRampId common.Address, destChainId uint64) H {
 	paddedOnRamp := onRampId.Hash()
 	return ctx.Hash(utils.ConcatBytes(prefix[:], math.U256Bytes(big.NewInt(0).SetUint64(sourceChainId)), math.U256Bytes(big.NewInt(0).SetUint64(destChainId)), paddedOnRamp[:]))
-}
-
-func LogPollerLogToEthLog(log logpoller.Log) types.Log {
-	return types.Log{
-		Topics: log.GetTopics(),
-		Data:   log.Data,
-	}
 }
 
 type LeafHasher struct {

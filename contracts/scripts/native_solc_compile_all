@@ -8,7 +8,6 @@ python3 -m pip install --require-hashes -r $SCRIPTPATH/requirements.txt
 solc-select install 0.6.6
 solc-select install 0.7.6
 solc-select install 0.8.6
-solc-select install 0.8.15
 
 $SCRIPTPATH/native_solc6_compile Flags.sol
 $SCRIPTPATH/native_solc6_compile Oracle.sol
@@ -36,13 +35,16 @@ $SCRIPTPATH/native_solc7_compile KeeperRegistry1_1.sol
 $SCRIPTPATH/native_solc7_compile UpkeepRegistrationRequests.sol
 $SCRIPTPATH/native_solc7_compile tests/UpkeepPerformCounterRestrictive.sol
 $SCRIPTPATH/native_solc7_compile tests/UpkeepCounter.sol
-$SCRIPTPATH/native_solc8_6_compile factories/CronUpkeepFactory.sol
-$SCRIPTPATH/native_solc8_6_compile KeeperRegistry1_2.sol
-$SCRIPTPATH/native_solc8_6_compile dev/KeeperRegistryCheckUpkeepGasUsageWrapper1_2.sol
-$SCRIPTPATH/native_solc8_6_compile KeeperRegistry1_3.sol
-$SCRIPTPATH/native_solc8_6_compile KeeperRegistryLogic1_3.sol
-$SCRIPTPATH/native_solc8_6_compile keeper2_0/KeeperRegistry2_0.sol
-$SCRIPTPATH/native_solc8_6_compile keeper2_0/KeeperRegistryLogic2_0.sol
+$SCRIPTPATH/native_solc8_6_compile automation/upkeeps/CronUpkeepFactory.sol
+$SCRIPTPATH/native_solc8_6_compile automation/1_2/KeeperRegistrar1_2.sol
+$SCRIPTPATH/native_solc8_6_compile automation/1_2/KeeperRegistry1_2.sol
+$SCRIPTPATH/native_solc8_6_compile automation/1_2/KeeperRegistryCheckUpkeepGasUsageWrapper1_2.sol
+$SCRIPTPATH/native_solc8_6_compile automation/1_3/KeeperRegistry1_3.sol
+$SCRIPTPATH/native_solc8_6_compile automation/1_3/KeeperRegistryLogic1_3.sol
+$SCRIPTPATH/native_solc8_6_compile automation/2_0/KeeperRegistrar2_0.sol
+$SCRIPTPATH/native_solc8_6_compile automation/2_0/KeeperRegistry2_0.sol
+$SCRIPTPATH/native_solc8_6_compile automation/2_0/KeeperRegistryLogic2_0.sol
+$SCRIPTPATH/native_solc8_6_compile automation/UpkeepTranscoder.sol
 
 # Aggregators
 $SCRIPTPATH/native_solc8_6_compile interfaces/AggregatorV2V3Interface.sol
@@ -87,7 +89,6 @@ $SCRIPTPATH/native_solc8_6_compile KeepersVRFConsumer.sol
 
 $SCRIPTPATH/native_solc8_6_compile tests/VRFCoordinatorV2TestHelper.sol
 $SCRIPTPATH/native_solc8_6_compile VRFCoordinatorV2.sol
-$SCRIPTPATH/native_solc8_6_compile dev/special/NoCancelVRFCoordinatorV2.sol
 
 # Feeds
 $SCRIPTPATH/native_solc8_6_compile dev/DerivedPriceFeed.sol
@@ -100,28 +101,17 @@ $SCRIPTPATH/native_solc8_6_compile dev/functions/Functions.sol
 $SCRIPTPATH/native_solc8_6_compile dev/functions/FunctionsClient.sol
 $SCRIPTPATH/native_solc8_6_compile dev/functions/FunctionsClientExample.sol
 $SCRIPTPATH/native_solc8_6_compile dev/functions/FunctionsOracle.sol
+$SCRIPTPATH/native_solc8_6_compile tests/FunctionsOracleWithInit.sol
 $SCRIPTPATH/native_solc8_6_compile dev/functions/FunctionsBillingRegistry.sol
+$SCRIPTPATH/native_solc8_6_compile tests/FunctionsBillingRegistryWithInit.sol
 
-# CCIP
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/commitStore/CommitStore.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/test/helpers/CommitStoreHelper.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/pools/LockReleaseTokenPool.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/pools/BurnMintTokenPool.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/test/helpers/CustomTokenPool.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/health/AFN.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/test/mocks/MockAFN.sol
+# Mercury
+$SCRIPTPATH/native_solc8_6_compile Verifier.sol
+$SCRIPTPATH/native_solc8_6_compile VerifierProxy.sol
+$SCRIPTPATH/native_solc8_6_compile tests/ExposedVerifier.sol
 
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/onRamp/EVM2EVMOnRamp.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/offRamp/EVM2EVMOffRamp.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/test/helpers/ramps/EVM2EVMOffRampHelper.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/router/Router.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/fees/FeeManager.sol
-
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/applications/ReceiverDapp.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/test/helpers/receivers/SimpleMessageReceiver.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/test/helpers/receivers/MaybeRevertMessageReceiver.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/applications/GovernanceDapp.sol
-$SCRIPTPATH/native_solc8_15_compile_ccip ccip/applications/PingPongDemo.sol
+# MetaTransaction
 $SCRIPTPATH/native_solc8_15_compile metatx/MetaERC20.sol
 $SCRIPTPATH/native_solc8_15_compile metatx/Forwarder.sol
 
+$SCRIPTPATH/native_solc_compile_all_ccip

@@ -38,7 +38,7 @@ before(async () => {
   )
 
   functionsBillingRegistryFactory = await ethers.getContractFactory(
-    'src/v0.8/dev/functions/FunctionsBillingRegistry.sol:FunctionsBillingRegistry',
+    'src/v0.8/tests/FunctionsBillingRegistryWithInit.sol:FunctionsBillingRegistryWithInit',
     roles.defaultAccount,
   )
 
@@ -65,6 +65,7 @@ describe('FunctionsOracle', () => {
   let transmitters: string[]
 
   beforeEach(async () => {
+    // Deploy contracts
     linkToken = await linkTokenFactory.connect(roles.defaultAccount).deploy()
     mockLinkEth = await mockAggregatorV3Factory.deploy(
       0,
@@ -74,6 +75,8 @@ describe('FunctionsOracle', () => {
     registry = await functionsBillingRegistryFactory
       .connect(roles.defaultAccount)
       .deploy(linkToken.address, mockLinkEth.address, oracle.address)
+
+    // Setup contracts
     await oracle.setRegistry(registry.address)
     await oracle.deactivateAuthorizedReceiver()
     client = await clientTestHelperFactory
@@ -95,6 +98,7 @@ describe('FunctionsOracle', () => {
       300, // requestTimeoutSeconds
     )
 
+    // Setup accounts
     const createSubTx = await registry
       .connect(roles.defaultAccount)
       .createSubscription()
@@ -324,7 +328,7 @@ describe('FunctionsOracle', () => {
 
       await expect(oracle.callReport(report)).to.emit(
         oracle,
-        'UserCallbackRawError',
+        'InvalidRequestID',
       )
     })
 
@@ -444,8 +448,8 @@ describe('FunctionsOracle', () => {
 
       // for second fulfill the requestId becomes invalid
       await expect(oracle.connect(roles.oracleNode).callReport(report))
-        .to.emit(oracle, 'UserCallbackRawError')
-        .withArgs(requestId, '0xda7aa3e1')
+        .to.emit(oracle, 'InvalidRequestID')
+        .withArgs(requestId)
     })
 
     it('#_report reverts for inconsistent encoding', async () => {

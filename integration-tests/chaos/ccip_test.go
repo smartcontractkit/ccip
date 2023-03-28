@@ -11,52 +11,16 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
+	"github.com/smartcontractkit/chainlink/integration-tests/testsetups"
 )
 
+/* @network-chaos and @pod-chaos are split intentionally into 2 parallel groups
+we can't use chaos.NewNetworkPartition and chaos.NewFailPods in parallel
+because of jsii runtime bug, see Makefile and please use those targets to run tests
+In .github/workflows/ccip-chaos-tests.yml we use these tags to run these tests separately
+*/
+
 func TestChaosCCIP(t *testing.T) {
-	var (
-		tearDown         func()
-		numOfCommitNodes = 5
-		numOfRequests    = 3
-		testEnvironment  *environment.Environment
-		lane             *actions.CCIPLane
-		testSetup        actions.CCIPTestEnv
-	)
-
-	lane, _, tearDown = actions.CCIPDefaultTestSetUp(t, "chaos-ccip",
-		map[string]interface{}{
-			"replicas": "12",
-			"toml":     actions.DefaultCCIPCLNodeEnv(t),
-			"env": map[string]interface{}{
-				"CL_DEV": "true",
-			},
-			"db": map[string]interface{}{
-				"stateful": true,
-				"capacity": "10Gi",
-				"resources": map[string]interface{}{
-					"requests": map[string]interface{}{
-						"cpu":    "250m",
-						"memory": "256Mi",
-					},
-					"limits": map[string]interface{}{
-						"cpu":    "250m",
-						"memory": "256Mi",
-					},
-				},
-			},
-		}, []*big.Int{big.NewInt(1e8)}, numOfCommitNodes, false, false)
-
-	// if the test runs on remote runner
-	if lane == nil {
-		return
-	}
-	t.Cleanup(func() {
-		tearDown()
-	})
-	require.NoError(t, lane.IsLaneDeployed())
-	testEnvironment = lane.TestEnv.K8Env
-	testSetup = *lane.TestEnv
-
 	inputs := []struct {
 		testName             string
 		chaosFunc            chaos.ManifestFunc
@@ -64,7 +28,38 @@ func TestChaosCCIP(t *testing.T) {
 		waitForChaosRecovery bool
 	}{
 		{
-			testName:  "CCIP Commit works after majority of CL nodes are recovered from pod failure",
+			testName:  "CCIP works after rpc is down for NetworkA @network-chaos",
+			chaosFunc: chaos.NewNetworkPartition,
+			chaosProps: &chaos.Props{
+				FromLabels: &map[string]*string{"app": a.Str(actions.GethLabelNetworkA)},
+				// chainlink-0 is default label set for all cll nodes
+				ToLabels:    &map[string]*string{"app": a.Str("chainlink-0")},
+				DurationStr: "1m",
+			},
+			waitForChaosRecovery: true,
+		},
+		{
+			testName:  "CCIP works after rpc is down for NetworkB @network-chaos",
+			chaosFunc: chaos.NewNetworkPartition,
+			chaosProps: &chaos.Props{
+				FromLabels:  &map[string]*string{"app": a.Str(actions.GethLabelNetworkB)},
+				ToLabels:    &map[string]*string{"app": a.Str("chainlink-0")},
+				DurationStr: "1m",
+			},
+			waitForChaosRecovery: true,
+		},
+		{
+			testName:  "CCIP works after 2 rpc's are down for all cll nodes @network-chaos",
+			chaosFunc: chaos.NewNetworkPartition,
+			chaosProps: &chaos.Props{
+				FromLabels:  &map[string]*string{"geth": a.Str(actions.ChaosGroupCCIPGeth)},
+				ToLabels:    &map[string]*string{"app": a.Str("chainlink-0")},
+				DurationStr: "1m",
+			},
+			waitForChaosRecovery: true,
+		},
+		{
+			testName:  "CCIP Commit works after majority of CL nodes are recovered from pod failure @pod-chaos",
 			chaosFunc: chaos.NewFailPods,
 			chaosProps: &chaos.Props{
 				LabelsSelector: &map[string]*string{actions.ChaosGroupCommitFaultyPlus: a.Str("1")},
@@ -73,7 +68,7 @@ func TestChaosCCIP(t *testing.T) {
 			waitForChaosRecovery: true,
 		},
 		{
-			testName:  "CCIP Execution works after majority of CL nodes are recovered from pod failure",
+			testName:  "CCIP Execution works after majority of CL nodes are recovered from pod failure @pod-chaos",
 			chaosFunc: chaos.NewFailPods,
 			chaosProps: &chaos.Props{
 				LabelsSelector: &map[string]*string{actions.ChaosGroupExecutionFaultyPlus: a.Str("1")},
@@ -82,7 +77,7 @@ func TestChaosCCIP(t *testing.T) {
 			waitForChaosRecovery: true,
 		},
 		{
-			testName:  "CCIP Commit works while minority of CL nodes are in failed state for pod failure",
+			testName:  "CCIP Commit works while minority of CL nodes are in failed state for pod failure @pod-chaos",
 			chaosFunc: chaos.NewFailPods,
 			chaosProps: &chaos.Props{
 				LabelsSelector: &map[string]*string{actions.ChaosGroupCommitFaulty: a.Str("1")},
@@ -91,7 +86,7 @@ func TestChaosCCIP(t *testing.T) {
 			waitForChaosRecovery: false,
 		},
 		{
-			testName:  "CCIP Execution works while minority of CL nodes are in failed state for pod failure",
+			testName:  "CCIP Execution works while minority of CL nodes are in failed state for pod failure @pod-chaos",
 			chaosFunc: chaos.NewFailPods,
 			chaosProps: &chaos.Props{
 				LabelsSelector: &map[string]*string{actions.ChaosGroupExecutionFaulty: a.Str("1")},
@@ -100,8 +95,53 @@ func TestChaosCCIP(t *testing.T) {
 			waitForChaosRecovery: false,
 		},
 	}
+	testCfg := testsetups.NewCCIPTestConfig(t, testsetups.Chaos)
 	for _, in := range inputs {
 		t.Run(in.testName, func(t *testing.T) {
+			t.Parallel()
+			var (
+				tearDown         func()
+				numOfCommitNodes = 5
+				numOfRequests    = 3
+				testEnvironment  *environment.Environment
+				lane             *actions.CCIPLane
+				testSetup        *actions.CCIPTestEnv
+			)
+
+			setUpArgs := testsetups.CCIPDefaultTestSetUp(t, "chaos-ccip", map[string]interface{}{
+				"replicas": "12",
+				"db": map[string]interface{}{
+					"stateful": true,
+					"capacity": "10Gi",
+					"resources": map[string]interface{}{
+						"requests": map[string]interface{}{
+							"cpu":    "250m",
+							"memory": "256Mi",
+						},
+						"limits": map[string]interface{}{
+							"cpu":    "250m",
+							"memory": "256Mi",
+						},
+					},
+				},
+			}, []*big.Int{big.NewInt(1e8)}, numOfCommitNodes, false, false, testCfg)
+
+			require.Greater(t, len(setUpArgs.Lanes), 0, "error in default set up")
+
+			lane = setUpArgs.Lanes[0].ForwardLane
+
+			// if the test runs on remote runner
+			if lane == nil {
+				return
+			}
+			tearDown = setUpArgs.TearDown
+			t.Cleanup(func() {
+				tearDown()
+			})
+
+			testEnvironment = lane.TestEnv.K8Env
+			testSetup = lane.TestEnv
+
 			testSetup.ChaosLabel(t)
 
 			// apply chaos

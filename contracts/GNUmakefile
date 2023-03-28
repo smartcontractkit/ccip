@@ -25,8 +25,8 @@ abigen: ## Build & install abigen.
 
 .PHONY: wrappers
 wrappers: abigen ## Recompiles solidity contracts and their go wrappers.
-	./scripts/native_solc_compile_all
-	go generate ./core/gethwrappers
+	./scripts/native_solc_compile_all_ccip
+	go generate ../core/gethwrappers/go_generate_ccip.go
 
 .PHONY: snapshot
 snapshot:
@@ -34,11 +34,18 @@ snapshot:
 
 ccip-precommit: export FOUNDRY_PROFILE=ccip
 .PHONY: ccip-precommit
-ccip-precommit:
+ccip-precommit: snapshot
 	forge test
 	pnpm prettier:write
 	pnpm lint:ccip
 	make ccip-abi-fix
+
+ccip-lcov: export FOUNDRY_PROFILE=ccip
+.PHONY: ccip-lcov
+ccip-lcov:
+	forge coverage --report lcov
+	../tools/ci/ccip_lcov_prune ./lcov.info ./lcov.info.pruned
+	genhtml -o report lcov.info.pruned --branch-coverage
 
 help:
 	@echo ""

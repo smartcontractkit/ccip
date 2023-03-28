@@ -1,6 +1,0 @@
-{
-  "getAllowlist()": "c5eff3d0",
-  "getAllowlistEnabled()": "f78faa32",
-  "setAllowlist(address[])": "552b818b",
-  "setAllowlistEnabled(bool)": "d7644ba2"
-}

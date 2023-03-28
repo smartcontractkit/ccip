@@ -2,24 +2,32 @@
 pragma solidity 0.8.15;
 
 import {ICommitStore} from "../../interfaces/ICommitStore.sol";
-import {IAny2EVMMessageReceiver} from "../../interfaces/router/IAny2EVMMessageReceiver.sol";
-import {IEVM2EVMOffRamp} from "../../interfaces/offRamp/IEVM2EVMOffRamp.sol";
-import {IFeeManager} from "../../interfaces/fees/IFeeManager.sol";
-import {IRouter} from "../../interfaces/router/IRouter.sol";
+import {IAny2EVMMessageReceiver} from "../../interfaces/IAny2EVMMessageReceiver.sol";
+import {IPriceRegistry} from "../../interfaces/IPriceRegistry.sol";
+import {IPool} from "../../interfaces/pools/IPool.sol";
 
 import {Internal} from "../../models/Internal.sol";
 import {Client} from "../../models/Client.sol";
-import {FeeManagerSetup} from "../fees/FeeManager.t.sol";
+import {TokenSetup} from "../TokenSetup.t.sol";
+import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
 import {MockCommitStore} from "../mocks/MockCommitStore.sol";
+import {Router} from "../../Router.sol";
+import {EVM2EVMOffRamp} from "../../offRamp/EVM2EVMOffRamp.sol";
 import {SimpleMessageReceiver} from "../helpers/receivers/SimpleMessageReceiver.sol";
-import {EVM2EVMOffRampHelper} from "../helpers/ramps/EVM2EVMOffRampHelper.sol";
-import "../TokenSetup.t.sol";
-import "../router/RouterSetup.t.sol";
+import {AggregateRateLimiter} from "../../AggregateRateLimiter.sol";
+import {EVM2EVMOffRampHelper} from "../helpers/EVM2EVMOffRampHelper.sol";
+import {TokenSetup} from "../TokenSetup.t.sol";
+import {RouterSetup} from "../router/RouterSetup.t.sol";
+import {MaybeRevertMessageReceiver} from "../helpers/receivers/MaybeRevertMessageReceiver.sol";
+import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
 
-contract EVM2EVMOffRampSetup is TokenSetup, FeeManagerSetup {
+import {IERC20} from "../../../vendor/IERC20.sol";
+
+contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup {
   ICommitStore internal s_mockCommitStore;
   IAny2EVMMessageReceiver internal s_receiver;
   IAny2EVMMessageReceiver internal s_secondary_receiver;
+  IAny2EVMMessageReceiver internal s_reverting_receiver;
 
   EVM2EVMOffRampHelper internal s_offRamp;
 
@@ -32,44 +40,47 @@ contract EVM2EVMOffRampSetup is TokenSetup, FeeManagerSetup {
   );
   event SkippedIncorrectNonce(uint64 indexed nonce, address indexed sender);
 
-  function setUp() public virtual override(TokenSetup, FeeManagerSetup) {
+  function setUp() public virtual override(TokenSetup, PriceRegistrySetup) {
     TokenSetup.setUp();
-    FeeManagerSetup.setUp();
+    PriceRegistrySetup.setUp();
 
     s_mockCommitStore = new MockCommitStore();
     s_receiver = new SimpleMessageReceiver();
     s_secondary_receiver = new SimpleMessageReceiver();
+    s_reverting_receiver = new MaybeRevertMessageReceiver(true);
 
-    deployOffRamp(s_mockCommitStore, s_destFeeManager, s_destRouter);
+    deployOffRamp(s_mockCommitStore, s_destRouter);
   }
 
-  function deployOffRamp(
-    ICommitStore commitStore,
-    IFeeManager feeManager,
-    IRouter router
-  ) internal {
+  function deployOffRamp(ICommitStore commitStore, Router router) internal {
     s_offRamp = new EVM2EVMOffRampHelper(
-      SOURCE_CHAIN_ID,
-      DEST_CHAIN_ID,
-      ON_RAMP_ADDRESS,
-      offRampConfig(feeManager, commitStore, router),
-      s_afn,
+      EVM2EVMOffRamp.StaticConfig({
+        commitStore: address(commitStore),
+        chainId: DEST_CHAIN_ID,
+        sourceChainId: SOURCE_CHAIN_ID,
+        onRamp: ON_RAMP_ADDRESS
+      }),
+      generateDynamicOffRampConfig(address(router), address(s_mockAFN)),
       getCastedSourceTokens(),
       getCastedDestinationPools(),
       rateLimiterConfig()
     );
-
+    address[] memory updaters = new address[](1);
+    updaters[0] = address(s_offRamp);
     s_offRamp.setPrices(getCastedDestinationTokens(), getTokenPrices());
-    s_destFeeManager.setFeeUpdater(address(s_offRamp));
+
     address[] memory s_offRamps = new address[](1);
     s_offRamps[0] = address(s_offRamp);
-    IRouter.OnRampUpdate[] memory onRampUpdates = new IRouter.OnRampUpdate[](0);
-    IRouter.OffRampUpdate[] memory offRampUpdates = new IRouter.OffRampUpdate[](1);
-    offRampUpdates[0] = IRouter.OffRampUpdate({sourceChainId: SOURCE_CHAIN_ID, offRamps: s_offRamps});
+    Router.OnRampUpdate[] memory onRampUpdates = new Router.OnRampUpdate[](0);
+    Router.OffRampUpdate[] memory offRampUpdates = new Router.OffRampUpdate[](1);
+    offRampUpdates[0] = Router.OffRampUpdate({sourceChainId: SOURCE_CHAIN_ID, offRamps: s_offRamps});
     s_destRouter.applyRampUpdates(onRampUpdates, offRampUpdates);
 
-    LockReleaseTokenPool(address(s_destPools[0])).setOffRamp(address(s_offRamp), true);
-    LockReleaseTokenPool(address(s_destPools[1])).setOffRamp(address(s_offRamp), true);
+    IPool.RampUpdate[] memory offRamps = new IPool.RampUpdate[](1);
+    offRamps[0] = IPool.RampUpdate({ramp: address(s_offRamp), allowed: true});
+
+    LockReleaseTokenPool(address(s_destPools[0])).applyRampUpdates(new IPool.RampUpdate[](0), offRamps);
+    LockReleaseTokenPool(address(s_destPools[1])).applyRampUpdates(new IPool.RampUpdate[](0), offRamps);
   }
 
   function _convertToGeneralMessage(Internal.EVM2EVMMessage memory original)
@@ -172,16 +183,21 @@ contract EVM2EVMOffRampSetup is TokenSetup, FeeManagerSetup {
       sequenceNumbers[i] = messages[i].sequenceNumber;
     }
 
-    bytes32[] memory proofs = new bytes32[](0);
-    Internal.FeeUpdate[] memory feeUpdates = new Internal.FeeUpdate[](0);
-
     return
       Internal.ExecutionReport({
         sequenceNumbers: sequenceNumbers,
-        proofs: proofs,
+        proofs: new bytes32[](0),
         proofFlagBits: 2**256 - 1,
-        encodedMessages: encodedMessages,
-        feeUpdates: feeUpdates
+        encodedMessages: encodedMessages
       });
+  }
+
+  function _assertSameConfig(EVM2EVMOffRamp.DynamicConfig memory a, EVM2EVMOffRamp.DynamicConfig memory b) public {
+    assertEq(a.executionDelaySeconds, b.executionDelaySeconds);
+    assertEq(a.maxDataSize, b.maxDataSize);
+    assertEq(a.maxTokensLength, b.maxTokensLength);
+    assertEq(a.permissionLessExecutionThresholdSeconds, b.permissionLessExecutionThresholdSeconds);
+    assertEq(a.afn, b.afn);
+    assertEq(a.router, b.router);
   }
 }

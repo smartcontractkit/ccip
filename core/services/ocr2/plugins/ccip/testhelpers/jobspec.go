@@ -27,23 +27,22 @@ func JobName(jobType JobType, source string, destination string) string {
 }
 
 type CCIPJobSpecParams struct {
-	Name                     string
-	OffRamp                  common.Address
-	OnRampForExecution       common.Address
-	OnRampsOnCommit          common.Address
-	CommitStore              common.Address
-	SourceChainName          string
-	DestChainName            string
-	SourceChainId            uint64
-	DestChainId              uint64
-	TokensPerFeeCoinPipeline string
-	PollPeriod               time.Duration
-	SourceStartBlock         uint64
-	DestStartBlock           uint64
-	RelayInflight            time.Duration
-	ExecInflight             time.Duration
-	RootSnooze               time.Duration
-	P2PV2Bootstrappers       pq.StringArray
+	Name                   string
+	OffRamp                common.Address
+	OnRamp                 common.Address
+	CommitStore            common.Address
+	SourceChainName        string
+	DestChainName          string
+	SourceChainId          uint64
+	DestChainId            uint64
+	TokenPricesUSDPipeline string
+	PollPeriod             time.Duration
+	SourceStartBlock       uint64
+	DestStartBlock         uint64
+	RelayInflight          time.Duration
+	ExecInflight           time.Duration
+	RootSnooze             time.Duration
+	P2PV2Bootstrappers     pq.StringArray
 }
 
 func (params CCIPJobSpecParams) Validate() error {
@@ -64,8 +63,11 @@ func (params CCIPJobSpecParams) ValidateCommitJobSpec() error {
 	if commonErr != nil {
 		return commonErr
 	}
-	if params.OnRampsOnCommit == common.HexToAddress("") {
+	if params.OnRamp == common.HexToAddress("") {
 		return fmt.Errorf("OnRampOnCommit cannot be empty. The commit job needs to set onRampID")
+	}
+	if params.OffRamp == common.HexToAddress("0x0") {
+		return fmt.Errorf("OffRamp cannot be empty for execution job")
 	}
 
 	return nil
@@ -76,7 +78,7 @@ func (params CCIPJobSpecParams) ValidateExecJobSpec() error {
 	if commonErr != nil {
 		return commonErr
 	}
-	if params.OnRampForExecution == common.HexToAddress("0x0") {
+	if params.OnRamp == common.HexToAddress("0x0") {
 		return fmt.Errorf("OnRampForExecution cannot be empty. The exec job needs to set onRampID")
 	}
 	if params.OffRamp == common.HexToAddress("0x0") {
@@ -101,8 +103,12 @@ func (params CCIPJobSpecParams) CommitJobSpec() (*client.OCR2TaskJobSpec, error)
 		P2PV2Bootstrappers:                params.P2PV2Bootstrappers,
 		PluginConfig: map[string]interface{}{
 			"sourceChainID": params.SourceChainId,
-			"onRampID":      fmt.Sprintf("\"%s\"", params.OnRampsOnCommit.Hex()),
+			"onRampID":      fmt.Sprintf("\"%s\"", params.OnRamp.Hex()),
+			"offRampID":     fmt.Sprintf("\"%s\"", params.OffRamp.Hex()),
 			"pollPeriod":    `"1s"`,
+			"tokenPricesUSDPipeline": fmt.Sprintf(`"""
+%s
+"""`, params.TokenPricesUSDPipeline),
 		},
 		RelayConfig: map[string]interface{}{
 			"chainID": params.DestChainId,
@@ -143,11 +149,8 @@ func (params CCIPJobSpecParams) ExecutionJobSpec() (*client.OCR2TaskJobSpec, err
 		P2PV2Bootstrappers:                params.P2PV2Bootstrappers,
 		PluginConfig: map[string]interface{}{
 			"sourceChainID": params.SourceChainId,
-			"onRampID":      fmt.Sprintf("\"%s\"", params.OnRampForExecution.Hex()),
+			"onRampID":      fmt.Sprintf("\"%s\"", params.OnRamp.Hex()),
 			"commitStoreID": fmt.Sprintf("\"%s\"", params.CommitStore.Hex()),
-			"tokensPerFeeCoinPipeline": fmt.Sprintf(`"""
-%s
-"""`, params.TokensPerFeeCoinPipeline),
 		},
 		RelayConfig: map[string]interface{}{
 			"chainID": params.DestChainId,

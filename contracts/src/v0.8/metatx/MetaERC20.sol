@@ -4,11 +4,11 @@ pragma solidity ^0.8.6;
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {CCIPReceiver} from "../ccip/applications/CCIPReceiver.sol";
-import {IRouterClient} from "../ccip/interfaces/router/IRouterClient.sol";
+import {IRouterClient} from "../ccip/interfaces/IRouterClient.sol";
 import {Client} from "../ccip/models/Client.sol";
 import {ERC2771Recipient} from "../metatx/ERC2771Recipient.sol";
 import {IForwarder} from "../metatx/IForwarder.sol";
-import {OwnerIsCreator} from "../ccip/access/OwnerIsCreator.sol";
+import {OwnerIsCreator} from "../ccip/OwnerIsCreator.sol";
 
 contract MetaERC20 is CCIPReceiver, IERC20, ERC2771Recipient, OwnerIsCreator {
   using SafeMath for uint256;

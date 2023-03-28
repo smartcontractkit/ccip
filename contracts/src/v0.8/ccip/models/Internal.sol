@@ -2,18 +2,28 @@
 pragma solidity ^0.8.0;
 
 import {Client} from "./Client.sol";
+import {MerkleMultiProof} from "../MerkleMultiProof.sol";
 
 // Library for CCIP internal definitions common to multiple contracts.
 library Internal {
-  struct FeeUpdate {
-    address sourceFeeToken;
-    uint64 destChainId;
-    uint128 feeTokenBaseUnitsPerUnitGas;
+  struct PriceUpdates {
+    TokenPriceUpdate[] tokenPriceUpdates;
+    uint64 destChainId; // ------┐ Destination chain Id
+    uint128 usdPerUnitGas; // ---┘ USD per unit of destination chain gas
+  }
+
+  struct TokenPriceUpdate {
+    address sourceToken; // Source token
+    uint128 usdPerToken; // USD per unit of token
+  }
+
+  struct PoolUpdate {
+    address token; // The IERC20 token address
+    address pool; // The token pool address
   }
 
   struct ExecutionReport {
     uint64[] sequenceNumbers;
-    FeeUpdate[] feeUpdates;
     bytes[] encodedMessages;
     bytes32[] proofs;
     uint256 proofFlagBits;
@@ -56,7 +66,7 @@ library Internal {
     return
       keccak256(
         abi.encode(
-          Internal.LEAF_DOMAIN_SEPARATOR,
+          MerkleMultiProof.LEAF_DOMAIN_SEPARATOR,
           metadataHash,
           original.sequenceNumber,
           original.nonce,
@@ -103,21 +113,10 @@ library Internal {
     return newTokens;
   }
 
-  // Offchain leaf domain separator
-  bytes32 public constant LEAF_DOMAIN_SEPARATOR = 0x0000000000000000000000000000000000000000000000000000000000000000;
-  // Internal domain separator used in proofs
-  bytes32 public constant INTERNAL_DOMAIN_SEPARATOR =
-    0x0000000000000000000000000000000000000000000000000000000000000001;
-
   enum MessageExecutionState {
     UNTOUCHED,
     IN_PROGRESS,
     SUCCESS,
     FAILURE
-  }
-
-  struct ExecutionResult {
-    uint64 sequenceNumber;
-    MessageExecutionState state;
   }
 }

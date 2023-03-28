@@ -2,10 +2,11 @@
 pragma solidity 0.8.15;
 
 import "../interfaces/ICommitStore.sol";
-import "../interfaces/offRamp/IEVM2EVMOffRamp.sol";
-import "../interfaces/rateLimiter/IAggregateRateLimiter.sol";
-import "../interfaces/router/IRouter.sol";
-import "../interfaces/onRamp/IEVM2EVMOnRamp.sol";
+import {AFN} from "../AFN.sol";
+import "../interfaces/IRouter.sol";
+import "../offRamp/EVM2EVMOffRamp.sol";
+import "../onRamp/EVM2EVMOnRamp.sol";
+import "../AggregateRateLimiter.sol";
 
 contract StructFactory {
   // addresses
@@ -14,6 +15,19 @@ contract StructFactory {
   address internal constant DUMMY_CONTRACT_ADDRESS = 0x1111111111111111111111111111111111111112;
   address internal constant ON_RAMP_ADDRESS = 0x11118e64e1FB0c487f25dD6D3601FF6aF8d32E4e;
   address internal constant ZERO_ADDRESS = address(0);
+  address internal constant BLESS_VOTER_1 = address(1);
+  address internal constant CURSE_VOTER_1 = address(10);
+  address internal constant CURSE_UNVOTER_1 = address(110);
+  address internal constant BLESS_VOTER_2 = address(2);
+  address internal constant CURSE_VOTER_2 = address(12);
+  address internal constant CURSE_UNVOTER_2 = address(112);
+  address internal constant BLESS_VOTER_3 = address(3);
+  address internal constant CURSE_VOTER_3 = address(13);
+  address internal constant CURSE_UNVOTER_3 = address(113);
+  address internal constant BLESS_VOTER_4 = address(4);
+  address internal constant CURSE_VOTER_4 = address(14);
+  address internal constant CURSE_UNVOTER_4 = address(114);
+
   address internal constant USER_1 = address(1);
   address internal constant USER_2 = address(2);
   address internal constant USER_3 = address(3);
@@ -21,41 +35,54 @@ contract StructFactory {
 
   // afn
 
-  function afnConstructorArgs()
-    internal
-    pure
-    returns (
-      address[] memory,
-      uint256[] memory,
-      uint256,
-      uint256
-    )
-  {
-    address[] memory participants = new address[](4);
-    participants[0] = USER_1;
-    participants[1] = USER_2;
-    participants[2] = USER_3;
-    participants[3] = USER_4;
-    uint256[] memory weights = new uint256[](4);
-    weights[0] = WEIGHT_1;
-    weights[1] = WEIGHT_10;
-    weights[2] = WEIGHT_20;
-    weights[3] = WEIGHT_40;
-    uint256 blessingThreshold = WEIGHT_10 + WEIGHT_20 + WEIGHT_40;
-    uint256 badSignalThreshold = WEIGHT_1 + WEIGHT_10 + WEIGHT_20 + WEIGHT_40;
-    return (participants, weights, blessingThreshold, badSignalThreshold);
+  function afnConstructorArgs() internal pure returns (AFN.Config memory) {
+    AFN.Voter[] memory voters = new AFN.Voter[](4);
+    voters[0] = AFN.Voter({
+      blessVoteAddr: BLESS_VOTER_1,
+      curseVoteAddr: CURSE_VOTER_1,
+      curseUnvoteAddr: CURSE_UNVOTER_1,
+      blessWeight: WEIGHT_1,
+      curseWeight: WEIGHT_1
+    });
+    voters[1] = AFN.Voter({
+      blessVoteAddr: BLESS_VOTER_2,
+      curseVoteAddr: CURSE_VOTER_2,
+      curseUnvoteAddr: CURSE_UNVOTER_2,
+      blessWeight: WEIGHT_10,
+      curseWeight: WEIGHT_10
+    });
+    voters[2] = AFN.Voter({
+      blessVoteAddr: BLESS_VOTER_3,
+      curseVoteAddr: CURSE_VOTER_3,
+      curseUnvoteAddr: CURSE_UNVOTER_3,
+      blessWeight: WEIGHT_20,
+      curseWeight: WEIGHT_20
+    });
+    voters[3] = AFN.Voter({
+      blessVoteAddr: BLESS_VOTER_4,
+      curseVoteAddr: CURSE_VOTER_4,
+      curseUnvoteAddr: CURSE_UNVOTER_4,
+      blessWeight: WEIGHT_40,
+      curseWeight: WEIGHT_40
+    });
+    return
+      AFN.Config({
+        voters: voters,
+        blessWeightThreshold: WEIGHT_10 + WEIGHT_20 + WEIGHT_40,
+        curseWeightThreshold: WEIGHT_1 + WEIGHT_10 + WEIGHT_20 + WEIGHT_40
+      });
   }
 
-  uint256 internal constant ZERO = 0;
-  uint256 internal constant WEIGHT_1 = 1;
-  uint256 internal constant WEIGHT_10 = 10;
-  uint256 internal constant WEIGHT_20 = 20;
-  uint256 internal constant WEIGHT_40 = 40;
+  uint8 internal constant ZERO = 0;
+  uint8 internal constant WEIGHT_1 = 1;
+  uint8 internal constant WEIGHT_10 = 10;
+  uint8 internal constant WEIGHT_20 = 20;
+  uint8 internal constant WEIGHT_40 = 40;
 
   // message info
   uint64 internal constant SOURCE_CHAIN_ID = 1;
   uint64 internal constant DEST_CHAIN_ID = 2;
-  uint256 internal constant GAS_LIMIT = 100_000;
+  uint64 internal constant GAS_LIMIT = 200_000;
 
   // timing
   uint256 internal constant BLOCK_TIME = 1234567890;
@@ -69,37 +96,63 @@ contract StructFactory {
   uint32 internal constant PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS = 500;
   uint64 internal constant MAX_GAS_LIMIT = 4_000_000;
 
-  function offRampConfig(
-    IFeeManager feeManager,
-    ICommitStore commitStore,
-    IRouter router
-  ) internal pure returns (IEVM2EVMOffRamp.OffRampConfig memory) {
+  function generateDynamicOffRampConfig(address router, address afn)
+    internal
+    pure
+    returns (EVM2EVMOffRamp.DynamicConfig memory)
+  {
     return
-      IEVM2EVMOffRamp.OffRampConfig({
-        router: address(router),
-        commitStore: address(commitStore),
-        feeManager: address(feeManager),
+      EVM2EVMOffRamp.DynamicConfig({
+        router: router,
         executionDelaySeconds: EXECUTION_DELAY_SECONDS,
         maxDataSize: MAX_DATA_SIZE,
         maxTokensLength: MAX_TOKENS_LENGTH,
-        permissionLessExecutionThresholdSeconds: PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS
+        permissionLessExecutionThresholdSeconds: PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS,
+        afn: afn
       });
   }
 
-  function onRampConfig() internal pure returns (IEVM2EVMOnRamp.OnRampConfig memory) {
+  function generateDynamicOnRampConfig(
+    address router,
+    address priceRegistry,
+    address afn
+  ) internal pure returns (EVM2EVMOnRamp.DynamicConfig memory) {
     return
-      IEVM2EVMOnRamp.OnRampConfig({
+      EVM2EVMOnRamp.DynamicConfig({
+        router: router,
+        priceRegistry: priceRegistry,
         maxDataSize: MAX_DATA_SIZE,
         maxTokensLength: MAX_TOKENS_LENGTH,
-        maxGasLimit: MAX_GAS_LIMIT
+        maxGasLimit: MAX_GAS_LIMIT,
+        afn: afn
       });
+  }
+
+  function getTokensAndPools(address[] memory sourceTokens, IPool[] memory pools)
+    internal
+    pure
+    returns (EVM2EVMOnRamp.TokenAndPool[] memory)
+  {
+    EVM2EVMOnRamp.TokenAndPool[] memory tokensAndPools = new EVM2EVMOnRamp.TokenAndPool[](sourceTokens.length);
+    for (uint256 i = 0; i < sourceTokens.length; ++i) {
+      tokensAndPools[i] = EVM2EVMOnRamp.TokenAndPool({token: sourceTokens[i], pool: address(pools[i])});
+    }
+    return tokensAndPools;
+  }
+
+  function getNopsAndWeights() internal pure returns (EVM2EVMOnRamp.NopAndWeight[] memory) {
+    EVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights = new EVM2EVMOnRamp.NopAndWeight[](3);
+    nopsAndWeights[0] = EVM2EVMOnRamp.NopAndWeight({nop: USER_1, weight: 19284});
+    nopsAndWeights[1] = EVM2EVMOnRamp.NopAndWeight({nop: USER_2, weight: 52935});
+    nopsAndWeights[2] = EVM2EVMOnRamp.NopAndWeight({nop: USER_3, weight: 8});
+    return nopsAndWeights;
   }
 
   // Rate limiter
-  address constant TOKEN_LIMIT_ADMIN = 0x11118e64e1FB0c487f25dD6D3601FF6aF8d32E4e;
+  address constant ADMIN = 0x11118e64e1FB0c487f25dD6D3601FF6aF8d32E4e;
 
-  function rateLimiterConfig() internal pure returns (IAggregateRateLimiter.RateLimiterConfig memory) {
-    return IAggregateRateLimiter.RateLimiterConfig({capacity: 100e28, rate: 1e15, admin: TOKEN_LIMIT_ADMIN});
+  function rateLimiterConfig() internal pure returns (AggregateRateLimiter.RateLimiterConfig memory) {
+    return AggregateRateLimiter.RateLimiterConfig({capacity: 100e28, rate: 1e15, admin: ADMIN});
   }
 
   function getTokenPrices() internal pure returns (uint256[] memory prices) {
@@ -107,5 +160,11 @@ contract StructFactory {
     prices[0] = 1;
     prices[1] = 8;
     return prices;
+  }
+
+  // OffRamp
+  function getEmptyPriceUpdates() internal pure returns (Internal.PriceUpdates memory priceUpdates) {
+    return
+      Internal.PriceUpdates({tokenPriceUpdates: new Internal.TokenPriceUpdate[](0), destChainId: 0, usdPerUnitGas: 0});
   }
 }

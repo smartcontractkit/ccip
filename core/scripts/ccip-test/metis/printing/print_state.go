@@ -13,12 +13,14 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/afn_contract"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ping_pong_demo"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/dione"
@@ -39,6 +41,8 @@ func PrintCCIPState(source *rhea.EvmDeploymentConfig, destination *rhea.EvmDeplo
 	printRampSanityCheck(source, destination.LaneConfig.OnRamp, destination.ChainConfig.ChainId)
 	printRampSanityCheck(destination, source.LaneConfig.OnRamp, source.ChainConfig.ChainId)
 
+	checkPriceRegistrySet(source, destination)
+
 	printPaused(source)
 	printPaused(destination)
 
@@ -46,7 +50,19 @@ func PrintCCIPState(source *rhea.EvmDeploymentConfig, destination *rhea.EvmDeplo
 	printRateLimitingStatus(destination)
 }
 
+func SetupAllLanesReadOnly(logger logger.Logger) {
+	err := deployments.Prod_AvaxFujiToOptimismGoerli.SetupReadOnlyChain(logger.Named(helpers.ChainName(int64(deployments.Prod_AvaxFujiToOptimismGoerli.ChainConfig.ChainId))))
+	if err != nil {
+		panic(err)
+	}
+	err = deployments.Prod_OptimismGoerliToAvaxFuji.SetupReadOnlyChain(logger.Named(helpers.ChainName(int64(deployments.Prod_OptimismGoerliToAvaxFuji.ChainConfig.ChainId))))
+	if err != nil {
+		panic(err)
+	}
+}
+
 func PrintTokenSupportAllChains(logger logger.Logger) {
+	SetupAllLanesReadOnly(logger)
 	err := deployments.Prod_SepoliaToOptimismGoerli.SetupReadOnlyChain(logger.Named(helpers.ChainName(int64(deployments.Prod_SepoliaToOptimismGoerli.ChainConfig.ChainId))))
 	if err != nil {
 		log.Fatal(err)
@@ -286,16 +302,16 @@ func printRampSanityCheck(chain *rhea.EvmDeploymentConfig, sourceOnRamp common.A
 
 	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(chain.LaneConfig.OnRamp, chain.Client)
 	helpers.PanicErr(err)
-	routerAddress, err := onRamp.GetRouter(&bind.CallOpts{})
+	dynamicOnRampConfig, err := onRamp.GetDynamicConfig(&bind.CallOpts{})
 	helpers.PanicErr(err)
-	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "OnRamp Router set", printBool(routerAddress == chain.ChainConfig.Router)))
+	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "OnRamp Router set", printBool(dynamicOnRampConfig.Router == chain.ChainConfig.Router)))
 
 	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(chain.LaneConfig.OffRamp, chain.Client)
 	helpers.PanicErr(err)
-	offRampConfig, err := offRamp.GetOffRampConfig(&bind.CallOpts{})
+	dynamicOffRampConfig, err := offRamp.GetDynamicConfig(&bind.CallOpts{})
 	helpers.PanicErr(err)
 
-	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "OffRamp Router set", printBool(offRampConfig.Router == chain.ChainConfig.Router)))
+	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "OffRamp Router set", printBool(dynamicOffRampConfig.Router == chain.ChainConfig.Router)))
 
 	configDetails, err := offRamp.LatestConfigDetails(&bind.CallOpts{})
 	helpers.PanicErr(err)
@@ -508,44 +524,45 @@ func printSupportedTokensCheck(source *rhea.EvmDeploymentConfig, destination *rh
 	sb.WriteString(generateHeader(tableHeaders, headerLengths))
 
 	for _, token := range rhea.GetAllTokens() {
-		sourcePool := false
-		if val, ok := source.ChainConfig.SupportedTokens[token]; ok && val.Pool != common.HexToAddress("") {
-			sourcePool = true
-		}
-
-		sourceFee, err := sourceRouter.GetFee(&bind.CallOpts{}, destination.ChainConfig.ChainId, router.ClientEVM2AnyMessage{
-			Receiver:     common.HexToAddress("").Bytes(),
-			Data:         []byte{},
-			TokenAmounts: []router.ClientEVMTokenAmount{},
-			FeeToken:     destination.ChainConfig.SupportedTokens[token].Token,
-			ExtraArgs:    []byte{},
-		})
-		isSourceFeeToken := err == nil
+		var sourceEnabled, isSourcePool, isSourceFeeToken bool
 		sourceFeeAmount := "➖"
 
-		if isSourceFeeToken {
-			sourceFeeAmount = dione.EthBalanceToString(sourceFee)
+		if _, ok := source.ChainConfig.SupportedTokens[token]; ok {
+			sourceEnabled = slices.Contains(sourceTokens, source.ChainConfig.SupportedTokens[token].Token)
+			isSourcePool = source.ChainConfig.SupportedTokens[token].Pool != common.HexToAddress("")
+
+			sourceFee, err := sourceRouter.GetFee(&bind.CallOpts{}, destination.ChainConfig.ChainId, router.ClientEVM2AnyMessage{
+				Receiver:     common.HexToAddress("").Bytes(),
+				Data:         []byte{},
+				TokenAmounts: []router.ClientEVMTokenAmount{},
+				FeeToken:     source.ChainConfig.SupportedTokens[token].Token,
+				ExtraArgs:    []byte{},
+			})
+
+			if isSourceFeeToken = err == nil; isSourceFeeToken {
+				sourceFeeAmount = dione.EthBalanceToString(sourceFee)
+			}
 		}
 
-		destPool := false
-		if val, ok := destination.ChainConfig.SupportedTokens[token]; ok && val.Pool != common.HexToAddress("") {
-			destPool = true
-		}
-		destFee, err := destRouter.GetFee(&bind.CallOpts{}, source.ChainConfig.ChainId, router.ClientEVM2AnyMessage{
-			Receiver:     common.HexToAddress("").Bytes(),
-			Data:         []byte{},
-			TokenAmounts: []router.ClientEVMTokenAmount{},
-			FeeToken:     destination.ChainConfig.SupportedTokens[token].Token,
-			ExtraArgs:    []byte{},
-		})
-		isDestFeeToken := err == nil
+		var destEnabled, isDestPool, isDestFeeToken bool
 		destFeeAmount := "➖"
-		if isDestFeeToken {
-			destFeeAmount = dione.EthBalanceToString(destFee)
-		}
 
-		sourceEnabled := slices.Contains(sourceTokens, source.ChainConfig.SupportedTokens[token].Token)
-		destEnabled := slices.Contains(destTokens, destination.ChainConfig.SupportedTokens[token].Token)
+		if _, ok := destination.ChainConfig.SupportedTokens[token]; ok {
+			destEnabled = slices.Contains(destTokens, destination.ChainConfig.SupportedTokens[token].Token)
+			isDestPool = destination.ChainConfig.SupportedTokens[token].Pool != common.HexToAddress("")
+
+			destFee, err := destRouter.GetFee(&bind.CallOpts{}, source.ChainConfig.ChainId, router.ClientEVM2AnyMessage{
+				Receiver:     common.HexToAddress("").Bytes(),
+				Data:         []byte{},
+				TokenAmounts: []router.ClientEVMTokenAmount{},
+				FeeToken:     destination.ChainConfig.SupportedTokens[token].Token,
+				ExtraArgs:    []byte{},
+			})
+
+			if isDestFeeToken = err == nil; isDestFeeToken {
+				destFeeAmount = dione.EthBalanceToString(destFee)
+			}
+		}
 
 		boolParser := printBoolNeutral
 		if sourceEnabled || destEnabled {
@@ -557,12 +574,54 @@ func printSupportedTokensCheck(source *rhea.EvmDeploymentConfig, destination *rh
 			printBoolNeutral(isSourceFeeToken),
 			sourceFeeAmount,
 			boolParser(sourceEnabled),
-			boolParser(sourcePool),
+			boolParser(isSourcePool),
 			printBoolNeutral(isDestFeeToken),
 			destFeeAmount,
 			boolParser(destEnabled),
-			boolParser(destPool),
+			boolParser(isDestPool),
 		))
+	}
+
+	sb.WriteString(generateSeparator(headerLengths))
+
+	source.Logger.Info(sb.String())
+}
+
+func checkPriceRegistrySet(source *rhea.EvmDeploymentConfig, destination *rhea.EvmDeploymentConfig) {
+	var sb strings.Builder
+
+	tableHeaders := []string{"Token", "Remote ChainID", "ConfigSet"}
+	headerLengths := []int{20, 14, 9}
+
+	sb.WriteString(fmt.Sprintf("FeeManager token config for %s\n", helpers.ChainName(int64(source.ChainConfig.ChainId))))
+
+	sb.WriteString(generateHeader(tableHeaders, headerLengths))
+
+	feeManager, err := price_registry.NewPriceRegistry(source.ChainConfig.PriceRegistry, source.Client)
+	helpers.PanicErr(err)
+
+	for _, tokenName := range source.ChainConfig.FeeTokens {
+		token := source.ChainConfig.SupportedTokens[tokenName].Token
+		_, err = feeManager.GetFeeTokenBaseUnitsPerUnitGas(&bind.CallOpts{}, token, destination.ChainConfig.ChainId)
+		if err != nil {
+			sb.WriteString(fmt.Sprintf("| %-20s | %14d | %9s |\n", tokenName, destination.ChainConfig.ChainId, printBool(false)))
+		}
+		sb.WriteString(fmt.Sprintf("| %-20s | %14d | %9s |\n", tokenName, destination.ChainConfig.ChainId, printBool(true)))
+	}
+	sb.WriteString(generateSeparator(headerLengths))
+
+	sb.WriteString(fmt.Sprintf("FeeManager token config for %s\n", helpers.ChainName(int64(destination.ChainConfig.ChainId))))
+	sb.WriteString(generateHeader(tableHeaders, headerLengths))
+	feeManager, err = price_registry.NewPriceRegistry(destination.ChainConfig.PriceRegistry, destination.Client)
+	helpers.PanicErr(err)
+
+	for _, tokenName := range destination.ChainConfig.FeeTokens {
+		token := destination.ChainConfig.SupportedTokens[tokenName].Token
+		_, err = feeManager.GetFeeTokenBaseUnitsPerUnitGas(&bind.CallOpts{}, token, source.ChainConfig.ChainId)
+		if err != nil {
+			sb.WriteString(fmt.Sprintf("| %-20s | %14d | %9s |\n", tokenName, source.ChainConfig.ChainId, printBool(false)))
+		}
+		sb.WriteString(fmt.Sprintf("| %-20s | %14d | %9s |\n", tokenName, source.ChainConfig.ChainId, printBool(true)))
 	}
 
 	sb.WriteString(generateSeparator(headerLengths))
@@ -630,4 +689,109 @@ func PrintJobSpecs(env dione.Environment, sourceClient rhea.EvmDeploymentConfig,
 		jobs += fmt.Sprintf("\n# CCIP execution spec%s", specString)
 	}
 	fmt.Println(jobs)
+}
+
+func PrintBidirectionalTokenSupportState(source *rhea.EvmDeploymentConfig, destination *rhea.EvmDeploymentConfig) {
+	printTokenSupportState(source, destination)
+	printTokenSupportState(destination, source)
+}
+
+type TokenPool interface {
+	IsOnRamp(opts *bind.CallOpts, onRamp common.Address) (bool, error)
+	IsOffRamp(opts *bind.CallOpts, offRamp common.Address) (bool, error)
+}
+
+func printTokenSupportState(source *rhea.EvmDeploymentConfig, destination *rhea.EvmDeploymentConfig) {
+	TOKEN := rhea.LINK
+	sourceTokenConfig := source.ChainConfig.SupportedTokens[TOKEN]
+	destTokenConfig := destination.ChainConfig.SupportedTokens[TOKEN]
+
+	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(source.LaneConfig.OnRamp, source.Client)
+	helpers.PanicErr(err)
+
+	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(destination.LaneConfig.OffRamp, destination.Client)
+	helpers.PanicErr(err)
+
+	var sourcePool, destPool TokenPool
+
+	if sourceTokenConfig.TokenPoolType == rhea.BurnMint {
+		sourcePool, err = burn_mint_token_pool.NewBurnMintTokenPool(sourceTokenConfig.Pool, source.Client)
+		helpers.PanicErr(err)
+	} else {
+		sourcePool, err = lock_release_token_pool.NewLockReleaseTokenPool(sourceTokenConfig.Pool, source.Client)
+		helpers.PanicErr(err)
+	}
+
+	if destTokenConfig.TokenPoolType == rhea.BurnMint {
+		destPool, err = burn_mint_token_pool.NewBurnMintTokenPool(destTokenConfig.Pool, destination.Client)
+		helpers.PanicErr(err)
+	} else {
+		destPool, err = lock_release_token_pool.NewLockReleaseTokenPool(destTokenConfig.Pool, destination.Client)
+		helpers.PanicErr(err)
+	}
+
+	tableHeaders := []string{"onRampAllowsToken", "onRampPoolCorrect", "onRampPricesSet", "offRampAllowsToken", "offRampPoolCorrect", "offRampPricesSet", "sourcePoolAllowsOnRamp", "destPoolAllowsOffRamp"}
+	headerLengths := []int{20, 20, 20, 20, 20, 20, 20, 20}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("\nToken support for %s -> %s \n", helpers.ChainName(int64(source.ChainConfig.ChainId)), helpers.ChainName(int64(destination.ChainConfig.ChainId))))
+	sb.WriteString(generateHeader(tableHeaders, headerLengths))
+
+	// Check
+	// onRamp token pool allowed
+	// onRamp token pool is correct
+	// onRamp prices set
+	// offRamp token pool allowed
+	// offRamp token pool is correct
+	// offRamp prices set
+	// source pool onRamp allowed
+	// dest pool offRamp allowed
+	var onRampAllowsPool, onRampPoolCorrect, onRampPricesSet, offRampAllowsPool, offRampPoolCorrect, offRampPricesSet, sourcePoolAllowsOnRamp, destPoolAllowsOffRamp bool
+
+	poolBySourceToken, err := onRamp.GetPoolBySourceToken(&bind.CallOpts{}, sourceTokenConfig.Token)
+	if err == nil && poolBySourceToken != common.HexToAddress("") {
+		onRampAllowsPool = true
+	}
+	if poolBySourceToken == sourceTokenConfig.Pool {
+		onRampPoolCorrect = true
+	}
+	price, err := onRamp.GetPricesForTokens(&bind.CallOpts{}, []common.Address{sourceTokenConfig.Token})
+	helpers.PanicErr(err)
+
+	if price[0].Uint64() != 0 {
+		onRampPricesSet = true
+	}
+	destPoolBySourceToken, err := offRamp.GetPoolBySourceToken(&bind.CallOpts{}, sourceTokenConfig.Token)
+	if err == nil && destPoolBySourceToken != common.HexToAddress("") {
+		offRampAllowsPool = true
+	}
+	if destPoolBySourceToken == destTokenConfig.Pool {
+		offRampPoolCorrect = true
+	}
+	destPrices, err := offRamp.GetPricesForTokens(&bind.CallOpts{}, []common.Address{destTokenConfig.Token})
+	helpers.PanicErr(err)
+
+	if destPrices[0].Uint64() != 0 {
+		offRampPricesSet = true
+	}
+
+	sourcePoolAllowsOnRamp, err = sourcePool.IsOnRamp(&bind.CallOpts{}, onRamp.Address())
+	helpers.PanicErr(err)
+	destPoolAllowsOffRamp, err = destPool.IsOffRamp(&bind.CallOpts{}, offRamp.Address())
+	helpers.PanicErr(err)
+
+	sb.WriteString(fmt.Sprintf("| %20s | %20s | %20s | %20s | %20s | %20s | %20s | %20s |\n",
+		printBool(onRampAllowsPool),
+		printBool(onRampPoolCorrect),
+		printBool(onRampPricesSet),
+		printBool(offRampAllowsPool),
+		printBool(offRampPoolCorrect),
+		printBool(offRampPricesSet),
+		printBool(sourcePoolAllowsOnRamp),
+		printBool(destPoolAllowsOffRamp),
+	))
+
+	sb.WriteString(generateSeparator(headerLengths))
+
+	source.Logger.Info(sb.String())
 }

@@ -34,6 +34,4 @@ contract OCR2Helper is OCR2Base {
   function typeAndVersion() public pure override returns (string memory) {
     return "OCR2BaseHelper 1.0.0";
   }
-
-  function _beforeSetOCR2Config(uint8 f, bytes memory onchainConfig) internal override {}
 }

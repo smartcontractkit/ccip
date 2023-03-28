@@ -27,18 +27,11 @@ import (
 	"github.com/smartcontractkit/chainlink/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/client"
 	v2 "github.com/smartcontractkit/chainlink/core/chains/evm/config/v2"
-	"github.com/smartcontractkit/chainlink/core/chains/evm/headtracker"
-	types2 "github.com/smartcontractkit/chainlink/core/chains/evm/headtracker/types"
-	"github.com/smartcontractkit/chainlink/core/chains/evm/log"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/core/chains/evm/txmgr"
-	"github.com/smartcontractkit/chainlink/core/chains/evm/types"
 	configv2 "github.com/smartcontractkit/chainlink/core/config/v2"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/internal/cltest/heavyweight"
 	"github.com/smartcontractkit/chainlink/core/internal/testutils"
-	"github.com/smartcontractkit/chainlink/core/internal/testutils/evmtest"
-	"github.com/smartcontractkit/chainlink/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/logger/audit"
 	"github.com/smartcontractkit/chainlink/core/services/chainlink"
@@ -108,7 +101,7 @@ func (node *Node) ConsistentlySeqNumHasNotBeenExecuted(t *testing.T, ccipContrac
 	c, err := node.App.GetChains().EVM.Get(big.NewInt(0).SetUint64(ccipContracts.Dest.ChainID))
 	require.NoError(t, err)
 	var log logpoller.Log
-	gomega.NewGomegaWithT(t).Eventually(func() bool {
+	gomega.NewGomegaWithT(t).Consistently(func() bool {
 		ccipContracts.Source.Chain.Commit()
 		ccipContracts.Dest.Chain.Commit()
 		lgs, err := c.LogPoller().IndexedLogsTopicRange(
@@ -125,7 +118,7 @@ func (node *Node) ConsistentlySeqNumHasNotBeenExecuted(t *testing.T, ccipContrac
 			return true
 		}
 		return false
-	}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeFalse(), "seq number got executed")
+	}, 10*time.Second, 1*time.Second).Should(gomega.BeFalse(), "seq number got executed")
 	return log
 }
 
@@ -148,11 +141,11 @@ func (node *Node) AddBootstrapJob(t *testing.T, spec *ctfClient.OCR2TaskJobSpec)
 }
 
 func AddAllJobs(t *testing.T, jobParams CCIPJobSpecParams, ccipContracts CCIPContracts, nodes []Node) {
+	jobParams.OffRamp = ccipContracts.Dest.OffRamp.Address()
+	jobParams.OnRamp = ccipContracts.Source.OnRamp.Address()
+
 	commitSpec, err := jobParams.CommitJobSpec()
 	require.NoError(t, err)
-
-	jobParams.OnRampForExecution = ccipContracts.Source.OnRamp.Address()
-	jobParams.OffRamp = ccipContracts.Dest.OffRamp.Address()
 	geExecutionSpec, err := jobParams.ExecutionJobSpec()
 	require.NoError(t, err)
 
@@ -219,31 +212,22 @@ func SetupNodeCCIP(
 
 	eventBroadcaster := pg.NewEventBroadcaster(config.DatabaseURL(), 0, 0, lggr, uuid.NewV1())
 
-	// We fake different chainIDs using the wrapped sim cltest.SimulatedBackend
+	// The in-memory geth sim does not let you create a custom ChainID, it will always be 1337.
+	// In particular this means that if you sign an eip155 tx, the chainID used MUST be 1337
+	// and the CHAINID op code will always emit 1337. To work around this to simulate a "multichain"
+	// test, we fake different chainIDs using the wrapped sim cltest.SimulatedBackend so the RPC
+	// appears to operate on different chainIDs and we use an EthKeyStoreSim wrapper which always
+	// signs 1337 see https://github.com/smartcontractkit/chainlink-ccip/blob/a24dd436810250a458d27d8bb3fb78096afeb79c/core/services/ocr2/plugins/ccip/testhelpers/simulated_backend.go#L35
 	chainORM := evm.NewORM(db, lggr, config)
-	_, err := chainORM.CreateChain(*utils.NewBig(sourceChainID), &types.ChainCfg{})
-	require.NoError(t, err)
-	_, err = chainORM.CreateChain(*utils.NewBig(destChainID), &types.ChainCfg{})
+	err := chainORM.EnsureChains([]utils.Big{*utils.NewBig(sourceChainID), *utils.NewBig(destChainID)})
 	require.NoError(t, err)
 	sourceClient := client.NewSimulatedBackendClient(t, sourceChain, sourceChainID)
 	destClient := client.NewSimulatedBackendClient(t, destChain, destChainID)
 	keyStore := keystore.New(db, utils.FastScryptParams, lggr, config)
 	simEthKeyStore := EthKeyStoreSim{Eth: keyStore.Eth()}
-
-	evmCfg := evmtest.NewChainScopedConfig(t, config)
-
-	// Create our chainset manually, so we can have custom eth clients
-	// (the wrapped sims faking different chainIDs)
-	var (
-		sourceLp logpoller.LogPoller = logpoller.NewLogPoller(logpoller.NewORM(sourceChainID, db, lggr, config), sourceClient,
-			lggr, 500*time.Millisecond, 10, 2, 2, int64(evmCfg.EvmLogKeepBlocksDepth()))
-		destLp logpoller.LogPoller = logpoller.NewLogPoller(logpoller.NewORM(destChainID, db, lggr, config), destClient,
-			lggr, 500*time.Millisecond, 10, 2, 2, int64(evmCfg.EvmLogKeepBlocksDepth()))
-	)
-
 	mailMon := utils.NewMailboxMonitor("CCIP")
 
-	evmChain, err := evm.LoadChainSet(context.Background(), evm.ChainSetOpts{
+	evmChain, err := evm.NewTOMLChainSet(context.Background(), evm.ChainSetOpts{
 		Config:           config,
 		Logger:           lggr,
 		DB:               db,
@@ -254,69 +238,6 @@ func SetupNodeCCIP(
 				return sourceClient
 			} else if chainID.String() == destChainID.String() {
 				return destClient
-			}
-			t.Fatalf("invalid chain ID %v", chainID.String())
-			return nil
-		},
-		GenHeadTracker: func(chainID *big.Int, hb types2.HeadBroadcaster) types2.HeadTracker {
-			if chainID.String() == sourceChainID.String() {
-				return headtracker.NewHeadTracker(
-					lggr,
-					sourceClient,
-					evmtest.NewChainScopedConfig(t, config),
-					hb,
-					headtracker.NewHeadSaver(lggr, headtracker.NewORM(db, lggr, pgtest.NewQConfig(falseRef), *sourceClient.ChainID()), evmCfg),
-					mailMon,
-				)
-			} else if chainID.String() == destChainID.String() {
-				return headtracker.NewHeadTracker(
-					lggr,
-					destClient,
-					evmtest.NewChainScopedConfig(t, config),
-					hb,
-					headtracker.NewHeadSaver(lggr, headtracker.NewORM(db, lggr, pgtest.NewQConfig(falseRef), *destClient.ChainID()), evmCfg),
-					mailMon,
-				)
-			}
-			t.Fatalf("invalid chain ID %v", chainID.String())
-			return nil
-		},
-		GenLogPoller: func(chainID *big.Int) logpoller.LogPoller {
-			if chainID.String() == sourceChainID.String() {
-				t.Log("Generating log broadcaster source")
-				return sourceLp
-			} else if chainID.String() == destChainID.String() {
-				return destLp
-			}
-			t.Fatalf("invalid chain ID %v", chainID.String())
-			return nil
-		},
-		GenLogBroadcaster: func(chainID *big.Int) log.Broadcaster {
-			if chainID.String() == sourceChainID.String() {
-				t.Log("Generating log broadcaster source")
-				return log.NewBroadcaster(
-					log.NewORM(db, lggr, config, *sourceChainID),
-					sourceClient,
-					evmtest.NewChainScopedConfig(t, config),
-					lggr,
-					nil, mailMon)
-			} else if chainID.String() == destChainID.String() {
-				return log.NewBroadcaster(
-					log.NewORM(db, lggr, config, *destChainID),
-					destClient,
-					evmtest.NewChainScopedConfig(t, config),
-					lggr,
-					nil,
-					mailMon)
-			}
-			t.Fatalf("invalid chain ID %v", chainID.String())
-			return nil
-		},
-		GenTxManager: func(chainID *big.Int) txmgr.TxManager {
-			if chainID.String() == sourceChainID.String() {
-				return txmgr.NewTxm(db, sourceClient, evmtest.NewChainScopedConfig(t, config), simEthKeyStore, eventBroadcaster, lggr, &txmgr.CheckerFactory{Client: sourceClient}, sourceLp)
-			} else if chainID.String() == destChainID.String() {
-				return txmgr.NewTxm(db, destClient, evmtest.NewChainScopedConfig(t, config), simEthKeyStore, eventBroadcaster, lggr, &txmgr.CheckerFactory{Client: destClient}, destLp)
 			}
 			t.Fatalf("invalid chain ID %v", chainID.String())
 			return nil
@@ -390,6 +311,10 @@ func createConfigV2Chain(t *testing.T, chainId *big.Int) *v2.EVMConfig {
 	sourceC.GasEstimator.LimitDefault = &defaultGasLimit
 	fixedPrice := "FixedPrice"
 	sourceC.GasEstimator.Mode = &fixedPrice
+	d, _ := models.MakeDuration(100 * time.Millisecond)
+	sourceC.LogPollInterval = &d
+	fd := uint32(2)
+	sourceC.FinalityDepth = &fd
 	return &v2.EVMConfig{
 		ChainID: (*utils.Big)(chainId),
 		Enabled: &tr,
@@ -422,9 +347,9 @@ func NoNodesHaveExecutedSeqNum(t *testing.T, ccipContracts CCIPContracts, eventS
 	return log
 }
 
-func EventuallyCommitReportAccepted(t *testing.T, ccipContracts CCIPContracts, currentBlock uint64) commit_store.ICommitStoreCommitReport {
+func EventuallyCommitReportAccepted(t *testing.T, ccipContracts CCIPContracts, currentBlock uint64) commit_store.CommitStoreCommitReport {
 	g := gomega.NewGomegaWithT(t)
-	var report commit_store.ICommitStoreCommitReport
+	var report commit_store.CommitStoreCommitReport
 	g.Eventually(func() bool {
 		it, err := ccipContracts.Dest.CommitStore.FilterReportAccepted(&bind.FilterOpts{Start: currentBlock})
 		g.Expect(err).NotTo(gomega.HaveOccurred(), "Error filtering ReportAccepted event")

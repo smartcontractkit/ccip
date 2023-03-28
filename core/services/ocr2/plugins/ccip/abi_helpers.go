@@ -11,15 +11,16 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/fee_manager"
+	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
 var (
 	// merkleRoot || minSeqNum || maxSeqNum
 	ReportAccepted common.Hash
-	// FeeManager
-	GasFeeUpdated common.Hash
+	// Prices
+	UsdPerUnitGasUpdated common.Hash
+	UsdPerTokenUpdated   common.Hash
 )
 
 // MessageExecutionState defines the execution states of CCIP messages.
@@ -47,11 +48,12 @@ func init() {
 	}
 	ReportAccepted = getIDOrPanic("ReportAccepted", commitStoreABI)
 
-	feeManagerABI, err := abi.JSON(strings.NewReader(fee_manager.FeeManagerABI))
+	pricesABI, err := abi.JSON(strings.NewReader(price_registry.PriceRegistryABI))
 	if err != nil {
 		panic(err)
 	}
-	GasFeeUpdated = getIDOrPanic("GasFeeUpdated", feeManagerABI)
+	UsdPerUnitGasUpdated = getIDOrPanic("UsdPerUnitGasUpdated", pricesABI)
+	UsdPerTokenUpdated = getIDOrPanic("UsdPerTokenUpdated", pricesABI)
 }
 
 func GetEventSignatures() EventSignatures {
@@ -222,24 +224,6 @@ func makeExecutionReportArgs() abi.Arguments {
 					Type: "uint64[]",
 				},
 				{
-					Name: "feeUpdates",
-					Type: "tuple[]",
-					Components: []abi.ArgumentMarshaling{
-						{
-							Name: "sourceFeeToken",
-							Type: "address",
-						},
-						{
-							Name: "destChainId",
-							Type: "uint64",
-						},
-						{
-							Name: "feeTokenBaseUnitsPerUnitGas",
-							Type: "uint256",
-						},
-					},
-				},
-				{
 					Name: "encodedMessages",
 					Type: "bytes[]",
 				},
@@ -261,6 +245,34 @@ func makeCommitReportArgs() abi.Arguments {
 		{
 			Name: "CommitReport",
 			Type: utils.MustAbiType("tuple", []abi.ArgumentMarshaling{
+				{
+					Name: "priceUpdates",
+					Type: "tuple",
+					Components: []abi.ArgumentMarshaling{
+						{
+							Name: "tokenPriceUpdates",
+							Type: "tuple[]",
+							Components: []abi.ArgumentMarshaling{
+								{
+									Name: "sourceToken",
+									Type: "address",
+								},
+								{
+									Name: "usdPerToken",
+									Type: "uint128",
+								},
+							},
+						},
+						{
+							Name: "destChainId",
+							Type: "uint64",
+						},
+						{
+							Name: "usdPerUnitGas",
+							Type: "uint128",
+						},
+					},
+				},
 				{
 					Name: "interval",
 					Type: "tuple",

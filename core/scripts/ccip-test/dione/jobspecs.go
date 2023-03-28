@@ -13,31 +13,37 @@ import (
 
 // NewCCIPJobSpecParams returns set of parameters needed for setting up ccip jobs for sourceClient --> destClient
 func NewCCIPJobSpecParams(sourceClient rhea.EvmDeploymentConfig, destClient rhea.EvmDeploymentConfig) testhelpers.CCIPJobSpecParams {
+	var pipelineTokens []rhea.EVMBridgedToken
+	for _, feeTokenName := range destClient.ChainConfig.FeeTokens {
+		if token, ok := destClient.ChainConfig.SupportedTokens[feeTokenName]; ok {
+			pipelineTokens = append(pipelineTokens, token)
+		}
+	}
+	pipelineTokens = append(pipelineTokens, sourceClient.ChainConfig.SupportedTokens[sourceClient.ChainConfig.WrappedNative])
 	return testhelpers.CCIPJobSpecParams{
-		OffRamp:                  destClient.LaneConfig.OffRamp,
-		OnRampForExecution:       sourceClient.LaneConfig.OnRamp,
-		OnRampsOnCommit:          sourceClient.LaneConfig.OnRamp,
-		CommitStore:              destClient.LaneConfig.CommitStore,
-		SourceChainName:          helpers.ChainName(int64(sourceClient.ChainConfig.ChainId)),
-		DestChainName:            helpers.ChainName(int64(destClient.ChainConfig.ChainId)),
-		SourceChainId:            sourceClient.ChainConfig.ChainId,
-		DestChainId:              destClient.ChainConfig.ChainId,
-		TokensPerFeeCoinPipeline: GetTokensPerFeeCoinPipeline(destClient.ChainConfig.SupportedTokens),
-		PollPeriod:               PollPeriod,
-		SourceStartBlock:         sourceClient.DeploySettings.DeployedAt,
-		DestStartBlock:           destClient.DeploySettings.DeployedAt,
-		P2PV2Bootstrappers:       []string{}, // Set in env vars
+		OffRamp:                destClient.LaneConfig.OffRamp,
+		OnRamp:                 sourceClient.LaneConfig.OnRamp,
+		CommitStore:            destClient.LaneConfig.CommitStore,
+		SourceChainName:        helpers.ChainName(int64(sourceClient.ChainConfig.ChainId)),
+		DestChainName:          helpers.ChainName(int64(destClient.ChainConfig.ChainId)),
+		SourceChainId:          sourceClient.ChainConfig.ChainId,
+		DestChainId:            destClient.ChainConfig.ChainId,
+		TokenPricesUSDPipeline: GetTokenPricesUSDPipeline(pipelineTokens),
+		PollPeriod:             PollPeriod,
+		SourceStartBlock:       sourceClient.LaneConfig.DeploySettings.DeployedAtBlock,
+		DestStartBlock:         destClient.LaneConfig.DeploySettings.DeployedAtBlock,
+		P2PV2Bootstrappers:     []string{}, // Set in env vars
 	}
 }
 
-func GetTokensPerFeeCoinPipeline(supportedTokens map[rhea.Token]rhea.EVMBridgedToken) string {
-	tokensPerFeeCoinPipeline := "merge [type=merge left=\"{}\" right=\"{"
-	for _, token := range supportedTokens {
-		tokensPerFeeCoinPipeline += fmt.Sprintf(`\\\"%s\\\":\\\"1000000000000000000\\\",`, token.Token.Hex())
+func GetTokenPricesUSDPipeline(pipelineTokens []rhea.EVMBridgedToken) string {
+	tokenPricesUSDPipeline := "merge [type=merge left=\"{}\" right=\"{"
+	for _, token := range pipelineTokens {
+		tokenPricesUSDPipeline += fmt.Sprintf(`\\\"%s\\\":\\\"%s\\\",`, token.Token.Hex(), token.Price)
 	}
-	tokensPerFeeCoinPipeline = strings.TrimSuffix(tokensPerFeeCoinPipeline, ",")
-	tokensPerFeeCoinPipeline += "}\"];"
-	return tokensPerFeeCoinPipeline
+	tokenPricesUSDPipeline = strings.TrimSuffix(tokenPricesUSDPipeline, ",")
+	tokenPricesUSDPipeline += "}\"];"
+	return tokenPricesUSDPipeline
 }
 
 func GetOCRkeysForChainType(OCRKeys client.OCR2Keys, chainType string) client.OCR2KeyData {

@@ -24,7 +24,7 @@ jobs:
         continue-on-error: true
 
       - name: Checkout the repo
-        uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # v3.1.0
+        uses: actions/checkout@24cb9080177205b6e8c946b17badbe402adc938f # v3.4.0
       - name: Set up Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@94ab11c41e45d028884a99163086648e898eed25 # v1.6.0
@@ -42,15 +42,14 @@ jobs:
           registry: ${{ secrets.AWS_ECR_REPO_URL }}
       - name: Docker meta
         id: docker_meta
-        uses: docker/metadata-action@e5622373a38e60fb6d795a4421e56882f2d7a681 # v3.6.2
+        uses: docker/metadata-action@507c2f2dc502c992ad446e3d7a5dfbe311567a96 # v4.3.0
         with:
           images: ${{ secrets.AWS_ECR_REPO_URL }} # list of Docker images to use as base name for tags
-          flavor: |
-            latest=true
           tags: |
             type=sha
             type=sha,format=long
             type=semver,pattern={{version}},value=v0.0.1
+            type=raw,value=latest,enable={{is_default_branch}}
       - name: Fetch operator-ui
         shell: bash
         env:
