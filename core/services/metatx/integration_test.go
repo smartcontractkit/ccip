@@ -72,11 +72,6 @@ func TestMetaERC20CrossChain(t *testing.T) {
 		forwarderAddress,
 	)
 
-	//setup Jobs
-	bootstrapNodePort := int64(19399)
-	ctx := context.Background()
-	// Starts nodes and configures them in the OCR contracts.
-	bootstrapNode, nodes, configBlock := testhelpers.SetupAndStartNodes(ctx, t, &ccipContracts, bootstrapNodePort)
 	linkEth := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, err := w.Write([]byte(`{"JuelsPerETH": "200000000000000000000"}`))
 		require.NoError(t, err)
@@ -88,22 +83,9 @@ link_parse [type=jsonparse path="JuelsPerETH"];
 link->link_parse;
 merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse)}"];`,
 		linkEth.URL, ccipContracts.Dest.LinkToken.Address())
-	jobParams := ccipContracts.NewCCIPJobSpecParams(tokensPerFeeCoinPipeline, configBlock)
 	defer linkEth.Close()
 
-	jobParams.RelayInflight = 2 * time.Second
-	jobParams.ExecInflight = 2 * time.Second
-	jobParams.RootSnooze = 1 * time.Second
-
-	// Add the bootstrap job
-	bootstrapNode.AddBootstrapJob(t, jobParams.BootstrapJob(ccipContracts.Dest.CommitStore.Address().Hex()))
-	testhelpers.AddAllJobs(t, jobParams, ccipContracts, nodes)
-
-	// Replay for bootstrap.
-	bc, err := bootstrapNode.App.GetChains().EVM.Get(big.NewInt(0).SetUint64(destChainID))
-	require.NoError(t, err)
-	require.NoError(t, bc.LogPoller().Replay(context.Background(), configBlock))
-	ccipContracts.Dest.Chain.Commit()
+	nodes, _ := testhelpers.SetUpNodesAndJobs(t, ccipContracts, tokensPerFeeCoinPipeline)
 
 	geCurrentSeqNum := 1
 

@@ -420,3 +420,28 @@ func SetupAndStartNodes(ctx context.Context, t *testing.T, ccipContracts *CCIPCo
 	configBlock := ccipContracts.SetupOnchainConfig(oracles, reportingPluginConfig)
 	return bootstrapNode, nodes, configBlock
 }
+
+func SetUpNodesAndJobs(t *testing.T, ccipContracts CCIPContracts, pricePipeline string) ([]Node, CCIPJobSpecParams) {
+	//setup Jobs
+	bootstrapNodePort := int64(19399)
+	ctx := context.Background()
+	// Starts nodes and configures them in the OCR contracts.
+	bootstrapNode, nodes, configBlock := SetupAndStartNodes(ctx, t, &ccipContracts, bootstrapNodePort)
+
+	jobParams := ccipContracts.NewCCIPJobSpecParams(pricePipeline, configBlock)
+	jobParams.RelayInflight = 2 * time.Second
+	jobParams.ExecInflight = 2 * time.Second
+	jobParams.RootSnooze = 1 * time.Second
+
+	// Add the bootstrap job
+	bootstrapNode.AddBootstrapJob(t, jobParams.BootstrapJob(ccipContracts.Dest.CommitStore.Address().Hex()))
+	AddAllJobs(t, jobParams, ccipContracts, nodes)
+
+	// Replay for bootstrap.
+	bc, err := bootstrapNode.App.GetChains().EVM.Get(big.NewInt(0).SetUint64(ccipContracts.Dest.ChainID))
+	require.NoError(t, err)
+	require.NoError(t, bc.LogPoller().Replay(context.Background(), configBlock))
+	ccipContracts.Dest.Chain.Commit()
+
+	return nodes, jobParams
+}
