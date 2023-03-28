@@ -1,9 +1,11 @@
 package ccip
 
 import (
+	"context"
 	"math/big"
 	"sort"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -18,6 +20,7 @@ import (
 	ccipconfig "github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
+	"github.com/smartcontractkit/chainlink/core/services/pg"
 	"github.com/smartcontractkit/chainlink/core/utils/mathutil"
 )
 
@@ -88,6 +91,7 @@ func contiguousReqs(lggr logger.Logger, min, max uint64, seqNrs []uint64) bool {
 }
 
 func leavesFromIntervals(
+	ctx context.Context,
 	lggr logger.Logger,
 	onRamp common.Address,
 	eventSigs EventSignatures,
@@ -104,7 +108,8 @@ func leavesFromIntervals(
 		eventSigs.SendRequestedSequenceNumberIndex,
 		logpoller.EvmWord(interval.Min),
 		logpoller.EvmWord(interval.Max),
-		confs)
+		confs,
+		pg.WithParentCtx(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -180,6 +185,7 @@ func commitReport(dstLogPoller logpoller.LogPoller, onRamp common.Address, commi
 }
 
 func buildExecution(
+	serviceCtx context.Context,
 	lggr logger.Logger,
 	source,
 	dest logpoller.LogPoller,
@@ -191,7 +197,7 @@ func buildExecution(
 	seqNumFromLog func(log logpoller.Log) (uint64, error),
 	hashLeaf LeafHasherInterface[[32]byte],
 ) (*MessageExecution, error) {
-	nextMin, err := commitStore.GetExpectedNextSequenceNumber(nil)
+	nextMin, err := commitStore.GetExpectedNextSequenceNumber(&bind.CallOpts{Context: serviceCtx})
 	if err != nil {
 		return nil, err
 	}
@@ -215,7 +221,7 @@ func buildExecution(
 	if len(msgsInRoot) != int(rep.Interval.Max-rep.Interval.Min+1) {
 		return nil, errors.Errorf("unexpected missing msgs in committed root %x have %d want %d", rep.MerkleRoot, len(msgsInRoot), int(rep.Interval.Max-rep.Interval.Min+1))
 	}
-	leaves, err := leavesFromIntervals(lggr, onRampAddress, eventSignatures, seqNumFromLog, rep.Interval, source, hashLeaf, confs)
+	leaves, err := leavesFromIntervals(serviceCtx, lggr, onRampAddress, eventSignatures, seqNumFromLog, rep.Interval, source, hashLeaf, confs)
 	if err != nil {
 		return nil, err
 	}
@@ -244,7 +250,7 @@ func buildExecution(
 	}
 	merkleProof := tree.Prove(innerIdxs)
 	// Double check this verifies before sending.
-	res, err := commitStore.Verify(nil, hashes, merkleProof.Hashes, ProofFlagsToBits(merkleProof.SourceFlags))
+	res, err := commitStore.Verify(&bind.CallOpts{Context: serviceCtx}, hashes, merkleProof.Hashes, ProofFlagsToBits(merkleProof.SourceFlags))
 	if err != nil {
 		lggr.Errorw("Unable to call verify", "seqNums", finalSeqNums, "indices", innerIdxs, "root", rep.MerkleRoot[:], "seqRange", rep.Interval, "err", err)
 		return nil, err

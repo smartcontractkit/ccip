@@ -261,7 +261,7 @@ func TestCalculateIntervalConsensus(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := calculateIntervalConsensus(tt.intervals, tt.f, func() (uint64, error) { return tt.nextMinSeqNumForOffRamp, nil })
+			got, err := calculateIntervalConsensus(context.Background(), tt.intervals, tt.f, func(ctx context.Context) (uint64, error) { return tt.nextMinSeqNumForOffRamp, nil })
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {

@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
@@ -25,6 +26,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
+	"github.com/smartcontractkit/chainlink/core/services/pg"
 )
 
 const MaxCommitReportLength = 1000
@@ -96,14 +98,14 @@ func DecodeCommitReport(report types.Report) (*commit_store.CommitStoreCommitRep
 	}, nil
 }
 
-func isCommitStoreDownNow(lggr logger.Logger, commitStore *commit_store.CommitStore) bool {
-	paused, err := commitStore.Paused(nil)
+func isCommitStoreDownNow(ctx context.Context, lggr logger.Logger, commitStore *commit_store.CommitStore) bool {
+	paused, err := commitStore.Paused(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		// Air on side of caution by halting if we cannot read the state?
 		lggr.Errorw("Unable to read offramp paused", "err", err)
 		return true
 	}
-	healthy, err := commitStore.IsAFNHealthy(nil)
+	healthy, err := commitStore.IsAFNHealthy(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		lggr.Errorw("Unable to read offramp afn", "err", err)
 		return true
@@ -195,8 +197,8 @@ func (r *CommitReportingPlugin) nextMinSeqNumForInFlight() uint64 {
 	return max + 1
 }
 
-func (r *CommitReportingPlugin) nextMinSeqNum() (uint64, error) {
-	nextMin, err := r.config.commitStore.GetExpectedNextSequenceNumber(nil)
+func (r *CommitReportingPlugin) nextMinSeqNum(ctx context.Context) (uint64, error) {
+	nextMin, err := r.config.commitStore.GetExpectedNextSequenceNumber(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return 0, err
 	}
@@ -231,9 +233,9 @@ type update = struct {
 }
 
 // latest gasPrice update is returned in addressZero (common.Address{}); the other keys are tokens price updates
-func (r *CommitReportingPlugin) getLatestPriceUpdates(tokens []common.Address, now time.Time) (latestUpdates map[common.Address]update, err error) {
+func (r *CommitReportingPlugin) getLatestPriceUpdates(ctx context.Context, tokens []common.Address, now time.Time) (latestUpdates map[common.Address]update, err error) {
 	latestUpdates = make(map[common.Address]update)
-	gasUpdatesWithinHeartBeat, err := r.config.dest.IndexedLogsCreatedAfter(UsdPerUnitGasUpdated, r.config.priceRegistry.Address(), 1, []common.Hash{EvmWord(r.config.sourceChainID)}, now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()))
+	gasUpdatesWithinHeartBeat, err := r.config.dest.IndexedLogsCreatedAfter(UsdPerUnitGasUpdated, r.config.priceRegistry.Address(), 1, []common.Hash{EvmWord(r.config.sourceChainID)}, now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()), pg.WithParentCtx(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +258,7 @@ func (r *CommitReportingPlugin) getLatestPriceUpdates(tokens []common.Address, n
 	for i, address := range tokens {
 		tokensWords[i] = address.Hash()
 	}
-	tokenUpdatesWithinHeartBeat, err := r.config.dest.IndexedLogsCreatedAfter(UsdPerTokenUpdated, r.config.priceRegistry.Address(), 1, tokensWords, now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()))
+	tokenUpdatesWithinHeartBeat, err := r.config.dest.IndexedLogsCreatedAfter(UsdPerTokenUpdated, r.config.priceRegistry.Address(), 1, tokensWords, now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()), pg.WithParentCtx(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -301,7 +303,7 @@ func (r *CommitReportingPlugin) getLatestPriceUpdates(tokens []common.Address, n
 // All prices are USD ($1=1e18) denominated. We only generate prices we think should be updated; otherwise, omitting values means voting to skip updating them
 func (r *CommitReportingPlugin) generatePriceUpdates(ctx context.Context, now time.Time) (sourceGasPriceUSD *big.Int, tokenPricesUSD map[common.Address]*big.Int, err error) {
 	// fetch feeTokens every observation, so we're automatically up-to-date if new feeTokens are added or removed
-	feeTokens, err := r.config.priceRegistry.GetFeeTokens(nil)
+	feeTokens, err := r.config.priceRegistry.GetFeeTokens(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -335,7 +337,7 @@ func (r *CommitReportingPlugin) generatePriceUpdates(ctx context.Context, now ti
 
 	sourceGasPriceUSD = calculateUsdPerUnitGas(gasPrice, sourceNativePriceUSD)
 
-	latestUpdates, err := r.getLatestPriceUpdates(feeTokens, now)
+	latestUpdates, err := r.getLatestPriceUpdates(ctx, feeTokens, now)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -358,14 +360,14 @@ func (r *CommitReportingPlugin) generatePriceUpdates(ctx context.Context, now ti
 
 func (r *CommitReportingPlugin) Observation(ctx context.Context, _ types.ReportTimestamp, _ types.Query) (types.Observation, error) {
 	lggr := r.config.lggr.Named("CommitObservation")
-	if isCommitStoreDownNow(lggr, r.config.commitStore) {
+	if isCommitStoreDownNow(ctx, lggr, r.config.commitStore) {
 		return nil, ErrCommitStoreIsDown
 	}
 	r.expireInflight(lggr)
 
 	// Will return 0,0 if no messages are found. This is a valid case as the report could
 	// still contain fee updates.
-	min, max, err := r.calculateMinMaxSequenceNumbers(lggr)
+	min, max, err := r.calculateMinMaxSequenceNumbers(ctx, lggr)
 	if err != nil {
 		return nil, err
 	}
@@ -385,14 +387,14 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, _ types.ReportT
 	}.Marshal()
 }
 
-func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(lggr logger.Logger) (uint64, uint64, error) {
-	nextMin, err := r.nextMinSeqNum()
+func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Context, lggr logger.Logger) (uint64, uint64, error) {
+	nextMin, err := r.nextMinSeqNum(ctx)
 	if err != nil {
 		return 0, 0, err
 	}
 	// All available messages that have not been committed yet and have sufficient confirmations.
 	lggr.Infof("Looking for requests with sig %s and nextMin %d on onRampAddr %s", r.config.reqEventSig.SendRequested.Hex(), nextMin, r.config.onRamp.Hex())
-	reqs, err := r.config.source.LogsDataWordGreaterThan(r.config.reqEventSig.SendRequested, r.config.onRamp, r.config.reqEventSig.SendRequestedSequenceNumberIndex, EvmWord(nextMin), int(r.offchainConfig.SourceIncomingConfirmations))
+	reqs, err := r.config.source.LogsDataWordGreaterThan(r.config.reqEventSig.SendRequested, r.config.onRamp, r.config.reqEventSig.SendRequestedSequenceNumberIndex, EvmWord(nextMin), int(r.offchainConfig.SourceIncomingConfirmations), pg.WithParentCtx(ctx))
 	if err != nil {
 		return 0, 0, err
 	}
@@ -424,7 +426,7 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(lggr logger.Logge
 }
 
 // buildReport assumes there is at least one message in reqs.
-func (r *CommitReportingPlugin) buildReport(interval commit_store.CommitStoreInterval, priceUpdates commit_store.InternalPriceUpdates) (*commit_store.CommitStoreCommitReport, error) {
+func (r *CommitReportingPlugin) buildReport(ctx context.Context, interval commit_store.CommitStoreInterval, priceUpdates commit_store.InternalPriceUpdates) (*commit_store.CommitStoreCommitReport, error) {
 	lggr := r.config.lggr.Named("BuildReport")
 
 	// If no messages are needed only include fee updates
@@ -436,7 +438,7 @@ func (r *CommitReportingPlugin) buildReport(interval commit_store.CommitStoreInt
 		}, nil
 	}
 
-	leaves, err := leavesFromIntervals(lggr, r.config.onRamp, r.config.reqEventSig, r.config.seqParsers, interval, r.config.source, r.config.hasher, int(r.offchainConfig.SourceIncomingConfirmations))
+	leaves, err := leavesFromIntervals(ctx, lggr, r.config.onRamp, r.config.reqEventSig, r.config.seqParsers, interval, r.config.source, r.config.hasher, int(r.offchainConfig.SourceIncomingConfirmations))
 	if err != nil {
 		return nil, err
 	}
@@ -456,9 +458,9 @@ func (r *CommitReportingPlugin) buildReport(interval commit_store.CommitStoreInt
 	}, nil
 }
 
-func (r *CommitReportingPlugin) Report(_ context.Context, _ types.ReportTimestamp, _ types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
+func (r *CommitReportingPlugin) Report(ctx context.Context, _ types.ReportTimestamp, _ types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
 	lggr := r.config.lggr.Named("Report")
-	if isCommitStoreDownNow(lggr, r.config.commitStore) {
+	if isCommitStoreDownNow(ctx, lggr, r.config.commitStore) {
 		return false, nil, ErrCommitStoreIsDown
 	}
 	nonEmptyObservations := getNonEmptyObservations[CommitObservation](lggr, observations)
@@ -471,7 +473,7 @@ func (r *CommitReportingPlugin) Report(_ context.Context, _ types.ReportTimestam
 		return false, nil, nil
 	}
 
-	agreedInterval, err := calculateIntervalConsensus(intervals, r.F, r.nextMinSeqNum)
+	agreedInterval, err := calculateIntervalConsensus(ctx, intervals, r.F, r.nextMinSeqNum)
 	if err != nil {
 		return false, nil, err
 	}
@@ -482,7 +484,7 @@ func (r *CommitReportingPlugin) Report(_ context.Context, _ types.ReportTimestam
 		return false, nil, nil
 	}
 
-	report, err := r.buildReport(agreedInterval, priceUpdates)
+	report, err := r.buildReport(ctx, agreedInterval, priceUpdates)
 	if err != nil {
 		return false, nil, err
 	}
@@ -549,7 +551,7 @@ func calculatePriceUpdates(destChainId uint64, observations []CommitObservation)
 }
 
 // Assumed at least f+1 valid observations
-func calculateIntervalConsensus(intervals []commit_store.CommitStoreInterval, f int, nextMinSeqNumForOffRamp func() (uint64, error)) (commit_store.CommitStoreInterval, error) {
+func calculateIntervalConsensus(ctx context.Context, intervals []commit_store.CommitStoreInterval, f int, nextMinSeqNumForOffRamp func(ctx context.Context) (uint64, error)) (commit_store.CommitStoreInterval, error) {
 	if len(intervals) <= f {
 		return commit_store.CommitStoreInterval{}, errors.Errorf("Not enough intervals to form consensus intervals %d, f %d", len(intervals), f)
 	}
@@ -575,7 +577,7 @@ func calculateIntervalConsensus(intervals []commit_store.CommitStoreInterval, f 
 	if maxSeqNum < minSeqNum {
 		return commit_store.CommitStoreInterval{}, errors.New("max seq num smaller than min")
 	}
-	nextMin, err := nextMinSeqNumForOffRamp()
+	nextMin, err := nextMinSeqNumForOffRamp(ctx)
 	if err != nil {
 		return commit_store.CommitStoreInterval{}, err
 	}
@@ -636,7 +638,7 @@ func (r *CommitReportingPlugin) addToInflight(lggr logger.Logger, report *commit
 	}
 }
 
-func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(_ context.Context, _ types.ReportTimestamp, report types.Report) (bool, error) {
+func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context, _ types.ReportTimestamp, report types.Report) (bool, error) {
 	lggr := r.config.lggr.Named("ShouldAcceptFinalizedReport")
 	parsedReport, err := DecodeCommitReport(report)
 	if err != nil {
@@ -650,11 +652,11 @@ func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(_ context.Context, _
 	if parsedReport.MerkleRoot != [32]byte{} {
 		// Note it's ok to leave the unstarted requests behind, since the
 		// 'Observe' is always based on the last reports onchain min seq num.
-		if r.isStaleReport(parsedReport) {
+		if r.isStaleReport(ctx, parsedReport) {
 			return false, nil
 		}
 
-		nextInflightMin, err := r.nextMinSeqNum()
+		nextInflightMin, err := r.nextMinSeqNum(ctx)
 		if err != nil {
 			return false, err
 		}
@@ -674,7 +676,7 @@ func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(_ context.Context, _
 	return true, nil
 }
 
-func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(_ context.Context, _ types.ReportTimestamp, report types.Report) (bool, error) {
+func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context, _ types.ReportTimestamp, report types.Report) (bool, error) {
 	parsedReport, err := DecodeCommitReport(report)
 	if err != nil {
 		return false, err
@@ -682,14 +684,14 @@ func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(_ context.Context, 
 	// If report is not stale we transmit.
 	// When the commitTransmitter enqueues the tx for tx manager,
 	// we mark it as fulfilled, effectively removing it from the set of inflight messages.
-	return !r.isStaleReport(parsedReport), nil
+	return !r.isStaleReport(ctx, parsedReport), nil
 }
 
-func (r *CommitReportingPlugin) isStaleReport(report *commit_store.CommitStoreCommitReport) bool {
-	if isCommitStoreDownNow(r.config.lggr, r.config.commitStore) {
+func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, report *commit_store.CommitStoreCommitReport) bool {
+	if isCommitStoreDownNow(ctx, r.config.lggr, r.config.commitStore) {
 		return true
 	}
-	nextMin, err := r.config.commitStore.GetExpectedNextSequenceNumber(nil)
+	nextMin, err := r.config.commitStore.GetExpectedNextSequenceNumber(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		// Assume it's a transient issue getting the last report
 		// Will try again on the next round
