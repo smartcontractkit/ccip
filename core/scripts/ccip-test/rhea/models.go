@@ -13,7 +13,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/secrets"
-	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 )
 
 // DefaultGasTipFee is the default gas tip fee of 1 gwei.
@@ -119,14 +119,11 @@ func (token Token) Price() *big.Int {
 	}
 
 	tokenValue := big.NewInt(0)
-	// Multiply by 1e6 so not lose precision in the token prices when we cast it to ints.
-	new(big.Float).Mul(TokenPrices[token], big.NewFloat(1e6)).Int(tokenValue)
+	new(big.Float).Mul(TokenPrices[token], big.NewFloat(1e18)).Int(tokenValue)
 
 	// Multiply by 1e18 and divide by the token multiplier so a token with fewer decimals
 	// becomes worth more per base unit if the full token price is the same.
-	result := new(big.Int).Quo(new(big.Int).Mul(tokenValue, big.NewInt(1e18)), token.Multiplier())
-	// Divide by 1e6 to negate the multiplication done above
-	return new(big.Int).Quo(result, big.NewInt(1e6))
+	return new(big.Int).Quo(new(big.Int).Mul(tokenValue, big.NewInt(1e18)), token.Multiplier())
 }
 
 func (token Token) Multiplier() *big.Int {
@@ -187,7 +184,7 @@ type EvmDeploymentConfig struct {
 func (chain *EvmDeploymentConfig) SetupChain(t *testing.T, ownerPrivateKey string) {
 	chain.Owner = GetOwner(t, ownerPrivateKey, chain.ChainConfig.ChainId, chain.ChainConfig.GasSettings)
 	chain.Client = GetClient(t, secrets.GetRPC(chain.ChainConfig.ChainId))
-	chain.Logger = logger.TestLogger(t).Named(helpers.ChainName(int64(chain.ChainConfig.ChainId)))
+	chain.Logger = logger.TestLogger(t).Named(ccip.ChainName(int64(chain.ChainConfig.ChainId)))
 	chain.Logger.Info("Completed chain setup")
 }
 

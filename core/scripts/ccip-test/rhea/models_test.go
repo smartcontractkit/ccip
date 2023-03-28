@@ -14,15 +14,15 @@ func TestTokenPrice(t *testing.T) {
 	}{
 		{
 			LINK,
-			big.NewInt(10),
+			new(big.Int).Mul(big.NewInt(10), big.NewInt(1e18)),
 		},
 		{
 			ANZ,
-			big.NewInt(1e12), // uses 6 decimals
+			new(big.Int).Mul(big.NewInt(1e12), big.NewInt(1e18)), // uses 6 decimals
 		},
 		{
 			CACHEGOLD,
-			big.NewInt(60e10), // uses 8 decimals
+			new(big.Int).Mul(big.NewInt(60e10), big.NewInt(1e18)), // uses 8 decimals
 		},
 	}
 	for _, tc := range tt {

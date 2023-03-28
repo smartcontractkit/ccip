@@ -53,7 +53,7 @@ func deploySourceContracts(t *testing.T, source *EvmDeploymentConfig, destChainI
 	if source.LaneConfig.DeploySettings.DeployRamp || source.ChainConfig.DeploySettings.DeployTokenPools {
 		setOnRampOnTokenPools(t, source)
 	}
-	source.Logger.Infof("%s contracts deployed as source chain", helpers.ChainName(int64(source.ChainConfig.ChainId)))
+	source.Logger.Infof("%s contracts deployed as source chain", ccip.ChainName(int64(source.ChainConfig.ChainId)))
 }
 
 func deployDestinationContracts(t *testing.T, client *EvmDeploymentConfig, sourceChainId uint64, onRamp common.Address, supportedTokens map[Token]EVMBridgedToken) {
@@ -78,7 +78,7 @@ func deployDestinationContracts(t *testing.T, client *EvmDeploymentConfig, sourc
 		setOffRampOnRouter(t, sourceChainId, client)
 	}
 
-	client.Logger.Infof("%s contracts fully deployed as destination chain", helpers.ChainName(int64(client.ChainConfig.ChainId)))
+	client.Logger.Infof("%s contracts fully deployed as destination chain", ccip.ChainName(int64(client.ChainConfig.ChainId)))
 }
 
 func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId uint64, destSupportedTokens map[Token]EVMBridgedToken) {

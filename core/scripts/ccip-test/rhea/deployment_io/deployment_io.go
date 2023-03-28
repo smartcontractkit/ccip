@@ -8,7 +8,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/dione"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
-	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 )
 
 func PrettyPrintLanes(env dione.Environment, source *rhea.EvmDeploymentConfig, destination *rhea.EvmDeploymentConfig) {
@@ -22,14 +22,14 @@ func PrettyPrintLanes(env dione.Environment, source *rhea.EvmDeploymentConfig, d
 func WriteChainConfigToFile(env dione.Environment, chain *rhea.EvmDeploymentConfig) {
 	sourceChainConfig := prettyPrint(chain.ChainConfig)
 	chain.Logger.Info(string(sourceChainConfig))
-	chainName := helpers.ChainName(int64(chain.ChainConfig.ChainId))
+	chainName := ccip.ChainName(int64(chain.ChainConfig.ChainId))
 	attemptWriteToFile(sourceChainConfig, chainName, "chain", string(env))
 }
 
 func writeLaneConfigToFile(env dione.Environment, chain *rhea.EvmDeploymentConfig) {
 	destLaneConfig := prettyPrint(chain.LaneConfig)
 	chain.Logger.Info(string(destLaneConfig))
-	chainName := helpers.ChainName(int64(chain.ChainConfig.ChainId))
+	chainName := ccip.ChainName(int64(chain.ChainConfig.ChainId))
 	attemptWriteToFile(destLaneConfig, chainName, "lane", string(env))
 }
 

@@ -7,7 +7,7 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
-	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
+	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/testhelpers"
 )
 
@@ -24,8 +24,8 @@ func NewCCIPJobSpecParams(sourceClient rhea.EvmDeploymentConfig, destClient rhea
 		OffRamp:                destClient.LaneConfig.OffRamp,
 		OnRamp:                 sourceClient.LaneConfig.OnRamp,
 		CommitStore:            destClient.LaneConfig.CommitStore,
-		SourceChainName:        helpers.ChainName(int64(sourceClient.ChainConfig.ChainId)),
-		DestChainName:          helpers.ChainName(int64(destClient.ChainConfig.ChainId)),
+		SourceChainName:        ccip.ChainName(int64(sourceClient.ChainConfig.ChainId)),
+		DestChainName:          ccip.ChainName(int64(destClient.ChainConfig.ChainId)),
 		SourceChainId:          sourceClient.ChainConfig.ChainId,
 		DestChainId:            destClient.ChainConfig.ChainId,
 		TokenPricesUSDPipeline: GetTokenPricesUSDPipeline(pipelineTokens),
