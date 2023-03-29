@@ -104,11 +104,10 @@ contract StructFactory {
     return
       EVM2EVMOffRamp.DynamicConfig({
         router: router,
-        executionDelaySeconds: EXECUTION_DELAY_SECONDS,
         maxDataSize: MAX_DATA_SIZE,
+        afn: afn,
         maxTokensLength: MAX_TOKENS_LENGTH,
-        permissionLessExecutionThresholdSeconds: PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS,
-        afn: afn
+        permissionLessExecutionThresholdSeconds: PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS
       });
   }
 

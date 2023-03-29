@@ -69,11 +69,10 @@ contract EVM2EVMOffRamp is Pausable, AggregateRateLimiter, TypeAndVersionInterfa
   /// @dev since OffRampConfig is part of OffRampConfigChanged event, if changing it, we should update the ABI on Atlas
   struct DynamicConfig {
     uint32 permissionLessExecutionThresholdSeconds; // -┐ Waiting time before manual execution is enabled
-    uint64 executionDelaySeconds; //                    | Execution delay in seconds
     address router; // ---------------------------------┘ Router address
-    uint32 maxDataSize; // --------┐ Maximum payload data size
+    address afn; // ---------------┐ AFN address
     uint16 maxTokensLength; //     | Maximum number of distinct ERC20 tokens that can be sent per message
-    address afn; // ---------------┘ AFN address
+    uint32 maxDataSize; // --------┘ Maximum payload data size
   }
 
   // STATIC CONFIG

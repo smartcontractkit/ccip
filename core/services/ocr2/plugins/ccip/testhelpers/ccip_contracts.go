@@ -129,11 +129,10 @@ func (c *CCIPContracts) DeployNewOffRamp() {
 		},
 		evm_2_evm_offramp.EVM2EVMOffRampDynamicConfig{
 			PermissionLessExecutionThresholdSeconds: 1,
-			ExecutionDelaySeconds:                   0,
 			Router:                                  c.Dest.Router.Address(),
+			Afn:                                     c.Dest.AFN.Address(),
 			MaxDataSize:                             1e5,
 			MaxTokensLength:                         5,
-			Afn:                                     c.Dest.AFN.Address(),
 		},
 		[]common.Address{c.Source.LinkToken.Address()}, // source tokens
 		[]common.Address{c.Dest.Pool.Address()},        // pools
@@ -690,12 +689,11 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			OnRamp:        onRampAddress,
 		},
 		evm_2_evm_offramp.EVM2EVMOffRampDynamicConfig{
-			Router:                                  destRouter.Address(),
 			PermissionLessExecutionThresholdSeconds: 1,
-			ExecutionDelaySeconds:                   0,
+			Router:                                  destRouter.Address(),
+			Afn:                                     afnDestAddress,
 			MaxDataSize:                             1e5,
 			MaxTokensLength:                         5,
-			Afn:                                     afnDestAddress,
 		},
 		[]common.Address{sourceLinkTokenAddress},
 		[]common.Address{destPoolAddress},
