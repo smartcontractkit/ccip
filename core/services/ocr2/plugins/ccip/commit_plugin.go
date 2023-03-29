@@ -143,7 +143,7 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 			priceRegistry:       priceRegistry,
 			priceGetter:         priceGetterObject,
 			sourceNative:        sourceNative,
-			sourceFeeEstimator:  sourceChain.TxManager().GetGasEstimator(),
+			sourceFeeEstimator:  sourceChain.GasEstimator(),
 			sourceChainID:       pluginConfig.SourceChainID,
 			commitStore:         commitStore,
 			hasher:              leafHasher,

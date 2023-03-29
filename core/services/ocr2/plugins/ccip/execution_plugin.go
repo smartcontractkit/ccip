@@ -136,7 +136,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 			inflightCacheExpiry:    inflightCacheExpiry,
 			destPriceRegistry:      destPriceRegistry,
 			srcPriceRegistry:       srcPriceRegistry,
-			destGasEstimator:       destChain.TxManager().GetGasEstimator(),
+			destGasEstimator:       destChain.GasEstimator(),
 			destWrappedNativeToken: destWrappedNative,
 			srcWrappedNativeToken:  sourceWrappedNative,
 		})
