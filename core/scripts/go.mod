@@ -3,7 +3,7 @@ module github.com/smartcontractkit/chainlink/core/scripts
 go 1.20
 
 // Make sure we're working with the latest chainlink libs
-replace github.com/smartcontractkit/chainlink => ../../
+replace github.com/smartcontractkit/chainlink/v2 => ../../
 
 require (
 	github.com/ava-labs/coreth v0.11.0-rc.4
@@ -15,9 +15,11 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/satori/go.uuid v1.2.0
 	github.com/shopspring/decimal v1.3.1
-	github.com/smartcontractkit/chainlink v1.10.0
+
 	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20230217222033-dbe927ed6e6d
-	github.com/smartcontractkit/libocr v0.0.0-20221209172631-568a30f68407
+	github.com/smartcontractkit/chainlink/v2 v2.0.0-00010101000000-000000000000
+	github.com/smartcontractkit/libocr v0.0.0-20230301222433-aec519050c9a
+
 	github.com/smartcontractkit/ocr2keepers v0.6.14
 	github.com/smartcontractkit/ocr2vrf v0.0.0-20230313164535-dce9b4be73a3
 	github.com/smartcontractkit/sqlx v1.3.5-0.20210805004948-4be295aacbeb
