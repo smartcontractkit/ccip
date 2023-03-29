@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
+	"golang.org/x/exp/slices"
 
 	txmgrtypes "github.com/smartcontractkit/chainlink/common/txmgr/types"
 	"github.com/smartcontractkit/chainlink/core/assets"
@@ -221,10 +222,14 @@ func calculateUsdPerUnitGas(sourceGasPrice *big.Int, usdPerFeeCoin *big.Int) *bi
 
 // deviation_parts_per_billion = ((x2 - x1) / x1) * 1e9
 func (r *CommitReportingPlugin) deviates(x1, x2 *big.Int) bool {
-	gasPriceDeviation := big.NewInt(0).Sub(x1, x2)
-	gasPriceDeviation.Mul(gasPriceDeviation, big.NewInt(1e9))
-	gasPriceDeviation.Div(gasPriceDeviation, x1)
-	return gasPriceDeviation.CmpAbs(big.NewInt(int64(r.offchainConfig.FeeUpdateDeviationPPB))) > 0
+	// if x1 == 0, deviates if x2 != x1, to avoid the relative division by 0 error
+	if x1.BitLen() == 0 {
+		return x1.Cmp(x2) != 0
+	}
+	diff := big.NewInt(0).Sub(x1, x2)
+	diff.Mul(diff, big.NewInt(1e9))
+	diff.Div(diff, x1)
+	return diff.CmpAbs(big.NewInt(int64(r.offchainConfig.FeeUpdateDeviationPPB))) > 0
 }
 
 type update = struct {
@@ -308,18 +313,25 @@ func (r *CommitReportingPlugin) generatePriceUpdates(ctx context.Context, now ti
 		return nil, nil, err
 	}
 
+	queryTokens := append([]common.Address{r.config.sourceNative}, feeTokens...)
 	// Include wrapped native in our token query as way to identify the source native USD price.
 	// notice USD is in 1e18 scale, i.e. $1 = 1e18
-	tokenPricesUSD, err = r.config.priceGetter.TokenPricesUSD(ctx, append(feeTokens, r.config.sourceNative))
+	tokenPricesUSD, err = r.config.priceGetter.TokenPricesUSD(ctx, queryTokens)
 	if err != nil {
 		return nil, nil, err
 	}
-
-	sourceNativePriceUSD, ok := tokenPricesUSD[r.config.sourceNative]
-	if !ok || sourceNativePriceUSD == nil {
-		return nil, nil, errors.New("could not get source native price")
+	for _, token := range queryTokens {
+		if tokenPricesUSD[token] == nil {
+			return nil, nil, errors.Errorf("missing token price: %+v", token)
+		}
 	}
-	delete(tokenPricesUSD, r.config.sourceNative)
+	sourceNativePriceUSD := tokenPricesUSD[r.config.sourceNative]
+	for token := range tokenPricesUSD {
+		if !slices.Contains(feeTokens, token) {
+			// clean tokenPricesUSD of any address which isn't a feeToken, including sourceNative
+			delete(tokenPricesUSD, token)
+		}
+	}
 
 	// Observe a source chain price for pricing.
 	sourceGasPriceWei, _, err := r.config.sourceFeeEstimator.GetFee(ctx, nil, BatchGasLimit, assets.NewWei(big.NewInt(MaxGasPrice)))
@@ -342,13 +354,13 @@ func (r *CommitReportingPlugin) generatePriceUpdates(ctx context.Context, now ti
 		return nil, nil, err
 	}
 
-	if gasUpdate := latestUpdates[common.Address{}]; now.Sub(gasUpdate.timestamp) < r.offchainConfig.FeeUpdateHeartBeat.Duration() && !r.deviates(sourceGasPriceUSD, gasUpdate.value) {
+	if gasUpdate := latestUpdates[common.Address{}]; gasUpdate.value != nil && now.Sub(gasUpdate.timestamp) < r.offchainConfig.FeeUpdateHeartBeat.Duration() && !r.deviates(sourceGasPriceUSD, gasUpdate.value) {
 		// vote skip gasPrice update by leaving it nil
 		sourceGasPriceUSD = nil
 	}
 
 	for token, price := range tokenPricesUSD {
-		if tokenUpdate := latestUpdates[token]; now.Sub(tokenUpdate.timestamp) < r.offchainConfig.FeeUpdateHeartBeat.Duration() && !r.deviates(price, tokenUpdate.value) {
+		if tokenUpdate := latestUpdates[token]; tokenUpdate.value != nil && now.Sub(tokenUpdate.timestamp) < r.offchainConfig.FeeUpdateHeartBeat.Duration() && !r.deviates(price, tokenUpdate.value) {
 			// vote skip tokenPrice update by not including it in price map
 			delete(tokenPricesUSD, token)
 		}

@@ -389,8 +389,11 @@ func TestGeneratePriceUpdates(t *testing.T) {
 	newExpectedGasPriceUSD := big.NewInt(0).Mul(newGasPrice, fakePrice)
 	newExpectedGasPriceUSD.Div(newExpectedGasPriceUSD, big.NewInt(1e18))
 
+	newFeeToken := testutils.NewAddress()
+
 	tests := []struct {
 		name                   string
+		addFeeTokens           []common.Address
 		updateTokenPricesUSD   map[common.Address]*big.Int
 		updateGasPriceUSD      *big.Int
 		updateGasPrice         *big.Int
@@ -415,10 +418,21 @@ func TestGeneratePriceUpdates(t *testing.T) {
 			expectedGasPriceUSD:    newExpectedGasPriceUSD,
 			expectedTokenPricesUSD: map[common.Address]*big.Int{},
 		},
+		{
+			name:                   "new feeToken, getLatestPriceUpdates returns nil",
+			addFeeTokens:           []common.Address{newFeeToken},
+			expectedGasPriceUSD:    newExpectedGasPriceUSD,
+			expectedTokenPricesUSD: map[common.Address]*big.Int{newFeeToken: fakePrice},
+		},
 	}
 
 	for i, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if len(tt.addFeeTokens) > 0 {
+				_, err = th.plugin.config.priceRegistry.ApplyFeeTokensUpdates(th.owner, tt.addFeeTokens, []common.Address{})
+				require.NoError(t, err)
+				th.flushLogs()
+			}
 			if len(tt.updateTokenPricesUSD) > 0 || tt.updateGasPriceUSD != nil {
 				destChainId := uint64(0)
 				if tt.updateGasPriceUSD != nil {
