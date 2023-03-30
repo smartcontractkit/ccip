@@ -14,7 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink/core/services/keystore"
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
 )
 
 func SetupChain(t *testing.T) (*backends.SimulatedBackend, *bind.TransactOpts) {

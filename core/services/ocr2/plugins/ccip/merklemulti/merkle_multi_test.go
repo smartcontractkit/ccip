@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"gonum.org/v1/gonum/stat/combin"
 
-	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
-	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti/fixtures"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/merklemulti/fixtures"
 )
 
 var (
