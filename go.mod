@@ -331,8 +331,8 @@ require (
 	github.com/sasha-s/go-deadlock v0.3.1 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/sirupsen/logrus v1.9.0 // indirect
-	github.com/smartcontractkit/chainlink-env v0.30.23-0.20230327111055-d0c8557d3123 // indirect
-	github.com/smartcontractkit/chainlink-testing-framework v1.11.0 // indirect
+	github.com/smartcontractkit/chainlink-env v0.3.25 // indirect
+	github.com/smartcontractkit/chainlink-testing-framework v1.11.1 // indirect
 	github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spf13/afero v1.9.2 // indirect
@@ -424,6 +424,8 @@ replace (
 	// replicating the replace directive on cosmos SDK
 	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
 	github.com/satori/go.uuid => github.com/satori/go.uuid v1.2.0
+
+	github.com/smartcontractkit/chainlink/integration-tests => ./integration-tests
 
 	// Fix CVE-2022-41717
 	golang/golang.org/x/net => golang/golang.org/x/net v0.4.0
