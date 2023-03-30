@@ -15,7 +15,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/satori/go.uuid v1.2.1-0.20181028125025-b2ce2384e17b
 	github.com/shopspring/decimal v1.3.1
-	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20230329174013-dffc9f082516
+	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20230330134826-c1c86487dd42
 	github.com/smartcontractkit/chainlink/v2 v2.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/libocr v0.0.0-20230301222433-aec519050c9a
 	github.com/smartcontractkit/ocr2keepers v0.6.14
@@ -316,7 +316,7 @@ require (
 	github.com/smartcontractkit/chainlink-relay v0.1.7-0.20230328133051-9d3eb8328c82 // indirect
 	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20230328132724-705a2932e300 // indirect
 	github.com/smartcontractkit/chainlink-starknet/relayer v0.0.0-20230328102724-20c5e1a716e9 // indirect
-	github.com/smartcontractkit/chainlink-testing-framework v1.11.0 // indirect
+	github.com/smartcontractkit/chainlink-testing-framework v1.11.1 // indirect
 	github.com/smartcontractkit/wsrpc v0.6.2-0.20230317160629-382a1ac921d8 // indirect
 	github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect

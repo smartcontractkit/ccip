@@ -64,7 +64,7 @@ require (
 	github.com/smartcontractkit/chainlink-relay v0.1.7-0.20230328133051-9d3eb8328c82
 	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20230328132724-705a2932e300
 	github.com/smartcontractkit/chainlink-starknet/relayer v0.0.0-20230328102724-20c5e1a716e9
-	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20230329174013-dffc9f082516
+	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20230330134826-c1c86487dd42
 	github.com/smartcontractkit/libocr v0.0.0-20230301222433-aec519050c9a
 	github.com/smartcontractkit/ocr2keepers v0.6.14
 	github.com/smartcontractkit/ocr2vrf v0.0.0-20230313164535-dce9b4be73a3
@@ -424,8 +424,6 @@ replace (
 	// replicating the replace directive on cosmos SDK
 	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
 	github.com/satori/go.uuid => github.com/satori/go.uuid v1.2.0
-
-	github.com/smartcontractkit/chainlink/integration-tests => ./integration-tests
 
 	// Fix CVE-2022-41717
 	golang/golang.org/x/net => golang/golang.org/x/net v0.4.0
