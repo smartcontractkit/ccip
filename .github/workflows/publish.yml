@@ -2,6 +2,8 @@ name: publish
 
 on:
   push:
+    tags:
+      - 'v*'
     branches:
       - ccip-develop
       - deployment-test
@@ -48,7 +50,7 @@ jobs:
           tags: |
             type=sha
             type=sha,format=long
-            type=semver,pattern={{version}},value=v0.0.1
+            type=semver,pattern={{version}}
             type=raw,value=latest,enable={{is_default_branch}}
       - name: Fetch operator-ui
         shell: bash
