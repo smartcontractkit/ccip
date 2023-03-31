@@ -464,9 +464,6 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 
 func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.ReportTimestamp, query types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
 	lggr := r.lggr.Named("Report")
-	if isCommitStoreDownNow(ctx, lggr, r.config.commitStore) {
-		return false, nil, ErrCommitStoreIsDown
-	}
 	nonEmptyObservations := getNonEmptyObservations[ExecutionObservation](lggr, observations)
 	// Need at least F+1 observations
 	if len(nonEmptyObservations) <= r.F {
@@ -535,6 +532,9 @@ func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Conte
 }
 
 func (r *ExecutionReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context, timestamp types.ReportTimestamp, report types.Report) (bool, error) {
+	if isCommitStoreDownNow(ctx, r.config.lggr, r.config.commitStore) {
+		return false, nil
+	}
 	seqNrs, _, err := MessagesFromExecutionReport(report)
 	if err != nil {
 		return false, nil

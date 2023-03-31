@@ -472,9 +472,6 @@ func (r *CommitReportingPlugin) buildReport(ctx context.Context, interval commit
 
 func (r *CommitReportingPlugin) Report(ctx context.Context, _ types.ReportTimestamp, _ types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
 	lggr := r.config.lggr.Named("Report")
-	if isCommitStoreDownNow(ctx, lggr, r.config.commitStore) {
-		return false, nil, ErrCommitStoreIsDown
-	}
 	nonEmptyObservations := getNonEmptyObservations[CommitObservation](lggr, observations)
 	var intervals []commit_store.CommitStoreInterval
 	for _, obs := range nonEmptyObservations {
@@ -689,6 +686,9 @@ func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context,
 }
 
 func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context, _ types.ReportTimestamp, report types.Report) (bool, error) {
+	if isCommitStoreDownNow(ctx, r.config.lggr, r.config.commitStore) {
+		return false, nil
+	}
 	parsedReport, err := DecodeCommitReport(report)
 	if err != nil {
 		return false, err
@@ -700,9 +700,6 @@ func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context
 }
 
 func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, report *commit_store.CommitStoreCommitReport) bool {
-	if isCommitStoreDownNow(ctx, r.config.lggr, r.config.commitStore) {
-		return true
-	}
 	nextMin, err := r.config.commitStore.GetExpectedNextSequenceNumber(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		// Assume it's a transient issue getting the last report
