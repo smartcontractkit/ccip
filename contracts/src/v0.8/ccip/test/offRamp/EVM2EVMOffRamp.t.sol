@@ -9,6 +9,7 @@ import "../helpers/receivers/MaybeRevertMessageReceiverNo165.sol";
 import "../helpers/receivers/ReentrancyAbuser.sol";
 import {AFN} from "../../AFN.sol";
 import "../../offRamp/EVM2EVMOffRamp.sol";
+import "../mocks/MockCommitStore.sol";
 
 /// @notice #constructor
 contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
@@ -335,7 +336,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
   // Reverts
 
   function testPausedReverts() public {
-    s_offRamp.pause();
+    s_mockCommitStore.pause();
     vm.expectRevert("Pausable: paused");
     s_offRamp.execute(_generateReportFromMessages(_generateMessagesWithTokens()), true);
   }
@@ -730,14 +731,6 @@ contract EVM2EVMOffRamp_getDestinationTokens is EVM2EVMOffRampSetup {
 
 contract EVM2EVMOffRamp_afn is EVM2EVMOffRampSetup {
   function testAFN() public {
-    // Test pausing
-    assertEq(s_offRamp.paused(), false);
-    s_offRamp.pause();
-    assertEq(s_offRamp.paused(), true);
-    s_offRamp.unpause();
-    assertEq(s_offRamp.paused(), false);
-
-    // Test afn
     assertEq(s_offRamp.isAFNHealthy(), true);
     s_mockAFN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
     assertEq(s_offRamp.isAFNHealthy(), false);

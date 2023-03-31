@@ -17,11 +17,10 @@ import {EnumerableMapAddresses} from "../../libraries/internal/EnumerableMapAddr
 import {IERC20} from "../../vendor/IERC20.sol";
 import {Address} from "../../vendor/Address.sol";
 import {ERC165Checker} from "../../vendor/ERC165Checker.sol";
-import {Pausable} from "../../vendor/Pausable.sol";
 
 /// @notice EVM2EVMOffRamp enables OCR networks to execute multiple messages
 /// in an OffRamp in a single transaction.
-contract EVM2EVMOffRamp is Pausable, AggregateRateLimiter, TypeAndVersionInterface, OCR2BaseNoChecks {
+contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2BaseNoChecks {
   using Address for address;
   using ERC165Checker for address;
   using EnumerableMapAddresses for EnumerableMapAddresses.AddressToAddressMap;
@@ -113,7 +112,7 @@ contract EVM2EVMOffRamp is Pausable, AggregateRateLimiter, TypeAndVersionInterfa
     IERC20[] memory sourceTokens,
     IPool[] memory pools,
     RateLimiterConfig memory rateLimiterConfig
-  ) OCR2BaseNoChecks() Pausable() AggregateRateLimiter(rateLimiterConfig) {
+  ) OCR2BaseNoChecks() AggregateRateLimiter(rateLimiterConfig) {
     if (sourceTokens.length != pools.length) revert InvalidTokenPoolConfig();
     if (staticConfig.onRamp == address(0) || staticConfig.commitStore == address(0)) revert ZeroAddressNotAllowed();
 
@@ -167,7 +166,7 @@ contract EVM2EVMOffRamp is Pausable, AggregateRateLimiter, TypeAndVersionInterfa
   /// @param report The execution report containing the messages and proofs.
   /// @param manualExecution A boolean value indication whether this function is called
   /// from the DON (false) or manually (true).
-  function _execute(Internal.ExecutionReport memory report, bool manualExecution) internal whenNotPaused whenHealthy {
+  function _execute(Internal.ExecutionReport memory report, bool manualExecution) internal whenHealthy {
     uint256 numMsgs = report.encodedMessages.length;
     if (numMsgs == 0) revert EmptyReport();
 
@@ -483,17 +482,5 @@ contract EVM2EVMOffRamp is Pausable, AggregateRateLimiter, TypeAndVersionInterfa
   modifier whenHealthy() {
     if (IAFN(s_dynamicConfig.afn).badSignalReceived()) revert BadAFNSignal();
     _;
-  }
-
-  /// @notice Pause the contract
-  /// @dev only callable by the owner
-  function pause() external onlyOwner {
-    _pause();
-  }
-
-  /// @notice Unpause the contract
-  /// @dev only callable by the owner
-  function unpause() external onlyOwner {
-    _unpause();
   }
 }

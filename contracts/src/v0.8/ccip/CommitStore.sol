@@ -133,7 +133,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
     bytes32[] calldata hashedLeaves,
     bytes32[] calldata proofs,
     uint256 proofFlagBits
-  ) external view override returns (uint256 timestamp) {
+  ) external view override whenNotPaused returns (uint256 timestamp) {
     bytes32 root = MerkleMultiProof.merkleRoot(hashedLeaves, proofs, proofFlagBits);
     // Only return non-zero if present and blessed.
     if (s_roots[root] == 0 || !isBlessed(root)) {
