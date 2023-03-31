@@ -10,7 +10,7 @@ import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol
 
 import {Client} from "../models/Client.sol";
 import {Internal} from "../models/Internal.sol";
-import {OCR2Base} from "../ocr/OCR2Base.sol";
+import {OCR2BaseNoChecks} from "../ocr/OCR2BaseNoChecks.sol";
 import {AggregateRateLimiter} from "../AggregateRateLimiter.sol";
 import {EnumerableMapAddresses} from "../../libraries/internal/EnumerableMapAddresses.sol";
 
@@ -21,7 +21,7 @@ import {Pausable} from "../../vendor/Pausable.sol";
 
 /// @notice EVM2EVMOffRamp enables OCR networks to execute multiple messages
 /// in an OffRamp in a single transaction.
-contract EVM2EVMOffRamp is Pausable, AggregateRateLimiter, TypeAndVersionInterface, OCR2Base {
+contract EVM2EVMOffRamp is Pausable, AggregateRateLimiter, TypeAndVersionInterface, OCR2BaseNoChecks {
   using Address for address;
   using ERC165Checker for address;
   using EnumerableMapAddresses for EnumerableMapAddresses.AddressToAddressMap;
@@ -113,7 +113,7 @@ contract EVM2EVMOffRamp is Pausable, AggregateRateLimiter, TypeAndVersionInterfa
     IERC20[] memory sourceTokens,
     IPool[] memory pools,
     RateLimiterConfig memory rateLimiterConfig
-  ) OCR2Base() Pausable() AggregateRateLimiter(rateLimiterConfig) {
+  ) OCR2BaseNoChecks() Pausable() AggregateRateLimiter(rateLimiterConfig) {
     if (sourceTokens.length != pools.length) revert InvalidTokenPoolConfig();
     if (staticConfig.onRamp == address(0) || staticConfig.commitStore == address(0)) revert ZeroAddressNotAllowed();
 
