@@ -694,7 +694,7 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 		if spec.Relay != relay.EVM {
 			return nil, errors.New("Non evm chains are not supported for CCIP commit")
 		}
-		ccipProvider, err2 := evmrelay.NewCCIPRelayer(relayer).NewCCIPRelayProvider(
+		ccipProvider, err2 := evmrelay.NewCCIPRelayer(relayer).NewCCIPCommitProvider(
 			types.RelayArgs{
 				ExternalJobID: jb.ExternalJobID,
 				JobID:         spec.ID,

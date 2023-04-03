@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store_helper"
@@ -326,4 +327,48 @@ func TestInternalExecutionReportEncoding(t *testing.T) {
 	decodeCommitReport, err := ccip.DecodeExecutionReport(encodeCommitReport)
 	require.NoError(t, err)
 	require.Equal(t, &report, decodeCommitReport)
+}
+
+func TestExecutionReportToEthTxMetadata(t *testing.T) {
+	c := setupContractsForExecution(t)
+	tests := []struct {
+		name     string
+		msgBatch messageBatch
+		err      error
+	}{
+		{
+			"happy flow",
+			c.generateMessageBatch(t, ccip.MaxPayloadLength, 50, ccip.MaxTokensPerMessage),
+			nil,
+		},
+		{
+			"invalid msgs",
+			func() messageBatch {
+				mb := c.generateMessageBatch(t, ccip.MaxPayloadLength, 50, ccip.MaxTokensPerMessage)
+				mb.allMsgBytes[0] = []byte{1, 1, 1, 1}
+				return mb
+			}(),
+			errors.New("abi: cannot marshal in to go type: length insufficient 4 require 32"),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			encExecReport, err := ccip.EncodeExecutionReport(
+				tc.msgBatch.seqNums,
+				tc.msgBatch.allMsgBytes,
+				tc.msgBatch.proof.Hashes,
+				tc.msgBatch.proof.SourceFlags,
+			)
+			require.NoError(t, err)
+			txMeta, err := ccip.ExecutionReportToEthTxMeta(encExecReport)
+			if tc.err != nil {
+				require.Equal(t, tc.err.Error(), err.Error())
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, txMeta)
+			require.Len(t, txMeta.MessageIDs, len(tc.msgBatch.allMsgBytes))
+		})
+	}
 }

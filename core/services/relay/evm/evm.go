@@ -28,6 +28,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ethkey"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	mercuryconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/mercury/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
@@ -297,7 +298,7 @@ func newConfigProvider(lggr logger.Logger, chainSet evm.ChainSet, args relaytype
 	return newConfigWatcher(lggr, contractAddress, contractABI, offchainConfigDigester, cp, chain, relayConfig.FromBlock, args.New), nil
 }
 
-func newContractTransmitter(lggr logger.Logger, rargs relaytypes.RelayArgs, transmitterID string, configWatcher *configWatcher, ethKeystore keystore.Eth) (*contractTransmitter, error) {
+func newContractTransmitter(lggr logger.Logger, rargs relaytypes.RelayArgs, transmitterID string, configWatcher *configWatcher, ethKeystore keystore.Eth, reportToEthMeta ReportToEthMetadata) (*contractTransmitter, error) {
 	var relayConfig types.RelayConfig
 	if err := json.Unmarshal(rargs.RelayConfig, &relayConfig); err != nil {
 		return nil, err
@@ -361,7 +362,7 @@ func newContractTransmitter(lggr logger.Logger, rargs relaytypes.RelayArgs, tran
 		transmitter,
 		configWatcher.chain.LogPoller(),
 		lggr,
-		nil,
+		reportToEthMeta,
 	)
 }
 
@@ -424,10 +425,8 @@ func (r *Relayer) NewMedianProvider(rargs relaytypes.RelayArgs, pargs relaytypes
 		return nil, err
 	}
 	var contractTransmitter ContractTransmitter
-	var reportCodec median.ReportCodec
-
-	reportCodec = evmreportcodec.ReportCodec{}
-	contractTransmitter, err = newContractTransmitter(r.lggr, rargs, pargs.TransmitterID, configWatcher, r.ks.Eth())
+	reportCodec := evmreportcodec.ReportCodec{}
+	contractTransmitter, err = newContractTransmitter(r.lggr, rargs, pargs.TransmitterID, configWatcher, r.ks.Eth(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -501,7 +500,7 @@ func (p *medianProvider) ContractConfigTracker() ocrtypes.ContractConfigTracker 
 	return p.configWatcher.ContractConfigTracker()
 }
 
-// CCIPRelayer is a relayer wrapper with added CCIP provider methods.
+// ccipRelayer is a relayer wrapper with added CCIP provider methods.
 type ccipRelayer struct {
 	*Relayer
 }
@@ -512,29 +511,29 @@ func NewCCIPRelayer(relayer interface{}) relay.CCIPRelayer {
 	return &ccipRelayer{relayer.(*Relayer)}
 }
 
-type ccipRelayProvider struct {
+type ccipCommitProvider struct {
 	*configWatcher
 	contractTransmitter *contractTransmitter
 }
 
-var _ relay.CCIPRelayProvider = (*ccipRelayProvider)(nil)
+var _ relay.CCIPCommitProvider = (*ccipCommitProvider)(nil)
 
-func (c *ccipRelayer) NewCCIPRelayProvider(rargs relaytypes.RelayArgs, transmitterID string) (relay.CCIPRelayProvider, error) {
+func (c *ccipRelayer) NewCCIPCommitProvider(rargs relaytypes.RelayArgs, transmitterID string) (relay.CCIPCommitProvider, error) {
 	configWatcher, err := newConfigProvider(c.lggr, c.chainSet, rargs)
 	if err != nil {
 		return nil, err
 	}
-	contractTransmitter, err := newContractTransmitter(c.lggr, rargs, transmitterID, configWatcher, c.ks.Eth())
+	contractTransmitter, err := newContractTransmitter(c.lggr, rargs, transmitterID, configWatcher, c.ks.Eth(), ccip.CommitReportToEthTxMeta)
 	if err != nil {
 		return nil, err
 	}
-	return &ccipRelayProvider{
+	return &ccipCommitProvider{
 		configWatcher:       configWatcher,
 		contractTransmitter: contractTransmitter,
 	}, nil
 }
 
-func (c *ccipRelayProvider) ContractTransmitter() ocrtypes.ContractTransmitter {
+func (c *ccipCommitProvider) ContractTransmitter() ocrtypes.ContractTransmitter {
 	return c.contractTransmitter
 }
 
@@ -550,7 +549,7 @@ func (c *ccipRelayer) NewCCIPExecutionProvider(rargs relaytypes.RelayArgs, trans
 	if err != nil {
 		return nil, err
 	}
-	contractTransmitter, err := newContractTransmitter(c.lggr, rargs, transmitterID, configWatcher, c.ks.Eth())
+	contractTransmitter, err := newContractTransmitter(c.lggr, rargs, transmitterID, configWatcher, c.ks.Eth(), ccip.ExecutionReportToEthTxMeta)
 	if err != nil {
 		return nil, err
 	}

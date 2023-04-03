@@ -19,12 +19,12 @@ var (
 
 type CCIPRelayer interface {
 	relaytypes.Relayer
-	NewCCIPRelayProvider(rargs relaytypes.RelayArgs, transmitterID string) (CCIPRelayProvider, error)
+	NewCCIPCommitProvider(rargs relaytypes.RelayArgs, transmitterID string) (CCIPCommitProvider, error)
 	NewCCIPExecutionProvider(rargs relaytypes.RelayArgs, transmitterID string) (CCIPExecutionProvider, error)
 }
 
-// CCIPRelayProvider provides all components needed for a CCIP Relay OCR2 plugin.
-type CCIPRelayProvider interface {
+// CCIPCommitProvider provides all components needed for a CCIP Relay OCR2 plugin.
+type CCIPCommitProvider interface {
 	relaytypes.Plugin
 }
 

@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
@@ -36,6 +37,23 @@ var (
 	_ types.ReportingPluginFactory = &CommitReportingPluginFactory{}
 	_ types.ReportingPlugin        = &CommitReportingPlugin{}
 )
+
+// CommitReportToEthTxMeta generates a txmgr.EthTxMeta from the given commit report.
+// sequence numbers of the committed messages will be added to tx metadata
+func CommitReportToEthTxMeta(report []byte) (*txmgr.EthTxMeta, error) {
+	commitReport, err := DecodeCommitReport(report)
+	if err != nil {
+		return nil, err
+	}
+	n := int(commitReport.Interval.Max-commitReport.Interval.Min) + 1
+	seqRange := make([]uint64, n)
+	for i := 0; i < n; i++ {
+		seqRange[i] = uint64(i) + commitReport.Interval.Min
+	}
+	return &txmgr.EthTxMeta{
+		SeqNumbers: seqRange,
+	}, nil
+}
 
 // EncodeCommitReport abi encodes an offramp.InternalCommitReport.
 func EncodeCommitReport(commitReport *commit_store.CommitStoreCommitReport) (types.Report, error) {
