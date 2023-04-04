@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
+	"github.com/shopspring/decimal"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
@@ -70,8 +71,21 @@ func (d *priceGetter) TokenPricesUSD(ctx context.Context, tokens []common.Addres
 	priceMap := make(map[common.Address]*big.Int)
 	for addr, priceI := range prices {
 		addr := common.HexToAddress(addr)
-		priceStr, _ := priceI.(string)
-		priceBigInt, _ := big.NewInt(0).SetString(priceStr, 10)
+		var priceStr string
+		switch v := priceI.(type) {
+		case decimal.Decimal:
+			priceStr = v.String()
+		case *decimal.Decimal:
+			priceStr = v.String()
+		case string:
+			priceStr = v
+		default:
+			return nil, errors.Errorf("unsupported price type %T from tokensForFeeCoin spec", priceI)
+		}
+		priceBigInt, success := big.NewInt(0).SetString(priceStr, 10)
+		if !success {
+			return nil, errors.Errorf("unable to convert to integer %v", priceStr)
+		}
 		priceMap[addr] = priceBigInt
 	}
 	// The mapping of token address to source of token price has to live offchain.

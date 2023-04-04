@@ -155,10 +155,25 @@ type EVMChainConfig struct {
 }
 
 type EVMBridgedToken struct {
-	Token gethcommon.Address
-	Pool  gethcommon.Address
+	ChainId uint64
+	Token   gethcommon.Address
+	Pool    gethcommon.Address
+	TokenPriceType
 	Price *big.Int
+	PriceFeed
 	TokenPoolType
+}
+
+type TokenPriceType string
+
+const (
+	TokenPrices TokenPriceType = "TokenPrices"
+	PriceFeeds  TokenPriceType = "PriceFeeds"
+)
+
+type PriceFeed struct {
+	Aggregator gethcommon.Address
+	Multiplier *big.Int
 }
 
 type EVMLaneConfig struct {
