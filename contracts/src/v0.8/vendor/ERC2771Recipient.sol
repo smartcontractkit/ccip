@@ -4,27 +4,18 @@ pragma solidity >=0.6.9;
 
 import "./IERC2771Recipient.sol";
 
-/**
- * @title The ERC-2771 Recipient Base Abstract Class - Implementation
- *
- * @notice Note that this contract was called `BaseRelayRecipient` in the previous revision of the GSN.
- *
- * @notice A base contract to be inherited by any contract that want to receive relayed transactions.
- *
- * @notice A subclass must use `_msgSender()` instead of `msg.sender`.
- */
+/// @title The ERC-2771 Recipient Base Abstract Class - Implementation
+/// @notice Note that this contract was called `BaseRelayRecipient` in the previous revision of the GSN.
+/// @notice A base contract to be inherited by any contract that want to receive relayed transactions.
+/// @notice A subclass must use `_msgSender()` instead of `msg.sender`.
 abstract contract ERC2771Recipient is IERC2771Recipient {
 
-    /*
-     * Forwarder singleton we accept calls from
-     */
-address private _trustedForwarder;
+    /// @notice Forwarder singleton we accept calls from
+    address private _trustedForwarder;
 
-    /**
-     * :warning: **Warning** :warning: The Forwarder can have a full control over your Recipient. Only trust verified Forwarder.
-     * @notice Method is not a required method to allow Recipients to trust multiple Forwarders. Not recommended yet.
-     * @return forwarder The address of the Forwarder contract that is being used.
-     */
+    /// @notice Method is not a required method to allow Recipients to trust multiple Forwarders. Not recommended yet.
+    /// @notice **Warning** The Forwarder can have a full control over your Recipient. Only trust verified Forwarder.
+    /// @return forwarder The address of the Forwarder contract that is being used.
     function getTrustedForwarder() public virtual view returns (address forwarder){
         return _trustedForwarder;
     }

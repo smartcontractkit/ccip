@@ -1,6 +1,6 @@
+// SPDX-License-Identifier: MIT
 // solhint-disable not-rely-on-time
-// SPDX-License-Identifier: GPL-3.0-only
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.15;
 pragma abicoder v2;
 
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
@@ -9,23 +9,21 @@ import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 import "./IForwarder.sol";
 import {OwnerIsCreator} from "../ccip/OwnerIsCreator.sol";
 
-/**
- * @title The Forwarder Implementation
- * @notice This implementation of the `IForwarder` interface uses ERC-712 signatures and stored nonces for verification.
- */
+/// @title The Forwarder Implementation
+/// @notice This implementation of the `IForwarder` interface uses ERC-712 signatures and stored nonces for verification.
 contract Forwarder is IForwarder, ERC165, OwnerIsCreator {
     using ECDSA for bytes32;
 
     address private constant DRY_RUN_ADDRESS = 0x0000000000000000000000000000000000000000;
 
-    string public constant GENERIC_PARAMS = "address from,address to,uint256 value,uint256 nonce,bytes data,uint256 validUntilTime";
+    string public constant GENERIC_PARAMS = "address from,address target,uint256 nonce,bytes data,uint256 expirationTime";
 
     string public constant EIP712_DOMAIN_TYPE = "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)";
 
     mapping(bytes32 => bool) public typeHashes;
     mapping(bytes32 => bool) public domains;
 
-    // Nonces of senders, used to prevent replay attacks
+    /// @notice Nonces of senders, used to prevent replay attacks
     mapping(address => uint256) private nonces;
 
     // solhint-disable-next-line no-empty-blocks
@@ -72,28 +70,25 @@ contract Forwarder is IForwarder, ERC165, OwnerIsCreator {
         bytes calldata sig
     )
     external payable
-    override {
+    override 
+    returns (bool success, bytes memory ret) {
         _verifySig(req, domainSeparator, requestTypeHash, suffixData, sig);
         _verifyAndUpdateNonce(req);
 
-        require(req.validUntilTime == 0 || req.validUntilTime > block.timestamp, "FWD: request expired");
+        require(req.expirationTime == 0 || req.expirationTime > block.timestamp, "FWD: request expired");
 
-        uint256 gasForTransfer = 0;
-        if ( req.value != 0 ) {
-            gasForTransfer = 40000; //buffer in case we need to move eth after the transaction.
-        }
         bytes memory callData = abi.encodePacked(req.data, req.from);
         // solhint-disable-next-line avoid-low-level-calls
-        (bool success,bytes memory ret) = req.to.call{gas : gasleft(), value : req.value}(callData);
-
-        if ( req.value != 0 && address(this).balance>0 ) {
-            // can't fail: req.from signed (off-chain) the request, so it must be an EOA...
-            payable(req.from).transfer(address(this).balance);
-        }
+        (success, ret) = req.target.call(callData);
 
         if (!success) {
-            revert ForwardFailed(ret);
+            if (ret.length == 0) revert("Forwarded call reverted without reason");
+            assembly {
+                revert(add(32, ret), mload(ret))
+            }
         }
+
+        return (success,ret);
     }
 
     function _verifyNonce(ForwardRequest calldata req) internal view {
@@ -167,9 +162,7 @@ contract Forwarder is IForwarder, ERC165, OwnerIsCreator {
         require(tx.origin == DRY_RUN_ADDRESS || digest.recover(sig) == req.from, "FWD: signature mismatch");
     }
 
-    /**
-     * @notice Creates a byte array that is a valid ABI encoding of a request of a `RequestType` type. See `execute()`.
-     */
+    /// @notice Creates a byte array that is a valid ABI encoding of a request of a `RequestType` type. See `execute()`. 
     function _getEncoded(
         ForwardRequest calldata req,
         bytes32 requestTypeHash,
@@ -186,11 +179,10 @@ contract Forwarder is IForwarder, ERC165, OwnerIsCreator {
         return abi.encodePacked(
             requestTypeHash,
             uint256(uint160(req.from)),
-            uint256(uint160(req.to)),
-            req.value,
+            uint256(uint160(req.target)),
             req.nonce,
             keccak256(req.data),
-            req.validUntilTime,
+            req.expirationTime,
             suffixData
         );
     }

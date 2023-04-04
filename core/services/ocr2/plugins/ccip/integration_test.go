@@ -18,13 +18,8 @@ import (
 	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/testhelpers"
 )
 
-var (
-	sourceChainID = uint64(1000)
-	destChainID   = uint64(1337)
-)
-
 func TestIntegration_CCIP(t *testing.T) {
-	ccipContracts := testhelpers.SetupCCIPContracts(t, sourceChainID, destChainID)
+	ccipContracts := testhelpers.SetupCCIPContracts(t, testhelpers.SourceChainID, testhelpers.DestChainID)
 	linkUSD := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, err := w.Write([]byte(`{"UsdPerLink": "8000000000000000000"}`))
 		require.NoError(t, err)
@@ -87,7 +82,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 			FeeToken:  ccipContracts.Source.LinkToken.Address(),
 			ExtraArgs: extraArgs,
 		}
-		fee, err := ccipContracts.Source.Router.GetFee(nil, destChainID, msg)
+		fee, err := ccipContracts.Source.Router.GetFee(nil, testhelpers.DestChainID, msg)
 		require.NoError(t, err)
 		// Currently no overhead and 10gwei dest gas price. So fee is simply (gasLimit * gasPrice)* link/native
 		//require.Equal(t, new(big.Int).Mul(gasLimit, gasPrice).String(), fee.String())
@@ -187,7 +182,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 				FeeToken:  ccipContracts.Source.LinkToken.Address(),
 				ExtraArgs: extraArgs,
 			}
-			fee, err := ccipContracts.Source.Router.GetFee(nil, destChainID, msg)
+			fee, err := ccipContracts.Source.Router.GetFee(nil, testhelpers.DestChainID, msg)
 			require.NoError(t, err)
 			// Currently no overhead and 1gwei dest gas price. So fee is simply gasLimit * gasPrice.
 			//require.Equal(t, new(big.Int).Mul(txGasLimit, gasPrice).String(), fee.String())
@@ -241,7 +236,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 			FeeToken:     ccipContracts.Source.LinkToken.Address(),
 			ExtraArgs:    extraArgs,
 		}
-		fee, err := ccipContracts.Source.Router.GetFee(nil, destChainID, msg)
+		fee, err := ccipContracts.Source.Router.GetFee(nil, testhelpers.DestChainID, msg)
 		require.NoError(t, err)
 		// Approve the fee amount
 		_, err = ccipContracts.Source.LinkToken.Approve(ccipContracts.Source.User, ccipContracts.Source.Router.Address(), big.NewInt(0).Mul(big.NewInt(int64(totalMsgs)), fee))
