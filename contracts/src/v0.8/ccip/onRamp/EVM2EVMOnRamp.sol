@@ -42,7 +42,6 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
   error PoolAlreadyAdded();
   error PoolDoesNotExist(address token);
   error TokenPoolMismatch();
-  error TokenOrChainNotSupported(address token, uint64 chain);
   error SenderNotAllowed(address sender);
   error InvalidConfig();
   error InvalidAddress(bytes encodedAddress);
@@ -398,7 +397,6 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
       message.feeToken,
       i_destChainId
     );
-    if (feeTokenBaseUnitsPerUnitGas == 0) revert TokenOrChainNotSupported(message.feeToken, i_destChainId);
 
     // NOTE: if a fee token is not configured, formula below will intentionally
     // return zero, i.e. zeroing the fees for that feeToken.

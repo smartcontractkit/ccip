@@ -97,7 +97,7 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
     if (!s_feeTokens.contains(feeToken)) revert NotAFeeToken(feeToken);
 
     TimestampedUint128Value memory gasPrice = s_usdPerUnitGasByDestChainId[destChainId];
-    if (gasPrice.timestamp == 0 || gasPrice.value == 0) revert ChainNotSupported(destChainId);
+    if (gasPrice.timestamp == 0) revert ChainNotSupported(destChainId);
     uint256 timePassed = block.timestamp - gasPrice.timestamp;
     if (timePassed > i_stalenessThreshold) revert StaleGasPrice(destChainId, i_stalenessThreshold, timePassed);
 

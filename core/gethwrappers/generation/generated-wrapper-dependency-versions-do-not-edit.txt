@@ -18,7 +18,7 @@ custom_token_pool: ../../contracts/solc/v0.8.15/CustomTokenPool.abi ../../contra
 derived_price_feed_wrapper: ../../contracts/solc/v0.8.6/DerivedPriceFeed.abi ../../contracts/solc/v0.8.6/DerivedPriceFeed.bin c8542e6c850c2d0fffb79a7f7213dc927ec64e6ddd54e1224cb2fb4a13aabdd0
 evm_2_evm_offramp: ../../contracts/solc/v0.8.15/EVM2EVMOffRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMOffRamp.bin b66c6ec32d5e29c902194708105d3196a27bdb055efb72f986785cb618432fc1
 evm_2_evm_offramp_helper: ../../contracts/solc/v0.8.15/EVM2EVMOffRampHelper.abi ../../contracts/solc/v0.8.15/EVM2EVMOffRampHelper.bin 58c309197ea1aa1ffd3079738300e1c5d9929ce19432b69ebbf713644f3da745
-evm_2_evm_onramp: ../../contracts/solc/v0.8.15/EVM2EVMOnRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMOnRamp.bin 9d1a3baaecea9b2a6aa0f04b592364b4dbd666642548c3587ae88149bdebf83e
+evm_2_evm_onramp: ../../contracts/solc/v0.8.15/EVM2EVMOnRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMOnRamp.bin 979472428a68182dcf5d09c1ce221afa6e99d5645a0e10dfb807c78bb0aca204
 flags_wrapper: ../../contracts/solc/v0.6/Flags.abi ../../contracts/solc/v0.6/Flags.bin 2034d1b562ca37a63068851915e3703980276e8d5f7db6db8a3351a49d69fc4a
 flux_aggregator_wrapper: ../../contracts/solc/v0.6/FluxAggregator.abi ../../contracts/solc/v0.6/FluxAggregator.bin a3b0a6396c4aa3b5ee39b3c4bd45efc89789d4859379a8a92caca3a0496c5794
 functions_billing_registry_events_mock: ../../contracts/solc/v0.8.6/FunctionsBillingRegistryEventsMock.abi ../../contracts/solc/v0.8.6/FunctionsBillingRegistryEventsMock.bin 50deeb883bd9c3729702be335c0388f9d8553bab4be5e26ecacac496a89e2b77
@@ -53,7 +53,7 @@ operator_factory: ../../contracts/solc/v0.7/OperatorFactory.abi ../../contracts/
 operator_wrapper: ../../contracts/solc/v0.7/Operator.abi ../../contracts/solc/v0.7/Operator.bin 97dcb51158733881bfbe414d0318a57c3bba7b32bdc7aa5961db2f0ea5e993cb
 oracle_wrapper: ../../contracts/solc/v0.6/Oracle.abi ../../contracts/solc/v0.6/Oracle.bin 7af2fbac22a6e8c2847e8e685a5400cac5101d72ddf5365213beb79e4dede43a
 ping_pong_demo: ../../contracts/solc/v0.8.15/PingPongDemo.abi ../../contracts/solc/v0.8.15/PingPongDemo.bin 91160c03413606de1db1e446137671cd5ff0e3df382ed66823bb4ab1fab2d953
-price_registry: ../../contracts/solc/v0.8.15/PriceRegistry.abi ../../contracts/solc/v0.8.15/PriceRegistry.bin 40de25f0ccc705405e3b0cb93583926aea7c48415748db384e8016d6a4fdc68c
+price_registry: ../../contracts/solc/v0.8.15/PriceRegistry.abi ../../contracts/solc/v0.8.15/PriceRegistry.bin 8c8d29bdf4b9b6d4aebdf13eaf1aa8a70cfa3580fe53d4ef8e523d212ac2b922
 receiver_dapp: ../../contracts/solc/v0.8.15/ReceiverDapp.abi ../../contracts/solc/v0.8.15/ReceiverDapp.bin d82f911d1bfef73f51e366a497f1e140ea50b8691cf2e7a4c08045d13ad51239
 router: ../../contracts/solc/v0.8.15/Router.abi ../../contracts/solc/v0.8.15/Router.bin abbdab44a364c9e8ad885c30b1cf799126b77357507abc4ac48f2295e2ed0ba9
 simple_message_receiver: ../../contracts/solc/v0.8.15/SimpleMessageReceiver.abi ../../contracts/solc/v0.8.15/SimpleMessageReceiver.bin cd3f864fdf1b55fdad193a2b71cea4dc6e193c1a440355da0ecf89256342b90f
