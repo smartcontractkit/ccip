@@ -363,17 +363,6 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
   /// #@inheritdoc IEVM2AnyOnRamp
   /// @dev This method can only be called by the owner of the contract.
   function applyPoolUpdates(Internal.PoolUpdate[] memory removes, Internal.PoolUpdate[] memory adds) public onlyOwner {
-    for (uint256 i = 0; i < adds.length; ++i) {
-      address token = adds[i].token;
-      address pool = adds[i].pool;
-
-      if (token == address(0) || pool == address(0)) revert InvalidTokenPoolConfig();
-      if (s_poolsBySourceToken.contains(token)) revert PoolAlreadyAdded();
-      s_poolsBySourceToken.set(token, pool);
-
-      emit PoolAdded(token, pool);
-    }
-
     for (uint256 i = 0; i < removes.length; ++i) {
       address token = removes[i].token;
       address pool = removes[i].pool;
@@ -383,6 +372,17 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
       s_poolsBySourceToken.remove(token);
 
       emit PoolRemoved(token, pool);
+    }
+
+    for (uint256 i = 0; i < adds.length; ++i) {
+      address token = adds[i].token;
+      address pool = adds[i].pool;
+
+      if (token == address(0) || pool == address(0)) revert InvalidTokenPoolConfig();
+      if (s_poolsBySourceToken.contains(token)) revert PoolAlreadyAdded();
+      s_poolsBySourceToken.set(token, pool);
+
+      emit PoolAdded(token, pool);
     }
   }
 
