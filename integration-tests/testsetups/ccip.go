@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -571,10 +572,11 @@ func CCIPDefaultTestSetUp(
 		err     error
 		chains  []blockchain.EVMClient
 	)
+	filename := fmt.Sprintf("./tmp_%s.json", strings.ReplaceAll(t.Name(), "/", "_"))
 	setUpArgs := &CCIPTestSetUpOutputs{
 		Cfg:            inputs,
 		Reporter:       testreporters.NewCCIPTestReporter(t),
-		LaneConfigFile: fmt.Sprintf("./tmp_%s.json", t.Name()),
+		LaneConfigFile: filename,
 	}
 	_, err = os.Stat(setUpArgs.LaneConfigFile)
 	if err == nil {

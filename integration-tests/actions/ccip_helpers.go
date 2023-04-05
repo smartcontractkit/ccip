@@ -515,7 +515,7 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 					Token:           common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
 					FeeAmount:       big.NewInt(0),
 					DestGasOverhead: 0,
-					Multiplier:      1e18,
+					Multiplier:      1e9, // the low multiplier is for testing purposes. This keeps accounts from running out of funds
 				}},
 			sourceCCIP.Common.FeeToken.EthAddress,
 		)
@@ -568,6 +568,7 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 			return fmt.Errorf("getting new onramp contractshouldn't fail %+v", err)
 		}
 	}
+
 	return nil
 }
 
