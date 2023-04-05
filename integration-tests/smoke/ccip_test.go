@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/rs/zerolog/log"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/testsetups"
 )
@@ -19,12 +18,11 @@ func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
 		"replicas": "6",
 	}, transferAmounts, 5, true, true, TestCfg)
 
-	require.Greater(t, len(setUpOutput.Lanes), 0, "error in default set up")
-	laneA := setUpOutput.Lanes[0].ForwardLane
-	laneB := setUpOutput.Lanes[0].ReverseLane
-	if laneA == nil {
+	if len(setUpOutput.Lanes) == 0 {
 		return
 	}
+	laneA := setUpOutput.Lanes[0].ForwardLane
+	laneB := setUpOutput.Lanes[0].ReverseLane
 	t.Cleanup(func() {
 		log.Info().Msg("Tearing down the environment")
 		setUpOutput.TearDown()

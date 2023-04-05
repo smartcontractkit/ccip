@@ -68,6 +68,7 @@ func (l *LinkToken) Approve(to string, amount *big.Int) error {
 	log.Info().
 		Str("From", l.client.GetDefaultWallet().Address()).
 		Str("To", to).
+		Str("Token", l.Address()).
 		Str("Amount", amount.String()).
 		Uint64("Nonce", opts.Nonce.Uint64()).
 		Str("Network Name", l.client.GetNetworkConfig().Name).

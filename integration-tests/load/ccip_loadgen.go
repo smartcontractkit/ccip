@@ -11,7 +11,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
+
 	"github.com/smartcontractkit/chainlink-testing-framework/loadgen"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
@@ -25,7 +26,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
-	bigmath "github.com/smartcontractkit/chainlink/v2/core/utils/big_math"
 )
 
 type CCIPE2ELoad struct {
@@ -82,10 +82,6 @@ func (c *CCIPE2ELoad) BeforeAllCall(msgType string) {
 		tokenAndAmounts = append(tokenAndAmounts, router.ClientEVMTokenAmount{
 			Token: common.HexToAddress(token.Address()), Amount: c.Source.TransferAmount[i],
 		})
-		// approve the onramp router so that it can initiate transferring the token
-		err := token.Approve(sourceCCIP.Common.Router.Address(), bigmath.Mul(sourceCCIP.TransferAmount[i], big.NewInt(c.NoOfReq)))
-		require.NoError(c.t, err, "Could not approve permissions for the onRamp router "+
-			"on the source link token contract")
 	}
 
 	err := sourceCCIP.Common.ChainClient.WaitForEvents()
@@ -121,25 +117,6 @@ func (c *CCIPE2ELoad) BeforeAllCall(msgType string) {
 	if msgType == testsetups.TokenTransfer {
 		c.msg.TokenAmounts = tokenAndAmounts
 	}
-	// calculate approx fee
-	fee, err := sourceCCIP.Common.Router.GetFee(sourceCCIP.DestinationChainId, c.msg)
-	require.NoError(c.t, err)
-	feeToken := sourceCCIP.Common.FeeToken.EthAddress
-
-	// if the token address is 0x0 it will use Native as fee token no need to approve
-	if feeToken != common.HexToAddress("0x0") {
-		// if any of the bridge tokens are same as feetoken approve the token amount as well
-		// otherwise the fee amount approval of the feetoken will overwrite previous transfer amount approval for same bridge token
-		for index, bt := range sourceCCIP.Common.BridgeTokens {
-			if bt.Address() == sourceCCIP.Common.FeeToken.Address() {
-				fee = bigmath.Add(fee, sourceCCIP.TransferAmount[index])
-			}
-		}
-		// Approve the fee amount approximately for all requests
-		err = sourceCCIP.Common.FeeToken.Approve(sourceCCIP.Common.Router.Address(), bigmath.Mul(fee, big.NewInt(c.NoOfReq)))
-		require.NoError(c.t, err, "approving fee for ge router")
-		require.NoError(c.t, sourceCCIP.Common.ChainClient.WaitForEvents(), "error waiting for events")
-	}
 
 	sourceCCIP.Common.ChainClient.ParallelTransactions(false)
 	destCCIP.Common.ChainClient.ParallelTransactions(false)
@@ -163,6 +140,13 @@ func (c *CCIPE2ELoad) Call(_ *loadgen.Generator) loadgen.CallResult {
 	msgSerialNo := c.CurrentMsgSerialNo.Load()
 	c.CurrentMsgSerialNo.Inc()
 
+	lggr := zerolog.New(zerolog.NewConsoleWriter(zerolog.ConsoleTestWriter(c.t))).
+		With().Timestamp().Logger().
+		With().Int("msg Number", int(msgSerialNo)).
+		Str("Lane",
+			fmt.Sprintf("%d-->%d", c.Source.Common.ChainClient.GetChainID().Int64(),
+				c.Destination.Common.ChainClient.GetChainID().Int64())).
+		Logger()
 	// form the message for transfer
 	msgStr := fmt.Sprintf("message with Id %d", msgSerialNo)
 	c.msgMu.Lock()
@@ -172,7 +156,7 @@ func (c *CCIPE2ELoad) Call(_ *loadgen.Generator) loadgen.CallResult {
 
 	feeToken := sourceCCIP.Common.FeeToken.EthAddress
 	// initiate the transfer
-	log.Debug().Int("msg Number", int(msgSerialNo)).Str("triggeredAt", time.Now().GoString()).Msg("triggering transfer")
+	lggr.Debug().Str("triggeredAt", time.Now().GoString()).Msg("triggering transfer")
 	var sendTx *types.Transaction
 	var err error
 
@@ -192,7 +176,7 @@ func (c *CCIPE2ELoad) Call(_ *loadgen.Generator) loadgen.CallResult {
 
 	if err != nil {
 		c.reports.UpdatePhaseStats(msgSerialNo, 0, testreporters.TX, time.Since(startTime), testreporters.Failure)
-		log.Err(err).Msgf("ccip-send tx error for msg ID %d", msgSerialNo)
+		lggr.Err(err).Msg("ccip-send tx error for msg ID")
 		res.Error = fmt.Sprintf("ccip-send tx error %+v for msg ID %d", err, msgSerialNo)
 		res.Data = c.reports.GetPhaseStatsForRequest(msgSerialNo)
 		return res
@@ -203,9 +187,9 @@ func (c *CCIPE2ELoad) Call(_ *loadgen.Generator) loadgen.CallResult {
 	// - CCIPSendRequested Event log to be generated,
 	ticker := time.NewTicker(c.TickerDuration)
 	defer ticker.Stop()
-	sentMsg, err := c.waitForCCIPSendRequested(ticker, c.InitialSourceBlockNum, msgSerialNo, sendTx.Hash().Hex(), time.Now())
+	sentMsg, err := c.waitForCCIPSendRequested(lggr, ticker, c.InitialSourceBlockNum, msgSerialNo, sendTx.Hash().Hex(), time.Now())
 	if err != nil {
-		log.Err(err).Msgf("CCIPSendRequested event error for msg ID %d", msgSerialNo)
+		lggr.Err(err).Msg("CCIPSendRequested event error")
 		res.Error = err.Error()
 		res.Data = c.reports.GetPhaseStatsForRequest(msgSerialNo)
 		return res
@@ -221,26 +205,29 @@ func (c *CCIPE2ELoad) Call(_ *loadgen.Generator) loadgen.CallResult {
 
 	// wait for
 	// - CommitStore to increase the seq number,
-	err = c.waitForSeqNumberIncrease(ticker, seqNum, msgSerialNo, commitStartTime)
+	err = c.waitForSeqNumberIncrease(lggr, ticker, seqNum, msgSerialNo, commitStartTime)
 	if err != nil {
-		log.Err(err).Msgf("waiting for seq num increase for msg ID %d", msgSerialNo)
+		lggr.Err(err).Msgf("waiting for seq num increase for msg ID %d", msgSerialNo)
 		res.Error = err.Error()
 		res.Data = c.reports.GetPhaseStatsForRequest(msgSerialNo)
 		return res
 	}
 	// wait for ReportAccepted event
-	err = c.waitForReportAccepted(ticker, msgSerialNo, seqNum, c.InitialDestBlockNum, commitStartTime)
+	err = c.waitForReportAccepted(lggr, ticker, msgSerialNo, seqNum, c.InitialDestBlockNum, commitStartTime)
 	if err != nil {
-		log.Err(err).Msgf("waiting for ReportAcceptedEvent for msg ID %d", msgSerialNo)
+		lggr.Err(err).Msgf("waiting for ReportAcceptedEvent for msg ID %d", msgSerialNo)
 		res.Error = err.Error()
 		res.Data = c.reports.GetPhaseStatsForRequest(msgSerialNo)
 		return res
 	}
 
 	// wait for ExecutionStateChanged event
-	err = c.waitForExecStateChange(ticker, []uint64{seqNum}, [][32]byte{messageID}, c.seqNumCommitted[seqNum]-2, msgSerialNo, time.Now())
+	c.seqNumCommittedMu.Lock()
+	currentBlockOnDest := c.seqNumCommitted[seqNum] - 2
+	c.seqNumCommittedMu.Unlock()
+	err = c.waitForExecStateChange(lggr, ticker, []uint64{seqNum}, [][32]byte{messageID}, currentBlockOnDest, msgSerialNo, time.Now())
 	if err != nil {
-		log.Err(err).Msgf("waiting for ExecutionStateChangedEvent for msg ID %d", msgSerialNo)
+		lggr.Err(err).Msgf("waiting for ExecutionStateChangedEvent for msg ID %d", msgSerialNo)
 		res.Error = err.Error()
 		res.Data = c.reports.GetPhaseStatsForRequest(msgSerialNo)
 		return res
@@ -261,9 +248,8 @@ func (c *CCIPE2ELoad) updateSeqNumCommitted(seqNum []uint64, blockNum uint64) {
 	}
 }
 
-func (c *CCIPE2ELoad) waitForExecStateChange(ticker *time.Ticker, seqNums []uint64, messageID [][32]byte, currentBlockOnDest uint64, msgSerialNo int64, timeNow time.Time) error {
-	log.Info().Int("msg Number", int(msgSerialNo)).Msgf(
-		"waiting for ExecutionStateChanged for seqNums %v", seqNums)
+func (c *CCIPE2ELoad) waitForExecStateChange(log zerolog.Logger, ticker *time.Ticker, seqNums []uint64, messageID [][32]byte, currentBlockOnDest uint64, msgSerialNo int64, timeNow time.Time) error {
+	log.Info().Msgf("waiting for ExecutionStateChanged for seqNums %v", seqNums)
 	ctx, cancel := context.WithTimeout(context.Background(), c.CallTimeOut)
 	defer cancel()
 	for {
@@ -299,8 +285,8 @@ func (c *CCIPE2ELoad) waitForExecStateChange(ticker *time.Ticker, seqNums []uint
 	}
 }
 
-func (c *CCIPE2ELoad) waitForSeqNumberIncrease(ticker *time.Ticker, seqNum uint64, msgSerialNo int64, timeNow time.Time) error {
-	log.Info().Int("msg Number", int(msgSerialNo)).Msgf("waiting for seq number %d to get increased", int(seqNum))
+func (c *CCIPE2ELoad) waitForSeqNumberIncrease(log zerolog.Logger, ticker *time.Ticker, seqNum uint64, msgSerialNo int64, timeNow time.Time) error {
+	log.Info().Msgf("waiting for seq number %d to get increased", int(seqNum))
 	ctx, cancel := context.WithTimeout(context.Background(), c.CallTimeOut)
 	defer cancel()
 	for {
@@ -321,15 +307,18 @@ func (c *CCIPE2ELoad) waitForSeqNumberIncrease(ticker *time.Ticker, seqNum uint6
 	}
 }
 
-func (c *CCIPE2ELoad) waitForReportAccepted(ticker *time.Ticker, msgSerialNo int64, seqNum uint64, currentBlockOnDest uint64, timeNow time.Time) error {
+func (c *CCIPE2ELoad) waitForReportAccepted(log zerolog.Logger, ticker *time.Ticker, msgSerialNo int64, seqNum uint64, currentBlockOnDest uint64, timeNow time.Time) error {
 	log.Info().Int("seq Number", int(seqNum)).Msg("waiting for ReportAccepted")
 	ctx, cancel := context.WithTimeout(context.Background(), c.CallTimeOut)
 	defer cancel()
 	for {
 		select {
 		case <-ticker.C:
+			c.seqNumCommittedMu.Lock()
+			_, ok := c.seqNumCommitted[seqNum]
+			c.seqNumCommittedMu.Unlock()
 			// skip calling FilterReportAccepted if the seqNum is present in the map
-			if _, ok := c.seqNumCommitted[seqNum]; ok {
+			if ok {
 				c.reports.UpdatePhaseStats(msgSerialNo, seqNum, testreporters.Commit, time.Since(timeNow), testreporters.Success)
 				return nil
 			}
@@ -361,6 +350,7 @@ func (c *CCIPE2ELoad) waitForReportAccepted(ticker *time.Ticker, msgSerialNo int
 }
 
 func (c *CCIPE2ELoad) waitForCCIPSendRequested(
+	log zerolog.Logger,
 	ticker *time.Ticker,
 	currentBlockOnSource uint64,
 	msgSerialNo int64,
@@ -368,7 +358,7 @@ func (c *CCIPE2ELoad) waitForCCIPSendRequested(
 	timeNow time.Time,
 ) (evm_2_evm_onramp.InternalEVM2EVMMessage, error) {
 	var sentmsg evm_2_evm_onramp.InternalEVM2EVMMessage
-	log.Info().Int("msg Number", int(msgSerialNo)).Msg("waiting for CCIPSendRequested")
+	log.Info().Msg("waiting for CCIPSendRequested")
 	ctx, cancel := context.WithTimeout(context.Background(), c.CallTimeOut)
 	defer cancel()
 	for {
@@ -395,7 +385,7 @@ func (c *CCIPE2ELoad) waitForCCIPSendRequested(
 	}
 }
 
-func (c *CCIPE2ELoad) ReportAcceptedLog() {
+func (c *CCIPE2ELoad) ReportAcceptedLog(log zerolog.Logger) {
 	log.Info().Msg("Commit Report stats")
 	it, err := c.Destination.CommitStore.FilterReportAccepted(c.InitialDestBlockNum)
 	require.NoError(c.t, err, "report committed result")

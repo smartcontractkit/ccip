@@ -194,36 +194,36 @@ func (r *CCIPTestReporter) SendSlackNotification(t *testing.T, slackClient *slac
 		headerText = ":x: CCIP Test FAILED :x:"
 	}
 	for name, lane := range r.LaneStats {
-		if strings.Contains(r.t.Name(), "load") {
+		if strings.Contains(strings.ToLower(r.t.Name()), "load") {
 			if lane.FailedCountsByPhase[E2E] > 0 {
 				msgTexts = append(msgTexts,
 					fmt.Sprintf(":x: Run Failed for lane %s :x:", name),
 					fmt.Sprintf(
-						"Load sequence ran for %.0fm sending a total of %d transactions at a rate of %d tx(s) per second."+
+						"Load sequence ran on lane %s for %.0fm sending a total of %d transactions at a rate of %d tx(s) per second."+
 							"\n No of failed requests %d",
-						r.duration.Minutes(), lane.TotalRequests, r.loadrps, lane.FailedCountsByPhase[E2E]))
+						name, r.duration.Minutes(), lane.TotalRequests, r.loadrps, lane.FailedCountsByPhase[E2E]))
 			} else {
 				msgTexts = append(msgTexts,
 					fmt.Sprintf(
-						"Load sequence ran for %.0fm sending a total of %d transactions at a rate of %d tx(s) per second."+
+						"Load sequence ran on lane %s for %.0fm sending a total of %d transactions at a rate of %d tx(s) per second."+
 							"\n All requests were successful",
-						r.duration.Minutes(), lane.TotalRequests, r.loadrps))
+						name, r.duration.Minutes(), lane.TotalRequests, r.loadrps))
 			}
 		}
-		if strings.Contains(r.t.Name(), "soak") {
+		if strings.Contains(strings.ToLower(r.t.Name()), "soak") {
 			if lane.FailedCountsByPhase[E2E] > 0 {
 				msgTexts = append(msgTexts,
 					fmt.Sprintf(":x: Run Failed for lane %s :x:", name),
 					fmt.Sprintf(
-						"Soak sequence ran for %.0fm sending a total of %d transactions triggering transaction at every %f seconds."+
+						"Soak sequence ran on lane %s for %.0fm sending a total of %d transactions triggering transaction at every %f seconds."+
 							"\n No of failed requests %d",
-						r.duration.Minutes(), lane.TotalRequests, r.soakInterval.Seconds(), lane.FailedCountsByPhase[E2E]))
+						name, r.duration.Minutes(), lane.TotalRequests, r.soakInterval.Seconds(), lane.FailedCountsByPhase[E2E]))
 			} else {
 				msgTexts = append(msgTexts,
 					fmt.Sprintf(
-						"Soak sequence ran for %.0fm sending a total of %d transactions triggering transaction at every %f seconds"+
+						"Soak sequence ran on lane %s for %.0fm sending a total of %d transactions triggering transaction at every %f seconds"+
 							"\n All requests were successful",
-						r.duration.Minutes(), lane.TotalRequests, r.soakInterval.Seconds()))
+						name, r.duration.Minutes(), lane.TotalRequests, r.soakInterval.Seconds()))
 			}
 		}
 	}
