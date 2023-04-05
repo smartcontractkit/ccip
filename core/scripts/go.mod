@@ -118,7 +118,7 @@ require (
 	github.com/gin-contrib/sessions v0.0.5 // indirect
 	github.com/gin-contrib/size v0.0.0-20220707104239-f5a650759656 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
-	github.com/gin-gonic/gin v1.8.1 // indirect
+	github.com/gin-gonic/gin v1.8.2 // indirect
 	github.com/go-errors/errors v1.4.2 // indirect
 	github.com/go-kit/kit v0.12.0 // indirect
 	github.com/go-kit/log v0.2.1 // indirect
@@ -340,7 +340,7 @@ require (
 	github.com/tklauser/go-sysconf v0.3.11 // indirect
 	github.com/tklauser/numcpus v0.6.0 // indirect
 	github.com/ugorji/go/codec v1.2.11 // indirect
-	github.com/ulule/limiter v0.0.0-20190417201358-7873d115fc4e // indirect
+	github.com/ulule/limiter/v3 v3.11.1 // indirect
 	github.com/umbracle/fastrlp v0.0.0-20220527094140-59d5dd30e722 // indirect
 	github.com/unrolled/secure v0.0.0-20190624173513-716474489ad3 // indirect
 	github.com/urfave/cli/v2 v2.10.2 // indirect
@@ -408,9 +408,6 @@ require (
 replace (
 	// needed to address mismatch between cosmosSDK and hdevalence/ed25519consensus
 	filippo.io/edwards25519 => filippo.io/edwards25519 v1.0.0-rc.1
-
-	// updating CosmWasm to v1.0.0 which brings ARM support
-	github.com/CosmWasm/wasmvm => github.com/CosmWasm/wasmvm v1.0.0
 
 	// Fix go mod tidy issue for ambiguous imports from go-ethereum
 	// See https://github.com/ugorji/go/issues/279
