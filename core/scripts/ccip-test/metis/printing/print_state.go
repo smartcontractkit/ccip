@@ -402,13 +402,6 @@ func printPaused(chain *rhea.EvmDeploymentConfig) {
 
 	sb.WriteString(fmt.Sprintf("| %-25s | %42s | %14s |\n", "onramp", onRamp.Address(), printBool(!paused)))
 
-	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(chain.LaneConfig.OffRamp, chain.Client)
-	helpers.PanicErr(err)
-	paused, err = offRamp.Paused(&bind.CallOpts{})
-	helpers.PanicErr(err)
-
-	sb.WriteString(fmt.Sprintf("| %-25s | %42s | %14s |\n", "offramp", offRamp.Address(), printBool(!paused)))
-
 	commitStore, err := commit_store.NewCommitStore(chain.LaneConfig.CommitStore, chain.Client)
 	helpers.PanicErr(err)
 	paused, err = commitStore.Paused(&bind.CallOpts{})
