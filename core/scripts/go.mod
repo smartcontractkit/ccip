@@ -16,7 +16,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/satori/go.uuid v1.2.1-0.20181028125025-b2ce2384e17b
 	github.com/shopspring/decimal v1.3.1
-	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20230330134826-c1c86487dd42
+	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20230406173616-ac1d259f4461
 	github.com/smartcontractkit/chainlink/v2 v2.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/libocr v0.0.0-20230301222433-aec519050c9a
 	github.com/smartcontractkit/ocr2keepers v0.6.14
@@ -326,7 +326,7 @@ require (
 	github.com/smartcontractkit/chainlink-relay v0.1.7-0.20230328133051-9d3eb8328c82 // indirect
 	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20230328132724-705a2932e300 // indirect
 	github.com/smartcontractkit/chainlink-starknet/relayer v0.0.0-20230328102724-20c5e1a716e9 // indirect
-	github.com/smartcontractkit/chainlink-testing-framework v1.11.1 // indirect
+	github.com/smartcontractkit/chainlink-testing-framework v1.11.2 // indirect
 	github.com/smartcontractkit/wsrpc v0.6.2-0.20230317160629-382a1ac921d8 // indirect
 	github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
@@ -408,7 +408,6 @@ require (
 	k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280 // indirect
 	k8s.io/kubectl v0.25.4 // indirect
 	k8s.io/utils v0.0.0-20221107191617-1a15be271d1d // indirect
-	nhooyr.io/websocket v1.8.7 // indirect
 	sigs.k8s.io/controller-runtime v0.13.0 // indirect
 	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2 // indirect
 	sigs.k8s.io/kustomize/api v0.12.1 // indirect

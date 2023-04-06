@@ -241,7 +241,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		_, err = ccipContracts.Dest.Receivers[1].Receiver.SetRevert(ccipContracts.Dest.User, true)
 		require.NoError(t, err, "setting revert to true on the receiver")
 		ccipContracts.Dest.Chain.Commit()
-		currentBlockNumber := ccipContracts.Dest.Chain.Blockchain().CurrentBlock().Number().Uint64()
+		currentBlockNumber := ccipContracts.Dest.Chain.Blockchain().CurrentBlock().Number.Uint64()
 
 		// Test sequence:
 		// Send msg1: strict reverts
@@ -302,7 +302,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 
 		// manually execute the failed request
 		failedSeqNum := testhelpers.ExecuteMessage(t, ccipContracts, failedReqLog, txForFailedReq.Hash(), currentBlockNumber)
-		currentBlockNumber = ccipContracts.Dest.Chain.Blockchain().CurrentBlock().Number().Uint64()
+		currentBlockNumber = ccipContracts.Dest.Chain.Blockchain().CurrentBlock().Number.Uint64()
 		testhelpers.EventuallyExecutionStateChangedToSuccess(t, ccipContracts, []uint64{failedSeqNum}, currentBlockNumber)
 
 		// verify all the pending requests should be successfully executed now
@@ -322,7 +322,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		ccipContracts.DeployNewOnRamp()
 		ccipContracts.DeployNewCommitStore()
 		ccipContracts.DeployNewOffRamp()
-		newConfigBlock := ccipContracts.Dest.Chain.Blockchain().CurrentBlock().Number().Int64()
+		newConfigBlock := ccipContracts.Dest.Chain.Blockchain().CurrentBlock().Number.Int64()
 		// delete previous jobs, 1 commit and exec
 		for _, node := range nodes {
 			err = node.App.DeleteJob(context.Background(), 1)

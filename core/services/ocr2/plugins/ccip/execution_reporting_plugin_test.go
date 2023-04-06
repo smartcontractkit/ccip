@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/txpool"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
@@ -306,7 +307,7 @@ func TestMaxInternalExecutionReportSize(t *testing.T) {
 		Data:     b,
 	}))
 	require.NoError(t, err)
-	pool := core.NewTxPool(core.DefaultTxPoolConfig, params.AllEthashProtocolChanges, c.destChain.Blockchain())
+	pool := txpool.NewTxPool(txpool.DefaultConfig, params.AllEthashProtocolChanges, c.destChain.Blockchain())
 	require.NoError(t, pool.AddLocal(signedTx))
 }
 

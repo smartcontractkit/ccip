@@ -1071,7 +1071,7 @@ func ExecuteMessage(
 		DestChain:          c.Dest.Chain,
 		SourceStartBlock:   sendReqReceipt.BlockNumber,
 		destStartBlock:     destStartBlock,
-		DestLatestBlockNum: c.Dest.Chain.Blockchain().CurrentBlock().Number().Uint64(),
+		DestLatestBlockNum: c.Dest.Chain.Blockchain().CurrentBlock().Number.Uint64(),
 		SendReqLogIndex:    uint(req.LogIndex),
 		SendReqTxHash:      txHash.String(),
 		CommitStore:        c.Dest.CommitStore.Address().String(),

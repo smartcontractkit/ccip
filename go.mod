@@ -64,7 +64,7 @@ require (
 	github.com/smartcontractkit/chainlink-relay v0.1.7-0.20230328133051-9d3eb8328c82
 	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20230328132724-705a2932e300
 	github.com/smartcontractkit/chainlink-starknet/relayer v0.0.0-20230328102724-20c5e1a716e9
-	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20230330134826-c1c86487dd42
+	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20230406173616-ac1d259f4461
 	github.com/smartcontractkit/libocr v0.0.0-20230301222433-aec519050c9a
 	github.com/smartcontractkit/ocr2keepers v0.6.14
 	github.com/smartcontractkit/ocr2vrf v0.0.0-20230313164535-dce9b4be73a3
@@ -342,8 +342,8 @@ require (
 	github.com/sasha-s/go-deadlock v0.3.1 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/sirupsen/logrus v1.9.0 // indirect
-	github.com/smartcontractkit/chainlink-env v0.3.25 // indirect
-	github.com/smartcontractkit/chainlink-testing-framework v1.11.1 // indirect
+	github.com/smartcontractkit/chainlink-env v0.3.26 // indirect
+	github.com/smartcontractkit/chainlink-testing-framework v1.11.2 // indirect
 	github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spf13/afero v1.9.2 // indirect
@@ -408,7 +408,6 @@ require (
 	k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280 // indirect
 	k8s.io/kubectl v0.25.4 // indirect
 	k8s.io/utils v0.0.0-20221107191617-1a15be271d1d // indirect
-	nhooyr.io/websocket v1.8.7 // indirect
 	sigs.k8s.io/controller-runtime v0.13.0 // indirect
 	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2 // indirect
 	sigs.k8s.io/kustomize/api v0.12.1 // indirect
