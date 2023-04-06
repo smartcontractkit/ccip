@@ -217,10 +217,9 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
       // Since there is only 1b link this is safe
       s_nopFeesJuels += uint96(feeTokenAmount);
     } else {
-      s_nopFeesJuels += IPriceRegistry(s_dynamicConfig.priceRegistry).convertFeeTokenAmountToLinkAmount(
-        i_linkToken,
-        message.feeToken,
-        feeTokenAmount
+      // the cast from uint256 to uint96 is considered safe, uint96 can store more than max supply of link token
+      s_nopFeesJuels += uint96(
+        IPriceRegistry(s_dynamicConfig.priceRegistry).convertTokenAmount(message.feeToken, feeTokenAmount, i_linkToken)
       );
     }
 

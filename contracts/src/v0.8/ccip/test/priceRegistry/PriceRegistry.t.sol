@@ -178,8 +178,8 @@ contract PriceRegistry_updatePrices is PriceRegistrySetup {
   }
 }
 
-contract PriceRegistry_convertFeeTokenAmountToLinkAmount is PriceRegistrySetup {
-  function testConvertFeeTokenAmountToLinkAmountSuccess() public {
+contract PriceRegistry_convertTokenAmount is PriceRegistrySetup {
+  function testConvertTokenAmountSuccess() public {
     Internal.PriceUpdates memory initialPriceUpdates = abi.decode(
       s_encodedInitialPriceUpdates,
       (Internal.PriceUpdates)
@@ -188,10 +188,10 @@ contract PriceRegistry_convertFeeTokenAmountToLinkAmount is PriceRegistrySetup {
     uint256 conversionRate = (uint256(initialPriceUpdates.tokenPriceUpdates[2].usdPerToken) * 1e18) /
       uint256(initialPriceUpdates.tokenPriceUpdates[0].usdPerToken);
     uint256 expected = (amount * conversionRate) / 1e18;
-    assertEq(s_priceRegistry.convertFeeTokenAmountToLinkAmount(s_sourceTokens[0], s_weth, amount), expected);
+    assertEq(s_priceRegistry.convertTokenAmount(s_weth, amount, s_sourceTokens[0]), expected);
   }
 
-  function test_fuzz_ConvertFeeTokenAmountToLinkAmountSuccess(
+  function test_fuzz_ConvertTokenAmountSuccess(
     uint256 feeTokenAmount,
     uint128 usdPerFeeToken,
     uint128 usdPerLinkToken,
@@ -219,16 +219,11 @@ contract PriceRegistry_convertFeeTokenAmountToLinkAmount is PriceRegistrySetup {
 
     s_priceRegistry.updatePrices(priceUpdates);
 
-    uint256 linkFee = s_priceRegistry.convertFeeTokenAmountToLinkAmount(linkToken, feeToken, feeTokenAmount);
+    uint256 linkFee = s_priceRegistry.convertTokenAmount(feeToken, feeTokenAmount, linkToken);
     assertEq(linkFee, (feeTokenAmount * usdPerFeeToken) / usdPerLinkToken);
   }
 
   // Reverts
-
-  function testNotAFeeTokenReverts() public {
-    vm.expectRevert(abi.encodeWithSelector(PriceRegistry.NotAFeeToken.selector, DUMMY_CONTRACT_ADDRESS));
-    s_priceRegistry.convertFeeTokenAmountToLinkAmount(s_sourceTokens[0], DUMMY_CONTRACT_ADDRESS, 3e16);
-  }
 
   function testStaleFeeTokenReverts() public {
     vm.warp(block.timestamp + TWELVE_HOURS + 1);
@@ -250,12 +245,15 @@ contract PriceRegistry_convertFeeTokenAmountToLinkAmount is PriceRegistrySetup {
         uint128(TWELVE_HOURS + 1)
       )
     );
-    s_priceRegistry.convertFeeTokenAmountToLinkAmount(s_sourceTokens[0], s_weth, 3e16);
+    s_priceRegistry.convertTokenAmount(s_weth, 3e16, s_sourceTokens[0]);
   }
 
   function testLinkTokenNotSupportedReverts() public {
     vm.expectRevert(abi.encodeWithSelector(PriceRegistry.TokenNotSupported.selector, DUMMY_CONTRACT_ADDRESS));
-    s_priceRegistry.convertFeeTokenAmountToLinkAmount(DUMMY_CONTRACT_ADDRESS, s_sourceTokens[0], 3e16);
+    s_priceRegistry.convertTokenAmount(DUMMY_CONTRACT_ADDRESS, 3e16, s_sourceTokens[0]);
+
+    vm.expectRevert(abi.encodeWithSelector(PriceRegistry.TokenNotSupported.selector, DUMMY_CONTRACT_ADDRESS));
+    s_priceRegistry.convertTokenAmount(s_sourceTokens[0], 3e16, DUMMY_CONTRACT_ADDRESS);
   }
 
   function testStaleLinkTokenReverts() public {
@@ -278,7 +276,7 @@ contract PriceRegistry_convertFeeTokenAmountToLinkAmount is PriceRegistrySetup {
         uint128(TWELVE_HOURS + 1)
       )
     );
-    s_priceRegistry.convertFeeTokenAmountToLinkAmount(s_sourceTokens[0], s_weth, 3e16);
+    s_priceRegistry.convertTokenAmount(s_weth, 3e16, s_sourceTokens[0]);
   }
 }
 

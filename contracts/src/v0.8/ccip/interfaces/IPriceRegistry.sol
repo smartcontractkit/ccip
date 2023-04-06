@@ -37,14 +37,14 @@ interface IPriceRegistry {
     view
     returns (uint256 feeTokenBaseUnitsPerUnitGas);
 
-  /// @notice Convert a fee token amount to a link token amount.
-  /// @param linkToken The link token address.
-  /// @param feeToken The fee token address.
-  /// @param feeTokenAmount The fee token amount.
-  /// @return linkTokenAmount The link token amount.
-  function convertFeeTokenAmountToLinkAmount(
-    address linkToken,
-    address feeToken,
-    uint256 feeTokenAmount
-  ) external returns (uint96 linkTokenAmount);
+  /// @notice Convert a given token amount to target token amount.
+  /// @param fromToken The given token address.
+  /// @param fromTokenAmount The given token amount.
+  /// @param toToken The target token address.
+  /// @return toTokenAmount The target token amount.
+  function convertTokenAmount(
+    address fromToken,
+    uint256 fromTokenAmount,
+    address toToken
+  ) external returns (uint256 toTokenAmount);
 }
