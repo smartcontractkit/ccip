@@ -16,7 +16,7 @@ contract Forwarder is IForwarder, ERC165, OwnerIsCreator {
 
     address private constant DRY_RUN_ADDRESS = 0x0000000000000000000000000000000000000000;
 
-    string public constant GENERIC_PARAMS = "address from,address target,uint256 nonce,bytes data,uint256 expirationTime";
+    string public constant GENERIC_PARAMS = "address from,address target,uint256 nonce,bytes data,uint256 validUntilTime";
 
     string public constant EIP712_DOMAIN_TYPE = "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)";
 
@@ -75,7 +75,7 @@ contract Forwarder is IForwarder, ERC165, OwnerIsCreator {
         _verifySig(req, domainSeparator, requestTypeHash, suffixData, sig);
         _verifyAndUpdateNonce(req);
 
-        require(req.expirationTime == 0 || req.expirationTime > block.timestamp, "FWD: request expired");
+        require(req.validUntilTime == 0 || req.validUntilTime > block.timestamp, "FWD: request expired");
 
         bytes memory callData = abi.encodePacked(req.data, req.from);
         // solhint-disable-next-line avoid-low-level-calls
@@ -182,7 +182,7 @@ contract Forwarder is IForwarder, ERC165, OwnerIsCreator {
             uint256(uint160(req.target)),
             req.nonce,
             keccak256(req.data),
-            req.expirationTime,
+            req.validUntilTime,
             suffixData
         );
     }

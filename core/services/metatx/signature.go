@@ -14,7 +14,7 @@ import (
 const (
 	MetaERC20Name    = "MetaERC20"
 	MetaERC20Version = "v1"
-	TypeHash         = "ForwardRequest(address from,address target,uint256 nonce,bytes data,uint256 expirationTime)"
+	TypeHash         = "ForwardRequest(address from,address target,uint256 nonce,bytes data,uint256 validUntilTime)"
 )
 
 func SignMetaTransfer(

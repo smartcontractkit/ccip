@@ -17,9 +17,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink/core/assets"
 	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/custom_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
@@ -27,7 +25,6 @@ import (
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/maybe_revert_message_receiver"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/meta_erc20"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/mock_afn_contract"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
@@ -120,94 +117,6 @@ type CCIPContracts struct {
 	Source    SourceChain
 	Dest      DestinationChain
 	OCRConfig *OCR2Config
-}
-
-func (c *CCIPContracts) SetUpNewMintAndBurnPool(sourceTokenAddress, destTokenAddress common.Address) (sourcePoolAddress, destPoolAddress common.Address) {
-	sourcePoolAddress, _, sourcePool, err := burn_mint_token_pool.DeployBurnMintTokenPool(c.Source.User, c.Source.Chain, sourceTokenAddress)
-	require.NoError(c.t, err)
-	c.Source.Chain.Commit()
-
-	destPoolAddress, _, destPool, err := burn_mint_token_pool.DeployBurnMintTokenPool(c.Dest.User, c.Dest.Chain, destTokenAddress)
-	require.NoError(c.t, err)
-	c.Dest.Chain.Commit()
-
-	// transfer tokens to source token pool to allow the pool to burn the source token
-	sourceToken, err := meta_erc20.NewMetaERC20(sourceTokenAddress, c.Source.Chain)
-	require.NoError(c.t, err)
-
-	_, err = sourceToken.Transfer(c.Source.User, sourcePoolAddress, assets.Ether(10).ToInt())
-	require.NoError(c.t, err)
-	c.Source.Chain.Commit()
-	sourcePoolBal, err := sourceToken.BalanceOf(nil, sourcePoolAddress)
-	require.NoError(c.t, err)
-	require.Equal(c.t, assets.Ether(10).ToInt(), sourcePoolBal)
-
-	// set onRamp and offRamp as valid callers for source pool and destination pool respectively
-	_, err = sourcePool.ApplyRampUpdates(c.Source.User, []burn_mint_token_pool.IPoolRampUpdate{
-		{
-			Ramp:    c.Source.OnRamp.Address(),
-			Allowed: true,
-		},
-	}, nil)
-	require.NoError(c.t, err)
-
-	_, err = destPool.ApplyRampUpdates(c.Dest.User, nil, []burn_mint_token_pool.IPoolRampUpdate{
-		{
-			Ramp:    c.Dest.OffRamp.Address(),
-			Allowed: true,
-		},
-	})
-	require.NoError(c.t, err)
-
-	wrappedNativeAddress, err := c.Source.Router.GetWrappedNative(nil)
-	require.NoError(c.t, err)
-
-	// native token is used as fee token
-	_, err = c.Source.PriceRegistry.UpdatePrices(c.Source.User, price_registry.InternalPriceUpdates{
-		TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
-			{
-				SourceToken: wrappedNativeAddress,
-				UsdPerToken: big.NewInt(1e18), // 1usd
-			},
-		},
-		DestChainId:   c.Dest.ChainID,
-		UsdPerUnitGas: big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9,
-	})
-	require.NoError(c.t, err)
-	c.Source.Chain.Commit()
-	_, err = c.Source.PriceRegistry.ApplyFeeTokensUpdates(c.Source.User, []common.Address{wrappedNativeAddress}, nil)
-	require.NoError(c.t, err)
-	c.Source.Chain.Commit()
-
-	// add new token pool created above
-	_, err = c.Source.OnRamp.ApplyPoolUpdates(c.Source.User, nil, []evm_2_evm_onramp.InternalPoolUpdate{
-		{
-			Token: sourceTokenAddress,
-			Pool:  sourcePoolAddress,
-		},
-	})
-	require.NoError(c.t, err)
-	c.Source.Chain.Commit()
-
-	// set token limit
-	_, err = c.Source.OnRamp.SetPrices(c.Source.User, []common.Address{sourceTokenAddress}, []*big.Int{big.NewInt(5)})
-	require.NoError(c.t, err)
-	c.Source.Chain.Commit()
-
-	_, err = c.Dest.OffRamp.ApplyPoolUpdates(c.Dest.User, nil, []evm_2_evm_offramp.InternalPoolUpdate{
-		{
-			Token: sourceTokenAddress,
-			Pool:  destPoolAddress,
-		},
-	})
-	require.NoError(c.t, err)
-	c.Dest.Chain.Commit()
-
-	_, err = c.Dest.OffRamp.SetPrices(c.Dest.User, []common.Address{destTokenAddress}, []*big.Int{big.NewInt(5)})
-	require.NoError(c.t, err)
-	c.Dest.Chain.Commit()
-
-	return sourcePoolAddress, destPoolAddress
 }
 
 func (c *CCIPContracts) DeployNewOffRamp() {

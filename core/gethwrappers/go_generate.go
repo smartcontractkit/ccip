@@ -104,18 +104,14 @@ package gethwrappers
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/GovernanceDapp.abi ../../contracts/solc/v0.8.15/GovernanceDapp.bin GovernanceDapp governance_dapp
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/PingPongDemo.abi ../../contracts/solc/v0.8.15/PingPongDemo.bin PingPongDemo ping_pong_demo
 
-// Meta Transaction
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/MetaERC20.abi ../../contracts/solc/v0.8.15/MetaERC20.bin MetaERC20 meta_erc20
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/Forwarder.abi ../../contracts/solc/v0.8.15/Forwarder.bin Forwarder forwarder
-
 // Mercury
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.6/Verifier.abi ../../contracts/solc/v0.8.6/Verifier.bin MercuryVerifier mercury_verifier
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.6/VerifierProxy.abi ../../contracts/solc/v0.8.6/VerifierProxy.bin MercuryVerifierProxy mercury_verifier_proxy
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.6/ExposedVerifier.abi ../../contracts/solc/v0.8.6/ExposedVerifier.bin MercuryExposedVerifier mercury_exposed_verifier
 
 // Meta Transaction
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/MetaERC20.abi ../../contracts/solc/v0.8.15/MetaERC20.bin MetaERC20 meta_erc20
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/Forwarder.abi ../../contracts/solc/v0.8.15/Forwarder.bin Forwarder forwarder
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/CrossChainERC20Extension.abi ../../contracts/solc/v0.8.15/CrossChainERC20Extension.bin CrossChainERC20Extension cross_chain_erc20_extension
 
 // Mocks that contain only events and functions to emit them
 //go:generate go run ./generation/generate_events_mock/create_events_mock_contract.go ../../contracts/solc/v0.8.6/FunctionsOracle.abi ../../contracts/src/v0.8/mocks/FunctionsOracleEventsMock.sol FunctionsOracleEventsMock
