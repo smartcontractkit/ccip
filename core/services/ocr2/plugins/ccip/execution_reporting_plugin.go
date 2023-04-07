@@ -234,7 +234,7 @@ func (r *ExecutionReportingPlugin) getExecutableSeqNrs(ctx context.Context, infl
 	// Since this will only increase over time, the highest observed value will
 	// always be the lower bound of what would be available on chain
 	// since we already account for inflight txs.
-	bucket, err := r.config.offRamp.CalculateCurrentTokenBucketState(&bind.CallOpts{Context: ctx})
+	bucket, err := r.config.offRamp.CurrentTokenBucketState(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return nil, err
 	}

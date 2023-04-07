@@ -10,6 +10,7 @@ import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol
 
 import {Client} from "../models/Client.sol";
 import {Internal} from "../models/Internal.sol";
+import {RateLimiter} from "../models/RateLimiter.sol";
 import {OCR2BaseNoChecks} from "../ocr/OCR2BaseNoChecks.sol";
 import {AggregateRateLimiter} from "../AggregateRateLimiter.sol";
 import {EnumerableMapAddresses} from "../../libraries/internal/EnumerableMapAddresses.sol";
@@ -111,7 +112,7 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
     DynamicConfig memory dynamicConfig,
     IERC20[] memory sourceTokens,
     IPool[] memory pools,
-    RateLimiterConfig memory rateLimiterConfig
+    RateLimiter.Config memory rateLimiterConfig
   ) OCR2BaseNoChecks() AggregateRateLimiter(rateLimiterConfig) {
     if (sourceTokens.length != pools.length) revert InvalidTokenPoolConfig();
     if (staticConfig.onRamp == address(0) || staticConfig.commitStore == address(0)) revert ZeroAddressNotAllowed();
@@ -459,7 +460,7 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
       destTokenAmounts[i].token = address(pool.getToken());
       destTokenAmounts[i].amount = sourceTokenAmounts[i].amount;
     }
-    _removeTokens(destTokenAmounts);
+    _rateLimitValue(destTokenAmounts);
     return destTokenAmounts;
   }
 

@@ -12,7 +12,7 @@ contract TokenPoolSetup is BaseTest {
   function setUp() public virtual override {
     BaseTest.setUp();
     s_token = new MockERC20("LINK", "LNK", OWNER, 2**256 - 1);
-    s_tokenPool = new TokenPoolHelper(s_token);
+    s_tokenPool = new TokenPoolHelper(s_token, rateLimiterConfig());
   }
 }
 
@@ -21,7 +21,7 @@ contract TokenPool_constructor is TokenPoolSetup {
   function testNullAddressNotAllowedReverts() public {
     vm.expectRevert(IPool.NullAddressNotAllowed.selector);
 
-    s_tokenPool = new TokenPoolHelper(IERC20(address(0)));
+    s_tokenPool = new TokenPoolHelper(IERC20(address(0)), rateLimiterConfig());
   }
 }
 
@@ -85,6 +85,56 @@ contract TokenPool_applyRampUpdates is TokenPoolSetup {
   }
 }
 
+contract TokenPool_currentTokenBucketState is TokenPoolSetup {
+  function testCurrentTokenBucketStateSuccess() public {
+    RateLimiter.TokenBucket memory bucket = s_tokenPool.currentTokenBucketState();
+    RateLimiter.Config memory expectedConfig = rateLimiterConfig();
+    assertEq(bucket.capacity, expectedConfig.capacity);
+    assertEq(bucket.rate, expectedConfig.rate);
+    assertEq(bucket.tokens, expectedConfig.capacity);
+    assertEq(bucket.lastUpdated, uint40(block.timestamp));
+  }
+}
+
+contract TokenPool_setRateLimiterConfig is TokenPoolSetup {
+  event ConfigChanged(RateLimiter.Config);
+
+  function testSetRateLimiterConfigSuccess(
+    uint256 capacity,
+    uint208 rate,
+    uint40 newTime
+  ) public {
+    // Bucket updates only work on increasing time
+    vm.assume(newTime >= block.timestamp);
+    vm.warp(newTime);
+
+    uint256 oldCapacity = rateLimiterConfig().capacity;
+    RateLimiter.Config memory newConfig = RateLimiter.Config({isEnabled: true, capacity: capacity, rate: rate});
+
+    vm.expectEmit();
+    emit ConfigChanged(newConfig);
+
+    s_tokenPool.setRateLimiterConfig(newConfig);
+
+    uint256 expectedNewCapacity = RateLimiter._min(newConfig.capacity, oldCapacity + rate * (newTime - BLOCK_TIME));
+
+    RateLimiter.TokenBucket memory bucket = s_tokenPool.currentTokenBucketState();
+    assertEq(bucket.capacity, newConfig.capacity);
+    assertEq(bucket.rate, newConfig.rate);
+    assertEq(bucket.tokens, expectedNewCapacity);
+    assertEq(bucket.lastUpdated, uint48(newTime));
+  }
+
+  // Reverts
+
+  function testOnlyOwnerReverts() public {
+    changePrank(STRANGER);
+
+    vm.expectRevert("Only callable by owner");
+    s_tokenPool.setRateLimiterConfig(rateLimiterConfig());
+  }
+}
+
 contract TokenPool_pause is TokenPoolSetup {
   function testPauseSuccess() public {
     s_tokenPool.pause();
@@ -98,7 +148,7 @@ contract TokenPool_pause is TokenPoolSetup {
     s_tokenPool.pause();
   }
 
-  function testNonOwnerRevets() public {
+  function testNonOwnerReverts() public {
     changePrank(STRANGER);
     vm.expectRevert("Only callable by owner");
     s_tokenPool.pause();
@@ -118,7 +168,7 @@ contract TokenPool_unpause is TokenPoolSetup {
     s_tokenPool.unpause();
   }
 
-  function testNonOwnerRevets() public {
+  function testNonOwnerReverts() public {
     s_tokenPool.pause();
     changePrank(STRANGER);
     vm.expectRevert("Only callable by owner");

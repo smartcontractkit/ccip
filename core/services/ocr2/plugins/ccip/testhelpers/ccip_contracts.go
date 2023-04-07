@@ -136,10 +136,10 @@ func (c *CCIPContracts) DeployNewOffRamp() {
 		},
 		[]common.Address{c.Source.LinkToken.Address()}, // source tokens
 		[]common.Address{c.Dest.Pool.Address()},        // pools
-		evm_2_evm_offramp.AggregateRateLimiterRateLimiterConfig{
-			Capacity: HundredLink,
-			Rate:     big.NewInt(1e18),
-			Admin:    c.Source.User.From,
+		evm_2_evm_offramp.RateLimiterConfig{
+			Capacity:  HundredLink,
+			Rate:      big.NewInt(1e18),
+			IsEnabled: true,
 		},
 	)
 	require.NoError(c.t, err)
@@ -226,10 +226,10 @@ func (c *CCIPContracts) DeployNewOnRamp() {
 			},
 		},
 		[]common.Address{}, // allow list
-		evm_2_evm_onramp.AggregateRateLimiterRateLimiterConfig{
-			Capacity: HundredLink,
-			Rate:     big.NewInt(1e18),
-			Admin:    c.Source.User.From,
+		evm_2_evm_onramp.RateLimiterConfig{
+			Capacity:  HundredLink,
+			Rate:      big.NewInt(1e18),
+			IsEnabled: true,
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs{
 			{
@@ -480,9 +480,15 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	sourceChain.Commit()
 	sourceLinkToken, err := link_token_interface.NewLinkToken(sourceLinkTokenAddress, sourceChain)
 	require.NoError(t, err)
-	sourcePoolAddress, _, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(sourceUser,
+	sourcePoolAddress, _, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(
+		sourceUser,
 		sourceChain,
-		sourceLinkTokenAddress)
+		sourceLinkTokenAddress,
+		lock_release_token_pool.RateLimiterConfig{
+			Capacity:  HundredLink,
+			Rate:      big.NewInt(1e18),
+			IsEnabled: true,
+		})
 	require.NoError(t, err)
 	sourceChain.Commit()
 	sourcePool, err := lock_release_token_pool.NewLockReleaseTokenPool(sourcePoolAddress, sourceChain)
@@ -494,7 +500,15 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	destChain.Commit()
 	destLinkToken, err := link_token_interface.NewLinkToken(destLinkTokenAddress, destChain)
 	require.NoError(t, err)
-	destPoolAddress, _, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(destUser, destChain, destLinkTokenAddress)
+	destPoolAddress, _, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(
+		destUser,
+		destChain,
+		destLinkTokenAddress,
+		lock_release_token_pool.RateLimiterConfig{
+			Capacity:  HundredLink,
+			Rate:      big.NewInt(1e18),
+			IsEnabled: true,
+		})
 	require.NoError(t, err)
 	destChain.Commit()
 	destPool, err := lock_release_token_pool.NewLockReleaseTokenPool(destPoolAddress, destChain)
@@ -590,10 +604,10 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			},
 		},
 		[]common.Address{}, // allow list
-		evm_2_evm_onramp.AggregateRateLimiterRateLimiterConfig{
-			Capacity: HundredLink,
-			Rate:     big.NewInt(1e18),
-			Admin:    sourceUser.From,
+		evm_2_evm_onramp.RateLimiterConfig{
+			Capacity:  HundredLink,
+			Rate:      big.NewInt(1e18),
+			IsEnabled: true,
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs{
 			{
@@ -697,10 +711,10 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		},
 		[]common.Address{sourceLinkTokenAddress},
 		[]common.Address{destPoolAddress},
-		evm_2_evm_offramp.AggregateRateLimiterRateLimiterConfig{
-			Capacity: HundredLink,
-			Rate:     big.NewInt(1e18),
-			Admin:    sourceUser.From,
+		evm_2_evm_offramp.RateLimiterConfig{
+			Capacity:  HundredLink,
+			Rate:      big.NewInt(1e18),
+			IsEnabled: true,
 		},
 	)
 	require.NoError(t, err)

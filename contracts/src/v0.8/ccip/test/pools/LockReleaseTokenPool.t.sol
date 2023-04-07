@@ -8,11 +8,52 @@ import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
 contract LockReleaseTokenPoolSetup is BaseTest {
   IERC20 internal s_token;
   LockReleaseTokenPool internal s_lockReleaseTokenPool;
+  address s_allowedOnRamp = address(123);
+  address s_allowedOffRamp = address(234);
 
   function setUp() public virtual override {
     BaseTest.setUp();
     s_token = new MockERC20("LINK", "LNK", OWNER, 2**256 - 1);
-    s_lockReleaseTokenPool = new LockReleaseTokenPool(s_token);
+    s_lockReleaseTokenPool = new LockReleaseTokenPool(s_token, rateLimiterConfig());
+
+    IPool.RampUpdate[] memory onRamps = new IPool.RampUpdate[](1);
+    onRamps[0] = IPool.RampUpdate({ramp: s_allowedOnRamp, allowed: true});
+    IPool.RampUpdate[] memory offRamps = new IPool.RampUpdate[](1);
+    offRamps[0] = IPool.RampUpdate({ramp: s_allowedOffRamp, allowed: true});
+
+    s_lockReleaseTokenPool.applyRampUpdates(onRamps, offRamps);
+  }
+}
+
+contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
+  event TokensConsumed(uint256 tokens);
+  event Released(address indexed sender, address indexed recipient, uint256 amount);
+
+  function testReleaseOrMintSuccess(address recipient, uint256 amount) public {
+    // Since the owner already has tokens this would break the checks
+    vm.assume(recipient != OWNER);
+    vm.assume(recipient != address(0));
+
+    // Makes sure the pool always has enough funds
+    deal(address(s_token), address(s_lockReleaseTokenPool), amount);
+    changePrank(s_allowedOffRamp);
+
+    uint256 capacity = rateLimiterConfig().capacity;
+    // Determine if we hit the rate limit or the txs should succeed.
+    if (amount > capacity) {
+      vm.expectRevert(abi.encodeWithSelector(RateLimiter.ConsumingMoreThanMaxCapacity.selector, capacity, amount));
+    } else {
+      // Only rate limit if the amount is >0
+      if (amount > 0) {
+        vm.expectEmit();
+        emit TokensConsumed(amount);
+      }
+
+      vm.expectEmit();
+      emit Released(s_allowedOffRamp, recipient, amount);
+    }
+
+    s_lockReleaseTokenPool.releaseOrMint(recipient, amount);
   }
 }
 

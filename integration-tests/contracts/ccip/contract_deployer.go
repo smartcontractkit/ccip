@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"encoding/hex"
 	"fmt"
+	"math/big"
 	"strings"
 	"time"
 
@@ -117,7 +118,15 @@ func (e *CCIPContractsDeployer) DeployLockReleaseTokenPoolContract(linkAddr stri
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return lock_release_token_pool.DeployLockReleaseTokenPool(auth, backend, token)
+		return lock_release_token_pool.DeployLockReleaseTokenPool(
+			auth,
+			backend,
+			token,
+			lock_release_token_pool.RateLimiterConfig{
+				Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
+				Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
+				IsEnabled: true,
+			})
 	})
 
 	if err != nil {
@@ -410,7 +419,7 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 			},
 			tokensAndPools,
 			allowList,
-			evm_2_evm_onramp.AggregateRateLimiterRateLimiterConfig{
+			evm_2_evm_onramp.RateLimiterConfig{
 				Capacity: opts.Capacity,
 				Rate:     opts.Rate,
 			},
@@ -469,10 +478,10 @@ func (e *CCIPContractsDeployer) DeployOffRamp(sourceChainId, destChainId uint64,
 			},
 			sourceToken,
 			pools,
-			evm_2_evm_offramp.AggregateRateLimiterRateLimiterConfig{
-				Rate:     opts.Rate,
-				Capacity: opts.Capacity,
-				Admin:    auth.From,
+			evm_2_evm_offramp.RateLimiterConfig{
+				Rate:      opts.Rate,
+				Capacity:  opts.Capacity,
+				IsEnabled: true,
 			},
 		)
 	})
