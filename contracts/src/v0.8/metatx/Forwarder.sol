@@ -11,6 +11,10 @@ import {OwnerIsCreator} from "../ccip/OwnerIsCreator.sol";
 
 /// @title The Forwarder Implementation
 /// @notice This implementation of the `IForwarder` interface uses ERC-712 signatures and stored nonces for verification.
+/// @dev This implementation has been ported from OpenGSN's Forwarder.sol and modified in following ways:
+/// @dev 1. execute() does not accept "gas" parameter which allows caller to specify max gas limit for the forwarded call
+/// @dev 2. execute() does not accept "value" parameter which allows caller to pass native token to the forwarded call
+/// @dev 3. renamed field: "address to" => "address target"
 contract Forwarder is IForwarder, ERC165, OwnerIsCreator {
     using ECDSA for bytes32;
 
