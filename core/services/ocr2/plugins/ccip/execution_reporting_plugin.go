@@ -32,10 +32,6 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
 
-const (
-	PERMISSIONLESS_EXECUTION_THRESHOLD = 7 * 24 * time.Hour
-)
-
 var (
 	_ types.ReportingPluginFactory = &ExecutionReportingPluginFactory{}
 	_ types.ReportingPlugin        = &ExecutionReportingPlugin{}
@@ -220,7 +216,12 @@ func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(min, max uint64) (ma
 }
 
 func (r *ExecutionReportingPlugin) getExecutableSeqNrs(ctx context.Context, inflight []InflightInternalExecutionReport) ([]uint64, error) {
-	unexpiredReports, err := getUnexpiredCommitReports(r.config.dest, r.config.commitStore)
+	config, err := r.config.offRamp.GetDynamicConfig(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return nil, err
+	}
+
+	unexpiredReports, err := getUnexpiredCommitReports(r.config.dest, r.config.commitStore, config.PermissionLessExecutionThresholdSeconds)
 	if err != nil {
 		return nil, err
 	}
@@ -327,11 +328,11 @@ func (r *ExecutionReportingPlugin) getExecutableSeqNrs(ctx context.Context, infl
 
 		batch, allMessagesExecuted := r.buildBatch(srcToDst, srcLogs, executedMp, inflight, allowedTokenAmount,
 			pricePerDestToken, srcFeeTokensPrices, destFeeTokensPrices, destGasPrice)
-		// If all messages are already executed, snooze the root for the PERMISSIONLESS_EXECUTION_THRESHOLD_SECONDS,
+		// If all messages are already executed, snooze the root for the config.PermissionLessExecutionThresholdSeconds
 		// so it will never be considered again.
 		if allMessagesExecuted {
 			r.lggr.Infof("Snoozing root %s forever since there are no executable txs anymore %v", hex.EncodeToString(unexpiredReport.MerkleRoot[:]), executedMp)
-			r.snoozedRoots[unexpiredReport.MerkleRoot] = time.Now().Add(PERMISSIONLESS_EXECUTION_THRESHOLD)
+			r.snoozedRoots[unexpiredReport.MerkleRoot] = time.Now().Add(time.Duration(config.PermissionLessExecutionThresholdSeconds))
 			incSkippedRequests(reasonAllExecuted)
 			continue
 		}
@@ -665,8 +666,8 @@ func getFeeTokensPrices(ctx context.Context, priceRegistry *price_registry.Price
 	return prices, nil
 }
 
-func getUnexpiredCommitReports(dstLogPoller logpoller.LogPoller, commitStore *commit_store.CommitStore) ([]commit_store.CommitStoreCommitReport, error) {
-	logs, err := dstLogPoller.LogsCreatedAfter(ReportAccepted, commitStore.Address(), time.Now().Add(-PERMISSIONLESS_EXECUTION_THRESHOLD))
+func getUnexpiredCommitReports(dstLogPoller logpoller.LogPoller, commitStore *commit_store.CommitStore, permissionLessExecutionThresholdSeconds uint32) ([]commit_store.CommitStoreCommitReport, error) {
+	logs, err := dstLogPoller.LogsCreatedAfter(ReportAccepted, commitStore.Address(), time.Now().Add(-time.Duration(permissionLessExecutionThresholdSeconds)))
 	if err != nil {
 		return nil, err
 	}
