@@ -19,25 +19,25 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink/common/txmgr/types/mocks"
-	"github.com/smartcontractkit/chainlink/core/assets"
-	evmclient "github.com/smartcontractkit/chainlink/core/chains/evm/client"
-	"github.com/smartcontractkit/chainlink/core/chains/evm/gas"
-	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
-	evmtypes "github.com/smartcontractkit/chainlink/core/chains/evm/types"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store_helper"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/mock_afn_contract"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
-	"github.com/smartcontractkit/chainlink/core/internal/testutils"
-	"github.com/smartcontractkit/chainlink/core/internal/testutils/pgtest"
-	"github.com/smartcontractkit/chainlink/core/logger"
-	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
-	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
-	"github.com/smartcontractkit/chainlink/core/store/models"
-	"github.com/smartcontractkit/chainlink/core/utils"
+	"github.com/smartcontractkit/chainlink/v2/common/txmgr/types/mocks"
+	"github.com/smartcontractkit/chainlink/v2/core/assets"
+	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store_helper"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/mock_afn_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
+	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/merklemulti"
+	"github.com/smartcontractkit/chainlink/v2/core/store/models"
+	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 func TestCommitReportSize(t *testing.T) {
@@ -77,7 +77,15 @@ func TestCommitReportEncoding(t *testing.T) {
 	require.NoError(t, err)
 
 	// Deploy link token pool.
-	destPoolAddress, _, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(destUser, destChain, destLinkTokenAddress)
+	destPoolAddress, _, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(
+		destUser,
+		destChain,
+		destLinkTokenAddress,
+		lock_release_token_pool.RateLimiterConfig{
+			Capacity:  big.NewInt(1e18),
+			Rate:      big.NewInt(1e18),
+			IsEnabled: true,
+		})
 	require.NoError(t, err)
 	destChain.Commit()
 	_, err = lock_release_token_pool.NewLockReleaseTokenPool(destPoolAddress, destChain)
@@ -273,6 +281,50 @@ func TestCalculateIntervalConsensus(t *testing.T) {
 	}
 }
 
+func TestCommitReportToEthTxMeta(t *testing.T) {
+	mctx := hasher.NewKeccakCtx()
+	tree, err := merklemulti.NewTree(mctx, [][32]byte{mctx.Hash([]byte{0xaa})})
+	require.NoError(t, err)
+
+	tests := []struct {
+		name          string
+		min, max      uint64
+		expectedRange []uint64
+	}{
+		{
+			"happy flow",
+			1, 10,
+			[]uint64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+		},
+		{
+			"same sequence",
+			1, 1,
+			[]uint64{1},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			report := commit_store.CommitStoreCommitReport{
+				PriceUpdates: commit_store.InternalPriceUpdates{
+					TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{},
+					DestChainId:       uint64(1337),
+					UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
+				},
+				MerkleRoot: tree.Root(),
+				Interval:   commit_store.CommitStoreInterval{Min: tc.min, Max: tc.max},
+			}
+			out, err := EncodeCommitReport(&report)
+			require.NoError(t, err)
+
+			txMeta, err := CommitReportToEthTxMeta(out)
+			require.NoError(t, err)
+			require.NotNil(t, txMeta)
+			require.EqualValues(t, tc.expectedRange, txMeta.SeqNumbers)
+		})
+	}
+}
+
 type testPluginHarness = struct {
 	plugin           *CommitReportingPlugin
 	client           *backends.SimulatedBackend
@@ -389,8 +441,11 @@ func TestGeneratePriceUpdates(t *testing.T) {
 	newExpectedGasPriceUSD := big.NewInt(0).Mul(newGasPrice, fakePrice)
 	newExpectedGasPriceUSD.Div(newExpectedGasPriceUSD, big.NewInt(1e18))
 
+	newFeeToken := testutils.NewAddress()
+
 	tests := []struct {
 		name                   string
+		addFeeTokens           []common.Address
 		updateTokenPricesUSD   map[common.Address]*big.Int
 		updateGasPriceUSD      *big.Int
 		updateGasPrice         *big.Int
@@ -415,10 +470,21 @@ func TestGeneratePriceUpdates(t *testing.T) {
 			expectedGasPriceUSD:    newExpectedGasPriceUSD,
 			expectedTokenPricesUSD: map[common.Address]*big.Int{},
 		},
+		{
+			name:                   "new feeToken, getLatestPriceUpdates returns nil",
+			addFeeTokens:           []common.Address{newFeeToken},
+			expectedGasPriceUSD:    newExpectedGasPriceUSD,
+			expectedTokenPricesUSD: map[common.Address]*big.Int{newFeeToken: fakePrice},
+		},
 	}
 
 	for i, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if len(tt.addFeeTokens) > 0 {
+				_, err = th.plugin.config.priceRegistry.ApplyFeeTokensUpdates(th.owner, tt.addFeeTokens, []common.Address{})
+				require.NoError(t, err)
+				th.flushLogs()
+			}
 			if len(tt.updateTokenPricesUSD) > 0 || tt.updateGasPriceUSD != nil {
 				destChainId := uint64(0)
 				if tt.updateGasPriceUSD != nil {

@@ -7,14 +7,14 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/burn_mint_token_pool"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/mock_afn_contract"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/wrapped_token_pool"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/shared"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/burn_mint_token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/mock_afn_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/wrapped_token_pool"
 )
 
 func DeployToNewChain(client *EvmDeploymentConfig) error {
@@ -112,7 +112,15 @@ func deployPool(client *EvmDeploymentConfig, tokenName Token, tokenConfig EVMBri
 }
 
 func deployLockReleaseTokenPool(client *EvmDeploymentConfig, tokenName Token, tokenAddress common.Address) (common.Address, error) {
-	tokenPoolAddress, tx, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(client.Owner, client.Client, tokenAddress)
+	tokenPoolAddress, tx, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(
+		client.Owner,
+		client.Client,
+		tokenAddress,
+		lock_release_token_pool.RateLimiterConfig{
+			Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
+			Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
+			IsEnabled: false,
+		})
 	if err != nil {
 		return common.Address{}, err
 	}
@@ -130,7 +138,15 @@ func deployLockReleaseTokenPool(client *EvmDeploymentConfig, tokenName Token, to
 
 func deployBurnMintTokenPool(client *EvmDeploymentConfig, tokenName Token, tokenAddress common.Address) (common.Address, error) {
 	client.Logger.Infof("Deploying token pool for %s token", tokenName)
-	tokenPoolAddress, tx, _, err := burn_mint_token_pool.DeployBurnMintTokenPool(client.Owner, client.Client, tokenAddress)
+	tokenPoolAddress, tx, _, err := burn_mint_token_pool.DeployBurnMintTokenPool(
+		client.Owner,
+		client.Client,
+		tokenAddress,
+		burn_mint_token_pool.RateLimiterConfig{
+			Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
+			Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
+			IsEnabled: false,
+		})
 	if err != nil {
 		return common.Address{}, err
 	}
@@ -146,7 +162,17 @@ func deployWrappedTokenPool(client *EvmDeploymentConfig, tokenName Token) (commo
 	if tokenName.Symbol() == "" {
 		return common.Address{}, fmt.Errorf("no token symbol given for wrapped token pool %s", tokenName)
 	}
-	tokenPoolAddress, tx, _, err := wrapped_token_pool.DeployWrappedTokenPool(client.Owner, client.Client, string(tokenName), tokenName.Symbol(), tokenName.Decimals())
+	tokenPoolAddress, tx, _, err := wrapped_token_pool.DeployWrappedTokenPool(
+		client.Owner,
+		client.Client,
+		string(tokenName),
+		tokenName.Symbol(),
+		tokenName.Decimals(),
+		wrapped_token_pool.RateLimiterConfig{
+			Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
+			Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
+			IsEnabled: false,
+		})
 	if err != nil {
 		return common.Address{}, err
 	}

@@ -12,17 +12,17 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/maybe_revert_message_receiver"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/mock_afn_contract"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/simple_message_receiver"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/maybe_revert_message_receiver"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/mock_afn_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/simple_message_receiver"
 )
 
 var HundredCoins = new(big.Int).Mul(big.NewInt(1e18), big.NewInt(100))
@@ -68,6 +68,7 @@ func (l *LinkToken) Approve(to string, amount *big.Int) error {
 	log.Info().
 		Str("From", l.client.GetDefaultWallet().Address()).
 		Str("To", to).
+		Str("Token", l.Address()).
 		Str("Amount", amount.String()).
 		Uint64("Nonce", opts.Nonce.Uint64()).
 		Str("Network Name", l.client.GetNetworkConfig().Name).

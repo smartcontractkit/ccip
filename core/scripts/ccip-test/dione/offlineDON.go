@@ -14,10 +14,10 @@ import (
 	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2/types"
 
-	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
 	"github.com/smartcontractkit/chainlink/core/scripts/common"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
 type OfflineDON struct {

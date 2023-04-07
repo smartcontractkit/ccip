@@ -12,10 +12,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/test-go/testify/assert"
 
-	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
-	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
-	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/testhelpers"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 )
 
 func TestIntegration_CCIP(t *testing.T) {

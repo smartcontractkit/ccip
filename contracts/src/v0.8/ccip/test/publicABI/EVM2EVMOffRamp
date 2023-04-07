@@ -1,8 +1,8 @@
 {
   "acceptOwnership()": "79ba5097",
   "applyPoolUpdates((address,address)[],(address,address)[])": "3a87ac53",
-  "calculateCurrentTokenBucketState()": "90c2339b",
   "ccipReceive((bytes32,uint64,bytes,bytes,(address,uint256)[]))": "85572ffb",
+  "currentTokenBucketState()": "c38945a7",
   "executeSingleMessage((uint64,uint64,uint256,address,uint64,uint256,bool,address,bytes,(address,uint256)[],address,bytes32),bool)": "abc39f1f",
   "getDestinationToken(address)": "b4069b31",
   "getDestinationTokens()": "681fba16",
@@ -21,15 +21,12 @@
   "latestConfigDigestAndEpoch()": "afcb95d7",
   "manuallyExecute((uint64[],bytes[],bytes32[],uint256))": "945b4993",
   "owner()": "8da5cb5b",
-  "pause()": "8456cb59",
-  "paused()": "5c975abb",
-  "setDynamicConfig((uint32,uint64,address,uint32,uint16,address))": "7499693a",
+  "setAdmin(address)": "704b6c02",
+  "setDynamicConfig((uint32,address,address,uint16,uint32))": "00a16f39",
   "setOCR2Config(address[],address[],uint8,bytes,uint64,bytes)": "1ef38174",
   "setPrices(address[],uint256[])": "4352fa9f",
-  "setRateLimiterConfig((address,uint208,uint256))": "b3a18a3e",
-  "setTokenLimitAdmin(address)": "39aa9264",
+  "setRateLimiterConfig((bool,uint208,uint256))": "3091aee7",
   "transferOwnership(address)": "f2fde38b",
   "transmit(bytes32[3],bytes,bytes32[],bytes32[],bytes32)": "b1dc65a4",
-  "typeAndVersion()": "181f5a77",
-  "unpause()": "3f4ba83a"
+  "typeAndVersion()": "181f5a77"
 }

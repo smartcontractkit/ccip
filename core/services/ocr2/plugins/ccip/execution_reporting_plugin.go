@@ -17,16 +17,17 @@ import (
 
 	"github.com/pkg/errors"
 
-	txmgrtypes "github.com/smartcontractkit/chainlink/common/txmgr/types"
-	"github.com/smartcontractkit/chainlink/core/assets"
-	"github.com/smartcontractkit/chainlink/core/chains/evm/gas"
-	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
-	evmtypes "github.com/smartcontractkit/chainlink/core/chains/evm/types"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
-	"github.com/smartcontractkit/chainlink/core/logger"
+	txmgrtypes "github.com/smartcontractkit/chainlink/v2/common/txmgr/types"
+	"github.com/smartcontractkit/chainlink/v2/core/assets"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
+	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
@@ -39,6 +40,28 @@ var (
 	_ types.ReportingPluginFactory = &ExecutionReportingPluginFactory{}
 	_ types.ReportingPlugin        = &ExecutionReportingPlugin{}
 )
+
+// ExecutionReportToEthTxMeta generates a txmgr.EthTxMeta from the given report.
+// all the message ids will be added to the tx metadata.
+func ExecutionReportToEthTxMeta(report []byte) (*txmgr.EthTxMeta, error) {
+	execReport, err := DecodeExecutionReport(report)
+	if err != nil {
+		return nil, err
+	}
+
+	msgIDs := make([]string, len(execReport.EncodedMessages))
+	for i, encMsg := range execReport.EncodedMessages {
+		msg, err := DecodeMessage(encMsg)
+		if err != nil {
+			return nil, err
+		}
+		msgIDs[i] = hexutil.Encode(msg.MessageId[:])
+	}
+
+	return &txmgr.EthTxMeta{
+		MessageIDs: msgIDs,
+	}, nil
+}
 
 func MessagesFromExecutionReport(report types.Report) ([]uint64, [][]byte, error) {
 	decodeExecutionReport, err := DecodeExecutionReport(report)
@@ -211,7 +234,7 @@ func (r *ExecutionReportingPlugin) getExecutableSeqNrs(ctx context.Context, infl
 	// Since this will only increase over time, the highest observed value will
 	// always be the lower bound of what would be available on chain
 	// since we already account for inflight txs.
-	bucket, err := r.config.offRamp.CalculateCurrentTokenBucketState(&bind.CallOpts{Context: ctx})
+	bucket, err := r.config.offRamp.CurrentTokenBucketState(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return nil, err
 	}
@@ -274,7 +297,6 @@ func (r *ExecutionReportingPlugin) getExecutableSeqNrs(ctx context.Context, infl
 		}
 		snoozeUntil, haveSnoozed := r.snoozedRoots[unexpiredReport.MerkleRoot]
 		if haveSnoozed && time.Now().Before(snoozeUntil) {
-			incSkippedRequests(reasonSnoozed)
 			continue
 		}
 		blessed, err := r.config.commitStore.IsBlessed(&bind.CallOpts{Context: ctx}, unexpiredReport.MerkleRoot)
@@ -465,9 +487,6 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 
 func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.ReportTimestamp, query types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
 	lggr := r.lggr.Named("Report")
-	if isCommitStoreDownNow(ctx, lggr, r.config.commitStore) {
-		return false, nil, ErrCommitStoreIsDown
-	}
 	nonEmptyObservations := getNonEmptyObservations[ExecutionObservation](lggr, observations)
 	// Need at least F+1 observations
 	if len(nonEmptyObservations) <= r.F {
@@ -536,6 +555,9 @@ func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Conte
 }
 
 func (r *ExecutionReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context, timestamp types.ReportTimestamp, report types.Report) (bool, error) {
+	if isCommitStoreDownNow(ctx, r.config.lggr, r.config.commitStore) {
+		return false, nil
+	}
 	seqNrs, _, err := MessagesFromExecutionReport(report)
 	if err != nil {
 		return false, nil

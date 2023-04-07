@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"encoding/hex"
 	"fmt"
+	"math/big"
 	"strings"
 	"time"
 
@@ -16,22 +17,22 @@ import (
 	ocrtypes2 "github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"golang.org/x/crypto/curve25519"
 
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
 
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/maybe_revert_message_receiver"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/mock_afn_contract"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/simple_message_receiver"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/weth9"
-	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
-	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/maybe_revert_message_receiver"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/mock_afn_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/simple_message_receiver"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/weth9"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocrcommon"
 )
 
 // CCIPContractsDeployer provides the implementations for deploying CCIP ETH contracts
@@ -117,7 +118,15 @@ func (e *CCIPContractsDeployer) DeployLockReleaseTokenPoolContract(linkAddr stri
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return lock_release_token_pool.DeployLockReleaseTokenPool(auth, backend, token)
+		return lock_release_token_pool.DeployLockReleaseTokenPool(
+			auth,
+			backend,
+			token,
+			lock_release_token_pool.RateLimiterConfig{
+				Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
+				Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
+				IsEnabled: true,
+			})
 	})
 
 	if err != nil {
@@ -410,7 +419,7 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 			},
 			tokensAndPools,
 			allowList,
-			evm_2_evm_onramp.AggregateRateLimiterRateLimiterConfig{
+			evm_2_evm_onramp.RateLimiterConfig{
 				Capacity: opts.Capacity,
 				Rate:     opts.Rate,
 			},
@@ -461,19 +470,18 @@ func (e *CCIPContractsDeployer) DeployOffRamp(sourceChainId, destChainId uint64,
 				OnRamp:        onRamp,
 			},
 			evm_2_evm_offramp.EVM2EVMOffRampDynamicConfig{
-				Router:                                  destRouter,
 				PermissionLessExecutionThresholdSeconds: 0,
-				ExecutionDelaySeconds:                   0,
+				Router:                                  destRouter,
+				Afn:                                     afn,
 				MaxDataSize:                             1e5,
 				MaxTokensLength:                         15,
-				Afn:                                     afn,
 			},
 			sourceToken,
 			pools,
-			evm_2_evm_offramp.AggregateRateLimiterRateLimiterConfig{
-				Rate:     opts.Rate,
-				Capacity: opts.Capacity,
-				Admin:    auth.From,
+			evm_2_evm_offramp.RateLimiterConfig{
+				Rate:      opts.Rate,
+				Capacity:  opts.Capacity,
+				IsEnabled: true,
 			},
 		)
 	})

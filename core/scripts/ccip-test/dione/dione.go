@@ -11,10 +11,10 @@ import (
 
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 
-	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
 	"github.com/smartcontractkit/chainlink/core/scripts/common"
-	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 )
 
 const (

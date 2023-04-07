@@ -10,6 +10,7 @@ import {IEVM2AnyOnRamp} from "../interfaces/IEVM2AnyOnRamp.sol";
 import {AggregateRateLimiter} from "../AggregateRateLimiter.sol";
 import {Client} from "../models/Client.sol";
 import {Internal} from "../models/Internal.sol";
+import {RateLimiter} from "../models/RateLimiter.sol";
 import {EnumerableMapAddresses} from "../../libraries/internal/EnumerableMapAddresses.sol";
 
 import {SafeERC20} from "../../vendor/SafeERC20.sol";
@@ -42,7 +43,6 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
   error PoolAlreadyAdded();
   error PoolDoesNotExist(address token);
   error TokenPoolMismatch();
-  error TokenOrChainNotSupported(address token, uint64 chain);
   error SenderNotAllowed(address sender);
   error InvalidConfig();
   error InvalidAddress(bytes encodedAddress);
@@ -95,7 +95,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
 
   /// @dev Nop address and weight, used to set the nops and their weights
   struct NopAndWeight {
-    address nop; // ---┐ Address of the node operator
+    address nop; // ----┐ Address of the node operator
     uint16 weight; // --┘ Weight for nop rewards
   }
 
@@ -150,7 +150,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
     DynamicConfig memory dynamicConfig,
     TokenAndPool[] memory tokensAndPools,
     address[] memory allowlist,
-    AggregateRateLimiter.RateLimiterConfig memory rateLimiterConfig,
+    RateLimiter.Config memory rateLimiterConfig,
     FeeTokenConfigArgs[] memory feeTokenConfigs,
     NopAndWeight[] memory nopsAndWeights
   ) Pausable() AggregateRateLimiter(rateLimiterConfig) {
@@ -218,10 +218,9 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
       // Since there is only 1b link this is safe
       s_nopFeesJuels += uint96(feeTokenAmount);
     } else {
-      s_nopFeesJuels += IPriceRegistry(s_dynamicConfig.priceRegistry).convertFeeTokenAmountToLinkAmount(
-        i_linkToken,
-        message.feeToken,
-        feeTokenAmount
+      // the cast from uint256 to uint96 is considered safe, uint96 can store more than max supply of link token
+      s_nopFeesJuels += uint96(
+        IPriceRegistry(s_dynamicConfig.priceRegistry).convertTokenAmount(message.feeToken, feeTokenAmount, i_linkToken)
       );
     }
 
@@ -285,7 +284,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
     if (tokenAmounts.length > uint256(s_dynamicConfig.maxTokensLength)) revert UnsupportedNumberOfTokens();
     if (s_allowlistEnabled && !s_allowList.contains(originalSender)) revert SenderNotAllowed(originalSender);
 
-    _removeTokens(tokenAmounts);
+    _rateLimitValue(tokenAmounts);
   }
 
   // ================================================================
@@ -364,17 +363,6 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
   /// #@inheritdoc IEVM2AnyOnRamp
   /// @dev This method can only be called by the owner of the contract.
   function applyPoolUpdates(Internal.PoolUpdate[] memory removes, Internal.PoolUpdate[] memory adds) public onlyOwner {
-    for (uint256 i = 0; i < adds.length; ++i) {
-      address token = adds[i].token;
-      address pool = adds[i].pool;
-
-      if (token == address(0) || pool == address(0)) revert InvalidTokenPoolConfig();
-      if (s_poolsBySourceToken.contains(token)) revert PoolAlreadyAdded();
-      s_poolsBySourceToken.set(token, pool);
-
-      emit PoolAdded(token, pool);
-    }
-
     for (uint256 i = 0; i < removes.length; ++i) {
       address token = removes[i].token;
       address pool = removes[i].pool;
@@ -384,6 +372,17 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
       s_poolsBySourceToken.remove(token);
 
       emit PoolRemoved(token, pool);
+    }
+
+    for (uint256 i = 0; i < adds.length; ++i) {
+      address token = adds[i].token;
+      address pool = adds[i].pool;
+
+      if (token == address(0) || pool == address(0)) revert InvalidTokenPoolConfig();
+      if (s_poolsBySourceToken.contains(token)) revert PoolAlreadyAdded();
+      s_poolsBySourceToken.set(token, pool);
+
+      emit PoolAdded(token, pool);
     }
   }
 
@@ -398,7 +397,6 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
       message.feeToken,
       i_destChainId
     );
-    if (feeTokenBaseUnitsPerUnitGas == 0) revert TokenOrChainNotSupported(message.feeToken, i_destChainId);
 
     // NOTE: if a fee token is not configured, formula below will intentionally
     // return zero, i.e. zeroing the fees for that feeToken.

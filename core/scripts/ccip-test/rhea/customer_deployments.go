@@ -5,9 +5,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/cache_gold_child"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/shared"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/cache_gold_child"
 )
 
 func DeployCacheGoldTokenAndPool(t *testing.T, client *EvmDeploymentConfig) {

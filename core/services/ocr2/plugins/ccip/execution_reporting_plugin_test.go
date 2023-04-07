@@ -15,22 +15,23 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store_helper"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp_helper"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/mock_afn_contract"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/simple_message_receiver"
-	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
-	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
-	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
-	"github.com/smartcontractkit/chainlink/core/utils"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store_helper"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp_helper"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/mock_afn_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/simple_message_receiver"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/merklemulti"
+	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 type ExecutionContracts struct {
@@ -62,7 +63,15 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	require.NoError(t, err)
 
 	// Deploy destination pool
-	destPoolAddress, _, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(destUser, destChain, destLinkTokenAddress)
+	destPoolAddress, _, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(
+		destUser,
+		destChain,
+		destLinkTokenAddress,
+		lock_release_token_pool.RateLimiterConfig{
+			Capacity:  big.NewInt(1e18),
+			Rate:      big.NewInt(1e18),
+			IsEnabled: true,
+		})
 	require.NoError(t, err)
 	destChain.Commit()
 	destPool, err := lock_release_token_pool.NewLockReleaseTokenPool(destPoolAddress, destChain)
@@ -137,19 +146,18 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 			OnRamp:        onRampAddress,
 		},
 		evm_2_evm_offramp.EVM2EVMOffRampDynamicConfig{
-			Router:                                  routerAddress,
 			PermissionLessExecutionThresholdSeconds: 1,
-			ExecutionDelaySeconds:                   0,
+			Router:                                  routerAddress,
+			Afn:                                     afnAddress,
 			MaxDataSize:                             1e5,
 			MaxTokensLength:                         5,
-			Afn:                                     afnAddress,
 		},
 		[]common.Address{linkTokenSourceAddress},
 		[]common.Address{destPoolAddress},
-		evm_2_evm_offramp.AggregateRateLimiterRateLimiterConfig{
-			Capacity: big.NewInt(1e18),
-			Rate:     big.NewInt(1e18),
-			Admin:    destUser.From,
+		evm_2_evm_offramp.RateLimiterConfig{
+			Capacity:  big.NewInt(1e18),
+			Rate:      big.NewInt(1e18),
+			IsEnabled: true,
 		},
 	)
 	require.NoError(t, err)
@@ -327,4 +335,48 @@ func TestInternalExecutionReportEncoding(t *testing.T) {
 	decodeCommitReport, err := ccip.DecodeExecutionReport(encodeCommitReport)
 	require.NoError(t, err)
 	require.Equal(t, &report, decodeCommitReport)
+}
+
+func TestExecutionReportToEthTxMetadata(t *testing.T) {
+	c := setupContractsForExecution(t)
+	tests := []struct {
+		name     string
+		msgBatch messageBatch
+		err      error
+	}{
+		{
+			"happy flow",
+			c.generateMessageBatch(t, ccip.MaxPayloadLength, 50, ccip.MaxTokensPerMessage),
+			nil,
+		},
+		{
+			"invalid msgs",
+			func() messageBatch {
+				mb := c.generateMessageBatch(t, ccip.MaxPayloadLength, 50, ccip.MaxTokensPerMessage)
+				mb.allMsgBytes[0] = []byte{1, 1, 1, 1}
+				return mb
+			}(),
+			errors.New("abi: cannot marshal in to go type: length insufficient 4 require 32"),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			encExecReport, err := ccip.EncodeExecutionReport(
+				tc.msgBatch.seqNums,
+				tc.msgBatch.allMsgBytes,
+				tc.msgBatch.proof.Hashes,
+				tc.msgBatch.proof.SourceFlags,
+			)
+			require.NoError(t, err)
+			txMeta, err := ccip.ExecutionReportToEthTxMeta(encExecReport)
+			if tc.err != nil {
+				require.Equal(t, tc.err.Error(), err.Error())
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, txMeta)
+			require.Len(t, txMeta.MessageIDs, len(tc.msgBatch.allMsgBytes))
+		})
+	}
 }

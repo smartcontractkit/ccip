@@ -1,45 +1,63 @@
-[
-  {
-    "network_name": "Sepolia Testnet",
-    "lane_config": {
-      "is_native_fee_token" : true,
-      "fee_token": "0x097D90c9d3E0B50Ca60e1ae45F6A81010f9FB534",
-      "fee_token_pool": "0x03319347bb6db2f3158a8f8c68b4ad562cef8279",
+{
+  "lane_configs": {
+    "Arbitrum Goerli": {
+      "fee_token": "0xF6521C7E6A6e97A1510221bC4c50375FEeC1da6B",
+      "fee_token_pool": "0x59779c72A1980cd8303Bb3f5fB7e4103955aECcb",
       "bridge_tokens": [
-        "0x779877A7B0D9E8603169DdbD7836e478b4624789"
+        "0x45930fd5d9f7C9f5858E6F0Ce023bC49cC3076e8",
+        "0xFa1627e96AEEA856F8afa2AD1615a22176b43c20"
       ],
       "bridge_tokens_pools": [
-        "0xf1686d99f337fd5b02ed0dda8a3f9e31bf17b447"
+        "0xa710f6adeb6ffFACA315Bcb5EEf2f5c22BcE0319",
+        "0xA8eCBcd3fAfDF0Bca5dB471BD87819171DF0a16C"
       ],
-      "afn": "0xdaebcfbf1a27bd416ebe20207495a9086a52c22d",
-      "router": "0x0a36795b3006f50088c11ea45b960a1b0406f03b",
-      "price_registry": "0xda9dfa4408514f90c4f42c76147596c55584c59d",
+      "afn": "0x968e5dAf3876530dB794fC8746E40B1e13BFDC95",
+      "router": "0x521567188EB86fD946837dc25bb661040DA368fB",
+      "price_registry": "0xF534528668930aa4Bf941a560ffBEaa787930121",
+      "wrapped_native": "0x176d1CAC26Dfc3CCEfaEE29e2e1ccF078aDe60F7",
       "src_contracts": {
         "43113": {
-          "on_ramp": "0x35a926bc94654627443e436bb3d197d62821cf05"
-        },
-        "420": {
-          "on_ramp": "0x473336c120f463a7295921754deda0455c8c80e9"
+          "on_ramp": "0x0C3666dC116868117B51F0EE8FaE5C684405387d"
         }
       },
       "dest_contracts": {
         "43113": {
-          "off_ramp": "0x6a14cfb4ee9b0a3950cbf731c5634ffec32a324f",
-          "commit_store": "0x4f1e580043e9c01c78ce615cb7eda4ba49a42dfa",
-          "receiver_dapp": "0x27f1a2da89a86d7d5c91bea303d5109d5641fa2f"
-        },
-        "420": {
-          "off_ramp": "0xd194a706e49750e9bfd77f2fc067f10e1c719213",
-          "commit_store": "0x94301e622996ab441fd632fcc8e971116be02b87",
-          "receiver_dapp": "0x17b9417224e1bec23bb7208f4d5aac4ba797e701"
+          "off_ramp": "0x5f2e63312d0535a41F2b63cAA5EB82933f8bf196",
+          "commit_store": "0x3bb0D473f4358eFA34EeA6400aC1573DA1f22e48",
+          "receiver_dapp": "0xc183a9539c63E9851A91F574595C884E26828caB"
         }
       }
-    }
-  },
-  {
-    "network_name": "Avalanche Fuji",
-    "lane_config": {
-      "is_native_fee_token" : true,
+    },
+    "Avalanche Fuji": {
+      "fee_token": "0x0A639b75af9452628b34E88e4E567306367394ff",
+      "fee_token_pool": "0x19BEd66b5aB7FD8f369A44fA7Bf3F549fC2F9C08",
+      "bridge_tokens": [
+        "0x871D8B61e5635078E88962147482E655b766D085",
+        "0x4e01A01637715F8003572465F4e7e94f3b77780E"
+      ],
+      "bridge_tokens_pools": [
+        "0x1d2C4CA372D0efC6cFbFeCA01c140C66F20b0C29",
+        "0xf14e4e38e1B4bF1a6dD4d04a1576E558BF7620F6"
+      ],
+      "afn": "0x33b8d2305b26f3c3e3E601750A37E2a1082995F2",
+      "router": "0xf34b9f9aF2c1c1170025fad972c2d60B772D33B2",
+      "price_registry": "0x71fa523b088C19079c34154eDf135E8795472E4a",
+      "wrapped_native": "0x73827c1892697e51a502Bc500d8BEbb0C794009E",
+      "src_contracts": {
+        "421613": {
+          "on_ramp": "0xB690FDF60476DF1fdb6B137E4B1c91C482084F6D"
+        }
+      },
+      "dest_contracts": {
+        "421613": {
+          "off_ramp": "0x31d604e07b91DC5c412CC43f493e223Bbcbc3ca0",
+          "commit_store": "0x8591181b3eaEC47fDF0ac975686B58640293C862",
+          "receiver_dapp": "0x43a9D6fde1D052378a504c3f57AE329A56027c96"
+        }
+      }
+    },
+    "Avalanche Fuji-beta": {
+      "is_native_fee_token": true,
       "fee_token": "0xd00ae08403B9bbb9124bB305C09058E32C39A48c",
       "fee_token_pool": "0x286d7515bd5e9f6c963090f660b4ee9aa0f29ac4",
       "bridge_tokens": [
@@ -51,6 +69,7 @@
       "afn": "0x4d896d80eec6e9dabd7acd4ec5933e5a39e2ad94",
       "router": "0xb352e636f4093e4f5a4ac903064881491926aaa9",
       "price_registry": "0x819f8c1d44fc6e65610116d81a905abaa1f37c38",
+      "wrapped_native": "",
       "src_contracts": {
         "11155111": {
           "on_ramp": "0x14774a07faaba3d3187abb0da4c45b7aa327375f"
@@ -71,12 +90,9 @@
           "receiver_dapp": "0x1b5c3f26275b8d5fe2b082d40f199c7194a466b4"
         }
       }
-    }
-  },
-  {
-    "network_name": "Optimism Goerli",
-    "is_native_fee_token" : true,
-    "lane_config": {
+    },
+    "Optimism Goerli-beta": {
+      "is_native_fee_token": true,
       "fee_token": "0xdc2CC710e42857672E7907CF474a69B63B93089f",
       "fee_token_pool": "0x9d5adc4348a28df5786e8be10d494402369e6a1e",
       "bridge_tokens": [
@@ -88,6 +104,7 @@
       "afn": "0x7556ada51ac7d8f319f90f05d5837349c0d6ebd4",
       "router": "0xec6d1ec94d518be47da1cb35f5d43286558d8b62",
       "price_registry": "0x3150c882f21cf670a01073002d8e10cd56db44cf",
+      "wrapped_native": "",
       "src_contracts": {
         "11155111": {
           "on_ramp": "0xfc6617f3dfa5500203f00ddf83c2212f376176bd"
@@ -108,6 +125,41 @@
           "receiver_dapp": "0xebd05f8d74c9cabfc4b6ef8835fd7c5fad4c9883"
         }
       }
+    },
+    "Sepolia Testnet-beta": {
+      "is_native_fee_token": true,
+      "fee_token": "0x097D90c9d3E0B50Ca60e1ae45F6A81010f9FB534",
+      "fee_token_pool": "0x03319347bb6db2f3158a8f8c68b4ad562cef8279",
+      "bridge_tokens": [
+        "0x779877A7B0D9E8603169DdbD7836e478b4624789"
+      ],
+      "bridge_tokens_pools": [
+        "0xf1686d99f337fd5b02ed0dda8a3f9e31bf17b447"
+      ],
+      "afn": "0xdaebcfbf1a27bd416ebe20207495a9086a52c22d",
+      "router": "0x0a36795b3006f50088c11ea45b960a1b0406f03b",
+      "price_registry": "0xda9dfa4408514f90c4f42c76147596c55584c59d",
+      "wrapped_native": "",
+      "src_contracts": {
+        "420": {
+          "on_ramp": "0x473336c120f463a7295921754deda0455c8c80e9"
+        },
+        "43113": {
+          "on_ramp": "0x35a926bc94654627443e436bb3d197d62821cf05"
+        }
+      },
+      "dest_contracts": {
+        "420": {
+          "off_ramp": "0xd194a706e49750e9bfd77f2fc067f10e1c719213",
+          "commit_store": "0x94301e622996ab441fd632fcc8e971116be02b87",
+          "receiver_dapp": ""
+        },
+        "43113": {
+          "off_ramp": "0x6a14cfb4ee9b0a3950cbf731c5634ffec32a324f",
+          "commit_store": "0x4f1e580043e9c01c78ce615cb7eda4ba49a42dfa",
+          "receiver_dapp": ""
+        }
+      }
     }
   }
-]
+}

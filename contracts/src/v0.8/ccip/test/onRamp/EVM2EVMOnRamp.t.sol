@@ -361,7 +361,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     s_onRamp.forwardFromRouter(message, 0, OWNER);
   }
 
-  function testValueExceedsCapacityReverts() public {
+  function testConsumingMoreThanMaxCapacityReverts() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.tokenAmounts = new Client.EVMTokenAmount[](1);
     message.tokenAmounts[0].amount = 2**128;
@@ -371,7 +371,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        AggregateRateLimiter.ValueExceedsCapacity.selector,
+        RateLimiter.ConsumingMoreThanMaxCapacity.selector,
         rateLimiterConfig().capacity,
         message.tokenAmounts[0].amount * getTokenPrices()[0]
       )
@@ -564,6 +564,32 @@ contract EVM2EVMOnRamp_applyPoolUpdates is EVM2EVMOnRampSetup {
     s_onRamp.getPoolBySourceToken(IERC20(adds[0].token));
   }
 
+  function testAtomicPoolReplacementSuccess() public {
+    address token = address(1);
+
+    Internal.PoolUpdate[] memory adds = new Internal.PoolUpdate[](1);
+    adds[0] = Internal.PoolUpdate({token: token, pool: address(2)});
+
+    vm.expectEmit();
+    emit PoolAdded(token, adds[0].pool);
+
+    s_onRamp.applyPoolUpdates(new Internal.PoolUpdate[](0), adds);
+
+    assertEq(adds[0].pool, address(s_onRamp.getPoolBySourceToken(IERC20(token))));
+
+    Internal.PoolUpdate[] memory updates = new Internal.PoolUpdate[](1);
+    updates[0] = Internal.PoolUpdate({token: token, pool: address(3)});
+
+    vm.expectEmit();
+    emit PoolRemoved(token, adds[0].pool);
+    vm.expectEmit();
+    emit PoolAdded(token, updates[0].pool);
+
+    s_onRamp.applyPoolUpdates(adds, updates);
+
+    assertEq(updates[0].pool, address(s_onRamp.getPoolBySourceToken(IERC20(token))));
+  }
+
   // Reverts
   function testOnlyCallableByOwnerReverts() public {
     changePrank(STRANGER);
@@ -610,6 +636,8 @@ contract EVM2EVMOnRamp_applyPoolUpdates is EVM2EVMOnRampSetup {
   function testTokenPoolMismatchReverts() public {
     Internal.PoolUpdate[] memory adds = new Internal.PoolUpdate[](1);
     adds[0] = Internal.PoolUpdate({token: address(1), pool: address(2)});
+    s_onRamp.applyPoolUpdates(new Internal.PoolUpdate[](0), adds);
+
     Internal.PoolUpdate[] memory removes = new Internal.PoolUpdate[](1);
     removes[0] = Internal.PoolUpdate({token: address(1), pool: address(20)});
 

@@ -9,6 +9,7 @@ import "../helpers/receivers/MaybeRevertMessageReceiverNo165.sol";
 import "../helpers/receivers/ReentrancyAbuser.sol";
 import {AFN} from "../../AFN.sol";
 import "../../offRamp/EVM2EVMOffRamp.sol";
+import "../mocks/MockCommitStore.sol";
 
 /// @notice #constructor
 contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
@@ -93,15 +94,11 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
   function testZeroOnRampAddressReverts() public {
     IPool[] memory pools = new IPool[](2);
     pools[0] = IPool(s_sourcePools[0]);
-    pools[1] = new LockReleaseTokenPool(IERC20(s_sourceTokens[1]));
+    pools[1] = new LockReleaseTokenPool(IERC20(s_sourceTokens[1]), rateLimiterConfig());
 
     vm.expectRevert(EVM2EVMOffRamp.ZeroAddressNotAllowed.selector);
 
-    AggregateRateLimiter.RateLimiterConfig memory rateLimiterConfig = AggregateRateLimiter.RateLimiterConfig({
-      rate: 1e20,
-      capacity: 1e20,
-      admin: ADMIN
-    });
+    RateLimiter.Config memory rateLimiterConfig = RateLimiter.Config({isEnabled: true, rate: 1e20, capacity: 1e20});
 
     s_offRamp = new EVM2EVMOffRampHelper(
       EVM2EVMOffRamp.StaticConfig({
@@ -335,7 +332,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
   // Reverts
 
   function testPausedReverts() public {
-    s_offRamp.pause();
+    s_mockCommitStore.pause();
     vm.expectRevert("Pausable: paused");
     s_offRamp.execute(_generateReportFromMessages(_generateMessagesWithTokens()), true);
   }
@@ -626,7 +623,10 @@ contract EVM2EVMOffRamp_applyPoolUpdates is EVM2EVMOffRampSetup {
 
   function testApplyPoolUpdatesSuccess() public {
     Internal.PoolUpdate[] memory adds = new Internal.PoolUpdate[](1);
-    adds[0] = Internal.PoolUpdate({token: address(1), pool: address(new LockReleaseTokenPool(IERC20(address(1))))});
+    adds[0] = Internal.PoolUpdate({
+      token: address(1),
+      pool: address(new LockReleaseTokenPool(IERC20(address(1)), rateLimiterConfig()))
+    });
 
     vm.expectEmit();
     emit PoolAdded(adds[0].token, adds[0].pool);
@@ -655,8 +655,14 @@ contract EVM2EVMOffRamp_applyPoolUpdates is EVM2EVMOffRampSetup {
 
   function testPoolAlreadyExistsReverts() public {
     Internal.PoolUpdate[] memory adds = new Internal.PoolUpdate[](2);
-    adds[0] = Internal.PoolUpdate({token: address(1), pool: address(new LockReleaseTokenPool(IERC20(address(1))))});
-    adds[1] = Internal.PoolUpdate({token: address(1), pool: address(new LockReleaseTokenPool(IERC20(address(1))))});
+    adds[0] = Internal.PoolUpdate({
+      token: address(1),
+      pool: address(new LockReleaseTokenPool(IERC20(address(1)), rateLimiterConfig()))
+    });
+    adds[1] = Internal.PoolUpdate({
+      token: address(1),
+      pool: address(new LockReleaseTokenPool(IERC20(address(1)), rateLimiterConfig()))
+    });
 
     vm.expectRevert(EVM2EVMOffRamp.PoolAlreadyAdded.selector);
 
@@ -680,7 +686,10 @@ contract EVM2EVMOffRamp_applyPoolUpdates is EVM2EVMOffRampSetup {
 
   function testPoolDoesNotExistReverts() public {
     Internal.PoolUpdate[] memory removes = new Internal.PoolUpdate[](1);
-    removes[0] = Internal.PoolUpdate({token: address(1), pool: address(new LockReleaseTokenPool(IERC20(address(1))))});
+    removes[0] = Internal.PoolUpdate({
+      token: address(1),
+      pool: address(new LockReleaseTokenPool(IERC20(address(1)), rateLimiterConfig()))
+    });
 
     vm.expectRevert(EVM2EVMOffRamp.PoolDoesNotExist.selector);
 
@@ -689,13 +698,16 @@ contract EVM2EVMOffRamp_applyPoolUpdates is EVM2EVMOffRampSetup {
 
   function testTokenPoolMismatchReverts() public {
     Internal.PoolUpdate[] memory adds = new Internal.PoolUpdate[](1);
-    adds[0] = Internal.PoolUpdate({token: address(1), pool: address(new LockReleaseTokenPool(IERC20(address(1))))});
+    adds[0] = Internal.PoolUpdate({
+      token: address(1),
+      pool: address(new LockReleaseTokenPool(IERC20(address(1)), rateLimiterConfig()))
+    });
     s_offRamp.applyPoolUpdates(new Internal.PoolUpdate[](0), adds);
 
     Internal.PoolUpdate[] memory removes = new Internal.PoolUpdate[](1);
     removes[0] = Internal.PoolUpdate({
       token: address(1),
-      pool: address(new LockReleaseTokenPool(IERC20(address(1000))))
+      pool: address(new LockReleaseTokenPool(IERC20(address(1000)), rateLimiterConfig()))
     });
 
     vm.expectRevert(EVM2EVMOffRamp.TokenPoolMismatch.selector);
@@ -730,14 +742,6 @@ contract EVM2EVMOffRamp_getDestinationTokens is EVM2EVMOffRampSetup {
 
 contract EVM2EVMOffRamp_afn is EVM2EVMOffRampSetup {
   function testAFN() public {
-    // Test pausing
-    assertEq(s_offRamp.paused(), false);
-    s_offRamp.pause();
-    assertEq(s_offRamp.paused(), true);
-    s_offRamp.unpause();
-    assertEq(s_offRamp.paused(), false);
-
-    // Test afn
     assertEq(s_offRamp.isAFNHealthy(), true);
     s_mockAFN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
     assertEq(s_offRamp.isAFNHealthy(), false);

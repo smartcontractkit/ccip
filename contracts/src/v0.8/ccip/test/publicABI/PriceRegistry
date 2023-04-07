@@ -2,7 +2,7 @@
   "acceptOwnership()": "79ba5097",
   "applyFeeTokensUpdates(address[],address[])": "7afac322",
   "applyPriceUpdatersUpdates(address[],address[])": "52877af0",
-  "convertFeeTokenAmountToLinkAmount(address,address,uint256)": "a5817a95",
+  "convertTokenAmount(address,uint256,address)": "0041e5be",
   "getDestinationChainGasPrice(uint64)": "514e8cff",
   "getFeeTokenBaseUnitsPerUnitGas(address,uint64)": "268e5d48",
   "getFeeTokens()": "cdc73d51",

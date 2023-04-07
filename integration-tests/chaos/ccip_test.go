@@ -31,7 +31,7 @@ func TestChaosCCIP(t *testing.T) {
 			testName:  "CCIP works after rpc is down for NetworkA @network-chaos",
 			chaosFunc: chaos.NewNetworkPartition,
 			chaosProps: &chaos.Props{
-				FromLabels: &map[string]*string{"app": a.Str(actions.GethLabelNetworkA)},
+				FromLabels: &map[string]*string{actions.ChaosGroupNetworkACCIPGeth: a.Str("1")},
 				// chainlink-0 is default label set for all cll nodes
 				ToLabels:    &map[string]*string{"app": a.Str("chainlink-0")},
 				DurationStr: "1m",
@@ -42,7 +42,7 @@ func TestChaosCCIP(t *testing.T) {
 			testName:  "CCIP works after rpc is down for NetworkB @network-chaos",
 			chaosFunc: chaos.NewNetworkPartition,
 			chaosProps: &chaos.Props{
-				FromLabels:  &map[string]*string{"app": a.Str(actions.GethLabelNetworkB)},
+				FromLabels:  &map[string]*string{actions.ChaosGroupNetworkBCCIPGeth: a.Str("1")},
 				ToLabels:    &map[string]*string{"app": a.Str("chainlink-0")},
 				DurationStr: "1m",
 			},
@@ -126,23 +126,17 @@ func TestChaosCCIP(t *testing.T) {
 				},
 			}, []*big.Int{big.NewInt(1e8)}, numOfCommitNodes, false, false, testCfg)
 
-			require.Greater(t, len(setUpArgs.Lanes), 0, "error in default set up")
+			if len(setUpArgs.Lanes) == 0 {
+				return
+			}
 
 			lane = setUpArgs.Lanes[0].ForwardLane
 
-			// if the test runs on remote runner
-			if lane == nil {
-				return
-			}
 			tearDown = setUpArgs.TearDown
-			t.Cleanup(func() {
-				tearDown()
-			})
-
 			testEnvironment = lane.TestEnv.K8Env
 			testSetup = lane.TestEnv
 
-			testSetup.ChaosLabel(t)
+			testSetup.ChaosLabel(t, lane.SourceChain.GetNetworkName(), lane.DestChain.GetNetworkName())
 
 			// apply chaos
 			chaosId, err := testEnvironment.Chaos.Run(in.chaosFunc(testEnvironment.Cfg.Namespace, in.chaosProps))
@@ -151,6 +145,7 @@ func TestChaosCCIP(t *testing.T) {
 				if chaosId != "" {
 					testEnvironment.Chaos.Stop(chaosId)
 				}
+				tearDown()
 			})
 			lane.RecordStateBeforeTransfer()
 			// Send the ccip-request while the chaos is at play

@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"fmt"
 	"math/big"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -15,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	envclient "github.com/smartcontractkit/chainlink-env/client"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver"
@@ -29,18 +29,17 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
-	ccipPlugin "github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
-	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/testhelpers"
-	"github.com/smartcontractkit/chainlink/core/utils"
-	bigmath "github.com/smartcontractkit/chainlink/core/utils/big_math"
-	networks "github.com/smartcontractkit/chainlink/integration-tests"
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts/ccip"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts/ccip/laneconfig"
 	"github.com/smartcontractkit/chainlink/integration-tests/testreporters"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
+	ccipPlugin "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
+	"github.com/smartcontractkit/chainlink/v2/core/utils"
+	bigmath "github.com/smartcontractkit/chainlink/v2/core/utils/big_math"
 )
 
 const (
@@ -51,6 +50,8 @@ const (
 	ChaosGroupExecutionFaultyPlus = "ExecutionNodesMajority" // > f number of nodes
 	ChaosGroupExecutionFaulty     = "ExecutionNodesMinority" //  f number of nodes
 	ChaosGroupCCIPGeth            = "CCIPGeth"               // both source and destination simulated geth networks
+	ChaosGroupNetworkACCIPGeth    = "CCIPNetworkAGeth"
+	ChaosGroupNetworkBCCIPGeth    = "CCIPNetworkBGeth"
 	RootSnoozeTime                = 10 * time.Second
 	InflightExpiry                = 10 * time.Second
 )
@@ -61,24 +62,11 @@ type CCIPTOMLEnv struct {
 
 var (
 	//go:embed clconfig/ccip-default.txt
-	CLConfig           string
-	NetworkA, NetworkB = func() (blockchain.EVMNetwork, blockchain.EVMNetwork) {
-		if len(networks.SelectedNetworks) < 3 {
-			log.Fatal().
-				Interface("SELECTED_NETWORKS", networks.SelectedNetworks).
-				Msg("Set source and destination network in index 1 & 2 of env variable SELECTED_NETWORKS")
-		}
-		log.Info().
-			Interface("Source Network", networks.SelectedNetworks[1]).
-			Interface("Destination Network", networks.SelectedNetworks[2]).
-			Msg("SELECTED_NETWORKS")
-		return networks.SelectedNetworks[1], networks.SelectedNetworks[2]
-	}()
-
-	DefaultCCIPCLNodeEnv = func(t *testing.T) string {
+	CLConfig             string
+	DefaultCCIPCLNodeEnv = func(t *testing.T, networks []blockchain.EVMNetwork) string {
 		ccipTOML, err := client.MarshallTemplate(
 			CCIPTOMLEnv{
-				Networks: []blockchain.EVMNetwork{NetworkA, NetworkB},
+				Networks: networks,
 			},
 			"ccip env toml", CLConfig)
 		require.NoError(t, err)
@@ -86,32 +74,36 @@ var (
 		return ccipTOML
 	}
 
-	NetworkAName      = strings.ReplaceAll(strings.ToLower(NetworkA.Name), " ", "-")
-	NetworkBName      = strings.ReplaceAll(strings.ToLower(NetworkB.Name), " ", "-")
-	GethLabelNetworkA = fmt.Sprintf("%s-ethereum-geth", NetworkA.Name)
-	GethLabelNetworkB = fmt.Sprintf("%s-ethereum-geth", NetworkB.Name)
+	NetworkName = func(name string) string {
+		return strings.ReplaceAll(strings.ToLower(name), " ", "-")
+	}
+
+	GethLabel = func(name string) string {
+		return fmt.Sprintf("%s-ethereum-geth", name)
+	}
+	// ApprovedAmountToRouter is the default amount which gets approved for router so that it can transfer token and use the fee token for fee payment
+	ApprovedAmountToRouter = new(big.Int).Mul(big.NewInt(1e18), big.NewInt(100))
 )
 
 type CCIPCommon struct {
-	ChainClient              blockchain.EVMClient
-	Deployer                 *ccip.CCIPContractsDeployer
-	FeeToken                 *ccip.LinkToken
-	FeeTokenPool             *ccip.LockReleaseTokenPool
-	BridgeTokens             []*ccip.LinkToken // as of now considering the bridge token is same as link token
-	TokenPrices              []*big.Int
-	BridgeTokenPools         []*ccip.LockReleaseTokenPool
-	RateLimiterConfig        ccip.RateLimiterConfig
-	AFNConfig                ccip.AFNConfig
-	AFN                      *ccip.AFN
-	Router                   *ccip.Router
-	PriceRegistry            *ccip.PriceRegistry
-	WrappedNative            common.Address
-	deployedNewPool          bool
-	deployedNewPriceRegistry bool
-	deploy                   *errgroup.Group
+	ChainClient        blockchain.EVMClient
+	Deployer           *ccip.CCIPContractsDeployer
+	FeeToken           *ccip.LinkToken
+	FeeTokenPool       *ccip.LockReleaseTokenPool
+	BridgeTokens       []*ccip.LinkToken // as of now considering the bridge token is same as link token
+	TokenPrices        []*big.Int
+	BridgeTokenPools   []*ccip.LockReleaseTokenPool
+	RateLimiterConfig  ccip.RateLimiterConfig
+	AFNConfig          ccip.AFNConfig
+	AFN                *ccip.AFN
+	Router             *ccip.Router
+	PriceRegistry      *ccip.PriceRegistry
+	WrappedNative      common.Address
+	ExistingDeployment bool
+	deploy             *errgroup.Group
 }
 
-func (ccipModule *CCIPCommon) CopyAddresses(ctx context.Context, chainClient blockchain.EVMClient) *CCIPCommon {
+func (ccipModule *CCIPCommon) CopyAddresses(ctx context.Context, chainClient blockchain.EVMClient, existingDeployment bool) *CCIPCommon {
 	var pools []*ccip.LockReleaseTokenPool
 	for _, pool := range ccipModule.BridgeTokenPools {
 		pools = append(pools, &ccip.LockReleaseTokenPool{EthAddress: pool.EthAddress})
@@ -129,6 +121,7 @@ func (ccipModule *CCIPCommon) CopyAddresses(ctx context.Context, chainClient blo
 		FeeToken: &ccip.LinkToken{
 			EthAddress: ccipModule.FeeToken.EthAddress,
 		},
+		ExistingDeployment: existingDeployment,
 		FeeTokenPool: &ccip.LockReleaseTokenPool{
 			EthAddress: ccipModule.FeeTokenPool.EthAddress,
 		},
@@ -154,42 +147,45 @@ func (ccipModule *CCIPCommon) CopyAddresses(ctx context.Context, chainClient blo
 	}
 }
 
-func (ccipModule *CCIPCommon) LoadContractAddresses(conf *laneconfig.Lane) {
+func (ccipModule *CCIPCommon) LoadContractAddresses(conf *laneconfig.LaneConfig) {
 	if conf != nil {
-		if common.IsHexAddress(conf.LaneConfig.FeeToken) {
+		if common.IsHexAddress(conf.FeeToken) {
 			ccipModule.FeeToken = &ccip.LinkToken{
-				EthAddress: common.HexToAddress(conf.LaneConfig.FeeToken),
+				EthAddress: common.HexToAddress(conf.FeeToken),
 			}
 		}
-		if conf.LaneConfig.IsNativeFeeToken {
+		if conf.IsNativeFeeToken {
 			ccipModule.FeeToken = &ccip.LinkToken{
 				EthAddress: common.HexToAddress("0x0"),
 			}
 		}
 
-		if common.IsHexAddress(conf.LaneConfig.FeeTokenPool) {
+		if common.IsHexAddress(conf.FeeTokenPool) {
 			ccipModule.FeeTokenPool = &ccip.LockReleaseTokenPool{
-				EthAddress: common.HexToAddress(conf.LaneConfig.FeeTokenPool),
+				EthAddress: common.HexToAddress(conf.FeeTokenPool),
 			}
 		}
-		if common.IsHexAddress(conf.LaneConfig.Router) {
+		if common.IsHexAddress(conf.Router) {
 			ccipModule.Router = &ccip.Router{
-				EthAddress: common.HexToAddress(conf.LaneConfig.Router),
+				EthAddress: common.HexToAddress(conf.Router),
 			}
 		}
-		if common.IsHexAddress(conf.LaneConfig.AFN) {
+		if common.IsHexAddress(conf.AFN) {
 			ccipModule.AFN = &ccip.AFN{
-				EthAddress: common.HexToAddress(conf.LaneConfig.AFN),
+				EthAddress: common.HexToAddress(conf.AFN),
 			}
 		}
-		if common.IsHexAddress(conf.LaneConfig.PriceRegistry) {
+		if common.IsHexAddress(conf.PriceRegistry) {
 			ccipModule.PriceRegistry = &ccip.PriceRegistry{
-				EthAddress: common.HexToAddress(conf.LaneConfig.PriceRegistry),
+				EthAddress: common.HexToAddress(conf.PriceRegistry),
 			}
 		}
-		if len(conf.LaneConfig.BridgeTokens) > 0 {
+		if common.IsHexAddress(conf.WrappedNative) {
+			ccipModule.WrappedNative = common.HexToAddress(conf.WrappedNative)
+		}
+		if len(conf.BridgeTokens) > 0 {
 			var tokens []*ccip.LinkToken
-			for _, token := range conf.LaneConfig.BridgeTokens {
+			for _, token := range conf.BridgeTokens {
 				if common.IsHexAddress(token) {
 					tokens = append(tokens, &ccip.LinkToken{
 						EthAddress: common.HexToAddress(token),
@@ -198,9 +194,9 @@ func (ccipModule *CCIPCommon) LoadContractAddresses(conf *laneconfig.Lane) {
 			}
 			ccipModule.BridgeTokens = tokens
 		}
-		if len(conf.LaneConfig.BridgeTokenPools) > 0 {
+		if len(conf.BridgeTokenPools) > 0 {
 			var pools []*ccip.LockReleaseTokenPool
-			for _, pool := range conf.LaneConfig.BridgeTokenPools {
+			for _, pool := range conf.BridgeTokenPools {
 				if common.IsHexAddress(pool) {
 					pools = append(pools, &ccip.LockReleaseTokenPool{
 						EthAddress: common.HexToAddress(pool),
@@ -212,16 +208,44 @@ func (ccipModule *CCIPCommon) LoadContractAddresses(conf *laneconfig.Lane) {
 	}
 }
 
+// ApproveTokens approve tokens for router - usually a massive amount of tokens enough to cover all the ccip transfers
+// to be triggered by the test
+func (ccipModule *CCIPCommon) ApproveTokens() error {
+	for _, token := range ccipModule.BridgeTokens {
+		err := token.Approve(ccipModule.Router.Address(), ApprovedAmountToRouter)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+	}
+	if ccipModule.FeeToken.EthAddress != common.HexToAddress("0x0") {
+		isApproved := false
+		for _, token := range ccipModule.BridgeTokens {
+			if token.EthAddress == ccipModule.FeeToken.EthAddress {
+				isApproved = true
+				break
+			}
+		}
+		if !isApproved {
+			err := ccipModule.FeeToken.Approve(ccipModule.Router.Address(), ApprovedAmountToRouter)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+		}
+	}
+	err := ccipModule.ChainClient.WaitForEvents()
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	return nil
+}
+
 // DeployContracts deploys the contracts which are necessary in both source and dest chain
 // This reuses common contracts for bidirectional lanes
-func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int, conf *laneconfig.Lane, reuseContracts bool) error {
+func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int, conf *laneconfig.LaneConfig) error {
 	var err error
 	cd := ccipModule.Deployer
 
-	// if REUSE_CCIP_CONTRACTS is true use existing contract addresses instead of deploying new ones. Used for testnet deployments
-	if reuseContracts && !ccipModule.ChainClient.NetworkSimulated() {
-		ccipModule.LoadContractAddresses(conf)
-	}
+	ccipModule.LoadContractAddresses(conf)
 	if ccipModule.FeeToken == nil {
 		// deploy link token
 		token, err := cd.DeployLinkTokenContract()
@@ -247,7 +271,6 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int, conf *laneconfig.L
 		if err != nil {
 			return fmt.Errorf("deploying fee Token pool shouldn't fail %+v", err)
 		}
-		ccipModule.deployedNewPool = true
 	} else {
 		pool, err := cd.NewLockReleaseTokenPoolContract(ccipModule.FeeTokenPool.EthAddress)
 		if err != nil {
@@ -362,7 +385,6 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int, conf *laneconfig.L
 		if err != nil {
 			return fmt.Errorf("error in waiting for PriceRegistry deployment %+v", err)
 		}
-		ccipModule.deployedNewPriceRegistry = true
 	} else {
 		ccipModule.PriceRegistry, err = cd.NewPriceRegistry(ccipModule.PriceRegistry.EthAddress)
 		if err != nil {
@@ -374,7 +396,7 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int, conf *laneconfig.L
 	return nil
 }
 
-func DefaultCCIPModule(ctx context.Context, chainClient blockchain.EVMClient) *CCIPCommon {
+func DefaultCCIPModule(ctx context.Context, chainClient blockchain.EVMClient, existingDeployment bool) *CCIPCommon {
 	grp, _ := errgroup.WithContext(ctx)
 	return &CCIPCommon{
 		ChainClient: chainClient,
@@ -383,6 +405,7 @@ func DefaultCCIPModule(ctx context.Context, chainClient blockchain.EVMClient) *C
 			Rate:     ccip.HundredCoins,
 			Capacity: ccip.HundredCoins,
 		},
+		ExistingDeployment: existingDeployment,
 		AFNConfig: ccip.AFNConfig{
 			AFNWeightsByParticipants: map[string]*big.Int{
 				chainClient.GetDefaultWallet().Address(): big.NewInt(1),
@@ -401,9 +424,9 @@ type SourceCCIPModule struct {
 	OnRamp             *ccip.OnRamp
 }
 
-func (sourceCCIP *SourceCCIPModule) LoadContracts(conf *laneconfig.Lane) {
+func (sourceCCIP *SourceCCIPModule) LoadContracts(conf *laneconfig.LaneConfig) {
 	if conf != nil {
-		cfg, ok := conf.LaneConfig.SrcContracts[sourceCCIP.DestinationChainId]
+		cfg, ok := conf.SrcContracts[sourceCCIP.DestinationChainId]
 		if ok {
 			if common.IsHexAddress(cfg.OnRamp) {
 				sourceCCIP.OnRamp = &ccip.OnRamp{
@@ -415,7 +438,7 @@ func (sourceCCIP *SourceCCIPModule) LoadContracts(conf *laneconfig.Lane) {
 }
 
 // DeployContracts deploys all CCIP contracts specific to the source chain
-func (sourceCCIP *SourceCCIPModule) DeployContracts(reuse bool, lane *laneconfig.Lane) error {
+func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig) error {
 	var err error
 	contractDeployer := sourceCCIP.Common.Deployer
 	log.Info().Msg("Deploying source chain specific contracts")
@@ -424,10 +447,10 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(reuse bool, lane *laneconfig
 		return errors.WithStack(err)
 	}
 
-	if reuse && !sourceCCIP.Common.ChainClient.NetworkSimulated() {
-		sourceCCIP.LoadContracts(lane)
-	}
-	if sourceCCIP.Common.deployedNewPriceRegistry {
+	sourceCCIP.Common.ApproveTokens()
+	sourceCCIP.LoadContracts(lane)
+
+	if !sourceCCIP.Common.ExistingDeployment {
 		// ensure token is a feeToken
 		err = sourceCCIP.Common.PriceRegistry.AddFeeToken(common.HexToAddress(sourceCCIP.Common.FeeToken.Address()))
 		if err != nil {
@@ -492,7 +515,7 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(reuse bool, lane *laneconfig
 					Token:           common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
 					FeeAmount:       big.NewInt(0),
 					DestGasOverhead: 0,
-					Multiplier:      1e18,
+					Multiplier:      1e9, // the low multiplier is for testing purposes. This keeps accounts from running out of funds
 				}},
 			sourceCCIP.Common.FeeToken.EthAddress,
 		)
@@ -545,6 +568,7 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(reuse bool, lane *laneconfig
 			return fmt.Errorf("getting new onramp contractshouldn't fail %+v", err)
 		}
 	}
+
 	return nil
 }
 
@@ -717,26 +741,6 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 	}
 	log.Info().Int64("fee", fee.Int64()).Msg("calculated fee")
 
-	// if the token address is 0x0 it will use Native as fee token no need to approve
-	if feeToken != common.HexToAddress("0x0") {
-		// if any of the bridge tokens are same as feetoken approve the token amount as well
-		// otherwise the fee amount approval of the feetoken will overwrite previous transfer amountapproval for same bridge token
-		for index, bt := range sourceCCIP.Common.BridgeTokens {
-			if bt.Address() == sourceCCIP.Common.FeeToken.Address() {
-				fee = big.NewInt(0).Add(fee, sourceCCIP.TransferAmount[index])
-			}
-		}
-		// Approve the fee amount
-		err = sourceCCIP.Common.FeeToken.Approve(sourceCCIP.Common.Router.Address(), fee)
-		if err != nil {
-			return "", d, nil, fmt.Errorf("failed approving the fee amount for ge router: %+v", err)
-		}
-		err = sourceCCIP.Common.ChainClient.WaitForEvents()
-		if err != nil {
-			return "", d, nil, fmt.Errorf("failed waiting for events: %+v", err)
-		}
-	}
-
 	var sendTx *types.Transaction
 	timeNow := time.Now()
 	// initiate the transfer
@@ -786,9 +790,9 @@ type DestCCIPModule struct {
 	WrappedNative common.Address
 }
 
-func (destCCIP *DestCCIPModule) LoadContracts(conf *laneconfig.Lane) {
+func (destCCIP *DestCCIPModule) LoadContracts(conf *laneconfig.LaneConfig) {
 	if conf != nil {
-		cfg, ok := conf.LaneConfig.DestContracts[destCCIP.SourceChainId]
+		cfg, ok := conf.DestContracts[destCCIP.SourceChainId]
 		if ok {
 			if common.IsHexAddress(cfg.OffRamp) {
 				destCCIP.OffRamp = &ccip.OffRamp{
@@ -813,8 +817,7 @@ func (destCCIP *DestCCIPModule) LoadContracts(conf *laneconfig.Lane) {
 func (destCCIP *DestCCIPModule) DeployContracts(
 	sourceCCIP SourceCCIPModule,
 	wg *sync.WaitGroup,
-	lane *laneconfig.Lane,
-	reuse bool,
+	lane *laneconfig.LaneConfig,
 ) error {
 	var err error
 	contractDeployer := destCCIP.Common.Deployer
@@ -825,10 +828,8 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 		return errors.WithStack(err)
 	}
 
-	if reuse && !destCCIP.Common.ChainClient.NetworkSimulated() {
-		destCCIP.LoadContracts(lane)
-	}
-	if destCCIP.Common.deployedNewPriceRegistry {
+	destCCIP.LoadContracts(lane)
+	if !destCCIP.Common.ExistingDeployment {
 		// ensure token is a feeToken
 		err = destCCIP.Common.PriceRegistry.AddFeeToken(common.HexToAddress(destCCIP.Common.FeeToken.Address()))
 		if err != nil {
@@ -912,7 +913,7 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 		destTokens = append(destTokens, common.HexToAddress(token.Address()))
 		pool := destCCIP.Common.BridgeTokenPools[i]
 		pools = append(pools, pool.EthAddress)
-		if destCCIP.Common.deployedNewPool {
+		if !destCCIP.Common.ExistingDeployment {
 			err = token.Transfer(pool.Address(), testhelpers.Link(10))
 			if err != nil {
 				return fmt.Errorf("transferring token to dest pool shouldn't fail %+v", err)
@@ -1214,6 +1215,7 @@ type CCIPRequest struct {
 
 type CCIPLane struct {
 	Test                    *testing.T
+	Logger                  zerolog.Logger
 	SourceNetworkName       string
 	DestNetworkName         string
 	SourceChain             blockchain.EVMClient
@@ -1232,63 +1234,66 @@ type CCIPLane struct {
 	ValidationTimeout       time.Duration
 	Context                 context.Context
 	CommonContractsWg       *sync.WaitGroup
+	SrcNetworkLaneCfg       *laneconfig.LaneConfig
+	DstNetworkLaneCfg       *laneconfig.LaneConfig
 }
 
-func (lane *CCIPLane) WriteLaneConfig() error {
+func (lane *CCIPLane) UpdateLaneConfig() {
 	var btAddresses, btpAddresses []string
 
-	if lane.Dest.Common.ChainClient.NetworkSimulated() ||
-		lane.Source.Common.ChainClient.NetworkSimulated() {
-		return nil
-	}
 	for i, bt := range lane.Source.Common.BridgeTokens {
 		btAddresses = append(btAddresses, bt.Address())
 		btpAddresses = append(btpAddresses, lane.Source.Common.BridgeTokenPools[i].Address())
 	}
-	l1 := laneconfig.Lane{
-		NetworkA: lane.Source.Common.ChainClient.GetNetworkName(),
-		LaneConfig: laneconfig.LaneConfig{
-			CommonContracts: laneconfig.CommonContracts{
-				FeeToken:         lane.Source.Common.FeeToken.Address(),
-				FeeTokenPool:     lane.Source.Common.FeeTokenPool.Address(),
-				BridgeTokens:     btAddresses,
-				BridgeTokenPools: btpAddresses,
-				AFN:              lane.Source.Common.AFN.Address(),
-				Router:           lane.Source.Common.Router.Address(),
-				PriceRegistry:    lane.Source.Common.PriceRegistry.Address(),
-			},
-			SrcContracts: map[uint64]laneconfig.SourceContracts{
-				lane.Source.DestinationChainId: {OnRamp: lane.Source.OnRamp.Address()},
-			},
-		},
+	lane.SrcNetworkLaneCfg.CommonContracts = laneconfig.CommonContracts{
+		FeeToken:         lane.Source.Common.FeeToken.Address(),
+		FeeTokenPool:     lane.Source.Common.FeeTokenPool.Address(),
+		BridgeTokens:     btAddresses,
+		BridgeTokenPools: btpAddresses,
+		AFN:              lane.Source.Common.AFN.Address(),
+		Router:           lane.Source.Common.Router.Address(),
+		PriceRegistry:    lane.Source.Common.PriceRegistry.Address(),
+		WrappedNative:    lane.Source.Common.WrappedNative.Hex(),
+	}
+	if lane.SrcNetworkLaneCfg.SrcContracts == nil {
+		lane.SrcNetworkLaneCfg.SrcContracts = map[uint64]laneconfig.SourceContracts{
+			lane.Source.DestinationChainId: {OnRamp: lane.Source.OnRamp.Address()},
+		}
+	} else {
+		lane.SrcNetworkLaneCfg.SrcContracts[lane.Source.DestinationChainId] = laneconfig.SourceContracts{
+			OnRamp: lane.Source.OnRamp.Address(),
+		}
 	}
 	btAddresses, btpAddresses = []string{}, []string{}
 	for i, bt := range lane.Dest.Common.BridgeTokens {
 		btAddresses = append(btAddresses, bt.Address())
 		btpAddresses = append(btpAddresses, lane.Dest.Common.BridgeTokenPools[i].Address())
 	}
-	l2 := laneconfig.Lane{
-		NetworkA: lane.Dest.Common.ChainClient.GetNetworkName(),
-		LaneConfig: laneconfig.LaneConfig{
-			CommonContracts: laneconfig.CommonContracts{
-				FeeToken:         lane.Dest.Common.FeeToken.Address(),
-				FeeTokenPool:     lane.Dest.Common.FeeTokenPool.Address(),
-				BridgeTokens:     btAddresses,
-				BridgeTokenPools: btpAddresses,
-				AFN:              lane.Dest.Common.AFN.Address(),
-				Router:           lane.Dest.Common.Router.Address(),
-				PriceRegistry:    lane.Dest.Common.PriceRegistry.Address(),
-			},
-			DestContracts: map[uint64]laneconfig.DestContracts{
-				lane.Dest.SourceChainId: {
-					OffRamp:      lane.Dest.OffRamp.Address(),
-					CommitStore:  lane.Dest.CommitStore.Address(),
-					ReceiverDapp: lane.Dest.ReceiverDapp.Address(),
-				},
-			},
-		},
+	lane.DstNetworkLaneCfg.CommonContracts = laneconfig.CommonContracts{
+		FeeToken:         lane.Dest.Common.FeeToken.Address(),
+		FeeTokenPool:     lane.Dest.Common.FeeTokenPool.Address(),
+		BridgeTokens:     btAddresses,
+		BridgeTokenPools: btpAddresses,
+		AFN:              lane.Dest.Common.AFN.Address(),
+		Router:           lane.Dest.Common.Router.Address(),
+		PriceRegistry:    lane.Dest.Common.PriceRegistry.Address(),
+		WrappedNative:    lane.Dest.Common.WrappedNative.Hex(),
 	}
-	return laneconfig.UpdateLane(l1, l2, fmt.Sprintf("./tmp_%s.json", lane.Test.Name()))
+	if lane.DstNetworkLaneCfg.DestContracts == nil {
+		lane.DstNetworkLaneCfg.DestContracts = map[uint64]laneconfig.DestContracts{
+			lane.Dest.SourceChainId: {
+				OffRamp:      lane.Dest.OffRamp.Address(),
+				CommitStore:  lane.Dest.CommitStore.Address(),
+				ReceiverDapp: lane.Dest.ReceiverDapp.Address(),
+			},
+		}
+	} else {
+		lane.DstNetworkLaneCfg.DestContracts[lane.Dest.SourceChainId] = laneconfig.DestContracts{
+			OffRamp:      lane.Dest.OffRamp.Address(),
+			CommitStore:  lane.Dest.CommitStore.Address(),
+			ReceiverDapp: lane.Dest.ReceiverDapp.Address(),
+		}
+	}
 }
 
 func (lane *CCIPLane) RecordStateBeforeTransfer() {
@@ -1315,13 +1320,6 @@ func (lane *CCIPLane) SendRequests(noOfRequests int) (map[int64]CCIPRequest, err
 		tokenAndAmounts = append(tokenAndAmounts, router.ClientEVMTokenAmount{
 			Token: common.HexToAddress(token.Address()), Amount: lane.Source.TransferAmount[i],
 		})
-		// approve the onramp router so that it can initiate transferring the token
-
-		err := token.Approve(lane.Source.Common.Router.Address(), bigmath.Mul(lane.Source.TransferAmount[i], big.NewInt(int64(noOfRequests))))
-		if err != nil {
-			return nil, fmt.Errorf("could not approve permissions for the onRamp router "+
-				"on the source link token contract: %+v", err)
-		}
 	}
 
 	err := lane.Source.Common.ChainClient.WaitForEvents()
@@ -1412,9 +1410,9 @@ func (lane *CCIPLane) SoakRun(interval, duration time.Duration) (int, int) {
 				break
 			}
 			numOfReq++
-			log.Info().
+			lane.Logger.Info().
 				Int("Req No", numOfReq).
-				Msgf("Token transfer with for lane %s --> %s", lane.SourceNetworkName, lane.DestNetworkName)
+				Msg("CCIP transfer")
 			txs, err := lane.SendRequests(1)
 			if err == nil {
 				for reqNo, req := range txs {
@@ -1428,9 +1426,8 @@ func (lane *CCIPLane) SoakRun(interval, duration time.Duration) (int, int) {
 				}
 			}
 		case <-ctx.Done():
-			log.Warn().
-				Msgf("Soak Test duration completed for lane %s --> %s. Completing validation for triggered requests",
-					lane.SourceNetworkName, lane.DestNetworkName)
+			lane.Logger.Warn().
+				Msg("Soak Test duration completed. Completing validation for triggered requests")
 			timeout = true
 			wg.Wait()
 			return numOfReq, reqSuccess
@@ -1448,6 +1445,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	transferAmounts []*big.Int,
 	newBootstrap bool,
 	configureCLNodes bool,
+	existingDeployment bool,
 ) error {
 	var err error
 	env := lane.TestEnv
@@ -1455,11 +1453,11 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	destChainClient := lane.DestChain
 
 	if sourceCommon == nil {
-		sourceCommon = DefaultCCIPModule(lane.Context, sourceChainClient)
+		sourceCommon = DefaultCCIPModule(lane.Context, sourceChainClient, existingDeployment)
 	}
 
 	if destCommon == nil {
-		destCommon = DefaultCCIPModule(lane.Context, destChainClient)
+		destCommon = DefaultCCIPModule(lane.Context, destChainClient, existingDeployment)
 	}
 
 	lane.Source, err = DefaultSourceCCIPModule(sourceChainClient, destChainClient.GetChainID().Uint64(), transferAmounts, sourceCommon)
@@ -1471,52 +1469,30 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		return errors.WithStack(err)
 	}
 
-	// if REUSE_CCIP_CONTRACTS= true, read already deployed contract addresses and
-	// reuse contracts in tests instead of deploying the contracts.
-	reuseEnv := os.Getenv("REUSE_CCIP_CONTRACTS")
-	reuse := false
-	if reuseEnv != "" {
-		reuse, err = strconv.ParseBool(reuseEnv)
-		if err != nil {
-			return errors.WithStack(err)
-		}
-	}
+	srcConf := lane.SrcNetworkLaneCfg
 
-	srcConf, err := laneconfig.ReadLane(
-		lane.Source.Common.ChainClient.GetNetworkName())
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	destConf, err := laneconfig.ReadLane(
-		lane.Dest.Common.ChainClient.GetNetworkName())
-	if err != nil {
-		return errors.WithStack(err)
-	}
+	destConf := lane.DstNetworkLaneCfg
 
 	// deploy all common contracts in parallel
 	lane.Source.Common.deploy.Go(func() error {
-		return lane.Source.Common.DeployContracts(len(lane.Source.TransferAmount), srcConf, reuse)
+		return lane.Source.Common.DeployContracts(len(lane.Source.TransferAmount), srcConf)
 	})
 
 	lane.Dest.Common.deploy.Go(func() error {
-		return lane.Dest.Common.DeployContracts(len(lane.Source.TransferAmount), destConf, reuse)
+		return lane.Dest.Common.DeployContracts(len(lane.Source.TransferAmount), destConf)
 	})
 
 	// deploy all source contracts
-	err = lane.Source.DeployContracts(reuse, srcConf)
+	err = lane.Source.DeployContracts(srcConf)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 	// deploy all destination contracts
-	err = lane.Dest.DeployContracts(*lane.Source, lane.CommonContractsWg, destConf, reuse)
+	err = lane.Dest.DeployContracts(*lane.Source, lane.CommonContractsWg, destConf)
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	err = lane.WriteLaneConfig()
-	if err != nil {
-		return errors.WithStack(err)
-	}
+	lane.UpdateLaneConfig()
 
 	// if lane is being set up for already configured CL nodes and contracts
 	// no further action is necessary
@@ -1525,7 +1501,10 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	}
 
 	// wait for the CL nodes to be ready before moving ahead with job creation
-	<-env.CLNodeWithKeyReady
+	err = env.CLNodeWithKeyReady.Wait()
+	if err != nil {
+		return errors.WithStack(err)
+	}
 	clNodesWithKeys := env.CLNodesWithKeys
 	mockServer := env.MockServer
 	// set up ocr2 jobs
@@ -1806,13 +1785,11 @@ type CCIPTestEnv struct {
 	numOfAllowedFaultyExec   int
 	numOfCommitNodes         int
 	numOfExecNodes           int
-	SourceChainClient        blockchain.EVMClient
-	DestChainClient          blockchain.EVMClient
 	K8Env                    *environment.Environment
-	CLNodeWithKeyReady       chan struct{} // denotes if the chainlink nodes are deployed, keys are created and ready to be used for job creation
+	CLNodeWithKeyReady       *errgroup.Group // denotes if the chainlink nodes are deployed, keys are created and ready to be used for job creation
 }
 
-func (c *CCIPTestEnv) ChaosLabel(t *testing.T) {
+func (c *CCIPTestEnv) ChaosLabel(t *testing.T, srcChain, destChain string) {
 	for i := c.commitNodeStartIndex; i < len(c.CLNodes); i++ {
 		labelSelector := map[string]string{
 			"app":      "chainlink-0",
@@ -1844,7 +1821,18 @@ func (c *CCIPTestEnv) ChaosLabel(t *testing.T) {
 			assert.NoError(t, err)
 		}
 	}
-	gethNetworksLabels := []string{GethLabelNetworkA, GethLabelNetworkB}
+
+	err := c.K8Env.Client.LabelChaosGroupByLabels(c.K8Env.Cfg.Namespace, map[string]string{
+		"app": GethLabel(srcChain),
+	}, ChaosGroupNetworkACCIPGeth)
+	require.NoError(t, err)
+
+	err = c.K8Env.Client.LabelChaosGroupByLabels(c.K8Env.Cfg.Namespace, map[string]string{
+		"app": GethLabel(destChain),
+	}, ChaosGroupNetworkBCCIPGeth)
+	require.NoError(t, err)
+
+	gethNetworksLabels := []string{GethLabel(srcChain), GethLabel(destChain)}
 	for _, gethNetworkLabel := range gethNetworksLabels {
 		err := c.K8Env.Client.AddLabel(c.K8Env.Cfg.Namespace,
 			fmt.Sprintf("app=%s", gethNetworkLabel),
@@ -1856,7 +1844,7 @@ func (c *CCIPTestEnv) ChaosLabel(t *testing.T) {
 func (c *CCIPTestEnv) SetUpNodesAndKeys(
 	ctx context.Context,
 	nodeFund *big.Float,
-	source, dest blockchain.EVMClient,
+	chains []blockchain.EVMClient,
 ) error {
 	log.Info().Msg("Connecting to launched resources")
 	chainlinkNodes, err := client.ConnectChainlinkNodes(c.K8Env)
@@ -1874,7 +1862,6 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 
 	nodesWithKeys := make(map[string][]*client.CLNodesWithKeys)
 	mu := &sync.Mutex{}
-	log.Info().Msg("creating node keys")
 	grp, _ := errgroup.WithContext(ctx)
 	populateKeys := func(chain blockchain.EVMClient) {
 		grp.Go(func() error {
@@ -1892,18 +1879,13 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 		})
 	}
 
-	populateKeys(source)
-	populateKeys(dest)
-
-	log.Info().Msg("Funding Chainlink nodes for both the chains")
-
-	fund := func(chain blockchain.EVMClient) {
+	fund := func(ec blockchain.EVMClient) {
 		grp.Go(func() error {
-			cfg := chain.GetNetworkConfig()
+			cfg := ec.GetNetworkConfig()
 			if cfg == nil {
 				return fmt.Errorf("blank network config")
 			}
-			c, err := blockchain.ConcurrentEVMClient(*cfg, c.K8Env, chain)
+			c, err := blockchain.ConcurrentEVMClient(*cfg, c.K8Env, ec)
 			if err != nil {
 				return fmt.Errorf("getting concurrent evmclient %+v", err)
 			}
@@ -1915,8 +1897,12 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 		})
 	}
 
-	fund(source)
-	fund(dest)
+	for _, chain := range chains {
+		log.Info().Msg("creating node keys")
+		populateKeys(chain)
+		log.Info().Msg("Funding Chainlink nodes for both the chains")
+		fund(chain)
+	}
 
 	err = grp.Wait()
 	if err != nil {
@@ -1937,74 +1923,42 @@ func DeployEnvironments(
 	t *testing.T,
 	envconfig *environment.Config,
 	clProps map[string]interface{},
+	gethResource map[string]interface{},
+	networks []blockchain.EVMNetwork,
 ) *CCIPTestEnv {
 	testEnvironment := environment.New(envconfig)
 	c := &CCIPTestEnv{
 		K8Env: testEnvironment,
 	}
 	numOfTxNodes := 1
-	if NetworkA.Simulated {
-		if !NetworkB.Simulated {
-			t.Fatalf("both the networks should be simulated")
+	for _, network := range networks {
+		if network.Simulated {
+			testEnvironment.
+				AddHelm(reorg.New(&reorg.Props{
+					NetworkName: network.Name,
+					NetworkType: "simulated-geth-non-dev",
+					Values: map[string]interface{}{
+						"geth": map[string]interface{}{
+							"genesis": map[string]interface{}{
+								"networkId": fmt.Sprint(network.ChainID),
+							},
+							"tx": map[string]interface{}{
+								"replicas":  strconv.Itoa(numOfTxNodes),
+								"resources": gethResource,
+							},
+							"miner": map[string]interface{}{
+								"replicas":  "0",
+								"resources": gethResource,
+							},
+						},
+						"bootnode": map[string]interface{}{
+							"replicas": "1",
+						},
+					},
+				}))
 		}
-		testEnvironment.
-			AddHelm(reorg.New(&reorg.Props{
-				NetworkName: NetworkA.Name,
-				NetworkType: "simulated-geth-non-dev",
-				Values: map[string]interface{}{
-					"geth": map[string]interface{}{
-						"genesis": map[string]interface{}{
-							"networkId": fmt.Sprint(NetworkA.ChainID),
-						},
-						"tx": map[string]interface{}{
-							"replicas": strconv.Itoa(numOfTxNodes),
-						},
-						"miner": map[string]interface{}{
-							"replicas": "0",
-						},
-					},
-					"bootnode": map[string]interface{}{
-						"replicas": "1",
-					},
-				},
-			})).
-			AddHelm(reorg.New(&reorg.Props{
-				NetworkName: NetworkB.Name,
-				NetworkType: "simulated-geth-non-dev",
-				Values: map[string]interface{}{
-					"geth": map[string]interface{}{
-						"genesis": map[string]interface{}{
-							"networkId": fmt.Sprint(NetworkB.ChainID),
-						},
-						"tx": map[string]interface{}{
-							"replicas": strconv.Itoa(numOfTxNodes),
-						},
-						"miner": map[string]interface{}{
-							"replicas": "0",
-						},
-					},
-					"bootnode": map[string]interface{}{
-						"replicas": "1",
-					},
-				},
-			}))
 	}
 
-	// skip adding blockscout for simplified deployments
-	// uncomment the following to debug on-chain transactions
-	/*
-		testEnvironment.AddChart(blockscout.New(&blockscout.Props{
-			Name:    "dest-blockscout",
-			WsURL:   NetworkB.URLs[0],
-			HttpURL: NetworkB.HTTPURLs[0],
-		}))
-
-			testEnvironment.AddChart(blockscout.New(&blockscout.Props{
-				Name:    "source-blockscout",
-				WsURL:   NetworkA.URLs[0],
-				HttpURL: NetworkA.HTTPURLs[0],
-			}))
-	*/
 	err := testEnvironment.
 		AddHelm(mockservercfg.New(nil)).
 		AddHelm(mockserver.New(nil)).
@@ -2013,7 +1967,11 @@ func DeployEnvironments(
 	if testEnvironment.WillUseRemoteRunner() {
 		return c
 	}
-	urlFinder := func(networkName string) ([]string, []string) {
+	urlFinder := func(network blockchain.EVMNetwork) ([]string, []string) {
+		if !network.Simulated {
+			return network.URLs, network.HTTPURLs
+		}
+		networkName := network.Name
 		var internalWsURLs, internalHttpURLs []string
 		for i := 0; i < numOfTxNodes; i++ {
 			podName := fmt.Sprintf("%s-ethereum-geth:%d", networkName, i)
@@ -2026,13 +1984,20 @@ func DeployEnvironments(
 		}
 		return internalWsURLs, internalHttpURLs
 	}
-	if NetworkA.Simulated {
-		NetworkA.URLs, NetworkA.HTTPURLs = urlFinder(NetworkA.Name)
+	for i := range networks {
+		networks[i].URLs, networks[i].HTTPURLs = urlFinder(networks[i])
+		// skip adding blockscout for simplified deployments
+		// uncomment the following to debug on-chain transactions
+		/*
+			testEnvironment.AddChart(blockscout.New(&blockscout.Props{
+					Name:    fmt.Sprintf("%s-blockscout", networks[i].Name),
+					WsURL:   networks[i].URLs[0],
+					HttpURL: networks[i].HTTPURLs[0],
+				}))
+		*/
 	}
-	if NetworkB.Simulated {
-		NetworkB.URLs, NetworkB.HTTPURLs = urlFinder(NetworkB.Name)
-	}
-	clProps["toml"] = DefaultCCIPCLNodeEnv(t)
+
+	clProps["toml"] = DefaultCCIPCLNodeEnv(t, networks)
 	err = testEnvironment.
 		AddHelm(chainlink.New(0, clProps)).
 		Run()

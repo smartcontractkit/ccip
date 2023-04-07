@@ -97,7 +97,7 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
     if (!s_feeTokens.contains(feeToken)) revert NotAFeeToken(feeToken);
 
     TimestampedUint128Value memory gasPrice = s_usdPerUnitGasByDestChainId[destChainId];
-    if (gasPrice.timestamp == 0 || gasPrice.value == 0) revert ChainNotSupported(destChainId);
+    if (gasPrice.timestamp == 0) revert ChainNotSupported(destChainId);
     uint256 timePassed = block.timestamp - gasPrice.timestamp;
     if (timePassed > i_stalenessThreshold) revert StaleGasPrice(destChainId, i_stalenessThreshold, timePassed);
 
@@ -113,33 +113,29 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
   /// @dev this function assumed that no more than 1e72 dollar, or type(uint240).max, is
   /// sent as payment. If more is sent, the multiplication of feeTokenAmount and feeTokenValue
   /// will overflow. Since there isn't even close to 1e72 dollars in the world economy this is safe.
-  /// @dev the result is a uint96 which is can store more than all the link that exists and is
-  /// therefore considered safe.
-  function convertFeeTokenAmountToLinkAmount(
-    address linkToken,
-    address feeToken,
-    uint256 feeTokenAmount
-  ) external view override returns (uint96 linkTokenAmount) {
-    if (!s_feeTokens.contains(feeToken)) revert NotAFeeToken(feeToken);
+  function convertTokenAmount(
+    address fromToken,
+    uint256 fromTokenAmount,
+    address toToken
+  ) external view override returns (uint256 toTokenAmount) {
+    TimestampedUint128Value memory fromTokenPrice = s_usdPerToken[fromToken];
+    if (fromTokenPrice.timestamp == 0 || fromTokenPrice.value == 0) revert TokenNotSupported(fromToken);
+    uint256 fromTokenTimePassed = block.timestamp - fromTokenPrice.timestamp;
+    if (fromTokenTimePassed > i_stalenessThreshold)
+      revert StaleTokenPrice(fromToken, i_stalenessThreshold, fromTokenTimePassed);
 
-    TimestampedUint128Value memory feeTokenPrice = s_usdPerToken[feeToken];
-    if (feeTokenPrice.timestamp == 0 || feeTokenPrice.value == 0) revert TokenNotSupported(feeToken);
-    uint256 feeTokenTimePassed = block.timestamp - feeTokenPrice.timestamp;
-    if (feeTokenTimePassed > i_stalenessThreshold)
-      revert StaleTokenPrice(feeToken, i_stalenessThreshold, feeTokenTimePassed);
-
-    TimestampedUint128Value memory linkTokenPrice = s_usdPerToken[linkToken];
-    if (linkTokenPrice.timestamp == 0 || linkTokenPrice.value == 0) revert TokenNotSupported(linkToken);
-    uint256 linkTokenTimePassed = block.timestamp - linkTokenPrice.timestamp;
-    if (linkTokenTimePassed > i_stalenessThreshold)
-      revert StaleTokenPrice(linkToken, i_stalenessThreshold, linkTokenTimePassed);
+    TimestampedUint128Value memory toTokenPrice = s_usdPerToken[toToken];
+    if (toTokenPrice.timestamp == 0 || toTokenPrice.value == 0) revert TokenNotSupported(toToken);
+    uint256 toTokenTimePassed = block.timestamp - toTokenPrice.timestamp;
+    if (toTokenTimePassed > i_stalenessThreshold)
+      revert StaleTokenPrice(toToken, i_stalenessThreshold, toTokenTimePassed);
 
     /// Example:
-    /// feeTokenAmount:   1e18      // 1 ETH
-    /// ETH:              2_000e18
-    /// LINK:             5e18
-    /// return:           1e18 * 2_000e18 / 5e18 = 400e18 (400 LINK)
-    return uint96((feeTokenAmount * uint256(feeTokenPrice.value)) / uint256(linkTokenPrice.value));
+    /// fromTokenAmount:   1e18      // 1 ETH
+    /// ETH:               2_000e18
+    /// LINK:              5e18
+    /// return:            1e18 * 2_000e18 / 5e18 = 400e18 (400 LINK)
+    return (fromTokenAmount * uint256(fromTokenPrice.value)) / uint256(toTokenPrice.value);
   }
 
   // ================================================================

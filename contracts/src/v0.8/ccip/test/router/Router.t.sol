@@ -198,6 +198,27 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     s_sourceRouter.ccipSend(DEST_CHAIN_ID, message);
   }
 
+  function testZeroFeeAndGasPriceSuccess() public {
+    address[] memory feeTokens = new address[](1);
+    feeTokens[0] = s_sourceTokens[1];
+    s_priceRegistry.applyFeeTokensUpdates(feeTokens, new address[](0));
+
+    Internal.TokenPriceUpdate[] memory tokenPriceUpdates = new Internal.TokenPriceUpdate[](1);
+    tokenPriceUpdates[0] = Internal.TokenPriceUpdate({sourceToken: s_sourceTokens[1], usdPerToken: 2_000 ether});
+    Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
+      tokenPriceUpdates: tokenPriceUpdates,
+      destChainId: DEST_CHAIN_ID,
+      usdPerUnitGas: 0
+    });
+    s_priceRegistry.updatePrices(priceUpdates);
+
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.feeToken = s_sourceTokens[1];
+    uint256 fee = s_sourceRouter.getFee(DEST_CHAIN_ID, message);
+    assertEq(fee, 0);
+    s_sourceRouter.ccipSend(DEST_CHAIN_ID, message);
+  }
+
   // Reverts
 
   function testUnsupportedDestinationChainReverts() public {

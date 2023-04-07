@@ -1,6 +1,7 @@
 {
   "acceptOwnership()": "79ba5097",
   "applyRampUpdates((address,bool)[],(address,bool)[])": "af519112",
+  "currentTokenBucketState()": "c38945a7",
   "getToken()": "21df0da7",
   "isOffRamp(address)": "1d7a74a0",
   "isOnRamp(address)": "6f32b872",
@@ -9,6 +10,7 @@
   "pause()": "8456cb59",
   "paused()": "5c975abb",
   "releaseOrMint(address,uint256)": "ea6192a2",
+  "setRateLimiterConfig((bool,uint208,uint256))": "3091aee7",
   "transferOwnership(address)": "f2fde38b",
   "unpause()": "3f4ba83a"
 }

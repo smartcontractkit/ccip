@@ -104,11 +104,10 @@ contract StructFactory {
     return
       EVM2EVMOffRamp.DynamicConfig({
         router: router,
-        executionDelaySeconds: EXECUTION_DELAY_SECONDS,
         maxDataSize: MAX_DATA_SIZE,
+        afn: afn,
         maxTokensLength: MAX_TOKENS_LENGTH,
-        permissionLessExecutionThresholdSeconds: PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS,
-        afn: afn
+        permissionLessExecutionThresholdSeconds: PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS
       });
   }
 
@@ -151,8 +150,8 @@ contract StructFactory {
   // Rate limiter
   address constant ADMIN = 0x11118e64e1FB0c487f25dD6D3601FF6aF8d32E4e;
 
-  function rateLimiterConfig() internal pure returns (AggregateRateLimiter.RateLimiterConfig memory) {
-    return AggregateRateLimiter.RateLimiterConfig({capacity: 100e28, rate: 1e15, admin: ADMIN});
+  function rateLimiterConfig() internal pure returns (RateLimiter.Config memory) {
+    return RateLimiter.Config({isEnabled: true, capacity: 100e28, rate: 1e15});
   }
 
   function getTokenPrices() internal pure returns (uint256[] memory prices) {

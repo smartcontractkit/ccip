@@ -24,7 +24,7 @@ import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
 import {IERC20} from "../../../vendor/IERC20.sol";
 
 contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup {
-  ICommitStore internal s_mockCommitStore;
+  MockCommitStore internal s_mockCommitStore;
   IAny2EVMMessageReceiver internal s_receiver;
   IAny2EVMMessageReceiver internal s_secondary_receiver;
   IAny2EVMMessageReceiver internal s_reverting_receiver;
@@ -193,7 +193,6 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup {
   }
 
   function _assertSameConfig(EVM2EVMOffRamp.DynamicConfig memory a, EVM2EVMOffRamp.DynamicConfig memory b) public {
-    assertEq(a.executionDelaySeconds, b.executionDelaySeconds);
     assertEq(a.maxDataSize, b.maxDataSize);
     assertEq(a.maxTokensLength, b.maxTokensLength);
     assertEq(a.permissionLessExecutionThresholdSeconds, b.permissionLessExecutionThresholdSeconds);

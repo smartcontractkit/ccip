@@ -3,7 +3,7 @@ package ccip
 import (
 	"encoding/json"
 
-	"github.com/smartcontractkit/chainlink/core/store/models"
+	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
 
 type OffchainConfig struct {

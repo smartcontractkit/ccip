@@ -9,7 +9,7 @@ contract EVM2EVMOffRampHelper is EVM2EVMOffRamp {
     DynamicConfig memory dynamicConfig,
     IERC20[] memory sourceTokens,
     IPool[] memory pools,
-    RateLimiterConfig memory rateLimiterConfig
+    RateLimiter.Config memory rateLimiterConfig
   ) EVM2EVMOffRamp(staticConfig, dynamicConfig, sourceTokens, pools, rateLimiterConfig) {}
 
   function setExecutionState(uint64 sequenceNumber, Internal.MessageExecutionState state) public {

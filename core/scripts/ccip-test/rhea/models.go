@@ -11,9 +11,9 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/test-go/testify/require"
 
-	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/secrets"
-	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 )
 
 // DefaultGasTipFee is the default gas tip fee of 1 gwei.
@@ -155,10 +155,25 @@ type EVMChainConfig struct {
 }
 
 type EVMBridgedToken struct {
-	Token gethcommon.Address
-	Pool  gethcommon.Address
+	ChainId uint64
+	Token   gethcommon.Address
+	Pool    gethcommon.Address
+	TokenPriceType
 	Price *big.Int
+	PriceFeed
 	TokenPoolType
+}
+
+type TokenPriceType string
+
+const (
+	TokenPrices TokenPriceType = "TokenPrices"
+	PriceFeeds  TokenPriceType = "PriceFeeds"
+)
+
+type PriceFeed struct {
+	Aggregator gethcommon.Address
+	Multiplier *big.Int
 }
 
 type EVMLaneConfig struct {

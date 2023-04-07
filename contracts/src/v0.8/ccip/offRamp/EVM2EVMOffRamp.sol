@@ -10,18 +10,18 @@ import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol
 
 import {Client} from "../models/Client.sol";
 import {Internal} from "../models/Internal.sol";
-import {OCR2Base} from "../ocr/OCR2Base.sol";
+import {RateLimiter} from "../models/RateLimiter.sol";
+import {OCR2BaseNoChecks} from "../ocr/OCR2BaseNoChecks.sol";
 import {AggregateRateLimiter} from "../AggregateRateLimiter.sol";
 import {EnumerableMapAddresses} from "../../libraries/internal/EnumerableMapAddresses.sol";
 
 import {IERC20} from "../../vendor/IERC20.sol";
 import {Address} from "../../vendor/Address.sol";
 import {ERC165Checker} from "../../vendor/ERC165Checker.sol";
-import {Pausable} from "../../vendor/Pausable.sol";
 
 /// @notice EVM2EVMOffRamp enables OCR networks to execute multiple messages
 /// in an OffRamp in a single transaction.
-contract EVM2EVMOffRamp is Pausable, AggregateRateLimiter, TypeAndVersionInterface, OCR2Base {
+contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2BaseNoChecks {
   using Address for address;
   using ERC165Checker for address;
   using EnumerableMapAddresses for EnumerableMapAddresses.AddressToAddressMap;
@@ -69,11 +69,10 @@ contract EVM2EVMOffRamp is Pausable, AggregateRateLimiter, TypeAndVersionInterfa
   /// @dev since OffRampConfig is part of OffRampConfigChanged event, if changing it, we should update the ABI on Atlas
   struct DynamicConfig {
     uint32 permissionLessExecutionThresholdSeconds; // -┐ Waiting time before manual execution is enabled
-    uint64 executionDelaySeconds; //                    | Execution delay in seconds
     address router; // ---------------------------------┘ Router address
-    uint32 maxDataSize; // --------┐ Maximum payload data size
+    address afn; // ---------------┐ AFN address
     uint16 maxTokensLength; //     | Maximum number of distinct ERC20 tokens that can be sent per message
-    address afn; // ---------------┘ AFN address
+    uint32 maxDataSize; // --------┘ Maximum payload data size
   }
 
   // STATIC CONFIG
@@ -113,8 +112,8 @@ contract EVM2EVMOffRamp is Pausable, AggregateRateLimiter, TypeAndVersionInterfa
     DynamicConfig memory dynamicConfig,
     IERC20[] memory sourceTokens,
     IPool[] memory pools,
-    RateLimiterConfig memory rateLimiterConfig
-  ) OCR2Base() Pausable() AggregateRateLimiter(rateLimiterConfig) {
+    RateLimiter.Config memory rateLimiterConfig
+  ) OCR2BaseNoChecks() AggregateRateLimiter(rateLimiterConfig) {
     if (sourceTokens.length != pools.length) revert InvalidTokenPoolConfig();
     if (staticConfig.onRamp == address(0) || staticConfig.commitStore == address(0)) revert ZeroAddressNotAllowed();
 
@@ -168,7 +167,7 @@ contract EVM2EVMOffRamp is Pausable, AggregateRateLimiter, TypeAndVersionInterfa
   /// @param report The execution report containing the messages and proofs.
   /// @param manualExecution A boolean value indication whether this function is called
   /// from the DON (false) or manually (true).
-  function _execute(Internal.ExecutionReport memory report, bool manualExecution) internal whenNotPaused whenHealthy {
+  function _execute(Internal.ExecutionReport memory report, bool manualExecution) internal whenHealthy {
     uint256 numMsgs = report.encodedMessages.length;
     if (numMsgs == 0) revert EmptyReport();
 
@@ -461,7 +460,7 @@ contract EVM2EVMOffRamp is Pausable, AggregateRateLimiter, TypeAndVersionInterfa
       destTokenAmounts[i].token = address(pool.getToken());
       destTokenAmounts[i].amount = sourceTokenAmounts[i].amount;
     }
-    _removeTokens(destTokenAmounts);
+    _rateLimitValue(destTokenAmounts);
     return destTokenAmounts;
   }
 
@@ -484,17 +483,5 @@ contract EVM2EVMOffRamp is Pausable, AggregateRateLimiter, TypeAndVersionInterfa
   modifier whenHealthy() {
     if (IAFN(s_dynamicConfig.afn).badSignalReceived()) revert BadAFNSignal();
     _;
-  }
-
-  /// @notice Pause the contract
-  /// @dev only callable by the owner
-  function pause() external onlyOwner {
-    _pause();
-  }
-
-  /// @notice Unpause the contract
-  /// @dev only callable by the owner
-  function unpause() external onlyOwner {
-    _unpause();
   }
 }

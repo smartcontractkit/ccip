@@ -12,22 +12,22 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"golang.org/x/exp/slices"
 
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/afn_contract"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/burn_mint_token_pool"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/ping_pong_demo"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
-	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/dione"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea/deployments"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
-	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/afn_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/burn_mint_token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/ping_pong_demo"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 )
 
 func PrintCCIPState(source *rhea.EvmDeploymentConfig, destination *rhea.EvmDeploymentConfig) {
@@ -356,14 +356,14 @@ func printRateLimitingStatus(chain *rhea.EvmDeploymentConfig) {
 
 	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(chain.LaneConfig.OnRamp, chain.Client)
 	helpers.PanicErr(err)
-	bucketState, err := onRamp.CalculateCurrentTokenBucketState(&bind.CallOpts{})
+	bucketState, err := onRamp.CurrentTokenBucketState(&bind.CallOpts{})
 	helpers.PanicErr(err)
 
 	sb.WriteString(fmt.Sprintf("| %-25s | %42d |\n", "onramp", bucketState.Tokens))
 
 	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(chain.LaneConfig.OffRamp, chain.Client)
 	helpers.PanicErr(err)
-	offRampBucketState, err := offRamp.CalculateCurrentTokenBucketState(&bind.CallOpts{})
+	offRampBucketState, err := offRamp.CurrentTokenBucketState(&bind.CallOpts{})
 	helpers.PanicErr(err)
 
 	sb.WriteString(fmt.Sprintf("| %-25s | %42d |\n", "offramp", offRampBucketState.Tokens))
@@ -401,13 +401,6 @@ func printPaused(chain *rhea.EvmDeploymentConfig) {
 	helpers.PanicErr(err)
 
 	sb.WriteString(fmt.Sprintf("| %-25s | %42s | %14s |\n", "onramp", onRamp.Address(), printBool(!paused)))
-
-	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(chain.LaneConfig.OffRamp, chain.Client)
-	helpers.PanicErr(err)
-	paused, err = offRamp.Paused(&bind.CallOpts{})
-	helpers.PanicErr(err)
-
-	sb.WriteString(fmt.Sprintf("| %-25s | %42s | %14s |\n", "offramp", offRamp.Address(), printBool(!paused)))
 
 	commitStore, err := commit_store.NewCommitStore(chain.LaneConfig.CommitStore, chain.Client)
 	helpers.PanicErr(err)

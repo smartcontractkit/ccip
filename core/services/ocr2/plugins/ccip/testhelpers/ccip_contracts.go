@@ -17,25 +17,25 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/commit_store"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/custom_token_pool"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/link_token_interface"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/maybe_revert_message_receiver"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/mock_afn_contract"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/router"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/weth9"
-	"github.com/smartcontractkit/chainlink/core/internal/testutils"
-	"github.com/smartcontractkit/chainlink/core/logger"
-	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
-	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/hasher"
-	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/merklemulti"
-	"github.com/smartcontractkit/chainlink/core/services/ocrcommon"
-	"github.com/smartcontractkit/chainlink/core/utils"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/custom_token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/maybe_revert_message_receiver"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/mock_afn_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/weth9"
+	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/merklemulti"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocrcommon"
+	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 var (
@@ -131,18 +131,17 @@ func (c *CCIPContracts) DeployNewOffRamp() {
 		},
 		evm_2_evm_offramp.EVM2EVMOffRampDynamicConfig{
 			PermissionLessExecutionThresholdSeconds: 1,
-			ExecutionDelaySeconds:                   0,
 			Router:                                  c.Dest.Router.Address(),
+			Afn:                                     c.Dest.AFN.Address(),
 			MaxDataSize:                             1e5,
 			MaxTokensLength:                         5,
-			Afn:                                     c.Dest.AFN.Address(),
 		},
 		[]common.Address{c.Source.LinkToken.Address()}, // source tokens
 		[]common.Address{c.Dest.Pool.Address()},        // pools
-		evm_2_evm_offramp.AggregateRateLimiterRateLimiterConfig{
-			Capacity: HundredLink,
-			Rate:     big.NewInt(1e18),
-			Admin:    c.Source.User.From,
+		evm_2_evm_offramp.RateLimiterConfig{
+			Capacity:  HundredLink,
+			Rate:      big.NewInt(1e18),
+			IsEnabled: true,
 		},
 	)
 	require.NoError(c.t, err)
@@ -229,10 +228,10 @@ func (c *CCIPContracts) DeployNewOnRamp() {
 			},
 		},
 		[]common.Address{}, // allow list
-		evm_2_evm_onramp.AggregateRateLimiterRateLimiterConfig{
-			Capacity: HundredLink,
-			Rate:     big.NewInt(1e18),
-			Admin:    c.Source.User.From,
+		evm_2_evm_onramp.RateLimiterConfig{
+			Capacity:  HundredLink,
+			Rate:      big.NewInt(1e18),
+			IsEnabled: true,
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs{
 			{
@@ -483,9 +482,15 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	sourceChain.Commit()
 	sourceLinkToken, err := link_token_interface.NewLinkToken(sourceLinkTokenAddress, sourceChain)
 	require.NoError(t, err)
-	sourcePoolAddress, _, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(sourceUser,
+	sourcePoolAddress, _, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(
+		sourceUser,
 		sourceChain,
-		sourceLinkTokenAddress)
+		sourceLinkTokenAddress,
+		lock_release_token_pool.RateLimiterConfig{
+			Capacity:  HundredLink,
+			Rate:      big.NewInt(1e18),
+			IsEnabled: true,
+		})
 	require.NoError(t, err)
 	sourceChain.Commit()
 	sourcePool, err := lock_release_token_pool.NewLockReleaseTokenPool(sourcePoolAddress, sourceChain)
@@ -497,7 +502,15 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	destChain.Commit()
 	destLinkToken, err := link_token_interface.NewLinkToken(destLinkTokenAddress, destChain)
 	require.NoError(t, err)
-	destPoolAddress, _, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(destUser, destChain, destLinkTokenAddress)
+	destPoolAddress, _, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(
+		destUser,
+		destChain,
+		destLinkTokenAddress,
+		lock_release_token_pool.RateLimiterConfig{
+			Capacity:  HundredLink,
+			Rate:      big.NewInt(1e18),
+			IsEnabled: true,
+		})
 	require.NoError(t, err)
 	destChain.Commit()
 	destPool, err := lock_release_token_pool.NewLockReleaseTokenPool(destPoolAddress, destChain)
@@ -593,10 +606,10 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			},
 		},
 		[]common.Address{}, // allow list
-		evm_2_evm_onramp.AggregateRateLimiterRateLimiterConfig{
-			Capacity: HundredLink,
-			Rate:     big.NewInt(1e18),
-			Admin:    sourceUser.From,
+		evm_2_evm_onramp.RateLimiterConfig{
+			Capacity:  HundredLink,
+			Rate:      big.NewInt(1e18),
+			IsEnabled: true,
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs{
 			{
@@ -692,19 +705,18 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			OnRamp:        onRampAddress,
 		},
 		evm_2_evm_offramp.EVM2EVMOffRampDynamicConfig{
-			Router:                                  destRouter.Address(),
 			PermissionLessExecutionThresholdSeconds: 1,
-			ExecutionDelaySeconds:                   0,
+			Router:                                  destRouter.Address(),
+			Afn:                                     afnDestAddress,
 			MaxDataSize:                             1e5,
 			MaxTokensLength:                         5,
-			Afn:                                     afnDestAddress,
 		},
 		[]common.Address{sourceLinkTokenAddress},
 		[]common.Address{destPoolAddress},
-		evm_2_evm_offramp.AggregateRateLimiterRateLimiterConfig{
-			Capacity: HundredLink,
-			Rate:     big.NewInt(1e18),
-			Admin:    sourceUser.From,
+		evm_2_evm_offramp.RateLimiterConfig{
+			Capacity:  HundredLink,
+			Rate:      big.NewInt(1e18),
+			IsEnabled: true,
 		},
 	)
 	require.NoError(t, err)

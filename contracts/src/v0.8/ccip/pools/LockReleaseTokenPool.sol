@@ -2,6 +2,7 @@
 pragma solidity 0.8.15;
 
 import {TokenPool} from "./TokenPool.sol";
+import {RateLimiter} from "../models/RateLimiter.sol";
 
 import {IERC20} from "../../vendor/IERC20.sol";
 import {SafeERC20} from "../../vendor/SafeERC20.sol";
@@ -21,9 +22,12 @@ contract LockReleaseTokenPool is TokenPool {
 
   mapping(address => uint256) internal s_liquidityProviderBalances;
 
-  constructor(IERC20 token) TokenPool(token) {}
+  constructor(IERC20 token, RateLimiter.Config memory rateLimiterConfig) TokenPool(token, rateLimiterConfig) {}
 
   /// @notice Locks the token in the pool
+  /// @dev Locks are not rate limited at per-pool level. Each pool is shared across lanes,
+  /// rate limiting locks does not meaningfully mitigate honeypot risk.
+  /// Benefits of rate limiting here does not justify the extra gas cost.
   /// @param amount Amount to lock
   function lockOrBurn(uint256 amount, address) external override whenNotPaused onlyOnRamp {
     emit Locked(msg.sender, amount);
@@ -33,6 +37,7 @@ contract LockReleaseTokenPool is TokenPool {
   /// @param recipient Recipient address
   /// @param amount Amount to release
   function releaseOrMint(address recipient, uint256 amount) external override whenNotPaused onlyOffRamp {
+    _consumeRateLimit(amount);
     getToken().safeTransfer(recipient, amount);
     emit Released(msg.sender, recipient, amount);
   }
