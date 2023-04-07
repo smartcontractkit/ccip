@@ -1,9 +1,13 @@
 package deployments
 
 import (
+	"time"
+
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
 
 var ProdChains = map[rhea.Chain]rhea.EvmDeploymentConfig{
@@ -311,6 +315,16 @@ var Prod_SepoliaToAvaxFuji = rhea.EvmDeploymentConfig{
 			DeployPingPongDapp: false,
 			DeployedAtBlock:    3127829,
 		},
+		CommitOffchainConfig: ccip.CommitOffchainConfig{
+			FeeUpdateHeartBeat:    models.MustMakeDuration(24 * time.Hour),
+			FeeUpdateDeviationPPB: 5e7,
+			MaxGasPrice:           200e9,
+		},
+		ExecOffchainConfig: ccip.ExecOffchainConfig{
+			BatchGasLimit:            5_000_000,
+			RelativeBoostPerWaitHour: 0.07,
+			MaxGasPrice:              200e9,
+		},
 	},
 }
 
@@ -326,6 +340,16 @@ var Prod_AvaxFujiToSepolia = rhea.EvmDeploymentConfig{
 			DeployRamp:         false,
 			DeployPingPongDapp: false,
 			DeployedAtBlock:    20040846,
+		},
+		CommitOffchainConfig: ccip.CommitOffchainConfig{
+			FeeUpdateHeartBeat:    models.MustMakeDuration(24 * time.Hour),
+			FeeUpdateDeviationPPB: 5e7,
+			MaxGasPrice:           200e9,
+		},
+		ExecOffchainConfig: ccip.ExecOffchainConfig{
+			BatchGasLimit:            5_000_000,
+			RelativeBoostPerWaitHour: 0.07,
+			MaxGasPrice:              200e9,
 		},
 	},
 }
@@ -343,6 +367,16 @@ var Prod_SepoliaToOptimismGoerli = rhea.EvmDeploymentConfig{
 			DeployPingPongDapp: false,
 			DeployedAtBlock:    3127868,
 		},
+		CommitOffchainConfig: ccip.CommitOffchainConfig{
+			FeeUpdateHeartBeat:    models.MustMakeDuration(24 * time.Hour),
+			FeeUpdateDeviationPPB: 5e7,
+			MaxGasPrice:           200e9,
+		},
+		ExecOffchainConfig: ccip.ExecOffchainConfig{
+			BatchGasLimit:            5_000_000,
+			RelativeBoostPerWaitHour: 0.07,
+			MaxGasPrice:              200e9,
+		},
 	},
 }
 
@@ -358,6 +392,16 @@ var Prod_OptimismGoerliToSepolia = rhea.EvmDeploymentConfig{
 			DeployRamp:         false,
 			DeployPingPongDapp: false,
 			DeployedAtBlock:    6939370,
+		},
+		CommitOffchainConfig: ccip.CommitOffchainConfig{
+			FeeUpdateHeartBeat:    models.MustMakeDuration(24 * time.Hour),
+			FeeUpdateDeviationPPB: 5e7,
+			MaxGasPrice:           200e9,
+		},
+		ExecOffchainConfig: ccip.ExecOffchainConfig{
+			BatchGasLimit:            5_000_000,
+			RelativeBoostPerWaitHour: 0.07,
+			MaxGasPrice:              200e9,
 		},
 	},
 }
@@ -375,6 +419,16 @@ var Prod_OptimismGoerliToAvaxFuji = rhea.EvmDeploymentConfig{
 			DeployPingPongDapp: false,
 			DeployedAtBlock:    6939519,
 		},
+		CommitOffchainConfig: ccip.CommitOffchainConfig{
+			FeeUpdateHeartBeat:    models.MustMakeDuration(24 * time.Hour),
+			FeeUpdateDeviationPPB: 5e7,
+			MaxGasPrice:           200e9,
+		},
+		ExecOffchainConfig: ccip.ExecOffchainConfig{
+			BatchGasLimit:            5_000_000,
+			RelativeBoostPerWaitHour: 0.07,
+			MaxGasPrice:              200e9,
+		},
 	},
 }
 
@@ -390,6 +444,16 @@ var Prod_AvaxFujiToOptimismGoerli = rhea.EvmDeploymentConfig{
 			DeployRamp:         false,
 			DeployPingPongDapp: false,
 			DeployedAtBlock:    20041225,
+		},
+		CommitOffchainConfig: ccip.CommitOffchainConfig{
+			FeeUpdateHeartBeat:    models.MustMakeDuration(24 * time.Hour),
+			FeeUpdateDeviationPPB: 5e7,
+			MaxGasPrice:           200e9,
+		},
+		ExecOffchainConfig: ccip.ExecOffchainConfig{
+			BatchGasLimit:            5_000_000,
+			RelativeBoostPerWaitHour: 0.07,
+			MaxGasPrice:              200e9,
 		},
 	},
 }
@@ -407,6 +471,16 @@ var Prod_OptimismGoerliToGoerli = rhea.EvmDeploymentConfig{
 			DeployPingPongDapp: false,
 			DeployedAtBlock:    6939814,
 		},
+		CommitOffchainConfig: ccip.CommitOffchainConfig{
+			FeeUpdateHeartBeat:    models.MustMakeDuration(24 * time.Hour),
+			FeeUpdateDeviationPPB: 5e7,
+			MaxGasPrice:           200e9,
+		},
+		ExecOffchainConfig: ccip.ExecOffchainConfig{
+			BatchGasLimit:            5_000_000,
+			RelativeBoostPerWaitHour: 0.07,
+			MaxGasPrice:              200e9,
+		},
 	},
 }
 
@@ -422,6 +496,16 @@ var Prod_GoerliToOptimismGoerli = rhea.EvmDeploymentConfig{
 			DeployRamp:         false,
 			DeployPingPongDapp: false,
 			DeployedAtBlock:    8686987,
+		},
+		CommitOffchainConfig: ccip.CommitOffchainConfig{
+			FeeUpdateHeartBeat:    models.MustMakeDuration(24 * time.Hour),
+			FeeUpdateDeviationPPB: 5e7,
+			MaxGasPrice:           200e9,
+		},
+		ExecOffchainConfig: ccip.ExecOffchainConfig{
+			BatchGasLimit:            5_000_000,
+			RelativeBoostPerWaitHour: 0.07,
+			MaxGasPrice:              200e9,
 		},
 	},
 }

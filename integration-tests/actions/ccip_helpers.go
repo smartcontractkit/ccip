@@ -1553,7 +1553,6 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	if err != nil {
 		return errors.WithStack(err)
 	}
-
 	// set up ocr2 config
 	err = SetOCR2Configs(commitNodes, execNodes, *lane.Dest)
 	if err != nil {
@@ -1566,7 +1565,11 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 // nil value in execNodes denotes commit and execution jobs are to be set up in same DON
 func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP DestCCIPModule) error {
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err :=
-		ccip.NewOffChainAggregatorV2Config(commitNodes)
+		ccip.NewOffChainAggregatorV2Config(commitNodes, ccipPlugin.CommitOffchainConfig{
+			SourceIncomingConfirmations: 1,
+			DestIncomingConfirmations:   1,
+			MaxGasPrice:                 200e9,
+		})
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -1575,15 +1578,24 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 	if err != nil {
 		return errors.WithStack(err)
 	}
+
+	nodes := commitNodes
 	// if commit and exec job is set up in different DON
 	if len(execNodes) > 0 {
+		nodes = execNodes
+	}
+	if destCCIP.OffRamp != nil {
 		signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err =
-			ccip.NewOffChainAggregatorV2Config(execNodes)
+			ccip.NewOffChainAggregatorV2Config(nodes, ccipPlugin.ExecOffchainConfig{
+				SourceIncomingConfirmations: 1,
+				DestIncomingConfirmations:   1,
+				BatchGasLimit:               5_000_000,
+				RelativeBoostPerWaitHour:    0.07,
+				MaxGasPrice:                 200e9,
+			})
 		if err != nil {
 			return errors.WithStack(err)
 		}
-	}
-	if destCCIP.OffRamp != nil {
 		err = destCCIP.OffRamp.SetOCR2Config(signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig)
 		if err != nil {
 			return errors.WithStack(err)

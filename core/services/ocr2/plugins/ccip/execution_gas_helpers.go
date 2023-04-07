@@ -38,9 +38,8 @@ const (
 )
 
 const (
-	RelativeBoostPerWaitHour = 0.07
-	MaxPayloadLength         = 1000
-	MaxTokensPerMessage      = 5
+	MaxPayloadLength    = 1000
+	MaxTokensPerMessage = 5
 )
 
 // Offchain: we compute the max overhead gas to determine msg executability.
@@ -85,9 +84,8 @@ func computeExecCost(msg *evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested, execG
 // At the same time, messages that are slightly underpaid will start going through after waiting for a little bit.
 //
 // wait_boosted_fee(m) = (1 + (now - m.send_time).hours * RELATIVE_BOOST_PER_WAIT_HOUR) * fee(m)
-func waitBoostedFee(sentAt time.Time, fee *big.Int) *big.Int {
-	sinceSent := int64(time.Since(sentAt).Hours())
-	k := 1.0 + float64(sinceSent)*RelativeBoostPerWaitHour
+func waitBoostedFee(waitTime time.Duration, fee *big.Int, relativeBoostPerWaitHour float64) *big.Int {
+	k := 1.0 + waitTime.Hours()*relativeBoostPerWaitHour
 
 	boostedFee := big.NewFloat(0).Mul(big.NewFloat(k), new(big.Float).SetInt(fee))
 	res, _ := boostedFee.Int(nil)
