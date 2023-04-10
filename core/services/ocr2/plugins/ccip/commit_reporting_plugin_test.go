@@ -399,7 +399,7 @@ func setupTestPlugin(t *testing.T) testPluginHarness {
 			sourceFeeEstimator: sourceFeeEstimator,
 			sourceChainID:      sourceChainId,
 		},
-		offchainConfig: OffchainConfig{
+		offchainConfig: CommitOffchainConfig{
 			FeeUpdateHeartBeat: models.MustMakeDuration(12 * time.Hour),
 		},
 	}

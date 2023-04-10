@@ -31,7 +31,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/simple_message_receiver"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/weth9"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
+	ccipplugin "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrcommon"
 )
 
@@ -414,7 +414,7 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 				PriceRegistry:   priceRegistry,
 				MaxDataSize:     1e5,
 				MaxTokensLength: 5,
-				MaxGasLimit:     ccip.GasLimitPerTx,
+				MaxGasLimit:     4_000_000,
 				Afn:             afn,
 			},
 			tokensAndPools,
@@ -552,8 +552,9 @@ func stripKeyPrefix(key string) string {
 	return key
 }
 
-func NewOffChainAggregatorV2Config(
+func NewOffChainAggregatorV2Config[T ccipplugin.OffchainConfig](
 	nodes []*client.CLNodesWithKeys,
+	offchainCfg T,
 ) (
 	signers []common.Address,
 	transmitters []common.Address,
@@ -601,10 +602,7 @@ func NewOffChainAggregatorV2Config(
 		return nil, nil, 0, nil, 0, nil, err
 	}
 	ocrConfig.Oracles = oracleIdentities
-	ocrConfig.ReportingPluginConfig, err = ccip.OffchainConfig{
-		SourceIncomingConfirmations: 1,
-		DestIncomingConfirmations:   1,
-	}.Encode()
+	ocrConfig.ReportingPluginConfig, err = ccipplugin.EncodeOffchainConfig[T](offchainCfg)
 	if err != nil {
 		return nil, nil, 0, nil, 0, nil, err
 	}

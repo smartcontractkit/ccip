@@ -3,7 +3,7 @@ pragma solidity 0.8.15;
 
 import {IBurnMintERC20} from "../interfaces/pools/IBurnMintERC20.sol";
 
-import {RateLimiter} from "../models/RateLimiter.sol";
+import {RateLimiter} from "../libraries/RateLimiter.sol";
 import {TokenPool} from "./TokenPool.sol";
 
 /// @notice This pool mints and burns a 3rd-party token.

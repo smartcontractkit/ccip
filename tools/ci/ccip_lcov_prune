@@ -2,9 +2,9 @@
 
 set -e
 
-# src/v0.8/ccip/models/Internal.sol
-# src/v0.8/ccip/models/RateLimiter.sol
-# src/v0.8/ccip/MerkleMultiProof.sol
+# src/v0.8/ccip/libraries/Internal.sol
+# src/v0.8/ccip/libraries/RateLimiter.sol
+# src/v0.8/ccip/libraries/MerkleMultiProof.sol
 # excluded because Foundry doesn't support coverage on library files
 
 
@@ -12,9 +12,9 @@ lcov --remove $1 -o $2 \
   '*/ccip/test/*' \
   '*/vendor/*' \
   'src/v0.8/ccip/ocr/OCR2Abstract.sol' \
-  'src/v0.8/ccip/models/Internal.sol' \
-  'src/v0.8/ccip/models/RateLimiter.sol' \
-  'src/v0.8/ccip/MerkleMultiProof.sol' \
+  'src/v0.8/ccip/libraries/Internal.sol' \
+  'src/v0.8/ccip/libraries/RateLimiter.sol' \
+  'src/v0.8/ccip/libraries/MerkleMultiProof.sol' \
   'src/v0.8/ConfirmedOwnerWithProposal.sol' \
   'src/v0.8/tests/MockV3Aggregator.sol' \
   'src/v0.8/ccip/applications/ImmutableExample.sol' \

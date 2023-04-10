@@ -185,6 +185,9 @@ type EVMLaneConfig struct {
 	GovernanceDapp gethcommon.Address
 	PingPongDapp   gethcommon.Address
 	DeploySettings LaneDeploySettings
+
+	ExecOffchainConfig   ccip.ExecOffchainConfig
+	CommitOffchainConfig ccip.CommitOffchainConfig
 }
 
 type EvmDeploymentConfig struct {

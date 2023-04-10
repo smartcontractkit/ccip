@@ -3,8 +3,8 @@ pragma solidity ^0.8.0;
 
 import {IPool} from "./pools/IPool.sol";
 
-import {Client} from "../models/Client.sol";
-import {Internal} from "../models/Internal.sol";
+import {Client} from "../libraries/Client.sol";
+import {Internal} from "../libraries/Internal.sol";
 
 import {IERC20} from "../../vendor/IERC20.sol";
 

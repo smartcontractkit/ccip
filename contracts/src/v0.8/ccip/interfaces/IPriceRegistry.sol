@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Internal} from "../models/Internal.sol";
+import {Internal} from "../libraries/Internal.sol";
 
 interface IPriceRegistry {
   /// @notice Value with a timestamp, used for gas prices and token prices.

@@ -9,29 +9,62 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
 
-func TestOffchainConfig_Encode_Decode(t *testing.T) {
+func TestCommitOffchainConfig_Encoding(t *testing.T) {
 	tests := map[string]struct {
-		want  OffchainConfig
+		want  CommitOffchainConfig
 		error bool
 	}{
-		"Success": {
-			want: OffchainConfig{
+		"happy flow": {
+			want: CommitOffchainConfig{
 				SourceIncomingConfirmations: 3,
 				DestIncomingConfirmations:   6,
 				FeeUpdateHeartBeat:          models.MustMakeDuration(1 * time.Hour),
 				FeeUpdateDeviationPPB:       5e7,
+				MaxGasPrice:                 200e9,
 			},
 		},
-		"Missing value as 0": {
-			want: OffchainConfig{
+		"missing fields": {
+			want: CommitOffchainConfig{
 				SourceIncomingConfirmations: 99999999,
 			},
 		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			encode, err := tc.want.Encode()
-			got, err := Decode(encode)
+			encode, err := EncodeOffchainConfig(tc.want)
+			require.NoError(t, err)
+			got, err := DecodeOffchainConfig[CommitOffchainConfig](encode)
+			require.NoError(t, err)
+			require.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestExecOffchainConfig_Encoding(t *testing.T) {
+	tests := map[string]struct {
+		want  ExecOffchainConfig
+		error bool
+	}{
+		"happy flow": {
+			want: ExecOffchainConfig{
+				SourceIncomingConfirmations: 3,
+				DestIncomingConfirmations:   6,
+				BatchGasLimit:               5_000_000,
+				RelativeBoostPerWaitHour:    0.07,
+				MaxGasPrice:                 200e9,
+			},
+		},
+		"missing fields": {
+			want: ExecOffchainConfig{
+				SourceIncomingConfirmations: 99999999,
+			},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			encode, err := EncodeOffchainConfig(tc.want)
+			require.NoError(t, err)
+			got, err := DecodeOffchainConfig[ExecOffchainConfig](encode)
 			require.NoError(t, err)
 			require.Equal(t, tc.want, got)
 		})

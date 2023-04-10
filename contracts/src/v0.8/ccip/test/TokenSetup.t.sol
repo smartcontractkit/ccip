@@ -6,7 +6,7 @@ import "./mocks/MockERC20.sol";
 import "../../tests/MockV3Aggregator.sol";
 import "../pools/BurnMintTokenPool.sol";
 import "../pools/LockReleaseTokenPool.sol";
-import "../models/Client.sol";
+import "../libraries/Client.sol";
 
 contract TokenSetup is BaseTest {
   address[] internal s_sourceTokens;

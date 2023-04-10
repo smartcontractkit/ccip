@@ -4,7 +4,7 @@ pragma solidity 0.8.15;
 import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
 
 import {CCIPReceiver} from "./CCIPReceiver.sol";
-import {Client} from "../models/Client.sol";
+import {Client} from "../libraries/Client.sol";
 
 import {IERC20} from "../../vendor/IERC20.sol";
 

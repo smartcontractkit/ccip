@@ -170,7 +170,7 @@ func NewCommitReportingPluginFactory(config CommitPluginConfig) types.ReportingP
 
 // NewReportingPlugin returns the ccip CommitReportingPlugin and satisfies the ReportingPluginFactory interface.
 func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.ReportingPluginConfig) (types.ReportingPlugin, types.ReportingPluginInfo, error) {
-	offchainConfig, err := Decode(config.OffchainConfig)
+	offchainConfig, err := DecodeOffchainConfig[CommitOffchainConfig](config.OffchainConfig)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
@@ -201,7 +201,7 @@ type CommitReportingPlugin struct {
 	inFlightMu           sync.RWMutex
 	inFlight             map[[32]byte]InflightReport
 	inFlightPriceUpdates []InflightPriceUpdate
-	offchainConfig       OffchainConfig
+	offchainConfig       CommitOffchainConfig
 }
 
 func (r *CommitReportingPlugin) nextMinSeqNumForInFlight() uint64 {
@@ -352,7 +352,7 @@ func (r *CommitReportingPlugin) generatePriceUpdates(ctx context.Context, now ti
 	}
 
 	// Observe a source chain price for pricing.
-	sourceGasPriceWei, _, err := r.config.sourceFeeEstimator.GetFee(ctx, nil, BatchGasLimit, assets.NewWei(big.NewInt(MaxGasPrice)))
+	sourceGasPriceWei, _, err := r.config.sourceFeeEstimator.GetFee(ctx, nil, 0, assets.NewWei(big.NewInt(int64(r.offchainConfig.MaxGasPrice))))
 	if err != nil {
 		return nil, nil, err
 	}
