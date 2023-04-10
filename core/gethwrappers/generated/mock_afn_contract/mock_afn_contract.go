@@ -25,6 +25,7 @@ var (
 	_ = common.Big1
 	_ = types.BloomLookup
 	_ = event.NewSubscription
+	_ = abi.ConvertType
 )
 
 type AFNUnvoteToCurseRecord struct {
@@ -143,11 +144,11 @@ func NewMockAFNContractFilterer(address common.Address, filterer bind.ContractFi
 }
 
 func bindMockAFNContract(address common.Address, caller bind.ContractCaller, transactor bind.ContractTransactor, filterer bind.ContractFilterer) (*bind.BoundContract, error) {
-	parsed, err := abi.JSON(strings.NewReader(MockAFNContractABI))
+	parsed, err := MockAFNContractMetaData.GetAbi()
 	if err != nil {
 		return nil, err
 	}
-	return bind.NewBoundContract(address, parsed, caller, transactor, filterer), nil
+	return bind.NewBoundContract(address, *parsed, caller, transactor, filterer), nil
 }
 
 func (_MockAFNContract *MockAFNContractRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
