@@ -8,9 +8,9 @@ import {IPool} from "../interfaces/pools/IPool.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
 
-import {Client} from "../models/Client.sol";
-import {Internal} from "../models/Internal.sol";
-import {RateLimiter} from "../models/RateLimiter.sol";
+import {Client} from "../libraries/Client.sol";
+import {Internal} from "../libraries/Internal.sol";
+import {RateLimiter} from "../libraries/RateLimiter.sol";
 import {OCR2BaseNoChecks} from "../ocr/OCR2BaseNoChecks.sol";
 import {AggregateRateLimiter} from "../AggregateRateLimiter.sol";
 import {EnumerableMapAddresses} from "../../libraries/internal/EnumerableMapAddresses.sol";

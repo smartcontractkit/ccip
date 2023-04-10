@@ -6,8 +6,8 @@ import {IAny2EVMMessageReceiver} from "../../interfaces/IAny2EVMMessageReceiver.
 import {IPriceRegistry} from "../../interfaces/IPriceRegistry.sol";
 import {IPool} from "../../interfaces/pools/IPool.sol";
 
-import {Internal} from "../../models/Internal.sol";
-import {Client} from "../../models/Client.sol";
+import {Internal} from "../../libraries/Internal.sol";
+import {Client} from "../../libraries/Client.sol";
 import {TokenSetup} from "../TokenSetup.t.sol";
 import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
 import {MockCommitStore} from "../mocks/MockCommitStore.sol";

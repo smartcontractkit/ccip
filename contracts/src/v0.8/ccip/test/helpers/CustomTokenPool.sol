@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import {TokenPool} from "../../pools/TokenPool.sol";
-import {RateLimiter} from "../../models/RateLimiter.sol";
+import {RateLimiter} from "../../libraries/RateLimiter.sol";
 
 import {IERC20} from "../../../vendor/IERC20.sol";
 

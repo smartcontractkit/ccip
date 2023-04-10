@@ -2,8 +2,8 @@
 pragma solidity 0.8.15;
 
 import {OwnerIsCreator} from "./OwnerIsCreator.sol";
-import {Client} from "./models/Client.sol";
-import {RateLimiter} from "./models/RateLimiter.sol";
+import {Client} from "./libraries/Client.sol";
+import {RateLimiter} from "./libraries/RateLimiter.sol";
 
 import {IERC20} from "../vendor/IERC20.sol";
 

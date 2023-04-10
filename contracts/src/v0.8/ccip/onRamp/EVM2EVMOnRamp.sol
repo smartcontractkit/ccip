@@ -8,9 +8,9 @@ import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
 import {IEVM2AnyOnRamp} from "../interfaces/IEVM2AnyOnRamp.sol";
 
 import {AggregateRateLimiter} from "../AggregateRateLimiter.sol";
-import {Client} from "../models/Client.sol";
-import {Internal} from "../models/Internal.sol";
-import {RateLimiter} from "../models/RateLimiter.sol";
+import {Client} from "../libraries/Client.sol";
+import {Internal} from "../libraries/Internal.sol";
+import {RateLimiter} from "../libraries/RateLimiter.sol";
 import {EnumerableMapAddresses} from "../../libraries/internal/EnumerableMapAddresses.sol";
 
 import {SafeERC20} from "../../vendor/SafeERC20.sol";

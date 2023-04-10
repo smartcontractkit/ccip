@@ -3,7 +3,7 @@ pragma solidity 0.8.15;
 
 import {BaseTest} from "../BaseTest.t.sol";
 import {RateLimiterHelper} from "../helpers/RateLimiterHelper.sol";
-import {RateLimiter} from "../../models/RateLimiter.sol";
+import {RateLimiter} from "../../libraries/RateLimiter.sol";
 
 contract RateLimiterSetup is BaseTest {
   RateLimiterHelper internal s_helper;

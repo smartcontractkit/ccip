@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 import {IRouterClient} from "../interfaces/IRouterClient.sol";
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
 
-import {Client} from "../models/Client.sol";
+import {Client} from "../libraries/Client.sol";
 
 import {IERC165} from "../../vendor/IERC165.sol";
 import {IERC20} from "../../vendor/IERC20.sol";

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {RateLimiter} from "../../models/RateLimiter.sol";
+import {RateLimiter} from "../../libraries/RateLimiter.sol";
 
 import {ERC20} from "../../../vendor/ERC20.sol";
 

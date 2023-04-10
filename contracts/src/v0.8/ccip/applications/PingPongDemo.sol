@@ -4,7 +4,7 @@ pragma solidity 0.8.15;
 import {IRouterClient} from "../interfaces/IRouterClient.sol";
 
 import {OwnerIsCreator} from "../OwnerIsCreator.sol";
-import {Client} from "../models/Client.sol";
+import {Client} from "../libraries/Client.sol";
 import {CCIPReceiver} from "./CCIPReceiver.sol";
 
 import {IERC20} from "../../vendor/IERC20.sol";
