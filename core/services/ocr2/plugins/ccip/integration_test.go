@@ -43,7 +43,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 	defer linkUSD.Close()
 	defer ethUSD.Close()
 
-	nodes, jobParams := testhelpers.SetUpNodesAndJobs(t, ccipContracts, tokenPricesUSDPipeline)
+	nodes, jobParams := testhelpers.SetUpNodesAndJobs(t, &ccipContracts, tokenPricesUSDPipeline)
 
 	geCurrentSeqNum := 1
 

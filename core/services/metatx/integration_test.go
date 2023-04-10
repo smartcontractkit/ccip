@@ -258,7 +258,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 	defer ethUSD.Close()
 	defer metaERC20USD.Close()
 
-	nodes, _ := testhelpers.SetUpNodesAndJobs(t, ccipContracts, tokenPricesUSDPipeline)
+	nodes, _ := testhelpers.SetUpNodesAndJobs(t, &ccipContracts, tokenPricesUSDPipeline)
 
 	geCurrentSeqNum := 1
 

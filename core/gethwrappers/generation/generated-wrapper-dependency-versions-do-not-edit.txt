@@ -17,11 +17,9 @@ cron_upkeep_wrapper: ../../contracts/solc/v0.8.6/CronUpkeep.abi - 362fcfcf30a6ab
 cross_chain_erc20_extension: ../../contracts/solc/v0.8.15/CrossChainERC20Extension.abi ../../contracts/solc/v0.8.15/CrossChainERC20Extension.bin 4cfe10b2ab1d6af4dc05ac41b041990748cbb3d7672539ee3daf0f9f294c939e
 custom_token_pool: ../../contracts/solc/v0.8.15/CustomTokenPool.abi ../../contracts/solc/v0.8.15/CustomTokenPool.bin 2fbebfbfb852e5e05cb4d4fc607860cc7681c6a311f08902cef066cd9b698394
 derived_price_feed_wrapper: ../../contracts/solc/v0.8.6/DerivedPriceFeed.abi ../../contracts/solc/v0.8.6/DerivedPriceFeed.bin c8542e6c850c2d0fffb79a7f7213dc927ec64e6ddd54e1224cb2fb4a13aabdd0
-evm_2_evm: ../../contracts/solc/v0.8.15/EVM2EVMOffRampHelper.abi ../../contracts/solc/v0.8.15/EVM2EVMOffRampHelper.bin 98146b12c5daa40975233469f61abf4570f3d3a58685ed3528e1ca35776439ad
 evm_2_evm_offramp: ../../contracts/solc/v0.8.15/EVM2EVMOffRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMOffRamp.bin d0b4ef4b06890c17b4b8b60003e41a0e774c184d8831417b7f1248d22dc6f18e
 evm_2_evm_offramp_helper: ../../contracts/solc/v0.8.15/EVM2EVMOffRampHelper.abi ../../contracts/solc/v0.8.15/EVM2EVMOffRampHelper.bin e4da71bed1ae8d87ff39ee117cf7b90dccd1bfe3e33ea0851073c727f6adaad1
 evm_2_evm_onramp: ../../contracts/solc/v0.8.15/EVM2EVMOnRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMOnRamp.bin 9f962b1b0db2ab43852b0f897dc655802f761f8e2bf71f8e3a8d77a43afe52be
-fee_manager: ../../contracts/solc/v0.8.15/FeeManager.abi ../../contracts/solc/v0.8.15/FeeManager.bin b9d0a6de21ff4cc6bd397cf0ae8032ce8de103fcaf5aec74ea33edc709eac0f9
 flags_wrapper: ../../contracts/solc/v0.6/Flags.abi ../../contracts/solc/v0.6/Flags.bin 2034d1b562ca37a63068851915e3703980276e8d5f7db6db8a3351a49d69fc4a
 flux_aggregator_wrapper: ../../contracts/solc/v0.6/FluxAggregator.abi ../../contracts/solc/v0.6/FluxAggregator.bin a3b0a6396c4aa3b5ee39b3c4bd45efc89789d4859379a8a92caca3a0496c5794
 forwarder: ../../contracts/solc/v0.8.15/Forwarder.abi ../../contracts/solc/v0.8.15/Forwarder.bin a1e80927433d948bab8bdf491b553dfaae45b32db45bd1fe4301d9df691f0efc

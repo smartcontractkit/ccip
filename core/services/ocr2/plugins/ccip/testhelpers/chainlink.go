@@ -428,12 +428,12 @@ func SetupAndStartNodes(ctx context.Context, t *testing.T, ccipContracts *CCIPCo
 	return bootstrapNode, nodes, configBlock
 }
 
-func SetUpNodesAndJobs(t *testing.T, ccipContracts CCIPContracts, pricePipeline string) ([]Node, CCIPJobSpecParams) {
+func SetUpNodesAndJobs(t *testing.T, ccipContracts *CCIPContracts, pricePipeline string) ([]Node, CCIPJobSpecParams) {
 	//setup Jobs
 	bootstrapNodePort := int64(19399)
 	ctx := context.Background()
 	// Starts nodes and configures them in the OCR contracts.
-	bootstrapNode, nodes, configBlock := SetupAndStartNodes(ctx, t, &ccipContracts, bootstrapNodePort)
+	bootstrapNode, nodes, configBlock := SetupAndStartNodes(ctx, t, ccipContracts, bootstrapNodePort)
 
 	jobParams := ccipContracts.NewCCIPJobSpecParams(pricePipeline, configBlock)
 	jobParams.RelayInflight = 2 * time.Second
@@ -442,7 +442,7 @@ func SetUpNodesAndJobs(t *testing.T, ccipContracts CCIPContracts, pricePipeline 
 
 	// Add the bootstrap job
 	bootstrapNode.AddBootstrapJob(t, jobParams.BootstrapJob(ccipContracts.Dest.CommitStore.Address().Hex()))
-	AddAllJobs(t, jobParams, ccipContracts, nodes)
+	AddAllJobs(t, jobParams, *ccipContracts, nodes)
 
 	// Replay for bootstrap.
 	bc, err := bootstrapNode.App.GetChains().EVM.Get(big.NewInt(0).SetUint64(ccipContracts.Dest.ChainID))
