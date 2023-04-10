@@ -19,6 +19,9 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/onsi/gomega"
+	"github.com/stretchr/testify/require"
+	"github.com/test-go/testify/assert"
+
 	"github.com/smartcontractkit/chainlink/v2/core/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/cross_chain_erc20_extension"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
@@ -33,8 +36,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/metatx"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
-	"github.com/stretchr/testify/require"
-	"github.com/test-go/testify/assert"
 )
 
 func TestMetaERC20SameChain(t *testing.T) {
