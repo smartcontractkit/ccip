@@ -8,8 +8,8 @@ import {IEVM2AnyOnRamp} from "./interfaces/IEVM2AnyOnRamp.sol";
 import {IWrappedNative} from "./interfaces/IWrappedNative.sol";
 import {IAny2EVMMessageReceiver} from "./interfaces/IAny2EVMMessageReceiver.sol";
 
-import {Client} from "./models/Client.sol";
-import {Internal} from "./models/Internal.sol";
+import {Client} from "./libraries/Client.sol";
+import {Internal} from "./libraries/Internal.sol";
 import {OwnerIsCreator} from "./OwnerIsCreator.sol";
 
 import {SafeERC20} from "../vendor/SafeERC20.sol";

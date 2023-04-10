@@ -8,8 +8,8 @@ import {Router} from "../../Router.sol";
 import {PriceRegistry} from "../../PriceRegistry.sol";
 import {RouterSetup} from "../router/RouterSetup.t.sol";
 import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
-import {Internal} from "../../models/Internal.sol";
-import {Client} from "../../models/Client.sol";
+import {Internal} from "../../libraries/Internal.sol";
+import {Client} from "../../libraries/Client.sol";
 import "../../offRamp/EVM2EVMOffRamp.sol";
 import "../TokenSetup.t.sol";
 
@@ -62,6 +62,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
     );
 
     s_onRamp.setPrices(getCastedSourceTokens(), getTokenPrices());
+    s_onRamp.setAdmin(ADMIN);
 
     IPool.RampUpdate[] memory onRamps = new IPool.RampUpdate[](1);
     onRamps[0] = IPool.RampUpdate({ramp: address(s_onRamp), allowed: true});

@@ -139,7 +139,7 @@ func NewExecutionReportingPluginFactory(config ExecutionPluginConfig) types.Repo
 }
 
 func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.ReportingPluginConfig) (types.ReportingPlugin, types.ReportingPluginInfo, error) {
-	offchainConfig, err := Decode(config.OffchainConfig)
+	offchainConfig, err := DecodeOffchainConfig[ExecOffchainConfig](config.OffchainConfig)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
@@ -171,7 +171,7 @@ type ExecutionReportingPlugin struct {
 	F               int
 	config          ExecutionPluginConfig
 	inflightReports *inflightReportsContainer
-	offchainConfig  OffchainConfig
+	offchainConfig  ExecOffchainConfig
 	snoozedRoots    map[[32]byte]time.Time
 	onRampABI       abi.ABI
 }
@@ -234,7 +234,7 @@ func (r *ExecutionReportingPlugin) getExecutableSeqNrs(ctx context.Context, infl
 	// Since this will only increase over time, the highest observed value will
 	// always be the lower bound of what would be available on chain
 	// since we already account for inflight txs.
-	bucket, err := r.config.offRamp.CalculateCurrentTokenBucketState(&bind.CallOpts{Context: ctx})
+	bucket, err := r.config.offRamp.CurrentTokenBucketState(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return nil, err
 	}
@@ -279,7 +279,7 @@ func (r *ExecutionReportingPlugin) getExecutableSeqNrs(ctx context.Context, infl
 		return nil, err
 	}
 
-	destGasPriceWei, _, err := r.config.destGasEstimator.GetFee(ctx, nil, BatchGasLimit, assets.NewWei(big.NewInt(MaxGasPrice)))
+	destGasPriceWei, _, err := r.config.destGasEstimator.GetFee(ctx, nil, 0, assets.NewWei(big.NewInt(int64(r.offchainConfig.MaxGasPrice))))
 	if err != nil {
 		return nil, errors.Wrap(err, "could not estimate destination gas price")
 	}
@@ -358,7 +358,7 @@ func (r *ExecutionReportingPlugin) buildBatch(srcToDst map[common.Address]common
 		r.lggr.Errorw("Unexpected error computing inflight values", "err", err)
 		return []uint64{}, false
 	}
-	availableGas := uint64(BatchGasLimit)
+	availableGas := uint64(r.offchainConfig.BatchGasLimit)
 	aggregateTokenLimit.Sub(aggregateTokenLimit, inflightAggregateValue)
 	executedAllMessages = true
 	expectedNonces := make(map[common.Address]uint64)
@@ -429,7 +429,7 @@ func (r *ExecutionReportingPlugin) buildBatch(srcToDst map[common.Address]common
 		// availableFee is 1e17*6e18/1e18 = 6e17 = 0.6 USD
 		availableFee := big.NewInt(0).Mul(msg.Message.FeeTokenAmount, srcFeeTokenPricesUSD[msg.Message.FeeToken])
 		availableFee = availableFee.Div(availableFee, big.NewInt(1e18))
-		availableFeeUsd := waitBoostedFee(srcLog.BlockTimestamp, availableFee)
+		availableFeeUsd := waitBoostedFee(time.Since(srcLog.BlockTimestamp), availableFee, r.offchainConfig.RelativeBoostPerWaitHour)
 		if availableFeeUsd.Cmp(execCostUsd) < 0 {
 			lggr.Infow("Insufficient remaining fee", "availableFeeUsd", availableFeeUsd, "execCostUsd", execCostUsd)
 			continue

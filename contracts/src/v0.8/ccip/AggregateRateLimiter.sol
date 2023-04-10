@@ -2,37 +2,19 @@
 pragma solidity 0.8.15;
 
 import {OwnerIsCreator} from "./OwnerIsCreator.sol";
-import {Client} from "./models/Client.sol";
+import {Client} from "./libraries/Client.sol";
+import {RateLimiter} from "./libraries/RateLimiter.sol";
 
 import {IERC20} from "../vendor/IERC20.sol";
 
 contract AggregateRateLimiter is OwnerIsCreator {
-  error OnlyCallableByAdminOrOwner();
+  using RateLimiter for RateLimiter.TokenBucket;
+
   error TokensAndPriceLengthMismatch();
-  error ValueExceedsAllowedThreshold(uint256 waitInSeconds);
-  error ValueExceedsCapacity(uint256 capacity, uint256 requested);
   error PriceNotFoundForToken(address token);
   error AddressCannotBeZero();
-  error BucketOverfilled();
 
-  event ConfigChanged(uint256 capacity, uint256 rate);
-  event TokensRemovedFromBucket(uint256 tokens);
   event TokenPriceChanged(address token, uint256 newPrice);
-
-  struct TokenBucket {
-    uint256 rate; // Number of tokens per second that the bucket is refilled.
-    uint256 capacity; // Maximum number of tokens that can be in the bucket.
-    uint256 tokens; // Current number of tokens that are in the bucket.
-    uint256 lastUpdated; // Timestamp of the last token update.
-  }
-
-  struct RateLimiterConfig {
-    address admin;
-    // We only allow a refill rate of uint208 so we don't have to deal with any
-    // overflows for the next ~9 million years. Any sensible rate is way below this value.
-    uint208 rate;
-    uint256 capacity;
-  }
 
   // The address of the token limit admin that has the same permissions as the owner.
   address internal s_admin;
@@ -43,50 +25,42 @@ contract AggregateRateLimiter is OwnerIsCreator {
   IERC20[] private s_allowedTokens;
 
   // The token bucket object that contains the bucket state.
-  TokenBucket private s_tokenBucket;
+  RateLimiter.TokenBucket private s_rateLimiter;
 
-  /// @param config The RateLimiterConfig containing the capacity and refill rate
+  /// @param config The RateLimiter.Config containing the capacity and refill rate
   /// of the bucket, plus the admin address.
-  constructor(RateLimiterConfig memory config) {
-    s_admin = config.admin;
-    s_tokenBucket = TokenBucket({
+  constructor(RateLimiter.Config memory config) {
+    s_rateLimiter = RateLimiter.TokenBucket({
       rate: config.rate,
       capacity: config.capacity,
       tokens: config.capacity,
-      lastUpdated: block.timestamp
+      lastUpdated: uint40(block.timestamp),
+      isEnabled: config.isEnabled
     });
   }
 
   /// @notice Gets the token bucket with its values for the block it was requested at.
   /// @return The token bucket.
-  function calculateCurrentTokenBucketState() public view returns (TokenBucket memory) {
-    TokenBucket memory bucket = s_tokenBucket;
+  function currentTokenBucketState() public view returns (RateLimiter.TokenBucket memory) {
+    return s_rateLimiter._currentTokenBucketState();
+  }
 
-    // We update the bucket to reflect the status at the exact time of the
-    // call. This means to might need to refill a part of the bucket based
-    // on the time that has passed since the last update.
-    uint256 difference = block.timestamp - bucket.lastUpdated;
+  function _rateLimitValue(Client.EVMTokenAmount[] memory tokenAmounts) internal {
+    uint256 value = 0;
+    for (uint256 i = 0; i < tokenAmounts.length; ++i) {
+      uint256 pricePerToken = s_priceByToken[IERC20(tokenAmounts[i].token)];
+      if (pricePerToken == 0) revert PriceNotFoundForToken(tokenAmounts[i].token);
+      value += pricePerToken * tokenAmounts[i].amount;
+    }
 
-    // Overflow doesn't happen here because bucket.rate is <= type(uint208).max
-    // leaving 48 bits for the time difference. 2 ** 48 seconds = 9 million years.
-    bucket.tokens = _min(bucket.capacity, bucket.tokens + difference * bucket.rate);
-    bucket.lastUpdated = block.timestamp;
-    return bucket;
+    s_rateLimiter._consume(value);
   }
 
   /// @notice Sets the rate limited config.
   /// @param config The new rate limiter config.
   /// @dev should only be callable by the owner or token limit admin.
-  function setRateLimiterConfig(RateLimiterConfig memory config) public requireAdminOrOwner {
-    // First update the bucket to make sure the proper rate is used for all the time
-    // up until the config change.
-    _update(s_tokenBucket);
-
-    s_tokenBucket.capacity = config.capacity;
-    s_tokenBucket.rate = config.rate;
-    s_tokenBucket.tokens = _min(config.capacity, s_tokenBucket.tokens);
-
-    emit ConfigChanged(config.capacity, config.rate);
+  function setRateLimiterConfig(RateLimiter.Config memory config) public requireAdminOrOwner {
+    s_rateLimiter._setTokenBucketConfig(config);
   }
 
   /// @notice Gets the set prices for the given IERC20s.
@@ -130,56 +104,6 @@ contract AggregateRateLimiter is OwnerIsCreator {
     s_allowedTokens = tokens;
   }
 
-  /// @notice _removeTokens removes the given token values from the pool, lowering the
-  /// value allowed to be transferred for subsequent calls. It will use the
-  /// s_priceByToken mapping to determine value in a standardised unit.
-  /// @param tokenAmounts The tokenAmounts that are send across the bridge. All
-  /// of the tokens need to have a corresponding price set in s_priceByToken.
-  /// @dev Reverts when a token price is not found or when the tx value exceeds the
-  /// amount allowed in the bucket.
-  /// @dev Will only remove and therefore emit removal of value if the value is > 0.
-  function _removeTokens(Client.EVMTokenAmount[] memory tokenAmounts) internal {
-    uint256 value = 0;
-    for (uint256 i = 0; i < tokenAmounts.length; ++i) {
-      uint256 pricePerToken = s_priceByToken[IERC20(tokenAmounts[i].token)];
-      if (pricePerToken == 0) revert PriceNotFoundForToken(tokenAmounts[i].token);
-      value += pricePerToken * tokenAmounts[i].amount;
-    }
-
-    // If there is no value to remove skip this step to reduce gas usage
-    if (value > 0) {
-      // Refill the bucket if possible
-      // This mutates s_tokenBucket in storage
-      _update(s_tokenBucket);
-
-      if (s_tokenBucket.capacity < value) revert ValueExceedsCapacity(s_tokenBucket.capacity, value);
-      if (s_tokenBucket.tokens < value)
-        // Seconds wait required until the bucket is refilled enough to accept this value
-        revert ValueExceedsAllowedThreshold((value - s_tokenBucket.tokens) / s_tokenBucket.rate);
-
-      s_tokenBucket.tokens -= value;
-      emit TokensRemovedFromBucket(value);
-    }
-  }
-
-  function _update(TokenBucket storage bucket) internal {
-    // Return if there's nothing to update
-    if (bucket.tokens == bucket.capacity || bucket.lastUpdated == block.timestamp) return;
-    // Revert if the tokens in the bucket exceed its capacity
-    if (bucket.tokens > bucket.capacity) revert BucketOverfilled();
-    uint256 difference = block.timestamp - bucket.lastUpdated;
-    bucket.tokens = _min(bucket.capacity, bucket.tokens + difference * bucket.rate);
-    bucket.lastUpdated = block.timestamp;
-  }
-
-  /// @notice Return the smallest of two integers
-  /// @param a first int
-  /// @param b second int
-  /// @return smallest
-  function _min(uint256 a, uint256 b) internal pure returns (uint256) {
-    return a < b ? a : b;
-  }
-
   // ================================================================
   // |                           Access                             |
   // ================================================================
@@ -192,14 +116,14 @@ contract AggregateRateLimiter is OwnerIsCreator {
 
   /// @notice Sets the token limit admin address.
   /// @param newAdmin the address of the new admin.
-  function setTokenLimitAdmin(address newAdmin) public onlyOwner {
+  function setAdmin(address newAdmin) public requireAdminOrOwner {
     s_admin = newAdmin;
   }
 
   /// @notice a modifier that allows the owner or the s_tokenLimitAdmin call the functions
   /// it is applied to.
   modifier requireAdminOrOwner() {
-    if (msg.sender != owner() && msg.sender != s_admin) revert OnlyCallableByAdminOrOwner();
+    if (msg.sender != owner() && msg.sender != s_admin) revert RateLimiter.OnlyCallableByAdminOrOwner();
     _;
   }
 }

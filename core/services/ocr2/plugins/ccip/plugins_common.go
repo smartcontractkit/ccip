@@ -32,12 +32,6 @@ const (
 	MessageStateFailure
 )
 
-const (
-	BatchGasLimit = 5_000_000                 // TODO: think if a good value for this
-	GasLimitPerTx = BatchGasLimit - 1_000_000 // Leave a buffer for overhead.
-	MaxGasPrice   = int64(200e9)              // 200 gwei. TODO: probably want this to be some dynamic value, a multiplier of the current gas price.
-)
-
 var (
 	ErrCommitStoreIsDown = errors.New("commitStore is down")
 )

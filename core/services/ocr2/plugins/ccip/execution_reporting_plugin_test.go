@@ -64,7 +64,15 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 	require.NoError(t, err)
 
 	// Deploy destination pool
-	destPoolAddress, _, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(destUser, destChain, destLinkTokenAddress)
+	destPoolAddress, _, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(
+		destUser,
+		destChain,
+		destLinkTokenAddress,
+		lock_release_token_pool.RateLimiterConfig{
+			Capacity:  big.NewInt(1e18),
+			Rate:      big.NewInt(1e18),
+			IsEnabled: true,
+		})
 	require.NoError(t, err)
 	destChain.Commit()
 	destPool, err := lock_release_token_pool.NewLockReleaseTokenPool(destPoolAddress, destChain)
@@ -147,10 +155,10 @@ func setupContractsForExecution(t *testing.T) ExecutionContracts {
 		},
 		[]common.Address{linkTokenSourceAddress},
 		[]common.Address{destPoolAddress},
-		evm_2_evm_offramp.AggregateRateLimiterRateLimiterConfig{
-			Capacity: big.NewInt(1e18),
-			Rate:     big.NewInt(1e18),
-			Admin:    destUser.From,
+		evm_2_evm_offramp.RateLimiterConfig{
+			Capacity:  big.NewInt(1e18),
+			Rate:      big.NewInt(1e18),
+			IsEnabled: true,
 		},
 	)
 	require.NoError(t, err)

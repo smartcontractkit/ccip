@@ -77,7 +77,15 @@ func TestCommitReportEncoding(t *testing.T) {
 	require.NoError(t, err)
 
 	// Deploy link token pool.
-	destPoolAddress, _, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(destUser, destChain, destLinkTokenAddress)
+	destPoolAddress, _, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(
+		destUser,
+		destChain,
+		destLinkTokenAddress,
+		lock_release_token_pool.RateLimiterConfig{
+			Capacity:  big.NewInt(1e18),
+			Rate:      big.NewInt(1e18),
+			IsEnabled: true,
+		})
 	require.NoError(t, err)
 	destChain.Commit()
 	_, err = lock_release_token_pool.NewLockReleaseTokenPool(destPoolAddress, destChain)
@@ -391,7 +399,7 @@ func setupTestPlugin(t *testing.T) testPluginHarness {
 			sourceFeeEstimator: sourceFeeEstimator,
 			sourceChainID:      sourceChainId,
 		},
-		offchainConfig: OffchainConfig{
+		offchainConfig: CommitOffchainConfig{
 			FeeUpdateHeartBeat: models.MustMakeDuration(12 * time.Hour),
 		},
 	}

@@ -21,7 +21,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
-	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
+	ocrconfighelper "github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/slices"
 
@@ -46,9 +46,20 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/merklemulti"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrcommon"
-	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
+
+type ocr2Configurer interface {
+	SetOCR2Config(
+		opts *bind.TransactOpts,
+		signers []common.Address,
+		transmitters []common.Address,
+		f uint8,
+		onchainConfig []byte,
+		offchainConfigVersion uint64,
+		offchainConfig []byte,
+	) (*types.Transaction, error)
+}
 
 func (client *CCIPClient) wip(t *testing.T, sourceClient *rhea.EvmDeploymentConfig, destClient *rhea.EvmDeploymentConfig) {
 }
@@ -106,7 +117,7 @@ func (client *CCIPClient) setAllowList(t *testing.T) {
 }
 
 func (client *CCIPClient) setRateLimiterConfig(t *testing.T) {
-	tx, err := client.Source.OnRamp.SetRateLimiterConfig(client.Source.Owner, evm_2_evm_onramp.AggregateRateLimiterRateLimiterConfig{
+	tx, err := client.Source.OnRamp.SetRateLimiterConfig(client.Source.Owner, evm_2_evm_onramp.RateLimiterConfig{
 		Rate:     new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
 		Capacity: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 	})
@@ -114,7 +125,7 @@ func (client *CCIPClient) setRateLimiterConfig(t *testing.T) {
 	err = shared.WaitForMined(client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 	shared.RequireNoError(t, err)
 
-	tx, err = client.Dest.OffRamp.SetRateLimiterConfig(client.Dest.Owner, evm_2_evm_offramp.AggregateRateLimiterRateLimiterConfig{
+	tx, err = client.Dest.OffRamp.SetRateLimiterConfig(client.Dest.Owner, evm_2_evm_offramp.RateLimiterConfig{
 		Rate:     new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
 		Capacity: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 	})
@@ -230,6 +241,9 @@ type DestClient struct {
 	CommitStore  *commit_store.CommitStore
 	ReceiverDapp *receiver_dapp.ReceiverDapp
 	OffRamp      *evm_2_evm_offramp.EVM2EVMOffRamp
+
+	ExecOffchainConfig   ccip.ExecOffchainConfig
+	CommitOffchainConfig ccip.CommitOffchainConfig
 }
 
 func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestClient {
@@ -285,9 +299,11 @@ func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestCli
 			Confirmations:    config.ChainConfig.Confirmations,
 			t:                t,
 		},
-		CommitStore:  commitStore,
-		ReceiverDapp: receiverDapp,
-		OffRamp:      offRamp,
+		CommitStore:          commitStore,
+		ReceiverDapp:         receiverDapp,
+		OffRamp:              offRamp,
+		CommitOffchainConfig: config.LaneConfig.CommitOffchainConfig,
+		ExecOffchainConfig:   config.LaneConfig.ExecOffchainConfig,
 	}
 }
 
@@ -644,18 +660,31 @@ func (client *CCIPClient) SetOCR2Config(env dione.Environment) {
 		client.Dest.logger.Infof("The new config will overwrite the current one.")
 	}
 
-	ccipConfig, err := ccip.OffchainConfig{
-		SourceIncomingConfirmations: client.Source.Confirmations,
-		DestIncomingConfirmations:   client.Dest.Confirmations,
-		FeeUpdateHeartBeat:          models.MustMakeDuration(24 * time.Hour),
-		FeeUpdateDeviationPPB:       5e7, // 5%
-	}.Encode()
+	// populating confirmations values from chain config
+	client.Dest.CommitOffchainConfig.SourceIncomingConfirmations = client.Source.Confirmations
+	client.Dest.CommitOffchainConfig.DestIncomingConfirmations = client.Dest.Confirmations
+	client.Dest.ExecOffchainConfig.SourceIncomingConfirmations = client.Source.Confirmations
+	client.Dest.ExecOffchainConfig.DestIncomingConfirmations = client.Dest.Confirmations
+
+	ccipCommitConfig, err := ccip.EncodeOffchainConfig(client.Dest.CommitOffchainConfig)
+	helpers.PanicErr(err)
+	ccipExecConfig, err := ccip.EncodeOffchainConfig(client.Dest.ExecOffchainConfig)
 	helpers.PanicErr(err)
 
 	don := dione.NewOfflineDON(env, client.Dest.logger)
 	faults := len(don.Config.Nodes) / 3
 
-	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := confighelper2.ContractSetConfigArgsForTests(
+	tx, err := client.setOCRConfig(client.Dest.CommitStore, ccipCommitConfig, faults, don.GenerateOracleIdentities(client.Dest.ChainId))
+	helpers.PanicErr(err)
+	client.Dest.logger.Infof("Config set on commitStore %s", helpers.ExplorerLink(int64(client.Dest.ChainId), tx.Hash()))
+
+	tx, err = client.setOCRConfig(client.Dest.OffRamp, ccipExecConfig, faults, don.GenerateOracleIdentities(client.Dest.ChainId))
+	helpers.PanicErr(err)
+	client.Dest.logger.Infof("Config set on offramp %s", helpers.ExplorerLink(int64(client.Dest.ChainId), tx.Hash()))
+}
+
+func (client *CCIPClient) setOCRConfig(ocrConf ocr2Configurer, offchainConfig []byte, faults int, identities []ocrconfighelper.OracleIdentityExtra) (*types.Transaction, error) {
+	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := ocrconfighelper.ContractSetConfigArgsForTests(
 		70*time.Second, // deltaProgress
 		5*time.Second,  // deltaResend
 		30*time.Second, // deltaRound
@@ -663,8 +692,8 @@ func (client *CCIPClient) SetOCR2Config(env dione.Environment) {
 		40*time.Second, // deltaStage
 		3,
 		[]int{1, 1, 2, 3}, // Transmission schedule: 1 oracle in first deltaStage, 2 in the second and so on.
-		don.GenerateOracleIdentities(client.Dest.ChainId),
-		ccipConfig,
+		identities,
+		offchainConfig,
 		5*time.Second,
 		32*time.Second,
 		20*time.Second,
@@ -673,14 +702,19 @@ func (client *CCIPClient) SetOCR2Config(env dione.Environment) {
 		faults,
 		nil,
 	)
-	helpers.PanicErr(err)
-
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create args for ocr config tx")
+	}
 	signerAddresses, err := ocrcommon.OnchainPublicKeyToAddress(signers)
-	helpers.PanicErr(err)
+	if err != nil {
+		return nil, err
+	}
 	transmitterAddresses, err := ocrcommon.AccountToAddress(transmitters)
-	helpers.PanicErr(err)
+	if err != nil {
+		return nil, err
+	}
 
-	tx, err := client.Dest.CommitStore.SetOCR2Config(
+	tx, err := ocrConf.SetOCR2Config(
 		client.Dest.Owner,
 		signerAddresses,
 		transmitterAddresses,
@@ -689,24 +723,15 @@ func (client *CCIPClient) SetOCR2Config(env dione.Environment) {
 		offchainConfigVersion,
 		offchainConfig,
 	)
-	helpers.PanicErr(err)
+	if err != nil {
+		return nil, err
+	}
 	err = shared.WaitForMined(client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
-	helpers.PanicErr(err)
-	client.Dest.logger.Infof("Config set on commitStore %s", helpers.ExplorerLink(int64(client.Dest.ChainId), tx.Hash()))
+	if err != nil {
+		return tx, err
+	}
 
-	tx, err = client.Dest.OffRamp.SetOCR2Config(
-		client.Dest.Owner,
-		signerAddresses,
-		transmitterAddresses,
-		f,
-		onchainConfig,
-		offchainConfigVersion,
-		offchainConfig,
-	)
-	helpers.PanicErr(err)
-	err = shared.WaitForMined(client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
-	helpers.PanicErr(err)
-	client.Dest.logger.Infof("Config set on offramp %s", helpers.ExplorerLink(int64(client.Dest.ChainId), tx.Hash()))
+	return tx, nil
 }
 
 func (client *CCIPClient) AcceptOwnership(t *testing.T) {

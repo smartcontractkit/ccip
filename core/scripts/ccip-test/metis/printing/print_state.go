@@ -356,14 +356,14 @@ func printRateLimitingStatus(chain *rhea.EvmDeploymentConfig) {
 
 	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(chain.LaneConfig.OnRamp, chain.Client)
 	helpers.PanicErr(err)
-	bucketState, err := onRamp.CalculateCurrentTokenBucketState(&bind.CallOpts{})
+	bucketState, err := onRamp.CurrentTokenBucketState(&bind.CallOpts{})
 	helpers.PanicErr(err)
 
 	sb.WriteString(fmt.Sprintf("| %-25s | %42d |\n", "onramp", bucketState.Tokens))
 
 	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(chain.LaneConfig.OffRamp, chain.Client)
 	helpers.PanicErr(err)
-	offRampBucketState, err := offRamp.CalculateCurrentTokenBucketState(&bind.CallOpts{})
+	offRampBucketState, err := offRamp.CurrentTokenBucketState(&bind.CallOpts{})
 	helpers.PanicErr(err)
 
 	sb.WriteString(fmt.Sprintf("| %-25s | %42d |\n", "offramp", offRampBucketState.Tokens))

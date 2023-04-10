@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import {TokenPool} from "../../pools/TokenPool.sol";
+import {RateLimiter} from "../../libraries/RateLimiter.sol";
 
 import {IERC20} from "../../../vendor/IERC20.sol";
 
@@ -9,7 +10,7 @@ contract CustomTokenPool is TokenPool {
   event SynthBurned(uint256 amount);
   event SynthMinted(uint256 amount);
 
-  constructor(IERC20 token) TokenPool(token) {}
+  constructor(IERC20 token, RateLimiter.Config memory rateLimiterConfig) TokenPool(token, rateLimiterConfig) {}
 
   /// @notice Locks the token in the pool
   /// @param amount Amount to lock

@@ -410,12 +410,20 @@ func SetupAndStartNodes(ctx context.Context, t *testing.T, ccipContracts *CCIPCo
 			app.Stop()
 		})
 	}
-
-	reportingPluginConfig, err := ccip.OffchainConfig{
+	commitOffchainCfg, err := ccip.EncodeOffchainConfig(ccip.CommitOffchainConfig{
 		SourceIncomingConfirmations: 0,
 		DestIncomingConfirmations:   1,
-	}.Encode()
+		MaxGasPrice:                 200e9,
+	})
 	require.NoError(t, err)
-	configBlock := ccipContracts.SetupOnchainConfig(oracles, reportingPluginConfig)
+	execOffchainCfg, err := ccip.EncodeOffchainConfig(ccip.ExecOffchainConfig{
+		SourceIncomingConfirmations: 0,
+		DestIncomingConfirmations:   1,
+		BatchGasLimit:               5_000_000,
+		RelativeBoostPerWaitHour:    0.07,
+		MaxGasPrice:                 200e9,
+	})
+	require.NoError(t, err)
+	configBlock := ccipContracts.SetupOnchainConfig(oracles, commitOffchainCfg, execOffchainCfg)
 	return bootstrapNode, nodes, configBlock
 }

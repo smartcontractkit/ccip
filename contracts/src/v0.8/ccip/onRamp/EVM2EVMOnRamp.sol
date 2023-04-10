@@ -8,8 +8,9 @@ import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
 import {IEVM2AnyOnRamp} from "../interfaces/IEVM2AnyOnRamp.sol";
 
 import {AggregateRateLimiter} from "../AggregateRateLimiter.sol";
-import {Client} from "../models/Client.sol";
-import {Internal} from "../models/Internal.sol";
+import {Client} from "../libraries/Client.sol";
+import {Internal} from "../libraries/Internal.sol";
+import {RateLimiter} from "../libraries/RateLimiter.sol";
 import {EnumerableMapAddresses} from "../../libraries/internal/EnumerableMapAddresses.sol";
 
 import {SafeERC20} from "../../vendor/SafeERC20.sol";
@@ -94,7 +95,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
 
   /// @dev Nop address and weight, used to set the nops and their weights
   struct NopAndWeight {
-    address nop; // ---┐ Address of the node operator
+    address nop; // ----┐ Address of the node operator
     uint16 weight; // --┘ Weight for nop rewards
   }
 
@@ -149,7 +150,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
     DynamicConfig memory dynamicConfig,
     TokenAndPool[] memory tokensAndPools,
     address[] memory allowlist,
-    AggregateRateLimiter.RateLimiterConfig memory rateLimiterConfig,
+    RateLimiter.Config memory rateLimiterConfig,
     FeeTokenConfigArgs[] memory feeTokenConfigs,
     NopAndWeight[] memory nopsAndWeights
   ) Pausable() AggregateRateLimiter(rateLimiterConfig) {
@@ -283,7 +284,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
     if (tokenAmounts.length > uint256(s_dynamicConfig.maxTokensLength)) revert UnsupportedNumberOfTokens();
     if (s_allowlistEnabled && !s_allowList.contains(originalSender)) revert SenderNotAllowed(originalSender);
 
-    _removeTokens(tokenAmounts);
+    _rateLimitValue(tokenAmounts);
   }
 
   // ================================================================

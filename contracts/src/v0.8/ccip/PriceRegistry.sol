@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
 
 import {OwnerIsCreator} from "./OwnerIsCreator.sol";
-import {Internal} from "./models/Internal.sol";
+import {Internal} from "./libraries/Internal.sol";
 
 import {EnumerableSet} from "../vendor/openzeppelin-solidity/v4.7.3/contracts/utils/structs/EnumerableSet.sol";
 

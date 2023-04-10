@@ -111,10 +111,11 @@ type BalanceReq struct {
 }
 
 type CCIPContracts struct {
-	t         *testing.T
-	Source    SourceChain
-	Dest      DestinationChain
-	OCRConfig *OCR2Config
+	t      *testing.T
+	Source SourceChain
+	Dest   DestinationChain
+
+	commitOCRConfig, execOCRConfig *OCR2Config
 }
 
 func (c *CCIPContracts) DeployNewOffRamp() {
@@ -136,10 +137,10 @@ func (c *CCIPContracts) DeployNewOffRamp() {
 		},
 		[]common.Address{c.Source.LinkToken.Address()}, // source tokens
 		[]common.Address{c.Dest.Pool.Address()},        // pools
-		evm_2_evm_offramp.AggregateRateLimiterRateLimiterConfig{
-			Capacity: HundredLink,
-			Rate:     big.NewInt(1e18),
-			Admin:    c.Source.User.From,
+		evm_2_evm_offramp.RateLimiterConfig{
+			Capacity:  HundredLink,
+			Rate:      big.NewInt(1e18),
+			IsEnabled: true,
 		},
 	)
 	require.NoError(c.t, err)
@@ -170,12 +171,12 @@ func (c *CCIPContracts) EnableOffRamp() {
 
 	_, err = c.Dest.OffRamp.SetOCR2Config(
 		c.Dest.User,
-		c.OCRConfig.Signers,
-		c.OCRConfig.Transmitters,
-		c.OCRConfig.F,
-		c.OCRConfig.OnchainConfig,
-		c.OCRConfig.OffchainConfigVersion,
-		c.OCRConfig.OffchainConfig,
+		c.execOCRConfig.Signers,
+		c.execOCRConfig.Transmitters,
+		c.execOCRConfig.F,
+		c.execOCRConfig.OnchainConfig,
+		c.execOCRConfig.OffchainConfigVersion,
+		c.execOCRConfig.OffchainConfig,
 	)
 	require.NoError(c.t, err)
 	c.Source.Chain.Commit()
@@ -185,12 +186,12 @@ func (c *CCIPContracts) EnableOffRamp() {
 func (c *CCIPContracts) EnableCommitStore() {
 	_, err := c.Dest.CommitStore.SetOCR2Config(
 		c.Dest.User,
-		c.OCRConfig.Signers,
-		c.OCRConfig.Transmitters,
-		c.OCRConfig.F,
-		c.OCRConfig.OnchainConfig,
-		c.OCRConfig.OffchainConfigVersion,
-		c.OCRConfig.OffchainConfig,
+		c.commitOCRConfig.Signers,
+		c.commitOCRConfig.Transmitters,
+		c.commitOCRConfig.F,
+		c.commitOCRConfig.OnchainConfig,
+		c.commitOCRConfig.OffchainConfigVersion,
+		c.commitOCRConfig.OffchainConfig,
 	)
 	require.NoError(c.t, err)
 	c.Dest.Chain.Commit()
@@ -216,7 +217,7 @@ func (c *CCIPContracts) DeployNewOnRamp() {
 			PriceRegistry:   c.Source.PriceRegistry.Address(),
 			MaxDataSize:     1e5,
 			MaxTokensLength: 5,
-			MaxGasLimit:     ccip.GasLimitPerTx,
+			MaxGasLimit:     4_000_000,
 			Afn:             c.Source.AFN.Address(), // AFN
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampTokenAndPool{
@@ -226,10 +227,10 @@ func (c *CCIPContracts) DeployNewOnRamp() {
 			},
 		},
 		[]common.Address{}, // allow list
-		evm_2_evm_onramp.AggregateRateLimiterRateLimiterConfig{
-			Capacity: HundredLink,
-			Rate:     big.NewInt(1e18),
-			Admin:    c.Source.User.From,
+		evm_2_evm_onramp.RateLimiterConfig{
+			Capacity:  HundredLink,
+			Rate:      big.NewInt(1e18),
+			IsEnabled: true,
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs{
 			{
@@ -324,7 +325,7 @@ func (c *CCIPContracts) AssertBalances(bas []BalanceAssertion) {
 	}
 }
 
-func (c *CCIPContracts) DeriveOCR2Config(oracles []confighelper.OracleIdentityExtra, reportingPluginConfig []byte) {
+func (c *CCIPContracts) DeriveOCR2Config(oracles []confighelper.OracleIdentityExtra, reportingPluginConfig []byte) *OCR2Config {
 	signers, transmitters, threshold, onchainConfig, offchainConfigVersion, offchainConfig, err := confighelper.ContractSetConfigArgsForTests(
 		2*time.Second,        // deltaProgress
 		1*time.Second,        // deltaResend
@@ -357,7 +358,7 @@ func (c *CCIPContracts) DeriveOCR2Config(oracles []confighelper.OracleIdentityEx
 	transmitterAddresses, err := ocrcommon.AccountToAddress(transmitters)
 	require.NoError(c.t, err)
 
-	c.OCRConfig = &OCR2Config{
+	return &OCR2Config{
 		Signers:               signerAddresses,
 		Transmitters:          transmitterAddresses,
 		F:                     threshold,
@@ -367,34 +368,35 @@ func (c *CCIPContracts) DeriveOCR2Config(oracles []confighelper.OracleIdentityEx
 	}
 }
 
-func (c *CCIPContracts) SetupOnchainConfig(oracles []confighelper.OracleIdentityExtra, reportingPluginConfig []byte) int64 {
+func (c *CCIPContracts) SetupOnchainConfig(oracles []confighelper.OracleIdentityExtra, commitPluginConfig, execPluginConfig []byte) int64 {
 	// Note We do NOT set the payees, payment is done in the OCR2Base implementation
 	// Set the offramp offchainConfig.
-	c.DeriveOCR2Config(oracles, reportingPluginConfig)
+	c.commitOCRConfig = c.DeriveOCR2Config(oracles, commitPluginConfig)
 	blockBeforeConfig, err := c.Dest.Chain.BlockByNumber(context.Background(), nil)
 	require.NoError(c.t, err)
-	// Set the DON on the offramp
+	// Set the DON on the commit store
 	_, err = c.Dest.CommitStore.SetOCR2Config(
 		c.Dest.User,
-		c.OCRConfig.Signers,
-		c.OCRConfig.Transmitters,
-		c.OCRConfig.F,
-		c.OCRConfig.OnchainConfig,
-		c.OCRConfig.OffchainConfigVersion,
-		c.OCRConfig.OffchainConfig,
+		c.commitOCRConfig.Signers,
+		c.commitOCRConfig.Transmitters,
+		c.commitOCRConfig.F,
+		c.commitOCRConfig.OnchainConfig,
+		c.commitOCRConfig.OffchainConfigVersion,
+		c.commitOCRConfig.OffchainConfig,
 	)
 	require.NoError(c.t, err)
 	c.Dest.Chain.Commit()
 
+	c.execOCRConfig = c.DeriveOCR2Config(oracles, execPluginConfig)
 	// Same DON on the offramp
 	_, err = c.Dest.OffRamp.SetOCR2Config(
 		c.Dest.User,
-		c.OCRConfig.Signers,
-		c.OCRConfig.Transmitters,
-		c.OCRConfig.F,
-		c.OCRConfig.OnchainConfig,
-		c.OCRConfig.OffchainConfigVersion,
-		c.OCRConfig.OffchainConfig,
+		c.execOCRConfig.Signers,
+		c.execOCRConfig.Transmitters,
+		c.execOCRConfig.F,
+		c.execOCRConfig.OnchainConfig,
+		c.execOCRConfig.OffchainConfigVersion,
+		c.execOCRConfig.OffchainConfig,
 	)
 	require.NoError(c.t, err)
 	c.Dest.Chain.Commit()
@@ -480,9 +482,15 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	sourceChain.Commit()
 	sourceLinkToken, err := link_token_interface.NewLinkToken(sourceLinkTokenAddress, sourceChain)
 	require.NoError(t, err)
-	sourcePoolAddress, _, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(sourceUser,
+	sourcePoolAddress, _, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(
+		sourceUser,
 		sourceChain,
-		sourceLinkTokenAddress)
+		sourceLinkTokenAddress,
+		lock_release_token_pool.RateLimiterConfig{
+			Capacity:  HundredLink,
+			Rate:      big.NewInt(1e18),
+			IsEnabled: true,
+		})
 	require.NoError(t, err)
 	sourceChain.Commit()
 	sourcePool, err := lock_release_token_pool.NewLockReleaseTokenPool(sourcePoolAddress, sourceChain)
@@ -494,7 +502,15 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	destChain.Commit()
 	destLinkToken, err := link_token_interface.NewLinkToken(destLinkTokenAddress, destChain)
 	require.NoError(t, err)
-	destPoolAddress, _, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(destUser, destChain, destLinkTokenAddress)
+	destPoolAddress, _, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(
+		destUser,
+		destChain,
+		destLinkTokenAddress,
+		lock_release_token_pool.RateLimiterConfig{
+			Capacity:  HundredLink,
+			Rate:      big.NewInt(1e18),
+			IsEnabled: true,
+		})
 	require.NoError(t, err)
 	destChain.Commit()
 	destPool, err := lock_release_token_pool.NewLockReleaseTokenPool(destPoolAddress, destChain)
@@ -580,7 +596,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			PriceRegistry:   sourcePricesAddress,
 			MaxDataSize:     1e5,
 			MaxTokensLength: 5,
-			MaxGasLimit:     ccip.GasLimitPerTx,
+			MaxGasLimit:     4_000_000,
 			Afn:             afnSourceAddress, // AFN
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampTokenAndPool{
@@ -590,10 +606,10 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			},
 		},
 		[]common.Address{}, // allow list
-		evm_2_evm_onramp.AggregateRateLimiterRateLimiterConfig{
-			Capacity: HundredLink,
-			Rate:     big.NewInt(1e18),
-			Admin:    sourceUser.From,
+		evm_2_evm_onramp.RateLimiterConfig{
+			Capacity:  HundredLink,
+			Rate:      big.NewInt(1e18),
+			IsEnabled: true,
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs{
 			{
@@ -697,10 +713,10 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		},
 		[]common.Address{sourceLinkTokenAddress},
 		[]common.Address{destPoolAddress},
-		evm_2_evm_offramp.AggregateRateLimiterRateLimiterConfig{
-			Capacity: HundredLink,
-			Rate:     big.NewInt(1e18),
-			Admin:    sourceUser.From,
+		evm_2_evm_offramp.RateLimiterConfig{
+			Capacity:  HundredLink,
+			Rate:      big.NewInt(1e18),
+			IsEnabled: true,
 		},
 	)
 	require.NoError(t, err)

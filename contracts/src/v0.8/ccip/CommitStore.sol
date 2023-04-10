@@ -7,9 +7,9 @@ import {IAFN} from "./interfaces/IAFN.sol";
 import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
 
 import {OCR2Base} from "./ocr/OCR2Base.sol";
-import {Internal} from "./models/Internal.sol";
+import {Internal} from "./libraries/Internal.sol";
 import {Pausable} from "../vendor/Pausable.sol";
-import {MerkleMultiProof} from "./MerkleMultiProof.sol";
+import {MerkleMultiProof} from "./libraries/MerkleMultiProof.sol";
 
 contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Base {
   error InvalidInterval(Interval interval);

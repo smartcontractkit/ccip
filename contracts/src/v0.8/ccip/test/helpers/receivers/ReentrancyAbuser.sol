@@ -3,8 +3,8 @@ pragma solidity 0.8.15;
 
 import {CCIPReceiver} from "../../../applications/CCIPReceiver.sol";
 import {EVM2EVMOffRamp} from "../../../offRamp/EVM2EVMOffRamp.sol";
-import {Client} from "../../../models/Client.sol";
-import {Internal} from "../../../models/Internal.sol";
+import {Client} from "../../../libraries/Client.sol";
+import {Internal} from "../../../libraries/Internal.sol";
 
 contract ReentrancyAbuser is CCIPReceiver {
   event ReentrancySucceeded();

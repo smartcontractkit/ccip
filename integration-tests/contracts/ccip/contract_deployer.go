@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"encoding/hex"
 	"fmt"
+	"math/big"
 	"strings"
 	"time"
 
@@ -30,7 +31,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/simple_message_receiver"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/weth9"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
+	ccipplugin "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrcommon"
 )
 
@@ -117,7 +118,15 @@ func (e *CCIPContractsDeployer) DeployLockReleaseTokenPoolContract(linkAddr stri
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return lock_release_token_pool.DeployLockReleaseTokenPool(auth, backend, token)
+		return lock_release_token_pool.DeployLockReleaseTokenPool(
+			auth,
+			backend,
+			token,
+			lock_release_token_pool.RateLimiterConfig{
+				Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
+				Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
+				IsEnabled: true,
+			})
 	})
 
 	if err != nil {
@@ -405,12 +414,12 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 				PriceRegistry:   priceRegistry,
 				MaxDataSize:     1e5,
 				MaxTokensLength: 5,
-				MaxGasLimit:     ccip.GasLimitPerTx,
+				MaxGasLimit:     4_000_000,
 				Afn:             afn,
 			},
 			tokensAndPools,
 			allowList,
-			evm_2_evm_onramp.AggregateRateLimiterRateLimiterConfig{
+			evm_2_evm_onramp.RateLimiterConfig{
 				Capacity: opts.Capacity,
 				Rate:     opts.Rate,
 			},
@@ -469,10 +478,10 @@ func (e *CCIPContractsDeployer) DeployOffRamp(sourceChainId, destChainId uint64,
 			},
 			sourceToken,
 			pools,
-			evm_2_evm_offramp.AggregateRateLimiterRateLimiterConfig{
-				Rate:     opts.Rate,
-				Capacity: opts.Capacity,
-				Admin:    auth.From,
+			evm_2_evm_offramp.RateLimiterConfig{
+				Rate:      opts.Rate,
+				Capacity:  opts.Capacity,
+				IsEnabled: true,
 			},
 		)
 	})
@@ -543,8 +552,9 @@ func stripKeyPrefix(key string) string {
 	return key
 }
 
-func NewOffChainAggregatorV2Config(
+func NewOffChainAggregatorV2Config[T ccipplugin.OffchainConfig](
 	nodes []*client.CLNodesWithKeys,
+	offchainCfg T,
 ) (
 	signers []common.Address,
 	transmitters []common.Address,
@@ -592,10 +602,7 @@ func NewOffChainAggregatorV2Config(
 		return nil, nil, 0, nil, 0, nil, err
 	}
 	ocrConfig.Oracles = oracleIdentities
-	ocrConfig.ReportingPluginConfig, err = ccip.OffchainConfig{
-		SourceIncomingConfirmations: 1,
-		DestIncomingConfirmations:   1,
-	}.Encode()
+	ocrConfig.ReportingPluginConfig, err = ccipplugin.EncodeOffchainConfig[T](offchainCfg)
 	if err != nil {
 		return nil, nil, 0, nil, 0, nil, err
 	}

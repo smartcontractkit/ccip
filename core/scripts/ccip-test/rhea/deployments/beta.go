@@ -2,10 +2,13 @@ package deployments
 
 import (
 	"math/big"
+	"time"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
 
 var BetaChains = map[rhea.Chain]rhea.EvmDeploymentConfig{
@@ -120,6 +123,16 @@ var Beta_OptimismGoerliToAvaxFuji = rhea.EvmDeploymentConfig{
 			DeployPingPongDapp: false,
 			DeployedAtBlock:    7367304,
 		},
+		CommitOffchainConfig: ccip.CommitOffchainConfig{
+			FeeUpdateHeartBeat:    models.MustMakeDuration(24 * time.Hour),
+			FeeUpdateDeviationPPB: 5e7,
+			MaxGasPrice:           200e9,
+		},
+		ExecOffchainConfig: ccip.ExecOffchainConfig{
+			BatchGasLimit:            5_000_000,
+			RelativeBoostPerWaitHour: 0.7,
+			MaxGasPrice:              200e9,
+		},
 	},
 }
 
@@ -135,6 +148,16 @@ var Beta_AvaxFujiToOptimismGoerli = rhea.EvmDeploymentConfig{
 			DeployRamp:         false,
 			DeployPingPongDapp: false,
 			DeployedAtBlock:    20412087,
+		},
+		CommitOffchainConfig: ccip.CommitOffchainConfig{
+			FeeUpdateHeartBeat:    models.MustMakeDuration(24 * time.Hour),
+			FeeUpdateDeviationPPB: 5e7,
+			MaxGasPrice:           200e9,
+		},
+		ExecOffchainConfig: ccip.ExecOffchainConfig{
+			BatchGasLimit:            5_000_000,
+			RelativeBoostPerWaitHour: 0.7,
+			MaxGasPrice:              200e9,
 		},
 	},
 }

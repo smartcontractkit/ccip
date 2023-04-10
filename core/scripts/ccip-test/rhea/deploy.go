@@ -141,10 +141,10 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId uint64,
 		},
 		tokensAndPools,
 		[]common.Address{}, // allow list
-		evm_2_evm_onramp.AggregateRateLimiterRateLimiterConfig{
-			Capacity: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
-			Rate:     new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
-			Admin:    client.Owner.From,
+		evm_2_evm_onramp.RateLimiterConfig{
+			Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
+			Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
+			IsEnabled: false,
 		},
 		feeTokenConfig,
 		[]evm_2_evm_onramp.EVM2EVMOnRampNopAndWeight{},
@@ -194,10 +194,10 @@ func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainId uint
 		},
 		syncedSourceTokens,
 		syncedDestPools,
-		evm_2_evm_offramp.AggregateRateLimiterRateLimiterConfig{
-			Capacity: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
-			Rate:     new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
-			Admin:    client.Owner.From,
+		evm_2_evm_offramp.RateLimiterConfig{
+			Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
+			Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
+			IsEnabled: false,
 		},
 	)
 	shared.RequireNoError(t, err)
