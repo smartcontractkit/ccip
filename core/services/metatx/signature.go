@@ -1,21 +1,24 @@
 package metatx
 
 import (
+	"bytes"
 	"crypto/ecdsa"
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
-	forwarder_wrapper "github.com/smartcontractkit/chainlink/core/gethwrappers/generated/forwarder"
-	"github.com/smartcontractkit/chainlink/core/utils"
+	forwarder_wrapper "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/forwarder"
+	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 const (
-	MetaERC20Name    = "MetaERC20"
-	MetaERC20Version = "v1"
-	TypeHash         = "ForwardRequest(address from,address target,uint256 nonce,bytes data,uint256 validUntilTime)"
+	CrossChainERC20ExtensionName    = "CrossChainERC20Extension"
+	CrossChainERC20ExtensionVersion = "v1"
 )
+
+var TypeHash = crypto.Keccak256([]byte("ForwardRequest(address from,address target,uint256 nonce,bytes data,uint256 validUntilTime)"))
 
 func SignMetaTransfer(
 	forwarder forwarder_wrapper.Forwarder,
@@ -24,20 +27,33 @@ func SignMetaTransfer(
 	calldataHash [32]byte,
 	deadline *big.Int,
 ) (signature []byte, domainSeparatorHash [32]byte, typeHash [32]byte, nonce *big.Int, err error) {
+	genericParams, err := forwarder.GENERICPARAMS(nil)
+	if err != nil {
+		return nil, [32]byte{}, [32]byte{}, nil, errors.Wrapf(err, "failed to get domainType of forwarder: %x", forwarder.Address())
+	}
+
+	typeHashRaw := crypto.Keccak256([]byte(fmt.Sprintf("ForwardRequest(%s)", genericParams)))
+
+	// Sanity check: make sure TypeHash is equal to keccak256 of the constants in Forwarder.sol
+	if !bytes.Equal(TypeHash, typeHashRaw) {
+		return nil, [32]byte{}, [32]byte{}, nil, errors.Errorf("unexpected domainType hash. Expected: %x Actual: %x", TypeHash, typeHashRaw)
+	}
+
+	copy(typeHash[:], typeHashRaw[:])
+
 	nonce, err = forwarder.GetNonce(nil, owner)
 	if err != nil {
 		return nil, [32]byte{}, [32]byte{}, nil, errors.Wrapf(err, "failed to get nonce of %s", owner.Hex())
 	}
 
-	domainSeparator, err := forwarder.GetDomainSeparator(nil, MetaERC20Name, MetaERC20Version)
+	domainSeparator, err := forwarder.GetDomainSeparator(nil, CrossChainERC20ExtensionName, CrossChainERC20ExtensionVersion)
 	if err != nil {
 		return nil, [32]byte{}, [32]byte{}, nil, errors.Wrap(err, "failed to get domain separator from contract")
 	}
 	domainSeparatorHashRaw := crypto.Keccak256(domainSeparator)
 	copy(domainSeparatorHash[:], domainSeparatorHashRaw[:])
 
-	typeHashRaw := crypto.Keccak256([]byte(TypeHash))
-	copy(typeHash[:], typeHashRaw[:])
+	copy(typeHash[:], TypeHash[:])
 	message := []byte{0x19, 0x01} // \x19\x01
 	message = append(message, domainSeparatorHashRaw[:]...)
 

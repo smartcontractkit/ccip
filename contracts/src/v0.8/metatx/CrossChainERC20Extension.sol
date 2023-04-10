@@ -5,7 +5,7 @@ import {ERC20} from "../vendor/ERC20.sol";
 import {IERC2771Recipient} from "../vendor/IERC2771Recipient.sol";
 import {Context} from "../vendor/Context.sol";
 import {IRouterClient} from "../ccip/interfaces/IRouterClient.sol";
-import {Client} from "../ccip/models/Client.sol";
+import {Client} from "../ccip/libraries/Client.sol";
 import {OwnerIsCreator} from "../ccip/OwnerIsCreator.sol";
 
 /// @dev CrossChainERC20Extension extends ERC20 token to add cross chain transfer functionality

@@ -15,9 +15,9 @@ export SOLC_VERSION=$SOLC_VERSION
 ROOT="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; cd ../../ && pwd -P )"
 
 compileContract () {
-  solc --overwrite --optimize --optimize-runs $OPTIMIZE_RUNS --metadata-hash none \
+  solc @openzeppelin/=$ROOT/contracts/node_modules/@openzeppelin/ --overwrite --optimize --optimize-runs $OPTIMIZE_RUNS --metadata-hash none \
       -o $ROOT/contracts/solc/v$SOLC_VERSION \
-      --abi --bin --allow-paths $ROOT/contracts/src/v0.8 \
+      --abi --bin --allow-paths $ROOT/contracts/src/v0.8,$ROOT/contracts/node_modules/.pnpm/@openzeppelin+contracts@4.3.3/node_modules/@openzeppelin/contracts \
       $ROOT/contracts/src/v0.8/$1
 }
 

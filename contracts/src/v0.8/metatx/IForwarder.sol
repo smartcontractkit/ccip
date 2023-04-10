@@ -10,6 +10,11 @@ import "@openzeppelin/contracts/interfaces/IERC165.sol";
 ///
 /// @notice if the `Forwarder` contract decides that an incoming `ForwardRequest` is valid, it must append 20 bytes that
 /// represent the caller to the `data` field of the request and send this new data to the target address (the `to` field)
+/// 
+/// @dev This implementation has been ported from OpenGSN's Forwarder.sol and modified in following ways:
+/// @dev 1. execute() does not accept "gas" parameter which allows caller to specify max gas limit for the forwarded call
+/// @dev 2. execute() does not accept "value" parameter which allows caller to pass native token to the forwarded call
+/// @dev 3. renamed field: "address to" => "address target"
 ///
 /// :warning: **Warning** :warning: The Forwarder can have a full control over a `Recipient` contract.
 /// Any vulnerability in a `Forwarder` implementation can make all of its `Recipient` contracts susceptible!

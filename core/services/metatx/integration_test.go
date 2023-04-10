@@ -19,20 +19,20 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/onsi/gomega"
-	"github.com/smartcontractkit/chainlink/core/assets"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/cross_chain_erc20_extension"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_offramp"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/evm_2_evm_onramp"
-	forwarder_wrapper "github.com/smartcontractkit/chainlink/core/gethwrappers/generated/forwarder"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/lock_release_token_pool"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/price_registry"
-	"github.com/smartcontractkit/chainlink/core/gethwrappers/generated/wrapped_token_pool"
-	"github.com/smartcontractkit/chainlink/core/internal/cltest"
-	"github.com/smartcontractkit/chainlink/core/internal/testutils"
-	"github.com/smartcontractkit/chainlink/core/services/keystore/keys/ethkey"
-	"github.com/smartcontractkit/chainlink/core/services/metatx"
-	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip"
-	"github.com/smartcontractkit/chainlink/core/services/ocr2/plugins/ccip/testhelpers"
+	"github.com/smartcontractkit/chainlink/v2/core/assets"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/cross_chain_erc20_extension"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
+	forwarder_wrapper "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/forwarder"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/wrapped_token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/internal/cltest"
+	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ethkey"
+	"github.com/smartcontractkit/chainlink/v2/core/services/metatx"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	"github.com/stretchr/testify/require"
 	"github.com/test-go/testify/assert"
 )
@@ -100,7 +100,7 @@ func TestMetaERC20SameChain(t *testing.T) {
 		require.NoError(t, err)
 
 		// send meta transaction to forwarder
-		_, err = forwarder.Execute(relay, forwardRequest, domainSeparatorHash, typeHash, []byte{}, signature)
+		_, err = forwarder.Execute(relay, forwardRequest, domainSeparatorHash, typeHash, nil, signature)
 		require.NoError(t, err)
 		chain.Commit()
 
@@ -133,11 +133,19 @@ func TestMetaERC20CrossChain(t *testing.T) {
 	totalTokens := big.NewInt(1e9)
 	sourceTokenAddress, sourceToken := setUpCrossChainERC20(t, ccipContracts.Source.User, ccipContracts.Source.Chain, forwarderAddress, ccipContracts.Source.Router.Address(), totalTokens, true)
 
-	wrappedDestTokenPoolAddress, _, wrappedDestTokenPool, err := wrapped_token_pool.DeployWrappedTokenPool(ccipContracts.Dest.User, ccipContracts.Dest.Chain, "WrappedBankToken", "WBANK", 18)
+	wrappedDestTokenPoolAddress, _, wrappedDestTokenPool, err := wrapped_token_pool.DeployWrappedTokenPool(ccipContracts.Dest.User, ccipContracts.Dest.Chain, "WrappedBankToken", "WBANK", 18, wrapped_token_pool.RateLimiterConfig{
+		Capacity:  testhelpers.HundredLink,
+		Rate:      big.NewInt(1e18),
+		IsEnabled: true,
+	})
 	require.NoError(t, err)
 	ccipContracts.Source.Chain.Commit()
 
-	sourcePoolAddress, _, sourcePool, err := lock_release_token_pool.DeployLockReleaseTokenPool(ccipContracts.Source.User, ccipContracts.Source.Chain, sourceTokenAddress)
+	sourcePoolAddress, _, sourcePool, err := lock_release_token_pool.DeployLockReleaseTokenPool(ccipContracts.Source.User, ccipContracts.Source.Chain, sourceTokenAddress, lock_release_token_pool.RateLimiterConfig{
+		Capacity:  testhelpers.HundredLink,
+		Rate:      big.NewInt(1e18),
+		IsEnabled: true,
+	})
 	require.NoError(t, err)
 	ccipContracts.Source.Chain.Commit()
 
@@ -325,7 +333,7 @@ func setUpForwarder(t *testing.T, owner *bind.TransactOpts, chain *backends.Simu
 	require.NoError(t, err)
 	chain.Commit()
 	// registers EIP712-compliant domain separator for MetaERC20 token
-	_, err = forwarder.RegisterDomainSeparator(owner, metatx.MetaERC20Name, metatx.MetaERC20Version)
+	_, err = forwarder.RegisterDomainSeparator(owner, metatx.CrossChainERC20ExtensionName, metatx.CrossChainERC20ExtensionVersion)
 	require.NoError(t, err)
 	chain.Commit()
 
