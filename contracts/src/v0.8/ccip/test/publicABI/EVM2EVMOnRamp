@@ -2,7 +2,7 @@
   "acceptOwnership()": "79ba5097",
   "applyAllowListUpdates(address[],address[])": "54c8a4f3",
   "applyPoolUpdates((address,address)[],(address,address)[])": "3a87ac53",
-  "currentTokenBucketState()": "c38945a7",
+  "currentRateLimiterState()": "546719cd",
   "forwardFromRouter((bytes,bytes,(address,uint256)[],address,bytes),uint256,address)": "a7d3e02f",
   "getAllowList()": "a7cd63b7",
   "getAllowListEnabled()": "e0351e13",

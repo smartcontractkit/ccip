@@ -89,7 +89,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator, Pausable {
 
   /// @notice Gets the token bucket with its values for the block it was requested at.
   /// @return The token bucket.
-  function currentTokenBucketState() public view returns (RateLimiter.TokenBucket memory) {
+  function currentRateLimiterState() public view returns (RateLimiter.TokenBucket memory) {
     return s_rateLimiter._currentTokenBucketState();
   }
 

@@ -234,11 +234,11 @@ func (r *ExecutionReportingPlugin) getExecutableSeqNrs(ctx context.Context, infl
 	// Since this will only increase over time, the highest observed value will
 	// always be the lower bound of what would be available on chain
 	// since we already account for inflight txs.
-	bucket, err := r.config.offRamp.CurrentTokenBucketState(&bind.CallOpts{Context: ctx})
+	rateLimiterState, err := r.config.offRamp.CurrentRateLimiterState(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return nil, err
 	}
-	allowedTokenAmount := bucket.Tokens
+	allowedTokenAmount := rateLimiterState.Tokens
 
 	// TODO don't build on every batch builder call but only change on changing configuration
 	srcToDst := make(map[common.Address]common.Address)

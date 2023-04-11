@@ -4,7 +4,7 @@
   "applyRampUpdates((address,bool)[],(address,bool)[])": "af519112",
   "approve(address,uint256)": "095ea7b3",
   "balanceOf(address)": "70a08231",
-  "currentTokenBucketState()": "c38945a7",
+  "currentRateLimiterState()": "546719cd",
   "decimals()": "313ce567",
   "decreaseAllowance(address,uint256)": "a457c2d7",
   "getToken()": "21df0da7",

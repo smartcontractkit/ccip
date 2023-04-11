@@ -2,7 +2,7 @@
   "acceptOwnership()": "79ba5097",
   "applyPoolUpdates((address,address)[],(address,address)[])": "3a87ac53",
   "ccipReceive((bytes32,uint64,bytes,bytes,(address,uint256)[]))": "85572ffb",
-  "currentTokenBucketState()": "c38945a7",
+  "currentRateLimiterState()": "546719cd",
   "executeSingleMessage((uint64,uint64,uint256,address,uint64,uint256,bool,address,bytes,(address,uint256)[],address,bytes32),bool)": "abc39f1f",
   "getDestinationToken(address)": "b4069b31",
   "getDestinationTokens()": "681fba16",

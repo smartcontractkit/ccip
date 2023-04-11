@@ -39,12 +39,6 @@ contract AggregateRateLimiter is OwnerIsCreator {
     });
   }
 
-  /// @notice Gets the token bucket with its values for the block it was requested at.
-  /// @return The token bucket.
-  function currentTokenBucketState() public view returns (RateLimiter.TokenBucket memory) {
-    return s_rateLimiter._currentTokenBucketState();
-  }
-
   function _rateLimitValue(Client.EVMTokenAmount[] memory tokenAmounts) internal {
     uint256 value = 0;
     for (uint256 i = 0; i < tokenAmounts.length; ++i) {
@@ -54,6 +48,12 @@ contract AggregateRateLimiter is OwnerIsCreator {
     }
 
     s_rateLimiter._consume(value);
+  }
+
+  /// @notice Gets the token bucket with its values for the block it was requested at.
+  /// @return The token bucket.
+  function currentRateLimiterState() public view returns (RateLimiter.TokenBucket memory) {
+    return s_rateLimiter._currentTokenBucketState();
   }
 
   /// @notice Sets the rate limited config.

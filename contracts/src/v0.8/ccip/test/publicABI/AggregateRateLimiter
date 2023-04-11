@@ -1,6 +1,6 @@
 {
   "acceptOwnership()": "79ba5097",
-  "currentTokenBucketState()": "c38945a7",
+  "currentRateLimiterState()": "546719cd",
   "getPricesForTokens(address[])": "4741062e",
   "getTokenLimitAdmin()": "599f6431",
   "owner()": "8da5cb5b",
