@@ -60,11 +60,7 @@ contract TokenPool_applyRampUpdates is TokenPoolSetup {
 
     vm.expectEmit();
     emit OnRampAllowanceSet(onRamps[0].ramp, onRamps[0].allowed);
-    vm.expectEmit();
-    emit OnRampAllowanceSet(onRamps[1].ramp, onRamps[1].allowed);
 
-    vm.expectEmit();
-    emit OffRampAllowanceSet(offRamps[0].ramp, offRamps[0].allowed);
     vm.expectEmit();
     emit OffRampAllowanceSet(offRamps[1].ramp, offRamps[1].allowed);
 

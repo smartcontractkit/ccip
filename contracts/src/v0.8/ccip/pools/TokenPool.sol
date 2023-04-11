@@ -63,24 +63,18 @@ abstract contract TokenPool is IPool, OwnerIsCreator, Pausable {
   function applyRampUpdates(RampUpdate[] memory onRamps, RampUpdate[] memory offRamps) public onlyOwner {
     for (uint256 i = 0; i < onRamps.length; ++i) {
       RampUpdate memory update = onRamps[i];
-      if (update.allowed) {
-        s_onRamps.add(update.ramp);
-      } else {
-        s_onRamps.remove(update.ramp);
-      }
 
-      emit OnRampAllowanceSet(onRamps[i].ramp, onRamps[i].allowed);
+      if (update.allowed ? s_onRamps.add(update.ramp) : s_onRamps.remove(update.ramp)) {
+        emit OnRampAllowanceSet(onRamps[i].ramp, onRamps[i].allowed);
+      }
     }
 
     for (uint256 i = 0; i < offRamps.length; ++i) {
       RampUpdate memory update = offRamps[i];
-      if (update.allowed) {
-        s_offRamps.add(update.ramp);
-      } else {
-        s_offRamps.remove(update.ramp);
-      }
 
-      emit OffRampAllowanceSet(offRamps[i].ramp, offRamps[i].allowed);
+      if (update.allowed ? s_offRamps.add(update.ramp) : s_offRamps.remove(update.ramp)) {
+        emit OffRampAllowanceSet(offRamps[i].ramp, offRamps[i].allowed);
+      }
     }
   }
 
