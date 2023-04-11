@@ -14,8 +14,8 @@ import (
 )
 
 var (
-	SOURCE      = deployments.Beta_SepoliaToAvaxFuji
-	DESTINATION = deployments.Beta_AvaxFujiToSepolia
+	SOURCE      = deployments.Beta_AvaxFujiToOptimismGoerli
+	DESTINATION = deployments.Beta_OptimismGoerliToAvaxFuji
 )
 
 // COMMANDS:

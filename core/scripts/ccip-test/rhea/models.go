@@ -53,11 +53,12 @@ const (
 	AvaxFuji       Chain = "avalanche-testnet-fuji"
 	OptimismGoerli Chain = "ethereum-testnet-goerli-optimism-1"
 	Goerli         Chain = "ethereum-testnet-goerli"
+	ArbitrumGoerli Chain = "ethereum-testnet-goerli-arbitrum-1"
 )
 
 func GetAllChains() []Chain {
 	return []Chain{
-		Sepolia, AvaxFuji, OptimismGoerli, Goerli,
+		Sepolia, AvaxFuji, OptimismGoerli, Goerli, ArbitrumGoerli,
 	}
 }
 
