@@ -143,15 +143,20 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, errors.Wrap(err, "failed to decode onRamp abi")
 	}
+	dynamicConfig, err := rf.config.offRamp.GetDynamicConfig(&bind.CallOpts{})
+	if err != nil {
+		return nil, types.ReportingPluginInfo{}, err
+	}
 
 	return &ExecutionReportingPlugin{
-			lggr:            rf.config.lggr.Named("ExecutionReportingPlugin"),
-			F:               config.F,
-			offchainConfig:  offchainConfig,
-			config:          rf.config,
-			snoozedRoots:    make(map[[32]byte]time.Time),
-			inflightReports: newInflightReportsContainer(rf.config.inflightCacheExpiry),
-			onRampABI:       onRampABI,
+			lggr:                             rf.config.lggr.Named("ExecutionReportingPlugin"),
+			F:                                config.F,
+			offchainConfig:                   offchainConfig,
+			config:                           rf.config,
+			snoozedRoots:                     make(map[[32]byte]time.Time),
+			inflightReports:                  newInflightReportsContainer(rf.config.inflightCacheExpiry),
+			onRampABI:                        onRampABI,
+			permissionLessExecutionThreshold: time.Duration(dynamicConfig.PermissionLessExecutionThresholdSeconds) * time.Second,
 		}, types.ReportingPluginInfo{
 			Name:          "CCIPExecution",
 			UniqueReports: true,
@@ -163,13 +168,14 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 }
 
 type ExecutionReportingPlugin struct {
-	lggr            logger.Logger
-	F               int
-	config          ExecutionPluginConfig
-	inflightReports *inflightReportsContainer
-	offchainConfig  ExecOffchainConfig
-	snoozedRoots    map[[32]byte]time.Time
-	onRampABI       abi.ABI
+	lggr                             logger.Logger
+	F                                int
+	config                           ExecutionPluginConfig
+	inflightReports                  *inflightReportsContainer
+	offchainConfig                   ExecOffchainConfig
+	snoozedRoots                     map[[32]byte]time.Time
+	onRampABI                        abi.ABI
+	permissionLessExecutionThreshold time.Duration
 }
 
 func (r *ExecutionReportingPlugin) Query(context.Context, types.ReportTimestamp) (types.Query, error) {
@@ -216,13 +222,7 @@ func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(min, max uint64) (ma
 }
 
 func (r *ExecutionReportingPlugin) getExecutableSeqNrs(ctx context.Context, inflight []InflightInternalExecutionReport) ([]uint64, error) {
-	config, err := r.config.offRamp.GetDynamicConfig(&bind.CallOpts{Context: ctx})
-	if err != nil {
-		return nil, err
-	}
-	permissionExecutionThreshold := time.Duration(config.PermissionLessExecutionThresholdSeconds) * time.Second
-
-	unexpiredReports, err := getUnexpiredCommitReports(r.config.dest, r.config.commitStore, permissionExecutionThreshold)
+	unexpiredReports, err := getUnexpiredCommitReports(r.config.dest, r.config.commitStore, r.permissionLessExecutionThreshold)
 	if err != nil {
 		return nil, err
 	}
@@ -333,7 +333,7 @@ func (r *ExecutionReportingPlugin) getExecutableSeqNrs(ctx context.Context, infl
 		// so it will never be considered again.
 		if allMessagesExecuted {
 			r.lggr.Infof("Snoozing root %s forever since there are no executable txs anymore %v", hex.EncodeToString(unexpiredReport.MerkleRoot[:]), executedMp)
-			r.snoozedRoots[unexpiredReport.MerkleRoot] = time.Now().Add(permissionExecutionThreshold)
+			r.snoozedRoots[unexpiredReport.MerkleRoot] = time.Now().Add(r.permissionLessExecutionThreshold)
 			incSkippedRequests(reasonAllExecuted)
 			continue
 		}
