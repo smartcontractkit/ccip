@@ -220,8 +220,9 @@ func (r *ExecutionReportingPlugin) getExecutableSeqNrs(ctx context.Context, infl
 	if err != nil {
 		return nil, err
 	}
+	permissionExecutionThreshold := time.Duration(config.PermissionLessExecutionThresholdSeconds) * time.Second
 
-	unexpiredReports, err := getUnexpiredCommitReports(r.config.dest, r.config.commitStore, config.PermissionLessExecutionThresholdSeconds)
+	unexpiredReports, err := getUnexpiredCommitReports(r.config.dest, r.config.commitStore, permissionExecutionThreshold)
 	if err != nil {
 		return nil, err
 	}
@@ -332,7 +333,7 @@ func (r *ExecutionReportingPlugin) getExecutableSeqNrs(ctx context.Context, infl
 		// so it will never be considered again.
 		if allMessagesExecuted {
 			r.lggr.Infof("Snoozing root %s forever since there are no executable txs anymore %v", hex.EncodeToString(unexpiredReport.MerkleRoot[:]), executedMp)
-			r.snoozedRoots[unexpiredReport.MerkleRoot] = time.Now().Add(time.Duration(config.PermissionLessExecutionThresholdSeconds) * time.Second)
+			r.snoozedRoots[unexpiredReport.MerkleRoot] = time.Now().Add(permissionExecutionThreshold)
 			incSkippedRequests(reasonAllExecuted)
 			continue
 		}
@@ -666,9 +667,8 @@ func getFeeTokensPrices(ctx context.Context, priceRegistry *price_registry.Price
 	return prices, nil
 }
 
-func getUnexpiredCommitReports(dstLogPoller logpoller.LogPoller, commitStore *commit_store.CommitStore, permissionLessExecutionThresholdSeconds uint32) ([]commit_store.CommitStoreCommitReport, error) {
-	duration := time.Duration(permissionLessExecutionThresholdSeconds) * time.Second
-	logs, err := dstLogPoller.LogsCreatedAfter(ReportAccepted, commitStore.Address(), time.Now().Add(-duration))
+func getUnexpiredCommitReports(dstLogPoller logpoller.LogPoller, commitStore *commit_store.CommitStore, permissionExecutionThreshold time.Duration) ([]commit_store.CommitStoreCommitReport, error) {
+	logs, err := dstLogPoller.LogsCreatedAfter(ReportAccepted, commitStore.Address(), time.Now().Add(-permissionExecutionThreshold))
 	if err != nil {
 		return nil, err
 	}
