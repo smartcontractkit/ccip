@@ -40,7 +40,7 @@ abstract contract AbstractCrossChainMetaTransactor is OwnerIsCreator, IERC2771Re
     address receiver,
     uint256 amount,
     uint64 destinationChainId
-  ) external validateTrustedForwarder returns (bytes32) {
+  ) external virtual validateTrustedForwarder returns (bytes32) {
     if (!isCrossChainTransfer(destinationChainId)) {
       _transfer(_msgSender(), receiver, amount);
       return ""; // return empty bytes32 because there is no ccip message ID
@@ -52,7 +52,7 @@ abstract contract AbstractCrossChainMetaTransactor is OwnerIsCreator, IERC2771Re
       data: "",
       tokenAmounts: tokenAmounts,
       feeToken: address(0), // use native token instead of ERC20 tokens
-      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 200_000, strict: false}))
+      extraArgs: ""
     });
     uint256 fee = IRouterClient(s_ccipRouter).getFee(destinationChainId, message);
 

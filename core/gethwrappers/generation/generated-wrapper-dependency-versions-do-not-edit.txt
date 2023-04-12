@@ -4,7 +4,7 @@ aggregator_v2v3_interface: ../../contracts/solc/v0.8.6/AggregatorV2V3Interface.a
 aggregator_v3_interface: ../../contracts/solc/v0.8.6/AggregatorV3Interface.abi ../../contracts/solc/v0.8.6/AggregatorV3Interface.bin 351b55d3b0f04af67db6dfb5c92f1c64479400ca1fec77afc20bc0ce65cb49ab
 authorized_forwarder: ../../contracts/solc/v0.7/AuthorizedForwarder.abi ../../contracts/solc/v0.7/AuthorizedForwarder.bin f126b772f088772779918fa3a250e7ccf13855ee5bce44c17691bb7b3e62f043
 authorized_receiver: ../../contracts/solc/v0.7/AuthorizedReceiver.abi ../../contracts/solc/v0.7/AuthorizedReceiver.bin 18e8969ba3234b027e1b16c11a783aca58d0ea5c2361010ec597f134b7bf1c4f
-bank_erc20: ../../contracts/solc/v0.8.15/BankERC20.abi ../../contracts/solc/v0.8.15/BankERC20.bin 5dd4ad7bf3336ef11a599bbd030aa22b8d44b9a4b68c3304d9c85d576e1fb31b
+bank_erc20: ../../contracts/solc/v0.8.15/BankERC20.abi ../../contracts/solc/v0.8.15/BankERC20.bin b820b6c0ba5e357e43d23fd748c050f7027b96b38cec1ac441396a187343298d
 batch_blockhash_store: ../../contracts/solc/v0.8.6/BatchBlockhashStore.abi ../../contracts/solc/v0.8.6/BatchBlockhashStore.bin 9220f1ed6c576863a2f5b34263846660e742f3513c19eb9e2562a374cb70c252
 batch_vrf_coordinator_v2: ../../contracts/solc/v0.8.6/BatchVRFCoordinatorV2.abi ../../contracts/solc/v0.8.6/BatchVRFCoordinatorV2.bin d0a54963260d8c1f1bbd984b758285e6027cfb5a7e42701bcb562ab123219332
 blockhash_store: ../../contracts/solc/v0.6/BlockhashStore.abi ../../contracts/solc/v0.6/BlockhashStore.bin 6b3da771f033b3a5e53bf112396d0698debf65a8dcd81370f07d72948c8b14d9
