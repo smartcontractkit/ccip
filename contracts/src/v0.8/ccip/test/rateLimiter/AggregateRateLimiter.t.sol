@@ -33,7 +33,7 @@ contract AggregateTokenLimiter_constructor is AggregateTokenLimiterSetup {
     assertEq(ADMIN, s_rateLimiter.getTokenLimitAdmin());
     assertEq(OWNER, s_rateLimiter.owner());
 
-    RateLimiter.TokenBucket memory bucket = s_rateLimiter.currentTokenBucketState();
+    RateLimiter.TokenBucket memory bucket = s_rateLimiter.currentRateLimiterState();
     assertEq(s_config.rate, bucket.rate);
     assertEq(s_config.capacity, bucket.capacity);
     assertEq(s_config.capacity, bucket.tokens);
@@ -68,7 +68,7 @@ contract AggregateTokenLimiter_setTokenLimitAdmin is AggregateTokenLimiterSetup 
 /// @notice #getTokenBucket
 contract AggregateTokenLimiter_getTokenBucket is AggregateTokenLimiterSetup {
   function testSuccess() public {
-    RateLimiter.TokenBucket memory bucket = s_rateLimiter.currentTokenBucketState();
+    RateLimiter.TokenBucket memory bucket = s_rateLimiter.currentRateLimiterState();
     assertEq(s_config.rate, bucket.rate);
     assertEq(s_config.capacity, bucket.capacity);
     assertEq(s_config.capacity, bucket.tokens);
@@ -79,7 +79,7 @@ contract AggregateTokenLimiter_getTokenBucket is AggregateTokenLimiterSetup {
     s_config.capacity = s_config.capacity * 2;
     s_rateLimiter.setRateLimiterConfig(s_config);
 
-    RateLimiter.TokenBucket memory bucket = s_rateLimiter.currentTokenBucketState();
+    RateLimiter.TokenBucket memory bucket = s_rateLimiter.currentRateLimiterState();
 
     assertEq(s_config.rate, bucket.rate);
     assertEq(s_config.capacity, bucket.capacity);
@@ -89,7 +89,7 @@ contract AggregateTokenLimiter_getTokenBucket is AggregateTokenLimiterSetup {
     uint256 warpTime = 4;
     vm.warp(BLOCK_TIME + warpTime);
 
-    bucket = s_rateLimiter.currentTokenBucketState();
+    bucket = s_rateLimiter.currentRateLimiterState();
 
     assertEq(s_config.rate, bucket.rate);
     assertEq(s_config.capacity, bucket.capacity);
@@ -99,7 +99,7 @@ contract AggregateTokenLimiter_getTokenBucket is AggregateTokenLimiterSetup {
     vm.warp(BLOCK_TIME + warpTime * 100);
 
     // Bucket overflow
-    bucket = s_rateLimiter.currentTokenBucketState();
+    bucket = s_rateLimiter.currentRateLimiterState();
     assertEq(s_config.capacity, bucket.tokens);
   }
 
@@ -109,7 +109,7 @@ contract AggregateTokenLimiter_getTokenBucket is AggregateTokenLimiterSetup {
     vm.warp(BLOCK_TIME - 1);
 
     vm.expectRevert(stdError.arithmeticError);
-    s_rateLimiter.currentTokenBucketState();
+    s_rateLimiter.currentRateLimiterState();
   }
 }
 
@@ -127,7 +127,7 @@ contract AggregateTokenLimiter_setRateLimiterConfig is AggregateTokenLimiterSetu
   }
 
   function setConfig() private {
-    RateLimiter.TokenBucket memory bucket = s_rateLimiter.currentTokenBucketState();
+    RateLimiter.TokenBucket memory bucket = s_rateLimiter.currentRateLimiterState();
     assertEq(s_config.rate, bucket.rate);
     assertEq(s_config.capacity, bucket.capacity);
 
@@ -139,7 +139,7 @@ contract AggregateTokenLimiter_setRateLimiterConfig is AggregateTokenLimiterSetu
 
     s_rateLimiter.setRateLimiterConfig(s_config);
 
-    bucket = s_rateLimiter.currentTokenBucketState();
+    bucket = s_rateLimiter.currentRateLimiterState();
     assertEq(s_config.rate, bucket.rate);
     assertEq(s_config.capacity, bucket.capacity);
   }
@@ -285,7 +285,7 @@ contract AggregateTokenLimiter__removeTokens is AggregateTokenLimiterSetup {
     vm.pauseGasMetering();
 
     // Get the updated bucket status
-    RateLimiter.TokenBucket memory bucket = s_rateLimiter.currentTokenBucketState();
+    RateLimiter.TokenBucket memory bucket = s_rateLimiter.currentRateLimiterState();
     // Assert the proper value has been taken out of the bucket
     assertEq(bucket.capacity - value, bucket.tokens);
 
@@ -300,7 +300,7 @@ contract AggregateTokenLimiter__removeTokens is AggregateTokenLimiterSetup {
 
     // The bucket has filled up enough so we can take out more tokens
     s_rateLimiter.rateLimitValue(tokenAmounts);
-    bucket = s_rateLimiter.currentTokenBucketState();
+    bucket = s_rateLimiter.currentRateLimiterState();
     assertEq(bucket.capacity - value + waitTime * s_config.rate - value, bucket.tokens);
     vm.resumeGasMetering();
   }
@@ -313,7 +313,7 @@ contract AggregateTokenLimiter__removeTokens is AggregateTokenLimiterSetup {
   }
 
   function testConsumingMoreThanMaxCapacityReverts() public {
-    RateLimiter.TokenBucket memory bucket = s_rateLimiter.currentTokenBucketState();
+    RateLimiter.TokenBucket memory bucket = s_rateLimiter.currentRateLimiterState();
 
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
     tokenAmounts[0].token = address(TOKEN);

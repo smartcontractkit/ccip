@@ -1,7 +1,7 @@
 {
   "acceptOwnership()": "79ba5097",
   "applyRampUpdates((address,bool)[],(address,bool)[])": "af519112",
-  "currentTokenBucketState()": "c38945a7",
+  "currentRateLimiterState()": "546719cd",
   "getToken()": "21df0da7",
   "isOffRamp(address)": "1d7a74a0",
   "isOnRamp(address)": "6f32b872",

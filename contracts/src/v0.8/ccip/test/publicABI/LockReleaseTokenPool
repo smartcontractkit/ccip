@@ -2,7 +2,7 @@
   "acceptOwnership()": "79ba5097",
   "addLiquidity(uint256)": "51c6590a",
   "applyRampUpdates((address,bool)[],(address,bool)[])": "af519112",
-  "currentTokenBucketState()": "c38945a7",
+  "currentRateLimiterState()": "546719cd",
   "getProvidedLiquidity(address)": "56dd1e81",
   "getToken()": "21df0da7",
   "isOffRamp(address)": "1d7a74a0",

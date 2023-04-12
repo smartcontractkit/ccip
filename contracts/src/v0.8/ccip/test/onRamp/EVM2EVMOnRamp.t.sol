@@ -766,9 +766,32 @@ contract EVM2EVMOnRamp_applyAllowListUpdates is EVM2EVMOnRampWithAllowListSetup 
     s_onRamp.applyAllowListUpdates(newAddresses, new address[](0));
     address[] memory setAddresses = s_onRamp.getAllowList();
 
-    // First address is owner.
-    assertEq(newAddresses[0], setAddresses[1]);
-    assertEq(newAddresses[1], setAddresses[2]);
+    // First address in allowList is owner, set in test setup.
+    assertEq(address(1), setAddresses[1]);
+    assertEq(address(2), setAddresses[2]);
+
+    // Add address(3), remove address(1) from allow list
+    newAddresses = new address[](2);
+    newAddresses[0] = address(2);
+    newAddresses[1] = address(3);
+
+    address[] memory removeAddresses = new address[](1);
+    removeAddresses[0] = address(1);
+
+    vm.expectEmit();
+    emit AllowListRemove(address(1));
+
+    vm.expectEmit();
+    emit AllowListAdd(address(3));
+
+    s_onRamp.applyAllowListUpdates(newAddresses, removeAddresses);
+    setAddresses = s_onRamp.getAllowList();
+
+    // Although we cannot assume strict ordering in enumerable set in general,
+    // in this case, address(2) should take the spot of address(1) after its removal,
+    // hence ordering is preserved.
+    assertEq(address(2), setAddresses[1]);
+    assertEq(address(3), setAddresses[2]);
   }
 
   // Reverts

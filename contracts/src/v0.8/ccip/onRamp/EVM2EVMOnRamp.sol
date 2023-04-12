@@ -369,9 +369,10 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
 
       if (!s_poolsBySourceToken.contains(token)) revert PoolDoesNotExist(token);
       if (s_poolsBySourceToken.get(token) != pool) revert TokenPoolMismatch();
-      s_poolsBySourceToken.remove(token);
 
-      emit PoolRemoved(token, pool);
+      if (s_poolsBySourceToken.remove(token)) {
+        emit PoolRemoved(token, pool);
+      }
     }
 
     for (uint256 i = 0; i < adds.length; ++i) {
@@ -380,9 +381,10 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
 
       if (token == address(0) || pool == address(0)) revert InvalidTokenPoolConfig();
       if (s_poolsBySourceToken.contains(token)) revert PoolAlreadyAdded();
-      s_poolsBySourceToken.set(token, pool);
 
-      emit PoolAdded(token, pool);
+      if (s_poolsBySourceToken.set(token, pool)) {
+        emit PoolAdded(token, pool);
+      }
     }
   }
 
@@ -548,12 +550,14 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
   /// @notice Internal version of applyAllowListUpdates to allow for reuse in the constructor.
   function _applyAllowListUpdates(address[] memory adds, address[] memory removes) internal {
     for (uint256 i = 0; i < removes.length; ++i) {
-      s_allowList.remove(removes[i]);
-      emit AllowListRemove(removes[i]);
+      if (s_allowList.remove(removes[i])) {
+        emit AllowListRemove(removes[i]);
+      }
     }
     for (uint256 i = 0; i < adds.length; ++i) {
-      s_allowList.add(adds[i]);
-      emit AllowListAdd(adds[i]);
+      if (s_allowList.add(adds[i])) {
+        emit AllowListAdd(adds[i]);
+      }
     }
   }
 

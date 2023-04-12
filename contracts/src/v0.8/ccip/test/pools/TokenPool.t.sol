@@ -60,11 +60,7 @@ contract TokenPool_applyRampUpdates is TokenPoolSetup {
 
     vm.expectEmit();
     emit OnRampAllowanceSet(onRamps[0].ramp, onRamps[0].allowed);
-    vm.expectEmit();
-    emit OnRampAllowanceSet(onRamps[1].ramp, onRamps[1].allowed);
 
-    vm.expectEmit();
-    emit OffRampAllowanceSet(offRamps[0].ramp, offRamps[0].allowed);
     vm.expectEmit();
     emit OffRampAllowanceSet(offRamps[1].ramp, offRamps[1].allowed);
 
@@ -85,9 +81,9 @@ contract TokenPool_applyRampUpdates is TokenPoolSetup {
   }
 }
 
-contract TokenPool_currentTokenBucketState is TokenPoolSetup {
-  function testCurrentTokenBucketStateSuccess() public {
-    RateLimiter.TokenBucket memory bucket = s_tokenPool.currentTokenBucketState();
+contract TokenPool_currentRateLimiterState is TokenPoolSetup {
+  function testCurrentRateLimiterStateSuccess() public {
+    RateLimiter.TokenBucket memory bucket = s_tokenPool.currentRateLimiterState();
     RateLimiter.Config memory expectedConfig = rateLimiterConfig();
     assertEq(bucket.capacity, expectedConfig.capacity);
     assertEq(bucket.rate, expectedConfig.rate);
@@ -118,7 +114,7 @@ contract TokenPool_setRateLimiterConfig is TokenPoolSetup {
 
     uint256 expectedNewCapacity = RateLimiter._min(newConfig.capacity, oldCapacity + rate * (newTime - BLOCK_TIME));
 
-    RateLimiter.TokenBucket memory bucket = s_tokenPool.currentTokenBucketState();
+    RateLimiter.TokenBucket memory bucket = s_tokenPool.currentRateLimiterState();
     assertEq(bucket.capacity, newConfig.capacity);
     assertEq(bucket.rate, newConfig.rate);
     assertEq(bucket.tokens, expectedNewCapacity);
