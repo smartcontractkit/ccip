@@ -62,7 +62,14 @@ contract Forwarder is IForwarder, ERC165, OwnerIsCreator {
   }
 
   error ForwardFailed(bytes reason);
-  event ForwardSucceeded(address indexed from, address indexed target, bytes32 indexed domainSeparator, uint256 nonce, bytes data, bytes returnValue);
+  event ForwardSucceeded(
+    address indexed from,
+    address indexed target,
+    bytes32 indexed domainSeparator,
+    uint256 nonce,
+    bytes data,
+    bytes returnValue
+  );
 
   /// @inheritdoc IForwarder
   function execute(
@@ -88,14 +95,7 @@ contract Forwarder is IForwarder, ERC165, OwnerIsCreator {
       }
     }
 
-    emit ForwardSucceeded(
-      req.from,
-      req.target,
-      domainSeparator,
-      req.nonce,
-      req.data,
-      ret
-    );
+    emit ForwardSucceeded(req.from, req.target, domainSeparator, req.nonce, req.data, ret);
 
     return (success, ret);
   }
