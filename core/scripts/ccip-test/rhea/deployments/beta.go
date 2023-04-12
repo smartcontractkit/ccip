@@ -252,10 +252,10 @@ var Beta_ArbitrumGoerli = rhea.EVMChainConfig{
 	PriceRegistry: gethcommon.HexToAddress("0xe5bd0b59ddb5ba47c1d6d8631276209f4d23c6e1"),
 	Confirmations: 1,
 	DeploySettings: rhea.ChainDeploySettings{
-		DeployAFN:           true,
-		DeployTokenPools:    true,
-		DeployRouter:        true,
-		DeployPriceRegistry: true,
+		DeployAFN:           false,
+		DeployTokenPools:    false,
+		DeployRouter:        false,
+		DeployPriceRegistry: false,
 		DeployedAtBlock:     0,
 	},
 }
@@ -583,7 +583,7 @@ var Beta_ArbitrumGoerliToSepolia = rhea.EvmDeploymentConfig{
 			DeployCommitStore:  false,
 			DeployRamp:         false,
 			DeployPingPongDapp: false,
-			DeployedAtBlock:    16013818,
+			DeployedAtBlock:    16022100,
 		},
 		CommitOffchainConfig: ccip.CommitOffchainConfig{
 			FeeUpdateHeartBeat:    models.MustMakeDuration(24 * time.Hour),
@@ -609,7 +609,7 @@ var Beta_SepoliaToArbitrumGoerli = rhea.EvmDeploymentConfig{
 			DeployCommitStore:  false,
 			DeployRamp:         false,
 			DeployPingPongDapp: false,
-			DeployedAtBlock:    3277280,
+			DeployedAtBlock:    3277498,
 		},
 		CommitOffchainConfig: ccip.CommitOffchainConfig{
 			FeeUpdateHeartBeat:    models.MustMakeDuration(24 * time.Hour),
