@@ -23,4 +23,4 @@ compileContract () {
 
 # Contracts
 compileContract metatx/Forwarder.sol
-compileContract metatx/CrossChainERC20Extension.sol
+compileContract metatx/BankERC20.sol

@@ -23,7 +23,7 @@ import (
 	"github.com/test-go/testify/assert"
 
 	"github.com/smartcontractkit/chainlink/v2/core/assets"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/cross_chain_erc20_extension"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/bank_erc20"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
 	forwarder_wrapper "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/forwarder"
@@ -49,6 +49,8 @@ func TestMetaERC20SameChain(t *testing.T) {
 	_, holder2 := generateKeyAndTransactor(t, chainID)
 	// relayKey is the relayer that submits signed meta-transaction to the forwarder contract on-chain
 	_, relay := generateKeyAndTransactor(t, chainID)
+	// chainlinkOwner can withdraw native tokens from BankERC20 contract
+	_, chainlinkOwner := generateKeyAndTransactor(t, chainID)
 
 	chain := backends.NewSimulatedBackend(core.GenesisAlloc{
 		contractOwner.From: {
@@ -59,11 +61,11 @@ func TestMetaERC20SameChain(t *testing.T) {
 	forwarderAddress, forwarder := setUpForwarder(t, contractOwner, chain)
 
 	totalTokens := big.NewInt(1e9)
-	tokenAddress, token := setUpCrossChainERC20(t, contractOwner, chain, forwarderAddress, common.HexToAddress("0x0"), totalTokens, false)
+	tokenAddress, token := setUpBankERC20(t, contractOwner, chain, forwarderAddress, common.HexToAddress("0x0"), chainlinkOwner.From, totalTokens, false)
 
 	amount := assets.Ether(1).ToInt()
 
-	// fund MetaERC20 contract with native ETH
+	// fund BankERC20 contract with native ETH
 	transferNative(t, contractOwner, tokenAddress, 50_000, amount, chain)
 
 	sourceTokenEthBal, err := chain.BalanceAt(testutils.Context(t), tokenAddress, nil)
@@ -71,7 +73,7 @@ func TestMetaERC20SameChain(t *testing.T) {
 	require.Equal(t, amount, sourceTokenEthBal)
 
 	t.Run("single same-chain meta transfer", func(t *testing.T) {
-		// transfer MetaERC20 from contract owner to holder1
+		// transfer BankERC20 from contract owner to holder1
 		transferToken(t, token, contractOwner, holder1, amount, chain)
 
 		deadline := big.NewInt(int64(chain.Blockchain().CurrentHeader().Time + uint64(time.Hour)))
@@ -128,11 +130,13 @@ func TestMetaERC20CrossChain(t *testing.T) {
 	_, holder2 := generateKeyAndTransactor(t, ccipContracts.Dest.Chain.Blockchain().Config().ChainID.Uint64())
 	// relayKey is the relayer that submits signed meta-transaction to the forwarder contract on-chain
 	_, relay := generateKeyAndTransactor(t, ccipContracts.Source.Chain.Blockchain().Config().ChainID.Uint64())
+	// chainlinkOwner can withdraw native tokens from BankERC20 contract
+	_, chainlinkOwner := generateKeyAndTransactor(t, ccipContracts.Source.Chain.Blockchain().Config().ChainID.Uint64())
 
 	forwarderAddress, forwarder := setUpForwarder(t, ccipContracts.Source.User, ccipContracts.Source.Chain)
 
 	totalTokens := big.NewInt(1e9)
-	sourceTokenAddress, sourceToken := setUpCrossChainERC20(t, ccipContracts.Source.User, ccipContracts.Source.Chain, forwarderAddress, ccipContracts.Source.Router.Address(), totalTokens, true)
+	sourceTokenAddress, sourceToken := setUpBankERC20(t, ccipContracts.Source.User, ccipContracts.Source.Chain, forwarderAddress, ccipContracts.Source.Router.Address(), chainlinkOwner.From, totalTokens, true)
 
 	wrappedDestTokenPoolAddress, _, wrappedDestTokenPool, err := wrapped_token_pool.DeployWrappedTokenPool(ccipContracts.Dest.User, ccipContracts.Dest.Chain, "WrappedBankToken", "WBANK", 18, wrapped_token_pool.RateLimiterConfig{
 		Capacity:  testhelpers.HundredLink,
@@ -149,14 +153,6 @@ func TestMetaERC20CrossChain(t *testing.T) {
 	})
 	require.NoError(t, err)
 	ccipContracts.Source.Chain.Commit()
-
-	// transfer tokens to source token pool to allow the pool to burn the source token
-	//_, err = sourceToken.Transfer(c.Source.User, sourcePoolAddress, assets.Ether(10).ToInt())
-	//require.NoError(c.t, err)
-	//c.Source.Chain.Commit()
-	//sourcePoolBal, err := sourceToken.BalanceOf(nil, sourcePoolAddress)
-	//require.NoError(c.t, err)
-	//require.Equal(c.t, assets.Ether(10).ToInt(), sourcePoolBal)
 
 	// set onRamp as valid caller for source pool
 	_, err = sourcePool.ApplyRampUpdates(ccipContracts.Source.User, []lock_release_token_pool.IPoolRampUpdate{
@@ -236,8 +232,8 @@ func TestMetaERC20CrossChain(t *testing.T) {
 		_, err := w.Write([]byte(`{"UsdPerETH": "2000000000000000000000"}`))
 		require.NoError(t, err)
 	}))
-	metaERC20USD := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, err := w.Write([]byte(`{"UsdPerMetaERC20": "5000000000000000000"}`))
+	bankERC20USD := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := w.Write([]byte(`{"UsdPerBankERC20": "5000000000000000000"}`))
 		require.NoError(t, err)
 	}))
 	wrapped, err := ccipContracts.Source.Router.GetWrappedNative(nil)
@@ -249,21 +245,21 @@ link->link_parse;
 eth [type=http method=GET url="%s"];
 eth_parse [type=jsonparse path="UsdPerETH"];
 eth->eth_parse;
-metaERC20 [type=http method=GET url="%s"];
-metaERC20_parse [type=jsonparse path="UsdPerMetaERC20"];
-metaERC20->metaERC20_parse
-merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_parse), \\\"%s\\\":$(metaERC20_parse)}"];`,
-		linkUSD.URL, ethUSD.URL, metaERC20USD.URL, ccipContracts.Dest.LinkToken.Address(), wrapped, sourceTokenAddress)
+bankERC20 [type=http method=GET url="%s"];
+bankERC20_parse [type=jsonparse path="UsdPerBankERC20"];
+bankERC20->bankERC20_parse
+merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_parse), \\\"%s\\\":$(bankERC20_parse)}"];`,
+		linkUSD.URL, ethUSD.URL, bankERC20USD.URL, ccipContracts.Dest.LinkToken.Address(), wrapped, sourceTokenAddress)
 	defer linkUSD.Close()
 	defer ethUSD.Close()
-	defer metaERC20USD.Close()
+	defer bankERC20USD.Close()
 
 	nodes, _ := testhelpers.SetUpNodesAndJobs(t, &ccipContracts, tokenPricesUSDPipeline)
 
 	geCurrentSeqNum := 1
 
 	t.Run("single cross-chain meta transfer", func(t *testing.T) {
-		// transfer MetaERC20 from owner to holder1
+		// transfer BankERC20 from owner to holder1
 		transferToken(t, sourceToken, ccipContracts.Source.User, holder1, amount, ccipContracts.Source.Chain)
 
 		deadline := big.NewInt(int64(ccipContracts.Source.Chain.Blockchain().CurrentHeader().Time + uint64(time.Hour)))
@@ -329,12 +325,12 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 }
 
 func setUpForwarder(t *testing.T, owner *bind.TransactOpts, chain *backends.SimulatedBackend) (common.Address, *forwarder_wrapper.Forwarder) {
-	// deploys EIP 2771 forwarder contract that verifies signatures from meta transaction and forwards the call to recipient contract (i.e MetaERC20 token)
+	// deploys EIP 2771 forwarder contract that verifies signatures from meta transaction and forwards the call to recipient contract (i.e BankERC20 token)
 	forwarderAddress, _, forwarder, err := forwarder_wrapper.DeployForwarder(owner, chain)
 	require.NoError(t, err)
 	chain.Commit()
-	// registers EIP712-compliant domain separator for MetaERC20 token
-	_, err = forwarder.RegisterDomainSeparator(owner, metatx.CrossChainERC20ExtensionName, metatx.CrossChainERC20ExtensionVersion)
+	// registers EIP712-compliant domain separator for BankERC20 token
+	_, err = forwarder.RegisterDomainSeparator(owner, metatx.BankERC20TokenName, metatx.BankERC20TokenVersion)
 	require.NoError(t, err)
 	chain.Commit()
 
@@ -387,16 +383,16 @@ func generateKeyAndTransactor(t *testing.T, chainID uint64) (key ethkey.KeyV2, t
 	return
 }
 
-func setUpCrossChainERC20(t *testing.T, owner *bind.TransactOpts, chain *backends.SimulatedBackend, forwarderAddress, routerAddress common.Address, totalSupply *big.Int, isCrossChainTransfer bool) (common.Address, *cross_chain_erc20_extension.CrossChainERC20Extension) {
-	// deploys MetaERC20 token that enables meta transactions for same-chain and cross-chain token transfers
-	tokenAddress, _, token, err := cross_chain_erc20_extension.DeployCrossChainERC20Extension(
-		owner, chain, "BankToken", "BANK", big.NewInt(0).Mul(totalSupply, big.NewInt(1e18)), forwarderAddress, routerAddress, isCrossChainTransfer)
+func setUpBankERC20(t *testing.T, owner *bind.TransactOpts, chain *backends.SimulatedBackend, forwarderAddress, routerAddress, chainlinkOwner common.Address, totalSupply *big.Int, isCrossChainTransfer bool) (common.Address, *bank_erc20.BankERC20) {
+	// deploys BankERC20 token that enables meta transactions for same-chain and cross-chain token transfers
+	tokenAddress, _, token, err := bank_erc20.DeployBankERC20(
+		owner, chain, "BankToken", "BANK", big.NewInt(0).Mul(totalSupply, big.NewInt(1e18)), forwarderAddress, routerAddress, chainlinkOwner, isCrossChainTransfer)
 	require.NoError(t, err)
 	chain.Commit()
 	return tokenAddress, token
 }
 
-func transferToken(t *testing.T, token *cross_chain_erc20_extension.CrossChainERC20Extension, sender, receiver *bind.TransactOpts, amount *big.Int, chain *backends.SimulatedBackend) {
+func transferToken(t *testing.T, token *bank_erc20.BankERC20, sender, receiver *bind.TransactOpts, amount *big.Int, chain *backends.SimulatedBackend) {
 	senderBalanceBefore, err := token.BalanceOf(nil, sender.From)
 	require.NoError(t, err)
 	chain.Commit()

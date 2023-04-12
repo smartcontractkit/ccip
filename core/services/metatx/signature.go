@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	CrossChainERC20ExtensionName    = "CrossChainERC20Extension"
-	CrossChainERC20ExtensionVersion = "v1"
+	BankERC20TokenName    = "BankERC20"
+	BankERC20TokenVersion = "v1"
 )
 
 var TypeHash = crypto.Keccak256([]byte("ForwardRequest(address from,address target,uint256 nonce,bytes data,uint256 validUntilTime)"))
@@ -47,7 +47,7 @@ func SignMetaTransfer(
 		return nil, [32]byte{}, [32]byte{}, nil, errors.Wrapf(err, "failed to get nonce of %s", owner.Hex())
 	}
 
-	domainSeparator, err := forwarder.GetDomainSeparator(nil, CrossChainERC20ExtensionName, CrossChainERC20ExtensionVersion)
+	domainSeparator, err := forwarder.GetDomainSeparator(nil, BankERC20TokenName, BankERC20TokenVersion)
 	if err != nil {
 		return nil, [32]byte{}, [32]byte{}, nil, errors.Wrap(err, "failed to get domain separator from contract")
 	}
