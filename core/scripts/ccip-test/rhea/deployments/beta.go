@@ -599,7 +599,7 @@ var Beta_ArbitrumGoerliToSepolia = rhea.EvmDeploymentConfig{
 }
 
 var Beta_SepoliaToArbitrumGoerli = rhea.EvmDeploymentConfig{
-	ChainConfig: Beta_ArbitrumGoerli,
+	ChainConfig: Beta_Sepolia,
 	LaneConfig: rhea.EVMLaneConfig{
 		CommitStore:  gethcommon.HexToAddress("0x50d289b2ff6605209988092424bf354488a52468"),
 		OnRamp:       gethcommon.HexToAddress("0x2eb5554ea058ca44ee18a731b651ae06b5261b7a"),
