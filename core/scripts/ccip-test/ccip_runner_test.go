@@ -18,7 +18,7 @@ import (
 var (
 	// Change these values
 	sourceChain = rhea.ArbitrumGoerli
-	destChain   = rhea.OptimismGoerli
+	destChain   = rhea.Sepolia
 	ENV         = dione.StagingBeta
 
 	// These will automatically populate or error if the lane doesn't exist
