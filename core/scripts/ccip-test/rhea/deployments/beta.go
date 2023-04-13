@@ -575,15 +575,15 @@ var Beta_SepoliaToOptimismGoerli = rhea.EvmDeploymentConfig{
 var Beta_ArbitrumGoerliToSepolia = rhea.EvmDeploymentConfig{
 	ChainConfig: Beta_ArbitrumGoerli,
 	LaneConfig: rhea.EVMLaneConfig{
-		CommitStore:  gethcommon.HexToAddress("0x7b9e7a97ca47b7a5501c8eb07abf78fb37bb4738"),
-		OnRamp:       gethcommon.HexToAddress("0xae32fd8ae148bd88e3da6fae8cd7561eed3ec5cc"),
-		OffRamp:      gethcommon.HexToAddress("0xb5fb34580ff11fd2ab6cb4b1182aa2cd589b9234"),
-		PingPongDapp: gethcommon.HexToAddress("0x95074a4903719940516ed44ae101dbd1bfe101d2"),
+		CommitStore:  gethcommon.HexToAddress("0xd97db6611816aa31d085a46a9731e97937a15b6f"),
+		OnRamp:       gethcommon.HexToAddress("0x21560b4acaedb8aa2dd935618f15da43197bdc12"),
+		OffRamp:      gethcommon.HexToAddress("0x7323c8101e472535647f84199700e687559ce8ea"),
+		PingPongDapp: gethcommon.HexToAddress("0x0ad2dc37e1a373b4d66563faf636021d96330c4a"),
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployCommitStore:  false,
 			DeployRamp:         false,
 			DeployPingPongDapp: false,
-			DeployedAtBlock:    16022100,
+			DeployedAtBlock:    16241152,
 		},
 		CommitOffchainConfig: ccip.CommitOffchainConfig{
 			FeeUpdateHeartBeat:    models.MustMakeDuration(24 * time.Hour),
@@ -601,15 +601,15 @@ var Beta_ArbitrumGoerliToSepolia = rhea.EvmDeploymentConfig{
 var Beta_SepoliaToArbitrumGoerli = rhea.EvmDeploymentConfig{
 	ChainConfig: Beta_Sepolia,
 	LaneConfig: rhea.EVMLaneConfig{
-		CommitStore:  gethcommon.HexToAddress("0x50d289b2ff6605209988092424bf354488a52468"),
-		OnRamp:       gethcommon.HexToAddress("0x2eb5554ea058ca44ee18a731b651ae06b5261b7a"),
-		OffRamp:      gethcommon.HexToAddress("0xfe01bbad74159b184f5a7351cdd3faddc68ceb89"),
-		PingPongDapp: gethcommon.HexToAddress("0x3859c817b9795cb82ced4b1447dc23310e98ce1d"),
+		CommitStore:  gethcommon.HexToAddress("0x7ce9b67c7ceff8a0638f71ddfe10179f69649064"),
+		OnRamp:       gethcommon.HexToAddress("0x6653c76f928b8f1442e25c8accf479ffb0d4ce96"),
+		OffRamp:      gethcommon.HexToAddress("0x71ae425e2631e91464afdb9558caf6f7d66a3634"),
+		PingPongDapp: gethcommon.HexToAddress("0xc3a11ef77e260e9bff04b6b2e0a4f1619436a9c2"),
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployCommitStore:  false,
 			DeployRamp:         false,
 			DeployPingPongDapp: false,
-			DeployedAtBlock:    3277498,
+			DeployedAtBlock:    3282515,
 		},
 		CommitOffchainConfig: ccip.CommitOffchainConfig{
 			FeeUpdateHeartBeat:    models.MustMakeDuration(24 * time.Hour),
