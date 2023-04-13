@@ -705,7 +705,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			OnRamp:        onRampAddress,
 		},
 		evm_2_evm_offramp.EVM2EVMOffRampDynamicConfig{
-			PermissionLessExecutionThresholdSeconds: 1,
+			PermissionLessExecutionThresholdSeconds: 60,
 			Router:                                  destRouter.Address(),
 			Afn:                                     afnDestAddress,
 			MaxDataSize:                             1e5,

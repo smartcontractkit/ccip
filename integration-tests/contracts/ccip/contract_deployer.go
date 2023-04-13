@@ -470,7 +470,7 @@ func (e *CCIPContractsDeployer) DeployOffRamp(sourceChainId, destChainId uint64,
 				OnRamp:        onRamp,
 			},
 			evm_2_evm_offramp.EVM2EVMOffRampDynamicConfig{
-				PermissionLessExecutionThresholdSeconds: 0,
+				PermissionLessExecutionThresholdSeconds: 24 * 7 * 60 * 60,
 				Router:                                  destRouter,
 				Afn:                                     afn,
 				MaxDataSize:                             1e5,

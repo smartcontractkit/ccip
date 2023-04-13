@@ -32,10 +32,6 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
 
-const (
-	PERMISSIONLESS_EXECUTION_THRESHOLD = 7 * 24 * time.Hour
-)
-
 var (
 	_ types.ReportingPluginFactory = &ExecutionReportingPluginFactory{}
 	_ types.ReportingPlugin        = &ExecutionReportingPlugin{}
@@ -147,15 +143,20 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, errors.Wrap(err, "failed to decode onRamp abi")
 	}
+	dynamicConfig, err := rf.config.offRamp.GetDynamicConfig(&bind.CallOpts{})
+	if err != nil {
+		return nil, types.ReportingPluginInfo{}, err
+	}
 
 	return &ExecutionReportingPlugin{
-			lggr:            rf.config.lggr.Named("ExecutionReportingPlugin"),
-			F:               config.F,
-			offchainConfig:  offchainConfig,
-			config:          rf.config,
-			snoozedRoots:    make(map[[32]byte]time.Time),
-			inflightReports: newInflightReportsContainer(rf.config.inflightCacheExpiry),
-			onRampABI:       onRampABI,
+			lggr:                             rf.config.lggr.Named("ExecutionReportingPlugin"),
+			F:                                config.F,
+			offchainConfig:                   offchainConfig,
+			config:                           rf.config,
+			snoozedRoots:                     make(map[[32]byte]time.Time),
+			inflightReports:                  newInflightReportsContainer(rf.config.inflightCacheExpiry),
+			onRampABI:                        onRampABI,
+			permissionLessExecutionThreshold: time.Duration(dynamicConfig.PermissionLessExecutionThresholdSeconds) * time.Second,
 		}, types.ReportingPluginInfo{
 			Name:          "CCIPExecution",
 			UniqueReports: true,
@@ -167,13 +168,14 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 }
 
 type ExecutionReportingPlugin struct {
-	lggr            logger.Logger
-	F               int
-	config          ExecutionPluginConfig
-	inflightReports *inflightReportsContainer
-	offchainConfig  ExecOffchainConfig
-	snoozedRoots    map[[32]byte]time.Time
-	onRampABI       abi.ABI
+	lggr                             logger.Logger
+	F                                int
+	config                           ExecutionPluginConfig
+	inflightReports                  *inflightReportsContainer
+	offchainConfig                   ExecOffchainConfig
+	snoozedRoots                     map[[32]byte]time.Time
+	onRampABI                        abi.ABI
+	permissionLessExecutionThreshold time.Duration
 }
 
 func (r *ExecutionReportingPlugin) Query(context.Context, types.ReportTimestamp) (types.Query, error) {
@@ -220,7 +222,7 @@ func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(min, max uint64) (ma
 }
 
 func (r *ExecutionReportingPlugin) getExecutableSeqNrs(ctx context.Context, inflight []InflightInternalExecutionReport) ([]uint64, error) {
-	unexpiredReports, err := getUnexpiredCommitReports(r.config.dest, r.config.commitStore)
+	unexpiredReports, err := getUnexpiredCommitReports(r.config.dest, r.config.commitStore, r.permissionLessExecutionThreshold)
 	if err != nil {
 		return nil, err
 	}
@@ -327,11 +329,11 @@ func (r *ExecutionReportingPlugin) getExecutableSeqNrs(ctx context.Context, infl
 
 		batch, allMessagesExecuted := r.buildBatch(srcToDst, srcLogs, executedMp, inflight, allowedTokenAmount,
 			pricePerDestToken, srcFeeTokensPrices, destFeeTokensPrices, destGasPrice)
-		// If all messages are already executed, snooze the root for the PERMISSIONLESS_EXECUTION_THRESHOLD_SECONDS,
+		// If all messages are already executed, snooze the root for the config.PermissionLessExecutionThresholdSeconds
 		// so it will never be considered again.
 		if allMessagesExecuted {
 			r.lggr.Infof("Snoozing root %s forever since there are no executable txs anymore %v", hex.EncodeToString(unexpiredReport.MerkleRoot[:]), executedMp)
-			r.snoozedRoots[unexpiredReport.MerkleRoot] = time.Now().Add(PERMISSIONLESS_EXECUTION_THRESHOLD)
+			r.snoozedRoots[unexpiredReport.MerkleRoot] = time.Now().Add(r.permissionLessExecutionThreshold)
 			incSkippedRequests(reasonAllExecuted)
 			continue
 		}
@@ -665,8 +667,8 @@ func getFeeTokensPrices(ctx context.Context, priceRegistry *price_registry.Price
 	return prices, nil
 }
 
-func getUnexpiredCommitReports(dstLogPoller logpoller.LogPoller, commitStore *commit_store.CommitStore) ([]commit_store.CommitStoreCommitReport, error) {
-	logs, err := dstLogPoller.LogsCreatedAfter(ReportAccepted, commitStore.Address(), time.Now().Add(-PERMISSIONLESS_EXECUTION_THRESHOLD))
+func getUnexpiredCommitReports(dstLogPoller logpoller.LogPoller, commitStore *commit_store.CommitStore, permissionExecutionThreshold time.Duration) ([]commit_store.CommitStoreCommitReport, error) {
+	logs, err := dstLogPoller.LogsCreatedAfter(ReportAccepted, commitStore.Address(), time.Now().Add(-permissionExecutionThreshold))
 	if err != nil {
 		return nil, err
 	}
