@@ -118,16 +118,16 @@ func (client *CCIPClient) setAllowList(t *testing.T) {
 
 func (client *CCIPClient) setRateLimiterConfig(t *testing.T) {
 	tx, err := client.Source.OnRamp.SetRateLimiterConfig(client.Source.Owner, evm_2_evm_onramp.RateLimiterConfig{
-		Rate:     new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
-		Capacity: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
+		Capacity: rhea.UsdToRateLimitValue(rhea.RATE_LIMIT_CAPACITY_DOLLAR),
+		Rate:     rhea.UsdToRateLimitValue(rhea.RATE_LIMIT_RATE_DOLLAR),
 	})
 	shared.RequireNoError(t, err)
 	err = shared.WaitForMined(client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 	shared.RequireNoError(t, err)
 
 	tx, err = client.Dest.OffRamp.SetRateLimiterConfig(client.Dest.Owner, evm_2_evm_offramp.RateLimiterConfig{
-		Rate:     new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
-		Capacity: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
+		Capacity: rhea.UsdToRateLimitValue(rhea.RATE_LIMIT_CAPACITY_DOLLAR),
+		Rate:     rhea.UsdToRateLimitValue(rhea.RATE_LIMIT_RATE_DOLLAR),
 	})
 	shared.RequireNoError(t, err)
 	err = shared.WaitForMined(client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)

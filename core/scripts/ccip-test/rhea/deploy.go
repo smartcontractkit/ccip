@@ -19,6 +19,17 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/ping_pong_demo"
 )
 
+const (
+	RATE_LIMIT_CAPACITY_DOLLAR        = 1e9
+	RATE_LIMIT_RATE_DOLLAR            = 1e6
+	MAX_DATA_SIZE                     = 200_000
+	MAX_TOKEN_LENGTH                  = 5
+	MAX_TX_GAS_LIMIT                  = 4e6
+	PERMISSIONLESS_EXEC_THRESHOLD_SEC = 60
+	DEST_GAS_OVERHEAD                 = 5000
+	DEFAULT_GAS_LIMIT                 = 200_000
+)
+
 // DeployLanes will deploy all source and Destination chain contracts using the
 // owner key. Only run this of the currently deployed contracts are outdated or
 // when initializing a new chain.
@@ -117,7 +128,7 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId uint64,
 			Token:           tokenConfig.Token,
 			Multiplier:      multiplier,
 			FeeAmount:       big.NewInt(100e9),
-			DestGasOverhead: 5_000,
+			DestGasOverhead: DEST_GAS_OVERHEAD,
 		})
 	}
 
@@ -129,22 +140,22 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainId uint64,
 			LinkToken:         client.ChainConfig.SupportedTokens[LINK].Token,
 			ChainId:           client.ChainConfig.ChainId,
 			DestChainId:       destChainId,
-			DefaultTxGasLimit: 200_000,
+			DefaultTxGasLimit: DEFAULT_GAS_LIMIT,
 		},
 		evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
 			Router:          client.ChainConfig.Router,
 			PriceRegistry:   client.ChainConfig.PriceRegistry,
-			MaxDataSize:     1e6,
-			MaxTokensLength: 5,
-			MaxGasLimit:     ccip.GasLimitPerTx,
+			MaxDataSize:     MAX_DATA_SIZE,
+			MaxTokensLength: MAX_TOKEN_LENGTH,
+			MaxGasLimit:     MAX_TX_GAS_LIMIT,
 			Afn:             client.ChainConfig.Afn,
 		},
 		tokensAndPools,
 		[]common.Address{}, // allow list
 		evm_2_evm_onramp.RateLimiterConfig{
-			Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
-			Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
-			IsEnabled: false,
+			Capacity:  UsdToRateLimitValue(RATE_LIMIT_CAPACITY_DOLLAR),
+			Rate:      UsdToRateLimitValue(RATE_LIMIT_RATE_DOLLAR),
+			IsEnabled: true,
 		},
 		feeTokenConfig,
 		[]evm_2_evm_onramp.EVM2EVMOnRampNopAndWeight{},
@@ -186,18 +197,18 @@ func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainId uint
 			OnRamp:        onRamp,
 		},
 		evm_2_evm_offramp.EVM2EVMOffRampDynamicConfig{
-			PermissionLessExecutionThresholdSeconds: 60,
+			PermissionLessExecutionThresholdSeconds: PERMISSIONLESS_EXEC_THRESHOLD_SEC,
 			Router:                                  client.ChainConfig.Router,
 			Afn:                                     client.ChainConfig.Afn,
-			MaxTokensLength:                         15,
-			MaxDataSize:                             1e5,
+			MaxTokensLength:                         MAX_TOKEN_LENGTH,
+			MaxDataSize:                             MAX_DATA_SIZE,
 		},
 		syncedSourceTokens,
 		syncedDestPools,
 		evm_2_evm_offramp.RateLimiterConfig{
-			Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
-			Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
-			IsEnabled: false,
+			Capacity:  UsdToRateLimitValue(RATE_LIMIT_CAPACITY_DOLLAR),
+			Rate:      UsdToRateLimitValue(RATE_LIMIT_RATE_DOLLAR),
+			IsEnabled: true,
 		},
 	)
 	shared.RequireNoError(t, err)
@@ -362,4 +373,8 @@ func deployGovernanceDapps(t *testing.T, sourceClient *EvmDeploymentConfig, dest
 	err = shared.WaitForMined(sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
 	shared.RequireNoError(t, err)
 	sourceClient.Logger.Infof("GovernanceDapp configured in tx: %s", helpers.ExplorerLink(int64(sourceClient.ChainConfig.ChainId), tx.Hash()))
+}
+
+func UsdToRateLimitValue(usd int64) *big.Int {
+	return new(big.Int).Mul(new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e18)), big.NewInt(usd))
 }
