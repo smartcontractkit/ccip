@@ -280,7 +280,7 @@ var Beta_OptimismGoerliToAvaxFuji = rhea.EvmDeploymentConfig{
 		},
 		ExecOffchainConfig: ccip.ExecOffchainConfig{
 			BatchGasLimit:            5_000_000,
-			RelativeBoostPerWaitHour: 6, // doubles every 10 minutes
+			RelativeBoostPerWaitHour: 60,
 			MaxGasPrice:              200e9,
 		},
 	},
@@ -306,7 +306,7 @@ var Beta_AvaxFujiToOptimismGoerli = rhea.EvmDeploymentConfig{
 		},
 		ExecOffchainConfig: ccip.ExecOffchainConfig{
 			BatchGasLimit:            5_000_000,
-			RelativeBoostPerWaitHour: 6,
+			RelativeBoostPerWaitHour: 60,
 			MaxGasPrice:              200e9,
 		},
 	},
@@ -332,7 +332,7 @@ var Beta_ArbitrumGoerliToAvaxFuji = rhea.EvmDeploymentConfig{
 		},
 		ExecOffchainConfig: ccip.ExecOffchainConfig{
 			BatchGasLimit:            5_000_000,
-			RelativeBoostPerWaitHour: 6,
+			RelativeBoostPerWaitHour: 60,
 			MaxGasPrice:              200e9,
 		},
 	},
@@ -358,7 +358,7 @@ var Beta_AvaxFujiToArbitrumGoerli = rhea.EvmDeploymentConfig{
 		},
 		ExecOffchainConfig: ccip.ExecOffchainConfig{
 			BatchGasLimit:            5_000_000,
-			RelativeBoostPerWaitHour: 6,
+			RelativeBoostPerWaitHour: 60,
 			MaxGasPrice:              200e9,
 		},
 	},
@@ -384,7 +384,7 @@ var Beta_ArbitrumGoerliToOptimismGoerli = rhea.EvmDeploymentConfig{
 		},
 		ExecOffchainConfig: ccip.ExecOffchainConfig{
 			BatchGasLimit:            5_000_000,
-			RelativeBoostPerWaitHour: 6,
+			RelativeBoostPerWaitHour: 60,
 			MaxGasPrice:              200e9,
 		},
 	},
@@ -410,7 +410,7 @@ var Beta_OptimismGoerliToArbitrumGoerli = rhea.EvmDeploymentConfig{
 		},
 		ExecOffchainConfig: ccip.ExecOffchainConfig{
 			BatchGasLimit:            5_000_000,
-			RelativeBoostPerWaitHour: 6,
+			RelativeBoostPerWaitHour: 60,
 			MaxGasPrice:              200e9,
 		},
 	},
@@ -436,7 +436,7 @@ var Beta_AvaxFujiToSepolia = rhea.EvmDeploymentConfig{
 		},
 		ExecOffchainConfig: ccip.ExecOffchainConfig{
 			BatchGasLimit:            5_000_000,
-			RelativeBoostPerWaitHour: 6,
+			RelativeBoostPerWaitHour: 60,
 			MaxGasPrice:              200e9,
 		},
 	},
@@ -462,7 +462,7 @@ var Beta_SepoliaToAvaxFuji = rhea.EvmDeploymentConfig{
 		},
 		ExecOffchainConfig: ccip.ExecOffchainConfig{
 			BatchGasLimit:            5_000_000,
-			RelativeBoostPerWaitHour: 6,
+			RelativeBoostPerWaitHour: 60,
 			MaxGasPrice:              200e9,
 		},
 	},
@@ -488,7 +488,7 @@ var Beta_OptimismGoerliToGoerli = rhea.EvmDeploymentConfig{
 		},
 		ExecOffchainConfig: ccip.ExecOffchainConfig{
 			BatchGasLimit:            5_000_000,
-			RelativeBoostPerWaitHour: 6,
+			RelativeBoostPerWaitHour: 60,
 			MaxGasPrice:              500e9,
 		},
 	},
@@ -514,7 +514,7 @@ var Beta_GoerliToOptimismGoerli = rhea.EvmDeploymentConfig{
 		},
 		ExecOffchainConfig: ccip.ExecOffchainConfig{
 			BatchGasLimit:            5_000_000,
-			RelativeBoostPerWaitHour: 6,
+			RelativeBoostPerWaitHour: 60,
 			MaxGasPrice:              200e9,
 		},
 	},
@@ -540,7 +540,7 @@ var Beta_OptimismGoerliToSepolia = rhea.EvmDeploymentConfig{
 		},
 		ExecOffchainConfig: ccip.ExecOffchainConfig{
 			BatchGasLimit:            5_000_000,
-			RelativeBoostPerWaitHour: 6,
+			RelativeBoostPerWaitHour: 60,
 			MaxGasPrice:              200e9,
 		},
 	},
@@ -566,7 +566,7 @@ var Beta_SepoliaToOptimismGoerli = rhea.EvmDeploymentConfig{
 		},
 		ExecOffchainConfig: ccip.ExecOffchainConfig{
 			BatchGasLimit:            5_000_000,
-			RelativeBoostPerWaitHour: 6,
+			RelativeBoostPerWaitHour: 60,
 			MaxGasPrice:              200e9,
 		},
 	},
@@ -592,7 +592,7 @@ var Beta_ArbitrumGoerliToSepolia = rhea.EvmDeploymentConfig{
 		},
 		ExecOffchainConfig: ccip.ExecOffchainConfig{
 			BatchGasLimit:            5_000_000,
-			RelativeBoostPerWaitHour: 6,
+			RelativeBoostPerWaitHour: 60,
 			MaxGasPrice:              200e9,
 		},
 	},
@@ -618,7 +618,7 @@ var Beta_SepoliaToArbitrumGoerli = rhea.EvmDeploymentConfig{
 		},
 		ExecOffchainConfig: ccip.ExecOffchainConfig{
 			BatchGasLimit:            5_000_000,
-			RelativeBoostPerWaitHour: 6,
+			RelativeBoostPerWaitHour: 60,
 			MaxGasPrice:              200e9,
 		},
 	},
