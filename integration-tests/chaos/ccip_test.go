@@ -4,10 +4,10 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/chainlink-env/chaos"
 	"github.com/smartcontractkit/chainlink-env/environment"
 	a "github.com/smartcontractkit/chainlink-env/pkg/alias"
+	"github.com/smartcontractkit/chainlink-testing-framework/utils"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
@@ -95,10 +95,12 @@ func TestChaosCCIP(t *testing.T) {
 			waitForChaosRecovery: false,
 		},
 	}
-	testCfg := testsetups.NewCCIPTestConfig(t, testsetups.Chaos)
+	l := utils.GetTestLogger(t)
+	testCfg := testsetups.NewCCIPTestConfig(t, l, testsetups.Chaos)
 	for _, in := range inputs {
 		t.Run(in.testName, func(t *testing.T) {
 			t.Parallel()
+			l := utils.GetTestLogger(t)
 			var (
 				tearDown         func()
 				numOfCommitNodes = 5
@@ -108,7 +110,7 @@ func TestChaosCCIP(t *testing.T) {
 				testSetup        *actions.CCIPTestEnv
 			)
 
-			setUpArgs := testsetups.CCIPDefaultTestSetUp(t, "chaos-ccip", map[string]interface{}{
+			setUpArgs := testsetups.CCIPDefaultTestSetUp(t, l, "chaos-ccip", map[string]interface{}{
 				"replicas": "12",
 				"db": map[string]interface{}{
 					"stateful": true,
@@ -149,12 +151,13 @@ func TestChaosCCIP(t *testing.T) {
 			})
 			lane.RecordStateBeforeTransfer()
 			// Send the ccip-request while the chaos is at play
-			lane.SendRequests(numOfRequests)
+			_, err = lane.SendRequests(numOfRequests)
+			require.NoError(t, err)
 			if in.waitForChaosRecovery {
 				// wait for chaos to be recovered before further validation
 				testEnvironment.Chaos.WaitForAllRecovered(chaosId)
 			} else {
-				log.Info().Msg("proceeding without waiting for chaos recovery")
+				l.Info().Msg("proceeding without waiting for chaos recovery")
 			}
 			lane.ValidateRequests()
 		})

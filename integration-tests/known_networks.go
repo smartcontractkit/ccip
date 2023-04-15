@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"github.com/smartcontractkit/chainlink-testing-framework/utils"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
@@ -257,19 +258,36 @@ func setURLs(prefix string, network *blockchain.EVMNetwork) {
 
 	wsEnvVar := fmt.Sprintf("%s_URLS", prefix)
 	httpEnvVar := fmt.Sprintf("%s_HTTP_URLS", prefix)
-	if os.Getenv(wsEnvVar) == "" {
-		wsURLs := strings.Split(os.Getenv("EVM_URLS"), ",")
-		httpURLs := strings.Split(os.Getenv("EVM_HTTP_URLS"), ",")
+	wsEnvURLs, err := utils.GetEnv(wsEnvVar)
+	if err != nil {
+		log.Fatal().Err(err).Str("env var", wsEnvVar).Msg("Error getting env var")
+	}
+	httpEnvURLs, err := utils.GetEnv(httpEnvVar)
+	if err != nil {
+		log.Fatal().Err(err).Str("env var", httpEnvVar).Msg("Error getting env var")
+	}
+	if wsEnvURLs == "" {
+		evmUrls, err := utils.GetEnv("EVM_URLS")
+		if err != nil {
+			log.Fatal().Err(err).Str("env var", "EVM_URLS").Msg("Error getting env var")
+		}
+		evmhttpUrls, err := utils.GetEnv("EVM_HTTP_URLS")
+		if err != nil {
+			log.Fatal().Err(err).Str("env var", "EVM_HTTP_URLS").Msg("Error getting env var")
+		}
+		wsURLs := strings.Split(evmUrls, ",")
+		httpURLs := strings.Split(evmhttpUrls, ",")
 		log.Warn().
 			Interface("EVM_URLS", wsURLs).
 			Interface("EVM_HTTP_URLS", httpURLs).
-			Msg(fmt.Sprintf("No '%s' env var defined, defaulting to 'EVM_URLS'", wsEnvVar))
+			Msgf("No '%s' env var defined, defaulting to 'EVM_URLS'", wsEnvVar)
 		network.URLs = wsURLs
 		network.HTTPURLs = httpURLs
 		return
 	}
-	wsURLs := strings.Split(os.Getenv(wsEnvVar), ",")
-	httpURLs := strings.Split(os.Getenv(httpEnvVar), ",")
+
+	wsURLs := strings.Split(wsEnvURLs, ",")
+	httpURLs := strings.Split(httpEnvURLs, ",")
 	network.URLs = wsURLs
 	network.HTTPURLs = httpURLs
 	log.Info().Interface(wsEnvVar, wsURLs).Interface(httpEnvVar, httpURLs).Msg("Read network URLs")
@@ -285,7 +303,11 @@ func setKeys(prefix string, network *blockchain.EVMNetwork) {
 	}
 
 	envVar := fmt.Sprintf("%s_KEYS", prefix)
-	if os.Getenv(envVar) == "" {
+	keysEnv, err := utils.GetEnv(envVar)
+	if err != nil {
+		log.Fatal().Err(err).Str("env var", envVar).Msg("Error getting env var")
+	}
+	if keysEnv == "" {
 		keys := strings.Split(os.Getenv("EVM_KEYS"), ",")
 		log.Warn().
 			Interface("EVM_KEYS", keys).
@@ -293,7 +315,7 @@ func setKeys(prefix string, network *blockchain.EVMNetwork) {
 		network.PrivateKeys = keys
 		return
 	}
-	keys := strings.Split(os.Getenv(envVar), ",")
+	keys := strings.Split(keysEnv, ",")
 	network.PrivateKeys = keys
 	log.Info().Interface(envVar, keys).Msg("Read network Keys")
 }

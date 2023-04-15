@@ -30,7 +30,8 @@ type CommonContracts struct {
 }
 
 type SourceContracts struct {
-	OnRamp string `json:"on_ramp"`
+	OnRamp     string `json:"on_ramp"`
+	DepolyedAt uint64 `json:"deployed_at"`
 }
 
 type DestContracts struct {
@@ -123,16 +124,10 @@ func ReadLanesFromExistingDeployment() (*Lanes, error) {
 }
 
 func CreateDeploymentJSON(path string) (*Lanes, error) {
-	var existingLanes Lanes
-	if len(ExistingContracts) == 0 {
-		_, err := os.Create(path)
-		return nil, err
+	existingLanes := Lanes{
+		LaneConfigs: make(map[string]*LaneConfig),
 	}
-	err := json.Unmarshal(ExistingContracts, &existingLanes)
-	if err != nil {
-		return nil, err
-	}
-	err = WriteLanesToJSON(path, &existingLanes)
+	err := WriteLanesToJSON(path, &existingLanes)
 	return &existingLanes, err
 }
 

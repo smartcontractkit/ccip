@@ -9,10 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/rs/zerolog"
-
 	"github.com/smartcontractkit/chainlink-testing-framework/loadgen"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
@@ -21,29 +20,22 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/testsetups"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 type CCIPE2ELoad struct {
 	t                     *testing.T
-	Source                *actions.SourceCCIPModule // all source contracts
-	Destination           *actions.DestCCIPModule   // all destination contracts
-	NoOfReq               int64                     // no of Request fired - required for balance assertion at the end
+	Lane                  *actions.CCIPLane
+	NoOfReq               int64 // no of Request fired - required for balance assertion at the end
 	totalGEFee            *big.Int
 	BalanceStats          BalanceStats  // balance assertion details
 	CurrentMsgSerialNo    *atomic.Int64 // current msg serial number in the load sequence
 	InitialSourceBlockNum uint64
 	InitialDestBlockNum   uint64        // blocknumber before the first message is fired in the load sequence
 	CallTimeOut           time.Duration // max time to wait for various on-chain events
-	TickerDuration        time.Duration // poll frequency while waiting for on-chain events
-	callStatsMu           *sync.Mutex
 	reports               *testreporters.CCIPLaneStats
-	seqNumCommittedMu     *sync.Mutex
-	seqNumCommitted       map[uint64]uint64 // key : seqNumber in the ReportAccepted event, value : blocknumber for corresponding event
 	msg                   router.ClientEVM2AnyMessage
 	msgMu                 *sync.Mutex
 }
@@ -54,19 +46,14 @@ type BalanceStats struct {
 	DestBalanceAssertions   []testhelpers.BalanceAssertion
 }
 
-func NewCCIPLoad(t *testing.T, source *actions.SourceCCIPModule, dest *actions.DestCCIPModule, timeout time.Duration, noOfReq int64, reporter *testreporters.CCIPLaneStats) *CCIPE2ELoad {
+func NewCCIPLoad(t *testing.T, lane *actions.CCIPLane, timeout time.Duration, noOfReq int64, reporter *testreporters.CCIPLaneStats) *CCIPE2ELoad {
 	return &CCIPE2ELoad{
 		t:                  t,
-		Source:             source,
-		Destination:        dest,
+		Lane:               lane,
 		CurrentMsgSerialNo: atomic.NewInt64(1),
-		TickerDuration:     time.Second,
 		CallTimeOut:        timeout,
 		NoOfReq:            noOfReq,
 		reports:            reporter,
-		callStatsMu:        &sync.Mutex{},
-		seqNumCommittedMu:  &sync.Mutex{},
-		seqNumCommitted:    make(map[uint64]uint64),
 		msgMu:              &sync.Mutex{},
 	}
 }
@@ -75,12 +62,12 @@ func NewCCIPLoad(t *testing.T, source *actions.SourceCCIPModule, dest *actions.D
 // Needs to be called before load sequence is started.
 // Needs to approve and fund for the entire sequence.
 func (c *CCIPE2ELoad) BeforeAllCall(msgType string) {
-	sourceCCIP := c.Source
-	destCCIP := c.Destination
+	sourceCCIP := c.Lane.Source
+	destCCIP := c.Lane.Dest
 	var tokenAndAmounts []router.ClientEVMTokenAmount
 	for i, token := range sourceCCIP.Common.BridgeTokens {
 		tokenAndAmounts = append(tokenAndAmounts, router.ClientEVMTokenAmount{
-			Token: common.HexToAddress(token.Address()), Amount: c.Source.TransferAmount[i],
+			Token: common.HexToAddress(token.Address()), Amount: c.Lane.Source.TransferAmount[i],
 		})
 	}
 
@@ -123,30 +110,25 @@ func (c *CCIPE2ELoad) BeforeAllCall(msgType string) {
 }
 
 func (c *CCIPE2ELoad) AfterAllCall() {
-	c.BalanceStats.DestBalanceAssertions = c.Destination.BalanceAssertions(
+	c.BalanceStats.DestBalanceAssertions = c.Lane.Dest.BalanceAssertions(
 		c.t,
 		c.BalanceStats.DestBalanceReq,
-		c.Source.TransferAmount,
+		c.Lane.Source.TransferAmount,
 		c.NoOfReq,
 	)
-	c.BalanceStats.SourceBalanceAssertions = c.Source.BalanceAssertions(c.t, c.BalanceStats.SourceBalanceReq, c.NoOfReq, c.totalGEFee)
+	c.BalanceStats.SourceBalanceAssertions = c.Lane.Source.BalanceAssertions(c.t, c.BalanceStats.SourceBalanceReq, c.NoOfReq, c.totalGEFee)
 	actions.AssertBalances(c.t, c.BalanceStats.DestBalanceAssertions)
 	actions.AssertBalances(c.t, c.BalanceStats.SourceBalanceAssertions)
 }
 
 func (c *CCIPE2ELoad) Call(_ *loadgen.Generator) loadgen.CallResult {
 	var res loadgen.CallResult
-	sourceCCIP := c.Source
+	sourceCCIP := c.Lane.Source
 	msgSerialNo := c.CurrentMsgSerialNo.Load()
 	c.CurrentMsgSerialNo.Inc()
 
-	lggr := zerolog.New(zerolog.NewConsoleWriter(zerolog.ConsoleTestWriter(c.t))).
-		With().Timestamp().Logger().
-		With().Int("msg Number", int(msgSerialNo)).
-		Str("Lane",
-			fmt.Sprintf("%d-->%d", c.Source.Common.ChainClient.GetChainID().Int64(),
-				c.Destination.Common.ChainClient.GetChainID().Int64())).
-		Logger()
+	lggr := c.Lane.Logger.With().Int("msg Number", int(msgSerialNo)).Logger()
+
 	// form the message for transfer
 	msgStr := fmt.Sprintf("message with Id %d", msgSerialNo)
 	c.msgMu.Lock()
@@ -173,7 +155,14 @@ func (c *CCIPE2ELoad) Call(_ *loadgen.Generator) loadgen.CallResult {
 		}
 		sendTx, err = sourceCCIP.Common.Router.CCIPSend(sourceCCIP.DestinationChainId, msg, fee)
 	}
-
+	txConfirmationTime := time.Now().UTC()
+	rcpt, err := c.Lane.Source.Common.ChainClient.GetTxReceipt(sendTx.Hash())
+	if err == nil {
+		hdr, err := c.Lane.Source.Common.ChainClient.HeaderByNumber(context.Background(), rcpt.BlockNumber)
+		if err == nil {
+			txConfirmationTime = hdr.Timestamp
+		}
+	}
 	if err != nil {
 		c.reports.UpdatePhaseStats(msgSerialNo, 0, testreporters.TX, time.Since(startTime), testreporters.Failure)
 		lggr.Err(err).Msg("ccip-send tx error for msg ID")
@@ -182,21 +171,20 @@ func (c *CCIPE2ELoad) Call(_ *loadgen.Generator) loadgen.CallResult {
 		return res
 	}
 	c.reports.UpdatePhaseStats(msgSerialNo, 0, testreporters.TX, time.Since(startTime), testreporters.Success)
-
+	lggr = lggr.With().Str("Msg Tx", sendTx.Hash().String()).Logger()
 	// wait for
 	// - CCIPSendRequested Event log to be generated,
-	ticker := time.NewTicker(c.TickerDuration)
-	defer ticker.Stop()
-	sentMsg, err := c.waitForCCIPSendRequested(lggr, ticker, c.InitialSourceBlockNum, msgSerialNo, sendTx.Hash().Hex(), time.Now())
+	sentMsg, commitStartTime, err := c.Lane.Source.AssertEventCCIPSendRequested(
+		lggr, msgSerialNo, sendTx.Hash().Hex(), c.CallTimeOut, txConfirmationTime, c.reports)
 	if err != nil {
 		lggr.Err(err).Msg("CCIPSendRequested event error")
 		res.Error = err.Error()
 		res.Data = c.reports.GetPhaseStatsForRequest(msgSerialNo)
 		return res
 	}
-	commitStartTime := time.Now()
+
 	seqNum := sentMsg.SequenceNumber
-	messageID := sentMsg.MessageId
+
 	if bytes.Compare(sentMsg.Data, []byte(msgStr)) != 0 {
 		res.Error = fmt.Sprintf("the message byte didnot match expected %s received %s msg ID %d", msgStr, string(sentMsg.Data), msgSerialNo)
 		res.Data = c.reports.GetPhaseStatsForRequest(msgSerialNo)
@@ -205,7 +193,7 @@ func (c *CCIPE2ELoad) Call(_ *loadgen.Generator) loadgen.CallResult {
 
 	// wait for
 	// - CommitStore to increase the seq number,
-	err = c.waitForSeqNumberIncrease(lggr, ticker, seqNum, msgSerialNo, commitStartTime)
+	err = c.Lane.Dest.AssertSeqNumberExecuted(lggr, msgSerialNo, seqNum, c.CallTimeOut, commitStartTime, c.reports)
 	if err != nil {
 		lggr.Err(err).Msgf("waiting for seq num increase for msg ID %d", msgSerialNo)
 		res.Error = err.Error()
@@ -213,7 +201,7 @@ func (c *CCIPE2ELoad) Call(_ *loadgen.Generator) loadgen.CallResult {
 		return res
 	}
 	// wait for ReportAccepted event
-	err = c.waitForReportAccepted(lggr, ticker, msgSerialNo, seqNum, c.InitialDestBlockNum, commitStartTime)
+	receivedAt, err := c.Lane.Dest.AssertEventReportAccepted(lggr, msgSerialNo, seqNum, c.CallTimeOut, commitStartTime, c.reports)
 	if err != nil {
 		lggr.Err(err).Msgf("waiting for ReportAcceptedEvent for msg ID %d", msgSerialNo)
 		res.Error = err.Error()
@@ -221,11 +209,7 @@ func (c *CCIPE2ELoad) Call(_ *loadgen.Generator) loadgen.CallResult {
 		return res
 	}
 
-	// wait for ExecutionStateChanged event
-	c.seqNumCommittedMu.Lock()
-	currentBlockOnDest := c.seqNumCommitted[seqNum] - 2
-	c.seqNumCommittedMu.Unlock()
-	err = c.waitForExecStateChange(lggr, ticker, []uint64{seqNum}, [][32]byte{messageID}, currentBlockOnDest, msgSerialNo, time.Now())
+	err = c.Lane.Dest.AssertEventExecutionStateChanged(lggr, msgSerialNo, seqNum, c.CallTimeOut, receivedAt, c.reports)
 	if err != nil {
 		lggr.Err(err).Msgf("waiting for ExecutionStateChangedEvent for msg ID %d", msgSerialNo)
 		res.Error = err.Error()
@@ -237,160 +221,12 @@ func (c *CCIPE2ELoad) Call(_ *loadgen.Generator) loadgen.CallResult {
 	return res
 }
 
-func (c *CCIPE2ELoad) updateSeqNumCommitted(seqNum []uint64, blockNum uint64) {
-	c.seqNumCommittedMu.Lock()
-	defer c.seqNumCommittedMu.Unlock()
-	for _, num := range seqNum {
-		if _, ok := c.seqNumCommitted[num]; ok {
-			return
-		}
-		c.seqNumCommitted[num] = blockNum
-	}
-}
-
-func (c *CCIPE2ELoad) waitForExecStateChange(log zerolog.Logger, ticker *time.Ticker, seqNums []uint64, messageID [][32]byte, currentBlockOnDest uint64, msgSerialNo int64, timeNow time.Time) error {
-	log.Info().Msgf("waiting for ExecutionStateChanged for seqNums %v", seqNums)
-	ctx, cancel := context.WithTimeout(context.Background(), c.CallTimeOut)
-	defer cancel()
-	for {
-		select {
-		case <-ticker.C:
-			iterator, err := c.Destination.OffRamp.FilterExecutionStateChanged(seqNums, messageID, currentBlockOnDest)
-			if err != nil {
-				for _, seqNum := range seqNums {
-					c.reports.UpdatePhaseStats(msgSerialNo, seqNum, testreporters.ExecStateChanged, time.Since(timeNow), testreporters.Failure)
-				}
-				return fmt.Errorf("filtering event ExecutionStateChanged returned error %+v msg ID %d and seqNum %v", err, msgSerialNo, seqNums)
-			}
-			for iterator.Next() {
-				switch ccip.MessageExecutionState(iterator.Event.State) {
-				case ccip.Success:
-					for _, seqNum := range seqNums {
-						c.reports.UpdatePhaseStats(msgSerialNo, seqNum, testreporters.ExecStateChanged, time.Since(timeNow), testreporters.Success)
-					}
-					return nil
-				case ccip.Failure:
-					for _, seqNum := range seqNums {
-						c.reports.UpdatePhaseStats(msgSerialNo, seqNum, testreporters.ExecStateChanged, time.Since(timeNow), testreporters.Failure)
-					}
-					return fmt.Errorf("ExecutionStateChanged event returned failure for seq num %v msg ID %d", seqNums, msgSerialNo)
-				}
-			}
-		case <-ctx.Done():
-			for _, seqNum := range seqNums {
-				c.reports.UpdatePhaseStats(msgSerialNo, seqNum, testreporters.ExecStateChanged, time.Since(timeNow), testreporters.Failure)
-			}
-			return fmt.Errorf("ExecutionStateChanged event not found for seq num %v msg ID %d", seqNums, msgSerialNo)
-		}
-	}
-}
-
-func (c *CCIPE2ELoad) waitForSeqNumberIncrease(log zerolog.Logger, ticker *time.Ticker, seqNum uint64, msgSerialNo int64, timeNow time.Time) error {
-	log.Info().Msgf("waiting for seq number %d to get increased", int(seqNum))
-	ctx, cancel := context.WithTimeout(context.Background(), c.CallTimeOut)
-	defer cancel()
-	for {
-		select {
-		case <-ticker.C:
-			seqNumberAfter, err := c.Destination.CommitStore.GetNextSeqNumber()
-			if err != nil {
-				c.reports.UpdatePhaseStats(msgSerialNo, seqNum, testreporters.Commit, time.Since(timeNow), testreporters.Failure)
-				return fmt.Errorf("error %+v in GetNextExpectedSeqNumber by commitStore for msg ID %d", err, msgSerialNo)
-			}
-			if seqNumberAfter > seqNum {
-				return nil
-			}
-		case <-ctx.Done():
-			c.reports.UpdatePhaseStats(msgSerialNo, seqNum, testreporters.Commit, time.Since(timeNow), testreporters.Failure)
-			return fmt.Errorf("sequence number is not increased for seq num %d msg ID %d", seqNum, msgSerialNo)
-		}
-	}
-}
-
-func (c *CCIPE2ELoad) waitForReportAccepted(log zerolog.Logger, ticker *time.Ticker, msgSerialNo int64, seqNum uint64, currentBlockOnDest uint64, timeNow time.Time) error {
-	log.Info().Int("seq Number", int(seqNum)).Msg("waiting for ReportAccepted")
-	ctx, cancel := context.WithTimeout(context.Background(), c.CallTimeOut)
-	defer cancel()
-	for {
-		select {
-		case <-ticker.C:
-			c.seqNumCommittedMu.Lock()
-			_, ok := c.seqNumCommitted[seqNum]
-			c.seqNumCommittedMu.Unlock()
-			// skip calling FilterReportAccepted if the seqNum is present in the map
-			if ok {
-				c.reports.UpdatePhaseStats(msgSerialNo, seqNum, testreporters.Commit, time.Since(timeNow), testreporters.Success)
-				return nil
-			}
-			it, err := c.Destination.CommitStore.FilterReportAccepted(currentBlockOnDest)
-			if err != nil {
-				c.reports.UpdatePhaseStats(msgSerialNo, seqNum, testreporters.Commit, time.Since(timeNow), testreporters.Failure)
-				return fmt.Errorf("error %+v in filtering by ReportAccepted event for seq num %d", err, seqNum)
-			}
-			for it.Next() {
-				in := it.Event.Report.Interval
-				seqNums := make([]uint64, in.Max-in.Min+1)
-				var i uint64
-				for range seqNums {
-					seqNums[i] = in.Min + i
-					i++
-				}
-				// update SeqNumCommitted map for all seqNums in the emitted ReportAccepted event
-				c.updateSeqNumCommitted(seqNums, it.Event.Raw.BlockNumber)
-				if in.Max >= seqNum && in.Min <= seqNum {
-					c.reports.UpdatePhaseStats(msgSerialNo, seqNum, testreporters.Commit, time.Since(timeNow), testreporters.Success)
-					return nil
-				}
-			}
-		case <-ctx.Done():
-			c.reports.UpdatePhaseStats(msgSerialNo, seqNum, testreporters.Commit, time.Since(timeNow), testreporters.Failure)
-			return fmt.Errorf("ReportAccepted is not found for seq num %d", seqNum)
-		}
-	}
-}
-
-func (c *CCIPE2ELoad) waitForCCIPSendRequested(
-	log zerolog.Logger,
-	ticker *time.Ticker,
-	currentBlockOnSource uint64,
-	msgSerialNo int64,
-	txHash string,
-	timeNow time.Time,
-) (evm_2_evm_onramp.InternalEVM2EVMMessage, error) {
-	var sentmsg evm_2_evm_onramp.InternalEVM2EVMMessage
-	log.Info().Msg("waiting for CCIPSendRequested")
-	ctx, cancel := context.WithTimeout(context.Background(), c.CallTimeOut)
-	defer cancel()
-	for {
-		select {
-		case <-ticker.C:
-			iterator, err := c.Source.OnRamp.FilterCCIPSendRequested(currentBlockOnSource)
-			if err != nil {
-				c.reports.UpdatePhaseStats(msgSerialNo, 0, testreporters.CCIPSendRe, time.Since(timeNow), testreporters.Failure)
-				return sentmsg, fmt.Errorf("error %+v in filtering CCIPSendRequested event for msg ID %d tx %s", err, msgSerialNo, txHash)
-			}
-			for iterator.Next() {
-				if iterator.Event.Raw.TxHash.Hex() == txHash {
-					sentmsg = iterator.Event.Message
-					c.reports.UpdatePhaseStats(msgSerialNo, sentmsg.SequenceNumber, testreporters.CCIPSendRe, time.Since(timeNow), testreporters.Success)
-					return sentmsg, nil
-				}
-			}
-		case <-ctx.Done():
-			c.reports.UpdatePhaseStats(msgSerialNo, 0, testreporters.CCIPSendRe, time.Since(timeNow), testreporters.Failure)
-			latest, _ := c.Source.Common.ChainClient.LatestBlockNumber(context.Background())
-			return sentmsg, fmt.Errorf("CCIPSendRequested event is not found for msg ID %d tx %s startblock %d latestblock %d",
-				msgSerialNo, txHash, currentBlockOnSource, latest)
-		}
-	}
-}
-
-func (c *CCIPE2ELoad) ReportAcceptedLog(log zerolog.Logger) {
-	log.Info().Msg("Commit Report stats")
-	it, err := c.Destination.CommitStore.FilterReportAccepted(c.InitialDestBlockNum)
+func (c *CCIPE2ELoad) ReportAcceptedLog() {
+	c.Lane.Logger.Info().Msg("Commit Report stats")
+	it, err := c.Lane.Dest.CommitStore.Instance.FilterReportAccepted(&bind.FilterOpts{Start: c.InitialDestBlockNum})
 	require.NoError(c.t, err, "report committed result")
 	i := 1
-	event := log.Info()
+	event := c.Lane.Logger.Info()
 	for it.Next() {
 		event.Interface(fmt.Sprintf("%d Report Intervals", i), it.Event.Report.Interval)
 		i++
