@@ -12,36 +12,52 @@ import {OwnerIsCreator} from "../ccip/OwnerIsCreator.sol";
 abstract contract AbstractCrossChainMetaTransactor is OwnerIsCreator, IERC2771Recipient {
   /// @dev forwarder verifies signatures for meta transactions and forwards the
   /// @dev request to this contract
-  address private s_forwarder;
-  address private s_ccipRouter;
-  address private s_chainlinkOwner;
-  /// @dev boolean only used for testing. Should be set to false in production
-  /// @dev go-ethereum.simulatedBackend (used for testing) doesn't allow custom chain IDs
-  /// @dev so block.chainid is hard-coded to 1337.
-  bool private s_test_only_force_cross_chain_transfer;
+  address private immutable i_forwarder;
+  IRouterClient private immutable i_ccipRouter;
+  /// @dev address of account privileged to fund/withdraw native token for CCIP fee
+  address private immutable i_ccipFeeProviderAddress;
+  /// @dev CCIP chain ID
+  uint64 private immutable i_ccipChainId;
+
+  /// @notice This error is thrown whenever a zero address is passed
+  error ZeroAddress();
 
   constructor(
     address forwarder,
     address ccipRouter,
-    address chainlinkOwner,
-    bool _test_only_force_cross_chain_transfer
+    address ccipFeeProviderAddress,
+    uint64 ccipChainId
   ) {
-    s_forwarder = forwarder;
-    s_ccipRouter = ccipRouter;
-    s_chainlinkOwner = chainlinkOwner;
-    s_test_only_force_cross_chain_transfer = _test_only_force_cross_chain_transfer;
+    if (forwarder == address(0)) {
+      revert ZeroAddress();
+    }
+    if (ccipRouter == address(0)) {
+      revert ZeroAddress();
+    }
+    if (ccipFeeProviderAddress == address(0)) {
+      revert ZeroAddress();
+    }
+    i_forwarder = forwarder;
+    i_ccipRouter = IRouterClient(ccipRouter);
+    i_ccipFeeProviderAddress = ccipFeeProviderAddress;
+    i_ccipChainId = ccipChainId;
   }
 
+  // ================================================================
+  // |                        Meta-Transaction                      |
+  // ================================================================
+
   /// @dev Transfers "amount" of this token to receiver address in destination chain.
-  /// @param receiver token receiver address in destination chain. Handles distribution of tokens to recipients
-  /// @param amount total token amount to be transferred
-  /// @param destinationChainId destination chain ID
+  /// @dev contract needs to be funded with native token, which is used for CCIP fee
+  /// @param receiver This is the address that tokens are transferred to
+  /// @param amount Total token amount to be transferred
+  /// @param destinationChainId Destination chain ID
   function metaTransfer(
     address receiver,
     uint256 amount,
     uint64 destinationChainId
   ) external virtual validateTrustedForwarder returns (bytes32) {
-    if (!isCrossChainTransfer(destinationChainId)) {
+    if (!_isCrossChainTransfer(destinationChainId)) {
       _transfer(_msgSender(), receiver, amount);
       return ""; // return empty bytes32 because there is no ccip message ID
     }
@@ -54,18 +70,19 @@ abstract contract AbstractCrossChainMetaTransactor is OwnerIsCreator, IERC2771Re
       feeToken: address(0), // use native token instead of ERC20 tokens
       extraArgs: ""
     });
-    uint256 fee = IRouterClient(s_ccipRouter).getFee(destinationChainId, message);
-
     _transfer(_msgSender(), address(this), amount);
-    _approve(address(this), s_ccipRouter, amount);
+    _approve(address(this), address(i_ccipRouter), amount);
 
-    return IRouterClient(s_ccipRouter).ccipSend{value: fee}(destinationChainId, message);
+    uint256 fee = i_ccipRouter.getFee(destinationChainId, message);
+
+    return i_ccipRouter.ccipSend{value: fee}(destinationChainId, message);
   }
 
   /// @dev Sets `amount` as the allowance of `spender` over the `owner` s tokens.
-  /// @param owner token owner approving allowance
-  /// @param spender approved token spender
-  /// @param amount total token amount to be approved
+  /// @dev Sample implementation: https://github.com/OpenZeppelin/openzeppelin-contracts/blob/d59306bd06a241083841c2e4a39db08e1f3722cc/contracts/token/ERC20/ERC20.sol#L308-L314
+  /// @param owner Token owner approving allowance
+  /// @param spender Approved token spender
+  /// @param amount Total token amount to be approved
   function _approve(
     address owner,
     address spender,
@@ -73,63 +90,83 @@ abstract contract AbstractCrossChainMetaTransactor is OwnerIsCreator, IERC2771Re
   ) internal virtual;
 
   /// @dev Moves `amount` of tokens from `sender` to `recipient`.
-  /// @param sender token sender
-  /// @param recipient token recipient
-  /// @param amount total token amount to be approved
+  /// @dev Sample implementation: https://github.com/OpenZeppelin/openzeppelin-contracts/blob/d59306bd06a241083841c2e4a39db08e1f3722cc/contracts/token/ERC20/ERC20.sol#L222-L240
+  /// @param sender Token sender
+  /// @param recipient Token recipient
+  /// @param amount Total token amount to be approved
   function _transfer(
     address sender,
     address recipient,
     uint256 amount
   ) internal virtual;
 
-  function isCrossChainTransfer(uint64 chainId) private view returns (bool) {
-    if (s_test_only_force_cross_chain_transfer) {
-      return true;
-    }
-    return chainId != block.chainid;
+  function _isCrossChainTransfer(uint64 chainId) private view returns (bool) {
+    return i_ccipChainId != chainId;
   }
 
+  function getCCIPChainId() public view returns (uint64) {
+    return i_ccipChainId;
+  }
+
+  function getCCIPRouter() public view returns (IRouterClient) {
+    return i_ccipRouter;
+  }
+
+  // ================================================================
+  // |                        Contract Funding                      |
+  // ================================================================
+
+  /// @dev For cross-chain transfers, this contract needs to be funded with native token
   receive() external payable {}
 
   error WithdrawFailure();
 
-  function withdrawNative() external validateChainlinkOwner {
+  /// @dev withdraws all native tokens from this contract to CCIP Fee Provider address
+  /// @dev Only callable by CCIP Fee Provider address
+  function withdrawNative() external validateCCIPFeeProvider {
     uint256 amount = address(this).balance;
     // Owner can receive Ether since the address of owner is payable
-    (bool success, ) = owner().call{value: amount}("");
+    (bool success, ) = i_ccipFeeProviderAddress.call{value: amount}("");
     if (!success) {
       revert WithdrawFailure();
     }
   }
 
-  /// @notice Method is not a required method to allow Recipients to trust multiple Forwarders. Not recommended yet.
-  /// @notice **Warning** The Forwarder can have a full control over your Recipient. Only trust verified Forwarder.
+  function getCCIPFeeProvider() public view returns (address) {
+    return i_ccipFeeProviderAddress;
+  }
+
+  // ================================================================
+  // |                        Forwarder                             |
+  // ================================================================
+
+  /// @notice Address of the trusted forwarder
   /// @return forwarder The address of the Forwarder contract that is being used.
   function getTrustedForwarder() public view returns (address forwarder) {
-    return s_forwarder;
+    return i_forwarder;
   }
 
   /// @inheritdoc IERC2771Recipient
   function isTrustedForwarder(address forwarder) public view override returns (bool) {
-    return forwarder == s_forwarder;
+    return forwarder == i_forwarder;
   }
 
   /// @inheritdoc IERC2771Recipient
-  function _msgSender() internal view override returns (address ret) {
+  function _msgSender() internal view override returns (address msgSender) {
     if (msg.data.length >= 20 && isTrustedForwarder(msg.sender)) {
       // At this point we know that the sender is a trusted forwarder,
       // so we trust that the last bytes of msg.data are the verified sender address.
       // extract sender address from the end of msg.data
       assembly {
-        ret := shr(96, calldataload(sub(calldatasize(), 20)))
+        msgSender := shr(96, calldataload(sub(calldatasize(), 20)))
       }
     } else {
-      ret = msg.sender;
+      msgSender = msg.sender;
     }
   }
 
   /// @inheritdoc IERC2771Recipient
-  function _msgData() internal view override returns (bytes calldata ret) {
+  function _msgData() internal view override returns (bytes calldata msgData) {
     if (msg.data.length >= 20 && isTrustedForwarder(msg.sender)) {
       return msg.data[0:msg.data.length - 20];
     } else {
@@ -138,19 +175,15 @@ abstract contract AbstractCrossChainMetaTransactor is OwnerIsCreator, IERC2771Re
   }
 
   function getForwarder() public view returns (address) {
-    return s_forwarder;
+    return i_forwarder;
   }
 
-  function getCCIPRouter() public view returns (address) {
-    return s_ccipRouter;
-  }
-
-  function getChainlinkOwner() public view returns (address) {
-    return s_chainlinkOwner;
-  }
+  // ================================================================
+  // |                      Access Control                           |
+  // ================================================================
 
   error MustBeTrustedForwarder(address sender);
-  error MustBeChainlinkOwner(address sender);
+  error MustBeCCIPFeeProvider(address sender);
 
   modifier validateTrustedForwarder() {
     if (!isTrustedForwarder(msg.sender)) {
@@ -159,9 +192,9 @@ abstract contract AbstractCrossChainMetaTransactor is OwnerIsCreator, IERC2771Re
     _;
   }
 
-  modifier validateChainlinkOwner() {
-    if (msg.sender != s_chainlinkOwner) {
-      revert MustBeChainlinkOwner(msg.sender);
+  modifier validateCCIPFeeProvider() {
+    if (msg.sender != i_ccipFeeProviderAddress) {
+      revert MustBeCCIPFeeProvider(msg.sender);
     }
     _;
   }

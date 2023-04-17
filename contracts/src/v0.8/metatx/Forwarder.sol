@@ -3,8 +3,8 @@
 pragma solidity ^0.8.15;
 pragma abicoder v2;
 
-import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
+import "../vendor/ECDSA.sol";
+import "../vendor/ERC165.sol";
 
 import "./IForwarder.sol";
 import {OwnerIsCreator} from "../ccip/OwnerIsCreator.sol";
@@ -25,18 +25,23 @@ contract Forwarder is IForwarder, ERC165, OwnerIsCreator {
   string public constant EIP712_DOMAIN_TYPE =
     "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)";
 
-  mapping(bytes32 => bool) public typeHashes;
-  mapping(bytes32 => bool) public domains;
+  /// @dev mapping of EIP712 request type to boolean.
+  /// @dev request type is validated during EIP712 signature verification
+  mapping(bytes32 => bool) public s_typeHashes;
+  /// @dev mapping of EIP712 domain separator to boolean.
+  /// @dev domain separator must be registered for every target contract
+  /// @dev domain separator is validated during EIP712 signature verification
+  mapping(bytes32 => bool) public s_domains;
 
   /// @notice Nonces of senders, used to prevent replay attacks
-  mapping(address => uint256) private nonces;
+  mapping(address => uint256) private s_nonces;
 
   // solhint-disable-next-line no-empty-blocks
   receive() external payable {}
 
   /// @inheritdoc IForwarder
   function getNonce(address from) public view override returns (uint256) {
-    return nonces[from];
+    return s_nonces[from];
   }
 
   constructor() {
@@ -71,6 +76,8 @@ contract Forwarder is IForwarder, ERC165, OwnerIsCreator {
     bytes returnValue
   );
 
+  error RequestExpired(uint256 expected, uint256 actual);
+
   /// @inheritdoc IForwarder
   function execute(
     ForwardRequest calldata req,
@@ -82,7 +89,9 @@ contract Forwarder is IForwarder, ERC165, OwnerIsCreator {
     _verifySig(req, domainSeparator, requestTypeHash, suffixData, sig);
     _verifyAndUpdateNonce(req);
 
-    require(req.validUntilTime == 0 || req.validUntilTime > block.timestamp, "FWD: request expired");
+    if (req.validUntilTime != 0 && req.validUntilTime <= block.timestamp) {
+      revert RequestExpired(block.timestamp, req.validUntilTime);
+    }
 
     bytes memory callData = abi.encodePacked(req.data, req.from);
     // solhint-disable-next-line avoid-low-level-calls
@@ -90,6 +99,7 @@ contract Forwarder is IForwarder, ERC165, OwnerIsCreator {
 
     if (!success) {
       if (ret.length == 0) revert("Forwarded call reverted without reason");
+      // assembly below extracts revert reason from the low-level call
       assembly {
         revert(add(32, ret), mload(ret))
       }
@@ -100,19 +110,29 @@ contract Forwarder is IForwarder, ERC165, OwnerIsCreator {
     return (success, ret);
   }
 
+  error NonceMismatch(uint256 expected, uint256 actual);
+
   function _verifyNonce(ForwardRequest calldata req) internal view {
-    require(nonces[req.from] == req.nonce, "FWD: nonce mismatch");
+    if (s_nonces[req.from] != req.nonce) {
+      revert NonceMismatch(s_nonces[req.from], req.nonce);
+    }
   }
 
   function _verifyAndUpdateNonce(ForwardRequest calldata req) internal {
-    require(nonces[req.from]++ == req.nonce, "FWD: nonce mismatch");
+    if (s_nonces[req.from]++ != req.nonce) {
+      revert NonceMismatch(s_nonces[req.from], req.nonce);
+    }
   }
+
+  error InvalidTypeName(string typeName);
 
   /// @inheritdoc IForwarder
   function registerRequestType(string calldata typeName, string calldata typeSuffix) external override {
     for (uint256 i = 0; i < bytes(typeName).length; i++) {
       bytes1 c = bytes(typeName)[i];
-      require(c != "(" && c != ")", "FWD: invalid typename");
+      if (c == "(" || c == ")") {
+        revert InvalidTypeName(typeName);
+      }
     }
 
     string memory requestType = string(abi.encodePacked(typeName, "(", GENERIC_PARAMS, ",", typeSuffix));
@@ -120,18 +140,12 @@ contract Forwarder is IForwarder, ERC165, OwnerIsCreator {
   }
 
   function getDomainSeparator(string calldata name, string calldata version) public view returns (bytes memory) {
-    uint256 chainId;
-    /* solhint-disable-next-line no-inline-assembly */
-    assembly {
-      chainId := chainid()
-    }
-
     return
       abi.encode(
         keccak256(bytes(EIP712_DOMAIN_TYPE)),
         keccak256(bytes(name)),
         keccak256(bytes(version)),
-        chainId,
+        block.chainid,
         address(this)
       );
   }
@@ -140,16 +154,20 @@ contract Forwarder is IForwarder, ERC165, OwnerIsCreator {
   function registerDomainSeparator(string calldata name, string calldata version) external override onlyOwner {
     bytes memory domainSeparator = getDomainSeparator(name, version);
     bytes32 domainHash = keccak256(domainSeparator);
-    domains[domainHash] = true;
+    s_domains[domainHash] = true;
 
     emit DomainRegistered(domainHash, domainSeparator);
   }
 
   function registerRequestTypeInternal(string memory requestType) internal {
     bytes32 requestTypehash = keccak256(bytes(requestType));
-    typeHashes[requestTypehash] = true;
+    s_typeHashes[requestTypehash] = true;
     emit RequestTypeRegistered(requestTypehash, requestType);
   }
+
+  error UnregisteredDomainSeparator();
+  error UnregisteredTypeHash();
+  error SignatureMismatch();
 
   function _verifySig(
     ForwardRequest calldata req,
@@ -158,14 +176,20 @@ contract Forwarder is IForwarder, ERC165, OwnerIsCreator {
     bytes calldata suffixData,
     bytes calldata sig
   ) internal view virtual {
-    require(domains[domainSeparator], "FWD: unregistered domain sep.");
-    require(typeHashes[requestTypeHash], "FWD: unregistered typehash");
+    if (!s_domains[domainSeparator]) {
+      revert UnregisteredDomainSeparator();
+    }
+    if (!s_typeHashes[requestTypeHash]) {
+      revert UnregisteredTypeHash();
+    }
     bytes32 digest = keccak256(
       abi.encodePacked("\x19\x01", domainSeparator, keccak256(_getEncoded(req, requestTypeHash, suffixData)))
     );
     // solhint-disable-next-line avoid-tx-origin
 
-    require(tx.origin == DRY_RUN_ADDRESS || digest.recover(sig) == req.from, "FWD: signature mismatch");
+    if (tx.origin != DRY_RUN_ADDRESS && digest.recover(sig) != req.from) {
+      revert SignatureMismatch();
+    }
   }
 
   /// @notice Creates a byte array that is a valid ABI encoding of a request of a `RequestType` type. See `execute()`.

@@ -8,12 +8,6 @@ import "../vendor/Context.sol";
 import "./AbstractCrossChainMetaTransactor.sol";
 
 /// @dev Implementation of the {IERC20} interface.
-/// This implementation is agnostic to the way tokens are created. This means
-/// that a supply mechanism has to be added in a derived contract using {_mint}.
-/// For a generic mechanism see {ERC20PresetMinterPauser}.
-/// TIP: For a detailed writeup see our guide
-/// https://forum.zeppelin.solutions/t/how-to-implement-erc20-supply-mechanisms/226[How
-/// to implement supply mechanisms].
 /// We have followed general OpenZeppelin Contracts guidelines: functions revert
 /// instead returning `false` on failure. This behavior is nonetheless
 /// conventional and does not conflict with the expectations of ERC20
@@ -35,20 +29,22 @@ contract BankERC20 is IERC20, IERC20Metadata, AbstractCrossChainMetaTransactor {
   string private _name;
   string private _symbol;
 
-  /// @dev Sets the values for {name} and {symbol}.
-  /// The default value of {decimals} is 18. To select a different value for
-  /// {decimals} you should overload it.
-  /// All two of these values are immutable: they can only be set once during
-  /// construction.
+  /// @param name Name of the token contract
+  /// @param symbol Symbol of the token contract
+  /// @param totalSupply Total supply for the token contract. Minted to the contract deployer address
+  /// @param forwarder address of EIP2771 forwarder that verifies signatures and forwards calls to the target contract
+  /// @param ccipRouter address of the CCIP router that is responsible for cross-chain token delivery
+  /// @param ccipFeeProvider address of the funding account that pre-funds the contract for CCIP fee
+  /// @param ccipChainId CCIP chain ID
   constructor(
     string memory name,
     string memory symbol,
     uint256 totalSupply,
     address forwarder,
     address ccipRouter,
-    address chainlinkOwner,
-    bool test_only_force_cross_chain_transfer
-  ) AbstractCrossChainMetaTransactor(forwarder, ccipRouter, chainlinkOwner, test_only_force_cross_chain_transfer) {
+    address ccipFeeProvider,
+    uint64 ccipChainId
+  ) AbstractCrossChainMetaTransactor(forwarder, ccipRouter, ccipFeeProvider, ccipChainId) {
     _name = name;
     _symbol = symbol;
     _mint(owner(), totalSupply);
