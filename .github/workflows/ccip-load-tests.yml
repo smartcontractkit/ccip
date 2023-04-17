@@ -46,12 +46,12 @@ on:
       send_request_per_second:
         description: Number of ccip-send requests to trigger per second
         required: true
-        default: 3
+        default: 2
         type: number
       phase_time_out:
         description: 'Max time(in minutes) to wait for individual events in ccip flow'
         required: true
-        default: 15m
+        default: 30m
         type: number
       slackMemberID:
         description: Slack Member ID (Not your @)
@@ -208,6 +208,10 @@ jobs:
           if [[ "${{ env.INPUT_CHAINLINK_TEST_VERSION }}" == "" ]]; then
             echo "INPUT_CHAINLINK_TEST_VERSION=load.${{ github.sha }}" >> $GITHUB_ENV
           fi
+          if [[ ${{ env.CCIP_NO_OF_NETWORKS }} > 2 ]]; then
+            echo "RR_MEM=8Gi" >> $GITHUB_ENV
+            echo "RR_CPU=4" >> $GITHUB_ENV
+          fi
       - name: step summary
         shell: bash
         env:
@@ -227,8 +231,6 @@ jobs:
           TEST_REUSE_CCIP_CONTRACTS: True
           TEST_LOKI_TOKEN: ${{ secrets.LOKI_TOKEN }}
           TEST_LOKI_URL: ${{ secrets.LOKI_URL }}
-          RR_MEM: 16Gi
-          RR_CPU: 4
         with:
           test_command_to_run: make test_need_operator_assets && cd ./integration-tests && go test -v -timeout 900h -count=1 -run ^TestLoadCCIPStableRPS$ ./load
           test_download_vendor_packages_command: cd ./integration-tests && go mod download

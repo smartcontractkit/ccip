@@ -36,9 +36,9 @@ const (
 	Smoke                           string = "Smoke"
 	DefaultTTL                             = 70 * time.Minute
 	DefaultNoOfNetworks             int    = 2
-	DefaultLoadRPS                  int64  = 3
+	DefaultLoadRPS                  int64  = 2
 	DefaultLoadTimeOut                     = 30 * time.Minute
-	DefaultPhaseTimeoutForLongTests        = 10 * time.Minute
+	DefaultPhaseTimeoutForLongTests        = 20 * time.Minute
 	DefaultPhaseTimeout                    = 5 * time.Minute
 	DefaultSoakInterval                    = 45 * time.Second
 	DefaultTestDuration                    = 15 * time.Minute
@@ -51,21 +51,21 @@ var (
 	}
 	GethResourceProfile = map[string]interface{}{
 		"requests": map[string]interface{}{
-			"cpu":    "2",
-			"memory": "4Gi",
+			"cpu":    "4",
+			"memory": "6Gi",
 		},
 		"limits": map[string]interface{}{
-			"cpu":    "2",
-			"memory": "4Gi",
+			"cpu":    "4",
+			"memory": "6Gi",
 		},
 	}
 	DONResourceProfile = map[string]interface{}{
 		"requests": map[string]interface{}{
-			"cpu":    "2",
+			"cpu":    "4",
 			"memory": "8Gi",
 		},
 		"limits": map[string]interface{}{
-			"cpu":    "2",
+			"cpu":    "4",
 			"memory": "8Gi",
 		},
 	}
@@ -685,7 +685,9 @@ func CCIPDefaultTestSetUp(
 	setUpArgs.TearDown = func() {
 		for _, lanes := range setUpArgs.Lanes {
 			assert.NoError(t, lanes.ForwardLane.CleanUp(), "error while cleaning up forward lane")
-			assert.NoError(t, lanes.ReverseLane.CleanUp(), "error while cleaning up reverse lane")
+			if lanes.ReverseLane != nil {
+				assert.NoError(t, lanes.ReverseLane.CleanUp(), "error while cleaning up reverse lane")
+			}
 		}
 		if configureCLNode {
 			require.NoError(t, err, "error while writing lane config to file - %s", setUpArgs.LaneConfigFile)

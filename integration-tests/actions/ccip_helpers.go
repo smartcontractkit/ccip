@@ -239,8 +239,12 @@ func (ccipModule *CCIPCommon) ApproveTokens() error {
 
 func (ccipModule *CCIPCommon) CleanUp() error {
 	if !ccipModule.ExistingDeployment {
-		for _, pool := range ccipModule.BridgeTokenPools {
-			err := pool.RemoveLiquidity(ccipModule.poolFunds)
+		for i, pool := range ccipModule.BridgeTokenPools {
+			bal, err := ccipModule.BridgeTokens[i].BalanceOf(context.Background(), pool.Address())
+			if err != nil {
+				return fmt.Errorf("error in getting pool balance %+v", err)
+			}
+			err = pool.RemoveLiquidity(bal)
 			if err != nil {
 				return fmt.Errorf("error in removing liquidity %+v", err)
 			}
