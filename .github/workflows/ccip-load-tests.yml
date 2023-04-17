@@ -162,6 +162,7 @@ jobs:
       CCIP_TESTS_ON_EXISTING_DEPLOYMENT: ${{ inputs.existing-deployment }}
       CCIP_NO_OF_NETWORKS: ${{ inputs.numberOfChains }}
       CCIP_KEEP_ENV_TTL: 5h
+      CCIP_REUSE_CONTRACTS: True
       TEST_LOG_LEVEL: info
       REF_NAME: ${{ github.head_ref || github.ref_name }}
       ENV_JOB_IMAGE_BASE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-ccip-tests
@@ -208,7 +209,7 @@ jobs:
           if [[ "${{ env.INPUT_CHAINLINK_TEST_VERSION }}" == "" ]]; then
             echo "INPUT_CHAINLINK_TEST_VERSION=load.${{ github.sha }}" >> $GITHUB_ENV
           fi
-          if [[ ${{ env.CCIP_NO_OF_NETWORKS }} > 2 ]]; then
+          if [[ ${{ env.CCIP_NO_OF_NETWORKS }} -gt 2 ]]; then
             echo "RR_MEM=8Gi" >> $GITHUB_ENV
             echo "RR_CPU=4" >> $GITHUB_ENV
           fi
@@ -228,7 +229,6 @@ jobs:
           TEST_SUITE: load
           TEST_ARGS: -test.timeout 900h
           DATABASE_URL: postgresql://postgres:node@localhost:5432/chainlink_test?sslmode=disable
-          TEST_REUSE_CCIP_CONTRACTS: True
           TEST_LOKI_TOKEN: ${{ secrets.LOKI_TOKEN }}
           TEST_LOKI_URL: ${{ secrets.LOKI_URL }}
         with:
