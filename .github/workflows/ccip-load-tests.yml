@@ -209,7 +209,7 @@ jobs:
           if [[ "${{ env.INPUT_CHAINLINK_TEST_VERSION }}" == "" ]]; then
             echo "INPUT_CHAINLINK_TEST_VERSION=load.${{ github.sha }}" >> $GITHUB_ENV
           fi
-          if [[ ${{ env.CCIP_NO_OF_NETWORKS }} -gt 2 ]]; then
+          if [[ "${{ env.CCIP_NO_OF_NETWORKS }}" != "" && ${{ env.CCIP_NO_OF_NETWORKS }} -gt 2 ]]; then
             echo "RR_MEM=8Gi" >> $GITHUB_ENV
             echo "RR_CPU=4" >> $GITHUB_ENV
           fi
