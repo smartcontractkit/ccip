@@ -27,10 +27,28 @@ LogPollInterval = '1s'
 [EVM.HeadTracker]
 HistoryDepth = 100
 
-{{if .Simulated}}
 [EVM.GasEstimator]
+{{if .Simulated}}
 Mode = 'FixedPrice'
 LimitDefault = 5_000_000
+{{else}}
+{{if eq .ChainID 421613}}
+LimitDefault = 100_000_000
+{{else}}
+LimitDefault = 6_000_000
+{{end}}
+{{if eq .ChainID 420}}
+BumpThreshold = 60
+BumpPercent = 20
+BumpMin = '100 wei'
+{{end}}
+{{if eq .ChainID 5}}
+PriceMax = '500 gwei'
+FeeCapDefault = '500 gwei'
+{{else}}
+PriceMax = '200 gwei'
+FeeCapDefault = '200 gwei'
+{{end}}
 {{end}}
 
 {{range $i,$url := .URLs }}

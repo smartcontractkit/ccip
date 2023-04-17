@@ -46,12 +46,12 @@ on:
       send_request_per_second:
         description: Number of ccip-send requests to trigger per second
         required: true
-        default: 3
+        default: 2
         type: number
       phase_time_out:
         description: 'Max time(in minutes) to wait for individual events in ccip flow'
         required: true
-        default: 15m
+        default: 30m
         type: number
       slackMemberID:
         description: Slack Member ID (Not your @)
@@ -158,10 +158,11 @@ jobs:
       CCIP_PHASE_VALIDATION_TIMEOUT: ${{ inputs.phase_time_out }}
       CCIP_LOAD_TEST_RPS: ${{ inputs.send_request_per_second }}
       CCIP_MSG_TYPE: WithoutToken
-      CCIP_CHAINLINK_NODE_FUNDING: 1
+      CCIP_CHAINLINK_NODE_FUNDING: 20
       CCIP_TESTS_ON_EXISTING_DEPLOYMENT: ${{ inputs.existing-deployment }}
       CCIP_NO_OF_NETWORKS: ${{ inputs.numberOfChains }}
       CCIP_KEEP_ENV_TTL: 5h
+      CCIP_REUSE_CONTRACTS: True
       TEST_LOG_LEVEL: info
       REF_NAME: ${{ github.head_ref || github.ref_name }}
       ENV_JOB_IMAGE_BASE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-ccip-tests
@@ -208,6 +209,10 @@ jobs:
           if [[ "${{ env.INPUT_CHAINLINK_TEST_VERSION }}" == "" ]]; then
             echo "INPUT_CHAINLINK_TEST_VERSION=load.${{ github.sha }}" >> $GITHUB_ENV
           fi
+          if [[ "${{ env.CCIP_NO_OF_NETWORKS }}" != "2" ]]; then
+            echo "RR_MEM=8Gi" >> $GITHUB_ENV
+            echo "RR_CPU=4" >> $GITHUB_ENV
+          fi
       - name: step summary
         shell: bash
         env:
@@ -224,11 +229,8 @@ jobs:
           TEST_SUITE: load
           TEST_ARGS: -test.timeout 900h
           DATABASE_URL: postgresql://postgres:node@localhost:5432/chainlink_test?sslmode=disable
-          TEST_REUSE_CCIP_CONTRACTS: ${{ inputs.existing-deployment }}
-         # TEST_LOKI_TOKEN: ${{ secrets.LOKI_TOKEN }}
-         # TEST_LOKI_URL: ${{ secrets.LOKI_URL }}
-          RR_MEM: 4Gi
-          RR_CPU: 2
+          TEST_LOKI_TOKEN: ${{ secrets.LOKI_TOKEN }}
+          TEST_LOKI_URL: ${{ secrets.LOKI_URL }}
         with:
           test_command_to_run: make test_need_operator_assets && cd ./integration-tests && go test -v -timeout 900h -count=1 -run ^TestLoadCCIPStableRPS$ ./load
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
@@ -239,3 +241,4 @@ jobs:
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
+          artifacts_location: ./integration-tests/load/logs/payload_ccip.json

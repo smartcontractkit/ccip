@@ -78,6 +78,7 @@ core/scripts/ccip-test/secrets/secrets.go
 
 core/scripts/ccip-test/json/credentials
 core/scripts/ccip-test/json/deployments
+core/scripts/ccip-test/csv/node-wallets
 
 # Test & linter reports
 *report.xml

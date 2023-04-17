@@ -188,7 +188,7 @@ func (e *CCIPContractsDeployer) NewCommitStore(addr common.Address) (
 		Msg("New contract")
 	return &CommitStore{
 		client:     e.evmClient,
-		instance:   ins,
+		Instance:   ins,
 		EthAddress: addr,
 	}, err
 }
@@ -217,7 +217,7 @@ func (e *CCIPContractsDeployer) DeployCommitStore(sourceChainId, destChainId uin
 	}
 	return &CommitStore{
 		client:     e.evmClient,
-		instance:   instance.(*commit_store.CommitStore),
+		Instance:   instance.(*commit_store.CommitStore),
 		EthAddress: *address,
 	}, err
 }
@@ -378,7 +378,7 @@ func (e *CCIPContractsDeployer) NewOnRamp(addr common.Address) (
 		Msg("New contract")
 	return &OnRamp{
 		client:     e.evmClient,
-		instance:   ins,
+		Instance:   ins,
 		EthAddress: addr,
 	}, err
 }
@@ -432,7 +432,7 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 	}
 	return &OnRamp{
 		client:     e.evmClient,
-		instance:   instance.(*evm_2_evm_onramp.EVM2EVMOnRamp),
+		Instance:   instance.(*evm_2_evm_onramp.EVM2EVMOnRamp),
 		EthAddress: *address,
 	}, err
 }
@@ -450,7 +450,7 @@ func (e *CCIPContractsDeployer) NewOffRamp(addr common.Address) (
 		Msg("New contract")
 	return &OffRamp{
 		client:     e.evmClient,
-		instance:   ins,
+		Instance:   ins,
 		EthAddress: addr,
 	}, err
 }
@@ -470,7 +470,7 @@ func (e *CCIPContractsDeployer) DeployOffRamp(sourceChainId, destChainId uint64,
 				OnRamp:        onRamp,
 			},
 			evm_2_evm_offramp.EVM2EVMOffRampDynamicConfig{
-				PermissionLessExecutionThresholdSeconds: 0,
+				PermissionLessExecutionThresholdSeconds: 24 * 7 * 60 * 60,
 				Router:                                  destRouter,
 				Afn:                                     afn,
 				MaxDataSize:                             1e5,
@@ -490,7 +490,7 @@ func (e *CCIPContractsDeployer) DeployOffRamp(sourceChainId, destChainId uint64,
 	}
 	return &OffRamp{
 		client:     e.evmClient,
-		instance:   instance.(*evm_2_evm_offramp.EVM2EVMOffRamp),
+		Instance:   instance.(*evm_2_evm_offramp.EVM2EVMOffRamp),
 		EthAddress: *address,
 	}, err
 }
@@ -526,20 +526,20 @@ func DefaultOffChainAggregatorV2Config(numberNodes int) contracts.OffChainAggreg
 		faultyNodes = 1
 	}
 	return contracts.OffChainAggregatorV2Config{
-		DeltaProgress:                           10 * time.Second,
-		DeltaResend:                             2 * time.Second,
-		DeltaRound:                              5 * time.Second,
-		DeltaGrace:                              500 * time.Millisecond,
-		DeltaStage:                              30 * time.Second,
+		DeltaProgress:                           70 * time.Second,
+		DeltaResend:                             5 * time.Second,
+		DeltaRound:                              30 * time.Second,
+		DeltaGrace:                              2 * time.Second,
+		DeltaStage:                              40 * time.Second,
 		RMax:                                    3,
 		S:                                       s,
 		F:                                       faultyNodes,
 		Oracles:                                 []ocrConfigHelper2.OracleIdentityExtra{},
-		MaxDurationQuery:                        1 * time.Second,
-		MaxDurationObservation:                  1 * time.Second,
-		MaxDurationReport:                       1 * time.Second,
-		MaxDurationShouldAcceptFinalizedReport:  1 * time.Second,
-		MaxDurationShouldTransmitAcceptedReport: 1 * time.Second,
+		MaxDurationQuery:                        5 * time.Second,
+		MaxDurationObservation:                  32 * time.Second,
+		MaxDurationReport:                       20 * time.Second,
+		MaxDurationShouldAcceptFinalizedReport:  10 * time.Second,
+		MaxDurationShouldTransmitAcceptedReport: 10 * time.Second,
 		OnchainConfig:                           []byte{},
 	}
 }

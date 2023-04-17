@@ -191,13 +191,8 @@ The nodes infra setup should have the proper `EVM_CHAINS` set and therefore have
 
 ### Dione
 
-Dione is the tool that will handle all the node communication for us. It is runnable through `TestDione` in [ccip_runner_test.go](ccip_runner_test.go). The script allows for many things, you should configure what it should do yourself with the don functions. First we should get some information from the nodes, namely the sending keys, the OCR2 keys and the PeerIDs. This can be done with the following commands
-
-```go
-don := dione.NewDON(ENV, logger.TestLogger(t))
-don.LoadCurrentNodeParams()
-don.WriteToFile()
-```
+Dione is the tool that will handle all the node communication for us. The script allows for many things, you should configure what it should do yourself with the don functions. First we should get some information from the nodes, namely the sending keys, the OCR2 keys and the PeerIDs. 
+This can be done with specified `TestDionePopulateNodeKeys` script.
 
 The `WriteToFile` call will write the params to disk in the  `/json/nodes/` folder its also needed to be called when cluster is changed.
 

@@ -4,12 +4,13 @@ pragma solidity ^0.8.0;
 import {Client} from "./Client.sol";
 
 library RateLimiter {
-  event TokensConsumed(uint256 tokens);
-  event ConfigChanged(Config config);
-
+  error BucketOverfilled();
   error ConsumingMoreThanMaxCapacity(uint256 capacity, uint256 requested);
   error RateLimitReached(uint256 waitInSeconds);
   error OnlyCallableByAdminOrOwner();
+
+  event TokensConsumed(uint256 tokens);
+  event ConfigChanged(Config config);
 
   struct TokenBucket {
     uint256 capacity; // Maximum number of tokens that can be in the bucket.
@@ -29,7 +30,8 @@ library RateLimiter {
   function _refill(TokenBucket storage bucket) private {
     // Return if there's nothing to update
     if (bucket.tokens == bucket.capacity || bucket.lastUpdated == block.timestamp) return;
-
+    // Revert if the tokens in the bucket exceed its capacity
+    if (bucket.tokens > bucket.capacity) revert BucketOverfilled();
     uint256 difference = block.timestamp - bucket.lastUpdated;
     bucket.tokens = _min(bucket.capacity, bucket.tokens + difference * bucket.rate);
     bucket.lastUpdated = uint40(block.timestamp);

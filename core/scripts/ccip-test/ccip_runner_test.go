@@ -1,11 +1,15 @@
 package main
 
 import (
+	"fmt"
+	"log"
 	"math/big"
 	"os"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/csv"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/dione"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/metis/printing"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
@@ -132,6 +136,15 @@ func TestDione(t *testing.T) {
 	// and attempts to add them.
 	don.AddMissingSpecs(DESTINATION, SOURCE)
 	don.AddMissingSpecs(SOURCE, DESTINATION)
+}
+
+// TestDionePopulateNodeKeys
+// 1. gets the keys from the nodes based upon ENV (OCR2Keys EthKeys PeerId) using json/credentials/ for auth
+// 2. writes the node keys into a file in json/nodes/
+func TestDionePopulateNodeKeys(t *testing.T) {
+	don := dione.NewDON(ENV, logger.TestLogger(t))
+	don.LoadCurrentNodeParams()
+	don.WriteToFile()
 }
 
 // TestUpdateAllLanes
@@ -325,6 +338,24 @@ func TestFundAllNodesPerEnv(t *testing.T) {
 		don := dione.NewOfflineDON(ENV, logger.TestLogger(t))
 		don.FundNodeKeys(&source, ownerKey, big.NewInt(1e18), big.NewInt(4e18))
 	}
+}
+
+// TestWriteNodesWalletsToCSV according to set ENV it writes a CSV file in csv/node-wallets/ directory
+// with all the node wallets for the given ENV per chain
+func TestWriteNodesWalletsToCSV(t *testing.T) {
+	headers := []string{"Environment", "Chain Name", "Chain Id", "Address"}
+	path := "csv/node-wallets"
+	fileName := fmt.Sprintf("%s-%s.csv", string(ENV), time.Now().Format("2006-01-02 15:04:05"))
+	filePath := fmt.Sprintf("%s/%s", path, fileName)
+	if err := os.MkdirAll(path, os.ModePerm); err != nil {
+		log.Fatalf("failed to create directory %s: %s", path, err)
+	}
+	csv.PrepareCsvFile(filePath, headers)
+	don := dione.NewOfflineDON(ENV, logger.TestLogger(t))
+	DoForEachChain(t, func(chain rhea.EvmDeploymentConfig) {
+		records := don.GetAllNodesWallets(chain.ChainConfig.ChainId)
+		csv.AppendToFile(filePath, records, ccip.ChainName(int64(chain.ChainConfig.ChainId)), ENV)
+	})
 }
 
 func checkOwnerKeyAndSetupChain(t *testing.T) string {

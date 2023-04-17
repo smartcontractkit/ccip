@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
+
 	"github.com/slack-go/slack"
 	"github.com/smartcontractkit/chainlink-testing-framework/testreporters"
 )
@@ -46,6 +46,7 @@ type PhaseStat struct {
 
 type CCIPLaneStats struct {
 	lane                    string
+	lggr                    zerolog.Logger
 	TotalRequests           int64                         `json:"total_requests,omitempty"`              // TotalRequests is the total number of requests made
 	SuccessCountsByPhase    map[Phase]int64               `json:"success_counts_by_phase,omitempty"`     // SuccessCountsByPhase is the number of requests that succeeded in each phase
 	FailedCountsByPhase     map[Phase]int64               `json:"failed_counts_by_phase,omitempty"`      // FailedCountsByPhase is the number of requests that failed in each phase
@@ -73,7 +74,7 @@ func (testStats *CCIPLaneStats) UpdatePhaseStats(reqNo int64, seqNum uint64, ste
 		Duration: durationInSec,
 		Status:   state,
 	}
-	event := log.Info().Str("lane", testStats.lane)
+	event := testStats.lggr.Info()
 	if seqNum != 0 {
 		event.Uint64("seq num", seqNum)
 	}
@@ -85,9 +86,8 @@ func (testStats *CCIPLaneStats) UpdatePhaseStats(reqNo int64, seqNum uint64, ste
 		}
 		testStats.FailedCountsByPhase[E2E]++
 		testStats.FailedCountsByPhase[step]++
-		log.Info().
+		testStats.lggr.Info().
 			Str(fmt.Sprint(E2E), fmt.Sprintf("%s", Failure)).
-			Str("lane", testStats.lane).
 			Msgf("reqNo %d", reqNo)
 		event.Str(fmt.Sprint(step), fmt.Sprintf("%s", Failure)).Msgf("reqNo %d", reqNo)
 	} else {
@@ -101,9 +101,8 @@ func (testStats *CCIPLaneStats) UpdatePhaseStats(reqNo int64, seqNum uint64, ste
 				Duration: testStats.StatusByPhaseByRequests[reqNo][step].Duration + testStats.StatusByPhaseByRequests[reqNo][E2E].Duration,
 			}
 			if step == ExecStateChanged {
-				log.Info().
+				testStats.lggr.Info().
 					Str(fmt.Sprint(E2E), fmt.Sprintf("%s", Success)).
-					Str("lane", testStats.lane).
 					Msgf("reqNo %d", reqNo)
 				testStats.SuccessCountsByPhase[E2E]++
 				testStats.consolidateDuration(E2E, testStats.StatusByPhaseByRequests[reqNo][E2E].Duration)
@@ -143,9 +142,9 @@ func (testStats *CCIPLaneStats) Finalize(lane string) {
 			testStats.TotalRequests = reqNo
 		}
 	}
-	log.Info().Int64("Total Requests Triggerred", testStats.TotalRequests).Msgf("Test Run Completed for Lane %s", lane)
+	testStats.lggr.Info().Int64("Total Requests Triggerred", testStats.TotalRequests).Msg("Test Run Completed")
 	for _, phase := range phases {
-		events[phase] = log.Info().Str("Phase", string(phase))
+		events[phase] = testStats.lggr.Info().Str("Phase", string(phase))
 		if phaseStat, ok := testStats.DurationStatByPhase[phase]; ok {
 			testStats.DurationStatByPhase[phase] = DurationStat{
 				Min: phaseStat.Min,
@@ -249,7 +248,8 @@ func (r *CCIPTestReporter) SendSlackNotification(t *testing.T, slackClient *slac
 }
 
 func (r *CCIPTestReporter) WriteReport(folderPath string) error {
-	log.Debug().Str("Folder Path", folderPath).Msg("Writing CCIP Test Report")
+	l := r.logger
+	l.Debug().Str("Folder Path", folderPath).Msg("Writing CCIP Test Report")
 	if err := testreporters.MkdirIfNotExists(folderPath); err != nil {
 		return err
 	}
@@ -259,7 +259,7 @@ func (r *CCIPTestReporter) WriteReport(folderPath string) error {
 	defer func() {
 		err = slackFile.Close()
 		if err != nil {
-			log.Error().Err(err).Msg("Error closing slack file")
+			l.Error().Err(err).Msg("Error closing slack file")
 		}
 	}()
 	if err != nil {
@@ -304,6 +304,7 @@ func (r *CCIPTestReporter) AddNewLane(name string) *CCIPLaneStats {
 	defer r.mu.Unlock()
 	i := &CCIPLaneStats{
 		lane:                    name,
+		lggr:                    r.logger.With().Str("Lane", name).Logger(),
 		FailedCountsByPhase:     make(map[Phase]int64),
 		SuccessCountsByPhase:    make(map[Phase]int64),
 		DurationStatByPhase:     make(map[Phase]DurationStat),
@@ -314,9 +315,10 @@ func (r *CCIPTestReporter) AddNewLane(name string) *CCIPLaneStats {
 	return i
 }
 
-func NewCCIPTestReporter(t *testing.T) *CCIPTestReporter {
+func NewCCIPTestReporter(t *testing.T, lggr zerolog.Logger) *CCIPTestReporter {
 	return &CCIPTestReporter{
 		LaneStats: make(map[string]*CCIPLaneStats),
+		logger:    lggr,
 		t:         t,
 		mu:        &sync.Mutex{},
 	}

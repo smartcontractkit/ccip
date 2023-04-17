@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"strconv"
 	"strings"
@@ -103,6 +104,26 @@ func (don *OfflineDON) FundNodeKeys(chainConfig *rhea.EvmDeploymentConfig, owner
 			don.lggr.Infof("✅ Node %2d has a balance of %s eth ", i, EthBalanceToString(balanceAt))
 		}
 	}
+}
+
+type NodeWallet struct {
+	ChainID uint64
+	Address string
+}
+
+func (don *OfflineDON) GetAllNodesWallets(chainId uint64) []NodeWallet {
+	fmt.Printf("ChainId %d\n", chainId)
+	var wallets []NodeWallet
+	for _, node := range don.Config.Nodes {
+		eoa := gethcommon.HexToAddress(node.EthKeys[strconv.FormatUint(chainId, 10)]).String()
+		if eoa == (gethcommon.Address{}).String() {
+			don.lggr.Warnf("Node %s has no sending key configured. Skipping.\n", eoa)
+			continue
+		}
+		fmt.Printf("%s\n", eoa)
+		wallets = append(wallets, NodeWallet{chainId, eoa})
+	}
+	return wallets
 }
 
 func EthBalanceToString(balance *big.Int) string {

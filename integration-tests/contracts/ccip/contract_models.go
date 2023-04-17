@@ -12,6 +12,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 
+	networks "github.com/smartcontractkit/chainlink/integration-tests"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
@@ -110,6 +111,59 @@ func (pool *LockReleaseTokenPool) Address() string {
 	return pool.EthAddress.Hex()
 }
 
+func (pool *LockReleaseTokenPool) RemoveLiquidity(amount *big.Int) error {
+	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Str("Token Pool", pool.Address()).
+		Str("Amount", amount.String()).
+		Msg("Initiating removing funds from pool")
+	tx, err := pool.instance.RemoveLiquidity(opts, amount)
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Str("Token Pool", pool.Address()).
+		Str("Amount", amount.String()).
+		Str("Network Name", pool.client.GetNetworkConfig().Name).
+		Msg("Liquidity removed")
+	return pool.client.ProcessTransaction(tx)
+}
+
+func (pool *LockReleaseTokenPool) AddLiquidity(linkToken *LinkToken, amount *big.Int) error {
+	log.Info().
+		Str("Link Token", linkToken.Address()).
+		Str("Token Pool", pool.Address()).
+		Msg("Initiating transferring of token to token pool")
+	err := linkToken.Approve(pool.Address(), amount)
+	if err != nil {
+		return err
+	}
+	err = pool.client.WaitForEvents()
+	if err != nil {
+		return err
+	}
+	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Str("Token Pool", pool.Address()).
+		Msg("Initiating adding Tokens in pool")
+	tx, err := pool.instance.AddLiquidity(opts, amount)
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Str("Token Pool", pool.Address()).
+		Str("Link Token", linkToken.Address()).
+		Str("Network Name", pool.client.GetNetworkConfig().Name).
+		Msg("Liquidity added")
+	return pool.client.ProcessTransaction(tx)
+}
+
 func (pool *LockReleaseTokenPool) LockOrBurnToken(linkToken contracts.LinkToken, amount *big.Int) error {
 	log.Info().
 		Str("Link Token", linkToken.Address()).
@@ -194,7 +248,7 @@ func (afn *AFN) Address() string {
 
 type CommitStore struct {
 	client     blockchain.EVMClient
-	instance   *commit_store.CommitStore
+	Instance   *commit_store.CommitStore
 	EthAddress common.Address
 }
 
@@ -223,7 +277,7 @@ func (b *CommitStore) SetOCR2Config(
 		Interface("transmitterAddresses", transmitters).
 		Str("Network Name", b.client.GetNetworkConfig().Name).
 		Msg("Configuring CommitStore")
-	tx, err := b.instance.SetOCR2Config(
+	tx, err := b.Instance.SetOCR2Config(
 		opts,
 		signers,
 		transmitters,
@@ -237,14 +291,6 @@ func (b *CommitStore) SetOCR2Config(
 		return err
 	}
 	return b.client.ProcessTransaction(tx)
-}
-
-func (b *CommitStore) FilterReportAccepted(currentBlock uint64) (*commit_store.CommitStoreReportAcceptedIterator, error) {
-	return b.instance.FilterReportAccepted(&bind.FilterOpts{Start: currentBlock})
-}
-
-func (b *CommitStore) GetNextSeqNumber() (uint64, error) {
-	return b.instance.GetExpectedNextSequenceNumber(nil)
 }
 
 type MessageReceiver struct {
@@ -387,6 +433,11 @@ func (r *Router) CCIPSend(destChainId uint64, msg router.ClientEVM2AnyMessage, v
 		opts.Value = valueForNative
 	}
 	opts.GasLimit = 500000
+	chain := r.client.GetNetworkConfig().Name
+	if chain == networks.ArbitrumGoerli.Name {
+		opts.GasLimit = 100000000
+	}
+
 	tx, err := r.Instance.CcipSend(opts, destChainId, msg)
 	if err != nil {
 		return nil, err
@@ -439,19 +490,12 @@ func (r *Router) GetFee(destinationChainId uint64, message router.ClientEVM2AnyM
 
 type OnRamp struct {
 	client     blockchain.EVMClient
-	instance   *evm_2_evm_onramp.EVM2EVMOnRamp
+	Instance   *evm_2_evm_onramp.EVM2EVMOnRamp
 	EthAddress common.Address
 }
 
 func (onRamp *OnRamp) Address() string {
 	return onRamp.EthAddress.Hex()
-}
-
-func (onRamp *OnRamp) FilterCCIPSendRequested(
-	currentBlock uint64,
-) (*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequestedIterator, error) {
-	filter := bind.FilterOpts{Start: currentBlock}
-	return onRamp.instance.FilterCCIPSendRequested(&filter)
 }
 
 func (onRamp *OnRamp) SetTokenPrices(tokens []common.Address, prices []*big.Int) error {
@@ -467,7 +511,7 @@ func (onRamp *OnRamp) SetTokenPrices(tokens []common.Address, prices []*big.Int)
 		Str("Network Name", onRamp.client.GetNetworkConfig().Name).
 		Str("OnRamp", onRamp.Address()).
 		Msg("Setting OnRamp token prices")
-	tx, err := onRamp.instance.SetPrices(opts, tokens, prices)
+	tx, err := onRamp.Instance.SetPrices(opts, tokens, prices)
 	if err != nil {
 		return err
 	}
@@ -476,7 +520,7 @@ func (onRamp *OnRamp) SetTokenPrices(tokens []common.Address, prices []*big.Int)
 
 type OffRamp struct {
 	client     blockchain.EVMClient
-	instance   *evm_2_evm_offramp.EVM2EVMOffRamp
+	Instance   *evm_2_evm_offramp.EVM2EVMOffRamp
 	EthAddress common.Address
 }
 
@@ -504,7 +548,7 @@ func (offRamp *OffRamp) SetOCR2Config(
 		Interface("transmitterAddresses", transmitters).
 		Str("Network Name", offRamp.client.GetNetworkConfig().Name).
 		Msg("Configuring OffRamp")
-	tx, err := offRamp.instance.SetOCR2Config(
+	tx, err := offRamp.Instance.SetOCR2Config(
 		opts,
 		signers,
 		transmitters,
@@ -520,12 +564,6 @@ func (offRamp *OffRamp) SetOCR2Config(
 	return offRamp.client.ProcessTransaction(tx)
 }
 
-func (offRamp *OffRamp) FilterExecutionStateChanged(seqNumber []uint64, messageId [][32]byte, currentBlockOnDest uint64) (
-	*evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChangedIterator, error,
-) {
-	return offRamp.instance.FilterExecutionStateChanged(&bind.FilterOpts{Start: currentBlockOnDest}, seqNumber, messageId)
-}
-
 func (offRamp *OffRamp) SetTokenPrices(tokens []common.Address, prices []*big.Int) error {
 	opts, err := offRamp.client.TransactionOpts(offRamp.client.GetDefaultWallet())
 	if err != nil {
@@ -535,7 +573,7 @@ func (offRamp *OffRamp) SetTokenPrices(tokens []common.Address, prices []*big.In
 		Str("Network Name", offRamp.client.GetNetworkConfig().Name).
 		Str("OffRamp", offRamp.Address()).
 		Msg("Setting OffRamp token prices")
-	tx, err := offRamp.instance.SetPrices(opts, tokens, prices)
+	tx, err := offRamp.Instance.SetPrices(opts, tokens, prices)
 	if err != nil {
 		return err
 	}

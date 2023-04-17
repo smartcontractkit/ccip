@@ -5,7 +5,7 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/rs/zerolog/log"
+	"github.com/smartcontractkit/chainlink-testing-framework/utils"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/testsetups"
@@ -23,17 +23,17 @@ func TestSoakCCIP(t *testing.T) {
 		reqSuccessLaneA = 0
 		reqSuccessLaneB = 0
 	)
-
-	TestCfg := testsetups.NewCCIPTestConfig(t, testsetups.Soak)
+	l := utils.GetTestLogger(t)
+	TestCfg := testsetups.NewCCIPTestConfig(t, l, testsetups.Soak)
 	interval := TestCfg.Soak.SoakInterval
 	duration := TestCfg.TestDuration
 
 	t.Cleanup(func() {
 		if tearDown != nil {
-			log.Info().Msg("Tearing down the environment")
+			l.Info().Msg("Tearing down the environment")
 			tearDown()
 			if laneA != nil {
-				log.Info().
+				l.Info().
 					Str("total duration", fmt.Sprint(duration)).
 					Str("req interval", fmt.Sprint(interval)).
 					Int("Total Requests", totalReqLaneA).
@@ -41,7 +41,7 @@ func TestSoakCCIP(t *testing.T) {
 					Msgf("Soak Result for lane %s --> %s", laneA.SourceNetworkName, laneA.DestNetworkName)
 			}
 			if laneB != nil {
-				log.Info().
+				l.Info().
 					Str("total duration", fmt.Sprint(duration)).
 					Str("req interval", fmt.Sprint(interval)).
 					Int("Total Requests", totalReqLaneB).
@@ -54,11 +54,11 @@ func TestSoakCCIP(t *testing.T) {
 	transferAmounts := []*big.Int{big.NewInt(5e17)}
 	var setUpOutput *testsetups.CCIPTestSetUpOutputs
 	if !TestCfg.ExistingDeployment {
-		setUpOutput = testsetups.CCIPDefaultTestSetUp(t, "soak-ccip", map[string]interface{}{
+		setUpOutput = testsetups.CCIPDefaultTestSetUp(t, l, "soak-ccip", map[string]interface{}{
 			"replicas": "6",
 		}, transferAmounts, 5, true, true, TestCfg)
 	} else {
-		setUpOutput = testsetups.CCIPExistingDeploymentTestSetUp(t, transferAmounts, true, TestCfg)
+		setUpOutput = testsetups.CCIPExistingDeploymentTestSetUp(t, l, transferAmounts, true, TestCfg)
 	}
 
 	if len(setUpOutput.Lanes) == 0 {
@@ -75,7 +75,7 @@ func TestSoakCCIP(t *testing.T) {
 		laneA.SourceNetworkName, laneA.DestNetworkName, duration), func(t *testing.T) {
 		t.Parallel()
 		totalReqLaneA, reqSuccessLaneA = laneA.SoakRun(interval, duration)
-		log.Info().
+		l.Info().
 			Str("Test Duration", fmt.Sprintf("%s", duration)).
 			Str("Request Triggering interval", fmt.Sprintf("%s", interval)).
 			Str("Source", laneA.SourceNetworkName).
@@ -88,7 +88,7 @@ func TestSoakCCIP(t *testing.T) {
 	if laneB != nil {
 		t.Run(fmt.Sprintf("CCIP message transfer from network %s to network %s for %s", laneB.SourceNetworkName, laneB.DestNetworkName, duration), func(t *testing.T) {
 			t.Parallel()
-			log.Info().
+			l.Info().
 				Str("Test Duration", fmt.Sprintf("%s", duration)).
 				Str("Request Triggering interval", fmt.Sprintf("%s", interval)).
 				Str("Source", laneB.SourceNetworkName).
@@ -111,14 +111,14 @@ func TestSoakCCIPMultiChain(t *testing.T) {
 		tearDown func()
 		tcs      []subtestInput
 	)
-
-	TestCfg := testsetups.NewCCIPTestConfig(t, testsetups.Soak)
+	l := utils.GetTestLogger(t)
+	TestCfg := testsetups.NewCCIPTestConfig(t, l, testsetups.Soak)
 	interval := TestCfg.Soak.SoakInterval
 	duration := TestCfg.TestDuration
 
 	t.Cleanup(func() {
 		if tearDown != nil {
-			log.Info().Msg("Tearing down the environment")
+			l.Info().Msg("Tearing down the environment")
 			tearDown()
 		}
 	})
@@ -126,12 +126,12 @@ func TestSoakCCIPMultiChain(t *testing.T) {
 	transferAmounts := []*big.Int{big.NewInt(100)}
 	var setUpOutput *testsetups.CCIPTestSetUpOutputs
 	if !TestCfg.ExistingDeployment {
-		setUpOutput = testsetups.CCIPDefaultTestSetUp(t, "soak-ccip", map[string]interface{}{
+		setUpOutput = testsetups.CCIPDefaultTestSetUp(t, l, "soak-ccip", map[string]interface{}{
 			"replicas":   "6",
 			"prometheus": "true",
 		}, transferAmounts, 5, true, true, TestCfg)
 	} else {
-		setUpOutput = testsetups.CCIPExistingDeploymentTestSetUp(t, transferAmounts, true, TestCfg)
+		setUpOutput = testsetups.CCIPExistingDeploymentTestSetUp(t, l, transferAmounts, true, TestCfg)
 	}
 
 	if len(setUpOutput.Lanes) == 0 {
@@ -160,7 +160,7 @@ func TestSoakCCIPMultiChain(t *testing.T) {
 		tc := testcase
 		t.Run(tc.testName, func(t *testing.T) {
 			t.Parallel()
-			log.Info().
+			l.Info().
 				Str("Test Duration", fmt.Sprintf("%s", duration)).
 				Str("Request Triggering interval", fmt.Sprintf("%s", interval)).
 				Str("Source", tc.lane.SourceNetworkName).

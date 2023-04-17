@@ -160,6 +160,7 @@ jobs:
       CCIP_PHASE_VALIDATION_TIMEOUT: 6m
       CCIP_TESTS_ON_EXISTING_DEPLOYMENT: ${{ inputs.existing-deployment }}
       CCIP_KEEP_ENV_TTL: 5h
+      CCIP_REUSE_CONTRACTS: True
       TEST_LOG_LEVEL: info
       REF_NAME: ${{ github.head_ref || github.ref_name }}
       GOERLI_URLS: ${{ secrets.QA_GOERLI_URLS }}
@@ -219,8 +220,6 @@ jobs:
           TEST_SUITE: soak
           TEST_ARGS: -test.timeout 900h
           DATABASE_URL: postgresql://postgres:node@localhost:5432/chainlink_test?sslmode=disable
-          TEST_CCIP_KEEP_ENV_TTL: 5h
-          TEST_REUSE_CCIP_CONTRACTS: ${{ inputs.existing-deployment }}
           RR_MEM: 4Gi
           RR_CPU: 2
         with:
