@@ -138,6 +138,15 @@ func TestDione(t *testing.T) {
 	don.AddMissingSpecs(SOURCE, DESTINATION)
 }
 
+// TestDionePopulateNodeKeys
+// 1. gets the keys from the nodes based upon ENV (OCR2Keys EthKeys PeerId) using json/credentials/ for auth
+// 2. writes the node keys into a file in json/nodes/
+func TestDionePopulateNodeKeys(t *testing.T) {
+	don := dione.NewDON(ENV, logger.TestLogger(t))
+	don.LoadCurrentNodeParams()
+	don.WriteToFile()
+}
+
 // TestUpdateAllLanes
 // 1. updates all the available lanes with new offramp, onramp, commit store
 // 2. creates new jobs
