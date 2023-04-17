@@ -224,15 +224,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
       );
     }
 
-    // Lock the tokens
-    for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
-      Client.EVMTokenAmount memory tokenAndAmount = message.tokenAmounts[i];
-      IPool pool = _getPoolBySourceToken(IERC20(tokenAndAmount.token));
-      pool.lockOrBurn(tokenAndAmount.amount, originalSender);
-    }
-
-    // Emit message request
-    // we need the next available sequence number so we increment before we use the value
+    // We need the next available sequence number so we increment before we use the value
     Internal.EVM2EVMMessage memory newMessage = Internal.EVM2EVMMessage({
       sourceChainId: i_chainId,
       sequenceNumber: ++s_sequenceNumber,
@@ -248,6 +240,16 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
       messageId: ""
     });
     newMessage.messageId = Internal._hash(newMessage, i_metadataHash);
+
+    // Lock the tokens as last step. TokenPools may not always be trusted.
+    // There should be no state changes after external call to TokenPools.
+    for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
+      Client.EVMTokenAmount memory tokenAndAmount = message.tokenAmounts[i];
+      IPool pool = _getPoolBySourceToken(IERC20(tokenAndAmount.token));
+      pool.lockOrBurn(tokenAndAmount.amount, originalSender);
+    }
+
+    // Emit message request
     emit CCIPSendRequested(newMessage);
     return newMessage.messageId;
   }

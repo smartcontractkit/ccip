@@ -18,7 +18,7 @@ custom_token_pool: ../../contracts/solc/v0.8.15/CustomTokenPool.abi ../../contra
 derived_price_feed_wrapper: ../../contracts/solc/v0.8.6/DerivedPriceFeed.abi ../../contracts/solc/v0.8.6/DerivedPriceFeed.bin c8542e6c850c2d0fffb79a7f7213dc927ec64e6ddd54e1224cb2fb4a13aabdd0
 evm_2_evm_offramp: ../../contracts/solc/v0.8.15/EVM2EVMOffRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMOffRamp.bin 3555f70de612f8200d0f13ed8a00468d6f790059f5792cced74a2407880456ae
 evm_2_evm_offramp_helper: ../../contracts/solc/v0.8.15/EVM2EVMOffRampHelper.abi ../../contracts/solc/v0.8.15/EVM2EVMOffRampHelper.bin 412f4349b6e6c88f4516b2a6d908e83b953393fbdb79581a78e4d9ccffa2eb7e
-evm_2_evm_onramp: ../../contracts/solc/v0.8.15/EVM2EVMOnRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMOnRamp.bin f624b7ea08a8a95c20207bb37f7d5dfb4661a62cd6b45b82c93d17d0f4ef93cb
+evm_2_evm_onramp: ../../contracts/solc/v0.8.15/EVM2EVMOnRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMOnRamp.bin 349935a47ac9de154b6e10e30b9a2b71838bfcc4a11db655e45bd51d2fac630e
 flags_wrapper: ../../contracts/solc/v0.6/Flags.abi ../../contracts/solc/v0.6/Flags.bin 2034d1b562ca37a63068851915e3703980276e8d5f7db6db8a3351a49d69fc4a
 flux_aggregator_wrapper: ../../contracts/solc/v0.6/FluxAggregator.abi ../../contracts/solc/v0.6/FluxAggregator.bin a3b0a6396c4aa3b5ee39b3c4bd45efc89789d4859379a8a92caca3a0496c5794
 functions_billing_registry_events_mock: ../../contracts/solc/v0.8.6/FunctionsBillingRegistryEventsMock.abi ../../contracts/solc/v0.8.6/FunctionsBillingRegistryEventsMock.bin 50deeb883bd9c3729702be335c0388f9d8553bab4be5e26ecacac496a89e2b77
