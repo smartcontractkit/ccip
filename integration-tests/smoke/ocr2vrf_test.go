@@ -2,6 +2,10 @@ package smoke
 
 import (
 	"fmt"
+	"math/big"
+	"strings"
+	"testing"
+
 	"github.com/smartcontractkit/chainlink-env/environment"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/chainlink"
 	eth "github.com/smartcontractkit/chainlink-env/pkg/helm/ethereum"
@@ -9,9 +13,6 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/utils"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
-	"math/big"
-	"strings"
-	"testing"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/actions/ocr2vrf_actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/actions/ocr2vrf_actions/ocr2vrf_constants"

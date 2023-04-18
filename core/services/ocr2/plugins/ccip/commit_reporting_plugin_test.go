@@ -331,7 +331,7 @@ type testPluginHarness = struct {
 	owner            *bind.TransactOpts
 	lggr             logger.Logger
 	logPoller        logpoller.LogPollerTest
-	mockFeeEstimator *mocks.FeeEstimator[*evmtypes.Head, gas.EvmFee, *assets.Wei, common.Hash]
+	mockFeeEstimator *mocks.FeeEstimator[*evmtypes.Head, gas.EvmFee, *assets.Wei, evmtypes.TxHash]
 	feeToken         common.Address
 	flushLogs        func()
 }
@@ -388,7 +388,7 @@ func setupTestPlugin(t *testing.T) testPluginHarness {
 		EventSigs: []common.Hash{UsdPerUnitGasUpdated, UsdPerTokenUpdated}, Addresses: []common.Address{priceRegistryAddress}})
 	require.NoError(t, err)
 
-	sourceFeeEstimator := mocks.NewFeeEstimator[*evmtypes.Head, gas.EvmFee, *assets.Wei, common.Hash](t)
+	sourceFeeEstimator := mocks.NewFeeEstimator[*evmtypes.Head, gas.EvmFee, *assets.Wei, evmtypes.TxHash](t)
 
 	plugin := CommitReportingPlugin{
 		config: CommitPluginConfig{

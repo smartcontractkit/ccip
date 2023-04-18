@@ -121,7 +121,7 @@ type ExecutionPluginConfig struct {
 	lggr                   logger.Logger
 	srcPriceRegistry       *price_registry.PriceRegistry
 	destPriceRegistry      *price_registry.PriceRegistry
-	destGasEstimator       txmgrtypes.FeeEstimator[*evmtypes.Head, gas.EvmFee, *assets.Wei, common.Hash]
+	destGasEstimator       txmgrtypes.FeeEstimator[*evmtypes.Head, gas.EvmFee, *assets.Wei, evmtypes.TxHash]
 	srcWrappedNativeToken  common.Address
 	destWrappedNativeToken common.Address
 }
