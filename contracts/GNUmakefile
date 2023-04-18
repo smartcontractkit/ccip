@@ -34,7 +34,7 @@ snapshot:
 
 ccip-precommit: export FOUNDRY_PROFILE=ccip
 .PHONY: ccip-precommit
-ccip-precommit: snapshot
+ccip-precommit:
 	forge test
 	pnpm prettier:write
 	pnpm lint:ccip

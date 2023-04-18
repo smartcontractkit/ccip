@@ -66,7 +66,7 @@ contract PriceRegistry_applyPriceUpdatersUpdates is PriceRegistrySetup {
   event PriceUpdaterSet(address indexed priceUpdater);
   event PriceUpdaterRemoved(address indexed priceUpdater);
 
-  function testSuccess() public {
+  function testApplyPriceUpdaterUpdatesSuccess() public {
     address[] memory priceUpdaters = new address[](1);
     priceUpdaters[0] = STRANGER;
 
@@ -106,7 +106,7 @@ contract PriceRegistry_applyFeeTokensUpdates is PriceRegistrySetup {
   event FeeTokenAdded(address indexed feeToken);
   event FeeTokenRemoved(address indexed feeToken);
 
-  function testSuccess() public {
+  function testApplyFeeTokensUpdatesSuccess() public {
     address[] memory feeTokens = new address[](1);
     feeTokens[0] = s_sourceTokens[1];
 
@@ -159,7 +159,7 @@ contract PriceRegistry_updatePrices is PriceRegistrySetup {
     s_encodedNewPriceUpdates = abi.encode(priceUpdates);
   }
 
-  function testSuccess() public {
+  function testUpdatePricesSuccess() public {
     Internal.PriceUpdates memory priceUpdates = abi.decode(s_encodedNewPriceUpdates, (Internal.PriceUpdates));
     s_priceRegistry.updatePrices(priceUpdates);
 

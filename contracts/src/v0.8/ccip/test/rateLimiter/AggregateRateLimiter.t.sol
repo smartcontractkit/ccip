@@ -29,7 +29,7 @@ contract AggregateTokenLimiterSetup is BaseTest {
 
 /// @notice #constructor
 contract AggregateTokenLimiter_constructor is AggregateTokenLimiterSetup {
-  function testSuccess() public {
+  function testConstructorSuccess() public {
     assertEq(ADMIN, s_rateLimiter.getTokenLimitAdmin());
     assertEq(OWNER, s_rateLimiter.owner());
 
@@ -43,7 +43,7 @@ contract AggregateTokenLimiter_constructor is AggregateTokenLimiterSetup {
 
 /// @notice #getTokenLimitAdmin
 contract AggregateTokenLimiter_getTokenLimitAdmin is AggregateTokenLimiterSetup {
-  function testSuccess() public {
+  function testGetTokenLimitAdminSuccess() public {
     assertEq(ADMIN, s_rateLimiter.getTokenLimitAdmin());
   }
 }
@@ -67,7 +67,7 @@ contract AggregateTokenLimiter_setTokenLimitAdmin is AggregateTokenLimiterSetup 
 
 /// @notice #getTokenBucket
 contract AggregateTokenLimiter_getTokenBucket is AggregateTokenLimiterSetup {
-  function testSuccess() public {
+  function testGetTokenBucketSuccess() public {
     RateLimiter.TokenBucket memory bucket = s_rateLimiter.currentRateLimiterState();
     assertEq(s_config.rate, bucket.rate);
     assertEq(s_config.capacity, bucket.capacity);
@@ -157,7 +157,7 @@ contract AggregateTokenLimiter_setRateLimiterConfig is AggregateTokenLimiterSetu
 
 /// @notice #getPricesForTokens
 contract AggregateTokenLimiter_getPricesForTokens is AggregateTokenLimiterSetup {
-  function testSuccess() public {
+  function testGetPricesForTokensSuccess() public {
     IERC20[] memory tokens = new IERC20[](2);
     // Unknown tokens
     tokens[0] = ERC20(0x31118E64E1fb0c487f25DD6D3601FF6Af8D32e4E);

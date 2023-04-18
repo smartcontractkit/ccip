@@ -98,9 +98,10 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
 
   // STATE
   mapping(address => uint64) internal s_senderNonce;
-  // A mapping of sequence numbers to execution state.
-  // This makes sure we never execute a message twice.
-  mapping(uint64 => Internal.MessageExecutionState) internal s_executedMessages;
+  // A mapping of sequence numbers to execution state using a bitmap with each execution state
+  // only taking up 2 bits of the uint256, packing 128 states into a single slot.
+  // This state makes sure we never execute a message twice.
+  mapping(uint64 => uint256) internal s_executionStates;
 
   /// @notice The `tokens` and `pools` passed to this constructor depend on which chain this contract
   /// is being deployed to. Mappings of source token => destination pool is maintained on the destination
@@ -137,11 +138,37 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
   // |                          Messaging                           |
   // ================================================================
 
+  // The size of the execution state in bits
+  uint256 private constant MESSAGE_EXECUTION_STATE_BIT_WIDTH = 2;
+  // The mask for the execution state bits
+  uint256 private constant MESSAGE_EXECUTION_STATE_MASK = (1 << MESSAGE_EXECUTION_STATE_BIT_WIDTH) - 1;
+
   /// @notice Returns the current execution state of a message based on its sequenceNumber.
-  /// @param sequenceNumber The sequence number of the message to get the execution state for
-  /// @return The current execution state of the message
+  /// @param sequenceNumber The sequence number of the message to get the execution state for.
+  /// @return The current execution state of the message.
+  /// @dev we use the literal number 128 because using a constant increased gas usage.
   function getExecutionState(uint64 sequenceNumber) public view returns (Internal.MessageExecutionState) {
-    return s_executedMessages[sequenceNumber];
+    return
+      Internal.MessageExecutionState(
+        (s_executionStates[sequenceNumber / 128] >> ((sequenceNumber % 128) * MESSAGE_EXECUTION_STATE_BIT_WIDTH)) &
+          MESSAGE_EXECUTION_STATE_MASK
+      );
+  }
+
+  /// @notice Sets a new execution state for a given sequence number. It will overwrite any existing state.
+  /// @param sequenceNumber The sequence number for which the state will be saved.
+  /// @param newState The new value the state will be in after this function is called.
+  /// @dev we use the literal number 128 because using a constant increased gas usage.
+  function _setExecutionState(uint64 sequenceNumber, Internal.MessageExecutionState newState) internal {
+    uint256 offset = (sequenceNumber % 128) * MESSAGE_EXECUTION_STATE_BIT_WIDTH;
+    uint256 bitmap = s_executionStates[sequenceNumber / 128];
+    // to unset any potential existing state we zero the bits of the section the state occupies,
+    // then we do an AND operation to blank out any existing state for the section.
+    bitmap &= ~(MESSAGE_EXECUTION_STATE_MASK << offset);
+    // Set the new state
+    bitmap |= uint256(newState) << offset;
+
+    s_executionStates[sequenceNumber / 128] = bitmap;
   }
 
   /// @notice Returns the the current nonce for a receiver.
@@ -223,9 +250,9 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
 
       _isWellFormed(message);
 
-      s_executedMessages[message.sequenceNumber] = Internal.MessageExecutionState.IN_PROGRESS;
+      _setExecutionState(message.sequenceNumber, Internal.MessageExecutionState.IN_PROGRESS);
       Internal.MessageExecutionState newState = _trialExecute(message, manualExecution);
-      s_executedMessages[message.sequenceNumber] = newState;
+      _setExecutionState(message.sequenceNumber, newState);
 
       if (manualExecution) {
         // Nonce changes per state transition:

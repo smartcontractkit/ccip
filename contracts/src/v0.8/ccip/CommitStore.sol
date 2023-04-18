@@ -62,20 +62,16 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
   DynamicConfig internal s_dynamicConfig;
 
   // STATE
-  // merkleRoot => timestamp when received
-  mapping(bytes32 => uint256) private s_roots;
   // The min sequence number expected for future messages
   uint64 private s_minSeqNr = 1;
+  // merkleRoot => timestamp when received
+  mapping(bytes32 => uint256) private s_roots;
 
   /// @param staticConfig Containing the static part of the commitStore config
   /// @param dynamicConfig Containing the dynamic part of the commitStore config
   constructor(StaticConfig memory staticConfig, DynamicConfig memory dynamicConfig) OCR2Base() Pausable() {
-    if (
-      dynamicConfig.priceRegistry == address(0) ||
-      staticConfig.onRamp == address(0) ||
-      staticConfig.chainId == 0 ||
-      staticConfig.sourceChainId == 0
-    ) revert InvalidCommitStoreConfig();
+    if (staticConfig.onRamp == address(0) || staticConfig.chainId == 0 || staticConfig.sourceChainId == 0)
+      revert InvalidCommitStoreConfig();
 
     i_chainId = staticConfig.chainId;
     i_sourceChainId = staticConfig.sourceChainId;

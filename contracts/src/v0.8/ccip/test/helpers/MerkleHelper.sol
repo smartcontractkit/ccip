@@ -3,7 +3,7 @@ pragma solidity 0.8.15;
 
 import {MerkleMultiProof} from "../../libraries/MerkleMultiProof.sol";
 
-contract MerkleHelper {
+library MerkleHelper {
   /// @notice Generate a Merkle Root from a full set of leaves. When a tree is unbalanced
   /// the value is brought up in the tree. For example consider (a,b,c) as leaves. This would
   /// result in the following tree with d being computed from hash(a,c) and the root r from
@@ -43,10 +43,10 @@ contract MerkleHelper {
   }
 
   function hashPair(bytes32 a, bytes32 b) public pure returns (bytes32) {
-    return a < b ? _hashInternalNode(a, b) : _hashInternalNode(b, a);
+    return a < b ? hashInternalNode(a, b) : hashInternalNode(b, a);
   }
 
-  function _hashInternalNode(bytes32 left, bytes32 right) private pure returns (bytes32 hash) {
+  function hashInternalNode(bytes32 left, bytes32 right) public pure returns (bytes32 hash) {
     return keccak256(abi.encode(MerkleMultiProof.INTERNAL_DOMAIN_SEPARATOR, left, right));
   }
 }

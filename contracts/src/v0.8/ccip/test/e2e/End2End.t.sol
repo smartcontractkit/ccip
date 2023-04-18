@@ -9,18 +9,16 @@ import "../offRamp/EVM2EVMOffRampSetup.t.sol";
 contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
   using Internal for Internal.EVM2EVMMessage;
 
-  MerkleHelper public s_merkleHelper;
-
   function setUp() public virtual override(EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup) {
     EVM2EVMOnRampSetup.setUp();
     CommitStoreSetup.setUp();
     EVM2EVMOffRampSetup.setUp();
 
     deployOffRamp(s_commitStore, s_destRouter);
-    s_merkleHelper = new MerkleHelper();
   }
 
-  function testSuccess() public {
+  function testE2E_3MessagesSuccess_gas() public {
+    vm.pauseGasMetering();
     IERC20 token0 = IERC20(s_sourceTokens[0]);
     IERC20 token1 = IERC20(s_sourceTokens[1]);
     uint256 balance0Pre = token0.balanceOf(OWNER);
@@ -44,18 +42,23 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
     hashedMessages[2] = messages[2]._hash(metaDataHash);
 
     bytes32[] memory merkleRoots = new bytes32[](1);
-    merkleRoots[0] = s_merkleHelper.getMerkleRoot(hashedMessages);
+    merkleRoots[0] = MerkleHelper.getMerkleRoot(hashedMessages);
 
     address[] memory onRamps = new address[](1);
     onRamps[0] = ON_RAMP_ADDRESS;
 
-    CommitStore.CommitReport memory report = CommitStore.CommitReport({
-      priceUpdates: getEmptyPriceUpdates(),
-      interval: CommitStore.Interval(messages[0].sequenceNumber, messages[2].sequenceNumber),
-      merkleRoot: merkleRoots[0]
-    });
+    bytes memory commitReport = abi.encode(
+      CommitStore.CommitReport({
+        priceUpdates: getEmptyPriceUpdates(),
+        interval: CommitStore.Interval(messages[0].sequenceNumber, messages[2].sequenceNumber),
+        merkleRoot: merkleRoots[0]
+      })
+    );
 
-    s_commitStore.report(abi.encode(report));
+    vm.resumeGasMetering();
+    s_commitStore.report(commitReport);
+    vm.pauseGasMetering();
+
     bytes32[] memory proofs = new bytes32[](0);
     uint256 timestamp = s_commitStore.verify(merkleRoots, proofs, 2**2 - 1);
     assertEq(BLOCK_TIME, timestamp);
@@ -86,7 +89,9 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
       Internal.MessageExecutionState.SUCCESS
     );
 
-    s_offRamp.execute(_generateReportFromMessages(messages), false);
+    Internal.ExecutionReport memory execReport = _generateReportFromMessages(messages);
+    vm.resumeGasMetering();
+    s_offRamp.execute(execReport, false);
   }
 
   function sendRequest(uint64 expectedSeqNum) public returns (Internal.EVM2EVMMessage memory) {
@@ -108,7 +113,9 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
     vm.expectEmit();
     emit CCIPSendRequested(geEvent);
 
+    vm.resumeGasMetering();
     s_sourceRouter.ccipSend(DEST_CHAIN_ID, message);
+    vm.pauseGasMetering();
 
     return geEvent;
   }

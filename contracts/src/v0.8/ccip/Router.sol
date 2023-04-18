@@ -93,10 +93,13 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
     address onRamp = s_onRamps[destinationChainId];
     if (onRamp == address(0)) revert UnsupportedDestinationChain(destinationChainId);
     uint256 feeTokenAmount;
+    // address(0) signals payment in true native
     if (message.feeToken == address(0)) {
-      // Ensure sufficient native.
+      // for fee calculation we check the wrapped native price as we wrap
+      // as part of the native fee coin payment.
       message.feeToken = s_wrappedNative;
       feeTokenAmount = IEVM2AnyOnRamp(onRamp).getFee(message);
+      // Ensure sufficient native.
       if (msg.value < feeTokenAmount) revert InsufficientFeeTokenAmount();
       // Wrap and send native payment.
       // Note we take the whole msg.value regardless if its larger.
