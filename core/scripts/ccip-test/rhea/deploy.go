@@ -186,7 +186,7 @@ func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainId uint
 			OnRamp:        onRamp,
 		},
 		evm_2_evm_offramp.EVM2EVMOffRampDynamicConfig{
-			PermissionLessExecutionThresholdSeconds: 60,
+			PermissionLessExecutionThresholdSeconds: 24 * 60 * 60, // 24 hours
 			Router:                                  client.ChainConfig.Router,
 			Afn:                                     client.ChainConfig.Afn,
 			MaxDataSize:                             1e6,
