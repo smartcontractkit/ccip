@@ -15,12 +15,14 @@ import (
 
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/secrets"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/afn_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/wrapped_token_pool"
 )
 
 func panicErr(err error) {
@@ -101,6 +103,13 @@ func DecodeErrorStringFromABI(errorString string, contractABIs []string) {
 		return
 	}
 
+	stringErr, err := abi.UnpackRevert(data)
+	if err == nil {
+		fmt.Println("String error thrown")
+		fmt.Printf("error: %s", stringErr)
+		return
+	}
+
 	fmt.Printf("Cannot match error with contract ABI. Error code \"%v\"\n", errorString)
 }
 
@@ -108,6 +117,8 @@ func getAllABIs() []string {
 	return []string{
 		afn_contract.AFNContractABI,
 		lock_release_token_pool.LockReleaseTokenPoolABI,
+		burn_mint_token_pool.BurnMintTokenPoolABI,
+		wrapped_token_pool.WrappedTokenPoolABI,
 		commit_store.CommitStoreABI,
 		price_registry.PriceRegistryABI,
 		evm_2_evm_onramp.EVM2EVMOnRampABI,
