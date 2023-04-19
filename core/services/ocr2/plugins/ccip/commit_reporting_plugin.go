@@ -174,6 +174,7 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
+	rf.config.lggr.Infow("Starting commit plugin", "offchainConfig", offchainConfig)
 
 	return &CommitReportingPlugin{
 			config:         rf.config,
