@@ -117,21 +117,6 @@ func DecodeCommitReport(report types.Report) (*commit_store.CommitStoreCommitRep
 	}, nil
 }
 
-func isCommitStoreDownNow(ctx context.Context, lggr logger.Logger, commitStore *commit_store.CommitStore) bool {
-	paused, err := commitStore.Paused(&bind.CallOpts{Context: ctx})
-	if err != nil {
-		// Air on side of caution by halting if we cannot read the state?
-		lggr.Errorw("Unable to read offramp paused", "err", err)
-		return true
-	}
-	healthy, err := commitStore.IsAFNHealthy(&bind.CallOpts{Context: ctx})
-	if err != nil {
-		lggr.Errorw("Unable to read offramp afn", "err", err)
-		return true
-	}
-	return paused || !healthy
-}
-
 type InflightReport struct {
 	report    *commit_store.CommitStoreCommitReport
 	createdAt time.Time
@@ -204,27 +189,18 @@ type CommitReportingPlugin struct {
 	offchainConfig       CommitOffchainConfig
 }
 
-func (r *CommitReportingPlugin) nextMinSeqNumForInFlight() uint64 {
-	r.inFlightMu.RLock()
-	defer r.inFlightMu.RUnlock()
-	max := uint64(0)
-	for _, report := range r.inFlight {
-		if report.report.Interval.Max > max {
-			max = report.report.Interval.Max
-		}
-	}
-	return max + 1
-}
-
 func (r *CommitReportingPlugin) nextMinSeqNum(ctx context.Context) (uint64, error) {
 	nextMin, err := r.config.commitStore.GetExpectedNextSequenceNumber(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return 0, err
 	}
-	nextMinInFlight := r.nextMinSeqNumForInFlight()
-	if nextMinInFlight > nextMin {
-		nextMin = nextMinInFlight
+	r.inFlightMu.RLock()
+	for _, report := range r.inFlight {
+		if report.report.Interval.Max >= nextMin {
+			nextMin = report.report.Interval.Max + 1
+		}
 	}
+	r.inFlightMu.RUnlock()
 	return nextMin, nil
 }
 
@@ -500,12 +476,12 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, _ types.ReportTimest
 		return false, nil, nil
 	}
 
-	agreedInterval, err := calculateIntervalConsensus(ctx, intervals, r.F, r.nextMinSeqNum)
+	agreedInterval, err := calculateIntervalConsensus(intervals, r.F)
 	if err != nil {
 		return false, nil, err
 	}
 
-	priceUpdates := calculatePriceUpdates(r.config.sourceChainID, nonEmptyObservations)
+	priceUpdates := calculatePriceUpdates(r.config.sourceChainID, nonEmptyObservations, r.F)
 	// If there are no fee updates and the interval is zero there is no report to produce.
 	if len(priceUpdates.TokenPriceUpdates) == 0 && priceUpdates.DestChainId == 0 && agreedInterval.Min == 0 {
 		return false, nil, nil
@@ -524,7 +500,7 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, _ types.ReportTimest
 }
 
 // Note priceUpdates must be deterministic.
-func calculatePriceUpdates(destChainId uint64, observations []CommitObservation) commit_store.InternalPriceUpdates {
+func calculatePriceUpdates(destChainId uint64, observations []CommitObservation, f int) commit_store.InternalPriceUpdates {
 	priceObservations := make(map[common.Address][]*big.Int)
 	var sourceGasObservations []*big.Int
 
@@ -545,7 +521,7 @@ func calculatePriceUpdates(destChainId uint64, observations []CommitObservation)
 	var priceUpdates []commit_store.InternalTokenPriceUpdate
 	for token, tokenPriceObservations := range priceObservations {
 		// If majority report a token price, include it in the update
-		if len(tokenPriceObservations) <= len(observations)/2 {
+		if len(tokenPriceObservations) <= f {
 			continue
 		}
 		medianPrice := median(tokenPriceObservations)
@@ -563,7 +539,7 @@ func calculatePriceUpdates(destChainId uint64, observations []CommitObservation)
 	// Must never be nil
 	usdPerUnitGas := big.NewInt(0)
 	// If majority report a gas price, include it in the update
-	if len(sourceGasObservations) <= len(observations)/2 {
+	if len(sourceGasObservations) <= f {
 		destChainId = 0
 	} else {
 		usdPerUnitGas = median(sourceGasObservations)
@@ -578,7 +554,7 @@ func calculatePriceUpdates(destChainId uint64, observations []CommitObservation)
 }
 
 // Assumed at least f+1 valid observations
-func calculateIntervalConsensus(ctx context.Context, intervals []commit_store.CommitStoreInterval, f int, nextMinSeqNumForOffRamp func(ctx context.Context) (uint64, error)) (commit_store.CommitStoreInterval, error) {
+func calculateIntervalConsensus(intervals []commit_store.CommitStoreInterval, f int) (commit_store.CommitStoreInterval, error) {
 	if len(intervals) <= f {
 		return commit_store.CommitStoreInterval{}, errors.Errorf("Not enough intervals to form consensus intervals %d, f %d", len(intervals), f)
 	}
@@ -603,14 +579,6 @@ func calculateIntervalConsensus(ctx context.Context, intervals []commit_store.Co
 	// TODO: Do we for sure want to fail everything here?
 	if maxSeqNum < minSeqNum {
 		return commit_store.CommitStoreInterval{}, errors.New("max seq num smaller than min")
-	}
-	nextMin, err := nextMinSeqNumForOffRamp(ctx)
-	if err != nil {
-		return commit_store.CommitStoreInterval{}, err
-	}
-	// Contract would revert
-	if nextMin > minSeqNum {
-		return commit_store.CommitStoreInterval{}, errors.Errorf("invalid min seq number got %v want %v", minSeqNum, nextMin)
 	}
 
 	return commit_store.CommitStoreInterval{
@@ -679,10 +647,8 @@ func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context,
 	if parsedReport.MerkleRoot != [32]byte{} {
 		// Note it's ok to leave the unstarted requests behind, since the
 		// 'Observe' is always based on the last reports onchain min seq num.
-		if r.isStaleReport(ctx, parsedReport) {
-			return false, nil
-		}
-
+		// This is a stricter isStaleReport, which considers inFlight requests and accepts only
+		// reports starting at nextMinSeqNum
 		nextInflightMin, err := r.nextMinSeqNum(ctx)
 		if err != nil {
 			return false, err
@@ -718,17 +684,19 @@ func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context
 }
 
 func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, report *commit_store.CommitStoreCommitReport) bool {
-	nextMin, err := r.config.commitStore.GetExpectedNextSequenceNumber(&bind.CallOpts{Context: ctx})
-	if err != nil {
-		// Assume it's a transient issue getting the last report
-		// Will try again on the next round
-		return true
-	}
-	// If the next min is already greater than this reports min,
-	// this report is stale.
-	if nextMin > report.Interval.Min {
-		r.config.lggr.Warnw("report is stale", "onchain min", nextMin, "report min", report.Interval.Min)
-		return true
+	if report.MerkleRoot != [32]byte{} {
+		nextMin, err := r.config.commitStore.GetExpectedNextSequenceNumber(&bind.CallOpts{Context: ctx})
+		if err != nil {
+			// Assume it's a transient issue getting the last report
+			// Will try again on the next round
+			return true
+		}
+		// If the next min is already greater than this reports min,
+		// this report is stale.
+		if nextMin > report.Interval.Min {
+			r.config.lggr.Warnw("report is stale", "onchain min", nextMin, "report min", report.Interval.Min)
+			return true
+		}
 	}
 	return false
 }

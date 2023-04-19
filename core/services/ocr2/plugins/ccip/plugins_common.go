@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
@@ -32,9 +31,7 @@ const (
 	MessageStateFailure
 )
 
-var (
-	ErrCommitStoreIsDown = errors.New("commitStore is down")
-)
+var ErrCommitStoreIsDown = errors.New("commitStore is down")
 
 func LoadOnRamp(onRampAddress common.Address, client client.Client) (*evm_2_evm_onramp.EVM2EVMOnRamp, error) {
 	err := ccipconfig.VerifyTypeAndVersion(onRampAddress, client, ccipconfig.EVM2EVMOnRamp)
@@ -94,7 +91,8 @@ func leavesFromIntervals(
 	interval commit_store.CommitStoreInterval,
 	srcLogPoller logpoller.LogPoller,
 	hasher LeafHasherInterface[[32]byte],
-	confs int) ([][32]byte, error) {
+	confs int,
+) ([][32]byte, error) {
 	// Logs are guaranteed to be in order of seq num, since these are finalized logs only
 	// and the contract's seq num is auto-incrementing.
 	logs, err := srcLogPoller.LogsDataWordRange(
@@ -152,7 +150,7 @@ type EventSignatures struct {
 	ExecutionStateChangedSequenceNumberIndex int
 }
 
-func commitReport(dstLogPoller logpoller.LogPoller, onRamp common.Address, commitStore *commit_store.CommitStore, seqNr uint64) (commit_store.CommitStoreCommitReport, error) {
+func commitReport(dstLogPoller logpoller.LogPoller, commitStore *commit_store.CommitStore, seqNr uint64) (commit_store.CommitStoreCommitReport, error) {
 	latest, err := dstLogPoller.LatestBlock()
 	if err != nil {
 		return commit_store.CommitStoreCommitReport{}, err
@@ -165,10 +163,7 @@ func commitReport(dstLogPoller logpoller.LogPoller, onRamp common.Address, commi
 		return commit_store.CommitStoreCommitReport{}, errors.Errorf("seq number not committed, nothing committed")
 	}
 	for _, log := range logs {
-		reportAccepted, err := commitStore.ParseReportAccepted(types.Log{
-			Topics: log.GetTopics(),
-			Data:   log.Data,
-		})
+		reportAccepted, err := commitStore.ParseReportAccepted(log.GetGethLog())
 		if err != nil {
 			return commit_store.CommitStoreCommitReport{}, err
 		}
@@ -199,7 +194,7 @@ func buildExecution(
 	if mathutil.Max(finalSeqNums[0], finalSeqNums[1:]...) >= nextMin {
 		return nil, errors.Errorf("Cannot execute uncommitted seq num. nextMin %v, seqNums %v", nextMin, finalSeqNums)
 	}
-	rep, err := commitReport(dest, onRampAddress, commitStore, finalSeqNums[0])
+	rep, err := commitReport(dest, commitStore, finalSeqNums[0])
 	if err != nil {
 		return nil, err
 	}
@@ -221,7 +216,7 @@ func buildExecution(
 		return nil, err
 	}
 	ctx := hasher.NewKeccakCtx()
-	tree, err := merklemulti.NewTree[[32]byte](ctx, leaves)
+	tree, err := merklemulti.NewTree(ctx, leaves)
 	if err != nil {
 		return nil, err
 	}
@@ -262,4 +257,19 @@ func buildExecution(
 		proofs:           merkleProof.Hashes,
 		proofSourceFlags: merkleProof.SourceFlags,
 	}, nil
+}
+
+func isCommitStoreDownNow(ctx context.Context, lggr logger.Logger, commitStore *commit_store.CommitStore) bool {
+	paused, err := commitStore.Paused(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		// Air on side of caution by halting if we cannot read the state?
+		lggr.Errorw("Unable to read CommitStore paused", "err", err)
+		return true
+	}
+	healthy, err := commitStore.IsAFNHealthy(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		lggr.Errorw("Unable to read CommitStore AFN state", "err", err)
+		return true
+	}
+	return paused || !healthy
 }
