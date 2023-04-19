@@ -152,7 +152,7 @@ type CommitPluginConfig struct {
 	priceRegistry       *price_registry.PriceRegistry
 	priceGetter         PriceGetter
 	sourceNative        common.Address
-	sourceFeeEstimator  txmgrtypes.FeeEstimator[*evmtypes.Head, gas.EvmFee, *assets.Wei, common.Hash]
+	sourceFeeEstimator  txmgrtypes.FeeEstimator[*evmtypes.Head, gas.EvmFee, *assets.Wei, evmtypes.TxHash]
 	sourceChainID       uint64
 	commitStore         *commit_store.CommitStore
 	hasher              LeafHasherInterface[[32]byte]

@@ -7,13 +7,13 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
 )
 
@@ -32,7 +32,7 @@ type EthKeyStoreSim struct {
 	keystore.Eth
 }
 
-func (ks EthKeyStoreSim) SignTx(address common.Address, tx *ethtypes.Transaction, chainID *big.Int) (*ethtypes.Transaction, error) {
+func (ks EthKeyStoreSim) SignTx(address types.Address, tx *ethtypes.Transaction, chainID *big.Int) (*ethtypes.Transaction, error) {
 	if chainID.String() == "1000" {
 		// A terrible hack, just for the multichain test. All simulation clients run on chainID 1337.
 		// We let the DestChain actually use 1337 to make sure the offchainConfig digests are properly generated.

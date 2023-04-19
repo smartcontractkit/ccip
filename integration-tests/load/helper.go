@@ -8,8 +8,7 @@ import (
 	"testing"
 
 	"github.com/rs/zerolog"
-	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
-	"github.com/smartcontractkit/chainlink-testing-framework/loadgen"
+	"github.com/smartcontractkit/wasp"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
@@ -22,7 +21,7 @@ type loadArgs struct {
 	lggr          zerolog.Logger
 	ctx           context.Context
 	ccipLoad      []*CCIPE2ELoad
-	loadRunner    []*loadgen.Generator
+	loadRunner    []*wasp.Generator
 	Wg            *errgroup.Group
 	TestCfg       *testsetups.CCIPTestConfig
 	TestSetupArgs *testsetups.CCIPTestSetUpOutputs
@@ -53,15 +52,15 @@ func (l *loadArgs) SetupStableLoad() {
 	for _, lane := range lanes {
 		ccipLoad := NewCCIPLoad(l.TestCfg.Test, lane, l.TestCfg.PhaseTimeout, 100000, lane.Reports)
 		ccipLoad.BeforeAllCall(testsetups.DataOnlyTransfer)
-		loadRunner, err := loadgen.NewLoadGenerator(&loadgen.Config{
+		loadRunner, err := wasp.NewGenerator(&wasp.Config{
 			T:           l.TestCfg.Test,
-			Schedule:    loadgen.Plain(l.TestCfg.Load.LoadRPS, l.TestCfg.TestDuration),
-			LoadType:    loadgen.RPSScheduleType,
+			Schedule:    wasp.Plain(l.TestCfg.Load.LoadRPS, l.TestCfg.TestDuration),
+			LoadType:    wasp.RPSScheduleType,
 			CallTimeout: l.TestCfg.Load.LoadTimeOut,
 			Gun:         ccipLoad,
 			Logger:      zerolog.Logger{},
 			SharedData:  l.TestCfg.MsgType,
-			LokiConfig: ctfClient.NewDefaultLokiConfig(
+			LokiConfig: wasp.NewDefaultLokiConfig(
 				os.Getenv("LOKI_URL"),
 				os.Getenv("LOKI_TOKEN")),
 			Labels: map[string]string{
@@ -83,7 +82,7 @@ func (l *loadArgs) SetupStableLoad() {
 
 func (l *loadArgs) Run() {
 	for i := range l.loadRunner {
-		l.loadRunner[i].Run()
+		l.loadRunner[i].Run(false)
 		go func(index int) {
 			// wait for load to finish
 			l.Wg.Go(func() error {
