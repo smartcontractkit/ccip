@@ -34,10 +34,6 @@ interface IForwarder is IERC165 {
 
   event RequestTypeRegistered(bytes32 indexed typeHash, string typeStr);
 
-  /// @param from The address of a sender.
-  /// @return The nonce for this address.
-  function getNonce(address from) external view returns (uint256);
-
   /// @notice Verify the transaction is valid and can be executed.
   /// @dev Implementations must validate the signature and the nonce of the request are correct.
   /// @dev Does not revert and returns successfully if the input is valid.

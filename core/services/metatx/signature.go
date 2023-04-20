@@ -3,6 +3,7 @@ package metatx
 import (
 	"bytes"
 	"crypto/ecdsa"
+	"crypto/rand"
 	"fmt"
 	"math/big"
 
@@ -42,9 +43,9 @@ func SignMetaTransfer(
 
 	copy(typeHash[:], typeHashRaw[:])
 
-	nonce, err = forwarder.GetNonce(nil, owner)
+	nonce, err = rand.Int(rand.Reader, new(big.Int).Exp(big.NewInt(2), big.NewInt(256), nil))
 	if err != nil {
-		return nil, [32]byte{}, [32]byte{}, nil, errors.Wrapf(err, "failed to get nonce of %s", owner.Hex())
+		panic(err)
 	}
 
 	domainSeparator, err := forwarder.GetDomainSeparator(nil, BankERC20TokenName, BankERC20TokenVersion)
