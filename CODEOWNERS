@@ -42,6 +42,9 @@
 
 /core/services/webhook @samsondav
 
+# CCIP services
+/core/services/ocr2/plugins/ccip @smartcontractkit/ccip
+
 # API
 /core/web @jkongie
 
@@ -55,6 +58,7 @@
 /contracts/ @se3000 @connorwstein
 /contracts/**/*Keeper* @smartcontractkit/keepers
 /contracts/**/*Upkeep* @smartcontractkit/keepers
+/contracts/**/ccip/ @rensr @matyang
 
 # Tests
 /integration-tests/ @smartcontractkit/test-tooling-team

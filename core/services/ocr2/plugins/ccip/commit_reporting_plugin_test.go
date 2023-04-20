@@ -6,12 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/leanovate/gopter"
 	"github.com/leanovate/gopter/gen"
 	"github.com/leanovate/gopter/prop"
@@ -19,26 +14,54 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/libocr/offchainreporting2/types"
+
 	"github.com/smartcontractkit/chainlink/v2/common/txmgr/types/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/assets"
-	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store_helper"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/lock_release_token_pool"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/mock_afn_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
-	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/merklemulti"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
+
+type commitTestHarness = struct {
+	ccipPluginTestHarness
+	plugin           *CommitReportingPlugin
+	mockFeeEstimator *mocks.FeeEstimator[*evmtypes.Head, gas.EvmFee, *assets.Wei, evmtypes.TxHash]
+}
+
+func setupCommitTestHarness(t *testing.T) commitTestHarness {
+	th := setupCcipTestHarness(t)
+
+	sourceFeeEstimator := mocks.NewFeeEstimator[*evmtypes.Head, gas.EvmFee, *assets.Wei, evmtypes.TxHash](t)
+
+	plugin := CommitReportingPlugin{
+		config: CommitPluginConfig{
+			lggr:               th.lggr,
+			dest:               th.logPoller,
+			commitStore:        th.commitStore,
+			priceRegistry:      th.priceRegistry,
+			priceGetter:        fakePriceGetter{},
+			sourceNative:       utils.RandomAddress(),
+			sourceFeeEstimator: sourceFeeEstimator,
+			sourceChainID:      th.sourceChainID,
+		},
+		inFlight: map[[32]byte]InflightReport{},
+		offchainConfig: CommitOffchainConfig{
+			FeeUpdateHeartBeat: models.MustMakeDuration(12 * time.Hour),
+		},
+	}
+	return commitTestHarness{
+		ccipPluginTestHarness: th,
+		plugin:                &plugin,
+		mockFeeEstimator:      sourceFeeEstimator,
+	}
+}
 
 func TestCommitReportSize(t *testing.T) {
 	testParams := gopter.DefaultTestParameters()
@@ -59,78 +82,9 @@ func TestCommitReportSize(t *testing.T) {
 }
 
 func TestCommitReportEncoding(t *testing.T) {
-	// Set up a user.
-	key, err := crypto.GenerateKey()
-	require.NoError(t, err)
-	destChainId := uint64(1337)
-	destUser, err := bind.NewKeyedTransactorWithChainID(key, big.NewInt(int64(destChainId)))
-	require.NoError(t, err)
-	destChain := backends.NewSimulatedBackend(core.GenesisAlloc{
-		destUser.From: {Balance: big.NewInt(0).Mul(big.NewInt(100), big.NewInt(1e18))}},
-		ethconfig.Defaults.Miner.GasCeil)
-
-	// Deploy link token.
-	destLinkTokenAddress, _, _, err := link_token_interface.DeployLinkToken(destUser, destChain)
-	require.NoError(t, err)
-	destChain.Commit()
-	_, err = link_token_interface.NewLinkToken(destLinkTokenAddress, destChain)
-	require.NoError(t, err)
-
-	// Deploy link token pool.
-	destPoolAddress, _, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(
-		destUser,
-		destChain,
-		destLinkTokenAddress,
-		lock_release_token_pool.RateLimiterConfig{
-			Capacity:  big.NewInt(1e18),
-			Rate:      big.NewInt(1e18),
-			IsEnabled: true,
-		})
-	require.NoError(t, err)
-	destChain.Commit()
-	_, err = lock_release_token_pool.NewLockReleaseTokenPool(destPoolAddress, destChain)
-	require.NoError(t, err)
-
-	// Deploy AFN.
-	afnAddress, _, _, err := mock_afn_contract.DeployMockAFNContract(
-		destUser,
-		destChain,
-	)
-	require.NoError(t, err)
-
-	priceRegistry, _, _, err := price_registry.DeployPriceRegistry(destUser, destChain, price_registry.InternalPriceUpdates{
-		TokenPriceUpdates: nil,
-		DestChainId:       0,
-		UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
-	}, []common.Address{}, []common.Address{}, uint32(time.Hour.Seconds()))
-	require.NoError(t, err)
-
-	// Deploy commitStore.
-	onRampAddress := common.HexToAddress("0x01BE23585060835E02B77ef475b0Cc51aA1e0709")
-	commitStoreAddress, _, _, err := commit_store_helper.DeployCommitStoreHelper(
-		destUser,  // user
-		destChain, // client
-		commit_store_helper.CommitStoreStaticConfig{
-			ChainId:       destChainId,
-			SourceChainId: 1337,
-			OnRamp:        onRampAddress,
-		},
-		commit_store_helper.CommitStoreDynamicConfig{
-			PriceRegistry: priceRegistry,
-			Afn:           afnAddress, // AFN address
-		},
-	)
-	require.NoError(t, err)
-	commitStore, err := commit_store_helper.NewCommitStoreHelper(commitStoreAddress, destChain)
-	require.NoError(t, err)
-	destChain.Commit()
-
-	newPriceRegistry, err := price_registry.NewPriceRegistry(priceRegistry, destChain)
-	require.NoError(t, err)
-
-	_, err = newPriceRegistry.ApplyPriceUpdatersUpdates(destUser, []common.Address{commitStoreAddress}, []common.Address{})
-	require.NoError(t, err)
-	destChain.Commit()
+	th := setupCcipTestHarness(t)
+	newTokenPrice := big.NewInt(9e18) // $9
+	newGasPrice := big.NewInt(2000e9) // $2000 per eth * 1gwei
 
 	// Send a report.
 	mctx := hasher.NewKeccakCtx()
@@ -140,12 +94,12 @@ func TestCommitReportEncoding(t *testing.T) {
 		PriceUpdates: commit_store.InternalPriceUpdates{
 			TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{
 				{
-					SourceToken: destLinkTokenAddress,
-					UsdPerToken: big.NewInt(8e18), // 8usd
+					SourceToken: th.feeTokenAddress,
+					UsdPerToken: newTokenPrice,
 				},
 			},
-			DestChainId:   destChainId,
-			UsdPerUnitGas: big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
+			DestChainId:   th.sourceChainID,
+			UsdPerUnitGas: newGasPrice,
 		},
 		MerkleRoot: tree.Root(),
 		Interval:   commit_store.CommitStoreInterval{Min: 1, Max: 10},
@@ -156,26 +110,26 @@ func TestCommitReportEncoding(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, &report, decodedReport)
 
-	tx, err := commitStore.Report(destUser, out)
+	tx, err := th.commitStoreHelper.Report(th.owner, out)
 	require.NoError(t, err)
-	destChain.Commit()
-	res, err := destChain.TransactionReceipt(context.Background(), tx.Hash())
+	th.flushLogs()
+	res, err := th.client.TransactionReceipt(context.Background(), tx.Hash())
 	require.NoError(t, err)
 	assert.Equal(t, uint64(1), res.Status)
 
 	// Ensure root exists.
-	ts, err := commitStore.GetMerkleRoot(nil, tree.Root())
+	ts, err := th.commitStore.GetMerkleRoot(nil, tree.Root())
 	require.NoError(t, err)
 	require.NotEqual(t, ts.String(), "0")
 
 	// Ensure price update went through
-	destChainGasPrice, err := newPriceRegistry.GetDestinationChainGasPrice(nil, destChainId)
+	destChainGasPrice, err := th.priceRegistry.GetDestinationChainGasPrice(nil, th.sourceChainID)
 	require.NoError(t, err)
-	assert.Equal(t, "2000000000000", destChainGasPrice.Value.String())
+	assert.Equal(t, newGasPrice, destChainGasPrice.Value)
 
-	linkTokenPrice, err := newPriceRegistry.GetTokenPrice(nil, destLinkTokenAddress)
+	linkTokenPrice, err := th.priceRegistry.GetTokenPrice(nil, th.feeTokenAddress)
 	require.NoError(t, err)
-	assert.Equal(t, "8000000000000000000", linkTokenPrice.Value.String())
+	assert.Equal(t, newTokenPrice, linkTokenPrice.Value)
 }
 
 func TestCalculatePriceUpdates(t *testing.T) {
@@ -184,22 +138,25 @@ func TestCalculatePriceUpdates(t *testing.T) {
 	tests := []struct {
 		name               string
 		commitObservations []CommitObservation
+		f                  int
 		wantGas            *big.Int
 	}{
 		{"median", []CommitObservation{
-			{SourceGasPriceUSD: big.NewInt(1)}, {SourceGasPriceUSD: big.NewInt(2)}, {SourceGasPriceUSD: big.NewInt(3)},
+			{SourceGasPriceUSD: big.NewInt(1)},
+			{SourceGasPriceUSD: big.NewInt(2)},
+			{SourceGasPriceUSD: big.NewInt(3)},
 			{SourceGasPriceUSD: big.NewInt(4)},
-		}, big.NewInt(3)},
+		}, 2, big.NewInt(3)},
 		{"insufficient", []CommitObservation{
 			{SourceGasPriceUSD: nil}, {SourceGasPriceUSD: nil}, {SourceGasPriceUSD: big.NewInt(3)},
-		}, big.NewInt(0)},
+		}, 1, big.NewInt(0)},
 		{"median including empties", []CommitObservation{
 			{SourceGasPriceUSD: nil}, {SourceGasPriceUSD: big.NewInt(1)}, {SourceGasPriceUSD: big.NewInt(2)},
-		}, big.NewInt(2)},
+		}, 1, big.NewInt(2)},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := calculatePriceUpdates(10, tt.commitObservations)
+			got := calculatePriceUpdates(10, tt.commitObservations, tt.f)
 			assert.Equal(t, tt.wantGas, got.UsdPerUnitGas)
 		})
 	}
@@ -208,31 +165,37 @@ func TestCalculatePriceUpdates(t *testing.T) {
 	tokenPricesTests := []struct {
 		name               string
 		commitObservations []CommitObservation
-		tokenPricesUpdates []commit_store.InternalTokenPriceUpdate
+		f                  int
+		wantedUpdates      []commit_store.InternalTokenPriceUpdate
 	}{
 		{"median one token", []CommitObservation{
 			{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: big.NewInt(10)}},
 			{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: big.NewInt(12)}},
-		}, []commit_store.InternalTokenPriceUpdate{
-			{SourceToken: feeToken1, UsdPerToken: big.NewInt(12)}}},
-		{"median two tokens", []CommitObservation{
-			{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: big.NewInt(10), feeToken2: big.NewInt(13)}},
-			{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: big.NewInt(12), feeToken2: big.NewInt(7)}},
-		}, []commit_store.InternalTokenPriceUpdate{
+		}, 1, []commit_store.InternalTokenPriceUpdate{
 			{SourceToken: feeToken1, UsdPerToken: big.NewInt(12)},
-			{SourceToken: feeToken2, UsdPerToken: big.NewInt(13)}},
+		}},
+		{
+			"median two tokens", []CommitObservation{
+				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: big.NewInt(10), feeToken2: big.NewInt(13)}},
+				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: big.NewInt(12), feeToken2: big.NewInt(7)}},
+			}, 1, []commit_store.InternalTokenPriceUpdate{
+				{SourceToken: feeToken1, UsdPerToken: big.NewInt(12)},
+				{SourceToken: feeToken2, UsdPerToken: big.NewInt(13)},
+			},
 		},
-		{"only one token with enough votes", []CommitObservation{
-			{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: big.NewInt(10)}},
-			{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: big.NewInt(12), feeToken2: big.NewInt(7)}},
-		}, []commit_store.InternalTokenPriceUpdate{
-			{SourceToken: feeToken1, UsdPerToken: big.NewInt(12)}},
+		{
+			"only one token with enough votes", []CommitObservation{
+				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: big.NewInt(10)}},
+				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: big.NewInt(12), feeToken2: big.NewInt(7)}},
+			}, 1, []commit_store.InternalTokenPriceUpdate{
+				{SourceToken: feeToken1, UsdPerToken: big.NewInt(12)},
+			},
 		},
 	}
 	for _, tt := range tokenPricesTests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := calculatePriceUpdates(10, tt.commitObservations)
-			assert.Equal(t, tt.tokenPricesUpdates, got.TokenPriceUpdates)
+			got := calculatePriceUpdates(10, tt.commitObservations, tt.f)
+			assert.Equal(t, tt.wantedUpdates, got.TokenPriceUpdates)
 		})
 	}
 }
@@ -241,35 +204,29 @@ func TestCalculateIntervalConsensus(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name                    string
-		intervals               []commit_store.CommitStoreInterval
-		f                       int
-		nextMinSeqNumForOffRamp uint64
-		wantMin                 uint64
-		wantMax                 uint64
-		wantErr                 bool
+		name      string
+		intervals []commit_store.CommitStoreInterval
+		f         int
+		wantMin   uint64
+		wantMax   uint64
+		wantErr   bool
 	}{
-		{"no obs", []commit_store.CommitStoreInterval{{Min: 0, Max: 0}}, 0, 100, 0, 0, false},
+		{"no obs", []commit_store.CommitStoreInterval{{Min: 0, Max: 0}}, 0, 0, 0, false},
 		{"basic", []commit_store.CommitStoreInterval{
 			{Min: 9, Max: 14},
 			{Min: 10, Max: 12},
 			{Min: 10, Max: 14},
-		}, 1, 10, 10, 14, false},
-		{"not enough intervals", []commit_store.CommitStoreInterval{}, 1, 0, 0, 0, true},
-		{"wrong next min", []commit_store.CommitStoreInterval{
-			{Min: 9, Max: 14},
-			{Min: 10, Max: 12},
-			{Min: 10, Max: 14},
-		}, 1, 11, 0, 0, true},
+		}, 1, 10, 14, false},
+		{"not enough intervals", []commit_store.CommitStoreInterval{}, 1, 0, 0, true},
 		{"min > max", []commit_store.CommitStoreInterval{
-			{Min: 9, Max: 5},
+			{Min: 9, Max: 4},
 			{Min: 10, Max: 4},
 			{Min: 10, Max: 6},
-		}, 1, 10, 0, 0, true},
+		}, 1, 0, 0, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := calculateIntervalConsensus(context.Background(), tt.intervals, tt.f, func(ctx context.Context) (uint64, error) { return tt.nextMinSeqNumForOffRamp, nil })
+			got, err := calculateIntervalConsensus(tt.intervals, tt.f)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -325,98 +282,8 @@ func TestCommitReportToEthTxMeta(t *testing.T) {
 	}
 }
 
-type testPluginHarness = struct {
-	plugin           *CommitReportingPlugin
-	client           *backends.SimulatedBackend
-	owner            *bind.TransactOpts
-	lggr             logger.Logger
-	logPoller        logpoller.LogPollerTest
-	mockFeeEstimator *mocks.FeeEstimator[*evmtypes.Head, gas.EvmFee, *assets.Wei, common.Hash]
-	feeToken         common.Address
-	flushLogs        func()
-}
-
-func setupTestPlugin(t *testing.T) testPluginHarness {
-	chainID := testutils.NewRandomEVMChainID()
-	lggr := logger.TestLogger(t)
-	owner := testutils.MustNewSimTransactor(t)
-	db := pgtest.NewSqlxDB(t)
-	require.NoError(t, utils.JustError(db.Exec(`SET CONSTRAINTS evm_log_poller_blocks_evm_chain_id_fkey DEFERRED`)))
-	require.NoError(t, utils.JustError(db.Exec(`SET CONSTRAINTS evm_log_poller_filters_evm_chain_id_fkey DEFERRED`)))
-	require.NoError(t, utils.JustError(db.Exec(`SET CONSTRAINTS evm_logs_evm_chain_id_fkey DEFERRED`)))
-	orm := logpoller.NewORM(chainID, db, lggr, pgtest.NewQConfig(true))
-	client := backends.NewSimulatedBackend(map[common.Address]core.GenesisAccount{
-		owner.From: {
-			Balance: big.NewInt(0).Mul(big.NewInt(10), big.NewInt(1e18)),
-		},
-	}, 10e6)
-	var logPoller logpoller.LogPollerTest = logpoller.NewLogPoller(orm, evmclient.NewSimulatedBackendClient(t, client, chainID), lggr, 1*time.Hour, 2, 3, 2, 1000)
-
-	prevStart := int64(1)
-	flushLogs := func() {
-		client.Commit()
-		logPoller.PollAndSaveLogs(testutils.Context(t), prevStart)
-		latestBlock, err := orm.SelectLatestBlock()
-		require.NoError(t, err)
-		prevStart = latestBlock.BlockNumber + 1
-	}
-
-	sourceChainId := testutils.NewRandomEVMChainID().Uint64()
-
-	// Deploy link token.
-	feeToken, _, _, err := link_token_interface.DeployLinkToken(owner, client)
-	require.NoError(t, err)
-	flushLogs()
-
-	// Deploy native
-	sourceNative := utils.RandomAddress()
-
-	priceRegistryAddress, _, _, err := price_registry.DeployPriceRegistry(owner, client, price_registry.InternalPriceUpdates{
-		TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
-			{SourceToken: feeToken, UsdPerToken: big.NewInt(2)},
-		},
-		DestChainId:   sourceChainId,
-		UsdPerUnitGas: big.NewInt(1),
-	}, []common.Address{}, []common.Address{feeToken}, uint32(time.Hour.Seconds()))
-	require.NoError(t, err)
-	flushLogs()
-
-	priceRegistry, err := price_registry.NewPriceRegistry(priceRegistryAddress, client)
-	require.NoError(t, err)
-
-	err = logPoller.RegisterFilter(logpoller.Filter{Name: logpoller.FilterName(COMMIT_PRICE_UPDATES, priceRegistryAddress),
-		EventSigs: []common.Hash{UsdPerUnitGasUpdated, UsdPerTokenUpdated}, Addresses: []common.Address{priceRegistryAddress}})
-	require.NoError(t, err)
-
-	sourceFeeEstimator := mocks.NewFeeEstimator[*evmtypes.Head, gas.EvmFee, *assets.Wei, common.Hash](t)
-
-	plugin := CommitReportingPlugin{
-		config: CommitPluginConfig{
-			dest:               logPoller,
-			priceRegistry:      priceRegistry,
-			priceGetter:        fakePriceGetter{},
-			sourceNative:       sourceNative,
-			sourceFeeEstimator: sourceFeeEstimator,
-			sourceChainID:      sourceChainId,
-		},
-		offchainConfig: CommitOffchainConfig{
-			FeeUpdateHeartBeat: models.MustMakeDuration(12 * time.Hour),
-		},
-	}
-	return testPluginHarness{
-		plugin:           &plugin,
-		client:           client,
-		owner:            owner,
-		lggr:             lggr,
-		logPoller:        logPoller,
-		mockFeeEstimator: sourceFeeEstimator,
-		feeToken:         feeToken,
-		flushLogs:        flushLogs,
-	}
-}
-
 func TestGeneratePriceUpdates(t *testing.T) {
-	th := setupTestPlugin(t)
+	th := setupCommitTestHarness(t)
 
 	gasPrice := big.NewInt(3e9)
 	mockedGetFee := th.mockFeeEstimator.On(
@@ -427,9 +294,9 @@ func TestGeneratePriceUpdates(t *testing.T) {
 		mock.Anything,
 	).Return(gas.EvmFee{Legacy: assets.NewWei(gasPrice)}, uint32(150e3), nil)
 
-	fakePrices, err := th.plugin.config.priceGetter.TokenPricesUSD(testutils.Context(t), []common.Address{th.feeToken}) // 2e20 hardcoded in fakePriceGetter
+	fakePrices, err := th.plugin.config.priceGetter.TokenPricesUSD(testutils.Context(t), []common.Address{th.feeTokenAddress}) // 2e20 hardcoded in fakePriceGetter
 	require.NoError(t, err)
-	fakePrice := fakePrices[th.feeToken]
+	fakePrice := fakePrices[th.feeTokenAddress]
 
 	expectedGasPrice := big.NewInt(0).Mul(fakePrice, gasPrice)
 	expectedGasPrice.Div(expectedGasPrice, big.NewInt(1e18))
@@ -455,17 +322,17 @@ func TestGeneratePriceUpdates(t *testing.T) {
 		{
 			name:                   "first update",
 			expectedGasPriceUSD:    expectedGasPrice,
-			expectedTokenPricesUSD: map[common.Address]*big.Int{th.feeToken: fakePrice},
+			expectedTokenPricesUSD: map[common.Address]*big.Int{th.feeTokenAddress: fakePrice},
 		},
 		{
 			name:                   "gasPrice up-to-date",
 			updateGasPriceUSD:      expectedGasPrice,
 			expectedGasPriceUSD:    nil,
-			expectedTokenPricesUSD: map[common.Address]*big.Int{th.feeToken: fakePrice},
+			expectedTokenPricesUSD: map[common.Address]*big.Int{th.feeTokenAddress: fakePrice},
 		},
 		{
 			name:                   "tokenPrice up-to-date, gasPrice deviated",
-			updateTokenPricesUSD:   map[common.Address]*big.Int{th.feeToken: fakePrice},
+			updateTokenPricesUSD:   map[common.Address]*big.Int{th.feeTokenAddress: fakePrice},
 			updateGasPrice:         newGasPrice,
 			expectedGasPriceUSD:    newExpectedGasPriceUSD,
 			expectedTokenPricesUSD: map[common.Address]*big.Int{},
@@ -481,14 +348,14 @@ func TestGeneratePriceUpdates(t *testing.T) {
 	for i, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if len(tt.addFeeTokens) > 0 {
-				_, err = th.plugin.config.priceRegistry.ApplyFeeTokensUpdates(th.owner, tt.addFeeTokens, []common.Address{})
+				_, err = th.priceRegistry.ApplyFeeTokensUpdates(th.owner, tt.addFeeTokens, []common.Address{})
 				require.NoError(t, err)
 				th.flushLogs()
 			}
 			if len(tt.updateTokenPricesUSD) > 0 || tt.updateGasPriceUSD != nil {
-				destChainId := uint64(0)
+				destChainID := uint64(0)
 				if tt.updateGasPriceUSD != nil {
-					destChainId = th.plugin.config.sourceChainID
+					destChainID = th.sourceChainID
 				} else {
 					tt.updateGasPriceUSD = big.NewInt(0)
 				}
@@ -499,9 +366,9 @@ func TestGeneratePriceUpdates(t *testing.T) {
 					}
 				}
 				// update gasPrice in priceRegistry
-				_, err = th.plugin.config.priceRegistry.UpdatePrices(th.owner, price_registry.InternalPriceUpdates{
+				_, err = th.priceRegistry.UpdatePrices(th.owner, price_registry.InternalPriceUpdates{
 					TokenPriceUpdates: tokenPriceUpdates,
-					DestChainId:       destChainId,
+					DestChainId:       destChainID,
 					UsdPerUnitGas:     tt.updateGasPriceUSD,
 				})
 				require.NoError(t, err)
@@ -516,6 +383,111 @@ func TestGeneratePriceUpdates(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tt.expectedGasPriceUSD, gotGasPriceUSD)
 			assert.Equal(t, tt.expectedTokenPricesUSD, gotTokenPricesUSD)
+		})
+	}
+}
+
+func TestShouldTransmitAcceptedReport(t *testing.T) {
+	th := setupCommitTestHarness(t)
+
+	nextMinSeqNr := uint64(10)
+	_, err := th.commitStore.SetMinSeqNr(th.owner, nextMinSeqNr)
+	require.NoError(t, err)
+	th.flushLogs()
+
+	tests := []struct {
+		name            string
+		commitStoreDown bool
+		seq             uint64
+		expected        bool
+	}{
+		{"base", false, nextMinSeqNr, true},
+		{"future", false, nextMinSeqNr * 2, true},
+		{"empty", false, 0, true}, // empty should have priceUpdates
+		{"stale", false, nextMinSeqNr - 1, false},
+		{"commitStore down", true, nextMinSeqNr, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.commitStoreDown && !isCommitStoreDownNow(testutils.Context(t), th.lggr, th.commitStore) {
+				_, err := th.commitStore.Pause(th.owner)
+				require.NoError(t, err)
+			} else if !tt.commitStoreDown && isCommitStoreDownNow(testutils.Context(t), th.lggr, th.commitStore) {
+				_, err := th.commitStore.Unpause(th.owner)
+				require.NoError(t, err)
+			}
+			th.flushLogs()
+
+			var root [32]byte
+			if tt.seq > 0 {
+				root = testutils.Random32Byte()
+			}
+
+			report, err := EncodeCommitReport(&commit_store.CommitStoreCommitReport{
+				PriceUpdates: commit_store.InternalPriceUpdates{
+					TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{},
+					DestChainId:       0,
+					UsdPerUnitGas:     new(big.Int),
+				},
+				MerkleRoot: root,
+				Interval:   commit_store.CommitStoreInterval{Min: tt.seq, Max: tt.seq},
+			})
+			require.NoError(t, err)
+
+			got, err := th.plugin.ShouldTransmitAcceptedReport(testutils.Context(t), types.ReportTimestamp{}, report)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, got)
+		})
+	}
+}
+
+func TestShouldAcceptFinalizedReport(t *testing.T) {
+	th := setupCommitTestHarness(t)
+
+	nextMinSeqNr := uint64(10)
+	_, err := th.commitStore.SetMinSeqNr(th.owner, nextMinSeqNr)
+	require.NoError(t, err)
+	th.flushLogs()
+
+	tests := []struct {
+		name     string
+		seq      uint64
+		expected bool
+		err      bool
+	}{
+		{"future", nextMinSeqNr * 2, false, true},
+		{"empty", 0, false, false},
+		{"stale", nextMinSeqNr - 1, false, true},
+		{"base", nextMinSeqNr, true, false},          // accepted is not side-effects-free: it adds to inFlight cache
+		{"base inFlight", nextMinSeqNr, false, true}, // this one is like future, but caused by previous test added to inFlight
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var root [32]byte
+			if tt.seq > 0 {
+				root = testutils.Random32Byte()
+			}
+
+			report, err := EncodeCommitReport(&commit_store.CommitStoreCommitReport{
+				PriceUpdates: commit_store.InternalPriceUpdates{
+					TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{},
+					DestChainId:       0,
+					UsdPerUnitGas:     new(big.Int),
+				},
+				MerkleRoot: root,
+				Interval:   commit_store.CommitStoreInterval{Min: tt.seq, Max: tt.seq},
+			})
+			require.NoError(t, err)
+
+			got, err := th.plugin.ShouldAcceptFinalizedReport(testutils.Context(t), types.ReportTimestamp{}, report)
+			if tt.err {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, tt.expected, got)
 		})
 	}
 }

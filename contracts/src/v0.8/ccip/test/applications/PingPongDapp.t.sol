@@ -33,7 +33,7 @@ contract PingPongDappSetup is EVM2EVMOnRampSetup {
 contract PingPong_startPingPong is PingPongDappSetup {
   event ConfigPropagated(uint64 chainId, address contractAddress);
 
-  function testSuccess() public {
+  function testStartPingPongSuccess() public {
     uint256 pingPongNumber = 1;
     bytes memory data = abi.encode(pingPongNumber);
 
@@ -75,7 +75,7 @@ contract PingPong_startPingPong is PingPongDappSetup {
 
 /// @notice #ccipReceive
 contract PingPong_ccipReceive is PingPongDappSetup {
-  function testSuccess() public {
+  function testCcipReceiveSuccess() public {
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
 
     uint256 pingPongNumber = 5;
@@ -95,5 +95,33 @@ contract PingPong_ccipReceive is PingPongDappSetup {
 
     s_pingPong.ccipReceive(message);
   }
-  // Revert
+}
+
+contract PingPong_plumbing is PingPongDappSetup {
+  function testCounterPartChainIdSuccess(uint64 chainId) public {
+    s_pingPong.setCounterpartChainId(chainId);
+
+    assertEq(s_pingPong.getCounterpartChainId(), chainId);
+  }
+
+  function testCounterPartAddressSuccess(address counterpartAddress) public {
+    s_pingPong.setCounterpartAddress(counterpartAddress);
+
+    assertEq(s_pingPong.getCounterpartAddress(), counterpartAddress);
+  }
+
+  function testCounterPartAddressSuccess(uint64 chainId, address counterpartAddress) public {
+    s_pingPong.setCounterpart(chainId, counterpartAddress);
+
+    assertEq(s_pingPong.getCounterpartAddress(), counterpartAddress);
+    assertEq(s_pingPong.getCounterpartChainId(), chainId);
+  }
+
+  function testPausingSuccess() public {
+    assertFalse(s_pingPong.isPaused());
+
+    s_pingPong.setPaused(true);
+
+    assertTrue(s_pingPong.isPaused());
+  }
 }

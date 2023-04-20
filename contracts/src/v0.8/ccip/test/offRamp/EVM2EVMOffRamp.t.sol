@@ -15,7 +15,7 @@ import "../mocks/MockCommitStore.sol";
 contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
   event ConfigSet(EVM2EVMOffRamp.StaticConfig staticConfig, EVM2EVMOffRamp.DynamicConfig dynamicConfig);
 
-  function testSuccess() public {
+  function testConstructorSuccess() public {
     EVM2EVMOffRamp.StaticConfig memory staticConfig = EVM2EVMOffRamp.StaticConfig({
       commitStore: address(s_mockCommitStore),
       chainId: DEST_CHAIN_ID,
@@ -150,7 +150,7 @@ contract EVM2EVMOffRamp_setDynamicConfig is EVM2EVMOffRampSetup {
 }
 
 contract EVM2EVMOffRamp_metadataHash is EVM2EVMOffRampSetup {
-  function testSuccess() public {
+  function testMetadataHashSuccess() public {
     bytes32 h = s_offRamp.metadataHash();
     assertEq(
       h,
@@ -551,24 +551,87 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
 
 /// @notice #getExecutionState
 contract EVM2EVMOffRamp_getExecutionState is EVM2EVMOffRampSetup {
-  function testSuccess() public {
-    // setting the execution state is done with a helper function. This
-    // is normally not exposed.
-    s_offRamp.setExecutionState(1, Internal.MessageExecutionState.FAILURE);
-    s_offRamp.setExecutionState(10, Internal.MessageExecutionState.IN_PROGRESS);
-    s_offRamp.setExecutionState(33, Internal.MessageExecutionState.UNTOUCHED);
-    s_offRamp.setExecutionState(50, Internal.MessageExecutionState.SUCCESS);
+  mapping(uint64 => Internal.MessageExecutionState) s_differentialExecutionState;
 
-    assertEq(uint256(Internal.MessageExecutionState.FAILURE), uint256(s_offRamp.getExecutionState(1)));
-    assertEq(uint256(Internal.MessageExecutionState.IN_PROGRESS), uint256(s_offRamp.getExecutionState(10)));
-    assertEq(uint256(Internal.MessageExecutionState.UNTOUCHED), uint256(s_offRamp.getExecutionState(33)));
-    assertEq(uint256(Internal.MessageExecutionState.SUCCESS), uint256(s_offRamp.getExecutionState(50)));
+  function testDifferentialSuccess(uint16[500] memory seqNums, uint8[500] memory values) public {
+    for (uint256 i = 0; i < seqNums.length; ++i) {
+      // Only use the first three slots. This makes sure existing slots get overwritten
+      // as the tests uses 500 sequence numbers.
+      uint16 seqNum = seqNums[i] % 386;
+      Internal.MessageExecutionState state = Internal.MessageExecutionState(values[i] % 4);
+      s_differentialExecutionState[seqNum] = state;
+      s_offRamp.setExecutionStateHelper(seqNum, state);
+      assertEq(uint256(state), uint256(s_offRamp.getExecutionState(seqNum)));
+    }
+
+    for (uint256 i = 0; i < seqNums.length; ++i) {
+      uint16 seqNum = seqNums[i] % 386;
+      Internal.MessageExecutionState expectedState = s_differentialExecutionState[seqNum];
+      assertEq(uint256(expectedState), uint256(s_offRamp.getExecutionState(seqNum)));
+    }
+  }
+
+  function test_GetExecutionStateSuccess() public {
+    s_offRamp.setExecutionStateHelper(0, Internal.MessageExecutionState.FAILURE);
+    assertEq(s_offRamp.getExecutionStateBitMap(0), 3);
+
+    s_offRamp.setExecutionStateHelper(1, Internal.MessageExecutionState.FAILURE);
+    assertEq(s_offRamp.getExecutionStateBitMap(0), 3 + (3 << 2));
+
+    s_offRamp.setExecutionStateHelper(1, Internal.MessageExecutionState.IN_PROGRESS);
+    assertEq(s_offRamp.getExecutionStateBitMap(0), 3 + (1 << 2));
+
+    s_offRamp.setExecutionStateHelper(2, Internal.MessageExecutionState.FAILURE);
+    assertEq(s_offRamp.getExecutionStateBitMap(0), 3 + (1 << 2) + (3 << 4));
+
+    s_offRamp.setExecutionStateHelper(127, Internal.MessageExecutionState.IN_PROGRESS);
+    assertEq(s_offRamp.getExecutionStateBitMap(0), 3 + (1 << 2) + (3 << 4) + (1 << 254));
+
+    s_offRamp.setExecutionStateHelper(128, Internal.MessageExecutionState.SUCCESS);
+    assertEq(s_offRamp.getExecutionStateBitMap(0), 3 + (1 << 2) + (3 << 4) + (1 << 254));
+    assertEq(s_offRamp.getExecutionStateBitMap(1), 2);
+
+    assertEq(uint256(Internal.MessageExecutionState.FAILURE), uint256(s_offRamp.getExecutionState(0)));
+    assertEq(uint256(Internal.MessageExecutionState.IN_PROGRESS), uint256(s_offRamp.getExecutionState(1)));
+    assertEq(uint256(Internal.MessageExecutionState.FAILURE), uint256(s_offRamp.getExecutionState(2)));
+    assertEq(uint256(Internal.MessageExecutionState.IN_PROGRESS), uint256(s_offRamp.getExecutionState(127)));
+    assertEq(uint256(Internal.MessageExecutionState.SUCCESS), uint256(s_offRamp.getExecutionState(128)));
+  }
+
+  function testFillExecutionStateSuccess() public {
+    for (uint64 i = 0; i < 384; ++i) {
+      s_offRamp.setExecutionStateHelper(i, Internal.MessageExecutionState.FAILURE);
+    }
+
+    for (uint64 i = 0; i < 384; ++i) {
+      assertEq(uint256(Internal.MessageExecutionState.FAILURE), uint256(s_offRamp.getExecutionState(i)));
+    }
+
+    for (uint64 i = 0; i < 3; ++i) {
+      assertEq(type(uint256).max, s_offRamp.getExecutionStateBitMap(i));
+    }
+
+    for (uint64 i = 0; i < 384; ++i) {
+      s_offRamp.setExecutionStateHelper(i, Internal.MessageExecutionState.IN_PROGRESS);
+    }
+
+    for (uint64 i = 0; i < 384; ++i) {
+      assertEq(uint256(Internal.MessageExecutionState.IN_PROGRESS), uint256(s_offRamp.getExecutionState(i)));
+    }
+
+    for (uint64 i = 0; i < 3; ++i) {
+      // 0x555... == 0b101010101010.....
+      assertEq(
+        0x5555555555555555555555555555555555555555555555555555555555555555,
+        s_offRamp.getExecutionStateBitMap(i)
+      );
+    }
   }
 }
 
 /// @notice #_releaseOrMintToken internal function
 contract EVM2EVMOffRamp__releaseOrMintToken is EVM2EVMOffRampSetup {
-  function testSuccess() public {
+  function test_releaseOrMintTokenSuccess() public {
     IERC20 destToken0 = IERC20(s_destTokens[0]);
     uint256 startingBalance = destToken0.balanceOf(OWNER);
     uint256 amount = POOL_BALANCE / 2;
@@ -596,7 +659,7 @@ contract EVM2EVMOffRamp__releaseOrMintToken is EVM2EVMOffRampSetup {
 
 /// @notice #_releaseOrMintTokens
 contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
-  function testSuccess() public {
+  function test_releaseOrMintTokensSuccess() public {
     Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
     IERC20 dstToken1 = IERC20(s_destTokens[0]);
     uint256 startingBalance = dstToken1.balanceOf(OWNER);

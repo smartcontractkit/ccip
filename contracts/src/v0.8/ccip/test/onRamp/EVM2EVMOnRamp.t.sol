@@ -531,7 +531,7 @@ contract EVM2EVMOnRamp_setFeeConfig is EVM2EVMOnRampSetup {
 
 // #getTokenPool
 contract EVM2EVMOnRamp_getTokenPool is EVM2EVMOnRampSetup {
-  function testSuccess() public {
+  function testGetTokenPoolSuccess() public {
     assertEq(s_sourcePools[0], address(s_onRamp.getPoolBySourceToken(IERC20(s_sourceTokens[0]))));
     assertEq(s_sourcePools[1], address(s_onRamp.getPoolBySourceToken(IERC20(s_sourceTokens[1]))));
 
@@ -668,7 +668,7 @@ contract EVM2EVMOnRamp_getSupportedTokens is EVM2EVMOnRampSetup {
 
 // #getExpectedNextSequenceNumber
 contract EVM2EVMOnRamp_getExpectedNextSequenceNumber is EVM2EVMOnRampSetup {
-  function testSuccess() public {
+  function testGetExpectedNextSequenceNumberSuccess() public {
     assertEq(1, s_onRamp.getExpectedNextSequenceNumber());
   }
 }
@@ -677,7 +677,7 @@ contract EVM2EVMOnRamp_getExpectedNextSequenceNumber is EVM2EVMOnRampSetup {
 contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
   event ConfigSet(EVM2EVMOnRamp.StaticConfig staticConfig, EVM2EVMOnRamp.DynamicConfig dynamicConfig);
 
-  function testSuccess() public {
+  function testSetDynamicConfigSuccess() public {
     EVM2EVMOnRamp.StaticConfig memory staticConfig = s_onRamp.getStaticConfig();
     EVM2EVMOnRamp.DynamicConfig memory newConfig = EVM2EVMOnRamp.DynamicConfig({
       router: address(2134),
@@ -720,7 +720,7 @@ contract EVM2EVMOnRampWithAllowListSetup is EVM2EVMOnRampSetup {
 }
 
 contract EVM2EVMOnRamp_setAllowListEnabled is EVM2EVMOnRampWithAllowListSetup {
-  function testSuccess() public {
+  function testSetAllowListEnabledSuccess() public {
     assertTrue(s_onRamp.getAllowListEnabled());
     s_onRamp.setAllowListEnabled(false);
     assertFalse(s_onRamp.getAllowListEnabled());
@@ -739,7 +739,7 @@ contract EVM2EVMOnRamp_setAllowListEnabled is EVM2EVMOnRampWithAllowListSetup {
 
 /// @notice #getAllowListEnabled
 contract EVM2EVMOnRamp_getAllowListEnabled is EVM2EVMOnRampWithAllowListSetup {
-  function testSuccess() public {
+  function testGetAllowListEnabledSuccess() public {
     assertTrue(s_onRamp.getAllowListEnabled());
     s_onRamp.setAllowListEnabled(false);
     assertFalse(s_onRamp.getAllowListEnabled());
@@ -753,7 +753,7 @@ contract EVM2EVMOnRamp_applyAllowListUpdates is EVM2EVMOnRampWithAllowListSetup 
   event AllowListAdd(address sender);
   event AllowListRemove(address sender);
 
-  function testSuccess() public {
+  function testSetAllowListSuccess() public {
     address[] memory newAddresses = new address[](2);
     newAddresses[0] = address(1);
     newAddresses[1] = address(2);
@@ -806,7 +806,7 @@ contract EVM2EVMOnRamp_applyAllowListUpdates is EVM2EVMOnRampWithAllowListSetup 
 
 /// @notice #getAllowList
 contract EVM2EVMOnRamp_getAllowList is EVM2EVMOnRampWithAllowListSetup {
-  function testSuccess() public {
+  function testGetAllowListSuccess() public {
     address[] memory setAddresses = s_onRamp.getAllowList();
     assertEq(OWNER, setAddresses[0]);
   }

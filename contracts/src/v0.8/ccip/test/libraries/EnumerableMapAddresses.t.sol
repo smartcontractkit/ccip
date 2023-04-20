@@ -14,7 +14,7 @@ contract EnumerableMapAddressesTest is BaseTest {
 }
 
 contract EnumerableMapAddresses_set is EnumerableMapAddressesTest {
-  function testSuccess() public {
+  function testSetSuccess() public {
     assertTrue(!s_helper.contains(address(this)));
     assertTrue(s_helper.set(address(this), address(this)));
     assertTrue(s_helper.contains(address(this)));
@@ -23,7 +23,7 @@ contract EnumerableMapAddresses_set is EnumerableMapAddressesTest {
 }
 
 contract EnumerableMapAddresses_remove is EnumerableMapAddressesTest {
-  function testSuccess() public {
+  function testRemoveSuccess() public {
     assertTrue(!s_helper.contains(address(this)));
     assertTrue(s_helper.set(address(this), address(this)));
     assertTrue(s_helper.contains(address(this)));
@@ -34,7 +34,7 @@ contract EnumerableMapAddresses_remove is EnumerableMapAddressesTest {
 }
 
 contract EnumerableMapAddresses_contains is EnumerableMapAddressesTest {
-  function testSuccess() public {
+  function testContainsSuccess() public {
     assertTrue(!s_helper.contains(address(this)));
     assertTrue(s_helper.set(address(this), address(this)));
     assertTrue(s_helper.contains(address(this)));
@@ -42,7 +42,7 @@ contract EnumerableMapAddresses_contains is EnumerableMapAddressesTest {
 }
 
 contract EnumerableMapAddresses_length is EnumerableMapAddressesTest {
-  function testSuccess() public {
+  function testLengthSuccess() public {
     assertTrue(s_helper.length() == 0);
     assertTrue(s_helper.set(address(this), address(this)));
     assertTrue(s_helper.length() == 1);
@@ -52,7 +52,7 @@ contract EnumerableMapAddresses_length is EnumerableMapAddressesTest {
 }
 
 contract EnumerableMapAddresses_at is EnumerableMapAddressesTest {
-  function testSuccess() public {
+  function testAtSuccess() public {
     assertTrue(s_helper.length() == 0);
     assertTrue(s_helper.set(address(this), address(this)));
     assertTrue(s_helper.length() == 1);
@@ -63,7 +63,7 @@ contract EnumerableMapAddresses_at is EnumerableMapAddressesTest {
 }
 
 contract EnumerableMapAddresses_tryGet is EnumerableMapAddressesTest {
-  function testSuccess() public {
+  function testTryGetSuccess() public {
     assertTrue(!s_helper.contains(address(this)));
     assertTrue(s_helper.set(address(this), address(this)));
     assertTrue(s_helper.contains(address(this)));
@@ -74,7 +74,7 @@ contract EnumerableMapAddresses_tryGet is EnumerableMapAddressesTest {
 }
 
 contract EnumerableMapAddresses_get is EnumerableMapAddressesTest {
-  function testSuccess() public {
+  function testGetSuccess() public {
     assertTrue(!s_helper.contains(address(this)));
     assertTrue(s_helper.set(address(this), address(this)));
     assertTrue(s_helper.contains(address(this)));
@@ -83,7 +83,7 @@ contract EnumerableMapAddresses_get is EnumerableMapAddressesTest {
 }
 
 contract EnumerableMapAddresses_get_errorMessage is EnumerableMapAddressesTest {
-  function testSuccess() public {
+  function testGetErrorMessageSuccess() public {
     assertTrue(!s_helper.contains(address(this)));
     assertTrue(s_helper.set(address(this), address(this)));
     assertTrue(s_helper.contains(address(this)));

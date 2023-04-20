@@ -31,7 +31,7 @@ contract GovernanceDappSetup is EVM2EVMOnRampSetup {
 
 /// @notice #constructor
 contract GovernanceDapp_constructor is GovernanceDappSetup {
-  function testSuccess() public {
+  function testConstructorSuccess() public {
     // typeAndVersion
     assertEq("GovernanceDapp 1.0.0", s_governanceDapp.typeAndVersion());
   }
@@ -41,7 +41,7 @@ contract GovernanceDapp_constructor is GovernanceDappSetup {
 contract GovernanceDapp_voteForNewFeeConfig is GovernanceDappSetup {
   event ConfigPropagated(uint64 chainId, address contractAddress);
 
-  function testSuccess() public {
+  function testVoteForNewFeeConfigSuccess() public {
     GovernanceDapp.FeeConfig memory feeConfig = GovernanceDapp.FeeConfig({feeAmount: 10000, changedAtBlock: 100});
     bytes memory data = abi.encode(feeConfig);
     Internal.EVM2EVMMessage memory message = Internal.EVM2EVMMessage({
@@ -72,7 +72,7 @@ contract GovernanceDapp_voteForNewFeeConfig is GovernanceDappSetup {
 
 /// @notice #ccipReceive
 contract GovernanceDapp_ccipReceive is GovernanceDappSetup {
-  function testSuccess() public {
+  function testCcipReceiveSuccess() public {
     GovernanceDapp.FeeConfig memory feeConfig = GovernanceDapp.FeeConfig({feeAmount: 10000, changedAtBlock: 100});
 
     Client.Any2EVMMessage memory message = Client.Any2EVMMessage({

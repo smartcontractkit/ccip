@@ -8,7 +8,6 @@ import {IPool} from "../../interfaces/pools/IPool.sol";
 
 import {Internal} from "../../libraries/Internal.sol";
 import {Client} from "../../libraries/Client.sol";
-import {TokenSetup} from "../TokenSetup.t.sol";
 import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
 import {MockCommitStore} from "../mocks/MockCommitStore.sol";
 import {Router} from "../../Router.sol";

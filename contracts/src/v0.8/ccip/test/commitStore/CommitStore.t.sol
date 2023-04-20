@@ -38,7 +38,8 @@ contract CommitStoreRealAFNSetup is PriceRegistrySetup {
       blessWeight: 1,
       curseWeight: 1
     });
-    s_afn = new AFN(AFN.Config({voters: voters, blessWeightThreshold: 1, curseWeightThreshold: 1})); // Overwrite base mock afn with real.
+    // Overwrite base mock afn with real.
+    s_afn = new AFN(AFN.Config({voters: voters, blessWeightThreshold: 1, curseWeightThreshold: 1}));
     s_commitStore = new CommitStoreHelper(
       CommitStore.StaticConfig({chainId: DEST_CHAIN_ID, sourceChainId: SOURCE_CHAIN_ID, onRamp: ON_RAMP_ADDRESS}),
       CommitStore.DynamicConfig({priceRegistry: address(s_priceRegistry), afn: address(s_afn)})
@@ -104,11 +105,12 @@ contract CommitStore_setMinSeqNr is CommitStoreSetup {
 contract CommitStore_setDynamicConfig is CommitStoreSetup {
   event ConfigSet(CommitStore.StaticConfig, CommitStore.DynamicConfig);
 
-  function testSetMinSeqNrSuccess() public {
+  function testSetMinSeqNrSuccess(address priceRegistry, address afn) public {
+    vm.assume(priceRegistry != address(0) && afn != address(0));
     CommitStore.StaticConfig memory staticConfig = s_commitStore.getStaticConfig();
     CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({
-      priceRegistry: address(23784264),
-      afn: address(s_mockAFN)
+      priceRegistry: priceRegistry,
+      afn: afn
     });
 
     vm.expectEmit();
@@ -129,6 +131,22 @@ contract CommitStore_setDynamicConfig is CommitStoreSetup {
 
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
+    s_commitStore.setDynamicConfig(dynamicConfig);
+  }
+
+  function testInvalidCommitStoreConfigReverts() public {
+    CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({
+      priceRegistry: address(0),
+      afn: address(1)
+    });
+
+    vm.expectRevert(CommitStore.InvalidCommitStoreConfig.selector);
+    s_commitStore.setDynamicConfig(dynamicConfig);
+
+    dynamicConfig.priceRegistry = address(1);
+    dynamicConfig.afn = address(0);
+
+    vm.expectRevert(CommitStore.InvalidCommitStoreConfig.selector);
     s_commitStore.setDynamicConfig(dynamicConfig);
   }
 }
@@ -213,8 +231,10 @@ contract CommitStore_report is CommitStoreSetup {
     vm.expectEmit();
     emit ReportAccepted(report);
 
+    bytes memory encodedReport = abi.encode(report);
+
     vm.resumeGasMetering();
-    s_commitStore.report(abi.encode(report));
+    s_commitStore.report(encodedReport);
     vm.pauseGasMetering();
 
     assertEq(max1 + 1, s_commitStore.getExpectedNextSequenceNumber());
@@ -325,7 +345,7 @@ contract CommitStore_report is CommitStoreSetup {
 contract CommitStore_verify is CommitStoreRealAFNSetup {
   function testNotBlessedSuccess() public {
     bytes32[] memory leaves = new bytes32[](1);
-    leaves[0] = "rootAndAlsoRootOfRoots";
+    leaves[0] = "root";
     s_commitStore.report(
       abi.encode(
         CommitStore.CommitReport({
@@ -337,13 +357,13 @@ contract CommitStore_verify is CommitStoreRealAFNSetup {
     );
     bytes32[] memory proofs = new bytes32[](0);
     // We have not blessed this root, should return 0.
-    uint256 timestamp = s_commitStore.verify(leaves, proofs, 2**1);
+    uint256 timestamp = s_commitStore.verify(leaves, proofs, 0);
     assertEq(uint256(0), timestamp);
   }
 
   function testBlessedSuccess() public {
     bytes32[] memory leaves = new bytes32[](1);
-    leaves[0] = "rootAndAlsoRootOfRoots";
+    leaves[0] = "root";
     s_commitStore.report(
       abi.encode(
         CommitStore.CommitReport({
@@ -358,7 +378,7 @@ contract CommitStore_verify is CommitStoreRealAFNSetup {
     taggedRoots[0] = AFN.TaggedRoot({commitStore: address(s_commitStore), root: leaves[0]});
     s_afn.voteToBless(taggedRoots);
     bytes32[] memory proofs = new bytes32[](0);
-    uint256 timestamp = s_commitStore.verify(leaves, proofs, 2**1);
+    uint256 timestamp = s_commitStore.verify(leaves, proofs, 0);
     assertEq(BLOCK_TIME, timestamp);
   }
 

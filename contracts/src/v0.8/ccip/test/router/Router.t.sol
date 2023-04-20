@@ -12,7 +12,7 @@ import "../offRamp/EVM2EVMOffRampSetup.t.sol";
 
 /// @notice #constructor
 contract Router_constructor is EVM2EVMOnRampSetup {
-  function testSuccess() public {
+  function testConstructorSuccess() public {
     assertEq("Router 1.0.0", s_sourceRouter.typeAndVersion());
     // owner
     assertEq(OWNER, s_sourceRouter.owner());
@@ -434,8 +434,9 @@ contract Router_applyRampUpdates is RouterSetup {
 
 /// @notice #setWrappedNative
 contract Router_setWrappedNative is EVM2EVMOnRampSetup {
-  function testSuccess() public {
-    s_sourceRouter.setWrappedNative(address(1));
+  function testSetWrappedNativeSuccess(address wrappedNative) public {
+    s_sourceRouter.setWrappedNative(wrappedNative);
+    assertEq(wrappedNative, s_sourceRouter.getWrappedNative());
   }
 
   // Reverts
@@ -460,19 +461,42 @@ contract Router_getSupportedTokens is EVM2EVMOnRampSetup {
 
 /// @notice #routeMessage
 contract Router_routeMessage is EVM2EVMOffRampSetup {
-  function testManualExec() public {
+  function testManualExecSuccess() public {
     changePrank(address(s_offRamp));
     assertTrue(s_destRouter.routeMessage(generateReceiverMessage(SOURCE_CHAIN_ID), true, 100_000, address(s_receiver)));
-    // Cannot run out of gas
+    // Manuel execution cannot run out of gas
     assertTrue(s_destRouter.routeMessage(generateReceiverMessage(SOURCE_CHAIN_ID), true, 10, address(s_receiver)));
   }
 
-  function testAutoExec() public {
+  function testAutoExecSuccess() public {
     changePrank(address(s_offRamp));
     assertTrue(
       s_destRouter.routeMessage(generateReceiverMessage(SOURCE_CHAIN_ID), false, 100_000, address(s_receiver))
     );
     // Can run out of gas, should return false
     assertFalse(s_destRouter.routeMessage(generateReceiverMessage(SOURCE_CHAIN_ID), false, 1, address(s_receiver)));
+  }
+
+  // Reverts
+  function testOnlyOffRampReverts() public {
+    vm.expectRevert(IRouter.OnlyOffRamp.selector);
+    s_destRouter.routeMessage(generateReceiverMessage(SOURCE_CHAIN_ID), true, 100_000, address(s_receiver));
+  }
+}
+
+/// @notice #getFee
+contract Router_getFee is EVM2EVMOnRampSetup {
+  function testGetFeeSupportedChainSuccess() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_ID, message);
+    assertGt(expectedFee, 10e9);
+  }
+
+  // Reverts
+  function testUnsupportedDestinationChainReverts() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+
+    vm.expectRevert(abi.encodeWithSelector(IRouterClient.UnsupportedDestinationChain.selector, 999));
+    s_sourceRouter.getFee(999, message);
   }
 }

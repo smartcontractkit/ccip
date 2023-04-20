@@ -12,7 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/smartcontractkit/chainlink-testing-framework/loadgen"
+	"github.com/smartcontractkit/wasp"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
@@ -121,8 +121,8 @@ func (c *CCIPE2ELoad) AfterAllCall() {
 	actions.AssertBalances(c.t, c.BalanceStats.SourceBalanceAssertions)
 }
 
-func (c *CCIPE2ELoad) Call(_ *loadgen.Generator) loadgen.CallResult {
-	var res loadgen.CallResult
+func (c *CCIPE2ELoad) Call(_ *wasp.Generator) wasp.CallResult {
+	var res wasp.CallResult
 	sourceCCIP := c.Lane.Source
 	msgSerialNo := c.CurrentMsgSerialNo.Load()
 	c.CurrentMsgSerialNo.Inc()

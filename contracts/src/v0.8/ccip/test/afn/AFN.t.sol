@@ -20,7 +20,7 @@ contract ConfigCompare is Test {
 }
 
 contract AFN_constructor is ConfigCompare, AFNSetup {
-  function testSuccess() public {
+  function testConstructorSuccess() public {
     AFN.Config memory expectedConfig = afnConstructorArgs();
     (uint32 actualVersion, , AFN.Config memory actualConfig) = s_afn.getConfigDetails();
     assertEq(actualVersion, 1);
@@ -150,7 +150,7 @@ contract AFN_voteToBlessRoots is AFNSetup {
 }
 
 contract AFN_ownerUnbless is AFNSetup {
-  function testSuccess() public {
+  function testUnblessSuccess() public {
     AFN.Config memory cfg = afnConstructorArgs();
     for (uint256 i = 0; i < cfg.voters.length; ++i) {
       changePrank(cfg.voters[i].blessVoteAddr);

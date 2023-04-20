@@ -12,8 +12,12 @@ contract EVM2EVMOffRampHelper is EVM2EVMOffRamp {
     RateLimiter.Config memory rateLimiterConfig
   ) EVM2EVMOffRamp(staticConfig, dynamicConfig, sourceTokens, pools, rateLimiterConfig) {}
 
-  function setExecutionState(uint64 sequenceNumber, Internal.MessageExecutionState state) public {
-    s_executedMessages[sequenceNumber] = state;
+  function setExecutionStateHelper(uint64 sequenceNumber, Internal.MessageExecutionState state) public {
+    _setExecutionState(sequenceNumber, state);
+  }
+
+  function getExecutionStateBitMap(uint64 bitmapIndex) public view returns (uint256) {
+    return s_executionStates[bitmapIndex];
   }
 
   function releaseOrMintToken(
