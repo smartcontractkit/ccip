@@ -20,7 +20,6 @@ contract Forwarder is IForwarder, ERC165, OwnerIsCreator {
   using ECDSA for bytes32;
   using ExcessivelySafeCall for address;
 
-
   address private constant DRY_RUN_ADDRESS = 0x0000000000000000000000000000000000000000;
 
   string public constant GENERIC_PARAMS = "address from,address target,uint256 nonce,bytes data,uint256 validUntilTime";
