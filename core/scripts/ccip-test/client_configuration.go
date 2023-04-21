@@ -684,6 +684,12 @@ func (client *CCIPClient) SetOCR2Config(env dione.Environment) {
 }
 
 func (client *CCIPClient) setOCRConfig(ocrConf ocr2Configurer, offchainConfig []byte, faults int, identities []ocrconfighelper.OracleIdentityExtra) (*types.Transaction, error) {
+	// Simple transmission schedule of 1 node per stage.
+	// sum(transmissionSchedule) should equal number of nodes.
+	var transmissionSchedule []int
+	for i := 0; i < len(identities); i++ {
+		transmissionSchedule = append(transmissionSchedule, 1)
+	}
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := ocrconfighelper.ContractSetConfigArgsForTests(
 		70*time.Second, // deltaProgress
 		5*time.Second,  // deltaResend
@@ -691,7 +697,7 @@ func (client *CCIPClient) setOCRConfig(ocrConf ocr2Configurer, offchainConfig []
 		2*time.Second,  // deltaGrace
 		40*time.Second, // deltaStage
 		3,
-		[]int{1, 1, 2, 3}, // Transmission schedule: 1 oracle in first deltaStage, 2 in the second and so on.
+		transmissionSchedule,
 		identities,
 		offchainConfig,
 		5*time.Second,
