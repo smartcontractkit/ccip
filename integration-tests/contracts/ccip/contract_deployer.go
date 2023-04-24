@@ -206,10 +206,6 @@ func (e *CCIPContractsDeployer) DeployCommitStore(sourceChainId, destChainId uin
 				SourceChainId: sourceChainId,
 				OnRamp:        onRamp,
 			},
-			commit_store.CommitStoreDynamicConfig{
-				PriceRegistry: priceRegistry,
-				Afn:           afn,
-			},
 		)
 	})
 	if err != nil {
@@ -469,13 +465,6 @@ func (e *CCIPContractsDeployer) DeployOffRamp(sourceChainId, destChainId uint64,
 				SourceChainId: sourceChainId,
 				OnRamp:        onRamp,
 			},
-			evm_2_evm_offramp.EVM2EVMOffRampDynamicConfig{
-				PermissionLessExecutionThresholdSeconds: 24 * 7 * 60 * 60,
-				Router:                                  destRouter,
-				Afn:                                     afn,
-				MaxDataSize:                             1e5,
-				MaxTokensLength:                         15,
-			},
 			sourceToken,
 			pools,
 			evm_2_evm_offramp.RateLimiterConfig{
@@ -555,6 +544,7 @@ func stripKeyPrefix(key string) string {
 func NewOffChainAggregatorV2Config[T ccipplugin.OffchainConfig](
 	nodes []*client.CLNodesWithKeys,
 	offchainCfg T,
+	onchainCfg ccipplugin.AbiDefined,
 ) (
 	signers []common.Address,
 	transmitters []common.Address,
@@ -606,6 +596,11 @@ func NewOffChainAggregatorV2Config[T ccipplugin.OffchainConfig](
 	if err != nil {
 		return nil, nil, 0, nil, 0, nil, err
 	}
+	ocrConfig.OnchainConfig, err = ccipplugin.EncodeAbiStruct(onchainCfg)
+	if err != nil {
+		return nil, nil, 0, nil, 0, nil, err
+	}
+
 	_, _, f_, onchainConfig_, offchainConfigVersion, offchainConfig, err = ocrConfigHelper2.ContractSetConfigArgsForTests(
 		ocrConfig.DeltaProgress,
 		ocrConfig.DeltaResend,

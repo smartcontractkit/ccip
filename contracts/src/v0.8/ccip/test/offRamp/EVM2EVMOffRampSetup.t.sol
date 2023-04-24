@@ -21,8 +21,9 @@ import {MaybeRevertMessageReceiver} from "../helpers/receivers/MaybeRevertMessag
 import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
 
 import {IERC20} from "../../../vendor/IERC20.sol";
+import {OCR2BaseSetup} from "../ocr/OCR2Base.t.sol";
 
-contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup {
+contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
   MockCommitStore internal s_mockCommitStore;
   IAny2EVMMessageReceiver internal s_receiver;
   IAny2EVMMessageReceiver internal s_secondary_receiver;
@@ -39,9 +40,10 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup {
   );
   event SkippedIncorrectNonce(uint64 indexed nonce, address indexed sender);
 
-  function setUp() public virtual override(TokenSetup, PriceRegistrySetup) {
+  function setUp() public virtual override(TokenSetup, PriceRegistrySetup, OCR2BaseSetup) {
     TokenSetup.setUp();
     PriceRegistrySetup.setUp();
+    OCR2BaseSetup.setUp();
 
     s_mockCommitStore = new MockCommitStore();
     s_receiver = new SimpleMessageReceiver();
@@ -59,11 +61,19 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup {
         sourceChainId: SOURCE_CHAIN_ID,
         onRamp: ON_RAMP_ADDRESS
       }),
-      generateDynamicOffRampConfig(address(router), address(s_mockAFN)),
       getCastedSourceTokens(),
       getCastedDestinationPools(),
       rateLimiterConfig()
     );
+    s_offRamp.setOCR2Config(
+      s_valid_signers,
+      s_valid_transmitters,
+      s_f,
+      abi.encode(generateDynamicOffRampConfig(address(router), address(s_mockAFN))),
+      s_offchainConfigVersion,
+      abi.encode("")
+    );
+
     address[] memory updaters = new address[](1);
     updaters[0] = address(s_offRamp);
     s_offRamp.setPrices(getCastedDestinationTokens(), getTokenPrices());

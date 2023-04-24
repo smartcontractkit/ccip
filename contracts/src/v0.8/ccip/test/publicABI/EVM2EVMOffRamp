@@ -22,7 +22,6 @@
   "manuallyExecute((uint64[],bytes[],bytes32[],uint256))": "945b4993",
   "owner()": "8da5cb5b",
   "setAdmin(address)": "704b6c02",
-  "setDynamicConfig((uint32,address,address,uint16,uint32))": "00a16f39",
   "setOCR2Config(address[],address[],uint8,bytes,uint64,bytes)": "1ef38174",
   "setPrices(address[],uint256[])": "4352fa9f",
   "setRateLimiterConfig((bool,uint208,uint256))": "3091aee7",

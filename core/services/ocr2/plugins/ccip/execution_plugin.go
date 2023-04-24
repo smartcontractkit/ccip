@@ -83,6 +83,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	if err != nil {
 		return nil, errors.Wrap(err, "failed loading offRamp")
 	}
+	// TODO DynamicConfig RPC call
 	dynamicOffRampConfig, err := offRamp.GetDynamicConfig(&bind.CallOpts{})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed loading offRamp config")
@@ -96,6 +97,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 		return nil, errors.Wrap(err, "could not get destination token")
 	}
 
+	// TODO DynamicConfig RPC call
 	dynamicConfig, err := commitStore.GetDynamicConfig(&bind.CallOpts{})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed getting the dynamic config from the commitStore")

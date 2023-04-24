@@ -81,6 +81,7 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 	if staticConfig.ChainId != uint64(destChainID) {
 		return nil, errors.Errorf("Wrong dest chain ID got %d expected from jobspec %d", staticConfig.ChainId, destChainID)
 	}
+	// TODO DynamicConfig call
 	dynamicConfig, err := commitStore.GetDynamicConfig(&bind.CallOpts{})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed getting the dynamic config from the commitStore")

@@ -5,16 +5,29 @@ import "../helpers/CommitStoreHelper.sol";
 import "../../AFN.sol";
 import "../../PriceRegistry.sol";
 import "../priceRegistry/PriceRegistry.t.sol";
+import "../ocr/OCR2Base.t.sol";
 
-contract CommitStoreSetup is PriceRegistrySetup {
+contract CommitStoreSetup is PriceRegistrySetup, OCR2BaseSetup {
   CommitStoreHelper s_commitStore;
 
-  function setUp() public virtual override {
+  function setUp() public virtual override(PriceRegistrySetup, OCR2BaseSetup) {
     PriceRegistrySetup.setUp();
+    OCR2BaseSetup.setUp();
 
     s_commitStore = new CommitStoreHelper(
-      CommitStore.StaticConfig({chainId: DEST_CHAIN_ID, sourceChainId: SOURCE_CHAIN_ID, onRamp: ON_RAMP_ADDRESS}),
-      CommitStore.DynamicConfig({priceRegistry: address(s_priceRegistry), afn: address(s_mockAFN)})
+      CommitStore.StaticConfig({chainId: DEST_CHAIN_ID, sourceChainId: SOURCE_CHAIN_ID, onRamp: ON_RAMP_ADDRESS})
+    );
+    CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({
+      priceRegistry: address(s_priceRegistry),
+      afn: address(s_mockAFN)
+    });
+    s_commitStore.setOCR2Config(
+      s_valid_signers,
+      s_valid_transmitters,
+      s_f,
+      abi.encode(dynamicConfig),
+      s_offchainConfigVersion,
+      abi.encode("")
     );
 
     address[] memory priceUpdaters = new address[](1);
@@ -23,13 +36,15 @@ contract CommitStoreSetup is PriceRegistrySetup {
   }
 }
 
-contract CommitStoreRealAFNSetup is PriceRegistrySetup {
+contract CommitStoreRealAFNSetup is PriceRegistrySetup, OCR2BaseSetup {
   CommitStoreHelper s_commitStore;
 
   AFN internal s_afn;
 
-  function setUp() public virtual override {
+  function setUp() public virtual override(PriceRegistrySetup, OCR2BaseSetup) {
     PriceRegistrySetup.setUp();
+    OCR2BaseSetup.setUp();
+
     AFN.Voter[] memory voters = new AFN.Voter[](1);
     voters[0] = AFN.Voter({
       blessVoteAddr: OWNER,
@@ -41,15 +56,31 @@ contract CommitStoreRealAFNSetup is PriceRegistrySetup {
     // Overwrite base mock afn with real.
     s_afn = new AFN(AFN.Config({voters: voters, blessWeightThreshold: 1, curseWeightThreshold: 1}));
     s_commitStore = new CommitStoreHelper(
-      CommitStore.StaticConfig({chainId: DEST_CHAIN_ID, sourceChainId: SOURCE_CHAIN_ID, onRamp: ON_RAMP_ADDRESS}),
-      CommitStore.DynamicConfig({priceRegistry: address(s_priceRegistry), afn: address(s_afn)})
+      CommitStore.StaticConfig({chainId: DEST_CHAIN_ID, sourceChainId: SOURCE_CHAIN_ID, onRamp: ON_RAMP_ADDRESS})
+    );
+    CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({
+      priceRegistry: address(s_priceRegistry),
+      afn: address(s_afn)
+    });
+    s_commitStore.setOCR2Config(
+      s_valid_signers,
+      s_valid_transmitters,
+      s_f,
+      abi.encode(dynamicConfig),
+      s_offchainConfigVersion,
+      abi.encode("")
     );
   }
 }
 
 /// @notice #constructor
-contract CommitStore_constructor is PriceRegistrySetup {
+contract CommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
   event ConfigSet(CommitStore.StaticConfig, CommitStore.DynamicConfig);
+
+  function setUp() public virtual override(PriceRegistrySetup, OCR2BaseSetup) {
+    PriceRegistrySetup.setUp();
+    OCR2BaseSetup.setUp();
+  }
 
   function testConstructorSuccess() public {
     CommitStore.StaticConfig memory staticConfig = CommitStore.StaticConfig({
@@ -65,7 +96,15 @@ contract CommitStore_constructor is PriceRegistrySetup {
     vm.expectEmit();
     emit ConfigSet(staticConfig, dynamicConfig);
 
-    CommitStore commitStore = new CommitStore(staticConfig, dynamicConfig);
+    CommitStore commitStore = new CommitStore(staticConfig);
+    commitStore.setOCR2Config(
+      s_valid_signers,
+      s_valid_transmitters,
+      s_f,
+      abi.encode(dynamicConfig),
+      s_offchainConfigVersion,
+      abi.encode("")
+    );
 
     CommitStore.StaticConfig memory gotStaticConfig = commitStore.getStaticConfig();
 
@@ -113,10 +152,18 @@ contract CommitStore_setDynamicConfig is CommitStoreSetup {
       afn: afn
     });
 
+    // FIXME Add checking if OCR2Abstract.ConfigSet was emitted
     vm.expectEmit();
     emit ConfigSet(staticConfig, dynamicConfig);
 
-    s_commitStore.setDynamicConfig(dynamicConfig);
+    s_commitStore.setOCR2Config(
+      s_valid_signers,
+      s_valid_transmitters,
+      s_f,
+      abi.encode(dynamicConfig),
+      s_offchainConfigVersion,
+      abi.encode("")
+    );
 
     CommitStore.DynamicConfig memory gotDynamicConfig = s_commitStore.getDynamicConfig();
     assertEq(gotDynamicConfig.priceRegistry, dynamicConfig.priceRegistry);
@@ -131,7 +178,14 @@ contract CommitStore_setDynamicConfig is CommitStoreSetup {
 
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
-    s_commitStore.setDynamicConfig(dynamicConfig);
+    s_commitStore.setOCR2Config(
+      s_valid_signers,
+      s_valid_transmitters,
+      s_f,
+      abi.encode(dynamicConfig),
+      s_offchainConfigVersion,
+      abi.encode("")
+    );
   }
 
   function testInvalidCommitStoreConfigReverts() public {
@@ -141,13 +195,27 @@ contract CommitStore_setDynamicConfig is CommitStoreSetup {
     });
 
     vm.expectRevert(CommitStore.InvalidCommitStoreConfig.selector);
-    s_commitStore.setDynamicConfig(dynamicConfig);
+    s_commitStore.setOCR2Config(
+      s_valid_signers,
+      s_valid_transmitters,
+      s_f,
+      abi.encode(dynamicConfig),
+      s_offchainConfigVersion,
+      abi.encode("")
+    );
 
     dynamicConfig.priceRegistry = address(1);
     dynamicConfig.afn = address(0);
 
     vm.expectRevert(CommitStore.InvalidCommitStoreConfig.selector);
-    s_commitStore.setDynamicConfig(dynamicConfig);
+    s_commitStore.setOCR2Config(
+      s_valid_signers,
+      s_valid_transmitters,
+      s_f,
+      abi.encode(dynamicConfig),
+      s_offchainConfigVersion,
+      abi.encode("")
+    );
   }
 }
 

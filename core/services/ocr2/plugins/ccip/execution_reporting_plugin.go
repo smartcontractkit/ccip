@@ -143,7 +143,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, errors.Wrap(err, "failed to decode onRamp abi")
 	}
-	dynamicConfig, err := rf.config.offRamp.GetDynamicConfig(&bind.CallOpts{})
+	execOnChainConfig, err := DecodeAbiStruct(config.OnchainConfig, &ExecOnchainConfig{})
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
@@ -156,7 +156,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			snoozedRoots:                     make(map[[32]byte]time.Time),
 			inflightReports:                  newInflightReportsContainer(rf.config.inflightCacheExpiry),
 			onRampABI:                        onRampABI,
-			permissionLessExecutionThreshold: time.Duration(dynamicConfig.PermissionLessExecutionThresholdSeconds) * time.Second,
+			permissionLessExecutionThreshold: execOnChainConfig.PermissionLessExecutionThresholdDuration(),
 		}, types.ReportingPluginInfo{
 			Name:          "CCIPExecution",
 			UniqueReports: true,

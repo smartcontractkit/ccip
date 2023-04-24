@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/stretchr/testify/require"
 
@@ -45,6 +46,24 @@ type ccipPluginTestHarness struct {
 	priceRegistry     *price_registry.PriceRegistry
 
 	feeTokenAddress, sourceNativeAddress common.Address
+	commitOnchainConfig                  CommitOnchainConfig
+	execOnchainConfig                    ExecOnchainConfig
+}
+
+type OCR2TestContract interface {
+	SetOCR2Config(opts *bind.TransactOpts, signers []common.Address, transmitters []common.Address, f uint8, onchainConfig []byte, offchainConfigVersion uint64, offchainConfig []byte) (*types.Transaction, error)
+}
+
+func generateAndSetTestOCR2Config(contract OCR2TestContract, owner *bind.TransactOpts, onChainConfig []byte) (*types.Transaction, error) {
+	var signers []common.Address
+	var transmitters []common.Address
+
+	for i := 0; i < 4; i++ {
+		signers = append(signers, utils.RandomAddress())
+		transmitters = append(transmitters, utils.RandomAddress())
+	}
+
+	return contract.SetOCR2Config(owner, signers, transmitters, 1, onChainConfig, 2, nil)
 }
 
 func setupCcipTestHarness(t *testing.T) ccipPluginTestHarness {
@@ -141,10 +160,6 @@ func setupCcipTestHarness(t *testing.T) ccipPluginTestHarness {
 			SourceChainId: sourceChainID,
 			OnRamp:        onRampAddress,
 		},
-		commit_store_helper.CommitStoreDynamicConfig{
-			PriceRegistry: priceRegistryAddress,
-			Afn:           afnAddress, // AFN address
-		},
 	)
 	require.NoError(t, err)
 	commitStoreHelper, err := commit_store_helper.NewCommitStoreHelper(commitStoreAddress, client)
@@ -169,13 +184,6 @@ func setupCcipTestHarness(t *testing.T) ccipPluginTestHarness {
 			SourceChainId: sourceChainID,
 			OnRamp:        onRampAddress,
 		},
-		evm_2_evm_offramp.EVM2EVMOffRampDynamicConfig{
-			PermissionLessExecutionThresholdSeconds: 1,
-			Router:                                  routerAddress,
-			Afn:                                     afnAddress,
-			MaxDataSize:                             1e5,
-			MaxTokensLength:                         5,
-		},
 		[]common.Address{sourceFeeTokenAddress},
 		[]common.Address{destPoolAddress},
 		evm_2_evm_offramp.RateLimiterConfig{
@@ -197,6 +205,21 @@ func setupCcipTestHarness(t *testing.T) ccipPluginTestHarness {
 	_, err = routerContract.ApplyRampUpdates(owner, nil, []router.RouterOffRampUpdate{
 		{SourceChainId: sourceChainID, OffRamps: []common.Address{offRampAddress}},
 	})
+	require.NoError(t, err)
+	flushLogs()
+
+	commitOnchainConfig := CommitOnchainConfig{Afn: afnAddress, PriceRegistry: priceRegistryAddress}
+	encodedCommitOnchainConfig, err := EncodeAbiStruct(commitOnchainConfig)
+	require.NoError(t, err)
+
+	_, err = generateAndSetTestOCR2Config(commitStoreHelper, owner, encodedCommitOnchainConfig)
+	require.NoError(t, err)
+
+	execOnchainConfig := ExecOnchainConfig{PermissionLessExecutionThresholdSeconds: 600, Router: routerAddress, Afn: afnAddress, MaxTokensLength: 5, MaxDataSize: 200_000}
+	encodedExecOnchainConfig, err := EncodeAbiStruct(execOnchainConfig)
+	require.NoError(t, err)
+
+	_, err = generateAndSetTestOCR2Config(offRamp, owner, encodedExecOnchainConfig)
 	require.NoError(t, err)
 	flushLogs()
 
@@ -224,5 +247,8 @@ func setupCcipTestHarness(t *testing.T) ccipPluginTestHarness {
 
 		feeTokenAddress:     feeTokenAddress,
 		sourceNativeAddress: testutils.NewAddress(),
+
+		commitOnchainConfig: commitOnchainConfig,
+		execOnchainConfig:   execOnchainConfig,
 	}
 }

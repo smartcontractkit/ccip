@@ -160,10 +160,16 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 		return nil, types.ReportingPluginInfo{}, err
 	}
 
+	onchainConfig, err := DecodeAbiStruct(config.OnchainConfig, &CommitOnchainConfig{})
+	if err != nil {
+		return nil, types.ReportingPluginInfo{}, err
+	}
+
 	return &CommitReportingPlugin{
 			config:         rf.config,
 			F:              config.F,
 			inFlight:       make(map[[32]byte]InflightReport),
+			onchainConfig:  onchainConfig,
 			offchainConfig: offchainConfig,
 		},
 		types.ReportingPluginInfo{
@@ -187,6 +193,7 @@ type CommitReportingPlugin struct {
 	inFlight             map[[32]byte]InflightReport
 	inFlightPriceUpdates []InflightPriceUpdate
 	offchainConfig       CommitOffchainConfig
+	onchainConfig        CommitOnchainConfig
 }
 
 func (r *CommitReportingPlugin) nextMinSeqNum(ctx context.Context) (uint64, error) {

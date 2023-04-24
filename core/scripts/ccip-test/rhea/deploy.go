@@ -196,13 +196,6 @@ func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainId uint
 			SourceChainId: sourceChainId,
 			OnRamp:        onRamp,
 		},
-		evm_2_evm_offramp.EVM2EVMOffRampDynamicConfig{
-			PermissionLessExecutionThresholdSeconds: PERMISSIONLESS_EXEC_THRESHOLD_SEC,
-			Router:                                  client.ChainConfig.Router,
-			Afn:                                     client.ChainConfig.Afn,
-			MaxTokensLength:                         MAX_TOKEN_LENGTH,
-			MaxDataSize:                             MAX_DATA_SIZE,
-		},
 		syncedSourceTokens,
 		syncedDestPools,
 		evm_2_evm_offramp.RateLimiterConfig{
@@ -243,10 +236,6 @@ func deployCommitStore(t *testing.T, client *EvmDeploymentConfig, sourceChainId 
 			ChainId:       client.ChainConfig.ChainId,
 			SourceChainId: sourceChainId,
 			OnRamp:        onRamp,
-		},
-		commit_store.CommitStoreDynamicConfig{
-			PriceRegistry: client.ChainConfig.PriceRegistry,
-			Afn:           client.ChainConfig.Afn,
 		},
 	)
 	shared.RequireNoError(t, err)

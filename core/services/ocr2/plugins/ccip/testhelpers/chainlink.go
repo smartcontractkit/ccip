@@ -410,13 +410,26 @@ func SetupAndStartNodes(ctx context.Context, t *testing.T, ccipContracts *CCIPCo
 			app.Stop()
 		})
 	}
-	commitOffchainCfg, err := ccip.EncodeOffchainConfig(ccip.CommitOffchainConfig{
+	commitOnchainConfig, err := ccip.EncodeAbiStruct(ccip.CommitOnchainConfig{
+		PriceRegistry: ccipContracts.Dest.PriceRegistry.Address(),
+		Afn:           ccipContracts.Dest.AFN.Address(),
+	})
+	require.NoError(t, err)
+	commitOffchainConfig, err := ccip.EncodeOffchainConfig(ccip.CommitOffchainConfig{
 		SourceIncomingConfirmations: 0,
 		DestIncomingConfirmations:   1,
 		MaxGasPrice:                 200e9,
 	})
 	require.NoError(t, err)
-	execOffchainCfg, err := ccip.EncodeOffchainConfig(ccip.ExecOffchainConfig{
+	execOnchainConfig, err := ccip.EncodeAbiStruct(ccip.ExecOnchainConfig{
+		PermissionLessExecutionThresholdSeconds: 60,
+		Router:                                  ccipContracts.Dest.Router.Address(),
+		Afn:                                     ccipContracts.Dest.AFN.Address(),
+		MaxDataSize:                             1e5,
+		MaxTokensLength:                         5,
+	})
+	require.NoError(t, err)
+	execOffchainConfig, err := ccip.EncodeOffchainConfig(ccip.ExecOffchainConfig{
 		SourceIncomingConfirmations: 0,
 		DestIncomingConfirmations:   1,
 		BatchGasLimit:               5_000_000,
@@ -424,6 +437,6 @@ func SetupAndStartNodes(ctx context.Context, t *testing.T, ccipContracts *CCIPCo
 		MaxGasPrice:                 200e9,
 	})
 	require.NoError(t, err)
-	configBlock := ccipContracts.SetupOnchainConfig(oracles, commitOffchainCfg, execOffchainCfg)
+	configBlock := ccipContracts.SetupOnchainConfig(oracles, commitOnchainConfig, commitOffchainConfig, execOnchainConfig, execOffchainConfig)
 	return bootstrapNode, nodes, configBlock
 }

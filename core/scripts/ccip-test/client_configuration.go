@@ -242,7 +242,9 @@ type DestClient struct {
 	ReceiverDapp *receiver_dapp.ReceiverDapp
 	OffRamp      *evm_2_evm_offramp.EVM2EVMOffRamp
 
+	ExecOnchainConfig    ccip.ExecOnchainConfig
 	ExecOffchainConfig   ccip.ExecOffchainConfig
+	CommitOnchainConfig  ccip.CommitOnchainConfig
 	CommitOffchainConfig ccip.CommitOffchainConfig
 }
 
@@ -666,24 +668,28 @@ func (client *CCIPClient) SetOCR2Config(env dione.Environment) {
 	client.Dest.ExecOffchainConfig.SourceIncomingConfirmations = client.Source.Confirmations
 	client.Dest.ExecOffchainConfig.DestIncomingConfirmations = client.Dest.Confirmations
 
-	ccipCommitConfig, err := ccip.EncodeOffchainConfig(client.Dest.CommitOffchainConfig)
+	commitOffchainConfig, err := ccip.EncodeOffchainConfig(client.Dest.CommitOffchainConfig)
 	helpers.PanicErr(err)
-	ccipExecConfig, err := ccip.EncodeOffchainConfig(client.Dest.ExecOffchainConfig)
+	execOffchainConfig, err := ccip.EncodeOffchainConfig(client.Dest.ExecOffchainConfig)
+	helpers.PanicErr(err)
+	commitOnchainConfig, err := ccip.EncodeAbiStruct(client.Dest.CommitOnchainConfig)
+	helpers.PanicErr(err)
+	execOnchainConfig, err := ccip.EncodeAbiStruct(client.Dest.ExecOnchainConfig)
 	helpers.PanicErr(err)
 
 	don := dione.NewOfflineDON(env, client.Dest.logger)
 	faults := len(don.Config.Nodes) / 3
 
-	tx, err := client.setOCRConfig(client.Dest.CommitStore, ccipCommitConfig, faults, don.GenerateOracleIdentities(client.Dest.ChainId))
+	tx, err := client.setOCRConfig(client.Dest.CommitStore, commitOffchainConfig, faults, don.GenerateOracleIdentities(client.Dest.ChainId), commitOnchainConfig)
 	helpers.PanicErr(err)
 	client.Dest.logger.Infof("Config set on commitStore %s", helpers.ExplorerLink(int64(client.Dest.ChainId), tx.Hash()))
 
-	tx, err = client.setOCRConfig(client.Dest.OffRamp, ccipExecConfig, faults, don.GenerateOracleIdentities(client.Dest.ChainId))
+	tx, err = client.setOCRConfig(client.Dest.OffRamp, execOffchainConfig, faults, don.GenerateOracleIdentities(client.Dest.ChainId), execOnchainConfig)
 	helpers.PanicErr(err)
 	client.Dest.logger.Infof("Config set on offramp %s", helpers.ExplorerLink(int64(client.Dest.ChainId), tx.Hash()))
 }
 
-func (client *CCIPClient) setOCRConfig(ocrConf ocr2Configurer, offchainConfig []byte, faults int, identities []ocrconfighelper.OracleIdentityExtra) (*types.Transaction, error) {
+func (client *CCIPClient) setOCRConfig(ocrConf ocr2Configurer, offchainConfig []byte, faults int, identities []ocrconfighelper.OracleIdentityExtra, onchainConfig []byte) (*types.Transaction, error) {
 	// Simple transmission schedule of 1 node per stage.
 	// sum(transmissionSchedule) should equal number of nodes.
 	var transmissionSchedule []int
@@ -706,7 +712,7 @@ func (client *CCIPClient) setOCRConfig(ocrConf ocr2Configurer, offchainConfig []
 		10*time.Second,
 		10*time.Second,
 		faults,
-		nil,
+		onchainConfig,
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create args for ocr config tx")

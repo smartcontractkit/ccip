@@ -1663,6 +1663,11 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		env.numOfExecNodes = len(execNodes)
 	}
 
+	// set up ocr2 config
+	err = SetOCR2Configs(commitNodes, execNodes, *lane.Dest)
+	if err != nil {
+		return errors.WithStack(err)
+	}
 	err = CreateOCRJobsForCCIP(
 		lane.Context,
 		bootstrapCommit, bootstrapExec, commitNodes, execNodes,
@@ -1674,11 +1679,6 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		tokenAddr,
 		mockServer, newBootstrap,
 	)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-	// set up ocr2 config
-	err = SetOCR2Configs(commitNodes, execNodes, *lane.Dest)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -1698,6 +1698,9 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 			SourceIncomingConfirmations: 1,
 			DestIncomingConfirmations:   1,
 			MaxGasPrice:                 200e9,
+		}, ccipPlugin.CommitOnchainConfig{
+			PriceRegistry: destCCIP.Common.PriceRegistry.EthAddress,
+			Afn:           destCCIP.Common.AFN.EthAddress,
 		})
 	if err != nil {
 		return errors.WithStack(err)
@@ -1721,6 +1724,13 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 				BatchGasLimit:               5_000_000,
 				RelativeBoostPerWaitHour:    0.07,
 				MaxGasPrice:                 200e9,
+			}, ccipPlugin.ExecOnchainConfig{
+				// FIXME Replace with real values
+				PermissionLessExecutionThresholdSeconds: 60,
+				Router:                                  destCCIP.Common.Router.EthAddress,
+				Afn:                                     destCCIP.Common.AFN.EthAddress,
+				MaxTokensLength:                         5,
+				MaxDataSize:                             1e5,
 			})
 		if err != nil {
 			return errors.WithStack(err)
