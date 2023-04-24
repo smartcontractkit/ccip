@@ -159,14 +159,14 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 	}
 	// If this is a brand-new job, then we make use of the start blocks. If not then we're rebooting and log poller will pick up where we left off.
 	if new {
-		return []job.ServiceCtx{&BackfilledOracle{
-			srcStartBlock: pluginConfig.SourceStartBlock,
-			dstStartBlock: pluginConfig.DestStartBlock,
-			src:           sourceChain.LogPoller(),
-			dst:           destChain.LogPoller(),
-			oracle:        job.NewServiceAdapter(oracle),
-			lggr:          lggr,
-		}}, nil
+		return []job.ServiceCtx{NewBackfilledOracle(
+			lggr,
+			sourceChain.LogPoller(),
+			destChain.LogPoller(),
+			pluginConfig.SourceStartBlock,
+			pluginConfig.DestStartBlock,
+			job.NewServiceAdapter(oracle)),
+		}, nil
 	}
 	return []job.ServiceCtx{job.NewServiceAdapter(oracle)}, nil
 }
