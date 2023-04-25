@@ -19,4 +19,9 @@ block_number = 12345
 solc_version = '0.8.15'
 src = 'src/v0.8/ccip'
 test = 'src/v0.8/ccip/test'
+
+[profile.metatx]
+solc_version = '0.8.15'
+src = 'src/v0.8/metatx'
+test = 'src/v0.8/metatx/test'
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config

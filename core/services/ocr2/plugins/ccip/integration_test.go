@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/require"
@@ -19,17 +18,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 )
 
-var (
-	sourceChainID = uint64(1000)
-	destChainID   = uint64(1337)
-)
-
 func TestIntegration_CCIP(t *testing.T) {
-	ccipContracts := testhelpers.SetupCCIPContracts(t, sourceChainID, destChainID)
-	bootstrapNodePort := int64(19399)
-	ctx := context.Background()
-	// Starts nodes and configures them in the OCR contracts.
-	bootstrapNode, nodes, configBlock := testhelpers.SetupAndStartNodes(ctx, t, &ccipContracts, bootstrapNodePort)
+	ccipContracts := testhelpers.SetupCCIPContracts(t, testhelpers.SourceChainID, testhelpers.DestChainID)
 	linkUSD := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, err := w.Write([]byte(`{"UsdPerLink": "8000000000000000000"}`))
 		require.NoError(t, err)
@@ -41,7 +31,7 @@ func TestIntegration_CCIP(t *testing.T) {
 	wrapped, err := ccipContracts.Source.Router.GetWrappedNative(nil)
 	require.NoError(t, err)
 	tokenPricesUSDPipeline := fmt.Sprintf(`
-// Price 1 
+// Price 1
 link [type=http method=GET url="%s"];
 link_parse [type=jsonparse path="UsdPerLink"];
 link->link_parse;
@@ -50,26 +40,12 @@ eth_parse [type=jsonparse path="UsdPerETH"];
 eth->eth_parse;
 merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_parse)}"];`,
 		linkUSD.URL, ethUSD.URL, ccipContracts.Dest.LinkToken.Address(), wrapped)
-	jobParams := ccipContracts.NewCCIPJobSpecParams(tokenPricesUSDPipeline, configBlock)
 	defer linkUSD.Close()
 	defer ethUSD.Close()
 
-	jobParams.RelayInflight = 2 * time.Second
-	jobParams.ExecInflight = 2 * time.Second
-	jobParams.RootSnooze = 1 * time.Second
-
-	// Add the bootstrap job
-	bootstrapNode.AddBootstrapJob(t, jobParams.BootstrapJob(ccipContracts.Dest.CommitStore.Address().Hex()))
-	testhelpers.AddAllJobs(t, jobParams, ccipContracts, nodes)
-
-	// Replay for bootstrap.
-	bc, err := bootstrapNode.App.GetChains().EVM.Get(big.NewInt(0).SetUint64(destChainID))
-	require.NoError(t, err)
-	require.NoError(t, bc.LogPoller().Replay(context.Background(), configBlock))
+	nodes, jobParams := testhelpers.SetUpNodesAndJobs(t, &ccipContracts, tokenPricesUSDPipeline)
 
 	geCurrentSeqNum := 1
-
-	ccipContracts.Dest.Chain.Commit()
 
 	t.Run("single ge", func(t *testing.T) {
 		tokenAmount := big.NewInt(500000003) // prime number
@@ -106,7 +82,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 			FeeToken:  ccipContracts.Source.LinkToken.Address(),
 			ExtraArgs: extraArgs,
 		}
-		fee, err := ccipContracts.Source.Router.GetFee(nil, destChainID, msg)
+		fee, err := ccipContracts.Source.Router.GetFee(nil, testhelpers.DestChainID, msg)
 		require.NoError(t, err)
 		// Currently no overhead and 10gwei dest gas price. So fee is simply (gasLimit * gasPrice)* link/native
 		//require.Equal(t, new(big.Int).Mul(gasLimit, gasPrice).String(), fee.String())
@@ -206,7 +182,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 				FeeToken:  ccipContracts.Source.LinkToken.Address(),
 				ExtraArgs: extraArgs,
 			}
-			fee, err := ccipContracts.Source.Router.GetFee(nil, destChainID, msg)
+			fee, err := ccipContracts.Source.Router.GetFee(nil, testhelpers.DestChainID, msg)
 			require.NoError(t, err)
 			// Currently no overhead and 1gwei dest gas price. So fee is simply gasLimit * gasPrice.
 			//require.Equal(t, new(big.Int).Mul(txGasLimit, gasPrice).String(), fee.String())
@@ -260,7 +236,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 			FeeToken:     ccipContracts.Source.LinkToken.Address(),
 			ExtraArgs:    extraArgs,
 		}
-		fee, err := ccipContracts.Source.Router.GetFee(nil, destChainID, msg)
+		fee, err := ccipContracts.Source.Router.GetFee(nil, testhelpers.DestChainID, msg)
 		require.NoError(t, err)
 		// Approve the fee amount
 		_, err = ccipContracts.Source.LinkToken.Approve(ccipContracts.Source.User, ccipContracts.Source.Router.Address(), big.NewInt(0).Mul(big.NewInt(int64(totalMsgs)), fee))

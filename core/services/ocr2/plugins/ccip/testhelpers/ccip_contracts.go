@@ -49,10 +49,12 @@ var (
 	OffRamp  = "offramp"
 	DestPool = "dest pool"
 
-	Receiver    = "receiver"
-	Sender      = "sender"
-	Link        = func(amount int64) *big.Int { return new(big.Int).Mul(big.NewInt(1e18), big.NewInt(amount)) }
-	HundredLink = Link(100)
+	Receiver      = "receiver"
+	Sender        = "sender"
+	Link          = func(amount int64) *big.Int { return new(big.Int).Mul(big.NewInt(1e18), big.NewInt(amount)) }
+	HundredLink   = Link(100)
+	SourceChainID = uint64(1000)
+	DestChainID   = uint64(1337)
 )
 
 type MaybeRevertReceiver struct {
