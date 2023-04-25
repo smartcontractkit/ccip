@@ -118,21 +118,36 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
 }
 
 contract EVM2EVMOffRamp_setDynamicConfig is EVM2EVMOffRampSetup {
+  // OffRamp event
   event ConfigSet(EVM2EVMOffRamp.StaticConfig staticConfig, EVM2EVMOffRamp.DynamicConfig dynamicConfig);
 
   function testSetDynamicConfigSuccess() public {
     EVM2EVMOffRamp.StaticConfig memory staticConfig = s_offRamp.getStaticConfig();
     EVM2EVMOffRamp.DynamicConfig memory dynamicConfig = generateDynamicOffRampConfig(USER_3, address(s_mockAFN));
+    bytes memory onchainConfig = abi.encode(dynamicConfig);
 
-    // FIXME Add checking if OCR2Abstract.ConfigSet was emitted
     vm.expectEmit();
     emit ConfigSet(staticConfig, dynamicConfig);
+
+    vm.expectEmit();
+    uint32 configCount = 1;
+    emit ConfigSet(
+      12345,
+      getBasicConfigDigest(address(s_offRamp), s_f, configCount, onchainConfig),
+      configCount + 1,
+      s_valid_signers,
+      s_valid_transmitters,
+      s_f,
+      onchainConfig,
+      s_offchainConfigVersion,
+      abi.encode("")
+    );
 
     s_offRamp.setOCR2Config(
       s_valid_signers,
       s_valid_transmitters,
       s_f,
-      abi.encode(dynamicConfig),
+      onchainConfig,
       s_offchainConfigVersion,
       abi.encode("")
     );

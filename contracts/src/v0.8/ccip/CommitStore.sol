@@ -182,7 +182,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
   }
 
   /// @notice Sets the dynamic config. This function is called during `setOCR2Config` flow
-  function _beforeSetConfig(uint8, bytes memory onchainConfig) internal override {
+  function _beforeSetConfig(bytes memory onchainConfig) internal override {
     DynamicConfig memory dynamicConfig = abi.decode(onchainConfig, (DynamicConfig));
 
     if (dynamicConfig.afn == address(0) || dynamicConfig.priceRegistry == address(0)) revert InvalidCommitStoreConfig();

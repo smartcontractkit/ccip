@@ -310,9 +310,9 @@ func EncodeAbiStruct[T AbiDefined](decoded T) ([]byte, error) {
 }
 
 func DecodeAbiStruct[T AbiDefined](encoded []byte, origin *T) (T, error) {
+	var empty T
 	if origin == nil {
-		var result T
-		return result, errors.New("nil origin passed to Decode func")
+		return empty, errors.New("nil origin passed to Decode func")
 	}
 
 	decoded, err := utils.ABIDecode((*origin).AbiString(), encoded)
@@ -320,6 +320,9 @@ func DecodeAbiStruct[T AbiDefined](encoded []byte, origin *T) (T, error) {
 		return *origin, err
 	}
 
-	out0 := *abi.ConvertType(decoded[0], origin).(*T)
-	return out0, nil
+	converted := abi.ConvertType(decoded[0], origin)
+	if casted, ok := converted.(*T); ok {
+		return *casted, nil
+	}
+	return empty, fmt.Errorf("can't cast from %T to %T", converted, empty)
 }

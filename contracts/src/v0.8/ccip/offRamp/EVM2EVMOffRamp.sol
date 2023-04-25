@@ -354,7 +354,7 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
   }
 
   /// @notice Sets the dynamic config. This function is called during `setOCR2Config` flow
-  function _beforeSetConfig(uint8, bytes memory onchainConfig) internal override {
+  function _beforeSetConfig(bytes memory onchainConfig) internal override {
     DynamicConfig memory dynamicConfig = abi.decode(onchainConfig, (DynamicConfig));
 
     if (dynamicConfig.router == address(0) || dynamicConfig.afn == address(0))

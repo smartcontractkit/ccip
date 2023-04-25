@@ -6,8 +6,11 @@ import "../../AFN.sol";
 import "../../PriceRegistry.sol";
 import "../priceRegistry/PriceRegistry.t.sol";
 import "../ocr/OCR2Base.t.sol";
+import "../../ocr/OCR2Abstract.sol";
 
 contract CommitStoreSetup is PriceRegistrySetup, OCR2BaseSetup {
+  event ConfigSet(CommitStore.StaticConfig, CommitStore.DynamicConfig);
+
   CommitStoreHelper s_commitStore;
 
   function setUp() public virtual override(PriceRegistrySetup, OCR2BaseSetup) {
@@ -142,8 +145,6 @@ contract CommitStore_setMinSeqNr is CommitStoreSetup {
 
 /// @notice #setDynamicConfig
 contract CommitStore_setDynamicConfig is CommitStoreSetup {
-  event ConfigSet(CommitStore.StaticConfig, CommitStore.DynamicConfig);
-
   function testSetMinSeqNrSuccess(address priceRegistry, address afn) public {
     vm.assume(priceRegistry != address(0) && afn != address(0));
     CommitStore.StaticConfig memory staticConfig = s_commitStore.getStaticConfig();
@@ -151,16 +152,31 @@ contract CommitStore_setDynamicConfig is CommitStoreSetup {
       priceRegistry: priceRegistry,
       afn: afn
     });
+    bytes memory onchainConfig = abi.encode(dynamicConfig);
 
-    // FIXME Add checking if OCR2Abstract.ConfigSet was emitted
     vm.expectEmit();
     emit ConfigSet(staticConfig, dynamicConfig);
+
+    uint32 configCount = 1;
+
+    vm.expectEmit();
+    emit ConfigSet(
+      12345,
+      getBasicConfigDigest(address(s_commitStore), s_f, configCount, onchainConfig),
+      configCount + 1,
+      s_valid_signers,
+      s_valid_transmitters,
+      s_f,
+      onchainConfig,
+      s_offchainConfigVersion,
+      abi.encode("")
+    );
 
     s_commitStore.setOCR2Config(
       s_valid_signers,
       s_valid_transmitters,
       s_f,
-      abi.encode(dynamicConfig),
+      onchainConfig,
       s_offchainConfigVersion,
       abi.encode("")
     );
