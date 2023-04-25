@@ -22,7 +22,7 @@ evm_2_evm_offramp_helper: ../../contracts/solc/v0.8.15/EVM2EVMOffRampHelper.abi 
 evm_2_evm_onramp: ../../contracts/solc/v0.8.15/EVM2EVMOnRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMOnRamp.bin 349935a47ac9de154b6e10e30b9a2b71838bfcc4a11db655e45bd51d2fac630e
 flags_wrapper: ../../contracts/solc/v0.6/Flags.abi ../../contracts/solc/v0.6/Flags.bin 2034d1b562ca37a63068851915e3703980276e8d5f7db6db8a3351a49d69fc4a
 flux_aggregator_wrapper: ../../contracts/solc/v0.6/FluxAggregator.abi ../../contracts/solc/v0.6/FluxAggregator.bin a3b0a6396c4aa3b5ee39b3c4bd45efc89789d4859379a8a92caca3a0496c5794
-forwarder: ../../contracts/solc/v0.8.15/Forwarder.abi ../../contracts/solc/v0.8.15/Forwarder.bin f8505029e782148ef9923f5be49eefd8aa65d06497ffa5d2945893f6113e984c
+forwarder: ../../contracts/solc/v0.8.15/Forwarder.abi ../../contracts/solc/v0.8.15/Forwarder.bin 2911ae6bcf6b60b6828320c999bc9dbf94e6e24cf5e31ea42074667d5b88d4e5
 functions_billing_registry_events_mock: ../../contracts/solc/v0.8.6/FunctionsBillingRegistryEventsMock.abi ../../contracts/solc/v0.8.6/FunctionsBillingRegistryEventsMock.bin 50deeb883bd9c3729702be335c0388f9d8553bab4be5e26ecacac496a89e2b77
 functions_oracle_events_mock: ../../contracts/solc/v0.8.6/FunctionsOracleEventsMock.abi ../../contracts/solc/v0.8.6/FunctionsOracleEventsMock.bin 22da3f3d78e6b45a13fff07e98134c1514a5263f3a49832b1fd4ccd86b4b560e
 gas_wrapper: ../../contracts/solc/v0.8.6/KeeperRegistryCheckUpkeepGasUsageWrapper1_2.abi ../../contracts/solc/v0.8.6/KeeperRegistryCheckUpkeepGasUsageWrapper1_2.bin 4a5dcdac486d18fcd58e3488c15c1710ae76b977556a3f3191bd269a4bc75723
