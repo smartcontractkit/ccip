@@ -28,13 +28,7 @@ abstract contract AbstractCrossChainMetaTransactor is OwnerIsCreator, IERC2771Re
     address ccipFeeProviderAddress,
     uint64 ccipChainId
   ) {
-    if (forwarder == address(0)) {
-      revert ZeroAddress();
-    }
-    if (ccipRouter == address(0)) {
-      revert ZeroAddress();
-    }
-    if (ccipFeeProviderAddress == address(0)) {
+    if (forwarder == address(0) || ccipRouter == address(0) || ccipFeeProviderAddress == address(0)) {
       revert ZeroAddress();
     }
     i_forwarder = forwarder;

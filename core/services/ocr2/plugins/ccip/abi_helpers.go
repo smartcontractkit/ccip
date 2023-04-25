@@ -1,6 +1,7 @@
 package ccip
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"strings"
@@ -294,4 +295,34 @@ func makeCommitReportArgs() abi.Arguments {
 			}),
 		},
 	}
+}
+
+type AbiDefined interface {
+	AbiString() string
+}
+
+func EncodeAbiStruct[T AbiDefined](decoded T) ([]byte, error) {
+	encoded, err := utils.ABIEncode(decoded.AbiString(), decoded)
+	if err != nil {
+		return nil, err
+	}
+	return encoded, nil
+}
+
+func DecodeAbiStruct[T AbiDefined](encoded []byte, origin *T) (T, error) {
+	var empty T
+	if origin == nil {
+		return empty, errors.New("nil origin passed to Decode func")
+	}
+
+	decoded, err := utils.ABIDecode((*origin).AbiString(), encoded)
+	if err != nil {
+		return *origin, err
+	}
+
+	converted := abi.ConvertType(decoded[0], origin)
+	if casted, ok := converted.(*T); ok {
+		return *casted, nil
+	}
+	return empty, fmt.Errorf("can't cast from %T to %T", converted, empty)
 }

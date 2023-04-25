@@ -8,6 +8,7 @@ import "../vendor/ERC165.sol";
 
 import "./IForwarder.sol";
 import {OwnerIsCreator} from "../ccip/OwnerIsCreator.sol";
+import "../vendor/nomad-xyz/ExcessivelySafeCall.sol";
 
 /// @title The Forwarder Implementation
 /// @notice This implementation of the `IForwarder` interface uses ERC-712 signatures and stored nonces for verification.
@@ -17,6 +18,7 @@ import {OwnerIsCreator} from "../ccip/OwnerIsCreator.sol";
 /// @dev 3. renamed field: "address to" => "address target"
 contract Forwarder is IForwarder, ERC165, OwnerIsCreator {
   using ECDSA for bytes32;
+  using ExcessivelySafeCall for address;
 
   address private constant DRY_RUN_ADDRESS = 0x0000000000000000000000000000000000000000;
 
@@ -91,8 +93,14 @@ contract Forwarder is IForwarder, ERC165, OwnerIsCreator {
     }
 
     bytes memory callData = abi.encodePacked(req.data, req.from);
+    address target = req.target;
     // solhint-disable-next-line avoid-low-level-calls
-    (success, ret) = req.target.call(callData);
+    (success, ret) = target.excessivelySafeCall(
+      gasleft(),
+      0, // do not pass any ethers
+      32, // if callee has a large return value, only copy upto 32 bytes
+      callData
+    );
 
     if (!success) {
       if (ret.length == 0) revert("Forwarded call reverted without reason");
@@ -107,17 +115,17 @@ contract Forwarder is IForwarder, ERC165, OwnerIsCreator {
     return (success, ret);
   }
 
-  error NonceUnavailable(uint256 unavailbleNonce);
+  error NonceAlreadyUsed(uint256 nonce);
 
   function _verifyNonce(ForwardRequest calldata req) internal view {
     if (s_nonces[req.from][req.nonce]) {
-      revert NonceUnavailable(req.nonce);
+      revert NonceAlreadyUsed(req.nonce);
     }
   }
 
   function _verifyAndUpdateNonce(ForwardRequest calldata req) internal {
     if (s_nonces[req.from][req.nonce]) {
-      revert NonceUnavailable(req.nonce);
+      revert NonceAlreadyUsed(req.nonce);
     }
     s_nonces[req.from][req.nonce] = true;
   }
@@ -126,8 +134,9 @@ contract Forwarder is IForwarder, ERC165, OwnerIsCreator {
 
   /// @inheritdoc IForwarder
   function registerRequestType(string calldata typeName, string calldata typeSuffix) external override {
-    for (uint256 i = 0; i < bytes(typeName).length; i++) {
-      bytes1 c = bytes(typeName)[i];
+    bytes memory typeNameBytes = bytes(typeName);
+    for (uint256 i = 0; i < typeNameBytes.length; ++i) {
+      bytes1 c = typeNameBytes[i];
       if (c == "(" || c == ")") {
         revert InvalidTypeName(typeName);
       }

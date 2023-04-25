@@ -59,7 +59,7 @@ contract ForwarderTest is BaseTest {
         assertTrue(success);
 
         vm.expectRevert(abi.encodeWithSelector(
-            Forwarder.NonceUnavailable.selector, 
+            Forwarder.NonceAlreadyUsed.selector,
             s_nonce
             ));
         s_forwarder.execute(

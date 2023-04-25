@@ -110,7 +110,6 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
   /// should both be source chain.
   constructor(
     StaticConfig memory staticConfig,
-    DynamicConfig memory dynamicConfig,
     IERC20[] memory sourceTokens,
     IPool[] memory pools,
     RateLimiter.Config memory rateLimiterConfig
@@ -130,8 +129,6 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
       s_poolsBySourceToken.set(address(sourceTokens[i]), address(pools[i]));
       s_poolsByDestToken.set(address(pools[i].getToken()), address(pools[i]));
     }
-
-    _setDynamicConfig(dynamicConfig);
   }
 
   // ================================================================
@@ -356,14 +353,10 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
     return s_dynamicConfig;
   }
 
-  /// @notice Sets a new dynamic config.
-  /// @param config The new config
-  function setDynamicConfig(DynamicConfig memory config) external onlyOwner {
-    _setDynamicConfig(config);
-  }
+  /// @notice Sets the dynamic config. This function is called during `setOCR2Config` flow
+  function _beforeSetConfig(bytes memory onchainConfig) internal override {
+    DynamicConfig memory dynamicConfig = abi.decode(onchainConfig, (DynamicConfig));
 
-  /// @notice Internal version of setDynamicConfig to allow for reuse in the constructor.
-  function _setDynamicConfig(DynamicConfig memory dynamicConfig) private {
     if (dynamicConfig.router == address(0) || dynamicConfig.afn == address(0))
       revert InvalidOffRampConfig(dynamicConfig);
 

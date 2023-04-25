@@ -68,16 +68,13 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
   mapping(bytes32 => uint256) private s_roots;
 
   /// @param staticConfig Containing the static part of the commitStore config
-  /// @param dynamicConfig Containing the dynamic part of the commitStore config
-  constructor(StaticConfig memory staticConfig, DynamicConfig memory dynamicConfig) OCR2Base() Pausable() {
+  constructor(StaticConfig memory staticConfig) OCR2Base() Pausable() {
     if (staticConfig.onRamp == address(0) || staticConfig.chainId == 0 || staticConfig.sourceChainId == 0)
       revert InvalidCommitStoreConfig();
 
     i_chainId = staticConfig.chainId;
     i_sourceChainId = staticConfig.sourceChainId;
     i_onRamp = staticConfig.onRamp;
-
-    _setDynamicConfig(dynamicConfig);
   }
 
   // ================================================================
@@ -184,15 +181,10 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
     return s_dynamicConfig;
   }
 
-  /// @notice Sets the dynamic configuration.
-  /// @param dynamicConfig The configuration.
-  function setDynamicConfig(DynamicConfig memory dynamicConfig) external onlyOwner {
-    _setDynamicConfig(dynamicConfig);
-  }
+  /// @notice Sets the dynamic config. This function is called during `setOCR2Config` flow
+  function _beforeSetConfig(bytes memory onchainConfig) internal override {
+    DynamicConfig memory dynamicConfig = abi.decode(onchainConfig, (DynamicConfig));
 
-  /// @notice the internal version of setDynamicConfig to allow for reuse
-  /// in the constructor. Emits ConfigSet on successful config set.
-  function _setDynamicConfig(DynamicConfig memory dynamicConfig) internal {
     if (dynamicConfig.afn == address(0) || dynamicConfig.priceRegistry == address(0)) revert InvalidCommitStoreConfig();
 
     s_dynamicConfig = dynamicConfig;

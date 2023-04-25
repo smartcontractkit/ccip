@@ -34,7 +34,7 @@ on:
       chainlinkVersion:
         description: Container image version for the Chainlink nodes
         required: false
-        default: "latest"
+        default: ""
       chainlinkTestVersion:
         description: Container image version for the Chainlink tests
         required: false
@@ -65,10 +65,10 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  INPUT_CHAINLINK_TEST_VERSION: ${{ inputs.chainlinkTestVersion }}
+  INPUT_CHAINLINK_TEST_VERSION: ${{ inputs.chainlinkTestVersion || github.sha}}
   INPUT_CHAINLINK_IMAGE: ${{ inputs.chainlinkImage }}
-  INPUT_CHAINLINK_VERSION: ${{ inputs.chainlinkVersion }}
-  ENV_JOB_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-ccip-tests:load.${{ github.sha }}
+  INPUT_CHAINLINK_VERSION: ${{ inputs.chainlinkVersion || github.sha}}
+  ENV_JOB_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-ccip-tests:${{ inputs.chainlinkTestVersion || github.sha }}
   INTERNAL_DOCKER_REPO: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com
 
 jobs:
@@ -82,15 +82,24 @@ jobs:
     runs-on: ubuntu20.04-16cores-64GB
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@24cb9080177205b6e8c946b17badbe402adc938f # v3.4.0
+        uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
+      - name: Check if image exists
+        id: check-image
+        uses: smartcontractkit/chainlink-github-actions/docker/image-exists@8489879838862929f43f7d7cd1b33903965cf507 # 2.1.6
+        with:
+          repository: chainlink
+          tag: ${{ env.INPUT_CHAINLINK_VERSION }}
+          AWS_REGION: ${{ secrets.QA_AWS_REGION }}
+          AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
       - name: Build Image
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@ce87f8986ca18336cc5015df75916c2ec0a7c4b3 # v2.1.2
+        if: steps.check-image.outputs.exists == 'false'
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@8489879838862929f43f7d7cd1b33903965cf507 # 2.1.6
         env:
           GH_TOKEN: ${{ github.token }}
         with:
           cl_repo: smartcontractkit/chainlink-ccip
-          cl_ref: ${{ github.sha }}
-          push_tag: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink:load.${{ github.sha }}
+          cl_ref: ${{ env.INPUT_CHAINLINK_VERSION }}
+          push_tag: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink:${{ env.INPUT_CHAINLINK_VERSION }}
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
       - name: Collect Metrics
@@ -105,7 +114,6 @@ jobs:
 
   build-test-image:
     environment: integration
-    if: ${{ inputs.chainlinkTestVersion == '' }}
     permissions:
       id-token: write
       contents: read
@@ -121,18 +129,14 @@ jobs:
           this-job-name: Build Test Image
         continue-on-error: true
       - name: Checkout the repo
-        uses: actions/checkout@24cb9080177205b6e8c946b17badbe402adc938f # v3.4.0
-      - name: build test runner
-        uses: smartcontractkit/chainlink-github-actions/docker/build-push@ce87f8986ca18336cc5015df75916c2ec0a7c4b3 # v2.1.2
+        uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
+      - name: Build Test Image
+        uses: ./.github/actions/build-test-image
         with:
-          tags: ${{ env.ENV_JOB_IMAGE }}
-          file: ./integration-tests/test.Dockerfile
-          build-args: |
-            BASE_IMAGE=${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/test-base-image
-            IMAGE_VERSION=v0.3.24
-            SUITES="load"
-          AWS_REGION: ${{ secrets.QA_AWS_REGION }}
-          AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+          tag: ${{ env.INPUT_CHAINLINK_TEST_VERSION }}
+          QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+          QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
+          QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
 
   ccip_load_test:
     name: CCIP Load Test
@@ -192,7 +196,7 @@ jobs:
           this-job-name: ${{ inputs.networks }} CCIP Load Test
         continue-on-error: true
       - name: Checkout the repo
-        uses: actions/checkout@24cb9080177205b6e8c946b17badbe402adc938f # v3.4.0
+        uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
         with:
           ref: ${{ env.REF_NAME }}
       - name: Sets env vars
@@ -204,10 +208,10 @@ jobs:
           fi
           if [[ "${{ env.INPUT_CHAINLINK_IMAGE }}" == "" || "${{ env.INPUT_CHAINLINK_VERSION }}" == "" ]]; then
             echo "INPUT_CHAINLINK_IMAGE=${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink" >> $GITHUB_ENV
-            echo "INPUT_CHAINLINK_VERSION=load.${{ github.sha }}" >> $GITHUB_ENV
+            echo "INPUT_CHAINLINK_VERSION=${{ github.sha }}" >> $GITHUB_ENV
           fi
           if [[ "${{ env.INPUT_CHAINLINK_TEST_VERSION }}" == "" ]]; then
-            echo "INPUT_CHAINLINK_TEST_VERSION=load.${{ github.sha }}" >> $GITHUB_ENV
+            echo "INPUT_CHAINLINK_TEST_VERSION=${{ github.sha }}" >> $GITHUB_ENV
           fi
           if [[ "${{ env.CCIP_NO_OF_NETWORKS }}" != "2" ]]; then
             echo "RR_MEM=8Gi" >> $GITHUB_ENV
@@ -220,11 +224,11 @@ jobs:
         run: |
           echo "ENV_JOB_IMAGE=${{ env.ENV_JOB_IMAGE_BASE }}:${{ env.INPUT_CHAINLINK_TEST_VERSION }}" >> $GITHUB_ENV
           echo "### chainlink image used for this test run :link:" >>$GITHUB_STEP_SUMMARY
-          echo "\`${{ env.INPUT_CHAINLINK_VERSION }}\`" >>$GITHUB_STEP_SUMMARY
+          echo "\`${{ env.INPUT_CHAINLINK_VERSION }}\`" >> $GITHUB_STEP_SUMMARY
           echo "### chainlink-tests image tag for this test run :ship:" >>$GITHUB_STEP_SUMMARY
-          echo "\`${{ env.INPUT_CHAINLINK_TEST_VERSION }}\`" >>$GITHUB_STEP_SUMMARY
+          echo "\`${{ env.INPUT_CHAINLINK_TEST_VERSION }}\`" >> $GITHUB_STEP_SUMMARY
       - name: Run Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@ce87f8986ca18336cc5015df75916c2ec0a7c4b3 # v2.1.2
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@8489879838862929f43f7d7cd1b33903965cf507 # 2.1.6
         env:
           TEST_SUITE: load
           TEST_ARGS: -test.timeout 900h

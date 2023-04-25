@@ -130,13 +130,6 @@ func (c *CCIPContracts) DeployNewOffRamp() {
 			SourceChainId: c.Source.ChainID,
 			OnRamp:        c.Source.OnRamp.Address(),
 		},
-		evm_2_evm_offramp.EVM2EVMOffRampDynamicConfig{
-			PermissionLessExecutionThresholdSeconds: 1,
-			Router:                                  c.Dest.Router.Address(),
-			Afn:                                     c.Dest.AFN.Address(),
-			MaxDataSize:                             1e5,
-			MaxTokensLength:                         5,
-		},
 		[]common.Address{c.Source.LinkToken.Address()}, // source tokens
 		[]common.Address{c.Dest.Pool.Address()},        // pools
 		evm_2_evm_offramp.RateLimiterConfig{
@@ -171,12 +164,23 @@ func (c *CCIPContracts) EnableOffRamp() {
 	require.NoError(c.t, err)
 	c.Dest.Chain.Commit()
 
+	config := ccip.ExecOnchainConfig{
+		PermissionLessExecutionThresholdSeconds: 60,
+		Router:                                  c.Dest.Router.Address(),
+		Afn:                                     c.Dest.AFN.Address(),
+		MaxDataSize:                             1e5,
+		MaxTokensLength:                         5,
+	}
+
+	onchainConfig, err := ccip.EncodeAbiStruct(config)
+	require.NoError(c.t, err)
+
 	_, err = c.Dest.OffRamp.SetOCR2Config(
 		c.Dest.User,
 		c.execOCRConfig.Signers,
 		c.execOCRConfig.Transmitters,
 		c.execOCRConfig.F,
-		c.execOCRConfig.OnchainConfig,
+		onchainConfig,
 		c.execOCRConfig.OffchainConfigVersion,
 		c.execOCRConfig.OffchainConfig,
 	)
@@ -186,12 +190,20 @@ func (c *CCIPContracts) EnableOffRamp() {
 }
 
 func (c *CCIPContracts) EnableCommitStore() {
-	_, err := c.Dest.CommitStore.SetOCR2Config(
+	config := ccip.CommitOnchainConfig{
+		PriceRegistry: c.Dest.PriceRegistry.Address(),
+		Afn:           c.Dest.AFN.Address(), // AFN address
+	}
+
+	onChainConfig, err := ccip.EncodeAbiStruct(config)
+	require.NoError(c.t, err)
+
+	_, err = c.Dest.CommitStore.SetOCR2Config(
 		c.Dest.User,
 		c.commitOCRConfig.Signers,
 		c.commitOCRConfig.Transmitters,
 		c.commitOCRConfig.F,
-		c.commitOCRConfig.OnchainConfig,
+		onChainConfig,
 		c.commitOCRConfig.OffchainConfigVersion,
 		c.commitOCRConfig.OffchainConfig,
 	)
@@ -287,10 +299,6 @@ func (c *CCIPContracts) DeployNewCommitStore() {
 			SourceChainId: c.Source.ChainID,
 			OnRamp:        c.Source.OnRamp.Address(),
 		},
-		commit_store.CommitStoreDynamicConfig{
-			PriceRegistry: c.Dest.PriceRegistry.Address(),
-			Afn:           c.Dest.AFN.Address(), // AFN address
-		},
 	)
 	require.NoError(c.t, err)
 	c.Dest.Chain.Commit()
@@ -327,7 +335,7 @@ func (c *CCIPContracts) AssertBalances(bas []BalanceAssertion) {
 	}
 }
 
-func (c *CCIPContracts) DeriveOCR2Config(oracles []confighelper.OracleIdentityExtra, reportingPluginConfig []byte) *OCR2Config {
+func (c *CCIPContracts) DeriveOCR2Config(oracles []confighelper.OracleIdentityExtra, rawOnchainConfig []byte, rawOffchainConfig []byte) *OCR2Config {
 	signers, transmitters, threshold, onchainConfig, offchainConfigVersion, offchainConfig, err := confighelper.ContractSetConfigArgsForTests(
 		2*time.Second,        // deltaProgress
 		1*time.Second,        // deltaResend
@@ -337,14 +345,14 @@ func (c *CCIPContracts) DeriveOCR2Config(oracles []confighelper.OracleIdentityEx
 		3,
 		[]int{1, 1, 1, 1},
 		oracles,
-		reportingPluginConfig,
+		rawOffchainConfig,
 		50*time.Millisecond, // Max duration query
 		1*time.Second,       // Max duration observation
 		100*time.Millisecond,
 		100*time.Millisecond,
 		100*time.Millisecond,
 		1, // faults
-		nil,
+		rawOnchainConfig,
 	)
 	require.NoError(c.t, err)
 	lggr := logger.TestLogger(c.t)
@@ -370,12 +378,12 @@ func (c *CCIPContracts) DeriveOCR2Config(oracles []confighelper.OracleIdentityEx
 	}
 }
 
-func (c *CCIPContracts) SetupOnchainConfig(oracles []confighelper.OracleIdentityExtra, commitPluginConfig, execPluginConfig []byte) int64 {
+func (c *CCIPContracts) SetupOnchainConfig(oracles []confighelper.OracleIdentityExtra, commitOnchainConfig, commitOffchainConfig, execOnchainConfig, execOffchainConfig []byte) int64 {
 	// Note We do NOT set the payees, payment is done in the OCR2Base implementation
-	// Set the offramp offchainConfig.
-	c.commitOCRConfig = c.DeriveOCR2Config(oracles, commitPluginConfig)
+	c.commitOCRConfig = c.DeriveOCR2Config(oracles, commitOnchainConfig, commitOffchainConfig)
 	blockBeforeConfig, err := c.Dest.Chain.BlockByNumber(context.Background(), nil)
 	require.NoError(c.t, err)
+
 	// Set the DON on the commit store
 	_, err = c.Dest.CommitStore.SetOCR2Config(
 		c.Dest.User,
@@ -389,7 +397,7 @@ func (c *CCIPContracts) SetupOnchainConfig(oracles []confighelper.OracleIdentity
 	require.NoError(c.t, err)
 	c.Dest.Chain.Commit()
 
-	c.execOCRConfig = c.DeriveOCR2Config(oracles, execPluginConfig)
+	c.execOCRConfig = c.DeriveOCR2Config(oracles, execOnchainConfig, execOffchainConfig)
 	// Same DON on the offramp
 	_, err = c.Dest.OffRamp.SetOCR2Config(
 		c.Dest.User,
@@ -678,10 +686,6 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			SourceChainId: sourceChainID,
 			OnRamp:        onRamp.Address(),
 		},
-		commit_store.CommitStoreDynamicConfig{
-			PriceRegistry: destPricesAddress,
-			Afn:           afnDestAddress, // AFN address
-		},
 	)
 	require.NoError(t, err)
 	commitStore, err := commit_store.NewCommitStore(commitStoreAddress, destChain)
@@ -705,13 +709,6 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			ChainId:       destChainID,
 			SourceChainId: sourceChainID,
 			OnRamp:        onRampAddress,
-		},
-		evm_2_evm_offramp.EVM2EVMOffRampDynamicConfig{
-			PermissionLessExecutionThresholdSeconds: 60,
-			Router:                                  destRouter.Address(),
-			Afn:                                     afnDestAddress,
-			MaxDataSize:                             1e5,
-			MaxTokensLength:                         5,
 		},
 		[]common.Address{sourceLinkTokenAddress},
 		[]common.Address{destPoolAddress},

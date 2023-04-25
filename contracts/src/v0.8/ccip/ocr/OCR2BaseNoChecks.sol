@@ -92,6 +92,7 @@ abstract contract OCR2BaseNoChecks is OwnerIsCreator, OCR2Abstract {
     uint64 offchainConfigVersion,
     bytes memory offchainConfig
   ) external override checkConfigValid(f) onlyOwner {
+    _beforeSetConfig(onchainConfig);
     uint256 oldTransmitterLength = s_transmitters.length;
     for (uint256 i = 0; i < oldTransmitterLength; ++i) {
       delete s_oracles[s_transmitters[i]];
@@ -135,6 +136,10 @@ abstract contract OCR2BaseNoChecks is OwnerIsCreator, OCR2Abstract {
       offchainConfig
     );
   }
+
+  /// @dev Hook that is run from setOCR2Config() right after validating configuration.
+  /// Empty by default, please provide an implementation in a child contract if you need additional configuration processing
+  function _beforeSetConfig(bytes memory _onchainConfig) internal virtual {}
 
   /// @return list of addresses permitted to transmit reports to this contract
   /// @dev The list will match the order used to specify the transmitter during setConfig

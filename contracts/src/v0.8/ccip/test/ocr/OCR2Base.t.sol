@@ -6,6 +6,18 @@ import {OCR2Base} from "../../ocr/OCR2Base.sol";
 import {OCR2Helper} from "../helpers/OCR2Helper.sol";
 
 contract OCR2BaseSetup is BaseTest {
+  event ConfigSet(
+    uint32 previousConfigBlockNumber,
+    bytes32 configDigest,
+    uint64 configCount,
+    address[] signers,
+    address[] transmitters,
+    uint8 f,
+    bytes onchainConfig,
+    uint64 offchainConfigVersion,
+    bytes offchainConfig
+  );
+
   // Signer private keys used for these test
   // Private 0: 7b2e97fe057e6de99d6872a2ef2abf52c9b4469bc848c2465ac3fcd8d336e81d
   // Private 1: ab56160806b05ef1796789248e1d7f34a6465c5280899159d645218cd216cee6
@@ -67,6 +79,26 @@ contract OCR2BaseSetup is BaseTest {
         configBytes,
         s_offchainConfigVersion,
         configBytes
+      );
+  }
+
+  function getBasicConfigDigest(
+    address contractAddress,
+    uint8 f,
+    uint64 currentConfigCount,
+    bytes memory onchainConfig
+  ) internal view returns (bytes32) {
+    return
+      s_OCR2Base.configDigestFromConfigData(
+        block.chainid,
+        contractAddress,
+        currentConfigCount + 1,
+        s_valid_signers,
+        s_valid_transmitters,
+        f,
+        onchainConfig,
+        s_offchainConfigVersion,
+        abi.encode("")
       );
   }
 }
@@ -167,18 +199,6 @@ contract OCR2Base_transmit is OCR2BaseSetup {
 }
 
 contract OCR2Base_setOCR2Config is OCR2BaseSetup {
-  event ConfigSet(
-    uint32 previousConfigBlockNumber,
-    bytes32 configDigest,
-    uint64 configCount,
-    address[] signers,
-    address[] transmitters,
-    uint8 f,
-    bytes onchainConfig,
-    uint64 offchainConfigVersion,
-    bytes offchainConfig
-  );
-
   function testSetConfigSuccess_gas() public {
     vm.pauseGasMetering();
     bytes memory configBytes = abi.encode("");

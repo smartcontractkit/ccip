@@ -2,12 +2,10 @@ package deployments
 
 import (
 	"math/big"
-	"time"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
 
@@ -56,7 +54,14 @@ var Beta_OptimismGoerli = rhea.EVMChainConfig{
 	Router:        gethcommon.HexToAddress("0x6378637c6da4bb73356d0e1b7858d7e238597642"),
 	Afn:           gethcommon.HexToAddress("0xb1c6dfae50984367711b81f2d9518ca4c133c2cd"),
 	PriceRegistry: gethcommon.HexToAddress("0x8e53ae9420247fe49c01bfd0e8fd362c978499f3"),
-	Confirmations: 4,
+	TunableChainValues: rhea.TunableChainValues{
+		BlockConfirmations:       getBlockConfirmations(rhea.OptimismGoerli),
+		BatchGasLimit:            BATCH_GAS_LIMIT,
+		RelativeBoostPerWaitHour: RELATIVE_BOOST_PER_WAIT_HOUR,
+		FeeUpdateHeartBeat:       models.MustMakeDuration(FEE_UPDATE_HEARTBEAT),
+		FeeUpdateDeviationPPB:    FEE_UPDATE_DEVIATION_PPB,
+		MaxGasPrice:              getMaxGasPrice(rhea.OptimismGoerli),
+	},
 	DeploySettings: rhea.ChainDeploySettings{
 		DeployAFN:           false,
 		DeployTokenPools:    false,
@@ -100,7 +105,14 @@ var Beta_AvaxFuji = rhea.EVMChainConfig{
 	Router:        gethcommon.HexToAddress("0xe86da2e1fd8d93b7a53a25fbfc55141f13f44fc0"),
 	Afn:           gethcommon.HexToAddress("0x5a730b4c573cc8f9bfa8e4c87104a0cadca32206"),
 	PriceRegistry: gethcommon.HexToAddress("0x081bb0ab942542cb7b652ebab874e8e153f35443"),
-	Confirmations: 1,
+	TunableChainValues: rhea.TunableChainValues{
+		BlockConfirmations:       getBlockConfirmations(rhea.AvaxFuji),
+		BatchGasLimit:            BATCH_GAS_LIMIT,
+		RelativeBoostPerWaitHour: RELATIVE_BOOST_PER_WAIT_HOUR,
+		FeeUpdateHeartBeat:       models.MustMakeDuration(FEE_UPDATE_HEARTBEAT),
+		FeeUpdateDeviationPPB:    FEE_UPDATE_DEVIATION_PPB,
+		MaxGasPrice:              getMaxGasPrice(rhea.AvaxFuji),
+	},
 	DeploySettings: rhea.ChainDeploySettings{
 		DeployAFN:           false,
 		DeployTokenPools:    false,
@@ -123,16 +135,6 @@ var Beta_OptimismGoerliToAvaxFuji = rhea.EvmDeploymentConfig{
 			DeployPingPongDapp: false,
 			DeployedAtBlock:    7367304,
 		},
-		CommitOffchainConfig: ccip.CommitOffchainConfig{
-			FeeUpdateHeartBeat:    models.MustMakeDuration(24 * time.Hour),
-			FeeUpdateDeviationPPB: 5e7,
-			MaxGasPrice:           200e9,
-		},
-		ExecOffchainConfig: ccip.ExecOffchainConfig{
-			BatchGasLimit:            5_000_000,
-			RelativeBoostPerWaitHour: 0.7,
-			MaxGasPrice:              200e9,
-		},
 	},
 }
 
@@ -148,16 +150,6 @@ var Beta_AvaxFujiToOptimismGoerli = rhea.EvmDeploymentConfig{
 			DeployRamp:         false,
 			DeployPingPongDapp: false,
 			DeployedAtBlock:    20412087,
-		},
-		CommitOffchainConfig: ccip.CommitOffchainConfig{
-			FeeUpdateHeartBeat:    models.MustMakeDuration(24 * time.Hour),
-			FeeUpdateDeviationPPB: 5e7,
-			MaxGasPrice:           200e9,
-		},
-		ExecOffchainConfig: ccip.ExecOffchainConfig{
-			BatchGasLimit:            5_000_000,
-			RelativeBoostPerWaitHour: 0.7,
-			MaxGasPrice:              200e9,
 		},
 	},
 }

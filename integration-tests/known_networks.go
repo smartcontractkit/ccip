@@ -54,7 +54,7 @@ var (
 		URLs:                      []string{"ws://simulated-non-dev1-ethereum-geth:8546"},
 		HTTPURLs:                  []string{"http://simulated-non-dev1-ethereum-geth:8544"},
 		ChainlinkTransactionLimit: 500000,
-		Timeout:                   blockchain.JSONStrDuration{2 * time.Minute},
+		Timeout:                   blockchain.JSONStrDuration{Duration: 2 * time.Minute},
 		MinimumConfirmations:      1,
 		GasEstimationBuffer:       10000,
 	}
@@ -71,7 +71,7 @@ var (
 		URLs:                      []string{"ws://simulated-non-dev2-ethereum-geth:8546"},
 		HTTPURLs:                  []string{"http://simulated-non-dev2-ethereum-geth:8544"},
 		ChainlinkTransactionLimit: 500000,
-		Timeout:                   blockchain.JSONStrDuration{2 * time.Minute},
+		Timeout:                   blockchain.JSONStrDuration{Duration: 2 * time.Minute},
 		MinimumConfirmations:      1,
 		GasEstimationBuffer:       10000,
 	}
@@ -87,7 +87,7 @@ var (
 		URLs:                      []string{"ws://simulated-ethereum-geth:8546"},
 		HTTPURLs:                  []string{"http://simulated-ethereum-geth:8544"},
 		ChainlinkTransactionLimit: 500000,
-		Timeout:                   blockchain.JSONStrDuration{2 * time.Minute},
+		Timeout:                   blockchain.JSONStrDuration{Duration: 2 * time.Minute},
 		MinimumConfirmations:      1,
 		GasEstimationBuffer:       10000,
 	}
@@ -99,7 +99,7 @@ var (
 		ChainID:                   11155111,
 		Simulated:                 false,
 		ChainlinkTransactionLimit: 5000,
-		Timeout:                   blockchain.JSONStrDuration{time.Minute},
+		Timeout:                   blockchain.JSONStrDuration{Duration: time.Minute},
 		MinimumConfirmations:      1,
 		GasEstimationBuffer:       1000,
 	}
@@ -111,7 +111,7 @@ var (
 		ChainID:                   5,
 		Simulated:                 false,
 		ChainlinkTransactionLimit: 5000,
-		Timeout:                   blockchain.JSONStrDuration{5 * time.Minute},
+		Timeout:                   blockchain.JSONStrDuration{Duration: 5 * time.Minute},
 		MinimumConfirmations:      1,
 		GasEstimationBuffer:       1000,
 	}
@@ -123,7 +123,7 @@ var (
 		ChainID:                   1001,
 		Simulated:                 false,
 		ChainlinkTransactionLimit: 5000,
-		Timeout:                   blockchain.JSONStrDuration{time.Minute},
+		Timeout:                   blockchain.JSONStrDuration{Duration: time.Minute},
 		MinimumConfirmations:      1,
 		GasEstimationBuffer:       0,
 	}
@@ -135,7 +135,7 @@ var (
 		ChainID:                   588,
 		Simulated:                 false,
 		ChainlinkTransactionLimit: 5000,
-		Timeout:                   blockchain.JSONStrDuration{time.Minute},
+		Timeout:                   blockchain.JSONStrDuration{Duration: time.Minute},
 		MinimumConfirmations:      1,
 		GasEstimationBuffer:       1000,
 	}
@@ -147,7 +147,7 @@ var (
 		ChainID:                   421613,
 		Simulated:                 false,
 		ChainlinkTransactionLimit: 5000,
-		Timeout:                   blockchain.JSONStrDuration{time.Minute},
+		Timeout:                   blockchain.JSONStrDuration{Duration: time.Minute},
 		MinimumConfirmations:      0,
 		GasEstimationBuffer:       0,
 	}
@@ -159,7 +159,7 @@ var (
 		ChainID:                   420,
 		Simulated:                 false,
 		ChainlinkTransactionLimit: 5000,
-		Timeout:                   blockchain.JSONStrDuration{time.Minute},
+		Timeout:                   blockchain.JSONStrDuration{Duration: time.Minute},
 		MinimumConfirmations:      1,
 		GasEstimationBuffer:       0,
 	}
@@ -171,7 +171,7 @@ var (
 		ChainID:                   31,
 		Simulated:                 false,
 		ChainlinkTransactionLimit: 5000,
-		Timeout:                   blockchain.JSONStrDuration{time.Minute},
+		Timeout:                   blockchain.JSONStrDuration{Duration: time.Minute},
 		MinimumConfirmations:      1,
 		GasEstimationBuffer:       1000,
 	}
@@ -183,7 +183,7 @@ var (
 		ChainID:                   80001,
 		Simulated:                 false,
 		ChainlinkTransactionLimit: 5000,
-		Timeout:                   blockchain.JSONStrDuration{time.Minute},
+		Timeout:                   blockchain.JSONStrDuration{Duration: time.Minute},
 		MinimumConfirmations:      1,
 		GasEstimationBuffer:       1000,
 	}
@@ -194,7 +194,40 @@ var (
 		ChainID:                   43113,
 		Simulated:                 false,
 		ChainlinkTransactionLimit: 5000,
-		Timeout:                   blockchain.JSONStrDuration{time.Minute},
+		Timeout:                   blockchain.JSONStrDuration{Duration: time.Minute},
+		MinimumConfirmations:      1,
+		GasEstimationBuffer:       1000,
+	}
+
+	Quorum = blockchain.EVMNetwork{
+		Name:                      "Quorum",
+		ClientImplementation:      blockchain.QuorumClientImplementation,
+		ChainID:                   1337,
+		Simulated:                 false,
+		ChainlinkTransactionLimit: 5000,
+		Timeout:                   blockchain.JSONStrDuration{Duration: time.Minute},
+		MinimumConfirmations:      1,
+		GasEstimationBuffer:       0,
+	}
+
+	BaseGoerli blockchain.EVMNetwork = blockchain.EVMNetwork{
+		Name:                      "Base Goerli",
+		ClientImplementation:      blockchain.OptimismClientImplementation,
+		ChainID:                   84531,
+		Simulated:                 false,
+		ChainlinkTransactionLimit: 5000,
+		Timeout:                   blockchain.JSONStrDuration{Duration: time.Minute},
+		MinimumConfirmations:      1,
+		GasEstimationBuffer:       0,
+	}
+
+	Celo = blockchain.EVMNetwork{
+		Name:                      "Celo Alfajores",
+		ClientImplementation:      blockchain.CeloClientImplementation,
+		ChainID:                   44787,
+		Simulated:                 false,
+		ChainlinkTransactionLimit: 5000,
+		Timeout:                   blockchain.JSONStrDuration{Duration: time.Minute},
 		MinimumConfirmations:      1,
 		GasEstimationBuffer:       1000,
 	}
@@ -211,9 +244,12 @@ var (
 		"METIS_STARDUST":  MetisStardust,
 		"ARBITRUM_GOERLI": ArbitrumGoerli,
 		"OPTIMISM_GOERLI": OptimismGoerli,
+		"BASE_GOERLI":     BaseGoerli,
+		"CELO_ALFAJORES":  Celo,
 		"RSK":             RSKTestnet,
 		"MUMBAI":          PolygonMumbai,
 		"AVALANCHE_FUJI":  Avalanche,
+		"QUORUM":          Quorum,
 	}
 )
 

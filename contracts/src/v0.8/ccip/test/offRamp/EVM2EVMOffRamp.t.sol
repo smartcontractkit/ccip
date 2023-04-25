@@ -10,6 +10,7 @@ import "../helpers/receivers/ReentrancyAbuser.sol";
 import {AFN} from "../../AFN.sol";
 import "../../offRamp/EVM2EVMOffRamp.sol";
 import "../mocks/MockCommitStore.sol";
+import "../ocr/OCR2Base.t.sol";
 
 /// @notice #constructor
 contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
@@ -32,10 +33,17 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
 
     s_offRamp = new EVM2EVMOffRampHelper(
       staticConfig,
-      dynamicConfig,
       getCastedSourceTokens(),
       getCastedDestinationPools(),
       rateLimiterConfig()
+    );
+    s_offRamp.setOCR2Config(
+      s_valid_signers,
+      s_valid_transmitters,
+      s_f,
+      abi.encode(dynamicConfig),
+      s_offchainConfigVersion,
+      abi.encode("")
     );
 
     // Static config
@@ -57,9 +65,9 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
     assertEq(address(s_offRamp.getPoolByDestToken(IERC20(s_destTokens[0]))), address(s_destPools[0]));
 
     (uint32 configCount, uint32 blockNumber, bytes32 configDigest) = s_offRamp.latestConfigDetails();
-    assertEq(0, configCount);
-    assertEq(0, blockNumber);
-    assertEq(0, configDigest);
+    assertEq(1, configCount);
+    assertEq(12345, blockNumber);
+    assertEq(0x000185269818e52ca7653d8bc52742f7ff59e05bcbb3f7cc4298c5daf1cdd6e4, configDigest);
 
     // OffRamp initial values
     assertEq("EVM2EVMOffRamp 1.0.0", s_offRamp.typeAndVersion());
@@ -73,10 +81,6 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
     IPool[] memory pools = new IPool[](1);
 
     IERC20[] memory wrongTokens = new IERC20[](5);
-    EVM2EVMOffRamp.DynamicConfig memory dynamicConfig = generateDynamicOffRampConfig(
-      address(s_destRouter),
-      address(s_mockAFN)
-    );
     s_offRamp = new EVM2EVMOffRampHelper(
       EVM2EVMOffRamp.StaticConfig({
         commitStore: address(s_mockCommitStore),
@@ -84,7 +88,6 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
         sourceChainId: SOURCE_CHAIN_ID,
         onRamp: ON_RAMP_ADDRESS
       }),
-      dynamicConfig,
       wrongTokens,
       pools,
       rateLimiterConfig()
@@ -107,7 +110,6 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
         sourceChainId: SOURCE_CHAIN_ID,
         onRamp: ZERO_ADDRESS
       }),
-      generateDynamicOffRampConfig(address(s_destRouter), address(s_mockAFN)),
       getCastedSourceTokens(),
       pools,
       rateLimiterConfig
@@ -116,16 +118,39 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
 }
 
 contract EVM2EVMOffRamp_setDynamicConfig is EVM2EVMOffRampSetup {
+  // OffRamp event
   event ConfigSet(EVM2EVMOffRamp.StaticConfig staticConfig, EVM2EVMOffRamp.DynamicConfig dynamicConfig);
 
   function testSetDynamicConfigSuccess() public {
     EVM2EVMOffRamp.StaticConfig memory staticConfig = s_offRamp.getStaticConfig();
     EVM2EVMOffRamp.DynamicConfig memory dynamicConfig = generateDynamicOffRampConfig(USER_3, address(s_mockAFN));
+    bytes memory onchainConfig = abi.encode(dynamicConfig);
 
     vm.expectEmit();
     emit ConfigSet(staticConfig, dynamicConfig);
 
-    s_offRamp.setDynamicConfig(dynamicConfig);
+    vm.expectEmit();
+    uint32 configCount = 1;
+    emit ConfigSet(
+      12345,
+      getBasicConfigDigest(address(s_offRamp), s_f, configCount, onchainConfig),
+      configCount + 1,
+      s_valid_signers,
+      s_valid_transmitters,
+      s_f,
+      onchainConfig,
+      s_offchainConfigVersion,
+      abi.encode("")
+    );
+
+    s_offRamp.setOCR2Config(
+      s_valid_signers,
+      s_valid_transmitters,
+      s_f,
+      onchainConfig,
+      s_offchainConfigVersion,
+      abi.encode("")
+    );
 
     EVM2EVMOffRamp.DynamicConfig memory newConfig = s_offRamp.getDynamicConfig();
     _assertSameConfig(dynamicConfig, newConfig);
@@ -137,7 +162,14 @@ contract EVM2EVMOffRamp_setDynamicConfig is EVM2EVMOffRampSetup {
 
     vm.expectRevert("Only callable by owner");
 
-    s_offRamp.setDynamicConfig(dynamicConfig);
+    s_offRamp.setOCR2Config(
+      s_valid_signers,
+      s_valid_transmitters,
+      s_f,
+      abi.encode(dynamicConfig),
+      s_offchainConfigVersion,
+      abi.encode("")
+    );
   }
 
   function testRouterZeroAddressReverts() public {
@@ -145,7 +177,14 @@ contract EVM2EVMOffRamp_setDynamicConfig is EVM2EVMOffRampSetup {
 
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.InvalidOffRampConfig.selector, dynamicConfig));
 
-    s_offRamp.setDynamicConfig(dynamicConfig);
+    s_offRamp.setOCR2Config(
+      s_valid_signers,
+      s_valid_transmitters,
+      s_f,
+      abi.encode(dynamicConfig),
+      s_offchainConfigVersion,
+      abi.encode("")
+    );
   }
 }
 

@@ -6,11 +6,10 @@ import "../../offRamp/EVM2EVMOffRamp.sol";
 contract EVM2EVMOffRampHelper is EVM2EVMOffRamp {
   constructor(
     StaticConfig memory staticConfig,
-    DynamicConfig memory dynamicConfig,
     IERC20[] memory sourceTokens,
     IPool[] memory pools,
     RateLimiter.Config memory rateLimiterConfig
-  ) EVM2EVMOffRamp(staticConfig, dynamicConfig, sourceTokens, pools, rateLimiterConfig) {}
+  ) EVM2EVMOffRamp(staticConfig, sourceTokens, pools, rateLimiterConfig) {}
 
   function setExecutionStateHelper(uint64 sequenceNumber, Internal.MessageExecutionState state) public {
     _setExecutionState(sequenceNumber, state);
