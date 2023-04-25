@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/secrets"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
 
 // DefaultGasTipFee is the default gas tip fee of 1 gwei.
@@ -142,16 +143,25 @@ type EVMChainConfig struct {
 	ChainId     uint64
 	GasSettings EVMGasSettings
 
-	SupportedTokens map[Token]EVMBridgedToken
-	FeeTokens       []Token
-	WrappedNative   Token
-	Router          gethcommon.Address
-	Afn             gethcommon.Address
-	PriceRegistry   gethcommon.Address
-	AllowList       []gethcommon.Address
-	Confirmations   uint32
-	DeploySettings  ChainDeploySettings
+	SupportedTokens    map[Token]EVMBridgedToken
+	FeeTokens          []Token
+	WrappedNative      Token
+	Router             gethcommon.Address
+	Afn                gethcommon.Address
+	PriceRegistry      gethcommon.Address
+	AllowList          []gethcommon.Address
+	DeploySettings     ChainDeploySettings
+	TunableChainValues TunableChainValues
 	CustomerSettings
+}
+
+type TunableChainValues struct {
+	BlockConfirmations       uint32
+	BatchGasLimit            uint32
+	RelativeBoostPerWaitHour float64
+	FeeUpdateHeartBeat       models.Duration
+	FeeUpdateDeviationPPB    uint32
+	MaxGasPrice              uint64
 }
 
 type EVMBridgedToken struct {
@@ -185,9 +195,6 @@ type EVMLaneConfig struct {
 	GovernanceDapp gethcommon.Address
 	PingPongDapp   gethcommon.Address
 	DeploySettings LaneDeploySettings
-
-	ExecOffchainConfig   ccip.ExecOffchainConfig
-	CommitOffchainConfig ccip.CommitOffchainConfig
 }
 
 type EvmDeploymentConfig struct {

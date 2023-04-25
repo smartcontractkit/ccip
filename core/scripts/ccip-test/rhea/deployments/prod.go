@@ -1,12 +1,9 @@
 package deployments
 
 import (
-	"time"
-
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
 
@@ -42,15 +39,7 @@ var Prod_Goerli = rhea.EVMChainConfig{
 		EIP1559:   true,
 		GasTipCap: rhea.DefaultGasTipFee,
 	},
-	AllowList: []gethcommon.Address{
-		// ==============  INTERNAL ==============
-		gethcommon.HexToAddress("0xda9e8e71bb750a996af33ebb8abb18cd9eb9dc75"), // deployer key
-		// Ping pong
-		gethcommon.HexToAddress("0x6db5f2850a5505738d25d13654848ea4273d8584"), // GoerliToOptimismGoerli.PingPongDapp,
-
-		// ==============  EXTERNAL ==============
-		gethcommon.HexToAddress("0x2C73B1262712eEBC33924b59edbeF57935DAC805"), // BetaUser - AAVE
-	},
+	AllowList: []gethcommon.Address{},
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 		rhea.LINK: {
 			Token:         gethcommon.HexToAddress("0x326C977E6efc84E512bB9C30f76E30c160eD06FB"),
@@ -70,6 +59,14 @@ var Prod_Goerli = rhea.EVMChainConfig{
 	Router:        gethcommon.HexToAddress("0x7d870741ca453ed5fa6808f8197664566d80c39e"),
 	Afn:           gethcommon.HexToAddress("0xb192F3b22f24d6DaD266DA5ECd7361D6e6534B49"),
 	PriceRegistry: gethcommon.HexToAddress("0x99d13D346f4D35F5139A5D51671563eb9a7e09a6"),
+	TunableChainValues: rhea.TunableChainValues{
+		BlockConfirmations:       getBlockConfirmations(rhea.Goerli),
+		BatchGasLimit:            BATCH_GAS_LIMIT,
+		RelativeBoostPerWaitHour: RELATIVE_BOOST_PER_WAIT_HOUR,
+		FeeUpdateHeartBeat:       models.MustMakeDuration(FEE_UPDATE_HEARTBEAT),
+		FeeUpdateDeviationPPB:    FEE_UPDATE_DEVIATION_PPB,
+		MaxGasPrice:              getMaxGasPrice(rhea.Goerli),
+	},
 	DeploySettings: rhea.ChainDeploySettings{
 		DeployAFN:           false,
 		DeployTokenPools:    false,
@@ -84,36 +81,7 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 	GasSettings: rhea.EVMGasSettings{
 		EIP1559: false,
 	},
-	AllowList: []gethcommon.Address{
-		// ==============  INTERNAL ==============
-		gethcommon.HexToAddress("0xda9e8e71bb750a996af33ebb8abb18cd9eb9dc75"), // deployer key
-		gethcommon.HexToAddress("0x9BE566ad50021129F00Ee7219FcEE28490a85656"), // batch testing key
-		gethcommon.HexToAddress("0xd54ba5d998479352f375940E5A2A18272714d434"), // batch testing key
-		gethcommon.HexToAddress("0x28C70D03e471a2f1D1cad1DC35e7D90AAd2Ac512"), // batch testing key
-		gethcommon.HexToAddress("0x5d39fF1Ae4Ab23E3640aa87a5C050483b53b9030"), // batch testing key
-		gethcommon.HexToAddress("0x50C38847c059a7c829F7AEee969C652922bd139B"), // batch testing key
-		gethcommon.HexToAddress("0x63fc8eE3Dc2326BC17A5E618872C1a4342Bcca09"), // batch testing key
-		gethcommon.HexToAddress("0x68f740b79B9abe81628a654f8f733dd4ccE44DFB"), // batch testing key
-		gethcommon.HexToAddress("0x0c55B0d8f41E6094a3d0F737c73E892ED0A52D8f"), // batch testing key
-		gethcommon.HexToAddress("0x37ffDEe6Dc234E0D1d66571E2c2405aEfd661A6f"), // batch testing key
-		gethcommon.HexToAddress("0x450F58153db2289B422e7629Eb4a70cFF77aA72f"), // batch testing key
-		// Ping pong
-		gethcommon.HexToAddress("0x6becd9eb4df6bf59152344fbcdc7919b9f38c6ef"), // SepoliaToAvaxFuji.PingPongDapp,
-		gethcommon.HexToAddress("0x4144d269d2c695f6bf9c24be2832b8b6c84b44f1"), // SepoliaToOptimismGoerli.PingPongDapp,
-		// Personal
-		gethcommon.HexToAddress("0xEa94AA1318796b5C01a9A37faCBc65423fb2c520"), // Anindita Ghosh
-		gethcommon.HexToAddress("0x25D7214ae75F169263921a1cAaf7E6F033210E24"), // Chris Cushman
-
-		// ==============  EXTERNAL ==============
-		gethcommon.HexToAddress("0xd65113b9B1EeD81113EaF41DC0D2d34fCa31522C"), // BetaUser - Multimedia
-		gethcommon.HexToAddress("0x217F4Eb693C54cA36Cfd80DA4DAAE6f7A5535e9C"), // BetaUser - Cozy Labs
-		gethcommon.HexToAddress("0xB22107572f5A5352dDC1B4fc9630083FBfAE2022"), // BetaUser - Cozy Labs
-		gethcommon.HexToAddress("0xB0AC8F6AF9712CF369934A811A79550DA046Fc51"), // BetaUser - InsurAce
-		gethcommon.HexToAddress("0x244d07fe4DFa30b4EE376751FDC793aE844c5dE6"), // BetaUser - CACHE.gold
-		gethcommon.HexToAddress("0x8264AcEE321ac02549aff7fA05A4Ae7a2e92A6f1"), // BetaUser - CACHE.gold
-		gethcommon.HexToAddress("0x552acA1343A6383aF32ce1B7c7B1b47959F7ad90"), // BetaUser - Sommelier Finance
-		gethcommon.HexToAddress("0x8e0866aacCF880E45249e932a094c821Ef4dE5f7"), // BetaUser - OpenZeppelin
-	},
+	AllowList: []gethcommon.Address{},
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 		rhea.LINK: {
 			Token:         gethcommon.HexToAddress("0x779877A7B0D9E8603169DdbD7836e478b4624789"),
@@ -151,7 +119,14 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 	Router:        gethcommon.HexToAddress("0x0a36795b3006f50088c11ea45b960a1b0406f03b"),
 	Afn:           gethcommon.HexToAddress("0xDB81c131193263314762CfCE59B9A057ae7dbB41"),
 	PriceRegistry: gethcommon.HexToAddress("0xd824DA3583F02183FaC25669315B004E977780FD"),
-	Confirmations: 4,
+	TunableChainValues: rhea.TunableChainValues{
+		BlockConfirmations:       getBlockConfirmations(rhea.Sepolia),
+		BatchGasLimit:            BATCH_GAS_LIMIT,
+		RelativeBoostPerWaitHour: RELATIVE_BOOST_PER_WAIT_HOUR,
+		FeeUpdateHeartBeat:       models.MustMakeDuration(FEE_UPDATE_HEARTBEAT),
+		FeeUpdateDeviationPPB:    FEE_UPDATE_DEVIATION_PPB,
+		MaxGasPrice:              getMaxGasPrice(rhea.Sepolia),
+	},
 	DeploySettings: rhea.ChainDeploySettings{
 		DeployAFN:           false,
 		DeployTokenPools:    false,
@@ -166,22 +141,7 @@ var Prod_OptimismGoerli = rhea.EVMChainConfig{
 	GasSettings: rhea.EVMGasSettings{
 		EIP1559: true,
 	},
-	AllowList: []gethcommon.Address{
-		// ==============  INTERNAL ==============
-		gethcommon.HexToAddress("0xda9e8e71bb750a996af33ebb8abb18cd9eb9dc75"), // deployer key
-		// Ping pong
-		gethcommon.HexToAddress("0xdf07fb6663caee468589a9d05ed5ddd640058fbb"), // OptimismGoerliToAvaxFuji.PingPongDapp
-		gethcommon.HexToAddress("0x3fa8796d568e743ce8c90ec4723a198d8bcd706c"), // OptimismGoerliToSepolia.PingPongDapp,
-		gethcommon.HexToAddress("0x9ef131613079733da157d7eb8ffb41f1d7ca869f"), // OptimismGoerliToGoerli.PingPongDapp,
-		// Personal
-		gethcommon.HexToAddress("0xEa94AA1318796b5C01a9A37faCBc65423fb2c520"), // Anindita Ghosh
-
-		// ==============  EXTERNAL ==============
-		gethcommon.HexToAddress("0x3FcFF7d9f88C64905e2cD9960c7452b5E6690E13"), // BetaUser - AAVE
-		gethcommon.HexToAddress("0x1b5D803Be089e43110Faf54c6b4eC40409Cc7450"), // BetaUser - Multimedia
-		gethcommon.HexToAddress("0x244d07fe4DFa30b4EE376751FDC793aE844c5dE6"), // BetaUser - CACHE.gold
-		gethcommon.HexToAddress("0x8264AcEE321ac02549aff7fA05A4Ae7a2e92A6f1"), // BetaUser - CACHE.gold
-	},
+	AllowList: []gethcommon.Address{},
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 		rhea.LINK: {
 			Token:         gethcommon.HexToAddress("0xdc2CC710e42857672E7907CF474a69B63B93089f"),
@@ -207,7 +167,14 @@ var Prod_OptimismGoerli = rhea.EVMChainConfig{
 	Router:        gethcommon.HexToAddress("0xec6d1ec94d518be47da1cb35f5d43286558d8b62"),
 	Afn:           gethcommon.HexToAddress("0x8E8cD3608AFce92b902B74F577B1429Ce7BcCa96"),
 	PriceRegistry: gethcommon.HexToAddress("0x737bbAEb317993e4450fD19E844bDC145aef5adA"),
-	Confirmations: 4,
+	TunableChainValues: rhea.TunableChainValues{
+		BlockConfirmations:       getBlockConfirmations(rhea.OptimismGoerli),
+		BatchGasLimit:            BATCH_GAS_LIMIT,
+		RelativeBoostPerWaitHour: RELATIVE_BOOST_PER_WAIT_HOUR,
+		FeeUpdateHeartBeat:       models.MustMakeDuration(FEE_UPDATE_HEARTBEAT),
+		FeeUpdateDeviationPPB:    FEE_UPDATE_DEVIATION_PPB,
+		MaxGasPrice:              getMaxGasPrice(rhea.OptimismGoerli),
+	},
 	CustomerSettings: rhea.CustomerSettings{
 		CacheGoldFeeAddress:  gethcommon.HexToAddress("0x8264AcEE321ac02549aff7fA05A4Ae7a2e92A6f1"),
 		CacheGoldFeeEnforcer: gethcommon.HexToAddress("0x194E7a932663f11AC0790bfC44dBdd8339f0ED65"),
@@ -226,30 +193,7 @@ var Prod_AvaxFuji = rhea.EVMChainConfig{
 	GasSettings: rhea.EVMGasSettings{
 		EIP1559: false,
 	},
-	AllowList: []gethcommon.Address{
-		// ==============  INTERNAL ==============
-		gethcommon.HexToAddress("0xda9e8e71bb750a996af33ebb8abb18cd9eb9dc75"), // deployer key
-		gethcommon.HexToAddress("0xEa94AA1318796b5C01a9A37faCBc65423fb2c520"), // Test Script 0xEa94AA1318796b5C01a9A37faCBc65423fb2c520
-		// Ping pong
-		gethcommon.HexToAddress("0xd63900c19183767af34c117463871bb7e7d8dca6"), // AvaxFujiToSepolia.PingPongDapp,
-		gethcommon.HexToAddress("0x482b912c4884830e71635a3bdf4e8a47e91c813a"), // AvaxFujiToOptimismGoerli.PingPongDapp,
-		// Personal
-		gethcommon.HexToAddress("0xEa94AA1318796b5C01a9A37faCBc65423fb2c520"), // Anindita Ghosh
-		gethcommon.HexToAddress("0x594D8E57D8801069C77AAB90222a9162E908AA63"), // Pramod - Dapp Fuji->OptimismGoerli
-
-		// ==============  EXTERNAL ==============
-		gethcommon.HexToAddress("0x1b5D803Be089e43110Faf54c6b4eC40409Cc7450"), // BetaUser - Multimedia
-		gethcommon.HexToAddress("0xa78ceF54da82D6279b20457F4D46294AfF59C871"), // BetaUser - Flash Liquidity
-		gethcommon.HexToAddress("0x6613fd61bbfEF3291f2D7C7203Ceab212e880DbB"), // BetaUser - Flash Liquidity
-		gethcommon.HexToAddress("0xcA218DCFD26990223a2eDA70f3A568eaae22c051"), // BetaUser - Cozy Labs
-		gethcommon.HexToAddress("0xD0fB066847d5DBc760E9575f79d9A044385e4079"), // BetaUser - Cozy Labs
-		gethcommon.HexToAddress("0xD93C3Ae0949f905846FdfFc2b5b8A0a047dda59f"), // BetaUser - InsurAce
-		gethcommon.HexToAddress("0x244d07fe4DFa30b4EE376751FDC793aE844c5dE6"), // BetaUser - CACHE.gold
-		gethcommon.HexToAddress("0x8264AcEE321ac02549aff7fA05A4Ae7a2e92A6f1"), // BetaUser - CACHE.gold
-		gethcommon.HexToAddress("0x1b38148B8DfdeA0B3D80C45F0d8569889504f0B5"), // BetaUser - Sommelier Finance
-		gethcommon.HexToAddress("0xe0534662Ff1182a1C32E400d2b64723817344Ab4"), // BetaUser - Sommelier Finance
-		gethcommon.HexToAddress("0x4986fD36b6b16f49b43282Ee2e24C5cF90ed166d"), // BetaUser - Sommelier Finance
-	},
+	AllowList: []gethcommon.Address{},
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 		rhea.LINK: {
 			Token:         gethcommon.HexToAddress("0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846"),
@@ -287,7 +231,14 @@ var Prod_AvaxFuji = rhea.EVMChainConfig{
 	Router:        gethcommon.HexToAddress("0xb352e636f4093e4f5a4ac903064881491926aaa9"),
 	Afn:           gethcommon.HexToAddress("0x5fCC6941D1685C7115e257CDcBda258aF85F0C83"),
 	PriceRegistry: gethcommon.HexToAddress("0x8D8cEE7D59D967b12A40330AE9F6CC15578073bb"),
-	Confirmations: 1,
+	TunableChainValues: rhea.TunableChainValues{
+		BlockConfirmations:       getBlockConfirmations(rhea.AvaxFuji),
+		BatchGasLimit:            BATCH_GAS_LIMIT,
+		RelativeBoostPerWaitHour: RELATIVE_BOOST_PER_WAIT_HOUR,
+		FeeUpdateHeartBeat:       models.MustMakeDuration(FEE_UPDATE_HEARTBEAT),
+		FeeUpdateDeviationPPB:    FEE_UPDATE_DEVIATION_PPB,
+		MaxGasPrice:              getMaxGasPrice(rhea.AvaxFuji),
+	},
 	CustomerSettings: rhea.CustomerSettings{
 		CacheGoldFeeAddress:  gethcommon.HexToAddress("0x8264AcEE321ac02549aff7fA05A4Ae7a2e92A6f1"),
 		CacheGoldFeeEnforcer: gethcommon.HexToAddress("0x194E7a932663f11AC0790bfC44dBdd8339f0ED65"),
@@ -301,7 +252,6 @@ var Prod_AvaxFuji = rhea.EVMChainConfig{
 	},
 }
 
-// Lanes
 var Prod_SepoliaToAvaxFuji = rhea.EvmDeploymentConfig{
 	ChainConfig: Prod_Sepolia,
 	LaneConfig: rhea.EVMLaneConfig{
@@ -314,16 +264,6 @@ var Prod_SepoliaToAvaxFuji = rhea.EvmDeploymentConfig{
 			DeployRamp:         false,
 			DeployPingPongDapp: false,
 			DeployedAtBlock:    3127829,
-		},
-		CommitOffchainConfig: ccip.CommitOffchainConfig{
-			FeeUpdateHeartBeat:    models.MustMakeDuration(24 * time.Hour),
-			FeeUpdateDeviationPPB: 5e7,
-			MaxGasPrice:           200e9,
-		},
-		ExecOffchainConfig: ccip.ExecOffchainConfig{
-			BatchGasLimit:            5_000_000,
-			RelativeBoostPerWaitHour: 0.07,
-			MaxGasPrice:              200e9,
 		},
 	},
 }
@@ -341,16 +281,6 @@ var Prod_AvaxFujiToSepolia = rhea.EvmDeploymentConfig{
 			DeployPingPongDapp: false,
 			DeployedAtBlock:    20040846,
 		},
-		CommitOffchainConfig: ccip.CommitOffchainConfig{
-			FeeUpdateHeartBeat:    models.MustMakeDuration(24 * time.Hour),
-			FeeUpdateDeviationPPB: 5e7,
-			MaxGasPrice:           200e9,
-		},
-		ExecOffchainConfig: ccip.ExecOffchainConfig{
-			BatchGasLimit:            5_000_000,
-			RelativeBoostPerWaitHour: 0.07,
-			MaxGasPrice:              200e9,
-		},
 	},
 }
 
@@ -366,16 +296,6 @@ var Prod_SepoliaToOptimismGoerli = rhea.EvmDeploymentConfig{
 			DeployRamp:         false,
 			DeployPingPongDapp: false,
 			DeployedAtBlock:    3127868,
-		},
-		CommitOffchainConfig: ccip.CommitOffchainConfig{
-			FeeUpdateHeartBeat:    models.MustMakeDuration(24 * time.Hour),
-			FeeUpdateDeviationPPB: 5e7,
-			MaxGasPrice:           200e9,
-		},
-		ExecOffchainConfig: ccip.ExecOffchainConfig{
-			BatchGasLimit:            5_000_000,
-			RelativeBoostPerWaitHour: 0.07,
-			MaxGasPrice:              200e9,
 		},
 	},
 }
@@ -393,16 +313,6 @@ var Prod_OptimismGoerliToSepolia = rhea.EvmDeploymentConfig{
 			DeployPingPongDapp: false,
 			DeployedAtBlock:    6939370,
 		},
-		CommitOffchainConfig: ccip.CommitOffchainConfig{
-			FeeUpdateHeartBeat:    models.MustMakeDuration(24 * time.Hour),
-			FeeUpdateDeviationPPB: 5e7,
-			MaxGasPrice:           200e9,
-		},
-		ExecOffchainConfig: ccip.ExecOffchainConfig{
-			BatchGasLimit:            5_000_000,
-			RelativeBoostPerWaitHour: 0.07,
-			MaxGasPrice:              200e9,
-		},
 	},
 }
 
@@ -418,16 +328,6 @@ var Prod_OptimismGoerliToAvaxFuji = rhea.EvmDeploymentConfig{
 			DeployRamp:         false,
 			DeployPingPongDapp: false,
 			DeployedAtBlock:    6939519,
-		},
-		CommitOffchainConfig: ccip.CommitOffchainConfig{
-			FeeUpdateHeartBeat:    models.MustMakeDuration(24 * time.Hour),
-			FeeUpdateDeviationPPB: 5e7,
-			MaxGasPrice:           200e9,
-		},
-		ExecOffchainConfig: ccip.ExecOffchainConfig{
-			BatchGasLimit:            5_000_000,
-			RelativeBoostPerWaitHour: 0.07,
-			MaxGasPrice:              200e9,
 		},
 	},
 }
@@ -445,16 +345,6 @@ var Prod_AvaxFujiToOptimismGoerli = rhea.EvmDeploymentConfig{
 			DeployPingPongDapp: false,
 			DeployedAtBlock:    20041225,
 		},
-		CommitOffchainConfig: ccip.CommitOffchainConfig{
-			FeeUpdateHeartBeat:    models.MustMakeDuration(24 * time.Hour),
-			FeeUpdateDeviationPPB: 5e7,
-			MaxGasPrice:           200e9,
-		},
-		ExecOffchainConfig: ccip.ExecOffchainConfig{
-			BatchGasLimit:            5_000_000,
-			RelativeBoostPerWaitHour: 0.07,
-			MaxGasPrice:              200e9,
-		},
 	},
 }
 
@@ -471,16 +361,6 @@ var Prod_OptimismGoerliToGoerli = rhea.EvmDeploymentConfig{
 			DeployPingPongDapp: false,
 			DeployedAtBlock:    6939814,
 		},
-		CommitOffchainConfig: ccip.CommitOffchainConfig{
-			FeeUpdateHeartBeat:    models.MustMakeDuration(24 * time.Hour),
-			FeeUpdateDeviationPPB: 5e7,
-			MaxGasPrice:           200e9,
-		},
-		ExecOffchainConfig: ccip.ExecOffchainConfig{
-			BatchGasLimit:            5_000_000,
-			RelativeBoostPerWaitHour: 0.07,
-			MaxGasPrice:              200e9,
-		},
 	},
 }
 
@@ -496,16 +376,6 @@ var Prod_GoerliToOptimismGoerli = rhea.EvmDeploymentConfig{
 			DeployRamp:         false,
 			DeployPingPongDapp: false,
 			DeployedAtBlock:    8686987,
-		},
-		CommitOffchainConfig: ccip.CommitOffchainConfig{
-			FeeUpdateHeartBeat:    models.MustMakeDuration(24 * time.Hour),
-			FeeUpdateDeviationPPB: 5e7,
-			MaxGasPrice:           200e9,
-		},
-		ExecOffchainConfig: ccip.ExecOffchainConfig{
-			BatchGasLimit:            5_000_000,
-			RelativeBoostPerWaitHour: 0.07,
-			MaxGasPrice:              200e9,
 		},
 	},
 }

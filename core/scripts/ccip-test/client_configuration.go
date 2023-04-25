@@ -163,8 +163,8 @@ type Client struct {
 	Afn              *afn_contract.AFNContract
 	PriceRegistry    *price_registry.PriceRegistry
 	Router           *router.Router
+	TunableValues    rhea.TunableChainValues
 	AllowList        []common.Address
-	Confirmations    uint32
 	logger           logger.Logger
 	t                *testing.T
 }
@@ -228,7 +228,6 @@ func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient
 			PingPongDapp:     pingPongDapp,
 			Router:           router,
 			AllowList:        config.ChainConfig.AllowList,
-			Confirmations:    config.ChainConfig.Confirmations,
 			logger:           config.Logger,
 			t:                t,
 		},
@@ -241,11 +240,6 @@ type DestClient struct {
 	CommitStore  *commit_store.CommitStore
 	ReceiverDapp *receiver_dapp.ReceiverDapp
 	OffRamp      *evm_2_evm_offramp.EVM2EVMOffRamp
-
-	ExecOnchainConfig    ccip.ExecOnchainConfig
-	ExecOffchainConfig   ccip.ExecOffchainConfig
-	CommitOnchainConfig  ccip.CommitOnchainConfig
-	CommitOffchainConfig ccip.CommitOffchainConfig
 }
 
 func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestClient {
@@ -297,15 +291,13 @@ func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestCli
 			PriceRegistry:    priceRegistry,
 			logger:           config.Logger,
 			Router:           router,
+			TunableValues:    config.ChainConfig.TunableChainValues,
 			AllowList:        config.ChainConfig.AllowList,
-			Confirmations:    config.ChainConfig.Confirmations,
 			t:                t,
 		},
-		CommitStore:          commitStore,
-		ReceiverDapp:         receiverDapp,
-		OffRamp:              offRamp,
-		CommitOffchainConfig: config.LaneConfig.CommitOffchainConfig,
-		ExecOffchainConfig:   config.LaneConfig.ExecOffchainConfig,
+		CommitStore:  commitStore,
+		ReceiverDapp: receiverDapp,
+		OffRamp:      offRamp,
 	}
 }
 
@@ -662,34 +654,76 @@ func (client *CCIPClient) SetOCR2Config(env dione.Environment) {
 		client.Dest.logger.Infof("The new config will overwrite the current one.")
 	}
 
-	// populating confirmations values from chain config
-	client.Dest.CommitOffchainConfig.SourceIncomingConfirmations = client.Source.Confirmations
-	client.Dest.CommitOffchainConfig.DestIncomingConfirmations = client.Dest.Confirmations
-	client.Dest.ExecOffchainConfig.SourceIncomingConfirmations = client.Source.Confirmations
-	client.Dest.ExecOffchainConfig.DestIncomingConfirmations = client.Dest.Confirmations
-
-	commitOffchainConfig, err := ccip.EncodeOffchainConfig(client.Dest.CommitOffchainConfig)
-	helpers.PanicErr(err)
-	execOffchainConfig, err := ccip.EncodeOffchainConfig(client.Dest.ExecOffchainConfig)
-	helpers.PanicErr(err)
-	commitOnchainConfig, err := ccip.EncodeAbiStruct(client.Dest.CommitOnchainConfig)
-	helpers.PanicErr(err)
-	execOnchainConfig, err := ccip.EncodeAbiStruct(client.Dest.ExecOnchainConfig)
-	helpers.PanicErr(err)
-
 	don := dione.NewOfflineDON(env, client.Dest.logger)
 	faults := len(don.Config.Nodes) / 3
 
-	tx, err := client.setOCRConfig(client.Dest.CommitStore, commitOffchainConfig, faults, don.GenerateOracleIdentities(client.Dest.ChainId), commitOnchainConfig)
+	tx, err := client.setOCRConfig(client.Dest.CommitStore, client.getCommitStoreOffChainConfig(), client.getCommitStoreOnchainConfig(), faults, don.GenerateOracleIdentities(client.Dest.ChainId))
 	helpers.PanicErr(err)
 	client.Dest.logger.Infof("Config set on commitStore %s", helpers.ExplorerLink(int64(client.Dest.ChainId), tx.Hash()))
 
-	tx, err = client.setOCRConfig(client.Dest.OffRamp, execOffchainConfig, faults, don.GenerateOracleIdentities(client.Dest.ChainId), execOnchainConfig)
+	tx, err = client.setOCRConfig(client.Dest.OffRamp, client.getOffRampOffChainConfig(), client.getOffRampOnchainConfig(), faults, don.GenerateOracleIdentities(client.Dest.ChainId))
 	helpers.PanicErr(err)
 	client.Dest.logger.Infof("Config set on offramp %s", helpers.ExplorerLink(int64(client.Dest.ChainId), tx.Hash()))
 }
 
-func (client *CCIPClient) setOCRConfig(ocrConf ocr2Configurer, offchainConfig []byte, faults int, identities []ocrconfighelper.OracleIdentityExtra, onchainConfig []byte) (*types.Transaction, error) {
+func (client *CCIPClient) getCommitStoreOffChainConfig() []byte {
+	commitPluginConfig := ccip.CommitOffchainConfig{
+		SourceIncomingConfirmations: client.Source.TunableValues.BlockConfirmations,
+		DestIncomingConfirmations:   client.Dest.TunableValues.BlockConfirmations,
+		FeeUpdateHeartBeat:          client.Dest.TunableValues.FeeUpdateHeartBeat,
+		FeeUpdateDeviationPPB:       client.Dest.TunableValues.FeeUpdateDeviationPPB,
+		MaxGasPrice:                 client.Dest.TunableValues.MaxGasPrice,
+	}
+
+	encodedOffchainConfig, err := ccip.EncodeOffchainConfig(commitPluginConfig)
+	helpers.PanicErr(err)
+
+	return encodedOffchainConfig
+}
+
+func (client *CCIPClient) getCommitStoreOnchainConfig() []byte {
+	commitStoreOnchainConfig := ccip.CommitOnchainConfig{
+		PriceRegistry: client.Dest.PriceRegistry.Address(),
+		Afn:           client.Dest.Afn.Address(),
+	}
+
+	encodedCommitStoreOnchainConfig, err := ccip.EncodeAbiStruct(commitStoreOnchainConfig)
+	helpers.PanicErr(err)
+
+	return encodedCommitStoreOnchainConfig
+}
+
+func (client *CCIPClient) getOffRampOffChainConfig() []byte {
+	execPluginConfig := ccip.ExecOffchainConfig{
+		SourceIncomingConfirmations: client.Source.TunableValues.BlockConfirmations,
+		DestIncomingConfirmations:   client.Dest.TunableValues.BlockConfirmations,
+		BatchGasLimit:               client.Dest.TunableValues.BatchGasLimit,
+		RelativeBoostPerWaitHour:    client.Dest.TunableValues.RelativeBoostPerWaitHour,
+		MaxGasPrice:                 client.Dest.TunableValues.MaxGasPrice,
+	}
+
+	encodedOffRampConfig, err := ccip.EncodeOffchainConfig(execPluginConfig)
+	helpers.PanicErr(err)
+
+	return encodedOffRampConfig
+}
+
+func (client *CCIPClient) getOffRampOnchainConfig() []byte {
+	offRampOnchainConfig := ccip.ExecOnchainConfig{
+		PermissionLessExecutionThresholdSeconds: rhea.PERMISSIONLESS_EXEC_THRESHOLD_SEC,
+		Router:                                  client.Dest.Router.Address(),
+		Afn:                                     client.Dest.Afn.Address(),
+		MaxTokensLength:                         rhea.MAX_TOKEN_LENGTH,
+		MaxDataSize:                             rhea.MAX_DATA_SIZE,
+	}
+
+	encodedOffRampOnchainConfig, err := ccip.EncodeAbiStruct(offRampOnchainConfig)
+	helpers.PanicErr(err)
+
+	return encodedOffRampOnchainConfig
+}
+
+func (client *CCIPClient) setOCRConfig(ocrConf ocr2Configurer, offchainConfig []byte, onchainConfig []byte, faults int, identities []ocrconfighelper.OracleIdentityExtra) (*types.Transaction, error) {
 	// Simple transmission schedule of 1 node per stage.
 	// sum(transmissionSchedule) should equal number of nodes.
 	var transmissionSchedule []int
