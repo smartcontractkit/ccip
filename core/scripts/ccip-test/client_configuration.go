@@ -1174,3 +1174,19 @@ func (client *CCIPClient) sendNativeTx(t *testing.T, from *bind.TransactOpts, to
 	client.Source.logger.Warnf("Message sent for max %d gas %s", tx.Gas(), helpers.ExplorerLink(int64(client.Source.ChainId), tx.Hash()))
 	return WaitForCrossChainSendRequest(client.Source, sourceBlockNumber, tx.Hash())
 }
+
+func FundPingPong(t *testing.T, chain rhea.EvmDeploymentConfig, minimumBalance *big.Int) {
+	linkToken, err := link_token_interface.NewLinkToken(chain.ChainConfig.SupportedTokens[rhea.LINK].Token, chain.Client)
+	require.NoError(t, err)
+
+	balance, err := linkToken.BalanceOf(&bind.CallOpts{}, chain.LaneConfig.PingPongDapp)
+	require.NoError(t, err)
+
+	if balance.Cmp(minimumBalance) == -1 {
+		t.Logf("❌ %s balance of %s link, which is lower than the set minimum. Funding...", ccip.ChainName(int64(chain.ChainConfig.ChainId)), dione.EthBalanceToString(balance))
+		_, err := linkToken.Transfer(chain.Owner, chain.LaneConfig.PingPongDapp, minimumBalance)
+		require.NoError(t, err)
+	} else {
+		t.Logf("✅ %s balance of %s link ", ccip.ChainName(int64(chain.ChainConfig.ChainId)), dione.EthBalanceToString(balance))
+	}
+}

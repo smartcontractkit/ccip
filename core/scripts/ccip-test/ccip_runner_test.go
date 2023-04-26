@@ -315,6 +315,15 @@ func TestFundNodes(t *testing.T) {
 	don.FundNodeKeys(&SOURCE, key, big.NewInt(4e18), big.NewInt(4e18))
 }
 
+func TestFundPingPong(t *testing.T) {
+	minimumBalance := new(big.Int).Mul(big.NewInt(20), big.NewInt(1e18))
+
+	DoForEachBidirectionalLane(t, func(source rhea.EvmDeploymentConfig, destination rhea.EvmDeploymentConfig) {
+		FundPingPong(t, source, minimumBalance)
+		FundPingPong(t, destination, minimumBalance)
+	})
+}
+
 // TestPrintAllNodeBalancesPerEnv can be run as a test with the following config
 // OWNER_KEY  private key used to deploy all contracts and is used as default in all single user tests.
 // It will print the node balances for all chains where the given `env` is deployed
