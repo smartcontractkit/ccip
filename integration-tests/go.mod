@@ -16,12 +16,12 @@ require (
 	github.com/satori/go.uuid v1.2.1-0.20181028125025-b2ce2384e17b
 	github.com/slack-go/slack v0.12.2
 	github.com/smartcontractkit/chainlink-env v0.3.30
-	github.com/smartcontractkit/chainlink-testing-framework v1.11.5
+	github.com/smartcontractkit/chainlink-testing-framework v1.11.6-0.20230425170248-ab9321e6729c
 	github.com/smartcontractkit/chainlink/v2 v2.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/libocr v0.0.0-20230413082317-9561d14087cc
 	github.com/smartcontractkit/ocr2keepers v0.6.14
 	github.com/smartcontractkit/ocr2vrf v0.0.0-20230313164535-dce9b4be73a3
-	github.com/smartcontractkit/wasp v0.1.3-0.20230419220650-e3664970b916
+	github.com/smartcontractkit/wasp v0.1.4-0.20230425144159-357cefce9c95
 	github.com/stretchr/testify v1.8.2
 	github.com/umbracle/ethgo v0.1.3
 	go.dedis.ch/kyber/v3 v3.0.14
@@ -495,6 +495,7 @@ replace (
 
 	// Some dependency keeps trying to update this to an unstable version
 	github.com/satori/go.uuid => github.com/satori/go.uuid v1.2.0
+
 	google.golang.org/grpc => google.golang.org/grpc v1.45.0
 	// K8s imports are weird
 	k8s.io/api => k8s.io/api v0.25.4

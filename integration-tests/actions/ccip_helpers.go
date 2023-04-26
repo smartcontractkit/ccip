@@ -56,7 +56,7 @@ const (
 	ChaosGroupCCIPGeth            = "CCIPGeth"               // both source and destination simulated geth networks
 	ChaosGroupNetworkACCIPGeth    = "CCIPNetworkAGeth"
 	ChaosGroupNetworkBCCIPGeth    = "CCIPNetworkBGeth"
-	RootSnoozeTime                = 10 * time.Second
+	RootSnoozeTime                = 1 * time.Minute
 	InflightExpiry                = 10 * time.Second
 )
 
@@ -86,7 +86,11 @@ var (
 		return fmt.Sprintf("%s-ethereum-geth", name)
 	}
 	// ApprovedAmountToRouter is the default amount which gets approved for router so that it can transfer token and use the fee token for fee payment
-	ApprovedAmountToRouter = new(big.Int).Mul(big.NewInt(1e18), big.NewInt(100))
+	ApprovedAmountToRouter           = new(big.Int).Mul(big.NewInt(1e18), big.NewInt(100))
+	ApprovedFeeAmountToRouter        = new(big.Int).Mul(big.NewInt(int64(FeeMultiplier)), big.NewInt(1e9))
+	FeeMultiplier             uint64 = 12e17
+	LinkToUSD                        = big.NewInt(8e18)
+	WrappedNativeToUSD               = new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1.7e3))
 )
 
 type CCIPCommon struct {
@@ -224,7 +228,12 @@ func (ccipModule *CCIPCommon) ApproveTokens() error {
 			}
 		}
 		if !isApproved {
-			err := ccipModule.FeeToken.Approve(ccipModule.Router.Address(), ApprovedAmountToRouter)
+			err := ccipModule.FeeToken.Approve(ccipModule.Router.Address(), ApprovedFeeAmountToRouter)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+		} else {
+			err := ccipModule.FeeToken.Approve(ccipModule.Router.Address(), new(big.Int).Add(ApprovedAmountToRouter, ApprovedFeeAmountToRouter))
 			if err != nil {
 				return errors.WithStack(err)
 			}
@@ -243,6 +252,9 @@ func (ccipModule *CCIPCommon) CleanUp() error {
 			bal, err := ccipModule.BridgeTokens[i].BalanceOf(context.Background(), pool.Address())
 			if err != nil {
 				return fmt.Errorf("error in getting pool balance %+v", err)
+			}
+			if bal.Cmp(big.NewInt(0)) == 0 {
+				continue
 			}
 			err = pool.RemoveLiquidity(bal)
 			if err != nil {
@@ -296,16 +308,15 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int, conf *laneconfig.L
 		}
 		ccipModule.FeeTokenPool = pool
 	}
-	var btAddresses, btpAddresses []string
-	if len(ccipModule.BridgeTokens) != noOfTokens {
+
+	if len(ccipModule.BridgeTokens) < noOfTokens {
 		// deploy bridge token.
-		for i := 0; i < noOfTokens; i++ {
+		for i := len(ccipModule.BridgeTokens); i < noOfTokens; i++ {
 			token, err := cd.DeployLinkTokenContract()
 			if err != nil {
 				return fmt.Errorf("deploying bridge token contract shouldn't fail %+v", err)
 			}
 			ccipModule.BridgeTokens = append(ccipModule.BridgeTokens, token)
-			btAddresses = append(btAddresses, token.Address())
 		}
 		err = ccipModule.ChainClient.WaitForEvents()
 		if err != nil {
@@ -319,19 +330,18 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int, conf *laneconfig.L
 				return fmt.Errorf("getting new bridge token contract shouldn't fail %+v", err)
 			}
 			tokens = append(tokens, newToken)
-			btAddresses = append(btAddresses, token.Address())
 		}
 		ccipModule.BridgeTokens = tokens
 	}
-	if len(ccipModule.BridgeTokenPools) != noOfTokens {
+	if len(ccipModule.BridgeTokenPools) < noOfTokens {
 		// deploy native token pool
-		for _, token := range ccipModule.BridgeTokens {
-			ntp, err := cd.DeployLockReleaseTokenPoolContract(token.Address())
+		for i := len(ccipModule.BridgeTokenPools); i < noOfTokens; i++ {
+			token := ccipModule.BridgeTokens[i]
+			btp, err := cd.DeployLockReleaseTokenPoolContract(token.Address())
 			if err != nil {
 				return fmt.Errorf("deploying bridge Token pool shouldn't fail %+v", err)
 			}
-			ccipModule.BridgeTokenPools = append(ccipModule.BridgeTokenPools, ntp)
-			btpAddresses = append(btpAddresses, ntp.Address())
+			ccipModule.BridgeTokenPools = append(ccipModule.BridgeTokenPools, btp)
 		}
 	} else {
 		var pools []*ccip.LockReleaseTokenPool
@@ -341,7 +351,6 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int, conf *laneconfig.L
 				return fmt.Errorf("getting new bridge token pool contract shouldn't fail %+v", err)
 			}
 			pools = append(pools, newPool)
-			btpAddresses = append(btpAddresses, newPool.Address())
 		}
 		ccipModule.BridgeTokenPools = pools
 	}
@@ -540,7 +549,7 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 					Token:           common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
 					FeeAmount:       big.NewInt(0),
 					DestGasOverhead: 0,
-					Multiplier:      1e9, // the low multiplier is for testing purposes. This keeps accounts from running out of funds
+					Multiplier:      FeeMultiplier, // the low multiplier is for testing purposes. This keeps accounts from running out of funds
 				}},
 			sourceCCIP.Common.FeeToken.EthAddress,
 		)
@@ -1548,11 +1557,10 @@ func (lane *CCIPLane) StartEventWatchers() error {
 	return nil
 }
 
-func (lane *CCIPLane) CleanUp() error {
+func (lane *CCIPLane) CleanUp() {
 	for _, sub := range lane.Subscriptions {
 		sub.Unsubscribe()
 	}
-	return lane.Dest.Common.CleanUp()
 }
 
 // DeployNewCCIPLane sets up a lane and initiates lane.Source and lane.Destination
@@ -1631,16 +1639,17 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	clNodesWithKeys := env.CLNodesWithKeys
 	mockServer := env.MockServer
 	// set up ocr2 jobs
-	var tokenAddr []string
+	tokenUSDMap := make(map[string]string)
 	for _, token := range lane.Dest.Common.BridgeTokens {
-		tokenAddr = append(tokenAddr, token.Address())
+		tokenUSDMap[token.Address()] = LinkToUSD.String()
 	}
 	clNodes, exists := clNodesWithKeys[lane.Dest.Common.ChainClient.GetChainID().String()]
 	if !exists {
 		return fmt.Errorf("could not find CL nodes for %s", lane.Dest.Common.ChainClient.GetChainID().String())
 	}
 
-	tokenAddr = append(tokenAddr, lane.Dest.Common.FeeToken.Address(), lane.Source.Common.WrappedNative.Hex())
+	tokenUSDMap[lane.Dest.Common.FeeToken.Address()] = LinkToUSD.String()
+	tokenUSDMap[lane.Source.Common.WrappedNative.Hex()] = WrappedNativeToUSD.String()
 
 	// first node is the bootstrapper
 	bootstrapCommit := clNodes[0]
@@ -1676,7 +1685,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		lane.Dest.OffRamp.EthAddress,
 		sourceChainClient, destChainClient,
 		lane.Source.SrcStartBlock,
-		tokenAddr,
+		tokenUSDMap,
 		mockServer, newBootstrap,
 	)
 	if err != nil {
@@ -1722,7 +1731,7 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 				SourceIncomingConfirmations: 1,
 				DestIncomingConfirmations:   1,
 				BatchGasLimit:               5_000_000,
-				RelativeBoostPerWaitHour:    0.07,
+				RelativeBoostPerWaitHour:    0.7,
 				MaxGasPrice:                 200e9,
 			}, ccipPlugin.ExecOnchainConfig{
 				// FIXME Replace with real values
@@ -1754,7 +1763,7 @@ func CreateOCRJobsForCCIP(
 	onRamp, commitStore, offRamp common.Address,
 	sourceChainClient, destChainClient blockchain.EVMClient,
 	srcStartBlock uint64,
-	linkTokenAddr []string,
+	tokenUSDMap map[string]string,
 	mockServer *ctfClient.MockserverClient,
 	newBootStrap bool,
 ) error {
@@ -1819,8 +1828,10 @@ func CreateOCRJobsForCCIP(
 	}
 
 	tokenFeeConv := make(map[string]interface{})
-	for _, token := range linkTokenAddr {
-		tokenFeeConv[token] = "200000000000000000000"
+	var linkTokenAddr []string
+	for token, value := range tokenUSDMap {
+		tokenFeeConv[token] = value
+		linkTokenAddr = append(linkTokenAddr, token)
 	}
 	err = SetMockServerWithSameTokenFeeConversionValue(ctx, tokenFeeConv, execNodes, mockServer)
 	if err != nil {
@@ -2018,7 +2029,7 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 				return errors.WithStack(err)
 			}
 			if len(clNodes) == 0 {
-				return fmt.Errorf("no CL node with keys found")
+				return fmt.Errorf("no CL node with keys found for chain %s", chain.GetNetworkName())
 			}
 			mu.Lock()
 			defer mu.Unlock()
@@ -2035,11 +2046,11 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 			}
 			c, err := blockchain.ConcurrentEVMClient(*cfg, c.K8Env, ec)
 			if err != nil {
-				return fmt.Errorf("getting concurrent evmclient %+v", err)
+				return fmt.Errorf("getting concurrent evmclient chain %s %+v", c.GetNetworkName(), err)
 			}
 			err = FundChainlinkNodesAddresses(chainlinkNodes[1:], c, nodeFund)
 			if err != nil {
-				return fmt.Errorf("funding nodes %+v", err)
+				return fmt.Errorf("funding nodes for chain %s %+v", c.GetNetworkName(), err)
 			}
 			return nil
 		})

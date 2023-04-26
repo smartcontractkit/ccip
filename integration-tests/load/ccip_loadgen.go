@@ -65,7 +65,8 @@ func (c *CCIPE2ELoad) BeforeAllCall(msgType string) {
 	sourceCCIP := c.Lane.Source
 	destCCIP := c.Lane.Dest
 	var tokenAndAmounts []router.ClientEVMTokenAmount
-	for i, token := range sourceCCIP.Common.BridgeTokens {
+	for i := range c.Lane.Source.TransferAmount {
+		token := sourceCCIP.Common.BridgeTokens[i]
 		tokenAndAmounts = append(tokenAndAmounts, router.ClientEVMTokenAmount{
 			Token: common.HexToAddress(token.Address()), Amount: c.Lane.Source.TransferAmount[i],
 		})
@@ -155,14 +156,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) wasp.CallResult {
 		}
 		sendTx, err = sourceCCIP.Common.Router.CCIPSend(sourceCCIP.DestinationChainId, msg, fee)
 	}
-	txConfirmationTime := time.Now().UTC()
-	rcpt, err := c.Lane.Source.Common.ChainClient.GetTxReceipt(sendTx.Hash())
-	if err == nil {
-		hdr, err := c.Lane.Source.Common.ChainClient.HeaderByNumber(context.Background(), rcpt.BlockNumber)
-		if err == nil {
-			txConfirmationTime = hdr.Timestamp
-		}
-	}
+
 	if err != nil {
 		c.reports.UpdatePhaseStats(msgSerialNo, 0, testreporters.TX, time.Since(startTime), testreporters.Failure)
 		lggr.Err(err).Msg("ccip-send tx error for msg ID")
@@ -172,6 +166,14 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) wasp.CallResult {
 	}
 	c.reports.UpdatePhaseStats(msgSerialNo, 0, testreporters.TX, time.Since(startTime), testreporters.Success)
 	lggr = lggr.With().Str("Msg Tx", sendTx.Hash().String()).Logger()
+	txConfirmationTime := time.Now().UTC()
+	rcpt, err1 := c.Lane.Source.Common.ChainClient.GetTxReceipt(sendTx.Hash())
+	if err1 == nil {
+		hdr, err1 := c.Lane.Source.Common.ChainClient.HeaderByNumber(context.Background(), rcpt.BlockNumber)
+		if err1 == nil {
+			txConfirmationTime = hdr.Timestamp
+		}
+	}
 	// wait for
 	// - CCIPSendRequested Event log to be generated,
 	sentMsg, commitStartTime, err := c.Lane.Source.AssertEventCCIPSendRequested(
