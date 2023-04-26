@@ -58,7 +58,8 @@ const (
 	ChaosGroupNetworkBCCIPGeth    = "CCIPNetworkBGeth"
 	RootSnoozeTime                = 1 * time.Minute
 	RootSnoozeTimeSimulated       = 10 * time.Second
-	InflightExpiry                = 10 * time.Second
+	InflightExpiry                = 1 * time.Minute
+	InflightExpirySimulated       = 45 * time.Second
 )
 
 type CCIPTOMLEnv struct {
@@ -1813,6 +1814,8 @@ func CreateOCRJobsForCCIP(
 
 	if destChainClient.NetworkSimulated() {
 		jobParams.RootSnooze = RootSnoozeTimeSimulated
+		jobParams.ExecInflight = InflightExpirySimulated
+		jobParams.RelayInflight = InflightExpirySimulated
 	}
 
 	if newBootStrap {
