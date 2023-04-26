@@ -28,10 +28,6 @@ LogPollInterval = '1s'
 HistoryDepth = 100
 
 [EVM.GasEstimator]
-{{if .Simulated}}
-Mode = 'FixedPrice'
-LimitDefault = 5_000_000
-{{else}}
 {{if eq .ChainID 421613}}
 LimitDefault = 100_000_000
 {{else}}
@@ -48,7 +44,6 @@ FeeCapDefault = '500 gwei'
 {{else}}
 PriceMax = '200 gwei'
 FeeCapDefault = '200 gwei'
-{{end}}
 {{end}}
 
 {{range $i,$url := .URLs }}

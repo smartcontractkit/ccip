@@ -57,6 +57,7 @@ const (
 	ChaosGroupNetworkACCIPGeth    = "CCIPNetworkAGeth"
 	ChaosGroupNetworkBCCIPGeth    = "CCIPNetworkBGeth"
 	RootSnoozeTime                = 1 * time.Minute
+	RootSnoozeTimeSimulated       = 10 * time.Second
 	InflightExpiry                = 10 * time.Second
 )
 
@@ -1808,6 +1809,10 @@ func CreateOCRJobsForCCIP(
 		ExecInflight:       InflightExpiry,
 		RootSnooze:         RootSnoozeTime,
 		P2PV2Bootstrappers: []string{p2pBootstrappersCommit.P2PV2Bootstrapper()},
+	}
+
+	if destChainClient.NetworkSimulated() {
+		jobParams.RootSnooze = RootSnoozeTimeSimulated
 	}
 
 	if newBootStrap {
