@@ -79,7 +79,7 @@ jobs:
         if: ${{ needs.changes.outputs.changes == 'true' }}
         uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: nightly
+          version: nightly-e0afc7cad6dc312e4f22b0a1be916afe6b59855e
 
       - name: Run Forge build
         if: ${{ needs.changes.outputs.changes == 'true' }}
@@ -134,7 +134,7 @@ jobs:
         if: ${{ needs.changes.outputs.changes == 'true' }}
         uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: nightly
+          version: nightly-e0afc7cad6dc312e4f22b0a1be916afe6b59855e
 
       - name: Run Forge build
         if: ${{ needs.changes.outputs.changes == 'true' }}
@@ -201,7 +201,7 @@ jobs:
         if: ${{ needs.changes.outputs.changes == 'true' }}
         uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: nightly
+          version: nightly-e0afc7cad6dc312e4f22b0a1be916afe6b59855e
 
       - name: Run Forge build
         if: ${{ needs.changes.outputs.changes == 'true' }}
