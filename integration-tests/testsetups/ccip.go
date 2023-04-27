@@ -213,6 +213,10 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 		p.PhaseTimeout = DefaultPhaseTimeoutForLongTests
 	}
 
+	if tType == Chaos {
+		p.CLNodeDBResourceProfile = DONDBResourceProfile
+	}
+
 	inputNoOfNetworks, _ := utils.GetEnv("CCIP_NO_OF_NETWORKS")
 	if inputNoOfNetworks != "" {
 		n, err := strconv.Atoi(inputNoOfNetworks)
