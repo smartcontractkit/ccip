@@ -57,9 +57,7 @@ const (
 	ChaosGroupCCIPGeth            = "CCIPGeth"               // both source and destination simulated geth networks
 	ChaosGroupNetworkACCIPGeth    = "CCIPNetworkAGeth"
 	ChaosGroupNetworkBCCIPGeth    = "CCIPNetworkBGeth"
-	RootSnoozeTime                = 1 * time.Minute
 	RootSnoozeTimeSimulated       = 10 * time.Second
-	InflightExpiry                = 1 * time.Minute
 	InflightExpirySimulated       = 45 * time.Second
 )
 
@@ -1712,8 +1710,10 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 		ccip.NewOffChainAggregatorV2Config(commitNodes, ccipPlugin.CommitOffchainConfig{
 			SourceIncomingConfirmations: 1,
 			DestIncomingConfirmations:   1,
+			FeeUpdateHeartBeat:          models.MustMakeDuration(24 * time.Hour),
+			FeeUpdateDeviationPPB:       5e7,
 			MaxGasPrice:                 200e9,
-			InflightCacheExpiry:         models.MustMakeDuration(3 * time.Minute),
+			InflightCacheExpiry:         models.MustMakeDuration(InflightExpirySimulated),
 		}, ccipPlugin.CommitOnchainConfig{
 			PriceRegistry: destCCIP.Common.PriceRegistry.EthAddress,
 			Afn:           destCCIP.Common.AFN.EthAddress,
@@ -1740,8 +1740,8 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 				BatchGasLimit:               5_000_000,
 				RelativeBoostPerWaitHour:    0.7,
 				MaxGasPrice:                 200e9,
-				InflightCacheExpiry:         models.MustMakeDuration(3 * time.Minute),
-				RootSnoozeTime:              models.MustMakeDuration(10 * time.Minute),
+				InflightCacheExpiry:         models.MustMakeDuration(InflightExpirySimulated),
+				RootSnoozeTime:              models.MustMakeDuration(RootSnoozeTimeSimulated),
 			}, ccipPlugin.ExecOnchainConfig{
 				PermissionLessExecutionThresholdSeconds: 60,
 				Router:                                  destCCIP.Common.Router.EthAddress,
@@ -1802,26 +1802,14 @@ func CreateOCRJobsForCCIP(
 	}
 
 	jobParams := testhelpers.CCIPJobSpecParams{
-		OnRamp:             onRamp,
 		OffRamp:            offRamp,
 		CommitStore:        commitStore,
 		SourceChainName:    sourceChainClient.GetNetworkName(),
 		DestChainName:      destChainClient.GetNetworkName(),
-		SourceChainId:      sourceChainClient.GetChainID().Uint64(),
 		DestChainId:        destChainClient.GetChainID().Uint64(),
-		PollPeriod:         time.Second,
 		SourceStartBlock:   srcStartBlock,
 		DestStartBlock:     currentBlockOnDest,
-		RelayInflight:      InflightExpiry,
-		ExecInflight:       InflightExpiry,
-		RootSnooze:         RootSnoozeTime,
 		P2PV2Bootstrappers: []string{p2pBootstrappersCommit.P2PV2Bootstrapper()},
-	}
-
-	if destChainClient.NetworkSimulated() {
-		jobParams.RootSnooze = RootSnoozeTimeSimulated
-		jobParams.ExecInflight = InflightExpirySimulated
-		jobParams.RelayInflight = InflightExpirySimulated
 	}
 
 	if newBootStrap {

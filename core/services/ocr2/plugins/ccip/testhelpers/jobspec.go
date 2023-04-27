@@ -29,19 +29,13 @@ func JobName(jobType JobType, source string, destination string) string {
 type CCIPJobSpecParams struct {
 	Name                   string
 	OffRamp                common.Address
-	OnRamp                 common.Address
 	CommitStore            common.Address
 	SourceChainName        string
 	DestChainName          string
-	SourceChainId          uint64
 	DestChainId            uint64
 	TokenPricesUSDPipeline string
-	PollPeriod             time.Duration
 	SourceStartBlock       uint64
 	DestStartBlock         uint64
-	RelayInflight          time.Duration
-	ExecInflight           time.Duration
-	RootSnooze             time.Duration
 	P2PV2Bootstrappers     pq.StringArray
 }
 
@@ -57,13 +51,9 @@ func (params CCIPJobSpecParams) ValidateCommitJobSpec() error {
 	if commonErr != nil {
 		return commonErr
 	}
-	if params.OnRamp == common.HexToAddress("") {
-		return fmt.Errorf("OnRampOnCommit cannot be empty. The commit job needs to set onRampID")
-	}
 	if params.OffRamp == common.HexToAddress("0x0") {
 		return fmt.Errorf("OffRamp cannot be empty for execution job")
 	}
-
 	return nil
 }
 
@@ -71,9 +61,6 @@ func (params CCIPJobSpecParams) ValidateExecJobSpec() error {
 	commonErr := params.Validate()
 	if commonErr != nil {
 		return commonErr
-	}
-	if params.OnRamp == common.HexToAddress("0x0") {
-		return fmt.Errorf("OnRampForExecution cannot be empty. The exec job needs to set onRampID")
 	}
 	if params.OffRamp == common.HexToAddress("0x0") {
 		return fmt.Errorf("OffRamp cannot be empty for execution job")
