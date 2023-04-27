@@ -412,14 +412,11 @@ func (c *CCIPContracts) SetupOnchainConfig(oracles []confighelper.OracleIdentity
 
 func (c *CCIPContracts) NewCCIPJobSpecParams(tokenPricesUSDPipeline string, configBlock int64) CCIPJobSpecParams {
 	return CCIPJobSpecParams{
-		OnRamp:                 c.Source.OnRamp.Address(),
 		CommitStore:            c.Dest.CommitStore.Address(),
-		SourceChainId:          c.Source.ChainID,
 		DestChainId:            c.Dest.ChainID,
 		SourceChainName:        "SimulatedSource",
 		DestChainName:          "SimulatedDest",
 		TokenPricesUSDPipeline: tokenPricesUSDPipeline,
-		PollPeriod:             time.Second,
 		DestStartBlock:         uint64(configBlock),
 	}
 }

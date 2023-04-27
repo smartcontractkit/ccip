@@ -16,12 +16,10 @@ import (
 func NewCCIPJobSpecParams(sourceClient rhea.EvmDeploymentConfig, destClient rhea.EvmDeploymentConfig) testhelpers.CCIPJobSpecParams {
 	return testhelpers.CCIPJobSpecParams{
 		OffRamp:                destClient.LaneConfig.OffRamp,
-		OnRamp:                 sourceClient.LaneConfig.OnRamp,
 		CommitStore:            destClient.LaneConfig.CommitStore,
 		SourceChainName:        ccip.ChainName(int64(sourceClient.ChainConfig.EvmChainId)),
 		DestChainName:          ccip.ChainName(int64(destClient.ChainConfig.EvmChainId)),
 		TokenPricesUSDPipeline: GetTokenPricesUSDPipeline(getPipelineTokens(sourceClient, destClient)),
-		PollPeriod:             PollPeriod,
 		SourceStartBlock:       sourceClient.LaneConfig.DeploySettings.DeployedAtBlock,
 		DestStartBlock:         destClient.LaneConfig.DeploySettings.DeployedAtBlock,
 		P2PV2Bootstrappers:     []string{}, // Set in env vars
