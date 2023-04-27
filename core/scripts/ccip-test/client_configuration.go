@@ -673,6 +673,7 @@ func (client *CCIPClient) getCommitStoreOffChainConfig() []byte {
 		FeeUpdateHeartBeat:          client.Dest.TunableValues.FeeUpdateHeartBeat,
 		FeeUpdateDeviationPPB:       client.Dest.TunableValues.FeeUpdateDeviationPPB,
 		MaxGasPrice:                 client.Dest.TunableValues.MaxGasPrice,
+		InflightCacheExpiry:         client.Dest.TunableValues.InflightCacheExpiry,
 	}
 
 	encodedOffchainConfig, err := ccip.EncodeOffchainConfig(commitPluginConfig)
@@ -700,6 +701,8 @@ func (client *CCIPClient) getOffRampOffChainConfig() []byte {
 		BatchGasLimit:               client.Dest.TunableValues.BatchGasLimit,
 		RelativeBoostPerWaitHour:    client.Dest.TunableValues.RelativeBoostPerWaitHour,
 		MaxGasPrice:                 client.Dest.TunableValues.MaxGasPrice,
+		InflightCacheExpiry:         client.Dest.TunableValues.InflightCacheExpiry,
+		RootSnoozeTime:              client.Dest.TunableValues.RootSnoozeTime,
 	}
 
 	encodedOffRampConfig, err := ccip.EncodeOffchainConfig(execPluginConfig)

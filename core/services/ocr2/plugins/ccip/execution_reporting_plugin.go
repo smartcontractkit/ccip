@@ -115,8 +115,6 @@ type ExecutionPluginConfig struct {
 	commitStore            *commit_store.CommitStore
 	source, dest           logpoller.LogPoller
 	eventSignatures        EventSignatures
-	snoozeTime             time.Duration
-	inflightCacheExpiry    time.Duration
 	leafHasher             LeafHasherInterface[[32]byte]
 	lggr                   logger.Logger
 	srcPriceRegistry       *price_registry.PriceRegistry
@@ -154,7 +152,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			offchainConfig:                   offchainConfig,
 			config:                           rf.config,
 			snoozedRoots:                     make(map[[32]byte]time.Time),
-			inflightReports:                  newInflightReportsContainer(rf.config.inflightCacheExpiry),
+			inflightReports:                  newInflightReportsContainer(offchainConfig.InflightCacheExpiry.Duration()),
 			onRampABI:                        onRampABI,
 			permissionLessExecutionThreshold: execOnChainConfig.PermissionLessExecutionThresholdDuration(),
 		}, types.ReportingPluginInfo{
@@ -340,7 +338,7 @@ func (r *ExecutionReportingPlugin) getExecutableSeqNrs(ctx context.Context, infl
 		if len(batch) != 0 {
 			return batch, nil
 		}
-		r.snoozedRoots[unexpiredReport.MerkleRoot] = time.Now().Add(r.config.snoozeTime)
+		r.snoozedRoots[unexpiredReport.MerkleRoot] = time.Now().Add(r.offchainConfig.RootSnoozeTime.Duration())
 	}
 	return []uint64{}, nil
 }

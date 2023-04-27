@@ -3,7 +3,6 @@ package ccip
 import (
 	"encoding/json"
 	"math/big"
-	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -23,8 +22,6 @@ import (
 )
 
 const (
-	DefaultInflightCacheExpiry   = 3 * time.Minute
-	DefaultRootSnoozeTime        = 10 * time.Minute
 	EXEC_CCIP_SENDS              = "Exec ccip sends"
 	EXEC_REPORT_ACCEPTS          = "Exec report accepts"
 	EXEC_EXECUTION_STATE_CHANGES = "Exec execution state changes"
@@ -37,16 +34,8 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	if err != nil {
 		return nil, err
 	}
-	err = pluginConfig.ValidateExecutionPluginConfig()
-	if err != nil {
-		return nil, err
-	}
 	lggr.Infof("CCIP execution plugin initialized with offchainConfig: %+v", pluginConfig)
 
-	sourceChain, err := chainSet.Get(big.NewInt(0).SetUint64(pluginConfig.SourceChainID))
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to open source chain")
-	}
 	chainIDInterface, ok := spec.RelayConfig["chainID"]
 	if !ok {
 		return nil, errors.New("chainID must be provided in relay config")
@@ -56,13 +45,23 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	if err != nil {
 		return nil, errors.Wrap(err, "get chainset")
 	}
-
-	commitStore, err := LoadCommitStore(common.HexToAddress(pluginConfig.CommitStoreID), destChain.Client())
+	offRamp, err := LoadOffRamp(common.HexToAddress(spec.ContractID), destChain.Client())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed loading offRamp")
+	}
+	offRampConfig, err := offRamp.GetStaticConfig(&bind.CallOpts{})
+	if err != nil {
+		return nil, err
+	}
+	sourceChain, err := chainSet.Get(big.NewInt(0).SetUint64(offRampConfig.SourceChainId))
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to open source chain")
+	}
+	commitStore, err := LoadCommitStore(offRampConfig.CommitStore, destChain.Client())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed loading commitStore")
 	}
-
-	onRamp, err := LoadOnRamp(common.HexToAddress(pluginConfig.OnRampID), sourceChain.Client())
+	onRamp, err := LoadOnRamp(offRampConfig.OnRamp, sourceChain.Client())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed loading onRamp")
 	}
@@ -79,10 +78,6 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 		return nil, errors.Wrap(err, "could not get source native token")
 	}
 
-	offRamp, err := LoadOffRamp(common.HexToAddress(spec.ContractID), destChain.Client())
-	if err != nil {
-		return nil, errors.Wrap(err, "failed loading offRamp")
-	}
 	// TODO DynamicConfig RPC call
 	dynamicOffRampConfig, err := offRamp.GetDynamicConfig(&bind.CallOpts{})
 	if err != nil {
@@ -112,16 +107,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 		return nil, errors.Wrap(err, "could not create source price registry")
 	}
 
-	lggr = lggr.With("srcChain", ChainName(int64(pluginConfig.SourceChainID)), "dstChain", ChainName(destChainID))
-
-	rootSnoozeTime := DefaultRootSnoozeTime
-	if pluginConfig.RootSnoozeTime.Duration() != 0 {
-		rootSnoozeTime = pluginConfig.RootSnoozeTime.Duration()
-	}
-	inflightCacheExpiry := DefaultInflightCacheExpiry
-	if pluginConfig.InflightCacheExpiry.Duration() != 0 {
-		inflightCacheExpiry = pluginConfig.InflightCacheExpiry.Duration()
-	}
+	lggr = lggr.With("srcChain", ChainName(int64(offRampConfig.SourceChainId)), "dstChain", ChainName(destChainID))
 
 	eventSignatures := GetEventSignatures()
 	wrappedPluginFactory := NewExecutionReportingPluginFactory(
@@ -133,9 +119,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 			onRamp:                 onRamp,
 			commitStore:            commitStore,
 			eventSignatures:        eventSignatures,
-			leafHasher:             NewLeafHasher(pluginConfig.SourceChainID, uint64(destChainID), onRamp.Address(), hasher.NewKeccakCtx()),
-			snoozeTime:             rootSnoozeTime,
-			inflightCacheExpiry:    inflightCacheExpiry,
+			leafHasher:             NewLeafHasher(offRampConfig.SourceChainId, uint64(destChainID), onRamp.Address(), hasher.NewKeccakCtx()),
 			destPriceRegistry:      destPriceRegistry,
 			srcPriceRegistry:       srcPriceRegistry,
 			destGasEstimator:       destChain.GasEstimator(),
@@ -162,7 +146,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 
 	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPExecution", string(spec.Relay), destChain.ID())
 	argsNoPlugin.Logger = logger.NewOCRWrapper(lggr.Named("CCIPExecution").With(
-		"srcChain", ChainName(int64(pluginConfig.SourceChainID)), "dstChain", ChainName(destChainID)), true, logError)
+		"srcChain", ChainName(int64(offRampConfig.SourceChainId)), "dstChain", ChainName(destChainID)), true, logError)
 	oracle, err := libocr2.NewOracle(argsNoPlugin)
 	if err != nil {
 		return nil, err

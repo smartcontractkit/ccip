@@ -102,10 +102,6 @@ func (params CCIPJobSpecParams) CommitJobSpec() (*client.OCR2TaskJobSpec, error)
 		ContractConfigTrackerPollInterval: models.Interval(20 * time.Second),
 		P2PV2Bootstrappers:                params.P2PV2Bootstrappers,
 		PluginConfig: map[string]interface{}{
-			"sourceChainID": params.SourceChainId,
-			"onRampID":      fmt.Sprintf("\"%s\"", params.OnRamp.Hex()),
-			"offRampID":     fmt.Sprintf("\"%s\"", params.OffRamp.Hex()),
-			"pollPeriod":    `"1s"`,
 			"tokenPricesUSDPipeline": fmt.Sprintf(`"""
 %s
 """`, params.TokenPricesUSDPipeline),
@@ -113,12 +109,6 @@ func (params CCIPJobSpecParams) CommitJobSpec() (*client.OCR2TaskJobSpec, error)
 		RelayConfig: map[string]interface{}{
 			"chainID": params.DestChainId,
 		},
-	}
-	if params.RelayInflight.Seconds() > 0 {
-		ocrSpec.PluginConfig["pollPeriod"] = fmt.Sprintf("\"%s\"", params.PollPeriod)
-	}
-	if params.RelayInflight.Seconds() > 0 {
-		ocrSpec.PluginConfig["inflightCacheExpiry"] = fmt.Sprintf("\"%s\"", params.RelayInflight)
 	}
 	if params.DestStartBlock > 0 {
 		ocrSpec.PluginConfig["destStartBlock"] = params.DestStartBlock
@@ -147,20 +137,10 @@ func (params CCIPJobSpecParams) ExecutionJobSpec() (*client.OCR2TaskJobSpec, err
 		ContractConfigConfirmations:       1,
 		ContractConfigTrackerPollInterval: models.Interval(20 * time.Second),
 		P2PV2Bootstrappers:                params.P2PV2Bootstrappers,
-		PluginConfig: map[string]interface{}{
-			"sourceChainID": params.SourceChainId,
-			"onRampID":      fmt.Sprintf("\"%s\"", params.OnRamp.Hex()),
-			"commitStoreID": fmt.Sprintf("\"%s\"", params.CommitStore.Hex()),
-		},
+		PluginConfig:                      map[string]interface{}{},
 		RelayConfig: map[string]interface{}{
 			"chainID": params.DestChainId,
 		},
-	}
-	if params.ExecInflight.Seconds() > 0 {
-		ocrSpec.PluginConfig["inflightCacheExpiry"] = fmt.Sprintf("\"%s\"", params.ExecInflight)
-	}
-	if params.RootSnooze.Seconds() > 0 {
-		ocrSpec.PluginConfig["rootSnoozeTime"] = fmt.Sprintf("\"%s\"", params.RootSnooze)
 	}
 	if params.DestStartBlock > 0 {
 		ocrSpec.PluginConfig["destStartBlock"] = params.DestStartBlock

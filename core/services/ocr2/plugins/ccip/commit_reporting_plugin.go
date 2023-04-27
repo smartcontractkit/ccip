@@ -23,7 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
@@ -128,20 +128,17 @@ type InflightPriceUpdate struct {
 }
 
 type CommitPluginConfig struct {
-	lggr                logger.Logger
-	source, dest        logpoller.LogPoller
-	seqParsers          func(log logpoller.Log) (uint64, error)
-	reqEventSig         EventSignatures
-	onRamp              common.Address
-	offRamp             *evm_2_evm_offramp.EVM2EVMOffRamp
-	priceRegistry       *price_registry.PriceRegistry
-	priceGetter         PriceGetter
-	sourceNative        common.Address
-	sourceFeeEstimator  txmgrtypes.FeeEstimator[*evmtypes.Head, gas.EvmFee, *assets.Wei, evmtypes.TxHash]
-	sourceChainID       uint64
-	commitStore         *commit_store.CommitStore
-	hasher              LeafHasherInterface[[32]byte]
-	inflightCacheExpiry time.Duration
+	lggr               logger.Logger
+	source, dest       logpoller.LogPoller
+	reqEventSig        EventSignatures
+	onRamp             *evm_2_evm_onramp.EVM2EVMOnRamp
+	priceRegistry      *price_registry.PriceRegistry
+	priceGetter        PriceGetter
+	sourceNative       common.Address
+	sourceFeeEstimator txmgrtypes.FeeEstimator[*evmtypes.Head, gas.EvmFee, *assets.Wei, evmtypes.TxHash]
+	sourceChainID      uint64
+	commitStore        *commit_store.CommitStore
+	hasher             LeafHasherInterface[[32]byte]
 }
 
 type CommitReportingPluginFactory struct {
@@ -194,6 +191,15 @@ type CommitReportingPlugin struct {
 	inFlightPriceUpdates []InflightPriceUpdate
 	offchainConfig       CommitOffchainConfig
 	onchainConfig        CommitOnchainConfig
+}
+
+func (r *CommitReportingPlugin) seqParser(log logpoller.Log) (uint64, error) {
+	req, err := r.config.onRamp.ParseCCIPSendRequested(log.GetGethLog())
+	if err != nil {
+		r.config.lggr.Warnf("failed to parse log: %+v", log)
+		return 0, err
+	}
+	return req.Message.SequenceNumber, nil
 }
 
 func (r *CommitReportingPlugin) nextMinSeqNum(ctx context.Context) (uint64, error) {
@@ -406,18 +412,18 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 		return 0, 0, err
 	}
 	// All available messages that have not been committed yet and have sufficient confirmations.
-	lggr.Infof("Looking for requests with sig %s and nextMin %d on onRampAddr %s", r.config.reqEventSig.SendRequested.Hex(), nextMin, r.config.onRamp.Hex())
-	reqs, err := r.config.source.LogsDataWordGreaterThan(r.config.reqEventSig.SendRequested, r.config.onRamp, r.config.reqEventSig.SendRequestedSequenceNumberIndex, EvmWord(nextMin), int(r.offchainConfig.SourceIncomingConfirmations), pg.WithParentCtx(ctx))
+	lggr.Infof("Looking for requests with sig %v and nextMin %d on onRampAddr %v", r.config.reqEventSig.SendRequested, nextMin, r.config.onRamp.Address())
+	reqs, err := r.config.source.LogsDataWordGreaterThan(r.config.reqEventSig.SendRequested, r.config.onRamp.Address(), r.config.reqEventSig.SendRequestedSequenceNumberIndex, EvmWord(nextMin), int(r.offchainConfig.SourceIncomingConfirmations), pg.WithParentCtx(ctx))
 	if err != nil {
 		return 0, 0, err
 	}
-	lggr.Infof("%d requests found for onRampAddr %s", len(reqs), r.config.onRamp.Hex())
+	lggr.Infof("%d requests found for onRampAddr %v", len(reqs), r.config.onRamp.Address())
 	if len(reqs) == 0 {
 		return 0, 0, nil
 	}
 	var seqNrs []uint64
 	for _, req := range reqs {
-		seqNr, err2 := r.config.seqParsers(req)
+		seqNr, err2 := r.seqParser(req)
 		if err2 != nil {
 			lggr.Errorw("error parsing seq num", "err", err2)
 			continue
@@ -429,7 +435,7 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 	if min != nextMin {
 		// Still report the observation as even partial reports have value e.g. all nodes are
 		// missing a single, different log each, they would still be able to produce a valid report.
-		lggr.Warnf("Missing sequence number range [%d-%d] for onRamp %s", nextMin, min, r.config.onRamp.Hex())
+		lggr.Warnf("Missing sequence number range [%d-%d] for onRamp %v", nextMin, min, r.config.onRamp.Address())
 	}
 	if !contiguousReqs(lggr, min, max, seqNrs) {
 		return 0, 0, errors.New("unexpected gap in seq nums")
@@ -451,13 +457,13 @@ func (r *CommitReportingPlugin) buildReport(ctx context.Context, interval commit
 		}, nil
 	}
 
-	leaves, err := leavesFromIntervals(ctx, lggr, r.config.onRamp, r.config.reqEventSig, r.config.seqParsers, interval, r.config.source, r.config.hasher, int(r.offchainConfig.SourceIncomingConfirmations))
+	leaves, err := leavesFromIntervals(ctx, lggr, r.config.onRamp.Address(), r.config.reqEventSig, r.seqParser, interval, r.config.source, r.config.hasher, int(r.offchainConfig.SourceIncomingConfirmations))
 	if err != nil {
 		return nil, err
 	}
 
 	if len(leaves) == 0 {
-		return nil, fmt.Errorf("tried building a tree without leaves for onRampAddr %s. %+v", r.config.onRamp.Hex(), leaves)
+		return nil, fmt.Errorf("tried building a tree without leaves for onRampAddr %v. %+v", r.config.onRamp.Address(), leaves)
 	}
 	tree, err := merklemulti.NewTree(hasher.NewKeccakCtx(), leaves)
 	if err != nil {
@@ -479,7 +485,7 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, _ types.ReportTimest
 		intervals = append(intervals, obs.Interval)
 	}
 	if len(intervals) <= r.F {
-		lggr.Debugf("Observations for OnRamp %s 1 < #obs <= F, need at least F+1 to continue", r.config.onRamp.Hex())
+		lggr.Debugf("Observations for OnRamp %v: #obs=%d <= F=%d, need at least F+1 to continue", r.config.onRamp.Address(), len(intervals), r.F)
 		return false, nil, nil
 	}
 
@@ -599,7 +605,7 @@ func (r *CommitReportingPlugin) expireInflight(lggr logger.Logger) {
 	defer r.inFlightMu.Unlock()
 	// Reap any expired entries from inflight.
 	for root, inFlightReport := range r.inFlight {
-		if time.Since(inFlightReport.createdAt) > r.config.inflightCacheExpiry {
+		if time.Since(inFlightReport.createdAt) > r.offchainConfig.InflightCacheExpiry.Duration() {
 			// Happy path: inflight report was successfully transmitted onchain, we remove it from inflight and onchain state reflects inflight.
 			// Sad path: inflight report reverts onchain, we remove it from inflight, onchain state does not reflect the chains so we retry.
 			lggr.Infow("Inflight report expired", "rootOfRoots", hexutil.Encode(inFlightReport.report.MerkleRoot[:]))
@@ -608,7 +614,7 @@ func (r *CommitReportingPlugin) expireInflight(lggr logger.Logger) {
 	}
 	var stillInflight []InflightPriceUpdate
 	for _, inFlightFeeUpdate := range r.inFlightPriceUpdates {
-		if time.Since(inFlightFeeUpdate.createdAt) > r.config.inflightCacheExpiry {
+		if time.Since(inFlightFeeUpdate.createdAt) > r.offchainConfig.InflightCacheExpiry.Duration() {
 			// Happy path: inflight report was successfully transmitted onchain, we remove it from inflight and onchain state reflects inflight.
 			// Sad path: inflight report reverts onchain, we remove it from inflight, onchain state does not reflect the chains so we retry.
 			lggr.Infow("Inflight price update expired", "updates", inFlightFeeUpdate.priceUpdates)

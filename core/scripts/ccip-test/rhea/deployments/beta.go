@@ -61,6 +61,8 @@ var Beta_OptimismGoerli = rhea.EVMChainConfig{
 		FeeUpdateHeartBeat:       models.MustMakeDuration(FEE_UPDATE_HEARTBEAT),
 		FeeUpdateDeviationPPB:    FEE_UPDATE_DEVIATION_PPB,
 		MaxGasPrice:              getMaxGasPrice(rhea.OptimismGoerli),
+		InflightCacheExpiry:      models.MustMakeDuration(INFLIGHT_CACHE_EXPIRY),
+		RootSnoozeTime:           models.MustMakeDuration(ROOT_SNOOZE_TIME),
 	},
 	DeploySettings: rhea.ChainDeploySettings{
 		DeployAFN:           false,
@@ -112,6 +114,8 @@ var Beta_AvaxFuji = rhea.EVMChainConfig{
 		FeeUpdateHeartBeat:       models.MustMakeDuration(FEE_UPDATE_HEARTBEAT),
 		FeeUpdateDeviationPPB:    FEE_UPDATE_DEVIATION_PPB,
 		MaxGasPrice:              getMaxGasPrice(rhea.AvaxFuji),
+		InflightCacheExpiry:      models.MustMakeDuration(INFLIGHT_CACHE_EXPIRY),
+		RootSnoozeTime:           models.MustMakeDuration(ROOT_SNOOZE_TIME),
 	},
 	DeploySettings: rhea.ChainDeploySettings{
 		DeployAFN:           false,

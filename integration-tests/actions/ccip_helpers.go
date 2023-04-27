@@ -42,6 +42,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
 	ccipPlugin "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
+	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 	bigmath "github.com/smartcontractkit/chainlink/v2/core/utils/big_math"
 )
@@ -1712,6 +1713,7 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 			SourceIncomingConfirmations: 1,
 			DestIncomingConfirmations:   1,
 			MaxGasPrice:                 200e9,
+			InflightCacheExpiry:         models.MustMakeDuration(3 * time.Minute),
 		}, ccipPlugin.CommitOnchainConfig{
 			PriceRegistry: destCCIP.Common.PriceRegistry.EthAddress,
 			Afn:           destCCIP.Common.AFN.EthAddress,
@@ -1738,8 +1740,9 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 				BatchGasLimit:               5_000_000,
 				RelativeBoostPerWaitHour:    0.7,
 				MaxGasPrice:                 200e9,
+				InflightCacheExpiry:         models.MustMakeDuration(3 * time.Minute),
+				RootSnoozeTime:              models.MustMakeDuration(10 * time.Minute),
 			}, ccipPlugin.ExecOnchainConfig{
-				// FIXME Replace with real values
 				PermissionLessExecutionThresholdSeconds: 60,
 				Router:                                  destCCIP.Common.Router.EthAddress,
 				Afn:                                     destCCIP.Common.AFN.EthAddress,

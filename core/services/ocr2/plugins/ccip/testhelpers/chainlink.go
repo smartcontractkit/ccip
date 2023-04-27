@@ -419,6 +419,7 @@ func SetupAndStartNodes(ctx context.Context, t *testing.T, ccipContracts *CCIPCo
 		SourceIncomingConfirmations: 0,
 		DestIncomingConfirmations:   1,
 		MaxGasPrice:                 200e9,
+		InflightCacheExpiry:         models.MustMakeDuration(3 * time.Millisecond),
 	})
 	require.NoError(t, err)
 	execOnchainConfig, err := ccip.EncodeAbiStruct(ccip.ExecOnchainConfig{
@@ -435,6 +436,8 @@ func SetupAndStartNodes(ctx context.Context, t *testing.T, ccipContracts *CCIPCo
 		BatchGasLimit:               5_000_000,
 		RelativeBoostPerWaitHour:    0.07,
 		MaxGasPrice:                 200e9,
+		InflightCacheExpiry:         models.MustMakeDuration(3 * time.Millisecond),
+		RootSnoozeTime:              models.MustMakeDuration(10 * time.Millisecond),
 	})
 	require.NoError(t, err)
 	configBlock := ccipContracts.SetupOnchainConfig(oracles, commitOnchainConfig, commitOffchainConfig, execOnchainConfig, execOffchainConfig)

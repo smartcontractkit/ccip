@@ -162,6 +162,8 @@ type TunableChainValues struct {
 	FeeUpdateHeartBeat       models.Duration
 	FeeUpdateDeviationPPB    uint32
 	MaxGasPrice              uint64
+	InflightCacheExpiry      models.Duration
+	RootSnoozeTime           models.Duration
 }
 
 type EVMBridgedToken struct {

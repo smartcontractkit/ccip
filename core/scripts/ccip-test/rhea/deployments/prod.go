@@ -66,6 +66,8 @@ var Prod_Goerli = rhea.EVMChainConfig{
 		FeeUpdateHeartBeat:       models.MustMakeDuration(FEE_UPDATE_HEARTBEAT),
 		FeeUpdateDeviationPPB:    FEE_UPDATE_DEVIATION_PPB,
 		MaxGasPrice:              getMaxGasPrice(rhea.Goerli),
+		InflightCacheExpiry:      models.MustMakeDuration(INFLIGHT_CACHE_EXPIRY),
+		RootSnoozeTime:           models.MustMakeDuration(ROOT_SNOOZE_TIME),
 	},
 	DeploySettings: rhea.ChainDeploySettings{
 		DeployAFN:           false,
@@ -126,6 +128,8 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 		FeeUpdateHeartBeat:       models.MustMakeDuration(FEE_UPDATE_HEARTBEAT),
 		FeeUpdateDeviationPPB:    FEE_UPDATE_DEVIATION_PPB,
 		MaxGasPrice:              getMaxGasPrice(rhea.Sepolia),
+		InflightCacheExpiry:      models.MustMakeDuration(INFLIGHT_CACHE_EXPIRY),
+		RootSnoozeTime:           models.MustMakeDuration(ROOT_SNOOZE_TIME),
 	},
 	DeploySettings: rhea.ChainDeploySettings{
 		DeployAFN:           false,
@@ -174,6 +178,8 @@ var Prod_OptimismGoerli = rhea.EVMChainConfig{
 		FeeUpdateHeartBeat:       models.MustMakeDuration(FEE_UPDATE_HEARTBEAT),
 		FeeUpdateDeviationPPB:    FEE_UPDATE_DEVIATION_PPB,
 		MaxGasPrice:              getMaxGasPrice(rhea.OptimismGoerli),
+		InflightCacheExpiry:      models.MustMakeDuration(INFLIGHT_CACHE_EXPIRY),
+		RootSnoozeTime:           models.MustMakeDuration(ROOT_SNOOZE_TIME),
 	},
 	CustomerSettings: rhea.CustomerSettings{
 		CacheGoldFeeAddress:  gethcommon.HexToAddress("0x8264AcEE321ac02549aff7fA05A4Ae7a2e92A6f1"),
@@ -238,6 +244,8 @@ var Prod_AvaxFuji = rhea.EVMChainConfig{
 		FeeUpdateHeartBeat:       models.MustMakeDuration(FEE_UPDATE_HEARTBEAT),
 		FeeUpdateDeviationPPB:    FEE_UPDATE_DEVIATION_PPB,
 		MaxGasPrice:              getMaxGasPrice(rhea.AvaxFuji),
+		InflightCacheExpiry:      models.MustMakeDuration(INFLIGHT_CACHE_EXPIRY),
+		RootSnoozeTime:           models.MustMakeDuration(ROOT_SNOOZE_TIME),
 	},
 	CustomerSettings: rhea.CustomerSettings{
 		CacheGoldFeeAddress:  gethcommon.HexToAddress("0x8264AcEE321ac02549aff7fA05A4Ae7a2e92A6f1"),

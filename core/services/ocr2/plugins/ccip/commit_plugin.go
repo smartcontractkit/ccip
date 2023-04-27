@@ -6,7 +6,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2"
 
@@ -29,7 +28,9 @@ const (
 
 func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
 	spec := jb.OCR2OracleSpec
-	pluginConfig, err := ParseAndVerifyPluginConfig(spec.PluginConfig)
+
+	var pluginConfig ccipconfig.CommitPluginConfig
+	err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -44,56 +45,29 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 	if err != nil {
 		return nil, errors.Wrap(err, "get chainset")
 	}
-
-	sourceChain, err := chainSet.Get(big.NewInt(0).SetUint64(pluginConfig.SourceChainID))
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to open source chain")
-	}
-
-	inflightCacheExpiry := DefaultInflightCacheExpiry
-	if pluginConfig.InflightCacheExpiry.Duration() != 0 {
-		inflightCacheExpiry = pluginConfig.InflightCacheExpiry.Duration()
-	}
-
 	commitStore, err := LoadCommitStore(common.HexToAddress(spec.ContractID), destChain.Client())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed loading commitStore")
 	}
-	onRamp, err := LoadOnRamp(common.HexToAddress(pluginConfig.OnRampID), sourceChain.Client())
-	if err != nil {
-		return nil, errors.Wrap(err, "failed loading onRamp")
-	}
-	offRamp, err := LoadOffRamp(common.HexToAddress(pluginConfig.OffRampID), destChain.Client())
-	if err != nil {
-		return nil, errors.Wrap(err, "failed loading offRamp")
-	}
-
 	staticConfig, err := commitStore.GetStaticConfig(&bind.CallOpts{})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed getting the static config from the commitStore")
 	}
-	if staticConfig.OnRamp != onRamp.Address() {
-		return nil, errors.Errorf("Wrong onRamp got %s expected from jobspec %s", staticConfig.OnRamp, onRamp.Address())
+	sourceChain, err := chainSet.Get(big.NewInt(0).SetUint64(staticConfig.SourceChainId))
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to open source chain")
 	}
-	if staticConfig.SourceChainId != pluginConfig.SourceChainID {
-		return nil, errors.Errorf("Wrong source chain ID got %d expected from jobspec %d", staticConfig.SourceChainId, pluginConfig.SourceChainID)
+	onRamp, err := LoadOnRamp(staticConfig.OnRamp, sourceChain.Client())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed loading onRamp")
 	}
 	if staticConfig.ChainId != uint64(destChainID) {
 		return nil, errors.Errorf("Wrong dest chain ID got %d expected from jobspec %d", staticConfig.ChainId, destChainID)
 	}
-	// TODO DynamicConfig call
+	// TODO DynamicConfig call, remove
 	dynamicConfig, err := commitStore.GetDynamicConfig(&bind.CallOpts{})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed getting the dynamic config from the commitStore")
-	}
-
-	seqParsers := func(log logpoller.Log) (uint64, error) {
-		req, err2 := onRamp.ParseCCIPSendRequested(types.Log{Data: log.Data, Topics: log.GetTopics()})
-		if err2 != nil {
-			lggr.Warnf("failed to parse log: %+v", log)
-			return 0, err2
-		}
-		return req.Message.SequenceNumber, nil
 	}
 
 	priceGetterObject, err := NewPriceGetter(pluginConfig.TokenPricesUSDPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
@@ -131,28 +105,25 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 		return nil, err
 	}
 
-	leafHasher := NewLeafHasher(pluginConfig.SourceChainID, uint64(destChainID), onRamp.Address(), hasher.NewKeccakCtx())
+	leafHasher := NewLeafHasher(staticConfig.SourceChainId, uint64(destChainID), onRamp.Address(), hasher.NewKeccakCtx())
 	wrappedPluginFactory := NewCommitReportingPluginFactory(
 		CommitPluginConfig{
-			lggr:                lggr,
-			source:              sourceChain.LogPoller(),
-			dest:                destChain.LogPoller(),
-			seqParsers:          seqParsers,
-			reqEventSig:         eventSigs,
-			onRamp:              onRamp.Address(),
-			offRamp:             offRamp,
-			priceRegistry:       priceRegistry,
-			priceGetter:         priceGetterObject,
-			sourceNative:        sourceNative,
-			sourceFeeEstimator:  sourceChain.GasEstimator(),
-			sourceChainID:       pluginConfig.SourceChainID,
-			commitStore:         commitStore,
-			hasher:              leafHasher,
-			inflightCacheExpiry: inflightCacheExpiry,
+			lggr:               lggr,
+			source:             sourceChain.LogPoller(),
+			dest:               destChain.LogPoller(),
+			reqEventSig:        eventSigs,
+			onRamp:             onRamp,
+			priceRegistry:      priceRegistry,
+			priceGetter:        priceGetterObject,
+			sourceNative:       sourceNative,
+			sourceFeeEstimator: sourceChain.GasEstimator(),
+			sourceChainID:      staticConfig.SourceChainId,
+			commitStore:        commitStore,
+			hasher:             leafHasher,
 		})
 	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPCommit", string(spec.Relay), destChain.ID())
 	argsNoPlugin.Logger = logger.NewOCRWrapper(lggr.Named("CCIPCommit").With(
-		"srcChain", ChainName(int64(pluginConfig.SourceChainID)), "dstChain", ChainName(destChainID)), true, logError)
+		"srcChain", ChainName(int64(staticConfig.SourceChainId)), "dstChain", ChainName(destChainID)), true, logError)
 	oracle, err := libocr2.NewOracle(argsNoPlugin)
 	if err != nil {
 		return nil, err
@@ -169,17 +140,4 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 		}, nil
 	}
 	return []job.ServiceCtx{job.NewServiceAdapter(oracle)}, nil
-}
-
-func ParseAndVerifyPluginConfig(jsonConfig job.JSONConfig) (ccipconfig.CommitPluginConfig, error) {
-	var pluginConfig ccipconfig.CommitPluginConfig
-	err := json.Unmarshal(jsonConfig.Bytes(), &pluginConfig)
-	if err != nil {
-		return ccipconfig.CommitPluginConfig{}, err
-	}
-	err = pluginConfig.ValidateCommitPluginConfig()
-	if err != nil {
-		return ccipconfig.CommitPluginConfig{}, err
-	}
-	return pluginConfig, nil
 }

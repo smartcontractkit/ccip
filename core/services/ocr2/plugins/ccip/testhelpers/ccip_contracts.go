@@ -164,15 +164,13 @@ func (c *CCIPContracts) EnableOffRamp() {
 	require.NoError(c.t, err)
 	c.Dest.Chain.Commit()
 
-	config := ccip.ExecOnchainConfig{
+	onChainConfig, err := ccip.EncodeAbiStruct(ccip.ExecOnchainConfig{
 		PermissionLessExecutionThresholdSeconds: 60,
 		Router:                                  c.Dest.Router.Address(),
 		Afn:                                     c.Dest.AFN.Address(),
 		MaxDataSize:                             1e5,
 		MaxTokensLength:                         5,
-	}
-
-	onchainConfig, err := ccip.EncodeAbiStruct(config)
+	})
 	require.NoError(c.t, err)
 
 	_, err = c.Dest.OffRamp.SetOCR2Config(
@@ -180,7 +178,7 @@ func (c *CCIPContracts) EnableOffRamp() {
 		c.execOCRConfig.Signers,
 		c.execOCRConfig.Transmitters,
 		c.execOCRConfig.F,
-		onchainConfig,
+		onChainConfig,
 		c.execOCRConfig.OffchainConfigVersion,
 		c.execOCRConfig.OffchainConfig,
 	)
@@ -190,12 +188,10 @@ func (c *CCIPContracts) EnableOffRamp() {
 }
 
 func (c *CCIPContracts) EnableCommitStore() {
-	config := ccip.CommitOnchainConfig{
+	onChainConfig, err := ccip.EncodeAbiStruct(ccip.CommitOnchainConfig{
 		PriceRegistry: c.Dest.PriceRegistry.Address(),
 		Afn:           c.Dest.AFN.Address(), // AFN address
-	}
-
-	onChainConfig, err := ccip.EncodeAbiStruct(config)
+	})
 	require.NoError(c.t, err)
 
 	_, err = c.Dest.CommitStore.SetOCR2Config(

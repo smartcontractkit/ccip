@@ -53,7 +53,8 @@ func setupCommitTestHarness(t *testing.T) commitTestHarness {
 		},
 		inFlight: map[[32]byte]InflightReport{},
 		offchainConfig: CommitOffchainConfig{
-			FeeUpdateHeartBeat: models.MustMakeDuration(12 * time.Hour),
+			FeeUpdateHeartBeat:  models.MustMakeDuration(12 * time.Hour),
+			InflightCacheExpiry: models.MustMakeDuration(3 * time.Minute),
 		},
 	}
 	return commitTestHarness{

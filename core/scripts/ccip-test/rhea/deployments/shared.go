@@ -12,6 +12,8 @@ const (
 	FEE_UPDATE_HEARTBEAT         = 24 * time.Hour
 	FEE_UPDATE_DEVIATION_PPB     = 5e7
 	RELATIVE_BOOST_PER_WAIT_HOUR = 0.7
+	INFLIGHT_CACHE_EXPIRY        = 3 * time.Minute
+	ROOT_SNOOZE_TIME             = 10 * time.Minute
 )
 
 func getBlockConfirmations(chain rhea.Chain) uint32 {
