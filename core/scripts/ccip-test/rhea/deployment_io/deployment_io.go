@@ -22,14 +22,14 @@ func PrettyPrintLanes(env dione.Environment, source *rhea.EvmDeploymentConfig, d
 func WriteChainConfigToFile(env dione.Environment, chain *rhea.EvmDeploymentConfig) {
 	sourceChainConfig := prettyPrint(chain.ChainConfig)
 	chain.Logger.Info(string(sourceChainConfig))
-	chainName := ccip.ChainName(int64(chain.ChainConfig.ChainId))
+	chainName := ccip.ChainName(int64(chain.ChainConfig.EvmChainId))
 	attemptWriteToFile(sourceChainConfig, chainName, "chain", string(env))
 }
 
 func writeLaneConfigToFile(env dione.Environment, chain *rhea.EvmDeploymentConfig) {
 	destLaneConfig := prettyPrint(chain.LaneConfig)
 	chain.Logger.Info(string(destLaneConfig))
-	chainName := ccip.ChainName(int64(chain.ChainConfig.ChainId))
+	chainName := ccip.ChainName(int64(chain.ChainConfig.EvmChainId))
 	attemptWriteToFile(destLaneConfig, chainName, "lane", string(env))
 }
 

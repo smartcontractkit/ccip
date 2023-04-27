@@ -58,7 +58,7 @@ func deployAFN(client *EvmDeploymentConfig) error {
 	if err = shared.WaitForMined(client.Logger, client.Client, tx.Hash(), true); err != nil {
 		return err
 	}
-	client.Logger.Infof("AFN deployed on %s in tx: %s", address.Hex(), helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash()))
+	client.Logger.Infof("AFN deployed on %s in tx: %s", address.Hex(), helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash()))
 	client.ChainConfig.Afn = address
 	return nil
 }
@@ -127,7 +127,7 @@ func deployLockReleaseTokenPool(client *EvmDeploymentConfig, tokenName Token, to
 	if err = shared.WaitForMined(client.Logger, client.Client, tx.Hash(), true); err != nil {
 		return common.Address{}, err
 	}
-	client.Logger.Infof("Lock/release pool for %s deployed on %s in tx %s", tokenName, tokenPoolAddress, helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash()))
+	client.Logger.Infof("Lock/release pool for %s deployed on %s in tx %s", tokenName, tokenPoolAddress, helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash()))
 	pool, err := lock_release_token_pool.NewLockReleaseTokenPool(tokenPoolAddress, client.Client)
 	if err != nil {
 		return common.Address{}, err
@@ -153,7 +153,7 @@ func deployBurnMintTokenPool(client *EvmDeploymentConfig, tokenName Token, token
 	if err = shared.WaitForMined(client.Logger, client.Client, tx.Hash(), true); err != nil {
 		return common.Address{}, err
 	}
-	client.Logger.Infof("Burn/mint pool for %s deployed on %s in tx %s", tokenName, tokenPoolAddress, helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash()))
+	client.Logger.Infof("Burn/mint pool for %s deployed on %s in tx %s", tokenName, tokenPoolAddress, helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash()))
 	return tokenPoolAddress, nil
 }
 
@@ -179,7 +179,7 @@ func deployWrappedTokenPool(client *EvmDeploymentConfig, tokenName Token) (commo
 	if err = shared.WaitForMined(client.Logger, client.Client, tx.Hash(), true); err != nil {
 		return common.Address{}, err
 	}
-	client.Logger.Infof("Wrapped token pool for %s deployed on %s in tx %s", tokenName, tokenPoolAddress, helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash()))
+	client.Logger.Infof("Wrapped token pool for %s deployed on %s in tx %s", tokenName, tokenPoolAddress, helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash()))
 	return tokenPoolAddress, nil
 }
 
@@ -205,7 +205,7 @@ func deployRouter(client *EvmDeploymentConfig) error {
 	}
 	client.ChainConfig.Router = routerAddress
 
-	client.Logger.Infof(fmt.Sprintf("Router deployed on %s in tx %s", routerAddress.String(), helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash())))
+	client.Logger.Infof(fmt.Sprintf("Router deployed on %s in tx %s", routerAddress.String(), helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash())))
 	return nil
 }
 
@@ -246,6 +246,6 @@ func deployPriceRegistry(client *EvmDeploymentConfig) error {
 	}
 	client.ChainConfig.PriceRegistry = priceRegistry
 
-	client.Logger.Infof(fmt.Sprintf("PriceRegistry deployed on %s in tx %s", priceRegistry.String(), helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash())))
+	client.Logger.Infof(fmt.Sprintf("PriceRegistry deployed on %s in tx %s", priceRegistry.String(), helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash())))
 	return nil
 }

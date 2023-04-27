@@ -129,7 +129,7 @@ func TestDione(t *testing.T) {
 	checkOwnerKeyAndSetupChain(t)
 
 	don := dione.NewDON(ENV, logger.TestLogger(t))
-	don.ClearAllJobs(ccip.ChainName(int64(SOURCE.ChainConfig.ChainId)), ccip.ChainName(int64(DESTINATION.ChainConfig.ChainId)))
+	don.ClearAllJobs(ccip.ChainName(int64(SOURCE.ChainConfig.EvmChainId)), ccip.ChainName(int64(DESTINATION.ChainConfig.EvmChainId)))
 	don.AddTwoWaySpecs(SOURCE, DESTINATION)
 
 	// Sometimes jobs don't get added correctly. This script looks for missing jobs
@@ -172,20 +172,20 @@ func TestUpdateAllLanes(t *testing.T) {
 	upgradeLane := func(source, dest rhea.EvmDeploymentConfig) {
 		if !source.LaneConfig.DeploySettings.DeployCommitStore || !source.LaneConfig.DeploySettings.DeployRamp {
 			source.Logger.Warnf("Please set \"DeployRamp and DeployCommitStore\" to true for the given EvmChainConfigs and make sure "+
-				"the right ones are set. Source: %d, Dest %d", source.ChainConfig.ChainId, dest.ChainConfig.ChainId)
+				"the right ones are set. Source: %d, Dest %d", source.ChainConfig.EvmChainId, dest.ChainConfig.EvmChainId)
 			return
 		}
 		if !dest.LaneConfig.DeploySettings.DeployCommitStore || !dest.LaneConfig.DeploySettings.DeployRamp {
 			dest.Logger.Warnf("Please set \"DeployRamp and DeployCommitStore\" to true for the given EvmChainConfigs and make sure "+
-				"the right ones are set. Source: %d, Dest %d", dest.ChainConfig.ChainId, source.ChainConfig.ChainId)
+				"the right ones are set. Source: %d, Dest %d", dest.ChainConfig.EvmChainId, source.ChainConfig.EvmChainId)
 			return
 		}
 		if source.ChainConfig.DeploySettings.DeployRouter || dest.ChainConfig.DeploySettings.DeployRouter {
-			dest.Logger.Warnf("Routers should never be set to true Source: %d, Dest %d", dest.ChainConfig.ChainId, source.ChainConfig.ChainId)
+			dest.Logger.Warnf("Routers should never be set to true Source: %d, Dest %d", dest.ChainConfig.EvmChainId, source.ChainConfig.EvmChainId)
 			return
 		}
 		// Removes any old job specs
-		don.ClearAllJobs(ccip.ChainName(int64(source.ChainConfig.ChainId)), ccip.ChainName(int64(dest.ChainConfig.ChainId)))
+		don.ClearAllJobs(ccip.ChainName(int64(source.ChainConfig.EvmChainId)), ccip.ChainName(int64(dest.ChainConfig.EvmChainId)))
 		// Deploys the new contracts and updates `source` and `dest`
 		rhea.DeployLanes(t, &source, &dest)
 		// Prints the new config and writes them to file
@@ -304,8 +304,8 @@ func TestPrintNodeBalances(t *testing.T) {
 
 	don := dione.NewOfflineDON(ENV, logger.TestLogger(t))
 
-	printing.PrintNodeBalances(&SOURCE, don.GetSendingKeys(SOURCE.ChainConfig.ChainId))
-	printing.PrintNodeBalances(&DESTINATION, don.GetSendingKeys(DESTINATION.ChainConfig.ChainId))
+	printing.PrintNodeBalances(&SOURCE, don.GetSendingKeys(SOURCE.ChainConfig.EvmChainId))
+	printing.PrintNodeBalances(&DESTINATION, don.GetSendingKeys(DESTINATION.ChainConfig.EvmChainId))
 }
 
 func TestFundNodes(t *testing.T) {
@@ -333,7 +333,7 @@ func TestPrintAllNodeBalancesPerEnv(t *testing.T) {
 	for _, source := range chainMapping[ENV] {
 		source.SetupChain(t, ownerKey)
 		don := dione.NewOfflineDON(ENV, logger.TestLogger(t))
-		printing.PrintNodeBalances(&source, don.GetSendingKeys(source.ChainConfig.ChainId))
+		printing.PrintNodeBalances(&source, don.GetSendingKeys(source.ChainConfig.EvmChainId))
 	}
 }
 
@@ -362,8 +362,8 @@ func TestWriteNodesWalletsToCSV(t *testing.T) {
 	csv.PrepareCsvFile(filePath, headers)
 	don := dione.NewOfflineDON(ENV, logger.TestLogger(t))
 	DoForEachChain(t, func(chain rhea.EvmDeploymentConfig) {
-		records := don.GetAllNodesWallets(chain.ChainConfig.ChainId)
-		csv.AppendToFile(filePath, records, ccip.ChainName(int64(chain.ChainConfig.ChainId)), ENV)
+		records := don.GetAllNodesWallets(chain.ChainConfig.EvmChainId)
+		csv.AppendToFile(filePath, records, ccip.ChainName(int64(chain.ChainConfig.EvmChainId)), ENV)
 	})
 }
 

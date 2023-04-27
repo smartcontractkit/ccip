@@ -140,8 +140,9 @@ const (
 )
 
 type EVMChainConfig struct {
-	ChainId     uint64
-	GasSettings EVMGasSettings
+	EvmChainId    uint64
+	ChainSelector uint64
+	GasSettings   EVMGasSettings
 
 	SupportedTokens    map[Token]EVMBridgedToken
 	FeeTokens          []Token
@@ -209,14 +210,14 @@ type EvmDeploymentConfig struct {
 }
 
 func (chain *EvmDeploymentConfig) SetupChain(t *testing.T, ownerPrivateKey string) {
-	chain.Owner = GetOwner(t, ownerPrivateKey, chain.ChainConfig.ChainId, chain.ChainConfig.GasSettings)
-	chain.Client = GetClient(t, secrets.GetRPC(chain.ChainConfig.ChainId))
-	chain.Logger = logger.TestLogger(t).Named(ccip.ChainName(int64(chain.ChainConfig.ChainId)))
+	chain.Owner = GetOwner(t, ownerPrivateKey, chain.ChainConfig.EvmChainId, chain.ChainConfig.GasSettings)
+	chain.Client = GetClient(t, secrets.GetRPC(chain.ChainConfig.EvmChainId))
+	chain.Logger = logger.TestLogger(t).Named(ccip.ChainName(int64(chain.ChainConfig.EvmChainId)))
 	chain.Logger.Info("Completed chain setup")
 }
 
 func (chain *EvmDeploymentConfig) SetupReadOnlyChain(lggr logger.Logger) error {
-	client, err := ethclient.Dial(secrets.GetRPC(chain.ChainConfig.ChainId))
+	client, err := ethclient.Dial(secrets.GetRPC(chain.ChainConfig.EvmChainId))
 	if err != nil {
 		return err
 	}

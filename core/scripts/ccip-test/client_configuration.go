@@ -154,6 +154,7 @@ type Client struct {
 	Users            []*bind.TransactOpts
 	Client           *ethclient.Client
 	ChainId          uint64
+	ChainSelector    uint64
 	LinkToken        *link_token_interface.LinkToken
 	LinkTokenAddress common.Address
 	WrappedNative    *link_token_interface.LinkToken
@@ -217,7 +218,8 @@ func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient
 	return SourceClient{
 		Client: Client{
 			Client:           config.Client,
-			ChainId:          config.ChainConfig.ChainId,
+			ChainId:          config.ChainConfig.EvmChainId,
+			ChainSelector:    config.ChainConfig.ChainSelector,
 			LinkTokenAddress: config.ChainConfig.SupportedTokens[rhea.LINK].Token,
 			LinkToken:        LinkToken,
 			WrappedNative:    wrappedNative,
@@ -280,7 +282,8 @@ func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestCli
 	return DestClient{
 		Client: Client{
 			Client:           config.Client,
-			ChainId:          config.ChainConfig.ChainId,
+			ChainId:          config.ChainConfig.EvmChainId,
+			ChainSelector:    config.ChainConfig.ChainSelector,
 			LinkTokenAddress: config.ChainConfig.SupportedTokens[rhea.LINK].Token,
 			LinkToken:        linkToken,
 			WrappedNative:    wrappedNative,
@@ -528,7 +531,7 @@ func (client *CCIPClient) SendCrossChainMessage(source SourceClient, from *bind.
 	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(100_000), false)
 	helpers.PanicErr(err)
 
-	tx, err := source.Router.CcipSend(from, client.Dest.ChainId, router.ClientEVM2AnyMessage{
+	tx, err := source.Router.CcipSend(from, client.Dest.ChainSelector, router.ClientEVM2AnyMessage{
 		Receiver:     toAddress.Bytes(),
 		Data:         nil,
 		TokenAmounts: []router.ClientEVMTokenAmount{token},
@@ -593,7 +596,7 @@ func (client *CCIPClient) SendToOnrampWithExecution(t *testing.T, source SourceC
 	}
 	source.logger.Infof("Send tx with payload %+v", payload)
 
-	tx, err := source.Router.CcipSend(from, client.Dest.ChainId, payload)
+	tx, err := source.Router.CcipSend(from, client.Dest.ChainSelector, payload)
 	if err != nil {
 		t.Log(err.Error())
 		printRevertReason(err, router.RouterABI)
@@ -1067,7 +1070,7 @@ func (client *CCIPClient) ccipSendBasicTx(t *testing.T) {
 
 	msg.Data = DATA
 
-	fee, err := client.Source.Router.GetFee(&bind.CallOpts{}, client.Dest.ChainId, msg)
+	fee, err := client.Source.Router.GetFee(&bind.CallOpts{}, client.Dest.ChainSelector, msg)
 	shared.RequireNoError(t, err)
 
 	// If link was sent, add it to the fee for the approval
@@ -1078,7 +1081,7 @@ func (client *CCIPClient) ccipSendBasicTx(t *testing.T) {
 	sourceBlockNumber := GetCurrentBlockNumber(client.Source.Client.Client)
 	DestBlockNum := GetCurrentBlockNumber(client.Dest.Client.Client)
 
-	tx, err := client.Source.Router.CcipSend(client.Source.Owner, client.Dest.ChainId, msg)
+	tx, err := client.Source.Router.CcipSend(client.Source.Owner, client.Dest.ChainSelector, msg)
 	shared.RequireNoError(t, err)
 	client.Source.logger.Warnf("Message sent for max %d gas %s", tx.Gas(), helpers.ExplorerLink(int64(client.Source.ChainId), tx.Hash()))
 
@@ -1122,7 +1125,7 @@ func (client *CCIPClient) getBasicTx(t *testing.T, feeToken common.Address, incl
 func (client *CCIPClient) sendLinkTx(t *testing.T, from *bind.TransactOpts, token bool) *evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested {
 	msg := client.getBasicTx(t, client.Source.LinkTokenAddress, token)
 
-	fee, err := client.Source.Router.GetFee(&bind.CallOpts{}, client.Dest.ChainId, msg)
+	fee, err := client.Source.Router.GetFee(&bind.CallOpts{}, client.Dest.ChainSelector, msg)
 	shared.RequireNoError(t, err)
 	if token {
 		fee.Add(fee, msg.TokenAmounts[0].Amount)
@@ -1131,7 +1134,7 @@ func (client *CCIPClient) sendLinkTx(t *testing.T, from *bind.TransactOpts, toke
 	client.Source.ApproveLinkFrom(t, from, client.Source.Router.Address(), fee)
 
 	sourceBlockNumber := GetCurrentBlockNumber(client.Source.Client.Client)
-	tx, err := client.Source.Router.CcipSend(from, client.Dest.ChainId, msg)
+	tx, err := client.Source.Router.CcipSend(from, client.Dest.ChainSelector, msg)
 	shared.RequireNoError(t, err)
 	client.Source.logger.Warnf("Message sent for max %d gas %s", tx.Gas(), helpers.ExplorerLink(int64(client.Source.ChainId), tx.Hash()))
 
@@ -1141,7 +1144,7 @@ func (client *CCIPClient) sendLinkTx(t *testing.T, from *bind.TransactOpts, toke
 func (client *CCIPClient) sendWrappedNativeTx(t *testing.T, from *bind.TransactOpts, token bool) *evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested {
 	msg := client.getBasicTx(t, client.Source.WrappedNative.Address(), token)
 
-	fee, err := client.Source.Router.GetFee(&bind.CallOpts{}, client.Dest.ChainId, msg)
+	fee, err := client.Source.Router.GetFee(&bind.CallOpts{}, client.Dest.ChainSelector, msg)
 	shared.RequireNoError(t, err)
 
 	tx, err := client.Source.WrappedNative.Approve(from, client.Source.Router.Address(), fee)
@@ -1153,7 +1156,7 @@ func (client *CCIPClient) sendWrappedNativeTx(t *testing.T, from *bind.TransactO
 	}
 
 	sourceBlockNumber := GetCurrentBlockNumber(client.Source.Client.Client)
-	tx, err = client.Source.Router.CcipSend(from, client.Dest.ChainId, msg)
+	tx, err = client.Source.Router.CcipSend(from, client.Dest.ChainSelector, msg)
 	shared.RequireNoError(t, err)
 	client.Source.logger.Warnf("Message sent for max %d gas %s", tx.Gas(), helpers.ExplorerLink(int64(client.Source.ChainId), tx.Hash()))
 	return WaitForCrossChainSendRequest(client.Source, sourceBlockNumber, tx.Hash())
@@ -1162,7 +1165,7 @@ func (client *CCIPClient) sendWrappedNativeTx(t *testing.T, from *bind.TransactO
 func (client *CCIPClient) sendNativeTx(t *testing.T, from *bind.TransactOpts, token bool) *evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested {
 	msg := client.getBasicTx(t, common.Address{}, token)
 
-	fee, err := client.Source.Router.GetFee(&bind.CallOpts{}, client.Dest.ChainId, msg)
+	fee, err := client.Source.Router.GetFee(&bind.CallOpts{}, client.Dest.ChainSelector, msg)
 	shared.RequireNoError(t, err)
 
 	if token {
@@ -1171,7 +1174,7 @@ func (client *CCIPClient) sendNativeTx(t *testing.T, from *bind.TransactOpts, to
 	from.Value = fee
 
 	sourceBlockNumber := GetCurrentBlockNumber(client.Source.Client.Client)
-	tx, err := client.Source.Router.CcipSend(from, client.Dest.ChainId, msg)
+	tx, err := client.Source.Router.CcipSend(from, client.Dest.ChainSelector, msg)
 	shared.RequireNoError(t, err)
 	from.Value = big.NewInt(0)
 	client.Source.logger.Warnf("Message sent for max %d gas %s", tx.Gas(), helpers.ExplorerLink(int64(client.Source.ChainId), tx.Hash()))

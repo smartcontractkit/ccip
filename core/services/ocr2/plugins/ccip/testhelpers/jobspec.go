@@ -49,12 +49,6 @@ func (params CCIPJobSpecParams) Validate() error {
 	if params.CommitStore == common.HexToAddress("0x0") {
 		return fmt.Errorf("must set commit store address")
 	}
-	if params.SourceChainId == 0 {
-		return fmt.Errorf("invalid source chain id")
-	}
-	if params.DestChainId == 0 {
-		return fmt.Errorf("invalid destination chain id")
-	}
 	return nil
 }
 

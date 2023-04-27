@@ -21,7 +21,7 @@ func DeployCacheGoldTokenAndPool(t *testing.T, client *EvmDeploymentConfig) {
 	shared.RequireNoError(t, err)
 	err = shared.WaitForMined(client.Logger, client.Client, tx.Hash(), true)
 	shared.RequireNoError(t, err)
-	client.Logger.Infof("CACHE.gold token instance deployed on %s in tx: %s", tokenAddress.Hex(), helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash()))
+	client.Logger.Infof("CACHE.gold token instance deployed on %s in tx: %s", tokenAddress.Hex(), helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash()))
 
 	poolAddress, err := deployBurnMintTokenPool(client, CACHEGOLD, tokenAddress)
 	shared.RequireNoError(t, err)
@@ -33,13 +33,13 @@ func DeployCacheGoldTokenAndPool(t *testing.T, client *EvmDeploymentConfig) {
 	shared.RequireNoError(t, err)
 	err = shared.WaitForMined(client.Logger, client.Client, tx.Hash(), true)
 	shared.RequireNoError(t, err)
-	client.Logger.Infof("CACHE.gold token initialized in tx: %s", helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash()))
+	client.Logger.Infof("CACHE.gold token initialized in tx: %s", helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash()))
 
 	tx, err = cacheGoldToken.SetTransferFeeExempt(client.Owner, poolAddress)
 	shared.RequireNoError(t, err)
 	err = shared.WaitForMined(client.Logger, client.Client, tx.Hash(), true)
 	shared.RequireNoError(t, err)
-	client.Logger.Infof("CACHE.gold token pool set fee exempt in tx: %s", helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash()))
+	client.Logger.Infof("CACHE.gold token pool set fee exempt in tx: %s", helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash()))
 }
 
 func UpdateCacheGoldPool(t *testing.T, client *EvmDeploymentConfig) {

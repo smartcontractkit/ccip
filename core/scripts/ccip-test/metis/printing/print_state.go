@@ -39,8 +39,8 @@ func PrintCCIPState(source *rhea.EvmDeploymentConfig, destination *rhea.EvmDeplo
 	printDappSanityCheck(source)
 	printDappSanityCheck(destination)
 
-	printRampSanityCheck(source, destination.LaneConfig.OnRamp, destination.ChainConfig.ChainId)
-	printRampSanityCheck(destination, source.LaneConfig.OnRamp, source.ChainConfig.ChainId)
+	printRampSanityCheck(source, destination.LaneConfig.OnRamp, destination.ChainConfig.ChainSelector)
+	printRampSanityCheck(destination, source.LaneConfig.OnRamp, source.ChainConfig.ChainSelector)
 
 	checkPriceRegistrySet(source, destination)
 
@@ -52,11 +52,11 @@ func PrintCCIPState(source *rhea.EvmDeploymentConfig, destination *rhea.EvmDeplo
 }
 
 func SetupAllLanesReadOnly(logger logger.Logger) {
-	err := deployments.Prod_AvaxFujiToOptimismGoerli.SetupReadOnlyChain(logger.Named(ccip.ChainName(int64(deployments.Prod_AvaxFujiToOptimismGoerli.ChainConfig.ChainId))))
+	err := deployments.Prod_AvaxFujiToOptimismGoerli.SetupReadOnlyChain(logger.Named(ccip.ChainName(int64(deployments.Prod_AvaxFujiToOptimismGoerli.ChainConfig.EvmChainId))))
 	if err != nil {
 		panic(err)
 	}
-	err = deployments.Prod_OptimismGoerliToAvaxFuji.SetupReadOnlyChain(logger.Named(ccip.ChainName(int64(deployments.Prod_OptimismGoerliToAvaxFuji.ChainConfig.ChainId))))
+	err = deployments.Prod_OptimismGoerliToAvaxFuji.SetupReadOnlyChain(logger.Named(ccip.ChainName(int64(deployments.Prod_OptimismGoerliToAvaxFuji.ChainConfig.EvmChainId))))
 	if err != nil {
 		panic(err)
 	}
@@ -64,27 +64,27 @@ func SetupAllLanesReadOnly(logger logger.Logger) {
 
 func PrintTokenSupportAllChains(logger logger.Logger) {
 	SetupAllLanesReadOnly(logger)
-	err := deployments.Prod_SepoliaToOptimismGoerli.SetupReadOnlyChain(logger.Named(ccip.ChainName(int64(deployments.Prod_SepoliaToOptimismGoerli.ChainConfig.ChainId))))
+	err := deployments.Prod_SepoliaToOptimismGoerli.SetupReadOnlyChain(logger.Named(ccip.ChainName(int64(deployments.Prod_SepoliaToOptimismGoerli.ChainConfig.EvmChainId))))
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = deployments.Prod_OptimismGoerliToSepolia.SetupReadOnlyChain(logger.Named(ccip.ChainName(int64(deployments.Prod_OptimismGoerliToSepolia.ChainConfig.ChainId))))
+	err = deployments.Prod_OptimismGoerliToSepolia.SetupReadOnlyChain(logger.Named(ccip.ChainName(int64(deployments.Prod_OptimismGoerliToSepolia.ChainConfig.EvmChainId))))
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = deployments.Prod_SepoliaToAvaxFuji.SetupReadOnlyChain(logger.Named(ccip.ChainName(int64(deployments.Prod_SepoliaToAvaxFuji.ChainConfig.ChainId))))
+	err = deployments.Prod_SepoliaToAvaxFuji.SetupReadOnlyChain(logger.Named(ccip.ChainName(int64(deployments.Prod_SepoliaToAvaxFuji.ChainConfig.EvmChainId))))
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = deployments.Prod_AvaxFujiToSepolia.SetupReadOnlyChain(logger.Named(ccip.ChainName(int64(deployments.Prod_AvaxFujiToSepolia.ChainConfig.ChainId))))
+	err = deployments.Prod_AvaxFujiToSepolia.SetupReadOnlyChain(logger.Named(ccip.ChainName(int64(deployments.Prod_AvaxFujiToSepolia.ChainConfig.EvmChainId))))
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = deployments.Prod_AvaxFujiToOptimismGoerli.SetupReadOnlyChain(logger.Named(ccip.ChainName(int64(deployments.Prod_AvaxFujiToOptimismGoerli.ChainConfig.ChainId))))
+	err = deployments.Prod_AvaxFujiToOptimismGoerli.SetupReadOnlyChain(logger.Named(ccip.ChainName(int64(deployments.Prod_AvaxFujiToOptimismGoerli.ChainConfig.EvmChainId))))
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = deployments.Prod_OptimismGoerliToAvaxFuji.SetupReadOnlyChain(logger.Named(ccip.ChainName(int64(deployments.Prod_OptimismGoerliToAvaxFuji.ChainConfig.ChainId))))
+	err = deployments.Prod_OptimismGoerliToAvaxFuji.SetupReadOnlyChain(logger.Named(ccip.ChainName(int64(deployments.Prod_OptimismGoerliToAvaxFuji.ChainConfig.EvmChainId))))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -239,7 +239,7 @@ func PrintTxStatuses(source *rhea.EvmDeploymentConfig, destination *rhea.EvmDepl
 				ExecutionStatus(tx.execStatus.State),
 				tx.execStatus.Raw.BlockNumber,
 				tx.message.Message.Nonce,
-				helpers.ExplorerLink(int64(destination.ChainConfig.ChainId), tx.execStatus.Raw.TxHash)))
+				helpers.ExplorerLink(int64(destination.ChainConfig.EvmChainId), tx.execStatus.Raw.TxHash)))
 		} else {
 			sb.WriteString(fmt.Sprintf("| %18d | %18s | %20v | %18s | %18d | %s \n",
 				tx.message.Message.SequenceNumber,
@@ -258,7 +258,7 @@ func PrintTxStatuses(source *rhea.EvmDeploymentConfig, destination *rhea.EvmDepl
 func printDappSanityCheck(source *rhea.EvmDeploymentConfig) {
 	var sb strings.Builder
 	sb.WriteString("\n")
-	sb.WriteString(fmt.Sprintf("Dapp sanity checks for %s\n", ccip.ChainName(int64(source.ChainConfig.ChainId))))
+	sb.WriteString(fmt.Sprintf("Dapp sanity checks for %s\n", ccip.ChainName(int64(source.ChainConfig.EvmChainId))))
 
 	tableHeaders := []string{"Dapp", "Router Set"}
 	headerLengths := []int{30, 14}
@@ -287,7 +287,7 @@ func printDappSanityCheck(source *rhea.EvmDeploymentConfig) {
 func printRampSanityCheck(chain *rhea.EvmDeploymentConfig, sourceOnRamp common.Address, remoteChainId uint64) {
 	var sb strings.Builder
 	sb.WriteString("\n")
-	sb.WriteString(fmt.Sprintf("Ramp checks for %s\n", ccip.ChainName(int64(chain.ChainConfig.ChainId))))
+	sb.WriteString(fmt.Sprintf("Ramp checks for %s\n", ccip.ChainName(int64(chain.ChainConfig.EvmChainId))))
 
 	tableHeaders := []string{"Contract", "Config correct"}
 	headerLengths := []int{30, 14}
@@ -347,7 +347,7 @@ func printRampSanityCheck(chain *rhea.EvmDeploymentConfig, sourceOnRamp common.A
 func printRateLimitingStatus(chain *rhea.EvmDeploymentConfig) {
 	var sb strings.Builder
 	sb.WriteString("\n")
-	sb.WriteString(fmt.Sprintf("Rate limits for %s\n", ccip.ChainName(int64(chain.ChainConfig.ChainId))))
+	sb.WriteString(fmt.Sprintf("Rate limits for %s\n", ccip.ChainName(int64(chain.ChainConfig.EvmChainId))))
 
 	tableHeaders := []string{"Contract", "Tokens"}
 	headerLengths := []int{25, 42}
@@ -375,7 +375,7 @@ func printRateLimitingStatus(chain *rhea.EvmDeploymentConfig) {
 func printPaused(chain *rhea.EvmDeploymentConfig) {
 	var sb strings.Builder
 	sb.WriteString("\n")
-	sb.WriteString(fmt.Sprintf("Paused addresses for %s\n", ccip.ChainName(int64(chain.ChainConfig.ChainId))))
+	sb.WriteString(fmt.Sprintf("Paused addresses for %s\n", ccip.ChainName(int64(chain.ChainConfig.EvmChainId))))
 
 	tableHeaders := []string{"Contract", "Address", "Running"}
 	headerLengths := []int{25, 42, 14}
@@ -416,7 +416,7 @@ func printPaused(chain *rhea.EvmDeploymentConfig) {
 func PrintNodeBalances(chain *rhea.EvmDeploymentConfig, addresses []common.Address) {
 	var sb strings.Builder
 	sb.WriteString("\n")
-	sb.WriteString(fmt.Sprintf("Node balances for %s\n", ccip.ChainName(int64(chain.ChainConfig.ChainId))))
+	sb.WriteString(fmt.Sprintf("Node balances for %s\n", ccip.ChainName(int64(chain.ChainConfig.EvmChainId))))
 
 	tableHeaders := []string{"Sender", "Balance"}
 	headerLengths := []int{42, 18}
@@ -437,7 +437,7 @@ func PrintNodeBalances(chain *rhea.EvmDeploymentConfig, addresses []common.Addre
 func printPoolBalances(chain *rhea.EvmDeploymentConfig) {
 	var sb strings.Builder
 	sb.WriteString("\n")
-	sb.WriteString(fmt.Sprintf("Pool balances for %s\n", ccip.ChainName(int64(chain.ChainConfig.ChainId))))
+	sb.WriteString(fmt.Sprintf("Pool balances for %s\n", ccip.ChainName(int64(chain.ChainConfig.EvmChainId))))
 
 	tableHeaders := []string{"Token", "Pool", "Balance", "Onramp", "OffRamp", "Price"}
 	headerLengths := []int{32, 42, 20, 9, 9, 10}
@@ -490,19 +490,19 @@ func printSupportedTokensCheck(source *rhea.EvmDeploymentConfig, destination *rh
 	sourceRouter, err := router.NewRouter(source.ChainConfig.Router, source.Client)
 	helpers.PanicErr(err)
 
-	sourceTokens, err := sourceRouter.GetSupportedTokens(&bind.CallOpts{}, destination.ChainConfig.ChainId)
+	sourceTokens, err := sourceRouter.GetSupportedTokens(&bind.CallOpts{}, destination.ChainConfig.ChainSelector)
 	helpers.PanicErr(err)
 
 	destRouter, err := router.NewRouter(destination.ChainConfig.Router, destination.Client)
 	helpers.PanicErr(err)
 
-	destTokens, err := destRouter.GetSupportedTokens(&bind.CallOpts{}, source.ChainConfig.ChainId)
+	destTokens, err := destRouter.GetSupportedTokens(&bind.CallOpts{}, source.ChainConfig.ChainSelector)
 	helpers.PanicErr(err)
 
 	var sb strings.Builder
 	sb.WriteString("\nToken matching\n")
 
-	tableHeaders := []string{"", "Source " + ccip.ChainName(int64(source.ChainConfig.ChainId)), "Destination " + ccip.ChainName(int64(destination.ChainConfig.ChainId))}
+	tableHeaders := []string{"", "Source " + ccip.ChainName(int64(source.ChainConfig.EvmChainId)), "Destination " + ccip.ChainName(int64(destination.ChainConfig.EvmChainId))}
 	headerLengths := []int{20, 49, 49}
 
 	sb.WriteString(generateSeparator(headerLengths))
@@ -525,7 +525,7 @@ func printSupportedTokensCheck(source *rhea.EvmDeploymentConfig, destination *rh
 			sourceEnabled = slices.Contains(sourceTokens, source.ChainConfig.SupportedTokens[token].Token)
 			isSourcePool = source.ChainConfig.SupportedTokens[token].Pool != common.HexToAddress("")
 
-			sourceFee, err := sourceRouter.GetFee(&bind.CallOpts{}, destination.ChainConfig.ChainId, router.ClientEVM2AnyMessage{
+			sourceFee, err := sourceRouter.GetFee(&bind.CallOpts{}, destination.ChainConfig.ChainSelector, router.ClientEVM2AnyMessage{
 				Receiver:     common.HexToAddress("").Bytes(),
 				Data:         []byte{},
 				TokenAmounts: []router.ClientEVMTokenAmount{},
@@ -545,7 +545,7 @@ func printSupportedTokensCheck(source *rhea.EvmDeploymentConfig, destination *rh
 			destEnabled = slices.Contains(destTokens, destination.ChainConfig.SupportedTokens[token].Token)
 			isDestPool = destination.ChainConfig.SupportedTokens[token].Pool != common.HexToAddress("")
 
-			destFee, err := destRouter.GetFee(&bind.CallOpts{}, source.ChainConfig.ChainId, router.ClientEVM2AnyMessage{
+			destFee, err := destRouter.GetFee(&bind.CallOpts{}, source.ChainConfig.ChainSelector, router.ClientEVM2AnyMessage{
 				Receiver:     common.HexToAddress("").Bytes(),
 				Data:         []byte{},
 				TokenAmounts: []router.ClientEVMTokenAmount{},
@@ -587,7 +587,7 @@ func checkPriceRegistrySet(source *rhea.EvmDeploymentConfig, destination *rhea.E
 	tableHeaders := []string{"Token", "Remote ChainID", "ConfigSet"}
 	headerLengths := []int{20, 14, 9}
 
-	sb.WriteString(fmt.Sprintf("FeeManager token config for %s\n", ccip.ChainName(int64(source.ChainConfig.ChainId))))
+	sb.WriteString(fmt.Sprintf("FeeManager token config for %s\n", ccip.ChainName(int64(source.ChainConfig.EvmChainId))))
 
 	sb.WriteString(generateHeader(tableHeaders, headerLengths))
 
@@ -596,26 +596,26 @@ func checkPriceRegistrySet(source *rhea.EvmDeploymentConfig, destination *rhea.E
 
 	for _, tokenName := range source.ChainConfig.FeeTokens {
 		token := source.ChainConfig.SupportedTokens[tokenName].Token
-		_, err = feeManager.GetFeeTokenBaseUnitsPerUnitGas(&bind.CallOpts{}, token, destination.ChainConfig.ChainId)
+		_, err = feeManager.GetFeeTokenBaseUnitsPerUnitGas(&bind.CallOpts{}, token, destination.ChainConfig.ChainSelector)
 		if err != nil {
-			sb.WriteString(fmt.Sprintf("| %-20s | %14d | %9s |\n", tokenName, destination.ChainConfig.ChainId, printBool(false)))
+			sb.WriteString(fmt.Sprintf("| %-20s | %14d | %9s |\n", tokenName, destination.ChainConfig.EvmChainId, printBool(false)))
 		}
-		sb.WriteString(fmt.Sprintf("| %-20s | %14d | %9s |\n", tokenName, destination.ChainConfig.ChainId, printBool(true)))
+		sb.WriteString(fmt.Sprintf("| %-20s | %14d | %9s |\n", tokenName, destination.ChainConfig.EvmChainId, printBool(true)))
 	}
 	sb.WriteString(generateSeparator(headerLengths))
 
-	sb.WriteString(fmt.Sprintf("FeeManager token config for %s\n", ccip.ChainName(int64(destination.ChainConfig.ChainId))))
+	sb.WriteString(fmt.Sprintf("FeeManager token config for %s\n", ccip.ChainName(int64(destination.ChainConfig.EvmChainId))))
 	sb.WriteString(generateHeader(tableHeaders, headerLengths))
 	feeManager, err = price_registry.NewPriceRegistry(destination.ChainConfig.PriceRegistry, destination.Client)
 	helpers.PanicErr(err)
 
 	for _, tokenName := range destination.ChainConfig.FeeTokens {
 		token := destination.ChainConfig.SupportedTokens[tokenName].Token
-		_, err = feeManager.GetFeeTokenBaseUnitsPerUnitGas(&bind.CallOpts{}, token, source.ChainConfig.ChainId)
+		_, err = feeManager.GetFeeTokenBaseUnitsPerUnitGas(&bind.CallOpts{}, token, source.ChainConfig.ChainSelector)
 		if err != nil {
-			sb.WriteString(fmt.Sprintf("| %-20s | %14d | %9s |\n", tokenName, source.ChainConfig.ChainId, printBool(false)))
+			sb.WriteString(fmt.Sprintf("| %-20s | %14d | %9s |\n", tokenName, source.ChainConfig.EvmChainId, printBool(false)))
 		}
-		sb.WriteString(fmt.Sprintf("| %-20s | %14d | %9s |\n", tokenName, source.ChainConfig.ChainId, printBool(true)))
+		sb.WriteString(fmt.Sprintf("| %-20s | %14d | %9s |\n", tokenName, source.ChainConfig.EvmChainId, printBool(true)))
 	}
 
 	sb.WriteString(generateSeparator(headerLengths))
@@ -728,7 +728,7 @@ func printTokenSupportState(source *rhea.EvmDeploymentConfig, destination *rhea.
 	headerLengths := []int{20, 20, 20, 20, 20, 20, 20, 20}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("\nToken support for %s -> %s \n", ccip.ChainName(int64(source.ChainConfig.ChainId)), ccip.ChainName(int64(destination.ChainConfig.ChainId))))
+	sb.WriteString(fmt.Sprintf("\nToken support for %s -> %s \n", ccip.ChainName(int64(source.ChainConfig.EvmChainId)), ccip.ChainName(int64(destination.ChainConfig.EvmChainId))))
 	sb.WriteString(generateHeader(tableHeaders, headerLengths))
 
 	// Check

@@ -18,10 +18,8 @@ func NewCCIPJobSpecParams(sourceClient rhea.EvmDeploymentConfig, destClient rhea
 		OffRamp:                destClient.LaneConfig.OffRamp,
 		OnRamp:                 sourceClient.LaneConfig.OnRamp,
 		CommitStore:            destClient.LaneConfig.CommitStore,
-		SourceChainName:        ccip.ChainName(int64(sourceClient.ChainConfig.ChainId)),
-		DestChainName:          ccip.ChainName(int64(destClient.ChainConfig.ChainId)),
-		SourceChainId:          sourceClient.ChainConfig.ChainId,
-		DestChainId:            destClient.ChainConfig.ChainId,
+		SourceChainName:        ccip.ChainName(int64(sourceClient.ChainConfig.EvmChainId)),
+		DestChainName:          ccip.ChainName(int64(destClient.ChainConfig.EvmChainId)),
 		TokenPricesUSDPipeline: GetTokenPricesUSDPipeline(getPipelineTokens(sourceClient, destClient)),
 		PollPeriod:             PollPeriod,
 		SourceStartBlock:       sourceClient.LaneConfig.DeploySettings.DeployedAtBlock,
@@ -35,18 +33,18 @@ func getPipelineTokens(sourceClient rhea.EvmDeploymentConfig, destClient rhea.Ev
 	var pipelineTokens []rhea.EVMBridgedToken
 	for _, feeTokenName := range destClient.ChainConfig.FeeTokens {
 		if token, ok := destClient.ChainConfig.SupportedTokens[feeTokenName]; ok {
-			token.ChainId = destClient.ChainConfig.ChainId
+			token.ChainId = destClient.ChainConfig.EvmChainId
 			pipelineTokens = append(pipelineTokens, token)
 		}
 	}
 	if sourceClient.ChainConfig.WrappedNative == "" {
-		panic(fmt.Errorf("WrappedNative is nil for chain: %d", sourceClient.ChainConfig.ChainId))
+		panic(fmt.Errorf("WrappedNative is nil for chain: %d", sourceClient.ChainConfig.EvmChainId))
 	}
 	if _, ok := sourceClient.ChainConfig.SupportedTokens[sourceClient.ChainConfig.WrappedNative]; !ok {
-		panic(fmt.Errorf("SupportedTokens does not contain WrappedNative: %s on chain: %d", sourceClient.ChainConfig.WrappedNative, sourceClient.ChainConfig.ChainId))
+		panic(fmt.Errorf("SupportedTokens does not contain WrappedNative: %s on chain: %d", sourceClient.ChainConfig.WrappedNative, sourceClient.ChainConfig.EvmChainId))
 	}
 	sourceWrappedNative := sourceClient.ChainConfig.SupportedTokens[sourceClient.ChainConfig.WrappedNative]
-	sourceWrappedNative.ChainId = sourceClient.ChainConfig.ChainId
+	sourceWrappedNative.ChainId = sourceClient.ChainConfig.EvmChainId
 	pipelineTokens = append(pipelineTokens, sourceWrappedNative)
 
 	return pipelineTokens

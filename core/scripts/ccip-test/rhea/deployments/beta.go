@@ -24,7 +24,8 @@ var BetaChainMapping = map[rhea.Chain]map[rhea.Chain]rhea.EvmDeploymentConfig{
 }
 
 var Beta_OptimismGoerli = rhea.EVMChainConfig{
-	ChainId: 420,
+	EvmChainId:    420,
+	ChainSelector: 420,
 	GasSettings: rhea.EVMGasSettings{
 		EIP1559: true,
 	},
@@ -74,7 +75,8 @@ var Beta_OptimismGoerli = rhea.EVMChainConfig{
 }
 
 var Beta_AvaxFuji = rhea.EVMChainConfig{
-	ChainId: 43113,
+	EvmChainId:    43113,
+	ChainSelector: 43113,
 	GasSettings: rhea.EVMGasSettings{
 		EIP1559: false,
 	},

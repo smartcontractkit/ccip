@@ -54,11 +54,11 @@ func NewMetisApp(client MetisClient) *cli.App {
 	app.Name = "Metis"
 	app.Usage = "CCIP sanity checker"
 
-	err := SOURCE.SetupReadOnlyChain(client.Logger.Named(ccip.ChainName(int64(SOURCE.ChainConfig.ChainId))))
+	err := SOURCE.SetupReadOnlyChain(client.Logger.Named(ccip.ChainName(int64(SOURCE.ChainConfig.EvmChainId))))
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = DESTINATION.SetupReadOnlyChain(client.Logger.Named(ccip.ChainName(int64(DESTINATION.ChainConfig.ChainId))))
+	err = DESTINATION.SetupReadOnlyChain(client.Logger.Named(ccip.ChainName(int64(DESTINATION.ChainConfig.EvmChainId))))
 	if err != nil {
 		log.Fatal(err)
 	}

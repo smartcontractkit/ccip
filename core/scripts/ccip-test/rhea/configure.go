@@ -35,17 +35,17 @@ func setOffRampOnTokenPools(t *testing.T, destClient *EvmDeploymentConfig) {
 		shared.RequireNoError(t, err)
 		err = shared.WaitForMined(destClient.Logger, destClient.Client, tx.Hash(), true)
 		shared.RequireNoError(t, err)
-		destClient.Logger.Infof("Offramp pool configured with offramp address: %s", helpers.ExplorerLink(int64(destClient.ChainConfig.ChainId), tx.Hash()))
+		destClient.Logger.Infof("Offramp pool configured with offramp address: %s", helpers.ExplorerLink(int64(destClient.ChainConfig.EvmChainId), tx.Hash()))
 	}
 }
 
-func SetPriceRegistryPrices(t *testing.T, client *EvmDeploymentConfig, destChainId uint64) {
+func SetPriceRegistryPrices(t *testing.T, client *EvmDeploymentConfig, destChainSelector uint64) {
 	priceRegistry, err := price_registry.NewPriceRegistry(client.ChainConfig.PriceRegistry, client.Client)
 	shared.RequireNoError(t, err)
 
 	priceUpdates := price_registry.InternalPriceUpdates{
 		TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{},
-		DestChainId:       destChainId,
+		DestChainId:       destChainSelector,
 		// Set 1e18 units of gas to $2k, being fairly reasonable for eth
 		// These values will get auto updated by the DON
 		UsdPerUnitGas: big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
@@ -81,7 +81,7 @@ func setOnRampPrices(t *testing.T, client *EvmDeploymentConfig) {
 	shared.RequireNoError(t, err)
 	err = shared.WaitForMined(client.Logger, client.Client, tx.Hash(), true)
 	shared.RequireNoError(t, err)
-	client.Logger.Infof(fmt.Sprintf("OnRamp prices set on %s in tx %s", client.LaneConfig.OnRamp.String(), helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash())))
+	client.Logger.Infof(fmt.Sprintf("OnRamp prices set on %s in tx %s", client.LaneConfig.OnRamp.String(), helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash())))
 }
 
 func setOffRampPrices(t *testing.T, client *EvmDeploymentConfig) {
@@ -100,15 +100,15 @@ func setOffRampPrices(t *testing.T, client *EvmDeploymentConfig) {
 	shared.RequireNoError(t, err)
 	err = shared.WaitForMined(client.Logger, client.Client, tx.Hash(), true)
 	shared.RequireNoError(t, err)
-	client.Logger.Infof(fmt.Sprintf("OffRamp prices set on %s in tx %s", client.LaneConfig.OnRamp.String(), helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash())))
+	client.Logger.Infof(fmt.Sprintf("OffRamp prices set on %s in tx %s", client.LaneConfig.OnRamp.String(), helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash())))
 }
 
-func setOnRampOnRouter(t *testing.T, sourceClient *EvmDeploymentConfig, destChainId uint64) {
+func setOnRampOnRouter(t *testing.T, sourceClient *EvmDeploymentConfig, destChainSelector uint64) {
 	sourceClient.Logger.Infof("Setting the onRamp on the Router")
 	routerContract, err := router.NewRouter(sourceClient.ChainConfig.Router, sourceClient.Client)
 	shared.RequireNoError(t, err)
 	sourceClient.Logger.Infof("Registering new onRamp")
-	tx, err := routerContract.ApplyRampUpdates(sourceClient.Owner, []router.RouterOnRampUpdate{{DestChainId: destChainId, OnRamp: sourceClient.LaneConfig.OnRamp}}, nil)
+	tx, err := routerContract.ApplyRampUpdates(sourceClient.Owner, []router.RouterOnRampUpdate{{DestChainId: destChainSelector, OnRamp: sourceClient.LaneConfig.OnRamp}}, nil)
 	shared.RequireNoError(t, err)
 	err = shared.WaitForMined(sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
 	shared.RequireNoError(t, err)
@@ -129,16 +129,16 @@ func setOnRampOnTokenPools(t *testing.T, sourceClient *EvmDeploymentConfig) {
 		shared.RequireNoError(t, err)
 		err = shared.WaitForMined(sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
 		shared.RequireNoError(t, err)
-		sourceClient.Logger.Infof("Onramp pool configured with offramp address: %s", helpers.ExplorerLink(int64(sourceClient.ChainConfig.ChainId), tx.Hash()))
+		sourceClient.Logger.Infof("Onramp pool configured with offramp address: %s", helpers.ExplorerLink(int64(sourceClient.ChainConfig.EvmChainId), tx.Hash()))
 	}
 }
 
-func setOffRampOnRouter(t *testing.T, sourceChainId uint64, client *EvmDeploymentConfig) {
+func setOffRampOnRouter(t *testing.T, sourceChainSelector uint64, client *EvmDeploymentConfig) {
 	client.Logger.Infof("Setting the offRamp on the Router")
 	routerContract, err := router.NewRouter(client.ChainConfig.Router, client.Client)
 	shared.RequireNoError(t, err)
 
-	offRamps, err := routerContract.GetOffRamps(&bind.CallOpts{}, sourceChainId)
+	offRamps, err := routerContract.GetOffRamps(&bind.CallOpts{}, sourceChainSelector)
 	shared.RequireNoError(t, err)
 	for _, offRamp := range offRamps {
 		if offRamp == client.LaneConfig.OffRamp {
@@ -148,7 +148,7 @@ func setOffRampOnRouter(t *testing.T, sourceChainId uint64, client *EvmDeploymen
 	}
 
 	tx, err := routerContract.ApplyRampUpdates(client.Owner, nil, []router.RouterOffRampUpdate{
-		{SourceChainId: sourceChainId, OffRamps: []common.Address{client.LaneConfig.OffRamp}}})
+		{SourceChainId: sourceChainSelector, OffRamps: []common.Address{client.LaneConfig.OffRamp}}})
 	shared.RequireNoError(t, err)
 	err = shared.WaitForMined(client.Logger, client.Client, tx.Hash(), true)
 	shared.RequireNoError(t, err)
@@ -176,7 +176,7 @@ func fillPoolWithTokens(client *EvmDeploymentConfig, pool *lock_release_token_po
 	if err != nil {
 		return err
 	}
-	client.Logger.Infof("Approving token to the token pool: %s", helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash()))
+	client.Logger.Infof("Approving token to the token pool: %s", helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash()))
 	if err = shared.WaitForMined(client.Logger, client.Client, tx.Hash(), true); err != nil {
 		return err
 	}
@@ -184,11 +184,11 @@ func fillPoolWithTokens(client *EvmDeploymentConfig, pool *lock_release_token_po
 	if err != nil {
 		return err
 	}
-	client.Logger.Infof("Adding liquidity to the token pool: %s", helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash()))
+	client.Logger.Infof("Adding liquidity to the token pool: %s", helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash()))
 	if err = shared.WaitForMined(client.Logger, client.Client, tx.Hash(), true); err != nil {
 		return err
 	}
-	client.Logger.Infof("Pool filled with tokens: %s", helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash()))
+	client.Logger.Infof("Pool filled with tokens: %s", helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash()))
 	return nil
 }
 
@@ -205,7 +205,7 @@ func FundPingPong(client *EvmDeploymentConfig, fundingAmount *big.Int, tokenAddr
 	if err = shared.WaitForMined(client.Logger, client.Client, tx.Hash(), true); err != nil {
 		return err
 	}
-	client.Logger.Infof("Ping pong funded with %s in tx: %s", fundingAmount.String(), helpers.ExplorerLink(int64(client.ChainConfig.ChainId), tx.Hash()))
+	client.Logger.Infof("Ping pong funded with %s in tx: %s", fundingAmount.String(), helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash()))
 	return nil
 }
 

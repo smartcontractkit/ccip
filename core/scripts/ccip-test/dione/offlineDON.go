@@ -78,11 +78,11 @@ func (don *OfflineDON) FundNodeKeys(chainConfig *rhea.EvmDeploymentConfig, owner
 	ownerKey, err := crypto.HexToECDSA(ownerPrivKey)
 	helpers.PanicErr(err)
 
-	don.lggr.Infof("Chain id %d", chainConfig.ChainConfig.ChainId)
+	don.lggr.Infof("Chain id %d", chainConfig.ChainConfig.EvmChainId)
 
 	nonceIncrement := 0
 	for i, node := range don.Config.Nodes {
-		eoa := gethcommon.HexToAddress(node.EthKeys[strconv.FormatUint(chainConfig.ChainConfig.ChainId, 10)])
+		eoa := gethcommon.HexToAddress(node.EthKeys[strconv.FormatUint(chainConfig.ChainConfig.EvmChainId, 10)])
 		if eoa == gethcommon.HexToAddress("0x") {
 			don.lggr.Warnf("Node %2d has no sending key configured. Skipping funding", i)
 			continue
@@ -158,7 +158,7 @@ func sendEth(to gethcommon.Address, chainConfig rhea.EvmDeploymentConfig, nonce 
 		},
 	)
 
-	signedTx, err := types.SignTx(tx, types.NewLondonSigner(big.NewInt(0).SetUint64(chainConfig.ChainConfig.ChainId)), ownerKey)
+	signedTx, err := types.SignTx(tx, types.NewLondonSigner(big.NewInt(0).SetUint64(chainConfig.ChainConfig.EvmChainId)), ownerKey)
 	helpers.PanicErr(err)
 	err = chainConfig.Client.SendTransaction(context.Background(), signedTx)
 	helpers.PanicErr(err)
@@ -167,7 +167,7 @@ func sendEth(to gethcommon.Address, chainConfig rhea.EvmDeploymentConfig, nonce 
 func sendEthEIP1559(to gethcommon.Address, chainConfig rhea.EvmDeploymentConfig, nonce uint64, gasTipCap *big.Int, ownerKey *ecdsa.PrivateKey, amount *big.Int) {
 	tx := types.NewTx(
 		&types.DynamicFeeTx{
-			ChainID:    big.NewInt(0).SetUint64(chainConfig.ChainConfig.ChainId),
+			ChainID:    big.NewInt(0).SetUint64(chainConfig.ChainConfig.EvmChainId),
 			Nonce:      nonce,
 			GasTipCap:  gasTipCap,
 			GasFeeCap:  big.NewInt(2e9),
@@ -179,7 +179,7 @@ func sendEthEIP1559(to gethcommon.Address, chainConfig rhea.EvmDeploymentConfig,
 		},
 	)
 
-	signedTx, err := types.SignTx(tx, types.NewLondonSigner(big.NewInt(0).SetUint64(chainConfig.ChainConfig.ChainId)), ownerKey)
+	signedTx, err := types.SignTx(tx, types.NewLondonSigner(big.NewInt(0).SetUint64(chainConfig.ChainConfig.EvmChainId)), ownerKey)
 	helpers.PanicErr(err)
 	err = chainConfig.Client.SendTransaction(context.Background(), signedTx)
 	helpers.PanicErr(err)
