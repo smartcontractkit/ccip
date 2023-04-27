@@ -137,17 +137,21 @@ func (params CCIPJobSpecParams) ExecutionJobSpec() (*client.OCR2TaskJobSpec, err
 }
 
 func (params CCIPJobSpecParams) BootstrapJob(contractID string) *client.OCR2TaskJobSpec {
-	return &client.OCR2TaskJobSpec{
-		Name:    fmt.Sprintf("%s-%s", Boostrap, params.DestChainName),
-		JobType: "bootstrap",
-		OCR2OracleSpec: job.OCR2OracleSpec{
-			ContractID:                        contractID,
-			Relay:                             relay.EVM,
-			ContractConfigConfirmations:       1,
-			ContractConfigTrackerPollInterval: models.Interval(20 * time.Second),
-			RelayConfig: map[string]interface{}{
-				"chainID": params.DestChainId,
-			},
+	bootstrapSpec := job.OCR2OracleSpec{
+		ContractID:                        contractID,
+		Relay:                             relay.EVM,
+		ContractConfigConfirmations:       1,
+		ContractConfigTrackerPollInterval: models.Interval(20 * time.Second),
+		RelayConfig: map[string]interface{}{
+			"chainID": params.DestChainId,
 		},
+	}
+	if params.DestStartBlock > 0 {
+		bootstrapSpec.RelayConfig["fromBlock"] = params.DestStartBlock
+	}
+	return &client.OCR2TaskJobSpec{
+		Name:           fmt.Sprintf("%s-%s", Boostrap, params.DestChainName),
+		JobType:        "bootstrap",
+		OCR2OracleSpec: bootstrapSpec,
 	}
 }
