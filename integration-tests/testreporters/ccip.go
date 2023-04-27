@@ -299,12 +299,12 @@ func (r *CCIPTestReporter) SetRPS(rps int64) {
 	r.loadrps = rps
 }
 
-func (r *CCIPTestReporter) AddNewLane(name string) *CCIPLaneStats {
+func (r *CCIPTestReporter) AddNewLane(name string, lggr zerolog.Logger) *CCIPLaneStats {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	i := &CCIPLaneStats{
 		lane:                    name,
-		lggr:                    r.logger.With().Str("Lane", name).Logger(),
+		lggr:                    lggr,
 		FailedCountsByPhase:     make(map[Phase]int64),
 		SuccessCountsByPhase:    make(map[Phase]int64),
 		DurationStatByPhase:     make(map[Phase]DurationStat),

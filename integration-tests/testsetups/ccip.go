@@ -15,7 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink-env/environment"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/multierr"
 	"go.uber.org/zap/zapcore"
@@ -403,8 +402,10 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 	t := o.Cfg.Test
 	var k8Env *environment.Environment
 	ccipEnv := o.Env
+	namespace := "existing"
 	if ccipEnv != nil {
 		k8Env = ccipEnv.K8Env
+		namespace = k8Env.Cfg.Namespace
 	}
 	configureCLNode := !o.Cfg.ExistingDeployment
 	setUpFuncs, ctx := errgroup.WithContext(context.Background())
@@ -422,17 +423,8 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 	require.NoError(t, err, "Connecting to blockchain nodes shouldn't fail")
 	destChainClientA2B.ParallelTransactions(true)
 
-	sourceChainClientB2A, err := blockchain.ConcurrentEVMClient(networkB, k8Env, destChainClientA2B)
-	require.NoError(t, err, "Connecting to blockchain nodes shouldn't fail")
-	sourceChainClientB2A.ParallelTransactions(true)
-
-	destChainClientB2A, err := blockchain.ConcurrentEVMClient(networkA, k8Env, sourceChainClientA2B)
-	require.NoError(t, err, "Connecting to blockchain nodes shouldn't fail")
-	destChainClientB2A.ParallelTransactions(true)
-
 	ccipLaneA2B := &actions.CCIPLane{
 		Test:              t,
-		Logger:            zerolog.New(zerolog.NewConsoleWriter(zerolog.ConsoleTestWriter(t))).With().Timestamp().Logger(),
 		TestEnv:           ccipEnv,
 		SourceChain:       sourceChainClientA2B,
 		DestChain:         destChainClientA2B,
@@ -445,16 +437,16 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 		DestBalances:      make(map[string]*big.Int),
 		Context:           ctx,
 		CommonContractsWg: &sync.WaitGroup{},
-		Reports: o.Reporter.AddNewLane(fmt.Sprintf("%d To %d",
-			networkA.ChainID, networkB.ChainID)),
 	}
 	ccipLaneA2B.SrcNetworkLaneCfg, err = o.LaneConfig.ReadLaneConfig(networkA.Name)
 	require.NoError(t, err, "Reading lane config shouldn't fail")
 	ccipLaneA2B.DstNetworkLaneCfg, err = o.LaneConfig.ReadLaneConfig(networkB.Name)
 	require.NoError(t, err, "Reading lane config shouldn't fail")
 
-	ccipLaneA2B.Logger = lggr.With().Str("Lane",
+	ccipLaneA2B.Logger = lggr.With().Str("env", namespace).Str("Lane",
 		fmt.Sprintf("%s-->%s", ccipLaneA2B.SourceNetworkName, ccipLaneA2B.DestNetworkName)).Logger()
+	ccipLaneA2B.Reports = o.Reporter.AddNewLane(fmt.Sprintf("%d To %d",
+		networkA.ChainID, networkB.ChainID), ccipLaneA2B.Logger)
 
 	bidirectionalLane := &BiDirectionalLaneConfig{
 		NetworkA:     networkA,
@@ -466,6 +458,14 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 	var ccipLaneB2A *actions.CCIPLane
 
 	if bidirectional {
+		sourceChainClientB2A, err := blockchain.ConcurrentEVMClient(networkB, k8Env, destChainClientA2B)
+		require.NoError(t, err, "Connecting to blockchain nodes shouldn't fail")
+		sourceChainClientB2A.ParallelTransactions(true)
+
+		destChainClientB2A, err := blockchain.ConcurrentEVMClient(networkA, k8Env, sourceChainClientA2B)
+		require.NoError(t, err, "Connecting to blockchain nodes shouldn't fail")
+		destChainClientB2A.ParallelTransactions(true)
+
 		ccipLaneB2A = &actions.CCIPLane{
 			Test:              t,
 			TestEnv:           ccipEnv,
@@ -480,12 +480,13 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 			TotalFee:          big.NewInt(0),
 			Context:           ctx,
 			CommonContractsWg: &sync.WaitGroup{},
-			Reports:           o.Reporter.AddNewLane(fmt.Sprintf("%d To %d", networkB.ChainID, networkA.ChainID)),
 			SrcNetworkLaneCfg: ccipLaneA2B.DstNetworkLaneCfg,
 			DstNetworkLaneCfg: ccipLaneA2B.SrcNetworkLaneCfg,
 		}
-		ccipLaneB2A.Logger = lggr.With().Str("Lane",
+		ccipLaneB2A.Logger = lggr.With().Str("env", namespace).Str("Lane",
 			fmt.Sprintf("%s-->%s", ccipLaneB2A.SourceNetworkName, ccipLaneB2A.DestNetworkName)).Logger()
+		ccipLaneB2A.Reports = o.Reporter.AddNewLane(
+			fmt.Sprintf("%d To %d", networkB.ChainID, networkA.ChainID), ccipLaneB2A.Logger)
 		bidirectionalLane.ReverseLane = ccipLaneB2A
 	}
 	o.Lanes = append(o.Lanes, bidirectionalLane)
@@ -571,6 +572,7 @@ func CCIPDefaultTestSetUp(
 		chains  []blockchain.EVMClient
 	)
 	filename := fmt.Sprintf("./tmp_%s.json", strings.ReplaceAll(t.Name(), "/", "_"))
+	inputs.Test = t
 	setUpArgs := &CCIPTestSetUpOutputs{
 		Cfg:            inputs,
 		Reporter:       testreporters.NewCCIPTestReporter(t, lggr),
@@ -641,6 +643,7 @@ func CCIPDefaultTestSetUp(
 	}
 	t.Cleanup(func() {
 		if configureCLNode {
+			lggr.Info().Msg("Tearing down the environment")
 			err = actions.TeardownSuite(t, ccipEnv.K8Env, utils.ProjectRoot, ccipEnv.CLNodes, setUpArgs.Reporter,
 				zapcore.ErrorLevel, chains...)
 			require.NoError(t, err, "Environment teardown shouldn't fail")
@@ -672,10 +675,10 @@ func CCIPDefaultTestSetUp(
 			chainByChainID[n.NetworkA.ChainID], chainByChainID[n.NetworkB.ChainID],
 			transferAmounts, numOfCommitNodes, commitAndExecOnSameDON,
 			bidirectional, newBootstrap)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
 	err = laneconfig.WriteLanesToJSON(setUpArgs.LaneConfigFile, setUpArgs.LaneConfig)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	setUpArgs.TearDown = func() {
 		for _, lanes := range setUpArgs.Lanes {

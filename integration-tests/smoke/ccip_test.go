@@ -30,7 +30,6 @@ func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
-		l.Info().Msg("Tearing down the environment")
 		setUpOutput.TearDown()
 	})
 	for i := range setUpOutput.Lanes {

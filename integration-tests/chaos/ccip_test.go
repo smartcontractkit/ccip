@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/smartcontractkit/chainlink-env/chaos"
-	"github.com/smartcontractkit/chainlink-env/environment"
 	a "github.com/smartcontractkit/chainlink-env/pkg/alias"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils"
 	"github.com/stretchr/testify/require"
@@ -95,19 +94,16 @@ func TestChaosCCIP(t *testing.T) {
 			waitForChaosRecovery: false,
 		},
 	}
-	l := utils.GetTestLogger(t)
-	testCfg := testsetups.NewCCIPTestConfig(t, l, testsetups.Chaos)
+
 	for _, in := range inputs {
+		in := in
 		t.Run(in.testName, func(t *testing.T) {
 			t.Parallel()
 			l := utils.GetTestLogger(t)
+			testCfg := testsetups.NewCCIPTestConfig(t, l, testsetups.Chaos)
 			var (
-				tearDown         func()
 				numOfCommitNodes = 5
 				numOfRequests    = 3
-				testEnvironment  *environment.Environment
-				lane             *actions.CCIPLane
-				testSetup        *actions.CCIPTestEnv
 			)
 
 			setUpArgs := testsetups.CCIPDefaultTestSetUp(t, l, "chaos-ccip", map[string]interface{}{
@@ -132,11 +128,11 @@ func TestChaosCCIP(t *testing.T) {
 				return
 			}
 
-			lane = setUpArgs.Lanes[0].ForwardLane
+			lane := setUpArgs.Lanes[0].ForwardLane
 
-			tearDown = setUpArgs.TearDown
-			testEnvironment = lane.TestEnv.K8Env
-			testSetup = lane.TestEnv
+			tearDown := setUpArgs.TearDown
+			testEnvironment := lane.TestEnv.K8Env
+			testSetup := lane.TestEnv
 
 			testSetup.ChaosLabel(t, lane.SourceChain.GetNetworkName(), lane.DestChain.GetNetworkName())
 

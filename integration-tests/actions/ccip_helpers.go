@@ -1560,9 +1560,12 @@ func (lane *CCIPLane) StartEventWatchers() error {
 }
 
 func (lane *CCIPLane) CleanUp() {
+	lane.Logger.Info().Msg("Cleaning up lane")
 	for _, sub := range lane.Subscriptions {
 		sub.Unsubscribe()
 	}
+	require.NoError(lane.Test, lane.DestChain.Close())
+	require.NoError(lane.Test, lane.SourceChain.Close())
 }
 
 // DeployNewCCIPLane sets up a lane and initiates lane.Source and lane.Destination
@@ -2056,6 +2059,11 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 			if err != nil {
 				return fmt.Errorf("getting concurrent evmclient chain %s %+v", c.GetNetworkName(), err)
 			}
+			defer func() {
+				if c != nil {
+					c.Close()
+				}
+			}()
 			err = FundChainlinkNodesAddresses(chainlinkNodes[1:], c, nodeFund)
 			if err != nil {
 				return fmt.Errorf("funding nodes for chain %s %+v", c.GetNetworkName(), err)
