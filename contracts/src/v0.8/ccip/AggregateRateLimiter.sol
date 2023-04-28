@@ -15,6 +15,7 @@ contract AggregateRateLimiter is OwnerIsCreator {
   error AddressCannotBeZero();
 
   event TokenPriceChanged(address token, uint256 newPrice);
+  event AdminSet(address newAdmin);
 
   // The address of the token limit admin that has the same permissions as the owner.
   address internal s_admin;
@@ -116,8 +117,10 @@ contract AggregateRateLimiter is OwnerIsCreator {
 
   /// @notice Sets the token limit admin address.
   /// @param newAdmin the address of the new admin.
+  /// @dev setting this to address(0) indicates there is no active admin.
   function setAdmin(address newAdmin) public requireAdminOrOwner {
     s_admin = newAdmin;
+    emit AdminSet(newAdmin);
   }
 
   /// @notice a modifier that allows the owner or the s_tokenLimitAdmin call the functions

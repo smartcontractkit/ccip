@@ -8,6 +8,7 @@
   "getSupportedTokens(uint64)": "fbca3b74",
   "getWrappedNative()": "e861e907",
   "isChainSupported(uint64)": "a48a9058",
+  "isOffRamp(address)": "1d7a74a0",
   "owner()": "8da5cb5b",
   "routeMessage((bytes32,uint64,bytes,bytes,(address,uint256)[]),bool,uint256,address)": "5607b375",
   "setWrappedNative(address)": "52cb60ca",

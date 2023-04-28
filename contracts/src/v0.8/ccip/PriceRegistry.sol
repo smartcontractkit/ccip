@@ -97,16 +97,12 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
     if (!s_feeTokens.contains(feeToken)) revert NotAFeeToken(feeToken);
 
     TimestampedUint128Value memory gasPrice = s_usdPerUnitGasByDestChainId[destChainId];
+    // We do allow a gas price of 0
     if (gasPrice.timestamp == 0) revert ChainNotSupported(destChainId);
     uint256 timePassed = block.timestamp - gasPrice.timestamp;
     if (timePassed > i_stalenessThreshold) revert StaleGasPrice(destChainId, i_stalenessThreshold, timePassed);
 
-    TimestampedUint128Value memory feeTokenPrice = s_usdPerToken[feeToken];
-    if (feeTokenPrice.timestamp == 0 || feeTokenPrice.value == 0) revert TokenNotSupported(feeToken);
-    timePassed = block.timestamp - feeTokenPrice.timestamp;
-    if (timePassed > i_stalenessThreshold) revert StaleTokenPrice(feeToken, i_stalenessThreshold, timePassed);
-
-    return (uint256(gasPrice.value) * 1e18) / uint256(feeTokenPrice.value);
+    return (uint256(gasPrice.value) * 1e18) / _getValidatedTokenPrice(feeToken);
   }
 
   /// @inheritdoc IPriceRegistry
@@ -117,25 +113,25 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
     address fromToken,
     uint256 fromTokenAmount,
     address toToken
-  ) external view override returns (uint256 toTokenAmount) {
-    TimestampedUint128Value memory fromTokenPrice = s_usdPerToken[fromToken];
-    if (fromTokenPrice.timestamp == 0 || fromTokenPrice.value == 0) revert TokenNotSupported(fromToken);
-    uint256 fromTokenTimePassed = block.timestamp - fromTokenPrice.timestamp;
-    if (fromTokenTimePassed > i_stalenessThreshold)
-      revert StaleTokenPrice(fromToken, i_stalenessThreshold, fromTokenTimePassed);
-
-    TimestampedUint128Value memory toTokenPrice = s_usdPerToken[toToken];
-    if (toTokenPrice.timestamp == 0 || toTokenPrice.value == 0) revert TokenNotSupported(toToken);
-    uint256 toTokenTimePassed = block.timestamp - toTokenPrice.timestamp;
-    if (toTokenTimePassed > i_stalenessThreshold)
-      revert StaleTokenPrice(toToken, i_stalenessThreshold, toTokenTimePassed);
-
+  ) external view override returns (uint256) {
     /// Example:
     /// fromTokenAmount:   1e18      // 1 ETH
     /// ETH:               2_000e18
     /// LINK:              5e18
     /// return:            1e18 * 2_000e18 / 5e18 = 400e18 (400 LINK)
-    return (fromTokenAmount * uint256(fromTokenPrice.value)) / uint256(toTokenPrice.value);
+    return (fromTokenAmount * _getValidatedTokenPrice(fromToken)) / _getValidatedTokenPrice(toToken);
+  }
+
+  /// @notice Gets the token price for a given token and revert if the token is either
+  /// not supported or the price is stale.
+  /// @param token The address of the token to get the price for
+  /// @return the token price
+  function _getValidatedTokenPrice(address token) internal view returns (uint256) {
+    TimestampedUint128Value memory tokenPrice = s_usdPerToken[token];
+    if (tokenPrice.timestamp == 0 || tokenPrice.value == 0) revert TokenNotSupported(token);
+    uint256 timePassed = block.timestamp - tokenPrice.timestamp;
+    if (timePassed > i_stalenessThreshold) revert StaleTokenPrice(token, i_stalenessThreshold, timePassed);
+    return tokenPrice.value;
   }
 
   // ================================================================

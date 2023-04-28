@@ -420,6 +420,8 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
 }
 
 contract EVM2EVMOnRamp_setNops is EVM2EVMOnRampSetup {
+  event NopPaid(address indexed nop, uint256 amount);
+
   // Used because EnumerableMap doesn't guarantee order
   mapping(address => uint256) internal s_nopsToWeights;
 
@@ -439,6 +441,41 @@ contract EVM2EVMOnRamp_setNops is EVM2EVMOnRampSetup {
     }
   }
 
+  function testIncludesPaymentSuccess() public {
+    EVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights = getNopsAndWeights();
+    nopsAndWeights[1].nop = USER_4;
+    nopsAndWeights[1].weight = 20;
+    uint32 totalWeight;
+    for (uint256 i = 0; i < nopsAndWeights.length; ++i) {
+      totalWeight += nopsAndWeights[i].weight;
+      s_nopsToWeights[nopsAndWeights[i].nop] = nopsAndWeights[i].weight;
+    }
+
+    // Make sure a payout happens regardless of what the weights are set to
+    uint96 nopFeesJuels = totalWeight * 5;
+    // Set Nop fee juels
+    deal(s_sourceFeeToken, address(s_onRamp), nopFeesJuels);
+    changePrank(address(s_sourceRouter));
+    s_onRamp.forwardFromRouter(_generateEmptyMessage(), nopFeesJuels, OWNER);
+    changePrank(OWNER);
+
+    // We don't care about the fee calculation logic in this test
+    // so we don't verify the amounts. We do verify the addresses to
+    // make sure the existing nops get paid and not the new ones.
+    EVM2EVMOnRamp.NopAndWeight[] memory existingNopsAndWeights = getNopsAndWeights();
+    for (uint256 i = 0; i < existingNopsAndWeights.length; ++i) {
+      vm.expectEmit(true, false, false, false);
+      emit NopPaid(existingNopsAndWeights[i].nop, 0);
+    }
+
+    s_onRamp.setNops(nopsAndWeights);
+
+    (EVM2EVMOnRamp.NopAndWeight[] memory actual, ) = s_onRamp.getNops();
+    for (uint256 i = 0; i < actual.length; ++i) {
+      assertEq(actual[i].weight, s_nopsToWeights[actual[i].nop]);
+    }
+  }
+
   function testSetNopsRemovesOldNopsCompletelySuccess() public {
     EVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights = new EVM2EVMOnRamp.NopAndWeight[](0);
     s_onRamp.setNops(nopsAndWeights);
@@ -447,11 +484,34 @@ contract EVM2EVMOnRamp_setNops is EVM2EVMOnRampSetup {
     assertEq(totalWeight, 0);
   }
 
+  // Reverts
+
+  function testNotEnoughFundsForPayoutReverts() public {
+    uint96 nopFeesJuels = 2**95;
+    // Set Nop fee juels but don't transfer LINK. This can happen when users
+    // pay in non-link tokens.
+    changePrank(address(s_sourceRouter));
+    s_onRamp.forwardFromRouter(_generateEmptyMessage(), nopFeesJuels, OWNER);
+    changePrank(OWNER);
+
+    vm.expectRevert(EVM2EVMOnRamp.InsufficientBalance.selector);
+
+    s_onRamp.setNops(getNopsAndWeights());
+  }
+
   function testNonOwnerReverts() public {
     EVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights = getNopsAndWeights();
     changePrank(STRANGER);
 
     vm.expectRevert("Only callable by owner");
+
+    s_onRamp.setNops(nopsAndWeights);
+  }
+
+  function testTooManyNopsReverts() public {
+    EVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights = new EVM2EVMOnRamp.NopAndWeight[](257);
+
+    vm.expectRevert(EVM2EVMOnRamp.TooManyNops.selector);
 
     s_onRamp.setNops(nopsAndWeights);
   }
@@ -463,16 +523,48 @@ contract EVM2EVMOnRamp_withdrawNonLinkFees is EVM2EVMOnRampSetup {
 
   function setUp() public virtual override {
     EVM2EVMOnRampSetup.setUp();
+    // Send some non-link tokens to the onRamp
     s_token = IERC20(s_sourceTokens[1]);
-    changePrank(OWNER);
-    s_token.transfer(address(s_onRamp), 100);
+    deal(s_sourceTokens[1], address(s_onRamp), 100);
   }
 
-  function testwithdrawNonLinkFeesSuccess() public {
+  function testWithdrawNonLinkFeesSuccess() public {
     s_onRamp.withdrawNonLinkFees(address(s_token), address(this));
 
     assertEq(0, s_token.balanceOf(address(s_onRamp)));
     assertEq(100, s_token.balanceOf(address(this)));
+  }
+
+  function testSettlingBalanceSuccess() public {
+    // Set Nop fee juels
+    uint96 nopFeesJuels = 10000000;
+    changePrank(address(s_sourceRouter));
+    s_onRamp.forwardFromRouter(_generateEmptyMessage(), nopFeesJuels, OWNER);
+    changePrank(OWNER);
+
+    vm.expectRevert(EVM2EVMOnRamp.LinkBalanceNotSettled.selector);
+    s_onRamp.withdrawNonLinkFees(address(s_token), address(this));
+
+    // It doesnt matter how the link tokens get to the onRamp
+    // In this case we simply deal them to the ramp to show
+    // anyone can settle the balance
+    deal(s_sourceTokens[0], address(s_onRamp), nopFeesJuels);
+
+    s_onRamp.withdrawNonLinkFees(address(s_token), address(this));
+  }
+
+  // Reverts
+
+  function testLinkBalanceNotSettledReverts() public {
+    // Set Nop fee juels
+    uint96 nopFeesJuels = 10000000;
+    changePrank(address(s_sourceRouter));
+    s_onRamp.forwardFromRouter(_generateEmptyMessage(), nopFeesJuels, OWNER);
+    changePrank(OWNER);
+
+    vm.expectRevert(EVM2EVMOnRamp.LinkBalanceNotSettled.selector);
+
+    s_onRamp.withdrawNonLinkFees(address(s_token), address(this));
   }
 
   function testNonOwnerReverts() public {
@@ -714,7 +806,7 @@ contract EVM2EVMOnRampWithAllowListSetup is EVM2EVMOnRampSetup {
     EVM2EVMOnRampSetup.setUp();
     address[] memory allowedAddresses = new address[](1);
     allowedAddresses[0] = OWNER;
-    s_onRamp.applyAllowListUpdates(allowedAddresses, new address[](0));
+    s_onRamp.applyAllowListUpdates(new address[](0), allowedAddresses);
     s_onRamp.setAllowListEnabled(true);
   }
 }
@@ -763,7 +855,7 @@ contract EVM2EVMOnRamp_applyAllowListUpdates is EVM2EVMOnRampWithAllowListSetup 
       emit AllowListAdd(newAddresses[i]);
     }
 
-    s_onRamp.applyAllowListUpdates(newAddresses, new address[](0));
+    s_onRamp.applyAllowListUpdates(new address[](0), newAddresses);
     address[] memory setAddresses = s_onRamp.getAllowList();
 
     // First address in allowList is owner, set in test setup.
@@ -784,12 +876,9 @@ contract EVM2EVMOnRamp_applyAllowListUpdates is EVM2EVMOnRampWithAllowListSetup 
     vm.expectEmit();
     emit AllowListAdd(address(3));
 
-    s_onRamp.applyAllowListUpdates(newAddresses, removeAddresses);
+    s_onRamp.applyAllowListUpdates(removeAddresses, newAddresses);
     setAddresses = s_onRamp.getAllowList();
 
-    // Although we cannot assume strict ordering in enumerable set in general,
-    // in this case, address(2) should take the spot of address(1) after its removal,
-    // hence ordering is preserved.
     assertEq(address(2), setAddresses[1]);
     assertEq(address(3), setAddresses[2]);
   }
@@ -800,7 +889,7 @@ contract EVM2EVMOnRamp_applyAllowListUpdates is EVM2EVMOnRampWithAllowListSetup 
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
     address[] memory newAddresses = new address[](2);
-    s_onRamp.applyAllowListUpdates(newAddresses, new address[](0));
+    s_onRamp.applyAllowListUpdates(new address[](0), newAddresses);
   }
 }
 

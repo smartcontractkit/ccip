@@ -48,9 +48,14 @@ contract AggregateTokenLimiter_getTokenLimitAdmin is AggregateTokenLimiterSetup 
   }
 }
 
-/// @notice #setTokenLimitAdmin
-contract AggregateTokenLimiter_setTokenLimitAdmin is AggregateTokenLimiterSetup {
+/// @notice #setAdmin
+contract AggregateTokenLimiter_setAdmin is AggregateTokenLimiterSetup {
+  event AdminSet(address newAdmin);
+
   function testOwnerSuccess() public {
+    vm.expectEmit();
+    emit AdminSet(STRANGER);
+
     s_rateLimiter.setAdmin(STRANGER);
     assertEq(STRANGER, s_rateLimiter.getTokenLimitAdmin());
   }
@@ -133,7 +138,6 @@ contract AggregateTokenLimiter_setRateLimiterConfig is AggregateTokenLimiterSetu
 
     s_config = RateLimiter.Config({isEnabled: true, rate: uint208(bucket.rate * 2), capacity: bucket.capacity * 8});
 
-    console.log(s_config.capacity, s_config.rate);
     vm.expectEmit();
     emit ConfigChanged(s_config);
 

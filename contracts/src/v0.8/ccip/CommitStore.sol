@@ -111,6 +111,8 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
 
   /// @notice Used by the owner in case an invalid sequence of roots has been
   /// posted and needs to be removed. The interval in the report is trusted.
+  /// @param rootToReset The roots that will be reset. This function will only
+  /// reset roots that are not blessed.
   function resetUnblessedRoots(bytes32[] calldata rootToReset) external onlyOwner {
     for (uint256 i = 0; i < rootToReset.length; ++i) {
       bytes32 root = rootToReset[i];
@@ -130,7 +132,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
     bytes32 root = MerkleMultiProof.merkleRoot(hashedLeaves, proofs, proofFlagBits);
     // Only return non-zero if present and blessed.
     if (s_roots[root] == 0 || !isBlessed(root)) {
-      return uint256(0);
+      return 0;
     }
     return s_roots[root];
   }

@@ -230,9 +230,13 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     s_sourceRouter.ccipSend(wrongChain, message);
   }
 
-  function testUnsupportedFeeTokenReverts() public {
+  function testUnsupportedFeeTokenReverts(address wrongFeeToken) public {
+    // We have three fee tokens set, all others should revert.
+    vm.assume(address(s_sourceFeeToken) != wrongFeeToken);
+    vm.assume(address(s_sourceRouter.getWrappedNative()) != wrongFeeToken);
+    vm.assume(address(0) != wrongFeeToken);
+
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    address wrongFeeToken = address(1);
     message.feeToken = wrongFeeToken;
 
     vm.expectRevert(abi.encodeWithSelector(PriceRegistry.NotAFeeToken.selector, wrongFeeToken));

@@ -288,6 +288,18 @@ contract PriceRegistry_getFeeTokenBaseUnitsPerUnitGas is PriceRegistrySetup {
     assertEq(s_priceRegistry.getFeeTokenBaseUnitsPerUnitGas(s_sourceTokens[0], DEST_CHAIN_ID), 2e5);
   }
 
+  function testZeroGasPriceSuccess() public {
+    uint64 zeroGasDestChainId = 345678;
+    Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
+      tokenPriceUpdates: new Internal.TokenPriceUpdate[](0),
+      destChainId: zeroGasDestChainId,
+      usdPerUnitGas: 0
+    });
+    s_priceRegistry.updatePrices(priceUpdates);
+
+    assertEq(s_priceRegistry.getFeeTokenBaseUnitsPerUnitGas(s_sourceTokens[0], zeroGasDestChainId), 0);
+  }
+
   function testUnsupportedTokenReverts() public {
     vm.expectRevert(abi.encodeWithSelector(PriceRegistry.NotAFeeToken.selector, DUMMY_CONTRACT_ADDRESS));
     s_priceRegistry.getFeeTokenBaseUnitsPerUnitGas(DUMMY_CONTRACT_ADDRESS, DEST_CHAIN_ID);

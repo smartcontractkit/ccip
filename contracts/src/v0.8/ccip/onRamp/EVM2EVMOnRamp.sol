@@ -33,6 +33,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
   error NoFeesToPay();
   error NoNopsToPay();
   error InsufficientBalance();
+  error TooManyNops();
   error MessageTooLarge(uint256 maxSize, uint256 actualSize);
   error MessageGasLimitTooHigh();
   error UnsupportedNumberOfTokens();
@@ -47,6 +48,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
   error InvalidConfig();
   error InvalidAddress(bytes encodedAddress);
   error BadAFNSignal();
+  error LinkBalanceNotSettled();
 
   event AllowListAdd(address sender);
   event AllowListRemove(address sender);
@@ -118,6 +120,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
   uint64 internal immutable i_chainId;
   /// @dev The chain ID of the destination chain
   uint64 internal immutable i_destChainId;
+  /// @dev the maximum number of nops that can be configured at the same time.
+  uint256 private constant MAX_NUMBER_OF_NOPS = 64;
 
   // DYNAMIC CONFIG
   /// @dev The config for the onRamp
@@ -126,6 +130,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
   EnumerableMap.AddressToUintMap internal s_nops;
   /// @dev source token => token pool
   EnumerableMapAddresses.AddressToAddressMap private s_poolsBySourceToken;
+  /// @dev this allowListing will be removed before public launch
   /// @dev Whether s_allowList is enabled or not.
   bool private s_allowlistEnabled;
   /// @dev A set of addresses which can make ccipSend calls.
@@ -245,7 +250,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
     // There should be no state changes after external call to TokenPools.
     for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
       Client.EVMTokenAmount memory tokenAndAmount = message.tokenAmounts[i];
-      IPool pool = _getPoolBySourceToken(IERC20(tokenAndAmount.token));
+      IPool pool = getPoolBySourceToken(IERC20(tokenAndAmount.token));
       pool.lockOrBurn(tokenAndAmount.amount, originalSender);
     }
 
@@ -350,14 +355,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
   }
 
   /// @inheritdoc IEVM2AnyOnRamp
-  function getPoolBySourceToken(IERC20 sourceToken) external view returns (IPool) {
-    return _getPoolBySourceToken(sourceToken);
-  }
-
-  /// @dev Get the pool for the given source token
-  /// @param sourceToken The source token to get the pool for
-  /// @return The pool for the given source token
-  function _getPoolBySourceToken(IERC20 sourceToken) private view returns (IPool) {
+  function getPoolBySourceToken(IERC20 sourceToken) public view returns (IPool) {
     if (!s_poolsBySourceToken.contains(address(sourceToken))) revert UnsupportedToken(sourceToken);
     return IPool(s_poolsBySourceToken.get(address(sourceToken)));
   }
@@ -470,12 +468,25 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
   /// @dev Set the nops and weights
   /// @param nopsAndWeights The nops and weights
   function _setNops(NopAndWeight[] memory nopsAndWeights) internal {
+    // Make sure all nops have been paid before removing nops
+    // We only have to pay when there are nops and there is enough
+    // outstanding NOP balance to trigger a payment.
+    if (s_nopWeightsTotal > 0 && s_nopFeesJuels > s_nopWeightsTotal) {
+      payNops();
+    }
+
+    uint256 numberOfNops = nopsAndWeights.length;
+    if (numberOfNops > MAX_NUMBER_OF_NOPS) revert TooManyNops();
+
     // Remove previous
     delete s_nops;
 
     // Add new
     uint32 nopWeightsTotal = 0;
-    for (uint256 i = 0; i < nopsAndWeights.length; ++i) {
+    // nopWeightsTotal is bounded by the MAX_NUMBER_OF_NOPS and the weight of
+    // a single nop being of type uint16. This ensures nopWeightsTotal will
+    // always fit into the uint32 type.
+    for (uint256 i = 0; i < numberOfNops; ++i) {
       s_nops.set(nopsAndWeights[i].nop, nopsAndWeights[i].weight);
       nopWeightsTotal += nopsAndWeights[i].weight;
     }
@@ -484,7 +495,10 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
   }
 
   /// @notice Pays the Node Ops their outstanding balances.
-  function payNops() external onlyOwnerOrAdminOrNop {
+  /// @dev some balance can remain after payments are done. This is at most the sum
+  /// of the weight of all nops. Since nop weights are uint16s and we can have at
+  /// most MAX_NUMBER_OF_NOPS NOPs, the highest possible value is 2**22 or 0.04 gjuels.
+  function payNops() public onlyOwnerOrAdminOrNop {
     uint32 weightsTotal = s_nopWeightsTotal;
     if (weightsTotal == 0) revert NoNopsToPay();
 
@@ -502,6 +516,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
       IERC20(i_linkToken).safeTransfer(nop, amount);
       emit NopPaid(nop, amount);
     }
+    // Some funds can remain, since this is an incredibly small
+    // amount we consider this OK.
     s_nopFeesJuels = fundsLeft;
   }
 
@@ -511,6 +527,12 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
   function withdrawNonLinkFees(address feeToken, address to) external onlyOwner {
     if (feeToken == i_linkToken) revert InvalidFeeToken(feeToken);
     if (to == address(0)) revert InvalidWithdrawalAddress(to);
+    uint256 linkBalance = IERC20(i_linkToken).balanceOf(address(this));
+
+    // We require the link balance to be settled before allowing withdrawal
+    // of non-link fees.
+    if (linkBalance < s_nopFeesJuels) revert LinkBalanceNotSettled();
+
     IERC20(feeToken).safeTransfer(to, IERC20(feeToken).balanceOf(address(this)));
   }
 
@@ -543,22 +565,29 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
   }
 
   /// @notice Apply updates to the allow list.
-  /// @param adds The added addresses.
-  /// @param adds The removed addresses.
-  function applyAllowListUpdates(address[] calldata adds, address[] calldata removes) external onlyOwner {
-    _applyAllowListUpdates(adds, removes);
+  /// @param removes The addresses to be removed.
+  /// @param adds The addresses to be added.
+  /// @dev allowListing will be removed before public launch
+  function applyAllowListUpdates(address[] calldata removes, address[] calldata adds) external onlyOwner {
+    _applyAllowListUpdates(removes, adds);
   }
 
   /// @notice Internal version of applyAllowListUpdates to allow for reuse in the constructor.
-  function _applyAllowListUpdates(address[] memory adds, address[] memory removes) internal {
+  /// @dev allowListing will be removed before public launch
+  function _applyAllowListUpdates(address[] memory removes, address[] memory adds) internal {
     for (uint256 i = 0; i < removes.length; ++i) {
-      if (s_allowList.remove(removes[i])) {
-        emit AllowListRemove(removes[i]);
+      address toRemove = removes[i];
+      if (s_allowList.remove(toRemove)) {
+        emit AllowListRemove(toRemove);
       }
     }
     for (uint256 i = 0; i < adds.length; ++i) {
-      if (s_allowList.add(adds[i])) {
-        emit AllowListAdd(adds[i]);
+      address toAdd = adds[i];
+      if (toAdd == address(0)) {
+        continue;
+      }
+      if (s_allowList.add(toAdd)) {
+        emit AllowListAdd(toAdd);
       }
     }
   }

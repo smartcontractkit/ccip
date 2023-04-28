@@ -23,8 +23,8 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
   using SafeERC20 for IERC20;
 
   event OnRampSet(uint64 indexed destChainId, address onRamp);
-  event OffRampAdded(uint64 indexed sourceChainId, address offRamp);
-  event OffRampRemoved(uint64 indexed sourceChainId, address offRamp);
+  event OffRampsAdded(uint64 indexed sourceChainId, address[] offRamps);
+  event OffRampsRemoved(uint64 indexed sourceChainId, address[] offRamps);
 
   struct OnRampUpdate {
     uint64 destChainId; // --┐  Destination chain Id.
@@ -213,17 +213,24 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
     return s_offRamps[sourceChainId];
   }
 
+  /// @notice Returns true if the given address is a permissioned offRamp.
+  function isOffRamp(address offRamp) external view returns (bool) {
+    return s_offRampSourceChainIds[offRamp] != 0;
+  }
+
   /// @notice Set applies a set of ingress and egress config updates.
   /// @dev only callable by owner.
-  function applyRampUpdates(OnRampUpdate[] memory onRampUpdates, OffRampUpdate[] memory offRampUpdates)
+  /// @dev Most of the time the number of supported offRamps per chain is 1.
+  function applyRampUpdates(OnRampUpdate[] calldata onRampUpdates, OffRampUpdate[] calldata offRampUpdates)
     external
     onlyOwner
   {
     // Apply egress updates.
     // We permit zero address as way to disable egress.
     for (uint256 i = 0; i < onRampUpdates.length; ++i) {
-      s_onRamps[onRampUpdates[i].destChainId] = onRampUpdates[i].onRamp;
-      emit OnRampSet(onRampUpdates[i].destChainId, onRampUpdates[i].onRamp);
+      OnRampUpdate memory onRampUpdate = onRampUpdates[i];
+      s_onRamps[onRampUpdate.destChainId] = onRampUpdate.onRamp;
+      emit OnRampSet(onRampUpdate.destChainId, onRampUpdate.onRamp);
     }
     // Apply ingress updates.
     // We permit an empty list as a way to disable ingress.
@@ -232,15 +239,17 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
       // For this source chain, clear all the existing offRamps.
       for (uint256 j = 0; j < s_offRamps[sourceChainId].length; ++j) {
         delete s_offRampSourceChainIds[s_offRamps[sourceChainId][j]];
-        emit OffRampRemoved(sourceChainId, s_offRamps[sourceChainId][j]);
       }
+      emit OffRampsRemoved(sourceChainId, s_offRamps[sourceChainId]);
+
       delete s_offRamps[sourceChainId];
       // For this source chain, add all the new offRamps (there may be zero)
-      for (uint256 j = 0; j < offRampUpdates[i].offRamps.length; ++j) {
-        s_offRampSourceChainIds[offRampUpdates[i].offRamps[j]] = sourceChainId;
-        emit OffRampAdded(sourceChainId, offRampUpdates[i].offRamps[j]);
+      address[] memory offRamps = offRampUpdates[i].offRamps;
+      for (uint256 j = 0; j < offRamps.length; ++j) {
+        s_offRampSourceChainIds[offRamps[j]] = sourceChainId;
       }
-      s_offRamps[sourceChainId] = offRampUpdates[i].offRamps;
+      s_offRamps[sourceChainId] = offRamps;
+      emit OffRampsAdded(sourceChainId, offRamps);
     }
   }
 

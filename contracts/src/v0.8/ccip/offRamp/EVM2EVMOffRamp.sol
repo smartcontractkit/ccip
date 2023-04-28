@@ -21,6 +21,10 @@ import {ERC165Checker} from "../../vendor/ERC165Checker.sol";
 
 /// @notice EVM2EVMOffRamp enables OCR networks to execute multiple messages
 /// in an OffRamp in a single transaction.
+/// @dev We will always deploy an onRamp, commitStore, and offRamp at the same time
+/// and we will never do partial updates where e.g. only an offRamp gets replaced.
+/// If we would replace only the offRamp and connect it with an existing commitStore
+/// a replay attack would be possible.
 contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2BaseNoChecks {
   using Address for address;
   using ERC165Checker for address;
@@ -29,6 +33,7 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
   error AlreadyAttempted(uint64 sequenceNumber);
   error AlreadyExecuted(uint64 sequenceNumber);
   error ZeroAddressNotAllowed();
+  error CommitStoreAlreadyInUse();
   error ExecutionError(bytes error);
   error InvalidSourceChain(uint64 sourceChainId);
   error MessageTooLarge(uint256 maxSize, uint256 actualSize);
@@ -116,6 +121,9 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
   ) OCR2BaseNoChecks() AggregateRateLimiter(rateLimiterConfig) {
     if (sourceTokens.length != pools.length) revert InvalidTokenPoolConfig();
     if (staticConfig.onRamp == address(0) || staticConfig.commitStore == address(0)) revert ZeroAddressNotAllowed();
+    // Ensures we can never deploy a new offRamp that points to a commitStore
+    // that already has roots committed.
+    if (ICommitStore(staticConfig.commitStore).getExpectedNextSequenceNumber() != 1) revert CommitStoreAlreadyInUse();
 
     i_commitStore = staticConfig.commitStore;
     i_sourceChainId = staticConfig.sourceChainId;
@@ -208,7 +216,7 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
 
     // SECURITY CRITICAL CHECK
     uint256 timestampCommitted = ICommitStore(i_commitStore).verify(hashedLeaves, report.proofs, report.proofFlagBits);
-    if (timestampCommitted <= 0) revert RootNotCommitted();
+    if (timestampCommitted == 0) revert RootNotCommitted();
 
     // Execute messages
     for (uint256 i = 0; i < numMsgs; ++i) {

@@ -19,9 +19,9 @@ abstract contract TokenPool is IPool, OwnerIsCreator, Pausable {
   // The immutable token that belongs to this pool.
   IERC20 internal immutable i_token;
   // A set of allowed onRamps.
-  EnumerableSet.AddressSet private s_onRamps;
+  EnumerableSet.AddressSet internal s_onRamps;
   // A set of allowed offRamps.
-  EnumerableSet.AddressSet private s_offRamps;
+  EnumerableSet.AddressSet internal s_offRamps;
   // The token bucket object that contains the bucket state.
   RateLimiter.TokenBucket private s_rateLimiter;
 
@@ -60,7 +60,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator, Pausable {
   /// @dev Only callable by the owner
   /// @param onRamps A list of onRamps and their new permission status
   /// @param offRamps A list of offRamps and their new permission status
-  function applyRampUpdates(RampUpdate[] memory onRamps, RampUpdate[] memory offRamps) public onlyOwner {
+  function applyRampUpdates(RampUpdate[] memory onRamps, RampUpdate[] memory offRamps) public virtual onlyOwner {
     for (uint256 i = 0; i < onRamps.length; ++i) {
       RampUpdate memory update = onRamps[i];
 

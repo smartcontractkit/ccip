@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 interface ICommitStore {
-  /// @notice Returns timestamp of when root was accepted or -1 if verification fails.
+  /// @notice Returns timestamp of when root was accepted or 0 if verification fails.
   /// @dev This method uses a merkle tree within a merkle tree, with the hashedLeaves,
   /// proofs and proofFlagBits being used to get the root of the inner tree.
   /// This root is then used as the singular leaf of the outer tree.
@@ -11,4 +11,6 @@ interface ICommitStore {
     bytes32[] calldata proofs,
     uint256 proofFlagBits
   ) external returns (uint256 timestamp);
+
+  function getExpectedNextSequenceNumber() external view returns (uint64);
 }

@@ -115,6 +115,24 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
       rateLimiterConfig
     );
   }
+
+  function testCommitStoreAlreadyInUseReverts() public {
+    s_mockCommitStore.setExpectedNextSequenceNumber(2);
+
+    vm.expectRevert(EVM2EVMOffRamp.CommitStoreAlreadyInUse.selector);
+
+    s_offRamp = new EVM2EVMOffRampHelper(
+      EVM2EVMOffRamp.StaticConfig({
+        commitStore: address(s_mockCommitStore),
+        chainId: DEST_CHAIN_ID,
+        sourceChainId: SOURCE_CHAIN_ID,
+        onRamp: ON_RAMP_ADDRESS
+      }),
+      getCastedSourceTokens(),
+      getCastedDestinationPools(),
+      rateLimiterConfig()
+    );
+  }
 }
 
 contract EVM2EVMOffRamp_setDynamicConfig is EVM2EVMOffRampSetup {
