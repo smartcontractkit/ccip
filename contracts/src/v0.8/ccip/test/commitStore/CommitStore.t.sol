@@ -329,16 +329,9 @@ contract CommitStore_report is CommitStoreSetup {
 
   function testReportAndPriceUpdateSuccess() public {
     uint64 max1 = 12;
-    Internal.TokenPriceUpdate[] memory tokenPriceUpdates = new Internal.TokenPriceUpdate[](1);
-    tokenPriceUpdates[0] = Internal.TokenPriceUpdate({sourceToken: s_sourceFeeToken, usdPerToken: 4e18});
-    Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
-      tokenPriceUpdates: tokenPriceUpdates,
-      destChainId: 0,
-      usdPerUnitGas: 0
-    });
 
     CommitStore.CommitReport memory report = CommitStore.CommitReport({
-      priceUpdates: priceUpdates,
+      priceUpdates: getSinglePriceUpdateStruct(s_sourceFeeToken, 4e18),
       interval: CommitStore.Interval(1, max1),
       merkleRoot: "test #2"
     });
@@ -352,16 +345,8 @@ contract CommitStore_report is CommitStoreSetup {
   }
 
   function testOnlyPriceUpdatesSuccess() public {
-    Internal.TokenPriceUpdate[] memory tokenPriceUpdates = new Internal.TokenPriceUpdate[](1);
-    tokenPriceUpdates[0] = Internal.TokenPriceUpdate({sourceToken: s_sourceFeeToken, usdPerToken: 4e18});
-    Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
-      tokenPriceUpdates: tokenPriceUpdates,
-      destChainId: 0,
-      usdPerUnitGas: 0
-    });
-
     CommitStore.CommitReport memory report = CommitStore.CommitReport({
-      priceUpdates: priceUpdates,
+      priceUpdates: getSinglePriceUpdateStruct(s_sourceFeeToken, 4e18),
       interval: CommitStore.Interval(0, 0),
       merkleRoot: ""
     });

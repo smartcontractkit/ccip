@@ -1,11 +1,9 @@
 {
   "acceptOwnership()": "79ba5097",
   "currentRateLimiterState()": "546719cd",
-  "getPricesForTokens(address[])": "4741062e",
   "getTokenLimitAdmin()": "599f6431",
   "owner()": "8da5cb5b",
   "setAdmin(address)": "704b6c02",
-  "setPrices(address[],uint256[])": "4352fa9f",
   "setRateLimiterConfig((bool,uint208,uint256))": "3091aee7",
   "transferOwnership(address)": "f2fde38b"
 }

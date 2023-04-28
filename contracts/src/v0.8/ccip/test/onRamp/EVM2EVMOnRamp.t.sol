@@ -350,9 +350,9 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     // We need to set the price of this new token to be able to reach
     // the proper revert point. This must be called by the owner.
     changePrank(OWNER);
-    uint256[] memory prices = new uint256[](1);
-    prices[0] = 1;
-    s_onRamp.setPrices(abi.decode(abi.encode(message.tokenAmounts), (IERC20[])), prices);
+
+    Internal.PriceUpdates memory priceUpdates = getSinglePriceUpdateStruct(wrongToken, 1);
+    s_priceRegistry.updatePrices(priceUpdates);
 
     // Change back to the router
     changePrank(address(s_sourceRouter));
@@ -373,7 +373,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
       abi.encodeWithSelector(
         RateLimiter.ConsumingMoreThanMaxCapacity.selector,
         rateLimiterConfig().capacity,
-        message.tokenAmounts[0].amount * getTokenPrices()[0]
+        message.tokenAmounts[0].amount * getSourceTokenPrices()[0]
       )
     );
 

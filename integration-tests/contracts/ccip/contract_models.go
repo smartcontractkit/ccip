@@ -2,13 +2,11 @@ package ccip
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 
@@ -466,26 +464,6 @@ func (onRamp *OnRamp) Address() string {
 	return onRamp.EthAddress.Hex()
 }
 
-func (onRamp *OnRamp) SetTokenPrices(tokens []common.Address, prices []*big.Int) error {
-	if len(tokens) != len(prices) {
-		return errors.New(fmt.Sprintf("Tokens and prices length mismatch %d != %d", len(tokens), len(prices)))
-	}
-
-	opts, err := onRamp.client.TransactionOpts(onRamp.client.GetDefaultWallet())
-	if err != nil {
-		return err
-	}
-	log.Info().
-		Str("Network Name", onRamp.client.GetNetworkConfig().Name).
-		Str("OnRamp", onRamp.Address()).
-		Msg("Setting OnRamp token prices")
-	tx, err := onRamp.Instance.SetPrices(opts, tokens, prices)
-	if err != nil {
-		return err
-	}
-	return onRamp.client.ProcessTransaction(tx)
-}
-
 type OffRamp struct {
 	client     blockchain.EVMClient
 	Instance   *evm_2_evm_offramp.EVM2EVMOffRamp
@@ -526,22 +504,6 @@ func (offRamp *OffRamp) SetOCR2Config(
 		offchainConfig,
 	)
 
-	if err != nil {
-		return err
-	}
-	return offRamp.client.ProcessTransaction(tx)
-}
-
-func (offRamp *OffRamp) SetTokenPrices(tokens []common.Address, prices []*big.Int) error {
-	opts, err := offRamp.client.TransactionOpts(offRamp.client.GetDefaultWallet())
-	if err != nil {
-		return err
-	}
-	log.Info().
-		Str("Network Name", offRamp.client.GetNetworkConfig().Name).
-		Str("OffRamp", offRamp.Address()).
-		Msg("Setting OffRamp token prices")
-	tx, err := offRamp.Instance.SetPrices(opts, tokens, prices)
 	if err != nil {
 		return err
 	}

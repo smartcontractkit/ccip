@@ -336,7 +336,7 @@ func (e *CCIPContractsDeployer) NewPriceRegistry(addr common.Address) (
 }
 
 func (e *CCIPContractsDeployer) DeployPriceRegistry(
-	feeUpdates price_registry.InternalPriceUpdates,
+	priceUpdates price_registry.InternalPriceUpdates,
 ) (
 	*PriceRegistry,
 	error,
@@ -345,11 +345,11 @@ func (e *CCIPContractsDeployer) DeployPriceRegistry(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		feeTokens := []common.Address{}
-		if len(feeUpdates.TokenPriceUpdates) > 0 {
-			feeTokens = append(feeTokens, feeUpdates.TokenPriceUpdates[0].SourceToken)
+		tokens := []common.Address{}
+		if len(priceUpdates.TokenPriceUpdates) > 0 {
+			tokens = append(tokens, priceUpdates.TokenPriceUpdates[0].SourceToken)
 		}
-		return price_registry.DeployPriceRegistry(auth, backend, feeUpdates, nil, feeTokens, 60*60*24*14)
+		return price_registry.DeployPriceRegistry(auth, backend, priceUpdates, nil, tokens, 60*60*24*14)
 	})
 	if err != nil {
 		return nil, err

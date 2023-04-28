@@ -215,7 +215,7 @@ func setupCcipTestHarness(t *testing.T) ccipPluginTestHarness {
 	_, err = generateAndSetTestOCR2Config(commitStoreHelper, owner, encodedCommitOnchainConfig)
 	require.NoError(t, err)
 
-	execOnchainConfig := ExecOnchainConfig{PermissionLessExecutionThresholdSeconds: 600, Router: routerAddress, Afn: afnAddress, MaxTokensLength: 5, MaxDataSize: 200_000}
+	execOnchainConfig := ExecOnchainConfig{PermissionLessExecutionThresholdSeconds: 600, Router: routerAddress, PriceRegistry: priceRegistryAddress, Afn: afnAddress, MaxTokensLength: 5, MaxDataSize: 200_000}
 	encodedExecOnchainConfig, err := EncodeAbiStruct(execOnchainConfig)
 	require.NoError(t, err)
 

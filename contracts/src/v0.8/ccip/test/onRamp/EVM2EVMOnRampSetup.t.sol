@@ -56,13 +56,11 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
       s_feeTokenConfigArgs,
       getNopsAndWeights()
     );
+    s_onRamp.setAdmin(ADMIN);
 
     s_metadataHash = keccak256(
       abi.encode(Internal.EVM_2_EVM_MESSAGE_HASH, SOURCE_CHAIN_ID, DEST_CHAIN_ID, address(s_onRamp))
     );
-
-    s_onRamp.setPrices(getCastedSourceTokens(), getTokenPrices());
-    s_onRamp.setAdmin(ADMIN);
 
     IPool.RampUpdate[] memory onRamps = new IPool.RampUpdate[](1);
     onRamps[0] = IPool.RampUpdate({ramp: address(s_onRamp), allowed: true});

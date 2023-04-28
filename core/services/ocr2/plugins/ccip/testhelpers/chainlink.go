@@ -424,6 +424,7 @@ func SetupAndStartNodes(ctx context.Context, t *testing.T, ccipContracts *CCIPCo
 	execOnchainConfig, err := ccip.EncodeAbiStruct(ccip.ExecOnchainConfig{
 		PermissionLessExecutionThresholdSeconds: 60,
 		Router:                                  ccipContracts.Dest.Router.Address(),
+		PriceRegistry:                           ccipContracts.Dest.PriceRegistry.Address(),
 		Afn:                                     ccipContracts.Dest.AFN.Address(),
 		MaxDataSize:                             1e5,
 		MaxTokensLength:                         5,

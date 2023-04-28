@@ -49,10 +49,13 @@ var (
 	OffRamp  = "offramp"
 	DestPool = "dest pool"
 
-	Receiver      = "receiver"
-	Sender        = "sender"
-	Link          = func(amount int64) *big.Int { return new(big.Int).Mul(big.NewInt(1e18), big.NewInt(amount)) }
-	HundredLink   = Link(100)
+	Receiver     = "receiver"
+	Sender       = "sender"
+	Link         = func(amount int64) *big.Int { return new(big.Int).Mul(big.NewInt(1e18), big.NewInt(amount)) }
+	HundredLink  = Link(100)
+	LinkUSDValue = func(amount int64) *big.Int {
+		return new(big.Int).Mul(big.NewInt(1e18), new(big.Int).Mul(big.NewInt(1e18), big.NewInt(amount)))
+	}
 	SourceChainID = uint64(1000)
 	DestChainID   = uint64(1337)
 )
@@ -133,8 +136,8 @@ func (c *CCIPContracts) DeployNewOffRamp() {
 		[]common.Address{c.Source.LinkToken.Address()}, // source tokens
 		[]common.Address{c.Dest.Pool.Address()},        // pools
 		evm_2_evm_offramp.RateLimiterConfig{
-			Capacity:  HundredLink,
-			Rate:      big.NewInt(1e18),
+			Capacity:  LinkUSDValue(100),
+			Rate:      LinkUSDValue(1),
 			IsEnabled: true,
 		},
 	)
@@ -144,8 +147,6 @@ func (c *CCIPContracts) DeployNewOffRamp() {
 	c.Dest.OffRamp, err = evm_2_evm_offramp.NewEVM2EVMOffRamp(offRampAddress, c.Dest.Chain)
 	require.NoError(c.t, err)
 
-	_, err = c.Dest.OffRamp.SetPrices(c.Dest.User, []common.Address{c.Dest.LinkToken.Address()}, []*big.Int{big.NewInt(1)})
-	require.NoError(c.t, err)
 	c.Dest.Chain.Commit()
 	c.Source.Chain.Commit()
 }
@@ -167,6 +168,7 @@ func (c *CCIPContracts) EnableOffRamp() {
 	onChainConfig, err := ccip.EncodeAbiStruct(ccip.ExecOnchainConfig{
 		PermissionLessExecutionThresholdSeconds: 60,
 		Router:                                  c.Dest.Router.Address(),
+		PriceRegistry:                           c.Dest.PriceRegistry.Address(),
 		Afn:                                     c.Dest.AFN.Address(),
 		MaxDataSize:                             1e5,
 		MaxTokensLength:                         5,
@@ -238,8 +240,8 @@ func (c *CCIPContracts) DeployNewOnRamp() {
 		},
 		[]common.Address{}, // allow list
 		evm_2_evm_onramp.RateLimiterConfig{
-			Capacity:  HundredLink,
-			Rate:      big.NewInt(1e18),
+			Capacity:  LinkUSDValue(100),
+			Rate:      LinkUSDValue(1),
 			IsEnabled: true,
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs{
@@ -257,9 +259,6 @@ func (c *CCIPContracts) DeployNewOnRamp() {
 	c.Source.OnRamp, err = evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddress, c.Source.Chain)
 	require.NoError(c.t, err)
 	c.Source.Chain.Commit()
-
-	_, err = c.Source.OnRamp.SetPrices(c.Source.User, []common.Address{c.Source.LinkToken.Address()}, []*big.Int{big.NewInt(1)})
-	require.NoError(c.t, err)
 
 	c.Source.Chain.Commit()
 	c.Dest.Chain.Commit()
@@ -610,8 +609,8 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		},
 		[]common.Address{}, // allow list
 		evm_2_evm_onramp.RateLimiterConfig{
-			Capacity:  HundredLink,
-			Rate:      big.NewInt(1e18),
+			Capacity:  LinkUSDValue(100),
+			Rate:      LinkUSDValue(1),
 			IsEnabled: true,
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs{
@@ -633,8 +632,6 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	)
 	require.NoError(t, err)
 	sourceChain.Commit()
-	_, err = onRamp.SetPrices(sourceUser, []common.Address{sourceLinkTokenAddress}, []*big.Int{big.NewInt(1)})
-	require.NoError(t, err)
 	_, err = sourceRouter.ApplyRampUpdates(sourceUser, []router.RouterOnRampUpdate{{DestChainId: destChainID, OnRamp: onRampAddress}}, nil)
 	require.NoError(t, err)
 	sourceChain.Commit()
@@ -706,8 +703,8 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		[]common.Address{sourceLinkTokenAddress},
 		[]common.Address{destPoolAddress},
 		evm_2_evm_offramp.RateLimiterConfig{
-			Capacity:  HundredLink,
-			Rate:      big.NewInt(1e18),
+			Capacity:  LinkUSDValue(100),
+			Rate:      LinkUSDValue(1),
 			IsEnabled: true,
 		},
 	)
@@ -724,8 +721,6 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	require.NoError(t, err)
 	_, err = destRouter.ApplyRampUpdates(destUser, nil, []router.RouterOffRampUpdate{
 		{SourceChainId: sourceChainID, OffRamps: []common.Address{offRampAddress}}})
-	require.NoError(t, err)
-	_, err = offRamp.SetPrices(destUser, []common.Address{destLinkTokenAddress}, []*big.Int{big.NewInt(1)})
 	require.NoError(t, err)
 
 	// Deploy 2 revertable (one SS one non-SS)

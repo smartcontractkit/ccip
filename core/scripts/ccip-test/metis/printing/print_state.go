@@ -444,7 +444,7 @@ func printPoolBalances(chain *rhea.EvmDeploymentConfig) {
 
 	sb.WriteString(generateHeader(tableHeaders, headerLengths))
 
-	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(chain.LaneConfig.OnRamp, chain.Client)
+	priceRegistry, err := price_registry.NewPriceRegistry(chain.ChainConfig.PriceRegistry, chain.Client)
 	helpers.PanicErr(err)
 
 	for tokenName, tokenConfig := range chain.ChainConfig.SupportedTokens {
@@ -462,7 +462,7 @@ func printPoolBalances(chain *rhea.EvmDeploymentConfig) {
 		tokenInstance, err := link_token_interface.NewLinkToken(tokenAddress, chain.Client)
 		helpers.PanicErr(err)
 
-		price, err := onRamp.GetPricesForTokens(&bind.CallOpts{}, []common.Address{tokenAddress})
+		tokenPrice, err := priceRegistry.GetTokenPrice(&bind.CallOpts{}, tokenAddress)
 		helpers.PanicErr(err)
 
 		balance, err := tokenInstance.BalanceOf(&bind.CallOpts{}, tokenConfig.Pool)
@@ -477,7 +477,7 @@ func printPoolBalances(chain *rhea.EvmDeploymentConfig) {
 		if tokenAddress != tokenConfig.Token {
 			sb.WriteString(fmt.Sprintf("| %-32s | TOKEN CONFIG MISMATCH ❌ | expected %s | pool token %s |\n", tokenName, tokenConfig.Token.Hex(), tokenAddress.Hex()))
 		} else {
-			sb.WriteString(fmt.Sprintf("| %-32s | %s | %20d | %9s | %9s | %10s |\n", tokenName, tokenConfig.Pool, balance, printBool(isAllowedOnRamp), printBool(isAllowedOffRamp), price[0].String()))
+			sb.WriteString(fmt.Sprintf("| %-32s | %s | %20d | %9s | %9s | %10s |\n", tokenName, tokenConfig.Pool, balance, printBool(isAllowedOnRamp), printBool(isAllowedOffRamp), tokenPrice.Value.String()))
 		}
 	}
 
@@ -724,8 +724,8 @@ func printTokenSupportState(source *rhea.EvmDeploymentConfig, destination *rhea.
 		helpers.PanicErr(err)
 	}
 
-	tableHeaders := []string{"onRampAllowsToken", "onRampPoolCorrect", "onRampPricesSet", "offRampAllowsToken", "offRampPoolCorrect", "offRampPricesSet", "sourcePoolAllowsOnRamp", "destPoolAllowsOffRamp"}
-	headerLengths := []int{20, 20, 20, 20, 20, 20, 20, 20}
+	tableHeaders := []string{"onRampAllowsToken", "onRampPoolCorrect", "offRampAllowsToken", "offRampPoolCorrect", "sourcePoolAllowsOnRamp", "destPoolAllowsOffRamp"}
+	headerLengths := []int{20, 20, 20, 20, 20, 20}
 
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("\nToken support for %s -> %s \n", ccip.ChainName(int64(source.ChainConfig.EvmChainId)), ccip.ChainName(int64(destination.ChainConfig.EvmChainId))))
@@ -734,13 +734,11 @@ func printTokenSupportState(source *rhea.EvmDeploymentConfig, destination *rhea.
 	// Check
 	// onRamp token pool allowed
 	// onRamp token pool is correct
-	// onRamp prices set
 	// offRamp token pool allowed
 	// offRamp token pool is correct
-	// offRamp prices set
 	// source pool onRamp allowed
 	// dest pool offRamp allowed
-	var onRampAllowsPool, onRampPoolCorrect, onRampPricesSet, offRampAllowsPool, offRampPoolCorrect, offRampPricesSet, sourcePoolAllowsOnRamp, destPoolAllowsOffRamp bool
+	var onRampAllowsPool, onRampPoolCorrect, offRampAllowsPool, offRampPoolCorrect, sourcePoolAllowsOnRamp, destPoolAllowsOffRamp bool
 
 	poolBySourceToken, err := onRamp.GetPoolBySourceToken(&bind.CallOpts{}, sourceTokenConfig.Token)
 	if err == nil && poolBySourceToken != common.HexToAddress("") {
@@ -749,12 +747,7 @@ func printTokenSupportState(source *rhea.EvmDeploymentConfig, destination *rhea.
 	if poolBySourceToken == sourceTokenConfig.Pool {
 		onRampPoolCorrect = true
 	}
-	price, err := onRamp.GetPricesForTokens(&bind.CallOpts{}, []common.Address{sourceTokenConfig.Token})
-	helpers.PanicErr(err)
 
-	if price[0].Uint64() != 0 {
-		onRampPricesSet = true
-	}
 	destPoolBySourceToken, err := offRamp.GetPoolBySourceToken(&bind.CallOpts{}, sourceTokenConfig.Token)
 	if err == nil && destPoolBySourceToken != common.HexToAddress("") {
 		offRampAllowsPool = true
@@ -762,25 +755,17 @@ func printTokenSupportState(source *rhea.EvmDeploymentConfig, destination *rhea.
 	if destPoolBySourceToken == destTokenConfig.Pool {
 		offRampPoolCorrect = true
 	}
-	destPrices, err := offRamp.GetPricesForTokens(&bind.CallOpts{}, []common.Address{destTokenConfig.Token})
-	helpers.PanicErr(err)
-
-	if destPrices[0].Uint64() != 0 {
-		offRampPricesSet = true
-	}
 
 	sourcePoolAllowsOnRamp, err = sourcePool.IsOnRamp(&bind.CallOpts{}, onRamp.Address())
 	helpers.PanicErr(err)
 	destPoolAllowsOffRamp, err = destPool.IsOffRamp(&bind.CallOpts{}, offRamp.Address())
 	helpers.PanicErr(err)
 
-	sb.WriteString(fmt.Sprintf("| %20s | %20s | %20s | %20s | %20s | %20s | %20s | %20s |\n",
+	sb.WriteString(fmt.Sprintf("| %20s | %20s | %20s | %20s | %20s | %20s |\n",
 		printBool(onRampAllowsPool),
 		printBool(onRampPoolCorrect),
-		printBool(onRampPricesSet),
 		printBool(offRampAllowsPool),
 		printBool(offRampPoolCorrect),
-		printBool(offRampPricesSet),
 		printBool(sourcePoolAllowsOnRamp),
 		printBool(destPoolAllowsOffRamp),
 	))

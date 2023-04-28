@@ -1,28 +1,32 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "../mocks/MockERC20.sol";
-import "../BaseTest.t.sol";
-import "../helpers/AggregateRateLimiterHelper.sol";
-import "../../AggregateRateLimiter.sol";
+import {RateLimiter} from "../../libraries/RateLimiter.sol";
+import {Internal} from "../../libraries/Internal.sol";
+import {Client} from "../../libraries/Client.sol";
+import {AggregateRateLimiterHelper} from "../helpers/AggregateRateLimiterHelper.sol";
+import {AggregateRateLimiter} from "../../AggregateRateLimiter.sol";
+import {PriceRegistry} from "../../PriceRegistry.sol";
+import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
 
-contract AggregateTokenLimiterSetup is BaseTest {
+import "../BaseTest.t.sol";
+
+contract AggregateTokenLimiterSetup is BaseTest, PriceRegistrySetup {
   AggregateRateLimiterHelper s_rateLimiter;
   RateLimiter.Config s_config;
 
-  IERC20 constant TOKEN = ERC20(0x21118E64E1fB0c487F25Dd6d3601FF6af8D32E4e);
-  uint256 constant TOKEN_PRICE = 4;
+  address immutable TOKEN = 0x21118E64E1fB0c487F25Dd6d3601FF6af8D32E4e;
+  uint192 constant TOKEN_PRICE = 4;
 
-  function setUp() public virtual override {
+  function setUp() public virtual override(BaseTest, PriceRegistrySetup) {
     BaseTest.setUp();
+    PriceRegistrySetup.setUp();
+
+    Internal.PriceUpdates memory priceUpdates = getSinglePriceUpdateStruct(TOKEN, TOKEN_PRICE);
+    s_priceRegistry.updatePrices(priceUpdates);
 
     s_config = RateLimiter.Config({isEnabled: true, rate: 5, capacity: 100});
     s_rateLimiter = new AggregateRateLimiterHelper(s_config);
-    IERC20[] memory tokens = new IERC20[](1);
-    tokens[0] = TOKEN;
-    uint256[] memory prices = new uint256[](1);
-    prices[0] = TOKEN_PRICE;
-    s_rateLimiter.setPrices(tokens, prices);
     s_rateLimiter.setAdmin(ADMIN);
   }
 }
@@ -159,133 +163,25 @@ contract AggregateTokenLimiter_setRateLimiterConfig is AggregateTokenLimiterSetu
   }
 }
 
-/// @notice #getPricesForTokens
-contract AggregateTokenLimiter_getPricesForTokens is AggregateTokenLimiterSetup {
-  function testGetPricesForTokensSuccess() public {
-    IERC20[] memory tokens = new IERC20[](2);
-    // Unknown tokens
-    tokens[0] = ERC20(0x31118E64E1fb0c487f25DD6D3601FF6Af8D32e4E);
-    // Zero token
-    tokens[0] = ERC20(address(0));
-    // Known token
-    tokens[1] = TOKEN;
-    uint256[] memory prices = new uint256[](2);
-    prices[0] = 0;
-    prices[0] = 0;
-    prices[1] = TOKEN_PRICE;
-
-    uint256[] memory actualPrices = s_rateLimiter.getPricesForTokens(tokens);
-
-    assertEq(actualPrices, prices);
-  }
-}
-
-/// @notice #setPrices
-contract AggregateTokenLimiter_setPrices is AggregateTokenLimiterSetup {
-  event TokenPriceChanged(address token, uint256 newPrice);
-  IERC20[] s_tokens;
-  uint256[] s_prices;
-
-  function setUp() public virtual override {
-    AggregateTokenLimiterSetup.setUp();
-
-    uint256 numberOfTokens = 15;
-    IERC20[] memory tokens = new IERC20[](numberOfTokens);
-    uint256[] memory prices = new uint256[](numberOfTokens);
-
-    for (uint256 i = 0; i < numberOfTokens; ++i) {
-      tokens[i] = IERC20(address(uint160(i + 1)));
-      prices[i] = TOKEN_PRICE * (i + 1);
-    }
-
-    s_rateLimiter.setPrices(tokens, prices);
-
-    s_tokens = tokens;
-    s_prices = prices;
-  }
-
-  function testOwnerSuccess() public {
-    setPrice();
-  }
-
-  function testTokenLimitAdminSuccess() public {
-    changePrank(ADMIN);
-    setPrice();
-  }
-
-  function setPrice() private {
-    IERC20[] memory tokens = new IERC20[](1);
-    tokens[0] = TOKEN;
-    uint256[] memory prices = new uint256[](1);
-    prices[0] = TOKEN_PRICE * 2;
-
-    vm.expectEmit();
-    emit TokenPriceChanged(address(TOKEN), TOKEN_PRICE * 2);
-
-    s_rateLimiter.setPrices(tokens, prices);
-
-    assertEq(TOKEN_PRICE * 2, s_rateLimiter.getPricesForTokens(tokens)[0]);
-  }
-
-  function testClearExistingTokens() public {
-    IERC20[] memory tokens = s_tokens;
-    IERC20[] memory unsetTokens = new IERC20[](1);
-    unsetTokens[0] = tokens[0];
-
-    tokens[0] = IERC20(address(10000));
-
-    // Assert the token has a price before being unset
-    assertEq(TOKEN_PRICE, s_rateLimiter.getPricesForTokens(unsetTokens)[0]);
-
-    s_rateLimiter.setPrices(tokens, s_prices);
-
-    // Assert the token not being sent in the new setPrices request has no
-    // corresponding price after the request.
-    assertEq(0, s_rateLimiter.getPricesForTokens(unsetTokens)[0]);
-  }
-
-  // Reverts
-
-  function testAddressCannotBeZeroReverts() public {
-    vm.expectRevert(AggregateRateLimiter.AddressCannotBeZero.selector);
-
-    s_rateLimiter.setPrices(new IERC20[](1), new uint256[](1));
-  }
-
-  function testOnlyOnlyCallableByAdminOrOwnerReverts() public {
-    changePrank(STRANGER);
-
-    vm.expectRevert(RateLimiter.OnlyCallableByAdminOrOwner.selector);
-
-    s_rateLimiter.setPrices(new IERC20[](1), new uint256[](1));
-  }
-
-  function testTokensAndPriceLengthMismatchReverts() public {
-    vm.expectRevert(AggregateRateLimiter.TokensAndPriceLengthMismatch.selector);
-
-    s_rateLimiter.setPrices(new IERC20[](2), new uint256[](1));
-  }
-}
-
-/// @notice #_removeTokens
-contract AggregateTokenLimiter__removeTokens is AggregateTokenLimiterSetup {
+/// @notice #_rateLimitValue
+contract AggregateTokenLimiter__rateLimitValue is AggregateTokenLimiterSetup {
   event TokensConsumed(uint256 tokens);
 
-  function testRemoveTokensSuccess_gas() public {
+  function testRateLimitValueSuccess_gas() public {
     vm.pauseGasMetering();
     // 15 (tokens) * 4 (price) * 2 (number of times) > 100 (capacity)
     uint256 numberOfTokens = 15;
     uint256 value = numberOfTokens * TOKEN_PRICE;
 
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
-    tokenAmounts[0].token = address(TOKEN);
+    tokenAmounts[0].token = TOKEN;
     tokenAmounts[0].amount = numberOfTokens;
 
     vm.expectEmit();
     emit TokensConsumed(value);
 
     vm.resumeGasMetering();
-    s_rateLimiter.rateLimitValue(tokenAmounts);
+    s_rateLimiter.rateLimitValue(tokenAmounts, s_priceRegistry);
     vm.pauseGasMetering();
 
     // Get the updated bucket status
@@ -297,13 +193,13 @@ contract AggregateTokenLimiter__removeTokens is AggregateTokenLimiterSetup {
     // Expect a revert when we try, with a wait time.
     uint256 waitTime = 4;
     vm.expectRevert(abi.encodeWithSelector(RateLimiter.RateLimitReached.selector, waitTime));
-    s_rateLimiter.rateLimitValue(tokenAmounts);
+    s_rateLimiter.rateLimitValue(tokenAmounts, s_priceRegistry);
 
     // Move the block time forward by 10 so the bucket refills by 10 * rate
     vm.warp(BLOCK_TIME + waitTime);
 
     // The bucket has filled up enough so we can take out more tokens
-    s_rateLimiter.rateLimitValue(tokenAmounts);
+    s_rateLimiter.rateLimitValue(tokenAmounts, s_priceRegistry);
     bucket = s_rateLimiter.currentRateLimiterState();
     assertEq(bucket.capacity - value + waitTime * s_config.rate - value, bucket.tokens);
     vm.resumeGasMetering();
@@ -313,14 +209,14 @@ contract AggregateTokenLimiter__removeTokens is AggregateTokenLimiterSetup {
 
   function testUnknownTokenReverts() public {
     vm.expectRevert(abi.encodeWithSelector(AggregateRateLimiter.PriceNotFoundForToken.selector, address(0)));
-    s_rateLimiter.rateLimitValue(new Client.EVMTokenAmount[](1));
+    s_rateLimiter.rateLimitValue(new Client.EVMTokenAmount[](1), s_priceRegistry);
   }
 
   function testConsumingMoreThanMaxCapacityReverts() public {
     RateLimiter.TokenBucket memory bucket = s_rateLimiter.currentRateLimiterState();
 
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
-    tokenAmounts[0].token = address(TOKEN);
+    tokenAmounts[0].token = TOKEN;
     tokenAmounts[0].amount = 100;
 
     vm.expectRevert(
@@ -330,6 +226,6 @@ contract AggregateTokenLimiter__removeTokens is AggregateTokenLimiterSetup {
         tokenAmounts[0].amount * TOKEN_PRICE
       )
     );
-    s_rateLimiter.rateLimitValue(tokenAmounts);
+    s_rateLimiter.rateLimitValue(tokenAmounts, s_priceRegistry);
   }
 }

@@ -31,6 +31,7 @@ func (d ExecOnchainConfig) AbiString() string {
 			"components": [
 				{"name": "permissionLessExecutionThresholdSeconds", "type": "uint32"},
 				{"name": "router", "type": "address"},
+				{"name": "priceRegistry", "type": "address"},
 				{"name": "afn", "type": "address"},
 				{"name": "maxTokensLength", "type": "uint16"},
 				{"name": "maxDataSize", "type": "uint32"}

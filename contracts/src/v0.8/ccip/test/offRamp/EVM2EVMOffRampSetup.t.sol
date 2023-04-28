@@ -69,14 +69,13 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
       s_valid_signers,
       s_valid_transmitters,
       s_f,
-      abi.encode(generateDynamicOffRampConfig(address(router), address(s_mockAFN))),
+      abi.encode(generateDynamicOffRampConfig(address(router), address(s_priceRegistry), address(s_mockAFN))),
       s_offchainConfigVersion,
       abi.encode("")
     );
 
     address[] memory updaters = new address[](1);
     updaters[0] = address(s_offRamp);
-    s_offRamp.setPrices(getCastedDestinationTokens(), getTokenPrices());
 
     address[] memory s_offRamps = new address[](1);
     s_offRamps[0] = address(s_offRamp);
@@ -207,5 +206,6 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     assertEq(a.permissionLessExecutionThresholdSeconds, b.permissionLessExecutionThresholdSeconds);
     assertEq(a.afn, b.afn);
     assertEq(a.router, b.router);
+    assertEq(a.priceRegistry, b.priceRegistry);
   }
 }

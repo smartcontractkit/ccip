@@ -51,11 +51,10 @@ func SetPriceRegistryPrices(t *testing.T, client *EvmDeploymentConfig, destChain
 		UsdPerUnitGas: big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
 	}
 
-	for _, feeToken := range client.ChainConfig.FeeTokens {
+	for _, tokenConfig := range client.ChainConfig.SupportedTokens {
 		priceUpdates.TokenPriceUpdates = append(priceUpdates.TokenPriceUpdates, price_registry.InternalTokenPriceUpdate{
-			SourceToken: client.ChainConfig.SupportedTokens[feeToken].Token,
-			// USD per wei.
-			UsdPerToken: client.ChainConfig.SupportedTokens[feeToken].Price,
+			SourceToken: tokenConfig.Token,
+			UsdPerToken: tokenConfig.Price,
 		})
 	}
 

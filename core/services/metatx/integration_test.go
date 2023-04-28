@@ -205,7 +205,16 @@ func TestMetaERC20CrossChain(t *testing.T) {
 	ccipContracts.Source.Chain.Commit()
 
 	// set token limit
-	_, err = ccipContracts.Source.OnRamp.SetPrices(ccipContracts.Source.User, []common.Address{sourceTokenAddress}, []*big.Int{big.NewInt(5)})
+	_, err = ccipContracts.Source.PriceRegistry.UpdatePrices(ccipContracts.Source.User, price_registry.InternalPriceUpdates{
+		TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
+			{
+				SourceToken: sourceTokenAddress,
+				UsdPerToken: big.NewInt(5),
+			},
+		},
+		DestChainId:   0,
+		UsdPerUnitGas: big.NewInt(0),
+	})
 	require.NoError(t, err)
 	ccipContracts.Source.Chain.Commit()
 
@@ -218,7 +227,17 @@ func TestMetaERC20CrossChain(t *testing.T) {
 	require.NoError(t, err)
 	ccipContracts.Dest.Chain.Commit()
 
-	_, err = ccipContracts.Dest.OffRamp.SetPrices(ccipContracts.Dest.User, []common.Address{wrappedDestTokenPoolAddress}, []*big.Int{big.NewInt(5)})
+	// set token limit
+	_, err = ccipContracts.Dest.PriceRegistry.UpdatePrices(ccipContracts.Dest.User, price_registry.InternalPriceUpdates{
+		TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
+			{
+				SourceToken: wrappedDestTokenPoolAddress,
+				UsdPerToken: big.NewInt(5),
+			},
+		},
+		DestChainId:   0,
+		UsdPerUnitGas: big.NewInt(0),
+	})
 	require.NoError(t, err)
 	ccipContracts.Dest.Chain.Commit()
 

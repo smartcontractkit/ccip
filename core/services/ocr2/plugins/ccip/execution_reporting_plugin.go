@@ -260,21 +260,11 @@ func (r *ExecutionReportingPlugin) getExecutableSeqNrs(ctx context.Context, infl
 		supportedDestTokens = append(supportedDestTokens, destToken)
 	}
 
-	destTokenPrices, err := r.config.offRamp.GetPricesForTokens(&bind.CallOpts{Context: ctx}, supportedDestTokens)
+	srcTokensPrices, err := getTokensPrices(ctx, r.config.srcPriceRegistry, r.config.srcWrappedNativeToken, []common.Address{})
 	if err != nil {
 		return nil, err
 	}
-
-	pricePerDestToken := make(map[common.Address]*big.Int)
-	for i, destToken := range supportedDestTokens {
-		pricePerDestToken[destToken] = destTokenPrices[i]
-	}
-
-	srcFeeTokensPrices, err := getFeeTokensPrices(ctx, r.config.srcPriceRegistry, r.config.srcWrappedNativeToken)
-	if err != nil {
-		return nil, err
-	}
-	destFeeTokensPrices, err := getFeeTokensPrices(ctx, r.config.destPriceRegistry, r.config.destWrappedNativeToken)
+	destTokensPrices, err := getTokensPrices(ctx, r.config.destPriceRegistry, r.config.destWrappedNativeToken, supportedDestTokens)
 	if err != nil {
 		return nil, err
 	}
@@ -326,7 +316,7 @@ func (r *ExecutionReportingPlugin) getExecutableSeqNrs(ctx context.Context, infl
 		r.lggr.Debugw("building next batch", "executedMp", len(executedMp))
 
 		batch, allMessagesExecuted := r.buildBatch(srcToDst, srcLogs, executedMp, inflight, allowedTokenAmount,
-			pricePerDestToken, srcFeeTokensPrices, destFeeTokensPrices, destGasPrice)
+			srcTokensPrices, destTokensPrices, destGasPrice)
 		// If all messages are already executed, snooze the root for the config.PermissionLessExecutionThresholdSeconds
 		// so it will never be considered again.
 		if allMessagesExecuted {
@@ -348,12 +338,11 @@ func (r *ExecutionReportingPlugin) buildBatch(srcToDst map[common.Address]common
 	executedSeq map[uint64]struct{},
 	inflight []InflightInternalExecutionReport,
 	aggregateTokenLimit *big.Int,
-	tokenLimitPrices map[common.Address]*big.Int,
-	srcFeeTokenPricesUSD map[common.Address]*big.Int,
-	destFeeTokenPricesUSD map[common.Address]*big.Int,
+	srcTokenPricesUSD map[common.Address]*big.Int,
+	destTokenPricesUSD map[common.Address]*big.Int,
 	execGasPriceEstimate *big.Int,
 ) (executableSeqNrs []uint64, executedAllMessages bool) {
-	inflightSeqNrs, inflightAggregateValue, maxInflightSenderNonces, err := r.inflight(inflight, tokenLimitPrices, srcToDst)
+	inflightSeqNrs, inflightAggregateValue, maxInflightSenderNonces, err := r.inflight(inflight, destTokenPricesUSD, srcToDst)
 	if err != nil {
 		r.lggr.Errorw("Unexpected error computing inflight values", "err", err)
 		return []uint64{}, false
@@ -411,7 +400,7 @@ func (r *ExecutionReportingPlugin) buildBatch(srcToDst map[common.Address]common
 			tokens = append(tokens, msg.Message.TokenAmounts[i].Token)
 			amounts = append(amounts, msg.Message.TokenAmounts[i].Amount)
 		}
-		msgValue, err := aggregateTokenValue(tokenLimitPrices, srcToDst, tokens, amounts)
+		msgValue, err := aggregateTokenValue(destTokenPricesUSD, srcToDst, tokens, amounts)
 		if err != nil {
 			lggr.Errorw("Skipping message unable to compute aggregate value", "err", err)
 			continue
@@ -422,12 +411,12 @@ func (r *ExecutionReportingPlugin) buildBatch(srcToDst map[common.Address]common
 			continue
 		}
 		// Fee boosting
-		execCostUsd := computeExecCost(msg, execGasPriceEstimate, destFeeTokenPricesUSD[r.config.destWrappedNativeToken])
+		execCostUsd := computeExecCost(msg, execGasPriceEstimate, destTokenPricesUSD[r.config.destWrappedNativeToken])
 		// calculating the source chain fee, dividing by 1e18 for denomination.
 		// For example:
 		// FeeToken=link; FeeTokenAmount=1e17 i.e. 0.1 link, price is 6e18 USD/link (1 USD = 1e18),
 		// availableFee is 1e17*6e18/1e18 = 6e17 = 0.6 USD
-		availableFee := big.NewInt(0).Mul(msg.Message.FeeTokenAmount, srcFeeTokenPricesUSD[msg.Message.FeeToken])
+		availableFee := big.NewInt(0).Mul(msg.Message.FeeTokenAmount, srcTokenPricesUSD[msg.Message.FeeToken])
 		availableFee = availableFee.Div(availableFee, big.NewInt(1e18))
 		availableFeeUsd := waitBoostedFee(time.Since(srcLog.BlockTimestamp), availableFee, r.offchainConfig.RelativeBoostPerWaitHour)
 		if availableFeeUsd.Cmp(execCostUsd) < 0 {
@@ -589,7 +578,7 @@ func (r *ExecutionReportingPlugin) Close() error {
 
 func (r *ExecutionReportingPlugin) inflight(
 	inflight []InflightInternalExecutionReport,
-	tokenLimitPrices map[common.Address]*big.Int,
+	destTokenPrices map[common.Address]*big.Int,
 	srcToDst map[common.Address]common.Address,
 ) (map[uint64]struct{}, *big.Int, map[common.Address]uint64, error) {
 	inflightSeqNrs := make(map[uint64]struct{})
@@ -614,7 +603,7 @@ func (r *ExecutionReportingPlugin) inflight(
 				tokens = append(tokens, msg.Message.TokenAmounts[i].Token)
 				amounts = append(amounts, msg.Message.TokenAmounts[i].Amount)
 			}
-			msgValue, err := aggregateTokenValue(tokenLimitPrices, srcToDst, tokens, amounts)
+			msgValue, err := aggregateTokenValue(destTokenPrices, srcToDst, tokens, amounts)
 			if err != nil {
 				return nil, nil, nil, err
 			}
@@ -637,23 +626,27 @@ func parseCCIPSendRequestedLog(log gethtypes.Log, abi abi.ABI) (*evm_2_evm_onram
 	return event, nil
 }
 
-// getFeeTokensPrices returns fee token prices of the given price registry,
+// getTokensPrices returns token prices of the given price registry,
+// results include feeTokens and passed-in tokens
 // price values are USD per full token, in base units 1e18 (e.g. 5$ = 5e18).
-// this function is used for price reigstry of both source and destination chains.
-func getFeeTokensPrices(ctx context.Context, priceRegistry *price_registry.PriceRegistry, wrappedNative common.Address) (map[common.Address]*big.Int, error) {
+// this function is used for price registry of both source and destination chains.
+func getTokensPrices(ctx context.Context, priceRegistry *price_registry.PriceRegistry, wrappedNative common.Address, tokens []common.Address) (map[common.Address]*big.Int, error) {
 	prices := make(map[common.Address]*big.Int)
 
-	srcFeeTokens, err := priceRegistry.GetFeeTokens(&bind.CallOpts{Context: ctx})
+	feeTokens, err := priceRegistry.GetFeeTokens(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return nil, errors.Wrap(err, "could not get source fee tokens")
 	}
-	for _, feeToken := range srcFeeTokens {
-		feeTokenPrice, err := priceRegistry.GetTokenPrice(&bind.CallOpts{Context: ctx}, feeToken)
-		if err != nil {
-			return nil, errors.Wrapf(err, "could not get token price of %s", feeToken.String())
-		}
-		prices[feeToken] = feeTokenPrice.Value
+
+	wantedTokens := append(feeTokens, tokens...)
+	wantedPrices, err := priceRegistry.GetTokenPrices(&bind.CallOpts{Context: ctx}, wantedTokens)
+	if err != nil {
+		return nil, errors.Wrapf(err, "could not get token prices of %v", wantedTokens)
 	}
+	for i, token := range wantedTokens {
+		prices[token] = wantedPrices[i].Value
+	}
+
 	if _, ok := prices[wrappedNative]; !ok {
 		srcTokenPrice, err := priceRegistry.GetTokenPrice(&bind.CallOpts{Context: ctx}, wrappedNative)
 		if err != nil {

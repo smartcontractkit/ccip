@@ -492,7 +492,7 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 		}
 
 		// update PriceRegistry
-		err = sourceCCIP.Common.PriceRegistry.UpdatePrices(price_registry.InternalPriceUpdates{
+		priceUpdates := price_registry.InternalPriceUpdates{
 			DestChainId:   sourceCCIP.DestinationChainId,
 			UsdPerUnitGas: big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
 			TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
@@ -506,7 +506,14 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 					UsdPerToken: big.NewInt(5e18),
 				},
 			},
-		})
+		}
+		for i, token := range sourceCCIP.Common.BridgeTokens {
+			priceUpdates.TokenPriceUpdates = append(priceUpdates.TokenPriceUpdates, price_registry.InternalTokenPriceUpdate{
+				SourceToken: token.EthAddress,
+				UsdPerToken: sourceCCIP.Common.TokenPrices[i],
+			})
+		}
+		err = sourceCCIP.Common.PriceRegistry.UpdatePrices(priceUpdates)
 		if err != nil {
 			return fmt.Errorf("feeupdates shouldn't fail %+v", err)
 		}
@@ -518,9 +525,7 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 
 	if sourceCCIP.OnRamp == nil {
 		var tokensAndPools []evm_2_evm_onramp.EVM2EVMOnRampTokenAndPool
-		var tokens []common.Address
 		for i, token := range sourceCCIP.Common.BridgeTokens {
-			tokens = append(tokens, token.EthAddress)
 			tokensAndPools = append(tokensAndPools, evm_2_evm_onramp.EVM2EVMOnRampTokenAndPool{
 				Token: token.EthAddress,
 				Pool:  sourceCCIP.Common.BridgeTokenPools[i].EthAddress,
@@ -562,12 +567,6 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 		err = sourceCCIP.Common.ChainClient.WaitForEvents()
 		if err != nil {
 			return fmt.Errorf("waiting for onRamp deployment shouldn't fail %+v", err)
-		}
-
-		// Set bridge token prices on the onRamp
-		err = sourceCCIP.OnRamp.SetTokenPrices(tokens, sourceCCIP.Common.TokenPrices)
-		if err != nil {
-			return fmt.Errorf("setting prices shouldn't fail %+v", err)
 		}
 
 		// update source Router with OnRamp address
@@ -880,21 +879,30 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 		}
 
 		// update PriceRegistry
-		err = destCCIP.Common.PriceRegistry.UpdatePrices(price_registry.InternalPriceUpdates{
+		priceUpdates := price_registry.InternalPriceUpdates{
 			DestChainId:   destCCIP.SourceChainId,
 			UsdPerUnitGas: big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
 			TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
 				{
 					SourceToken: common.HexToAddress(destCCIP.Common.FeeToken.Address()),
-					/// USD per full fee token, in base units 1e18.
+					/// The price, in USD with 18 decimals, per 1e18 of the smallest token denomination.
+					/// A value of 1e18 represents 1 USD per 1e18 token amount.
 					/// Example:
-					///   * 1 USDC = 1.00 USD per token -> 1e18
-					///   * 1 LINK = 5.00 USD per token -> 5e18
-					///   * 1 ETH = 2,000 USD per token -> 2_000e18
+					///   * 1 USDC = 1.00 USD per full token, each full token is 1e6 units -> 1 * 1e18 * 1e18 / 1e6 = 1e30
+					///   * 1 ETH = 2,000 USD per full token, each full token is 1e18 units -> 2000 * 1e18 * 1e18 / 1e18 = 2_000e18
+					///   * 1 LINK = 5.00 USD per full token, each full token is 1e18 units -> 5 * 1e18 * 1e18 / 1e18 = 5e18
 					UsdPerToken: big.NewInt(5e18),
 				},
 			},
-		})
+		}
+		for i, token := range destCCIP.Common.BridgeTokens {
+			priceUpdates.TokenPriceUpdates = append(priceUpdates.TokenPriceUpdates, price_registry.InternalTokenPriceUpdate{
+				SourceToken: token.EthAddress,
+				UsdPerToken: destCCIP.Common.TokenPrices[i],
+			})
+		}
+
+		err = destCCIP.Common.PriceRegistry.UpdatePrices(priceUpdates)
 		if err != nil {
 			return fmt.Errorf("priceupdates shouldn't fail %+v", err)
 		}
@@ -990,11 +998,6 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 		err = destCCIP.Common.ChainClient.WaitForEvents()
 		if err != nil {
 			return fmt.Errorf("waiting for events on destination contract shouldn't fail %+v", err)
-		}
-
-		err = destCCIP.OffRamp.SetTokenPrices(destTokens, destCCIP.Common.TokenPrices)
-		if err != nil {
-			return fmt.Errorf("setting offramp token prices shouldn't fail %+v", err)
 		}
 
 		// update pools with offRamp id
@@ -1790,6 +1793,7 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 			}, ccipPlugin.ExecOnchainConfig{
 				PermissionLessExecutionThresholdSeconds: 60,
 				Router:                                  destCCIP.Common.Router.EthAddress,
+				PriceRegistry:                           destCCIP.Common.PriceRegistry.EthAddress,
 				Afn:                                     destCCIP.Common.AFN.EthAddress,
 				MaxTokensLength:                         5,
 				MaxDataSize:                             1e5,

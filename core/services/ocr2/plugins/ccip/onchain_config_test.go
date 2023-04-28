@@ -54,6 +54,7 @@ func TestExecOnchainConfig(t *testing.T) {
 			want: ExecOnchainConfig{
 				PermissionLessExecutionThresholdSeconds: rand.Uint32(),
 				Router:                                  randomAddress(),
+				PriceRegistry:                           randomAddress(),
 				Afn:                                     randomAddress(),
 				MaxTokensLength:                         uint16(rand.Uint32()),
 				MaxDataSize:                             rand.Uint32(),

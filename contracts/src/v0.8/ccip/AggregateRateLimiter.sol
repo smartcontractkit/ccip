@@ -4,26 +4,18 @@ pragma solidity 0.8.15;
 import {OwnerIsCreator} from "./OwnerIsCreator.sol";
 import {Client} from "./libraries/Client.sol";
 import {RateLimiter} from "./libraries/RateLimiter.sol";
+import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
 
 import {IERC20} from "../vendor/IERC20.sol";
 
 contract AggregateRateLimiter is OwnerIsCreator {
   using RateLimiter for RateLimiter.TokenBucket;
 
-  error TokensAndPriceLengthMismatch();
   error PriceNotFoundForToken(address token);
-  error AddressCannotBeZero();
-
-  event TokenPriceChanged(address token, uint256 newPrice);
   event AdminSet(address newAdmin);
 
   // The address of the token limit admin that has the same permissions as the owner.
   address internal s_admin;
-
-  // A mapping of token => tokenPrice
-  mapping(IERC20 => uint256) private s_priceByToken;
-  // The tokens that have a set price
-  IERC20[] private s_allowedTokens;
 
   // The token bucket object that contains the bucket state.
   RateLimiter.TokenBucket private s_rateLimiter;
@@ -40,12 +32,14 @@ contract AggregateRateLimiter is OwnerIsCreator {
     });
   }
 
-  function _rateLimitValue(Client.EVMTokenAmount[] memory tokenAmounts) internal {
+  function _rateLimitValue(Client.EVMTokenAmount[] memory tokenAmounts, IPriceRegistry priceRegistry) internal {
+    uint256 numberOfTokens = tokenAmounts.length;
+
     uint256 value = 0;
-    for (uint256 i = 0; i < tokenAmounts.length; ++i) {
-      uint256 pricePerToken = s_priceByToken[IERC20(tokenAmounts[i].token)];
+    for (uint256 i = 0; i < numberOfTokens; ++i) {
+      uint256 pricePerToken = priceRegistry.getTokenPrice(tokenAmounts[i].token).value;
       if (pricePerToken == 0) revert PriceNotFoundForToken(tokenAmounts[i].token);
-      value += pricePerToken * tokenAmounts[i].amount;
+      value += tokenAmounts[i].amount * pricePerToken;
     }
 
     s_rateLimiter._consume(value);
@@ -62,47 +56,6 @@ contract AggregateRateLimiter is OwnerIsCreator {
   /// @dev should only be callable by the owner or token limit admin.
   function setRateLimiterConfig(RateLimiter.Config memory config) public requireAdminOrOwner {
     s_rateLimiter._setTokenBucketConfig(config);
-  }
-
-  /// @notice Gets the set prices for the given IERC20s.
-  /// @param tokens The tokens to get the price of.
-  /// @return prices The current prices of the token.
-  function getPricesForTokens(IERC20[] memory tokens) public view returns (uint256[] memory prices) {
-    uint256 numberOfTokens = tokens.length;
-    prices = new uint256[](numberOfTokens);
-
-    for (uint256 i = 0; i < numberOfTokens; ++i) {
-      prices[i] = s_priceByToken[tokens[i]];
-    }
-
-    return prices;
-  }
-
-  /// @notice Sets the prices of the given IERC20 tokens to the given prices.
-  /// @param tokens The tokens for which the price will be set.
-  /// @param prices The new prices of the given tokens.
-  /// @dev if any previous prices were set for a number of given tokens, these will
-  /// be overwritten. Previously set prices for tokens that are not present in subsequent
-  /// setPrices calls will *not* be reset to zero but will be left unchanged.
-  /// @dev should only be callable by the owner or token limit admin.
-  function setPrices(IERC20[] memory tokens, uint256[] memory prices) public requireAdminOrOwner {
-    uint256 newTokenLength = tokens.length;
-    if (newTokenLength != prices.length) revert TokensAndPriceLengthMismatch();
-
-    // Remove all old entries
-    uint256 setTokensLength = s_allowedTokens.length;
-    for (uint256 i = 0; i < setTokensLength; ++i) {
-      delete s_priceByToken[s_allowedTokens[i]];
-    }
-
-    for (uint256 i = 0; i < newTokenLength; ++i) {
-      IERC20 token = tokens[i];
-      if (token == IERC20(address(0))) revert AddressCannotBeZero();
-      s_priceByToken[token] = prices[i];
-      emit TokenPriceChanged(address(token), prices[i]);
-    }
-
-    s_allowedTokens = tokens;
   }
 
   // ================================================================

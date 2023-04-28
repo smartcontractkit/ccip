@@ -6,6 +6,7 @@ import {ICommitStore} from "../interfaces/ICommitStore.sol";
 import {IAFN} from "../interfaces/IAFN.sol";
 import {IPool} from "../interfaces/pools/IPool.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
+import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
 
 import {Client} from "../libraries/Client.sol";
@@ -75,6 +76,7 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
   struct DynamicConfig {
     uint32 permissionLessExecutionThresholdSeconds; // -┐ Waiting time before manual execution is enabled
     address router; // ---------------------------------┘ Router address
+    address priceRegistry; // Price registry address
     address afn; // ---------------┐ AFN address
     uint16 maxTokensLength; //     | Maximum number of distinct ERC20 tokens that can be sent per message
     uint32 maxDataSize; // --------┘ Maximum payload data size
@@ -488,7 +490,7 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
       destTokenAmounts[i].token = address(pool.getToken());
       destTokenAmounts[i].amount = sourceTokenAmounts[i].amount;
     }
-    _rateLimitValue(destTokenAmounts);
+    _rateLimitValue(destTokenAmounts, IPriceRegistry(s_dynamicConfig.priceRegistry));
     return destTokenAmounts;
   }
 

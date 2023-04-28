@@ -129,10 +129,10 @@ func leavesFromIntervals(
 	return leaves, nil
 }
 
-func aggregateTokenValue(tokenLimitPrices map[common.Address]*big.Int, srcToDst map[common.Address]common.Address, tokens []common.Address, amounts []*big.Int) (*big.Int, error) {
+func aggregateTokenValue(destTokenPricesUSD map[common.Address]*big.Int, srcToDst map[common.Address]common.Address, tokens []common.Address, amounts []*big.Int) (*big.Int, error) {
 	sum := big.NewInt(0)
 	for i := 0; i < len(tokens); i++ {
-		price, ok := tokenLimitPrices[srcToDst[tokens[i]]]
+		price, ok := destTokenPricesUSD[srcToDst[tokens[i]]]
 		if !ok {
 			return nil, errors.Errorf("do not have price for src token %x", tokens[i])
 		}

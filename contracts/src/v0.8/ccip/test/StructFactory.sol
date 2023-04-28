@@ -96,15 +96,16 @@ contract StructFactory {
   uint32 internal constant PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS = 500;
   uint64 internal constant MAX_GAS_LIMIT = 4_000_000;
 
-  function generateDynamicOffRampConfig(address router, address afn)
-    internal
-    pure
-    returns (EVM2EVMOffRamp.DynamicConfig memory)
-  {
+  function generateDynamicOffRampConfig(
+    address router,
+    address priceRegistry,
+    address afn
+  ) internal pure returns (EVM2EVMOffRamp.DynamicConfig memory) {
     return
       EVM2EVMOffRamp.DynamicConfig({
         router: router,
         maxDataSize: MAX_DATA_SIZE,
+        priceRegistry: priceRegistry,
         afn: afn,
         maxTokensLength: MAX_TOKENS_LENGTH,
         permissionLessExecutionThresholdSeconds: PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS
@@ -151,14 +152,44 @@ contract StructFactory {
   address constant ADMIN = 0x11118e64e1FB0c487f25dD6D3601FF6aF8d32E4e;
 
   function rateLimiterConfig() internal pure returns (RateLimiter.Config memory) {
-    return RateLimiter.Config({isEnabled: true, capacity: 100e28, rate: 1e15});
+    return RateLimiter.Config({isEnabled: true, capacity: 100e46, rate: 1e33});
   }
 
-  function getTokenPrices() internal pure returns (uint256[] memory prices) {
-    prices = new uint256[](2);
-    prices[0] = 1;
-    prices[1] = 8;
-    return prices;
+  function getSinglePriceUpdateStruct(address token, uint192 price)
+    internal
+    pure
+    returns (Internal.PriceUpdates memory)
+  {
+    Internal.TokenPriceUpdate[] memory tokenPriceUpdates = new Internal.TokenPriceUpdate[](1);
+    tokenPriceUpdates[0] = Internal.TokenPriceUpdate({sourceToken: token, usdPerToken: price});
+
+    Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
+      tokenPriceUpdates: tokenPriceUpdates,
+      destChainId: 0,
+      usdPerUnitGas: 0
+    });
+
+    return priceUpdates;
+  }
+
+  function getPriceUpdatesStruct(address[] memory tokens, uint192[] memory prices)
+    internal
+    pure
+    returns (Internal.PriceUpdates memory)
+  {
+    uint256 length = tokens.length;
+
+    Internal.TokenPriceUpdate[] memory tokenPriceUpdates = new Internal.TokenPriceUpdate[](length);
+    for (uint256 i = 0; i < length; ++i) {
+      tokenPriceUpdates[i] = Internal.TokenPriceUpdate({sourceToken: tokens[i], usdPerToken: prices[i]});
+    }
+    Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
+      tokenPriceUpdates: tokenPriceUpdates,
+      destChainId: 0,
+      usdPerUnitGas: 0
+    });
+
+    return priceUpdates;
   }
 
   // OffRamp

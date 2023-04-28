@@ -22,16 +22,28 @@ contract PriceRegistrySetup is TokenSetup, RouterSetup {
 
     s_weth = s_sourceRouter.getWrappedNative();
 
-    Internal.TokenPriceUpdate[] memory tokenPriceUpdates = new Internal.TokenPriceUpdate[](3);
-    // Include USD prices
-    tokenPriceUpdates[0] = Internal.TokenPriceUpdate({sourceToken: s_sourceTokens[0], usdPerToken: 5e18});
-    tokenPriceUpdates[1] = Internal.TokenPriceUpdate({sourceToken: s_sourceTokens[1], usdPerToken: 2000e18});
-    tokenPriceUpdates[2] = Internal.TokenPriceUpdate({sourceToken: s_weth, usdPerToken: 2000e18});
-    Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
-      tokenPriceUpdates: tokenPriceUpdates,
-      destChainId: DEST_CHAIN_ID,
-      usdPerUnitGas: 1e6
-    });
+    address[] memory pricedSourceTokens = getPricedSourceToken();
+    address[] memory pricedDestTokens = getPricedDestTokens();
+    uint192[] memory sourceTokenPrices = getSourceTokenPrices();
+    uint192[] memory destTokenPrices = getDestTokenPrices();
+
+    uint256 sourceTokenCount = pricedSourceTokens.length;
+    uint256 destTokenCount = pricedDestTokens.length;
+    address[] memory pricedTokens = new address[](sourceTokenCount + destTokenCount);
+    uint192[] memory tokenPrices = new uint192[](sourceTokenCount + destTokenCount);
+    for (uint256 i = 0; i < sourceTokenCount; ++i) {
+      pricedTokens[i] = pricedSourceTokens[i];
+      tokenPrices[i] = sourceTokenPrices[i];
+    }
+    for (uint256 i = 0; i < destTokenCount; ++i) {
+      pricedTokens[i + sourceTokenCount] = pricedDestTokens[i];
+      tokenPrices[i + sourceTokenCount] = destTokenPrices[i];
+    }
+
+    Internal.PriceUpdates memory priceUpdates = getPriceUpdatesStruct(pricedTokens, tokenPrices);
+    priceUpdates.destChainId = DEST_CHAIN_ID;
+    priceUpdates.usdPerUnitGas = 1e6;
+
     s_encodedInitialPriceUpdates = abi.encode(priceUpdates);
     address[] memory priceUpdaters = new address[](0);
     address[] memory feeTokens = new address[](2);
@@ -40,16 +52,48 @@ contract PriceRegistrySetup is TokenSetup, RouterSetup {
     s_priceRegistry = new PriceRegistry(priceUpdates, priceUpdaters, feeTokens, uint32(TWELVE_HOURS));
   }
 
-  function testSetupSuccess() public {
+  function getPricedSourceToken() internal view returns (address[] memory) {
+    address[] memory tokens = new address[](3);
+    tokens[0] = s_sourceTokens[0];
+    tokens[1] = s_sourceTokens[1];
+    tokens[2] = s_sourceRouter.getWrappedNative();
+    return tokens;
+  }
+
+  function getPricedDestTokens() internal view returns (address[] memory) {
+    address[] memory tokens = new address[](3);
+    tokens[0] = s_destTokens[0];
+    tokens[1] = s_destTokens[1];
+    tokens[2] = s_destRouter.getWrappedNative();
+    return tokens;
+  }
+
+  function getSourceTokenPrices() internal pure returns (uint192[] memory) {
+    uint192[] memory prices = new uint192[](3);
+    prices[0] = 5e18;
+    prices[1] = 2000e18;
+    prices[2] = 2000e18;
+    return prices;
+  }
+
+  function getDestTokenPrices() internal pure returns (uint192[] memory) {
+    uint192[] memory prices = new uint192[](3);
+    prices[0] = 5e18;
+    prices[1] = 2000e18;
+    prices[2] = 2000e18;
+    return prices;
+  }
+}
+
+contract PriceRegistry_constructor is PriceRegistrySetup {
+  function testSetupSuccess() public virtual {
     assertEq(s_priceRegistry.getTokenPrice(s_sourceTokens[0]).value, 5e18);
     assertEq(s_priceRegistry.getTokenPrice(s_sourceTokens[1]).value, 2000e18);
     assertEq(s_priceRegistry.getDestinationChainGasPrice(DEST_CHAIN_ID).value, 1e6);
     assertEq(s_priceRegistry.getFeeTokenBaseUnitsPerUnitGas(s_sourceTokens[0], DEST_CHAIN_ID), 2e5);
     assertEq(s_priceRegistry.getFeeTokenBaseUnitsPerUnitGas(s_weth, DEST_CHAIN_ID), 500);
   }
-}
 
-contract PriceRegistry_constructor is PriceRegistrySetup {
   function testInvalidStalenessThresholdReverts() public {
     Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
       tokenPriceUpdates: new Internal.TokenPriceUpdate[](0),
@@ -59,6 +103,24 @@ contract PriceRegistry_constructor is PriceRegistrySetup {
 
     vm.expectRevert(PriceRegistry.InvalidStalenessThreshold.selector);
     s_priceRegistry = new PriceRegistry(priceUpdates, new address[](0), new address[](0), 0);
+  }
+}
+
+contract PriceRegistry_getTokenPrices is PriceRegistrySetup {
+  function testGetTokenPricesSuccess() public {
+    Internal.PriceUpdates memory priceUpdates = abi.decode(s_encodedInitialPriceUpdates, (Internal.PriceUpdates));
+
+    address[] memory tokens = new address[](3);
+    tokens[0] = s_sourceTokens[0];
+    tokens[1] = s_sourceTokens[1];
+    tokens[2] = s_weth;
+
+    IPriceRegistry.TimestampedUint192Value[] memory tokenPrices = s_priceRegistry.getTokenPrices(tokens);
+
+    assertEq(tokenPrices.length, 3);
+    assertEq(tokenPrices[0].value, priceUpdates.tokenPriceUpdates[0].usdPerToken);
+    assertEq(tokenPrices[1].value, priceUpdates.tokenPriceUpdates[1].usdPerToken);
+    assertEq(tokenPrices[2].value, priceUpdates.tokenPriceUpdates[2].usdPerToken);
   }
 }
 
@@ -193,9 +255,9 @@ contract PriceRegistry_convertTokenAmount is PriceRegistrySetup {
 
   function test_fuzz_ConvertTokenAmountSuccess(
     uint256 feeTokenAmount,
-    uint128 usdPerFeeToken,
-    uint128 usdPerLinkToken,
-    uint128 usdPerUnitGas
+    uint192 usdPerFeeToken,
+    uint160 usdPerLinkToken,
+    uint192 usdPerUnitGas
   ) public {
     vm.assume(usdPerFeeToken > 0);
     vm.assume(usdPerLinkToken > 0);

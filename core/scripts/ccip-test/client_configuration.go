@@ -798,12 +798,6 @@ func (client *CCIPClient) AcceptOwnership(t *testing.T) {
 	helpers.PanicErr(err)
 }
 
-type aggregateRateLimiter interface {
-	Address() common.Address
-	GetPricesForTokens(opts *bind.CallOpts, tokens []common.Address) ([]*big.Int, error)
-	SetPrices(opts *bind.TransactOpts, tokens []common.Address, prices []*big.Int) (*types.Transaction, error)
-}
-
 func (client *CCIPClient) syncPoolsOnOnRamp() {
 	registeredTokens, err := client.Source.OnRamp.GetSupportedTokens(&bind.CallOpts{})
 	require.NoError(client.Source.t, err)
@@ -908,7 +902,7 @@ func (client *CCIPClient) syncPoolsOffOnRamp() {
 	}
 }
 
-func syncPrices(client *Client, limiter aggregateRateLimiter, otherChainTokens map[rhea.Token]EVMBridgedToken) {
+func syncPrices(client *Client, otherChainTokens map[rhea.Token]EVMBridgedToken) {
 	// We only want to add token prices that are supported on both chains.
 	var wantedTokens []common.Address
 	var prices []*big.Int
@@ -928,16 +922,30 @@ func syncPrices(client *Client, limiter aggregateRateLimiter, otherChainTokens m
 		return
 	}
 
-	limiterTokenPrices, err := limiter.GetPricesForTokens(&bind.CallOpts{}, wantedTokens)
+	tokenPrices, err := client.PriceRegistry.GetTokenPrices(&bind.CallOpts{}, wantedTokens)
 	require.NoError(client.t, err)
 	for i, price := range prices {
 		// If a price difference is found update all prices and return
-		if price.Cmp(limiterTokenPrices[i]) != 0 {
-			tx, err2 := limiter.SetPrices(client.Owner, wantedTokens, prices)
+		if price.Cmp(tokenPrices[i].Value) != 0 {
+			priceUpdates := price_registry.InternalPriceUpdates{
+				TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{},
+				DestChainId:       0,
+				UsdPerUnitGas:     big.NewInt(0),
+			}
+
+			for i, token := range wantedTokens {
+				priceUpdates.TokenPriceUpdates = append(priceUpdates.TokenPriceUpdates, price_registry.InternalTokenPriceUpdate{
+					SourceToken: token,
+					// USD per Token.
+					UsdPerToken: prices[i],
+				})
+			}
+
+			tx, err2 := client.PriceRegistry.UpdatePrices(client.Owner, priceUpdates)
 			require.NoError(client.t, err2)
 			err2 = shared.WaitForMined(client.logger, client.Client, tx.Hash(), true)
 			require.NoError(client.t, err2)
-			client.logger.Infof("setPrices(tokens=%s, prices=%s) for limiter=%s: tx=%s", wantedTokens, prices, limiter.Address(), tx.Hash())
+			client.logger.Infof("updatePrices(tokens=%s, prices=%s) for registry=%s: tx=%s", wantedTokens, prices, client.PriceRegistry.Address(), tx.Hash())
 			return
 		}
 	}
@@ -1013,13 +1021,13 @@ func (client *CCIPClient) syncOffRampOnPools() error {
 func (client *CCIPClient) SyncTokenPools() {
 	// onRamp maps source tokens to source pools
 	client.syncPoolsOnOnRamp()
-	syncPrices(&client.Source.Client, client.Source.OnRamp, client.Dest.SupportedTokens)
+	syncPrices(&client.Source.Client, client.Dest.SupportedTokens)
 	err := client.syncOnRampOnPools()
 	require.NoError(client.Source.t, err)
 
 	// offRamp maps *source* tokens to *dest* pools
 	client.syncPoolsOffOnRamp()
-	syncPrices(&client.Dest.Client, client.Dest.OffRamp, client.Source.SupportedTokens)
+	syncPrices(&client.Dest.Client, client.Source.SupportedTokens)
 	err = client.syncOffRampOnPools()
 	require.NoError(client.Dest.t, err)
 }

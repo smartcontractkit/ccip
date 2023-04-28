@@ -28,19 +28,19 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
   event UsdPerUnitGasUpdated(uint64 indexed destChain, uint256 value, uint256 timestamp);
   event UsdPerTokenUpdated(address indexed token, uint256 value, uint256 timestamp);
 
-  /// @dev The price, in USD, of 1 unit of gas for a given destination chain.
-  /// @dev 1e18 is 1 USD. Examples:
+  /// @dev The price, in USD with 18 decimals, of 1 unit of gas for a given destination chain.
+  /// @dev Price of 1e18 is 1 USD. Examples:
   ///     Very Expensive:   1 unit of gas costs 1 USD                  -> 1e18
   ///     Expensive:        1 unit of gas costs 0.1 USD                -> 1e17
   ///     Cheap:            1 unit of gas costs 0.000001 USD           -> 1e12
-  mapping(uint64 => TimestampedUint128Value) private s_usdPerUnitGasByDestChainId;
+  mapping(uint64 => TimestampedUint192Value) private s_usdPerUnitGasByDestChainId;
 
-  /// @dev USD per full token, in base units 1e18.
-  /// @dev Example:
-  ///     1 USDC = 1.00 USD per token -> 1e18
-  ///     1 LINK = 5.00 USD per token -> 5e18
-  ///     1 ETH = 2,000 USD per token -> 2_000e18
-  mapping(address => TimestampedUint128Value) private s_usdPerToken;
+  /// @dev The price, in USD with 18 decimals, per 1e18 of the smallest token denomination.
+  /// @dev Price of 1e18 represents 1 USD per 1e18 token amount.
+  ///     1 USDC = 1.00 USD per full token, each full token is 1e6 units -> 1 * 1e18 * 1e18 / 1e6 = 1e30
+  ///     1 ETH = 2,000 USD per full token, each full token is 1e18 units -> 2000 * 1e18 * 1e18 / 1e18 = 2_000e18
+  ///     1 LINK = 5.00 USD per full token, each full token is 1e18 units -> 5 * 1e18 * 1e18 / 1e18 = 5e18
+  mapping(address => TimestampedUint192Value) private s_usdPerToken;
 
   // Price updaters are allowed to update the prices.
   EnumerableSet.AddressSet private s_priceUpdaters;
@@ -67,8 +67,18 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
   // ================================================================
 
   // @inheritdoc IPriceRegistry
-  function getTokenPrice(address token) external view override returns (TimestampedUint128Value memory) {
+  function getTokenPrice(address token) public view override returns (TimestampedUint192Value memory) {
     return s_usdPerToken[token];
+  }
+
+  // @inheritdoc IPriceRegistry
+  function getTokenPrices(address[] calldata tokens) external view override returns (TimestampedUint192Value[] memory) {
+    uint256 length = tokens.length;
+    TimestampedUint192Value[] memory tokenPrices = new TimestampedUint192Value[](length);
+    for (uint256 i = 0; i < length; ++i) {
+      tokenPrices[i] = getTokenPrice(tokens[i]);
+    }
+    return tokenPrices;
   }
 
   /// @notice Get the staleness threshold.
@@ -82,7 +92,7 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
     external
     view
     override
-    returns (TimestampedUint128Value memory)
+    returns (TimestampedUint192Value memory)
   {
     return s_usdPerUnitGasByDestChainId[destChainId];
   }
@@ -96,7 +106,7 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
   {
     if (!s_feeTokens.contains(feeToken)) revert NotAFeeToken(feeToken);
 
-    TimestampedUint128Value memory gasPrice = s_usdPerUnitGasByDestChainId[destChainId];
+    TimestampedUint192Value memory gasPrice = s_usdPerUnitGasByDestChainId[destChainId];
     // We do allow a gas price of 0
     if (gasPrice.timestamp == 0) revert ChainNotSupported(destChainId);
     uint256 timePassed = block.timestamp - gasPrice.timestamp;
@@ -106,9 +116,9 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
   }
 
   /// @inheritdoc IPriceRegistry
-  /// @dev this function assumed that no more than 1e72 dollar, or type(uint240).max, is
+  /// @dev this function assumed that no more than 1e59 dollar, is
   /// sent as payment. If more is sent, the multiplication of feeTokenAmount and feeTokenValue
-  /// will overflow. Since there isn't even close to 1e72 dollars in the world economy this is safe.
+  /// will overflow. Since there isn't even close to 1e59 dollars in the world economy this is safe.
   function convertTokenAmount(
     address fromToken,
     uint256 fromTokenAmount,
@@ -127,7 +137,7 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
   /// @param token The address of the token to get the price for
   /// @return the token price
   function _getValidatedTokenPrice(address token) internal view returns (uint256) {
-    TimestampedUint128Value memory tokenPrice = s_usdPerToken[token];
+    TimestampedUint192Value memory tokenPrice = s_usdPerToken[token];
     if (tokenPrice.timestamp == 0 || tokenPrice.value == 0) revert TokenNotSupported(token);
     uint256 timePassed = block.timestamp - tokenPrice.timestamp;
     if (timePassed > i_stalenessThreshold) revert StaleTokenPrice(token, i_stalenessThreshold, timePassed);
@@ -187,19 +197,21 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
   /// @notice Updates all prices in the priceUpdates struct.
   /// @param priceUpdates The struct containing all the price updates.
   function _updatePrices(Internal.PriceUpdates memory priceUpdates) private {
-    for (uint256 i = 0; i < priceUpdates.tokenPriceUpdates.length; ++i) {
+    uint256 priceUpdatesLength = priceUpdates.tokenPriceUpdates.length;
+
+    for (uint256 i = 0; i < priceUpdatesLength; ++i) {
       Internal.TokenPriceUpdate memory update = priceUpdates.tokenPriceUpdates[i];
-      s_usdPerToken[update.sourceToken] = TimestampedUint128Value({
+      s_usdPerToken[update.sourceToken] = TimestampedUint192Value({
         value: update.usdPerToken,
-        timestamp: uint128(block.timestamp)
+        timestamp: uint64(block.timestamp)
       });
       emit UsdPerTokenUpdated(update.sourceToken, update.usdPerToken, block.timestamp);
     }
 
     if (priceUpdates.destChainId != 0) {
-      s_usdPerUnitGasByDestChainId[priceUpdates.destChainId] = TimestampedUint128Value({
+      s_usdPerUnitGasByDestChainId[priceUpdates.destChainId] = TimestampedUint192Value({
         value: priceUpdates.usdPerUnitGas,
-        timestamp: uint128(block.timestamp)
+        timestamp: uint64(block.timestamp)
       });
       emit UsdPerUnitGasUpdated(priceUpdates.destChainId, priceUpdates.usdPerUnitGas, block.timestamp);
     }

@@ -9,12 +9,12 @@ library Internal {
   struct PriceUpdates {
     TokenPriceUpdate[] tokenPriceUpdates;
     uint64 destChainId; // ------┐ Destination chain Id
-    uint128 usdPerUnitGas; // ---┘ USD per unit of destination chain gas
+    uint192 usdPerUnitGas; // ---┘ USD per unit of destination chain gas
   }
 
   struct TokenPriceUpdate {
     address sourceToken; // Source token
-    uint128 usdPerToken; // USD per unit of token
+    uint192 usdPerToken; // USD per unit of token
   }
 
   struct PoolUpdate {

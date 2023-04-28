@@ -291,7 +291,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
     if (tokenAmounts.length > uint256(s_dynamicConfig.maxTokensLength)) revert UnsupportedNumberOfTokens();
     if (s_allowlistEnabled && !s_allowList.contains(originalSender)) revert SenderNotAllowed(originalSender);
 
-    _rateLimitValue(tokenAmounts);
+    _rateLimitValue(tokenAmounts, IPriceRegistry(s_dynamicConfig.priceRegistry));
   }
 
   // ================================================================

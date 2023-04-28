@@ -9,7 +9,8 @@
   "getPriceUpdaters()": "bfcd4566",
   "getStalenessThreshold()": "a6c94a73",
   "getTokenPrice(address)": "d02641a0",
+  "getTokenPrices(address[])": "45ac924d",
   "owner()": "8da5cb5b",
   "transferOwnership(address)": "f2fde38b",
-  "updatePrices(((address,uint128)[],uint64,uint128))": "3c03ec3c"
+  "updatePrices(((address,uint192)[],uint64,uint192))": "866548c9"
 }

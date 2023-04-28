@@ -203,13 +203,10 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     feeTokens[0] = s_sourceTokens[1];
     s_priceRegistry.applyFeeTokensUpdates(feeTokens, new address[](0));
 
-    Internal.TokenPriceUpdate[] memory tokenPriceUpdates = new Internal.TokenPriceUpdate[](1);
-    tokenPriceUpdates[0] = Internal.TokenPriceUpdate({sourceToken: s_sourceTokens[1], usdPerToken: 2_000 ether});
-    Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
-      tokenPriceUpdates: tokenPriceUpdates,
-      destChainId: DEST_CHAIN_ID,
-      usdPerUnitGas: 0
-    });
+    Internal.PriceUpdates memory priceUpdates = getSinglePriceUpdateStruct(s_sourceTokens[1], 2_000 ether);
+    priceUpdates.destChainId = DEST_CHAIN_ID;
+    priceUpdates.usdPerUnitGas = 0;
+
     s_priceRegistry.updatePrices(priceUpdates);
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();

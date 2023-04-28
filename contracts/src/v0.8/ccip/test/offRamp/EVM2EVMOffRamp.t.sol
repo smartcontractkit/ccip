@@ -25,6 +25,7 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
     });
     EVM2EVMOffRamp.DynamicConfig memory dynamicConfig = generateDynamicOffRampConfig(
       address(s_destRouter),
+      address(s_priceRegistry),
       address(s_mockAFN)
     );
 
@@ -67,7 +68,7 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
     (uint32 configCount, uint32 blockNumber, bytes32 configDigest) = s_offRamp.latestConfigDetails();
     assertEq(1, configCount);
     assertEq(block.number, blockNumber);
-    assertEq(0x0001dfccffa0520a5d7acfad56841873ffb3734eb888da115354e97496994e7b, configDigest);
+    assertEq(0x0001285aaf79ffad0ffc300acb5d2eb12258ae419b5691dda1fdf7ef0343541f, configDigest);
 
     // OffRamp initial values
     assertEq("EVM2EVMOffRamp 1.0.0", s_offRamp.typeAndVersion());
@@ -141,7 +142,11 @@ contract EVM2EVMOffRamp_setDynamicConfig is EVM2EVMOffRampSetup {
 
   function testSetDynamicConfigSuccess() public {
     EVM2EVMOffRamp.StaticConfig memory staticConfig = s_offRamp.getStaticConfig();
-    EVM2EVMOffRamp.DynamicConfig memory dynamicConfig = generateDynamicOffRampConfig(USER_3, address(s_mockAFN));
+    EVM2EVMOffRamp.DynamicConfig memory dynamicConfig = generateDynamicOffRampConfig(
+      USER_3,
+      address(s_priceRegistry),
+      address(s_mockAFN)
+    );
     bytes memory onchainConfig = abi.encode(dynamicConfig);
 
     vm.expectEmit();
@@ -176,7 +181,11 @@ contract EVM2EVMOffRamp_setDynamicConfig is EVM2EVMOffRampSetup {
 
   function testNonOwnerReverts() public {
     changePrank(STRANGER);
-    EVM2EVMOffRamp.DynamicConfig memory dynamicConfig = generateDynamicOffRampConfig(USER_3, address(1));
+    EVM2EVMOffRamp.DynamicConfig memory dynamicConfig = generateDynamicOffRampConfig(
+      USER_3,
+      address(s_priceRegistry),
+      address(1)
+    );
 
     vm.expectRevert("Only callable by owner");
 
@@ -191,7 +200,11 @@ contract EVM2EVMOffRamp_setDynamicConfig is EVM2EVMOffRampSetup {
   }
 
   function testRouterZeroAddressReverts() public {
-    EVM2EVMOffRamp.DynamicConfig memory dynamicConfig = generateDynamicOffRampConfig(ZERO_ADDRESS, address(1));
+    EVM2EVMOffRamp.DynamicConfig memory dynamicConfig = generateDynamicOffRampConfig(
+      ZERO_ADDRESS,
+      ZERO_ADDRESS,
+      address(1)
+    );
 
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.InvalidOffRampConfig.selector, dynamicConfig));
 

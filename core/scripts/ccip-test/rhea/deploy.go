@@ -58,7 +58,6 @@ func deploySourceContracts(t *testing.T, source *EvmDeploymentConfig, destChainS
 	if source.LaneConfig.DeploySettings.DeployRamp {
 		// Updates source.OnRamp if any new contracts are deployed
 		deployOnRamp(t, source, destChainSelector, destSupportedTokens)
-		setOnRampPrices(t, source)
 		setOnRampOnRouter(t, source, destChainSelector)
 	}
 
@@ -80,7 +79,6 @@ func deployDestinationContracts(t *testing.T, client *EvmDeploymentConfig, sourc
 	if client.LaneConfig.DeploySettings.DeployRamp {
 		// Updates destClient.LaneConfig.OffRamp if any new contracts are deployed
 		deployOffRamp(t, client, sourceChainSelector, supportedTokens, onRamp)
-		setOffRampPrices(t, client)
 	}
 
 	if client.LaneConfig.DeploySettings.DeployRamp || client.ChainConfig.DeploySettings.DeployTokenPools {
@@ -211,14 +209,6 @@ func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainSelecto
 
 	client.Logger.Infof("OffRamp contract deployed on %s in tx: %s", offRampAddress.Hex(), helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash()))
 	client.LaneConfig.OffRamp = offRampAddress
-	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(client.LaneConfig.OffRamp, client.Client)
-	shared.RequireNoError(t, err)
-
-	// Prices are used by the rate limiter and dictate what tokens are supported
-	tx, err = offRamp.SetPrices(client.Owner, []common.Address{client.ChainConfig.SupportedTokens[LINK].Token}, []*big.Int{big.NewInt(10)})
-	shared.RequireNoError(t, err)
-	err = shared.WaitForMined(client.Logger, client.Client, tx.Hash(), true)
-	shared.RequireNoError(t, err)
 
 	client.Logger.Infof(fmt.Sprintf("Offramp configured for already deployed router in tx %s", helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash())))
 }
