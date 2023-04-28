@@ -6,11 +6,17 @@ import "./mocks/MockAFN.sol";
 import "./StructFactory.sol";
 
 contract BaseTest is Test, StructFactory {
+  bool private s_baseTestInitialized;
+
   MockAFN internal s_mockAFN;
 
   function setUp() public virtual {
+    // BaseTest.setUp is often called multiple times from tests' setUp due to inheritance.
+    if (s_baseTestInitialized) return;
+    s_baseTestInitialized = true;
+
     // Set the sender to OWNER permanently
-    changePrank(OWNER);
+    vm.startPrank(OWNER);
     deal(OWNER, 1e20);
 
     // Set the block time to a constant known value

@@ -66,8 +66,8 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
 
     (uint32 configCount, uint32 blockNumber, bytes32 configDigest) = s_offRamp.latestConfigDetails();
     assertEq(1, configCount);
-    assertEq(12345, blockNumber);
-    assertEq(0x000185269818e52ca7653d8bc52742f7ff59e05bcbb3f7cc4298c5daf1cdd6e4, configDigest);
+    assertEq(block.number, blockNumber);
+    assertEq(0x0001dfccffa0520a5d7acfad56841873ffb3734eb888da115354e97496994e7b, configDigest);
 
     // OffRamp initial values
     assertEq("EVM2EVMOffRamp 1.0.0", s_offRamp.typeAndVersion());
@@ -132,7 +132,7 @@ contract EVM2EVMOffRamp_setDynamicConfig is EVM2EVMOffRampSetup {
     vm.expectEmit();
     uint32 configCount = 1;
     emit ConfigSet(
-      12345,
+      uint32(block.number),
       getBasicConfigDigest(address(s_offRamp), s_f, configCount, onchainConfig),
       configCount + 1,
       s_valid_signers,

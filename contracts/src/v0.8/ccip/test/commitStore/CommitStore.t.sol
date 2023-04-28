@@ -161,7 +161,7 @@ contract CommitStore_setDynamicConfig is CommitStoreSetup {
 
     vm.expectEmit();
     emit ConfigSet(
-      12345,
+      uint32(block.number),
       getBasicConfigDigest(address(s_commitStore), s_f, configCount, onchainConfig),
       configCount + 1,
       s_valid_signers,
