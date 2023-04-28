@@ -118,7 +118,7 @@ func (params CCIPJobSpecParams) ExecutionJobSpec() (*client.OCR2TaskJobSpec, err
 		ContractConfigConfirmations:       1,
 		ContractConfigTrackerPollInterval: models.Interval(20 * time.Second),
 		P2PV2Bootstrappers:                params.P2PV2Bootstrappers,
-		PluginConfig:                      map[string]interface{}{},
+		PluginConfig:                      make(map[string]interface{}),
 		RelayConfig: map[string]interface{}{
 			"chainID": params.DestChainId,
 		},
@@ -145,9 +145,6 @@ func (params CCIPJobSpecParams) BootstrapJob(contractID string) *client.OCR2Task
 		RelayConfig: map[string]interface{}{
 			"chainID": params.DestChainId,
 		},
-	}
-	if params.DestStartBlock > 0 {
-		bootstrapSpec.RelayConfig["fromBlock"] = params.DestStartBlock
 	}
 	return &client.OCR2TaskJobSpec{
 		Name:           fmt.Sprintf("%s-%s", Boostrap, params.DestChainName),

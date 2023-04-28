@@ -57,8 +57,8 @@ const (
 	ChaosGroupCCIPGeth            = "CCIPGeth"               // both source and destination simulated geth networks
 	ChaosGroupNetworkACCIPGeth    = "CCIPNetworkAGeth"
 	ChaosGroupNetworkBCCIPGeth    = "CCIPNetworkBGeth"
-	RootSnoozeTimeSimulated       = 10 * time.Second
-	InflightExpirySimulated       = 45 * time.Second
+	RootSnoozeTimeSimulated       = 30 * time.Second
+	InflightExpirySimulated       = 1 * time.Minute
 )
 
 type CCIPTOMLEnv struct {
@@ -1674,6 +1674,49 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		env.execNodeStartIndex = 7
 		env.numOfCommitNodes = len(commitNodes)
 		env.numOfExecNodes = len(execNodes)
+	} else {
+		execNodes = commitNodes
+	}
+	// save the current block numbers. If there is a delay between job start up and ocr config set up, the jobs will
+	// replay the log polling from these mentioned block number. The dest block number should ideally be the block number on which
+	// contract config is set and the source block number should be the one on which the ccip send request is performed.
+	// Here for simplicity we are just taking the current block number just before the job is created.
+	currentBlockOnDest, err := destChainClient.LatestBlockNumber(context.Background())
+	if err != nil {
+		return fmt.Errorf("getting current block should be successful in destination chain %+v", err)
+	}
+
+	jobParams := testhelpers.CCIPJobSpecParams{
+		OffRamp:          lane.Dest.OffRamp.EthAddress,
+		CommitStore:      lane.Dest.CommitStore.EthAddress,
+		SourceChainName:  sourceChainClient.GetNetworkName(),
+		DestChainName:    destChainClient.GetNetworkName(),
+		DestChainId:      destChainClient.GetChainID().Uint64(),
+		SourceStartBlock: lane.Source.SrcStartBlock,
+		DestStartBlock:   currentBlockOnDest,
+	}
+	bootstrapCommitP2PId := bootstrapCommit.KeysBundle.P2PKeys.Data[0].Attributes.PeerID
+	var bootstrapExecP2PId string
+	var p2pBootstrappersExec, p2pBootstrappersCommit *client.P2PData
+	if bootstrapExec == nil {
+		bootstrapExec = bootstrapCommit
+		bootstrapExecP2PId = bootstrapCommitP2PId
+	} else {
+		bootstrapExecP2PId = bootstrapExec.KeysBundle.P2PKeys.Data[0].Attributes.PeerID
+		p2pBootstrappersExec = &client.P2PData{
+			RemoteIP: bootstrapExec.Node.RemoteIP(),
+			PeerID:   bootstrapExecP2PId,
+		}
+	}
+	p2pBootstrappersCommit = &client.P2PData{
+		RemoteIP: bootstrapCommit.Node.RemoteIP(),
+		PeerID:   bootstrapCommitP2PId,
+	}
+
+	jobParams.P2PV2Bootstrappers = []string{p2pBootstrappersCommit.P2PV2Bootstrapper()}
+
+	if newBootstrap {
+		CreateBootstrapJob(jobParams, bootstrapCommit, bootstrapExec)
 	}
 
 	// set up ocr2 config
@@ -1681,17 +1724,19 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	err = CreateOCRJobsForCCIP(
-		lane.Context,
-		bootstrapCommit, bootstrapExec, commitNodes, execNodes,
-		lane.Source.OnRamp.EthAddress,
-		lane.Dest.CommitStore.EthAddress,
-		lane.Dest.OffRamp.EthAddress,
-		sourceChainClient, destChainClient,
-		lane.Source.SrcStartBlock,
-		tokenUSDMap,
-		mockServer, newBootstrap,
+
+	err = CreateOCR2CCIPCommitJobs(
+		lane.Context, jobParams,
+		commitNodes,
+		tokenUSDMap, mockServer,
 	)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	if p2pBootstrappersExec != nil {
+		jobParams.P2PV2Bootstrappers = []string{p2pBootstrappersExec.P2PV2Bootstrapper()}
+	}
+	err = CreateOCR2CCIPExecutionJobs(jobParams, execNodes)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -1760,101 +1805,46 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 	return destCCIP.Common.ChainClient.WaitForEvents()
 }
 
-// CreateOCRJobsForCCIP bootstraps the first node and to the other nodes sends ocr jobs that
-// sets up ccip-commit and ccip-execution plugin
-// nil value in bootstrapExec and execNodes denotes commit and execution jobs are to be set up in same DON
-func CreateOCRJobsForCCIP(
-	ctx context.Context,
+func CreateBootstrapJob(
+	jobParams testhelpers.CCIPJobSpecParams,
 	bootstrapCommit *client.CLNodesWithKeys,
 	bootstrapExec *client.CLNodesWithKeys,
-	commitNodes, execNodes []*client.CLNodesWithKeys,
-	onRamp, commitStore, offRamp common.Address,
-	sourceChainClient, destChainClient blockchain.EVMClient,
-	srcStartBlock uint64,
-	tokenUSDMap map[string]string,
-	mockServer *ctfClient.MockserverClient,
-	newBootStrap bool,
 ) error {
-	bootstrapCommitP2PId := bootstrapCommit.KeysBundle.P2PKeys.Data[0].Attributes.PeerID
-	var bootstrapExecP2PId string
-	if bootstrapExec == nil {
-		bootstrapExec = bootstrapCommit
-		bootstrapExecP2PId = bootstrapCommitP2PId
-	} else {
-		bootstrapExecP2PId = bootstrapExec.KeysBundle.P2PKeys.Data[0].Attributes.PeerID
-	}
-	p2pBootstrappersCommit := &client.P2PData{
-		RemoteIP: bootstrapCommit.Node.RemoteIP(),
-		PeerID:   bootstrapCommitP2PId,
-	}
-
-	p2pBootstrappersExec := &client.P2PData{
-		RemoteIP: bootstrapExec.Node.RemoteIP(),
-		PeerID:   bootstrapExecP2PId,
-	}
-	// save the current block numbers. If there is a delay between job start up and ocr config set up, the jobs will
-	// replay the log polling from these mentioned block number. The dest block number should ideally be the block number on which
-	// contract config is set and the source block number should be the one on which the ccip send request is performed.
-	// Here for simplicity we are just taking the current block number just before the job is created.
-	currentBlockOnDest, err := destChainClient.LatestBlockNumber(context.Background())
+	_, err := bootstrapCommit.Node.MustCreateJob(jobParams.BootstrapJob(jobParams.CommitStore.Hex()))
 	if err != nil {
-		return fmt.Errorf("getting current block should be successful in destination chain %+v", err)
+		return fmt.Errorf("shouldn't fail creating bootstrap job on bootstrap node %+v", err)
 	}
-
-	jobParams := testhelpers.CCIPJobSpecParams{
-		OffRamp:            offRamp,
-		CommitStore:        commitStore,
-		SourceChainName:    sourceChainClient.GetNetworkName(),
-		DestChainName:      destChainClient.GetNetworkName(),
-		DestChainId:        destChainClient.GetChainID().Uint64(),
-		SourceStartBlock:   srcStartBlock,
-		DestStartBlock:     currentBlockOnDest,
-		P2PV2Bootstrappers: []string{p2pBootstrappersCommit.P2PV2Bootstrapper()},
-	}
-
-	if newBootStrap {
-		_, err = bootstrapCommit.Node.MustCreateJob(jobParams.BootstrapJob(commitStore.Hex()))
+	if bootstrapExec != nil {
+		_, err := bootstrapExec.Node.MustCreateJob(jobParams.BootstrapJob(jobParams.OffRamp.Hex()))
 		if err != nil {
 			return fmt.Errorf("shouldn't fail creating bootstrap job on bootstrap node %+v", err)
 		}
-		if bootstrapExec != nil && len(execNodes) > 0 {
-			_, err := bootstrapExec.Node.MustCreateJob(jobParams.BootstrapJob(offRamp.Hex()))
-			if err != nil {
-				return fmt.Errorf("shouldn't fail creating bootstrap job on bootstrap node %+v", err)
-			}
-		}
 	}
+	return nil
+}
 
-	if len(execNodes) == 0 {
-		execNodes = commitNodes
-	}
-
+func CreateOCR2CCIPCommitJobs(
+	ctx context.Context,
+	jobParams testhelpers.CCIPJobSpecParams,
+	commitNodes []*client.CLNodesWithKeys,
+	tokenUSDMap map[string]string,
+	mockServer *ctfClient.MockserverClient,
+) error {
 	tokenFeeConv := make(map[string]interface{})
 	var linkTokenAddr []string
 	for token, value := range tokenUSDMap {
 		tokenFeeConv[token] = value
 		linkTokenAddr = append(linkTokenAddr, token)
 	}
-	err = SetMockServerWithSameTokenFeeConversionValue(ctx, tokenFeeConv, execNodes, mockServer)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-	err = SetMockServerWithSameTokenFeeConversionValue(ctx, tokenFeeConv, commitNodes, mockServer)
-	if err != nil {
-		return errors.WithStack(err)
-	}
 
+	err := SetMockServerWithSameTokenFeeConversionValue(ctx, tokenFeeConv, commitNodes, mockServer)
+	if err != nil {
+		return errors.WithStack(err)
+	}
 	ocr2SpecCommit, err := jobParams.CommitJobSpec()
 	if err != nil {
 		return errors.WithStack(err)
 	}
-
-	jobParams.P2PV2Bootstrappers = []string{p2pBootstrappersExec.P2PV2Bootstrapper()}
-	ocr2SpecExec, err := jobParams.ExecutionJobSpec()
-	if err != nil {
-		return errors.WithStack(err)
-	}
-	ocr2SpecExec.Name = fmt.Sprintf("%s", ocr2SpecExec.Name)
 
 	for i, node := range commitNodes {
 		tokenPricesUSDPipeline := TokenFeeForMultipleTokenAddr(node, linkTokenAddr, mockServer)
@@ -1870,20 +1860,25 @@ func CreateOCRJobsForCCIP(
 			return fmt.Errorf("shouldn't fail creating CCIP-Commit job on OCR node %d job name %s - %+v", i+1, ocr2SpecCommit.Name, err)
 		}
 	}
+	return nil
+}
+
+func CreateOCR2CCIPExecutionJobs(jobParams testhelpers.CCIPJobSpecParams, execNodes []*client.CLNodesWithKeys) error {
+	ocr2SpecExec, err := jobParams.ExecutionJobSpec()
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	ocr2SpecExec.Name = fmt.Sprintf("%s", ocr2SpecExec.Name)
 
 	if ocr2SpecExec != nil {
 		for i, node := range execNodes {
-			tokenPricesUSDPipeline := TokenFeeForMultipleTokenAddr(node, linkTokenAddr, mockServer)
-
-			ocr2SpecExec.OCR2OracleSpec.PluginConfig["tokenPricesUSDPipeline"] = fmt.Sprintf(`"""
-%s
-"""`, tokenPricesUSDPipeline)
 			ocr2SpecExec.OCR2OracleSpec.OCRKeyBundleID.SetValid(node.KeysBundle.OCR2Key.Data.ID)
 			ocr2SpecExec.OCR2OracleSpec.TransmitterID.SetValid(node.KeysBundle.EthAddress)
 
 			_, err = node.Node.MustCreateJob(ocr2SpecExec)
 			if err != nil {
-				return fmt.Errorf("shouldn't fail creating CCIP-Exec job on OCR node %d job name %s - %+v", i+1, ocr2SpecCommit.Name, err)
+				return fmt.Errorf("shouldn't fail creating CCIP-Exec job on OCR node %d job name %s - %+v", i+1,
+					ocr2SpecExec.Name, err)
 			}
 		}
 	}

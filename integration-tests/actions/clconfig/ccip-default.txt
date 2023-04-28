@@ -7,7 +7,7 @@ Enabled = true
 
 [OCR]
 Enabled = false
-DefaultTransactionQueueDepth = 200
+DefaultTransactionQueueDepth = 250
 
 [P2P]
 [P2P.V2]
