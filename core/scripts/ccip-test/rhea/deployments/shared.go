@@ -22,6 +22,7 @@ func getBlockConfirmations(chain rhea.Chain) uint32 {
 		rhea.Sepolia:        4,
 		rhea.OptimismGoerli: 4,
 		rhea.AvaxFuji:       1,
+		rhea.PolygonMumbai:  4,
 	}
 
 	if val, ok := blockConfirmationPerChain[chain]; ok {

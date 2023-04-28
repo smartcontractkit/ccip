@@ -11,12 +11,14 @@ var AlphaChains = map[rhea.Chain]rhea.EvmDeploymentConfig{
 	rhea.AvaxFuji:       {ChainConfig: Alpha_AvaxFuji},
 	rhea.OptimismGoerli: {ChainConfig: Alpha_OptimismGoerli},
 	rhea.Sepolia:        {ChainConfig: Alpha_Sepolia},
+	rhea.PolygonMumbai:  {ChainConfig: Alpha_PolygonMumbai},
 }
 
 var AlphaChainMapping = map[rhea.Chain]map[rhea.Chain]rhea.EvmDeploymentConfig{
 	rhea.Sepolia: {
 		rhea.AvaxFuji:       Alpha_SepoliaToAvaxFuji,
 		rhea.OptimismGoerli: Alpha_SepoliaToOptimismGoerli,
+		rhea.PolygonMumbai:  Alpha_PolygonMumbaiToSepolia,
 	},
 	rhea.AvaxFuji: {
 		rhea.Sepolia:        Alpha_AvaxFujiToSepolia,
@@ -25,6 +27,52 @@ var AlphaChainMapping = map[rhea.Chain]map[rhea.Chain]rhea.EvmDeploymentConfig{
 	rhea.OptimismGoerli: {
 		rhea.Sepolia:  Alpha_OptimismGoerliToSepolia,
 		rhea.AvaxFuji: Alpha_OptimismGoerliToAvaxFuji,
+	},
+	rhea.PolygonMumbai: {
+		rhea.Sepolia: Alpha_SepoliaToPolygonMumbai,
+	},
+}
+
+var Alpha_PolygonMumbai = rhea.EVMChainConfig{
+	EvmChainId: 80001,
+	GasSettings: rhea.EVMGasSettings{
+		EIP1559: true,
+	},
+	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
+		rhea.LINK: {
+			Token:         gethcommon.HexToAddress(""),
+			Pool:          gethcommon.HexToAddress(""),
+			Price:         rhea.LINK.Price(),
+			TokenPoolType: rhea.LockRelease,
+		},
+		rhea.WETH: {
+			Token:         gethcommon.HexToAddress(""),
+			Pool:          gethcommon.HexToAddress(""),
+			Price:         rhea.WETH.Price(),
+			TokenPoolType: rhea.LockRelease,
+		},
+	},
+	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WETH},
+	WrappedNative: rhea.WETH,
+	Router:        gethcommon.HexToAddress(""),
+	Afn:           gethcommon.HexToAddress(""),
+	PriceRegistry: gethcommon.HexToAddress(""),
+	DeploySettings: rhea.ChainDeploySettings{
+		DeployAFN:           false,
+		DeployTokenPools:    false,
+		DeployRouter:        false,
+		DeployPriceRegistry: false,
+		DeployedAtBlock:     0,
+	},
+	TunableChainValues: rhea.TunableChainValues{
+		BlockConfirmations:       getBlockConfirmations(rhea.PolygonMumbai),
+		BatchGasLimit:            BATCH_GAS_LIMIT,
+		RelativeBoostPerWaitHour: RELATIVE_BOOST_PER_WAIT_HOUR,
+		FeeUpdateHeartBeat:       models.MustMakeDuration(FEE_UPDATE_HEARTBEAT),
+		FeeUpdateDeviationPPB:    FEE_UPDATE_DEVIATION_PPB,
+		MaxGasPrice:              getMaxGasPrice(rhea.OptimismGoerli),
+		InflightCacheExpiry:      models.MustMakeDuration(INFLIGHT_CACHE_EXPIRY),
+		RootSnoozeTime:           models.MustMakeDuration(ROOT_SNOOZE_TIME),
 	},
 }
 
@@ -258,6 +306,40 @@ var Alpha_AvaxFujiToSepolia = rhea.EvmDeploymentConfig{
 			DeployRamp:         false,
 			DeployPingPongDapp: false,
 			DeployedAtBlock:    19704118,
+		},
+	},
+}
+
+var Alpha_PolygonMumbaiToSepolia = rhea.EvmDeploymentConfig{
+	ChainConfig: Alpha_PolygonMumbai,
+	LaneConfig: rhea.EVMLaneConfig{
+		CommitStore:  gethcommon.HexToAddress(""),
+		OnRamp:       gethcommon.HexToAddress(""),
+		OffRamp:      gethcommon.HexToAddress(""),
+		ReceiverDapp: gethcommon.HexToAddress(""),
+		PingPongDapp: gethcommon.HexToAddress(""),
+		DeploySettings: rhea.LaneDeploySettings{
+			DeployCommitStore:  false,
+			DeployRamp:         false,
+			DeployPingPongDapp: false,
+			DeployedAtBlock:    0,
+		},
+	},
+}
+
+var Alpha_SepoliaToPolygonMumbai = rhea.EvmDeploymentConfig{
+	ChainConfig: Alpha_Sepolia,
+	LaneConfig: rhea.EVMLaneConfig{
+		CommitStore:  gethcommon.HexToAddress(""),
+		OnRamp:       gethcommon.HexToAddress(""),
+		OffRamp:      gethcommon.HexToAddress(""),
+		ReceiverDapp: gethcommon.HexToAddress(""),
+		PingPongDapp: gethcommon.HexToAddress(""),
+		DeploySettings: rhea.LaneDeploySettings{
+			DeployCommitStore:  false,
+			DeployRamp:         false,
+			DeployPingPongDapp: false,
+			DeployedAtBlock:    0,
 		},
 	},
 }

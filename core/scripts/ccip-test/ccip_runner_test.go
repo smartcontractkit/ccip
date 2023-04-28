@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/clo"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/csv"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/dione"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/metis/printing"
@@ -383,6 +384,30 @@ func checkOwnerKey(t *testing.T) string {
 	}
 
 	return ownerKey
+}
+
+// TestCLO prepares chains and lanes env according to set SOURCE, DESTINATION, ENV and run any provided function at the end
+// It uses set configuration by selected ENV and overrides any variables provided by calling CLO API configuration
+// You must set additional env variables FMS_AUTH_TOKEN, CLO_QUERY_URL for CLO requests
+func TestCLO(t *testing.T) {
+	ownerKey := checkOwnerKeyAndSetupChain(t)
+	seedKey := os.Getenv("SEED_KEY")
+	if seedKey == "" {
+		t.Error("must set seed key")
+	}
+
+	// Set configuration queried from CLO, laneID is lane id from CLO API
+	sourceContracts, destContracts := clo.GetTargetChainsContracts(t, SOURCE.ChainConfig.EvmChainId, DESTINATION.ChainConfig.EvmChainId)
+	clo.SetChainConfig(sourceContracts, &SOURCE)
+	clo.SetChainConfig(destContracts, &DESTINATION)
+	legA, legB := clo.GetTargetLaneConfig(t, SOURCE.ChainConfig.EvmChainId, DESTINATION.ChainConfig.EvmChainId, "10")
+	clo.SetLaneConfig(legA, &SOURCE, &DESTINATION)
+	clo.SetLaneConfig(legB, &DESTINATION, &SOURCE)
+
+	deployment_io.PrettyPrintLanes(ENV, &SOURCE, &DESTINATION)
+	client := NewCcipClient(t, SOURCE, DESTINATION, ownerKey, seedKey)
+	// Add any function after it for pulled configuration ex:
+	client.startPingPong(t)
 }
 
 // This ALWAYS uses the production env
