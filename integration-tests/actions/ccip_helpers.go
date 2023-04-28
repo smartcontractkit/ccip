@@ -57,7 +57,7 @@ const (
 	ChaosGroupCCIPGeth            = "CCIPGeth"               // both source and destination simulated geth networks
 	ChaosGroupNetworkACCIPGeth    = "CCIPNetworkAGeth"
 	ChaosGroupNetworkBCCIPGeth    = "CCIPNetworkBGeth"
-	RootSnoozeTimeSimulated       = 30 * time.Second
+	RootSnoozeTimeSimulated       = 1 * time.Minute
 	InflightExpirySimulated       = 1 * time.Minute
 )
 
@@ -1465,47 +1465,6 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash string, txConfirmattion tim
 		return fmt.Errorf("could not validate ExecutionStateChanged event: %+v", err)
 	}
 	return nil
-}
-
-func (lane *CCIPLane) SoakRun(interval, duration time.Duration) (int, int) {
-	ctx, cancel := context.WithTimeout(context.Background(), duration)
-	defer cancel()
-	ticker := time.NewTicker(interval)
-	numOfReq := 0
-	reqSuccess := 0
-	wg := &sync.WaitGroup{}
-	timeout := false
-	lane.RecordStateBeforeTransfer()
-	for {
-		select {
-		case <-ticker.C:
-			if timeout {
-				break
-			}
-			numOfReq++
-			lane.Logger.Info().
-				Int("Req No", numOfReq).
-				Msg("CCIP transfer")
-			txs, err := lane.SendRequests(1)
-			if err == nil {
-				for reqNo, req := range txs {
-					wg.Add(1)
-					go func(txHash string, reqNo int64, txConfirmationTime time.Time) {
-						defer wg.Done()
-						if lane.ValidateRequestByTxHash(txHash, txConfirmationTime, reqNo) == nil {
-							reqSuccess++
-						}
-					}(req.txHash, reqNo, req.txConfirmationTimestamp.In(time.Now().Location()))
-				}
-			}
-		case <-ctx.Done():
-			lane.Logger.Warn().
-				Msg("Soak Test duration completed. Completing validation for triggered requests")
-			timeout = true
-			wg.Wait()
-			return numOfReq, reqSuccess
-		}
-	}
 }
 
 func (lane *CCIPLane) StartEventWatchers() error {

@@ -64,7 +64,7 @@ func TestLoadCCIPIncrementalLoad(t *testing.T) {
 	})
 	stepDuration := testArgs.TestCfg.TestDuration / 3
 	schedules := wasp.CombineAndRepeat(3,
-		wasp.Line(1, testArgs.TestCfg.Load.LoadRPS, stepDuration))
+		wasp.Line(1, testArgs.TestCfg.Load.RequestPerUnitTime, stepDuration))
 	testArgs.TriggerLoad(schedules...)
 	testArgs.Wait()
 }

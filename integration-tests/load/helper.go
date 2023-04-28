@@ -25,17 +25,19 @@ type laneLoadCfg struct {
 }
 
 type loadArgs struct {
-	t             *testing.T
-	lggr          zerolog.Logger
-	ctx           context.Context
-	ccipLoad      []*CCIPE2ELoad
-	loadRunner    []*wasp.Generator
-	LaneLoadCfg   chan laneLoadCfg
-	RunnerWg      *errgroup.Group // to wait on individual load generators run
-	LoadStarterWg *sync.WaitGroup // waits for all the runners to start
-	TestCfg       *testsetups.CCIPTestConfig
-	TestSetupArgs *testsetups.CCIPTestSetUpOutputs
-	EstimatedEnd  time.Time
+	t                  *testing.T
+	lggr               zerolog.Logger
+	ctx                context.Context
+	ccipLoad           []*CCIPE2ELoad
+	RequestPerUnitTime int
+	UnitTime           time.Duration
+	loadRunner         []*wasp.Generator
+	LaneLoadCfg        chan laneLoadCfg
+	RunnerWg           *errgroup.Group // to wait on individual load generators run
+	LoadStarterWg      *sync.WaitGroup // waits for all the runners to start
+	TestCfg            *testsetups.CCIPTestConfig
+	TestSetupArgs      *testsetups.CCIPTestSetUpOutputs
+	EstimatedEnd       time.Time
 }
 
 func (l *loadArgs) Setup() {
@@ -61,7 +63,7 @@ func (l *loadArgs) Setup() {
 func (l *loadArgs) TriggerLoad(schedule ...*wasp.Segment) {
 	l.Start()
 	if len(schedule) == 0 {
-		schedule = wasp.Plain(l.TestCfg.Load.LoadRPS, l.TestCfg.TestDuration)
+		schedule = wasp.Plain(l.TestCfg.Load.RequestPerUnitTime, l.TestCfg.TestDuration)
 	}
 	for _, lane := range l.TestSetupArgs.Lanes {
 		if lane.LaneDeployed {
@@ -78,7 +80,7 @@ func (l *loadArgs) TriggerLoad(schedule ...*wasp.Segment) {
 		}
 	}
 	l.TestSetupArgs.Reporter.SetDuration(l.TestCfg.TestDuration)
-	l.TestSetupArgs.Reporter.SetRPS(l.TestCfg.Load.LoadRPS)
+	l.TestSetupArgs.Reporter.SetRPS(l.TestCfg.Load.RequestPerUnitTime)
 }
 
 func (l *loadArgs) AddMoreLanesToRun() {
@@ -116,12 +118,12 @@ func (l *loadArgs) AddMoreLanesToRun() {
 				dur = l.TestCfg.TestDuration
 			}
 			l.LaneLoadCfg <- laneLoadCfg{
-				schedule: wasp.Plain(l.TestCfg.Load.LoadRPS, dur),
+				schedule: wasp.Plain(l.TestCfg.Load.RequestPerUnitTime, dur),
 				lane:     l.TestSetupArgs.Lanes[netIndex].ForwardLane,
 			}
 			if l.TestSetupArgs.Lanes[netIndex].ReverseLane != nil {
 				l.LaneLoadCfg <- laneLoadCfg{
-					schedule: wasp.Plain(l.TestCfg.Load.LoadRPS, dur),
+					schedule: wasp.Plain(l.TestCfg.Load.RequestPerUnitTime, dur),
 					lane:     l.TestSetupArgs.Lanes[netIndex].ReverseLane,
 				}
 			}
@@ -160,14 +162,15 @@ func (l *loadArgs) Start() {
 				}
 
 				loadRunner, err := wasp.NewGenerator(&wasp.Config{
-					T:           l.TestCfg.Test,
-					Schedule:    schedule,
-					LoadType:    wasp.RPSScheduleType,
-					CallTimeout: l.TestCfg.Load.LoadTimeOut,
-					Gun:         ccipLoad,
-					Logger:      zerolog.Logger{},
-					SharedData:  l.TestCfg.MsgType,
-					LokiConfig:  wasp.NewEnvLokiConfig(),
+					T:                     l.TestCfg.Test,
+					Schedule:              schedule,
+					LoadType:              wasp.RPS,
+					RateLimitUnitDuration: l.TestCfg.Load.TimeUnit,
+					CallTimeout:           l.TestCfg.Load.LoadTimeOut,
+					Gun:                   ccipLoad,
+					Logger:                zerolog.Logger{},
+					SharedData:            l.TestCfg.MsgType,
+					LokiConfig:            wasp.NewEnvLokiConfig(),
 					Labels: map[string]string{
 						"test_group":   "load",
 						"cluster":      "sdlc",

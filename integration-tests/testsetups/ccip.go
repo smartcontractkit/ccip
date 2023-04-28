@@ -30,7 +30,6 @@ const (
 	TokenTransfer                   string = "WithToken"
 	DataOnlyTransfer                string = "WithoutToken"
 	Load                            string = "Load"
-	Soak                            string = "Soak"
 	Chaos                           string = "Chaos"
 	Smoke                           string = "Smoke"
 	DefaultTTLForLongTests                 = 5 * time.Hour
@@ -39,15 +38,10 @@ const (
 	DefaultLoadTimeOut                     = 30 * time.Minute
 	DefaultPhaseTimeoutForLongTests        = 30 * time.Minute
 	DefaultPhaseTimeout                    = 5 * time.Minute
-	DefaultSoakInterval                    = 45 * time.Second
 	DefaultTestDuration                    = 10 * time.Minute
 )
 
 var (
-	LongRunningTests = map[string]struct{}{
-		Load: {},
-		Soak: {},
-	}
 	GethResourceProfile = map[string]interface{}{
 		"requests": map[string]interface{}{
 			"cpu":    "4",
@@ -104,7 +98,6 @@ type CCIPTestConfig struct {
 	SequentialLaneAddition  bool
 	NodeFunding             *big.Float
 	Load                    *CCIPLoadInput
-	Soak                    *CCIPSoakInput
 	AllNetworks             []blockchain.EVMNetwork
 	NetworkPairs            []NetworkPair
 	NoOfNetworks            int
@@ -114,46 +107,34 @@ type CCIPTestConfig struct {
 }
 
 type CCIPLoadInput struct {
-	LoadRPS     int64
-	LoadTimeOut time.Duration
+	RequestPerUnitTime int64
+	LoadTimeOut        time.Duration
+	TimeUnit           time.Duration
 }
 
-type CCIPSoakInput struct {
-	SoakInterval time.Duration
-}
-
-func (p *CCIPTestConfig) setSoakInputs() {
+func (p *CCIPTestConfig) setLoadInputs() {
 	var allError error
-	p.Soak = &CCIPSoakInput{
-		SoakInterval: DefaultSoakInterval,
+	p.Load = &CCIPLoadInput{
+		RequestPerUnitTime: DefaultLoadRPS,
+		LoadTimeOut:        DefaultLoadTimeOut,
+		TimeUnit:           time.Second,
 	}
-	interval, _ := utils.GetEnv("CCIP_SOAK_TEST_REQ_INTERVAL")
+
+	interval, _ := utils.GetEnv("CCIP_LOAD_TEST_RATEUNIT")
 	if interval != "" {
 		d, err := time.ParseDuration(interval)
 		if err != nil {
 			allError = multierr.Append(allError, err)
 		} else {
-			if d.Seconds() < 10 || d.Hours() > 2 {
-				allError = multierr.Append(allError, fmt.Errorf("invalid interval %d - must be between 10s and 2h", d))
-			} else {
-				p.Soak.SoakInterval = d
-			}
+			p.Load.TimeUnit = d
 		}
 	}
 
 	if allError != nil {
 		p.Test.Fatal(allError)
 	}
-}
 
-func (p *CCIPTestConfig) setLoadInputs() {
-	var allError error
-	p.Load = &CCIPLoadInput{
-		LoadRPS:     DefaultLoadRPS,
-		LoadTimeOut: DefaultLoadTimeOut,
-	}
-
-	inputRps, _ := utils.GetEnv("CCIP_LOAD_TEST_RPS")
+	inputRps, _ := utils.GetEnv("CCIP_LOAD_TEST_RATE")
 	if inputRps != "" {
 		rps, err := strconv.ParseInt(inputRps, 10, 64)
 		if err != nil {
@@ -163,7 +144,7 @@ func (p *CCIPTestConfig) setLoadInputs() {
 			if rps > maxRps {
 				allError = multierr.Append(allError, fmt.Errorf("rps %d is too high - maximum value is %d", rps, maxRps))
 			} else {
-				p.Load.LoadRPS = rps
+				p.Load.RequestPerUnitTime = rps
 			}
 		}
 	}
@@ -204,17 +185,17 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 		NoOfNetworks: DefaultNoOfNetworks,
 		AllNetworks:  networks.SelectedNetworks[1:],
 	}
-	if _, ok := LongRunningTests[tType]; ok {
+
+	if tType != Smoke {
+		p.CLNodeDBResourceProfile = DONDBResourceProfile
+	}
+
+	if tType == Load {
 		p.EnvTTL = DefaultTTLForLongTests
 		p.GethResourceProfile = GethResourceProfile
 		p.CLNodeResourceProfile = DONResourceProfile
-		p.CLNodeDBResourceProfile = DONDBResourceProfile
 		p.NodeFunding = NodeFundingForLoad
 		p.PhaseTimeout = DefaultPhaseTimeoutForLongTests
-	}
-
-	if tType == Chaos {
-		p.CLNodeDBResourceProfile = DONDBResourceProfile
 	}
 
 	inputNoOfNetworks, _ := utils.GetEnv("CCIP_NO_OF_NETWORKS")
@@ -365,11 +346,8 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 	if allError != nil {
 		t.Fatal(allError)
 	}
-	switch tType {
-	case Load:
+	if tType == Load {
 		p.setLoadInputs()
-	case Soak:
-		p.setSoakInputs()
 	}
 
 	return p
