@@ -13,7 +13,6 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 
 	networks "github.com/smartcontractkit/chainlink/integration-tests"
-	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
@@ -161,37 +160,6 @@ func (pool *LockReleaseTokenPool) AddLiquidity(linkToken *LinkToken, amount *big
 		Str("Link Token", linkToken.Address()).
 		Str("Network Name", pool.client.GetNetworkConfig().Name).
 		Msg("Liquidity added")
-	return pool.client.ProcessTransaction(tx)
-}
-
-func (pool *LockReleaseTokenPool) LockOrBurnToken(linkToken contracts.LinkToken, amount *big.Int) error {
-	log.Info().
-		Str("Link Token", linkToken.Address()).
-		Str("Token Pool", pool.Address()).
-		Msg("Initiating transferring of token to token pool")
-	err := linkToken.Transfer(pool.Address(), amount)
-	if err != nil {
-		return err
-	}
-	err = pool.client.WaitForEvents()
-	if err != nil {
-		return err
-	}
-	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
-	if err != nil {
-		return err
-	}
-	log.Info().
-		Str("Token Pool", pool.Address()).
-		Msg("Initiating locking Tokens in pool")
-	tx, err := pool.instance.LockOrBurn(opts, amount, opts.From)
-	if err != nil {
-		return err
-	}
-	log.Info().
-		Str("Token Pool", pool.Address()).
-		Str("Network Name", pool.client.GetNetworkConfig().Name).
-		Msg("Pool is filled with tokens")
 	return pool.client.ProcessTransaction(tx)
 }
 
