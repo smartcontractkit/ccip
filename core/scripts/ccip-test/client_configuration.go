@@ -1189,10 +1189,10 @@ func FundPingPong(t *testing.T, chain rhea.EvmDeploymentConfig, minimumBalance *
 	require.NoError(t, err)
 
 	if balance.Cmp(minimumBalance) == -1 {
-		t.Logf("❌ %s balance of %s link, which is lower than the set minimum. Funding...", ccip.ChainName(int64(chain.ChainConfig.ChainId)), dione.EthBalanceToString(balance))
+		t.Logf("❌ %s balance of %s link, which is lower than the set minimum. Funding...", ccip.ChainName(int64(chain.ChainConfig.EvmChainId)), dione.EthBalanceToString(balance))
 		_, err := linkToken.Transfer(chain.Owner, chain.LaneConfig.PingPongDapp, minimumBalance)
 		require.NoError(t, err)
 	} else {
-		t.Logf("✅ %s balance of %s link ", ccip.ChainName(int64(chain.ChainConfig.ChainId)), dione.EthBalanceToString(balance))
+		t.Logf("✅ %s balance of %s link ", ccip.ChainName(int64(chain.ChainConfig.EvmChainId)), dione.EthBalanceToString(balance))
 	}
 }
