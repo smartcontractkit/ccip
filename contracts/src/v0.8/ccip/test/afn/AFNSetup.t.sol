@@ -2,27 +2,28 @@
 pragma solidity 0.8.15;
 
 import "../BaseTest.t.sol";
-import "../../AFN.sol";
+import {AFN} from "../../AFN.sol";
+import {IAFN} from "../../interfaces/IAFN.sol";
 
 contract AFNSetup is BaseTest {
-  function makeTaggedRootsInclusive(uint256 from, uint256 to) internal pure returns (AFN.TaggedRoot[] memory) {
-    AFN.TaggedRoot[] memory votes = new AFN.TaggedRoot[](to - from + 1);
+  function makeTaggedRootsInclusive(uint256 from, uint256 to) internal pure returns (IAFN.TaggedRoot[] memory) {
+    IAFN.TaggedRoot[] memory votes = new IAFN.TaggedRoot[](to - from + 1);
     for (uint256 i = from; i <= to; ++i) {
-      votes[i - from] = AFN.TaggedRoot({commitStore: address(1), root: bytes32(uint256(i))});
+      votes[i - from] = IAFN.TaggedRoot({commitStore: address(1), root: bytes32(uint256(i))});
     }
     return votes;
   }
 
-  function makeTaggedRootSingleton(uint256 index) internal pure returns (AFN.TaggedRoot[] memory) {
+  function makeTaggedRootSingleton(uint256 index) internal pure returns (IAFN.TaggedRoot[] memory) {
     return makeTaggedRootsInclusive(index, index);
   }
 
-  function makeTaggedRoot(uint256 index) internal pure returns (AFN.TaggedRoot memory) {
+  function makeTaggedRoot(uint256 index) internal pure returns (IAFN.TaggedRoot memory) {
     return makeTaggedRootSingleton(index)[0];
   }
 
   function makeTaggedRootHash(uint256 index) internal pure returns (bytes32) {
-    AFN.TaggedRoot memory taggedRoot = makeTaggedRootSingleton(index)[0];
+    IAFN.TaggedRoot memory taggedRoot = makeTaggedRootSingleton(index)[0];
     return keccak256(abi.encode(taggedRoot.commitStore, taggedRoot.root));
   }
 
@@ -37,7 +38,7 @@ contract AFNSetup is BaseTest {
     s_afn = new AFN(afnConstructorArgs());
   }
 
-  function hasVotedToBlessRoot(address voter, AFN.TaggedRoot memory taggedRoot_) internal view returns (bool) {
+  function hasVotedToBlessRoot(address voter, IAFN.TaggedRoot memory taggedRoot_) internal view returns (bool) {
     (address[] memory voters, ) = s_afn.getBlessVotersAndWeight(taggedRoot_);
     for (uint256 i = 0; i < voters.length; ++i) {
       if (voters[i] == voter) {
@@ -47,7 +48,7 @@ contract AFNSetup is BaseTest {
     return false;
   }
 
-  function getWeightOfVotesToBlessRoot(AFN.TaggedRoot memory taggedRoot_) internal view returns (uint16) {
+  function getWeightOfVotesToBlessRoot(IAFN.TaggedRoot memory taggedRoot_) internal view returns (uint16) {
     (, uint16 weight) = s_afn.getBlessVotersAndWeight(taggedRoot_);
     return weight;
   }

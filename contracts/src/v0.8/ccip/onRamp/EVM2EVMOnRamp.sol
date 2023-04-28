@@ -582,12 +582,12 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
 
   /// @notice Support querying whether health checker is healthy.
   function isAFNHealthy() external view returns (bool) {
-    return !IAFN(s_dynamicConfig.afn).badSignalReceived();
+    return !IAFN(s_dynamicConfig.afn).isCursed();
   }
 
   /// @notice Ensure that the AFN has not emitted a bad signal, and that the latest heartbeat is not stale.
   modifier whenHealthy() {
-    if (IAFN(s_dynamicConfig.afn).badSignalReceived()) revert BadAFNSignal();
+    if (IAFN(s_dynamicConfig.afn).isCursed()) revert BadAFNSignal();
     _;
   }
 

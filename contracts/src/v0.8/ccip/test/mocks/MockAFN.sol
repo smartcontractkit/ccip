@@ -7,7 +7,7 @@ import {AFN} from "../../AFN.sol";
 contract MockAFN is IAFN {
   bool private s_curse;
 
-  function badSignalReceived() external view override returns (bool) {
+  function isCursed() external view override returns (bool) {
     return s_curse;
   }
 
@@ -19,7 +19,7 @@ contract MockAFN is IAFN {
     s_curse = false;
   }
 
-  function isBlessed(bytes32) external view override returns (bool) {
+  function isBlessed(IAFN.TaggedRoot calldata) external view override returns (bool) {
     return !s_curse;
   }
 }

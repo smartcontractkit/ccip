@@ -2,7 +2,8 @@
 pragma solidity 0.8.15;
 
 import "../helpers/CommitStoreHelper.sol";
-import "../../AFN.sol";
+import {AFN} from "../../AFN.sol";
+import {IAFN} from "../../interfaces/IAFN.sol";
 import "../../PriceRegistry.sol";
 import "../priceRegistry/PriceRegistry.t.sol";
 import "../ocr/OCR2Base.t.sol";
@@ -269,8 +270,8 @@ contract CommitStore_resetUnblessedRoots is CommitStoreRealAFNSetup {
 
     s_commitStore.report(abi.encode(report));
 
-    AFN.TaggedRoot[] memory blessedTaggedRoots = new AFN.TaggedRoot[](1);
-    blessedTaggedRoots[0] = AFN.TaggedRoot({commitStore: address(s_commitStore), root: rootsToReset[1]});
+    IAFN.TaggedRoot[] memory blessedTaggedRoots = new IAFN.TaggedRoot[](1);
+    blessedTaggedRoots[0] = IAFN.TaggedRoot({commitStore: address(s_commitStore), root: rootsToReset[1]});
 
     s_afn.voteToBless(blessedTaggedRoots);
 
@@ -458,8 +459,8 @@ contract CommitStore_verify is CommitStoreRealAFNSetup {
       )
     );
     // Bless that root.
-    AFN.TaggedRoot[] memory taggedRoots = new AFN.TaggedRoot[](1);
-    taggedRoots[0] = AFN.TaggedRoot({commitStore: address(s_commitStore), root: leaves[0]});
+    IAFN.TaggedRoot[] memory taggedRoots = new IAFN.TaggedRoot[](1);
+    taggedRoots[0] = IAFN.TaggedRoot({commitStore: address(s_commitStore), root: leaves[0]});
     s_afn.voteToBless(taggedRoots);
     bytes32[] memory proofs = new bytes32[](0);
     uint256 timestamp = s_commitStore.verify(leaves, proofs, 0);

@@ -1,10 +1,10 @@
 {
   "acceptOwnership()": "79ba5097",
-  "badSignalReceived()": "46f8e6d7",
   "getBlessVotersAndWeight((address,bytes32))": "f7bc9772",
   "getConfigDetails()": "3f42ab73",
   "getCurseVotersAndWeight()": "8976609b",
-  "isBlessed(bytes32)": "ff888fb1",
+  "isBlessed((address,bytes32))": "4d616771",
+  "isCursed()": "397796f7",
   "owner()": "8da5cb5b",
   "ownerUnbless((address,bytes32)[])": "488f3d81",
   "ownerUnvoteToCurse((address,bytes32,bool)[])": "618af128",

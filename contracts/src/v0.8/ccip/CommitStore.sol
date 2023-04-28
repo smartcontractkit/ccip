@@ -106,7 +106,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
   /// @param root The merkle root to check the blessing status for.
   /// @return whether the root is blessed or not.
   function isBlessed(bytes32 root) public view returns (bool) {
-    return IAFN(s_dynamicConfig.afn).isBlessed(_hashCommitStoreWithRoot(root));
+    return IAFN(s_dynamicConfig.afn).isBlessed(IAFN.TaggedRoot({commitStore: address(this), root: root}));
   }
 
   /// @notice Used by the owner in case an invalid sequence of roots has been
@@ -159,12 +159,6 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
     emit ReportAccepted(report);
   }
 
-  /// @notice returns a hash of the abi encoded address of this contract and the
-  /// supplied root.
-  function _hashCommitStoreWithRoot(bytes32 root) internal view returns (bytes32) {
-    return keccak256(abi.encode(address(this), root));
-  }
-
   // ================================================================
   // |                           Config                             |
   // ================================================================
@@ -198,12 +192,12 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
 
   /// @notice Support querying whether health checker is healthy.
   function isAFNHealthy() external view returns (bool) {
-    return !IAFN(s_dynamicConfig.afn).badSignalReceived();
+    return !IAFN(s_dynamicConfig.afn).isCursed();
   }
 
   /// @notice Ensure that the AFN has not emitted a bad signal, and that the latest heartbeat is not stale.
   modifier whenHealthy() {
-    if (IAFN(s_dynamicConfig.afn).badSignalReceived()) revert BadAFNSignal();
+    if (IAFN(s_dynamicConfig.afn).isCursed()) revert BadAFNSignal();
     _;
   }
 

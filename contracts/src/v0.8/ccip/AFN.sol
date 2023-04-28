@@ -102,11 +102,6 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
   CurseVoteProgress private s_curseVoteProgress;
 
   // AUXILLARY STRUCTS
-  struct TaggedRoot {
-    address commitStore;
-    bytes32 root;
-  }
-
   struct UnvoteToCurseRecord {
     address curseVoteAddr;
     bytes32 cursesHash;
@@ -117,8 +112,8 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
   event ConfigSet(uint32 indexed configVersion, Config config);
   error InvalidConfig();
 
-  event TaggedRootBlessed(uint32 indexed configVersion, TaggedRoot taggedRoot, uint16 votes);
-  event VoteToBless(uint32 indexed configVersion, address indexed voter, TaggedRoot taggedRoot, uint8 weight);
+  event TaggedRootBlessed(uint32 indexed configVersion, IAFN.TaggedRoot taggedRoot, uint16 votes);
+  event VoteToBless(uint32 indexed configVersion, address indexed voter, IAFN.TaggedRoot taggedRoot, uint8 weight);
 
   event VoteToCurse(
     uint32 indexed configVersion,
@@ -149,8 +144,8 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
 
   // These events make it easier for offchain logic to discover that it performs
   // the same actions multiple times.
-  event AlreadyVotedToBless(uint32 indexed configVersion, address indexed voter, TaggedRoot taggedRoot);
-  event AlreadyBlessed(uint32 indexed configVersion, address indexed voter, TaggedRoot taggedRoot);
+  event AlreadyVotedToBless(uint32 indexed configVersion, address indexed voter, IAFN.TaggedRoot taggedRoot);
+  event AlreadyBlessed(uint32 indexed configVersion, address indexed voter, IAFN.TaggedRoot taggedRoot);
 
   event RecoveredFromCurse();
 
@@ -184,24 +179,24 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
     }
   }
 
-  function _taggedRootHash(TaggedRoot memory taggedRoot) internal pure returns (bytes32) {
+  function _taggedRootHash(IAFN.TaggedRoot memory taggedRoot) internal pure returns (bytes32) {
     return keccak256(abi.encode(taggedRoot.commitStore, taggedRoot.root));
   }
 
   /// @param taggedRoots A tagged root is hashed as `keccak256(abi.encode(taggedRoot.commitStore
   /// /* address */, taggedRoot.root /* bytes32 */))`.
-  function voteToBless(TaggedRoot[] calldata taggedRoots) external {
+  function voteToBless(IAFN.TaggedRoot[] calldata taggedRoots) external {
     // If we have an active curse, something is really wrong. Let's err on the
     // side of caution and not accept further blessings during this time of
     // uncertainty.
-    if (badSignalReceived()) revert MustRecoverFromCurse();
+    if (isCursed()) revert MustRecoverFromCurse();
 
     uint32 configVersion = s_versionedConfig.configVersion;
     BlesserRecord memory blesserRecord = s_blesserRecords[msg.sender];
     if (blesserRecord.configVersion != configVersion) revert InvalidVoter(msg.sender);
 
     for (uint256 i = 0; i < taggedRoots.length; ++i) {
-      TaggedRoot memory taggedRoot = taggedRoots[i];
+      IAFN.TaggedRoot memory taggedRoot = taggedRoots[i];
       bytes32 taggedRootHash = _taggedRootHash(taggedRoots[i]);
       BlessVoteProgress memory voteProgress = s_blessVoteProgressByTaggedRootHash[taggedRootHash];
       if (voteProgress.weightThresholdMet) {
@@ -246,7 +241,7 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
 
   /// @notice Can be called by the owner to remove unintentionally blessed tagged roots
   /// in a recovery scenario.
-  function ownerUnbless(TaggedRoot[] memory taggedRoots) external onlyOwner {
+  function ownerUnbless(IAFN.TaggedRoot[] memory taggedRoots) external onlyOwner {
     for (uint256 i = 0; i < taggedRoots.length; ++i) {
       delete s_blessVoteProgressByTaggedRootHash[_taggedRootHash(taggedRoots[i])];
     }
@@ -268,7 +263,7 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
     if (!ownerCall && msg.sender != curserRecord.curseUnvoteAddr) revert InvalidVoter(msg.sender);
 
     // If a curse is active, we want only the owner to be allowed to lift it.
-    if (!ownerCall && badSignalReceived()) revert MustRecoverFromCurse();
+    if (!ownerCall && isCursed()) revert MustRecoverFromCurse();
 
     if (!curserRecord.active || curserRecord.voteCount == 0) return;
 
@@ -291,17 +286,9 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
     );
     curserRecord.voteCount = 0;
     s_curserRecords[batch.curseVoteAddr] = curserRecord;
-
     s_curseVoteProgress.accumulatedWeight -= curserRecord.weight;
-    if (s_curseVoteProgress.weightThresholdMet) {
-      if (s_curseVoteProgress.accumulatedWeight < s_curseVoteProgress.curseWeightThreshold) {
-        s_curseVoteProgress.weightThresholdMet = false;
-        // Because unvoteToCurse cannot be called while a curse is active, this
-        // event can only be emitted through an ownerUnvoteToCurse call and at
-        // most once during said call.
-        emit RecoveredFromCurse();
-      }
-    }
+    // If not ownerCall, no need to update weightThresholdMet as it must already have been false before.
+    // If ownerCall, further logic to update weightThresholdMet follows in ownerUnvoteToCurse.
   }
 
   /// @notice A vote to curse is appropriate during unhealthy network conditions
@@ -345,11 +332,15 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
       _unvoteToCurse(true, records[i]);
     }
 
-    if (badSignalReceived()) return;
-
-    // Invalidate all in-progress votes to bless.
-    ++s_versionedConfig.configVersion;
-    emit ConfigSet(s_versionedConfig.configVersion, s_versionedConfig.config);
+    if (
+      s_curseVoteProgress.weightThresholdMet &&
+      s_curseVoteProgress.accumulatedWeight < s_curseVoteProgress.curseWeightThreshold
+    ) {
+      s_curseVoteProgress.weightThresholdMet = false;
+      emit RecoveredFromCurse();
+      // Invalidate all in-progress votes to bless by bumping the config.
+      _setConfig(s_versionedConfig.config);
+    }
   }
 
   /// @notice Will revert in case a curse is active.
@@ -358,12 +349,12 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
   }
 
   /// @inheritdoc IAFN
-  function isBlessed(bytes32 taggedRootHash) public view override returns (bool) {
-    return s_blessVoteProgressByTaggedRootHash[taggedRootHash].weightThresholdMet;
+  function isBlessed(IAFN.TaggedRoot calldata taggedRoot) public view override returns (bool) {
+    return s_blessVoteProgressByTaggedRootHash[_taggedRootHash(taggedRoot)].weightThresholdMet;
   }
 
   /// @inheritdoc IAFN
-  function badSignalReceived() public view override returns (bool) {
+  function isCursed() public view override returns (bool) {
     return s_curseVoteProgress.weightThresholdMet;
   }
 
@@ -386,7 +377,7 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
   /// @notice Get addresses of those who have voted to bless tagged root, and the total weight of their votes.
   /// @return blessVoteAddrs will be empty if voting took place with an older config version
   /// @dev This is a helper method for offchain code so efficiency is not really a concern.
-  function getBlessVotersAndWeight(TaggedRoot calldata taggedRoot)
+  function getBlessVotersAndWeight(IAFN.TaggedRoot calldata taggedRoot)
     external
     view
     returns (address[] memory blessVoteAddrs, uint16 weight)
@@ -491,7 +482,7 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
   }
 
   function _setConfig(Config memory config) private {
-    if (badSignalReceived()) revert MustRecoverFromCurse();
+    if (isCursed()) revert MustRecoverFromCurse();
     if (!_validateConfig(config)) revert InvalidConfig();
 
     Config memory oldConfig = s_versionedConfig.config;

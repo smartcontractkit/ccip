@@ -29,7 +29,7 @@ contract AFN_constructor is ConfigCompare, AFNSetup {
 }
 
 contract AFN_voteToBlessRoots is AFNSetup {
-  event VoteToBless(uint32 indexed configVersion, address indexed voter, AFN.TaggedRoot taggedRoot, uint8 weight);
+  event VoteToBless(uint32 indexed configVersion, address indexed voter, IAFN.TaggedRoot taggedRoot, uint8 weight);
 
   // Success
 
@@ -50,7 +50,7 @@ contract AFN_voteToBlessRoots is AFNSetup {
     s_afn.voteToBless(makeTaggedRootSingleton(1));
     vm.pauseGasMetering();
 
-    assertFalse(s_afn.isBlessed(makeTaggedRootHash(1)));
+    assertFalse(s_afn.isBlessed(makeTaggedRoot(1)));
     assertEq(voterWeight, getWeightOfVotesToBlessRoot(makeTaggedRoot(1)));
     assertTrue(hasVotedToBlessRoot(voter, makeTaggedRoot(1)));
     vm.resumeGasMetering();
@@ -71,7 +71,7 @@ contract AFN_voteToBlessRoots is AFNSetup {
     vm.pauseGasMetering();
 
     for (uint256 i = 1; i <= 3; ++i) {
-      assertFalse(s_afn.isBlessed(makeTaggedRootHash(i)));
+      assertFalse(s_afn.isBlessed(makeTaggedRoot(i)));
       assertEq(voterWeight, getWeightOfVotesToBlessRoot(makeTaggedRoot(i)));
       assertTrue(hasVotedToBlessRoot(voter, makeTaggedRoot(i)));
     }
@@ -93,7 +93,7 @@ contract AFN_voteToBlessRoots is AFNSetup {
     vm.pauseGasMetering();
 
     for (uint256 i = 1; i <= 5; ++i) {
-      assertFalse(s_afn.isBlessed(makeTaggedRootHash(i)));
+      assertFalse(s_afn.isBlessed(makeTaggedRoot(i)));
       assertEq(voterWeight, getWeightOfVotesToBlessRoot(makeTaggedRoot(i)));
       assertTrue(hasVotedToBlessRoot(voter, makeTaggedRoot(1)));
     }
@@ -156,11 +156,11 @@ contract AFN_ownerUnbless is AFNSetup {
       changePrank(cfg.voters[i].blessVoteAddr);
       s_afn.voteToBless(makeTaggedRootSingleton(1));
     }
-    assertTrue(s_afn.isBlessed(makeTaggedRootHash(1)));
+    assertTrue(s_afn.isBlessed(makeTaggedRoot(1)));
 
     changePrank(OWNER);
     s_afn.ownerUnbless(makeTaggedRootSingleton(1));
-    assertFalse(s_afn.isBlessed(makeTaggedRootHash(1)));
+    assertFalse(s_afn.isBlessed(makeTaggedRoot(1)));
   }
 }
 
@@ -176,7 +176,7 @@ contract AFN_unvoteToCurse is AFNSetup {
 
     changePrank(cfg.voters[0].curseVoteAddr);
     s_afn.voteToCurse(makeCurseId(1));
-    assertFalse(s_afn.badSignalReceived());
+    assertFalse(s_afn.isCursed());
     (address[] memory cursers, uint16 weight, uint32[] memory voteCounts) = s_afn.getCurseVotersAndWeight();
     assertEq(1, cursers.length);
     assertEq(1, voteCounts.length);
@@ -337,7 +337,7 @@ contract AFN_voteToCurse is AFNSetup {
     // Not part of the assertion of this test but good to have as a sanity
     // check. We want a curse to be active in order for the ultimate assertion
     // to make sense.
-    assert(s_afn.badSignalReceived());
+    assert(s_afn.isCursed());
 
     // Asserts that this call to vote with a new curse id goes through with no
     // reverts even when the AFN contract is cursed.
@@ -423,11 +423,32 @@ contract AFN_ownerUnvoteToCurse is AFNSetup {
     ownerUnvoteToCurse();
     vm.pauseGasMetering();
 
-    assertFalse(s_afn.badSignalReceived());
+    assertFalse(s_afn.isCursed());
     (address[] memory voters, uint256 weight, ) = s_afn.getCurseVotersAndWeight();
     assertEq(voters.length, 0);
     assertEq(weight, 0);
     vm.resumeGasMetering();
+  }
+
+  function testCanBlessAndCurseAfterRecovery() public {
+    // Contract is already cursed due to setUp.
+
+    // Owner unvotes to curse.
+    changePrank(OWNER);
+    vm.expectEmit();
+    emit RecoveredFromCurse();
+    ownerUnvoteToCurse();
+
+    // Contract is now uncursed.
+    assertFalse(s_afn.isCursed());
+
+    // Vote to bless should go through.
+    changePrank(BLESS_VOTER_1);
+    s_afn.voteToBless(makeTaggedRootSingleton(2387489729));
+
+    // Vote to curse should go through.
+    changePrank(CURSE_VOTER_1);
+    s_afn.voteToCurse(makeCurseId(73894728973));
   }
 
   // Reverts

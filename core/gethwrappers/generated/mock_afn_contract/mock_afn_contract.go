@@ -34,9 +34,14 @@ type AFNUnvoteToCurseRecord struct {
 	ForceUnvote   bool
 }
 
+type IAFNTaggedRoot struct {
+	CommitStore common.Address
+	Root        [32]byte
+}
+
 var MockAFNContractMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[],\"name\":\"badSignalReceived\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"isBlessed\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"curseVoteAddr\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"cursesHash\",\"type\":\"bytes32\"},{\"internalType\":\"bool\",\"name\":\"forceUnvote\",\"type\":\"bool\"}],\"internalType\":\"structAFN.UnvoteToCurseRecord[]\",\"name\":\"\",\"type\":\"tuple[]\"}],\"name\":\"ownerUnvoteToCurse\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"voteToCurse\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
-	Bin: "0x608060405234801561001057600080fd5b506102cf806100206000396000f3fe608060405234801561001057600080fd5b506004361061004c5760003560e01c8063119a35271461005157806346f8e6d71461008f578063618af128146100aa578063ff888fb1146100e3575b600080fd5b61008d61005f3660046100fc565b50600080547fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00166001179055565b005b60005460ff165b604051901515815260200160405180910390f35b61008d6100b83660046101bc565b50600080547fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00169055565b6100966100f13660046100fc565b5060005460ff161590565b60006020828403121561010e57600080fd5b5035919050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b6040516060810167ffffffffffffffff8111828210171561016757610167610115565b60405290565b604051601f82017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe016810167ffffffffffffffff811182821017156101b4576101b4610115565b604052919050565b600060208083850312156101cf57600080fd5b823567ffffffffffffffff808211156101e757600080fd5b818501915085601f8301126101fb57600080fd5b81358181111561020d5761020d610115565b61021b848260051b0161016d565b8181528481019250606091820284018501918883111561023a57600080fd5b938501935b828510156102b65780858a0312156102575760008081fd5b61025f610144565b853573ffffffffffffffffffffffffffffffffffffffff811681146102845760008081fd5b8152858701358782015260408087013580151581146102a35760008081fd5b908201528452938401939285019261023f565b5097965050505050505056fea164736f6c634300080f000a",
+	ABI: "[{\"inputs\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"commitStore\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"root\",\"type\":\"bytes32\"}],\"internalType\":\"structIAFN.TaggedRoot\",\"name\":\"\",\"type\":\"tuple\"}],\"name\":\"isBlessed\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"isCursed\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"curseVoteAddr\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"cursesHash\",\"type\":\"bytes32\"},{\"internalType\":\"bool\",\"name\":\"forceUnvote\",\"type\":\"bool\"}],\"internalType\":\"structAFN.UnvoteToCurseRecord[]\",\"name\":\"\",\"type\":\"tuple[]\"}],\"name\":\"ownerUnvoteToCurse\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"voteToCurse\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+	Bin: "0x608060405234801561001057600080fd5b506102e7806100206000396000f3fe608060405234801561001057600080fd5b506004361061004c5760003560e01c8063119a352714610051578063397796f71461008f5780634d616771146100aa578063618af128146100c3575b600080fd5b61008d61005f3660046100fc565b50600080547fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00166001179055565b005b60005460ff165b604051901515815260200160405180910390f35b6100966100b8366004610115565b5060005460ff161590565b61008d6100d13660046101d4565b50600080547fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00169055565b60006020828403121561010e57600080fd5b5035919050565b60006040828403121561012757600080fd5b50919050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b6040516060810167ffffffffffffffff8111828210171561017f5761017f61012d565b60405290565b604051601f82017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe016810167ffffffffffffffff811182821017156101cc576101cc61012d565b604052919050565b600060208083850312156101e757600080fd5b823567ffffffffffffffff808211156101ff57600080fd5b818501915085601f83011261021357600080fd5b8135818111156102255761022561012d565b610233848260051b01610185565b8181528481019250606091820284018501918883111561025257600080fd5b938501935b828510156102ce5780858a03121561026f5760008081fd5b61027761015c565b853573ffffffffffffffffffffffffffffffffffffffff8116811461029c5760008081fd5b8152858701358782015260408087013580151581146102bb5760008081fd5b9082015284529384019392850192610257565b5097965050505050505056fea164736f6c634300080f000a",
 }
 
 var MockAFNContractABI = MockAFNContractMetaData.ABI
@@ -175,29 +180,7 @@ func (_MockAFNContract *MockAFNContractTransactorRaw) Transact(opts *bind.Transa
 	return _MockAFNContract.Contract.contract.Transact(opts, method, params...)
 }
 
-func (_MockAFNContract *MockAFNContractCaller) BadSignalReceived(opts *bind.CallOpts) (bool, error) {
-	var out []interface{}
-	err := _MockAFNContract.contract.Call(opts, &out, "badSignalReceived")
-
-	if err != nil {
-		return *new(bool), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
-
-	return out0, err
-
-}
-
-func (_MockAFNContract *MockAFNContractSession) BadSignalReceived() (bool, error) {
-	return _MockAFNContract.Contract.BadSignalReceived(&_MockAFNContract.CallOpts)
-}
-
-func (_MockAFNContract *MockAFNContractCallerSession) BadSignalReceived() (bool, error) {
-	return _MockAFNContract.Contract.BadSignalReceived(&_MockAFNContract.CallOpts)
-}
-
-func (_MockAFNContract *MockAFNContractCaller) IsBlessed(opts *bind.CallOpts, arg0 [32]byte) (bool, error) {
+func (_MockAFNContract *MockAFNContractCaller) IsBlessed(opts *bind.CallOpts, arg0 IAFNTaggedRoot) (bool, error) {
 	var out []interface{}
 	err := _MockAFNContract.contract.Call(opts, &out, "isBlessed", arg0)
 
@@ -211,12 +194,34 @@ func (_MockAFNContract *MockAFNContractCaller) IsBlessed(opts *bind.CallOpts, ar
 
 }
 
-func (_MockAFNContract *MockAFNContractSession) IsBlessed(arg0 [32]byte) (bool, error) {
+func (_MockAFNContract *MockAFNContractSession) IsBlessed(arg0 IAFNTaggedRoot) (bool, error) {
 	return _MockAFNContract.Contract.IsBlessed(&_MockAFNContract.CallOpts, arg0)
 }
 
-func (_MockAFNContract *MockAFNContractCallerSession) IsBlessed(arg0 [32]byte) (bool, error) {
+func (_MockAFNContract *MockAFNContractCallerSession) IsBlessed(arg0 IAFNTaggedRoot) (bool, error) {
 	return _MockAFNContract.Contract.IsBlessed(&_MockAFNContract.CallOpts, arg0)
+}
+
+func (_MockAFNContract *MockAFNContractCaller) IsCursed(opts *bind.CallOpts) (bool, error) {
+	var out []interface{}
+	err := _MockAFNContract.contract.Call(opts, &out, "isCursed")
+
+	if err != nil {
+		return *new(bool), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
+
+	return out0, err
+
+}
+
+func (_MockAFNContract *MockAFNContractSession) IsCursed() (bool, error) {
+	return _MockAFNContract.Contract.IsCursed(&_MockAFNContract.CallOpts)
+}
+
+func (_MockAFNContract *MockAFNContractCallerSession) IsCursed() (bool, error) {
+	return _MockAFNContract.Contract.IsCursed(&_MockAFNContract.CallOpts)
 }
 
 func (_MockAFNContract *MockAFNContractTransactor) OwnerUnvoteToCurse(opts *bind.TransactOpts, arg0 []AFNUnvoteToCurseRecord) (*types.Transaction, error) {
@@ -248,9 +253,9 @@ func (_MockAFNContract *MockAFNContract) Address() common.Address {
 }
 
 type MockAFNContractInterface interface {
-	BadSignalReceived(opts *bind.CallOpts) (bool, error)
+	IsBlessed(opts *bind.CallOpts, arg0 IAFNTaggedRoot) (bool, error)
 
-	IsBlessed(opts *bind.CallOpts, arg0 [32]byte) (bool, error)
+	IsCursed(opts *bind.CallOpts) (bool, error)
 
 	OwnerUnvoteToCurse(opts *bind.TransactOpts, arg0 []AFNUnvoteToCurseRecord) (*types.Transaction, error)
 

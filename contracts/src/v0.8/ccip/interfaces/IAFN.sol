@@ -1,9 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-/// @notice This interface contains *only* the functions that might be used on-chain by other CCIP contracts.
+/// @notice This interface contains the only AFN-related functions that might be used on-chain by other CCIP contracts.
 interface IAFN {
-  function badSignalReceived() external view returns (bool);
+  struct TaggedRoot {
+    address commitStore;
+    bytes32 root;
+  }
 
-  function isBlessed(bytes32 taggedRootHash) external view returns (bool);
+  /// @notice Callers MUST NOT cache the return value as a blessed tagged root could become unblessed.
+  function isBlessed(TaggedRoot calldata taggedRoot) external view returns (bool);
+
+  function isCursed() external view returns (bool);
 }
