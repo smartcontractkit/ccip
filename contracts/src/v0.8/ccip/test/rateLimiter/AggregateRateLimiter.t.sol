@@ -41,6 +41,7 @@ contract AggregateTokenLimiter_constructor is AggregateTokenLimiterSetup {
     assertEq(s_config.rate, bucket.rate);
     assertEq(s_config.capacity, bucket.capacity);
     assertEq(s_config.capacity, bucket.tokens);
+    assertEq(s_config.isEnabled, bucket.isEnabled);
     assertEq(BLOCK_TIME, bucket.lastUpdated);
   }
 }
@@ -140,7 +141,11 @@ contract AggregateTokenLimiter_setRateLimiterConfig is AggregateTokenLimiterSetu
     assertEq(s_config.rate, bucket.rate);
     assertEq(s_config.capacity, bucket.capacity);
 
-    s_config = RateLimiter.Config({isEnabled: true, rate: uint208(bucket.rate * 2), capacity: bucket.capacity * 8});
+    s_config = RateLimiter.Config({
+      isEnabled: !bucket.isEnabled,
+      rate: uint208(bucket.rate * 2),
+      capacity: bucket.capacity * 8
+    });
 
     vm.expectEmit();
     emit ConfigChanged(s_config);
@@ -150,6 +155,7 @@ contract AggregateTokenLimiter_setRateLimiterConfig is AggregateTokenLimiterSetu
     bucket = s_rateLimiter.currentRateLimiterState();
     assertEq(s_config.rate, bucket.rate);
     assertEq(s_config.capacity, bucket.capacity);
+    assertEq(s_config.isEnabled, bucket.isEnabled);
   }
 
   // Reverts

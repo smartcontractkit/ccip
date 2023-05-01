@@ -25,7 +25,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
   using EnumerableMapAddresses for EnumerableMapAddresses.AddressToAddressMap;
   using EnumerableSet for EnumerableSet.AddressSet;
 
-  error InvalidExtraArgsTag(bytes4 expected, bytes4 got);
+  error InvalidExtraArgsTag();
   error OnlyCallableByOwnerOrFeeAdmin();
   error OnlyCallableByOwnerOrFeeAdminOrNop();
   error InvalidWithdrawalAddress(address addr);
@@ -266,8 +266,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
     if (extraArgs.length == 0) {
       return Client.EVMExtraArgsV1({gasLimit: i_defaultTxGasLimit, strict: false});
     }
-    if (bytes4(extraArgs[:4]) != Client.EVM_EXTRA_ARGS_V1_TAG)
-      revert InvalidExtraArgsTag(Client.EVM_EXTRA_ARGS_V1_TAG, bytes4(extraArgs[:4]));
+    if (bytes4(extraArgs[:4]) != Client.EVM_EXTRA_ARGS_V1_TAG) revert InvalidExtraArgsTag();
     return abi.decode(extraArgs[4:], (Client.EVMExtraArgsV1));
   }
 

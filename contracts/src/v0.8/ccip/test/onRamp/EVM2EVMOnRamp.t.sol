@@ -297,6 +297,15 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     s_onRamp.forwardFromRouter(_generateEmptyMessage(), 0, OWNER);
   }
 
+  function testInvalidExtraArgsTagReverts() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.extraArgs = bytes("bad args");
+
+    vm.expectRevert(EVM2EVMOnRamp.InvalidExtraArgsTag.selector);
+
+    s_onRamp.forwardFromRouter(message, 0, OWNER);
+  }
+
   function testUnhealthyReverts() public {
     s_mockAFN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
     vm.expectRevert(EVM2EVMOnRamp.BadAFNSignal.selector);
@@ -794,6 +803,36 @@ contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
   }
 
   // Reverts
+
+  function testSetConfigInvalidConfigReverts() public {
+    EVM2EVMOnRamp.DynamicConfig memory newConfig = EVM2EVMOnRamp.DynamicConfig({
+      router: address(0),
+      priceRegistry: address(23423),
+      maxDataSize: 400,
+      maxTokensLength: 14,
+      maxGasLimit: MAX_GAS_LIMIT / 2,
+      afn: address(11)
+    });
+
+    vm.expectRevert(EVM2EVMOnRamp.InvalidConfig.selector);
+
+    s_onRamp.setDynamicConfig(newConfig);
+
+    newConfig.router = address(1);
+    newConfig.priceRegistry = address(0);
+
+    vm.expectRevert(EVM2EVMOnRamp.InvalidConfig.selector);
+
+    s_onRamp.setDynamicConfig(newConfig);
+
+    newConfig.priceRegistry = address(23423);
+    newConfig.afn = address(0);
+
+    vm.expectRevert(EVM2EVMOnRamp.InvalidConfig.selector);
+
+    s_onRamp.setDynamicConfig(newConfig);
+  }
+
   function testSetConfigOnlyOwnerReverts() public {
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
@@ -881,6 +920,18 @@ contract EVM2EVMOnRamp_applyAllowListUpdates is EVM2EVMOnRampWithAllowListSetup 
 
     assertEq(address(2), setAddresses[1]);
     assertEq(address(3), setAddresses[2]);
+  }
+
+  function testSetAllowListSkipsZeroSuccess() public {
+    uint256 setAddressesLength = s_onRamp.getAllowList().length;
+
+    address[] memory newAddresses = new address[](1);
+    newAddresses[0] = address(0);
+
+    s_onRamp.applyAllowListUpdates(new address[](0), newAddresses);
+    address[] memory setAddresses = s_onRamp.getAllowList();
+
+    assertEq(setAddresses.length, setAddressesLength);
   }
 
   // Reverts
