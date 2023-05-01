@@ -295,8 +295,8 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 		if err != nil {
 			allError = multierr.Append(allError, err)
 		} else {
-			if d.Minutes() < 1 || d.Hours() > 5 {
-				allError = multierr.Append(allError, fmt.Errorf("invalid duration %d - must be between 1m and 5h", d))
+			if d.Minutes() < 1 {
+				allError = multierr.Append(allError, fmt.Errorf("invalid duration %d - should be atleast 1m", d))
 			} else {
 				p.TestDuration = d
 			}
