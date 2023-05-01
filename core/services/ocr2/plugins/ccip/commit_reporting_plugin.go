@@ -245,7 +245,7 @@ type update = struct {
 }
 
 // latest gasPrice update is returned in addressZero (common.Address{}); the other keys are tokens price updates
-func (r *CommitReportingPlugin) getLatestPriceUpdates(ctx context.Context, tokens []common.Address, now time.Time) (latestUpdates map[common.Address]update, err error) {
+func (r *CommitReportingPlugin) getLatestPriceUpdates(ctx context.Context, now time.Time, skipInflight bool) (latestUpdates map[common.Address]update, err error) {
 	latestUpdates = make(map[common.Address]update)
 	gasUpdatesWithinHeartBeat, err := r.config.dest.IndexedLogsCreatedAfter(UsdPerUnitGasUpdated, r.config.priceRegistry.Address(), 1, []common.Hash{EvmWord(r.config.sourceChainID)}, now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()), pg.WithParentCtx(ctx))
 	if err != nil {
@@ -266,11 +266,7 @@ func (r *CommitReportingPlugin) getLatestPriceUpdates(ctx context.Context, token
 		}
 	}
 
-	tokensWords := make([]common.Hash, len(tokens))
-	for i, address := range tokens {
-		tokensWords[i] = address.Hash()
-	}
-	tokenUpdatesWithinHeartBeat, err := r.config.dest.IndexedLogsCreatedAfter(UsdPerTokenUpdated, r.config.priceRegistry.Address(), 1, tokensWords, now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()), pg.WithParentCtx(ctx))
+	tokenUpdatesWithinHeartBeat, err := r.config.dest.LogsCreatedAfter(UsdPerTokenUpdated, r.config.priceRegistry.Address(), now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()), pg.WithParentCtx(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -287,6 +283,9 @@ func (r *CommitReportingPlugin) getLatestPriceUpdates(ctx context.Context, token
 				value:     tokenUpdate.Value,
 			}
 		}
+	}
+	if skipInflight {
+		return latestUpdates, nil
 	}
 
 	r.inFlightMu.RLock()
@@ -356,7 +355,7 @@ func (r *CommitReportingPlugin) generatePriceUpdates(ctx context.Context, now ti
 
 	sourceGasPriceUSD = calculateUsdPerUnitGas(gasPrice, sourceNativePriceUSD)
 
-	latestUpdates, err := r.getLatestPriceUpdates(ctx, feeTokens, now)
+	latestUpdates, err := r.getLatestPriceUpdates(ctx, now, false)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -484,10 +483,6 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, _ types.ReportTimest
 	for _, obs := range nonEmptyObservations {
 		intervals = append(intervals, obs.Interval)
 	}
-	if len(intervals) <= r.F {
-		lggr.Debugf("Observations for OnRamp %v: #obs=%d <= F=%d, need at least F+1 to continue", r.config.onRamp.Address(), len(intervals), r.F)
-		return false, nil, nil
-	}
 
 	agreedInterval, err := calculateIntervalConsensus(intervals, r.F)
 	if err != nil {
@@ -569,7 +564,7 @@ func calculatePriceUpdates(destChainId uint64, observations []CommitObservation,
 // Assumed at least f+1 valid observations
 func calculateIntervalConsensus(intervals []commit_store.CommitStoreInterval, f int) (commit_store.CommitStoreInterval, error) {
 	if len(intervals) <= f {
-		return commit_store.CommitStoreInterval{}, errors.Errorf("Not enough intervals to form consensus intervals %d, f %d", len(intervals), f)
+		return commit_store.CommitStoreInterval{}, errors.Errorf("Not enough intervals to form consensus: #obs=%d, f=%d", len(intervals), f)
 	}
 	// Extract the min and max
 	sort.Slice(intervals, func(i, j int) bool {
@@ -683,9 +678,6 @@ func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context,
 }
 
 func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context, _ types.ReportTimestamp, report types.Report) (bool, error) {
-	if isCommitStoreDownNow(ctx, r.config.lggr, r.config.commitStore) {
-		return false, nil
-	}
 	parsedReport, err := DecodeCommitReport(report)
 	if err != nil {
 		return false, err
@@ -707,9 +699,32 @@ func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, report *commi
 		// If the next min is already greater than this reports min,
 		// this report is stale.
 		if nextMin > report.Interval.Min {
-			r.config.lggr.Warnw("report is stale", "onchain min", nextMin, "report min", report.Interval.Min)
+			r.config.lggr.Infow("report is stale", "onchain min", nextMin, "report min", report.Interval.Min)
 			return true
 		}
+		return false
+	}
+
+	// getting the last price updates without including inflight is like querying
+	// current prices onchain, but uses logpoller's data to save on the RPC requests
+	latestUpdates, err := r.getLatestPriceUpdates(ctx, time.Now(), true)
+	if err != nil {
+		return true
+	}
+
+	if report.PriceUpdates.DestChainId != 0 {
+		if latestUpdate, ok := latestUpdates[common.Address{}]; ok && latestUpdate.value.Cmp(report.PriceUpdates.UsdPerUnitGas) == 0 {
+			r.config.lggr.Infow("gasPriceUpdate-only report is stale", "latest gasPrice", latestUpdate.value, "destChainID", report.PriceUpdates.DestChainId)
+			return true
+		}
+	} else if len(report.PriceUpdates.TokenPriceUpdates) > 0 { // check first token
+		tokenUpdate := report.PriceUpdates.TokenPriceUpdates[0]
+		if latestUpdate, ok := latestUpdates[tokenUpdate.SourceToken]; ok && latestUpdate.value.Cmp(tokenUpdate.UsdPerToken) == 0 {
+			r.config.lggr.Infow("tokenPriceUpdate-only report is stale", "latest tokenPrice", latestUpdate.value, "token", tokenUpdate.SourceToken)
+			return true
+		}
+	} else {
+		return true
 	}
 	return false
 }

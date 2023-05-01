@@ -67,7 +67,7 @@ func (e ccipPluginTestHarness) generateMessageBatch(t *testing.T, payloadSize in
 	var helperMsgs []evm_2_evm_onramp.InternalEVM2EVMMessage
 	for i := 0; i < nTokensPerMessage; i++ {
 		tokens = append(tokens, evm_2_evm_onramp.ClientEVMTokenAmount{
-			Token:  e.feeTokenAddress,
+			Token:  e.destFeeTokenAddress,
 			Amount: big.NewInt(1),
 		})
 	}
@@ -158,7 +158,7 @@ func TestMaxInternalExecutionReportSize(t *testing.T) {
 	bi, _ := abi.JSON(strings.NewReader(evm_2_evm_offramp_helper.EVM2EVMOffRampHelperABI))
 	b, err := bi.Pack("report", []byte(executorReport))
 	require.NoError(t, err)
-	n, err := c.client.NonceAt(context.Background(), c.owner.From, nil)
+	n, err := c.destClient.NonceAt(context.Background(), c.owner.From, nil)
 	require.NoError(t, err)
 	signedTx, err := c.owner.Signer(c.owner.From, types.NewTx(&types.LegacyTx{
 		To:       &a,
@@ -169,7 +169,7 @@ func TestMaxInternalExecutionReportSize(t *testing.T) {
 		Data:     b,
 	}))
 	require.NoError(t, err)
-	pool := txpool.NewTxPool(txpool.DefaultConfig, params.AllEthashProtocolChanges, c.client.Blockchain())
+	pool := txpool.NewTxPool(txpool.DefaultConfig, params.AllEthashProtocolChanges, c.destClient.Blockchain())
 	require.NoError(t, pool.AddLocal(signedTx))
 }
 
