@@ -4,6 +4,7 @@ pragma solidity 0.8.15;
 import "../BaseTest.t.sol";
 import {MockERC20} from "../mocks/MockERC20.sol";
 import {TokenPoolHelper} from "../helpers/TokenPoolHelper.sol";
+import {TokenPool} from "../../pools/TokenPool.sol";
 
 contract TokenPoolSetup is BaseTest {
   IERC20 internal s_token;
@@ -19,7 +20,7 @@ contract TokenPoolSetup is BaseTest {
 contract TokenPool_constructor is TokenPoolSetup {
   // Reverts
   function testNullAddressNotAllowedReverts() public {
-    vm.expectRevert(IPool.NullAddressNotAllowed.selector);
+    vm.expectRevert(TokenPool.NullAddressNotAllowed.selector);
 
     s_tokenPool = new TokenPoolHelper(IERC20(address(0)), rateLimiterConfig());
   }
@@ -30,12 +31,12 @@ contract TokenPool_applyRampUpdates is TokenPoolSetup {
   event OffRampAllowanceSet(address onRamp, bool allowed);
 
   function testApplyRampUpdatesSuccess() public {
-    IPool.RampUpdate[] memory onRamps = new IPool.RampUpdate[](2);
-    onRamps[0] = IPool.RampUpdate({ramp: address(1), allowed: true});
-    onRamps[1] = IPool.RampUpdate({ramp: address(2), allowed: true});
-    IPool.RampUpdate[] memory offRamps = new IPool.RampUpdate[](2);
-    offRamps[0] = IPool.RampUpdate({ramp: address(11), allowed: true});
-    offRamps[1] = IPool.RampUpdate({ramp: address(12), allowed: true});
+    TokenPool.RampUpdate[] memory onRamps = new TokenPool.RampUpdate[](2);
+    onRamps[0] = TokenPool.RampUpdate({ramp: address(1), allowed: true});
+    onRamps[1] = TokenPool.RampUpdate({ramp: address(2), allowed: true});
+    TokenPool.RampUpdate[] memory offRamps = new TokenPool.RampUpdate[](2);
+    offRamps[0] = TokenPool.RampUpdate({ramp: address(11), allowed: true});
+    offRamps[1] = TokenPool.RampUpdate({ramp: address(12), allowed: true});
 
     vm.expectEmit();
     emit OnRampAllowanceSet(onRamps[0].ramp, onRamps[0].allowed);
@@ -77,7 +78,7 @@ contract TokenPool_applyRampUpdates is TokenPoolSetup {
   function testOnlyCallableByOwnerReverts() public {
     changePrank(STRANGER);
     vm.expectRevert("Only callable by owner");
-    s_tokenPool.applyRampUpdates(new IPool.RampUpdate[](0), new IPool.RampUpdate[](0));
+    s_tokenPool.applyRampUpdates(new TokenPool.RampUpdate[](0), new TokenPool.RampUpdate[](0));
   }
 }
 

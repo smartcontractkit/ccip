@@ -11,14 +11,16 @@ import (
 
 func PrepareCsvFile(filePath string, headers []string) {
 	file, err := os.Create(filePath)
-	defer file.Close()
 	if err != nil {
 		log.Fatalln("failed to open file", err)
 	}
+	defer file.Close()
 	w := csv.NewWriter(file)
 	var data [][]string
 	data = append(data, headers)
-	err = w.WriteAll(data)
+	if err = w.WriteAll(data); err != nil {
+		log.Fatalln("failed to open file", err)
+	}
 	if err := w.Error(); err != nil {
 		log.Fatal(err)
 	}

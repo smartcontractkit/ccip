@@ -38,6 +38,8 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
   error ExecutionError(bytes error);
   error InvalidSourceChain(uint64 sourceChainId);
   error MessageTooLarge(uint256 maxSize, uint256 actualSize);
+  error TokenDataMismatch(uint64 sequenceNumber);
+  error UnexpectedTokenData();
   error UnsupportedNumberOfTokens(uint64 sequenceNumber);
   error ManualExecutionNotYetEnabled();
   error RootNotCommitted();
@@ -193,7 +195,7 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
 
   /// @notice Entrypoint for execution, called by the OCR network
   /// @dev Expects an encoded ExecutionReport
-  function _report(bytes memory report) internal override {
+  function _report(bytes calldata report) internal override {
     _execute(abi.decode(report, (Internal.ExecutionReport)), false);
   }
 
@@ -204,6 +206,7 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
   function _execute(Internal.ExecutionReport memory report, bool manualExecution) internal whenHealthy {
     uint256 numMsgs = report.encodedMessages.length;
     if (numMsgs == 0) revert EmptyReport();
+    if (numMsgs != report.offchainTokenData.length) revert UnexpectedTokenData();
 
     bytes32[] memory hashedLeaves = new bytes32[](numMsgs);
     Internal.EVM2EVMMessage[] memory decodedMessages = new Internal.EVM2EVMMessage[](numMsgs);
@@ -254,11 +257,12 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
           continue;
         }
       }
+      bytes[] memory offchainTokenData = report.offchainTokenData[i];
 
-      _isWellFormed(message);
+      _isWellFormed(message, offchainTokenData.length);
 
       _setExecutionState(message.sequenceNumber, Internal.MessageExecutionState.IN_PROGRESS);
-      Internal.MessageExecutionState newState = _trialExecute(message, manualExecution);
+      Internal.MessageExecutionState newState = _trialExecute(message, offchainTokenData, manualExecution);
       _setExecutionState(message.sequenceNumber, newState);
 
       if (manualExecution) {
@@ -291,10 +295,11 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
   /// @notice Does basic message validation. Should never fail.
   /// @param message The message to be validated.
   /// @dev reverts on validation failures.
-  function _isWellFormed(Internal.EVM2EVMMessage memory message) private view {
+  function _isWellFormed(Internal.EVM2EVMMessage memory message, uint256 offchainTokenDataLength) private view {
     if (message.sourceChainId != i_sourceChainId) revert InvalidSourceChain(message.sourceChainId);
     if (message.tokenAmounts.length > uint256(s_dynamicConfig.maxTokensLength))
       revert UnsupportedNumberOfTokens(message.sequenceNumber);
+    if (message.tokenAmounts.length != offchainTokenDataLength) revert TokenDataMismatch(message.sequenceNumber);
     if (message.data.length > uint256(s_dynamicConfig.maxDataSize))
       revert MessageTooLarge(uint256(s_dynamicConfig.maxDataSize), message.data.length);
   }
@@ -303,11 +308,12 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
   /// @param message Client.Any2EVMMessage memory message.
   /// @param manualExecution bool to indicate manual instead of DON execution.
   /// @return the new state of the message, being either SUCCESS or FAILURE.
-  function _trialExecute(Internal.EVM2EVMMessage memory message, bool manualExecution)
-    internal
-    returns (Internal.MessageExecutionState)
-  {
-    try this.executeSingleMessage(message, manualExecution) {} catch (bytes memory err) {
+  function _trialExecute(
+    Internal.EVM2EVMMessage memory message,
+    bytes[] memory offchainTokenData,
+    bool manualExecution
+  ) internal returns (Internal.MessageExecutionState) {
+    try this.executeSingleMessage(message, offchainTokenData, manualExecution) {} catch (bytes memory err) {
       if (ReceiverError.selector == bytes4(err)) {
         return Internal.MessageExecutionState.FAILURE;
       } else {
@@ -322,11 +328,20 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
   /// @param manualExecution bool to indicate manual instead of DON execution.
   /// @dev this can only be called by the contract itself. It is part of
   /// the Execute call, as we can only try/catch on external calls.
-  function executeSingleMessage(Internal.EVM2EVMMessage memory message, bool manualExecution) external {
+  function executeSingleMessage(
+    Internal.EVM2EVMMessage memory message,
+    bytes[] memory offchainTokenData,
+    bool manualExecution
+  ) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
     if (message.tokenAmounts.length > 0) {
-      destTokenAmounts = _releaseOrMintTokens(message.tokenAmounts, message.receiver);
+      destTokenAmounts = _releaseOrMintTokens(
+        message.tokenAmounts,
+        abi.encode(message.sender),
+        message.receiver,
+        offchainTokenData
+      );
     }
     if (
       !message.receiver.isContract() || !message.receiver.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId)
@@ -464,29 +479,20 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
     }
   }
 
-  /// @notice Uses the pool to release or mint tokens and send them to the given receiver address.
-  /// @param pool The pool to release/mint tokens from.
-  /// @param amount The number of tokens to release/mint.
-  /// @param receiver The address that will receive the tokens.
-  function _releaseOrMintToken(
-    IPool pool,
-    uint256 amount,
-    address receiver
-  ) internal {
-    pool.releaseOrMint(receiver, amount);
-  }
-
   /// @notice Uses pools to release or mint a number of different tokens to a receiver address.
   /// @param sourceTokenAmounts List of tokens and amount values to be released/minted.
   /// @param receiver The address that will receive the tokens.
-  function _releaseOrMintTokens(Client.EVMTokenAmount[] memory sourceTokenAmounts, address receiver)
-    internal
-    returns (Client.EVMTokenAmount[] memory)
-  {
+  function _releaseOrMintTokens(
+    Client.EVMTokenAmount[] memory sourceTokenAmounts,
+    bytes memory originalSender,
+    address receiver,
+    bytes[] memory offchainTokenData
+  ) internal returns (Client.EVMTokenAmount[] memory) {
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](sourceTokenAmounts.length);
     for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
       IPool pool = getPoolBySourceToken(IERC20(sourceTokenAmounts[i].token));
-      _releaseOrMintToken(pool, sourceTokenAmounts[i].amount, receiver);
+      pool.releaseOrMint(originalSender, receiver, sourceTokenAmounts[i].amount, i_sourceChainId, offchainTokenData[i]);
+
       destTokenAmounts[i].token = address(pool.getToken());
       destTokenAmounts[i].amount = sourceTokenAmounts[i].amount;
     }

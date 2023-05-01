@@ -229,6 +229,10 @@ func makeExecutionReportArgs() abi.Arguments {
 					Type: "bytes[]",
 				},
 				{
+					Name: "offchainTokenData",
+					Type: "bytes[][]",
+				},
+				{
 					Name: "proofs",
 					Type: "bytes32[]",
 				},

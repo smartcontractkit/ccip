@@ -29,17 +29,29 @@ contract LockReleaseTokenPool is TokenPool {
   /// rate limiting locks does not meaningfully mitigate honeypot risk.
   /// Benefits of rate limiting here does not justify the extra gas cost.
   /// @param amount Amount to lock
-  function lockOrBurn(uint256 amount, address) external override whenNotPaused onlyOnRamp {
+  function lockOrBurn(
+    address,
+    bytes calldata,
+    uint256 amount,
+    uint64,
+    bytes calldata
+  ) external override whenNotPaused onlyOnRamp {
     emit Locked(msg.sender, amount);
   }
 
   /// @notice Release tokens from the pool to the recipient
-  /// @param recipient Recipient address
+  /// @param receiver Recipient address
   /// @param amount Amount to release
-  function releaseOrMint(address recipient, uint256 amount) external override whenNotPaused onlyOffRamp {
+  function releaseOrMint(
+    bytes memory,
+    address receiver,
+    uint256 amount,
+    uint64,
+    bytes memory
+  ) external override whenNotPaused onlyOffRamp {
     _consumeRateLimit(amount);
-    getToken().safeTransfer(recipient, amount);
-    emit Released(msg.sender, recipient, amount);
+    getToken().safeTransfer(receiver, amount);
+    emit Released(msg.sender, receiver, amount);
   }
 
   /// @notice Gets the amount of provided liquidity for a given address.

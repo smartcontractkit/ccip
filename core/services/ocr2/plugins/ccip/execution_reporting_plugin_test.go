@@ -26,6 +26,7 @@ import (
 type messageBatch struct {
 	msgs        []Message
 	allMsgBytes [][]byte
+	tokenData   [][][]byte
 	seqNums     []uint64
 	helperMsgs  []evm_2_evm_onramp.InternalEVM2EVMMessage
 	proof       merklemulti.Proof[[32]byte]
@@ -60,6 +61,7 @@ func (e ccipPluginTestHarness) generateMessageBatch(t *testing.T, payloadSize in
 	maxPayload := maxData()
 	var leafHashes [][32]byte
 	var msgs []Message
+	var tokenData [][][]byte
 	var indices []int
 	var tokens []evm_2_evm_onramp.ClientEVMTokenAmount
 	var helperMsgs []evm_2_evm_onramp.InternalEVM2EVMMessage
@@ -104,7 +106,13 @@ func (e ccipPluginTestHarness) generateMessageBatch(t *testing.T, payloadSize in
 			MessageId:      message.MessageId,
 		})
 
+		var offchainTokenData [][]byte
+		for range message.TokenAmounts {
+			offchainTokenData = append(offchainTokenData, []byte{})
+		}
+
 		msgs = append(msgs, message)
+		tokenData = append(tokenData, offchainTokenData)
 		indices = append(indices, i)
 		msgBytes, err := MakeMessageArgs().PackValues([]interface{}{message})
 		require.NoError(t, err)
@@ -116,7 +124,16 @@ func (e ccipPluginTestHarness) generateMessageBatch(t *testing.T, payloadSize in
 	proof := tree.Prove(indices)
 	rootLocal, err := merklemulti.VerifyComputeRoot(mctx, leafHashes, proof)
 	require.NoError(t, err)
-	return messageBatch{allMsgBytes: allMsgBytes, seqNums: seqNums, msgs: msgs, proof: proof, root: rootLocal, helperMsgs: helperMsgs}
+
+	return messageBatch{
+		allMsgBytes: allMsgBytes,
+		seqNums:     seqNums,
+		msgs:        msgs,
+		tokenData:   tokenData,
+		proof:       proof,
+		root:        rootLocal,
+		helperMsgs:  helperMsgs,
+	}
 }
 
 func TestMaxInternalExecutionReportSize(t *testing.T) {
@@ -125,12 +142,13 @@ func TestMaxInternalExecutionReportSize(t *testing.T) {
 	c := setupCcipTestHarness(t)
 	mb := c.generateMessageBatch(t, MaxPayloadLength, 50, MaxTokensPerMessage)
 	// Ensure execution report size is valid
-	executorReport, err := EncodeExecutionReport(
-		mb.seqNums,
-		mb.allMsgBytes,
-		mb.proof.Hashes,
-		mb.proof.SourceFlags,
-	)
+	executorReport, err := EncodeExecutionReport(&MessageExecution{
+		seqNums:          mb.seqNums,
+		encMsgs:          mb.allMsgBytes,
+		tokenData:        mb.tokenData,
+		proofs:           mb.proof.Hashes,
+		proofSourceFlags: mb.proof.SourceFlags,
+	})
 	require.NoError(t, err)
 	t.Log("execution report length", len(executorReport), MaxExecutionReportLength)
 	require.True(t, len(executorReport) <= MaxExecutionReportLength)
@@ -162,12 +180,19 @@ func TestInternalExecutionReportEncoding(t *testing.T) {
 	c := setupCcipTestHarness(t)
 	mb := c.generateMessageBatch(t, 1, 1, 1)
 	report := evm_2_evm_offramp.InternalExecutionReport{
-		SequenceNumbers: mb.seqNums,
-		EncodedMessages: mb.allMsgBytes,
-		Proofs:          mb.proof.Hashes,
-		ProofFlagBits:   ProofFlagsToBits(mb.proof.SourceFlags),
+		SequenceNumbers:   mb.seqNums,
+		EncodedMessages:   mb.allMsgBytes,
+		OffchainTokenData: mb.tokenData,
+		Proofs:            mb.proof.Hashes,
+		ProofFlagBits:     ProofFlagsToBits(mb.proof.SourceFlags),
 	}
-	encodeCommitReport, err := EncodeExecutionReport(report.SequenceNumbers, report.EncodedMessages, report.Proofs, mb.proof.SourceFlags)
+	encodeCommitReport, err := EncodeExecutionReport(&MessageExecution{
+		seqNums:          report.SequenceNumbers,
+		encMsgs:          report.EncodedMessages,
+		tokenData:        report.OffchainTokenData,
+		proofs:           report.Proofs,
+		proofSourceFlags: mb.proof.SourceFlags,
+	})
 	require.NoError(t, err)
 	decodeCommitReport, err := DecodeExecutionReport(encodeCommitReport)
 	require.NoError(t, err)
@@ -199,12 +224,13 @@ func TestExecutionReportToEthTxMetadata(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			encExecReport, err := EncodeExecutionReport(
-				tc.msgBatch.seqNums,
-				tc.msgBatch.allMsgBytes,
-				tc.msgBatch.proof.Hashes,
-				tc.msgBatch.proof.SourceFlags,
-			)
+			encExecReport, err := EncodeExecutionReport(&MessageExecution{
+				seqNums:          tc.msgBatch.seqNums,
+				encMsgs:          tc.msgBatch.allMsgBytes,
+				tokenData:        tc.msgBatch.tokenData,
+				proofs:           tc.msgBatch.proof.Hashes,
+				proofSourceFlags: tc.msgBatch.proof.SourceFlags,
+			})
 			require.NoError(t, err)
 			txMeta, err := ExecutionReportToEthTxMeta(encExecReport)
 			if tc.err != nil {

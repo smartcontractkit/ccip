@@ -156,7 +156,7 @@ func TestMetaERC20CrossChain(t *testing.T) {
 	ccipContracts.Source.Chain.Commit()
 
 	// set onRamp as valid caller for source pool
-	_, err = sourcePool.ApplyRampUpdates(ccipContracts.Source.User, []lock_release_token_pool.IPoolRampUpdate{
+	_, err = sourcePool.ApplyRampUpdates(ccipContracts.Source.User, []lock_release_token_pool.TokenPoolRampUpdate{
 		{
 			Ramp:    ccipContracts.Source.OnRamp.Address(),
 			Allowed: true,
@@ -165,7 +165,7 @@ func TestMetaERC20CrossChain(t *testing.T) {
 	require.NoError(t, err)
 	ccipContracts.Source.Chain.Commit()
 
-	_, err = wrappedDestTokenPool.ApplyRampUpdates(ccipContracts.Dest.User, nil, []wrapped_token_pool.IPoolRampUpdate{
+	_, err = wrappedDestTokenPool.ApplyRampUpdates(ccipContracts.Dest.User, nil, []wrapped_token_pool.TokenPoolRampUpdate{
 		{
 			Ramp:    ccipContracts.Dest.OffRamp.Address(),
 			Allowed: true,

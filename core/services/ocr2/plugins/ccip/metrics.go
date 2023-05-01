@@ -10,9 +10,6 @@ import (
 type skipReason string
 
 const (
-	// reasonSnoozed describes when a report is skipped due to being snoozed.
-	reasonSnoozed skipReason = "snoozed"
-
 	// reasonNotBlessed describes when a report is skipped due to not being blessed.
 	reasonNotBlessed skipReason = "not blessed"
 

@@ -4,6 +4,7 @@ pragma solidity 0.8.15;
 import "../BaseTest.t.sol";
 import {MockERC20} from "../mocks/MockERC20.sol";
 import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
+import {TokenPool} from "../../pools/TokenPool.sol";
 
 contract LockReleaseTokenPoolSetup is BaseTest {
   IERC20 internal s_token;
@@ -16,10 +17,10 @@ contract LockReleaseTokenPoolSetup is BaseTest {
     s_token = new MockERC20("LINK", "LNK", OWNER, 2**256 - 1);
     s_lockReleaseTokenPool = new LockReleaseTokenPool(s_token, rateLimiterConfig());
 
-    IPool.RampUpdate[] memory onRamps = new IPool.RampUpdate[](1);
-    onRamps[0] = IPool.RampUpdate({ramp: s_allowedOnRamp, allowed: true});
-    IPool.RampUpdate[] memory offRamps = new IPool.RampUpdate[](1);
-    offRamps[0] = IPool.RampUpdate({ramp: s_allowedOffRamp, allowed: true});
+    TokenPool.RampUpdate[] memory onRamps = new TokenPool.RampUpdate[](1);
+    onRamps[0] = TokenPool.RampUpdate({ramp: s_allowedOnRamp, allowed: true});
+    TokenPool.RampUpdate[] memory offRamps = new TokenPool.RampUpdate[](1);
+    offRamps[0] = TokenPool.RampUpdate({ramp: s_allowedOffRamp, allowed: true});
 
     s_lockReleaseTokenPool.applyRampUpdates(onRamps, offRamps);
   }
@@ -53,7 +54,7 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
       emit Released(s_allowedOffRamp, recipient, amount);
     }
 
-    s_lockReleaseTokenPool.releaseOrMint(recipient, amount);
+    s_lockReleaseTokenPool.releaseOrMint(bytes(""), recipient, amount, SOURCE_CHAIN_ID, bytes(""));
   }
 }
 

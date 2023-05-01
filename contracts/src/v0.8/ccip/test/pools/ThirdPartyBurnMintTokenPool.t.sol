@@ -6,6 +6,7 @@ import {IBurnMintERC20} from "../../interfaces/pools/IBurnMintERC20.sol";
 import "../BaseTest.t.sol";
 import {MockERC20} from "../mocks/MockERC20.sol";
 import {ThirdPartyBurnMintTokenPool} from "../../pools/ThirdPartyBurnMintTokenPool.sol";
+import {TokenPool} from "../../pools/TokenPool.sol";
 import {Router} from "../../Router.sol";
 
 contract ThirdPartyBurnMintTokenPoolSetup is BaseTest {
@@ -40,11 +41,11 @@ contract ThirdPartyBurnMintTokenPool_applyRampUpdates is ThirdPartyBurnMintToken
   event OffRampAllowanceSet(address onRamp, bool allowed);
 
   function testApplyRampUpdatesSuccess() public {
-    IPool.RampUpdate[] memory onRamps = new IPool.RampUpdate[](1);
-    onRamps[0] = IPool.RampUpdate({ramp: address(1), allowed: true});
+    TokenPool.RampUpdate[] memory onRamps = new TokenPool.RampUpdate[](1);
+    onRamps[0] = TokenPool.RampUpdate({ramp: address(1), allowed: true});
 
-    IPool.RampUpdate[] memory offRamps = new IPool.RampUpdate[](1);
-    offRamps[0] = IPool.RampUpdate({ramp: s_routerAllowedOffRamp, allowed: true});
+    TokenPool.RampUpdate[] memory offRamps = new TokenPool.RampUpdate[](1);
+    offRamps[0] = TokenPool.RampUpdate({ramp: s_routerAllowedOffRamp, allowed: true});
 
     vm.expectEmit();
     emit OnRampAllowanceSet(onRamps[0].ramp, true);
@@ -54,7 +55,7 @@ contract ThirdPartyBurnMintTokenPool_applyRampUpdates is ThirdPartyBurnMintToken
 
     s_thirdPartyPool.applyRampUpdates(onRamps, offRamps);
 
-    offRamps[0] = IPool.RampUpdate({ramp: s_routerAllowedOffRamp, allowed: false});
+    offRamps[0] = TokenPool.RampUpdate({ramp: s_routerAllowedOffRamp, allowed: false});
 
     vm.expectEmit();
     emit OffRampAllowanceSet(offRamps[0].ramp, false);
@@ -66,11 +67,11 @@ contract ThirdPartyBurnMintTokenPool_applyRampUpdates is ThirdPartyBurnMintToken
 
   function testInvalidOffRampReverts() public {
     address invalidOffRamp = address(23456787654321);
-    IPool.RampUpdate[] memory offRamps = new IPool.RampUpdate[](1);
-    offRamps[0] = IPool.RampUpdate({ramp: invalidOffRamp, allowed: true});
+    TokenPool.RampUpdate[] memory offRamps = new TokenPool.RampUpdate[](1);
+    offRamps[0] = TokenPool.RampUpdate({ramp: invalidOffRamp, allowed: true});
 
     vm.expectRevert(abi.encodeWithSelector(ThirdPartyBurnMintTokenPool.InvalidOffRamp.selector, invalidOffRamp));
 
-    s_thirdPartyPool.applyRampUpdates(new IPool.RampUpdate[](0), offRamps);
+    s_thirdPartyPool.applyRampUpdates(new TokenPool.RampUpdate[](0), offRamps);
   }
 }

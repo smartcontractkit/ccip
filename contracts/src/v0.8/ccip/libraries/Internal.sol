@@ -25,6 +25,9 @@ library Internal {
   struct ExecutionReport {
     uint64[] sequenceNumbers;
     bytes[] encodedMessages;
+    // Contains a bytes array for each message
+    // each inner bytes array contains bytes per transferred token
+    bytes[][] offchainTokenData;
     bytes32[] proofs;
     uint256 proofFlagBits;
   }

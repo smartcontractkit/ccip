@@ -222,5 +222,5 @@ abstract contract OCR2BaseNoChecks is OwnerIsCreator, OCR2Abstract {
     return (true, bytes32(0), uint32(0));
   }
 
-  function _report(bytes memory report) internal virtual;
+  function _report(bytes calldata report) internal virtual;
 }

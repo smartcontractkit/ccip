@@ -12,16 +12,14 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
-	"github.com/smartcontractkit/chainlink/v2/core/utils/mathutil"
-
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/merklemulti"
+	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
 const (
@@ -67,7 +65,9 @@ func median(vals []*big.Int) *big.Int {
 }
 
 type MessageExecution struct {
+	seqNums          []uint64
 	encMsgs          [][]byte
+	tokenData        [][][]byte
 	proofs           [][32]byte
 	proofSourceFlags []bool
 }
@@ -177,10 +177,9 @@ func commitReport(dstLogPoller logpoller.LogPoller, commitStore *commit_store.Co
 func buildExecution(
 	serviceCtx context.Context,
 	lggr logger.Logger,
-	source,
-	dest logpoller.LogPoller,
+	source, dest logpoller.LogPoller,
 	onRampAddress common.Address,
-	finalSeqNums []uint64,
+	observedMessages []ObservedMessage,
 	commitStore *commit_store.CommitStore,
 	confs int,
 	eventSignatures EventSignatures,
@@ -191,14 +190,21 @@ func buildExecution(
 	if err != nil {
 		return nil, err
 	}
-	if mathutil.Max(finalSeqNums[0], finalSeqNums[1:]...) >= nextMin {
-		return nil, errors.Errorf("Cannot execute uncommitted seq num. nextMin %v, seqNums %v", nextMin, finalSeqNums)
+	maxSeqNumInBatch := uint64(0)
+	for _, seqNum := range observedMessages {
+		if seqNum.SeqNr > maxSeqNumInBatch {
+			maxSeqNumInBatch = seqNum.SeqNr
+		}
 	}
-	rep, err := commitReport(dest, commitStore, finalSeqNums[0])
+
+	if maxSeqNumInBatch >= nextMin {
+		return nil, errors.Errorf("Cannot execute uncommitted seq num. nextMin %v, seqNums %v", nextMin, observedMessages)
+	}
+	rep, err := commitReport(dest, commitStore, observedMessages[0].SeqNr)
 	if err != nil {
 		return nil, err
 	}
-	lggr.Infow("Building execution report", "finalSeqNums", finalSeqNums, "merkleRoot", hexutil.Encode(rep.MerkleRoot[:]), "report", rep)
+	lggr.Infow("Building execution report", "observations", observedMessages, "merkleRoot", hexutil.Encode(rep.MerkleRoot[:]), "report", rep)
 
 	msgsInRoot, err := source.LogsDataWordRange(
 		eventSignatures.SendRequested,
@@ -221,17 +227,21 @@ func buildExecution(
 		return nil, err
 	}
 
+	var batch MessageExecution
 	var innerIdxs []int
-	var encMsgs [][]byte
 	var hashes [][32]byte
-	for _, seqNum := range finalSeqNums {
-		if seqNum < rep.Interval.Min || seqNum > rep.Interval.Max {
+	for _, observedMessage := range observedMessages {
+		if observedMessage.SeqNr < rep.Interval.Min || observedMessage.SeqNr > rep.Interval.Max {
 			// We only return messages from a single root (the root of the first message).
 			continue
 		}
-		innerIdx := int(seqNum - rep.Interval.Min)
+		innerIdx := int(observedMessage.SeqNr - rep.Interval.Min)
+
+		batch.seqNums = append(batch.seqNums, observedMessage.SeqNr)
+		batch.encMsgs = append(batch.encMsgs, msgsInRoot[innerIdx].Data)
+		batch.tokenData = append(batch.tokenData, observedMessage.TokenData)
+
 		innerIdxs = append(innerIdxs, innerIdx)
-		encMsgs = append(encMsgs, msgsInRoot[innerIdx].Data)
 		hash, err2 := hashLeaf.HashLeaf(msgsInRoot[innerIdx].ToGethLog())
 		if err2 != nil {
 			return nil, err2
@@ -242,21 +252,21 @@ func buildExecution(
 	// Double check this verifies before sending.
 	res, err := commitStore.Verify(&bind.CallOpts{Context: serviceCtx}, hashes, merkleProof.Hashes, ProofFlagsToBits(merkleProof.SourceFlags))
 	if err != nil {
-		lggr.Errorw("Unable to call verify", "seqNums", finalSeqNums, "indices", innerIdxs, "root", rep.MerkleRoot[:], "seqRange", rep.Interval, "err", err)
+		lggr.Errorw("Unable to call verify", "observations", observedMessages, "indices", innerIdxs, "root", rep.MerkleRoot[:], "seqRange", rep.Interval, "err", err)
 		return nil, err
 	}
 	// No timestamp, means failed to verify root.
 	if res.Cmp(big.NewInt(0)) == 0 {
 		ir := tree.Root()
 		lggr.Errorf("Root does not verify for messages: %v (indices %v) our inner root %x contract",
-			finalSeqNums, innerIdxs, ir[:])
+			observedMessages, innerIdxs, ir[:])
 		return nil, errors.New("root does not verify")
 	}
-	return &MessageExecution{
-		encMsgs:          encMsgs,
-		proofs:           merkleProof.Hashes,
-		proofSourceFlags: merkleProof.SourceFlags,
-	}, nil
+
+	batch.proofs = merkleProof.Hashes
+	batch.proofSourceFlags = merkleProof.SourceFlags
+
+	return &batch, nil
 }
 
 func isCommitStoreDownNow(ctx context.Context, lggr logger.Logger, commitStore *commit_store.CommitStore) bool {

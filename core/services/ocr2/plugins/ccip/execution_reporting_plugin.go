@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -78,16 +79,18 @@ func DecodeExecutionReport(report types.Report) (*evm_2_evm_offramp.InternalExec
 
 	// Must be anonymous struct here
 	erStruct, ok := unpacked[0].(struct {
-		SequenceNumbers []uint64    `json:"sequenceNumbers"`
-		EncodedMessages [][]byte    `json:"encodedMessages"`
-		Proofs          [][32]uint8 `json:"proofs"`
-		ProofFlagBits   *big.Int    `json:"proofFlagBits"`
+		SequenceNumbers   []uint64    `json:"sequenceNumbers"`
+		EncodedMessages   [][]byte    `json:"encodedMessages"`
+		OffchainTokenData [][][]byte  `json:"offchainTokenData"`
+		Proofs            [][32]uint8 `json:"proofs"`
+		ProofFlagBits     *big.Int    `json:"proofFlagBits"`
 	})
 	if !ok {
 		return nil, fmt.Errorf("got %T", unpacked[0])
 	}
 	var er evm_2_evm_offramp.InternalExecutionReport
 	er.EncodedMessages = append(er.EncodedMessages, erStruct.EncodedMessages...)
+	er.OffchainTokenData = append(er.OffchainTokenData, erStruct.OffchainTokenData...)
 	er.Proofs = append(er.Proofs, erStruct.Proofs...)
 	er.SequenceNumbers = erStruct.SequenceNumbers
 	// Unpack will populate with big.Int{false, <allocated empty nat>} for 0 values,
@@ -96,29 +99,27 @@ func DecodeExecutionReport(report types.Report) (*evm_2_evm_offramp.InternalExec
 	return &er, nil
 }
 
-func EncodeExecutionReport(seqNums []uint64,
-	msgs [][]byte,
-	proofs [][32]byte,
-	proofSourceFlags []bool,
-) (types.Report, error) {
+func EncodeExecutionReport(me *MessageExecution) (types.Report, error) {
 	return makeExecutionReportArgs().PackValues([]interface{}{&evm_2_evm_offramp.InternalExecutionReport{
-		SequenceNumbers: seqNums,
-		EncodedMessages: msgs,
-		Proofs:          proofs,
-		ProofFlagBits:   ProofFlagsToBits(proofSourceFlags),
+		SequenceNumbers:   me.seqNums,
+		EncodedMessages:   me.encMsgs,
+		OffchainTokenData: me.tokenData,
+		Proofs:            me.proofs,
+		ProofFlagBits:     ProofFlagsToBits(me.proofSourceFlags),
 	}})
 }
 
 type ExecutionPluginConfig struct {
-	onRamp                 *evm_2_evm_onramp.EVM2EVMOnRamp
-	offRamp                *evm_2_evm_offramp.EVM2EVMOffRamp
-	commitStore            *commit_store.CommitStore
+	onRamp            *evm_2_evm_onramp.EVM2EVMOnRamp
+	offRamp           *evm_2_evm_offramp.EVM2EVMOffRamp
+	commitStore       *commit_store.CommitStore
+	srcPriceRegistry  *price_registry.PriceRegistry
+	destPriceRegistry *price_registry.PriceRegistry
+
 	source, dest           logpoller.LogPoller
 	eventSignatures        EventSignatures
 	leafHasher             LeafHasherInterface[[32]byte]
 	lggr                   logger.Logger
-	srcPriceRegistry       *price_registry.PriceRegistry
-	destPriceRegistry      *price_registry.PriceRegistry
 	destGasEstimator       txmgrtypes.FeeEstimator[*evmtypes.Head, gas.EvmFee, *assets.Wei, evmtypes.TxHash]
 	srcWrappedNativeToken  common.Address
 	destWrappedNativeToken common.Address
@@ -191,15 +192,15 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 
 	batchBuilderStart := time.Now()
 	// IMPORTANT: We build executable set based on the leaders token prices, ensuring consistency across followers.
-	executableSequenceNumbers, err := r.getExecutableSeqNrs(ctx, inFlight)
+	executableObservations, err := r.getExecutableObservations(ctx, inFlight)
 	lggr.Infof("Batch building took %d ms", time.Since(batchBuilderStart).Milliseconds())
 	if err != nil {
 		return nil, err
 	}
-	lggr.Infof("executable seq nums %v %x", executableSequenceNumbers, r.config.eventSignatures.SendRequested)
+	lggr.Infof("executable observations %v %x", executableObservations, r.config.eventSignatures.SendRequested)
 
 	// Note can be empty
-	return ExecutionObservation{SeqNrs: executableSequenceNumbers}.Marshal()
+	return ExecutionObservation{Messages: executableObservations}.Marshal()
 }
 
 func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(min, max uint64) (map[uint64]struct{}, error) {
@@ -219,14 +220,14 @@ func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(min, max uint64) (ma
 	return executedMp, nil
 }
 
-func (r *ExecutionReportingPlugin) getExecutableSeqNrs(ctx context.Context, inflight []InflightInternalExecutionReport) ([]uint64, error) {
+func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context, inflight []InflightInternalExecutionReport) ([]ObservedMessage, error) {
 	unexpiredReports, err := getUnexpiredCommitReports(r.config.dest, r.config.commitStore, r.permissionLessExecutionThreshold)
 	if err != nil {
 		return nil, err
 	}
 	r.lggr.Infow("unexpired roots", "n", len(unexpiredReports))
 	if len(unexpiredReports) == 0 {
-		return []uint64{}, nil
+		return []ObservedMessage{}, nil
 	}
 
 	// This could result in slightly different values on each call as
@@ -239,14 +240,12 @@ func (r *ExecutionReportingPlugin) getExecutableSeqNrs(ctx context.Context, infl
 		return nil, err
 	}
 	allowedTokenAmount := rateLimiterState.Tokens
-
 	// TODO don't build on every batch builder call but only change on changing configuration
 	srcToDst := make(map[common.Address]common.Address)
 	sourceTokens, err := r.config.offRamp.GetSupportedTokens(nil)
 	if err != nil {
 		return nil, err
 	}
-
 	for _, sourceToken := range sourceTokens {
 		dst, err2 := r.config.offRamp.GetDestinationToken(&bind.CallOpts{Context: ctx}, sourceToken)
 		if err2 != nil {
@@ -254,21 +253,19 @@ func (r *ExecutionReportingPlugin) getExecutableSeqNrs(ctx context.Context, infl
 		}
 		srcToDst[sourceToken] = dst
 	}
-
 	supportedDestTokens := make([]common.Address, 0, len(srcToDst))
 	for _, destToken := range srcToDst {
 		supportedDestTokens = append(supportedDestTokens, destToken)
 	}
 
-	srcTokensPrices, err := getTokensPrices(ctx, r.config.srcPriceRegistry, r.config.srcWrappedNativeToken, []common.Address{})
+	srcTokensPrices, err := getTokensPrices(ctx, r.config.srcPriceRegistry, []common.Address{r.config.srcWrappedNativeToken})
 	if err != nil {
 		return nil, err
 	}
-	destTokensPrices, err := getTokensPrices(ctx, r.config.destPriceRegistry, r.config.destWrappedNativeToken, supportedDestTokens)
+	destTokensPrices, err := getTokensPrices(ctx, r.config.destPriceRegistry, append(supportedDestTokens, r.config.destWrappedNativeToken))
 	if err != nil {
 		return nil, err
 	}
-
 	destGasPriceWei, _, err := r.config.destGasEstimator.GetFee(ctx, nil, 0, assets.NewWei(big.NewInt(int64(r.offchainConfig.MaxGasPrice))))
 	if err != nil {
 		return nil, errors.Wrap(err, "could not estimate destination gas price")
@@ -330,7 +327,7 @@ func (r *ExecutionReportingPlugin) getExecutableSeqNrs(ctx context.Context, infl
 		}
 		r.snoozedRoots[unexpiredReport.MerkleRoot] = time.Now().Add(r.offchainConfig.RootSnoozeTime.Duration())
 	}
-	return []uint64{}, nil
+	return []ObservedMessage{}, nil
 }
 
 func (r *ExecutionReportingPlugin) buildBatch(srcToDst map[common.Address]common.Address,
@@ -341,11 +338,11 @@ func (r *ExecutionReportingPlugin) buildBatch(srcToDst map[common.Address]common
 	srcTokenPricesUSD map[common.Address]*big.Int,
 	destTokenPricesUSD map[common.Address]*big.Int,
 	execGasPriceEstimate *big.Int,
-) (executableSeqNrs []uint64, executedAllMessages bool) {
+) (executableMessages []ObservedMessage, executedAllMessages bool) {
 	inflightSeqNrs, inflightAggregateValue, maxInflightSenderNonces, err := r.inflight(inflight, destTokenPricesUSD, srcToDst)
 	if err != nil {
 		r.lggr.Errorw("Unexpected error computing inflight values", "err", err)
-		return []uint64{}, false
+		return []ObservedMessage{}, false
 	}
 	availableGas := uint64(r.offchainConfig.BatchGasLimit)
 	aggregateTokenLimit.Sub(aggregateTokenLimit, inflightAggregateValue)
@@ -433,11 +430,21 @@ func (r *ExecutionReportingPlugin) buildBatch(srcToDst map[common.Address]common
 		availableGas -= messageMaxGas
 		aggregateTokenLimit.Sub(aggregateTokenLimit, msgValue)
 
+		var tokenData [][]byte
+
+		// TODO add attestation data for USDC here
+		for range msg.Message.TokenAmounts {
+			tokenData = append(tokenData, []byte{})
+		}
+
 		lggr.Infow("Adding msg to batch", "seqNum", msg.Message.SequenceNumber, "nonce", msg.Message.Nonce)
-		executableSeqNrs = append(executableSeqNrs, msg.Message.SequenceNumber)
+		executableMessages = append(executableMessages, ObservedMessage{
+			SeqNr:     msg.Message.SequenceNumber,
+			TokenData: tokenData,
+		})
 		expectedNonces[msg.Message.Sender] = msg.Message.Nonce + 1
 	}
-	return executableSeqNrs, executedAllMessages
+	return executableMessages, executedAllMessages
 }
 
 func (r *ExecutionReportingPlugin) parseSeqNr(log logpoller.Log) (uint64, error) {
@@ -450,14 +457,14 @@ func (r *ExecutionReportingPlugin) parseSeqNr(log logpoller.Log) (uint64, error)
 
 // Assumes non-empty report. Messages to execute can span more than one report, but are assumed to be in order of increasing
 // sequence number.
-func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.Logger, finalSeqNums []uint64) ([]byte, error) {
+func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.Logger, observedMessages []ObservedMessage) ([]byte, error) {
 	me, err := buildExecution(
 		ctx,
 		lggr,
 		r.config.source,
 		r.config.dest,
 		r.config.onRamp.Address(),
-		finalSeqNums,
+		observedMessages,
 		r.config.commitStore,
 		int(r.offchainConfig.SourceIncomingConfirmations),
 		r.config.eventSignatures,
@@ -467,11 +474,7 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 	if err != nil {
 		return nil, err
 	}
-	return EncodeExecutionReport(finalSeqNums,
-		me.encMsgs,
-		me.proofs,
-		me.proofSourceFlags,
-	)
+	return EncodeExecutionReport(me)
 }
 
 func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.ReportTimestamp, query types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
@@ -483,39 +486,58 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 		return false, nil, nil
 	}
 
-	finalSequenceNumbers := calculateSequenceNumberConsensus(nonEmptyObservations, r.F)
-	if len(finalSequenceNumbers) == 0 {
+	observedMessages := calculateObservedMessagesConsensus(lggr, nonEmptyObservations, r.F)
+	if len(observedMessages) == 0 {
 		return false, nil, nil
 	}
 
-	report, err := r.buildReport(ctx, lggr, finalSequenceNumbers)
+	report, err := r.buildReport(ctx, lggr, observedMessages)
 	if err != nil {
 		return false, nil, err
 	}
-	lggr.Infow("Built report",
-		"onRampAddr", r.config.onRamp.Address(),
-		"finalSeqNums", finalSequenceNumbers)
+	lggr.Infow("Built report", "onRampAddr", r.config.onRamp.Address(), "observations", observedMessages)
 	return true, report, nil
 }
 
-func calculateSequenceNumberConsensus(observations []ExecutionObservation, f int) []uint64 {
-	tally := make(map[uint64]int)
+type seqNumTally struct {
+	Tally     int
+	TokenData [][]byte
+}
+
+func calculateObservedMessagesConsensus(lggr logger.Logger, observations []ExecutionObservation, f int) []ObservedMessage {
+	tally := make(map[uint64]seqNumTally)
 	for _, obs := range observations {
-		for _, seqNr := range obs.SeqNrs {
-			tally[seqNr]++
+		for _, message := range obs.Messages {
+			if val, ok := tally[message.SeqNr]; ok {
+				// If we've already seen the seqNum we check if the token data is the same
+				if !reflect.DeepEqual(message.TokenData, val.TokenData) {
+					lggr.Warnf("Nodes reported different offchain token data [%v] [%v]", message.TokenData, val.TokenData)
+				}
+				val.Tally++
+				tally[message.SeqNr] = val
+				continue
+			}
+			// If we have not seen the seqNum we save a tally with the token data
+			tally[message.SeqNr] = seqNumTally{
+				Tally:     1,
+				TokenData: message.TokenData,
+			}
 		}
 	}
-	var finalSequenceNumbers []uint64
-	for seqNr, count := range tally {
+	var finalSequenceNumbers []ObservedMessage
+	for seqNr, tallyInfo := range tally {
 		// Note spec deviation - I think it's ok to rely on the batch builder for
 		// capping the number of messages vs capping in two places/ways?
-		if count > f {
-			finalSequenceNumbers = append(finalSequenceNumbers, seqNr)
+		if tallyInfo.Tally > f {
+			finalSequenceNumbers = append(finalSequenceNumbers, ObservedMessage{
+				SeqNr:     seqNr,
+				TokenData: tallyInfo.TokenData,
+			})
 		}
 	}
 	// buildReport expects sorted sequence numbers (tally map is non-deterministic).
 	sort.Slice(finalSequenceNumbers, func(i, j int) bool {
-		return finalSequenceNumbers[i] < finalSequenceNumbers[j]
+		return finalSequenceNumbers[i].SeqNr < finalSequenceNumbers[j].SeqNr
 	})
 	return finalSequenceNumbers
 }
@@ -630,9 +652,10 @@ func parseCCIPSendRequestedLog(log gethtypes.Log, abi abi.ABI) (*evm_2_evm_onram
 // results include feeTokens and passed-in tokens
 // price values are USD per full token, in base units 1e18 (e.g. 5$ = 5e18).
 // this function is used for price registry of both source and destination chains.
-func getTokensPrices(ctx context.Context, priceRegistry *price_registry.PriceRegistry, wrappedNative common.Address, tokens []common.Address) (map[common.Address]*big.Int, error) {
+func getTokensPrices(ctx context.Context, priceRegistry *price_registry.PriceRegistry, tokens []common.Address) (map[common.Address]*big.Int, error) {
 	prices := make(map[common.Address]*big.Int)
 
+	// TODO cache and only check on changing config
 	feeTokens, err := priceRegistry.GetFeeTokens(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return nil, errors.Wrap(err, "could not get source fee tokens")
@@ -645,14 +668,6 @@ func getTokensPrices(ctx context.Context, priceRegistry *price_registry.PriceReg
 	}
 	for i, token := range wantedTokens {
 		prices[token] = wantedPrices[i].Value
-	}
-
-	if _, ok := prices[wrappedNative]; !ok {
-		srcTokenPrice, err := priceRegistry.GetTokenPrice(&bind.CallOpts{Context: ctx}, wrappedNative)
-		if err != nil {
-			return nil, errors.Wrap(err, "could not get token prices in USD")
-		}
-		prices[wrappedNative] = srcTokenPrice.Value
 	}
 
 	return prices, nil

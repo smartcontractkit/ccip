@@ -19,22 +19,16 @@ contract EVM2EVMOffRampHelper is EVM2EVMOffRamp {
     return s_executionStates[bitmapIndex];
   }
 
-  function releaseOrMintToken(
-    IPool pool,
-    uint256 amount,
-    address receiver
-  ) external {
-    _releaseOrMintToken(pool, amount, receiver);
+  function releaseOrMintTokens(
+    Client.EVMTokenAmount[] memory sourceTokenAmounts,
+    bytes calldata originalSender,
+    address receiver,
+    bytes[] calldata offchainTokenData
+  ) external returns (Client.EVMTokenAmount[] memory) {
+    return _releaseOrMintTokens(sourceTokenAmounts, originalSender, receiver, offchainTokenData);
   }
 
-  function releaseOrMintTokens(Client.EVMTokenAmount[] memory sourceTokenAmounts, address receiver)
-    external
-    returns (Client.EVMTokenAmount[] memory)
-  {
-    return _releaseOrMintTokens(sourceTokenAmounts, receiver);
-  }
-
-  function report(bytes memory executableMessages) external {
+  function report(bytes calldata executableMessages) external {
     _report(executableMessages);
   }
 

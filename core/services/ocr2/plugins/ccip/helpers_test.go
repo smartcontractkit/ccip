@@ -195,7 +195,7 @@ func setupCcipTestHarness(t *testing.T) ccipPluginTestHarness {
 	require.NoError(t, err)
 	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(offRampAddress, client)
 	require.NoError(t, err)
-	_, err = destPool.ApplyRampUpdates(owner, []lock_release_token_pool.IPoolRampUpdate{}, []lock_release_token_pool.IPoolRampUpdate{{Ramp: offRampAddress, Allowed: true}})
+	_, err = destPool.ApplyRampUpdates(owner, []lock_release_token_pool.TokenPoolRampUpdate{}, []lock_release_token_pool.TokenPoolRampUpdate{{Ramp: offRampAddress, Allowed: true}})
 	require.NoError(t, err)
 	receiverAddress, _, _, err := simple_message_receiver.DeploySimpleMessageReceiver(owner, client)
 	require.NoError(t, err)

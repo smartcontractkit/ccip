@@ -153,8 +153,8 @@ func (c *CCIPContracts) DeployNewOffRamp() {
 
 func (c *CCIPContracts) EnableOffRamp() {
 	_, err := c.Dest.Pool.ApplyRampUpdates(c.Dest.User,
-		[]lock_release_token_pool.IPoolRampUpdate{},
-		[]lock_release_token_pool.IPoolRampUpdate{{Ramp: c.Dest.OffRamp.Address(), Allowed: true}},
+		[]lock_release_token_pool.TokenPoolRampUpdate{},
+		[]lock_release_token_pool.TokenPoolRampUpdate{{Ramp: c.Dest.OffRamp.Address(), Allowed: true}},
 	)
 
 	require.NoError(c.t, err)
@@ -267,8 +267,8 @@ func (c *CCIPContracts) DeployNewOnRamp() {
 func (c *CCIPContracts) EnableOnRamp() {
 	c.t.Log("Setting onRamp on source pool")
 	_, err := c.Source.Pool.ApplyRampUpdates(c.Source.User,
-		[]lock_release_token_pool.IPoolRampUpdate{{Ramp: c.Source.OnRamp.Address(), Allowed: true}},
-		[]lock_release_token_pool.IPoolRampUpdate{},
+		[]lock_release_token_pool.TokenPoolRampUpdate{{Ramp: c.Source.OnRamp.Address(), Allowed: true}},
+		[]lock_release_token_pool.TokenPoolRampUpdate{},
 	)
 
 	require.NoError(c.t, err)
@@ -627,8 +627,8 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddress, sourceChain)
 	require.NoError(t, err)
 	_, err = sourcePool.ApplyRampUpdates(sourceUser,
-		[]lock_release_token_pool.IPoolRampUpdate{{Ramp: onRampAddress, Allowed: true}},
-		[]lock_release_token_pool.IPoolRampUpdate{},
+		[]lock_release_token_pool.TokenPoolRampUpdate{{Ramp: onRampAddress, Allowed: true}},
+		[]lock_release_token_pool.TokenPoolRampUpdate{},
 	)
 	require.NoError(t, err)
 	sourceChain.Commit()
@@ -712,8 +712,8 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(offRampAddress, destChain)
 	require.NoError(t, err)
 	_, err = destPool.ApplyRampUpdates(destUser,
-		[]lock_release_token_pool.IPoolRampUpdate{},
-		[]lock_release_token_pool.IPoolRampUpdate{{Ramp: offRampAddress, Allowed: true}},
+		[]lock_release_token_pool.TokenPoolRampUpdate{},
+		[]lock_release_token_pool.TokenPoolRampUpdate{{Ramp: offRampAddress, Allowed: true}},
 	)
 	require.NoError(t, err)
 	destChain.Commit()
@@ -1006,6 +1006,7 @@ func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport
 	var leaves [][32]byte
 	var curr, prove int
 	var encodedMsg []byte
+	var tokenData [][][]byte
 	sendRequestedIterator, err := onRampContract.FilterCCIPSendRequested(&bind.FilterOpts{
 		Start: args.SourceStartBlock.Uint64(),
 	})
@@ -1024,6 +1025,12 @@ func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport
 			if sendRequestedIterator.Event.Message.SequenceNumber == seqNr {
 				fmt.Printf("Found proving %d %+v\n", curr, sendRequestedIterator.Event.Message)
 				encodedMsg = sendRequestedIterator.Event.Raw.Data
+				var msgTokenData [][]byte
+				for range sendRequestedIterator.Event.Message.TokenAmounts {
+					msgTokenData = append(msgTokenData, []byte{})
+				}
+
+				tokenData = append(tokenData, msgTokenData)
 				prove = curr
 			}
 			curr++
@@ -1043,10 +1050,11 @@ func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport
 
 	proof := tree.Prove([]int{prove})
 	offRampProof := evm_2_evm_offramp.InternalExecutionReport{
-		SequenceNumbers: []uint64{seqNr},
-		EncodedMessages: [][]byte{encodedMsg},
-		Proofs:          proof.Hashes,
-		ProofFlagBits:   ccip.ProofFlagsToBits(proof.SourceFlags),
+		SequenceNumbers:   []uint64{seqNr},
+		EncodedMessages:   [][]byte{encodedMsg},
+		OffchainTokenData: tokenData,
+		Proofs:            proof.Hashes,
+		ProofFlagBits:     ccip.ProofFlagsToBits(proof.SourceFlags),
 	}
 	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(common.HexToAddress(args.OffRamp), args.DestChain)
 	if err != nil {

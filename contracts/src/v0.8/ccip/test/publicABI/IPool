@@ -1,8 +1,5 @@
 {
-  "applyRampUpdates((address,bool)[],(address,bool)[])": "af519112",
   "getToken()": "21df0da7",
-  "lockOrBurn(uint256,address)": "e2e59b3e",
-  "pause()": "8456cb59",
-  "releaseOrMint(address,uint256)": "ea6192a2",
-  "unpause()": "3f4ba83a"
+  "lockOrBurn(address,bytes,uint256,uint64,bytes)": "96875445",
+  "releaseOrMint(bytes,address,uint256,uint64,bytes)": "8627fad6"
 }

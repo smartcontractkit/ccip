@@ -25,13 +25,13 @@ func setOffRampOnTokenPools(t *testing.T, destClient *EvmDeploymentConfig) {
 		pool, err := lock_release_token_pool.NewLockReleaseTokenPool(tokenConfig.Pool, destClient.Client)
 		shared.RequireNoError(t, err)
 
-		rampUpdate := lock_release_token_pool.IPoolRampUpdate{
+		rampUpdate := lock_release_token_pool.TokenPoolRampUpdate{
 			Ramp:    destClient.LaneConfig.OffRamp,
 			Allowed: true,
 		}
 
 		// Configure offramp address on pool
-		tx, err := pool.ApplyRampUpdates(destClient.Owner, []lock_release_token_pool.IPoolRampUpdate{}, []lock_release_token_pool.IPoolRampUpdate{rampUpdate})
+		tx, err := pool.ApplyRampUpdates(destClient.Owner, []lock_release_token_pool.TokenPoolRampUpdate{}, []lock_release_token_pool.TokenPoolRampUpdate{rampUpdate})
 		shared.RequireNoError(t, err)
 		err = shared.WaitForMined(destClient.Logger, destClient.Client, tx.Hash(), true)
 		shared.RequireNoError(t, err)
@@ -118,13 +118,13 @@ func setOnRampOnTokenPools(t *testing.T, sourceClient *EvmDeploymentConfig) {
 		pool, err := lock_release_token_pool.NewLockReleaseTokenPool(tokenConfig.Pool, sourceClient.Client)
 		shared.RequireNoError(t, err)
 
-		rampUpdate := lock_release_token_pool.IPoolRampUpdate{
+		rampUpdate := lock_release_token_pool.TokenPoolRampUpdate{
 			Ramp:    sourceClient.LaneConfig.OnRamp,
 			Allowed: true,
 		}
 
 		// Configure offramp address on pool
-		tx, err := pool.ApplyRampUpdates(sourceClient.Owner, []lock_release_token_pool.IPoolRampUpdate{rampUpdate}, []lock_release_token_pool.IPoolRampUpdate{})
+		tx, err := pool.ApplyRampUpdates(sourceClient.Owner, []lock_release_token_pool.TokenPoolRampUpdate{rampUpdate}, []lock_release_token_pool.TokenPoolRampUpdate{})
 		shared.RequireNoError(t, err)
 		err = shared.WaitForMined(sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
 		shared.RequireNoError(t, err)

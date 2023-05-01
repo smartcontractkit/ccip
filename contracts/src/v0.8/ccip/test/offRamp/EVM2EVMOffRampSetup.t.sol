@@ -19,6 +19,7 @@ import {TokenSetup} from "../TokenSetup.t.sol";
 import {RouterSetup} from "../router/RouterSetup.t.sol";
 import {MaybeRevertMessageReceiver} from "../helpers/receivers/MaybeRevertMessageReceiver.sol";
 import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
+import {TokenPool} from "../../pools/TokenPool.sol";
 
 import {IERC20} from "../../../vendor/IERC20.sol";
 import {OCR2BaseSetup} from "../ocr/OCR2Base.t.sol";
@@ -84,11 +85,11 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     offRampUpdates[0] = Router.OffRampUpdate({sourceChainId: SOURCE_CHAIN_ID, offRamps: s_offRamps});
     s_destRouter.applyRampUpdates(onRampUpdates, offRampUpdates);
 
-    IPool.RampUpdate[] memory offRamps = new IPool.RampUpdate[](1);
-    offRamps[0] = IPool.RampUpdate({ramp: address(s_offRamp), allowed: true});
+    TokenPool.RampUpdate[] memory offRamps = new TokenPool.RampUpdate[](1);
+    offRamps[0] = TokenPool.RampUpdate({ramp: address(s_offRamp), allowed: true});
 
-    LockReleaseTokenPool(address(s_destPools[0])).applyRampUpdates(new IPool.RampUpdate[](0), offRamps);
-    LockReleaseTokenPool(address(s_destPools[1])).applyRampUpdates(new IPool.RampUpdate[](0), offRamps);
+    LockReleaseTokenPool(address(s_destPools[0])).applyRampUpdates(new TokenPool.RampUpdate[](0), offRamps);
+    LockReleaseTokenPool(address(s_destPools[1])).applyRampUpdates(new TokenPool.RampUpdate[](0), offRamps);
   }
 
   function _convertToGeneralMessage(Internal.EVM2EVMMessage memory original)
@@ -120,7 +121,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     view
     returns (Internal.EVM2EVMMessage memory)
   {
-    return _generateAny2EVMMessage(sequenceNumber, getCastedSourceEVMTokenAmountsWithZeroAmounts());
+    return _generateAny2EVMMessage(sequenceNumber, new Client.EVMTokenAmount[](0));
   }
 
   function _generateAny2EVMMessageWithTokens(uint64 sequenceNumber, uint256[] memory amounts)
@@ -151,7 +152,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
       receiver: address(s_receiver),
       data: data,
       tokenAmounts: tokenAmounts,
-      feeToken: tokenAmounts[0].token,
+      feeToken: s_destFeeToken,
       feeTokenAmount: uint256(0),
       messageId: ""
     });
@@ -186,9 +187,13 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
   {
     bytes[] memory encodedMessages = new bytes[](messages.length);
     uint64[] memory sequenceNumbers = new uint64[](messages.length);
+    bytes[][] memory offchainTokenData = new bytes[][](messages.length);
+
     for (uint256 i = 0; i < messages.length; ++i) {
-      encodedMessages[i] = abi.encode(messages[i]);
-      sequenceNumbers[i] = messages[i].sequenceNumber;
+      Internal.EVM2EVMMessage memory message = messages[i];
+      encodedMessages[i] = abi.encode(message);
+      sequenceNumbers[i] = message.sequenceNumber;
+      offchainTokenData[i] = new bytes[](message.tokenAmounts.length);
     }
 
     return
@@ -196,7 +201,8 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
         sequenceNumbers: sequenceNumbers,
         proofs: new bytes32[](0),
         proofFlagBits: 2**256 - 1,
-        encodedMessages: encodedMessages
+        encodedMessages: encodedMessages,
+        offchainTokenData: offchainTokenData
       });
   }
 

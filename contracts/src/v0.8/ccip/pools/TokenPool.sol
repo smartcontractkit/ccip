@@ -8,13 +8,30 @@ import {RateLimiter} from "../libraries/RateLimiter.sol";
 
 import {SafeERC20} from "../../vendor/SafeERC20.sol";
 import {IERC20} from "../../vendor/IERC20.sol";
+import {IERC165} from "../../vendor/IERC165.sol";
 import {Pausable} from "../../vendor/Pausable.sol";
 import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v4.7.3/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice Base abstract class with common functions for all token pools.
-abstract contract TokenPool is IPool, OwnerIsCreator, Pausable {
+abstract contract TokenPool is IPool, OwnerIsCreator, Pausable, IERC165 {
   using EnumerableSet for EnumerableSet.AddressSet;
   using RateLimiter for RateLimiter.TokenBucket;
+
+  error ExceedsTokenLimit(uint256 currentLimit, uint256 requested);
+  error PermissionsError();
+  error NullAddressNotAllowed();
+
+  event Locked(address indexed sender, uint256 amount);
+  event Burned(address indexed sender, uint256 amount);
+  event Released(address indexed sender, address indexed recipient, uint256 amount);
+  event Minted(address indexed sender, address indexed recipient, uint256 amount);
+  event OnRampAllowanceSet(address onRamp, bool allowed);
+  event OffRampAllowanceSet(address onRamp, bool allowed);
+
+  struct RampUpdate {
+    address ramp;
+    bool allowed;
+  }
 
   // The immutable token that belongs to this pool.
   IERC20 internal immutable i_token;
@@ -43,6 +60,14 @@ abstract contract TokenPool is IPool, OwnerIsCreator, Pausable {
   function getToken() public view override returns (IERC20 token) {
     return i_token;
   }
+
+  function supportsInterface(bytes4 interfaceId) public pure override returns (bool) {
+    return interfaceId == type(IPool).interfaceId || interfaceId == type(IERC165).interfaceId;
+  }
+
+  // ================================================================
+  // |                      Ramp permissions                        |
+  // ================================================================
 
   /// @notice Checks whether something is a permissioned onRamp on this contract.
   /// @return true if the given address is a permissioned onRamp.
@@ -118,13 +143,13 @@ abstract contract TokenPool is IPool, OwnerIsCreator, Pausable {
     _;
   }
 
-  /// @inheritdoc IPool
-  function pause() external override onlyOwner {
+  /// @notice Pauses the token pool.
+  function pause() external onlyOwner {
     _pause();
   }
 
-  /// @inheritdoc IPool
-  function unpause() external override onlyOwner {
+  /// @notice Unpauses the token pool.
+  function unpause() external onlyOwner {
     _unpause();
   }
 }

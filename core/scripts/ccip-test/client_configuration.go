@@ -965,12 +965,12 @@ func (client *CCIPClient) syncOnRampOnPools() error {
 		}
 
 		if !isOnRamp {
-			rampUpdate := lock_release_token_pool.IPoolRampUpdate{
+			rampUpdate := lock_release_token_pool.TokenPoolRampUpdate{
 				Ramp:    client.Source.OnRamp.Address(),
 				Allowed: true,
 			}
 
-			tx, err := tokenConfig.Pool.ApplyRampUpdates(client.Source.Owner, []lock_release_token_pool.IPoolRampUpdate{rampUpdate}, []lock_release_token_pool.IPoolRampUpdate{})
+			tx, err := tokenConfig.Pool.ApplyRampUpdates(client.Source.Owner, []lock_release_token_pool.TokenPoolRampUpdate{rampUpdate}, []lock_release_token_pool.TokenPoolRampUpdate{})
 			if err != nil {
 				return errors.Wrapf(err, "failed to apply ramp update for token %s", tokenName)
 			}
@@ -997,12 +997,12 @@ func (client *CCIPClient) syncOffRampOnPools() error {
 		}
 
 		if !isOffRamp {
-			rampUpdate := lock_release_token_pool.IPoolRampUpdate{
+			rampUpdate := lock_release_token_pool.TokenPoolRampUpdate{
 				Ramp:    client.Dest.OffRamp.Address(),
 				Allowed: true,
 			}
 
-			tx, err := tokenConfig.Pool.ApplyRampUpdates(client.Dest.Owner, []lock_release_token_pool.IPoolRampUpdate{}, []lock_release_token_pool.IPoolRampUpdate{rampUpdate})
+			tx, err := tokenConfig.Pool.ApplyRampUpdates(client.Dest.Owner, []lock_release_token_pool.TokenPoolRampUpdate{}, []lock_release_token_pool.TokenPoolRampUpdate{rampUpdate})
 			if err != nil {
 				return errors.Wrapf(err, "failed to apply ramp update for token %s", tokenName)
 			}

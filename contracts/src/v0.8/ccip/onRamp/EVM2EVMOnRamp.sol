@@ -250,8 +250,13 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
     // There should be no state changes after external call to TokenPools.
     for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
       Client.EVMTokenAmount memory tokenAndAmount = message.tokenAmounts[i];
-      IPool pool = getPoolBySourceToken(IERC20(tokenAndAmount.token));
-      pool.lockOrBurn(tokenAndAmount.amount, originalSender);
+      getPoolBySourceToken(IERC20(tokenAndAmount.token)).lockOrBurn(
+        originalSender,
+        message.receiver,
+        tokenAndAmount.amount,
+        i_destChainId,
+        bytes("") // any future extraArgs component would be added here
+      );
     }
 
     // Emit message request

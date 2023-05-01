@@ -30,7 +30,18 @@ func TestObservationSize(t *testing.T) {
 	testParams.MinSuccessfulTests = 100
 	p := gopter.NewProperties(testParams)
 	p.Property("bounded observation size", prop.ForAll(func(min, max uint64) bool {
-		o := ExecutionObservation{SeqNrs: []uint64{min, max}}
+		o := ExecutionObservation{
+			Messages: []ObservedMessage{
+				{
+					SeqNr:     min,
+					TokenData: nil,
+				},
+				{
+					SeqNr:     max,
+					TokenData: nil,
+				},
+			},
+		}
 		b, err := o.Marshal()
 		require.NoError(t, err)
 		return len(b) <= MaxObservationLength

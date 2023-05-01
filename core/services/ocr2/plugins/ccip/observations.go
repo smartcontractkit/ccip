@@ -35,7 +35,12 @@ func (o CommitObservation) Marshal() ([]byte, error) {
 }
 
 type ExecutionObservation struct {
-	SeqNrs []uint64 `json:"seqNrs"`
+	Messages []ObservedMessage `json:"messages"`
+}
+
+type ObservedMessage struct {
+	SeqNr     uint64   `json:"seqNr"`
+	TokenData [][]byte `json:"tokenData"`
 }
 
 func (o ExecutionObservation) Marshal() ([]byte, error) {

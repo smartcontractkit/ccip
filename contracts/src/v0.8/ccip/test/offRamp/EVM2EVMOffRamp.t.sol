@@ -413,6 +413,15 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     s_offRamp.execute(_generateReportFromMessages(_generateMessagesWithTokens()), true);
   }
 
+  function testUnexpectedTokenDataReverts() public {
+    Internal.ExecutionReport memory report = _generateReportFromMessages(_generateBasicMessages());
+    report.offchainTokenData = new bytes[][](report.encodedMessages.length + 1);
+
+    vm.expectRevert(EVM2EVMOffRamp.UnexpectedTokenData.selector);
+
+    s_offRamp.execute(report, false);
+  }
+
   function testEmptyReportReverts() public {
     vm.expectRevert(EVM2EVMOffRamp.EmptyReport.selector);
     s_offRamp.execute(
@@ -420,7 +429,8 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
         sequenceNumbers: new uint64[](0),
         proofs: new bytes32[](0),
         proofFlagBits: 2**256 - 1,
-        encodedMessages: new bytes[](0)
+        encodedMessages: new bytes[](0),
+        offchainTokenData: new bytes[][](0)
       }),
       true
     );
@@ -475,6 +485,16 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     s_offRamp.execute(report, false);
   }
 
+  function testTokenDataMismatchReverts() public {
+    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
+    Internal.ExecutionReport memory report = _generateReportFromMessages(messages);
+
+    report.offchainTokenData[0] = new bytes[](messages[0].tokenAmounts.length + 1);
+
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.TokenDataMismatch.selector, messages[0].sequenceNumber));
+    s_offRamp.execute(report, false);
+  }
+
   function testMessageTooLargeReverts() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
     messages[0]
@@ -509,17 +529,19 @@ contract EVM2EVMOffRamp_executeSingleMessage is EVM2EVMOffRampSetup {
   }
 
   function testNoTokensSuccess() public {
-    s_offRamp.executeSingleMessage(_generateAny2EVMMessageNoTokens(1), false);
+    Internal.EVM2EVMMessage memory message = _generateAny2EVMMessageNoTokens(1);
+    s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), false);
   }
 
   function testTokensSuccess() public {
-    s_offRamp.executeSingleMessage(_generateMessagesWithTokens()[0], false);
+    Internal.EVM2EVMMessage memory message = _generateMessagesWithTokens()[0];
+    s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), false);
   }
 
   function testNonContractSuccess() public {
     Internal.EVM2EVMMessage memory message = _generateAny2EVMMessageNoTokens(1);
     message.receiver = STRANGER;
-    s_offRamp.executeSingleMessage(message, false);
+    s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), false);
   }
 
   event MessageReceived();
@@ -529,10 +551,10 @@ contract EVM2EVMOffRamp_executeSingleMessage is EVM2EVMOffRampSetup {
     message.gasLimit = 1;
     message.receiver = address(new ConformingReceiver(address(s_destRouter), s_destFeeToken));
     vm.expectRevert(EVM2EVMOffRamp.ReceiverError.selector);
-    s_offRamp.executeSingleMessage(message, false);
+    s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), false);
     vm.expectEmit();
     emit MessageReceived();
-    s_offRamp.executeSingleMessage(message, true);
+    s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), true);
   }
 
   event Released(address indexed sender, address indexed recipient, uint256 amount);
@@ -548,7 +570,7 @@ contract EVM2EVMOffRamp_executeSingleMessage is EVM2EVMOffRampSetup {
     emit Minted(address(s_offRamp), STRANGER, amounts[1]);
     Internal.EVM2EVMMessage memory message = _generateAny2EVMMessageWithTokens(1, amounts);
     message.receiver = STRANGER;
-    s_offRamp.executeSingleMessage(message, false);
+    s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), false);
   }
 
   // Reverts
@@ -557,7 +579,7 @@ contract EVM2EVMOffRamp_executeSingleMessage is EVM2EVMOffRampSetup {
     vm.stopPrank();
     Internal.EVM2EVMMessage memory message = _generateAny2EVMMessageNoTokens(1);
     vm.expectRevert(EVM2EVMOffRamp.CanOnlySelfCall.selector);
-    s_offRamp.executeSingleMessage(message, false);
+    s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), false);
   }
 }
 
@@ -699,34 +721,6 @@ contract EVM2EVMOffRamp_getExecutionState is EVM2EVMOffRampSetup {
   }
 }
 
-/// @notice #_releaseOrMintToken internal function
-contract EVM2EVMOffRamp__releaseOrMintToken is EVM2EVMOffRampSetup {
-  function test_releaseOrMintTokenSuccess() public {
-    IERC20 destToken0 = IERC20(s_destTokens[0]);
-    uint256 startingBalance = destToken0.balanceOf(OWNER);
-    uint256 amount = POOL_BALANCE / 2;
-    s_offRamp.releaseOrMintToken(IPool(s_destPools[0]), amount, OWNER);
-    assertEq(startingBalance + amount, destToken0.balanceOf(OWNER));
-  }
-
-  function testMintSuccess() public {
-    IERC20 destToken1 = IERC20(s_destTokens[1]);
-    uint256 startingBalance = destToken1.balanceOf(OWNER);
-    uint256 amount = POOL_BALANCE * 2; // amount bigger than balance
-    uint256 startingPoolBalance = destToken1.balanceOf(s_destPools[1]);
-    s_offRamp.releaseOrMintToken(IPool(s_destPools[1]), amount, OWNER);
-    assertEq(startingBalance + amount, destToken1.balanceOf(OWNER));
-    // pool balance doesn't change, because tokens were minted
-    assertEq(startingPoolBalance, destToken1.balanceOf(s_destPools[1]));
-  }
-
-  // Revert
-  function testExceedsPoolReverts() public {
-    vm.expectRevert("ERC20: transfer amount exceeds balance");
-    s_offRamp.releaseOrMintToken(IPool(s_destPools[0]), POOL_BALANCE * 2, OWNER);
-  }
-}
-
 /// @notice #_releaseOrMintTokens
 contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
   function test_releaseOrMintTokensSuccess() public {
@@ -736,7 +730,7 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
     uint256 amount1 = 100;
     srcTokenAmounts[0].amount = 100;
 
-    s_offRamp.releaseOrMintTokens(srcTokenAmounts, OWNER);
+    s_offRamp.releaseOrMintTokens(srcTokenAmounts, abi.encode(OWNER), OWNER, new bytes[](srcTokenAmounts.length));
     assertEq(startingBalance + amount1, dstToken1.balanceOf(OWNER));
   }
 
@@ -746,7 +740,7 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
 
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.UnsupportedToken.selector, address(0)));
-    s_offRamp.releaseOrMintTokens(tokenAmounts, OWNER);
+    s_offRamp.releaseOrMintTokens(tokenAmounts, bytes(""), OWNER, new bytes[](0));
   }
 }
 

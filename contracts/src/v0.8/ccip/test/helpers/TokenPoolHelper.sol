@@ -10,11 +10,23 @@ contract TokenPoolHelper is TokenPool {
 
   constructor(IERC20 token, RateLimiter.Config memory rateLimiterConfig) TokenPool(token, rateLimiterConfig) {}
 
-  function lockOrBurn(uint256 amount, address) external override {
+  function lockOrBurn(
+    address,
+    bytes calldata,
+    uint256 amount,
+    uint64,
+    bytes calldata
+  ) external override {
     emit LockOrBurn(amount);
   }
 
-  function releaseOrMint(address recipient, uint256 amount) external override {
-    emit ReleaseOrMint(recipient, amount);
+  function releaseOrMint(
+    bytes memory,
+    address receiver,
+    uint256 amount,
+    uint64,
+    bytes memory
+  ) external override {
+    emit ReleaseOrMint(receiver, amount);
   }
 }
