@@ -30,12 +30,13 @@ wrappers: abigen ## Recompiles solidity contracts and their go wrappers.
 
 .PHONY: snapshot
 snapshot:
-	forge snapshot --match-test _gas
+	FOUNDRY_PROFILE= forge snapshot --match-test _gas
 
 ccip-precommit: export FOUNDRY_PROFILE=ccip
 .PHONY: ccip-precommit
 ccip-precommit:
 	forge test
+	make snapshot
 	pnpm prettier:write
 	pnpm lint:ccip
 	make ccip-abi-fix
