@@ -5,7 +5,6 @@ import {Client} from "../libraries/Client.sol";
 
 interface IRouterClient {
   error UnsupportedDestinationChain(uint64 destChainId);
-  error SenderNotAllowed(address sender);
   error InsufficientFeeTokenAmount();
   error InvalidMsgValue();
 

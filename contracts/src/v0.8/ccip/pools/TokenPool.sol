@@ -17,7 +17,6 @@ abstract contract TokenPool is IPool, OwnerIsCreator, Pausable, IERC165 {
   using EnumerableSet for EnumerableSet.AddressSet;
   using RateLimiter for RateLimiter.TokenBucket;
 
-  error ExceedsTokenLimit(uint256 currentLimit, uint256 requested);
   error PermissionsError();
   error NullAddressNotAllowed();
 
