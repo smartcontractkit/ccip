@@ -441,7 +441,7 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 	if !contiguousReqs(lggr, min, max, seqNrs) {
 		return 0, 0, errors.New("unexpected gap in seq nums")
 	}
-	lggr.Infof("OnRamp %v: min %v max %v", r.config.onRamp, min, max)
+	lggr.Infof("OnRamp %v: min %v max %v", r.config.onRamp.Address(), min, max)
 	return min, max, nil
 }
 

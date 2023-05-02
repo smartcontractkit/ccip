@@ -13,13 +13,13 @@ import (
 )
 
 const (
-	MaxQueryLength           = 500     // TODO: Think about what to set this too, roughly maxTokens*maxPriceInBytesPerToken
-	MaxObservationLength     = 500     // TODO: Think about what to set this too
-	MaxExecutionReportLength = 150_000 // TODO
+	MaxQueryLength           = 500         // empty for both plugins
+	MaxObservationLength     = 14 + 256*46 // ExecutionObservation encoded JSON with 256 max-length uint64 seqNrs
+	MaxExecutionReportLength = 150_000     // TODO
 )
 
 func EvmWord(i uint64) common.Hash {
-	var b = make([]byte, 8)
+	b := make([]byte, 8)
 	binary.BigEndian.PutUint64(b, i)
 	return common.BigToHash(big.NewInt(0).SetBytes(b))
 }
