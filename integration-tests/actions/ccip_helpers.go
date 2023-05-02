@@ -2006,7 +2006,7 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 			}
 			c, err := blockchain.ConcurrentEVMClient(*cfg, c.K8Env, ec)
 			if err != nil {
-				return fmt.Errorf("getting concurrent evmclient chain %s %+v", c.GetNetworkName(), err)
+				return fmt.Errorf("getting concurrent evmclient chain %s %+v", ec.GetNetworkName(), err)
 			}
 			defer func() {
 				if c != nil {

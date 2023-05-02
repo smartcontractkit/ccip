@@ -177,13 +177,14 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 			Msg("Set source and destination network in index 1 & 2 of env variable SELECTED_NETWORKS")
 	}
 	p := &CCIPTestConfig{
-		Test:         t,
-		MsgType:      TokenTransfer,
-		PhaseTimeout: DefaultPhaseTimeout,
-		TestDuration: DefaultTestDuration,
-		NodeFunding:  DefaultNodeFunding,
-		NoOfNetworks: DefaultNoOfNetworks,
-		AllNetworks:  networks.SelectedNetworks[1:],
+		Test:                t,
+		MsgType:             TokenTransfer,
+		PhaseTimeout:        DefaultPhaseTimeout,
+		TestDuration:        DefaultTestDuration,
+		NodeFunding:         DefaultNodeFunding,
+		NoOfNetworks:        DefaultNoOfNetworks,
+		AllNetworks:         networks.SelectedNetworks[1:],
+		GethResourceProfile: GethResourceProfile,
 	}
 
 	if tType != Smoke {
@@ -192,7 +193,6 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 
 	if tType == Load {
 		p.EnvTTL = DefaultTTLForLongTests
-		p.GethResourceProfile = GethResourceProfile
 		p.CLNodeResourceProfile = DONResourceProfile
 		p.NodeFunding = NodeFundingForLoad
 		p.PhaseTimeout = DefaultPhaseTimeoutForLongTests
