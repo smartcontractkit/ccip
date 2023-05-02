@@ -13,6 +13,7 @@ import (
 	"github.com/test-go/testify/assert"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
@@ -335,5 +336,155 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		}
 
 		geCurrentSeqNum = endSeqNum + 1
+	})
+
+	t.Run("pay nops", func(t *testing.T) {
+		ccipContracts.SetTest(t)
+		linkToTransferToOnRamp := big.NewInt(1e18)
+
+		// transfer some link to onramp to pay the nops
+		_, err = ccipContracts.Source.LinkToken.Transfer(
+			ccipContracts.Source.User, ccipContracts.Source.OnRamp.Address(), linkToTransferToOnRamp)
+		require.NoError(t, err)
+		ccipContracts.Source.Chain.Commit()
+
+		srcBalReq := []testhelpers.BalanceReq{
+			{
+				Name:   testhelpers.Sender,
+				Addr:   ccipContracts.Source.User.From,
+				Getter: ccipContracts.GetSourceWrappedTokenBalance,
+			},
+			{
+				Name:   testhelpers.OnRampNative,
+				Addr:   ccipContracts.Source.OnRamp.Address(),
+				Getter: ccipContracts.GetSourceWrappedTokenBalance,
+			},
+			{
+				Name:   testhelpers.OnRamp,
+				Addr:   ccipContracts.Source.OnRamp.Address(),
+				Getter: ccipContracts.GetSourceLinkBalance,
+			},
+			{
+				Name:   testhelpers.SourceRouter,
+				Addr:   ccipContracts.Source.Router.Address(),
+				Getter: ccipContracts.GetSourceWrappedTokenBalance,
+			},
+		}
+
+		var nopsAndWeights []evm_2_evm_onramp.EVM2EVMOnRampNopAndWeight
+		var totalWeight uint16
+		for i := range nodes {
+			// For now set the transmitter addresses to be the same as the payee addresses
+			nodes[i].PaymentReceiver = nodes[i].Transmitter
+			nopsAndWeights = append(nopsAndWeights, evm_2_evm_onramp.EVM2EVMOnRampNopAndWeight{
+				Nop:    nodes[i].PaymentReceiver,
+				Weight: 5,
+			})
+			totalWeight += 5
+			srcBalReq = append(srcBalReq, testhelpers.BalanceReq{
+				Name:   fmt.Sprintf("node %d", i),
+				Addr:   nodes[i].PaymentReceiver,
+				Getter: ccipContracts.GetSourceLinkBalance,
+			})
+		}
+		srcBalances, err := testhelpers.GetBalances(srcBalReq)
+		require.NoError(t, err)
+
+		// set nops on the onramp
+		ccipContracts.SetNopsOnRamp(nopsAndWeights)
+
+		// send a message
+		extraArgs, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(200_000), true)
+		require.NoError(t, err)
+
+		// FeeToken is empty, therefore it should use native token
+		msg := router.ClientEVM2AnyMessage{
+			Receiver:     testhelpers.MustEncodeAddress(t, ccipContracts.Dest.Receivers[1].Receiver.Address()),
+			Data:         []byte("hello"),
+			TokenAmounts: []router.ClientEVMTokenAmount{},
+			ExtraArgs:    extraArgs,
+		}
+		fee, err := ccipContracts.Source.Router.GetFee(nil, testhelpers.DestChainID, msg)
+		require.NoError(t, err)
+
+		// verify message is sent
+		eventSignatures := ccip.GetEventSignatures()
+		ccipContracts.Source.User.Value = fee
+		testhelpers.SendRequest(t, ccipContracts, msg)
+		ccipContracts.Source.User.Value = nil
+		testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.Source.OnRamp.Address(), nodes, geCurrentSeqNum)
+		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.Source.OnRamp.Address(), geCurrentSeqNum)
+
+		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.Dest.OffRamp.Address(), nodes, geCurrentSeqNum, geCurrentSeqNum)
+		assert.Len(t, executionLogs, 1)
+		testhelpers.AssertExecState(t, ccipContracts, executionLogs[0], ccip.Success)
+		geCurrentSeqNum++
+
+		// get the nop fee
+		nopFee, err := ccipContracts.Source.OnRamp.GetNopFeesJuels(nil)
+		require.NoError(t, err)
+		t.Log("nopFee", nopFee)
+
+		// withdraw fees and verify there is still fund left for nop payment
+		_, err = ccipContracts.Source.OnRamp.WithdrawNonLinkFees(
+			ccipContracts.Source.User,
+			ccipContracts.Source.WrappedNative.Address(),
+			ccipContracts.Source.User.From,
+		)
+		require.NoError(t, err)
+		ccipContracts.Source.Chain.Commit()
+
+		// pay nops
+		_, err = ccipContracts.Source.OnRamp.PayNops(ccipContracts.Source.User)
+		require.NoError(t, err)
+		ccipContracts.Source.Chain.Commit()
+
+		srcBalanceAssertions := []testhelpers.BalanceAssertion{
+			{
+				// Onramp should not have any balance left in wrapped native
+				Name:     testhelpers.OnRampNative,
+				Address:  ccipContracts.Source.OnRamp.Address(),
+				Expected: big.NewInt(0).String(),
+				Getter:   ccipContracts.GetSourceWrappedTokenBalance,
+			},
+			{
+				// Onramp should have the remaining link after paying nops
+				Name:     testhelpers.OnRamp,
+				Address:  ccipContracts.Source.OnRamp.Address(),
+				Expected: new(big.Int).Sub(srcBalances[testhelpers.OnRamp], nopFee).String(),
+				Getter:   ccipContracts.GetSourceLinkBalance,
+			},
+			{
+				Name:     testhelpers.SourceRouter,
+				Address:  ccipContracts.Source.Router.Address(),
+				Expected: srcBalances[testhelpers.SourceRouter].String(),
+				Getter:   ccipContracts.GetSourceWrappedTokenBalance,
+			},
+			// onRamp's balance (of previously sent fee during message sending) should have been transferred to
+			// the owner as a result of WithdrawNonLinkFees
+			{
+				Name:     testhelpers.Sender,
+				Address:  ccipContracts.Source.User.From,
+				Expected: fee.String(),
+				Getter:   ccipContracts.GetSourceWrappedTokenBalance,
+			},
+		}
+
+		// the nodes should be paid according to the weights assigned
+		for i, node := range nodes {
+			paymentWeight := float64(nopsAndWeights[i].Weight) / float64(totalWeight)
+			paidInFloat := paymentWeight * float64(nopFee.Int64())
+			paid, _ := new(big.Float).SetFloat64(paidInFloat).Int64()
+			bal := new(big.Int).Add(
+				new(big.Int).SetInt64(paid),
+				srcBalances[fmt.Sprintf("node %d", i)]).String()
+			srcBalanceAssertions = append(srcBalanceAssertions, testhelpers.BalanceAssertion{
+				Name:     fmt.Sprintf("node %d", i),
+				Address:  node.PaymentReceiver,
+				Expected: bal,
+				Getter:   ccipContracts.GetSourceLinkBalance,
+			})
+		}
+		ccipContracts.AssertBalances(srcBalanceAssertions)
 	})
 }

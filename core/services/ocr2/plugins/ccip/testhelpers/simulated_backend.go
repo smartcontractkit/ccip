@@ -46,7 +46,7 @@ var _ keystore.Eth = EthKeyStoreSim{}
 func ConfirmTxs(t *testing.T, txs []*ethtypes.Transaction, chain *backends.SimulatedBackend) {
 	chain.Commit()
 	for _, tx := range txs {
-		rec, err := chain.TransactionReceipt(context.Background(), tx.Hash())
+		rec, err := bind.WaitMined(context.Background(), chain, tx)
 		require.NoError(t, err)
 		require.Equal(t, uint64(1), rec.Status)
 	}

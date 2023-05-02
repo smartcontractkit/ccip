@@ -47,9 +47,10 @@ import (
 )
 
 type Node struct {
-	App         chainlink.Application
-	Transmitter common.Address
-	KeyBundle   ocr2key.KeyBundle
+	App             chainlink.Application
+	Transmitter     common.Address
+	PaymentReceiver common.Address
+	KeyBundle       ocr2key.KeyBundle
 }
 
 func (node *Node) EventuallyHasReqSeqNum(t *testing.T, ccipContracts CCIPContracts, eventSignatures ccip.EventSignatures, onRamp common.Address, seqNum int) logpoller.Log {
@@ -376,7 +377,9 @@ func SetupAndStartNodes(ctx context.Context, t *testing.T, ccipContracts *CCIPCo
 		appBootstrap.Stop()
 	})
 	bootstrapNode := Node{
-		appBootstrap, bootstrapTransmitter, bootstrapKb,
+		App:         appBootstrap,
+		Transmitter: bootstrapTransmitter,
+		KeyBundle:   bootstrapKb,
 	}
 	// Set up the minimum 4 oracles all funded with destination ETH
 	for i := int64(0); i < 4; i++ {
@@ -392,7 +395,11 @@ func SetupAndStartNodes(ctx context.Context, t *testing.T, ccipContracts *CCIPCo
 			bootstrapPeerID,
 			bootstrapNodePort,
 		)
-		nodes = append(nodes, Node{app, transmitter, kb})
+		nodes = append(nodes, Node{
+			App:         app,
+			Transmitter: transmitter,
+			KeyBundle:   kb,
+		})
 		offchainPublicKey, _ := hex.DecodeString(strings.TrimPrefix(kb.OnChainPublicKey(), "0x"))
 		oracles = append(oracles, confighelper.OracleIdentityExtra{
 			OracleIdentity: confighelper.OracleIdentity{

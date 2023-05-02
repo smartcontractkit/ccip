@@ -43,6 +43,7 @@ var (
 	SourcePool   = "source pool"
 	SourcePrices = "source prices"
 	OnRamp       = "onramp"
+	OnRampNative = "onramp-native"
 	SourceRouter = "source router"
 
 	// Dest
@@ -66,15 +67,17 @@ type MaybeRevertReceiver struct {
 }
 
 type Common struct {
-	ChainID       uint64
-	User          *bind.TransactOpts
-	Chain         *backends.SimulatedBackend
-	LinkToken     *link_token_interface.LinkToken
-	Pool          *lock_release_token_pool.LockReleaseTokenPool
-	CustomPool    *custom_token_pool.CustomTokenPool
-	CustomToken   *link_token_interface.LinkToken
-	AFN           *mock_afn_contract.MockAFNContract
-	PriceRegistry *price_registry.PriceRegistry
+	ChainID           uint64
+	User              *bind.TransactOpts
+	Chain             *backends.SimulatedBackend
+	LinkToken         *link_token_interface.LinkToken
+	Pool              *lock_release_token_pool.LockReleaseTokenPool
+	CustomPool        *custom_token_pool.CustomTokenPool
+	CustomToken       *link_token_interface.LinkToken
+	WrappedNative     *weth9.WETH9
+	WrappedNativePool *lock_release_token_pool.LockReleaseTokenPool
+	AFN               *mock_afn_contract.MockAFNContract
+	PriceRegistry     *price_registry.PriceRegistry
 }
 
 type SourceChain struct {
@@ -301,21 +304,34 @@ func (c *CCIPContracts) DeployNewCommitStore() {
 	require.NoError(c.t, err)
 }
 
-func (c *CCIPContracts) GetSourceLinkBalance(addr common.Address) *big.Int {
-	bal, err := c.Source.LinkToken.BalanceOf(nil, addr)
+func (c *CCIPContracts) SetNopsOnRamp(nopsAndWeights []evm_2_evm_onramp.EVM2EVMOnRampNopAndWeight) {
+	tx, err := c.Source.OnRamp.SetNops(c.Source.User, nopsAndWeights)
 	require.NoError(c.t, err)
-	return bal
+	c.Source.Chain.Commit()
+	_, err = bind.WaitMined(context.Background(), c.Source.Chain, tx)
+	require.NoError(c.t, err)
+}
+
+func (c *CCIPContracts) GetSourceLinkBalance(addr common.Address) *big.Int {
+	return GetBalance(c.t, c.Source.Chain, c.Source.LinkToken.Address(), addr)
 }
 
 func (c *CCIPContracts) GetDestLinkBalance(addr common.Address) *big.Int {
-	bal, err := c.Dest.LinkToken.BalanceOf(nil, addr)
-	require.NoError(c.t, err)
-	return bal
+	return GetBalance(c.t, c.Dest.Chain, c.Dest.LinkToken.Address(), addr)
+}
+
+func (c *CCIPContracts) GetSourceWrappedTokenBalance(addr common.Address) *big.Int {
+	return GetBalance(c.t, c.Source.Chain, c.Source.WrappedNative.Address(), addr)
+}
+
+func (c *CCIPContracts) GetDestWrappedTokenBalance(addr common.Address) *big.Int {
+	return GetBalance(c.t, c.Dest.Chain, c.Dest.WrappedNative.Address(), addr)
 }
 
 func (c *CCIPContracts) AssertBalances(bas []BalanceAssertion) {
 	for _, b := range bas {
 		actual := b.Getter(b.Address)
+		c.t.Log("Checking balance for", b.Name, "at", b.Address.Hex(), "got", actual)
 		require.NotNil(c.t, actual, "%v getter return nil", b.Name)
 		if b.Within == "" {
 			require.Equal(c.t, b.Expected, actual.String(), "wrong balance for %s got %s want %s", b.Name, actual, b.Expected)
@@ -328,6 +344,11 @@ func (c *CCIPContracts) AssertBalances(bas []BalanceAssertion) {
 			require.Equal(c.t, 1, actual.Cmp(low), "wrong balance for %s got %s outside expected range [%s, %s]", b.Name, actual, low, high)
 		}
 	}
+}
+
+// helps with better logging
+func (c *CCIPContracts) SetTest(t *testing.T) {
+	c.t = t
 }
 
 func (c *CCIPContracts) DeriveOCR2Config(oracles []confighelper.OracleIdentityExtra, rawOnchainConfig []byte, rawOffchainConfig []byte) *OCR2Config {
@@ -555,6 +576,23 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	// Create router
 	sourceWeth9addr, _, _, err := weth9.DeployWETH9(sourceUser, sourceChain)
 	require.NoError(t, err)
+	sourceWrapped, err := weth9.NewWETH9(sourceWeth9addr, sourceChain)
+	require.NoError(t, err)
+	sourceWeth9PoolAddress, _, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(
+		sourceUser,
+		sourceChain,
+		sourceWeth9addr,
+		lock_release_token_pool.RateLimiterConfig{
+			Capacity:  HundredLink,
+			Rate:      big.NewInt(1e18),
+			IsEnabled: true,
+		})
+	require.NoError(t, err)
+	sourceChain.Commit()
+
+	sourceWeth9Pool, err := lock_release_token_pool.NewLockReleaseTokenPool(sourceWeth9PoolAddress, sourceChain)
+	require.NoError(t, err)
+
 	sourceRouterAddress, _, _, err := router.DeployRouter(sourceUser, sourceChain, sourceWeth9addr)
 	require.NoError(t, err)
 	sourceRouter, err := router.NewRouter(sourceRouterAddress, sourceChain)
@@ -571,12 +609,16 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 					SourceToken: sourceLinkTokenAddress,
 					UsdPerToken: big.NewInt(8e18), // 8usd
 				},
+				{
+					SourceToken: sourceWeth9addr,
+					UsdPerToken: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(2000)), // 2000usd
+				},
 			},
 			DestChainId:   destChainID,
 			UsdPerUnitGas: big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
 		},
 		nil,
-		[]common.Address{sourceLinkTokenAddress},
+		[]common.Address{sourceLinkTokenAddress, sourceWeth9addr},
 		60*60*24*14, // two weeks
 	)
 	require.NoError(t, err)
@@ -606,6 +648,10 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 				Token: sourceLinkTokenAddress,
 				Pool:  sourcePoolAddress,
 			},
+			{
+				Token: sourceWeth9addr,
+				Pool:  sourceWeth9PoolAddress,
+			},
 		},
 		[]common.Address{}, // allow list
 		evm_2_evm_onramp.RateLimiterConfig{
@@ -620,6 +666,12 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 				FeeAmount:       big.NewInt(0),
 				DestGasOverhead: 0,
 			},
+			{
+				Token:           sourceWeth9addr,
+				Multiplier:      1e18,
+				FeeAmount:       big.NewInt(0),
+				DestGasOverhead: 0,
+			},
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampNopAndWeight{},
 	)
@@ -627,6 +679,11 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddress, sourceChain)
 	require.NoError(t, err)
 	_, err = sourcePool.ApplyRampUpdates(sourceUser,
+		[]lock_release_token_pool.TokenPoolRampUpdate{{Ramp: onRampAddress, Allowed: true}},
+		[]lock_release_token_pool.TokenPoolRampUpdate{},
+	)
+	require.NoError(t, err)
+	_, err = sourceWeth9Pool.ApplyRampUpdates(sourceUser,
 		[]lock_release_token_pool.TokenPoolRampUpdate{{Ramp: onRampAddress, Allowed: true}},
 		[]lock_release_token_pool.TokenPoolRampUpdate{},
 	)
@@ -643,6 +700,23 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	require.NoError(t, err)
 	destChain.Commit()
 	destAFN, err := mock_afn_contract.NewMockAFNContract(afnDestAddress, destChain)
+	require.NoError(t, err)
+
+	destWeth9addr, _, _, err := weth9.DeployWETH9(destUser, destChain)
+	require.NoError(t, err)
+	destWrapped, err := weth9.NewWETH9(destWeth9addr, destChain)
+	require.NoError(t, err)
+	destWrappedPoolAddress, _, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(
+		destUser,
+		destChain,
+		destWeth9addr,
+		lock_release_token_pool.RateLimiterConfig{
+			Capacity:  HundredLink,
+			Rate:      big.NewInt(1e18),
+			IsEnabled: true,
+		})
+	require.NoError(t, err)
+	destWrappedPool, err := lock_release_token_pool.NewLockReleaseTokenPool(destWrappedPoolAddress, destChain)
 	require.NoError(t, err)
 
 	// Deploy and configure ge offramp.
@@ -683,8 +757,6 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	destChain.Commit()
 
 	// Create dest router
-	destWeth9addr, _, _, err := weth9.DeployWETH9(destUser, destChain)
-	require.NoError(t, err)
 	destRouterAddress, _, _, err := router.DeployRouter(destUser, destChain, destWeth9addr)
 	require.NoError(t, err)
 	destChain.Commit()
@@ -742,30 +814,34 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 
 	source := SourceChain{
 		Common: Common{
-			ChainID:       sourceChainID,
-			User:          sourceUser,
-			Chain:         sourceChain,
-			LinkToken:     sourceLinkToken,
-			Pool:          sourcePool,
-			CustomPool:    nil,
-			CustomToken:   sourceCustomToken,
-			AFN:           sourceAFN,
-			PriceRegistry: srcPriceRegistry,
+			ChainID:           sourceChainID,
+			User:              sourceUser,
+			Chain:             sourceChain,
+			LinkToken:         sourceLinkToken,
+			Pool:              sourcePool,
+			CustomPool:        nil,
+			CustomToken:       sourceCustomToken,
+			AFN:               sourceAFN,
+			PriceRegistry:     srcPriceRegistry,
+			WrappedNative:     sourceWrapped,
+			WrappedNativePool: sourceWeth9Pool,
 		},
 		Router: sourceRouter,
 		OnRamp: onRamp,
 	}
 	dest := DestinationChain{
 		Common: Common{
-			ChainID:       destChainID,
-			User:          destUser,
-			Chain:         destChain,
-			LinkToken:     destLinkToken,
-			Pool:          destPool,
-			CustomPool:    nil,
-			CustomToken:   destCustomToken,
-			AFN:           destAFN,
-			PriceRegistry: destPriceRegistry,
+			ChainID:           destChainID,
+			User:              destUser,
+			Chain:             destChain,
+			LinkToken:         destLinkToken,
+			Pool:              destPool,
+			CustomPool:        nil,
+			CustomToken:       destCustomToken,
+			AFN:               destAFN,
+			PriceRegistry:     destPriceRegistry,
+			WrappedNative:     destWrapped,
+			WrappedNativePool: destWrappedPool,
 		},
 		CommitStore: commitStore,
 		Router:      destRouter,
@@ -1098,4 +1174,12 @@ func ExecuteMessage(
 	require.Equal(t, uint64(1), rec.Status, "manual execution failed")
 	t.Logf("Manual Execution completed for seqNum %d", args.seqNr)
 	return args.seqNr
+}
+
+func GetBalance(t *testing.T, chain bind.ContractBackend, tokenAddr common.Address, addr common.Address) *big.Int {
+	token, err := link_token_interface.NewLinkToken(tokenAddr, chain)
+	require.NoError(t, err)
+	bal, err := token.BalanceOf(nil, addr)
+	require.NoError(t, err)
+	return bal
 }
