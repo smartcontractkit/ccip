@@ -77,8 +77,7 @@ var Alpha_PolygonMumbai = rhea.EVMChainConfig{
 }
 
 var Alpha_OptimismGoerli = rhea.EVMChainConfig{
-	EvmChainId:    420,
-	ChainSelector: 420,
+	EvmChainId: 420,
 	GasSettings: rhea.EVMGasSettings{
 		EIP1559: true,
 	},
@@ -121,8 +120,7 @@ var Alpha_OptimismGoerli = rhea.EVMChainConfig{
 }
 
 var Alpha_Sepolia = rhea.EVMChainConfig{
-	EvmChainId:    11155111,
-	ChainSelector: 11155111,
+	EvmChainId: 11155111,
 	GasSettings: rhea.EVMGasSettings{
 		EIP1559: false,
 	},
@@ -165,8 +163,7 @@ var Alpha_Sepolia = rhea.EVMChainConfig{
 }
 
 var Alpha_AvaxFuji = rhea.EVMChainConfig{
-	EvmChainId:    43113,
-	ChainSelector: 43113,
+	EvmChainId: 43113,
 	GasSettings: rhea.EVMGasSettings{
 		EIP1559: false,
 	},

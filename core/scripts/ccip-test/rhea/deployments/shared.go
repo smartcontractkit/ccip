@@ -23,6 +23,7 @@ func getBlockConfirmations(chain rhea.Chain) uint32 {
 		rhea.OptimismGoerli: 4,
 		rhea.AvaxFuji:       1,
 		rhea.PolygonMumbai:  4,
+		rhea.ArbitrumGoerli: 1,
 	}
 
 	if val, ok := blockConfirmationPerChain[chain]; ok {
@@ -37,6 +38,8 @@ func getMaxGasPrice(chain rhea.Chain) uint64 {
 		rhea.Sepolia:        200e9,
 		rhea.OptimismGoerli: 200e9,
 		rhea.AvaxFuji:       200e9,
+		rhea.PolygonMumbai:  200e9,
+		rhea.ArbitrumGoerli: 200e9,
 	}
 
 	if val, ok := maxGasPricePerChain[chain]; ok {

@@ -219,7 +219,7 @@ func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient
 		Client: Client{
 			Client:           config.Client,
 			ChainId:          config.ChainConfig.EvmChainId,
-			ChainSelector:    config.ChainConfig.ChainSelector,
+			ChainSelector:    rhea.GetCCIPChainId(config.ChainConfig.EvmChainId),
 			LinkTokenAddress: config.ChainConfig.SupportedTokens[rhea.LINK].Token,
 			LinkToken:        LinkToken,
 			WrappedNative:    wrappedNative,
@@ -283,7 +283,7 @@ func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestCli
 		Client: Client{
 			Client:           config.Client,
 			ChainId:          config.ChainConfig.EvmChainId,
-			ChainSelector:    config.ChainConfig.ChainSelector,
+			ChainSelector:    rhea.GetCCIPChainId(config.ChainConfig.EvmChainId),
 			LinkTokenAddress: config.ChainConfig.SupportedTokens[rhea.LINK].Token,
 			LinkToken:        linkToken,
 			WrappedNative:    wrappedNative,

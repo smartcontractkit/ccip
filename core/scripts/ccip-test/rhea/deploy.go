@@ -34,7 +34,7 @@ const (
 // owner key. Only run this of the currently deployed contracts are outdated or
 // when initializing a new chain.
 func DeployLanes(t *testing.T, source *EvmDeploymentConfig, destination *EvmDeploymentConfig) {
-	sourceChainSelector, destChainSelector := source.ChainConfig.ChainSelector, destination.ChainConfig.ChainSelector
+	sourceChainSelector, destChainSelector := GetCCIPChainId(source.ChainConfig.EvmChainId), GetCCIPChainId(destination.ChainConfig.EvmChainId)
 
 	// After running this code please update the configuration to reflect the newly
 	// deployed contract addresses.
@@ -137,7 +137,7 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainSelector u
 		client.Client, // client
 		evm_2_evm_onramp.EVM2EVMOnRampStaticConfig{
 			LinkToken:         client.ChainConfig.SupportedTokens[LINK].Token,
-			ChainId:           client.ChainConfig.ChainSelector,
+			ChainId:           GetCCIPChainId(client.ChainConfig.EvmChainId),
 			DestChainId:       destChainSelector,
 			DefaultTxGasLimit: DEFAULT_GAS_LIMIT,
 		},
@@ -191,7 +191,7 @@ func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainSelecto
 		client.Client,
 		evm_2_evm_offramp.EVM2EVMOffRampStaticConfig{
 			CommitStore:   client.LaneConfig.CommitStore,
-			ChainId:       client.ChainConfig.ChainSelector,
+			ChainId:       GetCCIPChainId(client.ChainConfig.EvmChainId),
 			SourceChainId: sourceChainSelector,
 			OnRamp:        onRamp,
 		},
@@ -224,7 +224,7 @@ func deployCommitStore(t *testing.T, client *EvmDeploymentConfig, sourceChainSel
 		client.Owner,  // user
 		client.Client, // client
 		commit_store.CommitStoreStaticConfig{
-			ChainId:       client.ChainConfig.ChainSelector,
+			ChainId:       GetCCIPChainId(client.ChainConfig.EvmChainId),
 			SourceChainId: sourceChainSelector,
 			OnRamp:        onRamp,
 		},
@@ -285,7 +285,7 @@ func DeployPingPongDapps(t *testing.T, sourceClient *EvmDeploymentConfig, destCl
 		pingDapp, err := ping_pong_demo.NewPingPongDemo(sourceClient.LaneConfig.PingPongDapp, sourceClient.Client)
 		shared.RequireNoError(t, err)
 
-		tx, err := pingDapp.SetCounterpart(sourceClient.Owner, destClient.ChainConfig.ChainSelector, destClient.LaneConfig.PingPongDapp)
+		tx, err := pingDapp.SetCounterpart(sourceClient.Owner, GetCCIPChainId(destClient.ChainConfig.EvmChainId), destClient.LaneConfig.PingPongDapp)
 		shared.RequireNoError(t, err)
 		err = shared.WaitForMined(sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
 		shared.RequireNoError(t, err)
@@ -294,7 +294,7 @@ func DeployPingPongDapps(t *testing.T, sourceClient *EvmDeploymentConfig, destCl
 		pongDapp, err := ping_pong_demo.NewPingPongDemo(destClient.LaneConfig.PingPongDapp, destClient.Client)
 		shared.RequireNoError(t, err)
 
-		tx, err = pongDapp.SetCounterpart(destClient.Owner, sourceClient.ChainConfig.ChainSelector, sourceClient.LaneConfig.PingPongDapp)
+		tx, err = pongDapp.SetCounterpart(destClient.Owner, GetCCIPChainId(sourceClient.ChainConfig.EvmChainId), sourceClient.LaneConfig.PingPongDapp)
 		shared.RequireNoError(t, err)
 		err = shared.WaitForMined(destClient.Logger, destClient.Client, tx.Hash(), true)
 		shared.RequireNoError(t, err)
@@ -344,7 +344,7 @@ func deployGovernanceDapps(t *testing.T, sourceClient *EvmDeploymentConfig, dest
 	require.NoError(t, err)
 
 	governanceClone := governance_dapp.GovernanceDappCrossChainClone{
-		ChainId:         destClient.ChainConfig.ChainSelector,
+		ChainId:         GetCCIPChainId(destClient.ChainConfig.EvmChainId),
 		ContractAddress: destClient.LaneConfig.GovernanceDapp,
 	}
 

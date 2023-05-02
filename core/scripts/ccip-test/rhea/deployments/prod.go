@@ -34,8 +34,7 @@ var ProdChainMapping = map[rhea.Chain]map[rhea.Chain]rhea.EvmDeploymentConfig{
 }
 
 var Prod_Goerli = rhea.EVMChainConfig{
-	EvmChainId:    5,
-	ChainSelector: 5,
+	EvmChainId: 5,
 	GasSettings: rhea.EVMGasSettings{
 		EIP1559:   true,
 		GasTipCap: rhea.DefaultGasTipFee,
@@ -80,8 +79,7 @@ var Prod_Goerli = rhea.EVMChainConfig{
 }
 
 var Prod_Sepolia = rhea.EVMChainConfig{
-	EvmChainId:    11155111,
-	ChainSelector: 11155111,
+	EvmChainId: 11155111,
 	GasSettings: rhea.EVMGasSettings{
 		EIP1559: false,
 	},
@@ -143,8 +141,7 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 }
 
 var Prod_OptimismGoerli = rhea.EVMChainConfig{
-	EvmChainId:    420,
-	ChainSelector: 420,
+	EvmChainId: 420,
 	GasSettings: rhea.EVMGasSettings{
 		EIP1559: true,
 	},
@@ -198,8 +195,7 @@ var Prod_OptimismGoerli = rhea.EVMChainConfig{
 }
 
 var Prod_AvaxFuji = rhea.EVMChainConfig{
-	EvmChainId:    43113,
-	ChainSelector: 43113,
+	EvmChainId: 43113,
 	GasSettings: rhea.EVMGasSettings{
 		EIP1559: false,
 	},

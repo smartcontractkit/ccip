@@ -39,8 +39,8 @@ func PrintCCIPState(source *rhea.EvmDeploymentConfig, destination *rhea.EvmDeplo
 	printDappSanityCheck(source)
 	printDappSanityCheck(destination)
 
-	printRampSanityCheck(source, destination.LaneConfig.OnRamp, destination.ChainConfig.ChainSelector)
-	printRampSanityCheck(destination, source.LaneConfig.OnRamp, source.ChainConfig.ChainSelector)
+	printRampSanityCheck(source, destination.LaneConfig.OnRamp, rhea.GetCCIPChainId(destination.ChainConfig.EvmChainId))
+	printRampSanityCheck(destination, source.LaneConfig.OnRamp, rhea.GetCCIPChainId(source.ChainConfig.EvmChainId))
 
 	checkPriceRegistrySet(source, destination)
 
@@ -296,7 +296,7 @@ func printRampSanityCheck(chain *rhea.EvmDeploymentConfig, sourceOnRamp common.A
 
 	afn, err := afn_contract.NewAFNContract(chain.ChainConfig.Afn, chain.Client)
 	helpers.PanicErr(err)
-	badSignal, err := afn.BadSignalReceived(&bind.CallOpts{})
+	badSignal, err := afn.IsCursed(&bind.CallOpts{})
 	helpers.PanicErr(err)
 
 	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "AFN healthy", printBool(!badSignal)))
@@ -490,13 +490,13 @@ func printSupportedTokensCheck(source *rhea.EvmDeploymentConfig, destination *rh
 	sourceRouter, err := router.NewRouter(source.ChainConfig.Router, source.Client)
 	helpers.PanicErr(err)
 
-	sourceTokens, err := sourceRouter.GetSupportedTokens(&bind.CallOpts{}, destination.ChainConfig.ChainSelector)
+	sourceTokens, err := sourceRouter.GetSupportedTokens(&bind.CallOpts{}, rhea.GetCCIPChainId(destination.ChainConfig.EvmChainId))
 	helpers.PanicErr(err)
 
 	destRouter, err := router.NewRouter(destination.ChainConfig.Router, destination.Client)
 	helpers.PanicErr(err)
 
-	destTokens, err := destRouter.GetSupportedTokens(&bind.CallOpts{}, source.ChainConfig.ChainSelector)
+	destTokens, err := destRouter.GetSupportedTokens(&bind.CallOpts{}, rhea.GetCCIPChainId(source.ChainConfig.EvmChainId))
 	helpers.PanicErr(err)
 
 	var sb strings.Builder
@@ -525,7 +525,7 @@ func printSupportedTokensCheck(source *rhea.EvmDeploymentConfig, destination *rh
 			sourceEnabled = slices.Contains(sourceTokens, source.ChainConfig.SupportedTokens[token].Token)
 			isSourcePool = source.ChainConfig.SupportedTokens[token].Pool != common.HexToAddress("")
 
-			sourceFee, err := sourceRouter.GetFee(&bind.CallOpts{}, destination.ChainConfig.ChainSelector, router.ClientEVM2AnyMessage{
+			sourceFee, err := sourceRouter.GetFee(&bind.CallOpts{}, rhea.GetCCIPChainId(destination.ChainConfig.EvmChainId), router.ClientEVM2AnyMessage{
 				Receiver:     common.HexToAddress("").Bytes(),
 				Data:         []byte{},
 				TokenAmounts: []router.ClientEVMTokenAmount{},
@@ -545,7 +545,7 @@ func printSupportedTokensCheck(source *rhea.EvmDeploymentConfig, destination *rh
 			destEnabled = slices.Contains(destTokens, destination.ChainConfig.SupportedTokens[token].Token)
 			isDestPool = destination.ChainConfig.SupportedTokens[token].Pool != common.HexToAddress("")
 
-			destFee, err := destRouter.GetFee(&bind.CallOpts{}, source.ChainConfig.ChainSelector, router.ClientEVM2AnyMessage{
+			destFee, err := destRouter.GetFee(&bind.CallOpts{}, rhea.GetCCIPChainId(source.ChainConfig.EvmChainId), router.ClientEVM2AnyMessage{
 				Receiver:     common.HexToAddress("").Bytes(),
 				Data:         []byte{},
 				TokenAmounts: []router.ClientEVMTokenAmount{},
@@ -596,7 +596,7 @@ func checkPriceRegistrySet(source *rhea.EvmDeploymentConfig, destination *rhea.E
 
 	for _, tokenName := range source.ChainConfig.FeeTokens {
 		token := source.ChainConfig.SupportedTokens[tokenName].Token
-		_, err = feeManager.GetFeeTokenBaseUnitsPerUnitGas(&bind.CallOpts{}, token, destination.ChainConfig.ChainSelector)
+		_, err = feeManager.GetFeeTokenBaseUnitsPerUnitGas(&bind.CallOpts{}, token, rhea.GetCCIPChainId(destination.ChainConfig.EvmChainId))
 		if err != nil {
 			sb.WriteString(fmt.Sprintf("| %-20s | %14d | %9s |\n", tokenName, destination.ChainConfig.EvmChainId, printBool(false)))
 		}
@@ -611,7 +611,7 @@ func checkPriceRegistrySet(source *rhea.EvmDeploymentConfig, destination *rhea.E
 
 	for _, tokenName := range destination.ChainConfig.FeeTokens {
 		token := destination.ChainConfig.SupportedTokens[tokenName].Token
-		_, err = feeManager.GetFeeTokenBaseUnitsPerUnitGas(&bind.CallOpts{}, token, source.ChainConfig.ChainSelector)
+		_, err = feeManager.GetFeeTokenBaseUnitsPerUnitGas(&bind.CallOpts{}, token, rhea.GetCCIPChainId(source.ChainConfig.EvmChainId))
 		if err != nil {
 			sb.WriteString(fmt.Sprintf("| %-20s | %14d | %9s |\n", tokenName, source.ChainConfig.EvmChainId, printBool(false)))
 		}

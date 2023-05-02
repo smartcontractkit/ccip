@@ -55,12 +55,17 @@ const (
 	OptimismGoerli Chain = "ethereum-testnet-goerli-optimism-1"
 	Goerli         Chain = "ethereum-testnet-goerli"
 	PolygonMumbai  Chain = "polygon-testnet-mumbai"
+	ArbitrumGoerli Chain = "ethereum-testnet-goerli-arbitrum-1"
 )
 
 func GetAllChains() []Chain {
 	return []Chain{
-		Sepolia, AvaxFuji, OptimismGoerli, Goerli, PolygonMumbai,
+		Sepolia, AvaxFuji, OptimismGoerli, Goerli, PolygonMumbai, ArbitrumGoerli,
 	}
+}
+
+func GetCCIPChainId(EVMChainId uint64) uint64 {
+	return EVMChainId
 }
 
 type Token string
@@ -141,9 +146,8 @@ const (
 )
 
 type EVMChainConfig struct {
-	EvmChainId    uint64
-	ChainSelector uint64
-	GasSettings   EVMGasSettings
+	EvmChainId  uint64
+	GasSettings EVMGasSettings
 
 	SupportedTokens    map[Token]EVMBridgedToken
 	FeeTokens          []Token

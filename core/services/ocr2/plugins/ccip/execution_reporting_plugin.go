@@ -147,6 +147,12 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 		return nil, types.ReportingPluginInfo{}, err
 	}
 
+	dynamicConfig, err := rf.config.offRamp.GetDynamicConfig(&bind.CallOpts{})
+	if err != nil {
+		return nil, types.ReportingPluginInfo{}, err
+	}
+	rf.config.lggr.Infow("Starting exec plugin", "offchainConfig", offchainConfig, "dynamicConfig", dynamicConfig)
+
 	return &ExecutionReportingPlugin{
 			lggr:                             rf.config.lggr.Named("ExecutionReportingPlugin"),
 			F:                                config.F,
@@ -417,7 +423,8 @@ func (r *ExecutionReportingPlugin) buildBatch(srcToDst map[common.Address]common
 		availableFee = availableFee.Div(availableFee, big.NewInt(1e18))
 		availableFeeUsd := waitBoostedFee(time.Since(srcLog.BlockTimestamp), availableFee, r.offchainConfig.RelativeBoostPerWaitHour)
 		if availableFeeUsd.Cmp(execCostUsd) < 0 {
-			lggr.Infow("Insufficient remaining fee", "availableFeeUsd", availableFeeUsd, "execCostUsd", execCostUsd)
+			lggr.Infow("Insufficient remaining fee", "availableFeeUsd", availableFeeUsd, "execCostUsd", execCostUsd,
+				"srcBlockTimestamp", srcLog.BlockTimestamp, "waitTime", time.Since(srcLog.BlockTimestamp), "boost", r.offchainConfig.RelativeBoostPerWaitHour)
 			continue
 		}
 
