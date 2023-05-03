@@ -92,6 +92,7 @@ jobs:
         with:
           cl_repo: smartcontractkit/chainlink
           cl_ref: ${{ github.sha }}
+          should_checkout: 'false'
           cl_dockerfile: ${{ matrix.image.dockerfile }}
           push_tag: ${{ env.CHAINLINK_IMAGE }}:${{ github.sha }}${{ matrix.image.tag-suffix }}
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
