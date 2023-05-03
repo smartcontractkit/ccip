@@ -7,6 +7,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/models"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
@@ -21,6 +22,7 @@ type Config interface {
 	JobPipelineResultWriteQueueDepth() uint64
 	LogSQL() bool
 	OCRDevelopmentMode() bool
+	MercuryCredentials(credName string) *models.MercuryCredentials
 }
 
 // ToLocalConfig creates a OCR2 LocalConfig from the global config and the OCR2 spec.
