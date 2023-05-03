@@ -55,8 +55,8 @@ func setupCommitTestHarness(t *testing.T) commitTestHarness {
 	plugin := CommitReportingPlugin{
 		config: CommitPluginConfig{
 			lggr:               th.lggr,
-			source:             th.sourceLP,
-			dest:               th.destLP,
+			sourceLP:           th.sourceLP,
+			destLP:             th.destLP,
 			onRamp:             th.onRamp,
 			commitStore:        th.commitStore,
 			priceRegistry:      th.priceRegistry,

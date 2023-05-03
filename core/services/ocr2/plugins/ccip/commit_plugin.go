@@ -109,8 +109,8 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 	wrappedPluginFactory := NewCommitReportingPluginFactory(
 		CommitPluginConfig{
 			lggr:               lggr,
-			source:             sourceChain.LogPoller(),
-			dest:               destChain.LogPoller(),
+			sourceLP:           sourceChain.LogPoller(),
+			destLP:             destChain.LogPoller(),
 			reqEventSig:        eventSigs,
 			onRamp:             onRamp,
 			priceRegistry:      priceRegistry,

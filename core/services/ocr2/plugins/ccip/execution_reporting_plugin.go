@@ -29,6 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
@@ -99,16 +100,6 @@ func DecodeExecutionReport(report types.Report) (*evm_2_evm_offramp.InternalExec
 	return &er, nil
 }
 
-func EncodeExecutionReport(me *MessageExecution) (types.Report, error) {
-	return makeExecutionReportArgs().PackValues([]interface{}{&evm_2_evm_offramp.InternalExecutionReport{
-		SequenceNumbers:   me.seqNums,
-		EncodedMessages:   me.encMsgs,
-		OffchainTokenData: me.tokenData,
-		Proofs:            me.proofs,
-		ProofFlagBits:     ProofFlagsToBits(me.proofSourceFlags),
-	}})
-}
-
 type ExecutionPluginConfig struct {
 	onRamp            *evm_2_evm_onramp.EVM2EVMOnRamp
 	offRamp           *evm_2_evm_offramp.EVM2EVMOffRamp
@@ -116,7 +107,7 @@ type ExecutionPluginConfig struct {
 	srcPriceRegistry  *price_registry.PriceRegistry
 	destPriceRegistry *price_registry.PriceRegistry
 
-	source, dest           logpoller.LogPoller
+	sourceLP, destLP       logpoller.LogPoller
 	eventSignatures        EventSignatures
 	leafHasher             LeafHasherInterface[[32]byte]
 	lggr                   logger.Logger
@@ -211,7 +202,7 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 
 func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(min, max uint64) (map[uint64]struct{}, error) {
 	// Should be able to keep this log constant across msg types.
-	executedLogs, err := r.config.dest.IndexedLogsTopicRange(r.config.eventSignatures.ExecutionStateChanged, r.config.offRamp.Address(), r.config.eventSignatures.ExecutionStateChangedSequenceNumberIndex, logpoller.EvmWord(min), logpoller.EvmWord(max), int(r.offchainConfig.DestIncomingConfirmations))
+	executedLogs, err := r.config.destLP.IndexedLogsTopicRange(r.config.eventSignatures.ExecutionStateChanged, r.config.offRamp.Address(), r.config.eventSignatures.ExecutionStateChangedSequenceNumberIndex, logpoller.EvmWord(min), logpoller.EvmWord(max), int(r.offchainConfig.DestIncomingConfirmations))
 	if err != nil {
 		return nil, err
 	}
@@ -227,7 +218,7 @@ func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(min, max uint64) (ma
 }
 
 func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context, inflight []InflightInternalExecutionReport) ([]ObservedMessage, error) {
-	unexpiredReports, err := getUnexpiredCommitReports(r.config.dest, r.config.commitStore, r.permissionLessExecutionThreshold)
+	unexpiredReports, err := getUnexpiredCommitReports(r.config.destLP, r.config.commitStore, r.permissionLessExecutionThreshold)
 	if err != nil {
 		return nil, err
 	}
@@ -302,7 +293,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 			continue
 		}
 		// Check this root for executable messages
-		srcLogs, err := r.config.source.LogsDataWordRange(r.config.eventSignatures.SendRequested, r.config.onRamp.Address(), r.config.eventSignatures.SendRequestedSequenceNumberIndex, logpoller.EvmWord(unexpiredReport.Interval.Min), logpoller.EvmWord(unexpiredReport.Interval.Max), int(r.offchainConfig.SourceIncomingConfirmations))
+		srcLogs, err := r.config.sourceLP.LogsDataWordRange(r.config.eventSignatures.SendRequested, r.config.onRamp.Address(), r.config.eventSignatures.SendRequestedSequenceNumberIndex, logpoller.EvmWord(unexpiredReport.Interval.Min), logpoller.EvmWord(unexpiredReport.Interval.Max), int(r.offchainConfig.SourceIncomingConfirmations))
 		if err != nil {
 			return nil, err
 		}
@@ -454,6 +445,18 @@ func (r *ExecutionReportingPlugin) buildBatch(srcToDst map[common.Address]common
 	return executableMessages, executedAllMessages
 }
 
+func aggregateTokenValue(destTokenPricesUSD map[common.Address]*big.Int, srcToDst map[common.Address]common.Address, tokens []common.Address, amounts []*big.Int) (*big.Int, error) {
+	sum := big.NewInt(0)
+	for i := 0; i < len(tokens); i++ {
+		price, ok := destTokenPricesUSD[srcToDst[tokens[i]]]
+		if !ok {
+			return nil, errors.Errorf("do not have price for src token %x", tokens[i])
+		}
+		sum.Add(sum, new(big.Int).Mul(price, amounts[i]))
+	}
+	return sum, nil
+}
+
 func (r *ExecutionReportingPlugin) parseSeqNr(log logpoller.Log) (uint64, error) {
 	s, err := r.config.onRamp.ParseCCIPSendRequested(log.ToGethLog())
 	if err != nil {
@@ -465,23 +468,22 @@ func (r *ExecutionReportingPlugin) parseSeqNr(log logpoller.Log) (uint64, error)
 // Assumes non-empty report. Messages to execute can span more than one report, but are assumed to be in order of increasing
 // sequence number.
 func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.Logger, observedMessages []ObservedMessage) ([]byte, error) {
-	me, err := buildExecution(
-		ctx,
-		lggr,
-		r.config.source,
-		r.config.dest,
-		r.config.onRamp.Address(),
-		observedMessages,
-		r.config.commitStore,
-		int(r.offchainConfig.SourceIncomingConfirmations),
-		r.config.eventSignatures,
-		r.parseSeqNr,
-		r.config.leafHasher,
-	)
+	getMsgLogs := func(min, max uint64) ([]logpoller.Log, error) {
+		return r.config.sourceLP.LogsDataWordRange(
+			r.config.eventSignatures.SendRequested,
+			r.config.onRamp.Address(),
+			r.config.eventSignatures.SendRequestedSequenceNumberIndex,
+			EvmWord(min),
+			EvmWord(max),
+			int(r.offchainConfig.SourceIncomingConfirmations),
+			pg.WithParentCtx(ctx))
+	}
+
+	execReport, err := buildExecutionReport(ctx, lggr, r.config.destLP, observedMessages, r.config.commitStore, r.parseSeqNr, r.config.leafHasher, getMsgLogs)
 	if err != nil {
 		return nil, err
 	}
-	return EncodeExecutionReport(me)
+	return execReport.Encode()
 }
 
 func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.ReportTimestamp, query types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {

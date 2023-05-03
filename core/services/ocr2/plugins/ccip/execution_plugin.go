@@ -113,8 +113,8 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	wrappedPluginFactory := NewExecutionReportingPluginFactory(
 		ExecutionPluginConfig{
 			lggr:                   lggr,
-			source:                 sourceChain.LogPoller(),
-			dest:                   destChain.LogPoller(),
+			sourceLP:               sourceChain.LogPoller(),
+			destLP:                 destChain.LogPoller(),
 			offRamp:                offRamp,
 			onRamp:                 onRamp,
 			commitStore:            commitStore,

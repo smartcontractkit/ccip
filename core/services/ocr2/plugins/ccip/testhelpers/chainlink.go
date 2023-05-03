@@ -451,9 +451,8 @@ func SetupAndStartNodes(ctx context.Context, t *testing.T, ccipContracts *CCIPCo
 	return bootstrapNode, nodes, configBlock
 }
 
-func SetUpNodesAndJobs(t *testing.T, ccipContracts *CCIPContracts, pricePipeline string) ([]Node, CCIPJobSpecParams) {
+func SetUpNodesAndJobs(t *testing.T, ccipContracts *CCIPContracts, pricePipeline string, bootstrapNodePort int64) ([]Node, CCIPJobSpecParams) {
 	//setup Jobs
-	bootstrapNodePort := int64(19399)
 	ctx := context.Background()
 	// Starts nodes and configures them in the OCR contracts.
 	bootstrapNode, nodes, configBlock := SetupAndStartNodes(ctx, t, ccipContracts, bootstrapNodePort)

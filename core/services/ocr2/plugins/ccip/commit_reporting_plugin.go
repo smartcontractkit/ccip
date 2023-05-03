@@ -129,7 +129,7 @@ type InflightPriceUpdate struct {
 
 type CommitPluginConfig struct {
 	lggr               logger.Logger
-	source, dest       logpoller.LogPoller
+	sourceLP, destLP   logpoller.LogPoller
 	reqEventSig        EventSignatures
 	onRamp             *evm_2_evm_onramp.EVM2EVMOnRamp
 	priceRegistry      *price_registry.PriceRegistry
@@ -249,7 +249,7 @@ type update = struct {
 // latest gasPrice update is returned in addressZero (common.Address{}); the other keys are tokens price updates
 func (r *CommitReportingPlugin) getLatestPriceUpdates(ctx context.Context, now time.Time, skipInflight bool) (latestUpdates map[common.Address]update, err error) {
 	latestUpdates = make(map[common.Address]update)
-	gasUpdatesWithinHeartBeat, err := r.config.dest.IndexedLogsCreatedAfter(UsdPerUnitGasUpdated, r.config.priceRegistry.Address(), 1, []common.Hash{EvmWord(r.config.sourceChainID)}, now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()), pg.WithParentCtx(ctx))
+	gasUpdatesWithinHeartBeat, err := r.config.destLP.IndexedLogsCreatedAfter(UsdPerUnitGasUpdated, r.config.priceRegistry.Address(), 1, []common.Hash{EvmWord(r.config.sourceChainID)}, now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()), pg.WithParentCtx(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -268,7 +268,7 @@ func (r *CommitReportingPlugin) getLatestPriceUpdates(ctx context.Context, now t
 		}
 	}
 
-	tokenUpdatesWithinHeartBeat, err := r.config.dest.LogsCreatedAfter(UsdPerTokenUpdated, r.config.priceRegistry.Address(), now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()), pg.WithParentCtx(ctx))
+	tokenUpdatesWithinHeartBeat, err := r.config.destLP.LogsCreatedAfter(UsdPerTokenUpdated, r.config.priceRegistry.Address(), now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()), pg.WithParentCtx(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -414,7 +414,7 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 	}
 	// All available messages that have not been committed yet and have sufficient confirmations.
 	lggr.Infof("Looking for requests with sig %v and nextMin %d on onRampAddr %v", r.config.reqEventSig.SendRequested, nextMin, r.config.onRamp.Address())
-	reqs, err := r.config.source.LogsDataWordGreaterThan(r.config.reqEventSig.SendRequested, r.config.onRamp.Address(), r.config.reqEventSig.SendRequestedSequenceNumberIndex, EvmWord(nextMin), int(r.offchainConfig.SourceIncomingConfirmations), pg.WithParentCtx(ctx))
+	reqs, err := r.config.sourceLP.LogsDataWordGreaterThan(r.config.reqEventSig.SendRequested, r.config.onRamp.Address(), r.config.reqEventSig.SendRequestedSequenceNumberIndex, EvmWord(nextMin), int(r.offchainConfig.SourceIncomingConfirmations), pg.WithParentCtx(ctx))
 	if err != nil {
 		return 0, 0, err
 	}
@@ -458,7 +458,20 @@ func (r *CommitReportingPlugin) buildReport(ctx context.Context, interval commit
 		}, nil
 	}
 
-	leaves, err := leavesFromIntervals(ctx, lggr, r.config.onRamp.Address(), r.config.reqEventSig, r.seqParser, interval, r.config.source, r.config.hasher, int(r.offchainConfig.SourceIncomingConfirmations))
+	// Logs are guaranteed to be in order of seq num, since these are finalized logs only
+	// and the contract's seq num is auto-incrementing.
+	logs, err := r.config.sourceLP.LogsDataWordRange(
+		r.config.reqEventSig.SendRequested,
+		r.config.onRamp.Address(),
+		r.config.reqEventSig.SendRequestedSequenceNumberIndex,
+		logpoller.EvmWord(interval.Min),
+		logpoller.EvmWord(interval.Max),
+		int(r.offchainConfig.SourceIncomingConfirmations),
+		pg.WithParentCtx(ctx))
+	if err != nil {
+		return nil, err
+	}
+	leaves, err := leavesFromIntervals(lggr, r.seqParser, interval, r.config.hasher, logs)
 	if err != nil {
 		return nil, err
 	}
@@ -561,6 +574,15 @@ func calculatePriceUpdates(destChainId uint64, observations []CommitObservation,
 		DestChainId:   destChainId,
 		UsdPerUnitGas: usdPerUnitGas,
 	}
+}
+
+func median(vals []*big.Int) *big.Int {
+	valsCopy := make([]*big.Int, len(vals))
+	copy(valsCopy[:], vals[:])
+	sort.Slice(valsCopy, func(i, j int) bool {
+		return valsCopy[i].Cmp(valsCopy[j]) == -1
+	})
+	return valsCopy[len(valsCopy)/2]
 }
 
 // Assumed at least f+1 valid observations
