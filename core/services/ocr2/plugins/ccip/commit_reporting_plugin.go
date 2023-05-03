@@ -130,7 +130,6 @@ type InflightPriceUpdate struct {
 type CommitPluginConfig struct {
 	lggr               logger.Logger
 	sourceLP, destLP   logpoller.LogPoller
-	reqEventSig        EventSignatures
 	onRamp             *evm_2_evm_onramp.EVM2EVMOnRamp
 	priceRegistry      *price_registry.PriceRegistry
 	priceGetter        PriceGetter
@@ -157,7 +156,7 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 		return nil, types.ReportingPluginInfo{}, err
 	}
 
-	onchainConfig, err := DecodeAbiStruct(config.OnchainConfig, &CommitOnchainConfig{})
+	onchainConfig, err := DecodeAbiStruct[CommitOnchainConfig](config.OnchainConfig)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
@@ -249,7 +248,7 @@ type update = struct {
 // latest gasPrice update is returned in addressZero (common.Address{}); the other keys are tokens price updates
 func (r *CommitReportingPlugin) getLatestPriceUpdates(ctx context.Context, now time.Time, skipInflight bool) (latestUpdates map[common.Address]update, err error) {
 	latestUpdates = make(map[common.Address]update)
-	gasUpdatesWithinHeartBeat, err := r.config.destLP.IndexedLogsCreatedAfter(UsdPerUnitGasUpdated, r.config.priceRegistry.Address(), 1, []common.Hash{EvmWord(r.config.sourceChainID)}, now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()), pg.WithParentCtx(ctx))
+	gasUpdatesWithinHeartBeat, err := r.config.destLP.IndexedLogsCreatedAfter(EventSignatures.UsdPerUnitGasUpdated, r.config.priceRegistry.Address(), 1, []common.Hash{EvmWord(r.config.sourceChainID)}, now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()), pg.WithParentCtx(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -268,7 +267,7 @@ func (r *CommitReportingPlugin) getLatestPriceUpdates(ctx context.Context, now t
 		}
 	}
 
-	tokenUpdatesWithinHeartBeat, err := r.config.destLP.LogsCreatedAfter(UsdPerTokenUpdated, r.config.priceRegistry.Address(), now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()), pg.WithParentCtx(ctx))
+	tokenUpdatesWithinHeartBeat, err := r.config.destLP.LogsCreatedAfter(EventSignatures.UsdPerTokenUpdated, r.config.priceRegistry.Address(), now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()), pg.WithParentCtx(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -413,8 +412,15 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 		return 0, 0, err
 	}
 	// All available messages that have not been committed yet and have sufficient confirmations.
-	lggr.Infof("Looking for requests with sig %v and nextMin %d on onRampAddr %v", r.config.reqEventSig.SendRequested, nextMin, r.config.onRamp.Address())
-	reqs, err := r.config.sourceLP.LogsDataWordGreaterThan(r.config.reqEventSig.SendRequested, r.config.onRamp.Address(), r.config.reqEventSig.SendRequestedSequenceNumberIndex, EvmWord(nextMin), int(r.offchainConfig.SourceIncomingConfirmations), pg.WithParentCtx(ctx))
+	lggr.Infof("Looking for requests with sig %v and nextMin %d on onRampAddr %v", EventSignatures.SendRequested, nextMin, r.config.onRamp.Address())
+	reqs, err := r.config.sourceLP.LogsDataWordGreaterThan(
+		EventSignatures.SendRequested,
+		r.config.onRamp.Address(),
+		EventSignatures.SendRequestedSequenceNumberWord,
+		EvmWord(nextMin),
+		int(r.offchainConfig.SourceIncomingConfirmations),
+		pg.WithParentCtx(ctx),
+	)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -461,9 +467,9 @@ func (r *CommitReportingPlugin) buildReport(ctx context.Context, interval commit
 	// Logs are guaranteed to be in order of seq num, since these are finalized logs only
 	// and the contract's seq num is auto-incrementing.
 	logs, err := r.config.sourceLP.LogsDataWordRange(
-		r.config.reqEventSig.SendRequested,
+		EventSignatures.SendRequested,
 		r.config.onRamp.Address(),
-		r.config.reqEventSig.SendRequestedSequenceNumberIndex,
+		EventSignatures.SendRequestedSequenceNumberWord,
 		logpoller.EvmWord(interval.Min),
 		logpoller.EvmWord(interval.Max),
 		int(r.offchainConfig.SourceIncomingConfirmations),

@@ -7,10 +7,8 @@ import (
 	"math/big"
 	"reflect"
 	"sort"
-	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -108,7 +106,6 @@ type ExecutionPluginConfig struct {
 	destPriceRegistry *price_registry.PriceRegistry
 
 	sourceLP, destLP       logpoller.LogPoller
-	eventSignatures        EventSignatures
 	leafHasher             LeafHasherInterface[[32]byte]
 	lggr                   logger.Logger
 	destGasEstimator       txmgrtypes.FeeEstimator[*evmtypes.Head, gas.EvmFee, *assets.Wei, common.Hash]
@@ -129,11 +126,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
-	onRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_onramp.EVM2EVMOnRampABI))
-	if err != nil {
-		return nil, types.ReportingPluginInfo{}, errors.Wrap(err, "failed to decode onRamp abi")
-	}
-	execOnChainConfig, err := DecodeAbiStruct(config.OnchainConfig, &ExecOnchainConfig{})
+	execOnChainConfig, err := DecodeAbiStruct[ExecOnchainConfig](config.OnchainConfig)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
@@ -151,7 +144,6 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			config:                           rf.config,
 			snoozedRoots:                     make(map[[32]byte]time.Time),
 			inflightReports:                  newInflightReportsContainer(offchainConfig.InflightCacheExpiry.Duration()),
-			onRampABI:                        onRampABI,
 			permissionLessExecutionThreshold: execOnChainConfig.PermissionLessExecutionThresholdDuration(),
 		}, types.ReportingPluginInfo{
 			Name:          "CCIPExecution",
@@ -170,7 +162,6 @@ type ExecutionReportingPlugin struct {
 	inflightReports                  *inflightReportsContainer
 	offchainConfig                   ExecOffchainConfig
 	snoozedRoots                     map[[32]byte]time.Time
-	onRampABI                        abi.ABI
 	permissionLessExecutionThreshold time.Duration
 }
 
@@ -194,7 +185,7 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 	if err != nil {
 		return nil, err
 	}
-	lggr.Infof("executable observations %v %x", executableObservations, r.config.eventSignatures.SendRequested)
+	lggr.Infof("executable observations %+v %v", executableObservations, EventSignatures.SendRequested)
 
 	// Note can be empty
 	return ExecutionObservation{Messages: executableObservations}.Marshal()
@@ -202,13 +193,20 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 
 func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(min, max uint64) (map[uint64]struct{}, error) {
 	// Should be able to keep this log constant across msg types.
-	executedLogs, err := r.config.destLP.IndexedLogsTopicRange(r.config.eventSignatures.ExecutionStateChanged, r.config.offRamp.Address(), r.config.eventSignatures.ExecutionStateChangedSequenceNumberIndex, logpoller.EvmWord(min), logpoller.EvmWord(max), int(r.offchainConfig.DestIncomingConfirmations))
+	executedLogs, err := r.config.destLP.IndexedLogsTopicRange(
+		EventSignatures.ExecutionStateChanged,
+		r.config.offRamp.Address(),
+		EventSignatures.ExecutionStateChangedSequenceNumberIndex,
+		logpoller.EvmWord(min),
+		logpoller.EvmWord(max),
+		int(r.offchainConfig.DestIncomingConfirmations),
+	)
 	if err != nil {
 		return nil, err
 	}
 	executedMp := make(map[uint64]struct{})
 	for _, executedLog := range executedLogs {
-		exec, err := r.config.offRamp.ParseExecutionStateChanged(gethtypes.Log{Data: executedLog.Data, Topics: executedLog.GetTopics()})
+		exec, err := r.config.offRamp.ParseExecutionStateChanged(executedLog.GetGethLog())
 		if err != nil {
 			return nil, err
 		}
@@ -293,7 +291,14 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 			continue
 		}
 		// Check this root for executable messages
-		srcLogs, err := r.config.sourceLP.LogsDataWordRange(r.config.eventSignatures.SendRequested, r.config.onRamp.Address(), r.config.eventSignatures.SendRequestedSequenceNumberIndex, logpoller.EvmWord(unexpiredReport.Interval.Min), logpoller.EvmWord(unexpiredReport.Interval.Max), int(r.offchainConfig.SourceIncomingConfirmations))
+		srcLogs, err := r.config.sourceLP.LogsDataWordRange(
+			EventSignatures.SendRequested,
+			r.config.onRamp.Address(),
+			EventSignatures.SendRequestedSequenceNumberWord,
+			logpoller.EvmWord(unexpiredReport.Interval.Min),
+			logpoller.EvmWord(unexpiredReport.Interval.Max),
+			int(r.offchainConfig.SourceIncomingConfirmations),
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -346,10 +351,11 @@ func (r *ExecutionReportingPlugin) buildBatch(srcToDst map[common.Address]common
 	executedAllMessages = true
 	expectedNonces := make(map[common.Address]uint64)
 	for _, srcLog := range srcLogs {
-		msg, err2 := parseCCIPSendRequestedLog(gethtypes.Log{
+		msg, err2 := r.config.onRamp.ParseCCIPSendRequested(gethtypes.Log{
+			// Note this needs to change if we start indexing things.
 			Topics: srcLog.GetTopics(),
 			Data:   srcLog.Data,
-		}, r.onRampABI)
+		})
 		if err2 != nil {
 			r.lggr.Errorw("unable to parse message", "err", err2, "msg", msg)
 			// Unable to parse so don't mark as executed
@@ -470,9 +476,9 @@ func (r *ExecutionReportingPlugin) parseSeqNr(log logpoller.Log) (uint64, error)
 func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.Logger, observedMessages []ObservedMessage) ([]byte, error) {
 	getMsgLogs := func(min, max uint64) ([]logpoller.Log, error) {
 		return r.config.sourceLP.LogsDataWordRange(
-			r.config.eventSignatures.SendRequested,
+			EventSignatures.SendRequested,
 			r.config.onRamp.Address(),
-			r.config.eventSignatures.SendRequestedSequenceNumberIndex,
+			EventSignatures.SendRequestedSequenceNumberWord,
 			EvmWord(min),
 			EvmWord(max),
 			int(r.offchainConfig.SourceIncomingConfirmations),
@@ -596,7 +602,7 @@ func (r *ExecutionReportingPlugin) isStaleReport(seqNrs []uint64) (bool, error) 
 		// TODO: do we need to check for not present error?
 		return true, err
 	}
-	if msgState == MessageStateFailure || msgState == MessageStateSuccess {
+	if state := MessageExecutionState(msgState); state == ExecutionStateFailure || state == ExecutionStateSuccess {
 		return true, nil
 	}
 
@@ -620,11 +626,11 @@ func (r *ExecutionReportingPlugin) inflight(
 			inflightSeqNrs[seqNr] = struct{}{}
 		}
 		for _, encMsg := range rep.encMessages {
-			msg, err := parseCCIPSendRequestedLog(gethtypes.Log{
+			msg, err := r.config.onRamp.ParseCCIPSendRequested(gethtypes.Log{
 				// Note this needs to change if we start indexing things.
-				Topics: []common.Hash{r.config.eventSignatures.SendRequested},
+				Topics: []common.Hash{EventSignatures.SendRequested},
 				Data:   encMsg,
-			}, r.onRampABI)
+			})
 			if err != nil {
 				return nil, nil, nil, err
 			}
@@ -646,15 +652,6 @@ func (r *ExecutionReportingPlugin) inflight(
 		}
 	}
 	return inflightSeqNrs, inflightAggregateValue, maxInflightSenderNonces, nil
-}
-
-func parseCCIPSendRequestedLog(log gethtypes.Log, abi abi.ABI) (*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested, error) {
-	event := new(evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested)
-	err := bind.NewBoundContract(common.Address{}, abi, nil, nil, nil).UnpackLog(event, "CCIPSendRequested", log)
-	if err != nil {
-		return nil, err
-	}
-	return event, nil
 }
 
 // getTokensPrices returns token prices of the given price registry,
@@ -683,7 +680,7 @@ func getTokensPrices(ctx context.Context, priceRegistry *price_registry.PriceReg
 }
 
 func getUnexpiredCommitReports(dstLogPoller logpoller.LogPoller, commitStore *commit_store.CommitStore, permissionExecutionThreshold time.Duration) ([]commit_store.CommitStoreCommitReport, error) {
-	logs, err := dstLogPoller.LogsCreatedAfter(ReportAccepted, commitStore.Address(), time.Now().Add(-permissionExecutionThreshold))
+	logs, err := dstLogPoller.LogsCreatedAfter(EventSignatures.ReportAccepted, commitStore.Address(), time.Now().Add(-permissionExecutionThreshold))
 	if err != nil {
 		return nil, err
 	}

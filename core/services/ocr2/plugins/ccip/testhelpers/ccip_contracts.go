@@ -877,7 +877,7 @@ func EventuallyExecutionStateChangedToSuccess(t *testing.T, ccipContracts CCIPCo
 		it, err := ccipContracts.Dest.OffRamp.FilterExecutionStateChanged(&bind.FilterOpts{Start: blockNum}, seqNum, [][32]byte{})
 		require.NoError(t, err)
 		for it.Next() {
-			if ccip.MessageExecutionState(it.Event.State) == ccip.Success {
+			if ccip.MessageExecutionState(it.Event.State) == ccip.ExecutionStateSuccess {
 				return true
 			}
 		}

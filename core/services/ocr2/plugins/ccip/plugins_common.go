@@ -16,22 +16,6 @@ import (
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 )
 
-const (
-	MessageStateUntouched = iota
-	MessageStateInProgress
-	MessageStateSuccess
-	MessageStateFailure
-)
-
-// EventSignatures contain pluginType specific signatures and indexes.
-// Indexes are zero indexed
-type EventSignatures struct {
-	SendRequested                            common.Hash
-	SendRequestedSequenceNumberIndex         int
-	ExecutionStateChanged                    common.Hash
-	ExecutionStateChangedSequenceNumberIndex int
-}
-
 var ErrCommitStoreIsDown = errors.New("commitStore is down")
 
 func LoadOnRamp(onRampAddress common.Address, client client.Client) (*evm_2_evm_onramp.EVM2EVMOnRamp, error) {

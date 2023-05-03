@@ -94,13 +94,12 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 		return nil, err
 	}
 
-	eventSigs := GetEventSignatures()
 	err = destChain.LogPoller().RegisterFilter(logpoller.Filter{Name: logpoller.FilterName(COMMIT_PRICE_UPDATES, dynamicConfig.PriceRegistry.String()),
-		EventSigs: []common.Hash{UsdPerUnitGasUpdated, UsdPerTokenUpdated}, Addresses: []common.Address{dynamicConfig.PriceRegistry}})
+		EventSigs: []common.Hash{EventSignatures.UsdPerUnitGasUpdated, EventSignatures.UsdPerTokenUpdated}, Addresses: []common.Address{dynamicConfig.PriceRegistry}})
 	if err != nil {
 		return nil, err
 	}
-	err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{Name: logpoller.FilterName(COMMIT_CCIP_SENDS, onRamp.Address().String()), EventSigs: []common.Hash{eventSigs.SendRequested}, Addresses: []common.Address{onRamp.Address()}})
+	err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{Name: logpoller.FilterName(COMMIT_CCIP_SENDS, onRamp.Address().String()), EventSigs: []common.Hash{EventSignatures.SendRequested}, Addresses: []common.Address{onRamp.Address()}})
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +110,6 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 			lggr:               lggr,
 			sourceLP:           sourceChain.LogPoller(),
 			destLP:             destChain.LogPoller(),
-			reqEventSig:        eventSigs,
 			onRamp:             onRamp,
 			priceRegistry:      priceRegistry,
 			priceGetter:        priceGetterObject,

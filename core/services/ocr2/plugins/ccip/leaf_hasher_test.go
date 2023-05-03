@@ -72,7 +72,7 @@ func generateLog(t *testing.T, message evm_2_evm_onramp.InternalEVM2EVMMessage) 
 	require.NoError(t, err)
 
 	return types.Log{
-		Topics: []common.Hash{GetEventSignatures().SendRequested},
+		Topics: []common.Hash{EventSignatures.SendRequested},
 		Data:   pack,
 	}
 }

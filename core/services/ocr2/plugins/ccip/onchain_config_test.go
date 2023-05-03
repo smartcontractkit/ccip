@@ -37,7 +37,7 @@ func TestCommitOnchainConfig(t *testing.T) {
 			encoded, err := EncodeAbiStruct(tt.want)
 			require.NoError(t, err)
 
-			decoded, err := DecodeAbiStruct(encoded, &CommitOnchainConfig{})
+			decoded, err := DecodeAbiStruct[CommitOnchainConfig](encoded)
 			require.NoError(t, err)
 			require.Equal(t, tt.want, decoded)
 		})
@@ -73,7 +73,7 @@ func TestExecOnchainConfig(t *testing.T) {
 			encoded, err := EncodeAbiStruct(tt.want)
 			require.NoError(t, err)
 
-			decoded, err := DecodeAbiStruct(encoded, &ExecOnchainConfig{})
+			decoded, err := DecodeAbiStruct[ExecOnchainConfig](encoded)
 			require.NoError(t, err)
 			require.Equal(t, tt.want, decoded)
 		})

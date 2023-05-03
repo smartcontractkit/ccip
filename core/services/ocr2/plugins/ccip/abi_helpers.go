@@ -1,7 +1,6 @@
 package ccip
 
 import (
-	"errors"
 	"fmt"
 	"math/big"
 	"strings"
@@ -16,23 +15,32 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
-var (
-	// merkleRoot || minSeqNum || maxSeqNum
-	ReportAccepted common.Hash
-	// Prices
-	UsdPerUnitGasUpdated common.Hash
-	UsdPerTokenUpdated   common.Hash
-)
-
 // MessageExecutionState defines the execution states of CCIP messages.
-type MessageExecutionState uint64
+type MessageExecutionState uint8
 
 const (
-	Untouched MessageExecutionState = iota
-	InProgress
-	Success
-	Failure
+	ExecutionStateUntouched MessageExecutionState = iota
+	ExecutionStateInProgress
+	ExecutionStateSuccess
+	ExecutionStateFailure
 )
+
+var EventSignatures struct {
+	SendRequested         common.Hash // OnRamp
+	ReportAccepted        common.Hash // CommitStore
+	ExecutionStateChanged common.Hash // OffRamp
+
+	// PriceRegistry
+	UsdPerUnitGasUpdated common.Hash
+	UsdPerTokenUpdated   common.Hash
+
+	// offset || sourceChainID || seqNum || ...
+	SendRequestedSequenceNumberWord int
+	// offset || priceUpdatesOffset || minSeqNum || maxSeqNum || merkleRoot
+	ReportAcceptedMaxSequenceNumberWord int
+	// sig || seqNum || messageId || ...
+	ExecutionStateChangedSequenceNumberIndex int
+}
 
 func getIDOrPanic(name string, abi2 abi.ABI) common.Hash {
 	event, ok := abi2.Events[name]
@@ -43,41 +51,33 @@ func getIDOrPanic(name string, abi2 abi.ABI) common.Hash {
 }
 
 func init() {
-	commitStoreABI, err := abi.JSON(strings.NewReader(commit_store.CommitStoreABI))
-	if err != nil {
-		panic(err)
-	}
-	ReportAccepted = getIDOrPanic("ReportAccepted", commitStoreABI)
-
-	pricesABI, err := abi.JSON(strings.NewReader(price_registry.PriceRegistryABI))
-	if err != nil {
-		panic(err)
-	}
-	UsdPerUnitGasUpdated = getIDOrPanic("UsdPerUnitGasUpdated", pricesABI)
-	UsdPerTokenUpdated = getIDOrPanic("UsdPerTokenUpdated", pricesABI)
-}
-
-func GetEventSignatures() EventSignatures {
 	onRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_onramp.EVM2EVMOnRampABI))
 	if err != nil {
 		panic(err)
 	}
-	CCIPSendRequested := getIDOrPanic("CCIPSendRequested", onRampABI)
+	EventSignatures.SendRequested = getIDOrPanic("CCIPSendRequested", onRampABI)
+	EventSignatures.SendRequestedSequenceNumberWord = 2
+
+	commitStoreABI, err := abi.JSON(strings.NewReader(commit_store.CommitStoreABI))
+	if err != nil {
+		panic(err)
+	}
+	EventSignatures.ReportAccepted = getIDOrPanic("ReportAccepted", commitStoreABI)
+	EventSignatures.ReportAcceptedMaxSequenceNumberWord = 3
 
 	offRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_offramp.EVM2EVMOffRampABI))
 	if err != nil {
 		panic(err)
 	}
-	ExecutionStateChanged := getIDOrPanic("ExecutionStateChanged", offRampABI)
+	EventSignatures.ExecutionStateChanged = getIDOrPanic("ExecutionStateChanged", offRampABI)
+	EventSignatures.ExecutionStateChangedSequenceNumberIndex = 1
 
-	return EventSignatures{
-		// offset || sourceChainID || seqNum || ...
-		SendRequested:                    CCIPSendRequested,
-		SendRequestedSequenceNumberIndex: 2,
-		// sig || seqNum || messageId || ...
-		ExecutionStateChanged:                    ExecutionStateChanged,
-		ExecutionStateChangedSequenceNumberIndex: 1,
+	priceRegistryABI, err := abi.JSON(strings.NewReader(price_registry.PriceRegistryABI))
+	if err != nil {
+		panic(err)
 	}
+	EventSignatures.UsdPerUnitGasUpdated = getIDOrPanic("UsdPerUnitGasUpdated", priceRegistryABI)
+	EventSignatures.UsdPerTokenUpdated = getIDOrPanic("UsdPerTokenUpdated", priceRegistryABI)
 }
 
 func DecodeMessage(b []byte) (*evm_2_evm_onramp.InternalEVM2EVMMessage, error) {
@@ -135,7 +135,7 @@ func DecodeMessage(b []byte) (*evm_2_evm_onramp.InternalEVM2EVMMessage, error) {
 }
 
 func MakeMessageArgs() abi.Arguments {
-	var tuples = []abi.ArgumentMarshaling{
+	tuples := []abi.ArgumentMarshaling{
 		{
 			Name: "sourceChainId",
 			Type: "uint64",
@@ -313,18 +313,15 @@ func EncodeAbiStruct[T AbiDefined](decoded T) ([]byte, error) {
 	return encoded, nil
 }
 
-func DecodeAbiStruct[T AbiDefined](encoded []byte, origin *T) (T, error) {
+func DecodeAbiStruct[T AbiDefined](encoded []byte) (T, error) {
 	var empty T
-	if origin == nil {
-		return empty, errors.New("nil origin passed to Decode func")
-	}
 
-	decoded, err := utils.ABIDecode((*origin).AbiString(), encoded)
+	decoded, err := utils.ABIDecode(empty.AbiString(), encoded)
 	if err != nil {
-		return *origin, err
+		return empty, err
 	}
 
-	converted := abi.ConvertType(decoded[0], origin)
+	converted := abi.ConvertType(decoded[0], &empty)
 	if casted, ok := converted.(*T); ok {
 		return *casted, nil
 	}

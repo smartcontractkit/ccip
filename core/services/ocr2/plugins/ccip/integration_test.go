@@ -53,7 +53,6 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		gasLimit := big.NewInt(200_003)      // prime number
 		//gasPrice := big.NewInt(1e9)          // 1 gwei
 
-		eventSignatures := ccip.GetEventSignatures()
 		extraArgs, err := testhelpers.GetEVMExtraArgsV1(gasLimit, false)
 		require.NoError(t, err)
 
@@ -93,12 +92,12 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		ccipContracts.Source.Chain.Commit()
 		testhelpers.SendRequest(t, ccipContracts, msg)
 		// Should eventually see this executed.
-		testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.Source.OnRamp.Address(), nodes, geCurrentSeqNum)
+		testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, ccipContracts.Source.OnRamp.Address(), nodes, geCurrentSeqNum)
 		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.Source.OnRamp.Address(), geCurrentSeqNum)
 
-		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.Dest.OffRamp.Address(), nodes, geCurrentSeqNum, geCurrentSeqNum)
+		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, ccipContracts.Dest.OffRamp.Address(), nodes, geCurrentSeqNum, geCurrentSeqNum)
 		assert.Len(t, executionLogs, 1)
-		testhelpers.AssertExecState(t, ccipContracts, executionLogs[0], ccip.Success)
+		testhelpers.AssertExecState(t, ccipContracts, executionLogs[0], ccip.ExecutionStateSuccess)
 
 		// Asserts
 		// 1) The total pool input == total pool output
@@ -160,7 +159,6 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		gasLimit := big.NewInt(250_000)
 		//gasPrice := big.NewInt(1e9) // 1 gwei
 
-		eventSignatures := ccip.GetEventSignatures()
 		var txs []*gethtypes.Transaction
 		// Enough to require batched executions as gasLimit per tx is 250k -> 500k -> 750k ....
 		// The actual gas usage of executing 15 messages is higher than the gas limit for
@@ -199,14 +197,14 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		testhelpers.ConfirmTxs(t, txs, ccipContracts.Source.Chain)
 		var reqs []logpoller.Log
 		for i := 0; i < n; i++ {
-			reqs = append(reqs, testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.Source.OnRamp.Address(), nodes, geCurrentSeqNum+i))
+			reqs = append(reqs, testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, ccipContracts.Source.OnRamp.Address(), nodes, geCurrentSeqNum+i))
 		}
 		// Should see a report with the full range
 		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.Source.OnRamp.Address(), geCurrentSeqNum+n-1)
 		// Should all be executed
-		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.Dest.OffRamp.Address(), nodes, geCurrentSeqNum, geCurrentSeqNum+n-1)
+		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, ccipContracts.Dest.OffRamp.Address(), nodes, geCurrentSeqNum, geCurrentSeqNum+n-1)
 		for _, execLog := range executionLogs {
-			testhelpers.AssertExecState(t, ccipContracts, execLog, ccip.Success)
+			testhelpers.AssertExecState(t, ccipContracts, execLog, ccip.ExecutionStateSuccess)
 		}
 
 		geCurrentSeqNum += n
@@ -243,16 +241,15 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		_, err = ccipContracts.Source.LinkToken.Approve(ccipContracts.Source.User, ccipContracts.Source.Router.Address(), big.NewInt(0).Mul(big.NewInt(int64(totalMsgs)), fee))
 		require.NoError(t, err)
 		ccipContracts.Source.Chain.Commit()
-		eventSignatures := ccip.GetEventSignatures()
 		txForFailedReq := testhelpers.SendRequest(t, ccipContracts, msg)
-		failedReqLog := testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.Source.OnRamp.Address(), nodes, geCurrentSeqNum)
+		failedReqLog := testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, ccipContracts.Source.OnRamp.Address(), nodes, geCurrentSeqNum)
 		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.Source.OnRamp.Address(), geCurrentSeqNum)
 		testhelpers.EventuallyCommitReportAccepted(t, ccipContracts, currentBlockNumber)
 
 		// execution status should be failed
-		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.Dest.OffRamp.Address(), nodes, geCurrentSeqNum, geCurrentSeqNum)
+		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, ccipContracts.Dest.OffRamp.Address(), nodes, geCurrentSeqNum, geCurrentSeqNum)
 		assert.Len(t, executionLogs, 1)
-		testhelpers.AssertExecState(t, ccipContracts, executionLogs[0], ccip.Failure)
+		testhelpers.AssertExecState(t, ccipContracts, executionLogs[0], ccip.ExecutionStateFailure)
 		// Nonce should not have incremented
 		afterNonce, err := ccipContracts.Dest.OffRamp.GetSenderNonce(nil, ccipContracts.Source.User.From)
 		require.NoError(t, err)
@@ -269,9 +266,9 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		var pendingReqNumbers []int
 		for i := 1; i < totalMsgs; i++ {
 			testhelpers.SendRequest(t, ccipContracts, msg)
-			testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.Source.OnRamp.Address(), nodes, geCurrentSeqNum)
+			testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, ccipContracts.Source.OnRamp.Address(), nodes, geCurrentSeqNum)
 			testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.Source.OnRamp.Address(), geCurrentSeqNum)
-			executionLog := testhelpers.NoNodesHaveExecutedSeqNum(t, ccipContracts, eventSignatures, ccipContracts.Dest.OffRamp.Address(), nodes, geCurrentSeqNum)
+			executionLog := testhelpers.NoNodesHaveExecutedSeqNum(t, ccipContracts, ccipContracts.Dest.OffRamp.Address(), nodes, geCurrentSeqNum)
 			require.Empty(t, executionLog)
 			pendingReqNumbers = append(pendingReqNumbers, geCurrentSeqNum)
 			geCurrentSeqNum++
@@ -319,7 +316,6 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 
 		startSeq := 1
 		endSeqNum := 3
-		eventSignatures := ccip.GetEventSignatures()
 		gasLimit := big.NewInt(200_003) // prime number
 		gasPrice := big.NewInt(1e9)     // 1 gwei
 		tokenAmount := big.NewInt(100)
@@ -329,10 +325,10 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 			ccipContracts.Source.Chain.Commit()
 			ccipContracts.Dest.Chain.Commit()
 			t.Logf("verifying seqnum %d", i)
-			testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.Source.OnRamp.Address(), nodes, i)
+			testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, ccipContracts.Source.OnRamp.Address(), nodes, i)
 			testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.Source.OnRamp.Address(), i)
-			executionLog := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.Dest.OffRamp.Address(), nodes, i, i)
-			testhelpers.AssertExecState(t, ccipContracts, executionLog[0], ccip.Success)
+			executionLog := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, ccipContracts.Dest.OffRamp.Address(), nodes, i, i)
+			testhelpers.AssertExecState(t, ccipContracts, executionLog[0], ccip.ExecutionStateSuccess)
 		}
 
 		geCurrentSeqNum = endSeqNum + 1
@@ -408,16 +404,15 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		require.NoError(t, err)
 
 		// verify message is sent
-		eventSignatures := ccip.GetEventSignatures()
 		ccipContracts.Source.User.Value = fee
 		testhelpers.SendRequest(t, ccipContracts, msg)
 		ccipContracts.Source.User.Value = nil
-		testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.Source.OnRamp.Address(), nodes, geCurrentSeqNum)
+		testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, ccipContracts.Source.OnRamp.Address(), nodes, geCurrentSeqNum)
 		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.Source.OnRamp.Address(), geCurrentSeqNum)
 
-		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.Dest.OffRamp.Address(), nodes, geCurrentSeqNum, geCurrentSeqNum)
+		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, ccipContracts.Dest.OffRamp.Address(), nodes, geCurrentSeqNum, geCurrentSeqNum)
 		assert.Len(t, executionLogs, 1)
-		testhelpers.AssertExecState(t, ccipContracts, executionLogs[0], ccip.Success)
+		testhelpers.AssertExecState(t, ccipContracts, executionLogs[0], ccip.ExecutionStateSuccess)
 		geCurrentSeqNum++
 
 		// get the nop fee

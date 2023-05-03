@@ -53,6 +53,7 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
   error PoolAlreadyAdded();
   error PoolDoesNotExist();
   error TokenPoolMismatch();
+  error InvalidNewState(uint64 sequenceNumber, Internal.MessageExecutionState newState);
 
   event PoolAdded(address token, address pool);
   event PoolRemoved(address token, address pool);
@@ -265,27 +266,27 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
       Internal.MessageExecutionState newState = _trialExecute(message, offchainTokenData, manualExecution);
       _setExecutionState(message.sequenceNumber, newState);
 
-      if (manualExecution) {
-        // Nonce changes per state transition:
-        // FAILURE->SUCCESS: no nonce bump unless strict
-        // UNTOUCHED->SUCCESS: nonce bump
-        // FAILURE->FAILURE: no nonce bump
-        if (
-          (message.strict &&
-            originalState == Internal.MessageExecutionState.FAILURE &&
-            newState == Internal.MessageExecutionState.SUCCESS) ||
-          (originalState == Internal.MessageExecutionState.UNTOUCHED &&
-            newState == Internal.MessageExecutionState.SUCCESS)
-        ) {
+      // The only valid prior states are UNTOUCHED and FAILURE (checked above)
+      // The only valid post states are FAILURE and SUCCESS (checked below)
+      if (newState != Internal.MessageExecutionState.FAILURE && newState != Internal.MessageExecutionState.SUCCESS)
+        revert InvalidNewState(message.sequenceNumber, newState);
+
+      // Nonce changes per state transition strict
+      // UNTOUCHED -> FAILURE  no nonce bump
+      // UNTOUCHED -> SUCCESS: nonce bump
+      // FAILURE   -> FAILURE: no nonce bump
+      // FAILURE   -> SUCCESS: nonce bump
+      if (message.strict) {
+        if (newState == Internal.MessageExecutionState.SUCCESS) {
           s_senderNonce[message.sender]++;
         }
-      } else {
-        // Nonce changes per state transition:
-        // UNTOUCHED->SUCCESS: nonce bump
-        // UNTOUCHED->FAILURE: nonce bump unless strict
-        if (!(message.strict && newState == Internal.MessageExecutionState.FAILURE)) {
-          s_senderNonce[message.sender]++;
-        }
+        // Nonce changes per state transition non-strict
+        // UNTOUCHED -> FAILURE  nonce bump
+        // UNTOUCHED -> SUCCESS  nonce bump
+        // FAILURE   -> FAILURE  no nonce bump
+        // FAILURE   -> SUCCESS  no nonce bump
+      } else if (originalState == Internal.MessageExecutionState.UNTOUCHED) {
+        s_senderNonce[message.sender]++;
       }
 
       emit ExecutionStateChanged(message.sequenceNumber, message.messageId, newState);

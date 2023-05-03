@@ -61,7 +61,6 @@ func setupCommitTestHarness(t *testing.T) commitTestHarness {
 			commitStore:        th.commitStore,
 			priceRegistry:      th.priceRegistry,
 			priceGetter:        fakePriceGetter{},
-			reqEventSig:        GetEventSignatures(),
 			sourceNative:       utils.RandomAddress(),
 			sourceFeeEstimator: sourceFeeEstimator,
 			sourceChainID:      th.sourceChainID,
@@ -242,7 +241,7 @@ func TestReport(t *testing.T) {
 	require.NoError(t, err)
 	th.flushLogs(t)
 	logs, err := th.sourceClient.FilterLogs(testutils.Context(t), ethereum.FilterQuery{
-		Topics:    [][]common.Hash{{th.plugin.config.reqEventSig.SendRequested}},
+		Topics:    [][]common.Hash{{EventSignatures.SendRequested}},
 		Addresses: []common.Address{th.onRamp.Address()},
 	})
 	require.NoError(t, err)

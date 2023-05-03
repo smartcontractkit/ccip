@@ -109,7 +109,6 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 
 	lggr = lggr.With("srcChain", ChainName(int64(offRampConfig.SourceChainId)), "dstChain", ChainName(destChainID))
 
-	eventSignatures := GetEventSignatures()
 	wrappedPluginFactory := NewExecutionReportingPluginFactory(
 		ExecutionPluginConfig{
 			lggr:                   lggr,
@@ -118,7 +117,6 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 			offRamp:                offRamp,
 			onRamp:                 onRamp,
 			commitStore:            commitStore,
-			eventSignatures:        eventSignatures,
 			leafHasher:             NewLeafHasher(offRampConfig.SourceChainId, uint64(destChainID), onRamp.Address(), hasher.NewKeccakCtx()),
 			destPriceRegistry:      destPriceRegistry,
 			srcPriceRegistry:       srcPriceRegistry,
@@ -129,17 +127,17 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 
 	// Subscribe to all relevant commit logs.
 	err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{Name: logpoller.FilterName(EXEC_CCIP_SENDS, onRamp.Address().String()),
-		EventSigs: []common.Hash{eventSignatures.SendRequested}, Addresses: []common.Address{onRamp.Address()}})
+		EventSigs: []common.Hash{EventSignatures.SendRequested}, Addresses: []common.Address{onRamp.Address()}})
 	if err != nil {
 		return nil, err
 	}
 	err = destChain.LogPoller().RegisterFilter(logpoller.Filter{Name: logpoller.FilterName(EXEC_REPORT_ACCEPTS, commitStore.Address().String()),
-		EventSigs: []common.Hash{ReportAccepted}, Addresses: []common.Address{commitStore.Address()}})
+		EventSigs: []common.Hash{EventSignatures.ReportAccepted}, Addresses: []common.Address{commitStore.Address()}})
 	if err != nil {
 		return nil, err
 	}
 	err = destChain.LogPoller().RegisterFilter(logpoller.Filter{Name: logpoller.FilterName(EXEC_EXECUTION_STATE_CHANGES, offRamp.Address().String()),
-		EventSigs: []common.Hash{eventSignatures.ExecutionStateChanged}, Addresses: []common.Address{offRamp.Address()}})
+		EventSigs: []common.Hash{EventSignatures.ExecutionStateChanged}, Addresses: []common.Address{offRamp.Address()}})
 	if err != nil {
 		return nil, err
 	}

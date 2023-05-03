@@ -268,7 +268,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     assertGt(s_offRamp.getSenderNonce(messages[0].sender), nonceBefore);
   }
 
-  function testStrictFailure() public {
+  function testStrictFailureSuccess() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
 
     messages[0].strict = true;
@@ -284,6 +284,24 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     assertEq(uint64(0), s_offRamp.getSenderNonce(address(OWNER)));
     s_offRamp.execute(_generateReportFromMessages(messages), false);
     assertEq(uint64(0), s_offRamp.getSenderNonce(address(OWNER)));
+  }
+
+  function testStrictUntouchedToSuccessSuccess() public {
+    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
+
+    messages[0].strict = true;
+    messages[0].receiver = address(s_receiver);
+
+    vm.expectEmit();
+    emit ExecutionStateChanged(
+      messages[0].sequenceNumber,
+      messages[0].messageId,
+      Internal.MessageExecutionState.SUCCESS
+    );
+    // Nonce should increment on a strict untouched -> success.
+    assertEq(uint64(0), s_offRamp.getSenderNonce(address(OWNER)));
+    s_offRamp.execute(_generateReportFromMessages(messages), false);
+    assertEq(uint64(1), s_offRamp.getSenderNonce(address(OWNER)));
   }
 
   function testSkippedIncorrectNonceSuccess() public {

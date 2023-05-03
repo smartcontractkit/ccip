@@ -1156,7 +1156,7 @@ func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(
 				if err == nil {
 					receivedAt = hdr.Timestamp
 				}
-				if e.State == ccipPlugin.MessageStateSuccess {
+				if ccipPlugin.MessageExecutionState(e.State) == ccipPlugin.ExecutionStateSuccess {
 					reports.UpdatePhaseStats(reqNo, seqNum, testreporters.ExecStateChanged, receivedAt.Sub(timeNow), testreporters.Success)
 					return nil
 				} else {
@@ -1750,7 +1750,7 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 				InflightCacheExpiry:         models.MustMakeDuration(InflightExpirySimulated),
 				RootSnoozeTime:              models.MustMakeDuration(RootSnoozeTimeSimulated),
 			}, ccipPlugin.ExecOnchainConfig{
-				PermissionLessExecutionThresholdSeconds: 60,
+				PermissionLessExecutionThresholdSeconds: 60 * 30,
 				Router:                                  destCCIP.Common.Router.EthAddress,
 				PriceRegistry:                           destCCIP.Common.PriceRegistry.EthAddress,
 				Afn:                                     destCCIP.Common.AFN.EthAddress,
