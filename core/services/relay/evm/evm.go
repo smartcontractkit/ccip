@@ -28,11 +28,9 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ethkey"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	mercuryconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/mercury/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
-	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/mercury"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/mercury/reportcodec"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/mercury/wsrpc"
@@ -498,67 +496,4 @@ func (p *medianProvider) OffchainConfigDigester() ocrtypes.OffchainConfigDigeste
 
 func (p *medianProvider) ContractConfigTracker() ocrtypes.ContractConfigTracker {
 	return p.configWatcher.ContractConfigTracker()
-}
-
-// ccipRelayer is a relayer wrapper with added CCIP provider methods.
-type ccipRelayer struct {
-	*Relayer
-}
-
-var _ relay.CCIPRelayer = (*ccipRelayer)(nil)
-
-func NewCCIPRelayer(relayer interface{}) relay.CCIPRelayer {
-	return &ccipRelayer{relayer.(*Relayer)}
-}
-
-type ccipCommitProvider struct {
-	*configWatcher
-	contractTransmitter *contractTransmitter
-}
-
-var _ relay.CCIPCommitProvider = (*ccipCommitProvider)(nil)
-
-func (c *ccipRelayer) NewCCIPCommitProvider(rargs relaytypes.RelayArgs, transmitterID string) (relay.CCIPCommitProvider, error) {
-	configWatcher, err := newConfigProvider(c.lggr, c.chainSet, rargs)
-	if err != nil {
-		return nil, err
-	}
-	contractTransmitter, err := newContractTransmitter(c.lggr, rargs, transmitterID, configWatcher, c.ks.Eth(), ccip.CommitReportToEthTxMeta)
-	if err != nil {
-		return nil, err
-	}
-	return &ccipCommitProvider{
-		configWatcher:       configWatcher,
-		contractTransmitter: contractTransmitter,
-	}, nil
-}
-
-func (c *ccipCommitProvider) ContractTransmitter() ocrtypes.ContractTransmitter {
-	return c.contractTransmitter
-}
-
-type ccipExecutionProvider struct {
-	*configWatcher
-	contractTransmitter *contractTransmitter
-}
-
-var _ relay.CCIPExecutionProvider = (*ccipExecutionProvider)(nil)
-
-func (c *ccipRelayer) NewCCIPExecutionProvider(rargs relaytypes.RelayArgs, transmitterID string) (relay.CCIPExecutionProvider, error) {
-	configWatcher, err := newConfigProvider(c.lggr, c.chainSet, rargs)
-	if err != nil {
-		return nil, err
-	}
-	contractTransmitter, err := newContractTransmitter(c.lggr, rargs, transmitterID, configWatcher, c.ks.Eth(), ccip.ExecutionReportToEthTxMeta)
-	if err != nil {
-		return nil, err
-	}
-	return &ccipExecutionProvider{
-		configWatcher:       configWatcher,
-		contractTransmitter: contractTransmitter,
-	}, nil
-}
-
-func (c *ccipExecutionProvider) ContractTransmitter() ocrtypes.ContractTransmitter {
-	return c.contractTransmitter
 }

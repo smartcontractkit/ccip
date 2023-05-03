@@ -10,6 +10,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-relay/pkg/loop"
 	"github.com/smartcontractkit/chainlink-relay/pkg/types"
+
 	"github.com/smartcontractkit/chainlink/v2/core/services"
 )
 
@@ -100,20 +101,4 @@ func (a *RelayerServiceAdapter) Relayer() (loop.Relayer, error) {
 // NewLocalRelayerService returns a RelayerService adapted from a [types.Relayer] and [RelayerExt].
 func NewLocalRelayerService(r types.Relayer, e RelayerExt) RelayerService {
 	return &RelayerServiceAdapter{&RelayerAdapter{Relayer: r, RelayerExt: e}}
-}
-
-type CCIPRelayer interface {
-	relaytypes.Relayer
-	NewCCIPCommitProvider(rargs relaytypes.RelayArgs, transmitterID string) (CCIPCommitProvider, error)
-	NewCCIPExecutionProvider(rargs relaytypes.RelayArgs, transmitterID string) (CCIPExecutionProvider, error)
-}
-
-// CCIPCommitProvider provides all components needed for a CCIP Relay OCR2 plugin.
-type CCIPCommitProvider interface {
-	relaytypes.Plugin
-}
-
-// CCIPExecutionProvider provides all components needed for a CCIP Execution OCR2 plugin.
-type CCIPExecutionProvider interface {
-	relaytypes.Plugin
 }

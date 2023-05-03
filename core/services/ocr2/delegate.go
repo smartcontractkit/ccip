@@ -21,6 +21,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-relay/pkg/loop"
 	"github.com/smartcontractkit/chainlink-relay/pkg/types"
+
 	"github.com/smartcontractkit/chainlink/v2/plugins"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm"
@@ -740,13 +741,22 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 		if spec.Relay != relay.EVM {
 			return nil, errors.New("Non evm chains are not supported for CCIP commit")
 		}
-		ccipProvider, err2 := evmrelay.NewCCIPRelayer(relayer).NewCCIPCommitProvider(
+		ccipProvider, err2 := evmrelay.NewFunctionsProvider(
+			d.chainSet,
 			types.RelayArgs{
 				ExternalJobID: jb.ExternalJobID,
 				JobID:         spec.ID,
 				ContractID:    spec.ContractID,
 				RelayConfig:   spec.RelayConfig.Bytes(),
-			}, spec.TransmitterID.String)
+				New:           d.isNewlyCreatedJob,
+			},
+			types.PluginArgs{
+				TransmitterID: transmitterID,
+				PluginConfig:  spec.PluginConfig.Bytes(),
+			},
+			lggr.Named("CCIPCommit"),
+			d.ethKs,
+		)
 		if err2 != nil {
 			return nil, err2
 		}
@@ -767,13 +777,22 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 		if spec.Relay != relay.EVM {
 			return nil, errors.New("Non evm chains are not supported for CCIP execution")
 		}
-		ccipProvider, err2 := evmrelay.NewCCIPRelayer(relayer).NewCCIPExecutionProvider(
+		ccipProvider, err2 := evmrelay.NewFunctionsProvider(
+			d.chainSet,
 			types.RelayArgs{
 				ExternalJobID: jb.ExternalJobID,
 				JobID:         spec.ID,
 				ContractID:    spec.ContractID,
 				RelayConfig:   spec.RelayConfig.Bytes(),
-			}, spec.TransmitterID.String)
+				New:           d.isNewlyCreatedJob,
+			},
+			types.PluginArgs{
+				TransmitterID: transmitterID,
+				PluginConfig:  spec.PluginConfig.Bytes(),
+			},
+			lggr.Named("CCIPExec"),
+			d.ethKs,
+		)
 		if err2 != nil {
 			return nil, err2
 		}

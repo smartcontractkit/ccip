@@ -111,7 +111,7 @@ type ExecutionPluginConfig struct {
 	eventSignatures        EventSignatures
 	leafHasher             LeafHasherInterface[[32]byte]
 	lggr                   logger.Logger
-	destGasEstimator       txmgrtypes.FeeEstimator[*evmtypes.Head, gas.EvmFee, *assets.Wei, evmtypes.TxHash]
+	destGasEstimator       txmgrtypes.FeeEstimator[*evmtypes.Head, gas.EvmFee, *assets.Wei, common.Hash]
 	srcWrappedNativeToken  common.Address
 	destWrappedNativeToken common.Address
 }
@@ -268,8 +268,8 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 		return nil, errors.Wrap(err, "could not estimate destination gas price")
 	}
 	destGasPrice := destGasPriceWei.Legacy.ToInt()
-	if destGasPriceWei.Dynamic != nil {
-		destGasPrice = destGasPriceWei.Dynamic.FeeCap.ToInt()
+	if destGasPriceWei.DynamicFeeCap != nil {
+		destGasPrice = destGasPriceWei.DynamicFeeCap.ToInt()
 	}
 
 	r.lggr.Debugw("processing unexpired reports", "n", len(unexpiredReports))
