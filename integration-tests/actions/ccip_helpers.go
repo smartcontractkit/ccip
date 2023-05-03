@@ -1750,7 +1750,7 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 				InflightCacheExpiry:         models.MustMakeDuration(InflightExpirySimulated),
 				RootSnoozeTime:              models.MustMakeDuration(RootSnoozeTimeSimulated),
 			}, ccipPlugin.ExecOnchainConfig{
-				PermissionLessExecutionThresholdSeconds: 60,
+				PermissionLessExecutionThresholdSeconds: 60 * 30,
 				Router:                                  destCCIP.Common.Router.EthAddress,
 				PriceRegistry:                           destCCIP.Common.PriceRegistry.EthAddress,
 				Afn:                                     destCCIP.Common.AFN.EthAddress,
