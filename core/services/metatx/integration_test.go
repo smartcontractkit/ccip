@@ -318,14 +318,12 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 			return holder2Balance.Cmp(amount) == 0
 		}, testutils.WaitTimeout(t), 5*time.Second).Should(gomega.BeTrue())
 
-		eventSignatures := ccip.GetEventSignatures()
-
-		testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, eventSignatures, ccipContracts.Source.OnRamp.Address(), nodes, geCurrentSeqNum)
+		testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, ccipContracts.Source.OnRamp.Address(), nodes, geCurrentSeqNum)
 		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.Source.OnRamp.Address(), geCurrentSeqNum)
 
-		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, eventSignatures, ccipContracts.Dest.OffRamp.Address(), nodes, geCurrentSeqNum, geCurrentSeqNum)
+		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, ccipContracts.Dest.OffRamp.Address(), nodes, geCurrentSeqNum, geCurrentSeqNum)
 		assert.Len(t, executionLogs, 1)
-		testhelpers.AssertExecState(t, ccipContracts, executionLogs[0], ccip.Success)
+		testhelpers.AssertExecState(t, ccipContracts, executionLogs[0], ccip.ExecutionStateSuccess)
 
 		//source token is locked in the token pool
 		lockedTokenBal, err := sourceToken.BalanceOf(nil, sourcePoolAddress)

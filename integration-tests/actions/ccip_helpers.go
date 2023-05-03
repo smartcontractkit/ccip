@@ -1156,7 +1156,7 @@ func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(
 				if err == nil {
 					receivedAt = hdr.Timestamp
 				}
-				if e.State == ccipPlugin.MessageStateSuccess {
+				if ccipPlugin.MessageExecutionState(e.State) == ccipPlugin.ExecutionStateSuccess {
 					reports.UpdatePhaseStats(reqNo, seqNum, testreporters.ExecStateChanged, receivedAt.Sub(timeNow), testreporters.Success)
 					return nil
 				} else {

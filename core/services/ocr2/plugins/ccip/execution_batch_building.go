@@ -133,19 +133,18 @@ func validateSeqNumbers(serviceCtx context.Context, commitStore *commit_store.Co
 	return nil
 }
 
-// Gets the commit report from the saved logs for a give sequence number.
-// TODO inefficient to always go through *all* commit reports that have ever been committed.
+// Gets the commit report from the saved logs for a given sequence number.
 func getCommitReportForSeqNum(dstLogPoller logpoller.LogPoller, commitStore *commit_store.CommitStore, seqNr uint64) (commit_store.CommitStoreCommitReport, error) {
-	latest, err := dstLogPoller.LatestBlock()
+	// fetch commitReports which report.Interval.Max >= seqNr
+	logs, err := dstLogPoller.LogsDataWordGreaterThan(
+		EventSignatures.ReportAccepted,
+		commitStore.Address(),
+		EventSignatures.ReportAcceptedMaxSequenceNumberWord,
+		logpoller.EvmWord(seqNr),
+		0,
+	)
 	if err != nil {
 		return commit_store.CommitStoreCommitReport{}, err
-	}
-	logs, err := dstLogPoller.Logs(1, latest, ReportAccepted, commitStore.Address())
-	if err != nil {
-		return commit_store.CommitStoreCommitReport{}, err
-	}
-	if len(logs) == 0 {
-		return commit_store.CommitStoreCommitReport{}, errors.Errorf("seq number not committed, nothing committed")
 	}
 	for _, log := range logs {
 		reportAccepted, err := commitStore.ParseReportAccepted(log.GetGethLog())

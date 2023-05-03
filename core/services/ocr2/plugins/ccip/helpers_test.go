@@ -385,14 +385,13 @@ func setupCcipTestHarness(t *testing.T) ccipPluginTestHarness {
 	destClient.Commit()
 
 	// register filters in logPoller
-	eventsSignatures := GetEventSignatures()
 	require.NoError(t, sourceLP.RegisterFilter(logpoller.Filter{
 		Name:      logpoller.FilterName(COMMIT_CCIP_SENDS, onRamp.Address().String()),
-		EventSigs: []common.Hash{eventsSignatures.SendRequested}, Addresses: []common.Address{onRamp.Address()},
+		EventSigs: []common.Hash{EventSignatures.SendRequested}, Addresses: []common.Address{onRamp.Address()},
 	}))
 	require.NoError(t, destLP.RegisterFilter(logpoller.Filter{
 		Name:      logpoller.FilterName(COMMIT_PRICE_UPDATES, priceRegistry.Address()),
-		EventSigs: []common.Hash{UsdPerUnitGasUpdated, UsdPerTokenUpdated}, Addresses: []common.Address{priceRegistry.Address()},
+		EventSigs: []common.Hash{EventSignatures.UsdPerUnitGasUpdated, EventSignatures.UsdPerTokenUpdated}, Addresses: []common.Address{priceRegistry.Address()},
 	}))
 
 	// approve router
