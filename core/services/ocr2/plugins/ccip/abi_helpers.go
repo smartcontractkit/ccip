@@ -305,6 +305,11 @@ type AbiDefined interface {
 	AbiString() string
 }
 
+type AbiDefinedValid interface {
+	AbiDefined
+	Validate() error
+}
+
 func EncodeAbiStruct[T AbiDefined](decoded T) ([]byte, error) {
 	encoded, err := utils.ABIEncode(decoded.AbiString(), decoded)
 	if err != nil {
@@ -313,7 +318,7 @@ func EncodeAbiStruct[T AbiDefined](decoded T) ([]byte, error) {
 	return encoded, nil
 }
 
-func DecodeAbiStruct[T AbiDefined](encoded []byte) (T, error) {
+func DecodeAbiStruct[T AbiDefinedValid](encoded []byte) (T, error) {
 	var empty T
 
 	decoded, err := utils.ABIDecode(empty.AbiString(), encoded)
@@ -323,7 +328,7 @@ func DecodeAbiStruct[T AbiDefined](encoded []byte) (T, error) {
 
 	converted := abi.ConvertType(decoded[0], &empty)
 	if casted, ok := converted.(*T); ok {
-		return *casted, nil
+		return *casted, (*casted).Validate()
 	}
 	return empty, fmt.Errorf("can't cast from %T to %T", converted, empty)
 }

@@ -15,8 +15,9 @@ func randomAddress() common.Address {
 
 func TestCommitOnchainConfig(t *testing.T) {
 	tests := []struct {
-		name string
-		want CommitOnchainConfig
+		name      string
+		want      CommitOnchainConfig
+		expectErr bool
 	}{
 		{
 			name: "encodes and decodes config with all fields set",
@@ -24,12 +25,14 @@ func TestCommitOnchainConfig(t *testing.T) {
 				PriceRegistry: randomAddress(),
 				Afn:           randomAddress(),
 			},
+			expectErr: false,
 		},
 		{
-			name: "encodes and decodes config with missing fields",
+			name: "encodes and fails decoding config with missing fields",
 			want: CommitOnchainConfig{
 				PriceRegistry: randomAddress(),
 			},
+			expectErr: true,
 		},
 	}
 	for _, tt := range tests {
@@ -38,16 +41,21 @@ func TestCommitOnchainConfig(t *testing.T) {
 			require.NoError(t, err)
 
 			decoded, err := DecodeAbiStruct[CommitOnchainConfig](encoded)
-			require.NoError(t, err)
-			require.Equal(t, tt.want, decoded)
+			if tt.expectErr {
+				require.ErrorContains(t, err, "must set")
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tt.want, decoded)
+			}
 		})
 	}
 }
 
 func TestExecOnchainConfig(t *testing.T) {
 	tests := []struct {
-		name string
-		want ExecOnchainConfig
+		name      string
+		want      ExecOnchainConfig
+		expectErr bool
 	}{
 		{
 			name: "encodes and decodes config with all fields set",
@@ -61,11 +69,12 @@ func TestExecOnchainConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "encodes and decodes config with missing fields",
+			name: "encodes and fails decoding config with missing fields",
 			want: ExecOnchainConfig{
 				PermissionLessExecutionThresholdSeconds: rand.Uint32(),
 				MaxDataSize:                             rand.Uint32(),
 			},
+			expectErr: true,
 		},
 	}
 	for _, tt := range tests {
@@ -74,8 +83,12 @@ func TestExecOnchainConfig(t *testing.T) {
 			require.NoError(t, err)
 
 			decoded, err := DecodeAbiStruct[ExecOnchainConfig](encoded)
-			require.NoError(t, err)
-			require.Equal(t, tt.want, decoded)
+			if tt.expectErr {
+				require.ErrorContains(t, err, "must set")
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tt.want, decoded)
+			}
 		})
 	}
 }

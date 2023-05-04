@@ -8,7 +8,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
 
-type ValidatedOffchainConfig interface {
+type OffchainConfig interface {
 	Validate() error
 }
 
@@ -21,6 +21,29 @@ type CommitOffchainConfig struct {
 	InflightCacheExpiry         models.Duration
 }
 
+func (c CommitOffchainConfig) Validate() error {
+	if c.SourceIncomingConfirmations == 0 {
+		return errors.New("must set SourceIncomingConfirmations")
+	}
+	if c.DestIncomingConfirmations == 0 {
+		return errors.New("must set DestIncomingConfirmations")
+	}
+	if c.FeeUpdateHeartBeat.Duration() == 0 {
+		return errors.New("must set FeeUpdateHeartBeat")
+	}
+	if c.FeeUpdateDeviationPPB == 0 {
+		return errors.New("must set FeeUpdateDeviationPPB")
+	}
+	if c.MaxGasPrice == 0 {
+		return errors.New("must set MaxGasPrice")
+	}
+	if c.InflightCacheExpiry.Duration() == 0 {
+		return errors.New("must set InflightCacheExpiry")
+	}
+
+	return nil
+}
+
 type ExecOffchainConfig struct {
 	SourceIncomingConfirmations uint32
 	DestIncomingConfirmations   uint32
@@ -31,29 +54,34 @@ type ExecOffchainConfig struct {
 	RootSnoozeTime              models.Duration
 }
 
-func (c CommitOffchainConfig) Validate() error {
-	if c.InflightCacheExpiry.Duration() == 0 {
-		return errors.New("InflightCacheExpiry not set")
-	}
-	return nil
-}
-
 func (c ExecOffchainConfig) Validate() error {
+	if c.SourceIncomingConfirmations == 0 {
+		return errors.New("must set SourceIncomingConfirmations")
+	}
+	if c.DestIncomingConfirmations == 0 {
+		return errors.New("must set DestIncomingConfirmations")
+	}
+	if c.BatchGasLimit == 0 {
+		return errors.New("must set BatchGasLimit")
+	}
+	if c.RelativeBoostPerWaitHour == 0 {
+		return errors.New("must set RelativeBoostPerWaitHour")
+	}
+	if c.MaxGasPrice == 0 {
+		return errors.New("must set MaxGasPrice")
+	}
 	if c.InflightCacheExpiry.Duration() == 0 {
-		return errors.New("InflightCacheExpiry not set")
+		return errors.New("must set InflightCacheExpiry")
 	}
 	if c.RootSnoozeTime.Duration() == 0 {
-		return errors.New("RootSnoozeTime not set")
+		return errors.New("must set RootSnoozeTime")
 	}
+
 	return nil
 }
 
-type OffchainConfig interface {
-	ValidatedOffchainConfig
-}
-
-func DecodeOffchainConfig[OCC OffchainConfig](encodedConfig []byte) (OCC, error) {
-	var result OCC
+func DecodeOffchainConfig[T OffchainConfig](encodedConfig []byte) (T, error) {
+	var result T
 	err := json.Unmarshal(encodedConfig, &result)
 	if err != nil {
 		return result, err
@@ -65,6 +93,6 @@ func DecodeOffchainConfig[OCC OffchainConfig](encodedConfig []byte) (OCC, error)
 	return result, nil
 }
 
-func EncodeOffchainConfig[OCC OffchainConfig](occ OCC) ([]byte, error) {
+func EncodeOffchainConfig[T OffchainConfig](occ T) ([]byte, error) {
 	return json.Marshal(occ)
 }

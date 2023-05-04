@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
@@ -12,10 +11,10 @@ import (
 
 func TestCommitOffchainConfig_Encoding(t *testing.T) {
 	tests := map[string]struct {
-		want    CommitOffchainConfig
-		wantErr error
+		want      CommitOffchainConfig
+		expectErr bool
 	}{
-		"happy flow": {
+		"encodes and decodes config with all fields set": {
 			want: CommitOffchainConfig{
 				SourceIncomingConfirmations: 3,
 				DestIncomingConfirmations:   6,
@@ -25,13 +24,22 @@ func TestCommitOffchainConfig_Encoding(t *testing.T) {
 				InflightCacheExpiry:         models.MustMakeDuration(23456 * time.Second),
 			},
 		},
-		"missing not required fields": {
+		"fails decoding when all fields present but with 0 values": {
 			want: CommitOffchainConfig{
-				SourceIncomingConfirmations: 99999999,
-				InflightCacheExpiry:         models.MustMakeDuration(23456 * time.Second),
+				SourceIncomingConfirmations: 0,
+				DestIncomingConfirmations:   0,
+				FeeUpdateHeartBeat:          models.MustMakeDuration(0),
+				FeeUpdateDeviationPPB:       0,
+				MaxGasPrice:                 0,
+				InflightCacheExpiry:         models.MustMakeDuration(0),
 			},
+			expectErr: true,
 		},
-		"missing required fields": {
+		"fails decoding when all fields are missing": {
+			want:      CommitOffchainConfig{},
+			expectErr: true,
+		},
+		"fails decoding when some fields are missing": {
 			want: CommitOffchainConfig{
 				SourceIncomingConfirmations: 3,
 				DestIncomingConfirmations:   6,
@@ -39,7 +47,7 @@ func TestCommitOffchainConfig_Encoding(t *testing.T) {
 				FeeUpdateDeviationPPB:       5e7,
 				MaxGasPrice:                 200e9,
 			},
-			wantErr: errors.New("InflightCacheExpiry not set"),
+			expectErr: true,
 		},
 	}
 	for name, tc := range tests {
@@ -48,8 +56,8 @@ func TestCommitOffchainConfig_Encoding(t *testing.T) {
 			require.NoError(t, err)
 			got, err := DecodeOffchainConfig[CommitOffchainConfig](encode)
 
-			if tc.wantErr != nil {
-				require.Error(t, tc.wantErr)
+			if tc.expectErr {
+				require.ErrorContains(t, err, "must set")
 			} else {
 				require.NoError(t, err)
 				require.Equal(t, tc.want, got)
@@ -60,10 +68,10 @@ func TestCommitOffchainConfig_Encoding(t *testing.T) {
 
 func TestExecOffchainConfig_Encoding(t *testing.T) {
 	tests := map[string]struct {
-		want    ExecOffchainConfig
-		wantErr error
+		want      ExecOffchainConfig
+		expectErr bool
 	}{
-		"happy flow": {
+		"encodes and decodes config with all fields set": {
 			want: ExecOffchainConfig{
 				SourceIncomingConfirmations: 3,
 				DestIncomingConfirmations:   6,
@@ -74,29 +82,38 @@ func TestExecOffchainConfig_Encoding(t *testing.T) {
 				RootSnoozeTime:              models.MustMakeDuration(128 * time.Minute),
 			},
 		},
-		"missing not required fields": {
+		"fails decoding when all fields present but with 0 values": {
 			want: ExecOffchainConfig{
-				SourceIncomingConfirmations: 99999999,
-				InflightCacheExpiry:         models.MustMakeDuration(64 * time.Second),
-				RootSnoozeTime:              models.MustMakeDuration(128 * time.Minute),
+				SourceIncomingConfirmations: 0,
+				DestIncomingConfirmations:   0,
+				BatchGasLimit:               0,
+				RelativeBoostPerWaitHour:    0,
+				MaxGasPrice:                 0,
+				InflightCacheExpiry:         models.MustMakeDuration(0),
+				RootSnoozeTime:              models.MustMakeDuration(0),
 			},
+			expectErr: true,
 		},
-		"missing required fields": {
+		"fails decoding when all fields are missing": {
+			want:      ExecOffchainConfig{},
+			expectErr: true,
+		},
+		"fails decoding when some fields are missing": {
 			want: ExecOffchainConfig{
 				SourceIncomingConfirmations: 99999999,
 				InflightCacheExpiry:         models.MustMakeDuration(64 * time.Second),
 			},
-			wantErr: errors.New("RootSnoozeTime not set"),
+			expectErr: true,
 		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			encode, err := EncodeOffchainConfig(tc.want)
+			encode, err := EncodeOffchainConfig(&tc.want)
 			require.NoError(t, err)
 			got, err := DecodeOffchainConfig[ExecOffchainConfig](encode)
 
-			if tc.wantErr != nil {
-				require.Error(t, tc.wantErr)
+			if tc.expectErr {
+				require.ErrorContains(t, err, "must set")
 			} else {
 				require.NoError(t, err)
 				require.Equal(t, tc.want, got)

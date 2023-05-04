@@ -423,38 +423,14 @@ func SetupAndStartNodes(ctx context.Context, t *testing.T, ccipContracts *CCIPCo
 			app.Stop()
 		})
 	}
-	commitOnchainConfig, err := ccip.EncodeAbiStruct(ccip.CommitOnchainConfig{
-		PriceRegistry: ccipContracts.Dest.PriceRegistry.Address(),
-		Afn:           ccipContracts.Dest.AFN.Address(),
-	})
-	require.NoError(t, err)
-	commitOffchainConfig, err := ccip.EncodeOffchainConfig(ccip.CommitOffchainConfig{
-		SourceIncomingConfirmations: 0,
-		DestIncomingConfirmations:   1,
-		MaxGasPrice:                 200e9,
-		InflightCacheExpiry:         models.MustMakeDuration(3 * time.Millisecond),
-	})
-	require.NoError(t, err)
-	execOnchainConfig, err := ccip.EncodeAbiStruct(ccip.ExecOnchainConfig{
-		PermissionLessExecutionThresholdSeconds: 60,
-		Router:                                  ccipContracts.Dest.Router.Address(),
-		PriceRegistry:                           ccipContracts.Dest.PriceRegistry.Address(),
-		Afn:                                     ccipContracts.Dest.AFN.Address(),
-		MaxDataSize:                             1e5,
-		MaxTokensLength:                         5,
-	})
-	require.NoError(t, err)
-	execOffchainConfig, err := ccip.EncodeOffchainConfig(ccip.ExecOffchainConfig{
-		SourceIncomingConfirmations: 0,
-		DestIncomingConfirmations:   1,
-		BatchGasLimit:               5_000_000,
-		RelativeBoostPerWaitHour:    0.07,
-		MaxGasPrice:                 200e9,
-		InflightCacheExpiry:         models.MustMakeDuration(3 * time.Millisecond),
-		RootSnoozeTime:              models.MustMakeDuration(10 * time.Millisecond),
-	})
-	require.NoError(t, err)
-	configBlock := ccipContracts.SetupOnchainConfig(oracles, commitOnchainConfig, commitOffchainConfig, execOnchainConfig, execOffchainConfig)
+
+	ccipContracts.Oracles = oracles
+	commitOnchainConfig := createDefaultCommitOnchainConfig(ccipContracts)
+	commitOffchainConfig := createDefaultCommitOffchainConfig(ccipContracts)
+	execOnchainConfig := createDefaultExecOnchainConfig(ccipContracts)
+	execOffchainConfig := createDefaultExecOffchainConfig(ccipContracts)
+
+	configBlock := ccipContracts.SetupOnchainConfig(commitOnchainConfig, commitOffchainConfig, execOnchainConfig, execOffchainConfig)
 	return bootstrapNode, nodes, configBlock
 }
 

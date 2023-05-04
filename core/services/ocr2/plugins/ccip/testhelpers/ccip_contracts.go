@@ -119,10 +119,10 @@ type BalanceReq struct {
 }
 
 type CCIPContracts struct {
-	t      *testing.T
-	Source SourceChain
-	Dest   DestinationChain
-
+	t                              *testing.T
+	Source                         SourceChain
+	Dest                           DestinationChain
+	Oracles                        []confighelper.OracleIdentityExtra
 	commitOCRConfig, execOCRConfig *OCR2Config
 }
 
@@ -168,50 +168,19 @@ func (c *CCIPContracts) EnableOffRamp() {
 	require.NoError(c.t, err)
 	c.Dest.Chain.Commit()
 
-	onChainConfig, err := ccip.EncodeAbiStruct(ccip.ExecOnchainConfig{
-		PermissionLessExecutionThresholdSeconds: 60,
-		Router:                                  c.Dest.Router.Address(),
-		PriceRegistry:                           c.Dest.PriceRegistry.Address(),
-		Afn:                                     c.Dest.AFN.Address(),
-		MaxDataSize:                             1e5,
-		MaxTokensLength:                         5,
-	})
-	require.NoError(c.t, err)
+	onChainConfig := createDefaultExecOnchainConfig(c)
+	offChainConfig := createDefaultExecOffchainConfig(c)
 
-	_, err = c.Dest.OffRamp.SetOCR2Config(
-		c.Dest.User,
-		c.execOCRConfig.Signers,
-		c.execOCRConfig.Transmitters,
-		c.execOCRConfig.F,
-		onChainConfig,
-		c.execOCRConfig.OffchainConfigVersion,
-		c.execOCRConfig.OffchainConfig,
-	)
-	require.NoError(c.t, err)
-	c.Source.Chain.Commit()
-	c.Dest.Chain.Commit()
+	c.SetupExecOCR2Config(onChainConfig, offChainConfig)
 }
 
 func (c *CCIPContracts) EnableCommitStore() {
-	onChainConfig, err := ccip.EncodeAbiStruct(ccip.CommitOnchainConfig{
-		PriceRegistry: c.Dest.PriceRegistry.Address(),
-		Afn:           c.Dest.AFN.Address(), // AFN address
-	})
-	require.NoError(c.t, err)
+	onChainConfig := createDefaultCommitOnchainConfig(c)
+	offChainConfig := createDefaultCommitOffchainConfig(c)
 
-	_, err = c.Dest.CommitStore.SetOCR2Config(
-		c.Dest.User,
-		c.commitOCRConfig.Signers,
-		c.commitOCRConfig.Transmitters,
-		c.commitOCRConfig.F,
-		onChainConfig,
-		c.commitOCRConfig.OffchainConfigVersion,
-		c.commitOCRConfig.OffchainConfig,
-	)
-	require.NoError(c.t, err)
-	c.Dest.Chain.Commit()
+	c.SetupCommitOCR2Config(onChainConfig, offChainConfig)
 
-	_, err = c.Dest.PriceRegistry.ApplyPriceUpdatersUpdates(c.Dest.User, []common.Address{c.Dest.CommitStore.Address()}, []common.Address{})
+	_, err := c.Dest.PriceRegistry.ApplyPriceUpdatersUpdates(c.Dest.User, []common.Address{c.Dest.CommitStore.Address()}, []common.Address{})
 	require.NoError(c.t, err)
 	c.Dest.Chain.Commit()
 }
@@ -394,14 +363,10 @@ func (c *CCIPContracts) DeriveOCR2Config(oracles []confighelper.OracleIdentityEx
 	}
 }
 
-func (c *CCIPContracts) SetupOnchainConfig(oracles []confighelper.OracleIdentityExtra, commitOnchainConfig, commitOffchainConfig, execOnchainConfig, execOffchainConfig []byte) int64 {
-	// Note We do NOT set the payees, payment is done in the OCR2Base implementation
-	c.commitOCRConfig = c.DeriveOCR2Config(oracles, commitOnchainConfig, commitOffchainConfig)
-	blockBeforeConfig, err := c.Dest.Chain.BlockByNumber(context.Background(), nil)
-	require.NoError(c.t, err)
-
+func (c *CCIPContracts) SetupCommitOCR2Config(commitOnchainConfig, commitOffchainConfig []byte) {
+	c.commitOCRConfig = c.DeriveOCR2Config(c.Oracles, commitOnchainConfig, commitOffchainConfig)
 	// Set the DON on the commit store
-	_, err = c.Dest.CommitStore.SetOCR2Config(
+	_, err := c.Dest.CommitStore.SetOCR2Config(
 		c.Dest.User,
 		c.commitOCRConfig.Signers,
 		c.commitOCRConfig.Transmitters,
@@ -412,10 +377,12 @@ func (c *CCIPContracts) SetupOnchainConfig(oracles []confighelper.OracleIdentity
 	)
 	require.NoError(c.t, err)
 	c.Dest.Chain.Commit()
+}
 
-	c.execOCRConfig = c.DeriveOCR2Config(oracles, execOnchainConfig, execOffchainConfig)
+func (c *CCIPContracts) SetupExecOCR2Config(execOnchainConfig, execOffchainConfig []byte) {
+	c.execOCRConfig = c.DeriveOCR2Config(c.Oracles, execOnchainConfig, execOffchainConfig)
 	// Same DON on the offramp
-	_, err = c.Dest.OffRamp.SetOCR2Config(
+	_, err := c.Dest.OffRamp.SetOCR2Config(
 		c.Dest.User,
 		c.execOCRConfig.Signers,
 		c.execOCRConfig.Transmitters,
@@ -426,6 +393,15 @@ func (c *CCIPContracts) SetupOnchainConfig(oracles []confighelper.OracleIdentity
 	)
 	require.NoError(c.t, err)
 	c.Dest.Chain.Commit()
+}
+
+func (c *CCIPContracts) SetupOnchainConfig(commitOnchainConfig, commitOffchainConfig, execOnchainConfig, execOffchainConfig []byte) int64 {
+	// Note We do NOT set the payees, payment is done in the OCR2Base implementation
+	blockBeforeConfig, err := c.Dest.Chain.BlockByNumber(context.Background(), nil)
+	require.NoError(c.t, err)
+
+	c.SetupCommitOCR2Config(commitOnchainConfig, commitOffchainConfig)
+	c.SetupExecOCR2Config(execOnchainConfig, execOffchainConfig)
 
 	return blockBeforeConfig.Number().Int64()
 }

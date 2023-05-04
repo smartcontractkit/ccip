@@ -312,6 +312,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		ccipContracts.Source.Chain.Commit()
 
 		gomega.NewWithT(t).Eventually(func() bool {
+			ccipContracts.Source.Chain.Commit()
 			ccipContracts.Dest.Chain.Commit()
 			holder2Balance, err := wrappedDestTokenPool.BalanceOf(nil, holder2.From)
 			require.NoError(t, err)

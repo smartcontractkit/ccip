@@ -729,7 +729,7 @@ func (client *CCIPClient) getOffRampOnchainConfig() []byte {
 	return encodedOffRampOnchainConfig
 }
 
-func (client *CCIPClient) setOCRConfig(ocrConf ocr2Configurer, offchainConfig []byte, onchainConfig []byte, faults int, identities []ocrconfighelper.OracleIdentityExtra) (*types.Transaction, error) {
+func (client *CCIPClient) setOCRConfig(ocrConf ocr2Configurer, pluginOffchainConfig []byte, onchainConfig []byte, faults int, identities []ocrconfighelper.OracleIdentityExtra) (*types.Transaction, error) {
 	// Simple transmission schedule of 1 node per stage.
 	// sum(transmissionSchedule) should equal number of nodes.
 	var transmissionSchedule []int
@@ -745,7 +745,7 @@ func (client *CCIPClient) setOCRConfig(ocrConf ocr2Configurer, offchainConfig []
 		3,
 		transmissionSchedule,
 		identities,
-		offchainConfig,
+		pluginOffchainConfig,
 		5*time.Second,
 		32*time.Second,
 		20*time.Second,

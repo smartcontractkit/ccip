@@ -1,7 +1,10 @@
 package ccip
 
 import (
+	"errors"
 	"time"
+
+	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
@@ -20,6 +23,16 @@ func (d CommitOnchainConfig) AbiString() string {
 			"type": "tuple"
 		}
 	]`
+}
+
+func (d CommitOnchainConfig) Validate() error {
+	if d.Afn == (common.Address{}) {
+		return errors.New("must set Afn address")
+	}
+	if d.PriceRegistry == (common.Address{}) {
+		return errors.New("must set Price Registry address")
+	}
+	return nil
 }
 
 type ExecOnchainConfig evm_2_evm_offramp.EVM2EVMOffRampDynamicConfig
@@ -41,6 +54,29 @@ func (d ExecOnchainConfig) AbiString() string {
 	]`
 }
 
-func (d ExecOnchainConfig) PermissionLessExecutionThresholdDuration() time.Duration {
+func (d ExecOnchainConfig) Validate() error {
+	//emptyAddress :=
+	if d.PermissionLessExecutionThresholdSeconds == 0 {
+		return errors.New("must set PermissionLessExecutionThresholdSeconds")
+	}
+	if d.Router == (common.Address{}) {
+		return errors.New("must set Router address")
+	}
+	if d.PriceRegistry == (common.Address{}) {
+		return errors.New("must set PriceRegistry address")
+	}
+	if d.Afn == (common.Address{}) {
+		return errors.New("must set Afn address")
+	}
+	if d.MaxTokensLength == 0 {
+		return errors.New("must set MaxTokensLength")
+	}
+	if d.MaxDataSize == 0 {
+		return errors.New("must set MaxDataSize")
+	}
+	return nil
+}
+
+func (d *ExecOnchainConfig) PermissionLessExecutionThresholdDuration() time.Duration {
 	return time.Duration(d.PermissionLessExecutionThresholdSeconds) * time.Second
 }
