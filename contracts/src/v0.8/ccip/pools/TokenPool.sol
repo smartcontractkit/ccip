@@ -60,7 +60,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator, Pausable, IERC165 {
     return i_token;
   }
 
-  function supportsInterface(bytes4 interfaceId) public pure override returns (bool) {
+  function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
     return interfaceId == type(IPool).interfaceId || interfaceId == type(IERC165).interfaceId;
   }
 

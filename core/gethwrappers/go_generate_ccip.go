@@ -26,6 +26,7 @@ package gethwrappers
 
 // Customer contracts
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/CacheGoldChild.abi ../../contracts/solc/v0.8.15/CacheGoldChild.bin CacheGoldChild cache_gold_child
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/USDCTokenPool.abi ../../contracts/solc/v0.8.15/USDCTokenPool.bin USDCTokenPool usdc_token_pool
 
 // To run these commands, you must either install docker, or the correct version
 // of abigen. The latter can be installed with these commands, at least on linux:
