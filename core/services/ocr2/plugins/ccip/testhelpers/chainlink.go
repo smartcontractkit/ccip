@@ -14,8 +14,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	types3 "github.com/ethereum/go-ethereum/core/types"
+	"github.com/google/uuid"
 	"github.com/onsi/gomega"
-	uuid "github.com/satori/go.uuid"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	types4 "github.com/smartcontractkit/libocr/offchainreporting2/types"
@@ -217,7 +217,7 @@ func SetupNodeCCIP(
 
 	var lggr = logger.TestLogger(t)
 
-	eventBroadcaster := pg.NewEventBroadcaster(config.DatabaseURL(), 0, 0, lggr, uuid.NewV1())
+	eventBroadcaster := pg.NewEventBroadcaster(config.DatabaseURL(), 0, 0, lggr, uuid.New())
 
 	// The in-memory geth sim does not let you create a custom ChainID, it will always be 1337.
 	// In particular this means that if you sign an eip155 tx, the chainID used MUST be 1337

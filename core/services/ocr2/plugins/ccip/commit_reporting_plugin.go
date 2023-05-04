@@ -134,7 +134,7 @@ type CommitPluginConfig struct {
 	priceRegistry      *price_registry.PriceRegistry
 	priceGetter        PriceGetter
 	sourceNative       common.Address
-	sourceFeeEstimator txmgrtypes.FeeEstimator[*evmtypes.Head, gas.EvmFee, *assets.Wei, evmtypes.TxHash]
+	sourceFeeEstimator txmgrtypes.FeeEstimator[*evmtypes.Head, gas.EvmFee, *assets.Wei, common.Hash]
 	sourceChainID      uint64
 	commitStore        *commit_store.CommitStore
 	hasher             LeafHasherInterface[[32]byte]
@@ -347,8 +347,8 @@ func (r *CommitReportingPlugin) generatePriceUpdates(ctx context.Context, now ti
 	}
 	// Use legacy if no dynamic is available.
 	gasPrice := sourceGasPriceWei.Legacy.ToInt()
-	if sourceGasPriceWei.Dynamic != nil && sourceGasPriceWei.Dynamic.FeeCap != nil {
-		gasPrice = sourceGasPriceWei.Dynamic.FeeCap.ToInt()
+	if sourceGasPriceWei.DynamicFeeCap != nil {
+		gasPrice = sourceGasPriceWei.DynamicFeeCap.ToInt()
 	}
 	if gasPrice == nil {
 		return nil, nil, fmt.Errorf("missing gas price %+v", sourceGasPriceWei)

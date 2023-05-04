@@ -42,7 +42,7 @@ type commitTestHarness = struct {
 func setupCommitTestHarness(t *testing.T) commitTestHarness {
 	th := setupCcipTestHarness(t)
 
-	sourceFeeEstimator := mocks.NewFeeEstimator[*evmtypes.Head, gas.EvmFee, *assets.Wei, evmtypes.TxHash](t)
+	sourceFeeEstimator := mocks.NewFeeEstimator[*evmtypes.Head, gas.EvmFee, *assets.Wei, common.Hash](t)
 
 	mockedGetFee := sourceFeeEstimator.On(
 		"GetFee",
