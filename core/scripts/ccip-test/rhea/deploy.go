@@ -99,6 +99,7 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainSelector u
 	}
 
 	var tokensAndPools []evm_2_evm_onramp.EVM2EVMOnRampTokenAndPool
+	var tokenTransferFeeConfig []evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs
 	for token, tokenConfig := range client.ChainConfig.SupportedTokens {
 		if _, ok := destSupportedTokens[token]; !ok {
 			// If the token is not supported on the destination chain we
@@ -110,6 +111,12 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainSelector u
 		tokensAndPools = append(tokensAndPools, evm_2_evm_onramp.EVM2EVMOnRampTokenAndPool{
 			Token: tokenConfig.Token,
 			Pool:  tokenConfig.Pool,
+		})
+		tokenTransferFeeConfig = append(tokenTransferFeeConfig, evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs{
+			Token:  tokenConfig.Token,
+			MinFee: 1_00,    // $1,
+			MaxFee: 5000_00, // $5,000
+			Ratio:  0,       // temporarily setting to 0 before regular price updates are added for non-fee tokens
 		})
 	}
 
@@ -157,6 +164,7 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainSelector u
 			IsEnabled: true,
 		},
 		feeTokenConfig,
+		tokenTransferFeeConfig,
 		[]evm_2_evm_onramp.EVM2EVMOnRampNopAndWeight{},
 	)
 	shared.RequireNoError(t, err)
@@ -356,5 +364,5 @@ func deployGovernanceDapps(t *testing.T, sourceClient *EvmDeploymentConfig, dest
 }
 
 func UsdToRateLimitValue(usd int64) *big.Int {
-	return new(big.Int).Mul(new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e18)), big.NewInt(usd))
+	return new(big.Int).Mul(big.NewInt(1e18), big.NewInt(usd))
 }

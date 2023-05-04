@@ -153,7 +153,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
       multiplier: 108e16,
       destGasOverhead: 2
     });
-    s_onRamp.setFeeConfig(feeTokenConfigArgs);
+    s_onRamp.setFeeTokenConfig(feeTokenConfigArgs);
 
     address[] memory feeTokens = new address[](1);
     feeTokens[0] = s_sourceTokens[1];
@@ -273,7 +273,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     // Include insufficient, should also revert
     vm.stopPrank();
 
-    s_onRamp.getFeeConfig(s_sourceRouter.getWrappedNative());
+    s_onRamp.getFeeTokenConfig(s_sourceRouter.getWrappedNative());
 
     hoax(address(1), 1);
     vm.expectRevert(IRouterClient.InsufficientFeeTokenAmount.selector);

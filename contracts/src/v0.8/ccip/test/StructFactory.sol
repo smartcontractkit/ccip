@@ -152,7 +152,7 @@ contract StructFactory {
   address constant ADMIN = 0x11118e64e1FB0c487f25dD6D3601FF6aF8d32E4e;
 
   function rateLimiterConfig() internal pure returns (RateLimiter.Config memory) {
-    return RateLimiter.Config({isEnabled: true, capacity: 100e46, rate: 1e33});
+    return RateLimiter.Config({isEnabled: true, capacity: 100e28, rate: 1e15});
   }
 
   function getSinglePriceUpdateStruct(address token, uint192 price)

@@ -385,7 +385,8 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 	tokensAndPools []evm_2_evm_onramp.EVM2EVMOnRampTokenAndPool,
 	afn, router, priceRegistry common.Address,
 	opts RateLimiterConfig,
-	feeConfig []evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs,
+	feeTokenConfig []evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs,
+	tokenTransferFeeConfig []evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs,
 	linkTokenAddress common.Address,
 ) (
 	*OnRamp,
@@ -398,7 +399,6 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 		return evm_2_evm_onramp.DeployEVM2EVMOnRamp(
 			auth,
 			backend,
-
 			evm_2_evm_onramp.EVM2EVMOnRampStaticConfig{
 				LinkToken:         linkTokenAddress,
 				ChainId:           sourceChainId, // source chain id
@@ -419,7 +419,8 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 				Capacity: opts.Capacity,
 				Rate:     opts.Rate,
 			},
-			feeConfig,
+			feeTokenConfig,
+			tokenTransferFeeConfig,
 			[]evm_2_evm_onramp.EVM2EVMOnRampNopAndWeight{},
 		)
 	})

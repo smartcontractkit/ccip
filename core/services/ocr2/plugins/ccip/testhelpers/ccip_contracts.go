@@ -50,13 +50,11 @@ var (
 	OffRamp  = "offramp"
 	DestPool = "dest pool"
 
-	Receiver     = "receiver"
-	Sender       = "sender"
-	Link         = func(amount int64) *big.Int { return new(big.Int).Mul(big.NewInt(1e18), big.NewInt(amount)) }
-	HundredLink  = Link(100)
-	LinkUSDValue = func(amount int64) *big.Int {
-		return new(big.Int).Mul(big.NewInt(1e18), new(big.Int).Mul(big.NewInt(1e18), big.NewInt(amount)))
-	}
+	Receiver      = "receiver"
+	Sender        = "sender"
+	Link          = func(amount int64) *big.Int { return new(big.Int).Mul(big.NewInt(1e18), big.NewInt(amount)) }
+	HundredLink   = Link(100)
+	LinkUSDValue  = func(amount int64) *big.Int { return new(big.Int).Mul(big.NewInt(1e18), big.NewInt(amount)) }
 	SourceChainID = uint64(1000)
 	DestChainID   = uint64(1337)
 )
@@ -222,6 +220,14 @@ func (c *CCIPContracts) DeployNewOnRamp() {
 				Multiplier:      1e18,
 				FeeAmount:       big.NewInt(0),
 				DestGasOverhead: 0,
+			},
+		},
+		[]evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs{
+			{
+				Token:  c.Source.LinkToken.Address(),
+				MinFee: 1_00,    // $1,
+				MaxFee: 5000_00, // $5,000
+				Ratio:  5_0,     // 5 bps
 			},
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampNopAndWeight{},
@@ -647,6 +653,14 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 				Multiplier:      1e18,
 				FeeAmount:       big.NewInt(0),
 				DestGasOverhead: 0,
+			},
+		},
+		[]evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs{
+			{
+				Token:  sourceLinkTokenAddress,
+				MinFee: 1_00,    // $1,
+				MaxFee: 5000_00, // $5,000
+				Ratio:  5_0,     // 5 bps
 			},
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampNopAndWeight{},

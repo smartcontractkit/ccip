@@ -525,15 +525,28 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 
 	if sourceCCIP.OnRamp == nil {
 		var tokensAndPools []evm_2_evm_onramp.EVM2EVMOnRampTokenAndPool
+		var tokenTransferFeeConfig []evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs
 		for i, token := range sourceCCIP.Common.BridgeTokens {
 			tokensAndPools = append(tokensAndPools, evm_2_evm_onramp.EVM2EVMOnRampTokenAndPool{
 				Token: token.EthAddress,
 				Pool:  sourceCCIP.Common.BridgeTokenPools[i].EthAddress,
 			})
+			tokenTransferFeeConfig = append(tokenTransferFeeConfig, evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs{
+				Token:  token.EthAddress,
+				MinFee: 1,
+				MaxFee: 100,
+				Ratio:  0, // temporarily setting to 0 before regular price updates are added for non-fee tokens
+			})
 		}
 		tokensAndPools = append(tokensAndPools, evm_2_evm_onramp.EVM2EVMOnRampTokenAndPool{
 			Token: common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
 			Pool:  sourceCCIP.Common.FeeTokenPool.EthAddress,
+		})
+		tokenTransferFeeConfig = append(tokenTransferFeeConfig, evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs{
+			Token:  common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
+			MinFee: 1,
+			MaxFee: 100,
+			Ratio:  1,
 		})
 
 		sourceCCIP.SrcStartBlock, err = sourceCCIP.Common.ChainClient.LatestBlockNumber(context.Background())
@@ -557,6 +570,7 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 					DestGasOverhead: 0,
 					Multiplier:      FeeMultiplier, // the low multiplier is for testing purposes. This keeps accounts from running out of funds
 				}},
+			tokenTransferFeeConfig,
 			sourceCCIP.Common.FeeToken.EthAddress,
 		)
 

@@ -2,7 +2,6 @@ package rhea
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 	"testing"
 
@@ -12,8 +11,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/shared"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
@@ -62,44 +59,6 @@ func SetPriceRegistryPrices(t *testing.T, client *EvmDeploymentConfig, destChain
 	shared.RequireNoError(t, err)
 	err = shared.WaitForMined(client.Logger, client.Client, tx.Hash(), true)
 	shared.RequireNoError(t, err)
-}
-
-func setOnRampPrices(t *testing.T, client *EvmDeploymentConfig) {
-	var tokens []common.Address
-	var prices []*big.Int
-	for _, tokenConfig := range client.ChainConfig.SupportedTokens {
-		tokens = append(tokens, tokenConfig.Token)
-		prices = append(prices, tokenConfig.Price)
-	}
-
-	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(client.LaneConfig.OnRamp, client.Client)
-	shared.RequireNoError(t, err)
-
-	// Prices are used by the rate limiter and dictate what tokens are supported
-	tx, err := onRamp.SetPrices(client.Owner, tokens, prices)
-	shared.RequireNoError(t, err)
-	err = shared.WaitForMined(client.Logger, client.Client, tx.Hash(), true)
-	shared.RequireNoError(t, err)
-	client.Logger.Infof(fmt.Sprintf("OnRamp prices set on %s in tx %s", client.LaneConfig.OnRamp.String(), helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash())))
-}
-
-func setOffRampPrices(t *testing.T, client *EvmDeploymentConfig) {
-	var tokens []common.Address
-	var prices []*big.Int
-	for _, tokenConfig := range client.ChainConfig.SupportedTokens {
-		tokens = append(tokens, tokenConfig.Token)
-		prices = append(prices, tokenConfig.Price)
-	}
-
-	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(client.LaneConfig.OffRamp, client.Client)
-	shared.RequireNoError(t, err)
-
-	// Prices are used by the rate limiter and dictate what tokens are supported
-	tx, err := offRamp.SetPrices(client.Owner, tokens, prices)
-	shared.RequireNoError(t, err)
-	err = shared.WaitForMined(client.Logger, client.Client, tx.Hash(), true)
-	shared.RequireNoError(t, err)
-	client.Logger.Infof(fmt.Sprintf("OffRamp prices set on %s in tx %s", client.LaneConfig.OnRamp.String(), helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash())))
 }
 
 func setOnRampOnRouter(t *testing.T, sourceClient *EvmDeploymentConfig, destChainSelector uint64) {

@@ -458,7 +458,7 @@ func aggregateTokenValue(destTokenPricesUSD map[common.Address]*big.Int, srcToDs
 		if !ok {
 			return nil, errors.Errorf("do not have price for src token %x", tokens[i])
 		}
-		sum.Add(sum, new(big.Int).Mul(price, amounts[i]))
+		sum.Add(sum, new(big.Int).Quo(new(big.Int).Mul(price, amounts[i]), big.NewInt(1e18)))
 	}
 	return sum, nil
 }

@@ -115,12 +115,37 @@ contract PriceRegistry_getTokenPrices is PriceRegistrySetup {
     tokens[1] = s_sourceTokens[1];
     tokens[2] = s_weth;
 
-    IPriceRegistry.TimestampedUint192Value[] memory tokenPrices = s_priceRegistry.getTokenPrices(tokens);
+    Internal.TimestampedUint192Value[] memory tokenPrices = s_priceRegistry.getTokenPrices(tokens);
 
     assertEq(tokenPrices.length, 3);
     assertEq(tokenPrices[0].value, priceUpdates.tokenPriceUpdates[0].usdPerToken);
     assertEq(tokenPrices[1].value, priceUpdates.tokenPriceUpdates[1].usdPerToken);
     assertEq(tokenPrices[2].value, priceUpdates.tokenPriceUpdates[2].usdPerToken);
+  }
+}
+
+contract PriceRegistry_getValidatedTokenPrice is PriceRegistrySetup {
+  function testGetValidatedTokenPriceSuccess() public {
+    Internal.PriceUpdates memory priceUpdates = abi.decode(s_encodedInitialPriceUpdates, (Internal.PriceUpdates));
+    address token = priceUpdates.tokenPriceUpdates[0].sourceToken;
+
+    uint192 tokenPrice = s_priceRegistry.getValidatedTokenPrice(token);
+
+    assertEq(priceUpdates.tokenPriceUpdates[0].usdPerToken, tokenPrice);
+  }
+
+  function testStaleFeeTokenReverts() public {
+    vm.warp(block.timestamp + TWELVE_HOURS + 1);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(PriceRegistry.StaleTokenPrice.selector, s_sourceTokens[0], TWELVE_HOURS, TWELVE_HOURS + 1)
+    );
+    s_priceRegistry.getValidatedTokenPrice(s_sourceTokens[0]);
+  }
+
+  function testTokenNotSupportedReverts() public {
+    vm.expectRevert(abi.encodeWithSelector(PriceRegistry.TokenNotSupported.selector, DUMMY_CONTRACT_ADDRESS));
+    s_priceRegistry.getValidatedTokenPrice(DUMMY_CONTRACT_ADDRESS);
   }
 }
 

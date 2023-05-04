@@ -11,6 +11,7 @@ import {AggregateRateLimiter} from "../AggregateRateLimiter.sol";
 import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
+import {USDPriceWith18Decimals} from "../libraries/USDPriceWith18Decimals.sol";
 import {EnumerableMapAddresses} from "../../libraries/internal/EnumerableMapAddresses.sol";
 
 import {SafeERC20} from "../../vendor/SafeERC20.sol";
@@ -24,6 +25,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
   using EnumerableMap for EnumerableMap.AddressToUintMap;
   using EnumerableMapAddresses for EnumerableMapAddresses.AddressToAddressMap;
   using EnumerableSet for EnumerableSet.AddressSet;
+  using USDPriceWith18Decimals for uint192;
 
   error InvalidExtraArgsTag();
   error OnlyCallableByOwnerOrFeeAdmin();
@@ -56,6 +58,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event NopPaid(address indexed nop, uint256 amount);
   event FeeConfigSet(FeeTokenConfigArgs[] feeConfig);
+  event TokenTransferFeeConfigSet(TokenTransferFeeConfigArgs[] transferFeeConfig);
   event CCIPSendRequested(Internal.EVM2EVMMessage message);
   event NopsSet(uint256 nopWeightsTotal, NopAndWeight[] nopsAndWeights);
   event PoolAdded(address token, address pool);
@@ -79,20 +82,36 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
     address afn; // ------------┘ AFN address
   }
 
-  /// @dev Struct to hold the fee configuration for a token
+  /// @dev Struct to hold the execution fee configuration for a fee token
   struct FeeTokenConfig {
     uint96 feeAmount; // --------┐ Flat fee
     uint64 multiplier; //        | Price multiplier for gas costs
     uint32 destGasOverhead; // --┘ Extra gas charged on top of the gasLimit
   }
 
-  /// @dev Struct to hold the fee configuration for a token, same as the FeeTokenConfig but with
-  /// token included so that an array of these can be passed in to setFeeConfig to set the mapping
+  /// @dev Struct to hold the fee configuration for a fee token, same as the FeeTokenConfig but with
+  /// token included so that an array of these can be passed in to setFeeTokenConfig to set the mapping
   struct FeeTokenConfigArgs {
     address token; // ---------┐ Token address
     uint64 multiplier; // -----┘ Price multiplier for gas costs
     uint96 feeAmount; // ------┐ Flat fee in feeToken
     uint32 destGasOverhead; //-┘ Extra gas charged on top of the gasLimit
+  }
+
+  /// @dev Struct to hold the transfer fee configuration for token transfers
+  struct TokenTransferFeeConfig {
+    uint32 minFee; // ---------┐ Minimim USD fee to charge, multiples of 1 US cent, or 0.01USD
+    uint32 maxFee; //          | Maximum USD fee to charge, multiples of 1 US cent, or 0.01USD
+    uint16 ratio; // ----------┘ Ratio of token transfer value to charge as fee, multiples of 0.1bps, or 10e-5
+  }
+
+  /// @dev Same as TokenTransferFeeConfig
+  /// token included so that an array of these can be passed in to setTokenTransferFeeConfig
+  struct TokenTransferFeeConfigArgs {
+    address token; // ---------┐ Token address
+    uint32 minFee; //          | Minimum USD fee to charge, multiples of 1 US cent, or 0.01USD
+    uint32 maxFee; //          | Maximum USD fee to charge, multiples of 1 US cent, or 0.01USD
+    uint16 ratio; // ----------┘ Ratio of token transfer value to charge as fee, multiples of 0.1bps, or 10e-5
   }
 
   /// @dev Nop address and weight, used to set the nops and their weights
@@ -135,8 +154,10 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
   bool private s_allowlistEnabled;
   /// @dev A set of addresses which can make ccipSend calls.
   EnumerableSet.AddressSet private s_allowList;
-  /// @dev The fee token config that can be set by the owner or fee admin
+  /// @dev The execution fee token config that can be set by the owner or fee admin
   mapping(address => FeeTokenConfig) internal s_feeTokenConfig;
+  /// @dev The token transfer fee config that can be set by the owner or fee admin
+  mapping(address => TokenTransferFeeConfig) internal s_tokenTransferFeeConfig;
 
   // STATE
   /// @dev The current nonce per sender
@@ -157,6 +178,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
     address[] memory allowlist,
     RateLimiter.Config memory rateLimiterConfig,
     FeeTokenConfigArgs[] memory feeTokenConfigs,
+    TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
     NopAndWeight[] memory nopsAndWeights
   ) Pausable() AggregateRateLimiter(rateLimiterConfig) {
     if (
@@ -175,7 +197,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
     i_defaultTxGasLimit = staticConfig.defaultTxGasLimit;
 
     _setDynamicConfig(dynamicConfig);
-    _setFeeConfig(feeTokenConfigs);
+    _setFeeTokenConfig(feeTokenConfigs);
+    _setTokenTransferFeeConfig(tokenTransferFeeConfigArgs);
     _setNops(nopsAndWeights);
 
     // Set new tokens and pools
@@ -214,6 +237,9 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
     Client.EVMExtraArgsV1 memory extraArgs = _fromBytes(message.extraArgs);
     // Validate the message with various checks
     _validateMessage(message.data.length, extraArgs.gasLimit, message.tokenAmounts, originalSender);
+    // Rate limit on aggregated token value
+    _rateLimitValue(message.tokenAmounts, IPriceRegistry(s_dynamicConfig.priceRegistry));
+
     if (message.receiver.length != 32) revert InvalidAddress(message.receiver);
     uint256 decodedReceiver = abi.decode(message.receiver, (uint256));
     if (decodedReceiver > type(uint160).max) revert InvalidAddress(message.receiver);
@@ -285,7 +311,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
     uint256 gasLimit,
     Client.EVMTokenAmount[] memory tokenAmounts,
     address originalSender
-  ) internal {
+  ) internal view {
     if (msg.sender != s_dynamicConfig.router) revert MustBeCalledByRouter();
     if (originalSender == address(0)) revert RouterMustSetOriginalSender();
     // Check that payload is formed correctly
@@ -294,8 +320,6 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
     if (gasLimit > uint256(s_dynamicConfig.maxGasLimit)) revert MessageGasLimitTooHigh();
     if (tokenAmounts.length > uint256(s_dynamicConfig.maxTokensLength)) revert UnsupportedNumberOfTokens();
     if (s_allowlistEnabled && !s_allowList.contains(originalSender)) revert SenderNotAllowed(originalSender);
-
-    _rateLimitValue(tokenAmounts, IPriceRegistry(s_dynamicConfig.priceRegistry));
   }
 
   // ================================================================
@@ -397,38 +421,92 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
   // ================================================================
 
   /// @inheritdoc IEVM2AnyOnRamp
-  function getFee(Client.EVM2AnyMessage calldata message) public view returns (uint256 fee) {
-    uint256 gasLimit = _fromBytes(message.extraArgs).gasLimit;
+  function getFee(Client.EVM2AnyMessage calldata message) public view returns (uint256) {
+    // ensure MessageExecutionFee is evaluated strictly before TokenTransferFee
+    // if there are validation reverts, errors from MessageExecutionFee take precendence
+    uint256 executionFee = _getMessageExecutionFee(message.feeToken, message.extraArgs);
+    return executionFee + _getTokenTransferFee(message.feeToken, message.tokenAmounts);
+  }
+
+  function _getMessageExecutionFee(address feeToken, bytes calldata extraArgs) internal view returns (uint256 fee) {
+    uint256 gasLimit = _fromBytes(extraArgs).gasLimit;
     uint256 feeTokenBaseUnitsPerUnitGas = IPriceRegistry(s_dynamicConfig.priceRegistry).getFeeTokenBaseUnitsPerUnitGas(
-      message.feeToken,
+      feeToken,
       i_destChainId
     );
 
     // NOTE: if a fee token is not configured, formula below will intentionally
     // return zero, i.e. zeroing the fees for that feeToken.
-    FeeTokenConfig memory feeTokenConfig = s_feeTokenConfig[message.feeToken];
+    FeeTokenConfig memory feeTokenConfig = s_feeTokenConfig[feeToken];
     return
       feeTokenConfig.feeAmount + // Flat fee
       ((gasLimit + feeTokenConfig.destGasOverhead) * feeTokenBaseUnitsPerUnitGas * feeTokenConfig.multiplier) / // Total gas reserved for tx
       1 ether; // latest gas reported gas fee with a safety margin
   }
 
+  function _getTokenTransferFee(address feeToken, Client.EVMTokenAmount[] calldata tokenAmounts)
+    internal
+    view
+    returns (uint256 feeTokenAmount)
+  {
+    uint256 numerOfTokens = tokenAmounts.length;
+    // short-circuit with 0 transfer fee if no token is being transferred
+    if (numerOfTokens == 0) {
+      return 0;
+    }
+
+    uint192 feeTokenPrice = IPriceRegistry(s_dynamicConfig.priceRegistry).getValidatedTokenPrice(feeToken);
+
+    for (uint256 i = 0; i < numerOfTokens; ++i) {
+      Client.EVMTokenAmount memory tokenAmount = tokenAmounts[i];
+      TokenTransferFeeConfig memory transferFeeConfig = s_tokenTransferFeeConfig[tokenAmount.token];
+
+      uint256 bpsValue;
+      // ratio can be 0, only calculate bps fee if ratio is greater than 0
+      if (transferFeeConfig.ratio > 0) {
+        uint192 tokenPrice = feeTokenPrice;
+        if (tokenAmount.token != feeToken) {
+          tokenPrice = IPriceRegistry(s_dynamicConfig.priceRegistry).getValidatedTokenPrice(tokenAmount.token);
+        }
+
+        uint256 tokenValue = tokenPrice._calcUSDValueFromTokenAmount(tokenAmount.amount);
+
+        // ratio represents multiples of 0.1bps, or 10e-5
+        bpsValue = (tokenValue * transferFeeConfig.ratio) / 1e5;
+      }
+
+      // convert USD values with 2 decimals to 18 decimals
+      uint256 minFeeValue = uint256(transferFeeConfig.minFee) * 1e16;
+      uint256 maxFeeValue = uint256(transferFeeConfig.maxFee) * 1e16;
+
+      if (bpsValue < minFeeValue) {
+        feeTokenAmount += feeTokenPrice._calcTokenAmountFromUSDValue(minFeeValue);
+      } else if (bpsValue > maxFeeValue) {
+        feeTokenAmount += feeTokenPrice._calcTokenAmountFromUSDValue(maxFeeValue);
+      } else {
+        feeTokenAmount += feeTokenPrice._calcTokenAmountFromUSDValue(bpsValue);
+      }
+    }
+
+    return feeTokenAmount;
+  }
+
   /// @notice Gets the fee configuration for a token
   /// @param token The token to get the fee configuration for
   /// @return feeTokenConfig FeeTokenConfig struct
-  function getFeeConfig(address token) external view returns (FeeTokenConfig memory feeTokenConfig) {
+  function getFeeTokenConfig(address token) external view returns (FeeTokenConfig memory feeTokenConfig) {
     return s_feeTokenConfig[token];
   }
 
   /// @notice Sets the fee configuration for a token
   /// @param feeTokenConfigs Array of FeeTokenConfigArgs structs
-  function setFeeConfig(FeeTokenConfigArgs[] memory feeTokenConfigs) external onlyOwnerOrAdmin {
-    _setFeeConfig(feeTokenConfigs);
+  function setFeeTokenConfig(FeeTokenConfigArgs[] memory feeTokenConfigs) external onlyOwnerOrAdmin {
+    _setFeeTokenConfig(feeTokenConfigs);
   }
 
   /// @dev Set the fee config
   /// @param feeTokenConfigs The fee token configs
-  function _setFeeConfig(FeeTokenConfigArgs[] memory feeTokenConfigs) internal {
+  function _setFeeTokenConfig(FeeTokenConfigArgs[] memory feeTokenConfigs) internal {
     for (uint256 i = 0; i < feeTokenConfigs.length; ++i) {
       s_feeTokenConfig[feeTokenConfigs[i].token] = FeeTokenConfig({
         feeAmount: feeTokenConfigs[i].feeAmount,
@@ -437,6 +515,34 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
       });
     }
     emit FeeConfigSet(feeTokenConfigs);
+  }
+
+  function getTokenTransferFeeConfig(address token)
+    external
+    view
+    returns (TokenTransferFeeConfig memory tokenTransferFeeConfig)
+  {
+    return s_tokenTransferFeeConfig[token];
+  }
+
+  function setTokenTransferFeeConfig(TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs)
+    external
+    onlyOwnerOrAdmin
+  {
+    _setTokenTransferFeeConfig(tokenTransferFeeConfigArgs);
+  }
+
+  function _setTokenTransferFeeConfig(TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs) internal {
+    uint256 numerOfTokens = tokenTransferFeeConfigArgs.length;
+
+    for (uint256 i = 0; i < numerOfTokens; ++i) {
+      s_tokenTransferFeeConfig[tokenTransferFeeConfigArgs[i].token] = TokenTransferFeeConfig({
+        minFee: tokenTransferFeeConfigArgs[i].minFee,
+        maxFee: tokenTransferFeeConfigArgs[i].maxFee,
+        ratio: tokenTransferFeeConfigArgs[i].ratio
+      });
+    }
+    emit TokenTransferFeeConfigSet(tokenTransferFeeConfigArgs);
   }
 
   // ================================================================

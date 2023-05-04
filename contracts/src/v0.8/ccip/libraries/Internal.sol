@@ -17,6 +17,11 @@ library Internal {
     uint192 usdPerToken; // USD per unit of token
   }
 
+  struct TimestampedUint192Value {
+    uint192 value; // -------┐ The price, in USD with 18 decimals.
+    uint64 timestamp; // ----┘ Timestamp of the most recent price update.
+  }
+
   struct PoolUpdate {
     address token; // The IERC20 token address
     address pool; // The token pool address

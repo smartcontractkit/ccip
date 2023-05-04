@@ -16,7 +16,7 @@ contract AggregateTokenLimiterSetup is BaseTest, PriceRegistrySetup {
   RateLimiter.Config s_config;
 
   address immutable TOKEN = 0x21118E64E1fB0c487F25Dd6d3601FF6af8D32E4e;
-  uint192 constant TOKEN_PRICE = 4;
+  uint192 constant TOKEN_PRICE = 4e18;
 
   function setUp() public virtual override(BaseTest, PriceRegistrySetup) {
     BaseTest.setUp();
@@ -177,7 +177,7 @@ contract AggregateTokenLimiter__rateLimitValue is AggregateTokenLimiterSetup {
     vm.pauseGasMetering();
     // 15 (tokens) * 4 (price) * 2 (number of times) > 100 (capacity)
     uint256 numberOfTokens = 15;
-    uint256 value = numberOfTokens * TOKEN_PRICE;
+    uint256 value = (numberOfTokens * TOKEN_PRICE) / 1e18;
 
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
     tokenAmounts[0].token = TOKEN;
@@ -229,7 +229,7 @@ contract AggregateTokenLimiter__rateLimitValue is AggregateTokenLimiterSetup {
       abi.encodeWithSelector(
         RateLimiter.ConsumingMoreThanMaxCapacity.selector,
         bucket.capacity,
-        tokenAmounts[0].amount * TOKEN_PRICE
+        (tokenAmounts[0].amount * TOKEN_PRICE) / 1e18
       )
     );
     s_rateLimiter.rateLimitValue(tokenAmounts, s_priceRegistry);

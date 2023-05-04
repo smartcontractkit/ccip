@@ -90,7 +90,7 @@ func (client *CCIPClient) setOnRampFeeConfig(t *testing.T, sourceClient *rhea.Ev
 		})
 	}
 
-	tx, err := client.Source.OnRamp.SetFeeConfig(client.Source.Owner, feeTokenConfig)
+	tx, err := client.Source.OnRamp.SetFeeTokenConfig(client.Source.Owner, feeTokenConfig)
 	shared.RequireNoError(t, err)
 	err = shared.WaitForMined(client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 	shared.RequireNoError(t, err)

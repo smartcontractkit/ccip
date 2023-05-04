@@ -10,6 +10,7 @@
   "getStalenessThreshold()": "a6c94a73",
   "getTokenPrice(address)": "d02641a0",
   "getTokenPrices(address[])": "45ac924d",
+  "getValidatedTokenPrice(address)": "4ab35b0b",
   "owner()": "8da5cb5b",
   "transferOwnership(address)": "f2fde38b",
   "updatePrices(((address,uint192)[],uint64,uint192))": "866548c9"

@@ -10,6 +10,7 @@ import {RouterSetup} from "../router/RouterSetup.t.sol";
 import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {Client} from "../../libraries/Client.sol";
+import {EVM2EVMOnRampHelper} from "../helpers/EVM2EVMOnRampHelper.sol";
 import "../../offRamp/EVM2EVMOffRamp.sol";
 import "../TokenSetup.t.sol";
 
@@ -22,10 +23,11 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
 
   bytes32 internal s_metadataHash;
 
-  EVM2EVMOnRamp internal s_onRamp;
+  EVM2EVMOnRampHelper internal s_onRamp;
   address[] s_offRamps;
 
   EVM2EVMOnRamp.FeeTokenConfigArgs[] s_feeTokenConfigArgs;
+  EVM2EVMOnRamp.TokenTransferFeeConfigArgs[] s_tokenTransferFeeConfigArgs;
 
   function setUp() public virtual override(TokenSetup, PriceRegistrySetup) {
     TokenSetup.setUp();
@@ -42,7 +44,25 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
         destGasOverhead: 2
       })
     );
-    s_onRamp = new EVM2EVMOnRamp(
+
+    s_tokenTransferFeeConfigArgs.push(
+      EVM2EVMOnRamp.TokenTransferFeeConfigArgs({
+        token: s_sourceFeeToken,
+        minFee: 1_00, // $1
+        maxFee: 5000_00, // $5000
+        ratio: 2_5 // 2.5 bps, or 0.025%
+      })
+    );
+    s_tokenTransferFeeConfigArgs.push(
+      EVM2EVMOnRamp.TokenTransferFeeConfigArgs({
+        token: s_sourceRouter.getWrappedNative(),
+        minFee: 2_00, // $2
+        maxFee: 10_000_00, // $10,000
+        ratio: 5_0 // 5 bps, or 0.05%
+      })
+    );
+
+    s_onRamp = new EVM2EVMOnRampHelper(
       EVM2EVMOnRamp.StaticConfig({
         linkToken: s_sourceTokens[0],
         chainId: SOURCE_CHAIN_ID,
@@ -54,6 +74,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
       new address[](0),
       rateLimiterConfig(),
       s_feeTokenConfigArgs,
+      s_tokenTransferFeeConfigArgs,
       getNopsAndWeights()
     );
     s_onRamp.setAdmin(ADMIN);
@@ -87,6 +108,24 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
     Client.EVMTokenAmount[] memory tokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
     tokenAmounts[0].amount = i_tokenAmount0;
     tokenAmounts[1].amount = i_tokenAmount1;
+    return
+      Client.EVM2AnyMessage({
+        receiver: abi.encode(OWNER),
+        data: "",
+        tokenAmounts: tokenAmounts,
+        feeToken: s_sourceFeeToken,
+        extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT, strict: false}))
+      });
+  }
+
+  function _generateSingleTokenMessage(address token, uint256 amount)
+    public
+    view
+    returns (Client.EVM2AnyMessage memory)
+  {
+    Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+    tokenAmounts[0] = Client.EVMTokenAmount({token: token, amount: amount});
+
     return
       Client.EVM2AnyMessage({
         receiver: abi.encode(OWNER),

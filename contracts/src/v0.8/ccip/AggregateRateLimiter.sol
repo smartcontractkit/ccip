@@ -2,14 +2,17 @@
 pragma solidity 0.8.15;
 
 import {OwnerIsCreator} from "./OwnerIsCreator.sol";
+import {Internal} from "./libraries/Internal.sol";
 import {Client} from "./libraries/Client.sol";
 import {RateLimiter} from "./libraries/RateLimiter.sol";
+import {USDPriceWith18Decimals} from "./libraries/USDPriceWith18Decimals.sol";
 import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
 
 import {IERC20} from "../vendor/IERC20.sol";
 
 contract AggregateRateLimiter is OwnerIsCreator {
   using RateLimiter for RateLimiter.TokenBucket;
+  using USDPriceWith18Decimals for uint192;
 
   error PriceNotFoundForToken(address token);
   event AdminSet(address newAdmin);
@@ -37,9 +40,11 @@ contract AggregateRateLimiter is OwnerIsCreator {
 
     uint256 value = 0;
     for (uint256 i = 0; i < numberOfTokens; ++i) {
-      uint256 pricePerToken = priceRegistry.getTokenPrice(tokenAmounts[i].token).value;
+      // not fetching validated price, as price staleness is not important for value-based rate limiting
+      // we only need to verify price is not 0
+      uint192 pricePerToken = priceRegistry.getTokenPrice(tokenAmounts[i].token).value;
       if (pricePerToken == 0) revert PriceNotFoundForToken(tokenAmounts[i].token);
-      value += tokenAmounts[i].amount * pricePerToken;
+      value += pricePerToken._calcUSDValueFromTokenAmount(tokenAmounts[i].amount);
     }
 
     s_rateLimiter._consume(value);
