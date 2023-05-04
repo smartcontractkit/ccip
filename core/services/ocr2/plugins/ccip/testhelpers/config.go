@@ -39,7 +39,7 @@ func createCommitOffchainConfig(c *CCIPContracts, feeUpdateHearBeat time.Duratio
 
 func createDefaultExecOnchainConfig(c *CCIPContracts) []byte {
 	config, err := ccip.EncodeAbiStruct(ccip.ExecOnchainConfig{
-		PermissionLessExecutionThresholdSeconds: 60,
+		PermissionLessExecutionThresholdSeconds: 5 * 60,
 		Router:                                  c.Dest.Router.Address(),
 		Afn:                                     c.Dest.AFN.Address(),
 		PriceRegistry:                           c.Dest.PriceRegistry.Address(),

@@ -77,31 +77,6 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	if err != nil {
 		return nil, errors.Wrap(err, "could not get source native token")
 	}
-
-	// TODO DynamicConfig RPC call
-	dynamicOffRampConfig, err := offRamp.GetDynamicConfig(&bind.CallOpts{})
-	if err != nil {
-		return nil, errors.Wrap(err, "failed loading offRamp config")
-	}
-	destRouter, err := router.NewRouter(dynamicOffRampConfig.Router, destChain.Client())
-	if err != nil {
-		return nil, errors.Wrap(err, "failed loading dest router")
-	}
-	destWrappedNative, err := destRouter.GetWrappedNative(&bind.CallOpts{})
-	if err != nil {
-		return nil, errors.Wrap(err, "could not get destination token")
-	}
-
-	// TODO DynamicConfig RPC call
-	dynamicConfig, err := commitStore.GetDynamicConfig(&bind.CallOpts{})
-	if err != nil {
-		return nil, errors.Wrap(err, "failed getting the dynamic config from the commitStore")
-	}
-	destPriceRegistry, err := price_registry.NewPriceRegistry(dynamicConfig.PriceRegistry, destChain.Client())
-	if err != nil {
-		return nil, errors.Wrap(err, "could not create dest price registry")
-	}
-
 	srcPriceRegistry, err := price_registry.NewPriceRegistry(dynamicOnRampConfig.PriceRegistry, sourceChain.Client())
 	if err != nil {
 		return nil, errors.Wrap(err, "could not create source price registry")
@@ -111,18 +86,17 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 
 	wrappedPluginFactory := NewExecutionReportingPluginFactory(
 		ExecutionPluginConfig{
-			lggr:                   lggr,
-			sourceLP:               sourceChain.LogPoller(),
-			destLP:                 destChain.LogPoller(),
-			offRamp:                offRamp,
-			onRamp:                 onRamp,
-			commitStore:            commitStore,
-			leafHasher:             NewLeafHasher(offRampConfig.SourceChainId, uint64(destChainID), onRamp.Address(), hasher.NewKeccakCtx()),
-			destPriceRegistry:      destPriceRegistry,
-			srcPriceRegistry:       srcPriceRegistry,
-			destGasEstimator:       destChain.GasEstimator(),
-			destWrappedNativeToken: destWrappedNative,
-			srcWrappedNativeToken:  sourceWrappedNative,
+			lggr:                  lggr,
+			sourceLP:              sourceChain.LogPoller(),
+			destLP:                destChain.LogPoller(),
+			onRamp:                onRamp,
+			offRamp:               offRamp,
+			commitStore:           commitStore,
+			srcPriceRegistry:      srcPriceRegistry,
+			srcWrappedNativeToken: sourceWrappedNative,
+			destClient:            destChain.Client(),
+			destGasEstimator:      destChain.GasEstimator(),
+			leafHasher:            NewLeafHasher(offRampConfig.SourceChainId, uint64(destChainID), onRamp.Address(), hasher.NewKeccakCtx()),
 		})
 
 	// Subscribe to all relevant commit logs.

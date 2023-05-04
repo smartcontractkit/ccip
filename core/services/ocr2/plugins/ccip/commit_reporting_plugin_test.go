@@ -59,12 +59,11 @@ func setupCommitTestHarness(t *testing.T) commitTestHarness {
 			destLP:             th.destLP,
 			onRamp:             th.onRamp,
 			commitStore:        th.commitStore,
-			priceRegistry:      th.priceRegistry,
 			priceGetter:        fakePriceGetter{},
 			sourceNative:       utils.RandomAddress(),
 			sourceFeeEstimator: sourceFeeEstimator,
 			sourceChainID:      th.sourceChainID,
-			hasher:             NewLeafHasher(th.sourceChainID, th.destChainID, th.onRamp.Address(), hasher.NewKeccakCtx()),
+			leafHasher:         NewLeafHasher(th.sourceChainID, th.destChainID, th.onRamp.Address(), hasher.NewKeccakCtx()),
 		},
 		inFlight: map[[32]byte]InflightReport{},
 		offchainConfig: CommitOffchainConfig{
@@ -74,6 +73,8 @@ func setupCommitTestHarness(t *testing.T) commitTestHarness {
 			FeeUpdateHeartBeat:          models.MustMakeDuration(12 * time.Hour),
 			MaxGasPrice:                 200e9,
 		},
+		lggr:          th.lggr,
+		priceRegistry: th.priceRegistry,
 	}
 	return commitTestHarness{
 		ccipPluginTestHarness: th,
@@ -246,7 +247,7 @@ func TestReport(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, 1, len(logs))
-	leafHash, err := th.plugin.config.hasher.HashLeaf(logs[0])
+	leafHash, err := th.plugin.config.leafHasher.HashLeaf(logs[0])
 	require.NoError(t, err)
 	tree, err := merklemulti.NewTree(hasher.NewKeccakCtx(), [][32]byte{leafHash})
 	require.NoError(t, err)

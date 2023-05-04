@@ -10,8 +10,6 @@ import (
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
@@ -64,20 +62,7 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 	if staticConfig.ChainId != uint64(destChainID) {
 		return nil, errors.Errorf("Wrong dest chain ID got %d expected from jobspec %d", staticConfig.ChainId, destChainID)
 	}
-	// TODO DynamicConfig call, remove
-	dynamicConfig, err := commitStore.GetDynamicConfig(&bind.CallOpts{})
-	if err != nil {
-		return nil, errors.Wrap(err, "failed getting the dynamic config from the commitStore")
-	}
-
 	priceGetterObject, err := NewPriceGetter(pluginConfig.TokenPricesUSDPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
-	if err != nil {
-		return nil, err
-	}
-
-	// subscribe for GasFeeUpdated logs, but the PriceRegistry is only available as part of onchain commitStore's config
-	// TODO: how to detect if commitStoreConfig.PriceRegistry changes on-chain? Currently, we expect a plugin/job/node restart
-	priceRegistry, err := price_registry.NewPriceRegistry(dynamicConfig.PriceRegistry, destChain.Client())
 	if err != nil {
 		return nil, err
 	}
@@ -94,16 +79,6 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 		return nil, err
 	}
 
-	err = destChain.LogPoller().RegisterFilter(logpoller.Filter{Name: logpoller.FilterName(COMMIT_PRICE_UPDATES, dynamicConfig.PriceRegistry.String()),
-		EventSigs: []common.Hash{EventSignatures.UsdPerUnitGasUpdated, EventSignatures.UsdPerTokenUpdated}, Addresses: []common.Address{dynamicConfig.PriceRegistry}})
-	if err != nil {
-		return nil, err
-	}
-	err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{Name: logpoller.FilterName(COMMIT_CCIP_SENDS, onRamp.Address().String()), EventSigs: []common.Hash{EventSignatures.SendRequested}, Addresses: []common.Address{onRamp.Address()}})
-	if err != nil {
-		return nil, err
-	}
-
 	leafHasher := NewLeafHasher(staticConfig.SourceChainId, uint64(destChainID), onRamp.Address(), hasher.NewKeccakCtx())
 	wrappedPluginFactory := NewCommitReportingPluginFactory(
 		CommitPluginConfig{
@@ -111,13 +86,13 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 			sourceLP:           sourceChain.LogPoller(),
 			destLP:             destChain.LogPoller(),
 			onRamp:             onRamp,
-			priceRegistry:      priceRegistry,
 			priceGetter:        priceGetterObject,
 			sourceNative:       sourceNative,
 			sourceFeeEstimator: sourceChain.GasEstimator(),
 			sourceChainID:      staticConfig.SourceChainId,
+			destClient:         destChain.Client(),
 			commitStore:        commitStore,
-			hasher:             leafHasher,
+			leafHasher:         leafHasher,
 		})
 	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPCommit", string(spec.Relay), destChain.ID())
 	argsNoPlugin.Logger = logger.NewOCRWrapper(lggr.Named("CCIPCommit").With(

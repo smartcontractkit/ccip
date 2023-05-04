@@ -719,6 +719,7 @@ func (client *CCIPClient) getOffRampOnchainConfig() []byte {
 		PermissionLessExecutionThresholdSeconds: rhea.PERMISSIONLESS_EXEC_THRESHOLD_SEC,
 		Router:                                  client.Dest.Router.Address(),
 		Afn:                                     client.Dest.Afn.Address(),
+		PriceRegistry:                           client.Dest.PriceRegistry.Address(),
 		MaxTokensLength:                         rhea.MAX_TOKEN_LENGTH,
 		MaxDataSize:                             rhea.MAX_DATA_SIZE,
 	}

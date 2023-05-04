@@ -55,7 +55,6 @@ func (d ExecOnchainConfig) AbiString() string {
 }
 
 func (d ExecOnchainConfig) Validate() error {
-	//emptyAddress :=
 	if d.PermissionLessExecutionThresholdSeconds == 0 {
 		return errors.New("must set PermissionLessExecutionThresholdSeconds")
 	}
@@ -77,6 +76,6 @@ func (d ExecOnchainConfig) Validate() error {
 	return nil
 }
 
-func (d *ExecOnchainConfig) PermissionLessExecutionThresholdDuration() time.Duration {
+func (d ExecOnchainConfig) PermissionLessExecutionThresholdDuration() time.Duration {
 	return time.Duration(d.PermissionLessExecutionThresholdSeconds) * time.Second
 }

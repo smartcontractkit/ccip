@@ -18,6 +18,7 @@ import (
 
 	txmgrtypes "github.com/smartcontractkit/chainlink/v2/common/txmgr/types"
 	"github.com/smartcontractkit/chainlink/v2/core/assets"
+	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
@@ -26,6 +27,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 
@@ -99,18 +101,28 @@ func DecodeExecutionReport(report types.Report) (*evm_2_evm_offramp.InternalExec
 }
 
 type ExecutionPluginConfig struct {
-	onRamp            *evm_2_evm_onramp.EVM2EVMOnRamp
-	offRamp           *evm_2_evm_offramp.EVM2EVMOffRamp
-	commitStore       *commit_store.CommitStore
-	srcPriceRegistry  *price_registry.PriceRegistry
-	destPriceRegistry *price_registry.PriceRegistry
+	lggr                  logger.Logger
+	sourceLP, destLP      logpoller.LogPoller
+	onRamp                *evm_2_evm_onramp.EVM2EVMOnRamp
+	offRamp               *evm_2_evm_offramp.EVM2EVMOffRamp
+	commitStore           *commit_store.CommitStore
+	srcPriceRegistry      *price_registry.PriceRegistry
+	srcWrappedNativeToken common.Address
+	destClient            evmclient.Client
+	destGasEstimator      txmgrtypes.FeeEstimator[*evmtypes.Head, gas.EvmFee, *assets.Wei, common.Hash]
+	leafHasher            LeafHasherInterface[[32]byte]
+}
 
-	sourceLP, destLP       logpoller.LogPoller
-	leafHasher             LeafHasherInterface[[32]byte]
-	lggr                   logger.Logger
-	destGasEstimator       txmgrtypes.FeeEstimator[*evmtypes.Head, gas.EvmFee, *assets.Wei, common.Hash]
-	srcWrappedNativeToken  common.Address
-	destWrappedNativeToken common.Address
+type ExecutionReportingPlugin struct {
+	config            ExecutionPluginConfig
+	F                 int
+	lggr              logger.Logger
+	inflightReports   *inflightReportsContainer
+	snoozedRoots      map[[32]byte]time.Time
+	destPriceRegistry *price_registry.PriceRegistry
+	destWrappedNative common.Address
+	onchainConfig     ExecOnchainConfig
+	offchainConfig    ExecOffchainConfig
 }
 
 type ExecutionReportingPluginFactory struct {
@@ -122,29 +134,39 @@ func NewExecutionReportingPluginFactory(config ExecutionPluginConfig) types.Repo
 }
 
 func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.ReportingPluginConfig) (types.ReportingPlugin, types.ReportingPluginInfo, error) {
+	onchainConfig, err := DecodeAbiStruct[ExecOnchainConfig](config.OnchainConfig)
+	if err != nil {
+		return nil, types.ReportingPluginInfo{}, err
+	}
 	offchainConfig, err := DecodeOffchainConfig[ExecOffchainConfig](config.OffchainConfig)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
-	execOnChainConfig, err := DecodeAbiStruct[ExecOnchainConfig](config.OnchainConfig)
+	priceRegistry, err := price_registry.NewPriceRegistry(onchainConfig.PriceRegistry, rf.config.destClient)
+	if err != nil {
+		return nil, types.ReportingPluginInfo{}, err
+	}
+	destRouter, err := router.NewRouter(onchainConfig.Router, rf.config.destClient)
+	if err != nil {
+		return nil, types.ReportingPluginInfo{}, err
+	}
+	destWrappedNative, err := destRouter.GetWrappedNative(&bind.CallOpts{})
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
 
-	dynamicConfig, err := rf.config.offRamp.GetDynamicConfig(&bind.CallOpts{})
-	if err != nil {
-		return nil, types.ReportingPluginInfo{}, err
-	}
-	rf.config.lggr.Infow("Starting exec plugin", "offchainConfig", offchainConfig, "dynamicConfig", dynamicConfig)
+	rf.config.lggr.Infow("Starting exec plugin", "offchainConfig", offchainConfig, "onchainConfig", onchainConfig)
 
 	return &ExecutionReportingPlugin{
-			lggr:                             rf.config.lggr.Named("ExecutionReportingPlugin"),
-			F:                                config.F,
-			offchainConfig:                   offchainConfig,
-			config:                           rf.config,
-			snoozedRoots:                     make(map[[32]byte]time.Time),
-			inflightReports:                  newInflightReportsContainer(offchainConfig.InflightCacheExpiry.Duration()),
-			permissionLessExecutionThreshold: execOnChainConfig.PermissionLessExecutionThresholdDuration(),
+			config:            rf.config,
+			F:                 config.F,
+			lggr:              rf.config.lggr.Named("ExecutionReportingPlugin"),
+			snoozedRoots:      make(map[[32]byte]time.Time),
+			inflightReports:   newInflightReportsContainer(offchainConfig.InflightCacheExpiry.Duration()),
+			destPriceRegistry: priceRegistry,
+			destWrappedNative: destWrappedNative,
+			onchainConfig:     onchainConfig,
+			offchainConfig:    offchainConfig,
 		}, types.ReportingPluginInfo{
 			Name:          "CCIPExecution",
 			UniqueReports: true,
@@ -153,16 +175,6 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 				MaxReportLength:      MaxExecutionReportLength,
 			},
 		}, nil
-}
-
-type ExecutionReportingPlugin struct {
-	lggr                             logger.Logger
-	F                                int
-	config                           ExecutionPluginConfig
-	inflightReports                  *inflightReportsContainer
-	offchainConfig                   ExecOffchainConfig
-	snoozedRoots                     map[[32]byte]time.Time
-	permissionLessExecutionThreshold time.Duration
 }
 
 func (r *ExecutionReportingPlugin) Query(context.Context, types.ReportTimestamp) (types.Query, error) {
@@ -216,7 +228,7 @@ func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(min, max uint64) (ma
 }
 
 func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context, inflight []InflightInternalExecutionReport) ([]ObservedMessage, error) {
-	unexpiredReports, err := getUnexpiredCommitReports(r.config.destLP, r.config.commitStore, r.permissionLessExecutionThreshold)
+	unexpiredReports, err := getUnexpiredCommitReports(r.config.destLP, r.config.commitStore, r.onchainConfig.PermissionLessExecutionThresholdDuration())
 	if err != nil {
 		return nil, err
 	}
@@ -257,7 +269,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 	if err != nil {
 		return nil, err
 	}
-	destTokensPrices, err := getTokensPrices(ctx, r.config.destPriceRegistry, append(supportedDestTokens, r.config.destWrappedNativeToken))
+	destTokensPrices, err := getTokensPrices(ctx, r.destPriceRegistry, append(supportedDestTokens, r.destWrappedNative))
 	if err != nil {
 		return nil, err
 	}
@@ -320,7 +332,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 		// so it will never be considered again.
 		if allMessagesExecuted {
 			r.lggr.Infof("Snoozing root %s forever since there are no executable txs anymore %v", hex.EncodeToString(unexpiredReport.MerkleRoot[:]), executedMp)
-			r.snoozedRoots[unexpiredReport.MerkleRoot] = time.Now().Add(r.permissionLessExecutionThreshold)
+			r.snoozedRoots[unexpiredReport.MerkleRoot] = time.Now().Add(r.onchainConfig.PermissionLessExecutionThresholdDuration())
 			incSkippedRequests(reasonAllExecuted)
 			continue
 		}
@@ -411,7 +423,7 @@ func (r *ExecutionReportingPlugin) buildBatch(srcToDst map[common.Address]common
 			continue
 		}
 		// Fee boosting
-		execCostUsd := computeExecCost(msg, execGasPriceEstimate, destTokenPricesUSD[r.config.destWrappedNativeToken])
+		execCostUsd := computeExecCost(msg, execGasPriceEstimate, destTokenPricesUSD[r.destWrappedNative])
 		// calculating the source chain fee, dividing by 1e18 for denomination.
 		// For example:
 		// FeeToken=link; FeeTokenAmount=1e17 i.e. 0.1 link, price is 6e18 USD/link (1 USD = 1e18),

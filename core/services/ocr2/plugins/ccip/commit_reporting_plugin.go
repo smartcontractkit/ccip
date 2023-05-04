@@ -18,6 +18,7 @@ import (
 
 	txmgrtypes "github.com/smartcontractkit/chainlink/v2/common/txmgr/types"
 	"github.com/smartcontractkit/chainlink/v2/core/assets"
+	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
@@ -131,13 +132,28 @@ type CommitPluginConfig struct {
 	lggr               logger.Logger
 	sourceLP, destLP   logpoller.LogPoller
 	onRamp             *evm_2_evm_onramp.EVM2EVMOnRamp
-	priceRegistry      *price_registry.PriceRegistry
+	commitStore        *commit_store.CommitStore
 	priceGetter        PriceGetter
+	sourceChainID      uint64
 	sourceNative       common.Address
 	sourceFeeEstimator txmgrtypes.FeeEstimator[*evmtypes.Head, gas.EvmFee, *assets.Wei, common.Hash]
-	sourceChainID      uint64
-	commitStore        *commit_store.CommitStore
-	hasher             LeafHasherInterface[[32]byte]
+	destClient         evmclient.Client
+	leafHasher         LeafHasherInterface[[32]byte]
+}
+
+type CommitReportingPlugin struct {
+	config CommitPluginConfig
+	F      int
+	lggr   logger.Logger
+	// We need to synchronize access to the inflight structure
+	// as reporting plugin methods may be called from separate goroutines,
+	// e.g. reporting vs transmission protocol.
+	inFlightMu           sync.RWMutex
+	inFlight             map[[32]byte]InflightReport
+	inFlightPriceUpdates []InflightPriceUpdate
+	priceRegistry        *price_registry.PriceRegistry
+	offchainConfig       CommitOffchainConfig
+	onchainConfig        CommitOnchainConfig
 }
 
 type CommitReportingPluginFactory struct {
@@ -151,22 +167,37 @@ func NewCommitReportingPluginFactory(config CommitPluginConfig) types.ReportingP
 
 // NewReportingPlugin returns the ccip CommitReportingPlugin and satisfies the ReportingPluginFactory interface.
 func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.ReportingPluginConfig) (types.ReportingPlugin, types.ReportingPluginInfo, error) {
-	offchainConfig, err := DecodeOffchainConfig[CommitOffchainConfig](config.OffchainConfig)
-	if err != nil {
-		return nil, types.ReportingPluginInfo{}, err
-	}
-
 	onchainConfig, err := DecodeAbiStruct[CommitOnchainConfig](config.OnchainConfig)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
+	offchainConfig, err := DecodeOffchainConfig[CommitOffchainConfig](config.OffchainConfig)
+	if err != nil {
+		return nil, types.ReportingPluginInfo{}, err
+	}
+	priceRegistry, err := price_registry.NewPriceRegistry(onchainConfig.PriceRegistry, rf.config.destClient)
+	if err != nil {
+		return nil, types.ReportingPluginInfo{}, err
+	}
+	err = rf.config.destLP.RegisterFilter(logpoller.Filter{Name: logpoller.FilterName(COMMIT_PRICE_UPDATES, onchainConfig.PriceRegistry.String()),
+		EventSigs: []common.Hash{EventSignatures.UsdPerUnitGasUpdated, EventSignatures.UsdPerTokenUpdated}, Addresses: []common.Address{onchainConfig.PriceRegistry}})
+	if err != nil {
+		return nil, types.ReportingPluginInfo{}, err
+	}
+	err = rf.config.sourceLP.RegisterFilter(logpoller.Filter{Name: logpoller.FilterName(COMMIT_CCIP_SENDS, rf.config.onRamp.Address().String()),
+		EventSigs: []common.Hash{EventSignatures.SendRequested}, Addresses: []common.Address{rf.config.onRamp.Address()}})
+	if err != nil {
+		return nil, types.ReportingPluginInfo{}, err
+	}
 
-	rf.config.lggr.Infow("Starting commit plugin", "offchainConfig", offchainConfig)
+	rf.config.lggr.Infow("Starting commit plugin", "offchainConfig", offchainConfig, "onchainConfig", onchainConfig)
 
 	return &CommitReportingPlugin{
 			config:         rf.config,
 			F:              config.F,
+			lggr:           rf.config.lggr.Named("CommitReportingPlugin"),
 			inFlight:       make(map[[32]byte]InflightReport),
+			priceRegistry:  priceRegistry,
 			onchainConfig:  onchainConfig,
 			offchainConfig: offchainConfig,
 		},
@@ -181,23 +212,10 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 		}, nil
 }
 
-type CommitReportingPlugin struct {
-	config CommitPluginConfig
-	F      int
-	// We need to synchronize access to the inflight structure
-	// as reporting plugin methods may be called from separate goroutines,
-	// e.g. reporting vs transmission protocol.
-	inFlightMu           sync.RWMutex
-	inFlight             map[[32]byte]InflightReport
-	inFlightPriceUpdates []InflightPriceUpdate
-	offchainConfig       CommitOffchainConfig
-	onchainConfig        CommitOnchainConfig
-}
-
 func (r *CommitReportingPlugin) seqParser(log logpoller.Log) (uint64, error) {
 	req, err := r.config.onRamp.ParseCCIPSendRequested(log.GetGethLog())
 	if err != nil {
-		r.config.lggr.Warnf("failed to parse log: %+v", log)
+		r.lggr.Warnf("failed to parse log: %+v", log)
 		return 0, err
 	}
 	return req.Message.SequenceNumber, nil
@@ -248,13 +266,13 @@ type update = struct {
 // latest gasPrice update is returned in addressZero (common.Address{}); the other keys are tokens price updates
 func (r *CommitReportingPlugin) getLatestPriceUpdates(ctx context.Context, now time.Time, skipInflight bool) (latestUpdates map[common.Address]update, err error) {
 	latestUpdates = make(map[common.Address]update)
-	gasUpdatesWithinHeartBeat, err := r.config.destLP.IndexedLogsCreatedAfter(EventSignatures.UsdPerUnitGasUpdated, r.config.priceRegistry.Address(), 1, []common.Hash{EvmWord(r.config.sourceChainID)}, now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()), pg.WithParentCtx(ctx))
+	gasUpdatesWithinHeartBeat, err := r.config.destLP.IndexedLogsCreatedAfter(EventSignatures.UsdPerUnitGasUpdated, r.priceRegistry.Address(), 1, []common.Hash{EvmWord(r.config.sourceChainID)}, now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()), pg.WithParentCtx(ctx))
 	if err != nil {
 		return nil, err
 	}
 	for _, log := range gasUpdatesWithinHeartBeat {
 		// Ordered by ascending timestamps
-		priceUpdate, err2 := r.config.priceRegistry.ParseUsdPerUnitGasUpdated(log.GetGethLog())
+		priceUpdate, err2 := r.priceRegistry.ParseUsdPerUnitGasUpdated(log.GetGethLog())
 		if err2 != nil {
 			return nil, err2
 		}
@@ -267,13 +285,13 @@ func (r *CommitReportingPlugin) getLatestPriceUpdates(ctx context.Context, now t
 		}
 	}
 
-	tokenUpdatesWithinHeartBeat, err := r.config.destLP.LogsCreatedAfter(EventSignatures.UsdPerTokenUpdated, r.config.priceRegistry.Address(), now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()), pg.WithParentCtx(ctx))
+	tokenUpdatesWithinHeartBeat, err := r.config.destLP.LogsCreatedAfter(EventSignatures.UsdPerTokenUpdated, r.priceRegistry.Address(), now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()), pg.WithParentCtx(ctx))
 	if err != nil {
 		return nil, err
 	}
 	for _, log := range tokenUpdatesWithinHeartBeat {
 		// Ordered by ascending timestamps
-		tokenUpdate, err := r.config.priceRegistry.ParseUsdPerTokenUpdated(log.GetGethLog())
+		tokenUpdate, err := r.priceRegistry.ParseUsdPerTokenUpdated(log.GetGethLog())
 		if err != nil {
 			return nil, err
 		}
@@ -315,7 +333,7 @@ func (r *CommitReportingPlugin) getLatestPriceUpdates(ctx context.Context, now t
 // All prices are USD ($1=1e18) denominated. We only generate prices we think should be updated; otherwise, omitting values means voting to skip updating them
 func (r *CommitReportingPlugin) generatePriceUpdates(ctx context.Context, now time.Time) (sourceGasPriceUSD *big.Int, tokenPricesUSD map[common.Address]*big.Int, err error) {
 	// fetch feeTokens every observation, so we're automatically up-to-date if new feeTokens are added or removed
-	feeTokens, err := r.config.priceRegistry.GetFeeTokens(&bind.CallOpts{Context: ctx})
+	feeTokens, err := r.priceRegistry.GetFeeTokens(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -378,7 +396,7 @@ func (r *CommitReportingPlugin) generatePriceUpdates(ctx context.Context, now ti
 }
 
 func (r *CommitReportingPlugin) Observation(ctx context.Context, _ types.ReportTimestamp, _ types.Query) (types.Observation, error) {
-	lggr := r.config.lggr.Named("CommitObservation")
+	lggr := r.lggr.Named("CommitObservation")
 	if isCommitStoreDownNow(ctx, lggr, r.config.commitStore) {
 		return nil, ErrCommitStoreIsDown
 	}
@@ -453,7 +471,7 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 
 // buildReport assumes there is at least one message in reqs.
 func (r *CommitReportingPlugin) buildReport(ctx context.Context, interval commit_store.CommitStoreInterval, priceUpdates commit_store.InternalPriceUpdates) (*commit_store.CommitStoreCommitReport, error) {
-	lggr := r.config.lggr.Named("BuildReport")
+	lggr := r.lggr.Named("BuildReport")
 
 	// If no messages are needed only include fee updates
 	if interval.Min == 0 {
@@ -477,7 +495,7 @@ func (r *CommitReportingPlugin) buildReport(ctx context.Context, interval commit
 	if err != nil {
 		return nil, err
 	}
-	leaves, err := leavesFromIntervals(lggr, r.seqParser, interval, r.config.hasher, logs)
+	leaves, err := leavesFromIntervals(lggr, r.seqParser, interval, r.config.leafHasher, logs)
 	if err != nil {
 		return nil, err
 	}
@@ -498,7 +516,7 @@ func (r *CommitReportingPlugin) buildReport(ctx context.Context, interval commit
 }
 
 func (r *CommitReportingPlugin) Report(ctx context.Context, _ types.ReportTimestamp, _ types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
-	lggr := r.config.lggr.Named("Report")
+	lggr := r.lggr.Named("Report")
 	nonEmptyObservations := getNonEmptyObservations[CommitObservation](lggr, observations)
 	var intervals []commit_store.CommitStoreInterval
 	for _, obs := range nonEmptyObservations {
@@ -672,7 +690,7 @@ func (r *CommitReportingPlugin) addToInflight(lggr logger.Logger, report *commit
 }
 
 func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context, _ types.ReportTimestamp, report types.Report) (bool, error) {
-	lggr := r.config.lggr.Named("ShouldAcceptFinalizedReport")
+	lggr := r.lggr.Named("ShouldAcceptFinalizedReport")
 	parsedReport, err := DecodeCommitReport(report)
 	if err != nil {
 		return false, err
@@ -729,7 +747,7 @@ func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, report *commi
 		// If the next min is already greater than this reports min,
 		// this report is stale.
 		if nextMin > report.Interval.Min {
-			r.config.lggr.Infow("report is stale", "onchain min", nextMin, "report min", report.Interval.Min)
+			r.lggr.Infow("report is stale", "onchain min", nextMin, "report min", report.Interval.Min)
 			return true
 		}
 		return false
@@ -744,13 +762,13 @@ func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, report *commi
 
 	if report.PriceUpdates.DestChainId != 0 {
 		if latestUpdate, ok := latestUpdates[common.Address{}]; ok && latestUpdate.value.Cmp(report.PriceUpdates.UsdPerUnitGas) == 0 {
-			r.config.lggr.Infow("gasPriceUpdate-only report is stale", "latest gasPrice", latestUpdate.value, "destChainID", report.PriceUpdates.DestChainId)
+			r.lggr.Infow("gasPriceUpdate-only report is stale", "latest gasPrice", latestUpdate.value, "destChainID", report.PriceUpdates.DestChainId)
 			return true
 		}
 	} else if len(report.PriceUpdates.TokenPriceUpdates) > 0 { // check first token
 		tokenUpdate := report.PriceUpdates.TokenPriceUpdates[0]
 		if latestUpdate, ok := latestUpdates[tokenUpdate.SourceToken]; ok && latestUpdate.value.Cmp(tokenUpdate.UsdPerToken) == 0 {
-			r.config.lggr.Infow("tokenPriceUpdate-only report is stale", "latest tokenPrice", latestUpdate.value, "token", tokenUpdate.SourceToken)
+			r.lggr.Infow("tokenPriceUpdate-only report is stale", "latest tokenPrice", latestUpdate.value, "token", tokenUpdate.SourceToken)
 			return true
 		}
 	} else {
