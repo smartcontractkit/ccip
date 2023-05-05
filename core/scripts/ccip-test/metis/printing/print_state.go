@@ -328,7 +328,7 @@ func printRampSanityCheck(chain *rhea.EvmDeploymentConfig, sourceOnRamp common.A
 	router, err := router.NewRouter(chain.ChainConfig.Router, chain.Client)
 	helpers.PanicErr(err)
 
-	offRamps, err := router.GetOffRamps(&bind.CallOpts{}, remoteChainId)
+	offRamps, err := router.GetAuthorizedCallers(&bind.CallOpts{})
 	helpers.PanicErr(err)
 	var isRamp bool
 	for _, ramp := range offRamps {

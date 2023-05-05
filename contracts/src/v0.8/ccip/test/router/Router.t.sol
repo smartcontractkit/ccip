@@ -19,6 +19,39 @@ contract Router_constructor is EVM2EVMOnRampSetup {
   }
 }
 
+/// @notice #recoverTokens
+contract Router_recoverTokens is EVM2EVMOnRampSetup {
+  function testRecoverTokensSuccess() public {
+    // Assert we can recover sourceToken
+    IERC20 token = IERC20(s_sourceTokens[0]);
+    uint256 balanceBefore = token.balanceOf(OWNER);
+    token.transfer(address(s_sourceRouter), 1);
+    assertEq(token.balanceOf(address(s_sourceRouter)), 1);
+    s_sourceRouter.recoverTokens(address(token), OWNER, 1);
+    assertEq(token.balanceOf(address(s_sourceRouter)), 0);
+    assertEq(token.balanceOf(OWNER), balanceBefore);
+
+    // Assert we can recover native
+    balanceBefore = OWNER.balance;
+    deal(address(s_sourceRouter), 10);
+    assertEq(address(s_sourceRouter).balance, 10);
+    s_sourceRouter.recoverTokens(address(0), OWNER, 10);
+    assertEq(OWNER.balance, balanceBefore + 10);
+    assertEq(address(s_sourceRouter).balance, 0);
+  }
+
+  function testRecoverTokensReverts() public {
+    // Reverts if not owner
+    changePrank(STRANGER);
+    vm.expectRevert("Only callable by owner");
+    s_sourceRouter.recoverTokens(address(0), STRANGER, 1);
+
+    // Reverts if no funds present
+    vm.expectRevert("Only callable by owner");
+    s_sourceRouter.recoverTokens(address(0), OWNER, 10);
+  }
+}
+
 /// @notice #ccipSend
 contract Router_ccipSend is EVM2EVMOnRampSetup {
   event Burned(address indexed sender, uint256 amount);
@@ -289,137 +322,66 @@ contract Router_applyRampUpdates is RouterSetup {
     s_receiver = new SimpleMessageReceiver();
   }
 
-  function generateSingleOffRampUpdate(uint64 sourceChainId, address offRamp)
-    private
-    pure
-    returns (Router.OffRampUpdate memory)
-  {
-    address[] memory offRamps = new address[](1);
-    offRamps[0] = offRamp;
-    return Router.OffRampUpdate({sourceChainId: sourceChainId, offRamps: offRamps});
-  }
-
-  function generateDisableOffRampUpdate(uint64 sourceChainId) private pure returns (Router.OffRampUpdate memory) {
-    address[] memory offRamps = new address[](0);
-    return Router.OffRampUpdate({sourceChainId: sourceChainId, offRamps: offRamps});
-  }
-
-  function testRampUpdates(uint16 config) public {
-    // Setup
-    uint16 nApply = config & ((1 << 8) - 1);
-    uint16 nOnRampUpdates = (config >> 8) & ((1 << 2) - 1);
-    uint16 nOffRampUpdates = (config >> 10) & ((1 << 2) - 1);
-    uint16 nOffRamps = (config >> 12) & ((1 << 2) - 1);
-    uint16 disableOnRamp = (config >> 14) & ((1 << 2) - 1);
-    vm.assume(nOffRampUpdates <= 2);
-    vm.assume(nOnRampUpdates <= 2);
-    vm.assume(nApply <= 2);
-    vm.assume(nOffRamps <= 2);
-    vm.assume(disableOnRamp <= 1);
-
-    // Apply series of updates.
-    for (uint256 j = 0; j < uint256(nApply); j++) {
-      Router.OnRampUpdate[] memory onRampUpdates = new Router.OnRampUpdate[](nOnRampUpdates);
-      Router.OffRampUpdate[] memory offRampUpdates = new Router.OffRampUpdate[](nOffRampUpdates);
-      // For each application we use the same chainID range to ensure overwriting.
-      for (uint256 i = 1; i < uint256(nOnRampUpdates) + 1; ++i) {
-        if (uint256(disableOnRamp) == i - 1) {
-          // Disable this chainID
-          onRampUpdates[i - 1] = Router.OnRampUpdate({destChainId: uint64(i), onRamp: address(uint160(0))});
-        } else {
-          onRampUpdates[i - 1] = Router.OnRampUpdate({destChainId: uint64(i), onRamp: address(uint160(i))});
-        }
-      }
-      for (uint256 i = 1; i < uint256(nOffRampUpdates) + 1; ++i) {
-        address[] memory offRamps = new address[](nOffRamps);
-        // If nOffRamps = 0, we are disabling this chainID.
-        for (uint256 k = 0; k < uint256(nOffRamps); k++) {
-          offRamps[k] = address(uint160(i));
-        }
-        offRampUpdates[i - 1] = Router.OffRampUpdate({sourceChainId: uint64(i), offRamps: offRamps});
-      }
-      s_sourceRouter.applyRampUpdates(onRampUpdates, offRampUpdates);
-
-      // Assert invariants
-      for (uint256 i = 1; i < nOnRampUpdates + 1; ++i) {
-        if (disableOnRamp == i - 1) {
-          assertFalse(s_sourceRouter.isChainSupported(uint64(i)));
-          assertEq(address(uint160(0)), s_sourceRouter.getOnRamp(uint64(i)));
-        } else {
-          assertTrue(s_sourceRouter.isChainSupported(uint64(i)));
-          assertEq(address(uint160(i)), s_sourceRouter.getOnRamp(uint64(i)));
-        }
-      }
-      for (uint256 i = 1; i < nOffRampUpdates + 1; ++i) {
-        // Should be able to call route message from configured offramps.
-        // This ensures the second map is properly maintained.
-        vm.stopPrank();
-        for (uint256 k = 0; k < nOffRamps; k++) {
-          vm.prank(offRampUpdates[i - 1].offRamps[k]);
-          s_sourceRouter.routeMessage(generateReceiverMessage(uint64(i)), false, 100_000, address(s_receiver));
-        }
-        vm.startPrank(OWNER);
-        // Will be true even if we disable the ingress (empty list)
-        assertEq(offRampUpdates[i - 1].offRamps, s_sourceRouter.getOffRamps(uint64(i)));
-      }
-      // Randomize number updates between applies
-      nOnRampUpdates++;
-      nOffRampUpdates++;
-      disableOnRamp++;
-      if (nOffRamps > 0) {
-        nOffRamps--;
-      }
-    }
-  }
-
   function testOffRampDisable() public {
     // Add ingress
-    Router.OnRampUpdate[] memory onRampUpdates = new Router.OnRampUpdate[](0);
-    Router.OffRampUpdate[] memory offRampUpdates = new Router.OffRampUpdate[](1);
+    Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](0);
+    Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](1);
     address offRamp = address(uint160(2));
-    offRampUpdates[0] = generateSingleOffRampUpdate(SOURCE_CHAIN_ID, offRamp);
-    s_sourceRouter.applyRampUpdates(onRampUpdates, offRampUpdates);
-    assertEq(1, s_sourceRouter.getOffRamps(SOURCE_CHAIN_ID).length);
-    assertEq(offRamp, s_sourceRouter.getOffRamps(SOURCE_CHAIN_ID)[0]);
+    offRampUpdates[0] = Router.OffRamp(SOURCE_CHAIN_ID, offRamp);
+    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
+    assertEq(1, s_sourceRouter.getOffRamps().length);
+    Router.OffRamp[] memory gotOffRamps = s_sourceRouter.getOffRamps();
+    assertEq(offRampUpdates[0].sourceChainSelector, gotOffRamps[0].sourceChainSelector);
+    assertEq(offRampUpdates[0].offRamp, gotOffRamps[0].offRamp);
     // Remove ingress
-    offRampUpdates[0] = generateDisableOffRampUpdate(SOURCE_CHAIN_ID);
-    s_sourceRouter.applyRampUpdates(onRampUpdates, offRampUpdates);
-    assertEq(0, s_sourceRouter.getOffRamps(SOURCE_CHAIN_ID).length);
+    s_sourceRouter.applyRampUpdates(onRampUpdates, offRampUpdates, new Router.OffRamp[](0));
+    assertEq(0, s_sourceRouter.getOffRamps().length);
 
     // Disabled offramp should not be able to route.
     vm.expectRevert(IRouter.OnlyOffRamp.selector);
     changePrank(offRamp);
-    s_sourceRouter.routeMessage(generateReceiverMessage(SOURCE_CHAIN_ID), false, 100_000, address(s_receiver));
+    s_sourceRouter.routeMessage(
+      generateReceiverMessage(SOURCE_CHAIN_ID),
+      GAS_FOR_CALL_EXACT_CHECK,
+      100_000,
+      address(s_receiver)
+    );
     changePrank(OWNER);
 
     // Re-enabling should succeed
-    offRampUpdates[0] = generateSingleOffRampUpdate(SOURCE_CHAIN_ID, offRamp);
-    s_sourceRouter.applyRampUpdates(onRampUpdates, offRampUpdates);
-    assertEq(1, s_sourceRouter.getOffRamps(SOURCE_CHAIN_ID).length);
-    assertEq(offRamp, s_sourceRouter.getOffRamps(SOURCE_CHAIN_ID)[0]);
+    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
+    assertEq(1, s_sourceRouter.getOffRamps().length);
+    gotOffRamps = s_sourceRouter.getOffRamps();
+    assertEq(offRampUpdates[0].sourceChainSelector, gotOffRamps[0].sourceChainSelector);
+    assertEq(offRampUpdates[0].offRamp, gotOffRamps[0].offRamp);
     changePrank(offRamp);
-    s_sourceRouter.routeMessage(generateReceiverMessage(SOURCE_CHAIN_ID), false, 100_000, address(s_receiver));
+    s_sourceRouter.routeMessage(
+      generateReceiverMessage(SOURCE_CHAIN_ID),
+      GAS_FOR_CALL_EXACT_CHECK,
+      100_000,
+      address(s_receiver)
+    );
   }
 
   function testOnRampDisable() public {
     // Add onRamp
-    Router.OnRampUpdate[] memory onRampUpdates = new Router.OnRampUpdate[](1);
-    Router.OffRampUpdate[] memory offRampUpdates = new Router.OffRampUpdate[](0);
+    Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
+    Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](0);
     address onRamp = address(uint160(2));
-    onRampUpdates[0] = Router.OnRampUpdate({destChainId: DEST_CHAIN_ID, onRamp: onRamp});
-    s_sourceRouter.applyRampUpdates(onRampUpdates, offRampUpdates);
+    onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_ID, onRamp: onRamp});
+    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
     assertEq(onRamp, s_sourceRouter.getOnRamp(DEST_CHAIN_ID));
     assertTrue(s_sourceRouter.isChainSupported(DEST_CHAIN_ID));
 
     // Disable onRamp
-    onRampUpdates[0] = Router.OnRampUpdate({destChainId: DEST_CHAIN_ID, onRamp: address(0)});
-    s_sourceRouter.applyRampUpdates(onRampUpdates, offRampUpdates);
+    onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_ID, onRamp: address(0)});
+    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
     assertEq(address(0), s_sourceRouter.getOnRamp(DEST_CHAIN_ID));
     assertFalse(s_sourceRouter.isChainSupported(DEST_CHAIN_ID));
 
     // Re-enable onRamp
-    onRampUpdates[0] = Router.OnRampUpdate({destChainId: DEST_CHAIN_ID, onRamp: onRamp});
-    s_sourceRouter.applyRampUpdates(onRampUpdates, offRampUpdates);
+    onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_ID, onRamp: onRamp});
+    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
     assertEq(onRamp, s_sourceRouter.getOnRamp(DEST_CHAIN_ID));
     assertTrue(s_sourceRouter.isChainSupported(DEST_CHAIN_ID));
   }
@@ -427,9 +389,9 @@ contract Router_applyRampUpdates is RouterSetup {
   function testOnlyOwnerReverts() public {
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
-    Router.OnRampUpdate[] memory onRampUpdates = new Router.OnRampUpdate[](0);
-    Router.OffRampUpdate[] memory offRampUpdates = new Router.OffRampUpdate[](0);
-    s_sourceRouter.applyRampUpdates(onRampUpdates, offRampUpdates);
+    Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](0);
+    Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](0);
+    s_sourceRouter.applyRampUpdates(onRampUpdates, offRampUpdates, offRampUpdates);
   }
 }
 
@@ -462,26 +424,157 @@ contract Router_getSupportedTokens is EVM2EVMOnRampSetup {
 
 /// @notice #routeMessage
 contract Router_routeMessage is EVM2EVMOffRampSetup {
-  function testManualExecSuccess() public {
+  event MessageExecuted(bytes32 indexed messageId, bool success, bytes data);
+
+  function setUp() public virtual override {
+    EVM2EVMOffRampSetup.setUp();
     changePrank(address(s_offRamp));
-    assertTrue(s_destRouter.routeMessage(generateReceiverMessage(SOURCE_CHAIN_ID), true, 100_000, address(s_receiver)));
+  }
+
+  function testManualExecSuccess() public {
+    Client.Any2EVMMessage memory message = generateReceiverMessage(SOURCE_CHAIN_ID);
     // Manuel execution cannot run out of gas
-    assertTrue(s_destRouter.routeMessage(generateReceiverMessage(SOURCE_CHAIN_ID), true, 10, address(s_receiver)));
+    assertTrue(
+      s_destRouter.routeMessage(
+        generateReceiverMessage(SOURCE_CHAIN_ID),
+        GAS_FOR_CALL_EXACT_CHECK,
+        generateManualGasLimit(message.data.length),
+        address(s_receiver)
+      )
+    );
+  }
+
+  function testExecutionEventSuccess() public {
+    Client.Any2EVMMessage memory message = generateReceiverMessage(SOURCE_CHAIN_ID);
+    // Should revert with reason
+    bytes memory realError1 = new bytes(2);
+    realError1[0] = 0xbe;
+    realError1[1] = 0xef;
+    s_reverting_receiver.setErr(realError1);
+
+    vm.expectEmit();
+    emit MessageExecuted(
+      message.messageId,
+      false,
+      abi.encodeWithSelector(MaybeRevertMessageReceiver.CustomError.selector, realError1)
+    );
+    assertFalse(
+      s_destRouter.routeMessage(
+        generateReceiverMessage(SOURCE_CHAIN_ID),
+        GAS_FOR_CALL_EXACT_CHECK,
+        generateManualGasLimit(message.data.length),
+        address(s_reverting_receiver)
+      )
+    );
+    // Reason is truncated
+    // Over the MAX_RET_BYTES limit (including offset and length word since we have a dynamic values), should be ignored
+    bytes memory realError2 = new bytes(32 * 2 + 1);
+    realError2[32 * 2 - 1] = 0xAA;
+    realError2[32 * 2] = 0xFF;
+    s_reverting_receiver.setErr(realError2);
+
+    vm.expectEmit();
+    emit MessageExecuted(
+      message.messageId,
+      false,
+      abi.encodeWithSelector(
+        MaybeRevertMessageReceiver.CustomError.selector,
+        uint256(32),
+        uint256(realError2.length),
+        uint256(0),
+        uint256(0xAA)
+      )
+    );
+    assertFalse(
+      s_destRouter.routeMessage(
+        generateReceiverMessage(SOURCE_CHAIN_ID),
+        GAS_FOR_CALL_EXACT_CHECK,
+        generateManualGasLimit(message.data.length),
+        address(s_reverting_receiver)
+      )
+    );
+    // Should emit success
+    vm.expectEmit();
+    emit MessageExecuted(message.messageId, true, new bytes(0));
+
+    assertTrue(
+      s_destRouter.routeMessage(
+        generateReceiverMessage(SOURCE_CHAIN_ID),
+        GAS_FOR_CALL_EXACT_CHECK,
+        generateManualGasLimit(message.data.length),
+        address(s_receiver)
+      )
+    );
+  }
+
+  function test_fuzz_ExecutionEventSuccess(bytes calldata error) public {
+    Client.Any2EVMMessage memory message = generateReceiverMessage(SOURCE_CHAIN_ID);
+    s_reverting_receiver.setErr(error);
+
+    if (error.length >= 33) {
+      uint256 cutOff = error.length > 64 ? 64 : error.length;
+      vm.expectEmit();
+      emit MessageExecuted(
+        message.messageId,
+        false,
+        abi.encodeWithSelector(
+          MaybeRevertMessageReceiver.CustomError.selector,
+          uint256(32),
+          uint256(error.length),
+          bytes32(error[:32]),
+          bytes32(error[32:cutOff])
+        )
+      );
+    } else {
+      vm.expectEmit();
+      emit MessageExecuted(
+        message.messageId,
+        false,
+        abi.encodeWithSelector(MaybeRevertMessageReceiver.CustomError.selector, error)
+      );
+    }
+
+    assertFalse(
+      s_destRouter.routeMessage(
+        generateReceiverMessage(SOURCE_CHAIN_ID),
+        GAS_FOR_CALL_EXACT_CHECK,
+        generateManualGasLimit(message.data.length),
+        address(s_reverting_receiver)
+      )
+    );
   }
 
   function testAutoExecSuccess() public {
-    changePrank(address(s_offRamp));
     assertTrue(
-      s_destRouter.routeMessage(generateReceiverMessage(SOURCE_CHAIN_ID), false, 100_000, address(s_receiver))
+      s_destRouter.routeMessage(
+        generateReceiverMessage(SOURCE_CHAIN_ID),
+        GAS_FOR_CALL_EXACT_CHECK,
+        100_000,
+        address(s_receiver)
+      )
     );
     // Can run out of gas, should return false
-    assertFalse(s_destRouter.routeMessage(generateReceiverMessage(SOURCE_CHAIN_ID), false, 1, address(s_receiver)));
+    assertFalse(
+      s_destRouter.routeMessage(
+        generateReceiverMessage(SOURCE_CHAIN_ID),
+        GAS_FOR_CALL_EXACT_CHECK,
+        1,
+        address(s_receiver)
+      )
+    );
   }
 
   // Reverts
   function testOnlyOffRampReverts() public {
+    changePrank(STRANGER);
+
     vm.expectRevert(IRouter.OnlyOffRamp.selector);
-    s_destRouter.routeMessage(generateReceiverMessage(SOURCE_CHAIN_ID), true, 100_000, address(s_receiver));
+    s_destRouter.routeMessage(
+      generateReceiverMessage(SOURCE_CHAIN_ID),
+      GAS_FOR_CALL_EXACT_CHECK,
+      100_000,
+      address(s_receiver)
+    );
   }
 }
 

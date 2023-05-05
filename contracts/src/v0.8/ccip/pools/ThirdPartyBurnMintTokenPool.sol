@@ -51,7 +51,8 @@ contract ThirdPartyBurnMintTokenPool is BurnMintTokenPool {
       // If the offRamp is being added do an additional check if the offRamp is
       // permission by the router. If not, we revert because we tried to add an
       // invalid offRamp.
-      if (Router(s_router).isOffRamp(update.ramp)) {
+      (bool exists, ) = Router(s_router).isOffRamp(update.ramp);
+      if (exists) {
         if (s_offRamps.add(update.ramp)) {
           emit OffRampAllowanceSet(offRamps[i].ramp, offRamps[i].allowed);
         }

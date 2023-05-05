@@ -56,14 +56,14 @@ contract USDCTokenPoolSetup is BaseTest {
   function setUpRamps() internal {
     s_router = new Router(address(s_token));
 
-    Router.OnRampUpdate[] memory onRampUpdates = new Router.OnRampUpdate[](1);
-    onRampUpdates[0] = Router.OnRampUpdate({destChainId: DEST_CHAIN_ID, onRamp: s_routerAllowedOnRamp});
-    Router.OffRampUpdate[] memory offRampUpdates = new Router.OffRampUpdate[](1);
+    Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
+    onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_ID, onRamp: s_routerAllowedOnRamp});
+    Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](1);
     address[] memory offRamps = new address[](1);
     offRamps[0] = s_routerAllowedOffRamp;
-    offRampUpdates[0] = Router.OffRampUpdate({sourceChainId: SOURCE_CHAIN_ID, offRamps: offRamps});
+    offRampUpdates[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_ID, offRamp: offRamps[0]});
 
-    s_router.applyRampUpdates(onRampUpdates, offRampUpdates);
+    s_router.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
   }
 }
 

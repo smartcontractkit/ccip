@@ -61,7 +61,7 @@ library Internal {
   {
     message = Client.Any2EVMMessage({
       messageId: original.messageId,
-      sourceChainId: original.sourceChainId,
+      sourceChainSelector: original.sourceChainId,
       sender: abi.encode(original.sender),
       data: original.data,
       destTokenAmounts: destTokenAmounts

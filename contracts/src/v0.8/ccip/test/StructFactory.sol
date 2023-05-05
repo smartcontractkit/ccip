@@ -93,8 +93,13 @@ contract StructFactory {
   uint32 internal constant EXECUTION_DELAY_SECONDS = 0;
   uint32 internal constant MAX_DATA_SIZE = 500;
   uint16 internal constant MAX_TOKENS_LENGTH = 5;
+  uint16 internal constant GAS_FOR_CALL_EXACT_CHECK = 5000;
   uint32 internal constant PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS = 500;
   uint64 internal constant MAX_GAS_LIMIT = 4_000_000;
+
+  function generateManualGasLimit(uint256 callDataLength) internal view returns (uint256) {
+    return ((gasleft() - 2 * (16 * callDataLength + GAS_FOR_CALL_EXACT_CHECK)) * 62) / 64;
+  }
 
   function generateDynamicOffRampConfig(
     address router,

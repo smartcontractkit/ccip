@@ -88,6 +88,8 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
   // STATIC CONFIG
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "EVM2EVMOffRamp 1.0.0";
+  // The minimum amount of gas to perform the call with exact gas
+  uint16 private constant GAS_FOR_CALL_EXACT_CHECK = 5_000;
   // Commit store address on the destination chain
   address internal immutable i_commitStore;
   // Chain ID of the source chain
@@ -347,11 +349,22 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
     if (
       !message.receiver.isContract() || !message.receiver.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId)
     ) return;
+
+    uint256 gasLimit = message.gasLimit;
+    if (manualExecution) {
+      // Want to pass the maximum that routeExternalCall will permit given the current gas value.
+      // It will revert if gasAmount <= (gasleft() - GAS_FOR_CALL_EXACT_CHECK)*63/64.
+      // However making the call to routeExternalMessage will also use some gas and itself only pass all but
+      // 1/64th. We air on the side of caution and  instead of passing ((gasleft() - approx cost of call)*63/64) - approx cost of call)*63/64
+      // we just pass (gasleft() - approx of call)*62/64.
+      // If this underflows and reverts thats ok because its manual execution.
+      gasLimit = ((gasleft() - 2 * (16 * message.data.length + GAS_FOR_CALL_EXACT_CHECK)) * 62) / 64;
+    }
     if (
       !IRouter(s_dynamicConfig.router).routeMessage(
         Internal._toAny2EVMMessage(message, destTokenAmounts),
-        manualExecution,
-        message.gasLimit,
+        GAS_FOR_CALL_EXACT_CHECK,
+        gasLimit,
         message.receiver
       )
     ) revert ReceiverError();

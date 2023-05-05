@@ -63,7 +63,7 @@ contract ImmutableExample is IAny2EVMMessageReceiver, IERC165 {
     external
     override
     onlyRouter
-    validChain(message.sourceChainId)
+    validChain(message.sourceChainSelector)
   {
     // Extremely important to ensure only router calls this.
     // Tokens in message if any will be transferred to this contract

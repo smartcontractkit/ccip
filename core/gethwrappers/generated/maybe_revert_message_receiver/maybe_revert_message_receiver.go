@@ -31,11 +31,11 @@ var (
 )
 
 type ClientAny2EVMMessage struct {
-	MessageId        [32]byte
-	SourceChainId    uint64
-	Sender           []byte
-	Data             []byte
-	DestTokenAmounts []ClientEVMTokenAmount
+	MessageId           [32]byte
+	SourceChainSelector uint64
+	Sender              []byte
+	Data                []byte
+	DestTokenAmounts    []ClientEVMTokenAmount
 }
 
 type ClientEVMTokenAmount struct {
@@ -44,8 +44,8 @@ type ClientEVMTokenAmount struct {
 }
 
 var MaybeRevertMessageReceiverMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"toRevert\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"MessageReceived\",\"type\":\"event\"},{\"inputs\":[{\"components\":[{\"internalType\":\"bytes32\",\"name\":\"messageId\",\"type\":\"bytes32\"},{\"internalType\":\"uint64\",\"name\":\"sourceChainId\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"sender\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"},{\"components\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"internalType\":\"structClient.EVMTokenAmount[]\",\"name\":\"destTokenAmounts\",\"type\":\"tuple[]\"}],\"internalType\":\"structClient.Any2EVMMessage\",\"name\":\"\",\"type\":\"tuple\"}],\"name\":\"ccipReceive\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"s_toRevert\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"toRevert\",\"type\":\"bool\"}],\"name\":\"setRevert\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"interfaceId\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"pure\",\"type\":\"function\"}]",
-	Bin: "0x608060405234801561001057600080fd5b5060405161033f38038061033f83398101604081905261002f9161005d565b600080546001600160a81b0319163360ff60a01b191617600160a01b92151592909202919091179055610086565b60006020828403121561006f57600080fd5b8151801515811461007f57600080fd5b9392505050565b6102aa806100956000396000f3fe608060405234801561001057600080fd5b506004361061004c5760003560e01c806301ffc9a7146100515780635100fc211461007857806385572ffb1461009d5780638fb5f171146100b2575b600080fd5b61006461005f3660046101f7565b61010a565b604051901515815260200160405180910390f35b6000546100649074010000000000000000000000000000000000000000900460ff1681565b6100b06100ab366004610240565b6101a3565b005b6100b06100c036600461027b565b6000805491151574010000000000000000000000000000000000000000027fffffffffffffffffffffff00ffffffffffffffffffffffffffffffffffffffff909216919091179055565b60007fffffffff0000000000000000000000000000000000000000000000000000000082167f85572ffb00000000000000000000000000000000000000000000000000000000148061019d57507fffffffff0000000000000000000000000000000000000000000000000000000082167f01ffc9a700000000000000000000000000000000000000000000000000000000145b92915050565b60005474010000000000000000000000000000000000000000900460ff16156101cb57600080fd5b6040517fd82ce31e3523f6eeb2d24317b2b4133001e8472729657f663b68624c45f8f3e890600090a150565b60006020828403121561020957600080fd5b81357fffffffff000000000000000000000000000000000000000000000000000000008116811461023957600080fd5b9392505050565b60006020828403121561025257600080fd5b813567ffffffffffffffff81111561026957600080fd5b820160a0818503121561023957600080fd5b60006020828403121561028d57600080fd5b8135801515811461023957600080fdfea164736f6c634300080f000a",
+	ABI: "[{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"toRevert\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"err\",\"type\":\"bytes\"}],\"name\":\"CustomError\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"MessageReceived\",\"type\":\"event\"},{\"inputs\":[{\"components\":[{\"internalType\":\"bytes32\",\"name\":\"messageId\",\"type\":\"bytes32\"},{\"internalType\":\"uint64\",\"name\":\"sourceChainSelector\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"sender\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"},{\"components\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"internalType\":\"structClient.EVMTokenAmount[]\",\"name\":\"destTokenAmounts\",\"type\":\"tuple[]\"}],\"internalType\":\"structClient.Any2EVMMessage\",\"name\":\"\",\"type\":\"tuple\"}],\"name\":\"ccipReceive\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"s_toRevert\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"err\",\"type\":\"bytes\"}],\"name\":\"setErr\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"toRevert\",\"type\":\"bool\"}],\"name\":\"setRevert\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"interfaceId\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"pure\",\"type\":\"function\"}]",
+	Bin: "0x608060405234801561001057600080fd5b5060405161071938038061071983398101604081905261002f9161005d565b600080546001600160a81b0319163360ff60a01b191617600160a01b92151592909202919091179055610086565b60006020828403121561006f57600080fd5b8151801515811461007f57600080fd5b9392505050565b610684806100956000396000f3fe608060405234801561001057600080fd5b50600436106100675760003560e01c806377f5b0e61161005057806377f5b0e6146100b857806385572ffb146100cd5780638fb5f171146100e057600080fd5b806301ffc9a71461006c5780635100fc2114610093575b600080fd5b61007f61007a36600461026e565b610138565b604051901515815260200160405180910390f35b60005461007f9074010000000000000000000000000000000000000000900460ff1681565b6100cb6100c63660046102e6565b6101d1565b005b6100cb6100db3660046103b5565b6101e1565b6100cb6100ee3660046103f0565b6000805491151574010000000000000000000000000000000000000000027fffffffffffffffffffffff00ffffffffffffffffffffffffffffffffffffffff909216919091179055565b60007fffffffff0000000000000000000000000000000000000000000000000000000082167f85572ffb0000000000000000000000000000000000000000000000000000000014806101cb57507fffffffff0000000000000000000000000000000000000000000000000000000082167f01ffc9a700000000000000000000000000000000000000000000000000000000145b92915050565b60016101dd82826104b4565b5050565b60005474010000000000000000000000000000000000000000900460ff16156102425760016040517f5a4ff67100000000000000000000000000000000000000000000000000000000815260040161023991906105ce565b60405180910390fd5b6040517fd82ce31e3523f6eeb2d24317b2b4133001e8472729657f663b68624c45f8f3e890600090a150565b60006020828403121561028057600080fd5b81357fffffffff00000000000000000000000000000000000000000000000000000000811681146102b057600080fd5b9392505050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b6000602082840312156102f857600080fd5b813567ffffffffffffffff8082111561031057600080fd5b818401915084601f83011261032457600080fd5b813581811115610336576103366102b7565b604051601f82017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0908116603f0116810190838211818310171561037c5761037c6102b7565b8160405282815287602084870101111561039557600080fd5b826020860160208301376000928101602001929092525095945050505050565b6000602082840312156103c757600080fd5b813567ffffffffffffffff8111156103de57600080fd5b820160a081850312156102b057600080fd5b60006020828403121561040257600080fd5b813580151581146102b057600080fd5b600181811c9082168061042657607f821691505b60208210810361045f577f4e487b7100000000000000000000000000000000000000000000000000000000600052602260045260246000fd5b50919050565b601f8211156104af57600081815260208120601f850160051c8101602086101561048c5750805b601f850160051c820191505b818110156104ab57828155600101610498565b5050505b505050565b815167ffffffffffffffff8111156104ce576104ce6102b7565b6104e2816104dc8454610412565b84610465565b602080601f83116001811461053557600084156104ff5750858301515b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff600386901b1c1916600185901b1785556104ab565b6000858152602081207fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe08616915b8281101561058257888601518255948401946001909101908401610563565b50858210156105be57878501517fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff600388901b60f8161c191681555b5050505050600190811b01905550565b60006020808352600084546105e281610412565b80848701526040600180841660008114610603576001811461063b57610669565b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff008516838a01528284151560051b8a01019550610669565b896000528660002060005b858110156106615781548b8201860152908301908801610646565b8a0184019650505b50939897505050505050505056fea164736f6c634300080f000a",
 }
 
 var MaybeRevertMessageReceiverABI = MaybeRevertMessageReceiverMetaData.ABI
@@ -240,6 +240,18 @@ func (_MaybeRevertMessageReceiver *MaybeRevertMessageReceiverTransactorSession) 
 	return _MaybeRevertMessageReceiver.Contract.CcipReceive(&_MaybeRevertMessageReceiver.TransactOpts, arg0)
 }
 
+func (_MaybeRevertMessageReceiver *MaybeRevertMessageReceiverTransactor) SetErr(opts *bind.TransactOpts, err []byte) (*types.Transaction, error) {
+	return _MaybeRevertMessageReceiver.contract.Transact(opts, "setErr", err)
+}
+
+func (_MaybeRevertMessageReceiver *MaybeRevertMessageReceiverSession) SetErr(err []byte) (*types.Transaction, error) {
+	return _MaybeRevertMessageReceiver.Contract.SetErr(&_MaybeRevertMessageReceiver.TransactOpts, err)
+}
+
+func (_MaybeRevertMessageReceiver *MaybeRevertMessageReceiverTransactorSession) SetErr(err []byte) (*types.Transaction, error) {
+	return _MaybeRevertMessageReceiver.Contract.SetErr(&_MaybeRevertMessageReceiver.TransactOpts, err)
+}
+
 func (_MaybeRevertMessageReceiver *MaybeRevertMessageReceiverTransactor) SetRevert(opts *bind.TransactOpts, toRevert bool) (*types.Transaction, error) {
 	return _MaybeRevertMessageReceiver.contract.Transact(opts, "setRevert", toRevert)
 }
@@ -392,6 +404,8 @@ type MaybeRevertMessageReceiverInterface interface {
 	SupportsInterface(opts *bind.CallOpts, interfaceId [4]byte) (bool, error)
 
 	CcipReceive(opts *bind.TransactOpts, arg0 ClientAny2EVMMessage) (*types.Transaction, error)
+
+	SetErr(opts *bind.TransactOpts, err []byte) (*types.Transaction, error)
 
 	SetRevert(opts *bind.TransactOpts, toRevert bool) (*types.Transaction, error)
 

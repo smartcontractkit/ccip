@@ -66,7 +66,8 @@ func setOnRampOnRouter(t *testing.T, sourceClient *EvmDeploymentConfig, destChai
 	routerContract, err := router.NewRouter(sourceClient.ChainConfig.Router, sourceClient.Client)
 	shared.RequireNoError(t, err)
 	sourceClient.Logger.Infof("Registering new onRamp")
-	tx, err := routerContract.ApplyRampUpdates(sourceClient.Owner, []router.RouterOnRampUpdate{{DestChainId: destChainSelector, OnRamp: sourceClient.LaneConfig.OnRamp}}, nil)
+	tx, err := routerContract.ApplyRampUpdates(sourceClient.Owner, []router.RouterOnRamp{
+		{DestChainId: destChainSelector, OnRamp: sourceClient.LaneConfig.OnRamp}}, nil, nil)
 	shared.RequireNoError(t, err)
 	err = shared.WaitForMined(sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
 	shared.RequireNoError(t, err)
@@ -96,17 +97,17 @@ func setOffRampOnRouter(t *testing.T, sourceChainSelector uint64, client *EvmDep
 	routerContract, err := router.NewRouter(client.ChainConfig.Router, client.Client)
 	shared.RequireNoError(t, err)
 
-	offRamps, err := routerContract.GetOffRamps(&bind.CallOpts{}, sourceChainSelector)
+	offRamps, err := routerContract.GetOffRamps(&bind.CallOpts{})
 	shared.RequireNoError(t, err)
 	for _, offRamp := range offRamps {
-		if offRamp == client.LaneConfig.OffRamp {
+		if offRamp.OffRamp == client.LaneConfig.OffRamp {
 			client.Logger.Infof("OffRamp already configured on router. Skipping")
 			return
 		}
 	}
 
-	tx, err := routerContract.ApplyRampUpdates(client.Owner, nil, []router.RouterOffRampUpdate{
-		{SourceChainId: sourceChainSelector, OffRamps: []common.Address{client.LaneConfig.OffRamp}}})
+	tx, err := routerContract.ApplyRampUpdates(client.Owner, nil, nil, []router.RouterOffRamp{
+		{SourceChainSelector: sourceChainSelector, OffRamp: client.LaneConfig.OffRamp}})
 	shared.RequireNoError(t, err)
 	err = shared.WaitForMined(client.Logger, client.Client, tx.Hash(), true)
 	shared.RequireNoError(t, err)

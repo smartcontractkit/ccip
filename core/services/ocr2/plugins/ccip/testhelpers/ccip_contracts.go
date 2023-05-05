@@ -163,9 +163,7 @@ func (c *CCIPContracts) EnableOffRamp(t *testing.T) {
 	require.NoError(t, err)
 	c.Dest.Chain.Commit()
 
-	_, err = c.Dest.Router.ApplyRampUpdates(c.Dest.User, nil, []router.RouterOffRampUpdate{
-		{SourceChainId: c.Source.ChainID, OffRamps: []common.Address{c.Dest.OffRamp.Address()}},
-	})
+	_, err = c.Dest.Router.ApplyRampUpdates(c.Dest.User, nil, nil, []router.RouterOffRamp{{SourceChainSelector: SourceChainID, OffRamp: c.Dest.OffRamp.Address()}})
 	require.NoError(t, err)
 	c.Dest.Chain.Commit()
 
@@ -256,7 +254,7 @@ func (c *CCIPContracts) EnableOnRamp(t *testing.T) {
 	c.Source.Chain.Commit()
 
 	t.Log("Setting onRamp on source router")
-	_, err = c.Source.Router.ApplyRampUpdates(c.Source.User, []router.RouterOnRampUpdate{{DestChainId: c.Dest.ChainID, OnRamp: c.Source.OnRamp.Address()}}, nil)
+	_, err = c.Source.Router.ApplyRampUpdates(c.Source.User, []router.RouterOnRamp{{DestChainSelector: c.Dest.ChainID, OnRamp: c.Source.OnRamp.Address()}}, nil, nil)
 	require.NoError(t, err)
 	c.Source.Chain.Commit()
 
@@ -679,7 +677,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	)
 	require.NoError(t, err)
 	sourceChain.Commit()
-	_, err = sourceRouter.ApplyRampUpdates(sourceUser, []router.RouterOnRampUpdate{{DestChainId: destChainID, OnRamp: onRampAddress}}, nil)
+	_, err = sourceRouter.ApplyRampUpdates(sourceUser, []router.RouterOnRamp{{DestChainSelector: destChainID, OnRamp: onRampAddress}}, nil, nil)
 	require.NoError(t, err)
 	sourceChain.Commit()
 
@@ -781,9 +779,8 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	destChain.Commit()
 	_, err = destPriceRegistry.ApplyPriceUpdatersUpdates(destUser, []common.Address{commitStoreAddress}, []common.Address{})
 	require.NoError(t, err)
-	_, err = destRouter.ApplyRampUpdates(destUser, nil, []router.RouterOffRampUpdate{
-		{SourceChainId: sourceChainID, OffRamps: []common.Address{offRampAddress}},
-	})
+	_, err = destRouter.ApplyRampUpdates(destUser, nil,
+		nil, []router.RouterOffRamp{{SourceChainSelector: sourceChainID, OffRamp: offRampAddress}})
 	require.NoError(t, err)
 
 	// Deploy 2 revertable (one SS one non-SS)

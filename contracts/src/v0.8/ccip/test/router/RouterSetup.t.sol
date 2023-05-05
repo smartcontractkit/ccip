@@ -27,7 +27,7 @@ contract RouterSetup is BaseTest {
     return
       Client.Any2EVMMessage({
         messageId: bytes32("a"),
-        sourceChainId: chainId,
+        sourceChainSelector: chainId,
         sender: bytes("a"),
         data: bytes("a"),
         destTokenAmounts: ta

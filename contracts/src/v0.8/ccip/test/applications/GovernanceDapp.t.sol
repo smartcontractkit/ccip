@@ -77,7 +77,7 @@ contract GovernanceDapp_ccipReceive is GovernanceDappSetup {
 
     Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
       messageId: bytes32("a"),
-      sourceChainId: SOURCE_CHAIN_ID,
+      sourceChainSelector: SOURCE_CHAIN_ID,
       sender: abi.encode(OWNER),
       data: abi.encode(feeConfig),
       destTokenAmounts: new Client.EVMTokenAmount[](0)

@@ -20,13 +20,13 @@ contract ThirdPartyBurnMintTokenPoolSetup is BaseTest {
     s_token = new MockERC20("LINK", "LNK", OWNER, 2**256 - 1);
     s_router = new Router(address(s_token));
 
-    Router.OnRampUpdate[] memory onRampUpdates = new Router.OnRampUpdate[](0);
-    Router.OffRampUpdate[] memory offRampUpdates = new Router.OffRampUpdate[](1);
+    Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](0);
+    Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](1);
     address[] memory offRamps = new address[](1);
     offRamps[0] = s_routerAllowedOffRamp;
-    offRampUpdates[0] = Router.OffRampUpdate({sourceChainId: SOURCE_CHAIN_ID, offRamps: offRamps});
+    offRampUpdates[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_ID, offRamp: s_routerAllowedOffRamp});
 
-    s_router.applyRampUpdates(onRampUpdates, offRampUpdates);
+    s_router.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
 
     s_thirdPartyPool = new ThirdPartyBurnMintTokenPool(
       IBurnMintERC20(address(s_token)),

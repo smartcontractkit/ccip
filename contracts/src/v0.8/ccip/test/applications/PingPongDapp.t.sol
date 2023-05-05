@@ -82,7 +82,7 @@ contract PingPong_ccipReceive is PingPongDappSetup {
 
     Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
       messageId: bytes32("a"),
-      sourceChainId: DEST_CHAIN_ID,
+      sourceChainSelector: DEST_CHAIN_ID,
       sender: abi.encode(i_pongContract),
       data: abi.encode(pingPongNumber),
       destTokenAmounts: tokenAmounts

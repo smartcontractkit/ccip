@@ -92,11 +92,12 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
     s_offRamps = new address[](2);
     s_offRamps[0] = address(10);
     s_offRamps[1] = address(11);
-    Router.OnRampUpdate[] memory onRampUpdates = new Router.OnRampUpdate[](1);
-    Router.OffRampUpdate[] memory offRampUpdates = new Router.OffRampUpdate[](1);
-    onRampUpdates[0] = Router.OnRampUpdate({destChainId: DEST_CHAIN_ID, onRamp: address(s_onRamp)});
-    offRampUpdates[0] = Router.OffRampUpdate({sourceChainId: SOURCE_CHAIN_ID, offRamps: s_offRamps});
-    s_sourceRouter.applyRampUpdates(onRampUpdates, offRampUpdates);
+    Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
+    Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](2);
+    onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_ID, onRamp: address(s_onRamp)});
+    offRampUpdates[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_ID, offRamp: s_offRamps[0]});
+    offRampUpdates[1] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_ID, offRamp: s_offRamps[1]});
+    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
 
     // Pre approve the first token so the gas estimates of the tests
     // only cover actual gas usage from the ramps

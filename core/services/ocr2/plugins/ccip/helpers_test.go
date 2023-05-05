@@ -198,7 +198,8 @@ func deploySourceCcipContracts(
 	// register onramp in router and pool
 	_, err = sourcePool.ApplyRampUpdates(owner, []lock_release_token_pool.TokenPoolRampUpdate{{Ramp: onRampAddress, Allowed: true}}, []lock_release_token_pool.TokenPoolRampUpdate{})
 	require.NoError(t, err)
-	_, err = sourceRouter.ApplyRampUpdates(owner, []router.RouterOnRampUpdate{{OnRamp: onRampAddress, DestChainId: destChainID}}, []router.RouterOffRampUpdate{})
+	_, err = sourceRouter.ApplyRampUpdates(owner, []router.RouterOnRamp{{OnRamp: onRampAddress, DestChainSelector: destChainID}},
+		nil, nil)
 	require.NoError(t, err)
 	sourceClient.Commit()
 
@@ -292,9 +293,7 @@ func deployDestCcipContracts(
 	// register offramp in router and pool
 	_, err = destPool.ApplyRampUpdates(owner, []lock_release_token_pool.TokenPoolRampUpdate{}, []lock_release_token_pool.TokenPoolRampUpdate{{Ramp: offRampAddress, Allowed: true}})
 	require.NoError(t, err)
-	_, err = destRouter.ApplyRampUpdates(owner, nil, []router.RouterOffRampUpdate{
-		{SourceChainId: sourceChainID, OffRamps: []common.Address{offRampAddress}},
-	})
+	_, err = destRouter.ApplyRampUpdates(owner, nil, nil, []router.RouterOffRamp{{SourceChainSelector: sourceChainID, OffRamp: offRampAddress}})
 	require.NoError(t, err)
 
 	return afnAddress, priceRegistry, destRouter, offRamp, commitStoreHelper
