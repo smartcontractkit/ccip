@@ -163,7 +163,8 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
   }
 
   function testConsumingMoreThanMaxCapacityReverts() public {
-    uint256 amount = 1000000000000000000000000000000000000000000000000;
+    uint256 capacity = rateLimiterConfig().capacity;
+    uint256 amount = 10 * capacity;
     address receiver = address(1);
     changePrank(s_routerAllowedOffRamp);
 
@@ -171,8 +172,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       USDCTokenPool.MessageAndAttestation({message: bytes(""), attestation: bytes("")})
     );
 
-    vm.expectEmit();
-    emit Minted(s_routerAllowedOffRamp, receiver, amount);
+    vm.expectRevert(abi.encodeWithSelector(RateLimiter.ConsumingMoreThanMaxCapacity.selector, capacity, amount));
 
     s_usdcTokenPool.releaseOrMint(abi.encode(OWNER), receiver, amount, SOURCE_CHAIN_ID, extraData);
   }
