@@ -182,7 +182,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     EVM2EVMOnRamp.FeeTokenConfigArgs[] memory feeTokenConfigArgs = new EVM2EVMOnRamp.FeeTokenConfigArgs[](1);
     feeTokenConfigArgs[0] = EVM2EVMOnRamp.FeeTokenConfigArgs({
       token: s_sourceTokens[1],
-      feeAmount: 2,
+      networkFeeAmountUSD: 2,
       multiplier: 108e16,
       destGasOverhead: 2
     });

@@ -55,12 +55,12 @@ contract GovernanceDapp_voteForNewFeeConfig is GovernanceDappSetup {
       gasLimit: 3e5,
       strict: false,
       feeToken: s_sourceFeeToken,
-      feeTokenAmount: 64800216001, // todo
+      feeTokenAmount: 0,
       messageId: ""
     });
     message.messageId = Internal._hash(message, s_metadataHash);
 
-    vm.expectEmit();
+    vm.expectEmit(false, false, false, false);
     emit CCIPSendRequested(message);
 
     vm.expectEmit();

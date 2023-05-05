@@ -84,23 +84,23 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
 
   /// @dev Struct to hold the execution fee configuration for a fee token
   struct FeeTokenConfig {
-    uint96 feeAmount; // --------┐ Flat fee
-    uint64 multiplier; //        | Price multiplier for gas costs
-    uint32 destGasOverhead; // --┘ Extra gas charged on top of the gasLimit
+    uint96 networkFeeAmountUSD; // -┐ Flat network fee in USD
+    uint64 multiplier; //           | Price multiplier for gas costs
+    uint32 destGasOverhead; // -----┘ Extra gas charged on top of the gasLimit
   }
 
   /// @dev Struct to hold the fee configuration for a fee token, same as the FeeTokenConfig but with
   /// token included so that an array of these can be passed in to setFeeTokenConfig to set the mapping
   struct FeeTokenConfigArgs {
-    address token; // ---------┐ Token address
-    uint64 multiplier; // -----┘ Price multiplier for gas costs
-    uint96 feeAmount; // ------┐ Flat fee in feeToken
-    uint32 destGasOverhead; //-┘ Extra gas charged on top of the gasLimit
+    address token; // --------------┐ Token address
+    uint64 multiplier; // ----------┘ Price multiplier for gas costs
+    uint96 networkFeeAmountUSD; // -┐ Flat network fee in USD
+    uint32 destGasOverhead; // -----┘ Extra gas charged on top of the gasLimit
   }
 
   /// @dev Struct to hold the transfer fee configuration for token transfers
   struct TokenTransferFeeConfig {
-    uint32 minFee; // ---------┐ Minimim USD fee to charge, multiples of 1 US cent, or 0.01USD
+    uint32 minFee; // ---------┐ Minimum USD fee to charge, multiples of 1 US cent, or 0.01USD
     uint32 maxFee; //          | Maximum USD fee to charge, multiples of 1 US cent, or 0.01USD
     uint16 ratio; // ----------┘ Ratio of token transfer value to charge as fee, multiples of 0.1bps, or 10e-5
   }
@@ -423,25 +423,23 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
   /// @inheritdoc IEVM2AnyOnRamp
   function getFee(Client.EVM2AnyMessage calldata message) public view returns (uint256) {
     // ensure MessageExecutionFee is evaluated strictly before TokenTransferFee
-    // if there are validation reverts, errors from MessageExecutionFee take precendence
+    // if there are validation reverts, errors from MessageExecutionFee take precedence
     uint256 executionFee = _getMessageExecutionFee(message.feeToken, message.extraArgs);
     return executionFee + _getTokenTransferFee(message.feeToken, message.tokenAmounts);
   }
 
   function _getMessageExecutionFee(address feeToken, bytes calldata extraArgs) internal view returns (uint256 fee) {
     uint256 gasLimit = _fromBytes(extraArgs).gasLimit;
-    uint256 feeTokenBaseUnitsPerUnitGas = IPriceRegistry(s_dynamicConfig.priceRegistry).getFeeTokenBaseUnitsPerUnitGas(
+    (uint192 feeTokenPrice, uint192 gasPrice) = IPriceRegistry(s_dynamicConfig.priceRegistry).getFeeTokenAndGasPrices(
       feeToken,
       i_destChainId
     );
-
-    // NOTE: if a fee token is not configured, formula below will intentionally
-    // return zero, i.e. zeroing the fees for that feeToken.
     FeeTokenConfig memory feeTokenConfig = s_feeTokenConfig[feeToken];
-    return
-      feeTokenConfig.feeAmount + // Flat fee
-      ((gasLimit + feeTokenConfig.destGasOverhead) * feeTokenBaseUnitsPerUnitGas * feeTokenConfig.multiplier) / // Total gas reserved for tx
-      1 ether; // latest gas reported gas fee with a safety margin
+
+    uint256 usdFeeAmount = gasPrice *
+      (((gasLimit + feeTokenConfig.destGasOverhead) * feeTokenConfig.multiplier) / 1 ether) +
+      feeTokenConfig.networkFeeAmountUSD;
+    return feeTokenPrice._calcTokenAmountFromUSDValue(usdFeeAmount);
   }
 
   function _getTokenTransferFee(address feeToken, Client.EVMTokenAmount[] calldata tokenAmounts)
@@ -509,7 +507,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
   function _setFeeTokenConfig(FeeTokenConfigArgs[] memory feeTokenConfigs) internal {
     for (uint256 i = 0; i < feeTokenConfigs.length; ++i) {
       s_feeTokenConfig[feeTokenConfigs[i].token] = FeeTokenConfig({
-        feeAmount: feeTokenConfigs[i].feeAmount,
+        networkFeeAmountUSD: feeTokenConfigs[i].networkFeeAmountUSD,
         multiplier: feeTokenConfigs[i].multiplier,
         destGasOverhead: feeTokenConfigs[i].destGasOverhead
       });

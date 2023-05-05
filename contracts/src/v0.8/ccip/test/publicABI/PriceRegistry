@@ -4,7 +4,7 @@
   "applyPriceUpdatersUpdates(address[],address[])": "52877af0",
   "convertTokenAmount(address,uint256,address)": "0041e5be",
   "getDestinationChainGasPrice(uint64)": "514e8cff",
-  "getFeeTokenBaseUnitsPerUnitGas(address,uint64)": "268e5d48",
+  "getFeeTokenAndGasPrices(address,uint64)": "b10096c0",
   "getFeeTokens()": "cdc73d51",
   "getPriceUpdaters()": "bfcd4566",
   "getStalenessThreshold()": "a6c94a73",

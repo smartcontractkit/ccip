@@ -31,18 +31,15 @@ interface IPriceRegistry {
     view
     returns (Internal.TimestampedUint192Value memory);
 
-  /// @notice Get the `feeTokenBaseUnitsPerUnitGas` for a given source chain token and destination chain ID.
+  /// @notice Gets the fee token price and the gas price, both denominated in dollars.
   /// @param feeToken The source token to get the fee for. Must be a feeToken.
-  /// @param destChainId The destination chain to get the fee for.
-  /// @return feeTokenBaseUnitsPerUnitGas The feeTokenBaseUnitsPerUnitGas for the given source chain token and destination chain ID.
-  /// @dev Example:
-  /// * The feeToken is WETH,
-  /// * The destination chain cost per unit of gas is 1 GWEI (1_000_000_000),
-  /// * The return value from this function is 1_000_000_000
-  function getFeeTokenBaseUnitsPerUnitGas(address feeToken, uint64 destChainId)
+  /// @param destChainId The destination chain to get the gas price for.
+  /// @return feeTokenPrice The price of the feeToken in 1e18 dollars per base unit.
+  /// @return gasPrice The price of gas in 1e18 dollars per base unit.
+  function getFeeTokenAndGasPrices(address feeToken, uint64 destChainId)
     external
     view
-    returns (uint256 feeTokenBaseUnitsPerUnitGas);
+    returns (uint192 feeTokenPrice, uint192 gasPrice);
 
   /// @notice Convert a given token amount to target token amount.
   /// @param fromToken The given token address.

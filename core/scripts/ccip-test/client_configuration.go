@@ -42,6 +42,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
+	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/merklemulti"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
@@ -83,10 +85,10 @@ func (client *CCIPClient) setOnRampFeeConfig(t *testing.T, sourceClient *rhea.Ev
 
 	for _, feeToken := range sourceClient.ChainConfig.FeeTokens {
 		feeTokenConfig = append(feeTokenConfig, evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs{
-			Token:           sourceClient.ChainConfig.SupportedTokens[feeToken].Token,
-			Multiplier:      1e18,
-			FeeAmount:       big.NewInt(100e9),
-			DestGasOverhead: 0,
+			Token:               sourceClient.ChainConfig.SupportedTokens[feeToken].Token,
+			Multiplier:          1e18,
+			NetworkFeeAmountUSD: big.NewInt(1e18),
+			DestGasOverhead:     0,
 		})
 	}
 
@@ -670,7 +672,7 @@ func (client *CCIPClient) SetOCR2Config(env dione.Environment) {
 }
 
 func (client *CCIPClient) getCommitStoreOffChainConfig() []byte {
-	commitPluginConfig := ccip.CommitOffchainConfig{
+	commitPluginConfig := ccipconfig.CommitOffchainConfig{
 		SourceIncomingConfirmations: client.Source.TunableValues.BlockConfirmations,
 		DestIncomingConfirmations:   client.Dest.TunableValues.BlockConfirmations,
 		FeeUpdateHeartBeat:          client.Dest.TunableValues.FeeUpdateHeartBeat,
@@ -679,26 +681,26 @@ func (client *CCIPClient) getCommitStoreOffChainConfig() []byte {
 		InflightCacheExpiry:         client.Dest.TunableValues.InflightCacheExpiry,
 	}
 
-	encodedOffchainConfig, err := ccip.EncodeOffchainConfig(commitPluginConfig)
+	encodedOffchainConfig, err := ccipconfig.EncodeOffchainConfig(commitPluginConfig)
 	helpers.PanicErr(err)
 
 	return encodedOffchainConfig
 }
 
 func (client *CCIPClient) getCommitStoreOnchainConfig() []byte {
-	commitStoreOnchainConfig := ccip.CommitOnchainConfig{
+	commitStoreOnchainConfig := ccipconfig.CommitOnchainConfig{
 		PriceRegistry: client.Dest.PriceRegistry.Address(),
 		Afn:           client.Dest.Afn.Address(),
 	}
 
-	encodedCommitStoreOnchainConfig, err := ccip.EncodeAbiStruct(commitStoreOnchainConfig)
+	encodedCommitStoreOnchainConfig, err := abihelpers.EncodeAbiStruct(commitStoreOnchainConfig)
 	helpers.PanicErr(err)
 
 	return encodedCommitStoreOnchainConfig
 }
 
 func (client *CCIPClient) getOffRampOffChainConfig() []byte {
-	execPluginConfig := ccip.ExecOffchainConfig{
+	execPluginConfig := ccipconfig.ExecOffchainConfig{
 		SourceIncomingConfirmations: client.Source.TunableValues.BlockConfirmations,
 		DestIncomingConfirmations:   client.Dest.TunableValues.BlockConfirmations,
 		BatchGasLimit:               client.Dest.TunableValues.BatchGasLimit,
@@ -708,14 +710,14 @@ func (client *CCIPClient) getOffRampOffChainConfig() []byte {
 		RootSnoozeTime:              client.Dest.TunableValues.RootSnoozeTime,
 	}
 
-	encodedOffRampConfig, err := ccip.EncodeOffchainConfig(execPluginConfig)
+	encodedOffRampConfig, err := ccipconfig.EncodeOffchainConfig(execPluginConfig)
 	helpers.PanicErr(err)
 
 	return encodedOffRampConfig
 }
 
 func (client *CCIPClient) getOffRampOnchainConfig() []byte {
-	offRampOnchainConfig := ccip.ExecOnchainConfig{
+	offRampOnchainConfig := ccipconfig.ExecOnchainConfig{
 		PermissionLessExecutionThresholdSeconds: rhea.PERMISSIONLESS_EXEC_THRESHOLD_SEC,
 		Router:                                  client.Dest.Router.Address(),
 		Afn:                                     client.Dest.Afn.Address(),
@@ -724,7 +726,7 @@ func (client *CCIPClient) getOffRampOnchainConfig() []byte {
 		MaxDataSize:                             rhea.MAX_DATA_SIZE,
 	}
 
-	encodedOffRampOnchainConfig, err := ccip.EncodeAbiStruct(offRampOnchainConfig)
+	encodedOffRampOnchainConfig, err := abihelpers.EncodeAbiStruct(offRampOnchainConfig)
 	helpers.PanicErr(err)
 
 	return encodedOffRampOnchainConfig

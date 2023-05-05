@@ -186,7 +186,7 @@ func deploySourceCcipContracts(
 			Rate:      big.NewInt(1e18),
 			IsEnabled: true,
 		},
-		[]evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs{{Token: sourceFeeTokenAddress, Multiplier: 1e18, FeeAmount: big.NewInt(0), DestGasOverhead: 0}},
+		[]evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs{{Token: sourceFeeTokenAddress, Multiplier: 1e18, NetworkFeeAmountUSD: big.NewInt(0), DestGasOverhead: 0}},
 		[]evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs{{Token: sourceFeeTokenAddress, MinFee: 0, MaxFee: 5_00, Ratio: 10}},
 		[]evm_2_evm_onramp.EVM2EVMOnRampNopAndWeight{},
 	)

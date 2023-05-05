@@ -33,15 +33,22 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
     TokenSetup.setUp();
     PriceRegistrySetup.setUp();
 
+    address WETH = s_sourceRouter.getWrappedNative();
+
     s_feeTokenConfigArgs.push(
-      EVM2EVMOnRamp.FeeTokenConfigArgs({token: s_sourceFeeToken, feeAmount: 1, multiplier: 108e16, destGasOverhead: 1})
+      EVM2EVMOnRamp.FeeTokenConfigArgs({
+        token: s_sourceFeeToken,
+        networkFeeAmountUSD: 1e10,
+        multiplier: 1e18,
+        destGasOverhead: 100_000
+      })
     );
     s_feeTokenConfigArgs.push(
       EVM2EVMOnRamp.FeeTokenConfigArgs({
-        token: s_sourceRouter.getWrappedNative(),
-        feeAmount: 2,
-        multiplier: 108e16,
-        destGasOverhead: 2
+        token: WETH,
+        networkFeeAmountUSD: 5e8,
+        multiplier: 2e18,
+        destGasOverhead: 200_000
       })
     );
 

@@ -109,12 +109,11 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
     return s_usdPerUnitGasByDestChainId[destChainId];
   }
 
-  // @inheritdoc IPriceRegistry
-  function getFeeTokenBaseUnitsPerUnitGas(address feeToken, uint64 destChainId)
+  function getFeeTokenAndGasPrices(address feeToken, uint64 destChainId)
     external
     view
     override
-    returns (uint256 feeTokenBaseUnitsPerUnitGas)
+    returns (uint192 feeTokenPrice, uint192 gasPriceValue)
   {
     if (!s_feeTokens.contains(feeToken)) revert NotAFeeToken(feeToken);
 
@@ -124,7 +123,7 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
     uint256 timePassed = block.timestamp - gasPrice.timestamp;
     if (timePassed > i_stalenessThreshold) revert StaleGasPrice(destChainId, i_stalenessThreshold, timePassed);
 
-    return _getValidatedTokenPrice(feeToken)._calcTokenAmountFromUSDValue(gasPrice.value);
+    return (_getValidatedTokenPrice(feeToken), gasPrice.value);
   }
 
   /// @inheritdoc IPriceRegistry

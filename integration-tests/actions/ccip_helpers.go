@@ -566,10 +566,10 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 			sourceCCIP.Common.RateLimiterConfig,
 			[]evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs{
 				{
-					Token:           common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
-					FeeAmount:       big.NewInt(0),
-					DestGasOverhead: 0,
-					Multiplier:      FeeMultiplier, // the low multiplier is for testing purposes. This keeps accounts from running out of funds
+					Token:               common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
+					NetworkFeeAmountUSD: big.NewInt(0),
+					DestGasOverhead:     0,
+					Multiplier:          FeeMultiplier, // the low multiplier is for testing purposes. This keeps accounts from running out of funds
 				},
 			},
 			tokenTransferFeeConfig,
