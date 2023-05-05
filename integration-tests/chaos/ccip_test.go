@@ -120,8 +120,10 @@ func TestChaosCCIP(t *testing.T) {
 			testEnvironment := lane.TestEnv.K8Env
 			testSetup := lane.TestEnv
 
-			testSetup.ChaosLabel(t, lane.SourceChain.GetNetworkName(), lane.DestChain.GetNetworkName())
-			lane.RecordStateBeforeTransfer(t)
+			testSetup.ChaosLabelForGeth(t, lane.SourceChain.GetNetworkName(), lane.DestChain.GetNetworkName())
+			testSetup.ChaosLabelForCLNodes(t)
+
+			lane.RecordStateBeforeTransfer()
 			// Send the ccip-request and verify ocr2 is running
 			_, err := lane.SendRequests(1)
 			require.NoError(t, err)
@@ -136,7 +138,7 @@ func TestChaosCCIP(t *testing.T) {
 				}
 				tearDown()
 			})
-			lane.RecordStateBeforeTransfer(t)
+			lane.RecordStateBeforeTransfer()
 			// Now send the ccip-request while the chaos is at play
 			_, err = lane.SendRequests(numOfRequests)
 			require.NoError(t, err)

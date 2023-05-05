@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/smartcontractkit/chainlink-env/chaos"
 	"github.com/smartcontractkit/wasp"
 	"github.com/stretchr/testify/assert"
 
@@ -22,6 +23,12 @@ import (
 type laneLoadCfg struct {
 	schedule []*wasp.Segment
 	lane     *actions.CCIPLane
+}
+
+type ChaosConfig struct {
+	ChaosName  string
+	ChaosFunc  chaos.ManifestFunc
+	ChaosProps *chaos.Props
 }
 
 type loadArgs struct {
@@ -38,18 +45,23 @@ type loadArgs struct {
 	TestCfg            *testsetups.CCIPTestConfig
 	TestSetupArgs      *testsetups.CCIPTestSetUpOutputs
 	EstimatedEnd       time.Time
+	ChaosExps          []ChaosConfig
 }
 
-func (l *loadArgs) Setup() {
+func (l *loadArgs) Setup(sameCommitAndExec bool) {
 	transferAmounts := []*big.Int{big.NewInt(1)}
 	lggr := l.lggr
 	var setUpArgs *testsetups.CCIPTestSetUpOutputs
 	if !l.TestCfg.ExistingDeployment {
+		replicas := "6"
+		if !sameCommitAndExec {
+			replicas = "12"
+		}
 		setUpArgs = testsetups.CCIPDefaultTestSetUp(l.TestCfg.Test, lggr, "load-ccip",
 			map[string]interface{}{
-				"replicas":   "6",
+				"replicas":   replicas,
 				"prometheus": "true",
-			}, transferAmounts, 5, true, true, l.TestCfg)
+			}, transferAmounts, 5, sameCommitAndExec, true, l.TestCfg)
 	} else {
 		setUpArgs = testsetups.CCIPExistingDeploymentTestSetUp(l.TestCfg.Test, lggr, transferAmounts, true, l.TestCfg)
 	}
@@ -213,6 +225,32 @@ func (l *loadArgs) Wait() {
 	require.NoError(l.t, err, "load run is failed")
 }
 
+func (l *loadArgs) ApplyChaos() {
+	testEnv := l.TestSetupArgs.Env
+	if testEnv == nil || testEnv.K8Env == nil {
+		l.lggr.Warn().Msg("test environment is nil, skipping chaos")
+		return
+	}
+	testEnv.ChaosLabelForCLNodes(l.TestCfg.Test)
+	waitBetweenChaosExps := l.TestCfg.Load.WaitBetweenChaosDuringLoad
+	if waitBetweenChaosExps == 0 {
+		l.lggr.Warn().Msg("waitBetweenChaosDuringLoad is not set, setting it to 1 minute")
+		waitBetweenChaosExps = 1 * time.Minute
+	}
+	for _, exp := range l.ChaosExps {
+		timeNow := <-time.After(waitBetweenChaosExps)
+		l.lggr.Info().Msgf("Starting to apply chaos %s at %s", exp.ChaosName, timeNow.UTC())
+		// apply chaos
+		chaosId, err := testEnv.K8Env.Chaos.Run(exp.ChaosFunc(testEnv.K8Env.Cfg.Namespace, exp.ChaosProps))
+		require.NoError(l.t, err)
+		if chaosId != "" {
+			testEnv.K8Env.Chaos.WaitForAllRecovered(chaosId)
+			testEnv.K8Env.Chaos.Stop(chaosId)
+			l.lggr.Info().Msgf("chaos %s is recovered at %s", exp.ChaosName, time.Now().UTC())
+		}
+	}
+}
+
 func (l *loadArgs) TearDown() {
 	if l.TestSetupArgs.TearDown != nil {
 		for i := range l.ccipLoad {
@@ -222,7 +260,7 @@ func (l *loadArgs) TearDown() {
 	}
 }
 
-func NewLoadArgs(t *testing.T, lggr zerolog.Logger, parent context.Context) *loadArgs {
+func NewLoadArgs(t *testing.T, lggr zerolog.Logger, parent context.Context, chaosExps ...ChaosConfig) *loadArgs {
 	wg, ctx := errgroup.WithContext(parent)
 	return &loadArgs{
 		t:             t,
@@ -232,5 +270,6 @@ func NewLoadArgs(t *testing.T, lggr zerolog.Logger, parent context.Context) *loa
 		TestCfg:       testsetups.NewCCIPTestConfig(t, lggr, testsetups.Load),
 		LaneLoadCfg:   make(chan laneLoadCfg),
 		LoadStarterWg: &sync.WaitGroup{},
+		ChaosExps:     chaosExps,
 	}
 }

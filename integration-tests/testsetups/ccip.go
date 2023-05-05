@@ -107,17 +107,19 @@ type CCIPTestConfig struct {
 }
 
 type CCIPLoadInput struct {
-	RequestPerUnitTime int64
-	LoadTimeOut        time.Duration
-	TimeUnit           time.Duration
+	RequestPerUnitTime         int64
+	LoadTimeOut                time.Duration
+	TimeUnit                   time.Duration
+	WaitBetweenChaosDuringLoad time.Duration
 }
 
 func (p *CCIPTestConfig) setLoadInputs() {
 	var allError error
 	p.Load = &CCIPLoadInput{
-		RequestPerUnitTime: DefaultLoadRPS,
-		LoadTimeOut:        DefaultLoadTimeOut,
-		TimeUnit:           time.Second,
+		RequestPerUnitTime:         DefaultLoadRPS,
+		LoadTimeOut:                DefaultLoadTimeOut,
+		TimeUnit:                   time.Second,
+		WaitBetweenChaosDuringLoad: 1 * time.Minute,
 	}
 
 	interval, _ := utils.GetEnv("CCIP_LOAD_TEST_RATEUNIT")
@@ -149,6 +151,19 @@ func (p *CCIPTestConfig) setLoadInputs() {
 		}
 	}
 
+	waitTimeBtwnChaos, _ := utils.GetEnv("CCIP_LOAD_TEST_CHAOS_INTERVAL")
+	if waitTimeBtwnChaos != "" {
+		d, err := time.ParseDuration(interval)
+		if err != nil {
+			allError = multierr.Append(allError, err)
+		} else {
+			if d > p.TestDuration {
+				allError = multierr.Append(allError, fmt.Errorf("invalid wait time between chaos experiments: %s", d))
+			} else {
+				p.Load.WaitBetweenChaosDuringLoad = d
+			}
+		}
+	}
 	if p.PhaseTimeout.Seconds() > 0 {
 		p.Load.LoadTimeOut = time.Duration(p.PhaseTimeout.Minutes()+10) * time.Minute
 	}

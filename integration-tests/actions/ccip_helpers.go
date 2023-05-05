@@ -1374,12 +1374,12 @@ func (lane *CCIPLane) UpdateLaneConfig() {
 	}
 }
 
-func (lane *CCIPLane) RecordStateBeforeTransfer(t *testing.T) {
+func (lane *CCIPLane) RecordStateBeforeTransfer() {
 	var err error
 	// collect the balance assert.ment to verify balances after transfer
-	lane.SourceBalances, err = testhelpers.GetBalances(t, lane.Source.CollectBalanceRequirements())
+	lane.SourceBalances, err = testhelpers.GetBalances(lane.Test, lane.Source.CollectBalanceRequirements())
 	require.NoError(lane.Test, err, "fetching source balance")
-	lane.DestBalances, err = testhelpers.GetBalances(t, lane.Dest.CollectBalanceRequirements())
+	lane.DestBalances, err = testhelpers.GetBalances(lane.Test, lane.Dest.CollectBalanceRequirements())
 	require.NoError(lane.Test, err, "fetching dest balance")
 
 	// save the current block numbers to use in various filter log requests
@@ -1644,6 +1644,9 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	env.numOfCommitNodes = numOfCommitNodes
 	env.numOfExecNodes = numOfCommitNodes
 	if !commitAndExecOnSameDON {
+		if len(clNodes) < 11 {
+			return fmt.Errorf("not enough CL nodes for separate commit and execution nodes")
+		}
 		bootstrapExec = clNodes[1] // for a set-up of different commit and execution nodes second node is the bootstrapper for execution nodes
 		commitNodes = clNodes[2 : 2+numOfCommitNodes]
 		execNodes = clNodes[2+numOfCommitNodes:]
@@ -1920,7 +1923,27 @@ type CCIPTestEnv struct {
 	CLNodeWithKeyReady       *errgroup.Group // denotes if the chainlink nodes are deployed, keys are created and ready to be used for job creation
 }
 
-func (c *CCIPTestEnv) ChaosLabel(t *testing.T, srcChain, destChain string) {
+func (c *CCIPTestEnv) ChaosLabelForGeth(t *testing.T, srcChain, destChain string) {
+	err := c.K8Env.Client.LabelChaosGroupByLabels(c.K8Env.Cfg.Namespace, map[string]string{
+		"app": GethLabel(srcChain),
+	}, ChaosGroupNetworkACCIPGeth)
+	require.NoError(t, err)
+
+	err = c.K8Env.Client.LabelChaosGroupByLabels(c.K8Env.Cfg.Namespace, map[string]string{
+		"app": GethLabel(destChain),
+	}, ChaosGroupNetworkBCCIPGeth)
+	require.NoError(t, err)
+
+	gethNetworksLabels := []string{GethLabel(srcChain), GethLabel(destChain)}
+	for _, gethNetworkLabel := range gethNetworksLabels {
+		err := c.K8Env.Client.AddLabel(c.K8Env.Cfg.Namespace,
+			fmt.Sprintf("app=%s", gethNetworkLabel),
+			fmt.Sprintf("geth=%s", ChaosGroupCCIPGeth))
+		require.NoError(t, err)
+	}
+}
+
+func (c *CCIPTestEnv) ChaosLabelForCLNodes(t *testing.T) {
 	for i := c.commitNodeStartIndex; i < len(c.CLNodes); i++ {
 		labelSelector := map[string]string{
 			"app":      "chainlink-0",
@@ -1951,24 +1974,6 @@ func (c *CCIPTestEnv) ChaosLabel(t *testing.T, srcChain, destChain string) {
 			err := c.K8Env.Client.LabelChaosGroupByLabels(c.K8Env.Cfg.Namespace, labelSelector, ChaosGroupExecutionFaulty)
 			assert.NoError(t, err)
 		}
-	}
-
-	err := c.K8Env.Client.LabelChaosGroupByLabels(c.K8Env.Cfg.Namespace, map[string]string{
-		"app": GethLabel(srcChain),
-	}, ChaosGroupNetworkACCIPGeth)
-	require.NoError(t, err)
-
-	err = c.K8Env.Client.LabelChaosGroupByLabels(c.K8Env.Cfg.Namespace, map[string]string{
-		"app": GethLabel(destChain),
-	}, ChaosGroupNetworkBCCIPGeth)
-	require.NoError(t, err)
-
-	gethNetworksLabels := []string{GethLabel(srcChain), GethLabel(destChain)}
-	for _, gethNetworkLabel := range gethNetworksLabels {
-		err := c.K8Env.Client.AddLabel(c.K8Env.Cfg.Namespace,
-			fmt.Sprintf("app=%s", gethNetworkLabel),
-			fmt.Sprintf("geth=%s", ChaosGroupCCIPGeth))
-		require.NoError(t, err)
 	}
 }
 
