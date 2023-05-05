@@ -25,6 +25,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
+	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/merklemulti"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
@@ -63,10 +65,10 @@ func setupCommitTestHarness(t *testing.T) commitTestHarness {
 			sourceNative:       utils.RandomAddress(),
 			sourceFeeEstimator: sourceFeeEstimator,
 			sourceChainID:      th.sourceChainID,
-			leafHasher:         NewLeafHasher(th.sourceChainID, th.destChainID, th.onRamp.Address(), hasher.NewKeccakCtx()),
+			leafHasher:         hasher.NewLeafHasher(th.sourceChainID, th.destChainID, th.onRamp.Address(), hasher.NewKeccakCtx()),
 		},
 		inFlight: map[[32]byte]InflightReport{},
-		offchainConfig: CommitOffchainConfig{
+		offchainConfig: ccipconfig.CommitOffchainConfig{
 			SourceIncomingConfirmations: 0,
 			DestIncomingConfirmations:   0,
 			FeeUpdateDeviationPPB:       5e7,
@@ -242,7 +244,7 @@ func TestReport(t *testing.T) {
 	require.NoError(t, err)
 	th.flushLogs(t)
 	logs, err := th.sourceClient.FilterLogs(testutils.Context(t), ethereum.FilterQuery{
-		Topics:    [][]common.Hash{{EventSignatures.SendRequested}},
+		Topics:    [][]common.Hash{{abihelpers.EventSignatures.SendRequested}},
 		Addresses: []common.Address{th.onRamp.Address()},
 	})
 	require.NoError(t, err)

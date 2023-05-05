@@ -38,7 +38,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/validate"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrbootstrap"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
@@ -53,7 +53,7 @@ type Node struct {
 	KeyBundle       ocr2key.KeyBundle
 }
 
-func (node *Node) EventuallyHasReqSeqNum(t *testing.T, ccipContracts CCIPContracts, onRamp common.Address, seqNum int) logpoller.Log {
+func (node *Node) EventuallyHasReqSeqNum(t *testing.T, ccipContracts *CCIPContracts, onRamp common.Address, seqNum int) logpoller.Log {
 	c, err := node.App.GetChains().EVM.Get(big.NewInt(0).SetUint64(ccipContracts.Source.ChainID))
 	require.NoError(t, err)
 	var log logpoller.Log
@@ -61,11 +61,11 @@ func (node *Node) EventuallyHasReqSeqNum(t *testing.T, ccipContracts CCIPContrac
 		ccipContracts.Source.Chain.Commit()
 		ccipContracts.Dest.Chain.Commit()
 		lgs, err := c.LogPoller().LogsDataWordRange(
-			ccip.EventSignatures.SendRequested,
+			abihelpers.EventSignatures.SendRequested,
 			onRamp,
-			ccip.EventSignatures.SendRequestedSequenceNumberWord,
-			ccip.EvmWord(uint64(seqNum)),
-			ccip.EvmWord(uint64(seqNum)),
+			abihelpers.EventSignatures.SendRequestedSequenceNumberWord,
+			abihelpers.EvmWord(uint64(seqNum)),
+			abihelpers.EvmWord(uint64(seqNum)),
 			1,
 		)
 		require.NoError(t, err)
@@ -79,7 +79,7 @@ func (node *Node) EventuallyHasReqSeqNum(t *testing.T, ccipContracts CCIPContrac
 	return log
 }
 
-func (node *Node) EventuallyHasExecutedSeqNums(t *testing.T, ccipContracts CCIPContracts, offRamp common.Address, minSeqNum int, maxSeqNum int) []logpoller.Log {
+func (node *Node) EventuallyHasExecutedSeqNums(t *testing.T, ccipContracts *CCIPContracts, offRamp common.Address, minSeqNum int, maxSeqNum int) []logpoller.Log {
 	c, err := node.App.GetChains().EVM.Get(big.NewInt(0).SetUint64(ccipContracts.Dest.ChainID))
 	require.NoError(t, err)
 	var logs []logpoller.Log
@@ -87,11 +87,11 @@ func (node *Node) EventuallyHasExecutedSeqNums(t *testing.T, ccipContracts CCIPC
 		ccipContracts.Source.Chain.Commit()
 		ccipContracts.Dest.Chain.Commit()
 		lgs, err := c.LogPoller().IndexedLogsTopicRange(
-			ccip.EventSignatures.ExecutionStateChanged,
+			abihelpers.EventSignatures.ExecutionStateChanged,
 			offRamp,
-			ccip.EventSignatures.ExecutionStateChangedSequenceNumberIndex,
-			ccip.EvmWord(uint64(minSeqNum)),
-			ccip.EvmWord(uint64(maxSeqNum)),
+			abihelpers.EventSignatures.ExecutionStateChangedSequenceNumberIndex,
+			abihelpers.EvmWord(uint64(minSeqNum)),
+			abihelpers.EvmWord(uint64(maxSeqNum)),
 			1)
 		require.NoError(t, err)
 		t.Logf("Have executed logs %d want %d", len(lgs), maxSeqNum-minSeqNum+1)
@@ -105,7 +105,7 @@ func (node *Node) EventuallyHasExecutedSeqNums(t *testing.T, ccipContracts CCIPC
 	return logs
 }
 
-func (node *Node) ConsistentlySeqNumHasNotBeenExecuted(t *testing.T, ccipContracts CCIPContracts, offRamp common.Address, seqNum int) logpoller.Log {
+func (node *Node) ConsistentlySeqNumHasNotBeenExecuted(t *testing.T, ccipContracts *CCIPContracts, offRamp common.Address, seqNum int) logpoller.Log {
 	c, err := node.App.GetChains().EVM.Get(big.NewInt(0).SetUint64(ccipContracts.Dest.ChainID))
 	require.NoError(t, err)
 	var log logpoller.Log
@@ -113,11 +113,11 @@ func (node *Node) ConsistentlySeqNumHasNotBeenExecuted(t *testing.T, ccipContrac
 		ccipContracts.Source.Chain.Commit()
 		ccipContracts.Dest.Chain.Commit()
 		lgs, err := c.LogPoller().IndexedLogsTopicRange(
-			ccip.EventSignatures.ExecutionStateChanged,
+			abihelpers.EventSignatures.ExecutionStateChanged,
 			offRamp,
-			ccip.EventSignatures.ExecutionStateChangedSequenceNumberIndex,
-			ccip.EvmWord(uint64(seqNum)),
-			ccip.EvmWord(uint64(seqNum)),
+			abihelpers.EventSignatures.ExecutionStateChangedSequenceNumberIndex,
+			abihelpers.EvmWord(uint64(seqNum)),
+			abihelpers.EvmWord(uint64(seqNum)),
 			1)
 		require.NoError(t, err)
 		t.Log("Executed logs", lgs)
@@ -148,23 +148,6 @@ func (node *Node) AddBootstrapJob(t *testing.T, spec *ctfClient.OCR2TaskJobSpec)
 	require.NoError(t, err)
 }
 
-func AddAllJobs(t *testing.T, jobParams CCIPJobSpecParams, ccipContracts CCIPContracts, nodes []Node) {
-	jobParams.OffRamp = ccipContracts.Dest.OffRamp.Address()
-
-	commitSpec, err := jobParams.CommitJobSpec()
-	require.NoError(t, err)
-	geExecutionSpec, err := jobParams.ExecutionJobSpec()
-	require.NoError(t, err)
-
-	for i, node := range nodes {
-		commitSpec.Name = fmt.Sprintf("ccip-commit-%d", i)
-		node.AddJobsWithSpec(t, commitSpec)
-
-		geExecutionSpec.Name = fmt.Sprintf("ccip-exec-ge-%d", i)
-		node.AddJobsWithSpec(t, geExecutionSpec)
-	}
-}
-
 func (node *Node) AddJobsWithSpec(t *testing.T, jobSpec *ctfClient.OCR2TaskJobSpec) {
 	// set node specific values
 	jobSpec.OCR2OracleSpec.OCRKeyBundleID.SetValid(node.KeyBundle.ID())
@@ -172,7 +155,7 @@ func (node *Node) AddJobsWithSpec(t *testing.T, jobSpec *ctfClient.OCR2TaskJobSp
 	node.AddJob(t, jobSpec)
 }
 
-func SetupNodeCCIP(
+func setupNodeCCIP(
 	t *testing.T,
 	owner *bind.TransactOpts,
 	port int64,
@@ -186,7 +169,7 @@ func SetupNodeCCIP(
 
 	// Do not want to load fixtures as they contain a dummy chainID.
 	loglevel := configv2.LogLevel(zap.DebugLevel)
-	config, db := heavyweight.FullTestDBNoFixturesV2(t, fmt.Sprintf("%s%d", dbName, port), func(c *chainlink.Config, s *chainlink.Secrets) {
+	config, db := heavyweight.FullTestDBNoFixturesV2(t, fmt.Sprintf("%s%d", dbName, port), func(c *chainlink.Config, _ *chainlink.Secrets) {
 		p2pAddresses := []string{
 			fmt.Sprintf("127.0.0.1:%d", port),
 		}
@@ -203,19 +186,21 @@ func SetupNodeCCIP(
 		c.P2P.V2.ListenAddresses = &p2pAddresses
 		c.P2P.V2.AnnounceAddresses = &p2pAddresses
 
-		c.EVM = []*v2.EVMConfig{createConfigV2Chain(t, sourceChainID), createConfigV2Chain(t, destChainID)}
+		c.EVM = []*v2.EVMConfig{createConfigV2Chain(sourceChainID), createConfigV2Chain(destChainID)}
 
 		if bootstrapPeerID != "" {
 			// Supply the bootstrap IP and port as a V2 peer address
-			c.P2P.V2.DefaultBootstrappers = &[]commontypes.BootstrapperLocator{{
-				PeerID: bootstrapPeerID, Addrs: []string{
-					fmt.Sprintf("127.0.0.1:%d", bootstrapPort),
-				}},
+			c.P2P.V2.DefaultBootstrappers = &[]commontypes.BootstrapperLocator{
+				{
+					PeerID: bootstrapPeerID, Addrs: []string{
+						fmt.Sprintf("127.0.0.1:%d", bootstrapPort),
+					},
+				},
 			}
 		}
 	})
 
-	var lggr = logger.TestLogger(t)
+	lggr := logger.TestLogger(t)
 
 	eventBroadcaster := pg.NewEventBroadcaster(config.DatabaseURL(), 0, 0, lggr, uuid.New())
 
@@ -308,7 +293,7 @@ func SetupNodeCCIP(
 	return app, peerID.Raw(), transmitter, kb
 }
 
-func createConfigV2Chain(t *testing.T, chainId *big.Int) *v2.EVMConfig {
+func createConfigV2Chain(chainId *big.Int) *v2.EVMConfig {
 	// NOTE: For the executor jobs, the default of 500k is insufficient for a 3 message batch
 	defaultGasLimit := uint32(5000000)
 	tr := true
@@ -329,35 +314,52 @@ func createConfigV2Chain(t *testing.T, chainId *big.Int) *v2.EVMConfig {
 	}
 }
 
-func AllNodesHaveReqSeqNum(t *testing.T, ccipContracts CCIPContracts, onRamp common.Address, nodes []Node, seqNum int) logpoller.Log {
+func (c *CCIPContracts) AddAllJobs(t *testing.T, jobParams CCIPJobSpecParams, nodes []Node) {
+	jobParams.OffRamp = c.Dest.OffRamp.Address()
+
+	commitSpec, err := jobParams.CommitJobSpec()
+	require.NoError(t, err)
+	geExecutionSpec, err := jobParams.ExecutionJobSpec()
+	require.NoError(t, err)
+
+	for i, node := range nodes {
+		commitSpec.Name = fmt.Sprintf("ccip-commit-%d", i)
+		node.AddJobsWithSpec(t, commitSpec)
+
+		geExecutionSpec.Name = fmt.Sprintf("ccip-exec-ge-%d", i)
+		node.AddJobsWithSpec(t, geExecutionSpec)
+	}
+}
+
+func (c *CCIPContracts) AllNodesHaveReqSeqNum(t *testing.T, onRamp common.Address, nodes []Node, seqNum int) logpoller.Log {
 	var log logpoller.Log
 	for _, node := range nodes {
-		log = node.EventuallyHasReqSeqNum(t, ccipContracts, onRamp, seqNum)
+		log = node.EventuallyHasReqSeqNum(t, c, onRamp, seqNum)
 	}
 	return log
 }
 
-func AllNodesHaveExecutedSeqNums(t *testing.T, ccipContracts CCIPContracts, offRamp common.Address, nodes []Node, minSeqNum int, maxSeqNum int) []logpoller.Log {
+func (c *CCIPContracts) AllNodesHaveExecutedSeqNums(t *testing.T, offRamp common.Address, nodes []Node, minSeqNum int, maxSeqNum int) []logpoller.Log {
 	var logs []logpoller.Log
 	for _, node := range nodes {
-		logs = node.EventuallyHasExecutedSeqNums(t, ccipContracts, offRamp, minSeqNum, maxSeqNum)
+		logs = node.EventuallyHasExecutedSeqNums(t, c, offRamp, minSeqNum, maxSeqNum)
 	}
 	return logs
 }
 
-func NoNodesHaveExecutedSeqNum(t *testing.T, ccipContracts CCIPContracts, offRamp common.Address, nodes []Node, seqNum int) logpoller.Log {
+func (c *CCIPContracts) NoNodesHaveExecutedSeqNum(t *testing.T, offRamp common.Address, nodes []Node, seqNum int) logpoller.Log {
 	var log logpoller.Log
 	for _, node := range nodes {
-		log = node.ConsistentlySeqNumHasNotBeenExecuted(t, ccipContracts, offRamp, seqNum)
+		log = node.ConsistentlySeqNumHasNotBeenExecuted(t, c, offRamp, seqNum)
 	}
 	return log
 }
 
-func EventuallyCommitReportAccepted(t *testing.T, ccipContracts CCIPContracts, currentBlock uint64) commit_store.CommitStoreCommitReport {
+func (c *CCIPContracts) EventuallyCommitReportAccepted(t *testing.T, currentBlock uint64) commit_store.CommitStoreCommitReport {
 	g := gomega.NewGomegaWithT(t)
 	var report commit_store.CommitStoreCommitReport
 	g.Eventually(func() bool {
-		it, err := ccipContracts.Dest.CommitStore.FilterReportAccepted(&bind.FilterOpts{Start: currentBlock})
+		it, err := c.Dest.CommitStore.FilterReportAccepted(&bind.FilterOpts{Start: currentBlock})
 		g.Expect(err).NotTo(gomega.HaveOccurred(), "Error filtering ReportAccepted event")
 		g.Expect(it.Next()).To(gomega.BeTrue(), "No ReportAccepted event found")
 		report = it.Event.Report
@@ -370,10 +372,10 @@ func EventuallyCommitReportAccepted(t *testing.T, ccipContracts CCIPContracts, c
 	return report
 }
 
-func SetupAndStartNodes(ctx context.Context, t *testing.T, ccipContracts *CCIPContracts, bootstrapNodePort int64) (Node, []Node, int64) {
-	appBootstrap, bootstrapPeerID, bootstrapTransmitter, bootstrapKb := SetupNodeCCIP(t, ccipContracts.Dest.User, bootstrapNodePort,
-		"bootstrap_ccip", ccipContracts.Source.Chain, ccipContracts.Dest.Chain, big.NewInt(0).SetUint64(ccipContracts.Source.ChainID),
-		big.NewInt(0).SetUint64(ccipContracts.Dest.ChainID), "", 0)
+func (c *CCIPContracts) SetupAndStartNodes(ctx context.Context, t *testing.T, bootstrapNodePort int64) (Node, []Node, int64) {
+	appBootstrap, bootstrapPeerID, bootstrapTransmitter, bootstrapKb := setupNodeCCIP(t, c.Dest.User, bootstrapNodePort,
+		"bootstrap_ccip", c.Source.Chain, c.Dest.Chain, big.NewInt(0).SetUint64(c.Source.ChainID),
+		big.NewInt(0).SetUint64(c.Dest.ChainID), "", 0)
 	var (
 		oracles []confighelper.OracleIdentityExtra
 		nodes   []Node
@@ -381,7 +383,7 @@ func SetupAndStartNodes(ctx context.Context, t *testing.T, ccipContracts *CCIPCo
 	err := appBootstrap.Start(ctx)
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		appBootstrap.Stop()
+		require.NoError(t, appBootstrap.Stop())
 	})
 	bootstrapNode := Node{
 		App:         appBootstrap,
@@ -390,15 +392,15 @@ func SetupAndStartNodes(ctx context.Context, t *testing.T, ccipContracts *CCIPCo
 	}
 	// Set up the minimum 4 oracles all funded with destination ETH
 	for i := int64(0); i < 4; i++ {
-		app, peerID, transmitter, kb := SetupNodeCCIP(
+		app, peerID, transmitter, kb := setupNodeCCIP(
 			t,
-			ccipContracts.Dest.User,
+			c.Dest.User,
 			bootstrapNodePort+1+i,
 			fmt.Sprintf("oracle_ccip%d", i),
-			ccipContracts.Source.Chain,
-			ccipContracts.Dest.Chain,
-			big.NewInt(0).SetUint64(ccipContracts.Source.ChainID),
-			big.NewInt(0).SetUint64(ccipContracts.Dest.ChainID),
+			c.Source.Chain,
+			c.Dest.Chain,
+			big.NewInt(0).SetUint64(c.Source.ChainID),
+			big.NewInt(0).SetUint64(c.Dest.ChainID),
 			bootstrapPeerID,
 			bootstrapNodePort,
 		)
@@ -420,37 +422,37 @@ func SetupAndStartNodes(ctx context.Context, t *testing.T, ccipContracts *CCIPCo
 		err = app.Start(ctx)
 		require.NoError(t, err)
 		t.Cleanup(func() {
-			app.Stop()
+			require.NoError(t, app.Stop())
 		})
 	}
 
-	ccipContracts.Oracles = oracles
-	commitOnchainConfig := createDefaultCommitOnchainConfig(ccipContracts)
-	commitOffchainConfig := createDefaultCommitOffchainConfig(ccipContracts)
-	execOnchainConfig := createDefaultExecOnchainConfig(ccipContracts)
-	execOffchainConfig := createDefaultExecOffchainConfig(ccipContracts)
+	c.Oracles = oracles
+	commitOnchainConfig := c.createDefaultCommitOnchainConfig(t)
+	commitOffchainConfig := c.createDefaultCommitOffchainConfig(t)
+	execOnchainConfig := c.createDefaultExecOnchainConfig(t)
+	execOffchainConfig := c.createDefaultExecOffchainConfig(t)
 
-	configBlock := ccipContracts.SetupOnchainConfig(commitOnchainConfig, commitOffchainConfig, execOnchainConfig, execOffchainConfig)
+	configBlock := c.SetupOnchainConfig(t, commitOnchainConfig, commitOffchainConfig, execOnchainConfig, execOffchainConfig)
 	return bootstrapNode, nodes, configBlock
 }
 
-func SetUpNodesAndJobs(t *testing.T, ccipContracts *CCIPContracts, pricePipeline string, bootstrapNodePort int64) ([]Node, CCIPJobSpecParams) {
-	//setup Jobs
+func (c *CCIPContracts) SetUpNodesAndJobs(t *testing.T, pricePipeline string, bootstrapNodePort int64) ([]Node, CCIPJobSpecParams) {
+	// setup Jobs
 	ctx := context.Background()
 	// Starts nodes and configures them in the OCR contracts.
-	bootstrapNode, nodes, configBlock := SetupAndStartNodes(ctx, t, ccipContracts, bootstrapNodePort)
+	bootstrapNode, nodes, configBlock := c.SetupAndStartNodes(ctx, t, bootstrapNodePort)
 
-	jobParams := ccipContracts.NewCCIPJobSpecParams(pricePipeline, configBlock)
+	jobParams := c.NewCCIPJobSpecParams(pricePipeline, configBlock)
 
 	// Add the bootstrap job
-	bootstrapNode.AddBootstrapJob(t, jobParams.BootstrapJob(ccipContracts.Dest.CommitStore.Address().Hex()))
-	AddAllJobs(t, jobParams, *ccipContracts, nodes)
+	bootstrapNode.AddBootstrapJob(t, jobParams.BootstrapJob(c.Dest.CommitStore.Address().Hex()))
+	c.AddAllJobs(t, jobParams, nodes)
 
 	// Replay for bootstrap.
-	bc, err := bootstrapNode.App.GetChains().EVM.Get(big.NewInt(0).SetUint64(ccipContracts.Dest.ChainID))
+	bc, err := bootstrapNode.App.GetChains().EVM.Get(big.NewInt(0).SetUint64(c.Dest.ChainID))
 	require.NoError(t, err)
 	require.NoError(t, bc.LogPoller().Replay(context.Background(), configBlock))
-	ccipContracts.Dest.Chain.Commit()
+	c.Dest.Chain.Commit()
 
 	return nodes, jobParams
 }

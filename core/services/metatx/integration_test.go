@@ -34,7 +34,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ethkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/metatx"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 )
 
@@ -274,7 +274,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 	defer ethUSD.Close()
 	defer bankERC20USD.Close()
 
-	nodes, _ := testhelpers.SetUpNodesAndJobs(t, &ccipContracts, tokenPricesUSDPipeline, 29599)
+	nodes, _ := ccipContracts.SetUpNodesAndJobs(t, tokenPricesUSDPipeline, 29599)
 
 	geCurrentSeqNum := 1
 
@@ -314,17 +314,17 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		gomega.NewWithT(t).Eventually(func() bool {
 			ccipContracts.Source.Chain.Commit()
 			ccipContracts.Dest.Chain.Commit()
-			holder2Balance, err := wrappedDestTokenPool.BalanceOf(nil, holder2.From)
-			require.NoError(t, err)
+			holder2Balance, err2 := wrappedDestTokenPool.BalanceOf(nil, holder2.From)
+			require.NoError(t, err2)
 			return holder2Balance.Cmp(amount) == 0
 		}, testutils.WaitTimeout(t), 5*time.Second).Should(gomega.BeTrue())
 
-		testhelpers.AllNodesHaveReqSeqNum(t, ccipContracts, ccipContracts.Source.OnRamp.Address(), nodes, geCurrentSeqNum)
-		testhelpers.EventuallyReportCommitted(t, ccipContracts, ccipContracts.Source.OnRamp.Address(), geCurrentSeqNum)
+		ccipContracts.AllNodesHaveReqSeqNum(t, ccipContracts.Source.OnRamp.Address(), nodes, geCurrentSeqNum)
+		ccipContracts.EventuallyReportCommitted(t, ccipContracts.Source.OnRamp.Address(), geCurrentSeqNum)
 
-		executionLogs := testhelpers.AllNodesHaveExecutedSeqNums(t, ccipContracts, ccipContracts.Dest.OffRamp.Address(), nodes, geCurrentSeqNum, geCurrentSeqNum)
+		executionLogs := ccipContracts.AllNodesHaveExecutedSeqNums(t, ccipContracts.Dest.OffRamp.Address(), nodes, geCurrentSeqNum, geCurrentSeqNum)
 		assert.Len(t, executionLogs, 1)
-		testhelpers.AssertExecState(t, ccipContracts, executionLogs[0], ccip.ExecutionStateSuccess)
+		ccipContracts.AssertExecState(t, executionLogs[0], abihelpers.ExecutionStateSuccess)
 
 		//source token is locked in the token pool
 		lockedTokenBal, err := sourceToken.BalanceOf(nil, sourcePoolAddress)

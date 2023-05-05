@@ -28,12 +28,12 @@ import (
 )
 
 func TestDataSource(t *testing.T) {
-	linkEth := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	linkEth := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, err := w.Write([]byte(`{"JuelsPerETH": "200000000000000000000"}`))
 		require.NoError(t, err)
 	}))
 	defer linkEth.Close()
-	usdcEth := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	usdcEth := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, err := w.Write([]byte(`{"USDCWeiPerETH": "1000000000000000000000"}`)) // 1000 USDC / ETH
 		require.NoError(t, err)
 	}))
@@ -41,7 +41,7 @@ func TestDataSource(t *testing.T) {
 	linkTokenAddress := common.HexToAddress("0x1591690b8638f5fb2dbec82ac741805ac5da8b45dc5263f4875b0496fdce4e05")
 	usdcTokenAddress := common.HexToAddress("0x1591690b8638f5fb2dbec82ac741805ac5da8b45dc5263f4875b0496fdce4e10")
 	source := fmt.Sprintf(`
-	// Price 1 
+	// Price 1
 	link [type=http method=GET url="%s"];
 	link_parse [type=jsonparse path="JuelsPerETH"];
 	link->link_parse;

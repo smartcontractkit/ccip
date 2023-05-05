@@ -1,4 +1,4 @@
-package ccip
+package config
 
 import (
 	"encoding/json"

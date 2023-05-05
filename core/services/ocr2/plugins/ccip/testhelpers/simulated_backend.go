@@ -23,7 +23,7 @@ func SetupChain(t *testing.T) (*backends.SimulatedBackend, *bind.TransactOpts) {
 	user, err := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
 	require.NoError(t, err)
 	chain := backends.NewSimulatedBackend(core.GenesisAlloc{
-		user.From: {Balance: big.NewInt(0).Mul(big.NewInt(1000), big.NewInt(1e18))}},
+		user.From: {Balance: new(big.Int).Mul(big.NewInt(1000), big.NewInt(1e18))}},
 		ethconfig.Defaults.Miner.GasCeil)
 	return chain, user
 }

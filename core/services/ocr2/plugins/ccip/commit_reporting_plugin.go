@@ -27,6 +27,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
+	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/merklemulti"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
@@ -58,7 +60,7 @@ func CommitReportToEthTxMeta(report []byte) (*txmgr.EthTxMeta, error) {
 
 // EncodeCommitReport abi encodes an offramp.InternalCommitReport.
 func EncodeCommitReport(commitReport *commit_store.CommitStoreCommitReport) (types.Report, error) {
-	report, err := makeCommitReportArgs().PackValues([]interface{}{
+	report, err := abihelpers.MakeCommitReportArgs().PackValues([]interface{}{
 		commitReport,
 	})
 	if err != nil {
@@ -69,7 +71,7 @@ func EncodeCommitReport(commitReport *commit_store.CommitStoreCommitReport) (typ
 
 // DecodeCommitReport abi decodes a types.Report to an CommitStoreCommitReport
 func DecodeCommitReport(report types.Report) (*commit_store.CommitStoreCommitReport, error) {
-	unpacked, err := makeCommitReportArgs().Unpack(report)
+	unpacked, err := abihelpers.MakeCommitReportArgs().Unpack(report)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +140,7 @@ type CommitPluginConfig struct {
 	sourceNative       common.Address
 	sourceFeeEstimator txmgrtypes.FeeEstimator[*evmtypes.Head, gas.EvmFee, *assets.Wei, common.Hash]
 	destClient         evmclient.Client
-	leafHasher         LeafHasherInterface[[32]byte]
+	leafHasher         hasher.LeafHasherInterface[[32]byte]
 }
 
 type CommitReportingPlugin struct {
@@ -152,8 +154,8 @@ type CommitReportingPlugin struct {
 	inFlight             map[[32]byte]InflightReport
 	inFlightPriceUpdates []InflightPriceUpdate
 	priceRegistry        *price_registry.PriceRegistry
-	offchainConfig       CommitOffchainConfig
-	onchainConfig        CommitOnchainConfig
+	offchainConfig       ccipconfig.CommitOffchainConfig
+	onchainConfig        ccipconfig.CommitOnchainConfig
 }
 
 type CommitReportingPluginFactory struct {
@@ -167,11 +169,11 @@ func NewCommitReportingPluginFactory(config CommitPluginConfig) types.ReportingP
 
 // NewReportingPlugin returns the ccip CommitReportingPlugin and satisfies the ReportingPluginFactory interface.
 func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.ReportingPluginConfig) (types.ReportingPlugin, types.ReportingPluginInfo, error) {
-	onchainConfig, err := DecodeAbiStruct[CommitOnchainConfig](config.OnchainConfig)
+	onchainConfig, err := abihelpers.DecodeAbiStruct[ccipconfig.CommitOnchainConfig](config.OnchainConfig)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
-	offchainConfig, err := DecodeOffchainConfig[CommitOffchainConfig](config.OffchainConfig)
+	offchainConfig, err := ccipconfig.DecodeOffchainConfig[ccipconfig.CommitOffchainConfig](config.OffchainConfig)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
@@ -180,12 +182,12 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 		return nil, types.ReportingPluginInfo{}, err
 	}
 	err = rf.config.destLP.RegisterFilter(logpoller.Filter{Name: logpoller.FilterName(COMMIT_PRICE_UPDATES, onchainConfig.PriceRegistry.String()),
-		EventSigs: []common.Hash{EventSignatures.UsdPerUnitGasUpdated, EventSignatures.UsdPerTokenUpdated}, Addresses: []common.Address{onchainConfig.PriceRegistry}})
+		EventSigs: []common.Hash{abihelpers.EventSignatures.UsdPerUnitGasUpdated, abihelpers.EventSignatures.UsdPerTokenUpdated}, Addresses: []common.Address{onchainConfig.PriceRegistry}})
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
 	err = rf.config.sourceLP.RegisterFilter(logpoller.Filter{Name: logpoller.FilterName(COMMIT_CCIP_SENDS, rf.config.onRamp.Address().String()),
-		EventSigs: []common.Hash{EventSignatures.SendRequested}, Addresses: []common.Address{rf.config.onRamp.Address()}})
+		EventSigs: []common.Hash{abihelpers.EventSignatures.SendRequested}, Addresses: []common.Address{rf.config.onRamp.Address()}})
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
@@ -266,7 +268,14 @@ type update = struct {
 // latest gasPrice update is returned in addressZero (common.Address{}); the other keys are tokens price updates
 func (r *CommitReportingPlugin) getLatestPriceUpdates(ctx context.Context, now time.Time, skipInflight bool) (latestUpdates map[common.Address]update, err error) {
 	latestUpdates = make(map[common.Address]update)
-	gasUpdatesWithinHeartBeat, err := r.config.destLP.IndexedLogsCreatedAfter(EventSignatures.UsdPerUnitGasUpdated, r.priceRegistry.Address(), 1, []common.Hash{EvmWord(r.config.sourceChainID)}, now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()), pg.WithParentCtx(ctx))
+	gasUpdatesWithinHeartBeat, err := r.config.destLP.IndexedLogsCreatedAfter(
+		abihelpers.EventSignatures.UsdPerUnitGasUpdated,
+		r.priceRegistry.Address(),
+		1,
+		[]common.Hash{abihelpers.EvmWord(r.config.sourceChainID)},
+		now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()),
+		pg.WithParentCtx(ctx),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -285,7 +294,7 @@ func (r *CommitReportingPlugin) getLatestPriceUpdates(ctx context.Context, now t
 		}
 	}
 
-	tokenUpdatesWithinHeartBeat, err := r.config.destLP.LogsCreatedAfter(EventSignatures.UsdPerTokenUpdated, r.priceRegistry.Address(), now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()), pg.WithParentCtx(ctx))
+	tokenUpdatesWithinHeartBeat, err := r.config.destLP.LogsCreatedAfter(abihelpers.EventSignatures.UsdPerTokenUpdated, r.priceRegistry.Address(), now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()), pg.WithParentCtx(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -430,12 +439,12 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 		return 0, 0, err
 	}
 	// All available messages that have not been committed yet and have sufficient confirmations.
-	lggr.Infof("Looking for requests with sig %v and nextMin %d on onRampAddr %v", EventSignatures.SendRequested, nextMin, r.config.onRamp.Address())
+	lggr.Infof("Looking for requests with sig %v and nextMin %d on onRampAddr %v", abihelpers.EventSignatures.SendRequested, nextMin, r.config.onRamp.Address())
 	reqs, err := r.config.sourceLP.LogsDataWordGreaterThan(
-		EventSignatures.SendRequested,
+		abihelpers.EventSignatures.SendRequested,
 		r.config.onRamp.Address(),
-		EventSignatures.SendRequestedSequenceNumberWord,
-		EvmWord(nextMin),
+		abihelpers.EventSignatures.SendRequestedSequenceNumberWord,
+		abihelpers.EvmWord(nextMin),
 		int(r.offchainConfig.SourceIncomingConfirmations),
 		pg.WithParentCtx(ctx),
 	)
@@ -485,9 +494,9 @@ func (r *CommitReportingPlugin) buildReport(ctx context.Context, interval commit
 	// Logs are guaranteed to be in order of seq num, since these are finalized logs only
 	// and the contract's seq num is auto-incrementing.
 	logs, err := r.config.sourceLP.LogsDataWordRange(
-		EventSignatures.SendRequested,
+		abihelpers.EventSignatures.SendRequested,
 		r.config.onRamp.Address(),
-		EventSignatures.SendRequestedSequenceNumberWord,
+		abihelpers.EventSignatures.SendRequestedSequenceNumberWord,
 		logpoller.EvmWord(interval.Min),
 		logpoller.EvmWord(interval.Max),
 		int(r.offchainConfig.SourceIncomingConfirmations),

@@ -79,7 +79,7 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 		return nil, err
 	}
 
-	leafHasher := NewLeafHasher(staticConfig.SourceChainId, uint64(destChainID), onRamp.Address(), hasher.NewKeccakCtx())
+	leafHasher := hasher.NewLeafHasher(staticConfig.SourceChainId, uint64(destChainID), onRamp.Address(), hasher.NewKeccakCtx())
 	wrappedPluginFactory := NewCommitReportingPluginFactory(
 		CommitPluginConfig{
 			lggr:               lggr,

@@ -23,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp_helper"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
 	mock_contracts "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/mocks"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/merklemulti"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
@@ -119,7 +120,7 @@ func (e ccipPluginTestHarness) generateMessageBatch(t *testing.T, payloadSize in
 		msgs = append(msgs, message)
 		tokenData = append(tokenData, offchainTokenData)
 		indices = append(indices, i)
-		msgBytes, err := MakeMessageArgs().PackValues([]interface{}{message})
+		msgBytes, err := abihelpers.MakeMessageArgs().PackValues([]interface{}{message})
 		require.NoError(t, err)
 		allMsgBytes = append(allMsgBytes, msgBytes)
 		leafHashes = append(leafHashes, mctx.Hash(msgBytes))
@@ -147,13 +148,13 @@ func TestMaxInternalExecutionReportSize(t *testing.T) {
 	c := setupCcipTestHarness(t)
 	mb := c.generateMessageBatch(t, MaxPayloadLength, 50, MaxTokensPerMessage)
 	// Ensure execution report size is valid
-	executorReport, err := ExecutionReport{
-		seqNums:          mb.seqNums,
-		encMsgs:          mb.allMsgBytes,
-		tokenData:        mb.tokenData,
-		proofs:           mb.proof.Hashes,
-		proofSourceFlags: mb.proof.SourceFlags,
-	}.Encode()
+	executorReport, err := EncodeExecutionReport(evm_2_evm_offramp.InternalExecutionReport{
+		SequenceNumbers:   mb.seqNums,
+		EncodedMessages:   mb.allMsgBytes,
+		OffchainTokenData: mb.tokenData,
+		Proofs:            mb.proof.Hashes,
+		ProofFlagBits:     abihelpers.ProofFlagsToBits(mb.proof.SourceFlags),
+	})
 	require.NoError(t, err)
 	t.Log("execution report length", len(executorReport), MaxExecutionReportLength)
 	require.True(t, len(executorReport) <= MaxExecutionReportLength)
@@ -189,15 +190,15 @@ func TestInternalExecutionReportEncoding(t *testing.T) {
 		EncodedMessages:   mb.allMsgBytes,
 		OffchainTokenData: mb.tokenData,
 		Proofs:            mb.proof.Hashes,
-		ProofFlagBits:     ProofFlagsToBits(mb.proof.SourceFlags),
+		ProofFlagBits:     abihelpers.ProofFlagsToBits(mb.proof.SourceFlags),
 	}
-	encodeCommitReport, err := ExecutionReport{
-		seqNums:          report.SequenceNumbers,
-		encMsgs:          report.EncodedMessages,
-		tokenData:        report.OffchainTokenData,
-		proofs:           report.Proofs,
-		proofSourceFlags: mb.proof.SourceFlags,
-	}.Encode()
+	encodeCommitReport, err := EncodeExecutionReport(evm_2_evm_offramp.InternalExecutionReport{
+		SequenceNumbers:   report.SequenceNumbers,
+		EncodedMessages:   report.EncodedMessages,
+		OffchainTokenData: report.OffchainTokenData,
+		Proofs:            report.Proofs,
+		ProofFlagBits:     abihelpers.ProofFlagsToBits(mb.proof.SourceFlags),
+	})
 	require.NoError(t, err)
 	decodeCommitReport, err := DecodeExecutionReport(encodeCommitReport)
 	require.NoError(t, err)
@@ -229,13 +230,13 @@ func TestExecutionReportToEthTxMetadata(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			encExecReport, err := ExecutionReport{
-				seqNums:          tc.msgBatch.seqNums,
-				encMsgs:          tc.msgBatch.allMsgBytes,
-				tokenData:        tc.msgBatch.tokenData,
-				proofs:           tc.msgBatch.proof.Hashes,
-				proofSourceFlags: tc.msgBatch.proof.SourceFlags,
-			}.Encode()
+			encExecReport, err := EncodeExecutionReport(evm_2_evm_offramp.InternalExecutionReport{
+				SequenceNumbers:   tc.msgBatch.seqNums,
+				EncodedMessages:   tc.msgBatch.allMsgBytes,
+				OffchainTokenData: tc.msgBatch.tokenData,
+				Proofs:            tc.msgBatch.proof.Hashes,
+				ProofFlagBits:     abihelpers.ProofFlagsToBits(tc.msgBatch.proof.SourceFlags),
+			})
 			require.NoError(t, err)
 			txMeta, err := ExecutionReportToEthTxMeta(encExecReport)
 			if tc.err != nil {
@@ -277,5 +278,4 @@ func TestUpdateSourceToDestTokenMapping(t *testing.T) {
 	gotDestToken, ok := plugin.srcToDstTokenMapping[sourceToken]
 	require.True(t, ok)
 	require.Equal(t, destToken, gotDestToken)
-
 }

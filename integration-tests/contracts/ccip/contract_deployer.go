@@ -31,7 +31,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/simple_message_receiver"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/weth9"
-	ccipplugin "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
+	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrcommon"
 )
 
@@ -542,10 +543,10 @@ func stripKeyPrefix(key string) string {
 	return key
 }
 
-func NewOffChainAggregatorV2Config[T ccipplugin.OffchainConfig](
+func NewOffChainAggregatorV2Config[T ccipconfig.OffchainConfig](
 	nodes []*client.CLNodesWithKeys,
 	offchainCfg T,
-	onchainCfg ccipplugin.AbiDefined,
+	onchainCfg abihelpers.AbiDefined,
 ) (
 	signers []common.Address,
 	transmitters []common.Address,
@@ -593,11 +594,11 @@ func NewOffChainAggregatorV2Config[T ccipplugin.OffchainConfig](
 		return nil, nil, 0, nil, 0, nil, err
 	}
 	ocrConfig.Oracles = oracleIdentities
-	ocrConfig.ReportingPluginConfig, err = ccipplugin.EncodeOffchainConfig[T](offchainCfg)
+	ocrConfig.ReportingPluginConfig, err = ccipconfig.EncodeOffchainConfig(offchainCfg)
 	if err != nil {
 		return nil, nil, 0, nil, 0, nil, err
 	}
-	ocrConfig.OnchainConfig, err = ccipplugin.EncodeAbiStruct(onchainCfg)
+	ocrConfig.OnchainConfig, err = abihelpers.EncodeAbiStruct(onchainCfg)
 	if err != nil {
 		return nil, nil, 0, nil, 0, nil, err
 	}

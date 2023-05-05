@@ -1,7 +1,6 @@
 package ccip
 
 import (
-	"encoding/binary"
 	"encoding/json"
 	"math/big"
 
@@ -17,12 +16,6 @@ const (
 	MaxObservationLength     = 14 + 256*46 // ExecutionObservation encoded JSON with 256 max-length uint64 seqNrs
 	MaxExecutionReportLength = 150_000     // TODO
 )
-
-func EvmWord(i uint64) common.Hash {
-	b := make([]byte, 8)
-	binary.BigEndian.PutUint64(b, i)
-	return common.BigToHash(big.NewInt(0).SetBytes(b))
-}
 
 type CommitObservation struct {
 	Interval          commit_store.CommitStoreInterval `json:"interval"`

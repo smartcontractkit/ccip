@@ -1,4 +1,4 @@
-package ccip
+package abihelpers
 
 import (
 	"math/big"

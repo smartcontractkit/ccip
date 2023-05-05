@@ -30,6 +30,9 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
+	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
@@ -50,7 +53,7 @@ func ExecutionReportToEthTxMeta(report []byte) (*txmgr.EthTxMeta, error) {
 
 	msgIDs := make([]string, len(execReport.EncodedMessages))
 	for i, encMsg := range execReport.EncodedMessages {
-		msg, err := DecodeMessage(encMsg)
+		msg, err := abihelpers.DecodeMessage(encMsg)
 		if err != nil {
 			return nil, err
 		}
@@ -71,7 +74,7 @@ func MessagesFromExecutionReport(report types.Report) ([]uint64, [][]byte, error
 }
 
 func DecodeExecutionReport(report types.Report) (*evm_2_evm_offramp.InternalExecutionReport, error) {
-	unpacked, err := makeExecutionReportArgs().Unpack(report)
+	unpacked, err := abihelpers.MakeExecutionReportArgs().Unpack(report)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +114,7 @@ type ExecutionPluginConfig struct {
 	srcWrappedNativeToken common.Address
 	destClient            evmclient.Client
 	destGasEstimator      txmgrtypes.FeeEstimator[*evmtypes.Head, gas.EvmFee, *assets.Wei, common.Hash]
-	leafHasher            LeafHasherInterface[[32]byte]
+	leafHasher            hasher.LeafHasherInterface[[32]byte]
 }
 
 type ExecutionReportingPlugin struct {
@@ -122,8 +125,8 @@ type ExecutionReportingPlugin struct {
 	snoozedRoots              map[[32]byte]time.Time
 	destPriceRegistry         price_registry.PriceRegistryInterface
 	destWrappedNative         common.Address
-	onchainConfig             ExecOnchainConfig
-	offchainConfig            ExecOffchainConfig
+	onchainConfig             ccipconfig.ExecOnchainConfig
+	offchainConfig            ccipconfig.ExecOffchainConfig
 	srcToDstTokenMappingMu    sync.RWMutex
 	srcToDstTokenMappingBlock int64
 	srcToDstTokenMapping      map[common.Address]common.Address
@@ -138,11 +141,11 @@ func NewExecutionReportingPluginFactory(config ExecutionPluginConfig) types.Repo
 }
 
 func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.ReportingPluginConfig) (types.ReportingPlugin, types.ReportingPluginInfo, error) {
-	onchainConfig, err := DecodeAbiStruct[ExecOnchainConfig](config.OnchainConfig)
+	onchainConfig, err := abihelpers.DecodeAbiStruct[ccipconfig.ExecOnchainConfig](config.OnchainConfig)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
-	offchainConfig, err := DecodeOffchainConfig[ExecOffchainConfig](config.OffchainConfig)
+	offchainConfig, err := ccipconfig.DecodeOffchainConfig[ccipconfig.ExecOffchainConfig](config.OffchainConfig)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
@@ -211,7 +214,7 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 	if err != nil {
 		return nil, err
 	}
-	lggr.Infof("executable observations %+v %v", executableObservations, EventSignatures.SendRequested)
+	lggr.Infof("executable observations %+v %v", executableObservations, abihelpers.EventSignatures.SendRequested)
 
 	// Note can be empty
 	return ExecutionObservation{Messages: executableObservations}.Marshal()
@@ -240,9 +243,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 
 	// Updates or sets the source to dest token mapping if needed
 	if err = r.updateSourceToDestTokenMapping(ctx); err != nil {
-		if err != nil {
-			return nil, err
-		}
+		return nil, err
 	}
 
 	r.srcToDstTokenMappingMu.RLock()
@@ -291,9 +292,9 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 		}
 		// Check this root for executable messages
 		srcLogs, err := r.config.sourceLP.LogsDataWordRange(
-			EventSignatures.SendRequested,
+			abihelpers.EventSignatures.SendRequested,
 			r.config.onRamp.Address(),
-			EventSignatures.SendRequestedSequenceNumberWord,
+			abihelpers.EventSignatures.SendRequestedSequenceNumberWord,
 			logpoller.EvmWord(unexpiredReport.Interval.Min),
 			logpoller.EvmWord(unexpiredReport.Interval.Max),
 			int(r.offchainConfig.SourceIncomingConfirmations),
@@ -342,7 +343,7 @@ func (r *ExecutionReportingPlugin) updateSourceToDestTokenMapping(ctx context.Co
 
 	poolEvents, err := r.config.destLP.LatestLogEventSigsAddrsWithConfs(
 		lastPoolChangeBlock,
-		[]common.Hash{EventSignatures.PoolAdded, EventSignatures.PoolRemoved},
+		[]common.Hash{abihelpers.EventSignatures.PoolAdded, abihelpers.EventSignatures.PoolRemoved},
 		[]common.Address{r.config.offRamp.Address()},
 		int(r.offchainConfig.DestIncomingConfirmations),
 	)
@@ -398,9 +399,9 @@ func generateSourceToDestTokenMapping(ctx context.Context, offRamp evm_2_evm_off
 // attempts even if they failed.
 func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(min, max uint64) (map[uint64]struct{}, error) {
 	executedLogs, err := r.config.destLP.IndexedLogsTopicRange(
-		EventSignatures.ExecutionStateChanged,
+		abihelpers.EventSignatures.ExecutionStateChanged,
 		r.config.offRamp.Address(),
-		EventSignatures.ExecutionStateChangedSequenceNumberIndex,
+		abihelpers.EventSignatures.ExecutionStateChangedSequenceNumberIndex,
 		logpoller.EvmWord(min),
 		logpoller.EvmWord(max),
 		int(r.offchainConfig.DestIncomingConfirmations),
@@ -562,11 +563,11 @@ func (r *ExecutionReportingPlugin) parseSeqNr(log logpoller.Log) (uint64, error)
 func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.Logger, observedMessages []ObservedMessage) ([]byte, error) {
 	getMsgLogs := func(min, max uint64) ([]logpoller.Log, error) {
 		return r.config.sourceLP.LogsDataWordRange(
-			EventSignatures.SendRequested,
+			abihelpers.EventSignatures.SendRequested,
 			r.config.onRamp.Address(),
-			EventSignatures.SendRequestedSequenceNumberWord,
-			EvmWord(min),
-			EvmWord(max),
+			abihelpers.EventSignatures.SendRequestedSequenceNumberWord,
+			abihelpers.EvmWord(min),
+			abihelpers.EvmWord(max),
 			int(r.offchainConfig.SourceIncomingConfirmations),
 			pg.WithParentCtx(ctx))
 	}
@@ -575,7 +576,7 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 	if err != nil {
 		return nil, err
 	}
-	return execReport.Encode()
+	return EncodeExecutionReport(execReport)
 }
 
 func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.ReportTimestamp, query types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
@@ -688,7 +689,7 @@ func (r *ExecutionReportingPlugin) isStaleReport(seqNrs []uint64) (bool, error) 
 		// TODO: do we need to check for not present error?
 		return true, err
 	}
-	if state := MessageExecutionState(msgState); state == ExecutionStateFailure || state == ExecutionStateSuccess {
+	if state := abihelpers.MessageExecutionState(msgState); state == abihelpers.ExecutionStateFailure || state == abihelpers.ExecutionStateSuccess {
 		return true, nil
 	}
 
@@ -714,7 +715,7 @@ func (r *ExecutionReportingPlugin) inflight(
 		for _, encMsg := range rep.encMessages {
 			msg, err := r.config.onRamp.ParseCCIPSendRequested(gethtypes.Log{
 				// Note this needs to change if we start indexing things.
-				Topics: []common.Hash{EventSignatures.SendRequested},
+				Topics: []common.Hash{abihelpers.EventSignatures.SendRequested},
 				Data:   encMsg,
 			})
 			if err != nil {
@@ -760,7 +761,7 @@ func getTokensPrices(ctx context.Context, priceRegistry price_registry.PriceRegi
 }
 
 func getUnexpiredCommitReports(dstLogPoller logpoller.LogPoller, commitStore commit_store.CommitStoreInterface, permissionExecutionThreshold time.Duration) ([]commit_store.CommitStoreCommitReport, error) {
-	logs, err := dstLogPoller.LogsCreatedAfter(EventSignatures.ReportAccepted, commitStore.Address(), time.Now().Add(-permissionExecutionThreshold))
+	logs, err := dstLogPoller.LogsCreatedAfter(abihelpers.EventSignatures.ReportAccepted, commitStore.Address(), time.Now().Add(-permissionExecutionThreshold))
 	if err != nil {
 		return nil, err
 	}

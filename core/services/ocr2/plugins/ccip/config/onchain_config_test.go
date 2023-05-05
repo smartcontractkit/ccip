@@ -1,4 +1,4 @@
-package ccip
+package config
 
 import (
 	"math/big"
@@ -7,6 +7,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 )
 
 func randomAddress() common.Address {
@@ -37,10 +39,10 @@ func TestCommitOnchainConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			encoded, err := EncodeAbiStruct(tt.want)
+			encoded, err := abihelpers.EncodeAbiStruct(tt.want)
 			require.NoError(t, err)
 
-			decoded, err := DecodeAbiStruct[CommitOnchainConfig](encoded)
+			decoded, err := abihelpers.DecodeAbiStruct[CommitOnchainConfig](encoded)
 			if tt.expectErr {
 				require.ErrorContains(t, err, "must set")
 			} else {
@@ -79,10 +81,10 @@ func TestExecOnchainConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			encoded, err := EncodeAbiStruct(tt.want)
+			encoded, err := abihelpers.EncodeAbiStruct(tt.want)
 			require.NoError(t, err)
 
-			decoded, err := DecodeAbiStruct[ExecOnchainConfig](encoded)
+			decoded, err := abihelpers.DecodeAbiStruct[ExecOnchainConfig](encoded)
 			if tt.expectErr {
 				require.ErrorContains(t, err, "must set")
 			} else {

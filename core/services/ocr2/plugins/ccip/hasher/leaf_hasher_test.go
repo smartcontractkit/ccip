@@ -1,4 +1,4 @@
-package ccip
+package hasher
 
 import (
 	"encoding/hex"
@@ -10,14 +10,14 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 )
 
 func TestHasher(t *testing.T) {
 	sourceChainId, destChainId := uint64(1), uint64(4)
 	onRampAddress := common.HexToAddress("0x5550000000000000000000000000000000000001")
 
-	hashingCtx := hasher.NewKeccakCtx()
+	hashingCtx := NewKeccakCtx()
 
 	hasher := NewLeafHasher(sourceChainId, destChainId, onRampAddress, hashingCtx)
 
@@ -68,11 +68,11 @@ func TestHasher(t *testing.T) {
 }
 
 func generateLog(t *testing.T, message evm_2_evm_onramp.InternalEVM2EVMMessage) types.Log {
-	pack, err := MakeMessageArgs().Pack(message)
+	pack, err := abihelpers.MakeMessageArgs().Pack(message)
 	require.NoError(t, err)
 
 	return types.Log{
-		Topics: []common.Hash{EventSignatures.SendRequested},
+		Topics: []common.Hash{abihelpers.EventSignatures.SendRequested},
 		Data:   pack,
 	}
 }
@@ -80,7 +80,7 @@ func generateLog(t *testing.T, message evm_2_evm_onramp.InternalEVM2EVMMessage) 
 func TestMetaDataHash(t *testing.T) {
 	sourceChainId, destChainId := uint64(1), uint64(4)
 	onRampAddress := common.HexToAddress("0x5550000000000000000000000000000000000001")
-	ctx := hasher.NewKeccakCtx()
+	ctx := NewKeccakCtx()
 	hash := getMetaDataHash(ctx, ctx.Hash([]byte("EVM2EVMSubscriptionMessagePlus")), sourceChainId, onRampAddress, destChainId)
 	require.Equal(t, "e8b93c9d01a7a72ec6c7235e238701cf1511b267a31fdb78dd342649ee58c08d", hex.EncodeToString(hash[:]))
 }

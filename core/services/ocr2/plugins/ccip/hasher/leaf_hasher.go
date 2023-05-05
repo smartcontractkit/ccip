@@ -1,4 +1,4 @@
-package ccip
+package hasher
 
 import (
 	"math/big"
@@ -11,11 +11,10 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
-type LeafHasherInterface[H hasher.Hash] interface {
+type LeafHasherInterface[H Hash] interface {
 	HashLeaf(log types.Log) (H, error)
 }
 
@@ -23,7 +22,7 @@ var (
 	LeafDomainSeparator = [1]byte{0x00}
 )
 
-func getMetaDataHash[H hasher.Hash](ctx hasher.Ctx[H], prefix [32]byte, sourceChainId uint64, onRampId common.Address, destChainId uint64) H {
+func getMetaDataHash[H Hash](ctx Ctx[H], prefix [32]byte, sourceChainId uint64, onRampId common.Address, destChainId uint64) H {
 	paddedOnRamp := onRampId.Hash()
 	return ctx.Hash(utils.ConcatBytes(prefix[:], math.U256Bytes(big.NewInt(0).SetUint64(sourceChainId)), math.U256Bytes(big.NewInt(0).SetUint64(destChainId)), paddedOnRamp[:]))
 }
@@ -31,10 +30,10 @@ func getMetaDataHash[H hasher.Hash](ctx hasher.Ctx[H], prefix [32]byte, sourceCh
 type LeafHasher struct {
 	geABI        abi.ABI
 	metaDataHash [32]byte
-	ctx          hasher.Ctx[[32]byte]
+	ctx          Ctx[[32]byte]
 }
 
-func NewLeafHasher(sourceChainId uint64, destChainId uint64, onRampId common.Address, ctx hasher.Ctx[[32]byte]) *LeafHasher {
+func NewLeafHasher(sourceChainId uint64, destChainId uint64, onRampId common.Address, ctx Ctx[[32]byte]) *LeafHasher {
 	geABI, _ := abi.JSON(strings.NewReader(evm_2_evm_onramp.EVM2EVMOnRampABI))
 	return &LeafHasher{
 		geABI:        geABI,

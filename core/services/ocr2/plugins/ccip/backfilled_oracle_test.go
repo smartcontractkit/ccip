@@ -4,17 +4,16 @@ import (
 	"testing"
 
 	"github.com/pkg/errors"
+	"github.com/stretchr/testify/mock"
 	"github.com/test-go/testify/assert"
 
 	lpmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	jobmocks "github.com/smartcontractkit/chainlink/v2/core/services/job/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
-	"github.com/stretchr/testify/mock"
 )
 
 func TestOracleBackfill(t *testing.T) {
-
 	// First scenario: Start() fails, check that all Replay are being called.
 	lp1 := lpmocks.NewLogPoller(t)
 	lp2 := lpmocks.NewLogPoller(t)

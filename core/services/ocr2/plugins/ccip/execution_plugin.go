@@ -15,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/promwrapper"
@@ -97,42 +98,47 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 			srcWrappedNativeToken: sourceWrappedNative,
 			destClient:            destChain.Client(),
 			destGasEstimator:      destChain.GasEstimator(),
-			leafHasher:            NewLeafHasher(offRampConfig.SourceChainId, uint64(destChainID), onRamp.Address(), hasher.NewKeccakCtx()),
+			leafHasher:            hasher.NewLeafHasher(offRampConfig.SourceChainId, uint64(destChainID), onRamp.Address(), hasher.NewKeccakCtx()),
 		})
 
 	// Subscribe to all relevant logs.
 	err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{
 		Name:      logpoller.FilterName(EXEC_CCIP_SENDS, onRamp.Address().String()),
-		EventSigs: []common.Hash{EventSignatures.SendRequested},
-		Addresses: []common.Address{onRamp.Address()}})
+		EventSigs: []common.Hash{abihelpers.EventSignatures.SendRequested},
+		Addresses: []common.Address{onRamp.Address()},
+	})
 	if err != nil {
 		return nil, err
 	}
 	err = destChain.LogPoller().RegisterFilter(logpoller.Filter{
 		Name:      logpoller.FilterName(EXEC_REPORT_ACCEPTS, commitStore.Address().String()),
-		EventSigs: []common.Hash{EventSignatures.ReportAccepted},
-		Addresses: []common.Address{commitStore.Address()}})
+		EventSigs: []common.Hash{abihelpers.EventSignatures.ReportAccepted},
+		Addresses: []common.Address{commitStore.Address()},
+	})
 	if err != nil {
 		return nil, err
 	}
 	err = destChain.LogPoller().RegisterFilter(logpoller.Filter{
 		Name:      logpoller.FilterName(EXEC_EXECUTION_STATE_CHANGES, offRamp.Address().String()),
-		EventSigs: []common.Hash{EventSignatures.ExecutionStateChanged},
-		Addresses: []common.Address{offRamp.Address()}})
+		EventSigs: []common.Hash{abihelpers.EventSignatures.ExecutionStateChanged},
+		Addresses: []common.Address{offRamp.Address()},
+	})
 	if err != nil {
 		return nil, err
 	}
 	err = destChain.LogPoller().RegisterFilter(logpoller.Filter{
 		Name:      logpoller.FilterName(EXEC_TOKEN_POOL_ADDED, offRamp.Address().String()),
-		EventSigs: []common.Hash{EventSignatures.PoolAdded},
-		Addresses: []common.Address{offRamp.Address()}})
+		EventSigs: []common.Hash{abihelpers.EventSignatures.PoolAdded},
+		Addresses: []common.Address{offRamp.Address()},
+	})
 	if err != nil {
 		return nil, err
 	}
 	err = destChain.LogPoller().RegisterFilter(logpoller.Filter{
 		Name:      logpoller.FilterName(EXEC_TOKEN_POOL_REMOVED, offRamp.Address().String()),
-		EventSigs: []common.Hash{EventSignatures.PoolRemoved},
-		Addresses: []common.Address{offRamp.Address()}})
+		EventSigs: []common.Hash{abihelpers.EventSignatures.PoolRemoved},
+		Addresses: []common.Address{offRamp.Address()},
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -146,13 +152,14 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	}
 	// If this is a brand-new job, then we make use of the start blocks. If not then we're rebooting and log poller will pick up where we left off.
 	if new {
-		return []job.ServiceCtx{NewBackfilledOracle(
-			lggr,
-			sourceChain.LogPoller(),
-			destChain.LogPoller(),
-			pluginConfig.SourceStartBlock,
-			pluginConfig.DestStartBlock,
-			job.NewServiceAdapter(oracle)),
+		return []job.ServiceCtx{
+			NewBackfilledOracle(
+				lggr,
+				sourceChain.LogPoller(),
+				destChain.LogPoller(),
+				pluginConfig.SourceStartBlock,
+				pluginConfig.DestStartBlock,
+				job.NewServiceAdapter(oracle)),
 		}, nil
 	}
 	return []job.ServiceCtx{job.NewServiceAdapter(oracle)}, nil

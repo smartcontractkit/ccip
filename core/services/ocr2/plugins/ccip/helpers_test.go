@@ -28,6 +28,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
+	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
@@ -66,8 +68,8 @@ type ccipPluginTestHarness struct {
 	commitStore         *commit_store.CommitStore
 	priceRegistry       *price_registry.PriceRegistry
 	receiver            *simple_message_receiver.SimpleMessageReceiver
-	commitOnchainConfig CommitOnchainConfig
-	execOnchainConfig   ExecOnchainConfig
+	commitOnchainConfig ccipconfig.CommitOnchainConfig
+	execOnchainConfig   ccipconfig.ExecOnchainConfig
 
 	sourceFeeTokenAddress common.Address
 	destFeeTokenAddress   common.Address
@@ -363,14 +365,14 @@ func setupCcipTestHarness(t *testing.T) ccipPluginTestHarness {
 	destClient.Commit()
 
 	// onChain configs
-	commitOnchainConfig := CommitOnchainConfig{Afn: afnAddress, PriceRegistry: priceRegistry.Address()}
-	encodedCommitOnchainConfig, err := EncodeAbiStruct(commitOnchainConfig)
+	commitOnchainConfig := ccipconfig.CommitOnchainConfig{Afn: afnAddress, PriceRegistry: priceRegistry.Address()}
+	encodedCommitOnchainConfig, err := abihelpers.EncodeAbiStruct(commitOnchainConfig)
 	require.NoError(t, err)
 
 	_, err = generateAndSetTestOCR2Config(commitStoreHelper, owner, encodedCommitOnchainConfig)
 	require.NoError(t, err)
 
-	execOnchainConfig := ExecOnchainConfig{
+	execOnchainConfig := ccipconfig.ExecOnchainConfig{
 		PermissionLessExecutionThresholdSeconds: 600,
 		Router:                                  destRouter.Address(),
 		PriceRegistry:                           priceRegistry.Address(),
@@ -378,7 +380,7 @@ func setupCcipTestHarness(t *testing.T) ccipPluginTestHarness {
 		MaxTokensLength:                         5,
 		MaxDataSize:                             200_000,
 	}
-	encodedExecOnchainConfig, err := EncodeAbiStruct(execOnchainConfig)
+	encodedExecOnchainConfig, err := abihelpers.EncodeAbiStruct(execOnchainConfig)
 	require.NoError(t, err)
 
 	_, err = generateAndSetTestOCR2Config(offRamp, owner, encodedExecOnchainConfig)
@@ -388,11 +390,11 @@ func setupCcipTestHarness(t *testing.T) ccipPluginTestHarness {
 	// register filters in logPoller
 	require.NoError(t, sourceLP.RegisterFilter(logpoller.Filter{
 		Name:      logpoller.FilterName(COMMIT_CCIP_SENDS, onRamp.Address().String()),
-		EventSigs: []common.Hash{EventSignatures.SendRequested}, Addresses: []common.Address{onRamp.Address()},
+		EventSigs: []common.Hash{abihelpers.EventSignatures.SendRequested}, Addresses: []common.Address{onRamp.Address()},
 	}))
 	require.NoError(t, destLP.RegisterFilter(logpoller.Filter{
 		Name:      logpoller.FilterName(COMMIT_PRICE_UPDATES, priceRegistry.Address()),
-		EventSigs: []common.Hash{EventSignatures.UsdPerUnitGasUpdated, EventSignatures.UsdPerTokenUpdated}, Addresses: []common.Address{priceRegistry.Address()},
+		EventSigs: []common.Hash{abihelpers.EventSignatures.UsdPerUnitGasUpdated, abihelpers.EventSignatures.UsdPerTokenUpdated}, Addresses: []common.Address{priceRegistry.Address()},
 	}))
 
 	// approve router

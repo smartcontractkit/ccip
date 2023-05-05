@@ -1,6 +1,7 @@
-package ccip
+package abihelpers
 
 import (
+	"encoding/binary"
 	"fmt"
 	"math/big"
 	"strings"
@@ -222,7 +223,7 @@ func ProofFlagsToBits(proofFlags []bool) *big.Int {
 	return encodedFlags
 }
 
-func makeExecutionReportArgs() abi.Arguments {
+func MakeExecutionReportArgs() abi.Arguments {
 	return []abi.Argument{
 		{
 			Name: "ExecutionReport",
@@ -252,7 +253,7 @@ func makeExecutionReportArgs() abi.Arguments {
 	}
 }
 
-func makeCommitReportArgs() abi.Arguments {
+func MakeCommitReportArgs() abi.Arguments {
 	return []abi.Argument{
 		{
 			Name: "CommitReport",
@@ -338,4 +339,10 @@ func DecodeAbiStruct[T AbiDefinedValid](encoded []byte) (T, error) {
 		return *casted, (*casted).Validate()
 	}
 	return empty, fmt.Errorf("can't cast from %T to %T", converted, empty)
+}
+
+func EvmWord(i uint64) common.Hash {
+	b := make([]byte, 8)
+	binary.BigEndian.PutUint64(b, i)
+	return common.BigToHash(big.NewInt(0).SetBytes(b))
 }

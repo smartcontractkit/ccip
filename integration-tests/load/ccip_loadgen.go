@@ -83,9 +83,9 @@ func (c *CCIPE2ELoad) BeforeAllCall(msgType string) {
 	c.InitialDestBlockNum = currentBlockOnDest
 	c.InitialSourceBlockNum = currentBlockOnSource
 	// collect the balance requirement to verify balances after transfer
-	sourceBalances, err := testhelpers.GetBalances(sourceCCIP.CollectBalanceRequirements(c.t))
+	sourceBalances, err := testhelpers.GetBalances(c.t, sourceCCIP.CollectBalanceRequirements())
 	require.NoError(c.t, err, "fetching source balance")
-	destBalances, err := testhelpers.GetBalances(destCCIP.CollectBalanceRequirements(c.t))
+	destBalances, err := testhelpers.GetBalances(c.t, destCCIP.CollectBalanceRequirements())
 	require.NoError(c.t, err, "fetching dest balance")
 	c.BalanceStats = BalanceStats{
 		SourceBalanceReq: sourceBalances,
@@ -112,12 +112,11 @@ func (c *CCIPE2ELoad) BeforeAllCall(msgType string) {
 
 func (c *CCIPE2ELoad) AfterAllCall() {
 	c.BalanceStats.DestBalanceAssertions = c.Lane.Dest.BalanceAssertions(
-		c.t,
 		c.BalanceStats.DestBalanceReq,
 		c.Lane.Source.TransferAmount,
 		c.NoOfReq,
 	)
-	c.BalanceStats.SourceBalanceAssertions = c.Lane.Source.BalanceAssertions(c.t, c.BalanceStats.SourceBalanceReq, c.NoOfReq, c.totalGEFee)
+	c.BalanceStats.SourceBalanceAssertions = c.Lane.Source.BalanceAssertions(c.BalanceStats.SourceBalanceReq, c.NoOfReq, c.totalGEFee)
 	actions.AssertBalances(c.t, c.BalanceStats.DestBalanceAssertions)
 	actions.AssertBalances(c.t, c.BalanceStats.SourceBalanceAssertions)
 }

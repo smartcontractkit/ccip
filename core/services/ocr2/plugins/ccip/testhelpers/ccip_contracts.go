@@ -19,6 +19,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store_helper"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/custom_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
@@ -31,7 +32,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/weth9"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/merklemulti"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrcommon"
@@ -87,10 +88,11 @@ type SourceChain struct {
 type DestinationChain struct {
 	Common
 
-	CommitStore *commit_store.CommitStore
-	Router      *router.Router
-	OffRamp     *evm_2_evm_offramp.EVM2EVMOffRamp
-	Receivers   []MaybeRevertReceiver
+	CommitStoreHelper *commit_store_helper.CommitStoreHelper
+	CommitStore       *commit_store.CommitStore
+	Router            *router.Router
+	OffRamp           *evm_2_evm_offramp.EVM2EVMOffRamp
+	Receivers         []MaybeRevertReceiver
 }
 
 type OCR2Config struct {
@@ -106,25 +108,25 @@ type BalanceAssertion struct {
 	Name     string
 	Address  common.Address
 	Expected string
-	Getter   func(addr common.Address) *big.Int
+	Getter   func(t *testing.T, addr common.Address) *big.Int
 	Within   string
 }
 
 type BalanceReq struct {
 	Name   string
 	Addr   common.Address
-	Getter func(addr common.Address) *big.Int
+	Getter func(t *testing.T, addr common.Address) *big.Int
 }
 
 type CCIPContracts struct {
-	t                              *testing.T
-	Source                         SourceChain
-	Dest                           DestinationChain
-	Oracles                        []confighelper.OracleIdentityExtra
+	Source  SourceChain
+	Dest    DestinationChain
+	Oracles []confighelper.OracleIdentityExtra
+
 	commitOCRConfig, execOCRConfig *OCR2Config
 }
 
-func (c *CCIPContracts) DeployNewOffRamp() {
+func (c *CCIPContracts) DeployNewOffRamp(t *testing.T) {
 	offRampAddress, _, _, err := evm_2_evm_offramp.DeployEVM2EVMOffRamp(
 		c.Dest.User,
 		c.Dest.Chain,
@@ -142,49 +144,50 @@ func (c *CCIPContracts) DeployNewOffRamp() {
 			IsEnabled: true,
 		},
 	)
-	require.NoError(c.t, err)
+	require.NoError(t, err)
 	c.Dest.Chain.Commit()
 
 	c.Dest.OffRamp, err = evm_2_evm_offramp.NewEVM2EVMOffRamp(offRampAddress, c.Dest.Chain)
-	require.NoError(c.t, err)
+	require.NoError(t, err)
 
 	c.Dest.Chain.Commit()
 	c.Source.Chain.Commit()
 }
 
-func (c *CCIPContracts) EnableOffRamp() {
+func (c *CCIPContracts) EnableOffRamp(t *testing.T) {
 	_, err := c.Dest.Pool.ApplyRampUpdates(c.Dest.User,
 		[]lock_release_token_pool.TokenPoolRampUpdate{},
 		[]lock_release_token_pool.TokenPoolRampUpdate{{Ramp: c.Dest.OffRamp.Address(), Allowed: true}},
 	)
 
-	require.NoError(c.t, err)
+	require.NoError(t, err)
 	c.Dest.Chain.Commit()
 
 	_, err = c.Dest.Router.ApplyRampUpdates(c.Dest.User, nil, []router.RouterOffRampUpdate{
-		{SourceChainId: c.Source.ChainID, OffRamps: []common.Address{c.Dest.OffRamp.Address()}}})
-	require.NoError(c.t, err)
+		{SourceChainId: c.Source.ChainID, OffRamps: []common.Address{c.Dest.OffRamp.Address()}},
+	})
+	require.NoError(t, err)
 	c.Dest.Chain.Commit()
 
-	onChainConfig := createDefaultExecOnchainConfig(c)
-	offChainConfig := createDefaultExecOffchainConfig(c)
+	onChainConfig := c.createDefaultExecOnchainConfig(t)
+	offChainConfig := c.createDefaultExecOffchainConfig(t)
 
-	c.SetupExecOCR2Config(onChainConfig, offChainConfig)
+	c.SetupExecOCR2Config(t, onChainConfig, offChainConfig)
 }
 
-func (c *CCIPContracts) EnableCommitStore() {
-	onChainConfig := createDefaultCommitOnchainConfig(c)
-	offChainConfig := createDefaultCommitOffchainConfig(c)
+func (c *CCIPContracts) EnableCommitStore(t *testing.T) {
+	onChainConfig := c.createDefaultCommitOnchainConfig(t)
+	offChainConfig := c.createDefaultCommitOffchainConfig(t)
 
-	c.SetupCommitOCR2Config(onChainConfig, offChainConfig)
+	c.SetupCommitOCR2Config(t, onChainConfig, offChainConfig)
 
 	_, err := c.Dest.PriceRegistry.ApplyPriceUpdatersUpdates(c.Dest.User, []common.Address{c.Dest.CommitStore.Address()}, []common.Address{})
-	require.NoError(c.t, err)
+	require.NoError(t, err)
 	c.Dest.Chain.Commit()
 }
 
-func (c *CCIPContracts) DeployNewOnRamp() {
-	c.t.Log("Deploying new onRamp")
+func (c *CCIPContracts) DeployNewOnRamp(t *testing.T) {
+	t.Log("Deploying new onRamp")
 	onRampAddress, _, _, err := evm_2_evm_onramp.DeployEVM2EVMOnRamp(
 		c.Source.User,  // user
 		c.Source.Chain, // client
@@ -233,100 +236,98 @@ func (c *CCIPContracts) DeployNewOnRamp() {
 		[]evm_2_evm_onramp.EVM2EVMOnRampNopAndWeight{},
 	)
 
-	require.NoError(c.t, err)
+	require.NoError(t, err)
 	c.Source.OnRamp, err = evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddress, c.Source.Chain)
-	require.NoError(c.t, err)
+	require.NoError(t, err)
 	c.Source.Chain.Commit()
 
 	c.Source.Chain.Commit()
 	c.Dest.Chain.Commit()
 }
 
-func (c *CCIPContracts) EnableOnRamp() {
-	c.t.Log("Setting onRamp on source pool")
+func (c *CCIPContracts) EnableOnRamp(t *testing.T) {
+	t.Log("Setting onRamp on source pool")
 	_, err := c.Source.Pool.ApplyRampUpdates(c.Source.User,
 		[]lock_release_token_pool.TokenPoolRampUpdate{{Ramp: c.Source.OnRamp.Address(), Allowed: true}},
 		[]lock_release_token_pool.TokenPoolRampUpdate{},
 	)
 
-	require.NoError(c.t, err)
+	require.NoError(t, err)
 	c.Source.Chain.Commit()
 
-	c.t.Log("Setting onRamp on source router")
+	t.Log("Setting onRamp on source router")
 	_, err = c.Source.Router.ApplyRampUpdates(c.Source.User, []router.RouterOnRampUpdate{{DestChainId: c.Dest.ChainID, OnRamp: c.Source.OnRamp.Address()}}, nil)
-	require.NoError(c.t, err)
+	require.NoError(t, err)
 	c.Source.Chain.Commit()
 
-	c.t.Log("Enabling onRamp on blob verifier")
+	t.Log("Enabling onRamp on blob verifier")
 
 	c.Source.Chain.Commit()
 	c.Dest.Chain.Commit()
 }
 
-func (c *CCIPContracts) DeployNewCommitStore() {
-	commitStoreAddress, _, _, err := commit_store.DeployCommitStore(
+func (c *CCIPContracts) DeployNewCommitStore(t *testing.T) {
+	commitStoreAddress, _, _, err := commit_store_helper.DeployCommitStoreHelper(
 		c.Dest.User,  // user
 		c.Dest.Chain, // client
-		commit_store.CommitStoreStaticConfig{
+		commit_store_helper.CommitStoreStaticConfig{
 			ChainId:       c.Dest.ChainID,
 			SourceChainId: c.Source.ChainID,
 			OnRamp:        c.Source.OnRamp.Address(),
 		},
 	)
-	require.NoError(c.t, err)
+	require.NoError(t, err)
 	c.Dest.Chain.Commit()
+	c.Dest.CommitStoreHelper, err = commit_store_helper.NewCommitStoreHelper(commitStoreAddress, c.Dest.Chain)
+	require.NoError(t, err)
+	// since CommitStoreHelper derives from CommitStore, it's safe to instantiate both on same address
 	c.Dest.CommitStore, err = commit_store.NewCommitStore(commitStoreAddress, c.Dest.Chain)
-	require.NoError(c.t, err)
+	require.NoError(t, err)
 }
 
-func (c *CCIPContracts) SetNopsOnRamp(nopsAndWeights []evm_2_evm_onramp.EVM2EVMOnRampNopAndWeight) {
+func (c *CCIPContracts) SetNopsOnRamp(t *testing.T, nopsAndWeights []evm_2_evm_onramp.EVM2EVMOnRampNopAndWeight) {
 	tx, err := c.Source.OnRamp.SetNops(c.Source.User, nopsAndWeights)
-	require.NoError(c.t, err)
+	require.NoError(t, err)
 	c.Source.Chain.Commit()
 	_, err = bind.WaitMined(context.Background(), c.Source.Chain, tx)
-	require.NoError(c.t, err)
+	require.NoError(t, err)
 }
 
-func (c *CCIPContracts) GetSourceLinkBalance(addr common.Address) *big.Int {
-	return GetBalance(c.t, c.Source.Chain, c.Source.LinkToken.Address(), addr)
+func (c *CCIPContracts) GetSourceLinkBalance(t *testing.T, addr common.Address) *big.Int {
+	return GetBalance(t, c.Source.Chain, c.Source.LinkToken.Address(), addr)
 }
 
-func (c *CCIPContracts) GetDestLinkBalance(addr common.Address) *big.Int {
-	return GetBalance(c.t, c.Dest.Chain, c.Dest.LinkToken.Address(), addr)
+func (c *CCIPContracts) GetDestLinkBalance(t *testing.T, addr common.Address) *big.Int {
+	return GetBalance(t, c.Dest.Chain, c.Dest.LinkToken.Address(), addr)
 }
 
-func (c *CCIPContracts) GetSourceWrappedTokenBalance(addr common.Address) *big.Int {
-	return GetBalance(c.t, c.Source.Chain, c.Source.WrappedNative.Address(), addr)
+func (c *CCIPContracts) GetSourceWrappedTokenBalance(t *testing.T, addr common.Address) *big.Int {
+	return GetBalance(t, c.Source.Chain, c.Source.WrappedNative.Address(), addr)
 }
 
-func (c *CCIPContracts) GetDestWrappedTokenBalance(addr common.Address) *big.Int {
-	return GetBalance(c.t, c.Dest.Chain, c.Dest.WrappedNative.Address(), addr)
+func (c *CCIPContracts) GetDestWrappedTokenBalance(t *testing.T, addr common.Address) *big.Int {
+	return GetBalance(t, c.Dest.Chain, c.Dest.WrappedNative.Address(), addr)
 }
 
-func (c *CCIPContracts) AssertBalances(bas []BalanceAssertion) {
+func (c *CCIPContracts) AssertBalances(t *testing.T, bas []BalanceAssertion) {
 	for _, b := range bas {
-		actual := b.Getter(b.Address)
-		c.t.Log("Checking balance for", b.Name, "at", b.Address.Hex(), "got", actual)
-		require.NotNil(c.t, actual, "%v getter return nil", b.Name)
+		actual := b.Getter(t, b.Address)
+		t.Log("Checking balance for", b.Name, "at", b.Address.Hex(), "got", actual)
+		require.NotNil(t, actual, "%v getter return nil", b.Name)
 		if b.Within == "" {
-			require.Equal(c.t, b.Expected, actual.String(), "wrong balance for %s got %s want %s", b.Name, actual, b.Expected)
+			require.Equal(t, b.Expected, actual.String(), "wrong balance for %s got %s want %s", b.Name, actual, b.Expected)
 		} else {
 			bi, _ := big.NewInt(0).SetString(b.Expected, 10)
 			withinI, _ := big.NewInt(0).SetString(b.Within, 10)
 			high := big.NewInt(0).Add(bi, withinI)
 			low := big.NewInt(0).Sub(bi, withinI)
-			require.Equal(c.t, -1, actual.Cmp(high), "wrong balance for %s got %s outside expected range [%s, %s]", b.Name, actual, low, high)
-			require.Equal(c.t, 1, actual.Cmp(low), "wrong balance for %s got %s outside expected range [%s, %s]", b.Name, actual, low, high)
+			require.Equal(t, -1, actual.Cmp(high), "wrong balance for %s got %s outside expected range [%s, %s]", b.Name, actual, low, high)
+			require.Equal(t, 1, actual.Cmp(low), "wrong balance for %s got %s outside expected range [%s, %s]", b.Name, actual, low, high)
 		}
 	}
 }
 
-// helps with better logging
-func (c *CCIPContracts) SetTest(t *testing.T) {
-	c.t = t
-}
-
-func (c *CCIPContracts) DeriveOCR2Config(oracles []confighelper.OracleIdentityExtra, rawOnchainConfig []byte, rawOffchainConfig []byte) *OCR2Config {
+func (c *CCIPContracts) DeriveOCR2Config(t *testing.T, oracles []confighelper.OracleIdentityExtra, rawOnchainConfig []byte, rawOffchainConfig []byte) *OCR2Config {
 	signers, transmitters, threshold, onchainConfig, offchainConfigVersion, offchainConfig, err := confighelper.ContractSetConfigArgsForTests(
 		2*time.Second,        // deltaProgress
 		1*time.Second,        // deltaResend
@@ -345,8 +346,8 @@ func (c *CCIPContracts) DeriveOCR2Config(oracles []confighelper.OracleIdentityEx
 		1, // faults
 		rawOnchainConfig,
 	)
-	require.NoError(c.t, err)
-	lggr := logger.TestLogger(c.t)
+	require.NoError(t, err)
+	lggr := logger.TestLogger(t)
 	lggr.Infow("Setting Config on Oracle Contract",
 		"signers", signers,
 		"transmitters", transmitters,
@@ -355,9 +356,9 @@ func (c *CCIPContracts) DeriveOCR2Config(oracles []confighelper.OracleIdentityEx
 		"encodedConfigVersion", offchainConfigVersion,
 	)
 	signerAddresses, err := ocrcommon.OnchainPublicKeyToAddress(signers)
-	require.NoError(c.t, err)
+	require.NoError(t, err)
 	transmitterAddresses, err := ocrcommon.AccountToAddress(transmitters)
-	require.NoError(c.t, err)
+	require.NoError(t, err)
 
 	return &OCR2Config{
 		Signers:               signerAddresses,
@@ -369,8 +370,8 @@ func (c *CCIPContracts) DeriveOCR2Config(oracles []confighelper.OracleIdentityEx
 	}
 }
 
-func (c *CCIPContracts) SetupCommitOCR2Config(commitOnchainConfig, commitOffchainConfig []byte) {
-	c.commitOCRConfig = c.DeriveOCR2Config(c.Oracles, commitOnchainConfig, commitOffchainConfig)
+func (c *CCIPContracts) SetupCommitOCR2Config(t *testing.T, commitOnchainConfig, commitOffchainConfig []byte) {
+	c.commitOCRConfig = c.DeriveOCR2Config(t, c.Oracles, commitOnchainConfig, commitOffchainConfig)
 	// Set the DON on the commit store
 	_, err := c.Dest.CommitStore.SetOCR2Config(
 		c.Dest.User,
@@ -381,12 +382,12 @@ func (c *CCIPContracts) SetupCommitOCR2Config(commitOnchainConfig, commitOffchai
 		c.commitOCRConfig.OffchainConfigVersion,
 		c.commitOCRConfig.OffchainConfig,
 	)
-	require.NoError(c.t, err)
+	require.NoError(t, err)
 	c.Dest.Chain.Commit()
 }
 
-func (c *CCIPContracts) SetupExecOCR2Config(execOnchainConfig, execOffchainConfig []byte) {
-	c.execOCRConfig = c.DeriveOCR2Config(c.Oracles, execOnchainConfig, execOffchainConfig)
+func (c *CCIPContracts) SetupExecOCR2Config(t *testing.T, execOnchainConfig, execOffchainConfig []byte) {
+	c.execOCRConfig = c.DeriveOCR2Config(t, c.Oracles, execOnchainConfig, execOffchainConfig)
 	// Same DON on the offramp
 	_, err := c.Dest.OffRamp.SetOCR2Config(
 		c.Dest.User,
@@ -397,17 +398,17 @@ func (c *CCIPContracts) SetupExecOCR2Config(execOnchainConfig, execOffchainConfi
 		c.execOCRConfig.OffchainConfigVersion,
 		c.execOCRConfig.OffchainConfig,
 	)
-	require.NoError(c.t, err)
+	require.NoError(t, err)
 	c.Dest.Chain.Commit()
 }
 
-func (c *CCIPContracts) SetupOnchainConfig(commitOnchainConfig, commitOffchainConfig, execOnchainConfig, execOffchainConfig []byte) int64 {
+func (c *CCIPContracts) SetupOnchainConfig(t *testing.T, commitOnchainConfig, commitOffchainConfig, execOnchainConfig, execOffchainConfig []byte) int64 {
 	// Note We do NOT set the payees, payment is done in the OCR2Base implementation
 	blockBeforeConfig, err := c.Dest.Chain.BlockByNumber(context.Background(), nil)
-	require.NoError(c.t, err)
+	require.NoError(t, err)
 
-	c.SetupCommitOCR2Config(commitOnchainConfig, commitOffchainConfig)
-	c.SetupExecOCR2Config(execOnchainConfig, execOffchainConfig)
+	c.SetupCommitOCR2Config(t, commitOnchainConfig, commitOffchainConfig)
+	c.SetupExecOCR2Config(t, execOnchainConfig, execOffchainConfig)
 
 	return blockBeforeConfig.Number().Int64()
 }
@@ -423,8 +424,7 @@ func (c *CCIPContracts) NewCCIPJobSpecParams(tokenPricesUSDPipeline string, conf
 	}
 }
 
-func SendMessage(gasLimit, gasPrice, tokenAmount *big.Int, receiverAddr common.Address, c CCIPContracts) {
-	t := c.t
+func (c *CCIPContracts) SendMessage(t *testing.T, gasLimit, gasPrice, tokenAmount *big.Int, receiverAddr common.Address) {
 	extraArgs, err := GetEVMExtraArgsV1(gasLimit, false)
 	require.NoError(t, err)
 	msg := router.ClientEVM2AnyMessage{
@@ -442,18 +442,18 @@ func SendMessage(gasLimit, gasPrice, tokenAmount *big.Int, receiverAddr common.A
 	fee, err := c.Source.Router.GetFee(nil, c.Dest.ChainID, msg)
 	require.NoError(t, err)
 	// Currently no overhead and 1gwei dest gas price. So fee is simply gasLimit * gasPrice.
-	//require.Equal(t, new(big.Int).Mul(gasLimit, gasPrice).String(), fee.String())
+	// require.Equal(t, new(big.Int).Mul(gasLimit, gasPrice).String(), fee.String())
 	// Approve the fee amount + the token amount
 	_, err = c.Source.LinkToken.Approve(c.Source.User, c.Source.Router.Address(), new(big.Int).Add(fee, tokenAmount))
 	require.NoError(t, err)
 	c.Source.Chain.Commit()
-	SendRequest(t, c, msg)
+	c.SendRequest(t, msg)
 }
 
-func GetBalances(brs []BalanceReq) (map[string]*big.Int, error) {
+func GetBalances(t *testing.T, brs []BalanceReq) (map[string]*big.Int, error) {
 	m := make(map[string]*big.Int)
 	for _, br := range brs {
-		m[br.Name] = br.Getter(br.Addr)
+		m[br.Name] = br.Getter(t, br.Addr)
 		if m[br.Name] == nil {
 			return nil, fmt.Errorf("%v getter return nil", br.Name)
 		}
@@ -782,7 +782,8 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	_, err = destPriceRegistry.ApplyPriceUpdatersUpdates(destUser, []common.Address{commitStoreAddress}, []common.Address{})
 	require.NoError(t, err)
 	_, err = destRouter.ApplyRampUpdates(destUser, nil, []router.RouterOffRampUpdate{
-		{SourceChainId: sourceChainID, OffRamps: []common.Address{offRampAddress}}})
+		{SourceChainId: sourceChainID, OffRamps: []common.Address{offRampAddress}},
+	})
 	require.NoError(t, err)
 
 	// Deploy 2 revertable (one SS one non-SS)
@@ -840,50 +841,49 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	}
 
 	return CCIPContracts{
-		t:      t,
 		Source: source,
 		Dest:   dest,
 	}
 }
 
-func SendRequest(t *testing.T, ccipContracts CCIPContracts, msg router.ClientEVM2AnyMessage) *types.Transaction {
-	tx, err := ccipContracts.Source.Router.CcipSend(ccipContracts.Source.User, ccipContracts.Dest.ChainID, msg)
+func (c *CCIPContracts) SendRequest(t *testing.T, msg router.ClientEVM2AnyMessage) *types.Transaction {
+	tx, err := c.Source.Router.CcipSend(c.Source.User, c.Dest.ChainID, msg)
 	require.NoError(t, err)
-	ConfirmTxs(t, []*types.Transaction{tx}, ccipContracts.Source.Chain)
+	ConfirmTxs(t, []*types.Transaction{tx}, c.Source.Chain)
 	return tx
 }
 
-func AssertExecState(t *testing.T, ccipContracts CCIPContracts, log logpoller.Log, state ccip.MessageExecutionState) {
-	executionStateChanged, err := ccipContracts.Dest.OffRamp.ParseExecutionStateChanged(log.GetGethLog())
+func (c *CCIPContracts) AssertExecState(t *testing.T, log logpoller.Log, state abihelpers.MessageExecutionState) {
+	executionStateChanged, err := c.Dest.OffRamp.ParseExecutionStateChanged(log.GetGethLog())
 	require.NoError(t, err)
-	if ccip.MessageExecutionState(executionStateChanged.State) != state {
+	if abihelpers.MessageExecutionState(executionStateChanged.State) != state {
 		t.Log("Execution failed")
 		t.Fail()
 	}
 }
 
-func EventuallyExecutionStateChangedToSuccess(t *testing.T, ccipContracts CCIPContracts, seqNum []uint64, blockNum uint64) {
+func (c *CCIPContracts) EventuallyExecutionStateChangedToSuccess(t *testing.T, seqNum []uint64, blockNum uint64) {
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
-		it, err := ccipContracts.Dest.OffRamp.FilterExecutionStateChanged(&bind.FilterOpts{Start: blockNum}, seqNum, [][32]byte{})
+		it, err := c.Dest.OffRamp.FilterExecutionStateChanged(&bind.FilterOpts{Start: blockNum}, seqNum, [][32]byte{})
 		require.NoError(t, err)
 		for it.Next() {
-			if ccip.MessageExecutionState(it.Event.State) == ccip.ExecutionStateSuccess {
+			if abihelpers.MessageExecutionState(it.Event.State) == abihelpers.ExecutionStateSuccess {
 				return true
 			}
 		}
-		ccipContracts.Source.Chain.Commit()
-		ccipContracts.Dest.Chain.Commit()
+		c.Source.Chain.Commit()
+		c.Dest.Chain.Commit()
 		return false
 	}, testutils.WaitTimeout(t), time.Second).
 		Should(gomega.BeTrue(), "ExecutionStateChanged Event")
 }
 
-func EventuallyReportCommitted(t *testing.T, ccipContracts CCIPContracts, onRamp common.Address, max int) {
+func (c *CCIPContracts) EventuallyReportCommitted(t *testing.T, onRamp common.Address, max int) {
 	gomega.NewGomegaWithT(t).Eventually(func() bool {
-		minSeqNum, err := ccipContracts.Dest.CommitStore.GetExpectedNextSequenceNumber(nil)
+		minSeqNum, err := c.Dest.CommitStore.GetExpectedNextSequenceNumber(nil)
 		require.NoError(t, err)
-		ccipContracts.Source.Chain.Commit()
-		ccipContracts.Dest.Chain.Commit()
+		c.Source.Chain.Commit()
+		c.Dest.Chain.Commit()
 		t.Log("min seq num reported", minSeqNum)
 		return minSeqNum > uint64(max)
 	}, testutils.WaitTimeout(t), time.Second).Should(gomega.BeTrue(), "report has not been committed")
@@ -963,10 +963,7 @@ func (args *ManualExecArgs) ApproxDestStartBlock() error {
 		}
 	}
 
-	for {
-		if closestBlockHdr.Time <= sendTxTime {
-			break
-		}
+	for closestBlockHdr.Time > sendTxTime {
 		closestBlockNum = closestBlockNum - blockOffset
 		if closestBlockNum <= 0 {
 			return fmt.Errorf("approx destination blocknumber not found")
@@ -1064,7 +1061,7 @@ func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport
 	seqNr := args.seqNr
 	// Build a merkle tree for the report
 	mctx := hasher.NewKeccakCtx()
-	leafHasher := ccip.NewLeafHasher(args.SourceChainID, args.DestChainID, common.HexToAddress(args.OnRamp), mctx)
+	leafHasher := hasher.NewLeafHasher(args.SourceChainID, args.DestChainID, common.HexToAddress(args.OnRamp), mctx)
 	onRampContract, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(common.HexToAddress(args.OnRamp), args.SourceChain)
 	if err != nil {
 		return nil, err
@@ -1120,7 +1117,7 @@ func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport
 		EncodedMessages:   [][]byte{encodedMsg},
 		OffchainTokenData: tokenData,
 		Proofs:            proof.Hashes,
-		ProofFlagBits:     ccip.ProofFlagsToBits(proof.SourceFlags),
+		ProofFlagBits:     abihelpers.ProofFlagsToBits(proof.SourceFlags),
 	}
 	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(common.HexToAddress(args.OffRamp), args.DestChain)
 	if err != nil {
@@ -1130,9 +1127,8 @@ func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport
 	return offRamp.ManuallyExecute(args.DestUser, offRampProof)
 }
 
-func ExecuteMessage(
+func (c *CCIPContracts) ExecuteMessage(
 	t *testing.T,
-	c CCIPContracts,
 	req logpoller.Log,
 	txHash common.Hash,
 	destStartBlock uint64,

@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 )
 
 var ErrCommitStoreIsDown = errors.New("commitStore is down")
@@ -60,7 +61,7 @@ func leavesFromIntervals(
 	lggr logger.Logger,
 	seqParser func(logpoller.Log) (uint64, error),
 	interval commit_store.CommitStoreInterval,
-	hasher LeafHasherInterface[[32]byte],
+	hasher hasher.LeafHasherInterface[[32]byte],
 	logs []logpoller.Log,
 ) ([][32]byte, error) {
 	var seqNrs []uint64
