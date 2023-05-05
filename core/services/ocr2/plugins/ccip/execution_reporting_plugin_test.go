@@ -13,11 +13,16 @@ import (
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/pkg/errors"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp_helper"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
+	mock_contracts "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/merklemulti"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
@@ -242,4 +247,35 @@ func TestExecutionReportToEthTxMetadata(t *testing.T) {
 			require.Len(t, txMeta.MessageIDs, len(tc.msgBatch.allMsgBytes))
 		})
 	}
+}
+
+func TestUpdateSourceToDestTokenMapping(t *testing.T) {
+	expectedNewBlockNumber := int64(10000)
+	logs := []logpoller.Log{{BlockNumber: expectedNewBlockNumber}}
+	mockDestLP := &mocks.LogPoller{}
+
+	mockDestLP.On("LatestLogEventSigsAddrsWithConfs", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(logs, nil)
+
+	sourceToken, destToken := common.HexToAddress("111111"), common.HexToAddress("222222")
+
+	mockOffRamp := &mock_contracts.EVM2EVMOffRampInterface{}
+	mockOffRamp.On("Address").Return(common.HexToAddress("0x01"))
+	mockOffRamp.On("GetSupportedTokens", mock.Anything).Return([]common.Address{sourceToken}, nil)
+	mockOffRamp.On("GetDestinationToken", mock.Anything, sourceToken).Return(destToken, nil)
+
+	plugin := ExecutionReportingPlugin{
+		config: ExecutionPluginConfig{
+			destLP:  mockDestLP,
+			offRamp: mockOffRamp,
+		},
+		srcToDstTokenMappingBlock: 0,
+	}
+
+	require.NoError(t, plugin.updateSourceToDestTokenMapping(context.Background()))
+	assert.Equal(t, expectedNewBlockNumber+1, plugin.srcToDstTokenMappingBlock)
+
+	gotDestToken, ok := plugin.srcToDstTokenMapping[sourceToken]
+	require.True(t, ok)
+	require.Equal(t, destToken, gotDestToken)
+
 }

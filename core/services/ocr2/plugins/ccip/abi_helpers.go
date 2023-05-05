@@ -26,9 +26,14 @@ const (
 )
 
 var EventSignatures struct {
-	SendRequested         common.Hash // OnRamp
-	ReportAccepted        common.Hash // CommitStore
-	ExecutionStateChanged common.Hash // OffRamp
+	// OnRamp
+	SendRequested common.Hash
+	// CommitStore
+	ReportAccepted common.Hash
+	// OffRamp
+	ExecutionStateChanged common.Hash
+	PoolAdded             common.Hash
+	PoolRemoved           common.Hash
 
 	// PriceRegistry
 	UsdPerUnitGasUpdated common.Hash
@@ -71,6 +76,8 @@ func init() {
 	}
 	EventSignatures.ExecutionStateChanged = getIDOrPanic("ExecutionStateChanged", offRampABI)
 	EventSignatures.ExecutionStateChangedSequenceNumberIndex = 1
+	EventSignatures.PoolAdded = getIDOrPanic("PoolAdded", offRampABI)
+	EventSignatures.PoolRemoved = getIDOrPanic("PoolRemoved", offRampABI)
 
 	priceRegistryABI, err := abi.JSON(strings.NewReader(price_registry.PriceRegistryABI))
 	if err != nil {

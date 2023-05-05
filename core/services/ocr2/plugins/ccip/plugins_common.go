@@ -88,7 +88,7 @@ func leavesFromIntervals(
 
 // Checks whether the commit store is down by doing an onchain check for
 // Paused and AFN status
-func isCommitStoreDownNow(ctx context.Context, lggr logger.Logger, commitStore *commit_store.CommitStore) bool {
+func isCommitStoreDownNow(ctx context.Context, lggr logger.Logger, commitStore commit_store.CommitStoreInterface) bool {
 	paused, err := commitStore.Paused(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		// Air on side of caution by halting if we cannot read the state?

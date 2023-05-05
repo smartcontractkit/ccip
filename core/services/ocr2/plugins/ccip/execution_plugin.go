@@ -18,16 +18,17 @@ import (
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/promwrapper"
-	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
 )
 
 const (
 	EXEC_CCIP_SENDS              = "Exec ccip sends"
 	EXEC_REPORT_ACCEPTS          = "Exec report accepts"
 	EXEC_EXECUTION_STATE_CHANGES = "Exec execution state changes"
+	EXEC_TOKEN_POOL_ADDED        = "Token pool added"
+	EXEC_TOKEN_POOL_REMOVED      = "Token pool removed"
 )
 
-func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
+func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, new bool, argsNoPlugin libocr2.OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
 	spec := jb.OCR2OracleSpec
 	var pluginConfig ccipconfig.ExecutionPluginConfig
 	err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
@@ -99,19 +100,39 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 			leafHasher:            NewLeafHasher(offRampConfig.SourceChainId, uint64(destChainID), onRamp.Address(), hasher.NewKeccakCtx()),
 		})
 
-	// Subscribe to all relevant commit logs.
-	err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{Name: logpoller.FilterName(EXEC_CCIP_SENDS, onRamp.Address().String()),
-		EventSigs: []common.Hash{EventSignatures.SendRequested}, Addresses: []common.Address{onRamp.Address()}})
+	// Subscribe to all relevant logs.
+	err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{
+		Name:      logpoller.FilterName(EXEC_CCIP_SENDS, onRamp.Address().String()),
+		EventSigs: []common.Hash{EventSignatures.SendRequested},
+		Addresses: []common.Address{onRamp.Address()}})
 	if err != nil {
 		return nil, err
 	}
-	err = destChain.LogPoller().RegisterFilter(logpoller.Filter{Name: logpoller.FilterName(EXEC_REPORT_ACCEPTS, commitStore.Address().String()),
-		EventSigs: []common.Hash{EventSignatures.ReportAccepted}, Addresses: []common.Address{commitStore.Address()}})
+	err = destChain.LogPoller().RegisterFilter(logpoller.Filter{
+		Name:      logpoller.FilterName(EXEC_REPORT_ACCEPTS, commitStore.Address().String()),
+		EventSigs: []common.Hash{EventSignatures.ReportAccepted},
+		Addresses: []common.Address{commitStore.Address()}})
 	if err != nil {
 		return nil, err
 	}
-	err = destChain.LogPoller().RegisterFilter(logpoller.Filter{Name: logpoller.FilterName(EXEC_EXECUTION_STATE_CHANGES, offRamp.Address().String()),
-		EventSigs: []common.Hash{EventSignatures.ExecutionStateChanged}, Addresses: []common.Address{offRamp.Address()}})
+	err = destChain.LogPoller().RegisterFilter(logpoller.Filter{
+		Name:      logpoller.FilterName(EXEC_EXECUTION_STATE_CHANGES, offRamp.Address().String()),
+		EventSigs: []common.Hash{EventSignatures.ExecutionStateChanged},
+		Addresses: []common.Address{offRamp.Address()}})
+	if err != nil {
+		return nil, err
+	}
+	err = destChain.LogPoller().RegisterFilter(logpoller.Filter{
+		Name:      logpoller.FilterName(EXEC_TOKEN_POOL_ADDED, offRamp.Address().String()),
+		EventSigs: []common.Hash{EventSignatures.PoolAdded},
+		Addresses: []common.Address{offRamp.Address()}})
+	if err != nil {
+		return nil, err
+	}
+	err = destChain.LogPoller().RegisterFilter(logpoller.Filter{
+		Name:      logpoller.FilterName(EXEC_TOKEN_POOL_REMOVED, offRamp.Address().String()),
+		EventSigs: []common.Hash{EventSignatures.PoolRemoved},
+		Addresses: []common.Address{offRamp.Address()}})
 	if err != nil {
 		return nil, err
 	}

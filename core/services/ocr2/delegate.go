@@ -808,7 +808,7 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 			OffchainKeyring:              kb,
 			OnchainKeyring:               kb,
 		}
-		return ccip.NewExecutionServices(lggr, jb, d.chainSet, d.isNewlyCreatedJob, d.pipelineRunner, oracleArgsNoPlugin, logError)
+		return ccip.NewExecutionServices(lggr, jb, d.chainSet, d.isNewlyCreatedJob, oracleArgsNoPlugin, logError)
 	default:
 		return nil, errors.Errorf("plugin type %s not supported", spec.PluginType)
 	}

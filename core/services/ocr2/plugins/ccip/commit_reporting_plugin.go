@@ -131,8 +131,8 @@ type InflightPriceUpdate struct {
 type CommitPluginConfig struct {
 	lggr               logger.Logger
 	sourceLP, destLP   logpoller.LogPoller
-	onRamp             *evm_2_evm_onramp.EVM2EVMOnRamp
-	commitStore        *commit_store.CommitStore
+	onRamp             evm_2_evm_onramp.EVM2EVMOnRampInterface
+	commitStore        commit_store.CommitStoreInterface
 	priceGetter        PriceGetter
 	sourceChainID      uint64
 	sourceNative       common.Address

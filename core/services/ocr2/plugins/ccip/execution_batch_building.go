@@ -41,7 +41,7 @@ func buildExecutionReport(
 	lggr logger.Logger,
 	destLP logpoller.LogPoller,
 	observedMessages []ObservedMessage,
-	commitStore *commit_store.CommitStore,
+	commitStore commit_store.CommitStoreInterface,
 	seqNumFromLog func(log logpoller.Log) (uint64, error),
 	hashLeaf LeafHasherInterface[[32]byte],
 	getMsgLogs func(min uint64, max uint64) ([]logpoller.Log, error),
@@ -115,7 +115,7 @@ func buildExecutionReport(
 
 // Validates the given message observations do not exceed the committed sequence numbers
 // in the commitStore.
-func validateSeqNumbers(serviceCtx context.Context, commitStore *commit_store.CommitStore, observedMessages []ObservedMessage) error {
+func validateSeqNumbers(serviceCtx context.Context, commitStore commit_store.CommitStoreInterface, observedMessages []ObservedMessage) error {
 	nextMin, err := commitStore.GetExpectedNextSequenceNumber(&bind.CallOpts{Context: serviceCtx})
 	if err != nil {
 		return err
@@ -134,7 +134,7 @@ func validateSeqNumbers(serviceCtx context.Context, commitStore *commit_store.Co
 }
 
 // Gets the commit report from the saved logs for a given sequence number.
-func getCommitReportForSeqNum(dstLogPoller logpoller.LogPoller, commitStore *commit_store.CommitStore, seqNr uint64) (commit_store.CommitStoreCommitReport, error) {
+func getCommitReportForSeqNum(dstLogPoller logpoller.LogPoller, commitStore commit_store.CommitStoreInterface, seqNr uint64) (commit_store.CommitStoreCommitReport, error) {
 	// fetch commitReports which report.Interval.Max >= seqNr
 	logs, err := dstLogPoller.LogsDataWordGreaterThan(
 		EventSignatures.ReportAccepted,
