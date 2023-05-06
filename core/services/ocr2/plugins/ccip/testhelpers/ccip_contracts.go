@@ -131,10 +131,10 @@ func (c *CCIPContracts) DeployNewOffRamp(t *testing.T) {
 		c.Dest.User,
 		c.Dest.Chain,
 		evm_2_evm_offramp.EVM2EVMOffRampStaticConfig{
-			CommitStore:   c.Dest.CommitStore.Address(),
-			ChainId:       c.Dest.ChainID,
-			SourceChainId: c.Source.ChainID,
-			OnRamp:        c.Source.OnRamp.Address(),
+			CommitStore:         c.Dest.CommitStore.Address(),
+			ChainSelector:       c.Dest.ChainID,
+			SourceChainSelector: c.Source.ChainID,
+			OnRamp:              c.Source.OnRamp.Address(),
 		},
 		[]common.Address{c.Source.LinkToken.Address()}, // source tokens
 		[]common.Address{c.Dest.Pool.Address()},        // pools
@@ -191,8 +191,8 @@ func (c *CCIPContracts) DeployNewOnRamp(t *testing.T) {
 		c.Source.Chain, // client
 		evm_2_evm_onramp.EVM2EVMOnRampStaticConfig{
 			LinkToken:         c.Source.LinkToken.Address(),
-			ChainId:           c.Source.ChainID,
-			DestChainId:       c.Dest.ChainID,
+			ChainSelector:     c.Source.ChainID,
+			DestChainSelector: c.Dest.ChainID,
 			DefaultTxGasLimit: 200_000,
 		},
 		evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
@@ -269,9 +269,9 @@ func (c *CCIPContracts) DeployNewCommitStore(t *testing.T) {
 		c.Dest.User,  // user
 		c.Dest.Chain, // client
 		commit_store_helper.CommitStoreStaticConfig{
-			ChainId:       c.Dest.ChainID,
-			SourceChainId: c.Source.ChainID,
-			OnRamp:        c.Source.OnRamp.Address(),
+			ChainSelector:       c.Dest.ChainID,
+			SourceChainSelector: c.Source.ChainID,
+			OnRamp:              c.Source.OnRamp.Address(),
 		},
 	)
 	require.NoError(t, err)
@@ -414,7 +414,8 @@ func (c *CCIPContracts) SetupOnchainConfig(t *testing.T, commitOnchainConfig, co
 func (c *CCIPContracts) NewCCIPJobSpecParams(tokenPricesUSDPipeline string, configBlock int64) CCIPJobSpecParams {
 	return CCIPJobSpecParams{
 		CommitStore:            c.Dest.CommitStore.Address(),
-		DestChainId:            c.Dest.ChainID,
+		DestEvmChainId:         c.Dest.ChainID,
+		SourceEvmChainId:       c.Source.ChainID,
 		SourceChainName:        "SimulatedSource",
 		DestChainName:          "SimulatedDest",
 		TokenPricesUSDPipeline: tokenPricesUSDPipeline,
@@ -594,8 +595,8 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 					UsdPerToken: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(2000)), // 2000usd
 				},
 			},
-			DestChainId:   destChainID,
-			UsdPerUnitGas: big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
+			DestChainSelector: destChainID,
+			UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
 		},
 		nil,
 		[]common.Address{sourceLinkTokenAddress, sourceWeth9addr},
@@ -611,8 +612,8 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		sourceChain, // client
 		evm_2_evm_onramp.EVM2EVMOnRampStaticConfig{
 			LinkToken:         sourceLinkTokenAddress,
-			ChainId:           sourceChainID, // source chain id
-			DestChainId:       destChainID,   // destinationChainIds
+			ChainSelector:     sourceChainID, // source chain id
+			DestChainSelector: destChainID,   // destinationChainSelectors
 			DefaultTxGasLimit: 200_000,
 		},
 		evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
@@ -718,8 +719,8 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 					UsdPerToken: big.NewInt(8e18), // 8usd
 				},
 			},
-			DestChainId:   sourceChainID,
-			UsdPerUnitGas: big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
+			DestChainSelector: sourceChainID,
+			UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
 		},
 		nil,
 		[]common.Address{destLinkTokenAddress},
@@ -734,9 +735,9 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		destUser,  // user
 		destChain, // client
 		commit_store.CommitStoreStaticConfig{
-			ChainId:       destChainID,
-			SourceChainId: sourceChainID,
-			OnRamp:        onRamp.Address(),
+			ChainSelector:       destChainID,
+			SourceChainSelector: sourceChainID,
+			OnRamp:              onRamp.Address(),
 		},
 	)
 	require.NoError(t, err)
@@ -755,10 +756,10 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		destUser,
 		destChain,
 		evm_2_evm_offramp.EVM2EVMOffRampStaticConfig{
-			CommitStore:   commitStore.Address(),
-			ChainId:       destChainID,
-			SourceChainId: sourceChainID,
-			OnRamp:        onRampAddress,
+			CommitStore:         commitStore.Address(),
+			ChainSelector:       destChainID,
+			SourceChainSelector: sourceChainID,
+			OnRamp:              onRampAddress,
 		},
 		[]common.Address{sourceLinkTokenAddress},
 		[]common.Address{destPoolAddress},

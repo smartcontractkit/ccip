@@ -32,7 +32,8 @@ type CCIPJobSpecParams struct {
 	CommitStore            common.Address
 	SourceChainName        string
 	DestChainName          string
-	DestChainId            uint64
+	SourceEvmChainId       uint64
+	DestEvmChainId         uint64
 	TokenPricesUSDPipeline string
 	SourceStartBlock       uint64
 	DestStartBlock         uint64
@@ -83,12 +84,13 @@ func (params CCIPJobSpecParams) CommitJobSpec() (*client.OCR2TaskJobSpec, error)
 		ContractConfigTrackerPollInterval: models.Interval(20 * time.Second),
 		P2PV2Bootstrappers:                params.P2PV2Bootstrappers,
 		PluginConfig: map[string]interface{}{
+			"sourceEvmChainId": params.SourceEvmChainId,
 			"tokenPricesUSDPipeline": fmt.Sprintf(`"""
 %s
 """`, params.TokenPricesUSDPipeline),
 		},
 		RelayConfig: map[string]interface{}{
-			"chainID": params.DestChainId,
+			"chainID": params.DestEvmChainId,
 		},
 	}
 	if params.DestStartBlock > 0 {
@@ -117,10 +119,13 @@ func (params CCIPJobSpecParams) ExecutionJobSpec() (*client.OCR2TaskJobSpec, err
 		ContractID:                        params.OffRamp.Hex(),
 		ContractConfigConfirmations:       1,
 		ContractConfigTrackerPollInterval: models.Interval(20 * time.Second),
-		P2PV2Bootstrappers:                params.P2PV2Bootstrappers,
-		PluginConfig:                      make(map[string]interface{}),
+
+		P2PV2Bootstrappers: params.P2PV2Bootstrappers,
+		PluginConfig: map[string]interface{}{
+			"sourceEvmChainId": params.SourceEvmChainId,
+		},
 		RelayConfig: map[string]interface{}{
-			"chainID": params.DestChainId,
+			"chainID": params.DestEvmChainId,
 		},
 	}
 	if params.DestStartBlock > 0 {
@@ -143,7 +148,7 @@ func (params CCIPJobSpecParams) BootstrapJob(contractID string) *client.OCR2Task
 		ContractConfigConfirmations:       1,
 		ContractConfigTrackerPollInterval: models.Interval(20 * time.Second),
 		RelayConfig: map[string]interface{}{
-			"chainID": params.DestChainId,
+			"chainID": params.DestEvmChainId,
 		},
 	}
 	return &client.OCR2TaskJobSpec{

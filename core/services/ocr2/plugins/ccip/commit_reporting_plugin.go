@@ -85,8 +85,8 @@ func DecodeCommitReport(report types.Report) (*commit_store.CommitStoreCommitRep
 				SourceToken common.Address `json:"sourceToken"`
 				UsdPerToken *big.Int       `json:"usdPerToken"`
 			} `json:"tokenPriceUpdates"`
-			DestChainId   uint64   `json:"destChainId"`
-			UsdPerUnitGas *big.Int `json:"usdPerUnitGas"`
+			DestChainSelector uint64   `json:"destChainSelector"`
+			UsdPerUnitGas     *big.Int `json:"usdPerUnitGas"`
 		} `json:"priceUpdates"`
 		Interval struct {
 			Min uint64 `json:"min"`
@@ -108,7 +108,7 @@ func DecodeCommitReport(report types.Report) (*commit_store.CommitStoreCommitRep
 
 	return &commit_store.CommitStoreCommitReport{
 		PriceUpdates: commit_store.InternalPriceUpdates{
-			DestChainId:       commitReport.PriceUpdates.DestChainId,
+			DestChainSelector: commitReport.PriceUpdates.DestChainSelector,
 			UsdPerUnitGas:     commitReport.PriceUpdates.UsdPerUnitGas,
 			TokenPriceUpdates: tokenPriceUpdates,
 		},
@@ -131,16 +131,16 @@ type InflightPriceUpdate struct {
 }
 
 type CommitPluginConfig struct {
-	lggr               logger.Logger
-	sourceLP, destLP   logpoller.LogPoller
-	onRamp             evm_2_evm_onramp.EVM2EVMOnRampInterface
-	commitStore        commit_store.CommitStoreInterface
-	priceGetter        PriceGetter
-	sourceChainID      uint64
-	sourceNative       common.Address
-	sourceFeeEstimator txmgrtypes.FeeEstimator[*evmtypes.Head, gas.EvmFee, *assets.Wei, common.Hash]
-	destClient         evmclient.Client
-	leafHasher         hasher.LeafHasherInterface[[32]byte]
+	lggr                logger.Logger
+	sourceLP, destLP    logpoller.LogPoller
+	onRamp              evm_2_evm_onramp.EVM2EVMOnRampInterface
+	commitStore         commit_store.CommitStoreInterface
+	priceGetter         PriceGetter
+	sourceChainSelector uint64
+	sourceNative        common.Address
+	sourceFeeEstimator  txmgrtypes.FeeEstimator[*evmtypes.Head, gas.EvmFee, *assets.Wei, common.Hash]
+	destClient          evmclient.Client
+	leafHasher          hasher.LeafHasherInterface[[32]byte]
 }
 
 type CommitReportingPlugin struct {
@@ -272,7 +272,7 @@ func (r *CommitReportingPlugin) getLatestPriceUpdates(ctx context.Context, now t
 		abihelpers.EventSignatures.UsdPerUnitGasUpdated,
 		r.priceRegistry.Address(),
 		1,
-		[]common.Hash{abihelpers.EvmWord(r.config.sourceChainID)},
+		[]common.Hash{abihelpers.EvmWord(r.config.sourceChainSelector)},
 		now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()),
 		pg.WithParentCtx(ctx),
 	)
@@ -319,7 +319,7 @@ func (r *CommitReportingPlugin) getLatestPriceUpdates(ctx context.Context, now t
 	r.inFlightMu.RLock()
 	defer r.inFlightMu.RUnlock()
 	for _, inflight := range r.inFlightPriceUpdates {
-		if inflight.priceUpdates.DestChainId != 0 && !inflight.createdAt.Before(latestUpdates[common.Address{}].timestamp) {
+		if inflight.priceUpdates.DestChainSelector != 0 && !inflight.createdAt.Before(latestUpdates[common.Address{}].timestamp) {
 			latestUpdates[common.Address{}] = update{
 				timestamp: inflight.createdAt,
 				value:     inflight.priceUpdates.UsdPerUnitGas,
@@ -537,9 +537,9 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, _ types.ReportTimest
 		return false, nil, err
 	}
 
-	priceUpdates := calculatePriceUpdates(r.config.sourceChainID, nonEmptyObservations, r.F)
+	priceUpdates := calculatePriceUpdates(r.config.sourceChainSelector, nonEmptyObservations, r.F)
 	// If there are no fee updates and the interval is zero there is no report to produce.
-	if len(priceUpdates.TokenPriceUpdates) == 0 && priceUpdates.DestChainId == 0 && agreedInterval.Min == 0 {
+	if len(priceUpdates.TokenPriceUpdates) == 0 && priceUpdates.DestChainSelector == 0 && agreedInterval.Min == 0 {
 		return false, nil, nil
 	}
 
@@ -556,7 +556,7 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, _ types.ReportTimest
 }
 
 // Note priceUpdates must be deterministic.
-func calculatePriceUpdates(destChainId uint64, observations []CommitObservation, f int) commit_store.InternalPriceUpdates {
+func calculatePriceUpdates(destChainSelector uint64, observations []CommitObservation, f int) commit_store.InternalPriceUpdates {
 	priceObservations := make(map[common.Address][]*big.Int)
 	var sourceGasObservations []*big.Int
 
@@ -596,7 +596,7 @@ func calculatePriceUpdates(destChainId uint64, observations []CommitObservation,
 	usdPerUnitGas := big.NewInt(0)
 	// If majority report a gas price, include it in the update
 	if len(sourceGasObservations) <= f {
-		destChainId = 0
+		destChainSelector = 0
 	} else {
 		usdPerUnitGas = median(sourceGasObservations)
 	}
@@ -604,8 +604,8 @@ func calculatePriceUpdates(destChainId uint64, observations []CommitObservation,
 	return commit_store.InternalPriceUpdates{
 		TokenPriceUpdates: priceUpdates,
 		// Sending zero is ok, UsdPerUnitGas update is skipped
-		DestChainId:   destChainId,
-		UsdPerUnitGas: usdPerUnitGas,
+		DestChainSelector: destChainSelector,
+		UsdPerUnitGas:     usdPerUnitGas,
 	}
 }
 
@@ -689,7 +689,7 @@ func (r *CommitReportingPlugin) addToInflight(lggr logger.Logger, report *commit
 		}
 	}
 
-	if report.PriceUpdates.DestChainId != 0 || len(report.PriceUpdates.TokenPriceUpdates) != 0 {
+	if report.PriceUpdates.DestChainSelector != 0 || len(report.PriceUpdates.TokenPriceUpdates) != 0 {
 		lggr.Infow("Adding to inflight fee updates", "priceUpdates", report.PriceUpdates)
 		r.inFlightPriceUpdates = append(r.inFlightPriceUpdates, InflightPriceUpdate{
 			priceUpdates: report.PriceUpdates,
@@ -704,7 +704,7 @@ func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context,
 	if err != nil {
 		return false, err
 	}
-	if parsedReport.MerkleRoot == [32]byte{} && parsedReport.PriceUpdates.DestChainId == 0 && len(parsedReport.PriceUpdates.TokenPriceUpdates) == 0 {
+	if parsedReport.MerkleRoot == [32]byte{} && parsedReport.PriceUpdates.DestChainSelector == 0 && len(parsedReport.PriceUpdates.TokenPriceUpdates) == 0 {
 		// Empty report, should not be put on chain
 		return false, nil
 	}
@@ -769,9 +769,9 @@ func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, report *commi
 		return true
 	}
 
-	if report.PriceUpdates.DestChainId != 0 {
+	if report.PriceUpdates.DestChainSelector != 0 {
 		if latestUpdate, ok := latestUpdates[common.Address{}]; ok && latestUpdate.value.Cmp(report.PriceUpdates.UsdPerUnitGas) == 0 {
-			r.lggr.Infow("gasPriceUpdate-only report is stale", "latest gasPrice", latestUpdate.value, "destChainID", report.PriceUpdates.DestChainId)
+			r.lggr.Infow("gasPriceUpdate-only report is stale", "latest gasPrice", latestUpdate.value, "destChainSelector", report.PriceUpdates.DestChainSelector)
 			return true
 		}
 	} else if len(report.PriceUpdates.TokenPriceUpdates) > 0 { // check first token

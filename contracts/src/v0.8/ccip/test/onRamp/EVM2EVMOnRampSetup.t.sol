@@ -72,8 +72,8 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
     s_onRamp = new EVM2EVMOnRampHelper(
       EVM2EVMOnRamp.StaticConfig({
         linkToken: s_sourceTokens[0],
-        chainId: SOURCE_CHAIN_ID,
-        destChainId: DEST_CHAIN_ID,
+        chainSelector: SOURCE_CHAIN_ID,
+        destChainSelector: DEST_CHAIN_ID,
         defaultTxGasLimit: GAS_LIMIT
       }),
       generateDynamicOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), address(s_mockAFN)),
@@ -175,7 +175,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
       nonce: nonce,
       gasLimit: extraArgs.gasLimit,
       strict: extraArgs.strict,
-      sourceChainId: SOURCE_CHAIN_ID,
+      sourceChainSelector: SOURCE_CHAIN_ID,
       receiver: abi.decode(message.receiver, (address)),
       data: message.data,
       tokenAmounts: message.tokenAmounts,

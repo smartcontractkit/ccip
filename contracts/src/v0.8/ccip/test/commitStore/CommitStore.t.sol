@@ -19,7 +19,11 @@ contract CommitStoreSetup is PriceRegistrySetup, OCR2BaseSetup {
     OCR2BaseSetup.setUp();
 
     s_commitStore = new CommitStoreHelper(
-      CommitStore.StaticConfig({chainId: DEST_CHAIN_ID, sourceChainId: SOURCE_CHAIN_ID, onRamp: ON_RAMP_ADDRESS})
+      CommitStore.StaticConfig({
+        chainSelector: DEST_CHAIN_ID,
+        sourceChainSelector: SOURCE_CHAIN_ID,
+        onRamp: ON_RAMP_ADDRESS
+      })
     );
     CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({
       priceRegistry: address(s_priceRegistry),
@@ -60,7 +64,11 @@ contract CommitStoreRealAFNSetup is PriceRegistrySetup, OCR2BaseSetup {
     // Overwrite base mock afn with real.
     s_afn = new AFN(AFN.Config({voters: voters, blessWeightThreshold: 1, curseWeightThreshold: 1}));
     s_commitStore = new CommitStoreHelper(
-      CommitStore.StaticConfig({chainId: DEST_CHAIN_ID, sourceChainId: SOURCE_CHAIN_ID, onRamp: ON_RAMP_ADDRESS})
+      CommitStore.StaticConfig({
+        chainSelector: DEST_CHAIN_ID,
+        sourceChainSelector: SOURCE_CHAIN_ID,
+        onRamp: ON_RAMP_ADDRESS
+      })
     );
     CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({
       priceRegistry: address(s_priceRegistry),
@@ -88,8 +96,8 @@ contract CommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
 
   function testConstructorSuccess() public {
     CommitStore.StaticConfig memory staticConfig = CommitStore.StaticConfig({
-      chainId: DEST_CHAIN_ID,
-      sourceChainId: SOURCE_CHAIN_ID,
+      chainSelector: DEST_CHAIN_ID,
+      sourceChainSelector: SOURCE_CHAIN_ID,
       onRamp: 0x2C44CDDdB6a900Fa2B585dd299E03D12Fa4293Bc
     });
     CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({
@@ -112,8 +120,8 @@ contract CommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
 
     CommitStore.StaticConfig memory gotStaticConfig = commitStore.getStaticConfig();
 
-    assertEq(staticConfig.chainId, gotStaticConfig.chainId);
-    assertEq(staticConfig.sourceChainId, gotStaticConfig.sourceChainId);
+    assertEq(staticConfig.chainSelector, gotStaticConfig.chainSelector);
+    assertEq(staticConfig.sourceChainSelector, gotStaticConfig.sourceChainSelector);
     assertEq(staticConfig.onRamp, gotStaticConfig.onRamp);
 
     CommitStore.DynamicConfig memory gotDynamicConfig = commitStore.getDynamicConfig();

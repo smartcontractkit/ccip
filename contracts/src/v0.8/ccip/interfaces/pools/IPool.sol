@@ -10,13 +10,13 @@ interface IPool {
   /// @param originalSender Original sender of the tokens.
   /// @param receiver Receiver of the tokens on destination chain.
   /// @param amount Amount to lock or burn.
-  /// @param destChainId Destination chain Id.
+  /// @param destChainSelector Destination chain Id.
   /// @param extraArgs Additional data passed in by sender for lockOrBurn processing in custom pools on source chain.
   function lockOrBurn(
     address originalSender,
     bytes calldata receiver,
     uint256 amount,
-    uint64 destChainId,
+    uint64 destChainSelector,
     bytes calldata extraArgs
   ) external;
 
@@ -24,7 +24,7 @@ interface IPool {
   /// @param originalSender Original sender of the tokens.
   /// @param receiver Receiver of the tokens.
   /// @param amount Amount to release or mint.
-  /// @param sourceChainId Source chain Id.
+  /// @param sourceChainSelector Source chain Id.
   /// @param extraData Additional data supplied offchain for releaseOrMint processing in
   /// custom pools on dest chain. This could be an attestation that was retrieved through a
   /// third party API.
@@ -33,7 +33,7 @@ interface IPool {
     bytes memory originalSender,
     address receiver,
     uint256 amount,
-    uint64 sourceChainId,
+    uint64 sourceChainSelector,
     bytes memory extraData
   ) external;
 

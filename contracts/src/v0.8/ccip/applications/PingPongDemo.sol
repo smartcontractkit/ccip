@@ -15,7 +15,7 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
   event Pong(uint256 pingPongCount);
 
   // The chain ID of the counterpart ping pong contract
-  uint64 private s_counterpartChainId;
+  uint64 private s_counterpartChainSelector;
   // The contract address of the counterpart ping pong contract
   address private s_counterpartAddress;
 
@@ -29,8 +29,8 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
     s_feeToken.approve(address(router), 2**256 - 1);
   }
 
-  function setCounterpart(uint64 counterpartChainId, address counterpartAddress) external onlyOwner {
-    s_counterpartChainId = counterpartChainId;
+  function setCounterpart(uint64 counterpartChainSelector, address counterpartAddress) external onlyOwner {
+    s_counterpartChainSelector = counterpartChainSelector;
     s_counterpartAddress = counterpartAddress;
   }
 
@@ -54,7 +54,7 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
       extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 200_000, strict: false})),
       feeToken: address(s_feeToken)
     });
-    IRouterClient(getRouter()).ccipSend(s_counterpartChainId, message);
+    IRouterClient(getRouter()).ccipSend(s_counterpartChainSelector, message);
   }
 
   function _ccipReceive(Client.Any2EVMMessage memory message) internal override {
@@ -68,12 +68,12 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
   // Plumbing
   /////////////////////////////////////////////////////////////////////
 
-  function getCounterpartChainId() external view returns (uint64) {
-    return s_counterpartChainId;
+  function getCounterpartChainSelector() external view returns (uint64) {
+    return s_counterpartChainSelector;
   }
 
-  function setCounterpartChainId(uint64 chainId) external onlyOwner {
-    s_counterpartChainId = chainId;
+  function setCounterpartChainSelector(uint64 chainSelector) external onlyOwner {
+    s_counterpartChainSelector = chainSelector;
   }
 
   function getCounterpartAddress() external view returns (address) {

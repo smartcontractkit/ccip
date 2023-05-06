@@ -23,8 +23,8 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
 
   /// @notice Static commit store config
   struct StaticConfig {
-    uint64 chainId; // -------┐  Destination chain Id
-    uint64 sourceChainId; // -┘  Source chain Id
+    uint64 chainSelector; // -------┐  Destination chainSelector
+    uint64 sourceChainSelector; // -┘  Source chainSelector
     address onRamp; //           OnRamp address on the source chain
   }
 
@@ -51,9 +51,9 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "CommitStore 1.0.0";
   // Chain ID of this chain
-  uint64 internal immutable i_chainId;
+  uint64 internal immutable i_chainSelector;
   // Chain ID of the source chain
-  uint64 internal immutable i_sourceChainId;
+  uint64 internal immutable i_sourceChainSelector;
   // The onRamp address on the source chain
   address internal immutable i_onRamp;
 
@@ -69,11 +69,11 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
 
   /// @param staticConfig Containing the static part of the commitStore config
   constructor(StaticConfig memory staticConfig) OCR2Base() Pausable() {
-    if (staticConfig.onRamp == address(0) || staticConfig.chainId == 0 || staticConfig.sourceChainId == 0)
+    if (staticConfig.onRamp == address(0) || staticConfig.chainSelector == 0 || staticConfig.sourceChainSelector == 0)
       revert InvalidCommitStoreConfig();
 
-    i_chainId = staticConfig.chainId;
-    i_sourceChainId = staticConfig.sourceChainId;
+    i_chainSelector = staticConfig.chainSelector;
+    i_sourceChainSelector = staticConfig.sourceChainSelector;
     i_onRamp = staticConfig.onRamp;
   }
 
@@ -141,7 +141,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
   function _report(bytes memory encodedReport) internal override whenNotPaused whenHealthy {
     CommitReport memory report = abi.decode(encodedReport, (CommitReport));
 
-    if (report.priceUpdates.tokenPriceUpdates.length > 0 || report.priceUpdates.destChainId != 0) {
+    if (report.priceUpdates.tokenPriceUpdates.length > 0 || report.priceUpdates.destChainSelector != 0) {
       IPriceRegistry(s_dynamicConfig.priceRegistry).updatePrices(report.priceUpdates);
       // If there is no root, the report only contained fee updated and
       // we return to not revert on the empty root check below.
@@ -168,7 +168,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
   /// @notice Returns the static commit store config.
   /// @return the configuration.
   function getStaticConfig() external view returns (StaticConfig memory) {
-    return StaticConfig({chainId: i_chainId, sourceChainId: i_sourceChainId, onRamp: i_onRamp});
+    return StaticConfig({chainSelector: i_chainSelector, sourceChainSelector: i_sourceChainSelector, onRamp: i_onRamp});
   }
 
   /// @notice Returns the dynamic commit store config.
@@ -185,7 +185,10 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
 
     s_dynamicConfig = dynamicConfig;
 
-    emit ConfigSet(StaticConfig({chainId: i_chainId, sourceChainId: i_sourceChainId, onRamp: i_onRamp}), dynamicConfig);
+    emit ConfigSet(
+      StaticConfig({chainSelector: i_chainSelector, sourceChainSelector: i_sourceChainSelector, onRamp: i_onRamp}),
+      dynamicConfig
+    );
   }
 
   // ================================================================

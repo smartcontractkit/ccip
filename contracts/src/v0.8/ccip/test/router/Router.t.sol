@@ -237,7 +237,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     s_priceRegistry.applyFeeTokensUpdates(feeTokens, new address[](0));
 
     Internal.PriceUpdates memory priceUpdates = getSinglePriceUpdateStruct(s_sourceTokens[1], 2_000 ether);
-    priceUpdates.destChainId = DEST_CHAIN_ID;
+    priceUpdates.destChainSelector = DEST_CHAIN_ID;
     priceUpdates.usdPerUnitGas = 0;
 
     s_priceRegistry.updatePrices(priceUpdates);

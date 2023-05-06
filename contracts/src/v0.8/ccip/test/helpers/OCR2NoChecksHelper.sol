@@ -5,7 +5,7 @@ import {OCR2BaseNoChecks} from "../../ocr/OCR2BaseNoChecks.sol";
 
 contract OCR2NoChecksHelper is OCR2BaseNoChecks {
   function configDigestFromConfigData(
-    uint256 chainId,
+    uint256 chainSelector,
     address contractAddress,
     uint64 configCount,
     address[] memory signers,
@@ -17,7 +17,7 @@ contract OCR2NoChecksHelper is OCR2BaseNoChecks {
   ) public pure returns (bytes32) {
     return
       _configDigestFromConfigData(
-        chainId,
+        chainSelector,
         contractAddress,
         configCount,
         signers,

@@ -8,7 +8,7 @@ import {MerkleMultiProof} from "../libraries/MerkleMultiProof.sol";
 library Internal {
   struct PriceUpdates {
     TokenPriceUpdate[] tokenPriceUpdates;
-    uint64 destChainId; // ------┐ Destination chain Id
+    uint64 destChainSelector; // ------┐ Destination chain Id
     uint192 usdPerUnitGas; // ---┘ USD per unit of destination chain gas
   }
 
@@ -39,7 +39,7 @@ library Internal {
 
   // @notice The cross chain message that gets committed to EVM chains
   struct EVM2EVMMessage {
-    uint64 sourceChainId;
+    uint64 sourceChainSelector;
     uint64 sequenceNumber;
     uint256 feeTokenAmount;
     address sender;
@@ -61,7 +61,7 @@ library Internal {
   {
     message = Client.Any2EVMMessage({
       messageId: original.messageId,
-      sourceChainSelector: original.sourceChainId,
+      sourceChainSelector: original.sourceChainSelector,
       sender: abi.encode(original.sender),
       data: original.data,
       destTokenAmounts: destTokenAmounts

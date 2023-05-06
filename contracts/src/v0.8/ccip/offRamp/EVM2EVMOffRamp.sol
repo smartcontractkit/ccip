@@ -36,7 +36,7 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
   error ZeroAddressNotAllowed();
   error CommitStoreAlreadyInUse();
   error ExecutionError(bytes error);
-  error InvalidSourceChain(uint64 sourceChainId);
+  error InvalidSourceChain(uint64 sourceChainSelector);
   error MessageTooLarge(uint256 maxSize, uint256 actualSize);
   error TokenDataMismatch(uint64 sequenceNumber);
   error UnexpectedTokenData();
@@ -69,8 +69,8 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
   /// @notice Static offRamp config
   struct StaticConfig {
     address commitStore; // --┐  CommitStore address on the destination chain
-    uint64 chainId; // -------┘  Destination chain Id
-    uint64 sourceChainId; // -┐  Source chain Id
+    uint64 chainSelector; // -------┘  Destination chainSelector
+    uint64 sourceChainSelector; // -┐  Source chainSelector
     address onRamp; // -------┘  OnRamp address on the source chain
   }
 
@@ -92,10 +92,10 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
   uint16 private constant GAS_FOR_CALL_EXACT_CHECK = 5_000;
   // Commit store address on the destination chain
   address internal immutable i_commitStore;
-  // Chain ID of the source chain
-  uint64 internal immutable i_sourceChainId;
-  // Chain ID of this chain
-  uint64 internal immutable i_chainId;
+  // ChainSelector of the source chain
+  uint64 internal immutable i_sourceChainSelector;
+  // ChainSelector of this chain
+  uint64 internal immutable i_chainSelector;
   // OnRamp address on the source chain
   address internal immutable i_onRamp;
   // metadataHash is a prefix for a message hash preimage to ensure uniqueness.
@@ -133,8 +133,8 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
     if (ICommitStore(staticConfig.commitStore).getExpectedNextSequenceNumber() != 1) revert CommitStoreAlreadyInUse();
 
     i_commitStore = staticConfig.commitStore;
-    i_sourceChainId = staticConfig.sourceChainId;
-    i_chainId = staticConfig.chainId;
+    i_sourceChainSelector = staticConfig.sourceChainSelector;
+    i_chainSelector = staticConfig.chainSelector;
     i_onRamp = staticConfig.onRamp;
 
     i_metadataHash = _metadataHash(Internal.EVM_2_EVM_MESSAGE_HASH);
@@ -300,7 +300,7 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
   /// @param message The message to be validated.
   /// @dev reverts on validation failures.
   function _isWellFormed(Internal.EVM2EVMMessage memory message, uint256 offchainTokenDataLength) private view {
-    if (message.sourceChainId != i_sourceChainId) revert InvalidSourceChain(message.sourceChainId);
+    if (message.sourceChainSelector != i_sourceChainSelector) revert InvalidSourceChain(message.sourceChainSelector);
     if (message.tokenAmounts.length > uint256(s_dynamicConfig.maxTokensLength))
       revert UnsupportedNumberOfTokens(message.sequenceNumber);
     if (message.tokenAmounts.length != offchainTokenDataLength) revert TokenDataMismatch(message.sequenceNumber);
@@ -373,7 +373,7 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
 
   /// @notice creates a unique hash to be used in message hashing.
   function _metadataHash(bytes32 prefix) internal view returns (bytes32) {
-    return keccak256(abi.encode(prefix, i_sourceChainId, i_chainId, i_onRamp));
+    return keccak256(abi.encode(prefix, i_sourceChainSelector, i_chainSelector, i_onRamp));
   }
 
   // ================================================================
@@ -384,7 +384,12 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
   /// @dev This function will always return the same struct as the contents is static and can never change.
   function getStaticConfig() external view returns (StaticConfig memory) {
     return
-      StaticConfig({commitStore: i_commitStore, chainId: i_chainId, sourceChainId: i_sourceChainId, onRamp: i_onRamp});
+      StaticConfig({
+        commitStore: i_commitStore,
+        chainSelector: i_chainSelector,
+        sourceChainSelector: i_sourceChainSelector,
+        onRamp: i_onRamp
+      });
   }
 
   /// @notice Returns the current dynamic config.
@@ -403,7 +408,12 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
     s_dynamicConfig = dynamicConfig;
 
     emit ConfigSet(
-      StaticConfig({commitStore: i_commitStore, chainId: i_chainId, sourceChainId: i_sourceChainId, onRamp: i_onRamp}),
+      StaticConfig({
+        commitStore: i_commitStore,
+        chainSelector: i_chainSelector,
+        sourceChainSelector: i_sourceChainSelector,
+        onRamp: i_onRamp
+      }),
       dynamicConfig
     );
   }
@@ -506,7 +516,13 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](sourceTokenAmounts.length);
     for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
       IPool pool = getPoolBySourceToken(IERC20(sourceTokenAmounts[i].token));
-      pool.releaseOrMint(originalSender, receiver, sourceTokenAmounts[i].amount, i_sourceChainId, offchainTokenData[i]);
+      pool.releaseOrMint(
+        originalSender,
+        receiver,
+        sourceTokenAmounts[i].amount,
+        i_sourceChainSelector,
+        offchainTokenData[i]
+      );
 
       destTokenAmounts[i].token = address(pool.getToken());
       destTokenAmounts[i].amount = sourceTokenAmounts[i].amount;

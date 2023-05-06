@@ -18,7 +18,7 @@ contract GovernanceDapp is CCIPReceiver, TypeAndVersionInterface, OwnerIsCreator
   using Client for Client.EVMExtraArgsV1;
 
   error InvalidDeliverer(address deliverer);
-  event ConfigPropagated(uint64 chainId, address contractAddress);
+  event ConfigPropagated(uint64 chainSelector, address contractAddress);
   event ReceivedConfig(uint256 feeAmount, uint256 changedAtBlock);
 
   struct FeeConfig {
@@ -27,7 +27,7 @@ contract GovernanceDapp is CCIPReceiver, TypeAndVersionInterface, OwnerIsCreator
   }
 
   struct CrossChainClone {
-    uint64 chainId;
+    uint64 chainSelector;
     address contractAddress;
   }
 
@@ -67,8 +67,8 @@ contract GovernanceDapp is CCIPReceiver, TypeAndVersionInterface, OwnerIsCreator
         feeToken: address(s_feeToken),
         extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 3e5, strict: false}))
       });
-      IRouterClient(getRouter()).ccipSend(clone.chainId, message);
-      emit ConfigPropagated(clone.chainId, clone.contractAddress);
+      IRouterClient(getRouter()).ccipSend(clone.chainSelector, message);
+      emit ConfigPropagated(clone.chainSelector, clone.contractAddress);
     }
   }
 

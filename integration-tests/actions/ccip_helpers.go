@@ -404,7 +404,7 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int, conf *laneconfig.L
 		// we will update the price updates later based on source and dest PriceUpdates
 		ccipModule.PriceRegistry, err = cd.DeployPriceRegistry(price_registry.InternalPriceUpdates{
 			TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{},
-			DestChainId:       0,
+			DestChainSelector: 0,
 			UsdPerUnitGas:     big.NewInt(0),
 		})
 		if err != nil {
@@ -494,8 +494,8 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 
 		// update PriceRegistry
 		priceUpdates := price_registry.InternalPriceUpdates{
-			DestChainId:   sourceCCIP.DestinationChainId,
-			UsdPerUnitGas: big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
+			DestChainSelector: sourceCCIP.DestinationChainId,
+			UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
 			TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
 				{
 					SourceToken: common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
@@ -896,8 +896,8 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 
 		// update PriceRegistry
 		priceUpdates := price_registry.InternalPriceUpdates{
-			DestChainId:   destCCIP.SourceChainId,
-			UsdPerUnitGas: big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
+			DestChainSelector: destCCIP.SourceChainId,
+			UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
 			TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
 				{
 					SourceToken: common.HexToAddress(destCCIP.Common.FeeToken.Address()),
@@ -1671,7 +1671,8 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		CommitStore:      lane.Dest.CommitStore.EthAddress,
 		SourceChainName:  sourceChainClient.GetNetworkName(),
 		DestChainName:    destChainClient.GetNetworkName(),
-		DestChainId:      destChainClient.GetChainID().Uint64(),
+		SourceEvmChainId: sourceChainClient.GetChainID().Uint64(),
+		DestEvmChainId:   destChainClient.GetChainID().Uint64(),
 		SourceStartBlock: lane.Source.SrcStartBlock,
 		DestStartBlock:   currentBlockOnDest,
 	}

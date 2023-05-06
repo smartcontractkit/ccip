@@ -18,7 +18,7 @@ import {IERC20} from "../../vendor/IERC20.sol";
 // can avoid storage based options.
 contract ImmutableExample is IAny2EVMMessageReceiver, IERC165 {
   error InvalidConfig();
-  error InvalidChain(uint64 chainId);
+  error InvalidChain(uint64 chainSelector);
   error OnlyRouter();
 
   event MessageSent(bytes32 messageId);
@@ -47,12 +47,12 @@ contract ImmutableExample is IAny2EVMMessageReceiver, IERC165 {
   }
 
   // TODO: permissions on enableChain/disableChain
-  function enableChain(uint64 chainId, bytes memory extraArgs) external {
-    s_chains[chainId] = extraArgs;
+  function enableChain(uint64 chainSelector, bytes memory extraArgs) external {
+    s_chains[chainSelector] = extraArgs;
   }
 
-  function disableChain(uint64 chainId) external {
-    delete s_chains[chainId];
+  function disableChain(uint64 chainSelector) external {
+    delete s_chains[chainSelector];
   }
 
   function supportsInterface(bytes4 interfaceId) public pure override returns (bool) {
@@ -73,50 +73,53 @@ contract ImmutableExample is IAny2EVMMessageReceiver, IERC165 {
 
   /// @notice sends data to receiver on dest chain. Assumes address(this) has sufficient native asset.
   function sendDataPayNative(
-    uint64 destChainId,
+    uint64 destChainSelector,
     bytes memory receiver,
     bytes memory data
-  ) external validChain(destChainId) {
+  ) external validChain(destChainSelector) {
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: receiver,
       data: data,
       tokenAmounts: tokenAmounts,
-      extraArgs: s_chains[destChainId],
+      extraArgs: s_chains[destChainSelector],
       feeToken: address(0) // We leave the feeToken empty indicating we'll pay raw native.
     });
-    bytes32 messageId = i_router.ccipSend{value: i_router.getFee(destChainId, message)}(destChainId, message);
+    bytes32 messageId = i_router.ccipSend{value: i_router.getFee(destChainSelector, message)}(
+      destChainSelector,
+      message
+    );
     emit MessageSent(messageId);
   }
 
   /// @notice sends data to receiver on dest chain. Assumes address(this) has sufficient feeToken.
   function sendDataPayFeeToken(
-    uint64 destChainId,
+    uint64 destChainSelector,
     bytes memory receiver,
     bytes memory data
-  ) external validChain(destChainId) {
+  ) external validChain(destChainSelector) {
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: receiver,
       data: data,
       tokenAmounts: tokenAmounts,
-      extraArgs: s_chains[destChainId],
+      extraArgs: s_chains[destChainSelector],
       feeToken: address(s_feeToken)
     });
-    // Optional uint256 fee = i_router.getFee(destChainId, message);
+    // Optional uint256 fee = i_router.getFee(destChainSelector, message);
     // Can decide if fee is acceptable.
     // address(this) must have sufficient feeToken or the send will revert.
-    bytes32 messageId = i_router.ccipSend(destChainId, message);
+    bytes32 messageId = i_router.ccipSend(destChainSelector, message);
     emit MessageSent(messageId);
   }
 
   /// @notice sends data to receiver on dest chain. Assumes address(this) has sufficient native token.
   function sendDataAndTokens(
-    uint64 destChainId,
+    uint64 destChainSelector,
     bytes memory receiver,
     bytes memory data,
     Client.EVMTokenAmount[] memory tokenAmounts
-  ) external validChain(destChainId) {
+  ) external validChain(destChainSelector) {
     for (uint256 i = 0; i < tokenAmounts.length; ++i) {
       IERC20(tokenAmounts[i].token).transferFrom(msg.sender, address(this), tokenAmounts[i].amount);
       IERC20(tokenAmounts[i].token).approve(address(i_router), tokenAmounts[i].amount);
@@ -125,23 +128,23 @@ contract ImmutableExample is IAny2EVMMessageReceiver, IERC165 {
       receiver: receiver,
       data: data,
       tokenAmounts: tokenAmounts,
-      extraArgs: s_chains[destChainId],
+      extraArgs: s_chains[destChainSelector],
       feeToken: address(s_feeToken)
     });
-    // Optional uint256 fee = i_router.getFee(destChainId, message);
+    // Optional uint256 fee = i_router.getFee(destChainSelector, message);
     // Can decide if fee is acceptable.
     // address(this) must have sufficient feeToken or the send will revert.
-    bytes32 messageId = i_router.ccipSend(destChainId, message);
+    bytes32 messageId = i_router.ccipSend(destChainSelector, message);
     emit MessageSent(messageId);
   }
 
   // @notice user sends tokens to a receiver
   // Approvals can be optimized with a whitelist of tokens and inf approvals if desired.
   function sendTokens(
-    uint64 destChainId,
+    uint64 destChainSelector,
     bytes memory receiver,
     Client.EVMTokenAmount[] memory tokenAmounts
-  ) external validChain(destChainId) {
+  ) external validChain(destChainSelector) {
     for (uint256 i = 0; i < tokenAmounts.length; ++i) {
       IERC20(tokenAmounts[i].token).transferFrom(msg.sender, address(this), tokenAmounts[i].amount);
       IERC20(tokenAmounts[i].token).approve(address(i_router), tokenAmounts[i].amount);
@@ -151,18 +154,18 @@ contract ImmutableExample is IAny2EVMMessageReceiver, IERC165 {
       receiver: receiver,
       data: data,
       tokenAmounts: tokenAmounts,
-      extraArgs: s_chains[destChainId],
+      extraArgs: s_chains[destChainSelector],
       feeToken: address(s_feeToken)
     });
-    // Optional uint256 fee = i_router.getFee(destChainId, message);
+    // Optional uint256 fee = i_router.getFee(destChainSelector, message);
     // Can decide if fee is acceptable.
     // address(this) must have sufficient feeToken or the send will revert.
-    bytes32 messageId = i_router.ccipSend(destChainId, message);
+    bytes32 messageId = i_router.ccipSend(destChainSelector, message);
     emit MessageSent(messageId);
   }
 
-  modifier validChain(uint64 chainId) {
-    if (s_chains[chainId].length == 0) revert InvalidChain(chainId);
+  modifier validChain(uint64 chainSelector) {
+    if (s_chains[chainSelector].length == 0) revert InvalidChain(chainSelector);
     _;
   }
 

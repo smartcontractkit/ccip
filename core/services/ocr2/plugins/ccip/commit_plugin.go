@@ -51,16 +51,13 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 	if err != nil {
 		return nil, errors.Wrap(err, "failed getting the static config from the commitStore")
 	}
-	sourceChain, err := chainSet.Get(big.NewInt(0).SetUint64(staticConfig.SourceChainId))
+	sourceChain, err := chainSet.Get(big.NewInt(0).SetUint64(uint64(pluginConfig.SourceEvmChainId)))
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to open source chain")
 	}
 	onRamp, err := LoadOnRamp(staticConfig.OnRamp, sourceChain.Client())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed loading onRamp")
-	}
-	if staticConfig.ChainId != uint64(destChainID) {
-		return nil, errors.Errorf("Wrong dest chain ID got %d expected from jobspec %d", staticConfig.ChainId, destChainID)
 	}
 	priceGetterObject, err := NewPriceGetter(pluginConfig.TokenPricesUSDPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
 	if err != nil {
@@ -79,24 +76,24 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 		return nil, err
 	}
 
-	leafHasher := hasher.NewLeafHasher(staticConfig.SourceChainId, uint64(destChainID), onRamp.Address(), hasher.NewKeccakCtx())
+	leafHasher := hasher.NewLeafHasher(staticConfig.SourceChainSelector, staticConfig.ChainSelector, onRamp.Address(), hasher.NewKeccakCtx())
 	wrappedPluginFactory := NewCommitReportingPluginFactory(
 		CommitPluginConfig{
-			lggr:               lggr,
-			sourceLP:           sourceChain.LogPoller(),
-			destLP:             destChain.LogPoller(),
-			onRamp:             onRamp,
-			priceGetter:        priceGetterObject,
-			sourceNative:       sourceNative,
-			sourceFeeEstimator: sourceChain.GasEstimator(),
-			sourceChainID:      staticConfig.SourceChainId,
-			destClient:         destChain.Client(),
-			commitStore:        commitStore,
-			leafHasher:         leafHasher,
+			lggr:                lggr,
+			sourceLP:            sourceChain.LogPoller(),
+			destLP:              destChain.LogPoller(),
+			onRamp:              onRamp,
+			priceGetter:         priceGetterObject,
+			sourceNative:        sourceNative,
+			sourceFeeEstimator:  sourceChain.GasEstimator(),
+			sourceChainSelector: staticConfig.SourceChainSelector,
+			destClient:          destChain.Client(),
+			commitStore:         commitStore,
+			leafHasher:          leafHasher,
 		})
 	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPCommit", string(spec.Relay), destChain.ID())
 	argsNoPlugin.Logger = logger.NewOCRWrapper(lggr.Named("CCIPCommit").With(
-		"srcChain", ChainName(int64(staticConfig.SourceChainId)), "dstChain", ChainName(destChainID)), true, logError)
+		"srcChain", ChainName(pluginConfig.SourceEvmChainId), "dstChain", ChainName(destChainID)), true, logError)
 	oracle, err := libocr2.NewOracle(argsNoPlugin)
 	if err != nil {
 		return nil, err

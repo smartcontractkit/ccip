@@ -41,18 +41,18 @@ type messageBatch struct {
 
 // Message contains the data from a cross chain message
 type Message struct {
-	SourceChainId  uint64                                  `json:"sourceChainId"`
-	SequenceNumber uint64                                  `json:"sequenceNumber"`
-	FeeTokenAmount *big.Int                                `json:"feeTokenAmount"`
-	Sender         common.Address                          `json:"sender"`
-	Nonce          uint64                                  `json:"nonce"`
-	GasLimit       *big.Int                                `json:"gasLimit"`
-	Strict         bool                                    `json:"strict"`
-	Receiver       common.Address                          `json:"receiver"`
-	Data           []uint8                                 `json:"data"`
-	TokenAmounts   []evm_2_evm_onramp.ClientEVMTokenAmount `json:"tokensAndAmounts"`
-	FeeToken       common.Address                          `json:"feeToken"`
-	MessageId      [32]byte                                `json:"messageId"`
+	SourceChainSelector uint64                                  `json:"sourceChainSelector"`
+	SequenceNumber      uint64                                  `json:"sequenceNumber"`
+	FeeTokenAmount      *big.Int                                `json:"feeTokenAmount"`
+	Sender              common.Address                          `json:"sender"`
+	Nonce               uint64                                  `json:"nonce"`
+	GasLimit            *big.Int                                `json:"gasLimit"`
+	Strict              bool                                    `json:"strict"`
+	Receiver            common.Address                          `json:"receiver"`
+	Data                []uint8                                 `json:"data"`
+	TokenAmounts        []evm_2_evm_onramp.ClientEVMTokenAmount `json:"tokensAndAmounts"`
+	FeeToken            common.Address                          `json:"feeToken"`
+	MessageId           [32]byte                                `json:"messageId"`
 }
 
 func (e ccipPluginTestHarness) generateMessageBatch(t *testing.T, payloadSize int, nMessages int, nTokensPerMessage int) messageBatch {
@@ -82,34 +82,34 @@ func (e ccipPluginTestHarness) generateMessageBatch(t *testing.T, payloadSize in
 	for i := 0; i < nMessages; i++ {
 		seqNums = append(seqNums, 1+uint64(i))
 		message := Message{
-			SourceChainId:  e.sourceChainID,
-			SequenceNumber: 1 + uint64(i),
-			FeeTokenAmount: big.NewInt(1e9),
-			Sender:         e.owner.From,
-			Nonce:          1 + uint64(i),
-			GasLimit:       big.NewInt(100_000),
-			Strict:         false,
-			Receiver:       e.receiver.Address(),
-			Data:           maxPayload,
-			TokenAmounts:   tokens,
-			FeeToken:       tokens[0].Token,
-			MessageId:      utils.Keccak256Fixed([]byte(`MyError(uint256)`)),
+			SourceChainSelector: e.sourceChainID,
+			SequenceNumber:      1 + uint64(i),
+			FeeTokenAmount:      big.NewInt(1e9),
+			Sender:              e.owner.From,
+			Nonce:               1 + uint64(i),
+			GasLimit:            big.NewInt(100_000),
+			Strict:              false,
+			Receiver:            e.receiver.Address(),
+			Data:                maxPayload,
+			TokenAmounts:        tokens,
+			FeeToken:            tokens[0].Token,
+			MessageId:           utils.Keccak256Fixed([]byte(`MyError(uint256)`)),
 		}
 
 		// Unfortunately have to do this to use the helper's gethwrappers.
 		helperMsgs = append(helperMsgs, evm_2_evm_onramp.InternalEVM2EVMMessage{
-			SourceChainId:  message.SourceChainId,
-			SequenceNumber: message.SequenceNumber,
-			FeeTokenAmount: message.FeeTokenAmount,
-			Sender:         message.Sender,
-			Nonce:          message.Nonce,
-			GasLimit:       message.GasLimit,
-			Strict:         message.Strict,
-			Receiver:       message.Receiver,
-			Data:           message.Data,
-			TokenAmounts:   message.TokenAmounts,
-			FeeToken:       message.FeeToken,
-			MessageId:      message.MessageId,
+			SourceChainSelector: message.SourceChainSelector,
+			SequenceNumber:      message.SequenceNumber,
+			FeeTokenAmount:      message.FeeTokenAmount,
+			Sender:              message.Sender,
+			Nonce:               message.Nonce,
+			GasLimit:            message.GasLimit,
+			Strict:              message.Strict,
+			Receiver:            message.Receiver,
+			Data:                message.Data,
+			TokenAmounts:        message.TokenAmounts,
+			FeeToken:            message.FeeToken,
+			MessageId:           message.MessageId,
 		})
 
 		var offchainTokenData [][]byte

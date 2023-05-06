@@ -153,8 +153,8 @@ func deploySourceCcipContracts(
 				UsdPerToken: big.NewInt(6e18), // $6
 			},
 		},
-		DestChainId:   destChainID,
-		UsdPerUnitGas: big.NewInt(2000e9), // $2000
+		DestChainSelector: destChainID,
+		UsdPerUnitGas:     big.NewInt(2000e9), // $2000
 	}, []common.Address{}, []common.Address{sourceFeeTokenAddress}, uint32(time.Hour.Seconds())) // 1h
 	require.NoError(t, err)
 	sourceClient.Commit()
@@ -165,8 +165,8 @@ func deploySourceCcipContracts(
 		sourceClient,
 		evm_2_evm_onramp.EVM2EVMOnRampStaticConfig{
 			LinkToken:         sourceFeeTokenAddress,
-			ChainId:           sourceClient.Blockchain().Config().ChainID.Uint64(),
-			DestChainId:       destChainID,
+			ChainSelector:     sourceClient.Blockchain().Config().ChainID.Uint64(),
+			DestChainSelector: destChainID,
 			DefaultTxGasLimit: 200_000,
 		},
 		evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
@@ -235,8 +235,8 @@ func deployDestCcipContracts(
 				UsdPerToken: big.NewInt(8e18), // $8
 			},
 		},
-		DestChainId:   sourceChainID,
-		UsdPerUnitGas: big.NewInt(2000e9), // $2000
+		DestChainSelector: sourceChainID,
+		UsdPerUnitGas:     big.NewInt(2000e9), // $2000
 	}, []common.Address{}, []common.Address{destFeeTokenAddress}, uint32(time.Hour.Seconds())) // 1h
 	require.NoError(t, err)
 	destClient.Commit()
@@ -248,9 +248,9 @@ func deployDestCcipContracts(
 		owner,      // user
 		destClient, // client
 		commit_store_helper.CommitStoreStaticConfig{
-			ChainId:       destClient.Blockchain().Config().ChainID.Uint64(),
-			SourceChainId: sourceChainID,
-			OnRamp:        onRampAddress,
+			ChainSelector:       destClient.Blockchain().Config().ChainID.Uint64(),
+			SourceChainSelector: sourceChainID,
+			OnRamp:              onRampAddress,
 		},
 	)
 	require.NoError(t, err)
@@ -273,10 +273,10 @@ func deployDestCcipContracts(
 		owner,
 		destClient,
 		evm_2_evm_offramp.EVM2EVMOffRampStaticConfig{
-			CommitStore:   commitStoreHelper.Address(),
-			ChainId:       destClient.Blockchain().Config().ChainID.Uint64(),
-			SourceChainId: sourceChainID,
-			OnRamp:        onRampAddress,
+			CommitStore:         commitStoreHelper.Address(),
+			ChainSelector:       destClient.Blockchain().Config().ChainID.Uint64(),
+			SourceChainSelector: sourceChainID,
+			OnRamp:              onRampAddress,
 		},
 		[]common.Address{sourceFeeTokenAddress},
 		[]common.Address{destPool.Address()},

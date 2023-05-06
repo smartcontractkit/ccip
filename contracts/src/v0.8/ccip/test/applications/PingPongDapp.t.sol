@@ -31,7 +31,7 @@ contract PingPongDappSetup is EVM2EVMOnRampSetup {
 
 /// @notice #startPingPong
 contract PingPong_startPingPong is PingPongDappSetup {
-  event ConfigPropagated(uint64 chainId, address contractAddress);
+  event ConfigPropagated(uint64 chainSelector, address contractAddress);
 
   function testStartPingPongSuccess() public {
     uint256 pingPongNumber = 1;
@@ -50,7 +50,7 @@ contract PingPong_startPingPong is PingPongDappSetup {
     Internal.EVM2EVMMessage memory message = Internal.EVM2EVMMessage({
       sequenceNumber: 1,
       feeTokenAmount: expectedFee,
-      sourceChainId: SOURCE_CHAIN_ID,
+      sourceChainSelector: SOURCE_CHAIN_ID,
       sender: address(s_pingPong),
       receiver: i_pongContract,
       nonce: 1,
@@ -98,10 +98,10 @@ contract PingPong_ccipReceive is PingPongDappSetup {
 }
 
 contract PingPong_plumbing is PingPongDappSetup {
-  function testCounterPartChainIdSuccess(uint64 chainId) public {
-    s_pingPong.setCounterpartChainId(chainId);
+  function testCounterPartChainSelectorSuccess(uint64 chainSelector) public {
+    s_pingPong.setCounterpartChainSelector(chainSelector);
 
-    assertEq(s_pingPong.getCounterpartChainId(), chainId);
+    assertEq(s_pingPong.getCounterpartChainSelector(), chainSelector);
   }
 
   function testCounterPartAddressSuccess(address counterpartAddress) public {
@@ -110,11 +110,11 @@ contract PingPong_plumbing is PingPongDappSetup {
     assertEq(s_pingPong.getCounterpartAddress(), counterpartAddress);
   }
 
-  function testCounterPartAddressSuccess(uint64 chainId, address counterpartAddress) public {
-    s_pingPong.setCounterpart(chainId, counterpartAddress);
+  function testCounterPartAddressSuccess(uint64 chainSelector, address counterpartAddress) public {
+    s_pingPong.setCounterpart(chainSelector, counterpartAddress);
 
     assertEq(s_pingPong.getCounterpartAddress(), counterpartAddress);
-    assertEq(s_pingPong.getCounterpartChainId(), chainId);
+    assertEq(s_pingPong.getCounterpartChainSelector(), chainSelector);
   }
 
   function testPausingSuccess() public {

@@ -14,26 +14,26 @@ import (
 )
 
 func TestHasher(t *testing.T) {
-	sourceChainId, destChainId := uint64(1), uint64(4)
+	sourceChainSelector, destChainSelector := uint64(1), uint64(4)
 	onRampAddress := common.HexToAddress("0x5550000000000000000000000000000000000001")
 
 	hashingCtx := NewKeccakCtx()
 
-	hasher := NewLeafHasher(sourceChainId, destChainId, onRampAddress, hashingCtx)
+	hasher := NewLeafHasher(sourceChainSelector, destChainSelector, onRampAddress, hashingCtx)
 
 	message := evm_2_evm_onramp.InternalEVM2EVMMessage{
-		SourceChainId:  sourceChainId,
-		SequenceNumber: 1337,
-		FeeTokenAmount: big.NewInt(1),
-		Sender:         common.HexToAddress("0x1110000000000000000000000000000000000001"),
-		Nonce:          1337,
-		GasLimit:       big.NewInt(100),
-		Strict:         false,
-		Receiver:       common.HexToAddress("0x2220000000000000000000000000000000000001"),
-		Data:           []byte{},
-		TokenAmounts:   []evm_2_evm_onramp.ClientEVMTokenAmount{{Token: common.HexToAddress("0x4440000000000000000000000000000000000001"), Amount: big.NewInt(12345678900)}},
-		FeeToken:       common.Address{},
-		MessageId:      [32]byte{},
+		SourceChainSelector: sourceChainSelector,
+		SequenceNumber:      1337,
+		FeeTokenAmount:      big.NewInt(1),
+		Sender:              common.HexToAddress("0x1110000000000000000000000000000000000001"),
+		Nonce:               1337,
+		GasLimit:            big.NewInt(100),
+		Strict:              false,
+		Receiver:            common.HexToAddress("0x2220000000000000000000000000000000000001"),
+		Data:                []byte{},
+		TokenAmounts:        []evm_2_evm_onramp.ClientEVMTokenAmount{{Token: common.HexToAddress("0x4440000000000000000000000000000000000001"), Amount: big.NewInt(12345678900)}},
+		FeeToken:            common.Address{},
+		MessageId:           [32]byte{},
 	}
 
 	hash, err := hasher.HashLeaf(generateLog(t, message))
@@ -43,15 +43,15 @@ func TestHasher(t *testing.T) {
 	require.Equal(t, "26f282c6ac8231933b1799648d01ff6cec792a33fb37408b4d135968f9168ace", hex.EncodeToString(hash[:]))
 
 	message = evm_2_evm_onramp.InternalEVM2EVMMessage{
-		SourceChainId:  sourceChainId,
-		SequenceNumber: 1337,
-		FeeTokenAmount: big.NewInt(1e12),
-		Sender:         common.HexToAddress("0x1110000000000000000000000000000000000001"),
-		Nonce:          1337,
-		GasLimit:       big.NewInt(100),
-		Strict:         false,
-		Receiver:       common.HexToAddress("0x2220000000000000000000000000000000000001"),
-		Data:           []byte("foo bar baz"),
+		SourceChainSelector: sourceChainSelector,
+		SequenceNumber:      1337,
+		FeeTokenAmount:      big.NewInt(1e12),
+		Sender:              common.HexToAddress("0x1110000000000000000000000000000000000001"),
+		Nonce:               1337,
+		GasLimit:            big.NewInt(100),
+		Strict:              false,
+		Receiver:            common.HexToAddress("0x2220000000000000000000000000000000000001"),
+		Data:                []byte("foo bar baz"),
 		TokenAmounts: []evm_2_evm_onramp.ClientEVMTokenAmount{
 			{Token: common.HexToAddress("0x4440000000000000000000000000000000000001"), Amount: big.NewInt(12345678900)},
 			{Token: common.HexToAddress("0x6660000000000000000000000000000000000001"), Amount: big.NewInt(4204242)},
@@ -78,9 +78,9 @@ func generateLog(t *testing.T, message evm_2_evm_onramp.InternalEVM2EVMMessage) 
 }
 
 func TestMetaDataHash(t *testing.T) {
-	sourceChainId, destChainId := uint64(1), uint64(4)
+	sourceChainSelector, destChainSelector := uint64(1), uint64(4)
 	onRampAddress := common.HexToAddress("0x5550000000000000000000000000000000000001")
 	ctx := NewKeccakCtx()
-	hash := getMetaDataHash(ctx, ctx.Hash([]byte("EVM2EVMSubscriptionMessagePlus")), sourceChainId, onRampAddress, destChainId)
+	hash := getMetaDataHash(ctx, ctx.Hash([]byte("EVM2EVMSubscriptionMessagePlus")), sourceChainSelector, onRampAddress, destChainSelector)
 	require.Equal(t, "e8b93c9d01a7a72ec6c7235e238701cf1511b267a31fdb78dd342649ee58c08d", hex.EncodeToString(hash[:]))
 }

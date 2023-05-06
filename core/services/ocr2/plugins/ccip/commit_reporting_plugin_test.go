@@ -56,16 +56,16 @@ func setupCommitTestHarness(t *testing.T) commitTestHarness {
 
 	plugin := CommitReportingPlugin{
 		config: CommitPluginConfig{
-			lggr:               th.lggr,
-			sourceLP:           th.sourceLP,
-			destLP:             th.destLP,
-			onRamp:             th.onRamp,
-			commitStore:        th.commitStore,
-			priceGetter:        fakePriceGetter{},
-			sourceNative:       utils.RandomAddress(),
-			sourceFeeEstimator: sourceFeeEstimator,
-			sourceChainID:      th.sourceChainID,
-			leafHasher:         hasher.NewLeafHasher(th.sourceChainID, th.destChainID, th.onRamp.Address(), hasher.NewKeccakCtx()),
+			lggr:                th.lggr,
+			sourceLP:            th.sourceLP,
+			destLP:              th.destLP,
+			onRamp:              th.onRamp,
+			commitStore:         th.commitStore,
+			priceGetter:         fakePriceGetter{},
+			sourceNative:        utils.RandomAddress(),
+			sourceFeeEstimator:  sourceFeeEstimator,
+			sourceChainSelector: th.sourceChainID,
+			leafHasher:          hasher.NewLeafHasher(th.sourceChainID, th.destChainID, th.onRamp.Address(), hasher.NewKeccakCtx()),
 		},
 		inFlight: map[[32]byte]InflightReport{},
 		offchainConfig: ccipconfig.CommitOffchainConfig{
@@ -94,7 +94,7 @@ func TestCommitReportSize(t *testing.T) {
 		copy(root32[:], root)
 		rep, err := EncodeCommitReport(&commit_store.CommitStoreCommitReport{MerkleRoot: root32, Interval: commit_store.CommitStoreInterval{Min: min, Max: max}, PriceUpdates: commit_store.InternalPriceUpdates{
 			TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{},
-			DestChainId:       1337,
+			DestChainSelector: 1337,
 			UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
 		}})
 		require.NoError(t, err)
@@ -120,8 +120,8 @@ func TestCommitReportEncoding(t *testing.T) {
 					UsdPerToken: newTokenPrice,
 				},
 			},
-			DestChainId:   th.sourceChainID,
-			UsdPerUnitGas: newGasPrice,
+			DestChainSelector: th.sourceChainID,
+			UsdPerUnitGas:     newGasPrice,
 		},
 		MerkleRoot: tree.Root(),
 		Interval:   commit_store.CommitStoreInterval{Min: 1, Max: 10},
@@ -274,7 +274,7 @@ func TestReport(t *testing.T) {
 				Interval:   commit_store.CommitStoreInterval{Min: 1, Max: 1},
 				PriceUpdates: commit_store.InternalPriceUpdates{
 					TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{},
-					DestChainId:       0,
+					DestChainSelector: 0,
 					UsdPerUnitGas:     new(big.Int),
 				},
 			},
@@ -471,7 +471,7 @@ func TestCommitReportToEthTxMeta(t *testing.T) {
 			report := commit_store.CommitStoreCommitReport{
 				PriceUpdates: commit_store.InternalPriceUpdates{
 					TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{},
-					DestChainId:       uint64(1337),
+					DestChainSelector: uint64(1337),
 					UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
 				},
 				MerkleRoot: tree.Root(),
@@ -565,7 +565,7 @@ func TestGeneratePriceUpdates(t *testing.T) {
 				// update gasPrice in priceRegistry
 				_, err = th.priceRegistry.UpdatePrices(th.owner, price_registry.InternalPriceUpdates{
 					TokenPriceUpdates: tokenPriceUpdates,
-					DestChainId:       destChainID,
+					DestChainSelector: destChainID,
 					UsdPerUnitGas:     tt.updateGasPriceUSD,
 				})
 				require.NoError(t, err)
@@ -596,8 +596,8 @@ func TestShouldTransmitAcceptedReport(t *testing.T) {
 		TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
 			{SourceToken: th.destFeeTokenAddress, UsdPerToken: tokenPrice},
 		},
-		DestChainId:   th.sourceChainID,
-		UsdPerUnitGas: gasPrice,
+		DestChainSelector: th.sourceChainID,
+		UsdPerUnitGas:     gasPrice,
 	})
 	require.NoError(t, err)
 	th.flushLogs(t)
@@ -644,7 +644,7 @@ func TestShouldTransmitAcceptedReport(t *testing.T) {
 			report, err := EncodeCommitReport(&commit_store.CommitStoreCommitReport{
 				PriceUpdates: commit_store.InternalPriceUpdates{
 					TokenPriceUpdates: tokenPrices,
-					DestChainId:       destChainID,
+					DestChainSelector: destChainID,
 					UsdPerUnitGas:     gasPrice,
 				},
 				MerkleRoot: root,
@@ -690,7 +690,7 @@ func TestShouldAcceptFinalizedReport(t *testing.T) {
 			report, err := EncodeCommitReport(&commit_store.CommitStoreCommitReport{
 				PriceUpdates: commit_store.InternalPriceUpdates{
 					TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{},
-					DestChainId:       0,
+					DestChainSelector: 0,
 					UsdPerUnitGas:     new(big.Int),
 				},
 				MerkleRoot: root,

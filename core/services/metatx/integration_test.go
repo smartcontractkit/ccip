@@ -185,8 +185,8 @@ func TestMetaERC20CrossChain(t *testing.T) {
 				UsdPerToken: big.NewInt(1e18), // 1usd
 			},
 		},
-		DestChainId:   ccipContracts.Dest.ChainID,
-		UsdPerUnitGas: big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9,
+		DestChainSelector: ccipContracts.Dest.ChainID,
+		UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9,
 	})
 	require.NoError(t, err)
 	ccipContracts.Source.Chain.Commit()
@@ -212,8 +212,8 @@ func TestMetaERC20CrossChain(t *testing.T) {
 				UsdPerToken: big.NewInt(5),
 			},
 		},
-		DestChainId:   0,
-		UsdPerUnitGas: big.NewInt(0),
+		DestChainSelector: 0,
+		UsdPerUnitGas:     big.NewInt(0),
 	})
 	require.NoError(t, err)
 	ccipContracts.Source.Chain.Commit()
@@ -235,8 +235,8 @@ func TestMetaERC20CrossChain(t *testing.T) {
 				UsdPerToken: big.NewInt(5),
 			},
 		},
-		DestChainId:   0,
-		UsdPerUnitGas: big.NewInt(0),
+		DestChainSelector: 0,
+		UsdPerUnitGas:     big.NewInt(0),
 	})
 	require.NoError(t, err)
 	ccipContracts.Dest.Chain.Commit()
@@ -370,7 +370,7 @@ func generateMetaTransferCalldata(t *testing.T, receiver common.Address, amount 
 				"type": "uint256"
 			}, {
 				"internalType": "uint64",
-				"name": "destinationChainId",
+				"name": "destinationChainSelector",
 				"type": "uint64"
 			}],
 			"name": "metaTransfer",

@@ -12,7 +12,7 @@ import {IERC20} from "../../../../vendor/IERC20.sol";
 /// @title FacadeClient - A simple proxy for calling Router
 contract FacadeClient {
   address private immutable i_router;
-  uint64 private immutable i_destChainId;
+  uint64 private immutable i_destChainSelector;
   IERC20 private immutable i_sourceToken;
   IERC20 private immutable i_feeToken;
 
@@ -20,12 +20,12 @@ contract FacadeClient {
 
   constructor(
     address router,
-    uint64 destChainId,
+    uint64 destChainSelector,
     IERC20 sourceToken,
     IERC20 feeToken
   ) {
     i_router = router;
-    i_destChainId = destChainId;
+    i_destChainSelector = destChainSelector;
     i_sourceToken = sourceToken;
     i_feeToken = feeToken;
 
@@ -50,7 +50,7 @@ contract FacadeClient {
 
     s_msg_sequence++;
 
-    IRouterClient(i_router).ccipSend(i_destChainId, message);
+    IRouterClient(i_router).ccipSend(i_destChainSelector, message);
   }
 
   function getSequence() public view returns (uint256) {

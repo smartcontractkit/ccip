@@ -67,8 +67,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
   /// @dev Struct that contains the static configuration
   struct StaticConfig {
     address linkToken; // --------┐ Link token address
-    uint64 chainId; // -----------┘ Source chain Id
-    uint64 destChainId; // -------┐ Destination chain Id
+    uint64 chainSelector; // -----------┘ Source chainSelector
+    uint64 destChainSelector; // -------┐ Destination chainSelector
     uint64 defaultTxGasLimit; // -┘ Default gas limit for a tx
   }
 
@@ -136,9 +136,9 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
   /// @dev The link token address - known to pay nops for their work
   address internal immutable i_linkToken;
   /// @dev The chain ID of the source chain that this contract is deployed to
-  uint64 internal immutable i_chainId;
+  uint64 internal immutable i_chainSelector;
   /// @dev The chain ID of the destination chain
-  uint64 internal immutable i_destChainId;
+  uint64 internal immutable i_destChainSelector;
   /// @dev the maximum number of nops that can be configured at the same time.
   uint256 private constant MAX_NUMBER_OF_NOPS = 64;
 
@@ -183,17 +183,22 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
   ) Pausable() AggregateRateLimiter(rateLimiterConfig) {
     if (
       staticConfig.linkToken == address(0) ||
-      staticConfig.chainId == 0 ||
-      staticConfig.destChainId == 0 ||
+      staticConfig.chainSelector == 0 ||
+      staticConfig.destChainSelector == 0 ||
       staticConfig.defaultTxGasLimit == 0
     ) revert InvalidConfig();
 
     i_metadataHash = keccak256(
-      abi.encode(Internal.EVM_2_EVM_MESSAGE_HASH, staticConfig.chainId, staticConfig.destChainId, address(this))
+      abi.encode(
+        Internal.EVM_2_EVM_MESSAGE_HASH,
+        staticConfig.chainSelector,
+        staticConfig.destChainSelector,
+        address(this)
+      )
     );
     i_linkToken = staticConfig.linkToken;
-    i_chainId = staticConfig.chainId;
-    i_destChainId = staticConfig.destChainId;
+    i_chainSelector = staticConfig.chainSelector;
+    i_destChainSelector = staticConfig.destChainSelector;
     i_defaultTxGasLimit = staticConfig.defaultTxGasLimit;
 
     _setDynamicConfig(dynamicConfig);
@@ -258,7 +263,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
 
     // We need the next available sequence number so we increment before we use the value
     Internal.EVM2EVMMessage memory newMessage = Internal.EVM2EVMMessage({
-      sourceChainId: i_chainId,
+      sourceChainSelector: i_chainSelector,
       sequenceNumber: ++s_sequenceNumber,
       feeTokenAmount: feeTokenAmount,
       sender: originalSender,
@@ -281,7 +286,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
         originalSender,
         message.receiver,
         tokenAndAmount.amount,
-        i_destChainId,
+        i_destChainSelector,
         bytes("") // any future extraArgs component would be added here
       );
     }
@@ -333,8 +338,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
     return
       StaticConfig({
         linkToken: i_linkToken,
-        chainId: i_chainId,
-        destChainId: i_destChainId,
+        chainSelector: i_chainSelector,
+        destChainSelector: i_destChainSelector,
         defaultTxGasLimit: i_defaultTxGasLimit
       });
   }
@@ -362,8 +367,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
     emit ConfigSet(
       StaticConfig({
         linkToken: i_linkToken,
-        chainId: i_chainId,
-        destChainId: i_destChainId,
+        chainSelector: i_chainSelector,
+        destChainSelector: i_destChainSelector,
         defaultTxGasLimit: i_defaultTxGasLimit
       }),
       dynamicConfig
@@ -433,7 +438,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
     uint256 gasLimit = _fromBytes(extraArgs).gasLimit;
     (uint192 feeTokenPrice, uint192 gasPrice) = IPriceRegistry(s_dynamicConfig.priceRegistry).getFeeTokenAndGasPrices(
       feeToken,
-      i_destChainId
+      i_destChainSelector
     );
     FeeTokenConfig memory feeTokenConfig = s_feeTokenConfig[feeToken];
 

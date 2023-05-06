@@ -20,8 +20,8 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
   function testConstructorSuccess() public {
     EVM2EVMOffRamp.StaticConfig memory staticConfig = EVM2EVMOffRamp.StaticConfig({
       commitStore: address(s_mockCommitStore),
-      chainId: DEST_CHAIN_ID,
-      sourceChainId: SOURCE_CHAIN_ID,
+      chainSelector: DEST_CHAIN_ID,
+      sourceChainSelector: SOURCE_CHAIN_ID,
       onRamp: ON_RAMP_ADDRESS
     });
     EVM2EVMOffRamp.DynamicConfig memory dynamicConfig = generateDynamicOffRampConfig(
@@ -52,8 +52,8 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
     // Static config
     EVM2EVMOffRamp.StaticConfig memory gotStaticConfig = s_offRamp.getStaticConfig();
     assertEq(staticConfig.commitStore, gotStaticConfig.commitStore);
-    assertEq(staticConfig.sourceChainId, gotStaticConfig.sourceChainId);
-    assertEq(staticConfig.chainId, gotStaticConfig.chainId);
+    assertEq(staticConfig.sourceChainSelector, gotStaticConfig.sourceChainSelector);
+    assertEq(staticConfig.chainSelector, gotStaticConfig.chainSelector);
     assertEq(staticConfig.onRamp, gotStaticConfig.onRamp);
 
     // Dynamic config
@@ -87,8 +87,8 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
     s_offRamp = new EVM2EVMOffRampHelper(
       EVM2EVMOffRamp.StaticConfig({
         commitStore: address(s_mockCommitStore),
-        chainId: DEST_CHAIN_ID,
-        sourceChainId: SOURCE_CHAIN_ID,
+        chainSelector: DEST_CHAIN_ID,
+        sourceChainSelector: SOURCE_CHAIN_ID,
         onRamp: ON_RAMP_ADDRESS
       }),
       wrongTokens,
@@ -109,8 +109,8 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
     s_offRamp = new EVM2EVMOffRampHelper(
       EVM2EVMOffRamp.StaticConfig({
         commitStore: address(s_mockCommitStore),
-        chainId: DEST_CHAIN_ID,
-        sourceChainId: SOURCE_CHAIN_ID,
+        chainSelector: DEST_CHAIN_ID,
+        sourceChainSelector: SOURCE_CHAIN_ID,
         onRamp: ZERO_ADDRESS
       }),
       getCastedSourceTokens(),
@@ -127,8 +127,8 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
     s_offRamp = new EVM2EVMOffRampHelper(
       EVM2EVMOffRamp.StaticConfig({
         commitStore: address(s_mockCommitStore),
-        chainId: DEST_CHAIN_ID,
-        sourceChainId: SOURCE_CHAIN_ID,
+        chainSelector: DEST_CHAIN_ID,
+        sourceChainSelector: SOURCE_CHAIN_ID,
         onRamp: ON_RAMP_ADDRESS
       }),
       getCastedSourceTokens(),
@@ -487,7 +487,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
 
   function testInvalidSourceChainReverts() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
-    messages[0].sourceChainId = SOURCE_CHAIN_ID + 1;
+    messages[0].sourceChainSelector = SOURCE_CHAIN_ID + 1;
 
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.InvalidSourceChain.selector, SOURCE_CHAIN_ID + 1));
     s_offRamp.execute(_generateReportFromMessages(messages), false);

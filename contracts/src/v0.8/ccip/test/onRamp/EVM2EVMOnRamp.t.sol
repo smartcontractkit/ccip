@@ -12,8 +12,8 @@ contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
   function testConstructorSuccess() public {
     EVM2EVMOnRamp.StaticConfig memory staticConfig = EVM2EVMOnRamp.StaticConfig({
       linkToken: s_sourceTokens[0],
-      chainId: SOURCE_CHAIN_ID,
-      destChainId: DEST_CHAIN_ID,
+      chainSelector: SOURCE_CHAIN_ID,
+      destChainSelector: DEST_CHAIN_ID,
       defaultTxGasLimit: GAS_LIMIT
     });
     EVM2EVMOnRamp.DynamicConfig memory dynamicConfig = generateDynamicOnRampConfig(
@@ -42,8 +42,8 @@ contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
     EVM2EVMOnRamp.StaticConfig memory gotStaticConfig = s_onRamp.getStaticConfig();
 
     assertEq(staticConfig.linkToken, gotStaticConfig.linkToken);
-    assertEq(staticConfig.chainId, gotStaticConfig.chainId);
-    assertEq(staticConfig.destChainId, gotStaticConfig.destChainId);
+    assertEq(staticConfig.chainSelector, gotStaticConfig.chainSelector);
+    assertEq(staticConfig.destChainSelector, gotStaticConfig.destChainSelector);
     assertEq(staticConfig.defaultTxGasLimit, gotStaticConfig.defaultTxGasLimit);
 
     EVM2EVMOnRamp.DynamicConfig memory gotDynamicConfig = s_onRamp.getDynamicConfig();
@@ -460,7 +460,7 @@ contract EVM2EVMOnRamp_getFeeSetup is EVM2EVMOnRampSetup {
     s_feeTokenPrices = tokenPrices;
 
     Internal.PriceUpdates memory priceUpdates = getPriceUpdatesStruct(pricedTokens, tokenPrices);
-    priceUpdates.destChainId = DEST_CHAIN_ID;
+    priceUpdates.destChainSelector = DEST_CHAIN_ID;
     priceUpdates.usdPerUnitGas = USD_PER_GAS;
     s_priceRegistry.updatePrices(priceUpdates);
 

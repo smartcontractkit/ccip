@@ -19,7 +19,7 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
   error NotAFeeToken(address token);
   error ChainNotSupported(uint64 chain);
   error OnlyCallableByUpdaterOrOwner();
-  error StaleGasPrice(uint64 destChainId, uint256 threshold, uint256 timePassed);
+  error StaleGasPrice(uint64 destChainSelector, uint256 threshold, uint256 timePassed);
   error StaleTokenPrice(address token, uint256 threshold, uint256 timePassed);
   error InvalidStalenessThreshold();
 
@@ -35,7 +35,7 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
   ///     Very Expensive:   1 unit of gas costs 1 USD                  -> 1e18
   ///     Expensive:        1 unit of gas costs 0.1 USD                -> 1e17
   ///     Cheap:            1 unit of gas costs 0.000001 USD           -> 1e12
-  mapping(uint64 => Internal.TimestampedUint192Value) private s_usdPerUnitGasByDestChainId;
+  mapping(uint64 => Internal.TimestampedUint192Value) private s_usdPerUnitGasByDestChainSelector;
 
   /// @dev The price, in USD with 18 decimals, per 1e18 of the smallest token denomination.
   /// @dev Price of 1e18 represents 1 USD per 1e18 token amount.
@@ -100,16 +100,16 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
   }
 
   // @inheritdoc IPriceRegistry
-  function getDestinationChainGasPrice(uint64 destChainId)
+  function getDestinationChainGasPrice(uint64 destChainSelector)
     external
     view
     override
     returns (Internal.TimestampedUint192Value memory)
   {
-    return s_usdPerUnitGasByDestChainId[destChainId];
+    return s_usdPerUnitGasByDestChainSelector[destChainSelector];
   }
 
-  function getFeeTokenAndGasPrices(address feeToken, uint64 destChainId)
+  function getFeeTokenAndGasPrices(address feeToken, uint64 destChainSelector)
     external
     view
     override
@@ -117,11 +117,11 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
   {
     if (!s_feeTokens.contains(feeToken)) revert NotAFeeToken(feeToken);
 
-    Internal.TimestampedUint192Value memory gasPrice = s_usdPerUnitGasByDestChainId[destChainId];
+    Internal.TimestampedUint192Value memory gasPrice = s_usdPerUnitGasByDestChainSelector[destChainSelector];
     // We do allow a gas price of 0, but no stale or unset gas prices
-    if (gasPrice.timestamp == 0) revert ChainNotSupported(destChainId);
+    if (gasPrice.timestamp == 0) revert ChainNotSupported(destChainSelector);
     uint256 timePassed = block.timestamp - gasPrice.timestamp;
-    if (timePassed > i_stalenessThreshold) revert StaleGasPrice(destChainId, i_stalenessThreshold, timePassed);
+    if (timePassed > i_stalenessThreshold) revert StaleGasPrice(destChainSelector, i_stalenessThreshold, timePassed);
 
     return (_getValidatedTokenPrice(feeToken), gasPrice.value);
   }
@@ -219,12 +219,12 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
       emit UsdPerTokenUpdated(update.sourceToken, update.usdPerToken, block.timestamp);
     }
 
-    if (priceUpdates.destChainId != 0) {
-      s_usdPerUnitGasByDestChainId[priceUpdates.destChainId] = Internal.TimestampedUint192Value({
+    if (priceUpdates.destChainSelector != 0) {
+      s_usdPerUnitGasByDestChainSelector[priceUpdates.destChainSelector] = Internal.TimestampedUint192Value({
         value: priceUpdates.usdPerUnitGas,
         timestamp: uint64(block.timestamp)
       });
-      emit UsdPerUnitGasUpdated(priceUpdates.destChainId, priceUpdates.usdPerUnitGas, block.timestamp);
+      emit UsdPerUnitGasUpdated(priceUpdates.destChainSelector, priceUpdates.usdPerUnitGas, block.timestamp);
     }
   }
 

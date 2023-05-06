@@ -5,7 +5,7 @@ import {OCR2Base} from "../../ocr/OCR2Base.sol";
 
 contract OCR2Helper is OCR2Base {
   function configDigestFromConfigData(
-    uint256 chainId,
+    uint256 chainSelector,
     address contractAddress,
     uint64 configCount,
     address[] memory signers,
@@ -17,7 +17,7 @@ contract OCR2Helper is OCR2Base {
   ) public pure returns (bytes32) {
     return
       _configDigestFromConfigData(
-        chainId,
+        chainSelector,
         contractAddress,
         configCount,
         signers,

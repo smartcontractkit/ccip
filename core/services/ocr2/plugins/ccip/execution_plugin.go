@@ -55,7 +55,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	if err != nil {
 		return nil, err
 	}
-	sourceChain, err := chainSet.Get(big.NewInt(0).SetUint64(offRampConfig.SourceChainId))
+	sourceChain, err := chainSet.Get(big.NewInt(0).SetUint64(uint64(pluginConfig.SourceEvmChainId)))
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to open source chain")
 	}
@@ -84,7 +84,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 		return nil, errors.Wrap(err, "could not create source price registry")
 	}
 
-	lggr = lggr.With("srcChain", ChainName(int64(offRampConfig.SourceChainId)), "dstChain", ChainName(destChainID))
+	lggr = lggr.With("srcChain", ChainName(int64(pluginConfig.SourceEvmChainId)), "dstChain", ChainName(destChainID))
 
 	wrappedPluginFactory := NewExecutionReportingPluginFactory(
 		ExecutionPluginConfig{
@@ -98,7 +98,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 			srcWrappedNativeToken: sourceWrappedNative,
 			destClient:            destChain.Client(),
 			destGasEstimator:      destChain.GasEstimator(),
-			leafHasher:            hasher.NewLeafHasher(offRampConfig.SourceChainId, uint64(destChainID), onRamp.Address(), hasher.NewKeccakCtx()),
+			leafHasher:            hasher.NewLeafHasher(offRampConfig.SourceChainSelector, offRampConfig.ChainSelector, onRamp.Address(), hasher.NewKeccakCtx()),
 		})
 
 	// Subscribe to all relevant logs.
@@ -145,7 +145,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 
 	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPExecution", string(spec.Relay), destChain.ID())
 	argsNoPlugin.Logger = logger.NewOCRWrapper(lggr.Named("CCIPExecution").With(
-		"srcChain", ChainName(int64(offRampConfig.SourceChainId)), "dstChain", ChainName(destChainID)), true, logError)
+		"srcChain", ChainName(pluginConfig.SourceEvmChainId), "dstChain", ChainName(destChainID)), true, logError)
 	oracle, err := libocr2.NewOracle(argsNoPlugin)
 	if err != nil {
 		return nil, err

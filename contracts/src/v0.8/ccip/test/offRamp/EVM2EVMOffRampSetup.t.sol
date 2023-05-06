@@ -58,8 +58,8 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     s_offRamp = new EVM2EVMOffRampHelper(
       EVM2EVMOffRamp.StaticConfig({
         commitStore: address(commitStore),
-        chainId: DEST_CHAIN_ID,
-        sourceChainId: SOURCE_CHAIN_ID,
+        chainSelector: DEST_CHAIN_ID,
+        sourceChainSelector: SOURCE_CHAIN_ID,
         onRamp: ON_RAMP_ADDRESS
       }),
       getCastedSourceTokens(),
@@ -107,7 +107,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     return
       Client.Any2EVMMessage({
         messageId: original.messageId,
-        sourceChainSelector: original.sourceChainId,
+        sourceChainSelector: original.sourceChainSelector,
         sender: abi.encode(original.sender),
         data: original.data,
         destTokenAmounts: destTokenAmounts
@@ -146,7 +146,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
       nonce: sequenceNumber,
       gasLimit: GAS_LIMIT,
       strict: false,
-      sourceChainId: SOURCE_CHAIN_ID,
+      sourceChainSelector: SOURCE_CHAIN_ID,
       receiver: address(s_receiver),
       data: data,
       tokenAmounts: tokenAmounts,

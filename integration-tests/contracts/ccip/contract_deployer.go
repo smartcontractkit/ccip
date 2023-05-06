@@ -194,7 +194,7 @@ func (e *CCIPContractsDeployer) NewCommitStore(addr common.Address) (
 	}, err
 }
 
-func (e *CCIPContractsDeployer) DeployCommitStore(sourceChainId, destChainId uint64, afn, onRamp, priceRegistry common.Address) (*CommitStore, error) {
+func (e *CCIPContractsDeployer) DeployCommitStore(sourceChainSelector, destChainSelector uint64, afn, onRamp, priceRegistry common.Address) (*CommitStore, error) {
 	address, _, instance, err := e.evmClient.DeployContract("CommitStore Contract", func(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
@@ -203,9 +203,9 @@ func (e *CCIPContractsDeployer) DeployCommitStore(sourceChainId, destChainId uin
 			auth,
 			backend,
 			commit_store.CommitStoreStaticConfig{
-				ChainId:       destChainId,
-				SourceChainId: sourceChainId,
-				OnRamp:        onRamp,
+				ChainSelector:       destChainSelector,
+				SourceChainSelector: sourceChainSelector,
+				OnRamp:              onRamp,
 			},
 		)
 	})
@@ -381,7 +381,7 @@ func (e *CCIPContractsDeployer) NewOnRamp(addr common.Address) (
 }
 
 func (e *CCIPContractsDeployer) DeployOnRamp(
-	sourceChainId, destChainId uint64,
+	sourceChainSelector, destChainSelector uint64,
 	allowList []common.Address,
 	tokensAndPools []evm_2_evm_onramp.EVM2EVMOnRampTokenAndPool,
 	afn, router, priceRegistry common.Address,
@@ -402,8 +402,8 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 			backend,
 			evm_2_evm_onramp.EVM2EVMOnRampStaticConfig{
 				LinkToken:         linkTokenAddress,
-				ChainId:           sourceChainId, // source chain id
-				DestChainId:       destChainId,   // destinationChainId
+				ChainSelector:     sourceChainSelector, // source chain id
+				DestChainSelector: destChainSelector,   // destinationChainSelector
 				DefaultTxGasLimit: 200_000,
 			},
 			evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
@@ -453,7 +453,7 @@ func (e *CCIPContractsDeployer) NewOffRamp(addr common.Address) (
 	}, err
 }
 
-func (e *CCIPContractsDeployer) DeployOffRamp(sourceChainId, destChainId uint64, commitStore, onRamp, afn, destRouter common.Address, sourceToken, pools []common.Address, opts RateLimiterConfig) (*OffRamp, error) {
+func (e *CCIPContractsDeployer) DeployOffRamp(sourceChainSelector, destChainSelector uint64, commitStore, onRamp, afn, destRouter common.Address, sourceToken, pools []common.Address, opts RateLimiterConfig) (*OffRamp, error) {
 	address, _, instance, err := e.evmClient.DeployContract("OffRamp Contract", func(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
@@ -462,10 +462,10 @@ func (e *CCIPContractsDeployer) DeployOffRamp(sourceChainId, destChainId uint64,
 			auth,
 			backend,
 			evm_2_evm_offramp.EVM2EVMOffRampStaticConfig{
-				CommitStore:   commitStore,
-				ChainId:       destChainId,
-				SourceChainId: sourceChainId,
-				OnRamp:        onRamp,
+				CommitStore:         commitStore,
+				ChainSelector:       destChainSelector,
+				SourceChainSelector: sourceChainSelector,
+				OnRamp:              onRamp,
 			},
 			sourceToken,
 			pools,

@@ -15,7 +15,7 @@ contract GovernanceDappSetup is EVM2EVMOnRampSetup {
   function setUp() public virtual override {
     EVM2EVMOnRampSetup.setUp();
 
-    s_crossChainClone = GovernanceDapp.CrossChainClone({chainId: DEST_CHAIN_ID, contractAddress: address(1)});
+    s_crossChainClone = GovernanceDapp.CrossChainClone({chainSelector: DEST_CHAIN_ID, contractAddress: address(1)});
 
     s_feeToken = IERC20(s_sourceTokens[0]);
     s_governanceDapp = new GovernanceDapp(address(s_sourceRouter), s_feeConfig, s_feeToken);
@@ -39,14 +39,14 @@ contract GovernanceDapp_constructor is GovernanceDappSetup {
 
 /// @notice #voteForNewFeeConfig
 contract GovernanceDapp_voteForNewFeeConfig is GovernanceDappSetup {
-  event ConfigPropagated(uint64 chainId, address contractAddress);
+  event ConfigPropagated(uint64 chainSelector, address contractAddress);
 
   function testVoteForNewFeeConfigSuccess() public {
     GovernanceDapp.FeeConfig memory feeConfig = GovernanceDapp.FeeConfig({feeAmount: 10000, changedAtBlock: 100});
     bytes memory data = abi.encode(feeConfig);
     Internal.EVM2EVMMessage memory message = Internal.EVM2EVMMessage({
       sequenceNumber: 1,
-      sourceChainId: SOURCE_CHAIN_ID,
+      sourceChainSelector: SOURCE_CHAIN_ID,
       sender: address(s_governanceDapp),
       receiver: s_crossChainClone.contractAddress,
       nonce: 1,
@@ -64,7 +64,7 @@ contract GovernanceDapp_voteForNewFeeConfig is GovernanceDappSetup {
     emit CCIPSendRequested(message);
 
     vm.expectEmit();
-    emit ConfigPropagated(s_crossChainClone.chainId, s_crossChainClone.contractAddress);
+    emit ConfigPropagated(s_crossChainClone.chainSelector, s_crossChainClone.contractAddress);
 
     s_governanceDapp.voteForNewFeeConfig(feeConfig);
   }
