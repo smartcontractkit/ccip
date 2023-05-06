@@ -206,6 +206,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
       if (tokensAndPools[i].token == address(0) || address(tokensAndPools[i].pool) == address(0))
         revert InvalidConfig();
       s_poolsBySourceToken.set(tokensAndPools[i].token, tokensAndPools[i].pool);
+      emit PoolAdded(tokensAndPools[i].token, tokensAndPools[i].pool);
     }
 
     if (allowlist.length > 0) {

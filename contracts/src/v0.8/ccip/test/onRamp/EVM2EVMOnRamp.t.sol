@@ -7,6 +7,7 @@ import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
 /// @notice #constructor
 contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
   event ConfigSet(EVM2EVMOnRamp.StaticConfig staticConfig, EVM2EVMOnRamp.DynamicConfig dynamicConfig);
+  event PoolAdded(address token, address pool);
 
   function testConstructorSuccess() public {
     EVM2EVMOnRamp.StaticConfig memory staticConfig = EVM2EVMOnRamp.StaticConfig({
@@ -20,14 +21,17 @@ contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
       address(s_priceRegistry),
       address(s_mockAFN)
     );
+    EVM2EVMOnRamp.TokenAndPool[] memory tokensAndPools = getTokensAndPools(s_sourceTokens, getCastedSourcePools());
 
     vm.expectEmit();
     emit ConfigSet(staticConfig, dynamicConfig);
+    vm.expectEmit();
+    emit PoolAdded(tokensAndPools[0].token, tokensAndPools[0].pool);
 
     s_onRamp = new EVM2EVMOnRampHelper(
       staticConfig,
       dynamicConfig,
-      getTokensAndPools(s_sourceTokens, getCastedSourcePools()),
+      tokensAndPools,
       new address[](0),
       rateLimiterConfig(),
       s_feeTokenConfigArgs,

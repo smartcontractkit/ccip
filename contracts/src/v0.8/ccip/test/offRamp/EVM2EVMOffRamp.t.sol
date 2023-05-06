@@ -15,6 +15,7 @@ import "../ocr/OCR2Base.t.sol";
 /// @notice #constructor
 contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
   event ConfigSet(EVM2EVMOffRamp.StaticConfig staticConfig, EVM2EVMOffRamp.DynamicConfig dynamicConfig);
+  event PoolAdded(address token, address pool);
 
   function testConstructorSuccess() public {
     EVM2EVMOffRamp.StaticConfig memory staticConfig = EVM2EVMOffRamp.StaticConfig({
@@ -28,16 +29,17 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
       address(s_priceRegistry),
       address(s_mockAFN)
     );
+    IERC20[] memory sourceTokens = getCastedSourceTokens();
+    IPool[] memory castedPools = getCastedDestinationPools();
+
+    vm.expectEmit();
+    emit PoolAdded(address(sourceTokens[0]), address(castedPools[0]));
+
+    s_offRamp = new EVM2EVMOffRampHelper(staticConfig, sourceTokens, castedPools, rateLimiterConfig());
 
     vm.expectEmit();
     emit ConfigSet(staticConfig, dynamicConfig);
 
-    s_offRamp = new EVM2EVMOffRampHelper(
-      staticConfig,
-      getCastedSourceTokens(),
-      getCastedDestinationPools(),
-      rateLimiterConfig()
-    );
     s_offRamp.setOCR2Config(
       s_valid_signers,
       s_valid_transmitters,

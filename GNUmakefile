@@ -89,7 +89,7 @@ abigen: ## Build & install abigen.
 	./tools/bin/build_abigen
 
 .PHONY: go-solidity-wrappers
-go-solidity-wrappers: pnpmdep abigen ## Recompiles solidity contracts and their go wrappers.
+go-solidity-wrappers: pnpmdep abigen mockery ## Recompiles solidity contracts and their go wrappers.
 	./contracts/scripts/native_solc_compile_all
 	go generate ./core/gethwrappers
 

@@ -143,6 +143,7 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
     for (uint256 i = 0; i < sourceTokens.length; ++i) {
       s_poolsBySourceToken.set(address(sourceTokens[i]), address(pools[i]));
       s_poolsByDestToken.set(address(pools[i].getToken()), address(pools[i]));
+      emit PoolAdded(address(sourceTokens[i]), address(pools[i]));
     }
   }
 
