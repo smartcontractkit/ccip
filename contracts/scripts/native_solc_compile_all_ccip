@@ -44,6 +44,5 @@ compileContract ccip/test/mocks/MockAFN.sol
 compileContract ccip/test/WETH9.sol
 
 # Customer contracts
-compileContract ccip/pools/tokens/CACHE.gold/CacheGoldChild.sol
 compileContract ccip/pools/USDC/USDCTokenPool.sol
 

@@ -9,7 +9,6 @@ batch_blockhash_store: ../../contracts/solc/v0.8.6/BatchBlockhashStore.abi ../..
 batch_vrf_coordinator_v2: ../../contracts/solc/v0.8.6/BatchVRFCoordinatorV2.abi ../../contracts/solc/v0.8.6/BatchVRFCoordinatorV2.bin d0a54963260d8c1f1bbd984b758285e6027cfb5a7e42701bcb562ab123219332
 blockhash_store: ../../contracts/solc/v0.6/BlockhashStore.abi ../../contracts/solc/v0.6/BlockhashStore.bin a0dc60bcc4bf071033d23fddf7ae936c6a4d1dd81488434b7e24b7aa1fabc37c
 burn_mint_token_pool: ../../contracts/solc/v0.8.15/BurnMintTokenPool.abi ../../contracts/solc/v0.8.15/BurnMintTokenPool.bin 4ec9c2821584bcaeb75b6fd842f09c2cda15796354dfe3567e9dfbf62e071eb4
-cache_gold_child: ../../contracts/solc/v0.8.15/CacheGoldChild.abi ../../contracts/solc/v0.8.15/CacheGoldChild.bin d2e7e74b9b0e7947c54d7a41ad77519e8acb1604df82404bf9e0d0edc0e0f134
 commit_store: ../../contracts/solc/v0.8.15/CommitStore.abi ../../contracts/solc/v0.8.15/CommitStore.bin dd8207e3cf27d9359fd21e34fd9b2139b1df5ae23e809559ef9cb0b77d39abec
 commit_store_helper: ../../contracts/solc/v0.8.15/CommitStoreHelper.abi ../../contracts/solc/v0.8.15/CommitStoreHelper.bin 453c3fe1e0ccac4b9a06a6e934c6ea575fb70f69e6eb80ec78a6d4c0c6b651c8
 consumer_wrapper: ../../contracts/solc/v0.7/Consumer.abi ../../contracts/solc/v0.7/Consumer.bin 894d1cbd920dccbd36d92918c1037c6ded34f66f417ccb18ec3f33c64ef83ec5

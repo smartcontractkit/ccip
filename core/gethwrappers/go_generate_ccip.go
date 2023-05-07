@@ -25,7 +25,6 @@ package gethwrappers
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/WETH9.abi ../../contracts/solc/v0.8.15/WETH9.bin WETH9 weth9
 
 // Customer contracts
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/CacheGoldChild.abi ../../contracts/solc/v0.8.15/CacheGoldChild.bin CacheGoldChild cache_gold_child
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/USDCTokenPool.abi ../../contracts/solc/v0.8.15/USDCTokenPool.bin USDCTokenPool usdc_token_pool
 
 // Generate mocks for our contracts
