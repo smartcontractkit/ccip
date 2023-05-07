@@ -22,7 +22,8 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
       commitStore: address(s_mockCommitStore),
       chainSelector: DEST_CHAIN_ID,
       sourceChainSelector: SOURCE_CHAIN_ID,
-      onRamp: ON_RAMP_ADDRESS
+      onRamp: ON_RAMP_ADDRESS,
+      prevOffRamp: address(0)
     });
     EVM2EVMOffRamp.DynamicConfig memory dynamicConfig = generateDynamicOffRampConfig(
       address(s_destRouter),
@@ -55,6 +56,7 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
     assertEq(staticConfig.sourceChainSelector, gotStaticConfig.sourceChainSelector);
     assertEq(staticConfig.chainSelector, gotStaticConfig.chainSelector);
     assertEq(staticConfig.onRamp, gotStaticConfig.onRamp);
+    assertEq(staticConfig.prevOffRamp, gotStaticConfig.prevOffRamp);
 
     // Dynamic config
     EVM2EVMOffRamp.DynamicConfig memory gotDynamicConfig = s_offRamp.getDynamicConfig();
@@ -89,7 +91,8 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
         commitStore: address(s_mockCommitStore),
         chainSelector: DEST_CHAIN_ID,
         sourceChainSelector: SOURCE_CHAIN_ID,
-        onRamp: ON_RAMP_ADDRESS
+        onRamp: ON_RAMP_ADDRESS,
+        prevOffRamp: address(0)
       }),
       wrongTokens,
       pools,
@@ -111,7 +114,8 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
         commitStore: address(s_mockCommitStore),
         chainSelector: DEST_CHAIN_ID,
         sourceChainSelector: SOURCE_CHAIN_ID,
-        onRamp: ZERO_ADDRESS
+        onRamp: ZERO_ADDRESS,
+        prevOffRamp: address(0)
       }),
       getCastedSourceTokens(),
       pools,
@@ -129,7 +133,8 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
         commitStore: address(s_mockCommitStore),
         chainSelector: DEST_CHAIN_ID,
         sourceChainSelector: SOURCE_CHAIN_ID,
-        onRamp: ON_RAMP_ADDRESS
+        onRamp: ON_RAMP_ADDRESS,
+        prevOffRamp: address(0)
       }),
       getCastedSourceTokens(),
       getCastedDestinationPools(),
@@ -538,6 +543,139 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
       )
     );
     s_offRamp.execute(_generateReportFromMessages(messages), false);
+  }
+}
+
+/// @notice #execute with ramp upgrade
+contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
+  event SkippedSenderWithPreviousRampMessageInflight(uint64 indexed nonce, address indexed sender);
+
+  EVM2EVMOffRampHelper internal s_prevOffRamp;
+
+  function setUp() public virtual override {
+    EVM2EVMOffRampSetup.setUp();
+
+    s_prevOffRamp = s_offRamp;
+
+    deployOffRamp(s_mockCommitStore, s_destRouter, address(s_prevOffRamp));
+  }
+
+  function testV2Success() public {
+    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
+    vm.expectEmit();
+    emit ExecutionStateChanged(
+      messages[0].sequenceNumber,
+      messages[0].messageId,
+      Internal.MessageExecutionState.SUCCESS
+    );
+
+    s_offRamp.execute(_generateReportFromMessages(messages), false);
+  }
+
+  function testV2NonceStartsAtV1NonceSuccess() public {
+    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
+    vm.expectEmit();
+    emit ExecutionStateChanged(
+      messages[0].sequenceNumber,
+      messages[0].messageId,
+      Internal.MessageExecutionState.SUCCESS
+    );
+
+    s_prevOffRamp.execute(_generateReportFromMessages(messages), false);
+
+    messages[0].nonce++;
+
+    vm.expectEmit();
+    emit ExecutionStateChanged(
+      messages[0].sequenceNumber,
+      messages[0].messageId,
+      Internal.MessageExecutionState.SUCCESS
+    );
+
+    // same sender nonce in new offramp should go from 0 -> 2
+    uint64 nonceBefore = s_offRamp.getSenderNonce(messages[0].sender);
+    s_offRamp.execute(_generateReportFromMessages(messages), false);
+    assertEq(s_offRamp.getSenderNonce(messages[0].sender), nonceBefore + 2);
+
+    messages[0].nonce++;
+    messages[0].sequenceNumber++;
+
+    vm.expectEmit();
+    emit ExecutionStateChanged(
+      messages[0].sequenceNumber,
+      messages[0].messageId,
+      Internal.MessageExecutionState.SUCCESS
+    );
+
+    nonceBefore = s_offRamp.getSenderNonce(messages[0].sender);
+    s_offRamp.execute(_generateReportFromMessages(messages), false);
+    assertEq(s_offRamp.getSenderNonce(messages[0].sender), nonceBefore + 1);
+  }
+
+  function testV2NonceNewSenderStartsAtZeroSuccess() public {
+    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
+    vm.expectEmit();
+    emit ExecutionStateChanged(
+      messages[0].sequenceNumber,
+      messages[0].messageId,
+      Internal.MessageExecutionState.SUCCESS
+    );
+
+    s_prevOffRamp.execute(_generateReportFromMessages(messages), false);
+
+    address newSender = address(1234567);
+    messages[0].sender = newSender;
+
+    vm.expectEmit();
+    emit ExecutionStateChanged(
+      messages[0].sequenceNumber,
+      messages[0].messageId,
+      Internal.MessageExecutionState.SUCCESS
+    );
+
+    // new sender nonce in new offramp should go from 0 -> 1
+    assertEq(s_offRamp.getSenderNonce(newSender), 0);
+    s_offRamp.execute(_generateReportFromMessages(messages), false);
+    assertEq(s_offRamp.getSenderNonce(newSender), 1);
+  }
+
+  function testV2OffRampNonceSkipsIfMsgInFlightSuccess() public {
+    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
+
+    address newSender = address(1234567);
+    messages[0].sender = newSender;
+    messages[0].nonce = 2;
+
+    // new offramp waits previous offramp to execute
+    vm.expectEmit();
+    emit SkippedSenderWithPreviousRampMessageInflight(messages[0].nonce, newSender);
+    s_offRamp.execute(_generateReportFromMessages(messages), false);
+    assertEq(s_offRamp.getSenderNonce(newSender), 0);
+
+    messages[0].nonce = 1;
+
+    // previous offramp executes msg and increases nonce
+    vm.expectEmit();
+    emit ExecutionStateChanged(
+      messages[0].sequenceNumber,
+      messages[0].messageId,
+      Internal.MessageExecutionState.SUCCESS
+    );
+    s_prevOffRamp.execute(_generateReportFromMessages(messages), false);
+
+    messages[0].nonce = 2;
+
+    // new offramp is able to execute
+    vm.expectEmit();
+    emit ExecutionStateChanged(
+      messages[0].sequenceNumber,
+      messages[0].messageId,
+      Internal.MessageExecutionState.SUCCESS
+    );
+
+    assertEq(s_offRamp.getSenderNonce(newSender), 0);
+    s_offRamp.execute(_generateReportFromMessages(messages), false);
+    assertEq(s_offRamp.getSenderNonce(newSender), 2);
   }
 }
 

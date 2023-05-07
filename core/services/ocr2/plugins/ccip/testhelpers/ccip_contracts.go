@@ -135,6 +135,7 @@ func (c *CCIPContracts) DeployNewOffRamp(t *testing.T) {
 			ChainSelector:       c.Dest.ChainID,
 			SourceChainSelector: c.Source.ChainID,
 			OnRamp:              c.Source.OnRamp.Address(),
+			PrevOffRamp:         common.HexToAddress(""),
 		},
 		[]common.Address{c.Source.LinkToken.Address()}, // source tokens
 		[]common.Address{c.Dest.Pool.Address()},        // pools
@@ -194,6 +195,7 @@ func (c *CCIPContracts) DeployNewOnRamp(t *testing.T) {
 			ChainSelector:     c.Source.ChainID,
 			DestChainSelector: c.Dest.ChainID,
 			DefaultTxGasLimit: 200_000,
+			PrevOnRamp:        common.HexToAddress(""),
 		},
 		evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
 			Router:          c.Source.Router.Address(),
@@ -615,6 +617,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			ChainSelector:     sourceChainID, // source chain id
 			DestChainSelector: destChainID,   // destinationChainSelectors
 			DefaultTxGasLimit: 200_000,
+			PrevOnRamp:        common.HexToAddress(""),
 		},
 		evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
 			Router:          sourceRouterAddress,
@@ -760,6 +763,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			ChainSelector:       destChainID,
 			SourceChainSelector: sourceChainID,
 			OnRamp:              onRampAddress,
+			PrevOffRamp:         common.HexToAddress(""),
 		},
 		[]common.Address{sourceLinkTokenAddress},
 		[]common.Address{destPoolAddress},

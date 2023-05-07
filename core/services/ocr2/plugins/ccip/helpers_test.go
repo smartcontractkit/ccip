@@ -168,6 +168,7 @@ func deploySourceCcipContracts(
 			ChainSelector:     sourceClient.Blockchain().Config().ChainID.Uint64(),
 			DestChainSelector: destChainID,
 			DefaultTxGasLimit: 200_000,
+			PrevOnRamp:        common.HexToAddress(""),
 		},
 		evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
 			Router:          sourceRouterAddress,
@@ -277,6 +278,7 @@ func deployDestCcipContracts(
 			ChainSelector:       destClient.Blockchain().Config().ChainID.Uint64(),
 			SourceChainSelector: sourceChainID,
 			OnRamp:              onRampAddress,
+			PrevOffRamp:         common.HexToAddress(""),
 		},
 		[]common.Address{sourceFeeTokenAddress},
 		[]common.Address{destPool.Address()},

@@ -147,6 +147,7 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainSelector u
 			ChainId:           GetCCIPChainId(client.ChainConfig.EvmChainId),
 			DestChainId:       destChainSelector,
 			DefaultTxGasLimit: DEFAULT_GAS_LIMIT,
+			PrevOnRamp:        common.HexToAddress(""),
 		},
 		evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
 			Router:          client.ChainConfig.Router,
@@ -202,6 +203,7 @@ func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainSelecto
 			ChainId:       GetCCIPChainId(client.ChainConfig.EvmChainId),
 			SourceChainId: sourceChainSelector,
 			OnRamp:        onRamp,
+			PrevOffRamp:   common.HexToAddress(""),
 		},
 		syncedSourceTokens,
 		syncedDestPools,

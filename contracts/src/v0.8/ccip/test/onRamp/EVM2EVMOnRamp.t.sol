@@ -14,7 +14,8 @@ contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
       linkToken: s_sourceTokens[0],
       chainSelector: SOURCE_CHAIN_ID,
       destChainSelector: DEST_CHAIN_ID,
-      defaultTxGasLimit: GAS_LIMIT
+      defaultTxGasLimit: GAS_LIMIT,
+      prevOnRamp: address(0)
     });
     EVM2EVMOnRamp.DynamicConfig memory dynamicConfig = generateDynamicOnRampConfig(
       address(s_sourceRouter),
@@ -40,14 +41,13 @@ contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
     );
 
     EVM2EVMOnRamp.StaticConfig memory gotStaticConfig = s_onRamp.getStaticConfig();
-
     assertEq(staticConfig.linkToken, gotStaticConfig.linkToken);
     assertEq(staticConfig.chainSelector, gotStaticConfig.chainSelector);
     assertEq(staticConfig.destChainSelector, gotStaticConfig.destChainSelector);
     assertEq(staticConfig.defaultTxGasLimit, gotStaticConfig.defaultTxGasLimit);
+    assertEq(staticConfig.prevOnRamp, gotStaticConfig.prevOnRamp);
 
     EVM2EVMOnRamp.DynamicConfig memory gotDynamicConfig = s_onRamp.getDynamicConfig();
-
     assertEq(dynamicConfig.router, gotDynamicConfig.router);
     assertEq(dynamicConfig.priceRegistry, gotDynamicConfig.priceRegistry);
     assertEq(dynamicConfig.maxDataSize, gotDynamicConfig.maxDataSize);
@@ -430,6 +430,83 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.InvalidAddress.selector, message.receiver));
 
     s_onRamp.forwardFromRouter(message, 1, OWNER);
+  }
+}
+
+/// @notice #forwardFromRouter with ramp upgrade
+contract EVM2EVMOnRamp_forwardFromRouter_upgrade is EVM2EVMOnRampSetup {
+  uint256 internal constant FEE_AMOUNT = 1234567890;
+  EVM2EVMOnRampHelper internal s_prevOnRamp;
+
+  function setUp() public virtual override {
+    EVM2EVMOnRampSetup.setUp();
+
+    s_prevOnRamp = s_onRamp;
+
+    s_onRamp = new EVM2EVMOnRampHelper(
+      EVM2EVMOnRamp.StaticConfig({
+        linkToken: s_sourceTokens[0],
+        chainSelector: SOURCE_CHAIN_ID,
+        destChainSelector: DEST_CHAIN_ID,
+        defaultTxGasLimit: GAS_LIMIT,
+        prevOnRamp: address(s_prevOnRamp)
+      }),
+      generateDynamicOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), address(s_mockAFN)),
+      getTokensAndPools(s_sourceTokens, getCastedSourcePools()),
+      new address[](0),
+      rateLimiterConfig(),
+      s_feeTokenConfigArgs,
+      s_tokenTransferFeeConfigArgs,
+      getNopsAndWeights()
+    );
+    s_onRamp.setAdmin(ADMIN);
+
+    s_metadataHash = keccak256(
+      abi.encode(Internal.EVM_2_EVM_MESSAGE_HASH, SOURCE_CHAIN_ID, DEST_CHAIN_ID, address(s_onRamp))
+    );
+
+    TokenPool.RampUpdate[] memory onRamps = new TokenPool.RampUpdate[](1);
+    onRamps[0] = TokenPool.RampUpdate({ramp: address(s_onRamp), allowed: true});
+    LockReleaseTokenPool(address(s_sourcePools[0])).applyRampUpdates(onRamps, new TokenPool.RampUpdate[](0));
+
+    changePrank(address(s_sourceRouter));
+  }
+
+  function testV2Success() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+
+    vm.expectEmit();
+    emit CCIPSendRequested(_messageToEvent(message, 1, 1, FEE_AMOUNT, OWNER));
+    s_onRamp.forwardFromRouter(message, FEE_AMOUNT, OWNER);
+  }
+
+  function testV2NonceStartsAtV1NonceSuccess() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+
+    // send 1 message from previous onramp
+    s_prevOnRamp.forwardFromRouter(message, FEE_AMOUNT, OWNER);
+
+    // new onramp nonce should start from 2
+    vm.expectEmit();
+    emit CCIPSendRequested(_messageToEvent(message, 1, 2, FEE_AMOUNT, OWNER));
+    s_onRamp.forwardFromRouter(message, FEE_AMOUNT, OWNER);
+
+    vm.expectEmit();
+    emit CCIPSendRequested(_messageToEvent(message, 2, 3, FEE_AMOUNT, OWNER));
+    s_onRamp.forwardFromRouter(message, FEE_AMOUNT, OWNER);
+  }
+
+  function testV2NonceNewSenderStartsAtZeroSuccess() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+
+    // send 1 message from previous onramp from OWNER
+    s_prevOnRamp.forwardFromRouter(message, FEE_AMOUNT, OWNER);
+
+    address newSender = address(1234567);
+    // new onramp nonce should start from 1 for new sender
+    vm.expectEmit();
+    emit CCIPSendRequested(_messageToEvent(message, 1, 1, FEE_AMOUNT, newSender));
+    s_onRamp.forwardFromRouter(message, FEE_AMOUNT, newSender);
   }
 }
 

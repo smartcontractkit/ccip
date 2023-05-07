@@ -14,7 +14,7 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
     CommitStoreSetup.setUp();
     EVM2EVMOffRampSetup.setUp();
 
-    deployOffRamp(s_commitStore, s_destRouter);
+    deployOffRamp(s_commitStore, s_destRouter, address(0));
   }
 
   function testE2E_3MessagesSuccess_gas() public {

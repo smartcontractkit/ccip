@@ -405,6 +405,7 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 				ChainSelector:     sourceChainSelector, // source chain id
 				DestChainSelector: destChainSelector,   // destinationChainSelector
 				DefaultTxGasLimit: 200_000,
+				PrevOnRamp:        common.HexToAddress(""),
 			},
 			evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
 				Router:          router,
@@ -466,6 +467,7 @@ func (e *CCIPContractsDeployer) DeployOffRamp(sourceChainSelector, destChainSele
 				ChainSelector:       destChainSelector,
 				SourceChainSelector: sourceChainSelector,
 				OnRamp:              onRamp,
+				PrevOffRamp:         common.HexToAddress(""),
 			},
 			sourceToken,
 			pools,

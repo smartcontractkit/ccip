@@ -8,6 +8,7 @@ import {IPool} from "../interfaces/pools/IPool.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
+import {IAny2EVMOffRamp} from "../interfaces/IAny2EVMOffRamp.sol";
 
 import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
@@ -26,7 +27,7 @@ import {ERC165Checker} from "../../vendor/ERC165Checker.sol";
 /// and we will never do partial updates where e.g. only an offRamp gets replaced.
 /// If we would replace only the offRamp and connect it with an existing commitStore
 /// a replay attack would be possible.
-contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2BaseNoChecks {
+contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersionInterface, OCR2BaseNoChecks {
   using Address for address;
   using ERC165Checker for address;
   using EnumerableMapAddresses for EnumerableMapAddresses.AddressToAddressMap;
@@ -60,6 +61,7 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
   // this event is needed for Atlas; if their structs/signature changes, we must update the ABIs there
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event SkippedIncorrectNonce(uint64 indexed nonce, address indexed sender);
+  event SkippedSenderWithPreviousRampMessageInflight(uint64 indexed nonce, address indexed sender);
   event ExecutionStateChanged(
     uint64 indexed sequenceNumber,
     bytes32 indexed messageId,
@@ -72,6 +74,7 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
     uint64 chainSelector; // -------┘  Destination chainSelector
     uint64 sourceChainSelector; // -┐  Source chainSelector
     address onRamp; // -------┘  OnRamp address on the source chain
+    address prevOffRamp; //      Address of previous-version OffRamp
   }
 
   /// @notice Dynamic offRamp config
@@ -100,6 +103,8 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
   address internal immutable i_onRamp;
   // metadataHash is a prefix for a message hash preimage to ensure uniqueness.
   bytes32 internal immutable i_metadataHash;
+  /// @dev The address of previous-version OffRamp for this lane
+  address internal immutable i_prevOffRamp;
 
   // DYNAMIC CONFIG
   DynamicConfig internal s_dynamicConfig;
@@ -136,6 +141,7 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
     i_sourceChainSelector = staticConfig.sourceChainSelector;
     i_chainSelector = staticConfig.chainSelector;
     i_onRamp = staticConfig.onRamp;
+    i_prevOffRamp = staticConfig.prevOffRamp;
 
     i_metadataHash = _metadataHash(Internal.EVM_2_EVM_MESSAGE_HASH);
 
@@ -184,9 +190,7 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
     s_executionStates[sequenceNumber / 128] = bitmap;
   }
 
-  /// @notice Returns the the current nonce for a receiver.
-  /// @param sender The sender address
-  /// @return nonce The nonce value belonging to the sender address.
+  /// @inheritdoc IAny2EVMOffRamp
   function getSenderNonce(address sender) public view returns (uint64 nonce) {
     return s_senderNonce[sender];
   }
@@ -252,10 +256,29 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
         if (originalState != Internal.MessageExecutionState.UNTOUCHED) revert AlreadyAttempted(message.sequenceNumber);
       }
 
-      // If this is the first time executing this message we take the fee
+      // Skip the current message if there are messages inlight for previous-version offramp after an ramp upgrade
+      uint64 prevNonce = s_senderNonce[message.sender];
+      if (prevNonce == 0 && i_prevOffRamp != address(0)) {
+        prevNonce = IAny2EVMOffRamp(i_prevOffRamp).getSenderNonce(message.sender);
+        if (prevNonce + 1 != message.nonce) {
+          // the starting v2 onramp nonce, i.e. the 1st message nonce v2 offramp is expected to receive,
+          // is guaranteed to equal (largest v1 onramp nonce + 1).
+          // if this message's nonce isn't (v1 offramp nonce + 1), then v1 offramp nonce != largest v1 onramp nonce,
+          // it tells us there are still messages inflight for v1 offramp
+          emit SkippedSenderWithPreviousRampMessageInflight(message.nonce, message.sender);
+          continue;
+        }
+        // Otherwise this nonce is indeed the "transitional nonce", that is
+        // all messages sent to v1 ramp have been executed by the DON and the sequence can resume in V2.
+        // Note if first time user in V2, then prevNonce will be 0,
+        // and message.nonce = 1, so this will be a no-op. If in strict mode and nonce isn't bumped due to failure,
+        // then we'll call the old offramp again until it succeeds.
+        s_senderNonce[message.sender] = prevNonce;
+      }
+
+      // UNTOUCHED messages MUST be executed in order always
       if (originalState == Internal.MessageExecutionState.UNTOUCHED) {
-        // UNTOUCHED messages MUST be executed in order always.
-        if (s_senderNonce[message.sender] + 1 != message.nonce) {
+        if (prevNonce + 1 != message.nonce) {
           // We skip the message if the nonce is incorrect
           emit SkippedIncorrectNonce(message.nonce, message.sender);
           continue;
@@ -388,7 +411,8 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
         commitStore: i_commitStore,
         chainSelector: i_chainSelector,
         sourceChainSelector: i_sourceChainSelector,
-        onRamp: i_onRamp
+        onRamp: i_onRamp,
+        prevOffRamp: i_prevOffRamp
       });
   }
 
@@ -412,7 +436,8 @@ contract EVM2EVMOffRamp is AggregateRateLimiter, TypeAndVersionInterface, OCR2Ba
         commitStore: i_commitStore,
         chainSelector: i_chainSelector,
         sourceChainSelector: i_sourceChainSelector,
-        onRamp: i_onRamp
+        onRamp: i_onRamp,
+        prevOffRamp: i_prevOffRamp
       }),
       dynamicConfig
     );

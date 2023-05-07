@@ -51,16 +51,21 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     s_secondary_receiver = new SimpleMessageReceiver();
     s_reverting_receiver = new MaybeRevertMessageReceiver(true);
 
-    deployOffRamp(s_mockCommitStore, s_destRouter);
+    deployOffRamp(s_mockCommitStore, s_destRouter, address(0));
   }
 
-  function deployOffRamp(ICommitStore commitStore, Router router) internal {
+  function deployOffRamp(
+    ICommitStore commitStore,
+    Router router,
+    address prevOffRamp
+  ) internal {
     s_offRamp = new EVM2EVMOffRampHelper(
       EVM2EVMOffRamp.StaticConfig({
         commitStore: address(commitStore),
         chainSelector: DEST_CHAIN_ID,
         sourceChainSelector: SOURCE_CHAIN_ID,
-        onRamp: ON_RAMP_ADDRESS
+        onRamp: ON_RAMP_ADDRESS,
+        prevOffRamp: prevOffRamp
       }),
       getCastedSourceTokens(),
       getCastedDestinationPools(),
@@ -75,12 +80,10 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
       abi.encode("")
     );
 
-    address[] memory updaters = new address[](1);
-    updaters[0] = address(s_offRamp);
-
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](0);
-    Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](1);
+    Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](2);
     offRampUpdates[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_ID, offRamp: address(s_offRamp)});
+    offRampUpdates[1] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_ID, offRamp: address(prevOffRamp)});
     s_destRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
 
     TokenPool.RampUpdate[] memory offRamps = new TokenPool.RampUpdate[](1);

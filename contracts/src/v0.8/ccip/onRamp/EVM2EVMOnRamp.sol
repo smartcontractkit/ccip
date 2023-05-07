@@ -70,6 +70,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
     uint64 chainSelector; // -----------┘ Source chainSelector
     uint64 destChainSelector; // -------┐ Destination chainSelector
     uint64 defaultTxGasLimit; // -┘ Default gas limit for a tx
+    address prevOnRamp; //          Address of previous-version OnRamp
   }
 
   /// @dev Struct to contains the dynamic configuration
@@ -139,6 +140,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
   uint64 internal immutable i_chainSelector;
   /// @dev The chain ID of the destination chain
   uint64 internal immutable i_destChainSelector;
+  /// @dev The address of previous-version OnRamp for this lane
+  address internal immutable i_prevOnRamp;
   /// @dev the maximum number of nops that can be configured at the same time.
   uint256 private constant MAX_NUMBER_OF_NOPS = 64;
 
@@ -200,6 +203,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
     i_chainSelector = staticConfig.chainSelector;
     i_destChainSelector = staticConfig.destChainSelector;
     i_defaultTxGasLimit = staticConfig.defaultTxGasLimit;
+    i_prevOnRamp = staticConfig.prevOnRamp;
 
     _setDynamicConfig(dynamicConfig);
     _setFeeTokenConfig(feeTokenConfigs);
@@ -259,6 +263,12 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
       s_nopFeesJuels += uint96(
         IPriceRegistry(s_dynamicConfig.priceRegistry).convertTokenAmount(message.feeToken, feeTokenAmount, i_linkToken)
       );
+    }
+
+    if (s_senderNonce[originalSender] == 0 && i_prevOnRamp != address(0)) {
+      // If this is first time send for a sender in new OnRamp, check if they have a nonce
+      // from the previous OnRamp and start from there instead of zero.
+      s_senderNonce[originalSender] = IEVM2AnyOnRamp(i_prevOnRamp).getSenderNonce(originalSender);
     }
 
     // We need the next available sequence number so we increment before we use the value
@@ -340,7 +350,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
         linkToken: i_linkToken,
         chainSelector: i_chainSelector,
         destChainSelector: i_destChainSelector,
-        defaultTxGasLimit: i_defaultTxGasLimit
+        defaultTxGasLimit: i_defaultTxGasLimit,
+        prevOnRamp: i_prevOnRamp
       });
   }
 
@@ -369,7 +380,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
         linkToken: i_linkToken,
         chainSelector: i_chainSelector,
         destChainSelector: i_destChainSelector,
-        defaultTxGasLimit: i_defaultTxGasLimit
+        defaultTxGasLimit: i_defaultTxGasLimit,
+        prevOnRamp: i_prevOnRamp
       }),
       dynamicConfig
     );
