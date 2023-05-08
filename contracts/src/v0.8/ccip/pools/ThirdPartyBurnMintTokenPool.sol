@@ -16,6 +16,7 @@ contract ThirdPartyBurnMintTokenPool is BurnMintTokenPool {
 
   error InvalidOffRamp(address offRamp);
 
+  /// @notice the trusted Router address to validate new offRamps through.
   address private s_router;
 
   constructor(

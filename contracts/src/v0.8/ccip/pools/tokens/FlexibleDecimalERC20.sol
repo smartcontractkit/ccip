@@ -3,6 +3,8 @@ pragma solidity ^0.8.0;
 
 import {ERC20} from "../../../vendor/ERC20.sol";
 
+/// This contract is a basic vanilla ERC20 but the number
+/// of decimal points can be set in the constructor.
 contract FlexibleDecimalERC20 is ERC20 {
     uint8 immutable i_decimals;
 

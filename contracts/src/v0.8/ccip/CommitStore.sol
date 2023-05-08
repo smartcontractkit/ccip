@@ -25,7 +25,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
   struct StaticConfig {
     uint64 chainSelector; // -------┐  Destination chainSelector
     uint64 sourceChainSelector; // -┘  Source chainSelector
-    address onRamp; //           OnRamp address on the source chain
+    address onRamp; // OnRamp address on the source chain
   }
 
   /// @notice Dynamic commit store config

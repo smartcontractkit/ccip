@@ -12,5 +12,6 @@ interface ICommitStore {
     uint256 proofFlagBits
   ) external returns (uint256 timestamp);
 
-  function getExpectedNextSequenceNumber() external view returns (uint64);
+  /// @notice Returns the expected next sequence number
+  function getExpectedNextSequenceNumber() external view returns (uint64 sequenceNumber);
 }

@@ -29,7 +29,7 @@ library Client {
   // bytes4(keccak256("CCIP EVMExtraArgsV1"));
   bytes4 public constant EVM_EXTRA_ARGS_V1_TAG = 0x97a657c9;
   struct EVMExtraArgsV1 {
-    uint256 gasLimit; // ATTENTION!!! MAX GAS LIMIT 4M FOR ALPHA TESTING
+    uint256 gasLimit; // ATTENTION!!! MAX GAS LIMIT 4M FOR BETA TESTING
     bool strict; // See strict sequencing details below.
   }
 

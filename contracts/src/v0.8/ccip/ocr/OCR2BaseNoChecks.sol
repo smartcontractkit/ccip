@@ -7,6 +7,8 @@ import {OCR2Abstract} from "./OCR2Abstract.sol";
 /// @notice Onchain verification of reports from the offchain reporting protocol
 /// @dev For details on its operation, see the offchain reporting protocol design
 /// doc, which refers to this contract as simply the "contract".
+/// @dev This contract does ***NOT*** check the supplied signatures on `transmit`
+/// This is intentional.
 abstract contract OCR2BaseNoChecks is OwnerIsCreator, OCR2Abstract {
   error InvalidConfig(string message);
   error WrongMessageLength(uint256 expected, uint256 actual);
@@ -18,7 +20,7 @@ abstract contract OCR2BaseNoChecks is OwnerIsCreator, OCR2Abstract {
   // added, make sure that storage of the struct still takes at most 32 bytes.
   struct ConfigInfo {
     bytes32 latestConfigDigest;
-    uint8 f; // TODO: could be optimized by squeezing into one slot
+    uint8 f;
     uint8 n;
   }
 

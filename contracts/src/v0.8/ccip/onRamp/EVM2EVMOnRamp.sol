@@ -20,6 +20,13 @@ import {Pausable} from "../../vendor/Pausable.sol";
 import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v4.7.3/contracts/utils/structs/EnumerableSet.sol";
 import {EnumerableMap} from "../../vendor/openzeppelin-solidity/v4.7.3/contracts/utils/structs/EnumerableMap.sol";
 
+/// @notice The onRamp is a contract that handles fee logic, NOP payments,
+/// token support and an allowList. It will always be deployed 1:1:1 with a
+/// commitStore and offRamp contract. These three contracts together form a
+/// `lane`. A lane is an upgradable set of contracts within the non-upgradable
+/// routers and are always deployed as complete set, even during upgrades.
+/// This means an upgrade to an onRamp will require redeployment of the
+/// commitStore and offRamp as well.
 contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAndVersionInterface {
   using SafeERC20 for IERC20;
   using EnumerableMap for EnumerableMap.AddressToUintMap;
@@ -67,8 +74,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
   /// @dev Struct that contains the static configuration
   struct StaticConfig {
     address linkToken; // --------┐ Link token address
-    uint64 chainSelector; // -----------┘ Source chainSelector
-    uint64 destChainSelector; // -------┐ Destination chainSelector
+    uint64 chainSelector; // -----┘ Source chainSelector
+    uint64 destChainSelector; // -┐ Destination chainSelector
     uint64 defaultTxGasLimit; // -┘ Default gas limit for a tx
     address prevOnRamp; //          Address of previous-version OnRamp
   }
@@ -101,24 +108,24 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
 
   /// @dev Struct to hold the transfer fee configuration for token transfers
   struct TokenTransferFeeConfig {
-    uint32 minFee; // ---------┐ Minimum USD fee to charge, multiples of 1 US cent, or 0.01USD
-    uint32 maxFee; //          | Maximum USD fee to charge, multiples of 1 US cent, or 0.01USD
-    uint16 ratio; // ----------┘ Ratio of token transfer value to charge as fee, multiples of 0.1bps, or 10e-5
+    uint32 minFee; // ---┐ Minimum USD fee to charge, multiples of 1 US cent, or 0.01USD
+    uint32 maxFee; //    | Maximum USD fee to charge, multiples of 1 US cent, or 0.01USD
+    uint16 ratio; // ----┘ Ratio of token transfer value to charge as fee, multiples of 0.1bps, or 10e-5
   }
 
   /// @dev Same as TokenTransferFeeConfig
   /// token included so that an array of these can be passed in to setTokenTransferFeeConfig
   struct TokenTransferFeeConfigArgs {
-    address token; // ---------┐ Token address
-    uint32 minFee; //          | Minimum USD fee to charge, multiples of 1 US cent, or 0.01USD
-    uint32 maxFee; //          | Maximum USD fee to charge, multiples of 1 US cent, or 0.01USD
-    uint16 ratio; // ----------┘ Ratio of token transfer value to charge as fee, multiples of 0.1bps, or 10e-5
+    address token; // ---┐ Token address
+    uint32 minFee; //    | Minimum USD fee to charge, multiples of 1 US cent, or 0.01USD
+    uint32 maxFee; //    | Maximum USD fee to charge, multiples of 1 US cent, or 0.01USD
+    uint16 ratio; // ----┘ Ratio of token transfer value to charge as fee, multiples of 0.1bps, or 10e-5
   }
 
   /// @dev Nop address and weight, used to set the nops and their weights
   struct NopAndWeight {
-    address nop; // ----┐ Address of the node operator
-    uint16 weight; // --┘ Weight for nop rewards
+    address nop; // -----┐ Address of the node operator
+    uint16 weight; // ---┘ Weight for nop rewards
   }
 
   struct TokenAndPool {
@@ -167,7 +174,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
   mapping(address => uint64) internal s_senderNonce;
   /// @dev The amount of LINK available to pay NOPS
   uint96 internal s_nopFeesJuels;
-  /// @dev The total weight of all NOPs weights
+  /// @dev The combined weight of all NOPs weights
   uint32 internal s_nopWeightsTotal;
   /// @dev The last used sequence number. This is zero in the case where no
   /// messages has been sent yet. 0 is not a valid sequence number for any
@@ -406,7 +413,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
     return IPool(s_poolsBySourceToken.get(address(sourceToken)));
   }
 
-  /// #@inheritdoc IEVM2AnyOnRamp
+  /// @inheritdoc IEVM2AnyOnRamp
   /// @dev This method can only be called by the owner of the contract.
   function applyPoolUpdates(Internal.PoolUpdate[] memory removes, Internal.PoolUpdate[] memory adds) public onlyOwner {
     for (uint256 i = 0; i < removes.length; ++i) {
@@ -446,6 +453,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
     return executionFee + _getTokenTransferFee(message.feeToken, message.tokenAmounts);
   }
 
+  /// @notice Returns the fee based on the gas usage and network fee for the
+  /// given message. Fees can be different for different fee tokens.
   function _getMessageExecutionFee(address feeToken, bytes calldata extraArgs) internal view returns (uint256 fee) {
     uint256 gasLimit = _fromBytes(extraArgs).gasLimit;
     (uint192 feeTokenPrice, uint192 gasPrice) = IPriceRegistry(s_dynamicConfig.priceRegistry).getFeeTokenAndGasPrices(
@@ -460,6 +469,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
     return feeTokenPrice._calcTokenAmountFromUSDValue(usdFeeAmount);
   }
 
+  /// @notice Returns the fee based on the tokens transferred. Will always be 0 if
+  /// no tokens are transferred. The token fee is calculated based on basis points.
   function _getTokenTransferFee(address feeToken, Client.EVMTokenAmount[] calldata tokenAmounts)
     internal
     view
@@ -533,6 +544,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
     emit FeeConfigSet(feeTokenConfigs);
   }
 
+  /// @notice Gets the transfer fee config for a given token.
   function getTokenTransferFeeConfig(address token)
     external
     view
@@ -541,6 +553,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
     return s_tokenTransferFeeConfig[token];
   }
 
+  /// @notice Sets the transfer fee config.
+  /// @dev only callable by the owner or admin.
   function setTokenTransferFeeConfig(TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs)
     external
     onlyOwnerOrAdmin
@@ -548,6 +562,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
     _setTokenTransferFeeConfig(tokenTransferFeeConfigArgs);
   }
 
+  /// @notice internal helper to set the token transfer fee config.
   function _setTokenTransferFeeConfig(TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs) internal {
     uint256 numerOfTokens = tokenTransferFeeConfigArgs.length;
 

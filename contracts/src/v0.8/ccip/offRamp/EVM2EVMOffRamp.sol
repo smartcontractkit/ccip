@@ -25,7 +25,7 @@ import {ERC165Checker} from "../../vendor/ERC165Checker.sol";
 /// in an OffRamp in a single transaction.
 /// @dev We will always deploy an onRamp, commitStore, and offRamp at the same time
 /// and we will never do partial updates where e.g. only an offRamp gets replaced.
-/// If we would replace only the offRamp and connect it with an existing commitStore
+/// If we would replace only the offRamp and connect it with an existing commitStore,
 /// a replay attack would be possible.
 contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersionInterface, OCR2BaseNoChecks {
   using Address for address;
@@ -70,11 +70,11 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
 
   /// @notice Static offRamp config
   struct StaticConfig {
-    address commitStore; // --┐  CommitStore address on the destination chain
+    address commitStore; // --------┐  CommitStore address on the destination chain
     uint64 chainSelector; // -------┘  Destination chainSelector
     uint64 sourceChainSelector; // -┐  Source chainSelector
-    address onRamp; // -------┘  OnRamp address on the source chain
-    address prevOffRamp; //      Address of previous-version OffRamp
+    address onRamp; // -------------┘  OnRamp address on the source chain
+    address prevOffRamp; //            Address of previous-version OffRamp
   }
 
   /// @notice Dynamic offRamp config
@@ -82,7 +82,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
   struct DynamicConfig {
     uint32 permissionLessExecutionThresholdSeconds; // -┐ Waiting time before manual execution is enabled
     address router; // ---------------------------------┘ Router address
-    address priceRegistry; // Price registry address
+    address priceRegistry; //        Price registry address
     address afn; // ---------------┐ AFN address
     uint16 maxTokensLength; //     | Maximum number of distinct ERC20 tokens that can be sent per message
     uint32 maxDataSize; // --------┘ Maximum payload data size
@@ -114,17 +114,13 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
   EnumerableMapAddresses.AddressToAddressMap private s_poolsByDestToken;
 
   // STATE
+  // The expected nonce for a given sender.
   mapping(address => uint64) internal s_senderNonce;
-  // A mapping of sequence numbers to execution state using a bitmap with each execution state
-  // only taking up 2 bits of the uint256, packing 128 states into a single slot.
+  // A mapping of sequence numbers to execution state using a bitmap with each execution
+  // state only taking up 2 bits of the uint256, packing 128 states into a single slot.
   // This state makes sure we never execute a message twice.
   mapping(uint64 => uint256) internal s_executionStates;
 
-  /// @notice The `tokens` and `pools` passed to this constructor depend on which chain this contract
-  /// is being deployed to. Mappings of source token => destination pool is maintained on the destination
-  /// chain. Therefore, when being deployed as an inheriting OffRamp, `tokens` should represent source chain tokens,
-  /// `pools` destinations chain pools. When being deployed as an inheriting OnRamp, `tokens` and `pools`
-  /// should both be source chain.
   constructor(
     StaticConfig memory staticConfig,
     IERC20[] memory sourceTokens,
@@ -133,8 +129,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
   ) OCR2BaseNoChecks() AggregateRateLimiter(rateLimiterConfig) {
     if (sourceTokens.length != pools.length) revert InvalidTokenPoolConfig();
     if (staticConfig.onRamp == address(0) || staticConfig.commitStore == address(0)) revert ZeroAddressNotAllowed();
-    // Ensures we can never deploy a new offRamp that points to a commitStore
-    // that already has roots committed.
+    // Ensures we can never deploy a new offRamp that points to a commitStore that
+    // already has roots committed.
     if (ICommitStore(staticConfig.commitStore).getExpectedNextSequenceNumber() != 1) revert CommitStoreAlreadyInUse();
 
     i_commitStore = staticConfig.commitStore;
@@ -256,7 +252,10 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
         if (originalState != Internal.MessageExecutionState.UNTOUCHED) revert AlreadyAttempted(message.sequenceNumber);
       }
 
-      // Skip the current message if there are messages inlight for previous-version offramp after an ramp upgrade
+      // In the scenario where we upgrade offRamps, we still want to have sequential nonces.
+      // Referencing the old offRamp to check the expected nonce if none is set for a
+      // given sender allows us to skip the current message if it would not be the next according
+      // to the old offRamp. This preserves sequencing between updates.
       uint64 prevNonce = s_senderNonce[message.sender];
       if (prevNonce == 0 && i_prevOffRamp != address(0)) {
         prevNonce = IAny2EVMOffRamp(i_prevOffRamp).getSenderNonce(message.sender);
@@ -284,8 +283,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
           continue;
         }
       }
-      bytes[] memory offchainTokenData = report.offchainTokenData[i];
 
+      bytes[] memory offchainTokenData = report.offchainTokenData[i];
       _isWellFormed(message, offchainTokenData.length);
 
       _setExecutionState(message.sequenceNumber, Internal.MessageExecutionState.IN_PROGRESS);
@@ -381,7 +380,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
       // However making the call to routeExternalMessage will also use some gas and itself only pass all but
       // 1/64th. We air on the side of caution and  instead of passing ((gasleft() - approx cost of call)*63/64) - approx cost of call)*63/64
       // we just pass (gasleft() - approx of call)*62/64.
-      // If this underflows and reverts thats ok because its manual execution.
+      // If this underflows and reverts that's ok because its manual execution.
       gasLimit = ((gasleft() - 2 * (16 * message.data.length + GAS_FOR_CALL_EXACT_CHECK)) * 62) / 64;
     }
     if (

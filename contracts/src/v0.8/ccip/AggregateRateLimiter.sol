@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
+import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
+
 import {OwnerIsCreator} from "./OwnerIsCreator.sol";
 import {Internal} from "./libraries/Internal.sol";
 import {Client} from "./libraries/Client.sol";
 import {RateLimiter} from "./libraries/RateLimiter.sol";
 import {USDPriceWith18Decimals} from "./libraries/USDPriceWith18Decimals.sol";
-import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
 
 import {IERC20} from "../vendor/IERC20.sol";
 
@@ -35,6 +36,8 @@ contract AggregateRateLimiter is OwnerIsCreator {
     });
   }
 
+  /// @notice Consumes value from the rate limiter bucket based on the
+  /// token value given. First, calculate the prices
   function _rateLimitValue(Client.EVMTokenAmount[] memory tokenAmounts, IPriceRegistry priceRegistry) internal {
     uint256 numberOfTokens = tokenAmounts.length;
 

@@ -8,8 +8,8 @@ import {MerkleMultiProof} from "../libraries/MerkleMultiProof.sol";
 library Internal {
   struct PriceUpdates {
     TokenPriceUpdate[] tokenPriceUpdates;
-    uint64 destChainSelector; // ------┐ Destination chain Id
-    uint192 usdPerUnitGas; // ---┘ USD per unit of destination chain gas
+    uint64 destChainSelector; // --┐ Destination chain Id
+    uint192 usdPerUnitGas; // -----┘ USD per unit of destination chain gas
   }
 
   struct TokenPriceUpdate {
@@ -90,37 +90,12 @@ library Internal {
       );
   }
 
-  function _addToTokensAmounts(Client.EVMTokenAmount[] memory existingTokens, Client.EVMTokenAmount memory newToken)
-    internal
-    pure
-    returns (Client.EVMTokenAmount[] memory)
-  {
-    for (uint256 i = 0; i < existingTokens.length; ++i) {
-      if (existingTokens[i].token == newToken.token) {
-        // already present, we need to create a new list because simply
-        // incrementing the value will also mutate the original list.
-        Client.EVMTokenAmount[] memory copyOfTokens = new Client.EVMTokenAmount[](existingTokens.length);
-        for (uint256 j = 0; j < existingTokens.length; ++j) {
-          copyOfTokens[j] = existingTokens[j];
-        }
-
-        copyOfTokens[i] = Client.EVMTokenAmount({
-          token: copyOfTokens[i].token,
-          amount: copyOfTokens[i].amount + newToken.amount
-        });
-        return copyOfTokens;
-      }
-    }
-
-    // Token is not already present, need to reallocate.
-    Client.EVMTokenAmount[] memory newTokens = new Client.EVMTokenAmount[](existingTokens.length + 1);
-    for (uint256 i = 0; i < existingTokens.length; ++i) {
-      newTokens[i] = existingTokens[i];
-    }
-    newTokens[existingTokens.length] = newToken;
-    return newTokens;
-  }
-
+  /// @notice Enum listing the possible message execution states within
+  /// the offRamp contract.
+  /// UNTOUCHED never executed
+  /// IN_PROGRESS currently being executed, used a replay protection
+  /// SUCCESS successfully executed. End state
+  /// FAILURE unsuccessfully executed, manual execution is now enabled.
   enum MessageExecutionState {
     UNTOUCHED,
     IN_PROGRESS,

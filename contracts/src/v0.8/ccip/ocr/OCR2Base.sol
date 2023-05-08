@@ -22,7 +22,7 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
   // added, make sure that storage of the struct still takes at most 32 bytes.
   struct ConfigInfo {
     bytes32 latestConfigDigest;
-    uint8 f; // TODO: could be optimized by squeezing into one slot
+    uint8 f;
     uint8 n;
   }
 

@@ -41,7 +41,7 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
   string public constant override typeAndVersion = "Router 1.0.0";
   // We limit return data to a selector plus 4 words. This is to avoid
   // malicious contracts from returning large amounts of data and causing
-  // repeated OOG scenarios.
+  // repeated out-of-gas scenarios.
   uint16 public constant MAX_RET_BYTES = 4 + 4 * 32;
 
   // DYNAMIC CONFIG
@@ -143,7 +143,7 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
     uint256 gasLimit,
     address receiver
   ) external override onlyOffRamp(message.sourceChainSelector) returns (bool) {
-    // We encode here instead of the offramps to constrain specifically what functions
+    // We encode here instead of the offRamps to constrain specifically what functions
     // can be called from the router.
     bytes memory callData = abi.encodeWithSelector(IAny2EVMMessageReceiver.ccipReceive.selector, message);
     (bool success, bytes memory retBytes) = _callWithExactGas(gasForCallExactCheck, gasLimit, receiver, callData);
@@ -232,7 +232,7 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
     return s_onRamps[destChainSelector];
   }
 
-  /// @notice Return a full list of configured offramps.
+  /// @notice Return a full list of configured offRamps.
   function getOffRamps() external view returns (OffRamp[] memory) {
     OffRamp[] memory offRamps = new OffRamp[](s_offRamps.length());
     for (uint256 i = 0; i < offRamps.length; ++i) {
@@ -299,7 +299,7 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
   // ================================================================
 
   /// @notice only lets permissioned offRamps execute
-  /// @dev We additionally restrict offramps to specific source chains for defense in depth.
+  /// @dev We additionally restrict offRamps to specific source chains for defense in depth.
   modifier onlyOffRamp(uint64 expectedSourceChainSelector) {
     (bool exists, uint256 sourceChainSelector) = s_offRamps.tryGet(msg.sender);
     if (!exists || expectedSourceChainSelector != uint64(sourceChainSelector)) revert OnlyOffRamp();
