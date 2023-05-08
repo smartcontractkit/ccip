@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.15;
+pragma solidity 0.8.19;
 
 import {CCIPReceiver} from "../../../applications/CCIPReceiver.sol";
 import {EVM2EVMOffRamp} from "../../../offRamp/EVM2EVMOffRamp.sol";

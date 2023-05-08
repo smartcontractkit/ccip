@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.15;
+pragma solidity 0.8.19;
 
 import {IEVM2AnyOnRamp} from "../../interfaces/IEVM2AnyOnRamp.sol";
 import {IRouter} from "../../interfaces/IRouter.sol";

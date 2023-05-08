@@ -16,7 +16,7 @@ block_timestamp = 1234567890
 block_number = 12345
 
 [profile.ccip]
-solc_version = '0.8.15'
+solc_version = '0.8.19'
 src = 'src/v0.8/ccip'
 test = 'src/v0.8/ccip/test'
 

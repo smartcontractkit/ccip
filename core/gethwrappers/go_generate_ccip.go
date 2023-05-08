@@ -2,29 +2,29 @@
 // golang packages, using abigen.
 package gethwrappers
 
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/CommitStore.abi ../../contracts/solc/v0.8.15/CommitStore.bin CommitStore commit_store
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/CommitStoreHelper.abi ../../contracts/solc/v0.8.15/CommitStoreHelper.bin CommitStoreHelper commit_store_helper
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/BurnMintTokenPool.abi ../../contracts/solc/v0.8.15/BurnMintTokenPool.bin BurnMintTokenPool burn_mint_token_pool
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/LockReleaseTokenPool.abi ../../contracts/solc/v0.8.15/LockReleaseTokenPool.bin LockReleaseTokenPool lock_release_token_pool
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/WrappedTokenPool.abi ../../contracts/solc/v0.8.15/WrappedTokenPool.bin WrappedTokenPool wrapped_token_pool
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/CustomTokenPool.abi ../../contracts/solc/v0.8.15/CustomTokenPool.bin CustomTokenPool custom_token_pool
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/AFN.abi ../../contracts/solc/v0.8.15/AFN.bin AFNContract afn_contract
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/MockAFN.abi ../../contracts/solc/v0.8.15/MockAFN.bin MockAFNContract mock_afn_contract
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/CommitStore.abi ../../contracts/solc/v0.8.19/CommitStore.bin CommitStore commit_store
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/CommitStoreHelper.abi ../../contracts/solc/v0.8.19/CommitStoreHelper.bin CommitStoreHelper commit_store_helper
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/BurnMintTokenPool.abi ../../contracts/solc/v0.8.19/BurnMintTokenPool.bin BurnMintTokenPool burn_mint_token_pool
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/LockReleaseTokenPool.abi ../../contracts/solc/v0.8.19/LockReleaseTokenPool.bin LockReleaseTokenPool lock_release_token_pool
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/WrappedTokenPool.abi ../../contracts/solc/v0.8.19/WrappedTokenPool.bin WrappedTokenPool wrapped_token_pool
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/CustomTokenPool.abi ../../contracts/solc/v0.8.19/CustomTokenPool.bin CustomTokenPool custom_token_pool
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/AFN.abi ../../contracts/solc/v0.8.19/AFN.bin AFNContract afn_contract
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/MockAFN.abi ../../contracts/solc/v0.8.19/MockAFN.bin MockAFNContract mock_afn_contract
 
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2EVMOnRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMOnRamp.bin EVM2EVMOnRamp evm_2_evm_onramp
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2EVMOffRamp.abi ../../contracts/solc/v0.8.15/EVM2EVMOffRamp.bin EVM2EVMOffRamp evm_2_evm_offramp
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/EVM2EVMOffRampHelper.abi ../../contracts/solc/v0.8.15/EVM2EVMOffRampHelper.bin EVM2EVMOffRampHelper evm_2_evm_offramp_helper
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/Router.abi ../../contracts/solc/v0.8.15/Router.bin Router router
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/PriceRegistry.abi ../../contracts/solc/v0.8.15/PriceRegistry.bin PriceRegistry price_registry
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/EVM2EVMOnRamp.abi ../../contracts/solc/v0.8.19/EVM2EVMOnRamp.bin EVM2EVMOnRamp evm_2_evm_onramp
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/EVM2EVMOffRamp.abi ../../contracts/solc/v0.8.19/EVM2EVMOffRamp.bin EVM2EVMOffRamp evm_2_evm_offramp
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/EVM2EVMOffRampHelper.abi ../../contracts/solc/v0.8.19/EVM2EVMOffRampHelper.bin EVM2EVMOffRampHelper evm_2_evm_offramp_helper
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/Router.abi ../../contracts/solc/v0.8.19/Router.bin Router router
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/PriceRegistry.abi ../../contracts/solc/v0.8.19/PriceRegistry.bin PriceRegistry price_registry
 
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/ReceiverDapp.abi ../../contracts/solc/v0.8.15/ReceiverDapp.bin ReceiverDapp receiver_dapp
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/SimpleMessageReceiver.abi ../../contracts/solc/v0.8.15/SimpleMessageReceiver.bin SimpleMessageReceiver simple_message_receiver
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/MaybeRevertMessageReceiver.abi ../../contracts/solc/v0.8.15/MaybeRevertMessageReceiver.bin MaybeRevertMessageReceiver maybe_revert_message_receiver
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/PingPongDemo.abi ../../contracts/solc/v0.8.15/PingPongDemo.bin PingPongDemo ping_pong_demo
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/WETH9.abi ../../contracts/solc/v0.8.15/WETH9.bin WETH9 weth9
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/ReceiverDapp.abi ../../contracts/solc/v0.8.19/ReceiverDapp.bin ReceiverDapp receiver_dapp
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/SimpleMessageReceiver.abi ../../contracts/solc/v0.8.19/SimpleMessageReceiver.bin SimpleMessageReceiver simple_message_receiver
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/MaybeRevertMessageReceiver.abi ../../contracts/solc/v0.8.19/MaybeRevertMessageReceiver.bin MaybeRevertMessageReceiver maybe_revert_message_receiver
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/PingPongDemo.abi ../../contracts/solc/v0.8.19/PingPongDemo.bin PingPongDemo ping_pong_demo
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/WETH9.abi ../../contracts/solc/v0.8.19/WETH9.bin WETH9 weth9
 
 // Customer contracts
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.15/USDCTokenPool.abi ../../contracts/solc/v0.8.15/USDCTokenPool.bin USDCTokenPool usdc_token_pool
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/USDCTokenPool.abi ../../contracts/solc/v0.8.19/USDCTokenPool.bin USDCTokenPool usdc_token_pool
 
 // Generate mocks for our contracts
 //go:generate mockery --quiet --dir ./generated/evm_2_evm_onramp/ --name EVM2EVMOnRampInterface --output ./mocks/ --outpkg mock_contracts --case=underscore

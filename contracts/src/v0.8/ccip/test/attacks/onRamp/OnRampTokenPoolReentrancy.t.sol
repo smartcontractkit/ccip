@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.15;
+pragma solidity 0.8.19;
 
 import {Internal} from "../../../libraries/Internal.sol";
 import {Client} from "../../../libraries/Client.sol";
