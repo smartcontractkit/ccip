@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/governance_dapp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/ping_pong_demo"
 )
 
@@ -312,57 +310,6 @@ func DeployPingPongDapps(t *testing.T, sourceClient *EvmDeploymentConfig, destCl
 	} else {
 		sourceClient.Logger.Infof("Skipping ping pong deployment")
 	}
-}
-
-func deployGovernanceDapps(t *testing.T, sourceClient *EvmDeploymentConfig, destClient *EvmDeploymentConfig) {
-	feeConfig := governance_dapp.GovernanceDappFeeConfig{
-		FeeAmount:      big.NewInt(10),
-		ChangedAtBlock: big.NewInt(0),
-	}
-
-	sourceClient.Logger.Infof("Deploying source chain governance dapp")
-	governanceDappAddress, tx, _, err := governance_dapp.DeployGovernanceDapp(
-		sourceClient.Owner,
-		sourceClient.Client,
-		sourceClient.ChainConfig.Router,
-		feeConfig,
-		destClient.ChainConfig.SupportedTokens[LINK].Token)
-	require.NoError(t, err)
-
-	err = shared.WaitForMined(sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
-	shared.RequireNoError(t, err)
-	sourceClient.Logger.Infof("GovernanceDapp deployed on %s in tx: %s", governanceDappAddress.Hex(), helpers.ExplorerLink(int64(sourceClient.ChainConfig.EvmChainId), tx.Hash()))
-
-	sourceClient.LaneConfig.GovernanceDapp = governanceDappAddress
-
-	destClient.Logger.Infof("Deploying destination chain governance dapp")
-	governanceDappAddress, tx, _, err = governance_dapp.DeployGovernanceDapp(
-		destClient.Owner,
-		destClient.Client,
-		destClient.ChainConfig.Router,
-		feeConfig,
-		destClient.ChainConfig.SupportedTokens[LINK].Token)
-	require.NoError(t, err)
-
-	err = shared.WaitForMined(destClient.Logger, destClient.Client, tx.Hash(), true)
-	shared.RequireNoError(t, err)
-	destClient.Logger.Infof("GovernanceDapp deployed on %s in tx: %s", governanceDappAddress.Hex(), helpers.ExplorerLink(int64(destClient.ChainConfig.EvmChainId), tx.Hash()))
-
-	destClient.LaneConfig.GovernanceDapp = governanceDappAddress
-
-	governanceDapp, err := governance_dapp.NewGovernanceDapp(sourceClient.LaneConfig.GovernanceDapp, sourceClient.Client)
-	require.NoError(t, err)
-
-	governanceClone := governance_dapp.GovernanceDappCrossChainClone{
-		ChainSelector:   GetCCIPChainId(destClient.ChainConfig.EvmChainId),
-		ContractAddress: destClient.LaneConfig.GovernanceDapp,
-	}
-
-	tx, err = governanceDapp.AddClone(sourceClient.Owner, governanceClone)
-	require.NoError(t, err)
-	err = shared.WaitForMined(sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
-	shared.RequireNoError(t, err)
-	sourceClient.Logger.Infof("GovernanceDapp configured in tx: %s", helpers.ExplorerLink(int64(sourceClient.ChainConfig.EvmChainId), tx.Hash()))
 }
 
 func UsdToRateLimitValue(usd int64) *big.Int {

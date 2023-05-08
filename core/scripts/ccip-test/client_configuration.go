@@ -33,7 +33,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/governance_dapp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/ping_pong_demo"
@@ -161,7 +160,6 @@ type Client struct {
 	LinkTokenAddress common.Address
 	WrappedNative    *link_token_interface.LinkToken
 	SupportedTokens  map[rhea.Token]EVMBridgedToken
-	GovernanceDapp   *governance_dapp.GovernanceDapp
 	PingPongDapp     *ping_pong_demo.PingPongDemo
 	Afn              *afn_contract.AFNContract
 	PriceRegistry    *price_registry.PriceRegistry
@@ -210,8 +208,6 @@ func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient
 	shared.RequireNoError(t, err)
 	router, err := router.NewRouter(config.ChainConfig.Router, config.Client)
 	shared.RequireNoError(t, err)
-	governanceDapp, err := governance_dapp.NewGovernanceDapp(config.LaneConfig.GovernanceDapp, config.Client)
-	shared.RequireNoError(t, err)
 	pingPongDapp, err := ping_pong_demo.NewPingPongDemo(config.LaneConfig.PingPongDapp, config.Client)
 	shared.RequireNoError(t, err)
 	priceRegistry, err := price_registry.NewPriceRegistry(config.ChainConfig.PriceRegistry, config.Client)
@@ -228,7 +224,6 @@ func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient
 			Afn:              afn,
 			PriceRegistry:    priceRegistry,
 			SupportedTokens:  supportedTokens,
-			GovernanceDapp:   governanceDapp,
 			PingPongDapp:     pingPongDapp,
 			Router:           router,
 			AllowList:        config.ChainConfig.AllowList,
@@ -274,8 +269,6 @@ func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestCli
 	shared.RequireNoError(t, err)
 	router, err := router.NewRouter(config.ChainConfig.Router, config.Client)
 	shared.RequireNoError(t, err)
-	governanceDapp, err := governance_dapp.NewGovernanceDapp(config.LaneConfig.GovernanceDapp, config.Client)
-	shared.RequireNoError(t, err)
 	pingPongDapp, err := ping_pong_demo.NewPingPongDemo(config.LaneConfig.PingPongDapp, config.Client)
 	shared.RequireNoError(t, err)
 	priceRegistry, err := price_registry.NewPriceRegistry(config.ChainConfig.PriceRegistry, config.Client)
@@ -290,7 +283,6 @@ func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestCli
 			LinkToken:        linkToken,
 			WrappedNative:    wrappedNative,
 			SupportedTokens:  supportedTokens,
-			GovernanceDapp:   governanceDapp,
 			PingPongDapp:     pingPongDapp,
 			Afn:              afn,
 			PriceRegistry:    priceRegistry,
@@ -367,21 +359,6 @@ func (client *Client) ApproveLinkFrom(t *testing.T, user *bind.TransactOpts, app
 
 func (client *Client) ApproveLink(t *testing.T, approvedFor common.Address, amount *big.Int) {
 	client.ApproveLinkFrom(t, client.Owner, approvedFor, amount)
-}
-
-func (client *CCIPClient) ChangeGovernanceParameters(t *testing.T) {
-	feeConfig := governance_dapp.GovernanceDappFeeConfig{
-		FeeAmount:      big.NewInt(10),
-		ChangedAtBlock: big.NewInt(0),
-	}
-	DestBlockNum := GetCurrentBlockNumber(client.Dest.Client.Client)
-	sourceBlockNum := GetCurrentBlockNumber(client.Source.Client.Client)
-
-	tx, err := client.Source.GovernanceDapp.VoteForNewFeeConfig(client.Source.Owner, feeConfig)
-	require.NoError(t, err)
-	sendRequest := WaitForCrossChainSendRequest(client.Source, sourceBlockNum, tx.Hash())
-	require.NoError(t, client.WaitForCommit(DestBlockNum), "waiting for commit")
-	require.NoError(t, client.WaitForExecution(DestBlockNum, sendRequest.Message.SequenceNumber), "waiting for execution")
 }
 
 func (client *CCIPClient) WaitForCommit(DestBlockNum uint64) error {

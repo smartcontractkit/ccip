@@ -200,7 +200,6 @@ type EVMLaneConfig struct {
 	CommitStore gethcommon.Address
 
 	ReceiverDapp   gethcommon.Address
-	GovernanceDapp gethcommon.Address
 	PingPongDapp   gethcommon.Address
 	DeploySettings LaneDeploySettings
 }
