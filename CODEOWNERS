@@ -45,6 +45,10 @@
 # CCIP services
 /core/services/ocr2/plugins/ccip @smartcontractkit/ccip
 
+# Chainlink Functions related services
+core/services/ocr2/plugins/functions @bolekk @justinkaseman @KuphJr @pinebit
+
+
 # API
 /core/web @jkongie
 
@@ -59,6 +63,9 @@
 /contracts/**/*Keeper* @smartcontractkit/keepers
 /contracts/**/*Upkeep* @smartcontractkit/keepers
 /contracts/**/ccip/ @rensr @matyang
+/contracts/**/*Functions* @bolekk @justinkaseman @KuphJr @pinebit
+/contracts/src/v0.8/functions @bolekk @justinkaseman @KuphJr @pinebit
+
 
 # Tests
 /integration-tests/ @smartcontractkit/test-tooling-team
