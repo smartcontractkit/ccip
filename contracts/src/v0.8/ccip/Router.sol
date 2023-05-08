@@ -145,8 +145,12 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
   ) external override onlyOffRamp(message.sourceChainSelector) returns (bool) {
     // We encode here instead of the offRamps to constrain specifically what functions
     // can be called from the router.
-    bytes memory callData = abi.encodeWithSelector(IAny2EVMMessageReceiver.ccipReceive.selector, message);
-    (bool success, bytes memory retBytes) = _callWithExactGas(gasForCallExactCheck, gasLimit, receiver, callData);
+    (bool success, bytes memory retBytes) = _callWithExactGas(
+      gasForCallExactCheck,
+      gasLimit,
+      receiver,
+      abi.encodeWithSelector(IAny2EVMMessageReceiver.ccipReceive.selector, message)
+    );
     // Execution message is emitted here so clients have a static address to monitor for results,
     // for example to detect failures and retry manually or to notify upon success.
     emit MessageExecuted(message.messageId, success, retBytes);
@@ -168,9 +172,7 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
     uint256 gasAmount,
     address target,
     bytes memory data
-  ) internal returns (bool, bytes memory) {
-    bytes memory retData = new bytes(MAX_RET_BYTES);
-    bool success;
+  ) internal returns (bool success, bytes memory retData) {
     // solhint-disable-next-line no-inline-assembly
     assembly {
       let g := gas()

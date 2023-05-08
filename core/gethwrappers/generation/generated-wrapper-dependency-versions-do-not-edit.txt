@@ -59,7 +59,7 @@ oracle_wrapper: ../../contracts/solc/v0.6/Oracle.abi ../../contracts/solc/v0.6/O
 ping_pong_demo: ../../contracts/solc/v0.8.15/PingPongDemo.abi ../../contracts/solc/v0.8.15/PingPongDemo.bin 5ba8986fa6a25286145bd099c778965d39c5129391f78ca946fbbcfe10167fb1
 price_registry: ../../contracts/solc/v0.8.15/PriceRegistry.abi ../../contracts/solc/v0.8.15/PriceRegistry.bin 3b67fb4370290fb557b5406aba3c4c02d53734416842cb262f0e1f93544a646a
 receiver_dapp: ../../contracts/solc/v0.8.15/ReceiverDapp.abi ../../contracts/solc/v0.8.15/ReceiverDapp.bin 0fa6cb8427816c6545ff445e718e85676937f334bdf0291f38c69d806355a2f7
-router: ../../contracts/solc/v0.8.15/Router.abi ../../contracts/solc/v0.8.15/Router.bin 4a1578fdf9f14704f32858b34b01be9fdb2568ee874d50ef9ba9ffe9701d4935
+router: ../../contracts/solc/v0.8.15/Router.abi ../../contracts/solc/v0.8.15/Router.bin 8ec30dcd8e80237a0102028d445df94f944176d4b445494c3348112fb81a9f43
 simple_message_receiver: ../../contracts/solc/v0.8.15/SimpleMessageReceiver.abi ../../contracts/solc/v0.8.15/SimpleMessageReceiver.bin baefc12c2fe8d25da00c200a40f18a273f0a6f2e84c2ceb4f0332b0ebb98c7b6
 solidity_vrf_consumer_interface: ../../contracts/solc/v0.6/VRFConsumer.abi ../../contracts/solc/v0.6/VRFConsumer.bin ecc99378aa798014de9db42b2eb81320778b0663dbe208008dad75ccdc1d4366
 solidity_vrf_consumer_interface_v08: ../../contracts/solc/v0.8.6/VRFConsumer.abi ../../contracts/solc/v0.8.6/VRFConsumer.bin b14f9136b15e3dc9d6154d5700f3ed4cf88ddc4f70f20c3bb57fc46050904c8f
