@@ -262,6 +262,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
 
     messages[0].nonce++;
     messages[0].sequenceNumber++;
+    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
     vm.expectEmit();
     emit ExecutionStateChanged(
@@ -280,6 +281,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
 
     messages[0].strict = true;
     messages[0].receiver = address(s_reverting_receiver);
+    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
     vm.expectEmit();
     emit ExecutionStateChanged(
@@ -298,6 +300,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
 
     messages[0].strict = true;
     messages[0].receiver = address(s_receiver);
+    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
     vm.expectEmit();
     emit ExecutionStateChanged(
@@ -315,6 +318,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
 
     messages[0].nonce++;
+    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
     vm.expectEmit();
     emit SkippedIncorrectNonce(messages[0].nonce, messages[0].sender);
@@ -326,6 +330,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     Internal.EVM2EVMMessage[] memory messages = _generateMessagesWithTokens();
 
     messages[1].nonce++;
+    messages[1].messageId = Internal._hash(messages[1], s_offRamp.metadataHash());
 
     vm.expectEmit();
     emit ExecutionStateChanged(
@@ -346,6 +351,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
     MaybeRevertMessageReceiverNo165 newReceiver = new MaybeRevertMessageReceiverNo165(true);
     messages[0].receiver = address(newReceiver);
+    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
     vm.expectEmit();
     emit ExecutionStateChanged(
@@ -379,6 +385,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     Internal.EVM2EVMMessage[] memory messages = _generateMessagesWithTokens();
     // Set message 1 to use another receiver to simulate more fair gas costs
     messages[1].receiver = address(s_secondary_receiver);
+    messages[1].messageId = Internal._hash(messages[1], s_offRamp.metadataHash());
 
     vm.expectEmit();
     emit ExecutionStateChanged(
@@ -404,6 +411,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     Internal.EVM2EVMMessage[] memory messages = _generateMessagesWithTokens();
     // Set message 1 to use another receiver to simulate more fair gas costs
     messages[1].receiver = address(s_secondary_receiver);
+    messages[1].messageId = Internal._hash(messages[1], s_offRamp.metadataHash());
 
     vm.expectEmit();
     emit ExecutionStateChanged(
@@ -425,6 +433,15 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
   }
 
   // Reverts
+
+  function testInvalidMessageIdReverts() public {
+    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
+    messages[0].nonce++;
+    // MessageID no longer matches hash.
+    Internal.ExecutionReport memory executionReport = _generateReportFromMessages(messages);
+    vm.expectRevert(EVM2EVMOffRamp.InvalidMessageId.selector);
+    s_offRamp.execute(executionReport, false);
+  }
 
   function testPausedReverts() public {
     s_mockCommitStore.pause();
@@ -493,6 +510,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
   function testInvalidSourceChainReverts() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
     messages[0].sourceChainSelector = SOURCE_CHAIN_ID + 1;
+    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.InvalidSourceChain.selector, SOURCE_CHAIN_ID + 1));
     s_offRamp.execute(_generateReportFromMessages(messages), false);
@@ -502,6 +520,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
     Client.EVMTokenAmount[] memory newTokens = new Client.EVMTokenAmount[](MAX_TOKENS_LENGTH + 1);
     messages[0].tokenAmounts = newTokens;
+    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
     Internal.ExecutionReport memory report = _generateReportFromMessages(messages);
 
     vm.expectRevert(
@@ -524,6 +543,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
     messages[0]
       .data = "3.1415926535897932384626433832795028841971693993751058209749445923078164062862089986280348253421170679821480865132823066470938446095505822317253594081284811174502841027019385211055596446229489549303819644288109756659334461284756482337867831652712019091456485669234603486104543266482133936072602491412737245870066063155881748815209209628292540917153643678925903600113305305488204665213841469519415116094330572703657595919530921861173819326117931051185480744623799627495673518857527248912279381830119491";
+    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
     Internal.ExecutionReport memory executionReport = _generateReportFromMessages(messages);
     vm.expectRevert(
@@ -536,6 +556,8 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     Internal.EVM2EVMMessage[] memory messages = _generateMessagesWithTokens();
     messages[0].tokenAmounts[0] = getCastedDestinationEVMTokenAmountsWithZeroAmounts()[0];
     messages[0].feeToken = messages[0].tokenAmounts[0].token;
+    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
+    messages[1].messageId = Internal._hash(messages[1], s_offRamp.metadataHash());
     vm.expectRevert(
       abi.encodeWithSelector(
         EVM2EVMOffRamp.ExecutionError.selector,
@@ -584,6 +606,7 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
     s_prevOffRamp.execute(_generateReportFromMessages(messages), false);
 
     messages[0].nonce++;
+    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
     vm.expectEmit();
     emit ExecutionStateChanged(
@@ -599,6 +622,7 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
 
     messages[0].nonce++;
     messages[0].sequenceNumber++;
+    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
     vm.expectEmit();
     emit ExecutionStateChanged(
@@ -625,6 +649,7 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
 
     address newSender = address(1234567);
     messages[0].sender = newSender;
+    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
     vm.expectEmit();
     emit ExecutionStateChanged(
@@ -645,6 +670,7 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
     address newSender = address(1234567);
     messages[0].sender = newSender;
     messages[0].nonce = 2;
+    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
     // new offramp waits previous offramp to execute
     vm.expectEmit();
@@ -653,6 +679,7 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
     assertEq(s_offRamp.getSenderNonce(newSender), 0);
 
     messages[0].nonce = 1;
+    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
     // previous offramp executes msg and increases nonce
     vm.expectEmit();
@@ -664,6 +691,7 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
     s_prevOffRamp.execute(_generateReportFromMessages(messages), false);
 
     messages[0].nonce = 2;
+    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
     // new offramp is able to execute
     vm.expectEmit();
@@ -708,6 +736,7 @@ contract EVM2EVMOffRamp_executeSingleMessage is EVM2EVMOffRampSetup {
     Internal.EVM2EVMMessage memory message = _generateAny2EVMMessageNoTokens(1);
     message.gasLimit = 1;
     message.receiver = address(new ConformingReceiver(address(s_destRouter), s_destFeeToken));
+    message.messageId = Internal._hash(message, s_offRamp.metadataHash());
     vm.expectRevert(EVM2EVMOffRamp.ReceiverError.selector);
     s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), false);
     vm.expectEmit();
@@ -778,6 +807,7 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
     messages[0].tokenAmounts = new Client.EVMTokenAmount[](1);
     messages[0].tokenAmounts[0] = Client.EVMTokenAmount({token: s_sourceFeeToken, amount: tokenAmount});
     messages[0].receiver = address(receiver);
+    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
     Internal.ExecutionReport memory report = _generateReportFromMessages(messages);
 

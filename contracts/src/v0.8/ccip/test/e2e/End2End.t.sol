@@ -38,8 +38,11 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
 
     bytes32[] memory hashedMessages = new bytes32[](3);
     hashedMessages[0] = messages[0]._hash(metaDataHash);
+    messages[0].messageId = hashedMessages[0];
     hashedMessages[1] = messages[1]._hash(metaDataHash);
+    messages[1].messageId = hashedMessages[1];
     hashedMessages[2] = messages[2]._hash(metaDataHash);
+    messages[2].messageId = hashedMessages[2];
 
     bytes32[] memory merkleRoots = new bytes32[](1);
     merkleRoots[0] = MerkleHelper.getMerkleRoot(hashedMessages);

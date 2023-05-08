@@ -50,6 +50,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
   error ReceiverError();
   error EmptyReport();
   error BadAFNSignal();
+  error InvalidMessageId();
   error InvalidTokenPoolConfig();
   error PoolAlreadyAdded();
   error PoolDoesNotExist();
@@ -220,6 +221,10 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
       // We do this hash here instead of in _verifyMessages to avoid two separate loops
       // over the same data, which increases gas cost
       hashedLeaves[i] = Internal._hash(decodedMessage, i_metadataHash);
+      // For EVM2EVM offramps, the messageID is the leaf hash.
+      // Asserting that this is true ensures we don't accidentally commit and then execute
+      // a message with an unexpected hash.
+      if (hashedLeaves[i] != decodedMessage.messageId) revert InvalidMessageId();
       decodedMessages[i] = decodedMessage;
     }
 
