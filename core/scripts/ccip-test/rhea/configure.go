@@ -42,7 +42,7 @@ func SetPriceRegistryPrices(t *testing.T, client *EvmDeploymentConfig, destChain
 
 	priceUpdates := price_registry.InternalPriceUpdates{
 		TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{},
-		DestChainId:       destChainSelector,
+		DestChainSelector: destChainSelector,
 		// Set 1e18 units of gas to $2k, being fairly reasonable for eth
 		// These values will get auto updated by the DON
 		UsdPerUnitGas: big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
@@ -67,7 +67,7 @@ func setOnRampOnRouter(t *testing.T, sourceClient *EvmDeploymentConfig, destChai
 	shared.RequireNoError(t, err)
 	sourceClient.Logger.Infof("Registering new onRamp")
 	tx, err := routerContract.ApplyRampUpdates(sourceClient.Owner, []router.RouterOnRamp{
-		{DestChainId: destChainSelector, OnRamp: sourceClient.LaneConfig.OnRamp}}, nil, nil)
+		{DestChainSelector: destChainSelector, OnRamp: sourceClient.LaneConfig.OnRamp}}, nil, nil)
 	shared.RequireNoError(t, err)
 	err = shared.WaitForMined(sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
 	shared.RequireNoError(t, err)

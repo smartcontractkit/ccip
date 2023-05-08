@@ -39,13 +39,13 @@ func main() {
 func NewClient() MetisClient {
 	lggr, closeLggr := logger.NewLogger()
 	return MetisClient{
-		Logger:      lggr,
+		Logger:      logger.Sugared(lggr),
 		CloseLogger: closeLggr,
 	}
 }
 
 type MetisClient struct {
-	Logger      logger.Logger
+	Logger      logger.SugaredLogger
 	CloseLogger func() error
 }
 

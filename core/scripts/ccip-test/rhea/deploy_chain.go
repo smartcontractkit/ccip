@@ -231,8 +231,8 @@ func deployPriceRegistry(client *EvmDeploymentConfig) error {
 			TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{},
 			// 0 signals that the UsdPerUnitGas should not be used and this is
 			// not an update for gas fee prices.
-			DestChainId:   0,
-			UsdPerUnitGas: big.NewInt(0),
+			DestChainSelector: 0,
+			UsdPerUnitGas:     big.NewInt(0),
 		},
 		[]common.Address{},
 		feeTokens,

@@ -932,7 +932,7 @@ func syncPrices(client *Client, otherChainTokens map[rhea.Token]EVMBridgedToken)
 		if price.Cmp(tokenPrices[i].Value) != 0 {
 			priceUpdates := price_registry.InternalPriceUpdates{
 				TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{},
-				DestChainId:       0,
+				DestChainSelector: 0,
 				UsdPerUnitGas:     big.NewInt(0),
 			}
 

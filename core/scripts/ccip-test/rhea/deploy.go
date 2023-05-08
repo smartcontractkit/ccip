@@ -144,8 +144,8 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainSelector u
 		client.Client, // client
 		evm_2_evm_onramp.EVM2EVMOnRampStaticConfig{
 			LinkToken:         client.ChainConfig.SupportedTokens[LINK].Token,
-			ChainId:           GetCCIPChainId(client.ChainConfig.EvmChainId),
-			DestChainId:       destChainSelector,
+			ChainSelector:     GetCCIPChainId(client.ChainConfig.EvmChainId),
+			DestChainSelector: destChainSelector,
 			DefaultTxGasLimit: DEFAULT_GAS_LIMIT,
 			PrevOnRamp:        common.HexToAddress(""),
 		},
@@ -199,11 +199,11 @@ func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainSelecto
 		client.Owner,
 		client.Client,
 		evm_2_evm_offramp.EVM2EVMOffRampStaticConfig{
-			CommitStore:   client.LaneConfig.CommitStore,
-			ChainId:       GetCCIPChainId(client.ChainConfig.EvmChainId),
-			SourceChainId: sourceChainSelector,
-			OnRamp:        onRamp,
-			PrevOffRamp:   common.HexToAddress(""),
+			CommitStore:         client.LaneConfig.CommitStore,
+			ChainSelector:       GetCCIPChainId(client.ChainConfig.EvmChainId),
+			SourceChainSelector: sourceChainSelector,
+			OnRamp:              onRamp,
+			PrevOffRamp:         common.HexToAddress(""),
 		},
 		syncedSourceTokens,
 		syncedDestPools,
@@ -234,9 +234,9 @@ func deployCommitStore(t *testing.T, client *EvmDeploymentConfig, sourceChainSel
 		client.Owner,  // user
 		client.Client, // client
 		commit_store.CommitStoreStaticConfig{
-			ChainId:       GetCCIPChainId(client.ChainConfig.EvmChainId),
-			SourceChainId: sourceChainSelector,
-			OnRamp:        onRamp,
+			ChainSelector:       GetCCIPChainId(client.ChainConfig.EvmChainId),
+			SourceChainSelector: sourceChainSelector,
+			OnRamp:              onRamp,
 		},
 	)
 	shared.RequireNoError(t, err)
@@ -354,7 +354,7 @@ func deployGovernanceDapps(t *testing.T, sourceClient *EvmDeploymentConfig, dest
 	require.NoError(t, err)
 
 	governanceClone := governance_dapp.GovernanceDappCrossChainClone{
-		ChainId:         GetCCIPChainId(destClient.ChainConfig.EvmChainId),
+		ChainSelector:   GetCCIPChainId(destClient.ChainConfig.EvmChainId),
 		ContractAddress: destClient.LaneConfig.GovernanceDapp,
 	}
 

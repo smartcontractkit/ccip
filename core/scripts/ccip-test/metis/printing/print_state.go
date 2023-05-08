@@ -328,12 +328,14 @@ func printRampSanityCheck(chain *rhea.EvmDeploymentConfig, sourceOnRamp common.A
 	router, err := router.NewRouter(chain.ChainConfig.Router, chain.Client)
 	helpers.PanicErr(err)
 
-	offRamps, err := router.GetAuthorizedCallers(&bind.CallOpts{})
+	offRamps, err := router.GetOffRamps(&bind.CallOpts{})
 	helpers.PanicErr(err)
-	var isRamp bool
+
+	isRamp := false
 	for _, ramp := range offRamps {
-		if ramp == chain.LaneConfig.OffRamp {
+		if ramp.OffRamp == chain.LaneConfig.OffRamp {
 			isRamp = true
+			break
 		}
 	}
 
@@ -596,7 +598,7 @@ func checkPriceRegistrySet(source *rhea.EvmDeploymentConfig, destination *rhea.E
 
 	for _, tokenName := range source.ChainConfig.FeeTokens {
 		token := source.ChainConfig.SupportedTokens[tokenName].Token
-		_, err = feeManager.GetFeeTokenBaseUnitsPerUnitGas(&bind.CallOpts{}, token, rhea.GetCCIPChainId(destination.ChainConfig.EvmChainId))
+		_, err = feeManager.GetFeeTokenAndGasPrices(&bind.CallOpts{}, token, rhea.GetCCIPChainId(destination.ChainConfig.EvmChainId))
 		if err != nil {
 			sb.WriteString(fmt.Sprintf("| %-20s | %14d | %9s |\n", tokenName, destination.ChainConfig.EvmChainId, printBool(false)))
 		}
@@ -611,7 +613,7 @@ func checkPriceRegistrySet(source *rhea.EvmDeploymentConfig, destination *rhea.E
 
 	for _, tokenName := range destination.ChainConfig.FeeTokens {
 		token := destination.ChainConfig.SupportedTokens[tokenName].Token
-		_, err = feeManager.GetFeeTokenBaseUnitsPerUnitGas(&bind.CallOpts{}, token, rhea.GetCCIPChainId(source.ChainConfig.EvmChainId))
+		_, err = feeManager.GetFeeTokenAndGasPrices(&bind.CallOpts{}, token, rhea.GetCCIPChainId(source.ChainConfig.EvmChainId))
 		if err != nil {
 			sb.WriteString(fmt.Sprintf("| %-20s | %14d | %9s |\n", tokenName, source.ChainConfig.EvmChainId, printBool(false)))
 		}
