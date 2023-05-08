@@ -168,15 +168,15 @@ func (c *CCIPContracts) EnableOffRamp(t *testing.T) {
 	require.NoError(t, err)
 	c.Dest.Chain.Commit()
 
-	onChainConfig := c.createDefaultExecOnchainConfig(t)
-	offChainConfig := c.createDefaultExecOffchainConfig(t)
+	onChainConfig := c.CreateDefaultExecOnchainConfig(t)
+	offChainConfig := c.CreateDefaultExecOffchainConfig(t)
 
 	c.SetupExecOCR2Config(t, onChainConfig, offChainConfig)
 }
 
 func (c *CCIPContracts) EnableCommitStore(t *testing.T) {
-	onChainConfig := c.createDefaultCommitOnchainConfig(t)
-	offChainConfig := c.createDefaultCommitOffchainConfig(t)
+	onChainConfig := c.CreateDefaultCommitOnchainConfig(t)
+	offChainConfig := c.CreateDefaultCommitOffchainConfig(t)
 
 	c.SetupCommitOCR2Config(t, onChainConfig, offChainConfig)
 
@@ -411,18 +411,6 @@ func (c *CCIPContracts) SetupOnchainConfig(t *testing.T, commitOnchainConfig, co
 	c.SetupExecOCR2Config(t, execOnchainConfig, execOffchainConfig)
 
 	return blockBeforeConfig.Number().Int64()
-}
-
-func (c *CCIPContracts) NewCCIPJobSpecParams(tokenPricesUSDPipeline string, configBlock int64) CCIPJobSpecParams {
-	return CCIPJobSpecParams{
-		CommitStore:            c.Dest.CommitStore.Address(),
-		DestEvmChainId:         c.Dest.ChainID,
-		SourceEvmChainId:       c.Source.ChainID,
-		SourceChainName:        "SimulatedSource",
-		DestChainName:          "SimulatedDest",
-		TokenPricesUSDPipeline: tokenPricesUSDPipeline,
-		DestStartBlock:         uint64(configBlock),
-	}
 }
 
 func (c *CCIPContracts) SendMessage(t *testing.T, gasLimit, gasPrice, tokenAmount *big.Int, receiverAddr common.Address) {
@@ -734,19 +722,21 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	require.NoError(t, err)
 
 	// Deploy commit store.
-	commitStoreAddress, _, _, err := commit_store.DeployCommitStore(
+	commitStoreAddress, _, _, err := commit_store_helper.DeployCommitStoreHelper(
 		destUser,  // user
 		destChain, // client
-		commit_store.CommitStoreStaticConfig{
+		commit_store_helper.CommitStoreStaticConfig{
 			ChainSelector:       destChainID,
 			SourceChainSelector: sourceChainID,
 			OnRamp:              onRamp.Address(),
 		},
 	)
 	require.NoError(t, err)
+	destChain.Commit()
 	commitStore, err := commit_store.NewCommitStore(commitStoreAddress, destChain)
 	require.NoError(t, err)
-	destChain.Commit()
+	commitStoreHelper, err := commit_store_helper.NewCommitStoreHelper(commitStoreAddress, destChain)
+	require.NoError(t, err)
 
 	// Create dest router
 	destRouterAddress, _, _, err := router.DeployRouter(destUser, destChain, destWeth9addr)
@@ -836,10 +826,11 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			WrappedNative:     destWrapped,
 			WrappedNativePool: destWrappedPool,
 		},
-		CommitStore: commitStore,
-		Router:      destRouter,
-		OffRamp:     offRamp,
-		Receivers:   []MaybeRevertReceiver{{Receiver: revertingMessageReceiver1, Strict: false}, {Receiver: revertingMessageReceiver2, Strict: true}},
+		CommitStoreHelper: commitStoreHelper,
+		CommitStore:       commitStore,
+		Router:            destRouter,
+		OffRamp:           offRamp,
+		Receivers:         []MaybeRevertReceiver{{Receiver: revertingMessageReceiver1, Strict: false}, {Receiver: revertingMessageReceiver2, Strict: true}},
 	}
 
 	return CCIPContracts{

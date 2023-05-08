@@ -36,6 +36,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/metatx"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
+	integrationtesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers/integration"
 )
 
 func TestMetaERC20SameChain(t *testing.T) {
@@ -55,7 +56,8 @@ func TestMetaERC20SameChain(t *testing.T) {
 	chain := backends.NewSimulatedBackend(core.GenesisAlloc{
 		contractOwner.From: {
 			Balance: big.NewInt(0).Mul(big.NewInt(1000), big.NewInt(1e18)),
-		}}, ethconfig.Defaults.Miner.GasCeil)
+		},
+	}, ethconfig.Defaults.Miner.GasCeil)
 
 	// deploys forwarder that verifies meta transaction signature and forwards requests to token
 	forwarderAddress, forwarder := setUpForwarder(t, contractOwner, chain)
@@ -123,7 +125,7 @@ func TestMetaERC20SameChain(t *testing.T) {
 }
 
 func TestMetaERC20CrossChain(t *testing.T) {
-	ccipContracts := testhelpers.SetupCCIPContracts(t, testhelpers.SourceChainID, testhelpers.DestChainID)
+	ccipContracts := integrationtesthelpers.SetupCCIPIntegrationTH(t, testhelpers.SourceChainID, testhelpers.DestChainID)
 
 	// holder1Key sends tokens to holder2
 	holder1Key, holder1 := generateKeyAndTransactor(t, ccipContracts.Source.Chain.Blockchain().Config().ChainID.Uint64())
@@ -326,7 +328,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		assert.Len(t, executionLogs, 1)
 		ccipContracts.AssertExecState(t, executionLogs[0], abihelpers.ExecutionStateSuccess)
 
-		//source token is locked in the token pool
+		// source token is locked in the token pool
 		lockedTokenBal, err := sourceToken.BalanceOf(nil, sourcePoolAddress)
 		require.NoError(t, err)
 		require.Equal(t, lockedTokenBal, amount)

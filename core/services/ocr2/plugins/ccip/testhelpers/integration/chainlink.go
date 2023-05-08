@@ -1,4 +1,4 @@
-package testhelpers
+package integrationtesthelpers
 
 import (
 	"context"
@@ -39,6 +39,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/validate"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrbootstrap"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
@@ -53,7 +54,7 @@ type Node struct {
 	KeyBundle       ocr2key.KeyBundle
 }
 
-func (node *Node) EventuallyHasReqSeqNum(t *testing.T, ccipContracts *CCIPContracts, onRamp common.Address, seqNum int) logpoller.Log {
+func (node *Node) EventuallyHasReqSeqNum(t *testing.T, ccipContracts *CCIPIntegrationTestHarness, onRamp common.Address, seqNum int) logpoller.Log {
 	c, err := node.App.GetChains().EVM.Get(big.NewInt(0).SetUint64(ccipContracts.Source.ChainID))
 	require.NoError(t, err)
 	var log logpoller.Log
@@ -79,7 +80,7 @@ func (node *Node) EventuallyHasReqSeqNum(t *testing.T, ccipContracts *CCIPContra
 	return log
 }
 
-func (node *Node) EventuallyHasExecutedSeqNums(t *testing.T, ccipContracts *CCIPContracts, offRamp common.Address, minSeqNum int, maxSeqNum int) []logpoller.Log {
+func (node *Node) EventuallyHasExecutedSeqNums(t *testing.T, ccipContracts *CCIPIntegrationTestHarness, offRamp common.Address, minSeqNum int, maxSeqNum int) []logpoller.Log {
 	c, err := node.App.GetChains().EVM.Get(big.NewInt(0).SetUint64(ccipContracts.Dest.ChainID))
 	require.NoError(t, err)
 	var logs []logpoller.Log
@@ -105,7 +106,7 @@ func (node *Node) EventuallyHasExecutedSeqNums(t *testing.T, ccipContracts *CCIP
 	return logs
 }
 
-func (node *Node) ConsistentlySeqNumHasNotBeenExecuted(t *testing.T, ccipContracts *CCIPContracts, offRamp common.Address, seqNum int) logpoller.Log {
+func (node *Node) ConsistentlySeqNumHasNotBeenExecuted(t *testing.T, ccipContracts *CCIPIntegrationTestHarness, offRamp common.Address, seqNum int) logpoller.Log {
 	c, err := node.App.GetChains().EVM.Get(big.NewInt(0).SetUint64(ccipContracts.Dest.ChainID))
 	require.NoError(t, err)
 	var log logpoller.Log
@@ -215,7 +216,7 @@ func setupNodeCCIP(
 	sourceClient := client.NewSimulatedBackendClient(t, sourceChain, sourceChainID)
 	destClient := client.NewSimulatedBackendClient(t, destChain, destChainID)
 	keyStore := keystore.New(db, utils.FastScryptParams, lggr, config)
-	simEthKeyStore := EthKeyStoreSim{Eth: keyStore.Eth()}
+	simEthKeyStore := testhelpers.EthKeyStoreSim{Eth: keyStore.Eth()}
 	mailMon := utils.NewMailboxMonitor("CCIP")
 
 	evmChain, err := evm.NewTOMLChainSet(context.Background(), evm.ChainSetOpts{
@@ -314,7 +315,18 @@ func createConfigV2Chain(chainId *big.Int) *v2.EVMConfig {
 	}
 }
 
-func (c *CCIPContracts) AddAllJobs(t *testing.T, jobParams CCIPJobSpecParams, nodes []Node) {
+type CCIPIntegrationTestHarness struct {
+	testhelpers.CCIPContracts
+}
+
+func SetupCCIPIntegrationTH(t *testing.T, sourceChainID, destChainID uint64) CCIPIntegrationTestHarness {
+	c := testhelpers.SetupCCIPContracts(t, sourceChainID, destChainID)
+	return CCIPIntegrationTestHarness{
+		CCIPContracts: c,
+	}
+}
+
+func (c *CCIPIntegrationTestHarness) AddAllJobs(t *testing.T, jobParams CCIPJobSpecParams, nodes []Node) {
 	jobParams.OffRamp = c.Dest.OffRamp.Address()
 
 	commitSpec, err := jobParams.CommitJobSpec()
@@ -331,7 +343,7 @@ func (c *CCIPContracts) AddAllJobs(t *testing.T, jobParams CCIPJobSpecParams, no
 	}
 }
 
-func (c *CCIPContracts) AllNodesHaveReqSeqNum(t *testing.T, onRamp common.Address, nodes []Node, seqNum int) logpoller.Log {
+func (c *CCIPIntegrationTestHarness) AllNodesHaveReqSeqNum(t *testing.T, onRamp common.Address, nodes []Node, seqNum int) logpoller.Log {
 	var log logpoller.Log
 	for _, node := range nodes {
 		log = node.EventuallyHasReqSeqNum(t, c, onRamp, seqNum)
@@ -339,7 +351,7 @@ func (c *CCIPContracts) AllNodesHaveReqSeqNum(t *testing.T, onRamp common.Addres
 	return log
 }
 
-func (c *CCIPContracts) AllNodesHaveExecutedSeqNums(t *testing.T, offRamp common.Address, nodes []Node, minSeqNum int, maxSeqNum int) []logpoller.Log {
+func (c *CCIPIntegrationTestHarness) AllNodesHaveExecutedSeqNums(t *testing.T, offRamp common.Address, nodes []Node, minSeqNum int, maxSeqNum int) []logpoller.Log {
 	var logs []logpoller.Log
 	for _, node := range nodes {
 		logs = node.EventuallyHasExecutedSeqNums(t, c, offRamp, minSeqNum, maxSeqNum)
@@ -347,7 +359,7 @@ func (c *CCIPContracts) AllNodesHaveExecutedSeqNums(t *testing.T, offRamp common
 	return logs
 }
 
-func (c *CCIPContracts) NoNodesHaveExecutedSeqNum(t *testing.T, offRamp common.Address, nodes []Node, seqNum int) logpoller.Log {
+func (c *CCIPIntegrationTestHarness) NoNodesHaveExecutedSeqNum(t *testing.T, offRamp common.Address, nodes []Node, seqNum int) logpoller.Log {
 	var log logpoller.Log
 	for _, node := range nodes {
 		log = node.ConsistentlySeqNumHasNotBeenExecuted(t, c, offRamp, seqNum)
@@ -355,7 +367,7 @@ func (c *CCIPContracts) NoNodesHaveExecutedSeqNum(t *testing.T, offRamp common.A
 	return log
 }
 
-func (c *CCIPContracts) EventuallyCommitReportAccepted(t *testing.T, currentBlock uint64) commit_store.CommitStoreCommitReport {
+func (c *CCIPIntegrationTestHarness) EventuallyCommitReportAccepted(t *testing.T, currentBlock uint64) commit_store.CommitStoreCommitReport {
 	g := gomega.NewGomegaWithT(t)
 	var report commit_store.CommitStoreCommitReport
 	g.Eventually(func() bool {
@@ -372,7 +384,7 @@ func (c *CCIPContracts) EventuallyCommitReportAccepted(t *testing.T, currentBloc
 	return report
 }
 
-func (c *CCIPContracts) SetupAndStartNodes(ctx context.Context, t *testing.T, bootstrapNodePort int64) (Node, []Node, int64) {
+func (c *CCIPIntegrationTestHarness) SetupAndStartNodes(ctx context.Context, t *testing.T, bootstrapNodePort int64) (Node, []Node, int64) {
 	appBootstrap, bootstrapPeerID, bootstrapTransmitter, bootstrapKb := setupNodeCCIP(t, c.Dest.User, bootstrapNodePort,
 		"bootstrap_ccip", c.Source.Chain, c.Dest.Chain, big.NewInt(0).SetUint64(c.Source.ChainID),
 		big.NewInt(0).SetUint64(c.Dest.ChainID), "", 0)
@@ -427,16 +439,16 @@ func (c *CCIPContracts) SetupAndStartNodes(ctx context.Context, t *testing.T, bo
 	}
 
 	c.Oracles = oracles
-	commitOnchainConfig := c.createDefaultCommitOnchainConfig(t)
-	commitOffchainConfig := c.createDefaultCommitOffchainConfig(t)
-	execOnchainConfig := c.createDefaultExecOnchainConfig(t)
-	execOffchainConfig := c.createDefaultExecOffchainConfig(t)
+	commitOnchainConfig := c.CreateDefaultCommitOnchainConfig(t)
+	commitOffchainConfig := c.CreateDefaultCommitOffchainConfig(t)
+	execOnchainConfig := c.CreateDefaultExecOnchainConfig(t)
+	execOffchainConfig := c.CreateDefaultExecOffchainConfig(t)
 
 	configBlock := c.SetupOnchainConfig(t, commitOnchainConfig, commitOffchainConfig, execOnchainConfig, execOffchainConfig)
 	return bootstrapNode, nodes, configBlock
 }
 
-func (c *CCIPContracts) SetUpNodesAndJobs(t *testing.T, pricePipeline string, bootstrapNodePort int64) ([]Node, CCIPJobSpecParams) {
+func (c *CCIPIntegrationTestHarness) SetUpNodesAndJobs(t *testing.T, pricePipeline string, bootstrapNodePort int64) ([]Node, CCIPJobSpecParams) {
 	// setup Jobs
 	ctx := context.Background()
 	// Starts nodes and configures them in the OCR contracts.

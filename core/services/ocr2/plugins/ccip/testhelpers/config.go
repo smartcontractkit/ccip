@@ -13,7 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
 
-func (c *CCIPContracts) createDefaultCommitOnchainConfig(t *testing.T) []byte {
+func (c *CCIPContracts) CreateDefaultCommitOnchainConfig(t *testing.T) []byte {
 	config, err := abihelpers.EncodeAbiStruct(ccipconfig.CommitOnchainConfig{
 		PriceRegistry: c.Dest.PriceRegistry.Address(),
 		Afn:           c.Dest.AFN.Address(),
@@ -22,7 +22,7 @@ func (c *CCIPContracts) createDefaultCommitOnchainConfig(t *testing.T) []byte {
 	return config
 }
 
-func (c *CCIPContracts) createDefaultCommitOffchainConfig(t *testing.T) []byte {
+func (c *CCIPContracts) CreateDefaultCommitOffchainConfig(t *testing.T) []byte {
 	return c.createCommitOffchainConfig(t, 10*time.Second, 5*time.Second)
 }
 
@@ -39,7 +39,7 @@ func (c *CCIPContracts) createCommitOffchainConfig(t *testing.T, feeUpdateHearBe
 	return config
 }
 
-func (c *CCIPContracts) createDefaultExecOnchainConfig(t *testing.T) []byte {
+func (c *CCIPContracts) CreateDefaultExecOnchainConfig(t *testing.T) []byte {
 	config, err := abihelpers.EncodeAbiStruct(ccipconfig.ExecOnchainConfig{
 		PermissionLessExecutionThresholdSeconds: 5 * 60,
 		Router:                                  c.Dest.Router.Address(),
@@ -52,7 +52,7 @@ func (c *CCIPContracts) createDefaultExecOnchainConfig(t *testing.T) []byte {
 	return config
 }
 
-func (c *CCIPContracts) createDefaultExecOffchainConfig(t *testing.T) []byte {
+func (c *CCIPContracts) CreateDefaultExecOffchainConfig(t *testing.T) []byte {
 	return c.createExecOffchainConfig(t, 5*time.Second, 1*time.Second)
 }
 

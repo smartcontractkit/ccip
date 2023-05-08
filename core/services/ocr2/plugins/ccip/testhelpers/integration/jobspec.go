@@ -1,4 +1,4 @@
-package testhelpers
+package integrationtesthelpers
 
 import (
 	"fmt"
@@ -155,5 +155,17 @@ func (params CCIPJobSpecParams) BootstrapJob(contractID string) *client.OCR2Task
 		Name:           fmt.Sprintf("%s-%s", Boostrap, params.DestChainName),
 		JobType:        "bootstrap",
 		OCR2OracleSpec: bootstrapSpec,
+	}
+}
+
+func (c *CCIPIntegrationTestHarness) NewCCIPJobSpecParams(tokenPricesUSDPipeline string, configBlock int64) CCIPJobSpecParams {
+	return CCIPJobSpecParams{
+		CommitStore:            c.Dest.CommitStore.Address(),
+		DestEvmChainId:         c.Dest.ChainID,
+		SourceEvmChainId:       c.Source.ChainID,
+		SourceChainName:        "SimulatedSource",
+		DestChainName:          "SimulatedDest",
+		TokenPricesUSDPipeline: tokenPricesUSDPipeline,
+		DestStartBlock:         uint64(configBlock),
 	}
 }

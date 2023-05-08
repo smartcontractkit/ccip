@@ -17,19 +17,19 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	envclient "github.com/smartcontractkit/chainlink-env/client"
-	"github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver"
-	mockservercfg "github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver-cfg"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
+	"golang.org/x/sync/errgroup"
 
+	envclient "github.com/smartcontractkit/chainlink-env/client"
 	"github.com/smartcontractkit/chainlink-env/environment"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/chainlink"
+	"github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver"
+	mockservercfg "github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver-cfg"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/reorg"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts/ccip"
@@ -43,6 +43,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipConfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
+	integrationtesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers/integration"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 	bigmath "github.com/smartcontractkit/chainlink/v2/core/utils/big_math"
@@ -1666,7 +1667,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		return fmt.Errorf("getting current block should be successful in destination chain %+v", err)
 	}
 
-	jobParams := testhelpers.CCIPJobSpecParams{
+	jobParams := integrationtesthelpers.CCIPJobSpecParams{
 		OffRamp:          lane.Dest.OffRamp.EthAddress,
 		CommitStore:      lane.Dest.CommitStore.EthAddress,
 		SourceChainName:  sourceChainClient.GetNetworkName(),
@@ -1786,7 +1787,7 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 }
 
 func CreateBootstrapJob(
-	jobParams testhelpers.CCIPJobSpecParams,
+	jobParams integrationtesthelpers.CCIPJobSpecParams,
 	bootstrapCommit *client.CLNodesWithKeys,
 	bootstrapExec *client.CLNodesWithKeys,
 ) error {
@@ -1805,7 +1806,7 @@ func CreateBootstrapJob(
 
 func CreateOCR2CCIPCommitJobs(
 	ctx context.Context,
-	jobParams testhelpers.CCIPJobSpecParams,
+	jobParams integrationtesthelpers.CCIPJobSpecParams,
 	commitNodes []*client.CLNodesWithKeys,
 	tokenUSDMap map[string]string,
 	mockServer *ctfClient.MockserverClient,
@@ -1843,7 +1844,7 @@ func CreateOCR2CCIPCommitJobs(
 	return nil
 }
 
-func CreateOCR2CCIPExecutionJobs(jobParams testhelpers.CCIPJobSpecParams, execNodes []*client.CLNodesWithKeys) error {
+func CreateOCR2CCIPExecutionJobs(jobParams integrationtesthelpers.CCIPJobSpecParams, execNodes []*client.CLNodesWithKeys) error {
 	ocr2SpecExec, err := jobParams.ExecutionJobSpec()
 	if err != nil {
 		return errors.WithStack(err)

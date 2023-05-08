@@ -16,10 +16,11 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
+	integrationtesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers/integration"
 )
 
 func TestIntegration_CCIP(t *testing.T) {
-	ccipContracts := testhelpers.SetupCCIPContracts(t, testhelpers.SourceChainID, testhelpers.DestChainID)
+	ccipContracts := integrationtesthelpers.SetupCCIPIntegrationTH(t, testhelpers.SourceChainID, testhelpers.DestChainID)
 	linkUSD := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, err := w.Write([]byte(`{"UsdPerLink": "8000000000000000000"}`))
 		require.NoError(t, err)
