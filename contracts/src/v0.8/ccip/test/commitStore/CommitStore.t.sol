@@ -49,13 +49,15 @@ contract CommitStoreRealAFNSetup is PriceRegistrySetup, OCR2BaseSetup {
 
   AFN internal s_afn;
 
+  address constant BLESS_VOTE_ADDR = address(8888);
+
   function setUp() public virtual override(PriceRegistrySetup, OCR2BaseSetup) {
     PriceRegistrySetup.setUp();
     OCR2BaseSetup.setUp();
 
     AFN.Voter[] memory voters = new AFN.Voter[](1);
     voters[0] = AFN.Voter({
-      blessVoteAddr: OWNER,
+      blessVoteAddr: BLESS_VOTE_ADDR,
       curseVoteAddr: address(9999),
       curseUnvoteAddr: address(19999),
       blessWeight: 1,
@@ -281,6 +283,7 @@ contract CommitStore_resetUnblessedRoots is CommitStoreRealAFNSetup {
     IAFN.TaggedRoot[] memory blessedTaggedRoots = new IAFN.TaggedRoot[](1);
     blessedTaggedRoots[0] = IAFN.TaggedRoot({commitStore: address(s_commitStore), root: rootsToReset[1]});
 
+    changePrank(BLESS_VOTE_ADDR);
     s_afn.voteToBless(blessedTaggedRoots);
 
     vm.expectEmit(false, false, false, true);
@@ -289,6 +292,7 @@ contract CommitStore_resetUnblessedRoots is CommitStoreRealAFNSetup {
     vm.expectEmit(false, false, false, true);
     emit RootRemoved(rootsToReset[2]);
 
+    changePrank(OWNER);
     s_commitStore.resetUnblessedRoots(rootsToReset);
 
     assertEq(0, s_commitStore.getMerkleRoot(rootsToReset[0]));
@@ -454,6 +458,7 @@ contract CommitStore_verify is CommitStoreRealAFNSetup {
     // Bless that root.
     IAFN.TaggedRoot[] memory taggedRoots = new IAFN.TaggedRoot[](1);
     taggedRoots[0] = IAFN.TaggedRoot({commitStore: address(s_commitStore), root: leaves[0]});
+    changePrank(BLESS_VOTE_ADDR);
     s_afn.voteToBless(taggedRoots);
     bytes32[] memory proofs = new bytes32[](0);
     uint256 timestamp = s_commitStore.verify(leaves, proofs, 0);

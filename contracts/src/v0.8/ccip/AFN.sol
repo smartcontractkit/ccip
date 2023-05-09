@@ -33,18 +33,18 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
     // or exceeds blessWeightThreshold, the tagged root becomes blessed.
     uint16 blessWeightThreshold;
     // When the total weight of voters that have voted to curse reaches or
-    // exceeds curseWeightThreshold, a curse is emitted.
+    // exceeds curseWeightThreshold, the AFN enters the cursed state.
     uint16 curseWeightThreshold;
   }
 
   struct VersionedConfig {
     Config config;
     // The version is incremented every time the config changes.
+    // The initial configuration on the contract will have configVersion == 1.
     uint32 configVersion;
     // The block number at which the config was last set. Helps the offchain
     // code check that the config was set in a stable block or double-check
-    // that it has the correct config through by querying logs at that block
-    // number.
+    // that it has the correct config by querying logs at that block number.
     uint32 blockNumber;
   }
 
@@ -66,6 +66,7 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
     // A BlessVoteProgress is considered invalid if weightThresholdMet is false when
     // s_versionedConfig.configVersion changes. we don't want old in-progress
     // votes to continue when we set a new config!
+    // The config version at which the bless vote for a tagged root was initiated.
     uint32 configVersion;
     uint16 accumulatedWeight;
     // Care must be taken that the bitmap has as many bits as MAX_NUM_VOTERS.
@@ -75,12 +76,11 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
 
   mapping(bytes32 => BlessVoteProgress) private s_blessVoteProgressByTaggedRootHash;
 
+  // voteCount and cursesHash can be reset through unvoteToCurse, and ownerUnvoteToCurse, and may be reset through
+  // setConfig if the curser is not part of the new config.
   struct CurserRecord {
     bool active;
     uint8 weight;
-    // Stores a count of the successful voteToCurse invocations by this curser
-    // since their votes were last reset (through setConfig, voteToCurse, or
-    // ownerUnvoteToCurse).
     uint32 voteCount;
     address curseUnvoteAddr;
     bytes32 cursesHash;
@@ -90,7 +90,8 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
 
   // Maintains a per-curser set of curseIds. Entries from this mapping are
   // never cleared. Once a curseId is used it can never be reused, even after
-  // an unvoteToCurse or ownerUnvoteToCurse.
+  // an unvoteToCurse or ownerUnvoteToCurse. This is to prevent accidental
+  // re-votes to curse, e.g. caused by TOCTOU issues.
   mapping(address => mapping(bytes32 => bool)) private s_curseVotes;
 
   struct CurseVoteProgress {
@@ -112,7 +113,8 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
   event ConfigSet(uint32 indexed configVersion, Config config);
   error InvalidConfig();
 
-  event TaggedRootBlessed(uint32 indexed configVersion, IAFN.TaggedRoot taggedRoot, uint16 votes);
+  event TaggedRootBlessed(uint32 indexed configVersion, IAFN.TaggedRoot taggedRoot, uint16 accumulatedWeight);
+  event TaggedRootBlessVotesReset(uint32 indexed configVersion, IAFN.TaggedRoot taggedRoot, bool wasBlessed);
   event VoteToBless(uint32 indexed configVersion, address indexed voter, IAFN.TaggedRoot taggedRoot, uint8 weight);
 
   event VoteToCurse(
@@ -159,16 +161,19 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
       // Ensure that the bitmap is large enough to hold MAX_NUM_VOTERS.
       // We do this in the constructor because MAX_NUM_VOTERS is constant.
       BlessVoteProgress memory vp;
-      vp.voterBitmap = uint128((1 << MAX_NUM_VOTERS) - 1);
+      vp.voterBitmap = ~uint128(0);
+      assert(vp.voterBitmap >> (MAX_NUM_VOTERS - 1) >= 1);
     }
     _setConfig(config);
   }
 
   function _bitmapGet(uint128 bitmap, uint8 index) internal pure returns (bool) {
-    return (bitmap >> index) & 1 == 1;
+    assert(index < MAX_NUM_VOTERS);
+    return bitmap & (uint128(1) << index) != 0;
   }
 
   function _bitmapSet(uint128 bitmap, uint8 index) internal pure returns (uint128) {
+    assert(index < MAX_NUM_VOTERS);
     return bitmap | (uint128(1) << index);
   }
 
@@ -239,11 +244,19 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
     }
   }
 
-  /// @notice Can be called by the owner to remove unintentionally blessed tagged roots
-  /// in a recovery scenario.
-  function ownerUnbless(IAFN.TaggedRoot[] memory taggedRoots) external onlyOwner {
+  /// @notice Can be called by the owner to remove unintentionally voted or even blessed tagged roots in a recovery
+  /// scenario. The owner must ensure that there are no in-flight transactions by AFN nodes voting for any of the
+  /// taggedRoots before calling this function, as such in-flight transactions could lead to the roots becoming
+  /// re-blessed shortly after the call to this function, contrary to the original intention.
+  function ownerResetBlessVotes(IAFN.TaggedRoot[] memory taggedRoots) external onlyOwner {
     for (uint256 i = 0; i < taggedRoots.length; ++i) {
-      delete s_blessVoteProgressByTaggedRootHash[_taggedRootHash(taggedRoots[i])];
+      bytes32 taggedRootHash = _taggedRootHash(taggedRoots[i]);
+      BlessVoteProgress memory voteProgress = s_blessVoteProgressByTaggedRootHash[taggedRootHash];
+      delete s_blessVoteProgressByTaggedRootHash[taggedRootHash];
+      bool wasBlessed = voteProgress.weightThresholdMet;
+      if (voteProgress.configVersion == s_versionedConfig.configVersion || wasBlessed) {
+        emit TaggedRootBlessVotesReset(s_versionedConfig.configVersion, taggedRoots[i], wasBlessed);
+      }
     }
   }
 
@@ -252,60 +265,43 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
   /// offchain code causing false voteToCurse calls.
   /// @notice Should be called from curser's corresponding curseUnvoteAddr.
   function unvoteToCurse(address curseVoteAddr, bytes32 cursesHash) external {
-    _unvoteToCurse(
-      false,
-      UnvoteToCurseRecord({curseVoteAddr: curseVoteAddr, cursesHash: cursesHash, forceUnvote: false})
-    );
-  }
+    CurserRecord memory curserRecord = s_curserRecords[curseVoteAddr];
 
-  function _unvoteToCurse(bool ownerCall, UnvoteToCurseRecord memory batch) internal {
-    CurserRecord memory curserRecord = s_curserRecords[batch.curseVoteAddr];
-    if (!ownerCall && msg.sender != curserRecord.curseUnvoteAddr) revert InvalidVoter(msg.sender);
+    // If a curse is active, only the owner is allowed to lift it.
+    if (isCursed()) revert MustRecoverFromCurse();
 
-    // If a curse is active, we want only the owner to be allowed to lift it.
-    if (!ownerCall && isCursed()) revert MustRecoverFromCurse();
+    if (msg.sender != curserRecord.curseUnvoteAddr) revert InvalidVoter(msg.sender);
 
     if (!curserRecord.active || curserRecord.voteCount == 0) return;
-
-    // Owner can avoid the curses hash check by setting forceUnvote to true, in case
-    // a malicious curser is flooding the system with votes to curse with the
-    // intention to disallow the owner to clear their curse.
-    if (ownerCall && !batch.forceUnvote && curserRecord.cursesHash != batch.cursesHash) {
-      emit SkippedUnvoteToCurse(batch.curseVoteAddr, curserRecord.cursesHash, batch.cursesHash);
-      return;
-    }
-    if (msg.sender == curserRecord.curseUnvoteAddr && curserRecord.cursesHash != batch.cursesHash)
-      revert InvalidCursesHash(curserRecord.cursesHash, batch.cursesHash);
+    if (curserRecord.cursesHash != cursesHash) revert InvalidCursesHash(curserRecord.cursesHash, cursesHash);
 
     emit UnvoteToCurse(
       s_versionedConfig.configVersion,
-      batch.curseVoteAddr,
+      curseVoteAddr,
       curserRecord.weight,
       curserRecord.voteCount,
-      batch.cursesHash
+      cursesHash
     );
     curserRecord.voteCount = 0;
-    s_curserRecords[batch.curseVoteAddr] = curserRecord;
+    s_curserRecords[curseVoteAddr] = curserRecord;
     s_curseVoteProgress.accumulatedWeight -= curserRecord.weight;
-    // If not ownerCall, no need to update weightThresholdMet as it must already have been false before.
-    // If ownerCall, further logic to update weightThresholdMet follows in ownerUnvoteToCurse.
   }
 
-  /// @notice A vote to curse is appropriate during unhealthy network conditions
-  /// (eg. unexpected reorgs).
+  /// @notice A vote to curse is appropriate during unhealthy blockchain conditions
+  /// (eg. finality violations).
   function voteToCurse(bytes32 curseId) external {
     CurserRecord memory curserRecord = s_curserRecords[msg.sender];
     if (!curserRecord.active) revert InvalidVoter(msg.sender);
     if (s_curseVotes[msg.sender][curseId]) revert AlreadyVotedToCurse(msg.sender, curseId);
     s_curseVotes[msg.sender][curseId] = true;
     ++curserRecord.voteCount;
-    curserRecord.cursesHash = keccak256(
-      abi.encode(curserRecord.cursesHash, block.chainid, blockhash(block.number - 1), curseId)
-    );
+    curserRecord.cursesHash = keccak256(abi.encode(curserRecord.cursesHash, curseId));
     s_curserRecords[msg.sender] = curserRecord;
     if (curserRecord.voteCount == 1) {
       s_curseVoteProgress.accumulatedWeight += curserRecord.weight;
-      // TODO: we could add the version to configVersion to avoid the extra slot access.
+      // NOTE: We could pack configVersion into CurserRecord that we already load in the beginning of this function to
+      // avoid the following extra storage read for it, but since voteToCurse is not on the hot path we'd rather keep
+      // things simple.
       uint32 configVersion = s_versionedConfig.configVersion;
       emit VoteToCurse(
         configVersion,
@@ -326,10 +322,32 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
   }
 
   /// @notice Enables the owner to remove curse votes. After the curse votes are removed,
-  /// this function will check whether the curse is still valid and restore the healthy state if possible.
-  function ownerUnvoteToCurse(UnvoteToCurseRecord[] memory records) external onlyOwner {
-    for (uint256 i = 0; i < records.length; ++i) {
-      _unvoteToCurse(true, records[i]);
+  /// this function will check whether the curse is still valid and restore the uncursed state if possible.
+  function ownerUnvoteToCurse(UnvoteToCurseRecord[] memory unvoteRecords) external onlyOwner {
+    for (uint256 i = 0; i < unvoteRecords.length; ++i) {
+      UnvoteToCurseRecord memory unvoteRecord = unvoteRecords[i];
+      CurserRecord memory curserRecord = s_curserRecords[unvoteRecord.curseVoteAddr];
+      // Owner can avoid the curses hash check by setting forceUnvote to true, in case
+      // a malicious curser is flooding the system with votes to curse with the
+      // intention to disallow the owner to clear their curse.
+      if (!unvoteRecord.forceUnvote && curserRecord.cursesHash != unvoteRecord.cursesHash) {
+        emit SkippedUnvoteToCurse(unvoteRecord.curseVoteAddr, curserRecord.cursesHash, unvoteRecord.cursesHash);
+        continue;
+      }
+
+      if (!curserRecord.active || curserRecord.voteCount == 0) continue;
+
+      emit UnvoteToCurse(
+        s_versionedConfig.configVersion,
+        unvoteRecord.curseVoteAddr,
+        curserRecord.weight,
+        curserRecord.voteCount,
+        curserRecord.cursesHash
+      );
+      curserRecord.voteCount = 0;
+      curserRecord.cursesHash = 0;
+      s_curserRecords[unvoteRecord.curseVoteAddr] = curserRecord;
+      s_curseVoteProgress.accumulatedWeight -= curserRecord.weight;
     }
 
     if (
@@ -338,12 +356,18 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
     ) {
       s_curseVoteProgress.weightThresholdMet = false;
       emit RecoveredFromCurse();
-      // Invalidate all in-progress votes to bless by bumping the config.
+      // Invalidate all in-progress votes to bless by bumping the config version.
+      // They might have been based on false information about the source chain
+      // (e.g. in case of a finality violation).
       _setConfig(s_versionedConfig.config);
     }
   }
 
-  /// @notice Will revert in case a curse is active.
+  /// @notice Will revert in case a curse is active. To avoid accidentally invalidating an in-progress curse vote, it
+  /// may be advisable to remove voters one-by-one over time, rather than many at once.
+  /// @dev The gas use of this function varies depending on the number of curse votes that are active. When calling this
+  /// function, be sure to include a gas cushion to account for curse votes that may occur between your transaction
+  /// being sent and mined.
   function setConfig(Config memory config) external onlyOwner {
     _setConfig(config);
   }
@@ -374,68 +398,70 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
     config = s_versionedConfig.config;
   }
 
-  /// @notice Get addresses of those who have voted to bless tagged root, and the total weight of their votes.
-  /// @return blessVoteAddrs will be empty if voting took place with an older config version
+  /// @return blessVoteAddrs addresses of voters, will be empty if voting took place with an older config version
+  /// @return accumulatedWeight sum of weights of voters, will be zero if voting took place with an older config version
+  /// @return blessed will be accurate regardless of when voting took place
   /// @dev This is a helper method for offchain code so efficiency is not really a concern.
-  function getBlessVotersAndWeight(IAFN.TaggedRoot calldata taggedRoot)
+  function getBlessProgress(IAFN.TaggedRoot calldata taggedRoot)
     external
     view
-    returns (address[] memory blessVoteAddrs, uint16 weight)
+    returns (
+      address[] memory blessVoteAddrs,
+      uint16 accumulatedWeight,
+      bool blessed
+    )
   {
     bytes32 taggedRootHash = _taggedRootHash(taggedRoot);
     BlessVoteProgress memory progress = s_blessVoteProgressByTaggedRootHash[taggedRootHash];
-    weight = progress.accumulatedWeight;
-    if (progress.configVersion != s_versionedConfig.configVersion) {
-      if (!progress.weightThresholdMet) {
-        // If the threshold wasn't met when the vote took place with an earlier
-        // config, the weight will be reset when voting restarts.
-        weight = 0;
-      }
-      // If we're not on the same config on which the voting to bless last took
-      // place we can't know for sure who voted, so return an empty array.
-      return (new address[](0), weight);
-    }
-    uint128 bitmap = progress.voterBitmap;
-    blessVoteAddrs = new address[](_bitmapCount(bitmap));
-    Voter[] memory voters = s_versionedConfig.config.voters;
-    uint256 j = 0;
-    for (uint256 i = 0; i < voters.length; ++i) {
-      if (_bitmapGet(bitmap, s_blesserRecords[voters[i].blessVoteAddr].index)) {
-        blessVoteAddrs[j++] = voters[i].blessVoteAddr;
+    blessed = progress.weightThresholdMet;
+    if (progress.configVersion == s_versionedConfig.configVersion) {
+      accumulatedWeight = progress.accumulatedWeight;
+      uint128 bitmap = progress.voterBitmap;
+      blessVoteAddrs = new address[](_bitmapCount(bitmap));
+      Voter[] memory voters = s_versionedConfig.config.voters;
+      uint256 j = 0;
+      for (uint256 i = 0; i < voters.length; ++i) {
+        if (_bitmapGet(bitmap, s_blesserRecords[voters[i].blessVoteAddr].index)) {
+          blessVoteAddrs[j] = voters[i].blessVoteAddr;
+          ++j;
+        }
       }
     }
   }
 
-  /// @notice Get addresses of those who have voted to curse, and the total weight of their votes.
-  /// @return curseVoteAddrs will be empty if voting took place with an older config version
   /// @dev This is a helper method for offchain code so efficiency is not really a concern.
-  function getCurseVotersAndWeight()
+  function getCurseProgress()
     external
     view
     returns (
       address[] memory curseVoteAddrs,
-      uint16 weight,
-      uint32[] memory voteCounts
+      uint32[] memory voteCounts,
+      bytes32[] memory cursesHashes,
+      uint16 accumulatedWeight,
+      bool cursed
     )
   {
-    weight = s_curseVoteProgress.accumulatedWeight;
+    accumulatedWeight = s_curseVoteProgress.accumulatedWeight;
+    cursed = s_curseVoteProgress.weightThresholdMet;
     uint256 numCursers;
     Voter[] memory voters = s_versionedConfig.config.voters;
     for (uint256 i = 0; i < voters.length; ++i) {
       CurserRecord memory curserRecord = s_curserRecords[voters[i].curseVoteAddr];
-      if (curserRecord.active && curserRecord.voteCount > 0) {
+      if (curserRecord.voteCount > 0) {
         ++numCursers;
       }
     }
     curseVoteAddrs = new address[](numCursers);
     voteCounts = new uint32[](numCursers);
+    cursesHashes = new bytes32[](numCursers);
     uint256 j = 0;
     for (uint256 i = 0; i < voters.length; ++i) {
       address curseVoteAddr = voters[i].curseVoteAddr;
       CurserRecord memory curserRecord = s_curserRecords[curseVoteAddr];
-      if (curserRecord.active && curserRecord.voteCount > 0) {
+      if (curserRecord.voteCount > 0) {
         curseVoteAddrs[j] = curseVoteAddr;
         voteCounts[j] = curserRecord.voteCount;
+        cursesHashes[j] = curserRecord.cursesHash;
         ++j;
       }
     }
@@ -453,14 +479,14 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
 
     uint256 totalBlessWeight = 0;
     uint256 totalCurseWeight = 0;
-    address[] memory allAddrs = new address[](config.voters.length * 3);
+    address[] memory allAddrs = new address[](3 * config.voters.length);
     for (uint256 i = 0; i < config.voters.length; ++i) {
       Voter memory voter = config.voters[i];
       if (
         voter.blessVoteAddr == address(0) ||
         voter.curseVoteAddr == address(0) ||
         voter.curseUnvoteAddr == address(0) ||
-        voter.blessWeight + voter.curseWeight == 0
+        (voter.blessWeight == 0 && voter.curseWeight == 0)
       ) {
         return false;
       }
@@ -503,7 +529,9 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
       }
     }
 
-    uint32 configVersion = ++s_versionedConfig.configVersion;
+    ++s_versionedConfig.configVersion;
+    uint32 configVersion = s_versionedConfig.configVersion;
+
     for (uint8 i = 0; i < config.voters.length; ++i) {
       Voter memory voter = config.voters[i];
       s_blesserRecords[voter.blessVoteAddr] = BlesserRecord({
@@ -511,9 +539,13 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
         index: i,
         weight: voter.blessWeight
       });
-      s_curserRecords[voter.curseVoteAddr].active = true;
-      s_curserRecords[voter.curseVoteAddr].weight = voter.curseWeight;
-      s_curserRecords[voter.curseVoteAddr].curseUnvoteAddr = voter.curseUnvoteAddr;
+      s_curserRecords[voter.curseVoteAddr] = CurserRecord({
+        active: true,
+        weight: voter.curseWeight,
+        curseUnvoteAddr: voter.curseUnvoteAddr,
+        voteCount: s_curserRecords[voter.curseVoteAddr].voteCount,
+        cursesHash: s_curserRecords[voter.curseVoteAddr].cursesHash
+      });
     }
     s_versionedConfig.blockNumber = uint32(block.number);
     emit ConfigSet(configVersion, config);
@@ -524,13 +556,15 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
       weightThresholdMet: false
     });
 
-    // Retain votes for the cursers who are still part of the new config.
+    // Retain votes for the cursers who are still part of the new config and delete records for the cursers who are not.
     for (uint8 i = 0; i < oldConfig.voters.length; ++i) {
       // We could be more efficient with this but since this is only for
       // setConfig it will do for now.
       address curseVoteAddr = oldConfig.voters[i].curseVoteAddr;
       CurserRecord memory curserRecord = s_curserRecords[curseVoteAddr];
-      if (curserRecord.active && curserRecord.voteCount > 0) {
+      if (!curserRecord.active) {
+        delete s_curserRecords[curseVoteAddr];
+      } else if (curserRecord.active && curserRecord.voteCount > 0) {
         newCurseVoteProgress.accumulatedWeight += curserRecord.weight;
         emit ReusedVotesToCurse(
           configVersion,

@@ -159,7 +159,7 @@ contract AFN_ownerUnbless is AFNSetup {
     assertTrue(s_afn.isBlessed(makeTaggedRoot(1)));
 
     changePrank(OWNER);
-    s_afn.ownerUnbless(makeTaggedRootSingleton(1));
+    s_afn.ownerResetBlessVotes(makeTaggedRootSingleton(1));
     assertFalse(s_afn.isBlessed(makeTaggedRoot(1)));
   }
 }
@@ -176,15 +176,25 @@ contract AFN_unvoteToCurse is AFNSetup {
 
     changePrank(cfg.voters[0].curseVoteAddr);
     s_afn.voteToCurse(makeCurseId(1));
+    bytes32 expectedCursesHash = keccak256(abi.encode(bytes32(0), makeCurseId(1)));
     assertFalse(s_afn.isCursed());
-    (address[] memory cursers, uint16 weight, uint32[] memory voteCounts) = s_afn.getCurseVotersAndWeight();
+    (
+      address[] memory cursers,
+      uint32[] memory voteCounts,
+      bytes32[] memory cursesHashes,
+      uint16 weight,
+      bool cursed
+    ) = s_afn.getCurseProgress();
     assertEq(1, cursers.length);
     assertEq(1, voteCounts.length);
     assertEq(cfg.voters[s_curser].curseVoteAddr, cursers[0]);
     assertEq(1, voteCounts[0]);
     assertEq(cfg.voters[s_curser].curseWeight, weight);
+    assertEq(1, cursesHashes.length);
+    assertEq(expectedCursesHash, cursesHashes[0]);
+    assertFalse(cursed);
 
-    s_cursesHash = keccak256(abi.encode(bytes32(0), block.chainid, blockhash(block.number - 1), makeCurseId(1)));
+    s_cursesHash = expectedCursesHash;
   }
 
   function testInvalidVoter() public {
@@ -297,7 +307,7 @@ contract AFN_voteToCurse is AFNSetup {
       weight,
       1,
       makeCurseId(123),
-      keccak256(abi.encode(bytes32(0), block.chainid, blockhash(block.number - 1), makeCurseId(123))),
+      keccak256(abi.encode(bytes32(0), makeCurseId(123))),
       weight
     );
 
@@ -305,10 +315,11 @@ contract AFN_voteToCurse is AFNSetup {
     s_afn.voteToCurse(makeCurseId(123));
     vm.pauseGasMetering();
 
-    (address[] memory voters, uint16 votes, ) = s_afn.getCurseVotersAndWeight();
+    (address[] memory voters, , , uint16 votes, bool cursed) = s_afn.getCurseProgress();
     assertEq(1, voters.length);
     assertEq(voter, voters[0]);
     assertEq(weight, votes);
+    assertFalse(cursed);
 
     vm.resumeGasMetering();
   }
@@ -424,10 +435,32 @@ contract AFN_ownerUnvoteToCurse is AFNSetup {
     vm.pauseGasMetering();
 
     assertFalse(s_afn.isCursed());
-    (address[] memory voters, uint256 weight, ) = s_afn.getCurseVotersAndWeight();
+    (address[] memory voters, , bytes32[] memory cursesHashes, uint256 weight, bool cursed) = s_afn.getCurseProgress();
     assertEq(voters.length, 0);
+    assertEq(cursesHashes.length, 0);
     assertEq(weight, 0);
+    assertFalse(cursed);
     vm.resumeGasMetering();
+  }
+
+  function testIsIdempotent() public {
+    changePrank(OWNER);
+    ownerUnvoteToCurse();
+    ownerUnvoteToCurse();
+
+    assertFalse(s_afn.isCursed());
+    (
+      address[] memory voters,
+      uint32[] memory voteCounts,
+      bytes32[] memory cursesHashes,
+      uint256 weight,
+      bool cursed
+    ) = s_afn.getCurseProgress();
+    assertEq(voters.length, 0);
+    assertEq(cursesHashes.length, 0);
+    assertEq(voteCounts.length, 0);
+    assertEq(weight, 0);
+    assertFalse(cursed);
   }
 
   function testCanBlessAndCurseAfterRecovery() public {
@@ -534,9 +567,13 @@ contract AFN_setConfig is ConfigCompare, AFNSetup {
 
     // Assert that curse votes have been cleared, except for CURSE_VOTER_2 who
     // has already voted and is also part of the new config
-    (address[] memory curseVoters, uint256 curseWeight, ) = s_afn.getCurseVotersAndWeight();
+    (address[] memory curseVoters, , bytes32[] memory cursesHashes, uint256 curseWeight, bool cursed) = s_afn
+      .getCurseProgress();
     assertEq(1, curseVoters.length);
     assertEq(WEIGHT_10, curseWeight);
+    assertEq(1, cursesHashes.length);
+    assertEq(keccak256(abi.encode(bytes32(0), makeCurseId(1))), cursesHashes[0]);
+    assertFalse(cursed);
 
     // Assert that good votes have been cleared
     uint256 votesToBlessRoot = getWeightOfVotesToBlessRoot(makeTaggedRoot(1));

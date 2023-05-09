@@ -1,5 +1,5 @@
 GETH_VERSION: 1.11.5
-afn_contract: ../../contracts/solc/v0.8.19/AFN.abi ../../contracts/solc/v0.8.19/AFN.bin 5933313f1c0098034cc70ebea0bf5404bd63d6cbb74e7b1174a010965dd9c133
+afn_contract: ../../contracts/solc/v0.8.19/AFN.abi ../../contracts/solc/v0.8.19/AFN.bin 0b9f9215ea4f3f792f49f7eb72ba580e90156eea9b74c53b156e78235c5a4df0
 aggregator_v2v3_interface: ../../contracts/solc/v0.8.6/AggregatorV2V3Interface.abi ../../contracts/solc/v0.8.6/AggregatorV2V3Interface.bin 95e8814b408bb05bf21742ef580d98698b7db6a9bac6a35c3de12b23aec4ee28
 aggregator_v3_interface: ../../contracts/solc/v0.8.6/AggregatorV3Interface.abi ../../contracts/solc/v0.8.6/AggregatorV3Interface.bin 351b55d3b0f04af67db6dfb5c92f1c64479400ca1fec77afc20bc0ce65cb49ab
 authorized_forwarder: ../../contracts/solc/v0.7/AuthorizedForwarder.abi ../../contracts/solc/v0.7/AuthorizedForwarder.bin f126b772f088772779918fa3a250e7ccf13855ee5bce44c17691bb7b3e62f043

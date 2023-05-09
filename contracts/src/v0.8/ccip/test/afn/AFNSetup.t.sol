@@ -39,7 +39,7 @@ contract AFNSetup is BaseTest {
   }
 
   function hasVotedToBlessRoot(address voter, IAFN.TaggedRoot memory taggedRoot_) internal view returns (bool) {
-    (address[] memory voters, ) = s_afn.getBlessVotersAndWeight(taggedRoot_);
+    (address[] memory voters, , ) = s_afn.getBlessProgress(taggedRoot_);
     for (uint256 i = 0; i < voters.length; ++i) {
       if (voters[i] == voter) {
         return true;
@@ -49,7 +49,7 @@ contract AFNSetup is BaseTest {
   }
 
   function getWeightOfVotesToBlessRoot(IAFN.TaggedRoot memory taggedRoot_) internal view returns (uint16) {
-    (, uint16 weight) = s_afn.getBlessVotersAndWeight(taggedRoot_);
+    (, uint16 weight, ) = s_afn.getBlessProgress(taggedRoot_);
     return weight;
   }
 }
