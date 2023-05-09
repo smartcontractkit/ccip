@@ -11,6 +11,8 @@ import {PriceRegistry} from "../../PriceRegistry.sol";
 import {IERC20} from "../../../vendor/IERC20.sol";
 
 contract PriceRegistrySetup is TokenSetup, RouterSetup {
+  uint192 internal constant USD_PER_GAS = 1e6;
+
   PriceRegistry internal s_priceRegistry;
   // Cheat to store the price updates in storage since struct arrays aren't supported.
   bytes internal s_encodedInitialPriceUpdates;
@@ -66,7 +68,7 @@ contract PriceRegistrySetup is TokenSetup, RouterSetup {
 
     Internal.PriceUpdates memory priceUpdates = getPriceUpdatesStruct(pricedTokens, tokenPrices);
     priceUpdates.destChainSelector = DEST_CHAIN_ID;
-    priceUpdates.usdPerUnitGas = 1e6;
+    priceUpdates.usdPerUnitGas = USD_PER_GAS;
 
     s_encodedInitialPriceUpdates = abi.encode(priceUpdates);
     address[] memory priceUpdaters = new address[](0);
@@ -81,14 +83,14 @@ contract PriceRegistry_constructor is PriceRegistrySetup {
   function testSetupSuccess() public virtual {
     assertEq(s_priceRegistry.getTokenPrice(s_sourceTokens[0]).value, 5e18);
     assertEq(s_priceRegistry.getTokenPrice(s_sourceTokens[1]).value, 2000e18);
-    assertEq(s_priceRegistry.getDestinationChainGasPrice(DEST_CHAIN_ID).value, 1e6);
+    assertEq(s_priceRegistry.getDestinationChainGasPrice(DEST_CHAIN_ID).value, USD_PER_GAS);
   }
 
   function testInvalidStalenessThresholdReverts() public {
     Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
       tokenPriceUpdates: new Internal.TokenPriceUpdate[](0),
       destChainSelector: DEST_CHAIN_ID,
-      usdPerUnitGas: 1e6
+      usdPerUnitGas: USD_PER_GAS
     });
 
     vm.expectRevert(PriceRegistry.InvalidStalenessThreshold.selector);
@@ -408,7 +410,7 @@ contract PriceRegistry_getFeeTokenAndGasPrices is PriceRegistrySetup {
     Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
       tokenPriceUpdates: new Internal.TokenPriceUpdate[](0),
       destChainSelector: DEST_CHAIN_ID,
-      usdPerUnitGas: 1e6
+      usdPerUnitGas: USD_PER_GAS
     });
     s_priceRegistry.updatePrices(priceUpdates);
 

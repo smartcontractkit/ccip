@@ -18,6 +18,9 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
   // Duplicate event of the CCIPSendRequested in the IOnRamp
   event CCIPSendRequested(Internal.EVM2EVMMessage message);
 
+  address internal constant CUSTOM_TOKEN = address(12345);
+  uint192 internal constant CUSTON_TOKEN_PRICE = 1e17; // $0.1 CUSTOM
+
   uint256 internal immutable i_tokenAmount0 = 9;
   uint256 internal immutable i_tokenAmount1 = 7;
 
@@ -26,12 +29,14 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
   EVM2EVMOnRampHelper internal s_onRamp;
   address[] s_offRamps;
 
-  EVM2EVMOnRamp.FeeTokenConfigArgs[] s_feeTokenConfigArgs;
-  EVM2EVMOnRamp.TokenTransferFeeConfigArgs[] s_tokenTransferFeeConfigArgs;
+  EVM2EVMOnRamp.FeeTokenConfigArgs[] internal s_feeTokenConfigArgs;
+  EVM2EVMOnRamp.TokenTransferFeeConfigArgs[] internal s_tokenTransferFeeConfigArgs;
 
   function setUp() public virtual override(TokenSetup, PriceRegistrySetup) {
     TokenSetup.setUp();
     PriceRegistrySetup.setUp();
+
+    s_priceRegistry.updatePrices(getSinglePriceUpdateStruct(CUSTOM_TOKEN, CUSTON_TOKEN_PRICE));
 
     address WETH = s_sourceRouter.getWrappedNative();
 
@@ -56,7 +61,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
       EVM2EVMOnRamp.TokenTransferFeeConfigArgs({
         token: s_sourceFeeToken,
         minFee: 1_00, // $1
-        maxFee: 5000_00, // $5000
+        maxFee: 5000_00, // $5,000
         ratio: 2_5 // 2.5 bps, or 0.025%
       })
     );
@@ -66,6 +71,14 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
         minFee: 2_00, // $2
         maxFee: 10_000_00, // $10,000
         ratio: 5_0 // 5 bps, or 0.05%
+      })
+    );
+    s_tokenTransferFeeConfigArgs.push(
+      EVM2EVMOnRamp.TokenTransferFeeConfigArgs({
+        token: CUSTOM_TOKEN,
+        minFee: 3_00, // $3
+        maxFee: 15_000_00, // $15,000
+        ratio: 10_0 // 10 bps, or 0.1%
       })
     );
 

@@ -463,10 +463,10 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
     );
     FeeTokenConfig memory feeTokenConfig = s_feeTokenConfig[feeToken];
 
-    uint256 usdFeeAmount = gasPrice *
+    uint256 usdFeeValue = gasPrice *
       (((gasLimit + feeTokenConfig.destGasOverhead) * feeTokenConfig.multiplier) / 1 ether) +
       feeTokenConfig.networkFeeAmountUSD;
-    return feeTokenPrice._calcTokenAmountFromUSDValue(usdFeeAmount);
+    return feeTokenPrice._calcTokenAmountFromUSDValue(usdFeeValue);
   }
 
   /// @notice Returns the fee based on the tokens transferred. Will always be 0 if

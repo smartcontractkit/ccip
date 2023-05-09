@@ -3,6 +3,7 @@ pragma solidity 0.8.19;
 
 import "./EVM2EVMOnRampSetup.t.sol";
 import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
+import {USDPriceWith18Decimals} from "../../libraries/USDPriceWith18Decimals.sol";
 
 /// @notice #constructor
 contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
@@ -511,64 +512,40 @@ contract EVM2EVMOnRamp_forwardFromRouter_upgrade is EVM2EVMOnRampSetup {
 }
 
 contract EVM2EVMOnRamp_getFeeSetup is EVM2EVMOnRampSetup {
-  address internal constant CUSTOM_TOKEN = address(1);
-  uint192 internal constant USD_PER_GAS = 1e6;
-  uint192[] s_feeTokenPrices;
+  uint192 internal s_feeTokenPrice;
+  uint192 internal s_wrappedTokenPrice;
+  uint192 internal s_customTokenPrice;
 
-  // fee calculations are sensitive to configs in multiple setup contracts
-  // lock them down in one place with easier-to-read values
   function setUp() public virtual override {
     EVM2EVMOnRampSetup.setUp();
 
-    address[] memory feeTokens = new address[](2);
-    feeTokens[0] = s_sourceFeeToken;
-    feeTokens[1] = s_sourceRouter.getWrappedNative();
-    s_priceRegistry.applyFeeTokensUpdates(feeTokens, new address[](0));
+    s_feeTokenPrice = s_sourceTokenPrices[0];
+    s_wrappedTokenPrice = s_sourceTokenPrices[2];
+    s_customTokenPrice = CUSTON_TOKEN_PRICE;
+  }
 
-    address[] memory pricedTokens = new address[](3);
-    pricedTokens[0] = s_sourceFeeToken;
-    pricedTokens[1] = s_sourceRouter.getWrappedNative();
-    pricedTokens[2] = CUSTOM_TOKEN;
+  function calcUSDValueFromTokenAmount(uint192 tokenPrice, uint256 tokenAmount) internal pure returns (uint256) {
+    return (tokenPrice * tokenAmount) / 1e18;
+  }
 
-    uint192[] memory tokenPrices = new uint192[](3);
-    tokenPrices[0] = 5e18; // $5 -> feeTokenBaseUnitsPerUnitGas = 1e6 / 5 = 2e5
-    tokenPrices[1] = 2000e18; // $2000 -> feeTokenBaseUnitsPerUnitGas = 1e6 / 2000 = 500
-    tokenPrices[2] = 1e17; // $0.1
-    s_feeTokenPrices = tokenPrices;
+  function calcTokenAmountFromUSDValue(uint192 tokenPrice, uint256 usdValue) internal pure returns (uint256) {
+    return (usdValue * 1e18) / tokenPrice;
+  }
 
-    Internal.PriceUpdates memory priceUpdates = getPriceUpdatesStruct(pricedTokens, tokenPrices);
-    priceUpdates.destChainSelector = DEST_CHAIN_ID;
-    priceUpdates.usdPerUnitGas = USD_PER_GAS;
-    s_priceRegistry.updatePrices(priceUpdates);
+  function applyBpsRatio(uint256 tokenAmount, uint16 ratio) internal pure returns (uint256) {
+    return (tokenAmount * ratio) / 1e5;
+  }
 
-    EVM2EVMOnRamp.TokenTransferFeeConfigArgs[]
-      memory tokenTransferFeeConfigArgs = new EVM2EVMOnRamp.TokenTransferFeeConfigArgs[](3);
-    tokenTransferFeeConfigArgs[0] = EVM2EVMOnRamp.TokenTransferFeeConfigArgs({
-      token: s_sourceFeeToken,
-      minFee: 1_00, // $1
-      maxFee: 5000_00, // $5,000
-      ratio: 2_5 // 2.5 bps, or 0.025%
-    });
-    tokenTransferFeeConfigArgs[1] = EVM2EVMOnRamp.TokenTransferFeeConfigArgs({
-      token: s_sourceRouter.getWrappedNative(),
-      minFee: 2_00, // $2
-      maxFee: 10_000_00, // $10,000
-      ratio: 5_0 // 5 bps, or 0.05%
-    });
-    tokenTransferFeeConfigArgs[2] = EVM2EVMOnRamp.TokenTransferFeeConfigArgs({
-      token: CUSTOM_TOKEN,
-      minFee: 3_00, // $3
-      maxFee: 15_000_00, // $15,000
-      ratio: 10_0 // 10 bps, or 0.1%
-    });
-    s_onRamp.setTokenTransferFeeConfig(tokenTransferFeeConfigArgs);
+  function centsToValue(uint32 cents) internal pure returns (uint256) {
+    return uint256(cents) * 1e16;
   }
 }
 
 /// @notice #getMessageExecutionFee
 contract EVM2EVMOnRamp_getMessageExecutionFee is EVM2EVMOnRamp_getFeeSetup {
-  function testLinkFeeTokenEmptyMessageSuccess() public {
-    for (uint256 i = 0; i < 2; ++i) {
+  function testEmptyMessageSuccess() public {
+    uint192[2] memory feeTokenPrices = [s_feeTokenPrice, s_wrappedTokenPrice];
+    for (uint256 i = 0; i < feeTokenPrices.length; ++i) {
       uint256 feeTokenIndex = i;
       EVM2EVMOnRamp.FeeTokenConfigArgs memory feeConfig = s_feeTokenConfigArgs[feeTokenIndex];
 
@@ -579,15 +556,15 @@ contract EVM2EVMOnRamp_getMessageExecutionFee is EVM2EVMOnRamp_getFeeSetup {
       uint256 totalGasUsed = (GAS_LIMIT + feeConfig.destGasOverhead);
       uint256 totalGasIncMP = (totalGasUsed * feeConfig.multiplier) / 1 ether;
       uint256 totalUSDPrice = totalGasIncMP * USD_PER_GAS + feeConfig.networkFeeAmountUSD;
-      uint256 totalPriceInFeeToken = (totalUSDPrice * 1e18) / s_feeTokenPrices[feeTokenIndex];
+      uint256 totalPriceInFeeToken = (totalUSDPrice * 1e18) / feeTokenPrices[feeTokenIndex];
 
       assertEq(totalPriceInFeeToken, feeAmount);
     }
   }
 
   function testLinkFeeTokenHighGasMessageSuccess() public {
-    uint256 feeTokenIndex = 0;
-    EVM2EVMOnRamp.FeeTokenConfigArgs memory feeConfig = s_feeTokenConfigArgs[feeTokenIndex];
+    EVM2EVMOnRamp.FeeTokenConfigArgs memory feeConfig = s_feeTokenConfigArgs[0];
+
     uint256 customGasLimit = 1_000_000;
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: abi.encode(OWNER),
@@ -601,7 +578,7 @@ contract EVM2EVMOnRamp_getMessageExecutionFee is EVM2EVMOnRamp_getFeeSetup {
     uint256 totalGasUsed = (customGasLimit + feeConfig.destGasOverhead);
     uint256 totalGasIncMP = (totalGasUsed * feeConfig.multiplier) / 1 ether;
     uint256 totalUSDPrice = totalGasIncMP * USD_PER_GAS + feeConfig.networkFeeAmountUSD;
-    uint256 totalPriceInFeeToken = (totalUSDPrice * 1e18) / s_feeTokenPrices[feeTokenIndex];
+    uint256 totalPriceInFeeToken = (totalUSDPrice * 1e18) / s_feeTokenPrice;
 
     assertEq(totalPriceInFeeToken, feeAmount);
   }
@@ -609,6 +586,8 @@ contract EVM2EVMOnRamp_getMessageExecutionFee is EVM2EVMOnRamp_getFeeSetup {
 
 /// @notice #getTokenTransferFee
 contract EVM2EVMOnRamp_getTokenTransferFee is EVM2EVMOnRamp_getFeeSetup {
+  using USDPriceWith18Decimals for uint192;
+
   function testNoTokenTransferSuccess() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     uint256 feeAmount = s_onRamp.getTokenTransferFee(message.feeToken, message.tokenAmounts);
@@ -617,38 +596,51 @@ contract EVM2EVMOnRamp_getTokenTransferFee is EVM2EVMOnRamp_getFeeSetup {
   }
 
   function testFeeTokenBpsFeeSuccess() public {
-    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, 10000e18);
+    uint256 tokenAmount = 10000e18;
+
+    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, tokenAmount);
     uint256 feeAmount = s_onRamp.getTokenTransferFee(message.feeToken, message.tokenAmounts);
 
-    // bps is 0.025%
-    assertEq(25e17, feeAmount);
+    uint256 usdValue = calcUSDValueFromTokenAmount(s_feeTokenPrice, tokenAmount);
+    uint256 bpsUSDValue = applyBpsRatio(usdValue, s_tokenTransferFeeConfigArgs[0].ratio);
+    uint256 expectedFeeTokenAmount = calcTokenAmountFromUSDValue(s_feeTokenPrice, bpsUSDValue);
+
+    assertEq(expectedFeeTokenAmount, feeAmount);
   }
 
   function testFeeTokenMinFeeSuccess() public {
     Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, 1);
     uint256 feeAmount = s_onRamp.getTokenTransferFee(message.feeToken, message.tokenAmounts);
 
-    // minFee is $1, price is $5 per token
-    assertEq(2e17, feeAmount);
+    uint256 minFeeValue = centsToValue(s_tokenTransferFeeConfigArgs[0].minFee);
+    uint256 expectedFeeTokenAmount = calcTokenAmountFromUSDValue(s_feeTokenPrice, minFeeValue);
+
+    assertEq(expectedFeeTokenAmount, feeAmount);
   }
 
   function testFeeTokenZeroAmountMinFeeSuccess() public {
     Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, 0);
     uint256 feeAmount = s_onRamp.getTokenTransferFee(message.feeToken, message.tokenAmounts);
 
-    // minFee is $1, price is $5 per token
-    assertEq(2e17, feeAmount);
+    uint256 minFeeValue = centsToValue(s_tokenTransferFeeConfigArgs[0].minFee);
+    uint256 expectedFeeTokenAmount = calcTokenAmountFromUSDValue(s_feeTokenPrice, minFeeValue);
+
+    assertEq(expectedFeeTokenAmount, feeAmount);
   }
 
   function testFeeTokenMaxFeeSuccess() public {
     Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, 1e36);
     uint256 feeAmount = s_onRamp.getTokenTransferFee(message.feeToken, message.tokenAmounts);
 
-    // maxFee is $5000, price is $5 per token
-    assertEq(1000e18, feeAmount);
+    uint256 maxFeeValue = centsToValue(s_tokenTransferFeeConfigArgs[0].maxFee);
+    uint256 expectedFeeTokenAmount = calcTokenAmountFromUSDValue(s_feeTokenPrice, maxFeeValue);
+
+    assertEq(expectedFeeTokenAmount, feeAmount);
   }
 
   function testWETHTokenBpsFeeSuccess() public {
+    uint256 tokenAmount = 10000e18;
+
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: abi.encode(OWNER),
       data: "",
@@ -656,15 +648,20 @@ contract EVM2EVMOnRamp_getTokenTransferFee is EVM2EVMOnRamp_getFeeSetup {
       feeToken: s_sourceRouter.getWrappedNative(),
       extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT, strict: false}))
     });
-    message.tokenAmounts[0] = Client.EVMTokenAmount({token: s_sourceRouter.getWrappedNative(), amount: 10000e18});
+    message.tokenAmounts[0] = Client.EVMTokenAmount({token: s_sourceRouter.getWrappedNative(), amount: tokenAmount});
 
     uint256 feeAmount = s_onRamp.getTokenTransferFee(message.feeToken, message.tokenAmounts);
 
-    // bps is 0.05%
-    assertEq(5e18, feeAmount);
+    uint256 usdValue = calcUSDValueFromTokenAmount(s_wrappedTokenPrice, tokenAmount);
+    uint256 bpsUSDValue = applyBpsRatio(usdValue, s_tokenTransferFeeConfigArgs[1].ratio);
+    uint256 expectedFeeTokenAmount = calcTokenAmountFromUSDValue(s_wrappedTokenPrice, bpsUSDValue);
+
+    assertEq(expectedFeeTokenAmount, feeAmount);
   }
 
   function testCustomTokenBpsFeeSuccess() public {
+    uint256 tokenAmount = 200000e18;
+
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: abi.encode(OWNER),
       data: "",
@@ -672,12 +669,15 @@ contract EVM2EVMOnRamp_getTokenTransferFee is EVM2EVMOnRamp_getFeeSetup {
       feeToken: s_sourceFeeToken,
       extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT, strict: false}))
     });
-    message.tokenAmounts[0] = Client.EVMTokenAmount({token: CUSTOM_TOKEN, amount: 200000e18});
+    message.tokenAmounts[0] = Client.EVMTokenAmount({token: CUSTOM_TOKEN, amount: tokenAmount});
 
     uint256 feeAmount = s_onRamp.getTokenTransferFee(message.feeToken, message.tokenAmounts);
 
-    // bps is 0.1%, value of transfer is $20,000, price of feeToken is $5
-    assertEq(4e18, feeAmount);
+    uint256 usdValue = calcUSDValueFromTokenAmount(s_customTokenPrice, tokenAmount);
+    uint256 bpsUSDValue = applyBpsRatio(usdValue, s_tokenTransferFeeConfigArgs[2].ratio);
+    uint256 expectedFeeTokenAmount = calcTokenAmountFromUSDValue(s_feeTokenPrice, bpsUSDValue);
+
+    assertEq(expectedFeeTokenAmount, feeAmount);
   }
 
   function testNoFeeConfigSuccess() public {
@@ -715,6 +715,9 @@ contract EVM2EVMOnRamp_getTokenTransferFee is EVM2EVMOnRamp_getFeeSetup {
   }
 
   function testMixedTokenFeeSuccess() public {
+    uint192[3] memory tokenPrices = [s_feeTokenPrice, s_wrappedTokenPrice, s_customTokenPrice];
+    uint256[3] memory tokenTransferAmounts = [uint256(10000e18), uint256(10000e18), uint256(100000e18)];
+
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: abi.encode(OWNER),
       data: "",
@@ -730,15 +733,28 @@ contract EVM2EVMOnRamp_getTokenTransferFee is EVM2EVMOnRamp_getFeeSetup {
     message.tokenAmounts[3] = Client.EVMTokenAmount({token: s_sourceFeeToken, amount: 1e36});
     message.tokenAmounts[4] = Client.EVMTokenAmount({token: s_sourceRouter.getWrappedNative(), amount: 1e36});
     message.tokenAmounts[5] = Client.EVMTokenAmount({token: CUSTOM_TOKEN, amount: 1e36});
-    // bps fees = 10000 * $5 * 0.025% + 10000 * $2000 * 0.05% + 100000 * $0.1 * 0.1%
-    message.tokenAmounts[6] = Client.EVMTokenAmount({token: s_sourceFeeToken, amount: 10000e18});
-    message.tokenAmounts[7] = Client.EVMTokenAmount({token: s_sourceRouter.getWrappedNative(), amount: 10000e18});
-    message.tokenAmounts[8] = Client.EVMTokenAmount({token: CUSTOM_TOKEN, amount: 100000e18});
+    // bps fees
+    message.tokenAmounts[6] = Client.EVMTokenAmount({token: s_sourceFeeToken, amount: tokenTransferAmounts[0]});
+    message.tokenAmounts[7] = Client.EVMTokenAmount({
+      token: s_sourceRouter.getWrappedNative(),
+      amount: tokenTransferAmounts[1]
+    });
+    message.tokenAmounts[8] = Client.EVMTokenAmount({token: CUSTOM_TOKEN, amount: tokenTransferAmounts[2]});
 
     uint256 feeAmount = s_onRamp.getTokenTransferFee(message.feeToken, message.tokenAmounts);
 
-    // total value of transfer is $40028.5, price of WETH is $2000 -> total fee is 20.01425 WETH
-    assertEq(2001425e13, feeAmount);
+    uint256 usdFeeValue;
+    for (uint256 i = 0; i < tokenTransferAmounts.length; ++i) {
+      usdFeeValue += centsToValue(s_tokenTransferFeeConfigArgs[i].minFee);
+      usdFeeValue += centsToValue(s_tokenTransferFeeConfigArgs[i].maxFee);
+      usdFeeValue += applyBpsRatio(
+        calcUSDValueFromTokenAmount(tokenPrices[i], tokenTransferAmounts[i]),
+        s_tokenTransferFeeConfigArgs[i].ratio
+      );
+    }
+
+    uint256 expectedFeeTokenAmount = calcTokenAmountFromUSDValue(s_wrappedTokenPrice, usdFeeValue);
+    assertEq(expectedFeeTokenAmount, feeAmount);
   }
 
   // reverts
@@ -783,36 +799,65 @@ contract EVM2EVMOnRamp_getTokenTransferFee is EVM2EVMOnRamp_getFeeSetup {
 
 /// @notice #getFee
 contract EVM2EVMOnRamp_getFee is EVM2EVMOnRamp_getFeeSetup {
+  using USDPriceWith18Decimals for uint192;
+
+  function getEmptyMessageExecutionFeeInLink() internal view returns (uint256) {
+    EVM2EVMOnRamp.FeeTokenConfigArgs memory feeConfig = s_feeTokenConfigArgs[0];
+
+    uint256 totalGasUsed = (GAS_LIMIT + feeConfig.destGasOverhead);
+    uint256 totalGasIncMP = (totalGasUsed * feeConfig.multiplier) / 1 ether;
+    uint256 totalUSDValue = totalGasIncMP * USD_PER_GAS + feeConfig.networkFeeAmountUSD;
+
+    return calcTokenAmountFromUSDValue(s_feeTokenPrice, totalUSDValue);
+  }
+
   function testEmptyMessageNoTokenTransferSuccess() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     uint256 feeAmount = s_onRamp.getFee(message);
 
-    assertEq(62e9, feeAmount);
+    assertEq(getEmptyMessageExecutionFeeInLink(), feeAmount);
   }
 
   function testMessageWithFeeTokenTransferSuccess() public {
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    uint256 tokenAmount = 10000e18;
 
-    Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
-    tokenAmounts[0] = Client.EVMTokenAmount({token: s_sourceFeeToken, amount: 10000e18});
-    message.tokenAmounts = tokenAmounts;
-
+    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, tokenAmount);
     uint256 feeAmount = s_onRamp.getFee(message);
 
-    assertEq(25e17 + 62e9, feeAmount);
+    uint256 usdValue = calcUSDValueFromTokenAmount(s_feeTokenPrice, tokenAmount);
+    uint256 bpsUSDValue = applyBpsRatio(usdValue, s_tokenTransferFeeConfigArgs[0].ratio);
+    uint256 expectedTransferFeeAmountInLink = calcTokenAmountFromUSDValue(s_feeTokenPrice, bpsUSDValue);
+
+    uint256 expectedTotalFeeAmount = getEmptyMessageExecutionFeeInLink() + expectedTransferFeeAmountInLink;
+    assertEq(expectedTotalFeeAmount, feeAmount);
   }
 
   function testMessageWithTwoTokenTransferSuccess() public {
+    uint256 feeTokenAmount = 10000e18;
+    uint256 customTokenAmount = 200000e18;
+
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](2);
-    tokenAmounts[0] = Client.EVMTokenAmount({token: s_sourceFeeToken, amount: 10000e18});
-    tokenAmounts[1] = Client.EVMTokenAmount({token: CUSTOM_TOKEN, amount: 200000e18});
+    tokenAmounts[0] = Client.EVMTokenAmount({token: s_sourceFeeToken, amount: feeTokenAmount});
+    tokenAmounts[1] = Client.EVMTokenAmount({token: CUSTOM_TOKEN, amount: customTokenAmount});
     message.tokenAmounts = tokenAmounts;
 
     uint256 feeAmount = s_onRamp.getFee(message);
 
-    assertEq(4e18 + 25e17 + 62e9, feeAmount);
+    uint256 usdFeeValue;
+    usdFeeValue += applyBpsRatio(
+      calcUSDValueFromTokenAmount(s_feeTokenPrice, feeTokenAmount),
+      s_tokenTransferFeeConfigArgs[0].ratio
+    );
+    usdFeeValue += applyBpsRatio(
+      calcUSDValueFromTokenAmount(s_customTokenPrice, customTokenAmount),
+      s_tokenTransferFeeConfigArgs[2].ratio
+    );
+    uint256 expectedTransferFeeAmountInLink = calcTokenAmountFromUSDValue(s_feeTokenPrice, usdFeeValue);
+
+    uint256 expectedTotalFeeAmount = getEmptyMessageExecutionFeeInLink() + expectedTransferFeeAmountInLink;
+    assertEq(expectedTotalFeeAmount, feeAmount);
   }
 }
 
