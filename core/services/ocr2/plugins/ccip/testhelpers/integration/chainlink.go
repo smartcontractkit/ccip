@@ -174,8 +174,6 @@ func setupNodeCCIP(
 		p2pAddresses := []string{
 			fmt.Sprintf("127.0.0.1:%d", port),
 		}
-		// Disables ocr spec validation, so we can have fast polling for the test.
-		c.DevMode = trueRef
 		c.Log.Level = &loglevel
 		c.Feature.CCIP = &trueRef
 		c.OCR.Enabled = &falseRef
