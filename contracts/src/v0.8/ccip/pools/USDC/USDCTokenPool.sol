@@ -15,9 +15,11 @@ import {IERC165} from "../../../vendor/IERC165.sol";
 /// Protocol (CCTP).
 contract USDCTokenPool is TokenPool {
   event DomainsSet(DomainUpdate[]);
+  event ConfigSet(USDCConfig);
 
   error UnknownDomain(uint64 domain);
   error UnlockingUSDCFailed();
+  error InvalidConfig();
 
   // This data is supplied from offchain and contains everything needed
   // to receive the USDC tokens.
@@ -61,7 +63,7 @@ contract USDCTokenPool is TokenPool {
     IBurnMintERC20 token,
     RateLimiter.Config memory rateLimiterConfig
   ) TokenPool(token, rateLimiterConfig) {
-    s_config = config;
+    _setConfig(config);
 
     i_token.approve(config.tokenMessenger, type(uint256).max);
   }
@@ -123,12 +125,33 @@ contract USDCTokenPool is TokenPool {
     emit Minted(msg.sender, receiver, amount);
   }
 
-  // @notice Gets the CCTP domain for a given CCIP chain selector.
+  // ================================================================
+  // |                           Config                             |
+  // ================================================================
+
+  /// @notice Gets the current config
+  function getConfig() external view returns (USDCConfig memory) {
+    return s_config;
+  }
+
+  /// @notice Sets the config
+  function setConfig(USDCConfig memory config) external onlyOwner {
+    _setConfig(config);
+  }
+
+  /// @notice Sets the config
+  function _setConfig(USDCConfig memory config) internal {
+    if (config.messageTransmitter == address(0) || config.tokenMessenger == address(0)) revert InvalidConfig();
+    s_config = config;
+    emit ConfigSet(config);
+  }
+
+  /// @notice Gets the CCTP domain for a given CCIP chain selector.
   function getDomain(uint64 chainSelector) external view returns (Domain memory) {
     return s_chainToDomain[chainSelector];
   }
 
-  // @notice Sets the CCTP domain for a CCIP chain selector.
+  /// @notice Sets the CCTP domain for a CCIP chain selector.
   function setDomains(DomainUpdate[] calldata domains) external onlyOwner {
     for (uint256 i = 0; i < domains.length; ++i) {
       DomainUpdate memory domain = domains[i];

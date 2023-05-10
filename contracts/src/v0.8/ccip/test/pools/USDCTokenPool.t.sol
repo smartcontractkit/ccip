@@ -235,3 +235,52 @@ contract USDCTokenPool_setDomains is USDCTokenPoolSetup {
     s_usdcTokenPool.setDomains(domainUpdates);
   }
 }
+
+contract USDCTokenPool_setConfig is USDCTokenPoolSetup {
+  event ConfigSet(USDCTokenPool.USDCConfig);
+
+  function testSetConfigSuccess() public {
+    USDCTokenPool.USDCConfig memory newConfig = USDCTokenPool.USDCConfig({
+      version: 12332,
+      tokenMessenger: address(100),
+      messageTransmitter: address(123456789)
+    });
+
+    vm.expectEmit();
+    emit ConfigSet(newConfig);
+    s_usdcTokenPool.setConfig(newConfig);
+
+    USDCTokenPool.USDCConfig memory gotConfig = s_usdcTokenPool.getConfig();
+    assertEq(gotConfig.tokenMessenger, newConfig.tokenMessenger);
+    assertEq(gotConfig.messageTransmitter, newConfig.messageTransmitter);
+    assertEq(gotConfig.version, newConfig.version);
+  }
+
+  // Reverts
+
+  function testInvalidConfigReverts() public {
+    USDCTokenPool.USDCConfig memory newConfig = USDCTokenPool.USDCConfig({
+      version: 12332,
+      tokenMessenger: address(0),
+      messageTransmitter: address(123456789)
+    });
+
+    vm.expectRevert(USDCTokenPool.InvalidConfig.selector);
+    s_usdcTokenPool.setConfig(newConfig);
+
+    newConfig.tokenMessenger = address(235);
+    newConfig.messageTransmitter = address(0);
+
+    vm.expectRevert(USDCTokenPool.InvalidConfig.selector);
+    s_usdcTokenPool.setConfig(newConfig);
+  }
+
+  function testOnlyOwnerReverts() public {
+    changePrank(STRANGER);
+    vm.expectRevert("Only callable by owner");
+
+    s_usdcTokenPool.setConfig(
+      USDCTokenPool.USDCConfig({version: 1, tokenMessenger: address(100), messageTransmitter: address(1)})
+    );
+  }
+}
