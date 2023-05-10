@@ -84,16 +84,15 @@ We cannot recommend specific version numbers for ethereum nodes since the softwa
 
 ## Running a local Chainlink node
 
-**NOTE**: By default, chainlink will run in TLS mode. For local development you can disable this by setting the following env vars and TOML fields:
-
-```dotenv
-CL_DEV=true
-```
+**NOTE**: By default, chainlink will run in TLS mode. For local development you can disable this by using a `dev build` using `make chainlink-dev` and setting the TOML fields:
 
 ```toml
 [WebServer]
 SecureCookies = false
 TLS.HTTPSPort = 0
+
+[Insecure]
+DevWebServer = true
 ```
 
 Alternatively, you can generate self signed certificates using `tools/bin/self-signed-certs` or [manually](https://github.com/smartcontractkit/chainlink/wiki/Creating-Self-Signed-Certificates).
@@ -255,6 +254,8 @@ pnpm i
 ```bash
 pnpm test
 ```
+NOTE: Chainlink is currently in the process of migrating to Foundry and contains both Foundry and Hardhat tests in some versions. More information can be found here: [Chainlink Foundry Documentation](https://github.com/smartcontractkit/chainlink/blob/develop/contracts/foundry.md).
+Any 't.sol' files associated with Foundry tests, contained within the src directories will be ignored by Hardhat.
 
 ### Code Generation
 
