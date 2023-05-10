@@ -8,14 +8,19 @@ import {Client} from "../libraries/Client.sol";
 import {IERC165} from "../../vendor/IERC165.sol";
 import {IERC20} from "../../vendor/IERC20.sol";
 
-// @notice Example of an immutable client example which supports EVM/non-EVM chains.
+// @notice Example of an immutable client example which supports EVM/non-EVM chains
 // @dev If chain specific logic is required for different chain families (e.g. particular
 // decoding the bytes sender for authorization checks), it may be required to point to a helper
 // authorization contract unless all chain families are known up front.
 // @dev If contract does not implement IAny2EVMMessageReceiver and IERC165,
 // and tokens are sent to it, ccipReceive will not be called but tokens will be transferred.
 // @dev If the client is upgradeable you have significantly more flexibility and
-// can avoid storage based options.
+// can avoid storage based options like the below contract uses. However it's
+// worth carefully considering how the trust assumptions of your client dapp will
+// change if you introduce upgradeability. An immutable dapp building on top of CCIP
+// like the example below will inherit the trust properties of CCIP (i.e. the oracle network).
+// @dev The receiver's are encoded offchain and passed as direct arguments to permit supporting
+// new chain family receivers (e.g. a solana encoded receiver address) without upgrading.
 contract ImmutableExample is IAny2EVMMessageReceiver, IERC165 {
   error InvalidConfig();
   error InvalidChain(uint64 chainSelector);
@@ -38,6 +43,8 @@ contract ImmutableExample is IAny2EVMMessageReceiver, IERC165 {
   //    Client.EVMExtraArgsV2 memory extraArgs = Client.EVMExtraArgsV2({gasLimit: 300_000, strict: false, destRefundAddress: 0x1234});
   //    bytes memory encodedV2ExtraArgs = Client._argsToBytes(extraArgs);
   // and update storage with the new args.
+  // If different options are required for different messages, for example different gas limits,
+  // one can simply key based on (chainSelector, messageType) instead of only chainSelector.
   mapping(uint64 => bytes) public s_chains;
 
   constructor(IRouterClient router, IERC20 feeToken) {
