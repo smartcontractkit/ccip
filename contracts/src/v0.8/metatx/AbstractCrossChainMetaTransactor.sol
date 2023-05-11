@@ -22,12 +22,7 @@ abstract contract AbstractCrossChainMetaTransactor is OwnerIsCreator, IERC2771Re
   /// @notice This error is thrown whenever a zero address is passed
   error ZeroAddress();
 
-  constructor(
-    address forwarder,
-    address ccipRouter,
-    address ccipFeeProviderAddress,
-    uint64 ccipChainId
-  ) {
+  constructor(address forwarder, address ccipRouter, address ccipFeeProviderAddress, uint64 ccipChainId) {
     if (forwarder == address(0) || ccipRouter == address(0) || ccipFeeProviderAddress == address(0)) {
       revert ZeroAddress();
     }
@@ -77,22 +72,14 @@ abstract contract AbstractCrossChainMetaTransactor is OwnerIsCreator, IERC2771Re
   /// @param owner Token owner approving allowance
   /// @param spender Approved token spender
   /// @param amount Total token amount to be approved
-  function _approve(
-    address owner,
-    address spender,
-    uint256 amount
-  ) internal virtual;
+  function _approve(address owner, address spender, uint256 amount) internal virtual;
 
   /// @dev Moves `amount` of tokens from `sender` to `recipient`.
   /// @dev Sample implementation: https://github.com/OpenZeppelin/openzeppelin-contracts/blob/d59306bd06a241083841c2e4a39db08e1f3722cc/contracts/token/ERC20/ERC20.sol#L222-L240
   /// @param sender Token sender
   /// @param recipient Token recipient
   /// @param amount Total token amount to be approved
-  function _transfer(
-    address sender,
-    address recipient,
-    uint256 amount
-  ) internal virtual;
+  function _transfer(address sender, address recipient, uint256 amount) internal virtual;
 
   function _isCrossChainTransfer(uint64 chainId) private view returns (bool) {
     return i_ccipChainId != chainId;

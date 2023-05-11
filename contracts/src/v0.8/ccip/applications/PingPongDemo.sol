@@ -26,7 +26,7 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
   constructor(address router, IERC20 feeToken) CCIPReceiver(router) {
     s_isPaused = false;
     s_feeToken = feeToken;
-    s_feeToken.approve(address(router), 2**256 - 1);
+    s_feeToken.approve(address(router), 2 ** 256 - 1);
   }
 
   function setCounterpart(uint64 counterpartChainSelector, address counterpartAddress) external onlyOwner {

@@ -9,7 +9,7 @@ import {TokenPool} from "./TokenPool.sol";
 /// @notice This pool mints and burns a 3rd-party token.
 contract BurnMintTokenPool is TokenPool {
   constructor(IBurnMintERC20 token, RateLimiter.Config memory rateLimiterConfig) TokenPool(token, rateLimiterConfig) {
-    token.approve(address(this), 2**256 - 1);
+    token.approve(address(this), 2 ** 256 - 1);
   }
 
   /// @notice Burn the token in the pool

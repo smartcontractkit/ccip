@@ -22,7 +22,7 @@ contract USDCTokenPoolSetup is BaseTest {
 
   function setUp() public virtual override {
     BaseTest.setUp();
-    s_token = new MockERC20("USDC", "USDC", OWNER, 2**256 - 1);
+    s_token = new MockERC20("USDC", "USDC", OWNER, 2 ** 256 - 1);
     setUpRamps();
 
     s_mockUSDC = new MockUSDC(42);

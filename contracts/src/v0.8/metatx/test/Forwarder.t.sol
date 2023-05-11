@@ -85,10 +85,10 @@ contract ForwarderTest is BaseTest {
     assertTrue(success);
   }
 
-  function _generateRequestAndSig(uint256 fromPK, address from)
-    internal
-    returns (IForwarder.ForwardRequest memory req, bytes memory signature)
-  {
+  function _generateRequestAndSig(
+    uint256 fromPK,
+    address from
+  ) internal returns (IForwarder.ForwardRequest memory req, bytes memory signature) {
     bytes memory encodedCalldata = abi.encodeWithSignature(
       "metaTransfer(address,uint256,uint64)",
       s_toAddress,

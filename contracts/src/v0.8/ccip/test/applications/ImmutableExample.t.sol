@@ -11,7 +11,7 @@ contract ImmutableExample_sanity is EVM2EVMOnRampSetup {
     deal(s_sourceFeeToken, address(e), 100 ether);
 
     // feeToken approval works
-    assertEq(IERC20(s_sourceFeeToken).allowance(address(e), address(s_sourceRouter)), 2**256 - 1);
+    assertEq(IERC20(s_sourceFeeToken).allowance(address(e), address(s_sourceRouter)), 2 ** 256 - 1);
 
     // Can set chain
     Client.EVMExtraArgsV1 memory extraArgs = Client.EVMExtraArgsV1({gasLimit: 300_000, strict: false});

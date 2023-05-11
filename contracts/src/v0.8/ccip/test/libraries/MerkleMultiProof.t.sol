@@ -72,7 +72,7 @@ contract MerkleMultiProofTest is BaseTest {
 
     bytes32 expectedRoot = MerkleHelper.hashPair(left, right);
 
-    bytes32 root = MerkleMultiProof.merkleRoot(leaves, proofs, 2**2 - 1);
+    bytes32 root = MerkleMultiProof.merkleRoot(leaves, proofs, 2 ** 2 - 1);
 
     assertEq(root, expectedRoot);
   }
@@ -86,16 +86,12 @@ contract MerkleMultiProofTest is BaseTest {
 
     bytes32 expectedRoot = MerkleHelper.getMerkleRoot(leaves);
 
-    bytes32 root = MerkleMultiProof.merkleRoot(leaves, proofs, 2**256 - 1);
+    bytes32 root = MerkleMultiProof.merkleRoot(leaves, proofs, 2 ** 256 - 1);
 
     assertEq(root, expectedRoot);
   }
 
-  function testMerkleMulti1of4(
-    bytes32 leaf1,
-    bytes32 proof1,
-    bytes32 proof2
-  ) public {
+  function testMerkleMulti1of4(bytes32 leaf1, bytes32 proof1, bytes32 proof2) public {
     bytes32[] memory leaves = new bytes32[](1);
     leaves[0] = leaf1;
     bytes32[] memory proofs = new bytes32[](2);
@@ -110,12 +106,7 @@ contract MerkleMultiProofTest is BaseTest {
     assertEq(MerkleMultiProof.merkleRoot(leaves, proofs, 0), result);
   }
 
-  function testMerkleMulti2of4(
-    bytes32 leaf1,
-    bytes32 leaf2,
-    bytes32 proof1,
-    bytes32 proof2
-  ) public {
+  function testMerkleMulti2of4(bytes32 leaf1, bytes32 leaf2, bytes32 proof1, bytes32 proof2) public {
     bytes32[] memory leaves = new bytes32[](2);
     leaves[0] = leaf1;
     leaves[1] = leaf2;
@@ -133,12 +124,7 @@ contract MerkleMultiProofTest is BaseTest {
     assertEq(MerkleMultiProof.merkleRoot(leaves, proofs, 4), finalResult);
   }
 
-  function testMerkleMulti3of4(
-    bytes32 leaf1,
-    bytes32 leaf2,
-    bytes32 leaf3,
-    bytes32 proof
-  ) public {
+  function testMerkleMulti3of4(bytes32 leaf1, bytes32 leaf2, bytes32 leaf3, bytes32 proof) public {
     bytes32[] memory leaves = new bytes32[](3);
     leaves[0] = leaf1;
     leaves[1] = leaf2;
@@ -156,12 +142,7 @@ contract MerkleMultiProofTest is BaseTest {
     assertEq(MerkleMultiProof.merkleRoot(leaves, proofs, 5), finalResult);
   }
 
-  function testMerkleMulti4of4(
-    bytes32 leaf1,
-    bytes32 leaf2,
-    bytes32 leaf3,
-    bytes32 leaf4
-  ) public {
+  function testMerkleMulti4of4(bytes32 leaf1, bytes32 leaf2, bytes32 leaf3, bytes32 leaf4) public {
     bytes32[] memory leaves = new bytes32[](4);
     leaves[0] = leaf1;
     leaves[1] = leaf2;

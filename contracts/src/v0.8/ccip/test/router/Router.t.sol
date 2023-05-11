@@ -61,10 +61,10 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 
     IERC20 sourceToken1 = IERC20(s_sourceTokens[1]);
-    sourceToken1.approve(address(s_sourceRouter), 2**64);
+    sourceToken1.approve(address(s_sourceRouter), 2 ** 64);
 
     message.tokenAmounts = new Client.EVMTokenAmount[](1);
-    message.tokenAmounts[0].amount = 2**64;
+    message.tokenAmounts[0].amount = 2 ** 64;
     message.tokenAmounts[0].token = s_sourceTokens[1];
 
     uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_ID, message);
@@ -117,10 +117,10 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 
     IERC20 sourceToken1 = IERC20(s_sourceTokens[1]);
-    sourceToken1.approve(address(s_sourceRouter), 2**64);
+    sourceToken1.approve(address(s_sourceRouter), 2 ** 64);
 
     message.tokenAmounts = new Client.EVMTokenAmount[](1);
-    message.tokenAmounts[0].amount = 2**64;
+    message.tokenAmounts[0].amount = 2 ** 64;
     message.tokenAmounts[0].token = s_sourceTokens[1];
     uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_ID, message);
     assertGt(expectedFee, 0);
@@ -194,7 +194,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.feeToken = s_sourceTokens[1];
-    IERC20(s_sourceTokens[1]).approve(address(s_sourceRouter), 2**64);
+    IERC20(s_sourceTokens[1]).approve(address(s_sourceRouter), 2 ** 64);
     s_sourceRouter.ccipSend(DEST_CHAIN_ID, message);
   }
 

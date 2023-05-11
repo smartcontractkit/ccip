@@ -111,11 +111,7 @@ contract BankERC20 is IERC20, IERC20Metadata, AbstractCrossChainMetaTransactor {
   /// - `sender` must have a balance of at least `amount`.
   /// - the caller must have allowance for ``sender``'s tokens of at least
   /// `amount`.
-  function transferFrom(
-    address sender,
-    address recipient,
-    uint256 amount
-  ) public virtual override returns (bool) {
+  function transferFrom(address sender, address recipient, uint256 amount) public virtual override returns (bool) {
     _transfer(sender, recipient, amount);
 
     uint256 currentAllowance = _allowances[sender][_msgSender()];
@@ -157,11 +153,7 @@ contract BankERC20 is IERC20, IERC20Metadata, AbstractCrossChainMetaTransactor {
   }
 
   /// @inheritdoc AbstractCrossChainMetaTransactor
-  function _transfer(
-    address sender,
-    address recipient,
-    uint256 amount
-  ) internal virtual override {
+  function _transfer(address sender, address recipient, uint256 amount) internal virtual override {
     require(sender != address(0), "ERC20: transfer from the zero address");
     require(recipient != address(0), "ERC20: transfer to the zero address");
 
@@ -219,11 +211,7 @@ contract BankERC20 is IERC20, IERC20Metadata, AbstractCrossChainMetaTransactor {
   }
 
   /// @inheritdoc AbstractCrossChainMetaTransactor
-  function _approve(
-    address owner,
-    address spender,
-    uint256 amount
-  ) internal virtual override {
+  function _approve(address owner, address spender, uint256 amount) internal virtual override {
     require(owner != address(0), "ERC20: approve from the zero address");
     require(spender != address(0), "ERC20: approve to the zero address");
 
@@ -240,11 +228,7 @@ contract BankERC20 is IERC20, IERC20Metadata, AbstractCrossChainMetaTransactor {
   /// - when `to` is zero, `amount` of ``from``'s tokens will be burned.
   /// - `from` and `to` are never both zero.
   /// To learn more about hooks, head to xref:ROOT:extending-contracts.adoc#using-hooks[Using Hooks].
-  function _beforeTokenTransfer(
-    address from,
-    address to,
-    uint256 amount
-  ) internal virtual {}
+  function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual {}
 
   /// @dev Hook that is called after any transfer of tokens. This includes
   /// minting and burning.
@@ -255,9 +239,5 @@ contract BankERC20 is IERC20, IERC20Metadata, AbstractCrossChainMetaTransactor {
   /// - when `to` is zero, `amount` of ``from``'s tokens have been burned.
   /// - `from` and `to` are never both zero.
   /// To learn more about hooks, head to xref:ROOT:extending-contracts.adoc#using-hooks[Using Hooks].
-  function _afterTokenTransfer(
-    address from,
-    address to,
-    uint256 amount
-  ) internal virtual {}
+  function _afterTokenTransfer(address from, address to, uint256 amount) internal virtual {}
 }

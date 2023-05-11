@@ -384,15 +384,7 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
 
   /// @notice Config version might be incremented for many reasons, including
   /// recovery from a curse and a regular config change.
-  function getConfigDetails()
-    external
-    view
-    returns (
-      uint32 version,
-      uint32 blockNumber,
-      Config memory config
-    )
-  {
+  function getConfigDetails() external view returns (uint32 version, uint32 blockNumber, Config memory config) {
     version = s_versionedConfig.configVersion;
     blockNumber = s_versionedConfig.blockNumber;
     config = s_versionedConfig.config;
@@ -402,15 +394,9 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
   /// @return accumulatedWeight sum of weights of voters, will be zero if voting took place with an older config version
   /// @return blessed will be accurate regardless of when voting took place
   /// @dev This is a helper method for offchain code so efficiency is not really a concern.
-  function getBlessProgress(IAFN.TaggedRoot calldata taggedRoot)
-    external
-    view
-    returns (
-      address[] memory blessVoteAddrs,
-      uint16 accumulatedWeight,
-      bool blessed
-    )
-  {
+  function getBlessProgress(
+    IAFN.TaggedRoot calldata taggedRoot
+  ) external view returns (address[] memory blessVoteAddrs, uint16 accumulatedWeight, bool blessed) {
     bytes32 taggedRootHash = _taggedRootHash(taggedRoot);
     BlessVoteProgress memory progress = s_blessVoteProgressByTaggedRootHash[taggedRootHash];
     blessed = progress.weightThresholdMet;

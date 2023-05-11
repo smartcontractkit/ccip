@@ -25,8 +25,8 @@ contract TokenSetup is BaseTest {
 
     // Source tokens & pools
     if (s_sourceTokens.length == 0) {
-      s_sourceTokens.push(address(new MockERC20("sLINK", "sLNK", OWNER, 2**256 - 1)));
-      s_sourceTokens.push(address(new MockERC20("sETH", "sETH", OWNER, 2**128)));
+      s_sourceTokens.push(address(new MockERC20("sLINK", "sLNK", OWNER, 2 ** 256 - 1)));
+      s_sourceTokens.push(address(new MockERC20("sETH", "sETH", OWNER, 2 ** 128)));
     }
 
     if (s_sourcePools.length == 0) {
@@ -38,8 +38,8 @@ contract TokenSetup is BaseTest {
 
     // Destination tokens & pools
     if (s_destTokens.length == 0) {
-      s_destTokens.push(address(new MockERC20("dLINK", "dLNK", OWNER, 2**256 - 1)));
-      s_destTokens.push(address(new MockERC20("dETH", "dETH", OWNER, 2**128)));
+      s_destTokens.push(address(new MockERC20("dLINK", "dLNK", OWNER, 2 ** 256 - 1)));
+      s_destTokens.push(address(new MockERC20("dETH", "dETH", OWNER, 2 ** 128)));
     }
 
     if (s_destPools.length == 0) {

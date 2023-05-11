@@ -41,33 +41,16 @@ contract NoCancelVRFCoordinatorV2_cancelSubscription is NoCancelVRFCoordinatorV2
     // contract owner are different.
     vm.stopPrank();
     vm.startPrank(subscriptionOwner);
-    vm.expectEmit(
-      true, /* subId */
-      false, /* checkTopic2 */
-      false, /* checkTopic3 */
-      true /* owner */
-    );
+    vm.expectEmit(true /* subId */, false /* checkTopic2 */, false /* checkTopic3 */, true /* owner */);
     emit SubscriptionCreated(1, subscriptionOwner);
     s_coordinator.createSubscription();
 
     // do basic assertions on a brand new subscription
     (uint96 balance, uint64 requestCount, address owner, address[] memory consumers) = s_coordinator.getSubscription(1);
-    assertEq(
-      0, /* expected balance */
-      balance /* actual balance */
-    );
-    assertEq(
-      0, /* expected count */
-      requestCount /* actual count */
-    );
-    assertEq(
-      subscriptionOwner, /* expected owner */
-      owner /* actual owner */
-    );
-    assertEq(
-      0, /* expected length */
-      consumers.length /* actual length */
-    );
+    assertEq(0 /* expected balance */, balance /* actual balance */);
+    assertEq(0 /* expected count */, requestCount /* actual count */);
+    assertEq(subscriptionOwner /* expected owner */, owner /* actual owner */);
+    assertEq(0 /* expected length */, consumers.length /* actual length */);
 
     vm.expectRevert(bytes("sub cancellation not allowed"));
     s_coordinator.cancelSubscription(1, address(0)); // args don't matter, always reverts
@@ -86,66 +69,30 @@ contract NoCancelVRFCoordinatorV2_cancelSubscription is NoCancelVRFCoordinatorV2
     // contract owner are different.
     vm.stopPrank();
     vm.prank(subscriptionOwner);
-    vm.expectEmit(
-      true, /* subId */
-      false, /* checkTopic2 */
-      false, /* checkTopic3 */
-      true /* owner */
-    );
+    vm.expectEmit(true /* subId */, false /* checkTopic2 */, false /* checkTopic3 */, true /* owner */);
     emit SubscriptionCreated(1, subscriptionOwner);
     s_coordinator.createSubscription();
 
     // do basic assertions on a brand new subscription
     (uint96 balance, uint64 requestCount, address owner, address[] memory consumers) = s_coordinator.getSubscription(1);
-    assertEq(
-      0, /* expected balance */
-      balance /* actual balance */
-    );
-    assertEq(
-      0, /* expected count */
-      requestCount /* actual count */
-    );
-    assertEq(
-      subscriptionOwner, /* expected owner */
-      owner /* actual owner */
-    );
-    assertEq(
-      0, /* expected length */
-      consumers.length /* actual length */
-    );
+    assertEq(0 /* expected balance */, balance /* actual balance */);
+    assertEq(0 /* expected count */, requestCount /* actual count */);
+    assertEq(subscriptionOwner /* expected owner */, owner /* actual owner */);
+    assertEq(0 /* expected length */, consumers.length /* actual length */);
 
     // transfer and call some link to the newly created subscription
     uint256 ownerLinkBalanceBefore = LINK.balanceOf(OWNER);
-    vm.expectEmit(
-      true, /* subId */
-      false, /* checkTopic2 */
-      false, /* checkTopic3 */
-      true /* oldBalance,newBalance */
-    );
+    vm.expectEmit(true /* subId */, false /* checkTopic2 */, false /* checkTopic3 */, true /* oldBalance,newBalance */);
     emit SubscriptionFunded(1, 0, 1e18);
     vm.prank(OWNER);
-    bool success = LINK.transferAndCall(
-      address(s_coordinator),
-      1e18, /* 1 LINK */
-      abi.encode(
-        uint64(1) /* sub id */
-      )
-    );
+    bool success = LINK.transferAndCall(address(s_coordinator), 1e18 /* 1 LINK */, abi.encode(uint64(1) /* sub id */));
     assertTrue(success);
 
     (balance, requestCount, owner, consumers) = s_coordinator.getSubscription(1);
-    assertEq(
-      1e18, /* expected balance */
-      balance /* actual balance */
-    ); // balance is 1 LINK
+    assertEq(1e18 /* expected balance */, balance /* actual balance */); // balance is 1 LINK
 
     // cancel subscription and assert OWNER link balance updated
-    vm.expectEmit(
-      true, /* subId */
-      false, /* checkTopic2 */
-      false, /* checkTopic3 */
-      true /* to,amount */
-    );
+    vm.expectEmit(true /* subId */, false /* checkTopic2 */, false /* checkTopic3 */, true /* to,amount */);
     emit SubscriptionCanceled(1, OWNER, 1e18);
     vm.prank(OWNER);
     s_coordinator.ownerCancelSubscription(1);

@@ -14,7 +14,7 @@ contract LockReleaseTokenPoolSetup is BaseTest {
 
   function setUp() public virtual override {
     BaseTest.setUp();
-    s_token = new MockERC20("LINK", "LNK", OWNER, 2**256 - 1);
+    s_token = new MockERC20("LINK", "LNK", OWNER, 2 ** 256 - 1);
     s_lockReleaseTokenPool = new LockReleaseTokenPool(s_token, rateLimiterConfig());
 
     TokenPool.RampUpdate[] memory onRamps = new TokenPool.RampUpdate[](1);
@@ -110,7 +110,7 @@ contract LockReleaseTokenPool_removeLiquidity is LockReleaseTokenPoolSetup {
   }
 
   function testInsufficientLiquidityReverts() public {
-    uint256 maxUint256 = 2**256 - 1;
+    uint256 maxUint256 = 2 ** 256 - 1;
     s_token.approve(address(s_lockReleaseTokenPool), maxUint256);
     s_lockReleaseTokenPool.addLiquidity(maxUint256);
 

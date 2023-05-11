@@ -79,12 +79,9 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
   }
 
   // @inheritdoc IPriceRegistry
-  function getTokenPrices(address[] calldata tokens)
-    external
-    view
-    override
-    returns (Internal.TimestampedUint192Value[] memory)
-  {
+  function getTokenPrices(
+    address[] calldata tokens
+  ) external view override returns (Internal.TimestampedUint192Value[] memory) {
     uint256 length = tokens.length;
     Internal.TimestampedUint192Value[] memory tokenPrices = new Internal.TimestampedUint192Value[](length);
     for (uint256 i = 0; i < length; ++i) {
@@ -100,21 +97,16 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
   }
 
   // @inheritdoc IPriceRegistry
-  function getDestinationChainGasPrice(uint64 destChainSelector)
-    external
-    view
-    override
-    returns (Internal.TimestampedUint192Value memory)
-  {
+  function getDestinationChainGasPrice(
+    uint64 destChainSelector
+  ) external view override returns (Internal.TimestampedUint192Value memory) {
     return s_usdPerUnitGasByDestChainSelector[destChainSelector];
   }
 
-  function getFeeTokenAndGasPrices(address feeToken, uint64 destChainSelector)
-    external
-    view
-    override
-    returns (uint192 feeTokenPrice, uint192 gasPriceValue)
-  {
+  function getFeeTokenAndGasPrices(
+    address feeToken,
+    uint64 destChainSelector
+  ) external view override returns (uint192 feeTokenPrice, uint192 gasPriceValue) {
     if (!s_feeTokens.contains(feeToken)) revert NotAFeeToken(feeToken);
 
     Internal.TimestampedUint192Value memory gasPrice = s_usdPerUnitGasByDestChainSelector[destChainSelector];
@@ -172,10 +164,10 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
   /// @param feeTokensToAdd The addresses of the tokens which are now considered fee tokens
   /// and can be used to calculate fees.
   /// @param feeTokensToRemove The addresses of the tokens which are no longer considered feeTokens.
-  function applyFeeTokensUpdates(address[] memory feeTokensToAdd, address[] memory feeTokensToRemove)
-    external
-    onlyOwner
-  {
+  function applyFeeTokensUpdates(
+    address[] memory feeTokensToAdd,
+    address[] memory feeTokensToRemove
+  ) external onlyOwner {
     _applyFeeTokensUpdates(feeTokensToAdd, feeTokensToRemove);
   }
 
@@ -246,10 +238,10 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
   /// to send fee updates.
   /// @param priceUpdatersToRemove The addresses of the priceUpdaters that are no longer allowed
   /// to send fee updates.
-  function applyPriceUpdatersUpdates(address[] memory priceUpdatersToAdd, address[] memory priceUpdatersToRemove)
-    external
-    onlyOwner
-  {
+  function applyPriceUpdatersUpdates(
+    address[] memory priceUpdatersToAdd,
+    address[] memory priceUpdatersToRemove
+  ) external onlyOwner {
     _applyPriceUpdatersUpdates(priceUpdatersToAdd, priceUpdatersToRemove);
   }
 
@@ -258,9 +250,10 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
   /// to send fee updates.
   /// @param priceUpdatersToRemove The addresses of the priceUpdaters that are no longer allowed
   /// to send fee updates.
-  function _applyPriceUpdatersUpdates(address[] memory priceUpdatersToAdd, address[] memory priceUpdatersToRemove)
-    private
-  {
+  function _applyPriceUpdatersUpdates(
+    address[] memory priceUpdatersToAdd,
+    address[] memory priceUpdatersToRemove
+  ) private {
     for (uint256 i = 0; i < priceUpdatersToAdd.length; ++i) {
       if (s_priceUpdaters.add(priceUpdatersToAdd[i])) {
         emit PriceUpdaterSet(priceUpdatersToAdd[i]);

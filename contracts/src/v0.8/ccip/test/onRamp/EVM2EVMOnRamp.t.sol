@@ -269,11 +269,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
   }
 
   // Make sure any valid sender, receiver and feeAmount can be handled.
-  function test_fuzz_ForwardFromRouterSuccess(
-    address originalSender,
-    address receiver,
-    uint96 feeTokenAmount
-  ) public {
+  function test_fuzz_ForwardFromRouterSuccess(address originalSender, address receiver, uint96 feeTokenAmount) public {
     // To avoid RouterMustSetOriginalSender
     vm.assume(originalSender != address(0));
 
@@ -379,10 +375,10 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
   function testConsumingMoreThanMaxCapacityReverts() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.tokenAmounts = new Client.EVMTokenAmount[](1);
-    message.tokenAmounts[0].amount = 2**128;
+    message.tokenAmounts[0].amount = 2 ** 128;
     message.tokenAmounts[0].token = s_sourceTokens[0];
 
-    IERC20(s_sourceTokens[0]).approve(address(s_onRamp), 2**128);
+    IERC20(s_sourceTokens[0]).approve(address(s_onRamp), 2 ** 128);
 
     vm.expectRevert(
       abi.encodeWithSelector(
@@ -929,7 +925,7 @@ contract EVM2EVMOnRamp_setNops is EVM2EVMOnRampSetup {
   // Reverts
 
   function testNotEnoughFundsForPayoutReverts() public {
-    uint96 nopFeesJuels = 2**95;
+    uint96 nopFeesJuels = 2 ** 95;
     // Set Nop fee juels but don't transfer LINK. This can happen when users
     // pay in non-link tokens.
     changePrank(address(s_sourceRouter));

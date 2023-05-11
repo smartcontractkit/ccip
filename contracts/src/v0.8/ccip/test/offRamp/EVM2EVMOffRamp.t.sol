@@ -470,7 +470,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
       Internal.ExecutionReport({
         sequenceNumbers: new uint64[](0),
         proofs: new bytes32[](0),
-        proofFlagBits: 2**256 - 1,
+        proofFlagBits: 2 ** 256 - 1,
         encodedMessages: new bytes[](0),
         offchainTokenData: new bytes[][](0)
       }),

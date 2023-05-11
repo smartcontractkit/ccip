@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 contract MockLinkToken {
-  uint256 public constant totalSupply = 10**27;
+  uint256 public constant totalSupply = 10 ** 27;
 
   mapping(address => uint256) public balances;
 
@@ -42,11 +42,7 @@ contract MockLinkToken {
     _;
   }
 
-  function contractFallback(
-    address _to,
-    uint256 _value,
-    bytes calldata _data
-  ) private {
+  function contractFallback(address _to, uint256 _value, bytes calldata _data) private {
     ERC677Receiver receiver = ERC677Receiver(_to);
     receiver.onTokenTransfer(msg.sender, _value, _data);
   }
@@ -61,9 +57,5 @@ contract MockLinkToken {
 }
 
 interface ERC677Receiver {
-  function onTokenTransfer(
-    address _sender,
-    uint256 _value,
-    bytes calldata _data
-  ) external;
+  function onTokenTransfer(address _sender, uint256 _value, bytes calldata _data) external;
 }

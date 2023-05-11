@@ -122,8 +122,8 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
 
     // Pre approve the first token so the gas estimates of the tests
     // only cover actual gas usage from the ramps
-    IERC20(s_sourceTokens[0]).approve(address(s_sourceRouter), 2**128);
-    IERC20(s_sourceTokens[1]).approve(address(s_sourceRouter), 2**128);
+    IERC20(s_sourceTokens[0]).approve(address(s_sourceRouter), 2 ** 128);
+    IERC20(s_sourceTokens[1]).approve(address(s_sourceRouter), 2 ** 128);
   }
 
   function _generateTokenMessage() public view returns (Client.EVM2AnyMessage memory) {
@@ -140,11 +140,10 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
       });
   }
 
-  function _generateSingleTokenMessage(address token, uint256 amount)
-    public
-    view
-    returns (Client.EVM2AnyMessage memory)
-  {
+  function _generateSingleTokenMessage(
+    address token,
+    uint256 amount
+  ) public view returns (Client.EVM2AnyMessage memory) {
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
     tokenAmounts[0] = Client.EVMTokenAmount({token: token, amount: amount});
 

@@ -18,19 +18,14 @@ contract FacadeClient {
 
   uint256 private s_msg_sequence = 1;
 
-  constructor(
-    address router,
-    uint64 destChainSelector,
-    IERC20 sourceToken,
-    IERC20 feeToken
-  ) {
+  constructor(address router, uint64 destChainSelector, IERC20 sourceToken, IERC20 feeToken) {
     i_router = router;
     i_destChainSelector = destChainSelector;
     i_sourceToken = sourceToken;
     i_feeToken = feeToken;
 
-    sourceToken.approve(address(router), 2**256 - 1);
-    feeToken.approve(address(router), 2**256 - 1);
+    sourceToken.approve(address(router), 2 ** 256 - 1);
+    feeToken.approve(address(router), 2 ** 256 - 1);
   }
 
   /// @dev Calls Router to initiate CCIP send.

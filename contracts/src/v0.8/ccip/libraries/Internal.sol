@@ -54,11 +54,10 @@ library Internal {
     bytes32 messageId;
   }
 
-  function _toAny2EVMMessage(EVM2EVMMessage memory original, Client.EVMTokenAmount[] memory destTokenAmounts)
-    internal
-    pure
-    returns (Client.Any2EVMMessage memory message)
-  {
+  function _toAny2EVMMessage(
+    EVM2EVMMessage memory original,
+    Client.EVMTokenAmount[] memory destTokenAmounts
+  ) internal pure returns (Client.Any2EVMMessage memory message) {
     message = Client.Any2EVMMessage({
       messageId: original.messageId,
       sourceChainSelector: original.sourceChainSelector,
