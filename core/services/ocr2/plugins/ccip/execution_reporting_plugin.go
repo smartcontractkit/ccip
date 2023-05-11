@@ -498,7 +498,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			continue
 		}
 		// Fee boosting
-		execCostUsd := computeExecCost(msg, execGasPriceEstimate, destTokenPricesUSD[r.destWrappedNative])
+		execCostUsd := computeExecCost(msg.Message.GasLimit, execGasPriceEstimate, destTokenPricesUSD[r.destWrappedNative])
 		// calculating the source chain fee, dividing by 1e18 for denomination.
 		// For example:
 		// FeeToken=link; FeeTokenAmount=1e17 i.e. 0.1 link, price is 6e18 USD/link (1 USD = 1e18),
@@ -512,7 +512,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			continue
 		}
 
-		messageMaxGas := msg.Message.GasLimit.Uint64() + maxGasOverHeadGas(len(srcLogs), msg.Message)
+		messageMaxGas := msg.Message.GasLimit.Uint64() + maxGasOverHeadGas(len(srcLogs), len(msg.Message.Data), len(msg.Message.TokenAmounts))
 		// Check sufficient gas in batch
 		if availableGas < messageMaxGas {
 			lggr.Infow("Insufficient remaining gas in batch limit", "availableGas", availableGas, "messageMaxGas", messageMaxGas)

@@ -4,8 +4,6 @@ import (
 	"math"
 	"math/big"
 	"time"
-
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
 )
 
 const (
@@ -43,37 +41,37 @@ const (
 )
 
 // Offchain: we compute the max overhead gas to determine msg executability.
-func overheadGas(geMsg evm_2_evm_onramp.InternalEVM2EVMMessage) uint64 {
+func overheadGas(dataLength, numTokens int) uint64 {
 	messageBytes := CONSTANT_MESSAGE_PART_BYTES +
-		(EVM_ADDRESS_LENGTH_BYTES+EVM_WORD_BYTES)*len(geMsg.TokenAmounts) + // token address (address) + token amount (uint256)
-		len(geMsg.Data)
+		(EVM_ADDRESS_LENGTH_BYTES+EVM_WORD_BYTES)*numTokens + // token address (address) + token amount (uint256)
+		dataLength
 	messageCallDataGas := uint64(messageBytes * CALLDATA_GAS_PER_BYTE)
 
 	// Rate limiter only limits value in tokens. It's not called if there are no
 	// tokens in the message.
 	rateLimiterOverhead := uint64(0)
-	if len(geMsg.TokenAmounts) >= 1 {
+	if numTokens >= 1 {
 		rateLimiterOverhead = RATE_LIMITER_OVERHEAD_GAS
 	}
 
 	return messageCallDataGas +
 		EXECUTION_STATE_PROCESSING_OVERHEAD_GAS +
-		PER_TOKEN_OVERHEAD_GAS*uint64(len(geMsg.TokenAmounts)) +
+		PER_TOKEN_OVERHEAD_GAS*uint64(numTokens) +
 		rateLimiterOverhead +
 		EXTERNAL_CALL_OVERHEAD_GAS
 }
 
-func maxGasOverHeadGas(numMsgs int, geMsg evm_2_evm_onramp.InternalEVM2EVMMessage) uint64 {
+func maxGasOverHeadGas(numMsgs, dataLength, numTokens int) uint64 {
 	merkleProofBytes := (math.Ceil(math.Log2(float64(numMsgs)))+2)*32 + (1+2)*32 // only ever one outer root hash
 	merkleGasShare := uint64(merkleProofBytes * CALLDATA_GAS_PER_BYTE)
 
-	return overheadGas(geMsg) + merkleGasShare
+	return overheadGas(dataLength, numTokens) + merkleGasShare
 }
 
 // computeExecCost calculates the costs for next execution, and converts to USD value scaled by 1e18 (e.g. 5$ = 5e18).
-func computeExecCost(msg *evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested, execGasPriceEstimate, tokenPriceUSD *big.Int) *big.Int {
-	execGasEstimate := big.NewInt(0).Add(big.NewInt(FEE_BOOSTING_OVERHEAD_GAS), msg.Message.GasLimit)
-	execGasEstimate = execGasEstimate.Mul(execGasEstimate, execGasPriceEstimate)
+func computeExecCost(gasLimit *big.Int, execGasPriceEstimate, tokenPriceUSD *big.Int) *big.Int {
+	execGasEstimate := new(big.Int).Add(big.NewInt(FEE_BOOSTING_OVERHEAD_GAS), gasLimit)
+	execGasEstimate = new(big.Int).Mul(execGasEstimate, execGasPriceEstimate)
 
 	return calculateUsdPerUnitGas(execGasEstimate, tokenPriceUSD)
 }

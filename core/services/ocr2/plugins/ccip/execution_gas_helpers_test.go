@@ -8,37 +8,30 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
 )
 
 func TestOverheadGas(t *testing.T) {
 	// Only Data and TokenAmounts are used from the messages
 	// And only the length is used so the contents doesn't matter.
 	tests := []struct {
-		geMsg evm_2_evm_onramp.InternalEVM2EVMMessage
-		want  uint64
+		dataLength     int
+		numberOfTokens int
+		want           uint64
 	}{
 		{
-			geMsg: evm_2_evm_onramp.InternalEVM2EVMMessage{
-				Data:         []byte{},
-				TokenAmounts: []evm_2_evm_onramp.ClientEVMTokenAmount{},
-			},
-			want: 27760,
+			dataLength:     0,
+			numberOfTokens: 0,
+			want:           27760,
 		},
 		{
-			geMsg: evm_2_evm_onramp.InternalEVM2EVMMessage{
-				Data: []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
-				TokenAmounts: []evm_2_evm_onramp.ClientEVMTokenAmount{
-					{},
-				},
-			},
-			want: 71288,
+			dataLength:     len([]byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0}),
+			numberOfTokens: 1,
+			want:           71288,
 		},
 	}
 
 	for _, tc := range tests {
-		got := overheadGas(tc.geMsg)
+		got := overheadGas(tc.dataLength, tc.numberOfTokens)
 		if !reflect.DeepEqual(tc.want, got) {
 			t.Fatalf("expected: %v, got: %v", tc.want, got)
 		}
@@ -49,32 +42,27 @@ func TestMaxGasOverHeadGas(t *testing.T) {
 	// Only Data and TokenAmounts are used from the messages
 	// And only the length is used so the contents doesn't matter.
 	tests := []struct {
-		numMsgs int
-		geMsg   evm_2_evm_onramp.InternalEVM2EVMMessage
-		want    uint64
+		numMsgs        int
+		dataLength     int
+		numberOfTokens int
+		want           uint64
 	}{
 		{
-			numMsgs: 6,
-			geMsg: evm_2_evm_onramp.InternalEVM2EVMMessage{
-				Data:         []byte{},
-				TokenAmounts: []evm_2_evm_onramp.ClientEVMTokenAmount{},
-			},
-			want: 31856,
+			numMsgs:        6,
+			dataLength:     0,
+			numberOfTokens: 0,
+			want:           31856,
 		},
 		{
-			numMsgs: 3,
-			geMsg: evm_2_evm_onramp.InternalEVM2EVMMessage{
-				Data: []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
-				TokenAmounts: []evm_2_evm_onramp.ClientEVMTokenAmount{
-					{},
-				},
-			},
-			want: 74872,
+			numMsgs:        3,
+			dataLength:     len([]byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0}),
+			numberOfTokens: 1,
+			want:           74872,
 		},
 	}
 
 	for _, tc := range tests {
-		got := maxGasOverHeadGas(tc.numMsgs, tc.geMsg)
+		got := maxGasOverHeadGas(tc.numMsgs, tc.dataLength, tc.numberOfTokens)
 		if !reflect.DeepEqual(tc.want, got) {
 			t.Fatalf("expected: %v, got: %v", tc.want, got)
 		}
@@ -107,12 +95,7 @@ func TestComputeExecCost(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			msg := &evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested{
-				Message: evm_2_evm_onramp.InternalEVM2EVMMessage{
-					GasLimit: tc.gasLimit,
-				},
-			}
-			execCostUsd := computeExecCost(msg, tc.execGasEstimate, tc.tokenPriceUSD)
+			execCostUsd := computeExecCost(tc.gasLimit, tc.execGasEstimate, tc.tokenPriceUSD)
 			require.Equal(t, tc.execCostUsd, execCostUsd)
 		})
 	}
