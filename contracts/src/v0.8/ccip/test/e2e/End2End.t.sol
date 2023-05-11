@@ -63,7 +63,7 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
     vm.pauseGasMetering();
 
     bytes32[] memory proofs = new bytes32[](0);
-    uint256 timestamp = s_commitStore.verify(merkleRoots, proofs, 2**2 - 1);
+    uint256 timestamp = s_commitStore.verify(merkleRoots, proofs, 2 ** 2 - 1);
     assertEq(BLOCK_TIME, timestamp);
 
     // We change the block time so when execute would e.g. use the current

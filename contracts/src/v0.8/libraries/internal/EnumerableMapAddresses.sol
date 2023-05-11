@@ -11,11 +11,7 @@ library EnumerableMapAddresses {
   }
 
   // solhint-disable-next-line chainlink-solidity/prefix-internal-functions-with-underscore
-  function set(
-    AddressToAddressMap storage map,
-    address key,
-    address value
-  ) internal returns (bool) {
+  function set(AddressToAddressMap storage map, address key, address value) internal returns (bool) {
     return map._inner.set(uint256(uint160(key)), value);
   }
 

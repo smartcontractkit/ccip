@@ -17,7 +17,7 @@ contract ThirdPartyBurnMintTokenPoolSetup is BaseTest {
 
   function setUp() public virtual override {
     BaseTest.setUp();
-    s_token = new MockERC20("LINK", "LNK", OWNER, 2**256 - 1);
+    s_token = new MockERC20("LINK", "LNK", OWNER, 2 ** 256 - 1);
     s_router = new Router(address(s_token));
 
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](0);

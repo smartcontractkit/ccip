@@ -200,11 +200,7 @@ abstract contract OCR2BaseNoChecks is OwnerIsCreator, OCR2Abstract {
     external
     view
     override
-    returns (
-      uint32 configCount,
-      uint32 blockNumber,
-      bytes32 configDigest
-    )
+    returns (uint32 configCount, uint32 blockNumber, bytes32 configDigest)
   {
     return (s_configCount, s_latestConfigBlockNumber, s_configInfo.latestConfigDigest);
   }
@@ -215,11 +211,7 @@ abstract contract OCR2BaseNoChecks is OwnerIsCreator, OCR2Abstract {
     view
     virtual
     override
-    returns (
-      bool scanLogs,
-      bytes32 configDigest,
-      uint32 epoch
-    )
+    returns (bool scanLogs, bytes32 configDigest, uint32 epoch)
   {
     return (true, bytes32(0), uint32(0));
   }

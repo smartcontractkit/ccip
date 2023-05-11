@@ -20,13 +20,7 @@ contract ReentrantMaliciousTokenPool is TokenPool {
   }
 
   /// @dev Calls into Facade to reenter Router exactly 1 time
-  function lockOrBurn(
-    address,
-    bytes calldata,
-    uint256 amount,
-    uint64,
-    bytes calldata
-  ) external override {
+  function lockOrBurn(address, bytes calldata, uint256 amount, uint64, bytes calldata) external override {
     if (s_attacked) {
       return;
     }
@@ -37,11 +31,5 @@ contract ReentrantMaliciousTokenPool is TokenPool {
     emit Burned(msg.sender, amount);
   }
 
-  function releaseOrMint(
-    bytes memory,
-    address receiver,
-    uint256 amount,
-    uint64,
-    bytes memory
-  ) external override {}
+  function releaseOrMint(bytes memory, address receiver, uint256 amount, uint64, bytes memory) external override {}
 }

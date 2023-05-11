@@ -64,11 +64,10 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
   // ================================================================
 
   /// @inheritdoc IRouterClient
-  function getFee(uint64 destinationChainSelector, Client.EVM2AnyMessage memory message)
-    external
-    view
-    returns (uint256 fee)
-  {
+  function getFee(
+    uint64 destinationChainSelector,
+    Client.EVM2AnyMessage memory message
+  ) external view returns (uint256 fee) {
     if (message.feeToken == address(0)) {
       // For empty feeToken return native quote.
       message.feeToken = address(s_wrappedNative);
@@ -92,11 +91,10 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
   }
 
   /// @inheritdoc IRouterClient
-  function ccipSend(uint64 destinationChainSelector, Client.EVM2AnyMessage memory message)
-    external
-    payable
-    returns (bytes32)
-  {
+  function ccipSend(
+    uint64 destinationChainSelector,
+    Client.EVM2AnyMessage memory message
+  ) external payable returns (bytes32) {
     address onRamp = s_onRamps[destinationChainSelector];
     if (onRamp == address(0)) revert UnsupportedDestinationChain(destinationChainSelector);
     uint256 feeTokenAmount;
@@ -284,11 +282,7 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
   /// @dev Must be onlyOwner to avoid malicious token contract calls.
   /// @param tokenAddress ERC20-token to recover
   /// @param to Destination address to send the tokens to.
-  function recoverTokens(
-    address tokenAddress,
-    address to,
-    uint256 amount
-  ) external onlyOwner {
+  function recoverTokens(address tokenAddress, address to, uint256 amount) external onlyOwner {
     if (tokenAddress == address(0)) {
       payable(to).transfer(amount);
       return;

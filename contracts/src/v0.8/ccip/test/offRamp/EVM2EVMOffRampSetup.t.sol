@@ -54,11 +54,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     deployOffRamp(s_mockCommitStore, s_destRouter, address(0));
   }
 
-  function deployOffRamp(
-    ICommitStore commitStore,
-    Router router,
-    address prevOffRamp
-  ) internal {
+  function deployOffRamp(ICommitStore commitStore, Router router, address prevOffRamp) internal {
     s_offRamp = new EVM2EVMOffRampHelper(
       EVM2EVMOffRamp.StaticConfig({
         commitStore: address(commitStore),
@@ -93,11 +89,9 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     LockReleaseTokenPool(address(s_destPools[1])).applyRampUpdates(new TokenPool.RampUpdate[](0), offRamps);
   }
 
-  function _convertToGeneralMessage(Internal.EVM2EVMMessage memory original)
-    internal
-    view
-    returns (Client.Any2EVMMessage memory message)
-  {
+  function _convertToGeneralMessage(
+    Internal.EVM2EVMMessage memory original
+  ) internal view returns (Client.Any2EVMMessage memory message) {
     uint256 numberOfTokens = original.tokenAmounts.length;
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](numberOfTokens);
 
@@ -117,19 +111,16 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
       });
   }
 
-  function _generateAny2EVMMessageNoTokens(uint64 sequenceNumber)
-    internal
-    view
-    returns (Internal.EVM2EVMMessage memory)
-  {
+  function _generateAny2EVMMessageNoTokens(
+    uint64 sequenceNumber
+  ) internal view returns (Internal.EVM2EVMMessage memory) {
     return _generateAny2EVMMessage(sequenceNumber, new Client.EVMTokenAmount[](0));
   }
 
-  function _generateAny2EVMMessageWithTokens(uint64 sequenceNumber, uint256[] memory amounts)
-    internal
-    view
-    returns (Internal.EVM2EVMMessage memory)
-  {
+  function _generateAny2EVMMessageWithTokens(
+    uint64 sequenceNumber,
+    uint256[] memory amounts
+  ) internal view returns (Internal.EVM2EVMMessage memory) {
     Client.EVMTokenAmount[] memory tokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
     for (uint256 i = 0; i < tokenAmounts.length; ++i) {
       tokenAmounts[i].amount = amounts[i];
@@ -137,11 +128,10 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     return _generateAny2EVMMessage(sequenceNumber, tokenAmounts);
   }
 
-  function _generateAny2EVMMessage(uint64 sequenceNumber, Client.EVMTokenAmount[] memory tokenAmounts)
-    internal
-    view
-    returns (Internal.EVM2EVMMessage memory)
-  {
+  function _generateAny2EVMMessage(
+    uint64 sequenceNumber,
+    Client.EVMTokenAmount[] memory tokenAmounts
+  ) internal view returns (Internal.EVM2EVMMessage memory) {
     bytes memory data = abi.encode(0);
     Internal.EVM2EVMMessage memory message = Internal.EVM2EVMMessage({
       sequenceNumber: sequenceNumber,
@@ -181,11 +171,9 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     return messages;
   }
 
-  function _generateReportFromMessages(Internal.EVM2EVMMessage[] memory messages)
-    internal
-    pure
-    returns (Internal.ExecutionReport memory)
-  {
+  function _generateReportFromMessages(
+    Internal.EVM2EVMMessage[] memory messages
+  ) internal pure returns (Internal.ExecutionReport memory) {
     bytes[] memory encodedMessages = new bytes[](messages.length);
     uint64[] memory sequenceNumbers = new uint64[](messages.length);
     bytes[][] memory offchainTokenData = new bytes[][](messages.length);
@@ -201,7 +189,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
       Internal.ExecutionReport({
         sequenceNumbers: sequenceNumbers,
         proofs: new bytes32[](0),
-        proofFlagBits: 2**256 - 1,
+        proofFlagBits: 2 ** 256 - 1,
         encodedMessages: encodedMessages,
         offchainTokenData: offchainTokenData
       });

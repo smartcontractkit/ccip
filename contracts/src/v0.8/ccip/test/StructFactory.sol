@@ -133,11 +133,10 @@ contract StructFactory {
       });
   }
 
-  function getTokensAndPools(address[] memory sourceTokens, IPool[] memory pools)
-    internal
-    pure
-    returns (EVM2EVMOnRamp.TokenAndPool[] memory)
-  {
+  function getTokensAndPools(
+    address[] memory sourceTokens,
+    IPool[] memory pools
+  ) internal pure returns (EVM2EVMOnRamp.TokenAndPool[] memory) {
     EVM2EVMOnRamp.TokenAndPool[] memory tokensAndPools = new EVM2EVMOnRamp.TokenAndPool[](sourceTokens.length);
     for (uint256 i = 0; i < sourceTokens.length; ++i) {
       tokensAndPools[i] = EVM2EVMOnRamp.TokenAndPool({token: sourceTokens[i], pool: address(pools[i])});
@@ -160,11 +159,10 @@ contract StructFactory {
     return RateLimiter.Config({isEnabled: true, capacity: 100e28, rate: 1e15});
   }
 
-  function getSinglePriceUpdateStruct(address token, uint192 price)
-    internal
-    pure
-    returns (Internal.PriceUpdates memory)
-  {
+  function getSinglePriceUpdateStruct(
+    address token,
+    uint192 price
+  ) internal pure returns (Internal.PriceUpdates memory) {
     Internal.TokenPriceUpdate[] memory tokenPriceUpdates = new Internal.TokenPriceUpdate[](1);
     tokenPriceUpdates[0] = Internal.TokenPriceUpdate({sourceToken: token, usdPerToken: price});
 
@@ -177,11 +175,10 @@ contract StructFactory {
     return priceUpdates;
   }
 
-  function getPriceUpdatesStruct(address[] memory tokens, uint192[] memory prices)
-    internal
-    pure
-    returns (Internal.PriceUpdates memory)
-  {
+  function getPriceUpdatesStruct(
+    address[] memory tokens,
+    uint192[] memory prices
+  ) internal pure returns (Internal.PriceUpdates memory) {
     uint256 length = tokens.length;
 
     Internal.TokenPriceUpdate[] memory tokenPriceUpdates = new Internal.TokenPriceUpdate[](length);

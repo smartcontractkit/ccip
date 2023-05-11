@@ -50,7 +50,7 @@ contract ImmutableExample is IAny2EVMMessageReceiver, IERC165 {
   constructor(IRouterClient router, IERC20 feeToken) {
     i_router = router;
     s_feeToken = feeToken;
-    s_feeToken.approve(address(i_router), 2**256 - 1);
+    s_feeToken.approve(address(i_router), 2 ** 256 - 1);
   }
 
   // TODO: permissions on enableChain/disableChain
@@ -66,12 +66,9 @@ contract ImmutableExample is IAny2EVMMessageReceiver, IERC165 {
     return interfaceId == type(IAny2EVMMessageReceiver).interfaceId || interfaceId == type(IERC165).interfaceId;
   }
 
-  function ccipReceive(Client.Any2EVMMessage calldata message)
-    external
-    override
-    onlyRouter
-    validChain(message.sourceChainSelector)
-  {
+  function ccipReceive(
+    Client.Any2EVMMessage calldata message
+  ) external override onlyRouter validChain(message.sourceChainSelector) {
     // Extremely important to ensure only router calls this.
     // Tokens in message if any will be transferred to this contract
     // TODO: Validate sender/origin chain and process message and/or tokens.

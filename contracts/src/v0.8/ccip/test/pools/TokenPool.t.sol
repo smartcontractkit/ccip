@@ -12,7 +12,7 @@ contract TokenPoolSetup is BaseTest {
 
   function setUp() public virtual override {
     BaseTest.setUp();
-    s_token = new MockERC20("LINK", "LNK", OWNER, 2**256 - 1);
+    s_token = new MockERC20("LINK", "LNK", OWNER, 2 ** 256 - 1);
     s_tokenPool = new TokenPoolHelper(s_token, rateLimiterConfig());
   }
 }
@@ -96,11 +96,7 @@ contract TokenPool_currentRateLimiterState is TokenPoolSetup {
 contract TokenPool_setRateLimiterConfig is TokenPoolSetup {
   event ConfigChanged(RateLimiter.Config);
 
-  function testSetRateLimiterConfigSuccess(
-    uint256 capacity,
-    uint208 rate,
-    uint40 newTime
-  ) public {
+  function testSetRateLimiterConfigSuccess(uint256 capacity, uint208 rate, uint40 newTime) public {
     // Bucket updates only work on increasing time
     vm.assume(newTime >= block.timestamp);
     vm.warp(newTime);

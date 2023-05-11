@@ -24,10 +24,10 @@ interface IRouterClient {
   /// @return fee returns guaranteed execution fee for the specified message
   /// delivery to destination chain
   /// @dev returns 0 fee on invalid message.
-  function getFee(uint64 destinationChainSelector, Client.EVM2AnyMessage memory message)
-    external
-    view
-    returns (uint256 fee);
+  function getFee(
+    uint64 destinationChainSelector,
+    Client.EVM2AnyMessage memory message
+  ) external view returns (uint256 fee);
 
   /// @notice Request a message to be sent to the destination chain
   /// @param destinationChainSelector The destination chain ID
@@ -35,8 +35,8 @@ interface IRouterClient {
   /// @return messageId The message ID
   /// @dev Note if msg.value is larger than the required fee (from getFee) we accept
   /// the overpayment with no refund.
-  function ccipSend(uint64 destinationChainSelector, Client.EVM2AnyMessage calldata message)
-    external
-    payable
-    returns (bytes32);
+  function ccipSend(
+    uint64 destinationChainSelector,
+    Client.EVM2AnyMessage calldata message
+  ) external payable returns (bytes32);
 }

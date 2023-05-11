@@ -471,11 +471,10 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
 
   /// @notice Returns the fee based on the tokens transferred. Will always be 0 if
   /// no tokens are transferred. The token fee is calculated based on basis points.
-  function _getTokenTransferFee(address feeToken, Client.EVMTokenAmount[] calldata tokenAmounts)
-    internal
-    view
-    returns (uint256 feeTokenAmount)
-  {
+  function _getTokenTransferFee(
+    address feeToken,
+    Client.EVMTokenAmount[] calldata tokenAmounts
+  ) internal view returns (uint256 feeTokenAmount) {
     uint256 numerOfTokens = tokenAmounts.length;
     // short-circuit with 0 transfer fee if no token is being transferred
     if (numerOfTokens == 0) {
@@ -545,20 +544,17 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
   }
 
   /// @notice Gets the transfer fee config for a given token.
-  function getTokenTransferFeeConfig(address token)
-    external
-    view
-    returns (TokenTransferFeeConfig memory tokenTransferFeeConfig)
-  {
+  function getTokenTransferFeeConfig(
+    address token
+  ) external view returns (TokenTransferFeeConfig memory tokenTransferFeeConfig) {
     return s_tokenTransferFeeConfig[token];
   }
 
   /// @notice Sets the transfer fee config.
   /// @dev only callable by the owner or admin.
-  function setTokenTransferFeeConfig(TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs)
-    external
-    onlyOwnerOrAdmin
-  {
+  function setTokenTransferFeeConfig(
+    TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs
+  ) external onlyOwnerOrAdmin {
     _setTokenTransferFeeConfig(tokenTransferFeeConfigArgs);
   }
 
