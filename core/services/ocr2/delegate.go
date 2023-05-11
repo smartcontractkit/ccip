@@ -768,7 +768,8 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 		if spec.Relay != relay.EVM {
 			return nil, errors.New("Non evm chains are not supported for CCIP commit")
 		}
-		ccipProvider, err2 := evmrelay.NewFunctionsProvider(
+		ccipProvider, err2 := evmrelay.NewCCIPCommitProvider(
+			lggr.Named("CCIPCommit"),
 			d.chainSet,
 			types.RelayArgs{
 				ExternalJobID: jb.ExternalJobID,
@@ -777,11 +778,7 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 				RelayConfig:   spec.RelayConfig.Bytes(),
 				New:           d.isNewlyCreatedJob,
 			},
-			types.PluginArgs{
-				TransmitterID: transmitterID,
-				PluginConfig:  spec.PluginConfig.Bytes(),
-			},
-			lggr.Named("CCIPCommit"),
+			transmitterID,
 			d.ethKs,
 		)
 		if err2 != nil {
@@ -804,7 +801,8 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 		if spec.Relay != relay.EVM {
 			return nil, errors.New("Non evm chains are not supported for CCIP execution")
 		}
-		ccipProvider, err2 := evmrelay.NewFunctionsProvider(
+		ccipProvider, err2 := evmrelay.NewCCIPExecutionProvider(
+			lggr.Named("CCIPExec"),
 			d.chainSet,
 			types.RelayArgs{
 				ExternalJobID: jb.ExternalJobID,
@@ -813,11 +811,7 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 				RelayConfig:   spec.RelayConfig.Bytes(),
 				New:           d.isNewlyCreatedJob,
 			},
-			types.PluginArgs{
-				TransmitterID: transmitterID,
-				PluginConfig:  spec.PluginConfig.Bytes(),
-			},
-			lggr.Named("CCIPExec"),
+			transmitterID,
 			d.ethKs,
 		)
 		if err2 != nil {

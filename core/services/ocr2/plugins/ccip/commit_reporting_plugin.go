@@ -228,6 +228,8 @@ func (r *CommitReportingPlugin) nextMinSeqNum(ctx context.Context) (uint64, erro
 	if err != nil {
 		return 0, err
 	}
+	// loop through sorted inFlightReports
+	// only increment nextMin if the report build ontop the running nextMin
 	r.inFlightMu.RLock()
 	for _, report := range r.inFlight {
 		if report.report.Interval.Max >= nextMin {
