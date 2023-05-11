@@ -2,15 +2,12 @@ package hasher
 
 import (
 	"math/big"
-	"strings"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
@@ -18,9 +15,7 @@ type LeafHasherInterface[H Hash] interface {
 	HashLeaf(log types.Log) (H, error)
 }
 
-var (
-	LeafDomainSeparator = [1]byte{0x00}
-)
+var LeafDomainSeparator = [1]byte{0x00}
 
 func getMetaDataHash[H Hash](ctx Ctx[H], prefix [32]byte, sourceChainId uint64, onRampId common.Address, destChainId uint64) H {
 	paddedOnRamp := onRampId.Hash()
@@ -28,15 +23,12 @@ func getMetaDataHash[H Hash](ctx Ctx[H], prefix [32]byte, sourceChainId uint64, 
 }
 
 type LeafHasher struct {
-	geABI        abi.ABI
 	metaDataHash [32]byte
 	ctx          Ctx[[32]byte]
 }
 
 func NewLeafHasher(sourceChainId uint64, destChainId uint64, onRampId common.Address, ctx Ctx[[32]byte]) *LeafHasher {
-	geABI, _ := abi.JSON(strings.NewReader(evm_2_evm_onramp.EVM2EVMOnRampABI))
 	return &LeafHasher{
-		geABI:        geABI,
 		metaDataHash: getMetaDataHash(ctx, ctx.Hash([]byte("EVM2EVMMessageEvent")), sourceChainId, onRampId, destChainId),
 		ctx:          ctx,
 	}
@@ -45,11 +37,12 @@ func NewLeafHasher(sourceChainId uint64, destChainId uint64, onRampId common.Add
 var _ LeafHasherInterface[[32]byte] = &LeafHasher{}
 
 func (t *LeafHasher) HashLeaf(log types.Log) ([32]byte, error) {
-	event, err := t.ParseEVM2EVMLog(log)
+	message, err := abihelpers.DecodeMessage(log.Data)
 	if err != nil {
 		return [32]byte{}, err
 	}
-	encodedTokens, err := utils.ABIEncode(`[{"components": [{"name": "token","type": "address"}, {"name": "amount", "type": "uint256"}],"type": "tuple[]"}]`, event.Message.TokenAmounts)
+
+	encodedTokens, err := abihelpers.TokenAmountsArgs.PackValues([]interface{}{message.TokenAmounts})
 	if err != nil {
 		return [32]byte{}, err
 	}
@@ -71,25 +64,19 @@ func (t *LeafHasher) HashLeaf(log types.Log) ([32]byte, error) {
 ]`,
 		LeafDomainSeparator,
 		t.metaDataHash,
-		event.Message.SequenceNumber,
-		event.Message.Nonce,
-		event.Message.Sender,
-		event.Message.Receiver,
-		t.ctx.Hash(event.Message.Data),
+		message.SequenceNumber,
+		message.Nonce,
+		message.Sender,
+		message.Receiver,
+		t.ctx.Hash(message.Data),
 		t.ctx.Hash(encodedTokens),
-		event.Message.GasLimit,
-		event.Message.Strict,
-		event.Message.FeeToken,
-		event.Message.FeeTokenAmount,
+		message.GasLimit,
+		message.Strict,
+		message.FeeToken,
+		message.FeeTokenAmount,
 	)
 	if err != nil {
 		return [32]byte{}, err
 	}
 	return t.ctx.Hash(packedValues), nil
-}
-
-func (t *LeafHasher) ParseEVM2EVMLog(log types.Log) (*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested, error) {
-	event := new(evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested)
-	err := bind.NewBoundContract(common.Address{}, t.geABI, nil, nil, nil).UnpackLog(event, "CCIPSendRequested", log)
-	return event, err
 }

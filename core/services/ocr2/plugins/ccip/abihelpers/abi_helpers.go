@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
@@ -48,12 +49,31 @@ var EventSignatures struct {
 	ExecutionStateChangedSequenceNumberIndex int
 }
 
+var (
+	MessageArgs         abi.Arguments
+	TokenAmountsArgs    abi.Arguments
+	CommitReportArgs    abi.Arguments
+	ExecutionReportArgs abi.Arguments
+)
+
 func getIDOrPanic(name string, abi2 abi.ABI) common.Hash {
 	event, ok := abi2.Events[name]
 	if !ok {
 		panic(fmt.Sprintf("missing event %s", name))
 	}
 	return event.ID
+}
+
+func getTupleNamedElem(name string, arg abi.Argument) *abi.Type {
+	if arg.Type.T != abi.TupleTy {
+		return nil
+	}
+	for i, elem := range arg.Type.TupleElems {
+		if arg.Type.TupleRawNames[i] == name {
+			return elem
+		}
+	}
+	return nil
 }
 
 func init() {
@@ -86,10 +106,26 @@ func init() {
 	}
 	EventSignatures.UsdPerUnitGasUpdated = getIDOrPanic("UsdPerUnitGasUpdated", priceRegistryABI)
 	EventSignatures.UsdPerTokenUpdated = getIDOrPanic("UsdPerTokenUpdated", priceRegistryABI)
+
+	// arguments
+	MessageArgs = onRampABI.Events["CCIPSendRequested"].Inputs
+	tokenAmountsTy := getTupleNamedElem("tokenAmounts", MessageArgs[0])
+	if tokenAmountsTy == nil {
+		panic(fmt.Sprintf("missing component '%s' in tuple %+v", "tokenAmounts", MessageArgs))
+	}
+	TokenAmountsArgs = abi.Arguments{{Type: *tokenAmountsTy, Name: "tokenAmounts"}}
+
+	CommitReportArgs = commitStoreABI.Events["ReportAccepted"].Inputs
+
+	manuallyExecuteMethod, ok := offRampABI.Methods["manuallyExecute"]
+	if !ok {
+		panic("missing event 'manuallyExecute'")
+	}
+	ExecutionReportArgs = manuallyExecuteMethod.Inputs
 }
 
 func DecodeMessage(b []byte) (*evm_2_evm_onramp.InternalEVM2EVMMessage, error) {
-	unpacked, err := MakeMessageArgs().Unpack(b)
+	unpacked, err := MessageArgs.Unpack(b)
 	if err != nil {
 		return nil, err
 	}
@@ -142,75 +178,6 @@ func DecodeMessage(b []byte) (*evm_2_evm_onramp.InternalEVM2EVMMessage, error) {
 	}, nil
 }
 
-func MakeMessageArgs() abi.Arguments {
-	tuples := []abi.ArgumentMarshaling{
-		{
-			Name: "sourceChainSelector",
-			Type: "uint64",
-		},
-		{
-			Name: "sequenceNumber",
-			Type: "uint64",
-		},
-		{
-			Name: "feeTokenAmount",
-			Type: "uint256",
-		},
-		{
-			Name: "sender",
-			Type: "address",
-		},
-		{
-			Name: "nonce",
-			Type: "uint64",
-		},
-		{
-			Name: "gasLimit",
-			Type: "uint256",
-		},
-		{
-			Name: "strict",
-			Type: "bool",
-		},
-		{
-			Name: "receiver",
-			Type: "address",
-		},
-		{
-			Name: "data",
-			Type: "bytes",
-		},
-		{
-			Name: "tokenAmounts",
-			Type: "tuple[]",
-			Components: []abi.ArgumentMarshaling{
-				{
-					Name: "token",
-					Type: "address",
-				},
-				{
-					Name: "amount",
-					Type: "uint256",
-				},
-			},
-		},
-		{
-			Name: "feeToken",
-			Type: "address",
-		},
-		{
-			Name: "messageId",
-			Type: "bytes32",
-		},
-	}
-	ty, _ := abi.NewType("tuple", "", tuples)
-	return abi.Arguments{
-		{
-			Type: ty,
-		},
-	}
-}
-
 // ProofFlagsToBits transforms a list of boolean proof flags to a *big.Int
 // encoded number.
 func ProofFlagsToBits(proofFlags []bool) *big.Int {
@@ -223,90 +190,95 @@ func ProofFlagsToBits(proofFlags []bool) *big.Int {
 	return encodedFlags
 }
 
-func MakeExecutionReportArgs() abi.Arguments {
-	return []abi.Argument{
-		{
-			Name: "ExecutionReport",
-			Type: utils.MustAbiType("tuple", []abi.ArgumentMarshaling{
-				{
-					Name: "sequenceNumbers",
-					Type: "uint64[]",
-				},
-				{
-					Name: "encodedMessages",
-					Type: "bytes[]",
-				},
-				{
-					Name: "offchainTokenData",
-					Type: "bytes[][]",
-				},
-				{
-					Name: "proofs",
-					Type: "bytes32[]",
-				},
-				{
-					Name: "proofFlagBits",
-					Type: "uint256",
-				},
-			}),
-		},
-	}
+func EncodeExecutionReport(execReport evm_2_evm_offramp.InternalExecutionReport) ([]byte, error) {
+	return ExecutionReportArgs.PackValues([]interface{}{&execReport})
 }
 
-func MakeCommitReportArgs() abi.Arguments {
-	return []abi.Argument{
-		{
-			Name: "CommitReport",
-			Type: utils.MustAbiType("tuple", []abi.ArgumentMarshaling{
-				{
-					Name: "priceUpdates",
-					Type: "tuple",
-					Components: []abi.ArgumentMarshaling{
-						{
-							Name: "tokenPriceUpdates",
-							Type: "tuple[]",
-							Components: []abi.ArgumentMarshaling{
-								{
-									Name: "sourceToken",
-									Type: "address",
-								},
-								{
-									Name: "usdPerToken",
-									Type: "uint128",
-								},
-							},
-						},
-						{
-							Name: "destChainSelector",
-							Type: "uint64",
-						},
-						{
-							Name: "usdPerUnitGas",
-							Type: "uint128",
-						},
-					},
-				},
-				{
-					Name: "interval",
-					Type: "tuple",
-					Components: []abi.ArgumentMarshaling{
-						{
-							Name: "min",
-							Type: "uint64",
-						},
-						{
-							Name: "max",
-							Type: "uint64",
-						},
-					},
-				},
-				{
-					Name: "merkleRoot",
-					Type: "bytes32",
-				},
-			}),
-		},
+func DecodeExecutionReport(report []byte) (evm_2_evm_offramp.InternalExecutionReport, error) {
+	unpacked, err := ExecutionReportArgs.Unpack(report)
+	if err != nil {
+		return evm_2_evm_offramp.InternalExecutionReport{}, err
 	}
+	if len(unpacked) == 0 {
+		return evm_2_evm_offramp.InternalExecutionReport{}, errors.New("assumptionViolation: expected at least one element")
+	}
+
+	// Must be anonymous struct here
+	erStruct, ok := unpacked[0].(struct {
+		SequenceNumbers   []uint64    `json:"sequenceNumbers"`
+		EncodedMessages   [][]byte    `json:"encodedMessages"`
+		OffchainTokenData [][][]byte  `json:"offchainTokenData"`
+		Proofs            [][32]uint8 `json:"proofs"`
+		ProofFlagBits     *big.Int    `json:"proofFlagBits"`
+	})
+	if !ok {
+		return evm_2_evm_offramp.InternalExecutionReport{}, fmt.Errorf("got %T", unpacked[0])
+	}
+	var er evm_2_evm_offramp.InternalExecutionReport
+	er.EncodedMessages = erStruct.EncodedMessages
+	er.OffchainTokenData = erStruct.OffchainTokenData
+	er.SequenceNumbers = erStruct.SequenceNumbers
+	er.Proofs = append(er.Proofs, erStruct.Proofs...)
+	// Unpack will populate with big.Int{false, <allocated empty nat>} for 0 values,
+	// which is different from the expected big.NewInt(0). Rebuild to the expected value for this case.
+	er.ProofFlagBits = new(big.Int).SetBytes(erStruct.ProofFlagBits.Bytes())
+	return er, nil
+}
+
+// EncodeCommitReport abi encodes an offramp.InternalCommitReport.
+func EncodeCommitReport(commitReport commit_store.CommitStoreCommitReport) ([]byte, error) {
+	return CommitReportArgs.PackValues([]interface{}{commitReport})
+}
+
+// DecodeCommitReport abi decodes a types.Report to an CommitStoreCommitReport
+func DecodeCommitReport(report []byte) (commit_store.CommitStoreCommitReport, error) {
+	unpacked, err := CommitReportArgs.Unpack(report)
+	if err != nil {
+		return commit_store.CommitStoreCommitReport{}, err
+	}
+	if len(unpacked) != 1 {
+		return commit_store.CommitStoreCommitReport{}, errors.New("expected single struct value")
+	}
+
+	commitReport, ok := unpacked[0].(struct {
+		PriceUpdates struct {
+			TokenPriceUpdates []struct {
+				SourceToken common.Address `json:"sourceToken"`
+				UsdPerToken *big.Int       `json:"usdPerToken"`
+			} `json:"tokenPriceUpdates"`
+			DestChainSelector uint64   `json:"destChainSelector"`
+			UsdPerUnitGas     *big.Int `json:"usdPerUnitGas"`
+		} `json:"priceUpdates"`
+		Interval struct {
+			Min uint64 `json:"min"`
+			Max uint64 `json:"max"`
+		} `json:"interval"`
+		MerkleRoot [32]byte `json:"merkleRoot"`
+	})
+	if !ok {
+		return commit_store.CommitStoreCommitReport{}, errors.Errorf("invalid commit report got %T", unpacked[0])
+	}
+
+	var tokenPriceUpdates []commit_store.InternalTokenPriceUpdate
+	for _, u := range commitReport.PriceUpdates.TokenPriceUpdates {
+		tokenPriceUpdates = append(tokenPriceUpdates, commit_store.InternalTokenPriceUpdate{
+			SourceToken: u.SourceToken,
+			UsdPerToken: u.UsdPerToken,
+		})
+	}
+
+	return commit_store.CommitStoreCommitReport{
+		PriceUpdates: commit_store.InternalPriceUpdates{
+			DestChainSelector: commitReport.PriceUpdates.DestChainSelector,
+			UsdPerUnitGas:     commitReport.PriceUpdates.UsdPerUnitGas,
+			TokenPriceUpdates: tokenPriceUpdates,
+		},
+		Interval: commit_store.CommitStoreInterval{
+			Min: commitReport.Interval.Min,
+			Max: commitReport.Interval.Max,
+		},
+		MerkleRoot: commitReport.MerkleRoot,
+	}, nil
 }
 
 type AbiDefined interface {
@@ -319,11 +291,7 @@ type AbiDefinedValid interface {
 }
 
 func EncodeAbiStruct[T AbiDefined](decoded T) ([]byte, error) {
-	encoded, err := utils.ABIEncode(decoded.AbiString(), decoded)
-	if err != nil {
-		return nil, err
-	}
-	return encoded, nil
+	return utils.ABIEncode(decoded.AbiString(), decoded)
 }
 
 func DecodeAbiStruct[T AbiDefinedValid](encoded []byte) (T, error) {

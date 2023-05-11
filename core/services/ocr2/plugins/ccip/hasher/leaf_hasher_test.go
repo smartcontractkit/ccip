@@ -68,7 +68,7 @@ func TestHasher(t *testing.T) {
 }
 
 func generateLog(t *testing.T, message evm_2_evm_onramp.InternalEVM2EVMMessage) types.Log {
-	pack, err := abihelpers.MakeMessageArgs().Pack(message)
+	pack, err := abihelpers.MessageArgs.Pack(message)
 	require.NoError(t, err)
 
 	return types.Log{

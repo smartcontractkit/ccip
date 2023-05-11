@@ -8,8 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 
-	"github.com/smartcontractkit/libocr/offchainreporting2/types"
-
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
@@ -18,10 +16,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/merklemulti"
 )
-
-func EncodeExecutionReport(execReport evm_2_evm_offramp.InternalExecutionReport) (types.Report, error) {
-	return abihelpers.MakeExecutionReportArgs().PackValues([]interface{}{&execReport})
-}
 
 func buildExecutionReport(
 	ctx context.Context,

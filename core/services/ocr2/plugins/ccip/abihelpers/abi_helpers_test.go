@@ -5,6 +5,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/test-go/testify/require"
+
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
+	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 )
 
 func TestProofFlagToBits(t *testing.T) {
@@ -15,7 +19,7 @@ func TestProofFlagToBits(t *testing.T) {
 		}
 		return bools
 	}
-	var tt = []struct {
+	tt := []struct {
 		flags    []bool
 		expected *big.Int
 	}{
@@ -49,4 +53,28 @@ func TestProofFlagToBits(t *testing.T) {
 		a := ProofFlagsToBits(tc.flags)
 		assert.Equal(t, tc.expected.String(), a.String())
 	}
+}
+
+func TestExecutionReportEncoding(t *testing.T) {
+	// Note could consider some fancier testing here (fuzz/property)
+	// but I think that would essentially be testing geth's abi library
+	// as our encode/decode is a thin wrapper around that.
+	report := evm_2_evm_offramp.InternalExecutionReport{
+		SequenceNumbers:   []uint64{0x1},
+		EncodedMessages:   [][]byte{[]byte("test")},
+		OffchainTokenData: [][][]byte{{}},
+		Proofs:            [][32]byte{testutils.Random32Byte()},
+		ProofFlagBits:     big.NewInt(133),
+	}
+	encodeCommitReport, err := EncodeExecutionReport(evm_2_evm_offramp.InternalExecutionReport{
+		SequenceNumbers:   report.SequenceNumbers,
+		EncodedMessages:   report.EncodedMessages,
+		OffchainTokenData: report.OffchainTokenData,
+		Proofs:            report.Proofs,
+		ProofFlagBits:     report.ProofFlagBits,
+	})
+	require.NoError(t, err)
+	decodeCommitReport, err := DecodeExecutionReport(encodeCommitReport)
+	require.NoError(t, err)
+	require.Equal(t, report, decodeCommitReport)
 }

@@ -3,7 +3,6 @@ package ccip
 import (
 	"context"
 	"encoding/hex"
-	"fmt"
 	"math/big"
 	"reflect"
 	"sort"
@@ -46,7 +45,7 @@ var (
 // ExecutionReportToEthTxMeta generates a txmgr.EthTxMeta from the given report.
 // all the message ids will be added to the tx metadata.
 func ExecutionReportToEthTxMeta(report []byte) (*txmgr.EthTxMeta, error) {
-	execReport, err := DecodeExecutionReport(report)
+	execReport, err := abihelpers.DecodeExecutionReport(report)
 	if err != nil {
 		return nil, err
 	}
@@ -66,42 +65,11 @@ func ExecutionReportToEthTxMeta(report []byte) (*txmgr.EthTxMeta, error) {
 }
 
 func MessagesFromExecutionReport(report types.Report) ([]uint64, [][]byte, error) {
-	decodeExecutionReport, err := DecodeExecutionReport(report)
+	decodeExecutionReport, err := abihelpers.DecodeExecutionReport(report)
 	if err != nil {
 		return nil, nil, err
 	}
 	return decodeExecutionReport.SequenceNumbers, decodeExecutionReport.EncodedMessages, nil
-}
-
-func DecodeExecutionReport(report types.Report) (*evm_2_evm_offramp.InternalExecutionReport, error) {
-	unpacked, err := abihelpers.MakeExecutionReportArgs().Unpack(report)
-	if err != nil {
-		return nil, err
-	}
-	if len(unpacked) == 0 {
-		return nil, errors.New("assumptionViolation: expected at least one element")
-	}
-
-	// Must be anonymous struct here
-	erStruct, ok := unpacked[0].(struct {
-		SequenceNumbers   []uint64    `json:"sequenceNumbers"`
-		EncodedMessages   [][]byte    `json:"encodedMessages"`
-		OffchainTokenData [][][]byte  `json:"offchainTokenData"`
-		Proofs            [][32]uint8 `json:"proofs"`
-		ProofFlagBits     *big.Int    `json:"proofFlagBits"`
-	})
-	if !ok {
-		return nil, fmt.Errorf("got %T", unpacked[0])
-	}
-	var er evm_2_evm_offramp.InternalExecutionReport
-	er.EncodedMessages = append(er.EncodedMessages, erStruct.EncodedMessages...)
-	er.OffchainTokenData = append(er.OffchainTokenData, erStruct.OffchainTokenData...)
-	er.Proofs = append(er.Proofs, erStruct.Proofs...)
-	er.SequenceNumbers = erStruct.SequenceNumbers
-	// Unpack will populate with big.Int{false, <allocated empty nat>} for 0 values,
-	// which is different from the expected big.NewInt(0). Rebuild to the expected value for this case.
-	er.ProofFlagBits = big.NewInt(erStruct.ProofFlagBits.Int64())
-	return &er, nil
 }
 
 type ExecutionPluginConfig struct {
@@ -576,7 +544,7 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 	if err != nil {
 		return nil, err
 	}
-	return EncodeExecutionReport(execReport)
+	return abihelpers.EncodeExecutionReport(execReport)
 }
 
 func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.ReportTimestamp, query types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {

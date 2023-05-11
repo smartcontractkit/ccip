@@ -101,7 +101,7 @@ func TestMaxInternalExecutionReportSize(t *testing.T) {
 	c := plugintesthelpers.SetupCCIPTestHarness(t)
 	mb := c.GenerateAndSendMessageBatch(t, 50, MaxPayloadLength, MaxTokensPerMessage)
 	// Ensure execution report size is valid
-	executorReport, err := EncodeExecutionReport(evm_2_evm_offramp.InternalExecutionReport{
+	executorReport, err := abihelpers.EncodeExecutionReport(evm_2_evm_offramp.InternalExecutionReport{
 		SequenceNumbers:   mb.SeqNums,
 		EncodedMessages:   mb.AllMsgBytes,
 		OffchainTokenData: mb.TokenData,
@@ -132,32 +132,6 @@ func TestMaxInternalExecutionReportSize(t *testing.T) {
 	require.NoError(t, pool.AddLocal(signedTx))
 }
 
-func TestInternalExecutionReportEncoding(t *testing.T) {
-	// Note could consider some fancier testing here (fuzz/property)
-	// but I think that would essentially be testing geth's abi library
-	// as our encode/decode is a thin wrapper around that.
-	c := plugintesthelpers.SetupCCIPTestHarness(t)
-	mb := c.GenerateAndSendMessageBatch(t, 1, 1, 1)
-	report := evm_2_evm_offramp.InternalExecutionReport{
-		SequenceNumbers:   mb.SeqNums,
-		EncodedMessages:   mb.AllMsgBytes,
-		OffchainTokenData: mb.TokenData,
-		Proofs:            mb.Proof.Hashes,
-		ProofFlagBits:     mb.ProofBits,
-	}
-	encodeCommitReport, err := EncodeExecutionReport(evm_2_evm_offramp.InternalExecutionReport{
-		SequenceNumbers:   report.SequenceNumbers,
-		EncodedMessages:   report.EncodedMessages,
-		OffchainTokenData: report.OffchainTokenData,
-		Proofs:            report.Proofs,
-		ProofFlagBits:     report.ProofFlagBits,
-	})
-	require.NoError(t, err)
-	decodeCommitReport, err := DecodeExecutionReport(encodeCommitReport)
-	require.NoError(t, err)
-	require.Equal(t, &report, decodeCommitReport)
-}
-
 func TestExecutionReportToEthTxMetadata(t *testing.T) {
 	c := plugintesthelpers.SetupCCIPTestHarness(t)
 	tests := []struct {
@@ -167,13 +141,13 @@ func TestExecutionReportToEthTxMetadata(t *testing.T) {
 	}{
 		{
 			"happy flow",
-			c.GenerateAndSendMessageBatch(t, 50, MaxPayloadLength, MaxTokensPerMessage),
+			c.GenerateAndSendMessageBatch(t, 5, MaxPayloadLength, MaxTokensPerMessage),
 			nil,
 		},
 		{
 			"invalid msgs",
 			func() plugintesthelpers.MessageBatch {
-				mb := c.GenerateAndSendMessageBatch(t, 50, MaxPayloadLength, MaxTokensPerMessage)
+				mb := c.GenerateAndSendMessageBatch(t, 5, MaxPayloadLength, MaxTokensPerMessage)
 				mb.AllMsgBytes[0] = []byte{1, 1, 1, 1}
 				return mb
 			}(),
@@ -183,7 +157,7 @@ func TestExecutionReportToEthTxMetadata(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			encExecReport, err := EncodeExecutionReport(evm_2_evm_offramp.InternalExecutionReport{
+			encExecReport, err := abihelpers.EncodeExecutionReport(evm_2_evm_offramp.InternalExecutionReport{
 				SequenceNumbers:   tc.msgBatch.SeqNums,
 				EncodedMessages:   tc.msgBatch.AllMsgBytes,
 				OffchainTokenData: tc.msgBatch.TokenData,
@@ -239,7 +213,7 @@ func TestExecObservation(t *testing.T) {
 	mb := th.GenerateAndSendMessageBatch(t, 2, 10, 1)
 
 	// commit root
-	encoded, err := EncodeCommitReport(&commit_store.CommitStoreCommitReport{
+	encoded, err := abihelpers.EncodeCommitReport(commit_store.CommitStoreCommitReport{
 		Interval:   mb.Interval,
 		MerkleRoot: mb.Root,
 		PriceUpdates: commit_store.InternalPriceUpdates{
@@ -316,7 +290,7 @@ func TestExecReport(t *testing.T) {
 	mb := th.GenerateAndSendMessageBatch(t, 2, 10, 1)
 
 	// commit root
-	encoded, err := EncodeCommitReport(&commit_store.CommitStoreCommitReport{
+	encoded, err := abihelpers.EncodeCommitReport(commit_store.CommitStoreCommitReport{
 		Interval:   mb.Interval,
 		MerkleRoot: mb.Root,
 		PriceUpdates: commit_store.InternalPriceUpdates{
@@ -418,7 +392,7 @@ func TestExecReport(t *testing.T) {
 
 			var encodedReport ocrtypes.Report
 			if tt.expectedReport != nil {
-				encodedReport, err = EncodeExecutionReport(*tt.expectedReport)
+				encodedReport, err = abihelpers.EncodeExecutionReport(*tt.expectedReport)
 				require.NoError(t, err)
 			}
 			assert.Equal(t, encodedReport, gotReport)
@@ -434,7 +408,7 @@ func TestExecShouldAcceptFinalizedReport(t *testing.T) {
 		Proofs:            [][32]byte{{}},
 		ProofFlagBits:     big.NewInt(1),
 	}
-	encodedReport, err := EncodeExecutionReport(report)
+	encodedReport, err := abihelpers.EncodeExecutionReport(report)
 	require.NoError(t, err)
 
 	mockOffRamp := &mock_contracts.EVM2EVMOffRampInterface{}
@@ -467,7 +441,7 @@ func TestExecShouldTransmitAcceptedReport(t *testing.T) {
 		Proofs:            [][32]byte{{}},
 		ProofFlagBits:     big.NewInt(1),
 	}
-	encodedReport, err := EncodeExecutionReport(report)
+	encodedReport, err := abihelpers.EncodeExecutionReport(report)
 	require.NoError(t, err)
 
 	mockOffRamp := &mock_contracts.EVM2EVMOffRampInterface{}

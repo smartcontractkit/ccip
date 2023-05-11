@@ -44,7 +44,7 @@ var (
 // CommitReportToEthTxMeta generates a txmgr.EthTxMeta from the given commit report.
 // sequence numbers of the committed messages will be added to tx metadata
 func CommitReportToEthTxMeta(report []byte) (*txmgr.EthTxMeta, error) {
-	commitReport, err := DecodeCommitReport(report)
+	commitReport, err := abihelpers.DecodeCommitReport(report)
 	if err != nil {
 		return nil, err
 	}
@@ -55,68 +55,6 @@ func CommitReportToEthTxMeta(report []byte) (*txmgr.EthTxMeta, error) {
 	}
 	return &txmgr.EthTxMeta{
 		SeqNumbers: seqRange,
-	}, nil
-}
-
-// EncodeCommitReport abi encodes an offramp.InternalCommitReport.
-func EncodeCommitReport(commitReport *commit_store.CommitStoreCommitReport) (types.Report, error) {
-	report, err := abihelpers.MakeCommitReportArgs().PackValues([]interface{}{
-		commitReport,
-	})
-	if err != nil {
-		return nil, err
-	}
-	return report, nil
-}
-
-// DecodeCommitReport abi decodes a types.Report to an CommitStoreCommitReport
-func DecodeCommitReport(report types.Report) (*commit_store.CommitStoreCommitReport, error) {
-	unpacked, err := abihelpers.MakeCommitReportArgs().Unpack(report)
-	if err != nil {
-		return nil, err
-	}
-	if len(unpacked) != 1 {
-		return nil, errors.New("expected single struct value")
-	}
-
-	commitReport, ok := unpacked[0].(struct {
-		PriceUpdates struct {
-			TokenPriceUpdates []struct {
-				SourceToken common.Address `json:"sourceToken"`
-				UsdPerToken *big.Int       `json:"usdPerToken"`
-			} `json:"tokenPriceUpdates"`
-			DestChainSelector uint64   `json:"destChainSelector"`
-			UsdPerUnitGas     *big.Int `json:"usdPerUnitGas"`
-		} `json:"priceUpdates"`
-		Interval struct {
-			Min uint64 `json:"min"`
-			Max uint64 `json:"max"`
-		} `json:"interval"`
-		MerkleRoot [32]byte `json:"merkleRoot"`
-	})
-	if !ok {
-		return nil, errors.Errorf("invalid commit report got %T", unpacked[0])
-	}
-
-	var tokenPriceUpdates []commit_store.InternalTokenPriceUpdate
-	for _, u := range commitReport.PriceUpdates.TokenPriceUpdates {
-		tokenPriceUpdates = append(tokenPriceUpdates, commit_store.InternalTokenPriceUpdate{
-			SourceToken: u.SourceToken,
-			UsdPerToken: u.UsdPerToken,
-		})
-	}
-
-	return &commit_store.CommitStoreCommitReport{
-		PriceUpdates: commit_store.InternalPriceUpdates{
-			DestChainSelector: commitReport.PriceUpdates.DestChainSelector,
-			UsdPerUnitGas:     commitReport.PriceUpdates.UsdPerUnitGas,
-			TokenPriceUpdates: tokenPriceUpdates,
-		},
-		Interval: commit_store.CommitStoreInterval{
-			Min: commitReport.Interval.Min,
-			Max: commitReport.Interval.Max,
-		},
-		MerkleRoot: commitReport.MerkleRoot,
 	}, nil
 }
 
@@ -481,12 +419,12 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 }
 
 // buildReport assumes there is at least one message in reqs.
-func (r *CommitReportingPlugin) buildReport(ctx context.Context, interval commit_store.CommitStoreInterval, priceUpdates commit_store.InternalPriceUpdates) (*commit_store.CommitStoreCommitReport, error) {
+func (r *CommitReportingPlugin) buildReport(ctx context.Context, interval commit_store.CommitStoreInterval, priceUpdates commit_store.InternalPriceUpdates) (commit_store.CommitStoreCommitReport, error) {
 	lggr := r.lggr.Named("BuildReport")
 
 	// If no messages are needed only include fee updates
 	if interval.Min == 0 {
-		return &commit_store.CommitStoreCommitReport{
+		return commit_store.CommitStoreCommitReport{
 			PriceUpdates: priceUpdates,
 			MerkleRoot:   [32]byte{},
 			Interval:     interval,
@@ -504,22 +442,22 @@ func (r *CommitReportingPlugin) buildReport(ctx context.Context, interval commit
 		int(r.offchainConfig.SourceIncomingConfirmations),
 		pg.WithParentCtx(ctx))
 	if err != nil {
-		return nil, err
+		return commit_store.CommitStoreCommitReport{}, err
 	}
 	leaves, err := leavesFromIntervals(lggr, r.seqParser, interval, r.config.leafHasher, logs)
 	if err != nil {
-		return nil, err
+		return commit_store.CommitStoreCommitReport{}, err
 	}
 
 	if len(leaves) == 0 {
-		return nil, fmt.Errorf("tried building a tree without leaves for onRampAddr %v. %+v", r.config.onRamp.Address(), leaves)
+		return commit_store.CommitStoreCommitReport{}, fmt.Errorf("tried building a tree without leaves for onRampAddr %v. %+v", r.config.onRamp.Address(), leaves)
 	}
 	tree, err := merklemulti.NewTree(hasher.NewKeccakCtx(), leaves)
 	if err != nil {
-		return nil, err
+		return commit_store.CommitStoreCommitReport{}, err
 	}
 
-	return &commit_store.CommitStoreCommitReport{
+	return commit_store.CommitStoreCommitReport{
 		PriceUpdates: priceUpdates,
 		MerkleRoot:   tree.Root(),
 		Interval:     interval,
@@ -549,7 +487,7 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, _ types.ReportTimest
 	if err != nil {
 		return false, nil, err
 	}
-	encodedReport, err := EncodeCommitReport(report)
+	encodedReport, err := abihelpers.EncodeCommitReport(report)
 	if err != nil {
 		return false, nil, err
 	}
@@ -702,7 +640,7 @@ func (r *CommitReportingPlugin) addToInflight(lggr logger.Logger, report *commit
 
 func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context, _ types.ReportTimestamp, report types.Report) (bool, error) {
 	lggr := r.lggr.Named("ShouldAcceptFinalizedReport")
-	parsedReport, err := DecodeCommitReport(report)
+	parsedReport, err := abihelpers.DecodeCommitReport(report)
 	if err != nil {
 		return false, err
 	}
@@ -731,13 +669,13 @@ func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context,
 		}
 	}
 
-	r.addToInflight(lggr, parsedReport)
+	r.addToInflight(lggr, &parsedReport)
 	lggr.Infow("Accepting finalized report", "merkleRoot", hexutil.Encode(parsedReport.MerkleRoot[:]))
 	return true, nil
 }
 
 func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context, _ types.ReportTimestamp, report types.Report) (bool, error) {
-	parsedReport, err := DecodeCommitReport(report)
+	parsedReport, err := abihelpers.DecodeCommitReport(report)
 	if err != nil {
 		return false, err
 	}
@@ -747,7 +685,7 @@ func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context
 	return !r.isStaleReport(ctx, parsedReport), nil
 }
 
-func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, report *commit_store.CommitStoreCommitReport) bool {
+func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, report commit_store.CommitStoreCommitReport) bool {
 	if report.MerkleRoot != [32]byte{} {
 		nextMin, err := r.config.commitStore.GetExpectedNextSequenceNumber(&bind.CallOpts{Context: ctx})
 		if err != nil {

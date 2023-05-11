@@ -23,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/merklemulti"
@@ -91,11 +92,15 @@ func TestCommitReportSize(t *testing.T) {
 	p.Property("bounded commit report size", prop.ForAll(func(root []byte, min, max uint64) bool {
 		var root32 [32]byte
 		copy(root32[:], root)
-		rep, err := EncodeCommitReport(&commit_store.CommitStoreCommitReport{MerkleRoot: root32, Interval: commit_store.CommitStoreInterval{Min: min, Max: max}, PriceUpdates: commit_store.InternalPriceUpdates{
-			TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{},
-			DestChainSelector: 1337,
-			UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
-		}})
+		rep, err := abihelpers.EncodeCommitReport(commit_store.CommitStoreCommitReport{
+			MerkleRoot: root32,
+			Interval:   commit_store.CommitStoreInterval{Min: min, Max: max},
+			PriceUpdates: commit_store.InternalPriceUpdates{
+				TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{},
+				DestChainSelector: 1337,
+				UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
+			},
+		})
 		require.NoError(t, err)
 		return len(rep) <= MaxCommitReportLength
 	}, gen.SliceOfN(32, gen.UInt8()), gen.UInt64(), gen.UInt64()))
@@ -125,11 +130,11 @@ func TestCommitReportEncoding(t *testing.T) {
 		MerkleRoot: tree.Root(),
 		Interval:   commit_store.CommitStoreInterval{Min: 1, Max: 10},
 	}
-	out, err := EncodeCommitReport(&report)
+	out, err := abihelpers.EncodeCommitReport(report)
 	require.NoError(t, err)
-	decodedReport, err := DecodeCommitReport(out)
+	decodedReport, err := abihelpers.DecodeCommitReport(out)
 	require.NoError(t, err)
-	require.Equal(t, &report, decodedReport)
+	require.Equal(t, report, decodedReport)
 
 	tx, err := th.Dest.CommitStoreHelper.Report(th.Dest.User, out)
 	require.NoError(t, err)
@@ -298,7 +303,7 @@ func TestCommitReport(t *testing.T) {
 
 			var expectedReport types.Report
 			if tt.commitReport != nil {
-				expectedReport, err = EncodeCommitReport(tt.commitReport)
+				expectedReport, err = abihelpers.EncodeCommitReport(*tt.commitReport)
 				require.NoError(t, err)
 			}
 			assert.Equal(t, expectedReport, gotReport)
@@ -445,7 +450,7 @@ func TestCommitReportToEthTxMeta(t *testing.T) {
 				MerkleRoot: tree.Root(),
 				Interval:   commit_store.CommitStoreInterval{Min: tc.min, Max: tc.max},
 			}
-			out, err := EncodeCommitReport(&report)
+			out, err := abihelpers.EncodeCommitReport(report)
 			require.NoError(t, err)
 
 			txMeta, err := CommitReportToEthTxMeta(out)
@@ -609,7 +614,7 @@ func TestShouldTransmitAcceptedReport(t *testing.T) {
 				root = testutils.Random32Byte()
 			}
 
-			report, err := EncodeCommitReport(&commit_store.CommitStoreCommitReport{
+			report, err := abihelpers.EncodeCommitReport(commit_store.CommitStoreCommitReport{
 				PriceUpdates: commit_store.InternalPriceUpdates{
 					TokenPriceUpdates: tokenPrices,
 					DestChainSelector: destChainID,
@@ -655,7 +660,7 @@ func TestShouldAcceptFinalizedReport(t *testing.T) {
 				root = testutils.Random32Byte()
 			}
 
-			report, err := EncodeCommitReport(&commit_store.CommitStoreCommitReport{
+			report, err := abihelpers.EncodeCommitReport(commit_store.CommitStoreCommitReport{
 				PriceUpdates: commit_store.InternalPriceUpdates{
 					TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{},
 					DestChainSelector: 0,
