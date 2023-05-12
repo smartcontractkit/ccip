@@ -40,11 +40,11 @@ func (o ExecutionObservation) Marshal() ([]byte, error) {
 	return json.Marshal(&o)
 }
 
-// getNonEmptyObservations checks the given observations for formatting and value errors.
+// getParsableObservations checks the given observations for formatting and value errors.
 // It returns all valid observations, potentially being an empty list. It will log
 // malformed observations but never error.
-func getNonEmptyObservations[O CommitObservation | ExecutionObservation](l logger.Logger, observations []types.AttributedObservation) []O {
-	var nonEmptyObservations []O
+func getParsableObservations[O CommitObservation | ExecutionObservation](l logger.Logger, observations []types.AttributedObservation) []O {
+	var parseableObservations []O
 	for _, ao := range observations {
 		if len(ao.Observation) == 0 {
 			// Empty observation
@@ -57,7 +57,7 @@ func getNonEmptyObservations[O CommitObservation | ExecutionObservation](l logge
 			l.Errorw("Received unmarshallable observation", "err", err, "observation", string(ao.Observation))
 			continue
 		}
-		nonEmptyObservations = append(nonEmptyObservations, ob)
+		parseableObservations = append(parseableObservations, ob)
 	}
-	return nonEmptyObservations
+	return parseableObservations
 }

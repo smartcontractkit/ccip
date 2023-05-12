@@ -549,14 +549,14 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 
 func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.ReportTimestamp, query types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
 	lggr := r.lggr.Named("Report")
-	nonEmptyObservations := getNonEmptyObservations[ExecutionObservation](lggr, observations)
+	parsableObservations := getParsableObservations[ExecutionObservation](lggr, observations)
 	// Need at least F+1 observations
-	if len(nonEmptyObservations) <= r.F {
+	if len(parsableObservations) <= r.F {
 		lggr.Tracew("Non-empty observations <= F, need at least F+1 to continue")
 		return false, nil, nil
 	}
 
-	observedMessages := calculateObservedMessagesConsensus(lggr, nonEmptyObservations, r.F)
+	observedMessages := calculateObservedMessagesConsensus(lggr, parsableObservations, r.F)
 	if len(observedMessages) == 0 {
 		return false, nil, nil
 	}

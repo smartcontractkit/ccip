@@ -19,7 +19,7 @@ func TestObservationFilter(t *testing.T) {
 	obs1 := CommitObservation{Interval: commit_store.CommitStoreInterval{Min: 1, Max: 10}}
 	b1, err := obs1.Marshal()
 	require.NoError(t, err)
-	nonEmpty := getNonEmptyObservations[CommitObservation](lggr, []types.AttributedObservation{{Observation: b1}, {Observation: []byte{}}})
+	nonEmpty := getParsableObservations[CommitObservation](lggr, []types.AttributedObservation{{Observation: b1}, {Observation: []byte{}}})
 	require.NoError(t, err)
 	require.Equal(t, 1, len(nonEmpty))
 	assert.Equal(t, nonEmpty[0].Interval, obs1.Interval)

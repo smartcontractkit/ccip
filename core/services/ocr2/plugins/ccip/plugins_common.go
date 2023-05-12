@@ -2,6 +2,7 @@ package ccip
 
 import (
 	"context"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -54,6 +55,12 @@ func contiguousReqs(lggr logger.Logger, min, max uint64, seqNrs []uint64) bool {
 		}
 	}
 	return true
+}
+
+func calculateUsdPerUnitGas(sourceGasPrice *big.Int, usdPerFeeCoin *big.Int) *big.Int {
+	// (wei / gas) * (usd / eth) * (1 eth / 1e18 wei)  = usd/gas
+	tmp := new(big.Int).Mul(sourceGasPrice, usdPerFeeCoin)
+	return tmp.Div(tmp, big.NewInt(1e18))
 }
 
 // Extracts the hashed leaves from a given set of logs

@@ -58,13 +58,14 @@ func setupCommitTestHarness(t *testing.T) commitTestHarness {
 			lggr:                th.Lggr,
 			sourceLP:            th.SourceLP,
 			destLP:              th.DestLP,
-			onRamp:              th.Source.OnRamp,
+			onRampAddress:       th.Source.OnRamp.Address(),
 			commitStore:         th.Dest.CommitStore,
 			priceGetter:         fakePriceGetter{},
 			sourceNative:        utils.RandomAddress(),
 			sourceFeeEstimator:  sourceFeeEstimator,
 			sourceChainSelector: th.Source.ChainID,
 			leafHasher:          hasher.NewLeafHasher(th.Source.ChainID, th.Dest.ChainID, th.Source.OnRamp.Address(), hasher.NewKeccakCtx()),
+			getSeqNumFromLog:    getSeqNumFromLog(th.Source.OnRamp),
 		},
 		inFlight:      map[[32]byte]InflightReport{},
 		onchainConfig: th.CommitOnchainConfig,
@@ -417,50 +418,6 @@ func TestCalculateIntervalConsensus(t *testing.T) {
 	}
 }
 
-func TestCommitReportToEthTxMeta(t *testing.T) {
-	mctx := hasher.NewKeccakCtx()
-	tree, err := merklemulti.NewTree(mctx, [][32]byte{mctx.Hash([]byte{0xaa})})
-	require.NoError(t, err)
-
-	tests := []struct {
-		name          string
-		min, max      uint64
-		expectedRange []uint64
-	}{
-		{
-			"happy flow",
-			1, 10,
-			[]uint64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
-		},
-		{
-			"same sequence",
-			1, 1,
-			[]uint64{1},
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			report := commit_store.CommitStoreCommitReport{
-				PriceUpdates: commit_store.InternalPriceUpdates{
-					TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{},
-					DestChainSelector: uint64(1337),
-					UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
-				},
-				MerkleRoot: tree.Root(),
-				Interval:   commit_store.CommitStoreInterval{Min: tc.min, Max: tc.max},
-			}
-			out, err := abihelpers.EncodeCommitReport(report)
-			require.NoError(t, err)
-
-			txMeta, err := CommitReportToEthTxMeta(out)
-			require.NoError(t, err)
-			require.NotNil(t, txMeta)
-			require.EqualValues(t, tc.expectedRange, txMeta.SeqNumbers)
-		})
-	}
-}
-
 func TestGeneratePriceUpdates(t *testing.T) {
 	th := setupCommitTestHarness(t)
 
@@ -508,7 +465,7 @@ func TestGeneratePriceUpdates(t *testing.T) {
 			expectedTokenPricesUSD: map[common.Address]*big.Int{},
 		},
 		{
-			name:                   "new feeToken, getLatestPriceUpdates returns nil",
+			name:                   "new feeToken, getLatestTokenPriceUpdates returns nil",
 			addFeeTokens:           []common.Address{newFeeToken},
 			expectedGasPriceUSD:    newExpectedGasPriceUSD,
 			expectedTokenPricesUSD: map[common.Address]*big.Int{newFeeToken: fakePrice},
@@ -678,6 +635,50 @@ func TestShouldAcceptFinalizedReport(t *testing.T) {
 				require.NoError(t, err)
 			}
 			assert.Equal(t, tt.expected, got)
+		})
+	}
+}
+
+func TestCommitReportToEthTxMeta(t *testing.T) {
+	mctx := hasher.NewKeccakCtx()
+	tree, err := merklemulti.NewTree(mctx, [][32]byte{mctx.Hash([]byte{0xaa})})
+	require.NoError(t, err)
+
+	tests := []struct {
+		name          string
+		min, max      uint64
+		expectedRange []uint64
+	}{
+		{
+			"happy flow",
+			1, 10,
+			[]uint64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+		},
+		{
+			"same sequence",
+			1, 1,
+			[]uint64{1},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			report := commit_store.CommitStoreCommitReport{
+				PriceUpdates: commit_store.InternalPriceUpdates{
+					TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{},
+					DestChainSelector: uint64(1337),
+					UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
+				},
+				MerkleRoot: tree.Root(),
+				Interval:   commit_store.CommitStoreInterval{Min: tc.min, Max: tc.max},
+			}
+			out, err := abihelpers.EncodeCommitReport(report)
+			require.NoError(t, err)
+
+			txMeta, err := CommitReportToEthTxMeta(out)
+			require.NoError(t, err)
+			require.NotNil(t, txMeta)
+			require.EqualValues(t, tc.expectedRange, txMeta.SeqNumbers)
 		})
 	}
 }
