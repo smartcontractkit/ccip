@@ -9,12 +9,12 @@ import (
 
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
+	integrationtesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers/integration"
 )
 
 // NewCCIPJobSpecParams returns set of parameters needed for setting up ccip jobs for sourceClient --> destClient
-func NewCCIPJobSpecParams(sourceClient rhea.EvmDeploymentConfig, destClient rhea.EvmDeploymentConfig) testhelpers.CCIPJobSpecParams {
-	return testhelpers.CCIPJobSpecParams{
+func NewCCIPJobSpecParams(sourceClient rhea.EvmDeploymentConfig, destClient rhea.EvmDeploymentConfig) integrationtesthelpers.CCIPJobSpecParams {
+	return integrationtesthelpers.CCIPJobSpecParams{
 		OffRamp:                destClient.LaneConfig.OffRamp,
 		CommitStore:            destClient.LaneConfig.CommitStore,
 		SourceChainName:        ccip.ChainName(int64(sourceClient.ChainConfig.EvmChainId)),
@@ -29,10 +29,14 @@ func NewCCIPJobSpecParams(sourceClient rhea.EvmDeploymentConfig, destClient rhea
 // Gathers all tokens needed for TokenPricesUSDPipeline
 func getPipelineTokens(sourceClient rhea.EvmDeploymentConfig, destClient rhea.EvmDeploymentConfig) []rhea.EVMBridgedToken {
 	var pipelineTokens []rhea.EVMBridgedToken
+
+	for _, token := range destClient.ChainConfig.SupportedTokens {
+		token.ChainId = destClient.ChainConfig.EvmChainId
+		pipelineTokens = append(pipelineTokens, token)
+	}
 	for _, feeTokenName := range destClient.ChainConfig.FeeTokens {
-		if token, ok := destClient.ChainConfig.SupportedTokens[feeTokenName]; ok {
-			token.ChainId = destClient.ChainConfig.EvmChainId
-			pipelineTokens = append(pipelineTokens, token)
+		if _, ok := destClient.ChainConfig.SupportedTokens[feeTokenName]; !ok {
+			panic(fmt.Errorf("FeeToken is not a supported token for chain: %d", sourceClient.ChainConfig.EvmChainId))
 		}
 	}
 	if sourceClient.ChainConfig.WrappedNative == "" {

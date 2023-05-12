@@ -114,7 +114,7 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainSelector u
 			Token:  tokenConfig.Token,
 			MinFee: 1_00,    // $1,
 			MaxFee: 5000_00, // $5,000
-			Ratio:  0,       // temporarily setting to 0 before regular price updates are added for non-fee tokens
+			Ratio:  5_0,     // 5 bps
 		})
 	}
 

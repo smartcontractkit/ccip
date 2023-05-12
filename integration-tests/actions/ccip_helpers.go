@@ -537,7 +537,7 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 				Token:  token.EthAddress,
 				MinFee: 1,
 				MaxFee: 100,
-				Ratio:  0, // temporarily setting to 0 before regular price updates are added for non-fee tokens
+				Ratio:  5_0, // 5 bps
 			})
 		}
 		tokensAndPools = append(tokensAndPools, evm_2_evm_onramp.EVM2EVMOnRampTokenAndPool{
@@ -1812,10 +1812,11 @@ func CreateOCR2CCIPCommitJobs(
 	mockServer *ctfClient.MockserverClient,
 ) error {
 	tokenFeeConv := make(map[string]interface{})
-	var linkTokenAddr []string
+	var tokenAddr []string
+	// Collect all dest tokens for price pipeline
 	for token, value := range tokenUSDMap {
 		tokenFeeConv[token] = value
-		linkTokenAddr = append(linkTokenAddr, token)
+		tokenAddr = append(tokenAddr, token)
 	}
 
 	err := SetMockServerWithSameTokenFeeConversionValue(ctx, tokenFeeConv, commitNodes, mockServer)
@@ -1828,7 +1829,7 @@ func CreateOCR2CCIPCommitJobs(
 	}
 
 	for i, node := range commitNodes {
-		tokenPricesUSDPipeline := TokenFeeForMultipleTokenAddr(node, linkTokenAddr, mockServer)
+		tokenPricesUSDPipeline := TokenFeeForMultipleTokenAddr(node, tokenAddr, mockServer)
 
 		ocr2SpecCommit.OCR2OracleSpec.OCRKeyBundleID.SetValid(node.KeysBundle.OCR2Key.Data.ID)
 		ocr2SpecCommit.OCR2OracleSpec.TransmitterID.SetValid(node.KeysBundle.EthAddress)

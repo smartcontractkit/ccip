@@ -7,7 +7,7 @@ type CommitPluginConfig struct {
 	SourceEvmChainId                 int64
 	// TokenPricesUSDPipeline should contain a token price pipeline for the following tokens:
 	//		The SOURCE chain wrapped native
-	// 		The DESTINATION fee tokens as defined in the destination chain PriceRegistry.
+	// 		The DESTINATION supported tokens (including fee tokens) as defined in destination OffRamp and PriceRegistry.
 	TokenPricesUSDPipeline string `json:"tokenPricesUSDPipeline"`
 }
 

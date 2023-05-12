@@ -3,6 +3,7 @@ package dione
 import (
 	"fmt"
 	"math/big"
+	"sort"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -10,6 +11,64 @@ import (
 
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
 )
+
+func TestGetPipelineTokens(t *testing.T) {
+	sourceClient := rhea.EvmDeploymentConfig{
+		ChainConfig: rhea.EVMChainConfig{
+			EvmChainId: 1,
+			SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
+				rhea.WAVAX: {
+					Token: common.HexToAddress("0x1"),
+					Price: rhea.WAVAX.Price(),
+				},
+			},
+			FeeTokens:     []rhea.Token{rhea.WAVAX},
+			WrappedNative: rhea.WAVAX,
+		},
+	}
+	destClient := rhea.EvmDeploymentConfig{
+		ChainConfig: rhea.EVMChainConfig{
+			EvmChainId: 2,
+			SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
+				rhea.LINK: {
+					Token: common.HexToAddress("0x2"),
+					Price: rhea.LINK.Price(),
+				},
+				rhea.WETH: {
+					Token: common.HexToAddress("0x3"),
+					Price: rhea.WETH.Price(),
+				},
+			},
+			FeeTokens:     []rhea.Token{rhea.LINK},
+			WrappedNative: rhea.LINK,
+		},
+	}
+
+	pipelineTokens := getPipelineTokens(sourceClient, destClient)
+
+	expected := []rhea.EVMBridgedToken{sourceClient.ChainConfig.SupportedTokens[sourceClient.ChainConfig.WrappedNative]}
+	for _, token := range destClient.ChainConfig.SupportedTokens {
+		expected = append(expected, token)
+	}
+
+	sort.Slice(pipelineTokens, func(i, j int) bool {
+		return pipelineTokens[i].Price.Cmp(pipelineTokens[j].Price) < 0
+	})
+	sort.Slice(expected, func(i, j int) bool {
+		return expected[i].Price.Cmp(expected[j].Price) < 0
+	})
+
+	assert.Equal(t, len(expected), len(pipelineTokens))
+	for i := 0; i < len(expected); i++ {
+		assert.Equal(t, expected[i].Token, pipelineTokens[i].Token)
+		assert.True(t, expected[i].Price.Cmp(pipelineTokens[i].Price) == 0)
+		if expected[i].Token == sourceClient.ChainConfig.SupportedTokens[sourceClient.ChainConfig.WrappedNative].Token {
+			assert.Equal(t, sourceClient.ChainConfig.EvmChainId, pipelineTokens[i].ChainId)
+		} else {
+			assert.Equal(t, destClient.ChainConfig.EvmChainId, pipelineTokens[i].ChainId)
+		}
+	}
+}
 
 func TestGetTokenPricesUSDPipeline(t *testing.T) {
 	srcWeth := rhea.EVMBridgedToken{
