@@ -401,9 +401,9 @@ func (r *ExecutionReportingPlugin) buildBatch(
 	execGasPriceEstimate *big.Int,
 ) (executableMessages []ObservedMessage, executedAllMessages bool) {
 	r.srcToDstTokenMappingMu.RLock()
-	srcToDstTokenMapping := r.srcToDstTokenMapping
-	r.srcToDstTokenMappingMu.RUnlock()
-	inflightSeqNrs, inflightAggregateValue, maxInflightSenderNonces, err := r.inflight(inflight, destTokenPricesUSD, srcToDstTokenMapping)
+	defer r.srcToDstTokenMappingMu.RUnlock()
+
+	inflightSeqNrs, inflightAggregateValue, maxInflightSenderNonces, err := r.inflight(inflight, destTokenPricesUSD, r.srcToDstTokenMapping)
 	if err != nil {
 		r.lggr.Errorw("Unexpected error computing inflight values", "err", err)
 		return []ObservedMessage{}, false
@@ -455,7 +455,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			lggr.Warnw("Skipping message invalid nonce", "have", msg.Message.Nonce, "want", expectedNonces[msg.Message.Sender])
 			continue
 		}
-		msgValue, err := aggregateTokenValue(destTokenPricesUSD, srcToDstTokenMapping, msg.Message.TokenAmounts)
+		msgValue, err := aggregateTokenValue(destTokenPricesUSD, r.srcToDstTokenMapping, msg.Message.TokenAmounts)
 		if err != nil {
 			lggr.Errorw("Skipping message unable to compute aggregate value", "err", err)
 			continue
@@ -705,7 +705,7 @@ func (r *ExecutionReportingPlugin) inflight(
 
 // getTokensPrices returns token prices of the given price registry,
 // results include feeTokens and passed-in tokens
-// price values are USD per full token, in base units 1e18 (e.g. 5$ = 5e18).
+// price values are USD per 1e18 of smallest token denomination, in base units 1e18 (e.g. 5$ = 5e18 USD per 1e18 units).
 // this function is used for price registry of both source and destination chains.
 func getTokensPrices(ctx context.Context, priceRegistry price_registry.PriceRegistryInterface, tokens []common.Address) (map[common.Address]*big.Int, error) {
 	prices := make(map[common.Address]*big.Int)

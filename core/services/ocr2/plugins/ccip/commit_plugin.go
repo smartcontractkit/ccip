@@ -57,6 +57,10 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to open source chain")
 	}
+	offRamp, err := LoadOffRamp(common.HexToAddress(pluginConfig.OffRamp), destChain.Client())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed loading offRamp")
+	}
 	onRamp, err := LoadOnRamp(staticConfig.OnRamp, sourceChain.Client())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed loading onRamp")
@@ -85,6 +89,7 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 			lggr:                lggr,
 			sourceLP:            sourceChain.LogPoller(),
 			destLP:              destChain.LogPoller(),
+			offRamp:             offRamp,
 			onRampAddress:       onRamp.Address(),
 			priceGetter:         priceGetterObject,
 			sourceNative:        sourceNative,

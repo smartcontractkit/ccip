@@ -85,6 +85,7 @@ func (params CCIPJobSpecParams) CommitJobSpec() (*client.OCR2TaskJobSpec, error)
 		P2PV2Bootstrappers:                params.P2PV2Bootstrappers,
 		PluginConfig: map[string]interface{}{
 			"sourceEvmChainId": params.SourceEvmChainId,
+			"offRamp":          fmt.Sprintf(`"%s"`, params.OffRamp.Hex()),
 			"tokenPricesUSDPipeline": fmt.Sprintf(`"""
 %s
 """`, params.TokenPricesUSDPipeline),
@@ -161,6 +162,7 @@ func (params CCIPJobSpecParams) BootstrapJob(contractID string) *client.OCR2Task
 func (c *CCIPIntegrationTestHarness) NewCCIPJobSpecParams(tokenPricesUSDPipeline string, configBlock int64) CCIPJobSpecParams {
 	return CCIPJobSpecParams{
 		CommitStore:            c.Dest.CommitStore.Address(),
+		OffRamp:                c.Dest.OffRamp.Address(),
 		DestEvmChainId:         c.Dest.ChainID,
 		SourceEvmChainId:       c.Source.ChainID,
 		SourceChainName:        "SimulatedSource",

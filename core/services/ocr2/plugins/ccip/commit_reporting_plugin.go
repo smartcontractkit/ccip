@@ -24,6 +24,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
@@ -58,6 +60,7 @@ type update struct {
 type CommitPluginConfig struct {
 	lggr                logger.Logger
 	sourceLP, destLP    logpoller.LogPoller
+	offRamp             evm_2_evm_offramp.EVM2EVMOffRampInterface
 	onRampAddress       common.Address
 	commitStore         commit_store.CommitStoreInterface
 	priceGetter         PriceGetter
@@ -76,12 +79,14 @@ type CommitReportingPlugin struct {
 	// We need to synchronize access to the inflight structure
 	// as reporting plugin methods may be called from separate goroutines,
 	// e.g. reporting vs transmission protocol.
-	inFlightMu           sync.RWMutex
-	inFlight             map[[32]byte]InflightReport
-	inFlightPriceUpdates []InflightPriceUpdate
-	priceRegistry        *price_registry.PriceRegistry
-	offchainConfig       ccipconfig.CommitOffchainConfig
-	onchainConfig        ccipconfig.CommitOnchainConfig
+	inFlightMu              sync.RWMutex
+	inFlight                map[[32]byte]InflightReport
+	inFlightPriceUpdates    []InflightPriceUpdate
+	priceRegistry           price_registry.PriceRegistryInterface
+	offchainConfig          ccipconfig.CommitOffchainConfig
+	onchainConfig           ccipconfig.CommitOnchainConfig
+	tokenToDecimalMappingMu sync.RWMutex
+	tokenToDecimalMapping   map[common.Address]uint8
 }
 
 type CommitReportingPluginFactory struct {
@@ -122,17 +127,22 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
+	tokenToDecimalMapping, err := generateTokenToDecimalMapping(context.Background(), rf.config, map[common.Address]uint8{}, priceRegistry)
+	if err != nil {
+		return nil, types.ReportingPluginInfo{}, err
+	}
 
 	rf.config.lggr.Infow("Starting commit plugin", "offchainConfig", offchainConfig, "onchainConfig", onchainConfig)
 
 	return &CommitReportingPlugin{
-			config:         rf.config,
-			F:              config.F,
-			lggr:           rf.config.lggr.Named("CommitReportingPlugin"),
-			inFlight:       make(map[[32]byte]InflightReport),
-			priceRegistry:  priceRegistry,
-			onchainConfig:  onchainConfig,
-			offchainConfig: offchainConfig,
+			config:                rf.config,
+			F:                     config.F,
+			lggr:                  rf.config.lggr.Named("CommitReportingPlugin"),
+			inFlight:              make(map[[32]byte]InflightReport),
+			priceRegistry:         priceRegistry,
+			onchainConfig:         onchainConfig,
+			offchainConfig:        offchainConfig,
+			tokenToDecimalMapping: tokenToDecimalMapping,
 		},
 		types.ReportingPluginInfo{
 			Name:          "CCIPCommit",
@@ -278,30 +288,45 @@ func (r *CommitReportingPlugin) generatePriceUpdates(
 	ctx context.Context,
 	now time.Time,
 ) (sourceGasPriceUSD *big.Int, tokenPricesUSD map[common.Address]*big.Int, err error) {
-	// fetch feeTokens every observation, so we're automatically up-to-date if new feeTokens are added or removed
-	feeTokens, err := r.priceRegistry.GetFeeTokens(&bind.CallOpts{Context: ctx})
-	if err != nil {
+	// Detect token changes and update decimals mapping if needed, so we are up-to-date with supported tokens
+	if err = r.updateTokenToDecimalMapping(ctx); err != nil {
 		return nil, nil, err
 	}
 
-	queryTokens := append([]common.Address{r.config.sourceNative}, feeTokens...)
+	r.tokenToDecimalMappingMu.RLock()
+	defer r.tokenToDecimalMappingMu.RUnlock()
+
+	tokensWithDecimal := make([]common.Address, 0, len(r.tokenToDecimalMapping))
+	for token := range r.tokenToDecimalMapping {
+		tokensWithDecimal = append(tokensWithDecimal, token)
+	}
+
+	queryTokens := append([]common.Address{r.config.sourceNative}, tokensWithDecimal...)
 	// Include wrapped native in our token query as way to identify the source native USD price.
 	// notice USD is in 1e18 scale, i.e. $1 = 1e18
-	tokenPricesUSD, err = r.config.priceGetter.TokenPricesUSD(ctx, queryTokens)
+	rawTokenPricesUSD, err := r.config.priceGetter.TokenPricesUSD(ctx, queryTokens)
 	if err != nil {
 		return nil, nil, err
 	}
 	for _, token := range queryTokens {
-		if tokenPricesUSD[token] == nil {
+		if rawTokenPricesUSD[token] == nil {
 			return nil, nil, errors.Errorf("missing token price: %+v", token)
 		}
 	}
-	sourceNativePriceUSD := tokenPricesUSD[r.config.sourceNative]
-	for token := range tokenPricesUSD {
-		if !slices.Contains(feeTokens, token) {
-			// clean tokenPricesUSD of any address which isn't a feeToken, including sourceNative
-			delete(tokenPricesUSD, token)
+
+	sourceNativePriceUSD := rawTokenPricesUSD[r.config.sourceNative]
+	tokenPricesUSD = make(map[common.Address]*big.Int, len(rawTokenPricesUSD))
+	for token := range rawTokenPricesUSD {
+		if !slices.Contains(tokensWithDecimal, token) {
+			// do not include any address which isn't a supported token on dest chain, including sourceNative
+			continue
 		}
+
+		decimals, ok := r.tokenToDecimalMapping[token]
+		if !ok {
+			return nil, nil, errors.Errorf("missing token decimals: %+v", token)
+		}
+		tokenPricesUSD[token] = calculateUsdPer1e18TokenAmount(rawTokenPricesUSD[token], decimals)
 	}
 
 	// Observe a source chain price for pricing.
@@ -345,6 +370,71 @@ func (r *CommitReportingPlugin) generatePriceUpdates(
 
 	// either may be empty
 	return sourceGasPriceUSD, tokenPricesUSD, nil
+}
+
+// Input price is USD per full token, in base units 1e18
+// Result price is USD per 1e18 of smallest token denomination, in base units 1e18
+// Example: 1 USDC = 1.00 USD per full token, each full token is 6 decimals -> 1 * 1e18 * 1e18 / 1e6 = 1e30
+func calculateUsdPer1e18TokenAmount(price *big.Int, decimals uint8) *big.Int {
+	tmp := big.NewInt(0).Mul(price, big.NewInt(1e18))
+	return tmp.Div(tmp, big.NewInt(0).Exp(big.NewInt(10), big.NewInt(int64(decimals)), nil))
+}
+
+// Checks for updates, updates the token to decimal mapping.
+func (r *CommitReportingPlugin) updateTokenToDecimalMapping(ctx context.Context) error {
+	newTokenToDecimalMapping, err := generateTokenToDecimalMapping(ctx, r.config, r.tokenToDecimalMapping, r.priceRegistry)
+	if err != nil {
+		return err
+	}
+
+	// Pre-emptively guarding plugin state changes
+	// Going forward, it may be possible for Should* OCR2 functions for call this from another thread
+	r.tokenToDecimalMappingMu.Lock()
+	r.tokenToDecimalMapping = newTokenToDecimalMapping
+	r.tokenToDecimalMappingMu.Unlock()
+
+	return nil
+}
+
+// Generates the token to decimal mapping for dest tokens and fee tokens.
+// NOTE: this queries token decimals n times, where n is the number of tokens whose decimals are not already cached.
+func generateTokenToDecimalMapping(ctx context.Context, config CommitPluginConfig, curMapping map[common.Address]uint8, priceRegistry price_registry.PriceRegistryInterface) (map[common.Address]uint8, error) {
+	newMapping := make(map[common.Address]uint8)
+
+	destTokens, err := config.offRamp.GetDestinationTokens(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return nil, err
+	}
+
+	feeTokens, err := priceRegistry.GetFeeTokens(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return nil, err
+	}
+	// In case if a fee token is not an offramp dest token, we still want to update its decimals and price
+	for _, feeToken := range feeTokens {
+		if !slices.Contains(destTokens, feeToken) {
+			destTokens = append(destTokens, feeToken)
+		}
+	}
+
+	for _, token := range destTokens {
+		if curDecimal, ok := curMapping[token]; ok {
+			// If token already in mapping, no need to call decimals again, decimals should be immutable
+			newMapping[token] = curDecimal
+			continue
+		}
+		tokenContract, err := link_token_interface.NewLinkToken(token, config.destClient)
+		if err != nil {
+			return nil, err
+		}
+
+		decimal, err := tokenContract.Decimals(&bind.CallOpts{Context: ctx})
+		if err != nil {
+			return nil, err
+		}
+		newMapping[token] = decimal
+	}
+	return newMapping, nil
 }
 
 // Gets the latest token price updates based on logs within the heartbeat

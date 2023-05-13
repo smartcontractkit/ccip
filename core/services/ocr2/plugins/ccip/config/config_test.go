@@ -11,6 +11,7 @@ func TestCommitConfig(t *testing.T) {
 	exampleConfig := CommitPluginConfig{
 		SourceStartBlock:       222,
 		DestStartBlock:         333,
+		OffRamp:                "0x123",
 		TokenPricesUSDPipeline: `merge [type=merge left="{}" right="{\"0xC79b96044906550A5652BCf20a6EA02f139B9Ae5\":\"1000000000000000000\"}"];`,
 	}
 

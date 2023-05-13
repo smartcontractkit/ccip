@@ -18,10 +18,13 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/common/txmgr/types/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/assets"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
+	mock_contracts "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
@@ -58,12 +61,14 @@ func setupCommitTestHarness(t *testing.T) commitTestHarness {
 			lggr:                th.Lggr,
 			sourceLP:            th.SourceLP,
 			destLP:              th.DestLP,
+			offRamp:             th.Dest.OffRamp,
 			onRampAddress:       th.Source.OnRamp.Address(),
 			commitStore:         th.Dest.CommitStore,
 			priceGetter:         fakePriceGetter{},
 			sourceNative:        utils.RandomAddress(),
 			sourceFeeEstimator:  sourceFeeEstimator,
 			sourceChainSelector: th.Source.ChainID,
+			destClient:          client.NewSimulatedBackendClient(t, th.Dest.Chain, new(big.Int).SetUint64(th.Dest.ChainID)),
 			leafHasher:          hasher.NewLeafHasher(th.Source.ChainID, th.Dest.ChainID, th.Source.OnRamp.Address(), hasher.NewKeccakCtx()),
 			getSeqNumFromLog:    getSeqNumFromLog(th.Source.OnRamp),
 		},
@@ -435,7 +440,8 @@ func TestGeneratePriceUpdates(t *testing.T) {
 	newExpectedGasPriceUSD := new(big.Int).Mul(newGasPrice, fakePrice)
 	newExpectedGasPriceUSD.Div(newExpectedGasPriceUSD, big.NewInt(1e18))
 
-	newFeeToken := testutils.NewAddress()
+	newFeeToken, _, _, err := link_token_interface.DeployLinkToken(th.Dest.User, th.Dest.Chain)
+	require.NoError(t, err)
 
 	tests := []struct {
 		name                   string
@@ -510,6 +516,83 @@ func TestGeneratePriceUpdates(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tt.expectedGasPriceUSD, gotGasPriceUSD)
 			assert.Equal(t, tt.expectedTokenPricesUSD, gotTokenPricesUSD)
+		})
+	}
+}
+
+func TestUpdateTokenToDecimalMapping(t *testing.T) {
+	th := plugintesthelpers.SetupCCIPTestHarness(t)
+
+	destToken, _, _, err := link_token_interface.DeployLinkToken(th.Dest.User, th.Dest.Chain)
+	require.NoError(t, err)
+
+	feeToken, _, _, err := link_token_interface.DeployLinkToken(th.Dest.User, th.Dest.Chain)
+	require.NoError(t, err)
+	th.CommitAndPollLogs(t)
+
+	tokens := []common.Address{}
+	tokens = append(tokens, destToken)
+	tokens = append(tokens, feeToken)
+
+	mockOffRamp := &mock_contracts.EVM2EVMOffRampInterface{}
+	mockOffRamp.On("GetDestinationTokens", mock.Anything).Return([]common.Address{destToken}, nil)
+
+	mockPriceRegistry := &mock_contracts.PriceRegistryInterface{}
+	mockPriceRegistry.On("GetFeeTokens", mock.Anything).Return([]common.Address{feeToken}, nil)
+
+	plugin := CommitReportingPlugin{
+		config: CommitPluginConfig{
+			offRamp:    mockOffRamp,
+			destClient: client.NewSimulatedBackendClient(t, th.Dest.Chain, new(big.Int).SetUint64(th.Dest.ChainID)),
+		},
+		priceRegistry:         mockPriceRegistry,
+		tokenToDecimalMapping: map[common.Address]uint8{},
+	}
+
+	require.NoError(t, plugin.updateTokenToDecimalMapping(testutils.Context(t)))
+	assert.Equal(t, len(tokens), len(plugin.tokenToDecimalMapping))
+	assert.Equal(t, uint8(18), plugin.tokenToDecimalMapping[destToken])
+	assert.Equal(t, uint8(18), plugin.tokenToDecimalMapping[feeToken])
+}
+
+func TestCalculateUsdPer1e18TokenAmount(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		price      *big.Int
+		decimal    uint8
+		wantResult *big.Int
+	}{
+		{
+			name:       "18-decimal token, $6.5 per token",
+			price:      big.NewInt(65e17),
+			decimal:    18,
+			wantResult: big.NewInt(65e17),
+		},
+		{
+			name:       "6-decimal token, $1 per token",
+			price:      big.NewInt(1e18),
+			decimal:    6,
+			wantResult: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e12)), // 1e30
+		},
+		{
+			name:       "0-decimal token, $1 per token",
+			price:      big.NewInt(1e18),
+			decimal:    0,
+			wantResult: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e18)), // 1e36
+		},
+		{
+			name:       "36-decimal token, $1 per token",
+			price:      big.NewInt(1e18),
+			decimal:    36,
+			wantResult: big.NewInt(1),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := calculateUsdPer1e18TokenAmount(tt.price, tt.decimal)
+			assert.Equal(t, tt.wantResult, got)
 		})
 	}
 }

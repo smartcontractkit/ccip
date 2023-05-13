@@ -254,6 +254,10 @@ func TestMetaERC20CrossChain(t *testing.T) {
 		_, err := w.Write([]byte(`{"UsdPerETH": "2000000000000000000000"}`))
 		require.NoError(t, err)
 	}))
+	wrappedDestTokenUSD := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := w.Write([]byte(`{"UsdPerWrappedDestToken": "500000000000000000"}`))
+		require.NoError(t, err)
+	}))
 	bankERC20USD := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, err := w.Write([]byte(`{"UsdPerBankERC20": "5000000000000000000"}`))
 		require.NoError(t, err)
@@ -267,13 +271,17 @@ link->link_parse;
 eth [type=http method=GET url="%s"];
 eth_parse [type=jsonparse path="UsdPerETH"];
 eth->eth_parse;
+wrapDest [type=http method=GET url="%s"];
+wrapDest_parse [type=jsonparse path="UsdPerWrappedDestToken"];
+wrapDest->wrapDest_parse;
 bankERC20 [type=http method=GET url="%s"];
 bankERC20_parse [type=jsonparse path="UsdPerBankERC20"];
 bankERC20->bankERC20_parse
-merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_parse), \\\"%s\\\":$(bankERC20_parse)}"];`,
-		linkUSD.URL, ethUSD.URL, bankERC20USD.URL, ccipContracts.Dest.LinkToken.Address(), wrapped, sourceTokenAddress)
+merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_parse), \\\"%s\\\":$(wrapDest_parse), \\\"%s\\\":$(bankERC20_parse)}"];`,
+		linkUSD.URL, ethUSD.URL, wrappedDestTokenUSD.URL, bankERC20USD.URL, ccipContracts.Dest.LinkToken.Address(), wrapped, wrappedDestTokenPoolAddress, sourceTokenAddress)
 	defer linkUSD.Close()
 	defer ethUSD.Close()
+	defer wrappedDestTokenUSD.Close()
 	defer bankERC20USD.Close()
 
 	nodes, _ := ccipContracts.SetUpNodesAndJobs(t, tokenPricesUSDPipeline, 29599)

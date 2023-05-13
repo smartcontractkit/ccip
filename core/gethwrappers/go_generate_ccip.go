@@ -30,6 +30,7 @@ package gethwrappers
 //go:generate mockery --quiet --dir ./generated/evm_2_evm_onramp/ --name EVM2EVMOnRampInterface --output ./mocks/ --outpkg mock_contracts --case=underscore
 //go:generate mockery --quiet --dir ./generated/evm_2_evm_offramp/ --name EVM2EVMOffRampInterface --output ./mocks/ --outpkg mock_contracts --case=underscore
 //go:generate mockery --quiet --dir ./generated/commit_store/ --name CommitStoreInterface --output ./mocks/ --outpkg mock_contracts --case=underscore
+//go:generate mockery --quiet --dir ./generated/price_registry/ --name PriceRegistryInterface --output ./mocks/ --outpkg mock_contracts --case=underscore
 
 // To run these commands, you must either install docker, or the correct version
 // of abigen. The latter can be installed with these commands, at least on linux:

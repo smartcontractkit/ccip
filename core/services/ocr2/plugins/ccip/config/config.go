@@ -5,6 +5,7 @@ package config
 type CommitPluginConfig struct {
 	SourceStartBlock, DestStartBlock int64 // Only for first time job add.
 	SourceEvmChainId                 int64
+	OffRamp                          string `json:"offRamp"`
 	// TokenPricesUSDPipeline should contain a token price pipeline for the following tokens:
 	//		The SOURCE chain wrapped native
 	// 		The DESTINATION supported tokens (including fee tokens) as defined in destination OffRamp and PriceRegistry.
