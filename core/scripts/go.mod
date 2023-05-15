@@ -432,4 +432,7 @@ replace (
 
 	// replicating the replace directive on cosmos SDK
 	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
+	// K8s imports are weird
+	k8s.io/api => k8s.io/api v0.25.4
+	k8s.io/client-go => k8s.io/client-go v0.25.4
 )
