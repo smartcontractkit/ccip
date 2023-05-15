@@ -35,7 +35,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
-const MaxCommitReportLength = 1000
+// only dynamic field in CommitReport is tokens PriceUpdates, and we don't expect to need to update thousands of tokens in a single tx
+const MaxCommitReportLength = 10_000
 
 var (
 	_ types.ReportingPluginFactory = &CommitReportingPluginFactory{}

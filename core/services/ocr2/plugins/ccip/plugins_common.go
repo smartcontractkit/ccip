@@ -18,6 +18,13 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 )
 
+const (
+	MaxTokensPerMessage  = 5
+	MaxMessagesPerBatch  = 256     // merkle proof bits need to fit in a uint256
+	MaxQueryLength       = 0       // empty for both plugins
+	MaxObservationLength = 250_000 // plugins's Observation should make sure to cap to this limit
+)
+
 var ErrCommitStoreIsDown = errors.New("commitStore is down")
 
 func LoadOnRamp(onRampAddress common.Address, client client.Client) (*evm_2_evm_onramp.EVM2EVMOnRamp, error) {
