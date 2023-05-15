@@ -217,7 +217,7 @@ func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient
 		Client: Client{
 			Client:           config.Client,
 			ChainId:          config.ChainConfig.EvmChainId,
-			ChainSelector:    rhea.GetCCIPChainId(config.ChainConfig.EvmChainId),
+			ChainSelector:    rhea.GetCCIPChainSelector(config.ChainConfig.EvmChainId),
 			LinkTokenAddress: config.ChainConfig.SupportedTokens[rhea.LINK].Token,
 			LinkToken:        LinkToken,
 			WrappedNative:    wrappedNative,
@@ -227,6 +227,7 @@ func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient
 			PingPongDapp:     pingPongDapp,
 			Router:           router,
 			AllowList:        config.ChainConfig.AllowList,
+			TunableValues:    config.ChainConfig.TunableChainValues,
 			logger:           config.Logger,
 			t:                t,
 		},
@@ -278,7 +279,7 @@ func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestCli
 		Client: Client{
 			Client:           config.Client,
 			ChainId:          config.ChainConfig.EvmChainId,
-			ChainSelector:    rhea.GetCCIPChainId(config.ChainConfig.EvmChainId),
+			ChainSelector:    rhea.GetCCIPChainSelector(config.ChainConfig.EvmChainId),
 			LinkTokenAddress: config.ChainConfig.SupportedTokens[rhea.LINK].Token,
 			LinkToken:        linkToken,
 			WrappedNative:    wrappedNative,
@@ -649,6 +650,10 @@ func (client *CCIPClient) SetOCR2Config(env dione.Environment) {
 }
 
 func (client *CCIPClient) getCommitStoreOffChainConfig() []byte {
+	if client.Source.TunableValues.BlockConfirmations == 0 || client.Dest.TunableValues.BlockConfirmations == 0 {
+		panic("Please set the tunable chain values")
+	}
+
 	commitPluginConfig := ccipconfig.CommitOffchainConfig{
 		SourceIncomingConfirmations: client.Source.TunableValues.BlockConfirmations,
 		DestIncomingConfirmations:   client.Dest.TunableValues.BlockConfirmations,
@@ -677,6 +682,9 @@ func (client *CCIPClient) getCommitStoreOnchainConfig() []byte {
 }
 
 func (client *CCIPClient) getOffRampOffChainConfig() []byte {
+	if client.Source.TunableValues.BlockConfirmations == 0 || client.Dest.TunableValues.BlockConfirmations == 0 {
+		panic("Please set the tunable chain values")
+	}
 	execPluginConfig := ccipconfig.ExecOffchainConfig{
 		SourceIncomingConfirmations: client.Source.TunableValues.BlockConfirmations,
 		DestIncomingConfirmations:   client.Dest.TunableValues.BlockConfirmations,

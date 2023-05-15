@@ -22,8 +22,8 @@ import (
 
 var (
 	// Change these values
-	sourceChain = rhea.OptimismGoerli
-	destChain   = rhea.AvaxFuji
+	sourceChain = rhea.ArbitrumGoerli
+	destChain   = rhea.Sepolia
 	ENV         = dione.StagingBeta
 
 	// These will automatically populate or error if the lane doesn't exist
@@ -83,6 +83,8 @@ func TestCCIP(t *testing.T) {
 		printing.PrintJobSpecs(ENV, SOURCE, DESTINATION)
 	case "setConfig": // Set the config to the commitStore and the offramp
 		client.SetOCR2Config(ENV)
+		clientOtherWayAround := NewCcipClient(t, DESTINATION, SOURCE, ownerKey, seedKey)
+		clientOtherWayAround.SetOCR2Config(ENV)
 	case "setOnRampFeeConfig":
 		client.setOnRampFeeConfig(t, &SOURCE)
 	case "applyFeeTokensUpdates":
@@ -119,9 +121,25 @@ func TestRheaDeployChains(t *testing.T) {
 // TestDeployLane can be run as a test with the following config
 // OWNER_KEY  private key used to deploy all contracts and is used as default in all single user tests.
 func TestRheaDeployLane(t *testing.T) {
-	checkOwnerKeyAndSetupChain(t)
+	key := checkOwnerKeyAndSetupChain(t)
 	rhea.DeployLanes(t, &SOURCE, &DESTINATION)
 	deployment_io.PrettyPrintLanes(ENV, &SOURCE, &DESTINATION)
+
+	client := NewCcipClient(t, SOURCE, DESTINATION, key, key)
+	client.SetOCR2Config(ENV)
+	clientOtherWayAround := NewCcipClient(t, DESTINATION, SOURCE, key, key)
+	clientOtherWayAround.SetOCR2Config(ENV)
+
+	client.startPingPong(t)
+
+	don := dione.NewDON(ENV, logger.TestLogger(t))
+	don.ClearAllJobs(ccip.ChainName(int64(SOURCE.ChainConfig.EvmChainId)), ccip.ChainName(int64(DESTINATION.ChainConfig.EvmChainId)))
+	don.AddTwoWaySpecs(SOURCE, DESTINATION)
+
+	// Sometimes jobs don't get added correctly. This script looks for missing jobs
+	// and attempts to add them.
+	don.AddMissingSpecs(DESTINATION, SOURCE)
+	don.AddMissingSpecs(SOURCE, DESTINATION)
 }
 
 // TestDione can be run as a test with the following config
@@ -346,7 +364,7 @@ func TestFundAllNodesPerEnv(t *testing.T) {
 	for _, source := range chainMapping[ENV] {
 		source.SetupChain(t, ownerKey)
 		don := dione.NewOfflineDON(ENV, logger.TestLogger(t))
-		don.FundNodeKeys(&source, ownerKey, big.NewInt(1e18), big.NewInt(4e18))
+		don.FundNodeKeys(&source, ownerKey, big.NewInt(5e18), big.NewInt(4e18))
 	}
 }
 

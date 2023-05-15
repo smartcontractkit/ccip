@@ -10,7 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ...
 
-## 0.3.0 - UNRELEASED
+## 0.4.0 - UNRELEASED
+
+## Added
+
+## Changed
+
+
+<!-- unreleasedstop -->
+
+## 0.3.0 - 2023-05-09
 
 ### Added
 - Added token bps fee to each individual token transfer
@@ -28,7 +37,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- AggregateRateLimiter now uses US dollar amounts with 18 decimals. Previously, it used 36 decimals.
+- Solidity version bumped to 0.8.19
+- AggregateRateLimiter values are now in US dollar amounts with 18 decimals. Previously, it was 36 decimals.
+- _setNops calls payNops 
 
 ## [0.2.0] - 2023-04-30
 ## [0.1.0] - 2023-03-14

@@ -10,10 +10,10 @@ import (
 const (
 	BATCH_GAS_LIMIT              = 5_000_000
 	FEE_UPDATE_HEARTBEAT         = 24 * time.Hour
-	FEE_UPDATE_DEVIATION_PPB     = 5e7
-	RELATIVE_BOOST_PER_WAIT_HOUR = 0.7
+	FEE_UPDATE_DEVIATION_PPB     = 10e7
+	RELATIVE_BOOST_PER_WAIT_HOUR = 600 // 10x every minute, fees artificially low (0.1 on testnet)
 	INFLIGHT_CACHE_EXPIRY        = 3 * time.Minute
-	ROOT_SNOOZE_TIME             = 10 * time.Minute
+	ROOT_SNOOZE_TIME             = 7 * time.Minute
 )
 
 func getBlockConfirmations(chain rhea.Chain) uint32 {

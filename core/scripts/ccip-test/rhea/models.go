@@ -64,8 +64,19 @@ func GetAllChains() []Chain {
 	}
 }
 
-func GetCCIPChainId(EVMChainId uint64) uint64 {
-	return EVMChainId
+var evmChainIdToChainSelector = map[uint64]uint64{
+	11155111: 16015286601757825753,
+	420:      2664363617261496610,
+	421613:   6101244977088475029,
+	43113:    14767482510784806043,
+}
+
+func GetCCIPChainSelector(EVMChainId uint64) uint64 {
+	selector, ok := evmChainIdToChainSelector[EVMChainId]
+	if !ok {
+		panic(fmt.Sprintf("no chain selector for %d", EVMChainId))
+	}
+	return selector
 }
 
 type Token string

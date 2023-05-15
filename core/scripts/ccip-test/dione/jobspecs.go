@@ -23,6 +23,8 @@ func NewCCIPJobSpecParams(sourceClient rhea.EvmDeploymentConfig, destClient rhea
 		SourceStartBlock:       sourceClient.LaneConfig.DeploySettings.DeployedAtBlock,
 		DestStartBlock:         destClient.LaneConfig.DeploySettings.DeployedAtBlock,
 		P2PV2Bootstrappers:     []string{}, // Set in env vars
+		SourceEvmChainId:       sourceClient.ChainConfig.EvmChainId,
+		DestEvmChainId:         destClient.ChainConfig.EvmChainId,
 	}
 }
 
