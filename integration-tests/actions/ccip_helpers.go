@@ -988,9 +988,6 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 			}
 		}
 	}
-	// add the fee token and fee token price for dest
-	destTokens = append(destTokens, common.HexToAddress(destCCIP.Common.FeeToken.Address()))
-	destCCIP.Common.TokenPrices = append(destCCIP.Common.TokenPrices, big.NewInt(1))
 
 	pools = append(pools, destCCIP.Common.FeeTokenPool.EthAddress)
 
@@ -1632,6 +1629,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 
 	tokenUSDMap[lane.Dest.Common.FeeToken.Address()] = LinkToUSD.String()
 	tokenUSDMap[lane.Source.Common.WrappedNative.Hex()] = WrappedNativeToUSD.String()
+	log.Info().Interface("tokenUSDMap", tokenUSDMap).Msg("tokenUSDMap")
 
 	// first node is the bootstrapper
 	bootstrapCommit := clNodes[0]
@@ -1677,6 +1675,11 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		SourceStartBlock: lane.Source.SrcStartBlock,
 		DestStartBlock:   currentBlockOnDest,
 	}
+
+	if newBootstrap {
+		CreateBootstrapJob(jobParams, bootstrapCommit, bootstrapExec)
+	}
+
 	bootstrapCommitP2PId := bootstrapCommit.KeysBundle.P2PKeys.Data[0].Attributes.PeerID
 	var bootstrapExecP2PId string
 	var p2pBootstrappersExec, p2pBootstrappersCommit *client.P2PData
@@ -1696,10 +1699,6 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	}
 
 	jobParams.P2PV2Bootstrappers = []string{p2pBootstrappersCommit.P2PV2Bootstrapper()}
-
-	if newBootstrap {
-		CreateBootstrapJob(jobParams, bootstrapCommit, bootstrapExec)
-	}
 
 	// set up ocr2 config
 	err = SetOCR2Configs(commitNodes, execNodes, *lane.Dest)
@@ -1898,11 +1897,13 @@ func SetMockServerWithSameTokenFeeConversionValue(
 		for _, n := range chainlinkNodes {
 			nodeTokenPairID := nodeContractPair(n.KeysBundle.EthAddress, tokenAddr)
 			path := fmt.Sprintf("/%s", nodeTokenPairID)
-			func(path string) {
-				valueAdditions.Go(func() error {
-					return mockserver.SetAnyValuePath(path, value)
-				})
-			}(path)
+			tokenValue := value
+			valueAdditions.Go(func() error {
+				log.Info().Str("path", path).
+					Str("value", fmt.Sprintf("%v", tokenValue)).
+					Msg(fmt.Sprintf("Setting mockserver response"))
+				return mockserver.SetAnyValuePath(path, tokenValue)
+			})
 		}
 	}
 	return valueAdditions.Wait()
