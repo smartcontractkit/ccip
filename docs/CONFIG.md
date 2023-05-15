@@ -59,6 +59,7 @@ FeedsManager = true # Default
 LogPoller = false # Default
 UICSAKeys = false # Default
 CCIP = false # Default
+LegacyGasStation = false # Default
 ```
 
 
@@ -85,6 +86,12 @@ UICSAKeys enables CSA Keys in the UI.
 CCIP = false # Default
 ```
 CCIP enables the Cross Chain Interoperability Protocol
+
+### LegacyGasStation
+```toml
+LegacyGasStation = false # Default
+```
+LegacyGasStation is an experimental feature that enables meta-transactions for token transfers
 
 ## Database
 ```toml

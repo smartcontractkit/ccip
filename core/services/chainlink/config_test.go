@@ -239,10 +239,11 @@ func TestConfig_Marshal(t *testing.T) {
 	}
 
 	full.Feature = config.Feature{
-		FeedsManager: ptr(true),
-		LogPoller:    ptr(true),
-		UICSAKeys:    ptr(true),
-		CCIP:         ptr(true),
+		FeedsManager:     ptr(true),
+		LogPoller:        ptr(true),
+		UICSAKeys:        ptr(true),
+		CCIP:             ptr(true),
+		LegacyGasStation: ptr(true),
 	}
 	full.Database = config.Database{
 		DefaultIdleInTxSessionTimeout: models.MustNewDuration(time.Minute),
@@ -646,6 +647,7 @@ FeedsManager = true
 LogPoller = true
 UICSAKeys = true
 CCIP = true
+LegacyGasStation = true
 `},
 		{"Database", Config{Core: config.Core{Database: full.Database}}, `[Database]
 DefaultIdleInTxSessionTimeout = '1m0s'

@@ -279,6 +279,10 @@ func (g *generalConfig) FeatureCCIP() bool {
 	return *g.c.Feature.CCIP
 }
 
+func (g *generalConfig) FeatureLegacyGasStation() bool {
+	return *g.c.Feature.LegacyGasStation
+}
+
 func (g *generalConfig) FeatureUICSAKeys() bool {
 	return *g.c.Feature.UICSAKeys
 }

@@ -1580,6 +1580,20 @@ func (_m *ChainScopedConfig) FeatureFeedsManager() bool {
 	return r0
 }
 
+// FeatureLegacyGasStation provides a mock function with given fields:
+func (_m *ChainScopedConfig) FeatureLegacyGasStation() bool {
+	ret := _m.Called()
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
 // FeatureLogPoller provides a mock function with given fields:
 func (_m *ChainScopedConfig) FeatureLogPoller() bool {
 	ret := _m.Called()

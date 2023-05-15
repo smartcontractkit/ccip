@@ -27,6 +27,7 @@ func TestTOMLGeneralConfig_Defaults(t *testing.T) {
 	assert.False(t, config.StarkNetEnabled())
 	assert.Equal(t, false, config.FeatureExternalInitiators())
 	assert.Equal(t, 15*time.Minute, config.SessionTimeout().Duration())
+	assert.Equal(t, false, config.FeatureLegacyGasStation())
 }
 
 func TestTOMLGeneralConfig_InsecureConfig(t *testing.T) {

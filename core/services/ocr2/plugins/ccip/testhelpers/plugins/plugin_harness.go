@@ -200,6 +200,7 @@ func (th *CCIPPluginTestHarness) GenerateAndSendMessageBatch(t *testing.T, nMess
 
 	th.Source.Chain.Commit()
 	startBlock := th.Source.Chain.Blockchain().CurrentBlock().Number
+	var lastFlush int
 	for i := 0; i < nMessages; i++ {
 		routerMsg := router.ClientEVM2AnyMessage{
 			Receiver:     testhelpers.MustEncodeAddress(t, th.Dest.Receivers[0].Receiver.Address()),
@@ -210,6 +211,11 @@ func (th *CCIPPluginTestHarness) GenerateAndSendMessageBatch(t *testing.T, nMess
 		}
 		_, err := th.Source.Router.CcipSend(th.Source.User, th.Dest.ChainID, routerMsg)
 		require.NoError(t, err)
+		lastFlush++
+		if lastFlush*payloadSize > 700_000 {
+			th.CommitAndPollLogs(t)
+			lastFlush = 0
+		}
 	}
 	th.CommitAndPollLogs(t)
 
