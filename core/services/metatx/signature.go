@@ -17,6 +17,7 @@ import (
 
 const (
 	BankERC20TokenName    = "BankERC20"
+	BankERC20TokenSymbol  = "BANK"
 	BankERC20TokenVersion = "v1"
 )
 
@@ -25,9 +26,10 @@ var TypeHash = crypto.Keccak256([]byte("ForwardRequest(address from,address targ
 func SignMetaTransfer(
 	forwarder forwarder_wrapper.Forwarder,
 	ownerPrivateKey *ecdsa.PrivateKey,
-	owner, sourceTokenAddress, to common.Address,
+	owner, sourceTokenAddress common.Address,
 	calldataHash [32]byte,
 	deadline *big.Int,
+	tokenName, tokenVersion string,
 ) (signature []byte, domainSeparatorHash [32]byte, typeHash [32]byte, nonce *big.Int, err error) {
 	genericParams, err := forwarder.GENERICPARAMS(nil)
 	if err != nil {
@@ -48,7 +50,7 @@ func SignMetaTransfer(
 		panic(err)
 	}
 
-	domainSeparator, err := forwarder.GetDomainSeparator(nil, BankERC20TokenName, BankERC20TokenVersion)
+	domainSeparator, err := forwarder.GetDomainSeparator(nil, tokenName, tokenVersion)
 	if err != nil {
 		return nil, [32]byte{}, [32]byte{}, nil, errors.Wrap(err, "failed to get domain separator from contract")
 	}

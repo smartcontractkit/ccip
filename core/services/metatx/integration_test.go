@@ -6,17 +6,14 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/require"
@@ -24,12 +21,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/bank_erc20"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
 	forwarder_wrapper "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/forwarder"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/lock_release_token_pool"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/wrapped_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/cltest"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ethkey"
@@ -81,15 +73,18 @@ func TestMetaERC20SameChain(t *testing.T) {
 
 		deadline := big.NewInt(int64(chain.Blockchain().CurrentHeader().Time + uint64(time.Hour)))
 
-		calldata, calldataHash := generateMetaTransferCalldata(t, holder2.From, amount, chainID)
+		calldata, calldataHash, err := metatx.GenerateMetaTransferCalldata(holder2.From, amount, chainID)
+		require.NoError(t, err)
 
 		signature, domainSeparatorHash, typeHash, forwarderNonce, err := metatx.SignMetaTransfer(*forwarder,
 			holder1Key.ToEcdsaPrivKey(),
 			holder1.From,
 			tokenAddress,
-			holder2.From,
 			calldataHash,
-			deadline)
+			deadline,
+			metatx.BankERC20TokenName,
+			metatx.BankERC20TokenVersion,
+		)
 		require.NoError(t, err)
 
 		forwardRequest := forwarder_wrapper.IForwarderForwardRequest{
@@ -141,107 +136,8 @@ func TestMetaERC20CrossChain(t *testing.T) {
 	totalTokens := big.NewInt(1e9)
 	sourceTokenAddress, sourceToken := setUpBankERC20(t, ccipContracts.Source.User, ccipContracts.Source.Chain, forwarderAddress, ccipContracts.Source.Router.Address(), ccipFeeProvider.From, totalTokens, testhelpers.SourceChainID)
 
-	wrappedDestTokenPoolAddress, _, wrappedDestTokenPool, err := wrapped_token_pool.DeployWrappedTokenPool(ccipContracts.Dest.User, ccipContracts.Dest.Chain, "WrappedBankToken", "WBANK", 18, wrapped_token_pool.RateLimiterConfig{
-		Capacity:  testhelpers.HundredLink,
-		Rate:      big.NewInt(1e18),
-		IsEnabled: true,
-	})
+	sourcePoolAddress, wrappedDestTokenPoolAddress, _, wrappedDestTokenPool, err := ccipContracts.SetupLockAndMintTokenPool(sourceTokenAddress, "WrappedBankToken", "WBANK")
 	require.NoError(t, err)
-	ccipContracts.Source.Chain.Commit()
-
-	sourcePoolAddress, _, sourcePool, err := lock_release_token_pool.DeployLockReleaseTokenPool(ccipContracts.Source.User, ccipContracts.Source.Chain, sourceTokenAddress, lock_release_token_pool.RateLimiterConfig{
-		Capacity:  testhelpers.HundredLink,
-		Rate:      big.NewInt(1e18),
-		IsEnabled: true,
-	})
-	require.NoError(t, err)
-	ccipContracts.Source.Chain.Commit()
-
-	// set onRamp as valid caller for source pool
-	_, err = sourcePool.ApplyRampUpdates(ccipContracts.Source.User, []lock_release_token_pool.TokenPoolRampUpdate{
-		{
-			Ramp:    ccipContracts.Source.OnRamp.Address(),
-			Allowed: true,
-		},
-	}, nil)
-	require.NoError(t, err)
-	ccipContracts.Source.Chain.Commit()
-
-	_, err = wrappedDestTokenPool.ApplyRampUpdates(ccipContracts.Dest.User, nil, []wrapped_token_pool.TokenPoolRampUpdate{
-		{
-			Ramp:    ccipContracts.Dest.OffRamp.Address(),
-			Allowed: true,
-		},
-	})
-	require.NoError(t, err)
-	ccipContracts.Dest.Chain.Commit()
-
-	wrappedNativeAddress, err := ccipContracts.Source.Router.GetWrappedNative(nil)
-	require.NoError(t, err)
-
-	// native token is used as fee token
-	_, err = ccipContracts.Source.PriceRegistry.UpdatePrices(ccipContracts.Source.User, price_registry.InternalPriceUpdates{
-		TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
-			{
-				SourceToken: wrappedNativeAddress,
-				UsdPerToken: big.NewInt(1e18), // 1usd
-			},
-		},
-		DestChainSelector: ccipContracts.Dest.ChainID,
-		UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9,
-	})
-	require.NoError(t, err)
-	ccipContracts.Source.Chain.Commit()
-	_, err = ccipContracts.Source.PriceRegistry.ApplyFeeTokensUpdates(ccipContracts.Source.User, []common.Address{wrappedNativeAddress}, nil)
-	require.NoError(t, err)
-	ccipContracts.Source.Chain.Commit()
-
-	// add new token pool created above
-	_, err = ccipContracts.Source.OnRamp.ApplyPoolUpdates(ccipContracts.Source.User, nil, []evm_2_evm_onramp.InternalPoolUpdate{
-		{
-			Token: sourceTokenAddress,
-			Pool:  sourcePoolAddress,
-		},
-	})
-	require.NoError(t, err)
-	ccipContracts.Source.Chain.Commit()
-
-	// set token limit
-	_, err = ccipContracts.Source.PriceRegistry.UpdatePrices(ccipContracts.Source.User, price_registry.InternalPriceUpdates{
-		TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
-			{
-				SourceToken: sourceTokenAddress,
-				UsdPerToken: big.NewInt(5),
-			},
-		},
-		DestChainSelector: 0,
-		UsdPerUnitGas:     big.NewInt(0),
-	})
-	require.NoError(t, err)
-	ccipContracts.Source.Chain.Commit()
-
-	_, err = ccipContracts.Dest.OffRamp.ApplyPoolUpdates(ccipContracts.Dest.User, nil, []evm_2_evm_offramp.InternalPoolUpdate{
-		{
-			Token: sourceTokenAddress,
-			Pool:  wrappedDestTokenPoolAddress,
-		},
-	})
-	require.NoError(t, err)
-	ccipContracts.Dest.Chain.Commit()
-
-	// set token limit
-	_, err = ccipContracts.Dest.PriceRegistry.UpdatePrices(ccipContracts.Dest.User, price_registry.InternalPriceUpdates{
-		TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
-			{
-				SourceToken: wrappedDestTokenPoolAddress,
-				UsdPerToken: big.NewInt(5),
-			},
-		},
-		DestChainSelector: 0,
-		UsdPerUnitGas:     big.NewInt(0),
-	})
-	require.NoError(t, err)
-	ccipContracts.Dest.Chain.Commit()
 
 	amount := assets.Ether(1).ToInt()
 	transferNative(t, ccipContracts.Source.User, sourceTokenAddress, 50_000, amount, ccipContracts.Source.Chain)
@@ -294,16 +190,19 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 
 		deadline := big.NewInt(int64(ccipContracts.Source.Chain.Blockchain().CurrentHeader().Time + uint64(time.Hour)))
 
-		calldata, calldataHash := generateMetaTransferCalldata(t, holder2.From, amount, ccipContracts.Dest.ChainID)
+		calldata, calldataHash, err := metatx.GenerateMetaTransferCalldata(holder2.From, amount, ccipContracts.Dest.ChainID)
+		require.NoError(t, err)
 
 		signature, domainSeparatorHash, typeHash, forwarderNonce, err := metatx.SignMetaTransfer(
 			*forwarder,
 			holder1Key.ToEcdsaPrivKey(),
 			holder1.From,
 			sourceTokenAddress,
-			holder2.From,
 			calldataHash,
-			deadline)
+			deadline,
+			metatx.BankERC20TokenName,
+			metatx.BankERC20TokenVersion,
+		)
 		require.NoError(t, err)
 
 		forwardRequest := forwarder_wrapper.IForwarderForwardRequest{
@@ -364,45 +263,6 @@ func setUpForwarder(t *testing.T, owner *bind.TransactOpts, chain *backends.Simu
 	chain.Commit()
 
 	return forwarderAddress, forwarder
-}
-
-func generateMetaTransferCalldata(t *testing.T, receiver common.Address, amount *big.Int, chainID uint64) ([]byte, [32]byte) {
-	calldataDefinition := `
-	[
-		{
-			"inputs": [{
-				"internalType": "address",
-				"name": "receiver",
-				"type": "address"
-			}, {
-				"internalType": "uint256",
-				"name": "amount",
-				"type": "uint256"
-			}, {
-				"internalType": "uint64",
-				"name": "destinationChainSelector",
-				"type": "uint64"
-			}],
-			"name": "metaTransfer",
-			"outputs": [],
-			"stateMutability": "nonpayable",
-			"type": "function"
-		}
-	]
-	`
-
-	calldataAbi, err := abi.JSON(strings.NewReader(calldataDefinition))
-	require.NoError(t, err)
-
-	calldata, err := calldataAbi.Pack("metaTransfer", receiver, amount, chainID)
-	require.NoError(t, err)
-
-	calldataHashRaw := crypto.Keccak256(calldata)
-
-	var calldataHash [32]byte
-	copy(calldataHash[:], calldataHashRaw[:])
-
-	return calldata, calldataHash
 }
 
 func generateKeyAndTransactor(t *testing.T, chainID uint64) (key ethkey.KeyV2, transactor *bind.TransactOpts) {

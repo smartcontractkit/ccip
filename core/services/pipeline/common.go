@@ -29,17 +29,19 @@ import (
 )
 
 const (
-	CronJobType               string = "cron"
-	DirectRequestJobType      string = "directrequest"
-	FluxMonitorJobType        string = "fluxmonitor"
-	OffchainReportingJobType  string = "offchainreporting"
-	OffchainReporting2JobType string = "offchainreporting2"
-	KeeperJobType             string = "keeper"
-	VRFJobType                string = "vrf"
-	BlockhashStoreJobType     string = "blockhashstore"
-	BlockHeaderFeederJobType  string = "blockheaderfeeder"
-	WebhookJobType            string = "webhook"
-	BootstrapJobType          string = "bootstrap"
+	CronJobType                    string = "cron"
+	DirectRequestJobType           string = "directrequest"
+	FluxMonitorJobType             string = "fluxmonitor"
+	OffchainReportingJobType       string = "offchainreporting"
+	OffchainReporting2JobType      string = "offchainreporting2"
+	KeeperJobType                  string = "keeper"
+	VRFJobType                     string = "vrf"
+	BlockhashStoreJobType          string = "blockhashstore"
+	BlockHeaderFeederJobType       string = "blockheaderfeeder"
+	WebhookJobType                 string = "webhook"
+	BootstrapJobType               string = "bootstrap"
+	LegacyGasStationServerJobType  string = "legacygasstationserver"
+	LegacyGasStationSidecarJobType string = "legacygasstationsidecar"
 )
 
 //go:generate mockery --quiet --name Config --output ./mocks/ --case=underscore
