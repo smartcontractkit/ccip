@@ -1677,6 +1677,10 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		SourceStartBlock: lane.Source.SrcStartBlock,
 		DestStartBlock:   currentBlockOnDest,
 	}
+	if newBootstrap {
+		CreateBootstrapJob(jobParams, bootstrapCommit, bootstrapExec)
+	}
+
 	bootstrapCommitP2PId := bootstrapCommit.KeysBundle.P2PKeys.Data[0].Attributes.PeerID
 	var bootstrapExecP2PId string
 	var p2pBootstrappersExec, p2pBootstrappersCommit *client.P2PData
@@ -1696,10 +1700,6 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	}
 
 	jobParams.P2PV2Bootstrappers = []string{p2pBootstrappersCommit.P2PV2Bootstrapper()}
-
-	if newBootstrap {
-		CreateBootstrapJob(jobParams, bootstrapCommit, bootstrapExec)
-	}
 
 	// set up ocr2 config
 	err = SetOCR2Configs(commitNodes, execNodes, *lane.Dest)
