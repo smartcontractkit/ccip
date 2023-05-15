@@ -175,10 +175,10 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 	r.inflightReports.expire(lggr)
 	inFlight := r.inflightReports.getAll()
 
-	batchBuilderStart := time.Now()
+	observationBuildStart := time.Now()
 	// IMPORTANT: We build executable set based on the leaders token prices, ensuring consistency across followers.
-	executableObservations, err := r.getExecutableObservations(ctx, inFlight)
-	lggr.Infof("Batch building took %d ms", time.Since(batchBuilderStart).Milliseconds())
+	executableObservations, err := r.getExecutableObservations(ctx, timestamp, inFlight)
+	measureObservationBuildDuration(timestamp, time.Since(observationBuildStart))
 	if err != nil {
 		return nil, err
 	}
@@ -188,7 +188,7 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 	return ExecutionObservation{Messages: executableObservations}.Marshal()
 }
 
-func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context, inflight []InflightInternalExecutionReport) ([]ObservedMessage, error) {
+func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context, timestamp types.ReportTimestamp, inflight []InflightInternalExecutionReport) ([]ObservedMessage, error) {
 	unexpiredReports, err := getUnexpiredCommitReports(r.config.destLP, r.config.commitStore, r.onchainConfig.PermissionLessExecutionThresholdDuration())
 	if err != nil {
 		return nil, err
@@ -198,6 +198,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 		return []ObservedMessage{}, nil
 	}
 
+	rpcPreprationStart := time.Now()
 	// This could result in slightly different values on each call as
 	// the function returns the allowed amount at the time of the last block.
 	// Since this will only increase over time, the highest observed value will
@@ -237,9 +238,14 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 	if destGasPriceWei.DynamicFeeCap != nil {
 		destGasPrice = destGasPriceWei.DynamicFeeCap.ToInt()
 	}
+	measureBatchPrepareRPCDuration(timestamp, time.Since(rpcPreprationStart))
 
 	r.lggr.Debugw("processing unexpired reports", "n", len(unexpiredReports))
-
+	measureNumberOfReportsProcessed(timestamp, len(unexpiredReports))
+	reportIterationStart := time.Now()
+	defer func() {
+		measureReportsIterationDuration(timestamp, time.Since(reportIterationStart))
+	}()
 	for _, unexpiredReport := range unexpiredReports {
 		if ctx.Err() != nil {
 			r.lggr.Warn("killed by context")
@@ -282,8 +288,10 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 
 		r.lggr.Debugw("building next batch", "executedMp", len(executedMp))
 
+		buildBatchDuration := time.Now()
 		batch, allMessagesExecuted := r.buildBatch(srcLogs, executedMp, inflight, allowedTokenAmount,
 			srcTokensPrices, destTokensPrices, destGasPrice)
+		measureBatchBuildDuration(timestamp, time.Since(buildBatchDuration))
 
 		// If all messages are already executed, snooze the root for the config.PermissionLessExecutionThresholdSeconds
 		// so it will never be considered again.
