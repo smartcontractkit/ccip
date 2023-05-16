@@ -111,7 +111,7 @@ func (client *CCIPClient) setAllowList(t *testing.T) {
 		client.setAllowListEnabled(t)
 	}
 
-	tx, err := client.Source.OnRamp.ApplyAllowListUpdates(client.Source.Owner, client.Source.AllowList, nil)
+	tx, err := client.Source.OnRamp.ApplyAllowListUpdates(client.Source.Owner, nil, client.Source.AllowList)
 	shared.RequireNoError(t, err)
 	err = shared.WaitForMined(client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 	shared.RequireNoError(t, err)
