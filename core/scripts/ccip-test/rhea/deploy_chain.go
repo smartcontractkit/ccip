@@ -73,6 +73,10 @@ func DeployTokenPools(client *EvmDeploymentConfig) error {
 }
 
 func deployPool(client *EvmDeploymentConfig, tokenName Token, tokenConfig EVMBridgedToken) error {
+	if tokenConfig.TokenPoolType == FeeTokenOnly {
+		client.Logger.Infof("Skipping pool deployment for fee only token")
+		return nil
+	}
 	// Only deploy a new pool if there is no current pool address given
 	// and the deploySetting indicate a new pool should be deployed.
 	if client.ChainConfig.DeploySettings.DeployTokenPools && tokenConfig.Pool == common.HexToAddress("") {

@@ -19,6 +19,9 @@ import (
 
 func setOffRampOnTokenPools(t *testing.T, destClient *EvmDeploymentConfig) {
 	for _, tokenConfig := range destClient.ChainConfig.SupportedTokens {
+		if tokenConfig.TokenPoolType == FeeTokenOnly {
+			continue
+		}
 		pool, err := lock_release_token_pool.NewLockReleaseTokenPool(tokenConfig.Pool, destClient.Client)
 		shared.RequireNoError(t, err)
 
@@ -75,6 +78,9 @@ func setOnRampOnRouter(t *testing.T, sourceClient *EvmDeploymentConfig, destChai
 
 func setOnRampOnTokenPools(t *testing.T, sourceClient *EvmDeploymentConfig) {
 	for _, tokenConfig := range sourceClient.ChainConfig.SupportedTokens {
+		if tokenConfig.TokenPoolType == FeeTokenOnly {
+			continue
+		}
 		pool, err := lock_release_token_pool.NewLockReleaseTokenPool(tokenConfig.Pool, sourceClient.Client)
 		shared.RequireNoError(t, err)
 

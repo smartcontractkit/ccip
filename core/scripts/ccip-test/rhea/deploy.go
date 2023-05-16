@@ -104,7 +104,11 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainSelector u
 	var tokensAndPools []evm_2_evm_onramp.EVM2EVMOnRampTokenAndPool
 	var tokenTransferFeeConfig []evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs
 	for token, tokenConfig := range client.ChainConfig.SupportedTokens {
-		if _, ok := destSupportedTokens[token]; !ok {
+		// Don't add tokens that are only configured for paying fees
+		if tokenConfig.TokenPoolType == FeeTokenOnly {
+			continue
+		}
+		if destToken, ok := destSupportedTokens[token]; !ok || destToken.TokenPoolType == FeeTokenOnly {
 			// If the token is not supported on the destination chain we
 			// should not enable it for this ramp. If we enable the token,
 			// txs could be sent but not executed, keeping the tokens in limbo.
@@ -189,7 +193,7 @@ func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainSelecto
 	var syncedDestPools []common.Address
 
 	for tokenName, tokenConfig := range sourceTokens {
-		if _, ok := client.ChainConfig.SupportedTokens[tokenName]; ok {
+		if sourceToken, ok := client.ChainConfig.SupportedTokens[tokenName]; ok && sourceToken.TokenPoolType != FeeTokenOnly {
 			syncedSourceTokens = append(syncedSourceTokens, tokenConfig.Token)
 			syncedDestPools = append(syncedDestPools, client.ChainConfig.SupportedTokens[tokenName].Pool)
 		} else {
