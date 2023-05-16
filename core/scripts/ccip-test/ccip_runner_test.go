@@ -62,7 +62,7 @@ func TestCCIP(t *testing.T) {
 	// first character of the given seed with the digits 0-9
 	seedKey := os.Getenv("SEED_KEY")
 	if seedKey == "" {
-		t.Error("must set seed key")
+		seedKey = ownerKey
 	}
 
 	// Configures a client to run tests with using the network defaults and given keys.
